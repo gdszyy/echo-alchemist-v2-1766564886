@@ -615,32 +615,19 @@
         .recipe-card.queue { opacity: 0.5; transform: scale(0.95); }
         */
         /* 战斗阶段 HUD 浮动容器 */
-        /* 战斗阶段 HUD 浮动容器 */
         .recipe-hud-floating {
-            position: absolute;
-            
-            /* 1. 垂直定位：底部与炮台基座(bottom:80px)视觉平齐 */
-            bottom: 80px; 
-            
-            /* 2. 水平定位：屏幕中心 */
-            left: 50%;
-            /* 向左偏移：将容器移动到炮台左侧 (数值可微调，-220px 比较合适) */
-            transform: translateX(-220px); 
-            
-            width: 140px;
-            display: flex;
-            
-            /* 3. 核心：反向排列，让第一个元素(当前弹药)沉在最下面 */
-            flex-direction: column-reverse; 
-            
-            gap: 6px; 
-            pointer-events: none;
-            z-index: 40;
-            
-            /* 4. 靠右对齐 (靠向炮台一侧) */
-            align-items: flex-end; 
-        }
-
+        position: absolute;
+        bottom: 80px;
+        left: 10px; /* 改为固定左边距，不再使用 50% 偏移 */
+        transform: none; /* 移除 translateX */
+        width: 140px;
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 6px;
+        pointer-events: none;
+        z-index: 40;
+        align-items: flex-start; /* 改为向左对齐 */
+    }
         /* 當前彈藥卡片 */
         .recipe-card.current {
             background: rgba(30, 41, 59, 0.95);
@@ -1142,6 +1129,8 @@
 const CONFIG = {
     /** 颜色配置 (保持不变) */
     colors: {
+        resonance: '#f59e0b', // 琥珀色
+        resonanceRipple: '#99DFBA', // 青色波纹
         laser: '#0ea5e9', // 天蓝色.
         wheelPointer:'#ef4444',
         slotWheel:'rgba(230, 221, 155,0.42)',
@@ -1275,7 +1264,8 @@ const CONFIG = {
         // 特殊系 (初始鎖定)
         redStripe: 1, 
         rainbow: 0, 
-        matryoshka: 0
+        matryoshka: 0,
+        resonance: 0,
     },
     /** 视觉表现配置 (新增) */
     visuals: {
@@ -1324,7 +1314,7 @@ const RELIC_DB = [
         rarity: 'rare', 
         effect: 'row_count_up' ,maxStacks: 1
     },
-
+    { id: 'stars_shines', name: '群星闪烁', icon: '✨', desc: '解鎖 [回响弹珠]：双倍获得连击充能。', rarity: 'rare', unlocks: 'resonance', boost: 8 ,maxStacks: 1},
     { id: 'optical_lens', name: '聚焦透鏡', icon: '🔭', desc: '解鎖 [光球]：發射瞬間穿透的折射光束。', rarity: 'legendary', unlocks: 'laser', boost: 10 ,maxStacks: 1},
     //  1. 粉色钉子遗物
     { id: 'pink_slime', name: '粉紅凝膠', icon: '💗', desc: '收集階段：出現 3 個高彈性粉色釘子 (可疊加)。', rarity: 'common', effect: 'pink_peg_up' ,maxStacks: 1},
@@ -2331,6 +2321,7 @@ class MarbleDefinition {
 
     getName() {
         if (this.type === 'white') return '純淨彈珠';
+        if (this.type === 'resonance') return '共鳴彈珠';
         if (this.type === 'redStripe') return '爆破彈珠';
         if (this.type === 'laser') return '光球';
         if (this.type === 'rainbow') return '七彩稜鏡';
@@ -2344,6 +2335,7 @@ class MarbleDefinition {
 
     getColor() {
         if (this.type === 'white') return CONFIG.colors.marbleWhite;
+        if (this.type === 'resonance') return CONFIG.colors.resonance;
         if (this.type === 'redStripe') return CONFIG.colors.marbleRedStripe;
         if (this.type === 'rainbow') return CONFIG.colors.marbleRainbow;
         if (this.type === 'matryoshka') return CONFIG.colors.matMatryoshka; // 
@@ -3251,17 +3243,25 @@ class DropBall {
                         peg.hit(impactSpeedVal);
                         this.hitCount++; 
                         // 如果是普通钉子 (normal)，触发两次能量球反馈
-if (peg.type === 'normal') {
-    game.createHitFeedback(this.pos.x, this.pos.y, impactVel, 'normal');
-    // 稍微延迟或偏移第二个球，视觉效果更好
-    if (Math.random() < CONFIG.balance.normalPegSecondEnergChancey){
-        game.createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.65), 'normal');
-    }
-    
-} else {
-    // 其他特殊钉子保持原本的一次反馈
-    game.createHitFeedback(this.pos.x, this.pos.y, impactVel, peg.type);
-}
+                        game.createHitFeedback(this.pos.x, this.pos.y, impactVel, peg.type);
+
+                        if (peg.type === 'normal' && Math.random() < CONFIG.balance.normalPegSecondEnergChancey) {
+                            game.createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.65), 'normal');
+                        }
+
+                        if (this.def.type === 'resonance') {
+                            if (Math.random() < CONFIG.balance.normalPegSecondEnergChancey){
+                                game.createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.21+0.42*Math.random()), 'resonance');
+                            }
+                            if (Math.random() < CONFIG.balance.normalPegSecondEnergChancey){
+                                game.createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(-0.21-0.72*Math.random()), 'resonance');
+                            }
+                            
+                        }
+
+
+
+
                         if (this.session.currentHits >= this.session.nextTriggerThreshold) {
                             this.session.currentHits = 0;
                             this.session.multicast++;
@@ -3535,6 +3535,35 @@ if (peg.type === 'normal') {
                  ctx.fillStyle = heatGrad;
                  ctx.beginPath(); ctx.arc(0, 0, r * heatSize, 0, Math.PI*2); ctx.fill();
 
+            }else if (this.def.type === 'resonance') {
+                const pulse = (Math.sin(this.lifeTime * 0.2) + 1) / 2; // 呼吸节奏
+                
+                // 1. 绘制外部波纹 (Ripple)
+                ctx.strokeStyle = CONFIG.colors.resonanceRipple;
+                ctx.lineWidth = 1.5;
+                ctx.globalAlpha = 0.6 - pulse * 0.3;
+                ctx.beginPath();
+                // 波纹从小变大
+                ctx.arc(0, 0, r * (1.0 + pulse * 0.4), 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // 2. 绘制核心 (Core)
+                const grad = ctx.createRadialGradient(-r*0.3, -r*0.3, 0, 0, 0, r);
+                grad.addColorStop(0, '#fcd34d'); // 亮黄
+                grad.addColorStop(1, '#b45309'); // 深琥珀
+                ctx.fillStyle = grad;
+                ctx.globalAlpha = 1.0;
+                ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+
+                // 3. 内部符号 (类似 wifi 信号或音叉)
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, r*0.5, -Math.PI/4, Math.PI/4); // 右括号
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(0, 0, r*0.5, Math.PI*0.75, Math.PI*1.25); // 左括号
+                ctx.stroke();
             } else {
                  // ... (其他普通/彩虹/套娃弹珠逻辑保持不变) ...
                  let baseLight = '#f8fafc';
@@ -3734,7 +3763,7 @@ class Enemy {
         this.scanFeedbackTimer = 0;
     }
     
-    update(timeScale) {
+    update(timeScale, gameInstance) {
         if (!this.active) return;
 
         // --- [新增] 预警状态更新 ---
@@ -7464,8 +7493,7 @@ class Game {
                     }
                 });
             }
-            // const activeCount = this.enemies.filter(e => e.active && (e.dropTargetY > 0 || e.pos.y > 0)).length;
-            const activeCount = this.enemies.filter(e => e.active && e.pos.y > 0).length;
+            const activeCount = this.enemies.filter(e => e.active && (e.pos.y > 0)).length;
             if(activeCount === 0) {
                 console.log(">>> [LOG] 全场敌人已清除。正在清理子弹...");
                 this.clearProjectiles(); 
@@ -7688,7 +7716,6 @@ class Game {
         
         // D. 战斗 HUD (右侧小卡片)
         // 再次确保它在非战斗阶段隐藏 (虽然 renderRecipeHUD 也会处理)
-        // D. 战斗 HUD (左侧小卡片)
         const combatHud = document.getElementById('recipe-hud-container');
         if (combatHud) {
             if (this.phase === 'combat') {
@@ -7697,7 +7724,6 @@ class Game {
                 combatHud.classList.add('hidden');
             }
         }
-
         // E. 确保 HTML 结构中的弹药槽 (.ammo-stage) 不会泄露
         // 如果你的 current/next 弹药槽是独立元素且有 ID，可以在这里加类似的隐藏逻辑
         // 例如：
@@ -7979,6 +8005,7 @@ class Game {
             redStripe: () => new MarbleDefinition('redStripe'),
             rainbow: () => new MarbleDefinition('rainbow'),
             matryoshka: () => new MarbleDefinition('matryoshka'),
+            resonance: () => new MarbleDefinition('resonance'),
             // 剩下的都是 colored 類型，但 subtype 不同
             bounce: () => new MarbleDefinition('colored', 'bounce'),
             pierce: () => new MarbleDefinition('colored', 'pierce'),
@@ -7986,6 +8013,7 @@ class Game {
             damage: () => new MarbleDefinition('colored', 'damage'),
             cryo: () => new MarbleDefinition('colored', 'cryo'),
             pyro: () => new MarbleDefinition('colored', 'pyro')
+
         };
 
         for(let i=0; i < CONFIG.gameplay.selectionCount; i++) {
@@ -8114,92 +8142,81 @@ class Game {
      * @description 渲染配方 HUD (严格单例渲染)
      */
     renderRecipeHUD() {
+        // 获取两个容器
         const gatheringHud = document.getElementById('gathering-hud-mount'); 
         const combatHud = document.getElementById('recipe-hud-container');
         
-        if (!combatHud) return;
-
         // --- 战斗阶段 ---
         if (this.phase === 'combat') { 
-            // 1. 确保收集阶段的容器清空
+            // 1. 确保收集阶段的容器为空 (尽管 updateUI 已经隐藏了它的父级，清空更保险)
             if (gatheringHud) gatheringHud.innerHTML = '';
 
-            // 2. 显示容器：强制移除 hidden 并确保应用悬浮样式
-            combatHud.classList.remove('hidden'); 
-            combatHud.classList.add('recipe-hud-floating'); 
-            combatHud.innerHTML = '';
+            // 2. 渲染战斗悬浮 HUD
+            if (combatHud) {
+                combatHud.classList.remove('hidden'); 
+                combatHud.classList.add('recipe-hud-floating'); 
+                combatHud.innerHTML = '';
+                
+                const previewLimit = 4;
+                this.ammoQueue.slice(0, previewLimit).forEach((recipe, idx) => {
+                    const isCurrent = (idx === 0);
+                    const card = document.createElement('div');
+                    card.className = `recipe-card ${isCurrent ? 'current' : 'queue'} mb-1 transition-all duration-300`;
+                    
+                    // --- 渲染 Header ---
+                    const header = document.createElement('div');
+                    header.className = 'flex justify-between items-center border-b border-white/10 pb-1 mb-1';
+                    let nameStr = '普通魔藥';
+                    if (recipe.explosive) nameStr = '爆破魔藥';
+                    else if (recipe.isLaser) nameStr = '光束魔藥';
+                    else if (recipe.isMatryoshka) nameStr = '套娃魔藥';
+                    header.innerHTML = `<span class="font-bold text-amber-400 text-[11px]">${nameStr}</span><span class="text-[10px] text-slate-300 bg-slate-700/50 px-1 rounded">DMG ${recipe.damage || 0}</span>`;
+                    
+                    // --- 渲染 Grid ---
+                    const grid = document.createElement('div');
+                    grid.className = 'grid grid-cols-4 gap-0.5 text-[9px] leading-tight';
+                    // ... (复制你原有的 stats 遍历逻辑) ...
+                    const stats = [
+                        { k: 'bounce', i: '⤴️' }, { k: 'pierce', i: '↗️' },
+                        { k: 'scatter', i: '🔱' }, { k: 'multicast', i: '🔗' }, // 
+                        { k: 'cryo', i: '❄️' }, { k: 'pyro', i: '🔥' },
+                        { k: 'lightning', i: '⚡' }, { k: 'laser', i: '🔦' }
+                    ];
+                    let hasStats = false;
+                    stats.forEach(s => {
+                        const val = recipe[s.k];
+                        if (val > 0) {
+                            hasStats = true;
+                            const tag = document.createElement('div');
+                            tag.innerHTML = `${s.i}<span class="text-white ml-px">${val}</span>`;
+                            grid.appendChild(tag);
+                        }
+                    });
+                    if (!hasStats) grid.innerHTML = '<span class="col-span-4 text-slate-500 italic text-center">基础属性</span>';
+
+                    card.appendChild(header); // 挂载标题
+                    card.appendChild(grid);   // 必须添加这一行，否则图标不显示！
+                    if (isCurrent) {
+                        const indicator = document.createElement('div');
+                        indicator.className = 'absolute -left-2 top-1/2 -translate-y-1/2 w-1 h-8 bg-amber-400 rounded-full shadow-[0_0_8px_#fbbf24]';
+                        card.appendChild(indicator);
+                    }
+                    combatHud.appendChild(card);
+                });
+            }
+        } 
+        else { 
+            // --- 收集阶段 ---
             
-            // 如果没有弹药，显示一个简单的提示，防止左侧看起来像由于 Bug 变空了
-            if (this.ammoQueue.length === 0) {
-                const emptyTip = document.createElement('div');
-                emptyTip.className = 'text-[10px] text-slate-500 italic bg-slate-900/50 p-2 rounded border border-slate-700';
-                emptyTip.innerText = '彈藥庫空';
-                combatHud.appendChild(emptyTip);
-                return;
+            // 1. 隐藏战斗 HUD
+            if (combatHud) {
+                combatHud.classList.add('hidden'); 
+                combatHud.classList.remove('recipe-hud-floating'); 
+                combatHud.innerHTML = '';
             }
 
-            const previewLimit = 4; // 最多显示 4 发预览
-            this.ammoQueue.slice(0, previewLimit).forEach((recipe, idx) => {
-                const isCurrent = (idx === 0);
-                const card = document.createElement('div');
-                // 确保 card 包含 transition 动画
-                card.className = `recipe-card ${isCurrent ? 'current' : 'queue'} mb-1 transition-all duration-300`;
-                
-                // --- 渲染 Header ---
-                const header = document.createElement('div');
-                header.className = 'flex justify-between items-center border-b border-white/10 pb-1 mb-1';
-                let nameStr = '普通魔藥';
-                if (recipe.explosive) nameStr = '爆破魔藥';
-                else if (recipe.isLaser) nameStr = '光束魔藥';
-                else if (recipe.isMatryoshka) nameStr = '套娃魔藥';
-                
-                header.innerHTML = `
-                    <span class="font-bold text-amber-400 text-[11px]">${nameStr}</span>
-                    <span class="text-[10px] text-slate-300 bg-slate-700/50 px-1 rounded">ATK ${recipe.damage || 0}</span>
-                `;
-                
-                // --- 渲染 属性网格 ---
-                const grid = document.createElement('div');
-                grid.className = 'grid grid-cols-4 gap-0.5 text-[9px] leading-tight';
-                const stats = [
-                    { k: 'bounce', i: '⤴️' }, { k: 'pierce', i: '↗️' },
-                    { k: 'scatter', i: '🔱' }, { k: 'multicast', i: '🔗' },
-                    { k: 'cryo', i: '❄️' }, { k: 'pyro', i: '🔥' },
-                    { k: 'lightning', i: '⚡' }, { k: 'laser', i: '🔦' }
-                ];
-                
-                let hasStats = false;
-                stats.forEach(s => {
-                    const val = recipe[s.k];
-                    if (val > 0) {
-                        hasStats = true;
-                        const tag = document.createElement('div');
-                        tag.innerHTML = `${s.i}<span class="text-white ml-px">${val}</span>`;
-                        grid.appendChild(tag);
-                    }
-                });
-                
-                if (!hasStats) {
-                    grid.innerHTML = '<span class="col-span-4 text-slate-500 italic">基礎屬性</span>';
-                }
-
-                card.appendChild(header);
-                card.appendChild(grid);
-
-                // 如果是当前弹药，左侧加一个黄色指示条
-                if (isCurrent) {
-                    const indicator = document.createElement('div');
-                    indicator.className = 'absolute -left-2 top-1/2 -translate-y-1/2 w-1 h-8 bg-amber-400 rounded-full shadow-[0_0_8px_#fbbf24]';
-                    card.appendChild(indicator);
-                }
-                
-                combatHud.appendChild(card);
-            });
-        } 
-        else if (this.phase === 'gathering') { 
-            // 收集阶段逻辑保持不变...
-            combatHud.classList.add('hidden'); 
-            if (gatheringHud) {
+            // 2. 渲染收集阶段横向滚动条
+            if (gatheringHud && this.phase === 'gathering') {
                 gatheringHud.innerHTML = ''; 
                 this.marbleQueue.forEach((item, idx) => { 
                     const isActive = idx === this.activeMarbleIndex; 
@@ -8510,14 +8527,14 @@ class Game {
         this.energyOrbs = [];
         this.switchPhase('combat'); 
         this.phase = 'combat';
-        
-
+        // --- [核心修复 1]：修复属性访问错误 ---
         if (!this.ammoQueue) {
             this.ammoQueue = [];
         }
-        this.updateUI();
 
+        // --- [核心修复 2]：UI 渲染 ---
         // 修复后，上面的代码不再报错，这一行将被正确执行，HUD 会在进入战斗时立即出现
+        this.updateUI();
         this.renderRecipeHUD(); 
 
         this.resetMultiplier(); 
@@ -9217,11 +9234,20 @@ class Game {
         // --- 以下保持之前的优化逻辑不变 ---
         
         let color = '#fbbf24'; 
-        if (type === 'cryo') color = '#67e8f9';
-        else if (type === 'pyro') color = '#f97316';
-        else if (type === 'lightning') color = '#d8b4fe';
-        else if (type === 'bounce') color = '#4ade80';
+        if (type === 'cryo') {
+            color = CONFIG.colors.cryo;
+        } else if (type == 'pyro') {
+            color = CONFIG.colors.pyro;
+        } else if (type == 'lightning') {
+            color = CONFIG.colors.lightning;
+        } else if (type == 'bounce') {
+            color = CONFIG.colors.bounce;
+        } else if (type == 'resonance') {
+            color = CONFIG.colors.resonanceRipple;
 
+        } else if (type == 'damage') {
+            color = CONFIG.colors.damage;
+        } 
         const initVel = velocity ? velocity : new Vec2((Math.random()-0.5)*5, -5);
 
         this.energyOrbs.push(new EnergyOrb(x, y, targetX, targetY, color, initVel, () => {
@@ -9925,14 +9951,14 @@ class Game {
                 if (e.active) {
                     e.update(this.timeScale, this);
                     e.draw(this.ctx);
-                    // if (e.dropTargetY > 0 || e.pos.y > 0) {
+                    // e.dropTargetY > 0 || 
                     if (e.pos.y > 0) {
                         activeEnemies++;
                     }
-                    
                     if (Math.abs(e.pos.y - e.dropTargetY) > 1) anyEnemyMoving = true;
                 }
             });
+
             if (this.checkDefeat()) this.gameOver = true;
 
             // 更新和绘制弹丸
