@@ -119,3 +119,52 @@
 - 游戏的核心是 **收集 (Gathering)** 和 **战斗 (Combat)** 两个阶段的循环。
 - 每个阶段都包含 **初始化、逻辑处理、渲染、销毁** 等生命周期步骤。
 - 我们之前定义的 **方法分类**（如 `combat_*`, `ui_*`）与这些生命周期步骤一一对应。
+
+
+## 8. 二级命名规范与渲染抽象 (v2.2)
+
+本次优化进一步细化了 `Game` 类中的方法命名，并抽象了渲染流程，使代码结构更接近标准的 ECS (Entity-Component-System) 架构。
+
+### 8.1 二级命名规范
+
+针对与特定属性系统强关联的方法，引入了**二级命名空间**，以 `模块_系统_方法` 的结构进行命名。
+
+| 旧命名 | 新命名 | 职责 |
+| :--- | :--- | :--- |
+| `spawn_addSonSword` | `combat_flyingSword_addSon` | 飞剑系统：生成子飞剑 |
+| `combat_assignSwordTarget` | `combat_flyingSword_assignTarget` | 飞剑系统：分配目标 |
+| `combat_fireLaser` | `combat_laser_fire` | 激光系统：发射激光 |
+| `combat_processLaserPenetration` | `combat_laser_processPenetration` | 激光系统：处理穿透 |
+| `spawn_triggerLightningChain` | `combat_lightning_triggerChain` | 闪电系统：触发闪电链 |
+| `calc_processSingleEnemyTurn` | `phase_enemy_processTurn` | 敌人AI：处理单回合逻辑 |
+| `ui_updateCombat` | `phase_combat_update` | 战斗阶段：更新逻辑 |
+| `ui_updateGathering` | `phase_gathering_update` | 收集阶段：更新逻辑 |
+
+### 8.2 渲染流程抽象
+
+`sys_loop` 中的渲染逻辑已被抽象为独立的 `render_*` 方法，极大地提升了主循环的可读性。
+
+| 新方法 | 职责 | 原始位置 |
+| :--- | :--- | :--- |
+| `render_clearCanvas` | 清理画布并绘制背景色 | `sys_loop` 内部 |
+| `render_background` | 绘制背景网格（仅非战斗阶段） | `sys_loop` 内部 |
+| `render_floatingTexts` | 更新并绘制全局浮动文字 | `sys_loop` 内部 |
+| `render_combat_launcherOrbitals` | 绘制发射器属性轨道 | `phase_combat_update` 内部 |
+
+**重构后的 `sys_loop` 结构**：
+
+```javascript
+sys_loop() {
+    // 1. 基础渲染准备
+    this.render_clearCanvas();
+    // 2. 全局状态更新 (倾斜)
+    // 3. 背景层渲染
+    this.render_background();
+    // 4. 阶段逻辑与渲染分发
+    this.phase_gathering_update(timeScale); // 或 phase_combat_update
+    // 5. 特效与文字层渲染
+    this.render_floatingTexts(timeScale);
+    // 6. 下一帧请求
+    requestAnimationFrame(() => this.sys_loop());
+}
+```
