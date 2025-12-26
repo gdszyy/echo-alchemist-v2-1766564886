@@ -7686,31 +7686,6 @@ class Game {
             }
         }
     }
-            // 绘制横线
-            for (let y = (tiltY % gridSpacing); y < this.height; y += gridSpacing) {
-                this.ctx.beginPath(); this.ctx.moveTo(0, y); this.ctx.lineTo(this.width, y); this.ctx.stroke();
-            }
-            this.ctx.restore();
-        }
-
-        // 3. 阶段分发
-        if (this.phase === 'gathering') {
-            this.phase_gathering_update(timeScale);
-        } else if (this.phase === 'combat') {
-            this.phase_combat_update(timeScale);
-        }
-
-        // 4. 全局浮动文字更新
-        for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
-            this.floatingTexts[i].update(timeScale);
-            this.floatingTexts[i].draw(this.ctx);
-            if (this.floatingTexts[i].life <= 0) {
-                this.floatingTexts.splice(i, 1);
-            }
-        }
-
-        requestAnimationFrame(() => this.sys_loop());
-    }
 
     /**
      * @method resize
