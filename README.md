@@ -1,8 +1,38 @@
-# Echo Alchemist (回聲煉金師) - 代码结构化索引文档
+# Echo Alchemist (回聲煉金師) - 代码结构化索引 v2.0
 
-本项目是一个基于 HTML5 Canvas 和 JavaScript 开发的单文件 Roguelike 游戏。为了方便 AI Agent 和开发者理解、编辑这个超过 11,000 行的超长文件，特建立此结构化索引。
+本项目是一个基于 HTML5 Canvas 和 JavaScript 开发的单文件 Roguelike 游戏。为了方便 AI Agent 和开发者理解、编辑这个超过 11,000 行的超长文件，特建立此结构化索引 v2.0。
 
-## 1. 核心架构 (Core Architecture)
+此版本引入了统一的**属性系统方法论**，并对代码进行了初步的规范化重构。
+
+## 1. 属性系统方法论与知识图谱
+
+### 1.1 设计原则
+
+- **语义化命名**: 内部标识符必须反映其功能，而非视觉表现 (e.g., `redStripe` 已重构为 `explosive`)。
+- **数据驱动**: 游戏核心参数由结构化的数据对象定义，避免硬编码。
+- **分类清晰**: 每个属性都归属于一个明确的分类，以决定其行为模式。
+
+### 1.2 属性分类体系
+
+我们为所有弹珠/子弹的属性划定了五大类别，以规范其交互逻辑和数据结构。
+
+![属性分类体系图](docs_attribute_flow.png)
+
+| 分类 (Category) | 类型 (Type) | 描述 | 示例 |
+| :--- | :--- | :--- | :--- |
+| **基础 (Base)** | `base` | 游戏开始时的默认属性。 | `white` (纯净) |
+| **物理 (Physical)** | `stackable` | 可通过碰撞累加数值，影响物理行为。 | `bounce`, `pierce`, `scatter` |
+| **元素 (Elemental)** | `stackable` | 可累加数值，附加元素伤害或效果。 | `cryo`, `pyro`, `lightning` |
+| **特殊 (Special)** | `marble_bound` | 与弹珠类型绑定，不可叠加，提供独特机制。 | `explosive`, `rainbow`, `matryoshka` |
+| **高级 (Advanced)** | `evolution` | 由其他属性组合进化而来，通常更强大。 | `flying_sword`, `laser` |
+
+### 1.3 属性交互流程
+
+下图展示了属性在“收集”和“战斗”两个阶段中如何流转、交互和演变。
+
+![属性交互流程图](docs_attribute_interaction.png)
+
+## 2. 核心架构 (Core Architecture)
 
 游戏采用面向对象的设计，逻辑高度解耦。
 
@@ -15,7 +45,7 @@
 | **`SoundManager`** | 音频引擎，基于 Web Audio API 合成音效。 | `playEffect`, `playTone`, `playHit` |
 | **`UIManager`** | UI 状态管理，处理 DOM 更新与交互。 | `updateSkillBar`, `showEnemyInfo`, `switchTab` |
 
-## 2. 全局配置与数据库 (Global Config & DB)
+## 3. 全局配置与数据库 (Global Config & DB)
 
 所有的平衡性调整和视觉规范都集中在以下常量中：
 
@@ -27,24 +57,6 @@
 *   **`RELIC_DB` (Line 1327)**: 遗物系统定义，包含 `id`, `name`, `effect`, `rarity` 等。
 *   **`SKILL_DB` (Line 1384)**: 玩家主动技能定义，包含消耗、逻辑 ID (`methodId`) 及参数。
 
-## 3. 关键逻辑流程 (Key Logic Flows)
-
-### 3.1 阶段循环 (Phase Loop)
-游戏在两个主要阶段间切换：
-1.  **`GATHERING` (收集阶段)**: 玩家投放弹珠，通过碰撞钉子获得属性和能量。
-2.  **`COMBAT` (战斗阶段)**: 玩家发射子弹攻击不断逼近的敌人。
-
-### 3.2 进化与突变 (Evolution System)
-位于 `CONFIG.evolutionRules`。当特定属性的弹珠碰撞到特定属性的钉子时，会触发：
-*   **Mutation (突变)**: 产生全新的属性（如 `pierce` + `pierce` -> `flying_sword`）。
-*   **Upgrade (升级)**: 提升现有属性的等级。
-
-### 3.3 伤害系统 (Damage System)
-核心方法：`Game.damageEnemy(enemy, projectile)`。
-支持多种效果叠加：
-*   **元素效果**: 冰冻 (Cryo)、燃烧 (Pyro)、连锁闪电 (Lightning)。
-*   **特殊攻击**: 飞剑 (Flying Sword)、斩击 (Slash)、光束 (Laser)。
-
 ## 4. 开发与调试指南 (Dev & Debug)
 
 *   **性能优化**: 游戏使用了 `requestAnimationFrame` 驱动主循环，并通过 `timeScale` 支持慢动作效果。
@@ -55,4 +67,4 @@
 
 ---
 
-*此文档由 AI Agent 自动生成，旨在作为大型代码库的“第二大脑”索引。*
+*此文档由 AI Agent 自动生成并迭代，旨在作为大型代码库的“第二大脑”索引。*

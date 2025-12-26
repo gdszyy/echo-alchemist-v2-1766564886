@@ -1132,8 +1132,7 @@ const CONFIG = {
         attributeDisplay: {
             'resonance': { name: '共鳴', icon: '🔔', color: '#f59e0b' },
             'white': { name: '純淨', icon: '⚪', color: '#f8fafc' },
-            'redStripe': { name: '爆破', icon: '🧨', color: '#fca5a5' },
-            'explosive':{ name: '爆破', icon: '🧨', color: '#fca5a5' },
+            'explosive': { name: '爆破', icon: '🧨', color: '#fca5a5' },
             'rainbow': { name: '七彩', icon: '🌈', color: '#fca5a5' },
             'matryoshka': { name: '套娃', icon: '🪆', color: '#d946ef' },
             'flying_sword': { name: '飛劍', icon: '🗡🗡', color: '#0ea5e9' },
@@ -1300,7 +1299,7 @@ const CONFIG = {
         pyro: 0, 
         
         // 特殊系 (初始鎖定)
-        redStripe: 1, 
+        explosive: 1, 
         rainbow: 0, 
         matryoshka: 0,
         resonance: 0,
@@ -1377,7 +1376,7 @@ const RELIC_DB = [
     { id: 'tactical_kit', name: '散射補給', icon: '🔱', desc: '解鎖 [散射] 屬性。', rarity: 'common', unlocks: ['scatter'], boost: 5 ,maxStacks: 1},
     { id: 'tactical_kit', name: '增幅補給', icon: '⚔️', desc: '解鎖 [增幅] 屬性。', rarity: 'common', unlocks: ['damage'], boost: 5 ,maxStacks: 1},
 
-    { id: 'explosive_ammo', name: '高爆火藥', icon: '🧨', desc: '解鎖 [爆破彈珠] 出現，且獲得一顆。', rarity: 'rare', unlocks: 'redStripe', boost: 10 ,maxStacks: 1},
+    { id: 'explosive_ammo', name: '高爆火藥', icon: '🧨', desc: '解鎖 [爆破彈珠] 出現，且獲得一顆。', rarity: 'rare', unlocks: 'explosive', boost: 10 ,maxStacks: 1},
     { id: 'prism_shard', name: '七彩稜鏡', icon: '🌈', desc: '解鎖 [彩虹彈珠] 出現，且獲得一顆。', rarity: 'legendary', unlocks: 'rainbow', boost: 5 ,maxStacks: 1},
     { id: 'russian_doll', name: '俄羅斯套娃', icon: '🪆', desc: '解鎖 [套娃彈珠]，子彈消失時會發射下一顆子彈。', rarity: 'legendary', unlocks: 'matryoshka', boost: 5 ,maxStacks: 1}
 ];
@@ -3608,7 +3607,7 @@ class DropBall {
             //  🔥 混沌闪烁计算 (通用火焰与爆破)
             // ==========================================
             let fireFlicker = 0;
-            if (buffs.pyro > 0 || this.def.type === 'redStripe') {
+            if (buffs.pyro > 0 || this.def.type === 'explosive') {
                 const slow = Math.sin(this.lifeTime * 0.1); 
                 const fast = Math.sin(this.lifeTime * 0.8);
                 const noise = Math.random() * 0.3;
@@ -3627,7 +3626,7 @@ class DropBall {
             if (buffs.laser > maxStack) { maxStack = buffs.laser; glowColor = '56, 189, 248'; } // Sky
             
             // [修改]：爆破弹珠的专属环境光 (危险的红色)
-            if (this.def.type === 'redStripe') {
+            if (this.def.type === 'explosive') {
                  glowColor = '239, 68, 68'; // Red-500
                  maxStack = 5; // 强制最大光晕
             } else if (maxStack === 0 && this.def.type === 'rainbow') {
@@ -3638,7 +3637,7 @@ class DropBall {
             let currentAlpha = baseAlpha;
             
             // [修改]：爆破弹珠的光晕会剧烈闪烁
-            if (this.def.type === 'redStripe') {
+            if (this.def.type === 'explosive') {
                  const strobe = (Math.sin(Date.now() / 50) + 1) / 2; // 高频闪烁
                  currentAlpha = baseAlpha * (0.5 + strobe); // 0.5 ~ 1.5 倍强度
             } else if (buffs.pyro > 0 && maxStack === buffs.pyro) {
@@ -3684,7 +3683,7 @@ class DropBall {
             
             // [新增/修改]：爆破弹珠专属绘制逻辑 (RedStripe)
             // 它不再和 Pyro 共用逻辑，而是拥有独立的"不稳定核心"外观
-            if (this.def.type === 'redStripe') {
+            if (this.def.type === 'explosive') {
                 // 1. 物理抖动 (Visual Jitter)
                 const shake = 1.2;
                 ctx.save();
@@ -3832,7 +3831,7 @@ class DropBall {
                          'scatter': ['#fef9c3', '#a16207'],
                          'damage': ['#f3e8ff', '#7e22ce'],
                          'laser':  ['#e0f2fe', '#0369a1'],
-                         // 'redStripe' 已经被上面单独处理了，这里不需要 map
+                         // 'explosive' 已经被上面单独处理了，这里不需要 map
                      };
                      if (this.def.type && map[this.def.type]) {
                          baseLight = map[this.def.type][0];
@@ -3846,7 +3845,7 @@ class DropBall {
             }
             
             // 绘制顶部高光 (除了爆破弹，因为爆破弹已经有核心高光了)
-            if (this.def.type !== 'redStripe') {
+            if (this.def.type !== 'explosive') {
                 this._drawHighlight(ctx, r);
             }
 
@@ -9023,7 +9022,7 @@ class Game {
         const typeMapping = {
             laser: () => new MarbleDefinition('laser'),
             white: () => new MarbleDefinition('white'),
-            redStripe: () => new MarbleDefinition('redStripe'),
+            explosive: () => new MarbleDefinition('explosive'),
             rainbow: () => new MarbleDefinition('rainbow'),
             matryoshka: () => new MarbleDefinition('matryoshka'),
             resonance: () => new MarbleDefinition('resonance'),
@@ -10412,7 +10411,7 @@ class Game {
         const recipe = { 
             damage: 2, 
             bounce: 0, pierce: 0, scatter: 0, 
-            explosive: marbleDef.type === 'redStripe', 
+            explosive: marbleDef.type === 'explosive', 
             isMatryoshka: marbleDef.type === 'matryoshka', 
             isLaser: marbleDef.type === 'laser', // 默认为 false，由 collected 决定
             nestedPayload: null, chainPayload: null, 

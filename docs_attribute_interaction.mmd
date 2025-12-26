@@ -1,0 +1,44 @@
+graph LR
+    subgraph "收集阶段 (Gathering Phase)"
+        direction TB
+        M[弹珠 Marble]
+        P[钉子 Peg]
+        
+        M -->|碰撞| P
+        P -->|同化<br>Assimilation| M
+        P -->|进化检查<br>Evolution Check| EVO{进化规则匹配?}
+        
+        EVO -->|是 - 突变| MUTATE[生成新属性]
+        EVO -->|是 - 升级| UPGRADE[提升等级]
+        EVO -->|否| STACK[叠加数值]
+    end
+
+    subgraph "战斗阶段 (Combat Phase)"
+        direction TB
+        B[子弹 Projectile]
+        E[敌人 Enemy]
+        
+        B -->|命中| E
+        E -->|受到伤害| DMG{伤害计算}
+        
+        DMG -->|物理属性| PHY[应用反弹/穿透/散射]
+        DMG -->|元素属性| ELEM[应用冰冻/燃烧/闪电]
+        DMG -->|特殊属性| SPEC[触发爆炸/套娃/共鸣]
+        DMG -->|高级属性| ADV[触发飞剑/光束]
+    end
+
+    subgraph "属性解锁 (Unlock System)"
+        direction LR
+        R[遗物 Relic]
+        PROB[概率池 Probability Pool]
+        
+        R -->|解锁| PROB
+        PROB -->|影响| M
+    end
+
+    classDef phase fill:#e0e7ff,stroke:#818cf8,color:#3730a3
+    classDef entity fill:#fef3c7,stroke:#fbbf24,color:#78350f
+    classDef logic fill:#dbeafe,stroke:#60a5fa,color:#1e3a8a
+
+    class M,P,B,E,R entity
+    class EVO,DMG logic

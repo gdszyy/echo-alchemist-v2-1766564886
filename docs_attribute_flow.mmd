@@ -1,0 +1,53 @@
+graph TD
+    subgraph "属性系统 (Attribute System)"
+        direction LR
+        
+        subgraph "基础属性 (Base)"
+            A[white<br>纯净]
+        end
+
+        subgraph "物理属性 (Physical - 可叠加)"
+            B1[bounce<br>弹性]
+            B2[pierce<br>穿透]
+            B3[scatter<br>散射]
+            B4[damage<br>增幅]
+        end
+
+        subgraph "元素属性 (Elemental - 可叠加)"
+            C1[cryo<br>冰霜]
+            C2[pyro<br>火焰]
+            C3[lightning<br>闪电]
+        end
+
+        subgraph "特殊属性 (Special - 弹珠绑定)"
+            D1[explosive<br>爆破]
+            D2[rainbow<br>彩虹]
+            D3[matryoshka<br>套娃]
+            D4[resonance<br>共鸣]
+        end
+
+        subgraph "高级属性 (Advanced - 进化型)"
+            E1[flying_sword<br>飞剑]
+            E2[laser<br>光束]
+        end
+    end
+
+    subgraph "进化路径 (Evolution Path)"
+        direction TB
+        B2 -- 突变 (Mutation)<br>pierce + pierce --> E1
+        E1 -- 升级 (Upgrade) --> E1_LV2(飞剑 Lv.2)
+        E1_LV2 -- 升级 (Upgrade) --> E1_LV3(飞剑 Lv.3)
+    end
+
+    %% 关系定义 (Relationships)
+    classDef base fill:#e2e8f0,stroke:#94a3b8,color:#0f172a
+    classDef physical fill:#dbeafe,stroke:#60a5fa,color:#1e3a8a
+    classDef elemental fill:#fee2e2,stroke:#f87171,color:#991b1b
+    classDef special fill:#fef9c3,stroke:#facc15,color:#854d0e
+    classDef advanced fill:#e0e7ff,stroke:#818cf8,color:#3730a3
+
+    class A base
+    class B1,B2,B3,B4 physical
+    class C1,C2,C3 elemental
+    class D1,D2,D3,D4 special
+    class E1,E2,E1_LV2,E1_LV3 advanced
