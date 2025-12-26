@@ -26,9 +26,12 @@ graph TD
             D4[resonance<br>共鸣]
         end
 
+        subgraph "功能属性 (Functional - 可叠加)"
+            F1[laser<br>光束]
+        end
+
         subgraph "高级属性 (Advanced - 进化型)"
             E1[flying_sword<br>飞剑]
-            E2[laser<br>光束]
         end
     end
 
@@ -44,10 +47,12 @@ graph TD
     classDef physical fill:#dbeafe,stroke:#60a5fa,color:#1e3a8a
     classDef elemental fill:#fee2e2,stroke:#f87171,color:#991b1b
     classDef special fill:#fef9c3,stroke:#facc15,color:#854d0e
+    classDef functional fill:#e0f2fe,stroke:#0ea5e9,color:#0369a1
     classDef advanced fill:#e0e7ff,stroke:#818cf8,color:#3730a3
 
     class A base
     class B1,B2,B3,B4 physical
     class C1,C2,C3 elemental
     class D1,D2,D3,D4 special
-    class E1,E2,E1_LV2,E1_LV3 advanced
+    class F1 functional
+    class E1,E1_LV2,E1_LV3 advanced

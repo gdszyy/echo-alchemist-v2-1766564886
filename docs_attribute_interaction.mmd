@@ -10,7 +10,7 @@ graph LR
         
         EVO -->|是 - 突变| MUTATE[生成新属性]
         EVO -->|是 - 升级| UPGRADE[提升等级]
-        EVO -->|否| STACK[叠加数值]
+        EVO -->|否| STACK[叠加数值/层数]
     end
 
     subgraph "战斗阶段 (Combat Phase)"
@@ -24,7 +24,8 @@ graph LR
         DMG -->|物理属性| PHY[应用反弹/穿透/散射]
         DMG -->|元素属性| ELEM[应用冰冻/燃烧/闪电]
         DMG -->|特殊属性| SPEC[触发爆炸/套娃/共鸣]
-        DMG -->|高级属性| ADV[触发飞剑/光束]
+        DMG -->|功能属性| FUNC[触发激光光束]
+        DMG -->|高级属性| ADV[触发飞剑/斩击]
     end
 
     subgraph "属性解锁 (Unlock System)"
