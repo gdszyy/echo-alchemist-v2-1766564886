@@ -1,0 +1,82 @@
+graph TD
+    Start([游戏启动]) --> Init[sys_initGameStart<br/>初始化游戏]
+    Init --> Loop[sys_loop<br/>主循环]
+    
+    Loop --> Clear[清理画布]
+    Clear --> UpdateTilt[更新陀螺仪倾斜]
+    UpdateTilt --> PhaseCheck{当前阶段?}
+    
+    PhaseCheck -->|gathering| GatheringPhase[ui_updateGathering<br/>收集阶段]
+    PhaseCheck -->|combat| CombatPhase[ui_updateCombat<br/>战斗阶段]
+    PhaseCheck -->|selection| SelectionPhase[遗物选择阶段]
+    
+    subgraph "收集阶段 (Gathering Phase)"
+        GatheringPhase --> G_Init[sys_initPachinko<br/>初始化钉板]
+        G_Init --> G_Logic[逻辑处理]
+        G_Logic --> G_Pegs[更新钉子状态]
+        G_Logic --> G_Marbles[更新弹珠物理]
+        G_Logic --> G_Check[phase_attemptCompleteGatheringTurn<br/>检查回合完成]
+        G_Check --> G_Render[渲染]
+        G_Render --> G_DrawPegs[绘制钉子]
+        G_Render --> G_DrawMarbles[绘制弹珠]
+        G_Render --> G_DrawHUD[ui_renderRecipeHUD<br/>绘制配方HUD]
+        G_DrawHUD --> G_End{是否完成?}
+        G_End -->|是| G_Switch[phase_switchPhase<br/>切换到战斗]
+        G_End -->|否| G_Continue[继续收集]
+    end
+    
+    subgraph "战斗阶段 (Combat Phase)"
+        CombatPhase --> C_Init[phase_startCombatPhase<br/>初始化战斗]
+        C_Init --> C_Logic[逻辑处理]
+        C_Logic --> C_Input[input_handleInputMove<br/>处理输入]
+        C_Logic --> C_Projectiles[更新子弹]
+        C_Logic --> C_Enemies[更新敌人]
+        C_Logic --> C_Collision[碰撞检测]
+        C_Collision --> C_Damage[combat_damageEnemy<br/>伤害计算]
+        C_Damage --> C_Effects[spawn_createParticle<br/>生成特效]
+        C_Effects --> C_Render[渲染]
+        C_Render --> C_DrawBG[绘制背景网格]
+        C_Render --> C_DrawEnemies[绘制敌人]
+        C_Render --> C_DrawProjectiles[绘制子弹]
+        C_Render --> C_DrawUI[ui_drawLauncherOrbitals<br/>绘制发射器]
+        C_DrawUI --> C_Check{是否击败所有敌人?}
+        C_Check -->|是| C_Advance[phase_advanceWave<br/>推进波次]
+        C_Advance --> C_Switch[phase_switchPhase<br/>切换阶段]
+        C_Check -->|否| C_Continue[继续战斗]
+    end
+    
+    subgraph "遗物选择阶段 (Selection Phase)"
+        SelectionPhase --> S_Init[sys_initSelectionPhase<br/>初始化选择]
+        S_Init --> S_Show[ui_showRelicSelection<br/>显示遗物]
+        S_Show --> S_Wait[等待玩家选择]
+        S_Wait --> S_Select[ui_selectRelic<br/>选择遗物]
+        S_Select --> S_Switch[phase_switchPhase<br/>切换到收集]
+    end
+    
+    G_Switch --> Loop
+    C_Switch --> Loop
+    S_Switch --> Loop
+    G_Continue --> FloatingText
+    C_Continue --> FloatingText
+    
+    FloatingText[更新浮动文字] --> NextFrame[requestAnimationFrame]
+    NextFrame --> Loop
+    
+    subgraph "组件系统 (Component Systems)"
+        direction LR
+        Spawn[spawn_*<br/>实体生成系统]
+        Combat[combat_*<br/>战斗系统]
+        UI[ui_*<br/>UI系统]
+        Input[input_*<br/>输入系统]
+        Calc[calc_*<br/>计算系统]
+    end
+    
+    classDef phaseStyle fill:#e0e7ff,stroke:#818cf8,color:#3730a3
+    classDef systemStyle fill:#fef3c7,stroke:#fbbf24,color:#78350f
+    classDef renderStyle fill:#dcfce7,stroke:#4ade80,color:#166534
+    classDef logicStyle fill:#dbeafe,stroke:#60a5fa,color:#1e3a8a
+    
+    class GatheringPhase,CombatPhase,SelectionPhase phaseStyle
+    class Init,G_Init,C_Init,S_Init systemStyle
+    class G_Render,C_Render,G_DrawPegs,G_DrawMarbles,C_DrawBG,C_DrawEnemies renderStyle
+    class G_Logic,C_Logic,C_Collision,C_Damage logicStyle

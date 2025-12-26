@@ -1,0 +1,84 @@
+graph LR
+    subgraph "阶段生命周期 (Phase Lifecycle)"
+        direction TB
+        
+        subgraph "1. 初始化 (Initialization)"
+            I1[sys_init*<br/>系统初始化]
+            I2[phase_start*<br/>阶段启动]
+            I3[构建数据结构]
+            I1 --> I2 --> I3
+        end
+        
+        subgraph "2. 逻辑处理 (Logic Processing)"
+            L1[input_handle*<br/>输入处理]
+            L2[calc_*<br/>计算与评估]
+            L3[combat_*<br/>战斗逻辑]
+            L4[spawn_*<br/>实体生成]
+            L1 --> L2 --> L3 --> L4
+        end
+        
+        subgraph "3. 渲染 (Rendering)"
+            R1[清理画布]
+            R2[绘制背景层]
+            R3[绘制实体层]
+            R4[绘制UI层]
+            R5[绘制特效层]
+            R1 --> R2 --> R3 --> R4 --> R5
+        end
+        
+        subgraph "4. 销毁与清理 (Cleanup)"
+            C1[移除死亡实体]
+            C2[data_clear*<br/>清理数据]
+            C3[重置临时状态]
+            C1 --> C2 --> C3
+        end
+        
+        subgraph "5. 阶段交接 (Phase Transition)"
+            T1[phase_finalize*<br/>完成当前阶段]
+            T2[phase_switch*<br/>切换阶段]
+            T3[phase_advance*<br/>推进进度]
+            T1 --> T2 --> T3
+        end
+        
+        I3 --> L1
+        L4 --> R1
+        R5 --> C1
+        C3 --> T1
+    end
+    
+    subgraph "方法分类映射 (Method Category Mapping)"
+        direction LR
+        
+        SYS[sys_*<br/>系统引擎]
+        PHASE[phase_*<br/>阶段管理]
+        SPAWN[spawn_*<br/>实体生成]
+        COMBAT[combat_*<br/>战斗逻辑]
+        UI[ui_*<br/>界面交互]
+        INPUT[input_*<br/>输入处理]
+        CALC[calc_*<br/>计算评估]
+        DATA[data_*<br/>数据管理]
+        
+        SYS -.-> I1
+        PHASE -.-> I2
+        PHASE -.-> T1
+        INPUT -.-> L1
+        CALC -.-> L2
+        COMBAT -.-> L3
+        SPAWN -.-> L4
+        UI -.-> R4
+        DATA -.-> C2
+    end
+    
+    classDef initStyle fill:#e0f2fe,stroke:#0ea5e9,color:#0369a1
+    classDef logicStyle fill:#dbeafe,stroke:#60a5fa,color:#1e3a8a
+    classDef renderStyle fill:#dcfce7,stroke:#4ade80,color:#166534
+    classDef cleanupStyle fill:#fee2e2,stroke:#f87171,color:#991b1b
+    classDef transitionStyle fill:#fef3c7,stroke:#fbbf24,color:#78350f
+    classDef categoryStyle fill:#e0e7ff,stroke:#818cf8,color:#3730a3
+    
+    class I1,I2,I3 initStyle
+    class L1,L2,L3,L4 logicStyle
+    class R1,R2,R3,R4,R5 renderStyle
+    class C1,C2,C3 cleanupStyle
+    class T1,T2,T3 transitionStyle
+    class SYS,PHASE,SPAWN,COMBAT,UI,INPUT,CALC,DATA categoryStyle
