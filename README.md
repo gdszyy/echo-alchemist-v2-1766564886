@@ -69,3 +69,30 @@
 ---
 
 *此文档由 AI Agent 自动生成并迭代，旨在作为大型代码库的“第二大脑”索引。*
+
+
+## 5. Game 类方法命名规范 (v2.1)
+
+为了提升代码的可读性和可维护性，`Game` 类中的所有方法都已按照其逻辑职责进行了重命名，并添加了模块前缀。
+
+| 模块前缀 | 职责范围 | 示例方法 |
+| :--- | :--- | :--- |
+| `sys_` | 系统/引擎层（初始化、循环、调整） | `sys_loop`, `sys_initGame` |
+| `phase_` | 阶段管理（切换、状态检查） | `phase_switch`, `phase_advanceWave` |
+| `spawn_` | 实体生成（敌人、掉落物、特效） | `spawn_enemyRow`, `spawn_createParticle` |
+| `combat_` | 战斗逻辑（伤害计算、技能释放） | `combat_damageEnemy`, `combat_fireLaser` |
+| `ui_` | 界面交互（更新、弹窗、浮动文字） | `ui_updateAll`, `ui_showRelicSelection` |
+| `input_` | 输入处理（鼠标、触摸、陀螺仪） | `input_handleInputMove`, `input_handleOrientation` |
+| `calc_` | 计算与评估 | `calc_evaluateAndAdjustDifficulty` |
+| `data_` | 数据管理（记录、统计） | `data_clearProjectiles` |
+
+此外，所有重命名后的方法都已添加了 **JSDoc 注释模板**，方便 IDE 进行识别和提示。
+
+## 6. 重构待办清单 (Refactoring TODO)
+
+在本次重构中，我们识别出以下可以进一步解耦的模块。详细信息请参见 `REFACTOR_TODO.md` 文件。
+
+- **UI 管理器 (`UIManager`)**: 将所有 `ui_` 方法整合进 `UIManager` 类。
+- **实体工厂 (`EntityManager`)**: 将所有 `spawn_` 和 `create_` 方法整合进一个工厂类。
+- **输入处理器 (`InputHandler`)**: 将所有 `input_` 方法封装成独立的输入处理模块。
+- **战斗逻辑管理器 (`CombatManager`)**: 将所有 `combat_` 方法剥离到专门的战斗管理器中。

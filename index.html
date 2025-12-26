@@ -1046,7 +1046,7 @@
             <div id="relic-container" class="flex flex-wrap justify-center gap-4 w-full max-w-4xl">
                 </div>
 
-            <button onclick="game.skipRelic()" class="mt-12 text-slate-500 hover:text-slate-300 text-sm underline cursor-pointer transition-colors">
+            <button onclick="game.ui_skipRelic()" class="mt-12 text-slate-500 hover:text-slate-300 text-sm underline cursor-pointer transition-colors">
                 放棄並獲得 500 分
             </button>
         </div>
@@ -3138,15 +3138,15 @@ class DropBall {
                             peg.level = 1; 
                             
                             // 特效
-                            game.createExplosion(peg.pos.x, peg.pos.y, CONFIG.colors[rule.result]);
-                            game.createFloatingText(peg.pos.x, peg.pos.y - 20, "Mutation!", CONFIG.colors[rule.result]);
+                            game.spawn_createExplosion(peg.pos.x, peg.pos.y, CONFIG.colors[rule.result]);
+                            game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 20, "Mutation!", CONFIG.colors[rule.result]);
                             audio.playMagic();
                         } else {
                             // 场上已有剑 -> 禁止突变，退化为普通同化 (变成 Pierce)
                             // 这样玩家不会觉得亏了，至少变成了一个红钉子
                             if (peg.type === 'normal') {
                                 peg.type = 'pierce';
-                                game.createParticle(peg.pos.x, peg.pos.y, CONFIG.colors.matPierce);
+                                game.spawn_createParticle(peg.pos.x, peg.pos.y, CONFIG.colors.matPierce);
                             }
                         }
                     } 
@@ -3156,12 +3156,12 @@ class DropBall {
                         const success = peg.upgrade();
                         if (success) {
                             // 升级成功特效
-                            game.createExplosion(peg.pos.x, peg.pos.y, '#fbbf24');
-                            game.createFloatingText(peg.pos.x, peg.pos.y - 15, `Lv${peg.level} 剑意!`, '#fbbf24');
+                            game.spawn_createExplosion(peg.pos.x, peg.pos.y, '#fbbf24');
+                            game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 15, `Lv${peg.level} 剑意!`, '#fbbf24');
                             audio.playPowerup(peg.level + 3); // 音调更高
                         } else {
                             // 已满级特效 (可选)
-                            game.createFloatingText(peg.pos.x, peg.pos.y - 15, "MAX!", '#ef4444');
+                            game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 15, "MAX!", '#ef4444');
                         }
                     }
                 }
@@ -3172,7 +3172,7 @@ class DropBall {
                 const assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0.25;
                 if (Math.random() < assimilationChance) {
                     peg.type = ballType;
-                    game.createParticle(peg.pos.x, peg.pos.y, this.def.getColor());
+                    game.spawn_createParticle(peg.pos.x, peg.pos.y, this.def.getColor());
                     audio.playMagic();
                 }
             }
@@ -3263,7 +3263,7 @@ class DropBall {
                 // --- ⚡ Lightning (闪电): 偶尔残留电弧 ---
                 // (既然做了就顺便加上)
                 if (buffs.lightning > 0 && Math.random() < 0.02 * buffs.lightning) {
-                     game.createParticle(this.pos.x, this.pos.y, '#d8b4fe', 'spark');
+                     game.spawn_createParticle(this.pos.x, this.pos.y, '#d8b4fe', 'spark');
                 }
             }
             if (this.portalCooldown > 0) this.portalCooldown -= timeScale;
@@ -3314,24 +3314,24 @@ class DropBall {
                         slot.hit = true;
                         this.portalCooldown = 40; 
                         if (slot.type === 'recall') {
-                            this.pos.y = 80; this.vel.y = 2; this.portalCooldown = 60; audio.playPowerup(); game.createExplosion(slot.x, slot.y, CONFIG.colors.slotRecall); showToast("時空回溯！");
+                            this.pos.y = 80; this.vel.y = 2; this.portalCooldown = 60; audio.playPowerup(); game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotRecall); showToast("時空回溯！");
                         } else if (slot.type === 'multicast') {
                             if (this.session.multicastAdded.indexOf(slot) === -1) { 
-                                this.session.multicast += 2; audio.playPowerup(); game.createExplosion(slot.x, slot.y, CONFIG.colors.slotMulticast); showToast("連續發射+2！");
-                                    game.updateMulticastDisplay(2);
+                                this.session.multicast += 2; audio.playPowerup(); game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotMulticast); showToast("連續發射+2！");
+                                    game.combat_updateMulticastDisplay(2);
                             }
                         } else if (slot.type === 'split') {
                             if (this.canTriggerSplitSlot) {
                                 this.active = false; 
                                 this.stopSound(); // 
-                                audio.playPowerup(); game.createExplosion(slot.x, slot.y, CONFIG.colors.slotSplit); 
+                                audio.playPowerup(); game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotSplit); 
                                 return { action: 'split', pos: this.pos, vel: this.vel, def: this.def };
                             }
                         } else if (slot.type === 'relic') {
                             this.active = false; 
                             this.stopSound(); // 
                             audio.playPowerup(); 
-                            game.createExplosion(slot.x, slot.y, '#facc15'); 
+                            game.spawn_createExplosion(slot.x, slot.y, '#facc15'); 
                             return { type: 'slot', slotType: 'relic', pos: this.pos };
                         } else if (slot.type === 'skill_point') {
                             // 1. 標記槽位被擊中 (立即消失)
@@ -3339,7 +3339,7 @@ class DropBall {
 
                             // 2. 播放原地音效與爆炸 (立即反饋)
                             audio.playPowerup();
-                            game.createExplosion(slot.x, slot.y, CONFIG.colors.slotSkill); 
+                            game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotSkill); 
                             showToast("技能點獲取!");
 
                             // --- [新增] 引導動畫邏輯 ---
@@ -3369,7 +3369,7 @@ class DropBall {
                                 () => {
                                     // --- C. 到達回調 (On Arrive) ---
                                     // 只有當球飛到時，才真正增加點數
-                                    game.addSkillPoint(1);
+                                    game.spawn_addSkillPoint(1);
 
                                     // 觸發 UI 閃光特效
                                     // 重新獲取一次 DOM，因為 addSkillPoint 可能重繪了它們
@@ -3398,15 +3398,15 @@ class DropBall {
                             
                             if (currentAttrs.length === 0) {
                                 audio.playEffect('bump');
-                                game.createExplosion(slot.x, slot.y, '#ffffff');
+                                game.spawn_createExplosion(slot.x, slot.y, '#ffffff');
                                 showToast("无属性可复制");
-                                game.attemptCompleteGatheringTurn(); 
+                                game.phase_attemptCompleteGatheringTurn(); 
                                 return { type: 'slot', slotType: 'wheel', pos: this.pos };
                             }
 
                             // [修改] 觸發轉盤
                             audio.playPowerup(); 
-                            game.createExplosion(slot.x, slot.y, CONFIG.colors.slotWheel); 
+                            game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotWheel); 
                             showToast("命運輪盤啟動!");
 
                             // [修改] 使用屏幕中心坐標 (game.width/2, game.height/2)
@@ -3431,15 +3431,15 @@ class DropBall {
                                 }
                                 
                                 // 文字提示位置也改為屏幕中間
-                                game.createFloatingText(wheelX, wheelY + 80, `${winningType.toUpperCase()} x${addCount}!`, "#fff");
-                                game.createExplosion(wheelX, wheelY, '#fff');
+                                game.spawn_createFloatingText(wheelX, wheelY + 80, `${winningType.toUpperCase()} x${addCount}!`, "#fff");
+                                game.spawn_createExplosion(wheelX, wheelY, '#fff');
                                 audio.playPowerup(5);
-                                game.renderRecipeHUD();
+                                game.ui_renderRecipeHUD();
                                 game.isWheelSpinning = false;
                                 
                                 if (game.dropBalls.length === 0) { 
                                     game.currentSession.activeBalls = 0; 
-                                    game.attemptCompleteGatheringTurn();
+                                    game.phase_attemptCompleteGatheringTurn();
                                     game.currentSession = null; 
                                 }
                             });
@@ -3473,18 +3473,18 @@ class DropBall {
                         peg.hit(impactSpeedVal);
                         this.hitCount++; 
                         // 如果是普通钉子 (normal)，触发两次能量球反馈
-                        game.createHitFeedback(this.pos.x, this.pos.y, impactVel, peg.type);
+                        game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel, peg.type);
 
                         if (peg.type === 'normal' && Math.random() < CONFIG.balance.normalPegSecondEnergChancey) {
-                            game.createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.65), 'normal');
+                            game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.65), 'normal');
                         }
 
                         if (this.def.type === 'resonance') {
                             if (Math.random() < CONFIG.balance.normalPegSecondEnergChancey){
-                                game.createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.21+0.42*Math.random()), 'resonance');
+                                game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.21+0.42*Math.random()), 'resonance');
                             }
                             if (Math.random() < CONFIG.balance.normalPegSecondEnergChancey){
-                                game.createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(-0.21-0.72*Math.random()), 'resonance');
+                                game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(-0.21-0.72*Math.random()), 'resonance');
                             }
                             
                         }
@@ -3563,7 +3563,7 @@ class DropBall {
 
                             // ---  合成反馈 ---
                             if (isSynthesized) {
-                                game.createFloatingText(this.pos.x, this.pos.y, "⚡ SYNTHESIS!", "#c084fc");
+                                game.spawn_createFloatingText(this.pos.x, this.pos.y, "⚡ SYNTHESIS!", "#c084fc");
                                 audio.playLightning(); // 播放闪电音效
                             }
 
@@ -4147,11 +4147,11 @@ class Enemy {
                         // 类型：'ember' (一种飘忽不定的火星)
                         // 注意：确保 Particle 类能处理 'ember'，通常 'ember' 和 'spark' 类似但更轻
                         // 这里我们直接用 'spark' 的物理逻辑，但颜色调得更亮
-                        game.createParticle(px, py, '#fbbf24', 'spark'); 
+                        game.spawn_createParticle(px, py, '#fbbf24', 'spark'); 
                         
                         // 偶尔加一个颜色深一点的 'ember' 颗粒
                          if (Math.random() < 0.3) {
-                            game.createParticle(px, py, '#f97316', 'ember');
+                            game.spawn_createParticle(px, py, '#f97316', 'ember');
                         }
                     }
                 }
@@ -4228,7 +4228,7 @@ class Enemy {
         if (!this.actionIcon && this.affixes.includes('jump')) {
             let moveAmount = game.enemyHeight;
             const targetY = this.dropTargetY + moveAmount;
-            const isBlocked = game.isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
+            const isBlocked = game.calc_isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
             if (isBlocked) {
                 this.actionIcon = '🦘'; this.actionName = '跳躍';
             }
@@ -4268,8 +4268,8 @@ class Enemy {
                 const heal = Math.floor(this.maxHp * afx.regenPercent) || 1;
                 if(this.hp < this.maxHp) {
                     this.hp = Math.min(this.maxHp, this.hp + heal);
-                    game.createFloatingText(this.pos.x, this.pos.y - 30, `+${heal}`, '#4ade80');
-                    game.createParticle(this.pos.x, this.pos.y, '#4ade80', 'spark');
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 30, `+${heal}`, '#4ade80');
+                    game.spawn_createParticle(this.pos.x, this.pos.y, '#4ade80', 'spark');
                     audio.playEffect('regen');
                 }
             }
@@ -4282,14 +4282,14 @@ class Enemy {
                     if (other !== this && other.active && other.hp < other.maxHp && this.pos.dist(other.pos) < range) {
                         const healAmt = Math.ceil(other.maxHp * afx.healerPercent);
                         other.hp = Math.min(other.maxHp, other.hp + healAmt);
-                        game.createParticle(other.pos.x, other.pos.y, '#f472b6', 'spark');
-                        game.createFloatingText(other.pos.x, other.pos.y - 20, `+${healAmt}`, '#f472b6');
+                        game.spawn_createParticle(other.pos.x, other.pos.y, '#f472b6', 'spark');
+                        game.spawn_createFloatingText(other.pos.x, other.pos.y - 20, `+${healAmt}`, '#f472b6');
                         healedCount++;
                     }
                 });
                 if (healedCount > 0) {
                      audio.playEffect('regen');
-                     game.createShockwave(this.pos.x, this.pos.y, '#f472b6');
+                     game.spawn_createShockwave(this.pos.x, this.pos.y, '#f472b6');
                 }
             }
 
@@ -4307,50 +4307,50 @@ class Enemy {
                      this.hp += absorbHp;
                      victim.affixes.forEach(af => { if (!this.affixes.includes(af)) this.affixes.push(af); });
                      const isDead = victim.takeDamage(99999); 
-                     if (isDead) game.addScore(absorbMax); 
-                     game.createFloatingText(this.pos.x, this.pos.y - 40, "DEVOUR!", "#ef4444");
-                     game.createParticle(victim.pos.x, victim.pos.y, '#ef4444', 'mist'); 
-                     game.createShockwave(this.pos.x, this.pos.y, '#ef4444');
+                     if (isDead) game.spawn_addScore(absorbMax); 
+                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, "DEVOUR!", "#ef4444");
+                     game.spawn_createParticle(victim.pos.x, victim.pos.y, '#ef4444', 'mist'); 
+                     game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
                      audio.playEffect('split');
                  }
             }
 
             // --- 4. 增殖 ---
             if(this.actionName === '增殖') {
-                game.triggerCloneSpawn(this);
+                game.spawn_triggerCloneSpawn(this);
             }
 
             if (isSecondAction) {
-                game.createFloatingText(this.pos.x, this.pos.y - 50, "⚡DOUBLE!", "#facc15");
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡DOUBLE!", "#facc15");
             }
 
             // --- 移动与跳跃 ---
             let moveAmount = game.enemyHeight;
             const targetY = this.dropTargetY + moveAmount;
-            const isBlocked = game.isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
+            const isBlocked = game.calc_isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
 
             if (!isBlocked) {
                 this.advance(moveAmount);
             } else {
                 if (this.affixes.includes('jump')) {
                     const jumpTargetY = this.dropTargetY + (moveAmount * afx.jumpRows);
-                    const isJumpBlocked = game.isAreaOccupied(this.pos.x, jumpTargetY, this.width * 0.8, this.height * 0.8, this);
+                    const isJumpBlocked = game.calc_isAreaOccupied(this.pos.x, jumpTargetY, this.width * 0.8, this.height * 0.8, this);
                     if (!isJumpBlocked) {
                         this.advance(moveAmount * 2);
                         this.bumpOffsetY = -30; 
-                        game.createFloatingText(this.pos.x, this.pos.y, "JUMP!", "#38bdf8");
-                        game.createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist'); 
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y, "JUMP!", "#38bdf8");
+                        game.spawn_createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist'); 
                         audio.playEffect('split');
                     } else {
                         if (i === 0) {
                             this.bumpOffsetY = -10;
-                            if (Math.random() < 0.3) game.createFloatingText(this.pos.x, this.pos.y - 20, "⛔ BLOCKED", "#ef4444");
+                            if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "⛔ BLOCKED", "#ef4444");
                         }
                     }
                 } else {
                     if (i === 0) {
                         this.bumpOffsetY = -10;
-                        if (Math.random() < 0.3) game.createFloatingText(this.pos.x, this.pos.y - 20, "⛔ BLOCKED", "#ef4444");
+                        if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "⛔ BLOCKED", "#ef4444");
                     }
                 }
             }
@@ -4380,8 +4380,8 @@ class Enemy {
                 const heal = Math.floor(this.maxHp * afx.regenPercent) || 1;
                 if(this.hp < this.maxHp) {
                     this.hp = Math.min(this.maxHp, this.hp + heal);
-                    game.createFloatingText(this.pos.x, this.pos.y - 30, `+${heal}`, '#4ade80');
-                    game.createParticle(this.pos.x, this.pos.y, '#4ade80', 'spark');
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 30, `+${heal}`, '#4ade80');
+                    game.spawn_createParticle(this.pos.x, this.pos.y, '#4ade80', 'spark');
                     audio.playEffect('regen');
                 }
             }
@@ -4399,15 +4399,15 @@ class Enemy {
                         other.hp = Math.min(other.maxHp, other.hp + healAmt);
                         
                         // 特效：發射治療粒子飛向隊友
-                        game.createParticle(other.pos.x, other.pos.y, '#f472b6', 'spark'); // 粉色粒子
-                        game.createFloatingText(other.pos.x, other.pos.y - 20, `+${healAmt}`, '#f472b6');
+                        game.spawn_createParticle(other.pos.x, other.pos.y, '#f472b6', 'spark'); // 粉色粒子
+                        game.spawn_createFloatingText(other.pos.x, other.pos.y - 20, `+${healAmt}`, '#f472b6');
                         healedCount++;
                     }
                 });
                 
                 if (healedCount > 0) {
                      audio.playEffect('regen'); // 復用治療音效
-                     game.createShockwave(this.pos.x, this.pos.y, '#f472b6'); // 自身粉色波動
+                     game.spawn_createShockwave(this.pos.x, this.pos.y, '#f472b6'); // 自身粉色波動
                 }
             }
 
@@ -4440,24 +4440,24 @@ class Enemy {
                     const isDead = victim.takeDamage(99999); 
                     
                     if (isDead) {
-                        game.addScore(absorbMax); // 补偿吞噬者的分数
+                        game.spawn_addScore(absorbMax); // 补偿吞噬者的分数
                     }
 
                     // 3. 特效反馈
-                    game.createFloatingText(this.pos.x, this.pos.y - 40, "DEVOUR!", "#ef4444");
-                    game.createParticle(victim.pos.x, victim.pos.y, '#ef4444', 'mist'); 
-                    game.createShockwave(this.pos.x, this.pos.y, '#ef4444');
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, "DEVOUR!", "#ef4444");
+                    game.spawn_createParticle(victim.pos.x, victim.pos.y, '#ef4444', 'mist'); 
+                    game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
                     audio.playEffect('split');
                  }
             }
 
             // --- 4. 增殖 (Clone) ---
             if(this.affixes.includes('clone') && Math.random() < afx.cloneChanceTurn) {
-                    game.triggerCloneSpawn(this);
+                    game.spawn_triggerCloneSpawn(this);
                 }
 
             if (isSecondAction) {
-                game.createFloatingText(this.pos.x, this.pos.y - 50, "⚡DOUBLE!", "#facc15");
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡DOUBLE!", "#facc15");
             }
 
             // --- 移動與跳躍邏輯 ---
@@ -4465,7 +4465,7 @@ class Enemy {
             const targetY = this.dropTargetY + moveAmount;
             
             // 檢查前方是否被阻擋
-            const isBlocked = game.isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
+            const isBlocked = game.calc_isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
 
             if (!isBlocked) {
                 // 正常移動
@@ -4476,26 +4476,26 @@ class Enemy {
                 if (this.affixes.includes('jump')) {
                     // [修改] 跳跃行数 (jumpRows)
                     const jumpTargetY = this.dropTargetY + (moveAmount * afx.jumpRows);
-                    const isJumpBlocked = game.isAreaOccupied(this.pos.x, jumpTargetY, this.width * 0.8, this.height * 0.8, this);
+                    const isJumpBlocked = game.calc_isAreaOccupied(this.pos.x, jumpTargetY, this.width * 0.8, this.height * 0.8, this);
                     
                     if (!isJumpBlocked) {
                         // 執行跳躍
                         this.advance(moveAmount * 2);
                         this.bumpOffsetY = -30; // 視覺上跳得更高
-                        game.createFloatingText(this.pos.x, this.pos.y, "JUMP!", "#38bdf8");
-                        game.createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist'); // 殘影
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y, "JUMP!", "#38bdf8");
+                        game.spawn_createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist'); // 殘影
                     } else {
                         // 跳躍也被阻擋，撞牆
                         if (i === 0) {
                             this.bumpOffsetY = -10;
-                            if (Math.random() < 0.3) game.createFloatingText(this.pos.x, this.pos.y - 20, "⛔ BLOCKED", "#ef4444");
+                            if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "⛔ BLOCKED", "#ef4444");
                         }
                     }
                 } else {
                     // 沒有跳躍詞條，正常撞牆
                     if (i === 0) {
                         this.bumpOffsetY = -10;
-                        if (Math.random() < 0.3) game.createFloatingText(this.pos.x, this.pos.y - 20, "⛔ BLOCKED", "#ef4444");
+                        if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "⛔ BLOCKED", "#ef4444");
                     }
                 }
             }
@@ -4504,7 +4504,7 @@ class Enemy {
 
     playFreezeBlockEffect(game) {
         this.bumpOffsetY = 6; 
-        game.createFloatingText(this.pos.x, this.pos.y, "❄️FROZEN", "#06b6d4");
+        game.spawn_createFloatingText(this.pos.x, this.pos.y, "❄️FROZEN", "#06b6d4");
         
         const mistCount = 4 + Math.floor(this.width / 15); 
         for(let i=0; i<mistCount; i++) {
@@ -4518,15 +4518,15 @@ class Enemy {
             game.particles.push(mist);
         }
         for(let i=0; i<5; i++) {
-            game.createParticle(this.pos.x + (Math.random()-0.5) * this.width, this.pos.y, '#a5f3fc', 'shard');
+            game.spawn_createParticle(this.pos.x + (Math.random()-0.5) * this.width, this.pos.y, '#a5f3fc', 'shard');
         }
     }
 
     playBurnTickEffect(game, dmg) {
         this.hitTimer = 15;
-        for(let i=0; i<8; i++) game.createParticle(this.pos.x, this.pos.y, '#f97316', 'spark');
-        for(let i=0; i<3; i++) game.createParticle(this.pos.x, this.pos.y, 'rgba(0,0,0,0.6)', 'smoke');
-        game.createFloatingText(this.pos.x, this.pos.y, `🔥-${dmg}`, '#fbbf24');
+        for(let i=0; i<8; i++) game.spawn_createParticle(this.pos.x, this.pos.y, '#f97316', 'spark');
+        for(let i=0; i<3; i++) game.spawn_createParticle(this.pos.x, this.pos.y, 'rgba(0,0,0,0.6)', 'smoke');
+        game.spawn_createFloatingText(this.pos.x, this.pos.y, `🔥-${dmg}`, '#fbbf24');
         audio.playEffect('burn_tick');
     }
 
@@ -4912,7 +4912,7 @@ class Enemy {
         // 设定为 45 帧 (约 0.75秒)，这段时间内白色血条不会减少
         this.whiteBarTimer = 45; 
         if (typeof game !== 'undefined') {
-            game.reportDamage(amount);
+            game.combat_reportDamage(amount);
         }
         if (this.hp <= 0) {
             this.active = false;
@@ -4949,9 +4949,9 @@ class SwordQi {
                 // 标记敌人
                 e.addSwordMark(1);
                 // 造成少量伤害
-                game.damageEnemy(e, { config: { damage: 2 }, pos: this.pos, isCopy: true });
+                game.combat_damageEnemy(e, { config: { damage: 2 }, pos: this.pos, isCopy: true });
                 // 视觉反馈
-                game.createParticle(e.pos.x, e.pos.y, '#0ea5e9', 'spark');
+                game.spawn_createParticle(e.pos.x, e.pos.y, '#0ea5e9', 'spark');
             }
         });
 
@@ -5238,22 +5238,22 @@ class SonSword {
 
     handleHit(enemy, game) {
         if (this.state === 'recalling') {
-            game.damageEnemy(enemy, { config: this.config, pos: this.pos, isCopy: true });
+            game.combat_damageEnemy(enemy, { config: this.config, pos: this.pos, isCopy: true });
             return;
         }
 
         if (enemy === this.currentTarget && this.passingThroughEnemy !== enemy) {
             let dmg = this.config.damage * 0.6;
             if (this.level >= 2) {
-                game.damageEnemy(enemy, { config: this.config, pos: this.pos, isCopy: true });
+                game.combat_damageEnemy(enemy, { config: this.config, pos: this.pos, isCopy: true });
             } else {
                 enemy.takeDamage(dmg);
-                game.createFloatingText(this.pos.x, this.pos.y, `-${Math.ceil(dmg)}`, '#fff');
+                game.spawn_createFloatingText(this.pos.x, this.pos.y, `-${Math.ceil(dmg)}`, '#fff');
             }
 
             // 特效
             game.particles.push(new SlashAnim(this.pos.x, this.pos.y, this.angle, 1.0));
-            game.createParticle(this.pos.x, this.pos.y, '#0ea5e9', 'spark');
+            game.spawn_createParticle(this.pos.x, this.pos.y, '#0ea5e9', 'spark');
             audio.playSlash();
 
             this.passingThroughEnemy = enemy;
@@ -5461,7 +5461,7 @@ class Projectile {
                     if (this.config.flying_sword) {
                         // 调用 Game 的分发方法，将敌人加入所有子剑的攻击队列
                         if (typeof game !== 'undefined') {
-                            game.assignSwordTarget(e);
+                            game.combat_assignSwordTarget(e);
                         }
                     }
 
@@ -5485,7 +5485,7 @@ class Projectile {
                                 // 在敌人位置附近生成子剑
                                 const spawnX = e.pos.x + (Math.random()-0.5)*20;
                                 const spawnY = e.pos.y + (Math.random()-0.5)*20;
-                                game.addSonSword(spawnX, spawnY, this, pegLevel, this.config);
+                                game.spawn_addSonSword(spawnX, spawnY, this, pegLevel, this.config);
                             }
                         }
 
@@ -5526,7 +5526,7 @@ class Projectile {
     
     // 使用深灰色/黑色，带有一定的透明度
     // 模拟未完全燃烧的火药烟雾
-    game.createParticle(smokeX, smokeY, 'rgba(51, 65, 85, 0.6)', 'smoke');
+    game.spawn_createParticle(smokeX, smokeY, 'rgba(51, 65, 85, 0.6)', 'smoke');
 }
 if (Math.random() < 0.2) {
                 const trailDir = this.vel.norm().mult(-1);
@@ -5545,7 +5545,7 @@ if (Math.random() < 0.2) {
              if (this.config.pyro > 0) color = '#f97316';
              else if (this.config.cryo > 0) color = '#06b6d4';
              else if (this.config.lightning > 0) color = '#c084fc';
-             if (color) game.createParticle(this.pos.x, this.pos.y, color);
+             if (color) game.spawn_createParticle(this.pos.x, this.pos.y, color);
         
         }
     }
@@ -5584,13 +5584,13 @@ if (Math.random() < 0.2) {
                 if (this.piercesLeft > 0) {
                     this.piercesLeft--;
                     didBounce = true;
-                    game.createShockwave(this.pos.x, height);
+                    game.spawn_createShockwave(this.pos.x, height);
                 } else if (this.config.bounce > 0) { 
                     didBounce = true;
                 } else if (this.config.type === 'flying_sword') {
                     // 母剑专用反弹逻辑
                     didBounce = true;
-                    game.createShockwave(this.pos.x, height, '#0ea5e9'); // 青色波纹
+                    game.spawn_createShockwave(this.pos.x, height, '#0ea5e9'); // 青色波纹
                 }
             }
             if (didBounce) {
@@ -5614,7 +5614,7 @@ if (Math.random() < 0.2) {
     }
     
     onHit(enemy, allEnemies) {
-        game.damageEnemy(enemy, this);
+        game.combat_damageEnemy(enemy, this);
     }
 
     destroy(spawnCallback) {
@@ -5661,7 +5661,7 @@ if (Math.random() < 0.2) {
             enemy.addSwordCrack(stuckBlade.stuckOffset, hitAngle+90);
             game.sonSwords.push(stuckBlade); 
 
-            game.createFloatingText(this.pos.x, this.pos.y, "🗡️STUCK", "#0ea5e9");
+            game.spawn_createFloatingText(this.pos.x, this.pos.y, "🗡️STUCK", "#0ea5e9");
             audio.playSlash();
 
             // 2. [新增] 触发子剑联动逻辑 (根据等级)
@@ -5672,18 +5672,18 @@ if (Math.random() < 0.2) {
                     if (pegLevel === 1) {
                         // Lv1: 母剑停下时，子剑消散
                         s.active = false;
-                        game.createParticle(s.pos.x, s.pos.y, '#0ea5e9', 'mist');
+                        game.spawn_createParticle(s.pos.x, s.pos.y, '#0ea5e9', 'mist');
                     } 
                     else if (pegLevel === 2) {
                         // Lv2: 攻击次数全部重置，并进入自动寻敌
                         s.attacksLeft = s.maxAttacks; // 重置次数
                         s.isAutoHunting = true;       // 开启自动寻敌
-                        game.createFloatingText(s.pos.x, s.pos.y, "RESET", "#6366f1");
+                        game.spawn_createFloatingText(s.pos.x, s.pos.y, "RESET", "#6366f1");
                     } 
                     else if (pegLevel >= 3) {
                         // Lv3: 攻击次数不变，进入自动寻敌
                         s.isAutoHunting = true;
-                        game.createFloatingText(s.pos.x, s.pos.y, "HUNT", "#f43f5e");
+                        game.spawn_createFloatingText(s.pos.x, s.pos.y, "HUNT", "#f43f5e");
                     }
                 }
             });
@@ -5710,7 +5710,7 @@ if (Math.random() < 0.2) {
                     s.state = 'flying'; 
                     s.isAutoHunting = true; 
                     s.mother = null; 
-                    game.createFloatingText(s.pos.x, s.pos.y, "HUNT", "#f43f5e");
+                    game.spawn_createFloatingText(s.pos.x, s.pos.y, "HUNT", "#f43f5e");
                 } else if (level === 2) {
                     // Lv2: 收剑 (飞向目标)
                     // [修改点]：传入 targetPos (玩家位置)，而不是 null
@@ -5719,10 +5719,10 @@ if (Math.random() < 0.2) {
                     // Lv1: 消散 (或者你可以改为飞回玩家)
                     // 如果你想让 Lv1 也飞回玩家，可以把下面的逻辑改成 triggerRecall(targetPos)
                     if (s.targetEnemy) {
-                        game.damageEnemy(s.targetEnemy, { config: { damage: this.config.damage * 0.5 }, pos: s.pos, isCopy: true });
+                        game.combat_damageEnemy(s.targetEnemy, { config: { damage: this.config.damage * 0.5 }, pos: s.pos, isCopy: true });
                     }
                     s.active = false; 
-                    game.createParticle(s.pos.x, s.pos.y, '#0ea5e9', 'mist');
+                    game.spawn_createParticle(s.pos.x, s.pos.y, '#0ea5e9', 'mist');
                 }
             }
         });
@@ -6302,7 +6302,7 @@ if (Math.random() < 0.2) {
                 };
 
                 // 使用 isCopy=true 防止伤害统计异常或无限触发
-                game.damageEnemy(other, {
+                game.combat_damageEnemy(other, {
                     config: slashConfig,
                     pos: closest, // 击中点设为最近点，用于生成粒子
                     isCopy: true
@@ -6338,7 +6338,7 @@ class CloneSpore {
             this.progress = 1;
             this.active = false;
             this.onLand(); // 落地，呼叫回調生成敵人
-            game.createExplosion(this.end.x, this.end.y, '#a855f7'); // 落地特效
+            game.spawn_createExplosion(this.end.x, this.end.y, '#a855f7'); // 落地特效
             audio.playPowerup();
         }
 
@@ -7148,7 +7148,7 @@ this.affixDict = {
                 // 3. 点击事件处理
                 btn.onclick = (e) => {
                     e.stopPropagation(); // 防止触发其他逻辑
-                    game.activateSkill(skill);
+                    game.combat_activateSkill(skill);
                 };
             }
 
@@ -7303,9 +7303,9 @@ class Game {
         this.isVisualEffectActive = false;
         this.isWheelSpinning = false;
         this.canvas = document.getElementById('gameCanvas'); this.ctx = this.canvas.getContext('2d');
-        this.resize();
+        this.sys_resize();
         // 窗口大小变化时重新调整 Canvas 大小并重新初始化弹珠台布局
-        window.addEventListener('resize', () => { this.resize(); if (this.phase === 'gathering') this.initPachinko(); });
+        window.addEventListener('resize', () => { this.sys_resize(); if (this.phase === 'gathering') this.sys_initPachinko(); });
         this.ui = new UIManager();
         this.boardTilt = {
             current: { x: 0, y: 0 }, // 当前平滑后的倾斜值 (-1 ~ 1)
@@ -7406,13 +7406,13 @@ class Game {
         this.slowMotionTimer = 0;        // 慢动作持续时间的计时器
         this.slowMotionThreshold = 100;  // 【可调】触发慢动作的伤害阈值
 
-        this.setupInputs(); 
-        this.initGameStart(); 
+        this.sys_setupInputs(); 
+        this.sys_initGameStart(); 
         
         // 启动游戏主循环 (修复了原始的 this.loop is not a function 错误
         this.currentRows = CONFIG.gameplay.rows; 
         this.boardBottomY = 0;
-        this.loop();
+        this.sys_loop();
     }
     // --- 在 Game 类中新增以下方法 ---
 
@@ -7420,7 +7420,7 @@ class Game {
      * @method calculatePlayerExpectedDamage
      * @description 计算玩家当前弹药队列的平均预期伤害 (DDA 核心算法)
      */
-    calculatePlayerExpectedDamage() {
+    combat_calculatePlayerExpectedDamage() {
         if (this.ammoQueue.length === 0) return 0;
 
         // 1. 计算每一发弹药的单发期望评分 (Raw Score)
@@ -7470,11 +7470,11 @@ class Game {
      * @method evaluateAndAdjustDifficulty
      * @description 对比玩家战力与敌人期望血量，动态调整难度系数
      */
-    evaluateAndAdjustDifficulty() {
+    calc_evaluateAndAdjustDifficulty() {
         // 前 3 回合不调整，让系统预热
         if (this.round < 3) return;
 
-        this.currentPlayerPower = this.calculatePlayerExpectedDamage();
+        this.currentPlayerPower = this.combat_calculatePlayerExpectedDamage();
 
         // 1. 计算当前敌人的期望血量 (Weighted HP Expectation)
         const b = CONFIG.balance;
@@ -7507,11 +7507,18 @@ class Game {
 
 
     // 1. 汇报伤害（供敌人受伤时调用）
-    reportDamage(amount) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for combat_reportDamage.
+     * @param {any} amount - TODO: Describe this parameter.
+     */
+    combat_reportDamage(amount) {
         this.frameDamageAccumulator += amount;
     }
     // --- [新增] 动态阈值计算 ---
-    calculateDynamicThreshold() {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for calc_calculateDynamicThreshold.
+     */
+    calc_calculateDynamicThreshold() {
         // 如果场上没敌人，设置一个极高值防止误触
         if (this.enemies.length === 0) return 999999;
 
@@ -7553,8 +7560,11 @@ class Game {
         return Math.max(minThreshold, finalThreshold);
     }
     // 2. 更新慢动作逻辑（放在 update 中调用）
-    updateSlowMotion() {
-        const dynamicThreshold = this.calculateDynamicThreshold();
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for ui_updateSlowMotion.
+     */
+    ui_updateSlowMotion() {
+        const dynamicThreshold = this.calc_calculateDynamicThreshold();
         // 1. 触发逻辑
         if (this.frameDamageAccumulator > dynamicThreshold) {
             this.slowMotionTimer = 40; // 慢动作持续约 0.6秒
@@ -7595,7 +7605,11 @@ class Game {
      * @method loop
      * @description 游戏主循环
      */
-    loop() {
+    /**
+     * [SYS] 游戏主循环，由 requestAnimationFrame 驱动。
+     * 负责更新游戏状态、渲染所有实体和 UI。
+     */
+    sys_loop() {
         // 1. 清理画布
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.ctx.fillStyle = CONFIG.colors.bg;
@@ -7635,9 +7649,9 @@ class Game {
 
         // 3. 阶段分发
         if (this.phase === 'gathering') {
-            this.updateGathering(timeScale);
+            this.ui_updateGathering(timeScale);
         } else if (this.phase === 'combat') {
-            this.updateCombat(timeScale);
+            this.ui_updateCombat(timeScale);
         }
 
         // 4. 全局浮动文字更新
@@ -7649,14 +7663,14 @@ class Game {
             }
         }
 
-        requestAnimationFrame(() => this.loop());
+        requestAnimationFrame(() => this.sys_loop());
     }
 
     /**
      * @method resize
      * @description 响应窗口大小变化，调整 Canvas 尺寸和游戏布局参数。
      */
-    resize() {
+    sys_resize() {
         const container = document.getElementById('game-container'); 
         
         // --- 修改开始：强制 JS 同步窗口高度，解决部分安卓浏览器兼容问题 ---
@@ -7674,24 +7688,27 @@ class Game {
         
         this.enemyWidth = (this.width / CONFIG.gameplay.enemyCols); 
         this.enemyHeight = this.enemyWidth; 
-        this.updateUICache();
+        this.ui_updateUICache();
         // 如果是在收集阶段，且已经初始化过，可能需要重新计算钉子位置（可选）
-        // if (this.phase === 'gathering') this.initPachinko();
+        // if (this.phase === 'gathering') this.sys_initPachinko();
     }
     /**
      * @method initGameStart
      * @description 初始化游戏开始状态 (生成初始敌人和进入选择阶段)。
      */
-    initGameStart() {
+    sys_initGameStart() {
         const startY = 80; 
         // 根据配置生成初始敌人行
         for(let i=0; i<CONFIG.gameplay.startRows; i++) { 
-            this.spawnEnemyRowAt(startY + i * this.enemyHeight); 
+            this.spawn_spawnEnemyRowAt(startY + i * this.enemyHeight); 
         }
-        this.showRelicSelection();
-        // this.initSelectionPhase(); // 进入弹珠选择阶段
+        this.ui_showRelicSelection();
+        // this.sys_initSelectionPhase(); // 进入弹珠选择阶段
     }
-    resetGame() {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for sys_resetGame.
+     */
+    sys_resetGame() {
         this.gameOver = false;
         this.round = 1;
         this.score = 0;
@@ -7715,11 +7732,11 @@ class Game {
         this.ui.updateSkillPoints(this.skillPoints);
 
         // 重新生成初始敵人
-        this.spawnEnemyRow(CONFIG.gameplay.startRows);
+        this.spawn_spawnEnemyRow(CONFIG.gameplay.startRows);
         
         // 進入選擇階段
-        // this.initSelectionPhase();
-        this.showRelicSelection();
+        // this.sys_initSelectionPhase();
+        this.ui_showRelicSelection();
         // 重置 UI
         document.getElementById('combat-message').innerHTML = '';
         document.getElementById('score-num').innerText = '0';
@@ -7729,7 +7746,7 @@ class Game {
      * @method setupInputs
      * @description 设置所有输入事件监听器（鼠标/触摸、按钮点击）。
      */
-    setupInputs() {
+    sys_setupInputs() {
         // 辅助函数：获取鼠标/触摸在 Canvas 上的相对位置
         const handler = (e) => {
             const rect = this.canvas.getBoundingClientRect(); 
@@ -7738,13 +7755,13 @@ class Game {
             return new Vec2(x - rect.left, y - rect.top);
         };
         // 绑定输入事件到 Canvas 和 Window
-        this.canvas.addEventListener('mousedown', e => this.handleInputStart(handler(e))); 
-        this.canvas.addEventListener('touchstart', e => this.handleInputStart(handler(e)), {passive: false});
-        window.addEventListener('mousemove', e => this.handleInputMove(handler(e), e)); 
-        window.addEventListener('touchmove', e => this.handleInputMove(handler(e), e), {passive: false});
-        window.addEventListener('mouseup', () => this.handleInputEnd()); 
-        window.addEventListener('touchend', () => this.handleInputEnd());
-        document.getElementById('confirm-selection-btn').onclick = () => this.confirmSelection(); // 确认选择按钮
+        this.canvas.addEventListener('mousedown', e => this.phase_handleInputStart(handler(e))); 
+        this.canvas.addEventListener('touchstart', e => this.phase_handleInputStart(handler(e)), {passive: false});
+        window.addEventListener('mousemove', e => this.input_handleInputMove(handler(e), e)); 
+        window.addEventListener('touchmove', e => this.input_handleInputMove(handler(e), e), {passive: false});
+        window.addEventListener('mouseup', () => this.input_handleInputEnd()); 
+        window.addEventListener('touchend', () => this.input_handleInputEnd());
+        document.getElementById('confirm-selection-btn').onclick = () => this.ui_confirmSelection(); // 确认选择按钮
 
         // 速度控制按钮
         const speedBtn = document.getElementById('speed-btn'); 
@@ -7770,13 +7787,13 @@ class Game {
                     const permission = await DeviceOrientationEvent.requestPermission();
                     if (permission === 'granted') {
                         this.boardTilt.enabled = true;
-                        window.addEventListener('deviceorientation', e => this.handleOrientation(e));
+                        window.addEventListener('deviceorientation', e => this.input_handleOrientation(e));
                     }
                 } catch (e) { console.log("Gyro permission failed", e); }
             } else if ('ondeviceorientation' in window) {
                 // 非 iOS 设备通常直接支持
                 this.boardTilt.enabled = true;
-                window.addEventListener('deviceorientation', e => this.handleOrientation(e));
+                window.addEventListener('deviceorientation', e => this.input_handleOrientation(e));
             }
         };
 
@@ -7792,7 +7809,11 @@ class Game {
     }
 
     //  处理设备倾斜
-    handleOrientation(e) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for input_handleOrientation.
+     * @param {any} e - TODO: Describe this parameter.
+     */
+    input_handleOrientation(e) {
         if (!this.boardTilt.enabled) return;
         
         // gamma: 左倾/右倾 (-90 ~ 90)
@@ -7823,11 +7844,15 @@ class Game {
      * @param {string} text - 文字內容
      * @param {string} [color] - 文字顏色 (可選)
      */
-    createFloatingText(x, y, text, color) { 
+    spawn_createFloatingText(x, y, text, color) { 
         this.floatingTexts.push(new FloatingText(x, y, text, color)); 
     }
     // --- [新增] 更新連射倍率 UI ---
-    updateMulticastDisplay(bonusAmount = 0) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for combat_updateMulticastDisplay.
+     * @param {any} bonusAmount - TODO: Describe this parameter.
+     */
+    combat_updateMulticastDisplay(bonusAmount = 0) {
         // 基礎是 1，加上當前累積的 multicast
         const total = 1 + (this.currentSession ? this.currentSession.multicast : 0);
         
@@ -7856,7 +7881,11 @@ class Game {
     }
 
     // --- [新增] 播放倍率轉移飛行特效 ---
-    playMulticastTransferEffect(multicastValue) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for combat_playMulticastTransferEffect.
+     * @param {any} multicastValue - TODO: Describe this parameter.
+     */
+    combat_playMulticastTransferEffect(multicastValue) {
         // 1. 獲取起點 (右下角倍率 UI)
         const startEl = document.getElementById('multicast-ui');
         // 2. 獲取終點 (左側當前配方卡片)
@@ -7914,7 +7943,10 @@ class Game {
         }, 600); // 這裡的時間要和 CSS transition 匹配
     }
     // --- 敌人生成与词缀系统 ---
-    generateAffixes() {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for spawn_generateAffixes.
+     */
+    spawn_generateAffixes() {
         const affixes = [];
         let possible = [];
         const r = this.round || 0;
@@ -7981,7 +8013,7 @@ class Game {
      * @method isAreaOccupied
      * @description 檢查指定區域是否被其他敵人佔用 (修正版：基于逻辑目标位置判断)
      */
-    isAreaOccupied(x, y, w, h, excludeEnemy = null) {
+    calc_isAreaOccupied(x, y, w, h, excludeEnemy = null) {
         // 定義检测区域的邊界
         const l1 = x - w / 2;
         const r1 = x + w / 2;
@@ -8022,7 +8054,7 @@ class Game {
      * 2. 机会生成器：概率生成布局破绽（降低难度/提供爽感）。
      * 3. 混合填充：智能填充剩余空位。
      */
-    spawnEnemyRowAt(yPos) {
+    spawn_spawnEnemyRowAt(yPos) {
         const b = CONFIG.balance;
         // 计算基础血量
         const dynamicGrowth = (this.round * b.enemyHpPerRound) * this.difficultyGrowthFactor;
@@ -8168,7 +8200,7 @@ class Game {
             // 否则按概率或最小数量生成 (注意：如果是Checkerboard布局，freeCols 已经很少了，这里的逻辑会自动适应)
             else if (currentCount < minEnemies || Math.random() < b.spawnProb) shouldSpawn = true;
 
-            if (shouldSpawn && !this.isAreaOccupied(centerX, yPos, w * 0.8, this.enemyHeight * 0.8)) {
+            if (shouldSpawn && !this.calc_isAreaOccupied(centerX, yPos, w * 0.8, this.enemyHeight * 0.8)) {
                 
                 // 决定血量
                 let hp = Math.floor(baseHP * (0.8 + Math.random() * 0.4));
@@ -8188,7 +8220,7 @@ class Game {
                     e.affixes = [];
                     // 可以在这里给弱点怪加个视觉标记，比如颜色变淡，或者在 update 里处理
                 } else {
-                    e.affixes = this.generateAffixes();
+                    e.affixes = this.spawn_generateAffixes();
                 }
 
                 if (e.affixes.length > 0) e.type = 'elite';
@@ -8204,7 +8236,7 @@ class Game {
         for (let cfg of pendingSpawns) {
             const centerX = cfg.col * w + w / 2;
             // 二次检查碰撞，虽然 occupiedCols 应该保证了位置
-            if (!this.isAreaOccupied(centerX, yPos, w * 0.8, this.enemyHeight * 0.8)) {
+            if (!this.calc_isAreaOccupied(centerX, yPos, w * 0.8, this.enemyHeight * 0.8)) {
                 const e = new Enemy(centerX, yPos, w, this.enemyHeight, cfg.hp);
                 e.affixes = cfg.affixes || [];
                 if (e.affixes.length > 0) e.type = 'elite';
@@ -8212,7 +8244,11 @@ class Game {
             }
         }
     }
-    addSkillPoint(amount = 1) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for spawn_addSkillPoint.
+     * @param {any} amount - TODO: Describe this parameter.
+     */
+    spawn_addSkillPoint(amount = 1) {
         this.skillPoints += amount;
         this.ui.updateSkillPoints(this.skillPoints);
         this.ui.updateSkillBar(this.skillPoints); // <--- [新增] 更新技能栏状态
@@ -8220,7 +8256,11 @@ class Game {
 
 
     // 在 Game 类中
-    activateSkill(skill) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for combat_activateSkill.
+     * @param {any} skill - TODO: Describe this parameter.
+     */
+    combat_activateSkill(skill) {
         if (this.phase !== 'combat' || this.isEnemyTurn || this.skillPoints < skill.cost) return;
 
         // 1. 扣除消耗
@@ -8246,10 +8286,10 @@ class Game {
                     e.pos.y = e.dropTargetY; 
                     e.bumpOffsetY = p.visualShake;
                     pushedCount++;
-                    this.createParticle(e.pos.x, e.pos.y + e.height/2, p.particleColor, 'mist');
+                    this.spawn_createParticle(e.pos.x, e.pos.y + e.height/2, p.particleColor, 'mist');
                 }
             });
-            this.createShockwave(this.width/2, this.height/2, p.shockwaveColor);
+            this.spawn_createShockwave(this.width/2, this.height/2, p.shockwaveColor);
             if(pushedCount > 0) audio.playEffect('split');
             document.getElementById('game-container').classList.add('shake-hard');
             setTimeout(() => document.getElementById('game-container').classList.remove('shake-hard'), 200);
@@ -8277,8 +8317,8 @@ class Game {
                     
                     // 2. 造成主伤害
                     const killed = e.takeDamage(dmg);
-                    this.recordDamage(dmg);
-                    this.createFloatingText(e.pos.x, e.pos.y, `-${dmg}`, '#c084fc');
+                    this.combat_recordDamage(dmg);
+                    this.spawn_createFloatingText(e.pos.x, e.pos.y, `-${dmg}`, '#c084fc');
                     
                     // 3. 施加感电效果 (温度)
                     e.applyTemp(CONFIG.balance.lightningTempIncrease || 3); 
@@ -8287,9 +8327,9 @@ class Game {
                     // 我们调用已有的 triggerLightningChain，把当前敌人 e 作为源头
                     // 传递 [e] 作为历史记录，防止闪电瞬间弹回给自己
                     // 连锁伤害通常比主伤害低一点，这里设定为 100% 或 80% 皆可，暂时用 100%
-                    this.triggerLightningChain(e, dmg, [e]);
+                    this.spawn_triggerLightningChain(e, dmg, [e]);
 
-                    if (killed) this.addScore(e.maxHp);
+                    if (killed) this.spawn_addScore(e.maxHp);
                 }
             }
             audio.playLightning();
@@ -8322,9 +8362,9 @@ class Game {
                 if (p.forceExplosive) nextAmmo.explosive = true;
                 
                 // 4. 视觉反馈
-                this.createExplosion(this.width/2, this.height - 80, p.explosionColor);
-                this.updateAmmoUI(); 
-                this.createFloatingText(this.width/2, this.height - 120, p.floatText, p.explosionColor);
+                this.spawn_createExplosion(this.width/2, this.height - 80, p.explosionColor);
+                this.ui_updateAmmoUI(); 
+                this.spawn_createFloatingText(this.width/2, this.height - 120, p.floatText, p.explosionColor);
             } else {
                 // 返还 SP
                 this.skillPoints += skill.cost;
@@ -8339,13 +8379,13 @@ class Game {
      * @description 生成指定数量的敌人行。
      * @param {number} [count=1] - **重要参数** 要生成的敌人行数。
      */
-    spawnEnemyRow(count = 1) { for(let i=0; i<count; i++) { this.spawnEnemyRowAt(80 - (i * this.enemyHeight)); } }
+    spawn_spawnEnemyRow(count = 1) { for(let i=0; i<count; i++) { this.spawn_spawnEnemyRowAt(80 - (i * this.enemyHeight)); } }
     
     /**
      * @method triggerCloneSpawn
      * @description 触发分身生成的通用逻辑
      */
-    triggerCloneSpawn(sourceEnemy) {
+    spawn_triggerCloneSpawn(sourceEnemy) {
         const w = this.enemyWidth;
         const cloneHp = Math.max(1, Math.floor(sourceEnemy.maxHp * 0.2));
         
@@ -8355,7 +8395,7 @@ class Game {
              for(let c = 0; c < CONFIG.gameplay.enemyCols; c++) {
                  const tx = c * w + w/2;
                  const ty = 80 + r * this.enemyHeight;
-                 if (!this.isAreaOccupied(tx, ty, w * 0.9, this.enemyHeight * 0.9)) {
+                 if (!this.calc_isAreaOccupied(tx, ty, w * 0.9, this.enemyHeight * 0.9)) {
                      validCols.push({x: tx, y: ty});
                  }
              }
@@ -8369,11 +8409,15 @@ class Game {
                 const clone = new Enemy(pos.x, pos.y, w, this.enemyHeight, cloneHp, cloneHp);
                 clone.affixes = []; // 分身没有词缀
                 this.enemies.push(clone);
-                this.createFloatingText(pos.x, pos.y, "SPAWN", "#a855f7");
+                this.spawn_createFloatingText(pos.x, pos.y, "SPAWN", "#a855f7");
             }));
         }
     }
-    assignSwordTarget(enemy) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for combat_assignSwordTarget.
+     * @param {any} enemy - TODO: Describe this parameter.
+     */
+    combat_assignSwordTarget(enemy) {
         // 遍历所有存活的子剑 (不包括充当标记的母剑)
         this.sonSwords.forEach(sword => {
             if (sword.active && !sword.isMotherBlade) {
@@ -8383,7 +8427,16 @@ class Game {
     }
 
     // --- 新增方法：添加子剑 ---
-    addSonSword(x, y, mother, level, config, delay = 0) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for spawn_addSonSword.
+     * @param {any} x - TODO: Describe this parameter.
+     * @param {any} y - TODO: Describe this parameter.
+     * @param {any} mother - TODO: Describe this parameter.
+     * @param {any} level - TODO: Describe this parameter.
+     * @param {any} config - TODO: Describe this parameter.
+     * @param {any} delay - TODO: Describe this parameter.
+     */
+    spawn_addSonSword(x, y, mother, level, config, delay = 0) {
         if (this.sonSwords.length >= 80) return;
         if (isNaN(x) || isNaN(y)) return;
         const sword = new SonSword(x, y, mother, level, config, delay);
@@ -8398,7 +8451,13 @@ class Game {
      * @param {Enemy} enemy - **重要参数** 目标敌人。
      * @param {Projectile} projectile - **重要参数** 造成伤害的弹丸。
      */
-    damageEnemy(enemy, projectile) {
+    /**
+     * [COMBAT] 对敌人造成伤害的核心方法。
+     * @param {Enemy} enemy - 目标敌人对象。
+     * @param {object} projectile - 造成伤害的弹丸或来源对象。
+     * @returns {number} 实际造成的伤害值。
+     */
+    combat_damageEnemy(enemy, projectile) {
         if (!enemy || !enemy.active) return; 
         // --- [修復]：如果是光球/偽造子彈，補齊 chainHistory 防止報錯 ---
         if (!projectile.chainHistory) projectile.chainHistory = [];
@@ -8442,18 +8501,18 @@ class Game {
 
         } else if (config.pyro > 0) {
             // 火焰：生成橙色火星和上升烟雾
-            for(let i=0; i<5; i++) this.createParticle(hitX, hitY, '#fdba74', 'spark');
-            for(let i=0; i<3; i++) this.createParticle(hitX, hitY, '#7c2d12', 'smoke');
+            for(let i=0; i<5; i++) this.spawn_createParticle(hitX, hitY, '#fdba74', 'spark');
+            for(let i=0; i<3; i++) this.spawn_createParticle(hitX, hitY, '#7c2d12', 'smoke');
         } else if (config.lightning > 0) {
             // 闪电：生成紫色快速火花
-            for(let i=0; i<8; i++) this.createParticle(hitX, hitY, '#d8b4fe', 'spark');
+            for(let i=0; i<8; i++) this.spawn_createParticle(hitX, hitY, '#d8b4fe', 'spark');
         } else if (config.pierce > 0) {
             // 穿透：红色锐利碎片
-            for(let i=0; i<5; i++) this.createParticle(hitX, hitY, '#fca5a5', 'spark');
+            for(let i=0; i<5; i++) this.spawn_createParticle(hitX, hitY, '#fca5a5', 'spark');
         } else {
             // 普通：生成基础粒子
             const color = config.damage > 5 ? '#d8b4fe' : '#e2e8f0';
-            for(let i=0; i<4; i++) this.createParticle(hitX, hitY, color, 'normal');
+            for(let i=0; i<4; i++) this.spawn_createParticle(hitX, hitY, color, 'normal');
         }
         // --- ：判断伤害类型 ---
         let hitType = 'normal';
@@ -8466,7 +8525,7 @@ class Game {
         if (config.pyro > 0) enemy.applyTemp(CONFIG.balance.pyroAmount * config.pyro); 
         if (config.lightning > 0) {
              // 1. 尝试触发闪电链，并获取结果
-             const isChainTriggered = this.triggerLightningChain(enemy, dmg, projectile.chainHistory); 
+             const isChainTriggered = this.spawn_triggerLightningChain(enemy, dmg, projectile.chainHistory); 
              
              // 2. 只有在成功触发闪电链时，才提升当前敌人的温度
              if (isChainTriggered) {
@@ -8477,7 +8536,7 @@ class Game {
         }
 
         const killed = enemy.takeDamage(dmg); 
-        this.recordDamage(dmg);
+        this.combat_recordDamage(dmg);
         audio.playEnemyHit(hitType);
         // 克隆词缀逻辑: 如果敌人被伤害且有 'clone' 词缀，有概率生成克隆
         
@@ -8500,11 +8559,11 @@ class Game {
         }
 
         if (killed) { 
-            this.addScore(enemy.maxHp); 
+            this.spawn_addScore(enemy.maxHp); 
             // 燃烧扩散逻辑 (保留)
             if (enemy.temp >= 100) {
                 this.fireWaves.push(new FireWave(enemy.pos.x, enemy.pos.y));
-                game.createFloatingText(enemy.pos.x, enemy.pos.y - 20, "🔥SPREAD!", "#f97316");
+                game.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 20, "🔥SPREAD!", "#f97316");
                 audio.playExplosion();
                 this.enemies.forEach(other => {
                     if (other.active && other !== enemy && enemy.pos.dist(other.pos) < CONFIG.gameplay.fireSpreadRadius) {
@@ -8516,7 +8575,7 @@ class Game {
             const activeCount = this.enemies.filter(e => e.active && (e.pos.y > 0)).length;
             if(activeCount === 0) {
                 console.log(">>> [LOG] 全场敌人已清除。正在清理子弹...");
-                this.clearProjectiles(); 
+                this.data_clearProjectiles(); 
                 if (this.isEnemyTurn) {
                     console.error(">>> [BUG] 严重错误：在清理子弹时，isEnemyTurn 竟然是 TRUE！");
                 }
@@ -8561,18 +8620,18 @@ class Game {
 
             // --- 2. 播放视觉特效 ---
             // 生成带有属性颜色的 Shockwave
-            this.createShockwave(projectile.pos.x, projectile.pos.y, theme.waveColor); 
+            this.spawn_createShockwave(projectile.pos.x, projectile.pos.y, theme.waveColor); 
             
             // 生成对应的爆炸粒子群
             const particleCount = 12; // 爆炸产生的粒子数量
             for(let i=0; i < particleCount; i++) { 
-                this.createParticle(projectile.pos.x, projectile.pos.y, theme.particleColor, theme.particleMode); 
+                this.spawn_createParticle(projectile.pos.x, projectile.pos.y, theme.particleColor, theme.particleMode); 
             }
 
             // 如果是火焰爆炸，额外加一点黑烟，增加质感
             if (config.pyro > 0) {
                 for(let i=0; i<5; i++) {
-                    this.createParticle(projectile.pos.x, projectile.pos.y, 'rgba(0,0,0,0.5)', 'smoke');
+                    this.spawn_createParticle(projectile.pos.x, projectile.pos.y, 'rgba(0,0,0,0.5)', 'smoke');
                 }
             }
             
@@ -8587,8 +8646,8 @@ class Game {
                     // 造成 AOE 伤害 (减半)
                     const aoeDmg = dmg * 0.5;
                     const k = other.takeDamage(aoeDmg); 
-                    this.recordDamage(aoeDmg); 
-                    if (k) this.addScore(other.maxHp); 
+                    this.combat_recordDamage(aoeDmg); 
+                    if (k) this.spawn_addScore(other.maxHp); 
                     
                     // --- 4. 关键：AOE 也要施加元素效果 ---
                     // 这样爆炸范围内的敌人也会被冰冻/点燃，符合直觉
@@ -8596,7 +8655,7 @@ class Game {
                         // 范围冰冻效果稍弱 (0.5倍)
                         other.applyTemp(-CONFIG.balance.cryoAmount * config.cryo * 0.5);
                         // 视觉反馈：给被波及的敌人也冒一点冷气
-                        if (Math.random() < 0.3) this.createParticle(other.pos.x, other.pos.y, '#a5f3fc', 'smoke');
+                        if (Math.random() < 0.3) this.spawn_createParticle(other.pos.x, other.pos.y, '#a5f3fc', 'smoke');
                     }
                     if (config.pyro > 0) {
                         other.applyTemp(CONFIG.balance.pyroAmount * config.pyro * 0.5);
@@ -8616,13 +8675,13 @@ class Game {
      * @method advanceWave
      * @description 推进到下一波敌人。
      */
-    advanceWave() { 
+    phase_advanceWave() { 
         this.resolveTemperatureAndAdvance(); // 结算温度效果
         // 根据场上敌人行数决定生成多少行新敌人
         const rows = new Set(this.enemies.filter(e=>e.active).map(e => Math.floor(e.pos.y))); 
         let spawnCount = 1; 
         if (rows.size < 3) spawnCount = 2; // 如果敌人行数少于3，则生成2行
-        this.spawnEnemyRow(spawnCount); 
+        this.spawn_spawnEnemyRow(spawnCount); 
         
         this.round++; // 回合数增加
         this.prevRoundDamage = this.roundDamage; // 记录上一回合伤害
@@ -8635,7 +8694,7 @@ class Game {
      * @description 记录本回合造成的伤害。
      * @param {number} amount - **重要参数** 伤害量。
      */
-    recordDamage(amount) { 
+    combat_recordDamage(amount) { 
         this.roundDamage += amount; 
     }
     /**
@@ -8643,19 +8702,19 @@ class Game {
      * @description 增加分数并提高分数乘数。
      * @param {number} amount - **重要参数** 基础分数。
      */
-    addScore(amount) { 
+    spawn_addScore(amount) { 
         this.score += Math.floor(amount * this.scoreMultiplier); 
         document.getElementById('score-num').innerText = this.score; 
         this.scoreMultiplier = parseFloat((this.scoreMultiplier + 0.2).toFixed(1)); // 乘数增加 0.2
-        this.updateMultiplierUI(); 
+        this.ui_updateMultiplierUI(); 
     }
     /**
      * @method resetMultiplier
      * @description 重置分数乘数。
      */
-    resetMultiplier() { 
+    sys_resetMultiplier() { 
         this.scoreMultiplier = 1.0; 
-        this.updateMultiplierUI(); 
+        this.ui_updateMultiplierUI(); 
         document.getElementById('multiplier-display').classList.remove('opacity-100'); 
         document.getElementById('multiplier-display').classList.add('opacity-0'); 
     }
@@ -8663,7 +8722,7 @@ class Game {
      * @method updateMultiplierUI
      * @description 更新分数乘数 UI。
      */
-    updateMultiplierUI() { 
+    ui_updateMultiplierUI() { 
         const el = document.getElementById('multiplier-val'); 
         el.innerText = `x${this.scoreMultiplier.toFixed(1)}`; 
         const container = document.getElementById('multiplier-display'); 
@@ -8679,7 +8738,7 @@ class Game {
      * @method updateUI
      * @description 更新 UI 界面显示，强制管理各阶段元素的显隐
      */
-    updateUI() {
+    ui_updateUI() {
         // 1. 基础：隐藏所有阶段的主容器 (.ui-overlay)
         document.querySelectorAll('.ui-overlay').forEach(el => { 
             el.style.display = 'none'; 
@@ -8754,7 +8813,10 @@ class Game {
     }
     //  計算波浪的動態速度
     // [修正] 计算波浪的动态速度
-    calculateWaveSpeed() {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for calc_calculateWaveSpeed.
+     */
+    calc_calculateWaveSpeed() {
         const maxSpeed = 25 * this.timeScale;
         const scanSpeed = 3 * this.timeScale;
         const clearSpeed = 12 * this.timeScale; //  清场时的展示速度 (适中)
@@ -8815,9 +8877,9 @@ class Game {
      * @description 切换游戏阶段。
      * @param {string} newPhase - **重要参数** 新阶段名称 ('selection', 'gathering', 'combat', 'gameover')。
      */
-    switchPhase(newPhase) {
+    phase_switchPhase(newPhase) {
         this.phase = newPhase;
-        this.updateUI(); // 更新 UI 界面
+        this.ui_updateUI(); // 更新 UI 界面
         const titleContainer = document.getElementById('phase-title-container');
         const titleText = document.getElementById('phase-title');
         const subText = document.getElementById('phase-sub');
@@ -8838,7 +8900,7 @@ class Game {
     /**
      * 显示遗物选择界面 (支持稀有度权重 + 防重复)
      */
-    showRelicSelection() {
+    ui_showRelicSelection() {
         // 1. 记录之前的状态 (用于关闭时恢复)
         this.stateBeforeRelic = this.phase; 
 
@@ -8852,7 +8914,7 @@ class Game {
         // 如果池子空了（全收集了），就给一些保底的或者是空的
         if (pool.length === 0) {
             showToast("已收集所有遗物！");
-            this.closeRelicSelection(); // 或者给个分数奖励
+            this.ui_closeRelicSelection(); // 或者给个分数奖励
             return;
         }
 
@@ -8905,7 +8967,7 @@ class Game {
             `;
             el.onclick = (e) => { 
                 e.stopPropagation(); 
-                this.selectRelic(relic);
+                this.ui_selectRelic(relic);
             };
             container.appendChild(el);
         });
@@ -8920,7 +8982,7 @@ class Game {
     /**
      * 玩家选择遗物
      */
-    selectRelic(relic) {
+    ui_selectRelic(relic) {
         this.ownedRelics.push(relic.id);
         showToast(`獲得遺物: ${relic.name}`);
         //  处理新遗物效果
@@ -8942,7 +9004,7 @@ class Game {
             this.slotCount += 1;
         } else if (relic.effect === 'row_count_up') {
             this.currentRows += 2;
-            this.initPachinko();
+            this.sys_initPachinko();
         }
         //  支持單個字串或數組的解鎖邏輯
         if (relic.unlocks) {
@@ -8962,22 +9024,22 @@ class Game {
         }
 
 
-        this.closeRelicSelection();
+        this.ui_closeRelicSelection();
     }
 
     /**
      * 跳过选择
      */
-    skipRelic() {
-        this.addScore(500);
+    ui_skipRelic() {
+        this.spawn_addScore(500);
         showToast("獲得 500 分");
-        this.closeRelicSelection();
+        this.ui_closeRelicSelection();
     }
 
     /**
      * 关闭界面并恢复
      */
-    closeRelicSelection() {
+    ui_closeRelicSelection() {
         const overlay = document.getElementById('phase-relic');
         overlay.style.display = 'none';
         overlay.classList.remove('active-phase');
@@ -8988,19 +9050,19 @@ class Game {
             // 情况 A: 在收集阶段(打中遗物槽)打开的
             // 不需要跳转阶段，只需要尝试结算当前回合
             // (因为在 updateGathering 里，球已经被移除并 activeBalls-- 了，这里检查是否需要发射)
-            this.attemptCompleteGatheringTurn();
+            this.phase_attemptCompleteGatheringTurn();
         } else {
             // 情况 B: 在回合结束(打完BOSS/固定回合事件)打开的
             // 正常进入下一轮的选弹珠阶段
-            this.initSelectionPhase(); 
+            this.sys_initSelectionPhase(); 
         }
     }
     /**
      * 初始化弹珠选择阶段
      */
-    initSelectionPhase() {
-        this.switchPhase('selection');
-        this.generateMarbleOptions(); // 生成弹珠选项
+    sys_initSelectionPhase() {
+        this.phase_switchPhase('selection');
+        this.spawn_generateMarbleOptions(); // 生成弹珠选项
         this.selectedMarbles = []; // 重置已选择弹珠
         document.getElementById('selected-count').innerText = '0'; 
         document.getElementById('confirm-selection-btn').disabled = true; 
@@ -9013,7 +9075,10 @@ class Game {
      */
     // 在 Game 類中
 
-    generateMarbleOptions() { 
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for spawn_generateMarbleOptions.
+     */
+    spawn_generateMarbleOptions() { 
         const container = document.getElementById('marble-selection-grid'); 
         container.innerHTML = ''; 
         this.marblesPool = []; 
@@ -9070,7 +9135,7 @@ class Game {
             // ... (創建 UI 卡片代碼保持不變) ...
             const card = document.createElement('div'); 
             card.className = 'select-card'; 
-            card.onclick = () => this.toggleMarbleSelection(i, card); 
+            card.onclick = () => this.sys_toggleMarbleSelection(i, card); 
             const icon = document.createElement('div'); 
             icon.className = 'select-icon flex-shrink-0'; 
             icon.style.background = m.getColor(); 
@@ -9087,7 +9152,7 @@ class Game {
      * @param {number} idx - **重要参数** 弹珠在 marblesPool 中的索引。
      * @param {HTMLElement} cardEl - **重要参数** 弹珠对应的 UI 元素。
      */
-    toggleMarbleSelection(idx, cardEl) { 
+    sys_toggleMarbleSelection(idx, cardEl) { 
         if (this.selectedMarbles.includes(idx)) {
             // 取消选择
             this.selectedMarbles = this.selectedMarbles.filter(i => i !== idx); 
@@ -9107,10 +9172,10 @@ class Game {
      * @method confirmSelection
      * @description 确认玩家选择的弹珠，并进入收集阶段。
      */
-    confirmSelection() { 
+    ui_confirmSelection() { 
         if (this.selectedMarbles.length !== 3) return; 
         this.marbleQueue = this.selectedMarbles.map(i => this.marblesPool[i]); // 将选中的弹珠放入队列
-        this.startGatheringPhase(); 
+        this.phase_startGatheringPhase(); 
     }
 
     /**
@@ -9118,13 +9183,16 @@ class Game {
      * @description 开始收集阶段，初始化弹珠台和队列。
      */
 
-    startGatheringPhase() {
-        this.switchPhase('gathering');
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for phase_startGatheringPhase.
+     */
+    phase_startGatheringPhase() {
+        this.phase_switchPhase('gathering');
         requestAnimationFrame(() => {
-            this.updateUICache();
+            this.ui_updateUICache();
         });
         if (this.pegs.length === 0) {
-            this.initPachinko(); 
+            this.sys_initPachinko(); 
         }
         
         // --- 新增：初始化持久阈值变量 ---
@@ -9134,18 +9202,18 @@ class Game {
         this.ammoQueue = []; 
         this.dropBalls = []; 
         this.activeMarbleIndex = 0; 
-        this.updateHitProgress(0, this.persistentThreshold); 
-        this.updateGatheringQueueUI(); 
-        this.renderRecipeHUD(); 
-        this.updateMulticastDisplay(0);
-        this.renderRecipeHUD();
+        this.combat_updateHitProgress(0, this.persistentThreshold); 
+        this.ui_updateGatheringQueueUI(); 
+        this.ui_renderRecipeHUD(); 
+        this.combat_updateMulticastDisplay(0);
+        this.ui_renderRecipeHUD();
     }
     /**
      * @method initRecipeHUD
      * @description 初始化配方 HUD (隐藏)。
      */
-    initRecipeHUD() { 
-        this.renderRecipeHUD(); 
+    sys_initRecipeHUD() { 
+        this.ui_renderRecipeHUD(); 
         const container = document.getElementById('recipe-hud-container'); 
         container.classList.add('hidden'); 
     }
@@ -9153,15 +9221,19 @@ class Game {
      * @method toggleHud
      * @description 切换 HUD 展开/折叠状态。
      */
-    toggleHud() { 
+    sys_toggleHud() { 
         this.hudExpanded = !this.hudExpanded; 
-        this.renderRecipeHUD(); 
+        this.ui_renderRecipeHUD(); 
     }
     /**
      * @method renderRecipeHUD
      * @description 渲染配方 HUD (严格单例渲染)
      */
-    renderRecipeHUD() {
+    /**
+     * [UI] 渲染配方界面的抬头显示 (HUD)。
+     * 负责展示当前收集的弹珠属性和配方预览。
+     */
+    ui_renderRecipeHUD() {
         // 获取两个容器
         const gatheringHud = document.getElementById('gathering-hud-mount'); 
         const combatHud = document.getElementById('recipe-hud-container');
@@ -9245,7 +9317,7 @@ class Game {
                 gatheringHud.innerHTML = ''; 
                 this.marbleQueue.forEach((item, idx) => { 
                     const isActive = idx === this.activeMarbleIndex; 
-                    this.renderRecipeCard(gatheringHud, item, isActive, isActive ? 'current' : 'queue'); 
+                    this.ui_renderRecipeCard(gatheringHud, item, isActive, isActive ? 'current' : 'queue'); 
                 }); 
             }
         }
@@ -9258,7 +9330,7 @@ class Game {
      * @param {boolean} isActive - 是否为当前激活项。
      * @param {string} statusClass - 状态 CSS 类名。
      */
-    renderRecipeCard(container, item, isActive, statusClass) {
+    ui_renderRecipeCard(container, item, isActive, statusClass) {
         const el = document.createElement('div'); 
         el.className = `recipe-card ${statusClass}`; 
         
@@ -9353,7 +9425,10 @@ class Game {
      * @description 初始化弹珠台（Pachinko）的钉子和特殊槽位。
      */
 
-    initPachinko() {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for sys_initPachinko.
+     */
+    sys_initPachinko() {
 
         const previousPegs = this.pegs || []; 
         const shouldInherit = previousPegs.length > 0;
@@ -9419,16 +9494,16 @@ class Game {
                                     // [修复]：显式继承等级
                                     level = prevPeg.level || 1; 
                                 } else {
-                                    type = this.getRandomPegType();
+                                    type = this.calc_getRandomPegType();
                                 }
                             } else {
-                                type = this.getRandomPegType();
+                                type = this.calc_getRandomPegType();
                             }
                         } else {
-                            type = this.getRandomPegType();
+                            type = this.calc_getRandomPegType();
                         }
                     } else {
-                        type = this.getRandomPegType();
+                        type = this.calc_getRandomPegType();
                     }
 
                     let p = new Peg(x, y, type);
@@ -9516,7 +9591,10 @@ class Game {
         }
     }
 
-    getRandomPegType() { 
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for calc_getRandomPegType.
+     */
+    calc_getRandomPegType() { 
     // 定义所有可能的钉子类型（包含普通钉子）
     const pegTypes = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'lightning'];
     
@@ -9557,13 +9635,13 @@ class Game {
      * @method startCombatPhase
      * @description 开始战斗阶段，初始化敌人和UI。
      */
-    startCombatPhase() { 
+    phase_startCombatPhase() { 
         console.log("进入战斗阶段...");
         this.isEnemyTurn = false;
         this.energyOrbs = [];
         this.sonSwordQueue = []; 
         this.sonSwordTimer = 0;
-        this.switchPhase('combat'); 
+        this.phase_switchPhase('combat'); 
         this.phase = 'combat';
         // --- [核心修复 1]：修复属性访问错误 ---
         if (!this.ammoQueue) {
@@ -9572,10 +9650,10 @@ class Game {
 
         // --- [核心修复 2]：UI 渲染 ---
         // 修复后，上面的代码不再报错，这一行将被正确执行，HUD 会在进入战斗时立即出现
-        this.updateUI();
-        this.renderRecipeHUD(); 
+        this.ui_updateUI();
+        this.ui_renderRecipeHUD(); 
 
-        this.resetMultiplier(); 
+        this.sys_resetMultiplier(); 
         this.burstQueue = []; 
         this.pendingShots = []; 
         
@@ -9591,14 +9669,28 @@ class Game {
      * @method clearProjectiles
      * @description 清除所有现存的投射物。
      */
-    clearProjectiles() {
+    data_clearProjectiles() {
         this.sonSwords = [];
         this.projectiles = []; 
         this.burstQueue = []; 
         this.spores = []; // 換場時清理掉還在飛的孢子
         this.fireWaves = []; // 清理火焰波
     }
-    createParticle(x, y, color, mode = 'normal') {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for spawn_createParticle.
+     * @param {any} x - TODO: Describe this parameter.
+     * @param {any} y - TODO: Describe this parameter.
+     * @param {any} color - TODO: Describe this parameter.
+     * @param {any} mode - TODO: Describe this parameter.
+     */
+    /**
+     * [SPAWN] 创建一个粒子效果。
+     * @param {number} x - 粒子的 x 坐标。
+     * @param {number} y - 粒子的 y 坐标。
+     * @param {string} color - 粒子的颜色。
+     * @param {string} [mode='normal'] - 粒子的行为模式 (e.g., 'normal', 'confetti')。
+     */
+    spawn_createParticle(x, y, color, mode = 'normal') {
         this.particles.push(new Particle(x, y, color, mode));
     }
     /**
@@ -9608,7 +9700,7 @@ class Game {
      * @method getTiltOffset
      * @description 获取当前的视觉偏移量 (用于修正鼠标点击坐标)
      */
-    getTiltOffset() {
+    input_getTiltOffset() {
         if (this.phase === 'combat') {
             const tilt = this.boardTilt.current;
             // [修正]：这里必须与 updateCombat 中"实体层"的系数 (-25, -20) 保持一致
@@ -9622,15 +9714,15 @@ class Game {
      * @method handleInputStart
      * @description 处理输入开始 (鼠标按下/触摸开始) - [修改版：直射模式]
      */
-    handleInputStart(pos) {
+    phase_handleInputStart(pos) {
         audio.resume();
-        const offset = this.getTiltOffset();
+        const offset = this.input_getTiltOffset();
         const logicPos = pos.sub(offset); 
         
         this.lastMousePos = logicPos;
 
         if (this.phase === 'combat') {
-             const hitEnemy = this.checkEnemyHover(pos);
+             const hitEnemy = this.input_checkEnemyHover(pos);
              if (hitEnemy) return; 
              if (this.ui.isOpen) {
                  this.ui.closeDrawer();
@@ -9670,11 +9762,11 @@ class Game {
                 } else if (marbleDef.type === 'colored' && marbleDef.type) {
                     this.currentSession.collected.push(marbleDef.type);
                 }
-                this.updateHitProgress(0, this.persistentThreshold);
+                this.combat_updateHitProgress(0, this.persistentThreshold);
                 this.dropBalls.push(new DropBall(pos.x, 30, marbleDef, this.currentSession));
-                this.updateGatheringQueueUI();
+                this.ui_updateGatheringQueueUI();
                 audio.playShoot();
-                this.updateMulticastDisplay(0);
+                this.combat_updateMulticastDisplay(0);
             } else {
                 // ---  下方区域：进入“抓取倾斜”模式，暂不报错 ---
                 this.isTiltingGrip = true;
@@ -9684,7 +9776,11 @@ class Game {
         } 
     }
     //  检测是否有敌人被悬浮/点击
-    checkEnemyHover(pos) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for input_checkEnemyHover.
+     * @param {any} pos - TODO: Describe this parameter.
+     */
+    input_checkEnemyHover(pos) {
         // 只有战斗阶段且非敌人回合才允许查看
         if (this.phase !== 'combat' || this.isEnemyTurn) return null;
 
@@ -9722,7 +9818,10 @@ class Game {
      * @description 处理输入结束 (松手发射) - [修改版：直射模式]
      */
     // --- Game 类 ---
-    handleInputEnd() {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for input_handleInputEnd.
+     */
+    input_handleInputEnd() {
 
     if (this.isDragging) {
         // ... (战斗发射逻辑保持不变) ...
@@ -9731,7 +9830,7 @@ class Game {
         const targetPos = this.lastMousePos;
         const aimVector = targetPos.sub(cannonPos);
         if (aimVector.y < -20) { 
-            this.resetMultiplier();
+            this.sys_resetMultiplier();
             // 保存计算好的力度，开启 flag
             this.pendingFireVelocity = aimVector.norm().mult(12);
             this.isChargingShot = true;
@@ -9739,7 +9838,7 @@ class Game {
             
             // 给 UI 一个初始反馈（可选，比如让轨道瞬间亮一下）
             audio.playTone(800, 'sine', 0.1, 0.1); // 可选：吸收开始的音效
-            // this.fireNextShot(aimVector.norm().mult(12)); 
+            // this.combat_fireNextShot(aimVector.norm().mult(12)); 
         }
     }
     
@@ -9775,8 +9874,13 @@ class Game {
      * @param {Event} e - 事件对象。
      */
 
-    handleInputMove(pos, e) {
-        const offset = this.getTiltOffset();
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for input_handleInputMove.
+     * @param {any} pos - TODO: Describe this parameter.
+     * @param {any} e - TODO: Describe this parameter.
+     */
+    input_handleInputMove(pos, e) {
+        const offset = this.input_getTiltOffset();
         const logicPos = pos.sub(offset);
         this.lastMousePos = logicPos;
         
@@ -9815,7 +9919,7 @@ class Game {
 
         // 战斗阶段悬浮检测
         if (this.phase === 'combat' && !this.ui.isOpen) {
-             this.checkEnemyHover(logicPos);
+             this.input_checkEnemyHover(logicPos);
         }
     }
     
@@ -9824,7 +9928,7 @@ class Game {
      * @description 触发连锁闪电效果 (修复单体报错版)
      * @returns {boolean} 是否成功触发了闪电链
      */
-    triggerLightningChain(sourceEnemy, dmg, history) {
+    spawn_triggerLightningChain(sourceEnemy, dmg, history) {
         // [修复1] 安全检查
         if (!sourceEnemy || !sourceEnemy.pos) return false; // <--- 修改：返回 false
 
@@ -9866,12 +9970,12 @@ class Game {
                 // 伤害与状态
                 closest.applyTemp(CONFIG.balance.lightningTempIncrease); 
                 const killed = closest.takeDamage(dmg); 
-                this.recordDamage(dmg); 
-                if(killed) this.addScore(closest.maxHp); 
+                this.combat_recordDamage(dmg); 
+                if(killed) this.spawn_addScore(closest.maxHp); 
                 
                 // 递归
                 history.push(closest); 
-                this.triggerLightningChain(closest, dmg, history); 
+                this.spawn_triggerLightningChain(closest, dmg, history); 
                 
                 return true; // <--- 新增：成功触发，返回 true
             } 
@@ -9885,7 +9989,7 @@ class Game {
      * @description 发射下一发弹丸 (处理多重射击)。
      * @param {Vec2} vel - **重要参数** 初始速度向量。
      */
-    fireNextShot(vel) { 
+    combat_fireNextShot(vel) { 
         if (this.ammoQueue.length === 0) return;
 
         // ... (套娃提取逻辑保持不变) ...
@@ -9910,7 +10014,7 @@ class Game {
             // 2. 延迟更新 UI (等待动画播放一部分，制造视觉连贯性)
             // 实际子弹已经生成，但UI滞后一点点更新，让玩家看到"发射"的过程
             setTimeout(() => {
-                this.updateAmmoUI();
+                this.ui_updateAmmoUI();
                 
                 // 3. 为新上膛的子弹添加"滑入"动画
                 const newCurrent = document.getElementById('current-ammo-render');
@@ -9920,10 +10024,10 @@ class Game {
                 }
             }, 150); 
         } else {
-            this.updateAmmoUI();
+            this.ui_updateAmmoUI();
         }
         
-        this.renderRecipeHUD(); 
+        this.ui_renderRecipeHUD(); 
         
         // 基础射击
         this.burstQueue.push({ delay: 0, vel: vel, recipe: finalRecipe }); 
@@ -9944,11 +10048,11 @@ class Game {
      * @param {Vec2} vel - **重要参数** 初始速度向量。
      * @param {object} recipe - **重要参数** 弹药配方。
      */
-    spawnBullet(x, y, vel, recipe) {
+    spawn_spawnBullet(x, y, vel, recipe) {
 
         // [关键] 如果是激光，发射光束后直接 return，不生成 Projectile
         if (recipe.isLaser) {
-            this.fireLaser(x, y, vel, recipe);
+            this.combat_fireLaser(x, y, vel, recipe);
             
             // 处理散射激光 (如果激光带有散射属性，比如吃了黄色钉子)
             if (recipe.scatter > 0) {
@@ -9960,7 +10064,7 @@ class Game {
                     // 递归调用 fireLaser 或 spawnBullet
                     // 注意：散射出的激光伤害通常减半或者保持
                     const copyRecipe = { ...recipe, scatter: 0 }; 
-                    this.fireLaser(x, y, newVel, copyRecipe);
+                    this.combat_fireLaser(x, y, newVel, copyRecipe);
                 } 
             }
             return; // <--- 确保这里有 return，就不会生成下面的 Projectile 实体球了
@@ -10003,7 +10107,7 @@ class Game {
         }
         this.projectiles.push(new Projectile(x, y, vel, recipe));
         if (recipe.isLaser) {
-            this.fireLaser(x, y, vel, recipe);
+            this.combat_fireLaser(x, y, vel, recipe);
             return;
         }
 
@@ -10021,7 +10125,14 @@ class Game {
     }
 
 // 在 Game 类中更新此方法
-    fireLaser(startX, startY, vel, recipe) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for combat_fireLaser.
+     * @param {any} startX - TODO: Describe this parameter.
+     * @param {any} startY - TODO: Describe this parameter.
+     * @param {any} vel - TODO: Describe this parameter.
+     * @param {any} recipe - TODO: Describe this parameter.
+     */
+    combat_fireLaser(startX, startY, vel, recipe) {
         // --- 1. 参数计算 ---
         this.isVisualEffectActive = true;
         // [射程] 基础 500 + 每层穿透 250 (决定光线能跑多远)
@@ -10050,14 +10161,14 @@ class Game {
         // 内部会判断是否撞墙/次数耗尽来 break
         while (remainLen > 0) {
             // A. 寻找最近的反射面 (墙壁 或 护盾敌人)
-            let hitResult = this.castRayToReflectors(currPos, currDir, remainLen);
+            let hitResult = this.combat_castRayToReflectors(currPos, currDir, remainLen);
             
             // B. 结算这一段路径 (移动光标)
             let segmentLen = hitResult.dist;
             let nextPos = currPos.add(currDir.mult(segmentLen));
             
             // C. 伤害路径上的普通敌人 (穿透所有)
-            this.processLaserPenetration(currPos, nextPos, recipe);
+            this.combat_processLaserPenetration(currPos, nextPos, recipe);
 
             // 记录路径点用于绘制
             points.push(nextPos);
@@ -10075,7 +10186,7 @@ class Game {
                 if (bounces <= 0) {
                     // 次数耗尽，光线在这里终止 (虽有长度但无法折射)
                     // 可以在末端加个小火花表示能量耗尽
-                    this.createParticle(nextPos.x, nextPos.y, color, 'spark');
+                    this.spawn_createParticle(nextPos.x, nextPos.y, color, 'spark');
                     break;
                 }
 
@@ -10085,12 +10196,12 @@ class Game {
                 // 触发撞击反馈
                 if (hitResult.hitType === 'wall') {
                     audio.playHit('bounce');
-                    this.createParticle(nextPos.x, nextPos.y, color, 'spark');
+                    this.spawn_createParticle(nextPos.x, nextPos.y, color, 'spark');
                 } else if (hitResult.hitType === 'shield') {
                     // 击中护盾敌人
-                    this.damageEnemy(hitResult.enemy, { config: recipe, pos: nextPos, isCopy: false }); 
+                    this.combat_damageEnemy(hitResult.enemy, { config: recipe, pos: nextPos, isCopy: false }); 
                     audio.playHit('bounce'); // 听起来像打铁
-                    this.createParticle(nextPos.x, nextPos.y, '#3b82f6', 'spark');
+                    this.spawn_createParticle(nextPos.x, nextPos.y, '#3b82f6', 'spark');
                 }
 
                 // 计算反射向量 (镜面反射)
@@ -10110,7 +10221,13 @@ class Game {
     }
 
     // 辅助：寻找最近的反射面（墙壁或带盾敌人）
-    castRayToReflectors(start, dir, maxDist) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for combat_castRayToReflectors.
+     * @param {any} start - TODO: Describe this parameter.
+     * @param {any} dir - TODO: Describe this parameter.
+     * @param {any} maxDist - TODO: Describe this parameter.
+     */
+    combat_castRayToReflectors(start, dir, maxDist) {
         let closest = { dist: maxDist, hitType: 'none', normal: null, enemy: null };
 
         // 1. 检测墙壁
@@ -10150,7 +10267,7 @@ class Game {
             // 但最简单的方法是：检测射线是否穿过敌人中心附近
             
             // 使用线段与矩形相交检测
-            const t = this.getLineRectIntersection(start, dir, e.pos.x - halfW, e.pos.y - halfH, e.width, e.height);
+            const t = this.calc_getLineRectIntersection(start, dir, e.pos.x - halfW, e.pos.y - halfH, e.width, e.height);
             if (t !== null && t > 0 && t < closest.dist) {
                 // 确定法线 (简化：看击中点的相对位置)
                 const hitX = start.x + dir.x * t;
@@ -10175,7 +10292,13 @@ class Game {
     }
 
     // 辅助：处理线段上的普通穿透
-    processLaserPenetration(p1, p2, recipe) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for combat_processLaserPenetration.
+     * @param {any} p1 - TODO: Describe this parameter.
+     * @param {any} p2 - TODO: Describe this parameter.
+     * @param {any} recipe - TODO: Describe this parameter.
+     */
+    combat_processLaserPenetration(p1, p2, recipe) {
         const laserVisualWidth = 3 + (recipe.laser * 4) + (recipe.explosive ? 10 : 0);
     const laserLogicRadius = laserVisualWidth / 2;
         // 构建线段包围盒用于快速剔除
@@ -10210,16 +10333,25 @@ class Game {
                 // 造成伤害
                 // 为了避免多重判定问题，我们可以在这里直接伤害
                 // 伪造一个 projectile 对象传给 damageEnemy
-                this.damageEnemy(e, { config: recipe, pos: new Vec2(projX, projY), isCopy: false });
+                this.combat_damageEnemy(e, { config: recipe, pos: new Vec2(projX, projY), isCopy: false });
                 
                 // 视觉：受击点特效
-                if (Math.random() < 0.3) this.createParticle(projX, projY, '#fff', 'spark');
+                if (Math.random() < 0.3) this.spawn_createParticle(projX, projY, '#fff', 'spark');
             }
         });
     }
 
     // 辅助：射线与矩形相交 (Slab Method) 返回距离 t
-    getLineRectIntersection(start, dir, rx, ry, rw, rh) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for calc_getLineRectIntersection.
+     * @param {any} start - TODO: Describe this parameter.
+     * @param {any} dir - TODO: Describe this parameter.
+     * @param {any} rx - TODO: Describe this parameter.
+     * @param {any} ry - TODO: Describe this parameter.
+     * @param {any} rw - TODO: Describe this parameter.
+     * @param {any} rh - TODO: Describe this parameter.
+     */
+    calc_getLineRectIntersection(start, dir, rx, ry, rw, rh) {
         let tmin = -Infinity;
         let tmax = Infinity;
 
@@ -10251,7 +10383,7 @@ class Game {
      * @param {number} y - **重要参数** 位置 Y。
      * @param {string} color - 颜色。
      */
-    createExplosion(x, y, color) { 
+    spawn_createExplosion(x, y, color) { 
         for(let i=0; i<10; i++) { 
             this.particles.push(new Particle(x, y, color || '#f87171')); 
         } 
@@ -10263,12 +10395,15 @@ class Game {
      * @param {number} x - **重要参数** 位置 X。
      * @param {number} y - **重要参数** 位置 Y。
      */
-    createShockwave(x, y, color = null) { 
+    spawn_createShockwave(x, y, color = null) { 
         console.log("add shockwaves")
         this.shockwaves.push(new Shockwave(x, y, color)); 
     }
 
-    updateUICache() {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for ui_updateUICache.
+     */
+    ui_updateUICache() {
         const gaugeEl = document.getElementById('hero-gauge-container');
         if (gaugeEl) {
             const rect = gaugeEl.getBoundingClientRect();
@@ -10287,9 +10422,16 @@ class Game {
         }
     }
     // ---  createHitFeedback ---
-    createHitFeedback(x, y, velocity, type = 'normal') {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for spawn_createHitFeedback.
+     * @param {any} x - TODO: Describe this parameter.
+     * @param {any} y - TODO: Describe this parameter.
+     * @param {any} velocity - TODO: Describe this parameter.
+     * @param {any} type - TODO: Describe this parameter.
+     */
+    spawn_createHitFeedback(x, y, velocity, type = 'normal') {
         // 1. 获取目标坐标
-        if (!this.uiCache) this.updateUICache();
+        if (!this.uiCache) this.ui_updateUICache();
         
         let targetX = this.uiCache.x;
         let targetY = this.uiCache.y;
@@ -10297,7 +10439,7 @@ class Game {
         // [核心修复]：兜底检测
         // 如果缓存坐标是 0 (说明上次获取时 UI 可能被隐藏了)，强制重算
         if (targetX === 0 && targetY === 0) {
-            this.updateUICache();
+            this.ui_updateUICache();
             targetX = this.uiCache.x;
             targetY = this.uiCache.y;
             
@@ -10339,7 +10481,7 @@ class Game {
                 }
 
                 // 更新 UI
-                this.updateHitProgress(this.currentSession.currentHits, this.currentSession.nextTriggerThreshold); 
+                this.combat_updateHitProgress(this.currentSession.currentHits, this.currentSession.nextTriggerThreshold); 
                 
                 const pulseLayer = this.uiCache.pulseLayer; // 使用缓存 DOM
                 if (pulseLayer) {
@@ -10368,17 +10510,22 @@ class Game {
                 }
 
                 if (this.currentSession.currentHits >= this.currentSession.nextTriggerThreshold) {
-                    this.triggerLevelUpEvent(targetX, targetY); 
+                    this.spawn_triggerLevelUpEvent(targetX, targetY); 
                 } 
             }
-            this.attemptCompleteGatheringTurn();
+            this.phase_attemptCompleteGatheringTurn();
         }));
     }
 
-    triggerLevelUpEvent(uiX, uiY) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for spawn_triggerLevelUpEvent.
+     * @param {any} uiX - TODO: Describe this parameter.
+     * @param {any} uiY - TODO: Describe this parameter.
+     */
+    spawn_triggerLevelUpEvent(uiX, uiY) {
     this.currentSession.currentHits = 0;
     this.currentSession.multicast++; 
-    this.updateMulticastDisplay(1);
+    this.combat_updateMulticastDisplay(1);
     
     // 1. 音效爆發
     audio.playPowerup(this.currentSession.multicast); 
@@ -10393,21 +10540,27 @@ class Game {
         setTimeout(() => gaugeShell.classList.remove('gauge-full'), 800);
     }
     // 3. 强力冲击波
-    this.createShockwave(uiX, uiY, '#facc15');
+    this.spawn_createShockwave(uiX, uiY, '#facc15');
     
     // 4. 生成大量粒子
     for(let i=0; i<20; i++) {
         const px = uiX + (Math.random()-0.5) * 80;
         const py = uiY + (Math.random()-0.5) * 30;
-        this.createParticle(px, py, '#fcd34d', 'spark');
+        this.spawn_createParticle(px, py, '#fcd34d', 'spark');
     }
 
-    this.createFloatingText(uiX, uiY - 50, "LEVEL UP!", "#fff");
-    this.updateHitProgress(0, this.currentSession.nextTriggerThreshold);
+    this.spawn_createFloatingText(uiX, uiY - 50, "LEVEL UP!", "#fff");
+    this.combat_updateHitProgress(0, this.currentSession.nextTriggerThreshold);
 }
 
     // 在 Game 类中
-    compileCollectionToRecipe(marbleDef, collectedTypes, totalMulticast) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for calc_compileCollectionToRecipe.
+     * @param {any} marbleDef - TODO: Describe this parameter.
+     * @param {any} collectedTypes - TODO: Describe this parameter.
+     * @param {any} totalMulticast - TODO: Describe this parameter.
+     */
+    calc_compileCollectionToRecipe(marbleDef, collectedTypes, totalMulticast) {
         const recipe = { 
             damage: 2, 
             bounce: 0, pierce: 0, scatter: 0, 
@@ -10457,7 +10610,7 @@ class Game {
      * @method updateGatheringQueueUI
      * @description 更新收集阶段的弹珠队列UI。
      */
-    updateGatheringQueueUI() { 
+    ui_updateGatheringQueueUI() { 
         const q = document.getElementById('gathering-queue'); 
         q.innerHTML = ''; 
         for(let i = this.activeMarbleIndex; i < this.marbleQueue.length; i++) { 
@@ -10475,7 +10628,7 @@ class Game {
      * @param {number} val - **重要参数** 当前命中次数。
      * @param {number} target - **重要参数** 目标命中次数。
      */
-    updateHitProgress(val, target) { 
+    combat_updateHitProgress(val, target) { 
         // 更新数字
         document.getElementById('hit-text').innerText = `${val}/${target}`; 
         
@@ -10499,7 +10652,7 @@ class Game {
      * @method updateAmmoUI
      * @description 更新战斗阶段的双槽位弹药UI (Current & Next)
      */
-    updateAmmoUI() {
+    ui_updateAmmoUI() {
         const currentContainer = document.getElementById('current-ammo-render');
         const nextContainer = document.getElementById('next-ammo-render');
         const statsContainer = document.getElementById('current-bullet-stats');
@@ -10513,7 +10666,7 @@ class Game {
         // 1. 渲染当前弹药 (Queue[0])
         if (this.ammoQueue.length > 0) {
             const currentRecipe = this.ammoQueue[0];
-            this.renderAmmoIcon(currentContainer, currentRecipe, true);
+            this.ui_renderAmmoIcon(currentContainer, currentRecipe, true);
             
             // 更新底部属性文本
             let html = '';
@@ -10536,7 +10689,7 @@ class Game {
         // 2. 渲染下一发弹药 (Queue[1])
         if (this.ammoQueue.length > 1) {
             const nextRecipe = this.ammoQueue[1];
-            this.renderAmmoIcon(nextContainer, nextRecipe, false);
+            this.ui_renderAmmoIcon(nextContainer, nextRecipe, false);
         } else {
             nextContainer.innerHTML = '<span class="text-slate-700 text-xs">--</span>';
         }
@@ -10545,7 +10698,7 @@ class Game {
     /**
      * 辅助方法：在UI中绘制一个纯CSS的子弹图标
      */
-    renderAmmoIcon(container, recipe, isCurrent) {
+    ui_renderAmmoIcon(container, recipe, isCurrent) {
         const size = isCurrent ? 24 : 16;
         const div = document.createElement('div');
         
@@ -10594,7 +10747,11 @@ class Game {
         container.appendChild(div);
     }
     //  处理单个敌人的回合逻辑 (当波扫到它时调用)
-    processSingleEnemyTurn(e) {
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for calc_processSingleEnemyTurn.
+     * @param {any} e - TODO: Describe this parameter.
+     */
+    calc_processSingleEnemyTurn(e) {
         if (!e.active || e.hasActedThisTurn) return;
         
         e.hasActedThisTurn = true; 
@@ -10620,7 +10777,7 @@ class Game {
 
              if (shouldFreeze) { 
                  e.isFrozenCurrentTurn = true;
-                 this.createExplosion(e.pos.x, e.pos.y, '#06b6d4');
+                 this.spawn_createExplosion(e.pos.x, e.pos.y, '#06b6d4');
                  audio.playEffect('freeze');
              } else {
                  e.isFrozenCurrentTurn = false;
@@ -10655,7 +10812,7 @@ class Game {
      * @method startEnemyTurnLogic
      * @description 启动敌人回合：锁定状态、显示UI提示、并计算所有敌人的移动与技能
      */
-    startEnemyTurnLogic() {
+    phase_startEnemyTurnLogic() {
         console.log(">>> [LOG] 启动敌人回合逻辑"); //
         this.isEnemyTurn = true;
         this.enemyTurnTimer = 0;
@@ -10685,7 +10842,7 @@ class Game {
      * @method finalizeRound
      * @description [修改版] 回合结算，包含劣势补偿机制(自动极速)
      */
-    finalizeRound() {
+    phase_finalizeRound() {
         // 1. 统计当前存活敌人数据
         const activeEnemies = this.enemies.filter(e => e.active);
         // 使用 Set 统计有多少个不同的 Y 坐标（即有多少行）
@@ -10700,7 +10857,7 @@ class Game {
                     e.affixes.push('haste');
                     buffCount++;
                     // [视觉] 获得Buff的特效
-                    this.createParticle(e.pos.x, e.pos.y, '#facc15', 'spark');
+                    this.spawn_createParticle(e.pos.x, e.pos.y, '#facc15', 'spark');
                 }
             });
             
@@ -10716,7 +10873,7 @@ class Game {
         const rowCountCurrent = uniqueRows.size;
         let spawnCount = 1;
         if (rowCountCurrent < 4) spawnCount = 3; // 稍微激进一点的生成
-        this.spawnEnemyRow(spawnCount);
+        this.spawn_spawnEnemyRow(spawnCount);
 
         // 重置倍率
         if (this.nextRoundHpMultiplier > 1) {
@@ -10732,26 +10889,26 @@ class Game {
         showToast(`Round ${this.round}`);
 
         // 检查失败
-        if (this.checkDefeat()) {
+        if (this.input_checkDefeat()) {
             this.gameOver = true;
             return;
         }
 
         document.getElementById('combat-message').innerHTML = '';
-        this.initPachinko();
+        this.sys_initPachinko();
 
         this.isEnemyTurn = false;
         // 遗物事件检查
         if (this.round % CONFIG.gameplay.relicRoundInterval == 0) {
             showToast("✨ 命運的饋贈 ✨");
             this.phase = 'relic_event';
-            setTimeout(() => { this.showRelicSelection(); }, 500);
+            setTimeout(() => { this.ui_showRelicSelection(); }, 500);
             return;
         }
         
         
         if (this.ammoQueue.length === 0) {
-            this.initSelectionPhase();
+            this.sys_initSelectionPhase();
         }
     }
 
@@ -10769,7 +10926,7 @@ class Game {
      * @method checkDefeat
      * @description 检查是否失败 (包含视差偏移计算)。
      */
-    checkDefeat() { 
+    input_checkDefeat() { 
         // [修正]：使用实体层 Y 轴系数 (-20)
         const viewShiftY = this.boardTilt.current.y * -20;
 
@@ -10786,7 +10943,7 @@ class Game {
      * @method updateCombat
      * @description 战斗阶段的游戏逻辑更新 (含可视化墙壁与分层视差)。
      */
-    updateCombat(timeScale) {
+    ui_updateCombat(timeScale) {
 
         // === [新增] 处理子剑动态生成队列 ===
         if (this.sonSwordQueue.length > 0) {
@@ -10799,7 +10956,7 @@ class Game {
                 // 只要母剑还活着(或者没飞太远)，就生成子剑
                 if (req.mother.active || !req.mother.destroyed) {
                     // 这里 startDelay 传 0，因为我们已经通过队列控制了时间
-                    this.addSonSword(req.x, req.y, req.mother, req.level, req.config, 0);
+                    this.spawn_addSonSword(req.x, req.y, req.mother, req.level, req.config, 0);
                     
                     // 播放一个轻微的生成音效 (可选)
                     // audio.playTone(600 + this.sonSwordQueue.length * 50, 'sine', 0.05, 0.1);
@@ -10825,7 +10982,7 @@ class Game {
                 this.isChargingShot = false;
                 this.chargeProgress = 0;
                 if (this.pendingFireVelocity) {
-                    this.fireNextShot(this.pendingFireVelocity);
+                    this.combat_fireNextShot(this.pendingFireVelocity);
                     this.pendingFireVelocity = null;
                     // --- [新增] 发射后立即触发“能量注入”动画 ---
                     this.isReloading = true;
@@ -10860,7 +11017,7 @@ class Game {
         // 在装填过程中(isReloading)，为了体现"未就位"，我们可以让轨道转得稍慢一点，或者反向转
         let currentFrameSpeed = baseSpeed + this.spinBoost;
         this.orbitalAngle += currentFrameSpeed * timeScale * 60; // *60 是为了适配 timeScale 的基准
-        this.updateSlowMotion();
+        this.ui_updateSlowMotion();
         const tilt = this.boardTilt.current;
         const container = document.getElementById('game-container');
         if (container) {
@@ -10902,7 +11059,7 @@ class Game {
             const shot = this.burstQueue[i]; 
             shot.delay -= timeScale; 
             if (shot.delay <= 0) { 
-                this.spawnBullet(this.width/2, this.height-80, shot.vel, shot.recipe); 
+                this.spawn_spawnBullet(this.width/2, this.height-80, shot.vel, shot.recipe); 
                 audio.playShoot(); 
                 this.burstQueue.splice(i, 1); 
             } 
@@ -10955,7 +11112,7 @@ class Game {
 
             // B. 绘制扫描波
             if (this.isEnemyTurn && this.enemyWaveActive) {
-                const currentSpeed = this.calculateWaveSpeed();
+                const currentSpeed = this.calc_calculateWaveSpeed();
                 this.enemyWaveY -= currentSpeed;
 
                 if (Math.floor(this.enemyWaveY) % 30 === 0) {
@@ -11016,7 +11173,7 @@ class Game {
                     if (!e.active) return;
                     if (e.pos.y + e.height/2 >= triggerLine && !e.hasActedThisTurn) {
                         e.playScanFeedback();
-                        this.processSingleEnemyTurn(e);
+                        this.calc_processSingleEnemyTurn(e);
                     }
                 });
                 if (this.enemyWaveY < -50) {
@@ -11081,13 +11238,13 @@ class Game {
                 }
             });
 
-            if (this.checkDefeat()) this.gameOver = true;
+            if (this.input_checkDefeat()) this.gameOver = true;
 
             // 更新和绘制弹丸
             for (let i = this.projectiles.length - 1; i >= 0; i--) { 
                 const p = this.projectiles[i]; 
                 if(p) { 
-                    p.update(this.width, this.height, this.enemies, (spawnInfo) => { this.spawnBullet(spawnInfo.x, spawnInfo.y, spawnInfo.vel, spawnInfo.config); }, timeScale); 
+                    p.update(this.width, this.height, this.enemies, (spawnInfo) => { this.spawn_spawnBullet(spawnInfo.x, spawnInfo.y, spawnInfo.vel, spawnInfo.config); }, timeScale); 
                     p.draw(this.ctx); 
                     if (p.destroyed) this.projectiles.splice(i, 1); 
                 } 
@@ -11206,9 +11363,9 @@ class Game {
                 showToast(`完美清場! 分數 x${scoreMult} | 下輪難度 UP!`);
                 audio.playPowerup();
                 this.ammoQueue = []; 
-                this.updateAmmoUI();
-                this.renderRecipeHUD();
-                this.clearProjectiles();
+                this.ui_updateAmmoUI();
+                this.ui_renderRecipeHUD();
+                this.data_clearProjectiles();
             }
         }
 
@@ -11226,7 +11383,7 @@ class Game {
             }
             // -------------------
             if (!this.isEnemyTurn) {
-                this.startEnemyTurnLogic();
+                this.phase_startEnemyTurnLogic();
             } else {
                 if (this.enemyWaveActive) return;
                 if (anyEnemyMoving) {
@@ -11236,7 +11393,7 @@ class Game {
                 this.enemyTurnTimer += this.timeScale;
                 if (this.enemyTurnTimer > 60) { 
                     console.log(">>> [LOG] 触发 finalizeRound! 计时器:", this.enemyTurnTimer, "扫描波状态:", this.enemyWaveActive);
-                    this.finalizeRound(); 
+                    this.phase_finalizeRound(); 
                     return;
                 }
             }
@@ -11283,7 +11440,7 @@ class Game {
             }
 
             //先绘制轨道 (Orbitals) -> 这样它就在炮台下面
-            this.drawLauncherOrbitals(this.ctx, startPos.x, startPos.y, nextAmmo);
+            this.ui_drawLauncherOrbitals(this.ctx, startPos.x, startPos.y, nextAmmo);
 
             //后绘制炮台核心 (Visuals) -> 这样它就在上面
             Projectile.drawVisuals(this.ctx, startPos.x, startPos.y, params.radius, nextAmmo, previewRotation, params.intensity, deformation);
@@ -11306,7 +11463,7 @@ class Game {
      * @method attemptCompleteGatheringTurn
      * @description 尝试完成收集回合。修复了最后一个能量球导致无法结算的BUG。
      */
-    attemptCompleteGatheringTurn() {
+    phase_attemptCompleteGatheringTurn() {
         if (this.isWheelSpinning) return;
         // 解决方法：只计算 active 为 true 的能量球。
         const activeOrbsCount = this.energyOrbs.filter(orb => orb.active).length;
@@ -11335,9 +11492,9 @@ class Game {
         const totalMulticast = 1 + this.currentSession.multicast;
         // 只有倍率大於 1 時才播放特效，或者你想每次都播也可以
         if (totalMulticast > 0) {
-            this.playMulticastTransferEffect(totalMulticast);
+            this.combat_playMulticastTransferEffect(totalMulticast);
         }
-        const recipe = this.compileCollectionToRecipe(marbleDef, this.currentSession.collected, this.currentSession.multicast > 0);
+        const recipe = this.calc_compileCollectionToRecipe(marbleDef, this.currentSession.collected, this.currentSession.multicast > 0);
         recipe.finalHits = this.currentSession.totalHits;
         recipe.multicast = this.currentSession.multicast;
         this.ammoQueue.push(recipe);
@@ -11346,12 +11503,12 @@ class Game {
         marbleDef.finalHits = this.currentSession.totalHits;
 
         this.activeMarbleIndex++;
-        this.updateGatheringQueueUI();
+        this.ui_updateGatheringQueueUI();
         
         // 4. 状态流转
         if (this.activeMarbleIndex >= this.marbleQueue.length) {
             // 所有弹珠都扔完了，进入战斗
-            setTimeout(() => this.startCombatPhase(), 500);
+            setTimeout(() => this.phase_startCombatPhase(), 500);
         } else {
              // 准备下一回合，清空当前 session，允许玩家再次点击
              this.currentSession = null; 
@@ -11362,7 +11519,7 @@ class Game {
      * @method drawLauncherOrbitals
      * @description 绘制发射器周围的属性轨道 (方案2：透明能量球环绕)
      */
-    drawLauncherOrbitals(ctx, centerX, centerY, recipe) {
+    ui_drawLauncherOrbitals(ctx, centerX, centerY, recipe) {
         if (!recipe) return;
 
         const stats = [];
@@ -11508,7 +11665,7 @@ class Game {
      * @description 收集階段的遊戲邏輯更新。
      * @param {number} [timeScale=1] - **重要參數** 時間縮放因子。
      */
-    updateGathering(timeScale = 1) {
+    ui_updateGathering(timeScale = 1) {
         if (document.getElementById('phase-relic').style.display !== 'none') return;
 
         const tilt = this.boardTilt.current;
@@ -11658,7 +11815,7 @@ class Game {
                     
                     // --- ：不再直接結算，而是嘗試結算 ---
                     // 處理“能量球先落地，彈珠後死”的情況
-                    this.attemptCompleteGatheringTurn();
+                    this.phase_attemptCompleteGatheringTurn();
 
                 } else if (result.type === 'collected') {
                     // 彈珠收集到材料
@@ -11667,9 +11824,9 @@ class Game {
                     if (this.marbleQueue[this.activeMarbleIndex]) {
                         this.marbleQueue[this.activeMarbleIndex].collected.push(result.material);
                     }
-                    this.createHitFeedback(ball.pos.x, ball.pos.y, ball.vel, result.material); // 這裡也許要傳入屬性類型作為顏色依據
+                    this.spawn_createHitFeedback(ball.pos.x, ball.pos.y, ball.vel, result.material); // 這裡也許要傳入屬性類型作為顏色依據
                     audio.playCollect();
-                    this.renderRecipeHUD();
+                    this.ui_renderRecipeHUD();
                     
                 } else if (result.type === 'slot') {
                     // 彈珠擊中特殊槽位
@@ -11696,7 +11853,7 @@ class Game {
                         showToast("分裂!");
                     } else if (result.slotType === 'relic') {
                         // 調用遺物選擇
-                        this.showRelicSelection(); 
+                        this.ui_showRelicSelection(); 
                         
                         // 將彈珠移除
                         this.dropBalls.splice(i, 1);
@@ -11737,7 +11894,7 @@ class Game {
                     this.dropBalls.splice(i, 1);
                     
                     // --- [新增修复]：刷新 UI 以显示新收集到的材料 ---
-                    this.renderRecipeHUD();
+                    this.ui_renderRecipeHUD();
                     
                     showToast("彩虹分裂!");
                 }
