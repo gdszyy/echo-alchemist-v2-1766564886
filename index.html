@@ -2956,9 +2956,50 @@ class Peg {
         
         // --- 3. 绘制特殊钉子边框 ---
         if (isSpecial) { 
-            ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-            ctx.lineWidth = 1.5; 
-            ctx.stroke(); 
+            // 如果是升级过的钉子 (level > 1)，绘制带反光动画的金边
+            if (this.level > 1) {
+                const time = Date.now() / 1000;
+                const goldColor = '#FFD700'; // 金色
+                const shineColor = '#FFFFFF'; // 反光色
+                
+                ctx.save();
+                // 绘制金边底色
+                ctx.strokeStyle = goldColor;
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.arc(this.pos.x, this.pos.y, currentRadius + 2.5, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // 绘制反光动画
+                // 使用线性渐变模拟扫过的反光
+                const angle = (time * 2) % (Math.PI * 2); // 旋转速度
+                const grad = ctx.createLinearGradient(
+                    this.pos.x - currentRadius * Math.cos(angle), 
+                    this.pos.y - currentRadius * Math.sin(angle),
+                    this.pos.x + currentRadius * Math.cos(angle), 
+                    this.pos.y + currentRadius * Math.sin(angle)
+                );
+                grad.addColorStop(0, goldColor);
+                grad.addColorStop(0.45, goldColor);
+                grad.addColorStop(0.5, shineColor); // 中间高亮
+                grad.addColorStop(0.55, goldColor);
+                grad.addColorStop(1, goldColor);
+                
+                ctx.strokeStyle = grad;
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+                
+                // 添加金色外发光
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = goldColor;
+                ctx.stroke();
+                ctx.restore();
+            } else {
+                // 普通特殊钉子边框
+                ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+                ctx.lineWidth = 1.5; 
+                ctx.stroke(); 
+            }
         }
 
         // 2. [新增] 绘制等级指示器 (Level Indicator)
