@@ -5156,21 +5156,37 @@ class SonSword {
             
             // [性能優化]：節流自動尋敵 (Throttling)
             // 不需要每幀都尋找目標，每 15 幀找一次即可
-            if (this.state === 'flying' && this.isAutoHunting && this.targetQueue.length === 0) {
+            if (this.state === 'flying' && this.isAutoHunting && this.targetQueue.length === 0 && !this.currentTarget) {
                 this.searchTimer -= timeScale;
+                // [优化]：如果当前完全没有目标，且计时器还没到，但敌人数量发生了变化，或者强制触发
                 if (this.searchTimer <= 0) {
                     this.searchForTarget(enemies);
                     this.searchTimer = 15; // 重置計時器
                 }
             }
 
+            // [优化]：目标验证逻辑，确保队列中的敌人都是活跃的
+            if (this.targetQueue.length > 0) {
+                this.targetQueue = this.targetQueue.filter(e => e && e.active);
+            }
+
             // 取目標
             if (this.state === 'flying' && !this.currentTarget && this.targetQueue.length > 0) {
                 this.currentTarget = this.targetQueue.shift();
             }
-            // 目標死亡檢測
-            if (this.currentTarget && !this.currentTarget.active) {
-                this.currentTarget = null;
+
+            // [优化]：目标死亡或超出范围检测
+            if (this.currentTarget) {
+                const isOffScreen = this.currentTarget.pos.y < -100 || this.currentTarget.pos.y > game.height + 100;
+                if (!this.currentTarget.active || isOffScreen) {
+                    this.currentTarget = null;
+                    // [优化]：目标丢失时，立即尝试从队列取下一个，或者重置计时器准备下一次搜索
+                    if (this.targetQueue.length > 0) {
+                        this.currentTarget = this.targetQueue.shift();
+                    } else {
+                        this.searchTimer = 0; // 强制下一帧进行搜索
+                    }
+                }
             }
 
             // --- [修改重点]：基于角度的转向逻辑 ---
