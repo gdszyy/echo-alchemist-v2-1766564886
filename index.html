@@ -10608,12 +10608,15 @@ class Game {
         this.shotDamageMap.set(shotId, { total: 0, byAttr: {}, projectileCount: 0, destroyedCount: 0 });
         
         // 基础射击
-        this.burstQueue.push({ delay: 0, vel: vel, recipe: finalRecipe, shotId: shotId }); 
+        // 如果没有多重射击，那么这第一发就是最后一发
+        const isOnlyOne = !(finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword');
+        this.burstQueue.push({ delay: 0, vel: vel, recipe: finalRecipe, shotId: shotId, isLast: isOnlyOne }); 
         
         // 多重射击
         if (finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword') {
             for(let i=1; i<=finalRecipe.multicast; i++) { 
-                this.burstQueue.push({ delay: i * 20, vel: vel, recipe: finalRecipe, shotId: shotId }); 
+                const isLastInBurst = (i === finalRecipe.multicast);
+                this.burstQueue.push({ delay: i * 20, vel: vel, recipe: finalRecipe, shotId: shotId, isLast: isLastInBurst }); 
             } 
         } 
     }
@@ -10627,14 +10630,14 @@ class Game {
      * @param {object} recipe - **重要参数** 弹药配方。
      * @param {number} shotId - 发射ID，用于统计伤害
      */
-    spawn_spawnBullet(x, y, vel, recipe, shotId = null) {
+    spawn_spawnBullet(x, y, vel, recipe, shotId = null, isLast = false) {
 
         // [关键] 属性优先级：飞剑 > 激光
         // 如果是飞剑，优先处理飞剑逻辑
         if (recipe.type === 'flying_sword') {
             // 1. 生成【唯一的母劍】 (Mother Sword)
             // 母劍強制只有一把，不受 scatter/multicast 影響而分裂
-            const motherSword = new Projectile(x, y, vel, recipe, false, shotId);
+            const motherSword = new Projectile(x, y, vel, recipe, false, shotId, isLast);
             this.projectiles.push(motherSword);
 
             // 2. 處理散射 -> 生成【初始護衛子劍】
@@ -10705,7 +10708,7 @@ class Game {
         }
         
         // [关键] 生成主子弹
-        this.projectiles.push(new Projectile(x, y, vel, recipe, false, shotId)); 
+        this.projectiles.push(new Projectile(x, y, vel, recipe, false, shotId, isLast)); 
     }
 
 // 在 Game 类中更新此方法
@@ -11681,7 +11684,7 @@ class Game {
             const shot = this.burstQueue[i]; 
             shot.delay -= timeScale; 
             if (shot.delay <= 0) { 
-                this.spawn_spawnBullet(this.width/2, this.height-80, shot.vel, shot.recipe, shot.shotId); 
+                this.spawn_spawnBullet(this.width/2, this.height-80, shot.vel, shot.recipe, shot.shotId, shot.isLast); 
                 audio.playShoot(); 
                 this.burstQueue.splice(i, 1); 
             } 
