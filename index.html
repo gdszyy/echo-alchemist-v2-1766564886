@@ -1022,10 +1022,20 @@
         <div id="skill-bar" class="absolute bottom-24 right-4 flex flex-col gap-3 pointer-events-auto z-50">
         </div>
         <div id="recipe-hud-container" class="absolute z-40 pointer-events-none"></div>
+        
+        <!-- 左下角伤害统计按钮 -->
+        <button id="damage-stats-btn" onclick="game.ui_toggleDamagePanel()" class="absolute bottom-2 left-2 w-10 h-10 bg-slate-800/90 hover:bg-slate-700/90 rounded-full border-2 border-purple-500/50 hover:border-purple-400 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg">
+            <span class="text-lg">📊</span>
+        </button>
+        
         <div class="text-center mt-4 pointer-events-none">
             <!-- Multiplier Display -->
             <div id="multiplier-display" class="mt-2 text-2xl font-bold text-yellow-400 opacity-0 transition-opacity drop-shadow-md">
                 COMBO <span id="multiplier-val">x1.0</span>
+            </div>
+            <!-- Round Damage Display -->
+            <div id="round-damage-display" class="mt-2 text-xl font-bold text-purple-400 opacity-0 transition-opacity drop-shadow-md">
+                <span id="round-damage-val">0</span>
             </div>
         </div>
 
@@ -1059,6 +1069,7 @@
             <button class="flex-1 py-3 text-sm font-bold text-amber-400 border-b-2 border-amber-400 tab-btn transition-colors" onclick="game.ui.switchTab('status')">敵人狀態</button>
             <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="game.ui.switchTab('affix')">特殊詞條</button>
             <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="game.ui.switchTab('recipe')">配方圖鑑</button>
+            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="game.ui.switchTab('damage')">傷害統計</button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-4 relative">
@@ -1114,6 +1125,12 @@
                         <div class="text-sky-400 font-bold mb-1">🔦 光球 (Laser)</div>
                         <div class="text-slate-400">瞬時射線，根據反射面進行折射。</div>
                     </div>
+                </div>
+            </div>
+            
+            <div id="tab-damage" class="tab-content hidden h-full overflow-y-auto">
+                <div id="damage-stats-container" class="flex gap-2 h-full">
+                    <!-- 子弹伤害统计将动态生成 -->
                 </div>
             </div>
         </div>
@@ -5019,14 +5036,28 @@ class Enemy {
     }
 
     takeDamage(amount) {
-        this.hp -= amount;
+        let finalDamage = amount;
+        
+        // 冰冻伤害加深机制
+        if (this.temp <= -100 || this.isFrozenCurrentTurn) {
+            const bonusDamage = amount * 0.5; // 50%额外伤害
+            finalDamage += bonusDamage;
+            
+            // 记录冰冻额外伤害
+            if (typeof game !== 'undefined') {
+                game.combat_recordDamage(bonusDamage, 'cryo');
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - 30, `+${Math.ceil(bonusDamage)}`, '#06b6d4');
+            }
+        }
+        
+        this.hp -= finalDamage;
         this.hitTimer = 10; 
         
         // ---  重置白色血条的滞留时间 ---
         // 设定为 45 帧 (约 0.75秒)，这段时间内白色血条不会减少
         this.whiteBarTimer = 45; 
         if (typeof game !== 'undefined') {
-            game.combat_reportDamage(amount);
+            game.combat_reportDamage(finalDamage);
         }
         if (this.hp <= 0) {
             this.active = false;
@@ -7385,7 +7416,7 @@ this.affixDict = {
         this.currentTab = tabName;
         // 更新按钮样式
         document.querySelectorAll('.tab-btn').forEach((btn, idx) => {
-            const targets = ['status', 'affix', 'recipe'];
+            const targets = ['status', 'affix', 'recipe', 'damage'];
             if (targets[idx] === tabName) {
                 btn.classList.add('active', 'text-amber-400', 'border-b-2', 'border-amber-400');
                 btn.classList.remove('text-slate-400');
@@ -7397,6 +7428,11 @@ this.affixDict = {
         // 切换内容显示
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
         document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+        
+        // 如果切换到伤害统计标签，更新显示
+        if (tabName === 'damage') {
+            game.ui_updateDamageStats();
+        }
     }
     updateSkillBar(currentSP) {
         const container = document.getElementById('skill-bar');
@@ -7681,6 +7717,11 @@ class Game {
         this.hudExpanded = false; // 战斗 HUD 是否展开
         this.roundDamage = 0; // 本回合造成的伤害
         this.prevRoundDamage = 0; // 上回合造成的伤害
+        this.currentShotDamage = 0; // 当前子弹造成的伤害
+        this.currentShotDamageByAttr = {}; // 当前子弹各属性造成的伤害
+        this.shotDamageHistory = []; // 子弹伤害历史记录 (最多保存3个)
+        this.roundDamageHistory = []; // 回合伤害历史记录 [{round: 1, shots: [...]}]
+        this.currentViewingRound = 0; // 当前查看的回合索引 (0表示当前回合)
 
         // --- 新增：敵人回合控制變量 ---
         this.isEnemyTurn = false;      // 是否處於敵人行動階段
@@ -8848,8 +8889,21 @@ class Game {
              projectile.chainHistory.push(enemy); 
         }
 
-        const killed = enemy.takeDamage(dmg); 
-        this.combat_recordDamage(dmg);
+        const killed = enemy.takeDamage(dmg);
+        // 根据属性类型记录伤害
+        let damageAttr = 'damage'; // 默认为普通伤害
+        
+        // 判断是否为飞剑伤害
+        if (config.type === 'flying_sword' || projectile.isCopy) {
+            damageAttr = 'flying_sword';
+        }
+        else if (config.cryo > 0) damageAttr = 'cryo';
+        else if (config.pyro > 0) damageAttr = 'pyro';
+        else if (config.lightning > 0) damageAttr = 'lightning';
+        else if (config.pierce > 0) damageAttr = 'pierce';
+        else if (config.bounce > 0) damageAttr = 'bounce';
+        else if (config.scatter > 0) damageAttr = 'scatter';
+        this.combat_recordDamage(dmg, damageAttr);
         audio.playEnemyHit(hitType);
 
         // --- [新增] 剑痕共鸣机制 (Stuck Sword Resonance) ---
@@ -8945,7 +8999,10 @@ class Game {
                 this.enemies.forEach(other => {
                     if (other.active && other !== enemy && enemy.pos.dist(other.pos) < CONFIG.gameplay.fireSpreadRadius) {
                         other.applyTemp(CONFIG.gameplay.fireSpreadTempIncrease);
-                        other.takeDamage(enemy.maxHp*CONFIG.gameplay.fireSpreadDamagePercent);
+                        const spreadDmg = enemy.maxHp*CONFIG.gameplay.fireSpreadDamagePercent;
+                        other.takeDamage(spreadDmg);
+                        // 记录火焰扩散伤害
+                        this.combat_recordDamage(spreadDmg, 'pyro');
                     }
                 });
             }
@@ -9071,8 +9128,14 @@ class Game {
      * @description 记录本回合造成的伤害。
      * @param {number} amount - **重要参数** 伤害量。
      */
-    combat_recordDamage(amount) { 
-        this.roundDamage += amount; 
+    combat_recordDamage(amount, attrType = 'damage') { 
+        this.roundDamage += amount;
+        this.currentShotDamage += amount;
+        // 追踪各属性造成的伤害
+        if (!this.currentShotDamageByAttr[attrType]) {
+            this.currentShotDamageByAttr[attrType] = 0;
+        }
+        this.currentShotDamageByAttr[attrType] += amount;
     }
     /**
      * @method addScore
@@ -9110,6 +9173,202 @@ class Game {
         el.classList.add('pop-anim'); 
     }
     
+    /**
+     * @method saveShotDamage
+     * @description 保存当前子弹的伤害统计到历史记录
+     */
+    ui_saveShotDamage() {
+        if (this.currentShotDamage > 0) {
+            // 保存到历史记录，最多保存3个
+            this.shotDamageHistory.unshift({
+                total: this.currentShotDamage,
+                byAttr: JSON.parse(JSON.stringify(this.currentShotDamageByAttr))
+            });
+            if (this.shotDamageHistory.length > 3) {
+                this.shotDamageHistory.pop();
+            }
+            // 更新显示
+            this.ui_updateRoundDamage();
+        }
+    }
+    
+    /**
+     * @method updateRoundDamage
+     * @description 更新当前子弹伤害显示（带滚动数字效果）
+     */
+    ui_updateRoundDamage() {
+        const el = document.getElementById('round-damage-val');
+        const container = document.getElementById('round-damage-display');
+        if (!el || !container) return;
+        
+        const targetValue = this.currentShotDamage;
+        const currentValue = parseInt(el.innerText) || 0;
+        
+        if (targetValue > 0) {
+            container.classList.remove('opacity-0');
+            container.classList.add('opacity-100');
+            
+            // 滚动数字效果
+            const duration = 500; // 毫秒
+            const steps = 20;
+            const stepValue = (targetValue - currentValue) / steps;
+            let currentStep = 0;
+            
+            const interval = setInterval(() => {
+                currentStep++;
+                const newValue = Math.floor(currentValue + stepValue * currentStep);
+                el.innerText = newValue;
+                
+                if (currentStep >= steps) {
+                    clearInterval(interval);
+                    el.innerText = targetValue;
+                }
+            }, duration / steps);
+        } else {
+            container.classList.add('opacity-0');
+            container.classList.remove('opacity-100');
+        }
+    }
+    
+    /**
+     * @method updateDamageStats
+     * @description 更新伤害统计图表显示
+     */
+    ui_updateDamageStats() {
+        const container = document.getElementById('damage-stats-container');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        // 获取当前查看的回合数据
+        let currentData;
+        let roundNumber;
+        if (this.currentViewingRound === 0) {
+            // 查看当前回合
+            currentData = this.shotDamageHistory;
+            roundNumber = this.round;
+        } else {
+            // 查看历史回合
+            const historyIndex = this.roundDamageHistory.length - this.currentViewingRound;
+            if (historyIndex >= 0 && historyIndex < this.roundDamageHistory.length) {
+                const roundData = this.roundDamageHistory[historyIndex];
+                currentData = roundData.shots;
+                roundNumber = roundData.round;
+            } else {
+                currentData = [];
+                roundNumber = 0;
+            }
+        }
+        
+        // 添加回合切换按钮
+        const header = document.createElement('div');
+        header.className = 'w-full flex items-center justify-between mb-2 px-2';
+        const canGoPrev = this.currentViewingRound < this.roundDamageHistory.length;
+        const canGoNext = this.currentViewingRound > 0;
+        header.innerHTML = `
+            <button onclick="game.ui_switchDamageRound(1)" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs ${!canGoPrev ? 'opacity-30 cursor-not-allowed' : ''}" ${!canGoPrev ? 'disabled' : ''}>◀</button>
+            <span class="text-sm font-bold text-purple-300">回合 ${roundNumber}</span>
+            <button onclick="game.ui_switchDamageRound(-1)" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs ${!canGoNext ? 'opacity-30 cursor-not-allowed' : ''}" ${!canGoNext ? 'disabled' : ''}>▶</button>
+        `;
+        container.appendChild(header);
+        
+        // 创建子弹列容器
+        const shotsContainer = document.createElement('div');
+        shotsContainer.className = 'flex gap-2 flex-1 overflow-x-auto';
+        
+        // 最多显示3个子弹的统计
+        const shotsToShow = Math.max(3, currentData.length);
+        
+        for (let i = 0; i < shotsToShow; i++) {
+            const shotData = currentData[i];
+            const column = document.createElement('div');
+            column.className = 'flex-1 bg-slate-800/50 rounded-lg p-3 flex flex-col';
+            
+            if (!shotData) {
+                // 骨架图
+                column.innerHTML = `
+                    <div class="text-center mb-2">
+                        <div class="text-xs text-slate-500">子弹 ${i + 1}</div>
+                    </div>
+                    <div class="flex-1 flex items-center justify-center">
+                        <div class="text-slate-600 text-4xl">•••</div>
+                    </div>
+                `;
+            } else {
+                // 显示实际数据
+                const maxDamage = Math.max(...currentData.map(s => s ? s.total : 0));
+                
+                let attrBarsHtml = '';
+                const attrConfig = CONFIG.ui.attributeDisplay;
+                
+                for (const [attr, damage] of Object.entries(shotData.byAttr)) {
+                    const attrInfo = attrConfig[attr] || { name: attr, color: '#94a3b8' };
+                    const barWidth = maxDamage > 0 ? (damage / maxDamage * 100) : 0;
+                    
+                    attrBarsHtml += `
+                        <div class="mb-1">
+                            <div class="flex justify-between text-[10px] mb-0.5">
+                                <span class="text-slate-400">${attrInfo.icon || ''} ${attrInfo.name}</span>
+                            </div>
+                            <div class="relative h-4 bg-slate-900/50 rounded overflow-hidden">
+                                <div class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white z-10">${damage}</div>
+                                <div class="h-full rounded transition-all duration-300" style="width: ${barWidth}%; background: ${attrInfo.color};"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                column.innerHTML = `
+                    <div class="text-center mb-2 pb-2 border-b border-slate-700">
+                        <div class="text-xs text-slate-400 mb-1">子弹 ${i + 1}</div>
+                        <div class="text-lg font-bold text-purple-400">${shotData.total}</div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto space-y-1">
+                        ${attrBarsHtml}
+                    </div>
+                `;
+            }
+            
+            shotsContainer.appendChild(column);
+        }
+        
+        container.appendChild(shotsContainer);
+    }
+    
+    /**
+     * @method switchDamageRound
+     * @description 切换伤害统计查看的回合
+     */
+    ui_switchDamageRound(direction) {
+        this.currentViewingRound += direction;
+        if (this.currentViewingRound < 0) this.currentViewingRound = 0;
+        if (this.currentViewingRound > this.roundDamageHistory.length) {
+            this.currentViewingRound = this.roundDamageHistory.length;
+        }
+        this.ui_updateDamageStats();
+    }
+    
+    /**
+     * @method toggleDamagePanel
+     * @description 切换伤害统计面板的显示/隐藏
+     */
+    ui_toggleDamagePanel() {
+        if (!this.ui) return;
+        
+        const drawer = document.getElementById('info-drawer');
+        if (!drawer) return;
+        
+        const isOpen = !drawer.classList.contains('translate-y-full');
+        
+        if (isOpen) {
+            // 关闭面板
+            this.ui.closeDrawer();
+        } else {
+            // 打开面板并切换到伤害统计标签
+            drawer.classList.remove('translate-y-full');
+            this.ui.switchTab('damage');
+        }
+    }
 
     /**
      * @method updateUI
@@ -9564,6 +9823,14 @@ class Game {
      * [AUTO-GENERATED] TODO: Add a description for phase_startGatheringPhase.
      */
     phase_startGatheringPhase() {
+        // 保存上一回合的伤害数据
+        if (this.shotDamageHistory.length > 0) {
+            this.roundDamageHistory.push({
+                round: this.round,
+                shots: JSON.parse(JSON.stringify(this.shotDamageHistory))
+            });
+        }
+        
         this.phase_switchPhase('gathering');
         requestAnimationFrame(() => {
             this.ui_updateUICache();
@@ -10032,7 +10299,11 @@ class Game {
 
         this.sys_resetMultiplier(); 
         this.burstQueue = []; 
-        this.pendingShots = []; 
+        this.pendingShots = [];
+        
+        // 初始化当前回合伤害记录
+        this.shotDamageHistory = [];
+        this.currentViewingRound = 0; 
         
         if (this.ui) {
             this.ui.updateSkillPoints(this.skillPoints);
@@ -10383,6 +10654,11 @@ class Game {
         };
         const finalRecipe = pullNext();
         if (!finalRecipe) return;
+        
+        // --- 新增：重置当前子弹伤害统计 ---
+        this.currentShotDamage = 0;
+        this.currentShotDamageByAttr = {};
+        
         // --- 新增：触发UI动画 ---
         const currentSlot = document.getElementById('current-ammo-render');
         if (currentSlot) {
@@ -11186,6 +11462,9 @@ class Game {
                 const dot = 5 + (e.temp - 100);
                 e.takeDamage(dot); // <--- 敵人可能在這裡死亡 (active = false)
                 
+                // 记录火焰持续伤害
+                this.combat_recordDamage(dot, 'pyro');
+                
                 // 觸發燃燒特效
                 e.playBurnTickEffect(this, Math.floor(dot));
                 
@@ -11638,7 +11917,13 @@ class Game {
                 if(p) { 
                     p.update(this.width, this.height, this.enemies, (spawnInfo) => { this.spawn_spawnBullet(spawnInfo.x, spawnInfo.y, spawnInfo.vel, spawnInfo.config); }, timeScale); 
                     p.draw(this.ctx); 
-                    if (p.destroyed) this.projectiles.splice(i, 1); 
+                    if (p.destroyed) {
+                        this.projectiles.splice(i, 1);
+                        // 当所有子弹都销毁时，保存伤害统计
+                        if (this.projectiles.length === 0 && this.burstQueue.length === 0) {
+                            this.ui_saveShotDamage();
+                        }
+                    } 
                 } 
             }
 
