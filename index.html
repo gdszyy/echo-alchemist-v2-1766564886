@@ -5063,6 +5063,7 @@ class SonSword {
         this.angle = 0;
         this.passingThroughEnemy = null;
         this.dashTimer = 0; 
+        this.hitEnemiesInDash = new Set(); // [修复] 记录单次冲刺中已命中的敌人
 
         // [性能優化]：索敵計時器
         // 初始化為隨機值，讓不同子劍錯開索敵時間，避免同一幀計算量過大
@@ -5117,11 +5118,29 @@ class SonSword {
              
              const isInside = enemy.active && distSq < safeDist * safeDist;
 
-             if (isInside) this.dashTimer = this.dashOvershoot;
+             if (isInside) {
+                 this.dashTimer = this.dashOvershoot;
+                 // [修复] 冲刺中持续检查碰撞，但每个敌人只造成一次伤害
+                 for (let e of enemies) {
+                     if (e.active && !this.hitEnemiesInDash.has(e)) {
+                         const dx = this.pos.x - e.pos.x;
+                         const dy = this.pos.y - e.pos.y;
+                         const distSq = dx*dx + dy*dy;
+                         const hitDist = (e.width/2 + 15);
+                         if (distSq < hitDist * hitDist) {
+                             this.hitEnemiesInDash.add(e);
+                             game.combat_damageEnemy(e, { config: this.config, pos: this.pos, isCopy: true });
+                             game.particles.push(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.8));
+                             audio.playSlash();
+                         }
+                     }
+                 }
+             }
              else this.dashTimer -= timeScale;
 
              if (!isInside && this.dashTimer <= 0) {
                  this.passingThroughEnemy = null;
+                 this.hitEnemiesInDash.clear(); // [修复] 结束冲刺，清空命中记录
                  const normalSpeed = (CONFIG.flyingSword.sonSpeed || 12) * this.speedRandomizer;
                  this.vel = this.vel.norm().mult(normalSpeed);
              } else {
@@ -5694,17 +5713,22 @@ if (Math.random() < 0.2) {
     // --- 在 class Projectile 中 ---
 
     handleFlyingSwordFinish(host, game) {
-        
-        
-        // [修改点]：如果没有宿主(host)，说明是掉落/销毁，将目标设为玩家发射点位置
-        // 发射点通常在 (width/2, height - 80)
-        const fallbackTarget = { x: game.width / 2, y: game.height - 80 };
-        const targetPos = host ? host.pos : fallbackTarget;
+        // [修复]：召回目标应该是母剑插着的敌人或位置
+        // 如果 host 存在，说明母剑插在敌人身上
+        // 如果 host 不存在，说明母剑被销毁了，但我们应该尝试找回它最后插着的敌人
+        let targetPos = null;
+        if (host) {
+            targetPos = host.pos;
+        } else if (this.lastHitEnemy && this.lastHitEnemy.active) {
+            targetPos = this.lastHitEnemy.pos;
+        } else {
+            // 兜底：回到玩家位置
+            targetPos = { x: game.width / 2, y: game.height - 80 };
+        }
 
         game.sonSwords.forEach(s => {
             const level = s.level || 1;
             if (s.mother === this && s.active) {
-                console.log("level",s.level)
                 if (level >= 3) {
                     // Lv3: 自动寻敌
                     s.state = 'flying'; 
@@ -5712,15 +5736,10 @@ if (Math.random() < 0.2) {
                     s.mother = null; 
                     game.spawn_createFloatingText(s.pos.x, s.pos.y, "HUNT", "#f43f5e");
                 } else if (level === 2) {
-                    // Lv2: 收剑 (飞向目标)
-                    // [修改点]：传入 targetPos (玩家位置)，而不是 null
+                    // Lv2: 收剑 (飞向母剑位置)
                     s.triggerRecall(targetPos);
                 } else {
-                    // Lv1: 消散 (或者你可以改为飞回玩家)
-                    // 如果你想让 Lv1 也飞回玩家，可以把下面的逻辑改成 triggerRecall(targetPos)
-                    if (s.targetEnemy) {
-                        game.combat_damageEnemy(s.targetEnemy, { config: { damage: this.config.damage * 0.5 }, pos: s.pos, isCopy: true });
-                    }
+                    // Lv1: 消散
                     s.active = false; 
                     game.spawn_createParticle(s.pos.x, s.pos.y, '#0ea5e9', 'mist');
                 }
@@ -10071,27 +10090,9 @@ class Game {
      */
     spawn_spawnBullet(x, y, vel, recipe) {
 
-        // [关键] 如果是激光，发射光束后直接 return，不生成 Projectile
-        if (recipe.isLaser) {
-            this.combat_laser_fire(x, y, vel, recipe);
-            
-            // 处理散射激光 (如果激光带有散射属性，比如吃了黄色钉子)
-            if (recipe.scatter > 0) {
-                 for (let i = 1; i <= recipe.scatter; i++) { 
-                    const sign = i % 2 === 0 ? -1 : 1; 
-                    const multiplier = Math.ceil(i / 2); 
-                    const angleOffset = 0.2 * multiplier * sign; 
-                    const newVel = vel.rotate(angleOffset); 
-                    // 递归调用 fireLaser 或 spawnBullet
-                    // 注意：散射出的激光伤害通常减半或者保持
-                    const copyRecipe = { ...recipe, scatter: 0 }; 
-                    this.combat_laser_fire(x, y, newVel, copyRecipe);
-                } 
-            }
-            return; // <--- 确保这里有 return，就不会生成下面的 Projectile 实体球了
-        }
+        // [关键] 属性优先级：飞剑 > 激光
+        // 如果是飞剑，优先处理飞剑逻辑
         if (recipe.type === 'flying_sword') {
-
             // 1. 生成【唯一的母劍】 (Mother Sword)
             // 母劍強制只有一把，不受 scatter/multicast 影響而分裂
             const motherSword = new Projectile(x, y, vel, recipe);
@@ -10124,9 +10125,29 @@ class Game {
                 }
             }
 
-            return; // <--- 飛劍邏輯結束，直接返回，不執行下方的普通子彈邏輯
+            return; // <--- 飛劍邏輯結束，直接返回
         }
-        this.projectiles.push(new Projectile(x, y, vel, recipe));
+
+        // 如果是激光，发射光束后直接 return，不生成 Projectile
+        if (recipe.isLaser) {
+            this.combat_laser_fire(x, y, vel, recipe);
+            
+            // 处理散射激光 (如果激光带有散射属性，比如吃了黄色钉子)
+            if (recipe.scatter > 0) {
+                 for (let i = 1; i <= recipe.scatter; i++) { 
+                    const sign = i % 2 === 0 ? -1 : 1; 
+                    const multiplier = Math.ceil(i / 2); 
+                    const angleOffset = 0.2 * multiplier * sign; 
+                    const newVel = vel.rotate(angleOffset); 
+                    // 递归调用 fireLaser 或 spawnBullet
+                    // 注意：散射出的激光伤害通常减半或者保持
+                    const copyRecipe = { ...recipe, scatter: 0 }; 
+                    this.combat_laser_fire(x, y, newVel, copyRecipe);
+                } 
+            }
+            return; // <--- 确保这里有 return，就不会生成下面的 Projectile 实体球了
+        }
+         
         if (recipe.isLaser) {
             this.combat_laser_fire(x, y, vel, recipe);
             return;
