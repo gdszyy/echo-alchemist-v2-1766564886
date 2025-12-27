@@ -1187,6 +1187,7 @@ const CONFIG = {
         matCryo: '#06b6d4',
         matPyro: '#f97316',
         matLightning: '#c084fc',
+        matWind: '#34d399',
         marbleWhite: '#f8fafc',
         matMatryoshka: '#d946ef',
         marbleRedStripe: '#fca5a5',
@@ -2783,6 +2784,7 @@ class Peg {
             case 'cryo': color = CONFIG.colors.matCryo; break;
             case 'pyro': color = CONFIG.colors.matPyro; break;
             case 'lightning': color = CONFIG.colors.matLightning; break;
+            case 'wind': color = CONFIG.colors.matWind; break;
             case 'pink': color = CONFIG.colors.pegPink; break;
             case 'laser': color = CONFIG.colors.laser; break;
         }
@@ -5794,8 +5796,10 @@ class Projectile {
                 this.vel.x = speed * Math.sin(newAngle);
                 this.vel.y = speed * Math.cos(newAngle) * (this.vel.y > 0 ? 1 : -1);
             }
-            if(this.config.bounce > 0) this.deformation = { x: 0.7, y: 1.3 };
-            this.hitCooldowns.clear();
+            if(this.config.bounce > 0) {
+                this.deformation = { x: 0.7, y: 1.3 };
+                this.hitCooldowns.clear();
+            }
         }
         if (this.pos.x > width - this.radius) { 
             this.pos.x = width - this.radius; this.vel.x = -Math.abs(this.vel.x); 
@@ -5807,8 +5811,10 @@ class Projectile {
                 this.vel.x = -speed * Math.sin(newAngle);
                 this.vel.y = speed * Math.cos(newAngle) * (this.vel.y > 0 ? 1 : -1);
             }
-            if(this.config.bounce > 0) this.deformation = { x: 0.7, y: 1.3 };
-            this.hitCooldowns.clear();
+            if(this.config.bounce > 0) {
+                this.deformation = { x: 0.7, y: 1.3 };
+                this.hitCooldowns.clear();
+            }
         }
         if (this.pos.y < this.radius) { 
             this.pos.y = this.radius; this.vel.y = Math.abs(this.vel.y); 
@@ -9924,7 +9930,8 @@ class Game {
             'cryo': { c: CONFIG.colors.matCryo, l: CONFIG.ui.attributeDisplay.cryo.icon, n: '冷' },
             'pyro': { c: CONFIG.colors.matPyro, l: CONFIG.ui.attributeDisplay.pyro.icon, n: '熱' },
             'lightning': { c: CONFIG.colors.matLightning, l: CONFIG.ui.attributeDisplay.lightning.icon, n: '雷' },
-            'laser': { c: CONFIG.colors.laser, l: CONFIG.ui.attributeDisplay.laser.icon, n: '光' }
+            'laser': { c: CONFIG.colors.laser, l: CONFIG.ui.attributeDisplay.laser.icon, n: '光' },
+            'wind': { c: CONFIG.colors.matWind, l: CONFIG.ui.attributeDisplay.wind.icon, n: '風' }
         };
 
         Object.keys(counts).forEach(type => { 
