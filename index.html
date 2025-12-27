@@ -5040,7 +5040,6 @@ class Enemy {
 
     addSwordMark(amount = 1) {
         this.swordMarks += amount;
-        console.log("mark",this.swordMarks)
         this.markTimer = CONFIG.flyingSword.markDuration;
     }
 
@@ -5781,7 +5780,7 @@ class Projectile {
                     if (this.piercesLeft > 0) {
                         if (this.config.flying_sword) {
                             const pegLevel = this.config.level || 1;
-                            console.log("flying_sword!")
+
                             
     
                             // B. 范围斩击 (如果 config.damage 足够高或有特定flag)
@@ -7938,7 +7937,7 @@ class Game {
         const dynamicThreshold = this.calc_calculateDynamicThreshold();
         // 1. 触发逻辑
         if (this.frameDamageAccumulator > dynamicThreshold) {
-            this.slowMotionTimer = 40; // 慢动作持续约 0.6秒
+            this.slowMotionTimer = 12; // 慢动作持续约 0.6秒
             // 触发瞬间强制降速，这里可以用固定值 0.1，保证打击感
             this.timeScale = 0.1; 
             console.log(`慢动作触发! 伤害: ${Math.floor(this.frameDamageAccumulator)} > 阈值: ${Math.floor(dynamicThreshold)}`);
@@ -11119,7 +11118,6 @@ class Game {
      * @param {number} y - **重要参数** 位置 Y。
      */
     spawn_createShockwave(x, y, color = null) { 
-        console.log("add shockwaves")
         this.shockwaves.push(new Shockwave(x, y, color)); 
     }
 
@@ -11853,9 +11851,6 @@ class Game {
                 const currentSpeed = this.calc_calculateWaveSpeed();
                 this.enemyWaveY -= currentSpeed;
 
-                if (Math.floor(this.enemyWaveY) % 30 === 0) {
-                    console.log(">>> [LOG] 扫描波运行中，Y:", Math.floor(this.enemyWaveY), "速度:", currentSpeed.toFixed(2));
-                }
                 this.ctx.save();
                 this.ctx.globalCompositeOperation = 'lighter';
                 
@@ -11915,7 +11910,6 @@ class Game {
                     }
                 });
                 if (this.enemyWaveY < -50) {
-                    console.log(">>> [LOG] 扫描波到达顶部 (-50)，正常关闭");
                     this.enemyWaveActive = false;
                     this.enemyTurnTimer = 0;
                 }
@@ -12119,13 +12113,7 @@ class Game {
                            !this.isVisualEffectActive;
 
         if (playerTurnFinished && !this.gameOver) {
-            // --- [新增调试代码] ---
-            if (this.isEnemyTurn && !this.enemyWaveActive && this.enemyTurnTimer === 0) {
-                console.error(">>> [BUG DETECTED] 异常状态：进入了回合切换逻辑，但系统认为已经是敌人回合，且扫描波未激活！");
-                console.log("当前 ammoQueue 长度:", this.ammoQueue.length);
-                console.log("当前 projectiles 长度:", this.projectiles.length);
-            }
-            // -------------------
+
             if (!this.isEnemyTurn) {
                 this.phase_enemy_startLogic();
             } else {
@@ -12136,7 +12124,6 @@ class Game {
                 }
                 this.enemyTurnTimer += this.timeScale;
                 if (this.enemyTurnTimer > 60) { 
-                    console.log(">>> [LOG] 触发 finalizeRound! 计时器:", this.enemyTurnTimer, "扫描波状态:", this.enemyWaveActive);
                     this.phase_finalizeRound(); 
                     return;
                 }
