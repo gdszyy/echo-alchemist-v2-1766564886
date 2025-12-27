@@ -24,7 +24,7 @@
 | **物理 (Physical)** | `stackable` | 可通过碰撞累加数值，影响物理行为。 | `bounce`, `pierce`, `scatter` |
 | **元素 (Elemental)** | `stackable` | 可累加数值，附加元素伤害或效果。 | `cryo`, `pyro`, `lightning` |
 | **特殊 (Special)** | `marble_bound` | 与弹珠类型绑定，不可叠加，提供独特机制。 | `explosive`, `rainbow`, `matryoshka` |
-| **高级 (Advanced)** | `evolution` | 由其他属性组合进化而来，通常更强大。 | `flying_sword` |
+| **高级 (Advanced)** | `evolution` | 由其他属性组合进化而来，通常更强大。 | `flying_sword`, `wind` |
 | **功能 (Functional)** | `stackable` | 特殊的功能性攻击，可叠加层数。 | `laser` |
 
 ### 1.3 属性交互流程
@@ -142,6 +142,7 @@
 | `ui_updateGathering` | `phase_gathering_update` | 收集阶段：更新逻辑 |
 | `ui_toggleDamagePanel` | `ui_toggleDamagePanel` | 切换伤害统计面板（记分板） |
 | `ui_updateDamageStats` | `ui_updateDamageStats` | 更新伤害统计数据 |
+| `combat_wind_addAnchor` | `combat_wind_addAnchor` | 添加风属性锚点并处理法阵逻辑 |
 
 ### 8.2 渲染流程抽象
 
