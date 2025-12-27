@@ -5898,7 +5898,7 @@ class Projectile {
                     if (this.bouncesLeft > 0) {
                         this.bouncesLeft--;
                         if (this.config.wind && this.isLast) {
-                            if (typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y);
+                            if (typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage);
                         }
                         // --- 修复开始：AABB 矩形法线计算 ---
                         // 计算相对位置比例 (dx, dy 是子弹相对于敌人中心的距离)
@@ -9143,14 +9143,14 @@ class Game {
      * @method combat_wind_addAnchor
      * @description 添加风属性锚点，并处理法阵逻辑
      */
-    combat_wind_addAnchor(x, y) {
+    combat_wind_addAnchor(x, y, bulletDamage = 2) {
         if (this.windAnchors.length >= 4) {
             const old = this.windAnchors.shift();
             // 触发小旋风特效和伤害
             this.spawn_smallWhirlwind(old.x, old.y);
-            this.combat_wind_triggerSmallWhirlwindDamage(old.x, old.y);
+            this.combat_wind_triggerSmallWhirlwindDamage(old.x, old.y, bulletDamage);
         }
-        this.windAnchors.push({ x, y, life: 1.0 });
+        this.windAnchors.push({ x, y, life: 1.0, bulletDamage: bulletDamage });
         this.spawn_createParticle(x, y, '#34d399', 'spark');
         if (this.windAnchors.length === 4) {
             this.combat_wind_triggerMagicCircle();
@@ -9194,9 +9194,10 @@ class Game {
     /**
      * [COMBAT] 触发锚点消失时的范围伤害
      */
-    combat_wind_triggerSmallWhirlwindDamage(centerX, centerY) {
+    combat_wind_triggerSmallWhirlwindDamage(centerX, centerY, bulletDamage = 2) {
         const radius = 60; // 伤害半径
-        const damage = 15; // 基础伤害
+        // 小旋风伤害挂钩子弹伤害 (例如 5 倍子弹伤害)
+        const damage = Math.floor(bulletDamage * 5); 
 
         // 遍历敌人检测碰撞
         this.enemies.forEach(e => {
@@ -9462,7 +9463,10 @@ class Game {
                 this.enemies.forEach(e => {
                     const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
                     if (e.active && inPath) {
-                        e.takeDamage(10);
+                        // 风道伤害挂钩子弹伤害 (例如 5 倍)
+                        const dmg = Math.max(1, Math.floor(bulletDamage * 5));
+                        e.takeDamage(dmg);
+                        this.spawn_createFloatingText(e.pos.x, e.pos.y, `Wind ${dmg}`, '#34d399');
                         // 添加命中特效
                         this.spawn_createParticle(e.pos.x, e.pos.y, '#34d399', 'spark');
                         this.enemies.forEach(other => {
@@ -9482,7 +9486,9 @@ class Game {
                 this.enemies.forEach(e => {
                     const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
                     if (e.active && inPath) {
-                        e.takeDamage(20);
+                        const dmg = Math.max(1, Math.floor(bulletDamage * 10));
+                        e.takeDamage(dmg);
+                        this.spawn_createFloatingText(e.pos.x, e.pos.y, `Blast ${dmg}`, '#fca5a5');
                         const pushDir = isHorizontal ? new Vec2(1, 0) : new Vec2(0, 1);
                         e.pos = e.pos.add(pushDir.mult(60));
                     }
@@ -9492,7 +9498,9 @@ class Game {
                 this.enemies.forEach(e => {
                     const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
                     if (e.active && inPath) {
-                        e.takeDamage(25);
+                        const dmg = Math.max(1, Math.floor(bulletDamage * 12));
+                        e.takeDamage(dmg);
+                        this.spawn_createFloatingText(e.pos.x, e.pos.y, `Storm ${dmg}`, '#0ea5e9');
                         this.spawn_createParticle(e.pos.x, e.pos.y, '#c084fc', 'spark');
                     }
                 });
