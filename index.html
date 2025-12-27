@@ -2969,6 +2969,10 @@ class Peg {
         if (this.type === 'flying_sword') {
             this.drawSwordPeg(ctx, currentRadius, isLit);
         }
+        // 特殊绘制：如果是风属性钉子，绘制风旋图标
+        if (this.type === 'wind') {
+            this.drawWindPeg(ctx, currentRadius, isLit);
+        }
 
         // --- 2. 绘制光照反光 (Rim Light) ---
         // 仅当光照强度足够时才绘制，且使用 globalAlpha 替代渐变
@@ -3066,6 +3070,34 @@ class Peg {
         ctx.closePath();
         
         ctx.fill();
+        ctx.restore();
+    }
+    // [新增] 绘制风属性钉子图标
+    drawWindPeg(ctx, r, isLit) {
+        // 风旋图标颜色：如果是点亮状态用深色，否则用浅色/白色
+        ctx.strokeStyle = isLit ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.8)';
+        ctx.lineWidth = r * 0.15;
+        ctx.lineCap = 'round';
+        
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        
+        // 缩小图标比例，使其待在圆钉子内部
+        const sr = r * 0.5;
+        
+        // 绘制三条弧线模拟风旋
+        for (let i = 0; i < 3; i++) {
+            const angle = (i * Math.PI * 2) / 3 + Date.now() / 1000; // 旋转动画
+            ctx.save();
+            ctx.rotate(angle);
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, sr * 0.6, 0, Math.PI * 0.6);
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+        
         ctx.restore();
     }
     // [新增] 绘制等级星级/点数
@@ -11188,7 +11220,8 @@ class Game {
             nestedPayload: null, chainPayload: null, 
             multicast: totalMulticast,
             flying_sword: 0,
-            cryo: 0, pyro: 0, lightning: 0, laser: marbleDef.type === 'laser' ? 1 : 0 ,
+            cryo: 0, pyro: 0, lightning: 0, laser: marbleDef.type === 'laser' ? 1 : 0,
+            wind: 0,
             level: 1, 
             type: 'normal'
         };
@@ -11220,6 +11253,11 @@ class Game {
                 recipe.flying_sword = 1;
                 recipe.type = 'flying_sword'; 
                 recipe.level = Math.max(recipe.level, itemLevel);
+            }
+            
+            // [新增] 处理风属性
+            if (itemType === 'wind') {
+                recipe.wind = (recipe.wind || 0) + 1;
             }
             
             // [新增] 处理彩虹属性：为所有基础元素属性加 1
