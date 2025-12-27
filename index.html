@@ -5886,23 +5886,41 @@ class Projectile {
 
     draw(ctx) {
         if (!this.active && !this.destroyed) return;
+        Projectile.drawVisuals(ctx, this.pos.x, this.pos.y, this.radius, this.config, this.rotation, this.intensity, this.deformation);
+    }
+
+    static drawVisuals(ctx, x, y, radius, config, rotation, intensity, deformation = { x: 1, y: 1 }) {
         ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-        ctx.rotate(this.rotation);
-        ctx.scale(this.deformation.x, this.deformation.y);
-        const color = this.config.getColor ? this.config.getColor() : '#ffffff';
-        ctx.shadowBlur = 15 * this.intensity;
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+        ctx.scale(deformation.x, deformation.y);
+        
+        // 获取颜色
+        let color = '#ffffff';
+        if (config.getColor) {
+            color = config.getColor();
+        } else if (config.type && CONFIG.colors[config.type]) {
+            color = CONFIG.colors[config.type];
+        } else if (CONFIG.colors.matBase) {
+            color = CONFIG.colors.matBase;
+        }
+
+        ctx.shadowBlur = 15 * intensity;
         ctx.shadowColor = color;
         ctx.fillStyle = color;
         ctx.beginPath();
-        if (this.config.pierce > 0) {
-            ctx.moveTo(this.radius * 1.5, 0);
-            ctx.lineTo(-this.radius, -this.radius * 0.8);
-            ctx.lineTo(-this.radius * 0.5, 0);
-            ctx.lineTo(-this.radius, this.radius * 0.8);
+        
+        if (config.pierce > 0) {
+            // 箭头形状
+            ctx.moveTo(radius * 1.5, 0);
+            ctx.lineTo(-radius, -radius * 0.8);
+            ctx.lineTo(-radius * 0.5, 0);
+            ctx.lineTo(-radius, radius * 0.8);
         } else {
-            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+            // 圆形
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
         }
+        
         ctx.fill();
         ctx.restore();
     }
