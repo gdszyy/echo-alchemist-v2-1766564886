@@ -1133,7 +1133,7 @@ const CONFIG = {
             'resonance': { name: '共鳴', icon: '🔔', color: '#f59e0b' },
             'white': { name: '純淨', icon: '⚪', color: '#f8fafc' },
             'explosive': { name: '爆破', icon: '🧨', color: '#fca5a5' },
-            'rainbow': { name: '七彩', icon: '🌈', color: '#fca5a5' },
+            'rainbow': { name: '七彩', icon: '🌈', color: 'linear-gradient(135deg, #fca5a5, #facc15, #4ade80, #60a5fa)' },
             'matryoshka': { name: '套娃', icon: '🪆', color: '#d946ef' },
             'flying_sword': { name: '飛劍', icon: '🗡🗡', color: '#0ea5e9' },
             'bounce': { name: '彈性', icon: '⤴️', color: '#22c55e' },
@@ -2398,6 +2398,11 @@ class MarbleDefinition {
         this.compiled = false; 
         this.recipe = null; 
         this.session = null; 
+
+        // [新增] 火焰和冰霜弹珠生成时自带一层属性
+        if (type === 'pyro' || type === 'cryo') {
+            this.collected.push(type);
+        }
     }
 
     getName() {
@@ -2408,6 +2413,7 @@ class MarbleDefinition {
     }
 
     getColor() {
+        if (this.type === 'rainbow') return CONFIG.colors.marbleRainbow;
         const display = CONFIG.ui.attributeDisplay[this.type];
         if (display) return display.color;
 
@@ -2906,52 +2912,36 @@ class Peg {
     // --- 替换 Peg 类的 draw 方法 ---
     draw(ctx, baseRadius, tilt = {x:0, y:0}) {
         const currentRadius = baseRadius * this.scale;
-        
-        // 性能优化：只有非普通钉子或被点亮时才设置阴影
-        // 普通渲染尽量避免 shadowBlur
         const isSpecial = this.type !== 'normal';
         const isLit = this.lit;
+        const color = this.getColor();
 
+        // 1. 绘制基础圆形钉子
         ctx.beginPath(); 
         ctx.arc(this.pos.x, this.pos.y, currentRadius, 0, Math.PI * 2);
         
-        
-        const color = this.getColor()
-
-        // 特殊绘制：子母飞剑钉子 (绘制成剑形或菱形)
-        if (this.type === 'flying_sword') {
-            this.drawSwordPeg(ctx, currentRadius, isLit);
-        } else {
-            // 原有的圆形绘制逻辑
-            ctx.arc(this.pos.x, this.pos.y, currentRadius, 0, Math.PI * 2);
-            ctx.fillStyle = isLit ? '#ffffff' : color;
-            ctx.fill();
-        }
-        
-        // --- 1. 绘制主体 ---
         if (this.type === 'laser') {
-            // 激光钉子保持发光特效
             ctx.shadowBlur = 10;
             ctx.shadowColor = CONFIG.colors.laser;
             ctx.fillStyle = isLit ? '#ffffff' : color;
+        } else if (isLit) {
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ffffff';
         } else {
-            // 普通/其他钉子：取消昂贵的 createRadialGradient，改用纯色或简单处理
-            // 仅在被击中时高亮
-            if (isLit) {
-                ctx.fillStyle = '#ffffff';
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = '#ffffff';
-            } else {
-                ctx.fillStyle = color;
-                // 取消默认阴影，大幅提升性能
-                ctx.shadowBlur = 0; 
-            }
+            ctx.fillStyle = color;
+            ctx.shadowBlur = 0; 
         }
         ctx.fill();
 
         // 恢复 Context 状态
         ctx.shadowBlur = 0;
         ctx.shadowColor = 'transparent';
+
+        // 2. 特殊绘制：如果是飞剑钉子，在圆钉子上绘制剑纹
+        if (this.type === 'flying_sword') {
+            this.drawSwordPeg(ctx, currentRadius, isLit);
+        }
 
         // --- 2. 绘制光照反光 (Rim Light) ---
         // 仅当光照强度足够时才绘制，且使用 globalAlpha 替代渐变
@@ -2986,32 +2976,28 @@ class Peg {
     }
     // [新增] 绘制剑形钉子
     drawSwordPeg(ctx, r, isLit) {
-        const color = this.getColor()
-        ctx.fillStyle = isLit ? '#ffffff' : color;
+        // 剑纹颜色：如果是点亮状态用深色，否则用浅色/白色
+        ctx.fillStyle = isLit ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.8)';
         
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
         
-        // 剑形绘制 (十字/菱形组合)
+        // 缩小剑纹比例，使其待在圆钉子内部
+        const sr = r * 0.6; 
+        
         ctx.beginPath();
-        // 剑刃
-        ctx.moveTo(0, -r * 1.6); // 剑尖
-        ctx.lineTo(r * 0.5, -r * 0.2);
-        ctx.lineTo(r * 0.15, -r * 0.2);
+        // 剑刃 (指向下方或上方，这里保持原逻辑方向但缩小)
+        ctx.moveTo(0, -sr * 1.2); // 剑尖
+        ctx.lineTo(sr * 0.4, -sr * 0.2);
+        ctx.lineTo(sr * 0.1, -sr * 0.2);
         // 剑柄
-        ctx.lineTo(r * 0.15, r * 1.2); 
-        ctx.lineTo(-r * 0.15, r * 1.2);
-        ctx.lineTo(-r * 0.15, -r * 0.2);
-        ctx.lineTo(-r * 0.5, -r * 0.2);
+        ctx.lineTo(sr * 0.1, sr * 0.8); 
+        ctx.lineTo(-sr * 0.1, sr * 0.8);
+        ctx.lineTo(-sr * 0.1, -sr * 0.2);
+        ctx.lineTo(-sr * 0.4, -sr * 0.2);
         ctx.closePath();
         
         ctx.fill();
-        
-        // 发光描边
-        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        
         ctx.restore();
     }
     // [新增] 绘制等级星级/点数
@@ -6075,6 +6061,7 @@ if (Math.random() < 0.2) {
             glowColors.push(CONFIG.colors.laser); // 外圈天蓝
         }
 
+        if (config.type === 'rainbow') { mainColors.push('rainbow'); glowColors.push('#ffffff'); }
         if (config.explosive) { mainColors.push('#fff'); glowColors.push('#ef4444'); }
         if (config.pyro > 0) { mainColors.push('#fdba74'); glowColors.push('#f97316'); }
         if (config.cryo > 0) { mainColors.push('#cffafe'); glowColors.push('#06b6d4'); }
@@ -6175,11 +6162,14 @@ if (Math.random() < 0.2) {
         } else {
             // 默认圆形/流体
             if (config.pyro > 0) {
-                const time = Date.now() / 60;
-                for (let i = 0; i <= 20; i++) {
-                    const angle = (i / 20) * Math.PI * 2;
-                    const wave = Math.sin(time + angle * 4) * (radius * 0.2); 
-                    const r = radius + wave;
+                const time = Date.now() / 50;
+                // 使用多层波浪模拟火焰跳动
+                for (let i = 0; i <= 30; i++) {
+                    const angle = (i / 30) * Math.PI * 2;
+                    // 基础波浪 + 高频抖动
+                    const wave1 = Math.sin(time + angle * 3) * (radius * 0.15);
+                    const wave2 = Math.sin(time * 1.5 + angle * 7) * (radius * 0.08);
+                    const r = radius + wave1 + wave2;
                     ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
                 }
             } else {
@@ -6196,7 +6186,17 @@ if (Math.random() < 0.2) {
         
         // B. 颜色变暗 (使用 globalAlpha 简单模拟或者在颜色上覆盖黑色层)
         // 这里我们填充主色
-        ctx.fillStyle = mainColor;
+        if (mainColor === 'rainbow') {
+            const grad = ctx.createLinearGradient(-radius, -radius, radius, radius);
+            grad.addColorStop(0, '#fca5a5');
+            grad.addColorStop(0.25, '#facc15');
+            grad.addColorStop(0.5, '#4ade80');
+            grad.addColorStop(0.75, '#60a5fa');
+            grad.addColorStop(1, '#c084fc');
+            ctx.fillStyle = grad;
+        } else {
+            ctx.fillStyle = mainColor;
+        }
         ctx.fill();
 
         // 如果耐久度不满，覆盖一层半透明黑色，使其看起来变暗/脏
@@ -6205,11 +6205,7 @@ if (Math.random() < 0.2) {
             ctx.fill();
         }
 
-        // 4. 填充
-        ctx.shadowBlur = CONFIG.visuals.glowBase * intensity;
-        ctx.shadowColor = glowColor;
-        ctx.fillStyle = mainColor;
-        ctx.fill();
+        // 4. 填充 (已在上方完成，此处为冗余代码，移除以避免覆盖彩虹渐变)
 
         // 5. 内部细节
         if (config.cryo > 0) {
