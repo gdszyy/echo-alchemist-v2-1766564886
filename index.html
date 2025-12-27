@@ -1162,6 +1162,7 @@ const CONFIG = {
             'pyro': { name: '火焰', icon: '🔥', color: '#f97316' },
             'lightning': { name: '閃電', icon: '⚡', color: '#c084fc' },
             'laser': { name: '光', icon: '☄️', color: '#0ea5e9' },
+            'wind': { name: '風', icon: '🌪️', color: '#34d399' },
             'multicast': { name: '连射', icon: '🔗', color: '#AAAAAA' }
         }
     },
@@ -1207,8 +1208,8 @@ const CONFIG = {
             'pierce': { result: 'flying_sword', type: 'mutation' }, // 穿透球撞穿透钉 -> 突变
             'flying_sword': { result: 'flying_sword', type: 'upgrade' } // 穿透球撞飞剑钉 -> 升级
         },
-        'bounced': {
-            'bounced': { result: 'wind', type: 'mutation' }, // 反弹球撞反弹钉 -> 突变风属性
+        'bounce': {
+            'bounce': { result: 'wind', type: 'mutation' }, // 反弹球撞反弹钉 -> 突变风属性
             'wind': { result: 'wind', type: 'upgrade' }     // 反弹球撞风钉 -> 升级
         }
     },
@@ -1299,7 +1300,6 @@ const CONFIG = {
         relicRoundInterval: 3,
         assimilationChance: {
             bounce: 0.25,
-            bounced: 0.25, // 新增：反弹属性子弹的同化概率
             pierce: 0.12,
             scatter: 0.05,
             damage: 0.2,
