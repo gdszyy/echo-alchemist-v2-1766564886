@@ -5637,17 +5637,17 @@ class SonSword {
     }
 }
 class Projectile {
-    constructor(x, y, vel, config, isCopy = false) {
+    constructor(x, y, vel, config, isCopy = false, shotId = null) {
         this.pos = new Vec2(x, y);
         this.vel = new Vec2(vel.x, vel.y);
         this.config = config;
         
-        // 为每个子弹分配独立的统计ID
-        if (typeof game !== 'undefined' && !isCopy) {
-            this.shotId = game.shotIdCounter++;
-            game.shotDamageMap.set(this.shotId, { total: 0, byAttr: {} });
-        } else {
-            this.shotId = null; // 副本子弹不独立统计
+        // [修复] shotId由外部传入，不再自己创建
+        this.shotId = isCopy ? null : shotId;
+        
+        // 如果有shotId，增加projectileCount
+        if (this.shotId !== null && typeof game !== 'undefined' && game.shotDamageMap.has(this.shotId)) {
+            game.shotDamageMap.get(this.shotId).projectileCount++;
         }
         
         // --- 1. 使用统一的公式计算半径 ---
@@ -10876,13 +10876,17 @@ class Game {
         
         this.ui_renderRecipeHUD(); 
         
+        // [修复] 为这次发射创建独立的shotId
+        const shotId = this.shotIdCounter++;
+        this.shotDamageMap.set(shotId, { total: 0, byAttr: {}, projectileCount: 0, destroyedCount: 0 });
+        
         // 基础射击
-        this.burstQueue.push({ delay: 0, vel: vel, recipe: finalRecipe }); 
+        this.burstQueue.push({ delay: 0, vel: vel, recipe: finalRecipe, shotId: shotId }); 
         
         // 多重射击
         if (finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword') {
             for(let i=1; i<=finalRecipe.multicast; i++) { 
-                this.burstQueue.push({ delay: i * 20, vel: vel, recipe: finalRecipe }); 
+                this.burstQueue.push({ delay: i * 20, vel: vel, recipe: finalRecipe, shotId: shotId }); 
             } 
         } 
     }
@@ -10894,15 +10898,16 @@ class Game {
      * @param {number} y - **重要参数** 初始位置 Y。
      * @param {Vec2} vel - **重要参数** 初始速度向量。
      * @param {object} recipe - **重要参数** 弹药配方。
+     * @param {number} shotId - 发射ID，用于统计伤害
      */
-    spawn_spawnBullet(x, y, vel, recipe) {
+    spawn_spawnBullet(x, y, vel, recipe, shotId = null) {
 
         // [关键] 属性优先级：飞剑 > 激光
         // 如果是飞剑，优先处理飞剑逻辑
         if (recipe.type === 'flying_sword') {
             // 1. 生成【唯一的母劍】 (Mother Sword)
             // 母劍強制只有一把，不受 scatter/multicast 影響而分裂
-            const motherSword = new Projectile(x, y, vel, recipe);
+            const motherSword = new Projectile(x, y, vel, recipe, false, shotId);
             this.projectiles.push(motherSword);
 
             // 2. 處理散射 -> 生成【初始護衛子劍】
@@ -10968,12 +10973,12 @@ class Game {
                 const angleOffset = 0.2 * multiplier * sign; // 散射角度偏移
                 const newVel = vel.rotate(angleOffset); 
                 const copyRecipe = { ...recipe, scatter: 0, chainPayload: null }; // 散射弹丸不带散射和连锁
-                this.projectiles.push(new Projectile(x, y, newVel, copyRecipe, true)); 
+                this.projectiles.push(new Projectile(x, y, newVel, copyRecipe, true, shotId)); 
             } 
         }
         
         // [关键] 生成主子弹
-        this.projectiles.push(new Projectile(x, y, vel, recipe)); 
+        this.projectiles.push(new Projectile(x, y, vel, recipe, false, shotId)); 
     }
 
 // 在 Game 类中更新此方法
@@ -11925,7 +11930,7 @@ class Game {
             const shot = this.burstQueue[i]; 
             shot.delay -= timeScale; 
             if (shot.delay <= 0) { 
-                this.spawn_spawnBullet(this.width/2, this.height-80, shot.vel, shot.recipe); 
+                this.spawn_spawnBullet(this.width/2, this.height-80, shot.vel, shot.recipe, shot.shotId); 
                 audio.playShoot(); 
                 this.burstQueue.splice(i, 1); 
             } 
@@ -12106,13 +12111,16 @@ class Game {
             for (let i = this.projectiles.length - 1; i >= 0; i--) { 
                 const p = this.projectiles[i]; 
                 if(p) { 
-                    p.update(this.width, this.height, this.enemies, (spawnInfo) => { this.spawn_spawnBullet(spawnInfo.x, spawnInfo.y, spawnInfo.vel, spawnInfo.config); }, timeScale); 
+                    p.update(this.width, this.height, this.enemies, (spawnInfo) => { this.spawn_spawnBullet(spawnInfo.x, spawnInfo.y, spawnInfo.vel, spawnInfo.config, p.shotId); }, timeScale); 
                     p.draw(this.ctx); 
                     if (p.destroyed) {
-                        // 在删除子弹前，保存该子弹的统计
+                        // [修复] 当该shotId的所有子弹都销毁时，保存统计
                         if (p.shotId !== null && this.shotDamageMap.has(p.shotId)) {
                             const shotStats = this.shotDamageMap.get(p.shotId);
-                            if (shotStats.total > 0) {
+                            shotStats.destroyedCount++;
+                            
+                            // 当所有子弹都销毁时，保存统计
+                            if (shotStats.destroyedCount >= shotStats.projectileCount && shotStats.total > 0) {
                                 this.shotDamageHistory.unshift({
                                     total: shotStats.total,
                                     byAttr: JSON.parse(JSON.stringify(shotStats.byAttr))
@@ -12121,8 +12129,8 @@ class Game {
                                     this.shotDamageHistory.pop();
                                 }
                                 this.ui_updateDamageStats();
+                                this.shotDamageMap.delete(p.shotId);
                             }
-                            this.shotDamageMap.delete(p.shotId);
                         }
                         this.projectiles.splice(i, 1);
                     } 
