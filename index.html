@@ -2502,30 +2502,23 @@ class FortuneWheel {
         const totalCount = Object.values(counts).reduce((a, b) => a + b, 0);
         let currentAngle = 0;
         
-        // [修复] 动态构建 colorMap，并增加更多属性支持
-        const colorMap = { 
-            'bounce': CONFIG.colors.matBounce, 'pierce': CONFIG.colors.matPierce, 
-            'scatter': CONFIG.colors.matScatter, 'damage': CONFIG.colors.matDamage, 
-            'cryo': CONFIG.colors.matCryo, 'pyro': CONFIG.colors.matPyro, 
-            'lightning': CONFIG.colors.matLightning, 'laser': CONFIG.colors.laser,
-            'multicast': CONFIG.colors.slotMulticast,
-            'resonance': CONFIG.colors.resonance,
-            'explosive': CONFIG.colors.matPyro,
-            'rainbow': CONFIG.colors.matDamage,
-            'matryoshka': CONFIG.colors.matMatryoshka,
-            'flying_sword': CONFIG.colors.flying_sword
-        };
-
+        // [修复] 动态构建 colorMap 和 iconMap，确保与全局配置同步
         Object.keys(counts).forEach(type => {
             const weight = counts[type] / totalCount;
             const arc = weight * Math.PI * 2;
+            
+            // 优先从全局配置中获取颜色和图标
+            const display = CONFIG.ui.attributeDisplay[type];
+            const color = display ? display.color : (CONFIG.colors['mat' + type.charAt(0).toUpperCase() + type.slice(1)] || '#ccc');
+            const icon = display ? display.icon : (this.iconMap[type] || '❓');
+
             this.slices.push({
                 type: type,
                 startAngle: currentAngle,
                 endAngle: currentAngle + arc,
-                color: colorMap[type] || '#ccc',
-                icon: this.iconMap[type] || (CONFIG.ui.attributeDisplay[type] ? CONFIG.ui.attributeDisplay[type].icon : '❓'),
-                count: counts[type] // 保存數量用於顯示
+                color: color,
+                icon: icon,
+                count: counts[type]
             });
             currentAngle += arc;
         });
