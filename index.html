@@ -5695,11 +5695,11 @@ class Projectile {
         this.hasAreaDamage = config.damage > 0;
         this.maxDurability = (this.maxBounces + this.maxPierces) || 1;
         this.hitCooldowns = new Map();
-        this.destroyed = false;
+        this.rotation = 0;
+        this.windBladeAngle = 0; // 风属性环绕风刃的旋转角度
         this.lifeTime = 60 * 15;
         this.chainHistory = [];
-        this.trail = []; 
-        this.rotation = 0;      
+        this.trail = [];      
         this.deformation = { x: 1, y: 1 }; 
         this.targetDeformation = { x: 1, y: 1 }; 
         this.elasticity = 0.2;
@@ -5727,6 +5727,10 @@ class Projectile {
 
     update(width, height, enemies, spawnCallback, timeScale) {
         if (!this.active) return;
+        // 更新风属性环绕风刃的旋转角度
+        if (this.config.wind) {
+            this.windBladeAngle += 0.15 * timeScale;
+        }
         if (this.config.pierce > 0) {
             this.rotation = Math.atan2(this.vel.y, this.vel.x);
         } else if (this.config.scatter > 0) {
@@ -5990,10 +5994,10 @@ class Projectile {
     draw(ctx) {
         if (!this.active && !this.destroyed) return;
         const integrity = (this.bouncesLeft + this.piercesLeft) / (this.maxDurability || 1);
-        Projectile.drawVisuals(ctx, this.pos.x, this.pos.y, this.radius, this.config, this.rotation, this.intensity, this.deformation, integrity, this.crackSeed);
+        Projectile.drawVisuals(ctx, this.pos.x, this.pos.y, this.radius, this.config, this.rotation, this.intensity, this.deformation, integrity, this.crackSeed, this.windBladeAngle);
     }
 
-    static drawVisuals(ctx, x, y, radius, config, rotation, intensity, deformation = {x:1, y:1}, integrity = 1.0, crackSeed = []) {
+    static drawVisuals(ctx, x, y, radius, config, rotation, intensity, deformation = {x:1, y:1}, integrity = 1.0, crackSeed = [], windBladeAngle = 0) {
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(rotation);
@@ -6274,6 +6278,45 @@ class Projectile {
             ctx.beginPath(); ctx.arc(0, -radius*0.2, radius*0.4, 0, Math.PI*2); ctx.fill(); 
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; 
             ctx.beginPath(); ctx.arc(0, 0, radius*0.8, 0, Math.PI*2); ctx.stroke();
+        }
+        // 风属性环绕风刃特效
+        if (config.wind && config.wind > 0) {
+            ctx.save();
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#34d399';
+            const bladeCount = Math.min(3 + config.wind, 6); // 根据风属性等级决定风刃数量
+            const orbitRadius = radius * 1.8; // 环绕轨道半径
+            
+            for (let i = 0; i < bladeCount; i++) {
+                const angle = windBladeAngle + (i * Math.PI * 2 / bladeCount);
+                const bladeX = Math.cos(angle) * orbitRadius;
+                const bladeY = Math.sin(angle) * orbitRadius;
+                
+                ctx.save();
+                ctx.translate(bladeX, bladeY);
+                ctx.rotate(angle + Math.PI / 2); // 风刃沿切线方向
+                
+                // 绘制弯月形风刃
+                ctx.strokeStyle = '#d1fae5';
+                ctx.fillStyle = 'rgba(209, 250, 229, 0.3)';
+                ctx.lineWidth = 1.5;
+                ctx.lineCap = 'round';
+                
+                const bladeLength = radius * 0.8;
+                const bladeCurve = radius * 0.3;
+                
+                ctx.beginPath();
+                ctx.moveTo(-bladeLength/2, 0);
+                ctx.quadraticCurveTo(0, bladeCurve, bladeLength/2, 0);
+                ctx.quadraticCurveTo(0, bladeCurve * 0.5, -bladeLength/2, 0);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                
+                ctx.restore();
+            }
+            
+            ctx.restore();
         }
          ctx.restore();
     }
@@ -7337,6 +7380,7 @@ class Game {
         this.spores = []; // 新增：存儲分身孢子
         this.fireWaves = []; // 新增火焰波數組
         this.sonSwords = [];
+        this.windAnchors = []; // 风属性锥点数组
         // --- [修改] 发射与装填物理状态 ---
         this.isChargingShot = false;    // 蓄力吸收中
         this.chargeProgress = 0;        // 0 -> 1
@@ -9870,7 +9914,8 @@ class Game {
                         { k: 'cryo', i: CONFIG.ui.attributeDisplay.cryo.icon },
                         { k: 'pyro', i: CONFIG.ui.attributeDisplay.pyro.icon },
                         { k: 'lightning', i: CONFIG.ui.attributeDisplay.lightning.icon },
-                        { k: 'laser', i: CONFIG.ui.attributeDisplay.laser.icon }
+                        { k: 'laser', i: CONFIG.ui.attributeDisplay.laser.icon },
+                        { k: 'wind', i: CONFIG.ui.attributeDisplay.wind.icon }
                     ];
                     let hasStats = false;
                     stats.forEach(s => {
