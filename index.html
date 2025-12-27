@@ -8872,8 +8872,22 @@ class Game {
         if (this.sonSwords.length >= 80) return;
         if (isNaN(x) || isNaN(y)) return;
         const sword = new SonSword(x, y, mother, level, config, delay);
-        // 初始给一个随机散射速度
-        sword.vel = new Vec2(Math.random()-0.5, Math.random()-0.5).mult(5);
+        
+        // [修复] 子剑继承母剑的飞行方向，并加上小随机偏移
+        if (mother && mother.vel) {
+            // 获取母剑的单位方向向量
+            const motherDir = mother.vel.norm();
+            // 加上小随机偏移，避免子剑完全重叠
+            const randomOffset = new Vec2(Math.random()-0.5, Math.random()-0.5).mult(2);
+            sword.vel = motherDir.mult(8).add(randomOffset);
+            // 设置初始角度
+            sword.angle = Math.atan2(sword.vel.y, sword.vel.x);
+        } else {
+            // 如果没有母剑，使用随机方向
+            sword.vel = new Vec2(Math.random()-0.5, Math.random()-0.5).mult(5);
+            sword.angle = Math.atan2(sword.vel.y, sword.vel.x);
+        }
+        
         this.sonSwords.push(sword);
     }
 
