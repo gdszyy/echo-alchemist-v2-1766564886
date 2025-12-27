@@ -5085,6 +5085,8 @@ class SonSword {
         this.passingThroughEnemy = null;
         this.dashTimer = 0; 
         this.hitEnemiesInDash = new Set(); // [修复] 记录单次冲刺中已命中的敌人
+        this.trail = []; // [新增] 拖尾轨迹
+        this.maxTrailLength = 8; // 拖尾长度
 
         // [性能優化]：索敵計時器
         // 初始化為隨機值，讓不同子劍錯開索敵時間，避免同一幀計算量過大
@@ -5265,11 +5267,15 @@ class SonSword {
                 this.vel.y = Math.sin(newAngle) * currentSpeed;
             }
             
-            this.pos.x += this.vel.x * timeScale;
-            this.pos.y += this.vel.y * timeScale;
-            this.angle = Math.atan2(this.vel.y, this.vel.x);
+        this.pos.x += this.vel.x * timeScale;
+        this.pos.y += this.vel.y * timeScale;
+        this.angle = Math.atan2(this.vel.y, this.vel.x);
 
-            // 碰撞检测
+        // 更新拖尾
+        this.trail.push({x: this.pos.x, y: this.pos.y});
+        if (this.trail.length > this.maxTrailLength) this.trail.shift();
+
+        // 碰撞检测
             for (let i = 0; i < enemies.length; i++) {
                 const e = enemies[i];
                 if (e.active) {
@@ -5293,8 +5299,8 @@ class SonSword {
     }
 
     handleHit(enemy, game) {
+        // [修复] 回收阶段不再造成伤害，避免每一帧都扣血
         if (this.state === 'recalling') {
-            game.combat_damageEnemy(enemy, { config: this.config, pos: this.pos, isCopy: true });
             return;
         }
 
@@ -5318,13 +5324,32 @@ class SonSword {
 
             this.attacksLeft--;
             if (this.attacksLeft <= 0) {
-                // 這裡傳入簡單對象即可
-                this.triggerRecall({x: this.pos.x, y: game.height + 200});
+                // [修改] 最后一次攻击插在敌人身上
+                this.stickToEnemy(enemy, game);
             } else if (this.targetQueue.length === 0 && this.isAutoHunting) {
                 // 立即搜索下一個，不等待計時器
                 this.searchForTarget(game.enemies);
             }
         }
+    }
+
+    stickToEnemy(enemy, game) {
+        this.state = 'stuck';
+        this.stuckHost = enemy;
+        this.stuckOffset = this.pos.sub(enemy.pos);
+        // 限制偏移量在敌人范围内
+        const maxOff = Math.min(enemy.width, enemy.height) * 0.4;
+        if (this.stuckOffset.mag() > maxOff) {
+            this.stuckOffset = this.stuckOffset.norm().mult(maxOff);
+        }
+        
+        if (enemy.stuckSwords) {
+            enemy.stuckSwords.push(this);
+        }
+        
+        // 视觉反馈
+        game.spawn_createFloatingText(this.pos.x, this.pos.y, "🗡️STUCK", "#0ea5e9");
+        audio.playSlash();
     }
 
     triggerRecall(targetPos) {
@@ -5337,37 +5362,53 @@ class SonSword {
     }
 
         draw(ctx) {
-        if (!this.active || this.state === 'stuck') return; // 插在敌人身上的由敌人负责绘制
+        if (!this.active || this.state === 'stuck') return; 
+
+        const color = this.level >= 3 ? '#f43f5e' : (this.level >= 2 ? '#6366f1' : '#0ea5e9');
+
+        // 1. 绘制拖尾 (Trail)
+        if (this.trail.length > 1) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(this.trail[0].x, this.trail[0].y);
+            for (let i = 1; i < this.trail.length; i++) {
+                ctx.lineTo(this.trail[i].x, this.trail[i].y);
+            }
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.4;
+            ctx.stroke();
+            ctx.restore();
+        }
+
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
         ctx.rotate(this.angle + Math.PI/2); 
-
-        const color = this.level >= 3 ? '#f43f5e' : (this.level >= 2 ? '#6366f1' : '#0ea5e9');
         
-        // 1. 动态发光强度：攻击次数越多，发光越强
+        // 2. 动态发光强度
         const attackRatio = 1 - (this.attacksLeft / this.maxAttacks);
         const glowIntensity = 5 + attackRatio * 15;
         
         if (game.sonSwords.length < 40 || this.passingThroughEnemy) {
-            ctx.shadowBlur = this.passingThroughEnemy ? 25 : glowIntensity;
+            ctx.shadowBlur = this.passingThroughEnemy ? 20 : glowIntensity;
             ctx.shadowColor = color; 
         }
 
-        // 2. 绘制实体小剑
+        // 3. 绘制实体小剑 (细化版)
         if (this.isMotherBlade) ctx.scale(1.4, 1.4);
         
-        // 剑刃 (Blade)
+        // 剑刃 (Blade) - 变细：从 4 缩减到 2.5
         ctx.beginPath();
         ctx.moveTo(0, -15); 
-        ctx.lineTo(4, -2); 
-        ctx.lineTo(4, 2); 
-        ctx.lineTo(-4, 2); 
-        ctx.lineTo(-4, -2);
+        ctx.lineTo(2.5, -2); 
+        ctx.lineTo(2.5, 2); 
+        ctx.lineTo(-2.5, 2); 
+        ctx.lineTo(-2.5, -2);
         ctx.closePath();
-        ctx.fillStyle = '#f8fafc'; // 亮钢色
+        ctx.fillStyle = '#f8fafc'; 
         ctx.fill();
         ctx.strokeStyle = '#cbd5e1';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 0.8;
         ctx.stroke();
 
         // 剑脊线
@@ -5377,17 +5418,17 @@ class SonSword {
         ctx.strokeStyle = 'rgba(203, 213, 225, 0.5)';
         ctx.stroke();
 
-        // 护手 (Guard)
+        // 护手 (Guard) - 变细：从 12 缩减到 10
         ctx.fillStyle = color;
-        ctx.fillRect(-6, 2, 12, 3);
+        ctx.fillRect(-5, 2, 10, 2);
         
-        // 剑柄 (Hilt)
+        // 剑柄 (Hilt) - 变细：从 4 缩减到 2.5
         ctx.fillStyle = '#334155';
-        ctx.fillRect(-2, 5, 4, 6);
+        ctx.fillRect(-1.25, 4, 2.5, 5);
         
-        // 剑首 (Pommel)
+        // 剑首 (Pommel) - 变细：从 3 缩减到 2
         ctx.beginPath();
-        ctx.arc(0, 12, 3, 0, Math.PI * 2);
+        ctx.arc(0, 10, 2, 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
 
@@ -5655,7 +5696,6 @@ if (Math.random() < 0.2) {
         }
         // 底部逻辑
         if (this.pos.y > height - this.radius) {
-            console.log("底部逻辑")
             let didBounce = false;
             // 如果有战斗底墙遗物
             if (game.hasCombatWall && (this.piercesLeft > 0 || this.config.bounce > 0 || this.config.type === 'flying_sword')) {
@@ -5679,14 +5719,13 @@ if (Math.random() < 0.2) {
                 if(this.config.bounce > 0) this.deformation = { x: 1.4, y: 0.6 };
             } else {
                 if (this.config.type === 'flying_sword') {
-                    this.handleFlyingSwordFinish(null, game); // null 表示没有宿主，即掉落
+                    // [修改] 底部退出导致的销毁，不插在敌人身上
+                    this.handleFlyingSwordFinish(null, game, true); // true 表示是从底部退出
                     this.active = false;
                 } else {
                     this.destroy(spawnCallback);
                 }
-                this.destroy(spawnCallback);
             }
-            
         }
         if (this.pos.y > height + 50) { this.destroy(spawnCallback); }
     }
@@ -5785,17 +5824,15 @@ if (Math.random() < 0.2) {
     // [修改] 母剑结束（掉落/消失）时的子剑处理逻辑
     // --- 在 class Projectile 中 ---
 
-    handleFlyingSwordFinish(host, game) {
+    handleFlyingSwordFinish(host, game, isBottomExit = false) {
         // [修复]：召回目标应该是母剑插着的敌人或位置
-        // 如果 host 存在，说明母剑插在敌人身上
-        // 如果 host 不存在，说明母剑被销毁了，但我们应该尝试找回它最后插着的敌人
         let targetPos = null;
         if (host) {
             targetPos = host.pos;
-        } else if (this.lastHitEnemy && this.lastHitEnemy.active) {
+        } else if (!isBottomExit && this.lastHitEnemy && this.lastHitEnemy.active) {
             targetPos = this.lastHitEnemy.pos;
         } else {
-            // 兜底：回到玩家位置
+            // 底部退出或无目标：回到玩家位置
             targetPos = { x: game.width / 2, y: game.height - 80 };
         }
 
@@ -8726,6 +8763,27 @@ class Game {
 
         if (killed) { 
             this.spawn_addScore(enemy.maxHp); 
+
+            // [新增] 子剑回收逻辑：如果敌人被杀，插在上面的子剑需要回收
+            if (enemy.stuckSwords && enemy.stuckSwords.length > 0) {
+                enemy.stuckSwords.forEach(sword => {
+                    if (sword.active) {
+                        // 寻找回收目标
+                        let recallTarget = null;
+                        // 寻找母剑是否还插在某个敌人身上
+                        const motherBladeMarker = this.sonSwords.find(s => s.mother === sword.mother && s.isMotherBlade && s.state === 'stuck' && s.active);
+                        if (motherBladeMarker) {
+                            recallTarget = motherBladeMarker.pos;
+                        } else {
+                            // 母剑不存在或未插在敌人身上，回到玩家位置
+                            recallTarget = { x: this.width / 2, y: this.height - 80 };
+                        }
+                        sword.triggerRecall(recallTarget);
+                    }
+                });
+                enemy.stuckSwords = [];
+            }
+
             // 燃烧扩散逻辑 (保留)
             if (enemy.temp >= 100) {
                 this.fireWaves.push(new FireWave(enemy.pos.x, enemy.pos.y));
