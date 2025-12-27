@@ -3967,6 +3967,7 @@ class Enemy {
         this.markTimer = 0;  // 标记持续时间
         this.swordMarks = 0; 
         this.markTimer = 0;  
+        this.stuckSwords = []; // [新增] 存储插在身上的子剑对象
         this.swordCracks = [];
         this.fissures = [];
         const crackCount = 3; // 裂纹数量
@@ -5679,6 +5680,11 @@ if (Math.random() < 0.2) {
             const hitAngle = Math.atan2(this.vel.y, this.vel.x);
             enemy.addSwordCrack(stuckBlade.stuckOffset, hitAngle+90);
             game.sonSwords.push(stuckBlade); 
+            
+            // [新增] 将子剑注册到敌人的 stuckSwords 列表中
+            if (enemy.stuckSwords) {
+                enemy.stuckSwords.push(stuckBlade);
+            }
 
             game.spawn_createFloatingText(this.pos.x, this.pos.y, "🗡️STUCK", "#0ea5e9");
             audio.playSlash();
@@ -8578,6 +8584,49 @@ class Game {
         const killed = enemy.takeDamage(dmg); 
         this.combat_recordDamage(dmg);
         audio.playEnemyHit(hitType);
+
+        // --- [新增] 剑痕共鸣机制 (Stuck Sword Resonance) ---
+        if (!killed && enemy.stuckSwords && enemy.stuckSwords.length > 0) {
+            enemy.stuckSwords.forEach(sword => {
+                if (sword.active) {
+                    const level = sword.level || 1;
+                    let extraDmg = 0;
+                    let resonanceColor = '#0ea5e9';
+                    
+                    // 1. 计算共鸣伤害和属性
+                    if (level === 1) {
+                        extraDmg = sword.config.damage * 0.5;
+                    } else if (level === 2) {
+                        extraDmg = sword.config.damage * 0.5;
+                        // 应用 50% 属性效果 (简化处理：直接应用 50% 的温度变化)
+                        if (sword.config.cryo > 0) enemy.applyTemp(-CONFIG.balance.cryoAmount * sword.config.cryo * 0.5);
+                        if (sword.config.pyro > 0) enemy.applyTemp(CONFIG.balance.pyroAmount * sword.config.pyro * 0.5);
+                        resonanceColor = '#6366f1';
+                    } else if (level >= 3) {
+                        extraDmg = sword.config.damage;
+                        // 应用 100% 属性效果
+                        if (sword.config.cryo > 0) enemy.applyTemp(-CONFIG.balance.cryoAmount * sword.config.cryo);
+                        if (sword.config.pyro > 0) enemy.applyTemp(CONFIG.balance.pyroAmount * sword.config.pyro);
+                        resonanceColor = '#f43f5e';
+                    }
+
+                    // 2. 造成额外伤害
+                    if (extraDmg > 0) {
+                        enemy.takeDamage(extraDmg);
+                        this.combat_recordDamage(extraDmg);
+                        this.spawn_createFloatingText(sword.pos.x, sword.pos.y, `+${Math.ceil(extraDmg)}`, resonanceColor);
+                    }
+
+                    // 3. 视觉特效：斩击动画
+                    const angle = Math.random() * Math.PI * 2;
+                    this.particles.push(new SlashAnim(sword.pos.x, sword.pos.y, angle, 0.7));
+                    this.spawn_createParticle(sword.pos.x, sword.pos.y, resonanceColor, 'spark');
+                }
+            });
+            // 清理已失效的子剑
+            enemy.stuckSwords = enemy.stuckSwords.filter(s => s.active);
+        }
+
         // 克隆词缀逻辑: 如果敌人被伤害且有 'clone' 词缀，有概率生成克隆
         
         if (!killed && enemy.affixes.includes('clone') && Math.random() < afx.cloneChanceHit) {
