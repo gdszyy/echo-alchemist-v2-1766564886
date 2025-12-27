@@ -5153,7 +5153,7 @@ class SonSword {
                          if (distSq < hitDist * hitDist) {
                              this.hitEnemiesInDash.add(e);
                              game.combat_damageEnemy(e, { config: this.config, pos: this.pos, isCopy: true });
-                             game.particles.push(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.8));
+                             game.particles.push(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.4));
                              audio.playSlash();
                          }
                      }
@@ -5314,7 +5314,7 @@ class SonSword {
             }
 
             // 特效
-            game.particles.push(new SlashAnim(this.pos.x, this.pos.y, this.angle, 1.0));
+            game.particles.push(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.5));
             game.spawn_createParticle(this.pos.x, this.pos.y, '#0ea5e9', 'spark');
             audio.playSlash();
 
@@ -5345,6 +5345,11 @@ class SonSword {
         
         if (enemy.stuckSwords) {
             enemy.stuckSwords.push(this);
+        }
+        
+        // [修复] 子剑插在敌人身上时也添加剑痕标记
+        if (enemy.addSwordCrack) {
+            enemy.addSwordCrack(this.stuckOffset, this.angle + Math.PI/2);
         }
         
         // 视觉反馈
@@ -8734,7 +8739,7 @@ class Game {
 
                     // 3. 视觉特效：斩击动画
                     const angle = Math.random() * Math.PI * 2;
-                    this.particles.push(new SlashAnim(sword.pos.x, sword.pos.y, angle, 0.7));
+                    this.particles.push(new SlashAnim(sword.pos.x, sword.pos.y, angle, 0.35));
                     this.spawn_createParticle(sword.pos.x, sword.pos.y, resonanceColor, 'spark');
                 }
             });
