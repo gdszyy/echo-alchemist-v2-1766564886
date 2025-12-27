@@ -11205,11 +11205,12 @@ class Game {
         
         // 基础射击
         // 如果没有多重射击，那么这第一发就是最后一发
-        const isOnlyOne = !(finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword');
+        // [修改] 风属性子弹也强制单发，不受 multicast 影响
+        const isOnlyOne = !(finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword' && !finalRecipe.wind);
         this.burstQueue.push({ delay: 0, vel: vel, recipe: finalRecipe, shotId: shotId, isLast: isOnlyOne }); 
         
         // 多重射击
-        if (finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword') {
+        if (finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword' && !finalRecipe.wind) {
             for(let i=1; i<=finalRecipe.multicast; i++) { 
                 const isLastInBurst = (i === finalRecipe.multicast);
                 this.burstQueue.push({ delay: i * 20, vel: vel, recipe: finalRecipe, shotId: shotId, isLast: isLastInBurst }); 
@@ -11292,7 +11293,8 @@ class Game {
         }
 
         // 散射 (Scatter)
-        if (recipe.scatter > 0) { 
+        // [修改] 风属性子弹强制单发，不受 scatter 影响
+        if (recipe.scatter > 0 && !recipe.wind) { 
             for (let i = 1; i <= recipe.scatter; i++) { 
                 const sign = i % 2 === 0 ? -1 : 1; 
                 const multiplier = Math.ceil(i / 2); 
