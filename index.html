@@ -8020,19 +8020,21 @@ class Game {
                 'line'
             );
             
-            // 设定方向速度
-            const speed = 15 + Math.random() * 10; // 极快
-            if (isHorizontal) {
-                p.vel = new Vec2(speed, (Math.random()-0.5)); // 主方向X，微量Y抖动
-                p.scale = { x: 30 + Math.random()*20, y: 1 }; // 拉长
-            } else {
-                p.vel = new Vec2((Math.random()-0.5), speed);
-                p.scale = { x: 1, y: 30 + Math.random()*20 };
+            if (p) {
+                // 设定方向速度
+                const speed = 15 + Math.random() * 10; // 极快
+                if (isHorizontal) {
+                    p.vel = new Vec2(speed, (Math.random()-0.5)); // 主方向X，微量Y抖动
+                    p.scale = { x: 30 + Math.random()*20, y: 1 }; // 拉长
+                } else {
+                    p.vel = new Vec2((Math.random()-0.5), speed);
+                    p.scale = { x: 1, y: 30 + Math.random()*20 };
+                }
+                
+                p.life = 1.2; // 粒子存活 1.2秒，比法阵本身长
+                p.opacity = 0.8;
+                p.friction = 0.98; // 阻力小，飞得远
             }
-            
-            p.life = 1.2; // 粒子存活 1.2秒，比法阵本身长
-            p.opacity = 0.8;
-            p.friction = 0.98; // 阻力小，飞得远
 
         } else if (type === 'cyclone') {
             // === 旋风粒子：被吸入或甩出 ===
@@ -8047,14 +8049,16 @@ class Game {
             
             const p = this.spawn_createParticle(px, py, '#ffffff', 'spark');
             
-            // 计算切线速度 (旋转) + 向心速度 (吸入)
-            const tangent = new Vec2(-Math.sin(angle), Math.cos(angle)).mult(8);
-            const inward = new Vec2(-Math.cos(angle), -Math.sin(angle)).mult(2);
-            
-            p.vel = tangent.add(inward);
-            p.life = 1.5; // 存活久一点
-            p.size = Math.random() * 3 + 1;
-            p.opacity = 0.7;
+            if (p) {
+                // 计算切线速度 (旋转) + 向心速度 (吸入)
+                const tangent = new Vec2(-Math.sin(angle), Math.cos(angle)).mult(8);
+                const inward = new Vec2(-Math.cos(angle), -Math.sin(angle)).mult(2);
+                
+                p.vel = tangent.add(inward);
+                p.life = 1.5; // 存活久一点
+                p.size = Math.random() * 3 + 1;
+                p.opacity = 0.7;
+            }
         }
     }
 
