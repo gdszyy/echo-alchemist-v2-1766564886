@@ -5722,6 +5722,7 @@ if (Math.random() < 0.2) {
                     // [修改] 底部退出导致的销毁，不插在敌人身上
                     this.handleFlyingSwordFinish(null, game, true); // true 表示是从底部退出
                     this.active = false;
+                    this.destroyed = true; // [修复] 必须设置销毁标记，否则无法发射下一发
                 } else {
                     this.destroy(spawnCallback);
                 }
