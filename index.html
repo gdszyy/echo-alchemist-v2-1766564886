@@ -5288,6 +5288,14 @@ class SonSword {
                              game.combat_damageEnemy(e, { config: this.config, pos: this.pos, isCopy: true });
                              game.particles.push(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.4));
                              audio.playSlash();
+                             
+                             // [新增] 冲刺中击中敌人也消耗攻击次数
+                             this.attacksLeft--;
+                             if (this.attacksLeft <= 0) {
+                                 // 攻击次数耗尽，插在当前敌人身上
+                                 this.stickToEnemy(e, game);
+                                 return; // 结束更新
+                             }
                          }
                      }
                  }
@@ -5631,6 +5639,14 @@ class Projectile {
         this.pos = new Vec2(x, y);
         this.vel = new Vec2(vel.x, vel.y);
         this.config = config;
+        
+        // 为每个子弹分配独立的统计ID
+        if (typeof game !== 'undefined' && !isCopy) {
+            this.shotId = game.shotIdCounter++;
+            game.shotDamageMap.set(this.shotId, { total: 0, byAttr: {} });
+        } else {
+            this.shotId = null; // 副本子弹不独立统计
+        }
         
         // --- 1. 使用统一的公式计算半径 ---
         const params = Projectile.calculateVisualParams(config, isCopy);
@@ -7757,6 +7773,8 @@ class Game {
         this.currentShotDamage = 0; // 当前子弹造成的伤害
         this.currentShotDamageByAttr = {}; // 当前子弹各属性造成的伤害
         this.shotDamageHistory = []; // 子弹伤害历史记录 (最多保存3个)
+        this.shotIdCounter = 0; // 子弹ID计数器
+        this.shotDamageMap = new Map(); // 每个子弹ID对应的伤害统计 {shotId: {total, byAttr}}
         this.roundDamageHistory = []; // 回合伤害历史记录 [{round: 1, shots: [...]}]
         this.currentViewingRound = 0; // 当前查看的回合索引 (0表示当前回合)
 
@@ -8708,7 +8726,7 @@ class Game {
                     
                     // 2. 造成主伤害
                     const killed = e.takeDamage(dmg);
-                    this.combat_recordDamage(dmg);
+                    this.combat_recordDamage(dmg, 'lightning');
                     this.spawn_createFloatingText(e.pos.x, e.pos.y, `-${dmg}`, '#c084fc');
                     
                     // 3. 施加感电效果 (温度)
@@ -8940,7 +8958,10 @@ class Game {
         else if (config.pierce > 0) damageAttr = 'pierce';
         else if (config.bounce > 0) damageAttr = 'bounce';
         else if (config.scatter > 0) damageAttr = 'scatter';
-        this.combat_recordDamage(dmg, damageAttr);
+        
+        // 传递shotId到recordDamage
+        const shotId = projectile.shotId !== undefined ? projectile.shotId : null;
+        this.combat_recordDamage(dmg, damageAttr, shotId);
         audio.playEnemyHit(hitType);
 
         // --- [新增] 剑痕共鸣机制 (Stuck Sword Resonance) ---
@@ -8971,7 +8992,7 @@ class Game {
                     // 2. 造成额外伤害
                     if (extraDmg > 0) {
                         enemy.takeDamage(extraDmg);
-                        this.combat_recordDamage(extraDmg);
+                        this.combat_recordDamage(extraDmg, 'flying_sword');
                         this.spawn_createFloatingText(sword.pos.x, sword.pos.y, `+${Math.ceil(extraDmg)}`, resonanceColor);
                     }
 
@@ -9117,7 +9138,7 @@ class Game {
                     // 造成 AOE 伤害 (减半)
                     const aoeDmg = dmg * 0.5;
                     const k = other.takeDamage(aoeDmg); 
-                    this.combat_recordDamage(aoeDmg); 
+                    this.combat_recordDamage(aoeDmg, 'explosive'); 
                     if (k) this.spawn_addScore(other.maxHp); 
                     
                     // --- 4. 关键：AOE 也要施加元素效果 ---
@@ -9164,8 +9185,10 @@ class Game {
      * @method recordDamage
      * @description 记录本回合造成的伤害。
      * @param {number} amount - **重要参数** 伤害量。
+     * @param {string} attrType - 属性类型
+     * @param {number} shotId - 子弹ID，用于区分不同子弹的伤害
      */
-    combat_recordDamage(amount, attrType = 'damage') { 
+    combat_recordDamage(amount, attrType = 'damage', shotId = null) { 
         this.roundDamage += amount;
         this.currentShotDamage += amount;
         // 追踪各属性造成的伤害
@@ -9173,6 +9196,16 @@ class Game {
             this.currentShotDamageByAttr[attrType] = 0;
         }
         this.currentShotDamageByAttr[attrType] += amount;
+        
+        // 如果有shotId，记录到对应的子弹统计中
+        if (shotId !== null && this.shotDamageMap.has(shotId)) {
+            const shotStats = this.shotDamageMap.get(shotId);
+            shotStats.total += amount;
+            if (!shotStats.byAttr[attrType]) {
+                shotStats.byAttr[attrType] = 0;
+            }
+            shotStats.byAttr[attrType] += amount;
+        }
         
         // 实时更新 combo 下方的伤害显示
         this.ui_updateRoundDamage();
@@ -10684,7 +10717,7 @@ class Game {
                 // 伤害与状态
                 closest.applyTemp(CONFIG.balance.lightningTempIncrease); 
                 const killed = closest.takeDamage(dmg); 
-                this.combat_recordDamage(dmg); 
+                this.combat_recordDamage(dmg, 'lightning'); 
                 if(killed) this.spawn_addScore(closest.maxHp); 
                 
                 // 递归
@@ -10720,10 +10753,6 @@ class Game {
         };
         const finalRecipe = pullNext();
         if (!finalRecipe) return;
-        
-        // --- 新增：重置当前子弹伤害统计 ---
-        this.currentShotDamage = 0;
-        this.currentShotDamageByAttr = {};
         
         // --- 新增：触发UI动画 ---
         const currentSlot = document.getElementById('current-ammo-render');
@@ -11979,11 +12008,22 @@ class Game {
                     p.update(this.width, this.height, this.enemies, (spawnInfo) => { this.spawn_spawnBullet(spawnInfo.x, spawnInfo.y, spawnInfo.vel, spawnInfo.config); }, timeScale); 
                     p.draw(this.ctx); 
                     if (p.destroyed) {
-                        this.projectiles.splice(i, 1);
-                        // 当所有子弹都销毁时，保存伤害统计
-                        if (this.projectiles.length === 0 && this.burstQueue.length === 0) {
-                            this.ui_saveShotDamage();
+                        // 在删除子弹前，保存该子弹的统计
+                        if (p.shotId !== null && this.shotDamageMap.has(p.shotId)) {
+                            const shotStats = this.shotDamageMap.get(p.shotId);
+                            if (shotStats.total > 0) {
+                                this.shotDamageHistory.unshift({
+                                    total: shotStats.total,
+                                    byAttr: JSON.parse(JSON.stringify(shotStats.byAttr))
+                                });
+                                if (this.shotDamageHistory.length > 3) {
+                                    this.shotDamageHistory.pop();
+                                }
+                                this.ui_updateDamageStats();
+                            }
+                            this.shotDamageMap.delete(p.shotId);
                         }
+                        this.projectiles.splice(i, 1);
                     } 
                 } 
             }
