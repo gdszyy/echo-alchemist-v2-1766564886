@@ -5054,7 +5054,7 @@ class Enemy {
             
             // 记录冰冻额外伤害
             if (typeof game !== 'undefined') {
-                game.combat_recordDamage(bonusDamage, 'cryo');
+                game.combat_recordDamage(bonusDamage, 'cryo', game._currentDamageShotId);
                 game.spawn_createFloatingText(this.pos.x, this.pos.y - 30, `+${Math.ceil(bonusDamage)}`, '#06b6d4');
             }
         }
@@ -8765,7 +8765,7 @@ class Game {
                     
                     // 2. 造成主伤害
                     const killed = e.takeDamage(dmg);
-                    this.combat_recordDamage(dmg, 'lightning');
+                    this.combat_recordDamage(dmg, 'lightning', this._currentDamageShotId);
                     this.spawn_createFloatingText(e.pos.x, e.pos.y, `-${dmg}`, '#c084fc');
                     
                     // 3. 施加感电效果 (温度)
@@ -9036,6 +9036,9 @@ class Game {
         const shotId = projectile.shotId !== undefined ? projectile.shotId : null;
         this.combat_recordDamage(dmg, damageAttr, shotId);
         
+        // [新增] 保存当前shotId，供后续额外伤害使用
+        this._currentDamageShotId = shotId;
+        
         // [新增] 统一显示伤害数字
         if (this.showDamageNumbers && dmg > 0) {
             this.spawn_createFloatingText(hitX, hitY, `-${Math.ceil(dmg)}`, damageColor);
@@ -9070,7 +9073,7 @@ class Game {
                     // 2. 造成额外伤害
                     if (extraDmg > 0) {
                         enemy.takeDamage(extraDmg);
-                        this.combat_recordDamage(extraDmg, 'flying_sword');
+                        this.combat_recordDamage(extraDmg, 'flying_sword', this._currentDamageShotId);
                         this.spawn_createFloatingText(sword.pos.x, sword.pos.y, `+${Math.ceil(extraDmg)}`, resonanceColor);
                     }
 
@@ -9144,7 +9147,7 @@ class Game {
                         const spreadDmg = enemy.maxHp*CONFIG.gameplay.fireSpreadDamagePercent;
                         other.takeDamage(spreadDmg);
                         // 记录火焰扩散伤害
-                        this.combat_recordDamage(spreadDmg, 'pyro');
+                        this.combat_recordDamage(spreadDmg, 'pyro', this._currentDamageShotId);
                     }
                 });
             }
@@ -9222,7 +9225,7 @@ class Game {
                     // 造成 AOE 伤害 (减半)
                     const aoeDmg = dmg * 0.5;
                     const k = other.takeDamage(aoeDmg); 
-                    this.combat_recordDamage(aoeDmg, 'explosive'); 
+                    this.combat_recordDamage(aoeDmg, 'explosive', this._currentDamageShotId); 
                     if (k) this.spawn_addScore(other.maxHp); 
                     
                     // --- 4. 关键：AOE 也要施加元素效果 ---
@@ -10814,7 +10817,7 @@ class Game {
                     // 伤害与状态
                     closest.applyTemp(CONFIG.balance.lightningTempIncrease); 
                     const killed = closest.takeDamage(dmg); 
-                    this.combat_recordDamage(dmg, 'lightning'); 
+                    this.combat_recordDamage(dmg, 'lightning', this._currentDamageShotId); 
                     if(killed) this.spawn_addScore(closest.maxHp); 
                     
                     // 递归
@@ -10942,7 +10945,7 @@ class Game {
 
         // 如果是激光，发射光束后直接 return，不生成 Projectile
         if (recipe.isLaser) {
-            this.combat_laser_fire(x, y, vel, recipe);
+            this.combat_laser_fire(x, y, vel, recipe, shotId);
             
             // 处理散射激光 (如果激光带有散射属性，比如吃了黄色钉子)
             if (recipe.scatter > 0) {
@@ -10954,14 +10957,14 @@ class Game {
                     // 递归调用 fireLaser 或 spawnBullet
                     // 注意：散射出的激光伤害通常减半或者保持
                     const copyRecipe = { ...recipe, scatter: 0 }; 
-                    this.combat_laser_fire(x, y, newVel, copyRecipe);
+                    this.combat_laser_fire(x, y, newVel, copyRecipe, shotId);
                 } 
             }
             return; // <--- 确保这里有 return，就不会生成下面的 Projectile 实体球了
         }
          
         if (recipe.isLaser) {
-            this.combat_laser_fire(x, y, vel, recipe);
+            this.combat_laser_fire(x, y, vel, recipe, shotId);
             return;
         }
 
@@ -10989,7 +10992,9 @@ class Game {
      * @param {any} vel - TODO: Describe this parameter.
      * @param {any} recipe - TODO: Describe this parameter.
      */
-    combat_laser_fire(startX, startY, vel, recipe) {
+    combat_laser_fire(startX, startY, vel, recipe, shotId = null) {
+        // [新增] 保存shotId供伤害记录使用
+        this._currentDamageShotId = shotId;
         // --- 1. 参数计算 ---
         this.isVisualEffectActive = true;
         // [射程] 基础 500 + 每层穿透 250 (决定光线能跑多远)
