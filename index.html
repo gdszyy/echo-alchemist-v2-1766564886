@@ -9385,11 +9385,23 @@ class Game {
                                 const p = this.spawn_createParticle(px, py, color, pType);
                                 
                                 if (p && p.vel) {
+                                    // [修改] 确保粒子至少旋转一圈半 (540度)
+                                    // 旋转速度 rotationSpeed 是像素/帧，我们需要将其转换为角速度
+                                    // 角速度 omega = v / r
+                                    const omega = (rotationSpeed * intensity) / radius;
+                                    
+                                    // 旋转一圈半所需的帧数 = (1.5 * 2 * PI) / omega
+                                    const framesNeeded = (1.5 * Math.PI * 2) / omega;
+                                    
+                                    // 设置生命周期和衰减，确保粒子在 framesNeeded 帧内不消失
+                                    p.life = 1.0;
+                                    p.decay = 1.0 / framesNeeded;
+                                    p.drag = 1.0; // 取消阻力，保持匀速旋转
+                                    
                                     // 切线方向，形成旋转
                                     const tangent = new Vec2(-Math.sin(angle), Math.cos(angle));
                                     p.vel = tangent.mult(rotationSpeed * intensity);
                                     p.size = 2 + Math.random() * 3 * intensity;
-                                    p.life = 0.5 + Math.random() * 0.3;
                                 }
                             }
                             
@@ -9583,21 +9595,29 @@ class Game {
                     
                     const p = this.spawn_createParticle(px, py, color, pType);
                     if (p && p.vel) {
-                        // 风暴速度：快速且有变化
-                        const speed = 25 + Math.random() * 25;
-                        // 添加微小的随机偏移，模拟溃流
+                        // [修改] 确保粒子贯穿全场
+                        const speed = 30 + Math.random() * 20;
                         const offset = isHorizontal ? 
-                            new Vec2(0, (Math.random() - 0.5) * 3) : 
-                            new Vec2((Math.random() - 0.5) * 3, 0);
+                            new Vec2(0, (Math.random() - 0.5) * 5) : 
+                            new Vec2((Math.random() - 0.5) * 5, 0);
                         p.vel = dir.mult(speed).add(offset);
                         
-                        // 根据粒子类型设置大小
+                        // 取消阻力，确保匀速贯穿
+                        p.drag = 1.0; 
+                        
+                        // 计算贯穿全场所需的生命周期 (距离 / 速度)
+                        const distance = isHorizontal ? this.canvas.width : this.canvas.height;
+                        const framesNeeded = distance / speed;
+                        // p.life 会在每帧减少 p.decay * timeScale
+                        // 默认 decay 约为 0.05，我们需要调整 decay 使得 life 在 framesNeeded 帧后才耗尽
+                        p.life = 1.0;
+                        p.decay = 1.0 / (framesNeeded * 1.2); // 额外增加20%余量确保飞出屏幕
+                        
                         if (pType === 'line') {
-                            p.scale = isHorizontal ? {x: 30, y: 0.8} : {x: 0.8, y: 30};
+                            p.scale = isHorizontal ? {x: 40, y: 1.0} : {x: 1.0, y: 40};
                         } else {
-                            p.size = 2 + Math.random() * 3;
+                            p.size = 2 + Math.random() * 4;
                         }
-                        p.life = 0.8 + Math.random() * 0.4;
                     }
                 }
 
