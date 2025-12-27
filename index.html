@@ -5246,7 +5246,7 @@ class SonSword {
                     targetPos = this.currentTarget.pos;
                     currentSpeed *= 2.8;     
                     maxTurnRate = 0.12 * timeScale; // 索敌时弧度优美一点
-                } else if (this.mother.active) {
+                } else if (this.mother && this.mother.active) {
                     // 跟随母剑
                     const mx = this.mother.vel.x;
                     const my = this.mother.vel.y;
