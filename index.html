@@ -7935,6 +7935,18 @@ class Game {
             this.ctx.shadowBlur = 10 + linePulse * 5;
             this.ctx.shadowColor = '#34d399';
             
+            // [属性特效]：在连线上方绘制微小的风纹粒子
+            if (Math.random() > 0.8) {
+                const a1 = this.windAnchors[Math.floor(Math.random() * this.windAnchors.length)];
+                const a2 = this.windAnchors[Math.floor(Math.random() * this.windAnchors.length)];
+                if (a1 !== a2) {
+                    const lerp = Math.random();
+                    const px = a1.x + (a2.x - a1.x) * lerp;
+                    const py = a1.y + (a2.y - a1.y) * lerp;
+                    this.spawn_createParticle(px, py, '#34d399', 'spark');
+                }
+            }
+            
             // 连线
             if (this.windAnchors.length > 1) {
                 this.ctx.beginPath();
@@ -9126,7 +9138,9 @@ class Game {
     combat_wind_addAnchor(x, y) {
         if (this.windAnchors.length >= 4) {
             const old = this.windAnchors.shift();
-            this.combat_wind_triggerAnchorExplosion(old.x, old.y);
+            // 触发小旋风特效和伤害
+            this.spawn_smallWhirlwind(old.x, old.y);
+            this.combat_wind_triggerSmallWhirlwindDamage(old.x, old.y);
         }
         this.windAnchors.push({ x, y, life: 1.0 });
         this.spawn_createParticle(x, y, '#34d399', 'spark');
@@ -9135,12 +9149,67 @@ class Game {
         }
     }
 
-    combat_wind_triggerAnchorExplosion(x, y) {
-        this.spawn_createExplosion(x, y, '#34d399', 40);
-        const dmg = 5;
+    /**
+     * [EFFECT] 生成小旋风特效 (消失时的反馈)
+     */
+    spawn_smallWhirlwind(x, y) {
+        // 播放风声
+        if (this.soundManager) this.soundManager.playEffect('split'); 
+
+        const particleCount = 12;
+        for (let i = 0; i < particleCount; i++) {
+            // 创建青色粒子
+            const p = this.spawn_createParticle(x, y, '#34d399', 'spark');
+            if (!p) continue;
+            
+            // [数学魔法]：计算螺旋速度
+            const angle = (i / particleCount) * Math.PI * 2;
+            const speed = 4;
+            
+            // 基础向外速度
+            const velocity = new Vec2(Math.cos(angle), Math.sin(angle));
+            
+            // 旋转 90 度得到切线方向，混合一点向外的分量
+            // 这样粒子会以螺旋线飞出
+            p.vel = velocity.rotate(Math.PI / 2).mult(speed); 
+            p.vel.x += velocity.x * 1.5; // 稍微加一点离心力
+            p.vel.y += velocity.y * 1.5;
+            
+            p.life = 0.6; // 短促
+            p.size = Math.random() * 3 + 2;
+        }
+        
+        // 中心加一个瞬间的淡出光圈
+        this.spawn_createShockwave(x, y, '#34d399');
+    }
+
+    /**
+     * [COMBAT] 触发锚点消失时的范围伤害
+     */
+    combat_wind_triggerSmallWhirlwindDamage(centerX, centerY) {
+        const radius = 60; // 伤害半径
+        const damage = 15; // 基础伤害
+
+        // 遍历敌人检测碰撞
         this.enemies.forEach(e => {
-            if (e.active && e.pos.dist(new Vec2(x, y)) < 60) {
-                e.takeDamage(dmg);
+            if (!e.active) return;
+
+            // 计算距离
+            const dist = e.pos.dist(new Vec2(centerX, centerY));
+            
+            // 判定命中 (考虑敌人体积)
+            if (dist < radius + e.width / 2) {
+                // 1. 造成伤害
+                e.takeDamage(damage);
+                this.combat_createFloatingText(e.pos.x, e.pos.y, `Wind ${damage}`, '#34d399');
+                
+                // 2. 施加轻微推力 (击退效果)
+                const pushDir = new Vec2(e.pos.x - centerX, e.pos.y - centerY).norm();
+                e.pos.x += pushDir.x * 10; 
+                e.pos.y += pushDir.y * 10;
+                
+                // 3. 受击反馈
+                e.hitTimer = 10;
             }
         });
     }
@@ -9200,7 +9269,11 @@ class Game {
         // 6. 推入活跃列表
         this.activeWindMatrices.push(newMatrix);
         
-        // 7. [关键] 消耗掉当前的锚点，以便立即开始构建下一个
+        // 7. [关键] 消耗掉当前的锚点，并触发它们的消失特效
+        this.windAnchors.forEach(a => {
+            this.spawn_smallWhirlwind(a.x, a.y);
+            this.combat_wind_triggerSmallWhirlwindDamage(a.x, a.y);
+        });
         this.windAnchors = []; 
         
         // 播放锁定音效 (如果已实现)
