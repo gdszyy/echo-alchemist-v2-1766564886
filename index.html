@@ -951,6 +951,7 @@
         <div class="stat-pill">Score <span id="score-num" class="stat-highlight">0</span></div>
         <button id="speed-btn" class="btn-icon">⏩</button>
         <button id="mute-btn" class="btn-icon">🔊</button>
+        <button id="damage-numbers-btn" class="btn-icon" title="切换伤害数字显示">🔢</button>
     </div>
 
     <div id="sp-panel" class="absolute top-16 left-4 flex flex-wrap gap-3 pointer-events-none z-50 transition-opacity duration-300">
@@ -5134,12 +5135,13 @@ class SwordQi {
 
 // --- [特效] 斩击光效 ---
 class SlashAnim {
-    constructor(x, y, angle, scale=1) {
+    constructor(x, y, angle, scale=1, color='#0ea5e9') {
         this.pos = new Vec2(x, y);
         this.angle = angle;
         this.life = 1.0;
         this.active = true;
         this.scale = scale;
+        this.color = color; // [新增] 支持自定义颜色
     }
     update(timeScale) {
         this.life -= 0.08 * timeScale;
@@ -5159,7 +5161,7 @@ class SlashAnim {
         ctx.fillStyle = '#ffffff';
         ctx.beginPath(); ctx.ellipse(20, 0, 60, 3, 0, 0, Math.PI*2); ctx.fill();
         
-        ctx.fillStyle = '#0ea5e9'; 
+        ctx.fillStyle = this.color; // [修复] 使用自定义颜色
         ctx.beginPath();
         ctx.moveTo(-40, 0);
         ctx.quadraticCurveTo(0, -25, 60, 0);
@@ -5471,8 +5473,8 @@ class SonSword {
             if (this.level >= 2) {
                 game.combat_damageEnemy(enemy, { config: this.config, pos: this.pos, isCopy: true });
             } else {
-                enemy.takeDamage(dmg);
-                game.spawn_createFloatingText(this.pos.x, this.pos.y, `-${Math.ceil(dmg)}`, '#fff');
+                // Lv1子剑伤害，也通过combat_damageEnemy统一处理
+                game.combat_damageEnemy(enemy, { config: { ...this.config, damage: dmg }, pos: this.pos, isCopy: true });
             }
 
             // 特效
@@ -6023,6 +6025,9 @@ if (Math.random() < 0.2) {
 
             game.spawn_createFloatingText(stuckPos.x, stuckPos.y, "🗡️STUCK", "#0ea5e9");
             audio.playSlash();
+            
+            // [新增] 母剑插入时触发斩击攻击
+            this.performSlashAttack(enemy, game.enemies);
 
             // 2. [新增] 触发子剑联动逻辑 (根据等级)
             game.sonSwords.forEach(s => {
@@ -6633,11 +6638,11 @@ if (Math.random() < 0.2) {
 
         // 3. 视觉特效：添加 SlashEffect 到粒子系统
         if (typeof game !== 'undefined') {
-            // 根据属性决定颜色
+            // [修复] 根据属性决定颜色，优先级：雷 > 火/冰
             let slashColor = CONFIG.colors.flying_sword || '#0ea5e9';
-            if (this.config.pyro > 0) slashColor = '#f97316';
+            if (this.config.lightning > 0) slashColor = '#c084fc'; // 雷属性最高优先级
+            else if (this.config.pyro > 0) slashColor = '#f97316';
             else if (this.config.cryo > 0) slashColor = '#06b6d4';
-            else if (this.config.lightning > 0) slashColor = '#c084fc';
 
             game.particles.push(new SlashEffect(center.x, center.y, angle, length, slashColor));
 
@@ -7763,6 +7768,9 @@ class Game {
         
         this.orbitalAngle = 0;          // 当前轨道旋转角度 (弧度)
         this.spinBoost = 0;             // 额外旋转速度 (受撞击增加)
+        
+        // [新增] 伤害数字显示开关
+        this.showDamageNumbers = true;  // 默认开启
 
 
         this.spores = []; // 新增：存儲分身孢子
@@ -8210,6 +8218,14 @@ class Game {
             audio.resume(); // 确保音频上下文已激活
             const isMuted = audio.toggleMute(); 
             muteBtn.innerText = isMuted ? '🔇' : '🔊'; 
+        };
+        
+        // [新增] 伤害数字开关按钮
+        const damageNumbersBtn = document.getElementById('damage-numbers-btn');
+        damageNumbersBtn.onclick = () => {
+            this.showDamageNumbers = !this.showDamageNumbers;
+            damageNumbersBtn.style.opacity = this.showDamageNumbers ? '1' : '0.5';
+            showToast(this.showDamageNumbers ? '伤害数字：开启' : '伤害数字：关闭');
         };
         //  陀螺仪权限申请与监听
         // 注意：iOS 13+ 需要用户交互（点击）才能申请权限
@@ -8984,21 +9000,46 @@ class Game {
         const killed = enemy.takeDamage(dmg);
         // 根据属性类型记录伤害
         let damageAttr = 'damage'; // 默认为普通伤害
+        let damageColor = '#ffffff'; // 默认颜色
         
         // 判断是否为飞剑伤害
         if (config.type === 'flying_sword' || projectile.isCopy) {
             damageAttr = 'flying_sword';
+            damageColor = '#0ea5e9';
         }
-        else if (config.cryo > 0) damageAttr = 'cryo';
-        else if (config.pyro > 0) damageAttr = 'pyro';
-        else if (config.lightning > 0) damageAttr = 'lightning';
-        else if (config.pierce > 0) damageAttr = 'pierce';
-        else if (config.bounce > 0) damageAttr = 'bounce';
-        else if (config.scatter > 0) damageAttr = 'scatter';
+        else if (config.lightning > 0) {
+            damageAttr = 'lightning';
+            damageColor = '#c084fc';
+        }
+        else if (config.pyro > 0) {
+            damageAttr = 'pyro';
+            damageColor = '#f97316';
+        }
+        else if (config.cryo > 0) {
+            damageAttr = 'cryo';
+            damageColor = '#06b6d4';
+        }
+        else if (config.pierce > 0) {
+            damageAttr = 'pierce';
+            damageColor = '#fca5a5';
+        }
+        else if (config.bounce > 0) {
+            damageAttr = 'bounce';
+            damageColor = '#fbbf24';
+        }
+        else if (config.scatter > 0) {
+            damageAttr = 'scatter';
+            damageColor = '#a78bfa';
+        }
         
         // 传递shotId到recordDamage
         const shotId = projectile.shotId !== undefined ? projectile.shotId : null;
         this.combat_recordDamage(dmg, damageAttr, shotId);
+        
+        // [新增] 统一显示伤害数字
+        if (this.showDamageNumbers && dmg > 0) {
+            this.spawn_createFloatingText(hitX, hitY, `-${Math.ceil(dmg)}`, damageColor);
+        }
         audio.playEnemyHit(hitType);
 
         // --- [新增] 剑痕共鸣机制 (Stuck Sword Resonance) ---
@@ -9033,10 +9074,16 @@ class Game {
                         this.spawn_createFloatingText(sword.pos.x, sword.pos.y, `+${Math.ceil(extraDmg)}`, resonanceColor);
                     }
 
-                    // 3. 视觉特效：斩击动画
+                    // 3. [修复] 视觉特效：斩击动画，使用元素属性颜色
                     const angle = Math.random() * Math.PI * 2;
-                    this.particles.push(new SlashAnim(sword.pos.x, sword.pos.y, angle, 0.35));
-                    this.spawn_createParticle(sword.pos.x, sword.pos.y, resonanceColor, 'spark');
+                    // 根据元素属性决定斩击颜色，优先级：雷 > 火/冰
+                    let slashColor = '#0ea5e9'; // 默认飞剑颜色
+                    if (sword.config.lightning > 0) slashColor = '#c084fc'; // 雷属性
+                    else if (sword.config.pyro > 0) slashColor = '#f97316'; // 火属性
+                    else if (sword.config.cryo > 0) slashColor = '#06b6d4'; // 冰属性
+                    
+                    this.particles.push(new SlashAnim(sword.pos.x, sword.pos.y, angle, 0.35, slashColor));
+                    this.spawn_createParticle(sword.pos.x, sword.pos.y, slashColor, 'spark');
                 }
             });
             // 清理已失效的子剑
