@@ -7891,27 +7891,28 @@ class Game {
     drawWindTunnelFlow(rect, isHorizontal) {
         const offset = (Date.now() / 15) % 80; // 随时间位移
         this.ctx.save();
-        this.ctx.beginPath();
-        this.ctx.rect(rect.x, rect.y, rect.w, rect.h);
-        this.ctx.clip(); // 限制在法阵区域内
-
+        
+        // [优化]：不再使用 clip，而是让流动线横穿全屏
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
         this.ctx.lineWidth = 2;
         
+        const canvasW = this.canvas.width;
+        const canvasH = this.canvas.height;
+
         if (isHorizontal) {
-            // 水平流动线
-            for (let i = -100; i < rect.w + 100; i += 40) {
+            // 水平流动线：横跨整个屏幕宽度
+            for (let x = -80; x < canvasW + 80; x += 40) {
                 this.ctx.beginPath();
-                this.ctx.moveTo(rect.x + i + offset, rect.y);
-                this.ctx.lineTo(rect.x + i + offset - 30, rect.y + rect.h);
+                this.ctx.moveTo(x + offset, rect.y);
+                this.ctx.lineTo(x + offset - 30, rect.y + rect.h);
                 this.ctx.stroke();
             }
         } else {
-            // 垂直流动线
-            for (let i = -100; i < rect.h + 100; i += 40) {
+            // 垂直流动线：横跨整个屏幕高度
+            for (let y = -80; y < canvasH + 80; y += 40) {
                 this.ctx.beginPath();
-                this.ctx.moveTo(rect.x, rect.y + i + offset);
-                this.ctx.lineTo(rect.x + rect.w, rect.y + i + offset - 30);
+                this.ctx.moveTo(rect.x, y + offset);
+                this.ctx.lineTo(rect.x + rect.w, y + offset - 30);
                 this.ctx.stroke();
             }
         }
@@ -8009,10 +8010,12 @@ class Game {
         const isHorizontal = rect.w > rect.h;
         
         if (type === 'tunnel') {
-            // === 风道粒子：长条、极速 ===
+            // === 风道粒子：长条、极速 (全屏延伸) ===
+            const px = isHorizontal ? (Math.random() * this.canvas.width) : (rect.x + Math.random() * rect.w);
+            const py = isHorizontal ? (rect.y + Math.random() * rect.h) : (Math.random() * this.canvas.height);
+            
             const p = this.spawn_createParticle(
-                rect.x + Math.random() * rect.w,
-                rect.y + Math.random() * rect.h,
+                px, py,
                 '#a7f3d0', // 浅绿
                 'line'
             );
@@ -8089,48 +8092,58 @@ class Game {
         ctx.closePath();
         ctx.stroke();
 
-        // 3. 限制绘制区域
-        ctx.beginPath();
-        ctx.rect(rect.x, rect.y, rect.w, rect.h);
-        ctx.clip();
-
-        // 4. 核心技能特效绘制
+        // 3. 核心技能特效绘制
         if (type === 'tunnel') {
-            // === 风道：超高速流光 ===
+            // === 风道：超高速流光 (全屏贯穿) ===
             const isHorizontal = rect.w > rect.h;
+            const canvasW = this.canvas.width;
+            const canvasH = this.canvas.height;
             
-            // 绘制主能量束 (中间亮，两边淡)
+            // 绘制主能量束 (横跨全屏)
             const gradient = isHorizontal 
-                ? ctx.createLinearGradient(rect.x, 0, rect.x + rect.w, 0)
-                : ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
+                ? ctx.createLinearGradient(0, 0, canvasW, 0)
+                : ctx.createLinearGradient(0, 0, 0, canvasH);
                 
             gradient.addColorStop(0, 'rgba(52, 211, 153, 0)');
-            gradient.addColorStop(0.5, `rgba(209, 250, 229, ${0.3 + progress * 0.4})`); // 越来越亮
+            gradient.addColorStop(0.5, `rgba(209, 250, 229, ${0.3 + progress * 0.4})`);
             gradient.addColorStop(1, 'rgba(52, 211, 153, 0)');
             
             ctx.fillStyle = gradient;
-            ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+            if (isHorizontal) {
+                ctx.fillRect(0, rect.y, canvasW, rect.h);
+            } else {
+                ctx.fillRect(rect.x, 0, rect.w, canvasH);
+            }
 
-            // 绘制极速线条 (Speed Lines)
+            // 绘制极速线条 (Speed Lines - 全屏分布)
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
             ctx.lineWidth = 2;
-            for(let i=0; i<5; i++) {
+            for(let i=0; i<8; i++) {
                 ctx.beginPath();
                 if (isHorizontal) {
                     const y = rect.y + Math.random() * rect.h;
-                    const len = Math.random() * rect.w * 0.5;
-                    const x = rect.x + Math.random() * rect.w;
+                    const len = 100 + Math.random() * 300;
+                    const x = Math.random() * canvasW;
                     ctx.moveTo(x, y);
                     ctx.lineTo(x + len, y);
                 } else {
                     const x = rect.x + Math.random() * rect.w;
-                    const len = Math.random() * rect.h * 0.5;
-                    const y = rect.y + Math.random() * rect.h;
+                    const len = 100 + Math.random() * 300;
+                    const y = Math.random() * canvasH;
                     ctx.moveTo(x, y);
                     ctx.lineTo(x, y + len);
                 }
                 ctx.stroke();
             }
+        } else {
+            // 旋风和爆破仍需限制在法阵内
+            ctx.beginPath();
+            ctx.rect(rect.x, rect.y, rect.w, rect.h);
+            ctx.clip();
+        }
+
+        // 4. 旋风和爆破的内部绘制
+        if (type === 'tunnel') {
             
             // 文字提示
             ctx.fillStyle = `rgba(255,255,255, ${progress})`;
@@ -9281,27 +9294,30 @@ class Game {
                 // [核心优化]：绘制流动的波纹底色
                 this.drawWindTunnelFlow({x, y, w, h}, isHorizontal);
 
-                // 添加风道粒子特效（具有加速感的高速长条粒子）
+                // [优化]：添加横穿全屏的风道粒子特效
+                const canvasW = this.canvas.width;
+                const canvasH = this.canvas.height;
+                
                 if (isHorizontal) {
-                    // 水平风道
-                    for(let i=0; i<40; i++) {
-                        const px = x + Math.random() * w;
+                    // 水平风道 (全屏)
+                    for(let i=0; i<60; i++) {
+                        const px = Math.random() * canvasW;
                         const py = centerY + (Math.random() - 0.5) * h * 0.8;
                         const p = this.spawn_createParticle(px, py, '#f0fdf4', 'spark');
                         if (p && p.vel) {
-                            p.vel = new Vec2(10 + Math.random() * 6, (Math.random() - 0.5) * 2);
-                            p.life = 0.6; // 短寿命，快速消失
+                            p.vel = new Vec2(15 + Math.random() * 10, (Math.random() - 0.5) * 2);
+                            p.life = 0.8;
                         }
                     }
                 } else {
-                    // 垂直风道
-                    for(let i=0; i<40; i++) {
+                    // 垂直风道 (全屏)
+                    for(let i=0; i<60; i++) {
                         const px = centerX + (Math.random() - 0.5) * w * 0.8;
-                        const py = y + Math.random() * h;
+                        const py = Math.random() * canvasH;
                         const p = this.spawn_createParticle(px, py, '#f0fdf4', 'spark');
                         if (p && p.vel) {
-                            p.vel = new Vec2((Math.random() - 0.5) * 2, 10 + Math.random() * 6);
-                            p.life = 0.6;
+                            p.vel = new Vec2((Math.random() - 0.5) * 2, 15 + Math.random() * 10);
+                            p.life = 0.8;
                         }
                     }
                 }
