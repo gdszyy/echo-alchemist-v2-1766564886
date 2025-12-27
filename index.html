@@ -8472,6 +8472,14 @@ class Game {
     spawn_createFloatingText(x, y, text, color) { 
         this.floatingTexts.push(new FloatingText(x, y, text, color)); 
     }
+
+    /**
+     * @method combat_createFloatingText
+     * @description 兼容旧代码的浮动文字方法
+     */
+    combat_createFloatingText(x, y, text, color) {
+        this.spawn_createFloatingText(x, y, text, color);
+    }
     // --- [新增] 更新連射倍率 UI ---
     /**
      * [AUTO-GENERATED] TODO: Add a description for combat_updateMulticastDisplay.
@@ -9201,7 +9209,7 @@ class Game {
             if (dist < radius + e.width / 2) {
                 // 1. 造成伤害
                 e.takeDamage(damage);
-                this.combat_createFloatingText(e.pos.x, e.pos.y, `Wind ${damage}`, '#34d399');
+                this.spawn_createFloatingText(e.pos.x, e.pos.y, `Wind ${damage}`, '#34d399');
                 
                 // 2. 施加轻微推力 (击退效果)
                 const pushDir = new Vec2(e.pos.x - centerX, e.pos.y - centerY).norm();
@@ -9323,7 +9331,9 @@ class Game {
                             }
                             this.enemies.forEach(e => {
                                 if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
-                                    e.takeDamage(2);
+                                    const dmg = 2;
+                                    e.takeDamage(dmg);
+                                    this.spawn_createFloatingText(e.pos.x, e.pos.y, `Wind ${dmg}`, '#34d399');
                                     e.applyTemp(e.temp * 0.1);
                                 }
                             });
@@ -9339,7 +9349,9 @@ class Game {
                 this.spawn_createFloatingText(centerX, centerY, "🕳️黑洞", "#0ea5e9");
                 this.enemies.forEach(e => {
                     if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
-                        e.takeDamage(9999);
+                        const dmg = 9999;
+                        e.takeDamage(dmg);
+                        this.spawn_createFloatingText(e.pos.x, e.pos.y, `Void ${dmg}`, '#0ea5e9');
                     }
                 });
             }
