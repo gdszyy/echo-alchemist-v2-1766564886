@@ -5642,8 +5642,8 @@ class Projectile {
         this.vel = new Vec2(vel.x, vel.y);
         this.config = config;
         
-        // [修复] shotId由外部传入，不再自己创建
-        this.shotId = isCopy ? null : shotId;
+        // [修复] shotId由外部传入，不再自己创建。散射子弹(isCopy)也需要继承shotId以进行统计
+        this.shotId = shotId;
         
         // 如果有shotId，增加projectileCount
         if (this.shotId !== null && typeof game !== 'undefined' && game.shotDamageMap.has(this.shotId)) {
@@ -10997,6 +10997,12 @@ class Game {
     combat_laser_fire(startX, startY, vel, recipe, shotId = null) {
         // [新增] 保存shotId供伤害记录使用
         this._currentDamageShotId = shotId;
+        
+        // [新增] 激光统计处理：激光是即时的，手动增加计数并在完成后减少
+        if (shotId !== null && this.shotDamageMap.has(shotId)) {
+            this.shotDamageMap.get(shotId).projectileCount++;
+        }
+        
         // --- 1. 参数计算 ---
         this.isVisualEffectActive = true;
         // [射程] 基础 500 + 每层穿透 250 (决定光线能跑多远)
@@ -11080,8 +11086,24 @@ class Game {
         // 音效：越粗越低沉
         audio.playTone(Math.max(100, 800 - width * 20), 'sawtooth', 0.15, 0.2 + width * 0.01);
         setTimeout(() => {
-        this.isVisualEffectActive = false;
-    }, 600); 
+            this.isVisualEffectActive = false;
+        }, 600); 
+        
+        // [新增] 激光发射完成，增加销毁计数以触发统计保存
+        if (shotId !== null && this.shotDamageMap.has(shotId)) {
+            const shotStats = this.shotDamageMap.get(shotId);
+            shotStats.destroyedCount++;
+            // 检查是否所有子弹都已销毁
+            if (shotStats.destroyedCount >= shotStats.projectileCount && shotStats.total > 0) {
+                this.shotDamageHistory.push({
+                    total: shotStats.total,
+                    byAttr: JSON.parse(JSON.stringify(shotStats.byAttr))
+                });
+                if (this.shotDamageHistory.length > 10) this.shotDamageHistory.shift();
+                this.ui_updateDamageStats();
+                this.shotDamageMap.delete(shotId);
+            }
+        }
     }
 
     // 辅助：寻找最近的反射面（墙壁或带盾敌人）
