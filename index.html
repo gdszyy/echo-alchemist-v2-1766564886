@@ -3074,29 +3074,39 @@ class Peg {
     }
     // [新增] 绘制风属性钉子图标
     drawWindPeg(ctx, r, isLit) {
-        // 风旋图标颜色：如果是点亮状态用深色，否则用浅色/白色
-        ctx.strokeStyle = isLit ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.8)';
-        ctx.lineWidth = r * 0.15;
+        // 风旋图标颜色：使用更鲜明的颜色对比
+        ctx.fillStyle = isLit ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.9)';
+        ctx.strokeStyle = isLit ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.9)';
+        ctx.lineWidth = r * 0.12;
         ctx.lineCap = 'round';
         
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
         
         // 缩小图标比例，使其待在圆钉子内部
-        const sr = r * 0.5;
+        const sr = r * 0.55;
         
-        // 绘制三条弧线模拟风旋
+        // 绘制三条弯月形风刃，替代弧线
         for (let i = 0; i < 3; i++) {
-            const angle = (i * Math.PI * 2) / 3 + Date.now() / 1000; // 旋转动画
+            const angle = (i * Math.PI * 2) / 3;
             ctx.save();
             ctx.rotate(angle);
             
+            // 绘制弯月形风刃
             ctx.beginPath();
-            ctx.arc(0, 0, sr * 0.6, 0, Math.PI * 0.6);
-            ctx.stroke();
+            ctx.moveTo(sr * 0.3, -sr * 0.2);
+            ctx.quadraticCurveTo(sr * 0.7, 0, sr * 0.3, sr * 0.2);
+            ctx.quadraticCurveTo(sr * 0.5, 0, sr * 0.3, -sr * 0.2);
+            ctx.closePath();
+            ctx.fill();
             
             ctx.restore();
         }
+        
+        // 绘制中心小圆
+        ctx.beginPath();
+        ctx.arc(0, 0, sr * 0.15, 0, Math.PI * 2);
+        ctx.fill();
         
         ctx.restore();
     }
@@ -3148,6 +3158,7 @@ class DropBall {
             // --- Visual State ---
             this.lifeTime = 0; // 用于驱动动画
             this.visualSeed = Math.random() * 1000; // 随机种子，用于闪电/噪点的不规则跳动
+            this.windBladeAngle = 0; // 风属性环绕风刃的旋转角度
 	    }
         /**
          * [核心方法] 获取当前所有属性的层数
@@ -3282,6 +3293,14 @@ class DropBall {
 
             this.lifeTime += timeScale;
             const buffs = this.getBuffState(); // 获取实时属性
+            
+            // 更新风属性环绕风刃的旋转角度
+            if (this.session && this.session.collected && this.session.collected.some(item => {
+                const type = (typeof item === 'string') ? item : item.type;
+                return type === 'wind';
+            })) {
+                this.windBladeAngle += 0.1 * timeScale;
+            }
 
             // --- 粒子生成逻辑 (基于当前拥有的属性) ---
             // 只要带有某种属性，就会掉落对应粒子
@@ -3912,14 +3931,15 @@ class DropBall {
                      ctx.beginPath(); ctx.arc(0, 0, r-2, 0, Math.PI*2); ctx.stroke();
                  } 
                  else {
-                     const map = {
-                         'bounce': ['#dcfce7', '#15803d'],
-                         'pierce': ['#fee2e2', '#b91c1c'],
-                         'scatter': ['#fef9c3', '#a16207'],
-                         'damage': ['#f3e8ff', '#7e22ce'],
-                         'laser':  ['#e0f2fe', '#0369a1'],
-                         // 'explosive' 已经被上面单独处理了，这里不需要 map
-                     };
+                    const map = {
+                        'bounce': ['#dcfce7', '#15803d'],
+                        'pierce': ['#fee2e2', '#b91c1c'],
+                        'scatter': ['#fef9c3', '#a16207'],
+                        'damage': ['#f3e8ff', '#7e22ce'],
+                        'laser':  ['#e0f2fe', '#0369a1'],
+                        'wind':   ['#d1fae5', '#047857'],
+                        // 'explosive' 已经被上面单独处理了，这里不需要 map
+                    };
                      if (this.def.type && map[this.def.type]) {
                          baseLight = map[this.def.type][0];
                          baseDark = map[this.def.type][1];
@@ -3995,6 +4015,63 @@ class DropBall {
                         ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.fill();
                     }
                 }
+                ctx.restore();
+            }
+            
+            // ==========================================
+            //  LAYER 5: 🌪️ Wind Blades (风刃环绕特效)
+            // ==========================================
+            // 检查是否有wind属性
+            const hasWind = this.session && this.session.collected && this.session.collected.some(item => {
+                const type = (typeof item === 'string') ? item : item.type;
+                return type === 'wind';
+            });
+            
+            if (hasWind) {
+                ctx.save();
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = '#34d399';
+                
+                // 计算wind属性的数量
+                let windCount = 0;
+                if (this.session && this.session.collected) {
+                    this.session.collected.forEach(item => {
+                        const type = (typeof item === 'string') ? item : item.type;
+                        if (type === 'wind') windCount++;
+                    });
+                }
+                
+                const bladeCount = Math.min(3 + windCount, 6);
+                const orbitRadius = r * 1.5;
+                
+                for (let i = 0; i < bladeCount; i++) {
+                    const angle = this.windBladeAngle + (i * Math.PI * 2 / bladeCount);
+                    const bladeX = Math.cos(angle) * orbitRadius;
+                    const bladeY = Math.sin(angle) * orbitRadius;
+                    
+                    ctx.save();
+                    ctx.translate(bladeX, bladeY);
+                    ctx.rotate(angle + Math.PI / 2);
+                    
+                    ctx.strokeStyle = '#d1fae5';
+                    ctx.fillStyle = 'rgba(209, 250, 229, 0.3)';
+                    ctx.lineWidth = 1.2;
+                    ctx.lineCap = 'round';
+                    
+                    const bladeLength = r * 0.6;
+                    const bladeCurve = r * 0.25;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(-bladeLength/2, 0);
+                    ctx.quadraticCurveTo(0, bladeCurve, bladeLength/2, 0);
+                    ctx.quadraticCurveTo(0, bladeCurve * 0.5, -bladeLength/2, 0);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                    
+                    ctx.restore();
+                }
+                
                 ctx.restore();
             }
             
@@ -7732,17 +7809,46 @@ class Game {
                 this.ctx.stroke();
             }
             
-            // 绘制锚点
+            // 绘制锥点（增强视觉效果）
             this.windAnchors.forEach((a, idx) => {
+                const pulse = (Math.sin(Date.now() / 200 + idx) + 1) / 2;
+                
+                // 绘制外圈发光
+                this.ctx.save();
+                this.ctx.globalAlpha = 0.3 + pulse * 0.3;
                 this.ctx.fillStyle = '#34d399';
+                this.ctx.shadowBlur = 15 + pulse * 10;
+                this.ctx.shadowColor = '#34d399';
                 this.ctx.beginPath();
-                this.ctx.arc(a.x, a.y, 4, 0, Math.PI * 2);
+                this.ctx.arc(a.x, a.y, 8 + pulse * 4, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.restore();
+                
+                // 绘制主体
+                this.ctx.save();
+                this.ctx.fillStyle = '#d1fae5';
+                this.ctx.shadowBlur = 10;
+                this.ctx.shadowColor = '#34d399';
+                this.ctx.beginPath();
+                this.ctx.arc(a.x, a.y, 5, 0, Math.PI * 2);
                 this.ctx.fill();
                 
-                // 编号
+                // 绘制中心亮点
                 this.ctx.fillStyle = '#ffffff';
-                this.ctx.font = '10px Arial';
-                this.ctx.fillText(idx + 1, a.x + 6, a.y - 6);
+                this.ctx.beginPath();
+                this.ctx.arc(a.x, a.y, 2, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.restore();
+                
+                // 编号
+                this.ctx.save();
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.strokeStyle = '#047857';
+                this.ctx.lineWidth = 3;
+                this.ctx.font = 'bold 14px Arial';
+                this.ctx.strokeText(idx + 1, a.x + 10, a.y - 8);
+                this.ctx.fillText(idx + 1, a.x + 10, a.y - 8);
+                this.ctx.restore();
             });
             this.ctx.restore();
         }
