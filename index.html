@@ -8120,80 +8120,58 @@ class Game {
 
         // --- B. 内部核心特效 ---
         if (type === 'tunnel') {
-            // === 风道：音爆风洞 (Sonic Tunnel) ===
+            // === 风道：简化视觉 (Minimalist Tunnel) ===
             const isHorizontal = rect.w > rect.h;
             const canvasW = this.canvas.width;
             const canvasH = this.canvas.height;
             const centerX = rect.x + rect.w/2;
             const centerY = rect.y + rect.h/2;
             
-            // 1. 绘制「切裂气流」(Sharp Stream Lines)
-            const lineCount = 8;
-            ctx.lineWidth = 2;
-            
-            for(let i=0; i<lineCount; i++) {
-                const p = (i / lineCount);
-                ctx.beginPath();
-                
-                let grad;
-                if (isHorizontal) {
-                    grad = ctx.createLinearGradient(0, centerY - rect.h/2, 0, centerY + rect.h/2);
-                    grad.addColorStop(0, 'rgba(52, 211, 153, 0)');
-                    grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.6)');
-                    grad.addColorStop(1, 'rgba(52, 211, 153, 0)');
-                    
-                    const y = rect.y + rect.h * p;
-                    const turb = Math.sin(time/50 + i) * 5; 
-                    ctx.moveTo(0, y + turb);
-                    ctx.lineTo(canvasW, y + turb);
-                } else {
-                    grad = ctx.createLinearGradient(centerX - rect.w/2, 0, centerX + rect.w/2, 0);
-                    grad.addColorStop(0, 'rgba(52, 211, 153, 0)');
-                    grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.6)');
-                    grad.addColorStop(1, 'rgba(52, 211, 153, 0)');
-                    
-                    const x = rect.x + rect.w * p;
-                    const turb = Math.sin(time/50 + i) * 5;
-                    ctx.moveTo(x + turb, 0);
-                    ctx.lineTo(x + turb, canvasH);
-                }
-                
-                ctx.strokeStyle = grad;
-                ctx.stroke();
+            // 1. 绘制极淡的贯穿中线 (Minimalist Beam)
+            ctx.beginPath();
+            let grad;
+            if (isHorizontal) {
+                grad = ctx.createLinearGradient(0, centerY - rect.h/2, 0, centerY + rect.h/2);
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(canvasW, centerY);
+            } else {
+                grad = ctx.createLinearGradient(centerX - rect.w/2, 0, centerX + rect.w/2, 0);
+                ctx.moveTo(centerX, 0);
+                ctx.lineTo(centerX, canvasH);
             }
+            grad.addColorStop(0, 'rgba(52, 211, 153, 0)');
+            grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)'); // 极淡
+            grad.addColorStop(1, 'rgba(52, 211, 153, 0)');
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = isHorizontal ? rect.h * 0.5 : rect.w * 0.5;
+            ctx.stroke();
             
-            // 2. 绘制「风锥」(Mach Cones)
-            const coneCount = 4;
-            ctx.fillStyle = `rgba(209, 250, 229, ${0.2 + progress * 0.3})`;
+            // 2. 绘制极简「风锥」
+            const coneCount = 3;
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.1 + progress * 0.2})`;
             for(let k=0; k<coneCount; k++) {
-                const conePos = ((time / 300) + k/coneCount) % 1;
-                const size = 30;
-                
+                const conePos = ((time / 400) + k/coneCount) % 1;
+                const size = 20;
                 ctx.beginPath();
                 if (isHorizontal) {
                     const cx = conePos * canvasW;
-                    const cy = centerY + (k%2===0?1:-1)*20;
-                    ctx.moveTo(cx + size, cy);
-                    ctx.lineTo(cx - size, cy - size/3);
-                    ctx.lineTo(cx - size + 10, cy);
-                    ctx.lineTo(cx - size, cy + size/3);
+                    ctx.moveTo(cx, centerY - rect.h/4);
+                    ctx.lineTo(cx + size, centerY);
+                    ctx.lineTo(cx, centerY + rect.h/4);
                 } else {
-                    const cx = centerX + (k%2===0?1:-1)*20;
                     const cy = conePos * canvasH;
-                    ctx.moveTo(cx, cy + size);
-                    ctx.lineTo(cx - size/3, cy - size);
-                    ctx.lineTo(cx, cy - size + 10);
-                    ctx.lineTo(cx + size/3, cy - size);
+                    ctx.moveTo(centerX - rect.w/4, cy);
+                    ctx.lineTo(centerX, cy + size);
+                    ctx.lineTo(centerX + rect.w/4, cy);
                 }
                 ctx.fill();
             }
 
-            // 文字提示
-            ctx.fillStyle = `rgba(255,255,255, ${progress})`;
-            ctx.font = "bold 20px Cinzel";
+            // 极简文字
+            ctx.fillStyle = `rgba(255,255,255, ${progress * 0.5})`;
+            ctx.font = "14px Cinzel";
             ctx.textAlign = "center";
-            ctx.fillText("SONIC TUNNEL", centerX, centerY);
-
+            ctx.fillText("TUNNEL", centerX, centerY);
         } else if (type === 'cyclone') {
             // === 旋风：绞肉机法阵 (Shredder Circle) ===
             const cx = rect.x + rect.w / 2;
@@ -9253,6 +9231,9 @@ class Game {
         const rect = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
         const area = rect.w * rect.h;
         const ratio = Math.max(rect.w / rect.h, rect.h / rect.w);
+        
+        // [优化]：计算平均子弹伤害作为法阵基础伤害
+        const avgBulletDamage = anchors.reduce((sum, a) => sum + (a.bulletDamage || 2), 0) / anchors.length;
 
         let type = 'burst';
         // [优化]：宽高比超过 3 判定为风道，否则根据面积判定旋风或爆破
@@ -9292,11 +9273,12 @@ class Game {
             anchors: anchors,
             element: element,
             tunnelVector: tunnelVector, // 存储矢量信息
+            bulletDamage: avgBulletDamage, // 存储伤害系数
             // 5. 伤害回调
             onComplete: () => {
                 let sizeType = area < 15000 ? 'small' : 'large';
                 let shapeType = ratio < 1.5 ? 'square' : 'rect';
-                this.combat_wind_executeCircleEffect(minX, minY, rect.w, rect.h, sizeType, shapeType, element, tunnelVector);
+                this.combat_wind_executeCircleEffect(minX, minY, rect.w, rect.h, sizeType, shapeType, element, tunnelVector, avgBulletDamage);
             }
         };
 
@@ -9314,7 +9296,7 @@ class Game {
         // if (this.soundManager) this.soundManager.playEffect('lock');
     }
 
-    combat_wind_executeCircleEffect(x, y, w, h, size, shape, element, tunnelVector = null) {
+    combat_wind_executeCircleEffect(x, y, w, h, size, shape, element, tunnelVector = null, bulletDamage = 2) {
         const centerX = x + w/2;
         const centerY = y + h/2;
 
