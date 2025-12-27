@@ -2476,17 +2476,11 @@ class FortuneWheel {
         this.slices = [];
         this.onFinish = null;
         
-        this.iconMap = {
-            'bounce': CONFIG.ui.attributeDisplay.bounce.icon,
-            'pierce': CONFIG.ui.attributeDisplay.pierce.icon,
-            'scatter': CONFIG.ui.attributeDisplay.scatter.icon,
-            'damage': CONFIG.ui.attributeDisplay.damage.icon,
-            'cryo': CONFIG.ui.attributeDisplay.cryo.icon,
-            'pyro': CONFIG.ui.attributeDisplay.pyro.icon,
-            'lightning': CONFIG.ui.attributeDisplay.lightning.icon,
-            'laser': CONFIG.ui.attributeDisplay.laser.icon,
-            'multicast': CONFIG.ui.attributeDisplay.multicast.icon
-        };
+        // [修复] 动态构建 iconMap，确保同步 CONFIG.ui.attributeDisplay 中的所有属性
+        this.iconMap = {};
+        Object.keys(CONFIG.ui.attributeDisplay).forEach(key => {
+            this.iconMap[key] = CONFIG.ui.attributeDisplay[key].icon;
+        });
     }
 
     spin(x, y, collectedAttributes, callback) {
@@ -2508,12 +2502,18 @@ class FortuneWheel {
         const totalCount = Object.values(counts).reduce((a, b) => a + b, 0);
         let currentAngle = 0;
         
+        // [修复] 动态构建 colorMap，并增加更多属性支持
         const colorMap = { 
             'bounce': CONFIG.colors.matBounce, 'pierce': CONFIG.colors.matPierce, 
             'scatter': CONFIG.colors.matScatter, 'damage': CONFIG.colors.matDamage, 
             'cryo': CONFIG.colors.matCryo, 'pyro': CONFIG.colors.matPyro, 
             'lightning': CONFIG.colors.matLightning, 'laser': CONFIG.colors.laser,
-            'multicast': CONFIG.colors.slotMulticast
+            'multicast': CONFIG.colors.slotMulticast,
+            'resonance': CONFIG.colors.resonance,
+            'explosive': CONFIG.colors.matPyro,
+            'rainbow': CONFIG.colors.matDamage,
+            'matryoshka': CONFIG.colors.matMatryoshka,
+            'flying_sword': CONFIG.colors.flying_sword
         };
 
         Object.keys(counts).forEach(type => {
@@ -2524,7 +2524,7 @@ class FortuneWheel {
                 startAngle: currentAngle,
                 endAngle: currentAngle + arc,
                 color: colorMap[type] || '#ccc',
-                icon: this.iconMap[type] || '❓',
+                icon: this.iconMap[type] || (CONFIG.ui.attributeDisplay[type] ? CONFIG.ui.attributeDisplay[type].icon : '❓'),
                 count: counts[type] // 保存數量用於顯示
             });
             currentAngle += arc;
