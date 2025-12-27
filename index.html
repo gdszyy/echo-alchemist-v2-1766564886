@@ -4689,11 +4689,40 @@ class Enemy {
         // console.log("isMarked",isMarked)
         if (isMarked) {
             ctx.save();
-            ctx.translate(0, -this.height/2 - 25);
-            ctx.fillStyle = '#0ea5e9'; // 青色剑气
-            ctx.font = 'bold 16px sans-serif';
-            // 显示一个剑标，或者根据队列数量显示 '† x3'
-            ctx.fillText('†༙', 0, 0); 
+            const time = Date.now() / 1000;
+            const pulse = Math.sin(time * 10) * 0.2 + 1; // 呼吸脉冲
+            
+            // 1. 顶部剑标
+            ctx.save();
+            ctx.translate(0, -this.height/2 - 30 - Math.sin(time * 5) * 5);
+            ctx.fillStyle = '#0ea5e9';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#0ea5e9';
+            ctx.font = 'bold 20px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('▼', 0, 0); 
+            ctx.restore();
+
+            // 2. 身体准星光圈
+            ctx.strokeStyle = '#0ea5e9';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]); // 虚线
+            ctx.beginPath();
+            ctx.arc(0, 0, (Math.max(this.width, this.height) / 2 + 10) * pulse, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // 3. 四角准星
+            ctx.setLineDash([]); // 实线
+            const size = Math.max(this.width, this.height) / 2 + 15;
+            const len = 10;
+            [[-1,-1], [1,-1], [-1,1], [1,1]].forEach(([sx, sy]) => {
+                ctx.beginPath();
+                ctx.moveTo(sx * size, sy * (size - len));
+                ctx.lineTo(sx * size, sy * size);
+                ctx.lineTo(sx * (size - len), sy * size);
+                ctx.stroke();
+            });
+            
             ctx.restore();
         }
         // === Layer 5: 内部边框 (保持不变) ===
