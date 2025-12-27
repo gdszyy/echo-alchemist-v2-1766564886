@@ -8120,14 +8120,14 @@ class Game {
 
         // --- B. 内部核心特效 ---
         if (type === 'tunnel') {
-            // === 风道：简化视觉 (Minimalist Tunnel) ===
+            // === [修改 2] 风道：半透明前进的">"符号 ===
             const isHorizontal = rect.w > rect.h;
             const canvasW = this.canvas.width;
             const canvasH = this.canvas.height;
             const centerX = rect.x + rect.w/2;
             const centerY = rect.y + rect.h/2;
             
-            // 1. 绘制极淡的贯穿中线 (Minimalist Beam)
+            // 1. 绘制极淡的背景中线
             ctx.beginPath();
             let grad;
             if (isHorizontal) {
@@ -8140,38 +8140,41 @@ class Game {
                 ctx.lineTo(centerX, canvasH);
             }
             grad.addColorStop(0, 'rgba(52, 211, 153, 0)');
-            grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)'); // 极淡
+            grad.addColorStop(0.5, 'rgba(52, 211, 153, 0.08)'); // 极淡
             grad.addColorStop(1, 'rgba(52, 211, 153, 0)');
             ctx.strokeStyle = grad;
             ctx.lineWidth = isHorizontal ? rect.h * 0.5 : rect.w * 0.5;
             ctx.stroke();
             
-            // 2. 绘制极简「风锥」
-            const coneCount = 3;
-            ctx.fillStyle = `rgba(255, 255, 255, ${0.1 + progress * 0.2})`;
-            for(let k=0; k<coneCount; k++) {
-                const conePos = ((time / 400) + k/coneCount) % 1;
-                const size = 20;
+            // 2. [修改 2] 绘制半透明前进的">"符号
+            const arrowCount = 5;
+            const arrowSize = 15;
+            const arrowAlpha = 0.15 + progress * 0.15; // 半透明，不抢眼
+            ctx.fillStyle = `rgba(52, 211, 153, ${arrowAlpha})`;
+            ctx.strokeStyle = `rgba(52, 211, 153, ${arrowAlpha * 1.5})`;
+            ctx.lineWidth = 1.5;
+            
+            for(let k=0; k<arrowCount; k++) {
+                const arrowPos = ((time / 500) + k/arrowCount) % 1;
                 ctx.beginPath();
                 if (isHorizontal) {
-                    const cx = conePos * canvasW;
-                    ctx.moveTo(cx, centerY - rect.h/4);
-                    ctx.lineTo(cx + size, centerY);
-                    ctx.lineTo(cx, centerY + rect.h/4);
+                    // 水平风道："> > > > >"
+                    const ax = arrowPos * canvasW;
+                    const ay = centerY;
+                    ctx.moveTo(ax - arrowSize/2, ay - arrowSize/2);
+                    ctx.lineTo(ax + arrowSize/2, ay);
+                    ctx.lineTo(ax - arrowSize/2, ay + arrowSize/2);
                 } else {
-                    const cy = conePos * canvasH;
-                    ctx.moveTo(centerX - rect.w/4, cy);
-                    ctx.lineTo(centerX, cy + size);
-                    ctx.lineTo(centerX + rect.w/4, cy);
+                    // 垂直风道：向下的"v v v v v"
+                    const ax = centerX;
+                    const ay = arrowPos * canvasH;
+                    ctx.moveTo(ax - arrowSize/2, ay - arrowSize/2);
+                    ctx.lineTo(ax, ay + arrowSize/2);
+                    ctx.lineTo(ax + arrowSize/2, ay - arrowSize/2);
                 }
                 ctx.fill();
+                ctx.stroke();
             }
-
-            // 极简文字
-            ctx.fillStyle = `rgba(255,255,255, ${progress * 0.5})`;
-            ctx.font = "14px Cinzel";
-            ctx.textAlign = "center";
-            ctx.fillText("TUNNEL", centerX, centerY);
         } else if (type === 'cyclone') {
             // === 旋风：绞肉机法阵 (Shredder Circle) ===
             const cx = rect.x + rect.w / 2;
@@ -9247,8 +9250,10 @@ class Game {
             type = 'cyclone';
         }
 
-        // 获取当前元素类型
+        // 获取当前元素类型和完整子弹配置
         const currentRecipe = this.projectiles.find(p => p.config.wind)?.config || { wind: true };
+        // [新增] 保存完整的子弹配置，用于法阵伤害套用属性效果
+        const bulletConfig = { ...currentRecipe };
         let element = 'wind';
         if (currentRecipe.explosive) element = 'wind_explosive';
         else if (currentRecipe.laser > 0) element = 'wind_light';
@@ -9278,11 +9283,12 @@ class Game {
             element: element,
             tunnelVector: tunnelVector, // 存储矢量信息
             bulletDamage: avgBulletDamage, // 存储伤害系数
+            bulletConfig: bulletConfig, // [新增] 存储完整子弹配置
             // 5. 伤害回调
             onComplete: () => {
                 let sizeType = area < 15000 ? 'small' : 'large';
                 let shapeType = ratio < 1.5 ? 'square' : 'rect';
-                this.combat_wind_executeCircleEffect(minX, minY, rect.w, rect.h, sizeType, shapeType, element, tunnelVector, avgBulletDamage);
+                this.combat_wind_executeCircleEffect(minX, minY, rect.w, rect.h, sizeType, shapeType, element, tunnelVector, avgBulletDamage, bulletConfig);
             }
         };
 
@@ -9300,9 +9306,14 @@ class Game {
         // if (this.soundManager) this.soundManager.playEffect('lock');
     }
 
-    combat_wind_executeCircleEffect(x, y, w, h, size, shape, element, tunnelVector = null, bulletDamage = 2) {
+    combat_wind_executeCircleEffect(x, y, w, h, size, shape, element, tunnelVector = null, bulletDamage = 2, bulletConfig = null) {
         const centerX = x + w/2;
         const centerY = y + h/2;
+
+        // [修改 1] 如果没有传入bulletConfig，则使用默认配置
+        if (!bulletConfig) {
+            bulletConfig = { wind: 1, damage: bulletDamage };
+        }
 
         // 1. 强烈的屏幕震动
         this.triggerScreenShake(size === 'large' ? 15 : 8);
@@ -9321,43 +9332,63 @@ class Game {
                 const hasEnemy = this.enemies.some(e => e.active && e.pos.x > expandedX && e.pos.x < expandedX + expandedW && e.pos.y > expandedY && e.pos.y < expandedY + expandedH);
                 if (hasEnemy) {
                     this.spawn_createFloatingText(centerX, centerY, "🌪️旋风", "#34d399");
-                    // 添加旋转向量场粒子
-                    for(let i=0; i<30; i++) {
-                        const angle = (i / 30) * Math.PI * 2;
-                        const radius = 30 + Math.random() * 30;
-                        const px = centerX + Math.cos(angle) * radius;
-                        const py = centerY + Math.sin(angle) * radius;
-                        const p = this.spawn_createParticle(px, py, '#34d399', 'spark');
-                        // 给粒子赋予切线速度，形成旋转效果
-                        if (p && p.vel) {
-                            const tangent = new Vec2(-Math.sin(angle), Math.cos(angle));
-                            p.vel = tangent.mult(2);
-                        }
-                    }
-                       // [修改] 旋风伤害次数与连射次数挂钩
+                    
+                    // [修改 3] 旋风持续时间至少2s以上
                     const multicastCount = this.currentSession ? (this.currentSession.multicast || 0) : 0;
-                    const tickCount = 5 + multicastCount; 
+                    const tickCount = Math.max(15, 10 + multicastCount); // 至少15次伤害，每次150ms，总计2.25s
+                    const totalDuration = tickCount * 150;
                     
                     for(let i=0; i<tickCount; i++) {
                         setTimeout(() => {
-                            // 每次伤害时添加旋转粒子
-                            for(let j=0; j<15; j++) {
-                                const angle = (j / 15) * Math.PI * 2 + (i * 0.5); // 每次偏移角度
-                                const radius = 25 + Math.random() * 30;
+                            // [修改 3] 从微弱到猛烈再到飘散的过程
+                            const progress = i / (tickCount - 1); // 0 -> 1
+                            let intensity;
+                            if (progress < 0.3) {
+                                // 前30%：微弱阶段 (0 -> 1)
+                                intensity = progress / 0.3;
+                            } else if (progress < 0.7) {
+                                // 中40%：猛烈阶段 (1)
+                                intensity = 1.0;
+                            } else {
+                                // 后30%：飘散阶段 (1 -> 0)
+                                intensity = 1.0 - (progress - 0.7) / 0.3;
+                            }
+                            
+                            // [修改 3] 绿色粒子围绕中心疯狂旋转
+                            const particleCount = Math.floor(20 + intensity * 30); // 20-50个粒子
+                            const rotationSpeed = 2 + intensity * 4; // 旋转速度随强度增加
+                            const radiusRange = 30 + intensity * 40; // 半径范围
+                            
+                            for(let j=0; j<particleCount; j++) {
+                                const angle = (j / particleCount) * Math.PI * 2 + (i * 0.8); // 每次偏移角度
+                                const radius = 15 + Math.random() * radiusRange;
                                 const px = centerX + Math.cos(angle) * radius;
                                 const py = centerY + Math.sin(angle) * radius;
-                                const p = this.spawn_createParticle(px, py, '#34d399', 'spark');
+                                
+                                // 使用多种绿色色调
+                                const greenColors = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0'];
+                                const color = greenColors[Math.floor(Math.random() * greenColors.length)];
+                                const p = this.spawn_createParticle(px, py, color, 'spark');
+                                
                                 if (p && p.vel) {
+                                    // 切线方向，形成旋转
                                     const tangent = new Vec2(-Math.sin(angle), Math.cos(angle));
-                                    p.vel = tangent.mult(1.5);
+                                    p.vel = tangent.mult(rotationSpeed * intensity);
+                                    p.size = 2 + Math.random() * 3 * intensity;
+                                    p.life = 0.5 + Math.random() * 0.3;
                                 }
                             }
+                            
+                            // 造成伤害
+                            let hitCount = 0;
                             this.enemies.forEach(e => {
                                 if (e.active && e.pos.x > expandedX && e.pos.x < expandedX + expandedW && e.pos.y > expandedY && e.pos.y < expandedY + expandedH) {
-                                    // [修改] 统一走 damageEnemy，实现属性联动
+                                    hitCount++;
+                                    // [修改 1] 套用子弹完整属性配置
                                     const dmg = Math.max(1, Math.floor(bulletDamage * 0.5));
+                                    const windConfig = { ...bulletConfig, damage: dmg };
                                     this.combat_damageEnemy(e, { 
-                                        config: { wind: 1, damage: dmg }, 
+                                        config: windConfig, 
                                         pos: e.pos, 
                                         isCopy: false,
                                         shotId: this._currentDamageShotId 
@@ -9365,7 +9396,13 @@ class Game {
                                     e.applyTemp(e.temp * 0.1);
                                 }
                             });
-                        }, i * 150); // 稍微加快频率
+                            
+                            // [修改 3] 每次伤害触发微弱的慢动作
+                            if (hitCount > 0) {
+                                this.slowMotionTimer = 3; // 微弱的慢动作
+                                this.timeScale = 0.25; // 轻微减速
+                            }
+                        }, i * 150); // 每150ms一次
                     }
                 }
             } else if (element === 'wind_explosive') {
@@ -9378,8 +9415,10 @@ class Game {
                 this.enemies.forEach(e => {
                     if (e.active && e.pos.x > expandedX && e.pos.x < expandedX + expandedW && e.pos.y > expandedY && e.pos.y < expandedY + expandedH) {
                         const dmg = 9999;
+                        // [修改 1] 套用子弹完整属性配置
+                        const windConfig = { ...bulletConfig, damage: dmg };
                         this.combat_damageEnemy(e, { 
-                            config: { wind: 1, laser: 1, damage: dmg }, 
+                            config: windConfig, 
                             pos: e.pos, 
                             isCopy: false,
                             shotId: this._currentDamageShotId 
@@ -9436,9 +9475,10 @@ class Game {
                                 if (k % 5 === 0) this.spawn_createParticle(px, py, '#e0f2fe', 'smoke');
                             }
                         }
-                        // [修改] 统一走 damageEnemy
+                        // [修改 1] 套用子弹完整属性配置
+                        const windConfig = { ...bulletConfig, damage: dmg };
                         this.combat_damageEnemy(e, { 
-                            config: { wind: 1, damage: dmg }, 
+                            config: windConfig, 
                             pos: e.pos, 
                             isCopy: false,
                             shotId: this._currentDamageShotId 
@@ -9449,8 +9489,10 @@ class Game {
                 this.spawn_createFloatingText(centerX, centerY, "💥内爆", "#fca5a5");
                 this.enemies.forEach(e => {
                     if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
+                        // [修改 1] 套用子弹完整属性配置
+                        const windConfig = { ...bulletConfig, damage: 15 };
                         this.combat_damageEnemy(e, { 
-                            config: { wind: 1, explosive: true, damage: 15 }, 
+                            config: windConfig, 
                             pos: e.pos, 
                             isCopy: false,
                             shotId: this._currentDamageShotId 
@@ -9463,8 +9505,10 @@ class Game {
                 this.spawn_createFloatingText(centerX, centerY, "🛡️屏障", "#0ea5e9");
                 this.enemies.forEach(e => {
                     if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
+                        // [修改 1] 套用子弹完整属性配置
+                        const windConfig = { ...bulletConfig, damage: 30 };
                         this.combat_damageEnemy(e, { 
-                            config: { wind: 1, laser: 1, damage: 30 }, 
+                            config: windConfig, 
                             pos: e.pos, 
                             isCopy: false,
                             shotId: this._currentDamageShotId 
@@ -9483,36 +9527,61 @@ class Game {
                 // [核心优化]：绘制流动的波纹底色 (沿中线全屏)
                 this.drawWindTunnelFlow({x, y, w, h}, isHorizontal);
 
-                // [优化]：添加横穿全屏的风道粒子特效 (沿矢量方向)
+                // [修改 2] 从一侧往另一侧吹的粒子风暴
                 const canvasW = this.canvas.width;
                 const canvasH = this.canvas.height;
                 
-                for(let i=0; i<80; i++) {
+                // 生成大量粒子，从起始侧开始吹向另一侧
+                for(let i=0; i<120; i++) {
                     let px, py;
                     if (isHorizontal) {
-                        px = Math.random() * canvasW;
-                        py = centerY + (Math.random() - 0.5) * h;
+                        // 水平风道：从左侧吹向右侧
+                        px = Math.random() * 100; // 从左侧边缘生成
+                        py = centerY + (Math.random() - 0.5) * h * 1.5; // 覆盖风道宽度
                     } else {
-                        px = centerX + (Math.random() - 0.5) * w;
-                        py = Math.random() * canvasH;
+                        // 垂直风道：从上侧吹向下侧
+                        px = centerX + (Math.random() - 0.5) * w * 1.5;
+                        py = Math.random() * 100; // 从上侧边缘生成
                     }
-                    const p = this.spawn_createParticle(px, py, '#f0fdf4', 'line');
+                    
+                    // 使用多种粒子类型混合，增加风暴感
+                    const particleTypes = ['spark', 'line', 'normal'];
+                    const pType = particleTypes[Math.floor(Math.random() * particleTypes.length)];
+                    const colors = ['#f0fdf4', '#d1fae5', '#6ee7b7', '#34d399'];
+                    const color = colors[Math.floor(Math.random() * colors.length)];
+                    
+                    const p = this.spawn_createParticle(px, py, color, pType);
                     if (p && p.vel) {
-                        const speed = 20 + Math.random() * 15;
-                        p.vel = dir.mult(speed);
-                        p.scale = isHorizontal ? {x: 50, y: 0.5} : {x: 0.5, y: 50};
-                        p.life = 1.0;
+                        // 风暴速度：快速且有变化
+                        const speed = 25 + Math.random() * 25;
+                        // 添加微小的随机偏移，模拟溃流
+                        const offset = isHorizontal ? 
+                            new Vec2(0, (Math.random() - 0.5) * 3) : 
+                            new Vec2((Math.random() - 0.5) * 3, 0);
+                        p.vel = dir.mult(speed).add(offset);
+                        
+                        // 根据粒子类型设置大小
+                        if (pType === 'line') {
+                            p.scale = isHorizontal ? {x: 30, y: 0.8} : {x: 0.8, y: 30};
+                        } else {
+                            p.size = 2 + Math.random() * 3;
+                        }
+                        p.life = 0.8 + Math.random() * 0.4;
                     }
                 }
 
+                // [修改 2] 风道造成伤害时触发慢动作
+                let hitCount = 0;
                 this.enemies.forEach(e => {
                     // [优化]：判定是否在全屏中线路径上
                     const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
                     if (e.active && inPath) {
+                        hitCount++;
                         const dmg = Math.max(1, Math.floor(bulletDamage * 5));
-                        // [修改] 统一走 damageEnemy，去掉 "Wind" 飘字
+                        // [修改 1] 套用子弹完整属性配置
+                        const windConfig = { ...bulletConfig, damage: dmg };
                         this.combat_damageEnemy(e, { 
-                            config: { wind: 1, damage: dmg }, 
+                            config: windConfig, 
                             pos: e.pos, 
                             isCopy: false,
                             shotId: this._currentDamageShotId 
@@ -9522,14 +9591,22 @@ class Game {
                         this.spawn_createParticle(e.pos.x, e.pos.y, '#34d399', 'spark');
                     }
                 });
+                
+                // [修改 2] 如果命中敌人，触发慢动作效果
+                if (hitCount > 0) {
+                    this.slowMotionTimer = 8; // 短暂的慢动作
+                    this.timeScale = 0.15; // 轻微的慢动，不要太强
+                }
             } else if (element === 'wind_explosive') {
                 this.spawn_createFloatingText(centerX, centerY, "🌊冲击波", "#fca5a5");
                 this.enemies.forEach(e => {
                     const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
                     if (e.active && inPath) {
                         const dmg = Math.max(1, Math.floor(bulletDamage * 10));
+                        // [修改 1] 套用子弹完整属性配置
+                        const windConfig = { ...bulletConfig, damage: dmg };
                         this.combat_damageEnemy(e, { 
-                            config: { wind: 1, explosive: true, damage: dmg }, 
+                            config: windConfig, 
                             pos: e.pos, 
                             isCopy: false,
                             shotId: this._currentDamageShotId 
@@ -9544,8 +9621,10 @@ class Game {
                     const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
                     if (e.active && inPath) {
                         const dmg = Math.max(1, Math.floor(bulletDamage * 12));
+                        // [修改 1] 套用子弹完整属性配置
+                        const windConfig = { ...bulletConfig, damage: dmg };
                         this.combat_damageEnemy(e, { 
-                            config: { wind: 1, laser: 1, damage: dmg }, 
+                            config: windConfig, 
                             pos: e.pos, 
                             isCopy: false,
                             shotId: this._currentDamageShotId 
