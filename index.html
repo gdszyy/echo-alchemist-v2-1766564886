@@ -6553,6 +6553,14 @@ class Particle {
             this.drag = 0.98; this.gravity = 0; this.decay = 0.02;
             this.size = 2; this.life = 1.0;
             this.scale = { x: 1, y: 1 };
+        } else if (mode === 'wind_slash') {
+            // === 🌪️ 新增：风刃粒子的物理初始化 ===
+            this.vel = new Vec2(0, 0); // 外部会设置 vel
+            this.drag = 1.0; // 默认无阻力
+            this.gravity = 0;
+            this.decay = 0.05;
+            this.size = 10;
+            this.life = 1.0;
         } else {          this.vel = new Vec2((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4);
             this.drag = 0.92; this.gravity = 0; this.decay = 0.05; this.size = Math.random() * 2 + 1;
         }
@@ -6581,8 +6589,8 @@ class Particle {
         // 设置混合模式
         if (this.mode === 'mist' && this.color && this.color.includes('0,0,0')) {
              ctx.globalCompositeOperation = 'source-over'; // 黑烟
-        } else if (this.mode === 'shard' || this.mode === 'spark' || this.mode === 'mist') {
-             ctx.globalCompositeOperation = this.mode === 'mist' ? 'screen' : 'lighter';
+        } else if (this.mode === 'shard' || this.mode === 'spark' || this.mode === 'mist' || this.mode === 'wind_slash') {
+             ctx.globalCompositeOperation = (this.mode === 'mist' || this.mode === 'wind_slash') ? 'screen' : 'lighter';
         }
 
         ctx.globalAlpha = Math.max(0, this.life);
@@ -11368,7 +11376,9 @@ class Game {
      * @param {string} [mode='normal'] - 粒子的行为模式 (e.g., 'normal', 'confetti')。
      */
     spawn_createParticle(x, y, color, mode = 'normal') {
-        this.particles.push(new Particle(x, y, color, mode));
+        const p = new Particle(x, y, color, mode);
+        this.particles.push(p);
+        return p;
     }
     /**
      * 获取当前的视觉偏移量
