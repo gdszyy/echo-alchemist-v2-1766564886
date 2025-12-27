@@ -3177,10 +3177,12 @@ class DropBall {
                     // === 逻辑 A: 突变 (Mutation) ===
                     if (rule.type === 'mutation') {
                         // [全场唯一性检查]
-                        // 检查场上是否已经有 flying_sword
-                        const hasSword = game.pegs.some(p => p.type === rule.result);
-                        if (!hasSword) {
-                            // 场上没有剑 -> 允许突变
+                        // 只有 flying_sword 需要全场唯一性检查
+                        const needsUniqueness = (rule.result === 'flying_sword');
+                        const alreadyExists = needsUniqueness && game.pegs.some(p => p.type === rule.result);
+
+                        if (!alreadyExists) {
+                            // 允许突变
                             peg.type = rule.result;
                             peg.level = 1; 
                             
@@ -3189,8 +3191,7 @@ class DropBall {
                             game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 20, "Mutation!", CONFIG.colors[rule.result]);
                             audio.playMagic();
                         } else {
-                            // 场上已有剑 -> 禁止突变，退化为普通同化 (变成 Pierce)
-                            // 这样玩家不会觉得亏了，至少变成了一个红钉子
+                            // 场上已有同类唯一实体 -> 禁止突变，退化为普通同化 (变成 Pierce)
                             if (peg.type === 'normal') {
                                 peg.type = 'pierce';
                                 game.spawn_createParticle(peg.pos.x, peg.pos.y, CONFIG.colors.matPierce);
@@ -5823,13 +5824,49 @@ class Projectile {
         game.combat_damageEnemy(enemy, this);
     }
 
-    performSlashAttack(enemy, enemies) {
+    performSlashAttack(target, enemies) {
         const angle = Math.random() * Math.PI * 2;
-        const slash = new SlashEffect(enemy.pos.x, enemy.pos.y, angle, 120, this.config.getColor ? this.config.getColor() : '#0ea5e9');
-        game.shockwaves.push(slash);
-        enemies.forEach(e => {
-            if (e !== enemy && e.active && e.pos.dist(enemy.pos) < 80) {
-                e.takeDamage(this.config.damage * 0.3);
+        const length = 160; 
+        const width = 40;   
+        const center = target.pos;
+        const halfLen = length / 2;
+        const dir = new Vec2(Math.cos(angle), Math.sin(angle));
+        const p1 = center.add(dir.mult(-halfLen));
+        const p2 = center.add(dir.mult(halfLen));
+
+        if (typeof game !== 'undefined') {
+            let slashColor = CONFIG.colors.flying_sword || '#0ea5e9';
+            if (this.config.lightning > 0) slashColor = '#c084fc'; 
+            else if (this.config.pyro > 0) slashColor = '#f97316';
+            else if (this.config.cryo > 0) slashColor = '#06b6d4';
+            game.particles.push(new SlashEffect(center.x, center.y, angle, length, slashColor));
+            audio.playSlash();
+        }
+
+        enemies.forEach(other => {
+            if (!other.active) return;
+            const E = other.pos;
+            const AB = p2.sub(p1);      
+            const AE = E.sub(p1);       
+            const lenSq = AB.dot(AB);
+            let t = (lenSq === 0) ? -1 : AE.dot(AB) / lenSq;
+            t = Math.max(0, Math.min(1, t));
+            const closest = p1.add(AB.mult(t));
+            const dist = E.dist(closest); 
+            const hitRadius = (other.width / 2) + (width / 2);
+            if (dist < hitRadius) {
+                const slashConfig = {
+                    ...this.config,
+                    damage: Math.ceil(this.config.damage * 0.6)
+                };
+                game.combat_damageEnemy(other, {
+                    config: slashConfig,
+                    pos: closest, 
+                    isCopy: true
+                });
+                if (other !== target) {
+                    other.addSwordMark(1);
+                }
             }
         });
     }
@@ -5851,35 +5888,62 @@ class Projectile {
     }
 
     stickToEnemy(enemy) {
-        const pegLevel = this.config.level || 1;
-        const hitAngle = Math.atan2(this.vel.y, this.vel.x);
-        const randomAngle = hitAngle + (Math.random() - 0.5) * (Math.PI / 6);
-        const randomOffsetX = (Math.random() - 0.5) * (enemy.width * 0.6);
-        const randomOffsetY = (Math.random() - 0.5) * (enemy.height * 0.6);
-        const stuckPos = enemy.pos.add(new Vec2(randomOffsetX, randomOffsetY));
-        const stuckBlade = new SonSword(stuckPos.x, stuckPos.y, this, pegLevel, this.config);
-        stuckBlade.state = 'stuck'; stuckBlade.stuckHost = enemy; stuckBlade.stuckOffset = new Vec2(randomOffsetX, randomOffsetY);
-        stuckBlade.angle = randomAngle; stuckBlade.isMotherBlade = true; 
-        enemy.addSwordCrack(stuckBlade.stuckOffset, randomAngle + Math.PI/2);
-        game.sonSwords.push(stuckBlade); 
-        if (enemy.stuckSwords) enemy.stuckSwords.push(stuckBlade);
-        game.spawn_createFloatingText(stuckPos.x, stuckPos.y, "🗡️STUCK", "#0ea5e9");
-        audio.playSlash();
-        this.performSlashAttack(enemy, game.enemies);
-        game.sonSwords.forEach(s => {
-            if (s.mother === this && s !== stuckBlade && s.active) {
-                if (pegLevel === 1) { s.active = false; game.spawn_createParticle(s.pos.x, s.pos.y, '#0ea5e9', 'mist'); } 
-                else if (pegLevel === 2) { s.attacksLeft = s.maxAttacks; s.isAutoHunting = true; game.spawn_createFloatingText(s.pos.x, s.pos.y, "RESET", "#6366f1"); } 
-                else if (pegLevel >= 3) { s.isAutoHunting = true; }
-            }
-        });
+        if (typeof game !== 'undefined') {
+            const pegLevel = this.config.level || 1;
+            const hitAngle = Math.atan2(this.vel.y, this.vel.x);
+            const randomAngle = hitAngle + (Math.random() - 0.5) * (Math.PI / 6);
+            const randomOffsetX = (Math.random() - 0.5) * (enemy.width * 0.6);
+            const randomOffsetY = (Math.random() - 0.5) * (enemy.height * 0.6);
+            const stuckPos = enemy.pos.add(new Vec2(randomOffsetX, randomOffsetY));
+            
+            // 使用 game.combat_flyingSword_addSon 而不是直接 new SonSword，以保持逻辑一致性
+            const stuckBlade = game.combat_flyingSword_addSon(stuckPos.x, stuckPos.y, this, pegLevel, this.config, true);
+            
+            this.performSlashAttack(enemy, game.enemies);
+
+            game.sonSwords.forEach(s => {
+                if (s.mother === this && s !== stuckBlade && s.active) {
+                    if (pegLevel === 1) {
+                        s.active = false;
+                        game.spawn_createParticle(s.pos.x, s.pos.y, '#0ea5e9', 'mist');
+                    } 
+                    else if (pegLevel === 2) {
+                        s.attacksLeft = s.maxAttacks; 
+                        s.isAutoHunting = true;       
+                        game.spawn_createFloatingText(s.pos.x, s.pos.y, "RESET", "#6366f1");
+                    } 
+                    else if (pegLevel >= 3) {
+                        s.isAutoHunting = true; 
+                    }
+                }
+            });
+        }
     }
 
-    handleFlyingSwordFinish(enemy, game) {
+    handleFlyingSwordFinish(host, game, isBottomExit = false) {
+        let targetPos = null;
+        if (host) {
+            targetPos = host.pos;
+        } else if (!isBottomExit && this.lastHitEnemy && this.lastHitEnemy.active) {
+            targetPos = this.lastHitEnemy.pos;
+        } else {
+            targetPos = { x: game.width / 2, y: game.height - 80 };
+        }
+
         game.sonSwords.forEach(s => {
+            const level = s.level || 1;
             if (s.mother === this && s.active) {
-                s.active = false;
-                game.spawn_createParticle(s.pos.x, s.pos.y, '#0ea5e9', 'mist');
+                if (level >= 3) {
+                    s.state = 'flying'; 
+                    s.isAutoHunting = true; 
+                    s.mother = null; 
+                    game.spawn_createFloatingText(s.pos.x, s.pos.y, "HUNT", "#f43f5e");
+                } else if (level === 2) {
+                    s.triggerRecall(targetPos);
+                } else {
+                    s.active = false; 
+                    game.spawn_createParticle(s.pos.x, s.pos.y, '#0ea5e9', 'mist');
+                }
             }
         });
     }

@@ -1,0 +1,244 @@
+class SoundManager {
+    constructor() {
+    createNoiseBuffer() {
+    createRollingSound() {
+    toggleMute() {
+    resume() { if (this.ctx.state === 'suspended') this.ctx.resume(); }
+    playSlash() {
+    playMagic() {
+    playTone(freq, type, duration, vol = 1) {
+    playHit(type, speed = 5) {
+    playShoot() {
+    playExplosion() { if (!this.muted) this.playTone(100, 'sawtooth', 0.4, 0.5); }
+    playLightning() {
+    playEnemyHit(type = 'normal') {
+    playPowerup(level = 1) {
+    playCollect() { this.playTone(700, 'sine', 0.1, 0.4); }
+class Vec2 {
+    constructor(x, y) { this.x = x; this.y = y; }
+    add(v) { return new Vec2(this.x + v.x, this.y + v.y); }
+    sub(v) { return new Vec2(this.x - v.x, this.y - v.y); }
+    mult(s) { return new Vec2(this.x * s, this.y * s); }
+    mag() { return Math.sqrt(this.x * this.x + this.y * this.y); }
+    norm() { const m = this.mag(); return m === 0 ? new Vec2(0,0) : new Vec2(this.x/m, this.y/m); }
+    dist(v) { return Math.sqrt(Math.pow(this.x - v.x, 2) + Math.pow(this.y - v.y, 2)); }
+    dot(v) { return this.x * v.x + this.y * v.y; }
+    rotate(angle) {
+    distSq(v) {
+class MarbleDefinition {
+    constructor(type) {
+    getName() {
+    getColor() {
+class SpecialSlot {
+    constructor(x, y, width, type) {
+    draw(ctx) {
+class FortuneWheel {
+    constructor(game) {
+    spin(x, y, collectedAttributes, callback) {
+    update(timeScale) {
+    getCurrentSlice() {
+    finalizeResult() {
+    draw(ctx) {
+class Peg {
+    constructor(x, y, type = 'normal') {
+    getColor() {
+    upgrade() {
+    drawShadow(ctx, lightPos, lightRadius) {
+    resetLight() {
+    calculateLight(sourcePos, lightRadius) {
+    hit(impactSpeed = 5) { 
+    draw(ctx, baseRadius, tilt = {x:0, y:0}) {
+    drawSwordPeg(ctx, r, isLit) {
+    drawLevelPips(ctx, r) {
+    update() { 
+class DropBall {
+class Enemy {
+    constructor(x, y, width, height, hp, maxHp = hp, type = 'normal', affixes = []) {
+    update(timeScale, game) {
+    addSwordCrack(relPos, angle) {
+    updateTempParticles(timeScale) {
+    advance(amount) { this.dropTargetY += amount; }
+    startTurnAction(game) {
+    executeTurnAction(game) {
+    performTurnActionAndMove(game) {
+    playFreezeBlockEffect(game) {
+    playBurnTickEffect(game, dmg) {
+    playScanFeedback() {
+    draw(ctx) {
+    addSwordMark(amount = 1) {
+    takeDamage(amount) {
+    applyTemp(amount) { this.temp += amount; }
+    getBounds() { return { left: this.pos.x - this.width/2, right: this.pos.x + this.width/2, top: this.pos.y - this.height/2, bottom: this.pos.y + this.height/2 }; }
+class SwordQi {
+    constructor(x, y, velocity, width) {
+    update(timeScale, enemies, game) {
+    draw(ctx) {
+class SlashAnim {
+    constructor(x, y, angle, scale=1, color='#0ea5e9') {
+    update(timeScale) {
+    draw(ctx) {
+class SonSword {
+    constructor(x, y, mother, level, config, startDelay = 0) {
+    addTarget(enemy) {
+    searchForTarget(enemies) {
+    update(timeScale, enemies, game) {
+    handleHit(enemy, game) {
+    stickToEnemy(enemy, game) {
+    triggerRecall(targetPos) {
+class Projectile {
+    constructor(x, y, vel, config, isCopy = false, shotId = null, isLast = false) {
+    static calculateVisualParams(config, isCopy) {
+    update(width, height, enemies, spawnCallback, timeScale) {
+    _applyMove(vel, width, height, spawnCallback) {
+    onHit(enemy, allEnemies) {
+    performSlashAttack(enemy, enemies) {
+    destroy(spawnCallback) {
+    stickToEnemy(enemy) {
+    handleFlyingSwordFinish(enemy, game) {
+    draw(ctx) {
+    static drawVisuals(ctx, x, y, radius, config, rotation, intensity, deformation = {x:1, y:1}, integrity = 1.0, crackSeed = []) {
+class CloneSpore {
+    constructor(startX, startY, targetX, targetY, onLandCallback) {
+    update(timeScale) {
+    draw(ctx) {
+class Particle {
+    constructor(x, y, color, mode = 'normal') {
+    update(timeScale) {
+    draw(ctx) {
+class SlashEffect {
+    constructor(x, y, angle, length, color) {
+    update() {
+    draw(ctx) {
+class CollectionBeam {
+    constructor(x, bottomY) {
+    update(timeScale) {
+    draw(ctx) {
+class Shockwave {
+    constructor(x, y, color) { 
+    update(timeScale) { 
+    draw(ctx) { 
+class LaserBeam {
+    constructor(segments, width, color) {
+    update(timeScale) {
+    draw(ctx) {
+class FloatingText {
+    constructor(x, y, text, color = '#fbbf24') { 
+    update(timeScale) { 
+    draw(ctx) { 
+class EnergyOrb {
+    constructor(x, y, targetX, targetY, color, initialVel, onArrive) {
+    update(timeScale) {
+    draw(ctx) {
+class LightningBolt {
+    constructor(x1, y1, x2, y2) {
+    generateSegments() {
+    update(timeScale) {
+    draw(ctx) {
+class FireWave {
+    constructor(x, y) {
+    update(timeScale) {
+    draw(ctx) {
+class UIManager {
+    constructor() {
+    switchTab(tabName) {
+    updateSkillBar(currentSP) {
+    updateSkillPoints(current, max = Math.max(5, current + 1)) {
+    showEnemyInfo(enemy) {
+    addStatusItem(container, title, desc, colorClass) {
+    closeDrawer() {
+class Game {
+    constructor() {
+    combat_calculatePlayerExpectedDamage() {
+    calc_evaluateAndAdjustDifficulty() {
+    combat_reportDamage(amount) {
+    calc_calculateDynamicThreshold() {
+    ui_updateSlowMotion() {
+    sys_loop() {
+    render_clearCanvas() {
+    render_background() {
+    render_floatingTexts(timeScale) {
+    sys_resize() {
+    sys_initGameStart() {
+    sys_resetGame() {
+    sys_setupInputs() {
+    input_handleOrientation(e) {
+    spawn_createFloatingText(x, y, text, color) { 
+    combat_updateMulticastDisplay(bonusAmount = 0) {
+    combat_playMulticastTransferEffect(multicastValue) {
+    spawn_generateAffixes() {
+    calc_isAreaOccupied(x, y, w, h, excludeEnemy = null) {
+    spawn_spawnEnemyRowAt(yPos) {
+    spawn_addSkillPoint(amount = 1) {
+    combat_activateSkill(skill) {
+    spawn_spawnEnemyRow(count = 1) { for(let i=0; i<count; i++) { this.spawn_spawnEnemyRowAt(80 - (i * this.enemyHeight)); } }
+    spawn_triggerCloneSpawn(sourceEnemy) {
+    combat_flyingSword_assignTarget(enemy) {
+    combat_flyingSword_addSon(x, y, mother, level, config, delay = 0) {
+    combat_wind_addAnchor(x, y) {
+    combat_wind_triggerAnchorExplosion(x, y) {
+    combat_wind_triggerMagicCircle() {
+    combat_wind_executeCircleEffect(x, y, w, h, size, shape, element) {
+    combat_damageEnemy(enemy, projectile) {
+    phase_advanceWave() { 
+    combat_recordDamage(amount, attrType = 'damage', shotId = null) { 
+    spawn_addScore(amount) { 
+    sys_resetMultiplier() { 
+    ui_updateMultiplierUI() { 
+    ui_saveShotDamage() {
+    ui_updateRoundDamage() {
+    ui_updateDamageStats() {
+    ui_switchDamageRound(direction) {
+    ui_toggleDamagePanel() {
+    ui_updateUI() {
+    calc_calculateWaveSpeed() {
+    phase_switchPhase(newPhase) {
+    ui_showRelicSelection() {
+    ui_selectRelic(relic) {
+    ui_skipRelic() {
+    ui_closeRelicSelection() {
+    sys_initSelectionPhase() {
+    spawn_generateMarbleOptions() { 
+    sys_toggleMarbleSelection(idx, cardEl) { 
+    ui_confirmSelection() { 
+    phase_startGatheringPhase() {
+    sys_initRecipeHUD() { 
+    sys_toggleHud() { 
+    ui_renderRecipeHUD() {
+    ui_renderRecipeCard(container, item, isActive, statusClass) {
+    phase_gathering_initPachinko() {
+    phase_gathering_getRandomPegType() { 
+    phase_startCombatPhase() { 
+    data_clearProjectiles() {
+    spawn_createParticle(x, y, color, mode = 'normal') {
+    input_getTiltOffset() {
+    phase_handleInputStart(pos) {
+    input_checkEnemyHover(pos) {
+    input_handleInputEnd() {
+    input_handleInputMove(pos, e) {
+    combat_lightning_triggerChain(sourceEnemy, dmg, history) {
+    combat_fireNextShot(vel) {
+    spawn_spawnBullet(x, y, vel, recipe, shotId = null) {
+    combat_laser_fire(startX, startY, vel, recipe, shotId = null) {
+    combat_laser_castRay(start, dir, maxDist) {
+    combat_laser_processPenetration(p1, p2, recipe) {
+    calc_getLineRectIntersection(start, dir, rx, ry, rw, rh) {
+    spawn_createExplosion(x, y, color) { 
+    spawn_createShockwave(x, y, color = null) { 
+    ui_updateUICache() {
+    spawn_createHitFeedback(x, y, velocity, type = 'normal') {
+    spawn_triggerLevelUpEvent(uiX, uiY) {
+    for(let i=0; i<20; i++) {
+    calc_compileCollectionToRecipe(marbleDef, collectedTypes, totalMulticast) {
+    ui_updateGatheringQueueUI() { 
+    combat_updateHitProgress(val, target) { 
+    ui_updateAmmoUI() {
+    ui_renderAmmoIcon(container, recipe, isCurrent) {
+    phase_enemy_processTurn(e) {
+    phase_enemy_startLogic() {
+    phase_finalizeRound() {
+    input_checkDefeat() { 
+    phase_combat_update(timeScale) {
+    phase_gathering_attemptComplete() {
+    render_combat_launcherOrbitals(ctx, centerX, centerY, recipe) {
+    phase_gathering_update(timeScale = 1) {
+    if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
