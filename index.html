@@ -9206,10 +9206,9 @@ class Game {
                     shotId: this._currentDamageShotId 
                 });
                 
-                // 2. 施加轻微推力 (击退效果)
-                // 计算从爆炸中心指向敌人的向量
-                const pushDir = new Vec2(e.pos.x - centerX, e.pos.y - centerY).norm();
-                this.combat_tryMoveEnemy(e, pushDir.mult(10));   
+                // [修改] 取消风属性造成的位移效果
+                // const pushDir = new Vec2(e.pos.x - centerX, e.pos.y - centerY).norm();
+                // this.combat_tryMoveEnemy(e, pushDir.mult(10));   
                 
                 // 3. 受击反馈
                 e.hitTimer = 10;
@@ -9365,10 +9364,25 @@ class Game {
                                 const px = centerX + Math.cos(angle) * radius;
                                 const py = centerY + Math.sin(angle) * radius;
                                 
-                                // 使用多种绿色色调
-                                const greenColors = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0'];
-                                const color = greenColors[Math.floor(Math.random() * greenColors.length)];
-                                const p = this.spawn_createParticle(px, py, color, 'spark');
+                                // [修改] 根据属性混合粒子颜色和类型
+                                let color, pType = 'spark';
+                                const isAttributeParticle = Math.random() < 0.4; // 40% 概率生成属性粒子
+                                
+                                if (isAttributeParticle && bulletConfig) {
+                                    if (bulletConfig.cryo > 0) { color = '#cffafe'; pType = 'shard'; }
+                                    else if (bulletConfig.pyro > 0) { color = '#fdba74'; pType = 'spark'; }
+                                    else if (bulletConfig.lightning > 0) { color = '#d8b4fe'; pType = 'spark'; }
+                                    else if (bulletConfig.pierce > 0) { color = '#fca5a5'; pType = 'spark'; }
+                                    else {
+                                        const greenColors = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0'];
+                                        color = greenColors[Math.floor(Math.random() * greenColors.length)];
+                                    }
+                                } else {
+                                    const greenColors = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0'];
+                                    color = greenColors[Math.floor(Math.random() * greenColors.length)];
+                                }
+
+                                const p = this.spawn_createParticle(px, py, color, pType);
                                 
                                 if (p && p.vel) {
                                     // 切线方向，形成旋转
@@ -9497,8 +9511,9 @@ class Game {
                             isCopy: false,
                             shotId: this._currentDamageShotId 
                         });
-                        const dir = e.pos.sub(new Vec2(centerX, centerY)).norm();
-                        this.combat_tryMoveEnemy(e, dir.mult(40));
+                        // [修改] 取消风属性造成的位移效果
+                        // const dir = e.pos.sub(new Vec2(centerX, centerY)).norm();
+                        // this.combat_tryMoveEnemy(e, dir.mult(40));
                     }
                 });
             } else if (element === 'wind_light') {
@@ -9544,11 +9559,27 @@ class Game {
                         py = Math.random() * 100; // 从上侧边缘生成
                     }
                     
-                    // 使用多种粒子类型混合，增加风暴感
-                    const particleTypes = ['spark', 'line', 'normal'];
-                    const pType = particleTypes[Math.floor(Math.random() * particleTypes.length)];
-                    const colors = ['#f0fdf4', '#d1fae5', '#6ee7b7', '#34d399'];
-                    const color = colors[Math.floor(Math.random() * colors.length)];
+                    // [修改] 根据属性混合粒子颜色和类型
+                    let pType, color;
+                    const isAttributeParticle = Math.random() < 0.4; // 40% 概率生成属性粒子
+                    
+                    if (isAttributeParticle && bulletConfig) {
+                        if (bulletConfig.cryo > 0) { color = '#cffafe'; pType = 'shard'; }
+                        else if (bulletConfig.pyro > 0) { color = '#fdba74'; pType = 'spark'; }
+                        else if (bulletConfig.lightning > 0) { color = '#d8b4fe'; pType = 'spark'; }
+                        else if (bulletConfig.pierce > 0) { color = '#fca5a5'; pType = 'spark'; }
+                        else {
+                            const particleTypes = ['spark', 'line', 'normal'];
+                            pType = particleTypes[Math.floor(Math.random() * particleTypes.length)];
+                            const colors = ['#f0fdf4', '#d1fae5', '#6ee7b7', '#34d399'];
+                            color = colors[Math.floor(Math.random() * colors.length)];
+                        }
+                    } else {
+                        const particleTypes = ['spark', 'line', 'normal'];
+                        pType = particleTypes[Math.floor(Math.random() * particleTypes.length)];
+                        const colors = ['#f0fdf4', '#d1fae5', '#6ee7b7', '#34d399'];
+                        color = colors[Math.floor(Math.random() * colors.length)];
+                    }
                     
                     const p = this.spawn_createParticle(px, py, color, pType);
                     if (p && p.vel) {
@@ -9586,8 +9617,8 @@ class Game {
                             isCopy: false,
                             shotId: this._currentDamageShotId 
                         });
-                        // 沿矢量方向击退
-                        this.combat_tryMoveEnemy(e, dir.mult(40));
+                        // [修改] 取消风属性造成的位移效果
+                        // this.combat_tryMoveEnemy(e, dir.mult(40));
                         this.spawn_createParticle(e.pos.x, e.pos.y, '#34d399', 'spark');
                     }
                 });
@@ -9611,8 +9642,9 @@ class Game {
                             isCopy: false,
                             shotId: this._currentDamageShotId 
                         });
-                        const pushDir = isHorizontal ? new Vec2(60, 0) : new Vec2(0, 60);
-                        this.combat_tryMoveEnemy(e, pushDir);
+                        // [修改] 取消风属性造成的位移效果
+                        // const pushDir = isHorizontal ? new Vec2(60, 0) : new Vec2(0, 60);
+                        // this.combat_tryMoveEnemy(e, pushDir);
                     }
                 });
             } else if (element === 'wind_light') {
