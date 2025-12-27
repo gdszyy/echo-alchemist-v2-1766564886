@@ -11355,7 +11355,7 @@ class Game {
             for(let i=this.lightningBolts.length-1; i>=0; i--) { let b = this.lightningBolts[i]; b.update(timeScale); b.draw(this.ctx); if(b.life <= 0) this.lightningBolts.splice(i,1); } 
             for(let i=this.spores.length-1; i>=0; i--) { let s = this.spores[i]; if(s) { s.update(timeScale); s.draw(this.ctx); if(!s.active) this.spores.splice(i,1); } }
             if (this.swordQis) {
-                this.swordQis.forEach(qi => qi.draw(ctx));
+                this.swordQis.forEach(qi => qi.draw(this.ctx));
             }
             // 拖拽瞄准线
             if (this.isDragging && this.projectiles.length === 0 && this.ammoQueue.length > 0 && this.burstQueue.length === 0) {
