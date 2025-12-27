@@ -9296,17 +9296,24 @@ class Game {
         // 1. 强烈的屏幕震动
         this.triggerScreenShake(size === 'large' ? 15 : 8);
         
-        // 2. 生成瞬间的爆炸波 (冲击感)
-        this.spawn_createShockwave(centerX, centerY, '#34d399', Math.max(w, h));
+        // 2. [优化]：移除爆炸感的冲击波
+        // this.spawn_createShockwave(centerX, centerY, '#34d399', Math.max(w, h));
+        
+        // [优化]：旋风范围比法阵稍大 (1.2倍)
+        const expandedW = w * 1.2;
+        const expandedH = h * 1.2;
+        const expandedX = centerX - expandedW / 2;
+        const expandedY = centerY - expandedH / 2;
+
         if (size === 'small') {
             if (element === 'wind') {
-                const hasEnemy = this.enemies.some(e => e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h);
+                const hasEnemy = this.enemies.some(e => e.active && e.pos.x > expandedX && e.pos.x < expandedX + expandedW && e.pos.y > expandedY && e.pos.y < expandedY + expandedH);
                 if (hasEnemy) {
                     this.spawn_createFloatingText(centerX, centerY, "🌪️旋风", "#34d399");
                     // 添加旋转向量场粒子
                     for(let i=0; i<30; i++) {
                         const angle = (i / 30) * Math.PI * 2;
-                        const radius = 25 + Math.random() * 25;
+                        const radius = 30 + Math.random() * 30;
                         const px = centerX + Math.cos(angle) * radius;
                         const py = centerY + Math.sin(angle) * radius;
                         const p = this.spawn_createParticle(px, py, '#34d399', 'spark');
@@ -9321,7 +9328,7 @@ class Game {
                             // 每次伤害时添加旋转粒子
                             for(let j=0; j<15; j++) {
                                 const angle = (j / 15) * Math.PI * 2 + (i * 0.5); // 每次偏移角度
-                                const radius = 20 + Math.random() * 25;
+                                const radius = 25 + Math.random() * 30;
                                 const px = centerX + Math.cos(angle) * radius;
                                 const py = centerY + Math.sin(angle) * radius;
                                 const p = this.spawn_createParticle(px, py, '#34d399', 'spark');
@@ -9331,7 +9338,7 @@ class Game {
                                 }
                             }
                             this.enemies.forEach(e => {
-                                if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
+                                if (e.active && e.pos.x > expandedX && e.pos.x < expandedX + expandedW && e.pos.y > expandedY && e.pos.y < expandedY + expandedH) {
                                     const dmg = 2;
                                     e.takeDamage(dmg);
                                     this.spawn_createFloatingText(e.pos.x, e.pos.y, `Wind ${dmg}`, '#34d399');
@@ -9344,12 +9351,12 @@ class Game {
             } else if (element === 'wind_explosive') {
                 this.spawn_createFloatingText(centerX, centerY, "🧨不稳定气流", "#fca5a5");
                 for(let i=0; i<3; i++) {
-                    this.spawn_createExplosion(x + Math.random()*w, y + Math.random()*h, '#fca5a5');
+                    this.spawn_createExplosion(expandedX + Math.random()*expandedW, expandedY + Math.random()*expandedH, '#fca5a5');
                 }
             } else if (element === 'wind_light') {
                 this.spawn_createFloatingText(centerX, centerY, "🕳️黑洞", "#0ea5e9");
                 this.enemies.forEach(e => {
-                    if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
+                    if (e.active && e.pos.x > expandedX && e.pos.x < expandedX + expandedW && e.pos.y > expandedY && e.pos.y < expandedY + expandedH) {
                         const dmg = 9999;
                         e.takeDamage(dmg);
                         this.spawn_createFloatingText(e.pos.x, e.pos.y, `Void ${dmg}`, '#0ea5e9');
@@ -9362,7 +9369,7 @@ class Game {
                 // 添加大范围旋转向量场
                 for(let i=0; i<50; i++) {
                     const angle = (i / 50) * Math.PI * 2;
-                    const radius = 50 + Math.random() * 60;
+                    const radius = 60 + Math.random() * 70;
                     const px = centerX + Math.cos(angle) * radius;
                     const py = centerY + Math.sin(angle) * radius;
                     const p = this.spawn_createParticle(px, py, '#34d399', 'spark');
@@ -9372,10 +9379,10 @@ class Game {
                         p.vel = tangent.mult(3);
                     }
                 }
-                // 添加爆炸效果
-                this.spawn_createExplosion(centerX, centerY, '#34d399', 120);
+                // [优化]：移除爆炸效果
+                // this.spawn_createExplosion(centerX, centerY, '#34d399', 120);
                 this.enemies.forEach(e => {
-                    if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
+                    if (e.active && e.pos.x > expandedX && e.pos.x < expandedX + expandedW && e.pos.y > expandedY && e.pos.y < expandedY + expandedH) {
                         let dmg = 20;
                         if (e.temp >= 100) { 
                             dmg *= 2; 
