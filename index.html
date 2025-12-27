@@ -5144,6 +5144,7 @@ class SonSword {
         this.passingThroughEnemy = null;
         this.dashTimer = 0; 
         this.hitEnemiesInDash = new Set(); // [修复] 记录单次冲刺中已命中的敌人
+        this.hitEnemiesInRecall = new Set(); // [新增] 记录回收阶段已命中的敌人
         this.trail = []; // [新增] 拖尾轨迹
         this.maxTrailLength = 8; // 拖尾长度
 
@@ -5364,8 +5365,15 @@ class SonSword {
     }
 
     handleHit(enemy, game) {
-        // [修复] 回收阶段不再造成伤害，避免每一帧都扣血
+        // [修改] 回收阶段造成一次性贯穿伤害
         if (this.state === 'recalling') {
+            if (!this.hitEnemiesInRecall.has(enemy)) {
+                this.hitEnemiesInRecall.add(enemy);
+                // 回收伤害设定为基础伤害的 50%
+                game.combat_damageEnemy(enemy, { config: this.config, pos: this.pos, isCopy: true }, 0.5);
+                game.particles.push(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.35));
+                audio.playSlash();
+            }
             return;
         }
 
@@ -5429,6 +5437,7 @@ class SonSword {
         this.targetQueue = [];
         this.currentTarget = null;
         this.passingThroughEnemy = null;
+        this.hitEnemiesInRecall.clear(); // [新增] 开始回收时清空命中记录
     }
 
         draw(ctx) {
