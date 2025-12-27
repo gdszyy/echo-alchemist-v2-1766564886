@@ -10917,17 +10917,29 @@ class Game {
             if (itemType === 'pierce') recipe.pierce += 1; 
             if (itemType === 'scatter') recipe.scatter += 1; 
             if (itemType === 'damage') recipe.damage += 2; 
-            if (itemType === 'cryo') recipe.cryo += 1; 
-            if (itemType === 'pyro') recipe.pyro += 1;       
-            if (itemType === 'lightning') recipe.lightning += 1;      
+            
+            // [修复] 确保元素属性正确累加
+            if (itemType === 'cryo') recipe.cryo = (recipe.cryo || 0) + 1; 
+            if (itemType === 'pyro') recipe.pyro = (recipe.pyro || 0) + 1;       
+            if (itemType === 'lightning') recipe.lightning = (recipe.lightning || 0) + 1;      
+            
             // 收集到激光钉子 -> 增加激光层数
             if (itemType === 'laser') {
-                recipe.laser += 1; 
+                recipe.laser = (recipe.laser || 0) + 1; 
             }
+            
             if (itemType === 'flying_sword') {
                 recipe.flying_sword = 1;
                 recipe.type = 'flying_sword'; 
                 recipe.level = Math.max(recipe.level, itemLevel);
+            }
+            
+            // [新增] 处理彩虹属性：为所有基础元素属性加 1
+            if (itemType === 'rainbow') {
+                recipe.cryo = (recipe.cryo || 0) + 1;
+                recipe.pyro = (recipe.pyro || 0) + 1;
+                recipe.lightning = (recipe.lightning || 0) + 1;
+                recipe.laser = (recipe.laser || 0) + 1;
             }
         });
         if (recipe.laser > 0) {
