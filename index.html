@@ -9448,8 +9448,8 @@ class Game {
         const shotsContainer = document.createElement('div');
         shotsContainer.className = 'flex gap-3 flex-1 overflow-x-auto w-full pb-2';
         
-        // 确保至少显示3个子弹的统计（骨架图）
-        const shotsToShow = 3;
+        // 显示所有已发射子弹的统计，最少显示3个
+        const shotsToShow = Math.max(3, currentData.length);
         
         for (let i = 0; i < shotsToShow; i++) {
             const shotData = currentData[i];
@@ -9487,7 +9487,9 @@ class Game {
                 
                 for (const [attr, damage] of sortedAttrs) {
                     if (damage <= 0) continue;
-                    const attrInfo = attrConfig[attr] || { name: attr, color: '#94a3b8', icon: '❓' };
+                    // [修复] 确保属性名匹配，增加容错
+                    const attrKey = attr.toLowerCase();
+                    const attrInfo = attrConfig[attrKey] || { name: attr, color: '#94a3b8', icon: '❓' };
                     const barWidth = maxAttrDamage > 0 ? (damage / maxAttrDamage * 100) : 0;
                     
                     attrBarsHtml += `
@@ -12126,12 +12128,13 @@ class Game {
                             
                             // 当所有子弹都销毁时，保存统计
                             if (shotStats.destroyedCount >= shotStats.projectileCount && shotStats.total > 0) {
-                                this.shotDamageHistory.unshift({
+                                this.shotDamageHistory.push({
                                     total: shotStats.total,
                                     byAttr: JSON.parse(JSON.stringify(shotStats.byAttr))
                                 });
-                                if (this.shotDamageHistory.length > 3) {
-                                    this.shotDamageHistory.pop();
+                                // 增加容量到 10 发子弹，方便查看
+                                if (this.shotDamageHistory.length > 10) {
+                                    this.shotDamageHistory.shift();
                                 }
                                 this.ui_updateDamageStats();
                                 this.shotDamageMap.delete(p.shotId);
