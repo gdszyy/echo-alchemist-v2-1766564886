@@ -8323,7 +8323,7 @@ class Game {
         const speedBtn = document.getElementById('speed-btn'); 
         speedBtn.onclick = () => { 
             if (this.timeScale === 1.0) this.timeScale = 2.0; 
-            else if (this.timeScale === 2.0) this.timeScale = 0.17; 
+            else if (this.timeScale === 2.0) this.timeScale = 0.42; 
             else this.timeScale = 1.0; 
             this.baseTimeScale = this.timeScale
             speedBtn.innerText = `⏩ x${this.timeScale}`; // 更新按钮文本
