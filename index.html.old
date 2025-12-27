@@ -5637,56 +5637,86 @@ class SonSword {
     }
 }
 class Projectile {
-    constructor(x, y, vel, config, isCopy = false, shotId = null, isLast = false) {
+    constructor(x, y, vel, config, isCopy = false, shotId = null) {
         this.pos = new Vec2(x, y);
-        this.vel = vel;
+        this.vel = new Vec2(vel.x, vel.y);
         this.config = config;
+        
+        // [修复] shotId由外部传入，不再自己创建。散射子弹(isCopy)也需要继承shotId以进行统计
         this.shotId = shotId;
-        this.isLast = isLast;
-        this.maxBounces = config.bounce || 0;
-        this.maxPierces = config.pierce || 0;
+        
+        // 如果有shotId，增加projectileCount
+        if (this.shotId !== null && typeof game !== 'undefined' && game.shotDamageMap.has(this.shotId)) {
+            game.shotDamageMap.get(this.shotId).projectileCount++;
+        }
+        
+        // --- 1. 使用统一的公式计算半径 ---
         const params = Projectile.calculateVisualParams(config, isCopy);
         this.radius = params.radius; 
-        this.intensity = params.intensity;
+        this.intensity = params.intensity; // 存储光晕强度供 update 使用
+
         this.active = true;
         this.isCopy = isCopy;
         this.bouncesLeft = config.bounce || 0;
         this.piercesLeft = config.pierce || 0;
+
         this.hasAreaDamage = config.damage > 0;
+
         this.maxDurability = (this.maxBounces + this.maxPierces) || 1;
+
         this.hitCooldowns = new Map();
         this.destroyed = false;
         this.lifeTime = 60 * 15;
         this.chainHistory = [];
+
+        // 视觉相关
         this.trail = []; 
-        this.rotation = 0;      
+        this.rotation = 0;
+        
+        // 物理变形初始化
         this.deformation = { x: 1, y: 1 }; 
         this.targetDeformation = { x: 1, y: 1 }; 
         this.elasticity = 0.2;
+
         this.crackSeed = [];
         this.lastHitEnemy = null;
+
+
         for(let i=0; i<3; i++) {
             this.crackSeed.push({
                 angle: Math.random() * Math.PI * 2,
-                len: 0.3 + Math.random() * 0.4,
-                jagged: (Math.random() - 0.5) * 0.5
+                len: 0.3 + Math.random() * 0.4, // 裂纹长度比例
+                jagged: (Math.random() - 0.5) * 0.5 // 裂纹曲折度
             });
         }
+
     }
 
+    /**
+     * 统一计算视觉参数 (尺寸、光晕)
+     */
     static calculateVisualParams(config, isCopy) {
         const v = CONFIG.visuals;
+        // 1. 计算半径：基础 + (伤害加成，但不超过上限)
         let r = v.baseRadius + Math.min(v.maxSizeBonus, (config.damage - 2) * v.damageGrowth);
+
+        // 2. 应用类型倍率
         if (isCopy) r *= v.copyScale;
         if (config.explosive) r *= v.explosiveScale;
         if (config.pierce > 0) r *= v.arrowScale;
+
+        // 3. 计算光晕强度
         let glow = 1.0 + (config.damage * v.glowPerDamage) / 10;
         glow = Math.min(v.maxGlow / v.glowBase, glow);
+
         return { radius: r, intensity: glow };
     }
 
     update(width, height, enemies, spawnCallback, timeScale) {
         if (!this.active) return;
+
+        // --- A. 视觉表现更新 ---
+        // 1. 旋转
         if (this.config.pierce > 0) {
             this.rotation = Math.atan2(this.vel.y, this.vel.x);
         } else if (this.config.scatter > 0) {
@@ -5694,6 +5724,8 @@ class Projectile {
         } else {
             this.rotation += 0.1 * timeScale;
         }
+
+        // 2. 弹性变形 (Q弹效果)
         if (this.config.bounce > 0) {
             const speed = this.vel.mag();
             if (speed > 1) {
@@ -5703,84 +5735,162 @@ class Projectile {
         }
         this.deformation.x += (this.targetDeformation.x - this.deformation.x) * this.elasticity * timeScale;
         this.deformation.y += (this.targetDeformation.y - this.deformation.y) * this.elasticity * timeScale;
+
+        // 3. 拖尾更新
         this.trail.push({x: this.pos.x, y: this.pos.y});
         if (this.trail.length > 8) this.trail.shift();
+
+
+        // --- B. 物理与碰撞逻辑 (找回丢失的部分) ---
+        
+        // 更新冷却
         for (const [enemy, timer] of this.hitCooldowns) {
             if (timer > 0) this.hitCooldowns.set(enemy, timer - timeScale);
             else this.hitCooldowns.delete(enemy);
         }
+
         this.lifeTime -= timeScale;
         if (this.lifeTime <= 0) { this.destroy(spawnCallback); return; }
+
         const fullMove = this.vel.mult(timeScale);
         const totalSpeed = fullMove.mag();
+
+        // 粗测 (Broadphase)
         let potentialEnemies = [];
         if (totalSpeed > this.radius) {
             potentialEnemies = enemies.filter(e => e.active && this.pos.dist(e.pos) < (totalSpeed + e.width));
-        } else {
+        }else{
             potentialEnemies = enemies.filter(e => e.active && this.pos.dist(e.pos) < (this.radius + e.width));
         }
+        
         const steps = Math.ceil(totalSpeed / (this.radius * 0.8));
         const subStepVel = fullMove.mult(1 / steps);
+
         for (let s = 0; s < steps; s++) {
             this._applyMove(subStepVel, width, height, spawnCallback);
             if (!this.active) return;
+
+            // 碰撞检测
             for (let e of potentialEnemies) {
                 if (!e.active) continue;
+                // 简单的圆形/矩形碰撞检测
                 const dx = this.pos.x - e.pos.x;
                 const dy = this.pos.y - e.pos.y;
                 const dist = Math.sqrt(dx*dx + dy*dy);
+
                 if (dist < (e.width/2 + this.radius)) {
                     if (this.hitCooldowns.has(e)) continue;
+
+                    // === 命中结算 ===
                     this.hitCooldowns.set(e, CONFIG.gameplay.hitCooldowns);
                     this.lastHitEnemy = e;
                     this.onHit(e, enemies);
+
                     if (this.config.flying_sword) {
-                        if (typeof game !== 'undefined') game.combat_flyingSword_assignTarget(e);
+                        // 调用 Game 的分发方法，将敌人加入所有子剑的攻击队列
+                        if (typeof game !== 'undefined') {
+                            game.combat_flyingSword_assignTarget(e);
+                        }
                     }
+
+                    
+                    // === 穿透判定 (优先级最高) ===
                     if (this.piercesLeft > 0) {
                         if (this.config.flying_sword) {
                             const pegLevel = this.config.level || 1;
-                            if (this.hasAreaDamage) this.performSlashAttack(e, game.enemies);
+
+                            
+    
+                            // B. 范围斩击 (如果 config.damage 足够高或有特定flag)
+                            if (this.hasAreaDamage) {
+                                this.performSlashAttack(e, game.enemies);
+                            }
+    
+                            // C. 【关键】穿透产生子剑 (Mutation Logic)
+                            // 规则："母剑每次穿透敌人会产生一把子剑"
+                            // 即使没有剩余穿透次数(即将反弹/销毁)，击中敌人这一刻也应该产生子剑
                             if (typeof game !== 'undefined') {
+                                // 在敌人位置附近生成子剑
                                 const spawnX = e.pos.x + (Math.random()-0.5)*20;
                                 const spawnY = e.pos.y + (Math.random()-0.5)*20;
                                 game.combat_flyingSword_addSon(spawnX, spawnY, this, pegLevel, this.config);
                             }
                         }
+
                         this.piercesLeft--;
-                        continue;
+                        // 穿透时仅仅稍微减速或不改变方向
+                        continue; // <--- 关键：继续飞行，不进行反弹处理
                     }
+
+                    // === 反弹判定 ===
                     if (this.bouncesLeft > 0) {
                         this.bouncesLeft--;
-                        if (this.config.wind && this.isLast) {
-                            if (typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y);
-                        }
+                        // 简单的反弹物理
                         const angle = Math.atan2(dy, dx);
                         const normal = new Vec2(Math.cos(angle), Math.sin(angle));
+
+                        // v' = v - 2 * (v . n) * n
                         const dot = this.vel.dot(normal);
                         this.vel = this.vel.sub(normal.mult(2 * dot));
+
+                        // 视觉形变
                         this.deformation = { x: 1.4, y: 0.6 };
                     } else {
+                        // 既没穿透也没反弹 -> 销毁
                         this.destroy(spawnCallback);
                         return;
                     }
                 }
             }
         }
+        
+        // 1. 爆破弹珠：引信燃烧效果 (高频掉落火星)
         if (this.config.explosive) {
+            // 每帧都有很高概率掉落火星
             if (Math.random() < 0.7) {
-                const spark = new Particle(this.pos.x, this.pos.y, '#fbbf24', 'spark');
-                spark.vel = this.vel.mult(-0.2).add(new Vec2((Math.random()-0.5)*2, (Math.random()-0.5)*2));
-                game.particles.push(spark);
+    const trailDir = this.vel.norm().mult(-1);
+    const smokeX = this.pos.x + trailDir.x * this.radius + (Math.random() - 0.5) * 4;
+    const smokeY = this.pos.y + trailDir.y * this.radius + (Math.random() - 0.5) * 4;
+    
+    // 使用深灰色/黑色，带有一定的透明度
+    // 模拟未完全燃烧的火药烟雾
+    game.spawn_createParticle(smokeX, smokeY, 'rgba(51, 65, 85, 0.6)', 'smoke');
+}
+if (Math.random() < 0.2) {
+                const trailDir = this.vel.norm().mult(-1);
+                const dustX = this.pos.x + trailDir.x * this.radius;
+                const dustY = this.pos.y + trailDir.y * this.radius;
+                
+                // 使用暗红色，不使用 'spark' 模式(因为 spark 会发光)
+                // 改用 'normal' 模式，就是一个普通的红色圆点
+                const p = new Particle(dustX, dustY, '#ef4444', 'normal');
+                p.size = Math.random() * 1.5 + 0.5; // 很小的粉尘
+                p.life = 0.5; // 消失得很快
+                game.particles.push(p);
             }
+        } else if (Math.random() < 0.3) {
+             let color = null;
+             if (this.config.pyro > 0) color = '#f97316';
+             else if (this.config.cryo > 0) color = '#06b6d4';
+             else if (this.config.lightning > 0) color = '#c084fc';
+             if (color) game.spawn_createParticle(this.pos.x, this.pos.y, color);
+        
         }
     }
 
+    /**
+     * 内部移动与边界处理 (包含撞墙变形)
+     */
     _applyMove(vel, width, height, spawnCallback) {
         this.pos = this.pos.add(vel);
+
+        // 左右墙反弹
         if (this.pos.x < this.radius) { 
-            this.pos.x = this.radius; this.vel.x = Math.abs(this.vel.x); 
-            if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y);
+            this.pos.x = this.radius; 
+            this.vel.x = Math.abs(this.vel.x); 
+            
+            // [优化] 防止左右墙近乎平行的无限反弹
+            // 如果垂直速度远大于水平速度（夹角小于10度），则每次反弹增加水平速度
             const angle = Math.abs(Math.atan2(this.vel.x, this.vel.y));
             if (angle < (10 * Math.PI / 180)) {
                 const speed = this.vel.mag();
@@ -5788,12 +5898,15 @@ class Projectile {
                 this.vel.x = speed * Math.sin(newAngle);
                 this.vel.y = speed * Math.cos(newAngle) * (this.vel.y > 0 ? 1 : -1);
             }
+
             if(this.config.bounce > 0) this.deformation = { x: 0.7, y: 1.3 };
-            this.hitCooldowns.clear();
+            this.hitCooldowns.clear()
         }
         if (this.pos.x > width - this.radius) { 
-            this.pos.x = width - this.radius; this.vel.x = -Math.abs(this.vel.x); 
-            if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y);
+            this.pos.x = width - this.radius; 
+            this.vel.x = -Math.abs(this.vel.x); 
+
+            // [优化] 防止左右墙近乎平行的无限反弹
             const angle = Math.abs(Math.atan2(this.vel.x, this.vel.y));
             if (angle < (10 * Math.PI / 180)) {
                 const speed = this.vel.mag();
@@ -5801,95 +5914,276 @@ class Projectile {
                 this.vel.x = -speed * Math.sin(newAngle);
                 this.vel.y = speed * Math.cos(newAngle) * (this.vel.y > 0 ? 1 : -1);
             }
+
             if(this.config.bounce > 0) this.deformation = { x: 0.7, y: 1.3 };
-            this.hitCooldowns.clear();
+            this.hitCooldowns.clear()
         }
+        // 顶部反弹
         if (this.pos.y < this.radius) { 
-            this.pos.y = this.radius; this.vel.y = Math.abs(this.vel.y); 
-            if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y);
+            this.pos.y = this.radius; 
+            this.vel.y = Math.abs(this.vel.y); 
             if(this.config.bounce > 0) this.deformation = { x: 1.3, y: 0.7 };
         }
+        // 底部逻辑
         if (this.pos.y > height - this.radius) {
-            if (game.hasCombatWall) {
-                this.pos.y = height - this.radius; this.vel.y = -Math.abs(this.vel.y);
-                if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y);
+            let didBounce = false;
+            // 如果有战斗底墙遗物
+            if (game.hasCombatWall && (this.piercesLeft > 0 || this.config.bounce > 0 || this.config.type === 'flying_sword')) {
+                if (this.piercesLeft > 0) {
+                    this.piercesLeft--;
+                    didBounce = true;
+                    game.spawn_createShockwave(this.pos.x, height);
+                } else if (this.config.bounce > 0) { 
+                    didBounce = true;
+                } else if (this.config.type === 'flying_sword') {
+                    // 母剑专用反弹逻辑
+                    didBounce = true;
+                    game.spawn_createShockwave(this.pos.x, height, '#0ea5e9'); // 青色波纹
+                }
+            }
+            if (didBounce) {
+                this.pos.y = height - this.radius;
+                this.vel.y *= -1;
+                this.vel.x += (Math.random() - 0.5) * 2;
+                audio.playHit('bounce');
+                if(this.config.bounce > 0) this.deformation = { x: 1.4, y: 0.6 };
             } else {
-                this.destroy(spawnCallback);
+                if (this.config.type === 'flying_sword') {
+                    // [修改] 底部退出导致的销毁，不插在敌人身上
+                    this.handleFlyingSwordFinish(null, game, true); // true 表示是从底部退出
+                    this.active = false;
+                    this.destroyed = true; // [修复] 必须设置销毁标记，否则无法发射下一发
+                } else {
+                    this.destroy(spawnCallback);
+                }
             }
         }
+        if (this.pos.y > height + 50) { this.destroy(spawnCallback); }
     }
-
+    
     onHit(enemy, allEnemies) {
         game.combat_damageEnemy(enemy, this);
     }
 
-    performSlashAttack(enemy, enemies) {
-        const angle = Math.random() * Math.PI * 2;
-        const slash = new SlashEffect(enemy.pos.x, enemy.pos.y, angle, 120, this.config.getColor ? this.config.getColor() : '#0ea5e9');
-        game.shockwaves.push(slash);
-        enemies.forEach(e => {
-            if (e !== enemy && e.active && e.pos.dist(enemy.pos) < 80) {
-                e.takeDamage(this.config.damage * 0.3);
-            }
-        });
-    }
-
     destroy(spawnCallback) {
         this.active = false; this.destroyed = true;
+        
+        // 套娃生成逻辑
         if (this.config.nestedPayload && !this.isCopy) {
              let nextVel = this.vel.norm().mult(this.vel.mag() * 1.1); 
              if (nextVel.mag() < 2) nextVel = new Vec2(0, -5);
              spawnCallback({ x: this.pos.x, y: this.pos.y, vel: nextVel, config: this.config.nestedPayload });
-        } else if (this.config.chainPayload && !this.isCopy) {
+        }
+        // 连锁生成逻辑
+        else if (this.config.chainPayload && !this.isCopy) {
             let nextVel = this.vel; if (nextVel.mag() < 1) nextVel = new Vec2(0, 5);
             spawnCallback({ x: this.pos.x, y: this.pos.y, vel: nextVel.norm().mult(10), config: this.config.chainPayload });
         }
+
         if (this.config.type === 'flying_sword') {
-            if (this.lastHitEnemy && this.lastHitEnemy.active) this.stickToEnemy(this.lastHitEnemy);
-            else this.handleFlyingSwordFinish(null, game);
+            // 如果是因为耐久耗尽而销毁，且有最后击中的敌人 -> 插在敌人身上
+            if (this.lastHitEnemy && this.lastHitEnemy.active) {
+                this.stickToEnemy(this.lastHitEnemy);
+            } else {
+                // 否则视为掉落处理
+                this.handleFlyingSwordFinish(null, game);
+            }
         }
     }
 
+
+
+
+    // 母剑结束时的处理 (插剑 或 通知子剑)
     stickToEnemy(enemy) {
-        const pegLevel = this.config.level || 1;
-        const hitAngle = Math.atan2(this.vel.y, this.vel.x);
-        const randomAngle = hitAngle + (Math.random() - 0.5) * (Math.PI / 6);
-        const randomOffsetX = (Math.random() - 0.5) * (enemy.width * 0.6);
-        const randomOffsetY = (Math.random() - 0.5) * (enemy.height * 0.6);
-        const stuckPos = enemy.pos.add(new Vec2(randomOffsetX, randomOffsetY));
-        const stuckBlade = new SonSword(stuckPos.x, stuckPos.y, this, pegLevel, this.config);
-        stuckBlade.state = 'stuck'; stuckBlade.stuckHost = enemy; stuckBlade.stuckOffset = new Vec2(randomOffsetX, randomOffsetY);
-        stuckBlade.angle = randomAngle; stuckBlade.isMotherBlade = true; 
-        enemy.addSwordCrack(stuckBlade.stuckOffset, randomAngle + Math.PI/2);
-        game.sonSwords.push(stuckBlade); 
-        if (enemy.stuckSwords) enemy.stuckSwords.push(stuckBlade);
-        game.spawn_createFloatingText(stuckPos.x, stuckPos.y, "🗡️STUCK", "#0ea5e9");
-        audio.playSlash();
-        this.performSlashAttack(enemy, game.enemies);
-        game.sonSwords.forEach(s => {
-            if (s.mother === this && s !== stuckBlade && s.active) {
-                if (pegLevel === 1) { s.active = false; game.spawn_createParticle(s.pos.x, s.pos.y, '#0ea5e9', 'mist'); } 
-                else if (pegLevel === 2) { s.attacksLeft = s.maxAttacks; s.isAutoHunting = true; game.spawn_createFloatingText(s.pos.x, s.pos.y, "RESET", "#6366f1"); } 
-                else if (pegLevel >= 3) { s.isAutoHunting = true; }
+        if (typeof game !== 'undefined') {
+            // 1. 生成插在敌人身上的“母剑标记”
+            const pegLevel = this.config.level || 1;
+            
+            // [优化]：随机化插入位置和角度
+            const hitAngle = Math.atan2(this.vel.y, this.vel.x);
+            const randomAngle = hitAngle + (Math.random() - 0.5) * (Math.PI / 6); // ±15度偏差
+            
+            // 随机偏移点 (在敌人中心附近)
+            const randomOffsetX = (Math.random() - 0.5) * (enemy.width * 0.6);
+            const randomOffsetY = (Math.random() - 0.5) * (enemy.height * 0.6);
+            const stuckPos = enemy.pos.add(new Vec2(randomOffsetX, randomOffsetY));
+
+            const stuckBlade = new SonSword(stuckPos.x, stuckPos.y, this, pegLevel, this.config);
+            stuckBlade.state = 'stuck';
+            stuckBlade.stuckHost = enemy;
+            stuckBlade.stuckOffset = new Vec2(randomOffsetX, randomOffsetY);
+            stuckBlade.angle = randomAngle; // 记录插入时的角度
+            stuckBlade.isMotherBlade = true; 
+            
+            enemy.addSwordCrack(stuckBlade.stuckOffset, randomAngle + Math.PI/2);
+            game.sonSwords.push(stuckBlade); 
+            
+            if (enemy.stuckSwords) {
+                enemy.stuckSwords.push(stuckBlade);
             }
-        });
+
+            game.spawn_createFloatingText(stuckPos.x, stuckPos.y, "🗡️STUCK", "#0ea5e9");
+            audio.playSlash();
+            
+            // [新增] 母剑插入时触发斩击攻击
+            this.performSlashAttack(enemy, game.enemies);
+
+            // 2. [新增] 触发子剑联动逻辑 (根据等级)
+            game.sonSwords.forEach(s => {
+                // 只影响属于这把母剑的子剑，且排除掉刚生成的那个母剑标记
+                if (s.mother === this && s !== stuckBlade && s.active) {
+                    
+                    if (pegLevel === 1) {
+                        // Lv1: 母剑停下时，子剑消散
+                        s.active = false;
+                        game.spawn_createParticle(s.pos.x, s.pos.y, '#0ea5e9', 'mist');
+                    } 
+                    else if (pegLevel === 2) {
+                        // Lv2: 攻击次数全部重置，并进入自动寻敌
+                        s.attacksLeft = s.maxAttacks; // 重置次数
+                        s.isAutoHunting = true;       // 开启自动寻敌
+                        game.spawn_createFloatingText(s.pos.x, s.pos.y, "RESET", "#6366f1");
+                    } 
+                    else if (pegLevel >= 3) {
+                        // Lv3: 攻击次数不变，进入自动寻敌
+                        s.isAutoHunting = true;
+                        game.spawn_createFloatingText(s.pos.x, s.pos.y, "HUNT", "#f43f5e");
+                    }
+                }
+            });
+        }
     }
 
-    handleFlyingSwordFinish(enemy, game) {
+    // [修改] 母剑结束（掉落/消失）时的子剑处理逻辑
+    // --- 在 class Projectile 中 ---
+
+    handleFlyingSwordFinish(host, game, isBottomExit = false) {
+        // [修复]：召回目标应该是母剑插着的敌人或位置
+        let targetPos = null;
+        if (host) {
+            targetPos = host.pos;
+        } else if (!isBottomExit && this.lastHitEnemy && this.lastHitEnemy.active) {
+            targetPos = this.lastHitEnemy.pos;
+        } else {
+            // 底部退出或无目标：回到玩家位置
+            targetPos = { x: game.width / 2, y: game.height - 80 };
+        }
+
         game.sonSwords.forEach(s => {
+            const level = s.level || 1;
             if (s.mother === this && s.active) {
-                s.active = false;
-                game.spawn_createParticle(s.pos.x, s.pos.y, '#0ea5e9', 'mist');
+                if (level >= 3) {
+                    // Lv3: 自动寻敌
+                    s.state = 'flying'; 
+                    s.isAutoHunting = true; 
+                    s.mother = null; 
+                    game.spawn_createFloatingText(s.pos.x, s.pos.y, "HUNT", "#f43f5e");
+                } else if (level === 2) {
+                    // Lv2: 收剑 (飞向母剑位置)
+                    s.triggerRecall(targetPos);
+                } else {
+                    // Lv1: 消散
+                    s.active = false; 
+                    game.spawn_createParticle(s.pos.x, s.pos.y, '#0ea5e9', 'mist');
+                }
             }
         });
     }
-
+    // --- 实例绘制 ---
+    // --- 在 Projectile 类中 ---
     draw(ctx) {
-        if (!this.active && !this.destroyed) return;
-        const integrity = (this.bouncesLeft + this.piercesLeft) / (this.maxDurability || 1);
-        Projectile.drawVisuals(ctx, this.pos.x, this.pos.y, this.radius, this.config, this.rotation, this.intensity, this.deformation, integrity, this.crackSeed);
+        if (!this.active) return;
+
+        // 1. 计算当前耐久度比例
+        const currentDurability = (this.bouncesLeft + this.piercesLeft);
+        let integrity = 1.0;
+        if (this.maxDurability > 0) {
+            integrity = currentDurability / this.maxDurability;
+        }
+        integrity = Math.max(0.2, integrity);
+
+        // --- 核心修复：判定是否需要绘制拖尾 ---
+        const hasElementalTrail = this.config.pyro > 0 || 
+                                  this.config.cryo > 0 || 
+                                  this.config.pierce > 0 || 
+                                  this.config.scatter > 0 || 
+                                  this.config.explosive;
+
+        if ((this.config.bounce === 0 || hasElementalTrail) && this.trail.length > 1) {
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.globalCompositeOperation = 'lighter'; 
+            
+            let trailColor = '255, 255, 255'; 
+            if (this.config.explosive) trailColor = '252, 165, 165'; 
+            else if (this.config.pyro) trailColor = '251, 146, 60'; 
+            else if (this.config.cryo) trailColor = '165, 243, 252'; 
+            else if (this.config.pierce) trailColor = '252, 165, 165'; 
+            else if (this.config.scatter) trailColor = '253, 224, 71'; 
+            
+            for (let i = 0; i < this.trail.length - 1; i++) {
+                const p1 = this.trail[i];
+                const p2 = this.trail[i+1];
+                const progress = i / this.trail.length; 
+                
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+
+                // 1. 基础系数 (普通弹保持 0.6, 弹性弹保持 0.4)
+                let widthMod = this.config.bounce > 0 ? 0.2 : 0.42;
+                
+                // 2. [优化] 穿透子弹尾迹优化：减小尾迹宽度系数，防止遮挡箭头
+                if (this.config.pierce > 0) {
+                    widthMod = 0.25; 
+                }
+                
+                // 3. 如果是爆破弹珠，强制使用极小的系数
+                if (this.config.explosive) {
+                    widthMod = 0.15; 
+                }
+                
+                // 4. 计算宽度
+                let finalWidth = (this.radius * widthMod) * progress * integrity;
+
+                // 5. [绝对防线]：如果是爆破弹，设置一个像素级的硬上限
+                if (this.config.explosive) {
+                    finalWidth = Math.min(finalWidth, 4); 
+                }
+
+                ctx.lineWidth = finalWidth;
+                
+                // 6. [优化] 穿透子弹尾迹透明度优化：降低透明度，使其更通透
+                let alpha = progress * 0.2 * integrity;
+                if (this.config.pierce > 0) alpha *= 0.6;
+
+                ctx.strokeStyle = `rgba(${trailColor}, ${alpha})`;
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // ... 绘制子弹本体的代码保持不变 ...
+        const dimIntensity = this.intensity * (0.5 + 0.5 * integrity); 
+
+        Projectile.drawVisuals(
+            ctx, 
+            this.pos.x, 
+            this.pos.y, 
+            this.radius, 
+            this.config, 
+            this.rotation, 
+            dimIntensity, 
+            this.deformation,
+            integrity,      
+            this.crackSeed  
+        );
     }
 
+    // --- 静态绘制方法 (已包含修正后的箭头和组合特效) ---
+    // --- 静态绘制方法 (修复冰霜菱形丢失问题) ---
     static drawVisuals(ctx, x, y, radius, config, rotation, intensity, deformation = {x:1, y:1}, integrity = 1.0, crackSeed = []) {
         ctx.save();
         ctx.translate(x, y);
@@ -5897,10 +6191,13 @@ class Projectile {
         if (config.type === 'flying_sword') {
             // 修正角度：假設畫筆是朝右(0度)畫的，如果原圖是朝上則需旋轉
             // 這裡我們直接畫朝右的劍，與 velocity 方向一致
+
             const scale = radius / 6; // 根據半徑動態調整大小 (基礎半徑約7~10)
+
             // 1. 劍身發光 (Spirit Aura) - 隨耐久度減弱
             ctx.shadowBlur = 15 * intensity * integrity;
             ctx.shadowColor = '#0ea5e9'; // 青色光暈
+
             // 2. 劍身 (Blade) - 雙刃劍，指向右側
             ctx.beginPath();
             ctx.moveTo(32 * scale, 0);       // 劍尖 (最右)
@@ -5909,6 +6206,7 @@ class Projectile {
             ctx.lineTo(-12 * scale, 4 * scale);  // 劍身後段
             ctx.lineTo(8 * scale, 4 * scale);  // 下刃
             ctx.closePath();
+
             // 劍刃金屬漸變 (橫向)
             const bladeGrad = ctx.createLinearGradient(-10 * scale, -5*scale, -10 * scale, 5*scale);
             bladeGrad.addColorStop(0, '#e0f2fe');   // 亮白邊緣
@@ -5916,6 +6214,7 @@ class Projectile {
             bladeGrad.addColorStop(1, '#e0f2fe');   // 亮白邊緣
             ctx.fillStyle = bladeGrad;
             ctx.fill();
+
             // 劍脊線 (Ridge)
             ctx.beginPath();
             ctx.moveTo(30 * scale, 0);
@@ -5923,6 +6222,7 @@ class Projectile {
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
             ctx.lineWidth = 1.5;
             ctx.stroke();
+
             // 3. 劍格 (Guard) - 祥雲/蝙蝠紋飾
             ctx.shadowBlur = 5;
             ctx.shadowColor = '#f59e0b';
@@ -5934,18 +6234,22 @@ class Projectile {
             ctx.lineTo(-14 * scale, 8 * scale); // 下翼
             ctx.quadraticCurveTo(-10 * scale, 10 * scale, -10 * scale, 0);
             ctx.fill();
+
             // 4. 劍柄 (Hilt)
             ctx.fillStyle = '#451a03'; // 深褐色木柄
             ctx.fillRect(-22 * scale, -2 * scale, 10 * scale, 4 * scale);
+
             // 5. 劍首 (Pommel)
             ctx.beginPath();
             ctx.arc(-24 * scale, 0, 3 * scale, 0, Math.PI * 2);
             ctx.fillStyle = '#fbbf24';
             ctx.fill();
+
             // 6. 劍穗 (Tassel) - 隨時間飄動的紅穗
             // 使用 Math.sin 模擬風吹效果
             const time = Date.now() / 100;
             const swing = Math.sin(time) * 3 * scale;
+
             ctx.beginPath();
             ctx.moveTo(-26 * scale, 0); // 連接劍首
             // 貝塞爾曲線模擬向後飄動 (向左)
@@ -5954,23 +6258,76 @@ class Projectile {
                 -40 * scale, -swing,          // 控制點2
                 -50 * scale, swing * 0.5      // 終點
             );
+
             ctx.shadowColor = '#ef4444';
             ctx.shadowBlur = 5;
             ctx.strokeStyle = '#ef4444'; // 紅色
             ctx.lineWidth = 2;
             ctx.lineCap = 'round';
             ctx.stroke();
+
             ctx.restore();
-            return; // *** 繪製完畢，直接返回，跳过原本的圆球繪製 ***
+            return; // *** 繪製完畢，直接返回，跳過原本的圓球繪製 ***
         }
-        
-        // 1. 确定形状
+
+        if (config.explosive) {
+            const time = Date.now();
+            
+            // 1. 高频脉冲 (每秒闪烁约 10 次)
+            // 产生一个 0.0 ~ 1.0 的波动值
+            const pulse = (Math.sin(time / 50) + 1) / 2; 
+
+            // 2. 颜色闪烁 (核心过热警告)
+            // 当脉冲达到峰值时，颜色由红色变为纯白，模拟临界状态
+            let coreColor = '#ef4444'; // 基础红
+            let glowColor = '#b91c1c'; // 深红光晕
+            
+            if (pulse > 0.7) {
+                coreColor = '#ffffff'; // 闪白
+                glowColor = '#fca5a5'; // 光晕变亮红
+                intensity *= 1.5; // 光晕暴涨
+            }
+
+            // 3. 体积膨胀 (呼吸感)
+            // 让子弹在 100% ~ 115% 大小之间震荡
+            const scaleMod = 1.0 + pulse * 0.15;
+            ctx.scale(deformation.x * scaleMod, deformation.y * scaleMod);
+
+            // 4. 位置颤抖 (Jitter - 关键特效)
+            // 就在原位置疯狂抖动，表现出能量无法控制的感觉
+            const shakeAmount = 1.5; 
+            ctx.translate((Math.random() - 0.5) * shakeAmount, (Math.random() - 0.5) * shakeAmount);
+
+            // --- 绘制炸弹本体 ---
+            // 光晕
+            ctx.shadowBlur = CONFIG.visuals.glowBase * intensity * 1.5;
+            ctx.shadowColor = glowColor;
+            
+            // 核心圆
+            ctx.fillStyle = coreColor;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 内部高光 (让它看起来像球体)
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.beginPath();
+            ctx.arc(-radius*0.3, -radius*0.3, radius*0.3, 0, Math.PI*2);
+            ctx.fill();
+
+            ctx.restore();
+            return; // *** 爆破弹绘制完毕，直接返回，跳过后续通用逻辑 ***
+        }
+
+
+        // 1. 决定形状 (修复：加回 crystal)
         let shapeType = 'circle';
-        if (config.pierce > 0) shapeType = 'arrow';
-        if (config.scatter > 0) shapeType = 'star';
-        if (config.isLaser) shapeType = 'orb';
         if (config.isMatryoshka) shapeType = 'matryoshka';
-        if (config.wind) shapeType = 'crystal'; // 风属性使用菱形
+        else if (config.pierce > 0) shapeType = 'arrow';
+        else if (config.scatter > 0) shapeType = 'star';
+        else if (config.cryo > 0) shapeType = 'crystal'; // <--- 找回了丢失的冰霜形状判定
+        else if (config.isLaser) shapeType = 'orb';
 
         // 2. 决定颜色
         let mainColors = [];
@@ -5980,46 +6337,73 @@ class Projectile {
             mainColors.push('#ffffff'); // 核心纯白
             glowColors.push(CONFIG.colors.laser); // 外圈天蓝
         }
+
         if (config.type === 'rainbow') { mainColors.push('rainbow'); glowColors.push('#ffffff'); }
         if (config.explosive) { mainColors.push('#fff'); glowColors.push('#ef4444'); }
         if (config.pyro > 0) { mainColors.push('#fdba74'); glowColors.push('#f97316'); }
         if (config.cryo > 0) { mainColors.push('#cffafe'); glowColors.push('#06b6d4'); }
         if (config.lightning > 0) { mainColors.push('#f3e8ff'); glowColors.push('#c084fc'); }
-        if (config.wind) { mainColors.push('#d1fae5'); glowColors.push('#34d399'); } // 风属性颜色
         if (config.pierce > 0 && mainColors.length === 0) { mainColors.push('#fee2e2'); glowColors.push('#ef4444'); }
+
         if (mainColors.length === 0) {
             if (config.bounce > 0) { mainColors.push('#dcfce7'); glowColors.push('#22c55e'); }
             else { mainColors.push('#f1f5f9'); glowColors.push('#94a3b8'); }
         }
+
         const mainColor = mainColors[mainColors.length - 1];
         const glowColor = glowColors[glowColors.length - 1];
+
         if (config.explosive && integrity > 0.1) {
             const time = Date.now();
+            
+            // 1. 高频脉冲 (每秒闪烁约 10 次)
+            // 产生一个 0.0 ~ 1.0 的波动值
             const pulse = (Math.sin(time / 50) + 1) / 2; 
+
+            // 2. 颜色闪烁 (核心过热)
+            // 当脉冲达到峰值时，颜色由红色变为纯白
             if (pulse > 0.7) {
+                // 混合白色：简单的逻辑是直接覆盖 mainColor
+                // 视觉上会产生红-白-红的急促警报感
                 mainColors[mainColors.length - 1] = '#ffffff'; 
-                glowColors[glowColors.length - 1] = '#fca5a5'; 
-                intensity *= 1.5; 
+                glowColors[glowColors.length - 1] = '#fca5a5'; // 光晕变亮红
+                intensity *= 1.5; // 光晕暴涨
             }
+
+            // 3. 体积膨胀 (呼吸感)
+            // 让子弹在 100% ~ 115% 大小之间震荡
             const scaleMod = 1.0 + pulse * 0.15;
             deformation.x *= scaleMod;
             deformation.y *= scaleMod;
+
+            // 4. 位置颤抖 (Jitter)
+            // 就在原位置疯狂抖动，表现出能量无法控制
             const shakeAmount = 1.5; 
             ctx.translate((Math.random() - 0.5) * shakeAmount, (Math.random() - 0.5) * shakeAmount);
         }
         // ---  光球的特殊渲染逻辑 (绑定特效) ---
         if (shapeType === 'orb') {
+            // 1. 动态脉冲 (模拟能量不稳定的感觉)
             const time = Date.now() / 200;
             const pulse = Math.sin(time) * 0.1 + 1.0; 
+            
+            // 2. 根据激光层数 (config.laser) 增强光晕和大小
+            // config.laser 越高，球体越亮，核心越大
             const laserPower = config.laser || 0;
             const sizeMod = 1 + (laserPower * 0.1); 
+            
+            // 绘制强光晕 (多层叠加)
             ctx.shadowBlur = 20 * intensity * sizeMod;
             ctx.shadowColor = glowColor;
+            
+            // 外层光环
             ctx.fillStyle = glowColor;
             ctx.globalAlpha = 0.4;
             ctx.beginPath();
             ctx.arc(0, 0, radius * 1.2 * pulse * sizeMod, 0, Math.PI * 2);
             ctx.fill();
+
+            // 内层核心 (高亮)
             ctx.shadowBlur = 10;
             ctx.shadowColor = '#fff';
             ctx.fillStyle = '#ffffff';
@@ -6027,13 +6411,15 @@ class Projectile {
             ctx.beginPath();
             ctx.arc(0, 0, radius * 0.8 * sizeMod, 0, Math.PI * 2);
             ctx.fill();
+            
+            // 恢复上下文，跳过后续通用绘制
             ctx.restore();
             return; 
         }
         // 3. 绘制形状
-        ctx.scale(deformation.x, deformation.y);
         ctx.beginPath();
         if (shapeType === 'arrow') {
+            // [优化] 增大箭头比例，使其在穿透层数高时依然清晰
             const arrowScale = 1.8; 
             ctx.moveTo(radius * arrowScale, 0); 
             ctx.lineTo(-radius * 0.8, radius * 0.7); 
@@ -6045,7 +6431,7 @@ class Projectile {
                 ctx.lineTo(radius, 0);
                 ctx.lineTo(radius * 0.4, radius * 0.4);
             }
-        } else if (shapeType === 'crystal') { 
+        } else if (shapeType === 'crystal') { // <--- 找回了丢失的菱形绘制逻辑
             ctx.moveTo(0, -radius * 1.3);
             ctx.lineTo(radius * 0.8, 0);
             ctx.lineTo(0, radius * 1.3);
@@ -6053,10 +6439,13 @@ class Projectile {
         } else if (shapeType === 'matryoshka') {
              ctx.arc(0, 0, radius, 0, Math.PI * 2);
         } else {
+            // 默认圆形/流体
             if (config.pyro > 0) {
                 const time = Date.now() / 50;
+                // 使用多层波浪模拟火焰跳动
                 for (let i = 0; i <= 30; i++) {
                     const angle = (i / 30) * Math.PI * 2;
+                    // 基础波浪 + 高频抖动
                     const wave1 = Math.sin(time + angle * 3) * (radius * 0.15);
                     const wave2 = Math.sin(time * 1.5 + angle * 7) * (radius * 0.08);
                     const r = radius + wave1 + wave2;
@@ -6067,8 +6456,15 @@ class Projectile {
             }
         }
         ctx.closePath();
-        ctx.shadowBlur = CONFIG.visuals.glowBase * intensity * integrity; 
+
+        // --- [视觉修改]：应用老化效果 ---
+    
+        // A. 光晕减弱
+        ctx.shadowBlur = CONFIG.visuals.glowBase * intensity * integrity; // 越破损光晕越小
         ctx.shadowColor = glowColor;
+        
+        // B. 颜色变暗 (使用 globalAlpha 简单模拟或者在颜色上覆盖黑色层)
+        // 这里我们填充主色
         if (mainColor === 'rainbow') {
             const grad = ctx.createLinearGradient(-radius, -radius, radius, radius);
             grad.addColorStop(0, '#fca5a5');
@@ -6081,10 +6477,16 @@ class Projectile {
             ctx.fillStyle = mainColor;
         }
         ctx.fill();
+
+        // 如果耐久度不满，覆盖一层半透明黑色，使其看起来变暗/脏
         if (integrity < 1.0) {
-            ctx.fillStyle = `rgba(0, 0, 0, ${0.6 - 0.6 * integrity})`; 
+            ctx.fillStyle = `rgba(0, 0, 0, ${0.6 - 0.6 * integrity})`; // 最多 60% 的黑度
             ctx.fill();
         }
+
+        // 4. 填充 (已在上方完成，此处为冗余代码，移除以避免覆盖彩虹渐变)
+
+        // 5. 内部细节
         if (config.cryo > 0) {
             ctx.shadowBlur = 0;
             ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
@@ -6092,6 +6494,7 @@ class Projectile {
             if (shapeType === 'arrow') {
                 ctx.moveTo(0, -radius * 0.25); ctx.lineTo(radius*0.3, 0); ctx.lineTo(0, radius*0.25); ctx.lineTo(-radius*0.3, 0);
             } else if (shapeType === 'crystal') {
+                // 如果是菱形，内部画个小菱形高光
                 ctx.moveTo(0, -radius * 0.6); 
                 ctx.lineTo(radius * 0.3, 0); 
                 ctx.lineTo(0, radius * 0.6); 
@@ -6105,66 +6508,103 @@ class Projectile {
             }
             ctx.fill();
         }
+
+        // --- [视觉修改]：绘制裂纹 ---
+        // 只有当完整度低于 60% 时才开始出现裂纹
         if (integrity < 0.6 && crackSeed && crackSeed.length > 0) {
             ctx.save();
-            ctx.shadowBlur = 0; 
-            ctx.lineWidth = 1.5; 
+            ctx.shadowBlur = 0; // 裂纹没有光晕
+            ctx.lineWidth = 1.5; // 裂纹宽度
+            // 裂纹颜色：深色，带一点点 glowColor 的余光
             ctx.strokeStyle = 'rgba(30, 41, 59, 0.8)'; 
+            
+            // 剪切路径，保证裂纹只画在子弹内部
             ctx.clip(); 
+
             crackSeed.forEach(seed => {
                 ctx.beginPath();
-                ctx.moveTo(0, 0); 
+                ctx.moveTo(0, 0); // 从中心裂开
+                // 计算裂纹终点
                 const r = radius * seed.len;
                 const endX = Math.cos(seed.angle) * r;
                 const endY = Math.sin(seed.angle) * r;
+                
+                // 画一个折线，增加破碎感
                 const midX = endX * 0.5 + Math.cos(seed.angle + Math.PI/2) * (radius * seed.jagged);
                 const midY = endY * 0.5 + Math.sin(seed.angle + Math.PI/2) * (radius * seed.jagged);
+                
                 ctx.lineTo(midX, midY);
                 ctx.lineTo(endX, endY);
                 ctx.stroke();
             });
             ctx.restore();
         }
+        
+        // --- [视觉修改]：如果弹性耗尽，绘制一个沉重的外边框 ---
+        // 判断逻辑：如果 config 里本来有弹性，但现在 integrity 很低
         if (config.bounce > 0 && integrity < 0.2) {
-            ctx.strokeStyle = '#475569'; 
+            ctx.strokeStyle = '#475569'; // 铁灰色
             ctx.lineWidth = 2;
-            ctx.stroke(); 
+            ctx.stroke(); // 给圆球画个圈，表示它变成了实心铁球，不再Q弹
         }
+        // --- [新增/修改]：子弹的狂暴电弧特效 ---
         if (config.lightning > 0) {
             ctx.save();
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            ctx.globalCompositeOperation = 'lighter'; 
+            ctx.globalCompositeOperation = 'lighter'; // 高亮叠加
+
+            // 1. 动态数量：层数越高，电弧越多
+            // 子弹飞行速度快，每帧刷新会导致电弧疯狂跳动，这正符合“球状闪电”的不稳定感
             const arcCount = 1 + Math.floor(config.lightning / 2);
+
             ctx.shadowBlur = 8 + config.lightning;
-            ctx.shadowColor = '#a855f7'; 
-            ctx.strokeStyle = '#e9d5ff'; 
+            ctx.shadowColor = '#a855f7'; // Purple-500
+            ctx.strokeStyle = '#e9d5ff'; // Purple-200 (同款高亮紫)
+            
             for (let k = 0; k < arcCount; k++) {
                 ctx.beginPath();
+                
+                // 随机起始角度
                 const startAngle = Math.random() * Math.PI * 2;
+                // 弧长比 DropBall 小一点，显得更紧凑
                 const arcLen = 0.5 + Math.random() * 0.5; 
+                
+                // 3~5 段折线
                 const segments = 3 + Math.floor(Math.random() * 2);
+
                 for (let i = 0; i <= segments; i++) {
                     const t = i / segments;
                     const currentAngle = startAngle + t * arcLen;
+                    
+                    // 悬浮距离：半径的 1.1 ~ 1.4 倍
+                    // 加上 deformation 修正，确保电弧跟随子弹被压扁/拉长
                     const jitter = (Math.random() - 0.5) * (radius * 0.3);
                     const dist = radius * 1.2 + jitter;
+                    
                     const px = Math.cos(currentAngle) * dist;
                     const py = Math.sin(currentAngle) * dist;
+                    
                     if (i === 0) ctx.moveTo(px, py);
                     else ctx.lineTo(px, py);
                 }
+                
+                // 线条稍微细一点，因为子弹本来就小
                 ctx.lineWidth = 0.8 + Math.random() * 1.2;
                 ctx.stroke();
             }
+            
+            // 偶尔的核心闪烁 (High Voltage Flicker)
             if (Math.random() < 0.2) {
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
                 ctx.beginPath();
                 ctx.arc(0, 0, radius * 0.8, 0, Math.PI * 2);
                 ctx.fill();
             }
+
             ctx.restore();
         }
+
         if (config.isMatryoshka) {
             ctx.shadowBlur = 0;
             ctx.fillStyle = '#d946ef'; 
@@ -6172,9 +6612,93 @@ class Projectile {
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; 
             ctx.beginPath(); ctx.arc(0, 0, radius*0.8, 0, Math.PI*2); ctx.stroke();
         }
+
         ctx.restore();
     }
 
+    /**
+     * 执行范围斩击 (AOE)
+     * @param {Enemy} target - 触发斩击的主要目标 (通常是被穿透的敌人)
+     * @param {Enemy[]} enemies - 游戏中的所有敌人列表
+     */
+    performSlashAttack(target, enemies) {
+        // 1. 确定斩击参数
+        // 角度：在目标周围随机，或者垂直于子弹飞行方向 (这里使用完全随机，更有乱舞的感觉)
+        const angle = Math.random() * Math.PI * 2;
+        const length = 160; // 斩击长度
+        const width = 40;   // 斩击判定的宽度 (宽一点容错率高)
+
+        // 2. 计算线段起点 (p1) 和终点 (p2)
+        const center = target.pos;
+        const halfLen = length / 2;
+        const dir = new Vec2(Math.cos(angle), Math.sin(angle));
+
+        const p1 = center.add(dir.mult(-halfLen));
+        const p2 = center.add(dir.mult(halfLen));
+
+        // 3. 视觉特效：添加 SlashEffect 到粒子系统
+        if (typeof game !== 'undefined') {
+            // [修复] 根据属性决定颜色，优先级：雷 > 火/冰
+            let slashColor = CONFIG.colors.flying_sword || '#0ea5e9';
+            if (this.config.lightning > 0) slashColor = '#c084fc'; // 雷属性最高优先级
+            else if (this.config.pyro > 0) slashColor = '#f97316';
+            else if (this.config.cryo > 0) slashColor = '#06b6d4';
+
+            game.particles.push(new SlashEffect(center.x, center.y, angle, length, slashColor));
+
+            // 播放音效 (如果没有专门的斩击音效，用 split 或 hit)
+            audio.playSlash();
+        }
+
+        // 4. 伤害判定：线段与圆的碰撞检测
+        // 我们需要检测线段 p1-p2 是否与敌人(圆形)相交
+        enemies.forEach(other => {
+            if (!other.active) return;
+
+            // 算法：计算敌人中心点 (E) 到线段 (p1-p2) 的最短距离
+            const E = other.pos;
+            const AB = p2.sub(p1);      // 向量 p1 -> p2
+            const AE = E.sub(p1);       // 向量 p1 -> E
+
+            // 计算投影比例 t
+            // t = (AE . AB) / (AB . AB)
+            const lenSq = AB.dot(AB);
+            let t = (lenSq === 0) ? -1 : AE.dot(AB) / lenSq;
+
+            // 限制 t 在 [0, 1] 之间，找到线段上最近的点 Closest
+            t = Math.max(0, Math.min(1, t));
+
+            const closest = p1.add(AB.mult(t));
+            const dist = E.dist(closest); // 敌人到线段的距离
+
+            // 判定半径 = 敌人半径 + 斩击宽度的一半
+            const hitRadius = (other.width / 2) + (width / 2);
+
+            if (dist < hitRadius) {
+                // 命中！
+                // 伤害减半 (AOE通常伤害较低)，并不触发反弹/穿透消耗
+                const slashConfig = {
+                    ...this.config,
+                    damage: Math.ceil(this.config.damage * 0.6)
+                };
+
+                // 使用 isCopy=true 防止伤害统计异常或无限触发
+                game.combat_damageEnemy(other, {
+                    config: slashConfig,
+                    pos: closest, // 击中点设为最近点，用于生成粒子
+                    isCopy: true
+                });
+
+                // 只有被斩击直接命中的非主目标，才添加标记
+                // (主目标 target 通常已经被母剑本体标记了)
+                if (other !== target) {
+                    other.addSwordMark(1);
+                }
+            }
+        });
+    }
+}
+// --- 新增：分身孢子動畫實體 ---
 class CloneSpore {
     constructor(startX, startY, targetX, targetY, onLandCallback) {
         this.start = new Vec2(startX, startY);
@@ -7566,39 +8090,6 @@ class Game {
             this.ctx.beginPath(); this.ctx.moveTo(0, y); this.ctx.lineTo(this.width, y); this.ctx.stroke();
         }
         this.ctx.restore();
-
-        // [新增] 渲染风属性锚点
-        if (this.windAnchors && this.windAnchors.length > 0) {
-            this.ctx.save();
-            this.ctx.strokeStyle = 'rgba(52, 211, 153, 0.5)';
-            this.ctx.lineWidth = 2;
-            this.ctx.setLineDash([5, 5]);
-            
-            // 连线
-            if (this.windAnchors.length > 1) {
-                this.ctx.beginPath();
-                this.ctx.moveTo(this.windAnchors[0].x, this.windAnchors[0].y);
-                for (let i = 1; i < this.windAnchors.length; i++) {
-                    this.ctx.lineTo(this.windAnchors[i].x, this.windAnchors[i].y);
-                }
-                if (this.windAnchors.length === 4) this.ctx.closePath();
-                this.ctx.stroke();
-            }
-            
-            // 绘制锚点
-            this.windAnchors.forEach((a, idx) => {
-                this.ctx.fillStyle = '#34d399';
-                this.ctx.beginPath();
-                this.ctx.arc(a.x, a.y, 4, 0, Math.PI * 2);
-                this.ctx.fill();
-                
-                // 编号
-                this.ctx.fillStyle = '#ffffff';
-                this.ctx.font = '10px Arial';
-                this.ctx.fillText(idx + 1, a.x + 6, a.y - 6);
-            });
-            this.ctx.restore();
-        }
     }
 
     /**
@@ -8428,155 +8919,6 @@ class Game {
      * @param {object} projectile - 造成伤害的弹丸或来源对象。
      * @returns {number} 实际造成的伤害值。
      */
-    /**
-     * @method combat_wind_addAnchor
-     * @description 添加风属性锚点，并处理法阵逻辑
-     */
-    combat_wind_addAnchor(x, y) {
-        if (this.windAnchors.length >= 4) {
-            const old = this.windAnchors.shift();
-            this.combat_wind_triggerAnchorExplosion(old.x, old.y);
-        }
-        this.windAnchors.push({ x, y, life: 1.0 });
-        this.spawn_createParticle(x, y, '#34d399', 'spark');
-        if (this.windAnchors.length === 4) {
-            this.combat_wind_triggerMagicCircle();
-        }
-    }
-
-    combat_wind_triggerAnchorExplosion(x, y) {
-        this.spawn_createExplosion(x, y, '#34d399', 40);
-        const dmg = 5;
-        this.enemies.forEach(e => {
-            if (e.active && e.pos.dist(new Vec2(x, y)) < 60) {
-                e.takeDamage(dmg);
-            }
-        });
-    }
-
-    combat_wind_triggerMagicCircle() {
-        const anchors = this.windAnchors;
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        anchors.forEach(a => {
-            minX = Math.min(minX, a.x); maxX = Math.max(maxX, a.x);
-            minY = Math.min(minY, a.y); maxY = Math.max(maxY, a.y);
-        });
-        const width = maxX - minX;
-        const height = maxY - minY;
-        const area = width * height;
-        const ratio = Math.max(width/height, height/width);
-        let sizeType = area < 15000 ? 'small' : 'large';
-        let shapeType = ratio < 1.5 ? 'square' : 'rect';
-        const currentRecipe = this.projectiles.find(p => p.config.wind)?.config || { wind: true };
-        let element = 'wind';
-        if (currentRecipe.explosive) element = 'wind_explosive';
-        else if (currentRecipe.laser > 0) element = 'wind_light';
-        this.combat_wind_executeCircleEffect(minX, minY, width, height, sizeType, shapeType, element);
-        this.windAnchors = [];
-    }
-
-    combat_wind_executeCircleEffect(x, y, w, h, size, shape, element) {
-        const centerX = x + w/2;
-        const centerY = y + h/2;
-        if (size === 'small') {
-            if (element === 'wind') {
-                const hasEnemy = this.enemies.some(e => e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h);
-                if (hasEnemy) {
-                    this.spawn_createFloatingText(centerX, centerY, "🌪️旋风", "#34d399");
-                    for(let i=0; i<5; i++) {
-                        setTimeout(() => {
-                            this.enemies.forEach(e => {
-                                if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
-                                    e.takeDamage(2);
-                                    e.applyTemp(e.temp * 0.1);
-                                }
-                            });
-                        }, i * 200);
-                    }
-                }
-            } else if (element === 'wind_explosive') {
-                this.spawn_createFloatingText(centerX, centerY, "🧨不稳定气流", "#fca5a5");
-                for(let i=0; i<3; i++) {
-                    this.spawn_createExplosion(x + Math.random()*w, y + Math.random()*h, '#fca5a5');
-                }
-            } else if (element === 'wind_light') {
-                this.spawn_createFloatingText(centerX, centerY, "🕳️黑洞", "#0ea5e9");
-                this.enemies.forEach(e => {
-                    if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
-                        e.takeDamage(9999);
-                    }
-                });
-            }
-        } else if (shape === 'square') {
-            if (element === 'wind') {
-                this.spawn_createFloatingText(centerX, centerY, "🌪️大旋风", "#34d399");
-                this.enemies.forEach(e => {
-                    if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
-                        let dmg = 20;
-                        if (e.temp >= 100) { dmg *= 2; e.applyTemp(-50); this.spawn_createFloatingText(e.pos.x, e.pos.y, "🔥火旋风", "#f97316"); }
-                        else if (e.temp <= -100) { dmg *= 2; e.applyTemp(50); this.spawn_createFloatingText(e.pos.x, e.pos.y, "❄️冰旋风", "#06b6d4"); }
-                        e.takeDamage(dmg);
-                    }
-                });
-            } else if (element === 'wind_explosive') {
-                this.spawn_createFloatingText(centerX, centerY, "💥内爆", "#fca5a5");
-                this.enemies.forEach(e => {
-                    if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
-                        e.takeDamage(15);
-                        const dir = e.pos.sub(new Vec2(centerX, centerY)).norm();
-                        e.pos = e.pos.add(dir.mult(40));
-                    }
-                });
-            } else if (element === 'wind_light') {
-                this.spawn_createFloatingText(centerX, centerY, "🛡️屏障", "#0ea5e9");
-                this.enemies.forEach(e => {
-                    if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
-                        e.takeDamage(30);
-                    }
-                });
-            }
-        } else {
-            const isHorizontal = w > h;
-            if (element === 'wind') {
-                this.spawn_createFloatingText(centerX, centerY, "🌬️风道", "#34d399");
-                this.enemies.forEach(e => {
-                    const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
-                    if (e.active && inPath) {
-                        e.takeDamage(10);
-                        this.enemies.forEach(other => {
-                            if (other !== e && other.active) {
-                                const dist = e.pos.dist(other.pos);
-                                if (dist < 200) {
-                                    const transfer = e.temp * (1 - dist/200) * 0.2;
-                                    other.applyTemp(transfer);
-                                    e.applyTemp(-transfer);
-                                }
-                            }
-                        });
-                    }
-                });
-            } else if (element === 'wind_explosive') {
-                this.spawn_createFloatingText(centerX, centerY, "🌊冲击波", "#fca5a5");
-                this.enemies.forEach(e => {
-                    const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
-                    if (e.active && inPath) {
-                        e.takeDamage(20);
-                        const pushDir = isHorizontal ? new Vec2(1, 0) : new Vec2(0, 1);
-                        e.pos = e.pos.add(pushDir.mult(60));
-                    }
-                });
-            } else if (element === 'wind_light') {
-                this.spawn_createFloatingText(centerX, centerY, "⚡离子风暴", "#0ea5e9");
-                this.enemies.forEach(e => {
-                    const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
-                    if (e.active && inPath) {
-                        e.takeDamage(25);
-                        this.spawn_createParticle(e.pos.x, e.pos.y, '#c084fc', 'spark');
-                    }
-                });
-            }
-        }
-    }
     combat_damageEnemy(enemy, projectile) {
         if (!enemy || !enemy.active) return; 
         // --- [修復]：如果是光球/偽造子彈，補齊 chainHistory 防止報錯 ---
