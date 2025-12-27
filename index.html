@@ -8083,7 +8083,7 @@ class Game {
     render_singleWindMatrix(matrix) {
         if (!matrix || !matrix.active) return;
 
-        const { timer, maxTimer, rect, type, anchors } = matrix;
+        const { timer, maxTimer, rect, type, anchors, tunnelVector } = matrix;
         
         // 使用 Exponential Easing (急剧加速)，模拟暴风瞬间成型
         const t = 1 - (timer / maxTimer);
@@ -8122,54 +8122,63 @@ class Game {
         if (type === 'tunnel') {
             // === 风道：音爆风洞 (Sonic Tunnel) ===
             const isHorizontal = rect.w > rect.h;
-            const speed = time * 3; // 极速流动
             const canvasW = this.canvas.width;
             const canvasH = this.canvas.height;
+            const centerX = rect.x + rect.w/2;
+            const centerY = rect.y + rect.h/2;
             
             // 1. 绘制「切裂气流」(Sharp Stream Lines)
             const lineCount = 8;
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 2;
             
             for(let i=0; i<lineCount; i++) {
                 const p = (i / lineCount);
                 ctx.beginPath();
-                const grad = ctx.createLinearGradient(0, 0, isHorizontal?canvasW:0, isHorizontal?0:canvasH);
-                grad.addColorStop(0, 'rgba(52, 211, 153, 0)');
-                grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.9)'); // 核心亮白
-                grad.addColorStop(1, 'rgba(52, 211, 153, 0)');
-                ctx.strokeStyle = grad;
                 
+                let grad;
                 if (isHorizontal) {
+                    grad = ctx.createLinearGradient(0, centerY - rect.h/2, 0, centerY + rect.h/2);
+                    grad.addColorStop(0, 'rgba(52, 211, 153, 0)');
+                    grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.6)');
+                    grad.addColorStop(1, 'rgba(52, 211, 153, 0)');
+                    
                     const y = rect.y + rect.h * p;
                     const turb = Math.sin(time/50 + i) * 5; 
                     ctx.moveTo(0, y + turb);
                     ctx.lineTo(canvasW, y + turb);
                 } else {
+                    grad = ctx.createLinearGradient(centerX - rect.w/2, 0, centerX + rect.w/2, 0);
+                    grad.addColorStop(0, 'rgba(52, 211, 153, 0)');
+                    grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.6)');
+                    grad.addColorStop(1, 'rgba(52, 211, 153, 0)');
+                    
                     const x = rect.x + rect.w * p;
                     const turb = Math.sin(time/50 + i) * 5;
                     ctx.moveTo(x + turb, 0);
                     ctx.lineTo(x + turb, canvasH);
                 }
+                
+                ctx.strokeStyle = grad;
                 ctx.stroke();
             }
             
-            // 2. 绘制「风锥」(Mach Cones) - 模拟突破音障的锐利三角形
+            // 2. 绘制「风锥」(Mach Cones)
             const coneCount = 4;
-            ctx.fillStyle = `rgba(209, 250, 229, ${0.4 + progress * 0.4})`;
+            ctx.fillStyle = `rgba(209, 250, 229, ${0.2 + progress * 0.3})`;
             for(let k=0; k<coneCount; k++) {
-                const conePos = ((time / 300) + k/coneCount) % 1; // 快速移动
+                const conePos = ((time / 300) + k/coneCount) % 1;
                 const size = 30;
                 
                 ctx.beginPath();
                 if (isHorizontal) {
                     const cx = conePos * canvasW;
-                    const cy = rect.y + rect.h/2 + (k%2===0?1:-1)*20; // 交错排列
+                    const cy = centerY + (k%2===0?1:-1)*20;
                     ctx.moveTo(cx + size, cy);
                     ctx.lineTo(cx - size, cy - size/3);
-                    ctx.lineTo(cx - size + 10, cy); // 内凹，像战机尾焰
+                    ctx.lineTo(cx - size + 10, cy);
                     ctx.lineTo(cx - size, cy + size/3);
                 } else {
-                    const cx = rect.x + rect.w/2 + (k%2===0?1:-1)*20;
+                    const cx = centerX + (k%2===0?1:-1)*20;
                     const cy = conePos * canvasH;
                     ctx.moveTo(cx, cy + size);
                     ctx.lineTo(cx - size/3, cy - size);
@@ -8183,7 +8192,7 @@ class Game {
             ctx.fillStyle = `rgba(255,255,255, ${progress})`;
             ctx.font = "bold 20px Cinzel";
             ctx.textAlign = "center";
-            ctx.fillText("SONIC TUNNEL", rect.x + rect.w/2, rect.y + rect.h/2);
+            ctx.fillText("SONIC TUNNEL", centerX, centerY);
 
         } else if (type === 'cyclone') {
             // === 旋风：绞肉机法阵 (Shredder Circle) ===
@@ -9246,9 +9255,11 @@ class Game {
         const ratio = Math.max(rect.w / rect.h, rect.h / rect.w);
 
         let type = 'burst';
-        if (area >= 15000) {
-            if (ratio >= 1.5) type = 'tunnel';
-            else type = 'cyclone';
+        // [优化]：宽高比超过 3 判定为风道，否则根据面积判定旋风或爆破
+        if (ratio >= 3.0) {
+            type = 'tunnel';
+        } else if (area >= 15000) {
+            type = 'cyclone';
         }
 
         // 获取当前元素类型
@@ -9256,6 +9267,19 @@ class Game {
         let element = 'wind';
         if (currentRecipe.explosive) element = 'wind_explosive';
         else if (currentRecipe.laser > 0) element = 'wind_light';
+
+        // [优化]：为风道计算长轴中线矢量
+        let tunnelVector = null;
+        if (type === 'tunnel') {
+            const isHorizontal = rect.w > rect.h;
+            if (isHorizontal) {
+                // 水平风道：从中线左侧指向右侧
+                tunnelVector = { start: new Vec2(minX, minY + rect.h/2), end: new Vec2(maxX, minY + rect.h/2), dir: new Vec2(1, 0) };
+            } else {
+                // 垂直风道：从中线顶部指向底部
+                tunnelVector = { start: new Vec2(minX + rect.w/2, minY), end: new Vec2(minX + rect.w/2, maxY), dir: new Vec2(0, 1) };
+            }
+        }
 
         // 4. 创建独立的法阵实例对象
         const newMatrix = {
@@ -9267,11 +9291,12 @@ class Game {
             rect: rect,
             anchors: anchors,
             element: element,
+            tunnelVector: tunnelVector, // 存储矢量信息
             // 5. 伤害回调
             onComplete: () => {
                 let sizeType = area < 15000 ? 'small' : 'large';
                 let shapeType = ratio < 1.5 ? 'square' : 'rect';
-                this.combat_wind_executeCircleEffect(minX, minY, rect.w, rect.h, sizeType, shapeType, element);
+                this.combat_wind_executeCircleEffect(minX, minY, rect.w, rect.h, sizeType, shapeType, element, tunnelVector);
             }
         };
 
@@ -9289,7 +9314,7 @@ class Game {
         // if (this.soundManager) this.soundManager.playEffect('lock');
     }
 
-    combat_wind_executeCircleEffect(x, y, w, h, size, shape, element) {
+    combat_wind_executeCircleEffect(x, y, w, h, size, shape, element, tunnelVector = null) {
         const centerX = x + w/2;
         const centerY = y + h/2;
 
@@ -9434,61 +9459,47 @@ class Game {
             }
         } else {
             const isHorizontal = w > h;
+            // [优化]：使用计算出的矢量方向，如果没有则回退到默认
+            const dir = tunnelVector ? tunnelVector.dir : (isHorizontal ? new Vec2(1, 0) : new Vec2(0, 1));
+            
             if (element === 'wind') {
                 this.spawn_createFloatingText(centerX, centerY, "🌬️风道", "#34d399");
                 
-                // [核心优化]：绘制流动的波纹底色
+                // [核心优化]：绘制流动的波纹底色 (沿中线全屏)
                 this.drawWindTunnelFlow({x, y, w, h}, isHorizontal);
 
-                // [优化]：添加横穿全屏的风道粒子特效
+                // [优化]：添加横穿全屏的风道粒子特效 (沿矢量方向)
                 const canvasW = this.canvas.width;
                 const canvasH = this.canvas.height;
                 
-                if (isHorizontal) {
-                    // 水平风道 (全屏)
-                    for(let i=0; i<60; i++) {
-                        const px = Math.random() * canvasW;
-                        const py = centerY + (Math.random() - 0.5) * h * 0.8;
-                        const p = this.spawn_createParticle(px, py, '#f0fdf4', 'spark');
-                        if (p && p.vel) {
-                            p.vel = new Vec2(15 + Math.random() * 10, (Math.random() - 0.5) * 2);
-                            p.life = 0.8;
-                        }
+                for(let i=0; i<80; i++) {
+                    let px, py;
+                    if (isHorizontal) {
+                        px = Math.random() * canvasW;
+                        py = centerY + (Math.random() - 0.5) * h;
+                    } else {
+                        px = centerX + (Math.random() - 0.5) * w;
+                        py = Math.random() * canvasH;
                     }
-                } else {
-                    // 垂直风道 (全屏)
-                    for(let i=0; i<60; i++) {
-                        const px = centerX + (Math.random() - 0.5) * w * 0.8;
-                        const py = Math.random() * canvasH;
-                        const p = this.spawn_createParticle(px, py, '#f0fdf4', 'spark');
-                        if (p && p.vel) {
-                            p.vel = new Vec2((Math.random() - 0.5) * 2, 15 + Math.random() * 10);
-                            p.life = 0.8;
-                        }
+                    const p = this.spawn_createParticle(px, py, '#f0fdf4', 'line');
+                    if (p && p.vel) {
+                        const speed = 20 + Math.random() * 15;
+                        p.vel = dir.mult(speed);
+                        p.scale = isHorizontal ? {x: 50, y: 0.5} : {x: 0.5, y: 50};
+                        p.life = 1.0;
                     }
                 }
+
                 this.enemies.forEach(e => {
+                    // [优化]：判定是否在全屏中线路径上
                     const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
-                        if (e.active && inPath) {
-                        // 风道伤害挂钩子弹伤害 (例如 5 倍)
+                    if (e.active && inPath) {
                         const dmg = Math.max(1, Math.floor(bulletDamage * 5));
                         e.takeDamage(dmg);
                         this.spawn_createFloatingText(e.pos.x, e.pos.y, `Wind ${dmg}`, '#34d399');
-                        // 击退
-                        const pushDir = isHorizontal ? new Vec2(40, 0) : new Vec2(0, 40);
-                        this.combat_tryMoveEnemy(e, pushDir);
-                        // 添加命中特效
+                        // 沿矢量方向击退
+                        this.combat_tryMoveEnemy(e, dir.mult(40));
                         this.spawn_createParticle(e.pos.x, e.pos.y, '#34d399', 'spark');
-                        this.enemies.forEach(other => {
-                            if (other !== e && other.active) {
-                                const dist = e.pos.dist(other.pos);
-                                if (dist < 200) {
-                                    const transfer = e.temp * (1 - dist/200) * 0.2;
-                                    other.applyTemp(transfer);
-                                    e.applyTemp(-transfer);
-                                }
-                            }
-                        });
                     }
                 });
             } else if (element === 'wind_explosive') {
