@@ -7493,6 +7493,17 @@ class Game {
         this.fireWaves = []; // 新增火焰波數組
         this.sonSwords = [];
         this.windAnchors = []; // 风属性锥点数组
+        // 风属性法阵激活状态
+        this.windMatrix = {
+            active: false,      // 是否正在激活中
+            timer: 0,           // 计时器
+            duration: 40,       // 激活过程持续帧数 (约0.6秒)
+            maxTimer: 40,       // 最大计时器值（用于计算进度）
+            type: null,         // 'tunnel' (风道), 'cyclone' (旋风), 'burst' (爆破)
+            rect: null,         // 法阵区域 {x, y, w, h}
+            anchors: [],        // 参与的锚点坐标
+            callback: null      // 动画结束后执行的实际伤害函数
+        };
         // --- [修改] 发射与装填物理状态 ---
         this.isChargingShot = false;    // 蓄力吸收中
         this.chargeProgress = 0;        // 0 -> 1
@@ -7796,6 +7807,20 @@ class Game {
         // 5.5 风属性锥点渲柑（仅在战斗阶段）
         if (this.phase === 'combat') {
             this.render_windAnchors();
+            
+            // 5.6 风属性法阵激活状态更新与渲柑
+            if (this.windMatrix && this.windMatrix.active) {
+                this.windMatrix.timer--;
+                
+                // 渲柑阵法预兆特效
+                this.render_windMatrixActivation();
+                
+                // 倒计时结束，触发真正的技能
+                if (this.windMatrix.timer <= 0) {
+                    this.windMatrix.active = false;
+                    if (this.windMatrix.callback) this.windMatrix.callback();
+                }
+            }
         }
 
         // 6. 下一帧请求
@@ -7944,6 +7969,130 @@ class Game {
             });
             this.ctx.restore();
         }
+    }
+
+    /**
+     * [RENDER] 绘制风属性法阵激活特效（预兆/咏唱阶段）
+     * @description 根据阵法类型（风道/旋风/爆破）显示不同的视觉预兆效果
+     */
+    render_windMatrixActivation() {
+        if (!this.windMatrix.active) return;
+
+        const { timer, maxTimer, rect, type, anchors } = this.windMatrix;
+        const progress = 1 - (timer / maxTimer); // 0.0 -> 1.0 进度
+        const ctx = this.ctx;
+
+        ctx.save();
+
+        // --- 1. 锚点连线的高亮 (Lock-on) ---
+        // 随着进度，连线越来越亮，最后发白
+        ctx.beginPath();
+        ctx.moveTo(anchors[0].x, anchors[0].y);
+        anchors.forEach(a => ctx.lineTo(a.x, a.y));
+        ctx.closePath();
+        
+        ctx.lineWidth = 3 + Math.sin(progress * Math.PI * 5) * 2; // 线条震动
+        ctx.strokeStyle = `rgba(167, 243, 208, ${0.5 + progress * 0.5})`; // 变亮
+        ctx.shadowBlur = 10 * progress;
+        ctx.shadowColor = '#fff';
+        ctx.stroke();
+
+        // --- 2. 阵法内部特效 (根据形状不同) ---
+        
+        // 设置裁剪区域，限制特效在法阵内
+        ctx.beginPath();
+        ctx.rect(rect.x, rect.y, rect.w, rect.h);
+        ctx.clip();
+
+        if (type === 'tunnel') {
+            // === 风道特效：指向性箭头流光 ===
+            // 判断是横向还是纵向
+            const isHorizontal = rect.w > rect.h;
+            const spacing = 40;
+            const offset = progress * spacing * 3; // 快速移动
+            
+            ctx.strokeStyle = `rgba(255, 255, 255, ${progress * 0.8})`;
+            ctx.lineWidth = 4;
+            
+            if (isHorizontal) {
+                // 画 >>>>> 箭头
+                for (let x = -spacing; x < rect.w; x += spacing) {
+                    let drawX = rect.x + (x + offset) % rect.w;
+                    ctx.beginPath();
+                    ctx.moveTo(drawX, rect.y);
+                    ctx.lineTo(drawX + 20, rect.y + rect.h / 2);
+                    ctx.lineTo(drawX, rect.y + rect.h);
+                    ctx.stroke();
+                }
+            } else {
+                // 画 vvvvv 箭头
+                for (let y = -spacing; y < rect.h; y += spacing) {
+                    let drawY = rect.y + (y + offset) % rect.h;
+                    ctx.beginPath();
+                    ctx.moveTo(rect.x, drawY);
+                    ctx.lineTo(rect.x + rect.w / 2, drawY + 20);
+                    ctx.lineTo(rect.x + rect.w, drawY);
+                    ctx.stroke();
+                }
+            }
+            
+            // 文字提示
+            ctx.fillStyle = `rgba(255,255,255, ${progress})`;
+            ctx.font = "bold 20px Cinzel";
+            ctx.textAlign = "center";
+            ctx.fillText("WIND TUNNEL", rect.x + rect.w/2, rect.y + rect.h/2);
+
+        } else if (type === 'cyclone') {
+            // === 旋风特效：旋转的魔法阵 ===
+            const centerX = rect.x + rect.w / 2;
+            const centerY = rect.y + rect.h / 2;
+            const radius = Math.min(rect.w, rect.h) * 0.4;
+            
+            ctx.translate(centerX, centerY);
+            ctx.rotate(progress * Math.PI * 4); // 旋转两圈
+            
+            // 外圈
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(52, 211, 153, ${progress})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // 内圈风刃
+            ctx.beginPath();
+            for(let i=0; i<3; i++) {
+                ctx.rotate(Math.PI * 2 / 3);
+                ctx.moveTo(0, 0);
+                ctx.quadraticCurveTo(radius/2, radius/2, radius, 0);
+            }
+            ctx.fillStyle = `rgba(167, 243, 208, ${progress * 0.5})`;
+            ctx.fill();
+            
+            // 恢复坐标系并写字 (不旋转文字)
+            ctx.rotate(-progress * Math.PI * 4 - (Math.PI * 2/3 * 3)); // 抵消旋转
+            ctx.translate(-centerX, -centerY);
+            
+            ctx.fillStyle = `rgba(255,255,255, ${progress})`;
+            ctx.font = "bold 20px Cinzel";
+            ctx.textAlign = "center";
+            ctx.fillText("CYCLONE", centerX, centerY);
+        } 
+        else {
+            // === 小范围爆破：高频闪烁 ===
+            const flash = Math.sin(progress * 20) > 0;
+            ctx.fillStyle = flash ? 'rgba(255, 255, 255, 0.3)' : 'rgba(52, 211, 153, 0.1)';
+            ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+            
+            // 添加文字提示
+            const centerX = rect.x + rect.w / 2;
+            const centerY = rect.y + rect.h / 2;
+            ctx.fillStyle = `rgba(255,255,255, ${progress})`;
+            ctx.font = "bold 16px Cinzel";
+            ctx.textAlign = "center";
+            ctx.fillText("BURST", centerX, centerY);
+        }
+
+        ctx.restore();
     }
 
     /**
@@ -8800,24 +8949,50 @@ class Game {
     }
 
     combat_wind_triggerMagicCircle() {
-        const anchors = this.windAnchors;
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        anchors.forEach(a => {
-            minX = Math.min(minX, a.x); maxX = Math.max(maxX, a.x);
-            minY = Math.min(minY, a.y); maxY = Math.max(maxY, a.y);
-        });
-        const width = maxX - minX;
-        const height = maxY - minY;
-        const area = width * height;
-        const ratio = Math.max(width/height, height/width);
-        let sizeType = area < 15000 ? 'small' : 'large';
-        let shapeType = ratio < 1.5 ? 'square' : 'rect';
+        if (this.windAnchors.length < 4) return;
+
+        // 1. 计算包围盒 (保持原有逻辑)
+        const xs = this.windAnchors.map(a => a.x);
+        const ys = this.windAnchors.map(a => a.y);
+        const minX = Math.min(...xs), maxX = Math.max(...xs);
+        const minY = Math.min(...ys), maxY = Math.max(...ys);
+        const rect = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+        const area = rect.w * rect.h;
+        const ratio = Math.max(rect.w / rect.h, rect.h / rect.w);
+
+        // 2. 判定阵法类型
+        let type = 'burst'; // 默认为小范围爆破
+        if (area >= 15000) {
+            if (ratio >= 1.5) type = 'tunnel';   // 长条 -> 风道
+            else type = 'cyclone';               // 方形 -> 旋风
+        }
+
+        // 获取当前元素类型
         const currentRecipe = this.projectiles.find(p => p.config.wind)?.config || { wind: true };
         let element = 'wind';
         if (currentRecipe.explosive) element = 'wind_explosive';
         else if (currentRecipe.laser > 0) element = 'wind_light';
-        this.combat_wind_executeCircleEffect(minX, minY, width, height, sizeType, shapeType, element);
-        this.windAnchors = [];
+
+        // 3. 启动"阵法生效"过程，而不是直接伤害
+        this.windMatrix = {
+            active: true,
+            timer: this.windMatrix.duration, // 倒计时开始
+            maxTimer: this.windMatrix.duration,
+            type: type,
+            rect: rect,
+            anchors: [...this.windAnchors], // 复制一份锚点用于绘制
+            // 将原本的伤害逻辑封装进 callback
+            callback: () => {
+                let sizeType = area < 15000 ? 'small' : 'large';
+                let shapeType = ratio < 1.5 ? 'square' : 'rect';
+                this.combat_wind_executeCircleEffect(minX, minY, rect.w, rect.h, sizeType, shapeType, element);
+                // 执行完后清空锚点
+                this.windAnchors = []; 
+            }
+        };
+        
+        // 播放一个"法阵充能"的音效
+        // this.soundManager.playTone(400, 'sine'); 
     }
 
     combat_wind_executeCircleEffect(x, y, w, h, size, shape, element) {
