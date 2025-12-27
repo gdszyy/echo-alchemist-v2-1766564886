@@ -7493,17 +7493,8 @@ class Game {
         this.fireWaves = []; // 新增火焰波數組
         this.sonSwords = [];
         this.windAnchors = []; // 风属性锥点数组
-        // 风属性法阵激活状态
-        this.windMatrix = {
-            active: false,      // 是否正在激活中
-            timer: 0,           // 计时器
-            duration: 40,       // 激活过程持续帧数 (约0.6秒)
-            maxTimer: 40,       // 最大计时器值（用于计算进度）
-            type: null,         // 'tunnel' (风道), 'cyclone' (旋风), 'burst' (爆破)
-            rect: null,         // 法阵区域 {x, y, w, h}
-            anchors: [],        // 参与的锚点坐标
-            callback: null      // 动画结束后执行的实际伤害函数
-        };
+        this.activeWindMatrices = []; // 活跃法阵列表 (支持多实例并行)
+        this.windMatrixDuration = 40; // 法阵激活持续帧数 (约0.6秒)
         // --- [修改] 发射与装填物理状态 ---
         this.isChargingShot = false;    // 蓄力吸收中
         this.chargeProgress = 0;        // 0 -> 1
@@ -7808,17 +7799,22 @@ class Game {
         if (this.phase === 'combat') {
             this.render_windAnchors();
             
-            // 5.6 风属性法阵激活状态更新与渲柑
-            if (this.windMatrix && this.windMatrix.active) {
-                this.windMatrix.timer--;
-                
-                // 渲柑阵法预兆特效
-                this.render_windMatrixActivation();
-                
-                // 倒计时结束，触发真正的技能
-                if (this.windMatrix.timer <= 0) {
-                    this.windMatrix.active = false;
-                    if (this.windMatrix.callback) this.windMatrix.callback();
+            // 5.6 风属性法阵激活状态更新与渲柑 (支持多实例并行)
+            for (let i = this.activeWindMatrices.length - 1; i >= 0; i--) {
+                const matrix = this.activeWindMatrices[i];
+                if (matrix.active) {
+                    matrix.timer--;
+                    
+                    // 渲柑该法阵实例的预兆特效
+                    this.render_windMatrixActivation(matrix);
+                    
+                    // 倒计时结束，触发真正的技能
+                    if (matrix.timer <= 0) {
+                        matrix.active = false;
+                        if (matrix.onComplete) matrix.onComplete();
+                        // 从活跃列表中移除
+                        this.activeWindMatrices.splice(i, 1);
+                    }
                 }
             }
         }
@@ -7974,11 +7970,12 @@ class Game {
     /**
      * [RENDER] 绘制风属性法阵激活特效（预兆/咏唱阶段）
      * @description 根据阵法类型（风道/旋风/爆破）显示不同的视觉预兆效果
+     * @param {object} matrix - 法阵实例对象
      */
-    render_windMatrixActivation() {
-        if (!this.windMatrix.active) return;
+    render_windMatrixActivation(matrix) {
+        if (!matrix || !matrix.active) return;
 
-        const { timer, maxTimer, rect, type, anchors } = this.windMatrix;
+        const { timer, maxTimer, rect, type, anchors } = matrix;
         const progress = 1 - (timer / maxTimer); // 0.0 -> 1.0 进度
         const ctx = this.ctx;
 
@@ -8922,6 +8919,36 @@ class Game {
      * @param {object} projectile - 造成伤害的弹丸或来源对象。
      * @returns {number} 实际造成的伤害值。
      */
+    // --- 几何工具方法 ---
+
+    // 检测线段 AB 和 CD 是否相交
+    checkLineIntersection(a, b, c, d) {
+        const cross = (x, y, z) => (y.x - x.x) * (z.y - x.y) - (y.y - x.y) * (z.x - x.x);
+        
+        // 快速排斥实验
+        if (Math.max(a.x, b.x) < Math.min(c.x, d.x) || Math.max(c.x, d.x) < Math.min(a.x, b.x) ||
+            Math.max(a.y, b.y) < Math.min(c.y, d.y) || Math.max(c.y, d.y) < Math.min(a.y, b.y)) {
+            return false;
+        }
+
+        // 跨立实验
+        const f1 = cross(a, b, c) * cross(a, b, d);
+        const f2 = cross(c, d, a) * cross(c, d, b);
+
+        // 如果两个叉积都小于0，说明线段互相跨越
+        return f1 < 0 && f2 < 0;
+    }
+
+    // 检测四边形是否自相交 (蝴蝶形/沙漏形)
+    isBowtieShape(anchors) {
+        if (anchors.length < 4) return false;
+        const p = anchors;
+        // 检查对边是否相交：(0-1) 与 (2-3)，以及 (1-2) 与 (3-0)
+        const cross1 = this.checkLineIntersection(p[0], p[1], p[2], p[3]);
+        const cross2 = this.checkLineIntersection(p[1], p[2], p[3], p[0]);
+        return cross1 || cross2;
+    }
+
     /**
      * @method combat_wind_addAnchor
      * @description 添加风属性锚点，并处理法阵逻辑
@@ -8949,22 +8976,31 @@ class Game {
     }
 
     combat_wind_triggerMagicCircle() {
+        // 1. 数量检查
         if (this.windAnchors.length < 4) return;
 
-        // 1. 计算包围盒 (保持原有逻辑)
-        const xs = this.windAnchors.map(a => a.x);
-        const ys = this.windAnchors.map(a => a.y);
+        // 2. [新增] 几何拓扑检查：如果是蝴蝶形/交叉形，则视为无效，不触发锁定
+        if (this.isBowtieShape(this.windAnchors)) {
+            // 可以在此处添加视觉或音效反馈提示形状无效
+            return; 
+        }
+
+        // --- 判定通过，开始锁定流程 ---
+
+        // 3. 计算形状属性
+        const anchors = [...this.windAnchors]; // 复制当前锚点，固化下来
+        const xs = anchors.map(a => a.x);
+        const ys = anchors.map(a => a.y);
         const minX = Math.min(...xs), maxX = Math.max(...xs);
         const minY = Math.min(...ys), maxY = Math.max(...ys);
         const rect = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
         const area = rect.w * rect.h;
         const ratio = Math.max(rect.w / rect.h, rect.h / rect.w);
 
-        // 2. 判定阵法类型
-        let type = 'burst'; // 默认为小范围爆破
+        let type = 'burst';
         if (area >= 15000) {
-            if (ratio >= 1.5) type = 'tunnel';   // 长条 -> 风道
-            else type = 'cyclone';               // 方形 -> 旋风
+            if (ratio >= 1.5) type = 'tunnel';
+            else type = 'cyclone';
         }
 
         // 获取当前元素类型
@@ -8973,26 +9009,32 @@ class Game {
         if (currentRecipe.explosive) element = 'wind_explosive';
         else if (currentRecipe.laser > 0) element = 'wind_light';
 
-        // 3. 启动"阵法生效"过程，而不是直接伤害
-        this.windMatrix = {
+        // 4. 创建独立的法阵实例对象
+        const newMatrix = {
+            id: Date.now() + Math.random(),
             active: true,
-            timer: this.windMatrix.duration, // 倒计时开始
-            maxTimer: this.windMatrix.duration,
+            timer: this.windMatrixDuration,
+            maxTimer: this.windMatrixDuration,
             type: type,
             rect: rect,
-            anchors: [...this.windAnchors], // 复制一份锚点用于绘制
-            // 将原本的伤害逻辑封装进 callback
-            callback: () => {
+            anchors: anchors,
+            element: element,
+            // 5. 伤害回调
+            onComplete: () => {
                 let sizeType = area < 15000 ? 'small' : 'large';
                 let shapeType = ratio < 1.5 ? 'square' : 'rect';
                 this.combat_wind_executeCircleEffect(minX, minY, rect.w, rect.h, sizeType, shapeType, element);
-                // 执行完后清空锚点
-                this.windAnchors = []; 
             }
         };
+
+        // 6. 推入活跃列表
+        this.activeWindMatrices.push(newMatrix);
         
-        // 播放一个"法阵充能"的音效
-        // this.soundManager.playTone(400, 'sine'); 
+        // 7. [关键] 消耗掉当前的锚点，以便立即开始构建下一个
+        this.windAnchors = []; 
+        
+        // 播放锁定音效 (如果已实现)
+        // if (this.soundManager) this.soundManager.playEffect('lock');
     }
 
     combat_wind_executeCircleEffect(x, y, w, h, size, shape, element) {
