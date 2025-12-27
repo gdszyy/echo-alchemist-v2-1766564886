@@ -9174,6 +9174,9 @@ class Game {
             this.currentShotDamageByAttr[attrType] = 0;
         }
         this.currentShotDamageByAttr[attrType] += amount;
+        
+        // 实时更新 combo 下方的伤害显示
+        this.ui_updateRoundDamage();
     }
     /**
      * @method addScore
@@ -9239,35 +9242,45 @@ class Game {
         const container = document.getElementById('round-damage-display');
         if (!el || !container) return;
         
-        const targetValue = this.currentShotDamage;
-        const currentValue = parseInt(el.innerText) || 0;
+        // 使用本回合实时累计伤害 (roundDamage)
+        const targetValue = Math.floor(this.roundDamage);
+        const currentValue = parseInt(el.innerText.replace(/,/g, '')) || 0;
         
         if (targetValue > 0) {
             container.classList.remove('opacity-0');
             container.classList.add('opacity-100');
             
+            // 如果差值较小，直接更新，避免频繁启动定时器
+            if (Math.abs(targetValue - currentValue) < 5) {
+                el.innerText = targetValue.toLocaleString();
+                return;
+            }
+
             // 滚动数字效果
-            const duration = 500; // 毫秒
-            const steps = 20;
+            if (this._damageScrollInterval) clearInterval(this._damageScrollInterval);
+            
+            const duration = 300; 
+            const steps = 10;
             const stepValue = (targetValue - currentValue) / steps;
             let currentStep = 0;
             
-            const interval = setInterval(() => {
+            this._damageScrollInterval = setInterval(() => {
                 currentStep++;
                 const newValue = Math.floor(currentValue + stepValue * currentStep);
-                el.innerText = newValue;
+                el.innerText = newValue.toLocaleString();
                 
                 if (currentStep >= steps) {
-                    clearInterval(interval);
-                    el.innerText = targetValue;
+                    el.innerText = targetValue.toLocaleString();
+                    clearInterval(this._damageScrollInterval);
                 }
             }, duration / steps);
         } else {
             container.classList.add('opacity-0');
             container.classList.remove('opacity-100');
+            el.innerText = '0';
         }
     }
-    
+
     /**
      * @method updateDamageStats
      * @description 更新伤害统计图表显示
@@ -9277,6 +9290,8 @@ class Game {
         if (!container) return;
         
         container.innerHTML = '';
+        // 强制容器为纵向布局，以便容纳顶部的回合切换栏
+        container.className = 'flex flex-col gap-2 h-full w-full p-2';
         
         // 获取当前查看的回合数据
         let currentData;
@@ -9300,69 +9315,83 @@ class Game {
         
         // 添加回合切换按钮
         const header = document.createElement('div');
-        header.className = 'w-full flex items-center justify-between mb-2 px-2';
+        header.className = 'w-full flex items-center justify-between mb-2 px-2 bg-slate-800/80 p-2 rounded-t-lg border-b border-slate-700';
         const canGoPrev = this.currentViewingRound < this.roundDamageHistory.length;
         const canGoNext = this.currentViewingRound > 0;
         header.innerHTML = `
-            <button onclick="game.ui_switchDamageRound(1)" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs ${!canGoPrev ? 'opacity-30 cursor-not-allowed' : ''}" ${!canGoPrev ? 'disabled' : ''}>◀</button>
-            <span class="text-sm font-bold text-purple-300">回合 ${roundNumber}</span>
-            <button onclick="game.ui_switchDamageRound(-1)" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs ${!canGoNext ? 'opacity-30 cursor-not-allowed' : ''}" ${!canGoNext ? 'disabled' : ''}>▶</button>
+            <button onclick="game.ui_switchDamageRound(1)" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm text-white transition-colors ${!canGoPrev ? 'opacity-30 cursor-not-allowed' : ''}" ${!canGoPrev ? 'disabled' : ''}>◀ 上一回合</button>
+            <span class="text-base font-bold text-purple-300">回合 ${roundNumber} ${this.currentViewingRound === 0 ? '(当前)' : ''}</span>
+            <button onclick="game.ui_switchDamageRound(-1)" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm text-white transition-colors ${!canGoNext ? 'opacity-30 cursor-not-allowed' : ''}" ${!canGoNext ? 'disabled' : ''}>下一回合 ▶</button>
         `;
         container.appendChild(header);
         
         // 创建子弹列容器
         const shotsContainer = document.createElement('div');
-        shotsContainer.className = 'flex gap-2 flex-1 overflow-x-auto';
+        shotsContainer.className = 'flex gap-3 flex-1 overflow-x-auto w-full pb-2';
         
-        // 最多显示3个子弹的统计
-        const shotsToShow = Math.max(3, currentData.length);
+        // 确保至少显示3个子弹的统计（骨架图）
+        const shotsToShow = 3;
         
         for (let i = 0; i < shotsToShow; i++) {
             const shotData = currentData[i];
             const column = document.createElement('div');
-            column.className = 'flex-1 bg-slate-800/50 rounded-lg p-3 flex flex-col';
+            column.className = 'flex-1 min-w-[180px] bg-slate-800/50 rounded-lg p-3 flex flex-col border border-slate-700/50';
             
             if (!shotData) {
                 // 骨架图
                 column.innerHTML = `
-                    <div class="text-center mb-2">
+                    <div class="text-center mb-2 pb-2 border-b border-slate-700/30">
                         <div class="text-xs text-slate-500">子弹 ${i + 1}</div>
+                        <div class="text-lg font-bold text-slate-700">---</div>
                     </div>
                     <div class="flex-1 flex items-center justify-center">
-                        <div class="text-slate-600 text-4xl">•••</div>
+                        <div class="text-slate-700 text-4xl opacity-20">•••</div>
                     </div>
                 `;
             } else {
                 // 显示实际数据
-                const maxDamage = Math.max(...currentData.map(s => s ? s.total : 0));
+                // 计算当前回合所有子弹中的最高属性伤害，用于归一化柱状图宽度
+                let maxAttrDamage = 0;
+                currentData.forEach(s => {
+                    if (s && s.byAttr) {
+                        Object.values(s.byAttr).forEach(d => {
+                            if (d > maxAttrDamage) maxAttrDamage = d;
+                        });
+                    }
+                });
                 
                 let attrBarsHtml = '';
                 const attrConfig = CONFIG.ui.attributeDisplay;
                 
-                for (const [attr, damage] of Object.entries(shotData.byAttr)) {
-                    const attrInfo = attrConfig[attr] || { name: attr, color: '#94a3b8' };
-                    const barWidth = maxDamage > 0 ? (damage / maxDamage * 100) : 0;
+                // 按伤害数值降序排列属性
+                const sortedAttrs = Object.entries(shotData.byAttr).sort((a, b) => b[1] - a[1]);
+                
+                for (const [attr, damage] of sortedAttrs) {
+                    if (damage <= 0) continue;
+                    const attrInfo = attrConfig[attr] || { name: attr, color: '#94a3b8', icon: '❓' };
+                    const barWidth = maxAttrDamage > 0 ? (damage / maxAttrDamage * 100) : 0;
                     
                     attrBarsHtml += `
-                        <div class="mb-1">
-                            <div class="flex justify-between text-[10px] mb-0.5">
-                                <span class="text-slate-400">${attrInfo.icon || ''} ${attrInfo.name}</span>
+                        <div class="mb-2">
+                            <div class="flex justify-between text-[11px] mb-1">
+                                <span class="text-slate-300 font-medium">${attrInfo.icon} ${attrInfo.name}</span>
+                                <span class="text-slate-400">${Math.ceil(damage).toLocaleString()}</span>
                             </div>
-                            <div class="relative h-4 bg-slate-900/50 rounded overflow-hidden">
-                                <div class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white z-10">${damage}</div>
-                                <div class="h-full rounded transition-all duration-300" style="width: ${barWidth}%; background: ${attrInfo.color};"></div>
+                            <div class="relative h-5 bg-slate-900/80 rounded-sm overflow-hidden border border-slate-700/30">
+                                <div class="h-full rounded-sm transition-all duration-500 ease-out" style="width: ${barWidth}%; background: ${attrInfo.color}; box-shadow: inset 0 0 10px rgba(0,0,0,0.2);"></div>
+                                <div class="absolute inset-0 flex items-center px-2 text-[10px] font-bold text-white drop-shadow-md z-10">${Math.ceil(damage)}</div>
                             </div>
                         </div>
                     `;
                 }
                 
                 column.innerHTML = `
-                    <div class="text-center mb-2 pb-2 border-b border-slate-700">
+                    <div class="text-center mb-3 pb-2 border-b border-slate-700">
                         <div class="text-xs text-slate-400 mb-1">子弹 ${i + 1}</div>
-                        <div class="text-lg font-bold text-purple-400">${shotData.total}</div>
+                        <div class="text-xl font-bold text-purple-400 drop-shadow-sm">${Math.ceil(shotData.total).toLocaleString()}</div>
                     </div>
-                    <div class="flex-1 overflow-y-auto space-y-1">
-                        ${attrBarsHtml}
+                    <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+                        ${attrBarsHtml || '<div class="text-center text-slate-600 text-xs mt-4">暂无伤害数据</div>'}
                     </div>
                 `;
             }
