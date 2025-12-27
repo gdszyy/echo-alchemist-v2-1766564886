@@ -10316,23 +10316,23 @@ class Game {
      * @method fireNextShot
      * @description 发射下一发弹丸 (处理多重射击)。
      * @param {Vec2} vel - **重要参数** 初始速度向量。
-     */
-    combat_fireNextShot(vel) { 
+     *    phase_combat_fireMarble(vel) {
         if (this.ammoQueue.length === 0) return;
 
-        // ... (套娃提取逻辑保持不变) ...
+        // [修复] 递归提取套娃配方，并确保使用深拷贝防止后续逻辑修改原始配方
         const pullNext = () => {
             if (this.ammoQueue.length === 0) return null;
             let r = this.ammoQueue.shift();
-            if (r.isMatryoshka) {
+            // 深拷贝配方对象，防止引用污染
+            const recipeCopy = JSON.parse(JSON.stringify(r));
+            if (recipeCopy.isMatryoshka) {
                 const nextR = pullNext();
-                if (nextR) r.nestedPayload = nextR;
+                if (nextR) recipeCopy.nestedPayload = nextR;
             }
-            return r;
+            return recipeCopy;
         };
         const finalRecipe = pullNext();
         if (!finalRecipe) return;
-
         // --- 新增：触发UI动画 ---
         const currentSlot = document.getElementById('current-ammo-render');
         if (currentSlot) {
