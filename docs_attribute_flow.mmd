@@ -32,6 +32,7 @@ graph TD
 
         subgraph "高级属性 (Advanced - 进化型)"
             E1[flying_sword<br>飞剑]
+            E2[wind<br>风]
         end
     end
 
@@ -40,6 +41,9 @@ graph TD
         B2 -- 突变 (Mutation)<br>pierce + pierce --> E1
         E1 -- 升级 (Upgrade) --> E1_LV2(飞剑 Lv.2)
         E1_LV2 -- 升级 (Upgrade) --> E1_LV3(飞剑 Lv.3)
+        
+        B1 -- 突变 (Mutation)<br>bounce + bounce --> E2
+        E2 -- 升级 (Upgrade) --> E2_LV2(风 Lv.2)
     end
 
     %% 关系定义 (Relationships)
@@ -55,4 +59,4 @@ graph TD
     class C1,C2,C3 elemental
     class D1,D2,D3,D4 special
     class F1 functional
-    class E1,E1_LV2,E1_LV3 advanced
+    class E1,E1_LV2,E1_LV3,E2,E2_LV2 advanced
