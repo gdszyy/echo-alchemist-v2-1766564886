@@ -5871,12 +5871,33 @@ if (Math.random() < 0.2) {
         if (this.pos.x < this.radius) { 
             this.pos.x = this.radius; 
             this.vel.x = Math.abs(this.vel.x); 
+            
+            // [优化] 防止左右墙近乎平行的无限反弹
+            // 如果垂直速度远大于水平速度（夹角小于10度），则每次反弹增加水平速度
+            const angle = Math.abs(Math.atan2(this.vel.x, this.vel.y));
+            if (angle < (10 * Math.PI / 180)) {
+                const speed = this.vel.mag();
+                const newAngle = angle + (1 * Math.PI / 180);
+                this.vel.x = speed * Math.sin(newAngle);
+                this.vel.y = speed * Math.cos(newAngle) * (this.vel.y > 0 ? 1 : -1);
+            }
+
             if(this.config.bounce > 0) this.deformation = { x: 0.7, y: 1.3 };
             this.hitCooldowns.clear()
         }
         if (this.pos.x > width - this.radius) { 
             this.pos.x = width - this.radius; 
             this.vel.x = -Math.abs(this.vel.x); 
+
+            // [优化] 防止左右墙近乎平行的无限反弹
+            const angle = Math.abs(Math.atan2(this.vel.x, this.vel.y));
+            if (angle < (10 * Math.PI / 180)) {
+                const speed = this.vel.mag();
+                const newAngle = angle + (1 * Math.PI / 180);
+                this.vel.x = -speed * Math.sin(newAngle);
+                this.vel.y = speed * Math.cos(newAngle) * (this.vel.y > 0 ? 1 : -1);
+            }
+
             if(this.config.bounce > 0) this.deformation = { x: 0.7, y: 1.3 };
             this.hitCooldowns.clear()
         }
@@ -6081,7 +6102,7 @@ if (Math.random() < 0.2) {
             else if (this.config.cryo) trailColor = '165, 243, 252'; 
             else if (this.config.pierce) trailColor = '252, 165, 165'; 
             else if (this.config.scatter) trailColor = '253, 224, 71'; 
-
+            
             for (let i = 0; i < this.trail.length - 1; i++) {
                 const p1 = this.trail[i];
                 const p2 = this.trail[i+1];
@@ -6094,25 +6115,31 @@ if (Math.random() < 0.2) {
                 // 1. 基础系数 (普通弹保持 0.6, 弹性弹保持 0.4)
                 let widthMod = this.config.bounce > 0 ? 0.2 : 0.42;
                 
-                // 2. 如果是爆破弹珠，强制使用极小的系数
-                // 因为爆破弹本来就很大，不能让拖尾跟着变大
+                // 2. [优化] 穿透子弹尾迹优化：减小尾迹宽度系数，防止遮挡箭头
+                if (this.config.pierce > 0) {
+                    widthMod = 0.25; 
+                }
+                
+                // 3. 如果是爆破弹珠，强制使用极小的系数
                 if (this.config.explosive) {
                     widthMod = 0.15; 
                 }
                 
-                // 3. 计算宽度
+                // 4. 计算宽度
                 let finalWidth = (this.radius * widthMod) * progress * integrity;
 
-                // 4. [绝对防线]：如果是爆破弹，设置一个像素级的硬上限
-                // 无论炸弹变得多巨大，拖尾最粗不能超过 4px
+                // 5. [绝对防线]：如果是爆破弹，设置一个像素级的硬上限
                 if (this.config.explosive) {
                     finalWidth = Math.min(finalWidth, 4); 
                 }
 
                 ctx.lineWidth = finalWidth;
                 
-                // 稍微降低一点透明度
-                ctx.strokeStyle = `rgba(${trailColor}, ${progress * 0.2 * integrity})`;
+                // 6. [优化] 穿透子弹尾迹透明度优化：降低透明度，使其更通透
+                let alpha = progress * 0.2 * integrity;
+                if (this.config.pierce > 0) alpha *= 0.6;
+
+                ctx.strokeStyle = `rgba(${trailColor}, ${alpha})`;
                 ctx.stroke();
             }
             ctx.restore();
@@ -6372,10 +6399,12 @@ if (Math.random() < 0.2) {
         // 3. 绘制形状
         ctx.beginPath();
         if (shapeType === 'arrow') {
-            ctx.moveTo(radius * 1.3, 0); 
-            ctx.lineTo(-radius * 0.8, radius * 0.5); 
-            ctx.lineTo(-radius * 0.4, 0); 
-            ctx.lineTo(-radius * 0.8, -radius * 0.5); 
+            // [优化] 增大箭头比例，使其在穿透层数高时依然清晰
+            const arrowScale = 1.8; 
+            ctx.moveTo(radius * arrowScale, 0); 
+            ctx.lineTo(-radius * 0.8, radius * 0.7); 
+            ctx.lineTo(-radius * 0.3, 0); 
+            ctx.lineTo(-radius * 0.8, -radius * 0.7); 
         } else if (shapeType === 'star') {
             for (let i = 0; i < 4; i++) {
                 ctx.rotate(Math.PI / 2);
