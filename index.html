@@ -9195,9 +9195,13 @@ class Game {
             
             // 判定命中 (考虑敌人体积)
             if (dist < radius + e.width / 2) {
-                // 1. 造成伤害
-                e.takeDamage(damage);
-                this.spawn_createFloatingText(e.pos.x, e.pos.y, `Wind ${damage}`, '#34d399');
+                // 1. 造成伤害 - 统一走 damageEnemy
+                this.combat_damageEnemy(e, { 
+                    config: { wind: 1, damage: damage }, 
+                    pos: e.pos, 
+                    isCopy: false,
+                    shotId: this._currentDamageShotId 
+                });
                 
                 // 2. 施加轻微推力 (击退效果)
                 // 计算从爆炸中心指向敌人的向量
@@ -9330,7 +9334,11 @@ class Game {
                             p.vel = tangent.mult(2);
                         }
                     }
-                    for(let i=0; i<5; i++) {
+                       // [修改] 旋风伤害次数与连射次数挂钩
+                    const multicastCount = this.currentSession ? (this.currentSession.multicast || 0) : 0;
+                    const tickCount = 5 + multicastCount; 
+                    
+                    for(let i=0; i<tickCount; i++) {
                         setTimeout(() => {
                             // 每次伤害时添加旋转粒子
                             for(let j=0; j<15; j++) {
@@ -9346,13 +9354,18 @@ class Game {
                             }
                             this.enemies.forEach(e => {
                                 if (e.active && e.pos.x > expandedX && e.pos.x < expandedX + expandedW && e.pos.y > expandedY && e.pos.y < expandedY + expandedH) {
-                                    const dmg = 2;
-                                    e.takeDamage(dmg);
-                                    this.spawn_createFloatingText(e.pos.x, e.pos.y, `Wind ${dmg}`, '#34d399');
+                                    // [修改] 统一走 damageEnemy，实现属性联动
+                                    const dmg = Math.max(1, Math.floor(bulletDamage * 0.5));
+                                    this.combat_damageEnemy(e, { 
+                                        config: { wind: 1, damage: dmg }, 
+                                        pos: e.pos, 
+                                        isCopy: false,
+                                        shotId: this._currentDamageShotId 
+                                    });
                                     e.applyTemp(e.temp * 0.1);
                                 }
                             });
-                        }, i * 200);
+                        }, i * 150); // 稍微加快频率
                     }
                 }
             } else if (element === 'wind_explosive') {
@@ -9365,8 +9378,12 @@ class Game {
                 this.enemies.forEach(e => {
                     if (e.active && e.pos.x > expandedX && e.pos.x < expandedX + expandedW && e.pos.y > expandedY && e.pos.y < expandedY + expandedH) {
                         const dmg = 9999;
-                        e.takeDamage(dmg);
-                        this.spawn_createFloatingText(e.pos.x, e.pos.y, `Void ${dmg}`, '#0ea5e9');
+                        this.combat_damageEnemy(e, { 
+                            config: { wind: 1, laser: 1, damage: dmg }, 
+                            pos: e.pos, 
+                            isCopy: false,
+                            shotId: this._currentDamageShotId 
+                        });
                     }
                 });
             }
@@ -9419,14 +9436,25 @@ class Game {
                                 if (k % 5 === 0) this.spawn_createParticle(px, py, '#e0f2fe', 'smoke');
                             }
                         }
-                        e.takeDamage(dmg);
+                        // [修改] 统一走 damageEnemy
+                        this.combat_damageEnemy(e, { 
+                            config: { wind: 1, damage: dmg }, 
+                            pos: e.pos, 
+                            isCopy: false,
+                            shotId: this._currentDamageShotId 
+                        });
                     }
                 });
             } else if (element === 'wind_explosive') {
                 this.spawn_createFloatingText(centerX, centerY, "💥内爆", "#fca5a5");
                 this.enemies.forEach(e => {
                     if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
-                        e.takeDamage(15);
+                        this.combat_damageEnemy(e, { 
+                            config: { wind: 1, explosive: true, damage: 15 }, 
+                            pos: e.pos, 
+                            isCopy: false,
+                            shotId: this._currentDamageShotId 
+                        });
                         const dir = e.pos.sub(new Vec2(centerX, centerY)).norm();
                         this.combat_tryMoveEnemy(e, dir.mult(40));
                     }
@@ -9435,7 +9463,12 @@ class Game {
                 this.spawn_createFloatingText(centerX, centerY, "🛡️屏障", "#0ea5e9");
                 this.enemies.forEach(e => {
                     if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
-                        e.takeDamage(30);
+                        this.combat_damageEnemy(e, { 
+                            config: { wind: 1, laser: 1, damage: 30 }, 
+                            pos: e.pos, 
+                            isCopy: false,
+                            shotId: this._currentDamageShotId 
+                        });
                     }
                 });
             }
@@ -9477,8 +9510,13 @@ class Game {
                     const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
                     if (e.active && inPath) {
                         const dmg = Math.max(1, Math.floor(bulletDamage * 5));
-                        e.takeDamage(dmg);
-                        this.spawn_createFloatingText(e.pos.x, e.pos.y, `Wind ${dmg}`, '#34d399');
+                        // [修改] 统一走 damageEnemy，去掉 "Wind" 飘字
+                        this.combat_damageEnemy(e, { 
+                            config: { wind: 1, damage: dmg }, 
+                            pos: e.pos, 
+                            isCopy: false,
+                            shotId: this._currentDamageShotId 
+                        });
                         // 沿矢量方向击退
                         this.combat_tryMoveEnemy(e, dir.mult(40));
                         this.spawn_createParticle(e.pos.x, e.pos.y, '#34d399', 'spark');
@@ -9490,8 +9528,12 @@ class Game {
                     const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
                     if (e.active && inPath) {
                         const dmg = Math.max(1, Math.floor(bulletDamage * 10));
-                        e.takeDamage(dmg);
-                        this.spawn_createFloatingText(e.pos.x, e.pos.y, `Blast ${dmg}`, '#fca5a5');
+                        this.combat_damageEnemy(e, { 
+                            config: { wind: 1, explosive: true, damage: dmg }, 
+                            pos: e.pos, 
+                            isCopy: false,
+                            shotId: this._currentDamageShotId 
+                        });
                         const pushDir = isHorizontal ? new Vec2(60, 0) : new Vec2(0, 60);
                         this.combat_tryMoveEnemy(e, pushDir);
                     }
@@ -9502,8 +9544,12 @@ class Game {
                     const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
                     if (e.active && inPath) {
                         const dmg = Math.max(1, Math.floor(bulletDamage * 12));
-                        e.takeDamage(dmg);
-                        this.spawn_createFloatingText(e.pos.x, e.pos.y, `Storm ${dmg}`, '#0ea5e9');
+                        this.combat_damageEnemy(e, { 
+                            config: { wind: 1, laser: 1, damage: dmg }, 
+                            pos: e.pos, 
+                            isCopy: false,
+                            shotId: this._currentDamageShotId 
+                        });
                         this.spawn_createParticle(e.pos.x, e.pos.y, '#c084fc', 'spark');
                     }
                 });
@@ -9595,6 +9641,12 @@ class Game {
         } else if (config.pierce > 0) {
             // 穿透：红色锐利碎片
             for(let i=0; i<5; i++) this.spawn_createParticle(hitX, hitY, '#fca5a5', 'spark');
+        } else if (config.wind > 0) {
+            // 风：生成青绿色气流粒子
+            for(let i=0; i<6; i++) {
+                const p = this.spawn_createParticle(hitX, hitY, '#34d399', 'spark');
+                if (p && p.vel) p.vel = p.vel.mult(1.5);
+            }
         } else {
             // 普通：生成基础粒子
             const color = config.damage > 5 ? '#d8b4fe' : '#e2e8f0';
@@ -9606,6 +9658,7 @@ class Game {
         else if (config.pyro > 0) hitType = 'pyro';
         else if (config.lightning > 0) hitType = 'lightning';
         else if (config.pierce > 0) hitType = 'pierce';
+        else if (config.wind > 0) hitType = 'wind';
         // --- 2. 伤害与状态逻辑 (保持原有逻辑) ---
         if (config.cryo > 0) enemy.applyTemp(-CONFIG.balance.cryoAmount * config.cryo); 
         if (config.pyro > 0) enemy.applyTemp(CONFIG.balance.pyroAmount * config.pyro); 
@@ -9654,6 +9707,10 @@ class Game {
         else if (config.scatter > 0) {
             damageAttr = 'scatter';
             damageColor = '#a78bfa';
+        }
+        else if (config.wind > 0) {
+            damageAttr = 'wind';
+            damageColor = '#34d399';
         }
         
         // 传递shotId到recordDamage
