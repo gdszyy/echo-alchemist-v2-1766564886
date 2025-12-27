@@ -2509,14 +2509,23 @@ class FortuneWheel {
         this.velocity = 0.4 + Math.random() * 0.2;
         this.angle = 0;
 
-        // 構建扇區 (保持不變)
+        // 構建扇區 (增加過濾邏輯，防止出現異常分區)
         this.slices = [];
         const counts = {};
+        
+        // 1. 統計有效屬性
         collectedAttributes.forEach(type => {
-            counts[type] = (counts[type] || 0) + 1;
+            if (type && CONFIG.ui.attributeDisplay[type]) {
+                counts[type] = (counts[type] || 0) + 1;
+            }
         });
 
-        const totalCount = Object.values(counts).reduce((a, b) => a + b, 0);
+        // 2. 計算總數
+        const validTypes = Object.keys(counts);
+        const totalCount = validTypes.reduce((sum, type) => sum + counts[type], 0);
+        
+        // 如果沒有有效屬性，不進行後續邏輯
+        if (totalCount === 0) return;
         let currentAngle = 0;
         
         // [修复] 动态构建 colorMap 和 iconMap，确保与全局配置同步
