@@ -6502,6 +6502,8 @@ class Particle {
         this.mode = mode;
         this.life = 1.0;
         this.maxLife = 1.0; 
+        this.turbulence = 0; // 湍流强度
+        this.wobble = Math.random() * Math.PI * 2; // 随机相位
         
         const angle = Math.random() * Math.PI * 2;
         
@@ -6570,6 +6572,15 @@ class Particle {
     update(timeScale) {
         if (this.mode === 'ember') {
             this.pos.x += Math.sin(this.life * 10 + this.wobble) * 0.5 * timeScale;
+        }
+        // 湍流逻辑：在垂直于速度的方向上产生正弦波动
+        if (this.turbulence > 0) {
+            const speed = this.vel.mag();
+            if (speed > 0.1) {
+                const perp = new Vec2(-this.vel.y / speed, this.vel.x / speed);
+                const wave = Math.sin(this.life * 15 + this.wobble) * this.turbulence;
+                this.pos = this.pos.add(perp.mult(wave * timeScale));
+            }
         }
         this.pos = this.pos.add(this.vel.mult(timeScale));
         this.vel = this.vel.mult(Math.pow(this.drag, timeScale));
@@ -9494,22 +9505,44 @@ class Game {
                 this.spawn_createFloatingText(centerX, centerY, "🌪️暴风绞杀", "#34d399");
                 
                 // 1. 制造“暴风眼”视觉：大量风刃向中心旋转坍塌
-                for(let i=0; i<80; i++) {
+                for(let i=0; i<100; i++) {
                     const angle = Math.random() * Math.PI * 2;
-                    const dist = 50 + Math.random() * 100; // 分布在周围
+                    const dist = 50 + Math.random() * 150; 
                     const px = centerX + Math.cos(angle) * dist;
                     const py = centerY + Math.sin(angle) * dist;
                     
-                    const p = this.spawn_createParticle(px, py, '#34d399', 'wind_slash');
+                    // 混合属性粒子
+                    let pMode = 'wind_slash';
+                    let color = '#34d399';
+                    const rand = Math.random();
+                    if (bulletConfig) {
+                        if (bulletConfig.cryo > 0 && rand < 0.25) { pMode = 'shard'; color = '#cffafe'; }
+                        else if (bulletConfig.pyro > 0 && rand < 0.25) { pMode = 'ember'; color = '#fdba74'; }
+                    }
+
+                    const p = this.spawn_createParticle(px, py, color, pMode);
                     if (p) {
-                        // 计算切线方向 (旋转) + 一点点向心力 (吸入感)
                         const tangent = new Vec2(-Math.sin(angle), Math.cos(angle));
                         const inward = new Vec2(-Math.cos(angle), -Math.sin(angle));
+                        p.vel = tangent.mult(12 + Math.random()*8).add(inward.mult(4 + Math.random()*4)); 
+                        p.size = (pMode === 'wind_slash' ? 8 : 4) + Math.random() * 10;
+                        p.life = 0.6 + Math.random() * 0.4;
                         
-                        // 速度合成：高速旋转 + 慢速吸入
-                        p.vel = tangent.mult(15).add(inward.mult(5)); 
-                        p.size = 8 + Math.random() * 12;
-                        p.life = 0.8;
+                        // 为旋风粒子添加湍流，增加混沌感
+                        p.turbulence = 1 + Math.random() * 2;
+                    }
+
+                    // [新增] 弥散微风粒子
+                    if (i % 2 === 0) {
+                        const pWind = this.spawn_createParticle(px, py, '#f0fdf4', 'spark');
+                        if (pWind) {
+                            const tangent = new Vec2(-Math.sin(angle), Math.cos(angle));
+                            pWind.vel = tangent.mult(5 + Math.random()*5);
+                            pWind.turbulence = 4 + Math.random() * 4; // 强湍流
+                            pWind.size = 1 + Math.random() * 2;
+                            pWind.life = 0.5 + Math.random() * 0.5;
+                            pWind.drag = 0.95;
+                        }
                     }
                 }
 
@@ -9653,34 +9686,52 @@ class Game {
                         py = Math.random() * -100;
                     }
 
-                    // [修改] 根据属性混合粒子颜色
+                    // [修改] 根据属性混合真实粒子类型
+                    let pMode = 'wind_slash';
                     let color = '#d1fae5';
+                    const rand = Math.random();
+                    
                     if (bulletConfig) {
-                        if (bulletConfig.cryo > 0) color = '#cffafe';
-                        else if (bulletConfig.pyro > 0) color = '#fdba74';
-                        else if (bulletConfig.lightning > 0) color = '#d8b4fe';
+                        if (bulletConfig.cryo > 0 && rand < 0.3) { pMode = 'shard'; color = '#cffafe'; }
+                        else if (bulletConfig.pyro > 0 && rand < 0.3) { pMode = 'ember'; color = '#fdba74'; }
+                        else if (bulletConfig.lightning > 0 && rand < 0.3) { pMode = 'spark'; color = '#d8b4fe'; }
                     }
 
-                    const p = this.spawn_createParticle(px, py, color, 'wind_slash');
+                    const p = this.spawn_createParticle(px, py, color, pMode);
                     if (p && p.vel) {
                         const speed = 40 + Math.random() * 30; 
                         p.vel = dir.mult(speed);
+                        p.drag = 1.0; 
                         
-                        // 尺寸差异化：有的细长(气流)，有的宽大(风刃)
-                        if (Math.random() < 0.3) {
-                            p.size = 20 + Math.random() * 20; // 主风刃
-                            p.color = '#ffffff'; // 亮白
+                        if (pMode === 'wind_slash') {
+                            if (Math.random() < 0.3) {
+                                p.size = 20 + Math.random() * 20; // 主风刃
+                                p.color = '#ffffff';
+                            } else {
+                                p.size = 5 + Math.random() * 10; // 伴生气流
+                            }
                         } else {
-                            p.size = 5 + Math.random() * 10;  // 伴生气流
-                            // 保持原色或半透明
+                            p.size = 4 + Math.random() * 6;
                         }
 
                         p.life = 1.0;
-                        p.drag = 1.0; // 无阻力
-                        // 计算贯穿全场所需的衰减
                         const distance = isHorizontal ? this.canvas.width : this.canvas.height;
                         const framesNeeded = (distance + 100) / speed;
                         p.decay = 1.0 / (framesNeeded * 1.2);
+                    }
+
+                    // [新增] 湍流微风粒子层：弥散、飘逸
+                    if (Math.random() < 0.4) {
+                        const pWind = this.spawn_createParticle(px, py, '#f0fdf4', 'spark');
+                        if (pWind) {
+                            const wSpeed = 15 + Math.random() * 15;
+                            pWind.vel = dir.mult(wSpeed).add(new Vec2((Math.random()-0.5)*5, (Math.random()-0.5)*5));
+                            pWind.turbulence = 2 + Math.random() * 3; // 湍流强度
+                            pWind.size = 1 + Math.random() * 2;
+                            pWind.life = 0.8 + Math.random() * 0.4;
+                            pWind.decay = 0.02;
+                            pWind.drag = 0.98; // 稍微有一点阻力，显得飘逸
+                        }
                     }
                 }
             } else if (element === 'wind_explosive') {
