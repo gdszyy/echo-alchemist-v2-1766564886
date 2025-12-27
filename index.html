@@ -10909,7 +10909,10 @@ class Game {
                 const copyRecipe = { ...recipe, scatter: 0, chainPayload: null }; // 散射弹丸不带散射和连锁
                 this.projectiles.push(new Projectile(x, y, newVel, copyRecipe, true)); 
             } 
-        } 
+        }
+        
+        // [关键] 生成主子弹
+        this.projectiles.push(new Projectile(x, y, vel, recipe)); 
     }
 
 // 在 Game 类中更新此方法
