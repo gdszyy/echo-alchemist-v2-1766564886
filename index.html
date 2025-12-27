@@ -4826,6 +4826,36 @@ class Enemy {
                 ctx.fillStyle = '#f8fafc';
                 ctx.fillRect(-3, 0, 6, 2);
 
+                // 5. [新增] 母剑剑穗 (红色下垂)
+                if (sword.isMotherBlade) {
+                    ctx.restore(); // 暂时退出旋转坐标系，以实现垂直下垂
+                    ctx.save();
+                    // 重新计算剑首在全局坐标系中的位置
+                    // 剑首在局部坐标系是 (0, 12)，旋转后需要变换
+                    const pommelLocalY = 12;
+                    const angle = sword.angle + Math.PI/2;
+                    const pommelX = sword.stuckOffset.x + Math.cos(angle) * 0 - Math.sin(angle) * pommelLocalY;
+                    const pommelY = sword.stuckOffset.y + Math.sin(angle) * 0 + Math.cos(angle) * pommelLocalY;
+                    
+                    ctx.translate(pommelX, pommelY);
+                    
+                    // 绘制红色剑穗
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    const time = Date.now() / 1000;
+                    const swing = Math.sin(time * 3) * 2;
+                    ctx.bezierCurveTo(swing, 5, swing * 2, 10, swing, 18);
+                    ctx.strokeStyle = '#ef4444'; // 红色
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    
+                    // 穗末端
+                    ctx.fillStyle = '#ef4444';
+                    ctx.beginPath();
+                    ctx.arc(swing, 18, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
                 ctx.restore();
             });
         }
@@ -5207,12 +5237,18 @@ class SonSword {
             
             // [性能優化]：節流自動尋敵 (Throttling)
             // 不需要每幀都尋找目標，每 15 幀找一次即可
-            if (this.state === 'flying' && this.isAutoHunting && this.targetQueue.length === 0 && !this.currentTarget) {
-                this.searchTimer -= timeScale;
-                // [优化]：如果当前完全没有目标，且计时器还没到，但敌人数量发生了变化，或者强制触发
-                if (this.searchTimer <= 0) {
-                    this.searchForTarget(enemies);
-                    this.searchTimer = 15; // 重置計時器
+            // [修复] 增强索敌逻辑：如果有标记的敌人，优先锁定标记敌人
+            if (this.state === 'flying' && !this.currentTarget && this.targetQueue.length === 0) {
+                // 检查是否有被标记的敌人
+                const markedEnemy = enemies.find(e => e.active && e.markTimer > 0);
+                if (markedEnemy) {
+                    this.currentTarget = markedEnemy;
+                } else if (this.isAutoHunting) {
+                    this.searchTimer -= timeScale;
+                    if (this.searchTimer <= 0) {
+                        this.searchForTarget(enemies);
+                        this.searchTimer = 15;
+                    }
                 }
             }
 
@@ -5431,7 +5467,7 @@ class SonSword {
         // 3. 绘制实体小剑 (细化版)
         if (this.isMotherBlade) ctx.scale(1.4, 1.4);
         
-        // 剑刃 (Blade) - 变细：从 4 缩减到 2.5
+        // 剑刃 (Blade)
         ctx.beginPath();
         ctx.moveTo(0, -15); 
         ctx.lineTo(2.5, -2); 
@@ -5452,19 +5488,50 @@ class SonSword {
         ctx.strokeStyle = 'rgba(203, 213, 225, 0.5)';
         ctx.stroke();
 
-        // 护手 (Guard) - 变细：从 12 缩减到 10
+        // 护手 (Guard)
         ctx.fillStyle = color;
         ctx.fillRect(-5, 2, 10, 2);
         
-        // 剑柄 (Hilt) - 变细：从 4 缩减到 2.5
+        // 剑柄 (Hilt)
         ctx.fillStyle = '#334155';
         ctx.fillRect(-1.25, 4, 2.5, 5);
         
-        // 剑首 (Pommel) - 变细：从 3 缩减到 2
+        // 剑首 (Pommel)
         ctx.beginPath();
         ctx.arc(0, 10, 2, 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
+
+        // 4. [新增] 母剑剑穗 (红色下垂)
+        if (this.isMotherBlade) {
+            ctx.restore(); // 退出旋转坐标系
+            ctx.save();
+            ctx.translate(this.pos.x, this.pos.y);
+            
+            // 计算剑首在当前旋转下的偏移
+            const pommelLocalY = 10 * 1.4; // 考虑了 scale(1.4)
+            const angle = this.angle + Math.PI/2;
+            const pommelOffX = -Math.sin(angle) * pommelLocalY;
+            const pommelOffY = Math.cos(angle) * pommelLocalY;
+            
+            ctx.translate(pommelOffX, pommelOffY);
+            
+            // 绘制红色剑穗
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            const time = Date.now() / 1000;
+            const swing = Math.sin(time * 3) * 2;
+            ctx.bezierCurveTo(swing, 5, swing * 2, 10, swing, 18);
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // 穗末端
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc(swing, 18, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         ctx.restore();
     }
