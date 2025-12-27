@@ -10316,7 +10316,8 @@ class Game {
      * @method fireNextShot
      * @description 发射下一发弹丸 (处理多重射击)。
      * @param {Vec2} vel - **重要参数** 初始速度向量。
-     *    phase_combat_fireMarble(vel) {
+     */
+    combat_fireNextShot(vel) {
         if (this.ammoQueue.length === 0) return;
 
         // [修复] 递归提取套娃配方，并确保使用深拷贝防止后续逻辑修改原始配方
