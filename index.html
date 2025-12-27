@@ -3078,65 +3078,56 @@ class Peg {
         ctx.fill();
         ctx.restore();
     }
-    // [优化] 绘制风属性钉子图标 - 螺旋风刃纹章
+    // [优化] 绘制风属性钉子图标 - 螺旋风刃纹章 (方案升级版)
     drawWindPeg(ctx, r, isLit) {
+        const time = Date.now() / 1000;
+        
+        // 1. 底色：使用更清透的薄荷绿渐变
+        const gradient = ctx.createRadialGradient(this.pos.x, this.pos.y, 0, this.pos.x, this.pos.y, r);
+        if (isLit) {
+            gradient.addColorStop(0, '#ffffff');
+            gradient.addColorStop(1, '#6ee7b7');
+        } else {
+            gradient.addColorStop(0, '#6ee7b7'); // light green
+            gradient.addColorStop(1, '#059669'); // emerald
+        }
+        ctx.fillStyle = gradient;
+        
+        // 绘制底圆
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2. 绘制动态旋转风刃 (与 Bounce 的纯圆区分)
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
+        ctx.rotate(time * 2.5); // 持续旋转
         
-        // 动态旋转角度
-        const rotationAngle = (Date.now() / 1500) % (Math.PI * 2);
-        ctx.rotate(rotationAngle);
+        const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
+        ctx.shadowBlur = 8 + pulse * 10;
+        ctx.shadowColor = '#34d399';
         
-        const sr = r * 0.6; // 稍微增大图标尺寸
+        ctx.strokeStyle = isLit ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.8)';
+        ctx.lineWidth = r * 0.15;
+        ctx.lineCap = 'round';
         
-        // 绘制三个螺旋风刃
         for (let i = 0; i < 3; i++) {
-            const angle = (i * Math.PI * 2) / 3;
-            ctx.save();
-            ctx.rotate(angle);
-            
-            // 渐变填充：从浅绿到深绿
-            const gradient = ctx.createRadialGradient(sr * 0.5, 0, 0, sr * 0.5, 0, sr * 0.5);
-            if (isLit) {
-                gradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
-                gradient.addColorStop(1, 'rgba(209, 250, 229, 0.7)');
-            } else {
-                gradient.addColorStop(0, 'rgba(209, 250, 229, 0.95)');
-                gradient.addColorStop(1, 'rgba(52, 211, 153, 0.8)');
-            }
-            ctx.fillStyle = gradient;
-            
-            // 绘制弯月形风刃（更加弯曲）
             ctx.beginPath();
-            ctx.moveTo(sr * 0.25, -sr * 0.25);
-            ctx.quadraticCurveTo(sr * 0.75, -sr * 0.1, sr * 0.85, sr * 0.15);
-            ctx.quadraticCurveTo(sr * 0.6, sr * 0.05, sr * 0.4, sr * 0.25);
-            ctx.quadraticCurveTo(sr * 0.45, 0, sr * 0.25, -sr * 0.25);
-            ctx.closePath();
-            ctx.fill();
-            
-            // 添加边缘高光
-            ctx.strokeStyle = isLit ? 'rgba(255, 255, 255, 0.6)' : 'rgba(167, 243, 208, 0.8)';
-            ctx.lineWidth = r * 0.08;
+            // 三段圆弧模拟风刃
+            const startAngle = i * (Math.PI * 2 / 3);
+            ctx.arc(0, 0, r * 0.65, startAngle, startAngle + 1.2); 
             ctx.stroke();
-            
-            ctx.restore();
         }
         
-        // 绘制中心发光圆
-        const pulse = (Math.sin(Date.now() / 200) + 1) / 2;
-        const coreGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, sr * 0.2);
-        if (isLit) {
-            coreGradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-            coreGradient.addColorStop(1, 'rgba(255, 255, 255, 0.5)');
-        } else {
-            coreGradient.addColorStop(0, 'rgba(255, 255, 255, ' + (0.9 + pulse * 0.1) + ')');
-            coreGradient.addColorStop(1, 'rgba(52, 211, 153, ' + (0.6 + pulse * 0.2) + ')');
-        }
-        ctx.fillStyle = coreGradient;
+        // 绘制中心气旋
+        ctx.rotate(-time * 4); // 反向旋转中心
         ctx.beginPath();
-        ctx.arc(0, 0, sr * 0.18, 0, Math.PI * 2);
-        ctx.fill();
+        for(let i=0; i<3; i++) {
+            const a = i * (Math.PI * 2 / 3);
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(Math.cos(a)*r*0.4, Math.sin(a)*r*0.4, Math.cos(a+0.5)*r*0.3, Math.sin(a+0.5)*r*0.3);
+        }
+        ctx.stroke();
         
         ctx.restore();
     }
@@ -7830,6 +7821,39 @@ class Game {
     /**
      * [RENDER] 渲染风属性锥点（独立渲染层）
      */
+    /**
+     * [RENDER] 绘制风道流速底色
+     */
+    drawWindTunnelFlow(rect, isHorizontal) {
+        const offset = (Date.now() / 15) % 80; // 随时间位移
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.rect(rect.x, rect.y, rect.w, rect.h);
+        this.ctx.clip(); // 限制在法阵区域内
+
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        this.ctx.lineWidth = 2;
+        
+        if (isHorizontal) {
+            // 水平流动线
+            for (let i = -100; i < rect.w + 100; i += 40) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(rect.x + i + offset, rect.y);
+                this.ctx.lineTo(rect.x + i + offset - 30, rect.y + rect.h);
+                this.ctx.stroke();
+            }
+        } else {
+            // 垂直流动线
+            for (let i = -100; i < rect.h + 100; i += 40) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(rect.x, rect.y + i + offset);
+                this.ctx.lineTo(rect.x + rect.w, rect.y + i + offset - 30);
+                this.ctx.stroke();
+            }
+        }
+        this.ctx.restore();
+    }
+
     render_windAnchors() {
         if (this.windAnchors && this.windAnchors.length > 0) {
             this.ctx.save();
@@ -7895,14 +7919,13 @@ class Game {
                 this.ctx.fill();
                 this.ctx.restore();
                 
-                // 编号
+                // 编号 (1-4)，让玩家知道进度
                 this.ctx.save();
-                this.ctx.fillStyle = '#ffffff';
-                this.ctx.strokeStyle = '#047857';
-                this.ctx.lineWidth = 3;
-                this.ctx.font = 'bold 14px Arial';
-                this.ctx.strokeText(idx + 1, a.x + 10, a.y - 8);
-                this.ctx.fillText(idx + 1, a.x + 10, a.y - 8);
+                this.ctx.fillStyle = '#34d399';
+                this.ctx.font = 'bold 12px Arial';
+                this.ctx.shadowBlur = 5;
+                this.ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                this.ctx.fillText(idx + 1, a.x + 8, a.y - 8);
                 this.ctx.restore();
             });
             this.ctx.restore();
@@ -8865,26 +8888,28 @@ class Game {
                             dmg *= 2; 
                             e.applyTemp(-50); 
                             this.spawn_createFloatingText(e.pos.x, e.pos.y, "🔥火旋风", "#f97316"); 
-                            // 添加火焰粒子
-                            for(let k=0; k<20; k++) {
+                            // 添加火焰粒子和烟雾
+                            for(let k=0; k<30; k++) {
                                 const angle = Math.random() * Math.PI * 2;
-                                const radius = Math.random() * 80;
+                                const radius = Math.random() * 100;
                                 const px = centerX + Math.cos(angle) * radius;
                                 const py = centerY + Math.sin(angle) * radius;
                                 this.spawn_createParticle(px, py, '#f97316', 'spark');
+                                if (k % 5 === 0) this.spawn_createParticle(px, py, '#4b5563', 'smoke');
                             }
                         }
                         else if (e.temp <= -100) { 
                             dmg *= 2; 
                             e.applyTemp(50); 
                             this.spawn_createFloatingText(e.pos.x, e.pos.y, "❄️冰旋风", "#06b6d4"); 
-                            // 添加冰霜粒子
-                            for(let k=0; k<20; k++) {
+                            // 添加冰霜粒子和寒气
+                            for(let k=0; k<30; k++) {
                                 const angle = Math.random() * Math.PI * 2;
-                                const radius = Math.random() * 80;
+                                const radius = Math.random() * 100;
                                 const px = centerX + Math.cos(angle) * radius;
                                 const py = centerY + Math.sin(angle) * radius;
                                 this.spawn_createParticle(px, py, '#06b6d4', 'shard');
+                                if (k % 5 === 0) this.spawn_createParticle(px, py, '#e0f2fe', 'smoke');
                             }
                         }
                         e.takeDamage(dmg);
@@ -8911,40 +8936,32 @@ class Game {
             const isHorizontal = w > h;
             if (element === 'wind') {
                 this.spawn_createFloatingText(centerX, centerY, "🌬️风道", "#34d399");
+                
+                // [核心优化]：绘制流动的波纹底色
+                this.drawWindTunnelFlow({x, y, w, h}, isHorizontal);
+
                 // 添加风道粒子特效（具有加速感的高速长条粒子）
                 if (isHorizontal) {
                     // 水平风道
                     for(let i=0; i<40; i++) {
-                        const px = x + (i / 40) * w;
-                        const py = centerY + (Math.random() - 0.5) * h * 0.8;
-                        const p = this.spawn_createParticle(px, py, '#34d399', 'spark');
-                        // 赋予水平速度，表现推力感
-                        if (p && p.vel) {
-                            p.vel = new Vec2(8 + Math.random() * 4, (Math.random() - 0.5) * 2);
-                        }
-                    }
-                    // 添加一些大型长条粒子
-                    for(let i=0; i<10; i++) {
                         const px = x + Math.random() * w;
-                        const py = centerY + (Math.random() - 0.5) * h * 0.6;
-                        this.spawn_createExplosion(px, py, '#34d399', 15);
+                        const py = centerY + (Math.random() - 0.5) * h * 0.8;
+                        const p = this.spawn_createParticle(px, py, '#f0fdf4', 'spark');
+                        if (p && p.vel) {
+                            p.vel = new Vec2(10 + Math.random() * 6, (Math.random() - 0.5) * 2);
+                            p.life = 0.6; // 短寿命，快速消失
+                        }
                     }
                 } else {
                     // 垂直风道
                     for(let i=0; i<40; i++) {
                         const px = centerX + (Math.random() - 0.5) * w * 0.8;
-                        const py = y + (i / 40) * h;
-                        const p = this.spawn_createParticle(px, py, '#34d399', 'spark');
-                        // 赋予垂直速度
-                        if (p && p.vel) {
-                            p.vel = new Vec2((Math.random() - 0.5) * 2, 8 + Math.random() * 4);
-                        }
-                    }
-                    // 添加一些大型长条粒子
-                    for(let i=0; i<10; i++) {
-                        const px = centerX + (Math.random() - 0.5) * w * 0.6;
                         const py = y + Math.random() * h;
-                        this.spawn_createExplosion(px, py, '#34d399', 15);
+                        const p = this.spawn_createParticle(px, py, '#f0fdf4', 'spark');
+                        if (p && p.vel) {
+                            p.vel = new Vec2((Math.random() - 0.5) * 2, 10 + Math.random() * 6);
+                            p.life = 0.6;
+                        }
                     }
                 }
                 this.enemies.forEach(e => {
