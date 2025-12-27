@@ -4781,6 +4781,40 @@ class Enemy {
             ctx.fillRect(-w/2, -h/2, w, h);
         }
 
+        // === Layer 5.5: 插在身上的子剑 (Stuck Swords) ===
+        if (this.stuckSwords && this.stuckSwords.length > 0) {
+            this.stuckSwords.forEach(sword => {
+                if (!sword.active) return;
+                ctx.save();
+                // 使用子剑记录的偏移量
+                ctx.translate(sword.stuckOffset.x, sword.stuckOffset.y);
+                ctx.rotate(sword.angle + Math.PI/2);
+                
+                const color = sword.level >= 3 ? '#f43f5e' : (sword.level >= 2 ? '#6366f1' : '#0ea5e9');
+                
+                // 深度模拟：只绘制剑柄和护手部分，隐藏剑刃（看上去插进去了）
+                // 1. 护手 (Guard)
+                ctx.fillStyle = color;
+                ctx.fillRect(-6, 2, 12, 3);
+                
+                // 2. 剑柄 (Hilt)
+                ctx.fillStyle = '#334155';
+                ctx.fillRect(-2, 5, 4, 6);
+                
+                // 3. 剑首 (Pommel)
+                ctx.beginPath();
+                ctx.arc(0, 12, 3, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                
+                // 4. 剑刃根部 (露出一点点)
+                ctx.fillStyle = '#f8fafc';
+                ctx.fillRect(-3, 0, 6, 2);
+
+                ctx.restore();
+            });
+        }
+
         ctx.restore(); // <--- 裁剪结束
 
         // === Layer 6: 外部特效 (光环/冰壳) ===
@@ -5316,39 +5350,61 @@ class SonSword {
         this.passingThroughEnemy = null;
     }
 
-    draw(ctx) {
-        if (!this.active) return;
+        draw(ctx) {
+        if (!this.active || this.state === 'stuck') return; // 插在敌人身上的由敌人负责绘制
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
         ctx.rotate(this.angle + Math.PI/2); 
 
         const color = this.level >= 3 ? '#f43f5e' : (this.level >= 2 ? '#6366f1' : '#0ea5e9');
         
-        // [性能優化]：動態畫質調整
-        // 如果場上子劍數量少 (<30)，開啟完整光效
-        // 如果數量多，關閉陰影，大幅提升 FPS
-        if (game.sonSwords.length < 30 || this.passingThroughEnemy) {
-            ctx.shadowBlur = this.passingThroughEnemy ? 20 : 10;
+        // 1. 动态发光强度：攻击次数越多，发光越强
+        const attackRatio = 1 - (this.attacksLeft / this.maxAttacks);
+        const glowIntensity = 5 + attackRatio * 15;
+        
+        if (game.sonSwords.length < 40 || this.passingThroughEnemy) {
+            ctx.shadowBlur = this.passingThroughEnemy ? 25 : glowIntensity;
             ctx.shadowColor = color; 
-        } else {
-            ctx.shadowBlur = 0; // 關閉發光
         }
 
-        ctx.strokeStyle = '#ffffff'; 
-        ctx.lineWidth = 2;
-        ctx.lineJoin = 'round'; 
-        ctx.lineCap = 'round';
-
+        // 2. 绘制实体小剑
+        if (this.isMotherBlade) ctx.scale(1.4, 1.4);
+        
+        // 剑刃 (Blade)
         ctx.beginPath();
-        if (this.isMotherBlade) ctx.scale(1.5, 1.5);
-        ctx.moveTo(0, -12); ctx.lineTo(3, 2); ctx.lineTo(0, 0); ctx.lineTo(-3, 2);
+        ctx.moveTo(0, -15); 
+        ctx.lineTo(4, -2); 
+        ctx.lineTo(4, 2); 
+        ctx.lineTo(-4, 2); 
+        ctx.lineTo(-4, -2);
         ctx.closePath();
-        ctx.stroke();
-        
-        ctx.fillStyle = color; 
-        ctx.globalAlpha = 0.5; 
+        ctx.fillStyle = '#f8fafc'; // 亮钢色
         ctx.fill();
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // 剑脊线
+        ctx.beginPath();
+        ctx.moveTo(0, -14);
+        ctx.lineTo(0, 2);
+        ctx.strokeStyle = 'rgba(203, 213, 225, 0.5)';
+        ctx.stroke();
+
+        // 护手 (Guard)
+        ctx.fillStyle = color;
+        ctx.fillRect(-6, 2, 12, 3);
         
+        // 剑柄 (Hilt)
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(-2, 5, 4, 6);
+        
+        // 剑首 (Pommel)
+        ctx.beginPath();
+        ctx.arc(0, 12, 3, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+
         ctx.restore();
     }
 }
@@ -5687,22 +5743,31 @@ if (Math.random() < 0.2) {
         if (typeof game !== 'undefined') {
             // 1. 生成插在敌人身上的“母剑标记”
             const pegLevel = this.config.level || 1;
-            const stuckBlade = new SonSword(this.pos.x, this.pos.y, this, pegLevel, this.config);
+            
+            // [优化]：随机化插入位置和角度
+            const hitAngle = Math.atan2(this.vel.y, this.vel.x);
+            const randomAngle = hitAngle + (Math.random() - 0.5) * (Math.PI / 6); // ±15度偏差
+            
+            // 随机偏移点 (在敌人中心附近)
+            const randomOffsetX = (Math.random() - 0.5) * (enemy.width * 0.6);
+            const randomOffsetY = (Math.random() - 0.5) * (enemy.height * 0.6);
+            const stuckPos = enemy.pos.add(new Vec2(randomOffsetX, randomOffsetY));
+
+            const stuckBlade = new SonSword(stuckPos.x, stuckPos.y, this, pegLevel, this.config);
             stuckBlade.state = 'stuck';
             stuckBlade.stuckHost = enemy;
-            stuckBlade.stuckOffset = this.pos.sub(enemy.pos);
+            stuckBlade.stuckOffset = new Vec2(randomOffsetX, randomOffsetY);
+            stuckBlade.angle = randomAngle; // 记录插入时的角度
             stuckBlade.isMotherBlade = true; 
             
-            const hitAngle = Math.atan2(this.vel.y, this.vel.x);
-            enemy.addSwordCrack(stuckBlade.stuckOffset, hitAngle+90);
+            enemy.addSwordCrack(stuckBlade.stuckOffset, randomAngle + Math.PI/2);
             game.sonSwords.push(stuckBlade); 
             
-            // [新增] 将子剑注册到敌人的 stuckSwords 列表中
             if (enemy.stuckSwords) {
                 enemy.stuckSwords.push(stuckBlade);
             }
 
-            game.spawn_createFloatingText(this.pos.x, this.pos.y, "🗡️STUCK", "#0ea5e9");
+            game.spawn_createFloatingText(stuckPos.x, stuckPos.y, "🗡️STUCK", "#0ea5e9");
             audio.playSlash();
 
             // 2. [新增] 触发子剑联动逻辑 (根据等级)
