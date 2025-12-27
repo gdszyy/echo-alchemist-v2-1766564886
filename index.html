@@ -7833,8 +7833,8 @@ class Game {
                 if (matrix.active) {
                     matrix.timer--;
                     
-                    // 渲柑该法阵实例的预兆特效
-                    this.render_windMatrixActivation(matrix);
+                    // 渲染该法阵实例的预兆特效
+                    this.render_singleWindMatrix(matrix);
                     
                     // 倒计时结束，触发真正的技能
                     if (matrix.timer <= 0) {
@@ -8067,88 +8067,89 @@ class Game {
      * @description 根据阵法类型（风道/旋风/爆破）显示不同的视觉预兆效果
      * @param {object} matrix - 法阵实例对象
      */
-    render_windMatrixActivation(matrix) {
+    render_singleWindMatrix(matrix) {
         if (!matrix || !matrix.active) return;
 
         const { timer, maxTimer, rect, type, anchors } = matrix;
-        const progress = 1 - (timer / maxTimer); // 0.0 -> 1.0 进度
+        // 使用 ease-in 曲线 (t*t)，让动画在最后时刻加速，增加张力
+        const rawProgress = 1 - (timer / maxTimer);
+        const progress = rawProgress * rawProgress; 
+        
         const ctx = this.ctx;
+        const time = Date.now();
 
-        // 1. 持续生成特效粒子 (每帧都生成，营造持续感)
-        this.spawn_windSkillParticles(type, rect, progress);
+        // 1. 持续产生环境粒子
+        this.spawn_windSkillParticles(type, rect, rawProgress);
 
         ctx.save();
-        
-        // --- 开启高亮叠加模式 ---
-        ctx.globalCompositeOperation = 'lighter'; 
+        ctx.globalCompositeOperation = 'lighter'; // 关键：叠加发光模式
 
-        // 2. 绘制法阵边界 (呼吸光效)
-        const glow = 10 + Math.sin(Date.now() / 50) * 5; // 高频闪烁
-        ctx.shadowBlur = glow;
-        ctx.shadowColor = '#34d399';
-        ctx.strokeStyle = `rgba(52, 211, 153, ${0.5 + Math.random() * 0.5})`; // 随机透明度模拟电流
-        ctx.lineWidth = 3;
-        
-        // 绘制连线框
+        // --- A. 绘制法阵边界 (带能量抖动的连线) ---
         ctx.beginPath();
         ctx.moveTo(anchors[0].x, anchors[0].y);
-        anchors.forEach(a => ctx.lineTo(a.x, a.y));
+        anchors.forEach(a => {
+            // 加入微小的随机抖动，随进度增强
+            const jitter = (Math.random() - 0.5) * (progress * 4); 
+            ctx.lineTo(a.x + jitter, a.y + jitter);
+        });
         ctx.closePath();
+        
+        // 呼吸光晕
+        const pulse = Math.sin(time / 50) * 0.5 + 0.5;
+        ctx.shadowBlur = 10 + pulse * 10 + progress * 20; // 越接近触发越亮
+        ctx.shadowColor = '#34d399';
+        ctx.strokeStyle = `rgba(167, 243, 208, ${0.5 + pulse * 0.5})`;
+        ctx.lineWidth = 2 + progress * 2;
         ctx.stroke();
 
-        // 3. 核心技能特效绘制
+        // --- B. 内部特效 (区分类型) ---
         if (type === 'tunnel') {
-            // === 风道：超高速流光 (全屏贯穿) ===
+            // === 风道：电磁加速轨道 (全屏贯穿) ===
             const isHorizontal = rect.w > rect.h;
+            const size = isHorizontal ? rect.h : rect.w;
             const canvasW = this.canvas.width;
             const canvasH = this.canvas.height;
             
-            // 绘制主能量束 (横跨全屏)
-            const gradient = isHorizontal 
-                ? ctx.createLinearGradient(0, 0, canvasW, 0)
-                : ctx.createLinearGradient(0, 0, 0, canvasH);
-                
-            gradient.addColorStop(0, 'rgba(52, 211, 153, 0)');
-            gradient.addColorStop(0.5, `rgba(209, 250, 229, ${0.3 + progress * 0.4})`);
-            gradient.addColorStop(1, 'rgba(52, 211, 153, 0)');
+            // 1. 核心能量束 (Core Beam) - 垂直于流动方向的渐变
+            const coreGrad = isHorizontal
+                ? ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h)
+                : ctx.createLinearGradient(rect.x, 0, rect.x + rect.w, 0);
+
+            coreGrad.addColorStop(0, 'rgba(52, 211, 153, 0)');
+            coreGrad.addColorStop(0.3, `rgba(52, 211, 153, ${0.2 * progress})`);
+            coreGrad.addColorStop(0.5, `rgba(255, 255, 255, ${0.8 * progress})`); // 核心亮白
+            coreGrad.addColorStop(0.7, `rgba(52, 211, 153, ${0.2 * progress})`);
+            coreGrad.addColorStop(1, 'rgba(52, 211, 153, 0)');
             
-            ctx.fillStyle = gradient;
+            ctx.fillStyle = coreGrad;
             if (isHorizontal) {
                 ctx.fillRect(0, rect.y, canvasW, rect.h);
             } else {
                 ctx.fillRect(rect.x, 0, rect.w, canvasH);
             }
 
-            // 绘制极速线条 (Speed Lines - 全屏分布)
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            // 2. 推进光环 (Propulsion Rings) - 模拟加速感
+            const ringCount = 5;
+            const ringSpeed = (time / 100) % 1; 
+            
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.6 * progress})`;
             ctx.lineWidth = 2;
-            for(let i=0; i<8; i++) {
+            
+            for(let i=0; i<ringCount; i++) {
+                let ringPos = (ringSpeed + i / ringCount) % 1; 
+                ringPos = ringPos * ringPos; // Easing
+                
                 ctx.beginPath();
                 if (isHorizontal) {
-                    const y = rect.y + Math.random() * rect.h;
-                    const len = 100 + Math.random() * 300;
-                    const x = Math.random() * canvasW;
-                    ctx.moveTo(x, y);
-                    ctx.lineTo(x + len, y);
+                    const drawX = ringPos * canvasW;
+                    ctx.ellipse(drawX, rect.y + rect.h/2, size*0.1, size*0.4, 0, 0, Math.PI*2);
                 } else {
-                    const x = rect.x + Math.random() * rect.w;
-                    const len = 100 + Math.random() * 300;
-                    const y = Math.random() * canvasH;
-                    ctx.moveTo(x, y);
-                    ctx.lineTo(x, y + len);
+                    const drawY = ringPos * canvasH;
+                    ctx.ellipse(rect.x + rect.w/2, drawY, size*0.4, size*0.1, 0, 0, Math.PI*2);
                 }
                 ctx.stroke();
             }
-        } else {
-            // 旋风和爆破仍需限制在法阵内
-            ctx.beginPath();
-            ctx.rect(rect.x, rect.y, rect.w, rect.h);
-            ctx.clip();
-        }
 
-        // 4. 旋风和爆破的内部绘制
-        if (type === 'tunnel') {
-            
             // 文字提示
             ctx.fillStyle = `rgba(255,255,255, ${progress})`;
             ctx.font = "bold 20px Cinzel";
@@ -8156,40 +8157,71 @@ class Game {
             ctx.fillText("WIND TUNNEL", rect.x + rect.w/2, rect.y + rect.h/2);
 
         } else if (type === 'cyclone') {
-            // === 旋风：狂暴的漩涡 ===
+            // === 旋风：奇点坍缩 (Singularity) ===
             const cx = rect.x + rect.w / 2;
             const cy = rect.y + rect.h / 2;
             const radius = Math.min(rect.w, rect.h) * 0.45;
             
-            ctx.save();
             ctx.translate(cx, cy);
-            // 随着进度加速旋转
-            const rotationSpeed = progress * 20; 
-            ctx.rotate(Date.now() / 100 * rotationSpeed);
+            
+            // 1. 底层：高速旋转的能量场
+            const rot = (time / 1000) * (5 + progress * 20); 
+            ctx.rotate(rot);
 
-            // 绘制多层风刃
-            for(let i=0; i<3; i++) {
+            for (let layer = 0; layer < 3; layer++) {
+                ctx.rotate(Math.PI / 4); 
+                const currentR = radius * (1 - layer * 0.2);
+                
                 ctx.beginPath();
-                ctx.arc(0, 0, radius * (0.5 + i * 0.2), 0, Math.PI * 1.5);
-                ctx.strokeStyle = `rgba(167, 243, 208, ${0.4 + i * 0.2})`;
-                ctx.lineWidth = 4 + progress * 10; // 越来越粗
+                const sides = 3 + layer; 
+                for (let s = 0; s <= sides; s++) {
+                    const theta = (s / sides) * Math.PI * 2;
+                    const rVar = currentR * (0.9 + Math.sin(time/50 + s)*0.1); 
+                    const px = Math.cos(theta) * rVar;
+                    const py = Math.sin(theta) * rVar;
+                    if (s===0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                
+                const alpha = (0.3 + progress * 0.7) * (1 - layer * 0.2);
+                ctx.strokeStyle = layer === 2 ? '#fff' : '#34d399';
+                ctx.lineWidth = 2 + progress * 3;
+                ctx.shadowBlur = 15 * progress;
                 ctx.stroke();
-                ctx.rotate(Math.PI / 1.5); // 错开角度
             }
-            
-            // 暴风眼
+
+            // 2. 顶层：吸入线条 (Implosion Lines)
+            ctx.rotate(-rot); 
             ctx.beginPath();
-            ctx.arc(0, 0, radius * 0.3, 0, Math.PI * 2);
-            ctx.fillStyle = '#fff';
-            ctx.globalAlpha = 0.3 + Math.sin(Date.now()/50)*0.2;
-            ctx.fill();
-            ctx.restore();
+            const lineCount = 8;
+            for (let i = 0; i < lineCount; i++) {
+                const angle = (i / lineCount) * Math.PI * 2 + (time / 500);
+                const startR = radius * 1.2;
+                const endR = radius * (0.8 - progress * 0.6);
+                
+                ctx.moveTo(Math.cos(angle) * startR, Math.sin(angle) * startR);
+                ctx.lineTo(Math.cos(angle) * endR, Math.sin(angle) * endR);
+            }
+            ctx.strokeStyle = `rgba(255, 255, 255, ${progress})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
             
+            // 3. 暴风眼 (Eye of the Storm)
+            const eyeSize = radius * 0.3 * (1 - progress * 0.5);
+            ctx.beginPath();
+            ctx.arc(0, 0, eyeSize, 0, Math.PI*2);
+            ctx.fillStyle = '#020617'; 
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
             // 文字提示
             ctx.fillStyle = `rgba(255,255,255, ${progress})`;
             ctx.font = "bold 20px Cinzel";
             ctx.textAlign = "center";
-            ctx.fillText("CYCLONE", rect.x + rect.w/2, rect.y + rect.h/2);
+            ctx.fillText("CYCLONE", 0, 0);
 
         } else {
             // 爆破：高频闪烁
