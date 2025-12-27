@@ -5897,8 +5897,22 @@ class Projectile {
                         if (this.config.wind && this.isLast) {
                             if (typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y);
                         }
-                        const angle = Math.atan2(dy, dx);
-                        const normal = new Vec2(Math.cos(angle), Math.sin(angle));
+                        // --- 修复开始：AABB 矩形法线计算 ---
+                        // 计算相对位置比例 (dx, dy 是子弹相对于敌人中心的距离)
+                        // 如果 x 方向的相对偏移比 y 方向大，说明撞到了左右侧边，反之则是上下底边
+                        const halfW = e.width / 2;
+                        const halfH = e.height / 2;
+                        
+                        // 使用比例判断碰撞面 (这样即便是长方形也能正确判断)
+                        let normal;
+                        if (Math.abs(dx / halfW) > Math.abs(dy / halfH)) {
+                            // 撞击左右侧面：法线为水平方向 (1,0) 或 (-1,0)
+                            normal = new Vec2(Math.sign(dx), 0);
+                        } else {
+                            // 撞击上下底面：法线为垂直方向 (0,1) 或 (0,-1)
+                            normal = new Vec2(0, Math.sign(dy));
+                        }
+                        // --- 修复结束 ---
                         const dot = this.vel.dot(normal);
                         this.vel = this.vel.sub(normal.mult(2 * dot));
                         this.deformation = { x: 1.4, y: 0.6 };
