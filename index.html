@@ -6628,6 +6628,35 @@ class Particle {
             ctx.lineTo(-this.size * 0.6, 0);
             ctx.fill();
 
+        } else if (this.mode === 'wind_slash') {
+            // === 🌪️ 新增：风刃粒子 (锐利的弯月/线条) ===
+            // 根据速度方向旋转
+            const angle = Math.atan2(this.vel.y, this.vel.x);
+            ctx.rotate(angle);
+            
+            // 拉伸感：速度越快，拉得越长
+            const speed = this.vel.mag();
+            const stretch = Math.min(3.0, 1.0 + speed * 0.1); 
+            ctx.scale(stretch, 1.0);
+
+            // 颜色：核心亮白，边缘青色
+            // 使用线性渐变模拟“刀光”
+            const grad = ctx.createLinearGradient(-this.size, 0, this.size, 0);
+            grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+            grad.addColorStop(0.2, 'rgba(52, 211, 153, 0.8)'); // 青色边缘
+            grad.addColorStop(0.5, 'rgba(255, 255, 255, 1)');   // 核心亮白
+            grad.addColorStop(0.8, 'rgba(52, 211, 153, 0.8)');
+            grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+            ctx.fillStyle = grad;
+            
+            // 绘制梭形/刀片形状
+            ctx.beginPath();
+            ctx.moveTo(-this.size * 1.5, 0);
+            ctx.quadraticCurveTo(0, this.size * 0.4, this.size * 1.5, 0); // 上弧
+            ctx.quadraticCurveTo(0, -this.size * 0.4, -this.size * 1.5, 0); // 下弧
+            ctx.fill();
+
         } else if (this.mode === 'line') {
             const rot = Math.atan2(this.vel.y, this.vel.x);
             ctx.rotate(rot);
@@ -9454,53 +9483,67 @@ class Game {
             }
         } else if (shape === 'square') {
             if (element === 'wind') {
-                this.spawn_createFloatingText(centerX, centerY, "🌪️大旋风", "#34d399");
-                // 添加大范围旋转向量场
-                for(let i=0; i<50; i++) {
-                    const angle = (i / 50) * Math.PI * 2;
-                    const radius = 60 + Math.random() * 70;
-                    const px = centerX + Math.cos(angle) * radius;
-                    const py = centerY + Math.sin(angle) * radius;
-                    const p = this.spawn_createParticle(px, py, '#34d399', 'spark');
-                    // 给粒子赋予切线速度，形成螺旋感
-                    if (p && p.vel) {
+                this.spawn_createFloatingText(centerX, centerY, "🌪️暴风绞杀", "#34d399");
+                
+                // 1. 制造“暴风眼”视觉：大量风刃向中心旋转坍塌
+                for(let i=0; i<80; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = 50 + Math.random() * 100; // 分布在周围
+                    const px = centerX + Math.cos(angle) * dist;
+                    const py = centerY + Math.sin(angle) * dist;
+                    
+                    const p = this.spawn_createParticle(px, py, '#34d399', 'wind_slash');
+                    if (p) {
+                        // 计算切线方向 (旋转) + 一点点向心力 (吸入感)
                         const tangent = new Vec2(-Math.sin(angle), Math.cos(angle));
-                        p.vel = tangent.mult(3);
+                        const inward = new Vec2(-Math.cos(angle), -Math.sin(angle));
+                        
+                        // 速度合成：高速旋转 + 慢速吸入
+                        p.vel = tangent.mult(15).add(inward.mult(5)); 
+                        p.size = 8 + Math.random() * 12;
+                        p.life = 0.8;
                     }
                 }
-                // [优化]：移除爆炸效果
-                // this.spawn_createExplosion(centerX, centerY, '#34d399', 120);
+
                 this.enemies.forEach(e => {
                     if (e.active && e.pos.x > expandedX && e.pos.x < expandedX + expandedW && e.pos.y > expandedY && e.pos.y < expandedY + expandedH) {
                         let dmg = 20;
+                        // 属性联动逻辑保持
                         if (e.temp >= 100) { 
                             dmg *= 2; 
                             e.applyTemp(-50); 
                             this.spawn_createFloatingText(e.pos.x, e.pos.y, "🔥火旋风", "#f97316"); 
-                            // 添加火焰粒子和烟雾
                             for(let k=0; k<30; k++) {
                                 const angle = Math.random() * Math.PI * 2;
                                 const radius = Math.random() * 100;
                                 const px = centerX + Math.cos(angle) * radius;
                                 const py = centerY + Math.sin(angle) * radius;
                                 this.spawn_createParticle(px, py, '#f97316', 'spark');
-                                if (k % 5 === 0) this.spawn_createParticle(px, py, '#4b5563', 'smoke');
                             }
                         }
                         else if (e.temp <= -100) { 
                             dmg *= 2; 
                             e.applyTemp(50); 
                             this.spawn_createFloatingText(e.pos.x, e.pos.y, "❄️冰旋风", "#06b6d4"); 
-                            // 添加冰霜粒子和寒气
                             for(let k=0; k<30; k++) {
                                 const angle = Math.random() * Math.PI * 2;
                                 const radius = Math.random() * 100;
                                 const px = centerX + Math.cos(angle) * radius;
                                 const py = centerY + Math.sin(angle) * radius;
                                 this.spawn_createParticle(px, py, '#06b6d4', 'shard');
-                                if (k % 5 === 0) this.spawn_createParticle(px, py, '#e0f2fe', 'smoke');
                             }
                         }
+                        
+                        // 视觉：身上爆出逆向的风刃
+                        for(let k=0; k<3; k++) {
+                            const p = this.spawn_createParticle(e.pos.x, e.pos.y, '#fff', 'wind_slash');
+                            if (p) {
+                                p.vel = new Vec2((Math.random()-0.5)*20, (Math.random()-0.5)*20);
+                                p.size = 15;
+                                p.life = 0.2;
+                            }
+                        }
+
                         // [修改 1] 套用子弹完整属性配置
                         const windConfig = { ...bulletConfig, damage: dmg };
                         this.combat_damageEnemy(e, { 
@@ -9549,104 +9592,88 @@ class Game {
             const dir = tunnelVector ? tunnelVector.dir : (isHorizontal ? new Vec2(1, 0) : new Vec2(0, 1));
             
             if (element === 'wind') {
-                this.spawn_createFloatingText(centerX, centerY, "🌬️风道", "#34d399");
+                this.spawn_createFloatingText(centerX, centerY, "🌪️绝息风道", "#34d399");
                 
-                // [核心优化]：绘制流动的波纹底色 (沿中线全屏)
+                // 1. 绘制底色流光
                 this.drawWindTunnelFlow({x, y, w, h}, isHorizontal);
 
-                // [修改 2] 从一侧往另一侧吹的粒子风暴
-                const canvasW = this.canvas.width;
-                const canvasH = this.canvas.height;
-                
-                // 生成大量粒子，从起始侧开始吹向另一侧
-                for(let i=0; i<120; i++) {
-                    let px, py;
-                    if (isHorizontal) {
-                        // 水平风道：从左侧吹向右侧
-                        px = Math.random() * 100; // 从左侧边缘生成
-                        py = centerY + (Math.random() - 0.5) * h * 1.5; // 覆盖风道宽度
-                    } else {
-                        // 垂直风道：从上侧吹向下侧
-                        px = centerX + (Math.random() - 0.5) * w * 1.5;
-                        py = Math.random() * 100; // 从上侧边缘生成
-                    }
-                    
-                    // [修改] 根据属性混合粒子颜色和类型
-                    let pType, color;
-                    const isAttributeParticle = Math.random() < 0.4; // 40% 概率生成属性粒子
-                    
-                    if (isAttributeParticle && bulletConfig) {
-                        if (bulletConfig.cryo > 0) { color = '#cffafe'; pType = 'shard'; }
-                        else if (bulletConfig.pyro > 0) { color = '#fdba74'; pType = 'spark'; }
-                        else if (bulletConfig.lightning > 0) { color = '#d8b4fe'; pType = 'spark'; }
-                        else if (bulletConfig.pierce > 0) { color = '#fca5a5'; pType = 'spark'; }
-                        else {
-                            const particleTypes = ['spark', 'line', 'normal'];
-                            pType = particleTypes[Math.floor(Math.random() * particleTypes.length)];
-                            const colors = ['#f0fdf4', '#d1fae5', '#6ee7b7', '#34d399'];
-                            color = colors[Math.floor(Math.random() * colors.length)];
-                        }
-                    } else {
-                        const particleTypes = ['spark', 'line', 'normal'];
-                        pType = particleTypes[Math.floor(Math.random() * particleTypes.length)];
-                        const colors = ['#f0fdf4', '#d1fae5', '#6ee7b7', '#34d399'];
-                        color = colors[Math.floor(Math.random() * colors.length)];
-                    }
-                    
-                    const p = this.spawn_createParticle(px, py, color, pType);
-                    if (p && p.vel) {
-                        // [修改] 确保粒子贯穿全场
-                        const speed = 30 + Math.random() * 20;
-                        const offset = isHorizontal ? 
-                            new Vec2(0, (Math.random() - 0.5) * 5) : 
-                            new Vec2((Math.random() - 0.5) * 5, 0);
-                        p.vel = dir.mult(speed).add(offset);
-                        
-                        // 取消阻力，确保匀速贯穿
-                        p.drag = 1.0; 
-                        
-                        // 计算贯穿全场所需的生命周期 (距离 / 速度)
-                        const distance = isHorizontal ? this.canvas.width : this.canvas.height;
-                        const framesNeeded = distance / speed;
-                        // p.life 会在每帧减少 p.decay * timeScale
-                        // 默认 decay 约为 0.05，我们需要调整 decay 使得 life 在 framesNeeded 帧后才耗尽
-                        p.life = 1.0;
-                        p.decay = 1.0 / (framesNeeded * 1.2); // 额外增加20%余量确保飞出屏幕
-                        
-                        if (pType === 'line') {
-                            p.scale = isHorizontal ? {x: 40, y: 1.0} : {x: 1.0, y: 40};
-                        } else {
-                            p.size = 2 + Math.random() * 4;
-                        }
-                    }
-                }
-
-                // [修改 2] 风道造成伤害时触发慢动作
+                // 2. 命中检测与【顿挫感】处理
                 let hitCount = 0;
                 this.enemies.forEach(e => {
-                    // [优化]：判定是否在全屏中线路径上
                     const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
                     if (e.active && inPath) {
                         hitCount++;
-                        const dmg = Math.max(1, Math.floor(bulletDamage * 5));
-                        // [修改 1] 套用子弹完整属性配置
-                        const windConfig = { ...bulletConfig, damage: dmg };
+                        const dmg = Math.max(1, Math.floor(bulletDamage * 6)); // 提升伤害倍率
+                        
+                        // 伤害逻辑
+                        const windConfig = { ...bulletConfig, damage: dmg, wind: 1 };
                         this.combat_damageEnemy(e, { 
                             config: windConfig, 
                             pos: e.pos, 
-                            isCopy: false,
+                            isCopy: false, 
                             shotId: this._currentDamageShotId 
                         });
-                        // [修改] 取消风属性造成的位移效果
-                        // this.combat_tryMoveEnemy(e, dir.mult(40));
-                        this.spawn_createParticle(e.pos.x, e.pos.y, '#34d399', 'spark');
+                        
+                        // 受击特效：在敌人身上爆出杂乱的风刃
+                        for(let k=0; k<5; k++) {
+                            const p = this.spawn_createParticle(e.pos.x, e.pos.y, '#34d399', 'wind_slash');
+                            if (p) {
+                                p.vel = new Vec2((Math.random()-0.5)*10, (Math.random()-0.5)*10); // 随机散射
+                                p.size = 10 + Math.random() * 10;
+                                p.life = 0.4; // 瞬间消失
+                            }
+                        }
                     }
                 });
-                
-                // [修改 2] 如果命中敌人，触发慢动作效果
+
+                // 3. 【核心优化】：强力顿挫 (Hit Stop)
                 if (hitCount > 0) {
-                    this.slowMotionTimer = 8; // 短暂的慢动作
-                    this.timeScale = 0.15; // 轻微的慢动，不要太强
+                    this.slowMotionTimer = 15; // 持续时间加长 (约0.25秒的定格)
+                    this.timeScale = 0.02;     // 极慢！接近静止
+                    this.triggerScreenShake(20); // 屏幕强震
+                }
+
+                // 4. 生成贯穿全屏的【暴风粒子流】
+                const particleCount = 150; // 加大密度
+                for(let i=0; i<particleCount; i++) {
+                    let px, py;
+                    if (isHorizontal) {
+                        px = Math.random() * -100; // 从屏幕外生成
+                        py = y + Math.random() * h;
+                    } else {
+                        px = x + Math.random() * w;
+                        py = Math.random() * -100;
+                    }
+
+                    // [修改] 根据属性混合粒子颜色
+                    let color = '#d1fae5';
+                    if (bulletConfig) {
+                        if (bulletConfig.cryo > 0) color = '#cffafe';
+                        else if (bulletConfig.pyro > 0) color = '#fdba74';
+                        else if (bulletConfig.lightning > 0) color = '#d8b4fe';
+                    }
+
+                    const p = this.spawn_createParticle(px, py, color, 'wind_slash');
+                    if (p && p.vel) {
+                        const speed = 40 + Math.random() * 30; 
+                        p.vel = dir.mult(speed);
+                        
+                        // 尺寸差异化：有的细长(气流)，有的宽大(风刃)
+                        if (Math.random() < 0.3) {
+                            p.size = 20 + Math.random() * 20; // 主风刃
+                            p.color = '#ffffff'; // 亮白
+                        } else {
+                            p.size = 5 + Math.random() * 10;  // 伴生气流
+                            // 保持原色或半透明
+                        }
+
+                        p.life = 1.0;
+                        p.drag = 1.0; // 无阻力
+                        // 计算贯穿全场所需的衰减
+                        const distance = isHorizontal ? this.canvas.width : this.canvas.height;
+                        const framesNeeded = (distance + 100) / speed;
+                        p.decay = 1.0 / (framesNeeded * 1.2);
+                    }
                 }
             } else if (element === 'wind_explosive') {
                 this.spawn_createFloatingText(centerX, centerY, "🌊冲击波", "#fca5a5");
