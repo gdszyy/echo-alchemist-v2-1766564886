@@ -2951,6 +2951,12 @@ class Peg {
             ctx.shadowBlur = 10;
             ctx.shadowColor = CONFIG.colors.laser;
             ctx.fillStyle = isLit ? '#ffffff' : color;
+        } else if (this.type === 'wind') {
+            // 风属性钉子使用特殊的脉冲发光
+            const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
+            ctx.shadowBlur = 12 + pulse * 8;
+            ctx.shadowColor = CONFIG.colors.matWind;
+            ctx.fillStyle = isLit ? '#ffffff' : color;
         } else if (isLit) {
             ctx.fillStyle = '#ffffff';
             ctx.shadowBlur = 15;
@@ -3228,7 +3234,7 @@ class DropBall {
                     if (rule.type === 'mutation') {
                         // [全场唯一性检查]
                         // 只有 flying_sword 需要全场唯一性检查
-                        const needsUniqueness = (rule.result === 'flying_sword');
+                        const needsUniqueness = (rule.result === 'flying_sword' || rule.result === 'wind');
                         const alreadyExists = needsUniqueness && game.pegs.some(p => p.type === rule.result);
 
                         if (!alreadyExists) {
@@ -7791,8 +7797,8 @@ class Game {
         }
         this.ctx.restore();
 
-        // [新增] 渲染风属性锚点
-        if (this.windAnchors && this.windAnchors.length > 0) {
+        // [新增] 渲染风属性锥点（仅在战斗阶段显示）
+        if (this.phase === 'combat' && this.windAnchors && this.windAnchors.length > 0) {
             this.ctx.save();
             this.ctx.strokeStyle = 'rgba(52, 211, 153, 0.5)';
             this.ctx.lineWidth = 2;
@@ -8736,8 +8742,24 @@ class Game {
                 const hasEnemy = this.enemies.some(e => e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h);
                 if (hasEnemy) {
                     this.spawn_createFloatingText(centerX, centerY, "🌪️旋风", "#34d399");
+                    // 添加旋转粒子特效
+                    for(let i=0; i<20; i++) {
+                        const angle = (i / 20) * Math.PI * 2;
+                        const radius = 30 + Math.random() * 20;
+                        const px = centerX + Math.cos(angle) * radius;
+                        const py = centerY + Math.sin(angle) * radius;
+                        this.spawn_createParticle(px, py, '#34d399', 'spark');
+                    }
                     for(let i=0; i<5; i++) {
                         setTimeout(() => {
+                            // 每次伤害时添加粒子
+                            for(let j=0; j<10; j++) {
+                                const angle = Math.random() * Math.PI * 2;
+                                const radius = 20 + Math.random() * 30;
+                                const px = centerX + Math.cos(angle) * radius;
+                                const py = centerY + Math.sin(angle) * radius;
+                                this.spawn_createParticle(px, py, '#34d399', 'spark');
+                            }
                             this.enemies.forEach(e => {
                                 if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
                                     e.takeDamage(2);
@@ -8763,6 +8785,16 @@ class Game {
         } else if (shape === 'square') {
             if (element === 'wind') {
                 this.spawn_createFloatingText(centerX, centerY, "🌪️大旋风", "#34d399");
+                // 添加大范围旋转特效
+                for(let i=0; i<40; i++) {
+                    const angle = (i / 40) * Math.PI * 2;
+                    const radius = 60 + Math.random() * 40;
+                    const px = centerX + Math.cos(angle) * radius;
+                    const py = centerY + Math.sin(angle) * radius;
+                    this.spawn_createParticle(px, py, '#34d399', 'spark');
+                }
+                // 添加爆炸效果
+                this.spawn_createExplosion(centerX, centerY, '#34d399', 100);
                 this.enemies.forEach(e => {
                     if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
                         let dmg = 20;
@@ -8792,10 +8824,28 @@ class Game {
             const isHorizontal = w > h;
             if (element === 'wind') {
                 this.spawn_createFloatingText(centerX, centerY, "🌬️风道", "#34d399");
+                // 添加风道粒子特效
+                if (isHorizontal) {
+                    // 水平风道
+                    for(let i=0; i<30; i++) {
+                        const px = x + (i / 30) * w;
+                        const py = centerY + (Math.random() - 0.5) * h;
+                        this.spawn_createParticle(px, py, '#34d399', 'spark');
+                    }
+                } else {
+                    // 垂直风道
+                    for(let i=0; i<30; i++) {
+                        const px = centerX + (Math.random() - 0.5) * w;
+                        const py = y + (i / 30) * h;
+                        this.spawn_createParticle(px, py, '#34d399', 'spark');
+                    }
+                }
                 this.enemies.forEach(e => {
                     const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
                     if (e.active && inPath) {
                         e.takeDamage(10);
+                        // 添加命中特效
+                        this.spawn_createParticle(e.pos.x, e.pos.y, '#34d399', 'spark');
                         this.enemies.forEach(other => {
                             if (other !== e && other.active) {
                                 const dist = e.pos.dist(other.pos);
@@ -10233,7 +10283,7 @@ class Game {
                         if (prevType !== 'pink') {
                             const weight = this.unlockedWeights[prevType] || 0;
                             // 允许继承的条件
-                            if (prevType === 'normal' || prevType === 'laser' || prevType === 'bounce' || prevType === 'flying_sword' || weight > 0) {
+                            if (prevType === 'normal' || prevType === 'laser' || prevType === 'bounce' || prevType === 'flying_sword' || prevType === 'wind' || weight > 0) {
                                 if (Math.random() < 1) { // 100% 继承位置
                                     type = prevType;
                                     // [修复]：显式继承等级
