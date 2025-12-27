@@ -4703,8 +4703,11 @@ class Enemy {
             mist.life = 1.5; 
             game.particles.push(mist);
         }
-        for(let i=0; i<5; i++) {
-            game.spawn_createParticle(this.pos.x + (Math.random()-0.5) * this.width, this.pos.y, '#a5f3fc', 'shard');
+        for(let i=0; i<8; i++) {
+            const p = new Particle(this.pos.x + (Math.random()-0.5) * this.width, this.pos.y, '#a5f3fc', 'shard');
+            // 给予一个向下的初速度，增强撞击感
+            p.vel = new Vec2((Math.random()-0.5) * 4, 2 + Math.random() * 3);
+            game.particles.push(p);
         }
     }
 
@@ -6531,7 +6534,7 @@ class Particle {
             // 移除向上偏移，使其向四周爆发并受重力下坠
             this.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed); 
             this.drag = 0.96; // 稍微减小阻力，让轨迹更平滑
-            this.gravity = 0.4; // 适中的重力，表现下坠感
+            this.gravity = 0.4; // 适中的重力，表现下坠感 (Canvas Y轴向下为正)
             this.decay = 0.02 + Math.random() * 0.02; // 寿命稍长一点点
             
             //  形状随机化：有的长有的短
@@ -6540,11 +6543,12 @@ class Particle {
             this.scaleY = Math.random() * 1.5 + 1.0; // 长度拉伸 (做成冰刺)
             
             this.angle = Math.random() * Math.PI * 2;
-            this.spin = (Math.random() - 0.5) * 0.5; // 旋转        } else if (this.mode === 'smoke') {
+            this.spin = (Math.random() - 0.5) * 0.5; // 旋转
+        } else if (mode === 'smoke') {
             this.vel = new Vec2((Math.random() - 0.5) * 0.5, -Math.random() * 1.5 - 0.5);
             this.drag = 0.98; this.gravity = -0.02; this.decay = 0.015;
             this.size = Math.random() * 6 + 4; this.life = 1.2; 
-        } else if (this.mode === 'line') {
+        } else if (mode === 'line') {
             this.vel = new Vec2(0, 0);
             this.drag = 0.98; this.gravity = 0; this.decay = 0.02;
             this.size = 2; this.life = 1.0;
