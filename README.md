@@ -45,6 +45,7 @@
 | **`DropBall`** | 收集阶段弹珠，处理物理模拟与钉板交互。 | `handlePegInteraction`, `update`, `draw` |
 | **`SoundManager`** | 音频引擎，基于 Web Audio API 合成音效。 | `playEffect`, `playTone`, `playHit` |
 | **`UIManager`** | UI 状态管理，处理 DOM 更新与交互。 | `updateSkillBar`, `showEnemyInfo`, `switchTab` |
+| **`FloatingText`** | 浮动文字特效类，用于显示伤害数字和得分。 | `update`, `draw` |
 
 ## 3. 全局配置与数据库 (Global Config & DB)
 
@@ -139,6 +140,8 @@
 | `calc_processSingleEnemyTurn` | `phase_enemy_processTurn` | 敌人AI：处理单回合逻辑 |
 | `ui_updateCombat` | `phase_combat_update` | 战斗阶段：更新逻辑 |
 | `ui_updateGathering` | `phase_gathering_update` | 收集阶段：更新逻辑 |
+| `ui_toggleDamagePanel` | `ui_toggleDamagePanel` | 切换伤害统计面板（记分板） |
+| `ui_updateDamageStats` | `ui_updateDamageStats` | 更新伤害统计数据 |
 
 ### 8.2 渲染流程抽象
 

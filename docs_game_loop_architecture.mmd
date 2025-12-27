@@ -59,14 +59,14 @@ graph TD
     G_Continue --> FloatingText
     C_Continue --> FloatingText
     
-    FloatingText[更新浮动文字] --> NextFrame[requestAnimationFrame]
+    FloatingText[render_floatingTexts<br/>更新并绘制伤害飘字] --> NextFrame[requestAnimationFrame]
     NextFrame --> Loop
     
     subgraph "组件系统 (Component Systems)"
         direction LR
         Spawn[spawn_*<br/>实体生成系统]
         Combat[combat_*<br/>战斗系统]
-        UI[ui_*<br/>UI系统]
+        UI[ui_*<br/>UI系统: 包含记分板/伤害统计]
         Input[input_*<br/>输入系统]
         Calc[calc_*<br/>计算系统]
     end
