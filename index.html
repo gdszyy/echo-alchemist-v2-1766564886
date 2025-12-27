@@ -9213,9 +9213,9 @@ class Game {
                 this.spawn_createFloatingText(e.pos.x, e.pos.y, `Wind ${damage}`, '#34d399');
                 
                 // 2. 施加轻微推力 (击退效果)
+                // 计算从爆炸中心指向敌人的向量
                 const pushDir = new Vec2(e.pos.x - centerX, e.pos.y - centerY).norm();
-                e.pos.x += pushDir.x * 10; 
-                e.pos.y += pushDir.y * 10;
+                this.combat_tryMoveEnemy(e, pushDir.mult(10));   
                 
                 // 3. 受击反馈
                 e.hitTimer = 10;
@@ -9414,7 +9414,7 @@ class Game {
                     if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
                         e.takeDamage(15);
                         const dir = e.pos.sub(new Vec2(centerX, centerY)).norm();
-                        e.pos = e.pos.add(dir.mult(40));
+                        this.combat_tryMoveEnemy(e, dir.mult(40));
                     }
                 });
             } else if (element === 'wind_light') {
@@ -9462,11 +9462,14 @@ class Game {
                 }
                 this.enemies.forEach(e => {
                     const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
-                    if (e.active && inPath) {
+                        if (e.active && inPath) {
                         // 风道伤害挂钩子弹伤害 (例如 5 倍)
                         const dmg = Math.max(1, Math.floor(bulletDamage * 5));
                         e.takeDamage(dmg);
                         this.spawn_createFloatingText(e.pos.x, e.pos.y, `Wind ${dmg}`, '#34d399');
+                        // 击退
+                        const pushDir = isHorizontal ? new Vec2(40, 0) : new Vec2(0, 40);
+                        this.combat_tryMoveEnemy(e, pushDir);
                         // 添加命中特效
                         this.spawn_createParticle(e.pos.x, e.pos.y, '#34d399', 'spark');
                         this.enemies.forEach(other => {
@@ -9489,8 +9492,8 @@ class Game {
                         const dmg = Math.max(1, Math.floor(bulletDamage * 10));
                         e.takeDamage(dmg);
                         this.spawn_createFloatingText(e.pos.x, e.pos.y, `Blast ${dmg}`, '#fca5a5');
-                        const pushDir = isHorizontal ? new Vec2(1, 0) : new Vec2(0, 1);
-                        e.pos = e.pos.add(pushDir.mult(60));
+                        const pushDir = isHorizontal ? new Vec2(60, 0) : new Vec2(0, 60);
+                        this.combat_tryMoveEnemy(e, pushDir);
                     }
                 });
             } else if (element === 'wind_light') {
@@ -9507,6 +9510,39 @@ class Game {
             }
         }
     }
+    /**
+     * [COMBAT] 尝试移动敌人，确保其不超出边界且不与其他敌人重叠
+     * @param {Enemy} enemy - 要移动的敌人
+     * @param {Vec2} delta - 移动向量
+     * @returns {boolean} 是否成功移动
+     */
+    combat_tryMoveEnemy(enemy, delta) {
+        if (!enemy || !enemy.active) return false;
+
+        const newPos = enemy.pos.add(delta);
+        const halfW = enemy.width / 2;
+        const halfH = enemy.height / 2;
+
+        // 1. 边界检查 (确保不超出画布左右和上下边界)
+        if (newPos.x - halfW < 0 || newPos.x + halfW > this.width) return false;
+        if (newPos.y - halfH < 0 || newPos.y + halfH > this.height) return false;
+
+        // 2. 碰撞检查 (确保不与其他活跃敌人重叠)
+        // 使用简单的 AABB 碰撞检测
+        const hasCollision = this.enemies.some(other => {
+            if (other === enemy || !other.active) return false;
+            
+            return Math.abs(newPos.x - other.pos.x) < (enemy.width + other.width) * 0.45 &&
+                   Math.abs(newPos.y - other.pos.y) < (enemy.height + other.height) * 0.45;
+        });
+
+        if (hasCollision) return false;
+
+        // 3. 执行移动
+        enemy.pos = newPos;
+        return true;
+    }
+
     combat_damageEnemy(enemy, projectile) {
         if (!enemy || !enemy.active) return; 
         // --- [修復]：如果是光球/偽造子彈，補齊 chainHistory 防止報錯 ---
