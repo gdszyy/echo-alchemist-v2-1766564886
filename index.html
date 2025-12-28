@@ -3578,8 +3578,9 @@ class DropBall {
                             game.isWheelSpinning = true;
 
                             game.fortuneWheel.spin(wheelX, wheelY, currentAttrs, (winningType) => {
-                                // ... (回調邏輯保持不變) ...
-                                const count = currentAttrs.filter(t => t === winningType).length;
+                                // [修改] 结算时重新获取弹珠当前的实时配方，而不是触发时的快照
+                                const latestAttrs = [...this.session.collected];
+                                const count = latestAttrs.filter(t => t === winningType).length;
                                 const addCount = Math.max(1, count); 
                                 
                                 for(let k=0; k<addCount; k++) {
@@ -8325,11 +8326,7 @@ class Game {
             ctx.fillText("SHREDDER", 0, 0);
 
         } else {
-            // 爆破：高频闪烁
-            if (Math.floor(Date.now() / 50) % 2 === 0) {
-                ctx.fillStyle = `rgba(255, 255, 255, ${0.1 + progress * 0.2})`;
-                ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-            }
+            // 爆破：取消矩形闪烁，仅保留文字提示
             
             // 文字提示
             ctx.fillStyle = `rgba(255,255,255, ${progress})`;
@@ -9338,8 +9335,7 @@ class Game {
         // [新增] 保存完整的子弹配置，用于法阵伤害套用属性效果
         const bulletConfig = { ...currentRecipe };
         let element = 'wind';
-        if (currentRecipe.explosive) element = 'wind_explosive';
-        else if (currentRecipe.laser > 0) element = 'wind_light';
+        if (currentRecipe.laser > 0) element = 'wind_light';
 
         // [优化]：为风道计算长轴中线矢量
         let tunnelVector = null;
@@ -9419,11 +9415,7 @@ class Game {
 
             if (element === 'wind') {
                 // 原本的旋风逻辑已移除，此处保留为空或重定向
-            } else if (element === 'wind_explosive') {
-                this.spawn_createFloatingText(centerX, centerY, "🧨不稳定气流", "#fca5a5");
-                for(let i=0; i<3; i++) {
-                    this.spawn_createExplosion(expandedX + Math.random()*expandedW, expandedY + Math.random()*expandedH, '#fca5a5');
-                }
+
             } else if (element === 'wind_light') {
                 this.spawn_createFloatingText(centerX, centerY, "🕳️黑洞", "#0ea5e9");
                 this.enemies.forEach(e => {
@@ -12317,8 +12309,9 @@ class Game {
             return; // <--- 飛劍邏輯結束，直接返回
         }
 
-        // 如果是激光，发射光束后直接 return，不生成 Projectile
-        if (recipe.isLaser) {
+        // 如果是激光且不是风属性，发射光束后直接 return，不生成 Projectile
+        // [修改] 优先级：风属性 > 激光。如果同时拥有，则发射风属性实体子弹。
+        if (recipe.isLaser && !recipe.wind) {
             this.combat_laser_fire(x, y, vel, recipe, shotId);
             
             // 处理散射激光 (如果激光带有散射属性，比如吃了黄色钉子)
@@ -12328,18 +12321,11 @@ class Game {
                     const multiplier = Math.ceil(i / 2); 
                     const angleOffset = 0.2 * multiplier * sign; 
                     const newVel = vel.rotate(angleOffset); 
-                    // 递归调用 fireLaser 或 spawnBullet
-                    // 注意：散射出的激光伤害通常减半或者保持
                     const copyRecipe = { ...recipe, scatter: 0 }; 
                     this.combat_laser_fire(x, y, newVel, copyRecipe, shotId);
                 } 
             }
-            return; // <--- 确保这里有 return，就不会生成下面的 Projectile 实体球了
-        }
-         
-        if (recipe.isLaser) {
-            this.combat_laser_fire(x, y, vel, recipe, shotId);
-            return;
+            return; 
         }
 
         // 散射 (Scatter)
