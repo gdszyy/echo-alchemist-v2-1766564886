@@ -2553,42 +2553,63 @@ class FortuneWheel {
         this.velocity = 0.4 + Math.random() * 0.2;
         this.angle = 0;
 
-        // 構建扇區 (增加過濾邏輯，防止出現異常分區)
+        // 構建扇區
         this.slices = [];
-        const counts = {};
         
-        // 1. 統計有效屬性
+        // [修改] 1. 过滤不可叠加属性 (如 pierce, bounce, scatter, flying_sword 等通常不适合转盘直接翻倍)
+        // 我们只允许元素属性和增幅属性进入转盘
+        const stackableTypes = ['damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind', 'resonance', 'explosive'];
+        
+        // 统计当前弹珠拥有的可叠加属性
+        const counts = {};
         collectedAttributes.forEach(type => {
-            if (type && CONFIG.ui.attributeDisplay[type]) {
+            // 必须是可叠加类型，且在配置中有定义
+            if (type && stackableTypes.includes(type) && CONFIG.ui.attributeDisplay[type]) {
                 counts[type] = (counts[type] || 0) + 1;
             }
         });
 
-        // 2. 計算總數
         const validTypes = Object.keys(counts);
-        const totalCount = validTypes.reduce((sum, type) => sum + counts[type], 0);
         
-        // 如果沒有有效屬性，不進行後續邏輯
-        if (totalCount === 0) return;
+        // [修改] 2. 重构概率算法：扇区大小 = (当前拥有层数 * 基础权重)
+        // 这样既考虑了“当前拥有”，也考虑了“稀有度”
+        const weights = {};
+        let totalWeight = 0;
+        
+        validTypes.forEach(type => {
+            // 获取基础权重 (从 CONFIG.probabilities 获取，如果没有则默认为 1)
+            const baseProb = CONFIG.probabilities[type] || 1;
+            // 最终权重 = 基础权重 * (1 + 当前层数 * 0.5) -> 拥有的越多，扇区越大，但也受基础稀有度限制
+            const weight = baseProb * (1 + counts[type] * 0.5);
+            weights[type] = weight;
+            totalWeight += weight;
+        });
+
+        // 如果没有有效属性，尝试加入一个保底的 'damage' 属性 (如果它在 stackableTypes 中)
+        if (totalWeight === 0) {
+            const fallbackType = 'damage';
+            weights[fallbackType] = 1;
+            totalWeight = 1;
+            validTypes.push(fallbackType);
+            counts[fallbackType] = 0;
+        }
+
         let currentAngle = 0;
-        
-        // [修复] 动态构建 colorMap 和 iconMap，确保与全局配置同步
-        Object.keys(counts).forEach(type => {
-            const weight = counts[type] / totalCount;
-            const arc = weight * Math.PI * 2;
-            
-            // 优先从全局配置中获取颜色和图标
+        Object.keys(weights).forEach(type => {
+            const arc = (weights[type] / totalWeight) * Math.PI * 2;
             const display = CONFIG.ui.attributeDisplay[type];
-            const color = display ? display.color : (CONFIG.colors['mat' + type.charAt(0).toUpperCase() + type.slice(1)] || '#ccc');
-            const icon = display ? display.icon : (this.iconMap[type] || '❓');
+            
+            // [修改] 3. 动态奖励算法：中奖后获得的层数
+            // 基础奖励 = 1，如果当前层数多，奖励也随之提升 (例如：获得当前层数的 50%，至少 1 层)
+            const rewardCount = Math.max(1, Math.ceil(counts[type] * 0.5));
 
             this.slices.push({
                 type: type,
                 startAngle: currentAngle,
                 endAngle: currentAngle + arc,
-                color: color,
-                icon: icon,
-                count: counts[type]
+                color: display ? display.color : '#ccc',
+                icon: display ? display.icon : '❓',
+                rewardCount: rewardCount // 存储奖励层数
             });
             currentAngle += arc;
         });
@@ -2623,7 +2644,8 @@ class FortuneWheel {
     finalizeResult() {
         const winner = this.getCurrentSlice();
         if (winner && this.onFinish) {
-            this.onFinish(winner.type);
+            // [修改] 传递中奖类型和奖励层数
+            this.onFinish(winner.type, winner.rewardCount);
         }
         setTimeout(() => { this.active = false; }, 1500); // 稍微延長展示時間
     }
@@ -3634,11 +3656,9 @@ class DropBall {
                             
                             game.isWheelSpinning = true;
 
-                            game.fortuneWheel.spin(wheelX, wheelY, currentAttrs, (winningType) => {
-                                // [修改] 结算时重新获取弹珠当前的实时配方，而不是触发时的快照
-                                const latestAttrs = [...this.session.collected];
-                                const count = latestAttrs.filter(t => t === winningType).length;
-                                const addCount = Math.max(1, count); 
+                            game.fortuneWheel.spin(wheelX, wheelY, currentAttrs, (winningType, rewardCount) => {
+                                // [修改] 使用转盘计算出的 rewardCount
+                                const addCount = rewardCount || 1; 
                                 
                                 for(let k=0; k<addCount; k++) {
                                     this.session.collected.push(winningType);
@@ -3649,8 +3669,11 @@ class DropBall {
                                     game.marbleQueue[game.activeMarbleIndex].collected = [...this.session.collected];
                                 }
                                 
+                                // 获取属性名称
+                                const attrName = CONFIG.ui.attributeDisplay[winningType] ? CONFIG.ui.attributeDisplay[winningType].name : winningType;
+                                
                                 // 文字提示位置也改為屏幕中間
-                                game.spawn_createFloatingText(wheelX, wheelY + 80, `${winningType.toUpperCase()} x${addCount}!`, "#fff");
+                                game.spawn_createFloatingText(wheelX, wheelY + 80, `${attrName} +${addCount}!`, "#fff");
                                 game.spawn_createExplosion(wheelX, wheelY, '#fff');
                                 audio.playPowerup(5);
                                 game.ui_renderRecipeHUD();
