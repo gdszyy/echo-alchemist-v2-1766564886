@@ -8163,101 +8163,110 @@ class Game {
      * @description 根据阵法类型（风道/旋风/爆破）显示不同的视觉预兆效果
      * @param {object} matrix - 法阵实例对象
      */
+    /**
+     * [VISUAL] 绘制蝴蝶法阵的路径波预览 (内部渲染版)
+     */
+    render_butterflyPathWave(ctx, anchors, center, progress) {
+        ctx.save();
+        const alpha = 0.3 + progress * 0.5;
+        ctx.strokeStyle = `rgba(52, 211, 153, ${alpha})`;
+        ctx.lineWidth = 2 + progress * 2;
+        ctx.setLineDash([10, 10]);
+        anchors.forEach((a, i) => {
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(center.x, center.y);
+            ctx.stroke();
+            const segments = 8;
+            const offset = (Date.now() / 150) % 1;
+            for(let j=0; j<segments; j++) {
+                const t = (j / segments + offset) % 1;
+                const px = a.x + (center.x - a.x) * t;
+                const py = a.y + (center.y - a.y) * t;
+                ctx.fillStyle = "#fff";
+                ctx.beginPath();
+                ctx.arc(px, py, 1.5 + progress * 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+        ctx.restore();
+    }
+
     render_singleWindMatrix(matrix) {
         if (!matrix || !matrix.active) return;
-
         const { timer, maxTimer, rect, type, anchors, tunnelVector } = matrix;
-        
-        // 使用 Exponential Easing (急剧加速)，模拟暴风瞬间成型
         const t = 1 - (timer / maxTimer);
-        const progress = t === 0 ? 0 : Math.pow(2, 10 * t - 10); 
-        
+        const progress = t === 0 ? 0 : Math.pow(2, 10 * t - 10);
         const ctx = this.ctx;
         const time = Date.now();
-        
-        // 1. 粒子喷射
         this.spawn_windSkillParticles(type, rect, progress);
-
         ctx.save();
-        ctx.globalCompositeOperation = 'lighter'; 
-
-        // --- A. 边界：不稳定的能量拘束 ---
+        ctx.globalCompositeOperation = "lighter";
         ctx.beginPath();
         ctx.moveTo(anchors[0].x, anchors[0].y);
-        
         anchors.forEach(a => {
-            // 高频抖动 (Frequency 高, Amplitude 小) -> 锐利感
             const shakeX = (Math.random() - 0.5) * (3 + progress * 5);
             const shakeY = (Math.random() - 0.5) * (3 + progress * 5);
             ctx.lineTo(a.x + shakeX, a.y + shakeY);
         });
         ctx.closePath();
-        
-        // 颜色：锐利的青白色，而非柔和的绿色
-        const flash = Math.sin(time / 20) > 0; // 极高频闪烁
-        ctx.strokeStyle = flash ? '#fff' : '#34d399';
+        const flash = Math.sin(time / 20) > 0;
+        ctx.strokeStyle = flash ? "#fff" : "#34d399";
         ctx.lineWidth = 2;
         ctx.shadowBlur = 20 * progress;
-        ctx.shadowColor = '#34d399';
+        ctx.shadowColor = "#34d399";
         ctx.stroke();
-
-        // --- B. 内部核心特效 ---
-        if (type === 'tunnel') {
-            // === [修改 2] 风道：半透明前进的">"符号 ===
+        if (type === "tunnel") {
             const isHorizontal = rect.w > rect.h;
-            const canvasW = this.canvas.width;
-            const canvasH = this.canvas.height;
             const centerX = rect.x + rect.w/2;
             const centerY = rect.y + rect.h/2;
-            
-            // 1. 绘制极淡的背景中线
             ctx.beginPath();
             let grad;
             if (isHorizontal) {
                 grad = ctx.createLinearGradient(0, centerY - rect.h/2, 0, centerY + rect.h/2);
-                ctx.moveTo(0, centerY);
-                ctx.lineTo(canvasW, centerY);
+                ctx.moveTo(rect.x, centerY);
+                ctx.lineTo(rect.x + rect.w, centerY);
             } else {
                 grad = ctx.createLinearGradient(centerX - rect.w/2, 0, centerX + rect.w/2, 0);
-                ctx.moveTo(centerX, 0);
-                ctx.lineTo(centerX, canvasH);
+                ctx.moveTo(centerX, rect.y);
+                ctx.lineTo(centerX, rect.y + rect.h);
             }
-            grad.addColorStop(0, 'rgba(52, 211, 153, 0)');
-            grad.addColorStop(0.5, 'rgba(52, 211, 153, 0.08)'); // 极淡
-            grad.addColorStop(1, 'rgba(52, 211, 153, 0)');
+            grad.addColorStop(0, "rgba(52, 211, 153, 0)");
+            grad.addColorStop(0.5, "rgba(52, 211, 153, 0.2)");
+            grad.addColorStop(1, "rgba(52, 211, 153, 0)");
             ctx.strokeStyle = grad;
-            ctx.lineWidth = isHorizontal ? rect.h * 0.5 : rect.w * 0.5;
+            ctx.lineWidth = isHorizontal ? rect.h : rect.w;
             ctx.stroke();
-            
-            // 2. [修改 2] 绘制半透明前进的">"符号
-            const arrowCount = 5;
-            const arrowSize = 15;
-            const arrowAlpha = 0.15 + progress * 0.15; // 半透明，不抢眼
-            ctx.fillStyle = `rgba(52, 211, 153, ${arrowAlpha})`;
-            ctx.strokeStyle = `rgba(52, 211, 153, ${arrowAlpha * 1.5})`;
-            ctx.lineWidth = 1.5;
-            
+            const arrowCount = 8;
+            const arrowSize = 20 + progress * 10;
+            const arrowAlpha = 0.4 + progress * 0.6;
+            ctx.fillStyle = `rgba(255, 255, 255, ${arrowAlpha})`;
+            ctx.strokeStyle = `rgba(52, 211, 153, ${arrowAlpha})`;
+            ctx.lineWidth = 2;
             for(let k=0; k<arrowCount; k++) {
-                const arrowPos = ((time / 500) + k/arrowCount) % 1;
+                const arrowPos = ((time / 300) + k/arrowCount) % 1;
                 ctx.beginPath();
                 if (isHorizontal) {
-                    // 水平风道："> > > > >"
-                    const ax = arrowPos * canvasW;
+                    const ax = rect.x + arrowPos * rect.w;
                     const ay = centerY;
-                    ctx.moveTo(ax - arrowSize/2, ay - arrowSize/2);
-                    ctx.lineTo(ax + arrowSize/2, ay);
-                    ctx.lineTo(ax - arrowSize/2, ay + arrowSize/2);
+                    ctx.moveTo(ax - arrowSize, ay - arrowSize/2);
+                    ctx.lineTo(ax, ay);
+                    ctx.lineTo(ax - arrowSize, ay + arrowSize/2);
                 } else {
-                    // 垂直风道：向下的"v v v v v"
                     const ax = centerX;
-                    const ay = arrowPos * canvasH;
-                    ctx.moveTo(ax - arrowSize/2, ay - arrowSize/2);
+                    const ay = rect.y + arrowPos * rect.h;
+                    ctx.moveTo(ax - arrowSize/2, ay - arrowSize);
                     ctx.lineTo(ax, ay + arrowSize/2);
-                    ctx.lineTo(ax + arrowSize/2, ay - arrowSize/2);
+                    ctx.lineTo(ax + arrowSize/2, ay - arrowSize);
                 }
-                ctx.fill();
                 ctx.stroke();
             }
+        } else if (this.isBowtieShape(anchors)) {
+            const intersection = this.getLineIntersectionPoint(anchors[0], anchors[2], anchors[1], anchors[3]);
+            if (intersection) {
+                this.render_butterflyPathWave(ctx, anchors, intersection, progress);
+            }
+        }
         } else if (type === 'cyclone') {
             // === 旋风：绞肉机法阵 (Shredder Circle) ===
             const cx = rect.x + rect.w / 2;
