@@ -1004,11 +1004,11 @@
                     <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-amber-100">煉金工坊</span>
                 </button>
 
-                <button onclick="showToast('真理之書編撰中 (Coming Soon)...')" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-cyan-500/30 transition-all duration-300 group backdrop-blur-sm">
+                <button onclick="game.ui_openTruthBook()" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-cyan-500/30 transition-all duration-300 group backdrop-blur-sm">
                     <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-cyan-900/20 group-hover:text-cyan-400 transition-all shadow-inner">
                         <span class="text-2xl">📖</span>
                     </div>
-                    <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-cyan-100">真理之書</span>
+                    <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-cyan-100">真理之书</span>
                 </button>
 
                 <button onclick="showToast('試煉場封印中 (Coming Soon)...')" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-red-500/30 transition-all duration-300 group backdrop-blur-sm">
@@ -1108,6 +1108,60 @@
 
         
  
+    </div>
+
+    <!-- Phase: Truth Book (Encyclopedia) -->
+    <div id="phase-truth-book" class="ui-overlay hidden-phase" style="display: none; z-index: 300; background: rgba(2, 6, 23, 0.98); pointer-events: auto;">
+        <div class="flex flex-col w-full h-full p-6">
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-6 shrink-0">
+                <h2 class="text-3xl font-[Cinzel] text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">真理之書 <span class="text-sm text-slate-500 ml-2">Liber Veritatis</span></h2>
+                <button onclick="game.ui_closeTruthBook()" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-400 hover:bg-red-900/40 hover:text-red-400 transition-all">✕</button>
+            </div>
+
+            <div class="flex flex-1 min-h-0 gap-6">
+                <!-- Left: List -->
+                <div class="w-1/3 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar">
+                    <div class="text-xs font-bold text-slate-500 tracking-widest uppercase mb-1">敵人圖鑑</div>
+                    <div id="truth-enemy-list" class="flex flex-col gap-2"></div>
+                    <div class="text-xs font-bold text-slate-500 tracking-widest uppercase mt-4 mb-1">屬性百科</div>
+                    <div id="truth-attr-list" class="flex flex-col gap-2"></div>
+                </div>
+
+                <!-- Right: Detail & Demo -->
+                <div id="truth-detail-panel" class="flex-1 flex flex-col bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden relative">
+                    <div id="truth-empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-slate-600">
+                        <span class="text-6xl mb-4">📜</span>
+                        <p>選擇一個條目以查看詳情</p>
+                    </div>
+                    
+                    <div id="truth-content" class="hidden flex flex-col h-full">
+                        <!-- Info Section -->
+                        <div class="p-6 border-b border-slate-800 bg-slate-900/80">
+                            <div class="flex items-center gap-4 mb-2">
+                                <span id="truth-item-icon" class="text-4xl"></span>
+                                <div>
+                                    <h3 id="truth-item-name" class="text-2xl font-bold text-white"></h3>
+                                    <div id="truth-item-tags" class="flex gap-2 mt-1"></div>
+                                </div>
+                            </div>
+                            <p id="truth-item-desc" class="text-slate-400 text-sm leading-relaxed"></p>
+                        </div>
+
+                        <!-- Demo Section -->
+                        <div class="flex-1 relative bg-black/40">
+                            <div class="absolute top-4 left-4 z-10 bg-slate-900/80 backdrop-blur-md px-3 py-1 rounded-full border border-slate-700 text-[10px] text-cyan-400 tracking-widest uppercase">
+                                實戰循環演示
+                            </div>
+                            <canvas id="truth-demo-canvas" class="w-full h-full"></canvas>
+                            <div id="truth-demo-log" class="absolute bottom-4 left-4 right-4 bg-slate-900/60 backdrop-blur-sm p-3 rounded-lg border border-slate-800 text-xs text-slate-300 font-mono h-16 overflow-hidden">
+                                <div id="truth-log-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="phase-relic" class="ui-overlay hidden-phase" style="display: none; z-index: 200; background: rgba(2, 6, 23, 0.95);">
@@ -7941,6 +7995,24 @@ class Game {
         this.currentRows = CONFIG.gameplay.rows; 
         this.boardBottomY = 0;
         this.sys_loop();
+        this.truthBook = new TruthBook(this);
+    }
+
+    ui_openTruthBook() {
+        this.phase_switchPhase('truth_book');
+        const overlay = document.getElementById('phase-truth-book');
+        overlay.style.display = 'flex';
+        overlay.classList.remove('hidden-phase');
+        overlay.classList.add('active-phase');
+    }
+
+    ui_closeTruthBook() {
+        const overlay = document.getElementById('phase-truth-book');
+        overlay.style.display = 'none';
+        overlay.classList.remove('active-phase');
+        overlay.classList.add('hidden-phase');
+        this.truthBook.active = false;
+        this.phase_switchPhase('meta');
     }
     // --- 在 Game 类中新增以下方法 ---
 
@@ -8191,13 +8263,17 @@ class Game {
         // 3. 背景层渲染
         if (this.phase !== 'combat') {
             this.render_background();
-        }
-
         // 4. 阶段逻辑与渲染分发
-        if (this.phase === 'gathering') {
-            this.phase_gathering_update(timeScale);
-        } else if (this.phase === 'combat') {
-            this.phase_combat_update(timeScale);
+        if (this.phase === 'truth_book') {
+            this.truthBook.update();
+        }
+        switch (this.phase) {
+            case 'gathering':
+                this.phase_gathering_update(timeScale);
+                break;
+            case 'combat':
+                this.phase_combat_update(timeScale);
+                break;
         }
 
         // 5. 特效与文字层渲柑
@@ -14760,9 +14836,391 @@ function lerpColor(a, b, amount) {
  * @param {number} t - 插值係數 (0 ~ 1，越小越慢)
  * @returns {number} 計算後的當前值
  */
-function lerp(start, end, t) {
-    return start * (1 - t) + end * t;
+	function lerp(start, end, t) {
+	    return start * (1 - t) + end * t;
+	}
+
+/**
+ * TruthBook Module - 演示引擎与配置
+ */
+const TRUTH_BOOK_DATA = {
+    enemies: [
+        {
+            id: 'normal_golem',
+            name: '普通魔像',
+            icon: '🤖',
+            tags: ['基礎', '均衡'],
+            desc: '最常見的煉金產物，雖然行動緩慢，但成群結隊時依然具有威脅。',
+            setup: (game) => {
+                const e = new Enemy(game.width/2, 150, 60, 60, 50);
+                game.enemies.push(e);
+            },
+            loop: [
+                { type: 'log', text: '魔像正在待機...' },
+                { type: 'wait', frames: 60 },
+                { type: 'log', text: '魔像向前推進！' },
+                { type: 'enemy_turn' },
+                { type: 'wait', frames: 90 },
+                { type: 'reset', delay: 60 }
+            ]
+        },
+        {
+            id: 'regen_golem',
+            name: '再生魔像',
+            icon: '🌿',
+            tags: ['詞綴: 再生', '持久'],
+            desc: '核心嵌入了生命精粹的魔像，每回合開始時會修復受損的軀體。',
+            setup: (game) => {
+                const e = new Enemy(game.width/2, 150, 60, 60, 40, 100, 'normal', ['regen']);
+                game.enemies.push(e);
+            },
+            loop: [
+                { type: 'log', text: '魔像受到 30 點傷害' },
+                { type: 'damage', value: 30 },
+                { type: 'wait', frames: 60 },
+                { type: 'log', text: '觸發 [再生] 效果' },
+                { type: 'enemy_turn' },
+                { type: 'wait', frames: 120 },
+                { type: 'reset', delay: 60 }
+            ]
+        },
+        {
+            id: 'shield_golem',
+            name: '護盾魔像',
+            icon: '🛡️',
+            tags: ['詞綴: 護盾', '高防'],
+            desc: '周身環繞著力場護盾，能大幅削減受到的物理衝擊。',
+            setup: (game) => {
+                const e = new Enemy(game.width/2, 150, 60, 60, 100, 100, 'normal', ['shield']);
+                game.enemies.push(e);
+            },
+            loop: [
+                { type: 'log', text: '發射普通彈丸' },
+                { type: 'spawn_projectile', config: { damage: 10 } },
+                { type: 'wait', frames: 120 },
+                { type: 'log', text: '護盾減少了 50% 的傷害' },
+                { type: 'wait', frames: 60 },
+                { type: 'reset', delay: 60 }
+            ]
+        },
+        {
+            id: 'healer_golem',
+            name: '祭司魔像',
+            icon: '✨',
+            tags: ['詞綴: 治療', '輔助'],
+            desc: '不具備直接戰鬥能力，但會持續為周圍的友軍提供能量修復。',
+            setup: (game) => {
+                const e1 = new Enemy(game.width/2 - 60, 150, 50, 50, 20, 100);
+                const e2 = new Enemy(game.width/2 + 60, 150, 60, 60, 100, 100, 'normal', ['healer']);
+                game.enemies.push(e1, e2);
+            },
+            loop: [
+                { type: 'log', text: '友軍受傷...' },
+                { type: 'damage', targetIdx: 0, value: 40 },
+                { type: 'wait', frames: 60 },
+                { type: 'log', text: '祭司釋放治療波' },
+                { type: 'enemy_turn', targetIdx: 1 },
+                { type: 'wait', frames: 120 },
+                { type: 'reset', delay: 60 }
+            ]
+        }
+    ],
+    attributes: [
+        {
+            id: 'cryo',
+            name: '冰霜',
+            icon: '❄️',
+            tags: ['控制', '低溫'],
+            desc: '降低敵人的分子活性。積累低溫可使敵人進入凍結狀態，跳過其行動回合。',
+            setup: (game) => {
+                const e = new Enemy(game.width/2, 150, 60, 60, 100);
+                game.enemies.push(e);
+            },
+            loop: [
+                { type: 'log', text: '注入冰霜能量' },
+                { type: 'spawn_projectile', config: { damage: 0, cryo: 60 } },
+                { type: 'wait', frames: 60 },
+                { type: 'log', text: '目標溫度下降，產生寒氣' },
+                { type: 'wait', frames: 120 },
+                { type: 'reset', delay: 60 }
+            ]
+        },
+        {
+            id: 'pyro',
+            name: '火焰',
+            icon: '🔥',
+            tags: ['傷害', '高溫'],
+            desc: '極端的高溫會破壞魔像的結構。當溫度超過臨界點時，魔像會持續崩潰。',
+            setup: (game) => {
+                const e = new Enemy(game.width/2, 150, 60, 60, 100);
+                game.enemies.push(e);
+            },
+            loop: [
+                { type: 'log', text: '注入火焰能量' },
+                { type: 'spawn_projectile', config: { damage: 0, pyro: 120 } },
+                { type: 'wait', frames: 60 },
+                { type: 'log', text: '目標過熱，開始持續受損' },
+                { type: 'wait', frames: 120 },
+                { type: 'reset', delay: 60 }
+            ]
+        }
+    ]
+};
+
+class TruthBook {
+    constructor(mainGame) {
+        this.mainGame = mainGame;
+        this.canvas = document.getElementById('truth-demo-canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.active = false;
+        this.currentEntry = null;
+        this.demoGame = null;
+        this.instructionIdx = 0;
+        this.waitTimer = 0;
+        
+        this.initUI();
+    }
+
+    initUI() {
+        const enemyList = document.getElementById('truth-enemy-list');
+        const attrList = document.getElementById('truth-attr-list');
+
+        TRUTH_BOOK_DATA.enemies.forEach(entry => {
+            const btn = this.createListButton(entry);
+            enemyList.appendChild(btn);
+        });
+
+        TRUTH_BOOK_DATA.attributes.forEach(entry => {
+            const btn = this.createListButton(entry);
+            attrList.appendChild(btn);
+        });
+    }
+
+    createListButton(entry) {
+        const btn = document.createElement('button');
+        btn.className = 'flex items-center gap-3 p-3 w-full bg-slate-800/40 border border-slate-700/50 rounded-xl hover:bg-cyan-900/20 hover:border-cyan-500/50 transition-all text-left group';
+        btn.innerHTML = `
+            <span class="text-2xl group-hover:scale-110 transition-transform">${entry.icon}</span>
+            <span class="text-sm font-bold text-slate-300 group-hover:text-cyan-100">${entry.name}</span>
+        `;
+        btn.onclick = () => this.showEntry(entry);
+        return btn;
+    }
+
+    showEntry(entry) {
+        this.currentEntry = entry;
+        document.getElementById('truth-empty-state').classList.add('hidden');
+        document.getElementById('truth-content').classList.remove('hidden');
+        
+        document.getElementById('truth-item-icon').innerText = entry.icon;
+        document.getElementById('truth-item-name').innerText = entry.name;
+        document.getElementById('truth-item-desc').innerText = entry.desc;
+        
+        const tagsCont = document.getElementById('truth-item-tags');
+        tagsCont.innerHTML = '';
+        entry.tags.forEach(tag => {
+            const s = document.createElement('span');
+            s.className = 'text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
+            s.innerText = tag;
+            tagsCont.appendChild(s);
+        });
+
+        this.startDemo(entry);
+    }
+
+    startDemo(entry) {
+        // 初始化演示沙盒
+        this.demoGame = {
+            width: this.canvas.width,
+            height: this.canvas.height,
+            enemies: [],
+            projectiles: [],
+            particles: [],
+            floatingTexts: [],
+            shockwaves: [],
+            spores: [],
+            fireWaves: [],
+            sonSwords: [],
+            lightningBolts: [],
+            enemyHeight: 60,
+            enemyWidth: 60,
+            timeScale: 1.0,
+            // 模拟核心方法
+            spawn_createParticle: (x, y, color, mode) => {
+                const p = new Particle(x, y, color, mode);
+                this.demoGame.particles.push(p);
+                return p;
+            },
+            spawn_createFloatingText: (x, y, text, color) => {
+                this.demoGame.floatingTexts.push({ pos: new Vec2(x, y), text, color, life: 60 });
+            },
+            spawn_createShockwave: (x, y, color) => {
+                this.demoGame.shockwaves.push({ pos: new Vec2(x, y), color, radius: 0, maxRadius: 100, life: 30 });
+            },
+            calc_isAreaOccupied: () => false,
+            damageEnemy: (enemy, proj) => {
+                // 复用主游戏的伤害逻辑，但需要简化或模拟
+                const dmg = proj.config.damage || 0;
+                enemy.hp -= dmg;
+                if (proj.config.cryo) enemy.temp -= proj.config.cryo;
+                if (proj.config.pyro) enemy.temp += proj.config.pyro;
+                this.demoGame.spawn_createFloatingText(enemy.pos.x, enemy.pos.y, `-${dmg}`, '#fff');
+            }
+        };
+
+        entry.setup(this.demoGame);
+        this.instructionIdx = 0;
+        this.waitTimer = 0;
+        document.getElementById('truth-log-content').innerHTML = '';
+        this.active = true;
+    }
+
+    update() {
+        if (!this.active || !this.demoGame) return;
+
+        // 1. 指令解析
+        if (this.waitTimer > 0) {
+            this.waitTimer--;
+        } else {
+            const inst = this.currentEntry.loop[this.instructionIdx];
+            this.executeInstruction(inst);
+            this.instructionIdx = (this.instructionIdx + 1) % this.currentEntry.loop.length;
+        }
+
+        // 2. 模拟更新
+        const ts = 1.0;
+        this.demoGame.enemies.forEach(e => e.update(ts, this.demoGame));
+        this.demoGame.projectiles.forEach(p => p.update(this.demoGame.width, this.demoGame.height, this.demoGame.enemies, null, ts));
+        this.demoGame.particles.forEach((p, i) => {
+            p.update(ts);
+            if (!p.active) this.demoGame.particles.splice(i, 1);
+        });
+        this.demoGame.floatingTexts.forEach((f, i) => {
+            f.pos.y -= 0.5;
+            f.life--;
+            if (f.life <= 0) this.demoGame.floatingTexts.splice(i, 1);
+        });
+        this.demoGame.shockwaves.forEach((s, i) => {
+            s.radius += 3;
+            s.life--;
+            if (s.life <= 0) this.demoGame.shockwaves.splice(i, 1);
+        });
+
+        this.draw();
+    }
+
+    executeInstruction(inst) {
+        switch(inst.type) {
+            case 'log':
+                this.addLog(inst.text);
+                break;
+            case 'wait':
+                this.waitTimer = inst.frames;
+                break;
+            case 'damage':
+                const target = this.demoGame.enemies[inst.targetIdx || 0];
+                if (target) {
+                    target.hp -= inst.value;
+                    target.whiteBarTimer = 30;
+                    this.demoGame.spawn_createFloatingText(target.pos.x, target.pos.y, `-${inst.value}`, '#ef4444');
+                }
+                break;
+            case 'enemy_turn':
+                const actor = this.demoGame.enemies[inst.targetIdx || 0];
+                if (actor) actor.executeTurnAction(this.demoGame);
+                break;
+            case 'spawn_projectile':
+                const p = new Projectile(this.demoGame.width/2, this.demoGame.height + 50, new Vec2(0, -8), inst.config);
+                this.demoGame.projectiles.push(p);
+                break;
+            case 'reset':
+                this.waitTimer = inst.delay || 60;
+                this.startDemo(this.currentEntry);
+                break;
+        }
+    }
+
+    addLog(text) {
+        const logCont = document.getElementById('truth-log-content');
+        const div = document.createElement('div');
+        div.className = 'mb-1 text-cyan-400/80';
+        div.innerHTML = `<span class="text-slate-600 mr-2">></span>${text}`;
+        logCont.appendChild(div);
+        if (logCont.childNodes.length > 3) logCont.removeChild(logCont.firstChild);
+    }
+
+    draw() {
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // 绘制背景网格
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.05)';
+        ctx.lineWidth = 1;
+        for(let x=0; x<this.canvas.width; x+=20) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, this.canvas.height); ctx.stroke();
+        }
+        for(let y=0; y<this.canvas.height; y+=20) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(this.canvas.width, y); ctx.stroke();
+        }
+
+        // 绘制实体 (复用原有绘制逻辑的简化版)
+        this.demoGame.enemies.forEach(e => this.drawEnemy(e));
+        this.demoGame.projectiles.forEach(p => this.drawProjectile(p));
+        this.demoGame.particles.forEach(p => p.draw(ctx));
+        
+        // 绘制浮动文字
+        this.demoGame.floatingTexts.forEach(f => {
+            ctx.fillStyle = f.color;
+            ctx.font = 'bold 14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(f.text, f.pos.x, f.pos.y);
+        });
+
+        // 绘制冲击波
+        this.demoGame.shockwaves.forEach(s => {
+            ctx.beginPath();
+            ctx.arc(s.pos.x, s.pos.y, s.radius, 0, Math.PI*2);
+            ctx.strokeStyle = s.color;
+            ctx.globalAlpha = s.life / 30;
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+        });
+    }
+
+    drawEnemy(e) {
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.translate(e.pos.x, e.pos.y + e.bumpOffsetY);
+        
+        // 身体
+        ctx.fillStyle = '#1e293b';
+        ctx.strokeStyle = e.temp > 0 ? '#f97316' : (e.temp < 0 ? '#06b6d4' : '#475569');
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(-e.width/2, -e.height/2, e.width, e.height, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        // 血条
+        const bw = e.width * 0.8;
+        const bh = 4;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(-bw/2, -e.height/2 - 10, bw, bh);
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(-bw/2, -e.height/2 - 10, bw * (e.hp / e.maxHp), bh);
+
+        ctx.restore();
+    }
+
+    drawProjectile(p) {
+        const ctx = this.ctx;
+        ctx.beginPath();
+        ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI*2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+    }
 }
+
 function hexToRgba(hex, alpha) {
     let c;
     if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
