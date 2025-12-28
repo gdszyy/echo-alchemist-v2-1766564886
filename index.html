@@ -7836,6 +7836,29 @@ class Game {
     // --- 在 Game 类中新增以下方法 ---
 
     /**
+     * @method calc_getPeakAverageDamage
+     * @description 计算最高三轮伤害的平均值，用于动态调整敌人血量。
+     */
+    calc_getPeakAverageDamage() {
+        // 1. 从历史记录中提取每轮总伤害
+        const damages = this.roundDamageHistory.map(r => {
+            return r.shots.reduce((sum, s) => sum + (s.total || 0), 0);
+        });
+        
+        // 2. 包含上一轮的实时伤害
+        if (this.prevRoundDamage > 0) damages.push(this.prevRoundDamage);
+        
+        if (damages.length === 0) return 0;
+        
+        // 3. 降序排列并取前 3 名
+        damages.sort((a, b) => b - a);
+        const top3 = damages.slice(0, 3);
+        const sum = top3.reduce((a, b) => a + b, 0);
+        
+        return sum / top3.length;
+    }
+
+    /**
      * @method calculatePlayerExpectedDamage
      * @description 计算玩家当前弹药队列的平均预期伤害 (DDA 核心算法)
      */
@@ -8928,9 +8951,26 @@ class Game {
      */
     spawn_spawnEnemyRowAt(yPos) {
         const b = CONFIG.balance;
-        // 计算基础血量
-        const dynamicGrowth = (this.round * b.enemyHpPerRound) * this.difficultyGrowthFactor;
-    const baseHP = Math.floor((b.enemyBaseHp + dynamicGrowth) * this.nextRoundHpMultiplier);
+        
+        // --- [优化] 动态血量修正逻辑 ---
+        // 1. 计算线性增长的基础血量
+        const linearHP = b.enemyBaseHp + (this.round * b.enemyHpPerRound) * this.difficultyGrowthFactor;
+        
+        // 2. 计算基于玩家峰值伤害的理想血量
+        const peakAvg = this.calc_getPeakAverageDamage();
+        const fullRowsCapacity = 2 * CONFIG.gameplay.enemyCols; // 以 2 行满员为对标
+        
+        let finalBaseHP = linearHP;
+        if (peakAvg > 0) {
+            const idealHP = peakAvg / fullRowsCapacity;
+            // 混合：40% 线性增长 + 60% 动态调整，确保血量跟随玩家强度
+            finalBaseHP = (linearHP * 0.4) + (idealHP * 0.6);
+        }
+        
+        // 3. 应用最终倍率
+        const baseHP = Math.floor(finalBaseHP * this.nextRoundHpMultiplier);
+        // ----------------------------
+
         const w = this.enemyWidth;
         
         // 标记占用状态：true 表示该列已被"处理"（可能是生成了怪，也可能是强制留空）
