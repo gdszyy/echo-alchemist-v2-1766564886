@@ -4608,6 +4608,8 @@ class Enemy {
                 game.enemies.forEach(other => {
                     if (other !== this && other.active && other.hp < other.maxHp && this.pos.dist(other.pos) < range) {
                         const healAmt = Math.ceil(other.maxHp * afx.healerPercent);
+                        // [修复] 回血前同步 greenHp，确保动画正常触发
+                        if (other.hp > other.greenHp) other.greenHp = other.hp;
                         other.hp = Math.min(other.maxHp, other.hp + healAmt);
                         game.spawn_createParticle(other.pos.x, other.pos.y, '#f472b6', 'spark');
                         game.spawn_createFloatingText(other.pos.x, other.pos.y - 20, `+${healAmt}`, '#f472b6');
@@ -5135,7 +5137,8 @@ class Enemy {
             if(this.affixes.includes('jump')) icons += '🦘';
             ctx.textAlign = 'center'; ctx.fillText(icons, 0, -h/2 + 8);
         }
-        if (!this.isFrozenCurrentTurn) {
+        // [修复] 即使被冻结也显示生命值数字，除非生命值为 0
+        if (this.displayHp > 0) {
             ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; 
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; 
             if (this.displayHp > this.hp + 1) ctx.fillStyle = '#fca5a5';
@@ -13040,16 +13043,16 @@ class Game {
             if (itemType === 'bounce') recipe.bounce += 1; 
             if (itemType === 'pierce') recipe.pierce += 1; 
             if (itemType === 'scatter') recipe.scatter += 1; 
-            if (itemType === 'damage') recipe.damage += 1; 
+            if (itemType === 'damage') recipe.damage += itemLevel; 
             
-            // [修复] 确保元素属性正确累加
-            if (itemType === 'cryo') recipe.cryo = (recipe.cryo || 0) + 1; 
-            if (itemType === 'pyro') recipe.pyro = (recipe.pyro || 0) + 1;       
-            if (itemType === 'lightning') recipe.lightning = (recipe.lightning || 0) + 1;      
+            // [修复] 确保元素属性正确累加，并支持层数 (itemLevel)
+            if (itemType === 'cryo') recipe.cryo = (recipe.cryo || 0) + itemLevel; 
+            if (itemType === 'pyro') recipe.pyro = (recipe.pyro || 0) + itemLevel;       
+            if (itemType === 'lightning') recipe.lightning = (recipe.lightning || 0) + itemLevel;      
             
             // 收集到激光钉子 -> 增加激光层数
             if (itemType === 'laser') {
-                recipe.laser = (recipe.laser || 0) + 1; 
+                recipe.laser = (recipe.laser || 0) + itemLevel; 
             }
             
             if (itemType === 'flying_sword') {
@@ -13060,15 +13063,15 @@ class Game {
             
             // [新增] 处理风属性
             if (itemType === 'wind') {
-                recipe.wind = (recipe.wind || 0) + 1;
+                recipe.wind = (recipe.wind || 0) + itemLevel;
             }
             
             // [新增] 处理彩虹属性：为所有基础元素属性加 1
             if (itemType === 'rainbow') {
-                recipe.cryo = (recipe.cryo || 0) + 1;
-                recipe.pyro = (recipe.pyro || 0) + 1;
-                recipe.lightning = (recipe.lightning || 0) + 1;
-                recipe.laser = (recipe.laser || 0) + 1;
+                recipe.cryo = (recipe.cryo || 0) + itemLevel;
+                recipe.pyro = (recipe.pyro || 0) + itemLevel;
+                recipe.lightning = (recipe.lightning || 0) + itemLevel;
+                recipe.laser = (recipe.laser || 0) + itemLevel;
             }
         });
         if (recipe.laser > 0) {
