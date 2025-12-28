@@ -9576,8 +9576,8 @@ class Game {
 
                 // 2. [重构] 绝息风暴：多段切割伤害逻辑
                 const cfg = CONFIG.wind_system.base;
-                const tickCount = 8; // 8次高频切割
-                const tickInterval = 100; // 每100ms切割一次
+                const tickCount = 1+bulletConfig.multicast; 
+                const tickInterval = 420; // 每100ms切割一次
                 
                 for(let i=0; i<tickCount; i++) {
                     setTimeout(() => {
