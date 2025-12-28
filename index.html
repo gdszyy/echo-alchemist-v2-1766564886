@@ -9304,18 +9304,24 @@ class Game {
         });
     }
 
-    combat_wind_triggerMagicCircle() {
+       combat_wind_triggerMagicCircle() {
         // 1. 数量检查
         if (this.windAnchors.length < 4) return;
 
+        // [新增] 获取当前风属性等级
+        const currentRecipe = this.projectiles.find(p => p.config.wind)?.config || { wind: 1 };
+        const windLevel = currentRecipe.wind || 1;
+
         // 2. [重构] 几何拓扑检查：如果是蝴蝶形/交叉形，触发独立的蝴蝶法阵
+        // [等级限制] Lv2 解锁蝴蝶法阵
         if (this.isBowtieShape(this.windAnchors)) {
-            this.combat_wind_triggerButterflyCircle();
-            return; 
+            if (windLevel >= 2) {
+                this.combat_wind_triggerButterflyCircle();
+                return; 
+            }
+            // 等级不足，继续向下判定，通常会进入暴风绞杀
         }
-
         // --- 判定通过，开始锁定流程 ---
-
         // 3. 计算形状属性
         const anchors = [...this.windAnchors]; // 复制当前锚点，固化下来
         const xs = anchors.map(a => a.x);
@@ -9328,12 +9334,12 @@ class Game {
         
         // [优化]：计算平均子弹伤害作为法阵基础伤害
         const avgBulletDamage = anchors.reduce((sum, a) => sum + (a.bulletDamage || 2), 0) / anchors.length;
-
         let type = 'burst';
         // [重构] 优先级：风道 > 风暴核心 > 爆破
-        if (ratio >= 3.0) {
+        // [等级限制] Lv3 解锁风道
+        if (ratio >= 3.0 && windLevel >= 3) {
             type = 'tunnel';
-        } else if (area < 6000) {
+        } else if (area < 6000) {{
             // 面积较小触发风暴核心 (范围稍微放宽)
             type = 'storm_core';
         }
