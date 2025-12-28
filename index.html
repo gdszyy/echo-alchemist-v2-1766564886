@@ -949,6 +949,7 @@
     <div class="top-bar">
         <div class="stat-pill">R <span id="round-num" class="stat-highlight">1</span></div>
         <div class="stat-pill">Score <span id="score-num" class="stat-highlight">0</span></div>
+        <div class="stat-pill border-amber-500/30 text-amber-400">🔮 <span id="run-currency-display" class="font-bold">0</span></div>
         <button id="speed-btn" class="btn-icon">⏩</button>
         <button id="mute-btn" class="btn-icon">🔊</button>
         <button id="damage-numbers-btn" class="btn-icon" title="切换伤害数字显示">🔢</button>
@@ -961,7 +962,70 @@
 
 
     <!-- Phase 0: Selection -->
-    <div id="phase-selection" class="ui-overlay active-phase" style="display: flex;">
+    <div id="phase-meta" class="ui-overlay active-phase" style="display: flex; z-index: 200; background: #020617;">
+        
+        <div class="absolute inset-0 overflow-hidden pointer-events-none">
+            <div class="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-indigo-900/20 rounded-full blur-[100px]"></div>
+            <div class="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-900/10 rounded-full blur-[80px]"></div>
+        </div>
+
+        <div class="absolute top-6 right-6 flex gap-4 pointer-events-auto z-10">
+             <div class="stat-pill border-amber-500/30 bg-slate-900/80 backdrop-blur-md text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.1)] px-4 py-2 rounded-full flex items-center">
+                <span class="text-lg filter drop-shadow-[0_0_5px_rgba(245,158,11,0.8)]">🔮</span>
+                <span id="meta-currency-display" class="font-bold text-xl ml-2 font-[Cinzel]">0</span>
+                <span class="text-[10px] text-amber-200/60 ml-2 tracking-widest uppercase">Energy Essence</span>
+             </div>
+        </div>
+
+        <div class="flex flex-col items-center justify-center w-full h-full pb-12 relative z-10">
+            
+            <div class="text-center mb-16 relative group cursor-default">
+                <h1 class="text-6xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-400 to-amber-700 font-[Cinzel] mb-4 drop-shadow-[0_0_35px_rgba(245,158,11,0.3)] tracking-tight">
+                    Echo Alchemist
+                </h1>
+                <p class="text-slate-400 text-sm tracking-[0.8em] opacity-60 font-serif border-t border-slate-800 pt-4 mt-2 mx-auto w-2/3">
+                    回聲煉金師
+                </p>
+                <div class="absolute -left-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transparent via-amber-500/30 to-transparent"></div>
+                <div class="absolute -right-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transparent via-amber-500/30 to-transparent"></div>
+            </div>
+
+            <button onclick="game.meta_startRun()" class="btn-main w-72 py-5 mb-12 border border-indigo-400/30 shadow-[0_0_40px_rgba(79,70,229,0.2)] hover:scale-105 hover:shadow-[0_0_60px_rgba(79,70,229,0.4)] transition-all duration-300 group relative overflow-hidden bg-slate-900/80 rounded-xl">
+                <div class="absolute inset-0 bg-gradient-to-r from-indigo-600/0 via-indigo-400/10 to-indigo-600/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                <span class="text-2xl font-[Cinzel] tracking-widest relative z-10 text-indigo-50 group-hover:text-white">開始煉成</span>
+                <div class="text-[10px] text-indigo-300/70 mt-1 font-sans tracking-wider uppercase">Initialize Sequence</div>
+            </button>
+
+            <div class="grid grid-cols-3 gap-6 w-full max-w-lg px-8">
+                <button onclick="showToast('煉金工坊裝修中 (Coming Soon)...')" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-amber-500/30 transition-all duration-300 group backdrop-blur-sm">
+                    <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-amber-900/20 group-hover:text-amber-400 transition-all shadow-inner">
+                        <span class="text-2xl">⚒️</span>
+                    </div>
+                    <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-amber-100">煉金工坊</span>
+                </button>
+
+                <button onclick="showToast('真理之書編撰中 (Coming Soon)...')" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-cyan-500/30 transition-all duration-300 group backdrop-blur-sm">
+                    <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-cyan-900/20 group-hover:text-cyan-400 transition-all shadow-inner">
+                        <span class="text-2xl">📖</span>
+                    </div>
+                    <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-cyan-100">真理之書</span>
+                </button>
+
+                <button onclick="showToast('試煉場封印中 (Coming Soon)...')" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-red-500/30 transition-all duration-300 group backdrop-blur-sm">
+                    <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-red-900/20 group-hover:text-red-400 transition-all shadow-inner">
+                        <span class="text-2xl">⚔️</span>
+                    </div>
+                    <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-red-100">試煉場</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="absolute bottom-4 w-full text-center text-slate-700 text-[10px] font-[Cinzel] tracking-widest opacity-50">
+            Ver 9.0 (Meta Architecture)
+        </div>
+    </div>
+
+    <div id="phase-selection" class="ui-overlay" style="display: none;">
     
         <div class="flex-1 w-full min-h-0 overflow-y-auto flex flex-col items-center py-4">
             <div id="marble-selection-grid" class="marble-grid"></div>
@@ -7860,7 +7924,18 @@ class Game {
         this.slowMotionThreshold = 100;  // 【可调】触发慢动作的伤害阈值
 
         this.sys_setupInputs(); 
-        this.sys_initGameStart(); 
+
+        // --- [META] 存档数据初始化 ---
+        this.saveData = {
+            currency: 0,        // 能量精粹
+            unlockedItems: [],  // 已解锁项目
+            highScore: 0
+        };
+        this.runCurrency = 0;   // 本局获得的货币
+        this.sys_loadSaveData(); // 读取存档
+
+        // --- [META] 不再直接开始游戏，而是显示主界面 ---
+        this.phase_switchPhase('meta'); 
         
         // 启动游戏主循环 (修复了原始的 this.loop is not a function 错误
         this.currentRows = CONFIG.gameplay.rows; 
@@ -8620,7 +8695,56 @@ class Game {
     /**
      * [AUTO-GENERATED] TODO: Add a description for sys_resetGame.
      */
+    /**
+     * [META] 读取存档 (模拟)
+     */
+    sys_loadSaveData() {
+        const saved = localStorage.getItem('echo_alchemist_save');
+        if (saved) {
+            try {
+                this.saveData = JSON.parse(saved);
+            } catch(e) { console.error("Save load failed", e); }
+        }
+        this.ui_updateMetaCurrency();
+    }
+
+    /**
+     * [META] 保存存档
+     */
+    sys_saveData() {
+        localStorage.setItem('echo_alchemist_save', JSON.stringify(this.saveData));
+    }
+
+    /**
+     * [META] 增加货币并保存
+     */
+    meta_addCurrency(amount) {
+        this.saveData.currency += amount;
+        this.sys_saveData();
+        this.ui_updateMetaCurrency();
+    }
+
+    /**
+     * [UI] 更新主界面的货币显示
+     */
+    ui_updateMetaCurrency() {
+        const el = document.getElementById('meta-currency-display');
+        if (el) el.innerText = this.saveData.currency.toLocaleString();
+        const runEl = document.getElementById('run-currency-display');
+        if (runEl) runEl.innerText = this.runCurrency.toLocaleString();
+    }
+
+    /**
+     * [META] 点击"开始炼成"按钮
+     */
+    meta_startRun() {
+        this.sys_resetGame(); 
+        this.sys_initGameStart();
+        this.sys_initSelectionPhase();
+    }
+
     sys_resetGame() {
+        this.runCurrency = 0; // 重置本局获得的货币
         this.gameOver = false;
         this.round = 1;
         this.score = 0;
@@ -11207,15 +11331,15 @@ class Game {
      * @method updateUI
      * @description 更新 UI 界面显示，强制管理各阶段元素的显隐
      */
-    ui_updateUI() {
+     ui_updateUI() {
         // 1. 基础：隐藏所有阶段的主容器 (.ui-overlay)
         document.querySelectorAll('.ui-overlay').forEach(el => { 
             el.style.display = 'none'; 
             el.classList.add('hidden-phase'); 
             el.classList.remove('active-phase'); 
         });
-
         // 2. 显示当前阶段的主容器
+        // [META] 兼容 phase-meta
         const activeEl = document.getElementById(`phase-${this.phase}`); 
         if(activeEl) { 
             activeEl.style.display = 'flex'; 
@@ -13052,6 +13176,9 @@ class Game {
                 this.currentSession.currentHits++;
                 this.currentSession.totalHits++; 
                 
+                // [META] 获得货币
+                this.runCurrency += 1;
+                
                 // 音效
                 const progress = Math.min(1, this.currentSession.currentHits / this.currentSession.nextTriggerThreshold);
                 if (this.currentSession.currentHits < this.currentSession.nextTriggerThreshold) {
@@ -13969,8 +14096,15 @@ class Game {
 
         // --- UI Overlays ---
         if (this.gameOver) { 
-            document.getElementById('combat-message').innerHTML = '<span class="text-red-400 font-bold text-4xl">防線失守</span><br><span class="text-sm pointer-events-none">點擊重试</span>'; 
-            if (this.isDragging) location.reload(); 
+            // [META] 结算货币并保存
+            this.meta_addCurrency(this.runCurrency);
+            this.runCurrency = 0;
+
+            document.getElementById('combat-message').innerHTML = '<span class="text-red-400 font-bold text-4xl">防線失守</span><br><span class="text-sm pointer-events-none">點擊返回主界面</span>'; 
+            if (this.isDragging) {
+                this.phase_switchPhase('meta');
+                this.sys_resetGame();
+            }
             return; 
         }
 
