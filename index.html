@@ -1188,6 +1188,8 @@ const CONFIG = {
         matPyro: '#f97316',
         matLightning: '#c084fc',
         matWind: '#34d399',
+        matWind_lv2: '#10b981', // 进阶深绿
+        matWind_lv3: '#059669', // 终极墨绿
         marbleWhite: '#f8fafc',
         matMatryoshka: '#d946ef',
         marbleRedStripe: '#fca5a5',
@@ -2840,6 +2842,11 @@ class Peg {
             if (this.level === 3) return CONFIG.colors.flying_sword_lv3;
             if (this.level === 2) return CONFIG.colors.flying_sword_lv2;
             return CONFIG.colors.flying_sword;
+        }
+        if (this.type === 'wind') {
+            if (this.level === 3) return CONFIG.colors.matWind_lv3;
+            if (this.level === 2) return CONFIG.colors.matWind_lv2;
+            return CONFIG.colors.matWind;
         }
 
         switch(this.type) {
@@ -9549,8 +9556,9 @@ class Game {
 
         // [修复] 直接从锚点中获取触发时的风属性等级，不再从全局子弹列表中查找
         const lastAnchor = this.windAnchors[this.windAnchors.length - 1];
-        const currentRecipe = lastAnchor.bulletConfig || { wind: 1 };
-        const windLevel = currentRecipe.wind || 1;
+        const currentRecipe = lastAnchor.bulletConfig || { wind: 1, level: 1 };
+        // [迁移] 优先使用 recipe.level (最高等级)，若无则回退到 wind 层数判定
+        const windLevel = currentRecipe.level || currentRecipe.wind || 1;
 
         // 2. [重构] 几何拓扑检查：如果是蝴蝶形/交叉形，触发独立的蝴蝶法阵
         // [等级限制] Lv2 解锁蝴蝶法阵
@@ -13144,6 +13152,7 @@ class Game {
             // [新增] 处理风属性
             if (itemType === 'wind') {
                 recipe.wind = (recipe.wind || 0) + itemLevel;
+                recipe.level = Math.max(recipe.level, itemLevel); // [迁移] 记录最高等级
             }
             
             // [已移除] 彩虹属性不再同步增加元素层数，仅保留分裂机制逻辑
