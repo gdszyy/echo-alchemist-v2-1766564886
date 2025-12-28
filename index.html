@@ -3411,7 +3411,7 @@ class DropBall {
                 if (Math.random() < assimilationChance) {
 					console.log("同化！",ballType)
                     peg.type = ballType;
-                    game.spawn_createParticle(peg.pos.x, peg.pos.y, this.def.getColor());
+					game.spawn_createShockwave(peg.pos.x, peg.pos.y, this.def.getColor());
                     audio.playMagic();
                 }
             }
