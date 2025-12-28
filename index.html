@@ -9530,7 +9530,8 @@ class Game {
                 const scatter = bulletConfig.scatter || 0;
                 const multicast = bulletConfig.multicast || 0;
                 const tickCount = 1 + scatter;
-                const totalDmg = stormDamageMult*bulletDamage * (1 + multicast);
+                const stormDamageMult = CONFIG.wind_system.base.stormDamageMult || 5.0;
+                const totalDmg = stormDamageMult * bulletDamage * (1 + multicast);
                 const tickDmg = Math.max(1, Math.floor(totalDmg / tickCount));
                 const tickInterval = 240; // 每100ms切割一次
 
