@@ -1323,10 +1323,12 @@ const CONFIG = {
         spawnMin: 3,        // 每波最少生成的敌人数量
         selectionCount: 6,  // 选卡阶段提供多少张卡
         selectionReq: 3,     // 需要选择多少张卡
-        hitCooldowns:12,
-        relicChance:0.1,
-        initTriggerThreshold:7,
-        nextTriggerThresholdIncrease:8,
+        hitCooldowns: 12,    // 默认基础冷却时间
+        pegCooldownAdd: 5,   // 每次触发增加的冷却帧数
+        pegCooldownDecay: 2, // 每秒减少的冷却帧数
+        relicChance: 0.1,
+        initTriggerThreshold: 7,
+        nextTriggerThresholdIncrease: 8,
         spSlotsStartRow:3,
         spSlotsEndRow:8,
         fireSpreadDamagePercent:0.25,
@@ -2963,7 +2965,11 @@ class Peg {
     hit(impactSpeed = 5) { 
         this.lit = true; 
         this.litTimer = 15; 
-        this.cooldown = 30; 
+        
+        // [修改] 动态冷却累加逻辑
+        // 每次触发增加配置的帧数 (默认 5 帧)
+        const addAmount = CONFIG.gameplay.pegCooldownAdd || 5;
+        this.cooldown = (this.cooldown || 0) + addAmount;
         
         // 速度越快，视觉缩放越大 (最大 1.8)
         this.scale = 1.6 + Math.min(impactSpeed / 20, 0.2); 
@@ -3186,8 +3192,23 @@ class Peg {
 
     update() { 
         if (this.litTimer > 0) this.litTimer--; else this.lit = false; 
-        if (this.cooldown > 0) this.cooldown--;
         
+        // [修改] 动态冷却衰减逻辑
+        if (this.cooldown > 0) {
+            // 累加时间，每过 1s (60帧) 减少配置的衰减量
+            if (!this.decayTimer) this.decayTimer = 0;
+            this.decayTimer++;
+            
+            if (this.decayTimer >= 60) {
+                this.cooldown -= (CONFIG.gameplay.pegCooldownDecay || 2);
+                this.decayTimer = 0;
+            }
+
+            // 确保冷却不会低于基础配置值 (hitCooldowns)
+            const minCooldown = CONFIG.gameplay.hitCooldowns || 12;
+            if (this.cooldown < minCooldown) this.cooldown = minCooldown;
+        }
+
         //  弹性恢复动画 (Lerp back to 1.0)
         if (this.scale > 1.0) {
             this.scale -= 0.1; // 回弹速度
@@ -14173,7 +14194,11 @@ class Game {
         });
         // 繪製釘子
         const pegRadius = Math.min(8, this.width / 60);
-        this.pegs.forEach(p => { p.update(); p.draw(this.ctx, pegRadius); p.resetLight();});
+        this.pegs.forEach(p => { 
+            p.update(); // 更新冷却和动画
+            p.draw(this.ctx, pegRadius); 
+            p.resetLight();
+        });
 
         
         lightSources.forEach(ball => {
