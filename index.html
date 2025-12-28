@@ -9525,7 +9525,7 @@ class Game {
                 const tickCount = 1 + scatter;
                 const totalDmg = stormDamageMult*bulletDamage * (1 + multicast);
                 const tickDmg = Math.max(1, Math.floor(totalDmg / tickCount));
-                const tickInterval = 100; // 每100ms切割一次
+                const tickInterval = 240; // 每100ms切割一次
 
                 // 1. 制造“暴风眼”视觉：大量风刃向中心旋转坍塌
                 for(let i=0; i<100; i++) {
