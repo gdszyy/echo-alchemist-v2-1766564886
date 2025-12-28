@@ -9247,8 +9247,10 @@ class Game {
             // 判定命中 (考虑敌人体积)
             if (dist < radius + e.width / 2) {
                 // 1. 造成伤害 - 统一走 damageEnemy
+                // [优化] 伤害挂钩子弹伤害倍率 (5倍)
+                const dmg = Math.max(1, Math.floor(bulletDamage * 5));
                 this.combat_damageEnemy(e, { 
-                    config: { wind: 1, damage: damage }, 
+                    config: { ...bulletConfig, damage: dmg }, 
                     pos: e.pos, 
                     isCopy: false,
                     shotId: this._currentDamageShotId 
@@ -9888,8 +9890,9 @@ class Game {
                 // 计算射线与屏幕边界的交点
                 let startPos = new Vec2(center.x, center.y);
                 const rayDir = dir;
-                const tX = rayDir.x > 0 ? (this.canvas.width + 100 - center.x) / rayDir.x : (-100 - center.x) / rayDir.x;
-                const tY = rayDir.y > 0 ? (this.canvas.height + 100 - center.y) / rayDir.y : (-100 - center.y) / rayDir.y;
+                // [优化] 发射起点设在屏幕外 150px 处
+                const tX = rayDir.x > 0 ? (this.canvas.width + 150 - center.x) / rayDir.x : (-150 - center.x) / rayDir.x;
+                const tY = rayDir.y > 0 ? (this.canvas.height + 150 - center.y) / rayDir.y : (-150 - center.y) / rayDir.y;
                 const t = Math.min(tX, tY);
                 startPos = center.add(rayDir.mult(t));
 
@@ -9928,9 +9931,9 @@ class Game {
             blade.angle += 0.2 * timeScale; // 3D旋转
             blade.damageTimer += timeScale;
             
-            // 检查是否飞出屏幕
-            if (blade.pos.x < -50 || blade.pos.x > this.canvas.width + 50 ||
-                blade.pos.y < -50 || blade.pos.y > this.canvas.height + 50) {
+            // [优化] 检查是否飞出屏幕：删除区设在屏幕外 200px 处，确保发射起点（150px）在删除区内
+            if (blade.pos.x < -200 || blade.pos.x > this.canvas.width + 200 ||
+                blade.pos.y < -200 || blade.pos.y > this.canvas.height + 200) {
                 this.butterflyBlades.splice(i, 1);
                 continue;
             }
@@ -9943,6 +9946,7 @@ class Game {
                     const dist = blade.pos.sub(e.pos).mag();
                     if (dist < 40) { // 判定范围稍微增大
                         hasHit = true;
+                        // [优化] 伤害挂钩子弹伤害倍率 (2倍)
                         const dmg = Math.max(1, Math.floor(blade.bulletDamage * 2));
                         const windConfig = { ...blade.bulletConfig, damage: dmg };
                         this.combat_damageEnemy(e, { 
@@ -13133,6 +13137,10 @@ class Game {
             this.nextRoundHpMultiplier = 1;
         }
 
+        // [修复] 回合切换时清空蝴蝶法阵和风刃，防止残留
+        if (this.butterflyCircles) this.butterflyCircles = [];
+        if (this.butterflyBlades) this.butterflyBlades = [];
+        
         // 更新回合数
         this.round++;
         this.prevRoundDamage = this.roundDamage;
