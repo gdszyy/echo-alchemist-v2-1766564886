@@ -1246,7 +1246,7 @@ const CONFIG = {
         },
         // 风暴核心参数
         storm_core: {
-            damageMult: 4.0,      // 大旋风伤害倍率
+            damageMult: 2.0,      // 大旋风伤害倍率
             radiusMax: 80,        // 最大核心半径
             energyPerSecond: 1,   // 每秒充能值
             decayPerRound: 1,     // 每回合能量衰减
@@ -1255,8 +1255,8 @@ const CONFIG = {
         // 基础风属性参数
         base: {
             anchorExplosionMult: 2.0, // 锚点消失爆炸伤害倍率
-            smallWhirlwindMult: 2.0,  // 小旋风伤害倍率
-            tunnelDamageMult: 3.0,    // 风道伤害倍率
+            smallWhirlwindMult: 1.0,  // 小旋风伤害倍率
+            tunnelDamageMult: 2.0,    // 风道伤害倍率
             shockwaveMult: 8.0,       // 冲击波伤害倍率
             blackholeMult: 9999,      // 黑洞伤害 (即死级)
             hitStopScale: 0.02,       // 强力顿挫时间缩放
@@ -9522,7 +9522,7 @@ class Game {
                 const scatter = bulletConfig.scatter || 0;
                 const multicast = bulletConfig.multicast || 0;
                 const tickCount = 1 + scatter;
-                const totalDmg = 20 * (1 + multicast);
+                const totalDmg = bulletDamage * (1 + multicast);
                 const tickDmg = Math.max(1, Math.floor(totalDmg / tickCount));
                 const tickInterval = 100; // 每100ms切割一次
 
@@ -9678,7 +9678,7 @@ class Game {
                 const tickCount = 1 + scatter;
                 const totalDmg = bulletDamage * cfg.tunnelDamageMult * (1 + multicast);
                 const tickDmg = Math.max(1, Math.floor(totalDmg / tickCount));
-                const tickInterval = 100; // 每100ms切割一次
+                const tickInterval = 210; // 每100ms切割一次
                 
                 for(let i=0; i<tickCount; i++) {
                     setTimeout(() => {
