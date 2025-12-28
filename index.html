@@ -2561,7 +2561,7 @@ class FortuneWheel {
         
         // [修改] 1. 过滤不可叠加属性 (如 pierce, bounce, scatter, flying_sword 等通常不适合转盘直接翻倍)
         // 我们只允许元素属性和增幅属性进入转盘
-        const stackableTypes = ['damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind', 'resonance', 'explosive'];
+        const stackableTypes = ['damage', 'cryo', 'pyro', 'lightning', 'laser',  'resonance','pierce','bounce','scatter'];
         
         // 统计当前弹珠拥有的可叠加属性
         const counts = {};
@@ -2583,7 +2583,7 @@ class FortuneWheel {
             // 获取基础权重 (从 CONFIG.probabilities 获取，如果没有则默认为 1)
             const baseProb = CONFIG.probabilities[type] || 1;
             // 最终权重 = 基础权重 * (1 + 当前层数 * 0.5) -> 拥有的越多，扇区越大，但也受基础稀有度限制
-            const weight = baseProb * (1 + counts[type] * 0.5);
+            const weight = baseProb / (1 + counts[type] * 0.5);
             weights[type] = weight;
             totalWeight += weight;
         });
