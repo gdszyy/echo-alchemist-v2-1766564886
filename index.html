@@ -11818,6 +11818,7 @@ class Game {
         let text = "命運抉择"; let sub = "選擇你的命運";
         if (newPhase === 'gathering') { text = "研磨階段"; sub = "收集魔力"; }
         else if (newPhase === 'combat') { text = "戰鬥階段"; sub = "抵禦魔像"; }
+        else if (newPhase === 'truth_book') { text = "真理之書"; sub = "洞悉萬物之理"; }
         titleText.innerText = text; subText.innerText = sub;
         
         // 1.2秒后隐藏阶段标题
@@ -15232,6 +15233,9 @@ class TruthBook {
         this.mainGame = mainGame;
         this.canvas = document.getElementById('truth-demo-canvas');
         this.ctx = this.canvas.getContext('2d');
+        // 初始化 Canvas 尺寸
+        this.canvas.width = 400;
+        this.canvas.height = 300;
         this.active = false;
         this.currentEntry = null;
         this.demoGame = null;
