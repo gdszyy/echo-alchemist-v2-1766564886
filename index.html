@@ -1233,20 +1233,20 @@ const CONFIG = {
     wind_system: {
         // 蝴蝶法阵参数
         butterfly: {
-            damageMult: 2.0,      // 风刃伤害倍率 (基于子弹伤害)
-            baseCooldown: 21,     // 基础伤害冷却 (帧)
-            minCooldown: 5,       // 最小伤害冷却 (帧)
+            damageMult: 1.0,      // 风刃伤害倍率 (基于子弹伤害)
+            baseCooldown: 17,     // 基础伤害冷却 (帧)
+            minCooldown: 2,       // 最小伤害冷却 (帧)
             bladeSizeBase: 25,    // 风刃基础大小
             bladeSizeVar: 15,     // 风刃大小随机波动
             bladeSpeedBase: 25,   // 风刃基础速度
-            bladeSpeedVar: 10,    // 风刃速度随机波动
+            bladeSpeedVar: 7,    // 风刃速度随机波动
             launchOffset: 150,    // 发射起点偏移 (屏幕外)
             deleteOffset: 200,    // 删除判定偏移 (屏幕外)
             duration: 5000        // 法阵持续时间 (ms)
         },
         // 风暴核心参数
         storm_core: {
-            damageMult: 8.0,      // 大旋风伤害倍率
+            damageMult: 4.0,      // 大旋风伤害倍率
             radiusMax: 80,        // 最大核心半径
             energyPerSecond: 1,   // 每秒充能值
             decayPerRound: 1,     // 每回合能量衰减
@@ -1254,10 +1254,10 @@ const CONFIG = {
         },
         // 基础风属性参数
         base: {
-            anchorExplosionMult: 5.0, // 锚点消失爆炸伤害倍率
-            smallWhirlwindMult: 5.0,  // 小旋风伤害倍率
-            tunnelDamageMult: 6.0,    // 风道伤害倍率
-            shockwaveMult: 4.0,       // 冲击波伤害倍率
+            anchorExplosionMult: 2.0, // 锚点消失爆炸伤害倍率
+            smallWhirlwindMult: 2.0,  // 小旋风伤害倍率
+            tunnelDamageMult: 3.0,    // 风道伤害倍率
+            shockwaveMult: 8.0,       // 冲击波伤害倍率
             blackholeMult: 9999,      // 黑洞伤害 (即死级)
             hitStopScale: 0.02,       // 强力顿挫时间缩放
             hitStopDuration: 15       // 强力顿挫持续帧数
