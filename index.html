@@ -2795,7 +2795,8 @@ class Peg {
         this.type = type; 
         this.lit = false; 
         this.litTimer = 0; 
-        this.cooldown = 0;
+        this.cooldownTimer = 0; // 当前剩余冷却帧数
+        this.dynamicCooldown = CONFIG.gameplay.hitCooldowns || 12; // 当前触发间隔（会累加和衰减）
         
         //  缩放动画属性
         this.scale = 1.0; 
@@ -2939,7 +2940,8 @@ class Peg {
     }
     // [新增] 重置冷却
     resetCooldown() {
-        this.cooldown = 0;
+        this.cooldownTimer = 0;
+        this.dynamicCooldown = CONFIG.gameplay.hitCooldowns || 12;
         this.decayTimer = 0;
     }
     //  计算来自某个光源的影响
@@ -2971,10 +2973,13 @@ class Peg {
         this.lit = true; 
         this.litTimer = 15; 
         
-        // [修改] 动态冷却累加逻辑
-        // 每次触发增加配置的帧数 (默认 5 帧)
+        // [修改] 动态冷却逻辑
+        // 1. 设置当前冷却计时器为当前的动态冷却时间
+        this.cooldownTimer = this.dynamicCooldown;
+        
+        // 2. 增加下次触发的冷却时间 (默认 +5 帧)
         const addAmount = CONFIG.gameplay.pegCooldownAdd || 5;
-        this.cooldown = (this.cooldown || 0) + addAmount;
+        this.dynamicCooldown += addAmount;
         
         // 速度越快，视觉缩放越大 (最大 1.8)
         this.scale = 1.6 + Math.min(impactSpeed / 20, 0.2); 
@@ -3018,20 +3023,25 @@ class Peg {
         ctx.shadowColor = 'transparent';
 
         // [新增] 绘制冷却视觉反馈 (灰色圆弧 Slice)
-        const baseCooldown = CONFIG.gameplay.hitCooldowns || 12;
-        if (this.cooldown > baseCooldown) {
+        if (this.cooldownTimer > 0) {
             ctx.save();
             ctx.beginPath();
             ctx.moveTo(this.pos.x, this.pos.y);
             
-            // 计算冷却比例 (当前冷却 / 最大可能冷却，这里用一个合理的上限或者动态上限)
-            // 为了视觉效果，我们假设 60 帧是一个明显的视觉上限
-            const cooldownProgress = Math.min(1, (this.cooldown - baseCooldown) / 60);
+            // 计算冷却比例 (当前剩余时间 / 总冷却时间)
+            const cooldownProgress = this.cooldownTimer / this.dynamicCooldown;
             
-            // 绘制半透明灰色扇形
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-            ctx.arc(this.pos.x, this.pos.y, currentRadius, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * cooldownProgress));
+            // 绘制半透明深灰色扇形 (Slice)
+            // 从顶部开始，逆时针减少或顺时针增加
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.arc(this.pos.x, this.pos.y, currentRadius + 1, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * cooldownProgress));
             ctx.fill();
+            
+            // 添加一个细边框让它更明显
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
             ctx.restore();
         }
 
@@ -3216,20 +3226,21 @@ class Peg {
     update() { 
         if (this.litTimer > 0) this.litTimer--; else this.lit = false; 
         
-        // [修改] 动态冷却衰减逻辑
-        if (this.cooldown > 0) {
-            // 累加时间，每过 1s (60帧) 减少配置的衰减量
-            if (!this.decayTimer) this.decayTimer = 0;
-            this.decayTimer++;
-            
-            if (this.decayTimer >= 60) {
-                this.cooldown -= (CONFIG.gameplay.pegCooldownDecay || 2);
-                this.decayTimer = 0;
-            }
+        // [修改] 冷却计时器递减 (每帧执行)
+        if (this.cooldownTimer > 0) this.cooldownTimer--;
 
-            // 确保冷却不会低于基础配置值 (hitCooldowns)
+        // [修改] 动态冷却上限衰减 (每秒执行)
+        if (!this.decayTimer) this.decayTimer = 0;
+        this.decayTimer++;
+        
+        if (this.decayTimer >= 60) {
+            const decayAmount = CONFIG.gameplay.pegCooldownDecay || 2;
             const minCooldown = CONFIG.gameplay.hitCooldowns || 12;
-            if (this.cooldown < minCooldown) this.cooldown = minCooldown;
+            
+            if (this.dynamicCooldown > minCooldown) {
+                this.dynamicCooldown = Math.max(minCooldown, this.dynamicCooldown - decayAmount);
+            }
+            this.decayTimer = 0;
         }
 
         //  弹性恢复动画 (Lerp back to 1.0)
@@ -3675,7 +3686,7 @@ class DropBall {
                         this.vel.x += (Math.random() - 0.5) * 0.5;
                     }
 
-                    if (peg.cooldown <= 0) {
+                    if (peg.cooldownTimer <= 0) {
                         // --- [关键修改：传递速度参数] ---
                         const impactSpeedVal = impactVel.mag(); 
                         peg.hit(impactSpeedVal);
