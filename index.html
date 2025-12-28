@@ -1351,7 +1351,7 @@ const CONFIG = {
         // 物理系 (初始鎖定，通過遺物解鎖)
         pierce: 1, 
         scatter: 1,
-        damage: 2,
+        damage: 2, // 保持概率权重不变
         
         // 元素系 (初始鎖定，通過遺物獨立解鎖)
         cryo: 0, 
@@ -5355,7 +5355,7 @@ class SwordQi {
                 // 标记敌人
                 e.addSwordMark(1);
                 // 造成少量伤害
-                game.combat_damageEnemy(e, { config: { damage: 2 }, pos: this.pos, isCopy: true });
+                game.combat_damageEnemy(e, { config: { damage: 1 }, pos: this.pos, isCopy: true });
                 // 视觉反馈
                 game.spawn_createParticle(e.pos.x, e.pos.y, '#0ea5e9', 'spark');
             }
@@ -12933,7 +12933,7 @@ class Game {
      */
     calc_compileCollectionToRecipe(marbleDef, collectedTypes, totalMulticast) {
         const recipe = { 
-            damage: 2, 
+            damage: 1, 
             bounce: 0, pierce: 0, scatter: 0, 
             explosive: marbleDef.type === 'explosive', 
             isMatryoshka: marbleDef.type === 'matryoshka', 
@@ -12958,7 +12958,7 @@ class Game {
             if (itemType === 'bounce') recipe.bounce += 1; 
             if (itemType === 'pierce') recipe.pierce += 1; 
             if (itemType === 'scatter') recipe.scatter += 1; 
-            if (itemType === 'damage') recipe.damage += 2; 
+            if (itemType === 'damage') recipe.damage += 1; 
             
             // [修复] 确保元素属性正确累加
             if (itemType === 'cryo') recipe.cryo = (recipe.cryo || 0) + 1; 
