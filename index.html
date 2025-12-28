@@ -9338,7 +9338,7 @@ class Game {
             onComplete: () => {
                 let sizeType = area < 15000 ? 'small' : 'large';
                 let shapeType = ratio < 1.5 ? 'square' : 'rect';
-                this.combat_wind_executeCircleEffect(minX, minY, rect.w, rect.h, sizeType, shapeType, element, tunnelVector, avgBulletDamage, bulletConfig);
+                this.combat_wind_executeCircleEffect(minX, minY, rect.w, rect.h, sizeType, shapeType, element, tunnelVector, avgBulletDamage, bulletConfig, type);
             }
         };
 
@@ -9356,7 +9356,7 @@ class Game {
         // if (this.soundManager) this.soundManager.playEffect('lock');
     }
 
-    combat_wind_executeCircleEffect(x, y, w, h, size, shape, element, tunnelVector = null, bulletDamage = 2, bulletConfig = null) {
+    combat_wind_executeCircleEffect(x, y, w, h, size, shape, element, tunnelVector = null, bulletDamage = 2, bulletConfig = null, type = 'burst') {
         const centerX = x + w/2;
         const centerY = y + h/2;
 
