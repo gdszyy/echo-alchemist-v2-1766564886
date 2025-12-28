@@ -1337,7 +1337,7 @@ const CONFIG = {
         //  固定回合遗物事件 (每多少回合触发一次)
         relicRoundInterval: 3,
         assimilationChance: {
-            bounce: 0.25,
+            bounce: 0.2,
             pierce: 0.12,
             scatter: 0.12,
             damage: 0.2,
@@ -1350,20 +1350,20 @@ const CONFIG = {
     },
     //  初始概率配置 (現在這些是基礎權重，解鎖後會增加)
     probabilities: { 
-        white: 150,       // 基礎
-        bounce: 25,       // 初始解鎖
+        white: 100,       // 基礎
+        bounce: 20,       // 初始解鎖
         laser: 0,
         // 物理系 (初始鎖定，通過遺物解鎖)
-        pierce: 1, 
-        scatter: 1,
-        damage: 2, // 保持概率权重不变
+        pierce: 7, 
+        scatter: 7,
+        damage: 12, // 保持概率权重不变
         
         // 元素系 (初始鎖定，通過遺物獨立解鎖)
-        cryo: 0, 
-        pyro: 0, 
+        cryo: 5, 
+        pyro: 5, 
         
         // 特殊系 (初始鎖定)
-        explosive: 1, 
+        explosive: 2, 
         rainbow: 0, 
         matryoshka: 0,
         resonance: 0,
