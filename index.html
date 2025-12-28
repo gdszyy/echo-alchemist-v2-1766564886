@@ -8382,6 +8382,8 @@ class Game {
         // 3. 背景层渲染
         if (this.phase !== 'combat') {
             this.render_background();
+        }
+
         // 4. 阶段逻辑与渲染分发
         if (this.phase === 'truth_book') {
             this.truthBook.update();
