@@ -9745,7 +9745,7 @@ class Game {
         // 5. 计算伤害冷却（使用配置参数，根据multicast减少冷却）
         const cfg = CONFIG.wind_system.butterfly;
         // 冷却帧数随multicast增加而减少
-        const cooldown = Math.max(cfg.minCooldown, Math.floor(cfg.baseCooldown / (1 + multicast * 0.5)));
+        const cooldown = Math.max(cfg.minCooldown, Math.floor(cfg.baseCooldown-bulletConfig.scatter));
         
         // 6. 计算风刃数量（1 + multicast）
         const bladeCount = 1 + multicast;
