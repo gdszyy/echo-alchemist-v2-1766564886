@@ -10623,7 +10623,7 @@ class Game {
              projectile.chainHistory.push(enemy); 
         }
 
-        const killed = en        const damageResult = enemy.takeDamage(dmg);
+        const damageResult = enemy.takeDamage(dmg);
         const killed = damageResult.killed;
         const actualDmg = damageResult.actualDamage;
 
