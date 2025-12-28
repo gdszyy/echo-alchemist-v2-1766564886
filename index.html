@@ -2561,11 +2561,13 @@ class FortuneWheel {
         
         // [修改] 1. 过滤不可叠加属性 (如 pierce, bounce, scatter, flying_sword 等通常不适合转盘直接翻倍)
         // 我们只允许元素属性和增幅属性进入转盘
-        const stackableTypes = ['damage', 'cryo', 'pyro', 'lightning', 'laser',  'resonance','pierce','bounce','scatter'];
+        const stackableTypes = ['damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind', 'resonance', 'explosive'];
         
         // 统计当前弹珠拥有的可叠加属性
         const counts = {};
-        collectedAttributes.forEach(type => {
+        collectedAttributes.forEach(item => {
+            // [修复] 兼容字符串和对象格式
+            const type = (typeof item === 'string') ? item : item.type;
             // 必须是可叠加类型，且在配置中有定义
             if (type && stackableTypes.includes(type) && CONFIG.ui.attributeDisplay[type]) {
                 counts[type] = (counts[type] || 0) + 1;
@@ -2575,20 +2577,19 @@ class FortuneWheel {
         const validTypes = Object.keys(counts);
         
         // [修改] 2. 重构概率算法：扇区大小 = (当前拥有层数 * 基础权重)
-        // 这样既考虑了“当前拥有”，也考虑了“稀有度”
         const weights = {};
         let totalWeight = 0;
         
         validTypes.forEach(type => {
             // 获取基础权重 (从 CONFIG.probabilities 获取，如果没有则默认为 1)
             const baseProb = CONFIG.probabilities[type] || 1;
-            // 最终权重 = 基础权重 * (1 + 当前层数 * 0.5) -> 拥有的越多，扇区越大，但也受基础稀有度限制
-            const weight = baseProb / (1 + counts[type] * 0.5);
+            // 最终权重 = 基础权重 * (1 + counts[type] * 0.5)
+            const weight = baseProb * (1 + counts[type] * 0.5);
             weights[type] = weight;
             totalWeight += weight;
         });
 
-        // 如果没有有效属性，尝试加入一个保底的 'damage' 属性 (如果它在 stackableTypes 中)
+        // 如果没有有效属性，尝试加入一个保底的 'damage' 属性
         if (totalWeight === 0) {
             const fallbackType = 'damage';
             weights[fallbackType] = 1;
@@ -2603,7 +2604,6 @@ class FortuneWheel {
             const display = CONFIG.ui.attributeDisplay[type];
             
             // [修改] 3. 动态奖励算法：中奖后获得的层数
-            // 基础奖励 = 1，如果当前层数多，奖励也随之提升 (例如：获得当前层数的 50%，至少 1 层)
             const rewardCount = Math.max(1, Math.ceil(counts[type] * 0.5));
 
             this.slices.push({
@@ -2612,11 +2612,11 @@ class FortuneWheel {
                 endAngle: currentAngle + arc,
                 color: display ? display.color : '#ccc',
                 icon: display ? display.icon : '❓',
-                rewardCount: rewardCount // 存储奖励层数
+                rewardCount: rewardCount, // 存储奖励层数
+                count: rewardCount        // [修复] 修复绘制时 s.count 为 undefined 的问题
             });
             currentAngle += arc;
         });
-		console.log("slices",this.slices)
     }
 
     update(timeScale) {
@@ -3409,9 +3409,15 @@ class DropBall {
                 // 这里保留原有的逻辑：普通弹珠同化普通钉子
                 const assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0.25;
                 if (Math.random() < assimilationChance) {
-					console.log("同化！",ballType)
                     peg.type = ballType;
-					game.spawn_createShockwave(peg.pos.x, peg.pos.y, this.def.getColor());
+                    
+                    // [新增] 同化钉子特效：爆炸 + 浮动文字
+                    const attrColor = this.def.getColor();
+                    const attrName = CONFIG.ui.attributeDisplay[ballType] ? CONFIG.ui.attributeDisplay[ballType].name : "Assimilation";
+                    game.spawn_createExplosion(peg.pos.x, peg.pos.y, attrColor);
+                    game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 20, attrName, attrColor);
+                    
+                    game.spawn_createParticle(peg.pos.x, peg.pos.y, attrColor);
                     audio.playMagic();
                 }
             }
@@ -3761,48 +3767,52 @@ class DropBall {
                             let isSynthesized = false;
                             const collectedList = this.session.collected;
 
-                            // 1. 捡到火，找冰
+                            // 1. 元素合成逻辑 (冰 + 火 = 雷)
                             if (peg.type === 'pyro') {
-                                const iceIdx = collectedList.indexOf('cryo');
+                                const iceIdx = collectedList.findIndex(item => (typeof item === 'string' ? item : item.type) === 'cryo');
                                 if (iceIdx !== -1) {
-                                    collectedList.splice(iceIdx, 1); // 移除一个冰
-                                    finalType = 'lightning';         // 变成雷
+                                    collectedList.splice(iceIdx, 1);
+                                    finalType = 'lightning';
                                     isSynthesized = true;
                                 }
-                            }
-                            // 2. 捡到冰，找火
-                            else if (peg.type === 'cryo') {
-                                const fireIdx = collectedList.indexOf('pyro');
+                            } else if (peg.type === 'cryo') {
+                                const fireIdx = collectedList.findIndex(item => (typeof item === 'string' ? item : item.type) === 'pyro');
                                 if (fireIdx !== -1) {
-                                    collectedList.splice(fireIdx, 1); // 移除一个火
-                                    finalType = 'lightning';          // 变成雷
+                                    collectedList.splice(fireIdx, 1);
+                                    finalType = 'lightning';
                                     isSynthesized = true;
                                 }
                             }
 
-
-
-                            const ballType = this.def.type;
+                            // 2. 进化属性唯一性检查 (飞剑、风)
                             const rules = CONFIG.evolutionRules;
-                            const inRules = Object.values(rules).some(innerObj =>
-                                Object.values(innerObj).some(item => item.result === peg.type)
-                            );
-                            const orgType = Object.entries(rules).find(([key, innerObj]) =>
-                                Object.values(innerObj).some(item => item.result === peg.type)
-                            )?.[0]
+                            let originalBaseType = null;
+                            let isEvolutionResult = false;
 
-                            if (inRules){
-
-
-                                const hasSwordInQueue = game.marbleQueue.some(m => m.collected && m.collected.includes(peg.type));
-                                // 3. 檢查目前下落中的彈珠是否已收集到飛劍
-                                const alreadyCollectedSword = this.session.collected.includes(peg.type);
-                                if (!hasSwordInQueue && !alreadyCollectedSword){
-                                    finalType = peg.type
-                                }else {
-
-                                    finalType = orgType;
+                            for (const [baseType, ruleSet] of Object.entries(rules)) {
+                                for (const [pegType, rule] of Object.entries(ruleSet)) {
+                                    if (rule.result === peg.type) {
+                                        isEvolutionResult = true;
+                                        originalBaseType = baseType;
+                                        break;
+                                    }
                                 }
+                                if (isEvolutionResult) break;
+                            }
+
+                            if (isEvolutionResult) {
+                                const alreadyInCurrent = this.session.collected.some(item => (typeof item === 'string' ? item : item.type) === peg.type);
+                                const alreadyInQueue = game.marbleQueue.some(m => m.collected && m.collected.some(item => (typeof item === 'string' ? item : item.type) === peg.type));
+                                
+                                if (alreadyInCurrent || alreadyInQueue) {
+                                    finalType = originalBaseType;
+                                }
+                            }
+
+                            // [修复] 确保 finalType 在 attributeDisplay 中有定义，否则不加入收集列表
+                            if (!CONFIG.ui.attributeDisplay[finalType]) {
+                                console.warn(`Attempted to collect unknown attribute type: ${finalType}`);
+                                return null;
                             }
 
                             // 将最终结果加入收集列表
@@ -4081,12 +4091,12 @@ class DropBall {
                         'damage': ['#f3e8ff', '#7e22ce'],
                         'laser':  ['#e0f2fe', '#0369a1'],
                         'wind':   ['#d1fae5', '#047857'],
-                        // 'explosive' 已经被上面单独处理了，这里不需要 map
+                        'lightning': ['#f3e8ff', '#7e22ce'],
+                        'cryo': ['#e0f2fe', '#0369a1'],
+                        'pyro': ['#ffedd5', '#ea580c'],
+                        'resonance': ['#fef3c7', '#d97706'],
                     };
                      if (this.def.type && map[this.def.type]) {
-                         baseLight = map[this.def.type][0];
-                         baseDark = map[this.def.type][1];
-                     } else if (this.def.type && map[this.def.type]) {
                          baseLight = map[this.def.type][0];
                          baseDark = map[this.def.type][1];
                      }
@@ -5387,6 +5397,9 @@ class Enemy {
             }
         }
         
+        // [修复] 返回实际造成的伤害，以便调用方显示正确的飘字
+        const actualDamage = finalDamage;
+        
         // 冰冻伤害加深机制
         if (this.temp <= -100 || this.isFrozenCurrentTurn) {
             const bonusDamage = amount * 0.5; // 50%额外伤害
@@ -5410,9 +5423,9 @@ class Enemy {
         }
         if (this.hp <= 0) {
             this.active = false;
-            return true;
+            return { killed: true, actualDamage: actualDamage };
         }
-        return false;
+        return { killed: false, actualDamage: actualDamage };
     }
     applyTemp(amount) { this.temp += amount; }
     getBounds() { return { left: this.pos.x - this.width/2, right: this.pos.x + this.width/2, top: this.pos.y - this.height/2, bottom: this.pos.y + this.height/2 }; }
@@ -5997,7 +6010,7 @@ class Projectile {
         this.hitCooldowns = new Map();
         this.rotation = 0;
         this.windBladeAngle = 0; // 风属性环绕风刃的旋转角度
-        this.lifeTime = 60 * 15;
+        this.lifeTime = 60 * 30; // [修改] 加倍子弹生命时间 (从15秒增加到30秒)
         this.chainHistory = [];
         this.trail = [];      
         this.deformation = { x: 1, y: 1 }; 
@@ -6175,6 +6188,10 @@ class Projectile {
             if (game.hasCombatWall) {
                 this.pos.y = height - this.radius; this.vel.y = -Math.abs(this.vel.y);
                 if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y);
+                
+                // [修复] 底部护盾反弹不消耗反弹次数
+                if(this.config.bounce > 0) this.deformation = { x: 1.3, y: 0.7 };
+                this.hitCooldowns.clear();
             } else {
                 this.destroy(spawnCallback);
             }
@@ -8965,14 +8982,14 @@ class Game {
         
         // 2. 计算基于玩家峰值伤害的理想血量
         const peakAvg = this.calc_getPeakAverageDamage();
-        const fullRowsCapacity = 1 * CONFIG.gameplay.enemyCols; // 以 2 行满员为对标
+        const fullRowsCapacity = 2 * CONFIG.gameplay.enemyCols; // 以 2 行满员为对标
         
         let finalBaseHP = linearHP;
         let idealHP = 0;
         if (peakAvg > 0) {
             idealHP = peakAvg / fullRowsCapacity;
             // 混合：40% 线性增长 + 60% 动态调整，确保血量跟随玩家强度
-            finalBaseHP = (linearHP * 0.65) + (idealHP * 0.35);
+            finalBaseHP = (linearHP * 0.4) + (idealHP * 0.6);
         }
         
         // 3. 应用最终倍率
@@ -10606,7 +10623,10 @@ class Game {
              projectile.chainHistory.push(enemy); 
         }
 
-        const killed = enemy.takeDamage(dmg);
+        const killed = en        const damageResult = enemy.takeDamage(dmg);
+        const killed = damageResult.killed;
+        const actualDmg = damageResult.actualDamage;
+
         // 根据属性类型记录伤害
         let damageAttr = 'damage'; // 默认为普通伤害
         let damageColor = '#ffffff'; // 默认颜色
@@ -10645,17 +10665,16 @@ class Game {
             damageColor = '#34d399';
         }
         
-        // 传递shotId到recordDamage
         const shotId = projectile.shotId !== undefined ? projectile.shotId : null;
-        this.combat_recordDamage(dmg, damageAttr, shotId);
+        this.combat_recordDamage(actualDmg, damageAttr, shotId);
         
         // [新增] 保存当前shotId，供后续额外伤害使用
         this._currentDamageShotId = shotId;
         
-        // [新增] 统一显示伤害数字
-        if (this.showDamageNumbers && dmg > 0) {
-            this.spawn_createFloatingText(hitX, hitY, `-${Math.ceil(dmg)}`, damageColor);
-        }
+        // [新增] 统一显示伤害数字 (使用实际造成的伤害)
+        if (this.showDamageNumbers && actualDmg > 0) {
+            this.spawn_createFloatingText(hitX, hitY, `-${Math.ceil(actualDmg)}`, damageColor);
+        }       }
         audio.playEnemyHit(hitType);
 
         // --- [新增] 剑痕共鸣机制 (Stuck Sword Resonance) ---
