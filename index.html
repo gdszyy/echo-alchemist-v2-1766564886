@@ -9767,6 +9767,8 @@ class Game {
             timer: 0,
             cooldown: cooldown,
             bladeCount: bladeCount,
+            firedCount: 0, // [新增] 已发射次数计数
+            maxFires: bladeCount, // [新增] 最大发射次数 (1 + multicast)
             active: true,
             startAnim: 60 // 启动阵图动画时长（帧）
         };
@@ -9818,6 +9820,11 @@ class Game {
             if (bc.timer >= bc.cooldown) {
                 bc.timer = 0;
                 this.combat_wind_fireButterflyBlades(bc);
+                bc.firedCount++;
+                // 如果发射次数达到上限，标记为结束
+                if (bc.firedCount >= bc.maxFires) {
+                    bc.duration = 0; 
+                }
             }
             
             if (bc.duration <= 0) {
