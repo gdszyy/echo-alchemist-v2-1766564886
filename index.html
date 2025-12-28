@@ -4298,8 +4298,6 @@ class Enemy {
 
         // 2. 白色延迟血条逻辑
         if (this.whiteBarTimer > 0) {
-            //        // 2. 白色延迟血条逻辑
-        if (this.whiteBarTimer > 0) {
             // 如果还在缓冲期（刚受过伤），白色血条不动，保持在旧的高位
             this.whiteBarTimer--;
         } else {
@@ -9415,8 +9413,7 @@ class Game {
             type = 'storm_core';
         }
 
-        // 获取当前元素类型和完整子弹配置
-        const currentRecipe = this.projectiles.find(p => p.config.wind)?.config || { wind: true };
+        // 获取当前元素类型和完整子弹配置 (已在方法开头获取)
         // [新增] 保存完整的子弹配置，用于法阵伤害套用属性效果
         const bulletConfig = { ...currentRecipe };
         let element = 'wind';
