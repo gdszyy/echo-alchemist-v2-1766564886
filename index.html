@@ -1229,6 +1229,40 @@ const CONFIG = {
         sonTurnSpeed: 0.12,
         markDuration: 999999 // 标记持续帧数
     },
+    /** 风属性系统配置 */
+    wind_system: {
+        // 蝴蝶法阵参数
+        butterfly: {
+            damageMult: 2.0,      // 风刃伤害倍率 (基于子弹伤害)
+            baseCooldown: 21,     // 基础伤害冷却 (帧)
+            minCooldown: 5,       // 最小伤害冷却 (帧)
+            bladeSizeBase: 25,    // 风刃基础大小
+            bladeSizeVar: 15,     // 风刃大小随机波动
+            bladeSpeedBase: 25,   // 风刃基础速度
+            bladeSpeedVar: 10,    // 风刃速度随机波动
+            launchOffset: 150,    // 发射起点偏移 (屏幕外)
+            deleteOffset: 200,    // 删除判定偏移 (屏幕外)
+            duration: 5000        // 法阵持续时间 (ms)
+        },
+        // 风暴核心参数
+        storm_core: {
+            damageMult: 8.0,      // 大旋风伤害倍率
+            radiusMax: 80,        // 最大核心半径
+            energyPerSecond: 1,   // 每秒充能值
+            decayPerRound: 1,     // 每回合能量衰减
+            cycloneRadiusMult: 1.5 // 大旋风半径相对于核心的倍率
+        },
+        // 基础风属性参数
+        base: {
+            anchorExplosionMult: 5.0, // 锚点消失爆炸伤害倍率
+            smallWhirlwindMult: 5.0,  // 小旋风伤害倍率
+            tunnelDamageMult: 6.0,    // 风道伤害倍率
+            shockwaveMult: 4.0,       // 冲击波伤害倍率
+            blackholeMult: 9999,      // 黑洞伤害 (即死级)
+            hitStopScale: 0.02,       // 强力顿挫时间缩放
+            hitStopDuration: 15       // 强力顿挫持续帧数
+        }
+    },
     /** 游戏平衡性：敌人与数值 */
     balance: {
         normalPegSecondEnergChancey:0.5,
@@ -9610,8 +9644,10 @@ class Game {
                 this.spawn_createFloatingText(centerX, centerY, "💥内爆", "#fca5a5");
                 this.enemies.forEach(e => {
                     if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
-                        // [修改 1] 套用子弹完整属性配置
-                        const windConfig = { ...bulletConfig, damage: 15 };
+                        // [优化] 伤害挂钩子弹伤害倍率 (使用配置参数)
+                        const cfg = CONFIG.wind_system.base;
+                        const dmg = Math.max(1, Math.floor(bulletDamage * cfg.shockwaveMult));
+                        const windConfig = { ...bulletConfig, damage: dmg };
                         this.combat_damageEnemy(e, { 
                             config: windConfig, 
                             pos: e.pos, 
@@ -9627,8 +9663,10 @@ class Game {
                 this.spawn_createFloatingText(centerX, centerY, "🛡️屏障", "#0ea5e9");
                 this.enemies.forEach(e => {
                     if (e.active && e.pos.x > x && e.pos.x < x+w && e.pos.y > y && e.pos.y < y+h) {
-                        // [修改 1] 套用子弹完整属性配置
-                        const windConfig = { ...bulletConfig, damage: 30 };
+                        // [优化] 伤害挂钩子弹伤害倍率 (使用配置参数)
+                        const cfg = CONFIG.wind_system.base;
+                        const dmg = Math.max(1, Math.floor(bulletDamage * cfg.shockwaveMult * 2)); // 屏障伤害通常更高
+                        const windConfig = { ...bulletConfig, damage: dmg };
                         this.combat_damageEnemy(e, { 
                             config: windConfig, 
                             pos: e.pos, 
@@ -9655,7 +9693,9 @@ class Game {
                     const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
                     if (e.active && inPath) {
                         hitCount++;
-                        const dmg = Math.max(1, Math.floor(bulletDamage * 6)); // 提升伤害倍率
+                        // [优化] 伤害挂钩子弹伤害倍率 (使用配置参数)
+                        const cfg = CONFIG.wind_system.base;
+                        const dmg = Math.max(1, Math.floor(bulletDamage * cfg.tunnelDamageMult));
                         
                         // 伤害逻辑
                         const windConfig = { ...bulletConfig, damage: dmg, wind: 1 };
@@ -9678,10 +9718,11 @@ class Game {
                     }
                 });
 
-                // 3. 【核心优化】：强力顿挫 (Hit Stop)
+                // 3. 【核心优化】：强力顿挫 (使用配置参数)
                 if (hitCount > 0) {
-                    this.slowMotionTimer = 15; // 持续时间加长 (约0.25秒的定格)
-                    this.timeScale = 0.02;     // 极慢！接近静止
+                    const cfg = CONFIG.wind_system.base;
+                    this.slowMotionTimer = cfg.hitStopDuration; 
+                    this.timeScale = cfg.hitStopScale;     
                     this.triggerScreenShake(20); // 屏幕强震
                 }
 
@@ -9809,25 +9850,24 @@ class Game {
         // 4. 计算 multicast（散射层数）
         const multicast = bulletConfig.multicast || 1;
         
-        // 5. 计算伤害冷却（multicast越大，冷却越小）
-        // [优化] 冷却减半
-        const baseCooldown = 21; 
-        const cooldown = Math.max(5, Math.floor(baseCooldown / Math.sqrt(multicast)));
+        // 5. 计算伤害冷却（使用配置参数）
+        const cfg = CONFIG.wind_system.butterfly;
+        const cooldown = Math.max(cfg.minCooldown, Math.floor(cfg.baseCooldown / Math.sqrt(multicast)));
         
         // 6. 计算风刃数量（基于multicast）
         const bladeCount = 2 + multicast * 2;
         
-        // 7. 创建蝴蝶法阵对象
         const butterflyCircle = {
-            center: intersection,
-            anchors: anchors,
+            center: center,
+            anchors: bc.anchors,
             bulletConfig: bulletConfig,
-            bulletDamage: avgBulletDamage,
-            multicast: multicast,
+            bulletDamage: bulletDamage,
+            duration: cfg.duration,
+            timer: 0,
             cooldown: cooldown,
             bladeCount: bladeCount,
-            timer: 0,
-            duration: 300,
+            active: true
+        };      duration: 300,
             active: true
         };
         
@@ -9890,9 +9930,10 @@ class Game {
                 // 计算射线与屏幕边界的交点
                 let startPos = new Vec2(center.x, center.y);
                 const rayDir = dir;
-                // [优化] 发射起点设在屏幕外 150px 处
-                const tX = rayDir.x > 0 ? (this.canvas.width + 150 - center.x) / rayDir.x : (-150 - center.x) / rayDir.x;
-                const tY = rayDir.y > 0 ? (this.canvas.height + 150 - center.y) / rayDir.y : (-150 - center.y) / rayDir.y;
+                // [优化] 发射起点（使用配置参数）
+                const cfg = CONFIG.wind_system.butterfly;
+                const tX = rayDir.x > 0 ? (this.canvas.width + cfg.launchOffset - center.x) / rayDir.x : (-cfg.launchOffset - center.x) / rayDir.x;
+                const tY = rayDir.y > 0 ? (this.canvas.height + cfg.launchOffset - center.y) / rayDir.y : (-cfg.launchOffset - center.y) / rayDir.y;
                 const t = Math.min(tX, tY);
                 startPos = center.add(rayDir.mult(t));
 
@@ -9902,10 +9943,10 @@ class Game {
                 const blade = {
                     pos: startPos,
                     // 向内发射：速度方向取反
-                    vel: dir.mult(-(25 + Math.random() * 10)), 
+                    vel: dir.mult(-(cfg.bladeSpeedBase + Math.random() * cfg.bladeSpeedVar)), 
                     bulletConfig: bc.bulletConfig,
                     bulletDamage: bc.bulletDamage,
-                    size: 25 + Math.random() * 15, // 风刃变粗
+                    size: cfg.bladeSizeBase + Math.random() * cfg.bladeSizeVar, 
                     life: 1.0,
                     angle: bladeAngle,
                     rotationAxis: dir,
@@ -9931,23 +9972,24 @@ class Game {
             blade.angle += 0.2 * timeScale; // 3D旋转
             blade.damageTimer += timeScale;
             
-            // [优化] 检查是否飞出屏幕：删除区设在屏幕外 200px 处，确保发射起点（150px）在删除区内
-            if (blade.pos.x < -200 || blade.pos.x > this.canvas.width + 200 ||
-                blade.pos.y < -200 || blade.pos.y > this.canvas.height + 200) {
+            // [优化] 检查是否飞出屏幕（使用配置参数）
+            const cfg = CONFIG.wind_system.butterfly;
+            if (blade.pos.x < -cfg.deleteOffset || blade.pos.x > this.canvas.width + cfg.deleteOffset ||
+                blade.pos.y < -cfg.deleteOffset || blade.pos.y > this.canvas.height + cfg.deleteOffset) {
                 this.butterflyBlades.splice(i, 1);
                 continue;
             }
             
-            // 伤害判定（冷却减半：5帧）
-            if (blade.damageTimer >= 5) {
+            // 伤害判定（使用配置参数）
+            if (blade.damageTimer >= cfg.minCooldown) {
                 let hasHit = false;
                 this.enemies.forEach(e => {
                     if (!e.active) return;
                     const dist = blade.pos.sub(e.pos).mag();
                     if (dist < 40) { // 判定范围稍微增大
                         hasHit = true;
-                        // [优化] 伤害挂钩子弹伤害倍率 (2倍)
-                        const dmg = Math.max(1, Math.floor(blade.bulletDamage * 2));
+                        // [优化] 伤害挂钩子弹伤害倍率
+                        const dmg = Math.max(1, Math.floor(blade.bulletDamage * cfg.damageMult));
                         const windConfig = { ...blade.bulletConfig, damage: dmg };
                         this.combat_damageEnemy(e, { 
                             config: windConfig, 
@@ -10045,12 +10087,13 @@ class Game {
      * 生成风暴核心区域
      */
     spawn_stormCore(x, y, radius, bulletDamage, bulletConfig) {
+        const cfg = CONFIG.wind_system.storm_core;
         // 计算能量需求（基于半径）
-        const energyRequired = Math.floor(radius / 10); 
+        const energyRequired = Math.max(1, Math.floor(radius / 10)); 
         
         const stormCore = {
             pos: new Vec2(x, y),
-            radius: radius,
+            radius: Math.min(cfg.radiusMax, radius),
             bulletDamage: bulletDamage,
             bulletConfig: bulletConfig || { wind: true },
             energy: 0,
@@ -10085,10 +10128,11 @@ class Game {
             });
             
             if (hasBulletInside) {
+                const cfg = CONFIG.wind_system.storm_core;
                 core.chargeTimer += timeScale;
                 if (core.chargeTimer >= 60) {
                     core.chargeTimer = 0;
-                    core.energy++;
+                    core.energy += cfg.energyPerSecond;
                     this.spawn_createParticle(core.pos.x, core.pos.y, '#34d399', 'spark');
                 }
             }
@@ -10104,9 +10148,10 @@ class Game {
      * 释放风暴核心的大旋风
      */
     combat_wind_releaseStormCoreCyclone(core) {
+        const cfg = CONFIG.wind_system.storm_core;
         const centerX = core.pos.x;
         const centerY = core.pos.y;
-        const radius = core.radius * 1.5;
+        const radius = core.radius * cfg.cycloneRadiusMult;
         
         this.spawn_createFloatingText(centerX, centerY, "🌀大旋风", "#10b981");
         this.spawn_createShockwave(centerX, centerY, '#10b981');
@@ -10130,7 +10175,7 @@ class Game {
             if (!e.active) return;
             const dist = e.pos.dist(core.pos);
             if (dist < radius) {
-                const dmg = Math.max(1, Math.floor(core.bulletDamage * 8));
+                const dmg = Math.max(1, Math.floor(core.bulletDamage * cfg.damageMult));
                 const windConfig = { ...core.bulletConfig, damage: dmg };
                 this.combat_damageEnemy(e, { 
                     config: windConfig, 
