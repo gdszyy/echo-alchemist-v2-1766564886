@@ -9849,12 +9849,13 @@ class Game {
         // 4. 计算 multicast（散射层数）
         const multicast = bulletConfig.multicast || 1;
         
-        // 5. 计算伤害冷却（使用配置参数）
+        // 5. 计算伤害冷却（使用配置参数，根据multicast减少冷却）
         const cfg = CONFIG.wind_system.butterfly;
-        const cooldown = Math.max(cfg.minCooldown, Math.floor(cfg.baseCooldown / Math.sqrt(multicast)));
+        // 冷却帧数随multicast增加而减少
+        const cooldown = Math.max(cfg.minCooldown, Math.floor(cfg.baseCooldown / (1 + multicast * 0.5)));
         
-        // 6. 计算风刃数量（基于multicast）
-        const bladeCount = 2 + multicast * 2;
+        // 6. 计算风刃数量（1 + multicast）
+        const bladeCount = 1 + multicast;
         
         const butterflyCircle = {
             center: intersection,
@@ -9865,7 +9866,8 @@ class Game {
             timer: 0,
             cooldown: cooldown,
             bladeCount: bladeCount,
-            active: true
+            active: true,
+            startAnim: 60 // 启动阵图动画时长（帧）
         };
         
         // 8. 添加到游戏对象数组
@@ -9877,6 +9879,17 @@ class Game {
         
         // 10. 视觉反馈
         this.spawn_createFloatingText(intersection.x, intersection.y, "🦋蝴蝶法阵", "#34d399");
+        
+        // 11. 启动粒子爆发
+        for (let i = 0; i < 30; i++) {
+            const p = this.spawn_createParticle(intersection.x, intersection.y, '#34d399', 'wind_slash');
+            if (p) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 5 + Math.random() * 10;
+                p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
+                p.life = 0.5 + Math.random() * 0.5;
+            }
+        }
     }
 
     getLineIntersectionPoint(a, b, c, d) {
@@ -9899,6 +9912,7 @@ class Game {
             
             bc.timer += timeScale;
             bc.duration -= timeScale;
+            if (bc.startAnim > 0) bc.startAnim -= timeScale;
             
             if (bc.timer >= bc.cooldown) {
                 bc.timer = 0;
@@ -10008,6 +10022,49 @@ class Game {
                 });
             }
         }
+    }
+
+    combat_wind_drawButterflyCircles(ctx) {
+        if (!this.butterflyCircles) return;
+        
+        this.butterflyCircles.forEach(bc => {
+            if (bc.startAnim > 0) {
+                const progress = 1 - bc.startAnim / 60;
+                const alpha = Math.sin(progress * Math.PI) * 0.6;
+                
+                ctx.save();
+                ctx.translate(bc.center.x, bc.center.y);
+                ctx.globalAlpha = alpha;
+                
+                // 1. 绘制核心光阵
+                ctx.strokeStyle = '#34d399';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(0, 0, 40 + progress * 20, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // 2. 绘制蝴蝶翅膀动效 (四个扇形)
+                for (let i = 0; i < 4; i++) {
+                    const angle = i * Math.PI / 2 + progress * Math.PI;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.arc(0, 0, 60 + progress * 40, angle - 0.4, angle + 0.4);
+                    ctx.closePath();
+                    ctx.fillStyle = 'rgba(52, 211, 153, 0.3)';
+                    ctx.fill();
+                    ctx.stroke();
+                }
+                
+                // 3. 绘制交叉线
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(-100, -100); ctx.lineTo(100, 100);
+                ctx.moveTo(100, -100); ctx.lineTo(-100, 100);
+                ctx.stroke();
+                
+                ctx.restore();
+            }
+        });
     }
 
     combat_wind_drawButterflyBlades(ctx) {
@@ -13587,6 +13644,7 @@ class Game {
             }
             // 蝴蝶法阵更新和绘制
             this.combat_wind_updateButterflyCircles(timeScale);
+            this.combat_wind_drawButterflyCircles(this.ctx);
             this.combat_wind_updateButterflyBlades(timeScale);
             this.combat_wind_drawButterflyBlades(this.ctx);
             // 风暴核心更新和绘制
