@@ -3416,6 +3416,7 @@ class DropBall {
                     const attrColor = this.def.getColor();
                     const attrName = CONFIG.ui.attributeDisplay[ballType] ? CONFIG.ui.attributeDisplay[ballType].name : "Assimilation";
                     game.spawn_createExplosion(peg.pos.x, peg.pos.y, attrColor);
+					game.spawn_createShockwave(peg.pos.x, peg.pos.y, attrColor);
                     game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 20, attrName, attrColor);
                     
                     game.spawn_createParticle(peg.pos.x, peg.pos.y, attrColor);
