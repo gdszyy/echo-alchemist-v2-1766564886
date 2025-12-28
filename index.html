@@ -1343,7 +1343,10 @@ const CONFIG = {
             damage: 0.2,
             cryo: 0.2,  
             pyro: 0.2
-        }
+        },
+        // [新增] 特殊变体概率乘子
+        specialMutationMult: 0.5, // 变异概率乘子 (基于同化概率)
+        specialUpgradeMult: 1.0   // 升级概率乘子 (基于同化概率)
     },
     //  初始概率配置 (現在這些是基礎權重，解鎖後會增加)
     probabilities: { 
@@ -3352,9 +3355,11 @@ class DropBall {
             if (rules && rules[peg.type]) {
                 const rule = rules[peg.type];
                 
-                // 概率设定：升级概率与同化一致，变异概率为同化的一半
+                // 概率设定：使用配置中的乘子
                 const assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0.2;
-                const chance = rule.type === 'upgrade' ? assimilationChance : assimilationChance * 0.5;
+                const mutationMult = CONFIG.gameplay.specialMutationMult || 0.5;
+                const upgradeMult = CONFIG.gameplay.specialUpgradeMult || 1.0;
+                const chance = rule.type === 'upgrade' ? assimilationChance * upgradeMult : assimilationChance * mutationMult;
 
                 if (Math.random() < chance) {
                     
