@@ -3416,8 +3416,8 @@ class DropBall {
             // 3. 原有的普通同化逻辑 (Fallback)
             else if (peg.type === 'normal' && ballType) {
                 // 这里保留原有的逻辑：普通弹珠同化普通钉子
-                const assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0.25;
-                if (Math.random() < assimilationChance) {
+                const assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0;
+                if (Math.random() < assimilationChance && assimilationChance>0) {
                     peg.type = ballType;
                     
                     // [新增] 同化钉子特效：爆炸 + 浮动文字
