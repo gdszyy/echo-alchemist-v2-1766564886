@@ -2565,6 +2565,7 @@ class FortuneWheel {
         
         // 统计当前弹珠拥有的可叠加属性
         const counts = {};
+		console.log("collectedAttributes",collectedAttributes)
         collectedAttributes.forEach(item => {
             // [修复] 兼容字符串和对象格式
             const type = (typeof item === 'string') ? item : item.type;
