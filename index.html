@@ -9268,9 +9268,9 @@ class Game {
         // 1. 数量检查
         if (this.windAnchors.length < 4) return;
 
-        // 2. [新增] 几何拓扑检查：如果是蝴蝶形/交叉形，则视为无效，不触发锁定
+        // 2. [重构] 几何拓扑检查：如果是蝴蝶形/交叉形，触发独立的蝴蝶法阵
         if (this.isBowtieShape(this.windAnchors)) {
-            // 可以在此处添加视觉或音效反馈提示形状无效
+            this.combat_wind_triggerButterflyCircle();
             return; 
         }
 
@@ -9779,6 +9779,215 @@ class Game {
      * @param {Vec2} delta - 移动向量
      * @returns {boolean} 是否成功移动
      */
+    // === 🦋 蝴蝶法阵系统 ===
+    combat_wind_triggerButterflyCircle() {
+        // 1. 获取锁点和配置
+        const anchors = [...this.windAnchors];
+        if (anchors.length < 4) return;
+        
+        // 2. 计算交叉线的交点（沙漏中心）
+        const p = anchors;
+        const intersection = this.getLineIntersectionPoint(p[0], p[2], p[1], p[3]);
+        if (!intersection) return;
+        
+        // 3. 获取子弹配置
+        const currentRecipe = this.projectiles.find(proj => proj.config.wind)?.config || { wind: true };
+        const bulletConfig = { ...currentRecipe };
+        const avgBulletDamage = anchors.reduce((sum, a) => sum + (a.bulletDamage || 2), 0) / anchors.length;
+        
+        // 4. 计算 multicast（散射层数）
+        const multicast = bulletConfig.multicast || 1;
+        
+        // 5. 计算伤害冷却（multicast越大，冷却越小）
+        const baseCooldown = 42;
+        const cooldown = Math.max(10, Math.floor(baseCooldown / Math.sqrt(multicast)));
+        
+        // 6. 计算风刃数量（基于multicast）
+        const bladeCount = 2 + multicast * 2;
+        
+        // 7. 创建蝴蝶法阵对象
+        const butterflyCircle = {
+            center: intersection,
+            anchors: anchors,
+            bulletConfig: bulletConfig,
+            bulletDamage: avgBulletDamage,
+            multicast: multicast,
+            cooldown: cooldown,
+            bladeCount: bladeCount,
+            timer: 0,
+            duration: 300,
+            active: true
+        };
+        
+        // 8. 添加到游戏对象数组
+        if (!this.butterflyCircles) this.butterflyCircles = [];
+        this.butterflyCircles.push(butterflyCircle);
+        
+        // 9. 清空锁点
+        this.windAnchors = [];
+        
+        // 10. 视觉反馈
+        this.spawn_createFloatingText(intersection.x, intersection.y, "🦋蝴蝶法阵", "#34d399");
+    }
+
+    getLineIntersectionPoint(a, b, c, d) {
+        const denom = (a.x - b.x) * (c.y - d.y) - (a.y - b.y) * (c.x - d.x);
+        if (Math.abs(denom) < 0.001) return null;
+        
+        const t = ((a.x - c.x) * (c.y - d.y) - (a.y - c.y) * (c.x - d.x)) / denom;
+        
+        return new Vec2(
+            a.x + t * (b.x - a.x),
+            a.y + t * (b.y - a.y)
+        );
+    }
+
+    combat_wind_updateButterflyCircles(timeScale) {
+        if (!this.butterflyCircles) return;
+        
+        for (let i = this.butterflyCircles.length - 1; i >= 0; i--) {
+            const bc = this.butterflyCircles[i];
+            
+            bc.timer += timeScale;
+            bc.duration -= timeScale;
+            
+            if (bc.timer >= bc.cooldown) {
+                bc.timer = 0;
+                this.combat_wind_fireButterflyBlades(bc);
+            }
+            
+            if (bc.duration <= 0) {
+                bc.active = false;
+                this.butterflyCircles.splice(i, 1);
+            }
+        }
+    }
+
+    combat_wind_fireButterflyBlades(bc) {
+        const directions = [
+            bc.anchors[0].sub(bc.center).norm(),
+            bc.anchors[1].sub(bc.center).norm(),
+            bc.anchors[2].sub(bc.center).norm(),
+            bc.anchors[3].sub(bc.center).norm()
+        ];
+        
+        directions.forEach((dir, idx) => {
+            for (let i = 0; i < Math.ceil(bc.bladeCount / 4); i++) {
+                const rotationPhase = (bc.timer / bc.cooldown) * Math.PI * 2;
+                const bladeAngle = rotationPhase + (i / (bc.bladeCount / 4)) * Math.PI * 2;
+                
+                const blade = {
+                    pos: new Vec2(bc.center.x, bc.center.y),
+                    vel: dir.mult(30 + Math.random() * 10),
+                    bulletConfig: bc.bulletConfig,
+                    bulletDamage: bc.bulletDamage,
+                    size: 15 + Math.random() * 10,
+                    life: 1.0,
+                    angle: bladeAngle,
+                    rotationAxis: dir,
+                    active: true,
+                    damageTimer: 0
+                };
+                
+                if (!this.butterflyBlades) this.butterflyBlades = [];
+                this.butterflyBlades.push(blade);
+            }
+        });
+    }
+
+    combat_wind_updateButterflyBlades(timeScale) {
+        if (!this.butterflyBlades) return;
+        
+        for (let i = this.butterflyBlades.length - 1; i >= 0; i--) {
+            const blade = this.butterflyBlades[i];
+            
+            // 更新位置
+            blade.pos = blade.pos.add(blade.vel.mult(timeScale));
+            blade.angle += 0.2 * timeScale; // 3D旋转
+            blade.damageTimer += timeScale;
+            
+            // 检查是否飞出屏幕
+            if (blade.pos.x < -50 || blade.pos.x > this.canvas.width + 50 ||
+                blade.pos.y < -50 || blade.pos.y > this.canvas.height + 50) {
+                this.butterflyBlades.splice(i, 1);
+                continue;
+            }
+            
+            // 伤害判定（每10帧一次）
+            if (blade.damageTimer >= 10) {
+                blade.damageTimer = 0;
+                this.enemies.forEach(e => {
+                    if (!e.active) return;
+                    const dist = blade.pos.sub(e.pos).mag();
+                    if (dist < 30) {
+                        const dmg = Math.max(1, Math.floor(blade.bulletDamage * 2));
+                        const windConfig = { ...blade.bulletConfig, damage: dmg };
+                        this.combat_damageEnemy(e, { 
+                            config: windConfig, 
+                            pos: blade.pos, 
+                            isCopy: false,
+                            shotId: this._currentDamageShotId 
+                        });
+                        
+                        // 受击特效
+                        for(let k=0; k<3; k++) {
+                            const p = this.spawn_createParticle(e.pos.x, e.pos.y, '#34d399', 'wind_slash');
+                            if (p) {
+                                p.vel = new Vec2((Math.random()-0.5)*8, (Math.random()-0.5)*8);
+                                p.size = 8 + Math.random() * 8;
+                                p.life = 0.3;
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    combat_wind_drawButterflyBlades(ctx) {
+        if (!this.butterflyBlades) return;
+        
+        this.butterflyBlades.forEach(blade => {
+            ctx.save();
+            ctx.translate(blade.pos.x, blade.pos.y);
+            
+            // 3D旋转效果：模拟沿中轴线旋转
+            const scale = Math.abs(Math.cos(blade.angle));
+            const alpha = 0.3 + scale * 0.7;
+            
+            ctx.globalAlpha = alpha;
+            
+            // 根据属性混合颜色
+            let color = '#d1fae5';
+            if (blade.bulletConfig) {
+                if (blade.bulletConfig.cryo > 0) color = '#cffafe';
+                else if (blade.bulletConfig.pyro > 0) color = '#fdba74';
+                else if (blade.bulletConfig.lightning > 0) color = '#d8b4fe';
+            }
+            
+            // 绘制风刃
+            const angle = Math.atan2(blade.vel.y, blade.vel.x);
+            ctx.rotate(angle);
+            ctx.scale(1.0, scale);
+            
+            const grad = ctx.createLinearGradient(-blade.size, 0, blade.size, 0);
+            grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+            grad.addColorStop(0.2, color.replace(')', ', 0.8)').replace('rgb', 'rgba'));
+            grad.addColorStop(0.5, 'rgba(255, 255, 255, 1)');
+            grad.addColorStop(0.8, color.replace(')', ', 0.8)').replace('rgb', 'rgba'));
+            grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.moveTo(-blade.size * 1.5, 0);
+            ctx.quadraticCurveTo(0, blade.size * 0.4, blade.size * 1.5, 0);
+            ctx.quadraticCurveTo(0, -blade.size * 0.4, -blade.size * 1.5, 0);
+            ctx.fill();
+            
+            ctx.restore();
+        });
+    }
+
     combat_tryMoveEnemy(enemy, delta) {
         if (!enemy || !enemy.active) return false;
 
@@ -13096,6 +13305,10 @@ class Game {
             if (this.swordQis) {
                 this.swordQis.forEach(qi => qi.draw(this.ctx));
             }
+            // 蝴蝶法阵更新和绘制
+            this.combat_wind_updateButterflyCircles(timeScale);
+            this.combat_wind_updateButterflyBlades(timeScale);
+            this.combat_wind_drawButterflyBlades(this.ctx);
             // 拖拽瞄准线
             if (this.isDragging && this.projectiles.length === 0 && this.ammoQueue.length > 0 && this.burstQueue.length === 0) {
                 const start = new Vec2(this.width / 2, this.height - 80);
