@@ -4161,7 +4161,9 @@ class Enemy {
         // --- [新增/修改] 血条动画相关 ---
         this.displayHp = this.hp;      // 真实血条的显示值 (平滑过渡)
         this.delayedHp = this.hp;      // 白色延迟血条的值
+        this.greenHp = this.hp;        // [新增] 绿色回血血条的值
         this.whiteBarTimer = 0;        // 延迟缓冲计时器
+        this.greenBarTimer = 0;        // [新增] 绿色回血计时器
 
         this.hpDropTimer = 0;
         this.active = true; 
@@ -4233,6 +4235,7 @@ class Enemy {
 
         this.hasActedThisTurn = false;
         this.scanFeedbackTimer = 0;
+        this.shieldHitTimer = 0; // 护盾受击反馈计时器
     }
     
     update(timeScale, game) {
@@ -4259,6 +4262,7 @@ class Enemy {
         }
         
         if (this.hitTimer > 0) this.hitTimer -= timeScale;
+        if (this.shieldHitTimer > 0) this.shieldHitTimer -= timeScale;
         if (this.justSpawned) { this.justSpawned = false; }
         
         // 弹跳恢复
@@ -4294,24 +4298,46 @@ class Enemy {
 
         // 2. 白色延迟血条逻辑
         if (this.whiteBarTimer > 0) {
+            //        // 2. 白色延迟血条逻辑
+        if (this.whiteBarTimer > 0) {
             // 如果还在缓冲期（刚受过伤），白色血条不动，保持在旧的高位
             this.whiteBarTimer--;
         } else {
             // 缓冲结束，白色血条快速追赶当前血量
-            if (this.delayedHp > this.displayHp) {
-                // 追赶速度比 displayHp 快，产生"崩塌"感
-                this.delayedHp = lerp(this.delayedHp, this.displayHp, 0.25);
-                
-                // 阈值修正，防止无限逼近
-                if (Math.abs(this.delayedHp - this.displayHp) < 0.1) {
-                    this.delayedHp = this.displayHp;
-                }
+            // 追赶速度比 displayHp 快，产生"崩塌"感
+            this.delayedHp = lerp(this.delayedHp, this.displayHp, 0.25);
+            
+            // 阈值修正，防止无限逼近
+            if (Math.abs(this.delayedHp - this.displayHp) < 0.1) {
+                this.delayedHp = this.displayHp;
             }
         }
         
         // 确保白色血条不会低于真实血条 (比如治疗时)
         if (this.delayedHp < this.displayHp) {
             this.delayedHp = this.displayHp;
+        }
+
+        // 3. [新增] 绿色回血血条逻辑
+        if (this.hp > this.greenHp) {
+            // 发生回血，greenHp 立即跳到新血量，displayHp 随后跟上
+            this.greenHp = this.hp;
+            this.greenBarTimer = 30; // 持续约 0.5 秒
+        }
+
+        if (this.greenBarTimer > 0) {
+            this.greenBarTimer -= timeScale;
+        } else {
+            // 缓冲结束，greenHp 追赶 hp (实际上 hp 已经在那了，是 displayHp 在追赶)
+            // 这里我们让 greenHp 保持在 hp，主要是 displayHp 的滚动逻辑在起作用
+            this.greenHp = this.hp;
+        }
+
+        // 修正 displayHp 的回血滚动逻辑
+        if (this.displayHp < this.hp) {
+            // 回血时，displayHp 慢慢涨上去
+            this.displayHp = lerp(this.displayHp, this.hp, 0.1 * timeScale);
+            if (Math.abs(this.hp - this.displayHp) < 0.5) this.displayHp = this.hp;
         }
         this.updateTempParticles(timeScale);
     }
@@ -4793,20 +4819,29 @@ class Enemy {
         // A. 计算高度比例
         const hpRatio = Math.max(0, Math.min(1, this.displayHp / this.maxHp));
         const whiteRatio = Math.max(0, Math.min(1, this.delayedHp / this.maxHp)); // 白色条比例
+        const greenRatio = Math.max(0, Math.min(1, this.greenHp / this.maxHp));   // 绿色条比例
         
         const fillHeight = h * hpRatio;
         const whiteHeight = h * whiteRatio; // 白色条高度
+        const greenHeight = h * greenRatio; // 绿色条高度
         
         const fillY = (h/2) - fillHeight;
         const whiteY = (h/2) - whiteHeight; // 白色条Y坐标
+        const greenY = (h/2) - greenHeight; // 绿色条Y坐标
         
         // B. 绘制白色延迟条 (在彩色条底下)
-        // 只有当 delayedHp > displayHp 时才绘制，避免不必要的重绘
         if (whiteRatio > hpRatio) {
             ctx.fillStyle = '#ffffff'; 
-            // 稍微加一点透明度，不那么刺眼
             ctx.globalAlpha = 0.8;
             ctx.fillRect(-w/2, whiteY, w, whiteHeight);
+            ctx.globalAlpha = 1.0;
+        }
+
+        // [新增] B2. 绘制绿色回血条 (在彩色条底下)
+        if (greenRatio > hpRatio) {
+            ctx.fillStyle = '#4ade80'; // 亮绿色
+            ctx.globalAlpha = 0.6;
+            ctx.fillRect(-w/2, greenY, w, greenHeight);
             ctx.globalAlpha = 1.0;
         }
 
@@ -5033,6 +5068,30 @@ class Enemy {
             ctx.fillRect(-w/2, -h/2, w, h);
         }
 
+        // --- [新增] 护盾受击视觉反馈 (放大虚化的护盾) ---
+        if (this.shieldHitTimer > 0) {
+            ctx.save();
+            const alpha = (this.shieldHitTimer / 15) * 0.5;
+            const scale = 1.2 + (1 - this.shieldHitTimer / 15) * 0.2; // 逐渐放大
+            ctx.scale(scale, scale);
+            
+            // 绘制一个圆角矩形虚化护盾
+            ctx.strokeStyle = `rgba(147, 197, 253, ${alpha})`; // 浅蓝色
+            ctx.lineWidth = 4;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#60a5fa';
+            
+            ctx.beginPath();
+            ctx.roundRect(-w/2 - 5, -h/2 - 5, w + 10, h + 10, r + 2);
+            ctx.stroke();
+            
+            // 内部填充一点淡蓝色
+            ctx.fillStyle = `rgba(147, 197, 253, ${alpha * 0.3})`;
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
         // === Layer 5.5: 插在身上的子剑 (Stuck Swords) ===
         if (this.stuckSwords && this.stuckSwords.length > 0) {
             this.stuckSwords.forEach(sword => {
@@ -5222,6 +5281,17 @@ class Enemy {
 
     takeDamage(amount) {
         let finalDamage = amount;
+
+        // --- [新增] 护盾减伤机制 ---
+        if (this.affixes.includes('shield')) {
+            const reduction = CONFIG.balance.affixes.shieldReduction || 0.5;
+            finalDamage *= reduction;
+            
+            // 触发护盾视觉反馈 (限制频率)
+            if (this.shieldHitTimer <= 0) {
+                this.shieldHitTimer = 15; // 持续约 0.25 秒
+            }
+        }
         
         // 冰冻伤害加深机制
         if (this.temp <= -100 || this.isFrozenCurrentTurn) {
@@ -8461,7 +8531,8 @@ class Game {
         const speedBtn = document.getElementById('speed-btn'); 
         speedBtn.onclick = () => { 
             if (this.timeScale === 1.0) this.timeScale = 2.0; 
-            else if (this.timeScale === 2.0) this.timeScale = 0.42; 
+            else if (this.timeScale === 2.0) this.timeScale = 3.0; 
+            else if (this.timeScale === 3.0) this.timeScale = 0.42; 
             else this.timeScale = 1.0; 
             this.baseTimeScale = this.timeScale
             speedBtn.innerText = `⏩ x${this.timeScale}`; // 更新按钮文本
@@ -11924,6 +11995,17 @@ class Game {
      * @param {string} [mode='normal'] - 粒子的行为模式 (e.g., 'normal', 'confetti')。
      */
     spawn_createParticle(x, y, color, mode = 'normal') {
+        // [优化] 限制粒子总数，防止高频触发（如火焰）导致卡顿
+        const MAX_PARTICLES = 400;
+        const EMBER_LIMIT = 150; // 针对性能开销大的火焰粒子设置更严格的限制
+        
+        if (this.particles.length > MAX_PARTICLES) return null;
+        
+        if (mode === 'ember') {
+            const currentEmbers = this.particles.filter(p => p.mode === 'ember').length;
+            if (currentEmbers > EMBER_LIMIT) return null;
+        }
+
         const p = new Particle(x, y, color, mode);
         this.particles.push(p);
         return p;
