@@ -9873,11 +9873,12 @@ class Game {
     }
 
     combat_wind_fireButterflyBlades(bc) {
+        const center = new Vec2(bc.center.x, bc.center.y);
         const directions = [
-            bc.anchors[0].sub(bc.center).norm(),
-            bc.anchors[1].sub(bc.center).norm(),
-            bc.anchors[2].sub(bc.center).norm(),
-            bc.anchors[3].sub(bc.center).norm()
+            new Vec2(bc.anchors[0].x, bc.anchors[0].y).sub(center).norm(),
+            new Vec2(bc.anchors[1].x, bc.anchors[1].y).sub(center).norm(),
+            new Vec2(bc.anchors[2].x, bc.anchors[2].y).sub(center).norm(),
+            new Vec2(bc.anchors[3].x, bc.anchors[3].y).sub(center).norm()
         ];
         
         directions.forEach((dir, idx) => {
