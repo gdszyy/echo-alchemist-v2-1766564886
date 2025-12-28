@@ -3275,8 +3275,9 @@ class DropBall {
             if (rules && rules[peg.type]) {
                 const rule = rules[peg.type];
                 
-                // 概率设定：升级通常是 100% 或者是高概率，突变是低概率
-                const chance = rule.type === 'upgrade' ? CONFIG.gameplay.assimilationChance[ballType]*0.7 : CONFIG.gameplay.assimilationChance[ballType]; // 20% 突变率
+                // 概率设定：升级概率与同化一致，变异概率为同化的一半
+                const assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0.2;
+                const chance = rule.type === 'upgrade' ? assimilationChance : assimilationChance * 0.5;
 
                 if (Math.random() < chance) {
                     
@@ -10230,7 +10231,7 @@ class Game {
                     const dist = e.pos.dist(core.pos);
                     if (dist < radius) {
                         // 每段伤害为总伤害的 1/4，总计 3 倍爆发伤害
-                        const dmg = Math.max(1, Math.floor(core.bulletDamage * cfg.damageMult * 0.25));
+                        const dmg = Math.max(1, Math.floor(core.bulletDamage * (CONFIG.wind_system.storm_core.damageMult || 4.0) * 0.25));
                         const windConfig = { ...core.bulletConfig, damage: dmg };
                         this.combat_damageEnemy(e, { 
                             config: windConfig, 
