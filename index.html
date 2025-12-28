@@ -997,7 +997,7 @@
             </button>
 
             <div class="grid grid-cols-3 gap-6 w-full max-w-lg px-8">
-                <button onclick="showToast('煉金工坊裝修中 (Coming Soon)...')" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-amber-500/30 transition-all duration-300 group backdrop-blur-sm">
+                <button onclick="game.meta_openShop()" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-amber-500/30 transition-all duration-300 group backdrop-blur-sm">
                     <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-amber-900/20 group-hover:text-amber-400 transition-all shadow-inner">
                         <span class="text-2xl">⚒️</span>
                     </div>
@@ -1021,7 +1021,31 @@
         </div>
         
         <div class="absolute bottom-4 w-full text-center text-slate-700 text-[10px] font-[Cinzel] tracking-widest opacity-50">
-            Ver 9.0 (Meta Architecture)
+            Ver 9.2 (Meta Progression)
+        </div>
+    </div>
+
+    <!-- [META] 炼金工坊 (商店) UI -->
+    <div id="phase-shop" class="ui-overlay" style="display: none; background: #020617;">
+        <div class="w-full max-w-md h-full flex flex-col p-6">
+            <div class="flex justify-between items-center mb-6">
+                <button onclick="game.phase_switchPhase('meta')" class="text-slate-400 hover:text-white transition-colors">
+                    <span class="text-2xl">⬅️</span>
+                </button>
+                <h2 class="text-2xl font-[Cinzel] text-amber-100 tracking-widest">煉金工坊</h2>
+                <div class="flex items-center bg-slate-900/80 px-3 py-1 rounded-full border border-amber-500/30">
+                    <span class="text-amber-400 mr-1">✨</span>
+                    <span id="shop-currency-display" class="font-bold text-amber-100">0</span>
+                </div>
+            </div>
+            
+            <div id="shop-category-tabs" class="flex gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar">
+                <!-- 动态生成分类标签 -->
+            </div>
+
+            <div id="shop-items-container" class="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+                <!-- 动态生成升级项 -->
+            </div>
         </div>
     </div>
 
@@ -1258,6 +1282,100 @@
 </div>
 
 <script>
+// --- META SHOP CONFIG ---
+/**
+ * 局外商店 (炼金工坊) 可配置数据结构
+ */
+const META_SHOP_CONFIG = {
+    resources: {
+        energy_essence: { id: 'energy_essence', name: '能量精粹', icon: '✨', color: '#fbbf24' }
+    },
+    upgrades: [
+        {
+            id: 'init_weight_bounce',
+            category: 'attribute',
+            name: '彈性增幅',
+            desc: '增加初始彈珠中 [反彈] 屬性的權重。',
+            icon: '🔄',
+            maxLevel: 10,
+            cost: { resourceId: 'energy_essence', base: 50, growth: 1.4, type: 'exponential' },
+            effect: { path: 'probabilities.bounce', valuePerLevel: 10, type: 'add' }
+        },
+        {
+            id: 'init_weight_pierce',
+            category: 'attribute',
+            name: '穿透解鎖',
+            desc: '解鎖並增加初始 [穿透] 屬性的權重。',
+            icon: '↗️',
+            maxLevel: 10,
+            cost: { resourceId: 'energy_essence', base: 100, growth: 1.5, type: 'exponential' },
+            effect: { path: 'probabilities.pierce', valuePerLevel: 8, type: 'add' }
+        },
+        {
+            id: 'assimilation_boost',
+            category: 'attribute',
+            name: '同化共鳴',
+            desc: '提升所有屬性的基礎同化概率。',
+            icon: '🧪',
+            maxLevel: 5,
+            cost: { resourceId: 'energy_essence', base: 200, growth: 2.0, type: 'exponential' },
+            effect: { path: 'gameplay.assimilationChance', valuePerLevel: 0.02, type: 'add_all' }
+        },
+        {
+            id: 'defense_line',
+            category: 'defense',
+            name: '防線加固',
+            desc: '減少初始生成的敵人行數。',
+            icon: '🛡️',
+            maxLevel: 2,
+            cost: { resourceId: 'energy_essence', values: [500, 2000], type: 'fixed' },
+            effect: { path: 'gameplay.startRows', valuePerLevel: -1, type: 'add' }
+        },
+        {
+            id: 'relic_choice',
+            category: 'resource',
+            name: '博学多才',
+            desc: '增加遺物選擇時的可選數量。',
+            icon: '📚',
+            maxLevel: 2,
+            cost: { resourceId: 'energy_essence', base: 1000, growth: 3000, type: 'linear' },
+            effect: { path: 'gameplay.relicChoiceNum', valuePerLevel: 1, type: 'add' }
+        }
+    ],
+    categories: {
+        attribute: { name: '屬性煉金', icon: '🧪' },
+        defense: { name: '陣地防御', icon: '🏰' },
+        resource: { name: '資源調度', icon: '📦' }
+    }
+};
+
+/**
+ * 深度设置对象值
+ */
+function setDeepValue(obj, path, value, type) {
+    const keys = path.split('.');
+    let current = obj;
+    
+    // 特殊处理：add_all (针对 assimilationChance 这种对象)
+    if (type === 'add_all') {
+        const target = keys.reduce((acc, key) => acc[key], obj);
+        for (let k in target) {
+            if (typeof target[k] === 'number') target[k] += value;
+        }
+        return;
+    }
+
+    for (let i = 0; i < keys.length - 1; i++) {
+        if (!current[keys[i]]) current[keys[i]] = {};
+        current = current[keys[i]];
+    }
+    const lastKey = keys[keys.length - 1];
+    
+    if (type === 'add') current[lastKey] = (current[lastKey] || 0) + value;
+    else if (type === 'multiply') current[lastKey] = (current[lastKey] || 1) * value;
+    else if (type === 'set') current[lastKey] = value;
+}
+
 // --- CONFIG ---
 /**
  * 游戏配置对象
@@ -7982,6 +8100,7 @@ class Game {
         // --- [META] 存档数据初始化 ---
         this.saveData = {
             currency: 0,        // 能量精粹
+            upgrades: {},       // 已购买的升级项 { id: level }
             unlockedItems: [],  // 已解锁项目
             highScore: 0
         };
@@ -8760,6 +8879,9 @@ class Game {
      * @description 初始化游戏开始状态 (生成初始敌人和进入选择阶段)。
      */
     sys_initGameStart() {
+        // [META] 注入局外升级效果
+        this.meta_applyUpgrades();
+
         const startY = 80; 
         // 根据配置生成初始敌人行
         for(let i=0; i<CONFIG.gameplay.startRows; i++) { 
@@ -8767,6 +8889,23 @@ class Game {
         }
         this.ui_showRelicSelection();
         // this.sys_initSelectionPhase(); // 进入弹珠选择阶段
+    }
+
+    /**
+     * [META] 应用局外升级到当前运行的 CONFIG
+     */
+    meta_applyUpgrades() {
+        if (!this.saveData.upgrades) this.saveData.upgrades = {};
+        
+        META_SHOP_CONFIG.upgrades.forEach(upgrade => {
+            const level = this.saveData.upgrades[upgrade.id] || 0;
+            if (level > 0) {
+                const effectValue = upgrade.effect.valuePerLevel * level;
+                setDeepValue(CONFIG, upgrade.effect.path, effectValue, upgrade.effect.type);
+            }
+        });
+        
+        console.log("Meta upgrades applied to CONFIG");
     }
     /**
      * [AUTO-GENERATED] TODO: Add a description for sys_resetGame.
@@ -8817,6 +8956,120 @@ class Game {
         this.sys_resetGame(); 
         this.sys_initGameStart();
         this.sys_initSelectionPhase();
+    }
+
+    /**
+     * [META] 打开商店
+     */
+    meta_openShop() {
+        this.phase_switchPhase('shop');
+        this.meta_currentShopCategory = Object.keys(META_SHOP_CONFIG.categories)[0];
+        this.ui_renderShop();
+    }
+
+    /**
+     * [UI] 渲染商店内容
+     */
+    ui_renderShop() {
+        const categoryContainer = document.getElementById('shop-category-tabs');
+        const itemsContainer = document.getElementById('shop-items-container');
+        const currencyDisplay = document.getElementById('shop-currency-display');
+        
+        if (currencyDisplay) currencyDisplay.innerText = this.saveData.currency.toLocaleString();
+        
+        // 1. 渲染分类标签
+        if (categoryContainer) {
+            categoryContainer.innerHTML = '';
+            for (let catId in META_SHOP_CONFIG.categories) {
+                const cat = META_SHOP_CONFIG.categories[catId];
+                const isActive = this.meta_currentShopCategory === catId;
+                const btn = document.createElement('button');
+                btn.className = `px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${isActive ? 'bg-amber-500 text-slate-900' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`;
+                btn.innerHTML = `${cat.icon} ${cat.name}`;
+                btn.onclick = () => {
+                    this.meta_currentShopCategory = catId;
+                    this.ui_renderShop();
+                };
+                categoryContainer.appendChild(btn);
+            }
+        }
+
+        // 2. 渲染升级项
+        if (itemsContainer) {
+            itemsContainer.innerHTML = '';
+            const upgrades = META_SHOP_CONFIG.upgrades.filter(u => u.category === this.meta_currentShopCategory);
+            
+            upgrades.forEach(upgrade => {
+                const level = this.saveData.upgrades[upgrade.id] || 0;
+                const isMax = level >= upgrade.maxLevel;
+                const cost = this.meta_calculateUpgradeCost(upgrade, level);
+                const canAfford = this.saveData.currency >= cost;
+
+                const card = document.createElement('div');
+                card.className = `bg-slate-900/60 border ${isMax ? 'border-slate-700 opacity-80' : 'border-slate-700/50'} p-4 rounded-xl flex flex-col gap-3 relative overflow-hidden group`;
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-xl shadow-inner">${upgrade.icon}</div>
+                            <div>
+                                <h3 class="font-bold text-slate-100">${upgrade.name}</h3>
+                                <p class="text-[10px] text-slate-500 uppercase tracking-wider">LV. ${level} / ${upgrade.maxLevel}</p>
+                            </div>
+                        </div>
+                        ${isMax ? '<span class="text-[10px] bg-slate-800 text-slate-500 px-2 py-1 rounded">MAX</span>' : ''}
+                    </div>
+                    <p class="text-xs text-slate-400 leading-relaxed">${upgrade.desc}</p>
+                    <div class="flex justify-between items-center mt-2">
+                        <div class="text-[10px] text-slate-500">
+                            ${!isMax ? `下一級: <span class="text-amber-400/80">+${upgrade.effect.valuePerLevel}${upgrade.effect.type === 'multiply' ? 'x' : ''}</span>` : '已達最高等級'}
+                        </div>
+                        ${!isMax ? `
+                            <button onclick="game.meta_buyUpgrade('${upgrade.id}')" 
+                                    class="px-4 py-2 rounded-lg text-xs font-bold transition-all ${canAfford ? 'bg-amber-500 text-slate-900 hover:scale-105 active:scale-95' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}">
+                                ✨ ${cost.toLocaleString()}
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+                itemsContainer.appendChild(card);
+            });
+        }
+    }
+
+    /**
+     * [META] 计算升级价格
+     */
+    meta_calculateUpgradeCost(upgrade, level) {
+        const c = upgrade.cost;
+        if (c.type === 'fixed') return c.values[level] || 0;
+        if (c.type === 'linear') return c.base + level * c.growth;
+        if (c.type === 'exponential') return Math.floor(c.base * Math.pow(c.growth, level));
+        return 0;
+    }
+
+    /**
+     * [META] 购买升级
+     */
+    meta_buyUpgrade(upgradeId) {
+        const upgrade = META_SHOP_CONFIG.upgrades.find(u => u.id === upgradeId);
+        const level = this.saveData.upgrades[upgradeId] || 0;
+        
+        if (level >= upgrade.maxLevel) return;
+        
+        const cost = this.meta_calculateUpgradeCost(upgrade, level);
+        if (this.saveData.currency >= cost) {
+            this.saveData.currency -= cost;
+            this.saveData.upgrades[upgradeId] = level + 1;
+            this.sys_saveData();
+            this.ui_updateMetaCurrency();
+            this.ui_renderShop();
+            if (window.audio) audio.playTone(800, 'sine', 0.1, 0.3);
+            if (window.showToast) showToast(`升級成功: ${upgrade.name} LV.${level + 1}`);
+        } else {
+            if (window.showToast) showToast("能量精粹不足");
+            if (window.audio) audio.playTone(200, 'sawtooth', 0.1, 0.2);
+        }
     }
 
     sys_resetGame() {
@@ -11415,7 +11668,7 @@ class Game {
             el.classList.remove('active-phase'); 
         });
         // 2. 显示当前阶段的主容器
-        // [META] 兼容 phase-meta
+        // [META] 兼容 phase-meta, shop, truth_book
         const activeEl = document.getElementById(`phase-${this.phase}`); 
         if(activeEl) { 
             activeEl.style.display = 'flex'; 
@@ -11424,6 +11677,11 @@ class Game {
                 activeEl.classList.remove('hidden-phase'); 
                 activeEl.classList.add('active-phase'); 
             }, 10); 
+        }
+        
+        // [META] 切换到主界面或商店时更新货币显示
+        if (this.phase === 'meta' || this.phase === 'shop') {
+            this.ui_updateMetaCurrency();
         }
 
         // 1. 底部面板 (.bottom-panel) 只在收集阶段 (gathering) 显示
