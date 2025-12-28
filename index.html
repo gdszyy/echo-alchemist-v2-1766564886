@@ -13057,7 +13057,7 @@ class Game {
             else html += `<span class="text-slate-400">⚔️${currentRecipe.damage}</span>`;
 
             Object.keys(CONFIG.ui.attributeDisplay).foreach((_type) => {
-                if (currentRecipe[_type]) html += `<span class="text-green-300">{CONFIG.ui.attributeDisplay[_type].icon}${currentRecipe[_type]}</span>`;
+                if (currentRecipe[_type]) html += `<span class="text-green-300">${CONFIG.ui.attributeDisplay[_type].icon}${currentRecipe[_type]}</span>`;
             })
             if(html === '') html = '<span class="text-slate-500">基础弹药</span>';
             statsContainer.innerHTML = html;
