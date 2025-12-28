@@ -9857,10 +9857,10 @@ class Game {
         const bladeCount = 2 + multicast * 2;
         
         const butterflyCircle = {
-            center: center,
-            anchors: bc.anchors,
+            center: intersection,
+            anchors: anchors,
             bulletConfig: bulletConfig,
-            bulletDamage: bulletDamage,
+            bulletDamage: avgBulletDamage,
             duration: cfg.duration,
             timer: 0,
             cooldown: cooldown,
