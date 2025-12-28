@@ -8963,14 +8963,14 @@ class Game {
         
         // 2. 计算基于玩家峰值伤害的理想血量
         const peakAvg = this.calc_getPeakAverageDamage();
-        const fullRowsCapacity = 2 * CONFIG.gameplay.enemyCols; // 以 2 行满员为对标
+        const fullRowsCapacity = 1 * CONFIG.gameplay.enemyCols; // 以 2 行满员为对标
         
         let finalBaseHP = linearHP;
         let idealHP = 0;
         if (peakAvg > 0) {
             idealHP = peakAvg / fullRowsCapacity;
             // 混合：40% 线性增长 + 60% 动态调整，确保血量跟随玩家强度
-            finalBaseHP = (linearHP * 0.4) + (idealHP * 0.6);
+            finalBaseHP = (linearHP * 0.65) + (idealHP * 0.35);
         }
         
         // 3. 应用最终倍率
