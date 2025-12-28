@@ -1256,6 +1256,7 @@ const CONFIG = {
         base: {
             anchorExplosionMult: 2.0, // 锚点消失爆炸伤害倍率
             smallWhirlwindMult: 1.0,  // 小旋风伤害倍率
+			stormDamageMult: 5.0,
             tunnelDamageMult: 2.0,    // 风道伤害倍率
             shockwaveMult: 8.0,       // 冲击波伤害倍率
             blackholeMult: 9999,      // 黑洞伤害 (即死级)
@@ -9522,7 +9523,7 @@ class Game {
                 const scatter = bulletConfig.scatter || 0;
                 const multicast = bulletConfig.multicast || 0;
                 const tickCount = 1 + scatter;
-                const totalDmg = bulletDamage * (1 + multicast);
+                const totalDmg = stormDamageMult*bulletDamage * (1 + multicast);
                 const tickDmg = Math.max(1, Math.floor(totalDmg / tickCount));
                 const tickInterval = 100; // 每100ms切割一次
 
