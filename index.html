@@ -1267,7 +1267,7 @@ const CONFIG = {
     balance: {
         normalPegSecondEnergChancey:0.5,
         // 敌人血量 = baseHp + (当前回合数 * hpPerRound)
-        enemyBaseHp: 50,
+        enemyBaseHp: 5,
         enemyHpPerRound: 6,
         
         // 特殊敌人血量倍率
@@ -1300,11 +1300,11 @@ const CONFIG = {
         affixes: {
             shieldReduction: 0.5,   // 护盾减伤 50%
             hasteActions: 2,        // 极速行动次数
-            regenPercent: 0.15,      // 再生回血百分比
+            regenPercent: 0.2,      // 再生回血百分比
             cloneChanceHit: 0.2,    // 受击分身概率
             cloneChanceTurn: 0.5,   // 回合开始分身概率
             berserkChanceMult: 0.5, // 狂暴概率系数 (Temp * 0.5)
-            healerPercent: 0.1,     // 治疗百分比
+            healerPercent: 0.12,     // 治疗百分比
             healerRange: 2,       // 治疗范围 (自身宽度的倍数)
             devourChance: 1,      // 吞噬触发概率
             devourRange: 2,       // 吞噬范围
@@ -1334,9 +1334,9 @@ const CONFIG = {
         //  固定回合遗物事件 (每多少回合触发一次)
         relicRoundInterval: 3,
         assimilationChance: {
-            bounce: 1,
+            bounce: 0.25,
             pierce: 0.12,
-            scatter: 0.05,
+            scatter: 0.12,
             damage: 0.2,
             cryo: 0.2,  
             pyro: 0.2
@@ -1345,7 +1345,7 @@ const CONFIG = {
     //  初始概率配置 (現在這些是基礎權重，解鎖後會增加)
     probabilities: { 
         white: 150,       // 基礎
-        bounce: 100,       // 初始解鎖
+        bounce: 25,       // 初始解鎖
         laser: 0,
         // 物理系 (初始鎖定，通過遺物解鎖)
         pierce: 1, 
@@ -1353,8 +1353,8 @@ const CONFIG = {
         damage: 2,
         
         // 元素系 (初始鎖定，通過遺物獨立解鎖)
-        cryo: 50, 
-        pyro: 50, 
+        cryo: 0, 
+        pyro: 0, 
         
         // 特殊系 (初始鎖定)
         explosive: 1, 
