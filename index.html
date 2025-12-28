@@ -10674,7 +10674,7 @@ class Game {
         // [新增] 统一显示伤害数字 (使用实际造成的伤害)
         if (this.showDamageNumbers && actualDmg > 0) {
             this.spawn_createFloatingText(hitX, hitY, `-${Math.ceil(actualDmg)}`, damageColor);
-        }       }
+        }
         audio.playEnemyHit(hitType);
 
         // --- [新增] 剑痕共鸣机制 (Stuck Sword Resonance) ---
