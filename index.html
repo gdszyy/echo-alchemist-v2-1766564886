@@ -1345,8 +1345,8 @@ const CONFIG = {
             pyro: 0.2
         },
         // [新增] 特殊变体概率乘子
-        specialMutationMult: 0.5, // 变异概率乘子 (基于同化概率)
-        specialUpgradeMult: 1.0   // 升级概率乘子 (基于同化概率)
+        specialMutationMult: 0.1, // 变异概率乘子 (基于同化概率)
+        specialUpgradeMult: 0.42   // 升级概率乘子 (基于同化概率)
     },
     //  初始概率配置 (現在這些是基礎權重，解鎖後會增加)
     probabilities: { 
@@ -8966,14 +8966,23 @@ class Game {
         const fullRowsCapacity = 2 * CONFIG.gameplay.enemyCols; // 以 2 行满员为对标
         
         let finalBaseHP = linearHP;
+        let idealHP = 0;
         if (peakAvg > 0) {
-            const idealHP = peakAvg / fullRowsCapacity;
+            idealHP = peakAvg / fullRowsCapacity;
             // 混合：40% 线性增长 + 60% 动态调整，确保血量跟随玩家强度
             finalBaseHP = (linearHP * 0.4) + (idealHP * 0.6);
         }
         
         // 3. 应用最终倍率
         const baseHP = Math.floor(finalBaseHP * this.nextRoundHpMultiplier);
+        
+        // [日志] 记录血量计算过程
+        console.log(`[HP Scaling] Round: ${this.round}`);
+        console.log(` - Linear HP: ${linearHP.toFixed(2)}`);
+        console.log(` - Peak Avg Damage: ${peakAvg.toFixed(2)}`);
+        console.log(` - Ideal HP (based on damage): ${idealHP.toFixed(2)}`);
+        console.log(` - Final Base HP (Mixed): ${finalBaseHP.toFixed(2)}`);
+        console.log(` - Final HP (with Multiplier): ${baseHP}`);
         // ----------------------------
 
         const w = this.enemyWidth;
