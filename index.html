@@ -3409,6 +3409,7 @@ class DropBall {
                 // 这里保留原有的逻辑：普通弹珠同化普通钉子
                 const assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0.25;
                 if (Math.random() < assimilationChance) {
+					console.log("同化！",ballType)
                     peg.type = ballType;
                     game.spawn_createParticle(peg.pos.x, peg.pos.y, this.def.getColor());
                     audio.playMagic();
