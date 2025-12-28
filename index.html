@@ -9808,8 +9808,9 @@ class Game {
         const multicast = bulletConfig.multicast || 1;
         
         // 5. 计算伤害冷却（multicast越大，冷却越小）
-        const baseCooldown = 42;
-        const cooldown = Math.max(10, Math.floor(baseCooldown / Math.sqrt(multicast)));
+        // [优化] 冷却减半
+        const baseCooldown = 21; 
+        const cooldown = Math.max(5, Math.floor(baseCooldown / Math.sqrt(multicast)));
         
         // 6. 计算风刃数量（基于multicast）
         const bladeCount = 2 + multicast * 2;
@@ -9883,20 +9884,31 @@ class Game {
         
         directions.forEach((dir, idx) => {
             for (let i = 0; i < Math.ceil(bc.bladeCount / 4); i++) {
+                // [优化] 发射起点：从中心向外延伸至屏幕边缘，作为起点向内发射
+                // 计算射线与屏幕边界的交点
+                let startPos = new Vec2(center.x, center.y);
+                const rayDir = dir;
+                const tX = rayDir.x > 0 ? (this.canvas.width + 100 - center.x) / rayDir.x : (-100 - center.x) / rayDir.x;
+                const tY = rayDir.y > 0 ? (this.canvas.height + 100 - center.y) / rayDir.y : (-100 - center.y) / rayDir.y;
+                const t = Math.min(tX, tY);
+                startPos = center.add(rayDir.mult(t));
+
                 const rotationPhase = (bc.timer / bc.cooldown) * Math.PI * 2;
                 const bladeAngle = rotationPhase + (i / (bc.bladeCount / 4)) * Math.PI * 2;
                 
                 const blade = {
-                    pos: new Vec2(bc.center.x, bc.center.y),
-                    vel: dir.mult(30 + Math.random() * 10),
+                    pos: startPos,
+                    // 向内发射：速度方向取反
+                    vel: dir.mult(-(25 + Math.random() * 10)), 
                     bulletConfig: bc.bulletConfig,
                     bulletDamage: bc.bulletDamage,
-                    size: 15 + Math.random() * 10,
+                    size: 25 + Math.random() * 15, // 风刃变粗
                     life: 1.0,
                     angle: bladeAngle,
                     rotationAxis: dir,
                     active: true,
-                    damageTimer: 0
+                    // [优化] 初始冷却为0，确保第一次命中立即触发
+                    damageTimer: 10 
                 };
                 
                 if (!this.butterflyBlades) this.butterflyBlades = [];
@@ -9923,13 +9935,14 @@ class Game {
                 continue;
             }
             
-            // 伤害判定（每10帧一次）
-            if (blade.damageTimer >= 10) {
-                blade.damageTimer = 0;
+            // 伤害判定（冷却减半：5帧）
+            if (blade.damageTimer >= 5) {
+                let hasHit = false;
                 this.enemies.forEach(e => {
                     if (!e.active) return;
                     const dist = blade.pos.sub(e.pos).mag();
-                    if (dist < 30) {
+                    if (dist < 40) { // 判定范围稍微增大
+                        hasHit = true;
                         const dmg = Math.max(1, Math.floor(blade.bulletDamage * 2));
                         const windConfig = { ...blade.bulletConfig, damage: dmg };
                         this.combat_damageEnemy(e, { 
@@ -9958,16 +9971,36 @@ class Game {
         if (!this.butterflyBlades) return;
         
         this.butterflyBlades.forEach(blade => {
+            // 1. 绘制辅助风粒子流（龙卷风气流感）
+            const particleCount = 6;
+            for (let i = 0; i < particleCount; i++) {
+                const pOffset = (i / particleCount) * Math.PI * 2 + blade.angle * 1.5;
+                const pScale = Math.cos(pOffset);
+                const pY = pScale * blade.size * 1.2;
+                const pAlpha = (0.2 + Math.abs(pScale) * 0.4) * (1 - blade.pos.dist(new Vec2(this.canvas.width/2, this.height/2)) / 1000);
+                
+                ctx.save();
+                ctx.translate(blade.pos.x, blade.pos.y);
+                const moveAngle = Math.atan2(blade.vel.y, blade.vel.x);
+                ctx.rotate(moveAngle);
+                
+                ctx.globalAlpha = Math.max(0, pAlpha);
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                // 气流粒子随旋转在垂直方向偏移
+                ctx.arc((Math.random()-0.5) * blade.size, pY, 1 + Math.random() * 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 2. 绘制主风刃
             ctx.save();
             ctx.translate(blade.pos.x, blade.pos.y);
             
-            // 3D旋转效果：模拟沿中轴线旋转
             const scale = Math.abs(Math.cos(blade.angle));
-            const alpha = 0.3 + scale * 0.7;
-            
+            const alpha = 0.4 + scale * 0.6;
             ctx.globalAlpha = alpha;
             
-            // 根据属性混合颜色
             let color = '#d1fae5';
             if (blade.bulletConfig) {
                 if (blade.bulletConfig.cryo > 0) color = '#cffafe';
@@ -9975,23 +10008,28 @@ class Game {
                 else if (blade.bulletConfig.lightning > 0) color = '#d8b4fe';
             }
             
-            // 绘制风刃
             const angle = Math.atan2(blade.vel.y, blade.vel.x);
             ctx.rotate(angle);
-            ctx.scale(1.0, scale);
+            
+            // [优化] 风刃变粗：增加垂直方向的缩放基础值
+            ctx.scale(1.2, 0.3 + scale * 1.2); 
             
             const grad = ctx.createLinearGradient(-blade.size, 0, blade.size, 0);
             grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-            grad.addColorStop(0.2, color.replace(')', ', 0.8)').replace('rgb', 'rgba'));
-            grad.addColorStop(0.5, 'rgba(255, 255, 255, 1)');
-            grad.addColorStop(0.8, color.replace(')', ', 0.8)').replace('rgb', 'rgba'));
+            grad.addColorStop(0.3, color);
+            grad.addColorStop(0.5, '#ffffff');
+            grad.addColorStop(0.7, color);
             grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
             
             ctx.fillStyle = grad;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = color;
+            
             ctx.beginPath();
-            ctx.moveTo(-blade.size * 1.5, 0);
-            ctx.quadraticCurveTo(0, blade.size * 0.4, blade.size * 1.5, 0);
-            ctx.quadraticCurveTo(0, -blade.size * 0.4, -blade.size * 1.5, 0);
+            // [优化] 形状更厚实
+            ctx.moveTo(-blade.size * 1.8, 0);
+            ctx.quadraticCurveTo(0, blade.size * 0.8, blade.size * 1.8, 0);
+            ctx.quadraticCurveTo(0, -blade.size * 0.8, -blade.size * 1.8, 0);
             ctx.fill();
             
             ctx.restore();
@@ -10113,28 +10151,53 @@ class Game {
         this.stormCores.forEach(core => {
             ctx.save();
             ctx.translate(core.pos.x, core.pos.y);
-            const pulse = Math.sin(core.pulsePhase) * 0.2 + 1.0;
-            const energyRatio = core.energy / core.energyRequired;
-            ctx.globalAlpha = 0.2 * core.alpha;
+            
+            // 1. 背景脉冲区域
+            const pulse = Math.sin(core.pulsePhase) * 0.15 + 1.0;
+            ctx.globalAlpha = 0.15 * core.alpha;
             ctx.fillStyle = '#34d399';
             ctx.beginPath();
             ctx.arc(0, 0, core.radius * pulse, 0, Math.PI * 2);
             ctx.fill();
-            ctx.globalAlpha = 0.6 * core.alpha;
-            ctx.strokeStyle = '#10b981';
-            ctx.lineWidth = 4;
+
+            // 2. 平滑能量环反馈
+            // [优化] 过程值反馈：当前能量 + 当前秒内的充能进度
+            const smoothEnergy = core.energy + (core.chargeTimer / 60);
+            const energyRatio = Math.min(1.0, smoothEnergy / core.energyRequired);
+            
+            // 底环
+            ctx.globalAlpha = 0.2 * core.alpha;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 6;
             ctx.beginPath();
-            ctx.arc(0, 0, core.radius * 0.8, 0, Math.PI * 2 * energyRatio);
+            ctx.arc(0, 0, core.radius * 0.85, 0, Math.PI * 2);
             ctx.stroke();
+
+            // 进度环
             ctx.globalAlpha = 0.8 * core.alpha;
+            ctx.strokeStyle = '#10b981';
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.arc(0, 0, core.radius * 0.85, -Math.PI/2, -Math.PI/2 + Math.PI * 2 * energyRatio);
+            ctx.stroke();
+
+            // 3. 中心图标与数值
+            ctx.globalAlpha = 0.9 * core.alpha;
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 24px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            // 图标随充能速度旋转
+            ctx.rotate(core.pulsePhase * 2);
             ctx.fillText('🌀', 0, 0);
-            ctx.font = 'bold 14px sans-serif';
-            ctx.fillStyle = '#34d399';
-            ctx.fillText(`${core.energy}/${core.energyRequired}`, 0, core.radius + 20);
+            ctx.rotate(-core.pulsePhase * 2);
+
+            ctx.font = 'bold 16px monospace';
+            ctx.fillStyle = '#10b981';
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = '#000000';
+            ctx.fillText(`${core.energy}/${core.energyRequired}`, 0, core.radius + 25);
+            
             ctx.restore();
         });
     }
