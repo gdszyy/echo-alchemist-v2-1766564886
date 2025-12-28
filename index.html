@@ -9213,14 +9213,14 @@ class Game {
 
     /**
      * @method combat_wind_addAnchor
-     * @description 添加风属性锚点，并处理法阵逻辑
+     * @description 添加风属性锚点
      */
-    combat_wind_addAnchor(x, y, bulletDamage = 2) {
+    combat_wind_addAnchor(x, y, bulletDamage = 2, bulletConfig = { wind: true }) {
         if (this.windAnchors.length >= 4) {
             const old = this.windAnchors.shift();
             // 触发小旋风特效和伤害
             this.spawn_smallWhirlwind(old.x, old.y);
-            this.combat_wind_triggerSmallWhirlwindDamage(old.x, old.y, bulletDamage);
+            this.combat_wind_triggerSmallWhirlwindDamage(old.x, old.y, bulletDamage, bulletConfig);
         }
         this.windAnchors.push({ x, y, life: 1.0, bulletDamage: bulletDamage });
         this.spawn_createParticle(x, y, '#34d399', 'spark');
@@ -9266,10 +9266,9 @@ class Game {
     /**
      * [COMBAT] 触发锚点消失时的范围伤害
      */
-    combat_wind_triggerSmallWhirlwindDamage(centerX, centerY, bulletDamage = 2) {
+    combat_wind_triggerSmallWhirlwindDamage(centerX, centerY, bulletDamage = 2, bulletConfig = { wind: true }) {
+        const cfg = CONFIG.wind_system.base;
         const radius = 60; // 伤害半径
-        // 小旋风伤害挂钩子弹伤害 (例如 5 倍子弹伤害)
-        const damage = Math.floor(bulletDamage * 5); 
 
         // 遍历敌人检测碰撞
         this.enemies.forEach(e => {
@@ -9281,8 +9280,8 @@ class Game {
             // 判定命中 (考虑敌人体积)
             if (dist < radius + e.width / 2) {
                 // 1. 造成伤害 - 统一走 damageEnemy
-                // [优化] 伤害挂钩子弹伤害倍率 (5倍)
-                const dmg = Math.max(1, Math.floor(bulletDamage * 5));
+                // [优化] 伤害挂钩子弹伤害倍率 (使用配置参数)
+                const dmg = Math.max(1, Math.floor(bulletDamage * cfg.anchorExplosionMult));
                 this.combat_damageEnemy(e, { 
                     config: { ...bulletConfig, damage: dmg }, 
                     pos: e.pos, 
