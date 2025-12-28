@@ -12616,14 +12616,31 @@ class Game {
             
             // 处理散射激光 (如果激光带有散射属性，比如吃了黄色钉子)
             if (recipe.scatter > 0) {
-                 for (let i = 1; i <= recipe.scatter; i++) { 
-                    const sign = i % 2 === 0 ? -1 : 1; 
-                    const multiplier = Math.ceil(i / 2); 
-                    const angleOffset = 0.2 * multiplier * sign; 
-                    const newVel = vel.rotate(angleOffset); 
-                    const copyRecipe = { ...recipe, scatter: 0 }; 
+                const scatterCount = recipe.scatter;
+                const fullInheritCount = Math.floor(scatterCount / 2);
+                const halfInheritCount = scatterCount % 2;
+                
+                let currentScatterIdx = 1;
+                // 生成 100% 继承的副子弹
+                for (let i = 0; i < fullInheritCount; i++) {
+                    const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
+                    const multiplier = Math.ceil(currentScatterIdx / 2);
+                    const angleOffset = 0.2 * multiplier * sign;
+                    const newVel = vel.rotate(angleOffset);
+                    const copyRecipe = { ...recipe, scatter: 0 };
                     this.combat_laser_fire(x, y, newVel, copyRecipe, shotId);
-                } 
+                    currentScatterIdx++;
+                }
+                // 生成 50% 继承的副子弹
+                for (let i = 0; i < halfInheritCount; i++) {
+                    const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
+                    const multiplier = Math.ceil(currentScatterIdx / 2);
+                    const angleOffset = 0.2 * multiplier * sign;
+                    const newVel = vel.rotate(angleOffset);
+                    const copyRecipe = { ...recipe, scatter: 0, damage: Math.max(1, Math.floor(recipe.damage * 0.5)) };
+                    this.combat_laser_fire(x, y, newVel, copyRecipe, shotId);
+                    currentScatterIdx++;
+                }
             }
             return; 
         }
@@ -12631,14 +12648,31 @@ class Game {
         // 散射 (Scatter)
         // [修改] 风属性子弹强制单发，不受 scatter 影响
         if (recipe.scatter > 0 && !recipe.wind) { 
-            for (let i = 1; i <= recipe.scatter; i++) { 
-                const sign = i % 2 === 0 ? -1 : 1; 
-                const multiplier = Math.ceil(i / 2); 
-                const angleOffset = 0.2 * multiplier * sign; // 散射角度偏移
-                const newVel = vel.rotate(angleOffset); 
-                const copyRecipe = { ...recipe, scatter: 0, chainPayload: null }; // 散射弹丸不带散射和连锁
-                this.projectiles.push(new Projectile(x, y, newVel, copyRecipe, true, shotId)); 
-            } 
+            const scatterCount = recipe.scatter;
+            const fullInheritCount = Math.floor(scatterCount / 2);
+            const halfInheritCount = scatterCount % 2;
+            
+            let currentScatterIdx = 1;
+            // 生成 100% 继承的副子弹
+            for (let i = 0; i < fullInheritCount; i++) {
+                const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
+                const multiplier = Math.ceil(currentScatterIdx / 2);
+                const angleOffset = 0.2 * multiplier * sign;
+                const newVel = vel.rotate(angleOffset);
+                const copyRecipe = { ...recipe, scatter: 0, chainPayload: null };
+                this.projectiles.push(new Projectile(x, y, newVel, copyRecipe, true, shotId));
+                currentScatterIdx++;
+            }
+            // 生成 50% 继承的副子弹
+            for (let i = 0; i < halfInheritCount; i++) {
+                const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
+                const multiplier = Math.ceil(currentScatterIdx / 2);
+                const angleOffset = 0.2 * multiplier * sign;
+                const newVel = vel.rotate(angleOffset);
+                const copyRecipe = { ...recipe, scatter: 0, chainPayload: null, damage: Math.max(1, Math.floor(recipe.damage * 0.5)) };
+                this.projectiles.push(new Projectile(x, y, newVel, copyRecipe, true, shotId));
+                currentScatterIdx++;
+            }
         }
         
         // [关键] 生成主子弹
@@ -12664,8 +12698,8 @@ class Game {
         
         // --- 1. 参数计算 ---
         this.isVisualEffectActive = true;
-        // [射程] 基础 500 + 每层穿透 250 (决定光线能跑多远)
-        let maxLen = 500 + (recipe.pierce * 250); 
+        // [射程] 基础 500 * 1.35 + 每层穿透 250 (决定光线能跑多远)
+        let maxLen = (500 * 1.35) + (recipe.pierce * 250); 
         
         // [粗细] 基础 3px + 每层激光 4px + 爆破加成 (决定光线视觉宽度)
         let width = 3 + (recipe.laser * 4) + (recipe.explosive ? 10 : 0);
