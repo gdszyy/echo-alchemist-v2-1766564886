@@ -9862,8 +9862,9 @@ class Game {
                     angle: bladeAngle,
                     rotationAxis: dir,
                     active: true,
-                    // [优化] 初始冷却为0，确保第一次命中立即触发
-                    damageTimer: 10 
+                    cooldown: bc.cooldown, // [新增] 传递法阵计算出的伤害冷却
+                    // [优化] 初始冷却设为足够大，确保第一次命中立即触发
+                    damageTimer: 100 
                 };
                 
                 if (!this.butterflyBlades) this.butterflyBlades = [];
@@ -9891,8 +9892,8 @@ class Game {
                 continue;
             }
             
-            // 伤害判定（使用配置参数）
-            if (blade.damageTimer >= cfg.minCooldown) {
+            // 伤害判定（使用法阵计算出的 cooldown）
+            if (blade.damageTimer >= (blade.cooldown || cfg.baseCooldown)) {
                 let hasHit = false;
                 this.enemies.forEach(e => {
                     if (!e.active) return;
@@ -9920,6 +9921,9 @@ class Game {
                         }
                     }
                 });
+                if (hasHit) {
+                    blade.damageTimer = 0; // 命中后重置计时器
+                }
             }
         }
     }
