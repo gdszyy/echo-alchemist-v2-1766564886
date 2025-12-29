@@ -13030,92 +13030,54 @@ if (this.phase === 'truth_book') {
     /**
      * [AUTO-GENERATED] TODO: Add a description for sys_initPachinko.
      */
-    phase_gathering_initPachinko() {
+    phase_gathering_initPachinko(shouldInherit = false) {
+        const rows = CONFIG.gameplay.rows;
+        const spacingX = CONFIG.gameplay.spacingX;
+        const spacingY = CONFIG.gameplay.spacingY;
+        const offsetX = (canvas.width - (CONFIG.gameplay.cols - 1) * spacingX) / 2;
+        const offsetY = 100;
 
-        const previousPegs = this.pegs || []; 
-        const shouldInherit = previousPegs.length > 0;
-        this.pegs = []; 
-        this.specialSlots = []; 
-        
-        const rows = this.currentRows;  
-        
-        // --- [核心修改开始]：宽高自适应的正方形网格计算 ---
-        
-        // 1. 计算基准单元格大小
-        // 基于屏幕宽度计算，(cols + 1) 是为了左右留出半个格子的边缘缓冲
-        // 这样无论屏幕变宽变窄，格子都会等比缩放
-        const unitSize = this.width / (CONFIG.gameplay.cols + 1);
-        
-        // 2. 强制横竖间距一致 (正方形布局基础)
-        const spacingX = unitSize;
-        const spacingY = unitSize*0.866; 
-        // 注：如果你想要帕青哥那种"紧凑的等边三角形"布局，把上面这行改成：
-        // const spacingY = unitSize * 0.866; 
-
-        // 3. 动态计算起始 X 偏移量，让整个阵列在屏幕居中
-        // 偶数行有 CONFIG.gameplay.cols 个钉子，总宽度是 (cols - 1) * spacingX
-        const gridTotalWidth = (CONFIG.gameplay.cols - 1) * spacingX;
-        const baseOffsetX = (this.width - gridTotalWidth) / 2;
-
-        // 4. 起始 Y 坐标 (保持固定或按需调整)
-        const startY = 120; 
-        
-        // --- [核心修改结束] ---
-
-        let grid = []; 
+        const previousPegs = [...this.pegs];
+        this.pegs = [];
+        this.specialSlots = [];
         let pegIndex = 0;
-        let maxPegY = 120; 
-        for (let r = 0; r < rows; r++) { 
-            // 奇数行少一个钉子 (错位)
+        let maxPegY = 0;
+
+        for (let r = 0; r < rows; r++) {
             const isOddRow = r % 2 !== 0;
-            const cols = isOddRow ? CONFIG.gameplay.cols - 1 : CONFIG.gameplay.cols; 
-            
-            // 如果是奇数行，向右偏移半个间距
-            const rowShift = isOddRow ? (spacingX * 0.5) : 0;
-            
-            let rowPegs = []; 
-            for (let c = 0; c < cols; c++) { 
-                // X = 基础居中偏移 + 列间距 + 错位偏移
-                let x = baseOffsetX + (c * spacingX) + rowShift; 
-                let y = startY + r * spacingY; 
-                if (y > maxPegY) maxPegY = y;
-                // --- 以下为继承逻辑 (保持不变) ---
+            const cols = isOddRow ? CONFIG.gameplay.cols - 1 : CONFIG.gameplay.cols;
+            const rowOffsetX = isOddRow ? spacingX / 2 : 0;
+
+            for (let c = 0; c < cols; c++) {
+                const x = offsetX + rowOffsetX + c * spacingX;
+                const y = offsetY + r * spacingY;
+                maxPegY = Math.max(maxPegY, y);
+
                 let type = 'normal';
-                    let level = 1; // 默认等级
-
-                    if (shouldInherit && previousPegs[pegIndex]) {
-                        const prevPeg = previousPegs[pegIndex];
-                        const prevType = prevPeg.type;
-
-                        if (prevType !== 'pink') {
-                            const weight = this.unlockedWeights[prevType] || 0;
-                            if (prevType === 'normal' || prevType === 'laser' || prevType === 'bounce' || prevType === 'flying_sword' || prevType === 'wind' || weight > 0) {
-                                if (Math.random() < 1) {
-                                    type = prevType;
-                                    level = prevPeg.level || 1;
-                                } else {
-                                    type = this.phase_gathering_getRandomPegType();
-                                }
-                            } else {
-                                type = this.phase_gathering_getRandomPegType();
-                            }
+                let level = 1;
+                if (shouldInherit && previousPegs[pegIndex]) {
+                    const prevPeg = previousPegs[pegIndex];
+                    if (prevPeg.type !== 'pink') {
+                        const weight = this.unlockedWeights[prevPeg.type] || 0;
+                        if (prevPeg.type === 'normal' || prevPeg.type === 'laser' || prevPeg.type === 'bounce' || prevPeg.type === 'flying_sword' || prevPeg.type === 'wind' || weight > 0) {
+                            type = prevPeg.type;
+                            level = prevPeg.level || 1;
                         } else {
                             type = this.phase_gathering_getRandomPegType();
                         }
                     } else {
                         type = this.phase_gathering_getRandomPegType();
                     }
-
-                    let p = new Peg(x, y, type);
-                    p.level = level; // 应用等级
-                    this.pegs.push(p);
-                    rowPegs.push(p);
-                    pegIndex++;
-            } 
-            grid.push(rowPegs); 
+                } else {
+                    type = this.phase_gathering_getRandomPegType();
+                }
+                let p = new Peg(x, y, type);
+                p.level = level;
+                this.pegs.push(p);
+                pegIndex++;
+            }
         }
-        
-        // --- [新增] 初始特殊钉子逻辑 (仅在第一回合触发) ---
+
         if (this.round === 1 && !shouldInherit) {
             const replaceWithSpecial = (count, type) => {
                 if (!count || count <= 0) return;
@@ -13132,86 +13094,38 @@ if (this.phase === 'truth_book') {
             replaceWithSpecial(CONFIG.gameplay.initWindPegs, 'wind');
             replaceWithSpecial(CONFIG.gameplay.initSwordPegs, 'flying_sword');
         }
+
         this.boardBottomY = maxPegY;
-        // --- 生成粉色钉子 (保持不变) ---
-        const pinkCount = this.pinkPegCount; 
-        for(let i=0; i<pinkCount; i++) { 
-            if(this.pegs.length > 0) { 
-                const idx = Math.floor(Math.random() * this.pegs.length); 
-                this.pegs[idx].type = 'pink'; 
-            } 
-        }
-
-        // --- 生成特殊槽位 (保持不变) ---
-        if (this.unlockedSlots.length > 0 && this.slotCount > 0) {
-            const slotTypes = this.unlockedSlots;
-            
-            // 安全机制：防止运气极差时死循环
-            let attempts = 0;
-            const maxAttempts = 100; 
-
-            // 核心修复：只要数量不够，就继续尝试生成
-            while (this.specialSlots.length < this.slotCount && attempts < maxAttempts) {
-                attempts++;
-
-                // 1. 随机选择行
-                let r = Math.floor(Math.random() * (CONFIG.gameplay.spSlotsEndRow - CONFIG.gameplay.spSlotsStartRow + 1)) + CONFIG.gameplay.spSlotsStartRow;
-                let rowPegs = grid[r];
-                
-                // 行无效则重试
-                if (!rowPegs || rowPegs.length < 2) continue; 
-                
-                // 2. 随机选择列
-                let c = Math.floor(Math.random() * (rowPegs.length - 1)); 
-                let p1 = rowPegs[c]; 
-                let p2 = rowPegs[c+1]; 
-                
-                let cx = (p1.pos.x + p2.pos.x) / 2; 
-                let cy = p1.pos.y; 
-                
-                // 使用之前计算好的 spacingX，如果作用域访问不到，可用 this.width / (CONFIG.gameplay.cols + 1) 代替
-                // 这里假设你应用了上一条回答的代码，spacingX 是可用的
-                let w = spacingX * 0.8; 
-                
-                // 3. 检查重叠
-                const isOverlapping = this.specialSlots.some(s => Math.abs(s.x - cx) < 20 && Math.abs(s.y - cy) < 20);
-
-                if (!isOverlapping) { 
-                    // 确定类型
-                    // 1. 隨機選擇一種類型
-                    let slotType = slotTypes[Math.floor(Math.random() * slotTypes.length)]; 
-                    
-                    // [修改] 強制檢查：如果隨機到了 wheel，但場上已經有了，就換成別的 (比如 multicast)
-                    // 這能解決 slotTypes 數組本身就包含 'wheel' 時可能產生的重複
-                    if (slotType === 'wheel' && this.specialSlots.some(s => s.type === 'wheel')) {
-                        // 嘗試換一個，如果解鎖了 multicast 就用它，否則用 skill_point，或者直接跳過本次循環
-                         slotType = this.unlockedSlots.includes('multicast') ? 'multicast' : 'skill_point';
-                    }
-
-                    // 2. 概率覆蓋邏輯 (Force Spawn)
-                    // 只有當場上還沒有 wheel 時，才嘗試強制生成
-                    if (this.unlockedSlots.includes('wheel') && !this.specialSlots.some(s => s.type === 'wheel')) {
-                        // 降低一點概率，避免每局必出
-                        if (Math.random() < 0.3) { 
-                             slotType = 'wheel';
-                        }
-                    }
-
-                    // 遺物槽獨立判定 (每局最多一個)
-                    if (Math.random() < CONFIG.gameplay.relicChance && !this.specialSlots.some(s => s.type === 'relic')) {
-                        slotType = 'relic';
-                    }
-                    // 成功加入
-                    this.specialSlots.push(new SpecialSlot(cx, cy, w, slotType)); 
-                } 
-                // 如果 isOverlapping 为 true，while 循环会继续下一次尝试，不会直接放弃
+        const pinkCount = this.pinkPegCount;
+        for (let i = 0; i < pinkCount; i++) {
+            if (this.pegs.length > 0) {
+                const idx = Math.floor(Math.random() * this.pegs.length);
+                this.pegs[idx].type = 'pink';
             }
         }
-    }
 
-    /**
-     * [AUTO-GENERATED] TODO: Add a description for calc_getRandomPegType.
-     */
+        if (this.unlockedSlots.length > 0 && this.slotCount > 0) {
+            const slotTypes = this.unlockedSlots;
+            let attempts = 0;
+            while (this.specialSlots.length < this.slotCount && attempts < 100) {
+                attempts++;
+                const r = Math.floor(Math.random() * rows);
+                const isOddRow = r % 2 !== 0;
+                const cols = isOddRow ? CONFIG.gameplay.cols - 1 : CONFIG.gameplay.cols;
+                const c = Math.floor(Math.random() * cols);
+                const pegIdx = this.pegs.findIndex(p => 
+                    Math.abs(p.y - (offsetY + r * spacingY)) < 1 && 
+                    Math.abs(p.x - (offsetX + (isOddRow ? spacingX / 2 : 0) + c * spacingX)) < 1
+                );
+                if (pegIdx !== -1 && this.pegs[pegIdx].type !== 'pink' && !this.specialSlots.some(s => s.pegIndex === pegIdx)) {
+                    const type = slotTypes[Math.floor(Math.random() * slotTypes.length)];
+                    this.specialSlots.push({ pegIndex: pegIdx, type: type });
+                }
+            }
+        }
+        this.ui_updateGatheringQueueUI();
+        this.ui_renderRecipeHUD();
+    }
     phase_gathering_getRandomPegType() { 
     // 定义所有可能的钉子类型（包含普通钉子）
     // const pegTypes = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'lightning'];
