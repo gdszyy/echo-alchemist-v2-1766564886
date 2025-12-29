@@ -1352,13 +1352,112 @@ const META_SHOP_CONFIG = {
             cost: { resourceId: 'energy_essence', base: 1000, growth: 3000, type: 'linear' },
             effect: { path: 'gameplay.relicChoiceNum', valuePerLevel: 1, type: 'add' }
         }
-    ],
+    ,
+        // (需求3) 初始解锁风属性钉子
+        {
+            id: 'init_wind_peg',
+            category: 'attribute',
+            name: '风暴之眼',
+            desc: '收集阶段：初始将 1 个普通钉子替换为 [风] 属性钉子。',
+            icon: '🌪️',
+            maxLevel: 3,
+            cost: { resourceId: 'energy_essence', base: 200, growth: 2.0, type: 'exponential' },
+            effect: { path: 'gameplay.initWindPegs', valuePerLevel: 1, type: 'add' }
+        },
+        // (需求4) 初始解锁子母剑钉子
+        {
+            id: 'init_sword_peg',
+            category: 'attribute',
+            name: '剑冢',
+            desc: '收集阶段：初始将 1 个普通钉子替换为 [飞剑] 属性钉子。',
+            icon: '🗡️',
+            maxLevel: 3,
+            cost: { resourceId: 'energy_essence', base: 300, growth: 2.0, type: 'exponential' },
+            effect: { path: 'gameplay.initSwordPegs', valuePerLevel: 1, type: 'add' }
+        },
+        // (需求6) 子弹初始伤害
+        {
+            id: 'base_damage_up',
+            category: 'attribute',
+            name: '火药改良',
+            desc: '所有子弹的初始基础伤害提升。',
+            icon: '💥',
+            maxLevel: 5,
+            cost: { resourceId: 'energy_essence', base: 500, growth: 1.5, type: 'exponential' },
+            effect: { path: 'gameplay.baseDamage', valuePerLevel: 1, type: 'add' }
+        },
+        // (需求7) 冰火温度值升级
+        {
+            id: 'pyro_efficiency',
+            category: 'attribute',
+            name: '纯净燃油',
+            desc: '提升 [火焰] 属性单层提供的热量值。',
+            icon: '🔥',
+            maxLevel: 5,
+            cost: { resourceId: 'energy_essence', base: 150, growth: 1.5, type: 'exponential' },
+            effect: { path: 'balance.pyroAmount', valuePerLevel: 0.2, type: 'add' }
+        },
+        {
+            id: 'cryo_efficiency',
+            category: 'attribute',
+            name: '极寒晶核',
+            desc: '提升 [冰霜] 属性单层提供的冷冻值。',
+            icon: '❄️',
+            maxLevel: 5,
+            cost: { resourceId: 'energy_essence', base: 150, growth: 1.5, type: 'exponential' },
+            effect: { path: 'balance.cryoAmount', valuePerLevel: 0.2, type: 'add' }
+        },
+        // (需求8) 激光长度升级
+        {
+            id: 'laser_focus',
+            category: 'attribute',
+            name: '聚焦透镜',
+            desc: '提升 [激光] 属性的初始射程/穿透深度。',
+            icon: '🔦',
+            maxLevel: 5,
+            cost: { resourceId: 'energy_essence', base: 200, growth: 1.5, type: 'exponential' },
+            effect: { path: 'gameplay.laserLengthBonus', valuePerLevel: 50, type: 'add' }
+        },
+        // (需求9) 连击需求降低
+        {
+            id: 'combo_mastery',
+            category: 'resource',
+            name: '节奏大师',
+            desc: '降低连击充能条的初始触发需求值。',
+            icon: '🔋',
+            maxLevel: 3,
+            cost: { resourceId: 'energy_essence', base: 1000, growth: 2.0, type: 'exponential' },
+            effect: { path: 'gameplay.initTriggerThreshold', valuePerLevel: -1, type: 'add' }
+        }],
     categories: {
         attribute: { name: '屬性煉金', icon: '🧪' },
         defense: { name: '陣地防御', icon: '🏰' },
         resource: { name: '資源調度', icon: '📦' }
     }
 };
+// (需求5) 批量添加所有属性的概率商品
+const ATTRIBUTES_FOR_SHOP = [
+    { id: 'scatter', icon: '🔱', name: '散射' },
+    { id: 'cryo', icon: '❄️', name: '冰霜' },
+    { id: 'pyro', icon: '🔥', name: '火焰' },
+    { id: 'lightning', icon: '⚡', name: '闪电' },
+    { id: 'wind', icon: '🌪️', name: '风' },
+    { id: 'laser', icon: '🔦', name: '激光' }
+];
+
+ATTRIBUTES_FOR_SHOP.forEach(attr => {
+    META_SHOP_CONFIG.upgrades.push({
+        id: `prob_${attr.id}`,
+        category: 'attribute',
+        name: `${attr.name}亲和`,
+        desc: `增加收集阶段 [${attr.name}] 属性出现的概率权重。`,
+        icon: attr.icon,
+        maxLevel: 5,
+        cost: { resourceId: 'energy_essence', base: 100, growth: 1.3, type: 'exponential' },
+        effect: { path: `probabilities.${attr.id}`, valuePerLevel: 5, type: 'add' }
+    });
+});
+
 
 /**
  * 深度设置对象值
@@ -1562,7 +1661,11 @@ const CONFIG = {
         }
     },
     /** 游戏玩法配置 */
-    gameplay: {    
+    gameplay: {
+	        initWindPegs: 0,
+	        initSwordPegs: 0,
+	        baseDamage: 1,
+	        laserLengthBonus: 0,    
         enemyShowTimeFrames:72,
         relicChoiceNum:4,
         enemyCols:6,
@@ -8451,6 +8554,48 @@ class TrainingGround {
 }
 
 class Game {
+    // (需求1 & 2) 通用资源飞入动画
+    ui_playResourceFlyEffect(startX, startY, amount) {
+        if (amount <= 0) return;
+        
+        const flyer = document.createElement('div');
+        flyer.innerHTML = `🔮 +${amount}`;
+        flyer.className = 'fixed font-bold text-amber-400 text-lg pointer-events-none z-[9999]';
+        flyer.style.left = `${startX}px`;
+        flyer.style.top = `${startY}px`;
+        flyer.style.textShadow = '0 0 5px rgba(245,158,11,0.8), 0 2px 4px rgba(0,0,0,0.5)';
+        flyer.style.transition = 'all 0.8s cubic-bezier(0.16, 1, 0.3, 1)';
+        document.body.appendChild(flyer);
+
+        // 目标位置：顶部的资源图标
+        let targetEl = document.getElementById('run-currency-display');
+        if (!targetEl || targetEl.offsetParent === null) {
+            targetEl = document.getElementById('meta-currency-display');
+        }
+        
+        const targetRect = targetEl 
+            ? targetEl.getBoundingClientRect() 
+            : { left: window.innerWidth - 60, top: 20, width: 0, height: 0 };
+
+        void flyer.offsetWidth;
+
+        flyer.style.transform = `translate(${targetRect.left - startX}px, ${targetRect.top - startY}px) scale(0.5)`;
+        flyer.style.opacity = '0';
+
+        setTimeout(() => {
+            flyer.remove();
+            if (targetEl) {
+                const parent = targetEl.parentElement;
+                parent.style.transform = 'scale(1.2)';
+                parent.style.filter = 'brightness(1.5)';
+                setTimeout(() => {
+                    parent.style.transform = 'scale(1)';
+                    parent.style.filter = 'none';
+                }, 150);
+            }
+        }, 800);
+    }
+
     /**
      * 构造函数：初始化游戏状态、Canvas 和事件监听器
      */
@@ -9416,6 +9561,12 @@ if (this.phase === 'truth_book') {
             try {
                 this.saveData = JSON.parse(saved);
             } catch(e) { console.error("Save load failed", e); }
+        }
+        // --- [新增] 开发福利 ---
+        if ((this.saveData.currency || 0) < 2000) {
+            this.saveData.currency = 2000;
+            console.log("DEV: Granted 2000 Energy Essence");
+            this.sys_saveData();
         }
         this.ui_updateMetaCurrency();
     }
@@ -12933,7 +13084,23 @@ if (this.phase === 'truth_book') {
                                     type = prevType;
                                     // [修复]：显式继承等级
                                     level = prevPeg.level || 1; 
-                                } else {
+                                
+        // --- [新增] 初始特殊钉子逻辑 ---
+        const replaceWithSpecial = (count, type) => {
+            if (!count || count <= 0) return;
+            const normalPegs = this.pegs.filter(p => p.type === 'normal');
+            for (let i = normalPegs.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [normalPegs[i], normalPegs[j]] = [normalPegs[j], normalPegs[i]];
+            }
+            for (let i = 0; i < Math.min(count, normalPegs.length); i++) {
+                normalPegs[i].type = type;
+                normalPegs[i].level = 1;
+            }
+        };
+        replaceWithSpecial(CONFIG.gameplay.initWindPegs, 'wind');
+        replaceWithSpecial(CONFIG.gameplay.initSwordPegs, 'flying_sword');
+} else {
                                     type = this.phase_gathering_getRandomPegType();
                                 }
                             } else {
@@ -14111,7 +14278,7 @@ if (this.phase === 'truth_book') {
      */
     calc_compileCollectionToRecipe(marbleDef, collectedTypes, totalMulticast) {
         const recipe = { 
-            damage: 1, 
+            damage: CONFIG.gameplay.baseDamage || 1, 
             bounce: 0, pierce: 0, scatter: 0, 
             explosive: marbleDef.type === 'explosive', 
             isMatryoshka: marbleDef.type === 'matryoshka', 
