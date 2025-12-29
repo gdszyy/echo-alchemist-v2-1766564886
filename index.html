@@ -8265,6 +8265,8 @@ class TrainingGround {
         this.game.enemies = [];
         this.game.projectiles = [];
         this.game.particles = [];
+        this.game.sonSwordQueue = [];
+        this.game.swordQis = [];
         this.game.roundDamage = 0;
         this.stats.totalDamage = 0;
         this.stats.lastTotal = 0;
@@ -8335,6 +8337,8 @@ class Game {
         this.lightningBolts = []; // 闪电特效
         this.pendingShots = []; // 待发射的弹丸 (用于多重发射)
         this.burstQueue = []; // 散射弹丸队列
+        this.sonSwordQueue = []; // 子剑生成队列
+        this.swordQis = []; // 剑气数组
         this.ownedRelics = []; // 玩家当前拥有的遗物 ID 列表
         this.spores = []; // 新增：存儲分身孢子
         this.fireWaves = []; // 新增火焰波數組
