@@ -13089,16 +13089,11 @@ if (this.phase === 'truth_book') {
 
                         if (prevType !== 'pink') {
                             const weight = this.unlockedWeights[prevType] || 0;
-                            // 允许继承的条件
                             if (prevType === 'normal' || prevType === 'laser' || prevType === 'bounce' || prevType === 'flying_sword' || prevType === 'wind' || weight > 0) {
-                                if (Math.random() < 1) { // 100% 继承位置
+                                if (Math.random() < 1) {
                                     type = prevType;
-                                    // [修复]：显式继承等级
                                     level = prevPeg.level || 1;
                                 } else {
-                                    type = this.phase_gathering_getRandomPegType();
-                                }
-} else {
                                     type = this.phase_gathering_getRandomPegType();
                                 }
                             } else {
