@@ -15592,6 +15592,60 @@ const TRUTH_BOOK_DATA = {
             ]
         },
         {
+            id: 'clone_golem',
+            name: '分身魔像',
+            icon: '👥',
+            tags: ['詞綴: 分身', '數量優勢'],
+            desc: '受到攻擊時有概率分裂出虛弱的幻象，迅速佔領戰場。',
+            setup: (game) => {
+                game.enemies.push(new Enemy(game.width/2, 150, 60, 60, 100, 100, 'normal', ['clone']));
+            },
+            loop: [
+                { type: 'log', text: '發射測試彈丸' },
+                { type: 'spawn_projectile', config: { damage: 10, bounce: 2 } },
+                { type: 'wait', frames: 180 },
+                { type: 'log', text: '魔像觸發了 [分身]' },
+                { type: 'wait', frames: 120 },
+                { type: 'reset', delay: 60 }
+            ]
+        },
+        {
+            id: 'spore_golem',
+            name: '孢子魔像',
+            icon: '🍄',
+            tags: ['詞綴: 孢子', '寄生'],
+            desc: '死亡或受傷時散播寄生孢子，孢子成熟後會轉化為新的敵人。',
+            setup: (game) => {
+                game.enemies.push(new Enemy(game.width/2, 150, 60, 60, 100, 100, 'normal', ['spore']));
+            },
+            loop: [
+                { type: 'log', text: '魔像散播了孢子' },
+                { type: 'damage', value: 50 },
+                { type: 'wait', frames: 100 },
+                { type: 'log', text: '孢子正在生長...' },
+                { type: 'wait', frames: 150 },
+                { type: 'reset', delay: 60 }
+            ]
+        },
+        {
+            id: 'armor_golem',
+            name: '重甲魔像',
+            icon: '🧱',
+            tags: ['詞綴: 重甲', '免傷'],
+            desc: '覆蓋著厚重的合金裝甲，能完全抵擋低於一定數值的輕微傷害。',
+            setup: (game) => {
+                game.enemies.push(new Enemy(game.width/2, 150, 60, 60, 200, 200, 'normal', ['armor']));
+            },
+            loop: [
+                { type: 'log', text: '發射輕型彈丸' },
+                { type: 'spawn_projectile', config: { damage: 5, bounce: 1 } },
+                { type: 'wait', frames: 120 },
+                { type: 'log', text: '傷害被 [重甲] 彈開了' },
+                { type: 'wait', frames: 60 },
+                { type: 'reset', delay: 60 }
+            ]
+        },
+        {
             id: 'regen_golem',
             name: '再生魔像',
             icon: '🌿',
@@ -15639,23 +15693,77 @@ const TRUTH_BOOK_DATA = {
             tags: ['連鎖', '熱量', '過冷增益'],
             desc: '閃电鏈會擊中多個敵人並產生熱量。過冷狀態會顯著增加閃電鏈的觸發概率。',
             setup: (game) => {
-                // 1. 常温敌人 (中间)
                 const eNormal = new Enemy(game.width/2, 150, 60, 60, 100);
-                // 2. 临近燃烧敌人 (左侧)
                 const eHot = new Enemy(game.width/2 - 120, 180, 60, 60, 100);
                 eHot.temp = 80; 
-                // 3. 冷冻敌人 (右侧)
                 const eCold = new Enemy(game.width/2 + 120, 180, 60, 60, 100);
                 eCold.temp = -100; 
-                
                 game.enemies.push(eNormal, eHot, eCold);
             },
             loop: [
                 { type: 'log', text: '發射高頻閃電彈丸' },
                 { type: 'spawn_projectile', config: { damage: 10, lightning: 5, bounce: 100 } },
                 { type: 'wait', frames: 300 },
-                { type: 'log', text: '觀察：冷凍目標觸發了更多連鎖' },
+                { type: 'log', text: '觀察：連鎖反應產生大量熱量' },
                 { type: 'wait', frames: 120 },
+                { type: 'reset', delay: 60 }
+            ]
+        },
+        {
+            id: 'laser',
+            name: '激光屬性',
+            icon: '🔦',
+            tags: ['即時', '折射', '穿透'],
+            desc: '將彈丸轉化為高能激光，瞬間擊中路徑上的所有敵人，並在牆壁間折射。',
+            setup: (game) => {
+                for(let i=0; i<5; i++) {
+                    game.enemies.push(new Enemy(game.width/2 + (i-2)*80, 150 + Math.abs(i-2)*30, 40, 40, 50));
+                }
+            },
+            loop: [
+                { type: 'log', text: '激發高能激光' },
+                { type: 'spawn_projectile', config: { damage: 15, laser: 1, bounce: 3, pierce: 2 } },
+                { type: 'wait', frames: 120 },
+                { type: 'log', text: '激光瞬間貫穿多個目標' },
+                { type: 'wait', frames: 60 },
+                { type: 'reset', delay: 60 }
+            ]
+        },
+        {
+            id: 'wind',
+            name: '風暴屬性',
+            icon: '🌪️',
+            tags: ['法陣', '持續傷害', '牽引'],
+            desc: '子弹在反弹时留下风之锚点，集齐四个锚点将召唤强大的风暴法阵。',
+            setup: (game) => {
+                for(let i=0; i<4; i++) {
+                    game.enemies.push(new Enemy(game.width/2 + (i-1.5)*60, 150, 40, 40, 100));
+                }
+            },
+            loop: [
+                { type: 'log', text: '發射風暴彈丸' },
+                { type: 'spawn_projectile', config: { damage: 5, wind: 1, bounce: 4 }, vel: {x: 5, y: -15} },
+                { type: 'wait', frames: 200 },
+                { type: 'log', text: '風暴法阵已激活！' },
+                { type: 'wait', frames: 150 },
+                { type: 'reset', delay: 60 }
+            ]
+        },
+        {
+            id: 'matryoshka',
+            name: '套娃屬性',
+            icon: '🪆',
+            tags: ['分裂', '指數增長'],
+            desc: '子彈在擊中敵人或牆壁時會分裂出更小的子彈，造成連鎖分裂反應。',
+            setup: (game) => {
+                game.enemies.push(new Enemy(game.width/2, 150, 80, 80, 500));
+            },
+            loop: [
+                { type: 'log', text: '發射套娃彈丸' },
+                { type: 'spawn_projectile', config: { damage: 10, isMatryoshka: true, bounce: 2 } },
+                { type: 'wait', frames: 250 },
+                { type: 'log', text: '子彈正在瘋狂分裂' },
+                { type: 'wait', frames: 100 },
                 { type: 'reset', delay: 60 }
             ]
         },
