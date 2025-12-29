@@ -8084,6 +8084,16 @@ class TrainingGround {
                 <button onclick="game.trainingGround.exit()" class="text-slate-400 hover:text-white text-sm">退出</button>
             </div>
 
+            <!-- 快捷操作按钮 (仅在面板收起时显示) -->
+            <div id="train-quick-actions" class="absolute bottom-12 left-1/2 -translate-x-1/2 flex gap-4 z-[450] transition-opacity duration-300">
+                <button onclick="game.trainingGround.fireBullet()" class="w-12 h-12 rounded-full bg-indigo-600/80 backdrop-blur-md border border-indigo-400/50 text-white shadow-lg shadow-indigo-500/20 flex items-center justify-center active:scale-90 transition-transform">
+                    <span class="text-xl">🔥</span>
+                </button>
+                <button onclick="game.trainingGround.spawnEnemy()" class="w-12 h-12 rounded-full bg-red-600/80 backdrop-blur-md border border-red-400/50 text-white shadow-lg shadow-red-500/20 flex items-center justify-center active:scale-90 transition-transform">
+                    <span class="text-xl">👾</span>
+                </button>
+            </div>
+
             <!-- 底部控制面板 -->
             <div id="train-control-panel" class="collapsed">
                 <button id="train-toggle-main" onclick="game.trainingGround.toggleMainPanel()">
@@ -8325,8 +8335,15 @@ class TrainingGround {
     toggleMainPanel() {
         const panel = document.getElementById('train-control-panel');
         const btn = document.getElementById('train-toggle-main');
+        const quickActions = document.getElementById('train-quick-actions');
         const isCollapsed = panel.classList.toggle('collapsed');
         btn.innerText = isCollapsed ? '▲ 展开配置' : '▼ 收起配置';
+        
+        // 切换快捷按钮的可见性
+        if (quickActions) {
+            quickActions.style.opacity = isCollapsed ? '1' : '0';
+            quickActions.style.pointerEvents = isCollapsed ? 'auto' : 'none';
+        }
     }
 
     switchTab(tab) {
@@ -15526,7 +15543,7 @@ const TRUTH_BOOK_DATA = {
             tags: ['基礎', '均衡'],
             desc: '最常見的煉金產物，雖然行動緩慢，但成群結隊時依然具有威脅。',
             setup: (game) => {
-                const e = new Enemy(game.width/2, 200, 60, 60, 100);
+                const e = new Enemy(game.width/2, 150, 60, 60, 100);
                 game.enemies.push(e);
             },
             loop: [
@@ -15545,7 +15562,7 @@ const TRUTH_BOOK_DATA = {
             tags: ['詞綴: 再生', '持久'],
             desc: '核心嵌入了生命精粹的魔像，每回合開始時會修復受損的軀體。',
             setup: (game) => {
-                const e = new Enemy(game.width/2, 200, 60, 60, 100, 100, 'normal', ['regen']);
+                const e = new Enemy(game.width/2, 150, 60, 60, 100, 100, 'normal', ['regen']);
                 game.enemies.push(e);
             },
             loop: [
@@ -15565,7 +15582,7 @@ const TRUTH_BOOK_DATA = {
             tags: ['詞綴: 護盾', '高防'],
             desc: '周身環繞著力場護盾，能大幅削減受到的物理衝擊。',
             setup: (game) => {
-                const e = new Enemy(game.width/2, 200, 60, 60, 200, 200, 'normal', ['shield']);
+                const e = new Enemy(game.width/2, 150, 60, 60, 200, 200, 'normal', ['shield']);
                 game.enemies.push(e);
             },
             loop: [
@@ -15580,15 +15597,42 @@ const TRUTH_BOOK_DATA = {
     ],
     attributes: [
         {
+            id: 'lightning',
+            name: '閃電屬性',
+            icon: '⚡',
+            tags: ['連鎖', '熱量', '過冷增益'],
+            desc: '閃电鏈會擊中多個敵人並產生熱量。過冷狀態會顯著增加閃電鏈的觸發概率。',
+            setup: (game) => {
+                // 1. 常温敌人 (中间)
+                const eNormal = new Enemy(game.width/2, 150, 60, 60, 100);
+                // 2. 临近燃烧敌人 (左侧)
+                const eHot = new Enemy(game.width/2 - 120, 180, 60, 60, 100);
+                eHot.temp = 80; 
+                // 3. 冷冻敌人 (右侧)
+                const eCold = new Enemy(game.width/2 + 120, 180, 60, 60, 100);
+                eCold.temp = -100; 
+                
+                game.enemies.push(eNormal, eHot, eCold);
+            },
+            loop: [
+                { type: 'log', text: '發射高頻閃電彈丸' },
+                { type: 'spawn_projectile', config: { damage: 10, lightning: 5, bounce: 100 } },
+                { type: 'wait', frames: 300 },
+                { type: 'log', text: '觀察：冷凍目標觸發了更多連鎖' },
+                { type: 'wait', frames: 120 },
+                { type: 'reset', delay: 60 }
+            ]
+        },
+        {
             id: 'scatter',
             name: '散射',
             icon: '🏹',
             tags: ['範圍', '多重'],
             desc: '彈丸在飛行過程中會向四周散射出小型碎片，覆蓋更廣的區域。',
             setup: (game) => {
-                const e1 = new Enemy(game.width/2 - 100, 200, 50, 50, 50);
-                const e2 = new Enemy(game.width/2, 150, 50, 50, 50);
-                const e3 = new Enemy(game.width/2 + 100, 200, 50, 50, 50);
+                const e1 = new Enemy(game.width/2 - 100, 150, 50, 50, 50);
+                const e2 = new Enemy(game.width/2, 120, 50, 50, 50);
+                const e3 = new Enemy(game.width/2 + 100, 150, 50, 50, 50);
                 game.enemies.push(e1, e2, e3);
             },
             loop: [
@@ -15605,33 +15649,15 @@ const TRUTH_BOOK_DATA = {
             tags: ['AOE', '高傷'],
             desc: '擊中目標或牆壁時引發劇烈爆炸，對範圍內的所有敵人造成毀滅性打擊。',
             setup: (game) => {
-                const e1 = new Enemy(game.width/2, 200, 60, 60, 100);
-                const e2 = new Enemy(game.width/2 - 40, 180, 40, 40, 50);
-                const e3 = new Enemy(game.width/2 + 40, 180, 40, 40, 50);
+                const e1 = new Enemy(game.width/2, 150, 60, 60, 100);
+                const e2 = new Enemy(game.width/2 - 40, 130, 40, 40, 50);
+                const e3 = new Enemy(game.width/2 + 40, 130, 40, 40, 50);
                 game.enemies.push(e1, e2, e3);
             },
             loop: [
                 { type: 'log', text: '發射爆炸彈丸' },
                 { type: 'spawn_projectile', config: { damage: 20, explosive: true, bounce: 1 } },
                 { type: 'wait', frames: 200 },
-                { type: 'reset', delay: 60 }
-            ]
-        },
-        {
-            id: 'pierce',
-            name: '穿透',
-            icon: '⚡',
-            tags: ['直線', '多重打擊'],
-            desc: '強大的動能使彈丸能夠穿透敵人，對直線上的所有目標造成傷害。',
-            setup: (game) => {
-                for(let i=0; i<4; i++) {
-                    game.enemies.push(new Enemy(game.width/2, 100 + i*80, 50, 50, 50));
-                }
-            },
-            loop: [
-                { type: 'log', text: '發射穿透彈丸' },
-                { type: 'spawn_projectile', config: { damage: 15, pierce: 3 } },
-                { type: 'wait', frames: 150 },
                 { type: 'reset', delay: 60 }
             ]
         }
@@ -15808,8 +15834,10 @@ class TruthBook {
                 if (actor) actor.executeTurnAction(this.demoGame);
                 break;
             case 'spawn_projectile':
-                const p = new Projectile(this.demoGame.width/2, this.demoGame.height + 50, new Vec2(0, -8), inst.config);
-                this.demoGame.projectiles.push(p);
+                const px = inst.x || this.demoGame.width / 2;
+                const py = inst.y || this.demoGame.height - 100;
+                const pvel = inst.vel ? new Vec2(inst.vel.x, inst.vel.y) : new Vec2(0, -15);
+                this.demoGame.spawn_spawnBullet(px, py, pvel, inst.config);
                 break;
             case 'reset':
                 this.waitTimer = inst.delay || 60;
@@ -15842,11 +15870,12 @@ class TruthBook {
         }
 
         ctx.save();
-        // 缩放渲染：将 600x800 的逻辑空间缩放到 400x300 的 Canvas
-        const scaleX = this.canvas.width / this.demoGame.width;
-        const scaleY = this.canvas.height / this.demoGame.height;
-        const scale = Math.min(scaleX, scaleY);
-        ctx.translate((this.canvas.width - this.demoGame.width * scale) / 2, (this.canvas.height - this.demoGame.height * scale) / 2);
+        // 缩放渲染：等比缩放，确保逻辑空间完整显示在 Canvas 内
+        const scale = Math.min(this.canvas.width / this.demoGame.width, this.canvas.height / this.demoGame.height);
+        const offsetX = (this.canvas.width - this.demoGame.width * scale) / 2;
+        const offsetY = (this.canvas.height - this.demoGame.height * scale) / 2;
+        
+        ctx.translate(offsetX, offsetY);
         ctx.scale(scale, scale);
 
         // 绘制墙壁边界
@@ -15862,7 +15891,7 @@ class TruthBook {
         // 绘制浮动文字
         this.demoGame.floatingTexts.forEach(f => {
             ctx.fillStyle = f.color;
-            ctx.font = 'bold 24px sans-serif'; // 逻辑空间较大，字体调大
+            ctx.font = 'bold 24px sans-serif';
             ctx.textAlign = 'center';
             ctx.fillText(f.text, f.pos.x, f.pos.y);
         });
