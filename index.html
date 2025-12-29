@@ -8055,6 +8055,12 @@ class TrainingGround {
                         清空
                     </button>
                 </div>
+                
+                <div class="mt-2">
+                    <button onclick="game.phase_enemy_startLogic()" class="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white rounded font-bold transition-colors text-sm flex items-center justify-center gap-2">
+                        <span>📡</span> 触发敌人行动
+                    </button>
+                </div>
 
                 <div class="mt-auto pt-4 hidden md:block">
                     <button onclick="game.trainingGround.exit()" class="w-full py-2 border border-slate-600 text-slate-400 hover:text-white hover:border-white rounded transition-all text-sm">
@@ -14796,6 +14802,24 @@ if (this.phase === 'truth_book') {
                            !this.isVisualEffectActive;
 
         if (playerTurnFinished && !this.gameOver) {
+            // 试炼场模式下，不自动进入敌人回合
+            if (this.phase === 'training') {
+                if (this.isEnemyTurn) {
+                    if (this.enemyWaveActive) return;
+                    if (anyEnemyMoving) {
+                        this.enemyTurnTimer = 0; 
+                        return;
+                    }
+                    this.enemyTurnTimer += this.timeScale;
+                    if (this.enemyTurnTimer > 60) { 
+                        this.isEnemyTurn = false;
+                        this.enemyTurnTimer = 0;
+                        this.enemies.forEach(e => e.hasActedThisTurn = false);
+                        return;
+                    }
+                }
+                return;
+            }
 
             if (!this.isEnemyTurn) {
                 this.phase_enemy_startLogic();
@@ -14807,7 +14831,14 @@ if (this.phase === 'truth_book') {
                 }
                 this.enemyTurnTimer += this.timeScale;
                 if (this.enemyTurnTimer > 60) { 
-                    this.phase_finalizeRound(); 
+                    if (this.phase === 'training') {
+                        // 试炼场不进入下一阶段，只重置敌人回合状态
+                        this.isEnemyTurn = false;
+                        this.enemyTurnTimer = 0;
+                        this.enemies.forEach(e => e.hasActedThisTurn = false);
+                    } else {
+                        this.phase_finalizeRound(); 
+                    }
                     return;
                 }
             }
