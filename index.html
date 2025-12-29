@@ -15895,7 +15895,7 @@ const TRUTH_BOOK_DATA = {
         },
         {
             id: 'laser', name: '光球', icon: '🔦', tags: ['特殊', '瞬時'],
-            desc: '以光速射出折射激光，瞬間對路徑上的敵人造成傷害。',
+            desc: '發射彈珠，命中時觸發折射激光，瞬間對路徑上的敵人造成傷害。',
             setup: (game) => {
                 game.enemies.push(
                     new Enemy(game.width/2, 100, 60, 60, 500, 500, 'normal', ['shield']),
@@ -15904,7 +15904,7 @@ const TRUTH_BOOK_DATA = {
                 );
             },
             loop: [
-                { type: 'log', text: '發射激光 (Laser Beam)' },
+                { type: 'log', text: '發射彈珠 -> 觸發激光' },
                 { type: 'spawn_projectile', config: { damage: 15, isLaser: true, laser: 10 }, vel: {x: 0, y: -20} },
                 { type: 'wait', frames: 120 }, { type: 'reset' }
             ]
@@ -16062,8 +16062,17 @@ class TruthBook {
             },
             
             // 子彈生成
-            spawn_spawnBullet: (x, y, vel, recipe, id, isLast) => {
-                const p = new Projectile(x, y, vel, recipe, id, isLast);
+            spawn_spawnBullet: (arg1, arg2, arg3, arg4, arg5, arg6) => {
+                let x, y, vel, config, id, isLast;
+                if (typeof arg1 === 'object' && arg1.config) {
+                    // 處理對象形式的調用 (Projectile.destroy 使用的形式)
+                    x = arg1.x; y = arg1.y; vel = arg1.vel; config = arg1.config;
+                    id = arg1.id || null; isLast = arg1.isLast || false;
+                } else {
+                    // 處理參數列表形式的調用
+                    x = arg1; y = arg2; vel = arg3; config = arg4; id = arg5; isLast = arg6;
+                }
+                const p = new Projectile(x, y, vel, config, false, id, isLast);
                 p.game = this.demoGame; 
                 this.demoGame.projectiles.push(p);
             },
@@ -16085,12 +16094,23 @@ class TruthBook {
                 
                 if (config.cryo) enemy.applyTemp(-config.cryo);
                 if (config.pyro) enemy.applyTemp(config.pyro);
-                if (config.lightning) this.demoGame.combat_lightning_triggerChain(enemy, damage, [enemy], 5);
+                
+                // 閃電：需要命中已凍結目標 (temp <= -100)
+                if (config.lightning && enemy.temp <= -100) {
+                    this.demoGame.combat_lightning_triggerChain(enemy, damage, [enemy], 5);
+                }
+                
+                // 風：命中時生成錨點
+                if (config.wind) {
+                    this.demoGame.combat_wind_addAnchor(proj.pos.x, proj.pos.y, config.damage, config);
+                }
+
+                // 爆破：產生 AOE 和 Shockwave
                 if (config.explosive) {
-                    this.demoGame.spawn_createExplosion(enemy.pos.x, enemy.pos.y, '#f97316');
+                    this.demoGame.spawn_createExplosion(proj.pos.x, proj.pos.y, '#f97316');
                     this.demoGame.enemies.forEach(other => {
-                        if (other !== enemy && other.active && enemy.pos.dist(other.pos) < 120) {
-                            this.demoGame.combat_damageEnemy(other, { config: { damage: damage * 0.5 } });
+                        if (other !== enemy && other.active && proj.pos.dist(other.pos) < 120) {
+                            this.demoGame.combat_damageEnemy(other, { config: { damage: damage * 0.5 }, pos: proj.pos });
                         }
                     });
                 }
@@ -16109,7 +16129,7 @@ class TruthBook {
             
             combat_lightning_triggerChain: (currentEnemy, dmg, history, level) => {
                 if (level <= 0) return;
-                const range = 250;
+                const range = 150; // 縮小閃電跳躍範圍，要求敵人靠得近
                 let closest = null;
                 let minDist = Infinity;
                 this.demoGame.enemies.forEach(e => {
@@ -16120,13 +16140,14 @@ class TruthBook {
                 });
                 if (closest) {
                     this.demoGame.lightningBolts.push(new LightningBolt(currentEnemy.pos, closest.pos));
+                    const nextDmg = Math.floor(dmg * 0.8);
+                    closest.takeDamage(nextDmg);
+                    this.demoGame.spawn_createFloatingText(closest.pos.x, closest.pos.y, `-${nextDmg}`, '#c084fc');
+                    history.push(closest);
+                    // 遞歸跳躍
                     setTimeout(() => {
-                        const nextDmg = Math.floor(dmg * (currentEnemy.temp <= -50 ? 1.2 : 0.8));
-                        closest.takeDamage(nextDmg);
-                        this.demoGame.spawn_createFloatingText(closest.pos.x, closest.pos.y, `-${nextDmg}`, '#c084fc');
-                        history.push(closest);
                         this.demoGame.combat_lightning_triggerChain(closest, nextDmg, history, level - 1);
-                    }, 100);
+                    }, 60);
                 }
             },
             
