@@ -1153,37 +1153,48 @@
                 </div>
 
                 <!-- Right: Detail & Demo -->
-                <div id="truth-detail-panel" class="flex-1 flex flex-col bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden relative">
-                    <div id="truth-empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-slate-600">
-                        <span class="text-6xl mb-4">📜</span>
-                        <p>選擇一個條目以查看詳情</p>
-                    </div>
-                    
-                    <div id="truth-content" class="hidden flex flex-col h-full">
-                        <!-- Info Section -->
-                        <div class="p-6 border-b border-slate-800 bg-slate-900/80">
-                            <div class="flex items-center gap-4 mb-2">
-                                <span id="truth-item-icon" class="text-4xl"></span>
-                                <div>
-                                    <h3 id="truth-item-name" class="text-2xl font-bold text-white"></h3>
-                                    <div id="truth-item-tags" class="flex gap-2 mt-1"></div>
-                                </div>
-                            </div>
-                            <p id="truth-item-desc" class="text-slate-400 text-sm leading-relaxed"></p>
-                        </div>
-
-                        <!-- Demo Section -->
-                        <div class="flex-1 relative bg-black/40">
-                            <div class="absolute top-4 left-4 z-10 bg-slate-900/80 backdrop-blur-md px-3 py-1 rounded-full border border-slate-700 text-[10px] text-cyan-400 tracking-widest uppercase">
-                                實戰循環演示
-                            </div>
-                            <canvas id="truth-demo-canvas" class="w-full h-full"></canvas>
-                            <div id="truth-demo-log" class="absolute bottom-4 left-4 right-4 bg-slate-900/60 backdrop-blur-sm p-3 rounded-lg border border-slate-800 text-xs text-slate-300 font-mono h-16 overflow-hidden">
-                                <div id="truth-log-content"></div>
-                            </div>
-                        </div>
-                    </div>
+                <div id="truth-detail-panel" class="flex-1 flex flex-col bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden relative shadow-2xl">
+    <div id="truth-empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-slate-700">
+        <span class="text-6xl mb-4 opacity-50">🔮</span>
+        <p class="font-[Cinzel] tracking-widest text-sm">SELECT AN ENTRY TO ANALYZE</p>
+    </div>
+    
+    <div id="truth-content" class="hidden flex flex-col h-full relative">
+        <div class="p-5 border-b border-slate-800 bg-slate-900/90 backdrop-blur-sm z-20 shadow-md">
+            <div class="flex items-center gap-4 mb-2">
+                <div class="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 shadow-inner shrink-0">
+                    <span id="truth-item-icon" class="text-3xl filter drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]"></span>
                 </div>
+                <div>
+                    <h3 id="truth-item-name" class="text-2xl font-bold text-white font-[Cinzel] tracking-wide"></h3>
+                    <div id="truth-item-tags" class="flex flex-wrap gap-2 mt-1"></div>
+                </div>
+            </div>
+            <p id="truth-item-desc" class="text-slate-400 text-xs leading-relaxed pl-1"></p>
+        </div>
+
+        <div class="flex-1 relative bg-[#020617] overflow-hidden group">
+            <div class="absolute top-4 left-4 z-10 flex flex-col gap-1 pointer-events-none">
+                <div class="bg-cyan-950/80 backdrop-blur-md px-3 py-1 rounded border-l-2 border-cyan-400 text-[10px] text-cyan-300 tracking-widest uppercase shadow-[0_0_15px_rgba(6,182,212,0.1)]">
+                    SIMULATION MATRIX
+                </div>
+                <div class="text-[9px] text-cyan-700 font-mono" id="truth-sim-time">T: 000</div>
+            </div>
+
+            <button onclick="game.truthBook.resetDemo()" class="absolute top-4 right-4 z-10 w-8 h-8 rounded bg-slate-800/50 hover:bg-cyan-600/20 border border-slate-700 hover:border-cyan-400/50 text-slate-400 hover:text-cyan-300 transition-all flex items-center justify-center" title="重置演示">
+                ⟳
+            </button>
+
+            <canvas id="truth-demo-canvas" class="w-full h-full block"></canvas>
+
+            <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent pointer-events-none">
+                <div id="truth-demo-log" class="font-mono text-[10px] space-y-1 text-slate-400 h-20 overflow-hidden flex flex-col justify-end mask-image-t">
+                    </div>
+            </div>
+        </div>
+    </div>
+</div>
+
             </div>
         </div>
     </div>
@@ -15868,46 +15879,67 @@ class TruthBook {
         this.mainGame = mainGame;
         this.canvas = document.getElementById('truth-demo-canvas');
         this.ctx = this.canvas.getContext('2d');
-        // 初始化 Canvas 尺寸
-        this.canvas.width = 400;
-        this.canvas.height = 300;
+        
         this.active = false;
         this.currentEntry = null;
         this.demoGame = null;
+        
+        // 演示控制
         this.instructionIdx = 0;
         this.waitTimer = 0;
+        this.simFrame = 0; // 模擬幀數計數
+        
+        // 視覺特效參數
+        this.scanLineY = 0;
+        this.gridOffset = 0;
         
         this.initUI();
+        
+        // 監聽窗口調整以重繪
+        window.addEventListener('resize', () => {
+            if (this.active) this.resize();
+        });
     }
 
     initUI() {
         const enemyList = document.getElementById('truth-enemy-list');
         const attrList = document.getElementById('truth-attr-list');
+        
+        // 清空列表防止重複 (如果有的話)
+        if(enemyList) enemyList.innerHTML = '';
+        if(attrList) attrList.innerHTML = '';
 
-        TRUTH_BOOK_DATA.enemies.forEach(entry => {
-            const btn = this.createListButton(entry);
-            enemyList.appendChild(btn);
-        });
-
-        TRUTH_BOOK_DATA.attributes.forEach(entry => {
-            const btn = this.createListButton(entry);
-            attrList.appendChild(btn);
-        });
+        if (typeof TRUTH_BOOK_DATA !== 'undefined') {
+            TRUTH_BOOK_DATA.enemies.forEach(entry => {
+                const btn = this.createListButton(entry);
+                enemyList.appendChild(btn);
+            });
+            TRUTH_BOOK_DATA.attributes.forEach(entry => {
+                const btn = this.createListButton(entry);
+                attrList.appendChild(btn);
+            });
+        }
     }
 
     createListButton(entry) {
         const btn = document.createElement('button');
-        btn.className = 'flex items-center gap-3 p-3 w-full bg-slate-800/40 border border-slate-700/50 rounded-xl hover:bg-cyan-900/20 hover:border-cyan-500/50 transition-all text-left group';
+        // 優化按鈕樣式：增加選中狀態的視覺反饋邏輯在 showEntry 處理
+        btn.className = 'truth-list-btn flex items-center gap-3 p-3 w-full bg-slate-800/40 border border-slate-700/50 rounded-xl hover:bg-cyan-900/20 hover:border-cyan-500/50 transition-all text-left group mb-2';
         btn.innerHTML = `
-            <span class="text-2xl group-hover:scale-110 transition-transform">${entry.icon}</span>
-            <span class="text-sm font-bold text-slate-300 group-hover:text-cyan-100">${entry.name}</span>
+            <span class="text-2xl group-hover:scale-110 transition-transform filter drop-shadow-md">${entry.icon}</span>
+            <div class="flex flex-col">
+                <span class="text-sm font-bold text-slate-300 group-hover:text-cyan-100 transition-colors">${entry.name}</span>
+                <span class="text-[9px] text-slate-500 uppercase tracking-wider group-hover:text-cyan-400/70">${entry.tags[0] || 'ENTITY'}</span>
+            </div>
         `;
-        btn.onclick = () => this.showEntry(entry);
+        btn.onclick = () => this.showEntry(entry, btn);
         return btn;
     }
 
-    showEntry(entry) {
+    showEntry(entry, btnElement) {
         this.currentEntry = entry;
+        
+        // UI 更新
         document.getElementById('truth-empty-state').classList.add('hidden');
         document.getElementById('truth-content').classList.remove('hidden');
         
@@ -15919,19 +15951,34 @@ class TruthBook {
         tagsCont.innerHTML = '';
         entry.tags.forEach(tag => {
             const s = document.createElement('span');
-            s.className = 'text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
-            s.innerText = tag;
+            s.className = 'text-[9px] font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700 shadow-sm tracking-wide';
+            s.innerText = tag.toUpperCase();
             tagsCont.appendChild(s);
         });
+
+        // 按鈕高亮邏輯
+        document.querySelectorAll('.truth-list-btn').forEach(b => {
+            b.classList.remove('border-cyan-500', 'bg-cyan-900/30');
+            b.classList.add('border-slate-700/50', 'bg-slate-800/40');
+        });
+        if (btnElement) {
+            btnElement.classList.remove('border-slate-700/50', 'bg-slate-800/40');
+            btnElement.classList.add('border-cyan-500', 'bg-cyan-900/30');
+        }
 
         this.startDemo(entry);
     }
 
+    // 手動重置按鈕調用
+    resetDemo() {
+        if (this.currentEntry) this.startDemo(this.currentEntry);
+    }
+
     startDemo(entry) {
-        // 初始化演示沙盒，复用主游戏的物理参数
+        // 模擬環境初始化 (Virtual Game State)
         this.demoGame = {
-            width: 600, // 逻辑宽度
-            height: 800, // 逻辑高度
+            width: 600,  // 邏輯寬度 (固定)
+            height: 800, // 邏輯高度 (固定)
             enemies: [],
             projectiles: [],
             particles: [],
@@ -15940,21 +15987,22 @@ class TruthBook {
             spores: [],
             fireWaves: [],
             sonSwords: [],
-            sonSwordQueue: [],
+            sonSwordQueue: [], 
             swordQis: [],
             lightningBolts: [],
             enemyHeight: 60,
             enemyWidth: 60,
             timeScale: 1.0,
-            hasCombatWall: true, // 演示窗强制开启反弹墙
-            // 模拟核心方法
-            spawn_createParticle: (x, y, color, mode) => {
+            hasCombatWall: true, // 演示強制開啟底牆
+            
+            // 模擬核心方法 (Mock Methods)
+            spawn_createParticle: (x, y, color, mode) => { 
                 const p = new Particle(x, y, color, mode);
-                this.demoGame.particles.push(p);
+                this.demoGame.particles.push(p); 
                 return p;
             },
             spawn_createFloatingText: (x, y, text, color) => {
-                this.demoGame.floatingTexts.push({ pos: new Vec2(x, y), text, color, life: 60 });
+                this.demoGame.floatingTexts.push({ pos: new Vec2(x, y), text, color, life: 60, yOffset: 0 });
             },
             spawn_createShockwave: (x, y, color) => {
                 this.demoGame.shockwaves.push({ pos: new Vec2(x, y), color, radius: 0, maxRadius: 100, life: 30 });
@@ -15964,70 +16012,123 @@ class TruthBook {
                 this.demoGame.projectiles.push(p);
             },
             combat_damageEnemy: (enemy, proj) => {
-                const dmg = proj.config.damage || 10;
+                const dmg = (proj.config && proj.config.damage) ? proj.config.damage : 10;
                 enemy.hp -= dmg;
+                enemy.hitTimer = 10;
                 this.demoGame.spawn_createFloatingText(enemy.pos.x, enemy.pos.y, `-${dmg}`, '#fff');
             },
-            calc_isAreaOccupied: () => false
+            // 簡化版的碰撞查詢
+            calc_isAreaOccupied: () => false 
         };
 
-        entry.setup(this.demoGame);
+        // 執行條目特定的初始化
+        if (entry.setup) entry.setup(this.demoGame);
+
         this.instructionIdx = 0;
         this.waitTimer = 0;
-        document.getElementById('truth-log-content').innerHTML = '';
+        this.simFrame = 0;
+        this.scanLineY = 0;
+        document.getElementById('truth-demo-log').innerHTML = ''; // 清空日誌
+        
+        // 確保畫布尺寸正確
         this.active = true;
+        this.resize();
+        
+        // 立即添加初始日誌
+        this.addLog("SIMULATION_INIT... OK", "text-green-400");
+    }
+
+    resize() {
+        if (!this.canvas) return;
+        const parent = this.canvas.parentElement;
+        if (parent) {
+            // 獲取 CSS 像素尺寸
+            const rect = parent.getBoundingClientRect();
+            // 獲取設備像素比 (Retina 支援)
+            const dpr = window.devicePixelRatio || 1;
+            
+            // 設置畫布的物理像素尺寸
+            this.canvas.width = rect.width * dpr;
+            this.canvas.height = rect.height * dpr;
+            
+            // 縮放 Context 以匹配 CSS 像素
+            this.ctx.scale(dpr, dpr);
+            
+            // 保存 CSS 寬高供渲染邏輯使用
+            this.viewWidth = rect.width;
+            this.viewHeight = rect.height;
+        }
     }
 
     update() {
         if (!this.active || !this.demoGame) return;
 
-        // 1. 指令解析
+        this.simFrame++;
+        
+        // 更新 UI 時間顯示
+        const timeDisplay = document.getElementById('truth-sim-time');
+        if (timeDisplay && this.simFrame % 5 === 0) {
+            timeDisplay.innerText = `T: ${this.simFrame.toString().padStart(4, '0')}`;
+        }
+
+        // 1. 指令解析與執行 (Scripting Engine)
         if (this.waitTimer > 0) {
             this.waitTimer--;
         } else {
-            const inst = this.currentEntry.loop[this.instructionIdx];
-            this.executeInstruction(inst);
-            this.instructionIdx = (this.instructionIdx + 1) % this.currentEntry.loop.length;
+            const loop = this.currentEntry.loop;
+            if (loop && loop.length > 0) {
+                const inst = loop[this.instructionIdx];
+                this.executeInstruction(inst);
+                this.instructionIdx = (this.instructionIdx + 1) % loop.length;
+            }
         }
 
-        // 2. 模拟更新 (复用真实类的方法)
-        const ts = 1.0;
+        // 2. 物理模擬更新 (Physics Step)
+        const ts = 1.0; // 固定時間步長
+        
         this.demoGame.enemies.forEach(e => e.update(ts, this.demoGame));
+        
         this.demoGame.projectiles.forEach(p => {
-            p.game = this.demoGame; // 注入模拟游戏对象
-            p.update(this.demoGame.width, this.demoGame.height, this.demoGame.enemies, (x,y,v,r)=>this.demoGame.spawn_spawnBullet(x,y,v,r), ts);
+            p.game = this.demoGame; // 注入環境引用
+            p.update(this.demoGame.width, this.demoGame.height, this.demoGame.enemies, 
+                (x,y,v,r) => this.demoGame.spawn_spawnBullet(x,y,v,r), ts);
         });
+        
         this.demoGame.particles.forEach((p, i) => {
             p.update(ts);
             if (!p.active) this.demoGame.particles.splice(i, 1);
         });
+        
         this.demoGame.floatingTexts.forEach((f, i) => {
             f.pos.y -= 0.5;
             f.life--;
             if (f.life <= 0) this.demoGame.floatingTexts.splice(i, 1);
         });
+        
         this.demoGame.shockwaves.forEach((s, i) => {
             s.radius += 3;
             s.life--;
             if (s.life <= 0) this.demoGame.shockwaves.splice(i, 1);
         });
 
+        // 3. 渲染
         this.draw();
     }
 
     executeInstruction(inst) {
+        if (!inst) return;
         switch(inst.type) {
-            case 'log':
-                this.addLog(inst.text);
+            case 'log': 
+                this.addLog(inst.text); 
                 break;
-            case 'wait':
-                this.waitTimer = inst.frames;
+            case 'wait': 
+                this.waitTimer = inst.frames; 
                 break;
-            case 'damage':
+            case 'damage': 
                 const target = this.demoGame.enemies[inst.targetIdx || 0];
                 if (target) {
                     target.hp -= inst.value;
-                    target.whiteBarTimer = 30;
+                    target.hitTimer = 10;
                     this.demoGame.spawn_createFloatingText(target.pos.x, target.pos.y, `-${inst.value}`, '#ef4444');
                 }
                 break;
@@ -16038,78 +16139,146 @@ class TruthBook {
             case 'spawn_projectile':
                 const px = inst.x || this.demoGame.width / 2;
                 const py = inst.y || this.demoGame.height - 100;
-                const pvel = inst.vel ? new Vec2(inst.vel.x, inst.vel.y) : new Vec2(0, -15);
-                this.demoGame.spawn_spawnBullet(px, py, pvel, inst.config);
+                // 模擬隨機角度偏移
+                const angle = -Math.PI/2 + (Math.random()-0.5) * 0.2; 
+                const pvel = inst.vel ? new Vec2(inst.vel.x, inst.vel.y) : new Vec2(Math.cos(angle)*15, Math.sin(angle)*15);
+                
+                // 確保 config 包含必要的渲染標誌
+                const cfg = inst.config || {};
+                if (cfg.laser > 0) cfg.isLaser = true;
+                if (cfg.explosive) cfg.explosive = true;
+                
+                this.demoGame.spawn_spawnBullet(px, py, pvel, cfg);
                 break;
             case 'reset':
                 this.waitTimer = inst.delay || 60;
+                this.addLog("--- RESET ---", "text-slate-600");
                 this.startDemo(this.currentEntry);
                 break;
         }
     }
 
-    addLog(text) {
-        const logCont = document.getElementById('truth-log-content');
+    addLog(text, colorClass = 'text-cyan-400') {
+        const logCont = document.getElementById('truth-demo-log');
         const div = document.createElement('div');
-        div.className = 'mb-1 text-cyan-400/80';
-        div.innerHTML = `<span class="text-slate-600 mr-2">></span>${text}`;
+        div.className = `flex items-center gap-2 ${colorClass}`;
+        // 添加時間戳
+        div.innerHTML = `<span class="text-slate-600 text-[8px]">[${this.simFrame}]</span> <span>${text}</span>`;
         logCont.appendChild(div);
-        if (logCont.childNodes.length > 3) logCont.removeChild(logCont.firstChild);
+        
+        // 保持日誌長度
+        if (logCont.childNodes.length > 5) logCont.removeChild(logCont.firstChild);
+        // 自動滾動
+        logCont.scrollTop = logCont.scrollHeight;
     }
 
     draw() {
         const ctx = this.ctx;
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        const w = this.viewWidth; // 使用 CSS 寬度
+        const h = this.viewHeight;
+        const gameW = this.demoGame.width;
+        const gameH = this.demoGame.height;
 
-        // 绘制背景网格
-        ctx.strokeStyle = 'rgba(34, 211, 238, 0.05)';
+        // 1. 清空與背景
+        ctx.clearRect(0, 0, w, h);
+        
+        // 繪製動態全息網格 (Holographic Grid)
+        this.gridOffset = (this.gridOffset + 0.5) % 40;
+        ctx.strokeStyle = 'rgba(6, 182, 212, 0.1)'; // Cyan-500 low opacity
         ctx.lineWidth = 1;
-        for(let x=0; x<this.canvas.width; x+=20) {
-            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, this.canvas.height); ctx.stroke();
+        
+        ctx.beginPath();
+        // 垂直線
+        for (let x = 0; x <= w; x += 40) {
+            ctx.moveTo(x, 0); ctx.lineTo(x, h);
         }
-        for(let y=0; y<this.canvas.height; y+=20) {
-            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(this.canvas.width, y); ctx.stroke();
+        // 水平線 (向下滾動效果)
+        for (let y = this.gridOffset; y <= h; y += 40) {
+            ctx.moveTo(0, y); ctx.lineTo(w, y);
         }
+        ctx.stroke();
 
         ctx.save();
-        // 缩放渲染：等比缩放，确保逻辑空间完整显示在 Canvas 内
-        const scale = Math.min(this.canvas.width / this.demoGame.width, this.canvas.height / this.demoGame.height);
-        const offsetX = (this.canvas.width - this.demoGame.width * scale) / 2;
-        const offsetY = (this.canvas.height - this.demoGame.height * scale) / 2;
+
+        // 2. 自適應縮放：計算 "Contain" 模式的縮放比例
+        // 留出 20px 邊距 (padding)
+        const padding = 40;
+        const scale = Math.min((w - padding) / gameW, (h - padding) / gameH);
         
+        // 居中偏移
+        const offsetX = (w - gameW * scale) / 2;
+        const offsetY = (h - gameH * scale) / 2;
+
         ctx.translate(offsetX, offsetY);
         ctx.scale(scale, scale);
 
-        // 绘制墙壁边界
-        ctx.strokeStyle = '#334155';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(0, 0, this.demoGame.width, this.demoGame.height);
+        // 3. 繪製遊戲邊界 (Simulation Boundary)
+        ctx.strokeStyle = '#1e293b'; // Slate-800
+        ctx.lineWidth = 4;
+        ctx.strokeRect(0, 0, gameW, gameH);
+        
+        // 邊界發光
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = 'rgba(6, 182, 212, 0.2)';
+        ctx.strokeRect(0, 0, gameW, gameH);
+        ctx.shadowBlur = 0;
 
-        // 绘制实体 (复用真实类的 draw 方法)
-        this.demoGame.enemies.forEach(e => e.draw(ctx));
+        // 裁剪區域：確保物體不會畫出遊戲邊界
+        ctx.beginPath();
+        ctx.rect(0, 0, gameW, gameH);
+        ctx.clip();
+
+        // 4. 繪製實體
+        // 繪製敵人
+        this.demoGame.enemies.forEach(e => {
+            e.draw(ctx);
+            // 在演示模式下，繪製額外的血條數值，方便觀察
+            ctx.fillStyle = '#fff';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(e.hp, e.pos.x, e.pos.y + 5);
+        });
+
+        // 繪製彈道
         this.demoGame.projectiles.forEach(p => p.draw(ctx));
         this.demoGame.particles.forEach(p => p.draw(ctx));
         
-        // 绘制浮动文字
+        // 繪製浮動文字
         this.demoGame.floatingTexts.forEach(f => {
             ctx.fillStyle = f.color;
-            ctx.font = 'bold 24px sans-serif';
+            ctx.font = 'bold 24px sans-serif'; // 在縮放後會變小，所以這裡設大一點
             ctx.textAlign = 'center';
+            // 添加簡單的浮動動畫
             ctx.fillText(f.text, f.pos.x, f.pos.y);
         });
 
-        // 绘制冲击波
+        // 繪製衝擊波
         this.demoGame.shockwaves.forEach(s => {
             ctx.beginPath();
             ctx.arc(s.pos.x, s.pos.y, s.radius, 0, Math.PI*2);
             ctx.strokeStyle = s.color;
+            ctx.lineWidth = 3;
             ctx.globalAlpha = s.life / 30;
             ctx.stroke();
             ctx.globalAlpha = 1.0;
         });
+
         ctx.restore();
+
+        // 5. 掃描線特效 (Scanline Overlay)
+        this.scanLineY = (this.scanLineY + 2) % h;
+        ctx.fillStyle = `rgba(6, 182, 212, 0.1)`;
+        ctx.fillRect(0, this.scanLineY, w, 2); // 亮線
+        
+        // 6. 晕影 (Vignette) - 讓邊緣變暗，增加屏幕感
+        const grad = ctx.createRadialGradient(w/2, h/2, Math.max(w,h)*0.4, w/2, h/2, Math.max(w,h)*0.8);
+        grad.addColorStop(0, 'transparent');
+        grad.addColorStop(1, 'rgba(2, 6, 23, 0.6)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
     }
 }
+
 
 function hexToRgba(hex, alpha) {
     let c;
