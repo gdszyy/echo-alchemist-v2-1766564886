@@ -6399,6 +6399,10 @@ class Projectile {
 
     _applyMove(vel, width, height, spawnCallback) {
         this.pos = this.pos.add(vel);
+        
+        // [优化] 在 Demo 模式下强制开启底墙
+        const hasBottomWall = (this.game && this.game.isDemo) ? true : game.hasCombatWall;
+
         if (this.pos.x < this.radius) { 
             this.pos.x = this.radius; this.vel.x = Math.abs(this.vel.x); 
             if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
@@ -6431,7 +6435,7 @@ class Projectile {
             if(this.config.bounce > 0) this.deformation = { x: 1.3, y: 0.7 };
         }
         if (this.pos.y > height - this.radius) {
-            if (game.hasCombatWall) {
+            if (hasBottomWall) {
                 this.pos.y = height - this.radius; this.vel.y = -Math.abs(this.vel.y);
                 if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
                 
@@ -15826,7 +15830,10 @@ class TruthBook {
         // 2. 模拟更新 (复用真实类的方法)
         const ts = 1.0;
         this.demoGame.enemies.forEach(e => e.update(ts, this.demoGame));
-        this.demoGame.projectiles.forEach(p => p.update(this.demoGame.width, this.demoGame.height, this.demoGame.enemies, (x,y,v,r)=>this.demoGame.spawn_spawnBullet(x,y,v,r), ts));
+        this.demoGame.projectiles.forEach(p => {
+            p.game = this.demoGame; // 注入模拟游戏对象
+            p.update(this.demoGame.width, this.demoGame.height, this.demoGame.enemies, (x,y,v,r)=>this.demoGame.spawn_spawnBullet(x,y,v,r), ts);
+        });
         this.demoGame.particles.forEach((p, i) => {
             p.update(ts);
             if (!p.active) this.demoGame.particles.splice(i, 1);
