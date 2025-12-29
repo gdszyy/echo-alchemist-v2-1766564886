@@ -8163,11 +8163,13 @@ class TrainingGround {
     renderAffixButtons() {
         const affixes = [
             { id: 'elite', name: '精英', color: 'text-amber-400' },
-            { id: 'shielded', name: '护盾', color: 'text-blue-400' },
-            { id: 'regenerative', name: '再生', color: 'text-green-400' },
+            { id: 'shield', name: '护盾', color: 'text-blue-400' },
+            { id: 'regen', name: '再生', color: 'text-green-400' },
             { id: 'haste', name: '极速', color: 'text-purple-400' },
             { id: 'clone', name: '分身', color: 'text-pink-400' },
-            { id: 'berserk', name: '狂暴', color: 'text-red-400' }
+            { id: 'berserk', name: '狂暴', color: 'text-red-400' },
+            { id: 'spore', name: '孢子', color: 'text-lime-400' },
+            { id: 'armor', name: '重甲', color: 'text-slate-400' }
         ];
         
         const container = document.getElementById('train-affix-list');
@@ -8188,7 +8190,10 @@ class TrainingGround {
             { id: 'pyro', name: '火焰', icon: '🔥', min: 0, max: 50 },
             { id: 'cryo', name: '冰霜', icon: '❄️', min: 0, max: 50 },
             { id: 'lightning', name: '闪电', icon: '⚡', min: 0, max: 50 },
-            { id: 'wind', name: '风暴', icon: '🌪️', min: 0, max: 50 }
+            { id: 'wind', name: '风暴', icon: '🌪️', min: 0, max: 50 },
+            { id: 'laser', name: '激光', icon: '🔦', min: 0, max: 10 },
+            { id: 'explosive', name: '爆破', icon: '💥', type: 'bool' },
+            { id: 'isMatryoshka', name: '套娃', icon: '🪆', type: 'bool' }
         ];
         
         const container = document.getElementById('train-attr-grid');
@@ -8196,11 +8201,15 @@ class TrainingGround {
             <div class="bg-slate-800/50 p-2 rounded border border-slate-700/50">
                 <div class="flex justify-between items-center mb-1">
                     <span class="text-[10px] text-slate-400">${a.icon} ${a.name}</span>
-                    <span id="val-${a.id}" class="text-[10px] font-mono text-indigo-400">${this.bulletConfig[a.id] || 0}</span>
+                    <span id="val-${a.id}" class="text-[10px] font-mono text-indigo-400">${a.type === 'bool' ? (this.bulletConfig[a.id] ? 'ON' : 'OFF') : (this.bulletConfig[a.id] || 0)}</span>
                 </div>
-                <input type="range" min="${a.min}" max="${a.max}" value="${this.bulletConfig[a.id] || 0}" 
-                    oninput="game.trainingGround.updateBulletAttr('${a.id}', this.value)" 
-                    class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                ${a.type === 'bool' ? `
+                    <button onclick="game.trainingGround.toggleAttr('${a.id}')" class="w-full py-1 bg-slate-700 hover:bg-slate-600 rounded text-[10px] text-slate-300">切换</button>
+                ` : `
+                    <input type="range" min="${a.min}" max="${a.max}" value="${this.bulletConfig[a.id] || 0}" 
+                        oninput="game.trainingGround.updateBulletAttr('${a.id}', this.value)" 
+                        class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                `}
             </div>
         `).join('');
     }
@@ -8218,8 +8227,14 @@ class TrainingGround {
     }
 
     updateBulletAttr(id, val) {
-        this.bulletConfig[id] = parseFloat(val);
+        this.bulletConfig[id] = parseInt(val);
         document.getElementById(`val-${id}`).innerText = val;
+        this.updateBulletPreview();
+    }
+
+    toggleAttr(id) {
+        this.bulletConfig[id] = !this.bulletConfig[id];
+        document.getElementById(`val-${id}`).innerText = this.bulletConfig[id] ? 'ON' : 'OFF';
         this.updateBulletPreview();
     }
 
@@ -8239,13 +8254,21 @@ class TrainingGround {
 
     spawnEnemy() {
         const hp = parseInt(document.getElementById('train-enemy-hp').value) || 100;
-        const x = this.game.width / 2;
-        const y = 150;
         const width = 60;
         const height = 60;
         
+        // [优化] 寻找空位生成敌人
+        let x, y;
+        let attempts = 0;
+        const margin = 80;
+        do {
+            x = margin + Math.random() * (this.game.width - margin * 2);
+            y = margin + Math.random() * (this.game.height / 2); // 生成在屏幕上半部分
+            attempts++;
+        } while (this.game.enemies.some(e => e.pos.dist(new Vec2(x, y)) < 80) && attempts < 20);
+
         const enemy = new Enemy(x, y, width, height, hp, hp, 'normal', [...this.enemyConfig.affixes]);
-        enemy.dropTargetY = y; // 确保敌人不会因为没有目标位置而飞走或不显示
+        enemy.dropTargetY = y; 
         this.game.enemies.push(enemy);
         
         // 播放音效
@@ -8262,9 +8285,14 @@ class TrainingGround {
         // 试炼场发射逻辑：从底部中央向上发射
         const x = this.game.width / 2;
         const y = this.game.height - 100;
-        const vel = new Vec2(0, -15);
+        
+        // [优化] 随机角度发射 (-30度 到 30度)
+        const angle = (Math.random() - 0.5) * Math.PI / 3;
+        const vel = new Vec2(0, -15).rotate(angle);
         
         this.game.spawn_spawnBullet(x, y, vel, recipe);
+        
+        if (this.stats.startTime === 0) this.stats.startTime = Date.now();
     }
 
     resetBullet() {
@@ -8316,6 +8344,8 @@ class TrainingGround {
         this.game.particles = [];
         this.game.sonSwordQueue = [];
         this.game.swordQis = [];
+        this.game.windAnchors = []; // [修复] 清空风锚点
+        this.game.activeWindMatrices = []; // [修复] 清空风阵
         this.game.roundDamage = 0;
         this.stats.totalDamage = 0;
         this.stats.lastTotal = 0;
@@ -8326,6 +8356,8 @@ class TrainingGround {
     exit() {
         this.active = false;
         this.game.hasCombatWall = false; // 退出时重置
+        this.game.windAnchors = []; // [修复] 退出时清空
+        this.game.activeWindMatrices = [];
         document.getElementById('phase-training').style.display = 'none';
         document.getElementById('phase-training').classList.remove('active-phase');
         document.getElementById('phase-training').classList.add('hidden-phase');
