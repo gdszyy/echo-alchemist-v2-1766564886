@@ -1011,7 +1011,7 @@
                     <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-cyan-100">真理之书</span>
                 </button>
 
-                <button onclick="showToast('試煉場封印中 (Coming Soon)...')" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-red-500/30 transition-all duration-300 group backdrop-blur-sm">
+                <button onclick="game.trainingGround.enter()" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-red-500/30 transition-all duration-300 group backdrop-blur-sm">
                     <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-red-900/20 group-hover:text-red-400 transition-all shadow-inner">
                         <span class="text-2xl">⚔️</span>
                     </div>
@@ -7966,6 +7966,266 @@ this.affixDict = {
     }
 }
 // --- 主游戏控制器 ---
+
+/**
+ * Echo Alchemist - Training Ground Module
+ * 试炼场模块：包含敌人配置器、子弹编辑器和战斗测试逻辑
+ */
+
+class TrainingGround {
+    constructor(game) {
+        this.game = game;
+        this.active = false;
+        this.enemyConfig = {
+            hp: 100,
+            maxHp: 100,
+            affixes: []
+        };
+        this.bulletConfig = {
+            damage: 10,
+            bounce: 0,
+            pierce: 0,
+            scatter: 0,
+            multicast: 0,
+            pyro: 0,
+            cryo: 0,
+            lightning: 0,
+            wind: 0,
+            isLaser: false,
+            isMatryoshka: false,
+            type: 'normal'
+        };
+        this.initUI();
+    }
+
+    initUI() {
+        // 创建试炼场 UI 容器
+        const ui = document.createElement('div');
+        ui.id = 'phase-training';
+        ui.className = 'ui-overlay hidden-phase';
+        ui.style.cssText = 'display: none; z-index: 400; background: rgba(2, 6, 23, 0.9); pointer-events: auto; flex-direction: row;';
+        
+        ui.innerHTML = `
+            <div class="flex flex-col w-64 bg-slate-900/90 border-r border-slate-700 p-4 overflow-y-auto custom-scrollbar">
+                <h2 class="text-xl font-[Cinzel] text-red-400 mb-4 flex items-center gap-2">
+                    <span>⚔️</span> 敌人配置器
+                </h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-xs text-slate-500 uppercase font-bold">基础血量</label>
+                        <input type="number" id="train-enemy-hp" value="100" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white mt-1">
+                    </div>
+                    
+                    <div>
+                        <label class="text-xs text-slate-500 uppercase font-bold">词缀注入</label>
+                        <div id="train-affix-list" class="grid grid-cols-2 gap-2 mt-2">
+                            <!-- 动态生成词缀按钮 -->
+                        </div>
+                    </div>
+                    
+                    <button onclick="game.trainingGround.spawnEnemy()" class="w-full py-2 bg-red-600 hover:bg-red-500 text-white rounded font-bold transition-colors mt-4">
+                        召唤敌人
+                    </button>
+                    
+                    <button onclick="game.trainingGround.clearEnemies()" class="w-full py-2 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold transition-colors">
+                        清空敌人
+                    </button>
+                </div>
+
+                <div class="mt-8 pt-8 border-t border-slate-800">
+                    <button onclick="game.trainingGround.exit()" class="w-full py-2 border border-slate-600 text-slate-400 hover:text-white hover:border-white rounded transition-all">
+                        返回主界面
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 relative flex flex-col">
+                <!-- 顶部状态栏 -->
+                <div class="h-12 bg-slate-900/50 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-6">
+                    <div class="text-slate-400 text-sm">
+                        试炼场模式 <span class="text-slate-600 ml-2">| 实时战斗模拟</span>
+                    </div>
+                    <div id="train-stats" class="text-amber-400 font-mono text-sm">
+                        DPS: 0 | TOTAL: 0
+                    </div>
+                </div>
+                
+                <!-- 战斗区域 (Canvas 已经在下面，这里放一些浮层) -->
+                <div class="flex-1 pointer-events-none"></div>
+
+                <!-- 底部子弹编辑器 -->
+                <div class="h-48 bg-slate-900/90 border-t border-slate-700 p-4 flex gap-6 pointer-events-auto">
+                    <div class="w-48 shrink-0">
+                        <h3 class="text-xs text-slate-500 uppercase font-bold mb-2">子弹预览</h3>
+                        <div id="train-bullet-preview" class="w-full h-32 bg-slate-800 rounded-lg border-2 border-dashed border-slate-700 flex items-center justify-center relative overflow-hidden">
+                            <div id="preview-bullet-render" class="w-8 h-8 rounded-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.5)]"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                        <h3 class="text-xs text-slate-500 uppercase font-bold mb-2">配方编辑</h3>
+                        <div id="train-attr-grid" class="grid grid-cols-4 gap-3">
+                            <!-- 动态生成属性调节器 -->
+                        </div>
+                    </div>
+
+                    <div class="w-40 shrink-0 flex flex-col gap-2">
+                        <button onclick="game.trainingGround.fireBullet()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold flex flex-col items-center justify-center transition-all active:scale-95">
+                            <span class="text-2xl">🔥</span>
+                            <span>发射测试</span>
+                        </button>
+                        <button onclick="game.trainingGround.resetBullet()" class="py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs">
+                            重置配方
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(ui);
+        this.renderAffixButtons();
+        this.renderAttributeControls();
+    }
+
+    renderAffixButtons() {
+        const affixes = [
+            { id: 'elite', name: '精英', color: 'text-amber-400' },
+            { id: 'shielded', name: '护盾', color: 'text-blue-400' },
+            { id: 'regenerative', name: '再生', color: 'text-green-400' },
+            { id: 'haste', name: '极速', color: 'text-purple-400' },
+            { id: 'clone', name: '分身', color: 'text-pink-400' },
+            { id: 'berserk', name: '狂暴', color: 'text-red-400' }
+        ];
+        
+        const container = document.getElementById('train-affix-list');
+        container.innerHTML = affixes.map(a => `
+            <button onclick="game.trainingGround.toggleAffix('${a.id}')" id="affix-btn-${a.id}" class="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-[10px] hover:border-slate-500 transition-all">
+                ${a.name}
+            </button>
+        `).join('');
+    }
+
+    renderAttributeControls() {
+        const attrs = [
+            { id: 'damage', name: '伤害', icon: '⚔️', min: 1, max: 999 },
+            { id: 'bounce', name: '弹跳', icon: '⤴️', min: 0, max: 20 },
+            { id: 'pierce', name: '穿透', icon: '↗️', min: 0, max: 20 },
+            { id: 'scatter', name: '散射', icon: '🔱', min: 0, max: 10 },
+            { id: 'multicast', name: '连射', icon: '🔗', min: 0, max: 10 },
+            { id: 'pyro', name: '火焰', icon: '🔥', min: 0, max: 50 },
+            { id: 'cryo', name: '冰霜', icon: '❄️', min: 0, max: 50 },
+            { id: 'lightning', name: '闪电', icon: '⚡', min: 0, max: 50 },
+            { id: 'wind', name: '风暴', icon: '🌪️', min: 0, max: 50 }
+        ];
+        
+        const container = document.getElementById('train-attr-grid');
+        container.innerHTML = attrs.map(a => `
+            <div class="bg-slate-800/50 p-2 rounded border border-slate-700/50">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-[10px] text-slate-400">${a.icon} ${a.name}</span>
+                    <span id="val-${a.id}" class="text-[10px] font-mono text-indigo-400">${this.bulletConfig[a.id] || 0}</span>
+                </div>
+                <input type="range" min="${a.min}" max="${a.max}" value="${this.bulletConfig[a.id] || 0}" 
+                    oninput="game.trainingGround.updateBulletAttr('${a.id}', this.value)" 
+                    class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+            </div>
+        `).join('');
+    }
+
+    toggleAffix(id) {
+        const idx = this.enemyConfig.affixes.indexOf(id);
+        const btn = document.getElementById(`affix-btn-${id}`);
+        if (idx === -1) {
+            this.enemyConfig.affixes.push(id);
+            btn.classList.add('border-red-500', 'bg-red-900/20', 'text-red-400');
+        } else {
+            this.enemyConfig.affixes.splice(idx, 1);
+            btn.classList.remove('border-red-500', 'bg-red-900/20', 'text-red-400');
+        }
+    }
+
+    updateBulletAttr(id, val) {
+        this.bulletConfig[id] = parseFloat(val);
+        document.getElementById(`val-${id}`).innerText = val;
+        this.updateBulletPreview();
+    }
+
+    updateBulletPreview() {
+        const preview = document.getElementById('preview-bullet-render');
+        // 根据属性调整预览效果
+        let color = '#ffffff';
+        if (this.bulletConfig.pyro > 0) color = '#f97316';
+        else if (this.bulletConfig.cryo > 0) color = '#06b6d4';
+        else if (this.bulletConfig.lightning > 0) color = '#c084fc';
+        else if (this.bulletConfig.wind > 0) color = '#34d399';
+        
+        preview.style.backgroundColor = color;
+        preview.style.boxShadow = `0 0 ${10 + this.bulletConfig.damage/10}px ${color}`;
+        preview.style.transform = `scale(${1 + this.bulletConfig.scatter/10})`;
+    }
+
+    spawnEnemy() {
+        const hp = parseInt(document.getElementById('train-enemy-hp').value) || 100;
+        const x = this.game.width / 2;
+        const y = 150;
+        const width = 60;
+        const height = 60;
+        
+        const enemy = new Enemy(x, y, width, height, hp, hp, 'normal', [...this.enemyConfig.affixes]);
+        this.game.enemies.push(enemy);
+        
+        // 播放音效
+        if (window.audio) audio.playTone(400, 'square', 0.1, 0.2);
+    }
+
+    clearEnemies() {
+        this.game.enemies = [];
+    }
+
+    fireBullet() {
+        // 构造配方
+        const recipe = { ...this.bulletConfig };
+        // 试炼场发射逻辑：从底部中央向上发射
+        const x = this.game.width / 2;
+        const y = this.game.height - 100;
+        const vel = new Vec2(0, -15);
+        
+        this.game.spawn_spawnBullet(x, y, vel, recipe);
+    }
+
+    resetBullet() {
+        this.bulletConfig = {
+            damage: 10, bounce: 0, pierce: 0, scatter: 0, multicast: 0,
+            pyro: 0, cryo: 0, lightning: 0, wind: 0,
+            isLaser: false, isMatryoshka: false, type: 'normal'
+        };
+        this.renderAttributeControls();
+        this.updateBulletPreview();
+    }
+
+    enter() {
+        this.active = true;
+        this.game.phase_switchPhase('training');
+        document.getElementById('phase-training').style.display = 'flex';
+        document.getElementById('phase-training').classList.remove('hidden-phase');
+        document.getElementById('phase-training').classList.add('active-phase');
+        
+        // 清空当前战斗状态
+        this.game.enemies = [];
+        this.game.projectiles = [];
+        this.game.particles = [];
+    }
+
+    exit() {
+        this.active = false;
+        document.getElementById('phase-training').style.display = 'none';
+        document.getElementById('phase-training').classList.remove('active-phase');
+        document.getElementById('phase-training').classList.add('hidden-phase');
+        this.game.phase_switchPhase('meta');
+    }
+}
+
 class Game {
     /**
      * 构造函数：初始化游戏状态、Canvas 和事件监听器
@@ -8115,6 +8375,8 @@ class Game {
         this.boardBottomY = 0;
         this.sys_loop();
         this.truthBook = new TruthBook(this);
+        this.trainingGround = new TrainingGround(this);
+        this.trainingGround = new TrainingGround(this);
     }
 
     ui_openTruthBook() {
@@ -8385,13 +8647,18 @@ class Game {
         }
 
         // 4. 阶段逻辑与渲染分发
-        if (this.phase === 'truth_book') {
-            this.truthBook.update();
-        }
+if (this.phase === 'truth_book') {
+	            this.truthBook.update();
+	        }
+	        if (this.phase === 'training') {
+	            this.trainingGround.update();
+	        }
         switch (this.phase) {
             case 'gathering':
                 this.phase_gathering_update(timeScale);
                 break;
+            case 'training':
+            case 'training':
             case 'combat':
                 this.phase_combat_update(timeScale);
                 break;
@@ -11819,6 +12086,8 @@ class Game {
         if (newPhase === 'gathering') { text = "研磨階段"; sub = "收集魔力"; }
         else if (newPhase === 'combat') { text = "戰鬥階段"; sub = "抵禦魔像"; }
         else if (newPhase === 'truth_book') { text = "真理之書"; sub = "洞悉萬物之理"; }
+        else if (newPhase === 'training') { text = "試煉場"; sub = "極限戰鬥測試"; }
+        else if (newPhase === 'training') { text = "試煉場"; sub = "極限戰鬥測試"; }
         titleText.innerText = text; subText.innerText = sub;
         
         // 1.2秒后隐藏阶段标题
