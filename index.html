@@ -16292,7 +16292,7 @@ class TruthBook {
         // 渲染實體 (使用它們自己的 draw 方法)
         this.demoGame.enemies.forEach(e => e.draw(ctx));
         this.demoGame.projectiles.forEach(p => p.draw(ctx));
-        this.demoGame.particles.forEach(p => p.draw(ctx));
+        this.demoGame.particles.forEach(p => p.update ? p.draw(ctx) : null); // Particle has draw
         this.demoGame.shockwaves.forEach(s => s.draw(ctx));
         this.demoGame.lightningBolts.forEach(l => l.draw(ctx));
         this.demoGame.floatingTexts.forEach(f => f.draw(ctx));
