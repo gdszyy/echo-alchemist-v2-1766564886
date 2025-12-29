@@ -13094,23 +13094,10 @@ if (this.phase === 'truth_book') {
                                 if (Math.random() < 1) { // 100% 继承位置
                                     type = prevType;
                                     // [修复]：显式继承等级
-                                    level = prevPeg.level || 1; 
-                                
-        // --- [新增] 初始特殊钉子逻辑 ---
-        const replaceWithSpecial = (count, type) => {
-            if (!count || count <= 0) return;
-            const normalPegs = this.pegs.filter(p => p.type === 'normal');
-            for (let i = normalPegs.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [normalPegs[i], normalPegs[j]] = [normalPegs[j], normalPegs[i]];
-            }
-            for (let i = 0; i < Math.min(count, normalPegs.length); i++) {
-                normalPegs[i].type = type;
-                normalPegs[i].level = 1;
-            }
-        };
-        replaceWithSpecial(CONFIG.gameplay.initWindPegs, 'wind');
-        replaceWithSpecial(CONFIG.gameplay.initSwordPegs, 'flying_sword');
+                                    level = prevPeg.level || 1;
+                                } else {
+                                    type = this.phase_gathering_getRandomPegType();
+                                }
 } else {
                                     type = this.phase_gathering_getRandomPegType();
                                 }
@@ -13131,6 +13118,24 @@ if (this.phase === 'truth_book') {
                     pegIndex++;
             } 
             grid.push(rowPegs); 
+        }
+        
+        // --- [新增] 初始特殊钉子逻辑 (仅在第一回合触发) ---
+        if (this.round === 1 && !shouldInherit) {
+            const replaceWithSpecial = (count, type) => {
+                if (!count || count <= 0) return;
+                const normalPegs = this.pegs.filter(p => p.type === 'normal');
+                for (let i = normalPegs.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [normalPegs[i], normalPegs[j]] = [normalPegs[j], normalPegs[i]];
+                }
+                for (let i = 0; i < Math.min(count, normalPegs.length); i++) {
+                    normalPegs[i].type = type;
+                    normalPegs[i].level = 1;
+                }
+            };
+            replaceWithSpecial(CONFIG.gameplay.initWindPegs, 'wind');
+            replaceWithSpecial(CONFIG.gameplay.initSwordPegs, 'flying_sword');
         }
         this.boardBottomY = maxPegY;
         // --- 生成粉色钉子 (保持不变) ---
