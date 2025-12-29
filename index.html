@@ -15665,7 +15665,7 @@ const TRUTH_BOOK_DATA = {
             },
             loop: [
                 { type: 'log', text: '護盾減傷測試' },
-                { type: 'spawn_projectile', config: { damage: 20 } }, // 打上去只有 10 點傷害
+                { type: 'spawn_projectile', config: { damage: 20 } },
                 { type: 'wait', frames: 60 },
                 { type: 'log', text: '激光反射測試' },
                 { type: 'spawn_projectile', config: { damage: 10, isLaser: true, laser: 5 } },
@@ -15681,7 +15681,7 @@ const TRUTH_BOOK_DATA = {
             desc: '體內植入了生命水晶，每回合行動時會恢復最大生命值的 20%。',
             setup: (game) => {
                 const e = new Enemy(game.width/2, 150, 60, 60, 200, 200, 'normal', ['regen']);
-                e.hp = 100; // 初始半血，演示回血
+                e.hp = 100; 
                 game.enemies.push(e);
             },
             loop: [
@@ -15722,7 +15722,7 @@ const TRUTH_BOOK_DATA = {
             },
             loop: [
                 { type: 'log', text: '極速行動 (2x)' },
-                { type: 'enemy_turn' }, // 內部會執行兩次移動
+                { type: 'enemy_turn' }, 
                 { type: 'wait', frames: 120 },
                 { type: 'reset' }
             ]
@@ -15735,7 +15735,7 @@ const TRUTH_BOOK_DATA = {
             desc: '當前溫度：150°C (過熱)。當處於「過熱」狀態時，有高概率觸發狂暴，獲得額外行動機會。',
             setup: (game) => {
                 const e = new Enemy(game.width/2, 150, 60, 60, 300, 300, 'normal', ['berserk']);
-                e.temp = 150; // 初始過熱
+                e.temp = 150; 
                 game.enemies.push(e);
             },
             loop: [
@@ -15754,16 +15754,16 @@ const TRUTH_BOOK_DATA = {
             tags: ['群體治療', '輔助'],
             desc: '戰場上的醫療兵。回合行動時會治療周圍的友軍單位。',
             setup: (game) => {
-                const e1 = new Enemy(game.width/2 - 70, 150, 60, 60, 100, 200); // 受傷隊友
+                const e1 = new Enemy(game.width/2 - 70, 150, 60, 60, 100, 200); 
                 const healer = new Enemy(game.width/2, 150, 60, 60, 200, 200, 'normal', ['healer']);
-                const e2 = new Enemy(game.width/2 + 70, 150, 60, 60, 100, 200); // 受傷隊友
+                const e2 = new Enemy(game.width/2 + 70, 150, 60, 60, 100, 200); 
                 game.enemies.push(e1, healer, e2);
             },
             loop: [
                 { type: 'log', text: '隊友生命危急...' },
                 { type: 'wait', frames: 60 },
                 { type: 'log', text: '施放群體治癒' },
-                { type: 'enemy_turn', targetIdx: 1 }, // 指定中間的醫生行動
+                { type: 'enemy_turn', targetIdx: 1 }, 
                 { type: 'wait', frames: 120 },
                 { type: 'reset' }
             ]
@@ -15775,7 +15775,7 @@ const TRUTH_BOOK_DATA = {
             tags: ['吞噬友軍', '成長'],
             desc: '殘忍的同類相食者。會吞噬相鄰的友軍以恢復自身生命並繼承其詞條。',
             setup: (game) => {
-                const food = new Enemy(game.width/2 - 60, 150, 50, 50, 100, 100, 'normal', ['haste']); // 帶有極速的食物
+                const food = new Enemy(game.width/2 - 60, 150, 50, 50, 100, 100, 'normal', ['haste']); 
                 const eater = new Enemy(game.width/2, 150, 70, 70, 200, 500, 'normal', ['devour']);
                 game.enemies.push(food, eater);
             },
@@ -15795,8 +15795,7 @@ const TRUTH_BOOK_DATA = {
             tags: ['越過障礙', '突進'],
             desc: '腿部裝有彈簧裝置。當前方被阻擋時，可以直接跳過障礙物繼續前進。',
             setup: (game) => {
-                // 前方放置一個障礙物(敵人)
-                const blocker = new Enemy(game.width/2, 250, 60, 60, 100, 100); 
+                const blocker = new Enemy(game.width/2, 210, 60, 60, 100, 100); 
                 const jumper = new Enemy(game.width/2, 150, 60, 60, 200, 200, 'normal', ['jump']);
                 game.enemies.push(blocker, jumper);
             },
@@ -15854,9 +15853,9 @@ const TRUTH_BOOK_DATA = {
             setup: (game) => { game.enemies.push(new Enemy(game.width/2, 200, 80, 80, 500)); },
             loop: [
                 { type: 'log', text: '施加極寒打擊' },
-                { type: 'spawn_projectile', config: { damage: 5, cryo: 50 } }, // 一發 50度
+                { type: 'spawn_projectile', config: { damage: 5, cryo: 50 } }, 
                 { type: 'wait', frames: 20 },
-                { type: 'spawn_projectile', config: { damage: 5, cryo: 50 } }, // 兩發凍結
+                { type: 'spawn_projectile', config: { damage: 5, cryo: 50 } }, 
                 { type: 'wait', frames: 60 },
                 { type: 'log', text: '敵人已凍結 (無法行動)' },
                 { type: 'enemy_turn' },
@@ -15871,8 +15870,8 @@ const TRUTH_BOOK_DATA = {
                 { type: 'log', text: '點火升溫...' },
                 { type: 'spawn_projectile', config: { damage: 5, pyro: 120 } },
                 { type: 'wait', frames: 60 },
-                { type: 'log', text: '觸發燃燒 DOT' },
-                { type: 'enemy_turn' }, // 燃燒結算在回合行動中
+                { type: 'log', text: '觸發燃燒 (溫度>=100)' },
+                { type: 'enemy_turn' }, 
                 { type: 'wait', frames: 60 },
                 { type: 'enemy_turn' },
                 { type: 'wait', frames: 60 }, { type: 'reset' }
@@ -15880,15 +15879,16 @@ const TRUTH_BOOK_DATA = {
         },
         {
             id: 'lightning', name: '閃電', icon: '⚡', tags: ['元素', '連鎖'],
-            desc: '命中時觸發連鎖閃電，自動跳躍攻擊附近的敵人。',
+            desc: '命中時觸發連鎖閃電。若敵人處於【凍結】狀態，閃電將在附近敵人中瘋狂跳躍。',
             setup: (game) => {
-                game.enemies.push(
-                    new Enemy(game.width/2 - 100, 200, 50, 50, 200),
-                    new Enemy(game.width/2, 150, 50, 50, 200),
-                    new Enemy(game.width/2 + 100, 200, 50, 50, 200)
-                );
+                const e1 = new Enemy(game.width/2 - 50, 200, 50, 50, 200);
+                e1.temp = -100; // 凍結狀態
+                const e2 = new Enemy(game.width/2 + 50, 200, 50, 50, 200);
+                const e3 = new Enemy(game.width/2, 120, 50, 50, 200);
+                game.enemies.push(e1, e2, e3);
             },
             loop: [
+                { type: 'log', text: '打擊凍結目標 (連鎖強化)' },
                 { type: 'spawn_projectile', config: { damage: 20, lightning: 5 }, vel: {x: 0, y: -15} },
                 { type: 'wait', frames: 120 }, { type: 'reset' }
             ]
@@ -15897,7 +15897,6 @@ const TRUTH_BOOK_DATA = {
             id: 'laser', name: '光球', icon: '🔦', tags: ['特殊', '瞬時'],
             desc: '以光速射出折射激光，瞬間對路徑上的敵人造成傷害。',
             setup: (game) => {
-                // 放置一個盾怪演示反射，和幾個普通怪演示折射
                 game.enemies.push(
                     new Enemy(game.width/2, 100, 60, 60, 500, 500, 'normal', ['shield']),
                     new Enemy(game.width/2 - 120, 200, 50, 50, 200),
@@ -15905,7 +15904,7 @@ const TRUTH_BOOK_DATA = {
                 );
             },
             loop: [
-                { type: 'log', text: '發射激光 (Shield Reflect)' },
+                { type: 'log', text: '發射激光 (Laser Beam)' },
                 { type: 'spawn_projectile', config: { damage: 15, isLaser: true, laser: 10 }, vel: {x: 0, y: -20} },
                 { type: 'wait', frames: 120 }, { type: 'reset' }
             ]
@@ -15922,15 +15921,6 @@ const TRUTH_BOOK_DATA = {
             ]
         },
         {
-            id: 'resonance', name: '共鳴', icon: '🔔', tags: ['特殊', '增幅'],
-            desc: '觸發時產生共鳴波紋，對範圍內敵人造成傷害並附加易傷標記。',
-            setup: (game) => { game.enemies.push(new Enemy(game.width/2, 200, 80, 80, 500)); },
-            loop: [
-                { type: 'spawn_projectile', config: { damage: 15, type: 'resonance' }, vel: {x: 0, y: -15} },
-                { type: 'wait', frames: 120 }, { type: 'reset' }
-            ]
-        },
-        {
             id: 'explosive', name: '爆破', icon: '🧨', tags: ['特殊', 'AOE'],
             desc: '接觸敵人時引發劇烈爆炸，造成大範圍傷害。',
             setup: (game) => {
@@ -15943,10 +15933,15 @@ const TRUTH_BOOK_DATA = {
         },
         {
             id: 'matryoshka', name: '套娃', icon: '🪆', tags: ['特殊', '連鎖'],
-            desc: '子彈消失時會分裂出下一顆子彈，造成連綿不絕的攻擊。',
-            setup: (game) => { game.enemies.push(new Enemy(game.width/2, 200, 80, 80, 500)); },
+            desc: '子彈消失時會分裂出下一顆子彈。演示：散射子彈分裂出散射火屬性子彈。',
+            setup: (game) => { game.enemies.push(new Enemy(game.width/2, 200, 80, 80, 1000)); },
             loop: [
-                { type: 'spawn_projectile', config: { damage: 10, isMatryoshka: true, bounce: 1 }, vel: {x: 0, y: -15} },
+                { type: 'log', text: '發射套娃彈 (散射->火散射)' },
+                { type: 'spawn_projectile', config: { 
+                    damage: 10, 
+                    scatter: 3,
+                    nestedPayload: { damage: 10, scatter: 5, pyro: 50 }
+                }, vel: {x: 0, y: -15} },
                 { type: 'wait', frames: 180 }, { type: 'reset' }
             ]
         }
@@ -16038,7 +16033,6 @@ class TruthBook {
 
     startDemo(entry) {
         // --- 核心修復：構建全功能 Mock Game ---
-        // 這個對象代理了 Game 類中所有被實體調用的方法
         this.demoGame = {
             width: 600, height: 800,
             enemies: [], projectiles: [], particles: [], floatingTexts: [], 
@@ -16046,11 +16040,11 @@ class TruthBook {
             sonSwordQueue: [], swordQis: [], lightningBolts: [],
             activeWindMatrices: [], windAnchors: [],
             enemyHeight: 60, enemyWidth: 60, timeScale: 1.0,
-            hasCombatWall: true,
+            hasCombatWall: true, isDemo: true,
             roundDamage: 0, currentShotDamage: 0, currentShotDamageByAttr: {},
             shotDamageMap: new Map(),
             
-            // 粒子系統
+            // 粒子與特效
             spawn_createParticle: (x, y, color, mode) => {
                 const p = new Particle(x, y, color, mode);
                 this.demoGame.particles.push(p);
@@ -16062,65 +16056,72 @@ class TruthBook {
             spawn_createFloatingText: (x, y, text, color) => {
                 this.demoGame.floatingTexts.push(new FloatingText(x, y, text, color));
             },
+            spawn_createExplosion: (x, y, color) => {
+                this.demoGame.spawn_createShockwave(x, y, color);
+                for(let i=0; i<10; i++) this.demoGame.spawn_createParticle(x, y, color, 'spark');
+            },
             
-            // 子彈生成 (支持遞歸)
+            // 子彈生成
             spawn_spawnBullet: (x, y, vel, recipe, id, isLast) => {
                 const p = new Projectile(x, y, vel, recipe, id, isLast);
-                p.game = this.demoGame; // 重要：注入 demoGame 作為上下文
+                p.game = this.demoGame; 
                 this.demoGame.projectiles.push(p);
             },
             
-            // 傷害邏輯 (複製主遊戲的核心邏輯)
-            combat_damageEnemy: (enemy, proj) => {
+            // 傷害與戰鬥
+            combat_damageEnemy: (enemy, proj, multiplier = 1.0) => {
                 const config = proj.config || {};
-                let damage = config.damage || 10;
+                let damage = (config.damage || 10) * multiplier;
                 
-                // 1. 護盾減傷
                 if (enemy.affixes.includes('shield')) {
                     damage *= CONFIG.balance.affixes.shieldReduction;
                     this.demoGame.spawn_createFloatingText(enemy.pos.x, enemy.pos.y, "SHIELDED", "#93c5fd");
                     enemy.shieldHitTimer = 15;
                 }
                 
-                // 2. 應用傷害
-                const killed = enemy.takeDamage(damage); // 調用 Enemy 類自帶的方法
+                const killed = enemy.takeDamage(damage);
+                this.demoGame.combat_recordDamage(damage, config.pyro ? 'pyro' : (config.cryo ? 'cryo' : 'damage'));
                 this.demoGame.spawn_createFloatingText(enemy.pos.x, enemy.pos.y, `-${Math.ceil(damage)}`, '#fff');
                 
-                // 3. 元素效果
                 if (config.cryo) enemy.applyTemp(-config.cryo);
                 if (config.pyro) enemy.applyTemp(config.pyro);
-                if (config.lightning) {
-                    // 簡單的閃電鏈模擬
-                    this.demoGame.combat_lightning_triggerChain(enemy, damage, [enemy], 5);
+                if (config.lightning) this.demoGame.combat_lightning_triggerChain(enemy, damage, [enemy], 5);
+                if (config.explosive) {
+                    this.demoGame.spawn_createExplosion(enemy.pos.x, enemy.pos.y, '#f97316');
+                    this.demoGame.enemies.forEach(other => {
+                        if (other !== enemy && other.active && enemy.pos.dist(other.pos) < 120) {
+                            this.demoGame.combat_damageEnemy(other, { config: { damage: damage * 0.5 } });
+                        }
+                    });
                 }
                 
-                // 4. 擊殺
                 if (killed) {
                     this.demoGame.spawn_createParticle(enemy.pos.x, enemy.pos.y, '#fff', 'spark');
-                    if (config.explosive) audio.playExplosion();
-                } else {
-                    audio.playEnemyHit(config.type || 'normal');
+                    this.demoGame.spawn_addScore(enemy.maxHp);
                 }
             },
             
-            // 閃電鏈模擬
+            combat_recordDamage: (amount, attrType = 'damage') => {
+                this.demoGame.roundDamage += amount;
+                if (!this.demoGame.currentShotDamageByAttr[attrType]) this.demoGame.currentShotDamageByAttr[attrType] = 0;
+                this.demoGame.currentShotDamageByAttr[attrType] += amount;
+            },
+            
             combat_lightning_triggerChain: (currentEnemy, dmg, history, level) => {
                 if (level <= 0) return;
                 const range = 250;
                 let closest = null;
                 let minDist = Infinity;
-                
                 this.demoGame.enemies.forEach(e => {
                     if (e !== currentEnemy && e.active && !history.includes(e)) {
                         const d = currentEnemy.pos.dist(e.pos);
                         if (d < range && d < minDist) { minDist = d; closest = e; }
                     }
                 });
-
                 if (closest) {
                     this.demoGame.lightningBolts.push(new LightningBolt(currentEnemy.pos, closest.pos));
                     setTimeout(() => {
-                        const nextDmg = Math.floor(dmg * 0.8);
+                        const nextDmg = Math.floor(dmg * (currentEnemy.temp <= -50 ? 1.2 : 0.8));
                         closest.takeDamage(nextDmg);
                         this.demoGame.spawn_createFloatingText(closest.pos.x, closest.pos.y, `-${nextDmg}`, '#c084fc');
                         history.push(closest);
@@ -16129,30 +16130,33 @@ class TruthBook {
                 }
             },
             
-            // 克隆生成 (供 Enemy.js 調用)
-            spawn_triggerCloneSpawn: (parent) => {
-                const cloneHp = Math.floor(parent.maxHp * 0.5);
-                const clone = new Enemy(parent.pos.x + 60, parent.pos.y, 50, 50, cloneHp, cloneHp);
-                clone.affixes = []; // 克隆體無詞條
-                this.demoGame.enemies.push(clone);
-                this.demoGame.spawn_createFloatingText(parent.pos.x, parent.pos.y, "CLONE!", "#10b981");
+            combat_wind_addAnchor: (x, y, bulletDamage, bulletConfig) => {
+                this.demoGame.windAnchors.push({ x, y, life: 1.0, bulletDamage, bulletConfig });
+                this.demoGame.spawn_createParticle(x, y, '#34d399', 'spark');
+                if (this.demoGame.windAnchors.length >= 4) {
+                    this.demoGame.spawn_createShockwave(x, y, '#34d399');
+                    this.demoGame.windAnchors = []; // 簡化：滿4個直接重置
+                }
             },
 
-            // 碰撞檢測 Mock
-            calc_isAreaOccupied: () => false,
-            
-            // 戰鬥記錄 Mock
-            combat_recordDamage: (amount, attrType = 'damage', shotId = null) => {
-                this.demoGame.roundDamage += amount;
-                if (!this.demoGame.currentShotDamageByAttr[attrType]) this.demoGame.currentShotDamageByAttr[attrType] = 0;
-                this.demoGame.currentShotDamageByAttr[attrType] += amount;
+            spawn_triggerCloneSpawn: (parent) => {
+                const cloneHp = Math.floor(parent.maxHp * 0.2);
+                const clone = new Enemy(parent.pos.x + 60, parent.pos.y, 50, 50, cloneHp, cloneHp);
+                clone.affixes = [];
+                this.demoGame.enemies.push(clone);
+                this.demoGame.spawn_createFloatingText(parent.pos.x, parent.pos.y, "CLONE!", "#a855f7");
             },
-            ui_updateRoundDamage: () => {} // 演示環境不需要更新主 UI
+
+            spawn_addScore: (amt) => {},
+            ui_updateRoundDamage: () => {},
+            calc_isAreaOccupied: (x, y, w, h, exclude) => {
+                return this.demoGame.enemies.some(e => e !== exclude && e.active && 
+                    Math.abs(e.pos.x - x) < (e.width + w)/2 && 
+                    Math.abs(e.pos.y - y) < (e.height + h)/2);
+            }
         };
 
-        // 執行 Setup
         if (entry.setup) entry.setup(this.demoGame);
-
         this.instructionIdx = 0;
         this.waitTimer = 0;
         this.simFrame = 0;
@@ -16179,19 +16183,14 @@ class TruthBook {
 
     update() {
         if (!this.active || !this.demoGame) return;
-        
-        // --- 隔離性修復：暫時替換全局 game 變量 ---
         const _realGame = window.game;
         window.game = this.demoGame;
-        
         try {
             this.simFrame++;
             const timeDisplay = document.getElementById('truth-sim-time');
             if (timeDisplay && this.simFrame % 5 === 0) {
                 timeDisplay.innerText = `T: ${this.simFrame.toString().padStart(4, '0')}`;
             }
-
-            // 1. 指令執行
             if (this.waitTimer > 0) {
                 this.waitTimer--;
             } else {
@@ -16202,14 +16201,11 @@ class TruthBook {
                     this.instructionIdx = (this.instructionIdx + 1) % loop.length;
                 }
             }
-
-            // 2. 物理模擬
             const ts = 1.0;
             this.demoGame.enemies.forEach(e => e.update(ts, this.demoGame));
             this.demoGame.projectiles.forEach(p => {
                 p.update(this.demoGame.width, this.demoGame.height, this.demoGame.enemies, this.demoGame.spawn_spawnBullet, ts);
             });
-
             this.demoGame.particles.forEach(p => p.update(ts));
             this.demoGame.floatingTexts.forEach(f => {
                 f.update(ts);
@@ -16218,17 +16214,13 @@ class TruthBook {
             });
             this.demoGame.shockwaves.forEach(s => s.update(ts));
             this.demoGame.lightningBolts.forEach(l => l.update(ts));
-            
             this.demoGame.projectiles = this.demoGame.projectiles.filter(p => p.active);
             this.demoGame.particles = this.demoGame.particles.filter(p => p.active);
             this.demoGame.floatingTexts = this.demoGame.floatingTexts.filter(f => f.life > 0);
             this.demoGame.shockwaves = this.demoGame.shockwaves.filter(s => s.alpha > 0);
             this.demoGame.lightningBolts = this.demoGame.lightningBolts.filter(l => l.life > 0);
-            
-            // 3. 渲染
             this.draw();
         } finally {
-            // 恢復全局變量
             window.game = _realGame;
         }
     }
@@ -16240,7 +16232,6 @@ class TruthBook {
             case 'wait': this.waitTimer = inst.frames; break;
             case 'enemy_turn': 
                 const actor = this.demoGame.enemies[inst.targetIdx || 0];
-                // 使用真實的行動邏輯
                 if (actor) this.mainGame.phase_enemy_processTurn.call(this.demoGame, actor);
                 break;
             case 'spawn_projectile':
@@ -16248,11 +16239,7 @@ class TruthBook {
                 const py = inst.y || this.demoGame.height - 150;
                 const angle = -Math.PI/2 + (Math.random()-0.5) * 0.1;
                 const pvel = inst.vel ? new Vec2(inst.vel.x, inst.vel.y) : new Vec2(Math.cos(angle)*15, Math.sin(angle)*15);
-                const cfg = inst.config || {};
-                // 自動設置標記位
-                if (cfg.laser > 0) cfg.isLaser = true;
-                if (cfg.explosive) cfg.explosive = true;
-                this.demoGame.spawn_spawnBullet(px, py, pvel, cfg);
+                this.demoGame.spawn_spawnBullet(px, py, pvel, inst.config || {});
                 break;
             case 'reset':
                 this.waitTimer = inst.delay || 60;
@@ -16278,10 +16265,7 @@ class TruthBook {
         const h = this.viewHeight;
         const gameW = this.demoGame.width;
         const gameH = this.demoGame.height;
-
         ctx.clearRect(0, 0, w, h);
-
-        // 繪製網格背景
         this.gridOffset = (this.gridOffset + 0.5) % 40;
         ctx.strokeStyle = 'rgba(6, 182, 212, 0.1)';
         ctx.lineWidth = 1;
@@ -16289,37 +16273,26 @@ class TruthBook {
         for (let x = 0; x <= w; x += 40) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
         for (let y = this.gridOffset; y <= h; y += 40) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
         ctx.stroke();
-
         ctx.save();
-        // 自適應縮放
         const padding = 20;
         const scale = Math.min((w - padding) / gameW, (h - padding) / gameH);
         const offsetX = (w - gameW * scale) / 2;
         const offsetY = (h - gameH * scale) / 2;
         ctx.translate(offsetX, offsetY);
         ctx.scale(scale, scale);
-
-        // 繪製邊界
         ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 4; ctx.strokeRect(0, 0, gameW, gameH);
-
-        // 渲染實體 (使用它們自己的 draw 方法)
         this.demoGame.enemies.forEach(e => e.draw(ctx));
         this.demoGame.projectiles.forEach(p => p.draw(ctx));
-        this.demoGame.particles.forEach(p => p.update ? p.draw(ctx) : null); // Particle has draw
+        this.demoGame.particles.forEach(p => p.draw ? p.draw(ctx) : null);
         this.demoGame.shockwaves.forEach(s => s.draw(ctx));
         this.demoGame.lightningBolts.forEach(l => l.draw(ctx));
         this.demoGame.floatingTexts.forEach(f => f.draw(ctx));
-
-        // 掃描線特效
         this.scanLineY = (this.scanLineY + 2) % gameH;
         ctx.fillStyle = `rgba(6, 182, 212, 0.1)`;
         ctx.fillRect(0, this.scanLineY, gameW, 2);
-
         ctx.restore();
     }
-}
-
-function hexToRgba(hex, alpha) {
+}\n\nfunction hexToRgba(hex, alpha) {
     let c;
     if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
         c = hex.substring(1).split('');
