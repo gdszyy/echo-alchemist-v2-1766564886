@@ -16169,55 +16169,58 @@ class TruthBook {
 
     update() {
         if (!this.active || !this.demoGame) return;
-        this.simFrame++;
-        const timeDisplay = document.getElementById('truth-sim-time');
-        if (timeDisplay && this.simFrame % 5 === 0) {
-            timeDisplay.innerText = `T: ${this.simFrame.toString().padStart(4, '0')}`;
-        }
-
-        // 1. 指令執行
-        if (this.waitTimer > 0) {
-            this.waitTimer--;
-        } else {
-            const loop = this.currentEntry.loop;
-            if (loop && loop.length > 0) {
-                const inst = loop[this.instructionIdx];
-                this.executeInstruction(inst);
-                this.instructionIdx = (this.instructionIdx + 1) % loop.length;
+        
+        // --- 隔離性修復：暫時替換全局 game 變量 ---
+        const _realGame = window.game;
+        window.game = this.demoGame;
+        
+        try {
+            this.simFrame++;
+            const timeDisplay = document.getElementById('truth-sim-time');
+            if (timeDisplay && this.simFrame % 5 === 0) {
+                timeDisplay.innerText = `T: ${this.simFrame.toString().padStart(4, '0')}`;
             }
+
+            // 1. 指令執行
+            if (this.waitTimer > 0) {
+                this.waitTimer--;
+            } else {
+                const loop = this.currentEntry.loop;
+                if (loop && loop.length > 0) {
+                    const inst = loop[this.instructionIdx];
+                    this.executeInstruction(inst);
+                    this.instructionIdx = (this.instructionIdx + 1) % loop.length;
+                }
+            }
+
+            // 2. 物理模擬
+            const ts = 1.0;
+            this.demoGame.enemies.forEach(e => e.update(ts, this.demoGame));
+            this.demoGame.projectiles.forEach(p => {
+                p.update(this.demoGame.width, this.demoGame.height, this.demoGame.enemies, this.demoGame.spawn_spawnBullet, ts);
+            });
+
+            this.demoGame.particles.forEach(p => p.update(ts));
+            this.demoGame.floatingTexts.forEach(f => {
+                f.update(ts);
+                if (f instanceof FloatingText && f.life <= 0) f.active = false;
+                else if (f.life !== undefined) { f.pos.y -= 0.5; f.life--; }
+            });
+            this.demoGame.shockwaves.forEach(s => s.update(ts));
+            this.demoGame.lightningBolts.forEach(l => l.update(ts));
+            
+            this.demoGame.projectiles = this.demoGame.projectiles.filter(p => p.active);
+            this.demoGame.particles = this.demoGame.particles.filter(p => p.active);
+            this.demoGame.floatingTexts = this.demoGame.floatingTexts.filter(f => f.life > 0);
+            this.demoGame.shockwaves = this.demoGame.shockwaves.filter(s => s.alpha > 0);
+            this.demoGame.lightningBolts = this.demoGame.lightningBolts.filter(l => l.life > 0);
+            
+            // 3. 渲染
+            this.draw();
+        } finally {
+            // 恢復全局變量
+            window.game = _realGame;
         }
-
-        // 2. 物理模擬 (使用真實的 update 方法)
-        const ts = 1.0;
-        // 敵人更新 (傳入 demoGame 作為 game 上下文)
-        this.demoGame.enemies.forEach(e => e.update(ts, this.demoGame));
-        
-        // 子彈更新 (傳入 demoGame 的邊界和敵人列表)
-        this.demoGame.projectiles.forEach(p => {
-            p.game = this.demoGame; // 確保子彈持有環境引用
-            p.update(this.demoGame.width, this.demoGame.height, this.demoGame.enemies, this.demoGame.spawn_spawnBullet, ts);
-        });
-
-        // 其他實體更新
-        this.demoGame.particles.forEach(p => p.update(ts));
-        this.demoGame.floatingTexts.forEach(f => {
-            f.update(ts);
-            // 兼容舊版結構或新類
-            if (f instanceof FloatingText && f.life <= 0) f.active = false;
-            else if (f.life !== undefined) { f.pos.y -= 0.5; f.life--; }
-        });
-        this.demoGame.shockwaves.forEach(s => s.update(ts));
-        this.demoGame.lightningBolts.forEach(l => l.update(ts));
-        
-        // 簡單的清理邏輯
-        this.demoGame.projectiles = this.demoGame.projectiles.filter(p => p.active);
-        this.demoGame.particles = this.demoGame.particles.filter(p => p.active);
-        this.demoGame.floatingTexts = this.demoGame.floatingTexts.filter(f => f.life > 0);
-        this.demoGame.shockwaves = this.demoGame.shockwaves.filter(s => s.alpha > 0);
-        this.demoGame.lightningBolts = this.demoGame.lightningBolts.filter(l => l.life > 0);
-        
-        // 3. 渲染
-        this.draw();
     }
 
     executeInstruction(inst) {
