@@ -7999,91 +7999,109 @@ class TrainingGround {
     }
 
     initUI() {
-        // 创建试炼场 UI 容器
         const ui = document.createElement('div');
         ui.id = 'phase-training';
         ui.className = 'ui-overlay hidden-phase';
-        ui.style.cssText = 'display: none; z-index: 400; background: rgba(2, 6, 23, 0.9); pointer-events: auto; flex-direction: row;';
+        ui.style.cssText = 'display: none; z-index: 400; background: rgba(2, 6, 23, 0.95); pointer-events: auto; flex-direction: column;';
         
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @media (min-width: 768px) {
+                #phase-training { flex-direction: row !important; }
+                #train-side-panel { width: 16rem !important; height: 100% !important; border-right: 1px solid #334155 !important; border-bottom: none !important; }
+                #train-bottom-panel { height: 12rem !important; }
+            }
+            @media (max-width: 767px) {
+                #train-side-panel { width: 100% !important; height: auto !important; max-height: 40% !important; border-bottom: 1px solid #334155 !important; }
+                #train-bottom-panel { height: auto !important; max-height: 50% !important; padding-bottom: env(safe-area-inset-bottom) !important; }
+                #train-attr-grid { grid-template-columns: repeat(2, 1fr) !important; }
+                .train-btn-text { display: none; }
+            }
+        `;
+        document.head.appendChild(style);
+
         ui.innerHTML = `
-            <div class="flex flex-col w-64 bg-slate-900/90 border-r border-slate-700 p-4 overflow-y-auto custom-scrollbar">
-                <h2 class="text-xl font-[Cinzel] text-red-400 mb-4 flex items-center gap-2">
-                    <span>⚔️</span> 敌人配置器
-                </h2>
+            <div id="train-side-panel" class="flex flex-col bg-slate-900/90 p-4 overflow-y-auto custom-scrollbar shrink-0">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-[Cinzel] text-red-400 flex items-center gap-2">
+                        <span>⚔️</span> 敌人配置
+                    </h2>
+                    <button onclick="game.trainingGround.exit()" class="md:hidden w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 text-slate-400">✕</button>
+                </div>
                 
-                <div class="space-y-4">
+                <div class="grid grid-cols-2 md:grid-cols-1 gap-4">
                     <div>
-                        <label class="text-xs text-slate-500 uppercase font-bold">基础血量</label>
-                        <input type="number" id="train-enemy-hp" value="100" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white mt-1">
+                        <label class="text-[10px] text-slate-500 uppercase font-bold">基础血量</label>
+                        <input type="number" id="train-enemy-hp" value="100" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white mt-1 text-sm">
                     </div>
                     
-                    <div>
-                        <label class="text-xs text-slate-500 uppercase font-bold">词缀注入</label>
-                        <div id="train-affix-list" class="grid grid-cols-2 gap-2 mt-2">
-                            <!-- 动态生成词缀按钮 -->
-                        </div>
+                    <div class="col-span-2 md:col-span-1">
+                        <label class="text-[10px] text-slate-500 uppercase font-bold">词缀注入</label>
+                        <div id="train-affix-list" class="grid grid-cols-3 md:grid-cols-2 gap-2 mt-2"></div>
                     </div>
-                    
-                    <button onclick="game.trainingGround.spawnEnemy()" class="w-full py-2 bg-red-600 hover:bg-red-500 text-white rounded font-bold transition-colors mt-4">
-                        召唤敌人
+                </div>
+                
+                <div class="flex gap-2 mt-4">
+                    <button onclick="game.trainingGround.spawnEnemy()" class="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded font-bold transition-colors text-sm">
+                        召唤
                     </button>
-                    
-                    <button onclick="game.trainingGround.clearEnemies()" class="w-full py-2 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold transition-colors">
-                        清空敌人
+                    <button onclick="game.trainingGround.clearEnemies()" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold transition-colors text-sm">
+                        清空
                     </button>
                 </div>
 
-                <div class="mt-8 pt-8 border-t border-slate-800">
-                    <button onclick="game.trainingGround.exit()" class="w-full py-2 border border-slate-600 text-slate-400 hover:text-white hover:border-white rounded transition-all">
+                <div class="mt-auto pt-4 hidden md:block">
+                    <button onclick="game.trainingGround.exit()" class="w-full py-2 border border-slate-600 text-slate-400 hover:text-white hover:border-white rounded transition-all text-sm">
                         返回主界面
                     </button>
                 </div>
             </div>
 
-            <div class="flex-1 relative flex flex-col">
-                <!-- 顶部状态栏 -->
-                <div class="h-12 bg-slate-900/50 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-6">
-                    <div class="text-slate-400 text-sm">
-                        试炼场模式 <span class="text-slate-600 ml-2">| 实时战斗模拟</span>
+            <div class="flex-1 relative flex flex-col min-h-0">
+                <div class="h-10 bg-slate-900/50 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 shrink-0">
+                    <div class="text-slate-400 text-[10px] uppercase tracking-wider">
+                        Combat Simulation
                     </div>
-                    <div id="train-stats" class="text-amber-400 font-mono text-sm">
+                    <div id="train-stats" class="text-amber-400 font-mono text-xs">
                         DPS: 0 | TOTAL: 0
                     </div>
                 </div>
                 
-                <!-- 战斗区域 (Canvas 已经在下面，这里放一些浮层) -->
                 <div class="flex-1 pointer-events-none"></div>
 
-                <!-- 底部子弹编辑器 -->
-                <div class="h-48 bg-slate-900/90 border-t border-slate-700 p-4 flex gap-6 pointer-events-auto">
-                    <div class="w-48 shrink-0">
-                        <h3 class="text-xs text-slate-500 uppercase font-bold mb-2">子弹预览</h3>
-                        <div id="train-bullet-preview" class="w-full h-32 bg-slate-800 rounded-lg border-2 border-dashed border-slate-700 flex items-center justify-center relative overflow-hidden">
-                            <div id="preview-bullet-render" class="w-8 h-8 rounded-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.5)]"></div>
+                <div id="train-bottom-panel" class="bg-slate-900/95 border-t border-slate-700 p-3 flex flex-col md:flex-row gap-4 pointer-events-auto overflow-y-auto">
+                    <div class="flex gap-4 items-center md:items-start">
+                        <div class="w-20 h-20 md:w-32 md:h-32 bg-slate-800 rounded-lg border-2 border-dashed border-slate-700 flex items-center justify-center relative overflow-hidden shrink-0">
+                            <div id="preview-bullet-render" class="w-6 h-6 md:w-8 md:h-8 rounded-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.5)]"></div>
+                        </div>
+                        
+                        <div class="flex-1 md:hidden flex flex-col gap-2">
+                             <button onclick="game.trainingGround.fireBullet()" class="py-3 bg-indigo-600 text-white rounded-lg font-bold active:scale-95">
+                                发射测试
+                            </button>
+                            <button onclick="game.trainingGround.resetBullet()" class="py-1 bg-slate-800 text-slate-400 rounded-lg text-[10px]">
+                                重置
+                            </button>
                         </div>
                     </div>
                     
-                    <div class="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                        <h3 class="text-xs text-slate-500 uppercase font-bold mb-2">配方编辑</h3>
-                        <div id="train-attr-grid" class="grid grid-cols-4 gap-3">
-                            <!-- 动态生成属性调节器 -->
-                        </div>
+                    <div class="flex-1 overflow-y-auto custom-scrollbar">
+                        <div id="train-attr-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2"></div>
                     </div>
 
-                    <div class="w-40 shrink-0 flex flex-col gap-2">
+                    <div class="hidden md:flex w-32 shrink-0 flex-col gap-2">
                         <button onclick="game.trainingGround.fireBullet()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold flex flex-col items-center justify-center transition-all active:scale-95">
-                            <span class="text-2xl">🔥</span>
-                            <span>发射测试</span>
+                            <span class="text-xl">🔥</span>
+                            <span class="text-sm">发射测试</span>
                         </button>
-                        <button onclick="game.trainingGround.resetBullet()" class="py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs">
+                        <button onclick="game.trainingGround.resetBullet()" class="py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px]">
                             重置配方
                         </button>
                     </div>
                 </div>
             </div>
         `;
-        
-        document.body.appendChild(ui);
+    document.body.appendChild(ui);
         this.renderAffixButtons();
         this.renderAttributeControls();
     }
@@ -8173,6 +8191,7 @@ class TrainingGround {
         const height = 60;
         
         const enemy = new Enemy(x, y, width, height, hp, hp, 'normal', [...this.enemyConfig.affixes]);
+        enemy.dropTargetY = y; // 确保敌人不会因为没有目标位置而飞走或不显示
         this.game.enemies.push(enemy);
         
         // 播放音效
@@ -8215,6 +8234,10 @@ class TrainingGround {
         this.game.enemies = [];
         this.game.projectiles = [];
         this.game.particles = [];
+        this.game.roundDamage = 0;
+        this.stats.totalDamage = 0;
+        this.stats.lastTotal = 0;
+        this.stats.dps = 0;
     }
 
     exit() {
@@ -8642,7 +8665,7 @@ class Game {
         this.boardTilt.current.y += (this.boardTilt.target.y - this.boardTilt.current.y) * smoothSpeed;
 
         // 3. 背景层渲染
-        if (this.phase !== 'combat') {
+        if (this.phase !== 'combat' && this.phase !== 'training') {
             this.render_background();
         }
 
@@ -8658,7 +8681,6 @@ if (this.phase === 'truth_book') {
                 this.phase_gathering_update(timeScale);
                 break;
             case 'training':
-            case 'training':
             case 'combat':
                 this.phase_combat_update(timeScale);
                 break;
@@ -8667,8 +8689,8 @@ if (this.phase === 'truth_book') {
         // 5. 特效与文字层渲柑
         this.render_floatingTexts(timeScale);
         
-        // 5.5 风属性锥点渲柑（仅在战斗阶段）
-        if (this.phase === 'combat') {
+        // 5.5 风属性锥点渲柑（仅在战斗阶段或试炼场）
+        if (this.phase === 'combat' || this.phase === 'training') {
             this.render_windAnchors();
             
             // 5.6 风属性法阵激活状态更新与渲柑 (支持多实例并行)
