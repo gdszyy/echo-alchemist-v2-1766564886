@@ -15526,7 +15526,7 @@ const TRUTH_BOOK_DATA = {
             tags: ['基礎', '均衡'],
             desc: '最常見的煉金產物，雖然行動緩慢，但成群結隊時依然具有威脅。',
             setup: (game) => {
-                const e = new Enemy(game.width/2, 150, 60, 60, 50);
+                const e = new Enemy(game.width/2, 200, 60, 60, 100);
                 game.enemies.push(e);
             },
             loop: [
@@ -15545,12 +15545,12 @@ const TRUTH_BOOK_DATA = {
             tags: ['詞綴: 再生', '持久'],
             desc: '核心嵌入了生命精粹的魔像，每回合開始時會修復受損的軀體。',
             setup: (game) => {
-                const e = new Enemy(game.width/2, 150, 60, 60, 40, 100, 'normal', ['regen']);
+                const e = new Enemy(game.width/2, 200, 60, 60, 100, 100, 'normal', ['regen']);
                 game.enemies.push(e);
             },
             loop: [
-                { type: 'log', text: '魔像受到 30 點傷害' },
-                { type: 'damage', value: 30 },
+                { type: 'log', text: '魔像受到傷害' },
+                { type: 'damage', value: 40 },
                 { type: 'wait', frames: 60 },
                 { type: 'log', text: '觸發 [再生] 效果' },
                 { type: 'enemy_turn' },
@@ -15565,76 +15565,73 @@ const TRUTH_BOOK_DATA = {
             tags: ['詞綴: 護盾', '高防'],
             desc: '周身環繞著力場護盾，能大幅削減受到的物理衝擊。',
             setup: (game) => {
-                const e = new Enemy(game.width/2, 150, 60, 60, 100, 100, 'normal', ['shield']);
+                const e = new Enemy(game.width/2, 200, 60, 60, 200, 200, 'normal', ['shield']);
                 game.enemies.push(e);
             },
             loop: [
                 { type: 'log', text: '發射普通彈丸' },
-                { type: 'spawn_projectile', config: { damage: 10 } },
-                { type: 'wait', frames: 120 },
-                { type: 'log', text: '護盾減少了 50% 的傷害' },
+                { type: 'spawn_projectile', config: { damage: 20, bounce: 1 } },
+                { type: 'wait', frames: 180 },
+                { type: 'log', text: '護盾大幅削減了傷害' },
                 { type: 'wait', frames: 60 },
-                { type: 'reset', delay: 60 }
-            ]
-        },
-        {
-            id: 'healer_golem',
-            name: '祭司魔像',
-            icon: '✨',
-            tags: ['詞綴: 治療', '輔助'],
-            desc: '不具備直接戰鬥能力，但會持續為周圍的友軍提供能量修復。',
-            setup: (game) => {
-                const e1 = new Enemy(game.width/2 - 60, 150, 50, 50, 20, 100);
-                const e2 = new Enemy(game.width/2 + 60, 150, 60, 60, 100, 100, 'normal', ['healer']);
-                game.enemies.push(e1, e2);
-            },
-            loop: [
-                { type: 'log', text: '友軍受傷...' },
-                { type: 'damage', targetIdx: 0, value: 40 },
-                { type: 'wait', frames: 60 },
-                { type: 'log', text: '祭司釋放治療波' },
-                { type: 'enemy_turn', targetIdx: 1 },
-                { type: 'wait', frames: 120 },
                 { type: 'reset', delay: 60 }
             ]
         }
     ],
     attributes: [
         {
-            id: 'cryo',
-            name: '冰霜',
-            icon: '❄️',
-            tags: ['控制', '低溫'],
-            desc: '降低敵人的分子活性。積累低溫可使敵人進入凍結狀態，跳過其行動回合。',
+            id: 'scatter',
+            name: '散射',
+            icon: '🏹',
+            tags: ['範圍', '多重'],
+            desc: '彈丸在飛行過程中會向四周散射出小型碎片，覆蓋更廣的區域。',
             setup: (game) => {
-                const e = new Enemy(game.width/2, 150, 60, 60, 100);
-                game.enemies.push(e);
+                const e1 = new Enemy(game.width/2 - 100, 200, 50, 50, 50);
+                const e2 = new Enemy(game.width/2, 150, 50, 50, 50);
+                const e3 = new Enemy(game.width/2 + 100, 200, 50, 50, 50);
+                game.enemies.push(e1, e2, e3);
             },
             loop: [
-                { type: 'log', text: '注入冰霜能量' },
-                { type: 'spawn_projectile', config: { damage: 0, cryo: 60 } },
-                { type: 'wait', frames: 60 },
-                { type: 'log', text: '目標溫度下降，產生寒氣' },
-                { type: 'wait', frames: 120 },
+                { type: 'log', text: '發射散射彈丸' },
+                { type: 'spawn_projectile', config: { damage: 10, scatter: 5, bounce: 1 } },
+                { type: 'wait', frames: 240 },
                 { type: 'reset', delay: 60 }
             ]
         },
         {
-            id: 'pyro',
-            name: '火焰',
-            icon: '🔥',
-            tags: ['傷害', '高溫'],
-            desc: '極端的高溫會破壞魔像的結構。當溫度超過臨界點時，魔像會持續崩潰。',
+            id: 'explosive',
+            name: '爆炸',
+            icon: '💥',
+            tags: ['AOE', '高傷'],
+            desc: '擊中目標或牆壁時引發劇烈爆炸，對範圍內的所有敵人造成毀滅性打擊。',
             setup: (game) => {
-                const e = new Enemy(game.width/2, 150, 60, 60, 100);
-                game.enemies.push(e);
+                const e1 = new Enemy(game.width/2, 200, 60, 60, 100);
+                const e2 = new Enemy(game.width/2 - 40, 180, 40, 40, 50);
+                const e3 = new Enemy(game.width/2 + 40, 180, 40, 40, 50);
+                game.enemies.push(e1, e2, e3);
             },
             loop: [
-                { type: 'log', text: '注入火焰能量' },
-                { type: 'spawn_projectile', config: { damage: 0, pyro: 120 } },
-                { type: 'wait', frames: 60 },
-                { type: 'log', text: '目標過熱，開始持續受損' },
-                { type: 'wait', frames: 120 },
+                { type: 'log', text: '發射爆炸彈丸' },
+                { type: 'spawn_projectile', config: { damage: 20, explosive: true, bounce: 1 } },
+                { type: 'wait', frames: 200 },
+                { type: 'reset', delay: 60 }
+            ]
+        },
+        {
+            id: 'pierce',
+            name: '穿透',
+            icon: '⚡',
+            tags: ['直線', '多重打擊'],
+            desc: '強大的動能使彈丸能夠穿透敵人，對直線上的所有目標造成傷害。',
+            setup: (game) => {
+                for(let i=0; i<4; i++) {
+                    game.enemies.push(new Enemy(game.width/2, 100 + i*80, 50, 50, 50));
+                }
+            },
+            loop: [
+                { type: 'log', text: '發射穿透彈丸' },
+                { type: 'spawn_projectile', config: { damage: 15, pierce: 3 } },
+                { type: 'wait', frames: 150 },
                 { type: 'reset', delay: 60 }
             ]
         }
@@ -15706,10 +15703,10 @@ class TruthBook {
     }
 
     startDemo(entry) {
-        // 初始化演示沙盒
+        // 初始化演示沙盒，复用主游戏的物理参数
         this.demoGame = {
-            width: this.canvas.width,
-            height: this.canvas.height,
+            width: 600, // 逻辑宽度
+            height: 800, // 逻辑高度
             enemies: [],
             projectiles: [],
             particles: [],
@@ -15718,10 +15715,13 @@ class TruthBook {
             spores: [],
             fireWaves: [],
             sonSwords: [],
+            sonSwordQueue: [],
+            swordQis: [],
             lightningBolts: [],
             enemyHeight: 60,
             enemyWidth: 60,
             timeScale: 1.0,
+            hasCombatWall: true, // 演示窗强制开启反弹墙
             // 模拟核心方法
             spawn_createParticle: (x, y, color, mode) => {
                 const p = new Particle(x, y, color, mode);
@@ -15734,15 +15734,16 @@ class TruthBook {
             spawn_createShockwave: (x, y, color) => {
                 this.demoGame.shockwaves.push({ pos: new Vec2(x, y), color, radius: 0, maxRadius: 100, life: 30 });
             },
-            calc_isAreaOccupied: () => false,
-            damageEnemy: (enemy, proj) => {
-                // 复用主游戏的伤害逻辑，但需要简化或模拟
-                const dmg = proj.config.damage || 0;
+            spawn_spawnBullet: (x, y, vel, recipe) => {
+                const p = new Projectile(x, y, vel, recipe);
+                this.demoGame.projectiles.push(p);
+            },
+            combat_damageEnemy: (enemy, proj) => {
+                const dmg = proj.config.damage || 10;
                 enemy.hp -= dmg;
-                if (proj.config.cryo) enemy.temp -= proj.config.cryo;
-                if (proj.config.pyro) enemy.temp += proj.config.pyro;
                 this.demoGame.spawn_createFloatingText(enemy.pos.x, enemy.pos.y, `-${dmg}`, '#fff');
-            }
+            },
+            calc_isAreaOccupied: () => false
         };
 
         entry.setup(this.demoGame);
@@ -15764,10 +15765,10 @@ class TruthBook {
             this.instructionIdx = (this.instructionIdx + 1) % this.currentEntry.loop.length;
         }
 
-        // 2. 模拟更新
+        // 2. 模拟更新 (复用真实类的方法)
         const ts = 1.0;
         this.demoGame.enemies.forEach(e => e.update(ts, this.demoGame));
-        this.demoGame.projectiles.forEach(p => p.update(this.demoGame.width, this.demoGame.height, this.demoGame.enemies, null, ts));
+        this.demoGame.projectiles.forEach(p => p.update(this.demoGame.width, this.demoGame.height, this.demoGame.enemies, (x,y,v,r)=>this.demoGame.spawn_spawnBullet(x,y,v,r), ts));
         this.demoGame.particles.forEach((p, i) => {
             p.update(ts);
             if (!p.active) this.demoGame.particles.splice(i, 1);
@@ -15840,15 +15841,28 @@ class TruthBook {
             ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(this.canvas.width, y); ctx.stroke();
         }
 
-        // 绘制实体 (复用原有绘制逻辑的简化版)
-        this.demoGame.enemies.forEach(e => this.drawEnemy(e));
-        this.demoGame.projectiles.forEach(p => this.drawProjectile(p));
+        ctx.save();
+        // 缩放渲染：将 600x800 的逻辑空间缩放到 400x300 的 Canvas
+        const scaleX = this.canvas.width / this.demoGame.width;
+        const scaleY = this.canvas.height / this.demoGame.height;
+        const scale = Math.min(scaleX, scaleY);
+        ctx.translate((this.canvas.width - this.demoGame.width * scale) / 2, (this.canvas.height - this.demoGame.height * scale) / 2);
+        ctx.scale(scale, scale);
+
+        // 绘制墙壁边界
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(0, 0, this.demoGame.width, this.demoGame.height);
+
+        // 绘制实体 (复用真实类的 draw 方法)
+        this.demoGame.enemies.forEach(e => e.draw(ctx));
+        this.demoGame.projectiles.forEach(p => p.draw(ctx));
         this.demoGame.particles.forEach(p => p.draw(ctx));
         
         // 绘制浮动文字
         this.demoGame.floatingTexts.forEach(f => {
             ctx.fillStyle = f.color;
-            ctx.font = 'bold 14px sans-serif';
+            ctx.font = 'bold 24px sans-serif'; // 逻辑空间较大，字体调大
             ctx.textAlign = 'center';
             ctx.fillText(f.text, f.pos.x, f.pos.y);
         });
@@ -15862,39 +15876,7 @@ class TruthBook {
             ctx.stroke();
             ctx.globalAlpha = 1.0;
         });
-    }
-
-    drawEnemy(e) {
-        const ctx = this.ctx;
-        ctx.save();
-        ctx.translate(e.pos.x, e.pos.y + e.bumpOffsetY);
-        
-        // 身体
-        ctx.fillStyle = '#1e293b';
-        ctx.strokeStyle = e.temp > 0 ? '#f97316' : (e.temp < 0 ? '#06b6d4' : '#475569');
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.roundRect(-e.width/2, -e.height/2, e.width, e.height, 8);
-        ctx.fill();
-        ctx.stroke();
-
-        // 血条
-        const bw = e.width * 0.8;
-        const bh = 4;
-        ctx.fillStyle = '#000';
-        ctx.fillRect(-bw/2, -e.height/2 - 10, bw, bh);
-        ctx.fillStyle = '#ef4444';
-        ctx.fillRect(-bw/2, -e.height/2 - 10, bw * (e.hp / e.maxHp), bh);
-
         ctx.restore();
-    }
-
-    drawProjectile(p) {
-        const ctx = this.ctx;
-        ctx.beginPath();
-        ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI*2);
-        ctx.fillStyle = '#fff';
-        ctx.fill();
     }
 }
 
