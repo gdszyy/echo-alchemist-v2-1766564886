@@ -8014,20 +8014,51 @@ class TrainingGround {
         style.innerHTML = `
             @media (min-width: 768px) {
                 #phase-training { flex-direction: row !important; }
-                #train-side-panel { width: 16rem !important; height: 100% !important; border-right: 1px solid #334155 !important; border-bottom: none !important; }
-                #train-bottom-panel { height: 12rem !important; }
+                #train-side-panel { width: 18rem !important; height: 100% !important; border-right: 1px solid #334155 !important; border-bottom: none !important; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+                #train-side-panel.collapsed { transform: translateX(-100%); }
+                #train-bottom-panel { height: 14rem !important; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+                #train-bottom-panel.collapsed { transform: translateY(100%); }
+                #train-toggle-side { left: 18rem; top: 50%; transform: translateY(-50%); }
+                #train-side-panel.collapsed + #train-main-area #train-toggle-side { left: 0; }
+                #train-toggle-bottom { bottom: 14rem; left: 50%; transform: translateX(-50%); }
+                #train-bottom-panel.collapsed { transform: translateY(100%); }
             }
             @media (max-width: 767px) {
-                #train-side-panel { width: 100% !important; height: auto !important; max-height: 40% !important; border-bottom: 1px solid #334155 !important; }
-                #train-bottom-panel { height: auto !important; max-height: 50% !important; padding-bottom: env(safe-area-inset-bottom) !important; }
+                #train-side-panel { width: 100% !important; height: auto !important; max-height: 40% !important; border-bottom: 1px solid #334155 !important; transition: transform 0.3s; }
+                #train-side-panel.collapsed { transform: translateY(-100%); }
+                #train-bottom-panel { height: auto !important; max-height: 50% !important; padding-bottom: env(safe-area-inset-bottom) !important; transition: transform 0.3s; }
+                #train-bottom-panel.collapsed { transform: translateY(100%); }
                 #train-attr-grid { grid-template-columns: repeat(2, 1fr) !important; }
                 .train-btn-text { display: none; }
+            }
+            .train-toggle-btn {
+                position: absolute;
+                z-index: 500;
+                background: rgba(30, 41, 59, 0.8);
+                backdrop-blur: md;
+                border: 1px solid #475569;
+                color: #94a3b8;
+                padding: 4px 8px;
+                font-size: 10px;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .train-toggle-btn:hover { background: #334155; color: white; }
+            #simulation-viewport {
+                position: relative;
+                overflow: hidden;
+                background: rgba(15, 23, 42, 0.3);
+                border: 2px solid rgba(51, 65, 85, 0.5);
+                border-radius: 8px;
+                margin: 10px;
+                box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
             }
         `;
         document.head.appendChild(style);
 
         ui.innerHTML = `
-            <div id="train-side-panel" class="flex flex-col bg-slate-900/90 p-4 overflow-y-auto custom-scrollbar shrink-0">
+            <div id="train-side-panel" class="flex flex-col bg-slate-900/95 p-4 overflow-y-auto custom-scrollbar shrink-0 relative z-10">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-[Cinzel] text-red-400 flex items-center gap-2">
                         <span>⚔️</span> 敌人配置
@@ -8069,9 +8100,14 @@ class TrainingGround {
                 </div>
             </div>
 
-            <div class="flex-1 relative flex flex-col min-h-0">
-                <div class="h-10 bg-slate-900/50 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 shrink-0">
-                    <div class="text-slate-400 text-[10px] uppercase tracking-wider">
+            <div id="train-main-area" class="flex-1 relative flex flex-col min-h-0">
+                <button id="train-toggle-side" onclick="game.trainingGround.togglePanel('side')" class="train-toggle-btn hidden md:block">
+                    ◀ 面板
+                </button>
+                
+                <div class="h-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 shrink-0 z-20">
+                    <div class="text-slate-400 text-[10px] uppercase tracking-wider flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
                         Combat Simulation
                     </div>
                     <div id="train-stats" class="text-amber-400 font-mono text-xs">
@@ -8079,9 +8115,16 @@ class TrainingGround {
                     </div>
                 </div>
                 
-                <div class="flex-1 pointer-events-none"></div>
+                <div class="flex-1 flex items-center justify-center p-4 overflow-hidden relative">
+                    <div id="simulation-viewport" class="w-full h-full max-w-[600px] max-height-[800px] pointer-events-none">
+                        <!-- 这是一个视觉占位符，实际渲染仍在底层的 Canvas 上 -->
+                    </div>
+                    <button id="train-toggle-bottom" onclick="game.trainingGround.togglePanel('bottom')" class="train-toggle-btn absolute bottom-0">
+                        ▼ 属性
+                    </button>
+                </div>
 
-                <div id="train-bottom-panel" class="bg-slate-900/95 border-t border-slate-700 p-3 flex flex-col md:flex-row gap-4 pointer-events-auto overflow-y-auto">
+                <div id="train-bottom-panel" class="bg-slate-900/95 border-t border-slate-700 p-3 flex flex-col md:flex-row gap-4 pointer-events-auto overflow-y-auto relative z-10">
                     <div class="flex gap-4 items-center md:items-start">
                         <div class="w-20 h-20 md:w-32 md:h-32 bg-slate-800 rounded-lg border-2 border-dashed border-slate-700 flex items-center justify-center relative overflow-hidden shrink-0">
                             <div id="preview-bullet-render" class="w-6 h-6 md:w-8 md:h-8 rounded-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.5)]"></div>
@@ -8262,6 +8305,7 @@ class TrainingGround {
 
     enter() {
         this.active = true;
+        this.game.hasCombatWall = true; // 试炼场强制开启底墙
         this.game.phase_switchPhase('training');
         document.getElementById('phase-training').style.display = 'flex';
         document.getElementById('phase-training').classList.remove('hidden-phase');
@@ -8282,10 +8326,28 @@ class TrainingGround {
 
     exit() {
         this.active = false;
+        this.game.hasCombatWall = false; // 退出时重置
         document.getElementById('phase-training').style.display = 'none';
         document.getElementById('phase-training').classList.remove('active-phase');
         document.getElementById('phase-training').classList.add('hidden-phase');
         this.game.phase_switchPhase('meta');
+    }
+
+    togglePanel(type) {
+        const panelId = type === 'side' ? 'train-side-panel' : 'train-bottom-panel';
+        const btnId = type === 'side' ? 'train-toggle-side' : 'train-toggle-bottom';
+        const panel = document.getElementById(panelId);
+        const btn = document.getElementById(btnId);
+        
+        const isCollapsed = panel.classList.toggle('collapsed');
+        
+        if (type === 'side') {
+            btn.innerText = isCollapsed ? '▶ 面板' : '◀ 面板';
+        } else {
+            btn.innerText = isCollapsed ? '▲ 属性' : '▼ 属性';
+            // 调整按钮位置
+            btn.style.bottom = isCollapsed ? '0' : '';
+        }
     }
 }
 
@@ -8695,6 +8757,32 @@ class Game {
         }
 
         this.ctx.save();
+        
+        // [新增] 试炼场局部缩放逻辑
+        if (this.phase === 'training') {
+            const viewport = document.getElementById('simulation-viewport');
+            if (viewport) {
+                const rect = viewport.getBoundingClientRect();
+                const canvasRect = this.canvas.getBoundingClientRect();
+                
+                // 计算 viewport 相对于 canvas 的偏移
+                const offsetX = rect.left - canvasRect.left;
+                const offsetY = rect.top - canvasRect.top;
+                
+                // 计算缩放比例 (将原本全屏的内容缩放到 viewport 大小)
+                const scaleX = rect.width / this.width;
+                const scaleY = rect.height / this.height;
+                const scale = Math.min(scaleX, scaleY);
+                
+                // 应用变换：先移动到 viewport 位置，再进行缩放
+                this.ctx.translate(offsetX + (rect.width - this.width * scale) / 2, offsetY + (rect.height - this.height * scale) / 2);
+                this.ctx.scale(scale, scale);
+                
+                // 保存当前的变换矩阵，用于输入坐标转换
+                this.trainingTransform = { offsetX, offsetY, scale, viewportRect: rect };
+            }
+        }
+
         // 应用震动偏移
         this.ctx.translate(shakeX, shakeY); 
 
@@ -9448,9 +9536,30 @@ if (this.phase === 'truth_book') {
         // 辅助函数：获取鼠标/触摸在 Canvas 上的相对位置
         const handler = (e) => {
             const rect = this.canvas.getBoundingClientRect(); 
-            const x = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX; 
-            const y = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY; 
-            return new Vec2(x - rect.left, y - rect.top);
+            let x = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX; 
+            let y = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY; 
+            
+            let canvasX = x - rect.left;
+            let canvasY = y - rect.top;
+
+            // [新增] 试炼场坐标映射
+            if (this.phase === 'training' && this.trainingTransform) {
+                const t = this.trainingTransform;
+                // 检查点击是否在 viewport 内
+                if (x >= t.viewportRect.left && x <= t.viewportRect.right &&
+                    y >= t.viewportRect.top && y <= t.viewportRect.bottom) {
+                    
+                    // 逆向变换：(canvas坐标 - 偏移) / 缩放
+                    // 注意：这里的偏移需要考虑 viewport 居中带来的额外偏移
+                    const actualOffsetX = t.offsetX + (t.viewportRect.width - this.width * t.scale) / 2;
+                    const actualOffsetY = t.offsetY + (t.viewportRect.height - this.height * t.scale) / 2;
+                    
+                    canvasX = (canvasX - actualOffsetX) / t.scale;
+                    canvasY = (canvasY - actualOffsetY) / t.scale;
+                }
+            }
+
+            return new Vec2(canvasX, canvasY);
         };
         // 绑定输入事件到 Canvas 和 Window
         this.canvas.addEventListener('mousedown', e => this.phase_handleInputStart(handler(e))); 
