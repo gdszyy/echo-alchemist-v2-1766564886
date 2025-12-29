@@ -1711,7 +1711,8 @@ const SKILL_DB = [
             roundMult: 5,
             // 闪电相关参数
             boltColor: '#c084fc', // 闪电颜色
-            flashColor: 'rgba(192, 132, 252, 0.2)'
+            flashColor: 'rgba(192, 132, 252, 0.2)',
+            chainLevel: 15 // [新增] 技能自带的闪电等级 (15级 = 每次弹跳伤害+20%)
         }
     },
     { 
@@ -10197,8 +10198,9 @@ if (this.phase === 'truth_book') {
                     // 4. [关键] 触发连锁
                     // 我们调用已有的 triggerLightningChain，把当前敌人 e 作为源头
                     // 传递 [e] 作为历史记录，防止闪电瞬间弹回给自己
-                    // 连锁伤害通常比主伤害低一点，这里设定为 100% 或 80% 皆可，暂时用 100%
-                    this.combat_lightning_triggerChain(e, dmg, [e]);
+                    // 使用 p.chainLevel (如果配置了) 或者默认 15 级
+                    const skillChainLevel = p.chainLevel || 15; 
+                    this.combat_lightning_triggerChain(e, dmg, [e], skillChainLevel);
 
                     if (killed) this.spawn_addScore(e.maxHp);
                 }
@@ -11541,16 +11543,17 @@ if (this.phase === 'truth_book') {
         if (config.cryo > 0) enemy.applyTemp(-CONFIG.balance.cryoAmount * config.cryo); 
         if (config.pyro > 0) enemy.applyTemp(CONFIG.balance.pyroAmount * config.pyro); 
         if (config.lightning > 0) {
-             // 1. 尝试触发闪电链，并获取结果
-             const isChainTriggered = this.combat_lightning_triggerChain(enemy, dmg, projectile.chainHistory); 
-             
-             // 2. 只有在成功触发闪电链时，才提升当前敌人的温度
-             if (isChainTriggered) {
-                 enemy.applyTemp(config.lightning); 
-             }
-             
-             projectile.chainHistory.push(enemy); 
-        }
+	             // 1. 尝试触发闪电链，并获取结果
+	             // [修改] 传入当前闪电等级 (config.lightning)
+	             const isChainTriggered = this.combat_lightning_triggerChain(enemy, dmg, projectile.chainHistory, config.lightning); 
+	             
+	             // 2. 只有在成功触发闪电链时，才提升当前敌人的温度
+	             if (isChainTriggered) {
+	                 enemy.applyTemp(config.lightning); 
+	             }
+	             
+	             projectile.chainHistory.push(enemy); 
+	        }
 
         const damageResult = enemy.takeDamage(dmg);
         const killed = damageResult.killed;
@@ -13348,7 +13351,7 @@ if (this.phase === 'truth_book') {
      * @description 触发连锁闪电效果 (修复单体报错版)
      * @returns {boolean} 是否成功触发了闪电链
      */
-    combat_lightning_triggerChain(sourceEnemy, dmg, history) {
+    combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1) {
         // [修复1] 安全检查
         if (!sourceEnemy || !sourceEnemy.pos) return false;
 
@@ -13400,6 +13403,13 @@ if (this.phase === 'truth_book') {
                         this.spawn_createParticle(closest.pos.x, closest.pos.y, '#c084fc', 'spark');
                     }
                     
+                    // [核心修改] 计算下一次伤害
+                    // 公式：D = 0.55 - 0.05 * Level
+                    // NextDmg = CurrentDmg * (1 - D)
+                    // 化简：Factor = 1 - (0.55 - 0.05*L) = 0.45 + 0.05*L
+                    const decayFactor = 0.45 + (0.05 * level);
+                    const nextDmg = Math.max(1, Math.floor(dmg * decayFactor));
+
                     // 伤害与状态
                     closest.applyTemp(CONFIG.balance.lightningTempIncrease); 
                     const killed = closest.takeDamage(dmg); 
@@ -13408,7 +13418,7 @@ if (this.phase === 'truth_book') {
                     
                     // 递归
                     history.push(closest); 
-                    this.combat_lightning_triggerChain(closest, dmg, history); 
+                    this.combat_lightning_triggerChain(closest, nextDmg, history, level); 
                 }, delay);
                 
                 return true;
