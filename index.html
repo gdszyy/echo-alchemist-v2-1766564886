@@ -7995,6 +7995,12 @@ class TrainingGround {
             isMatryoshka: false,
             type: 'normal'
         };
+        this.stats = {
+            totalDamage: 0,
+            lastTotal: 0,
+            dps: 0,
+            startTime: 0
+        };
         this.initUI();
     }
 
@@ -8002,7 +8008,7 @@ class TrainingGround {
         const ui = document.createElement('div');
         ui.id = 'phase-training';
         ui.className = 'ui-overlay hidden-phase';
-        ui.style.cssText = 'display: none; z-index: 400; background: rgba(2, 6, 23, 0.95); pointer-events: auto; flex-direction: column;';
+        ui.style.cssText = 'display: none; z-index: 400; background: transparent; pointer-events: auto; flex-direction: column;';
         
         const style = document.createElement('style');
         style.innerHTML = `
@@ -8223,6 +8229,31 @@ class TrainingGround {
         this.updateBulletPreview();
     }
 
+    update() {
+        if (!this.active) return;
+        
+        // 更新伤害统计
+        this.stats.totalDamage = this.game.roundDamage;
+        
+        // 简单的 DPS 计算 (每秒更新一次或每帧平滑)
+        if (this.stats.totalDamage > 0 && this.stats.startTime === 0) {
+            this.stats.startTime = Date.now();
+        }
+        
+        if (this.stats.startTime > 0) {
+            const duration = (Date.now() - this.stats.startTime) / 1000;
+            if (duration > 0.5) {
+                this.stats.dps = Math.floor(this.stats.totalDamage / duration);
+            }
+        }
+        
+        // 更新 UI
+        const statsEl = document.getElementById('train-stats');
+        if (statsEl) {
+            statsEl.innerText = `DPS: ${this.stats.dps.toLocaleString()} | TOTAL: ${Math.floor(this.stats.totalDamage).toLocaleString()}`;
+        }
+    }
+
     enter() {
         this.active = true;
         this.game.phase_switchPhase('training');
@@ -8238,6 +8269,7 @@ class TrainingGround {
         this.stats.totalDamage = 0;
         this.stats.lastTotal = 0;
         this.stats.dps = 0;
+        this.stats.startTime = 0;
     }
 
     exit() {
