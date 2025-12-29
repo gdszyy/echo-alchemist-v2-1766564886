@@ -8301,24 +8301,47 @@ class TrainingGround {
     }
 
     fireBullet() {
-        // 构造配方
+        // 构造配方 (浅拷贝)
         const recipe = { ...this.bulletConfig };
+
+        // --- [修复 1]：自动推导特殊属性的类型和标志位 ---
+        // 游戏主逻辑依赖 recipe.type 和 recipe.isLaser，而不仅仅是数值
         
-        // [修复] 处理风属性和子母剑属性的等级映射
-        if (recipe.wind > 0) recipe.wind_lv = this.bulletConfig.wind_lv || 1;
-        if (recipe.flying_sword > 0) recipe.flying_sword_lv = this.bulletConfig.flying_sword_lv || 1;
+        // 1. 飞剑修复：如果有飞剑点数，强制设置类型为 flying_sword
+        if (recipe.flying_sword > 0) {
+            recipe.type = 'flying_sword';
+            // 同步等级，确保生成的子剑等级正确
+            recipe.level = this.bulletConfig.flying_sword_lv || 1;
+        }
+
+        // 2. 激光修复：如果有激光点数，强制开启 isLaser 开关
+        if (recipe.laser > 0) {
+            recipe.isLaser = true;
+        }
+
+        // 3. 风属性修复：确保等级传递
+        if (recipe.wind > 0) {
+            recipe.level = this.bulletConfig.wind_lv || 1;
+            // 兼容性：某些逻辑可能检查 wind_lv
+            recipe.wind_lv = recipe.level;
+        }
 
         // 试炼场发射逻辑：从底部中央向上发射
         const x = this.game.width / 2;
         const y = this.game.height - 100;
         
-        // [优化] 随机角度发射 (-30度 到 30度)
+        // [优化] 随机角度发射 (-30度 到 30度)，模拟真实散布
         const angle = (Math.random() - 0.5) * Math.PI / 3;
         const vel = new Vec2(0, -15).rotate(angle);
-        
-        // [修复] 试炼场子弹标记为 isLast，确保风属性锚点能正常生成
-        this.game.spawn_spawnBullet(x, y, vel, recipe, true);
-        
+
+        // --- [修复 2]：修正参数传递顺序 ---
+        // spawnBullet 定义: (x, y, vel, recipe, shotId, isLast)
+        // 我们需要传递:
+        // shotId: null (或生成的唯一ID，这里null即可)
+        // isLast: true (关键！必须为 true 才能触发风属性锚点生成)
+        this.game.spawn_spawnBullet(x, y, vel, recipe, null, true);
+
+        // 记录开始时间用于计算 DPS
         if (this.stats.startTime === 0) this.stats.startTime = Date.now();
     }
 
