@@ -8171,25 +8171,19 @@ class TrainingGround {
         const container = document.getElementById('train-affix-list');
         if (!container) return;
         
-        // 从 CONFIG.balance.affixes 动态获取词条，并定义对应的名称和图标
-        const affixMeta = {
-            shield: { name: '护盾', icon: '🛡️' },
-            haste: { name: '极速', icon: '⚡' },
-            regen: { name: '再生', icon: '💚' },
-            clone: { name: '分身', icon: '🦠' },
-            berserk: { name: '狂暴', icon: '😡' },
-            healer: { name: '治疗', icon: '💖' },
-            devour: { name: '吞噬', icon: '👅' },
-            jump: { name: '跳跃', icon: '🦘' }
-        };
-
-        // 动态构建词条列表，过滤掉无效词条，并加入精英选项
-        const affixes = Object.keys(CONFIG.balance.affixes)
-            .filter(id => affixMeta[id])
-            .map(id => ({ id, ...affixMeta[id] }));
-        
-        // 加入精英词条
-        affixes.push({ id: 'elite', name: '精英', icon: '💀' });
+        // 定义有效的词条列表及其元数据
+        // 这些 ID 必须与 Enemy 类中 includes() 判断的字符串一致
+        const affixes = [
+            { id: 'elite', name: '精英', icon: '💀' },
+            { id: 'shield', name: '护盾', icon: '🛡️' },
+            { id: 'haste', name: '极速', icon: '⚡' },
+            { id: 'regen', name: '再生', icon: '💚' },
+            { id: 'clone', name: '分身', icon: '🦠' },
+            { id: 'berserk', name: '狂暴', icon: '😡' },
+            { id: 'healer', name: '治疗', icon: '💖' },
+            { id: 'devour', name: '吞噬', icon: '👅' },
+            { id: 'jump', name: '跳跃', icon: '🦘' }
+        ];
         
         container.innerHTML = affixes.map(afx => `
             <button onclick="game.trainingGround.toggleAffix('${afx.id}')" 
