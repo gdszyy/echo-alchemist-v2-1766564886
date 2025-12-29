@@ -16047,6 +16047,8 @@ class TruthBook {
             activeWindMatrices: [], windAnchors: [],
             enemyHeight: 60, enemyWidth: 60, timeScale: 1.0,
             hasCombatWall: true,
+            roundDamage: 0, currentShotDamage: 0, currentShotDamageByAttr: {},
+            shotDamageMap: new Map(),
             
             // 粒子系統
             spawn_createParticle: (x, y, color, mode) => {
@@ -16137,7 +16139,15 @@ class TruthBook {
             },
 
             // 碰撞檢測 Mock
-            calc_isAreaOccupied: () => false
+            calc_isAreaOccupied: () => false,
+            
+            // 戰鬥記錄 Mock
+            combat_recordDamage: (amount, attrType = 'damage', shotId = null) => {
+                this.demoGame.roundDamage += amount;
+                if (!this.demoGame.currentShotDamageByAttr[attrType]) this.demoGame.currentShotDamageByAttr[attrType] = 0;
+                this.demoGame.currentShotDamageByAttr[attrType] += amount;
+            },
+            ui_updateRoundDamage: () => {} // 演示環境不需要更新主 UI
         };
 
         // 執行 Setup
