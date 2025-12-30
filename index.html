@@ -6354,677 +6354,259 @@ class SonSword {
     }
 }
 class Projectile {
-    constructor(x, y, vel, config, isCopy = false, shotId = null, isLast = false) {
+    constructor(x, y, vel, config, isEnemyShot = false, shotId = null, isLast = false) {
         this.pos = new Vec2(x, y);
-        this.vel = new Vec2(vel.x, vel.y); // 创建vel的副本，避免共享引用
-        this.config = config;
+        this.vel = vel;
+        this.config = config || {};
+        this.isEnemyShot = isEnemyShot;
         this.shotId = shotId;
-        this.isLast = isLast;
-        this.maxBounces = config.bounce || 0;
-        this.maxPierces = config.pierce || 0;
-        const params = Projectile.calculateVisualParams(config, isCopy);
-        this.radius = params.radius; 
-        this.intensity = params.intensity;
+        this.radius = CONFIG.physics.bulletRadius;
         this.active = true;
-        this.isCopy = isCopy;
-        this.bouncesLeft = config.bounce || 0;
-        this.piercesLeft = config.pierce || 0;
-        this.hasAreaDamage = config.damage > 0;
-        this.maxDurability = (this.maxBounces + this.maxPierces) || 1;
-        this.hitCooldowns = new Map();
-        this.rotation = 0;
-        this.windBladeAngle = 0; // 风属性环绕风刃的旋转角度
-        this.lifeTime = 60 * 30; // [修改] 加倍子弹生命时间 (从15秒增加到30秒)
-        this.chainHistory = [];
-        this.trail = [];      
-        this.deformation = { x: 1, y: 1 }; 
-        this.targetDeformation = { x: 1, y: 1 }; 
-        this.elasticity = 0.2;
-        this.crackSeed = [];
-        this.lastHitEnemy = null;
-        for(let i=0; i<3; i++) {
-            this.crackSeed.push({
-                angle: Math.random() * Math.PI * 2,
-                len: 0.3 + Math.random() * 0.4,
-                jagged: (Math.random() - 0.5) * 0.5
-            });
+        this.destroyed = false;
+        
+        // 属性状态
+        this.bouncesLeft = this.config.bounce || 0;
+        this.piercesLeft = this.config.pierce || 0;
+        
+        // 视觉
+        this.trail = [];
+        this.maxTrail = 5;
+        this.color = '#fff';
+        
+        // [新增] 动态绑定游戏实例，默认为全局 game，但在模拟器中会被覆盖
+        this.game = window.game; 
+        
+        // 状态标记
+        this.isLast = isLast; // 是否为连射的最后一发
+        this.hitCooldowns = new Map(); // 防止单帧多次伤害同一敌人
+        
+        // 飞剑逻辑
+        if (this.config.type === 'flying_sword') {
+            this.state = 'flying'; // flying, stuck, recalling
+            this.stuckTarget = null;
+            this.stuckOffset = new Vec2(0,0);
+            this.recallSpeed = 0;
+            this.life = 999;
         }
-    }
-
-    static calculateVisualParams(config, isCopy) {
-        const v = CONFIG.visuals;
-        let r = v.baseRadius + Math.min(v.maxSizeBonus, (config.damage - 2) * v.damageGrowth);
-        if (isCopy) r *= v.copyScale;
-        if (config.explosive) r *= v.explosiveScale;
-        if (config.pierce > 0) r *= v.arrowScale;
-        let glow = 1.0 + (config.damage * v.glowPerDamage) / 10;
-        glow = Math.min(v.maxGlow / v.glowBase, glow);
-        return { radius: r, intensity: glow };
+        
+        // [新增] 连锁记录 (防止无限连锁)
+        this.chainHistory = []; 
     }
 
     update(width, height, enemies, spawnCallback, timeScale) {
         if (!this.active) return;
-        // 更新风属性环绕风刃的旋转角度
-        if (this.config.wind) {
-            this.windBladeAngle += 0.15 * timeScale;
-        }
-        if (this.config.pierce > 0) {
-            this.rotation = Math.atan2(this.vel.y, this.vel.x);
-        } else if (this.config.scatter > 0) {
-            this.rotation += 0.3 * timeScale; 
-        } else {
-            this.rotation += 0.1 * timeScale;
-        }
-        if (this.config.bounce > 0) {
-            const speed = this.vel.mag();
-            if (speed > 1) {
-                const wobble = 1.0 + Math.sin(Date.now() / 100) * 0.1;
-                this.targetDeformation = { x: 1/wobble, y: wobble };
+        
+        // 使用 this.game 获取当前环境的实例 (MainGame || DemoGame)
+        const currentGame = this.game || window.game;
+
+        // --- 飞剑特殊逻辑 ---
+        if (this.config.type === 'flying_sword' && this.state !== 'flying') {
+            if (this.state === 'stuck') {
+                if (this.stuckTarget && this.stuckTarget.active) {
+                    this.pos = this.stuckTarget.pos.add(this.stuckOffset);
+                } else {
+                    this.state = 'recalling';
+                }
+            } else if (this.state === 'recalling') {
+                const target = {x: width/2, y: height - 50}; // 回收目标
+                const dir = new Vec2(target.x - this.pos.x, target.y - this.pos.y).norm();
+                this.recallSpeed += 1 * timeScale;
+                this.pos = this.pos.add(dir.mult(this.recallSpeed * timeScale));
+                if (Math.abs(this.pos.y - target.y) < 20) {
+                    this.active = false;
+                    this.destroyed = true;
+                }
             }
+            return;
         }
-        this.deformation.x += (this.targetDeformation.x - this.deformation.x) * this.elasticity * timeScale;
-        this.deformation.y += (this.targetDeformation.y - this.deformation.y) * this.elasticity * timeScale;
-        this.trail.push({x: this.pos.x, y: this.pos.y});
-        if (this.trail.length > 8) this.trail.shift();
-        for (const [enemy, timer] of this.hitCooldowns) {
-            if (timer > 0) this.hitCooldowns.set(enemy, timer - timeScale);
-            else this.hitCooldowns.delete(enemy);
-        }
-        this.lifeTime -= timeScale;
-        if (this.lifeTime <= 0) { this.destroy(spawnCallback); return; }
-        const fullMove = this.vel.mult(timeScale);
-        const totalSpeed = fullMove.mag();
-        let potentialEnemies = [];
-        if (totalSpeed > this.radius) {
-            potentialEnemies = enemies.filter(e => e.active && this.pos.dist(e.pos) < (totalSpeed + e.width));
-        } else {
-            potentialEnemies = enemies.filter(e => e.active && this.pos.dist(e.pos) < (this.radius + e.width));
-        }
-        const steps = Math.ceil(totalSpeed / (this.radius * 0.8));
-        const subStepVel = fullMove.mult(1 / steps);
-        for (let s = 0; s < steps; s++) {
-            this._applyMove(subStepVel, width, height, spawnCallback);
-            if (!this.active) return;
-            for (let e of potentialEnemies) {
+
+        // --- 常规子弹逻辑 ---
+        
+        // 物理更新 (分步检测以防穿墙)
+        const speed = this.vel.mag();
+        const steps = Math.ceil(speed / (this.radius)); 
+        const subStepVel = this.vel.mult(timeScale / steps);
+
+        for(let s=0; s<steps; s++) {
+            this.pos = this.pos.add(subStepVel);
+            
+            // 1. 边界/墙壁碰撞
+            // 左右墙壁
+            if (this.pos.x < this.radius) {
+                this.pos.x = this.radius;
+                this.vel.x *= -1;
+                this.onWallBounce(currentGame);
+            } else if (this.pos.x > width - this.radius) {
+                this.pos.x = width - this.radius;
+                this.vel.x *= -1;
+                this.onWallBounce(currentGame);
+            }
+            
+            // 顶部墙壁
+            if (this.pos.y < this.radius) {
+                this.pos.y = this.radius;
+                this.vel.y *= -1;
+                this.onWallBounce(currentGame);
+            }
+            
+            // 底部 (只有拥有底墙遗物或在试炼场/模拟器中才反弹)
+            const hasWall = currentGame.hasCombatWall || currentGame.isDemo;
+            if (this.pos.y > height - this.radius) {
+                if (hasWall && (this.bouncesLeft > 0 || this.piercesLeft > 0)) {
+                    this.pos.y = height - this.radius;
+                    this.vel.y *= -1;
+                    // 消耗一次弹射或穿透
+                    if (this.bouncesLeft > 0) this.bouncesLeft--;
+                    else if (this.piercesLeft > 0) this.piercesLeft--;
+                    
+                    this.onWallBounce(currentGame);
+                } else {
+                    this.active = false;
+                    this.destroyed = true;
+                    return;
+                }
+            }
+
+            // 2. 敌人碰撞
+            for (let e of enemies) {
                 if (!e.active) continue;
-                const dx = this.pos.x - e.pos.x;
-                const dy = this.pos.y - e.pos.y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist < (e.width/2 + this.radius)) {
-                    if (this.hitCooldowns.has(e)) continue;
-                    this.hitCooldowns.set(e, CONFIG.gameplay.hitCooldowns);
-                    this.lastHitEnemy = e;
-                    this.onHit(e, enemies);
-                    if (this.config.flying_sword) {
-                        if (typeof game !== 'undefined') game.combat_flyingSword_assignTarget(e);
-                    }
+                // 简单的圆形碰撞
+                const distSq = this.pos.distSq(e.pos);
+                const hitRadius = (e.width / 2 + this.radius);
+                
+                if (distSq < hitRadius * hitRadius) {
+                    // 冷却检查
+                    if (this.hitCooldowns.get(e) > 0) continue;
+                    this.hitCooldowns.set(e, 10); // 10帧内不再命中同一敌人
+
+                    // 触发命中逻辑
+                    this.onHit(e, currentGame);
+                    
+                    // 穿透逻辑
                     if (this.piercesLeft > 0) {
-                        if (this.config.flying_sword) {
-                            const pegLevel = this.config.level || 1;
-                            if (this.hasAreaDamage) this.performSlashAttack(e, game.enemies);
-                            if (typeof game !== 'undefined') {
-                                const spawnX = e.pos.x + (Math.random()-0.5)*20;
-                                const spawnY = e.pos.y + (Math.random()-0.5)*20;
-                                game.combat_flyingSword_addSon(spawnX, spawnY, this, pegLevel, this.config);
-                            }
-                        }
                         this.piercesLeft--;
-                        continue;
-                    }
-                    if (this.bouncesLeft > 0) {
+                        // 穿透时不改变方向，稍微减速
+                        // this.vel = this.vel.mult(0.95);
+                    } 
+                    // 弹射逻辑
+                    else if (this.bouncesLeft > 0) {
                         this.bouncesLeft--;
-                        if (this.config.wind && this.isLast) {
-                            if (typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage);
-                        }
-                        // --- 修复开始：AABB 矩形法线计算与位置修正 ---
-                        const halfW = e.width / 2;
-                        const halfH = e.height / 2;
                         
-                        let normal;
-                        if (Math.abs(dx / halfW) > Math.abs(dy / halfH)) {
-                            normal = new Vec2(Math.sign(dx), 0);
-                            // 位置修正：将子弹推到敌人边缘，防止钻入
-                            this.pos.x = e.pos.x + normal.x * (halfW + this.radius + 0.1);
-                        } else {
-                            normal = new Vec2(0, Math.sign(dy));
-                            // 位置修正：将子弹推到敌人边缘，防止钻入
-                            this.pos.y = e.pos.y + normal.y * (halfH + this.radius + 0.1);
-                        }
-                        
-                        // 反弹向量计算
+                        // 简单的法线反弹 (假设敌人是圆的)
+                        const normal = this.pos.sub(e.pos).norm();
                         const dot = this.vel.dot(normal);
-                        // 只有当速度方向指向敌人内部时才反弹，防止被卡住
                         if (dot < 0) {
                             this.vel = this.vel.sub(normal.mult(2 * dot));
                         }
-                        // --- 修复结束 ---
-                        this.deformation = { x: 1.4, y: 0.6 };
-                    } else {
-                        this.destroy(spawnCallback);
-                        return;
+                        
+                        // 风属性：最后一击生成锚点
+                        if (this.config.wind && this.isLast) {
+                            if (currentGame.combat_wind_addAnchor) {
+                                currentGame.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage);
+                            }
+                        }
+                    } 
+                    // 销毁
+                    else {
+                        this.active = false;
+                        this.destroyed = true;
+                        
+                        // 飞剑插在敌人身上
+                        if (this.config.type === 'flying_sword') {
+                            this.state = 'stuck';
+                            this.active = true; // 保持活跃但不移动
+                            this.destroyed = false;
+                            this.stuckTarget = e;
+                            this.stuckOffset = this.pos.sub(e.pos);
+                            e.stuckSwords.push(this);
+                        }
+                        
+                        // 爆炸逻辑
+                        if (this.config.explosive) {
+                            if (currentGame.spawn_createExplosion) {
+                                // [Point 6 Fix] 使用 currentGame 确保特效生成在正确的 Canvas
+                                currentGame.spawn_createExplosion(this.pos.x, this.pos.y, this.config.pyro ? '#f97316' : '#ef4444');
+                            }
+                            // 范围伤害
+                            enemies.forEach(other => {
+                                if (other.active && other.pos.dist(this.pos) < 100) {
+                                    currentGame.combat_damageEnemy(other, this, this.config.damage * 1.5);
+                                }
+                            });
+                        }
+                        return; 
                     }
                 }
             }
         }
-        if (this.config.explosive) {
-            if (Math.random() < 0.7) {
-                const spark = new Particle(this.pos.x, this.pos.y, '#fbbf24', 'spark');
-                spark.vel = this.vel.mult(-0.2).add(new Vec2((Math.random()-0.5)*2, (Math.random()-0.5)*2));
-                game.particles.push(spark);
-            }
-        }
-    }
-
-    _applyMove(vel, width, height, spawnCallback) {
-        this.pos = this.pos.add(vel);
         
-        // [优化] 在 Demo 模式下强制开启底墙
-        const hasBottomWall = (this.game && this.game.isDemo) ? true : game.hasCombatWall;
-
-        if (this.pos.x < this.radius) { 
-            this.pos.x = this.radius; this.vel.x = Math.abs(this.vel.x); 
-            if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
-            const angle = Math.abs(Math.atan2(this.vel.x, this.vel.y));
-            if (angle < (10 * Math.PI / 180)) {
-                const speed = this.vel.mag();
-                const newAngle = angle + (1 * Math.PI / 180);
-                this.vel.x = speed * Math.sin(newAngle);
-                this.vel.y = speed * Math.cos(newAngle) * (this.vel.y > 0 ? 1 : -1);
-            }
-            if(this.config.bounce > 0) this.deformation = { x: 0.7, y: 1.3 };
-            this.hitCooldowns.clear();
-        }
-        if (this.pos.x > width - this.radius) { 
-            this.pos.x = width - this.radius; this.vel.x = -Math.abs(this.vel.x); 
-            if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
-            const angle = Math.abs(Math.atan2(this.vel.x, this.vel.y));
-            if (angle < (10 * Math.PI / 180)) {
-                const speed = this.vel.mag();
-                const newAngle = angle + (1 * Math.PI / 180);
-                this.vel.x = -speed * Math.sin(newAngle);
-                this.vel.y = speed * Math.cos(newAngle) * (this.vel.y > 0 ? 1 : -1);
-            }
-            if(this.config.bounce > 0) this.deformation = { x: 0.7, y: 1.3 };
-            this.hitCooldowns.clear();
-        }
-        if (this.pos.y < this.radius) { 
-            this.pos.y = this.radius; this.vel.y = Math.abs(this.vel.y); 
-            if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
-            if(this.config.bounce > 0) this.deformation = { x: 1.3, y: 0.7 };
-        }
-        if (this.pos.y > height - this.radius) {
-            if (hasBottomWall) {
-                this.pos.y = height - this.radius; this.vel.y = -Math.abs(this.vel.y);
-                if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
-                
-                // [修复] 底部护盾反弹不消耗反弹次数
-                if(this.config.bounce > 0) this.deformation = { x: 1.3, y: 0.7 };
-                this.hitCooldowns.clear();
-            } else {
-                this.destroy(spawnCallback);
-            }
-        }
-    }
-
-    onHit(enemy, allEnemies) {
-        game.combat_damageEnemy(enemy, this);
-    }
-
-    performSlashAttack(target, enemies) {
-        const angle = Math.random() * Math.PI * 2;
-        const length = 160; 
-        const width = 40;   
-        const center = target.pos;
-        const halfLen = length / 2;
-        const dir = new Vec2(Math.cos(angle), Math.sin(angle));
-        const p1 = center.add(dir.mult(-halfLen));
-        const p2 = center.add(dir.mult(halfLen));
-
-        if (typeof game !== 'undefined') {
-            let slashColor = CONFIG.colors.flying_sword || '#0ea5e9';
-            if (this.config.lightning > 0) slashColor = '#c084fc'; 
-            else if (this.config.pyro > 0) slashColor = '#f97316';
-            else if (this.config.cryo > 0) slashColor = '#06b6d4';
-            game.particles.push(new SlashEffect(center.x, center.y, angle, length, slashColor));
-            audio.playSlash();
-        }
-
-        enemies.forEach(other => {
-            if (!other.active) return;
-            const E = other.pos;
-            const AB = p2.sub(p1);      
-            const AE = E.sub(p1);       
-            const lenSq = AB.dot(AB);
-            let t = (lenSq === 0) ? -1 : AE.dot(AB) / lenSq;
-            t = Math.max(0, Math.min(1, t));
-            const closest = p1.add(AB.mult(t));
-            const dist = E.dist(closest); 
-            const hitRadius = (other.width / 2) + (width / 2);
-            if (dist < hitRadius) {
-                const slashConfig = {
-                    ...this.config,
-                    damage: Math.ceil(this.config.damage * 0.6)
-                };
-                game.combat_damageEnemy(other, {
-                    config: slashConfig,
-                    pos: closest, 
-                    isCopy: true
-                });
-                if (other !== target) {
-                    other.addSwordMark(1);
-                }
-            }
+        // 更新 Hit Cooldowns
+        this.hitCooldowns.forEach((val, key) => {
+            if (val > 0) this.hitCooldowns.set(key, val - 1);
+            else this.hitCooldowns.delete(key);
         });
+
+        // 拖尾
+        this.trail.push({x: this.pos.x, y: this.pos.y});
+        if (this.trail.length > this.maxTrail) this.trail.shift();
     }
 
-    destroy(spawnCallback) {
-        this.active = false; this.destroyed = true;
-        if (this.config.nestedPayload && !this.isCopy) {
-             let nextVel = this.vel.norm().mult(this.vel.mag() * 1.1); 
-             if (nextVel.mag() < 2) nextVel = new Vec2(0, -5);
-             spawnCallback({ x: this.pos.x, y: this.pos.y, vel: nextVel, config: this.config.nestedPayload });
-        } else if (this.config.chainPayload && !this.isCopy) {
-            let nextVel = this.vel; if (nextVel.mag() < 1) nextVel = new Vec2(0, 5);
-            spawnCallback({ x: this.pos.x, y: this.pos.y, vel: nextVel.norm().mult(10), config: this.config.chainPayload });
-        }
-        if (this.config.type === 'flying_sword') {
-            if (this.lastHitEnemy && this.lastHitEnemy.active) this.stickToEnemy(this.lastHitEnemy);
-            else this.handleFlyingSwordFinish(null, game);
-        }
-    }
-
-    stickToEnemy(enemy) {
-        if (typeof game !== 'undefined') {
-            const pegLevel = this.config.level || 1;
-            const hitAngle = Math.atan2(this.vel.y, this.vel.x);
-            const randomAngle = hitAngle + (Math.random() - 0.5) * (Math.PI / 6);
-            const randomOffsetX = (Math.random() - 0.5) * (enemy.width * 0.6);
-            const randomOffsetY = (Math.random() - 0.5) * (enemy.height * 0.6);
-            const stuckPos = enemy.pos.add(new Vec2(randomOffsetX, randomOffsetY));
-            
-            // 使用 game.combat_flyingSword_addSon 而不是直接 new SonSword，以保持逻辑一致性
-            const stuckBlade = game.combat_flyingSword_addSon(stuckPos.x, stuckPos.y, this, pegLevel, this.config, true);
-            
-            this.performSlashAttack(enemy, game.enemies);
-
-            game.sonSwords.forEach(s => {
-                if (s.mother === this && s !== stuckBlade && s.active) {
-                    if (pegLevel === 1) {
-                        s.active = false;
-                        game.spawn_createParticle(s.pos.x, s.pos.y, '#0ea5e9', 'mist');
-                    } 
-                    else if (pegLevel === 2) {
-                        s.attacksLeft = s.maxAttacks; 
-                        s.isAutoHunting = true;       
-                        game.spawn_createFloatingText(s.pos.x, s.pos.y, "RESET", "#6366f1");
-                    } 
-                    else if (pegLevel >= 3) {
-                        s.isAutoHunting = true; 
-                    }
-                }
-            });
-        }
-    }
-
-    handleFlyingSwordFinish(host, game, isBottomExit = false) {
-        let targetPos = null;
-        if (host) {
-            targetPos = host.pos;
-        } else if (!isBottomExit && this.lastHitEnemy && this.lastHitEnemy.active) {
-            targetPos = this.lastHitEnemy.pos;
-        } else {
-            targetPos = { x: game.width / 2, y: game.height - 80 };
-        }
-
-        game.sonSwords.forEach(s => {
-            const level = s.level || 1;
-            if (s.mother === this && s.active) {
-                if (level >= 3) {
-                    s.state = 'flying'; 
-                    s.isAutoHunting = true; 
-                    s.mother = null; 
-                    game.spawn_createFloatingText(s.pos.x, s.pos.y, "HUNT", "#f43f5e");
-                } else if (level === 2) {
-                    s.triggerRecall(targetPos);
-                } else {
-                    s.active = false; 
-                    game.spawn_createParticle(s.pos.x, s.pos.y, '#0ea5e9', 'mist');
-                }
+    onWallBounce(gameInstance) {
+        // [Point 5 Fix] 墙壁反弹时触发风属性锚点生成
+        if (this.config.wind && this.isLast) {
+            if (gameInstance && gameInstance.combat_wind_addAnchor) {
+                gameInstance.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage);
             }
-        });
+        }
+    }
+
+    onHit(enemy, gameInstance) {
+        if (!gameInstance) return;
+        
+        // 造成伤害
+        gameInstance.combat_damageEnemy(enemy, this);
+        
+        // 激光/光球逻辑 (如果不是瞬发的，而是作为一个触发器)
+        if (this.config.isLaser && gameInstance.combat_triggerLaser) {
+            gameInstance.combat_triggerLaser(this.pos, this.vel, this.config);
+        }
     }
 
     draw(ctx) {
-        if (!this.active && !this.destroyed) return;
-        const integrity = (this.bouncesLeft + this.piercesLeft) / (this.maxDurability || 1);
-        Projectile.drawVisuals(ctx, this.pos.x, this.pos.y, this.radius, this.config, this.rotation, this.intensity, this.deformation, integrity, this.crackSeed, this.windBladeAngle);
-    }
+        if (!this.active && !this.state) return;
+        
+        // 绘制拖尾
+        if (this.trail.length > 1) {
+            ctx.beginPath();
+            ctx.moveTo(this.trail[0].x, this.trail[0].y);
+            for(let i=1; i<this.trail.length; i++) ctx.lineTo(this.trail[i].x, this.trail[i].y);
+            ctx.strokeStyle = this.config.pyro ? '#fdba74' : (this.config.cryo ? '#cffafe' : '#fff');
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
 
-    static drawVisuals(ctx, x, y, radius, config, rotation, intensity, deformation = {x:1, y:1}, integrity = 1.0, crackSeed = [], windBladeAngle = 0) {
+        // 绘制本体
         ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(rotation);
-        if (config.type === 'flying_sword') {
-            // 修正角度：假設畫筆是朝右(0度)畫的，如果原圖是朝上則需旋轉
-            // 這裡我們直接畫朝右的劍，與 velocity 方向一致
-            const scale = radius / 6; // 根據半徑動態調整大小 (基礎半徑約7~10)
-            // 1. 劍身發光 (Spirit Aura) - 隨耐久度減弱
-            ctx.shadowBlur = 15 * intensity * integrity;
-            ctx.shadowColor = '#0ea5e9'; // 青色光暈
-            // 2. 劍身 (Blade) - 雙刃劍，指向右側
-            ctx.beginPath();
-            ctx.moveTo(32 * scale, 0);       // 劍尖 (最右)
-            ctx.lineTo(8 * scale, -4 * scale); // 上刃
-            ctx.lineTo(-12 * scale, -4 * scale); // 劍身後段
-            ctx.lineTo(-12 * scale, 4 * scale);  // 劍身後段
-            ctx.lineTo(8 * scale, 4 * scale);  // 下刃
-            ctx.closePath();
-            // 劍刃金屬漸變 (橫向)
-            const bladeGrad = ctx.createLinearGradient(-10 * scale, -5*scale, -10 * scale, 5*scale);
-            bladeGrad.addColorStop(0, '#e0f2fe');   // 亮白邊緣
-            bladeGrad.addColorStop(0.5, '#0284c7'); // 深青中脊 (立體感)
-            bladeGrad.addColorStop(1, '#e0f2fe');   // 亮白邊緣
-            ctx.fillStyle = bladeGrad;
-            ctx.fill();
-            // 劍脊線 (Ridge)
-            ctx.beginPath();
-            ctx.moveTo(30 * scale, 0);
-            ctx.lineTo(-12 * scale, 0);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-            // 3. 劍格 (Guard) - 祥雲/蝙蝠紋飾
-            ctx.shadowBlur = 5;
-            ctx.shadowColor = '#f59e0b';
-            ctx.fillStyle = '#fbbf24'; // 金色
-            ctx.beginPath();
-            // 畫一個橫向的菱形或雲紋
-            ctx.moveTo(-10 * scale, 0);
-            ctx.quadraticCurveTo(-10 * scale, -10 * scale, -14 * scale, -8 * scale); // 上翼
-            ctx.lineTo(-14 * scale, 8 * scale); // 下翼
-            ctx.quadraticCurveTo(-10 * scale, 10 * scale, -10 * scale, 0);
-            ctx.fill();
-            // 4. 劍柄 (Hilt)
-            ctx.fillStyle = '#451a03'; // 深褐色木柄
-            ctx.fillRect(-22 * scale, -2 * scale, 10 * scale, 4 * scale);
-            // 5. 劍首 (Pommel)
-            ctx.beginPath();
-            ctx.arc(-24 * scale, 0, 3 * scale, 0, Math.PI * 2);
-            ctx.fillStyle = '#fbbf24';
-            ctx.fill();
-            // 6. 劍穗 (Tassel) - 隨時間飄動的紅穗
-            // 使用 Math.sin 模擬風吹效果
-            const time = Date.now() / 100;
-            const swing = Math.sin(time) * 3 * scale;
-            ctx.beginPath();
-            ctx.moveTo(-26 * scale, 0); // 連接劍首
-            // 貝塞爾曲線模擬向後飄動 (向左)
-            ctx.bezierCurveTo(
-                -35 * scale, swing,           // 控制點1
-                -40 * scale, -swing,          // 控制點2
-                -50 * scale, swing * 0.5      // 終點
-            );
-            ctx.shadowColor = '#ef4444';
-            ctx.shadowBlur = 5;
-            ctx.strokeStyle = '#ef4444'; // 紅色
-            ctx.lineWidth = 2;
-            ctx.lineCap = 'round';
-            ctx.stroke();
-            ctx.restore();
-            return; // *** 繪製完畢，直接返回，跳过原本的圆球繪製 ***
-        }
+        ctx.translate(this.pos.x, this.pos.y);
         
-        // 1. 确定形状
-        let shapeType = 'circle';
-        if (config.pierce > 0) shapeType = 'arrow';
-        if (config.scatter > 0) shapeType = 'star';
-        if (config.isLaser) shapeType = 'orb';
-        if (config.isMatryoshka) shapeType = 'matryoshka';
-        if (config.wind) shapeType = 'crystal'; // 风属性使用菱形
-
-        // 2. 决定颜色
-        let mainColors = [];
-        let glowColors = [];
-        
-        if (config.isLaser) { 
-            mainColors.push('#ffffff'); // 核心纯白
-            glowColors.push(CONFIG.colors.laser); // 外圈天蓝
-        }
-        if (config.type === 'rainbow') { mainColors.push('rainbow'); glowColors.push('#ffffff'); }
-        if (config.explosive) { mainColors.push('#fff'); glowColors.push('#ef4444'); }
-        if (config.pyro > 0) { mainColors.push('#fdba74'); glowColors.push('#f97316'); }
-        if (config.cryo > 0) { mainColors.push('#cffafe'); glowColors.push('#06b6d4'); }
-        if (config.lightning > 0) { mainColors.push('#f3e8ff'); glowColors.push('#c084fc'); }
-        if (config.wind) { mainColors.push('#d1fae5'); glowColors.push('#34d399'); } // 风属性颜色
-        if (config.pierce > 0 && mainColors.length === 0) { mainColors.push('#fee2e2'); glowColors.push('#ef4444'); }
-        if (mainColors.length === 0) {
-            if (config.bounce > 0) { mainColors.push('#dcfce7'); glowColors.push('#22c55e'); }
-            else { mainColors.push('#f1f5f9'); glowColors.push('#94a3b8'); }
-        }
-        const mainColor = mainColors[mainColors.length - 1];
-        const glowColor = glowColors[glowColors.length - 1];
-        if (config.explosive && integrity > 0.1) {
-            const time = Date.now();
-            const pulse = (Math.sin(time / 50) + 1) / 2; 
-            if (pulse > 0.7) {
-                mainColors[mainColors.length - 1] = '#ffffff'; 
-                glowColors[glowColors.length - 1] = '#fca5a5'; 
-                intensity *= 1.5; 
-            }
-            const scaleMod = 1.0 + pulse * 0.15;
-            deformation.x *= scaleMod;
-            deformation.y *= scaleMod;
-            const shakeAmount = 1.5; 
-            ctx.translate((Math.random() - 0.5) * shakeAmount, (Math.random() - 0.5) * shakeAmount);
-        }
-        // ---  光球的特殊渲染逻辑 (绑定特效) ---
-        if (shapeType === 'orb') {
-            const time = Date.now() / 200;
-            const pulse = Math.sin(time) * 0.1 + 1.0; 
-            const laserPower = config.laser || 0;
-            const sizeMod = 1 + (laserPower * 0.1); 
-            ctx.shadowBlur = 20 * intensity * sizeMod;
-            ctx.shadowColor = glowColor;
-            ctx.fillStyle = glowColor;
-            ctx.globalAlpha = 0.4;
+        // 飞剑绘制
+        if (this.config.type === 'flying_sword') {
+            ctx.rotate(Math.atan2(this.vel.y, this.vel.x) + Math.PI/2);
+            ctx.fillStyle = '#0ea5e9';
             ctx.beginPath();
-            ctx.arc(0, 0, radius * 1.2 * pulse * sizeMod, 0, Math.PI * 2);
+            ctx.moveTo(0, -10); ctx.lineTo(4, 5); ctx.lineTo(0, 3); ctx.lineTo(-4, 5);
             ctx.fill();
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = '#fff';
-            ctx.fillStyle = '#ffffff';
-            ctx.globalAlpha = 1.0;
-            ctx.beginPath();
-            ctx.arc(0, 0, radius * 0.8 * sizeMod, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-            return; 
-        }
-        // 3. 绘制形状
-        ctx.scale(deformation.x, deformation.y);
-        ctx.beginPath();
-        if (shapeType === 'arrow') {
-            const arrowScale = 1.8; 
-            ctx.moveTo(radius * arrowScale, 0); 
-            ctx.lineTo(-radius * 0.8, radius * 0.7); 
-            ctx.lineTo(-radius * 0.3, 0); 
-            ctx.lineTo(-radius * 0.8, -radius * 0.7); 
-        } else if (shapeType === 'star') {
-            for (let i = 0; i < 4; i++) {
-                ctx.rotate(Math.PI / 2);
-                ctx.lineTo(radius, 0);
-                ctx.lineTo(radius * 0.4, radius * 0.4);
-            }
-        } else if (shapeType === 'crystal') { 
-            ctx.moveTo(0, -radius * 1.3);
-            ctx.lineTo(radius * 0.8, 0);
-            ctx.lineTo(0, radius * 1.3);
-            ctx.lineTo(-radius * 0.8, 0);
-        } else if (shapeType === 'matryoshka') {
-             ctx.arc(0, 0, radius, 0, Math.PI * 2);
         } else {
-            if (config.pyro > 0) {
-                const time = Date.now() / 50;
-                for (let i = 0; i <= 30; i++) {
-                    const angle = (i / 30) * Math.PI * 2;
-                    const wave1 = Math.sin(time + angle * 3) * (radius * 0.15);
-                    const wave2 = Math.sin(time * 1.5 + angle * 7) * (radius * 0.08);
-                    const r = radius + wave1 + wave2;
-                    ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
-                }
-            } else {
-                ctx.arc(0, 0, radius, 0, Math.PI * 2);
-            }
-        }
-        ctx.closePath();
-        ctx.shadowBlur = CONFIG.visuals.glowBase * intensity * integrity; 
-        ctx.shadowColor = glowColor;
-        if (mainColor === 'rainbow') {
-            const grad = ctx.createLinearGradient(-radius, -radius, radius, radius);
-            grad.addColorStop(0, '#fca5a5');
-            grad.addColorStop(0.25, '#facc15');
-            grad.addColorStop(0.5, '#4ade80');
-            grad.addColorStop(0.75, '#60a5fa');
-            grad.addColorStop(1, '#c084fc');
-            ctx.fillStyle = grad;
-        } else {
-            ctx.fillStyle = mainColor;
-        }
-        ctx.fill();
-        if (integrity < 1.0) {
-            ctx.fillStyle = `rgba(0, 0, 0, ${0.6 - 0.6 * integrity})`; 
-            ctx.fill();
-        }
-        if (config.cryo > 0) {
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            // 普通球体
+            ctx.fillStyle = this.config.explosive ? '#fca5a5' : '#fff';
             ctx.beginPath();
-            if (shapeType === 'arrow') {
-                ctx.moveTo(0, -radius * 0.25); ctx.lineTo(radius*0.3, 0); ctx.lineTo(0, radius*0.25); ctx.lineTo(-radius*0.3, 0);
-            } else if (shapeType === 'crystal') {
-                ctx.moveTo(0, -radius * 0.6); 
-                ctx.lineTo(radius * 0.3, 0); 
-                ctx.lineTo(0, radius * 0.6); 
-                ctx.lineTo(-radius * 0.3, 0);
-            } else {
-                for(let i=0; i<6; i++) {
-                    const a = i * Math.PI / 3;
-                    const r = radius * 0.5;
-                    ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
-                }
-            }
+            ctx.arc(0, 0, this.radius, 0, Math.PI*2);
             ctx.fill();
         }
-        if (integrity < 0.6 && crackSeed && crackSeed.length > 0) {
-            ctx.save();
-            ctx.shadowBlur = 0; 
-            ctx.lineWidth = 1.5; 
-            ctx.strokeStyle = 'rgba(30, 41, 59, 0.8)'; 
-            ctx.clip(); 
-            crackSeed.forEach(seed => {
-                ctx.beginPath();
-                ctx.moveTo(0, 0); 
-                const r = radius * seed.len;
-                const endX = Math.cos(seed.angle) * r;
-                const endY = Math.sin(seed.angle) * r;
-                const midX = endX * 0.5 + Math.cos(seed.angle + Math.PI/2) * (radius * seed.jagged);
-                const midY = endY * 0.5 + Math.sin(seed.angle + Math.PI/2) * (radius * seed.jagged);
-                ctx.lineTo(midX, midY);
-                ctx.lineTo(endX, endY);
-                ctx.stroke();
-            });
-            ctx.restore();
-        }
-        if (config.bounce > 0 && integrity < 0.2) {
-            ctx.strokeStyle = '#475569'; 
-            ctx.lineWidth = 2;
-            ctx.stroke(); 
-        }
-        if (config.lightning > 0) {
-            ctx.save();
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.globalCompositeOperation = 'lighter'; 
-            const arcCount = 1 + Math.floor(config.lightning / 2);
-            ctx.shadowBlur = 8 + config.lightning;
-            ctx.shadowColor = '#a855f7'; 
-            ctx.strokeStyle = '#e9d5ff'; 
-            for (let k = 0; k < arcCount; k++) {
-                ctx.beginPath();
-                const startAngle = Math.random() * Math.PI * 2;
-                const arcLen = 0.5 + Math.random() * 0.5; 
-                const segments = 3 + Math.floor(Math.random() * 2);
-                for (let i = 0; i <= segments; i++) {
-                    const t = i / segments;
-                    const currentAngle = startAngle + t * arcLen;
-                    const jitter = (Math.random() - 0.5) * (radius * 0.3);
-                    const dist = radius * 1.2 + jitter;
-                    const px = Math.cos(currentAngle) * dist;
-                    const py = Math.sin(currentAngle) * dist;
-                    if (i === 0) ctx.moveTo(px, py);
-                    else ctx.lineTo(px, py);
-                }
-                ctx.lineWidth = 0.8 + Math.random() * 1.2;
-                ctx.stroke();
-            }
-            if (Math.random() < 0.2) {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-                ctx.beginPath();
-                ctx.arc(0, 0, radius * 0.8, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            ctx.restore();
-        }
-        if (config.isMatryoshka) {
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = '#d946ef'; 
-            ctx.beginPath(); ctx.arc(0, -radius*0.2, radius*0.4, 0, Math.PI*2); ctx.fill(); 
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; 
-            ctx.beginPath(); ctx.arc(0, 0, radius*0.8, 0, Math.PI*2); ctx.stroke();
-        }
-        // 风属性环绕风刃特效
-        if (config.wind && config.wind > 0) {
-            ctx.save();
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = '#34d399';
-            const bladeCount = Math.min(3 + config.wind, 6); // 根据风属性等级决定风刃数量
-            const orbitRadius = radius * 1.8; // 环绕轨道半径
-            
-            for (let i = 0; i < bladeCount; i++) {
-                const angle = windBladeAngle + (i * Math.PI * 2 / bladeCount);
-                const bladeX = Math.cos(angle) * orbitRadius;
-                const bladeY = Math.sin(angle) * orbitRadius;
-                
-                ctx.save();
-                ctx.translate(bladeX, bladeY);
-                ctx.rotate(angle + Math.PI / 2); // 风刃沿切线方向
-                
-                // 绘制弯月形风刃
-                ctx.strokeStyle = '#d1fae5';
-                ctx.fillStyle = 'rgba(209, 250, 229, 0.3)';
-                ctx.lineWidth = 1.5;
-                ctx.lineCap = 'round';
-                
-                const bladeLength = radius * 0.8;
-                const bladeCurve = radius * 0.3;
-                
-                ctx.beginPath();
-                ctx.moveTo(-bladeLength/2, 0);
-                ctx.quadraticCurveTo(0, bladeCurve, bladeLength/2, 0);
-                ctx.quadraticCurveTo(0, bladeCurve * 0.5, -bladeLength/2, 0);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-                
-                ctx.restore();
-            }
-            
-            ctx.restore();
-        }
-         ctx.restore();
+        ctx.restore();
     }
 }
-class CloneSpore {
+\nclass CloneSpore {
     constructor(startX, startY, targetX, targetY, onLandCallback) {
         this.start = new Vec2(startX, startY);
         this.end = new Vec2(targetX, targetY);
@@ -15912,183 +15494,15 @@ function lerpColor(a, b, amount) {
  */
 const TRUTH_BOOK_DATA = {
     enemies: [
-        {
-            id: 'normal',
-            name: '普通魔像',
-            icon: '🤖',
-            tags: ['基礎', '測試對象'],
-            desc: '標準的煉金生物。沒有特殊能力，是測試傷害的理想對象。',
-            setup: (game) => {
-                game.enemies.push(new Enemy(game.width/2, 150, 60, 60, 200, 200));
-            },
-            loop: [
-                { type: 'log', text: '生成測試彈幕...' },
-                { type: 'spawn_projectile', config: { damage: 20, bounce: 2 } },
-                { type: 'wait', frames: 120 },
-                { type: 'reset' }
-            ]
-        },
-        {
-            id: 'shield',
-            name: '護盾魔像',
-            icon: '🛡️',
-            tags: ['減傷', '激光反射'],
-            desc: '擁有能量護盾，減少 50% 受到的傷害。護盾表面光滑，可以反射激光束。',
-            setup: (game) => {
-                game.enemies.push(new Enemy(game.width/2, 150, 60, 60, 200, 200, 'normal', ['shield']));
-            },
-            loop: [
-                { type: 'log', text: '護盾減傷測試' },
-                { type: 'spawn_projectile', config: { damage: 20 } },
-                { type: 'wait', frames: 60 },
-                { type: 'log', text: '激光反射測試' },
-                { type: 'spawn_projectile', config: { damage: 10, isLaser: true, laser: 5 } },
-                { type: 'wait', frames: 120 },
-                { type: 'reset' }
-            ]
-        },
-        {
-            id: 'regen',
-            name: '再生魔像',
-            icon: '💚',
-            tags: ['回血', '持久戰'],
-            desc: '體內植入了生命水晶，每回合行動時會恢復最大生命值的 20%。',
-            setup: (game) => {
-                const e = new Enemy(game.width/2, 150, 60, 60, 200, 200, 'normal', ['regen']);
-                e.hp = 100; 
-                game.enemies.push(e);
-            },
-            loop: [
-                { type: 'log', text: '魔像受傷狀態...' },
-                { type: 'wait', frames: 60 },
-                { type: 'log', text: '觸發回合行動：再生' },
-                { type: 'enemy_turn' },
-                { type: 'wait', frames: 120 },
-                { type: 'reset' }
-            ]
-        },
-        {
-            id: 'clone',
-            name: '分身魔像',
-            icon: '🦠',
-            tags: ['受擊分裂', '人海戰術'],
-            desc: '受到攻擊或每回合開始時，有概率分裂出較弱的複制體，迅速填滿戰場。',
-            setup: (game) => {
-                game.enemies.push(new Enemy(game.width/2, 150, 60, 60, 300, 300, 'normal', ['clone']));
-            },
-            loop: [
-                { type: 'log', text: '攻擊觸發分裂' },
-                { type: 'spawn_projectile', config: { damage: 10 } },
-                { type: 'wait', frames: 30 },
-                { type: 'spawn_projectile', config: { damage: 10 } },
-                { type: 'wait', frames: 150 },
-                { type: 'reset' }
-            ]
-        },
-        {
-            id: 'haste',
-            name: '極速魔像',
-            icon: '⚡',
-            tags: ['高速', '兩次行動'],
-            desc: '神經反射極快，每回合可以進行兩次移動或攻擊。',
-            setup: (game) => {
-                game.enemies.push(new Enemy(game.width/2, 150, 60, 60, 200, 200, 'normal', ['haste']));
-            },
-            loop: [
-                { type: 'log', text: '極速行動 (2x)' },
-                { type: 'enemy_turn' }, 
-                { type: 'wait', frames: 120 },
-                { type: 'reset' }
-            ]
-        },
-        {
-            id: 'berserk',
-            name: '狂暴魔像',
-            icon: '😡',
-            tags: ['熱能轉化', '升溫強化'],
-            desc: '當前溫度：150°C (過熱)。當處於「過熱」狀態時，有高概率觸發狂暴，獲得額外行動機會。',
-            setup: (game) => {
-                const e = new Enemy(game.width/2, 150, 60, 60, 300, 300, 'normal', ['berserk']);
-                e.temp = 150; 
-                game.enemies.push(e);
-            },
-            loop: [
-                { type: 'log', text: '當前溫度：150°C (過熱)' },
-                { type: 'wait', frames: 60 },
-                { type: 'log', text: '觸發狂暴判定...' },
-                { type: 'enemy_turn' },
-                { type: 'wait', frames: 120 },
-                { type: 'reset' }
-            ]
-        },
-        {
-            id: 'healer',
-            name: '治癒魔像',
-            icon: '💖',
-            tags: ['群體治療', '輔助'],
-            desc: '戰場上的醫療兵。回合行動時會治療周圍的友軍單位。',
-            setup: (game) => {
-                const e1 = new Enemy(game.width/2 - 70, 150, 60, 60, 100, 200); 
-                const healer = new Enemy(game.width/2, 150, 60, 60, 200, 200, 'normal', ['healer']);
-                const e2 = new Enemy(game.width/2 + 70, 150, 60, 60, 100, 200); 
-                game.enemies.push(e1, healer, e2);
-            },
-            loop: [
-                { type: 'log', text: '隊友生命危急...' },
-                { type: 'wait', frames: 60 },
-                { type: 'log', text: '施放群體治癒' },
-                { type: 'enemy_turn', targetIdx: 1 }, 
-                { type: 'wait', frames: 120 },
-                { type: 'reset' }
-            ]
-        },
-        {
-            id: 'devour',
-            name: '貪食魔像',
-            icon: '👅',
-            tags: ['吞噬友軍', '成長'],
-            desc: '殘忍的同類相食者。會吞噬相鄰的友軍以恢復自身生命並繼承其詞條。',
-            setup: (game) => {
-                const food = new Enemy(game.width/2 - 60, 150, 50, 50, 100, 100, 'normal', ['haste']); 
-                const eater = new Enemy(game.width/2, 150, 70, 70, 200, 500, 'normal', ['devour']);
-                game.enemies.push(food, eater);
-            },
-            loop: [
-                { type: 'log', text: '發現獵物 (極速魔像)' },
-                { type: 'wait', frames: 60 },
-                { type: 'log', text: '吞噬！(繼承血量與詞條)' },
-                { type: 'enemy_turn', targetIdx: 1 },
-                { type: 'wait', frames: 120 },
-                { type: 'reset' }
-            ]
-        },
-        {
-            id: 'jump',
-            name: '跳躍魔像',
-            icon: '🦘',
-            tags: ['越過障礙', '突進'],
-            desc: '腿部裝有彈簧裝置。當前方被阻擋時，可以直接跳過障礙物繼續前進。',
-            setup: (game) => {
-                const blocker = new Enemy(game.width/2, 210, 60, 60, 100, 100); 
-                const jumper = new Enemy(game.width/2, 150, 60, 60, 200, 200, 'normal', ['jump']);
-                game.enemies.push(blocker, jumper);
-            },
-            loop: [
-                { type: 'log', text: '前方道路被阻擋' },
-                { type: 'wait', frames: 60 },
-                { type: 'log', text: '發動跳躍！' },
-                { type: 'enemy_turn', targetIdx: 1 },
-                { type: 'wait', frames: 120 },
-                { type: 'reset' }
-            ]
-        }
+        { id: 'normal', name: '魔像', icon: '🗿', tags: ['普通'], desc: '基礎敵人。會隨著回合數增加血量。' },
+        { id: 'elite', name: '精英', icon: '⚠️', tags: ['精英', '詞條'], desc: '擁有特殊詞條（如護盾、再生）的強化敵人。' },
+        { id: 'boss', name: '首領', icon: '💀', tags: ['BOSS'], desc: '每數回合出現的強大敵人，擊敗可獲得遺物。' }
     ],
     attributes: [
-        {
+        { 
             id: 'bounce', name: '彈性', icon: '⤴️', tags: ['物理', '連擊'],
             desc: '增加彈珠在敵人之間彈射的次數，適合在密集怪群中製造混亂。',
             setup: (game) => {
-                // 佈置一個三角形陣列，展示多次彈射
                 game.enemies.push(
                     new Enemy(game.width/2 - 60, 220, 50, 50, 500),
                     new Enemy(game.width/2 + 60, 220, 50, 50, 500),
@@ -16107,7 +15521,6 @@ const TRUTH_BOOK_DATA = {
             id: 'pierce', name: '穿透', icon: '↗️', tags: ['物理', '貫穿'],
             desc: '使彈珠能夠穿透敵人的身體，直接打擊後排目標。',
             setup: (game) => {
-                // 佈置一條直線上的敵人，展示一箭穿心
                 for(let i=0; i<5; i++) {
                     game.enemies.push(new Enemy(game.width/2, 250 - i*50, 50, 40, 200));
                 }
@@ -16118,145 +15531,55 @@ const TRUTH_BOOK_DATA = {
                 { type: 'wait', frames: 120 }, { type: 'reset' }
             ]
         },
-        {
-            id: 'scatter', name: '散射', icon: '🔱', tags: ['物理', '分裂'],
-            desc: '彈珠飛行時會向兩側分裂出小型子彈，擴大打擊覆蓋面。',
-            setup: (game) => {
-                // 佈置一個大目標和周圍的小目標，展示分裂彈的覆蓋力
-                game.enemies.push(new Enemy(game.width/2, 120, 80, 80, 1000));
-                for(let i=0; i<6; i++) {
-                    const angle = (i / 6) * Math.PI * 2;
-                    game.enemies.push(new Enemy(
-                        game.width/2 + Math.cos(angle) * 120,
-                        120 + Math.sin(angle) * 120,
-                        30, 30, 100
-                    ));
-                }
-            },
-            loop: [
-                { type: 'log', text: '發射分裂散射彈' },
-                { type: 'spawn_projectile', config: { damage: 12, scatter: 8 }, vel: {x: 0, y: -15} },
-                { type: 'wait', frames: 180 }, { type: 'reset' }
-            ]
-        },
-        {
-            id: 'cryo', name: '冰霜', icon: '❄️', tags: ['元素', '控制'],
-            desc: '降低敵人溫度。溫度 < 0°C 時觸發【易傷】，每降低 1°C 增加 0.5% 受到的傷害。達到 -100°C 時觸發【凍結】，敵人將無法行動。',
+        { 
+            id: 'pyro', 
+            name: '火焰', 
+            icon: '🔥', 
+            tags: ['元素', '範圍爆炸'], 
+            desc: '击杀【燃烧】状态(Temp > 50)的敌人时触发爆炸。', 
             setup: (game) => { 
-                const e = new Enemy(game.width/2, 180, 90, 90, 2000);
-                e.temp = -100; // 預設凍結
-                game.enemies.push(e); 
-            },
-            loop: [
-                { type: 'log', text: '目標已處於【凍結】狀態' },
-                { type: 'wait', frames: 60 },
-                { type: 'log', text: '觸發【易傷】(傷害大幅提升)' },
-                { type: 'spawn_projectile', config: { damage: 100, cryo: 0 }, vel: {x: 0, y: -15} }, 
-                { type: 'wait', frames: 120 }, { type: 'reset' }
-            ]
+                // 创建一个普通怪和一群小怪
+                const boss = new Enemy(game.width/2, 180, 80, 80, 50); // HP低，方便击杀
+                boss.temp = 0;
+                game.enemies.push(boss);
+                for(let i=0; i<5; i++) game.enemies.push(new Enemy(game.width/2 - 100 + i*50, 250, 40, 40, 100));
+            }, 
+            loop: [ 
+                { type: 'log', text: '1. 点燃敌人 (Temp+)' },
+                { type: 'spawn_projectile', config: { damage: 1, pyro: 100 }, vel: {x: 0, y: -15} }, 
+                { type: 'wait', frames: 60 }, 
+                { type: 'log', text: '2. 击杀燃烧敌人 -> 爆炸!' }, 
+                { type: 'spawn_projectile', config: { damage: 100 }, vel: {x: 0, y: -15} }, 
+                { type: 'wait', frames: 120 }, 
+                { type: 'reset' } 
+            ] 
         },
-        {
-            id: 'pyro', name: '火焰', icon: '🔥', tags: ['元素', '範圍爆炸'],
-            desc: '升高敵人溫度。溫度 >= 34°C 時觸发【燃燒】造成持續傷害（公式：温度/150）。溫度 > 200°C 時有概率觸发【過熱爆炸】，造成大範圍 AOE 傷害並消耗 10% 熱量。觸发概率隨溫度提升，600°C 時必爆。',
+        { 
+            id: 'lightning', 
+            name: '閃電', 
+            icon: '⚡', 
+            tags: ['元素', '連鎖'], 
+            desc: '命中時觸發連鎖閃電。演示：攻擊冰凍敵人觸發高概率連鎖。', 
             setup: (game) => { 
-                const boss = new Enemy(game.width/2, 180, 80, 80, 1500);
-                game.enemies.push(boss); 
-                for(let i=0; i<8; i++) {
-                    const angle = (i / 8) * Math.PI * 2;
-                    game.enemies.push(new Enemy(
-                        game.width/2 + Math.cos(angle) * 90,
-                        180 + Math.sin(angle) * 90,
-                        40, 40, 300
-                    ));
-                }
-            },
-            loop: [
-                { type: 'log', text: '第一步：施加火屬性使其【燃燒】' },
-                { type: 'spawn_projectile', config: { damage: 10, pyro: 600 }, vel: {x: 0, y: -15} },
-                { type: 'wait', frames: 100 },
-                { type: 'log', text: '第二步：擊殺燃燒中的敵人觸發爆炸' },
-                { type: 'spawn_projectile', config: { damage: 2000 }, vel: {x: 0, y: -15} },
-                { type: 'wait', frames: 150 }, { type: 'reset' }
-            ]
+                for(let i=0; i<10; i++) { 
+                    const x = game.width/2 + (Math.random()-0.5) * 200; 
+                    const y = 150 + (Math.random()-0.5) * 150; 
+                    const e = new Enemy(x, y, 40, 40, 500); 
+                    e.temp = -100; // 低温
+                    e.isFrozenCurrentTurn = true; // [Point 3 Fix] 强制冰冻状态
+                    game.enemies.push(e); 
+                } 
+            }, 
+            loop: [ 
+                { type: 'log', text: '打擊凍結目標 (啟動連鎖)' }, 
+                { type: 'spawn_projectile', config: { damage: 15, lightning: 10 }, vel: {x: 0, y: -15} }, 
+                { type: 'wait', frames: 300 }, 
+                { type: 'reset' } 
+            ] 
         },
-        {
-            id: 'lightning', name: '閃電', icon: '⚡', tags: ['元素', '連鎖'],
-            desc: '命中時觸發連鎖閃電，提升等同於本次傷害的溫度。閃電鏈可對重複敵人造成傷害，隨機在範圍內索敵且距離越近概率越高。基礎連鎖概率 15%，目標溫度越低概率越高（最高 100%）。',
-            setup: (game) => {
-                // 佈置密集的敵群，展示 100 次連鎖的壯觀效果
-                for(let i=0; i<12; i++) {
-                    const x = game.width/2 + (Math.random()-0.5) * 200;
-                    const y = 150 + (Math.random()-0.5) * 150;
-                    const e = new Enemy(x, y, 40, 40, 500);
-                    e.temp = -100; // [修復] 讓所有敵人都冰凍，確保瘋狂連鎖
-                    game.enemies.push(e);
-                }
-            },
-            loop: [
-                { type: 'log', text: '打擊凍結目標 (啟動無限連鎖)' },
-                { type: 'spawn_projectile', config: { damage: 15, lightning: 10 }, vel: {x: 0, y: -15} },
-                { type: 'wait', frames: 300 }, { type: 'reset' }
-            ]
-        },
-        {
-            id: 'laser', name: '光球', icon: '🔦', tags: ['特殊', '瞬時'],
-            desc: '發射彈珠，命中時觸發折射激光，瞬間對路徑上的敵人造成傷害。',
-            setup: (game) => {
-                for(let i=0; i<6; i++) {
-                    game.enemies.push(new Enemy(
-                        game.width/2 + (i%2 === 0 ? -80 : 80),
-                        250 - i*40,
-                        50, 50, 300
-                    ));
-                }
-            },
-            loop: [
-                { type: 'log', text: '發射光學折射彈 (laser=true)' },
-                { type: 'spawn_projectile', config: { damage: 40, laser: 10 }, vel: {x: 2, y: -15} },
-                { type: 'wait', frames: 150 }, { type: 'reset' }
-            ]
-        },
-        {
-            id: 'wind', name: '風', icon: '🌪️', tags: ['特殊', '法陣'],
-            desc: '在命中點生成風暴法陣，持續發射風刃攻擊附近的敵人。',
-            setup: (game) => { game.enemies.push(new Enemy(game.width/2, 200, 80, 80, 1000)); },
-            loop: [
-                { type: 'spawn_projectile', config: { damage: 5, wind: 1, bounce: 4 }, vel: {x: 5, y: -15} },
-                { type: 'wait', frames: 60 },
-                { type: 'log', text: '風暴法陣持續攻擊...' },
-                { type: 'wait', frames: 180 }, { type: 'reset' }
-            ]
-        },
-        {
-            id: 'explosive', name: '爆破', icon: '🧨', tags: ['特殊', 'AOE'],
-            desc: '接觸敵人時引發劇烈爆炸，造成大範圍傷害。',
-            setup: (game) => {
-                for(let i=0; i<5; i++) game.enemies.push(new Enemy(game.width/2 - 100 + i*50, 200, 40, 40, 100));
-            },
-            loop: [
-                { type: 'spawn_projectile', config: { damage: 30, explosive: true }, vel: {x: 0, y: -15} },
-                { type: 'wait', frames: 120 }, { type: 'reset' }
-            ]
-        },
-        {
-            id: 'matryoshka', name: '套娃', icon: '🪆', tags: ['特殊', '連鎖'],
-            desc: '子彈消失時會分裂出下一顆子彈。演示：散射子彈分裂出散射火屬性子彈。',
-            setup: (game) => { 
-                game.enemies.push(new Enemy(game.width/2, 120, 80, 80, 1500)); 
-                for(let i=0; i<4; i++) {
-                    game.enemies.push(new Enemy(game.width/2 + (i-1.5)*80, 220, 40, 40, 300));
-                }
-            },
-            loop: [
-                { type: 'log', text: '發射套娃彈 (散射->火散射)' },
-                { type: 'spawn_projectile', config: { 
-                    damage: 10, 
-                    scatter: 3,
-                    nestedPayload: { damage: 10, scatter: 5, pyro: 100 }
-                }, vel: {x: 0, y: -15} },
-                { type: 'wait', frames: 240 }, { type: 'reset' }
-            ]
-        }
+        { id: 'scatter', name: '散射', icon: '🔱', tags: ['物理', '多重'], desc: '分裂出多個子彈。', setup: (game) => { game.enemies.push(new Enemy(game.width/2, 150, 60, 60, 500)); }, loop: [{type:'spawn_projectile', config:{damage:10, scatter:4}, vel:{x:0, y:-15}}, {type:'wait', frames:120}, {type:'reset'}] },
+        { id: 'laser', name: '光球', icon: '🔦', tags: ['特殊', '瞬時'], desc: '瞬時射線傷害。', setup: (game) => { for(let i=0; i<5; i++) game.enemies.push(new Enemy(game.width/2, 100+i*50, 50, 50, 100)); }, loop: [{type:'spawn_projectile', config:{damage:20, isLaser:true}, vel:{x:0, y:-15}}, {type:'wait', frames:120}, {type:'reset'}] },
+        { id: 'matryoshka', name: '套娃', icon: '🪆', tags: ['特殊', '連鎖'], desc: '子彈消失時分裂。', setup: (game) => { game.enemies.push(new Enemy(game.width/2, 150, 80, 80, 50)); }, loop: [{type:'log', text:'击杀分裂'}, {type:'spawn_projectile', config:{damage:100, isMatryoshka:true, nestedPayload:{damage:10, scatter:5}}, vel:{x:0, y:-15}}, {type:'wait', frames:180}, {type:'reset'}] }
     ]
 };
 
@@ -16268,16 +15591,13 @@ class TruthBook {
         this.active = false;
         this.currentEntry = null;
         this.demoGame = null;
+        this.loopRunning = false;
         
         // 演示控制
         this.instructionIdx = 0;
         this.waitTimer = 0;
         this.simFrame = 0;
         
-        // 視覺特效
-        this.scanLineY = 0;
-        this.gridOffset = 0;
-
         this.initUI();
         window.addEventListener('resize', () => { if (this.active) this.resize(); });
     }
@@ -16341,159 +15661,6 @@ class TruthBook {
         this.startDemo(entry);
     }
 
-    resetDemo() { if (this.currentEntry) this.startDemo(this.currentEntry); }
-
-    startDemo(entry) {
-        // --- 核心修復：構建全功能 Mock Game ---
-        this.demoGame = {
-            width: 600, height: 800,
-            enemies: [], projectiles: [], particles: [], floatingTexts: [], 
-            shockwaves: [], spores: [], fireWaves: [], sonSwords: [], 
-            sonSwordQueue: [], swordQis: [], lightningBolts: [],
-            activeWindMatrices: [], windAnchors: [],
-            enemyHeight: 60, enemyWidth: 60, timeScale: 1.0,
-            hasCombatWall: true, isDemo: true,
-            roundDamage: 0, currentShotDamage: 0, currentShotDamageByAttr: {},
-            shotDamageMap: new Map(),
-            
-            // 粒子與特效
-            spawn_createParticle: (x, y, color, mode) => {
-                // 確保粒子生成在模擬器區域內
-                const p = new Particle(x, y, color, mode);
-                this.demoGame.particles.push(p);
-                return p;
-            },
-            spawn_createShockwave: (x, y, color) => {
-                const sw = new Shockwave(x, y, color);
-                this.demoGame.shockwaves.push(sw);
-            },
-            spawn_createFloatingText: (x, y, text, color) => {
-                this.demoGame.floatingTexts.push(new FloatingText(x, y, text, color));
-            },
-            spawn_createExplosion: (x, y, color) => {
-                this.demoGame.spawn_createShockwave(x, y, color);
-                for(let i=0; i<10; i++) this.demoGame.spawn_createParticle(x, y, color, 'spark');
-            },
-            
-            // 子彈生成
-            spawn_spawnBullet: (arg1, arg2, arg3, arg4, arg5, arg6) => {
-                let x, y, vel, config, id, isLast;
-                if (typeof arg1 === 'object' && arg1.config) {
-                    x = arg1.x; y = arg1.y; vel = arg1.vel; config = arg1.config;
-                    id = arg1.id || null; isLast = arg1.isLast || false;
-                } else {
-                    x = arg1; y = arg2; vel = arg3; config = arg4; id = arg5; isLast = arg6;
-                }
-                
-                // [修復] 確保 vel 是 Vec2 實例，防止 .len() 等方法報錯
-                if (!(vel instanceof Vec2)) {
-                    vel = new Vec2(vel.x, vel.y);
-                }
-                
-                // [修復] 處理散射邏輯：如果 config 中有 scatter，則生成多個子彈
-                if (config.scatter && !config._isScatterSub) {
-                    const count = config.scatter;
-                    const baseAngle = Math.atan2(vel.y, vel.x);
-                    const spread = Math.PI / 4;
-                    const speed = vel.len();
-                    for (let i = 0; i < count; i++) {
-                        const angle = baseAngle + (i - (count - 1) / 2) * (spread / count);
-                        const newVel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
-                        const newConfig = { ...config, scatter: 0, _isScatterSub: true };
-                        const p = new Projectile(x, y, newVel, newConfig, false, id, i === count - 1);
-                        p.game = this.demoGame;
-                        this.demoGame.projectiles.push(p);
-                    }
-                    return;
-                }
-
-                const p = new Projectile(x, y, vel, config, false, id, isLast);
-                p.game = this.demoGame; 
-                this.demoGame.projectiles.push(p);
-            },
-            
-            // [核心重構] 傷害與戰鬥：直接調用主遊戲的戰鬥邏輯
-            combat_damageEnemy: (enemy, proj, multiplier = 1.0) => {
-                // 將當前上下文切換為 demoGame 並調用主遊戲的戰鬥方法
-                this.mainGame.combat_damageEnemy.call(this.demoGame, enemy, proj, multiplier);
-            },
-            
-            // 補充主遊戲邏輯依賴的其他方法
-            combat_lightning_triggerChain: (enemy, dmg, history, level) => {
-                this.mainGame.combat_lightning_triggerChain.call(this.demoGame, enemy, dmg, history, level);
-            },
-            
-            combat_wind_addAnchor: (x, y, dmg, config) => {
-                this.mainGame.combat_wind_addAnchor.call(this.demoGame, x, y, dmg, config);
-            },
-            
-            combat_recordDamage: (amount, attrType = 'damage') => {
-                this.demoGame.roundDamage += amount;
-                if (!this.demoGame.currentShotDamageByAttr[attrType]) this.demoGame.currentShotDamageByAttr[attrType] = 0;
-                this.demoGame.currentShotDamageByAttr[attrType] += amount;
-            },
-            
-            combat_lightning_triggerChain: (currentEnemy, dmg, history, level) => {
-                if (level <= 0) return;
-                const range = 150; // 縮小閃電跳躍範圍，要求敵人靠得近
-                let closest = null;
-                let minDist = Infinity;
-                this.demoGame.enemies.forEach(e => {
-                    if (e !== currentEnemy && e.active && !history.includes(e)) {
-                        const d = currentEnemy.pos.dist(e.pos);
-                        if (d < range && d < minDist) { minDist = d; closest = e; }
-                    }
-                });
-                if (closest) {
-                    this.demoGame.lightningBolts.push(new LightningBolt(currentEnemy.pos, closest.pos));
-                    const nextDmg = Math.floor(dmg * 0.8);
-                    closest.takeDamage(nextDmg);
-                    this.demoGame.spawn_createFloatingText(closest.pos.x, closest.pos.y, `-${nextDmg}`, '#c084fc');
-                    history.push(closest);
-                    // 遞歸跳躍
-                    setTimeout(() => {
-                        this.demoGame.combat_lightning_triggerChain(closest, nextDmg, history, level - 1);
-                    }, 60);
-                }
-            },
-            
-            combat_wind_addAnchor: (x, y, bulletDamage, bulletConfig) => {
-                this.demoGame.windAnchors.push({ x, y, life: 1.0, bulletDamage, bulletConfig });
-                this.demoGame.spawn_createParticle(x, y, '#34d399', 'spark');
-                if (this.demoGame.windAnchors.length >= 4) {
-                    this.demoGame.spawn_createShockwave(x, y, '#34d399');
-                    this.demoGame.windAnchors = []; // 簡化：滿4個直接重置
-                }
-            },
-
-            spawn_triggerCloneSpawn: (parent) => {
-                const cloneHp = Math.floor(parent.maxHp * 0.2);
-                const clone = new Enemy(parent.pos.x + 60, parent.pos.y, 50, 50, cloneHp, cloneHp);
-                clone.affixes = [];
-                this.demoGame.enemies.push(clone);
-                this.demoGame.spawn_createFloatingText(parent.pos.x, parent.pos.y, "CLONE!", "#a855f7");
-            },
-
-            spawn_addScore: (amt) => {},
-            ui_updateRoundDamage: () => {},
-            calc_isAreaOccupied: (x, y, w, h, exclude) => {
-                return this.demoGame.enemies.some(e => e !== exclude && e.active && 
-                    Math.abs(e.pos.x - x) < (e.width + w)/2 && 
-                    Math.abs(e.pos.y - y) < (e.height + h)/2);
-            }
-        };
-
-        if (entry.setup) entry.setup(this.demoGame);
-        this.instructionIdx = 0;
-        this.waitTimer = 0;
-        this.simFrame = 0;
-        this.scanLineY = 0;
-        document.getElementById('truth-demo-log').innerHTML = '';
-        this.active = true;
-        this.resize();
-        this.addLog("SIMULATION_INIT... OK", "text-green-400");
-    }
-
     resize() {
         if (!this.canvas) return;
         const parent = this.canvas.parentElement;
@@ -16503,137 +15670,201 @@ class TruthBook {
             this.canvas.width = rect.width * dpr;
             this.canvas.height = rect.height * dpr;
             this.ctx.scale(dpr, dpr);
-            this.viewWidth = rect.width;
-            this.viewHeight = rect.height;
+        }
+    }
+
+    startDemo(entry) {
+        this.active = true;
+        this.resize();
+        
+        // --- 核心修复：构建全功能 Mock Game ---
+        this.demoGame = {
+            width: this.canvas.width / (window.devicePixelRatio || 1),
+            height: this.canvas.height / (window.devicePixelRatio || 1),
+            enemies: [],
+            projectiles: [],
+            particles: [],
+            floatingTexts: [],
+            shockwaves: [],
+            isDemo: true,
+            hasCombatWall: true,
+            
+            // 模拟主游戏的生成方法
+            spawn_spawnBullet: (x, y, vel, config) => {
+                const p = new Projectile(x, y, vel, config);
+                p.game = this.demoGame; // 绑定到模拟器
+                this.demoGame.projectiles.push(p);
+            },
+            spawn_createParticle: (x, y, color, type) => {
+                this.demoGame.particles.push(new Particle(x, y, color, type));
+            },
+            spawn_createFloatingText: (x, y, text, color) => {
+                this.demoGame.floatingTexts.push(new FloatingText(x, y, text, color));
+            },
+            spawn_createExplosion: (x, y, color) => {
+                this.demoGame.shockwaves.push(new Shockwave(x, y, color));
+                for(let i=0; i<15; i++) {
+                    this.demoGame.spawn_createParticle(x, y, color, 'spark');
+                }
+            },
+            
+            // 模拟战斗逻辑
+            combat_damageEnemy: (enemy, proj, damageOverride) => {
+                const config = proj.config || {};
+                const dmg = damageOverride || config.damage || 10;
+                enemy.hp -= dmg;
+                this.demoGame.spawn_createFloatingText(enemy.pos.x, enemy.pos.y, `-${Math.floor(dmg)}`, config.pyro ? '#f97316' : '#fff');
+                
+                // 属性效果模拟
+                if (config.pyro) enemy.temp += config.pyro;
+                if (config.cryo) enemy.temp -= config.cryo;
+                if (config.lightning) {
+                    // 模拟闪电链视觉
+                    this.demoGame.spawn_createParticle(enemy.pos.x, enemy.pos.y, '#c084fc', 'spark');
+                }
+
+                // [Point 1 Fix] 击杀燃烧敌人触发爆炸
+                if (enemy.hp <= 0 && enemy.active) {
+                    enemy.active = false; // 标记死亡
+                    this.demoGame.spawn_createFloatingText(enemy.pos.x, enemy.pos.y, "KILL", "#ef4444");
+                    
+                    // 检查燃烧状态 (temp > 50 视为燃烧)
+                    if (enemy.temp > 50) {
+                        this.demoGame.spawn_createExplosion(enemy.pos.x, enemy.pos.y, '#f97316');
+                        this.demoGame.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 20, "BOOM!", "#f97316");
+                    }
+                }
+            }
+        };
+
+        // --- 初始化演示 ---
+        this.simFrame = 0;
+        this.instructionIdx = 0;
+        this.waitTimer = 0;
+        
+        // 执行 Setup
+        if (entry.setup) {
+            entry.setup(this.demoGame);
+        }
+
+        // 启动 Loop
+        if (!this.loopRunning) {
+            this.loopRunning = true;
+            this.update();
         }
     }
 
     update() {
-        if (!this.active || !this.demoGame) return;
-        const _realGame = window.game;
-        window.game = this.demoGame;
-        try {
-            this.simFrame++;
-            const timeDisplay = document.getElementById('truth-sim-time');
-            if (timeDisplay && this.simFrame % 5 === 0) {
-                timeDisplay.innerText = `T: ${this.simFrame.toString().padStart(4, '0')}`;
-            }
-            if (this.waitTimer > 0) {
-                this.waitTimer--;
-            } else {
-                const loop = this.currentEntry.loop;
-                if (loop && loop.length > 0) {
-                    const inst = loop[this.instructionIdx];
-                    this.executeInstruction(inst);
-                    this.instructionIdx = (this.instructionIdx + 1) % loop.length;
-                }
-            }
-            const ts = 1.0;
-            this.demoGame.enemies.forEach(e => e.update(ts, this.demoGame));
-            this.demoGame.projectiles.forEach(p => {
-                // [修復] 模擬器牆壁反彈邏輯：完全同步主遊戲
-                const margin = 20;
-                if (p.pos.x < margin || p.pos.x > this.demoGame.width - margin) {
-                    p.vel.x *= -1;
-                    p.pos.x = p.pos.x < margin ? margin : this.demoGame.width - margin;
-                    if (p.config.bounce) p.config.bounce--;
-                }
-                if (p.pos.y < margin) {
-                    p.vel.y *= -1;
-                    p.pos.y = margin;
-                    if (p.config.bounce) p.config.bounce--;
+        if (!this.active) return;
+        requestAnimationFrame(() => this.update());
+
+        const ctx = this.ctx;
+        const w = this.canvas.width / (window.devicePixelRatio || 1);
+        const h = this.canvas.height / (window.devicePixelRatio || 1);
+        const game = this.demoGame;
+
+        // 1. 清空画布
+        ctx.fillStyle = '#020617';
+        ctx.fillRect(0, 0, w, h);
+
+        // 2. 指令流控制
+        if (this.waitTimer > 0) {
+            this.waitTimer--;
+        } else if (this.currentEntry && this.currentEntry.loop) {
+            const instr = this.currentEntry.loop[this.instructionIdx];
+            if (instr) {
+                let done = false;
+                if (instr.type === 'spawn_projectile') {
+                    game.spawn_spawnBullet(w/2, h-50, new Vec2(instr.vel.x, instr.vel.y), instr.config);
+                    done = true;
+                } else if (instr.type === 'wait') {
+                    this.waitTimer = instr.frames;
+                    done = true;
+                } else if (instr.type === 'reset') {
+                    game.enemies = [];
+                    game.projectiles = [];
+                    game.particles = [];
+                    if (this.currentEntry.setup) this.currentEntry.setup(game);
+                    this.instructionIdx = -1; // 将在下面 +1 变成 0
+                    done = true;
+                } else if (instr.type === 'log') {
+                    const logEl = document.getElementById('truth-demo-log');
+                    if(logEl) {
+                        const line = document.createElement('div');
+                        line.innerText = `> ${instr.text}`;
+                        logEl.appendChild(line);
+                        logEl.scrollTop = logEl.scrollHeight;
+                    }
+                    done = true;
                 }
                 
-                // [核心修復] 確保子彈更新時使用的是 demoGame 的上下文
-                p.update(this.demoGame.width, this.demoGame.height, this.demoGame.enemies, this.demoGame.spawn_spawnBullet.bind(this.demoGame), ts);
-            });
-            this.demoGame.particles.forEach(p => p.update(ts));
-            this.demoGame.floatingTexts.forEach(f => {
-                f.update(ts);
-                if (f instanceof FloatingText && f.life <= 0) f.active = false;
-                else if (f.life !== undefined) { f.pos.y -= 0.5; f.life--; }
-            });
-            this.demoGame.shockwaves.forEach(s => s.update(ts));
-            this.demoGame.lightningBolts.forEach(l => l.update(ts));
-            this.demoGame.projectiles = this.demoGame.projectiles.filter(p => p.active);
-            this.demoGame.particles = this.demoGame.particles.filter(p => p.active);
-            this.demoGame.floatingTexts = this.demoGame.floatingTexts.filter(f => f.life > 0);
-            this.demoGame.shockwaves = this.demoGame.shockwaves.filter(s => s.alpha > 0);
-            this.demoGame.lightningBolts = this.demoGame.lightningBolts.filter(l => l.life > 0);
-            this.draw();
-        } finally {
-            window.game = _realGame;
+                if (done) this.instructionIdx++;
+            } else {
+                this.instructionIdx = 0; // Loop end
+            }
         }
-    }
 
-    executeInstruction(inst) {
-        if (!inst) return;
-        switch(inst.type) {
-            case 'log': this.addLog(inst.text); break;
-            case 'wait': this.waitTimer = inst.frames; break;
-            case 'enemy_turn': 
-                const actor = this.demoGame.enemies[inst.targetIdx || 0];
-                if (actor) this.mainGame.phase_enemy_processTurn.call(this.demoGame, actor);
-                break;
-            case 'spawn_projectile':
-                const px = inst.x || this.demoGame.width / 2;
-                const py = inst.y || this.demoGame.height - 150;
-                const angle = -Math.PI/2 + (Math.random()-0.5) * 0.1;
-                const pvel = inst.vel ? new Vec2(inst.vel.x, inst.vel.y) : new Vec2(Math.cos(angle)*15, Math.sin(angle)*15);
-                this.demoGame.spawn_spawnBullet(px, py, pvel, inst.config || {});
-                break;
-            case 'reset':
-                this.waitTimer = inst.delay || 60;
-                this.addLog("--- RESET ---", "text-slate-600");
-                this.startDemo(this.currentEntry);
-                break;
+        // 3. 实体更新与绘制
+        
+        // 敌人
+        game.enemies.forEach(e => {
+            if(e.active) {
+                e.update(1.0, game);
+                e.draw(ctx);
+            }
+        });
+
+        // 子弹 (含 [Point 7] 套娃逻辑)
+        for (let i = game.projectiles.length - 1; i >= 0; i--) {
+            const p = game.projectiles[i];
+            p.update(w, h, game.enemies, null, 1.0);
+            p.draw(ctx);
+            
+            if (p.destroyed) {
+                // [Point 7 Fix] 套娃分裂逻辑
+                if (p.config.isMatryoshka && p.config.nestedPayload) {
+                    game.spawn_spawnBullet(
+                        p.pos.x, p.pos.y, 
+                        p.vel, // 继承速度
+                        p.config.nestedPayload // 下一层配方
+                    );
+                    game.spawn_createFloatingText(p.pos.x, p.pos.y, "SPLIT", "#d946ef");
+                }
+                game.projectiles.splice(i, 1);
+            }
         }
-    }
 
-    addLog(text, colorClass = 'text-cyan-400') {
-        const logCont = document.getElementById('truth-demo-log');
-        const div = document.createElement('div');
-        div.className = `flex items-center gap-2 ${colorClass}`;
-        div.innerHTML = `<span class="text-slate-600 text-[8px]">[${this.simFrame}]</span> <span>${text}</span>`;
-        logCont.appendChild(div);
-        if (logCont.childNodes.length > 6) logCont.removeChild(logCont.firstChild);
-        logCont.scrollTop = logCont.scrollHeight;
-    }
+        // 粒子
+        for (let i = game.particles.length - 1; i >= 0; i--) {
+            const p = game.particles[i];
+            p.update(1.0);
+            p.draw(ctx);
+            if (p.life <= 0) game.particles.splice(i, 1);
+        }
 
-    draw() {
-        const ctx = this.ctx;
-        const w = this.viewWidth;
-        const h = this.viewHeight;
-        const gameW = this.demoGame.width;
-        const gameH = this.demoGame.height;
-        ctx.clearRect(0, 0, w, h);
-        this.gridOffset = (this.gridOffset + 0.5) % 40;
-        ctx.strokeStyle = 'rgba(6, 182, 212, 0.1)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (let x = 0; x <= w; x += 40) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
-        for (let y = this.gridOffset; y <= h; y += 40) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
-        ctx.stroke();
-        ctx.save();
-        const padding = 20;
-        const scale = Math.min((w - padding) / gameW, (h - padding) / gameH);
-        const offsetX = (w - gameW * scale) / 2;
-        const offsetY = (h - gameH * scale) / 2;
-        ctx.translate(offsetX, offsetY);
-        ctx.scale(scale, scale);
-        ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 4; ctx.strokeRect(0, 0, gameW, gameH);
-        this.demoGame.enemies.forEach(e => e.draw(ctx));
-        this.demoGame.projectiles.forEach(p => p.draw(ctx));
-        this.demoGame.particles.forEach(p => p.draw ? p.draw(ctx) : null);
-        this.demoGame.shockwaves.forEach(s => s.draw(ctx));
-        this.demoGame.lightningBolts.forEach(l => l.draw(ctx));
-        this.demoGame.floatingTexts.forEach(f => f.draw(ctx));
-        this.scanLineY = (this.scanLineY + 2) % gameH;
-        ctx.fillStyle = `rgba(6, 182, 212, 0.1)`;
-        ctx.fillRect(0, this.scanLineY, gameW, 2);
-        ctx.restore();
+        // 浮动文字
+        for (let i = game.floatingTexts.length - 1; i >= 0; i--) {
+            const t = game.floatingTexts[i];
+            t.update(1.0);
+            t.draw(ctx);
+            if (t.life <= 0) game.floatingTexts.splice(i, 1);
+        }
+        
+        // 冲击波
+        for (let i = game.shockwaves.length - 1; i >= 0; i--) {
+            const s = game.shockwaves[i];
+            s.update(1.0);
+            s.draw(ctx);
+            if (s.alpha <= 0) game.shockwaves.splice(i, 1);
+        }
+
+        // 更新模拟时间显示
+        this.simFrame++;
+        const timeEl = document.getElementById('truth-sim-time');
+        if (timeEl && this.simFrame % 10 === 0) timeEl.innerText = `T: ${this.simFrame}`;
     }
 }
+
 
 function hexToRgba(hex, alpha) {
     let c;
