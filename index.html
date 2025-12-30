@@ -16099,7 +16099,7 @@ const TRUTH_BOOK_DATA = {
         },
         {
             id: 'cryo', name: '冰霜', icon: '❄️', tags: ['元素', '控制'],
-            desc: '降低敵人溫度。達到 -100°C 時觸發【凍結】，敵人將無法行動且受到的閃电傷害會觸發強力連鎖。',
+            desc: '降低敵人溫度。溫度 < 0°C 時觸發【易傷】，每降低 1°C 增加 0.5% 受到的傷害。達到 -100°C 時觸發【凍結】，敵人將無法行動。',
             setup: (game) => { game.enemies.push(new Enemy(game.width/2, 200, 80, 80, 500)); },
             loop: [
                 { type: 'log', text: '施加極寒打擊' },
@@ -16107,6 +16107,8 @@ const TRUTH_BOOK_DATA = {
                 { type: 'wait', frames: 20 },
                 { type: 'spawn_projectile', config: { damage: 5, cryo: 50 } }, 
                 { type: 'wait', frames: 60 },
+                { type: 'log', text: '觸發【易傷】(傷害隨低溫提升)' },
+                { type: 'wait', frames: 30 },
                 { type: 'log', text: '敵人已凍結 (無法行動)' },
                 { type: 'enemy_turn' },
                 { type: 'wait', frames: 100 }, { type: 'reset' }
@@ -16133,7 +16135,7 @@ const TRUTH_BOOK_DATA = {
         },
         {
             id: 'lightning', name: '閃電', icon: '⚡', tags: ['元素', '連鎖'],
-            desc: '命中時觸發連鎖閃電並提升目標溫度。若命中【凍結】目標，閃電將在附近敵人中進行多次強力跳躍，是清理群怪的核心手段。',
+            desc: '命中時觸發連鎖閃電。基礎連鎖概率 15%，目標溫度越低概率越高（最高 100%）。連鎖傷害衰減系數隨閃電等級提升（0.45 + 0.05 * 等級），且連锁次數越多跳躍延遲越短。',
             setup: (game) => {
                 const e1 = new Enemy(game.width/2 - 50, 200, 50, 50, 200);
                 e1.temp = -100; // 凍結狀態
@@ -16142,7 +16144,7 @@ const TRUTH_BOOK_DATA = {
                 game.enemies.push(e1, e2, e3);
             },
             loop: [
-                { type: 'log', text: '打擊凍結目標 (連鎖強化)' },
+                { type: 'log', text: '打擊凍結目標 (100% 連鎖概率)' },
                 { type: 'spawn_projectile', config: { damage: 20, lightning: 5 }, vel: {x: 0, y: -15} },
                 { type: 'wait', frames: 120 }, { type: 'reset' }
             ]
