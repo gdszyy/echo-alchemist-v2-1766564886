@@ -8235,7 +8235,7 @@ class Game {
             unlockedItems: [],  // 已解锁项目
             highScore: 0
         };
-           // 本局获得的货币
+        this.runCurrency = 0;   // 本局获得的货币
         this.sys_loadSaveData(); // 读取存档
 
         // --- [META] 不再直接开始游戏，而是显示主界面 ---
@@ -9126,9 +9126,13 @@ if (this.phase === 'truth_book') {
      */
     ui_updateMetaCurrency() {
         const el = document.getElementById('meta-currency-display');
-        if (el) el.innerText = this.saveData.currency.toLocaleString();
+        if (el && this.saveData && typeof this.saveData.currency === 'number') {
+            el.innerText = this.saveData.currency.toLocaleString();
+        }
         const runEl = document.getElementById('run-currency-display');
-        if (runEl) runEl.innerText = this.runCurrency.toLocaleString();
+        if (runEl && typeof this.runCurrency === 'number') {
+            runEl.innerText = this.runCurrency.toLocaleString();
+        }
     }
 
     /**
