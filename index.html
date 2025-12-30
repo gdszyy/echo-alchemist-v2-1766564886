@@ -13685,8 +13685,8 @@ if (this.phase === 'truth_book') {
                 
                 // 递归
                 history.push(selected); 
-                // 限制最大连锁次数防止死循环 (例如 15 次)
-                if (history.length < 15) {
+                // 限制最大连锁次数防止死循环 (增加到 100 次)
+                if (history.length < 100) {
                     this.combat_lightning_triggerChain(selected, nextDmg, history, level); 
                 }
             }, delay);
