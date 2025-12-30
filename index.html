@@ -1671,8 +1671,8 @@ const CONFIG = {
         enemyCols:6,
         cols: 10,           // 网格列数 
         rows: 6,           // 钉子行数
-        spacingX: 40,      // 钉子水平间距
-        spacingY: 40,      // 钉子垂直间距
+        spacingX: 45,      // 钉子水平间距
+        spacingY: 45,      // 钉子垂直间距
         startRows: 4,       // 初始生成的敌人行数
         spawnMin: 3,        // 每波最少生成的敌人数量
         selectionCount: 6,  // 选卡阶段提供多少张卡
@@ -9516,7 +9516,9 @@ if (this.phase === 'truth_book') {
         this.enemyHeight = this.enemyWidth; 
         this.ui_updateUICache();
         // 如果是在收集阶段，且已经初始化过，可能需要重新计算钉子位置（可选）
-        // if (this.phase === 'gathering') this.phase_gathering_initPachinko();
+        if (this.phase === 'gathering') {
+            this.phase_gathering_initPachinko(true); 
+        }
     }
     /**
      * @method initGameStart
@@ -13033,11 +13035,15 @@ if (this.phase === 'truth_book') {
      * [AUTO-GENERATED] TODO: Add a description for sys_initPachinko.
      */
     phase_gathering_initPachinko(shouldInherit = false) {
-        const rows = CONFIG.gameplay.rows;
-        const spacingX = CONFIG.gameplay.spacingX;
-        const spacingY = CONFIG.gameplay.spacingY;
-        const offsetX = (this.canvas.width - (CONFIG.gameplay.cols - 1) * spacingX) / 2;
-        const offsetY = 100;
+        // [修复] 使用动态行数
+        const rows = this.currentRows || CONFIG.gameplay.rows;
+        // [修复] 获取间距配置
+        const spacingX = CONFIG.gameplay.spacingX || 45;
+        const spacingY = CONFIG.gameplay.spacingY || 45;
+        
+        // [修复] 修正 width 引用
+        const offsetX = (this.width - (CONFIG.gameplay.cols - 1) * spacingX) / 2;
+        const offsetY = 120;
 
         const previousPegs = [...this.pegs];
         this.pegs = [];
@@ -13057,24 +13063,28 @@ if (this.phase === 'truth_book') {
 
                 let type = 'normal';
                 let level = 1;
+
+                // [继承逻辑]
                 if (shouldInherit && previousPegs[pegIndex]) {
                     const prevPeg = previousPegs[pegIndex];
+                    // 排除粉色钉子（假设它是临时Buff）
                     if (prevPeg.type !== 'pink') {
-                        const weight = this.unlockedWeights[prevPeg.type] || 0;
-                        if (prevPeg.type === 'normal' || prevPeg.type === 'laser' || prevPeg.type === 'bounce' || prevPeg.type === 'flying_sword' || prevPeg.type === 'wind' || weight > 0) {
-                            type = prevPeg.type;
-                            level = prevPeg.level || 1;
-                        } else {
-                            type = this.phase_gathering_getRandomPegType();
-                        }
+                        type = prevPeg.type;
+                        level = prevPeg.level || 1;
                     } else {
                         type = this.phase_gathering_getRandomPegType();
                     }
                 } else {
                     type = this.phase_gathering_getRandomPegType();
                 }
+
                 let p = new Peg(x, y, type);
                 p.level = level;
+                // [继承逻辑] 如果继承，保留当前的冷却状态
+                if (shouldInherit && previousPegs[pegIndex]) {
+                     p.cooldownTimer = previousPegs[pegIndex].cooldownTimer;
+                }
+                
                 this.pegs.push(p);
                 pegIndex++;
             }
@@ -14560,7 +14570,7 @@ if (this.phase === 'truth_book') {
         }
 
         document.getElementById('combat-message').innerHTML = '';
-        this.phase_gathering_initPachinko();
+        this.phase_gathering_initPachinko(true);
 
         this.isEnemyTurn = false;
         // 遗物事件检查
