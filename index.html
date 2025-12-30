@@ -990,28 +990,28 @@
                 <div class="absolute -right-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transparent via-amber-500/30 to-transparent"></div>
             </div>
 
-            <button onclick="game.meta_startRun()" class="btn-main w-72 py-5 mb-12 border border-indigo-400/30 shadow-[0_0_40px_rgba(79,70,229,0.2)] hover:scale-105 hover:shadow-[0_0_60px_rgba(79,70,229,0.4)] transition-all duration-300 group relative overflow-hidden bg-slate-900/80 rounded-xl">
+            <button onclick="window.game.meta_startRun()" class="btn-main w-72 py-5 mb-12 border border-indigo-400/30 shadow-[0_0_40px_rgba(79,70,229,0.2)] hover:scale-105 hover:shadow-[0_0_60px_rgba(79,70,229,0.4)] transition-all duration-300 group relative overflow-hidden bg-slate-900/80 rounded-xl">
                 <div class="absolute inset-0 bg-gradient-to-r from-indigo-600/0 via-indigo-400/10 to-indigo-600/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                 <span class="text-2xl font-[Cinzel] tracking-widest relative z-10 text-indigo-50 group-hover:text-white">開始煉成</span>
                 <div class="text-[10px] text-indigo-300/70 mt-1 font-sans tracking-wider uppercase">Initialize Sequence</div>
             </button>
 
             <div class="grid grid-cols-3 gap-6 w-full max-w-lg px-8">
-                <button onclick="game.meta_openShop()" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-amber-500/30 transition-all duration-300 group backdrop-blur-sm">
+                <button onclick="window.game.meta_openShop()" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-amber-500/30 transition-all duration-300 group backdrop-blur-sm">
                     <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-amber-900/20 group-hover:text-amber-400 transition-all shadow-inner">
                         <span class="text-2xl">⚒️</span>
                     </div>
                     <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-amber-100">煉金工坊</span>
                 </button>
 
-                <button onclick="game.ui_openTruthBook()" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-cyan-500/30 transition-all duration-300 group backdrop-blur-sm">
+                <button onclick="window.game.ui_openTruthBook()" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-cyan-500/30 transition-all duration-300 group backdrop-blur-sm">
                     <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-cyan-900/20 group-hover:text-cyan-400 transition-all shadow-inner">
                         <span class="text-2xl">📖</span>
                     </div>
                     <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-cyan-100">真理之书</span>
                 </button>
 
-                <button onclick="game.trainingGround.enter()" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-red-500/30 transition-all duration-300 group backdrop-blur-sm">
+                <button onclick="window.game.trainingGround.enter()" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-red-500/30 transition-all duration-300 group backdrop-blur-sm">
                     <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-red-900/20 group-hover:text-red-400 transition-all shadow-inner">
                         <span class="text-2xl">⚔️</span>
                     </div>
@@ -1029,7 +1029,7 @@
     <div id="phase-shop" class="ui-overlay" style="display: none; background: #020617; pointer-events: auto; z-index: 300;">
         <div class="w-full max-w-md h-full flex flex-col p-6">
             <div class="flex justify-between items-center mb-6">
-                <button onclick="game.phase_switchPhase('meta')" class="text-slate-400 hover:text-white transition-colors">
+                <button onclick="window.game.phase_switchPhase('meta')" class="text-slate-400 hover:text-white transition-colors">
                     <span class="text-2xl">⬅️</span>
                 </button>
                 <h2 class="text-2xl font-[Cinzel] text-amber-100 tracking-widest">煉金工坊</h2>
@@ -1113,7 +1113,7 @@
         <div id="recipe-hud-container" class="absolute z-40 pointer-events-none"></div>
         
         <!-- 左下角伤害统计按钮 -->
-        <button id="damage-stats-btn" onclick="game.ui_toggleDamagePanel()" class="absolute bottom-2 left-2 w-10 h-10 bg-slate-800/90 hover:bg-slate-700/90 rounded-full border-2 border-purple-500/50 hover:border-purple-400 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg">
+        <button id="damage-stats-btn" onclick="window.game.ui_toggleDamagePanel()" class="absolute bottom-2 left-2 w-10 h-10 bg-slate-800/90 hover:bg-slate-700/90 rounded-full border-2 border-purple-500/50 hover:border-purple-400 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg">
             <span class="text-lg">📊</span>
         </button>
         
@@ -1140,7 +1140,7 @@
             <!-- Header -->
             <div class="flex justify-between items-center mb-6 shrink-0">
                 <h2 class="text-3xl font-[Cinzel] text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">真理之書 <span class="text-sm text-slate-500 ml-2">Liber Veritatis</span></h2>
-                <button onclick="game.ui_closeTruthBook()" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-400 hover:bg-red-900/40 hover:text-red-400 transition-all">✕</button>
+                <button onclick="window.game.ui_closeTruthBook()" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-400 hover:bg-red-900/40 hover:text-red-400 transition-all">✕</button>
             </div>
 
             <div class="flex flex-1 min-h-0 gap-6">
@@ -1181,7 +1181,7 @@
                 <div class="text-[9px] text-cyan-700 font-mono" id="truth-sim-time">T: 000</div>
             </div>
 
-            <button onclick="game.truthBook.resetDemo()" class="absolute top-4 right-4 z-10 w-8 h-8 rounded bg-slate-800/50 hover:bg-cyan-600/20 border border-slate-700 hover:border-cyan-400/50 text-slate-400 hover:text-cyan-300 transition-all flex items-center justify-center" title="重置演示">
+            <button onclick="window.game.truthBook.resetDemo()" class="absolute top-4 right-4 z-10 w-8 h-8 rounded bg-slate-800/50 hover:bg-cyan-600/20 border border-slate-700 hover:border-cyan-400/50 text-slate-400 hover:text-cyan-300 transition-all flex items-center justify-center" title="重置演示">
                 ⟳
             </button>
 
@@ -1210,20 +1210,20 @@
             <div id="relic-container" class="flex flex-wrap justify-center gap-4 w-full max-w-4xl">
                 </div>
 
-            <button onclick="game.ui_skipRelic()" class="mt-12 text-slate-500 hover:text-slate-300 text-sm underline cursor-pointer transition-colors">
+            <button onclick="window.game.ui_skipRelic()" class="mt-12 text-slate-500 hover:text-slate-300 text-sm underline cursor-pointer transition-colors">
                 放棄並獲得 500 分
             </button>
         </div>
     </div>
     <div id="info-drawer" class="absolute bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-600 text-slate-200 transform transition-transform duration-300 translate-y-full z-50 flex flex-col h-[75vh] safe-area-pb">
     
-        <button onclick="game.ui.closeDrawer()" class="absolute top-2 right-2 text-slate-400 hover:text-white p-2">✕</button>
+        <button onclick="window.game.ui.closeDrawer()" class="absolute top-2 right-2 text-slate-400 hover:text-white p-2">✕</button>
 
         <div class="flex border-b border-slate-700 bg-slate-900/50">
-            <button class="flex-1 py-3 text-sm font-bold text-amber-400 border-b-2 border-amber-400 tab-btn transition-colors" onclick="game.ui.switchTab('status')">敵人狀態</button>
-            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="game.ui.switchTab('affix')">特殊詞條</button>
-            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="game.ui.switchTab('recipe')">配方圖鑑</button>
-            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="game.ui.switchTab('damage')">傷害統計</button>
+            <button class="flex-1 py-3 text-sm font-bold text-amber-400 border-b-2 border-amber-400 tab-btn transition-colors" onclick="window.game.ui.switchTab('status')">敵人狀態</button>
+            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="window.game.ui.switchTab('affix')">特殊詞條</button>
+            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="window.game.ui.switchTab('recipe')">配方圖鑑</button>
+            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="window.game.ui.switchTab('damage')">傷害統計</button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-4 relative">
@@ -3739,7 +3739,7 @@ class DropBall {
                             peg.level = 1; 
                             
                             // 特效
-                            game.spawn_createExplosion(peg.pos.x, peg.pos.y, CONFIG.colors[rule.result]);
+                            window.game.spawn_createExplosion(peg.pos.x, peg.pos.y, CONFIG.colors[rule.result]);
                             game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 20, "Mutation!", CONFIG.colors[rule.result]);
                             audio.playMagic();
                         } else {
@@ -3756,7 +3756,7 @@ class DropBall {
                         const success = peg.upgrade();
                         if (success) {
                             // 升级成功特效
-                            game.spawn_createExplosion(peg.pos.x, peg.pos.y, '#fbbf24');
+                            window.game.spawn_createExplosion(peg.pos.x, peg.pos.y, '#fbbf24');
                             game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 15, `Lv${peg.level} 剑意!`, '#fbbf24');
                             audio.playPowerup(peg.level + 3); // 音调更高
                         } else {
@@ -3776,7 +3776,7 @@ class DropBall {
                     // [新增] 同化钉子特效：爆炸 + 浮动文字
                     const attrColor = this.def.getColor();
                     const attrName = CONFIG.ui.attributeDisplay[ballType] ? CONFIG.ui.attributeDisplay[ballType].name : "Assimilation";
-                    game.spawn_createExplosion(peg.pos.x, peg.pos.y, attrColor);
+                    window.game.spawn_createExplosion(peg.pos.x, peg.pos.y, attrColor);
 					game.spawn_createShockwave(peg.pos.x, peg.pos.y, attrColor);
                     game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 20, attrName, attrColor);
                     
@@ -3930,24 +3930,24 @@ class DropBall {
                         slot.hit = true;
                         this.portalCooldown = 40; 
                         if (slot.type === 'recall') {
-                            this.pos.y = 80; this.vel.y = 2; this.portalCooldown = 60; audio.playPowerup(); game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotRecall); showToast("時空回溯！");
+                            this.pos.y = 80; this.vel.y = 2; this.portalCooldown = 60; audio.playPowerup(); window.game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotRecall); showToast("時空回溯！");
                         } else if (slot.type === 'multicast') {
                             if (this.session.multicastAdded.indexOf(slot) === -1) { 
-                                this.session.multicast += 2; audio.playPowerup(); game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotMulticast); showToast("連續發射+2！");
+                                this.session.multicast += 2; audio.playPowerup(); window.game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotMulticast); showToast("連續發射+2！");
                                     game.combat_updateMulticastDisplay(2);
                             }
                         } else if (slot.type === 'split') {
                             if (this.canTriggerSplitSlot) {
                                 this.active = false; 
                                 this.stopSound(); // 
-                                audio.playPowerup(); game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotSplit); 
+                                audio.playPowerup(); window.game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotSplit); 
                                 return { action: 'split', pos: this.pos, vel: this.vel, def: this.def };
                             }
                         } else if (slot.type === 'relic') {
                             this.active = false; 
                             this.stopSound(); // 
                             audio.playPowerup(); 
-                            game.spawn_createExplosion(slot.x, slot.y, '#facc15'); 
+                            window.game.spawn_createExplosion(slot.x, slot.y, '#facc15'); 
                             return { type: 'slot', slotType: 'relic', pos: this.pos };
                         } else if (slot.type === 'skill_point') {
                             // 1. 標記槽位被擊中 (立即消失)
@@ -3955,7 +3955,7 @@ class DropBall {
 
                             // 2. 播放原地音效與爆炸 (立即反饋)
                             audio.playPowerup();
-                            game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotSkill); 
+                            window.game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotSkill); 
                             showToast("技能點獲取!");
 
                             // --- [新增] 引導動畫邏輯 ---
@@ -4014,7 +4014,7 @@ class DropBall {
                             
                             if (currentAttrs.length === 0) {
                                 audio.playEffect('bump');
-                                game.spawn_createExplosion(slot.x, slot.y, '#ffffff');
+                                window.game.spawn_createExplosion(slot.x, slot.y, '#ffffff');
                                 showToast("无属性可复制");
                                 game.phase_gathering_attemptComplete(); 
                                 return { type: 'slot', slotType: 'wheel', pos: this.pos };
@@ -4022,7 +4022,7 @@ class DropBall {
 
                             // [修改] 觸發轉盤
                             audio.playPowerup(); 
-                            game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotWheel); 
+                            window.game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotWheel); 
                             showToast("命運輪盤啟動!");
 
                             // [修改] 使用屏幕中心坐標 (game.width/2, game.height/2)
@@ -4050,7 +4050,7 @@ class DropBall {
                                 
                                 // 文字提示位置也改為屏幕中間
                                 game.spawn_createFloatingText(wheelX, wheelY + 80, `${attrName} +${addCount}!`, "#fff");
-                                game.spawn_createExplosion(wheelX, wheelY, '#fff');
+                                window.game.spawn_createExplosion(wheelX, wheelY, '#fff');
                                 audio.playPowerup(5);
                                 game.ui_renderRecipeHUD();
                                 game.isWheelSpinning = false;
@@ -6606,7 +6606,8 @@ class Projectile {
         ctx.restore();
     }
 }
-\nclass CloneSpore {
+
+class CloneSpore {
     constructor(startX, startY, targetX, targetY, onLandCallback) {
         this.start = new Vec2(startX, startY);
         this.end = new Vec2(targetX, targetY);
@@ -6626,7 +6627,7 @@ class Projectile {
             this.progress = 1;
             this.active = false;
             this.onLand(); // 落地，呼叫回調生成敵人
-            game.spawn_createExplosion(this.end.x, this.end.y, '#a855f7'); // 落地特效
+            window.game.spawn_createExplosion(this.end.x, this.end.y, '#a855f7'); // 落地特效
             audio.playPowerup();
         }
 
@@ -7784,29 +7785,29 @@ class TrainingGround {
                 <div id="train-stats" class="text-amber-400 font-mono text-xs">
                     DPS: 0 | TOTAL: 0
                 </div>
-                <button onclick="game.trainingGround.exit()" class="text-slate-400 hover:text-white text-sm">退出</button>
+                <button onclick="window.game.trainingGround.exit()" class="text-slate-400 hover:text-white text-sm">退出</button>
             </div>
 
             <!-- 快捷操作按钮 (仅在面板收起时显示) -->
             <div id="train-quick-actions" class="absolute bottom-12 left-1/2 -translate-x-1/2 flex gap-4 z-[450] transition-opacity duration-300">
-                <button onclick="game.trainingGround.fireBullet()" class="w-12 h-12 rounded-full bg-indigo-600/80 backdrop-blur-md border border-indigo-400/50 text-white shadow-lg shadow-indigo-500/20 flex items-center justify-center active:scale-90 transition-transform">
+                <button onclick="window.game.trainingGround.fireBullet()" class="w-12 h-12 rounded-full bg-indigo-600/80 backdrop-blur-md border border-indigo-400/50 text-white shadow-lg shadow-indigo-500/20 flex items-center justify-center active:scale-90 transition-transform">
                     <span class="text-xl">🔥</span>
                 </button>
-                <button onclick="game.trainingGround.spawnEnemy()" class="w-12 h-12 rounded-full bg-red-600/80 backdrop-blur-md border border-red-400/50 text-white shadow-lg shadow-red-500/20 flex items-center justify-center active:scale-90 transition-transform">
+                <button onclick="window.game.trainingGround.spawnEnemy()" class="w-12 h-12 rounded-full bg-red-600/80 backdrop-blur-md border border-red-400/50 text-white shadow-lg shadow-red-500/20 flex items-center justify-center active:scale-90 transition-transform">
                     <span class="text-xl">👾</span>
                 </button>
             </div>
 
             <!-- 底部控制面板 -->
             <div id="train-control-panel" class="collapsed">
-                <button id="train-toggle-main" onclick="game.trainingGround.toggleMainPanel()">
+                <button id="train-toggle-main" onclick="window.game.trainingGround.toggleMainPanel()">
                     ▲ 展开配置
                 </button>
                 
                 <!-- Tab 导航 -->
                 <div class="flex border-b border-slate-700 bg-slate-900/50">
-                    <button onclick="game.trainingGround.switchTab('bullet')" id="tab-btn-bullet" class="train-tab-btn active">子弹编辑</button>
-                    <button onclick="game.trainingGround.switchTab('enemy')" id="tab-btn-enemy" class="train-tab-btn">敌人配置</button>
+                    <button onclick="window.game.trainingGround.switchTab('bullet')" id="tab-btn-bullet" class="train-tab-btn active">子弹编辑</button>
+                    <button onclick="window.game.trainingGround.switchTab('enemy')" id="tab-btn-enemy" class="train-tab-btn">敌人配置</button>
                 </div>
 
                 <!-- 子弹编辑面板 -->
@@ -7817,19 +7818,19 @@ class TrainingGround {
                                 <div id="preview-bullet-render" class="w-6 h-6 md:w-8 md:h-8 rounded-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.5)]"></div>
                             </div>
                             <div class="flex-1 md:hidden flex flex-col gap-2">
-                                <button onclick="game.trainingGround.fireBullet()" class="py-3 bg-indigo-600 text-white rounded-lg font-bold active:scale-95">发射测试</button>
-                                <button onclick="game.trainingGround.resetBullet()" class="py-1 bg-slate-800 text-slate-400 rounded-lg text-[10px]">重置</button>
+                                <button onclick="window.game.trainingGround.fireBullet()" class="py-3 bg-indigo-600 text-white rounded-lg font-bold active:scale-95">发射测试</button>
+                                <button onclick="window.game.trainingGround.resetBullet()" class="py-1 bg-slate-800 text-slate-400 rounded-lg text-[10px]">重置</button>
                             </div>
                         </div>
                         <div class="flex-1">
                             <div id="train-attr-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2"></div>
                         </div>
                         <div class="hidden md:flex w-32 shrink-0 flex-col gap-2">
-                            <button onclick="game.trainingGround.fireBullet()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold flex flex-col items-center justify-center transition-all active:scale-95">
+                            <button onclick="window.game.trainingGround.fireBullet()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold flex flex-col items-center justify-center transition-all active:scale-95">
                                 <span class="text-xl">🔥</span>
                                 <span class="text-sm">发射测试</span>
                             </button>
-                            <button onclick="game.trainingGround.resetBullet()" class="py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px]">重置配方</button>
+                            <button onclick="window.game.trainingGround.resetBullet()" class="py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px]">重置配方</button>
                         </div>
                     </div>
                 </div>
@@ -7843,10 +7844,10 @@ class TrainingGround {
                                 <input type="number" id="train-enemy-hp" value="100" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white mt-1 text-sm">
                             </div>
                             <div class="flex gap-2">
-                                <button onclick="game.trainingGround.spawnEnemy()" class="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded font-bold transition-colors text-sm">召唤敌人</button>
-                                <button onclick="game.trainingGround.clearEnemies()" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold transition-colors text-sm">清空</button>
+                                <button onclick="window.game.trainingGround.spawnEnemy()" class="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded font-bold transition-colors text-sm">召唤敌人</button>
+                                <button onclick="window.game.trainingGround.clearEnemies()" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold transition-colors text-sm">清空</button>
                             </div>
-                            <button onclick="game.phase_enemy_startLogic()" class="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white rounded font-bold transition-colors text-sm flex items-center justify-center gap-2">
+                            <button onclick="window.game.phase_enemy_startLogic()" class="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white rounded font-bold transition-colors text-sm flex items-center justify-center gap-2">
                                 <span>📡</span> 触发敌人行动
                             </button>
                         </div>
@@ -7882,7 +7883,7 @@ class TrainingGround {
         ];
         
         container.innerHTML = affixes.map(afx => `
-            <button onclick="game.trainingGround.toggleAffix('${afx.id}')" 
+            <button onclick="window.game.trainingGround.toggleAffix('${afx.id}')" 
                 id="affix-btn-${afx.id}"
                 class="flex flex-col items-center justify-center p-2 rounded border-2 transition-all ${this.enemyConfig.affixes.includes(afx.id) ? 'border-indigo-500 bg-indigo-900/40' : 'border-slate-700 bg-slate-800 hover:bg-slate-700'}">
                 <span class="text-lg">${afx.icon || ''}</span>
@@ -7918,7 +7919,7 @@ class TrainingGround {
                     <span id="val-${a.id}" class="text-[10px] font-mono text-indigo-400">${a.type === 'bool' ? (this.bulletConfig[a.id] ? 'ON' : 'OFF') : (this.bulletConfig[a.id] || 0)}</span>
                 </div>
                 ${a.type === 'bool' ? `
-                    <button onclick="game.trainingGround.toggleAttr('${a.id}')" class="w-full py-1 bg-slate-700 hover:bg-slate-600 rounded text-[10px] text-slate-300">切换</button>
+                    <button onclick="window.game.trainingGround.toggleAttr('${a.id}')" class="w-full py-1 bg-slate-700 hover:bg-slate-600 rounded text-[10px] text-slate-300">切换</button>
                 ` : `
                     <input type="range" min="${a.min}" max="${a.max}" value="${this.bulletConfig[a.id] || 0}" 
                         oninput="game.trainingGround.updateBulletAttr('${a.id}', this.value)" 
@@ -9251,7 +9252,7 @@ if (this.phase === 'truth_book') {
                             ${!isMax ? `下一級: <span class="text-amber-400/80">+${upgrade.effect.valuePerLevel}${upgrade.effect.type === 'multiply' ? 'x' : ''}</span>` : '已達最高等級'}
                         </div>
                         ${!isMax ? `
-                            <button onclick="game.meta_buyUpgrade('${upgrade.id}')" 
+                            <button onclick="window.game.meta_buyUpgrade('${upgrade.id}')" 
                                     class="px-4 py-2 rounded-lg text-xs font-bold transition-all ${canAfford ? 'bg-amber-500 text-slate-900 hover:scale-105 active:scale-95' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}">
                                 ✨ ${cost.toLocaleString()}
                             </button>
@@ -11848,9 +11849,9 @@ if (this.phase === 'truth_book') {
         const header = document.createElement('div');
         header.className = 'w-full flex justify-between items-center bg-slate-800 p-2 rounded shrink-0 sticky top-0 z-10 border border-slate-700 shadow-md';
         header.innerHTML = `
-            <button onclick="game.ui_switchDamageRound(1)" class="text-slate-400 hover:text-white px-3 py-1">◀</button>
+            <button onclick="window.game.ui_switchDamageRound(1)" class="text-slate-400 hover:text-white px-3 py-1">◀</button>
             <span class="text-xs font-bold text-amber-400 font-[Cinzel]">Round ${roundNumber}</span>
-            <button onclick="game.ui_switchDamageRound(-1)" class="text-slate-400 hover:text-white px-3 py-1">▶</button>
+            <button onclick="window.game.ui_switchDamageRound(-1)" class="text-slate-400 hover:text-white px-3 py-1">▶</button>
         `;
         container.appendChild(header);
 
@@ -15878,7 +15879,7 @@ function hexToRgba(hex, alpha) {
     }
     return hex; // 如果转换失败返回原值
 }
-const game = new Game();
+window.game = new Game();
 </script>
 </body>
 </html>
