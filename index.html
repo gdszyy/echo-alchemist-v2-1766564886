@@ -11792,11 +11792,17 @@ if (this.phase === 'truth_book') {
             }
 
             // Step 3: [新增] 过热爆炸机制 (Small Explosion)
-            // 设定阈值和概率
+            // 设定阈值和动态概率：基础 0.2 (200度)，600度时 1.0 (100%)
             const EXPLODE_THRESHOLD = 200; 
-            const EXPLODE_CHANCE = 0.3; // 30% 概率触发 (可根据需要调整)
+            let explodeChance = 0;
+            if (enemy.temp > EXPLODE_THRESHOLD) {
+                // 线性插值计算概率: 200->0.2, 600->1.0
+                // 公式: 0.2 + (temp - 200) * (1.0 - 0.2) / (600 - 200)
+                explodeChance = 0.2 + (enemy.temp - 200) * (0.8 / 400);
+                explodeChance = Math.min(1.0, explodeChance); // 最高 100%
+            }
 
-            if (enemy.temp > EXPLODE_THRESHOLD && Math.random() < EXPLODE_CHANCE) {
+            if (explodeChance > 0 && Math.random() < explodeChance) {
                 
                 // A. 计算消耗量：10% 当前热量
                 const consumedHeat = enemy.temp * 0.10;
@@ -11833,11 +11839,7 @@ if (this.phase === 'truth_book') {
                     });
                 }
 
-                // D. 热量回填机制
-                // "提升受到爆炸伤害的敌人本次消耗热量值 35% 的热量"
-                // 净消耗 = 10% - (10% * 35%) = 6.5%
-                const heatRefund = consumedHeat * 0.35;
-                enemy.temp += heatRefund;
+                // D. 移除热量回填机制 (根据需求取消回填)
             }
         }
         
