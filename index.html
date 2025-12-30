@@ -11731,17 +11731,17 @@ if (this.phase === 'truth_book') {
         if (config.cryo > 0) enemy.applyTemp(-CONFIG.balance.cryoAmount * config.cryo); 
         if (config.pyro > 0) enemy.applyTemp(CONFIG.balance.pyroAmount * config.pyro); 
         if (config.lightning > 0) {
-	             // 1. 尝试触发闪电链，并获取结果
-	             // [修改] 传入当前闪电等级 (config.lightning)
-	             const isChainTriggered = this.combat_lightning_triggerChain(enemy, dmg, projectile.chainHistory, config.lightning); 
-	             
-	             // 2. 只有在成功触发闪电链时，才提升当前敌人的温度
-	             if (isChainTriggered) {
-	                 enemy.applyTemp(config.lightning); 
-	             }
-	             
-	             projectile.chainHistory.push(enemy); 
-	        }
+		             // 1. 尝试触发闪电链，并获取结果
+		             // [修改] 传入当前闪电等级 (config.lightning)
+		             const isChainTriggered = this.combat_lightning_triggerChain(enemy, dmg, projectile.chainHistory, config.lightning); 
+		             
+		             // 2. 只有在成功触发闪电链时，才提升当前敌人的温度 (提升等同于本次伤害的温度)
+		             if (isChainTriggered) {
+		                 enemy.applyTemp(dmg); 
+		             }
+		             
+		             projectile.chainHistory.push(enemy); 
+		        }
 
         const damageResult = enemy.takeDamage(dmg);
         const killed = damageResult.killed;
@@ -11780,8 +11780,8 @@ if (this.phase === 'truth_book') {
         // --- 2. [火属性核心逻辑] 燃烧与过热爆炸 ---
         if (config.pyro > 0 && enemy.temp >= 34) {
             
-            // Step 1: 计算当前的基础额外火伤 (移除平方根以优化性能，改用线性比例)
-            const baseFireDmg = (config.pyro * enemy.temp) / 100;
+            // Step 1: 计算当前的基础额外火伤 (移除平方根以优化性能，改用线性比例 /150)
+            const baseFireDmg = (config.pyro * enemy.temp) / 150;
 
             // Step 2: 造成基础燃烧伤害
             if (baseFireDmg >= 1) {
@@ -13618,73 +13618,81 @@ if (this.phase === 'truth_book') {
         // [修复2] 容错处理
         history = history || [];
 
-        // 查找未被击中且在范围内的最近敌人
+        // 查找范围内的所有有效敌人 (取消 !history.includes(e) 限制，允许重复命中)
+        const RANGE = 150;
         let targets = this.enemies.filter(e => 
             e.active &&             
-            e !== sourceEnemy &&    
-            !history.includes(e)    
+            e !== sourceEnemy &&
+            sourceEnemy.pos.dist(e.pos) < RANGE
         ); 
 
-        // [修复3] 如果没有有效目标
+        // 如果没有有效目标
         if (targets.length === 0) return false;
 
-        let closest = null; 
-        let minDist = 150; // 连锁范围
-        
-        // 寻找最近邻居
-        targets.forEach(t => { 
-            let d = sourceEnemy.pos.dist(t.pos); 
-            if(d < minDist) { 
-                minDist = d; 
-                closest = t; 
-            } 
+        // --- 核心逻辑：距离越近概率越高 ---
+        // 计算每个目标的权重：weight = 1 / (distance^2)
+        let totalWeight = 0;
+        const weightedTargets = targets.map(t => {
+            const dist = sourceEnemy.pos.dist(t.pos);
+            const weight = 1 / (Math.pow(dist, 2) + 1); // 加1防止除以0
+            totalWeight += weight;
+            return { target: t, weight: weight, dist: dist };
         });
 
-        // 只有找到目标才继续递归
-        if (closest) { 
-            let p = 0.15; // 基础连锁概率
-            if (closest.temp < 0) p = Math.min(1.0, 0.15 + Math.abs(closest.temp) * 0.0085); 
-            
-            if (Math.random() < p) { 
-                // [优化] 动态延迟逻辑：链接次数越多，延迟越短
-                const chainCount = history.length;
-                const delay = Math.max(0, 150 - chainCount * 30); // 初始 150ms，每层减少 30ms，最低 0ms
-
-                setTimeout(() => {
-                    // 再次检查目标是否仍然有效
-                    if (!closest.active) return;
-
-                    // 视觉效果：闪电链
-                    this.lightningBolts.push(new LightningBolt(sourceEnemy.pos.x, sourceEnemy.pos.y, closest.pos.x, closest.pos.y)); 
-                    audio.playLightning(); 
-                    
-                    // [优化] 击中特效：产生电击粒子
-                    for(let i=0; i<5; i++) {
-                        this.spawn_createParticle(closest.pos.x, closest.pos.y, '#c084fc', 'spark');
-                    }
-                    
-                    // [核心修改] 计算下一次伤害
-                    const decayFactor = 0.45 + (0.05 * level);
-                    const nextDmg = Math.max(1, Math.floor(dmg * decayFactor));
-
-                    // 伤害与状态
-                    closest.applyTemp(CONFIG.balance.lightningTempIncrease); 
-                    
-                    // === 修改开始 ===
-                    const result = closest.takeDamage(dmg); // 获取结果对象
-                    this.combat_recordDamage(result.actualDamage, 'lightning', 'main', this._currentDamageShotId); // 记录真实伤害
-                    
-                    if(result.killed) this.spawn_addScore(closest.maxHp);
-                    // === 修改结束 ===
-                    
-                    // 递归
-                    history.push(closest); 
-                    this.combat_lightning_triggerChain(closest, nextDmg, history, level); 
-                }, delay);
-                
-                return true;
-            } 
+        // 随机选择一个目标
+        let randomValue = Math.random() * totalWeight;
+        let selected = null;
+        for (const wt of weightedTargets) {
+            randomValue -= wt.weight;
+            if (randomValue <= 0) {
+                selected = wt.target;
+                break;
+            }
         }
+        if (!selected) selected = targets[0];
+
+        // 判定连锁概率
+        let p = 0.15; // 基础连锁概率
+        if (selected.temp < 0) p = Math.min(1.0, 0.15 + Math.abs(selected.temp) * 0.0085); 
+        
+        if (Math.random() < p) { 
+            // [优化] 动态延迟逻辑：链接次数越多，延迟越短
+            const chainCount = history.length;
+            const delay = Math.max(0, 150 - chainCount * 30); 
+
+            setTimeout(() => {
+                if (!selected.active) return;
+
+                // 视觉效果：闪电链
+                this.lightningBolts.push(new LightningBolt(sourceEnemy.pos.x, sourceEnemy.pos.y, selected.pos.x, selected.pos.y)); 
+                audio.playLightning(); 
+                
+                for(let i=0; i<5; i++) {
+                    this.spawn_createParticle(selected.pos.x, selected.pos.y, '#c084fc', 'spark');
+                }
+                
+                // 计算下一次伤害
+                const decayFactor = 0.45 + (0.05 * level);
+                const nextDmg = Math.max(1, Math.floor(dmg * decayFactor));
+
+                // 伤害与状态：提升等同于本次伤害的温度
+                selected.applyTemp(dmg); 
+                
+                const result = selected.takeDamage(dmg); 
+                this.combat_recordDamage(result.actualDamage, 'lightning', 'main', this._currentDamageShotId); 
+                
+                if(result.killed) this.spawn_addScore(selected.maxHp);
+                
+                // 递归
+                history.push(selected); 
+                // 限制最大连锁次数防止死循环 (例如 15 次)
+                if (history.length < 15) {
+                    this.combat_lightning_triggerChain(selected, nextDmg, history, level); 
+                }
+            }, delay);
+            
+            return true;
+        } 
         return false;
     }
     /**
@@ -16116,7 +16124,7 @@ const TRUTH_BOOK_DATA = {
         },
         {
             id: 'pyro', name: '火焰', icon: '🔥', tags: ['元素', '範圍爆炸'],
-            desc: '升高敵人溫度。溫度 >= 34°C 時觸发【燃燒】造成持續傷害。溫度 > 200°C 時有概率觸发【過熱爆炸】，造成大範圍 AOE 傷害並消耗 10% 熱量。觸发概率隨溫度提升，600°C 時必爆。',
+            desc: '升高敵人溫度。溫度 >= 34°C 時觸发【燃燒】造成持續傷害（公式：温度/150）。溫度 > 200°C 時有概率觸发【過熱爆炸】，造成大範圍 AOE 傷害並消耗 10% 熱量。觸发概率隨溫度提升，600°C 時必爆。',
             setup: (game) => { 
                 game.enemies.push(new Enemy(game.width/2, 200, 80, 80, 1000)); 
                 // 增加周圍敵人以演示 AOE
@@ -16135,7 +16143,7 @@ const TRUTH_BOOK_DATA = {
         },
         {
             id: 'lightning', name: '閃電', icon: '⚡', tags: ['元素', '連鎖'],
-            desc: '命中時觸發連鎖閃電。基礎連鎖概率 15%，目標溫度越低概率越高（最高 100%）。連鎖傷害衰減系數隨閃電等級提升（0.45 + 0.05 * 等級），且連锁次數越多跳躍延遲越短。',
+            desc: '命中時觸發連鎖閃電，提升等同於本次傷害的溫度。閃電鏈可對重複敵人造成傷害，隨機在範圍內索敵且距離越近概率越高。基礎連鎖概率 15%，目標溫度越低概率越高（最高 100%）。',
             setup: (game) => {
                 const e1 = new Enemy(game.width/2 - 50, 200, 50, 50, 200);
                 e1.temp = -100; // 凍結狀態
