@@ -7743,14 +7743,12 @@ class LightningBolt {
             current = nextPos;
         }
     }
-
     update(timeScale) {
-        // [优化] 闪电链生长动画：先快速生长，再缓慢消失
+        // [优化] 闪电链生长动画：先快速生长，再缓慢消失 (放慢消失速度以提升视觉快感)
         if (this.progress < 1.0) {
-            this.progress += 0.15 * timeScale; // 生长速度
-            if (this.progress > 1.0) this.progress = 1.0;
+            this.progress += 0.12 * timeScale; // 生长速度稍微放慢 (原 0.15)
         } else {
-            this.life -= 0.08 * timeScale; // 消失速度
+            this.life -= 0.04 * timeScale; // 消失速度大幅放慢 (原 0.08)，让闪电在屏幕上停留更久
         }
     }
 
@@ -13662,9 +13660,10 @@ if (this.phase === 'truth_book') {
         if (selected.temp < 0) p = Math.min(1.0, 0.15 + Math.abs(selected.temp) * 0.0085); 
         
         if (Math.random() < p) { 
-            // [优化] 动态延迟逻辑：链接次数越多，延迟越短
+            // [优化] 增加基础延迟，放慢连锁节奏，提升视觉快感
             const chainCount = history.length;
-            const delay = Math.max(0, 150 - chainCount * 30); 
+            // 基础延迟从 150ms 增加到 250ms，且减速曲线更平缓
+            const delay = Math.max(50, 250 - chainCount * 15); 
 
             setTimeout(() => {
                 if (!selected.active) return;
