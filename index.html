@@ -1353,27 +1353,29 @@ const META_SHOP_CONFIG = {
             effect: { path: 'gameplay.relicChoiceNum', valuePerLevel: 1, type: 'add' }
         }
     ,
-        // (需求3) 初始解锁风属性钉子
+        // (需求3) 初始解锁风属性钉子 - 改为临时增强
         {
             id: 'init_wind_peg',
-            category: 'attribute',
+            category: 'temporary',
             name: '风暴之眼',
-            desc: '收集阶段：初始将 1 个普通钉子替换为 [风] 属性钉子。',
+            desc: '下一次游戏：收集阶段初始将 1 个普通钉子替换为 [风] 属性钉子。(每局可购买一次)',
             icon: '🌪️',
-            maxLevel: 3,
-            cost: { resourceId: 'energy_essence', base: 200, growth: 2.0, type: 'exponential' },
-            effect: { path: 'gameplay.initWindPegs', valuePerLevel: 1, type: 'add' }
+            maxLevel: 1,
+            cost: { resourceId: 'energy_essence', base: 200, growth: 1.0, type: 'exponential' },
+            effect: { path: 'gameplay.initWindPegs', valuePerLevel: 1, type: 'add' },
+            temporary: true
         },
-        // (需求4) 初始解锁子母剑钉子
+        // (需求4) 初始解锁子母剑钉子 - 改为临时增强
         {
             id: 'init_sword_peg',
-            category: 'attribute',
+            category: 'temporary',
             name: '剑冢',
-            desc: '收集阶段：初始将 1 个普通钉子替换为 [飞剑] 属性钉子。',
+            desc: '下一次游戏：收集阶段初始将 1 个普通钉子替换为 [飞剑] 属性钉子。(每局可购买一次)',
             icon: '🗡️',
-            maxLevel: 3,
-            cost: { resourceId: 'energy_essence', base: 300, growth: 2.0, type: 'exponential' },
-            effect: { path: 'gameplay.initSwordPegs', valuePerLevel: 1, type: 'add' }
+            maxLevel: 1,
+            cost: { resourceId: 'energy_essence', base: 300, growth: 1.0, type: 'exponential' },
+            effect: { path: 'gameplay.initSwordPegs', valuePerLevel: 1, type: 'add' },
+            temporary: true
         },
         // (需求6) 子弹初始伤害
         {
@@ -1432,7 +1434,8 @@ const META_SHOP_CONFIG = {
     categories: {
         attribute: { name: '屬性煉金', icon: '🧪' },
         defense: { name: '陣地防御', icon: '🏰' },
-        resource: { name: '資源調度', icon: '📦' }
+        resource: { name: '資源調度', icon: '📦' },
+        temporary: { name: '临时增强', icon: '⏳' }
     }
 };
 // (需求5) 批量添加所有属性的概率商品
@@ -8727,6 +8730,7 @@ class Game {
         this.saveData = {
             currency: 0,        // 能量精粹
             upgrades: {},       // 已购买的升级项 { id: level }
+            temporaryUpgrades: {}, // 临时增强 { id: level } 每局重置
             unlockedItems: [],  // 已解锁项目
             highScore: 0
         };
@@ -9534,9 +9538,18 @@ if (this.phase === 'truth_book') {
      */
     meta_applyUpgrades() {
         if (!this.saveData.upgrades) this.saveData.upgrades = {};
+        if (!this.saveData.temporaryUpgrades) this.saveData.temporaryUpgrades = {};
         
         META_SHOP_CONFIG.upgrades.forEach(upgrade => {
-            const level = this.saveData.upgrades[upgrade.id] || 0;
+            let level = 0;
+            // 临时增强从 temporaryUpgrades 读取
+            if (upgrade.temporary) {
+                level = this.saveData.temporaryUpgrades[upgrade.id] || 0;
+            } else {
+                // 永久升级从 upgrades 读取
+                level = this.saveData.upgrades[upgrade.id] || 0;
+            }
+            
             if (level > 0) {
                 const effectValue = upgrade.effect.valuePerLevel * level;
                 setDeepValue(CONFIG, upgrade.effect.path, effectValue, upgrade.effect.type);
@@ -9644,7 +9657,9 @@ if (this.phase === 'truth_book') {
             const upgrades = META_SHOP_CONFIG.upgrades.filter(u => u.category === this.meta_currentShopCategory);
             
             upgrades.forEach(upgrade => {
-                const level = this.saveData.upgrades[upgrade.id] || 0;
+                const isTemporary = upgrade.temporary || false;
+                const currentData = isTemporary ? this.saveData.temporaryUpgrades : this.saveData.upgrades;
+                const level = currentData[upgrade.id] || 0;
                 const isMax = level >= upgrade.maxLevel;
                 const cost = this.meta_calculateUpgradeCost(upgrade, level);
                 const canAfford = this.saveData.currency >= cost;
@@ -9697,19 +9712,24 @@ if (this.phase === 'truth_book') {
      */
     meta_buyUpgrade(upgradeId) {
         const upgrade = META_SHOP_CONFIG.upgrades.find(u => u.id === upgradeId);
-        const level = this.saveData.upgrades[upgradeId] || 0;
+        
+        // 临时增强和永久升级分开处理
+        const isTemporary = upgrade.temporary || false;
+        const currentData = isTemporary ? this.saveData.temporaryUpgrades : this.saveData.upgrades;
+        const level = currentData[upgradeId] || 0;
         
         if (level >= upgrade.maxLevel) return;
         
         const cost = this.meta_calculateUpgradeCost(upgrade, level);
         if (this.saveData.currency >= cost) {
             this.saveData.currency -= cost;
-            this.saveData.upgrades[upgradeId] = level + 1;
+            currentData[upgradeId] = level + 1;
             this.sys_saveData();
             this.ui_updateMetaCurrency();
             this.ui_renderShop();
             if (window.audio) audio.playTone(800, 'sine', 0.1, 0.3);
-            if (window.showToast) showToast(`升級成功: ${upgrade.name} LV.${level + 1}`);
+            const typeText = isTemporary ? '下一局生效' : `LV.${level + 1}`;
+            if (window.showToast) showToast(`购买成功: ${upgrade.name} ${typeText}`);
         } else {
             if (window.showToast) showToast("能量精粹不足");
             if (window.audio) audio.playTone(200, 'sawtooth', 0.1, 0.2);
@@ -9719,6 +9739,10 @@ if (this.phase === 'truth_book') {
     sys_resetGame() {
         this.runCurrency = 0; // 重置本局获得的货币
         this.gameOver = false;
+        
+        // 清空临时增强（游戏结束后重置）
+        this.saveData.temporaryUpgrades = {};
+        this.sys_saveData();
         this.round = 1;
         this.score = 0;
         this.scoreMultiplier = 1.0;
@@ -12129,7 +12153,7 @@ if (this.phase === 'truth_book') {
     spawn_addScore(amount) { 
         const finalScore = Math.floor(amount * this.scoreMultiplier);
         this.score += finalScore;
-        const resourceGain = Math.floor(finalScore / 10);
+        const resourceGain = Math.floor(Math.sqrt(finalScore) / 2 + 2);
         if (resourceGain > 0) {
             this.runCurrency += resourceGain;
             this.meta_addCurrency(resourceGain);
@@ -13409,6 +13433,13 @@ if (this.phase === 'truth_book') {
         const logicPos = pos.sub(offset); 
         
         this.lastMousePos = logicPos;
+
+        // 处理 gameOver 状态的点击返回主界面
+        if (this.gameOver) {
+            this.phase_switchPhase('meta');
+            this.sys_resetGame();
+            return;
+        }
 
         if (this.phase === 'combat') {
              const hitEnemy = this.input_checkEnemyHover(pos);
@@ -15215,14 +15246,12 @@ if (this.phase === 'truth_book') {
         // --- UI Overlays ---
         if (this.gameOver) { 
             // [META] 结算货币并保存
-            this.meta_addCurrency(this.runCurrency);
-            this.runCurrency = 0;
-
-            document.getElementById('combat-message').innerHTML = '<span class="text-red-400 font-bold text-4xl">防線失守</span><br><span class="text-sm pointer-events-none">點擊返回主界面</span>'; 
-            if (this.isDragging) {
-                this.phase_switchPhase('meta');
-                this.sys_resetGame();
+            if (this.runCurrency > 0) {
+                this.meta_addCurrency(this.runCurrency);
+                this.runCurrency = 0;
             }
+
+            document.getElementById('combat-message').innerHTML = '<span class="text-red-400 font-bold text-4xl">防線失守</span><br><span class="text-sm">點擊返回主界面</span>'; 
             return; 
         }
 
