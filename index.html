@@ -6435,25 +6435,46 @@ class Projectile {
         }
         this.lifeTime -= timeScale;
         if (this.lifeTime <= 0) { this.destroy(spawnCallback); return; }
-        const fullMove = this.vel.mult(timeScale);
-        const totalSpeed = fullMove.mag();
-        let potentialEnemies = [];
-        if (totalSpeed > this.radius) {
-            potentialEnemies = enemies.filter(e => e.active && this.pos.dist(e.pos) < (totalSpeed + e.width));
-        } else {
-            potentialEnemies = enemies.filter(e => e.active && this.pos.dist(e.pos) < (this.radius + e.width));
-        }
-        const steps = Math.ceil(totalSpeed / (this.radius * 0.8));
-        const subStepVel = fullMove.mult(1 / steps);
+        // [优化 1] 增加空气阻力，防止无限加速导致的隧穿 (可选，这里设为 1.0 表示无阻力)
+        this.vel = this.vel.mult(1.0);
+
+        // [优化 2] 动态子步进计算
+        // 确保每一步移动距离不超过半径的 50%，大幅提升高速碰撞的稳定性
+        const speed = this.vel.mag();
+        const safeStep = this.radius * 0.5;
+        const steps = Math.ceil(speed * timeScale / safeStep) || 1;
+        const subStepVel = this.vel.mult(timeScale / steps);
+
+        // 获取活跃敌人列表 (优化遍历性能)
+        const activeEnemies = enemies.filter(e => e.active);
+
         for (let s = 0; s < steps; s++) {
+            // 分步移动
             this._applyMove(subStepVel, width, height, spawnCallback);
             if (!this.active) return;
-            for (let e of potentialEnemies) {
-                if (!e.active) continue;
-                const dx = this.pos.x - e.pos.x;
-                const dy = this.pos.y - e.pos.y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist < (e.width/2 + this.radius)) {
+
+            for (let e of activeEnemies) {
+                // [优化 3] 矩形碰撞检测 (Circle vs AABB)
+                // 这能完美解决 "从两个斜对角敌人中间穿过" 的问题
+                
+                const halfW = e.width / 2;
+                const halfH = e.height / 2;
+
+                // 1. 寻找矩形上离圆心最近的点 (Closest Point)
+                // 将圆心坐标限制在矩形边界内
+                const closestX = Math.max(e.pos.x - halfW, Math.min(this.pos.x, e.pos.x + halfW));
+                const closestY = Math.max(e.pos.y - halfH, Math.min(this.pos.y, e.pos.y + halfH));
+
+                // 2. 计算距离向量 (圆心 到 最近点)
+                const distVecX = this.pos.x - closestX;
+                const distVecY = this.pos.y - closestY;
+                const distSq = distVecX * distVecX + distVecY * distVecY;
+
+                // 3. 判定碰撞 (距离平方 < 半径平方)
+                // 注意：这里稍微加大了判定半径 (+2)，让碰撞手感更"实"，不容易漏
+                const hitRadius = this.radius + 2;
+
+                if (distSq < hitRadius * hitRadius) {
                     if (this.hitCooldowns.has(e)) continue;
                     this.hitCooldowns.set(e, CONFIG.gameplay.hitCooldowns);
                     this.lastHitEnemy = e;
@@ -6476,32 +6497,58 @@ class Projectile {
                     }
                     if (this.bouncesLeft > 0) {
                         this.bouncesLeft--;
-                        if (this.config.wind && this.isLast) {
-                            if (typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage);
-                        }
-                        // --- 修复开始：AABB 矩形法线计算与位置修正 ---
-                        const halfW = e.width / 2;
-                        const halfH = e.height / 2;
                         
+                        // 风属性锤点逻辑
+                        if (this.config.wind && this.isLast && typeof game !== 'undefined') {
+                            game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage);
+                        }
+
+                        // [核心修复] 基于最近点的精确物理反弹
+                        const dist = Math.sqrt(distSq);
                         let normal;
-                        if (Math.abs(dx / halfW) > Math.abs(dy / halfH)) {
-                            normal = new Vec2(Math.sign(dx), 0);
-                            // 位置修正：将子弹推到敌人边缘，防止钻入
-                            this.pos.x = e.pos.x + normal.x * (halfW + this.radius + 0.1);
+
+                        if (dist === 0) {
+                            // 特殊情况：圆心在矩形内部 (Deep Penetration)
+                            // 策略：寻找最近的边界推出
+                            const dx = this.pos.x - e.pos.x;
+                            const dy = this.pos.y - e.pos.y;
+                            // 判断是更靠近左右边还是上下边
+                            const overlapX = halfW - Math.abs(dx);
+                            const overlapY = halfH - Math.abs(dy);
+
+                            if (overlapX < overlapY) {
+                                normal = new Vec2(Math.sign(dx) || 1, 0);
+                            } else {
+                                normal = new Vec2(0, Math.sign(dy) || 1);
+                            }
                         } else {
-                            normal = new Vec2(0, Math.sign(dy));
-                            // 位置修正：将子弹推到敌人边缘，防止钻入
-                            this.pos.y = e.pos.y + normal.y * (halfH + this.radius + 0.1);
+                            // 正常情况：撞击表面或角落
+                            // 法线就是 "最近点 -> 圆心" 的单位向量
+                            normal = new Vec2(distVecX / dist, distVecY / dist);
                         }
-                        
-                        // 反弹向量计算
+
+                        // 1. 位置修正 (Push Out)：将子弹推离敌人表面，防止下一帧卡住
+                        const pushOutDist = this.radius + 0.1;
+                        if (dist === 0) {
+                            // 内部推出
+                            this.pos.x = closestX + normal.x * pushOutDist;
+                            this.pos.y = closestY + normal.y * pushOutDist;
+                        } else {
+                            // 外部推出 (从最近点往外推)
+                            this.pos.x = closestX + normal.x * pushOutDist;
+                            this.pos.y = closestY + normal.y * pushOutDist;
+                        }
+
+                        // 2. 速度反弹 (Reflection)
+                        // v' = v - 2 * (v · n) * n
                         const dot = this.vel.dot(normal);
-                        // 只有当速度方向指向敌人内部时才反弹，防止被卡住
+                        // 只有当速度朝向物体内部时才反弹 (防止已经离开时被错误反拉)
                         if (dot < 0) {
                             this.vel = this.vel.sub(normal.mult(2 * dot));
                         }
-                        // --- 修复结束 ---
-                        this.deformation = { x: 1.4, y: 0.6 };
+
+                        // 视觉挤压效果
+                        this.deformation = { x: 1.3, y: 0.7 }; // 撞击变扁
                     } else {
                         this.destroy(spawnCallback);
                         return;
