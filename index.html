@@ -11780,9 +11780,8 @@ if (this.phase === 'truth_book') {
         // --- 2. [火属性核心逻辑] 燃烧与过热爆炸 ---
         if (config.pyro > 0 && enemy.temp >= 34) {
             
-            // Step 1: 计算当前的基础额外火伤 (使用平方根公式保持数值健康)
-            const tempFactor = Math.sqrt(enemy.temp); 
-            const baseFireDmg = config.pyro * tempFactor * 2.0;
+            // Step 1: 计算当前的基础额外火伤 (移除平方根以优化性能，改用线性比例)
+            const baseFireDmg = (config.pyro * enemy.temp) / 100;
 
             // Step 2: 造成基础燃烧伤害
             if (baseFireDmg >= 1) {
