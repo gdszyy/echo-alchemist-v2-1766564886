@@ -1302,36 +1302,29 @@ const META_SHOP_CONFIG = {
         energy_essence: { id: 'energy_essence', name: '能量精粹', icon: '✨', color: '#fbbf24' }
     },
     upgrades: [
+        // --- 基礎屬性 (定價: 50起，線性增長) ---
+        {
+            id: 'base_damage_up',
+            category: 'attribute',
+            name: '火藥改良',
+            desc: '基礎傷害 +1。',
+            icon: '💥',
+            maxLevel: 10,
+            cost: { resourceId: 'energy_essence', base: 50, growth: 25, type: 'linear' },
+            effect: { path: 'gameplay.baseDamage', valuePerLevel: 1, type: 'add' }
+        },
         {
             id: 'init_weight_bounce',
             category: 'attribute',
             name: '彈性增幅',
-            desc: '增加初始彈珠中 [反彈] 屬性的權重。',
+            desc: '增加初始 [反彈] 屬性權重。',
             icon: '🔄',
             maxLevel: 10,
-            cost: { resourceId: 'energy_essence', base: 50, growth: 1.4, type: 'exponential' },
+            cost: { resourceId: 'energy_essence', base: 30, growth: 1.5, type: 'exponential' },
             effect: { path: 'probabilities.bounce', valuePerLevel: 10, type: 'add' }
         },
-        {
-            id: 'init_weight_pierce',
-            category: 'attribute',
-            name: '穿透解鎖',
-            desc: '解鎖並增加初始 [穿透] 屬性的權重。',
-            icon: '↗️',
-            maxLevel: 10,
-            cost: { resourceId: 'energy_essence', base: 100, growth: 1.5, type: 'exponential' },
-            effect: { path: 'probabilities.pierce', valuePerLevel: 8, type: 'add' }
-        },
-        {
-            id: 'assimilation_boost',
-            category: 'attribute',
-            name: '同化共鳴',
-            desc: '提升所有屬性的基礎同化概率。',
-            icon: '🧪',
-            maxLevel: 5,
-            cost: { resourceId: 'energy_essence', base: 200, growth: 2.0, type: 'exponential' },
-            effect: { path: 'gameplay.assimilationChance', valuePerLevel: 0.02, type: 'add_all' }
-        },
+        
+        // --- 戰略升級 (定價: 150~300) ---
         {
             id: 'defense_line',
             category: 'defense',
@@ -1339,124 +1332,53 @@ const META_SHOP_CONFIG = {
             desc: '減少初始生成的敵人行數。',
             icon: '🛡️',
             maxLevel: 2,
-            cost: { resourceId: 'energy_essence', values: [500, 2000], type: 'fixed' },
+            cost: { resourceId: 'energy_essence', values: [150, 400], type: 'fixed' },
             effect: { path: 'gameplay.startRows', valuePerLevel: -1, type: 'add' }
         },
         {
             id: 'relic_choice',
             category: 'resource',
-            name: '博学多才',
-            desc: '增加遺物選擇時的可選數量。',
+            name: '博學多才',
+            desc: '增加遺物選擇數量。',
             icon: '📚',
             maxLevel: 2,
-            cost: { resourceId: 'energy_essence', base: 1000, growth: 3000, type: 'linear' },
+            cost: { resourceId: 'energy_essence', values: [200, 500], type: 'fixed' },
             effect: { path: 'gameplay.relicChoiceNum', valuePerLevel: 1, type: 'add' }
-        }
-    ,
-        // (需求3) 初始解锁风属性钉子
+        },
+        
+        // --- [奢侈品] 一次性消耗品 (定價: 300~600) ---
         {
-            id: 'init_wind_peg',
-            category: 'attribute',
-            name: '风暴之眼',
-            desc: '收集阶段：初始将 1 个普通钉子替换为 [风] 属性钉子。',
+            id: 'consumable_wind_peg',
+            category: 'consumable',
+            name: '風暴信標',
+            desc: '【一次性】下一局開局生成 [風] 屬性釘子。',
             icon: '🌪️',
-            maxLevel: 3,
-            cost: { resourceId: 'energy_essence', base: 200, growth: 2.0, type: 'exponential' },
-            effect: { path: 'gameplay.initWindPegs', valuePerLevel: 1, type: 'add' }
+            maxLevel: 1,
+            type: 'consumable',
+            cost: { resourceId: 'energy_essence', base: 300, growth: 0, type: 'fixed' }, 
+            effect: { type: 'flag', flag: 'start_with_wind_peg' }
         },
-        // (需求4) 初始解锁子母剑钉子
         {
-            id: 'init_sword_peg',
-            category: 'attribute',
-            name: '剑冢',
-            desc: '收集阶段：初始将 1 个普通钉子替换为 [飞剑] 属性钉子。',
+            id: 'consumable_sword_peg',
+            category: 'consumable',
+            name: '劍冢令',
+            desc: '【一次性】下一局開局生成 [飛劍] 屬性釘子。',
             icon: '🗡️',
-            maxLevel: 3,
-            cost: { resourceId: 'energy_essence', base: 300, growth: 2.0, type: 'exponential' },
-            effect: { path: 'gameplay.initSwordPegs', valuePerLevel: 1, type: 'add' }
-        },
-        // (需求6) 子弹初始伤害
-        {
-            id: 'base_damage_up',
-            category: 'attribute',
-            name: '火药改良',
-            desc: '所有子弹的初始基础伤害提升。',
-            icon: '💥',
-            maxLevel: 5,
-            cost: { resourceId: 'energy_essence', base: 500, growth: 1.5, type: 'exponential' },
-            effect: { path: 'gameplay.baseDamage', valuePerLevel: 1, type: 'add' }
-        },
-        // (需求7) 冰火温度值升级
-        {
-            id: 'pyro_efficiency',
-            category: 'attribute',
-            name: '纯净燃油',
-            desc: '提升 [火焰] 属性单层提供的热量值。',
-            icon: '🔥',
-            maxLevel: 5,
-            cost: { resourceId: 'energy_essence', base: 150, growth: 1.5, type: 'exponential' },
-            effect: { path: 'balance.pyroAmount', valuePerLevel: 0.2, type: 'add' }
-        },
-        {
-            id: 'cryo_efficiency',
-            category: 'attribute',
-            name: '极寒晶核',
-            desc: '提升 [冰霜] 属性单层提供的冷冻值。',
-            icon: '❄️',
-            maxLevel: 5,
-            cost: { resourceId: 'energy_essence', base: 150, growth: 1.5, type: 'exponential' },
-            effect: { path: 'balance.cryoAmount', valuePerLevel: 0.2, type: 'add' }
-        },
-        // (需求8) 激光长度升级
-        {
-            id: 'laser_focus',
-            category: 'attribute',
-            name: '聚焦透镜',
-            desc: '提升 [激光] 属性的初始射程/穿透深度。',
-            icon: '🔦',
-            maxLevel: 5,
-            cost: { resourceId: 'energy_essence', base: 200, growth: 1.5, type: 'exponential' },
-            effect: { path: 'gameplay.laserLengthBonus', valuePerLevel: 50, type: 'add' }
-        },
-        // (需求9) 连击需求降低
-        {
-            id: 'combo_mastery',
-            category: 'resource',
-            name: '节奏大师',
-            desc: '降低连击充能条的初始触发需求值。',
-            icon: '🔋',
-            maxLevel: 3,
-            cost: { resourceId: 'energy_essence', base: 1000, growth: 2.0, type: 'exponential' },
-            effect: { path: 'gameplay.initTriggerThreshold', valuePerLevel: -1, type: 'add' }
-        }],
+            maxLevel: 1,
+            type: 'consumable',
+            cost: { resourceId: 'energy_essence', base: 600, growth: 0, type: 'fixed' }, 
+            effect: { type: 'flag', flag: 'start_with_sword_peg' }
+        }
+    ],
     categories: {
-        attribute: { name: '屬性煉金', icon: '🧪' },
-        defense: { name: '陣地防御', icon: '🏰' },
-        resource: { name: '資源調度', icon: '📦' }
+        attribute: { name: '基礎煉金', icon: '🧪' },
+        defense: { name: '陣地防禦', icon: '🏰' },
+        resource: { name: '資源調度', icon: '📦' },
+        consumable: { name: '禁忌秘儀', icon: '📜' }
     }
 };
 // (需求5) 批量添加所有属性的概率商品
-const ATTRIBUTES_FOR_SHOP = [
-    { id: 'scatter', icon: '🔱', name: '散射' },
-    { id: 'cryo', icon: '❄️', name: '冰霜' },
-    { id: 'pyro', icon: '🔥', name: '火焰' },
-    { id: 'lightning', icon: '⚡', name: '闪电' },
-    
-    { id: 'laser', icon: '🔦', name: '激光' }
-];
 
-ATTRIBUTES_FOR_SHOP.forEach(attr => {
-    META_SHOP_CONFIG.upgrades.push({
-        id: `prob_${attr.id}`,
-        category: 'attribute',
-        name: `${attr.name}亲和`,
-        desc: `增加收集阶段 [${attr.name}] 属性出现的概率权重。`,
-        icon: attr.icon,
-        maxLevel: 5,
-        cost: { resourceId: 'energy_essence', base: 100, growth: 1.3, type: 'exponential' },
-        effect: { path: `probabilities.${attr.id}`, valuePerLevel: 5, type: 'add' }
-    });
-});
 
 
 /**
@@ -8313,7 +8235,7 @@ class Game {
             unlockedItems: [],  // 已解锁项目
             highScore: 0
         };
-        this.runCurrency = 0;   // 本局获得的货币
+           // 本局获得的货币
         this.sys_loadSaveData(); // 读取存档
 
         // --- [META] 不再直接开始游戏，而是显示主界面 ---
@@ -9166,6 +9088,39 @@ if (this.phase === 'truth_book') {
         this.ui_updateMetaCurrency();
     }
 
+    sys_triggerGameOver() {
+        this.gameOver = true;
+        
+        // --- 修改：新的資源轉化公式 ---
+        // 公式: Floor( Sqrt(分數) )
+        const baseIncome = Math.floor(Math.sqrt(this.score));
+        const totalIncome = baseIncome; 
+
+        if (totalIncome > 0) {
+            this.meta_addCurrency(totalIncome);
+        }
+
+        // 顯示結算 UI
+        const container = document.getElementById('phase-title-container');
+        const title = document.getElementById('phase-title');
+        const sub = document.getElementById('phase-sub');
+        
+        if (container && title && sub) {
+            container.classList.remove('minimized');
+            title.innerText = "煉成失敗";
+            title.style.color = "#ef4444";
+            sub.innerHTML = `得分: ${Math.floor(this.score)}<br><span style="color:#fbbf24; font-weight:bold;">獲得精粹: +${totalIncome}</span>`;
+        }
+        
+        setTimeout(() => {
+            document.body.onclick = () => {
+                document.body.onclick = null;
+                location.reload();
+            };
+        }, 1000);
+    }
+
+
     /**
      * [UI] 更新主界面的货币显示
      */
@@ -9269,7 +9224,10 @@ if (this.phase === 'truth_book') {
      */
     meta_calculateUpgradeCost(upgrade, level) {
         const c = upgrade.cost;
-        if (c.type === 'fixed') return c.values[level] || 0;
+        if (c.type === 'fixed') {
+            if (c.values) return c.values[level] || 0;
+            return c.base || 0;
+        }
         if (c.type === 'linear') return c.base + level * c.growth;
         if (c.type === 'exponential') return Math.floor(c.base * Math.pow(c.growth, level));
         return 0;
@@ -9278,7 +9236,7 @@ if (this.phase === 'truth_book') {
     /**
      * [META] 购买升级
      */
-    meta_buyUpgrade(upgradeId) {
+        meta_buyUpgrade(upgradeId) {
         const upgrade = META_SHOP_CONFIG.upgrades.find(u => u.id === upgradeId);
         const level = this.saveData.upgrades[upgradeId] || 0;
         
@@ -9287,12 +9245,21 @@ if (this.phase === 'truth_book') {
         const cost = this.meta_calculateUpgradeCost(upgrade, level);
         if (this.saveData.currency >= cost) {
             this.saveData.currency -= cost;
-            this.saveData.upgrades[upgradeId] = level + 1;
+            
+            // [修改] 处理消耗品逻辑
+            if (upgrade.type === 'consumable') {
+                const flag = upgrade.effect.flag;
+                this.saveData.flags = this.saveData.flags || {};
+                this.saveData.flags[flag] = true;
+            } else {
+                this.saveData.upgrades[upgradeId] = level + 1;
+            }
+            
             this.sys_saveData();
             this.ui_updateMetaCurrency();
             this.ui_renderShop();
             if (window.audio) audio.playTone(800, 'sine', 0.1, 0.3);
-            if (window.showToast) showToast(`升級成功: ${upgrade.name} LV.${level + 1}`);
+            if (window.showToast) showToast(`購買成功: ${upgrade.name}`);
         } else {
             if (window.showToast) showToast("能量精粹不足");
             if (window.audio) audio.playTone(200, 'sawtooth', 0.1, 0.2);
@@ -9300,7 +9267,7 @@ if (this.phase === 'truth_book') {
     }
 
     sys_resetGame() {
-        this.runCurrency = 0; // 重置本局获得的货币
+         // 重置本局获得的货币
         this.gameOver = false;
         this.round = 1;
         this.score = 0;
@@ -12745,7 +12712,23 @@ if (this.phase === 'truth_book') {
     /**
      * [AUTO-GENERATED] TODO: Add a description for sys_initPachinko.
      */
-    phase_gathering_initPachinko(shouldInherit = false) {
+        phase_gathering_initPachinko(shouldInherit = false) {
+        // [新增] 处理开局消耗品逻辑
+        if (!shouldInherit && this.round === 1) {
+            const flags = this.saveData.flags || {};
+            if (flags['start_with_wind_peg']) {
+                this.guaranteedNextRound.push('wind');
+                delete flags['start_with_wind_peg'];
+                this.sys_saveData();
+                showToast("🌪️ 風暴信標已啟用");
+            }
+            if (flags['start_with_sword_peg']) {
+                this.guaranteedNextRound.push('flying_sword');
+                delete flags['start_with_sword_peg'];
+                this.sys_saveData();
+                showToast("🗡️ 劍冢令已啟用");
+            }
+        }
         // [修复] 使用动态行数
         const rows = this.currentRows || CONFIG.gameplay.rows;
         // [修复] 获取间距配置
@@ -12782,11 +12765,21 @@ if (this.phase === 'truth_book') {
                     if (prevPeg.type !== 'pink') {
                         type = prevPeg.type;
                         level = prevPeg.level || 1;
+                                    } else {
+                    // [修改] 优先使用保证生成的类型
+                    if (!shouldInherit && this.round === 1 && this.guaranteedNextRound.length > 0 && Math.random() < 0.1) {
+                        type = this.guaranteedNextRound.shift();
                     } else {
                         type = this.phase_gathering_getRandomPegType();
                     }
-                } else {
-                    type = this.phase_gathering_getRandomPegType();
+                }
+                                } else {
+                    // [修改] 优先使用保证生成的类型
+                    if (!shouldInherit && this.round === 1 && this.guaranteedNextRound.length > 0 && Math.random() < 0.1) {
+                        type = this.guaranteedNextRound.shift();
+                    } else {
+                        type = this.phase_gathering_getRandomPegType();
+                    }
                 }
 
                 let p = new Peg(x, y, type);
@@ -14322,7 +14315,7 @@ if (this.phase === 'truth_book') {
 
         // 检查失败
         if (this.input_checkDefeat()) {
-            this.gameOver = true;
+            this.sys_triggerGameOver();
             return;
         }
 
@@ -14666,7 +14659,7 @@ if (this.phase === 'truth_book') {
                 }
             });
 
-            if (this.input_checkDefeat()) this.gameOver = true;
+            if (this.input_checkDefeat()) { this.sys_triggerGameOver(); return; }
 
             // 更新和绘制弹丸
             for (let i = this.projectiles.length - 1; i >= 0; i--) { 
@@ -14804,8 +14797,8 @@ if (this.phase === 'truth_book') {
         // --- UI Overlays ---
         if (this.gameOver) { 
             // [META] 结算货币并保存
-            this.meta_addCurrency(this.runCurrency);
-            this.runCurrency = 0;
+            // 结算逻辑已移至 sys_triggerGameOver
+            
 
             document.getElementById('combat-message').innerHTML = '<span class="text-red-400 font-bold text-4xl">防線失守</span><br><span class="text-sm pointer-events-none">點擊返回主界面</span>'; 
             if (this.isDragging) {
