@@ -16099,7 +16099,7 @@ const TRUTH_BOOK_DATA = {
         },
         {
             id: 'cryo', name: '冰霜', icon: '❄️', tags: ['元素', '控制'],
-            desc: '降低敵人溫度。達到 -100°C 時觸發【凍結】，敵人無法行動。',
+            desc: '降低敵人溫度。達到 -100°C 時觸發【凍結】，敵人將無法行動且受到的閃电傷害會觸發強力連鎖。',
             setup: (game) => { game.enemies.push(new Enemy(game.width/2, 200, 80, 80, 500)); },
             loop: [
                 { type: 'log', text: '施加極寒打擊' },
@@ -16133,7 +16133,7 @@ const TRUTH_BOOK_DATA = {
         },
         {
             id: 'lightning', name: '閃電', icon: '⚡', tags: ['元素', '連鎖'],
-            desc: '命中時觸發連鎖閃電。若敵人處於【凍結】狀態，閃電將在附近敵人中瘋狂跳躍。',
+            desc: '命中時觸發連鎖閃電並提升目標溫度。若命中【凍結】目標，閃電將在附近敵人中進行多次強力跳躍，是清理群怪的核心手段。',
             setup: (game) => {
                 const e1 = new Enemy(game.width/2 - 50, 200, 50, 50, 200);
                 e1.temp = -100; // 凍結狀態
