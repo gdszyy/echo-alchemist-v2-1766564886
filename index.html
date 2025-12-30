@@ -16143,29 +16143,24 @@ const TRUTH_BOOK_DATA = {
             id: 'cryo', name: '冰霜', icon: '❄️', tags: ['元素', '控制'],
             desc: '降低敵人溫度。溫度 < 0°C 時觸發【易傷】，每降低 1°C 增加 0.5% 受到的傷害。達到 -100°C 時觸發【凍結】，敵人將無法行動。',
             setup: (game) => { 
-                // 佈置一個強大的敵人，展示低溫易傷的威力
-                game.enemies.push(new Enemy(game.width/2, 180, 90, 90, 2000)); 
+                const e = new Enemy(game.width/2, 180, 90, 90, 2000);
+                e.temp = -100; // 預設凍結
+                game.enemies.push(e); 
             },
             loop: [
-                { type: 'log', text: '施加極寒打擊 (累積低溫)' },
-                { type: 'spawn_projectile', config: { damage: 2, cryo: 80 } }, 
-                { type: 'wait', frames: 20 },
-                { type: 'spawn_projectile', config: { damage: 2, cryo: 80 } }, 
-                { type: 'wait', frames: 40 },
+                { type: 'log', text: '目標已處於【凍結】狀態' },
+                { type: 'wait', frames: 60 },
                 { type: 'log', text: '觸發【易傷】(傷害大幅提升)' },
-                { type: 'spawn_projectile', config: { damage: 50, cryo: 0 } }, 
-                { type: 'wait', frames: 40 },
-                { type: 'log', text: '敵人已凍結 (無法行動)' },
-                { type: 'enemy_turn' },
-                { type: 'wait', frames: 100 }, { type: 'reset' }
+                { type: 'spawn_projectile', config: { damage: 100, cryo: 0 }, vel: {x: 0, y: -15} }, 
+                { type: 'wait', frames: 120 }, { type: 'reset' }
             ]
         },
         {
             id: 'pyro', name: '火焰', icon: '🔥', tags: ['元素', '範圍爆炸'],
             desc: '升高敵人溫度。溫度 >= 34°C 時觸发【燃燒】造成持續傷害（公式：温度/150）。溫度 > 200°C 時有概率觸发【過熱爆炸】，造成大範圍 AOE 傷害並消耗 10% 熱量。觸发概率隨溫度提升，600°C 時必爆。',
             setup: (game) => { 
-                // 佈置一個核心目標和密集的護衛群，展示爆炸的清場能力
-                game.enemies.push(new Enemy(game.width/2, 180, 80, 80, 1500)); 
+                const boss = new Enemy(game.width/2, 180, 80, 80, 1500);
+                game.enemies.push(boss); 
                 for(let i=0; i<8; i++) {
                     const angle = (i / 8) * Math.PI * 2;
                     game.enemies.push(new Enemy(
@@ -16176,12 +16171,11 @@ const TRUTH_BOOK_DATA = {
                 }
             },
             loop: [
-                { type: 'log', text: '注入高熱能量...' },
-                { type: 'spawn_projectile', config: { damage: 10, pyro: 450 } },
-                { type: 'wait', frames: 60 },
-                { type: 'log', text: '觸發燃燒與持續升溫' },
-                { type: 'wait', frames: 40 },
-                { type: 'log', text: '過熱臨界！觸發連鎖爆炸 (AOE)！' },
+                { type: 'log', text: '第一步：施加火屬性使其【燃燒】' },
+                { type: 'spawn_projectile', config: { damage: 10, pyro: 600 }, vel: {x: 0, y: -15} },
+                { type: 'wait', frames: 100 },
+                { type: 'log', text: '第二步：擊殺燃燒中的敵人觸發爆炸' },
+                { type: 'spawn_projectile', config: { damage: 2000 }, vel: {x: 0, y: -15} },
                 { type: 'wait', frames: 150 }, { type: 'reset' }
             ]
         },
@@ -16208,7 +16202,6 @@ const TRUTH_BOOK_DATA = {
             id: 'laser', name: '光球', icon: '🔦', tags: ['特殊', '瞬時'],
             desc: '發射彈珠，命中時觸發折射激光，瞬間對路徑上的敵人造成傷害。',
             setup: (game) => {
-                // 佈置多個敵人，展示激光的折射路徑
                 for(let i=0; i<6; i++) {
                     game.enemies.push(new Enemy(
                         game.width/2 + (i%2 === 0 ? -80 : 80),
@@ -16218,8 +16211,8 @@ const TRUTH_BOOK_DATA = {
                 }
             },
             loop: [
-                { type: 'log', text: '發射光學折射彈' },
-                { type: 'spawn_projectile', config: { damage: 40, isLaser: true, laser: 10 }, vel: {x: 2, y: -15} },
+                { type: 'log', text: '發射光學折射彈 (laser=true)' },
+                { type: 'spawn_projectile', config: { damage: 40, laser: 10 }, vel: {x: 2, y: -15} },
                 { type: 'wait', frames: 150 }, { type: 'reset' }
             ]
         },
@@ -16365,12 +16358,14 @@ class TruthBook {
             
             // 粒子與特效
             spawn_createParticle: (x, y, color, mode) => {
+                // 確保粒子生成在模擬器區域內
                 const p = new Particle(x, y, color, mode);
                 this.demoGame.particles.push(p);
                 return p;
             },
             spawn_createShockwave: (x, y, color) => {
-                this.demoGame.shockwaves.push(new Shockwave(x, y, color));
+                const sw = new Shockwave(x, y, color);
+                this.demoGame.shockwaves.push(sw);
             },
             spawn_createFloatingText: (x, y, text, color) => {
                 this.demoGame.floatingTexts.push(new FloatingText(x, y, text, color));
@@ -16384,13 +16379,28 @@ class TruthBook {
             spawn_spawnBullet: (arg1, arg2, arg3, arg4, arg5, arg6) => {
                 let x, y, vel, config, id, isLast;
                 if (typeof arg1 === 'object' && arg1.config) {
-                    // 處理對象形式的調用 (Projectile.destroy 使用的形式)
                     x = arg1.x; y = arg1.y; vel = arg1.vel; config = arg1.config;
                     id = arg1.id || null; isLast = arg1.isLast || false;
                 } else {
-                    // 處理參數列表形式的調用
                     x = arg1; y = arg2; vel = arg3; config = arg4; id = arg5; isLast = arg6;
                 }
+                
+                // [修復] 處理散射邏輯：如果 config 中有 scatter，則生成多個子彈
+                if (config.scatter && !config._isScatterSub) {
+                    const count = config.scatter;
+                    const baseAngle = Math.atan2(vel.y, vel.x);
+                    const spread = Math.PI / 4;
+                    for (let i = 0; i < count; i++) {
+                        const angle = baseAngle + (i - (count - 1) / 2) * (spread / count);
+                        const newVel = new Vec2(Math.cos(angle) * vel.len(), Math.sin(angle) * vel.len());
+                        const newConfig = { ...config, scatter: 0, _isScatterSub: true };
+                        const p = new Projectile(x, y, newVel, newConfig, false, id, i === count - 1);
+                        p.game = this.demoGame;
+                        this.demoGame.projectiles.push(p);
+                    }
+                    return;
+                }
+
                 const p = new Projectile(x, y, vel, config, false, id, isLast);
                 p.game = this.demoGame; 
                 this.demoGame.projectiles.push(p);
@@ -16544,7 +16554,32 @@ class TruthBook {
             const ts = 1.0;
             this.demoGame.enemies.forEach(e => e.update(ts, this.demoGame));
             this.demoGame.projectiles.forEach(p => {
+                const margin = 20;
+                if (p.pos.x < margin || p.pos.x > this.demoGame.width - margin) {
+                    p.vel.x *= -1;
+                    p.pos.x = p.pos.x < margin ? margin : this.demoGame.width - margin;
+                    if (p.config.bounce) p.config.bounce--;
+                }
+                if (p.pos.y < margin) {
+                    p.vel.y *= -1;
+                    p.pos.y = margin;
+                    if (p.config.bounce) p.config.bounce--;
+                }
+                
                 p.update(this.demoGame.width, this.demoGame.height, this.demoGame.enemies, this.demoGame.spawn_spawnBullet, ts);
+                
+                // [修復] 套娃邏輯：當子彈消失且有 nestedPayload 時，觸發分裂
+                if (!p.active && p.config.nestedPayload) {
+                    const nextConfig = { ...p.config.nestedPayload };
+                    // 簡單模擬分裂：向三個方向發射
+                    const angles = [-Math.PI/4, 0, Math.PI/4];
+                    angles.forEach(angle => {
+                        const baseAngle = Math.atan2(-1, 0); // 向上
+                        const finalAngle = baseAngle + angle;
+                        const nextVel = new Vec2(Math.cos(finalAngle) * 12, Math.sin(finalAngle) * 12);
+                        this.demoGame.spawn_spawnBullet(p.pos.x, p.pos.y, nextVel, nextConfig);
+                    });
+                }
             });
             this.demoGame.particles.forEach(p => p.update(ts));
             this.demoGame.floatingTexts.forEach(f => {
