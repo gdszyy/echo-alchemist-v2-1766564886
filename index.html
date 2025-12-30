@@ -11877,12 +11877,18 @@ if (this.phase === 'truth_book') {
                         resonanceColor = '#f43f5e';
                     }
 
-                    // 2. 造成额外伤害
-                    if (extraDmg > 0) {
-                        enemy.takeDamage(extraDmg);
-                        this.combat_recordDamage(extraDmg, 'flying_sword', 'flying_sword', this._currentDamageShotId);
-                        this.spawn_createFloatingText(sword.pos.x, sword.pos.y, `+${Math.ceil(extraDmg)}`, resonanceColor);
-                    }
+	                    // 2. 造成额外伤害
+	                    if (extraDmg > 0) {
+	                        enemy.takeDamage(extraDmg);
+	                        this.combat_recordDamage(extraDmg, 'flying_sword', 'flying_sword', this._currentDamageShotId);
+	                        this.spawn_createFloatingText(sword.pos.x, sword.pos.y, `+${Math.ceil(extraDmg)}`, resonanceColor);
+
+                            // [新增] 电属性飞剑联动：触发连锁闪电
+                            if (sword.config.lightning > 0) {
+                                // 按照正常概率触发闪电链
+                                this.combat_lightning_triggerChain(enemy, extraDmg, [], sword.config.lightning);
+                            }
+	                    }
 
                     // 3. [修复] 视觉特效：斩击动画，使用元素属性颜色
                     const angle = Math.random() * Math.PI * 2;
