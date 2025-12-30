@@ -1430,6 +1430,17 @@ const META_SHOP_CONFIG = {
             maxLevel: 3,
             cost: { resourceId: 'energy_essence', base: 1000, growth: 2.0, type: 'exponential' },
             effect: { path: 'gameplay.initTriggerThreshold', valuePerLevel: -1, type: 'add' }
+        },
+        // (新增) SP上限提升
+        {
+            id: 'sp_capacity',
+            category: 'resource',
+            name: '能量容器',
+            desc: '提升技能点(SP)的最大存储上限。',
+            icon: '⚡',
+            maxLevel: 5,
+            cost: { resourceId: 'energy_essence', base: 800, growth: 2.0, type: 'exponential' },
+            effect: { path: 'gameplay.maxSkillPoints', valuePerLevel: 1, type: 'add' }
         }],
     categories: {
         attribute: { name: '屬性煉金', icon: '🧪' },
@@ -1686,6 +1697,7 @@ const CONFIG = {
         relicChance: 0.1,
         initTriggerThreshold: 7,
         nextTriggerThresholdIncrease: 8,
+        maxSkillPoints: 5,  // 技能点上限
         spSlotsStartRow:3,
         spSlotsEndRow:8,
         fireSpreadDamagePercent:0.25,
@@ -8001,7 +8013,11 @@ this.affixDict = {
             container.appendChild(btn);
         });
     }
-    updateSkillPoints(current, max = Math.max(5, current + 1)) {
+    updateSkillPoints(current, max = null) {
+        // 使用 CONFIG 中的 maxSkillPoints，如果没有传入 max 参数
+        if (max === null) {
+            max = Math.max(CONFIG.gameplay.maxSkillPoints, current);
+        }
         this.spContainer.innerHTML = ''; // 清空当前
 
         for (let i = 0; i < max; i++) {
