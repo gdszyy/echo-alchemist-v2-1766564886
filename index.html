@@ -12181,150 +12181,175 @@ if (this.phase === 'truth_book') {
     ui_updateDamageStats() {
         const container = document.getElementById('damage-stats-container');
         if (!container) return;
-
         container.innerHTML = '';
-        container.className = 'flex flex-col gap-2 h-full w-full p-2 overflow-y-auto custom-scrollbar';
+        // 修改容器样式：使用 flex-col 垂直排列不同的子弹数据
+        container.className = 'flex flex-col gap-4 h-full w-full p-2 overflow-y-auto custom-scrollbar'; 
 
-        // 1. 获取当前数据
-        let currentData;
-        let roundNumber;
+        // --- 1. 获取数据源 ---
+        let shotsData = [];
+        let roundNumber = this.round;
+
         if (this.currentViewingRound === 0) {
-            currentData = this.shotDamageHistory;
-            roundNumber = this.round;
+            // 查看当前回合（实时数据）
+            shotsData = this.shotDamageHistory; 
         } else {
+            // 查看历史回合
             const historyIndex = this.roundDamageHistory.length - this.currentViewingRound;
             if (historyIndex >= 0 && historyIndex < this.roundDamageHistory.length) {
-                const roundData = this.roundDamageHistory[historyIndex];
-                currentData = roundData.shots;
-                roundNumber = roundData.round;
-            } else {
-                currentData = []; roundNumber = 0;
+                shotsData = this.roundDamageHistory[historyIndex].shots;
+                roundNumber = this.roundDamageHistory[historyIndex].round;
             }
         }
 
-        // 2. 顶部导航
+        // --- 2. 渲染顶部导航 ---
         const header = document.createElement('div');
-        header.className = 'w-full flex justify-between items-center bg-slate-800 p-2 rounded mb-2';
+        header.className = 'w-full flex justify-between items-center bg-slate-800 p-2 rounded shrink-0 sticky top-0 z-10 border border-slate-700 shadow-md';
         header.innerHTML = `
-            <button onclick="game.ui_switchDamageRound(1)" class="text-slate-400 hover:text-white">◀</button>
-            <span class="text-xs font-bold text-amber-400">Round ${roundNumber}</span>
-            <button onclick="game.ui_switchDamageRound(-1)" class="text-slate-400 hover:text-white">▶</button>
+            <button onclick="game.ui_switchDamageRound(1)" class="text-slate-400 hover:text-white px-3 py-1">◀</button>
+            <span class="text-xs font-bold text-amber-400 font-[Cinzel]">Round ${roundNumber}</span>
+            <button onclick="game.ui_switchDamageRound(-1)" class="text-slate-400 hover:text-white px-3 py-1">▶</button>
         `;
         container.appendChild(header);
 
-        // 3. 聚合数据：将所有子弹的数据合并为一个总表
-        // 结构: aggregated[damageType][sourceType] = amount
-        const aggregated = {};
-        let totalRoundDamage = 0;
-
-        currentData.forEach(shot => {
-            totalRoundDamage += shot.total;
-            for (const [dtype, sources] of Object.entries(shot.byAttr)) {
-                if (!aggregated[dtype]) aggregated[dtype] = {};
-                // 处理旧数据 (兼容旧的 byAttr[dtype] = amount 格式)
-                if (typeof sources === 'number') {
-                    if (!aggregated[dtype]['main']) aggregated[dtype]['main'] = 0;
-                    aggregated[dtype]['main'] += sources;
-                } else {
-                    for (const [stype, amount] of Object.entries(sources)) {
-                        if (!aggregated[dtype][stype]) aggregated[dtype][stype] = 0;
-                        aggregated[dtype][stype] += amount;
-                    }
-                }
-            }
-        });
-
-        if (totalRoundDamage === 0) {
-            container.innerHTML += `<div class="text-slate-500 text-center text-xs mt-4">暂无伤害数据</div>`;
+        if (!shotsData || shotsData.length === 0) {
+            container.innerHTML += `<div class="text-slate-500 text-center text-xs mt-10 italic">暂无伤害数据</div>`;
             return;
         }
 
-        // 4. 定义颜色映射
-        const getSourceColorStyle = (damageType, sourceType) => {
-            // [需求2b] 如果来源是散射，用散射颜色 (黄色系)
-            if (sourceType === 'scatter') return '#facc15'; 
-            
-            // 否则使用 DamageType 的主色
-            const typeColors = {
-                'bounce': '#fbbf24', 'pierce': '#fca5a5', 'scatter': '#facc15',
-                'damage': '#ffffff', 'cryo': '#06b6d4', 'pyro': '#f97316',
-                'lightning': '#c084fc', 'wind': '#34d399', 'flying_sword': '#0ea5e9'
-            };
-            return typeColors[damageType] || '#cbd5e1';
-        };
+        // --- 3. 遍历每一发子弹 (Shot) 分别渲染 ---
+        shotsData.forEach((shot, index) => {
+            const shotTotal = shot.total;
+            if (shotTotal <= 0) return;
 
-        const getSourceOpacity = (sourceType) => {
-            if (sourceType === 'main') return 1.0;
-            return 0.7; // 散射、风、飞剑等来源稍微透明一点以示区分
-        };
-
-        // 5. 渲染每一行 (Damage Type)
-        // 按伤害总量排序
-        const sortedTypes = Object.keys(aggregated).sort((a, b) => {
-            const sumA = Object.values(aggregated[a]).reduce((acc, v) => acc + v, 0);
-            const sumB = Object.values(aggregated[b]).reduce((acc, v) => acc + v, 0);
-            return sumB - sumA;
-        });
-
-        sortedTypes.forEach(dtype => {
-            const sources = aggregated[dtype];
-            const typeTotal = Object.values(sources).reduce((acc, v) => acc + v, 0);
-            const typePercent = (typeTotal / totalRoundDamage) * 100;
+            // 子弹容器
+            const shotContainer = document.createElement('div');
+            shotContainer.className = 'bg-slate-900/60 p-3 rounded-lg border border-slate-700/50 relative';
             
-            const row = document.createElement('div');
-            row.className = 'flex flex-col gap-1 mb-3';
-            
-            // 标签行
-            const label = document.createElement('div');
-            label.className = 'flex justify-between text-[10px] px-1';
-            const typeNames = {
-                'pyro': '🔥 火属性', 'cryo': '❄️ 冰属性', 'lightning': '⚡ 雷属性',
-                'bounce': '⤴️ 弹射', 'pierce': '➡️ 穿透', 'damage': '⚔️ 基础',
-                'wind': '🌪️ 风属性', 'flying_sword': '🗡️ 飞剑', 'explosive': '💥 爆炸'
-            };
-            label.innerHTML = `
-                <span class="text-slate-300 font-bold">${typeNames[dtype] || dtype}</span>
-                <span class="text-slate-400">${Math.ceil(typeTotal).toLocaleString()} (${typePercent.toFixed(1)}%)</span>
+            // 子弹标题
+            const shotTitle = document.createElement('div');
+            shotTitle.className = 'text-[10px] text-slate-400 font-bold mb-3 flex justify-between items-center border-b border-slate-700/50 pb-1';
+            shotTitle.innerHTML = `
+                <span class="bg-slate-800 px-2 py-0.5 rounded text-slate-300">Shot #${index + 1}</span> 
+                <span class="text-amber-100">Total: ${Math.ceil(shotTotal).toLocaleString()}</span>
             `;
-            row.appendChild(label);
+            shotContainer.appendChild(shotTitle);
+
+            // --- 预计算：找出本发子弹中伤害最高的类型，用于归一化进度条宽度 ---
+            let maxTypeTotal = 0;
+            const typeTotals = {};
             
-            // 堆叠进度条
-            const barContainer = document.createElement('div');
-            barContainer.className = 'w-full h-3 bg-slate-900 rounded-full overflow-hidden flex border border-slate-700';
-            
-            // 按来源排序 (main 优先)
-            const sortedSources = Object.keys(sources).sort((a, b) => (a === 'main' ? -1 : 1));
-            
-            sortedSources.forEach(stype => {
-                const amount = sources[stype];
-                const segmentPercent = (amount / typeTotal) * 100;
+            for (const [dtype, sources] of Object.entries(shot.byAttr)) {
+                let tTotal = 0;
+                // 兼容旧数据格式 (number) 和新格式 (object)
+                if (typeof sources === 'number') {
+                    tTotal = sources;
+                } else {
+                    tTotal = Object.values(sources).reduce((a, b) => a + b, 0);
+                }
+                typeTotals[dtype] = tTotal;
+                if (tTotal > maxTypeTotal) maxTypeTotal = tTotal;
+            }
+
+            // 按伤害量排序
+            const sortedTypes = Object.keys(shot.byAttr).sort((a, b) => typeTotals[b] - typeTotals[a]);
+
+            sortedTypes.forEach(dtype => {
+                const sources = shot.byAttr[dtype];
+                const typeTotal = typeTotals[dtype];
                 
-                const segment = document.createElement('div');
-                segment.style.width = `${segmentPercent}%`;
-                segment.style.backgroundColor = getSourceColorStyle(dtype, stype);
-                segment.style.opacity = getSourceOpacity(stype);
-                segment.className = 'h-full transition-all duration-500';
-                segment.title = `${stype}: ${Math.ceil(amount)}`;
-                barContainer.appendChild(segment);
+                // [修复3]：横轴坐标缩放
+                // 进度条容器的宽度 = (当前类型总伤 / 本发子弹最大类型总伤) * 100%
+                // 这样伤害低的类型条就会很短
+                const rowWidthPercent = maxTypeTotal > 0 ? (typeTotal / maxTypeTotal) * 100 : 0;
+
+                const row = document.createElement('div');
+                row.className = 'flex flex-col gap-1 mb-2';
+
+                // 类型标签与数值
+                const label = document.createElement('div');
+                label.className = 'flex justify-between text-[10px] px-1';
+                
+                // [修复1]：颜色定义优化
+                // 将 bounce 改为绿色，避免与 scatter (黄色) 混淆
+                const typeConfig = {
+                    'bounce':   { name: '⤴️ 弹射', color: '#22c55e' }, // Green
+                    'pierce':   { name: '➡️ 穿透', color: '#fca5a5' }, // Red-ish
+                    'scatter':  { name: '🔱 散射', color: '#facc15' }, // Yellow
+                    'damage':   { name: '⚔️ 基础', color: '#e2e8f0' }, // White/Slate
+                    'cryo':     { name: '❄️ 冰霜', color: '#06b6d4' },
+                    'pyro':     { name: '🔥 火焰', color: '#f97316' },
+                    'lightning':{ name: '⚡ 闪电', color: '#c084fc' },
+                    'wind':     { name: '🌪️ 风暴', color: '#34d399' },
+                    'flying_sword': { name: '🗡️ 飞剑', color: '#0ea5e9' },
+                    'explosive': { name: '💥 爆炸', color: '#f87171' }
+                };
+                
+                const conf = typeConfig[dtype] || { name: dtype, color: '#cbd5e1' };
+
+                label.innerHTML = `
+                    <span style="color:${conf.color}" class="font-bold shadow-black drop-shadow-sm">${conf.name}</span>
+                    <span class="text-slate-400 text-[9px]">${Math.ceil(typeTotal).toLocaleString()}</span>
+                `;
+                row.appendChild(label);
+
+                // 进度条轨道 (全长背景)
+                const track = document.createElement('div');
+                track.className = 'w-full h-2.5 bg-slate-800/50 rounded-r-md rounded-bl-md overflow-hidden relative';
+                
+                // 实际长度容器 (根据伤害比例缩放)
+                const barWrapper = document.createElement('div');
+                barWrapper.style.width = `${Math.max(1, rowWidthPercent)}%`; // 至少显示 1%
+                barWrapper.className = 'h-full flex transition-all duration-500 relative';
+                
+                // 数据源细分 (Stacking Segments)
+                let sourceEntries = [];
+                if (typeof sources === 'number') {
+                    sourceEntries = [['main', sources]];
+                } else {
+                    // 排序：主子弹(main)在左侧，其他在右侧
+                    sourceEntries = Object.entries(sources).sort((a, b) => (a[0] === 'main' ? -1 : 1));
+                }
+
+                sourceEntries.forEach(([stype, amount]) => {
+                    // 每一段的宽度相对于该类型的总长度
+                    const segmentPercent = (amount / typeTotal) * 100;
+                    const segment = document.createElement('div');
+                    segment.style.width = `${segmentPercent}%`;
+                    
+                    // 颜色逻辑：
+                    // 如果是散射产生的伤害，使用特定纹理或颜色，但在“弹射”条里，最好保持弹射的主色调，
+                    // 只用透明度或高亮来区分来源，避免把“弹射”看成“散射”。
+                    if (stype === 'scatter') {
+                        segment.style.backgroundColor = conf.color; // 保持类型颜色
+                        segment.style.backgroundImage = 'linear-gradient(45deg, rgba(255,255,255,0.2) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.2) 75%, transparent 75%, transparent)';
+                        segment.style.backgroundSize = '4px 4px'; // 加斜纹表示散射来源
+                    } else {
+                        segment.style.backgroundColor = conf.color;
+                    }
+                    
+                    // 透明度区分：非主子弹稍微淡一点
+                    segment.style.opacity = (stype === 'main') ? '1' : '0.8';
+                    
+                    // Tooltip
+                    segment.title = `${stype === 'main' ? '主子弹' : (stype === 'scatter' ? '散射' : stype)}: ${Math.ceil(amount)}`;
+                    
+                    barWrapper.appendChild(segment);
+                });
+
+                track.appendChild(barWrapper);
+                row.appendChild(track);
+                shotContainer.appendChild(row);
             });
             
-            row.appendChild(barContainer);
-            container.appendChild(row);
+            container.appendChild(shotContainer);
         });
 
-        // 6. 底部图例
+        // 底部图例
         const legend = document.createElement('div');
-        legend.className = 'mt-4 pt-2 border-t border-slate-700 flex flex-wrap gap-3 justify-center';
+        legend.className = 'mt-2 pt-2 border-t border-slate-700 flex flex-wrap gap-3 justify-center text-[9px] text-slate-500';
         legend.innerHTML = `
-            <div class="flex items-center gap-1 text-[9px] text-slate-400">
-                <div class="w-2 h-2 rounded-full bg-white"></div> 主体
-            </div>
-            <div class="flex items-center gap-1 text-[9px] text-slate-400">
-                <div class="w-2 h-2 rounded-full bg-yellow-400"></div> 散射
-            </div>
-            <div class="flex items-center gap-1 text-[9px] text-slate-400">
-                <div class="w-2 h-2 rounded-full opacity-70 bg-slate-500"></div> 其他来源
-            </div>
+            <div class="flex items-center gap-1"><div class="w-2 h-2 rounded-sm bg-slate-400"></div> 主子弹</div>
+            <div class="flex items-center gap-1"><div class="w-2 h-2 rounded-sm bg-slate-400 opacity-80" style="background-image: linear-gradient(45deg, rgba(255,255,255,0.4) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0.4) 75%, transparent 75%, transparent); background-size: 4px 4px;"></div> 散射来源</div>
         `;
         container.appendChild(legend);
     }
