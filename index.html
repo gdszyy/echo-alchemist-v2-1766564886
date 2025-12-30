@@ -11700,9 +11700,9 @@ if (this.phase === 'truth_book') {
             }
 
         } else if (config.pyro > 0) {
-            // 火焰：生成橙色火星和上升烟雾
-            for(let i=0; i<5; i++) this.spawn_createParticle(hitX, hitY, '#fdba74', 'spark');
-            for(let i=0; i<3; i++) this.spawn_createParticle(hitX, hitY, '#7c2d12', 'smoke');
+            // 火焰：生成橙色火星和上升烟雾 (降低单体粒子数量，原 5+3=8，现 2+1=3)
+            for(let i=0; i<2; i++) this.spawn_createParticle(hitX, hitY, '#fdba74', 'spark');
+            for(let i=0; i<1; i++) this.spawn_createParticle(hitX, hitY, '#7c2d12', 'smoke');
         } else if (config.lightning > 0) {
             // 闪电：生成紫色快速火花
             for(let i=0; i<8; i++) this.spawn_createParticle(hitX, hitY, '#d8b4fe', 'spark');
@@ -11808,16 +11808,29 @@ if (this.phase === 'truth_book') {
                 const explodeDmg = baseFireDmg * 0.50;
                 
                 if (explodeDmg >= 1) {
+                    // --- 1. 视觉特效 (参考爆炸子弹) ---
+                    this.spawn_createShockwave(enemy.pos.x, enemy.pos.y, '#f97316'); // 橙色冲击波
+                    for(let i=0; i<10; i++) this.spawn_createParticle(enemy.pos.x, enemy.pos.y, '#fdba74', 'spark');
+                    for(let i=0; i<5; i++) this.spawn_createParticle(enemy.pos.x, enemy.pos.y, 'rgba(0,0,0,0.5)', 'smoke');
+                    audio.playExplosion();
+
+                    // --- 2. 核心伤害 (对当前敌人) ---
                     const expResult = enemy.takeDamage(explodeDmg);
-                    
-                    // 记录伤害 (依然归类为 pyro，或者您可以新建一个 'explode' 类型)
                     this.combat_recordDamage(expResult.actualDamage, 'pyro', sourceType, shotId);
-                    
-                    // 视觉特效：显示红色 BOOM! 以及伤害数值
                     this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 50, `BOOM! ${Math.ceil(expResult.actualDamage)}`, '#dc2626');
                     
-                    // (可选) 添加一点屏幕震动或强击退感
-                    // enemy.pos.y -= 2; // 简单的震动模拟
+                    // --- 3. 范围伤害 (AOE) ---
+                    const EXPLODE_RADIUS = 120; // 爆炸半径
+                    this.enemies.forEach(other => {
+                        if (other !== enemy && other.active && enemy.pos.dist(other.pos) < EXPLODE_RADIUS) {
+                            const aoeDmg = explodeDmg * 0.6; // 范围伤害为爆炸主伤害的 60%
+                            const aoeResult = other.takeDamage(aoeDmg);
+                            this.combat_recordDamage(aoeResult.actualDamage, 'pyro', sourceType, shotId);
+                            
+                            // 范围内的敌人也受到热量波及 (增加少量温度)
+                            other.applyTemp(config.pyro * 5);
+                        }
+                    });
                 }
 
                 // D. 热量回填机制
@@ -13347,7 +13360,7 @@ if (this.phase === 'truth_book') {
      */
     spawn_createParticle(x, y, color, mode = 'normal') {
         // [优化] 限制粒子总数，防止高频触发（如火焰）导致卡顿
-        const MAX_PARTICLES = 400;
+        const MAX_PARTICLES = 800; // 粒子上限翻倍 (原 400)
         const EMBER_LIMIT = 150; // 针对性能开销大的火焰粒子设置更严格的限制
         
         if (this.particles.length > MAX_PARTICLES) return null;
