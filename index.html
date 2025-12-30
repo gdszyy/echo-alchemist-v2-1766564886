@@ -7762,11 +7762,12 @@ class LightningBolt {
         const flicker = Math.random() > 0.5 ? 1 : 0.5;
         const opacity = this.life * flicker;
 
-        // [优化] 根据 progress 决定绘制哪些线段
-        const visibleCount = Math.floor(this.segments.length * this.progress);
+        // [优化] 根据 progress 决定绘制哪些线段 (添加边界检查防止 undefined)
+        const visibleCount = Math.min(this.segments.length, Math.floor(this.segments.length * this.progress));
 
         for (let i = 0; i < visibleCount; i++) {
             const seg = this.segments[i];
+            if (!seg) continue;
             ctx.beginPath();
             ctx.moveTo(seg.p1.x, seg.p1.y);
             ctx.lineTo(seg.p2.x, seg.p2.y);
