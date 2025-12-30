@@ -12171,12 +12171,13 @@ if (this.phase === 'truth_book') {
     ui_updateDamageStats() {
         const container = document.getElementById('damage-stats-container');
         if (!container) return;
-        
+
+        // 清空容器并设置基础布局
         container.innerHTML = '';
-        // 强制容器为纵向布局，以便容纳顶部的回合切换栏
-        container.className = 'flex flex-col gap-2 h-full w-full p-2';
-        
-        // 获取当前查看的回合数据
+        // 强制容器为纵向布局，以便容纳顶部的汇总面板
+        container.className = 'flex flex-col gap-3 h-full w-full p-2';
+
+        // 1. 获取当前要显示的数据 (当前回合 或 历史回合)
         let currentData;
         let roundNumber;
         if (this.currentViewingRound === 0) {
@@ -12195,95 +12196,194 @@ if (this.phase === 'truth_book') {
                 roundNumber = 0;
             }
         }
-        
-        // 添加回合切换按钮
+
+        // 2. 顶部导航栏 (切换回合)
         const header = document.createElement('div');
-        header.className = 'w-full flex items-center justify-between mb-2 px-2 bg-slate-800/80 p-2 rounded-t-lg border-b border-slate-700';
+        header.className = 'w-full flex items-center justify-between px-3 py-2 bg-slate-800/90 rounded-lg border border-slate-700 shrink-0 shadow-sm';
         const canGoPrev = this.currentViewingRound < this.roundDamageHistory.length;
         const canGoNext = this.currentViewingRound > 0;
+        
         header.innerHTML = `
-            <button onclick="game.ui_switchDamageRound(1)" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm text-white transition-colors ${!canGoPrev ? 'opacity-30 cursor-not-allowed' : ''}" ${!canGoPrev ? 'disabled' : ''}>◀ 上一回合</button>
-            <span class="text-base font-bold text-purple-300">回合 ${roundNumber} ${this.currentViewingRound === 0 ? '(当前)' : ''}</span>
-            <button onclick="game.ui_switchDamageRound(-1)" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm text-white transition-colors ${!canGoNext ? 'opacity-30 cursor-not-allowed' : ''}" ${!canGoNext ? 'disabled' : ''}>下一回合 ▶</button>
+            <button onclick="game.ui_switchDamageRound(1)" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-white transition-colors flex items-center gap-1 ${!canGoPrev ? 'opacity-30 cursor-not-allowed' : ''}" ${!canGoPrev ? 'disabled' : ''}>
+                <span>◀</span> <span>Prev</span>
+            </button>
+            <div class="flex flex-col items-center leading-tight">
+                <span class="text-xs text-slate-400 uppercase tracking-widest">Analysis</span>
+                <span class="text-sm font-bold text-amber-400">Round ${roundNumber} ${this.currentViewingRound === 0 ? '(Now)' : ''}</span>
+            </div>
+            <button onclick="game.ui_switchDamageRound(-1)" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-white transition-colors flex items-center gap-1 ${!canGoNext ? 'opacity-30 cursor-not-allowed' : ''}" ${!canGoNext ? 'disabled' : ''}>
+                <span>Next</span> <span>▶</span>
+            </button>
         `;
         container.appendChild(header);
+
+        // =========================================
+        // [新增] 3. 回合总伤害汇总面板 (Summary)
+        // =========================================
         
-        // 创建子弹列容器
+        // 3.1 计算统计数据
+        let totalRoundDamage = 0;
+        const totalAttrMap = {}; // { 'pyro': 1200, 'phys': 500 }
+
+        currentData.forEach(shot => {
+            totalRoundDamage += shot.total;
+            if (shot.byAttr) {
+                Object.entries(shot.byAttr).forEach(([attr, val]) => {
+                    if (!totalAttrMap[attr]) totalAttrMap[attr] = 0;
+                    totalAttrMap[attr] += val;
+                });
+            }
+        });
+
+        // 3.2 创建汇总面板容器
+        const summaryPanel = document.createElement('div');
+        summaryPanel.className = 'w-full bg-slate-900/60 rounded-xl p-3 border border-indigo-500/20 shrink-0 flex flex-col gap-3 relative overflow-hidden';
+        
+        // 背景装饰
+        const bgDeco = document.createElement('div');
+        bgDeco.className = 'absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none';
+        summaryPanel.appendChild(bgDeco);
+
+        // 3.3 总伤数字
+        const summaryHeader = document.createElement('div');
+        summaryHeader.className = 'flex justify-between items-end border-b border-white/5 pb-2 relative z-10';
+        summaryHeader.innerHTML = `
+            <div class="flex items-center gap-2">
+                <span class="text-lg">📊</span>
+                <span class="text-xs text-slate-300 font-bold tracking-wider uppercase">Total Output</span>
+            </div>
+            <span class="text-2xl font-[Cinzel] font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-200 to-purple-400 drop-shadow-sm">
+                ${Math.ceil(totalRoundDamage).toLocaleString()}
+            </span>
+        `;
+        summaryPanel.appendChild(summaryHeader);
+
+        // 3.4 属性分布可视化 (Stacked Bar & Legend)
+        if (totalRoundDamage > 0) {
+            // 堆叠条容器
+            const barContainer = document.createElement('div');
+            barContainer.className = 'w-full h-2.5 bg-slate-950 rounded-full overflow-hidden flex shadow-inner relative z-10';
+            
+            // 图例网格
+            const legendGrid = document.createElement('div');
+            legendGrid.className = 'grid grid-cols-3 gap-2 relative z-10';
+
+            // 排序属性 (按伤害高低)
+            const sortedTotalAttrs = Object.entries(totalAttrMap).sort((a, b) => b[1] - a[1]);
+            const attrConfig = CONFIG.ui.attributeDisplay;
+
+            sortedTotalAttrs.forEach(([attr, val]) => {
+                if (val <= 0) return;
+                const attrKey = attr.toLowerCase();
+                // 获取配置，如果是未知属性则给默认值
+                const info = attrConfig[attrKey] || { name: attr, color: '#94a3b8', icon: '🔹' };
+                const percent = (val / totalRoundDamage) * 100;
+
+                // 添加进度条片段
+                const barSegment = document.createElement('div');
+                barSegment.style.width = `${percent}%`;
+                barSegment.style.backgroundColor = info.color;
+                barSegment.style.boxShadow = `0 0 10px ${info.color}40`; // 辉光
+                barContainer.appendChild(barSegment);
+
+                // 添加图例卡片
+                const legendItem = document.createElement('div');
+                legendItem.className = 'flex flex-col bg-slate-800/50 px-2 py-1.5 rounded border-l-2 border-white/5';
+                legendItem.style.borderLeftColor = info.color;
+                legendItem.innerHTML = `
+                    <div class="flex justify-between items-center text-[10px] text-slate-400 mb-0.5">
+                        <span class="flex items-center gap-1">
+                            <span style="color:${info.color}">${info.icon}</span> ${info.name}
+                        </span>
+                        <span class="font-mono opacity-50">${percent.toFixed(0)}%</span>
+                    </div>
+                    <div class="text-xs font-bold text-slate-200 leading-none">
+                        ${Math.ceil(val).toLocaleString()}
+                    </div>
+                `;
+                legendGrid.appendChild(legendItem);
+            });
+
+            summaryPanel.appendChild(barContainer);
+            summaryPanel.appendChild(legendGrid);
+        } else {
+            const emptyText = document.createElement('div');
+            emptyText.className = 'text-center text-xs text-slate-600 py-2 italic';
+            emptyText.innerText = "No damage data recorded";
+            summaryPanel.appendChild(emptyText);
+        }
+
+        container.appendChild(summaryPanel);
+
+        // =========================================
+        // 4. 子弹详情列表 (保留并优化视觉)
+        // =========================================
         const shotsContainer = document.createElement('div');
-        shotsContainer.className = 'flex gap-3 flex-1 overflow-x-auto w-full pb-2';
-        
-        // 显示所有已发射子弹的统计，最少显示3个
+        shotsContainer.className = 'flex gap-3 flex-1 overflow-x-auto w-full pb-2 min-h-0'; // min-h-0 fix flex overflow
+
+        // 显示最近的 N 发子弹
         const shotsToShow = Math.max(3, currentData.length);
         
         for (let i = 0; i < shotsToShow; i++) {
             const shotData = currentData[i];
             const column = document.createElement('div');
-            column.className = 'flex-1 min-w-[180px] bg-slate-800/50 rounded-lg p-3 flex flex-col border border-slate-700/50';
-            
+            column.className = 'flex-none w-[140px] bg-slate-800/40 rounded-lg p-2 flex flex-col border border-slate-700/50 relative group hover:bg-slate-800/60 transition-colors';
+
             if (!shotData) {
-                // 骨架图
+                // 占位符 (未发射的子弹)
                 column.innerHTML = `
-                    <div class="text-center mb-2 pb-2 border-b border-slate-700/30">
-                        <div class="text-xs text-slate-500">子弹 ${i + 1}</div>
-                        <div class="text-lg font-bold text-slate-700">---</div>
+                    <div class="text-center mb-2 pb-1 border-b border-slate-700/30">
+                        <div class="text-[10px] text-slate-600 uppercase">Shot ${i + 1}</div>
                     </div>
                     <div class="flex-1 flex items-center justify-center">
-                        <div class="text-slate-700 text-4xl opacity-20">•••</div>
+                        <div class="text-2xl opacity-10 grayscale">⚪</div>
                     </div>
                 `;
             } else {
-                // 显示实际数据
-                // 计算当前回合所有子弹中的最高属性伤害，用于归一化柱状图宽度
-                let maxAttrDamage = 0;
-                currentData.forEach(s => {
-                    if (s && s.byAttr) {
-                        Object.values(s.byAttr).forEach(d => {
-                            if (d > maxAttrDamage) maxAttrDamage = d;
-                        });
-                    }
-                });
-                
+                // 真实数据
+                // 计算该子弹内的最大属性伤害，用于绘制相对长度的条
+                let maxAttrInShot = 0;
+                if (shotData.byAttr) {
+                    Object.values(shotData.byAttr).forEach(d => { if(d > maxAttrInShot) maxAttrInShot = d; });
+                }
+
                 let attrBarsHtml = '';
                 const attrConfig = CONFIG.ui.attributeDisplay;
-                
-                // 按伤害数值降序排列属性
                 const sortedAttrs = Object.entries(shotData.byAttr).sort((a, b) => b[1] - a[1]);
-                
+
                 for (const [attr, damage] of sortedAttrs) {
                     if (damage <= 0) continue;
-                    // [修复] 确保属性名匹配，增加容错
                     const attrKey = attr.toLowerCase();
-                    const attrInfo = attrConfig[attrKey] || { name: attr, color: '#94a3b8', icon: '❓' };
-                    const barWidth = maxAttrDamage > 0 ? (damage / maxAttrDamage * 100) : 0;
+                    const info = attrConfig[attrKey] || { name: attr, color: '#94a3b8', icon: '❓' };
+                    // 相对长度
+                    const barWidth = maxAttrInShot > 0 ? (damage / maxAttrInShot * 100) : 0;
                     
                     attrBarsHtml += `
-                        <div class="mb-2">
-                            <div class="flex justify-between text-[11px] mb-1">
-                                <span class="text-slate-300 font-medium">${attrInfo.icon} ${attrInfo.name}</span>
-                                <span class="text-slate-400">${Math.ceil(damage).toLocaleString()}</span>
+                        <div class="mb-1.5 last:mb-0">
+                            <div class="flex justify-between text-[10px] leading-tight mb-0.5">
+                                <span class="text-slate-400 scale-90 origin-left">${info.icon}</span>
+                                <span class="text-slate-200 font-mono">${Math.ceil(damage)}</span>
                             </div>
-                            <div class="relative h-5 bg-slate-900/80 rounded-sm overflow-hidden border border-slate-700/30">
-                                <div class="h-full rounded-sm transition-all duration-500 ease-out" style="width: ${barWidth}%; background: ${attrInfo.color}; box-shadow: inset 0 0 10px rgba(0,0,0,0.2);"></div>
-                                <div class="absolute inset-0 flex items-center px-2 text-[10px] font-bold text-white drop-shadow-md z-10">${Math.ceil(damage)}</div>
+                            <div class="h-1 bg-slate-700/50 rounded-full overflow-hidden">
+                                <div class="h-full rounded-full" style="width: ${barWidth}%; background-color: ${info.color}"></div>
                             </div>
                         </div>
                     `;
                 }
-                
+
                 column.innerHTML = `
-                    <div class="text-center mb-3 pb-2 border-b border-slate-700">
-                        <div class="text-xs text-slate-400 mb-1">子弹 ${i + 1}</div>
-                        <div class="text-xl font-bold text-purple-400 drop-shadow-sm">${Math.ceil(shotData.total).toLocaleString()}</div>
+                    <div class="text-center mb-2 pb-1 border-b border-white/10">
+                        <div class="text-[10px] text-slate-500 uppercase mb-0.5">Shot ${i + 1}</div>
+                        <div class="text-sm font-bold text-white font-[Cinzel]">${Math.ceil(shotData.total).toLocaleString()}</div>
                     </div>
-                    <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
-                        ${attrBarsHtml || '<div class="text-center text-slate-600 text-xs mt-4">暂无伤害数据</div>'}
+                    <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-1">
+                        ${attrBarsHtml || '<div class="text-center text-[10px] text-slate-600 mt-2">-</div>'}
                     </div>
                 `;
             }
-            
             shotsContainer.appendChild(column);
         }
-        
+
         container.appendChild(shotsContainer);
     }
     
