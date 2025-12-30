@@ -13635,12 +13635,20 @@ if (this.phase === 'truth_book') {
         // 如果没有有效目标
         if (targets.length === 0) return false;
 
-        // --- 核心逻辑：距离越近概率越高 ---
-        // 计算每个目标的权重：weight = 1 / (distance^2)
+        // --- 核心逻辑：距离越近概率越高，且降低跳回来源的概率 ---
+        // 获取上一个来源敌人 (history 的最后一个元素)
+        const lastSource = history.length > 0 ? history[history.length - 1] : null;
+
         let totalWeight = 0;
         const weightedTargets = targets.map(t => {
             const dist = sourceEnemy.pos.dist(t.pos);
-            const weight = 1 / (Math.pow(dist, 2) + 1); // 加1防止除以0
+            let weight = 1 / (Math.pow(dist, 2) + 1); // 基础权重：距离平方反比
+            
+            // [优化] 如果目标是上一个来源敌人，权重减半，防止来回跳
+            if (lastSource && t === lastSource) {
+                weight *= 0.5;
+            }
+            
             totalWeight += weight;
             return { target: t, weight: weight, dist: dist };
         });
