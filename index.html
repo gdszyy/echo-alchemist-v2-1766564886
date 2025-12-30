@@ -15598,6 +15598,8 @@ class TruthBook {
         this.instructionIdx = 0;
         this.waitTimer = 0;
         this.simFrame = 0;
+        this.lastTime = performance.now();
+        this.lastTime = 0;
         
         this.initUI();
         window.addEventListener('resize', () => { if (this.active) this.resize(); });
@@ -15740,6 +15742,8 @@ class TruthBook {
 
         // --- 初始化演示 ---
         this.simFrame = 0;
+        this.lastTime = performance.now();
+        this.lastTime = 0;
         this.instructionIdx = 0;
         this.waitTimer = 0;
         
@@ -15755,14 +15759,26 @@ class TruthBook {
         }
     }
 
-    update() {
+        update() {
         if (!this.active) return;
-        requestAnimationFrame(() => this.update());
+        requestAnimationFrame((t) => this.update(t));
 
+        // 计算时间增量 (ms)
+        if (!this.lastTime) this.lastTime = performance.now();
+        const dt = performance.now() - this.lastTime;
+        
+        // 目标是 60 FPS，即每帧约 16.67ms
+        // 如果 dt 太小（比如在 120Hz 屏幕上只有 8ms），我们累积它直到达到 16ms
+        if (dt < 16) return; 
+        
+        this.lastTime = performance.now();
+        
+        // 这里的逻辑现在大约每 16.67ms 执行一次，相当于 60FPS
         const ctx = this.ctx;
         const w = this.canvas.width / (window.devicePixelRatio || 1);
         const h = this.canvas.height / (window.devicePixelRatio || 1);
         const game = this.demoGame;
+
 
         // 1. 清空画布
         ctx.fillStyle = '#020617';
