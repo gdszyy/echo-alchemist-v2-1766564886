@@ -13931,6 +13931,12 @@ if (this.phase === 'truth_book') {
     spawn_triggerLevelUpEvent(uiX, uiY) {
     this.currentSession.currentHits = 0;
     this.currentSession.multicast++; 
+    
+    // [修复] 每次升级提升下一次充能所需的命中数
+    const increase = CONFIG.gameplay.nextTriggerThresholdIncrease || 8;
+    this.currentSession.nextTriggerThreshold += increase;
+    this.persistentThreshold = this.currentSession.nextTriggerThreshold;
+    
     this.combat_updateMulticastDisplay(1);
     
     // 1. 音效爆發
