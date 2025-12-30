@@ -12328,22 +12328,6 @@ if (this.phase === 'truth_book') {
         `;
         container.appendChild(legend);
     }
-
-                column.innerHTML = `
-                    <div class="text-center mb-2 pb-1 border-b border-white/10">
-                        <div class="text-[10px] text-slate-500 uppercase mb-0.5">Shot ${i + 1}</div>
-                        <div class="text-sm font-bold text-white font-[Cinzel]">${Math.ceil(shotData.total).toLocaleString()}</div>
-                    </div>
-                    <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-1">
-                        ${attrBarsHtml || '<div class="text-center text-[10px] text-slate-600 mt-2">-</div>'}
-                    </div>
-                `;
-            }
-            shotsContainer.appendChild(column);
-        }
-
-        container.appendChild(shotsContainer);
-    }
     
     /**
      * @method switchDamageRound
