@@ -11734,9 +11734,10 @@ if (this.phase === 'truth_book') {
 		             // [修改] 传入当前闪电等级 (config.lightning)
 		             const isChainTriggered = this.combat_lightning_triggerChain(enemy, dmg, projectile.chainHistory, config.lightning); 
 		             
-		             // 2. 只有在成功触发闪电链时，才提升当前敌人的温度 (提升等同于本次伤害的温度)
+		             // 2. 只有在成功触发闪电链时，才提升当前敌人的温度 (公式：闪电层数 + 连锁次数/3)
 		             if (isChainTriggered) {
-		                 enemy.applyTemp(dmg); 
+                         const chainCount = projectile.chainHistory.length;
+		                 enemy.applyTemp(config.lightning + chainCount / 3); 
 		             }
 		             
 		             projectile.chainHistory.push(enemy); 
@@ -13681,8 +13682,9 @@ if (this.phase === 'truth_book') {
                 const decayFactor = 0.45 + (0.05 * level);
                 const nextDmg = Math.max(1, Math.floor(dmg * decayFactor));
 
-                // 伤害与状态：提升等同于本次伤害的温度
-                selected.applyTemp(dmg); 
+                // 伤害与状态：提升温度 (公式：闪电层数 + 连锁次数/3)
+                const chainCount = history.length;
+                selected.applyTemp(level + chainCount / 3); 
                 
                 const result = selected.takeDamage(dmg); 
                 this.combat_recordDamage(result.actualDamage, 'lightning', 'main', this._currentDamageShotId); 
