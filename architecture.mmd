@@ -1,0 +1,62 @@
+classDiagram
+    class Game {
+        +phase: string
+        +round: number
+        +saveData: Object
+        +trainingGround: TrainingGround
+        +truthBook: TruthBook
+        +init()
+        +phase_switchPhase(newPhase)
+        +meta_startRun()
+        +meta_openShop()
+        +ui_updateDamageStats()
+        +combat_recordDamage()
+        +combat_damageEnemy()
+        +spawn_spawnBullet()
+    }
+
+    class TrainingGround {
+        +active: boolean
+        +enemyConfig: Object
+        +bulletConfig: Object
+        +enter()
+        +exit()
+        +fireBullet()
+        +spawnEnemy()
+        +toggleMainPanel()
+    }
+
+    class TruthBook {
+        +active: boolean
+        +render()
+        +showDetail(id)
+    }
+
+    class SoundManager {
+        +ctx: AudioContext
+        +playEffect(name)
+        +playTone(freq, type)
+    }
+
+    class Enemy {
+        +hp: number
+        +affixes: Array
+        +update()
+        +draw()
+    }
+
+    class Projectile {
+        +config: Object
+        +update()
+        +draw()
+    }
+
+    TrainingGround --|> Game : manages
+    TruthBook --|> Game : manages
+    Game "1" *-- "many" Enemy : contains
+    Game "1" *-- "many" Projectile : contains
+    Game ..> SoundManager : uses
+    
+    note for Game "核心控制器，管理所有阶段和子系统"
+    note for TrainingGround "试炼场：自由配置敌人和子弹进行测试"
+    note for TruthBook "真理之书：展示游戏内所有元素和词条的图鉴"

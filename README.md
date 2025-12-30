@@ -1,82 +1,73 @@
-# Echo Alchemist (回聲煉金師) - 代码结构化索引 v2.3
+# Echo Alchemist (回聲煉金師) - 代码结构化索引 v3.0
 
 本项目是一个基于 HTML5 Canvas 和 JavaScript 开发的**单文件 Roguelike 游戏**。
 
 > [!IMPORTANT]
 > **单文件架构要求**: 所有的游戏逻辑、样式和资源引用必须集成在 `index.html` 中。请勿创建额外的 `.js` 或 `.css` 文件，以确保项目的便携性和 AI Agent 的易读性。
 
-为了方便 AI Agent 和开发者理解、编辑这个超过 11,000 行的超长文件，特建立此结构化索引。
+## 1. 项目架构 (Project Architecture)
 
-## 1. 属性系统方法论与知识图谱
+游戏采用面向对象的设计，逻辑高度解耦。核心控制器 `Game` 类管理着多个子系统和功能模块。
 
-### 1.1 设计原则
+![项目架构图](architecture.png)
 
-- **语义化命名**: 内部标识符必须反映其功能，而非视觉表现 (e.g., `redStripe` 已重构为 `explosive`)。
-- **数据驱动**: 游戏核心参数由结构化的数据对象定义，避免硬编码。
-- **分类清晰**: 每个属性都归属于一个明确的分类，以决定其行为模式。
-
-### 1.2 属性分类体系
-
-我们为所有弹珠/子弹的属性划定了五大类别，以规范其交互逻辑和数据结构。
-
-![属性分类体系图](docs_attribute_flow.png)
-
-| 分类 (Category) | 类型 (Type) | 描述 | 示例 |
-| :--- | :--- | :--- | :--- |
-| **基础 (Base)** | `base` | 游戏开始时的默认属性。 | `white` (纯净) |
-| **物理 (Physical)** | `stackable` | 可通过碰撞累加数值，影响物理行为。 | `bounce`, `pierce`, `scatter` |
-| **元素 (Elemental)** | `stackable` | 可累加数值，附加元素伤害或效果。 | `cryo`, `pyro`, `lightning` |
-| **特殊 (Special)** | `marble_bound` | 与弹珠类型绑定，不可叠加，提供独特机制。 | `explosive`, `rainbow`, `matryoshka` |
-| **高级 (Advanced)** | `evolution` | 由其他属性组合进化而来，通常更强大。 | `flying_sword`, `wind` |
-| **功能 (Functional)** | `stackable` | 特殊的功能性攻击，可叠加层数。 | `laser` |
-
-### 1.3 属性交互流程
-
-下图展示了属性在“收集”和“战斗”两个阶段中如何流转、交互和演变。
-
-![属性交互流程图](docs_attribute_interaction.png)
-
-## 2. 核心架构 (Core Architecture)
-
-游戏采用面向对象的设计，逻辑高度解耦。
+### 1.1 核心类说明
 
 | 类名 | 职责描述 | 关键方法 |
 | :--- | :--- | :--- |
-| **`Game`** | 游戏引擎核心，管理状态、循环、输入及全局逻辑。 | `sys_loop`, `phase_switch`, `combat_damageEnemy` |
-| **`Enemy`** | 敌人逻辑，处理 AI、血量、词缀及受击反馈。 | `takeDamage`, `executeTurnAction`, `draw` |
-| **`Projectile`** | 战斗弹丸，处理移动、碰撞及特殊攻击逻辑。 | `update`, `onHit`, `performSlashAttack` |
-| **`DropBall`** | 收集阶段弹珠，处理物理模拟与钉板交互。 | `handlePegInteraction`, `update`, `draw` |
-| **`SoundManager`** | 音频引擎，基于 Web Audio API 合成音效。 | `playEffect`, `playTone`, `playHit` |
-| **`UIManager`** | UI 状态管理，处理 DOM 更新与交互。 | `updateSkillBar`, `showEnemyInfo`, `switchTab` |
-| **`FloatingText`** | 浮动文字特效类，用于显示伤害数字和得分。 | `update`, `draw` |
+| **`Game`** | 游戏引擎核心，管理状态、循环、输入及全局逻辑。 | `sys_loop`, `phase_switchPhase`, `combat_damageEnemy` |
+| **`TrainingGround`** | **[新增]** 试炼场模块，提供自由配置敌人和子弹的测试环境。 | `enter`, `exit`, `fireBullet`, `spawnEnemy` |
+| **`TruthBook`** | **[新增]** 真理之书模块，展示游戏内所有元素、词条和属性的图鉴。 | `render`, `showDetail`, `ui_openTruthBook` |
+| **`Enemy`** | 敌人逻辑，处理 AI、血量、词缀及受击反馈。 | `update`, `draw`, `advance` |
+| **`Projectile`** | 战斗弹丸，处理移动、碰撞及特殊攻击逻辑。 | `update`, `draw`, `destroy` |
+| **`SoundManager`** | 音频引擎，基于 Web Audio API 合成音效。 | `playEffect`, `playTone`, `resume` |
 
-## 3. 游戏规则文档 (Game Rules)
+## 2. 功能模块详解
 
-为了保持 README 的简洁，详细的游戏机制规则已拆分为独立文档：
+### 2.1 首页与局外成长 (Meta Progression)
+游戏现在拥有一个完整的首页（`phase-meta`），作为玩家的行动中心：
+- **开始炼成**: 初始化新的游戏循环。
+- **炼金工坊 (Workshop)**: 使用“能量精粹”进行局外永久升级，包括属性权重解锁、初始属性增强、防线加固等。
+- **数据持久化**: 玩家的升级进度和货币通过 `saveData` 对象进行管理。
 
-- [**风属性系统逻辑**](RULES_WIND_V2.md): 详细介绍了风属性锚点的生成、几何判定逻辑及法阵效果矩阵。
-- [**子母剑系统规则**](RULES_FLYING_SWORD.md): 详细介绍了子母剑（飞剑）的获取、升级、战斗行为及等级视觉表现。
+### 2.2 试炼场 (Training Ground)
+一个独立的测试模式，允许玩家：
+- **自定义子弹**: 自由调整伤害、弹跳、穿透、元素层数等参数。
+- **配置敌人**: 设置敌人血量并注入各种词缀（如精英、护盾、分身等）。
+- **实时统计**: 提供 DPS 监测和总伤害统计，方便测试不同属性组合的强度。
 
-## 4. 全局配置与数据库 (Global Config & DB)
+### 2.3 真理之书 (Truth Book)
+游戏内的百科全书，包含：
+- **属性图鉴**: 详细解释每种属性（火、冰、雷、风、飞剑等）的效果。
+- **词缀说明**: 介绍敌人可能携带的特殊能力。
+- **演示引擎**: 在图鉴内提供实时的视觉演示。
 
-所有的平衡性调整和视觉规范都集中在以下常量中：
+### 2.4 伤害统计看板 (Damage Analytics)
+经过优化的伤害统计系统，支持：
+- **多维统计**: 同时记录伤害的类型（Type）和来源（Source）。
+- **堆叠柱状图**: 视觉化展示每种伤害类型的构成（如：火属性伤害中，主体贡献与散射贡献的比例）。
+- **历史回溯**: 支持查看当前回合及过往回合的详细伤害分布。
 
-*   **`CONFIG` (Line 1129)**: 
-    *   `ui`: 颜色与图标定义。
-    *   `physics`: 重力、摩擦力、弹珠半径等物理参数。
-    *   `balance`: 敌人血量成长、词缀触发概率、伤害系数。
-    *   `gameplay`: 网格大小、波次规则、遗物出现间隔。
-*   **`RELIC_DB` (Line 1327)**: 遗物系统定义，包含 `id`, `name`, `effect`, `rarity` 等。
-*   **`SKILL_DB` (Line 1384)**: 玩家主动技能定义，包含消耗、逻辑 ID (`methodId`) 及参数。
+## 3. 属性系统与规则
 
-## 5. 开发与调试指南 (Dev & Debug)
+### 3.1 属性分类体系
 
-*   **性能优化**: 游戏使用了 `requestAnimationFrame` 驱动主循环，并通过 `timeScale` 支持慢动作效果。
-*   **视觉特效**: 结合了 CSS `@keyframes` 和 Canvas 绘图。
-*   **调试建议**: 
-    *   修改 `CONFIG.balance` 可快速测试不同难度。
-    *   搜索 `class Game` 下的 `setupInputs` 可调整交互逻辑。
+| 分类 (Category) | 描述 | 示例 |
+| :--- | :--- | :--- |
+| **基础 (Base)** | 默认属性。 | `damage` (基础伤害) |
+| **物理 (Physical)** | 影响物理行为。 | `bounce`, `pierce`, `scatter` |
+| **元素 (Elemental)** | 附加元素伤害或效果。 | `cryo` (冰), `pyro` (火), `lightning` (雷) |
+| **高级 (Advanced)** | 独特机制或进化属性。 | `flying_sword` (飞剑), `wind` (风), `laser` (激光) |
+
+### 3.2 详细规则文档
+- [**风属性系统逻辑**](RULES_WIND_V2.md): 锚点生成、几何判定及法阵效果。
+- [**子母剑系统规则**](RULES_FLYING_SWORD.md): 飞剑获取、升级及战斗行为。
+
+## 4. 全局配置 (Global Config)
+
+- **`CONFIG`**: 核心平衡性参数、UI 定义及物理常数。
+- **`META_SHOP_CONFIG`**: 炼金工坊的升级项、价格曲线及效果定义。
+- **`RELIC_DB` & `SKILL_DB`**: 遗物与主动技能数据库。
 
 ---
-
-*此文档由 AI Agent 自动生成并迭代，旨在作为大型代码库的“第二大脑”索引。*
+*此文档由 AI Agent 根据最新代码库自动更新，旨在提供最准确的项目架构索引。*
