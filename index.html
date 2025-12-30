@@ -1671,6 +1671,8 @@ const CONFIG = {
         enemyCols:6,
         cols: 10,           // 网格列数 
         rows: 6,           // 钉子行数
+        spacingX: 40,      // 钉子水平间距
+        spacingY: 40,      // 钉子垂直间距
         startRows: 4,       // 初始生成的敌人行数
         spawnMin: 3,        // 每波最少生成的敌人数量
         selectionCount: 6,  // 选卡阶段提供多少张卡
@@ -13034,7 +13036,7 @@ if (this.phase === 'truth_book') {
         const rows = CONFIG.gameplay.rows;
         const spacingX = CONFIG.gameplay.spacingX;
         const spacingY = CONFIG.gameplay.spacingY;
-        const offsetX = (canvas.width - (CONFIG.gameplay.cols - 1) * spacingX) / 2;
+        const offsetX = (this.canvas.width - (CONFIG.gameplay.cols - 1) * spacingX) / 2;
         const offsetY = 100;
 
         const previousPegs = [...this.pegs];
