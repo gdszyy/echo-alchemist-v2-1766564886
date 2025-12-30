@@ -16188,7 +16188,7 @@ const TRUTH_BOOK_DATA = {
                     const x = game.width/2 + (Math.random()-0.5) * 200;
                     const y = 150 + (Math.random()-0.5) * 150;
                     const e = new Enemy(x, y, 40, 40, 500);
-                    if (i === 0) e.temp = -100; // 首個目標凍結，確保 100% 觸發連鎖
+                    e.temp = -100; // [修復] 讓所有敵人都冰凍，確保瘋狂連鎖
                     game.enemies.push(e);
                 }
             },
@@ -16412,48 +16412,19 @@ class TruthBook {
                 this.demoGame.projectiles.push(p);
             },
             
-            // 傷害與戰鬥
+            // [核心重構] 傷害與戰鬥：直接調用主遊戲的戰鬥邏輯
             combat_damageEnemy: (enemy, proj, multiplier = 1.0) => {
-                const config = proj.config || {};
-                let damage = (config.damage || 10) * multiplier;
-                
-                if (enemy.affixes.includes('shield')) {
-                    damage *= CONFIG.balance.affixes.shieldReduction;
-                    this.demoGame.spawn_createFloatingText(enemy.pos.x, enemy.pos.y, "SHIELDED", "#93c5fd");
-                    enemy.shieldHitTimer = 15;
-                }
-                
-                const killed = enemy.takeDamage(damage);
-                this.demoGame.combat_recordDamage(damage, config.pyro ? 'pyro' : (config.cryo ? 'cryo' : 'damage'), 'main');
-                this.demoGame.spawn_createFloatingText(enemy.pos.x, enemy.pos.y, `-${Math.ceil(damage)}`, '#fff');
-                
-                if (config.cryo) enemy.applyTemp(-config.cryo);
-                if (config.pyro) enemy.applyTemp(config.pyro);
-                
-                // 閃電：需要命中已凍結目標 (temp <= -100)
-                if (config.lightning && enemy.temp <= -100) {
-                    this.demoGame.combat_lightning_triggerChain(enemy, damage, [enemy], 5);
-                }
-                
-                // 風：命中時生成錨點
-                if (config.wind) {
-                    this.demoGame.combat_wind_addAnchor(proj.pos.x, proj.pos.y, config.damage, config);
-                }
-
-                // 爆破：產生 AOE 和 Shockwave
-                if (config.explosive) {
-                    this.demoGame.spawn_createExplosion(proj.pos.x, proj.pos.y, '#f97316');
-                    this.demoGame.enemies.forEach(other => {
-                        if (other !== enemy && other.active && proj.pos.dist(other.pos) < 120) {
-                            this.demoGame.combat_damageEnemy(other, { config: { damage: damage * 0.5 }, pos: proj.pos });
-                        }
-                    });
-                }
-                
-                if (killed) {
-                    this.demoGame.spawn_createParticle(enemy.pos.x, enemy.pos.y, '#fff', 'spark');
-                    this.demoGame.spawn_addScore(enemy.maxHp);
-                }
+                // 將當前上下文切換為 demoGame 並調用主遊戲的戰鬥方法
+                this.mainGame.combat_damageEnemy.call(this.demoGame, enemy, proj, multiplier);
+            },
+            
+            // 補充主遊戲邏輯依賴的其他方法
+            combat_lightning_triggerChain: (enemy, dmg, history, level) => {
+                this.mainGame.combat_lightning_triggerChain.call(this.demoGame, enemy, dmg, history, level);
+            },
+            
+            combat_wind_addAnchor: (x, y, dmg, config) => {
+                this.mainGame.combat_wind_addAnchor.call(this.demoGame, x, y, dmg, config);
             },
             
             combat_recordDamage: (amount, attrType = 'damage') => {
@@ -16560,6 +16531,7 @@ class TruthBook {
             const ts = 1.0;
             this.demoGame.enemies.forEach(e => e.update(ts, this.demoGame));
             this.demoGame.projectiles.forEach(p => {
+                // [修復] 模擬器牆壁反彈邏輯：完全同步主遊戲
                 const margin = 20;
                 if (p.pos.x < margin || p.pos.x > this.demoGame.width - margin) {
                     p.vel.x *= -1;
@@ -16572,20 +16544,8 @@ class TruthBook {
                     if (p.config.bounce) p.config.bounce--;
                 }
                 
-                p.update(this.demoGame.width, this.demoGame.height, this.demoGame.enemies, this.demoGame.spawn_spawnBullet, ts);
-                
-                // [修復] 套娃邏輯：當子彈消失且有 nestedPayload 時，觸發分裂
-                if (!p.active && p.config.nestedPayload) {
-                    const nextConfig = { ...p.config.nestedPayload };
-                    // 簡單模擬分裂：向三個方向發射
-                    const angles = [-Math.PI/4, 0, Math.PI/4];
-                    angles.forEach(angle => {
-                        const baseAngle = Math.atan2(-1, 0); // 向上
-                        const finalAngle = baseAngle + angle;
-                        const nextVel = new Vec2(Math.cos(finalAngle) * 12, Math.sin(finalAngle) * 12);
-                        this.demoGame.spawn_spawnBullet(p.pos.x, p.pos.y, nextVel, nextConfig);
-                    });
-                }
+                // [核心修復] 確保子彈更新時使用的是 demoGame 的上下文
+                p.update(this.demoGame.width, this.demoGame.height, this.demoGame.enemies, this.demoGame.spawn_spawnBullet.bind(this.demoGame), ts);
             });
             this.demoGame.particles.forEach(p => p.update(ts));
             this.demoGame.floatingTexts.forEach(f => {
