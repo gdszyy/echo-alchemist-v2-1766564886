@@ -16113,18 +16113,22 @@ const TRUTH_BOOK_DATA = {
             ]
         },
         {
-            id: 'pyro', name: '火焰', icon: '🔥', tags: ['元素', '持續傷害'],
-            desc: '升高敵人溫度。超過 100°C 時觸發【過熱】，造成持續燃燒傷害並向周圍擴散。',
-            setup: (game) => { game.enemies.push(new Enemy(game.width/2, 200, 80, 80, 1000)); },
+            id: 'pyro', name: '火焰', icon: '🔥', tags: ['元素', '範圍爆炸'],
+            desc: '升高敵人溫度。溫度 >= 34°C 時觸发【燃燒】造成持續傷害。溫度 > 200°C 時有概率觸发【過熱爆炸】，造成大範圍 AOE 傷害並消耗 10% 熱量。觸发概率隨溫度提升，600°C 時必爆。',
+            setup: (game) => { 
+                game.enemies.push(new Enemy(game.width/2, 200, 80, 80, 1000)); 
+                // 增加周圍敵人以演示 AOE
+                game.enemies.push(new Enemy(game.width/2 - 100, 200, 50, 50, 500));
+                game.enemies.push(new Enemy(game.width/2 + 100, 200, 50, 50, 500));
+            },
             loop: [
                 { type: 'log', text: '點火升溫...' },
-                { type: 'spawn_projectile', config: { damage: 5, pyro: 120 } },
+                { type: 'spawn_projectile', config: { damage: 5, pyro: 250 } },
                 { type: 'wait', frames: 60 },
-                { type: 'log', text: '觸發燃燒 (溫度>=100)' },
-                { type: 'enemy_turn' }, 
-                { type: 'wait', frames: 60 },
-                { type: 'enemy_turn' },
-                { type: 'wait', frames: 60 }, { type: 'reset' }
+                { type: 'log', text: '觸發燃燒 (溫度>=34)' },
+                { type: 'wait', frames: 30 },
+                { type: 'log', text: '高溫觸發過热爆炸 (AOE)！' },
+                { type: 'wait', frames: 120 }, { type: 'reset' }
             ]
         },
         {
