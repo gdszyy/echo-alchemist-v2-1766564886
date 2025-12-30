@@ -16385,14 +16385,20 @@ class TruthBook {
                     x = arg1; y = arg2; vel = arg3; config = arg4; id = arg5; isLast = arg6;
                 }
                 
+                // [修復] 確保 vel 是 Vec2 實例，防止 .len() 等方法報錯
+                if (!(vel instanceof Vec2)) {
+                    vel = new Vec2(vel.x, vel.y);
+                }
+                
                 // [修復] 處理散射邏輯：如果 config 中有 scatter，則生成多個子彈
                 if (config.scatter && !config._isScatterSub) {
                     const count = config.scatter;
                     const baseAngle = Math.atan2(vel.y, vel.x);
                     const spread = Math.PI / 4;
+                    const speed = vel.len();
                     for (let i = 0; i < count; i++) {
                         const angle = baseAngle + (i - (count - 1) / 2) * (spread / count);
-                        const newVel = new Vec2(Math.cos(angle) * vel.len(), Math.sin(angle) * vel.len());
+                        const newVel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
                         const newConfig = { ...config, scatter: 0, _isScatterSub: true };
                         const p = new Projectile(x, y, newVel, newConfig, false, id, i === count - 1);
                         p.game = this.demoGame;
