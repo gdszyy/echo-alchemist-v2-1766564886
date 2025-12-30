@@ -10371,7 +10371,7 @@ if (this.phase === 'truth_book') {
                     
                     // 2. 造成主伤害
                     const killed = e.takeDamage(dmg);
-                    this.combat_recordDamage(dmg, 'lightning', this._currentDamageShotId);
+                    this.combat_recordDamage(dmg, 'lightning', 'main', this._currentDamageShotId);
                     this.spawn_createFloatingText(e.pos.x, e.pos.y, `-${dmg}`, '#c084fc');
                     
                     // 3. 施加感电效果 (温度)
@@ -11651,13 +11651,19 @@ if (this.phase === 'truth_book') {
         return true;
     }
 
-    combat_damageEnemy(enemy, projectile) {
+    combat_damageEnemy(enemy, projectile, damageOverride = null) {
         if (!enemy || !enemy.active) return; 
-        // --- [修復]：如果是光球/偽造子彈，補齊 chainHistory 防止報錯 ---
+        // --- [修復]：如果是光球/偽造子彈，補齊 chainHistory 防止報措 ---
         if (!projectile.chainHistory) projectile.chainHistory = [];
 
         const config = projectile.config;
-        const dmg = projectile.isCopy ? config.damage * 0.5 : config.damage;
+        let dmg = damageOverride !== null ? damageOverride : (projectile.isCopy ? config.damage * 0.5 : config.damage);
+
+        // --- [新增] 确定伤害来源类型 (用于统计图表颜色) ---
+        let sourceType = 'main';
+        if (config.isScatterChild) sourceType = 'scatter';
+        else if (config.type === 'flying_sword') sourceType = 'flying_sword'; // 飞剑
+        else if (config.wind) sourceType = 'wind'; // 风
         
         // --- 1. 视觉特效生成逻辑 ---
         const hitX = projectile.pos.x;
@@ -11741,46 +11747,46 @@ if (this.phase === 'truth_book') {
         const killed = damageResult.killed;
         const actualDmg = damageResult.actualDamage;
 
-        // 根据属性类型记录伤害
-        let damageAttr = 'damage'; // 默认为普通伤害
-        let damageColor = '#ffffff'; // 默认颜色
-        
-        // 判断是否为飞剑伤害
-        if (config.type === 'flying_sword' || projectile.isCopy) {
-            damageAttr = 'flying_sword';
-            damageColor = '#0ea5e9';
+        // --- [新增] 确定基础伤害类型 (用于统计图表行) ---
+        // 需求2a: 火属性子弹的弹射/穿透伤害分别统计，只有额外火伤才算火属性
+        let damageType = 'damage'; // 默认为物理/基础
+
+        // 判定是否为弹射或穿透产生的击打
+        const isBounceHit = (config.bounce > 0 && projectile.bouncesLeft < config.bounce);
+        const isPierceHit = (config.pierce > 0 && projectile.piercesLeft < config.pierce);
+
+        if (isBounceHit) {
+            damageType = 'bounce';
+        } else if (isPierceHit) {
+            damageType = 'pierce';
+        } else {
+            if (config.pyro > 0) damageType = 'pyro';
+            else if (config.cryo > 0) damageType = 'cryo';
+            else if (config.lightning > 0) damageType = 'lightning';
+            else if (config.wind > 0) damageType = 'wind';
+            else if (config.type === 'flying_sword') damageType = 'flying_sword';
         }
-        else if (config.lightning > 0) {
-            damageAttr = 'lightning';
-            damageColor = '#c084fc';
-        }
-        else if (config.pyro > 0) {
-            damageAttr = 'pyro';
-            damageColor = '#f97316';
-        }
-        else if (config.cryo > 0) {
-            damageAttr = 'cryo';
-            damageColor = '#06b6d4';
-        }
-        else if (config.pierce > 0) {
-            damageAttr = 'pierce';
-            damageColor = '#fca5a5';
-        }
-        else if (config.bounce > 0) {
-            damageAttr = 'bounce';
-            damageColor = '#fbbf24';
-        }
-        else if (config.scatter > 0) {
-            damageAttr = 'scatter';
-            damageColor = '#a78bfa';
-        }
-        else if (config.wind > 0) {
-            damageAttr = 'wind';
-            damageColor = '#34d399';
-        }
+
+        const colorMap = {
+            'pyro': '#f97316', 'cryo': '#06b6d4', 'lightning': '#c084fc',
+            'bounce': '#fbbf24', 'pierce': '#fca5a5', 'damage': '#ffffff',
+            'wind': '#34d399', 'flying_sword': '#0ea5e9', 'scatter': '#facc15'
+        };
+        const damageColor = colorMap[damageType] || '#ffffff';
         
         const shotId = projectile.shotId !== undefined ? projectile.shotId : null;
-        this.combat_recordDamage(actualDmg, damageAttr, shotId);
+        this.combat_recordDamage(actualDmg, damageType, sourceType, shotId);
+
+        // --- [需求1] 火属性额外伤害逻辑 ---
+        // 当温度 >= 34度时，造成 子弹火属性层数 * 温度 / 100 的伤害
+        if (config.pyro > 0 && enemy.temp >= 34) {
+            const extraFireDmg = (config.pyro * enemy.temp) / 100;
+            if (extraFireDmg > 0) {
+                const fireResult = enemy.takeDamage(extraFireDmg);
+                this.combat_recordDamage(fireResult.actualDamage, 'pyro', sourceType, shotId);
+                this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 25, `+${Math.ceil(fireResult.actualDamage)}`, '#f97316');
+            }
+        }
         
         // [新增] 保存当前shotId，供后续额外伤害使用
         this._currentDamageShotId = shotId;
@@ -11819,7 +11825,7 @@ if (this.phase === 'truth_book') {
                     // 2. 造成额外伤害
                     if (extraDmg > 0) {
                         enemy.takeDamage(extraDmg);
-                        this.combat_recordDamage(extraDmg, 'flying_sword', this._currentDamageShotId);
+                        this.combat_recordDamage(extraDmg, 'flying_sword', 'flying_sword', this._currentDamageShotId);
                         this.spawn_createFloatingText(sword.pos.x, sword.pos.y, `+${Math.ceil(extraDmg)}`, resonanceColor);
                     }
 
@@ -11893,7 +11899,7 @@ if (this.phase === 'truth_book') {
                         const spreadDmg = enemy.maxHp*CONFIG.gameplay.fireSpreadDamagePercent;
                         other.takeDamage(spreadDmg);
                         // 记录火焰扩散伤害
-                        this.combat_recordDamage(spreadDmg, 'pyro', this._currentDamageShotId);
+                        this.combat_recordDamage(spreadDmg, 'pyro', 'main', this._currentDamageShotId);
                     }
                 });
             }
@@ -11971,7 +11977,7 @@ if (this.phase === 'truth_book') {
                     // 造成 AOE 伤害 (减半)
                     const aoeDmg = dmg * 0.5;
                     const k = other.takeDamage(aoeDmg); 
-                    this.combat_recordDamage(aoeDmg, 'explosive', this._currentDamageShotId); 
+                    this.combat_recordDamage(aoeDmg, 'explosive', 'main', this._currentDamageShotId); 
                     if (k) this.spawn_addScore(other.maxHp); 
                     
                     // --- 4. 关键：AOE 也要施加元素效果 ---
@@ -12019,30 +12025,41 @@ if (this.phase === 'truth_book') {
      * @description 记录本回合造成的伤害。
      * @param {number} amount - **重要参数** 伤害量。
      * @param {string} attrType - 属性类型
-     * @param {number} shotId - 子弹ID，用于区分不同子弹的伤害
+     * @param {string} sourceType - 来源类型
+     * @param {number} shotId - 子弹ID
      */
-    combat_recordDamage(amount, attrType = 'damage', shotId = null) { 
+    combat_recordDamage(amount, attrType = 'damage', sourceType = 'main', shotId = null) {
+        if (amount <= 0) return;
+
         this.roundDamage += amount;
         this.currentShotDamage += amount;
-        // 追踪各属性造成的伤害
+
+        // --- 1. 更新实时显示的统计 (Game 实例级) ---
         if (!this.currentShotDamageByAttr[attrType]) {
-            this.currentShotDamageByAttr[attrType] = 0;
+            this.currentShotDamageByAttr[attrType] = {};
         }
-        this.currentShotDamageByAttr[attrType] += amount;
-        
-        // 如果有shotId，记录到对应的子弹统计中
+        if (!this.currentShotDamageByAttr[attrType][sourceType]) {
+            this.currentShotDamageByAttr[attrType][sourceType] = 0;
+        }
+        this.currentShotDamageByAttr[attrType][sourceType] += amount;
+
+        // --- 2. 更新子弹历史统计 (Shot ID 级) ---
         if (shotId !== null && this.shotDamageMap.has(shotId)) {
             const shotStats = this.shotDamageMap.get(shotId);
             shotStats.total += amount;
+            
             if (!shotStats.byAttr[attrType]) {
-                shotStats.byAttr[attrType] = 0;
+                shotStats.byAttr[attrType] = {};
             }
-            shotStats.byAttr[attrType] += amount;
+            if (!shotStats.byAttr[attrType][sourceType]) {
+                shotStats.byAttr[attrType][sourceType] = 0;
+            }
+            shotStats.byAttr[attrType][sourceType] += amount;
         }
-        
-        // 实时更新 combo 下方的伤害显示
+
         this.ui_updateRoundDamage();
     }
+
     /**
      * @method addScore
      * @description 增加分数并提高分数乘数。
@@ -12165,204 +12182,152 @@ if (this.phase === 'truth_book') {
         const container = document.getElementById('damage-stats-container');
         if (!container) return;
 
-        // 清空容器并设置基础布局
         container.innerHTML = '';
-        // 强制容器为纵向布局，以便容纳顶部的汇总面板
-        container.className = 'flex flex-col gap-3 h-full w-full p-2';
+        container.className = 'flex flex-col gap-2 h-full w-full p-2 overflow-y-auto custom-scrollbar';
 
-        // 1. 获取当前要显示的数据 (当前回合 或 历史回合)
+        // 1. 获取当前数据
         let currentData;
         let roundNumber;
         if (this.currentViewingRound === 0) {
-            // 查看当前回合
             currentData = this.shotDamageHistory;
             roundNumber = this.round;
         } else {
-            // 查看历史回合
             const historyIndex = this.roundDamageHistory.length - this.currentViewingRound;
             if (historyIndex >= 0 && historyIndex < this.roundDamageHistory.length) {
                 const roundData = this.roundDamageHistory[historyIndex];
                 currentData = roundData.shots;
                 roundNumber = roundData.round;
             } else {
-                currentData = [];
-                roundNumber = 0;
+                currentData = []; roundNumber = 0;
             }
         }
 
-        // 2. 顶部导航栏 (切换回合)
+        // 2. 顶部导航
         const header = document.createElement('div');
-        header.className = 'w-full flex items-center justify-between px-3 py-2 bg-slate-800/90 rounded-lg border border-slate-700 shrink-0 shadow-sm';
-        const canGoPrev = this.currentViewingRound < this.roundDamageHistory.length;
-        const canGoNext = this.currentViewingRound > 0;
-        
+        header.className = 'w-full flex justify-between items-center bg-slate-800 p-2 rounded mb-2';
         header.innerHTML = `
-            <button onclick="game.ui_switchDamageRound(1)" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-white transition-colors flex items-center gap-1 ${!canGoPrev ? 'opacity-30 cursor-not-allowed' : ''}" ${!canGoPrev ? 'disabled' : ''}>
-                <span>◀</span> <span>Prev</span>
-            </button>
-            <div class="flex flex-col items-center leading-tight">
-                <span class="text-xs text-slate-400 uppercase tracking-widest">Analysis</span>
-                <span class="text-sm font-bold text-amber-400">Round ${roundNumber} ${this.currentViewingRound === 0 ? '(Now)' : ''}</span>
-            </div>
-            <button onclick="game.ui_switchDamageRound(-1)" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-white transition-colors flex items-center gap-1 ${!canGoNext ? 'opacity-30 cursor-not-allowed' : ''}" ${!canGoNext ? 'disabled' : ''}>
-                <span>Next</span> <span>▶</span>
-            </button>
+            <button onclick="game.ui_switchDamageRound(1)" class="text-slate-400 hover:text-white">◀</button>
+            <span class="text-xs font-bold text-amber-400">Round ${roundNumber}</span>
+            <button onclick="game.ui_switchDamageRound(-1)" class="text-slate-400 hover:text-white">▶</button>
         `;
         container.appendChild(header);
 
-        // =========================================
-        // [新增] 3. 回合总伤害汇总面板 (Summary)
-        // =========================================
-        
-        // 3.1 计算统计数据
+        // 3. 聚合数据：将所有子弹的数据合并为一个总表
+        // 结构: aggregated[damageType][sourceType] = amount
+        const aggregated = {};
         let totalRoundDamage = 0;
-        const totalAttrMap = {}; // { 'pyro': 1200, 'phys': 500 }
 
         currentData.forEach(shot => {
             totalRoundDamage += shot.total;
-            if (shot.byAttr) {
-                Object.entries(shot.byAttr).forEach(([attr, val]) => {
-                    if (!totalAttrMap[attr]) totalAttrMap[attr] = 0;
-                    totalAttrMap[attr] += val;
-                });
+            for (const [dtype, sources] of Object.entries(shot.byAttr)) {
+                if (!aggregated[dtype]) aggregated[dtype] = {};
+                // 处理旧数据 (兼容旧的 byAttr[dtype] = amount 格式)
+                if (typeof sources === 'number') {
+                    if (!aggregated[dtype]['main']) aggregated[dtype]['main'] = 0;
+                    aggregated[dtype]['main'] += sources;
+                } else {
+                    for (const [stype, amount] of Object.entries(sources)) {
+                        if (!aggregated[dtype][stype]) aggregated[dtype][stype] = 0;
+                        aggregated[dtype][stype] += amount;
+                    }
+                }
             }
         });
 
-        // 3.2 创建汇总面板容器
-        const summaryPanel = document.createElement('div');
-        summaryPanel.className = 'w-full bg-slate-900/60 rounded-xl p-3 border border-indigo-500/20 shrink-0 flex flex-col gap-3 relative overflow-hidden';
-        
-        // 背景装饰
-        const bgDeco = document.createElement('div');
-        bgDeco.className = 'absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none';
-        summaryPanel.appendChild(bgDeco);
-
-        // 3.3 总伤数字
-        const summaryHeader = document.createElement('div');
-        summaryHeader.className = 'flex justify-between items-end border-b border-white/5 pb-2 relative z-10';
-        summaryHeader.innerHTML = `
-            <div class="flex items-center gap-2">
-                <span class="text-lg">📊</span>
-                <span class="text-xs text-slate-300 font-bold tracking-wider uppercase">Total Output</span>
-            </div>
-            <span class="text-2xl font-[Cinzel] font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-200 to-purple-400 drop-shadow-sm">
-                ${Math.ceil(totalRoundDamage).toLocaleString()}
-            </span>
-        `;
-        summaryPanel.appendChild(summaryHeader);
-
-        // 3.4 属性分布可视化 (Stacked Bar & Legend)
-        if (totalRoundDamage > 0) {
-            // 堆叠条容器
-            const barContainer = document.createElement('div');
-            barContainer.className = 'w-full h-2.5 bg-slate-950 rounded-full overflow-hidden flex shadow-inner relative z-10';
-            
-            // 图例网格
-            const legendGrid = document.createElement('div');
-            legendGrid.className = 'grid grid-cols-3 gap-2 relative z-10';
-
-            // 排序属性 (按伤害高低)
-            const sortedTotalAttrs = Object.entries(totalAttrMap).sort((a, b) => b[1] - a[1]);
-            const attrConfig = CONFIG.ui.attributeDisplay;
-
-            sortedTotalAttrs.forEach(([attr, val]) => {
-                if (val <= 0) return;
-                const attrKey = attr.toLowerCase();
-                // 获取配置，如果是未知属性则给默认值
-                const info = attrConfig[attrKey] || { name: attr, color: '#94a3b8', icon: '🔹' };
-                const percent = (val / totalRoundDamage) * 100;
-
-                // 添加进度条片段
-                const barSegment = document.createElement('div');
-                barSegment.style.width = `${percent}%`;
-                barSegment.style.backgroundColor = info.color;
-                barSegment.style.boxShadow = `0 0 10px ${info.color}40`; // 辉光
-                barContainer.appendChild(barSegment);
-
-                // 添加图例卡片
-                const legendItem = document.createElement('div');
-                legendItem.className = 'flex flex-col bg-slate-800/50 px-2 py-1.5 rounded border-l-2 border-white/5';
-                legendItem.style.borderLeftColor = info.color;
-                legendItem.innerHTML = `
-                    <div class="flex justify-between items-center text-[10px] text-slate-400 mb-0.5">
-                        <span class="flex items-center gap-1">
-                            <span style="color:${info.color}">${info.icon}</span> ${info.name}
-                        </span>
-                        <span class="font-mono opacity-50">${percent.toFixed(0)}%</span>
-                    </div>
-                    <div class="text-xs font-bold text-slate-200 leading-none">
-                        ${Math.ceil(val).toLocaleString()}
-                    </div>
-                `;
-                legendGrid.appendChild(legendItem);
-            });
-
-            summaryPanel.appendChild(barContainer);
-            summaryPanel.appendChild(legendGrid);
-        } else {
-            const emptyText = document.createElement('div');
-            emptyText.className = 'text-center text-xs text-slate-600 py-2 italic';
-            emptyText.innerText = "No damage data recorded";
-            summaryPanel.appendChild(emptyText);
+        if (totalRoundDamage === 0) {
+            container.innerHTML += `<div class="text-slate-500 text-center text-xs mt-4">暂无伤害数据</div>`;
+            return;
         }
 
-        container.appendChild(summaryPanel);
+        // 4. 定义颜色映射
+        const getSourceColorStyle = (damageType, sourceType) => {
+            // [需求2b] 如果来源是散射，用散射颜色 (黄色系)
+            if (sourceType === 'scatter') return '#facc15'; 
+            
+            // 否则使用 DamageType 的主色
+            const typeColors = {
+                'bounce': '#fbbf24', 'pierce': '#fca5a5', 'scatter': '#facc15',
+                'damage': '#ffffff', 'cryo': '#06b6d4', 'pyro': '#f97316',
+                'lightning': '#c084fc', 'wind': '#34d399', 'flying_sword': '#0ea5e9'
+            };
+            return typeColors[damageType] || '#cbd5e1';
+        };
 
-        // =========================================
-        // 4. 子弹详情列表 (保留并优化视觉)
-        // =========================================
-        const shotsContainer = document.createElement('div');
-        shotsContainer.className = 'flex gap-3 flex-1 overflow-x-auto w-full pb-2 min-h-0'; // min-h-0 fix flex overflow
+        const getSourceOpacity = (sourceType) => {
+            if (sourceType === 'main') return 1.0;
+            return 0.7; // 散射、风、飞剑等来源稍微透明一点以示区分
+        };
 
-        // 显示最近的 N 发子弹
-        const shotsToShow = Math.max(3, currentData.length);
-        
-        for (let i = 0; i < shotsToShow; i++) {
-            const shotData = currentData[i];
-            const column = document.createElement('div');
-            column.className = 'flex-none w-[140px] bg-slate-800/40 rounded-lg p-2 flex flex-col border border-slate-700/50 relative group hover:bg-slate-800/60 transition-colors';
+        // 5. 渲染每一行 (Damage Type)
+        // 按伤害总量排序
+        const sortedTypes = Object.keys(aggregated).sort((a, b) => {
+            const sumA = Object.values(aggregated[a]).reduce((acc, v) => acc + v, 0);
+            const sumB = Object.values(aggregated[b]).reduce((acc, v) => acc + v, 0);
+            return sumB - sumA;
+        });
 
-            if (!shotData) {
-                // 占位符 (未发射的子弹)
-                column.innerHTML = `
-                    <div class="text-center mb-2 pb-1 border-b border-slate-700/30">
-                        <div class="text-[10px] text-slate-600 uppercase">Shot ${i + 1}</div>
-                    </div>
-                    <div class="flex-1 flex items-center justify-center">
-                        <div class="text-2xl opacity-10 grayscale">⚪</div>
-                    </div>
-                `;
-            } else {
-                // 真实数据
-                // 计算该子弹内的最大属性伤害，用于绘制相对长度的条
-                let maxAttrInShot = 0;
-                if (shotData.byAttr) {
-                    Object.values(shotData.byAttr).forEach(d => { if(d > maxAttrInShot) maxAttrInShot = d; });
-                }
+        sortedTypes.forEach(dtype => {
+            const sources = aggregated[dtype];
+            const typeTotal = Object.values(sources).reduce((acc, v) => acc + v, 0);
+            const typePercent = (typeTotal / totalRoundDamage) * 100;
+            
+            const row = document.createElement('div');
+            row.className = 'flex flex-col gap-1 mb-3';
+            
+            // 标签行
+            const label = document.createElement('div');
+            label.className = 'flex justify-between text-[10px] px-1';
+            const typeNames = {
+                'pyro': '🔥 火属性', 'cryo': '❄️ 冰属性', 'lightning': '⚡ 雷属性',
+                'bounce': '⤴️ 弹射', 'pierce': '➡️ 穿透', 'damage': '⚔️ 基础',
+                'wind': '🌪️ 风属性', 'flying_sword': '🗡️ 飞剑', 'explosive': '💥 爆炸'
+            };
+            label.innerHTML = `
+                <span class="text-slate-300 font-bold">${typeNames[dtype] || dtype}</span>
+                <span class="text-slate-400">${Math.ceil(typeTotal).toLocaleString()} (${typePercent.toFixed(1)}%)</span>
+            `;
+            row.appendChild(label);
+            
+            // 堆叠进度条
+            const barContainer = document.createElement('div');
+            barContainer.className = 'w-full h-3 bg-slate-900 rounded-full overflow-hidden flex border border-slate-700';
+            
+            // 按来源排序 (main 优先)
+            const sortedSources = Object.keys(sources).sort((a, b) => (a === 'main' ? -1 : 1));
+            
+            sortedSources.forEach(stype => {
+                const amount = sources[stype];
+                const segmentPercent = (amount / typeTotal) * 100;
+                
+                const segment = document.createElement('div');
+                segment.style.width = `${segmentPercent}%`;
+                segment.style.backgroundColor = getSourceColorStyle(dtype, stype);
+                segment.style.opacity = getSourceOpacity(stype);
+                segment.className = 'h-full transition-all duration-500';
+                segment.title = `${stype}: ${Math.ceil(amount)}`;
+                barContainer.appendChild(segment);
+            });
+            
+            row.appendChild(barContainer);
+            container.appendChild(row);
+        });
 
-                let attrBarsHtml = '';
-                const attrConfig = CONFIG.ui.attributeDisplay;
-                const sortedAttrs = Object.entries(shotData.byAttr).sort((a, b) => b[1] - a[1]);
-
-                for (const [attr, damage] of sortedAttrs) {
-                    if (damage <= 0) continue;
-                    const attrKey = attr.toLowerCase();
-                    const info = attrConfig[attrKey] || { name: attr, color: '#94a3b8', icon: '❓' };
-                    // 相对长度
-                    const barWidth = maxAttrInShot > 0 ? (damage / maxAttrInShot * 100) : 0;
-                    
-                    attrBarsHtml += `
-                        <div class="mb-1.5 last:mb-0">
-                            <div class="flex justify-between text-[10px] leading-tight mb-0.5">
-                                <span class="text-slate-400 scale-90 origin-left">${info.icon}</span>
-                                <span class="text-slate-200 font-mono">${Math.ceil(damage)}</span>
-                            </div>
-                            <div class="h-1 bg-slate-700/50 rounded-full overflow-hidden">
-                                <div class="h-full rounded-full" style="width: ${barWidth}%; background-color: ${info.color}"></div>
-                            </div>
-                        </div>
-                    `;
-                }
+        // 6. 底部图例
+        const legend = document.createElement('div');
+        legend.className = 'mt-4 pt-2 border-t border-slate-700 flex flex-wrap gap-3 justify-center';
+        legend.innerHTML = `
+            <div class="flex items-center gap-1 text-[9px] text-slate-400">
+                <div class="w-2 h-2 rounded-full bg-white"></div> 主体
+            </div>
+            <div class="flex items-center gap-1 text-[9px] text-slate-400">
+                <div class="w-2 h-2 rounded-full bg-yellow-400"></div> 散射
+            </div>
+            <div class="flex items-center gap-1 text-[9px] text-slate-400">
+                <div class="w-2 h-2 rounded-full opacity-70 bg-slate-500"></div> 其他来源
+            </div>
+        `;
+        container.appendChild(legend);
+    }
 
                 column.innerHTML = `
                     <div class="text-center mb-2 pb-1 border-b border-white/10">
@@ -13643,7 +13608,7 @@ if (this.phase === 'truth_book') {
                     
                     // === 修改开始 ===
                     const result = closest.takeDamage(dmg); // 获取结果对象
-                    this.combat_recordDamage(result.actualDamage, 'lightning', this._currentDamageShotId); // 记录真实伤害
+                    this.combat_recordDamage(result.actualDamage, 'lightning', 'main', this._currentDamageShotId); // 记录真实伤害
                     
                     if(result.killed) this.spawn_addScore(closest.maxHp);
                     // === 修改结束 ===
@@ -13735,6 +13700,24 @@ if (this.phase === 'truth_book') {
      * @param {number} shotId - 发射ID，用于统计伤害
      */
     spawn_spawnBullet(x, y, vel, recipe, shotId = null, isLast = false) {
+        if (!shotId) shotId = Date.now() + Math.random();
+
+        // 初始化伤害统计结构 (支持二维统计: 伤害类型 -> 来源类型)
+        if (!this.shotDamageMap.has(shotId)) {
+            this.shotDamageMap.set(shotId, { 
+                total: 0, 
+                projectileCount: 0, 
+                destroyedCount: 0, 
+                // 修改：byAttr 存储为二维对象 { 'pyro': { 'main': 0, 'scatter': 0 }, ... }
+                byAttr: {} 
+            });
+            
+            // 绑定到当前 Game 实例的临时变量，供 UI 实时显示
+            this.currentShotDamage = 0;
+            this.currentShotDamageByAttr = {}; 
+        }
+        
+        const shotStats = this.shotDamageMap.get(shotId);
 
         // [关键] 属性优先级：飞剑 > 激光
         // 如果是飞剑，优先处理飞剑逻辑
@@ -13824,8 +13807,9 @@ if (this.phase === 'truth_book') {
                 const multiplier = Math.ceil(currentScatterIdx / 2);
                 const angleOffset = 0.2 * multiplier * sign;
                 const newVel = vel.rotate(angleOffset);
-                const copyRecipe = { ...recipe, scatter: 0, chainPayload: null };
+                const copyRecipe = { ...recipe, scatter: 0, chainPayload: null, isScatterChild: true };
                 this.projectiles.push(new Projectile(x, y, newVel, copyRecipe, true, shotId));
+                shotStats.projectileCount++;
                 currentScatterIdx++;
             }
             // 生成 50% 继承的副子弹
@@ -13834,14 +13818,17 @@ if (this.phase === 'truth_book') {
                 const multiplier = Math.ceil(currentScatterIdx / 2);
                 const angleOffset = 0.2 * multiplier * sign;
                 const newVel = vel.rotate(angleOffset);
-                const copyRecipe = { ...recipe, scatter: 0, chainPayload: null, damage: Math.max(1, Math.floor(recipe.damage * 0.5)) };
+                const copyRecipe = { ...recipe, scatter: 0, chainPayload: null, damage: Math.max(1, Math.floor(recipe.damage * 0.5)), isScatterChild: true };
                 this.projectiles.push(new Projectile(x, y, newVel, copyRecipe, true, shotId));
+                shotStats.projectileCount++;
                 currentScatterIdx++;
             }
         }
         
         // [关键] 生成主子弹
-        this.projectiles.push(new Projectile(x, y, vel, recipe, false, shotId, isLast)); 
+        shotStats.projectileCount++;
+        const mainRecipe = { ...recipe, isScatterChild: false };
+        this.projectiles.push(new Projectile(x, y, vel, mainRecipe, false, shotId, isLast)); 
     }
 
 // 在 Game 类中更新此方法
@@ -14556,7 +14543,7 @@ if (this.phase === 'truth_book') {
                 e.takeDamage(dot); // <--- 敵人可能在這裡死亡 (active = false)
                 
                 // 记录火焰持续伤害
-                this.combat_recordDamage(dot, 'pyro');
+                this.combat_recordDamage(dot, 'pyro', 'main');
                 
                 // 觸發燃燒特效
                 e.playBurnTickEffect(this, Math.floor(dot));
@@ -16288,7 +16275,7 @@ class TruthBook {
                 }
                 
                 const killed = enemy.takeDamage(damage);
-                this.demoGame.combat_recordDamage(damage, config.pyro ? 'pyro' : (config.cryo ? 'cryo' : 'damage'));
+                this.demoGame.combat_recordDamage(damage, config.pyro ? 'pyro' : (config.cryo ? 'cryo' : 'damage'), 'main');
                 this.demoGame.spawn_createFloatingText(enemy.pos.x, enemy.pos.y, `-${Math.ceil(damage)}`, '#fff');
                 
                 if (config.cryo) enemy.applyTemp(-config.cryo);
