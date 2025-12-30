@@ -11777,14 +11777,55 @@ if (this.phase === 'truth_book') {
         const shotId = projectile.shotId !== undefined ? projectile.shotId : null;
         this.combat_recordDamage(actualDmg, damageType, sourceType, shotId);
 
-        // --- [需求1] 火属性额外伤害逻辑 ---
-        // 当温度 >= 34度时，造成 子弹火属性层数 * 温度 / 100 的伤害
+        // --- 2. [火属性核心逻辑] 燃烧与过热爆炸 ---
         if (config.pyro > 0 && enemy.temp >= 34) {
-            const extraFireDmg = (config.pyro * enemy.temp) / 100;
-            if (extraFireDmg > 0) {
-                const fireResult = enemy.takeDamage(extraFireDmg);
+            
+            // Step 1: 计算当前的基础额外火伤 (使用平方根公式保持数值健康)
+            const tempFactor = Math.sqrt(enemy.temp); 
+            const baseFireDmg = config.pyro * tempFactor * 2.0;
+
+            // Step 2: 造成基础燃烧伤害
+            if (baseFireDmg >= 1) {
+                const fireResult = enemy.takeDamage(baseFireDmg);
                 this.combat_recordDamage(fireResult.actualDamage, 'pyro', sourceType, shotId);
-                this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 25, `+${Math.ceil(fireResult.actualDamage)}`, '#f97316');
+                // 显示橙色燃烧字样
+                this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 25, `Burn ${Math.ceil(fireResult.actualDamage)}`, '#fb923c');
+            }
+
+            // Step 3: [新增] 过热爆炸机制 (Small Explosion)
+            // 设定阈值和概率
+            const EXPLODE_THRESHOLD = 200; 
+            const EXPLODE_CHANCE = 0.3; // 30% 概率触发 (可根据需要调整)
+
+            if (enemy.temp > EXPLODE_THRESHOLD && Math.random() < EXPLODE_CHANCE) {
+                
+                // A. 计算消耗量：10% 当前热量
+                const consumedHeat = enemy.temp * 0.10;
+                
+                // B. 执行消耗：先扣除
+                enemy.temp -= consumedHeat;
+
+                // C. 计算爆炸伤害：50% 的当前额外火伤
+                const explodeDmg = baseFireDmg * 0.50;
+                
+                if (explodeDmg >= 1) {
+                    const expResult = enemy.takeDamage(explodeDmg);
+                    
+                    // 记录伤害 (依然归类为 pyro，或者您可以新建一个 'explode' 类型)
+                    this.combat_recordDamage(expResult.actualDamage, 'pyro', sourceType, shotId);
+                    
+                    // 视觉特效：显示红色 BOOM! 以及伤害数值
+                    this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 50, `BOOM! ${Math.ceil(expResult.actualDamage)}`, '#dc2626');
+                    
+                    // (可选) 添加一点屏幕震动或强击退感
+                    // enemy.pos.y -= 2; // 简单的震动模拟
+                }
+
+                // D. 热量回填机制
+                // "提升受到爆炸伤害的敌人本次消耗热量值 35% 的热量"
+                // 净消耗 = 10% - (10% * 35%) = 6.5%
+                const heatRefund = consumedHeat * 0.35;
+                enemy.temp += heatRefund;
             }
         }
         
