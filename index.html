@@ -8672,10 +8672,6 @@ class Game {
         
         // [新增] 伤害数字显示开关
         this.showDamageNumbers = true;  // 默认开启
-
-
-        this.spores = []; // 新增：存儲分身孢子
-        this.fireWaves = []; // 新增火焰波數組
         this.energyOrbs = []; //  存儲能量球
         this.fortuneWheel = new FortuneWheel(this);
         //  初始化所有細分權重
@@ -8746,7 +8742,6 @@ class Game {
         this.boardBottomY = 0;
         this.sys_loop();
         this.truthBook = new TruthBook(this);
-        this.trainingGround = new TrainingGround(this);
         this.trainingGround = new TrainingGround(this);
     }
 
@@ -13587,8 +13582,6 @@ if (this.phase === 'truth_book') {
      * @description 触发连锁闪电效果 (修复单体报错版)
      * @returns {boolean} 是否成功触发了闪电链
      */
-    combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1) {
-        // [修复1] 安全检查
     combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1) {
         // [修复1] 安全检查
         if (!sourceEnemy || !sourceEnemy.pos) return false;
