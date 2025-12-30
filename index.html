@@ -5746,52 +5746,50 @@ class Enemy {
     }
 
     takeDamage(amount) {
-        let finalDamage = amount;
-
-        // --- [新增] 护盾减伤机制 ---
+        let actualDamage = amount;
+        
+        // 1. 计算护盾减伤
         if (this.affixes.includes('shield')) {
-            const reduction = CONFIG.balance.affixes.shieldReduction || 0.5;
-            finalDamage *= reduction;
+            const reduction = CONFIG.balance.affixes.shieldReduction || 0.8;
+            actualDamage *= reduction; // 护盾减少伤害
             
             // 触发护盾视觉反馈 (限制频率)
             if (this.shieldHitTimer <= 0) {
-                this.shieldHitTimer = 15; // 持续约 0.25 秒
-                // [新增] 减伤文字提示
+                this.shieldHitTimer = 15;
                 if (typeof game !== 'undefined') {
                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "🛡️Block", "#93c5fd");
                 }
             }
         }
         
-        // [修复] 返回实际造成的伤害，以便调用方显示正确的飘字
-        const actualDamage = finalDamage;
-        
-        // 冰冻伤害加深机制
-        if (this.temp <= -100 || this.isFrozenCurrentTurn) {
-            const bonusDamage = amount * 0.5; // 50%额外伤害
-            finalDamage += bonusDamage;
+        // 2. 计算冰冻易伤
+        if (this.temp < 0) {
+            // 冰冻增加伤害 (根据温度线性增加)
+            actualDamage *= (1 + Math.abs(this.temp) * 0.005);
             
-            // 记录冰冻额外伤害
-            if (typeof game !== 'undefined') {
-                game.combat_recordDamage(bonusDamage, 'cryo', game._currentDamageShotId);
-                game.spawn_createFloatingText(this.pos.x, this.pos.y - 30, `+${Math.ceil(bonusDamage)}`, '#06b6d4');
+            // 记录冰冻额外伤害视觉反馈
+            if (typeof game !== 'undefined' && actualDamage > amount) {
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - 30, `+${Math.ceil(actualDamage - amount)}`, '#06b6d4');
             }
         }
-        
-        this.hp -= finalDamage;
+
+        // 3. 执行扣血
+        this.hp -= actualDamage; 
         this.hitTimer = 10; 
-        
-        // ---  重置白色血条的滞留时间 ---
-        // 设定为 45 帧 (约 0.75秒)，这段时间内白色血条不会减少
         this.whiteBarTimer = 45; 
+
         if (typeof game !== 'undefined') {
-            game.combat_reportDamage(finalDamage);
+            game.combat_reportDamage(actualDamage);
         }
-        if (this.hp <= 0) {
-            this.active = false;
-            return { killed: true, actualDamage: actualDamage };
-        }
-        return { killed: false, actualDamage: actualDamage };
+
+        // 4. 返回详细结果
+        const killed = this.hp <= 0;
+        if (killed) this.active = false;
+
+        return { 
+            killed: killed, 
+            actualDamage: actualDamage 
+        };
     }
     applyTemp(amount) { this.temp += amount; }
     getBounds() { return { left: this.pos.x - this.width/2, right: this.pos.x + this.width/2, top: this.pos.y - this.height/2, bottom: this.pos.y + this.height/2 }; }
@@ -13591,6 +13589,8 @@ if (this.phase === 'truth_book') {
      */
     combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1) {
         // [修复1] 安全检查
+    combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1) {
+        // [修复1] 安全检查
         if (!sourceEnemy || !sourceEnemy.pos) return false;
 
         // [修复2] 容错处理
@@ -13642,17 +13642,18 @@ if (this.phase === 'truth_book') {
                     }
                     
                     // [核心修改] 计算下一次伤害
-                    // 公式：D = 0.55 - 0.05 * Level
-                    // NextDmg = CurrentDmg * (1 - D)
-                    // 化简：Factor = 1 - (0.55 - 0.05*L) = 0.45 + 0.05*L
                     const decayFactor = 0.45 + (0.05 * level);
                     const nextDmg = Math.max(1, Math.floor(dmg * decayFactor));
 
                     // 伤害与状态
                     closest.applyTemp(CONFIG.balance.lightningTempIncrease); 
-                    const killed = closest.takeDamage(dmg); 
-                    this.combat_recordDamage(dmg, 'lightning', this._currentDamageShotId); 
-                    if(killed) this.spawn_addScore(closest.maxHp); 
+                    
+                    // === 修改开始 ===
+                    const result = closest.takeDamage(dmg); // 获取结果对象
+                    this.combat_recordDamage(result.actualDamage, 'lightning', this._currentDamageShotId); // 记录真实伤害
+                    
+                    if(result.killed) this.spawn_addScore(closest.maxHp);
+                    // === 修改结束 ===
                     
                     // 递归
                     history.push(closest); 
@@ -13664,7 +13665,6 @@ if (this.phase === 'truth_book') {
         }
         return false;
     }
-
     /**
     /**
      * @method fireNextShot
