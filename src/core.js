@@ -5845,6 +5845,7 @@ if (this.phase === 'truth_book') {
                 return;
             }
             if (this.dropBalls.length > 0 || this.energyOrbs.length > 0) {
+                console.log('[DEBUG] 充能中 - dropBalls:', this.dropBalls.length, 'energyOrbs:', this.energyOrbs.length, 'activeBalls:', this.currentSession?.activeBalls);
                 showToast("充能中...");
                 return;
             }
@@ -7777,7 +7778,9 @@ if (this.phase === 'truth_book') {
         const activeOrbsCount = this.energyOrbs.filter(orb => orb.active).length;
 
         // 1. 基础检查：如果还有东西在动，绝对不能结算
+        console.log('[DEBUG] attemptComplete - dropBalls:', this.dropBalls.length, 'activeOrbs:', activeOrbsCount, 'activeBalls:', this.currentSession?.activeBalls);
         if (this.dropBalls.length > 0 || activeOrbsCount > 0 || this.currentSession.activeBalls > 0) {
+            console.log('[DEBUG] 不能结算，还有东西在动');
             return;
         }
 
@@ -8124,9 +8127,11 @@ if (this.phase === 'truth_book') {
 
                     // 3. 播放一个确认音效 (比如 reload 或 magic)
                     audio.playCollect(); // 或者 audio.playTone(800, 'sine', 0.2)
-                    // 彈珠落出屏幕
+                    // 弹珠落出屏幕
+                    console.log('[DEBUG] 弹珠移除 - 移除前 dropBalls:', this.dropBalls.length, 'activeBalls:', this.currentSession.activeBalls);
                     this.dropBalls.splice(i, 1);
                     this.currentSession.activeBalls--;
+                    console.log('[DEBUG] 弹珠移除 - 移除后 dropBalls:', this.dropBalls.length, 'activeBalls:', this.currentSession.activeBalls);
                     
                     // --- ：不再直接結算，而是嘗試結算 ---
                     // 處理“能量球先落地，彈珠後死”的情況
