@@ -22,6 +22,9 @@
 
 import { CONFIG } from './config.js';
 
+// 注意：audio 实例在 core.js 中创建并挂载到 window 对象，避免循环依赖
+const audio = window.audio;
+
 // ==================== 工具类 ====================
 
 class Vec2 {
