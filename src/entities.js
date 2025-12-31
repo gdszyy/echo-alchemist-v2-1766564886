@@ -23,7 +23,19 @@
 import { CONFIG } from './config.js';
 
 // 注意：audio 实例在 core.js 中创建并挂载到 window 对象，避免循环依赖
-const audio = window.audio;
+// 使用 getter 函数懒加载，确保访问时 audio 已经初始化
+const getAudio = () => window.audio;
+// 为了代码兼容，创建一个 Proxy 对象
+const audio = new Proxy({}, {
+    get: (target, prop) => {
+        const audioInstance = window.audio;
+        if (!audioInstance) {
+            console.warn('audio instance not yet initialized');
+            return () => {}; // 返回空函数避免错误
+        }
+        return audioInstance[prop];
+    }
+});
 
 // ==================== 工具类 ====================
 
