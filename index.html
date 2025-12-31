@@ -9587,13 +9587,14 @@ if (this.phase === 'truth_book') {
         // [META] 注入局外升级效果
         this.meta_applyUpgrades();
 
+        // 重新生成初始敌人 (sys_resetGame 已经清空了敌人)
         const startY = 80; 
-        // 根据配置生成初始敌人行
         for(let i=0; i<CONFIG.gameplay.startRows; i++) { 
             this.spawn_spawnEnemyRowAt(startY + i * this.enemyHeight); 
         }
+        
+        // 进入遗物选择阶段 (命运抉择)
         this.ui_showRelicSelection();
-        // this.sys_initSelectionPhase(); // 进入弹珠选择阶段
     }
 
     /**
@@ -9675,7 +9676,7 @@ if (this.phase === 'truth_book') {
     meta_startRun() {
         this.sys_resetGame(); 
         this.sys_initGameStart();
-        this.sys_initSelectionPhase();
+        // sys_initGameStart 内部已经调用了 ui_showRelicSelection
     }
 
     /**
@@ -9830,9 +9831,6 @@ if (this.phase === 'truth_book') {
         // 重新生成初始敵人
         this.spawn_spawnEnemyRow(CONFIG.gameplay.startRows);
         
-        // 進入選擇階段
-        // this.sys_initSelectionPhase();
-        this.ui_showRelicSelection();
         // 重置 UI
         document.getElementById('combat-message').innerHTML = '';
         document.getElementById('score-num').innerText = '0';
@@ -13500,7 +13498,8 @@ if (this.phase === 'truth_book') {
         // 处理 gameOver 状态的点击返回主界面
         if (this.gameOver) {
             this.phase_switchPhase('meta');
-            this.sys_resetGame();
+            // 注意：这里不再调用 sys_resetGame，因为重置逻辑应该在点击“开始炼成”时触发
+            // 这样可以确保返回的是首页，而不是直接进入下一局
             return;
         }
 
