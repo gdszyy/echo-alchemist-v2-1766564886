@@ -5846,7 +5846,7 @@ if (this.phase === 'truth_book') {
             }
             if (this.dropBalls.length > 0 || this.energyOrbs.length > 0) {
                 console.log('[DEBUG] 充能中 - dropBalls:', this.dropBalls.length, 'energyOrbs:', this.energyOrbs.length, 'activeBalls:', this.currentSession?.activeBalls);
-                showToast("充能中...");
+                // showToast("充能中..."); // 移除正常情况下的提示
                 return;
             }
             
