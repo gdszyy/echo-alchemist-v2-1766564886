@@ -12,7 +12,7 @@
  * - TruthBook: 真理之书（图鉴系统）
  */
 
-import { CONFIG } from './config.js';
+import { CONFIG, SKILL_DB } from './config.js';
 import { Vec2, Enemy, Projectile, Particle, Shockwave, LightningBolt, FloatingText, adjustColorBrightness, lerpColor, lerp, hexToRgba } from './entities.js';
 
 
