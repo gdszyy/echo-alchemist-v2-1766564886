@@ -935,7 +935,6 @@ class SoundManager {
      */
     playCollect() { this.playTone(700, 'sine', 0.1, 0.4); }
 }
-const audio = new SoundManager();
 
 // --- 工具类 ---
 

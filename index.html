@@ -1298,7 +1298,14 @@
 import { Game } from './src/core.js';
 
 // ==================== 创建全局游戏实例 ====================
-window.game = new Game();
+// 注意：必须在 window 对象上声明，以便 HTML 中的 onclick 属性可以访问
+const game = new Game();
+window.game = game;
+
+// 也可以通过全局变量访问（用于控制台调试）
+if (typeof globalThis !== 'undefined') {
+    globalThis.game = game;
+}
 </script>
 </body>
 </html>
