@@ -70,7 +70,7 @@ function adjustColorBrightness(hex, factor) {
     const gg = g.toString(16).padStart(2, '0');
     const bb = b.toString(16).padStart(2, '0');
 
-    return \`#\${rr}\${gg}\${bb}\`;
+    return `#${rr}${gg}${bb}`;
 }
 
 /**
