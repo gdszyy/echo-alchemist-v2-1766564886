@@ -44,17 +44,17 @@ import {
     LightningBolt, 
     FireWave, 
     showToast, 
-    rotateTowards 
+    rotateTowards,
+    adjustColorBrightness, 
+    lerpColor, 
+    lerp, 
+    hexToRgba 
 } from './entities.js';
 
 import { 
     UIManager, 
     TrainingGround, 
-    TruthBook, 
-    adjustColorBrightness, 
-    lerpColor, 
-    lerp, 
-    hexToRgba 
+    TruthBook 
 } from './systems.js';
 
 // ==================== 音频管理器 ====================
