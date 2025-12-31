@@ -5147,30 +5147,8 @@ class FireWave {
 }
 
 
-// ==================== 辅助函数 ====================
-
-function showToast(msg) {
-    const el = document.getElementById('toast');
-    el.innerText = msg;
-    el.classList.add('toast-visible');
-    setTimeout(() => el.classList.remove('toast-visible'), 1500);
-}
-
-function rotateTowards(currentAngle, targetAngle, maxStep) {
-    let diff = targetAngle - currentAngle;
-    // 处理 -PI 到 PI 的突变，确保走最近的弧线
-    while (diff <= -Math.PI) diff += Math.PI * 2;
-    while (diff > Math.PI) diff -= Math.PI * 2;
-    
-    // 限制单帧最大转弯角度
-    if (Math.abs(diff) < maxStep) {
-        return targetAngle;
-    } else {
-        return currentAngle + (diff > 0 ? maxStep : -maxStep);
-    }
-}
-
 // ==================== 导出实体类 ====================
+// 注意：showToast 和 rotateTowards 已经在文件中间声明，不需要重复声明
 
 export {
     Vec2,
