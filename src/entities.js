@@ -38,6 +38,75 @@ const audio = new Proxy({}, {
 });
 
 // ==================== 工具类 ====================
+// ==================== 辅助函数 ====================
+
+function adjustColorBrightness(hex, factor) {
+    // 1. 移除可能存在的 '#'
+    hex = hex.replace('#', '');
+
+    // 2. 处理 3 位简写 (例如 "f00" -> "ff0000")
+    if (hex.length === 3) {
+        hex = hex.split('').map(char => char + char).join('');
+    }
+
+    // 3. 验证是否为有效的 6 位 Hex
+    if (hex.length !== 6) {
+        console.warn("Invalid hex color:", hex);
+        return "#000000"; // 返回黑色作为回退
+    }
+
+    // 4. 解析 RGB 分量
+    let r = parseInt(hex.substring(0, 2), 16);
+    let g = parseInt(hex.substring(2, 4), 16);
+    let b = parseInt(hex.substring(4, 6), 16);
+
+    // 5. 应用系数并钳制范围在 0 ~ 255
+    r = Math.min(255, Math.max(0, Math.round(r * factor)));
+    g = Math.min(255, Math.max(0, Math.round(g * factor)));
+    b = Math.min(255, Math.max(0, Math.round(b * factor)));
+
+    // 6. 转换回 Hex 字符串，并确保单位数时前面补 '0'
+    const rr = r.toString(16).padStart(2, '0');
+    const gg = g.toString(16).padStart(2, '0');
+    const bb = b.toString(16).padStart(2, '0');
+
+    return \`#\${rr}\${gg}\${bb}\`;
+}
+
+/**
+ * 颜色线性插值函数
+ */
+function lerpColor(a, b, amount) {
+    const ah = parseInt(a.replace(/#/g, ''), 16),
+          ar = ah >> 16, ag = ah >> 8 & 0xff, ab = ah & 0xff,
+          bh = parseInt(b.replace(/#/g, ''), 16),
+          br = bh >> 16, bg = bh >> 8 & 0xff, bb = bh & 0xff,
+          rr = ar + amount * (br - ar),
+          rg = ag + amount * (bg - ag),
+          rb = ab + amount * (bb - ab);
+    return '#' + ((1 << 24) + (Math.round(rr) << 16) + (Math.round(rg) << 8) + Math.round(rb)).toString(16).slice(1);
+}
+
+/**
+ * 線性插值函數 (Linear Interpolation)
+ */
+function lerp(start, end, t) {
+    return start * (1 - t) + end * t;
+}
+
+function hexToRgba(hex, alpha) {
+    let c;
+    if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
+        c = hex.substring(1).split('');
+        if(c.length === 3){
+            c= [c[0], c[0], c[1], c[1], c[2], c[2]];
+        }
+        c = '0x'+c.join('');
+        return 'rgba('+[(c>>16)&255, (c>>8)&255, c&255].join(',')+','+alpha+')';
+    }
+    return hex;
+}
+
 
 class Vec2 {
     /**
@@ -5188,5 +5257,9 @@ export {
     LightningBolt,
     FireWave,
     showToast,
-    rotateTowards
+    rotateTowards,
+    adjustColorBrightness,
+    lerpColor,
+    lerp,
+    hexToRgba
 };
