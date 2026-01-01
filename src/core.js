@@ -4252,7 +4252,6 @@ if (this.phase === 'truth_book') {
                     });
                 }
             }    // D. 移除热量回填机制 (根据需求取消回填)
-            }
         }
         
         // [新增] 保存当前shotId，供后续额外伤害使用
@@ -4365,7 +4364,7 @@ if (this.phase === 'truth_book') {
             // 燃烧扩散逻辑 (保留)
             if (enemy.temp >= 100) {
                 this.fireWaves.push(new FireWave(enemy.pos.x, enemy.pos.y));
-                game.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 20, "🔥SPREAD!", "#f97316");
+                this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 20, "🔥SPREAD!", "#f97316");
                 audio.playExplosion();
                 this.enemies.forEach(other => {
                     if (other.active && other !== enemy && enemy.pos.dist(other.pos) < CONFIG.gameplay.fireSpreadRadius) {
@@ -5864,6 +5863,7 @@ if (this.phase === 'truth_book') {
                 
                 // 使用之前修复过的持久化阈值逻辑
                 this.currentSession = {
+                    game: this, // [新增] 传入 game 实例引用
                     collected: [], multicast: 0, activeBalls: 1, currentHits: 0,
                     nextTriggerThreshold: this.persistentThreshold, // 确保这里用了 persistentThreshold
                     totalHits: 0, multicastAdded: [], isFinished: false

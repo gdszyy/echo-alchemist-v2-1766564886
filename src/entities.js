@@ -999,7 +999,11 @@ class DropBall {
 	     * @param {object} session - **重要参数** 当前收集会话数据 (包含 collected, multicast, currentHits 等)
 	     */
 	    constructor(x, y, marbleDef, session) {
-	        this.pos = new Vec2(x, y); this.vel = new Vec2((Math.random() - 0.5) * 2, 2); this.radius = CONFIG.physics.marbleRadius+ (game.marbleSizeBonus || 0); this.active = true; this.def = marbleDef; this.session = session;
+	        this.pos = new Vec2(x, y); this.vel = new Vec2((Math.random() - 0.5) * 2, 2); 
+	        // 修正：game 引用错误，改为从 session 关联或使用默认值
+	        const sizeBonus = (session && session.game) ? (session.game.marbleSizeBonus || 0) : 0;
+	        this.radius = CONFIG.physics.marbleRadius + sizeBonus; 
+	        this.active = true; this.def = marbleDef; this.session = session;
 	        this.isRainbowShard = false; // 是否为彩虹弹珠分裂出的碎片
 	        this.portalCooldown = 0; // 槽位冷却时间
 	        this.hitCount = 0; // 撞击次数
