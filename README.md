@@ -1,9 +1,9 @@
-# Echo Alchemist (回聲煉金師) - 代码结构化索引 v3.0
+# Echo Alchemist (回聲煉金師) - 代码结构化索引 v4.0
 
-本项目是一个基于 HTML5 Canvas 和 JavaScript 开发的**单文件 Roguelike 游戏**。
+本项目是一个基于 HTML5 Canvas 和 JavaScript 开发的**模块化 Roguelike 游戏**。
 
 > [!IMPORTANT]
-> **单文件架构要求**: 所有的游戏逻辑、样式和资源引用必须集成在 `index.html` 中。请勿创建额外的 `.js` 或 `.css` 文件，以确保项目的便携性和 AI Agent 的易读性。
+> **多文件架构说明**: 为了提升代码的可维护性和扩展性，项目已从单文件架构迁移至模块化架构。核心逻辑已拆分至 `src/` 目录下的多个模块中。
 
 ## 1. 项目架构 (Project Architecture)
 
@@ -11,13 +11,23 @@
 
 ![项目架构图](architecture.png)
 
-### 1.1 核心类说明
+### 1.1 目录结构与核心模块
+
+| 路径 | 职责描述 | 关键内容 |
+| :--- | :--- | :--- |
+| **`index.html`** | 游戏入口与 UI 结构。 | 包含 HTML 骨架、CSS 样式及模块化脚本导入。 |
+| **`src/core.js`** | 游戏引擎核心。 | `Game` 类、游戏循环 (`sys_loop`)、状态管理及音频管理。 |
+| **`src/config.js`** | 全局配置中心。 | `CONFIG` 对象、`RELIC_DB`、`SKILL_DB` 及平衡性参数。 |
+| **`src/entities.js`** | 游戏实体定义。 | `Enemy`、`Projectile`、`Particle` 等基础类。 |
+| **`src/systems.js`** | 业务逻辑子系统。 | `TrainingGround` (试炼场)、`TruthBook` (真理之书) 及 UI 交互逻辑。 |
+
+### 1.2 核心类说明
 
 | 类名 | 职责描述 | 关键方法 |
 | :--- | :--- | :--- |
 | **`Game`** | 游戏引擎核心，管理状态、循环、输入及全局逻辑。 | `sys_loop`, `phase_switchPhase`, `combat_damageEnemy` |
-| **`TrainingGround`** | **[新增]** 试炼场模块，提供自由配置敌人和子弹的测试环境。 | `enter`, `exit`, `fireBullet`, `spawnEnemy` |
-| **`TruthBook`** | **[新增]** 真理之书模块，展示游戏内所有元素、词条和属性的图鉴。 | `render`, `showDetail`, `ui_openTruthBook` |
+| **`TrainingGround`** | 试炼场模块，提供自由配置敌人和子弹的测试环境。 | `enter`, `exit`, `fireBullet`, `spawnEnemy` |
+| **`TruthBook`** | 真理之书模块，展示游戏内所有元素、词条和属性的图鉴。 | `render`, `showDetail`, `ui_openTruthBook` |
 | **`Enemy`** | 敌人逻辑，处理 AI、血量、词缀及受击反馈。 | `update`, `draw`, `advance` |
 | **`Projectile`** | 战斗弹丸，处理移动、碰撞及特殊攻击逻辑。 | `update`, `draw`, `destroy` |
 | **`SoundManager`** | 音频引擎，基于 Web Audio API 合成音效。 | `playEffect`, `playTone`, `resume` |
@@ -66,9 +76,10 @@
 - [**风属性系统逻辑**](RULES_WIND_V2.md): 锚点生成、几何判定及法阵效果。
 - [**子母剑系统规则**](RULES_FLYING_SWORD.md): 飞剑获取、升级及战斗行为。
 
-## 4. 全局配置 (Global Config)
+## 4. 开发与配置 (Development & Config)
 
-- **`CONFIG`**: 核心平衡性参数、UI 定义及物理常数。
+- **模块化开发**: 逻辑已拆分，修改功能时请前往对应的 `src/*.js` 文件。
+- **`CONFIG`**: 核心平衡性参数、UI 定义及物理常数，位于 `src/config.js`。
 - **`META_SHOP_CONFIG`**: 炼金工坊的升级项、价格曲线及效果定义。
 - **`RELIC_DB` & `SKILL_DB`**: 遗物与主动技能数据库。
 
