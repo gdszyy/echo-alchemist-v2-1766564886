@@ -348,8 +348,8 @@ const CONFIG = {
     balance: {
         normalPegSecondEnergChancey:0.42,
         // 敌人血量 = baseHp + (当前回合数 * hpPerRound)
-        enemyBaseHp: 5,
-        enemyHpPerRound: 6,
+        enemyBaseHp: 7,
+        enemyHpPerRound: 12,
         
         // 特殊敌人血量倍率
         eliteHpMult: 7,     // 精英怪是普通怪的多少倍
@@ -409,13 +409,13 @@ const CONFIG = {
         spawnMin: 3,        // 每波最少生成的敌人数量
         selectionCount: 6,  // 选卡阶段提供多少张卡
         selectionReq: 3,     // 需要选择多少张卡
-        hitCooldowns: 12,    // 默认基础冷却时间
-        pegCooldownAdd: 5,   // 每次触发增加的冷却帧数
+        hitCooldowns: 17,    // 默认基础冷却时间
+        pegCooldownAdd: 7,   // 每次触发增加的冷却帧数
         pegCooldownDecay: 2, // 每秒减少的冷却帧数
         relicChance: 0.1,
-        initTriggerThreshold: 7,
+        initTriggerThreshold: 15,
         nextTriggerThresholdIncrease: 8,
-        maxSkillPoints: 5,  // 技能点上限
+        maxSkillPoints: 3,  // 技能点上限
         spSlotsStartRow:3,
         spSlotsEndRow:8,
         fireSpreadDamagePercent:0.25,
