@@ -3135,7 +3135,8 @@ if (this.phase === 'truth_book') {
             bulletConfig: bulletConfig, // [新增] 存储完整子弹配置
             // 5. 伤害回调
             onComplete: () => {
-                let sizeType = area < 15000 ? 'small' : 'large';
+                const windCfg = CONFIG.mechanics.wind;
+                let sizeType = area < windCfg.stormAreaThreshold ? 'small' : 'large';
                 let shapeType = ratio < 1.5 ? 'square' : 'rect';
                 this.combat_wind_executeCircleEffect(minX, minY, rect.w, rect.h, sizeType, shapeType, element, tunnelVector, avgBulletDamage, bulletConfig, type);
             }

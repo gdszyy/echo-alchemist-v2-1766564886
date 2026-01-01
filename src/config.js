@@ -362,6 +362,10 @@ const CONFIG = {
             timeScale: 0.1,       // 触发时的降速值
             recoveryRate: 0.1     // 恢复速率
         },
+        // 风属性系统
+        wind: {
+            stormAreaThreshold: 15000, // 判定为大型风暴的面积阈值
+        },
         // 火属性 (过热爆炸)
         pyro: {
             explodeThreshold: 200,    // 过热爆炸阈值
