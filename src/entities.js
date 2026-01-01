@@ -3527,17 +3527,19 @@ class SonSword {
         // [修改] 回收阶段造成一次性贯穿伤害
         if (this.state === 'recalling') {
             if (!this.hitEnemiesInRecall.has(enemy)) {
-                this.hitEnemiesInRecall.add(enemy);
-                // 回收伤害设定为基础伤害的 50%
-                game.combat_damageEnemy(enemy, { config: this.config, pos: this.pos, isCopy: true }, 0.5);
-                game.particles.push(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.35));
+            this.hitEnemiesInRecall.add(enemy);
+            // 回收伤害设定
+            const fsCfg = CONFIG.mechanics.flying_sword;
+            game.combat_damageEnemy(enemy, { config: this.config, pos: this.pos, isCopy: true }, fsCfg.recallDamageMult);
+            game.particles.push(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.35));
                 audio.playSlash();
             }
             return;
         }
 
         if (enemy === this.currentTarget && this.passingThroughEnemy !== enemy) {
-            let dmg = this.config.damage * 0.6;
+            const fsCfg = CONFIG.mechanics.flying_sword;
+            let dmg = this.config.damage * fsCfg.dashDamageMult;
             if (this.level >= 2) {
                 game.combat_damageEnemy(enemy, { config: this.config, pos: this.pos, isCopy: true });
             } else {
@@ -3999,9 +4001,10 @@ class Projectile {
             const dist = E.dist(closest); 
             const hitRadius = (other.width / 2) + (width / 2);
             if (dist < hitRadius) {
+                const fsCfg = CONFIG.mechanics.flying_sword;
                 const slashConfig = {
                     ...this.config,
-                    damage: Math.ceil(this.config.damage * 0.6)
+                    damage: Math.ceil(this.config.damage * fsCfg.dashDamageMult)
                 };
                 game.combat_damageEnemy(other, {
                     config: slashConfig,

@@ -1246,15 +1246,16 @@ class Game {
         const expectedEnemyHp = rawGrowthHp * weightMultiplier;
 
         // 2. 判定逻辑
-        // 如果玩家的 [单发平均期望伤害] 低于 [敌人加权平均血量] 的 60%
+        // 如果玩家的 [单发平均期望伤害] 低于 [敌人加权平均血量] 的阈值
         // 说明玩家可能需要两发甚至三发子弹才能打死一个普通怪，处于劣势
-        const threshold = expectedEnemyHp * 0.6;
+        const ddaCfg = CONFIG.mechanics.dda;
+        const threshold = expectedEnemyHp * ddaCfg.playerPowerThresholdMult;
 
         if (this.currentPlayerPower < threshold) {
             // 玩家太弱 -> 降低成长速度
             // 并不直接减半当前血量，而是减半“成长系数”
             // 这样难度曲线会变得平缓，给玩家喘息机会
-            this.difficultyGrowthFactor = 0.5;
+            this.difficultyGrowthFactor = ddaCfg.difficultyGrowthFactorLow;
             showToast("检测到战力不足，敌人成长减缓...", 2000);
             console.log(`[DDA] 难度降低! 玩家战力 ${this.currentPlayerPower.toFixed(1)} < 阈值 ${threshold.toFixed(1)}`);
         } else {
@@ -1297,15 +1298,16 @@ class Game {
         if (aliveCount === 0) return 999999;
 
         // --- [配置参数区域] 可根据手感微调 ---
+        const smCfg = CONFIG.mechanics.slow_motion;
         // 方案：阈值 = (当前总血量 * A%) * 权重1 + (最大总血量 * B%) * 权重2
         
-        const percentCurrent = 0.10; // 定义为：造成当前剩余总血量的 10% 伤害算“重击”
-        const percentMax = 0.05;     // 定义为：造成最大总血量的 5% 伤害算“重击”
+        const percentCurrent = smCfg.percentCurrent; // 定义为：造成当前剩余总血量的 10% 伤害算“重击”
+        const percentMax = smCfg.percentMax;     // 定义为：造成最大总血量的 5% 伤害算“重击”
         
-        const wCurrent = 0.7;        // 权重：更看重“当前血量”的比例 (70%)
-        const wMax = 0.3;            // 权重：最大血量的比例占 (30%)
+        const wCurrent = smCfg.wCurrent;        // 权重：更看重“当前血量”的比例 (70%)
+        const wMax = smCfg.wMax;            // 权重：最大血量的比例占 (30%)
         
-        const minThreshold = 25;     // 【保底值】防止敌人剩1血时，打1血就慢放，太频繁会晕
+        const minThreshold = smCfg.minThreshold;     // 【保底值】防止敌人剩1血时，打1血就慢放，太频繁会晕
 
         // 2. 计算两部分的基准
         const valBasedOnCurrent = totalCurrentHP * percentCurrent;
@@ -1322,12 +1324,13 @@ class Game {
      * [AUTO-GENERATED] TODO: Add a description for ui_updateSlowMotion.
      */
     ui_updateSlowMotion() {
+        const smCfg = CONFIG.mechanics.slow_motion;
         const dynamicThreshold = this.calc_calculateDynamicThreshold();
         // 1. 触发逻辑
         if (this.frameDamageAccumulator > dynamicThreshold) {
-            this.slowMotionTimer = 12; // 慢动作持续约 0.6秒
+            this.slowMotionTimer = smCfg.duration; // 慢动作持续约 0.6秒
             // 触发瞬间强制降速，这里可以用固定值 0.1，保证打击感
-            this.timeScale = 0.1; 
+            this.timeScale = smCfg.timeScale; 
             console.log(`慢动作触发! 伤害: ${Math.floor(this.frameDamageAccumulator)} > 阈值: ${Math.floor(dynamicThreshold)}`);
         }
 
@@ -1347,7 +1350,7 @@ class Game {
                 
                 // 使用插值慢慢恢复 (lerp)
                 // 0.1 是恢复速率，越大恢复越快
-                this.timeScale += (this.baseTimeScale - this.timeScale) * 0.1;
+                this.timeScale += (this.baseTimeScale - this.timeScale) * smCfg.recoveryRate;
 
                 // 如果非常接近了，就直接归位，避免浮点数抖动
                 if (Math.abs(this.timeScale - this.baseTimeScale) < 0.01) {
@@ -4199,26 +4202,28 @@ if (this.phase === 'truth_book') {
             }
 
             // Step 3: [新增] 过热爆炸机制 (Small Explosion)
-            // 设定阈值和动态概率：基础 0.2 (200度)，600度时 1.0 (100%)
-            const EXPLODE_THRESHOLD = 200; 
+            // 设定阈值 and 动态概率
+            const pyroCfg = CONFIG.mechanics.pyro;
+            const EXPLODE_THRESHOLD = pyroCfg.explodeThreshold; 
             let explodeChance = 0;
             if (enemy.temp > EXPLODE_THRESHOLD) {
-                // 线性插值计算概率: 200->0.2, 600->1.0
-                // 公式: 0.2 + (temp - 200) * (1.0 - 0.2) / (600 - 200)
-                explodeChance = 0.2 + (enemy.temp - 200) * (0.8 / 400);
-                explodeChance = Math.min(1.0, explodeChance); // 最高 100%
+                // 线性插值计算概率
+                const range = pyroCfg.tempForMaxChance - EXPLODE_THRESHOLD;
+                const chanceRange = pyroCfg.maxExplodeChance - pyroCfg.baseExplodeChance;
+                explodeChance = pyroCfg.baseExplodeChance + (enemy.temp - EXPLODE_THRESHOLD) * (chanceRange / range);
+                explodeChance = Math.min(pyroCfg.maxExplodeChance, explodeChance); // 最高限制
             }
 
             if (explodeChance > 0 && Math.random() < explodeChance) {
                 
-                // A. 计算消耗量：10% 当前热量
-                const consumedHeat = enemy.temp * 0.10;
+                // A. 计算消耗量
+                const consumedHeat = enemy.temp * pyroCfg.heatConsumptionRate;
                 
                 // B. 执行消耗：先扣除
                 enemy.temp -= consumedHeat;
 
-                // C. 计算爆炸伤害：50% 的当前额外火伤
-                const explodeDmg = baseFireDmg * 0.50;
+                // C. 计算爆炸伤害
+                const explodeDmg = baseFireDmg * pyroCfg.damageMult;
                 
                 if (explodeDmg >= 1) {
                     // --- 1. 视觉特效 (参考爆炸子弹) ---
@@ -4233,10 +4238,10 @@ if (this.phase === 'truth_book') {
                     this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 50, `BOOM! ${Math.ceil(expResult.actualDamage)}`, '#dc2626');
                     
                     // --- 3. 范围伤害 (AOE) ---
-                    const EXPLODE_RADIUS = 120; // 爆炸半径
+                    const EXPLODE_RADIUS = pyroCfg.radius; // 爆炸半径
                     this.enemies.forEach(other => {
                         if (other !== enemy && other.active && enemy.pos.dist(other.pos) < EXPLODE_RADIUS) {
-                            const aoeDmg = explodeDmg * 0.6; // 范围伤害为爆炸主伤害的 60%
+                            const aoeDmg = explodeDmg * pyroCfg.aoeDamageMult; // 范围伤害
                             const aoeResult = other.takeDamage(aoeDmg);
                             this.combat_recordDamage(aoeResult.actualDamage, 'pyro', sourceType, shotId);
                             
@@ -4245,8 +4250,7 @@ if (this.phase === 'truth_book') {
                         }
                     });
                 }
-
-                // D. 移除热量回填机制 (根据需求取消回填)
+            }    // D. 移除热量回填机制 (根据需求取消回填)
             }
         }
         
@@ -4267,11 +4271,12 @@ if (this.phase === 'truth_book') {
                     let extraDmg = 0;
                     let resonanceColor = '#0ea5e9';
                     
-                    // 1. 计算共鸣伤害和属性
+                    // 1. 计算共鸣伤害 and 属性
+                    const fsCfg = CONFIG.mechanics.flying_sword;
                     if (level === 1) {
-                        extraDmg = sword.config.damage * 0.5;
+                        extraDmg = sword.config.damage * fsCfg.resonanceDamageMult;
                     } else if (level === 2) {
-                        extraDmg = sword.config.damage * 0.5;
+                        extraDmg = sword.config.damage * fsCfg.resonanceDamageMult;
                         // 应用 50% 属性效果 (简化处理：直接应用 50% 的温度变化)
                         if (sword.config.cryo > 0) enemy.applyTemp(-CONFIG.balance.cryoAmount * sword.config.cryo * 0.5);
                         if (sword.config.pyro > 0) enemy.applyTemp(CONFIG.balance.pyroAmount * sword.config.pyro * 0.5);
@@ -6082,14 +6087,15 @@ if (this.phase === 'truth_book') {
         if (!selected) selected = targets[0];
 
         // 判定连锁概率
-        let p = 0.15; // 基础连锁概率
-        if (selected.temp < 0) p = Math.min(1.0, 0.15 + Math.abs(selected.temp) * 0.0085); 
+        const lightCfg = CONFIG.mechanics.lightning;
+        let p = lightCfg.baseChainChance; // 基础连锁概率
+        if (selected.temp < 0) p = Math.min(lightCfg.maxChainChance, lightCfg.baseChainChance + Math.abs(selected.temp) * lightCfg.tempChainMult); 
         
         if (Math.random() < p) { 
             // [优化] 增加基础延迟，放慢连锁节奏，提升视觉快感
             const chainCount = history.length;
             // 基础延迟从 150ms 增加到 250ms，且减速曲线更平缓
-            const delay = Math.max(50, 250 - chainCount * 15); 
+            const delay = Math.max(lightCfg.chainDelayMin, lightCfg.chainDelayBase - chainCount * lightCfg.chainDelayDecay); 
 
             setTimeout(() => {
                 if (!selected.active) return;
@@ -6103,7 +6109,7 @@ if (this.phase === 'truth_book') {
                 }
                 
                 // 计算下一次伤害
-                const decayFactor = 0.45 + (0.05 * level);
+                const decayFactor = lightCfg.damageDecayBase + (lightCfg.damageDecayPerLevel * level);
                 const nextDmg = Math.max(1, Math.floor(dmg * decayFactor));
 
                 // 伤害与状态：提升温度 (公式：闪电层数 + 连锁次数/3)
@@ -7223,12 +7229,11 @@ if (this.phase === 'truth_book') {
 
                 // [核心算法] 动态延迟计算
                 // 剩余数量越多，延迟越短 (喷射而出)；剩余越少，延迟越长 (慢慢收尾)
+                const fsCfg = CONFIG.mechanics.flying_sword;
                 const remaining = this.sonSwordQueue.length;
                 
-                // 公式：基础延迟 20帧，每多一个排队减少 2帧，最快 2帧
-                // 例如：剩 10 个 -> delay = max(2, 20 - 20) = 2 (极速)
-                // 例如：剩 1 个 -> delay = max(2, 20 - 2) = 18 (慢速)
-                this.sonSwordTimer = Math.max(2, 20 - (remaining * 2));
+                // 公式：基础延迟，每多一个排队减少 2帧，最快限制
+                this.sonSwordTimer = Math.max(fsCfg.sonSwordDelayMin, fsCfg.sonSwordDelayBase - (remaining * 2));
             }
         }
 

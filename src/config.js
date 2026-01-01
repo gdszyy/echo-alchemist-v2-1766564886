@@ -344,6 +344,55 @@ const CONFIG = {
             hitStopDuration: 15       // 强力顿挫持续帧数
         }
     },
+    /** 属性与机制阈值配置 */
+    mechanics: {
+        // DDA (动态难度调整)
+        dda: {
+            playerPowerThresholdMult: 0.6, // 玩家战力阈值倍率 (基于敌人期望血量)
+            difficultyGrowthFactorLow: 0.5, // 战力不足时的成长系数
+        },
+        // 慢动作系统
+        slow_motion: {
+            percentCurrent: 0.10, // 造成当前剩余总血量的 10% 伤害算“重击”
+            percentMax: 0.05,     // 造成最大总血量的 5% 伤害算“重击”
+            wCurrent: 0.7,        // 权重：更看重“当前血量”的比例
+            wMax: 0.3,            // 权重：最大血量的比例
+            minThreshold: 25,     // 保底值
+            duration: 12,         // 持续帧数
+            timeScale: 0.1,       // 触发时的降速值
+            recoveryRate: 0.1     // 恢复速率
+        },
+        // 火属性 (过热爆炸)
+        pyro: {
+            explodeThreshold: 200,    // 过热爆炸阈值
+            baseExplodeChance: 0.2,   // 基础爆炸概率
+            maxExplodeChance: 1.0,    // 最大爆炸概率
+            tempForMaxChance: 600,    // 达到最大概率所需的温度
+            heatConsumptionRate: 0.1, // 爆炸消耗热量比例
+            damageMult: 0.5,          // 爆炸伤害倍率 (基于基础火伤)
+            radius: 120,              // 爆炸半径
+            aoeDamageMult: 0.6        // AOE伤害倍率
+        },
+        // 雷属性 (连锁闪电)
+        lightning: {
+            baseChainChance: 0.15,    // 基础连锁概率
+            tempChainMult: 0.0085,    // 温度对连锁概率的加成系数
+            maxChainChance: 1.0,      // 最大连锁概率
+            chainDelayBase: 250,      // 基础连锁延迟 (ms)
+            chainDelayMin: 50,        // 最小连锁延迟 (ms)
+            chainDelayDecay: 15,      // 每次连锁减少的延迟
+            damageDecayBase: 0.45,    // 基础伤害衰减系数
+            damageDecayPerLevel: 0.05 // 每级闪电增加的伤害保持系数
+        },
+        // 飞剑属性
+        flying_sword: {
+            resonanceDamageMult: 0.5, // 共鸣额外伤害倍率
+            recallDamageMult: 0.5,    // 回收伤害倍率
+            dashDamageMult: 0.6,      // 穿透伤害倍率
+            sonSwordDelayBase: 20,    // 子剑生成基础延迟
+            sonSwordDelayMin: 2       // 子剑生成最小延迟
+        }
+    },
     /** 游戏平衡性：敌人与数值 */
     balance: {
         normalPegSecondEnergChancey:0.42,
