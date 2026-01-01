@@ -379,8 +379,8 @@ const CONFIG = {
         },
         // 雷属性 (连锁闪电)
         lightning: {
-            baseChainChance: 0.15,    // 基础连锁概率
-            tempChainMult: 0.0085,    // 温度对连锁概率的加成系数
+            baseChainChance: 0.25,    // 基础连锁概率
+            tempChainMult: 0.0075,    // 温度对连锁概率的加成系数
             maxChainChance: 1.0,      // 最大连锁概率
             chainDelayBase: 250,      // 基础连锁延迟 (ms)
             chainDelayMin: 50,        // 最小连锁延迟 (ms)
