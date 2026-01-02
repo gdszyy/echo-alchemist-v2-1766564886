@@ -2395,6 +2395,38 @@ class Enemy {
             const targetY = this.dropTargetY + moveAmount;
             const isBlocked = game.calc_isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
 
+            // --- 横向移动逻辑：当与player同行时，接近player ---
+            if (game.player) {
+                const playerRow = Math.floor((game.player.pos.y) / game.enemyHeight);
+                const enemyRow = Math.floor(this.dropTargetY / game.enemyHeight);
+                
+                // 如果在同一行，尝试横向移动接近player
+                if (playerRow === enemyRow) {
+                    const playerX = game.player.pos.x;
+                    const enemyX = this.pos.x;
+                    const horizontalDist = Math.abs(playerX - enemyX);
+                    
+                    // 只有当横向距离超过半个网格宽度时才移动
+                    if (horizontalDist > game.enemyWidth / 2) {
+                        const moveDir = playerX > enemyX ? 1 : -1;
+                        const horizontalMove = game.enemyWidth * moveDir;
+                        const targetX = this.pos.x + horizontalMove;
+                        
+                        // 检查横向移动是否被阻挡
+                        const isHorizontalBlocked = game.calc_isAreaOccupied(targetX, this.dropTargetY, this.width * 0.8, this.height * 0.8, this);
+                        
+                        if (!isHorizontalBlocked && targetX > 0 && targetX < game.width) {
+                            // 执行横向移动
+                            this.pos.x = targetX;
+                            game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "→", "#fbbf24");
+                            game.spawn_createParticle(this.pos.x, this.pos.y, '#fbbf24', 'spark');
+                            // 横向移动后不再纵向移动，直接跳过后续纵向移动逻辑
+                            continue;
+                        }
+                    }
+                }
+            }
+
             if (!isBlocked) {
                 this.advance(moveAmount);
             } else {

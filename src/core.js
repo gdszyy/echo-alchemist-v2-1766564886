@@ -7499,6 +7499,12 @@ if (this.phase === 'truth_book') {
             // ------------------------------------
 
             // C. 绘制游戏实体
+            
+            // 绘制警戒区（在敌人下方，确保enemywave时也显示）
+            if (this.player) {
+                this.player.drawAlertZone(this.ctx);
+            }
+            
             let activeEnemies = 0; 
             let anyEnemyMoving = false;
             this.enemies.forEach(e => {
@@ -7734,15 +7740,12 @@ if (this.phase === 'truth_book') {
         } else { 
             if (!this.gameOver) document.getElementById('combat-message').innerHTML = ''; 
         }
-        // --- 修改开始：调整层级，先画警戒区，再画轨道，最后画炮台 ---
+        // --- 修改开始：调整层级，先画轨道，最后画炮台 ---
         this.ctx.save();
         // 应用与实体层相同的视差偏移
         this.ctx.translate(entityShiftX, entityShiftY);
         
-        // 绘制警戒区（在发射器下方）
-        if (this.player) {
-            this.player.drawAlertZone(this.ctx);
-        }
+        // 警戒区已移动到实体层（LAYER 2）绘制
 
         const startPos = new Vec2(this.width / 2, this.height - 80);
         this.ctx.fillStyle = 'rgba(15, 23, 42, 0.8)'; // 深色半透明底 (Slate-900 80%)
