@@ -7211,40 +7211,15 @@ if (this.phase === 'truth_book') {
      * @description 检查是否失败 - 检测敌人是否进入玩家周围 3x3 警戒区。
      */
     input_checkDefeat() { 
+        if (!this.player) return false;
+        
         // [修正]：使用实体层 Y 轴系数 (-20)
         const viewShiftY = this.boardTilt.current.y * -20;
         
-        // 玩家位置（发射器位置）
-        const playerX = this.width / 2;
-        const playerY = this.height - 80;
-        
-        // 计算玩家所在的网格列（中心位置）
-        const playerCol = Math.floor(playerX / this.enemyWidth);
-        
-        // 计算玩家所在的网格行（从屏幕顶部开始计算）
-        const playerRow = Math.floor(playerY / this.enemyHeight);
-        
-        // 3x3 警戒区：玩家周围 8 个格子
-        // 列范围：[playerCol-1, playerCol, playerCol+1]
-        // 行范围：[playerRow-1, playerRow, playerRow+1]
-        
+        // 使用 Player 类的方法检测敌人是否在警戒区内
         for(let e of this.enemies) { 
-            if (!e.active) continue;
-            
-            // 计算敌人的实际位置（包含视差偏移）
-            const enemyY = e.pos.y + viewShiftY;
-            const enemyX = e.pos.x;
-            
-            // 计算敌人所在的网格位置
-            const enemyCol = Math.floor(enemyX / this.enemyWidth);
-            const enemyRow = Math.floor(enemyY / this.enemyHeight);
-            
-            // 检查敌人是否在 3x3 警戒区内
-            const inAlertCol = Math.abs(enemyCol - playerCol) <= 1;
-            const inAlertRow = Math.abs(enemyRow - playerRow) <= 1;
-            
-            if (inAlertCol && inAlertRow) {
-                return true; 
+            if (this.player.isEnemyInAlertZone(e, viewShiftY)) {
+                return true;
             }
         } 
         return false; 
@@ -7377,53 +7352,9 @@ if (this.phase === 'truth_book') {
         if (this.waveMomentumTimer > 0) this.waveMomentumTimer -= timeScale;
 
         // ==========================================
-        //  LAYER 0: 固定 UI 层 (警戒区)
+        //  LAYER 0: 固定 UI 层
         // ==========================================
-        // 绘制玩家周围 3x3 警戒区
-        this.ctx.save();
-        
-        // 玩家位置
-        const playerX = this.width / 2;
-        const playerY = this.height - 80;
-        
-        // 计算玩家所在的网格位置
-        const playerCol = Math.floor(playerX / this.enemyWidth);
-        const playerRow = Math.floor(playerY / this.enemyHeight);
-        
-        // 绘制 3x3 警戒区网格
-        this.ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
-        this.ctx.lineWidth = 2;
-        this.ctx.setLineDash([5, 5]);
-        
-        for (let dr = -1; dr <= 1; dr++) {
-            for (let dc = -1; dc <= 1; dc++) {
-                const col = playerCol + dc;
-                const row = playerRow + dr;
-                
-                // 计算网格位置
-                const x = col * this.enemyWidth;
-                const y = row * this.enemyHeight;
-                
-                // 绘制网格边框
-                this.ctx.strokeRect(x, y, this.enemyWidth, this.enemyHeight);
-            }
-        }
-        
-        // 绘制警戒区背景高亮
-        this.ctx.fillStyle = 'rgba(239, 68, 68, 0.08)';
-        const alertX = (playerCol - 1) * this.enemyWidth;
-        const alertY = (playerRow - 1) * this.enemyHeight;
-        const alertWidth = this.enemyWidth * 3;
-        const alertHeight = this.enemyHeight * 3;
-        this.ctx.fillRect(alertX, alertY, alertWidth, alertHeight);
-        
-        // 绘制警告文本
-        this.ctx.setLineDash([]);
-        this.ctx.fillStyle = 'rgba(239, 68, 68, 0.7)';
-        this.ctx.font = 'bold 10px monospace';
-        this.ctx.fillText("⚠️ ALERT ZONE", alertX + 5, alertY + 15);
-        
-        this.ctx.restore();
+        // 警戒区已移动到实体层，由 Player 类管理
 
 
         // ==========================================
@@ -7793,10 +7724,15 @@ if (this.phase === 'truth_book') {
         } else { 
             if (!this.gameOver) document.getElementById('combat-message').innerHTML = ''; 
         }
-        // --- 修改开始：调整层级，先画轨道，再画炮台 ---
+        // --- 修改开始：调整层级，先画警戒区，再画轨道，最后画炮台 ---
         this.ctx.save();
         // 应用与实体层相同的视差偏移
         this.ctx.translate(entityShiftX, entityShiftY);
+        
+        // 绘制警戒区（在发射器下方）
+        if (this.player) {
+            this.player.drawAlertZone(this.ctx);
+        }
 
         const startPos = new Vec2(this.width / 2, this.height - 80);
         this.ctx.fillStyle = 'rgba(15, 23, 42, 0.8)'; // 深色半透明底 (Slate-900 80%)

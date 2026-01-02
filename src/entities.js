@@ -5285,6 +5285,9 @@ class Player {
         this.baseRadius = 22;           // 发射器基础半径
         this.previewRotation = -Math.PI / 2; // 预览旋转角度（默认朝上）
         this.deformation = { x: 1, y: 1 };   // 形变参数
+        
+        // === 警戒区 ===
+        this.alertZoneRadius = 1;       // 警戒区半径（网格数），1 = 3x3
     }
     
     /**
@@ -5819,6 +5822,84 @@ class Player {
         ctx.arc(0, 0, 12, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillRect(8, -4, 8, 8);
+        ctx.restore();
+    }
+    
+    // ==================== 警戒区系统 ====================
+    
+    /**
+     * 获取玩家所在的网格坐标
+     * @returns {{col: number, row: number}} 网格坐标
+     */
+    getGridPosition() {
+        const enemyWidth = this.game.enemyWidth;
+        const enemyHeight = this.game.enemyHeight;
+        
+        return {
+            col: Math.floor(this.pos.x / enemyWidth),
+            row: Math.floor(this.pos.y / enemyHeight)
+        };
+    }
+    
+    /**
+     * 检查敌人是否在警戒区内
+     * @param {Enemy} enemy - 敌人实体
+     * @param {number} viewShiftY - Y轴视差偏移
+     * @returns {boolean} 是否在警戒区内
+     */
+    isEnemyInAlertZone(enemy, viewShiftY = 0) {
+        if (!enemy.active) return false;
+        
+        const playerGrid = this.getGridPosition();
+        
+        // 计算敌人的实际位置（包含视差偏移）
+        const enemyY = enemy.pos.y + viewShiftY;
+        const enemyX = enemy.pos.x;
+        
+        // 计算敌人所在的网格位置
+        const enemyCol = Math.floor(enemyX / this.game.enemyWidth);
+        const enemyRow = Math.floor(enemyY / this.game.enemyHeight);
+        
+        // 检查是否在警戒区内
+        const inAlertCol = Math.abs(enemyCol - playerGrid.col) <= this.alertZoneRadius;
+        const inAlertRow = Math.abs(enemyRow - playerGrid.row) <= this.alertZoneRadius;
+        
+        return inAlertCol && inAlertRow;
+    }
+    
+    /**
+     * 绘制警戒区（应该在实体层绘制，在玩家下方）
+     * @param {CanvasRenderingContext2D} ctx - 绘图上下文
+     */
+    drawAlertZone(ctx) {
+        const playerGrid = this.getGridPosition();
+        const enemyWidth = this.game.enemyWidth;
+        const enemyHeight = this.game.enemyHeight;
+        
+        ctx.save();
+        
+        // 计算警戒区的屏幕坐标
+        const alertX = (playerGrid.col - this.alertZoneRadius) * enemyWidth;
+        const alertY = (playerGrid.row - this.alertZoneRadius) * enemyHeight;
+        const alertWidth = enemyWidth * (this.alertZoneRadius * 2 + 1);
+        const alertHeight = enemyHeight * (this.alertZoneRadius * 2 + 1);
+        
+        // 绘制警戒区背景高亮
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.08)';
+        ctx.fillRect(alertX, alertY, alertWidth, alertHeight);
+        
+        // 绘制警戒区外边框（不绘制内部网格）
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(alertX, alertY, alertWidth, alertHeight);
+        
+        // 绘制警告文本
+        ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.7)';
+        ctx.font = 'bold 10px monospace';
+        ctx.fillText("⚠️ ALERT ZONE", alertX + 5, alertY + 15);
+        
         ctx.restore();
     }
 }
