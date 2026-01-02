@@ -7393,7 +7393,7 @@ if (this.phase === 'truth_book') {
             this.ctx.stroke();
             this.ctx.restore();
 
-            // B. 绘制矩形扩散波
+            // B. 绘制科技感扫描波
             if (this.isEnemyTurn && this.enemyWaveActive) {
                 const currentSpeed = this.calc_calculateWaveSpeed();
                 this.enemyWaveRadius += currentSpeed;
@@ -7404,6 +7404,7 @@ if (this.phase === 'truth_book') {
                 const centerX = this.enemyWaveCenterX;
                 const centerY = this.enemyWaveCenterY;
                 const radius = this.enemyWaveRadius;
+                const time = Date.now() / 50;
                 
                 // 计算矩形边界
                 const left = centerX - radius;
@@ -7411,21 +7412,115 @@ if (this.phase === 'truth_book') {
                 const top = centerY - radius;
                 const bottom = centerY + radius;
                 
-                // 绘制矩形边框（主边框）
-                const time = Date.now() / 50;
-                this.ctx.strokeStyle = '#fbbf24'; // 金黄色
-                this.ctx.lineWidth = 4;
-                this.ctx.shadowColor = '#fef08a';
-                this.ctx.shadowBlur = 20;
+                // === 1. 绘制扫描网格 ===
+                this.ctx.strokeStyle = 'rgba(6, 182, 212, 0.15)'; // 青色，低透明度
+                this.ctx.lineWidth = 1;
+                this.ctx.shadowBlur = 0;
+                
+                const gridSize = 25; // 网格大小
+                const gridLeft = Math.max(0, Math.floor(left / gridSize) * gridSize);
+                const gridTop = Math.max(0, Math.floor(top / gridSize) * gridSize);
+                
+                this.ctx.beginPath();
+                // 纵向网格线
+                for (let x = gridLeft; x <= right && x <= this.width; x += gridSize) {
+                    if (x >= left) {
+                        this.ctx.moveTo(x, Math.max(0, top));
+                        this.ctx.lineTo(x, Math.min(this.height, bottom));
+                    }
+                }
+                // 横向网格线
+                for (let y = gridTop; y <= bottom && y <= this.height; y += gridSize) {
+                    if (y >= top) {
+                        this.ctx.moveTo(Math.max(0, left), y);
+                        this.ctx.lineTo(Math.min(this.width, right), y);
+                    }
+                }
+                this.ctx.stroke();
+                
+                // === 2. 绘制雷达波纹（同心矩形） ===
+                const rippleCount = 4;
+                const rippleSpacing = radius / rippleCount;
+                
+                for (let i = 1; i <= rippleCount; i++) {
+                    const r = rippleSpacing * i;
+                    const alpha = 1 - (i / rippleCount) * 0.7; // 越远越透明
+                    
+                    this.ctx.strokeStyle = `rgba(34, 211, 238, ${alpha * 0.4})`; // 亮青色
+                    this.ctx.lineWidth = 1.5;
+                    this.ctx.shadowColor = '#22d3ee';
+                    this.ctx.shadowBlur = 8;
+                    
+                    const rl = centerX - r;
+                    const rr = centerX + r;
+                    const rt = centerY - r;
+                    const rb = centerY + r;
+                    
+                    this.ctx.strokeRect(rl, rt, rr - rl, rb - rt);
+                }
+                
+                // === 3. 绘制扫描线（从中心向外） ===
+                const scanProgress = (radius % 80) / 80; // 循环扫描
+                
+                // 横向扫描线
+                for (let i = 0; i < 3; i++) {
+                    const offset = (i * 0.33 + scanProgress) % 1;
+                    const scanY = top + (bottom - top) * offset;
+                    
+                    if (scanY >= top && scanY <= bottom) {
+                        const grad = this.ctx.createLinearGradient(left, scanY, right, scanY);
+                        grad.addColorStop(0, 'rgba(6, 182, 212, 0)');
+                        grad.addColorStop(0.5, 'rgba(6, 182, 212, 0.6)');
+                        grad.addColorStop(1, 'rgba(6, 182, 212, 0)');
+                        
+                        this.ctx.strokeStyle = grad;
+                        this.ctx.lineWidth = 2;
+                        this.ctx.shadowBlur = 10;
+                        this.ctx.shadowColor = '#06b6d4';
+                        
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(left, scanY);
+                        this.ctx.lineTo(right, scanY);
+                        this.ctx.stroke();
+                    }
+                }
+                
+                // 纵向扫描线
+                for (let i = 0; i < 3; i++) {
+                    const offset = (i * 0.33 + scanProgress + 0.17) % 1;
+                    const scanX = left + (right - left) * offset;
+                    
+                    if (scanX >= left && scanX <= right) {
+                        const grad = this.ctx.createLinearGradient(scanX, top, scanX, bottom);
+                        grad.addColorStop(0, 'rgba(6, 182, 212, 0)');
+                        grad.addColorStop(0.5, 'rgba(6, 182, 212, 0.6)');
+                        grad.addColorStop(1, 'rgba(6, 182, 212, 0)');
+                        
+                        this.ctx.strokeStyle = grad;
+                        this.ctx.lineWidth = 2;
+                        this.ctx.shadowBlur = 10;
+                        this.ctx.shadowColor = '#06b6d4';
+                        
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(scanX, top);
+                        this.ctx.lineTo(scanX, bottom);
+                        this.ctx.stroke();
+                    }
+                }
+                
+                // === 4. 绘制主边框（青色科技感） ===
+                this.ctx.strokeStyle = '#06b6d4'; // 青色
+                this.ctx.lineWidth = 3;
+                this.ctx.shadowColor = '#22d3ee';
+                this.ctx.shadowBlur = 15;
                 
                 // 绘制波动效果的矩形
                 this.ctx.beginPath();
-                const waveOffset = 3;
+                const waveOffset = 2;
                 for (let i = 0; i <= 100; i++) {
                     const t = i / 100;
-                    const offset = Math.sin(t * Math.PI * 8 + time) * waveOffset;
+                    const offset = Math.sin(t * Math.PI * 10 + time) * waveOffset;
                     
-                    // 上边
                     const x1 = left + (right - left) * t;
                     const y1 = top + offset;
                     if (i === 0) this.ctx.moveTo(x1, y1);
@@ -7433,27 +7528,24 @@ if (this.phase === 'truth_book') {
                 }
                 for (let i = 0; i <= 100; i++) {
                     const t = i / 100;
-                    const offset = Math.sin(t * Math.PI * 8 + time + Math.PI/2) * waveOffset;
+                    const offset = Math.sin(t * Math.PI * 10 + time + Math.PI/2) * waveOffset;
                     
-                    // 右边
                     const x2 = right + offset;
                     const y2 = top + (bottom - top) * t;
                     this.ctx.lineTo(x2, y2);
                 }
                 for (let i = 100; i >= 0; i--) {
                     const t = i / 100;
-                    const offset = Math.sin(t * Math.PI * 8 + time + Math.PI) * waveOffset;
+                    const offset = Math.sin(t * Math.PI * 10 + time + Math.PI) * waveOffset;
                     
-                    // 下边
                     const x3 = left + (right - left) * t;
                     const y3 = bottom + offset;
                     this.ctx.lineTo(x3, y3);
                 }
                 for (let i = 100; i >= 0; i--) {
                     const t = i / 100;
-                    const offset = Math.sin(t * Math.PI * 8 + time + Math.PI*1.5) * waveOffset;
+                    const offset = Math.sin(t * Math.PI * 10 + time + Math.PI*1.5) * waveOffset;
                     
-                    // 左边
                     const x4 = left + offset;
                     const y4 = top + (bottom - top) * t;
                     this.ctx.lineTo(x4, y4);
@@ -7461,41 +7553,89 @@ if (this.phase === 'truth_book') {
                 this.ctx.closePath();
                 this.ctx.stroke();
                 
-                // 绘制内部发光效果
-                this.ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+                // === 5. 绘制角落标记 ===
+                const cornerSize = 15;
+                this.ctx.strokeStyle = '#22d3ee';
                 this.ctx.lineWidth = 2;
-                this.ctx.shadowBlur = 10;
-                this.ctx.strokeRect(left - 5, top - 5, (right - left) + 10, (bottom - top) + 10);
+                this.ctx.shadowBlur = 8;
                 
-                // 绘制粒子效果
-                this.ctx.fillStyle = '#fef3c7';
-                for(let i = 0; i < 8; i++) {
+                // 左上角
+                this.ctx.beginPath();
+                this.ctx.moveTo(left, top + cornerSize);
+                this.ctx.lineTo(left, top);
+                this.ctx.lineTo(left + cornerSize, top);
+                this.ctx.stroke();
+                
+                // 右上角
+                this.ctx.beginPath();
+                this.ctx.moveTo(right - cornerSize, top);
+                this.ctx.lineTo(right, top);
+                this.ctx.lineTo(right, top + cornerSize);
+                this.ctx.stroke();
+                
+                // 左下角
+                this.ctx.beginPath();
+                this.ctx.moveTo(left + cornerSize, bottom);
+                this.ctx.lineTo(left, bottom);
+                this.ctx.lineTo(left, bottom - cornerSize);
+                this.ctx.stroke();
+                
+                // 右下角
+                this.ctx.beginPath();
+                this.ctx.moveTo(right, bottom - cornerSize);
+                this.ctx.lineTo(right, bottom);
+                this.ctx.lineTo(right - cornerSize, bottom);
+                this.ctx.stroke();
+                
+                // === 6. 绘制数据点和粒子 ===
+                this.ctx.fillStyle = '#22d3ee';
+                this.ctx.shadowBlur = 5;
+                for(let i = 0; i < 12; i++) {
                     const side = Math.floor(Math.random() * 4);
                     let px, py;
                     
-                    if (side === 0) { // 上边
+                    if (side === 0) {
                         px = left + Math.random() * (right - left);
-                        py = top + (Math.random() - 0.5) * 10;
-                    } else if (side === 1) { // 右边
-                        px = right + (Math.random() - 0.5) * 10;
+                        py = top + (Math.random() - 0.5) * 8;
+                    } else if (side === 1) {
+                        px = right + (Math.random() - 0.5) * 8;
                         py = top + Math.random() * (bottom - top);
-                    } else if (side === 2) { // 下边
+                    } else if (side === 2) {
                         px = left + Math.random() * (right - left);
-                        py = bottom + (Math.random() - 0.5) * 10;
-                    } else { // 左边
-                        px = left + (Math.random() - 0.5) * 10;
+                        py = bottom + (Math.random() - 0.5) * 8;
+                    } else {
+                        px = left + (Math.random() - 0.5) * 8;
                         py = top + Math.random() * (bottom - top);
                     }
                     
-                    const size = Math.random() * 3 + 1;
+                    const size = Math.random() * 2 + 1;
                     this.ctx.fillRect(px, py, size, size);
                 }
+                
+                // === 7. 绘制中心标记 ===
+                this.ctx.strokeStyle = '#10b981'; // 绿色
+                this.ctx.lineWidth = 2;
+                this.ctx.shadowColor = '#10b981';
+                this.ctx.shadowBlur = 10;
+                
+                const crossSize = 8;
+                this.ctx.beginPath();
+                this.ctx.moveTo(centerX - crossSize, centerY);
+                this.ctx.lineTo(centerX + crossSize, centerY);
+                this.ctx.moveTo(centerX, centerY - crossSize);
+                this.ctx.lineTo(centerX, centerY + crossSize);
+                this.ctx.stroke();
+                
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, 12, 0, Math.PI * 2);
+                this.ctx.stroke();
                 
                 this.ctx.restore();
 
                 // 触发敌人行动：检测敌人是否被矩形边界扫过
+                this.ctx.save();
                 this.enemies.forEach(e => {
-                    if (!e.active || e.hasActedThisTurn) return;
+                    if (!e.active) return;
                     
                     const enemyX = e.pos.x;
                     const enemyY = e.pos.y;
@@ -7504,11 +7644,98 @@ if (this.phase === 'truth_book') {
                     const inRect = enemyX >= left && enemyX <= right && 
                                    enemyY >= top && enemyY <= bottom;
                     
-                    if (inRect) {
+                    if (inRect && !e.hasActedThisTurn) {
                         e.playScanFeedback();
                         this.phase_enemy_processTurn(e);
                     }
+                    
+                    // === 8. 绘制已扫描敌人的数据标记 ===
+                    if (e.hasActedThisTurn && inRect) {
+                        this.ctx.strokeStyle = '#10b981'; // 绿色表示已扫描
+                        this.ctx.lineWidth = 1.5;
+                        this.ctx.shadowColor = '#10b981';
+                        this.ctx.shadowBlur = 8;
+                        
+                        // 绘制十字准星
+                        const markSize = 15;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(enemyX - markSize, enemyY);
+                        this.ctx.lineTo(enemyX + markSize, enemyY);
+                        this.ctx.moveTo(enemyX, enemyY - markSize);
+                        this.ctx.lineTo(enemyX, enemyY + markSize);
+                        this.ctx.stroke();
+                        
+                        // 绘制围绕圆环
+                        this.ctx.beginPath();
+                        this.ctx.arc(enemyX, enemyY, 20, 0, Math.PI * 2);
+                        this.ctx.stroke();
+                        
+                        // 绘制角落标记
+                        const cornerDist = 18;
+                        const cornerLen = 5;
+                        this.ctx.beginPath();
+                        // 左上
+                        this.ctx.moveTo(enemyX - cornerDist, enemyY - cornerDist + cornerLen);
+                        this.ctx.lineTo(enemyX - cornerDist, enemyY - cornerDist);
+                        this.ctx.lineTo(enemyX - cornerDist + cornerLen, enemyY - cornerDist);
+                        // 右上
+                        this.ctx.moveTo(enemyX + cornerDist - cornerLen, enemyY - cornerDist);
+                        this.ctx.lineTo(enemyX + cornerDist, enemyY - cornerDist);
+                        this.ctx.lineTo(enemyX + cornerDist, enemyY - cornerDist + cornerLen);
+                        // 左下
+                        this.ctx.moveTo(enemyX - cornerDist + cornerLen, enemyY + cornerDist);
+                        this.ctx.lineTo(enemyX - cornerDist, enemyY + cornerDist);
+                        this.ctx.lineTo(enemyX - cornerDist, enemyY + cornerDist - cornerLen);
+                        // 右下
+                        this.ctx.moveTo(enemyX + cornerDist, enemyY + cornerDist - cornerLen);
+                        this.ctx.lineTo(enemyX + cornerDist, enemyY + cornerDist);
+                        this.ctx.lineTo(enemyX + cornerDist - cornerLen, enemyY + cornerDist);
+                        this.ctx.stroke();
+                        
+                        // 绘制距离信息
+                        const dist = Math.floor(Math.sqrt((enemyX - centerX)**2 + (enemyY - centerY)**2));
+                        this.ctx.font = '10px monospace';
+                        this.ctx.fillStyle = '#10b981';
+                        this.ctx.shadowBlur = 5;
+                        this.ctx.fillText(`${dist}m`, enemyX + 25, enemyY - 10);
+                    }
                 });
+                this.ctx.restore();
+                
+                // === 9. 绘制HUD元素 ===
+                this.ctx.save();
+                this.ctx.globalCompositeOperation = 'source-over';
+                
+                // 扫描进度条
+                const hudX = 20;
+                const hudY = 20;
+                const barWidth = 150;
+                const barHeight = 8;
+                
+                const totalEnemies = this.enemies.filter(e => e.active).length;
+                const scannedEnemies = this.enemies.filter(e => e.active && e.hasActedThisTurn).length;
+                const progress = totalEnemies > 0 ? scannedEnemies / totalEnemies : 1;
+                
+                // 背景框
+                this.ctx.strokeStyle = '#06b6d4';
+                this.ctx.lineWidth = 1;
+                this.ctx.strokeRect(hudX, hudY, barWidth, barHeight);
+                
+                // 进度条
+                this.ctx.fillStyle = '#10b981';
+                this.ctx.fillRect(hudX + 1, hudY + 1, (barWidth - 2) * progress, barHeight - 2);
+                
+                // 文字信息
+                this.ctx.font = '12px monospace';
+                this.ctx.fillStyle = '#22d3ee';
+                this.ctx.shadowColor = '#22d3ee';
+                this.ctx.shadowBlur = 5;
+                this.ctx.fillText(`SCAN: ${scannedEnemies}/${totalEnemies}`, hudX, hudY - 5);
+                
+                // 扫描半径信息
+                this.ctx.fillText(`RADIUS: ${Math.floor(radius)}px`, hudX + barWidth + 20, hudY + 6);
+                
+                this.ctx.restore();
                 
                 // 结束条件：矩形扩散到足够大或所有敌人都已行动
                 const maxDist = Math.max(this.width, this.height) * 1.5;
