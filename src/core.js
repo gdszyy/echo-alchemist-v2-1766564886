@@ -1104,12 +1104,14 @@ class Game {
         this.currentViewingRound = 0; // 当前查看的回合索引 (0表示当前回合)
 
         // --- 新增：敵人回合控制變量 ---
-        this.isEnemyTurn = false;      // 是否處於敵人行動階段
+        this.isEnemyTurn = false;      // 是否處於敌人行動階段
         this.enemyTurnTimer = 0;       // 計時器
-        //  扫描波相关变量
-        this.enemyWaveY = 0;       // 波当前的 Y 坐标
-        this.enemyWaveActive = false; // 波是否正在运行
-        this.waveSpeed = 4;        // 波的移动速度 (像素/帧)
+        //  矩形扩散波相关变量
+        this.enemyWaveRadius = 0;      // 波的扩散半径
+        this.enemyWaveCenterX = 0;     // 波的中心X坐标
+        this.enemyWaveCenterY = 0;     // 波的中心Y坐标
+        this.enemyWaveActive = false;  // 波是否正在运行
+        this.waveSpeed = 4;            // 波的扩散速度 (像素/帧)
         this.waveMomentumTimer = 0;
         this.nextRoundHpMultiplier = 1; // 默认为 1 (正常血量)
         // ---------------------------
@@ -7107,11 +7109,13 @@ if (this.phase === 'truth_book') {
         this.isEnemyTurn = true;
         this.enemyTurnTimer = 0;
 
-        // 初始化扫描波
+        // 初始化矩形扩散波：从玩家位置开始
         this.enemyWaveActive = true;
-        this.enemyWaveY = this.height + 50; // 从屏幕最下方开始
-        this.waveSpeed = 8 * this.timeScale; // 根据倍速调整扫描速度
-        console.log(">>> [LOG] 扫描波已激活，起始 Y:", this.enemyWaveY);
+        this.enemyWaveRadius = 0; // 从0开始扩散
+        this.enemyWaveCenterX = this.player ? this.player.pos.x : this.width / 2;
+        this.enemyWaveCenterY = this.player ? this.player.pos.y : this.height - 80;
+        this.waveSpeed = 6 * this.timeScale; // 根据倍速调整扩散速度
+        console.log(">>> [LOG] 矩形扩散波已激活，中心:", this.enemyWaveCenterX, this.enemyWaveCenterY);
         // 重置所有敌人的行动标记
         this.enemies.forEach(e => {
             e.hasActedThisTurn = false;
@@ -7389,70 +7393,128 @@ if (this.phase === 'truth_book') {
             this.ctx.stroke();
             this.ctx.restore();
 
-            // B. 绘制扫描波
+            // B. 绘制矩形扩散波
             if (this.isEnemyTurn && this.enemyWaveActive) {
                 const currentSpeed = this.calc_calculateWaveSpeed();
-                this.enemyWaveY -= currentSpeed;
+                this.enemyWaveRadius += currentSpeed;
 
                 this.ctx.save();
                 this.ctx.globalCompositeOperation = 'lighter';
                 
-                const trailHeight = 220; 
-                const gridGrad = this.ctx.createLinearGradient(0, this.enemyWaveY, 0, this.enemyWaveY + trailHeight);
-                gridGrad.addColorStop(0, 'rgba(251, 191, 36, 0.5)'); 
-                gridGrad.addColorStop(0.3, 'rgba(217, 119, 6, 0.2)'); 
-                gridGrad.addColorStop(1, 'rgba(180, 83, 9, 0)');     
-                this.ctx.strokeStyle = gridGrad;
-                this.ctx.lineWidth = 1;
+                const centerX = this.enemyWaveCenterX;
+                const centerY = this.enemyWaveCenterY;
+                const radius = this.enemyWaveRadius;
+                
+                // 计算矩形边界
+                const left = centerX - radius;
+                const right = centerX + radius;
+                const top = centerY - radius;
+                const bottom = centerY + radius;
+                
+                // 绘制矩形边框（主边框）
+                const time = Date.now() / 50;
+                this.ctx.strokeStyle = '#fbbf24'; // 金黄色
+                this.ctx.lineWidth = 4;
+                this.ctx.shadowColor = '#fef08a';
+                this.ctx.shadowBlur = 20;
+                
+                // 绘制波动效果的矩形
                 this.ctx.beginPath();
-                const cols = 8;
-                for(let i=0; i<=cols; i++) {
-                    const x = (this.width / cols) * i;
-                    this.ctx.moveTo(x, this.enemyWaveY);
-                    this.ctx.lineTo(x, this.enemyWaveY + trailHeight);
+                const waveOffset = 3;
+                for (let i = 0; i <= 100; i++) {
+                    const t = i / 100;
+                    const offset = Math.sin(t * Math.PI * 8 + time) * waveOffset;
+                    
+                    // 上边
+                    const x1 = left + (right - left) * t;
+                    const y1 = top + offset;
+                    if (i === 0) this.ctx.moveTo(x1, y1);
+                    else this.ctx.lineTo(x1, y1);
                 }
-                const gridSize = 40;
-                const startGridY = Math.floor(this.enemyWaveY / gridSize) * gridSize;
-                for(let y = startGridY; y < this.enemyWaveY + trailHeight; y += gridSize) {
-                    if(y > this.enemyWaveY) { 
-                        this.ctx.moveTo(0, y);
-                        this.ctx.lineTo(this.width, y);
-                    }
+                for (let i = 0; i <= 100; i++) {
+                    const t = i / 100;
+                    const offset = Math.sin(t * Math.PI * 8 + time + Math.PI/2) * waveOffset;
+                    
+                    // 右边
+                    const x2 = right + offset;
+                    const y2 = top + (bottom - top) * t;
+                    this.ctx.lineTo(x2, y2);
                 }
-                this.ctx.stroke();
-
-                const time = Date.now() / 50; 
-                this.ctx.beginPath();
-                this.ctx.strokeStyle = '#ffffff'; 
-                this.ctx.lineWidth = 3;
-                this.ctx.shadowColor = '#fef08a'; 
-                this.ctx.shadowBlur = 15;
-                for (let x = 0; x <= this.width; x += 10) {
-                    const offset = Math.sin(x * 0.1 + time) * 2 + (Math.random() - 0.5) * 6;
-                    const y = this.enemyWaveY + offset;
-                    if (x === 0) this.ctx.moveTo(x, y);
-                    else this.ctx.lineTo(x, y);
+                for (let i = 100; i >= 0; i--) {
+                    const t = i / 100;
+                    const offset = Math.sin(t * Math.PI * 8 + time + Math.PI) * waveOffset;
+                    
+                    // 下边
+                    const x3 = left + (right - left) * t;
+                    const y3 = bottom + offset;
+                    this.ctx.lineTo(x3, y3);
                 }
+                for (let i = 100; i >= 0; i--) {
+                    const t = i / 100;
+                    const offset = Math.sin(t * Math.PI * 8 + time + Math.PI*1.5) * waveOffset;
+                    
+                    // 左边
+                    const x4 = left + offset;
+                    const y4 = top + (bottom - top) * t;
+                    this.ctx.lineTo(x4, y4);
+                }
+                this.ctx.closePath();
                 this.ctx.stroke();
                 
-                this.ctx.fillStyle = '#fef3c7'; 
-                for(let i=0; i<5; i++) {
-                    const lx = Math.random() * this.width;
-                    const ly = this.enemyWaveY + (Math.random() - 0.5) * 30;
-                    const lw = Math.random() * 50 + 10;
-                    this.ctx.fillRect(lx, ly, lw, 1);
+                // 绘制内部发光效果
+                this.ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+                this.ctx.lineWidth = 2;
+                this.ctx.shadowBlur = 10;
+                this.ctx.strokeRect(left - 5, top - 5, (right - left) + 10, (bottom - top) + 10);
+                
+                // 绘制粒子效果
+                this.ctx.fillStyle = '#fef3c7';
+                for(let i = 0; i < 8; i++) {
+                    const side = Math.floor(Math.random() * 4);
+                    let px, py;
+                    
+                    if (side === 0) { // 上边
+                        px = left + Math.random() * (right - left);
+                        py = top + (Math.random() - 0.5) * 10;
+                    } else if (side === 1) { // 右边
+                        px = right + (Math.random() - 0.5) * 10;
+                        py = top + Math.random() * (bottom - top);
+                    } else if (side === 2) { // 下边
+                        px = left + Math.random() * (right - left);
+                        py = bottom + (Math.random() - 0.5) * 10;
+                    } else { // 左边
+                        px = left + (Math.random() - 0.5) * 10;
+                        py = top + Math.random() * (bottom - top);
+                    }
+                    
+                    const size = Math.random() * 3 + 1;
+                    this.ctx.fillRect(px, py, size, size);
                 }
+                
                 this.ctx.restore();
 
-                const triggerLine = this.enemyWaveY; 
+                // 触发敌人行动：检测敌人是否被矩形边界扫过
                 this.enemies.forEach(e => {
-                    if (!e.active) return;
-                    if (e.pos.y + e.height/2 >= triggerLine && !e.hasActedThisTurn) {
+                    if (!e.active || e.hasActedThisTurn) return;
+                    
+                    const enemyX = e.pos.x;
+                    const enemyY = e.pos.y;
+                    
+                    // 检查敌人是否在矩形内
+                    const inRect = enemyX >= left && enemyX <= right && 
+                                   enemyY >= top && enemyY <= bottom;
+                    
+                    if (inRect) {
                         e.playScanFeedback();
                         this.phase_enemy_processTurn(e);
                     }
                 });
-                if (this.enemyWaveY < -50) {
+                
+                // 结束条件：矩形扩散到足够大或所有敌人都已行动
+                const maxDist = Math.max(this.width, this.height) * 1.5;
+                const allEnemiesActed = this.enemies.every(e => !e.active || e.hasActedThisTurn);
+                
+                if (this.enemyWaveRadius > maxDist || allEnemiesActed) {
                     this.enemyWaveActive = false;
                     this.enemyTurnTimer = 0;
                 }
