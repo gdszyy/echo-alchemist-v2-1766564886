@@ -9,7 +9,7 @@
 
 游戏采用面向对象的设计，逻辑高度解耦。核心控制器 `Game` 类管理着多个子系统和功能模块。
 
-![项目架构图](architecture.png)
+![项目架构图](assets/images/architecture.png)
 
 ### 1.1 目录结构与核心模块
 
