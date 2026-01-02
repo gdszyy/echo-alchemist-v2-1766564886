@@ -13,6 +13,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.m
 import { CameraController, CameraPreset } from './camera.js';
 import { Enemy3D, EnemyRenderer3D } from './entities/enemy.js';
 import { ShockwaveRenderer3D } from './effects/shockwave.js';
+import { LightningRenderer3D } from './effects/lightning.js';
 
 export class RenderSystem3D {
     /**
@@ -88,6 +89,9 @@ export class RenderSystem3D {
         
         // 监听窗口大小变化
         window.addEventListener('resize', () => this.onWindowResize());
+        
+        // 初始化闪电渲染器
+        this.lightningRenderer = new LightningRenderer3D(this.scene, this.game);
     }
     
     /**
@@ -379,6 +383,12 @@ export class RenderSystem3D {
         // 同步冲击波
         this.syncShockwaves();
         
+        // 同步和更新闪电链
+        if (this.lightningRenderer) {
+            this.lightningRenderer.sync();
+            this.lightningRenderer.update(deltaTime);
+        }
+        
         // 更新摄像机控制器
         if (this.cameraController) {
             this.cameraController.update(deltaTime);
@@ -437,6 +447,12 @@ export class RenderSystem3D {
             enemy3D.destroy();
         }
         this.enemies3D.clear();
+        
+        // 清理闪电渲染器
+        if (this.lightningRenderer) {
+            this.lightningRenderer.dispose();
+            this.lightningRenderer = null;
+        }
         
         // 清理three.js资源
         if (this.renderer) {

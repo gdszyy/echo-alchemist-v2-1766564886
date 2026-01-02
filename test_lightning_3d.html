@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>闪电链3D渲染测试 - Echo Alchemist</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #0a0a0a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: scale(0.95);
+        }
+        
+        .info {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            font-size: 12px;
+        }
+        
+        .status {
+            color: #4ade80;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="controls">
+        <h2 style="margin-top: 0;">⚡ 闪电链3D渲染测试</h2>
+        <button onclick="toggle3D()">切换 2D/3D 模式</button>
+        <button onclick="spawnLightning()">生成闪电链</button>
+        <button onclick="spawnMultipleLightning()">生成多条闪电</button>
+        <button onclick="clearLightning()">清除所有闪电</button>
+        <div class="info">
+            <div>渲染模式: <span id="mode" class="status">2D</span></div>
+            <div>闪电数量: <span id="count" class="status">0</span></div>
+            <div>FPS: <span id="fps" class="status">60</span></div>
+        </div>
+        <div class="info" style="margin-top: 10px; font-size: 11px;">
+            <strong>说明：</strong><br>
+            - 点击"生成闪电链"创建单条闪电<br>
+            - 点击"生成多条闪电"创建5条闪电<br>
+            - 闪电会自动消失（约2秒）<br>
+            - 切换到3D模式查看3D渲染效果
+        </div>
+    </div>
+
+    <script type="module">
+        import { Game } from './src/core.js';
+        import { LightningBolt, Vec2 } from './src/entities.js';
+
+        // 初始化游戏
+        const canvas = document.getElementById('gameCanvas');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const game = new Game(canvas);
+        window.game = game; // 暴露到全局，方便调试
+
+        // 初始化游戏到战斗阶段
+        game.phase = 'combat';
+        game.waveNumber = 1;
+
+        // FPS计算
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fps = 60;
+
+        // 游戏循环
+        function gameLoop(currentTime) {
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+
+            // 更新FPS
+            frameCount++;
+            if (frameCount % 30 === 0) {
+                fps = Math.round(1 / deltaTime);
+                document.getElementById('fps').textContent = fps;
+            }
+
+            // 更新游戏
+            game.update(deltaTime);
+
+            // 更新UI
+            document.getElementById('count').textContent = game.lightningBolts.length;
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 启动游戏循环
+        requestAnimationFrame(gameLoop);
+
+        // 控制函数
+        window.toggle3D = function() {
+            if (game.renderSystem3D.enabled) {
+                game.renderSystem3D.transitionTo2D();
+                document.getElementById('mode').textContent = '2D';
+            } else {
+                game.renderSystem3D.transitionTo3D();
+                document.getElementById('mode').textContent = '3D';
+            }
+        };
+
+        window.spawnLightning = function() {
+            const x1 = Math.random() * canvas.width;
+            const y1 = Math.random() * canvas.height * 0.3; // 上半部分
+            const x2 = Math.random() * canvas.width;
+            const y2 = canvas.height * 0.5 + Math.random() * canvas.height * 0.5; // 下半部分
+            
+            game.lightningBolts.push(new LightningBolt(x1, y1, x2, y2));
+            
+            // 播放音效
+            if (game.audio) {
+                game.audio.playLightning();
+            }
+        };
+
+        window.spawnMultipleLightning = function() {
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => {
+                    window.spawnLightning();
+                }, i * 100);
+            }
+        };
+
+        window.clearLightning = function() {
+            game.lightningBolts = [];
+        };
+
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            game.width = canvas.width;
+            game.height = canvas.height;
+        });
+
+        console.log('闪电链3D渲染测试已启动');
+        console.log('使用 window.game 访问游戏实例');
+    </script>
+</body>
+</html>
