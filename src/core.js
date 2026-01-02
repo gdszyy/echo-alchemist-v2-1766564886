@@ -1398,6 +1398,9 @@ class Game {
             this.camera.update();
         }
 
+        // 1. 基础渲染准备 - 先清除画布（在原始坐标系下）
+        this.render_clearCanvas();
+
         // 应用震动偏移
         this.ctx.translate(shakeX, shakeY); 
         
@@ -1405,9 +1408,6 @@ class Game {
         if (this.camera && this.phase === 'combat') {
             this.camera.apply(this.ctx);
         }
-
-        // 1. 基础渲染准备
-        this.render_clearCanvas();
 
         // 2. 全局状态更新
         const smoothSpeed = 0.05 * timeScale;
