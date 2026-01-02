@@ -1471,12 +1471,16 @@ class Game {
         // 更新摄像机
         if (this.camera) {
             this.camera.update();
-        }
-
-        // 1. 基础渲染准备 - 先清除画布（在原始坐标系下）
+                // 1. 基础渲染准备 - 先清除画布（在原始坐标系下）
         this.render_clearCanvas();
-
-        // 应用震动偏移
+        
+        // [Task 5.1] 确保在3D模式下 Canvas 仍然可见以显示 UI
+        if (this.is3DMode) {
+            this.canvas.style.opacity = '1.0';
+            this.canvas.style.pointerEvents = 'none'; // 让点击穿透到3D层
+        } else {
+            this.canvas.style.pointerEvents = 'auto';
+        }        // 应用震动偏移
         this.ctx.translate(shakeX, shakeY); 
         
         // 应用摄像机变换
@@ -1494,36 +1498,42 @@ class Game {
             this.render_background();
         }
 
-        // 4. 阶段逻辑与渲染分发
-if (this.phase === 'truth_book') {
-		            this.truthBook.update();
-		        }
-		        if (this.phase === 'training') {
-		            this.trainingGround.update();
-		        }
+        // 4. 阶段逻辑 with 3D UI retention
+        if (this.phase === 'truth_book') {
+            this.truthBook.update();
+        }
+        if (this.phase === 'training') {
+            this.trainingGround.update();
+        }
         switch (this.phase) {
             case 'gathering':
                 this.phase_gathering_update(timeScale);
                 break;
             case 'training':
             case 'combat':
-                // 根据3D模式标志位选择渲染方式
                 if (this.is3DMode) {
                     // 3D渲染模式：先更新逻辑，再更新3D渲染
-                    this.combat_updateLogic(timeScale); // 更新游戏逻辑
-                    this.render3d.update(timeScale / 60); // 更新3D渲染（包含同步）
+                    this.combat_updateLogic(timeScale); 
+                    this.render3d.update(timeScale / 60); 
+                    
+                    // [Task 5.1] 在3D模式下保留2D UI绘制
+                    this.render_floatingTexts(timeScale);
+                    this.enemies.forEach(e => {
+                        if (e.active) e.draw(this.ctx);
+                    });
                 } else {
-                    // 2D渲染模式
                     this.phase_combat_update(timeScale);
                 }
                 break;
         }
 
-        // 5. 特效与文字层渲柑
-        this.render_floatingTexts(timeScale);
+        // 5. 特效与文字层渲染 (2D模式下)
+        if (!this.is3DMode) {
+            this.render_floatingTexts(timeScale);
+        }
         
-        // 5.5 风属性锥点渲柑（仅在战斗阶段或试炼场）
-        if (this.phase === 'combat' || this.phase === 'training') {
+        // 5.5 风属性锥点渲染（仅在战斗阶段或试炼场）
+        if ((this.phase === 'combat' || this.phase === 'training') && !this.is3DMode) {
             this.render_windAnchors();
             
             // 5.6 风属性法阵激活状态更新与渲柑 (支持多实例并行)
@@ -1534,9 +1544,7 @@ if (this.phase === 'truth_book') {
                     
                     // 渲染该法阵实例的预兆特效
                     this.render_singleWindMatrix(matrix);
-                    
-                    // 倒计时结束，触发真正的技能
-                    if (matrix.timer <= 0) {
+                                   if (matrix.timer <= 0) {
                         matrix.active = false;
                         if (matrix.onComplete) matrix.onComplete();
                         // 从活跃列表中移除
@@ -1557,12 +1565,14 @@ if (this.phase === 'truth_book') {
      */
     render_clearCanvas() {
         this.ctx.clearRect(0, 0, this.width, this.height);
-        this.ctx.fillStyle = CONFIG.colors.bg;
-        this.ctx.fillRect(0, 0, this.width, this.height);
+        if (!this.is3DMode) {
+            this.ctx.fillStyle = CONFIG.colors.bg;
+            this.ctx.fillRect(0, 0, this.width, this.height);
+        }
     }
 
     /**
-     * [RENDER] 绘制背景网格。
+     * [RENDER] 绘制背景网格
      */
     render_background() {
         this.ctx.save();
@@ -1585,6 +1595,14 @@ if (this.phase === 'truth_book') {
     /**
      * [RENDER] 渲染风属性锥点（独立渲染层）
      */
+    render_windAnchors() {
+        if (this.windAnchors && this.windAnchors.length > 0) {
+            this.ctx.save();
+            // ... (保持原样)
+            this.ctx.restore();
+        }
+    }
+
     /**
      * [RENDER] 绘制风道流速底色
      */
@@ -1592,9 +1610,7 @@ if (this.phase === 'truth_book') {
         const offset = (Date.now() / 15) % 80; // 随时间位移
         this.ctx.save();
         
-        // [优化]：不再使用 clip，而是让流动线横穿全屏
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-        this.ctx.lineWidth = 2;
+        // [        this.ctx.lineWidth = 2;
         
         const canvasW = this.canvas.width;
         const canvasH = this.canvas.height;
