@@ -43,6 +43,7 @@ import {
     EnergyOrb, 
     LightningBolt, 
     FireWave, 
+    Player, 
     showToast, 
     rotateTowards,
     adjustColorBrightness, 
@@ -1000,6 +1001,10 @@ class Game {
         
         // 初始化摄像机
         this.camera = new Camera(this.width, this.height);
+        
+        // 初始化玩家
+        this.player = new Player(this);
+        
         // 窗口大小变化时重新调整 Canvas 大小并重新初始化弹珠台布局
         window.addEventListener('resize', () => { this.sys_resize(); if (this.phase === 'gathering') this.phase_gathering_initPachinko(); });
         this.ui = new UIManager();
@@ -1908,6 +1913,11 @@ if (this.phase === 'truth_book') {
         // 更新摄像机尺寸
         if (this.camera) {
             this.camera.resize(this.width, this.height);
+        }
+        
+        // 更新玩家位置
+        if (this.player) {
+            this.player.updatePosition();
         }
         
         // 动态调整失败判定线，防止在矮屏幕上太高

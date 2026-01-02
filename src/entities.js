@@ -5872,6 +5872,12 @@ class Player {
      * @param {CanvasRenderingContext2D} ctx - 绘图上下文
      */
     drawAlertZone(ctx) {
+        // 防御性检查
+        if (!this.game.enemyWidth || !this.game.enemyHeight) {
+            console.warn('enemyWidth or enemyHeight not initialized');
+            return;
+        }
+        
         const playerGrid = this.getGridPosition();
         const enemyWidth = this.game.enemyWidth;
         const enemyHeight = this.game.enemyHeight;
@@ -5885,20 +5891,20 @@ class Player {
         const alertHeight = enemyHeight * (this.alertZoneRadius * 2 + 1);
         
         // 绘制警戒区背景高亮
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.08)';
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';  // 提高不透明度以便更明显
         ctx.fillRect(alertX, alertY, alertWidth, alertHeight);
         
         // 绘制警戒区外边框（不绘制内部网格）
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';  // 提高不透明度
+        ctx.lineWidth = 3;  // 加粗边框
         ctx.setLineDash([5, 5]);
         ctx.strokeRect(alertX, alertY, alertWidth, alertHeight);
         
         // 绘制警告文本
         ctx.setLineDash([]);
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.7)';
-        ctx.font = 'bold 10px monospace';
-        ctx.fillText("⚠️ ALERT ZONE", alertX + 5, alertY + 15);
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
+        ctx.font = 'bold 12px monospace';  // 加大字体
+        ctx.fillText("⚠️ ALERT ZONE", alertX + 5, alertY + 18);
         
         ctx.restore();
     }
