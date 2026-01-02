@@ -1,240 +1,353 @@
 /**
- * render3d/entities/enemy.js - 敌人3D渲染器
+ * render3d/entities/enemy.js - 3D敌人渲染器
  * 
  * 职责：
- * - 将2D敌人实体渲染为3D模型
- * - 使用"地板平面 + 立方体"结构
- * - 同步2D实体的位置、状态和动画
- * - 提供视觉反馈（受击、死亡等）
+ * - 创建离屏Canvas绘制敌人地板纹理
+ * - 从entities.js的Enemy.draw()提取绘制逻辑
+ * - 将Canvas作为纹理应用到3D地板平面
+ * - 保持与2D版本的视觉一致性（血条、温度效果等）
  */
 
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
 
+/**
+ * 颜色线性插值函数（从entities.js复制）
+ */
+function lerpColor(a, b, amount) {
+    const ah = parseInt(a.replace(/#/g, ''), 16),
+          ar = ah >> 16, ag = ah >> 8 & 0xff, ab = ah & 0xff,
+          bh = parseInt(b.replace(/#/g, ''), 16),
+          br = bh >> 16, bg = bh >> 8 & 0xff, bb = bh & 0xff,
+          rr = ar + amount * (br - ar),
+          rg = ag + amount * (bg - ag),
+          rb = ab + amount * (bb - ab);
+    return '#' + ((1 << 24) + (Math.round(rr) << 16) + (Math.round(rg) << 8) + Math.round(rb)).toString(16).slice(1);
+}
+
+/**
+ * EnemyRenderer3D - 3D敌人渲染器
+ */
 export class EnemyRenderer3D {
     /**
-     * 构造函数：创建敌人的3D表示
-     * @param {Enemy} enemy - 2D敌人实体引用
+     * 构造函数
      * @param {THREE.Scene} scene - Three.js场景对象
      */
-    constructor(enemy, scene) {
-        this.enemy = enemy;
+    constructor(scene) {
         this.scene = scene;
         
-        // 创建THREE.Group容器，用于组合地板和立方体
-        this.group = new THREE.Group();
+        // 离屏Canvas用于绘制地板纹理
+        this.floorCanvas = document.createElement('canvas');
+        this.floorCanvas.width = 256;  // 纹理分辨率
+        this.floorCanvas.height = 128;
+        this.floorCtx = this.floorCanvas.getContext('2d');
         
-        // 初始化几何体和材质
-        this.initGeometry();
+        // Canvas纹理
+        this.floorTexture = new THREE.CanvasTexture(this.floorCanvas);
+        this.floorTexture.needsUpdate = true;
         
-        // 添加到场景
-        this.scene.add(this.group);
+        // 存储敌人3D对象的映射 {enemyId: mesh}
+        this.enemyMeshes = new Map();
         
-        // 动画相关
-        this.hitAnimTimer = 0;
-        this.deathAnimTimer = 0;
-        this.isDying = false;
-        
-        console.log('[EnemyRenderer3D] 敌人3D渲染器创建完成');
+        console.log('[EnemyRenderer3D] 初始化完成');
     }
     
     /**
-     * 初始化几何体和材质
+     * 创建敌人的3D表示
+     * @param {Enemy} enemy - 敌人实体对象
+     * @returns {THREE.Group} 敌人的3D组对象
      */
-    initGeometry() {
-        // === 1. 创建地板平面 ===
-        const floorWidth = this.enemy.width / 50;  // 将2D像素转换为3D单位
-        const floorDepth = this.enemy.height / 50;
-        const floorGeometry = new THREE.PlaneGeometry(floorWidth, floorDepth);
+    createEnemyMesh(enemy) {
+        const group = new THREE.Group();
         
-        // 地板材质 - 使用深色半透明
-        const floorMaterial = new THREE.MeshStandardMaterial({
-            color: 0x333333,
-            transparent: true,
-            opacity: 0.6,
-            side: THREE.DoubleSide,
-            metalness: 0.2,
-            roughness: 0.8
-        });
+        // 1. 创建主体（立方体）
+        const bodyWidth = enemy.width / 10;  // 缩放到3D空间
+        const bodyHeight = enemy.height / 10;
+        const bodyDepth = 1;
         
-        this.floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
-        // 旋转地板使其水平
-        this.floorMesh.rotation.x = -Math.PI / 2;
-        this.floorMesh.position.y = 0; // 地板在底部
-        
-        this.group.add(this.floorMesh);
-        
-        // === 2. 创建立方体（敌人主体）===
-        const cubeSize = Math.min(floorWidth, floorDepth) * 0.8; // 立方体略小于地板
-        const cubeGeometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
-        
-        // 根据敌人类型选择颜色
-        let cubeColor = 0xff4444; // 默认红色
-        if (this.enemy.type === 'elite') {
-            cubeColor = 0xffaa00; // 精英敌人 - 橙色
-        } else if (this.enemy.type === 'boss') {
-            cubeColor = 0xaa00ff; // Boss - 紫色
-        }
-        
-        // 立方体材质 - 使用标准材质以支持光照
-        const cubeMaterial = new THREE.MeshStandardMaterial({
-            color: cubeColor,
+        const bodyGeometry = new THREE.BoxGeometry(bodyWidth, bodyHeight, bodyDepth);
+        const bodyMaterial = new THREE.MeshStandardMaterial({
+            color: 0x475569,
             metalness: 0.3,
-            roughness: 0.4,
-            emissive: cubeColor,
-            emissiveIntensity: 0.2
+            roughness: 0.7
         });
+        const bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        bodyMesh.position.y = bodyHeight / 2; // 抬高到地面上
+        group.add(bodyMesh);
         
-        this.cubeMesh = new THREE.Mesh(cubeGeometry, cubeMaterial);
-        // 立方体位于地板上方
-        this.cubeMesh.position.y = cubeSize / 2;
-        
-        this.group.add(this.cubeMesh);
-        
-        // === 3. 添加边缘线框（可选，增强视觉效果）===
-        const edgesGeometry = new THREE.EdgesGeometry(cubeGeometry);
-        const edgesMaterial = new THREE.LineBasicMaterial({ 
-            color: 0xffffff,
+        // 2. 创建地板平面（用于显示血条和温度效果）
+        const floorGeometry = new THREE.PlaneGeometry(bodyWidth * 1.2, bodyDepth * 1.2);
+        const floorMaterial = new THREE.MeshBasicMaterial({
+            map: this.floorTexture,
             transparent: true,
-            opacity: 0.3
+            side: THREE.DoubleSide
         });
-        this.edgesMesh = new THREE.LineSegments(edgesGeometry, edgesMaterial);
-        this.edgesMesh.position.copy(this.cubeMesh.position);
+        const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+        floorMesh.rotation.x = -Math.PI / 2; // 旋转到水平
+        floorMesh.position.y = 0.01; // 略高于地面，避免z-fighting
+        group.add(floorMesh);
         
-        this.group.add(this.edgesMesh);
+        // 存储引用
+        group.userData.bodyMesh = bodyMesh;
+        group.userData.floorMesh = floorMesh;
+        group.userData.enemy = enemy;
         
-        // 保存原始颜色用于动画
-        this.originalColor = cubeColor;
+        return group;
     }
     
     /**
-     * 更新3D表示（每帧调用）
-     * @param {number} deltaTime - 帧间隔时间
+     * 绘制敌人地板纹理
+     * 从entities.js的Enemy.draw()方法提取绘制逻辑
+     * @param {Enemy} enemy - 敌人实体对象
      */
-    update(deltaTime = 0.016) {
-        if (!this.enemy.active && !this.isDying) {
-            // 敌人死亡，开始死亡动画
-            this.startDeathAnimation();
-            return;
+    drawEnemyFloor(enemy) {
+        const ctx = this.floorCtx;
+        const canvas = this.floorCanvas;
+        
+        // 清空画布
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // 设置绘制参数（映射到Canvas空间）
+        const w = canvas.width - 20;  // 留边距
+        const h = canvas.height - 20;
+        const r = 6; // 圆角半径
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        
+        // === Layer 1: 容器裁剪 ===
+        ctx.beginPath();
+        ctx.roundRect(-w/2, -h/2, w, h, r);
+        ctx.fillStyle = '#0f172a';
+        ctx.fill();
+        ctx.clip();
+        
+        // === Layer 2: 液体血条 (含延迟白条) ===
+        
+        // A. 计算高度比例
+        const hpRatio = Math.max(0, Math.min(1, enemy.displayHp / enemy.maxHp));
+        const whiteRatio = Math.max(0, Math.min(1, enemy.delayedHp / enemy.maxHp));
+        const greenRatio = Math.max(0, Math.min(1, enemy.greenHp / enemy.maxHp));
+        
+        const fillHeight = h * hpRatio;
+        const whiteHeight = h * whiteRatio;
+        const greenHeight = h * greenRatio;
+        
+        const fillY = (h/2) - fillHeight;
+        const whiteY = (h/2) - whiteHeight;
+        const greenY = (h/2) - greenHeight;
+        
+        // B. 绘制白色延迟条 (在彩色条底下)
+        if (whiteRatio > hpRatio) {
+            ctx.fillStyle = '#ffffff';
+            ctx.globalAlpha = 0.8;
+            ctx.fillRect(-w/2, whiteY, w, whiteHeight);
+            ctx.globalAlpha = 1.0;
         }
         
-        // === 1. 同步位置 ===
-        // 将2D坐标转换为3D坐标（假设2D画布中心为原点）
-        // 2D: (0,0)在左上角，3D: (0,0,0)在中心
-        const x3d = (this.enemy.pos.x - 400) / 50; // 假设画布宽度800
-        const z3d = (this.enemy.pos.y - 300) / 50; // 假设画布高度600，Z轴反向
-        
-        this.group.position.set(x3d, 0, z3d);
-        
-        // === 2. 同步血量变化（颜色渐变）===
-        const hpRatio = this.enemy.hp / this.enemy.maxHp;
-        const damageColor = new THREE.Color(0xff0000); // 红色
-        const healthColor = new THREE.Color(this.originalColor);
-        const currentColor = healthColor.clone().lerp(damageColor, 1 - hpRatio);
-        this.cubeMesh.material.color.copy(currentColor);
-        this.cubeMesh.material.emissive.copy(currentColor);
-        
-        // === 3. 受击动画 ===
-        if (this.enemy.hitTimer > 0) {
-            this.hitAnimTimer = 0.3; // 受击动画持续0.3秒
+        // B2. 绘制绿色回血条 (在彩色条底下)
+        if (greenRatio > hpRatio) {
+            ctx.fillStyle = '#4ade80';
+            ctx.globalAlpha = 0.6;
+            ctx.fillRect(-w/2, greenY, w, greenHeight);
+            ctx.globalAlpha = 1.0;
         }
         
-        if (this.hitAnimTimer > 0) {
-            this.hitAnimTimer -= deltaTime;
-            // 闪烁效果
-            const flash = Math.sin(this.hitAnimTimer * 50) > 0 ? 1.5 : 1.0;
-            this.cubeMesh.material.emissiveIntensity = 0.2 * flash;
+        // C. 绘制真实彩色条 (盖在白条上面)
+        let baseColor = '#475569';
+        if (enemy.type === 'elite') baseColor = '#581c87';
+        if (enemy.type === 'boss') baseColor = '#7f1d1d';
+        
+        // 温度变色逻辑
+        if (enemy.temp > 0) {
+            const t = Math.min(1, enemy.temp / 34);
+            baseColor = lerpColor(baseColor, '#ea580c', t);
+        } else if (enemy.temp < 0) {
+            const t = Math.min(1, Math.abs(enemy.temp) / 34);
+            baseColor = lerpColor(baseColor, '#0891b2', t);
+        }
+        
+        ctx.fillStyle = baseColor;
+        ctx.fillRect(-w/2, fillY, w, fillHeight);
+        
+        // D. 液面亮边
+        if (hpRatio > 0 && hpRatio < 1) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.fillRect(-w/2, fillY, w, 2);
+        }
+        
+        // === Layer 3: 内部覆盖层 (Glow & Mist) ===
+        
+        // 过热 Stage 3: 内部炙热发光
+        if (enemy.temp >= 67) {
+            const glowAlpha = Math.min(0.6, (enemy.temp - 60) / 60);
+            const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 0.8);
+            grad.addColorStop(0, `rgba(251, 146, 60, ${glowAlpha})`);
+            grad.addColorStop(1, `rgba(251, 146, 60, 0)`);
+            ctx.fillStyle = grad;
+            ctx.fillRect(-w/2, -h/2, w, h);
+        }
+        
+        // 过冷 Stage 2~4: 动态雾化蒙层
+        if (enemy.temp <= -34) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
             
-            // 轻微震动
-            const shake = Math.sin(this.hitAnimTimer * 100) * 0.1;
-            this.cubeMesh.position.x = shake;
-        } else {
-            this.cubeMesh.material.emissiveIntensity = 0.2;
-            this.cubeMesh.position.x = 0;
+            let mistOpacity = 0;
+            if (enemy.isFrozenCurrentTurn || enemy.temp <= -100) mistOpacity = 0.5;
+            else mistOpacity = Math.min(0.4, (Math.abs(enemy.temp) - 30) / 70);
+            
+            const time = Date.now() / 2500;
+            
+            // 绘制浮动雾团
+            const patchCount = 2;
+            for(let i = 0; i < patchCount; i++) {
+                const seed = (enemy.visualSeed || 0) * 100 + i;
+                const offsetX = Math.sin(seed + time) * (w * 0.25);
+                const offsetY = Math.cos(seed + time * 1.2) * (h * 0.25);
+                const size = w * (0.5 + Math.sin(time * 2 + i) * 0.1);
+                
+                const grad = ctx.createRadialGradient(offsetX, offsetY, 0, offsetX, offsetY, size);
+                grad.addColorStop(0, `rgba(207, 250, 254, ${mistOpacity * 0.4})`);
+                grad.addColorStop(1, `rgba(207, 250, 254, 0)`);
+                
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(offsetX, offsetY, size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // 全身薄霜
+            ctx.fillStyle = `rgba(165, 243, 252, ${mistOpacity * 0.15})`;
+            ctx.fillRect(-w/2, -h/2, w, h);
+            ctx.restore();
         }
         
-        // === 4. 旋转动画（轻微摇摆）===
-        const time = Date.now() * 0.001;
-        this.cubeMesh.rotation.y = Math.sin(time + this.enemy.visualSeed * 10) * 0.1;
-        
-        // === 5. 死亡动画 ===
-        if (this.isDying) {
-            this.updateDeathAnimation(deltaTime);
+        // === Layer 4: 内部边框 ===
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 2;
+        if (enemy.type === 'elite') {
+            ctx.strokeStyle = '#facc15';
+            ctx.lineWidth = 3;
         }
+        if (enemy.type === 'boss') {
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 4;
+        }
+        
+        // 预警时边框闪烁白色
+        if (enemy.actionPhase === 'telegraphing') {
+            ctx.strokeStyle = '#ffffff';
+            ctx.shadowColor = '#fff';
+            ctx.shadowBlur = 15;
+        }
+        
+        ctx.strokeRect(-w/2, -h/2, w, h);
+        ctx.shadowBlur = 0;
+        
+        // === Layer 5: 文字与图标 ===
+        
+        // 词缀图标
+        if (enemy.affixes && enemy.affixes.length > 0) {
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px sans-serif';
+            let icons = '';
+            if(enemy.affixes.includes('shield')) icons += '🛡️';
+            if(enemy.affixes.includes('haste')) icons += '⚡';
+            if(enemy.affixes.includes('regen')) icons += '💚';
+            if(enemy.affixes.includes('clone')) icons += '🦠';
+            if(enemy.affixes.includes('berserk')) icons += '😡';
+            if(enemy.affixes.includes('healer')) icons += '💖';
+            if(enemy.affixes.includes('devour')) icons += '👅';
+            if(enemy.affixes.includes('jump')) icons += '🦘';
+            if(enemy.affixes.includes('elite')) icons += '💀';
+            ctx.textAlign = 'center';
+            ctx.fillText(icons, 0, -h/2 + 8);
+        }
+        
+        // 生命值数字
+        if (enemy.displayHp > 0) {
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            if (enemy.displayHp > enemy.hp + 1) ctx.fillStyle = '#fca5a5';
+            ctx.fillText(Math.ceil(enemy.displayHp), 0, 2);
+        }
+        
+        // 受击闪白
+        if (enemy.hitTimer > 0) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${enemy.hitTimer / 10 * 0.6})`;
+            ctx.fillRect(-w/2, -h/2, w, h);
+        }
+        
+        ctx.restore();
+        
+        // 标记纹理需要更新
+        this.floorTexture.needsUpdate = true;
     }
     
     /**
-     * 开始死亡动画
+     * 更新敌人的3D表示
+     * @param {Array<Enemy>} enemies - 敌人数组
      */
-    startDeathAnimation() {
-        this.isDying = true;
-        this.deathAnimTimer = 1.0; // 死亡动画持续1秒
-    }
-    
-    /**
-     * 更新死亡动画
-     * @param {number} deltaTime - 帧间隔时间
-     */
-    updateDeathAnimation(deltaTime) {
-        this.deathAnimTimer -= deltaTime;
-        
-        if (this.deathAnimTimer <= 0) {
-            // 动画结束，销毁3D对象
-            this.dispose();
-            return;
+    updateEnemies(enemies) {
+        // 清理不活跃的敌人
+        const activeEnemyIds = new Set(enemies.filter(e => e.active).map(e => e.id));
+        for (const [id, mesh] of this.enemyMeshes.entries()) {
+            if (!activeEnemyIds.has(id)) {
+                this.scene.remove(mesh);
+                this.enemyMeshes.delete(id);
+            }
         }
         
-        const progress = 1 - (this.deathAnimTimer / 1.0);
-        
-        // 下沉效果
-        this.group.position.y = -progress * 2;
-        
-        // 旋转加速
-        this.cubeMesh.rotation.y += deltaTime * 10;
-        this.cubeMesh.rotation.x += deltaTime * 5;
-        
-        // 缩小
-        const scale = 1 - progress;
-        this.cubeMesh.scale.set(scale, scale, scale);
-        
-        // 淡出
-        this.cubeMesh.material.opacity = 1 - progress;
-        this.cubeMesh.material.transparent = true;
-        this.floorMesh.material.opacity = (1 - progress) * 0.6;
+        // 更新或创建敌人
+        for (const enemy of enemies) {
+            if (!enemy.active) continue;
+            
+            let enemyGroup = this.enemyMeshes.get(enemy.id);
+            
+            // 如果敌人还没有3D表示，创建它
+            if (!enemyGroup) {
+                enemyGroup = this.createEnemyMesh(enemy);
+                this.scene.add(enemyGroup);
+                this.enemyMeshes.set(enemy.id, enemyGroup);
+            }
+            
+            // 更新位置（将2D坐标映射到3D空间）
+            // 假设2D游戏空间是800x600，映射到3D空间的-10到10范围
+            enemyGroup.position.x = (enemy.pos.x - 400) / 40;
+            enemyGroup.position.z = (enemy.pos.y - 300) / 40;
+            
+            // 更新地板纹理
+            this.drawEnemyFloor(enemy);
+        }
     }
     
     /**
-     * 销毁3D对象
+     * 销毁渲染器
      */
     dispose() {
-        // 从场景中移除
-        this.scene.remove(this.group);
+        // 清理所有敌人网格
+        for (const mesh of this.enemyMeshes.values()) {
+            this.scene.remove(mesh);
+            if (mesh.geometry) mesh.geometry.dispose();
+            if (mesh.material) {
+                if (Array.isArray(mesh.material)) {
+                    mesh.material.forEach(m => m.dispose());
+                } else {
+                    mesh.material.dispose();
+                }
+            }
+        }
+        this.enemyMeshes.clear();
         
-        // 释放几何体
-        this.floorMesh.geometry.dispose();
-        this.cubeMesh.geometry.dispose();
-        this.edgesMesh.geometry.dispose();
+        // 清理纹理
+        if (this.floorTexture) {
+            this.floorTexture.dispose();
+        }
         
-        // 释放材质
-        this.floorMesh.material.dispose();
-        this.cubeMesh.material.dispose();
-        this.edgesMesh.material.dispose();
-        
-        console.log('[EnemyRenderer3D] 敌人3D渲染器已销毁');
-    }
-    
-    /**
-     * 获取3D位置
-     * @returns {THREE.Vector3} 3D位置向量
-     */
-    getPosition() {
-        return this.group.position.clone();
-    }
-    
-    /**
-     * 设置可见性
-     * @param {boolean} visible - 是否可见
-     */
-    setVisible(visible) {
-        this.group.visible = visible;
+        console.log('[EnemyRenderer3D] 已销毁');
     }
 }

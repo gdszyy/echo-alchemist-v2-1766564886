@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enemy Renderer 3D Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #1a1a2e;
+            font-family: sans-serif;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 100;
+            max-width: 300px;
+        }
+        #info h3 {
+            margin: 0 0 10px 0;
+            color: #4ade80;
+        }
+        #info p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 100;
+        }
+        button {
+            margin: 0 5px;
+            padding: 10px 20px;
+            background: #4ade80;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #22c55e;
+        }
+        button:active {
+            background: #16a34a;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>🎮 Enemy Renderer 3D Test</h3>
+        <p>✅ Task 3.3 - CanvasTexture地板实现</p>
+        <p>📊 状态: <span id="status">初始化中...</span></p>
+        <p>🎯 敌人数量: <span id="enemyCount">0</span></p>
+    </div>
+    
+    <div id="controls">
+        <button id="addEnemy">添加敌人</button>
+        <button id="damageEnemy">造成伤害</button>
+        <button id="heatEnemy">加热敌人</button>
+        <button id="freezeEnemy">冰冻敌人</button>
+        <button id="resetEnemies">重置</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+        import { EnemyRenderer3D } from './src/render3d/entities/enemy.js';
+
+        // 模拟Enemy类（简化版）
+        class MockEnemy {
+            constructor(id, x, y) {
+                this.id = id;
+                this.active = true;
+                this.pos = { x, y };
+                this.width = 80;
+                this.height = 40;
+                this.maxHp = 100;
+                this.hp = 100;
+                this.displayHp = 100;
+                this.delayedHp = 100;
+                this.greenHp = 100;
+                this.temp = 0;
+                this.type = 'normal'; // 'normal', 'elite', 'boss'
+                this.affixes = [];
+                this.hitTimer = 0;
+                this.actionPhase = 'idle';
+                this.isFrozenCurrentTurn = false;
+                this.visualSeed = Math.random();
+            }
+
+            takeDamage(amount) {
+                this.hp = Math.max(0, this.hp - amount);
+                this.displayHp = this.hp;
+                this.hitTimer = 10;
+            }
+
+            heat(amount) {
+                this.temp = Math.min(100, this.temp + amount);
+            }
+
+            freeze(amount) {
+                this.temp = Math.max(-100, this.temp - amount);
+                if (this.temp <= -100) {
+                    this.isFrozenCurrentTurn = true;
+                }
+            }
+
+            update() {
+                if (this.hitTimer > 0) this.hitTimer--;
+                // 延迟血条追赶
+                if (this.delayedHp > this.displayHp) {
+                    this.delayedHp = Math.max(this.displayHp, this.delayedHp - 0.5);
+                }
+            }
+        }
+
+        // 初始化Three.js场景
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a2e);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 8, 12);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        // 添加光照
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 7.5);
+        scene.add(directionalLight);
+
+        // 添加网格辅助线
+        const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
+        scene.add(gridHelper);
+
+        // 初始化敌人渲染器
+        const enemyRenderer = new EnemyRenderer3D(scene);
+
+        // 敌人数组
+        const enemies = [];
+        let enemyIdCounter = 0;
+
+        // 添加敌人
+        function addEnemy() {
+            const x = 400 + (Math.random() - 0.5) * 200;
+            const y = 200 + (Math.random() - 0.5) * 200;
+            const enemy = new MockEnemy(enemyIdCounter++, x, y);
+            
+            // 随机类型
+            const rand = Math.random();
+            if (rand > 0.9) {
+                enemy.type = 'boss';
+                enemy.maxHp = 300;
+                enemy.hp = 300;
+                enemy.displayHp = 300;
+                enemy.delayedHp = 300;
+                enemy.affixes.push('elite');
+            } else if (rand > 0.7) {
+                enemy.type = 'elite';
+                enemy.maxHp = 150;
+                enemy.hp = 150;
+                enemy.displayHp = 150;
+                enemy.delayedHp = 150;
+                enemy.affixes.push('shield');
+            }
+            
+            enemies.push(enemy);
+            updateInfo();
+        }
+
+        // 对所有敌人造成伤害
+        function damageAllEnemies() {
+            enemies.forEach(enemy => {
+                if (enemy.active) {
+                    enemy.takeDamage(20);
+                }
+            });
+        }
+
+        // 加热所有敌人
+        function heatAllEnemies() {
+            enemies.forEach(enemy => {
+                if (enemy.active) {
+                    enemy.heat(30);
+                }
+            });
+        }
+
+        // 冰冻所有敌人
+        function freezeAllEnemies() {
+            enemies.forEach(enemy => {
+                if (enemy.active) {
+                    enemy.freeze(30);
+                }
+            });
+        }
+
+        // 重置所有敌人
+        function resetEnemies() {
+            enemies.length = 0;
+            enemyIdCounter = 0;
+            updateInfo();
+        }
+
+        // 更新信息显示
+        function updateInfo() {
+            document.getElementById('enemyCount').textContent = enemies.filter(e => e.active).length;
+            document.getElementById('status').textContent = '运行中';
+        }
+
+        // 按钮事件
+        document.getElementById('addEnemy').addEventListener('click', addEnemy);
+        document.getElementById('damageEnemy').addEventListener('click', damageAllEnemies);
+        document.getElementById('heatEnemy').addEventListener('click', heatAllEnemies);
+        document.getElementById('freezeEnemy').addEventListener('click', freezeAllEnemies);
+        document.getElementById('resetEnemies').addEventListener('click', resetEnemies);
+
+        // 窗口大小变化
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // 添加初始敌人
+        for (let i = 0; i < 3; i++) {
+            addEnemy();
+        }
+
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 更新敌人状态
+            enemies.forEach(enemy => {
+                if (enemy.active) {
+                    enemy.update();
+                }
+            });
+
+            // 更新敌人渲染
+            enemyRenderer.updateEnemies(enemies);
+
+            // 渲染场景
+            renderer.render(scene, camera);
+        }
+
+        animate();
+        updateInfo();
+
+        console.log('✅ Enemy Renderer 3D Test 初始化完成');
+        console.log('📊 敌人渲染器已创建');
+        console.log('🎯 使用底部按钮进行交互测试');
+    </script>
+</body>
+</html>
