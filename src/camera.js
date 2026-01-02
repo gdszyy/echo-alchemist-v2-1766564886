@@ -44,6 +44,12 @@ class Camera {
         // 是否处于远距离视角模式
         this.isDistantView = false;
         
+        // 是否正在移动（用于拖影效果）
+        this.isMoving = false;
+        
+        // 移动阈值（小于此值认为静止）
+        this.movementThreshold = 0.5;
+        
         // 远距离视角的偏移量 (向上移动多少)
         this.distantViewOffset = 300;
         
@@ -106,10 +112,25 @@ class Camera {
      * 更新摄像机状态 (每帧调用)
      */
     update() {
+        // 保存上一帧的位置
+        const oldX = this.x;
+        const oldY = this.y;
+        const oldZoom = this.zoom;
+        
         // 平滑插值到目标位置
         this.x = lerp(this.x, this.targetX, this.smoothness);
         this.y = lerp(this.y, this.targetY, this.smoothness);
         this.zoom = lerp(this.zoom, this.targetZoom, this.smoothness);
+        
+        // 检测是否正在移动
+        const deltaX = Math.abs(this.x - oldX);
+        const deltaY = Math.abs(this.y - oldY);
+        const deltaZoom = Math.abs(this.zoom - oldZoom);
+        
+        // 如果位置或缩放变化超过阈值，认为正在移动
+        this.isMoving = (deltaX > this.movementThreshold || 
+                        deltaY > this.movementThreshold || 
+                        deltaZoom > 0.001);
     }
     
     /**
