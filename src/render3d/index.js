@@ -8,6 +8,7 @@
  */
 
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+import { CameraController, CameraPreset } from './camera.js';
 
 export class RenderSystem3D {
     /**
@@ -48,11 +49,10 @@ export class RenderSystem3D {
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x1a1a2e); // 深蓝色背景
         
-        // 创建摄像机
+        // 创建摄像机控制器
         const aspect = window.innerWidth / window.innerHeight;
-        this.camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
-        this.camera.position.set(0, 5, 10);
-        this.camera.lookAt(0, 0, 0);
+        this.cameraController = new CameraController(aspect);
+        this.camera = this.cameraController.getCamera();
         
         // 创建渲染器
         this.renderer = new THREE.WebGLRenderer({ 
@@ -103,8 +103,10 @@ export class RenderSystem3D {
         const width = window.innerWidth;
         const height = window.innerHeight;
         
-        this.camera.aspect = width / height;
-        this.camera.updateProjectionMatrix();
+        // 更新摄像机控制器
+        if (this.cameraController) {
+            this.cameraController.onWindowResize(width, height);
+        }
         
         this.renderer.setSize(width, height);
     }
@@ -115,6 +117,11 @@ export class RenderSystem3D {
      */
     update(deltaTime = 0.016) {
         if (!this.enabled) return;
+        
+        // 更新摄像机控制器
+        if (this.cameraController) {
+            this.cameraController.update();
+        }
         
         // 旋转测试立方体
         if (this.testCube) {
@@ -178,3 +185,46 @@ export class RenderSystem3D {
         window.removeEventListener('resize', () => this.onWindowResize());
     }
 }
+
+    /**
+     * 切换摄像机预设
+     * @param {string} presetName - 预设名称 (CameraPreset枚举值)
+     * @param {boolean} smooth - 是否平滑过渡 (默认true)
+     */
+    setCameraPreset(presetName, smooth = true) {
+        if (this.cameraController) {
+            this.cameraController.setPreset(presetName, smooth);
+        }
+    }
+    
+    /**
+     * 切换到2D俯视视角
+     * @param {boolean} smooth - 是否平滑过渡 (默认true)
+     */
+    setCameraTopDownView(smooth = true) {
+        if (this.cameraController) {
+            this.cameraController.setTopDownView(smooth);
+        }
+    }
+    
+    /**
+     * 切换到3D斜视视角
+     * @param {boolean} smooth - 是否平滑过渡 (默认true)
+     */
+    setCameraIsometricView(smooth = true) {
+        if (this.cameraController) {
+            this.cameraController.setIsometricView(smooth);
+        }
+    }
+    
+    /**
+     * 获取当前摄像机预设
+     * @returns {string} 当前预设名称
+     */
+    getCurrentCameraPreset() {
+        return this.cameraController ? this.cameraController.getCurrentPreset() : null;
+    }
+}
+
+// 导出CameraPreset枚举供外部使用
+export { CameraPreset };
