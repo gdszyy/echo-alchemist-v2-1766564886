@@ -996,7 +996,6 @@ class Game {
         this.marbleSizeBonus=0;
         this.isVisualEffectActive = false;
         this.isWheelSpinning = false;
-        this.is3DMode = false; // [新增] 3D 模式标志
         this.canvas = document.getElementById('gameCanvas'); this.ctx = this.canvas.getContext('2d');
         this.sys_resize();
         
@@ -2266,39 +2265,6 @@ if (this.phase === 'truth_book') {
         };
         window.addEventListener('click', initialClickHandler);
         window.addEventListener('touchstart', initialClickHandler);
-
-        // [新增] 监听 'V' 键按下以切换 3D 模式
-        window.addEventListener('keydown', (e) => {
-            if (e.key.toLowerCase() === 'v') {
-                this.toggle3DMode();
-            }
-        });
-    }
-
-    /**
-     * [新增] 切换 2D/3D 模式
-     */
-    toggle3DMode() {
-        this.is3DMode = !this.is3DMode;
-        
-        // 切换 Canvas 的 z-index 层级
-        // 假设 3D 模式下层级更高，或者根据需求调整
-        if (this.is3DMode) {
-            this.canvas.style.zIndex = "10";
-            showToast("3D 模式：开启");
-        } else {
-            this.canvas.style.zIndex = "1";
-            showToast("3D 模式：关闭");
-        }
-
-        // 添加淡入淡出效果
-        this.canvas.style.transition = "opacity 0.3s ease-in-out";
-        this.canvas.style.opacity = "0.5";
-        setTimeout(() => {
-            this.canvas.style.opacity = "1";
-        }, 150);
-
-        console.log(`[Mode] Switched to ${this.is3DMode ? '3D' : '2D'} mode`);
     }
 
     //  处理设备倾斜
@@ -7274,311 +7240,140 @@ if (this.phase === 'truth_book') {
     }
 
         /**
-     * @method phase_combat_update
-     * @description 战斗阶段的游戏逻辑更新与渲染 (已重构为逻辑与渲染分离)
+     * @method updateCombat
+     * @description 战斗阶段的游戏逻辑更新 (含可视化墙壁与分层视差)。
      */
     phase_combat_update(timeScale) {
-        // 1. 纯逻辑更新
-        this.combat_updateLogic(timeScale);
-        
-        // 2. 纯2D渲染
-        this.combat_render2D(timeScale);
-    }
 
-    /**
-     * @method combat_updateLogic
-     * @description 战斗阶段的纯逻辑更新 (不包含渲染)
-     */
-    combat_updateLogic(timeScale) {
         // === [新增] 处理子剑动态生成队列 ===
         if (this.sonSwordQueue.length > 0) {
             this.sonSwordTimer -= timeScale;
             
             if (this.sonSwordTimer <= 0) {
+                // 取出一个生成请求
                 const req = this.sonSwordQueue.shift();
+                
+                // 只要母剑还活着(或者没飞太远)，就生成子剑
                 if (req.mother.active || !req.mother.destroyed) {
+                    // 这里 startDelay 传 0，因为我们已经通过队列控制了时间
                     this.combat_flyingSword_addSon(req.x, req.y, req.mother, req.level, req.config, 0);
+                    
+                    // 播放一个轻微的生成音效 (可选)
+                    // audio.playTone(600 + this.sonSwordQueue.length * 50, 'sine', 0.05, 0.1);
                 }
+
+                // [核心算法] 动态延迟计算
+                // 剩余数量越多，延迟越短 (喷射而出)；剩余越少，延迟越长 (慢慢收尾)
                 const fsCfg = CONFIG.mechanics.flying_sword;
                 const remaining = this.sonSwordQueue.length;
+                
+                // 公式：基础延迟，每多一个排队减少 2帧，最快限制
                 this.sonSwordTimer = Math.max(fsCfg.sonSwordDelayMin, fsCfg.sonSwordDelayBase - (remaining * 2));
             }
         }
 
         if (this.isChargingShot) {
+            // 吸收速度：0.08 大约需要 12 帧 (0.2秒)，手感比较干脆
             this.chargeProgress += 0.08 * timeScale;
+            
             if (this.chargeProgress >= 1.0) {
+                // 动画结束，真正发射
                 this.isChargingShot = false;
                 this.chargeProgress = 0;
                 if (this.pendingFireVelocity) {
                     this.combat_fireNextShot(this.pendingFireVelocity);
                     this.pendingFireVelocity = null;
+                    // --- [新增] 发射后立即触发“能量注入”动画 ---
                     this.isReloading = true;
                     this.reloadProgress = 0;
                 }
             }
         }
-
+        // --- [修改] 2. 处理能量注入 (变慢 & 增加撞击反馈) ---
         if (this.isReloading) {
+            // [修改点] 速度从 0.1 改为 0.035，让过程持续约 0.5秒，更具重量感
             this.reloadProgress += 0.035 * timeScale;
+            
             if (this.reloadProgress >= 1.0) {
                 this.isReloading = false;
                 this.reloadProgress = 1.0;
-                this.spinBoost = 0.002;
+                
+                // [新增] 撞击时刻！给予轨道一个巨大的旋转初速度
+                // 就像能量球狠狠砸在了轨道上，带动它疯狂旋转
+                this.spinBoost = 0.002; 
             }
         }
 
-        const baseSpeed = 0.00012;
+        // --- [新增] 3. 计算轨道旋转物理 (惯性与阻力) ---
+        // 基础旋转速度 (约为 0.5 rad/frame)
+        const baseSpeed = 0.00012; 
+        
+        // 阻力衰减：每一帧速度乘以 0.92，快速慢下来
         this.spinBoost *= 0.95;
         if (this.spinBoost < 0.0001) this.spinBoost = 0;
+
+        // 最终角度累加：基础速度 + 爆发速度
+        // 在装填过程中(isReloading)，为了体现"未就位"，我们可以让轨道转得稍慢一点，或者反向转
         let currentFrameSpeed = baseSpeed + this.spinBoost;
-        this.orbitalAngle += currentFrameSpeed * timeScale * 60;
-        
+        this.orbitalAngle += currentFrameSpeed * timeScale * 60; // *60 是为了适配 timeScale 的基准
         this.ui_updateSlowMotion();
-        
         const tilt = this.boardTilt.current;
         const container = document.getElementById('game-container');
         if (container) {
             container.style.perspective = "1200px";
+            const rotateX = tilt.y * -8;
+            const rotateY = tilt.x * 8;
+            const translateZ = -20;
+            // container.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(${translateZ}px)`;
             container.style.transform = `rotateX(0deg) rotateY(0deg) translateZ(0px)`;
         }
+
+        // === 1. 计算视差参数 ===
+        // 背景层 (地板)：正向移动
+        const bgShiftX = tilt.x * 20;
+        const bgShiftY = tilt.y * 15;
+
+        // 实体层 (敌人/UI/墙壁)：反向移动
+        const entityShiftX = tilt.x * -15;
+        const entityShiftY = tilt.y * -10;
+
+        // 应用 CSS 到 DOM UI
+        // const skillBar = document.getElementById('skill-bar');
+        // const hud = document.getElementById('recipe-hud-container');
+        // const uiTransform = `translate3d(${entityShiftX}px, ${entityShiftY}px, 0)`;
+        // if (skillBar) skillBar.style.transform = uiTransform;
+        // if (hud) hud.style.transform = uiTransform;
 
         if (this.swordQis) {
             for (let i = this.swordQis.length - 1; i >= 0; i--) {
                 const qi = this.swordQis[i];
-                qi.update(timeScale, this.enemies, this);
+                qi.update(timeScale, this.enemies, this); // 傳入 enemies 和 game 實例
                 if (!qi.active) {
                     this.swordQis.splice(i, 1);
                 }
             }
         }
-
-        for (let i = this.burstQueue.length - 1; i >= 0; i--) {
-            const shot = this.burstQueue[i];
-            shot.delay -= timeScale;
-            if (shot.delay <= 0) {
-                this.spawn_spawnBullet(this.width/2, this.height-80, shot.vel, shot.recipe, shot.shotId, shot.isLast);
-                audio.playShoot();
-                this.burstQueue.splice(i, 1);
-            }
+        // --- 逻辑更新 ---
+        for (let i = this.burstQueue.length - 1; i >= 0; i--) { 
+            const shot = this.burstQueue[i]; 
+            shot.delay -= timeScale; 
+            if (shot.delay <= 0) { 
+                this.spawn_spawnBullet(this.width/2, this.height-80, shot.vel, shot.recipe, shot.shotId, shot.isLast); 
+                audio.playShoot(); 
+                this.burstQueue.splice(i, 1); 
+            } 
         }
-        
         if (this.waveMomentumTimer > 0) this.waveMomentumTimer -= timeScale;
 
-        // === 敌人回合扫描波逻辑 ===
-        if (this.isEnemyTurn && this.enemyWaveActive) {
-            const currentSpeed = this.calc_calculateWaveSpeed();
-            this.enemyWaveRadius += currentSpeed;
-            
-            const centerX = this.enemyWaveCenterX;
-            const centerY = this.enemyWaveCenterY;
-            const radius = this.enemyWaveRadius;
-            const left = centerX - radius;
-            const right = centerX + radius;
-            const top = centerY - radius;
-            const bottom = centerY + radius;
-            
-            this.enemies.forEach(e => {
-                if (!e.active || e.hasActedThisTurn) return;
-                const enemyX = e.pos.x;
-                const enemyY = e.pos.y;
-                const inBoundsX = enemyX >= left && enemyX <= right;
-                const inBoundsY = enemyY >= top && enemyY <= bottom;
-                if (inBoundsX && inBoundsY) {
-                    this.phase_enemy_processTurn(e);
-                }
-            });
-            
-            const allEnemiesActed = this.enemies.every(e => !e.active || e.hasActedThisTurn);
-            if (allEnemiesActed) {
-                this.enemyWaveActive = false;
-                this.enemyTurnTimer = 0;
-            }
-        }
+        // ==========================================
+        //  LAYER 0: 固定 UI 层
+        // ==========================================
+        // 警戒区已移动到实体层，由 Player 类管理
 
-        // === 更新敌人状态 ===
-        this.activeEnemies = 0;
-        this.anyEnemyMoving = false;
-        this.enemies.forEach(e => {
-            if (e.active) {
-                e.update(this.timeScale, this);
-                if (e.pos.y > 0) this.activeEnemies++;
-                if (Math.abs(e.pos.y - e.dropTargetY) > 1) this.anyEnemyMoving = true;
-            }
-        });
 
-        if (this.input_checkDefeat()) this.gameOver = true;
-
-        // === 更新弹丸 ===
-        for (let i = this.projectiles.length - 1; i >= 0; i--) {
-            const p = this.projectiles[i];
-            if(p) {
-                p.update(this.width, this.height, this.enemies, (spawnInfo) => { 
-                    this.spawn_spawnBullet(spawnInfo.x, spawnInfo.y, spawnInfo.vel, spawnInfo.config, p.shotId); 
-                }, timeScale);
-                if (p.destroyed) {
-                    if (p.shotId !== null && this.shotDamageMap.has(p.shotId)) {
-                        const shotStats = this.shotDamageMap.get(p.shotId);
-                        shotStats.destroyedCount++;
-                        if (shotStats.destroyedCount >= shotStats.projectileCount && shotStats.total > 0) {
-                            this.shotDamageHistory.push({
-                                total: shotStats.total,
-                                byAttr: JSON.parse(JSON.stringify(shotStats.byAttr))
-                            });
-                            if (this.shotDamageHistory.length > 10) {
-                                this.shotDamageHistory.shift();
-                            }
-                            this.ui_updateDamageStats();
-                            this.shotDamageMap.delete(p.shotId);
-                        }
-                    }
-                    this.projectiles.splice(i, 1);
-                }
-            }
-        }
-
-        // === 更新特效 ===
-        for (let i = this.fireWaves.length - 1; i >= 0; i--) {
-            const fw = this.fireWaves[i];
-            fw.update(timeScale);
-            if (fw.life <= 0) this.fireWaves.splice(i, 1);
-        }
-
-        for(let i=this.particles.length-1; i>=0; i--) {
-            let p = this.particles[i];
-            if(p) {
-                p.update(timeScale);
-                if(p.life <= 0) this.particles.splice(i,1);
-            }
-        }
-        
-        for(let i=this.shockwaves.length-1; i>=0; i--) {
-            let s = this.shockwaves[i];
-            if(s) {
-                s.update(timeScale);
-                if(s.alpha <= 0) this.shockwaves.splice(i,1);
-            }
-        }
-        
-        for(let i=this.lightningBolts.length-1; i>=0; i--) {
-            let b = this.lightningBolts[i];
-            b.update(timeScale);
-            if(b.life <= 0) this.lightningBolts.splice(i,1);
-        }
-        
-        for(let i=this.spores.length-1; i>=0; i--) {
-            let s = this.spores[i];
-            if(s) {
-                s.update(timeScale);
-                if(!s.active) this.spores.splice(i,1);
-            }
-        }
-
-        // === 更新风属性效果 ===
-        this.combat_wind_updateButterflyCircles(timeScale);
-        this.combat_wind_updateButterflyBlades(timeScale);
-        this.combat_wind_updateStormCores(timeScale);
-
-        // === 更新子剑 ===
-        this.sonSwords.forEach(s => s.update(timeScale, this.enemies, this));
-        this.sonSwords = this.sonSwords.filter(s => s.active);
-
-        // === 游戏结束处理 ===
-        if (this.gameOver) {
-            if (this.runCurrency > 0) {
-                this.meta_addCurrency(this.runCurrency);
-                this.runCurrency = 0;
-            }
-            document.getElementById('combat-message').innerHTML = '<span class="text-red-400 font-bold text-4xl">防線失守</span><br><span class="text-sm">點擊返回主界面</span>';
-            return;
-        }
-
-        // === 完美清场检测 ===
-        if (this.activeEnemies === 0) {
-            const hasLeftoverAmmo = this.ammoQueue.length > 0;
-            if (hasLeftoverAmmo) {
-                const leftoverCount = this.ammoQueue.length;
-                const scoreMult = Math.pow(CONFIG.balance.unusedAmmoScoreMult, leftoverCount);
-                this.score *= scoreMult;
-                document.getElementById('score-num').innerText = this.score;
-                this.nextRoundHpMultiplier = CONFIG.balance.nextRoundDifficultyMult;
-                showToast(`完美清場! 分數 x${scoreMult} | 下輪難度 UP!`);
-                audio.playPowerup();
-                this.ammoQueue = [];
-                this.ui_updateAmmoUI();
-                this.ui_renderRecipeHUD();
-                this.data_clearProjectiles();
-            }
-        }
-
-        // === 回合结束逻辑 ===
-        const playerTurnFinished = this.ammoQueue.length === 0 && 
-                                   this.projectiles.length === 0 && 
-                                   this.burstQueue.length === 0 &&
-                                   !this.isVisualEffectActive;
-
-        if (playerTurnFinished && !this.gameOver) {
-            if (this.phase === 'training') {
-                if (this.isEnemyTurn) {
-                    if (this.enemyWaveActive) return;
-                    if (this.anyEnemyMoving) {
-                        this.enemyTurnTimer = 0;
-                        return;
-                    }
-                    this.enemyTurnTimer += this.timeScale;
-                    if (this.enemyTurnTimer > 60) {
-                        this.isEnemyTurn = false;
-                        this.enemyTurnTimer = 0;
-                        this.enemies.forEach(e => e.hasActedThisTurn = false);
-                        return;
-                    }
-                }
-                return;
-            }
-
-            if (!this.isEnemyTurn) {
-                this.phase_enemy_startLogic();
-            } else {
-                if (this.enemyWaveActive) return;
-                if (this.anyEnemyMoving) {
-                    this.enemyTurnTimer = 0;
-                    return;
-                }
-                this.enemyTurnTimer += this.timeScale;
-                if (this.enemyTurnTimer > 60) {
-                    if (this.phase === 'training') {
-                        this.isEnemyTurn = false;
-                        this.enemyTurnTimer = 0;
-                        this.enemies.forEach(e => e.hasActedThisTurn = false);
-                    } else {
-                        this.phase_finalizeRound();
-                    }
-                    return;
-                }
-            }
-            return;
-        }
-
-        // === 弹药耗尽提示 ===
-        if (this.ammoQueue.length === 0 && this.projectiles.length === 0 && this.burstQueue.length === 0 && !this.gameOver) {
-            this.combat_wind_decayStormCoresEnergy();
-            document.getElementById('combat-message').innerHTML = '<div class="bg-black/50 p-4 rounded-xl backdrop-blur-md border border-blue-500/50 pointer-events-none"><span class="text-blue-300 font-bold text-xl block mb-2">彈藥耗盡</span><span class="text-sm text-slate-300">點擊收集新彈药</span></div>';
-        } else {
-            if (!this.gameOver) document.getElementById('combat-message').innerHTML = '';
-        }
-    }
-
-    /**
-     * @method combat_render2D
-     * @description 战斗阶段的纯2D渲染 (不包含逻辑更新)
-     */
-    combat_render2D(timeScale) {
-        const tilt = this.boardTilt.current;
-        const bgShiftX = tilt.x * 20;
-        const bgShiftY = tilt.y * 15;
-        const entityShiftX = tilt.x * -15;
-        const entityShiftY = tilt.y * -10;
-
+        // ==========================================
+        //  LAYER 1: 背景层 (网格 & 扫描波)
+        // ==========================================
         this.ctx.save();
         this.ctx.translate(bgShiftX, bgShiftY); 
 
@@ -7599,6 +7394,131 @@ if (this.phase === 'truth_book') {
             this.ctx.restore();
 
             // B. 绘制矩形扩散波
+            if (this.isEnemyTurn && this.enemyWaveActive) {
+                const currentSpeed = this.calc_calculateWaveSpeed();
+                this.enemyWaveRadius += currentSpeed;
+
+                this.ctx.save();
+                this.ctx.globalCompositeOperation = 'lighter';
+                
+                const centerX = this.enemyWaveCenterX;
+                const centerY = this.enemyWaveCenterY;
+                const radius = this.enemyWaveRadius;
+                const time = Date.now() / 50;
+                
+                // 计算矩形边界
+                const left = centerX - radius;
+                const right = centerX + radius;
+                const top = centerY - radius;
+                const bottom = centerY + radius;
+                
+                // 绘制矩形边框（主边框）
+                this.ctx.strokeStyle = '#fbbf24'; // 金黄色
+                this.ctx.lineWidth = 4;
+                this.ctx.shadowColor = '#fef08a';
+                this.ctx.shadowBlur = 20;
+                
+                // 绘制波动效果的矩形
+                this.ctx.beginPath();
+                const waveOffset = 3;
+                for (let i = 0; i <= 100; i++) {
+                    const t = i / 100;
+                    const offset = Math.sin(t * Math.PI * 8 + time) * waveOffset;
+                    
+                    // 上边
+                    const x1 = left + (right - left) * t;
+                    const y1 = top + offset;
+                    if (i === 0) this.ctx.moveTo(x1, y1);
+                    else this.ctx.lineTo(x1, y1);
+                }
+                for (let i = 0; i <= 100; i++) {
+                    const t = i / 100;
+                    const offset = Math.sin(t * Math.PI * 8 + time + Math.PI/2) * waveOffset;
+                    
+                    // 右边
+                    const x2 = right + offset;
+                    const y2 = top + (bottom - top) * t;
+                    this.ctx.lineTo(x2, y2);
+                }
+                for (let i = 100; i >= 0; i--) {
+                    const t = i / 100;
+                    const offset = Math.sin(t * Math.PI * 8 + time + Math.PI) * waveOffset;
+                    
+                    // 下边
+                    const x3 = left + (right - left) * t;
+                    const y3 = bottom + offset;
+                    this.ctx.lineTo(x3, y3);
+                }
+                for (let i = 100; i >= 0; i--) {
+                    const t = i / 100;
+                    const offset = Math.sin(t * Math.PI * 8 + time + Math.PI*1.5) * waveOffset;
+                    
+                    // 左边
+                    const x4 = left + offset;
+                    const y4 = top + (bottom - top) * t;
+                    this.ctx.lineTo(x4, y4);
+                }
+                this.ctx.closePath();
+                this.ctx.stroke();
+                
+                // 绘制内部发光效果
+                this.ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+                this.ctx.lineWidth = 2;
+                this.ctx.shadowBlur = 10;
+                this.ctx.strokeRect(left - 5, top - 5, (right - left) + 10, (bottom - top) + 10);
+                
+                // 绘制粒子效果
+                this.ctx.fillStyle = '#fef3c7';
+                for(let i = 0; i < 8; i++) {
+                    const side = Math.floor(Math.random() * 4);
+                    let px, py;
+                    
+                    if (side === 0) { // 上边
+                        px = left + Math.random() * (right - left);
+                        py = top + (Math.random() - 0.5) * 10;
+                    } else if (side === 1) { // 右边
+                        px = right + (Math.random() - 0.5) * 10;
+                        py = top + Math.random() * (bottom - top);
+                    } else if (side === 2) { // 下边
+                        px = left + Math.random() * (right - left);
+                        py = bottom + (Math.random() - 0.5) * 10;
+                    } else { // 左边
+                        px = left + (Math.random() - 0.5) * 10;
+                        py = top + Math.random() * (bottom - top);
+                    }
+                    
+                    const size = Math.random() * 3 + 1;
+                    this.ctx.fillRect(px, py, size, size);
+                }
+                
+                this.ctx.restore();
+
+                // 触发敌人行动：检测敌人是否被矩形边界扫过
+                this.enemies.forEach(e => {
+                    if (!e.active || e.hasActedThisTurn) return;
+                    
+                    const enemyX = e.pos.x;
+                    const enemyY = e.pos.y;
+                    
+                    // 检查敌人是否在矩形内
+                    const inRect = enemyX >= left && enemyX <= right && 
+                                   enemyY >= top && enemyY <= bottom;
+                    
+                    if (inRect) {
+                        e.playScanFeedback();
+                        this.phase_enemy_processTurn(e);
+                    }
+                });
+                
+                // 结束条件：矩形扩散到足够大或所有敌人都已行动
+                const maxDist = Math.max(this.width, this.height) * 1.5;
+                const allEnemiesActed = this.enemies.every(e => !e.active || e.hasActedThisTurn);
+                
+                if (this.enemyWaveRadius > maxDist || allEnemiesActed) {
+                    this.enemyWaveActive = false;
+                    this.enemyTurnTimer = 0;
+                }
+            }
         this.ctx.restore(); 
 
 
@@ -7649,37 +7569,64 @@ if (this.phase === 'truth_book') {
             
             let activeEnemies = 0; 
             let anyEnemyMoving = false;
-        // 绘制敌人
-        this.enemies.forEach(e => {
-            if (e.active) {
-                e.draw(this.ctx);
-            }
-        });
+            this.enemies.forEach(e => {
+                if (e.active) {
+                    e.update(this.timeScale, this);
+                    e.draw(this.ctx);
+                    // e.dropTargetY > 0 || 
+                    if (e.pos.y > 0) {
+                        activeEnemies++;
+                    }
+                    if (Math.abs(e.pos.y - e.dropTargetY) > 1) anyEnemyMoving = true;
+                }
+            });
 
-
+            if (this.input_checkDefeat()) this.gameOver = true;
 
             // 更新和绘制弹丸
-        // 绘制弹丸
-        for (let i = this.projectiles.length - 1; i >= 0; i--) {
-            const p = this.projectiles[i];
-            if(p) p.draw(this.ctx);
-        }
-
+            for (let i = this.projectiles.length - 1; i >= 0; i--) { 
+                const p = this.projectiles[i]; 
+                if(p) { 
+                    p.update(this.width, this.height, this.enemies, (spawnInfo) => { this.spawn_spawnBullet(spawnInfo.x, spawnInfo.y, spawnInfo.vel, spawnInfo.config, p.shotId); }, timeScale); 
+                    p.draw(this.ctx); 
+                    if (p.destroyed) {
+                        // [修复] 当该shotId的所有子弹都销毁时，保存统计
+                        if (p.shotId !== null && this.shotDamageMap.has(p.shotId)) {
+                            const shotStats = this.shotDamageMap.get(p.shotId);
+                            shotStats.destroyedCount++;
+                            
+                            // 当所有子弹都销毁时，保存统计
+                            if (shotStats.destroyedCount >= shotStats.projectileCount && shotStats.total > 0) {
+                                this.shotDamageHistory.push({
+                                    total: shotStats.total,
+                                    byAttr: JSON.parse(JSON.stringify(shotStats.byAttr))
+                                });
+                                // 增加容量到 10 发子弹，方便查看
+                                if (this.shotDamageHistory.length > 10) {
+                                    this.shotDamageHistory.shift();
+                                }
+                                this.ui_updateDamageStats();
+                                this.shotDamageMap.delete(p.shotId);
+                            }
+                        }
+                        this.projectiles.splice(i, 1);
+                    } 
+                } 
+            }
 
             // 更新和绘制 FireWaves
-        // 绘制火焰波
-        for (let i = this.fireWaves.length - 1; i >= 0; i--) {
-            const fw = this.fireWaves[i];
-            fw.draw(this.ctx);
-        }
-
+            for (let i = this.fireWaves.length - 1; i >= 0; i--) {
+                const fw = this.fireWaves[i];
+                fw.update(timeScale);
+                fw.draw(this.ctx);
+                if (fw.life <= 0) this.fireWaves.splice(i, 1);
+            }
 
             // 更新和绘制特效
-        // 绘制粒子
-        for(let i=this.particles.length-1; i>=0; i--) { let p = this.particles[i]; if(p) p.draw(this.ctx); }
-        for(let i=this.shockwaves.length-1; i>=0; i--) { let s = this.shockwaves[i]; if(s) s.draw(this.ctx); }
-        for(let i=this.lightningBolts.length-1; i>=0; i--) { let b = this.lightningBolts[i]; b.draw(this.ctx); }
-        for(let i=this.spores.length-1; i>=0; i--) { let s = this.spores[i]; if(s) s.draw(this.ctx); }
+            for(let i=this.particles.length-1; i>=0; i--) { let p = this.particles[i]; if(p) { p.update(timeScale); p.draw(this.ctx); if(p.life <= 0) this.particles.splice(i,1); } } 
+            for(let i=this.shockwaves.length-1; i>=0; i--) { let s = this.shockwaves[i]; if(s) { s.update(timeScale); s.draw(this.ctx); if(s.alpha <= 0) this.shockwaves.splice(i,1); } } 
+            for(let i=this.lightningBolts.length-1; i>=0; i--) { let b = this.lightningBolts[i]; b.update(timeScale); b.draw(this.ctx); if(b.life <= 0) this.lightningBolts.splice(i,1); } 
+            for(let i=this.spores.length-1; i>=0; i--) { let s = this.spores[i]; if(s) { s.update(timeScale); s.draw(this.ctx); if(!s.active) this.spores.splice(i,1); } }
             if (this.swordQis) {
                 this.swordQis.forEach(qi => qi.draw(this.ctx));
             }
@@ -7761,8 +7708,10 @@ if (this.phase === 'truth_book') {
                 this.ctx.restore();
             }
 
+        this.sonSwords.forEach(s => s.update(timeScale, this.enemies, this));
         this.sonSwords.forEach(s => s.draw(this.ctx));
         // 清理不活跃的子剑
+        this.sonSwords = this.sonSwords.filter(s => s.active);
 
         this.ctx.restore(); // 结束实体层
 
@@ -7775,13 +7724,138 @@ if (this.phase === 'truth_book') {
                 this.runCurrency = 0;
             }
 
+            document.getElementById('combat-message').innerHTML = '<span class="text-red-400 font-bold text-4xl">防線失守</span><br><span class="text-sm">點擊返回主界面</span>'; 
             return; 
         }
 
+        if (activeEnemies === 0) {
+            const hasLeftoverAmmo = this.ammoQueue.length > 0;
+            if (hasLeftoverAmmo) {
+                console.log(">>> [LOG] 检测到全清场，自动结算剩余弹药");
+                const leftoverCount = this.ammoQueue.length;
+                const scoreMult = Math.pow(CONFIG.balance.unusedAmmoScoreMult, leftoverCount);
+                this.score *= scoreMult;
+                document.getElementById('score-num').innerText = this.score; 
+                this.nextRoundHpMultiplier = CONFIG.balance.nextRoundDifficultyMult;
+                showToast(`完美清場! 分數 x${scoreMult} | 下輪難度 UP!`);
+                audio.playPowerup();
+                this.ammoQueue = []; 
+                this.ui_updateAmmoUI();
+                this.ui_renderRecipeHUD();
+                this.data_clearProjectiles();
+            }
+        }
 
+        const playerTurnFinished = this.ammoQueue.length === 0 && 
+                                   this.projectiles.length === 0 && 
+                                   this.burstQueue.length === 0 &&
+                           !this.isVisualEffectActive;
+
+        if (playerTurnFinished && !this.gameOver) {
+            // 试炼场模式下，不自动进入敌人回合
+            if (this.phase === 'training') {
+                if (this.isEnemyTurn) {
+                    if (this.enemyWaveActive) return;
+                    if (anyEnemyMoving) {
+                        this.enemyTurnTimer = 0; 
+                        return;
+                    }
+                    this.enemyTurnTimer += this.timeScale;
+                    if (this.enemyTurnTimer > 60) { 
+                        this.isEnemyTurn = false;
+                        this.enemyTurnTimer = 0;
+                        this.enemies.forEach(e => e.hasActedThisTurn = false);
+                        return;
+                    }
+                }
+                return;
+            }
+
+            if (!this.isEnemyTurn) {
+                this.phase_enemy_startLogic();
+            } else {
+                if (this.enemyWaveActive) return;
+                if (anyEnemyMoving) {
+                    this.enemyTurnTimer = 0; 
+                    return;
+                }
+                this.enemyTurnTimer += this.timeScale;
+                if (this.enemyTurnTimer > 60) { 
+                    if (this.phase === 'training') {
+                        // 试炼场不进入下一阶段，只重置敌人回合状态
+                        this.isEnemyTurn = false;
+                        this.enemyTurnTimer = 0;
+                        this.enemies.forEach(e => e.hasActedThisTurn = false);
+                    } else {
+                        this.phase_finalizeRound(); 
+                    }
+                    return;
+                }
+            }
+            return;
+        }
+
+        if (this.ammoQueue.length === 0 && this.projectiles.length === 0 && this.burstQueue.length === 0 && !this.gameOver) { 
+            // 回合结束，风暴核心能量衰减
+            this.combat_wind_decayStormCoresEnergy();
+            document.getElementById('combat-message').innerHTML = '<div class="bg-black/50 p-4 rounded-xl backdrop-blur-md border border-blue-500/50 pointer-events-none"><span class="text-blue-300 font-bold text-xl block mb-2">彈藥耗盡</span><span class="text-sm text-slate-300">點擊收集新彈药</span></div>'; 
+        } else { 
+            if (!this.gameOver) document.getElementById('combat-message').innerHTML = ''; 
+        }
+        // --- 修改开始：调整层级，先画轨道，最后画炮台 ---
+        this.ctx.save();
+        // 应用与实体层相同的视差偏移
+        this.ctx.translate(entityShiftX, entityShiftY);
+        
+        // 警戒区已移动到实体层（LAYER 2）绘制
+
+        const startPos = new Vec2(this.width / 2, this.height - 80);
+        this.ctx.fillStyle = 'rgba(15, 23, 42, 0.8)'; // 深色半透明底 (Slate-900 80%)
+        this.ctx.beginPath();
+        this.ctx.arc(startPos.x, startPos.y, 22, 0, Math.PI * 2); // 半径比子弹稍大
+        this.ctx.fill();
+        let nextAmmo = this.ammoQueue.length > 0 ? this.ammoQueue[0] : null;
+
+        if (nextAmmo) {
+            const params = Projectile.calculateVisualParams(nextAmmo, false);
+            let previewRotation =  -Math.PI / 2;
+            let deformation = {x: 1, y: 1};
+            
+            if (this.isDragging) {
+                const force = this.dragStart.sub(this.dragCurrent);
+                if (force.mag() > 10) {
+                    previewRotation = Math.atan2(force.y, force.x) ;
+                    deformation = {x: 1.15, y: 0.85}; 
+                }
+            }
+            if (this.isChargingShot) {
+                const shake = Math.random() * 2; // 吸收时的剧烈抖动
+                startPos.x += (Math.random()-0.5) * shake;
+                startPos.y += (Math.random()-0.5) * shake;
+                // 核心随着能量吸收变大变亮
+                const absorbScale = 1.0 + this.chargeProgress * 0.3;
+                deformation.x *= absorbScale;
+                deformation.y *= absorbScale;
+            }
+
+            //先绘制轨道 (Orbitals) -> 这样它就在炮台下面
+            this.render_combat_launcherOrbitals(this.ctx, startPos.x, startPos.y, nextAmmo);
+
+            //后绘制炮台核心 (Visuals) -> 这样它就在上面
+            Projectile.drawVisuals(this.ctx, startPos.x, startPos.y, params.radius, nextAmmo, previewRotation, params.intensity, deformation);
+
+        } else {
+            // 空仓状态
+            this.ctx.fillStyle = '#1e293b';
+            this.ctx.beginPath();
+            this.ctx.arc(startPos.x, startPos.y, 10, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.strokeStyle = '#475569';
+            this.ctx.stroke();
+        }
+        this.ctx.restore();
+        
     }
-
-
 
 
     /**
