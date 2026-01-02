@@ -1472,17 +1472,9 @@ if (this.phase === 'truth_book') {
      * [RENDER] 清理画布并绘制背景色。
      */
     render_clearCanvas() {
-        // 如果摄像机正在移动，使用半透明填充产生拖影效果
-        if (this.camera && this.camera.isMoving && this.phase === 'combat') {
-            // 使用半透明黑色填充，保留上一帧的画面
-            this.ctx.fillStyle = 'rgba(2, 6, 23, 0.3)'; // 透明度越低，拖影越长
-            this.ctx.fillRect(0, 0, this.width, this.height);
-        } else {
-            // 正常情况下完全清除
-            this.ctx.clearRect(0, 0, this.width, this.height);
-            this.ctx.fillStyle = CONFIG.colors.bg;
-            this.ctx.fillRect(0, 0, this.width, this.height);
-        }
+        this.ctx.clearRect(0, 0, this.width, this.height);
+        this.ctx.fillStyle = CONFIG.colors.bg;
+        this.ctx.fillRect(0, 0, this.width, this.height);
     }
 
     /**
