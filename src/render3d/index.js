@@ -10,6 +10,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
 import { CameraController, CameraPreset } from './camera.js';
 import { EnemyRenderer3D } from './entities/enemy.js';
+import { SceneManager } from './scene.js';
 
 export class RenderSystem3D {
     /**
@@ -49,9 +50,9 @@ export class RenderSystem3D {
      * 初始化three.js场景、渲染器、摄像机
      */
     initThreeJS() {
-        // 创建场景
-        this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x1a1a2e); // 深蓝色背景
+        // 使用SceneManager创建和管理场景
+        this.sceneManager = new SceneManager();
+        this.scene = this.sceneManager.getScene();
         
         // 创建摄像机控制器
         const aspect = window.innerWidth / window.innerHeight;
@@ -65,16 +66,9 @@ export class RenderSystem3D {
         });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.shadowMap.enabled = true; // 启用阴影
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // 柔和阴影
         this.container.appendChild(this.renderer.domElement);
-        
-        // 添加环境光
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        this.scene.add(ambientLight);
-        
-        // 添加方向光
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(5, 10, 7.5);
-        this.scene.add(directionalLight);
         
         // 监听窗口大小变化
         window.addEventListener('resize', () => this.onWindowResize());
@@ -92,12 +86,10 @@ export class RenderSystem3D {
             roughness: 0.4
         });
         this.testCube = new THREE.Mesh(geometry, material);
-        this.testCube.position.set(0, 0, 0);
+        this.testCube.position.set(0, 1, 0); // 抬高到地板上方
+        this.testCube.castShadow = true; // 投射阴影
+        this.testCube.receiveShadow = true; // 接收阴影
         this.scene.add(this.testCube);
-        
-        // 添加网格辅助线
-        const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
-        this.scene.add(gridHelper);
     }
     
     /**
@@ -313,6 +305,7 @@ export class RenderSystem3D {
     update(deltaTime = 0.016) {
         if (!this.enabled) return;
         
+<<<<<<< HEAD
         // 更新摄像机控制器
         if (this.cameraController) {
             this.cameraController.update();
@@ -322,6 +315,13 @@ export class RenderSystem3D {
         this.syncProjectiles();
         this.syncParticles();
         
+=======
+        // 更新场景管理器
+        if (this.sceneManager) {
+            this.sceneManager.update(deltaTime);
+        }
+        
+>>>>>>> 7d102b8 (feat: 实现SceneManager场景管理器 (Task 2.1))
         // 旋转测试立方体
         if (this.testCube) {
             this.testCube.rotation.x += 0.01;
@@ -471,8 +471,15 @@ export class RenderSystem3D {
     dispose() {
         console.log('[RenderSystem3D] 销毁渲染系统');
         
+<<<<<<< HEAD
         // 清理所有敌人渲染器
         this.clearEnemyRenderers();
+=======
+        // 清理场景管理器
+        if (this.sceneManager) {
+            this.sceneManager.dispose();
+        }
+>>>>>>> 7d102b8 (feat: 实现SceneManager场景管理器 (Task 2.1))
         
         // 清理three.js资源
         if (this.renderer) {
