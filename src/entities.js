@@ -2288,12 +2288,46 @@ class Enemy {
              }
         }
 
-        // 检测是否需要跳跃 (前方受阻)
+        // 检测是否需要跳跃 (四个方向都被阻挡但跳跃可行)
         if (!this.actionIcon && this.affixes.includes('jump')) {
-            let moveAmount = game.enemyHeight;
-            const targetY = this.dropTargetY + moveAmount;
-            const isBlocked = game.calc_isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
-            if (isBlocked) {
+            const directions = [
+                { dx: 0, dy: game.enemyHeight },
+                { dx: 0, dy: -game.enemyHeight },
+                { dx: -game.enemyWidth, dy: 0 },
+                { dx: game.enemyWidth, dy: 0 }
+            ];
+            
+            let allBlocked = true;
+            let canJump = false;
+            
+            for (let dir of directions) {
+                const targetX = this.pos.x + dir.dx;
+                const targetY = this.dropTargetY + dir.dy;
+                
+                // 检查边界
+                if (targetX < game.enemyWidth/2 || targetX > game.width - game.enemyWidth/2) continue;
+                if (targetY < 0) continue;
+                
+                const isBlocked = game.calc_isAreaOccupied(targetX, targetY, this.width * 0.8, this.height * 0.8, this);
+                
+                if (!isBlocked) {
+                    allBlocked = false;
+                    break;
+                } else {
+                    // 检查跳跃是否可行
+                    const jumpX = this.pos.x + dir.dx * 2;
+                    const jumpY = this.dropTargetY + dir.dy * 2;
+                    
+                    if (jumpX >= game.enemyWidth/2 && jumpX <= game.width - game.enemyWidth/2 && jumpY >= 0) {
+                        const isJumpBlocked = game.calc_isAreaOccupied(jumpX, jumpY, this.width * 0.8, this.height * 0.8, this);
+                        if (!isJumpBlocked) {
+                            canJump = true;
+                        }
+                    }
+                }
+            }
+            
+            if (allBlocked && canJump) {
                 this.actionIcon = '🦘'; this.actionName = '跳躍';
             }
         }
@@ -2390,71 +2424,106 @@ class Enemy {
                 game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡DOUBLE!", "#facc15");
             }
 
-            // --- 移动与跳跃 ---
-            let moveAmount = game.enemyHeight;
-            const targetY = this.dropTargetY + moveAmount;
-            const isBlocked = game.calc_isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
+            // --- 四向移动系统：总是向player移动 ---
+            this.performOptimalMove(game, i === 0);
+        }
+        
+        this.hasActedThisTurn = true;
+    }
 
-            // --- 横向移动逻辑：当与player同行时，接近player ---
-            if (game.player) {
-                const playerRow = Math.floor((game.player.pos.y) / game.enemyHeight);
-                const enemyRow = Math.floor(this.dropTargetY / game.enemyHeight);
-                
-                // 如果在同一行，尝试横向移动接近player
-                if (playerRow === enemyRow) {
-                    const playerX = game.player.pos.x;
-                    const enemyX = this.pos.x;
-                    const horizontalDist = Math.abs(playerX - enemyX);
-                    
-                    // 只有当横向距离超过半个网格宽度时才移动
-                    if (horizontalDist > game.enemyWidth / 2) {
-                        const moveDir = playerX > enemyX ? 1 : -1;
-                        const horizontalMove = game.enemyWidth * moveDir;
-                        const targetX = this.pos.x + horizontalMove;
-                        
-                        // 检查横向移动是否被阻挡
-                        const isHorizontalBlocked = game.calc_isAreaOccupied(targetX, this.dropTargetY, this.width * 0.8, this.height * 0.8, this);
-                        
-                        if (!isHorizontalBlocked && targetX > 0 && targetX < game.width) {
-                            // 执行横向移动
-                            this.pos.x = targetX;
-                            game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "→", "#fbbf24");
-                            game.spawn_createParticle(this.pos.x, this.pos.y, '#fbbf24', 'spark');
-                            // 横向移动后不再纵向移动，直接跳过后续纵向移动逻辑
-                            continue;
-                        }
-                    }
-                }
-            }
-
+    /**
+     * 执行最优移动：选择能最接近player的移动方向
+     * @param {Game} game - 游戏实例
+     * @param {boolean} showFeedback - 是否显示视觉反馈
+     */
+    performOptimalMove(game, showFeedback = true) {
+        if (!game.player) return;
+        
+        const afx = CONFIG.balance.affixes;
+        const playerPos = game.player.pos;
+        const currentPos = new Vec2(this.pos.x, this.dropTargetY);
+        
+        // 计算当前到player的距离
+        const currentDist = Math.abs(currentPos.x - playerPos.x) + Math.abs(currentPos.y - playerPos.y);
+        
+        // 定义四个方向：上、下、左、右
+        const directions = [
+            { name: 'down', dx: 0, dy: game.enemyHeight, icon: '↓' },
+            { name: 'up', dx: 0, dy: -game.enemyHeight, icon: '↑' },
+            { name: 'left', dx: -game.enemyWidth, dy: 0, icon: '←' },
+            { name: 'right', dx: game.enemyWidth, dy: 0, icon: '→' }
+        ];
+        
+        let bestMove = null;
+        let bestDist = currentDist;
+        let bestIsJump = false;
+        
+        // 尝试所有可能的移动方向
+        for (let dir of directions) {
+            // 1. 尝试普通移动（1格）
+            const targetX = this.pos.x + dir.dx;
+            const targetY = this.dropTargetY + dir.dy;
+            
+            // 检查边界
+            if (targetX < game.enemyWidth/2 || targetX > game.width - game.enemyWidth/2) continue;
+            if (targetY < 0) continue; // 不能向上移出屏幕
+            
+            // 检查碰撞
+            const isBlocked = game.calc_isAreaOccupied(targetX, targetY, this.width * 0.8, this.height * 0.8, this);
+            
             if (!isBlocked) {
-                this.advance(moveAmount);
-            } else {
-                if (this.affixes.includes('jump')) {
-                    const jumpTargetY = this.dropTargetY + (moveAmount * afx.jumpRows);
-                    const isJumpBlocked = game.calc_isAreaOccupied(this.pos.x, jumpTargetY, this.width * 0.8, this.height * 0.8, this);
-                    if (!isJumpBlocked) {
-                        this.advance(moveAmount * 2);
-                        this.bumpOffsetY = -30; 
-                        game.spawn_createFloatingText(this.pos.x, this.pos.y, "JUMP!", "#38bdf8");
-                        game.spawn_createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist'); 
-                        audio.playEffect('split');
-                    } else {
-                        if (i === 0) {
-                            this.bumpOffsetY = -10;
-                            if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "⛔ BLOCKED", "#ef4444");
-                        }
-                    }
-                } else {
-                    if (i === 0) {
-                        this.bumpOffsetY = -10;
-                        if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "⛔ BLOCKED", "#ef4444");
+                // 计算移动后的距离
+                const newDist = Math.abs(targetX - playerPos.x) + Math.abs(targetY - playerPos.y);
+                if (newDist < bestDist) {
+                    bestDist = newDist;
+                    bestMove = { x: targetX, y: targetY, dir: dir, isJump: false };
+                }
+            } else if (this.affixes.includes('jump')) {
+                // 2. 如果被阻挡且有跳跃技能，尝试跳跃2格
+                const jumpX = this.pos.x + dir.dx * 2;
+                const jumpY = this.dropTargetY + dir.dy * 2;
+                
+                // 检查边界
+                if (jumpX < game.enemyWidth/2 || jumpX > game.width - game.enemyWidth/2) continue;
+                if (jumpY < 0) continue;
+                
+                const isJumpBlocked = game.calc_isAreaOccupied(jumpX, jumpY, this.width * 0.8, this.height * 0.8, this);
+                
+                if (!isJumpBlocked) {
+                    const newDist = Math.abs(jumpX - playerPos.x) + Math.abs(jumpY - playerPos.y);
+                    if (newDist < bestDist) {
+                        bestDist = newDist;
+                        bestMove = { x: jumpX, y: jumpY, dir: dir, isJump: true };
                     }
                 }
             }
         }
         
-        this.hasActedThisTurn = true;
+        // 执行最优移动
+        if (bestMove) {
+            this.pos.x = bestMove.x;
+            this.dropTargetY = bestMove.y;
+            
+            if (showFeedback) {
+                if (bestMove.isJump) {
+                    this.bumpOffsetY = -30;
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y, "JUMP!", "#38bdf8");
+                    game.spawn_createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist');
+                    audio.playEffect('split');
+                } else {
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, bestMove.dir.icon, "#fbbf24");
+                    game.spawn_createParticle(this.pos.x, this.pos.y, '#fbbf24', 'spark');
+                }
+            }
+        } else {
+            // 所有方向都被阻挡
+            if (showFeedback) {
+                this.bumpOffsetY = -10;
+                if (Math.random() < 0.3) {
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "⛔ BLOCKED", "#ef4444");
+                }
+            }
+        }
     }
 
     performTurnActionAndMove(game) {
