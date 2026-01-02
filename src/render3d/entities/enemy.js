@@ -7,6 +7,7 @@
  * - 实现温度变色效果
  * - 实现生成弹出动画
  * - 实现死亡下沉动画
+ * - 使用"地板平面 + 立方体"结构（Task 3.3）
  */
 
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
@@ -36,6 +37,9 @@ export class Enemy3D {
         // === 震动效果 ===
         this.shakeOffset = new THREE.Vector3(0, 0, 0);
         
+        // 创建THREE.Group容器，用于组合地板和立方体
+        this.group = new THREE.Group();
+        
         // 创建3D网格
         this.createMesh();
         
@@ -47,16 +51,50 @@ export class Enemy3D {
     }
     
     /**
-     * 创建3D网格（立方体）
+     * 创建3D网格（地板平面 + 立方体）
      */
     createMesh() {
         // 根据2D敌人的尺寸创建立方体
-        const width = this.enemy2D.width / 10; // 缩放到合适的3D尺寸
-        const height = this.enemy2D.height / 10;
+        const width = this.enemy2D.width / 50; // 缩放到合适的3D尺寸
+        const height = this.enemy2D.height / 50;
         const depth = Math.min(width, height); // 深度取宽高的较小值
         
-        // 创建立方体几何体
-        const geometry = new THREE.BoxGeometry(width, height, depth);
+        // === 1. 创建地板平面 ===
+        const floorWidth = width;
+        const floorDepth = depth;
+        const floorGeometry = new THREE.PlaneGeometry(floorWidth, floorDepth);
+        
+        // 地板材质 - 使用深色半透明
+        const floorMaterial = new THREE.MeshStandardMaterial({
+            color: 0x333333,
+            transparent: true,
+            opacity: 0.6,
+            side: THREE.DoubleSide,
+            metalness: 0.2,
+            roughness: 0.8
+        });
+        
+        this.floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+        // 旋转地板使其水平
+        this.floorMesh.rotation.x = -Math.PI / 2;
+        this.floorMesh.position.y = 0; // 地板在底部
+        
+        this.group.add(this.floorMesh);
+        
+        // === 2. 创建立方体几何体（敌人主体）===
+        const cubeSize = Math.min(width, height) * 0.8; // 立方体略小于地板
+        const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+        
+        // 根据敌人类型选择初始颜色
+        let cubeColor = 0x475569; // 默认灰色
+        if (this.enemy2D.type === 'elite') {
+            cubeColor = 0x581c87; // 精英敌人 - 紫色
+        } else if (this.enemy2D.type === 'boss') {
+            cubeColor = 0x7f1d1d; // Boss - 深红色
+        }
+        
+        this.currentColor = new THREE.Color(cubeColor);
+        this.targetColor = new THREE.Color(cubeColor);
         
         // 创建材质
         this.material = new THREE.MeshStandardMaterial({
@@ -64,27 +102,45 @@ export class Enemy3D {
             metalness: 0.3,
             roughness: 0.4,
             transparent: true,
-            opacity: 1.0
+            opacity: 1.0,
+            emissive: cubeColor,
+            emissiveIntensity: 0.2
         });
         
         // 创建网格
         this.mesh = new THREE.Mesh(geometry, this.material);
         
+        // 立方体位于地板上方
+        this.mesh.position.y = cubeSize / 2;
+        
+        this.group.add(this.mesh);
+        
+        // === 3. 添加边缘线框（增强视觉效果）===
+        const edgesGeometry = new THREE.EdgesGeometry(geometry);
+        const edgesMaterial = new THREE.LineBasicMaterial({ 
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.3
+        });
+        this.edgesMesh = new THREE.LineSegments(edgesGeometry, edgesMaterial);
+        this.edgesMesh.position.y = cubeSize / 2;
+        this.group.add(this.edgesMesh);
+        
         // 设置初始位置（从2D位置转换）
         this.updatePosition();
         
         // 初始缩放为0（用于生成动画）
-        this.mesh.scale.set(0, 0, 0);
+        this.group.scale.set(0, 0, 0);
         
         // 添加到场景
-        this.scene.add(this.mesh);
+        this.scene.add(this.group);
     }
     
     /**
      * 更新3D位置（从2D位置同步）
      */
     updatePosition() {
-        if (!this.mesh) return;
+        if (!this.group) return;
         
         // 将2D Canvas坐标转换为3D世界坐标
         // 假设Canvas中心对应3D世界原点
@@ -92,7 +148,7 @@ export class Enemy3D {
         const y = -(this.enemy2D.pos.y - 300) / 50; // Y轴翻转，300是Canvas高度的一半
         const z = 0;
         
-        this.mesh.position.set(x, y, z);
+        this.group.position.set(x, y, z);
     }
     
     /**
@@ -212,12 +268,12 @@ export class Enemy3D {
         const t = this.easeOutElastic(this.spawnAnimProgress);
         
         // 缩放动画：从0放大到1
-        this.mesh.scale.set(t, t, t);
+        this.group.scale.set(t, t, t);
         
         // 位置动画：从上方弹出
         const baseY = -(this.enemy2D.pos.y - 300) / 50;
         const offsetY = (1 - this.spawnAnimProgress) * 5; // 从上方5个单位开始
-        this.mesh.position.y = baseY + offsetY;
+        this.group.position.y = baseY + offsetY;
     }
     
     /**
@@ -242,12 +298,12 @@ export class Enemy3D {
         
         // 缩放动画：逐渐缩小
         const scale = 1 - t * 0.5; // 缩小到50%
-        this.mesh.scale.set(scale, scale, scale);
+        this.group.scale.set(scale, scale, scale);
         
         // 位置动画：向下沉降
         const baseY = -(this.enemy2D.pos.y - 300) / 50;
         const offsetY = -t * 8; // 下沉8个单位
-        this.mesh.position.y = baseY + offsetY;
+        this.group.position.y = baseY + offsetY;
         
         // 透明度动画：逐渐消失
         this.material.opacity = 1 - t;
@@ -292,9 +348,9 @@ export class Enemy3D {
      * @param {number} deltaTime - 帧间隔时间
      */
     update(deltaTime) {
-        if (!this.mesh || !this.enemy2D.active) {
+        if (!this.group || !this.enemy2D.active) {
             // 如果2D敌人已经不活跃，触发死亡动画
-            if (!this.isDying && this.mesh) {
+            if (!this.isDying && this.group) {
                 this.triggerDeath();
             }
         }
@@ -315,7 +371,7 @@ export class Enemy3D {
         
         // 应用震动偏移
         if (this.shakeOffset.length() > 0.001) {
-            this.mesh.position.add(this.shakeOffset);
+            this.group.position.add(this.shakeOffset);
         }
         
         // 更新受击闪烁
@@ -334,12 +390,20 @@ export class Enemy3D {
      * 销毁3D实体
      */
     destroy() {
-        if (this.mesh) {
-            this.scene.remove(this.mesh);
-            this.mesh.geometry.dispose();
-            this.mesh.material.dispose();
+        if (this.group) {
+            // 清理所有子对象
+            this.group.traverse((child) => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            });
+            
+            this.scene.remove(this.group);
+            this.group = null;
             this.mesh = null;
         }
         console.log('[Enemy3D] 销毁敌人3D实体');
     }
 }
+
+// 导出别名以兼容旧代码
+export { Enemy3D as EnemyRenderer3D };

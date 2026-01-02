@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enemy 3D Renderer Test</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: sans-serif;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>敌人3D渲染器测试</h3>
+        <p>按键说明：</p>
+        <ul>
+            <li>空格键 - 切换2D/3D模式</li>
+            <li>数字1-3 - 生成不同类型敌人</li>
+            <li>C键 - 清除所有敌人</li>
+            <li>D键 - 对第一个敌人造成伤害</li>
+        </ul>
+        <p id="status">当前模式: 2D</p>
+        <p id="count">敌人数量: 0</p>
+    </div>
+    
+    <canvas id="canvas2d" width="800" height="600" style="position: absolute; top: 0; left: 0;"></canvas>
+    
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+        import { EnemyRenderer3D } from './src/render3d/entities/enemy.js';
+        
+        // 简化的Enemy类用于测试
+        class TestEnemy {
+            constructor(x, y, type = 'normal') {
+                this.pos = { x, y };
+                this.width = 60;
+                this.height = 60;
+                this.hp = 100;
+                this.maxHp = 100;
+                this.type = type;
+                this.active = true;
+                this.hitTimer = 0;
+                this.visualSeed = Math.random();
+            }
+            
+            update() {
+                if (this.hitTimer > 0) this.hitTimer--;
+            }
+            
+            takeDamage(amount) {
+                this.hp -= amount;
+                this.hitTimer = 10;
+                if (this.hp <= 0) {
+                    this.hp = 0;
+                    this.active = false;
+                }
+            }
+        }
+        
+        // 初始化2D Canvas
+        const canvas = document.getElementById('canvas2d');
+        const ctx = canvas.getContext('2d');
+        
+        // 初始化3D场景
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a2e);
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 5, 10);
+        camera.lookAt(0, 0, 0);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.domElement.style.position = 'absolute';
+        renderer.domElement.style.top = '0';
+        renderer.domElement.style.left = '0';
+        renderer.domElement.style.display = 'none';
+        document.body.appendChild(renderer.domElement);
+        
+        // 添加光照
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 7.5);
+        scene.add(directionalLight);
+        
+        // 添加网格
+        const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
+        scene.add(gridHelper);
+        
+        // 游戏状态
+        let is3DMode = false;
+        const enemies = [];
+        const enemyRenderers = [];
+        
+        // 切换2D/3D模式
+        function toggle3D() {
+            is3DMode = !is3DMode;
+            if (is3DMode) {
+                canvas.style.opacity = '0.3';
+                renderer.domElement.style.display = 'block';
+                document.getElementById('status').textContent = '当前模式: 3D';
+            } else {
+                canvas.style.opacity = '1';
+                renderer.domElement.style.display = 'none';
+                document.getElementById('status').textContent = '当前模式: 2D';
+            }
+        }
+        
+        // 生成敌人
+        function spawnEnemy(type = 'normal') {
+            const x = 200 + Math.random() * 400;
+            const y = 150 + Math.random() * 300;
+            const enemy = new TestEnemy(x, y, type);
+            enemies.push(enemy);
+            
+            // 创建3D渲染器
+            const renderer3d = new EnemyRenderer3D(enemy, scene);
+            enemyRenderers.push(renderer3d);
+            
+            updateCount();
+        }
+        
+        // 清除所有敌人
+        function clearEnemies() {
+            enemyRenderers.forEach(r => r.dispose());
+            enemyRenderers.length = 0;
+            enemies.length = 0;
+            updateCount();
+        }
+        
+        // 更新计数显示
+        function updateCount() {
+            document.getElementById('count').textContent = `敌人数量: ${enemies.length}`;
+        }
+        
+        // 键盘事件
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                toggle3D();
+            } else if (e.code === 'Digit1') {
+                spawnEnemy('normal');
+            } else if (e.code === 'Digit2') {
+                spawnEnemy('elite');
+            } else if (e.code === 'Digit3') {
+                spawnEnemy('boss');
+            } else if (e.code === 'KeyC') {
+                clearEnemies();
+            } else if (e.code === 'KeyD') {
+                // 测试伤害
+                if (enemies.length > 0) {
+                    enemies[0].takeDamage(20);
+                }
+            }
+        });
+        
+        // 2D渲染
+        function render2D() {
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            enemies.forEach(enemy => {
+                // 绘制敌人
+                let color = '#ff4444';
+                if (enemy.type === 'elite') color = '#ffaa00';
+                if (enemy.type === 'boss') color = '#aa00ff';
+                
+                ctx.fillStyle = color;
+                ctx.fillRect(enemy.pos.x - enemy.width/2, enemy.pos.y - enemy.height/2, enemy.width, enemy.height);
+                
+                // 绘制血条
+                const barWidth = enemy.width;
+                const barHeight = 5;
+                const hpRatio = enemy.hp / enemy.maxHp;
+                
+                ctx.fillStyle = '#333';
+                ctx.fillRect(enemy.pos.x - barWidth/2, enemy.pos.y - enemy.height/2 - 10, barWidth, barHeight);
+                
+                ctx.fillStyle = '#00ff00';
+                ctx.fillRect(enemy.pos.x - barWidth/2, enemy.pos.y - enemy.height/2 - 10, barWidth * hpRatio, barHeight);
+            });
+        }
+        
+        // 主循环
+        let lastTime = performance.now();
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const currentTime = performance.now();
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+            
+            // 更新敌人
+            enemies.forEach(e => e.update());
+            
+            // 更新3D渲染器
+            enemyRenderers.forEach(r => r.update(deltaTime));
+            
+            // 渲染
+            render2D();
+            if (is3DMode) {
+                renderer.render(scene, camera);
+            }
+        }
+        
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // 启动
+        console.log('Enemy 3D Renderer Test Started');
+        spawnEnemy('normal');
+        spawnEnemy('elite');
+        spawnEnemy('boss');
+        animate();
+    </script>
+</body>
+</html>
