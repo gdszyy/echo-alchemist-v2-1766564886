@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>敌人视觉效果测试 - Echo Alchemist</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 100;
+            max-width: 300px;
+        }
+        
+        #info-panel h2 {
+            margin-bottom: 15px;
+            color: #00ff88;
+            font-size: 18px;
+        }
+        
+        #info-panel button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            background: #00ff88;
+            color: #1a1a2e;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        #info-panel button:hover {
+            background: #00cc6a;
+            transform: translateY(-2px);
+        }
+        
+        #info-panel button:active {
+            transform: translateY(0);
+        }
+        
+        #info-panel .status {
+            margin: 10px 0;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            font-size: 12px;
+        }
+        
+        #info-panel .status span {
+            color: #fbbf24;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="info-panel">
+        <h2>🎮 敌人视觉效果测试</h2>
+        <div class="status">
+            <div>模式: <span id="mode-status">2D</span></div>
+            <div>敌人数量: <span id="enemy-count">0</span></div>
+        </div>
+        <button onclick="toggleMode()">切换 2D/3D 模式</button>
+        <button onclick="testHitFlash()">测试受击闪烁</button>
+        <button onclick="testTemperatureHot()">测试高温变色</button>
+        <button onclick="testTemperatureCold()">测试低温变色</button>
+        <button onclick="testSpawnAnimation()">测试生成动画</button>
+        <button onclick="testDeathAnimation()">测试死亡动画</button>
+        <button onclick="resetTest()">重置测试</button>
+    </div>
+    
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+        import { Enemy3D } from './src/render3d/entities/enemy.js';
+        
+        // 模拟2D敌人类
+        class MockEnemy2D {
+            constructor(x, y, width, height, hp, maxHp) {
+                this.pos = { x, y };
+                this.width = width;
+                this.height = height;
+                this.hp = hp;
+                this.maxHp = maxHp;
+                this.active = true;
+                this.type = 'normal';
+                this.temp = 0;
+                this.hitTimer = 0;
+            }
+        }
+        
+        // 初始化3D场景
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a2e);
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 5, 15);
+        camera.lookAt(0, 0, 0);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+        
+        // 添加光照
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 7.5);
+        scene.add(directionalLight);
+        
+        // 添加网格辅助线
+        const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
+        scene.add(gridHelper);
+        
+        // 创建测试敌人
+        let testEnemy2D = null;
+        let testEnemy3D = null;
+        let is3DMode = false;
+        
+        function createTestEnemy() {
+            // 创建2D敌人
+            testEnemy2D = new MockEnemy2D(400, 300, 100, 80, 100, 100);
+            
+            // 创建3D敌人
+            testEnemy3D = new Enemy3D(testEnemy2D, scene);
+            
+            updateEnemyCount();
+        }
+        
+        function updateEnemyCount() {
+            document.getElementById('enemy-count').textContent = testEnemy3D ? '1' : '0';
+        }
+        
+        // 全局函数
+        window.toggleMode = function() {
+            is3DMode = !is3DMode;
+            document.getElementById('mode-status').textContent = is3DMode ? '3D' : '2D';
+            console.log('切换到', is3DMode ? '3D' : '2D', '模式');
+        };
+        
+        window.testHitFlash = function() {
+            if (!testEnemy3D) {
+                alert('请先创建敌人！');
+                return;
+            }
+            console.log('测试受击闪烁效果');
+            testEnemy3D.triggerHitFlash();
+        };
+        
+        window.testTemperatureHot = function() {
+            if (!testEnemy2D) {
+                alert('请先创建敌人！');
+                return;
+            }
+            console.log('测试高温变色效果');
+            testEnemy2D.temp = 34; // 设置高温
+        };
+        
+        window.testTemperatureCold = function() {
+            if (!testEnemy2D) {
+                alert('请先创建敌人！');
+                return;
+            }
+            console.log('测试低温变色效果');
+            testEnemy2D.temp = -34; // 设置低温
+        };
+        
+        window.testSpawnAnimation = function() {
+            console.log('测试生成动画');
+            resetTest();
+            createTestEnemy();
+        };
+        
+        window.testDeathAnimation = function() {
+            if (!testEnemy3D) {
+                alert('请先创建敌人！');
+                return;
+            }
+            console.log('测试死亡动画');
+            testEnemy3D.triggerDeath();
+        };
+        
+        window.resetTest = function() {
+            console.log('重置测试');
+            if (testEnemy3D) {
+                testEnemy3D.destroy();
+                testEnemy3D = null;
+            }
+            testEnemy2D = null;
+            updateEnemyCount();
+        };
+        
+        // 初始化
+        createTestEnemy();
+        
+        // 动画循环
+        let lastTime = performance.now();
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const currentTime = performance.now();
+            const deltaTime = (currentTime - lastTime) / 1000; // 转换为秒
+            lastTime = currentTime;
+            
+            // 更新3D敌人
+            if (testEnemy3D && is3DMode) {
+                testEnemy3D.update(deltaTime);
+            }
+            
+            // 渲染场景
+            if (is3DMode) {
+                renderer.render(scene, camera);
+            }
+        }
+        
+        animate();
+        
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        console.log('敌人视觉效果测试系统已启动');
+    </script>
+</body>
+</html>

@@ -5,9 +5,11 @@
  * - 管理three.js场景、渲染器、摄像机
  * - 提供2D/3D模式切换
  * - 在游戏主循环中更新3D场景
+ * - 管理敌人3D实体
  */
 
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+import { Enemy3D } from './entities/enemy.js';
 
 export class RenderSystem3D {
     /**
@@ -17,6 +19,9 @@ export class RenderSystem3D {
     constructor(game) {
         this.game = game;
         this.enabled = false; // 3D渲染是否启用
+        
+        // 敌人3D实体管理
+        this.enemies3D = new Map(); // key: enemy2D实例, value: Enemy3D实例
         
         // 创建3D Canvas容器
         this.container = document.createElement('div');
@@ -110,11 +115,60 @@ export class RenderSystem3D {
     }
     
     /**
+     * 同步2D敌人到3D场景
+     */
+    syncEnemies() {
+        if (!this.game.enemies) return;
+        
+        // 遍历2D敌人列表
+        for (const enemy2D of this.game.enemies) {
+            if (enemy2D.active) {
+                // 如果该敌人还没有3D实体，创建一个
+                if (!this.enemies3D.has(enemy2D)) {
+                    const enemy3D = new Enemy3D(enemy2D, this.scene);
+                    this.enemies3D.set(enemy2D, enemy3D);
+                    console.log('[RenderSystem3D] 创建新的敌人3D实体');
+                }
+            } else {
+                // 如果2D敌人已经不活跃，触发3D实体的死亡动画
+                const enemy3D = this.enemies3D.get(enemy2D);
+                if (enemy3D && !enemy3D.isDying) {
+                    enemy3D.triggerDeath();
+                }
+            }
+        }
+        
+        // 清理已销毁的3D实体
+        for (const [enemy2D, enemy3D] of this.enemies3D.entries()) {
+            if (!enemy3D.mesh) {
+                this.enemies3D.delete(enemy2D);
+                console.log('[RenderSystem3D] 清理已销毁的敌人3D实体');
+            }
+        }
+    }
+    
+    /**
+     * 更新所有敌人3D实体
+     * @param {number} deltaTime - 帧间隔时间
+     */
+    updateEnemies(deltaTime) {
+        for (const enemy3D of this.enemies3D.values()) {
+            enemy3D.update(deltaTime);
+        }
+    }
+    
+    /**
      * 更新3D场景（每帧调用）
      * @param {number} deltaTime - 帧间隔时间
      */
     update(deltaTime = 0.016) {
         if (!this.enabled) return;
+        
+        // 同步敌人
+        this.syncEnemies();
+        
+        // 更新敌人3D实体
+        this.updateEnemies(deltaTime);
         
         // 旋转测试立方体
         if (this.testCube) {
@@ -163,6 +217,12 @@ export class RenderSystem3D {
      */
     dispose() {
         console.log('[RenderSystem3D] 销毁渲染系统');
+        
+        // 清理所有敌人3D实体
+        for (const enemy3D of this.enemies3D.values()) {
+            enemy3D.destroy();
+        }
+        this.enemies3D.clear();
         
         // 清理three.js资源
         if (this.renderer) {
