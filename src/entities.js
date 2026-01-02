@@ -2001,6 +2001,11 @@ class Enemy {
         this.telegraphTimer = 0;   // 预警倒计时
         this.actionIcon = '';      // 即将触发的动作图标
         this.actionName = '';      // 动作名称
+        
+        // --- [新增] 长短距离方向系统 ---
+        this.primaryAxis = null;    // 长距离方向：'horizontal' 或 'vertical'
+        this.secondaryAxis = null;  // 短距离方向：'horizontal' 或 'vertical'
+        this.spawnPos = new Vec2(x, y); // 记录生成位置，用于后续计算
 
         this.swordMarks = 0; // 剑痕标记层数
         this.markTimer = 0;  // 标记持续时间
@@ -2432,74 +2437,97 @@ class Enemy {
     }
 
     /**
-     * 执行最优移动：选择能最接近player的移动方向
+     * 初始化长短距离方向（第一次移动时调用）
+     * @param {Game} game - 游戏实例
+     */
+    initializeMoveAxes(game) {
+        if (!game.player || this.primaryAxis !== null) return;
+        
+        const playerPos = game.player.pos;
+        const dx = Math.abs(this.spawnPos.x - playerPos.x);
+        const dy = Math.abs(this.spawnPos.y - playerPos.y);
+        
+        if (dx > dy) {
+            this.primaryAxis = 'horizontal';  // 横向为长距离方向
+            this.secondaryAxis = 'vertical';   // 纵向为短距离方向
+        } else {
+            this.primaryAxis = 'vertical';     // 纵向为长距离方向
+            this.secondaryAxis = 'horizontal';  // 横向为短距离方向
+        }
+    }
+    
+    /**
+     * 执行最优移动：优先选择长距离方向
      * @param {Game} game - 游戏实例
      * @param {boolean} showFeedback - 是否显示视觉反馈
      */
     performOptimalMove(game, showFeedback = true) {
         if (!game.player) return;
         
+        // 第一次移动时初始化长短距离方向
+        this.initializeMoveAxes(game);
+        
         const afx = CONFIG.balance.affixes;
         const playerPos = game.player.pos;
-        const currentPos = new Vec2(this.pos.x, this.dropTargetY);
         
-        // 计算当前到player的距离
-        const currentDist = Math.abs(currentPos.x - playerPos.x) + Math.abs(currentPos.y - playerPos.y);
+        // 定义四个方向
+        const directions = {
+            horizontal: [
+                { name: 'left', dx: -game.enemyWidth, dy: 0, icon: '←', axis: 'horizontal' },
+                { name: 'right', dx: game.enemyWidth, dy: 0, icon: '→', axis: 'horizontal' }
+            ],
+            vertical: [
+                { name: 'down', dx: 0, dy: game.enemyHeight, icon: '↓', axis: 'vertical' },
+                { name: 'up', dx: 0, dy: -game.enemyHeight, icon: '↑', axis: 'vertical' }
+            ]
+        };
         
-        // 定义四个方向：上、下、左、右
-        const directions = [
-            { name: 'down', dx: 0, dy: game.enemyHeight, icon: '↓' },
-            { name: 'up', dx: 0, dy: -game.enemyHeight, icon: '↑' },
-            { name: 'left', dx: -game.enemyWidth, dy: 0, icon: '←' },
-            { name: 'right', dx: game.enemyWidth, dy: 0, icon: '→' }
+        // 按优先级排序：先长距离方向，后短距离方向
+        const primaryDirs = directions[this.primaryAxis];
+        const secondaryDirs = directions[this.secondaryAxis];
+        
+        // 尝试移动的优先级列表
+        const tryOrder = [
+            { dirs: primaryDirs, distance: 1, isJump: false },      // 1. 长距离方向 1格
+            { dirs: secondaryDirs, distance: 1, isJump: false },    // 2. 短距离方向 1格
+            { dirs: primaryDirs, distance: 2, isJump: true },       // 3. 长距离方向跳跃 2格
+            { dirs: secondaryDirs, distance: 2, isJump: true }      // 4. 短距离方向跳跃 2格
         ];
         
         let bestMove = null;
-        let bestDist = currentDist;
-        let bestIsJump = false;
         
-        // 尝试所有可能的移动方向
-        for (let dir of directions) {
-            // 1. 尝试普通移动（1格）
-            const targetX = this.pos.x + dir.dx;
-            const targetY = this.dropTargetY + dir.dy;
+        // 按优先级尝试移动
+        for (let attempt of tryOrder) {
+            // 如果是跳跃但没有jump技能，跳过
+            if (attempt.isJump && !this.affixes.includes('jump')) continue;
             
-            // 检查边界
-            if (targetX < game.enemyWidth/2 || targetX > game.width - game.enemyWidth/2) continue;
-            if (targetY < 0) continue; // 不能向上移出屏幕
-            
-            // 检查碰撞
-            const isBlocked = game.calc_isAreaOccupied(targetX, targetY, this.width * 0.8, this.height * 0.8, this);
-            
-            if (!isBlocked) {
-                // 计算移动后的距离
-                const newDist = Math.abs(targetX - playerPos.x) + Math.abs(targetY - playerPos.y);
-                if (newDist < bestDist) {
-                    bestDist = newDist;
-                    bestMove = { x: targetX, y: targetY, dir: dir, isJump: false };
-                }
-            } else if (this.affixes.includes('jump')) {
-                // 2. 如果被阻挡且有跳跃技能，尝试跳跃2格
-                const jumpX = this.pos.x + dir.dx * 2;
-                const jumpY = this.dropTargetY + dir.dy * 2;
+            for (let dir of attempt.dirs) {
+                const targetX = this.pos.x + dir.dx * attempt.distance;
+                const targetY = this.dropTargetY + dir.dy * attempt.distance;
                 
                 // 检查边界
-                if (jumpX < game.enemyWidth/2 || jumpX > game.width - game.enemyWidth/2) continue;
-                if (jumpY < 0) continue;
+                if (targetX < game.enemyWidth/2 || targetX > game.width - game.enemyWidth/2) continue;
+                if (targetY < 0) continue;
                 
-                const isJumpBlocked = game.calc_isAreaOccupied(jumpX, jumpY, this.width * 0.8, this.height * 0.8, this);
+                // 检查是否向player移动（距离减小）
+                const currentDist = Math.abs(this.pos.x - playerPos.x) + Math.abs(this.dropTargetY - playerPos.y);
+                const newDist = Math.abs(targetX - playerPos.x) + Math.abs(targetY - playerPos.y);
                 
-                if (!isJumpBlocked) {
-                    const newDist = Math.abs(jumpX - playerPos.x) + Math.abs(jumpY - playerPos.y);
-                    if (newDist < bestDist) {
-                        bestDist = newDist;
-                        bestMove = { x: jumpX, y: jumpY, dir: dir, isJump: true };
-                    }
+                if (newDist >= currentDist) continue; // 不接近player，跳过
+                
+                // 检查碰撞
+                const isBlocked = game.calc_isAreaOccupied(targetX, targetY, this.width * 0.8, this.height * 0.8, this);
+                
+                if (!isBlocked) {
+                    bestMove = { x: targetX, y: targetY, dir: dir, isJump: attempt.isJump };
+                    break; // 找到可行移动，立即执行
                 }
             }
+            
+            if (bestMove) break; // 已找到移动，退出循环
         }
         
-        // 执行最优移动
+        // 执行移动
         if (bestMove) {
             this.pos.x = bestMove.x;
             this.dropTargetY = bestMove.y;
@@ -2516,7 +2544,7 @@ class Enemy {
                 }
             }
         } else {
-            // 所有方向都被阻挡
+            // 所有方向都被阻挡或不接近player
             if (showFeedback) {
                 this.bumpOffsetY = -10;
                 if (Math.random() < 0.3) {
