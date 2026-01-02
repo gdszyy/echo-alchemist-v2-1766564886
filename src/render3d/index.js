@@ -9,6 +9,7 @@
 
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
 import { CameraController, CameraPreset } from './camera.js';
+import { EnemyRenderer3D } from './entities/enemy.js';
 
 export class RenderSystem3D {
     /**
@@ -18,6 +19,9 @@ export class RenderSystem3D {
     constructor(game) {
         this.game = game;
         this.enabled = false; // 3D渲染是否启用
+        
+        // 敌人3D渲染器数组
+        this.enemyRenderers = [];
         
         // 创建3D Canvas容器
         this.container = document.createElement('div');
@@ -324,6 +328,11 @@ export class RenderSystem3D {
             this.testCube.rotation.y += 0.01;
         }
         
+        // 更新所有敌人渲染器
+        this.enemyRenderers.forEach(renderer => {
+            renderer.update(deltaTime);
+        });
+        
         // 渲染场景
         this.renderer.render(this.scene, this.camera);
     }
@@ -361,26 +370,62 @@ export class RenderSystem3D {
     }
     
     /**
-     * 销毁3D渲染系统
+     * 为敌人创建3D渲染器
+     * @param {Enemy} enemy - 2D敌人实体
+     * @returns {EnemyRenderer3D} 创建的渲染器
      */
-    dispose() {
-        console.log('[RenderSystem3D] 销毁渲染系统');
-        
-        // 清理three.js资源
-        if (this.renderer) {
-            this.renderer.dispose();
-        }
-        
-        // 移除DOM元素
-        if (this.container && this.container.parentNode) {
-            this.container.parentNode.removeChild(this.container);
-        }
-        
-        // 移除事件监听
-        window.removeEventListener('resize', () => this.onWindowResize());
+    createEnemyRenderer(enemy) {
+        const renderer = new EnemyRenderer3D(enemy, this.scene);
+        this.enemyRenderers.push(renderer);
+        console.log(`[RenderSystem3D] 为敌人创建3D渲染器，当前总数: ${this.enemyRenderers.length}`);
+        return renderer;
     }
-}
-
+    
+    /**
+     * 移除敌人3D渲染器
+     * @param {EnemyRenderer3D} renderer - 要移除的渲染器
+     */
+    removeEnemyRenderer(renderer) {
+        const index = this.enemyRenderers.indexOf(renderer);
+        if (index !== -1) {
+            this.enemyRenderers.splice(index, 1);
+            renderer.dispose();
+            console.log(`[RenderSystem3D] 移除敌人3D渲染器，当前总数: ${this.enemyRenderers.length}`);
+        }
+    }
+    
+    /**
+     * 清除所有敌人3D渲染器
+     */
+    clearEnemyRenderers() {
+        this.enemyRenderers.forEach(renderer => renderer.dispose());
+        this.enemyRenderers = [];
+        console.log('[RenderSystem3D] 已清除所有敌人3D渲染器');
+    }
+    
+    /**
+     * 同步敌人数据（从2D敌人列表创建/更新3D渲染器）
+     * @param {Array<Enemy>} enemies - 2D敌人实体数组
+     */
+    syncEnemies(enemies) {
+        // 清除已死亡的敌人渲染器
+        this.enemyRenderers = this.enemyRenderers.filter(renderer => {
+            if (!renderer.enemy.active && !renderer.isDying) {
+                renderer.dispose();
+                return false;
+            }
+            return true;
+        });
+        
+        // 为新敌人创建渲染器
+        enemies.forEach(enemy => {
+            const hasRenderer = this.enemyRenderers.some(r => r.enemy === enemy);
+            if (!hasRenderer && enemy.active) {
+                this.createEnemyRenderer(enemy);
+            }
+        });
+    }
+    
     /**
      * 切换摄像机预设
      * @param {string} presetName - 预设名称 (CameraPreset枚举值)
@@ -418,6 +463,29 @@ export class RenderSystem3D {
      */
     getCurrentCameraPreset() {
         return this.cameraController ? this.cameraController.getCurrentPreset() : null;
+    }
+    
+    /**
+     * 销毁3D渲染系统
+     */
+    dispose() {
+        console.log('[RenderSystem3D] 销毁渲染系统');
+        
+        // 清理所有敌人渲染器
+        this.clearEnemyRenderers();
+        
+        // 清理three.js资源
+        if (this.renderer) {
+            this.renderer.dispose();
+        }
+        
+        // 移除DOM元素
+        if (this.container && this.container.parentNode) {
+            this.container.parentNode.removeChild(this.container);
+        }
+        
+        // 移除事件监听
+        window.removeEventListener('resize', () => this.onWindowResize());
     }
 }
 
