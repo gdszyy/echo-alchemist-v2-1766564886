@@ -57,6 +57,8 @@ import {
     TruthBook 
 } from './systems.js';
 
+import { Camera } from './camera.js';
+
 // ==================== 音频管理器 ====================
 
 class SoundManager {
@@ -995,6 +997,9 @@ class Game {
         this.isWheelSpinning = false;
         this.canvas = document.getElementById('gameCanvas'); this.ctx = this.canvas.getContext('2d');
         this.sys_resize();
+        
+        // 初始化摄像机
+        this.camera = new Camera(this.width, this.height);
         // 窗口大小变化时重新调整 Canvas 大小并重新初始化弹珠台布局
         window.addEventListener('resize', () => { this.sys_resize(); if (this.phase === 'gathering') this.phase_gathering_initPachinko(); });
         this.ui = new UIManager();
@@ -1388,10 +1393,18 @@ class Game {
 
         this.ctx.save();
         
-
+        // 更新摄像机
+        if (this.camera) {
+            this.camera.update();
+        }
 
         // 应用震动偏移
         this.ctx.translate(shakeX, shakeY); 
+        
+        // 应用摄像机变换
+        if (this.camera && this.phase === 'combat') {
+            this.camera.apply(this.ctx);
+        }
 
         // 1. 基础渲染准备
         this.render_clearCanvas();
@@ -1891,6 +1904,11 @@ if (this.phase === 'truth_book') {
 
         this.width = this.canvas.width = container.clientWidth; 
         this.height = this.canvas.height = container.clientHeight; 
+        
+        // 更新摄像机尺寸
+        if (this.camera) {
+            this.camera.resize(this.width, this.height);
+        }
         
         // 动态调整失败判定线，防止在矮屏幕上太高
         // 建议改为百分比，而不是固定的 -150
@@ -8261,15 +8279,31 @@ if (this.phase === 'truth_book') {
         container.style.transform = `rotateY(${tx * 0.2}deg) rotateX(${-ty * 0.2}deg)`;
 
     }
+    
+    /**
+     * [CAMERA] 启用远距离视角
+     */
+    camera_enableDistantView() {
+        if (this.camera && this.phase === 'combat') {
+            this.camera.enableDistantView();
+        }
+    }
+    
+    /**
+     * [CAMERA] 禁用远距离视角
+     */
+    camera_disableDistantView() {
+        if (this.camera && this.phase === 'combat') {
+            this.camera.disableDistantView();
+        }
+    }
 }
 /**
  * 调整 Hex 颜色的亮度
  * @param {string} hex - 颜色值 (例如 "#ff0000" 或 "f00")
- * @param {number} factor - 亮度系数 (1.0 = 原色, 0.5 = 变暗50%, 1.5 = 变亮50%)
+ * @param {number} factor - 亮度系数 (1.0 = 原色, 0.5 = 变暗 50%, 1.5 = 变亮 50%)
  * @returns {string} 调整后的 Hex 颜色
  */
-
-
 // ==================== 创建全局实例 ====================
 
 const audio = new SoundManager();

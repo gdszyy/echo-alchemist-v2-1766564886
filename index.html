@@ -1117,6 +1117,21 @@
             <span class="text-lg">📊</span>
         </button>
         
+        <!-- 底部中央远距离视角按钮 -->
+        <button 
+            id="distant-view-btn" 
+            onmousedown="game.camera_enableDistantView()" 
+            onmouseup="game.camera_disableDistantView()" 
+            onmouseleave="game.camera_disableDistantView()"
+            ontouchstart="game.camera_enableDistantView()" 
+            ontouchend="game.camera_disableDistantView()" 
+            ontouchcancel="game.camera_disableDistantView()"
+            class="absolute bottom-2 left-1/2 -translate-x-1/2 px-6 py-3 bg-cyan-900/80 hover:bg-cyan-800/90 active:bg-cyan-700/90 rounded-full border-2 border-cyan-500/50 hover:border-cyan-400 flex items-center justify-center gap-2 pointer-events-auto z-40 transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg backdrop-blur-sm"
+            style="touch-action: none; user-select: none; -webkit-user-select: none;">
+            <span class="text-lg">🔭</span>
+            <span class="text-sm font-bold text-cyan-100">按住查看远方</span>
+        </button>
+        
         <div class="text-center mt-4 pointer-events-none">
             <!-- Multiplier Display -->
             <div id="multiplier-display" class="mt-2 text-2xl font-bold text-yellow-400 opacity-0 transition-opacity drop-shadow-md">
