@@ -5878,32 +5878,33 @@ class Player {
             return;
         }
         
-        const playerGrid = this.getGridPosition();
         const enemyWidth = this.game.enemyWidth;
         const enemyHeight = this.game.enemyHeight;
         
         ctx.save();
         
-        // 计算警戒区的屏幕坐标
-        const alertX = (playerGrid.col - this.alertZoneRadius) * enemyWidth;
-        const alertY = (playerGrid.row - this.alertZoneRadius) * enemyHeight;
+        // 计算警戒区尺寸（3x3 网格）
         const alertWidth = enemyWidth * (this.alertZoneRadius * 2 + 1);
         const alertHeight = enemyHeight * (this.alertZoneRadius * 2 + 1);
         
+        // 以玩家位置为中心计算警戒区左上角
+        const alertX = this.pos.x - alertWidth / 2;
+        const alertY = this.pos.y - alertHeight / 2;
+        
         // 绘制警戒区背景高亮
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';  // 提高不透明度以便更明显
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
         ctx.fillRect(alertX, alertY, alertWidth, alertHeight);
         
         // 绘制警戒区外边框（不绘制内部网格）
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';  // 提高不透明度
-        ctx.lineWidth = 3;  // 加粗边框
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+        ctx.lineWidth = 3;
         ctx.setLineDash([5, 5]);
         ctx.strokeRect(alertX, alertY, alertWidth, alertHeight);
         
         // 绘制警告文本
         ctx.setLineDash([]);
         ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
-        ctx.font = 'bold 12px monospace';  // 加大字体
+        ctx.font = 'bold 12px monospace';
         ctx.fillText("⚠️ ALERT ZONE", alertX + 5, alertY + 18);
         
         ctx.restore();
