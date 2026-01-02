@@ -996,6 +996,7 @@ class Game {
         this.marbleSizeBonus=0;
         this.isVisualEffectActive = false;
         this.isWheelSpinning = false;
+        this.is3DMode = false; // [新增] 3D 模式标志
         this.canvas = document.getElementById('gameCanvas'); this.ctx = this.canvas.getContext('2d');
         this.sys_resize();
         
@@ -2265,6 +2266,39 @@ if (this.phase === 'truth_book') {
         };
         window.addEventListener('click', initialClickHandler);
         window.addEventListener('touchstart', initialClickHandler);
+
+        // [新增] 监听 'V' 键按下以切换 3D 模式
+        window.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'v') {
+                this.toggle3DMode();
+            }
+        });
+    }
+
+    /**
+     * [新增] 切换 2D/3D 模式
+     */
+    toggle3DMode() {
+        this.is3DMode = !this.is3DMode;
+        
+        // 切换 Canvas 的 z-index 层级
+        // 假设 3D 模式下层级更高，或者根据需求调整
+        if (this.is3DMode) {
+            this.canvas.style.zIndex = "10";
+            showToast("3D 模式：开启");
+        } else {
+            this.canvas.style.zIndex = "1";
+            showToast("3D 模式：关闭");
+        }
+
+        // 添加淡入淡出效果
+        this.canvas.style.transition = "opacity 0.3s ease-in-out";
+        this.canvas.style.opacity = "0.5";
+        setTimeout(() => {
+            this.canvas.style.opacity = "1";
+        }, 150);
+
+        console.log(`[Mode] Switched to ${this.is3DMode ? '3D' : '2D'} mode`);
     }
 
     //  处理设备倾斜
