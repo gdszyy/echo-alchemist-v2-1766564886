@@ -13,6 +13,13 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.m
 /**
  * 缓动函数：EaseInOutCubic
  * 提供平滑的加速-减速效果
+ * 
+ * 数学原理：
+ * - 前半段 (t < 0.5): 使用三次方加速 f(t) = 4t³
+ * - 后半段 (t >= 0.5): 使用三次方减速 f(t) = 1 - (-2t + 2)³ / 2
+ * 
+ * 效果：开始和结束时速度较慢，中间速度较快，适合视角切换动画
+ * 
  * @param {number} t - 进度值 (0-1)
  * @returns {number} 缓动后的值 (0-1)
  */
@@ -430,21 +437,4 @@ export class CameraController {
     }
 }
 
-/**
- * 创建摄像机控制器 (工厂函数)
- * @param {number} aspect - 摄像机宽高比
- * @returns {CameraController} 摄像机控制器实例
- */
-export function createCameraController(aspect) {
-    return new CameraController(aspect);
-}
 
-/**
- * 创建摄像机 (向后兼容的简单工厂函数)
- * @returns {THREE.PerspectiveCamera} Three.js摄像机对象
- */
-export function createCamera() {
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 5;
-    return camera;
-}
