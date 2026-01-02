@@ -1,0 +1,23 @@
+# Echo Alchemist AI 开发守则
+
+你正在参与 `Echo Alchemist` 项目的开发。为了确保项目的可维护性和 AI 友好度，请遵循以下规则：
+
+## 1. 架构感知 (Architecture Awareness)
+- 在修改任何核心逻辑前，请先阅读 `docs/architecture/architecture_map.md` 和 `docs/architecture/game_flow.md`。
+- 确保你了解当前修改的代码属于哪个阶段（Gathering, Combat, 或 Selection）。
+
+## 2. 文档同步更新 (Documentation Sync)
+- **强制要求**: 如果你新增、重命名或删除了核心类、函数或修改了游戏阶段逻辑，必须同步更新以下文档：
+    - `docs/architecture/architecture_map.md`: 更新类/函数索引。
+    - `docs/architecture/game_flow.md`: 如果涉及阶段切换逻辑。
+- 在提交代码前，请检查 `index.md` 是否需要更新。
+
+## 3. 代码风格 (Coding Style)
+- 保持现有的命名规范（如 `phase_*` 表示阶段相关，`ui_*` 表示 UI 相关，`calc_*` 表示计算相关）。
+- 为复杂的逻辑添加 JSDoc 注释，方便后续 AI 理解。
+
+## 4. 提交规范 (Commit Convention)
+- 提交信息应清晰描述修改内容，例如: `feat: add new relic effect` 或 `fix: resolve combat phase transition bug`。
+
+---
+**记住**: 你不仅是代码的编写者，也是项目索引的维护者。
