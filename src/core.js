@@ -59,6 +59,7 @@ import {
 } from './systems.js';
 
 import { Camera } from './camera.js';
+import Stats from 'stats.js';
 import { RenderSystem3D } from './render3d/index.js';
 
 // ==================== 音频管理器 ====================
@@ -1006,11 +1007,71 @@ class Game {
         
         // 初始化3D渲染系统
         this.render3d = new RenderSystem3D(this);
+        
+        // [新增] 初始化性能监控工具 stats.js
+        this.initStats();
         this.is3DMode = false; // 3D模式标志位
         
         // 初始化玩家
         this.player = new Player(this);
         
+        // 初始化游戏状态和 UI
+        this.initGame();
+    }
+
+    /**
+     * [新增] 初始化性能监控工具 stats.js
+     */
+    initStats() {
+        this.stats = new Stats();
+        // 0: fps, 1: ms, 2: mb, 3+: custom
+        this.stats.showPanel(0); 
+        document.body.appendChild(this.stats.dom);
+        
+        // 设置样式，使其在右上角显示
+        this.stats.dom.style.position = 'fixed';
+        this.stats.dom.style.left = 'auto';
+        this.stats.dom.style.right = '0px';
+        this.stats.dom.style.top = '0px';
+        this.stats.dom.style.zIndex = '10000';
+
+        // 添加内存监控面板 (如果浏览器支持)
+        if (window.performance && window.performance.memory) {
+            this.stats.showPanel(2); // 内存面板
+        }
+    }
+
+    /**
+     * [DEV] 压力测试场景：生成大量敌人和粒子
+     * @param {number} enemyCount - 敌人数量
+     * @param {number} particleCount - 粒子数量
+     */
+    runStressTest(enemyCount = 100, particleCount = 500) {
+        console.log(`[STRESS TEST] Spawning ${enemyCount} enemies and ${particleCount} particles...`);
+        
+        // 1. 生成敌人
+        for (let i = 0; i < enemyCount; i++) {
+            const x = Math.random() * this.width;
+            const y = Math.random() * this.height;
+            const enemy = new Enemy(x, y, 1); // 假设 1 是基础类型
+            this.enemies.push(enemy);
+        }
+
+        // 2. 生成粒子
+        for (let i = 0; i < particleCount; i++) {
+            const x = Math.random() * this.width;
+            const y = Math.random() * this.height;
+            const p = new Particle(x, y, '#ff0000');
+            this.particles.push(p);
+        }
+
+        showToast(`压力测试已启动: ${enemyCount} 敌人, ${particleCount} 粒子`);
+    }
+
+    /**
+     * [SYS] 初始化游戏状态、Canvas 和事件监听器
+     */
+    initGame() {
         // 窗口大小变化时重新调整 Canvas 大小并重新初始化弹珠台布局
         window.addEventListener('resize', () => { this.sys_resize(); if (this.phase === 'gathering') this.phase_gathering_initPachinko(); });
         this.ui = new UIManager();
@@ -1393,6 +1454,7 @@ class Game {
      * 负责更新游戏状态、渲染所有实体和 UI。
      */
     sys_loop() {
+        if (this.stats) this.stats.begin();
         const timeScale = this.timeScale; 
 
         // 处理震动衰减
@@ -1486,6 +1548,7 @@ if (this.phase === 'truth_book') {
 
         // 6. 下一帧请求
         this.ctx.restore(); 
+        if (this.stats) this.stats.end();
         requestAnimationFrame(() => this.sys_loop());
     }
 
