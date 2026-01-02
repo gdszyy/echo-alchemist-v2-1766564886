@@ -9,6 +9,7 @@
 
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
 import { CameraController, CameraPreset } from './camera.js';
+import { ProjectileRenderer3D } from './entities/projectile.js';
 
 export class RenderSystem3D {
     /**
@@ -34,6 +35,9 @@ export class RenderSystem3D {
         
         // 初始化three.js核心组件
         this.initThreeJS();
+        
+        // 初始化子弹渲染器
+        this.projectileRenderer = null;
         
         // 添加测试内容
         this.addTestContent();
@@ -94,6 +98,9 @@ export class RenderSystem3D {
         // 添加网格辅助线
         const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
         this.scene.add(gridHelper);
+        
+        // 初始化子弹渲染器
+        this.projectileRenderer = new ProjectileRenderer3D(this.scene);
     }
     
     /**
@@ -127,6 +134,11 @@ export class RenderSystem3D {
         if (this.testCube) {
             this.testCube.rotation.x += 0.01;
             this.testCube.rotation.y += 0.01;
+        }
+        
+        // 更新子弹渲染
+        if (this.projectileRenderer && this.game.projectiles) {
+            this.projectileRenderer.updateAll(this.game.projectiles);
         }
         
         // 渲染场景
@@ -166,26 +178,16 @@ export class RenderSystem3D {
     }
     
     /**
-     * 销毁3D渲染系统
+     * 获取性能统计信息
      */
-    dispose() {
-        console.log('[RenderSystem3D] 销毁渲染系统');
-        
-        // 清理three.js资源
-        if (this.renderer) {
-            this.renderer.dispose();
-        }
-        
-        // 移除DOM元素
-        if (this.container && this.container.parentNode) {
-            this.container.parentNode.removeChild(this.container);
-        }
-        
-        // 移除事件监听
-        window.removeEventListener('resize', () => this.onWindowResize());
+    getStats() {
+        const stats = {
+            enabled: this.enabled,
+            projectiles: this.projectileRenderer ? this.projectileRenderer.getStats() : null
+        };
+        return stats;
     }
-}
-
+    
     /**
      * 切换摄像机预设
      * @param {string} presetName - 预设名称 (CameraPreset枚举值)
@@ -223,6 +225,32 @@ export class RenderSystem3D {
      */
     getCurrentCameraPreset() {
         return this.cameraController ? this.cameraController.getCurrentPreset() : null;
+    }
+    
+    /**
+     * 销毁3D渲染系统
+     */
+    dispose() {
+        console.log('[RenderSystem3D] 销毁渲染系统');
+        
+        // 销毁子弹渲染器
+        if (this.projectileRenderer) {
+            this.projectileRenderer.dispose();
+            this.projectileRenderer = null;
+        }
+        
+        // 清理three.js资源
+        if (this.renderer) {
+            this.renderer.dispose();
+        }
+        
+        // 移除DOM元素
+        if (this.container && this.container.parentNode) {
+            this.container.parentNode.removeChild(this.container);
+        }
+        
+        // 移除事件监听
+        window.removeEventListener('resize', () => this.onWindowResize());
     }
 }
 
