@@ -12,6 +12,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
 import { CameraController, CameraPreset } from './camera.js';
 import { Enemy3D, EnemyRenderer3D } from './entities/enemy.js';
+import { ShockwaveRenderer3D } from './effects/shockwave.js';
 
 export class RenderSystem3D {
     /**
@@ -25,6 +26,9 @@ export class RenderSystem3D {
         // 敌人3D实体管理
         this.enemies3D = new Map(); // key: enemy2D实例, value: Enemy3D实例
         this.enemyRenderers = []; // 兼容旧代码
+        
+        // 冲击波渲染器
+        this.shockwaveRenderer = null;
         
         // 创建3D Canvas容器
         this.container = document.createElement('div');
@@ -41,6 +45,9 @@ export class RenderSystem3D {
         
         // 初始化three.js核心组件
         this.initThreeJS();
+        
+        // 初始化冲击波渲染器
+        this.initShockwaveRenderer();
         
         // 添加测试内容
         this.addTestContent();
@@ -81,6 +88,14 @@ export class RenderSystem3D {
         
         // 监听窗口大小变化
         window.addEventListener('resize', () => this.onWindowResize());
+    }
+    
+    /**
+     * 初始化冲击波渲染器
+     */
+    initShockwaveRenderer() {
+        this.shockwaveRenderer = new ShockwaveRenderer3D(this.scene, 100);
+        console.log('[RenderSystem3D] 冲击波渲染器初始化完成');
     }
     
     /**
@@ -334,6 +349,17 @@ export class RenderSystem3D {
     }
     
     /**
+     * 同步冲击波到3D场景
+     * 从游戏的2D shockwaves数组创建/更新3D表示
+     */
+    syncShockwaves() {
+        if (!this.enabled || !this.game.shockwaves || !this.shockwaveRenderer) return;
+        
+        // 调用冲击波渲染器的同步方法
+        this.shockwaveRenderer.syncShockwaves(this.game.shockwaves, this.game);
+    }
+    
+    /**
      * 更新3D场景（每帧调用）
      * @param {number} deltaTime - 帧间隔时间
      */
@@ -349,6 +375,9 @@ export class RenderSystem3D {
         // 同步子弹和粒子
         this.syncProjectiles();
         this.syncParticles();
+        
+        // 同步冲击波
+        this.syncShockwaves();
         
         // 更新摄像机控制器
         if (this.cameraController) {
