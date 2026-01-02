@@ -1447,8 +1447,9 @@ if (this.phase === 'truth_book') {
             case 'combat':
                 // 根据3D模式标志位选择渲染方式
                 if (this.is3DMode) {
-                    // 3D渲染模式
-                    this.render3d.update(timeScale / 60); // 转换为deltaTime
+                    // 3D渲染模式：先更新逻辑，再更新3D渲染
+                    this.combat_updateLogic(timeScale); // 更新游戏逻辑
+                    this.render3d.update(timeScale / 60); // 更新3D渲染（包含同步）
                 } else {
                     // 2D渲染模式
                     this.phase_combat_update(timeScale);

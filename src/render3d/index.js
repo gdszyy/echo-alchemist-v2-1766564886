@@ -9,6 +9,7 @@
 
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
 import { CameraController, CameraPreset } from './camera.js';
+import { EnemyRenderer3D } from './entities/enemy.js';
 import { ProjectileRenderer3D } from './entities/projectile.js';
 
 export class RenderSystem3D {
@@ -19,6 +20,9 @@ export class RenderSystem3D {
     constructor(game) {
         this.game = game;
         this.enabled = false; // 3D渲染是否启用
+        
+        // 敌人3D渲染器数组
+        this.enemyRenderers = [];
         
         // 创建3D Canvas容器
         this.container = document.createElement('div');
@@ -119,6 +123,197 @@ export class RenderSystem3D {
     }
     
     /**
+     * 同步子弹到3D场景
+     * 从游戏的2D projectiles数组创建/更新3D表示
+     */
+    syncProjectiles() {
+        if (!this.enabled || !this.game.projectiles) return;
+        
+        // 初始化3D子弹容器
+        if (!this.projectile3DMap) {
+            this.projectile3DMap = new Map();
+        }
+        
+        // 获取当前活跃的2D子弹ID集合
+        const activeIds = new Set();
+        
+        // 遍历2D子弹，创建或更新对应的3D对象
+        this.game.projectiles.forEach(proj => {
+            if (!proj || !proj.active) return;
+            
+            // 使用子弹对象作为唯一标识
+            const id = proj;
+            activeIds.add(id);
+            
+            let mesh3D = this.projectile3DMap.get(id);
+            
+            // 如果3D对象不存在，创建新的
+            if (!mesh3D) {
+                // 根据子弹配置选择几何体
+                let geometry;
+                if (proj.config.pierce > 0) {
+                    // 穿透子弹：箭矢形状
+                    geometry = new THREE.ConeGeometry(proj.radius * 0.5, proj.radius * 2, 8);
+                } else if (proj.config.explosive) {
+                    // 爆炸子弹：八面体
+                    geometry = new THREE.OctahedronGeometry(proj.radius);
+                } else {
+                    // 普通子弹：球体
+                    geometry = new THREE.SphereGeometry(proj.radius, 16, 16);
+                }
+                
+                // 根据子弹属性选择颜色
+                let color = 0x00ff88; // 默认绿色
+                if (proj.config.pyro > 0) color = 0xff6b35; // 火焰橙
+                else if (proj.config.cryo > 0) color = 0x06b6d4; // 冰霜青
+                else if (proj.config.lightning > 0) color = 0xfbbf24; // 闪电黄
+                else if (proj.config.wind > 0) color = 0x34d399; // 风绿
+                else if (proj.config.laser > 0) color = 0xec4899; // 激光粉
+                
+                const material = new THREE.MeshStandardMaterial({
+                    color: color,
+                    emissive: color,
+                    emissiveIntensity: proj.intensity || 0.5,
+                    metalness: 0.3,
+                    roughness: 0.4
+                });
+                
+                mesh3D = new THREE.Mesh(geometry, material);
+                this.scene.add(mesh3D);
+                this.projectile3DMap.set(id, mesh3D);
+            }
+            
+            // 更新3D位置（2D坐标转换为3D坐标）
+            // Canvas坐标系：原点在左上角，Y向下
+            // Three.js坐标系：原点在中心，Y向上
+            const x = (proj.pos.x - this.game.width / 2) / 50; // 缩放因子
+            const y = -(proj.pos.y - this.game.height / 2) / 50; // Y轴反转
+            const z = 0;
+            
+            mesh3D.position.set(x, y, z);
+            
+            // 更新旋转（根据速度方向）
+            if (proj.vel) {
+                const angle = Math.atan2(proj.vel.y, proj.vel.x);
+                if (proj.config.pierce > 0) {
+                    // 箭矢朝向飞行方向
+                    mesh3D.rotation.z = -angle + Math.PI / 2;
+                } else {
+                    // 其他子弹自旋
+                    mesh3D.rotation.x += 0.1;
+                    mesh3D.rotation.y += 0.1;
+                }
+            }
+        });
+        
+        // 清理已失效的3D对象
+        this.projectile3DMap.forEach((mesh, id) => {
+            if (!activeIds.has(id)) {
+                this.scene.remove(mesh);
+                mesh.geometry.dispose();
+                mesh.material.dispose();
+                this.projectile3DMap.delete(id);
+            }
+        });
+    }
+    
+    /**
+     * 同步粒子到3D场景
+     * 从游戏的2D particles数组创建/更新3D表示
+     */
+    syncParticles() {
+        if (!this.enabled || !this.game.particles) return;
+        
+        // 初始化3D粒子容器
+        if (!this.particle3DMap) {
+            this.particle3DMap = new Map();
+        }
+        
+        // 获取当前活跃的2D粒子ID集合
+        const activeIds = new Set();
+        
+        // 遍历2D粒子，创建或更新对应的3D对象
+        this.game.particles.forEach(particle => {
+            if (!particle || particle.life <= 0) return;
+            
+            // 使用粒子对象作为唯一标识
+            const id = particle;
+            activeIds.add(id);
+            
+            let mesh3D = this.particle3DMap.get(id);
+            
+            // 如果3D对象不存在，创建新的
+            if (!mesh3D) {
+                // 根据粒子模式选择几何体
+                let geometry;
+                if (particle.mode === 'spark') {
+                    geometry = new THREE.SphereGeometry(particle.size * 0.1, 4, 4);
+                } else if (particle.mode === 'ember') {
+                    geometry = new THREE.SphereGeometry(particle.size * 0.1, 6, 6);
+                } else if (particle.mode === 'mist') {
+                    geometry = new THREE.SphereGeometry(particle.size * 0.1, 8, 8);
+                } else if (particle.mode === 'shard') {
+                    geometry = new THREE.BoxGeometry(
+                        particle.size * 0.1 * (particle.scaleX || 1),
+                        particle.size * 0.1 * (particle.scaleY || 1),
+                        particle.size * 0.1
+                    );
+                } else {
+                    geometry = new THREE.SphereGeometry(particle.size * 0.1 || 0.2, 6, 6);
+                }
+                
+                // 解析颜色
+                let color = 0xffffff;
+                if (particle.color) {
+                    // 移除#号并转换为十六进制数
+                    const hexColor = particle.color.replace('#', '');
+                    color = parseInt(hexColor, 16);
+                }
+                
+                const material = new THREE.MeshBasicMaterial({
+                    color: color,
+                    transparent: true,
+                    opacity: particle.life,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                mesh3D = new THREE.Mesh(geometry, material);
+                this.scene.add(mesh3D);
+                this.particle3DMap.set(id, mesh3D);
+            }
+            
+            // 更新3D位置
+            const x = (particle.pos.x - this.game.width / 2) / 50;
+            const y = -(particle.pos.y - this.game.height / 2) / 50;
+            const z = 0;
+            
+            mesh3D.position.set(x, y, z);
+            
+            // 更新透明度
+            mesh3D.material.opacity = particle.life;
+            
+            // 更新旋转（如果有角度属性）
+            if (particle.angle !== undefined) {
+                mesh3D.rotation.z = particle.angle;
+            }
+            
+            // 更新缩放（根据生命值）
+            const scale = 0.5 + particle.life * 0.5;
+            mesh3D.scale.set(scale, scale, scale);
+        });
+        
+        // 清理已失效的3D对象
+        this.particle3DMap.forEach((mesh, id) => {
+            if (!activeIds.has(id)) {
+                this.scene.remove(mesh);
+                mesh.geometry.dispose();
+                mesh.material.dispose();
+                this.particle3DMap.delete(id);
+            }
+        });
+    }
+    
+    /**
      * 更新3D场景（每帧调用）
      * @param {number} deltaTime - 帧间隔时间
      */
@@ -130,16 +325,25 @@ export class RenderSystem3D {
             this.cameraController.update();
         }
         
+        // 同步游戏实体到3D场景
+        this.syncProjectiles();
+        this.syncParticles();
+        
+        // 更新子弹渲染器（使用新的ProjectileRenderer3D）
+        if (this.projectileRenderer && this.game.projectiles) {
+            this.projectileRenderer.updateAll(this.game.projectiles);
+        }
+        
         // 旋转测试立方体
         if (this.testCube) {
             this.testCube.rotation.x += 0.01;
             this.testCube.rotation.y += 0.01;
         }
         
-        // 更新子弹渲染
-        if (this.projectileRenderer && this.game.projectiles) {
-            this.projectileRenderer.updateAll(this.game.projectiles);
-        }
+        // 更新所有敌人渲染器
+        this.enemyRenderers.forEach(renderer => {
+            renderer.update(deltaTime);
+        });
         
         // 渲染场景
         this.renderer.render(this.scene, this.camera);
@@ -178,14 +382,60 @@ export class RenderSystem3D {
     }
     
     /**
-     * 获取性能统计信息
+     * 为敌人创建3D渲染器
+     * @param {Enemy} enemy - 2D敌人实体
+     * @returns {EnemyRenderer3D} 创建的渲染器
      */
-    getStats() {
-        const stats = {
-            enabled: this.enabled,
-            projectiles: this.projectileRenderer ? this.projectileRenderer.getStats() : null
-        };
-        return stats;
+    createEnemyRenderer(enemy) {
+        const renderer = new EnemyRenderer3D(enemy, this.scene);
+        this.enemyRenderers.push(renderer);
+        console.log(`[RenderSystem3D] 为敌人创建3D渲染器，当前总数: ${this.enemyRenderers.length}`);
+        return renderer;
+    }
+    
+    /**
+     * 移除敌人3D渲染器
+     * @param {EnemyRenderer3D} renderer - 要移除的渲染器
+     */
+    removeEnemyRenderer(renderer) {
+        const index = this.enemyRenderers.indexOf(renderer);
+        if (index !== -1) {
+            this.enemyRenderers.splice(index, 1);
+            renderer.dispose();
+            console.log(`[RenderSystem3D] 移除敌人3D渲染器，当前总数: ${this.enemyRenderers.length}`);
+        }
+    }
+    
+    /**
+     * 清除所有敌人3D渲染器
+     */
+    clearEnemyRenderers() {
+        this.enemyRenderers.forEach(renderer => renderer.dispose());
+        this.enemyRenderers = [];
+        console.log('[RenderSystem3D] 已清除所有敌人3D渲染器');
+    }
+    
+    /**
+     * 同步敌人数据（从2D敌人列表创建/更新3D渲染器）
+     * @param {Array<Enemy>} enemies - 2D敌人实体数组
+     */
+    syncEnemies(enemies) {
+        // 清除已死亡的敌人渲染器
+        this.enemyRenderers = this.enemyRenderers.filter(renderer => {
+            if (!renderer.enemy.active && !renderer.isDying) {
+                renderer.dispose();
+                return false;
+            }
+            return true;
+        });
+        
+        // 为新敌人创建渲染器
+        enemies.forEach(enemy => {
+            const hasRenderer = this.enemyRenderers.some(r => r.enemy === enemy);
+            if (!hasRenderer && enemy.active) {
+                this.createEnemyRenderer(enemy);
+            }
+        });
     }
     
     /**
@@ -238,6 +488,9 @@ export class RenderSystem3D {
             this.projectileRenderer.dispose();
             this.projectileRenderer = null;
         }
+        
+        // 清理所有敌人渲染器
+        this.clearEnemyRenderers();
         
         // 清理three.js资源
         if (this.renderer) {
