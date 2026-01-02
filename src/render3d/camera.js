@@ -11,6 +11,18 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
 
 /**
+ * 缓动函数：EaseInOutCubic
+ * 提供平滑的加速-减速效果
+ * @param {number} t - 进度值 (0-1)
+ * @returns {number} 缓动后的值 (0-1)
+ */
+function easeInOutCubic(t) {
+    return t < 0.5 
+        ? 4 * t * t * t 
+        : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+/**
  * 摄像机预设类型
  */
 export const CameraPreset = {
@@ -63,6 +75,19 @@ export class CameraController {
         
         // 默认设置为3D斜视视角
         this.setPreset(CameraPreset.ISOMETRIC_3D, false);
+        
+        // 运镜动画状态 (Task 2.4)
+        this.isTransitioning = false;
+        this.transitionProgress = 0;
+        this.transitionDuration = 1.5; // 1.5秒过渡时长
+        this.transitionStartTime = 0;
+        this.transitionStartPosition = new THREE.Vector3();
+        this.transitionStartRotation = new THREE.Euler();
+        this.transitionStartFOV = 75;
+        
+        // Canvas引用 (用于淡入淡出)
+        this.canvas2D = null;
+        this.container3D = null;
         
         console.log('[CameraController] 初始化完成');
     }
@@ -212,6 +237,196 @@ export class CameraController {
      */
     setTransitionSpeed(speed) {
         this.transitionSpeed = Math.max(0, Math.min(1, speed));
+    }
+    
+    /**
+     * 设置Canvas引用 (用于Task 2.4运镜动画)
+     * @param {HTMLCanvasElement} canvas2D - 2D Canvas元素
+     * @param {HTMLElement} container3D - 3D容器元素
+     */
+    setCanvasReferences(canvas2D, container3D) {
+        this.canvas2D = canvas2D;
+        this.container3D = container3D;
+    }
+    
+    /**
+     * 切换到3D模式 (Task 2.4)
+     * 启动平滑过渡动画，过渡时长1.5秒
+     */
+    transitionTo3D() {
+        if (this.isTransitioning) {
+            console.warn('[CameraController] 正在过渡中，忽略请求');
+            return;
+        }
+        
+        console.log('[CameraController] 开始切换到3D模式');
+        
+        // 记录起始状态
+        this.transitionStartPosition.copy(this.camera.position);
+        this.transitionStartRotation.copy(this.camera.rotation);
+        this.transitionStartFOV = this.camera.fov;
+        
+        // 设置目标为3D预设
+        this.setPreset(CameraPreset.ISOMETRIC_3D, false);
+        
+        // 启动过渡
+        this.isTransitioning = true;
+        this.transitionProgress = 0;
+        this.transitionStartTime = performance.now();
+        
+        // 显示3D容器（初始透明）
+        if (this.container3D) {
+            this.container3D.style.display = 'block';
+            this.container3D.style.opacity = '0';
+        }
+        
+        // 开始动画循环
+        this._animateTransition();
+    }
+    
+    /**
+     * 切换到2D模式 (Task 2.4)
+     * 启动平滑过渡动画，过渡时长1.5秒
+     */
+    transitionTo2D() {
+        if (this.isTransitioning) {
+            console.warn('[CameraController] 正在过渡中，忽略请求');
+            return;
+        }
+        
+        console.log('[CameraController] 开始切换到2D模式');
+        
+        // 记录起始状态
+        this.transitionStartPosition.copy(this.camera.position);
+        this.transitionStartRotation.copy(this.camera.rotation);
+        this.transitionStartFOV = this.camera.fov;
+        
+        // 设置目标为2D预设
+        this.setPreset(CameraPreset.TOP_DOWN_2D, false);
+        
+        // 启动过渡
+        this.isTransitioning = true;
+        this.transitionProgress = 0;
+        this.transitionStartTime = performance.now();
+        
+        // 开始动画循环
+        this._animateTransition();
+    }
+    
+    /**
+     * 动画循环（内部方法）
+     * 使用requestAnimationFrame实现平滑过渡
+     */
+    _animateTransition() {
+        if (!this.isTransitioning) {
+            return;
+        }
+        
+        const currentTime = performance.now();
+        const elapsed = (currentTime - this.transitionStartTime) / 1000; // 转换为秒
+        this.transitionProgress = Math.min(elapsed / this.transitionDuration, 1.0);
+        
+        // 应用缓动函数
+        const easedProgress = easeInOutCubic(this.transitionProgress);
+        
+        // 插值摄像机位置
+        this.camera.position.lerpVectors(
+            this.transitionStartPosition,
+            this.targetPosition,
+            easedProgress
+        );
+        
+        // 插值摄像机FOV
+        this.camera.fov = this.transitionStartFOV + 
+            (this.targetFOV - this.transitionStartFOV) * easedProgress;
+        this.camera.updateProjectionMatrix();
+        
+        // 更新摄像机朝向
+        this.camera.lookAt(this.targetLookAt);
+        
+        // 同步Canvas淡入淡出效果
+        this._updateCanvasOpacity(easedProgress);
+        
+        // 检查是否完成过渡
+        if (this.transitionProgress >= 1.0) {
+            this._finishTransition();
+        } else {
+            // 继续动画
+            requestAnimationFrame(() => this._animateTransition());
+        }
+    }
+    
+    /**
+     * 更新Canvas透明度（内部方法）
+     * 根据过渡进度同步淡入淡出效果
+     * @param {number} progress - 缓动后的进度值 (0-1)
+     */
+    _updateCanvasOpacity(progress) {
+        const isTo3D = this.currentPreset === CameraPreset.ISOMETRIC_3D;
+        
+        if (isTo3D) {
+            // 切换到3D：2D Canvas淡出，3D容器淡入
+            if (this.canvas2D) {
+                this.canvas2D.style.opacity = String(1 - progress * 0.7); // 淡出到0.3
+            }
+            if (this.container3D) {
+                this.container3D.style.opacity = String(progress);
+            }
+        } else {
+            // 切换到2D：3D容器淡出，2D Canvas淡入
+            if (this.container3D) {
+                this.container3D.style.opacity = String(1 - progress);
+            }
+            if (this.canvas2D) {
+                this.canvas2D.style.opacity = String(0.3 + progress * 0.7); // 从0.3淡入到1
+            }
+        }
+    }
+    
+    /**
+     * 完成过渡（内部方法）
+     * 清理过渡状态并设置最终样式
+     */
+    _finishTransition() {
+        this.isTransitioning = false;
+        this.transitionProgress = 0;
+        
+        // 确保摄像机精确到达目标位置
+        this.camera.position.copy(this.targetPosition);
+        this.camera.lookAt(this.targetLookAt);
+        this.camera.fov = this.targetFOV;
+        this.camera.updateProjectionMatrix();
+        
+        const isTo3D = this.currentPreset === CameraPreset.ISOMETRIC_3D;
+        
+        if (isTo3D) {
+            // 3D模式：显示3D容器，半透明2D Canvas
+            if (this.container3D) {
+                this.container3D.style.opacity = '1';
+            }
+            if (this.canvas2D) {
+                this.canvas2D.style.opacity = '0.3';
+            }
+            console.log('[CameraController] 切换到3D模式完成');
+        } else {
+            // 2D模式：隐藏3D容器，完全显示2D Canvas
+            if (this.container3D) {
+                this.container3D.style.display = 'none';
+                this.container3D.style.opacity = '0';
+            }
+            if (this.canvas2D) {
+                this.canvas2D.style.opacity = '1';
+            }
+            console.log('[CameraController] 切换到2D模式完成');
+        }
+    }
+    
+    /**
+     * 检查是否正在过渡
+     * @returns {boolean}
+     */
+    isInTransition() {
+        return this.isTransitioning;
     }
 }
 

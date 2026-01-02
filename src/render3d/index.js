@@ -59,6 +59,9 @@ export class RenderSystem3D {
         this.cameraController = new CameraController(aspect);
         this.camera = this.cameraController.getCamera();
         
+        // 设置Canvas引用以支持运镜动画 (Task 2.4)
+        this.cameraController.setCanvasReferences(this.game.canvas, this.container);
+        
         // 创建渲染器
         this.renderer = new THREE.WebGLRenderer({ 
             antialias: true,
@@ -343,13 +346,18 @@ export class RenderSystem3D {
     transitionTo3D() {
         console.log('[RenderSystem3D] 切换到3D模式');
         this.enabled = true;
-        if (this.container) {
-            this.container.style.display = 'block';
-        }
         
-        // 隐藏2D Canvas
-        if (this.game.canvas) {
-            this.game.canvas.style.opacity = '0.3'; // 半透明显示2D内容作为参考
+        // 使用CameraController执行平滑过渡 (Task 2.4)
+        if (this.cameraController) {
+            this.cameraController.transitionTo3D();
+        } else {
+            // 降级方案：直接显示
+            if (this.container) {
+                this.container.style.display = 'block';
+            }
+            if (this.game.canvas) {
+                this.game.canvas.style.opacity = '0.3';
+            }
         }
     }
     
@@ -359,13 +367,18 @@ export class RenderSystem3D {
     transitionTo2D() {
         console.log('[RenderSystem3D] 切换到2D模式');
         this.enabled = false;
-        if (this.container) {
-            this.container.style.display = 'none';
-        }
         
-        // 恢复2D Canvas显示
-        if (this.game.canvas) {
-            this.game.canvas.style.opacity = '1';
+        // 使用CameraController执行平滑过渡 (Task 2.4)
+        if (this.cameraController) {
+            this.cameraController.transitionTo2D();
+        } else {
+            // 降级方案：直接隐藏
+            if (this.container) {
+                this.container.style.display = 'none';
+            }
+            if (this.game.canvas) {
+                this.game.canvas.style.opacity = '1';
+            }
         }
     }
     
