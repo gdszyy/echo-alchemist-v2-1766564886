@@ -59,6 +59,7 @@ import {
 } from './systems.js';
 
 import { Camera } from './camera.js';
+import { RenderSystem3D } from './render3d/index.js';
 
 // ==================== 音频管理器 ====================
 
@@ -1003,6 +1004,10 @@ class Game {
         // 初始化摄像机
         this.camera = new Camera(this.width, this.height);
         
+        // 初始化3D渲染系统
+        this.render3d = new RenderSystem3D(this);
+        this.is3DMode = false; // 3D模式标志位
+        
         // 初始化玩家
         this.player = new Player(this);
         
@@ -1429,18 +1434,25 @@ class Game {
 
         // 4. 阶段逻辑与渲染分发
 if (this.phase === 'truth_book') {
-	            this.truthBook.update();
-	        }
-	        if (this.phase === 'training') {
-	            this.trainingGround.update();
-	        }
+		            this.truthBook.update();
+		        }
+		        if (this.phase === 'training') {
+		            this.trainingGround.update();
+		        }
         switch (this.phase) {
             case 'gathering':
                 this.phase_gathering_update(timeScale);
                 break;
             case 'training':
             case 'combat':
-                this.phase_combat_update(timeScale);
+                // 根据3D模式标志位选择渲染方式
+                if (this.is3DMode) {
+                    // 3D渲染模式
+                    this.render3d.update(timeScale / 60); // 转换为deltaTime
+                } else {
+                    // 2D渲染模式
+                    this.phase_combat_update(timeScale);
+                }
                 break;
         }
 
