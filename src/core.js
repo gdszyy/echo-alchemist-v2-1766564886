@@ -6301,48 +6301,75 @@ if (this.phase === 'truth_book') {
                     currentScatterIdx++;
                 }
             }
-            return; 
-        }
-
-        // 散射 (Scatter)
-        // [修改] 风属性子弹强制单发，不受 scatter 影响
+            // === [修改重点] 散射 (Scatter) 实体子弹优化 ===
+        // 风属性子弹强制单发，不受 scatter 影响
         if (recipe.scatter > 0 && !recipe.wind) { 
             const scatterCount = recipe.scatter;
             const fullInheritCount = Math.floor(scatterCount / 2);
             const halfInheritCount = scatterCount % 2;
             
+            // 定义需要缩放的属性列表
+            const scalableAttrs = ['damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind', 'pierce', 'bounce'];
+
+            // 辅助函数：创建散射副本配方
+            const createScatterRecipe = (base, factor) => {
+                const r = { ...base }; // 浅拷贝，保留 nestedPayload (套娃)
+                r.scatter = 0;         // 清除散射，防止无限递归
+                r.chainPayload = null; // 清除普通连锁，防止无限循环 (套娃逻辑由 nestedPayload 负责)
+                r.isScatterChild = true; // 标记为散射子弹
+                
+                // 批量缩放属性
+                scalableAttrs.forEach(attr => {
+                    if (typeof r[attr] === 'number') {
+                        if (attr === 'damage') {
+                            // 伤害至少为 1
+                            r[attr] = Math.max(1, Math.floor(r[attr] * factor));
+                        } else {
+                            // 其他层数向下取整
+                            r[attr] = Math.floor(r[attr] * factor);
+                        }
+                    }
+                });
+                return r;
+            };
+            
             let currentScatterIdx = 1;
-            // 生成 100% 继承的副子弹
+
+            // 1. 生成 100% 继承的副子弹
             for (let i = 0; i < fullInheritCount; i++) {
                 const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
                 const multiplier = Math.ceil(currentScatterIdx / 2);
                 const angleOffset = 0.2 * multiplier * sign;
                 const newVel = vel.rotate(angleOffset);
-                const copyRecipe = { ...recipe, scatter: 0, chainPayload: null, isScatterChild: true };
+                
+                // 全继承：因子为 1.0
+                const copyRecipe = createScatterRecipe(recipe, 1.0);
+                
                 this.projectiles.push(new Projectile(x, y, newVel, copyRecipe, true, shotId));
                 shotStats.projectileCount++;
                 currentScatterIdx++;
             }
-            // 生成 50% 继承的副子弹
+
+            // 2. 生成 50% 继承的副子弹 (属性层数也减半)
             for (let i = 0; i < halfInheritCount; i++) {
                 const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
                 const multiplier = Math.ceil(currentScatterIdx / 2);
                 const angleOffset = 0.2 * multiplier * sign;
                 const newVel = vel.rotate(angleOffset);
-                const copyRecipe = { ...recipe, scatter: 0, chainPayload: null, damage: Math.max(1, Math.floor(recipe.damage * 0.5)), isScatterChild: true };
+                
+                // 半继承：因子为 0.5
+                const copyRecipe = createScatterRecipe(recipe, 0.5);
+                
                 this.projectiles.push(new Projectile(x, y, newVel, copyRecipe, true, shotId));
                 shotStats.projectileCount++;
                 currentScatterIdx++;
-            }
-        }
+                }
         
-        // [关键] 生成主子弹
+        // 生成主子弹
         shotStats.projectileCount++;
         const mainRecipe = { ...recipe, isScatterChild: false };
         this.projectiles.push(new Projectile(x, y, vel, mainRecipe, false, shotId, isLast)); 
     }
-
-// 在 Game 类中更新此方法
     /**
      * [AUTO-GENERATED] TODO: Add a description for combat_fireLaser.
      * @param {any} startX - TODO: Describe this parameter.

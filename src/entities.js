@@ -4021,17 +4021,26 @@ class Projectile {
             }
         });
     }
-
+    
     destroy(spawnCallback) {
-        this.active = false; this.destroyed = true;
-        if (this.config.nestedPayload && !this.isCopy) {
+        this.active = false; 
+        this.destroyed = true;
+
+        // [修改重点]：允许套娃子弹触发嵌套逻辑，即使它是 Copy (散射出来的)
+        // 之前的逻辑是 !this.isCopy，这会阻止散射子弹裂变
+        // 现在放宽条件：如果是非 Copy，或者 虽然是 Copy 但是是套娃(isMatryoshka)
+        const canSpawnNested = !this.isCopy || this.config.isMatryoshka;
+
+        if (this.config.nestedPayload && canSpawnNested) {
              let nextVel = this.vel.norm().mult(this.vel.mag() * 1.1); 
              if (nextVel.mag() < 2) nextVel = new Vec2(0, -5);
              spawnCallback({ x: this.pos.x, y: this.pos.y, vel: nextVel, config: this.config.nestedPayload });
         } else if (this.config.chainPayload && !this.isCopy) {
+            // 普通链式载荷依然禁止 Copy 触发，防止无限循环
             let nextVel = this.vel; if (nextVel.mag() < 1) nextVel = new Vec2(0, 5);
             spawnCallback({ x: this.pos.x, y: this.pos.y, vel: nextVel.norm().mult(10), config: this.config.chainPayload });
         }
+        
         if (this.config.type === 'flying_sword') {
             if (this.lastHitEnemy && this.lastHitEnemy.active) this.stickToEnemy(this.lastHitEnemy);
             else this.handleFlyingSwordFinish(null, game);
