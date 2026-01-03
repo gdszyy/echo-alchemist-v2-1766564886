@@ -60,6 +60,8 @@ import {
 
 import { Camera } from './camera.js';
 
+import { SelectionPhase, GatheringPhase, CombatPhase } from './phases.js';
+
 // ==================== 音频管理器 ====================
 
 class SoundManager {
@@ -1015,6 +1017,7 @@ class Game {
         };
         // 游戏状态变量
         this.phase = 'meta'; // 当前阶段 ('meta', 'selection', 'gathering', 'combat', 'gameover')
+        this.currentPhase = null; // 当前阶段对象 (SelectionPhase, GatheringPhase, CombatPhase)
         this.marblesPool = []; // 弹珠池
         this.selectedMarbles = []; // 已选择的弹珠 (3个)
         this.marbleQueue = []; // 待收集的弹珠队列
@@ -1427,20 +1430,31 @@ class Game {
         }
 
         // 4. 阶段逻辑与渲染分发
-if (this.phase === 'truth_book') {
-	            this.truthBook.update();
-	        }
-	        if (this.phase === 'training') {
-	            this.trainingGround.update();
-	        }
-        switch (this.phase) {
-            case 'gathering':
-                this.phase_gathering_update(timeScale);
-                break;
-            case 'training':
-            case 'combat':
-                this.phase_combat_update(timeScale);
-                break;
+        if (this.phase === 'truth_book') {
+            this.truthBook.update();
+        }
+        if (this.phase === 'training') {
+            this.trainingGround.update();
+        }
+        
+        // 使用阶段对象的update方法
+        if (this.currentPhase) {
+            this.currentPhase.update(timeScale);
+        } else {
+            // 对于没有阶段对象的阶段，使用原有逻辑
+            switch (this.phase) {
+                case 'gathering':
+                    if (this.phase_gathering_update) {
+                        this.phase_gathering_update(timeScale);
+                    }
+                    break;
+                case 'training':
+                case 'combat':
+                    if (this.phase_combat_update) {
+                        this.phase_combat_update(timeScale);
+                    }
+                    break;
+            }
         }
 
         // 5. 特效与文字层渲柑
@@ -5041,19 +5055,43 @@ if (this.phase === 'truth_book') {
      * @param {string} newPhase - **重要参数** 新阶段名称 ('selection', 'gathering', 'combat', 'gameover')。
      */
     phase_switchPhase(newPhase) {
+        // 清理当前阶段
+        if (this.currentPhase) {
+            this.currentPhase.cleanup();
+        }
+        
+        // 创建新阶段对象
+        if (newPhase === 'selection') {
+            this.currentPhase = new SelectionPhase(this);
+        } else if (newPhase === 'gathering') {
+            this.currentPhase = new GatheringPhase(this);
+        } else if (newPhase === 'combat') {
+            this.currentPhase = new CombatPhase(this);
+        } else {
+            // 其他阶段（meta, truth_book, training）不使用阶段对象
+            this.currentPhase = null;
+        }
+        
+        // 初始化新阶段
+        if (this.currentPhase) {
+            this.currentPhase.init();
+        }
+        
+        // 更新阶段状态
         this.phase = newPhase;
         this.ui_updateUI(); // 更新 UI 界面
+        
+        // 显示阶段标题
         const titleContainer = document.getElementById('phase-title-container');
         const titleText = document.getElementById('phase-title');
         const subText = document.getElementById('phase-sub');
-        titleContainer.classList.remove('minimized'); // 显示阶段标题
+        titleContainer.classList.remove('minimized');
 
         // 根据阶段设置标题文本
-        let text = "命運抉择"; let sub = "選擇你的命運";
+        let text = "命運拉择"; let sub = "選擇你的命運";
         if (newPhase === 'gathering') { text = "研磨階段"; sub = "收集魔力"; }
         else if (newPhase === 'combat') { text = "戰鬥階段"; sub = "抵禦魔像"; }
         else if (newPhase === 'truth_book') { text = "真理之書"; sub = "洞悉萬物之理"; }
-        else if (newPhase === 'training') { text = "試煉場"; sub = "極限戰鬥測試"; }
         else if (newPhase === 'training') { text = "試煉場"; sub = "極限戰鬥測試"; }
         titleText.innerText = text; subText.innerText = sub;
         
@@ -5749,7 +5787,7 @@ if (this.phase === 'truth_book') {
      * @method startCombatPhase
      * @description 开始战斗阶段，初始化敌人和UI。
      */
-    phase_startCombatPhase() { 
+    phase_startCombatPhase_impl() { 
         console.log("进入战斗阶段...");
         this.isEnemyTurn = false;
         this.energyOrbs = [];
@@ -7243,7 +7281,7 @@ if (this.phase === 'truth_book') {
      * @method updateCombat
      * @description 战斗阶段的游戏逻辑更新 (含可视化墙壁与分层视差)。
      */
-    phase_combat_update(timeScale) {
+    phase_combat_update_impl(timeScale) {
 
         // === [新增] 处理子剑动态生成队列 ===
         if (this.sonSwordQueue.length > 0) {
