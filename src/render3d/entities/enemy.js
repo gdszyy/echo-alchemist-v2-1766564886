@@ -67,11 +67,6 @@ export class Enemy3D {
         
         // 创建3D网格
         this.createMesh();
-        
-            hp: enemy2D.hp,
-            maxHp: enemy2D.maxHp,
-            type: enemy2D.type
-        });
     }
     
     /**
