@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enemy3D 性能测试 - Task 6.2</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #0f172a;
+            color: #e2e8f0;
+            font-family: monospace;
+        }
+        #stats {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 1000;
+            min-width: 300px;
+        }
+        #stats h3 {
+            margin: 0 0 10px 0;
+            color: #22d3ee;
+        }
+        #stats .stat-line {
+            margin: 5px 0;
+        }
+        #stats .stat-value {
+            color: #34d399;
+            font-weight: bold;
+        }
+        #stats .stat-label {
+            color: #94a3b8;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 600px;
+            position: relative;
+            margin-top: 200px;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+        }
+        button {
+            background: #0891b2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0e7490;
+        }
+    </style>
+</head>
+<body>
+    <div id="stats">
+        <h3>性能统计 (Task 6.2)</h3>
+        <div class="stat-line">
+            <span class="stat-label">FPS:</span>
+            <span class="stat-value" id="fps">0</span>
+        </div>
+        <div class="stat-line">
+            <span class="stat-label">敌人数量:</span>
+            <span class="stat-value" id="enemy-count">0</span>
+        </div>
+        <div class="stat-line">
+            <span class="stat-label">脏标记更新次数/帧:</span>
+            <span class="stat-value" id="dirty-updates">0</span>
+        </div>
+        <div class="stat-line">
+            <span class="stat-label">位置更新次数/帧:</span>
+            <span class="stat-value" id="position-updates">0</span>
+        </div>
+        <div class="stat-line">
+            <span class="stat-label">颜色更新次数/帧:</span>
+            <span class="stat-value" id="color-updates">0</span>
+        </div>
+        <div class="stat-line">
+            <span class="stat-label">平均帧时间:</span>
+            <span class="stat-value" id="frame-time">0</span> ms
+        </div>
+    </div>
+
+    <div class="controls">
+        <button onclick="addEnemies(10)">添加 10 个敌人</button>
+        <button onclick="addEnemies(50)">添加 50 个敌人</button>
+        <button onclick="clearEnemies()">清空敌人</button>
+        <button onclick="triggerHitAll()">全体受击</button>
+        <button onclick="changeTemperatureAll()">改变温度</button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+        import { Enemy3D } from './src/render3d/entities/enemy.js';
+
+        // 创建场景
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 20;
+        camera.position.y = 5;
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, 600);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // 添加光源
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 10, 10);
+        scene.add(directionalLight);
+
+        // 敌人数组
+        const enemies = [];
+        let enemyIdCounter = 0;
+
+        // 性能统计
+        let frameCount = 0;
+        let lastTime = performance.now();
+        let fps = 0;
+        let frameTimes = [];
+        let dirtyUpdateCount = 0;
+        let positionUpdateCount = 0;
+        let colorUpdateCount = 0;
+
+        // 创建模拟的2D敌人对象
+        function createMockEnemy2D() {
+            return {
+                id: enemyIdCounter++,
+                pos: {
+                    x: 400 + (Math.random() - 0.5) * 600,
+                    y: 300 + (Math.random() - 0.5) * 400
+                },
+                width: 40 + Math.random() * 20,
+                height: 40 + Math.random() * 20,
+                hp: 100,
+                maxHp: 100,
+                temp: 0,
+                type: Math.random() > 0.8 ? 'elite' : 'normal',
+                active: true,
+                hitTimer: 0,
+                velocity: {
+                    x: (Math.random() - 0.5) * 2,
+                    y: (Math.random() - 0.5) * 2
+                }
+            };
+        }
+
+        // 添加敌人
+        window.addEnemies = function(count) {
+            for (let i = 0; i < count; i++) {
+                const enemy2D = createMockEnemy2D();
+                const enemy3D = new Enemy3D(enemy2D, scene);
+                enemies.push({ enemy2D, enemy3D });
+            }
+            console.log(`添加了 ${count} 个敌人，当前总数: ${enemies.length}`);
+        };
+
+        // 清空敌人
+        window.clearEnemies = function() {
+            enemies.forEach(({ enemy3D }) => {
+                enemy3D.destroy();
+            });
+            enemies.length = 0;
+            console.log('已清空所有敌人');
+        };
+
+        // 触发全体受击
+        window.triggerHitAll = function() {
+            enemies.forEach(({ enemy2D, enemy3D }) => {
+                enemy2D.hitTimer = 0.3;
+                enemy3D.triggerHitFlash();
+            });
+            console.log('触发全体受击效果');
+        };
+
+        // 改变全体温度
+        window.changeTemperatureAll = function() {
+            enemies.forEach(({ enemy2D }) => {
+                enemy2D.temp = (Math.random() - 0.5) * 60;
+            });
+            console.log('改变全体温度');
+        };
+
+        // 更新敌人逻辑
+        function updateEnemies(deltaTime) {
+            dirtyUpdateCount = 0;
+            positionUpdateCount = 0;
+            colorUpdateCount = 0;
+
+            enemies.forEach(({ enemy2D, enemy3D }) => {
+                // 模拟移动
+                enemy2D.pos.x += enemy2D.velocity.x;
+                enemy2D.pos.y += enemy2D.velocity.y;
+
+                // 边界反弹
+                if (enemy2D.pos.x < 100 || enemy2D.pos.x > 700) {
+                    enemy2D.velocity.x *= -1;
+                }
+                if (enemy2D.pos.y < 100 || enemy2D.pos.y > 500) {
+                    enemy2D.velocity.y *= -1;
+                }
+
+                // 更新hitTimer
+                if (enemy2D.hitTimer > 0) {
+                    enemy2D.hitTimer -= deltaTime;
+                }
+
+                // 温度衰减
+                if (Math.abs(enemy2D.temp) > 0.1) {
+                    enemy2D.temp *= 0.98;
+                }
+
+                // 统计脏标记
+                const stats = enemy3D.getStats();
+                if (stats.isDirty) {
+                    dirtyUpdateCount++;
+                }
+                if (stats.dirtyFlags.position) {
+                    positionUpdateCount++;
+                }
+                if (stats.dirtyFlags.color) {
+                    colorUpdateCount++;
+                }
+
+                // 更新3D渲染
+                enemy3D.update(deltaTime);
+            });
+        }
+
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const currentTime = performance.now();
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+
+            // 记录帧时间
+            frameTimes.push(deltaTime * 1000);
+            if (frameTimes.length > 60) {
+                frameTimes.shift();
+            }
+
+            // 更新敌人
+            updateEnemies(deltaTime);
+
+            // 渲染场景
+            renderer.render(scene, camera);
+
+            // 更新FPS统计
+            frameCount++;
+            if (frameCount >= 30) {
+                fps = Math.round(1 / deltaTime);
+                frameCount = 0;
+
+                // 更新UI
+                document.getElementById('fps').textContent = fps;
+                document.getElementById('enemy-count').textContent = enemies.length;
+                document.getElementById('dirty-updates').textContent = dirtyUpdateCount;
+                document.getElementById('position-updates').textContent = positionUpdateCount;
+                document.getElementById('color-updates').textContent = colorUpdateCount;
+                
+                const avgFrameTime = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
+                document.getElementById('frame-time').textContent = avgFrameTime.toFixed(2);
+            }
+        }
+
+        // 响应窗口大小变化
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / 600;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, 600);
+        });
+
+        // 初始化：添加一些敌人
+        addEnemies(20);
+
+        // 启动动画循环
+        animate();
+
+        console.log('性能测试已启动 - Task 6.2 脏标记优化');
+    </script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+    /**
+     * @method combat_render2D
+     * @description 战斗阶段的纯2D渲染 (不包含逻辑更新)
+     */
+    combat_render2D(timeScale) {
+        const tilt = this.boardTilt.current;
+        const bgShiftX = tilt.x * 20;
+        const bgShiftY = tilt.y * 15;
+        const entityShiftX = tilt.x * -15;
+        const entityShiftY = tilt.y * -10;
+
+        this.ctx.save();
+        this.ctx.translate(bgShiftX, bgShiftY); 
+
+            // A. 绘制背景网格
+            this.ctx.save();
+            this.ctx.strokeStyle = 'rgba(71, 85, 105, 0.15)';
+            this.ctx.lineWidth = 1;
+            this.ctx.beginPath();
+            const gridOffsetX = bgShiftX * 1.5;
+            const gridOffsetY = bgShiftY * 1.5;
+            for (let x = -50; x < this.width + 50; x += 40) {
+                this.ctx.moveTo(x, -50); this.ctx.lineTo(x, this.height + 50);
+            }
+            for (let y = -50; y < this.height + 50; y += 40) {
+                this.ctx.moveTo(-50, y); this.ctx.lineTo(this.width + 50, y);
+            }
+            this.ctx.stroke();
+            this.ctx.restore();
+
+            // B. 绘制矩形扩散波
+        this.ctx.restore(); 
+
+
+        // ==========================================
+        //  LAYER 2: 实体层 (墙壁 / 敌人 / 子弹)
+        // ==========================================
+        this.ctx.save();
+        this.ctx.translate(entityShiftX, entityShiftY); 
+
+            // --- [新增]：绘制可视化的边界墙壁 ---
+            this.ctx.save();
+            // 左墙 (半透明渐变)
+            const wallGradLeft = this.ctx.createLinearGradient(0, 0, 20, 0);
+            wallGradLeft.addColorStop(0, 'rgba(148, 163, 184, 0.2)');
+            wallGradLeft.addColorStop(1, 'rgba(148, 163, 184, 0)');
+            this.ctx.fillStyle = wallGradLeft;
+            this.ctx.fillRect(0, -100, 20, this.height + 100);
+            
+            // 右墙 (半透明渐变)
+            const wallGradRight = this.ctx.createLinearGradient(this.width, 0, this.width - 20, 0);
+            wallGradRight.addColorStop(0, 'rgba(148, 163, 184, 0.2)');
+            wallGradRight.addColorStop(1, 'rgba(148, 163, 184, 0)');
+            this.ctx.fillStyle = wallGradRight;
+            this.ctx.fillRect(this.width - 20, -100, 20, this.height + 100);
+
+            // 墙壁发光边框 (明确反弹线)
+            this.ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)'; // Slate-400
+            this.ctx.lineWidth = 2;
+            this.ctx.shadowColor = '#94a3b8';
+            this.ctx.shadowBlur = 10;
+            this.ctx.beginPath();
+            // 左边线
+            this.ctx.moveTo(1, -100); this.ctx.lineTo(1, this.height);
+            // 右边线
+            this.ctx.moveTo(this.width - 1, -100); this.ctx.lineTo(this.width - 1, this.height);
+            // 顶部线 (封顶)
+            this.ctx.moveTo(0, 1); this.ctx.lineTo(this.width, 1);
+            this.ctx.stroke();
+            this.ctx.restore();
+            // ------------------------------------
+
+            // C. 绘制游戏实体
+            
+            // 绘制警戒区（在敌人下方，确保enemywave时也显示）
+            if (this.player) {
+                this.player.drawAlertZone(this.ctx);
+            }
+            
+            let activeEnemies = 0; 
+            let anyEnemyMoving = false;
+        // 绘制敌人
+        this.enemies.forEach(e => {
+            if (e.active) {
+                e.draw(this.ctx);
+            }
+        });
+
+
+
+            // 更新和绘制弹丸
+        // 绘制弹丸
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const p = this.projectiles[i];
+            if(p) p.draw(this.ctx);
+        }
+
+
+            // 更新和绘制 FireWaves
+        // 绘制火焰波
+        for (let i = this.fireWaves.length - 1; i >= 0; i--) {
+            const fw = this.fireWaves[i];
+            fw.draw(this.ctx);
+        }
+
+
+            // 更新和绘制特效
+        // 绘制粒子
+        for(let i=this.particles.length-1; i>=0; i--) { let p = this.particles[i]; if(p) p.draw(this.ctx); }
+        for(let i=this.shockwaves.length-1; i>=0; i--) { let s = this.shockwaves[i]; if(s) s.draw(this.ctx); }
+        for(let i=this.lightningBolts.length-1; i>=0; i--) { let b = this.lightningBolts[i]; b.draw(this.ctx); }
+        for(let i=this.spores.length-1; i>=0; i--) { let s = this.spores[i]; if(s) s.draw(this.ctx); }
+            if (this.swordQis) {
+                this.swordQis.forEach(qi => qi.draw(this.ctx));
+            }
+            // 蝴蝶法阵更新和绘制
+            this.combat_wind_updateButterflyCircles(timeScale);
+            this.combat_wind_drawButterflyCircles(this.ctx);
+            this.combat_wind_updateButterflyBlades(timeScale);
+            this.combat_wind_drawButterflyBlades(this.ctx);
+            // 风暴核心更新和绘制
+            this.combat_wind_updateStormCores(timeScale);
+            this.combat_wind_drawStormCores(this.ctx);
+            // 拖拽瞄准线
+            if (this.isDragging && this.projectiles.length === 0 && this.ammoQueue.length > 0 && this.burstQueue.length === 0) {
+                const start = new Vec2(this.width / 2, this.height - 80);
+                let force = this.lastMousePos.sub(start);
+                
+                if (force.y < -20) {
+                    const maxLen = 800; 
+                    const radius = CONFIG.physics.bulletRadius;
+                    let dir = force.norm(); 
+                    
+                    this.ctx.save();
+                    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.setLineDash([6, 6]);
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(start.x, start.y);
+
+                    let distToX = Infinity;
+                    let distToY = Infinity;
+                    if (dir.x > 0) distToX = (this.width - radius - start.x) / dir.x;
+                    else if (dir.x < 0) distToX = (radius - start.x) / dir.x;
+                    if (dir.y < 0) distToY = (radius - start.y) / dir.y;
+
+                    let hitDist = Math.min(distToX, distToY);
+                    if (hitDist < maxLen) {
+                        const hitPoint = start.add(dir.mult(hitDist));
+                        this.ctx.lineTo(hitPoint.x, hitPoint.y);
+                        const remainLen = maxLen - hitDist;
+                        let reflectDir = new Vec2(dir.x, dir.y);
+                        if (distToX < distToY) reflectDir.x *= -1; 
+                        else reflectDir.y *= -1; 
+                        const endPoint = hitPoint.add(reflectDir.mult(remainLen));
+                        this.ctx.lineTo(endPoint.x, endPoint.y);
+                        this.ctx.stroke();
+                        this.ctx.beginPath();
+                        this.ctx.setLineDash([]);
+                        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                        this.ctx.arc(endPoint.x, endPoint.y, 3, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    } else {
+                        const end = start.add(dir.mult(maxLen));
+                        this.ctx.lineTo(end.x, end.y);
+                        this.ctx.stroke();
+                    }
+                    this.ctx.restore();
+
+                    this.ctx.save();
+                    this.ctx.translate(start.x, start.y);
+                    this.ctx.rotate(Math.atan2(force.y, force.x));
+                    this.ctx.fillStyle = '#6366f1';
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 0, 15, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.fillStyle = '#818cf8';
+                    this.ctx.fillRect(10, -6, 12, 12); 
+                    this.ctx.restore();
+                }
+            } else if (this.projectiles.length === 0) {
+                const start = new Vec2(this.width / 2, this.height - 80);
+                this.ctx.save();
+                this.ctx.translate(start.x, start.y);
+                this.ctx.rotate(-Math.PI / 2); 
+                this.ctx.fillStyle = '#475569';
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, 12, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.fillRect(8, -4, 8, 8);
+                this.ctx.restore();
+            }
+
+        this.sonSwords.forEach(s => s.draw(this.ctx));
+        // 清理不活跃的子剑
+
+        this.ctx.restore(); // 结束实体层
+
+
+        // --- UI Overlays ---
+        if (this.gameOver) { 
+            // [META] 结算货币并保存
+            if (this.runCurrency > 0) {
+                this.meta_addCurrency(this.runCurrency);
+                this.runCurrency = 0;
+            }
+
+            return; 
+        }
+
+
+    }

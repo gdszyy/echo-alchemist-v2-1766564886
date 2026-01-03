@@ -1,0 +1,34 @@
+// 此文件用于存储修复后的代码片段，稍后将通过 edit 应用
+    constructor() {
+        this.variantLevels = {
+            flying_sword: 1 // 默认为 1 级，后续如有升级逻辑可修改此值
+        };
+        this.marbleSizeBonus=0;
+        this.isVisualEffectActive = false;
+        this.isWheelSpinning = false;
+        this.is3DMode = false; // [新增] 3D 模式标志
+        this.canvas = document.getElementById('gameCanvas'); this.ctx = this.canvas.getContext('2d');
+        this.sys_resize();
+        
+        // 初始化摄像机
+        this.camera = new Camera(this.width, this.height);
+        
+        // 初始化3D渲染系统
+        this.render3d = new RenderSystem3D(this);
+        
+        // [新增] 初始化性能监控工具 stats.js
+        this.initStats();
+        this.is3DMode = false; // 3D模式标志位
+        
+        // 初始化玩家
+        this.player = new Player(this);
+        
+        // 窗口大小变化时重新调整 Canvas 大小并重新初始化弹珠台布局
+        window.addEventListener('resize', () => { this.sys_resize(); if (this.phase === 'gathering') this.phase_gathering_initPachinko(); });
+        this.ui = new UIManager();
+        this.boardTilt = {
+            current: { x: 0, y: 0 }, // 当前平滑后的倾斜值 (-1 ~ 1)
+            target: { x: 0, y: 0 },  // 目标倾斜值 (来自传感器或鼠标)
+            enabled: false           // 是否已启用陀螺仪
+        };
+        // 游戏状态变量

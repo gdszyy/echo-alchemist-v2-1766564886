@@ -1,4 +1,4 @@
-# Echo Alchemist (回聲煉金師) - 代码结构化索引 v4.0
+# Echo Alchemist (回聲煉金師) - 代码结构化索引 v4.1
 
 本项目是一个基于 HTML5 Canvas 和 JavaScript 开发的**模块化 Roguelike 游戏**。
 
@@ -20,6 +20,7 @@
 | **`src/config.js`** | 全局配置中心。 | `CONFIG` 对象、`RELIC_DB`、`SKILL_DB` 及平衡性参数。 |
 | **`src/entities.js`** | 游戏实体定义。 | `Enemy`、`Projectile`、`Particle` 等基础类。 |
 | **`src/systems.js`** | 业务逻辑子系统。 | `TrainingGround` (试炼场)、`TruthBook` (真理之书) 及 UI 交互逻辑。 |
+| **`src/render3d/`** | **3D 渲染系统核心**。 | 基于 Three.js 实现的 3D 场景、实体同步及摄像机控制。 |
 
 ### 1.2 核心类说明
 
@@ -31,6 +32,10 @@
 | **`Enemy`** | 敌人逻辑，处理 AI、血量、词缀及受击反馈。 | `update`, `draw`, `advance` |
 | **`Projectile`** | 战斗弹丸，处理移动、碰撞及特殊攻击逻辑。 | `update`, `draw`, `destroy` |
 | **`SoundManager`** | 音频引擎，基于 Web Audio API 合成音效。 | `playEffect`, `playTone`, `resume` |
+| **`RenderSystem3D`** | 3D 渲染主控制器，负责 2D/3D 实体同步及模式切换。 | `transitionTo3D`, `transitionTo2D`, `syncEnemies`, `syncParticles` |
+| **`SceneManager`** | 3D 场景管理器，负责光照、地板、雾效等环境配置。 | `addLights`, `addReflectiveFloor`, `addFog` |
+| **`CameraController`** | 3D 摄像机控制器，管理视角预设及 2D/3D 模式间的平滑过渡。 | `transitionTo3D`, `transitionTo2D`, `setPreset` |
+| **`Enemy3D`** | 3D 敌人实体，实现受击闪烁、温度变色及动画效果。 | `update`, `triggerHitFlash`, `updateTemperatureColor` |
 
 ## 2. 功能模块详解
 
@@ -61,6 +66,15 @@
     - **来源标记**: 使用斜纹纹理标记“散射”产生的伤害，同时保留其所属的伤害类型颜色。
 - **历史回溯**: 支持查看当前回合及过往回合的详细伤害分布。
 
+### 2.5 3D 渲染系统 (3D Rendering System)
+
+项目引入了基于 **Three.js** 的实验性 3D 渲染系统，旨在提供更具沉浸感的视觉体验，并作为未来功能扩展的基础。
+
+- **核心目标**: 在保留 2D 游戏逻辑的同时，将关键实体（敌人、子弹、粒子）的视觉表现同步到 3D 空间。
+- **模式切换**: 支持 2D (俯视) 和 3D (等距) 视角之间的平滑过渡，由 `CameraController` 负责管理。
+- **实体同步**: `RenderSystem3D` 负责将 2D 逻辑实体的位置、状态（如生命值、温度）实时映射到 3D 网格。
+- **视觉效果**: 3D 实体（如 `Enemy3D`）实现了复杂的视觉反馈，包括受击闪烁、基于温度的颜色渐变、以及生成/死亡的动画效果。
+
 ## 3. 属性系统与规则
 
 ### 3.1 属性分类体系
@@ -73,6 +87,7 @@
 | **高级 (Advanced)** | 独特机制或进化属性。 | `flying_sword` (飞剑), `wind` (风), `laser` (激光) |
 
 ### 3.2 详细规则文档
+- [**3D 渲染系统技术文档**](docs/3D_RENDERING.md): 详细介绍 3D 渲染的实现原理、架构和使用方法。
 - [**风属性系统逻辑**](RULES_WIND_V2.md): 锚点生成、几何判定及法阵效果。
 - [**子母剑系统规则**](RULES_FLYING_SWORD.md): 飞剑获取、升级及战斗行为。
 
