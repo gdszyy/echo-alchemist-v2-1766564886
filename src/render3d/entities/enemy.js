@@ -342,7 +342,11 @@ export class Enemy3D {
         this.material.color.copy(this.currentColor);
         
         // 检查是否已经接近目标颜色，如果是则清除脏标记
-        const colorDistance = this.currentColor.distanceTo(this.targetColor);
+        // 注意：THREE.Color没有distanceTo方法，需要手动计算颜色距离
+        const dr = this.currentColor.r - this.targetColor.r;
+        const dg = this.currentColor.g - this.targetColor.g;
+        const db = this.currentColor.b - this.targetColor.b;
+        const colorDistance = Math.sqrt(dr * dr + dg * dg + db * db);
         if (colorDistance < 0.01) {
             this.clearDirty('color');
         }
