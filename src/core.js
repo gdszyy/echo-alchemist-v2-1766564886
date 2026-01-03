@@ -2671,29 +2671,28 @@ if (this.phase === 'truth_book') {
                 // [应用弱点策略]：如果是选定的弱点列，血量强制设为极低
                 if (c === weakSpotCol) {
                     // 弱点怪血量约为基础血量的 10% ~ 20%，或者直接为 1
-                    const variantRatio = (12 + (Math.random() * 14 - 7)) / 100; 
+                    const variantRatio = (12 + (Math.random() * 14 - 7)) / 100;
                     const weakHP = Math.max(1, Math.floor(baseHP * variantRatio));
                     hp = weakHP;
                 }
-
-                const e = new Enemy(centerX, yPos, w, this.enemyHeight, hp);
-                
+                const e = new Enemy(centerX, yPos, w, this.enemyHeight, hp);               
                 // 生成词条 (如果是弱点怪，不带词条)
                 if (c === weakSpotCol) {
                     e.affixes = [];
-                    // 可以在这里给弱点怪加个视觉标记，比如颜色变淡，或者在 update 里处理
                 } else {
                     e.affixes = this.spawn_generateAffixes();
+                }
+
+                // [新增] 初始化护盾层数 (1 + 回合数)
+                if (e.affixes.includes('shield')) {
+                    e.shieldCharges = 1 + this.round;
                 }
 
                 if (e.affixes.length > 0) e.type = 'elite';
                 
                 this.enemies.push(e);
                 currentCount++;
-            }
-        }
-
-        // =========================================
+              // =========================================
         // 4. 最后实例化导演生成的精英 (Pending Spawns)
         // =========================================
         for (let cfg of pendingSpawns) {
@@ -2702,11 +2701,18 @@ if (this.phase === 'truth_book') {
             if (!this.calc_isAreaOccupied(centerX, yPos, w * 0.8, this.enemyHeight * 0.8)) {
                 const e = new Enemy(centerX, yPos, w, this.enemyHeight, cfg.hp);
                 e.affixes = cfg.affixes || [];
+                
+                // [新增] 初始化护盾层数
+                if (e.affixes.includes('shield')) {
+                    e.shieldCharges = 1 + this.round;
+                }
+
                 if (e.affixes.length > 0) e.type = 'elite';
                 this.enemies.push(e);
             }
         }
     }
+
     /**
      * [AUTO-GENERATED] TODO: Add a description for spawn_addSkillPoint.
      * @param {any} amount - TODO: Describe this parameter.
@@ -4153,12 +4159,10 @@ if (this.phase === 'truth_book') {
 		             
 		             projectile.chainHistory.push(enemy); 
 		        }
-
-        const damageResult = enemy.takeDamage(dmg);
+        // [修改] 调用 takeDamage 时传入 projectile 作为源，用于方向判定
+        const damageResult = enemy.takeDamage(dmg, projectile);
         const killed = damageResult.killed;
-        const actualDmg = damageResult.actualDamage;
-
-        // --- [新增] 确定基础伤害类型 (用于统计图表行) ---
+        const actualDmg = damageResult.actualDamage; // --- [新增] 确定基础伤害类型 (用于统计图表行) ---
         // 需求2a: 火属性子弹的弹射/穿透伤害分别统计，只有额外火伤才算火属性
         let damageType = 'damage'; // 默认为物理/基础
 

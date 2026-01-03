@@ -1962,16 +1962,15 @@ class DropBall {
             ctx.ellipse(-r*0.35, -r*0.35, r*0.3, r*0.2, Math.PI/4, 0, Math.PI*2);
             ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
             ctx.fill();
-        }
-	}
-
-class Enemy {
     constructor(x, y, width, height, hp, maxHp = hp, type = 'normal', affixes = []) {
         this.pos = new Vec2(x, y); 
         this.width = width; 
         this.height = height; 
         this.hp = hp;       
         this.maxHp = maxHp; 
+
+        // [新增] 护盾充能层数 (默认为0，生成时在core.js中赋值)
+        this.shieldCharges = 0;
 
         // --- [新增/修改] 血条动画相关 ---
         this.displayHp = this.hp;      // 真实血条的显示值 (平滑过渡)
@@ -3093,26 +3092,57 @@ class Enemy {
             ctx.stroke();
             ctx.restore();
         }
-    }
 
     addSwordMark(amount = 1) {
         this.swordMarks += amount;
-        this.markTimer = CONFIG.flyingSword.markDuration;
     }
 
-    takeDamage(amount) {
+    /**  * 受到伤害
+     * @param {number} amount - 伤害数值
+     * @param {object|null} source - 伤害来源 (通常是 projectile 或带有 pos 的对象)
+     */
+    takeDamage(amount, source = null) {
         let actualDamage = amount;
         
-        // 1. 计算护盾减伤
+        // 1. 计算护盾逻辑 (优化版)
         if (this.affixes.includes('shield')) {
-            const reduction = CONFIG.balance.affixes.shieldReduction || 0.8;
-            actualDamage *= reduction; // 护盾减少伤害
-            
-            // 触发护盾视觉反馈 (限制频率)
-            if (this.shieldHitTimer <= 0) {
-                this.shieldHitTimer = 15;
+            // A. 方向判定：检查是否从后方 (上方) 攻击
+            // 敌人坐标是中心点，如果子弹在敌人上方 (y < pos.y)，则视为绕后
+            let isBackAttack = false;
+            if (source && source.pos && source.pos.y < this.pos.y) {
+                isBackAttack = true;
+            }
+
+            // B. 护盾生效判定：非绕后且有剩余次数
+            if (!isBackAttack && this.shieldCharges > 0) {
+                const reduction = CONFIG.balance.affixes.shieldReduction || 0.8;
+                actualDamage *= reduction; // 护盾减少伤害 (只受20%伤害)
+                this.shieldCharges--; // 消耗一层护盾
+
+                // 触发护盾视觉反馈 (限制频率)
+                if (this.shieldHitTimer <= 0) {
+                    this.shieldHitTimer = 15;
+                    if (typeof game !== 'undefined') {
+                        // 显示剩余层数
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, `🛡️${this.shieldCharges}`, "#93c5fd");
+                    }
+                }
+
+                // C. 护盾破碎判定
+                if (this.shieldCharges <= 0) {
+                    // 移除护盾词条
+                    this.affixes = this.affixes.filter(a => a !== 'shield');
+                    if (typeof game !== 'undefined') {
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, "💔BROKEN!", "#ef4444");
+                        game.spawn_createParticle(this.pos.x, this.pos.y, '#93c5fd', 'shard');
+                        // 播放破碎音效 (如果支持)
+                        // audio.playEffect('shatter'); 
+                    }
+                }
+            } else if (isBackAttack) {
+                // 绕后攻击反馈
                 if (typeof game !== 'undefined') {
-                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "🛡️Block", "#93c5fd");
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "🗡️BACKSTAB!", "#facc15");
                 }
             }
         }
