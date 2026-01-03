@@ -6307,6 +6307,7 @@ if (this.phase === 'truth_book') {
                     currentScatterIdx++;
                 }
             }
+		}
             // === [修改重点] 散射 (Scatter) 实体子弹优化 ===
         // 风属性子弹强制单发，不受 scatter 影响
         if (recipe.scatter > 0 && !recipe.wind) { 
