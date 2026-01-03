@@ -2089,12 +2089,11 @@ class DropBall {
             this.bumpOffsetY -= 1 * timeScale;
             if (this.bumpOffsetY < 0) this.bumpOffsetY = 0;
         }
-        // 1. 真实血条平滑过渡 (保持原逻辑)
-        // this.displayHp = lerp(this.displayHp, this.hp, 0.2);
-
+        // 1. 真实血条更新逻辑 (Damage Scrolling vs Healing Animation)
+        // [优化]：将伤害滚动与回血动画分离，防止回血时被强制 Snap 导致动画丢失
         
-        // 血量滚动
         if (this.displayHp > this.hp) {
+            // Case A: 受到伤害 (Damage) -> 向下滚动
             const diff = this.displayHp - this.hp;
             if (diff > 20) {
                 this.displayHp -= diff * 0.2 * timeScale;
@@ -2106,52 +2105,63 @@ class DropBall {
                     this.displayHp -= 1;
                 }
             }
+            // 防止过冲
             if (this.displayHp < this.hp) this.displayHp = this.hp;
+            
+        } else if (this.displayHp < this.hp) {
+            // Case B: 正在回血 (Healing) -> 向上增长
+            // [关键]：此处不做任何操作，也不重置 displayHp！
+            // 具体的增长逻辑 (Lerp) 交给下方的 "绿色回血血条逻辑" 统一处理
+            this.hpDropTimer = 0;
+            
         } else {
+            // Case C: 稳定状态 (Stable)
             this.displayHp = this.hp;
             this.hpDropTimer = 0;
         }
 
-        // 2. 白色延迟血条逻辑
+        // 2. 白色延迟血条逻辑 (White Bar)
         if (this.whiteBarTimer > 0) {
-            // 如果还在缓冲期（刚受过伤），白色血条不动，保持在旧的高位
             this.whiteBarTimer--;
         } else {
-            // 缓冲结束，白色血条快速追赶当前血量
-            // 追赶速度比 displayHp 快，产生"崩塌"感
             this.delayedHp = lerp(this.delayedHp, this.displayHp, 0.25);
-            
-            // 阈值修正，防止无限逼近
             if (Math.abs(this.delayedHp - this.displayHp) < 0.1) {
                 this.delayedHp = this.displayHp;
             }
         }
-        
-        // 确保白色血条不会低于真实血条 (比如治疗时)
+        // 治疗时，白条跟随真实血条上涨，不应滞后
         if (this.delayedHp < this.displayHp) {
             this.delayedHp = this.displayHp;
         }
 
-        // 3. [新增] 绿色回血血条逻辑
-        if (this.hp > this.greenHp) {
-            // 发生回血，greenHp 立即跳到新血量，displayHp 随后跟上
+        // 3. 绿色回血血条逻辑 (Green Bar & Healing Animation)
+        
+        // [新增]：如果受到伤害 (当前血量 < 预期绿条)，立即中断回血预览，防止绿条悬空
+        if (this.hp < this.greenHp) {
             this.greenHp = this.hp;
-            this.greenBarTimer = 45; // 增加缓冲时间，约 0.75 秒
+            this.greenBarTimer = 0;
+        }
+
+        // 检测回血触发
+        if (this.hp > this.greenHp) {
+            this.greenHp = this.hp;
+            this.greenBarTimer = 45; // 缓冲时间，展示绿条
         }
 
         if (this.greenBarTimer > 0) {
             this.greenBarTimer -= timeScale;
-            // 在缓冲期内，displayHp 保持不动，让绿色血块显现
+            // 缓冲期：displayHp 暂停增长，让玩家看清绿色的 "预期回血量"
         } else {
-            // 缓冲结束，displayHp 开始追赶真实血量
+            // 缓冲结束：displayHp 追赶真实 hp
             if (this.displayHp < this.hp) {
-                // 回血时，displayHp 慢慢涨上去
                 this.displayHp = lerp(this.displayHp, this.hp, 0.1 * timeScale);
+                // 吸附
                 if (Math.abs(this.hp - this.displayHp) < 0.5) {
                     this.displayHp = this.hp;
-                    this.greenHp = this.hp; // 追赶完成后同步 greenHp
+                    this.greenHp = this.hp;
                 }
             } else {
+                // 稳定后同步
                 this.greenHp = this.hp;
             }
         }
