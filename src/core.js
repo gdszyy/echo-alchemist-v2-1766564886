@@ -6356,7 +6356,8 @@ if (this.phase === 'truth_book') {
             // 2. 生成 50% 继承的副子弹 (属性层数也减半)
             for (let i = 0; i < halfInheritCount; i++) {
                 const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
-                const multiplier = Math.ceil(currentScatterIdx /                 const angleOffset = 0.2 * multiplier * sign;
+                const multiplier = Math.ceil(currentScatterIdx /2);
+				const angleOffset = 0.2 * multiplier * sign;
                 const newVel = vel.rotate(angleOffset);                
                 // 半继承：因子为 0.5
                 const copyRecipe = createScatterRecipe(recipe, 0.5);
