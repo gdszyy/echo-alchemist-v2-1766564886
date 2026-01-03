@@ -5,18 +5,21 @@
  * - 管理three.js场景、渲染器、摄像机
  * - 提供2D/3D模式切换功能
  * - 在游戏主循环中更新3D场景
- * - 协调敌人、子弹、粒子的3D渲染
+ * - 协调敌人、子弹、粒子、冲击波、闪电的3D渲染
  * 
  * 架构说明：
  * - 使用统一的坐标转换工具（coordinate.js）
  * - 敌人使用独立的Enemy3D类管理
  * - 子弹和粒子使用简化的Mesh管理（未来可扩展为独立渲染器）
+ * - 冲击波和闪电使用专用渲染器
  */
 
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
 import { CameraController, CameraPreset } from './camera.js';
 import { Enemy3D } from './entities/enemy.js';
 import { mapTo3D, HEIGHT_LAYERS } from './utils/coordinate.js';
+import { ShockwaveRenderer3D } from './effects/shockwave.js';
+import { LightningRenderer3D } from './effects/lightning.js';
 
 /**
  * 3D渲染系统主类
@@ -36,12 +39,19 @@ export class RenderSystem3D {
         this.projectile3DMap = new Map(); // key: projectile2D实例, value: THREE.Mesh
         this.particle3DMap = new Map(); // key: particle2D实例, value: THREE.Mesh
         
+        // === 特效渲染器 ===
+        this.shockwaveRenderer = null; // 冲击波渲染器
+        this.lightningRenderer = null; // 闪电渲染器
+        
         // === 创建3D Canvas容器 ===
         this.container = this.createContainer();
         document.body.appendChild(this.container);
         
         // === 初始化three.js核心组件 ===
         this.initThreeJS();
+        
+        // === 初始化特效渲染器 ===
+        this.initShockwaveRenderer();
         
         // === 开发模式：添加调试辅助 ===
         if (this.isDebugMode()) {
@@ -94,6 +104,9 @@ export class RenderSystem3D {
         // === 添加光照系统 ===
         this.setupLighting();
         
+        // === 初始化闪电渲染器 ===
+        this.lightningRenderer = new LightningRenderer3D(this.scene, this.game);
+        
         // === 监听窗口大小变化 ===
         window.addEventListener('resize', () => this.onWindowResize());
     }
@@ -110,6 +123,14 @@ export class RenderSystem3D {
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
         directionalLight.position.set(5, 10, 7.5);
         this.scene.add(directionalLight);
+    }
+    
+    /**
+     * 初始化冲击波渲染器
+     */
+    initShockwaveRenderer() {
+        this.shockwaveRenderer = new ShockwaveRenderer3D(this.scene, 100);
+        console.log('[RenderSystem3D] 冲击波渲染器初始化完成');
     }
     
     /**
@@ -434,6 +455,17 @@ export class RenderSystem3D {
     }
     
     /**
+     * 同步冲击波到3D场景
+     * 从游戏的2D shockwaves数组创建/更新3D表示
+     */
+    syncShockwaves() {
+        if (!this.enabled || !this.game.shockwaves || !this.shockwaveRenderer) return;
+        
+        // 调用冲击波渲染器的同步方法
+        this.shockwaveRenderer.syncShockwaves(this.game.shockwaves, this.game);
+    }
+    
+    /**
      * 启用3D渲染
      */
     enable() {
@@ -469,18 +501,25 @@ export class RenderSystem3D {
     update(deltaTime) {
         if (!this.enabled) return;
         
-        // 更新摄像机控制器
-        if (this.cameraController) {
-            this.cameraController.update();
-        }
-        
         // 同步所有实体
         this.syncEnemies();
         this.syncProjectiles();
         this.syncParticles();
+        this.syncShockwaves();
+        
+        // 同步和更新闪电链
+        if (this.lightningRenderer) {
+            this.lightningRenderer.sync();
+            this.lightningRenderer.update(deltaTime);
+        }
         
         // 更新敌人动画
         this.updateEnemies(deltaTime);
+        
+        // 更新摄像机控制器
+        if (this.cameraController) {
+            this.cameraController.update(deltaTime);
+        }
         
         // 渲染场景
         this.renderer.render(this.scene, this.camera);
