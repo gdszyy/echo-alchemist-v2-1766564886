@@ -2270,6 +2270,53 @@ class DropBall {
         // 如果被冻结，直接跳过
         if (this.isFrozenCurrentTurn) {
             this.playFreezeBlockEffect(game);
+            
+            // ============================================================
+            // [新增] 冰属性脆化机制 (Cryo Brittleness)
+            // 机制：被冰冻时，根据温度强度永久削减血量上限
+            // 公式：削减百分比 = 温度绝对值 / 10 (例如 -100度 -> 削减 10%)
+            // ============================================================
+            const freezePercent = Math.abs(this.temp) / 10;
+            
+            // 设置一个最小触发阈值 (例如 1% 即 -10度) 避免无意义的浮点数计算
+            if (freezePercent >= 1.0) {
+                const ratio = 1 - (freezePercent / 100);
+                
+                // 1. 削减最大血量 (Max HP Wither)
+                const oldMax = this.maxHp;
+                this.maxHp = Math.max(1, Math.floor(this.maxHp * ratio));
+                
+                // 2. 当前血量按同比例削减 (Proportional Reduction)
+                // 这保证了敌人不会因为上限降低而导致当前血量看起来"变多"了
+                this.hp = Math.max(1, Math.floor(this.hp * ratio));
+                
+                // 3. 同步缩放视觉血条 (Visual Bars Sync)
+                // 确保动画平滑，不会出现血条突然跳满的情况
+                this.displayHp *= ratio;
+                this.delayedHp *= ratio; // 白条也同步
+                this.greenHp *= ratio;   // 绿条也同步
+                
+                // 4. 视觉反馈 (Floating Text)
+                const loss = oldMax - this.maxHp;
+                if (loss > 0) {
+                    // 显示 "脆弱 -10%" 这种提示
+                    game.spawn_createFloatingText(
+                        this.pos.x, 
+                        this.pos.y - 50, 
+                        `❄️脆弱 -${freezePercent.toFixed(1)}% HP`, 
+                        "#a5f3fc" // 亮青色
+                    );
+                    
+                    // 额外生成一点冰渣特效
+                    for(let i=0; i<3; i++) {
+                        const p = new Particle(this.pos.x, this.pos.y, '#a5f3fc', 'shard');
+                        p.vel.y = -2; // 向上崩裂
+                        if (typeof game.particles !== 'undefined') game.particles.push(p);
+                    }
+                }
+            }
+            // ============================================================
+
             this.hasActedThisTurn = true;
             return;
         }
