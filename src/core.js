@@ -4255,7 +4255,7 @@ if (this.phase === 'truth_book') {
         }
         
         // [新增] 保存当前shotId，供后续额外伤害使用
-        this._currentDamageShotId = shotId;
+        // this._currentDamageShotId = shotId; // 移除：不再需要全局缓存 shotId
         
         // [新增] 统一显示伤害数字 (使用实际造成的伤害)
         if (this.showDamageNumbers && actualDmg > 0) {
@@ -4292,7 +4292,7 @@ if (this.phase === 'truth_book') {
 	                    // 2. 造成额外伤害
 	                    if (extraDmg > 0) {
 	                        enemy.takeDamage(extraDmg);
-	                        this.combat_recordDamage(extraDmg, 'flying_sword', 'flying_sword', this._currentDamageShotId);
+	                        this.combat_recordDamage(extraDmg, 'flying_sword', 'flying_sword', shotId);
 	                        this.spawn_createFloatingText(sword.pos.x, sword.pos.y, `+${Math.ceil(extraDmg)}`, resonanceColor);
 
                             // [新增] 电属性飞剑联动：触发连锁闪电
@@ -4372,7 +4372,7 @@ if (this.phase === 'truth_book') {
                         const spreadDmg = enemy.maxHp*CONFIG.gameplay.fireSpreadDamagePercent;
                         other.takeDamage(spreadDmg);
                         // 记录火焰扩散伤害
-                        this.combat_recordDamage(spreadDmg, 'pyro', 'main', this._currentDamageShotId);
+                        this.combat_recordDamage(spreadDmg, 'pyro', 'main', shotId);
                     }
                 });
             }
@@ -4450,7 +4450,7 @@ if (this.phase === 'truth_book') {
                     // 造成 AOE 伤害 (减半)
                     const aoeDmg = dmg * 0.5;
                     const k = other.takeDamage(aoeDmg); 
-                    this.combat_recordDamage(aoeDmg, 'explosive', 'main', this._currentDamageShotId); 
+                    this.combat_recordDamage(aoeDmg, 'explosive', 'main', shotId); 
                     if (k) this.spawn_addScore(other.maxHp); 
                     
                     // --- 4. 关键：AOE 也要施加元素效果 ---
@@ -6352,7 +6352,7 @@ if (this.phase === 'truth_book') {
      */
     combat_laser_fire(startX, startY, vel, recipe, shotId = null) {
         // [新增] 保存shotId供伤害记录使用
-        this._currentDamageShotId = shotId;
+        // this._currentDamageShotId = shotId; // 移除：不再需要全局缓存 shotId
         
         // [新增] 激光统计处理：激光是即时的，手动增加计数并在完成后减少
         if (shotId !== null && this.shotDamageMap.has(shotId)) {
