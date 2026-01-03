@@ -2376,6 +2376,9 @@ class Game {
     toggle3DMode() {
         this.is3DMode = !this.is3DMode;
         
+        // [FIX] 切换3D渲染系统的显示状态
+        this.render3d.toggle();
+        
         // 切换 Canvas 的 z-index 层级
         // 假设 3D 模式下层级更高，或者根据需求调整
         if (this.is3DMode) {

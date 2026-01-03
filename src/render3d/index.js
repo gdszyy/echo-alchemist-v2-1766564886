@@ -35,6 +35,7 @@ export class RenderSystem3D {
         this.enabled = false; // 3D渲染是否启用
         
         // === 实体管理 ===
+        this.playerMesh = null; // Player的3D网格
         this.enemies3D = new Map(); // key: enemy2D实例, value: Enemy3D实例
         this.projectile3DMap = new Map(); // key: projectile2D实例, value: THREE.Mesh
         this.particle3DMap = new Map(); // key: particle2D实例, value: THREE.Mesh
@@ -463,6 +464,74 @@ export class RenderSystem3D {
     }
     
     /**
+     * 同步Player到3D场景
+     * 从游戏的player实例创建/更新3D表示
+     */
+    syncPlayer() {
+        if (!this.enabled || !this.game.player) return;
+        
+        // 如果Player 3D网格不存在，创建一个
+        if (!this.playerMesh) {
+            this.playerMesh = this.createPlayerMesh();
+            this.scene.add(this.playerMesh);
+        }
+        
+        // 更新Player位置
+        this.updatePlayerMesh();
+    }
+    
+    /**
+     * 创建Player的3D网格（简单的立方体占位符）
+     * @returns {THREE.Mesh} 3D网格对象
+     */
+    createPlayerMesh() {
+        // 创建立方体几何体（使用Player的baseRadius作为尺寸参考）
+        const size = (this.game.player.baseRadius || 22) / 25; // 缩放到合适的3D尺寸
+        const geometry = new THREE.BoxGeometry(size, size, size);
+        
+        // 创建材质（青绿色，带发光效果）
+        const material = new THREE.MeshStandardMaterial({
+            color: 0x00ff88,
+            emissive: 0x00ff88,
+            emissiveIntensity: 0.5,
+            metalness: 0.3,
+            roughness: 0.4
+        });
+        
+        const mesh = new THREE.Mesh(geometry, material);
+        
+        // 添加边缘线框（增强视觉效果）
+        const edgesGeometry = new THREE.EdgesGeometry(geometry);
+        const edgesMaterial = new THREE.LineBasicMaterial({ 
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.5
+        });
+        const edgesMesh = new THREE.LineSegments(edgesGeometry, edgesMaterial);
+        mesh.add(edgesMesh);
+        
+        return mesh;
+    }
+    
+    /**
+     * 更新Player网格的位置
+     */
+    updatePlayerMesh() {
+        if (!this.playerMesh || !this.game.player) return;
+        
+        // 将从2D Canvas坐标转换为3D世界坐标
+        // Player位于屏幕底部中央
+        const x = (this.game.player.pos.x - this.game.width / 2) / 50;
+        const y = -(this.game.player.pos.y - this.game.height / 2) / 50;
+        const z = 0;
+        
+        this.playerMesh.position.set(x, y, z);
+        
+        // 添加轻微的旋转动画
+        this.playerMesh.rotation.y += 0.02;
+    }
+    
+    /**
      * 启用3D渲染
      */
     enable() {
@@ -497,6 +566,7 @@ export class RenderSystem3D {
         if (!this.enabled) return;
         
         // 同步所有实体
+        this.syncPlayer();
         this.syncEnemies();
         this.syncProjectiles();
         this.syncParticles();

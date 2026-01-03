@@ -234,10 +234,16 @@ export class Enemy3D {
             return;
         }
         
+        // [FIX] 使用统一的坐标转换工具，但需要获取game实例
+        // 注意：Enemy3D构造函数中没有保存game引用，所以这里使用硬编码值
+        // TODO: 如果需要支持动态屏幕尺寸，应在构造函数中保存game引用
+        const canvasWidth = 800;
+        const canvasHeight = 600;
+        const worldScale = 0.02; // 1/50 = 0.02
+        
         // 将2D Canvas坐标转换为3D世界坐标
-        // 假设Canvas中心对应3D世界原点
-        const x = (this.enemy2D.pos.x - 400) / 50; // 400是Canvas宽度的一半，50是缩放因子
-        const y = -(this.enemy2D.pos.y - 300) / 50; // Y轴翻转，300是Canvas高度的一半
+        const x = (this.enemy2D.pos.x - canvasWidth / 2) * worldScale;
+        const y = (canvasHeight / 2 - this.enemy2D.pos.y) * worldScale; // Y轴翻转
         const z = 0;
         
         this.group.position.set(x, y, z);
