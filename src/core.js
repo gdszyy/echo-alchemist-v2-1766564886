@@ -59,8 +59,11 @@ import {
 } from './systems.js';
 
 import { Camera } from './camera.js';
-import Stats from 'stats.js';
+// import Stats from '../node_modules/stats.js/build/stats.min.js';
 import { RenderSystem3D } from './render3d/index.js';
+
+// Stats.js 使用UMD格式，不支持ES6模块导入，需要通过script标签导入
+const Stats = window.Stats || null;
 
 // ==================== 音频管理器 ====================
 
@@ -1023,6 +1026,11 @@ class Game {
      * [新增] 初始化性能监控工具 stats.js
      */
     initStats() {
+        if (!Stats) {
+            console.warn('Stats.js not loaded, performance monitoring disabled');
+            this.stats = null;
+            return;
+        }
         this.stats = new Stats();
         // 0: fps, 1: ms, 2: mb, 3+: custom
         this.stats.showPanel(0); 
