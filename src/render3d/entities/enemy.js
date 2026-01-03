@@ -555,5 +555,4 @@ export class Enemy3D {
     }
 }
 
-// 导出别名以兼容旧代码
-export { Enemy3D as EnemyRenderer3D };
+

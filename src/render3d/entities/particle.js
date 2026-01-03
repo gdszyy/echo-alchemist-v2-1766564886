@@ -73,13 +73,16 @@ export class ParticleSystem3D {
      */
     initMaterial() {
         // 顶点着色器
+        // 职责：处理每个粒子的顶点变换，计算屏幕位置和大小
         const vertexShader = `
-            attribute float size;
-            attribute float alpha;
-            attribute float mode;
-            attribute vec3 velocity;
-            attribute float rotation;
+            // 自定义属性
+            attribute float size;       // 粒子大小
+            attribute float alpha;      // 透明度
+            attribute float mode;       // 粒子模式（编码为浮点数）
+            attribute vec3 velocity;    // 速度向量
+            attribute float rotation;   // 旋转角度
             
+            // 传递给片段着色器的变量
             varying vec3 vColor;
             varying float vAlpha;
             varying float vMode;
@@ -87,20 +90,29 @@ export class ParticleSystem3D {
             varying float vRotation;
             
             void main() {
+                // 将属性传递给片段着色器
                 vColor = color;
                 vAlpha = alpha;
                 vMode = mode;
                 vVelocity = velocity;
                 vRotation = rotation;
                 
+                // 计算视图空间位置
                 vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-                gl_PointSize = size * (300.0 / -mvPosition.z); // 透视缩放
+                
+                // 计算粒子大小（带透视缩放）
+                // 300.0 / -mvPosition.z 实现距离衰减效果
+                gl_PointSize = size * (300.0 / -mvPosition.z);
+                
+                // 计算最终屏幕位置
                 gl_Position = projectionMatrix * mvPosition;
             }
         `;
         
         // 片段着色器
+        // 职责：根据粒子模式绘制不同的形状和效果
         const fragmentShader = `
+            // 从顶点着色器传入的变量
             varying vec3 vColor;
             varying float vAlpha;
             varying float vMode;
@@ -108,16 +120,24 @@ export class ParticleSystem3D {
             varying float vRotation;
             
             void main() {
-                // 计算粒子中心距离
+                // 计算当前像素到粒子中心的距离
+                // gl_PointCoord: 当前像素在粒子中的归一化坐标 (0-1)
                 vec2 center = gl_PointCoord - vec2(0.5);
                 float dist = length(center);
                 
-                // 根据模式选择不同的渲染效果
+                // 初始化颜色和透明度
                 float alpha = vAlpha;
                 vec3 finalColor = vColor;
                 
-                // mode 编码:
-                // 0: normal, 1: spark, 2: ember, 3: mist, 4: shard, 5: smoke, 6: line, 7: wind_slash
+                // 粒子模式编码映射表：
+                // 0: normal      - 普通圆形粒子
+                // 1: spark       - 火花，拉伸的椭圆形
+                // 2: ember       - 余烬，径向渐变发光
+                // 3: mist        - 雾气，大面积柔和边缘
+                // 4: shard       - 冰渣，菱形/多边形
+                // 5: smoke       - 烟雾效果
+                // 6: line        - 线条粒子
+                // 7: wind_slash  - 风刃，梭形
                 
                 if (vMode < 0.5) {
                     // normal: 简单圆形粒子

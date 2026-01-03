@@ -219,12 +219,4 @@ export class SceneManager {
     }
 }
 
-/**
- * 创建场景（兼容旧版API）
- * @returns {THREE.Scene} 场景对象
- * @deprecated 请使用 SceneManager 类
- */
-export function createScene() {
-    const manager = new SceneManager();
-    return manager.getScene();
-}
+
