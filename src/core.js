@@ -61,6 +61,7 @@ import {
 import { Camera } from './camera.js';
 
 import { SelectionPhase, GatheringPhase, CombatPhase } from './phases.js';
+import { SoundManager } from './audio.js';
 
 // ==================== 音频管理器 ====================
 
