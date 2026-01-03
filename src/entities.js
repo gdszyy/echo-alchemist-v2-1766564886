@@ -1962,6 +1962,11 @@ class DropBall {
             ctx.ellipse(-r*0.35, -r*0.35, r*0.3, r*0.2, Math.PI/4, 0, Math.PI*2);
             ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
             ctx.fill();
+        }
+    }
+
+// ==================== Enemy 类 ====================
+class Enemy {
     constructor(x, y, width, height, hp, maxHp = hp, type = 'normal', affixes = []) {
         this.pos = new Vec2(x, y); 
         this.width = width; 
@@ -3149,6 +3154,7 @@ class DropBall {
             ctx.stroke();
             ctx.restore();
         }
+    }
 
     addSwordMark(amount = 1) {
         this.swordMarks += amount;
