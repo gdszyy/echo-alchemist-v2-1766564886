@@ -10,7 +10,7 @@
  * - Camera: 摄像机类
  */
 
-import { lerp } from './entities.js';
+import { lerp } from './entities/mechanics.js';
 
 /**
  * Camera 类

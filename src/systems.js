@@ -13,7 +13,11 @@
  */
 
 import { CONFIG, SKILL_DB } from './config.js';
-import { Vec2, Enemy, Projectile, Particle, Shockwave, LightningBolt, FloatingText, adjustColorBrightness, lerpColor, lerp, hexToRgba } from './entities.js';
+// 从 entities 子模块导入
+import { Vec2, adjustColorBrightness, lerpColor, lerp, hexToRgba } from './entities/mechanics.js';
+import { Enemy } from './entities/enemy.js';
+import { Projectile } from './entities/projectiles.js';
+import { Particle, Shockwave, LightningBolt, FloatingText } from './entities/effects.js';
 
 
 // ==================== 真理之书数据 ====================

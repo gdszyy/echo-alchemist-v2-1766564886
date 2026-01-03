@@ -21,19 +21,33 @@ import {
     SKILL_DB 
 } from './config.js';
 
+// 从 entities 子模块导入
 import { 
     Vec2, 
     MarbleDefinition, 
     SpecialSlot, 
     FortuneWheel, 
     Peg, 
-    DropBall, 
-    Enemy, 
+    DropBall,
+    adjustColorBrightness, 
+    lerpColor, 
+    lerp, 
+    hexToRgba,
+    showToast
+} from './entities/mechanics.js';
+
+import { Enemy } from './entities/enemy.js';
+
+import { 
     SwordQi, 
     SlashAnim, 
     SonSword, 
     Projectile, 
-    CloneSpore, 
+    CloneSpore,
+    rotateTowards
+} from './entities/projectiles.js';
+
+import { 
     Particle, 
     SlashEffect, 
     CollectionBeam, 
@@ -42,15 +56,10 @@ import {
     FloatingText, 
     EnergyOrb, 
     LightningBolt, 
-    FireWave, 
-    Player, 
-    showToast, 
-    rotateTowards,
-    adjustColorBrightness, 
-    lerpColor, 
-    lerp, 
-    hexToRgba 
-} from './entities.js';
+    FireWave
+} from './entities/effects.js';
+
+import { Player } from './entities/player.js';
 
 import { 
     UIManager, 
