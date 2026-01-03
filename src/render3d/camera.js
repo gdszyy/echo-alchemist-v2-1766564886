@@ -96,7 +96,6 @@ export class CameraController {
         this.canvas2D = null;
         this.container3D = null;
         
-        console.log('[CameraController] 初始化完成');
     }
     
     /**
@@ -126,7 +125,6 @@ export class CameraController {
             this.camera.updateProjectionMatrix();
         }
         
-        console.log(`[CameraController] 切换到预设: ${presetName} - ${preset.description}`);
     }
     
     /**
@@ -266,7 +264,6 @@ export class CameraController {
             return;
         }
         
-        console.log('[CameraController] 开始切换到3D模式');
         
         // 记录起始状态
         this.transitionStartPosition.copy(this.camera.position);
@@ -301,7 +298,6 @@ export class CameraController {
             return;
         }
         
-        console.log('[CameraController] 开始切换到2D模式');
         
         // 记录起始状态
         this.transitionStartPosition.copy(this.camera.position);
@@ -414,7 +410,6 @@ export class CameraController {
             if (this.canvas2D) {
                 this.canvas2D.style.opacity = '0.3';
             }
-            console.log('[CameraController] 切换到3D模式完成');
         } else {
             // 2D模式：隐藏3D容器，完全显示2D Canvas
             if (this.container3D) {
@@ -424,7 +419,6 @@ export class CameraController {
             if (this.canvas2D) {
                 this.canvas2D.style.opacity = '1';
             }
-            console.log('[CameraController] 切换到2D模式完成');
         }
     }
     

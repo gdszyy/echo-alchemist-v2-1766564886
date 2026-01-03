@@ -271,7 +271,6 @@ class FortuneWheel {
         
         // 统计当前弹珠拥有的可叠加属性
         const counts = {};
-		console.log("collectedAttributes",collectedAttributes)
         collectedAttributes.forEach(item => {
             // [修复] 兼容字符串和对象格式
             const type = (typeof item === 'string') ? item : item.type;
@@ -324,7 +323,6 @@ class FortuneWheel {
             });
             currentAngle += arc;
         });
-		console.log("this.slices",this.slices)
     }
 
     update(timeScale) {
@@ -2906,7 +2904,6 @@ class Enemy {
         const isMarked = typeof game !== 'undefined' && game.sonSwords.some(s => 
             s.active && (s.currentTarget === this || s.targetQueue.includes(this))
         );
-        // console.log("isMarked",isMarked)
         if (isMarked) {
             ctx.save();
             const time = Date.now() / 1000;

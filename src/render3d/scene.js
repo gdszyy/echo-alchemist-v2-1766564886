@@ -42,7 +42,6 @@ export class SceneManager {
         // 配置雾效果
         this.addFog();
         
-        console.log('[SceneManager] 场景初始化完成');
     }
     
     /**
@@ -75,7 +74,6 @@ export class SceneManager {
         this.scene.add(directionalLight);
         this.lights.directional = directionalLight;
         
-        console.log('[SceneManager] 光照系统已添加');
     }
     
     /**
@@ -90,7 +88,6 @@ export class SceneManager {
         this.scene.add(gridHelper);
         this.helpers.grid = gridHelper;
         
-        console.log('[SceneManager] 网格辅助线已添加');
     }
     
     /**
@@ -118,7 +115,6 @@ export class SceneManager {
         
         this.scene.add(this.floor);
         
-        console.log('[SceneManager] 反光地板已添加');
     }
     
     /**
@@ -129,7 +125,6 @@ export class SceneManager {
         // 线性雾效果 (颜色, 起始距离, 结束距离)
         this.scene.fog = new THREE.Fog(0x1a1a2e, 10, 50);
         
-        console.log('[SceneManager] 雾效果已配置');
     }
     
     /**
@@ -177,7 +172,6 @@ export class SceneManager {
     setLightIntensity(lightType, intensity) {
         if (this.lights[lightType]) {
             this.lights[lightType].intensity = intensity;
-            console.log(`[SceneManager] ${lightType}光照强度已更新为: ${intensity}`);
         }
     }
     
@@ -190,7 +184,6 @@ export class SceneManager {
         if (this.scene.fog) {
             this.scene.fog.near = near;
             this.scene.fog.far = far;
-            console.log(`[SceneManager] 雾效果已更新: near=${near}, far=${far}`);
         }
     }
     
@@ -198,7 +191,6 @@ export class SceneManager {
      * 清理场景资源
      */
     dispose() {
-        console.log('[SceneManager] 清理场景资源');
         
         // 清理地板
         if (this.floor) {

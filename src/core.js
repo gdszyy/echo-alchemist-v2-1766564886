@@ -1055,7 +1055,6 @@ class Game {
      * @param {number} particleCount - 粒子数量
      */
     runStressTest(enemyCount = 100, particleCount = 500) {
-        console.log(`[STRESS TEST] Spawning ${enemyCount} enemies and ${particleCount} particles...`);
         
         // 1. 生成敌人
         for (let i = 0; i < enemyCount; i++) {
@@ -1307,7 +1306,6 @@ class Game {
         
         const finalAverage = filteredScores.reduce((a, b) => a + b, 0) / filteredScores.length;
         
-        console.log(`[DDA] 战力评估 -> 原始: ${scores.length}, 过滤后: ${filteredScores.length}, 最终评分: ${finalAverage.toFixed(1)}`);
         return finalAverage;
     }
 
@@ -1344,7 +1342,6 @@ class Game {
             // 这样难度曲线会变得平缓，给玩家喘息机会
             this.difficultyGrowthFactor = ddaCfg.difficultyGrowthFactorLow;
             showToast("检测到战力不足，敌人成长减缓...", 2000);
-            console.log(`[DDA] 难度降低! 玩家战力 ${this.currentPlayerPower.toFixed(1)} < 阈值 ${threshold.toFixed(1)}`);
         } else {
             // 恢复正常成长
             this.difficultyGrowthFactor = 1.0;
@@ -1418,7 +1415,6 @@ class Game {
             this.slowMotionTimer = smCfg.duration; // 慢动作持续约 0.6秒
             // 触发瞬间强制降速，这里可以用固定值 0.1，保证打击感
             this.timeScale = smCfg.timeScale; 
-            console.log(`慢动作触发! 伤害: ${Math.floor(this.frameDamageAccumulator)} > 阈值: ${Math.floor(dynamicThreshold)}`);
         }
 
         // 清空当帧累计
@@ -2078,7 +2074,6 @@ class Game {
             }
         });
         
-        console.log("Meta upgrades applied to CONFIG");
     }
     /**
      * [AUTO-GENERATED] TODO: Add a description for sys_resetGame.
@@ -2096,7 +2091,6 @@ class Game {
         // --- [新增] 开发福利 ---
         if ((this.saveData.currency || 0) < 2000) {
             this.saveData.currency = 2000;
-            console.log("DEV: Granted 2000 Energy Essence");
             this.sys_saveData();
         }
         this.ui_updateMetaCurrency();
@@ -2351,7 +2345,6 @@ class Game {
                         this.boardTilt.enabled = true;
                         window.addEventListener('deviceorientation', e => this.input_handleOrientation(e));
                     }
-                } catch (e) { console.log("Gyro permission failed", e); }
             } else if ('ondeviceorientation' in window) {
                 // 非 iOS 设备通常直接支持
                 this.boardTilt.enabled = true;
@@ -2400,7 +2393,6 @@ class Game {
             this.canvas.style.opacity = "1";
         }, 150);
 
-        console.log(`[Mode] Switched to ${this.is3DMode ? '3D' : '2D'} mode`);
     }
 
     //  处理设备倾斜
@@ -2680,12 +2672,6 @@ class Game {
         const baseHP = Math.floor(finalBaseHP * this.nextRoundHpMultiplier);
         
         // [日志] 记录血量计算过程
-        console.log(`[HP Scaling] Round: ${this.round}`);
-        console.log(` - Linear HP: ${linearHP.toFixed(2)}`);
-        console.log(` - Peak Avg Damage: ${peakAvg.toFixed(2)}`);
-        console.log(` - Ideal HP (based on damage): ${idealHP.toFixed(2)}`);
-        console.log(` - Final Base HP (Mixed): ${finalBaseHP.toFixed(2)}`);
-        console.log(` - Final HP (with Multiplier): ${baseHP}`);
         // ----------------------------
 
         const w = this.enemyWidth;
@@ -4544,10 +4530,8 @@ class Game {
             }
             const activeCount = this.enemies.filter(e => e.active && (e.pos.y > 0)).length;
             if(activeCount === 0) {
-                console.log(">>> [LOG] 全场敌人已清除。正在清理子弹...");
                 this.data_clearProjectiles(); 
                 if (this.isEnemyTurn) {
-                    console.error(">>> [BUG] 严重错误：在清理子弹时，isEnemyTurn 竟然是 TRUE！");
                 }
             }
             if (enemy.type === 'boss') {
@@ -5886,7 +5870,6 @@ class Game {
      * @description 开始战斗阶段，初始化敌人和UI。
      */
     phase_startCombatPhase() { 
-        console.log("进入战斗阶段...");
         this.isEnemyTurn = false;
         this.energyOrbs = [];
         this.sonSwordQueue = []; 
@@ -6016,7 +5999,6 @@ class Game {
                 return;
             }
             if (this.dropBalls.length > 0 || this.energyOrbs.length > 0) {
-                console.log('[DEBUG] 充能中 - dropBalls:', this.dropBalls.length, 'energyOrbs:', this.energyOrbs.length, 'activeBalls:', this.currentSession?.activeBalls);
                 // showToast("充能中..."); // 移除正常情况下的提示
                 return;
             }
@@ -7241,7 +7223,6 @@ class Game {
      * @description 启动敌人回合：锁定状态、显示UI提示、并计算所有敌人的移动与技能
      */
     phase_enemy_startLogic() {
-        console.log(">>> [LOG] 启动敌人回合逻辑"); //
         this.isEnemyTurn = true;
         this.enemyTurnTimer = 0;
 
@@ -7251,7 +7232,6 @@ class Game {
         this.enemyWaveCenterX = this.player ? this.player.pos.x : this.width / 2;
         this.enemyWaveCenterY = this.player ? this.player.pos.y : this.height - 80;
         this.waveSpeed = 6 * this.timeScale; // 根据倍速调整扩散速度
-        console.log(">>> [LOG] 矩形扩散波已激活，中心:", this.enemyWaveCenterX, this.enemyWaveCenterY);
         // 重置所有敌人的行动标记
         this.enemies.forEach(e => {
             e.hasActedThisTurn = false;
@@ -7896,9 +7876,7 @@ class Game {
         const activeOrbsCount = this.energyOrbs.filter(orb => orb.active).length;
 
         // 1. 基础检查：如果还有东西在动，绝对不能结算
-        console.log('[DEBUG] attemptComplete - dropBalls:', this.dropBalls.length, 'activeOrbs:', activeOrbsCount, 'activeBalls:', this.currentSession?.activeBalls);
         if (this.dropBalls.length > 0 || activeOrbsCount > 0 || this.currentSession.activeBalls > 0) {
-            console.log('[DEBUG] 不能结算，还有东西在动');
             return;
         }
 
@@ -8246,10 +8224,8 @@ class Game {
                     // 3. 播放一个确认音效 (比如 reload 或 magic)
                     audio.playCollect(); // 或者 audio.playTone(800, 'sine', 0.2)
                     // 弹珠落出屏幕
-                    console.log('[DEBUG] 弹珠移除 - 移除前 dropBalls:', this.dropBalls.length, 'activeBalls:', this.currentSession.activeBalls);
                     this.dropBalls.splice(i, 1);
                     this.currentSession.activeBalls--;
-                    console.log('[DEBUG] 弹珠移除 - 移除后 dropBalls:', this.dropBalls.length, 'activeBalls:', this.currentSession.activeBalls);
                     
                     // --- ：不再直接結算，而是嘗試結算 ---
                     // 處理“能量球先落地，彈珠後死”的情況

@@ -27,7 +27,6 @@ export class ShockwaveRenderer3D {
         // 冲击波3D对象映射表 (key: shockwave2D实例, value: THREE.Mesh)
         this.shockwave3DMap = new Map();
         
-        console.log('[ShockwaveRenderer3D] 初始化完成, 最大冲击波数量:', maxShockwaves);
     }
     
     /**
@@ -226,6 +225,5 @@ export class ShockwaveRenderer3D {
      */
     dispose() {
         this.clearAllShockwaves();
-        console.log('[ShockwaveRenderer3D] 已销毁');
     }
 }

@@ -68,7 +68,6 @@ export class Enemy3D {
         // 创建3D网格
         this.createMesh();
         
-        console.log('[Enemy3D] 创建敌人3D实体', {
             hp: enemy2D.hp,
             maxHp: enemy2D.maxHp,
             type: enemy2D.type
@@ -251,7 +250,6 @@ export class Enemy3D {
     triggerHitFlash() {
         this.hitFlashTimer = this.hitFlashDuration;
         this.markDirty('opacity');
-        console.log('[Enemy3D] 触发受击闪烁');
     }
     
     /**
@@ -474,7 +472,6 @@ export class Enemy3D {
         if (this.isDying) return;
         this.isDying = true;
         this.deathAnimProgress = 0;
-        console.log('[Enemy3D] 触发死亡动画');
     }
     
     /**
@@ -538,7 +535,6 @@ export class Enemy3D {
             this.group = null;
             this.mesh = null;
         }
-        console.log('[Enemy3D] 销毁敌人3D实体');
     }
     
     /**

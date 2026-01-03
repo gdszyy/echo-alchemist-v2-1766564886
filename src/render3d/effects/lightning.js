@@ -219,7 +219,6 @@ export class LightningRenderer3D {
         // 闪电3D实体映射表：key = lightning2D实例, value = Lightning3D实例
         this.lightnings3D = new Map();
         
-        console.log('[LightningRenderer3D] 初始化完成');
     }
     
     /**
@@ -272,6 +271,5 @@ export class LightningRenderer3D {
         });
         this.lightnings3D.clear();
         
-        console.log('[LightningRenderer3D] 已销毁');
     }
 }

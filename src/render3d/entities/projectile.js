@@ -27,7 +27,6 @@ class ProjectileTextureCache {
         this.canvas.height = 256;
         this.ctx = this.canvas.getContext('2d');
         
-        console.log('[ProjectileTextureCache] 初始化完成');
     }
     
     /**
@@ -140,7 +139,6 @@ class ProjectileTextureCache {
             texture.dispose();
         }
         this.cache.clear();
-        console.log('[ProjectileTextureCache] 缓存已清空');
     }
     
     /**
@@ -168,7 +166,6 @@ class ProjectileSpritePool {
             this.pool.push(this.createSprite());
         }
         
-        console.log(`[ProjectileSpritePool] 初始化完成，预创建 ${initialSize} 个对象`);
     }
     
     /**
@@ -260,7 +257,6 @@ class ProjectileSpritePool {
         
         this.pool = [];
         this.active.clear();
-        console.log('[ProjectileSpritePool] 对象池已销毁');
     }
 }
 
@@ -288,7 +284,6 @@ export class ProjectileRenderer3D {
             cacheMisses: 0
         };
         
-        console.log('[ProjectileRenderer3D] 初始化完成');
     }
     
     /**
@@ -448,7 +443,6 @@ export class ProjectileRenderer3D {
      * 销毁渲染器
      */
     dispose() {
-        console.log('[ProjectileRenderer3D] 开始销毁...');
         
         // 清空子弹
         this.clear();
@@ -459,6 +453,5 @@ export class ProjectileRenderer3D {
         // 清空纹理缓存
         this.textureCache.clear();
         
-        console.log('[ProjectileRenderer3D] 销毁完成');
     }
 }

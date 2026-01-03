@@ -58,7 +58,6 @@ export class RenderSystem3D {
             this.addDebugHelpers();
         }
         
-        console.log('[RenderSystem3D] 初始化完成');
     }
     
     /**
@@ -130,7 +129,6 @@ export class RenderSystem3D {
      */
     initShockwaveRenderer() {
         this.shockwaveRenderer = new ShockwaveRenderer3D(this.scene, 100);
-        console.log('[RenderSystem3D] 冲击波渲染器初始化完成');
     }
     
     /**
@@ -155,7 +153,6 @@ export class RenderSystem3D {
         const axesHelper = new THREE.AxesHelper(5);
         this.scene.add(axesHelper);
         
-        console.log('[RenderSystem3D] 调试辅助已启用');
     }
     
     /**
@@ -471,7 +468,6 @@ export class RenderSystem3D {
     enable() {
         this.enabled = true;
         this.container.style.display = 'block';
-        console.log('[RenderSystem3D] 3D渲染已启用');
     }
     
     /**
@@ -480,7 +476,6 @@ export class RenderSystem3D {
     disable() {
         this.enabled = false;
         this.container.style.display = 'none';
-        console.log('[RenderSystem3D] 3D渲染已禁用');
     }
     
     /**
@@ -561,6 +556,5 @@ export class RenderSystem3D {
             this.container.parentNode.removeChild(this.container);
         }
         
-        console.log('[RenderSystem3D] 资源已清理');
     }
 }

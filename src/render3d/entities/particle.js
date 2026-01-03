@@ -36,7 +36,6 @@ export class ParticleSystem3D {
         this.points.frustumCulled = false; // 禁用视锥剔除以提高性能
         this.scene.add(this.points);
         
-        console.log('[ParticleSystem3D] 初始化完成, 最大粒子数:', maxParticles);
     }
     
     /**
@@ -377,6 +376,5 @@ export class ParticleSystem3D {
             this.scene.remove(this.points);
         }
         
-        console.log('[ParticleSystem3D] 已销毁');
     }
 }
