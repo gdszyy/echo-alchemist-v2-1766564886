@@ -313,7 +313,8 @@ export class ProjectileRenderer3D {
         sprite.material.needsUpdate = true;
         
         // 设置尺寸（根据2D半径映射到3D空间）
-        const scale = projectile.radius * 0.1; // 调整比例以适配3D场景
+        // [FIX] 调整比例使弹珠大小与敌人协调（约为敌人宽度的1/10到1/5）
+        const scale = projectile.radius * 0.02; // 从0.1调整到0.02，缩小5倍
         sprite.scale.set(scale, scale, 1);
         
         // 设置初始位置（2D坐标转3D坐标）
@@ -350,8 +351,8 @@ export class ProjectileRenderer3D {
         
         // 更新形变（弹性效果）
         if (projectile.deformation) {
-            sprite.scale.x = projectile.radius * 0.1 * projectile.deformation.x;
-            sprite.scale.y = projectile.radius * 0.1 * projectile.deformation.y;
+            sprite.scale.x = projectile.radius * 0.02 * projectile.deformation.x;
+            sprite.scale.y = projectile.radius * 0.02 * projectile.deformation.y;
         }
     }
     

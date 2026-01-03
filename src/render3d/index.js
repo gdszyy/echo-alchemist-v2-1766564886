@@ -213,7 +213,7 @@ export class RenderSystem3D {
      */
     updateEnemies(deltaTime) {
         for (const enemy3D of this.enemies3D.values()) {
-            enemy3D.update(deltaTime);
+            enemy3D.update(deltaTime, this.camera);
         }
     }
     

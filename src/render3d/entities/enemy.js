@@ -482,8 +482,9 @@ export class Enemy3D {
     /**
      * 每帧更新
      * @param {number} deltaTime - 帧间隔时间
+     * @param {THREE.Camera} camera - 摄像机对象（用于Billboard效果）
      */
-    update(deltaTime) {
+    update(deltaTime, camera) {
         if (!this.group || !this.enemy2D.active) {
             // 如果2D敌人已经不活跃，触发死亡动画
             if (!this.isDying && this.group) {
@@ -522,6 +523,12 @@ export class Enemy3D {
         // 检测受击（通过hitTimer）
         if (this.enemy2D.hitTimer > 0 && this.hitFlashTimer <= 0) {
             this.triggerHitFlash();
+        }
+        
+        // === Billboard效果：让地板始终面向摄像机 ===
+        if (camera && this.floorMesh) {
+            // 使用quaternion复制实现Billboard效果
+            this.floorMesh.quaternion.copy(camera.quaternion);
         }
     }
     
