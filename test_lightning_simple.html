@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>闪电链3D测试（简化版）</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #0a0a0a;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            z-index: 1000;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .status {
+            color: #4ade80;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <h2>⚡ 闪电链3D测试</h2>
+        <button onclick="testLightning()">生成闪电</button>
+        <button onclick="toggle3D()">切换3D</button>
+        <div style="margin-top: 10px;">
+            <div>状态: <span id="status" class="status">初始化中...</span></div>
+            <div>闪电数: <span id="count" class="status">0</span></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+        import { LightningRenderer3D } from './src/render3d/effects/lightning.js';
+        import { LightningBolt, Vec2 } from './src/entities.js';
+
+        // 创建场景
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a2e);
+
+        // 创建摄像机
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 15;
+
+        // 创建渲染器
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // 添加光照
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        // 模拟游戏对象
+        const mockGame = {
+            lightningBolts: [],
+            width: 800,
+            height: 600
+        };
+        window.mockGame = mockGame;
+
+        // 创建闪电渲染器
+        const lightningRenderer = new LightningRenderer3D(scene, mockGame);
+        window.lightningRenderer = lightningRenderer;
+
+        // 动画循环
+        let is3D = false;
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (is3D) {
+                lightningRenderer.sync();
+                lightningRenderer.update(0.016);
+                renderer.render(scene, camera);
+            }
+            
+            // 更新UI
+            document.getElementById('count').textContent = mockGame.lightningBolts.length;
+        }
+        animate();
+
+        // 控制函数
+        window.testLightning = function() {
+            const lightning = new LightningBolt(100, 50, 700, 500);
+            mockGame.lightningBolts.push(lightning);
+            console.log('Created lightning:', lightning);
+            console.log('Segments:', lightning.segments.length);
+        };
+
+        window.toggle3D = function() {
+            is3D = !is3D;
+            renderer.domElement.style.display = is3D ? 'block' : 'none';
+            document.getElementById('status').textContent = is3D ? '3D模式' : '2D模式';
+        };
+
+        // 窗口调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        document.getElementById('status').textContent = '就绪';
+        console.log('闪电链3D测试已启动');
+    </script>
+</body>
+</html>

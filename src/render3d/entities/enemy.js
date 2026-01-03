@@ -8,6 +8,7 @@
  * - 实现生成弹出动画
  * - 实现死亡下沉动画
  * - 使用"地板平面 + 立方体"结构（Task 3.3）
+ * - 使用脏标记优化渲染性能（Task 6.2）
  */
 
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
@@ -36,6 +37,30 @@ export class Enemy3D {
         
         // === 震动效果 ===
         this.shakeOffset = new THREE.Vector3(0, 0, 0);
+        
+        // === 脏标记优化（Task 6.2）===
+        this.dirty = {
+            position: true,      // 位置是否需要更新
+            color: true,         // 颜色是否需要更新
+            opacity: true,       // 透明度是否需要更新
+            scale: true,         // 缩放是否需要更新
+            rotation: true       // 旋转是否需要更新
+        };
+        
+        // === 状态缓存（用于检测变化）===
+        this.lastState = {
+            posX: 0,
+            posY: 0,
+            temp: 0,
+            hp: 0,
+            hitTimer: 0,
+            opacity: 1.0,
+            scaleX: 0,
+            scaleY: 0,
+            scaleZ: 0,
+            rotationX: 0,
+            rotationY: 0
+        };
         
         // 创建THREE.Group容器，用于组合地板和立方体
         this.group = new THREE.Group();
@@ -137,10 +162,78 @@ export class Enemy3D {
     }
     
     /**
+     * 标记特定属性为脏（需要更新）
+     * @param {string} property - 属性名称
+     */
+    markDirty(property) {
+        if (this.dirty.hasOwnProperty(property)) {
+            this.dirty[property] = true;
+        }
+    }
+    
+    /**
+     * 清除脏标记
+     * @param {string} property - 属性名称
+     */
+    clearDirty(property) {
+        if (this.dirty.hasOwnProperty(property)) {
+            this.dirty[property] = false;
+        }
+    }
+    
+    /**
+     * 检查状态是否发生变化
+     * @returns {boolean} 是否有任何状态变化
+     */
+    checkStateChanges() {
+        let hasChanges = false;
+        
+        // 检查位置变化
+        if (this.enemy2D.pos.x !== this.lastState.posX || 
+            this.enemy2D.pos.y !== this.lastState.posY) {
+            this.markDirty('position');
+            this.lastState.posX = this.enemy2D.pos.x;
+            this.lastState.posY = this.enemy2D.pos.y;
+            hasChanges = true;
+        }
+        
+        // 检查温度变化（影响颜色）
+        const currentTemp = this.enemy2D.temp || 0;
+        if (currentTemp !== this.lastState.temp) {
+            this.markDirty('color');
+            this.lastState.temp = currentTemp;
+            hasChanges = true;
+        }
+        
+        // 检查HP变化（可能触发受击效果）
+        if (this.enemy2D.hp !== this.lastState.hp) {
+            this.lastState.hp = this.enemy2D.hp;
+            hasChanges = true;
+        }
+        
+        // 检查受击状态变化
+        if (this.enemy2D.hitTimer !== this.lastState.hitTimer) {
+            if (this.enemy2D.hitTimer > 0 && this.hitFlashTimer <= 0) {
+                this.markDirty('opacity');
+            }
+            this.lastState.hitTimer = this.enemy2D.hitTimer;
+            hasChanges = true;
+        }
+        
+        return hasChanges;
+    }
+    
+    /**
      * 更新3D位置（从2D位置同步）
+     * 仅在位置脏标记为true时执行
      */
     updatePosition() {
         if (!this.group) return;
+        
+        // 脏标记优化：仅在位置变化时更新
+        if (!this.dirty.position && !this.isSpawning && !this.isDying) {
+            return;
+        }
         
         // 将2D Canvas坐标转换为3D世界坐标
         // 假设Canvas中心对应3D世界原点
@@ -149,6 +242,7 @@ export class Enemy3D {
         const z = 0;
         
         this.group.position.set(x, y, z);
+        this.clearDirty('position');
     }
     
     /**
@@ -156,6 +250,7 @@ export class Enemy3D {
      */
     triggerHitFlash() {
         this.hitFlashTimer = this.hitFlashDuration;
+        this.markDirty('opacity');
         console.log('[Enemy3D] 触发受击闪烁');
     }
     
@@ -175,7 +270,12 @@ export class Enemy3D {
         // 使用正弦波实现快速闪烁
         const flashFrequency = 20; // 闪烁频率
         const opacity = 0.3 + 0.7 * Math.abs(Math.sin(progress * Math.PI * flashFrequency));
-        this.material.opacity = opacity;
+        
+        // 脏标记优化：仅在透明度实际变化时更新
+        if (Math.abs(this.material.opacity - opacity) > 0.01) {
+            this.material.opacity = opacity;
+            this.markDirty('opacity');
+        }
         
         // === 震动效果 ===
         // 震动强度随进度衰减
@@ -183,18 +283,27 @@ export class Enemy3D {
         this.shakeOffset.x = (Math.random() - 0.5) * shakeIntensity;
         this.shakeOffset.y = (Math.random() - 0.5) * shakeIntensity;
         this.shakeOffset.z = (Math.random() - 0.5) * shakeIntensity;
+        this.markDirty('position'); // 震动会影响位置
         
         // 闪烁结束时恢复
         if (this.hitFlashTimer <= 0) {
             this.material.opacity = 1.0;
             this.shakeOffset.set(0, 0, 0);
+            this.markDirty('opacity');
+            this.markDirty('position');
         }
     }
     
     /**
      * 更新温度变色效果
+     * 仅在颜色脏标记为true时执行
      */
     updateTemperatureColor() {
+        // 脏标记优化：仅在温度变化时更新颜色
+        if (!this.dirty.color) {
+            return;
+        }
+        
         const temp = this.enemy2D.temp || 0;
         
         // 根据温度计算目标颜色
@@ -232,6 +341,12 @@ export class Enemy3D {
         // 平滑过渡到目标颜色
         this.currentColor.lerp(this.targetColor, 0.1);
         this.material.color.copy(this.currentColor);
+        
+        // 检查是否已经接近目标颜色，如果是则清除脏标记
+        const colorDistance = this.currentColor.distanceTo(this.targetColor);
+        if (colorDistance < 0.01) {
+            this.clearDirty('color');
+        }
     }
     
     /**
@@ -256,19 +371,32 @@ export class Enemy3D {
     updateSpawnAnimation(deltaTime) {
         if (!this.isSpawning) return;
         
+        // 动画进行中，标记缩放和位置为脏
+        this.markDirty('scale');
+        this.markDirty('position');
+        
         // 动画进度递增
         this.spawnAnimProgress += deltaTime * 2; // 0.5秒完成
         
         if (this.spawnAnimProgress >= 1.0) {
             this.spawnAnimProgress = 1.0;
             this.isSpawning = false;
+            this.clearDirty('scale');
         }
         
         // 使用缓动函数实现弹性效果
         const t = this.easeOutElastic(this.spawnAnimProgress);
         
         // 缩放动画：从0放大到1
-        this.group.scale.set(t, t, t);
+        const newScale = { x: t, y: t, z: t };
+        if (this.lastState.scaleX !== newScale.x || 
+            this.lastState.scaleY !== newScale.y || 
+            this.lastState.scaleZ !== newScale.z) {
+            this.group.scale.set(newScale.x, newScale.y, newScale.z);
+            this.lastState.scaleX = newScale.x;
+            this.lastState.scaleY = newScale.y;
+            this.lastState.scaleZ = newScale.z;
+        }
         
         // 位置动画：从上方弹出
         const baseY = -(this.enemy2D.pos.y - 300) / 50;
@@ -282,6 +410,12 @@ export class Enemy3D {
      */
     updateDeathAnimation(deltaTime) {
         if (!this.isDying) return;
+        
+        // 动画进行中，标记所有属性为脏
+        this.markDirty('scale');
+        this.markDirty('position');
+        this.markDirty('opacity');
+        this.markDirty('rotation');
         
         // 动画进度递增
         this.deathAnimProgress += deltaTime * 1.5; // 约0.67秒完成
@@ -366,7 +500,10 @@ export class Enemy3D {
             return; // 死亡动画期间不更新其他状态
         }
         
-        // 更新位置（从2D同步）
+        // === 脏标记优化：检查状态变化 ===
+        this.checkStateChanges();
+        
+        // 更新位置（从2D同步）- 仅在脏标记为true时执行
         this.updatePosition();
         
         // 应用震动偏移
@@ -377,7 +514,7 @@ export class Enemy3D {
         // 更新受击闪烁
         this.updateHitFlash(deltaTime);
         
-        // 更新温度变色
+        // 更新温度变色 - 仅在脏标记为true时执行
         this.updateTemperatureColor();
         
         // 检测受击（通过hitTimer）
@@ -402,6 +539,19 @@ export class Enemy3D {
             this.mesh = null;
         }
         console.log('[Enemy3D] 销毁敌人3D实体');
+    }
+    
+    /**
+     * 获取性能统计信息（用于调试）
+     */
+    getStats() {
+        return {
+            isDirty: Object.values(this.dirty).some(v => v),
+            dirtyFlags: { ...this.dirty },
+            isSpawning: this.isSpawning,
+            isDying: this.isDying,
+            hitFlashTimer: this.hitFlashTimer
+        };
     }
 }
 
