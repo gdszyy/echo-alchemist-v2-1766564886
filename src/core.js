@@ -2345,6 +2345,9 @@ class Game {
                         this.boardTilt.enabled = true;
                         window.addEventListener('deviceorientation', e => this.input_handleOrientation(e));
                     }
+                } catch (error) {
+                    console.warn('DeviceOrientation permission denied:', error);
+                }
             } else if ('ondeviceorientation' in window) {
                 // 非 iOS 设备通常直接支持
                 this.boardTilt.enabled = true;
