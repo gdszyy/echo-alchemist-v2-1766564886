@@ -6344,8 +6344,7 @@ if (this.phase === 'truth_book') {
                 const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
                 const multiplier = Math.ceil(currentScatterIdx / 2);
                 const angleOffset = 0.2 * multiplier * sign;
-                const newVel = vel.rotate(angleOffset);
-                
+                const newVel = vel.rotate(angleOffset);           
                 // 全继承：因子为 1.0
                 const copyRecipe = createScatterRecipe(recipe, 1.0);
                 
@@ -6357,26 +6356,24 @@ if (this.phase === 'truth_book') {
             // 2. 生成 50% 继承的副子弹 (属性层数也减半)
             for (let i = 0; i < halfInheritCount; i++) {
                 const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
-                const multiplier = Math.ceil(currentScatterIdx / 2);
-                const angleOffset = 0.2 * multiplier * sign;
-                const newVel = vel.rotate(angleOffset);
-                
+                const multiplier = Math.ceil(currentScatterIdx /                 const angleOffset = 0.2 * multiplier * sign;
+                const newVel = vel.rotate(angleOffset);                
                 // 半继承：因子为 0.5
                 const copyRecipe = createScatterRecipe(recipe, 0.5);
-                
                 this.projectiles.push(new Projectile(x, y, newVel, copyRecipe, true, shotId));
                 shotStats.projectileCount++;
                 currentScatterIdx++;
-                }
+            }
+        }
         
         // 生成主子弹
         shotStats.projectileCount++;
         const mainRecipe = { ...recipe, isScatterChild: false };
         this.projectiles.push(new Projectile(x, y, vel, mainRecipe, false, shotId, isLast)); 
     }
+
     /**
-     * [AUTO-GENERATED] TODO: Add a description for combat_fireLaser.
-     * @param {any} startX - TODO: Describe this parameter.
+     * [AUTO-GENERATED] TODO: Add a description for combat_fireLaser.his parameter.
      * @param {any} startY - TODO: Describe this parameter.
      * @param {any} vel - TODO: Describe this parameter.
      * @param {any} recipe - TODO: Describe this parameter.
@@ -6963,7 +6960,7 @@ if (this.phase === 'truth_book') {
             if (currentRecipe.damage > 2) html += `<span class="text-purple-300">⚔️${currentRecipe.damage}</span>`;
             else html += `<span class="text-slate-400">⚔️${currentRecipe.damage}</span>`;
 
-            Object.keys(CONFIG.ui.attributeDisplay).foreach((_type) => {
+            Object.keys(CONFIG.ui.attributeDisplay).forEach((_type) => {
                 if (currentRecipe[_type]) html += `<span class="text-green-300">${CONFIG.ui.attributeDisplay[_type].icon}${currentRecipe[_type]}</span>`;
             })
             if(html === '') html = '<span class="text-slate-500">基础弹药</span>';
