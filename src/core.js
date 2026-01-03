@@ -1204,7 +1204,7 @@ class Game {
         // --- [META] 不再直接开始游戏，而是显示主界面 ---
         this.phase_switchPhase('meta'); 
         
-        // 启动游戏主循环 (修复了原始的 this.loop is not a function 错误
+        // 启动游戏主循环 (修复了原始的 this.loop is not a function 错误)
         this.currentRows = CONFIG.gameplay.rows; 
         this.boardBottomY = 0;
         this.sys_loop();
@@ -1471,7 +1471,9 @@ class Game {
         // 更新摄像机
         if (this.camera) {
             this.camera.update();
-                // 1. 基础渲染准备 - 先清除画布（在原始坐标系下）
+        }
+        
+        // 1. 基础渲染准备 - 先清除画布（在原始坐标系下）
         this.render_clearCanvas();
         
         // [Task 5.1] 确保在3D模式下 Canvas 仍然可见以显示 UI
