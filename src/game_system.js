@@ -241,6 +241,8 @@ sys_resetGame() {
         this.marbleQueue = [];
         this.energyOrbs = [];
         this.spores = [];
+        this.pegs = [];
+        this.specialSlots = [];
         this.currentRows = CONFIG.gameplay.rows;
         this.skillPoints = 0; // 重置
         this.ui.updateSkillPoints(this.skillPoints);
@@ -492,7 +494,9 @@ getLineIntersectionPoint(a, b, c, d) {
         this.sonSwords = [];
         this.projectiles = []; 
         this.burstQueue = []; 
-        this.spores = []; // 換場時清理掉還在飛的孢子
+        this.spores = [];
+        this.pegs = [];
+        this.specialSlots = []; // 換場時清理掉還在飛的孢子
         this.fireWaves = []; // 清理火焰波
     },
 

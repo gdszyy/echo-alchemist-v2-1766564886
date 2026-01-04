@@ -72,9 +72,9 @@ export const game_phase = {
         requestAnimationFrame(() => {
             this.ui_updateUICache();
         });
-        if (this.pegs.length === 0) {
-            this.phase_gathering_initPachinko(); 
-        }
+        // 确保每次进入收集阶段都初始化钉板，因为钉板可能在战斗阶段被清空
+        // 或者在游戏重置后需要初始化。
+        this.phase_gathering_initPachinko();
         
         // --- 新增：初始化持久阈值变量 ---
         this.persistentThreshold = CONFIG.gameplay.initTriggerThreshold; 
