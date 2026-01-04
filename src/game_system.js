@@ -26,6 +26,9 @@ export const game_system = {
     sys_loop() {
         const timeScale = this.timeScale; 
 
+        // [DEBUG] 全局阶段监控
+        if (Math.random() < 0.005) console.log(`[DEBUG] sys_loop: phase=${this.phase}`);
+
         // 处理震动衰减
         let shakeX = 0, shakeY = 0;
         if (this.screenShake > 0) {

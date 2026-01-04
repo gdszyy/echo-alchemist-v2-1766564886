@@ -1221,7 +1221,7 @@ phase_gathering_getRandomPegType() {
         this.ctx.fillRect(0, 0, this.width, this.height);
 
         // [DEBUG] 确认渲染流程执行到此处
-        if (Math.random() < 0.01) console.log(`[DEBUG] Rendering gathering: pegs=${this.pegs.length}, slots=${this.specialSlots.length}`);
+        if (Math.random() < 0.05) console.log(`[DEBUG] Rendering gathering: pegs=${this.pegs.length}, slots=${this.specialSlots.length}`);
 
         // --- [新增] 绘制转盘 (在阴影和钉子之前) ---
         if (this.fortuneWheel.active) {
