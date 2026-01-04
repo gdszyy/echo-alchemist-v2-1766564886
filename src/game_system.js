@@ -59,6 +59,7 @@ export const game_system = {
         }
 
         // 4. 阶段逻辑与渲染分发
+        if (this.phase === 'gathering') console.log("[DEBUG] sys_loop: 当前 phase 为 gathering，准备进入 switch");
 if (this.phase === 'truth_book') {
 	            this.truthBook.update();
 	        }
