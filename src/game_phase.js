@@ -192,7 +192,11 @@ export const game_phase = {
                 );
                 if (pegIdx !== -1 && this.pegs[pegIdx].type !== 'pink' && !this.specialSlots.some(s => s.pegIndex === pegIdx)) {
                     const type = slotTypes[Math.floor(Math.random() * slotTypes.length)];
-                    this.specialSlots.push({ pegIndex: pegIdx, type: type });
+                    const peg = this.pegs[pegIdx];
+                    // [修复] 必须实例化 SpecialSlot 对象，否则它没有 draw 方法，导致渲染失败
+                    const slot = new SpecialSlot(peg.pos.x, peg.pos.y, spacingX * 0.8, type);
+                    slot.pegIndex = pegIdx;
+                    this.specialSlots.push(slot);
                 }
             }
         }
@@ -201,9 +205,9 @@ export const game_phase = {
     },
 
 phase_gathering_getRandomPegType() { 
-    // 定义所有可能的钉子类型（包含普通钉子）
-    // const pegTypes = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'lightning'];
-    const pegTypes = ['bounce'];
+    // 定义所有可能的特殊钉子类型
+    const pegTypes = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind'];
+    
     // 1. 获取 normal 的基础权重
     // 我们手动从 unlockedWeights 中取 white 作为普通钉子的权重基准（默认 100）
     const normalWeight = this.unlockedWeights['white'] || 100; 
@@ -211,6 +215,7 @@ phase_gathering_getRandomPegType() {
     // 2. 计算当前所有“已解锁”类型的总权重
     let totalWeight = normalWeight;
     pegTypes.forEach(t => {
+        // 只有在 unlockedWeights 中权重 > 0 的才会被计入
         totalWeight += (this.unlockedWeights[t] || 0);
     });
     
