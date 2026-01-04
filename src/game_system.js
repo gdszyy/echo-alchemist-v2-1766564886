@@ -256,9 +256,10 @@ sys_resetGame() {
         this.energyOrbs = [];
         this.spores = [];
         this.pegs = [];
-        this.specialSlots = [];
+        this.specialSlots = ["skill_point"];
         this.currentRows = CONFIG.gameplay.rows;
         this.skillPoints = 0; // 重置
+	this.slotCount=1;
         this.ui.updateSkillPoints(this.skillPoints);
 
         // 重新生成初始敵人
