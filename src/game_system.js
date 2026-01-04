@@ -147,25 +147,32 @@ if (this.phase === 'truth_book') {
      */
     sys_resize() {
         const container = document.getElementById('game-container'); 
-        
+        if (!container) return;
+
         // --- 修改开始：强制 JS 同步窗口高度，解决部分安卓浏览器兼容问题 ---
         // 这一步会覆盖 CSS 的设置，确保 canvas 刚好填满可视区域
         container.style.height = `${window.innerHeight}px`;
         container.style.width = `${window.innerWidth}px`;
         // --- 修改结束 ---
 
-        this.width = this.canvas.width = container.clientWidth; 
-        this.height = this.canvas.height = container.clientHeight; 
+        // [修复] 增加保底宽度获取逻辑
+        const newWidth = container.clientWidth || window.innerWidth;
+        const newHeight = container.clientHeight || window.innerHeight;
+
+        this.width = this.canvas.width = newWidth; 
+        this.height = this.canvas.height = newHeight; 
         
+        console.log(`[DEBUG] sys_resize: width=${this.width}, height=${this.height}`);
+
         // 动态调整失败判定线，防止在矮屏幕上太高
-        // 建议改为百分比，而不是固定的 -150
         this.defeatLineY = this.height - 120; // 稍微调低一点，给底部 UI 留空间
         
         this.enemyWidth = (this.width / CONFIG.gameplay.enemyCols); 
         this.enemyHeight = this.enemyWidth; 
         this.ui_updateUICache();
+        
         // 如果是在收集阶段，且已经初始化过，可能需要重新计算钉子位置（可选）
-        if (this.phase === 'gathering') {
+        if (this.phase === 'gathering' && this.pegs && this.pegs.length > 0) {
             this.phase_gathering_initPachinko(true); 
         }
     },
@@ -495,8 +502,9 @@ getLineIntersectionPoint(a, b, c, d) {
         this.projectiles = []; 
         this.burstQueue = []; 
         this.spores = [];
-        this.pegs = [];
-        this.specialSlots = []; // 換場時清理掉還在飛的孢子
+        // [修复] 不应在此处清空 pegs 和 specialSlots，它们属于收集阶段的静态板面
+        // this.pegs = [];
+        // this.specialSlots = []; 
         this.fireWaves = []; // 清理火焰波
     },
 

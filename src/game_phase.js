@@ -96,14 +96,18 @@ export const game_phase = {
     phase_gathering_initPachinko(shouldInherit = false) {
         // [修复] 使用动态行数
         const rows = this.currentRows || CONFIG.gameplay.rows;
+        const cols = CONFIG.gameplay.cols || 10;
         // [修复] 获取间距配置
         const spacingX = CONFIG.gameplay.spacingX || 45;
         const spacingY = CONFIG.gameplay.spacingY || 45;
         
+        // [监控] 打印初始化关键参数
+        console.log(`[DEBUG] initPachinko: rows=${rows}, cols=${cols}, width=${this.width}`);
+
         // [修复] 修正 width 引用
         // 确保 this.width 在初始化时已正确设置，否则使用默认值 400
-        const canvasWidth = this.width || 400; 
-        const offsetX = (canvasWidth - (CONFIG.gameplay.cols - 1) * spacingX) / 2;
+        const canvasWidth = (this.width && this.width > 0) ? this.width : 400; 
+        const offsetX = (canvasWidth - (cols - 1) * spacingX) / 2;
         const offsetY = 120;
 
         const previousPegs = [...this.pegs];
@@ -1254,7 +1258,15 @@ phase_gathering_getRandomPegType() {
             }
         });
         // 繪製釘子
-        const pegRadius = Math.min(8, this.width / 60);
+        // [修复] 增加保底半径，防止 this.width 为 0 时钉子消失
+        const pegRadius = Math.max(4, Math.min(8, (this.width || 400) / 60));
+        
+        // [防御性检查] 如果钉子数组为空，尝试自动恢复
+        if (this.pegs.length === 0) {
+            console.warn("[DEBUG] 收集阶段钉子数组为空，尝试自动恢复...");
+            this.phase_gathering_initPachinko();
+        }
+
         this.pegs.forEach(p => { 
             p.update(); // 更新冷却和动画
             p.draw(this.ctx, pegRadius); 
