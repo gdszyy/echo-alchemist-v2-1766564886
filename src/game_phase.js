@@ -1176,6 +1176,7 @@ phase_gathering_getRandomPegType() {
      * @param {number} [timeScale=1] - **重要參數** 時間縮放因子。
      */
     phase_gathering_update(timeScale = 1) {
+        console.log("[DEBUG] phase_gathering_update: 函数被调用");
         // [修复] 确保 Canvas 状态干净
         this.ctx.save();
         this.ctx.globalAlpha = 1.0;
@@ -1192,6 +1193,7 @@ phase_gathering_getRandomPegType() {
 
         const container = document.getElementById('game-container');
         if (container) {
+            console.log("[DEBUG] phase_gathering_update: 找到 game-container，应用 3D 变换");
             // 1. 设置透视距离，值越小 3D 感越强
             container.style.perspective = "1200px"; 
             
@@ -1204,6 +1206,8 @@ phase_gathering_getRandomPegType() {
 
             container.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(${translateZ}px)`;
             container.style.transition = "transform 0.1s ease-out"; // 平滑动画
+        } else {
+            console.warn("[DEBUG] phase_gathering_update: 未找到 game-container");
         }
         // 模拟板子边缘受光不均
         const grad = this.ctx.createRadialGradient(

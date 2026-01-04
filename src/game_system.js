@@ -67,6 +67,7 @@ if (this.phase === 'truth_book') {
 	        }
         switch (this.phase) {
             case 'gathering':
+                console.log("[DEBUG] sys_loop: 进入 gathering 分支");
                 this.phase_gathering_update(timeScale);
                 break;
             case 'training':
