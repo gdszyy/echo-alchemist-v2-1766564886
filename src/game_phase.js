@@ -107,8 +107,18 @@ export const game_phase = {
         // [修复] 修正 width 引用
         // 确保 this.width 在初始化时已正确设置，否则使用默认值 400
         const canvasWidth = (this.width && this.width > 0) ? this.width : 400; 
+        const canvasHeight = (this.height && this.height > 0) ? this.height : 600;
+        
         const offsetX = (canvasWidth - (cols - 1) * spacingX) / 2;
-        const offsetY = 120;
+        
+        // [优化] 动态计算 offsetY，确保在矮屏幕下钉子不会被挤出屏幕
+        // 预留顶部空间 (约占高度的 20%，但不超过 120px)
+        const offsetY = Math.min(120, canvasHeight * 0.2);
+        
+        // [优化] 如果屏幕太矮，自动压缩垂直间距
+        const adjustedSpacingY = (offsetY + rows * spacingY > canvasHeight - 50) 
+            ? (canvasHeight - offsetY - 80) / rows 
+            : spacingY;
 
         const previousPegs = [...this.pegs];
         this.pegs = [];
@@ -123,7 +133,7 @@ export const game_phase = {
 
             for (let c = 0; c < cols; c++) {
                 const x = offsetX + rowOffsetX + c * spacingX;
-                const y = offsetY + r * spacingY;
+                const y = offsetY + r * adjustedSpacingY;
                 maxPegY = Math.max(maxPegY, y);
 
                 let type = 'normal';
@@ -191,7 +201,7 @@ export const game_phase = {
                 const cols = isOddRow ? CONFIG.gameplay.cols - 1 : CONFIG.gameplay.cols;
                 const c = Math.floor(Math.random() * cols);
                 const pegIdx = this.pegs.findIndex(p => 
-                    Math.abs(p.y - (offsetY + r * spacingY)) < 1 && 
+                    Math.abs(p.y - (offsetY + r * adjustedSpacingY)) < 1 && 
                     Math.abs(p.x - (offsetX + (isOddRow ? spacingX / 2 : 0) + c * spacingX)) < 1
                 );
                 if (pegIdx !== -1 && this.pegs[pegIdx].type !== 'pink' && !this.specialSlots.some(s => s.pegIndex === pegIdx)) {
