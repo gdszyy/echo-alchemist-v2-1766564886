@@ -1176,6 +1176,13 @@ phase_gathering_getRandomPegType() {
      * @param {number} [timeScale=1] - **重要參數** 時間縮放因子。
      */
     phase_gathering_update(timeScale = 1) {
+        // [修复] 确保 Canvas 状态干净
+        this.ctx.save();
+        this.ctx.globalAlpha = 1.0;
+        this.ctx.globalCompositeOperation = 'source-over';
+        this.ctx.shadowBlur = 0;
+        this.ctx.shadowColor = 'transparent';
+
         // [修复] 移除 DOM 依赖的检查。如果遗物界面打开，phase 应该已经被切换到 'relic'
         // 并且主循环 (sys_loop) 会根据 phase 决定是否调用此函数。
         // 额外的 DOM 检查可能导致状态不同步。
@@ -1212,6 +1219,9 @@ phase_gathering_getRandomPegType() {
 
         this.ctx.fillStyle = grad;
         this.ctx.fillRect(0, 0, this.width, this.height);
+
+        // [DEBUG] 确认渲染流程执行到此处
+        if (Math.random() < 0.01) console.log(`[DEBUG] Rendering gathering: pegs=${this.pegs.length}, slots=${this.specialSlots.length}`);
 
         // --- [新增] 绘制转盘 (在阴影和钉子之前) ---
         if (this.fortuneWheel.active) {
@@ -1296,6 +1306,10 @@ phase_gathering_getRandomPegType() {
         this.specialSlots = this.specialSlots.filter(s => !s.hit);
         // 繪製特殊槽位
         this.specialSlots.forEach(s => s.draw(this.ctx));
+
+        // [修复] 结束收集阶段渲染，恢复 Canvas 状态
+        this.ctx.restore();
+
         // --- 更新和绘制光柱 ---
         for (let i = this.collectionBeams.length - 1; i >= 0; i--) {
             const beam = this.collectionBeams[i];
