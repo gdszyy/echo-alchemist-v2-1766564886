@@ -138,6 +138,9 @@ class Game {
 
         // [修复] 最后再切换到 meta 阶段，这样 UI 就不会被上面的代码隐藏了
         this.phase_switchPhase('meta');
+
+        // [核心修复] 启动游戏主循环
+        this.sys_loop();
     }
 }
 
