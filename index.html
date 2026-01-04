@@ -932,12 +932,67 @@
             z-index: 1000;
         }
 
+        /* ==================== [新增] CRT 显像管特效 ==================== */
+
+        /* 特效遮罩层 */
+        #crt-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none; /* 关键：确保鼠标点击能穿透，不影响游戏操作 */
+            z-index: 9999;        /* 确保覆盖在所有 UI 之上 */
+            
+            /* 1. 扫描线 (Scanlines) - 使用线性渐变模拟 */
+            background: linear-gradient(
+                to bottom,
+                rgba(255, 255, 255, 0),
+                rgba(255, 255, 255, 0) 50%,
+                rgba(0, 0, 0, 0.2) 50%,
+                rgba(0, 0, 0, 0.2)
+            );
+            background-size: 100% 4px; /* 每 4px 一条线 */
+            
+            /* 2. 晕影 (Vignette) - 四周变暗，模拟老式显示器 */
+            box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.9);
+            
+            /* 3. 混合模式 (可选，增加通透感) */
+            mix-blend-mode: multiply;
+
+            /* 默认隐藏，通过 JS 激活 */
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        /* 激活状态 */
+        #crt-overlay.active {
+            opacity: 1;
+            /* 叠加微弱的闪烁动画 */
+            animation: crt-flicker 0.15s infinite;
+        }
+
+        /* 屏幕微闪动画 */
+        @keyframes crt-flicker {
+            0% { opacity: 0.95; }
+            50% { opacity: 0.92; }
+            100% { opacity: 0.95; }
+        }
+
+        /* 激活时的按钮样式 */
+        #crt-btn.active {
+            color: #fbbf24; /* Amber-400 */
+            border-color: #fbbf24;
+            text-shadow: 0 0 5px #fbbf24;
+        }
+
     </style>
 </head>
 <body>
 
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
+    <div id="crt-overlay"></div>
 
     <!-- Phase Title Animation -->
     <div id="phase-title-container">
@@ -953,6 +1008,7 @@
         <button id="speed-btn" class="btn-icon">⏩</button>
         <button id="mute-btn" class="btn-icon">🔊</button>
         <button id="damage-numbers-btn" class="btn-icon" title="切换伤害数字显示">🔢</button>
+        <button id="crt-btn" class="btn-icon" title="切換顯像管特效">📺</button>
     </div>
 
     <div id="sp-panel" class="absolute top-16 left-4 flex flex-wrap gap-3 pointer-events-none z-50 transition-opacity duration-300">
@@ -1307,6 +1363,35 @@ window.audio = audio; // 将 audio 实例也挂载到 window，供其他模块�
 if (typeof globalThis !== 'undefined') {
     globalThis.game = game;
 }
+
+// ==================== [新增] CRT 特效控制逻辑 ====================
+const crtBtn = document.getElementById('crt-btn');
+const crtOverlay = document.getElementById('crt-overlay');
+
+// 1. 从本地存储读取设置 (默认为开启 'true'，如果你想默认关闭则改为 'false')
+let isCrtOn = localStorage.getItem('ea_crt_enabled') !== 'false'; 
+
+// 2. 初始化状态
+updateCrtVisuals();
+
+// 3. 绑定点击事件
+crtBtn.addEventListener('click', () => {
+    isCrtOn = !isCrtOn;
+    localStorage.setItem('ea_crt_enabled', isCrtOn); // 保存设置
+    updateCrtVisuals();
+});
+
+// 4. 更新视觉效果函数
+function updateCrtVisuals() {
+    if (isCrtOn) {
+        crtOverlay.classList.add('active');
+        crtBtn.classList.add('active');
+    } else {
+        crtOverlay.classList.remove('active');
+        crtBtn.classList.remove('active');
+    }
+}
+// ==============================================================
 </script>
 </body>
 </html>
