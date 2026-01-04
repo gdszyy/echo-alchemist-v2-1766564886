@@ -120,7 +120,6 @@ class Game {
         this.sys_loadSaveData(); // 必须先加载存档，才能应用升级
         this.sys_resize(); // 必须在加载存档后，才能确保 this.width/height 被正确设置
         this.sys_setupInputs(); 
-        this.phase_switchPhase('meta'); 
         this.currentRows = CONFIG.gameplay.rows; 
         this.boardBottomY = 0;
         
@@ -136,6 +135,9 @@ class Game {
             if (this.phase === 'gathering') this.phase_gathering_initPachinko(); 
         });
         this.ui = new UIManager();
+
+        // [修复] 最后再切换到 meta 阶段，这样 UI 就不会被上面的代码隐藏了
+        this.phase_switchPhase('meta');
     }
 }
 

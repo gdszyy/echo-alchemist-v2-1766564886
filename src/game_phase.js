@@ -45,10 +45,10 @@ export const game_phase = {
 
         // 根据阶段设置标题文本
         let text = "命運抉择"; let sub = "選擇你的命運";
-        if (newPhase === 'gathering') { text = "研磨階段"; sub = "收集魔力"; }
+        if (newPhase === 'meta') { text = "回聲煉金師"; sub = "Echo Alchemist"; }
+        else if (newPhase === 'gathering') { text = "研磨階段"; sub = "收集魔力"; }
         else if (newPhase === 'combat') { text = "戰鬥階段"; sub = "抵禦魔像"; }
         else if (newPhase === 'truth_book') { text = "真理之書"; sub = "洞悉萬物之理"; }
-        else if (newPhase === 'training') { text = "試煉場"; sub = "極限戰鬥測試"; }
         else if (newPhase === 'training') { text = "試煉場"; sub = "極限戰鬥測試"; }
         titleText.innerText = text; subText.innerText = sub;
         
