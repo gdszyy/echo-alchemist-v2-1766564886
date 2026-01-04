@@ -60,6 +60,7 @@ export const game_phase = {
      * [AUTO-GENERATED] TODO: Add a description for phase_startGatheringPhase.
      */
     phase_startGatheringPhase() {
+        console.log("[DEBUG] phase_startGatheringPhase: 开始进入收集阶段");
         // 保存上一回合的伤害数据
         if (this.shotDamageHistory.length > 0) {
             this.roundDamageHistory.push({
