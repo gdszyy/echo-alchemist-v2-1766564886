@@ -24,6 +24,8 @@ export const game_system = {
      * 负责更新游戏状态、渲染所有实体和 UI。
      */
     sys_loop() {
+        // [DEBUG] 确认循环存活
+        if (Math.random() < 0.01) console.log(`[DEBUG] sys_loop 运行中, 当前 phase: ${this.phase}`);
         const timeScale = this.timeScale; 
 
         // [DEBUG] 全局阶段监控
