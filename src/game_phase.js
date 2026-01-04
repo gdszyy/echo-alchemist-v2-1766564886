@@ -101,7 +101,9 @@ export const game_phase = {
         const spacingY = CONFIG.gameplay.spacingY || 45;
         
         // [修复] 修正 width 引用
-        const offsetX = (this.width - (CONFIG.gameplay.cols - 1) * spacingX) / 2;
+        // 确保 this.width 在初始化时已正确设置，否则使用默认值 400
+        const canvasWidth = this.width || 400; 
+        const offsetX = (canvasWidth - (CONFIG.gameplay.cols - 1) * spacingX) / 2;
         const offsetY = 120;
 
         const previousPegs = [...this.pegs];

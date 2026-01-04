@@ -117,9 +117,9 @@ class Game {
         this.slowMotionThreshold = 100;  
         this.saveData = { currency: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0 };
         this.runCurrency = 0;   
-        this.sys_resize();
+        this.sys_loadSaveData(); // 必须先加载存档，才能应用升级
+        this.sys_resize(); // 必须在加载存档后，才能确保 this.width/height 被正确设置
         this.sys_setupInputs(); 
-        this.sys_loadSaveData(); 
         this.phase_switchPhase('meta'); 
         this.currentRows = CONFIG.gameplay.rows; 
         this.boardBottomY = 0;
