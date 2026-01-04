@@ -123,6 +123,14 @@ class Game {
         this.phase_switchPhase('meta'); 
         this.currentRows = CONFIG.gameplay.rows; 
         this.boardBottomY = 0;
+        
+        // [修复] 确保所有 UI 覆盖层在游戏开始时都被隐藏，防止状态残留
+        document.querySelectorAll('.ui-overlay').forEach(el => { 
+            el.style.display = 'none'; 
+            el.classList.add('hidden-phase'); 
+            el.classList.remove('active-phase'); 
+        });
+        
         window.addEventListener('resize', () => { 
             this.sys_resize(); 
             if (this.phase === 'gathering') this.phase_gathering_initPachinko(); 

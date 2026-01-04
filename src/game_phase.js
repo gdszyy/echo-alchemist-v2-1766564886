@@ -1157,7 +1157,9 @@ phase_gathering_getRandomPegType() {
      * @param {number} [timeScale=1] - **重要參數** 時間縮放因子。
      */
     phase_gathering_update(timeScale = 1) {
-        if (document.getElementById('phase-relic').style.display !== 'none') return;
+        // [修复] 移除 DOM 依赖的检查。如果遗物界面打开，phase 应该已经被切换到 'relic'
+        // 并且主循环 (sys_loop) 会根据 phase 决定是否调用此函数。
+        // 额外的 DOM 检查可能导致状态不同步。
 
         const tilt = this.boardTilt.current;
 
