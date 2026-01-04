@@ -968,15 +968,111 @@
         /* 激活状态 */
         #crt-overlay.active {
             opacity: 1;
-            /* 叠加微弱的闪烁动画 */
-            animation: crt-flicker 0.15s infinite;
+            /* 叠加微弱的闪烁动画 - 使用更慢的速度模拟电压不稳 */
+            animation: crt-flicker 3s infinite, crt-flicker-random 8s infinite;
         }
 
-        /* 屏幕微闪动画 */
+        /* 屏幕微闪动画 - 增强版：模拟电压不稳 */
         @keyframes crt-flicker {
             0% { opacity: 0.95; }
-            50% { opacity: 0.92; }
-            100% { opacity: 0.95; }
+            10% { opacity: 0.93; }
+            15% { opacity: 0.96; }
+            20% { opacity: 0.92; }
+            30% { opacity: 0.94; }
+            40% { opacity: 0.91; }
+            45% { opacity: 0.95; }
+            50% { opacity: 0.93; }
+            60% { opacity: 0.96; }
+            70% { opacity: 0.92; }
+            75% { opacity: 0.94; }
+            85% { opacity: 0.93; }
+            90% { opacity: 0.95; }
+            100% { opacity: 0.94; }
+        }
+        
+        /* 随机闪烁效果 - 模拟偶尔的电压波动 */
+        @keyframes crt-flicker-random {
+            0% { opacity: 0.95; filter: brightness(1); }
+            2% { opacity: 0.88; filter: brightness(0.95); }
+            4% { opacity: 0.96; filter: brightness(1.02); }
+            6% { opacity: 0.93; filter: brightness(0.98); }
+            8% { opacity: 0.95; filter: brightness(1); }
+            100% { opacity: 0.95; filter: brightness(1); }
+        }
+        
+        /* 色差效果 - 模拟RGB信号分离 */
+        @keyframes crt-chromatic-aberration-light {
+            0% { 
+                text-shadow: 0 0 0 transparent;
+                filter: none;
+            }
+            20% { 
+                text-shadow: 1px 0 0 rgba(255, 0, 0, 0.5), -1px 0 0 rgba(0, 255, 255, 0.5);
+                filter: blur(0.3px);
+            }
+            40% { 
+                text-shadow: 0.5px 0 0 rgba(255, 0, 0, 0.3), -0.5px 0 0 rgba(0, 255, 255, 0.3);
+                filter: blur(0.15px);
+            }
+            100% { 
+                text-shadow: 0 0 0 transparent;
+                filter: none;
+            }
+        }
+        
+        @keyframes crt-chromatic-aberration-medium {
+            0% { 
+                text-shadow: 0 0 0 transparent;
+                filter: none;
+            }
+            15% { 
+                text-shadow: 2px 0 0 rgba(255, 0, 0, 0.7), -2px 0 0 rgba(0, 255, 255, 0.7);
+                filter: blur(0.5px);
+            }
+            30% { 
+                text-shadow: 1px 0 0 rgba(255, 0, 0, 0.4), -1px 0 0 rgba(0, 255, 255, 0.4);
+                filter: blur(0.25px);
+            }
+            100% { 
+                text-shadow: 0 0 0 transparent;
+                filter: none;
+            }
+        }
+        
+        @keyframes crt-chromatic-aberration-heavy {
+            0% { 
+                text-shadow: 0 0 0 transparent;
+                filter: none;
+            }
+            10% { 
+                text-shadow: 3px 0 0 rgba(255, 0, 0, 0.9), -3px 0 0 rgba(0, 255, 255, 0.9), 0 2px 0 rgba(0, 255, 0, 0.5);
+                filter: blur(0.8px);
+            }
+            25% { 
+                text-shadow: 2px 0 0 rgba(255, 0, 0, 0.6), -2px 0 0 rgba(0, 255, 255, 0.6);
+                filter: blur(0.4px);
+            }
+            50% { 
+                text-shadow: 1px 0 0 rgba(255, 0, 0, 0.3), -1px 0 0 rgba(0, 255, 255, 0.3);
+                filter: blur(0.2px);
+            }
+            100% { 
+                text-shadow: 0 0 0 transparent;
+                filter: none;
+            }
+        }
+        
+        /* 色差效果应用类 */
+        #crt-overlay.chromatic-light {
+            animation: crt-flicker 3s infinite, crt-flicker-random 8s infinite, crt-chromatic-aberration-light 0.3s ease-out;
+        }
+        
+        #crt-overlay.chromatic-medium {
+            animation: crt-flicker 3s infinite, crt-flicker-random 8s infinite, crt-chromatic-aberration-medium 0.4s ease-out;
+        }
+        
+        #crt-overlay.chromatic-heavy {
+            animation: crt-flicker 3s infinite, crt-flicker-random 8s infinite, crt-chromatic-aberration-heavy 0.5s ease-out;
         }
 
         /* 激活时的按钮样式 */

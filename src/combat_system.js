@@ -538,8 +538,8 @@ combat_wind_executeCircleEffect(x, y, w, h, size, shape, element, tunnelVector =
                             shotId: this._currentDamageShotId 
                         });
                     }
-                });
-            }
+                })
+             }
         } else if (shape === 'square') {
             if (element === 'wind') {
                 this.spawn_createFloatingText(centerX, centerY, "🌪️暴风绞杀", "#34d399");
@@ -1549,6 +1549,9 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
             }    // D. 移除热量回填机制 (根据需求取消回填)
         }
         
+        // --- [CRT效果] 根据伤害大小触发色差效果 ---
+        this.combat_triggerChromaticAberration(actualDmg);
+        
         // [新增] 保存当前shotId，供后续额外伤害使用
         // this._currentDamageShotId = shotId; // 移除：不再需要全局缓存 shotId
         
@@ -1766,6 +1769,46 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
                 }
             });
         }
+    },
+    
+    /**
+     * @method combat_triggerChromaticAberration
+     * @description 根据伤害大小触发CRT色差效果，限制触发频率
+     * @param {number} damage - 造成的伤害
+     */
+    combat_triggerChromaticAberration(damage) {
+        // 检查CRT效果是否开启
+        const crtOverlay = document.getElementById('crt-overlay');
+        if (!crtOverlay || !crtOverlay.classList.contains('active')) return;
+        
+        // 频率限制：每100ms最多触发一次
+        const now = Date.now();
+        if (!this._lastChromaticTime) this._lastChromaticTime = 0;
+        if (now - this._lastChromaticTime < 100) return;
+        this._lastChromaticTime = now;
+        
+        // 根据伤害大小决定效果强度
+        let effectClass = '';
+        if (damage >= 50) {
+            effectClass = 'chromatic-heavy';
+        } else if (damage >= 20) {
+            effectClass = 'chromatic-medium';
+        } else if (damage >= 5) {
+            effectClass = 'chromatic-light';
+        } else {
+            return; // 伤害太小，不触发
+        }
+        
+        // 移除旧的效果类
+        crtOverlay.classList.remove('chromatic-light', 'chromatic-medium', 'chromatic-heavy');
+        
+        // 添加新效果类
+        crtOverlay.classList.add(effectClass);
+        
+        // 动画结束后移除类
+        setTimeout(() => {
+            crtOverlay.classList.remove(effectClass);
+        }, 500);
     },
 
 /**
