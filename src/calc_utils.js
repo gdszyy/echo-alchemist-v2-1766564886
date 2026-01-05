@@ -67,7 +67,6 @@ export const calc_utils = {
             // 这样难度曲线会变得平缓，给玩家喘息机会
             this.difficultyGrowthFactor = ddaCfg.difficultyGrowthFactorLow;
             showToast("检测到战力不足，敌人成长减缓...", 2000);
-            console.log(`[DDA] 难度降低! 玩家战力 ${this.currentPlayerPower.toFixed(1)} < 阈值 ${threshold.toFixed(1)}`);
         } else {
             // 恢复正常成长
             this.difficultyGrowthFactor = 1.0;

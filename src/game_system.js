@@ -25,11 +25,9 @@ export const game_system = {
      */
     sys_loop() {
         // [DEBUG] 确认循环存活
-        if (Math.random() < 0.01) console.log(`[DEBUG] sys_loop 运行中, 当前 phase: ${this.phase}`);
         const timeScale = this.timeScale; 
 
         // [DEBUG] 全局阶段监控
-        if (Math.random() < 0.005) console.log(`[DEBUG] sys_loop: phase=${this.phase}`);
 
         // 处理震动衰减
         let shakeX = 0, shakeY = 0;
@@ -61,7 +59,6 @@ export const game_system = {
         }
 
         // 4. 阶段逻辑与渲染分发
-        if (this.phase === 'gathering') console.log("[DEBUG] sys_loop: 当前 phase 为 gathering，准备进入 switch");
 if (this.phase === 'truth_book') {
 	            this.truthBook.update();
 	        }
@@ -70,7 +67,6 @@ if (this.phase === 'truth_book') {
 	        }
         switch (this.phase) {
             case 'gathering':
-                console.log("[DEBUG] sys_loop: 进入 gathering 分支");
                 this.phase_gathering_update(timeScale);
                 break;
             case 'training':
@@ -169,7 +165,6 @@ if (this.phase === 'truth_book') {
         this.width = this.canvas.width = newWidth; 
         this.height = this.canvas.height = newHeight; 
         
-        console.log(`[DEBUG] sys_resize: width=${this.width}, height=${this.height}`);
 
         // 动态调整失败判定线，防止在矮屏幕上太高
         this.defeatLineY = this.height - 120; // 稍微调低一点，给底部 UI 留空间
@@ -218,7 +213,6 @@ if (this.phase === 'truth_book') {
         // --- [新增] 开发福利 ---
         if ((this.saveData.currency || 0) < 2000) {
             this.saveData.currency = 2000;
-            console.log("DEV: Granted 2000 Energy Essence");
             this.sys_saveData();
         }
         this.ui_updateMetaCurrency();
@@ -328,7 +322,6 @@ sys_resetGame() {
                         this.boardTilt.enabled = true;
                         window.addEventListener('deviceorientation', e => this.input_handleOrientation(e));
                     }
-                } catch (e) { console.log("Gyro permission failed", e); }
             } else if ('ondeviceorientation' in window) {
                 // 非 iOS 设备通常直接支持
                 this.boardTilt.enabled = true;

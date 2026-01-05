@@ -183,12 +183,6 @@ export const spawn_system = {
         const baseHP = Math.floor(finalBaseHP * this.nextRoundHpMultiplier);
         
         // [日志] 记录血量计算过程
-        console.log(`[HP Scaling] Round: ${this.round}`);
-        console.log(` - Linear HP: ${linearHP.toFixed(2)}`);
-        console.log(` - Peak Avg Damage: ${peakAvg.toFixed(2)}`);
-        console.log(` - Ideal HP (based on damage): ${idealHP.toFixed(2)}`);
-        console.log(` - Final Base HP (Mixed): ${finalBaseHP.toFixed(2)}`);
-        console.log(` - Final HP (with Multiplier): ${baseHP}`);
         // ----------------------------
 
         const w = this.enemyWidth;

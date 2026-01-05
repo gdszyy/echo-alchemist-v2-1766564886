@@ -82,7 +82,6 @@ ui_closeTruthBook() {
             this.slowMotionTimer = smCfg.duration; // 慢动作持续约 0.6秒
             // 触发瞬间强制降速，这里可以用固定值 0.1，保证打击感
             this.timeScale = smCfg.timeScale; 
-            console.log(`慢动作触发! 伤害: ${Math.floor(this.frameDamageAccumulator)} > 阈值: ${Math.floor(dynamicThreshold)}`);
         }
 
         // 清空当帧累计
@@ -745,13 +744,11 @@ ui_closeTruthBook() {
      * @description 确认玩家选择的弹珠，并进入收集阶段。
      */
     ui_confirmSelection() { 
-        console.log("[DEBUG] ui_confirmSelection: 按钮被点击, 已选弹珠:", this.selectedMarbles.length);
         if (this.selectedMarbles.length !== 3) {
             console.warn("[DEBUG] ui_confirmSelection: 选中的弹珠数量不足 3 个，当前为:", this.selectedMarbles.length);
             return;
         }
         this.marbleQueue = this.selectedMarbles.map(i => this.marblesPool[i]); // 将选中的弹珠放入队列
-        console.log("[DEBUG] ui_confirmSelection: 弹珠队列已准备，调用 phase_startGatheringPhase");
         this.phase_startGatheringPhase(); 
     },
 
@@ -1112,7 +1109,6 @@ ui_closeTruthBook() {
             }
         });
         
-        console.log("Meta upgrades applied to CONFIG");
     },
 
 /**

@@ -57,7 +57,6 @@ export const combat_system = {
         
         const finalAverage = filteredScores.reduce((a, b) => a + b, 0) / filteredScores.length;
         
-        console.log(`[DDA] 战力评估 -> 原始: ${scores.length}, 过滤后: ${filteredScores.length}, 最终评分: ${finalAverage.toFixed(1)}`);
         return finalAverage;
     },
 
@@ -1676,7 +1675,6 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
             }
             const activeCount = this.enemies.filter(e => e.active && (e.pos.y > 0)).length;
             if(activeCount === 0) {
-                console.log(">>> [LOG] 全场敌人已清除。正在清理子弹...");
                 this.data_clearProjectiles(); 
                 if (this.isEnemyTurn) {
                     console.error(">>> [BUG] 严重错误：在清理子弹时，isEnemyTurn 竟然是 TRUE！");

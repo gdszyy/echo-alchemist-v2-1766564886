@@ -60,7 +60,6 @@ export const game_phase = {
      * [AUTO-GENERATED] TODO: Add a description for phase_startGatheringPhase.
      */
     phase_startGatheringPhase() {
-        console.log("[DEBUG] phase_startGatheringPhase: 开始进入收集阶段");
         // 保存上一回合的伤害数据
         if (this.shotDamageHistory.length > 0) {
             this.roundDamageHistory.push({
@@ -103,7 +102,6 @@ export const game_phase = {
         const spacingY = CONFIG.gameplay.spacingY || 45;
         
         // [监控] 打印初始化关键参数
-        console.log(`[DEBUG] initPachinko: rows=${rows}, cols=${cols}, width=${this.width}`);
 
         // [修复] 修正 width 引用
         // 确保 this.width 在初始化时已正确设置，否则使用默认值 400
@@ -192,6 +190,7 @@ export const game_phase = {
             }
         }
 
+        console.log(`[DEBUG] Starting special slot creation: unlockedSlots=${JSON.stringify(this.unlockedSlots)}, slotCount=${this.slotCount}`);
         if (this.unlockedSlots.length > 0 && this.slotCount > 0) {
             const slotTypes = this.unlockedSlots;
             let attempts = 0;
@@ -212,8 +211,16 @@ export const game_phase = {
                     const slot = new SpecialSlot(peg.pos.x, peg.pos.y, spacingX * 0.8, type);
                     slot.pegIndex = pegIdx;
                     this.specialSlots.push(slot);
+                    console.log(`[DEBUG] Created special slot: type=${type}, pegIdx=${pegIdx}, pos=(${peg.pos.x}, ${peg.pos.y})`);
+                } else {
+                    if (attempts % 10 === 0) {
+                        console.log(`[DEBUG] Failed to create slot at attempt ${attempts}: pegIdx=${pegIdx}, type=${pegIdx !== -1 ? this.pegs[pegIdx].type : 'N/A'}`);
+                    }
                 }
             }
+            console.log(`[DEBUG] Finished special slot creation: final count=${this.specialSlots.length}, attempts=${attempts}`);
+        } else {
+            console.log(`[DEBUG] Skipping special slot creation: unlockedSlots.length=${this.unlockedSlots.length}, slotCount=${this.slotCount}`);
         }
         this.ui_updateGatheringQueueUI();
         this.ui_renderRecipeHUD();
@@ -261,7 +268,6 @@ phase_gathering_getRandomPegType() {
      * @description 开始战斗阶段，初始化敌人和UI。
      */
     phase_startCombatPhase() { 
-        console.log("进入战斗阶段...");
         this.isEnemyTurn = false;
         this.energyOrbs = [];
         this.sonSwordQueue = []; 
@@ -331,7 +337,6 @@ phase_gathering_getRandomPegType() {
                 return;
             }
             if (this.dropBalls.length > 0 || this.energyOrbs.length > 0) {
-                console.log('[DEBUG] 充能中 - dropBalls:', this.dropBalls.length, 'energyOrbs:', this.energyOrbs.length, 'activeBalls:', this.currentSession?.activeBalls);
                 // showToast("充能中..."); // 移除正常情况下的提示
                 return;
             }
@@ -439,7 +444,6 @@ phase_gathering_getRandomPegType() {
      * @description 启动敌人回合：锁定状态、显示UI提示、并计算所有敌人的移动与技能
      */
     phase_enemy_startLogic() {
-        console.log(">>> [LOG] 启动敌人回合逻辑"); //
         this.isEnemyTurn = true;
         this.enemyTurnTimer = 0;
 
@@ -447,7 +451,6 @@ phase_gathering_getRandomPegType() {
         this.enemyWaveActive = true;
         this.enemyWaveY = this.height + 50; // 从屏幕最下方开始
         this.waveSpeed = 8 * this.timeScale; // 根据倍速调整扫描速度
-        console.log(">>> [LOG] 扫描波已激活，起始 Y:", this.enemyWaveY);
         // 重置所有敌人的行动标记
         this.enemies.forEach(e => {
             e.hasActedThisTurn = false;
@@ -985,7 +988,6 @@ phase_gathering_getRandomPegType() {
         if (activeEnemies === 0) {
             const hasLeftoverAmmo = this.ammoQueue.length > 0;
             if (hasLeftoverAmmo) {
-                console.log(">>> [LOG] 检测到全清场，自动结算剩余弹药");
                 const leftoverCount = this.ammoQueue.length;
                 const scoreMult = Math.pow(CONFIG.balance.unusedAmmoScoreMult, leftoverCount);
                 this.score *= scoreMult;
@@ -1119,9 +1121,7 @@ phase_gathering_getRandomPegType() {
         const activeOrbsCount = this.energyOrbs.filter(orb => orb.active).length;
 
         // 1. 基础检查：如果还有东西在动，绝对不能结算
-        console.log('[DEBUG] attemptComplete - dropBalls:', this.dropBalls.length, 'activeOrbs:', activeOrbsCount, 'activeBalls:', this.currentSession?.activeBalls);
         if (this.dropBalls.length > 0 || activeOrbsCount > 0 || this.currentSession.activeBalls > 0) {
-            console.log('[DEBUG] 不能结算，还有东西在动');
             return;
         }
 
@@ -1177,7 +1177,6 @@ phase_gathering_getRandomPegType() {
      * @param {number} [timeScale=1] - **重要參數** 時間縮放因子。
      */
     phase_gathering_update(timeScale = 1) {
-        console.log("[DEBUG] phase_gathering_update: 函数被调用");
         // [修复] 确保 Canvas 状态干净
         this.ctx.save();
         this.ctx.globalAlpha = 1.0;
@@ -1194,7 +1193,6 @@ phase_gathering_getRandomPegType() {
 
         const container = document.getElementById('game-container');
         if (container) {
-            console.log("[DEBUG] phase_gathering_update: 找到 game-container，应用 3D 变换");
             // 1. 设置透视距离，值越小 3D 感越强
             container.style.perspective = "1200px"; 
             
@@ -1226,7 +1224,6 @@ phase_gathering_getRandomPegType() {
         this.ctx.fillRect(0, 0, this.width, this.height);
 
         // [DEBUG] 确认渲染流程执行到此处
-        if (Math.random() < 0.05) console.log(`[DEBUG] Rendering gathering: pegs=${this.pegs.length}, slots=${this.specialSlots.length}`);
 
         // --- [新增] 绘制转盘 (在阴影和钉子之前) ---
         if (this.fortuneWheel.active) {
@@ -1353,10 +1350,8 @@ phase_gathering_getRandomPegType() {
                     // 3. 播放一个确认音效 (比如 reload 或 magic)
                     audio.playCollect(); // 或者 audio.playTone(800, 'sine', 0.2)
                     // 弹珠落出屏幕
-                    console.log('[DEBUG] 弹珠移除 - 移除前 dropBalls:', this.dropBalls.length, 'activeBalls:', this.currentSession.activeBalls);
                     this.dropBalls.splice(i, 1);
                     this.currentSession.activeBalls--;
-                    console.log('[DEBUG] 弹珠移除 - 移除后 dropBalls:', this.dropBalls.length, 'activeBalls:', this.currentSession.activeBalls);
                     
                     // --- ：不再直接結算，而是嘗試結算 ---
                     // 處理“能量球先落地，彈珠後死”的情況
