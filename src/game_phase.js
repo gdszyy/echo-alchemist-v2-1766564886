@@ -221,8 +221,8 @@ export const game_phase = {
 
 phase_gathering_getRandomPegType() { 
     // 定义所有可能的特殊钉子类型
-    const pegTypes = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind'];
-    
+    // const pegTypes = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind'];
+    const pegTypes = ['bounce']
     // 1. 获取 normal 的基础权重
     // 我们手动从 unlockedWeights 中取 white 作为普通钉子的权重基准（默认 100）
     const normalWeight = this.unlockedWeights['white'] || 100; 
