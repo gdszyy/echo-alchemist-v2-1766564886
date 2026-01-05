@@ -193,32 +193,35 @@ export const game_phase = {
         console.log(`[DEBUG] Starting special slot creation: unlockedSlots=${JSON.stringify(this.unlockedSlots)}, slotCount=${this.slotCount}`);
         if (this.unlockedSlots.length > 0 && this.slotCount > 0) {
             const slotTypes = this.unlockedSlots;
-            let attempts = 0;
-            while (this.specialSlots.length < this.slotCount && attempts < 100) {
-                attempts++;
-                const r = Math.floor(Math.random() * rows);
-                const isOddRow = r % 2 !== 0;
-                const cols = isOddRow ? CONFIG.gameplay.cols - 1 : CONFIG.gameplay.cols;
-                const c = Math.floor(Math.random() * cols);
-                const pegIdx = this.pegs.findIndex(p => 
-                    Math.abs(p.y - (offsetY + r * adjustedSpacingY)) < 1 && 
-                    Math.abs(p.x - (offsetX + (isOddRow ? spacingX / 2 : 0) + c * spacingX)) < 1
-                );
-                if (pegIdx !== -1 && this.pegs[pegIdx].type !== 'pink' && !this.specialSlots.some(s => s.pegIndex === pegIdx)) {
-                    const type = slotTypes[Math.floor(Math.random() * slotTypes.length)];
-                    const peg = this.pegs[pegIdx];
-                    // [修复] 必须实例化 SpecialSlot 对象，否则它没有 draw 方法，导致渲染失败
-                    const slot = new SpecialSlot(peg.pos.x, peg.pos.y, spacingX * 0.8, type);
-                    slot.pegIndex = pegIdx;
-                    this.specialSlots.push(slot);
-                    console.log(`[DEBUG] Created special slot: type=${type}, pegIdx=${pegIdx}, pos=(${peg.pos.x}, ${peg.pos.y})`);
-                } else {
-                    if (attempts % 10 === 0) {
-                        console.log(`[DEBUG] Failed to create slot at attempt ${attempts}: pegIdx=${pegIdx}, type=${pegIdx !== -1 ? this.pegs[pegIdx].type : 'N/A'}`);
-                    }
-                }
+            
+            // [重构] 不再使用随机坐标匹配，而是直接从合法候选钉子池中抽取
+            // 1. 筛选出所有合法的候选钉子索引 (非粉色且未被占用)
+            let validPegIndices = this.pegs
+                .map((p, index) => ({ type: p.type, index }))
+                .filter(item => item.type !== 'pink')
+                .map(item => item.index);
+
+            console.log(`[DEBUG] Found ${validPegIndices.length} valid candidate pegs for special slots`);
+
+            let createdCount = 0;
+            while (createdCount < this.slotCount && validPegIndices.length > 0) {
+                // 2. 从候选池中随机抽取一个索引
+                const randIdxInPool = Math.floor(Math.random() * validPegIndices.length);
+                const pegIdx = validPegIndices.splice(randIdxInPool, 1)[0];
+                
+                const type = slotTypes[Math.floor(Math.random() * slotTypes.length)];
+                const peg = this.pegs[pegIdx];
+                
+                // 3. 实例化 SpecialSlot
+                const slot = new SpecialSlot(peg.pos.x, peg.pos.y, spacingX * 0.8, type);
+                slot.pegIndex = pegIdx;
+                this.specialSlots.push(slot);
+                
+                createdCount++;
+                console.log(`[DEBUG] Created special slot: type=${type}, pegIdx=${pegIdx}, pos=(${peg.pos.x}, ${peg.pos.y})`);
             }
-            console.log(`[DEBUG] Finished special slot creation: final count=${this.specialSlots.length}, attempts=${attempts}`);
+            
+            console.log(`[DEBUG] Finished special slot creation: final count=${this.specialSlots.length}, target=${this.slotCount}`);
         } else {
             console.log(`[DEBUG] Skipping special slot creation: unlockedSlots.length=${this.unlockedSlots.length}, slotCount=${this.slotCount}`);
         }
