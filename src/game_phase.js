@@ -1292,10 +1292,16 @@ phase_gathering_getRandomPegType() {
             this.phase_gathering_initPachinko();
         }
 
-        this.pegs.forEach(p => { 
+        this.pegs.forEach((p, idx) => { 
             p.update(); // 更新冷却和动画
             p.draw(this.ctx, pegRadius); 
             p.resetLight();
+            
+            // 调试日志：检查是否有槽位叠加在当前钉子上
+            const hasSlot = this.specialSlots.some(s => s.pegIndex === idx);
+            if (hasSlot && Math.random() < 0.01) {
+                console.log(`[DEBUG] Rendering peg ${idx} with overlaid special slot at (${p.pos.x.toFixed(1)}, ${p.pos.y.toFixed(1)})`);
+            }
         });
 
         

@@ -208,6 +208,7 @@ class SpecialSlot {
      */
     draw(ctx) {
         if (this.hit) return;
+        
         this.animTimer += 0.05;
         ctx.save();
         let color = '#fff'; let text = '';
@@ -215,17 +216,35 @@ class SpecialSlot {
         else if (this.type === 'multicast') { color = CONFIG.colors.slotMulticast; text = "+2"; }
         else if (this.type === 'split') { color = CONFIG.colors.slotSplit; text = "⑂"; }
         else if (this.type === 'relic') { color = '#facc15'; text = '🏆'; }
-
-        // [新增] 變大槽 與 技能點槽
-        else if (this.type === 'giant') { color = CONFIG.colors.slotGiant; text = "⬆️"; } // 變大圖標
-        else if (this.type === 'skill_point') { color = CONFIG.colors.slotSkill; text = "★"; } // 星星代表技能點
+        else if (this.type === 'giant') { color = CONFIG.colors.slotGiant; text = "⬆️"; }
+        else if (this.type === 'skill_point') { color = CONFIG.colors.slotSkill; text = "★"; }
         else if (this.type === 'wheel') { color = CONFIG.colors.slotWheel; text = "🎡"; }
 
         const glow = Math.sin(this.animTimer) * 5 + 10;
-        ctx.shadowBlur = glow; ctx.shadowColor = color; ctx.fillStyle = color; ctx.globalAlpha = 0.3;
-        ctx.fillRect(this.x - this.width/2, this.y - this.height/2, this.width, this.height);
-        ctx.globalAlpha = 1.0; ctx.shadowBlur = 0; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText(text, this.x, this.y);
+        
+        // [叠加视觉优化] 绘制一个环绕钉子的发光圈，而不是实心方块
+        ctx.shadowBlur = glow; 
+        ctx.shadowColor = color; 
+        ctx.strokeStyle = color; 
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.6;
+        
+        // 绘制一个圆环，刚好包围钉子
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.width / 2 + 2, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // 绘制半透明填充
+        ctx.globalAlpha = 0.2;
+        ctx.fill();
+        
+        ctx.globalAlpha = 1.0; 
+        ctx.shadowBlur = 0; 
+        ctx.textAlign = 'center'; 
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 14px sans-serif'; 
+        ctx.fillStyle = '#fff'; 
+        ctx.fillText(text, this.x, this.y);
         ctx.restore();
     }
 }
