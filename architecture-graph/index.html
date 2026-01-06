@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XPBET 产品架构知识图谱</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .header {
+            padding: 20px 40px;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header .subtitle {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 4px;
+        }
+        .controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .control-btn {
+            padding: 8px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s ease;
+        }
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+        .control-btn.active {
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            border-color: transparent;
+        }
+        .main-container {
+            display: flex;
+            height: calc(100vh - 80px);
+        }
+        #chart-container {
+            flex: 1;
+            position: relative;
+        }
+        .sidebar {
+            width: 320px;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .sidebar h2 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .module-info {
+            display: none;
+        }
+        .module-info.active {
+            display: block;
+        }
+        .info-label {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 4px;
+        }
+        .info-value {
+            font-size: 14px;
+            margin-bottom: 16px;
+            line-height: 1.6;
+        }
+        .priority-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .priority-p0 { background: #e74c3c; }
+        .priority-p1 { background: #f39c12; }
+        .priority-p2 { background: #3498db; }
+        .status-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+        .status-done { background: #27ae60; }
+        .status-dev { background: #9b59b6; }
+        .status-plan { background: #7f8c8d; }
+        .legend {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .legend h3 {
+            font-size: 14px;
+            margin-bottom: 12px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        .default-info {
+            text-align: center;
+            padding: 40px 20px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+        .default-info .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        .related-modules {
+            margin-top: 16px;
+        }
+        .related-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .related-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .related-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .filter-section {
+            margin-bottom: 20px;
+        }
+        .filter-section h3 {
+            font-size: 14px;
+            margin-bottom: 12px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        .filter-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .filter-chip {
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.2s ease;
+        }
+        .filter-chip:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        .filter-chip.active {
+            background: rgba(0, 212, 255, 0.3);
+            border-color: #00d4ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>XPBET 产品架构知识图谱</h1>
+            <div class="subtitle">可交互式模块关系图 · 支持拖拽、缩放、点击查看详情</div>
+        </div>
+        <div class="controls">
+            <button class="control-btn" onclick="resetView()">重置视图</button>
+            <button class="control-btn" onclick="toggleLayout()">切换布局</button>
+            <button class="control-btn" onclick="exportImage()">导出图片</button>
+        </div>
+    </div>
+    
+    <div class="main-container">
+        <div id="chart-container"></div>
+        <div class="sidebar">
+            <div class="filter-section">
+                <h3>按优先级筛选</h3>
+                <div class="filter-chips">
+                    <div class="filter-chip active" data-filter="all" onclick="filterByPriority('all')">全部</div>
+                    <div class="filter-chip" data-filter="P0" onclick="filterByPriority('P0')">P0 核心</div>
+                    <div class="filter-chip" data-filter="P1" onclick="filterByPriority('P1')">P1 重要</div>
+                    <div class="filter-chip" data-filter="P2" onclick="filterByPriority('P2')">P2 延后</div>
+                </div>
+            </div>
+            
+            <h2>模块详情</h2>
+            
+            <div class="default-info" id="default-info">
+                <div class="icon">👆</div>
+                <p>点击图谱中的节点<br>查看模块详细信息</p>
+            </div>
+            
+            <div class="module-info" id="module-info">
+                <div class="info-label">模块名称</div>
+                <div class="info-value" id="info-name" style="font-size: 18px; font-weight: 600;"></div>
+                
+                <div class="info-label">所属领域</div>
+                <div class="info-value" id="info-category"></div>
+                
+                <div class="info-label">优先级 / 状态</div>
+                <div class="info-value">
+                    <span class="priority-tag" id="info-priority"></span>
+                    <span class="status-tag" id="info-status"></span>
+                </div>
+                
+                <div class="info-label">模块描述</div>
+                <div class="info-value" id="info-desc"></div>
+                
+                <div class="info-label">关键功能</div>
+                <div class="info-value" id="info-features"></div>
+                
+                <div class="related-modules">
+                    <div class="info-label">关联模块</div>
+                    <div id="related-list"></div>
+                </div>
+            </div>
+            
+            <div class="legend">
+                <h3>图例说明</h3>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e74c3c;"></div>
+                    <span>P0 - 3月上线核心</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f39c12;"></div>
+                    <span>P1 - 6月上线必备</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #3498db;"></div>
+                    <span>P2 - 世界杯后迭代</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #9b59b6;"></div>
+                    <span>支撑体系</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #1abc9c;"></div>
+                    <span>技术基础设施</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 模块数据定义
+        const moduleData = {
+            // 核心业务 - P0
+            'user-auth': {
+                name: '用户认证与账户管理',
+                category: 'C端核心业务',
+                priority: 'P0',
+                status: '开发中',
+                desc: '平台用户身份验证和账户管理的核心模块，集成巴西本地化的CPF身份验证。',
+                features: ['用户注册/登录', 'KYC身份验证(CPF)', '账户安全中心(2FA)', '设备管理'],
+                related: ['payment', 'risk-control', 'vip']
+            },
+            'payment': {
+                name: '资金管理与支付系统',
+                category: 'C端核心业务',
+                priority: 'P0',
+                status: '开发中',
+                desc: '处理用户充值、提现和交易的核心系统，深度集成巴西PIX支付。',
+                features: ['充值/提现(PIX集成)', '订单管理', '多币种支持', '自动结算'],
+                related: ['user-auth', 'betting', 'agent']
+            },
+            'event-data': {
+                name: '赛事数据与实时推送',
+                category: 'C端核心业务',
+                priority: 'P0',
+                status: '开发中',
+                desc: '集成Sportradar数据源，提供实时赛事数据和赔率推送。',
+                features: ['Sportradar UOF集成', 'WebSocket实时推送', '盘口分组', '热门度计算'],
+                related: ['betting', 'recommend', 'risk-control']
+            },
+            'betting': {
+                name: '投注交易系统',
+                category: 'C端核心业务',
+                priority: 'P0',
+                status: '开发中',
+                desc: '平台核心交易引擎，处理各类投注、结算和冲正。',
+                features: ['多种投注类型', '提前结算(Cash Out)', '串关投注', '投注记录'],
+                related: ['event-data', 'payment', 'risk-control', 'share-bet']
+            },
+            'risk-control': {
+                name: '风险控制与合规',
+                category: '支撑体系',
+                priority: 'P0',
+                status: '开发中',
+                desc: '用户画像与标签系统，集成Sportradar MTS实现精细化风控。',
+                features: ['用户画像与标签', 'MTS集成', '反欺诈检测', 'CPF/PIX合规'],
+                related: ['user-auth', 'betting', 'event-data', 'agent']
+            },
+            'agent': {
+                name: '代理分销系统',
+                category: 'B端运营',
+                priority: 'P0',
+                status: '设计中',
+                desc: '代理商管理和佣金分成系统，是世界杯前快速获客的关键引擎。',
+                features: ['代理门户', '多样化佣金模型', '推广工具箱', 'PIX秒到结算'],
+                related: ['payment', 'risk-control', 'activity']
+            },
+            // P1 模块
+            'activity': {
+                name: '活动运营中心',
+                category: 'B端运营',
+                priority: 'P1',
+                status: '规划中',
+                desc: '灵活的活动规则引擎，支持各类营销活动配置。',
+                features: ['规则引擎', '红利与流水管理', '任务系统', '卡券系统'],
+                related: ['agent', 'vip', 'recommend']
+            },
+            'recommend': {
+                name: '首页推荐系统',
+                category: 'C端核心业务',
+                priority: 'P1',
+                status: '规划中',
+                desc: '智能推荐引擎，提升用户转化率和投注体验。',
+                features: ['串关推荐', 'Live比赛推荐', '快捷投注', '个性化推荐'],
+                related: ['event-data', 'betting', 'activity']
+            },
+            'share-bet': {
+                name: '注单分享系统',
+                category: 'C端社交',
+                priority: 'P1',
+                status: '规划中',
+                desc: '社交裂变核心功能，支持注单分享和跟单。',
+                features: ['链接生成与分享', '一键跟单', '跟单分佣', '红单广场'],
+                related: ['betting', 'agent', 'vip']
+            },
+            'vip': {
+                name: '用户激励与会员体系',
+                category: 'C端核心业务',
+                priority: 'P1',
+                status: '规划中',
+                desc: 'VIP等级体系和用户激励机制。',
+                features: ['VIP等级与权益', '奖励体系', '返水机制', '负责任博彩'],
+                related: ['user-auth', 'activity', 'share-bet']
+            },
+            'customer-service': {
+                name: '客户服务与支持',
+                category: '支撑体系',
+                priority: 'P1',
+                status: '规划中',
+                desc: '客户服务系统，提供多渠道支持。',
+                features: ['在线客服', '工单系统', '知识库', '问题反馈'],
+                related: ['user-auth', 'ops-admin']
+            },
+            // P2 模块
+            'pitcher': {
+                name: '投手后台系统',
+                category: 'B端运营',
+                priority: 'P2',
+                status: '规划中',
+                desc: '广告投放管理系统，提升买量效率。',
+                features: ['多渠道聚合看板', '自动化出价', '预算分配', '素材管理'],
+                related: ['agent', 'bi-report']
+            },
+            'ops-admin': {
+                name: '后台运营管理',
+                category: '支撑体系',
+                priority: 'P1',
+                status: '开发中',
+                desc: '运营人员使用的后台管理系统。',
+                features: ['用户管理', '内容管理', '权限管理(RBAC)', '财务管理'],
+                related: ['customer-service', 'bi-report', 'risk-control']
+            },
+            'bi-report': {
+                name: '数据报表与分析',
+                category: '支撑体系',
+                priority: 'P1',
+                status: '规划中',
+                desc: '业务数据分析和报表系统。',
+                features: ['核心业务报表', '用户行为分析', '渠道效果分析', '财务报表'],
+                related: ['ops-admin', 'pitcher', 'risk-control']
+            },
+            // 技术基础设施
+            'tech-infra': {
+                name: '技术基础设施',
+                category: '技术架构',
+                priority: 'P0',
+                status: '开发中',
+                desc: '平台技术底座，支撑所有业务系统运行。',
+                features: ['前后端分离', 'WebSocket推送', 'REST API', 'AMQP消息队列'],
+                related: ['event-data', 'betting', 'payment']
+            }
+        };
+
+        // 颜色配置
+        const categoryColors = {
+            'C端核心业务': '#e74c3c',
+            'C端社交': '#e67e22',
+            'B端运营': '#f39c12',
+            '支撑体系': '#9b59b6',
+            '技术架构': '#1abc9c'
+        };
+
+        const priorityColors = {
+            'P0': '#e74c3c',
+            'P1': '#f39c12',
+            'P2': '#3498db'
+        };
+
+        // 生成节点数据
+        function generateNodes() {
+            const nodes = [];
+            const categories = [...new Set(Object.values(moduleData).map(m => m.category))];
+            
+            Object.entries(moduleData).forEach(([id, data]) => {
+                nodes.push({
+                    id: id,
+                    name: data.name,
+                    symbolSize: data.priority === 'P0' ? 60 : (data.priority === 'P1' ? 50 : 40),
+                    category: categories.indexOf(data.category),
+                    itemStyle: {
+                        color: priorityColors[data.priority],
+                        borderColor: '#fff',
+                        borderWidth: 2,
+                        shadowBlur: 10,
+                        shadowColor: priorityColors[data.priority]
+                    },
+                    label: {
+                        show: true,
+                        fontSize: 11,
+                        color: '#fff',
+                        formatter: function(params) {
+                            const name = params.name;
+                            if (name.length > 6) {
+                                return name.substring(0, 6) + '\n' + name.substring(6);
+                            }
+                            return name;
+                        }
+                    },
+                    emphasis: {
+                        itemStyle: {
+                            shadowBlur: 20,
+                            shadowColor: '#fff'
+                        },
+                        label: {
+                            fontSize: 13,
+                            fontWeight: 'bold'
+                        }
+                    }
+                });
+            });
+            return nodes;
+        }
+
+        // 生成连线数据
+        function generateLinks() {
+            const links = [];
+            const addedLinks = new Set();
+            
+            Object.entries(moduleData).forEach(([id, data]) => {
+                data.related.forEach(relatedId => {
+                    const linkKey = [id, relatedId].sort().join('-');
+                    if (!addedLinks.has(linkKey) && moduleData[relatedId]) {
+                        addedLinks.add(linkKey);
+                        links.push({
+                            source: id,
+                            target: relatedId,
+                            lineStyle: {
+                                color: 'rgba(255, 255, 255, 0.3)',
+                                width: 2,
+                                curveness: 0.2
+                            },
+                            emphasis: {
+                                lineStyle: {
+                                    color: '#00d4ff',
+                                    width: 3
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+            return links;
+        }
+
+        // 生成分类数据
+        function generateCategories() {
+            const categories = [...new Set(Object.values(moduleData).map(m => m.category))];
+            return categories.map(cat => ({
+                name: cat,
+                itemStyle: {
+                    color: categoryColors[cat]
+                }
+            }));
+        }
+
+        // 初始化图表
+        const chartDom = document.getElementById('chart-container');
+        const myChart = echarts.init(chartDom, 'dark');
+        
+        let currentLayout = 'force';
+        
+        const option = {
+            backgroundColor: 'transparent',
+            tooltip: {
+                trigger: 'item',
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                textStyle: {
+                    color: '#fff'
+                },
+                formatter: function(params) {
+                    if (params.dataType === 'node') {
+                        const data = moduleData[params.data.id];
+                        return `<div style="padding: 8px;">
+                            <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px;">${data.name}</div>
+                            <div style="color: #aaa; font-size: 12px;">优先级: ${data.priority} | 状态: ${data.status}</div>
+                            <div style="margin-top: 8px; font-size: 12px;">${data.desc}</div>
+                        </div>`;
+                    }
+                    return '';
+                }
+            },
+            legend: {
+                show: false
+            },
+            animationDuration: 1500,
+            animationEasingUpdate: 'quinticInOut',
+            series: [{
+                type: 'graph',
+                layout: 'force',
+                data: generateNodes(),
+                links: generateLinks(),
+                categories: generateCategories(),
+                roam: true,
+                draggable: true,
+                force: {
+                    repulsion: 300,
+                    gravity: 0.1,
+                    edgeLength: [100, 200],
+                    layoutAnimation: true
+                },
+                emphasis: {
+                    focus: 'adjacency',
+                    lineStyle: {
+                        width: 4
+                    }
+                },
+                lineStyle: {
+                    curveness: 0.3
+                }
+            }]
+        };
+
+        myChart.setOption(option);
+
+        // 点击事件
+        myChart.on('click', function(params) {
+            if (params.dataType === 'node') {
+                showModuleInfo(params.data.id);
+            }
+        });
+
+        // 显示模块信息
+        function showModuleInfo(moduleId) {
+            const data = moduleData[moduleId];
+            if (!data) return;
+            
+            document.getElementById('default-info').style.display = 'none';
+            document.getElementById('module-info').classList.add('active');
+            
+            document.getElementById('info-name').textContent = data.name;
+            document.getElementById('info-category').textContent = data.category;
+            
+            const priorityEl = document.getElementById('info-priority');
+            priorityEl.textContent = data.priority;
+            priorityEl.className = 'priority-tag priority-' + data.priority.toLowerCase();
+            
+            const statusEl = document.getElementById('info-status');
+            statusEl.textContent = data.status;
+            statusEl.className = 'status-tag status-' + (data.status === '开发中' ? 'dev' : (data.status === '已上线' ? 'done' : 'plan'));
+            
+            document.getElementById('info-desc').textContent = data.desc;
+            document.getElementById('info-features').innerHTML = data.features.map(f => `• ${f}`).join('<br>');
+            
+            // 关联模块
+            const relatedList = document.getElementById('related-list');
+            relatedList.innerHTML = '';
+            data.related.forEach(relatedId => {
+                const relatedData = moduleData[relatedId];
+                if (relatedData) {
+                    const item = document.createElement('div');
+                    item.className = 'related-item';
+                    item.innerHTML = `
+                        <div class="related-dot" style="background: ${priorityColors[relatedData.priority]}"></div>
+                        <span>${relatedData.name}</span>
+                    `;
+                    item.onclick = () => {
+                        showModuleInfo(relatedId);
+                        highlightNode(relatedId);
+                    };
+                    relatedList.appendChild(item);
+                }
+            });
+        }
+
+        // 高亮节点
+        function highlightNode(nodeId) {
+            myChart.dispatchAction({
+                type: 'highlight',
+                seriesIndex: 0,
+                dataIndex: Object.keys(moduleData).indexOf(nodeId)
+            });
+        }
+
+        // 重置视图
+        function resetView() {
+            myChart.dispatchAction({
+                type: 'restore'
+            });
+        }
+
+        // 切换布局
+        function toggleLayout() {
+            currentLayout = currentLayout === 'force' ? 'circular' : 'force';
+            const newOption = {
+                series: [{
+                    layout: currentLayout,
+                    force: currentLayout === 'force' ? {
+                        repulsion: 300,
+                        gravity: 0.1,
+                        edgeLength: [100, 200],
+                        layoutAnimation: true
+                    } : undefined,
+                    circular: currentLayout === 'circular' ? {
+                        rotateLabel: true
+                    } : undefined
+                }]
+            };
+            myChart.setOption(newOption);
+        }
+
+        // 导出图片
+        function exportImage() {
+            const url = myChart.getDataURL({
+                type: 'png',
+                pixelRatio: 2,
+                backgroundColor: '#1a1a2e'
+            });
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'XPBET-Architecture-Graph.png';
+            a.click();
+        }
+
+        // 按优先级筛选
+        function filterByPriority(priority) {
+            // 更新筛选按钮状态
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.classList.remove('active');
+                if (chip.dataset.filter === priority) {
+                    chip.classList.add('active');
+                }
+            });
+            
+            // 更新节点显示
+            const nodes = generateNodes().map(node => {
+                const data = moduleData[node.id];
+                if (priority === 'all' || data.priority === priority) {
+                    return {
+                        ...node,
+                        itemStyle: {
+                            ...node.itemStyle,
+                            opacity: 1
+                        },
+                        label: {
+                            ...node.label,
+                            opacity: 1
+                        }
+                    };
+                } else {
+                    return {
+                        ...node,
+                        itemStyle: {
+                            ...node.itemStyle,
+                            opacity: 0.15
+                        },
+                        label: {
+                            ...node.label,
+                            opacity: 0.15
+                        }
+                    };
+                }
+            });
+            
+            myChart.setOption({
+                series: [{
+                    data: nodes
+                }]
+            });
+        }
+
+        // 响应式调整
+        window.addEventListener('resize', function() {
+            myChart.resize();
+        });
+    </script>
+</body>
+</html>
