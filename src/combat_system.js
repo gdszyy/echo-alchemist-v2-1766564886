@@ -1439,8 +1439,7 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         if (config.lightning > 0) {
 		             // 1. 尝试触发闪电链，并获取结果
 		             // [修改] 传入当前闪电等级 (config.lightning)
-		             const isChainTriggered = this.combat_lightning_triggerChain(enemy, dmg, projectile.chainHistory, config.lightning); 
-		             
+		             const isChainTriggered = this.combat_lightning_triggerChain(enemy, dmg, projectile.chainHistory, config.lightning, shotId);
 		             // 2. 只有在成功触发闪电链时，才提升当前敌人的温度 (公式：闪电层数 + 连锁次数/3)
 		             if (isChainTriggered) {
                          const chainCount = projectile.chainHistory.length;
@@ -1595,7 +1594,7 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
                             // [新增] 电属性飞剑联动：触发连锁闪电
                             if (sword.config.lightning > 0) {
                                 // 按照正常概率触发闪电链
-                                this.combat_lightning_triggerChain(enemy, extraDmg, [], sword.config.lightning);
+                                this.combat_lightning_triggerChain(enemy, extraDmg, [], sword.config.lightning, shotId);
                             }
 	                    }
 
@@ -1854,7 +1853,7 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
      * @description 触发连锁闪电效果 (修复单体报错版)
      * @returns {boolean} 是否成功触发了闪电链
      */
-    combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1) {
+    combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = null) {
         // [修复1] 安全检查
         if (!sourceEnemy || !sourceEnemy.pos) return false;
 
@@ -1933,7 +1932,7 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
                 selected.applyTemp(level + chainCount / 3); 
                 
                 const result = selected.takeDamage(dmg); 
-                this.combat_recordDamage(result.actualDamage, 'lightning', 'main', this._currentDamageShotId); 
+                this.combat_recordDamage(result.actualDamage, 'lightning', 'main', shotId);
                 
                 if(result.killed) this.spawn_addScore(selected.maxHp);
                 
@@ -1941,7 +1940,7 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
                 history.push(selected); 
                 // 限制最大连锁次数防止死循环 (增加到 100 次)
                 if (history.length < 100) {
-                    this.combat_lightning_triggerChain(selected, nextDmg, history, level); 
+                    this.combat_lightning_triggerChain(selected, nextDmg, history, level, shotId);
                 }
             }, delay);
             
