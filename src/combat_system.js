@@ -1362,6 +1362,7 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         // --- [修復]：如果是光球/偽造子彈，補齊 chainHistory 防止報措 ---
         if (!projectile.chainHistory) projectile.chainHistory = [];
 
+		const shotId = projectile.shotId !== undefined ? projectile.shotId : null;
         const config = projectile.config;
         let dmg = damageOverride !== null ? damageOverride : (projectile.isCopy ? config.damage * 0.5 : config.damage);
 
@@ -1478,7 +1479,7 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         };
         const damageColor = colorMap[damageType] || '#ffffff';
         
-        const shotId = projectile.shotId !== undefined ? projectile.shotId : null;
+ 
         this.combat_recordDamage(actualDmg, damageType, sourceType, shotId);
 
         // --- 2. [火属性核心逻辑] 燃烧与过热爆炸 ---
