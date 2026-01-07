@@ -1413,10 +1413,11 @@ class DropBall {
                                     this.def.collected.push(winningType);
                                 }
                                 // 3. 同步给主队列中的弹珠定义，防止结算时丢失
+								/*
                                 if (game.marbleQueue[game.activeMarbleIndex]) {
                                     game.marbleQueue[game.activeMarbleIndex].collected = [...this.session.collected];
                                 }
-                                
+                                */
                                 // 获取属性名称
                                 const attrName = CONFIG.ui.attributeDisplay[winningType] ? CONFIG.ui.attributeDisplay[winningType].name : winningType;
                                 
