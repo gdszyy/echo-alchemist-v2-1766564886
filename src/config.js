@@ -348,8 +348,8 @@ const CONFIG = {
     mechanics: {
         // DDA (动态难度调整)
         dda: {
-            playerPowerThresholdMult: 0.6, // 玩家战力阈值倍率 (基于敌人期望血量)
-            difficultyGrowthFactorLow: 0.5, // 战力不足时的成长系数
+            playerPowerThresholdMult: 0.5, // 玩家战力阈值倍率 (基于敌人期望血量)
+            difficultyGrowthFactorLow: 0.65, // 战力不足时的成长系数
         },
         // 慢动作系统
         slow_motion: {
@@ -369,22 +369,22 @@ const CONFIG = {
         // 火属性 (过热爆炸)
         pyro: {
             explodeThreshold: 200,    // 过热爆炸阈值
-            baseExplodeChance: 0.2,   // 基础爆炸概率
-            maxExplodeChance: 1.0,    // 最大爆炸概率
-            tempForMaxChance: 600,    // 达到最大概率所需的温度
-            heatConsumptionRate: 0.1, // 爆炸消耗热量比例
+            baseExplodeChance: 0.15,   // 基础爆炸概率
+            maxExplodeChance: 0.9,    // 最大爆炸概率
+            tempForMaxChance: 800,    // 达到最大概率所需的温度
+            heatConsumptionRate: 0.27, // 爆炸消耗热量比例
             damageMult: 0.5,          // 爆炸伤害倍率 (基于基础火伤)
             radius: 120,              // 爆炸半径
-            aoeDamageMult: 0.6        // AOE伤害倍率
+            aoeDamageMult: 0.5        // AOE伤害倍率
         },
         // 雷属性 (连锁闪电)
         lightning: {
-            baseChainChance: 0.25,    // 基础连锁概率
-            tempChainMult: 0.0075,    // 温度对连锁概率的加成系数
+            baseChainChance: 0.15,    // 基础连锁概率
+            tempChainMult: 0.0085,    // 温度对连锁概率的加成系数
             maxChainChance: 1.0,      // 最大连锁概率
             chainDelayBase: 250,      // 基础连锁延迟 (ms)
             chainDelayMin: 50,        // 最小连锁延迟 (ms)
-            chainDelayDecay: 15,      // 每次连锁减少的延迟
+            chainDelayDecay: 10,      // 每次连锁减少的延迟
             damageDecayBase: 0.45,    // 基础伤害衰减系数
             damageDecayPerLevel: 0.05 // 每级闪电增加的伤害保持系数
         },
@@ -401,7 +401,7 @@ const CONFIG = {
     balance: {
         normalPegSecondEnergChancey:0.42,
         // 敌人血量 = baseHp + (当前回合数 * hpPerRound)
-        enemyBaseHp: 7,
+        enemyBaseHp: 5,
         enemyHpPerRound: 12,
         
         // 特殊敌人血量倍率
@@ -423,8 +423,8 @@ const CONFIG = {
         unusedAmmoScoreMult: 1.5,   // 剩余每颗子弹让分数乘多少 (当前是 *2)
         nextRoundDifficultyMult: 5, // 触发此机制后，下一轮敌人血量乘多少
         cryoAmount:1,
-        pyroAmount:1,
-        lightningTempIncrease:3,
+        pyroAmount:0.5,
+        lightningTempIncrease:1,
         relicRarityWright:{
             'common': 60,    // 普通: 权重 60 (约 60%)
             'rare': 30,      // 稀有: 权重 30 (约 30%)
@@ -565,7 +565,7 @@ const RELIC_DB = [
     { id: 'pink_slime', name: '粉紅凝膠', icon: '💗', desc: '收集階段：出現 3 個高彈性粉色釘子 (可疊加)。', rarity: 'common', effect: 'pink_peg_up' ,maxStacks: 1},
 
     //  2. 战斗底部反弹墙
-    { id: 'energy_shield', name: '力場護盾', icon: '🛡️', desc: '戰鬥階段：底部邊界可消耗彈性/穿透次數來反彈子彈。', rarity: 'rare', effect: 'combat_wall' ,maxStacks: 1},
+    { id: 'energy_shield', name: '力場護盾', icon: '🛡️', desc: '戰鬥階段：底部邊界可消耗彈性/穿透次數來反彈子彈。', rarity: 'cursed', effect: 'combat_wall' ,maxStacks: 1},
 
     //  3. 特殊槽解锁 (三种槽位)
     { id: 'unlock_recall', name: '時光沙漏', icon: '⏳', desc: '收集階段：解鎖 [回溯槽] 的出現 (若無槽位則+1)。', rarity: 'rare', effect: 'unlock_slot', slotType: 'recall' ,maxStacks: 1},
