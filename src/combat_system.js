@@ -1486,7 +1486,7 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         if (config.pyro > 0 && enemy.temp >= 34) {
             
             // Step 1: 计算当前的基础额外火伤 (移除平方根以优化性能，改用线性比例 /150)
-            const baseFireDmg = (config.pyro * enemy.temp) / 150;
+            const baseFireDmg = (config.pyro * enemy.temp) / 200;
 
             // Step 2: 造成基础燃烧伤害
             if (baseFireDmg >= 1) {
@@ -1541,7 +1541,7 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
                             this.combat_recordDamage(aoeResult.actualDamage, 'pyro', sourceType, shotId);
                             
                             // 范围内的敌人也受到热量波及 (增加少量温度)
-                            other.applyTemp(config.pyro * 5);
+                            other.applyTemp(consumedHeat*0.25);
                         }
                     });
                 }
