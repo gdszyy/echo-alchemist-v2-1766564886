@@ -163,11 +163,17 @@ export const spawn_system = {
     spawn_spawnEnemyRowAt(yPos) {
         const b = CONFIG.balance;
         
-        // --- [优化] 动态血量修正逻辑 ---
-        // 1. 计算线性增长的基础血量
-        const linearHP = b.enemyBaseHp + (this.round * b.enemyHpPerRound) * this.difficultyGrowthFactor;
+        // --- [优化] 动态血量修正逻辑 (V2: 指数膨胀) ---
+        // 1. [修改] 引入指数曲线
+        // 设定一个基础膨胀率（从 config 读取，默认 1.12 即 12%），随回合数呈指数级放大
+        // 前5回合保护期不膨胀，Math.max(0, ...) 确保前期不会变成小数
+        const hpExponent = b.hpExponent || 1.12;
+        const exponentialFactor = Math.pow(hpExponent, Math.max(0, this.round - 5));
         
-        // 2. 计算基于玩家峰值伤害的理想血量
+        // 2. 新公式：(基础 + 线性) * 指数 * 难度系数
+        const linearHP = (b.enemyBaseHp + (this.round * b.enemyHpPerRound)) * exponentialFactor * this.difficultyGrowthFactor;
+        
+        // 3. 计算基于玩家峰值伤害的理想血量
         const peakAvg = this.calc_getPeakAverageDamage();
         const fullRowsCapacity = 2 * CONFIG.gameplay.enemyCols; // 以 2 行满员为对标
         
@@ -175,8 +181,8 @@ export const spawn_system = {
         let idealHP = 0;
         if (peakAvg > 0) {
             idealHP = peakAvg / fullRowsCapacity;
-            // 混合：40% 线性增长 + 60% 动态调整，确保血量跟随玩家强度
-            finalBaseHP = (linearHP * 0.4) + (idealHP * 0.6);
+            // 混合：60% 指数线性增长 + 40% 动态调整，提高硬数值权重
+            finalBaseHP = (linearHP * 0.6) + (idealHP * 0.4);
         }
         
         // 3. 应用最终倍率

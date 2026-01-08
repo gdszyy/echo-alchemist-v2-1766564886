@@ -400,9 +400,12 @@ const CONFIG = {
     /** 游戏平衡性：敌人与数值 */
     balance: {
         normalPegSecondEnergChancey:0.42,
-        // 敌人血量 = baseHp + (当前回合数 * hpPerRound)
-        enemyBaseHp: 5,
-        enemyHpPerRound: 12,
+        // 敌人血量 = (baseHp + 当前回合数 * hpPerRound) * 指数因子 * 难度系数
+        // [修改] 提高基础血量，降低线性斜率，依靠指数在后期发力
+        enemyBaseHp: 10,       // 原 5 -> 稍微提高基础，防止第1回合太脆
+        enemyHpPerRound: 8,    // 原 12 -> 降低线性斜率，依靠指数在 15 回合后发力
+        // [新增] 指数膨胀系数，1.12 表示每回合血量额外膨胀 12%
+        hpExponent: 1.12,
         
         // 特殊敌人血量倍率
         eliteHpMult: 7,     // 精英怪是普通怪的多少倍
