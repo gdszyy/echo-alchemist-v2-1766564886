@@ -1,0 +1,3 @@
+[gd_scene format=3 uid="uid://gathering_scene"]
+
+[node name="Gathering" type="Node2D"]

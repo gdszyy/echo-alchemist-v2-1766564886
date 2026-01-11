@@ -1,0 +1,31 @@
+[gd_scene load_steps=3 format=3 uid="uid://c8x7y9z0enemy"]
+
+[ext_resource type="Script" path="res://scripts/entities/enemy.gd" id="1_enemy"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_1"]
+radius = 20.0
+
+[node name="Enemy" type="CharacterBody2D"]
+collision_layer = 2
+collision_mask = 1
+script = ExtResource("1_enemy")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_1")
+
+[node name="HealthBar" type="Node2D" parent="."]
+position = Vector2(0, -30)
+
+[node name="ShieldVisual" type="Node2D" parent="."]
+
+[node name="HitFlashTimer" type="Timer" parent="."]
+wait_time = 0.1
+one_shot = true
+
+[node name="FreezeTimer" type="Timer" parent="."]
+wait_time = 1.0
+one_shot = true
+
+[node name="OverheatTimer" type="Timer" parent="."]
+wait_time = 1.0
+one_shot = true

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://d0m0u0yw7qvlf5c8"]
+
+[ext_resource type="Script" path="res://scripts/effects/lightning_bolt.gd"]
+
+[node name="LightningBolt" type="Node2D"]
+script = ExtResource("res://scripts/effects/lightning_bolt.gd")
