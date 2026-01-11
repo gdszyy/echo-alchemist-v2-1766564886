@@ -1,16 +1,14 @@
-[gd_scene load_steps=3 format=3 uid="uid://dxjkwn2jq1yk5"]
+[gd_scene load_steps=3 format=3 uid="uid://projectile_scene"]
 
-[ext_resource type="Script" path="res://scripts/entities/projectile.gd"]
+[ext_resource type="Script" path="res://scripts/entities/projectile.gd" id="1_script"]
 
-[sub_resource type="CircleShape2D" id="CircleShape2D_abc12"]
+[sub_resource type="CircleShape2D" id="CircleShape2D_1"]
 radius = 6.0
 
 [node name="Projectile" type="Area2D"]
-script = ExtResource("Script_abc12")
+script = ExtResource("1_script")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-shape = SubResource("CircleShape2D_abc12")
+shape = SubResource("CircleShape2D_1")
 
 [node name="VisualMarker" type="Node2D" parent="."]
-
-[connection signal="area_entered" from="." to="." method="_on_area_entered"]

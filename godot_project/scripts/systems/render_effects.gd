@@ -120,7 +120,8 @@ func _update_lightning_bolts(delta: float) -> void:
 			to_remove.append(i)
 	
 	# 移除已过期的闪电
-	for i in to_remove.reverse():
+	to_remove.reverse()
+	for i in to_remove:
 		if lightning_bolts[i].node:
 			lightning_bolts[i].node.queue_free()
 		lightning_bolts.remove_at(i)
@@ -139,7 +140,8 @@ func _update_particles(delta: float) -> void:
 			to_remove.append(i)
 	
 	# 移除已过期的粒子
-	for i in to_remove.reverse():
+	to_remove.reverse()
+	for i in to_remove:
 		particles.remove_at(i)
 
 

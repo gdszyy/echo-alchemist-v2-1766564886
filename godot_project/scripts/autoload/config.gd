@@ -1,18 +1,18 @@
 extends Node
 
-## 元商店配置 - 资源和升级定义
-class_name MetaShopConfig
+## 游戏配置单例
+## 注意：不使用 class_name 避免与自动加载冲突
 
-## 资源定义类
-class Resource:
+## 游戏资源定义类（重命名避免与 Godot Resource 冲突）
+class GameResource:
 	var id: String
-	var name: String
+	var res_name: String
 	var icon: String
 	var color: String
 	
 	func _init(p_id: String, p_name: String, p_icon: String, p_color: String) -> void:
 		id = p_id
-		name = p_name
+		res_name = p_name
 		icon = p_icon
 		color = p_color
 
@@ -21,30 +21,30 @@ class Cost:
 	var resource_id: String
 	var base: int
 	var growth: float
-	var type: String  # "exponential", "linear", etc.
+	var cost_type: String  # "exponential", "linear", etc.
 	
 	func _init(p_resource_id: String, p_base: int, p_growth: float, p_type: String) -> void:
 		resource_id = p_resource_id
 		base = p_base
 		growth = p_growth
-		type = p_type
+		cost_type = p_type
 
 ## 效果定义类
 class Effect:
 	var path: String
 	var value_per_level: int
-	var type: String  # "add", "multiply", etc.
+	var effect_type: String  # "add", "multiply", etc.
 	
 	func _init(p_path: String, p_value_per_level: int, p_type: String) -> void:
 		path = p_path
 		value_per_level = p_value_per_level
-		type = p_type
+		effect_type = p_type
 
 ## 升级项定义类
 class Upgrade:
 	var id: String
 	var category: String
-	var name: String
+	var upgrade_name: String
 	var desc: String
 	var icon: String
 	var max_level: int
@@ -63,7 +63,7 @@ class Upgrade:
 	) -> void:
 		id = p_id
 		category = p_category
-		name = p_name
+		upgrade_name = p_name
 		desc = p_desc
 		icon = p_icon
 		max_level = p_max_level
@@ -72,12 +72,12 @@ class Upgrade:
 
 ## 属性显示配置类
 class AttributeDisplay:
-	var name: String
+	var display_name: String
 	var icon: String
 	var color: Color
 	
 	func _init(p_name: String, p_icon: String, p_color: Color) -> void:
-		name = p_name
+		display_name = p_name
 		icon = p_icon
 		color = p_color
 
@@ -93,7 +93,7 @@ func _ready() -> void:
 func _init_meta_shop_config() -> void:
 	# 资源定义
 	var resources: Dictionary = {
-		"energy_essence": Resource.new(
+		"energy_essence": GameResource.new(
 			"energy_essence",
 			"能量精粹",
 			"✨",
@@ -102,7 +102,7 @@ func _init_meta_shop_config() -> void:
 	}
 	
 	# 升级项定义
-	var upgrades: Array[Upgrade] = [
+	var upgrades: Array = [
 		Upgrade.new(
 			"init_weight_bounce",
 			"attribute",
@@ -126,16 +126,16 @@ func _init_meta_shop_config() -> void:
 # ============================================================================
 
 ## UI 配置 - 属性显示
-var ui_attribute_display: Dictionary[String, AttributeDisplay] = {}
+var ui_attribute_display: Dictionary = {}
 
 ## 颜色配置
-var colors: Dictionary[String, Color] = {}
+var colors: Dictionary = {}
 
 ## 物理配置
-var physics: Dictionary[String, float] = {}
+var physics: Dictionary = {}
 
 ## 游戏玩法配置
-var gameplay: Dictionary[String, int] = {}
+var gameplay: Dictionary = {}
 
 func _init() -> void:
 	_init_ui_config()
@@ -186,7 +186,7 @@ func _init_gameplay_config() -> void:
 # ============================================================================
 
 ## 获取资源配置
-func get_resource(resource_id: String) -> Resource:
+func get_resource(resource_id: String) -> GameResource:
 	if meta_shop_config.has("resources") and meta_shop_config["resources"].has(resource_id):
 		return meta_shop_config["resources"][resource_id]
 	push_error("Resource not found: %s" % resource_id)
@@ -202,7 +202,7 @@ func get_upgrade(upgrade_id: String) -> Upgrade:
 	return null
 
 ## 获取所有升级项
-func get_all_upgrades() -> Array[Upgrade]:
+func get_all_upgrades() -> Array:
 	if meta_shop_config.has("upgrades"):
 		return meta_shop_config["upgrades"]
 	return []
@@ -234,3 +234,10 @@ func get_gameplay_value(param_name: String) -> int:
 		return gameplay[param_name]
 	push_error("Gameplay parameter not found: %s" % param_name)
 	return 0
+
+## 场景切换方法（供 main.gd 调用）
+func change_scene(scene_path: String) -> Node:
+	var scene_resource = load(scene_path)
+	if scene_resource:
+		return scene_resource.instantiate()
+	return null

@@ -1,16 +1,16 @@
-[gd_scene load_steps=3 format=3 uid="uid://c8xjkwn2jq2yk6"]
+[gd_scene load_steps=3 format=3 uid="uid://drop_ball_scene"]
 
-[ext_resource type="Script" path="res://scripts/entities/drop_ball.gd"]
+[ext_resource type="Script" path="res://scripts/entities/drop_ball.gd" id="1_script"]
 
-[sub_resource type="CircleShape2D" id="CircleShape2D_def45"]
+[sub_resource type="CircleShape2D" id="CircleShape2D_1"]
 radius = 8.0
 
 [node name="DropBall" type="RigidBody2D"]
 mass = 1.0
 gravity_scale = 1.0
-script = ExtResource("Script_def45")
+script = ExtResource("1_script")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-shape = SubResource("CircleShape2D_def45")
+shape = SubResource("CircleShape2D_1")
 
 [node name="VisualMarker" type="Node2D" parent="."]

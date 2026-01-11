@@ -1,0 +1,52 @@
+[2026-01-11T06:23:00Z] [INFO] 开始创建迁移子任务
+[2026-01-11T06:23:01Z] [TASK_CREATED] T01 - 创建 Godot 项目骨架
+  - Manus Task ID: QyZ23SvsAuSWpHUPseUkd9
+  - Model: manus-1.6-lite
+  - URL: https://manus.im/app/QyZ23SvsAuSWpHUPseUkd9
+
+[2026-01-11T06:23:02Z] [TASK_CREATED] T02 - 迁移配置系统
+  - Manus Task ID: kv7DCxbWvUDChPL2aoBJC4
+  - Model: manus-1.6
+  - URL: https://manus.im/app/kv7DCxbWvUDChPL2aoBJC4
+
+[2026-01-11T06:23:03Z] [TASK_CREATED] T03 - 迁移实体基类
+  - Manus Task ID: PVM5uGb64adatZSwNBQiFe
+  - Model: manus-1.6
+  - URL: https://manus.im/app/PVM5uGb64adatZSwNBQiFe
+
+[2026-01-11T06:23:04Z] [TASK_CREATED] T04 - 迁移敌人系统
+  - Manus Task ID: TahHnUQHxBpKcSTPmWMCkg
+  - Model: manus-1.6-max
+  - URL: https://manus.im/app/TahHnUQHxBpKcSTPmWMCkg
+
+[2026-01-11T06:23:05Z] [TASK_CREATED] T05 - 迁移弹丸系统
+  - Manus Task ID: fFLrH85h5m54tzSUpyZwDD
+  - Model: manus-1.6
+  - URL: https://manus.im/app/fFLrH85h5m54tzSUpyZwDD
+
+[2026-01-11T06:23:06Z] [TASK_CREATED] T06 - 迁移战斗系统
+  - Manus Task ID: PQPJvYc8iqNiA5CpKZ8PoW
+  - Model: manus-1.6-max
+  - URL: https://manus.im/app/PQPJvYc8iqNiA5CpKZ8PoW
+
+[2026-01-11T06:23:07Z] [TASK_CREATED] T07 - 迁移游戏阶段管理
+  - Manus Task ID: eGzrMeFrWK8RA2D4zsoHTE
+  - Model: manus-1.6
+  - URL: https://manus.im/app/eGzrMeFrWK8RA2D4zsoHTE
+
+[2026-01-11T06:23:08Z] [TASK_CREATED] T08 - 迁移渲染系统
+  - Manus Task ID: HgYqrXHQiPAta7ArQm9Kon
+  - Model: manus-1.6
+  - URL: https://manus.im/app/HgYqrXHQiPAta7ArQm9Kon
+
+[2026-01-11T06:23:09Z] [TASK_CREATED] T09 - 迁移 UI 系统
+  - Manus Task ID: DMuV9vk6aindeobXsmwBQc
+  - Model: manus-1.6
+  - URL: https://manus.im/app/DMuV9vk6aindeobXsmwBQc
+
+[2026-01-11T06:23:10Z] [TASK_CREATED] T10 - 迁移音频系统
+  - Manus Task ID: PRAwFzyNayTp6Z2C8NSScF
+  - Model: manus-1.6-lite
+  - URL: https://manus.im/app/PRAwFzyNayTp6Z2C8NSScF
+
+[2026-01-11T06:23:11Z] [INFO] 所有 10 个子任务已成功创建，等待执行完成

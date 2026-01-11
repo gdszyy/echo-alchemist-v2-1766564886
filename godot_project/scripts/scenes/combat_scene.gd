@@ -1,12 +1,10 @@
 extends Node2D
 ## 战斗场景 - 处理战斗的显示和逻辑
 
-class_name CombatScene
-
 # 引用
-var phase_manager: PhaseManager = null
+var phase_manager = null
 
-# 敌人相关
+# 敌人相关（使用内部类 CombatEnemy 避免与全局 Enemy 冲突）
 var enemies: Array = []
 var current_enemy_index: int = 0
 
@@ -23,40 +21,26 @@ var board_width: float = 800.0
 var board_height: float = 600.0
 
 func _ready() -> void:
-	"""初始化战斗场景"""
 	print("CombatScene ready")
 
 func _process(delta: float) -> void:
-	"""
-	处理每帧更新
-	
-	Args:
-		delta: 帧时间差
-	"""
 	if phase_manager and phase_manager.is_in_phase("combat"):
 		_update_combat(delta)
 		queue_redraw()
 
 func _draw() -> void:
-	"""绘制场景"""
 	# 绘制背景
 	draw_rect(Rect2(0, 0, board_width, board_height), Color.DARK_RED)
 	
 	# 绘制敌人
 	for enemy in enemies:
-		if enemy is Enemy:
+		if enemy is CombatEnemy:
 			_draw_enemy(enemy)
 	
 	# 绘制 UI 信息
 	_draw_combat_ui()
 
-func _draw_enemy(enemy: Enemy) -> void:
-	"""
-	绘制敌人
-	
-	Args:
-		enemy: 敌人对象
-	"""
+func _draw_enemy(enemy: CombatEnemy) -> void:
 	var pos = enemy.get_position()
 	var hp = enemy.get_hp()
 	var max_hp = enemy.get_max_hp()
@@ -79,7 +63,6 @@ func _draw_enemy(enemy: Enemy) -> void:
 	)
 
 func _draw_combat_ui() -> void:
-	"""绘制战斗 UI"""
 	var text_pos = Vector2(10.0, 20.0)
 	var font = ThemeDB.fallback_font
 	
@@ -88,7 +71,7 @@ func _draw_combat_ui() -> void:
 	
 	if current_enemy_index < enemies.size():
 		var enemy = enemies[current_enemy_index]
-		if enemy is Enemy:
+		if enemy is CombatEnemy:
 			draw_string(
 				font,
 				text_pos + Vector2(0, 60),
@@ -96,12 +79,6 @@ func _draw_combat_ui() -> void:
 			)
 
 func _update_combat(delta: float) -> void:
-	"""
-	更新战斗
-	
-	Args:
-		delta: 帧时间差
-	"""
 	if not phase_manager:
 		return
 	
@@ -120,7 +97,6 @@ func _update_combat(delta: float) -> void:
 				_on_wave_complete()
 
 func _spawn_enemy_wave() -> void:
-	"""生成敌人波次"""
 	enemies.clear()
 	current_enemy_index = 0
 	
@@ -128,14 +104,12 @@ func _spawn_enemy_wave() -> void:
 	for i in range(3):
 		var enemy_x = 200.0 + i * 200.0
 		var enemy_y = 150.0
-		var enemy = Enemy.new(enemy_x, enemy_y, 100)
+		var enemy = CombatEnemy.new(enemy_x, enemy_y, 100)
 		enemies.append(enemy)
-		add_child(enemy)
 	
 	print("Enemy wave spawned: %d enemies" % enemies.size())
 
 func _fire_ammo() -> void:
-	"""发射弹药"""
 	if current_ammo_index >= ammo_queue.size():
 		return
 	
@@ -147,16 +121,16 @@ func _fire_ammo() -> void:
 	var current_enemy = enemies[current_enemy_index]
 	
 	# 计算伤害
-	var damage = ammo["damage"]
+	var damage = ammo.get("damage", 10)
 	
 	# 应用属性效果
-	if ammo["pierce"] > 0:
+	if ammo.get("pierce", 0) > 0:
 		damage = int(damage * 1.5)
-	if ammo["cryo"] > 0:
+	if ammo.get("cryo", 0) > 0:
 		damage = int(damage * 1.2)
-	if ammo["pyro"] > 0:
+	if ammo.get("pyro", 0) > 0:
 		damage = int(damage * 1.3)
-	if ammo["lightning"] > 0:
+	if ammo.get("lightning", 0) > 0:
 		damage = int(damage * 1.25)
 	
 	# 造成伤害
@@ -168,18 +142,11 @@ func _fire_ammo() -> void:
 	print("Ammo fired! Damage: %d, Total: %d" % [damage, total_damage])
 
 func _on_wave_complete() -> void:
-	"""波次完成回调"""
 	print("Wave complete! Total damage: %d" % total_damage)
 	if phase_manager:
 		phase_manager.switch_phase("gameover")
 
-func set_phase_manager(manager: PhaseManager) -> void:
-	"""
-	设置阶段管理器
-	
-	Args:
-		manager: 阶段管理器
-	"""
+func set_phase_manager(manager) -> void:
 	phase_manager = manager
 	
 	if phase_manager:
@@ -188,18 +155,15 @@ func set_phase_manager(manager: PhaseManager) -> void:
 		board_height = phase_manager.game_height
 
 func fire_next_shot() -> void:
-	"""发射下一发"""
 	_fire_ammo()
 
 func get_total_damage() -> int:
-	"""获取总伤害"""
 	return total_damage
 
 
-# ============ 敌人类 ============
+# ============ 内部敌人类（避免与全局 Enemy 冲突）============
 
-class Enemy:
-	"""敌人类"""
+class CombatEnemy:
 	var position_x: float
 	var position_y: float
 	var hp: int
