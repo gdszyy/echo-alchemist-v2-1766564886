@@ -1167,6 +1167,14 @@ ui_closeTruthBook() {
             this.saveData.currency -= cost;
             currentData[upgradeId] = level + 1;
             this.sys_saveData();
+            
+            // [修复] 立即应用升级效果（仅对非临时升级）
+            if (!isTemporary) {
+                const effectValue = upgrade.effect.valuePerLevel * (level + 1);
+                setDeepValue(CONFIG, upgrade.effect.path, effectValue, upgrade.effect.type);
+                console.log(`[META] 立即应用升级: ${upgrade.id}, level: ${level + 1}, path: ${upgrade.effect.path}, value: ${effectValue}`);
+            }
+            
             this.ui_updateMetaCurrency();
             this.ui_renderShop();
             if (window.audio) audio.playTone(800, 'sine', 0.1, 0.3);
