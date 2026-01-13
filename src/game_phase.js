@@ -546,7 +546,7 @@ phase_gathering_getRandomPegType() {
             this.sys_initSelectionPhase();
         }
     },
-    function smartScientific(num, fractionDigits = 2) {
+    smartScientific(num, fractionDigits = 2) {
         // 1. 处理 0 和 非数字 的情况
         if (isNaN(num)) return "NaN";
         if (num === 0) return "0";
