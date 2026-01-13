@@ -196,6 +196,7 @@ ATTRIBUTES_FOR_SHOP.forEach(attr => {
  * 深度设置对象值
  */
 function setDeepValue(obj, path, value, type) {
+	console.log("setDeepValue")
     const keys = path.split('.');
     let current = obj;
     
