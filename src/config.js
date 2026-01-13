@@ -217,6 +217,7 @@ function setDeepValue(obj, path, value, type) {
     if (type === 'add') current[lastKey] = (current[lastKey] || 0) + value;
     else if (type === 'multiply') current[lastKey] = (current[lastKey] || 1) * value;
     else if (type === 'set') current[lastKey] = value;
+	console.log(path,current[lastKey])
 }
 
 
