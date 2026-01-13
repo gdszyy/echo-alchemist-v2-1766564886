@@ -994,7 +994,7 @@ phase_gathering_getRandomPegType() {
                 const leftoverCount = this.ammoQueue.length;
                 const scoreMult = Math.pow(CONFIG.balance.unusedAmmoScoreMult, leftoverCount);
                 this.score *= scoreMult;
-                document.getElementById('score-num').innerText = this.score; 
+                document.getElementById('score-num').innerText = smartScientific(this.score,3); 
                 this.nextRoundHpMultiplier = CONFIG.balance.nextRoundDifficultyMult;
                 showToast(`完美清場! 分數 x${scoreMult} | 下輪難度 UP!`);
                 audio.playPowerup();
@@ -1172,7 +1172,36 @@ phase_gathering_getRandomPegType() {
              this.currentSession = null; 
         }
     },
+    function smartScientific(num, fractionDigits = 2) {
+        // 1. 处理 0 和 非数字 的情况
+        if (isNaN(num)) return "NaN";
+        if (num === 0) return "0";
 
+        const absVal = Math.abs(num);
+
+        // 2. 设定阈值：绝对值 >= 10000 或 < 0.001 时使用科学计数法
+        // 你可以根据需求修改这个范围
+        if (absVal >= 10000 || absVal < 0.001) {
+            // --- 方案 2 的美化逻辑 ---
+            
+            // 获取标准格式 (如 "1.23e+5")
+            const str = num.toExponential(fractionDigits);
+            
+            // 分割底数和指数
+            const [base, exponent] = str.split('e');
+            
+            // 去掉指数的正号 (如 "+5" -> "5")
+            const cleanExponent = exponent.replace('+', '');
+            
+            // 返回美化格式
+            return `${base} × 10^${cleanExponent}`;
+        }
+
+        // 3. 正常范围内的数字
+        // 使用 parseFloat + toFixed 是为了处理 JS 浮点数精度问题 (如 0.1+0.2)
+        // 并自动去掉末尾多余的 0 (例如 5.500 -> 5.5)
+        return parseFloat(num.toFixed(fractionDigits)).toString();
+    }
 // Gathering Phase Update
     /**
      * @method updateGathering
