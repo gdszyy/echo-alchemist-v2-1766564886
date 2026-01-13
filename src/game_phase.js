@@ -177,6 +177,7 @@ export const game_phase = {
                     normalPegs[i].level = 1;
                 }
             };
+            console.log(CONFIG.gameplay.initWindPegs,CONFIG.gameplay.initSwordPegs)
             replaceWithSpecial(CONFIG.gameplay.initWindPegs, 'wind');
             replaceWithSpecial(CONFIG.gameplay.initSwordPegs, 'flying_sword');
         }
