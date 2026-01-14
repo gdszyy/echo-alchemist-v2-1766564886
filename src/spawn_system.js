@@ -505,7 +505,7 @@ export const spawn_system = {
     spawn_addScore(amount) { 
         const finalScore = Math.floor(amount * this.scoreMultiplier);
         this.score += finalScore;
-        const resourceGain = Math.floor(Math.sqrt(finalScore) / 2 + 2);
+        const resourceGain = Math.floor(0.523 * Math.pow(finalScore, 0.63));
         if (resourceGain > 0) {
             this.runCurrency += resourceGain;
             this.meta_addCurrency(resourceGain);
@@ -515,7 +515,7 @@ export const spawn_system = {
                 this.ui_playResourceFlyEffect(rect.left + rect.width/2, rect.top + rect.height/2, resourceGain);
             }
         } 
-        document.getElementById('score-num').innerText = smartScientific(this.score,3);
+        document.getElementById('score-num').innerText = this.score; 
         this.scoreMultiplier = parseFloat((this.scoreMultiplier + 0.2).toFixed(1)); // 乘数增加 0.2
         this.ui_updateMultiplierUI(); 
     },
