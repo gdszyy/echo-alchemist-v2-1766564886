@@ -515,7 +515,7 @@ export const spawn_system = {
                 this.ui_playResourceFlyEffect(rect.left + rect.width/2, rect.top + rect.height/2, resourceGain);
             }
         } 
-        document.getElementById('score-num').innerText = this.score; 
+        document.getElementById('score-num').innerText = smartScientific(this.score,3);
         this.scoreMultiplier = parseFloat((this.scoreMultiplier + 0.2).toFixed(1)); // 乘数增加 0.2
         this.ui_updateMultiplierUI(); 
     },
