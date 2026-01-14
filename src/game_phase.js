@@ -1024,7 +1024,7 @@ phase_gathering_getRandomPegType() {
                 const leftoverCount = this.ammoQueue.length;
                 const scoreMult = Math.pow(CONFIG.balance.unusedAmmoScoreMult, leftoverCount);
                 this.score *= scoreMult;
-                document.getElementById('score-num').innerText = smartScientific(this.score,3); 
+                document.getElementById('score-num').innerText = this.smartScientific(this.score,3); 
                 this.nextRoundHpMultiplier = CONFIG.balance.nextRoundDifficultyMult;
                 showToast(`完美清場! 分數 x${scoreMult} | 下輪難度 UP!`);
                 audio.playPowerup();
