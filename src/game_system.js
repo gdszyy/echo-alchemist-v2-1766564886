@@ -494,12 +494,17 @@ export const game_system = {
         this.lastMousePos = logicPos;
 
         if (this.phase === 'meta') {
-            this.meta_handleClick(pos);
+            // [fix] 移除幽灵调用 this.meta_handleClick(pos)
+            // meta 阶段的 UI 是基于 HTML DOM 的（#phase-meta z-index:200 pointer-events:auto）
+            // DOM 层会拦截所有点击，canvas 的 mousedown 在此阶段不会被触发
+            // meta_handleClick 从未在任何历史版本中实现，是 AI 重构时引入的幽灵调用
             return;
         }
 
         if (this.phase === 'selection') {
-            this.ui_handleSelectionClick(pos);
+            // [fix] 移除幽灵调用 this.ui_handleSelectionClick(pos)
+            // selection 阶段的弹珠选择通过 DOM 事件处理（card.onclick -> sys_toggleMarbleSelection）
+            // ui_handleSelectionClick 从未在任何历史版本中实现，是 AI 重构时引入的幽灵调用
             return;
         }
 

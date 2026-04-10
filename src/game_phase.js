@@ -14,10 +14,15 @@ import { eventBus } from './event_bus.js';
 export const game_phase = {
 /**
      * @method advanceWave
-     * @description 推进到下一波敌人。
+     * @description [DEAD CODE] 此方法从未被调用，其职责已由 phase_finalizeRound 完全承担。
+     * [fix] 移除了幽灵调用 this.resolveTemperatureAndAdvance()：
+     *   - 该方法在整个项目历史中从未被实现（只有调用，没有定义）
+     *   - 温度结算逻辑已完整实现于 phase_enemy_processTurn() 中
+     *   - 此方法本身也是死代码（无调用者），保留仅作历史参考
      */
     phase_advanceWave() { 
-        this.resolveTemperatureAndAdvance(); // 结算温度效果
+        // [fix] 移除幽灵调用：this.resolveTemperatureAndAdvance() 从未被实现
+        // 温度结算已在 phase_enemy_processTurn() 中逐敌处理，无需在此重复
         // 根据场上敌人行数决定生成多少行新敌人
         const rows = new Set(this.enemies.filter(e=>e.active).map(e => Math.floor(e.pos.y))); 
         let spawnCount = 1; 

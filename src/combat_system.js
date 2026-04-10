@@ -1697,8 +1697,9 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
             }
             if (enemy.type === 'boss') {
                 setTimeout(() => {
-                    this.stateBeforeRelic = this.phase; 
-                    this.openRelicSelection(); 
+                    // [fix] 修复命名不一致：openRelicSelection -> ui_showRelicSelection
+                    // ui_showRelicSelection 内部已经会设置 stateBeforeRelic，无需在此重复设置
+                    this.ui_showRelicSelection();
                 }, 500);
             }
 
