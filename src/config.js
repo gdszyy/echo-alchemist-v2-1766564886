@@ -227,6 +227,19 @@ function setDeepValue(obj, path, value, type) {
 const CONFIG = {
     /** 颜色配置 (保持不变) */
     ui: {
+        damageStats: {
+            bounce: '#22c55e',
+            pierce: '#fca5a5',
+            scatter: '#facc15',
+            damage: '#e2e8f0',
+            cryo: '#06b6d4',
+            pyro: '#f97316',
+            lightning: '#c084fc',
+            wind: '#34d399',
+            flying_sword: '#0ea5e9',
+            explosive: '#f87171',
+            default: '#cbd5e1'
+        },
         attributeDisplay: {
             'resonance': { name: '共鳴', icon: '🔔', color: '#f59e0b' },
             'white': { name: '純淨', icon: '⚪', color: '#f8fafc' },
@@ -452,6 +465,7 @@ const CONFIG = {
     },
     /** 游戏玩法配置 */
     gameplay: {
+        deviceTiltBaseAngle: 60,
 	        initWindPegs: 0,
 	        initSwordPegs: 0,
 	        baseDamage: 1,
