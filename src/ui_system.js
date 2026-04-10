@@ -14,16 +14,48 @@ import { RUNE_DB, RUNEWORD_DB } from './rune_config.js';
 
 export const ui_system = {
 // (需求1 & 2) 通用资源飞入动画
+// [fix] DOM 对象池：限制同时存在的飞行节点数量，防止内存泄漏
+    _flyEffectPool: [],
+    _flyEffectMaxNodes: 8, // 最多同时存在 8 个飞行节点
+
+    _getFlyEffectNode() {
+        // 从对象池中获取空闲节点，或创建新节点
+        const pool = this._flyEffectPool;
+        let node = pool.find(n => !n._inUse);
+        if (!node) {
+            if (pool.length >= this._flyEffectMaxNodes) {
+                // 池已满：强制回收最早的节点
+                node = pool[0];
+                if (node._timer) { clearTimeout(node._timer); node._timer = null; }
+                if (node.parentNode) node.parentNode.removeChild(node);
+            } else {
+                node = document.createElement('div');
+                node.className = 'fixed font-bold text-amber-400 text-lg pointer-events-none z-[9999]';
+                node.style.textShadow = '0 0 5px rgba(245,158,11,0.8), 0 2px 4px rgba(0,0,0,0.5)';
+                node.style.transition = 'all 0.8s cubic-bezier(0.16, 1, 0.3, 1)';
+                node._inUse = false;
+                node._timer = null;
+                pool.push(node);
+            }
+        }
+        node._inUse = true;
+        return node;
+    },
+
+    _releaseFlyEffectNode(node) {
+        node._inUse = false;
+        if (node.parentNode) node.parentNode.removeChild(node);
+    },
+
     ui_playResourceFlyEffect(startX, startY, amount) {
         if (amount <= 0) return;
         
-        const flyer = document.createElement('div');
+        const flyer = this._getFlyEffectNode();
         flyer.innerHTML = `🔮 +${amount}`;
-        flyer.className = 'fixed font-bold text-amber-400 text-lg pointer-events-none z-[9999]';
         flyer.style.left = `${startX}px`;
         flyer.style.top = `${startY}px`;
-        flyer.style.textShadow = '0 0 5px rgba(245,158,11,0.8), 0 2px 4px rgba(0,0,0,0.5)';
-        flyer.style.transition = 'all 0.8s cubic-bezier(0.16, 1, 0.3, 1)';
+        flyer.style.opacity = '1';
+        flyer.style.transform = '';
         document.body.appendChild(flyer);
 
         // 目标位置：顶部的资源图标
@@ -41,8 +73,10 @@ export const ui_system = {
         flyer.style.transform = `translate(${targetRect.left - startX}px, ${targetRect.top - startY}px) scale(0.5)`;
         flyer.style.opacity = '0';
 
-        setTimeout(() => {
-            flyer.remove();
+        if (flyer._timer) clearTimeout(flyer._timer); // [fix] 防止重复定时器
+        flyer._timer = setTimeout(() => {
+            flyer._timer = null;
+            this._releaseFlyEffectNode(flyer);
             if (targetEl) {
                 const parent = targetEl.parentElement;
                 parent.style.transform = 'scale(1.2)';

@@ -153,11 +153,17 @@ class Vec2 {
  * 显示短暂的提示信息
  * @param {string} msg - **重要参数** 提示信息内容
  */
+// [fix] 保存 showToast 的定时器引用，防止重复调用时泳出多个定时器
+let _toastTimer = null;
 function showToast(msg) {
     const el = document.getElementById('toast');
     el.innerText = msg;
     el.classList.add('toast-visible');
-    setTimeout(() => el.classList.remove('toast-visible'), 1500);
+    if (_toastTimer) clearTimeout(_toastTimer); // 清理上一个定时器
+    _toastTimer = setTimeout(() => {
+        el.classList.remove('toast-visible');
+        _toastTimer = null;
+    }, 1500);
 }
 
 // --- 游戏实体 ---
@@ -255,6 +261,7 @@ class FortuneWheel {
         this.active = false;
         this.spinning = false;
         this.stopping = false;
+        this._deactivateTimer = null; // [fix] 保存定时器引用以便清理
         
         this.pos = new Vec2(0, 0);
         this.radius = 120; // [修改] 加大半徑，讓它在屏幕中間更氣派
@@ -376,7 +383,11 @@ class FortuneWheel {
             // [修改] 传递中奖类型和奖励层数
             this.onFinish(winner.type, winner.rewardCount);
         }
-        setTimeout(() => { this.active = false; }, 1500); // 稍微延長展示時間
+        if (this._deactivateTimer) clearTimeout(this._deactivateTimer); // [fix] 防止重复调用
+        this._deactivateTimer = setTimeout(() => { 
+            this.active = false;
+            this._deactivateTimer = null;
+        }, 1500); // 稍微延長展示時間
     }
 
     draw(ctx) {
@@ -3947,108 +3958,113 @@ class Projectile {
             if (!this.active) return;
 
             for (let e of activeEnemies) {
-                // [优化 3] 矩形碰撞检测 (Circle vs AABB)
-                // 这能完美解决 "从两个斜对角敌人中间穿过" 的问题
-                
-                const halfW = e.width / 2;
-                const halfH = e.height / 2;
-
-                // 1. 寻找矩形上离圆心最近的点 (Closest Point)
-                // 将圆心坐标限制在矩形边界内
-                const closestX = Math.max(e.pos.x - halfW, Math.min(this.pos.x, e.pos.x + halfW));
-                const closestY = Math.max(e.pos.y - halfH, Math.min(this.pos.y, e.pos.y + halfH));
-
-                // 2. 计算距离向量 (圆心 到 最近点)
-                const distVecX = this.pos.x - closestX;
-                const distVecY = this.pos.y - closestY;
-                const distSq = distVecX * distVecX + distVecY * distVecY;
-
-                // 3. 判定碰撞 (距离平方 < 半径平方)
-                // 注意：这里稍微加大了判定半径 (+2)，让碰撞手感更"实"，不容易漏
-                const hitRadius = this.radius + 2;
-
-                if (distSq < hitRadius * hitRadius) {
-                    if (this.hitCooldowns.has(e)) continue;
-                    this.hitCooldowns.set(e, CONFIG.gameplay.hitCooldowns);
-                    this.lastHitEnemy = e;
-                    this.onHit(e, enemies);
-                    if (this.config.flying_sword) {
-                        if (typeof game !== 'undefined') game.combat_flyingSword_assignTarget(e);
-                    }
-                    if (this.piercesLeft > 0) {
-                        if (this.config.flying_sword) {
-                            const pegLevel = this.config.level || 1;
-                            if (this.hasAreaDamage) this.performSlashAttack(e, game.enemies);
-                            if (typeof game !== 'undefined') {
-                                const spawnX = e.pos.x + (Math.random()-0.5)*20;
-                                const spawnY = e.pos.y + (Math.random()-0.5)*20;
-                                game.combat_flyingSword_addSon(spawnX, spawnY, this, pegLevel, this.config);
-                            }
-                        }
-                        this.piercesLeft--;
-                        continue;
-                    }
-                    if (this.bouncesLeft > 0) {
-                        this.bouncesLeft--;
-                        
-                        // 风属性锤点逻辑
-                        if (this.config.wind && this.isLast && typeof game !== 'undefined') {
-                            game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage);
-                        }
-
-                        // [核心修复] 基于最近点的精确物理反弹
-                        const dist = Math.sqrt(distSq);
-                        let normal;
-
-                        if (dist === 0) {
-                            // 特殊情况：圆心在矩形内部 (Deep Penetration)
-                            // 策略：寻找最近的边界推出
-                            const dx = this.pos.x - e.pos.x;
-                            const dy = this.pos.y - e.pos.y;
-                            // 判断是更靠近左右边还是上下边
-                            const overlapX = halfW - Math.abs(dx);
-                            const overlapY = halfH - Math.abs(dy);
-
-                            if (overlapX < overlapY) {
-                                normal = new Vec2(Math.sign(dx) || 1, 0);
-                            } else {
-                                normal = new Vec2(0, Math.sign(dy) || 1);
-                            }
-                        } else {
-                            // 正常情况：撞击表面或角落
-                            // 法线就是 "最近点 -> 圆心" 的单位向量
-                            normal = new Vec2(distVecX / dist, distVecY / dist);
-                        }
-
-                        // 1. 位置修正 (Push Out)：将子弹推离敌人表面，防止下一帧卡住
-                        const pushOutDist = this.radius + 0.1;
-                        if (dist === 0) {
-                            // 内部推出
-                            this.pos.x = closestX + normal.x * pushOutDist;
-                            this.pos.y = closestY + normal.y * pushOutDist;
-                        } else {
-                            // 外部推出 (从最近点往外推)
-                            this.pos.x = closestX + normal.x * pushOutDist;
-                            this.pos.y = closestY + normal.y * pushOutDist;
-                        }
-
-                        // 2. 速度反弹 (Reflection)
-                        // v' = v - 2 * (v · n) * n
-                        const dot = this.vel.dot(normal);
-                        // 只有当速度朝向物体内部时才反弹 (防止已经离开时被错误反拉)
-                        if (dot < 0) {
-                            this.vel = this.vel.sub(normal.mult(2 * dot));
-                        }
-
-                        // 视觉挤压效果
-                        this.deformation = { x: 1.3, y: 0.7 }; // 撞击变扁
-                    } else {
-                        this.destroy(spawnCallback);
-                        return;
-                    }
-                }
+                // 委托给 _handleCollision 处理单个敌人的碰撞逻辑
+                const result = this._handleCollision(e, enemies, spawnCallback);
+                if (result === 'destroyed') return;
             }
         }
+        // 委托给 _spawnEffect 处理爆炸粒子特效
+        this._spawnEffect();
+    }
+
+    /**
+     * 处理与单个敌人的碰撞检测与响应（Circle vs AABB）
+     * @param {Enemy} e - 目标敌人
+     * @param {Enemy[]} enemies - 所有敌人列表（用于 onHit）
+     * @param {Function} spawnCallback - 子弹销毁时的回调
+     * @returns {'destroyed'|undefined} 若子弹被销毁则返回 'destroyed'
+     */
+    _handleCollision(e, enemies, spawnCallback) {
+        const halfW = e.width / 2;
+        const halfH = e.height / 2;
+
+        // 1. 寻找矩形上离圆心最近的点 (Closest Point)
+        const closestX = Math.max(e.pos.x - halfW, Math.min(this.pos.x, e.pos.x + halfW));
+        const closestY = Math.max(e.pos.y - halfH, Math.min(this.pos.y, e.pos.y + halfH));
+
+        // 2. 计算距离向量 (圆心 到 最近点)
+        const distVecX = this.pos.x - closestX;
+        const distVecY = this.pos.y - closestY;
+        const distSq = distVecX * distVecX + distVecY * distVecY;
+
+        // 3. 判定碰撞 (距离平方 < 半径平方)
+        // 注意：这里稍微加大了判定半径 (+2)，让碰撞手感更"实"，不容易漏
+        const hitRadius = this.radius + 2;
+
+        if (distSq < hitRadius * hitRadius) {
+            if (this.hitCooldowns.has(e)) return;
+            this.hitCooldowns.set(e, CONFIG.gameplay.hitCooldowns);
+            this.lastHitEnemy = e;
+            this.onHit(e, enemies);
+            if (this.config.flying_sword) {
+                if (typeof game !== 'undefined') game.combat_flyingSword_assignTarget(e);
+            }
+            if (this.piercesLeft > 0) {
+                if (this.config.flying_sword) {
+                    const pegLevel = this.config.level || 1;
+                    if (this.hasAreaDamage) this.performSlashAttack(e, game.enemies);
+                    if (typeof game !== 'undefined') {
+                        const spawnX = e.pos.x + (Math.random()-0.5)*20;
+                        const spawnY = e.pos.y + (Math.random()-0.5)*20;
+                        game.combat_flyingSword_addSon(spawnX, spawnY, this, pegLevel, this.config);
+                    }
+                }
+                this.piercesLeft--;
+                return;
+            }
+            if (this.bouncesLeft > 0) {
+                this.bouncesLeft--;
+                
+                // 风属性锤点逻辑
+                if (this.config.wind && this.isLast && typeof game !== 'undefined') {
+                    game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage);
+                }
+
+                // [核心修复] 基于最近点的精确物理反弹
+                const dist = Math.sqrt(distSq);
+                let normal;
+
+                if (dist === 0) {
+                    // 特殊情况：圆心在矩形内部 (Deep Penetration)
+                    const dx = this.pos.x - e.pos.x;
+                    const dy = this.pos.y - e.pos.y;
+                    const overlapX = halfW - Math.abs(dx);
+                    const overlapY = halfH - Math.abs(dy);
+
+                    if (overlapX < overlapY) {
+                        normal = new Vec2(Math.sign(dx) || 1, 0);
+                    } else {
+                        normal = new Vec2(0, Math.sign(dy) || 1);
+                    }
+                } else {
+                    // 正常情况：法线就是 "最近点 -> 圆心" 的单位向量
+                    normal = new Vec2(distVecX / dist, distVecY / dist);
+                }
+
+                // 位置修正 (Push Out)：将子弹推离敌人表面
+                const pushOutDist = this.radius + 0.1;
+                this.pos.x = closestX + normal.x * pushOutDist;
+                this.pos.y = closestY + normal.y * pushOutDist;
+
+                // 速度反弹 (Reflection): v' = v - 2 * (v · n) * n
+                const dot = this.vel.dot(normal);
+                if (dot < 0) {
+                    this.vel = this.vel.sub(normal.mult(2 * dot));
+                }
+
+                // 视觉挤压效果
+                this.deformation = { x: 1.3, y: 0.7 };
+            } else {
+                this.destroy(spawnCallback);
+                return 'destroyed';
+            }
+        }
+    }
+
+    /**
+     * 生成子弹自身的粒子特效（如爆炸子弹的火花）
+     */
+    _spawnEffect() {
         if (this.config.explosive) {
             if (Math.random() < 0.7) {
                 const spark = new Particle(this.pos.x, this.pos.y, '#fbbf24', 'spark');
@@ -4257,6 +4273,7 @@ class Projectile {
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(rotation);
+        // [fix] 重构为 if-else 结构，确保每条执行路径只有一个顶层 restore
         if (config.type === 'flying_sword') {
             // 修正角度：假設畫筆是朝右(0度)畫的，如果原圖是朝上則需旋轉
             // 這裡我們直接畫朝右的劍，與 velocity 方向一致
@@ -4323,9 +4340,8 @@ class Projectile {
             ctx.lineWidth = 2;
             ctx.lineCap = 'round';
             ctx.stroke();
-            ctx.restore();
-            return; // *** 繪製完畢，直接返回，跳过原本的圆球繪製 ***
-        }
+            // [fix] 删除此处的 restore+return，改为 else if 结构，由函数末尾统一 restore
+        } else {
         
         // 1. 确定形状
         let shapeType = 'circle';
@@ -4371,7 +4387,7 @@ class Projectile {
             ctx.translate((Math.random() - 0.5) * shakeAmount, (Math.random() - 0.5) * shakeAmount);
         }
         // ---  光球的特殊渲染逻辑 (绑定特效) ---
-        if (shapeType === 'orb') {
+        if (shapeType === 'orb') {  // [fix] 此 if 在 else 块内，与 flying_sword 互斥
             const time = Date.now() / 200;
             const pulse = Math.sin(time) * 0.1 + 1.0; 
             const laserPower = config.laser || 0;
@@ -4390,10 +4406,9 @@ class Projectile {
             ctx.beginPath();
             ctx.arc(0, 0, radius * 0.8 * sizeMod, 0, Math.PI * 2);
             ctx.fill();
-            ctx.restore();
-            return; 
-        }
-        // 3. 绘制形状
+            // [fix] 删除此处的 restore+return，由函数末尾统一 restore
+        } else {
+        // 3. 绘制形状 (orb 的 else 分支，即正常绘制路径)
         ctx.scale(deformation.x, deformation.y);
         ctx.beginPath();
         if (shapeType === 'arrow') {
@@ -4575,7 +4590,9 @@ class Projectile {
             ctx.restore();
         }
          ctx.restore();
-    }
+        } // [fix] 关闭 orb else 块
+        } // [fix] 关闭 flying_sword else 块
+    } // drawVisuals 函数结束
 }
 class CloneSpore {
     constructor(startX, startY, targetX, targetY, onLandCallback) {
