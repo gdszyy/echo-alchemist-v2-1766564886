@@ -5972,6 +5972,91 @@ class Player {
 }
 
 
+// ==================== 符文掉落物实体 ====================
+/**
+ * RuneLoot - 场地上待拾取的符文掉落物
+ *
+ * 当敌人被击杀时，可能在其位置生成一个 RuneLoot 实体。
+ * 玩家进入拾取范围后自动拾取，将符文加入 runeInventory。
+ */
+class RuneLoot {
+    /**
+     * @param {number} x - 掉落位置 X 坐标
+     * @param {number} y - 掉落位置 Y 坐标
+     * @param {string} runeId - 符文 ID（对应 RUNE_DB 中的 id）
+     */
+    constructor(x, y, runeId) {
+        this.x = x;
+        this.y = y;
+        this.runeId = runeId;
+        this.active = true;          // 是否仍在场地上（未被拾取）
+        this._animTimer = 0;         // 动画计时器（用于悬浮/发光效果）
+        this._glowRadius = 18;       // 发光圈半径
+        this._floatOffset = 0;       // 悬浮偏移量
+    }
+
+    /**
+     * 在画布上绘制发光的符文图标
+     * @param {CanvasRenderingContext2D} ctx - 绘图上下文
+     */
+    draw(ctx) {
+        if (!this.active) return;
+
+        this._animTimer += 0.05;
+        this._floatOffset = Math.sin(this._animTimer) * 4; // 上下悬浮 ±4px
+
+        const drawY = this.y + this._floatOffset;
+
+        ctx.save();
+
+        // 外圈发光效果
+        const glowPulse = 0.5 + 0.5 * Math.sin(this._animTimer * 1.5);
+        const gradient = ctx.createRadialGradient(
+            this.x, drawY, 0,
+            this.x, drawY, this._glowRadius + glowPulse * 6
+        );
+        gradient.addColorStop(0, `rgba(255, 220, 80, ${0.5 + glowPulse * 0.3})`);
+        gradient.addColorStop(0.5, `rgba(255, 160, 30, ${0.3 + glowPulse * 0.2})`);
+        gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+
+        ctx.beginPath();
+        ctx.arc(this.x, drawY, this._glowRadius + glowPulse * 6, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // 内圈背景
+        ctx.beginPath();
+        ctx.arc(this.x, drawY, 14, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(30, 20, 10, 0.75)';
+        ctx.fill();
+        ctx.strokeStyle = `rgba(255, 200, 60, ${0.7 + glowPulse * 0.3})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 绘制符文图标（emoji 字符）
+        ctx.font = '14px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('✦', this.x, drawY); // 默认符文占位符，实际应从 RUNE_DB 获取 icon
+
+        ctx.restore();
+    }
+
+    /**
+     * 检测玩家是否进入拾取范围
+     * @param {{ x: number, y: number }} playerPos - 玩家当前位置
+     * @param {number} [radius=30] - 拾取判定半径（像素）
+     * @returns {boolean} 是否在拾取范围内
+     */
+    checkPickup(playerPos, radius = 30) {
+        if (!this.active) return false;
+        const dx = playerPos.x - this.x;
+        const dy = playerPos.y - this.y;
+        return Math.sqrt(dx * dx + dy * dy) <= radius;
+    }
+}
+
 // ==================== 导出实体类 ====================
 // 注意：showToast 和 rotateTowards 已经在文件中间声明，不需要重复声明
 
@@ -5998,6 +6083,7 @@ export {
     LightningBolt,
     FireWave,
     Player,
+    RuneLoot,
     showToast,
     rotateTowards,
     adjustColorBrightness,

@@ -5,11 +5,12 @@
 import { 
     META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB 
 } from './config.js';
+import { RUNE_DB, RUNEWORD_DB, COUNTER_MAP } from './rune_config.js';
 
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
-    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, showToast, 
+    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, RuneLoot, showToast, 
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
 } from './entities.js';
 
@@ -117,6 +118,17 @@ class Game {
         this.slowMotionThreshold = 100;  
         this.saveData = { currency: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0 };
         this.runCurrency = 0;   
+
+        // ==================== 符文词条系统状态变量 ====================
+        /** 玩家持有的符文列表，每个元素为 runeId 字符串 */
+        this.runeInventory = [];
+        /** 3x3 符文网格，存放 runeId 或 null，索引 0~8 对应左上到右下 */
+        this.runeGrid = Array(9).fill(null);
+        /** 当前激活词条的汇总属性加成，格式如 { pyro: 2, bounce: 1 } */
+        this.activeRunewordStats = {};
+        /** 场地上待拾取的符文掉落物列表 */
+        this.runeLootItems = [];
+
         this.sys_loadSaveData(); // 必须先加载存档，才能应用升级
         this.sys_resize(); // 必须在加载存档后，才能确保 this.width/height 被正确设置
         this.sys_setupInputs(); 
