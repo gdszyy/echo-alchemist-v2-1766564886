@@ -1,17 +1,3 @@
-import { 
-    META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB 
-} from './config.js';
-import { 
-    Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
-    SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
-    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, showToast, 
-    rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
-} from './entities.js';
-import { UIManager, TrainingGround, TruthBook } from './systems.js';
-import { audio } from './audio.js';
-import { eventBus } from './event_bus.js';
-
-export const game_system = {
 /**
  * game_system.js - 游戏核心系统
  * 

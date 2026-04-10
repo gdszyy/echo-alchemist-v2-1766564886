@@ -88,7 +88,6 @@ export const spawn_system = {
 
 // --- 敌人生成与词缀系统 ---
     /**
-     * [AUTO-GENERATED] TODO: Add a description for spawn_generateAffixes.
      */
     spawn_generateAffixes() {
         const affixes = [];
@@ -386,7 +385,6 @@ export const spawn_system = {
     },
 
 /**
-     * [AUTO-GENERATED] TODO: Add a description for spawn_addSkillPoint.
      * @param {any} amount - TODO: Describe this parameter.
      */
     spawn_addSkillPoint(amount = 1) {
@@ -522,7 +520,6 @@ export const spawn_system = {
     },
 
 /**
-     * [AUTO-GENERATED] TODO: Add a description for spawn_generateMarbleOptions.
      */
     spawn_generateMarbleOptions() { 
         const container = document.getElementById('marble-selection-grid'); 
@@ -594,7 +591,6 @@ export const spawn_system = {
     },
 
 /**
-     * [AUTO-GENERATED] TODO: Add a description for spawn_createParticle.
      * @param {any} x - TODO: Describe this parameter.
      * @param {any} y - TODO: Describe this parameter.
      * @param {any} color - TODO: Describe this parameter.
@@ -819,7 +815,6 @@ export const spawn_system = {
 
 // ---  createHitFeedback ---
     /**
-     * [AUTO-GENERATED] TODO: Add a description for spawn_createHitFeedback.
      * @param {any} x - TODO: Describe this parameter.
      * @param {any} y - TODO: Describe this parameter.
      * @param {any} velocity - TODO: Describe this parameter.
@@ -919,7 +914,6 @@ export const spawn_system = {
     },
 
 /**
-     * [AUTO-GENERATED] TODO: Add a description for spawn_triggerLevelUpEvent.
      * @param {any} uiX - TODO: Describe this parameter.
      * @param {any} uiY - TODO: Describe this parameter.
      */

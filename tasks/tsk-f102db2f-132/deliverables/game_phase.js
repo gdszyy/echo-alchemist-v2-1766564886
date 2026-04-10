@@ -9,7 +9,6 @@ import {
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
-import { eventBus } from './event_bus.js';
 
 export const game_phase = {
 /**
@@ -24,13 +23,11 @@ export const game_phase = {
         if (rows.size < 3) spawnCount = 2; // 如果敌人行数少于3，则生成2行
         this.spawn_spawnEnemyRow(spawnCount); 
         
-        // [BUGFIX #5b] 删除此处的 round++，避免与 phase_finalizeRound 中的 round++ 重复执行
-        // 原 Bug: round++ 在 phase_advanceWave 和 phase_finalizeRound 中均执行，导致回合计数异常
-        // 回合计数的唯一执行位置保留在 phase_finalizeRound 中
+        this.round++; // 回合数增加
         this.prevRoundDamage = this.roundDamage; // 记录上一回合伤害
         this.roundDamage = 0; // 重置本回合伤害
-        // 事件总线广播波次推进（[BUGFIX #5b] 保留：不在此处更新 DOM，由 UI 监听 wave:advance 事件处理）
-        eventBus.emit('wave:advance', { round: this.round });
+        document.getElementById('round-num').innerText = this.round; 
+        showToast(`Round ${this.round}`); 
     },
 
 /**
@@ -39,15 +36,24 @@ export const game_phase = {
      * @param {string} newPhase - **重要参数** 新阶段名称 ('selection', 'gathering', 'combat', 'gameover')。
      */
     phase_switchPhase(newPhase) {
-        const oldPhase = this.phase;
         this.phase = newPhase;
-        
-        // 事件总线广播阶段切换
-        eventBus.emit('phase:change', { from: oldPhase, to: newPhase });
-        
         this.ui_updateUI(); // 更新 UI 界面
-        // [重构] 将阶段标题的 DOM 操作集中到 ui_system.js 的 ui_onPhaseChange 方法中
-        this.ui_onPhaseChange(newPhase);
+        const titleContainer = document.getElementById('phase-title-container');
+        const titleText = document.getElementById('phase-title');
+        const subText = document.getElementById('phase-sub');
+        titleContainer.classList.remove('minimized'); // 显示阶段标题
+
+        // 根据阶段设置标题文本
+        let text = "命運抉择"; let sub = "選擇你的命運";
+        if (newPhase === 'meta') { text = "回聲煉金師"; sub = "Echo Alchemist"; }
+        else if (newPhase === 'gathering') { text = "研磨階段"; sub = "收集魔力"; }
+        else if (newPhase === 'combat') { text = "戰鬥階段"; sub = "抵禦魔像"; }
+        else if (newPhase === 'truth_book') { text = "真理之書"; sub = "洞悉萬物之理"; }
+        else if (newPhase === 'training') { text = "試煉場"; sub = "極限戰鬥測試"; }
+        titleText.innerText = text; subText.innerText = sub;
+        
+        // 1.2秒后隐藏阶段标题
+        setTimeout(() => { titleContainer.classList.add('minimized'); }, 1200);
     },
 
 /**
@@ -223,10 +229,9 @@ export const game_phase = {
     },
 
 phase_gathering_getRandomPegType() { 
-    // [BUGFIX #1] 恢复完整 pegTypes 数组，根据玩家已解锁属性动态过滤
-    // 原 Bug: pegTypes 被硬编码为 ['bounce']，导致所有元素属性钉子无法生成
-    const allPegTypes = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind'];
-    const pegTypes = allPegTypes.filter(t => (this.unlockedWeights[t] || 0) > 0);
+    // 定义所有可能的特殊钉子类型
+    // const pegTypes = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind'];
+    const pegTypes = ['bounce']
     // 1. 获取 normal 的基础权重
     // 我们手动从 unlockedWeights 中取 white 作为普通钉子的权重基准（默认 100）
     const normalWeight = this.unlockedWeights['white'] || 100; 
@@ -270,8 +275,7 @@ phase_gathering_getRandomPegType() {
         this.sonSwordQueue = []; 
         this.sonSwordTimer = 0;
         this.phase_switchPhase('combat'); 
-        // [BUGFIX #5a] 删除冗余的 this.phase = 'combat' 赋值
-        // 原 Bug: phase_switchPhase 内部已赋值 this.phase = newPhase，此处重复赋值冗余
+        this.phase = 'combat';
         // --- [核心修复 1]：修复属性访问错误 ---
         if (!this.ammoQueue) {
             this.ammoQueue = [];

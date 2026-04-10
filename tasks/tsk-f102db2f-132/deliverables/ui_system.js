@@ -9,54 +9,21 @@ import {
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
-import { eventBus } from './event_bus.js';
 import { parseRuneGrid } from './rune_system.js';
 import { RUNE_DB, RUNEWORD_DB } from './rune_config.js';
 
 export const ui_system = {
 // (需求1 & 2) 通用资源飞入动画
-// [fix] DOM 对象池：限制同时存在的飞行节点数量，防止内存泄漏
-    _flyEffectPool: [],
-    _flyEffectMaxNodes: 8, // 最多同时存在 8 个飞行节点
-
-    _getFlyEffectNode() {
-        // 从对象池中获取空闲节点，或创建新节点
-        const pool = this._flyEffectPool;
-        let node = pool.find(n => !n._inUse);
-        if (!node) {
-            if (pool.length >= this._flyEffectMaxNodes) {
-                // 池已满：强制回收最早的节点
-                node = pool[0];
-                if (node._timer) { clearTimeout(node._timer); node._timer = null; }
-                if (node.parentNode) node.parentNode.removeChild(node);
-            } else {
-                node = document.createElement('div');
-                node.className = 'fixed font-bold text-amber-400 text-lg pointer-events-none z-[9999]';
-                node.style.textShadow = '0 0 5px rgba(245,158,11,0.8), 0 2px 4px rgba(0,0,0,0.5)';
-                node.style.transition = 'all 0.8s cubic-bezier(0.16, 1, 0.3, 1)';
-                node._inUse = false;
-                node._timer = null;
-                pool.push(node);
-            }
-        }
-        node._inUse = true;
-        return node;
-    },
-
-    _releaseFlyEffectNode(node) {
-        node._inUse = false;
-        if (node.parentNode) node.parentNode.removeChild(node);
-    },
-
     ui_playResourceFlyEffect(startX, startY, amount) {
         if (amount <= 0) return;
         
-        const flyer = this._getFlyEffectNode();
+        const flyer = document.createElement('div');
         flyer.innerHTML = `🔮 +${amount}`;
+        flyer.className = 'fixed font-bold text-amber-400 text-lg pointer-events-none z-[9999]';
         flyer.style.left = `${startX}px`;
         flyer.style.top = `${startY}px`;
-        flyer.style.opacity = '1';
-        flyer.style.transform = '';
+        flyer.style.textShadow = '0 0 5px rgba(245,158,11,0.8), 0 2px 4px rgba(0,0,0,0.5)';
+        flyer.style.transition = 'all 0.8s cubic-bezier(0.16, 1, 0.3, 1)';
         document.body.appendChild(flyer);
 
         // 目标位置：顶部的资源图标
@@ -74,10 +41,8 @@ export const ui_system = {
         flyer.style.transform = `translate(${targetRect.left - startX}px, ${targetRect.top - startY}px) scale(0.5)`;
         flyer.style.opacity = '0';
 
-        if (flyer._timer) clearTimeout(flyer._timer); // [fix] 防止重复定时器
-        flyer._timer = setTimeout(() => {
-            flyer._timer = null;
-            this._releaseFlyEffectNode(flyer);
+        setTimeout(() => {
+            flyer.remove();
             if (targetEl) {
                 const parent = targetEl.parentElement;
                 parent.style.transform = 'scale(1.2)';
@@ -201,71 +166,31 @@ ui_closeTruthBook() {
 
                 const card = document.createElement('div');
                 card.className = `bg-slate-900/60 border ${isMax ? 'border-slate-700 opacity-80' : 'border-slate-700/50'} p-4 rounded-xl flex flex-col gap-3 relative overflow-hidden group`;
-
-                // --- 顶部区域：图标 + 名称 + 等级 ---
-                const topRow = document.createElement('div');
-                topRow.className = 'flex justify-between items-start';
-
-                const iconGroup = document.createElement('div');
-                iconGroup.className = 'flex gap-3';
-
-                const iconEl = document.createElement('div');
-                iconEl.className = 'w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-xl shadow-inner';
-                iconEl.textContent = upgrade.icon;
-
-                const nameGroup = document.createElement('div');
-                const nameEl = document.createElement('h3');
-                nameEl.className = 'font-bold text-slate-100';
-                nameEl.textContent = upgrade.name;
-                const levelEl = document.createElement('p');
-                levelEl.className = 'text-[10px] text-slate-500 uppercase tracking-wider';
-                levelEl.textContent = `LV. ${level} / ${upgrade.maxLevel}`;
-                nameGroup.appendChild(nameEl);
-                nameGroup.appendChild(levelEl);
-
-                iconGroup.appendChild(iconEl);
-                iconGroup.appendChild(nameGroup);
-                topRow.appendChild(iconGroup);
-
-                if (isMax) {
-                    const maxBadge = document.createElement('span');
-                    maxBadge.className = 'text-[10px] bg-slate-800 text-slate-500 px-2 py-1 rounded';
-                    maxBadge.textContent = 'MAX';
-                    topRow.appendChild(maxBadge);
-                }
-                card.appendChild(topRow);
-
-                // --- 描述 ---
-                const descEl = document.createElement('p');
-                descEl.className = 'text-xs text-slate-400 leading-relaxed';
-                descEl.textContent = upgrade.desc;
-                card.appendChild(descEl);
-
-                // --- 底部区域：下一级信息 + 购买按钮 ---
-                const bottomRow = document.createElement('div');
-                bottomRow.className = 'flex justify-between items-center mt-2';
-
-                const nextLevelEl = document.createElement('div');
-                nextLevelEl.className = 'text-[10px] text-slate-500';
-                if (!isMax) {
-                    nextLevelEl.innerHTML = `下一級: <span class="text-amber-400/80">+${upgrade.effect.valuePerLevel}${upgrade.effect.type === 'multiply' ? 'x' : ''}</span>`;
-                } else {
-                    nextLevelEl.textContent = '已達最高等級';
-                }
-                bottomRow.appendChild(nextLevelEl);
-
-                if (!isMax) {
-                    const buyBtn = document.createElement('button');
-                    buyBtn.className = `px-4 py-2 rounded-lg text-xs font-bold transition-all ${canAfford ? 'bg-amber-500 text-slate-900 hover:scale-105 active:scale-95' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`;
-                    buyBtn.textContent = `✨ ${cost.toLocaleString()}`;
-                    // [重构] 使用 addEventListener 替代内联 onclick="game.meta_buyUpgrade(...)"，移除 window.game 依赖
-                    buyBtn.addEventListener('click', () => {
-                        this.meta_buyUpgrade(upgrade.id);
-                    });
-                    bottomRow.appendChild(buyBtn);
-                }
-                card.appendChild(bottomRow);
-
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-xl shadow-inner">${upgrade.icon}</div>
+                            <div>
+                                <h3 class="font-bold text-slate-100">${upgrade.name}</h3>
+                                <p class="text-[10px] text-slate-500 uppercase tracking-wider">LV. ${level} / ${upgrade.maxLevel}</p>
+                            </div>
+                        </div>
+                        ${isMax ? '<span class="text-[10px] bg-slate-800 text-slate-500 px-2 py-1 rounded">MAX</span>' : ''}
+                    </div>
+                    <p class="text-xs text-slate-400 leading-relaxed">${upgrade.desc}</p>
+                    <div class="flex justify-between items-center mt-2">
+                        <div class="text-[10px] text-slate-500">
+                            ${!isMax ? `下一級: <span class="text-amber-400/80">+${upgrade.effect.valuePerLevel}${upgrade.effect.type === 'multiply' ? 'x' : ''}</span>` : '已達最高等級'}
+                        </div>
+                        ${!isMax ? `
+                            <button onclick="game.meta_buyUpgrade('${upgrade.id}')" 
+                                    class="px-4 py-2 rounded-lg text-xs font-bold transition-all ${canAfford ? 'bg-amber-500 text-slate-900 hover:scale-105 active:scale-95' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}">
+                                ✨ ${cost.toLocaleString()}
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
                 itemsContainer.appendChild(card);
             });
         }
@@ -383,25 +308,11 @@ ui_closeTruthBook() {
         // --- 2. 渲染顶部导航 ---
         const header = document.createElement('div');
         header.className = 'w-full flex justify-between items-center bg-slate-800 p-2 rounded shrink-0 sticky top-0 z-10 border border-slate-700 shadow-md';
-
-        // [重构] 使用 createElement + addEventListener 替代 innerHTML 内联事件，移除 window.game 依赖
-        const prevBtn = document.createElement('button');
-        prevBtn.className = 'text-slate-400 hover:text-white px-3 py-1';
-        prevBtn.textContent = '◀';
-        prevBtn.addEventListener('click', () => this.ui_switchDamageRound(1));
-
-        const roundLabel = document.createElement('span');
-        roundLabel.className = 'text-xs font-bold text-amber-400 font-[Cinzel]';
-        roundLabel.textContent = `Round ${roundNumber}`;
-
-        const nextBtn = document.createElement('button');
-        nextBtn.className = 'text-slate-400 hover:text-white px-3 py-1';
-        nextBtn.textContent = '▶';
-        nextBtn.addEventListener('click', () => this.ui_switchDamageRound(-1));
-
-        header.appendChild(prevBtn);
-        header.appendChild(roundLabel);
-        header.appendChild(nextBtn);
+        header.innerHTML = `
+            <button onclick="game.ui_switchDamageRound(1)" class="text-slate-400 hover:text-white px-3 py-1">◀</button>
+            <span class="text-xs font-bold text-amber-400 font-[Cinzel]">Round ${roundNumber}</span>
+            <button onclick="game.ui_switchDamageRound(-1)" class="text-slate-400 hover:text-white px-3 py-1">▶</button>
+        `;
         container.appendChild(header);
 
         if (!shotsData || shotsData.length === 0) {
@@ -1015,16 +926,14 @@ ui_closeTruthBook() {
             // 样式：绝对定位在卡片右上角或醒目位置
             badge.className = 'absolute -top-2 -right-2 bg-slate-900 border border-slate-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-md z-10';
             
-            // [BUGFIX #4] 修复连击徽章颜色条件顺序错误
-            // 原 Bug: >= 5 在 >= 10 之前，导致金色徽章永远无法显示
-            if (item.multicast >= 10) {
-                badge.style.borderColor = '#facc15';
-                badge.style.color = '#facc15';
-                badge.style.boxShadow = '0 0 5px #facc15';
-            } else if (item.multicast >= 5) {
+            // 根据连击数变色
+            if (item.multicast >= 5) {
                 badge.style.borderColor = '#d8b4fe';
                 badge.style.color = '#d8b4fe';
                 badge.style.boxShadow = '0 0 5px #d8b4fe';
+            } else if (item.multicast >= 10) {
+                badge.style.borderColor = '#facc15';
+                badge.style.color = '#facc15';
             }
             
             badge.innerText = `x${1+item.multicast}`;
@@ -1259,9 +1168,12 @@ ui_closeTruthBook() {
             currentData[upgradeId] = level + 1;
             this.sys_saveData();
             
-            // [BUGFIX #2] 修复 setDeepValue 重复调用导致临时升级数值翻倍
-            // 原 Bug: isTemporary 分支内外各调用了一次 setDeepValue，导致临时升级效果被应用两次
-            // 修复：统一在分支外调用一次
+            // [修复] 立即应用升级效果（仅对临时升级）
+            if (isTemporary) {
+                const effectValue = upgrade.effect.valuePerLevel * (level + 1);
+                setDeepValue(CONFIG, upgrade.effect.path, effectValue, upgrade.effect.type);
+            }
+
             const effectValue = upgrade.effect.valuePerLevel * (level + 1);
             setDeepValue(CONFIG, upgrade.effect.path, effectValue, upgrade.effect.type);
             console.log(`[META] 立即应用升级: ${upgrade.id}, level: ${level + 1}, path: ${upgrade.effect.path}, value: ${effectValue}`);
@@ -1269,12 +1181,12 @@ ui_closeTruthBook() {
             
             this.ui_updateMetaCurrency();
             this.ui_renderShop();
-            audio.playTone(800, 'sine', 0.1, 0.3);
+            if (window.audio) audio.playTone(800, 'sine', 0.1, 0.3);
             const typeText = isTemporary ? '下一局生效' : `LV.${level + 1}`;
             if (window.showToast) showToast(`购买成功: ${upgrade.name} ${typeText}`);
         } else {
             if (window.showToast) showToast("能量精粹不足");
-            audio.playTone(200, 'sawtooth', 0.1, 0.2);
+            if (window.audio) audio.playTone(200, 'sawtooth', 0.1, 0.2);
         }
     },
 
@@ -1343,7 +1255,7 @@ ui_closeTruthBook() {
                     this.runeGrid[i] = null;
                     this.runeInventory.push(runeId);
                     this.ui_updateRuneGrid();
-                    audio.playTone(400, 'sine', 0.08, 0.15);
+                    if (window.audio) audio.playTone(400, 'sine', 0.08, 0.15);
                 } else {
                     // 空格：打开符文选择器
                     this._pendingRuneGridIndex = i;
@@ -1397,7 +1309,7 @@ ui_closeTruthBook() {
                 this.runeGrid[cellIndex] = runeId;
                 this.ui_closeRunePicker();
                 this.ui_updateRuneGrid();
-                audio.playTone(600, 'sine', 0.1, 0.2);
+                if (window.audio) audio.playTone(600, 'sine', 0.1, 0.2);
             });
             list.appendChild(btn);
         });
@@ -1567,51 +1479,5 @@ ui_closeTruthBook() {
             tag.textContent = `${key} +${val}`;
             list.appendChild(tag);
         });
-    },
-
-    /**
-     * @method ui_onPhaseChange
-     * @description [重构] 集中处理阶段切换时的所有 DOM 类名操作。
-     * 由 phase_switchPhase 调用，负责阶段标题容器的显示/隐藏和文本更新。
-     * 将原先分散在 game_phase.js 中的 DOM 操作集中到此处统一管理。
-     * @param {string} newPhase - 新阶段名称
-     */
-    ui_onPhaseChange(newPhase) {
-        const titleContainer = document.getElementById('phase-title-container');
-        const titleText = document.getElementById('phase-title');
-        const subText = document.getElementById('phase-sub');
-        if (!titleContainer || !titleText || !subText) return;
-
-        // 显示阶段标题
-        titleContainer.classList.remove('minimized');
-
-        // 根据阶段设置标题文本
-        // 注：此处文字与 game_phase.js 原始内容保持一致
-        const PHASE_TITLES = {
-            'meta':       { text: '\u56de\u8072\u7149\u91d1\u5e2b', sub: 'Echo Alchemist' },
-            'gathering':  { text: '\u7814\u78e8\u968e\u6bb5', sub: '\u6536\u96c6\u9b54\u529b' },
-            'combat':     { text: '\u6230\u9b25\u968e\u6bb5', sub: '\u6297\u79a6\u9b54\u50cf' },
-            'truth_book': { text: '\u771f\u7406\u4e4b\u66f8', sub: '\u6d1e\u6089\u842c\u7269\u4e4b\u7406' },
-            'training':   { text: '\u8a66\u7149\u5834', sub: '\u6975\u9650\u6230\u9b25\u6e2c\u8a66' },
-        };
-        const titleData = PHASE_TITLES[newPhase] || { text: '\u547d\u904b\u6289\u62e9', sub: '\u9078\u64c7\u4f60\u7684\u547d\u904b' };
-        titleText.innerText = titleData.text;
-        subText.innerText = titleData.sub;
-
-        // 1.2秒后隐藏阶段标题
-        setTimeout(() => { titleContainer.classList.add('minimized'); }, 1200);
-    },
-
-    /**
-     * @method ui_triggerScreenShake
-     * @description [重构] 触发屏幕震动效果（shake-hard CSS 动画）。
-     * 将原先分散在 combat_system.js 中的直接 DOM 操作提取到 ui_system.js。
-     * @param {number} [duration=200] - 震动持续时间（毫秒）
-     */
-    ui_triggerScreenShake(duration = 200) {
-        const container = document.getElementById('game-container');
-        if (!container) return;
-        container.classList.add('shake-hard');
-        setTimeout(() => container.classList.remove('shake-hard'), duration);
     },
 };

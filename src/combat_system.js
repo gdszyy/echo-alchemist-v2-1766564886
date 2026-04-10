@@ -64,7 +64,6 @@ export const combat_system = {
 
 // 1. 汇报伤害（供敌人受伤时调用）
     /**
-     * [AUTO-GENERATED] TODO: Add a description for combat_reportDamage.
      * @param {any} amount - TODO: Describe this parameter.
      */
     combat_reportDamage(amount) {
@@ -81,7 +80,6 @@ export const combat_system = {
 
 // --- [新增] 更新連射倍率 UI ---
     /**
-     * [AUTO-GENERATED] TODO: Add a description for combat_updateMulticastDisplay.
      * @param {any} bonusAmount - TODO: Describe this parameter.
      */
     combat_updateMulticastDisplay(bonusAmount = 0) {
@@ -114,7 +112,6 @@ export const combat_system = {
 
 // --- [新增] 播放倍率轉移飛行特效 ---
     /**
-     * [AUTO-GENERATED] TODO: Add a description for combat_playMulticastTransferEffect.
      * @param {any} multicastValue - TODO: Describe this parameter.
      */
     combat_playMulticastTransferEffect(multicastValue) {
@@ -177,7 +174,6 @@ export const combat_system = {
 
 // 在 Game 类中
     /**
-     * [AUTO-GENERATED] TODO: Add a description for combat_activateSkill.
      * @param {any} skill - TODO: Describe this parameter.
      */
     combat_activateSkill(skill) {
@@ -297,7 +293,6 @@ export const combat_system = {
     },
 
 /**
-     * [AUTO-GENERATED] TODO: Add a description for combat_assignSwordTarget.
      * @param {any} enemy - TODO: Describe this parameter.
      */
     combat_flyingSword_assignTarget(enemy) {
@@ -311,7 +306,6 @@ export const combat_system = {
 
 // --- 新增方法：添加子剑 ---
     /**
-     * [AUTO-GENERATED] TODO: Add a description for spawn_addSonSword.
      * @param {any} x - TODO: Describe this parameter.
      * @param {any} y - TODO: Describe this parameter.
      * @param {any} mother - TODO: Describe this parameter.
@@ -2079,7 +2073,6 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
     },
 
 /**
-     * [AUTO-GENERATED] TODO: Add a description for combat_fireLaser.his parameter.
      * @param {any} startY - TODO: Describe this parameter.
      * @param {any} vel - TODO: Describe this parameter.
      * @param {any} recipe - TODO: Describe this parameter.
@@ -2198,7 +2191,6 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
 
 // 辅助：寻找最近的反射面（墙壁或带盾敌人）
     /**
-     * [AUTO-GENERATED] TODO: Add a description for combat_castRayToReflectors.
      * @param {any} start - TODO: Describe this parameter.
      * @param {any} dir - TODO: Describe this parameter.
      * @param {any} maxDist - TODO: Describe this parameter.
@@ -2269,7 +2261,6 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
 
 // 辅助：处理线段上的普通穿透
     /**
-     * [AUTO-GENERATED] TODO: Add a description for combat_processLaserPenetration.
      * @param {any} p1 - TODO: Describe this parameter.
      * @param {any} p2 - TODO: Describe this parameter.
      * @param {any} recipe - TODO: Describe this parameter.
