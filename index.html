@@ -1513,14 +1513,16 @@
 
 
 <script type="module">
-// ==================== 模块化导入 ====================
-import { Game, audio } from './src/core.js';
+// ==================== 模块化导入 (v2 - EventBus 架构) ====================
+import { Game, audio, eventBus } from './src/core.js';
 
 // ==================== 创建全局游戏实例 ====================
 // 注意：必须在 window 对象上声明，以便 HTML 中的 onclick 属性可以访问
 const game = new Game();
 window.game = game;
-window.audio = audio; // 将 audio 实例也挂载到 window，供其他模块使用
+// [v2 变更] 移除 window.audio 直接挂载，改用事件总线和依赖注入
+// audio 代理对象在 SoundManager 未初始化时静默失败，无需全局挂载
+window.audio = audio; // 保留兼容性，但现在是安全代理而非直接实例
 
 // 也可以通过全局变量访问（用于控制台调试）
 if (typeof globalThis !== 'undefined') {

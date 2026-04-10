@@ -9,6 +9,7 @@ import {
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
+import { eventBus } from './event_bus.js';
 import { parseRuneGrid } from './rune_system.js';
 import { RUNE_DB, RUNEWORD_DB } from './rune_config.js';
 
@@ -1219,12 +1220,12 @@ ui_closeTruthBook() {
             
             this.ui_updateMetaCurrency();
             this.ui_renderShop();
-            if (window.audio) audio.playTone(800, 'sine', 0.1, 0.3);
+            audio.playTone(800, 'sine', 0.1, 0.3);
             const typeText = isTemporary ? '下一局生效' : `LV.${level + 1}`;
             if (window.showToast) showToast(`购买成功: ${upgrade.name} ${typeText}`);
         } else {
             if (window.showToast) showToast("能量精粹不足");
-            if (window.audio) audio.playTone(200, 'sawtooth', 0.1, 0.2);
+            audio.playTone(200, 'sawtooth', 0.1, 0.2);
         }
     },
 
@@ -1293,7 +1294,7 @@ ui_closeTruthBook() {
                     this.runeGrid[i] = null;
                     this.runeInventory.push(runeId);
                     this.ui_updateRuneGrid();
-                    if (window.audio) audio.playTone(400, 'sine', 0.08, 0.15);
+                    audio.playTone(400, 'sine', 0.08, 0.15);
                 } else {
                     // 空格：打开符文选择器
                     this._pendingRuneGridIndex = i;
@@ -1347,7 +1348,7 @@ ui_closeTruthBook() {
                 this.runeGrid[cellIndex] = runeId;
                 this.ui_closeRunePicker();
                 this.ui_updateRuneGrid();
-                if (window.audio) audio.playTone(600, 'sine', 0.1, 0.2);
+                audio.playTone(600, 'sine', 0.1, 0.2);
             });
             list.appendChild(btn);
         });

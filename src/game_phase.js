@@ -9,6 +9,7 @@ import {
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
+import { eventBus } from './event_bus.js';
 
 export const game_phase = {
 /**
@@ -28,6 +29,8 @@ export const game_phase = {
         // 回合计数的唯一执行位置保留在 phase_finalizeRound 中
         this.prevRoundDamage = this.roundDamage; // 记录上一回合伤害
         this.roundDamage = 0; // 重置本回合伤害
+        // 事件总线广播波次推进（[BUGFIX #5b] 保留：不在此处更新 DOM，由 UI 监听 wave:advance 事件处理）
+        eventBus.emit('wave:advance', { round: this.round });
     },
 
 /**
@@ -36,7 +39,12 @@ export const game_phase = {
      * @param {string} newPhase - **重要参数** 新阶段名称 ('selection', 'gathering', 'combat', 'gameover')。
      */
     phase_switchPhase(newPhase) {
+        const oldPhase = this.phase;
         this.phase = newPhase;
+        
+        // 事件总线广播阶段切换
+        eventBus.emit('phase:change', { from: oldPhase, to: newPhase });
+        
         this.ui_updateUI(); // 更新 UI 界面
         const titleContainer = document.getElementById('phase-title-container');
         const titleText = document.getElementById('phase-title');

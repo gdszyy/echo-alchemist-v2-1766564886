@@ -22,18 +22,36 @@
 
 import { CONFIG } from './config.js';
 
-// 注意：audio 实例在 core.js 中创建并挂载到 window 对象，避免循环依赖
-// 使用 getter 函数懒加载，确保访问时 audio 已经初始化
-const getAudio = () => window.audio;
-// 为了代码兼容，创建一个 Proxy 对象
+// ==================== 音频依赖注入 (重构 v2) ====================
+// 移除 Proxy 方案和 window.audio 依赖
+// 改用依赖注入：由 core.js 在音频初始化后调用 setAudioProvider()
+let _audioProvider = null;
+
+/**
+ * 设置音频提供者（由 core.js 调用）
+ * @param {SoundManager} provider - SoundManager 实例
+ */
+function setAudioProvider(provider) {
+    _audioProvider = provider;
+}
+
+/**
+ * 安全的音频访问代理
+ * 在 SoundManager 未初始化时，所有方法调用静默失败
+ */
 const audio = new Proxy({}, {
     get: (target, prop) => {
-        const audioInstance = window.audio;
-        if (!audioInstance) {
-            console.warn('audio instance not yet initialized');
-            return () => {}; // 返回空函数避免错误
+        if (_audioProvider) {
+            const val = _audioProvider[prop];
+            if (typeof val === 'function') {
+                return val.bind(_audioProvider);
+            }
+            return val;
         }
-        return audioInstance[prop];
+        // 未初始化时返回空函数，静默失败
+        if (prop === 'ctx') return null;
+        if (prop === 'muted') return false;
+        return () => {};
     }
 });
 
@@ -6106,5 +6124,6 @@ export {
     adjustColorBrightness,
     lerpColor,
     lerp,
-    hexToRgba
+    hexToRgba,
+    setAudioProvider
 };

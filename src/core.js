@@ -1,5 +1,12 @@
 /**
- * core.js - 游戏核心引擎层 (重构版)
+ * core.js - 游戏核心引擎层 (重构版 v2 - EventBus 架构)
+ * 
+ * 变更记录：
+ * - 引入 EventBus 事件总线，挂载到 Game 实例
+ * - 延迟初始化 SoundManager（首次用户交互后）
+ * - 移除 window.audio 全局依赖
+ * - 通过 _setAudioInstance 注入音频实例到 audio.js 的代理
+ * - 通过 setAudioProvider 注入音频实例到 entities.js
  */
 
 import { 
@@ -11,13 +18,19 @@ import {
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
     Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, RuneLoot, showToast, 
-    rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
+    rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba,
+    setAudioProvider
 } from './entities.js';
 
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 
+// 导入事件总线
+import { eventBus } from './event_bus.js';
+
+// 导入 SoundManager 类和音频代理
+import { SoundManager, audio, _setAudioInstance } from './audio.js';
+
 // 导入拆分后的子系统
-import { audio, SoundManager } from './audio.js';
 import { game_system } from './game_system.js';
 import { game_phase } from './game_phase.js';
 import { combat_system } from './combat_system.js';
@@ -26,8 +39,55 @@ import { spawn_system } from './spawn_system.js';
 import { ui_system } from './ui_system.js';
 import { calc_utils } from './calc_utils.js';
 
+// ==================== 延迟音频初始化 ====================
+let _audioInitialized = false;
+
+/**
+ * 初始化音频系统（应在首次用户交互后调用）
+ * 解决浏览器 AudioContext 策略限制
+ */
+function initAudio() {
+    if (_audioInitialized) return;
+    _audioInitialized = true;
+    
+    const instance = new SoundManager();
+    
+    // 注入到 audio.js 的代理层（所有 import { audio } from './audio.js' 的模块自动生效）
+    _setAudioInstance(instance);
+    
+    // 注入到 entities.js（替代旧的 window.audio Proxy 方案）
+    setAudioProvider(instance);
+    
+    // 通过事件总线广播音频就绪
+    eventBus.emit('audio:ready', { audio: instance });
+    
+    console.log('[Core] SoundManager initialized on user interaction');
+    return instance;
+}
+
+// ==================== 首次交互监听 ====================
+function setupAudioInitListener() {
+    const handler = () => {
+        if (!_audioInitialized) {
+            initAudio();
+            window.removeEventListener('click', handler);
+            window.removeEventListener('touchstart', handler);
+            window.removeEventListener('keydown', handler);
+        }
+    };
+    window.addEventListener('click', handler);
+    window.addEventListener('touchstart', handler);
+    window.addEventListener('keydown', handler);
+}
+
+// 立即设置监听
+setupAudioInitListener();
+
 class Game {
     constructor() {
+        // ==================== 事件总线挂载 ====================
+        this.eventBus = eventBus;
+        
         this.variantLevels = { flying_sword: 1 };
         this.marbleSizeBonus=0;
         this.isVisualEffectActive = false;
@@ -120,22 +180,18 @@ class Game {
         this.runCurrency = 0;   
 
         // ==================== 符文词条系统状态变量 ====================
-        /** 玩家持有的符文列表，每个元素为 runeId 字符串 */
         this.runeInventory = [];
-        /** 3x3 符文网格，存放 runeId 或 null，索引 0~8 对应左上到右下 */
         this.runeGrid = Array(9).fill(null);
-        /** 当前激活词条的汇总属性加成，格式如 { pyro: 2, bounce: 1 } */
         this.activeRunewordStats = {};
-        /** 场地上待拾取的符文掉落物列表 */
         this.runeLootItems = [];
 
-        this.sys_loadSaveData(); // 必须先加载存档，才能应用升级
-        this.sys_resize(); // 必须在加载存档后，才能确保 this.width/height 被正确设置
+        this.sys_loadSaveData();
+        this.sys_resize();
         this.sys_setupInputs(); 
         this.currentRows = CONFIG.gameplay.rows; 
         this.boardBottomY = 0;
         
-        // [修复] 确保所有 UI 覆盖层在游戏开始时都被隐藏，防止状态残留
+        // [修复] 确保所有 UI 覆盖层在游戏开始时都被隐藏
         document.querySelectorAll('.ui-overlay').forEach(el => { 
             el.style.display = 'none'; 
             el.classList.add('hidden-phase'); 
@@ -148,11 +204,47 @@ class Game {
         });
         this.ui = new UIManager();
 
-        // [修复] 最后再切换到 meta 阶段，这样 UI 就不会被上面的代码隐藏了
+        // ==================== 注册事件总线监听器 ====================
+        this._setupEventListeners();
+
+        // 最后切换到 meta 阶段
         this.phase_switchPhase('meta');
 
-        // [核心修复] 启动游戏主循环
+        // 启动游戏主循环
         this.sys_loop();
+    }
+
+    /**
+     * 注册核心事件监听器
+     * 将事件总线与游戏子系统连接
+     * @private
+     */
+    _setupEventListeners() {
+        // 阶段变化事件
+        this.eventBus.on('phase:change', (data) => {
+            // 其他子系统可以监听此事件来响应阶段变化
+            // 例如：音频系统可以根据阶段切换背景音乐
+        });
+
+        // 伤害事件
+        this.eventBus.on('damage:dealt', (data) => {
+            // 可用于伤害统计面板的实时更新
+        });
+
+        // 波次推进事件
+        this.eventBus.on('wave:advance', (data) => {
+            // 可用于触发波次相关的 UI 更新
+        });
+
+        // 敌人死亡事件
+        this.eventBus.on('enemy:killed', (data) => {
+            // 可用于成就系统、掉落系统等
+        });
+
+        // 音频就绪事件
+        this.eventBus.on('audio:ready', (data) => {
+            console.log('[Game] Audio system ready');
+        });
     }
 }
 
@@ -160,4 +252,4 @@ Object.assign(Game.prototype,
     game_system, game_phase, combat_system, render_system, spawn_system, ui_system, calc_utils
 );
 
-export { SoundManager, Game, audio };
+export { SoundManager, Game, audio, eventBus, initAudio };

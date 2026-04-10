@@ -9,6 +9,7 @@ import {
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
+import { eventBus } from './event_bus.js';
 
 export const game_system = {
 /**
