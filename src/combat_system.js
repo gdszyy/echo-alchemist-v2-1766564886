@@ -5,8 +5,9 @@ import {
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
     Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, showToast, 
-    rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
+    rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba, RuneLoot
 } from './entities.js';
+import { loot_calcRuneDrop } from './loot_system.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 
@@ -1685,6 +1686,14 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
                     this.stateBeforeRelic = this.phase; 
                     this.openRelicSelection(); 
                 }, 500);
+            }
+
+            // [符文掉落] 以 30% 的概率触发符文掉落，避免每个敌人都掉落
+            if (Math.random() < 0.3) {
+                const runeId = loot_calcRuneDrop(this);
+                if (runeId) {
+                    this.runeLootItems.push(new RuneLoot(enemy.pos.x, enemy.pos.y, runeId));
+                }
             }
         }
         
