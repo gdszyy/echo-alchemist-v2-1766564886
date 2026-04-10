@@ -7,9 +7,13 @@ description: "Record scripted browser interactions as animated GIFs with a visib
 
 Produces animated GIFs from scripted Playwright browser sessions. Each frame is composited with a white arrow cursor and optional orange click-ripple effects before being assembled by ffmpeg.
 
-## Quick Start
+## Workflow
 
-### 1. Install dependencies (first time only)
+1. Install dependencies (first time only)
+2. Copy the scenario template and implement `run()`
+3. Run the recorder
+
+### 1. Install dependencies
 
 ```bash
 bash /home/ubuntu/skills/web-interaction-gif-recorder/scripts/ensure_deps.sh
@@ -17,7 +21,7 @@ bash /home/ubuntu/skills/web-interaction-gif-recorder/scripts/ensure_deps.sh
 
 ### 2. Write a scenario file
 
-Copy `templates/scenario_example.py` and implement the `run()` coroutine. Required top-level variables:
+Copy `templates/scenario_example.py`. Required top-level variables:
 
 | Variable | Type | Description |
 |---|---|---|
@@ -37,7 +41,7 @@ python3 /home/ubuntu/skills/web-interaction-gif-recorder/scripts/record_gif.py \
 
 ## Recorder API
 
-Inside `run(page, recorder)`:
+All coordinates are **page CSS pixels** (not clip-relative, not scaled). The recorder converts them to physical pixels internally.
 
 ```python
 recorder.set_mouse(x, y)                     # set initial cursor position (no capture)
@@ -47,19 +51,9 @@ await recorder.click(x, y, ripple_frames=8)  # click + capture expanding ripple
 await recorder.snap()                         # capture a single frame (rarely needed directly)
 ```
 
-All coordinates are **page CSS pixels** (not clip-relative, not scaled).
-
-## Workflow for Documenting a Web Project
-
-1. Visit the deployed site in the browser to identify interaction regions.
-2. Use browser DevTools or Playwright's `page.locator().bounding_box()` to get exact element coordinates.
-3. Set `CLIP` to frame the relevant UI area with ~200 px margin on the side where popovers appear.
-4. Write one scenario file per interaction flow.
-5. Run the recorder and verify key frames before embedding in docs.
-
 ## Coordinate Debugging
 
-If the cursor appears in the wrong position, add a debug screenshot inside `run()`:
+If the cursor appears in the wrong position:
 
 ```python
 await page.screenshot(path="/tmp/debug.png")
@@ -67,7 +61,7 @@ bbox = await page.locator(".my-element").bounding_box()
 print(bbox)  # {"x": ..., "y": ..., "width": ..., "height": ...}
 ```
 
-The cursor hot-point is the **top-left corner** of the arrow glyph.
+The cursor hot-point is the **top-left corner** of the arrow glyph. Coordinates from `bounding_box()` are CSS pixels and can be passed directly to `recorder.move()` / `recorder.click()`.
 
 ## Tips
 
@@ -75,7 +69,4 @@ The cursor hot-point is the **top-left corner** of the arrow glyph.
 - **Hover delays**: If the UI has a built-in hover delay, insert `await asyncio.sleep(0.3)` before `recorder.hold()`.
 - **File size**: 15 fps × ~10 s ≈ 150 frames ≈ 0.2–0.5 MB at 680 px wide. Reduce `FPS` to 10 or `GIF_WIDTH` to 480 to shrink further.
 - **Loop**: GIFs loop infinitely by default. End the scenario on a stable "result" state so the loop transition looks natural.
-
-## Scenario Template
-
-See `templates/scenario_example.py` for a minimal annotated starting point.
+- **DEVICE_SCALE**: Increasing this value sharpens the output but does not affect coordinate inputs — always use CSS pixels in the scenario.
