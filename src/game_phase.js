@@ -1141,6 +1141,10 @@ phase_gathering_getRandomPegType() {
             this.ctx.stroke();
         }
         this.ctx.restore();
+
+        // --- [新增] 手机偏移提示强化：绘制边缘泛光和水平仪指示器 ---
+        this.drawTiltVignette(this.ctx, this.boardTilt.current);
+        this.drawTiltIndicator(this.ctx, this.boardTilt.current);
         
     },
 
@@ -1512,6 +1516,10 @@ phase_gathering_getRandomPegType() {
         container.style.perspective = "1000px";
         // 甚至可以增加旋转感 (谨慎使用，可能会晕)
         container.style.transform = `rotateY(${tx * 0.2}deg) rotateX(${-ty * 0.2}deg)`;
+
+        // --- [新增] 手机偏移提示强化：绘制边缘泛光和水平仪指示器 ---
+        this.drawTiltVignette(this.ctx, this.boardTilt.current);
+        this.drawTiltIndicator(this.ctx, this.boardTilt.current);
 
     },
 };

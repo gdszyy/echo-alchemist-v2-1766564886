@@ -477,4 +477,141 @@ render_singleWindMatrix(matrix) {
 
         ctx.restore();
     },
+
+/**
+     * [RENDER] 绘制基于偏移量的屏幕边缘渐变泛光（Edge Vignette）。
+     * @description 当手机/鼠标向左偏移时，屏幕左侧边缘出现蓝紫色发光；
+     *              向右偏移时，右侧边缘发光。偏移越大，发光范围和透明度越高。
+     * @param {CanvasRenderingContext2D} ctx - Canvas 2D 上下文
+     * @param {object} tilt - 偏移对象，包含 x 属性（范围 -1 ~ 1）
+     */
+    drawTiltVignette(ctx, tilt) {
+        const tiltX = tilt.x;
+        const absTilt = Math.abs(tiltX);
+        if (absTilt < 0.02) return; // 偏移量极小时不绘制，避免性能浪费
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+
+        const vignetteWidth = this.width * 0.45; // 泛光宽度最大为画布宽度的 45%
+        const maxAlpha = 0.55; // 最大透明度
+        const alpha = absTilt * maxAlpha;
+
+        if (tiltX < 0) {
+            // 向左偏移：左侧边缘发光（蓝紫色）
+            const grad = ctx.createLinearGradient(0, 0, vignetteWidth * absTilt, 0);
+            grad.addColorStop(0, `rgba(99, 102, 241, ${alpha})`);   // Indigo-500
+            grad.addColorStop(0.5, `rgba(139, 92, 246, ${alpha * 0.5})`); // Violet-500
+            grad.addColorStop(1, 'rgba(139, 92, 246, 0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, vignetteWidth * absTilt, this.height);
+        } else {
+            // 向右偏移：右侧边缘发光（蓝紫色）
+            const startX = this.width - vignetteWidth * absTilt;
+            const grad = ctx.createLinearGradient(this.width, 0, startX, 0);
+            grad.addColorStop(0, `rgba(99, 102, 241, ${alpha})`);   // Indigo-500
+            grad.addColorStop(0.5, `rgba(139, 92, 246, ${alpha * 0.5})`); // Violet-500
+            grad.addColorStop(1, 'rgba(139, 92, 246, 0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(startX, 0, vignetteWidth * absTilt, this.height);
+        }
+
+        ctx.restore();
+    },
+
+/**
+     * [RENDER] 绘制水平仪样式的偏移指示器（Tilt Gauge）。
+     * @description 在屏幕底部绘制一个水平仪，中心为平衡点，光标随 boardTilt.current.x
+     *              左右移动，偏移越大颜色越偏红。
+     * @param {CanvasRenderingContext2D} ctx - Canvas 2D 上下文
+     * @param {object} tilt - 偏移对象，包含 x 属性（范围 -1 ~ 1）
+     */
+    drawTiltIndicator(ctx, tilt) {
+        const tiltX = Math.max(-1, Math.min(1, tilt.x)); // 限制在 -1 ~ 1 范围内
+
+        ctx.save();
+
+        // --- 布局参数 ---
+        const gaugeWidth = this.width * 0.55;  // 仪表盘总宽度
+        const gaugeHeight = 8;                  // 仪表盘轨道高度
+        const gaugeX = (this.width - gaugeWidth) / 2; // 居中
+        const gaugeY = this.height - 22;        // 距离底部 22px
+        const cursorRadius = 7;                 // 光标半径
+
+        // --- 颜色计算：偏移越大越红 ---
+        const absTilt = Math.abs(tiltX);
+        // 从青色(平衡) -> 黄色(中等偏移) -> 红色(大偏移)
+        let r, g, b;
+        if (absTilt < 0.5) {
+            // 0 ~ 0.5: 青色 (0, 200, 255) -> 黄色 (255, 220, 0)
+            const t = absTilt / 0.5;
+            r = Math.round(0 + t * 255);
+            g = Math.round(200 + t * 20);
+            b = Math.round(255 - t * 255);
+        } else {
+            // 0.5 ~ 1: 黄色 (255, 220, 0) -> 红色 (255, 50, 0)
+            const t = (absTilt - 0.5) / 0.5;
+            r = 255;
+            g = Math.round(220 - t * 170);
+            b = 0;
+        }
+        const cursorColor = `rgb(${r}, ${g}, ${b})`;
+        const cursorAlpha = 0.5 + absTilt * 0.5; // 偏移越大越不透明
+
+        // --- 绘制轨道背景 ---
+        ctx.globalAlpha = 0.6;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
+        const trackRadius = gaugeHeight / 2;
+        ctx.beginPath();
+        ctx.roundRect(gaugeX, gaugeY - trackRadius, gaugeWidth, gaugeHeight, trackRadius);
+        ctx.fill();
+
+        // --- 绘制轨道边框 ---
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // --- 绘制中心平衡线 ---
+        ctx.globalAlpha = 0.7;
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.8)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(this.width / 2, gaugeY - trackRadius - 3);
+        ctx.lineTo(this.width / 2, gaugeY + trackRadius + 3);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // --- 计算光标位置 ---
+        const cursorX = this.width / 2 + tiltX * (gaugeWidth / 2 - cursorRadius);
+        const cursorY = gaugeY;
+
+        // --- 绘制光标发光效果 ---
+        ctx.globalAlpha = cursorAlpha * 0.4;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = cursorColor;
+        ctx.fillStyle = cursorColor;
+        ctx.beginPath();
+        ctx.arc(cursorX, cursorY, cursorRadius + 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // --- 绘制光标主体 ---
+        ctx.globalAlpha = cursorAlpha;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = cursorColor;
+        ctx.fillStyle = cursorColor;
+        ctx.beginPath();
+        ctx.arc(cursorX, cursorY, cursorRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // --- 绘制光标高光 ---
+        ctx.globalAlpha = cursorAlpha * 0.8;
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.beginPath();
+        ctx.arc(cursorX - 2, cursorY - 2, cursorRadius * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    },
 };
