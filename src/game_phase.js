@@ -51,7 +51,6 @@ export const game_phase = {
     },
 
 /**
-     * [AUTO-GENERATED] TODO: Add a description for phase_startGatheringPhase.
      */
     phase_startGatheringPhase() {
         // 保存上一回合的伤害数据
@@ -85,7 +84,6 @@ export const game_phase = {
     },
 
 /**
-     * [AUTO-GENERATED] TODO: Add a description for sys_initPachinko.
      */
     phase_gathering_initPachinko(shouldInherit = false) {
         // [修复] 使用动态行数
@@ -375,7 +373,6 @@ phase_gathering_getRandomPegType() {
 
 //  处理单个敌人的回合逻辑 (当波扫到它时调用)
     /**
-     * [AUTO-GENERATED] TODO: Add a description for calc_processSingleEnemyTurn.
      * @param {any} e - TODO: Describe this parameter.
      */
     phase_enemy_processTurn(e) {
@@ -513,20 +510,14 @@ phase_gathering_getRandomPegType() {
         if (this.butterflyCircles) this.butterflyCircles = [];
         if (this.butterflyBlades) this.butterflyBlades = [];
         
-        // 更新回合数
         this.round++;
         this.prevRoundDamage = this.roundDamage;
         this.roundDamage = 0;
-        document.getElementById('round-num').innerText = this.round;
+        document.getElementById("round-num").innerText = this.round;
         showToast(`Round ${this.round}`);
 
         // 检查失败
         if (this.input_checkDefeat()) {
-            this.gameOver = true;
-            return;
-        }
-
-        document.getElementById('combat-message').innerHTML = '';
         this.phase_gathering_initPachinko(true);
 
         this.isEnemyTurn = false;

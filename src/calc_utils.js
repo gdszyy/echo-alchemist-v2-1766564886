@@ -75,7 +75,6 @@ export const calc_utils = {
 
 // --- [新增] 动态阈值计算 ---
     /**
-     * [AUTO-GENERATED] TODO: Add a description for calc_calculateDynamicThreshold.
      */
     calc_calculateDynamicThreshold() {
         // 如果场上没敌人，设置一个极高值防止误触
@@ -161,7 +160,6 @@ export const calc_utils = {
 //  計算波浪的動態速度
     // [修正] 计算波浪的动态速度
     /**
-     * [AUTO-GENERATED] TODO: Add a description for calc_calculateWaveSpeed.
      */
     calc_calculateWaveSpeed() {
         const maxSpeed = 25 * this.timeScale;
@@ -222,7 +220,6 @@ export const calc_utils = {
 
 // 辅助：射线与矩形相交 (Slab Method) 返回距离 t
     /**
-     * [AUTO-GENERATED] TODO: Add a description for calc_getLineRectIntersection.
      * @param {any} start - TODO: Describe this parameter.
      * @param {any} dir - TODO: Describe this parameter.
      * @param {any} rx - TODO: Describe this parameter.
@@ -258,7 +255,6 @@ export const calc_utils = {
 
 // 在 Game 类中
     /**
-     * [AUTO-GENERATED] TODO: Add a description for calc_compileCollectionToRecipe.
      * @param {any} marbleDef - TODO: Describe this parameter.
      * @param {any} collectedTypes - TODO: Describe this parameter.
      * @param {any} totalMulticast - TODO: Describe this parameter.

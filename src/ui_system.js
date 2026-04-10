@@ -109,7 +109,6 @@ ui_closeTruthBook() {
 
 // 2. 更新慢动作逻辑（放在 update 中调用）
     /**
-     * [AUTO-GENERATED] TODO: Add a description for ui_updateSlowMotion.
      */
     ui_updateSlowMotion() {
         const smCfg = CONFIG.mechanics.slow_motion;
@@ -466,19 +465,19 @@ ui_closeTruthBook() {
                 // [修复1]：颜色定义优化
                 // 将 bounce 改为绿色，避免与 scatter (黄色) 混淆
                 const typeConfig = {
-                    'bounce':   { name: '⤴️ 弹射', color: '#22c55e' }, // Green
-                    'pierce':   { name: '➡️ 穿透', color: '#fca5a5' }, // Red-ish
-                    'scatter':  { name: '🔱 散射', color: '#facc15' }, // Yellow
-                    'damage':   { name: '⚔️ 基础', color: '#e2e8f0' }, // White/Slate
-                    'cryo':     { name: '❄️ 冰霜', color: '#06b6d4' },
-                    'pyro':     { name: '🔥 火焰', color: '#f97316' },
-                    'lightning':{ name: '⚡ 闪电', color: '#c084fc' },
-                    'wind':     { name: '🌪️ 风暴', color: '#34d399' },
-                    'flying_sword': { name: '🗡️ 飞剑', color: '#0ea5e9' },
-                    'explosive': { name: '💥 爆炸', color: '#f87171' }
+                    'bounce':   { name: '⤴️ 弹射', color: CONFIG.ui.damageStats.bounce }, // Green
+                    'pierce':   { name: '➡️ 穿透', color: CONFIG.ui.damageStats.pierce }, // Red-ish
+                    'scatter':  { name: '🔱 散射', color: CONFIG.ui.damageStats.scatter }, // Yellow
+                    'damage':   { name: '⚔️ 基础', color: CONFIG.ui.damageStats.damage }, // White/Slate
+                    'cryo':     { name: '❄️ 冰霜', color: CONFIG.ui.damageStats.cryo },
+                    'pyro':     { name: '🔥 火焰', color: CONFIG.ui.damageStats.pyro },
+                    'lightning':{ name: '⚡ 闪电', color: CONFIG.ui.damageStats.lightning },
+                    'wind':     { name: '🌪️ 风暴', color: CONFIG.ui.damageStats.wind },
+                    'flying_sword': { name: '🗡️ 飞剑', color: CONFIG.ui.damageStats.flying_sword },
+                    'explosive': { name: '💥 爆炸', color: CONFIG.ui.damageStats.explosive }
                 };
                 
-                const conf = typeConfig[dtype] || { name: dtype, color: '#cbd5e1' };
+                const conf = typeConfig[dtype] || { name: dtype, color: CONFIG.ui.damageStats.default };
 
                 label.innerHTML = `
                     <span style="color:${conf.color}" class="font-bold shadow-black drop-shadow-sm">${conf.name}</span>
@@ -1042,7 +1041,6 @@ ui_closeTruthBook() {
     },
 
 /**
-     * [AUTO-GENERATED] TODO: Add a description for ui_updateUICache.
      */
     ui_updateUICache() {
         const gaugeEl = document.getElementById('hero-gauge-container');
