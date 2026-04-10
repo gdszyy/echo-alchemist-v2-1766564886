@@ -10,7 +10,7 @@ import {
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus } from './event_bus.js';
-
+import { RUNE_DB } from './rune_config.js';
 export const game_phase = {
 /**
      * @method advanceWave
@@ -999,6 +999,32 @@ phase_gathering_getRandomPegType() {
         this.sonSwords.forEach(s => s.draw(this.ctx));
         // 清理不活跃的子剑
         this.sonSwords = this.sonSwords.filter(s => s.active);
+
+        // --- 符文採落物渲染与自动拾取 ---
+        if (this.runeLootItems && this.runeLootItems.length > 0) {
+            for (let i = this.runeLootItems.length - 1; i >= 0; i--) {
+                const loot = this.runeLootItems[i];
+                if (!loot || !loot.active) {
+                    this.runeLootItems.splice(i, 1);
+                    continue;
+                }
+                // 绘制符文採落物
+                loot.draw(this.ctx);
+                // 当所有敌人被清除时，自动拾取尚在场地上的符文
+                if (activeEnemies === 0 && loot.active) {
+                    const runeDef = RUNE_DB.find(r => r.id === loot.runeId);
+                    if (runeDef) {
+                        const runeObj = { id: loot.runeId, level: 1 };
+                        this.runeInventory.push(runeObj);
+                        loot.active = false;
+                        const runeName = runeDef.icon ? `${runeDef.icon} ${runeDef.name}` : runeDef.name;
+                        showToast(`拾取符文：${runeName}`);
+                    }
+                }
+            }
+            // 清理已拾取的採落物
+            this.runeLootItems = this.runeLootItems.filter(l => l && l.active);
+        }
 
         this.ctx.restore(); // 结束实体层
 

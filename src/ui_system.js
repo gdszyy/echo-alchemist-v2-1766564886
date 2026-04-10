@@ -10,8 +10,8 @@ import {
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus } from './event_bus.js';
-import { parseRuneGrid, calcRuneBaseStats, getRuneId } from './rune_system.js';
-import { RUNE_DB, RUNEWORD_DB } from './rune_config.js';
+import { parseRuneGrid, calcRuneBaseStats, getRuneId, rune_merge, rune_reforge } from './rune_system.js';
+import { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY } from './rune_config.js';
 
 export const ui_system = {
 // (需求1 & 2) 通用资源飞入动画
@@ -1500,7 +1500,10 @@ ui_closeTruthBook() {
         const emptyEl = document.getElementById('rune-inventory-empty');
         if (!container) return;
 
-        // 移除旧的符文按钮（保留 empty 提示）
+        // 初始化选中状态
+        if (!this._selectedRuneIndices) this._selectedRuneIndices = new Set();
+
+        // 移除旧的符文按鈕（保留 empty 提示）
         Array.from(container.children).forEach(child => {
             if (child.id !== 'rune-inventory-empty') child.remove();
         });
@@ -1509,6 +1512,9 @@ ui_closeTruthBook() {
 
         if (!this.runeInventory || this.runeInventory.length === 0) {
             if (emptyEl) emptyEl.classList.remove('hidden');
+            // 清空选中状态
+            this._selectedRuneIndices.clear();
+            this._ui_updateRuneActionButtons();
             return;
         }
         if (emptyEl) emptyEl.classList.add('hidden');
@@ -1521,15 +1527,52 @@ ui_closeTruthBook() {
             if (!runeDef) return;
             // 获取符文等级（新格式有 level，旧格式默认为 1）
             const runeLevel = (typeof runeEntry === 'object' && runeEntry.level) ? runeEntry.level : 1;
-            const tag = document.createElement('div');
-            tag.className = [
-                'flex items-center gap-1 px-2 py-1',
-                'bg-slate-800/60 border border-slate-600/40 rounded-lg',
-                'text-xs text-slate-300',
+            const isSelected = this._selectedRuneIndices.has(idx);
+
+            const card = document.createElement('div');
+            card.className = [
+                'relative flex flex-col items-center gap-0.5 p-2',
+                'rounded-xl cursor-pointer select-none',
+                'transition-all duration-200',
+                isSelected
+                    ? 'bg-purple-900/40 border-2 border-purple-400/80 shadow-[0_0_8px_rgba(168,85,247,0.5)]'
+                    : 'bg-slate-800/60 border-2 border-slate-600/40 hover:border-purple-500/40',
             ].join(' ');
-            tag.innerHTML = `<span>${runeDef.icon || '?'}</span><span>${runeDef.name}</span>${runeLevel > 1 ? `<span class="text-amber-400 text-[9px] font-bold">Lv.${runeLevel}</span>` : ''}`;
-            container.appendChild(tag);
+
+            card.innerHTML = `
+                <span class="text-xl">${runeDef.icon || '?'}</span>
+                <span class="text-[9px] text-slate-300 text-center leading-tight">${runeDef.name}</span>
+                <span class="absolute top-0.5 right-0.5 text-[8px] font-bold px-1 rounded
+                    ${runeLevel > 1 ? 'text-amber-400 bg-slate-900/60' : 'text-slate-500 bg-slate-900/40'}">
+                    Lv.${runeLevel}
+                </span>
+                ${isSelected ? '<span class="absolute bottom-0.5 left-0.5 text-[8px] text-purple-300">✓</span>' : ''}
+            `;
+
+            card.addEventListener('click', () => {
+                if (!this._selectedRuneIndices) this._selectedRuneIndices = new Set();
+                if (this._selectedRuneIndices.has(idx)) {
+                    // 取消选中
+                    this._selectedRuneIndices.delete(idx);
+                } else {
+                    // 添加选中（最多 3 个）
+                    if (this._selectedRuneIndices.size >= 3) {
+                        // 移除最早选中的
+                        const first = this._selectedRuneIndices.values().next().value;
+                        this._selectedRuneIndices.delete(first);
+                    }
+                    this._selectedRuneIndices.add(idx);
+                }
+                // 刷新库存显示和按鈕状态
+                this._ui_updateRuneInventoryDisplay();
+                this._ui_updateRuneActionButtons();
+            });
+
+            container.appendChild(card);
         });
+
+        // 更新按鈕状态
+        this._ui_updateRuneActionButtons();
     },
 
     /**
@@ -1600,13 +1643,14 @@ ui_closeTruthBook() {
         if (baseEntries.length > 0) {
             const baseLabel = document.createElement('div');
             baseLabel.className = 'w-full text-[10px] text-slate-400/70 tracking-widest uppercase mb-1';
-            baseLabel.textContent = '基础属性';
+            baseLabel.textContent = '基础属性（符文等级加成）';
             list.appendChild(baseLabel);
 
             baseEntries.forEach(([key, val]) => {
+                const statInfo = STAT_DISPLAY[key] || { name: key, icon: '' };
                 const tag = document.createElement('div');
                 tag.className = 'px-2 py-1 bg-blue-900/30 border border-blue-600/40 rounded-lg text-xs text-blue-200 font-bold';
-                tag.textContent = `${key} +${val}`;
+                tag.textContent = `${statInfo.icon} ${statInfo.name} +${val}`;
                 list.appendChild(tag);
             });
         }
@@ -1615,16 +1659,173 @@ ui_closeTruthBook() {
         if (runewordEntries.length > 0) {
             const runewordLabel = document.createElement('div');
             runewordLabel.className = 'w-full text-[10px] text-slate-400/70 tracking-widest uppercase mb-1 mt-2';
-            runewordLabel.textContent = '词条共鸣';
+            runewordLabel.textContent = '词条共鸣（词条共鸣加成）';
             list.appendChild(runewordLabel);
 
             runewordEntries.forEach(([key, val]) => {
+                const statInfo = STAT_DISPLAY[key] || { name: key, icon: '' };
                 const tag = document.createElement('div');
                 tag.className = 'px-2 py-1 bg-amber-900/30 border border-amber-600/40 rounded-lg text-xs text-amber-200 font-bold';
-                tag.textContent = `${key} +${val}`;
+                tag.textContent = `${statInfo.icon} ${statInfo.name} +${val}`;
                 list.appendChild(tag);
             });
         }
+    },
+
+    /**
+     * 更新合成/重铸按鈕状态
+     * @private
+     */
+    _ui_updateRuneActionButtons() {
+        if (!this._selectedRuneIndices) this._selectedRuneIndices = new Set();
+        const selectedCount = this._selectedRuneIndices.size;
+
+        // 更新选中计数显示
+        const countEl = document.getElementById('rune-selected-count');
+        if (countEl) {
+            countEl.textContent = `已选中 ${selectedCount}/3`;
+            countEl.className = selectedCount > 0
+                ? 'text-xs text-purple-300 font-bold'
+                : 'text-xs text-slate-500';
+        }
+
+        // 获取选中符文对象
+        const selectedRunes = Array.from(this._selectedRuneIndices).map(idx => {
+            const entry = this.runeInventory[idx];
+            if (!entry) return null;
+            return typeof entry === 'object' ? entry : { id: entry, level: 1 };
+        }).filter(Boolean);
+
+        // 判断合成条件：3 个同 ID 同等级
+        const mergeBtn = document.getElementById('rune-merge-btn');
+        if (mergeBtn) {
+            const canMerge = selectedCount === 3 &&
+                selectedRunes.length === 3 &&
+                selectedRunes.every(r => r.id === selectedRunes[0].id && r.level === selectedRunes[0].level);
+
+            if (canMerge) {
+                mergeBtn.disabled = false;
+                mergeBtn.className = [
+                    'w-full py-2 px-3 rounded-xl text-sm font-bold',
+                    'bg-amber-600/80 text-amber-100 border border-amber-400/60',
+                    'hover:bg-amber-500/80 cursor-pointer transition-all duration-200',
+                    'shadow-[0_0_8px_rgba(251,191,36,0.3)]',
+                ].join(' ');
+                mergeBtn.textContent = `⚗️ 合成 → ${selectedRunes[0].id.replace('rune_', '').replace(/_\d+$/, '')} Lv.${selectedRunes[0].level + 1}`;
+            } else {
+                mergeBtn.disabled = true;
+                mergeBtn.className = [
+                    'w-full py-2 px-3 rounded-xl text-sm font-bold',
+                    'bg-slate-800/60 text-slate-600 border border-slate-700/40',
+                    'cursor-not-allowed transition-all duration-200',
+                ].join(' ');
+                mergeBtn.textContent = '⚗️ 合成（需选中 3 个同 ID 同等级）';
+            }
+        }
+
+        // 判断重铸条件：任意 3 个
+        const reforgeBtn = document.getElementById('rune-reforge-btn');
+        if (reforgeBtn) {
+            const canReforge = selectedCount === 3;
+            if (canReforge) {
+                reforgeBtn.disabled = false;
+                reforgeBtn.className = [
+                    'w-full py-2 px-3 rounded-xl text-sm font-bold',
+                    'bg-purple-600/80 text-purple-100 border border-purple-400/60',
+                    'hover:bg-purple-500/80 cursor-pointer transition-all duration-200',
+                    'shadow-[0_0_8px_rgba(168,85,247,0.3)]',
+                ].join(' ');
+                reforgeBtn.textContent = '🔮 重铸（消耗 3 个符文，获得全新符文）';
+            } else {
+                reforgeBtn.disabled = true;
+                reforgeBtn.className = [
+                    'w-full py-2 px-3 rounded-xl text-sm font-bold',
+                    'bg-slate-800/60 text-slate-600 border border-slate-700/40',
+                    'cursor-not-allowed transition-all duration-200',
+                ].join(' ');
+                reforgeBtn.textContent = '🔮 重铸（消耗 3 个符文，获得全新符文）';
+            }
+        }
+    },
+
+    /**
+     * 执行符文合成
+     */
+    ui_doRuneMerge() {
+        if (!this._selectedRuneIndices || this._selectedRuneIndices.size !== 3) return;
+
+        const selectedRunes = Array.from(this._selectedRuneIndices).map(idx => {
+            const entry = this.runeInventory[idx];
+            return typeof entry === 'object' ? entry : { id: entry, level: 1 };
+        }).filter(Boolean);
+
+        const result = rune_merge(selectedRunes, this.runeInventory);
+
+        if (result.success) {
+            this._selectedRuneIndices = new Set();
+            const runeDef = RUNE_DB.find(r => r.id === result.result.id);
+            const runeName = runeDef ? `${runeDef.icon} ${runeDef.name}` : result.result.id;
+            this._ui_showRuneActionResult(
+                `⚗️ 合成成功！获得 ${runeName} Lv.${result.result.level}`,
+                'success'
+            );
+            audio.playTone(880, 'sine', 0.15, 0.3);
+            this.ui_updateRuneGrid();
+        } else {
+            this._ui_showRuneActionResult(`⚠️ 合成失败：${result.error}`, 'error');
+        }
+    },
+
+    /**
+     * 执行符文重铸
+     */
+    ui_doRuneReforge() {
+        if (!this._selectedRuneIndices || this._selectedRuneIndices.size !== 3) return;
+
+        const selectedRunes = Array.from(this._selectedRuneIndices).map(idx => {
+            const entry = this.runeInventory[idx];
+            return typeof entry === 'object' ? entry : { id: entry, level: 1 };
+        }).filter(Boolean);
+
+        const result = rune_reforge(selectedRunes, this.runeInventory, this);
+
+        if (result.success) {
+            this._selectedRuneIndices = new Set();
+            const runeDef = RUNE_DB.find(r => r.id === result.result.id);
+            const runeName = runeDef ? `${runeDef.icon} ${runeDef.name}` : result.result.id;
+            this._ui_showRuneActionResult(
+                `🔮 重铸完成！获得 ${runeName} Lv.${result.result.level}`,
+                'success'
+            );
+            audio.playTone(660, 'triangle', 0.12, 0.4);
+            this.ui_updateRuneGrid();
+        } else {
+            this._ui_showRuneActionResult(`⚠️ 重铸失败：${result.error}`, 'error');
+        }
+    },
+
+    /**
+     * 展示操作结果提示
+     * @param {string} message - 提示文字
+     * @param {'success'|'error'} type - 提示类型
+     * @private
+     */
+    _ui_showRuneActionResult(message, type) {
+        const el = document.getElementById('rune-action-result');
+        if (!el) return;
+        el.textContent = message;
+        el.className = [
+            'mb-4 text-sm font-bold text-center py-2 px-3 rounded-xl',
+            type === 'success'
+                ? 'bg-green-900/30 border border-green-500/50 text-green-300'
+                : 'bg-red-900/30 border border-red-500/50 text-red-300',
+        ].join(' ');
+        el.classList.remove('hidden');
+        // 3 秒后自动隐藏
+        clearTimeout(this._runeActionResultTimer);
+        this._runeActionResultTimer = setTimeout(() => {
+            el.classList.add('hidden');
+        }, 3000);
     },
 
     /**

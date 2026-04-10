@@ -330,5 +330,21 @@ const COUNTER_MAP = {
     }
 };
 
+// ==================== 属性显示名称映射 ====================
+/**
+ * STAT_DISPLAY - 属性显示名称与图标映射
+ * 用于 UI 展示属性加成时的友好名称
+ */
+const STAT_DISPLAY = {
+    pyro:      { name: '火焰', icon: '🔥' },
+    cryo:      { name: '冰霜', icon: '❄️' },
+    lightning: { name: '闪电', icon: '⚡' },
+    bounce:    { name: '弹跳', icon: '🔄' },
+    pierce:    { name: '穿透', icon: '💠' },
+    scatter:   { name: '散射', icon: '🌟' },
+    laser:     { name: '激光', icon: '🔦' },
+    damage:    { name: '伤害', icon: '⚔️' },
+};
+
 // ==================== 导出 ====================
-export { RUNE_DB, RUNEWORD_DB, COUNTER_MAP };
+export { RUNE_DB, RUNEWORD_DB, COUNTER_MAP, STAT_DISPLAY };
