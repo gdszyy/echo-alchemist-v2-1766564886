@@ -519,6 +519,9 @@ export const game_system = {
                 this.gripStartPos = pos;
                 return;
             }
+            // [BUGFIX] 将点击事件转发给 phase_handleInputStart 以触发球的发射
+            this.phase_handleInputStart(logicPos);
+            return;
         }
 
         if (this.phase === 'combat') {
