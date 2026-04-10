@@ -9,6 +9,8 @@ import {
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
+import { parseRuneGrid } from './rune_system.js';
+import { RUNE_DB, RUNEWORD_DB } from './rune_config.js';
 
 export const ui_system = {
 // (需求1 & 2) 通用资源飞入动画
@@ -1188,5 +1190,296 @@ ui_closeTruthBook() {
             if (window.showToast) showToast("能量精粹不足");
             if (window.audio) audio.playTone(200, 'sawtooth', 0.1, 0.2);
         }
+    },
+
+    // ==================== 符文发射器 UI ====================
+
+    /**
+     * 打开符文发射器面板
+     */
+    ui_openRuneLauncher() {
+        const panel = document.getElementById('phase-rune-launcher');
+        if (panel) {
+            panel.style.display = 'flex';
+        }
+        this.ui_initRuneGrid();
+        this.ui_updateRuneGrid();
+    },
+
+    /**
+     * 关闭符文发射器面板
+     */
+    ui_closeRuneLauncher() {
+        const panel = document.getElementById('phase-rune-launcher');
+        if (panel) {
+            panel.style.display = 'none';
+        }
+    },
+
+    /**
+     * 关闭符文选择弹出层
+     */
+    ui_closeRunePicker() {
+        const overlay = document.getElementById('rune-picker-overlay');
+        if (overlay) overlay.classList.add('hidden');
+        this._pendingRuneGridIndex = null;
+    },
+
+    /**
+     * ui_initRuneGrid - 初始化符文网格 DOM 并绑定点击事件
+     * 生成 9 个格子，每格绑定点击逻辑：
+     *   - 空格：打开符文选择器
+     *   - 已有符文：将符文移除并放回库存
+     */
+    ui_initRuneGrid() {
+        const container = document.getElementById('rune-grid-container');
+        if (!container) return;
+        container.innerHTML = '';
+
+        for (let i = 0; i < 9; i++) {
+            const cell = document.createElement('div');
+            cell.id = `rune-cell-${i}`;
+            cell.dataset.index = i;
+            cell.className = [
+                'rune-grid-cell',
+                'w-16 h-16 flex items-center justify-center',
+                'bg-slate-900/60 border-2 border-slate-700/60 rounded-xl',
+                'cursor-pointer select-none',
+                'hover:border-purple-500/60 hover:bg-slate-800/60',
+                'transition-all duration-200',
+                'text-2xl',
+            ].join(' ');
+
+            cell.addEventListener('click', () => {
+                const runeId = this.runeGrid[i];
+                if (runeId) {
+                    // 已有符文：移除并放回库存
+                    this.runeGrid[i] = null;
+                    this.runeInventory.push(runeId);
+                    this.ui_updateRuneGrid();
+                    if (window.audio) audio.playTone(400, 'sine', 0.08, 0.15);
+                } else {
+                    // 空格：打开符文选择器
+                    this._pendingRuneGridIndex = i;
+                    this.ui_openRunePicker(i);
+                }
+            });
+
+            container.appendChild(cell);
+        }
+    },
+
+    /**
+     * ui_openRunePicker - 打开符文选择弹出层
+     * @param {number} cellIndex - 目标格子索引
+     */
+    ui_openRunePicker(cellIndex) {
+        if (!this.runeInventory || this.runeInventory.length === 0) {
+            if (window.showToast) showToast('库存中没有符文');
+            return;
+        }
+
+        const overlay = document.getElementById('rune-picker-overlay');
+        const list = document.getElementById('rune-picker-list');
+        if (!overlay || !list) return;
+
+        list.innerHTML = '';
+
+        // 对库存中的符文去重显示（但保留多个实例的选择）
+        this.runeInventory.forEach((runeId, invIdx) => {
+            const runeDef = RUNE_DB.find(r => r.id === runeId);
+            if (!runeDef) return;
+
+            const btn = document.createElement('button');
+            btn.className = [
+                'flex flex-col items-center gap-1 p-3',
+                'bg-slate-800/80 border border-slate-600/50 rounded-xl',
+                'hover:border-purple-400/60 hover:bg-slate-700/80',
+                'transition-all duration-200 min-w-[72px]',
+            ].join(' ');
+            btn.innerHTML = `
+                <span class="text-2xl">${runeDef.icon || '?'}</span>
+                <span class="text-[10px] text-slate-300 text-center leading-tight">${runeDef.name}</span>
+                <span class="text-[9px] text-purple-400/70">${runeDef.element}</span>
+            `;
+            btn.addEventListener('click', () => {
+                // 将该符文从库存中移除（取第一个匹配项）
+                const removeIdx = this.runeInventory.indexOf(runeId);
+                if (removeIdx !== -1) {
+                    this.runeInventory.splice(removeIdx, 1);
+                }
+                this.runeGrid[cellIndex] = runeId;
+                this.ui_closeRunePicker();
+                this.ui_updateRuneGrid();
+                if (window.audio) audio.playTone(600, 'sine', 0.1, 0.2);
+            });
+            list.appendChild(btn);
+        });
+
+        overlay.classList.remove('hidden');
+    },
+
+    /**
+     * ui_updateRuneGrid - 更新网格 DOM 显示，重新解析词条，更新 activeRunewordStats
+     * 每次网格内容变化时调用。
+     */
+    ui_updateRuneGrid() {
+        // 1. 更新每个格子的显示
+        for (let i = 0; i < 9; i++) {
+            const cell = document.getElementById(`rune-cell-${i}`);
+            if (!cell) continue;
+
+            const runeId = this.runeGrid[i];
+            if (runeId) {
+                const runeDef = RUNE_DB.find(r => r.id === runeId);
+                cell.innerHTML = runeDef ? `<span title="${runeDef.name}">${runeDef.icon || '?'}</span>` : '?';
+                cell.classList.add('border-purple-500/60', 'bg-slate-800/60');
+                cell.classList.remove('border-slate-700/60');
+            } else {
+                cell.innerHTML = '';
+                cell.classList.remove('border-purple-500/60', 'bg-slate-800/60');
+                cell.classList.add('border-slate-700/60');
+            }
+        }
+
+        // 2. 解析词条，计算 activeRunewordStats
+        const { activeStats, activatedRunewords, activatedCells } = parseRuneGrid(this.runeGrid, RUNEWORD_DB);
+        this.activeRunewordStats = activeStats;
+
+        // 3. 高亮激活词条对应的格子
+        for (let i = 0; i < 9; i++) {
+            const cell = document.getElementById(`rune-cell-${i}`);
+            if (!cell) continue;
+            if (activatedCells.has(i)) {
+                cell.classList.add('shadow-[0_0_8px_rgba(168,85,247,0.6)]', 'border-purple-400/80');
+            } else {
+                cell.classList.remove('shadow-[0_0_8px_rgba(168,85,247,0.6)]', 'border-purple-400/80');
+            }
+        }
+
+        // 4. 更新库存显示
+        this._ui_updateRuneInventoryDisplay();
+
+        // 5. 更新激活词条列表
+        this._ui_updateActivatedRunewordsDisplay(activatedRunewords);
+
+        // 6. 更新属性加成汇总
+        this._ui_updateRuneStatsDisplay(activeStats);
+
+        // 7. 更新 meta 页面的激活徽章
+        const badge = document.getElementById('meta-rune-active-badge');
+        if (badge) {
+            if (activatedRunewords.length > 0) {
+                badge.classList.remove('hidden');
+                badge.textContent = `${activatedRunewords.length} 激活`;
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+    },
+
+    /**
+     * 更新符文库存显示
+     * @private
+     */
+    _ui_updateRuneInventoryDisplay() {
+        const container = document.getElementById('rune-inventory-container');
+        const countEl = document.getElementById('rune-inventory-count');
+        const emptyEl = document.getElementById('rune-inventory-empty');
+        if (!container) return;
+
+        // 移除旧的符文按钮（保留 empty 提示）
+        Array.from(container.children).forEach(child => {
+            if (child.id !== 'rune-inventory-empty') child.remove();
+        });
+
+        if (countEl) countEl.textContent = `(${this.runeInventory.length})`;
+
+        if (!this.runeInventory || this.runeInventory.length === 0) {
+            if (emptyEl) emptyEl.classList.remove('hidden');
+            return;
+        }
+        if (emptyEl) emptyEl.classList.add('hidden');
+
+        this.runeInventory.forEach((runeId, idx) => {
+            const runeDef = RUNE_DB.find(r => r.id === runeId);
+            if (!runeDef) return;
+            const tag = document.createElement('div');
+            tag.className = [
+                'flex items-center gap-1 px-2 py-1',
+                'bg-slate-800/60 border border-slate-600/40 rounded-lg',
+                'text-xs text-slate-300',
+            ].join(' ');
+            tag.innerHTML = `<span>${runeDef.icon || '?'}</span><span>${runeDef.name}</span>`;
+            container.appendChild(tag);
+        });
+    },
+
+    /**
+     * 更新已激活词条列表显示
+     * @private
+     */
+    _ui_updateActivatedRunewordsDisplay(activatedRunewords) {
+        const container = document.getElementById('rune-active-runewords');
+        const noRunewordsEl = document.getElementById('rune-no-runewords');
+        if (!container) return;
+
+        Array.from(container.children).forEach(child => {
+            if (child.id !== 'rune-no-runewords') child.remove();
+        });
+
+        if (!activatedRunewords || activatedRunewords.length === 0) {
+            if (noRunewordsEl) noRunewordsEl.classList.remove('hidden');
+            return;
+        }
+        if (noRunewordsEl) noRunewordsEl.classList.add('hidden');
+
+        activatedRunewords.forEach(rw => {
+            const card = document.createElement('div');
+            card.className = [
+                'flex items-start gap-3 p-3',
+                'bg-purple-900/20 border border-purple-700/40 rounded-xl',
+            ].join(' ');
+
+            const statsText = rw.stats
+                ? Object.entries(rw.stats).map(([k, v]) => `${k}+${v}`).join(', ')
+                : '';
+
+            card.innerHTML = `
+                <div class="flex-1">
+                    <div class="text-sm font-bold text-purple-200">${rw.name}</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">${rw.effect_desc || ''}</div>
+                    ${statsText ? `<div class="text-[10px] text-amber-300 mt-1">${statsText}</div>` : ''}
+                </div>
+                <span class="text-green-400 text-xs font-bold whitespace-nowrap">激活</span>
+            `;
+            container.appendChild(card);
+        });
+    },
+
+    /**
+     * 更新属性加成汇总显示
+     * @private
+     */
+    _ui_updateRuneStatsDisplay(activeStats) {
+        const summary = document.getElementById('rune-stats-summary');
+        const list = document.getElementById('rune-stats-list');
+        if (!summary || !list) return;
+
+        list.innerHTML = '';
+
+        const entries = Object.entries(activeStats || {});
+        if (entries.length === 0) {
+            summary.classList.add('hidden');
+            return;
+        }
+        summary.classList.remove('hidden');
+
+        entries.forEach(([key, val]) => {
+            const tag = document.createElement('div');
+            tag.className = 'px-2 py-1 bg-amber-900/30 border border-amber-600/40 rounded-lg text-xs text-amber-200 font-bold';
+            tag.textContent = `${key} +${val}`;
+            list.appendChild(tag);
+        });
     },
 };

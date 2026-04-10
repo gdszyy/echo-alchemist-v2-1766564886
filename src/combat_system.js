@@ -1982,6 +1982,38 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         };
         const finalRecipe = pullNext();
         if (!finalRecipe) return;
+
+        // --- [符文词条系统] 将 activeRunewordStats 加成叠加到当前弹药配方 ---
+        if (this.activeRunewordStats && typeof this.activeRunewordStats === 'object') {
+            for (const [key, val] of Object.entries(this.activeRunewordStats)) {
+                if (typeof val === 'number' && val !== 0) {
+                    if (key === 'damage') {
+                        // damage 直接加到基础伤害
+                        finalRecipe.damage = (finalRecipe.damage || 0) + val;
+                    } else if (key === 'bounce') {
+                        finalRecipe.bounce = (finalRecipe.bounce || 0) + val;
+                    } else if (key === 'pierce') {
+                        finalRecipe.pierce = (finalRecipe.pierce || 0) + val;
+                    } else if (key === 'scatter') {
+                        finalRecipe.scatter = (finalRecipe.scatter || 0) + val;
+                    } else if (key === 'pyro') {
+                        finalRecipe.pyro = (finalRecipe.pyro || 0) + val;
+                    } else if (key === 'cryo') {
+                        finalRecipe.cryo = (finalRecipe.cryo || 0) + val;
+                    } else if (key === 'lightning') {
+                        finalRecipe.lightning = (finalRecipe.lightning || 0) + val;
+                    } else if (key === 'laser') {
+                        finalRecipe.laser = (finalRecipe.laser || 0) + val;
+                        if (finalRecipe.laser > 0) finalRecipe.isLaser = true;
+                    } else {
+                        // 其他数値属性通用叠加
+                        if (typeof finalRecipe[key] === 'number' || finalRecipe[key] === undefined) {
+                            finalRecipe[key] = (finalRecipe[key] || 0) + val;
+                        }
+                    }
+                }
+            }
+        }
         
         // --- 新增：触发UI动画 ---
         const currentSlot = document.getElementById('current-ammo-render');

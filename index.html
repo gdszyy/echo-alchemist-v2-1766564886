@@ -1170,10 +1170,77 @@
                     <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-red-100">試煉場</span>
                 </button>
             </div>
+            <!-- 符文发射器入口按钮 -->
+            <button onclick="game.ui_openRuneLauncher()" class="mt-6 flex items-center gap-3 px-6 py-3 bg-slate-900/40 border border-purple-700/50 rounded-xl hover:bg-slate-800/60 hover:border-purple-400/60 transition-all duration-300 group backdrop-blur-sm">
+                <span class="text-2xl group-hover:scale-110 transition-transform inline-block">🔮</span>
+                <div class="text-left">
+                    <div class="text-sm font-bold text-purple-200 tracking-wider group-hover:text-purple-100">符文發射器</div>
+                    <div class="text-[10px] text-purple-400/60 tracking-widest uppercase">Rune Launcher</div>
+                </div>
+                <div id="meta-rune-active-badge" class="hidden ml-auto bg-purple-500/20 border border-purple-400/40 rounded-full px-2 py-0.5 text-[10px] text-purple-300 font-bold">激活中</div>
+            </button>
         </div>
         
         <div class="absolute bottom-4 w-full text-center text-slate-700 text-[10px] font-[Cinzel] tracking-widest opacity-50">
             Ver 9.2 (Meta Progression)
+        </div>
+    </div>
+
+    <!-- [RUNE] 符文发射器面板 -->
+    <div id="phase-rune-launcher" class="ui-overlay" style="display: none; background: #020617; pointer-events: auto; z-index: 300;">
+        <div class="w-full max-w-md h-full flex flex-col p-6 overflow-y-auto">
+            <!-- 顶部导航 -->
+            <div class="flex justify-between items-center mb-6">
+                <button onclick="game.ui_closeRuneLauncher()" class="text-slate-400 hover:text-white transition-colors">
+                    <span class="text-2xl">⬅️</span>
+                </button>
+                <h2 class="text-2xl font-[Cinzel] text-purple-100 tracking-widest">符文發射器</h2>
+                <div class="w-8"></div>
+            </div>
+
+            <!-- 符文网格区域 -->
+            <div class="mb-6">
+                <div class="text-xs text-purple-300/60 tracking-widest uppercase mb-3 text-center">Rune Grid — 3×3</div>
+                <div id="rune-grid-container" class="grid grid-cols-3 gap-3 mx-auto" style="max-width: 240px;">
+                    <!-- 9 个格子由 JS 动态生成 -->
+                </div>
+            </div>
+
+            <!-- 符文库存区域 -->
+            <div class="mb-6">
+                <div class="text-xs text-slate-400/60 tracking-widest uppercase mb-3">符文庫存 <span id="rune-inventory-count" class="text-purple-300">(0)</span></div>
+                <div id="rune-inventory-container" class="flex flex-wrap gap-2 min-h-[60px] p-3 bg-slate-900/40 border border-slate-700/30 rounded-xl">
+                    <!-- 库存符文由 JS 动态生成 -->
+                    <div id="rune-inventory-empty" class="w-full text-center text-slate-600 text-xs py-2">暫無符文</div>
+                </div>
+            </div>
+
+            <!-- 激活词条列表 -->
+            <div class="mb-4">
+                <div class="text-xs text-amber-300/60 tracking-widest uppercase mb-3">已激活詞條</div>
+                <div id="rune-active-runewords" class="space-y-2">
+                    <div id="rune-no-runewords" class="text-slate-600 text-xs text-center py-3">尚無激活詞條</div>
+                </div>
+            </div>
+
+            <!-- 属性加成汇总 -->
+            <div id="rune-stats-summary" class="hidden bg-purple-900/20 border border-purple-700/30 rounded-xl p-4">
+                <div class="text-xs text-purple-300/60 tracking-widest uppercase mb-2">屬性加成匯總</div>
+                <div id="rune-stats-list" class="flex flex-wrap gap-2">
+                    <!-- 由 JS 动态生成 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 符文选择弹出层 -->
+        <div id="rune-picker-overlay" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-[400] flex items-end justify-center" onclick="game.ui_closeRunePicker()">
+            <div class="w-full max-w-md bg-slate-900 border border-purple-700/50 rounded-t-2xl p-5" onclick="event.stopPropagation()">
+                <div class="text-sm text-purple-200 font-bold mb-4 tracking-wider">選擇符文放入格子</div>
+                <div id="rune-picker-list" class="flex flex-wrap gap-3 max-h-48 overflow-y-auto">
+                    <!-- 由 JS 动态生成 -->
+                </div>
+                <button onclick="game.ui_closeRunePicker()" class="mt-4 w-full py-2 text-slate-400 hover:text-white text-sm border border-slate-700 rounded-lg transition-colors">取消</button>
+            </div>
         </div>
     </div>
 
