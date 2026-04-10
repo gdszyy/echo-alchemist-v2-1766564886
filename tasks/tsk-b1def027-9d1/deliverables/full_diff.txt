@@ -1,0 +1,105 @@
+diff --git a/src/game_phase.js b/src/game_phase.js
+index 3647f35..731b0fc 100644
+--- a/src/game_phase.js
++++ b/src/game_phase.js
+@@ -23,11 +23,11 @@ export const game_phase = {
+         if (rows.size < 3) spawnCount = 2; // 如果敌人行数少于3，则生成2行
+         this.spawn_spawnEnemyRow(spawnCount); 
+         
+-        this.round++; // 回合数增加
++        // [BUGFIX #5b] 删除此处的 round++，避免与 phase_finalizeRound 中的 round++ 重复执行
++        // 原 Bug: round++ 在 phase_advanceWave 和 phase_finalizeRound 中均执行，导致回合计数异常
++        // 回合计数的唯一执行位置保留在 phase_finalizeRound 中
+         this.prevRoundDamage = this.roundDamage; // 记录上一回合伤害
+         this.roundDamage = 0; // 重置本回合伤害
+-        document.getElementById('round-num').innerText = this.round; 
+-        showToast(`Round ${this.round}`); 
+     },
+ 
+ /**
+@@ -231,9 +231,10 @@ export const game_phase = {
+     },
+ 
+ phase_gathering_getRandomPegType() { 
+-    // 定义所有可能的特殊钉子类型
+-    // const pegTypes = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind'];
+-    const pegTypes = ['bounce']
++    // [BUGFIX #1] 恢复完整 pegTypes 数组，根据玩家已解锁属性动态过滤
++    // 原 Bug: pegTypes 被硬编码为 ['bounce']，导致所有元素属性钉子无法生成
++    const allPegTypes = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind'];
++    const pegTypes = allPegTypes.filter(t => (this.unlockedWeights[t] || 0) > 0);
+     // 1. 获取 normal 的基础权重
+     // 我们手动从 unlockedWeights 中取 white 作为普通钉子的权重基准（默认 100）
+     const normalWeight = this.unlockedWeights['white'] || 100; 
+@@ -277,7 +278,8 @@ phase_gathering_getRandomPegType() {
+         this.sonSwordQueue = []; 
+         this.sonSwordTimer = 0;
+         this.phase_switchPhase('combat'); 
+-        this.phase = 'combat';
++        // [BUGFIX #5a] 删除冗余的 this.phase = 'combat' 赋值
++        // 原 Bug: phase_switchPhase 内部已赋值 this.phase = newPhase，此处重复赋值冗余
+         // --- [核心修复 1]：修复属性访问错误 ---
+         if (!this.ammoQueue) {
+             this.ammoQueue = [];
+diff --git a/src/game_system.js b/src/game_system.js
+index 011e306..40cc886 100644
+--- a/src/game_system.js
++++ b/src/game_system.js
+@@ -250,7 +250,10 @@ sys_resetGame() {
+         this.energyOrbs = [];
+         this.spores = [];
+         this.pegs = [];
+-        this.specialSlots = ["skill_point"];
++        // [BUGFIX #3] 修复 specialSlots 初始化类型错误
++        // 原 Bug: 被初始化为字符串数组 ["skill_point"]，后续 forEach 调用 s.draw() 抛出 TypeError
++        // specialSlots 应为 SpecialSlot 实例对象数组，在 phase_gathering_initPachinko 中动态创建
++        this.specialSlots = [];
+         this.currentRows = CONFIG.gameplay.rows;
+         this.skillPoints = 0; // 重置
+ 	this.slotCount=1;
+diff --git a/src/ui_system.js b/src/ui_system.js
+index 59586f5..4b1c628 100644
+--- a/src/ui_system.js
++++ b/src/ui_system.js
+@@ -927,14 +927,16 @@ ui_closeTruthBook() {
+             // 样式：绝对定位在卡片右上角或醒目位置
+             badge.className = 'absolute -top-2 -right-2 bg-slate-900 border border-slate-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-md z-10';
+             
+-            // 根据连击数变色
+-            if (item.multicast >= 5) {
++            // [BUGFIX #4] 修复连击徽章颜色条件顺序错误
++            // 原 Bug: >= 5 在 >= 10 之前，导致金色徽章永远无法显示
++            if (item.multicast >= 10) {
++                badge.style.borderColor = '#facc15';
++                badge.style.color = '#facc15';
++                badge.style.boxShadow = '0 0 5px #facc15';
++            } else if (item.multicast >= 5) {
+                 badge.style.borderColor = '#d8b4fe';
+                 badge.style.color = '#d8b4fe';
+                 badge.style.boxShadow = '0 0 5px #d8b4fe';
+-            } else if (item.multicast >= 10) {
+-                badge.style.borderColor = '#facc15';
+-                badge.style.color = '#facc15';
+             }
+             
+             badge.innerText = `x${1+item.multicast}`;
+@@ -1170,14 +1172,14 @@ ui_closeTruthBook() {
+             currentData[upgradeId] = level + 1;
+             this.sys_saveData();
+             
+-            // [修复] 立即应用升级效果（仅对临时升级）
++            // [BUGFIX #2] 修复 setDeepValue 重复调用导致临时升级数值翻倍
++            // 原 Bug: isTemporary 分支内外各调用了一次 setDeepValue，导致临时升级效果被应用两次
++            const effectValue = upgrade.effect.valuePerLevel * (level + 1);
+             if (isTemporary) {
+-                const effectValue = upgrade.effect.valuePerLevel * (level + 1);
++                setDeepValue(CONFIG, upgrade.effect.path, effectValue, upgrade.effect.type);
++            } else {
+                 setDeepValue(CONFIG, upgrade.effect.path, effectValue, upgrade.effect.type);
+             }
+-
+-            const effectValue = upgrade.effect.valuePerLevel * (level + 1);
+-            setDeepValue(CONFIG, upgrade.effect.path, effectValue, upgrade.effect.type);
+             console.log(`[META] 立即应用升级: ${upgrade.id}, level: ${level + 1}, path: ${upgrade.effect.path}, value: ${effectValue}`);
+ 
+             

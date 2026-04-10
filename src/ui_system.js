@@ -927,14 +927,16 @@ ui_closeTruthBook() {
             // 样式：绝对定位在卡片右上角或醒目位置
             badge.className = 'absolute -top-2 -right-2 bg-slate-900 border border-slate-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-md z-10';
             
-            // 根据连击数变色
-            if (item.multicast >= 5) {
+            // [BUGFIX #4] 修复连击徽章颜色条件顺序错误
+            // 原 Bug: >= 5 在 >= 10 之前，导致金色徽章永远无法显示
+            if (item.multicast >= 10) {
+                badge.style.borderColor = '#facc15';
+                badge.style.color = '#facc15';
+                badge.style.boxShadow = '0 0 5px #facc15';
+            } else if (item.multicast >= 5) {
                 badge.style.borderColor = '#d8b4fe';
                 badge.style.color = '#d8b4fe';
                 badge.style.boxShadow = '0 0 5px #d8b4fe';
-            } else if (item.multicast >= 10) {
-                badge.style.borderColor = '#facc15';
-                badge.style.color = '#facc15';
             }
             
             badge.innerText = `x${1+item.multicast}`;
@@ -1170,14 +1172,14 @@ ui_closeTruthBook() {
             currentData[upgradeId] = level + 1;
             this.sys_saveData();
             
-            // [修复] 立即应用升级效果（仅对临时升级）
+            // [BUGFIX #2] 修复 setDeepValue 重复调用导致临时升级数值翻倍
+            // 原 Bug: isTemporary 分支内外各调用了一次 setDeepValue，导致临时升级效果被应用两次
+            const effectValue = upgrade.effect.valuePerLevel * (level + 1);
             if (isTemporary) {
-                const effectValue = upgrade.effect.valuePerLevel * (level + 1);
+                setDeepValue(CONFIG, upgrade.effect.path, effectValue, upgrade.effect.type);
+            } else {
                 setDeepValue(CONFIG, upgrade.effect.path, effectValue, upgrade.effect.type);
             }
-
-            const effectValue = upgrade.effect.valuePerLevel * (level + 1);
-            setDeepValue(CONFIG, upgrade.effect.path, effectValue, upgrade.effect.type);
             console.log(`[META] 立即应用升级: ${upgrade.id}, level: ${level + 1}, path: ${upgrade.effect.path}, value: ${effectValue}`);
 
             

@@ -250,7 +250,10 @@ sys_resetGame() {
         this.energyOrbs = [];
         this.spores = [];
         this.pegs = [];
-        this.specialSlots = ["skill_point"];
+        // [BUGFIX #3] 修复 specialSlots 初始化类型错误
+        // 原 Bug: 被初始化为字符串数组 ["skill_point"]，后续 forEach 调用 s.draw() 抛出 TypeError
+        // specialSlots 应为 SpecialSlot 实例对象数组，在 phase_gathering_initPachinko 中动态创建
+        this.specialSlots = [];
         this.currentRows = CONFIG.gameplay.rows;
         this.skillPoints = 0; // 重置
 	this.slotCount=1;
