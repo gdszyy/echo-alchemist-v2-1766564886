@@ -167,31 +167,71 @@ ui_closeTruthBook() {
 
                 const card = document.createElement('div');
                 card.className = `bg-slate-900/60 border ${isMax ? 'border-slate-700 opacity-80' : 'border-slate-700/50'} p-4 rounded-xl flex flex-col gap-3 relative overflow-hidden group`;
-                
-                card.innerHTML = `
-                    <div class="flex justify-between items-start">
-                        <div class="flex gap-3">
-                            <div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-xl shadow-inner">${upgrade.icon}</div>
-                            <div>
-                                <h3 class="font-bold text-slate-100">${upgrade.name}</h3>
-                                <p class="text-[10px] text-slate-500 uppercase tracking-wider">LV. ${level} / ${upgrade.maxLevel}</p>
-                            </div>
-                        </div>
-                        ${isMax ? '<span class="text-[10px] bg-slate-800 text-slate-500 px-2 py-1 rounded">MAX</span>' : ''}
-                    </div>
-                    <p class="text-xs text-slate-400 leading-relaxed">${upgrade.desc}</p>
-                    <div class="flex justify-between items-center mt-2">
-                        <div class="text-[10px] text-slate-500">
-                            ${!isMax ? `下一級: <span class="text-amber-400/80">+${upgrade.effect.valuePerLevel}${upgrade.effect.type === 'multiply' ? 'x' : ''}</span>` : '已達最高等級'}
-                        </div>
-                        ${!isMax ? `
-                            <button onclick="game.meta_buyUpgrade('${upgrade.id}')" 
-                                    class="px-4 py-2 rounded-lg text-xs font-bold transition-all ${canAfford ? 'bg-amber-500 text-slate-900 hover:scale-105 active:scale-95' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}">
-                                ✨ ${cost.toLocaleString()}
-                            </button>
-                        ` : ''}
-                    </div>
-                `;
+
+                // --- 顶部区域：图标 + 名称 + 等级 ---
+                const topRow = document.createElement('div');
+                topRow.className = 'flex justify-between items-start';
+
+                const iconGroup = document.createElement('div');
+                iconGroup.className = 'flex gap-3';
+
+                const iconEl = document.createElement('div');
+                iconEl.className = 'w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-xl shadow-inner';
+                iconEl.textContent = upgrade.icon;
+
+                const nameGroup = document.createElement('div');
+                const nameEl = document.createElement('h3');
+                nameEl.className = 'font-bold text-slate-100';
+                nameEl.textContent = upgrade.name;
+                const levelEl = document.createElement('p');
+                levelEl.className = 'text-[10px] text-slate-500 uppercase tracking-wider';
+                levelEl.textContent = `LV. ${level} / ${upgrade.maxLevel}`;
+                nameGroup.appendChild(nameEl);
+                nameGroup.appendChild(levelEl);
+
+                iconGroup.appendChild(iconEl);
+                iconGroup.appendChild(nameGroup);
+                topRow.appendChild(iconGroup);
+
+                if (isMax) {
+                    const maxBadge = document.createElement('span');
+                    maxBadge.className = 'text-[10px] bg-slate-800 text-slate-500 px-2 py-1 rounded';
+                    maxBadge.textContent = 'MAX';
+                    topRow.appendChild(maxBadge);
+                }
+                card.appendChild(topRow);
+
+                // --- 描述 ---
+                const descEl = document.createElement('p');
+                descEl.className = 'text-xs text-slate-400 leading-relaxed';
+                descEl.textContent = upgrade.desc;
+                card.appendChild(descEl);
+
+                // --- 底部区域：下一级信息 + 购买按钮 ---
+                const bottomRow = document.createElement('div');
+                bottomRow.className = 'flex justify-between items-center mt-2';
+
+                const nextLevelEl = document.createElement('div');
+                nextLevelEl.className = 'text-[10px] text-slate-500';
+                if (!isMax) {
+                    nextLevelEl.innerHTML = `下一級: <span class="text-amber-400/80">+${upgrade.effect.valuePerLevel}${upgrade.effect.type === 'multiply' ? 'x' : ''}</span>`;
+                } else {
+                    nextLevelEl.textContent = '已達最高等級';
+                }
+                bottomRow.appendChild(nextLevelEl);
+
+                if (!isMax) {
+                    const buyBtn = document.createElement('button');
+                    buyBtn.className = `px-4 py-2 rounded-lg text-xs font-bold transition-all ${canAfford ? 'bg-amber-500 text-slate-900 hover:scale-105 active:scale-95' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`;
+                    buyBtn.textContent = `✨ ${cost.toLocaleString()}`;
+                    // [重构] 使用 addEventListener 替代内联 onclick="game.meta_buyUpgrade(...)"，移除 window.game 依赖
+                    buyBtn.addEventListener('click', () => {
+                        this.meta_buyUpgrade(upgrade.id);
+                    });
+                    bottomRow.appendChild(buyBtn);
+                }
+                card.appendChild(bottomRow);
+
                 itemsContainer.appendChild(card);
             });
         }
@@ -309,11 +349,25 @@ ui_closeTruthBook() {
         // --- 2. 渲染顶部导航 ---
         const header = document.createElement('div');
         header.className = 'w-full flex justify-between items-center bg-slate-800 p-2 rounded shrink-0 sticky top-0 z-10 border border-slate-700 shadow-md';
-        header.innerHTML = `
-            <button onclick="game.ui_switchDamageRound(1)" class="text-slate-400 hover:text-white px-3 py-1">◀</button>
-            <span class="text-xs font-bold text-amber-400 font-[Cinzel]">Round ${roundNumber}</span>
-            <button onclick="game.ui_switchDamageRound(-1)" class="text-slate-400 hover:text-white px-3 py-1">▶</button>
-        `;
+
+        // [重构] 使用 createElement + addEventListener 替代 innerHTML 内联事件，移除 window.game 依赖
+        const prevBtn = document.createElement('button');
+        prevBtn.className = 'text-slate-400 hover:text-white px-3 py-1';
+        prevBtn.textContent = '◀';
+        prevBtn.addEventListener('click', () => this.ui_switchDamageRound(1));
+
+        const roundLabel = document.createElement('span');
+        roundLabel.className = 'text-xs font-bold text-amber-400 font-[Cinzel]';
+        roundLabel.textContent = `Round ${roundNumber}`;
+
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'text-slate-400 hover:text-white px-3 py-1';
+        nextBtn.textContent = '▶';
+        nextBtn.addEventListener('click', () => this.ui_switchDamageRound(-1));
+
+        header.appendChild(prevBtn);
+        header.appendChild(roundLabel);
+        header.appendChild(nextBtn);
         container.appendChild(header);
 
         if (!shotsData || shotsData.length === 0) {
@@ -1481,5 +1535,51 @@ ui_closeTruthBook() {
             tag.textContent = `${key} +${val}`;
             list.appendChild(tag);
         });
+    },
+
+    /**
+     * @method ui_onPhaseChange
+     * @description [重构] 集中处理阶段切换时的所有 DOM 类名操作。
+     * 由 phase_switchPhase 调用，负责阶段标题容器的显示/隐藏和文本更新。
+     * 将原先分散在 game_phase.js 中的 DOM 操作集中到此处统一管理。
+     * @param {string} newPhase - 新阶段名称
+     */
+    ui_onPhaseChange(newPhase) {
+        const titleContainer = document.getElementById('phase-title-container');
+        const titleText = document.getElementById('phase-title');
+        const subText = document.getElementById('phase-sub');
+        if (!titleContainer || !titleText || !subText) return;
+
+        // 显示阶段标题
+        titleContainer.classList.remove('minimized');
+
+        // 根据阶段设置标题文本
+        // 注：此处文字与 game_phase.js 原始内容保持一致
+        const PHASE_TITLES = {
+            'meta':       { text: '\u56de\u8072\u7149\u91d1\u5e2b', sub: 'Echo Alchemist' },
+            'gathering':  { text: '\u7814\u78e8\u968e\u6bb5', sub: '\u6536\u96c6\u9b54\u529b' },
+            'combat':     { text: '\u6230\u9b25\u968e\u6bb5', sub: '\u6297\u79a6\u9b54\u50cf' },
+            'truth_book': { text: '\u771f\u7406\u4e4b\u66f8', sub: '\u6d1e\u6089\u842c\u7269\u4e4b\u7406' },
+            'training':   { text: '\u8a66\u7149\u5834', sub: '\u6975\u9650\u6230\u9b25\u6e2c\u8a66' },
+        };
+        const titleData = PHASE_TITLES[newPhase] || { text: '\u547d\u904b\u6289\u62e9', sub: '\u9078\u64c7\u4f60\u7684\u547d\u904b' };
+        titleText.innerText = titleData.text;
+        subText.innerText = titleData.sub;
+
+        // 1.2秒后隐藏阶段标题
+        setTimeout(() => { titleContainer.classList.add('minimized'); }, 1200);
+    },
+
+    /**
+     * @method ui_triggerScreenShake
+     * @description [重构] 触发屏幕震动效果（shake-hard CSS 动画）。
+     * 将原先分散在 combat_system.js 中的直接 DOM 操作提取到 ui_system.js。
+     * @param {number} [duration=200] - 震动持续时间（毫秒）
+     */
+    ui_triggerScreenShake(duration = 200) {
+        const container = document.getElementById('game-container');
+        if (!container) return;
+        container.classList.add('shake-hard');
+        setTimeout(() => container.classList.remove('shake-hard'), duration);
     },
 };

@@ -210,8 +210,8 @@ export const combat_system = {
             });
             this.spawn_createShockwave(this.width/2, this.height/2, p.shockwaveColor);
             if(pushedCount > 0) audio.playEffect('split');
-            document.getElementById('game-container').classList.add('shake-hard');
-            setTimeout(() => document.getElementById('game-container').classList.remove('shake-hard'), 200);
+            // [重构] 将直接 DOM 操作提取到 ui_system.js 的 ui_triggerScreenShake 方法
+            this.ui_triggerScreenShake(200);
         } 
         else if (method === 'chain_lightning_all') {
             // === [新增] 全屏闪电链逻辑 ===
@@ -223,8 +223,8 @@ export const combat_system = {
             flash.style.backgroundColor = p.flashColor;
             document.body.appendChild(flash);
             setTimeout(() => { flash.style.opacity = '0'; setTimeout(() => flash.remove(), 200); }, 50);
-            document.getElementById('game-container').classList.add('shake-hard');
-            setTimeout(() => document.getElementById('game-container').classList.remove('shake-hard'), 200);
+            // [重构] 将直接 DOM 操作提取到 ui_system.js 的 ui_triggerScreenShake 方法
+            this.ui_triggerScreenShake(200);
             // 倒序遍历（防止数组变动影响）
             // 策略：对每个敌人从天降下一道闪电，并以此为起点尝试触发连锁
             for (let i = this.enemies.length - 1; i >= 0; i--) {

@@ -38,22 +38,8 @@ export const game_phase = {
     phase_switchPhase(newPhase) {
         this.phase = newPhase;
         this.ui_updateUI(); // 更新 UI 界面
-        const titleContainer = document.getElementById('phase-title-container');
-        const titleText = document.getElementById('phase-title');
-        const subText = document.getElementById('phase-sub');
-        titleContainer.classList.remove('minimized'); // 显示阶段标题
-
-        // 根据阶段设置标题文本
-        let text = "命運抉择"; let sub = "選擇你的命運";
-        if (newPhase === 'meta') { text = "回聲煉金師"; sub = "Echo Alchemist"; }
-        else if (newPhase === 'gathering') { text = "研磨階段"; sub = "收集魔力"; }
-        else if (newPhase === 'combat') { text = "戰鬥階段"; sub = "抵禦魔像"; }
-        else if (newPhase === 'truth_book') { text = "真理之書"; sub = "洞悉萬物之理"; }
-        else if (newPhase === 'training') { text = "試煉場"; sub = "極限戰鬥測試"; }
-        titleText.innerText = text; subText.innerText = sub;
-        
-        // 1.2秒后隐藏阶段标题
-        setTimeout(() => { titleContainer.classList.add('minimized'); }, 1200);
+        // [重构] 将阶段标题的 DOM 操作集中到 ui_system.js 的 ui_onPhaseChange 方法中
+        this.ui_onPhaseChange(newPhase);
     },
 
 /**
