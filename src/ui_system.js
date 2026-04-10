@@ -10,7 +10,7 @@ import {
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus } from './event_bus.js';
-import { parseRuneGrid } from './rune_system.js';
+import { parseRuneGrid, calcRuneBaseStats } from './rune_system.js';
 import { RUNE_DB, RUNEWORD_DB } from './rune_config.js';
 
 export const ui_system = {
@@ -1449,10 +1449,13 @@ ui_closeTruthBook() {
         // 5. 更新激活词条列表
         this._ui_updateActivatedRunewordsDisplay(activatedRunewords);
 
-        // 6. 更新属性加成汇总
-        this._ui_updateRuneStatsDisplay(activeStats);
+        // 6. 计算符文基础属性层数加成
+        const baseStats = calcRuneBaseStats(this.runeGrid, RUNE_DB);
 
-        // 7. 更新 meta 页面的激活徽章
+        // 7. 更新属性加成汇总（展示词条加成 + 基础加成）
+        this._ui_updateRuneStatsDisplay(activeStats, baseStats);
+
+        // 8. 更新 meta 页面的激活徽章
         const badge = document.getElementById('meta-rune-active-badge');
         if (badge) {
             if (activatedRunewords.length > 0) {
@@ -1545,28 +1548,55 @@ ui_closeTruthBook() {
 
     /**
      * 更新属性加成汇总显示
+     * @param {Object} activeStats - 词条加成对象（来自 parseRuneGrid）
+     * @param {Object} [baseStats={}] - 基础属性加成对象（来自 calcRuneBaseStats）
      * @private
      */
-    _ui_updateRuneStatsDisplay(activeStats) {
+    _ui_updateRuneStatsDisplay(activeStats, baseStats = {}) {
         const summary = document.getElementById('rune-stats-summary');
         const list = document.getElementById('rune-stats-list');
         if (!summary || !list) return;
 
         list.innerHTML = '';
 
-        const entries = Object.entries(activeStats || {});
-        if (entries.length === 0) {
+        const runewordEntries = Object.entries(activeStats || {});
+        const baseEntries = Object.entries(baseStats || {});
+
+        if (runewordEntries.length === 0 && baseEntries.length === 0) {
             summary.classList.add('hidden');
             return;
         }
         summary.classList.remove('hidden');
 
-        entries.forEach(([key, val]) => {
-            const tag = document.createElement('div');
-            tag.className = 'px-2 py-1 bg-amber-900/30 border border-amber-600/40 rounded-lg text-xs text-amber-200 font-bold';
-            tag.textContent = `${key} +${val}`;
-            list.appendChild(tag);
-        });
+        // 展示基础属性加成（来自符文等级）
+        if (baseEntries.length > 0) {
+            const baseLabel = document.createElement('div');
+            baseLabel.className = 'w-full text-[10px] text-slate-400/70 tracking-widest uppercase mb-1';
+            baseLabel.textContent = '基础属性';
+            list.appendChild(baseLabel);
+
+            baseEntries.forEach(([key, val]) => {
+                const tag = document.createElement('div');
+                tag.className = 'px-2 py-1 bg-blue-900/30 border border-blue-600/40 rounded-lg text-xs text-blue-200 font-bold';
+                tag.textContent = `${key} +${val}`;
+                list.appendChild(tag);
+            });
+        }
+
+        // 展示词条加成（来自符文词条共鸣）
+        if (runewordEntries.length > 0) {
+            const runewordLabel = document.createElement('div');
+            runewordLabel.className = 'w-full text-[10px] text-slate-400/70 tracking-widest uppercase mb-1 mt-2';
+            runewordLabel.textContent = '词条共鸣';
+            list.appendChild(runewordLabel);
+
+            runewordEntries.forEach(([key, val]) => {
+                const tag = document.createElement('div');
+                tag.className = 'px-2 py-1 bg-amber-900/30 border border-amber-600/40 rounded-lg text-xs text-amber-200 font-bold';
+                tag.textContent = `${key} +${val}`;
+                list.appendChild(tag);
+            });
+        }
     },
 
     /**

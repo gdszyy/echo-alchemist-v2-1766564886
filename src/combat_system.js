@@ -8,6 +8,8 @@ import {
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba, RuneLoot
 } from './entities.js';
 import { loot_calcRuneDrop } from './loot_system.js';
+import { calcRuneBaseStats } from './rune_system.js';
+import { RUNE_DB } from './rune_config.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus } from './event_bus.js';
@@ -2030,6 +2032,21 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
             }
         }
         
+        // --- [符文基础属性] 将 calcRuneBaseStats() 的基础属性层数叠加到当前弹药配方 ---
+        if (this.runeGrid && Array.isArray(this.runeGrid)) {
+            const baseStats = calcRuneBaseStats(this.runeGrid, RUNE_DB);
+            for (const [key, val] of Object.entries(baseStats)) {
+                if (typeof val === 'number' && val > 0) {
+                    if (key === 'laser') {
+                        finalRecipe.laser = (finalRecipe.laser || 0) + val;
+                        if (finalRecipe.laser > 0) finalRecipe.isLaser = true;
+                    } else {
+                        finalRecipe[key] = (finalRecipe[key] || 0) + val;
+                    }
+                }
+            }
+        }
+
         // --- 新增：触发UI动画 ---
         const currentSlot = document.getElementById('current-ammo-render');
         if (currentSlot) {

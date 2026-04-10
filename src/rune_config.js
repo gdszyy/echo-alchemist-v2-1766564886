@@ -19,6 +19,7 @@
  *   id: 唯一字符串标识符
  *   name: 显示名称（中文）
  *   element: 对应属性类型
+ *   baseStat: 基础属性层数对应的弹药属性键（与 element 相同，用于 calcRuneBaseStats 累加）
  *   icon: emoji 图标
  *   baseDropWeight: 基础掉落权重（1~10，越高越常见）
  *   affinity_tags: 亲和标签数组（与敌人词缀对应，用于智能掉落权重计算）
@@ -29,6 +30,7 @@ const RUNE_DB = [
         id: 'rune_pyro_1',
         name: '烈焰符文',
         element: 'pyro',
+        baseStat: 'pyro',
         icon: '🔥',
         baseDropWeight: 8,
         affinity_tags: ['shield', 'regen']
@@ -37,6 +39,7 @@ const RUNE_DB = [
         id: 'rune_pyro_2',
         name: '炎核符文',
         element: 'pyro',
+        baseStat: 'pyro',
         icon: '🌋',
         baseDropWeight: 5,
         affinity_tags: ['shield', 'healer']
@@ -47,6 +50,7 @@ const RUNE_DB = [
         id: 'rune_cryo_1',
         name: '寒冰符文',
         element: 'cryo',
+        baseStat: 'cryo',
         icon: '❄️',
         baseDropWeight: 8,
         affinity_tags: ['haste', 'jump']
@@ -55,6 +59,7 @@ const RUNE_DB = [
         id: 'rune_cryo_2',
         name: '冰晶符文',
         element: 'cryo',
+        baseStat: 'cryo',
         icon: '🧊',
         baseDropWeight: 5,
         affinity_tags: ['haste', 'regen']
@@ -65,6 +70,7 @@ const RUNE_DB = [
         id: 'rune_lightning_1',
         name: '雷霆符文',
         element: 'lightning',
+        baseStat: 'lightning',
         icon: '⚡',
         baseDropWeight: 7,
         affinity_tags: ['clone', 'healer']
@@ -73,6 +79,7 @@ const RUNE_DB = [
         id: 'rune_lightning_2',
         name: '电弧符文',
         element: 'lightning',
+        baseStat: 'lightning',
         icon: '🌩️',
         baseDropWeight: 4,
         affinity_tags: ['clone', 'haste']
@@ -83,6 +90,7 @@ const RUNE_DB = [
         id: 'rune_bounce_1',
         name: '弹跃符文',
         element: 'bounce',
+        baseStat: 'bounce',
         icon: '🔄',
         baseDropWeight: 8,
         affinity_tags: ['clone', 'jump']
@@ -91,6 +99,7 @@ const RUNE_DB = [
         id: 'rune_bounce_2',
         name: '回响符文',
         element: 'bounce',
+        baseStat: 'bounce',
         icon: '↩️',
         baseDropWeight: 5,
         affinity_tags: ['clone', 'devour']
@@ -101,6 +110,7 @@ const RUNE_DB = [
         id: 'rune_pierce_1',
         name: '穿刺符文',
         element: 'pierce',
+        baseStat: 'pierce',
         icon: '↗️',
         baseDropWeight: 7,
         affinity_tags: ['shield', 'jump']
@@ -109,6 +119,7 @@ const RUNE_DB = [
         id: 'rune_pierce_2',
         name: '破甲符文',
         element: 'pierce',
+        baseStat: 'pierce',
         icon: '🗡️',
         baseDropWeight: 4,
         affinity_tags: ['shield', 'devour']
@@ -119,6 +130,7 @@ const RUNE_DB = [
         id: 'rune_scatter_1',
         name: '散裂符文',
         element: 'scatter',
+        baseStat: 'scatter',
         icon: '🔱',
         baseDropWeight: 6,
         affinity_tags: ['clone', 'healer']
@@ -129,6 +141,7 @@ const RUNE_DB = [
         id: 'rune_laser_1',
         name: '光束符文',
         element: 'laser',
+        baseStat: 'laser',
         icon: '☄️',
         baseDropWeight: 4,
         affinity_tags: ['regen', 'devour']
@@ -137,6 +150,7 @@ const RUNE_DB = [
         id: 'rune_laser_2',
         name: '聚焦符文',
         element: 'laser',
+        baseStat: 'laser',
         icon: '🔦',
         baseDropWeight: 3,
         affinity_tags: ['shield', 'regen']
