@@ -1030,6 +1030,9 @@ class DropBall {
             this.lifeTime = 0; // 用于驱动动画
             this.visualSeed = Math.random() * 1000; // 随机种子，用于闪电/噪点的不规则跳动
             this.windBladeAngle = 0; // 风属性环绕风刃的旋转角度
+            // --- Tilt Boost (偏移加速度加成衰减机制) ---
+            this.tiltBoostMultiplier = 1.0;  // 当前加成倍率，1.0 = 无加成
+            this.lastTiltDirection = 0;      // 上一帧的倾斜方向：-1（左）/ 0（平衡）/ 1（右）
 	    }
         /**
          * [核心方法] 获取当前所有属性的层数
@@ -1260,9 +1263,35 @@ class DropBall {
             let gx = 0;
             let gy = CONFIG.physics.gravity;
 
-            // 叠加倾斜影响
+            // --- 偏移加速度加成衰减机制 (Tilt Boost) ---
+            // a. 计算当前帧的倾斜方向
+            const newTiltDir = Math.sign(tilt.x);
+            // b. 检测方向改变（越过平衡点）：新方向非零且与上一帧不同
+            if (newTiltDir !== 0 && newTiltDir !== this.lastTiltDirection) {
+                // 方向改变，重置加成为 25%
+                this.tiltBoostMultiplier = 1.25;
+            }
+            // c. 更新上一帧方向
+            this.lastTiltDirection = newTiltDir;
+            // d. 若加成大于 1.0，每帧衰减
+            if (this.tiltBoostMultiplier > 1.0) {
+                this.tiltBoostMultiplier = Math.max(1.0, this.tiltBoostMultiplier - 0.04 * timeScale);
+            }
+            // e. 叠加倾斜影响（含加成倍率）
             // x轴倾斜直接产生横向重力
-            gx += tilt.x * 0.05; // 0.25 是倾斜重力系数，可调整手感
+            gx += tilt.x * 0.05 * this.tiltBoostMultiplier; // 倾斜重力系数 * 加成倍率
+
+            // 可选视觉反馈：当 tiltBoostMultiplier > 1.05 时，生成少量尾迹粒子
+            if (this.tiltBoostMultiplier > 1.05 && Math.random() < 0.3 * timeScale) {
+                // 在弹珠后方（与运动方向相反）生成尾迹粒子
+                const trailColor = tilt.x > 0 ? '#fbbf24' : '#60a5fa'; // 向右黄色，向左蓝色
+                game.spawn_createParticle(
+                    this.pos.x - this.vel.x * 0.5,
+                    this.pos.y - this.vel.y * 0.5,
+                    trailColor,
+                    'spark'
+                );
+            }
             
             // y轴倾斜微调垂直重力 (前倾加速，后倾减速)
             // gy += tilt.y * 0.1;
