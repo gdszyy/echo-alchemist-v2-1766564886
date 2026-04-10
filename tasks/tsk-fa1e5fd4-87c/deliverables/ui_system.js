@@ -1,0 +1,1485 @@
+import { 
+    META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB 
+} from './config.js';
+import { 
+    Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
+    SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
+    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, showToast, 
+    rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
+} from './entities.js';
+import { UIManager, TrainingGround, TruthBook } from './systems.js';
+import { audio } from './audio.js';
+import { parseRuneGrid } from './rune_system.js';
+import { RUNE_DB, RUNEWORD_DB } from './rune_config.js';
+
+export const ui_system = {
+// (需求1 & 2) 通用资源飞入动画
+    ui_playResourceFlyEffect(startX, startY, amount) {
+        if (amount <= 0) return;
+        
+        const flyer = document.createElement('div');
+        flyer.innerHTML = `🔮 +${amount}`;
+        flyer.className = 'fixed font-bold text-amber-400 text-lg pointer-events-none z-[9999]';
+        flyer.style.left = `${startX}px`;
+        flyer.style.top = `${startY}px`;
+        flyer.style.textShadow = '0 0 5px rgba(245,158,11,0.8), 0 2px 4px rgba(0,0,0,0.5)';
+        flyer.style.transition = 'all 0.8s cubic-bezier(0.16, 1, 0.3, 1)';
+        document.body.appendChild(flyer);
+
+        // 目标位置：顶部的资源图标
+        let targetEl = document.getElementById('run-currency-display');
+        if (!targetEl || targetEl.offsetParent === null) {
+            targetEl = document.getElementById('meta-currency-display');
+        }
+        
+        const targetRect = targetEl 
+            ? targetEl.getBoundingClientRect() 
+            : { left: window.innerWidth - 60, top: 20, width: 0, height: 0 };
+
+        void flyer.offsetWidth;
+
+        flyer.style.transform = `translate(${targetRect.left - startX}px, ${targetRect.top - startY}px) scale(0.5)`;
+        flyer.style.opacity = '0';
+
+        setTimeout(() => {
+            flyer.remove();
+            if (targetEl) {
+                const parent = targetEl.parentElement;
+                parent.style.transform = 'scale(1.2)';
+                parent.style.filter = 'brightness(1.5)';
+                setTimeout(() => {
+                    parent.style.transform = 'scale(1)';
+                    parent.style.filter = 'none';
+                }, 150);
+            }
+        }, 800);
+    },
+
+ui_openTruthBook() {
+        this.phase_switchPhase('truth_book');
+        const overlay = document.getElementById('phase-truth-book');
+        overlay.style.display = 'flex';
+        overlay.classList.remove('hidden-phase');
+        overlay.classList.add('active-phase');
+    },
+
+ui_closeTruthBook() {
+        const overlay = document.getElementById('phase-truth-book');
+        overlay.style.display = 'none';
+        overlay.classList.remove('active-phase');
+        overlay.classList.add('hidden-phase');
+        this.truthBook.active = false;
+        this.phase_switchPhase('meta');
+    },
+
+// 2. 更新慢动作逻辑（放在 update 中调用）
+    /**
+     * [AUTO-GENERATED] TODO: Add a description for ui_updateSlowMotion.
+     */
+    ui_updateSlowMotion() {
+        const smCfg = CONFIG.mechanics.slow_motion;
+        const dynamicThreshold = this.calc_calculateDynamicThreshold();
+        // 1. 触发逻辑
+        if (this.frameDamageAccumulator > dynamicThreshold) {
+            this.slowMotionTimer = smCfg.duration; // 慢动作持续约 0.6秒
+            // 触发瞬间强制降速，这里可以用固定值 0.1，保证打击感
+            this.timeScale = smCfg.timeScale; 
+        }
+
+        // 清空当帧累计
+        this.frameDamageAccumulator = 0;
+
+        // 2. 恢复逻辑
+        if (this.slowMotionTimer > 0) {
+            // 倒计时阶段
+            this.slowMotionTimer--;
+            // 保持慢速 (或者你也可以让它在这里就开始缓慢回升)
+        } else {
+            // 倒计时结束，开始恢复正常
+            
+            // 如果当前速度 不等于 玩家设定的基础速度
+            if (Math.abs(this.timeScale - this.baseTimeScale) > 0.01) {
+                
+                // 使用插值慢慢恢复 (lerp)
+                // 0.1 是恢复速率，越大恢复越快
+                this.timeScale += (this.baseTimeScale - this.timeScale) * smCfg.recoveryRate;
+
+                // 如果非常接近了，就直接归位，避免浮点数抖动
+                if (Math.abs(this.timeScale - this.baseTimeScale) < 0.01) {
+                    this.timeScale = this.baseTimeScale;
+                }
+            } else {
+                // 确保完全对齐
+                this.timeScale = this.baseTimeScale;
+            }
+        }
+    },
+
+/**
+     * [UI] 更新主界面的货币显示
+     */
+    ui_updateMetaCurrency() {
+        const el = document.getElementById('meta-currency-display');
+        if (el) el.innerText = this.saveData.currency.toLocaleString();
+        const runEl = document.getElementById('run-currency-display');
+        if (runEl) runEl.innerText = this.runCurrency.toLocaleString();
+    },
+
+/**
+     * [UI] 渲染商店内容
+     */
+    ui_renderShop() {
+        const categoryContainer = document.getElementById('shop-category-tabs');
+        const itemsContainer = document.getElementById('shop-items-container');
+        const currencyDisplay = document.getElementById('shop-currency-display');
+        
+        if (currencyDisplay) currencyDisplay.innerText = this.saveData.currency.toLocaleString();
+        
+        // 1. 渲染分类标签
+        if (categoryContainer) {
+            categoryContainer.innerHTML = '';
+            for (let catId in META_SHOP_CONFIG.categories) {
+                const cat = META_SHOP_CONFIG.categories[catId];
+                const isActive = this.meta_currentShopCategory === catId;
+                const btn = document.createElement('button');
+                btn.className = `px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${isActive ? 'bg-amber-500 text-slate-900' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`;
+                btn.innerHTML = `${cat.icon} ${cat.name}`;
+                btn.onclick = () => {
+                    this.meta_currentShopCategory = catId;
+                    this.ui_renderShop();
+                };
+                categoryContainer.appendChild(btn);
+            }
+        }
+
+        // 2. 渲染升级项
+        if (itemsContainer) {
+            itemsContainer.innerHTML = '';
+            const upgrades = META_SHOP_CONFIG.upgrades.filter(u => u.category === this.meta_currentShopCategory);
+            
+            upgrades.forEach(upgrade => {
+                const isTemporary = upgrade.temporary || false;
+                const currentData = isTemporary ? this.saveData.temporaryUpgrades : this.saveData.upgrades;
+                const level = currentData[upgrade.id] || 0;
+                const isMax = level >= upgrade.maxLevel;
+                const cost = this.meta_calculateUpgradeCost(upgrade, level);
+                const canAfford = this.saveData.currency >= cost;
+
+                const card = document.createElement('div');
+                card.className = `bg-slate-900/60 border ${isMax ? 'border-slate-700 opacity-80' : 'border-slate-700/50'} p-4 rounded-xl flex flex-col gap-3 relative overflow-hidden group`;
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-xl shadow-inner">${upgrade.icon}</div>
+                            <div>
+                                <h3 class="font-bold text-slate-100">${upgrade.name}</h3>
+                                <p class="text-[10px] text-slate-500 uppercase tracking-wider">LV. ${level} / ${upgrade.maxLevel}</p>
+                            </div>
+                        </div>
+                        ${isMax ? '<span class="text-[10px] bg-slate-800 text-slate-500 px-2 py-1 rounded">MAX</span>' : ''}
+                    </div>
+                    <p class="text-xs text-slate-400 leading-relaxed">${upgrade.desc}</p>
+                    <div class="flex justify-between items-center mt-2">
+                        <div class="text-[10px] text-slate-500">
+                            ${!isMax ? `下一級: <span class="text-amber-400/80">+${upgrade.effect.valuePerLevel}${upgrade.effect.type === 'multiply' ? 'x' : ''}</span>` : '已達最高等級'}
+                        </div>
+                        ${!isMax ? `
+                            <button onclick="game.meta_buyUpgrade('${upgrade.id}')" 
+                                    class="px-4 py-2 rounded-lg text-xs font-bold transition-all ${canAfford ? 'bg-amber-500 text-slate-900 hover:scale-105 active:scale-95' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}">
+                                ✨ ${cost.toLocaleString()}
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+                itemsContainer.appendChild(card);
+            });
+        }
+    },
+
+/**
+     * @method updateMultiplierUI
+     * @description 更新分数乘数 UI。
+     */
+    ui_updateMultiplierUI() { 
+        const el = document.getElementById('multiplier-val'); 
+        el.innerText = `x${this.scoreMultiplier.toFixed(1)}`; 
+        const container = document.getElementById('multiplier-display'); 
+        container.classList.remove('opacity-0'); 
+        container.classList.add('opacity-100'); 
+        el.classList.remove('pop-anim'); 
+        void el.offsetWidth; 
+        el.classList.add('pop-anim'); 
+    },
+
+/**
+     * @method saveShotDamage
+     * @description 保存当前子弹的伤害统计到历史记录
+     */
+    ui_saveShotDamage() {
+        if (this.currentShotDamage > 0) {
+            // 保存到历史记录，最多保存3个
+            this.shotDamageHistory.unshift({
+                total: this.currentShotDamage,
+                byAttr: JSON.parse(JSON.stringify(this.currentShotDamageByAttr))
+            });
+            if (this.shotDamageHistory.length > 3) {
+                this.shotDamageHistory.pop();
+            }
+            // 更新显示
+            this.ui_updateRoundDamage();
+        }
+    },
+
+/**
+     * @method updateRoundDamage
+     * @description 更新当前子弹伤害显示（带滚动数字效果）
+     */
+    ui_updateRoundDamage() {
+        const el = document.getElementById('round-damage-val');
+        const container = document.getElementById('round-damage-display');
+        if (!el || !container) return;
+        
+        // 使用本回合实时累计伤害 (roundDamage)
+        const targetValue = Math.floor(this.roundDamage);
+        const currentValue = parseInt(el.innerText.replace(/,/g, '')) || 0;
+        
+        if (targetValue > 0) {
+            container.classList.remove('opacity-0');
+            container.classList.add('opacity-100');
+            
+            // 如果差值较小，直接更新，避免频繁启动定时器
+            if (Math.abs(targetValue - currentValue) < 5) {
+                el.innerText = targetValue.toLocaleString();
+                return;
+            }
+
+            // 滚动数字效果
+            if (this._damageScrollInterval) clearInterval(this._damageScrollInterval);
+            
+            const duration = 300; 
+            const steps = 10;
+            const stepValue = (targetValue - currentValue) / steps;
+            let currentStep = 0;
+            
+            this._damageScrollInterval = setInterval(() => {
+                currentStep++;
+                const newValue = Math.floor(currentValue + stepValue * currentStep);
+                el.innerText = newValue.toLocaleString();
+                
+                if (currentStep >= steps) {
+                    el.innerText = targetValue.toLocaleString();
+                    clearInterval(this._damageScrollInterval);
+                }
+            }, duration / steps);
+        } else {
+            container.classList.add('opacity-0');
+            container.classList.remove('opacity-100');
+            el.innerText = '0';
+        }
+    },
+
+/**
+     * @method updateDamageStats
+     * @description 更新伤害统计图表显示
+     */
+    ui_updateDamageStats() {
+        const container = document.getElementById('damage-stats-container');
+        if (!container) return;
+        container.innerHTML = '';
+        // 修改容器样式：使用 flex-col 垂直排列不同的子弹数据
+        container.className = 'flex flex-col gap-4 h-full w-full p-2 overflow-y-auto custom-scrollbar'; 
+
+        // --- 1. 获取数据源 ---
+        let shotsData = [];
+        let roundNumber = this.round;
+
+        if (this.currentViewingRound === 0) {
+            // 查看当前回合（实时数据）
+            shotsData = this.shotDamageHistory; 
+        } else {
+            // 查看历史回合
+            const historyIndex = this.roundDamageHistory.length - this.currentViewingRound;
+            if (historyIndex >= 0 && historyIndex < this.roundDamageHistory.length) {
+                shotsData = this.roundDamageHistory[historyIndex].shots;
+                roundNumber = this.roundDamageHistory[historyIndex].round;
+            }
+        }
+
+        // --- 2. 渲染顶部导航 ---
+        const header = document.createElement('div');
+        header.className = 'w-full flex justify-between items-center bg-slate-800 p-2 rounded shrink-0 sticky top-0 z-10 border border-slate-700 shadow-md';
+        header.innerHTML = `
+            <button onclick="game.ui_switchDamageRound(1)" class="text-slate-400 hover:text-white px-3 py-1">◀</button>
+            <span class="text-xs font-bold text-amber-400 font-[Cinzel]">Round ${roundNumber}</span>
+            <button onclick="game.ui_switchDamageRound(-1)" class="text-slate-400 hover:text-white px-3 py-1">▶</button>
+        `;
+        container.appendChild(header);
+
+        if (!shotsData || shotsData.length === 0) {
+            container.innerHTML += `<div class="text-slate-500 text-center text-xs mt-10 italic">暂无伤害数据</div>`;
+            return;
+        }
+
+        // --- 3. 遍历每一发子弹 (Shot) 分别渲染 ---
+        shotsData.forEach((shot, index) => {
+            const shotTotal = shot.total;
+            if (shotTotal <= 0) return;
+
+            // 子弹容器
+            const shotContainer = document.createElement('div');
+            shotContainer.className = 'bg-slate-900/60 p-3 rounded-lg border border-slate-700/50 relative';
+            
+            // 子弹标题
+            const shotTitle = document.createElement('div');
+            shotTitle.className = 'text-[10px] text-slate-400 font-bold mb-3 flex justify-between items-center border-b border-slate-700/50 pb-1';
+            shotTitle.innerHTML = `
+                <span class="bg-slate-800 px-2 py-0.5 rounded text-slate-300">Shot #${index + 1}</span> 
+                <span class="text-amber-100">Total: ${Math.ceil(shotTotal).toLocaleString()}</span>
+            `;
+            shotContainer.appendChild(shotTitle);
+
+            // --- 预计算：找出本发子弹中伤害最高的类型，用于归一化进度条宽度 ---
+            let maxTypeTotal = 0;
+            const typeTotals = {};
+            
+            for (const [dtype, sources] of Object.entries(shot.byAttr)) {
+                let tTotal = 0;
+                // 兼容旧数据格式 (number) 和新格式 (object)
+                if (typeof sources === 'number') {
+                    tTotal = sources;
+                } else {
+                    tTotal = Object.values(sources).reduce((a, b) => a + b, 0);
+                }
+                typeTotals[dtype] = tTotal;
+                if (tTotal > maxTypeTotal) maxTypeTotal = tTotal;
+            }
+
+            // 按伤害量排序
+            const sortedTypes = Object.keys(shot.byAttr).sort((a, b) => typeTotals[b] - typeTotals[a]);
+
+            sortedTypes.forEach(dtype => {
+                const sources = shot.byAttr[dtype];
+                const typeTotal = typeTotals[dtype];
+                
+                // [修复3]：横轴坐标缩放
+                // 进度条容器的宽度 = (当前类型总伤 / 本发子弹最大类型总伤) * 100%
+                // 这样伤害低的类型条就会很短
+                const rowWidthPercent = maxTypeTotal > 0 ? (typeTotal / maxTypeTotal) * 100 : 0;
+
+                const row = document.createElement('div');
+                row.className = 'flex flex-col gap-1 mb-2';
+
+                // 类型标签与数值
+                const label = document.createElement('div');
+                label.className = 'flex justify-between text-[10px] px-1';
+                
+                // [修复1]：颜色定义优化
+                // 将 bounce 改为绿色，避免与 scatter (黄色) 混淆
+                const typeConfig = {
+                    'bounce':   { name: '⤴️ 弹射', color: '#22c55e' }, // Green
+                    'pierce':   { name: '➡️ 穿透', color: '#fca5a5' }, // Red-ish
+                    'scatter':  { name: '🔱 散射', color: '#facc15' }, // Yellow
+                    'damage':   { name: '⚔️ 基础', color: '#e2e8f0' }, // White/Slate
+                    'cryo':     { name: '❄️ 冰霜', color: '#06b6d4' },
+                    'pyro':     { name: '🔥 火焰', color: '#f97316' },
+                    'lightning':{ name: '⚡ 闪电', color: '#c084fc' },
+                    'wind':     { name: '🌪️ 风暴', color: '#34d399' },
+                    'flying_sword': { name: '🗡️ 飞剑', color: '#0ea5e9' },
+                    'explosive': { name: '💥 爆炸', color: '#f87171' }
+                };
+                
+                const conf = typeConfig[dtype] || { name: dtype, color: '#cbd5e1' };
+
+                label.innerHTML = `
+                    <span style="color:${conf.color}" class="font-bold shadow-black drop-shadow-sm">${conf.name}</span>
+                    <span class="text-slate-400 text-[9px]">${Math.ceil(typeTotal).toLocaleString()}</span>
+                `;
+                row.appendChild(label);
+
+                // 进度条轨道 (全长背景)
+                const track = document.createElement('div');
+                track.className = 'w-full h-2.5 bg-slate-800/50 rounded-r-md rounded-bl-md overflow-hidden relative';
+                
+                // 实际长度容器 (根据伤害比例缩放)
+                const barWrapper = document.createElement('div');
+                barWrapper.style.width = `${Math.max(1, rowWidthPercent)}%`; // 至少显示 1%
+                barWrapper.className = 'h-full flex transition-all duration-500 relative';
+                
+                // 数据源细分 (Stacking Segments)
+                let sourceEntries = [];
+                if (typeof sources === 'number') {
+                    sourceEntries = [['main', sources]];
+                } else {
+                    // 排序：主子弹(main)在左侧，其他在右侧
+                    sourceEntries = Object.entries(sources).sort((a, b) => (a[0] === 'main' ? -1 : 1));
+                }
+
+                sourceEntries.forEach(([stype, amount]) => {
+                    // 每一段的宽度相对于该类型的总长度
+                    const segmentPercent = (amount / typeTotal) * 100;
+                    const segment = document.createElement('div');
+                    segment.style.width = `${segmentPercent}%`;
+                    
+                    // 颜色逻辑：
+                    // 如果是散射产生的伤害，使用特定纹理或颜色，但在“弹射”条里，最好保持弹射的主色调，
+                    // 只用透明度或高亮来区分来源，避免把“弹射”看成“散射”。
+                    if (stype === 'scatter') {
+                        segment.style.backgroundColor = conf.color; // 保持类型颜色
+                        segment.style.backgroundImage = 'linear-gradient(45deg, rgba(255,255,255,0.2) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.2) 75%, transparent 75%, transparent)';
+                        segment.style.backgroundSize = '4px 4px'; // 加斜纹表示散射来源
+                    } else {
+                        segment.style.backgroundColor = conf.color;
+                    }
+                    
+                    // 透明度区分：非主子弹稍微淡一点
+                    segment.style.opacity = (stype === 'main') ? '1' : '0.8';
+                    
+                    // Tooltip
+                    segment.title = `${stype === 'main' ? '主子弹' : (stype === 'scatter' ? '散射' : stype)}: ${Math.ceil(amount)}`;
+                    
+                    barWrapper.appendChild(segment);
+                });
+
+                track.appendChild(barWrapper);
+                row.appendChild(track);
+                shotContainer.appendChild(row);
+            });
+            
+            container.appendChild(shotContainer);
+        });
+
+        // 底部图例
+        const legend = document.createElement('div');
+        legend.className = 'mt-2 pt-2 border-t border-slate-700 flex flex-wrap gap-3 justify-center text-[9px] text-slate-500';
+        legend.innerHTML = `
+            <div class="flex items-center gap-1"><div class="w-2 h-2 rounded-sm bg-slate-400"></div> 主子弹</div>
+            <div class="flex items-center gap-1"><div class="w-2 h-2 rounded-sm bg-slate-400 opacity-80" style="background-image: linear-gradient(45deg, rgba(255,255,255,0.4) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0.4) 75%, transparent 75%, transparent); background-size: 4px 4px;"></div> 散射来源</div>
+        `;
+        container.appendChild(legend);
+    },
+
+/**
+     * @method switchDamageRound
+     * @description 切换伤害统计查看的回合
+     */
+    ui_switchDamageRound(direction) {
+        this.currentViewingRound += direction;
+        if (this.currentViewingRound < 0) this.currentViewingRound = 0;
+        if (this.currentViewingRound > this.roundDamageHistory.length) {
+            this.currentViewingRound = this.roundDamageHistory.length;
+        }
+        this.ui_updateDamageStats();
+    },
+
+/**
+     * @method toggleDamagePanel
+     * @description 切换伤害统计面板的显示/隐藏
+     */
+    ui_toggleDamagePanel() {
+        if (!this.ui) return;
+        
+        const drawer = document.getElementById('info-drawer');
+        if (!drawer) return;
+        
+        const isOpen = !drawer.classList.contains('translate-y-full');
+        
+        if (isOpen) {
+            // 关闭面板
+            this.ui.closeDrawer();
+        } else {
+            // 打开面板并切换到伤害统计标签
+            drawer.classList.remove('translate-y-full');
+            this.ui.switchTab('damage');
+        }
+    },
+
+/**
+     * @method updateUI
+     * @description 更新 UI 界面显示，强制管理各阶段元素的显隐
+     */
+     ui_updateUI() {
+        // 1. 基础：隐藏所有阶段的主容器 (.ui-overlay)
+        document.querySelectorAll('.ui-overlay').forEach(el => { 
+            el.style.display = 'none'; 
+            el.classList.add('hidden-phase'); 
+            el.classList.remove('active-phase'); 
+        });
+        // 2. 显示当前阶段的主容器
+        // [META] 兼容 phase-meta, shop, truth_book
+        const activeEl = document.getElementById(`phase-${this.phase}`); 
+        if(activeEl) { 
+            activeEl.style.display = 'flex'; 
+            // 微小延迟以触发 CSS transition (如果有)
+            setTimeout(() => { 
+                activeEl.classList.remove('hidden-phase'); 
+                activeEl.classList.add('active-phase'); 
+            }, 10); 
+        }
+        
+        // [META] 切换到主界面或商店时更新货币显示
+        if (this.phase === 'meta' || this.phase === 'shop') {
+            this.ui_updateMetaCurrency();
+        }
+
+        // 1. 底部面板 (.bottom-panel) 只在收集阶段 (gathering) 显示
+        const bottomPanel = document.querySelector('.bottom-panel');
+        if (bottomPanel) {
+            if (this.phase === 'gathering') {
+                bottomPanel.style.display = 'flex';
+            } else {
+                bottomPanel.style.display = 'none'; // 战斗阶段隐藏底部面板
+            }
+        }
+
+        // A. 技能栏 (Skill Bar) - 仅在战斗且非敌人回合显示
+        const skillBar = document.getElementById('skill-bar');
+        if (skillBar) {
+            // 只有在 combat 阶段才显示，其他阶段强制隐藏
+            skillBar.style.display = (this.phase === 'combat') ? 'flex' : 'none';
+        }
+
+        // B. 连击倍率显示 (Multiplier)
+        const multiplierEl = document.getElementById('multiplier-display');
+        if (multiplierEl) {
+            multiplierEl.style.opacity = (this.phase === 'combat') ? '1' : '0';
+        }
+
+        // C. 技能点面板 (SP Panel)
+        // 逻辑：在 gathering 和 combat 显示，在选择阶段隐藏
+        const spPanel = document.getElementById('sp-panel');
+        if (spPanel) {
+            if (this.phase === 'gathering' || this.phase === 'combat') {
+                spPanel.style.opacity = '1';
+                spPanel.style.pointerEvents = 'auto'; // 允许交互（查看提示等）
+            } else {
+                spPanel.style.opacity = '0';
+                spPanel.style.pointerEvents = 'none';
+            }
+        }
+        
+        // D. 战斗 HUD (右侧小卡片)
+        // 再次确保它在非战斗阶段隐藏 (虽然 renderRecipeHUD 也会处理)
+        const combatHud = document.getElementById('recipe-hud-container');
+        if (combatHud) {
+            if (this.phase === 'combat') {
+                combatHud.classList.remove('hidden'); // 确保进入战斗时可见
+            } else {
+                combatHud.classList.add('hidden');
+            }
+        }
+        // E. 确保 HTML 结构中的弹药槽 (.ammo-stage) 不会泄露
+        // 如果你的 current/next 弹药槽是独立元素且有 ID，可以在这里加类似的隐藏逻辑
+        // 例如：
+        /*
+        const ammoSlots = document.getElementById('ammo-ui-container');
+        if (ammoSlots) ammoSlots.style.display = (this.phase === 'combat') ? 'block' : 'none';
+        */
+    },
+
+/**
+     * 显示遗物选择界面
+     */
+    /**
+     * 显示遗物选择界面 (支持稀有度权重 + 防重复)
+     */
+    ui_showRelicSelection() {
+        // 1. 记录之前的状态 (用于关闭时恢复)
+        this.stateBeforeRelic = this.phase; 
+
+        // --- 配置权重 ---
+        const RARITY_WEIGHTS = CONFIG.balance.relicRarityWright
+
+        // 2. 准备遗物池
+        // 过滤掉玩家已经拥有的遗物 (this.ownedRelics)
+        let pool = RELIC_DB.filter(r => !this.ownedRelics.includes(r.id));
+        
+        // 如果池子空了（全收集了），就给一些保底的或者是空的
+        if (pool.length === 0) {
+            showToast("已收集所有遗物！");
+            this.ui_closeRelicSelection(); // 或者给个分数奖励
+            return;
+        }
+
+        const choices = [];
+        
+        // 3. 抽取 3 个遗物 (加权随机 & 不放回)
+        for(let i=0; i<CONFIG.gameplay.relicChoiceNum; i++) {
+            if(pool.length === 0) break;
+
+            // A. 计算当前临时池子的总权重
+            let totalWeight = 0;
+            pool.forEach(r => {
+                totalWeight += (RARITY_WEIGHTS[r.rarity] || 10); // 默认权重10
+            });
+
+            // B. 生成随机数 [0, totalWeight)
+            let randomVal = Math.random() * totalWeight;
+            let selectedIdx = -1;
+
+            // C. 遍历寻找命中的遗物
+            for (let j = 0; j < pool.length; j++) {
+                const weight = RARITY_WEIGHTS[pool[j].rarity] || 10;
+                randomVal -= weight;
+                if (randomVal <= 0) {
+                    selectedIdx = j;
+                    break;
+                }
+            }
+
+            // D. 兜底 (防止浮点数误差导致没选中，默认选第一个)
+            if (selectedIdx === -1) selectedIdx = 0;
+
+            // E. 加入结果 并 从临时池中移除 (防止同一次选卡出现两个一样的)
+            choices.push(pool[selectedIdx]);
+            pool.splice(selectedIdx, 1);
+        }
+
+        // 4. 生成 HTML (保持原有逻辑)
+        const container = document.getElementById('relic-container');
+        container.innerHTML = '';
+        
+        choices.forEach(relic => {
+            const el = document.createElement('div');
+            // 加上 rarity 类名以便 CSS 显示不同边框颜色
+            el.className = `relic-card ${relic.rarity || 'common'}`; 
+            el.innerHTML = `
+                <div class="relic-icon">${relic.icon}</div>
+                <div class="relic-name">${relic.name}</div>
+                <div class="relic-desc">${relic.desc}</div>
+            `;
+            el.onclick = (e) => { 
+                e.stopPropagation(); 
+                this.ui_selectRelic(relic);
+            };
+            container.appendChild(el);
+        });
+
+        // 5. 显示界面
+        const overlay = document.getElementById('phase-relic');
+        overlay.style.display = 'flex';
+        overlay.classList.remove('hidden-phase');
+        overlay.classList.add('active-phase');
+    },
+
+/**
+     * 玩家选择遗物
+     */
+    ui_selectRelic(relic) {
+        this.ownedRelics.push(relic.id);
+        showToast(`獲得遺物: ${relic.name}`);
+        //  处理新遗物效果
+        if (relic.effect === 'pink_peg_up') {
+            this.pinkPegCount += 3; // 叠加增加
+        } 
+        else if (relic.effect === 'combat_wall') {
+            this.hasCombatWall = true;
+        }else if (relic.effect === 'permanent_size_up') {
+    this.marbleSizeBonus = 4.2; // 每次获得增加 4 像素半径
+}else if (relic.effect === 'unlock_slot') {
+            if (!this.unlockedSlots.includes(relic.slotType)) {
+                this.unlockedSlots.push(relic.slotType);
+            }
+            // 规则：解锁任意一种，特殊槽出现数量从 0 -> 1
+            if (this.slotCount === 0) this.slotCount = 1;
+        }
+        else if (relic.effect === 'slot_count_up') {
+            this.slotCount += 1;
+        } else if (relic.effect === 'row_count_up') {
+            this.currentRows += 2;
+            this.phase_gathering_initPachinko(true);
+        }
+        //  支持單個字串或數組的解鎖邏輯
+        if (relic.unlocks) {
+            const keys = Array.isArray(relic.unlocks) ? relic.unlocks : [relic.unlocks];
+            const boost = relic.boost || 10;
+            
+            keys.forEach(key => {
+                const current = this.unlockedWeights[key] || 0;
+                // 如果是第一次解鎖，設為 boost；如果是重複獲取，增加權重
+                this.unlockedWeights[key] = current === 0 ? boost : current + Math.floor(boost * 1.5);
+                
+                // 加入保底列表
+                this.guaranteedNextRound.push(key);
+            });
+            
+            showToast(`已解鎖相關屬性!`);
+        }
+
+
+        this.ui_closeRelicSelection();
+    },
+
+/**
+     * 跳过选择
+     */
+    ui_skipRelic() {
+        this.spawn_addScore(500);
+        showToast("獲得 500 分");
+        this.ui_closeRelicSelection();
+    },
+
+/**
+     * 关闭界面并恢复
+     */
+    ui_closeRelicSelection() {
+        const overlay = document.getElementById('phase-relic');
+        overlay.style.display = 'none';
+        overlay.classList.remove('active-phase');
+        overlay.classList.add('hidden-phase');
+        
+        // [核心修复] 根据打开前的状态决定去向
+        if (this.stateBeforeRelic === 'gathering') {
+            // 情况 A: 在收集阶段(打中遗物槽)打开的
+            // 不需要跳转阶段，只需要尝试结算当前回合
+            // (因为在 updateGathering 里，球已经被移除并 activeBalls-- 了，这里检查是否需要发射)
+            this.phase_gathering_attemptComplete();
+        } else {
+            // 情况 B: 在回合结束(打完BOSS/固定回合事件)打开的
+            // 正常进入下一轮的选弹珠阶段
+            this.sys_initSelectionPhase(); 
+        }
+    },
+
+/**
+     * @method confirmSelection
+     * @description 确认玩家选择的弹珠，并进入收集阶段。
+     */
+    ui_confirmSelection() { 
+        if (this.selectedMarbles.length !== 3) {
+            console.warn("[DEBUG] ui_confirmSelection: 选中的弹珠数量不足 3 个，当前为:", this.selectedMarbles.length);
+            return;
+        }
+        this.marbleQueue = this.selectedMarbles.map(i => this.marblesPool[i]); // 将选中的弹珠放入队列
+        this.phase_startGatheringPhase(); 
+    },
+
+/**
+     * @method renderRecipeHUD
+     * @description 渲染配方 HUD (严格单例渲染)
+     */
+    /**
+     * [UI] 渲染配方界面的抬头显示 (HUD)。
+     * 负责展示当前收集的弹珠属性和配方预览。
+     */
+    ui_renderRecipeHUD() {
+        // 获取两个容器
+        const gatheringHud = document.getElementById('gathering-hud-mount'); 
+        const combatHud = document.getElementById('recipe-hud-container');
+        
+        // --- 战斗阶段 ---
+        if (this.phase === 'combat') { 
+            // 1. 确保收集阶段的容器为空 (尽管 updateUI 已经隐藏了它的父级，清空更保险)
+            if (gatheringHud) gatheringHud.innerHTML = '';
+
+            // 2. 渲染战斗悬浮 HUD
+            if (combatHud) {
+                combatHud.classList.remove('hidden'); 
+                combatHud.classList.add('recipe-hud-floating'); 
+                combatHud.innerHTML = '';
+                
+                const previewLimit = 4;
+                this.ammoQueue.slice(0, previewLimit).forEach((recipe, idx) => {
+                    const isCurrent = (idx === 0);
+                    const card = document.createElement('div');
+                    card.className = `recipe-card ${isCurrent ? 'current' : 'queue'} mb-1 transition-all duration-300`;
+                    
+                    // --- 渲染 Header ---
+                    const header = document.createElement('div');
+                    header.className = 'flex justify-between items-center border-b border-white/10 pb-1 mb-1';
+                    let nameStr = '普通魔藥';
+                    if (recipe.explosive) nameStr = '爆破魔藥';
+                    else if (recipe.isLaser) nameStr = '光束魔藥';
+                    else if (recipe.isMatryoshka) nameStr = '套娃魔藥';
+                    header.innerHTML = `<span class="font-bold text-amber-400 text-[11px]">${nameStr}</span><span class="text-[10px] text-slate-300 bg-slate-700/50 px-1 rounded">DMG ${recipe.damage || 0}</span>`;
+                    
+                    // --- 渲染 Grid ---
+                    const grid = document.createElement('div');
+                    grid.className = 'grid grid-cols-4 gap-0.5 text-[9px] leading-tight';
+                    // ... (复制你原有的 stats 遍历逻辑) ...
+                    const stats = [
+                        { k: 'flying_sword', i: CONFIG.ui.attributeDisplay.flying_sword.icon },
+                        { k: 'bounce', i: CONFIG.ui.attributeDisplay.bounce.icon },
+                        { k: 'pierce', i: CONFIG.ui.attributeDisplay.pierce.icon },
+                        { k: 'scatter', i: CONFIG.ui.attributeDisplay.scatter.icon },
+                        { k: 'multicast', i: CONFIG.ui.attributeDisplay.multicast.icon },
+                        { k: 'cryo', i: CONFIG.ui.attributeDisplay.cryo.icon },
+                        { k: 'pyro', i: CONFIG.ui.attributeDisplay.pyro.icon },
+                        { k: 'lightning', i: CONFIG.ui.attributeDisplay.lightning.icon },
+                        { k: 'laser', i: CONFIG.ui.attributeDisplay.laser.icon },
+                        { k: 'wind', i: CONFIG.ui.attributeDisplay.wind.icon }
+                    ];
+                    let hasStats = false;
+                    stats.forEach(s => {
+                        const val = recipe[s.k];
+                        if (val > 0) {
+                            hasStats = true;
+                            const tag = document.createElement('div');
+                            tag.innerHTML = `${s.i}<span class="text-white ml-px">${val}</span>`;
+                            grid.appendChild(tag);
+                        }
+                    });
+                    if (!hasStats) grid.innerHTML = '<span class="col-span-4 text-slate-500 italic text-center">基础属性</span>';
+
+                    card.appendChild(header); // 挂载标题
+                    card.appendChild(grid);   // 必须添加这一行，否则图标不显示！
+                    if (isCurrent) {
+                        const indicator = document.createElement('div');
+                        indicator.className = 'absolute -left-2 top-1/2 -translate-y-1/2 w-1 h-8 bg-amber-400 rounded-full shadow-[0_0_8px_#fbbf24]';
+                        card.appendChild(indicator);
+                    }
+                    combatHud.appendChild(card);
+                });
+            }
+        } 
+        else { 
+            // --- 收集阶段 ---
+            
+            // 1. 隐藏战斗 HUD
+            if (combatHud) {
+                combatHud.classList.add('hidden'); 
+                combatHud.classList.remove('recipe-hud-floating'); 
+                combatHud.innerHTML = '';
+            }
+
+            // 2. 渲染收集阶段横向滚动条
+            if (gatheringHud && this.phase === 'gathering') {
+                gatheringHud.innerHTML = ''; 
+                this.marbleQueue.forEach((item, idx) => { 
+                    const isActive = idx === this.activeMarbleIndex; 
+                    this.ui_renderRecipeCard(gatheringHud, item, isActive, isActive ? 'current' : 'queue'); 
+                }); 
+            }
+        }
+    },
+
+/**
+     * @method renderRecipeCard
+     * @description 渲染单个配方/弹珠卡片。
+     * @param {HTMLElement} container - **重要参数** 容器元素。
+     * @param {object} item - **重要参数** 弹珠定义或配方对象。
+     * @param {boolean} isActive - 是否为当前激活项。
+     * @param {string} statusClass - 状态 CSS 类名。
+     */
+    ui_renderRecipeCard(container, item, isActive, statusClass) {
+        const el = document.createElement('div'); 
+        el.className = `recipe-card ${statusClass}`; 
+        
+        const head = document.createElement('div'); 
+        // [优化]：
+        // 1. mb-0.5 (2px) 替代 mb-1 (4px)
+        // 2. pb-0.5 (2px) 替代 pb-1 (4px)
+        // 3. text-[10px] 稍微减小标题字号，使其更精致
+        head.className = 'flex items-center justify-between mb-0.5 border-b border-slate-600/50 pb-0.5'; 
+        
+        const name = document.createElement('span'); 
+        name.innerText = item.getName ? item.getName() : (item.name || '光球');
+        name.className = 'font-bold text-amber-100 mr-2 text-[11px]'; // 标题字号 11px
+        head.appendChild(name); 
+        
+        const mats = document.createElement('div'); 
+        mats.className = 'mats-grid'; // 确保使用了新的 grid 类
+
+        const counts = {}; 
+        if (item.collected) { 
+            item.collected.forEach(type => { 
+                counts[type] = (counts[type] || 0) + 1; 
+            }); 
+        }
+
+        const colors = {
+            'flying_sword': { c: CONFIG.colors.flying_sword, l: CONFIG.ui.attributeDisplay.flying_sword.icon, n: '劍' },
+            'bounce': { c: CONFIG.colors.matBounce, l: CONFIG.ui.attributeDisplay.bounce.icon, n: '彈' },
+            'pierce': { c: CONFIG.colors.matPierce, l: CONFIG.ui.attributeDisplay.pierce.icon, n: '穿' },
+            'scatter': { c: CONFIG.colors.matScatter, l: CONFIG.ui.attributeDisplay.scatter.icon, n: '散' },
+            'damage': { c: CONFIG.colors.matDamage, l: CONFIG.ui.attributeDisplay.damage.icon, n: '強' },
+            'cryo': { c: CONFIG.colors.matCryo, l: CONFIG.ui.attributeDisplay.cryo.icon, n: '冷' },
+            'pyro': { c: CONFIG.colors.matPyro, l: CONFIG.ui.attributeDisplay.pyro.icon, n: '熱' },
+            'lightning': { c: CONFIG.colors.matLightning, l: CONFIG.ui.attributeDisplay.lightning.icon, n: '雷' },
+            'laser': { c: CONFIG.colors.laser, l: CONFIG.ui.attributeDisplay.laser.icon, n: '光' },
+            'wind': { c: CONFIG.colors.matWind, l: CONFIG.ui.attributeDisplay.wind.icon, n: '風' }
+        };
+
+        Object.keys(counts).forEach(type => { 
+            const info = colors[type]; 
+            if(!info) return; 
+            const row = document.createElement('div'); 
+            row.className = 'mat-row text-slate-300'; 
+            // 图标和文字之间只留极小的间距
+            row.innerHTML = `<span style="color:${info.c}; font-size:0.8em;">${info.l}</span> <span class="ml-0.5">${info.n}${counts[type]}</span>`; 
+            mats.appendChild(row); 
+        });
+        
+        if (item.lightning > 0) {
+             const lightningBadge = document.createElement('div');
+             lightningBadge.className = 'mat-row text-purple-300 font-bold';
+             lightningBadge.innerHTML = `<span style="font-size:0.8em;">⚡</span> <span class="ml-0.5">反應: ${item.lightning}</span>`;
+             mats.appendChild(lightningBadge);
+        }
+        
+        if (Object.keys(counts).length === 0) { 
+            mats.className = 'text-slate-500 text-[9px] mt-0.5'; // 无材料时也紧凑点
+            mats.innerHTML = '<span>無材料</span>'; 
+        } 
+        
+        if (item.multicast > 0) {
+            const badge = document.createElement('div');
+            // 样式：绝对定位在卡片右上角或醒目位置
+            badge.className = 'absolute -top-2 -right-2 bg-slate-900 border border-slate-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-md z-10';
+            
+            // 根据连击数变色
+            if (item.multicast >= 5) {
+                badge.style.borderColor = '#d8b4fe';
+                badge.style.color = '#d8b4fe';
+                badge.style.boxShadow = '0 0 5px #d8b4fe';
+            } else if (item.multicast >= 10) {
+                badge.style.borderColor = '#facc15';
+                badge.style.color = '#facc15';
+            }
+            
+            badge.innerText = `x${1+item.multicast}`;
+            el.appendChild(badge); // 将徽章添加到卡片中
+            
+            // 确保父元素 el 有 relative 定位，以便 badge 绝对定位
+            el.style.position = 'relative';
+            // 确保 overflow 不是 hidden，否则徽章会被切掉
+            el.style.overflow = 'visible'; 
+        }
+
+        el.append(head, mats); 
+        container.appendChild(el);
+    },
+
+/**
+     * [AUTO-GENERATED] TODO: Add a description for ui_updateUICache.
+     */
+    ui_updateUICache() {
+        const gaugeEl = document.getElementById('hero-gauge-container');
+        if (gaugeEl) {
+            const rect = gaugeEl.getBoundingClientRect();
+            // 缓存中心坐标
+            this.uiCache = {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2,
+                // 缓存 DOM 引用，避免重复查询
+                el: gaugeEl,
+                pulseLayer: document.getElementById('gauge-pulse-layer'),
+                gaugeShell: document.getElementById('gauge-shell')
+            };
+        } else {
+            // 兜底坐标
+            this.uiCache = { x: this.width / 2, y: this.height - 100, el: null };
+        }
+    },
+
+/**
+    /**
+     * @method updateGatheringQueueUI
+     * @description 更新收集阶段的弹珠队列UI。
+     */
+    ui_updateGatheringQueueUI() { 
+        const q = document.getElementById('gathering-queue'); 
+        q.innerHTML = ''; 
+        for(let i = this.activeMarbleIndex; i < this.marbleQueue.length; i++) { 
+            const m = this.marbleQueue[i]; 
+            const d = document.createElement('div'); 
+            d.className = 'queue-dot flex-shrink-0'; 
+            d.style.background = m.type === 'rainbow' ? CONFIG.colors.marbleRainbow : m.getColor(); 
+            q.appendChild(d); 
+        } 
+    },
+
+/**
+     * @method updateAmmoUI
+     * @description 更新战斗阶段的双槽位弹药UI (Current & Next)
+     */
+    ui_updateAmmoUI() {
+        const currentContainer = document.getElementById('current-ammo-render');
+        const nextContainer = document.getElementById('next-ammo-render');
+        const statsContainer = document.getElementById('current-bullet-stats');
+        
+        if (!currentContainer || !nextContainer) return;
+
+        // 清空当前内容
+        currentContainer.innerHTML = '';
+        nextContainer.innerHTML = '';
+
+        // 1. 渲染当前弹药 (Queue[0])
+        if (this.ammoQueue.length > 0) {
+            const currentRecipe = this.ammoQueue[0];
+            this.ui_renderAmmoIcon(currentContainer, currentRecipe, true);
+            
+            // 更新底部属性文本
+            let html = '';
+            if (currentRecipe.damage > 2) html += `<span class="text-purple-300">⚔️${currentRecipe.damage}</span>`;
+            else html += `<span class="text-slate-400">⚔️${currentRecipe.damage}</span>`;
+
+            Object.keys(CONFIG.ui.attributeDisplay).forEach((_type) => {
+                if (currentRecipe[_type]) html += `<span class="text-green-300">${CONFIG.ui.attributeDisplay[_type].icon}${currentRecipe[_type]}</span>`;
+            })
+            if(html === '') html = '<span class="text-slate-500">基础弹药</span>';
+            statsContainer.innerHTML = html;
+            
+            // 移除发射动画类（如果是重新渲染）
+            currentContainer.classList.remove('shoot-anim');
+        } else {
+            currentContainer.innerHTML = '<span class="text-slate-600 text-xs">EMPTY</span>';
+            statsContainer.innerHTML = '<span class="text-slate-600">-- 弹药耗尽 --</span>';
+        }
+
+        // 2. 渲染下一发弹药 (Queue[1])
+        if (this.ammoQueue.length > 1) {
+            const nextRecipe = this.ammoQueue[1];
+            this.ui_renderAmmoIcon(nextContainer, nextRecipe, false);
+        } else {
+            nextContainer.innerHTML = '<span class="text-slate-700 text-xs">--</span>';
+        }
+    },
+
+/**
+     * 辅助方法：在UI中绘制一个纯CSS的子弹图标
+     */
+    ui_renderAmmoIcon(container, recipe, isCurrent) {
+        const size = isCurrent ? 24 : 16;
+        const div = document.createElement('div');
+        
+        // 基础球体
+        div.style.width = `${size}px`;
+        div.style.height = `${size}px`;
+        div.style.borderRadius = '50%';
+        
+        // 颜色逻辑 (与 Projectile 一致)
+        let bg = '#e2e8f0';
+        let shadow = 'none';
+
+
+        //  光球的 UI 样式 (高优先级)
+        if (recipe.isLaser) { 
+            // 核心白，外发光蓝，模拟“光球”质感
+            bg = '#ffffff'; 
+            // 动态阴影：激光层数越多，阴影扩散越大
+            const glowSize = 10 + (recipe.laser || 0) * 2;
+            shadow = `0 0 ${glowSize}px ${CONFIG.colors.laser}, inset 0 0 5px ${CONFIG.colors.laser}`;
+        }else if (recipe.explosive) { bg = '#fca5a5'; shadow = '0 0 10px #ef4444'; }
+        else if (recipe.pyro) { bg = '#fdba74'; shadow = '0 0 8px #f97316'; }
+        else if (recipe.cryo) { bg = '#cffafe'; shadow = '0 0 8px #06b6d4'; }
+        else if (recipe.lightning) { bg = '#e9d5ff'; shadow = '0 0 8px #c084fc'; }
+        else if (recipe.pierce) { bg = '#fecaca'; }
+        else if (recipe.bounce) { bg = '#bbf7d0'; }
+        
+        div.style.background = bg;
+        div.style.boxShadow = shadow;
+        div.style.position = 'relative';
+
+        if (recipe.isLaser) {
+             div.style.border = '2px solid #fff'; // 加个白圈
+        }
+        // 简单图标装饰
+        if (recipe.scatter) {
+            div.style.border = '2px solid #facc15'; // 黄框
+        }
+        if (recipe.multicast) {
+            const badge = document.createElement('div');
+            badge.innerText = `+${recipe.multicast}`;
+            badge.className = 'absolute -top-2 -right-2 text-[10px] bg-orange-500 text-white rounded-full px-1 font-bold leading-tight';
+            container.appendChild(badge);
+        }
+        
+        container.appendChild(div);
+    },
+
+/**
+     * [META] 应用局外升级到当前运行的 CONFIG
+     */
+    meta_applyUpgrades() {
+        if (!this.saveData.upgrades) this.saveData.upgrades = {};
+        if (!this.saveData.temporaryUpgrades) this.saveData.temporaryUpgrades = {};
+        
+        META_SHOP_CONFIG.upgrades.forEach(upgrade => {
+            let level = 0;
+            // 临时增强从 temporaryUpgrades 读取
+            if (upgrade.temporary) {
+                level = this.saveData.temporaryUpgrades[upgrade.id] || 0;
+            } else {
+                // 永久升级从 upgrades 读取
+                level = this.saveData.upgrades[upgrade.id] || 0;
+            }
+            
+            if (level > 0) {
+                const effectValue = upgrade.effect.valuePerLevel * level;
+                setDeepValue(CONFIG, upgrade.effect.path, effectValue, upgrade.effect.type);
+            }
+        });
+        
+    },
+
+/**
+     * [META] 增加货币并保存
+     */
+    meta_addCurrency(amount) {
+        this.saveData.currency += amount;
+        this.sys_saveData();
+        this.ui_updateMetaCurrency();
+    },
+
+/**
+     * [META] 点击"开始炼成"按钮
+     */
+    meta_startRun() {
+        this.sys_resetGame(); 
+        this.sys_initGameStart();
+        // sys_initGameStart 内部已经调用了 ui_showRelicSelection
+    },
+
+/**
+     * [META] 打开商店
+     */
+    meta_openShop() {
+        this.phase_switchPhase('shop');
+        this.meta_currentShopCategory = Object.keys(META_SHOP_CONFIG.categories)[0];
+        this.ui_renderShop();
+    },
+
+/**
+     * [META] 计算升级价格
+     */
+    meta_calculateUpgradeCost(upgrade, level) {
+        const c = upgrade.cost;
+        if (c.type === 'fixed') return c.values[level] || 0;
+        if (c.type === 'linear') return c.base + level * c.growth;
+        if (c.type === 'exponential') return Math.floor(c.base * Math.pow(c.growth, level));
+        return 0;
+    },
+
+/**
+     * [META] 购买升级
+     */
+    meta_buyUpgrade(upgradeId) {
+        const upgrade = META_SHOP_CONFIG.upgrades.find(u => u.id === upgradeId);
+        
+        // 临时增强和永久升级分开处理
+        const isTemporary = upgrade.temporary || false;
+        const currentData = isTemporary ? this.saveData.temporaryUpgrades : this.saveData.upgrades;
+        const level = currentData[upgradeId] || 0;
+        
+        if (level >= upgrade.maxLevel) return;
+        
+        const cost = this.meta_calculateUpgradeCost(upgrade, level);
+        if (this.saveData.currency >= cost) {
+            this.saveData.currency -= cost;
+            currentData[upgradeId] = level + 1;
+            this.sys_saveData();
+            
+            // [修复] 立即应用升级效果（仅对临时升级）
+            if (isTemporary) {
+                const effectValue = upgrade.effect.valuePerLevel * (level + 1);
+                setDeepValue(CONFIG, upgrade.effect.path, effectValue, upgrade.effect.type);
+            }
+
+            const effectValue = upgrade.effect.valuePerLevel * (level + 1);
+            setDeepValue(CONFIG, upgrade.effect.path, effectValue, upgrade.effect.type);
+            console.log(`[META] 立即应用升级: ${upgrade.id}, level: ${level + 1}, path: ${upgrade.effect.path}, value: ${effectValue}`);
+
+            
+            this.ui_updateMetaCurrency();
+            this.ui_renderShop();
+            if (window.audio) audio.playTone(800, 'sine', 0.1, 0.3);
+            const typeText = isTemporary ? '下一局生效' : `LV.${level + 1}`;
+            if (window.showToast) showToast(`购买成功: ${upgrade.name} ${typeText}`);
+        } else {
+            if (window.showToast) showToast("能量精粹不足");
+            if (window.audio) audio.playTone(200, 'sawtooth', 0.1, 0.2);
+        }
+    },
+
+    // ==================== 符文发射器 UI ====================
+
+    /**
+     * 打开符文发射器面板
+     */
+    ui_openRuneLauncher() {
+        const panel = document.getElementById('phase-rune-launcher');
+        if (panel) {
+            panel.style.display = 'flex';
+        }
+        this.ui_initRuneGrid();
+        this.ui_updateRuneGrid();
+    },
+
+    /**
+     * 关闭符文发射器面板
+     */
+    ui_closeRuneLauncher() {
+        const panel = document.getElementById('phase-rune-launcher');
+        if (panel) {
+            panel.style.display = 'none';
+        }
+    },
+
+    /**
+     * 关闭符文选择弹出层
+     */
+    ui_closeRunePicker() {
+        const overlay = document.getElementById('rune-picker-overlay');
+        if (overlay) overlay.classList.add('hidden');
+        this._pendingRuneGridIndex = null;
+    },
+
+    /**
+     * ui_initRuneGrid - 初始化符文网格 DOM 并绑定点击事件
+     * 生成 9 个格子，每格绑定点击逻辑：
+     *   - 空格：打开符文选择器
+     *   - 已有符文：将符文移除并放回库存
+     */
+    ui_initRuneGrid() {
+        const container = document.getElementById('rune-grid-container');
+        if (!container) return;
+        container.innerHTML = '';
+
+        for (let i = 0; i < 9; i++) {
+            const cell = document.createElement('div');
+            cell.id = `rune-cell-${i}`;
+            cell.dataset.index = i;
+            cell.className = [
+                'rune-grid-cell',
+                'w-16 h-16 flex items-center justify-center',
+                'bg-slate-900/60 border-2 border-slate-700/60 rounded-xl',
+                'cursor-pointer select-none',
+                'hover:border-purple-500/60 hover:bg-slate-800/60',
+                'transition-all duration-200',
+                'text-2xl',
+            ].join(' ');
+
+            cell.addEventListener('click', () => {
+                const runeId = this.runeGrid[i];
+                if (runeId) {
+                    // 已有符文：移除并放回库存
+                    this.runeGrid[i] = null;
+                    this.runeInventory.push(runeId);
+                    this.ui_updateRuneGrid();
+                    if (window.audio) audio.playTone(400, 'sine', 0.08, 0.15);
+                } else {
+                    // 空格：打开符文选择器
+                    this._pendingRuneGridIndex = i;
+                    this.ui_openRunePicker(i);
+                }
+            });
+
+            container.appendChild(cell);
+        }
+    },
+
+    /**
+     * ui_openRunePicker - 打开符文选择弹出层
+     * @param {number} cellIndex - 目标格子索引
+     */
+    ui_openRunePicker(cellIndex) {
+        if (!this.runeInventory || this.runeInventory.length === 0) {
+            if (window.showToast) showToast('库存中没有符文');
+            return;
+        }
+
+        const overlay = document.getElementById('rune-picker-overlay');
+        const list = document.getElementById('rune-picker-list');
+        if (!overlay || !list) return;
+
+        list.innerHTML = '';
+
+        // 对库存中的符文去重显示（但保留多个实例的选择）
+        this.runeInventory.forEach((runeId, invIdx) => {
+            const runeDef = RUNE_DB.find(r => r.id === runeId);
+            if (!runeDef) return;
+
+            const btn = document.createElement('button');
+            btn.className = [
+                'flex flex-col items-center gap-1 p-3',
+                'bg-slate-800/80 border border-slate-600/50 rounded-xl',
+                'hover:border-purple-400/60 hover:bg-slate-700/80',
+                'transition-all duration-200 min-w-[72px]',
+            ].join(' ');
+            btn.innerHTML = `
+                <span class="text-2xl">${runeDef.icon || '?'}</span>
+                <span class="text-[10px] text-slate-300 text-center leading-tight">${runeDef.name}</span>
+                <span class="text-[9px] text-purple-400/70">${runeDef.element}</span>
+            `;
+            btn.addEventListener('click', () => {
+                // 将该符文从库存中移除（取第一个匹配项）
+                const removeIdx = this.runeInventory.indexOf(runeId);
+                if (removeIdx !== -1) {
+                    this.runeInventory.splice(removeIdx, 1);
+                }
+                this.runeGrid[cellIndex] = runeId;
+                this.ui_closeRunePicker();
+                this.ui_updateRuneGrid();
+                if (window.audio) audio.playTone(600, 'sine', 0.1, 0.2);
+            });
+            list.appendChild(btn);
+        });
+
+        overlay.classList.remove('hidden');
+    },
+
+    /**
+     * ui_updateRuneGrid - 更新网格 DOM 显示，重新解析词条，更新 activeRunewordStats
+     * 每次网格内容变化时调用。
+     */
+    ui_updateRuneGrid() {
+        // 1. 更新每个格子的显示
+        for (let i = 0; i < 9; i++) {
+            const cell = document.getElementById(`rune-cell-${i}`);
+            if (!cell) continue;
+
+            const runeId = this.runeGrid[i];
+            if (runeId) {
+                const runeDef = RUNE_DB.find(r => r.id === runeId);
+                cell.innerHTML = runeDef ? `<span title="${runeDef.name}">${runeDef.icon || '?'}</span>` : '?';
+                cell.classList.add('border-purple-500/60', 'bg-slate-800/60');
+                cell.classList.remove('border-slate-700/60');
+            } else {
+                cell.innerHTML = '';
+                cell.classList.remove('border-purple-500/60', 'bg-slate-800/60');
+                cell.classList.add('border-slate-700/60');
+            }
+        }
+
+        // 2. 解析词条，计算 activeRunewordStats
+        const { activeStats, activatedRunewords, activatedCells } = parseRuneGrid(this.runeGrid, RUNEWORD_DB);
+        this.activeRunewordStats = activeStats;
+
+        // 3. 高亮激活词条对应的格子
+        for (let i = 0; i < 9; i++) {
+            const cell = document.getElementById(`rune-cell-${i}`);
+            if (!cell) continue;
+            if (activatedCells.has(i)) {
+                cell.classList.add('shadow-[0_0_8px_rgba(168,85,247,0.6)]', 'border-purple-400/80');
+            } else {
+                cell.classList.remove('shadow-[0_0_8px_rgba(168,85,247,0.6)]', 'border-purple-400/80');
+            }
+        }
+
+        // 4. 更新库存显示
+        this._ui_updateRuneInventoryDisplay();
+
+        // 5. 更新激活词条列表
+        this._ui_updateActivatedRunewordsDisplay(activatedRunewords);
+
+        // 6. 更新属性加成汇总
+        this._ui_updateRuneStatsDisplay(activeStats);
+
+        // 7. 更新 meta 页面的激活徽章
+        const badge = document.getElementById('meta-rune-active-badge');
+        if (badge) {
+            if (activatedRunewords.length > 0) {
+                badge.classList.remove('hidden');
+                badge.textContent = `${activatedRunewords.length} 激活`;
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+    },
+
+    /**
+     * 更新符文库存显示
+     * @private
+     */
+    _ui_updateRuneInventoryDisplay() {
+        const container = document.getElementById('rune-inventory-container');
+        const countEl = document.getElementById('rune-inventory-count');
+        const emptyEl = document.getElementById('rune-inventory-empty');
+        if (!container) return;
+
+        // 移除旧的符文按钮（保留 empty 提示）
+        Array.from(container.children).forEach(child => {
+            if (child.id !== 'rune-inventory-empty') child.remove();
+        });
+
+        if (countEl) countEl.textContent = `(${this.runeInventory.length})`;
+
+        if (!this.runeInventory || this.runeInventory.length === 0) {
+            if (emptyEl) emptyEl.classList.remove('hidden');
+            return;
+        }
+        if (emptyEl) emptyEl.classList.add('hidden');
+
+        this.runeInventory.forEach((runeId, idx) => {
+            const runeDef = RUNE_DB.find(r => r.id === runeId);
+            if (!runeDef) return;
+            const tag = document.createElement('div');
+            tag.className = [
+                'flex items-center gap-1 px-2 py-1',
+                'bg-slate-800/60 border border-slate-600/40 rounded-lg',
+                'text-xs text-slate-300',
+            ].join(' ');
+            tag.innerHTML = `<span>${runeDef.icon || '?'}</span><span>${runeDef.name}</span>`;
+            container.appendChild(tag);
+        });
+    },
+
+    /**
+     * 更新已激活词条列表显示
+     * @private
+     */
+    _ui_updateActivatedRunewordsDisplay(activatedRunewords) {
+        const container = document.getElementById('rune-active-runewords');
+        const noRunewordsEl = document.getElementById('rune-no-runewords');
+        if (!container) return;
+
+        Array.from(container.children).forEach(child => {
+            if (child.id !== 'rune-no-runewords') child.remove();
+        });
+
+        if (!activatedRunewords || activatedRunewords.length === 0) {
+            if (noRunewordsEl) noRunewordsEl.classList.remove('hidden');
+            return;
+        }
+        if (noRunewordsEl) noRunewordsEl.classList.add('hidden');
+
+        activatedRunewords.forEach(rw => {
+            const card = document.createElement('div');
+            card.className = [
+                'flex items-start gap-3 p-3',
+                'bg-purple-900/20 border border-purple-700/40 rounded-xl',
+            ].join(' ');
+
+            const statsText = rw.stats
+                ? Object.entries(rw.stats).map(([k, v]) => `${k}+${v}`).join(', ')
+                : '';
+
+            card.innerHTML = `
+                <div class="flex-1">
+                    <div class="text-sm font-bold text-purple-200">${rw.name}</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">${rw.effect_desc || ''}</div>
+                    ${statsText ? `<div class="text-[10px] text-amber-300 mt-1">${statsText}</div>` : ''}
+                </div>
+                <span class="text-green-400 text-xs font-bold whitespace-nowrap">激活</span>
+            `;
+            container.appendChild(card);
+        });
+    },
+
+    /**
+     * 更新属性加成汇总显示
+     * @private
+     */
+    _ui_updateRuneStatsDisplay(activeStats) {
+        const summary = document.getElementById('rune-stats-summary');
+        const list = document.getElementById('rune-stats-list');
+        if (!summary || !list) return;
+
+        list.innerHTML = '';
+
+        const entries = Object.entries(activeStats || {});
+        if (entries.length === 0) {
+            summary.classList.add('hidden');
+            return;
+        }
+        summary.classList.remove('hidden');
+
+        entries.forEach(([key, val]) => {
+            const tag = document.createElement('div');
+            tag.className = 'px-2 py-1 bg-amber-900/30 border border-amber-600/40 rounded-lg text-xs text-amber-200 font-bold';
+            tag.textContent = `${key} +${val}`;
+            list.appendChild(tag);
+        });
+    },
+};
