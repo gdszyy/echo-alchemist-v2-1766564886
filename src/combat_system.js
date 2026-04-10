@@ -10,6 +10,7 @@ import {
 import { loot_calcRuneDrop } from './loot_system.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
+import { eventBus } from './event_bus.js';
 
 export const combat_system = {
 /**
@@ -1482,6 +1483,18 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         
  
         this.combat_recordDamage(actualDmg, damageType, sourceType, shotId);
+        
+        // 事件总线广播伤害事件
+        eventBus.emit('damage:dealt', {
+            enemy: enemy,
+            amount: actualDmg,
+            type: damageType,
+            sourceType: sourceType,
+            shotId: shotId,
+            hitX: hitX,
+            hitY: hitY,
+            killed: killed
+        });
 
         // --- 2. [火属性核心逻辑] 燃烧与过热爆炸 ---
         if (config.pyro > 0 && enemy.temp >= 34) {
@@ -1637,7 +1650,14 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         }
 
         if (killed) { 
-            this.spawn_addScore(enemy.maxHp); 
+            this.spawn_addScore(enemy.maxHp);
+            
+            // 事件总线广播敌人死亡
+            eventBus.emit('enemy:killed', {
+                enemy: enemy,
+                maxHp: enemy.maxHp,
+                shotId: shotId
+            });
 
             // [新增] 子剑回收逻辑：如果敌人被杀，插在上面的子剑需要回收
             if (enemy.stuckSwords && enemy.stuckSwords.length > 0) {
