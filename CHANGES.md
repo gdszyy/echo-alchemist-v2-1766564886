@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Task 1: 符文系统数据结构升级 变更说明
 
 **任务 ID**: tsk-abf80056-b4f  
@@ -135,3 +136,79 @@ function getRuneId(entry) {
 - Task 2: 符文掉落与拾取系统（在 `combat_system.js` 和 `game_phase.js` 中实现）
 - Task 3: 符文合成与重铸系统（新增 UI 交互）
 - Task 4: 基础属性加成应用（在 `ui_system.js` 的 `ui_updateRuneGrid()` 中累加 baseStat）
+=======
+# Task 4 修改说明 — 符文合成与重铸逻辑
+
+**任务 ID**: tsk-a6181a7f-1da  
+**完成时间**: 2026-04-10  
+**负责人**: developer (agt-47fa321a-a66)
+
+---
+
+## 修改文件
+
+### `src/rune_system.js`
+
+**新增内容**：
+
+1. **`import { loot_calcRuneDrop } from './loot_system.js'`**  
+   在文件顶部新增对 `loot_system.js` 的导入，供 `rune_reforge` 函数调用智能掉落算法。
+
+2. **辅助函数 `_removeRuneFromInventory(runeInventory, runeObj)`**  
+   从 `runeInventory` 数组中精确移除一个匹配 `{ id, level }` 的符文对象（每次只移除一个）。
+
+3. **`rune_merge(runeObjects, runeInventory)`** — 符文合成函数  
+   - **输入**：三个符文对象数组 `[{id, level}, {id, level}, {id, level}]` 及符文背包引用。
+   - **校验**：三个符文的 `id` 必须相同，且 `level` 必须相同；背包中需有足够数量的符文（原子性预检）。
+   - **效果**：从 `runeInventory` 移除这三个符文，将 `{ id: 同id, level: level+1 }` 加入 `runeInventory`。
+   - **返回**：`{ success: boolean, result: {id, level}|null, error: string|null }`
+
+4. **`rune_reforge(runeObjects, runeInventory, game)`** — 符文重铸函数  
+   - **输入**：任意三个符文对象数组及符文背包引用、Game 实例。
+   - **等级计算**：`newLevel = Math.max(1, Math.floor((lvA + lvB + lvC) / 3))`
+   - **种类选择**：调用 `loot_calcRuneDrop(game)` 智能掉落算法获取新符文 ID。
+   - **效果**：从 `runeInventory` 移除这三个符文，将 `{ id: newId, level: newLevel }` 加入 `runeInventory`。
+   - **返回**：`{ success: boolean, result: {id, level}|null, error: string|null }`
+
+5. **更新导出**：在文件末尾的 `export` 语句中新增 `rune_merge` 和 `rune_reforge`。
+
+---
+
+## 设计说明
+
+### 原子性保障
+
+合成和重铸操作在执行移除前均进行**预检**（dry-run），确认背包中存在足够数量的目标符文后才执行实际修改。这避免了"部分移除"导致的背包状态不一致问题。
+
+### 与现有系统的集成
+
+- `rune_merge` 和 `rune_reforge` 均接受 `runeInventory` 作为参数（而非直接访问 `game.runeInventory`），保持函数的纯粹性和可测试性。调用方（UI 层，Task 5）负责传入正确的背包引用。
+- `rune_reforge` 通过 `game` 参数调用 `loot_calcRuneDrop`，与现有智能掉落系统无缝集成。
+
+### 符文对象数据结构
+
+本任务的实现基于设计文档 §4 的规范，符文对象格式为 `{ id: string, level: number }`，与 Task 1 建立的数据结构保持一致。
+
+---
+
+## 测试覆盖
+
+共编写 20 个单元测试用例，全部通过：
+
+| 测试场景 | 函数 | 结果 |
+|---------|------|------|
+| 正常合成（3 个同 id 同 level） | `rune_merge` | ✅ |
+| 合成结果 id 与 level 正确 | `rune_merge` | ✅ |
+| 背包正确更新（移除 3 个，添加 1 个） | `rune_merge` | ✅ |
+| id 不同时拒绝合成 | `rune_merge` | ✅ |
+| level 不同时拒绝合成 | `rune_merge` | ✅ |
+| 背包不足时拒绝合成且不修改背包 | `rune_merge` | ✅ |
+| 输入不足 3 个时拒绝 | `rune_merge` | ✅ |
+| 正常重铸（任意 3 个符文） | `rune_reforge` | ✅ |
+| 等级计算公式正确 | `rune_reforge` | ✅ |
+| 背包正确更新 | `rune_reforge` | ✅ |
+| 全 level 1 时新等级为 1 | `rune_reforge` | ✅ |
+| level 0 时保底为 1（Math.max） | `rune_reforge` | ✅ |
+| 背包不足时拒绝重铸且不修改背包 | `rune_reforge` | ✅ |
+| 同种符文重铸 | `rune_reforge` | ✅ |
+>>>>>>> 15ac4be (feat(rune): 实现符文合成(rune_merge)与重铸(rune_reforge)逻辑 [Task 4])

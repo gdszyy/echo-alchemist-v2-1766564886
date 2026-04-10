@@ -7,7 +7,14 @@
  * 变更记录 (Task 1: 数据结构升级)：
  * - 兼容新的对象格式 { id: string, level: number }，同时保持对旧字符串格式的向后兼容
  * - 新增 getRuneId(entry) 辅助函数，统一提取符文 ID
+ *
+ * 变更记录 (Task 4: 符文合成与重铸逻辑)：
+ * - 新增 rune_merge(runeObjects, runeInventory)：三同ID同等级符文合成为高一等级符文
+ * - 新增 rune_reforge(runeObjects, runeInventory, game)：任意三符文重铸为新符文
+ * - 新增 _removeRuneFromInventory 辅助函数
  */
+
+import { loot_calcRuneDrop } from './loot_system.js';
 
 /**
  * getRuneId - 从网格条目中提取符文 ID（向后兼容辅助函数）
@@ -158,4 +165,159 @@ function sequenceMatchesPattern(sliceRunes, pattern) {
     return filtered.every((r, i) => r === pattern[i]);
 }
 
-export { parseRuneGrid, getRuneId };
+// ==================== 符文合成与重铸系统 ====================
+
+/**
+ * _removeRuneFromInventory - 从 runeInventory 中移除一个符文对象（精确匹配 id 和 level）
+ *
+ * 每次调用只移除一个匹配项（防止一次性移除多个相同符文）。
+ *
+ * @param {Array<{id: string, level: number}>} runeInventory - 符文背包数组
+ * @param {{ id: string, level: number }} runeObj - 要移除的符文对象
+ * @returns {boolean} 是否成功移除
+ */
+function _removeRuneFromInventory(runeInventory, runeObj) {
+    const idx = runeInventory.findIndex(r => r.id === runeObj.id && r.level === runeObj.level);
+    if (idx === -1) return false;
+    runeInventory.splice(idx, 1);
+    return true;
+}
+
+/**
+ * rune_merge - 符文合成：三个同 ID、同等级的符文合成为高一等级的同名符文
+ *
+ * 规则（来自设计文档 §4.1）：
+ *   Rune A (Lv X) × 3  =>  Rune A (Lv X+1)
+ *
+ * @param {Array<{id: string, level: number}>} runeObjects - 三个符文对象数组
+ * @param {Array<{id: string, level: number}>} runeInventory - 符文背包（会被原地修改）
+ * @returns {{
+ *   success: boolean,
+ *   result: {id: string, level: number}|null,
+ *   error: string|null
+ * }}
+ *   - success: 合成是否成功
+ *   - result: 合成产出的新符文对象（成功时）
+ *   - error: 失败原因描述（失败时）
+ */
+function rune_merge(runeObjects, runeInventory) {
+    // ---- 输入校验 ----
+    if (!Array.isArray(runeObjects) || runeObjects.length !== 3) {
+        return { success: false, result: null, error: '合成需要恰好 3 个符文对象' };
+    }
+
+    const [runeA, runeB, runeC] = runeObjects;
+
+    // 校验三个符文的 id 必须相同
+    if (runeA.id !== runeB.id || runeA.id !== runeC.id) {
+        return {
+            success: false,
+            result: null,
+            error: `合成失败：三个符文的 id 必须相同（当前：${runeA.id}, ${runeB.id}, ${runeC.id}）`
+        };
+    }
+
+    // 校验三个符文的 level 必须相同
+    if (runeA.level !== runeB.level || runeA.level !== runeC.level) {
+        return {
+            success: false,
+            result: null,
+            error: `合成失败：三个符文的 level 必须相同（当前：${runeA.level}, ${runeB.level}, ${runeC.level}）`
+        };
+    }
+
+    const sharedId = runeA.id;
+    const sharedLevel = runeA.level;
+
+    // ---- 预检：确认背包中有足够数量的符文（原子性保障）----
+    // 统计背包中 id 和 level 均匹配的符文数量
+    const matchCount = runeInventory.filter(r => r.id === sharedId && r.level === sharedLevel).length;
+    if (matchCount < 3) {
+        return {
+            success: false,
+            result: null,
+            error: '合成失败：背包中不存在足够数量的目标符文'
+        };
+    }
+
+    // ---- 从背包移除三个符文 ----
+    [runeA, runeB, runeC].forEach(rune => _removeRuneFromInventory(runeInventory, rune));
+
+    // ---- 生成合成结果 ----
+    const mergedRune = { id: sharedId, level: sharedLevel + 1 };
+    runeInventory.push(mergedRune);
+
+    return { success: true, result: mergedRune, error: null };
+}
+
+/**
+ * rune_reforge - 符文重铸：任意三个符文重铸为一个全新的随机符文
+ *
+ * 规则（来自设计文档 §4.2）：
+ *   - 等级计算：newLevel = Math.max(1, Math.floor((lvA + lvB + lvC) / 3))
+ *   - 种类选择：调用 loot_calcRuneDrop(game) 智能掉落算法获取新符文 ID
+ *
+ * @param {Array<{id: string, level: number}>} runeObjects - 三个符文对象数组（任意组合）
+ * @param {Array<{id: string, level: number}>} runeInventory - 符文背包（会被原地修改）
+ * @param {Object} game - Game 实例（传递给 loot_calcRuneDrop 用于智能掉落计算）
+ * @returns {{
+ *   success: boolean,
+ *   result: {id: string, level: number}|null,
+ *   error: string|null
+ * }}
+ *   - success: 重铸是否成功
+ *   - result: 重铸产出的新符文对象（成功时）
+ *   - error: 失败原因描述（失败时）
+ */
+function rune_reforge(runeObjects, runeInventory, game) {
+    // ---- 输入校验 ----
+    if (!Array.isArray(runeObjects) || runeObjects.length !== 3) {
+        return { success: false, result: null, error: '重铸需要恰好 3 个符文对象' };
+    }
+
+    const [runeA, runeB, runeC] = runeObjects;
+
+    // ---- 计算新等级 ----
+    const lvA = runeA.level;
+    const lvB = runeB.level;
+    const lvC = runeC.level;
+    const newLevel = Math.max(1, Math.floor((lvA + lvB + lvC) / 3));
+
+    // ---- 调用智能掉落算法获取新符文 ID ----
+    const newId = loot_calcRuneDrop(game);
+    if (!newId) {
+        return {
+            success: false,
+            result: null,
+            error: '重铸失败：loot_calcRuneDrop 未能返回有效的符文 ID'
+        };
+    }
+
+    // ---- 预检：确认背包中有足够数量的符文（原子性保障）----
+    // 对每个输入符文逐一检查背包中是否存在匹配项（考虑重复符文的情况）
+    const inventoryCopy = [...runeInventory];
+    const allPresent = [runeA, runeB, runeC].every(rune => {
+        const idx = inventoryCopy.findIndex(r => r.id === rune.id && r.level === rune.level);
+        if (idx === -1) return false;
+        inventoryCopy.splice(idx, 1); // 临时移除，避免重复计数
+        return true;
+    });
+    if (!allPresent) {
+        return {
+            success: false,
+            result: null,
+            error: '重铸失败：背包中不存在足够数量的目标符文'
+        };
+    }
+
+    // ---- 从背包移除三个符文 ----
+    [runeA, runeB, runeC].forEach(rune => _removeRuneFromInventory(runeInventory, rune));
+
+    // ---- 生成重铸结果 ----
+    const reforgedRune = { id: newId, level: newLevel };
+    runeInventory.push(reforgedRune);
+
+    return { success: true, result: reforgedRune, error: null };
+}
+
+export { parseRuneGrid, getRuneId, rune_merge, rune_reforge };
