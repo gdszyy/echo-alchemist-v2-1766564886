@@ -13,6 +13,7 @@
  */
 
 import { CONFIG, SKILL_DB } from './config.js';
+import { audio } from './audio.js';
 import { Vec2, Enemy, Projectile, Particle, Shockwave, LightningBolt, FloatingText, adjustColorBrightness, lerpColor, lerp, hexToRgba } from './entities.js';
 
 
@@ -954,7 +955,7 @@ class TrainingGround {
         this.game.enemies.push(enemy);
         
         // 播放音效
-        if (window.audio) audio.playTone(400, 'square', 0.1, 0.2);
+        audio.playTone(400, 'square', 0.1, 0.2);
     }
 
     clearEnemies() {
