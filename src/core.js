@@ -180,6 +180,8 @@ class Game {
         this.runCurrency = 0;   
 
         // ==================== 符文词条系统状态变量 ====================
+        // Task 1: 数据结构升级 - runeInventory 和 runeGrid 存储对象格式 { id: string, level: number }
+        // 例如: { id: 'rune_pyro_1', level: 1 }
         this.runeInventory = [];
         this.runeGrid = Array(9).fill(null);
         this.activeRunewordStats = {};

@@ -171,6 +171,13 @@ export const game_system = {
         this.energyOrbs = [];
         this.spores = [];
         this.currentRows = CONFIG.gameplay.rows;
+
+        // Task 1: 数据结构升级 - 局内重置时清空符文库存和网格
+        // runeInventory 和 runeGrid 属于局内状态，每局开始时重置
+        this.runeInventory = [];
+        this.runeGrid = Array(9).fill(null);
+        this.activeRunewordStats = {};
+        this.runeLootItems = [];
         this.skillPoints = 0;
         this.ui.updateSkillPoints(this.skillPoints);
 

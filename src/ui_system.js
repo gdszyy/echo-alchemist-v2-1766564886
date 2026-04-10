@@ -10,7 +10,7 @@ import {
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus } from './event_bus.js';
-import { parseRuneGrid } from './rune_system.js';
+import { parseRuneGrid, getRuneId } from './rune_system.js';
 import { RUNE_DB, RUNEWORD_DB } from './rune_config.js';
 
 export const ui_system = {
@@ -1337,11 +1337,11 @@ ui_closeTruthBook() {
             ].join(' ');
 
             cell.addEventListener('click', () => {
-                const runeId = this.runeGrid[i];
-                if (runeId) {
-                    // 已有符文：移除并放回库存
+                const runeEntry = this.runeGrid[i];
+                if (runeEntry) {
+                    // 已有符文：移除并放回库存（保留对象格式）
                     this.runeGrid[i] = null;
-                    this.runeInventory.push(runeId);
+                    this.runeInventory.push(runeEntry);
                     this.ui_updateRuneGrid();
                     audio.playTone(400, 'sine', 0.08, 0.15);
                 } else {
@@ -1372,9 +1372,15 @@ ui_closeTruthBook() {
         list.innerHTML = '';
 
         // 对库存中的符文去重显示（但保留多个实例的选择）
-        this.runeInventory.forEach((runeId, invIdx) => {
+        this.runeInventory.forEach((runeEntry, invIdx) => {
+            // 兼容新旧格式：提取符文 ID
+            const runeId = getRuneId(runeEntry);
+            if (!runeId) return;
             const runeDef = RUNE_DB.find(r => r.id === runeId);
             if (!runeDef) return;
+
+            // 获取符文等级（新格式有 level，旧格式默认为 1）
+            const runeLevel = (typeof runeEntry === 'object' && runeEntry.level) ? runeEntry.level : 1;
 
             const btn = document.createElement('button');
             btn.className = [
@@ -1387,14 +1393,23 @@ ui_closeTruthBook() {
                 <span class="text-2xl">${runeDef.icon || '?'}</span>
                 <span class="text-[10px] text-slate-300 text-center leading-tight">${runeDef.name}</span>
                 <span class="text-[9px] text-purple-400/70">${runeDef.element}</span>
+                <span class="text-[9px] text-amber-400/80">Lv.${runeLevel}</span>
             `;
             btn.addEventListener('click', () => {
                 // 将该符文从库存中移除（取第一个匹配项）
-                const removeIdx = this.runeInventory.indexOf(runeId);
+                const removeIdx = this.runeInventory.indexOf(runeEntry);
                 if (removeIdx !== -1) {
                     this.runeInventory.splice(removeIdx, 1);
+                } else {
+                    // 如果对象引用不同，则通过 ID 和等级匹配
+                    const fallbackIdx = this.runeInventory.findIndex(e => getRuneId(e) === runeId && 
+                        ((typeof e === 'object' && e.level === runeLevel) || typeof e === 'string'));
+                    if (fallbackIdx !== -1) {
+                        this.runeInventory.splice(fallbackIdx, 1);
+                    }
                 }
-                this.runeGrid[cellIndex] = runeId;
+                // 将符文放入网格（保留原始对象格式）
+                this.runeGrid[cellIndex] = runeEntry;
                 this.ui_closeRunePicker();
                 this.ui_updateRuneGrid();
                 audio.playTone(600, 'sine', 0.1, 0.2);
@@ -1415,10 +1430,18 @@ ui_closeTruthBook() {
             const cell = document.getElementById(`rune-cell-${i}`);
             if (!cell) continue;
 
-            const runeId = this.runeGrid[i];
+            const runeEntry = this.runeGrid[i];
+            // 兼容新旧格式：提取符文 ID
+            const runeId = getRuneId(runeEntry);
             if (runeId) {
                 const runeDef = RUNE_DB.find(r => r.id === runeId);
-                cell.innerHTML = runeDef ? `<span title="${runeDef.name}">${runeDef.icon || '?'}</span>` : '?';
+                // 获取符文等级（新格式有 level，旧格式默认为 1）
+                const runeLevel = (typeof runeEntry === 'object' && runeEntry.level) ? runeEntry.level : 1;
+                if (runeDef) {
+                    cell.innerHTML = `<span title="${runeDef.name} Lv.${runeLevel}">${runeDef.icon || '?'}</span>${runeLevel > 1 ? `<span class="rune-level-badge">${runeLevel}</span>` : ''}`;
+                } else {
+                    cell.innerHTML = '?';
+                }
                 cell.classList.add('border-purple-500/60', 'bg-slate-800/60');
                 cell.classList.remove('border-slate-700/60');
             } else {
@@ -1487,16 +1510,21 @@ ui_closeTruthBook() {
         }
         if (emptyEl) emptyEl.classList.add('hidden');
 
-        this.runeInventory.forEach((runeId, idx) => {
+        this.runeInventory.forEach((runeEntry, idx) => {
+            // 兼容新旧格式：提取符文 ID
+            const runeId = getRuneId(runeEntry);
+            if (!runeId) return;
             const runeDef = RUNE_DB.find(r => r.id === runeId);
             if (!runeDef) return;
+            // 获取符文等级（新格式有 level，旧格式默认为 1）
+            const runeLevel = (typeof runeEntry === 'object' && runeEntry.level) ? runeEntry.level : 1;
             const tag = document.createElement('div');
             tag.className = [
                 'flex items-center gap-1 px-2 py-1',
                 'bg-slate-800/60 border border-slate-600/40 rounded-lg',
                 'text-xs text-slate-300',
             ].join(' ');
-            tag.innerHTML = `<span>${runeDef.icon || '?'}</span><span>${runeDef.name}</span>`;
+            tag.innerHTML = `<span>${runeDef.icon || '?'}</span><span>${runeDef.name}</span>${runeLevel > 1 ? `<span class="text-amber-400 text-[9px] font-bold">Lv.${runeLevel}</span>` : ''}`;
             container.appendChild(tag);
         });
     },

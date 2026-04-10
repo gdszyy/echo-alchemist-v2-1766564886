@@ -10,6 +10,10 @@
  * - 符文 element 与现有属性类型保持一致：pyro, cryo, lightning, bounce, pierce, scatter, laser
  * - affinity_tags 与敌人 affixes 对应：shield, regen, haste, clone, devour, healer, jump
  * - 词条 stats 键与现有弹药属性对应
+ *
+ * 变更记录 (Task 1: 数据结构升级)：
+ * - 为每个符文增加 baseStat 字段，映射到对应的弹药属性
+ *   baseStat 表示该符文放置在网格中时，每级提供的属性层数加成类型
  */
 
 // ==================== 符文基础数据库 ====================
@@ -22,6 +26,7 @@
  *   icon: emoji 图标
  *   baseDropWeight: 基础掉落权重（1~10，越高越常见）
  *   affinity_tags: 亲和标签数组（与敌人词缀对应，用于智能掉落权重计算）
+ *   baseStat: 基础属性映射（符文放置在网格中时提供的属性层数类型，与 element 对应）
  */
 const RUNE_DB = [
     // ---- 火焰系 (Pyro) ----
@@ -31,7 +36,8 @@ const RUNE_DB = [
         element: 'pyro',
         icon: '🔥',
         baseDropWeight: 8,
-        affinity_tags: ['shield', 'regen']
+        affinity_tags: ['shield', 'regen'],
+        baseStat: 'pyro'
     },
     {
         id: 'rune_pyro_2',
@@ -39,7 +45,8 @@ const RUNE_DB = [
         element: 'pyro',
         icon: '🌋',
         baseDropWeight: 5,
-        affinity_tags: ['shield', 'healer']
+        affinity_tags: ['shield', 'healer'],
+        baseStat: 'pyro'
     },
 
     // ---- 冰霜系 (Cryo) ----
@@ -49,7 +56,8 @@ const RUNE_DB = [
         element: 'cryo',
         icon: '❄️',
         baseDropWeight: 8,
-        affinity_tags: ['haste', 'jump']
+        affinity_tags: ['haste', 'jump'],
+        baseStat: 'cryo'
     },
     {
         id: 'rune_cryo_2',
@@ -57,7 +65,8 @@ const RUNE_DB = [
         element: 'cryo',
         icon: '🧊',
         baseDropWeight: 5,
-        affinity_tags: ['haste', 'regen']
+        affinity_tags: ['haste', 'regen'],
+        baseStat: 'cryo'
     },
 
     // ---- 闪电系 (Lightning) ----
@@ -67,7 +76,8 @@ const RUNE_DB = [
         element: 'lightning',
         icon: '⚡',
         baseDropWeight: 7,
-        affinity_tags: ['clone', 'healer']
+        affinity_tags: ['clone', 'healer'],
+        baseStat: 'lightning'
     },
     {
         id: 'rune_lightning_2',
@@ -75,7 +85,8 @@ const RUNE_DB = [
         element: 'lightning',
         icon: '🌩️',
         baseDropWeight: 4,
-        affinity_tags: ['clone', 'haste']
+        affinity_tags: ['clone', 'haste'],
+        baseStat: 'lightning'
     },
 
     // ---- 弹射系 (Bounce) ----
@@ -85,7 +96,8 @@ const RUNE_DB = [
         element: 'bounce',
         icon: '🔄',
         baseDropWeight: 8,
-        affinity_tags: ['clone', 'jump']
+        affinity_tags: ['clone', 'jump'],
+        baseStat: 'bounce'
     },
     {
         id: 'rune_bounce_2',
@@ -93,7 +105,8 @@ const RUNE_DB = [
         element: 'bounce',
         icon: '↩️',
         baseDropWeight: 5,
-        affinity_tags: ['clone', 'devour']
+        affinity_tags: ['clone', 'devour'],
+        baseStat: 'bounce'
     },
 
     // ---- 穿透系 (Pierce) ----
@@ -103,7 +116,8 @@ const RUNE_DB = [
         element: 'pierce',
         icon: '↗️',
         baseDropWeight: 7,
-        affinity_tags: ['shield', 'jump']
+        affinity_tags: ['shield', 'jump'],
+        baseStat: 'pierce'
     },
     {
         id: 'rune_pierce_2',
@@ -111,7 +125,8 @@ const RUNE_DB = [
         element: 'pierce',
         icon: '🗡️',
         baseDropWeight: 4,
-        affinity_tags: ['shield', 'devour']
+        affinity_tags: ['shield', 'devour'],
+        baseStat: 'pierce'
     },
 
     // ---- 散射系 (Scatter) ----
@@ -121,7 +136,8 @@ const RUNE_DB = [
         element: 'scatter',
         icon: '🔱',
         baseDropWeight: 6,
-        affinity_tags: ['clone', 'healer']
+        affinity_tags: ['clone', 'healer'],
+        baseStat: 'scatter'
     },
 
     // ---- 激光系 (Laser) ----
@@ -131,7 +147,8 @@ const RUNE_DB = [
         element: 'laser',
         icon: '☄️',
         baseDropWeight: 4,
-        affinity_tags: ['regen', 'devour']
+        affinity_tags: ['regen', 'devour'],
+        baseStat: 'laser'
     },
     {
         id: 'rune_laser_2',
@@ -139,7 +156,8 @@ const RUNE_DB = [
         element: 'laser',
         icon: '🔦',
         baseDropWeight: 3,
-        affinity_tags: ['shield', 'regen']
+        affinity_tags: ['shield', 'regen'],
+        baseStat: 'laser'
     }
 ];
 
