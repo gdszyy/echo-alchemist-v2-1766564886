@@ -518,6 +518,11 @@ phase_gathering_getRandomPegType() {
 
         // 检查失败
         if (this.input_checkDefeat()) {
+            this.gameOver = true;
+            return;
+        }
+
+        document.getElementById('combat-message').innerHTML = '';
         this.phase_gathering_initPachinko(true);
 
         this.isEnemyTurn = false;
