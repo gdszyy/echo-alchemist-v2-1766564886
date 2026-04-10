@@ -1,17 +1,3 @@
-import { 
-    META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB 
-} from './config.js';
-import { 
-    Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
-    SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
-    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, showToast, 
-    rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
-} from './entities.js';
-import { UIManager, TrainingGround, TruthBook } from './systems.js';
-import { audio } from './audio.js';
-import { eventBus } from './event_bus.js';
-
-export const game_system = {
 /**
  * game_system.js - 游戏核心系统
  * 
@@ -23,18 +9,13 @@ export const game_system = {
 import { Vec2, showToast } from './entities.js';
 import { CONFIG } from './config.js';
 
-export class GameSystem {
-    constructor(game) {
-        this.game = game;
-        Object.assign(this, game);
-    }
+export const game_system = {
 
     /**
-     * @method loop
+     * @method sys_loop
      * @description 游戏主循环
      */
     sys_loop() {
-        // [DEBUG] 确认循环存活
         const timeScale = this.timeScale; 
 
         // 处理震动衰减
@@ -74,10 +55,10 @@ export class GameSystem {
         // 5. 下一帧请求
         this.ctx.restore(); 
         requestAnimationFrame(() => this.sys_loop());
-    }
+    },
 
     /**
-     * @method getTiltOffset
+     * @method input_getTiltOffset
      * @description 获取当前视差偏移量。
      */
     input_getTiltOffset() {
@@ -85,10 +66,10 @@ export class GameSystem {
             this.boardTilt.current.x * 20,
             this.boardTilt.current.y * 20
         );
-    }
+    },
 
     /**
-     * @method handleOrientation
+     * @method input_handleOrientation
      * @description 处理设备陀螺仪输入。
      */
     input_handleOrientation(e) {
@@ -98,7 +79,7 @@ export class GameSystem {
         let x = e.gamma || 0;
         let y = e.beta || 0;
         
-        // 修正：通常手机竖拿时 beta 约为 45-90度。我们需要相对于“竖直握持”的偏移。
+        // 修正：通常手机竖拿时 beta 约为 45-90度。我们需要相对于"竖直握持"的偏移。
         y = y - CONFIG.gameplay.deviceTiltBaseAngle; 
 
         // 钳制范围
@@ -108,7 +89,7 @@ export class GameSystem {
         // 归一化为 -1 到 1
         this.boardTilt.target.x = x / maxTilt;
         this.boardTilt.target.y = y / maxTilt;
-    }
+    },
 
     input_handleInputStart(pos, e) {
         const offset = this.input_getTiltOffset();
@@ -144,7 +125,7 @@ export class GameSystem {
         if (this.phase === 'combat') {
             this.phase_handleInputStart(logicPos);
         }
-    }
+    },
 
     input_handleInputMove(pos, e) {
         const offset = this.input_getTiltOffset();
@@ -158,7 +139,7 @@ export class GameSystem {
             return;
         } 
         
-        //  收集阶段 - 手动拖拽倾斜
+        // 收集阶段 - 手动拖拽倾斜
         if (this.phase === 'gathering' && this.isTiltingGrip && !this.boardTilt.enabled) {
             e.preventDefault();
             // 计算拖拽偏移量，模拟倾斜
@@ -186,7 +167,7 @@ export class GameSystem {
         if (this.phase === 'combat' && !this.ui.isOpen) {
              this.input_checkEnemyHover(logicPos);
         }
-    }
+    },
 
     input_handleInputEnd(pos, e) {
         this.isTiltingGrip = false;
@@ -201,10 +182,10 @@ export class GameSystem {
             }
             this.boardTilt.target = {x: 0, y: 0};
         }
-    }
+    },
 
     /**
-     * @method checkDefeat
+     * @method input_checkDefeat
      * @description 检查是否失败 (包含视差偏移计算)。
      */
     input_checkDefeat() { 
@@ -215,7 +196,7 @@ export class GameSystem {
             }
         } 
         return false;
-    }
+    },
 
     input_checkEnemyHover(pos) {
         this.enemies.forEach(e => {
@@ -225,4 +206,5 @@ export class GameSystem {
             }
         });
     }
-}
+
+};
