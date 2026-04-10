@@ -1705,8 +1705,19 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
                 }, 500);
             }
 
-            // [符文掉落] 以 30% 的概率触发符文掉落，避免每个敌人都掉落
-            if (Math.random() < 0.3) {
+            // [符文掉落] 三因子动态掉落率公式
+            // 因子1：基础掉落率（随回合数线性增长，上限 40%）
+            const BaseDropRate = Math.min(0.05 + (this.round / 10) * 0.05, 0.40);
+            // 因子2：敌人数量修正（敌人越多，单个掉落率越低）
+            const spawnedEnemiesInRound = this.spawnedEnemiesInRound || Math.max(1, this.enemies.length);
+            const EnemyModifier = Math.max(0.3, 1.0 / Math.sqrt(spawnedEnemiesInRound));
+            // 因子3：背包与网格占用率衰减（防溢出机制）
+            const MAX_RUNE_CAPACITY = 20;
+            const runesInGrid = (this.runeGrid || []).filter(r => r !== null).length;
+            const OccupancyPenalty = Math.max(0.2, 1.0 - (this.runeInventory.length + runesInGrid) / MAX_RUNE_CAPACITY);
+            // 最终掉落率
+            const FinalDropRate = BaseDropRate * EnemyModifier * OccupancyPenalty;
+            if (Math.random() < FinalDropRate) {
                 const runeId = loot_calcRuneDrop(this);
                 if (runeId) {
                     this.runeLootItems.push(new RuneLoot(enemy.pos.x, enemy.pos.y, runeId));

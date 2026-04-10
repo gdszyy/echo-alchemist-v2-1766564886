@@ -117,18 +117,6 @@
 - 共为 14 个符文（pyro×2, cryo×2, lightning×2, bounce×2, pierce×2, scatter×1, laser×2）添加了 `baseStat` 字段
 - 在 RUNE_DB 注释中补充了 `baseStat` 字段的说明
 
-**示例：**
-```js
-{
-    id: 'rune_pyro_1',
-    name: '烈焰符文',
-    element: 'pyro',
-    baseStat: 'pyro',   // 新增字段
-    icon: '🔥',
-    ...
-}
-```
-
 ### 2. `src/rune_system.js`
 
 **修改内容：** 新增 `calcRuneBaseStats()` 函数，并更新 `export` 语句。
@@ -145,34 +133,13 @@
 **修改内容：** 在 `combat_fireNextShot()` 中，在现有词条加成逻辑之后，新增基础属性层数叠加逻辑。
 
 - **新增导入：** `calcRuneBaseStats` 从 `./rune_system.js`，`RUNE_DB` 从 `./rune_config.js`
-- **新增逻辑段（位于词条加成逻辑之后）：**
-  ```js
-  // --- [符文基础属性] 将 calcRuneBaseStats() 的基础属性层数叠加到当前弹药配方 ---
-  if (this.runeGrid && Array.isArray(this.runeGrid)) {
-      const baseStats = calcRuneBaseStats(this.runeGrid, RUNE_DB);
-      for (const [key, val] of Object.entries(baseStats)) {
-          if (typeof val === 'number' && val > 0) {
-              if (key === 'laser') {
-                  finalRecipe.laser = (finalRecipe.laser || 0) + val;
-                  if (finalRecipe.laser > 0) finalRecipe.isLaser = true;
-              } else {
-                  finalRecipe[key] = (finalRecipe[key] || 0) + val;
-              }
-          }
-      }
-  }
-  ```
 
 ### 4. `src/ui_system.js`
 
 **修改内容：** 在 `ui_updateRuneGrid()` 中调用 `calcRuneBaseStats()` 并在 UI 展示基础加成汇总。
 
 - **新增导入：** `calcRuneBaseStats` 从 `./rune_system.js`（与 `parseRuneGrid`、`getRuneId` 合并导入）
-- **`ui_updateRuneGrid()` 新增步骤 6：** 调用 `calcRuneBaseStats(this.runeGrid, RUNE_DB)` 计算基础属性加成
-- **`_ui_updateRuneStatsDisplay()` 函数更新：**
-  - 新增 `baseStats` 参数（默认为 `{}`）
-  - 分区展示：「基础属性」（蓝色标签）和「词条共鸣」（金色标签）
-  - 当网格中有符文时，即使无词条激活，也会显示基础属性加成
+- **`_ui_updateRuneStatsDisplay()` 函数更新：** 分区展示「基础属性」（蓝色标签）和「词条共鸣」（金色标签）
 
 ### 5. `index.html`
 
@@ -188,11 +155,6 @@
 |---------|------|---------|--------|
 | 基础属性加成 | 符文等级（每个格子中的符文贡献 level 层数） | `calcRuneBaseStats()` | 蓝色标签 |
 | 词条共鸣加成 | 符文排列匹配词条 pattern | `parseRuneGrid()` | 金色标签 |
-
-### 兼容性设计
-
-- `calcRuneBaseStats()` 兼容字符串格式（`runeGrid[i] = 'rune_pyro_1'`，level=1）和对象格式（`runeGrid[i] = { id: 'rune_pyro_1', level: 2 }`）
-- 当前游戏使用字符串格式，每个符文贡献 1 层基础属性；未来升级为对象格式后可自动支持多等级
 
 ---
 
@@ -249,3 +211,76 @@
 ### 符文对象数据结构
 
 本任务的实现基于设计文档 §4 的规范，符文对象格式为 `{ id: string, level: number }`，与 Task 1 建立的数据结构保持一致。
+
+---
+
+---
+
+# Task 2: 动态掉落率与自动拾取
+
+**任务 ID**: tsk-3557ba9e-bb3  
+**完成时间**: 2026-04-10  
+**执行 Agent**: developer
+
+---
+
+## 任务概述
+
+本次修改实现了符文系统的两个核心功能：
+1. **三因子动态掉落率公式**（替换原有固定 30% 概率）
+2. **回合结束自动拾取**（遍历 runeLootItems 并转化为库存对象）
+
+---
+
+## 修改文件
+
+### 1. `src/combat_system.js`
+
+**修改位置**：敌人击杀逻辑中的符文掉落判定（约第 1706 行）
+
+**修改内容**：将原有固定 30% 掉落率替换为三因子动态掉落率公式：
+
+```
+FinalDropRate = BaseDropRate × EnemyModifier × OccupancyPenalty
+```
+
+- **因子1 - BaseDropRate（基础掉落率）**：随回合数线性增长，公式为 `min(0.05 + (round/10) * 0.05, 0.40)`，上限 40%
+- **因子2 - EnemyModifier（敌人数量修正）**：敌人越多，单个掉落率越低，公式为 `max(0.3, 1/sqrt(spawnedEnemiesInRound))`，防止多敌人时掉落过多
+- **因子3 - OccupancyPenalty（占用率衰减）**：背包与网格占用率越高，掉落率越低，公式为 `max(0.2, 1 - (runeInventory.length + runesInGrid) / 20)`，防止符文溢出
+
+新增常量 `MAX_RUNE_CAPACITY = 20`（符文库存最大容量）。
+
+### 2. `src/game_phase.js`
+
+**修改位置1**：`phase_startCombatPhase` 函数（约第 298 行）
+
+**修改内容**：在战斗阶段开始时记录当前场上敌人数量到 `this.spawnedEnemiesInRound`，用于动态掉落率的因子2计算。
+
+**修改位置2**：`phase_finalizeRound` 函数（约第 504 行）
+
+**修改内容**：在回合结束时实现自动拾取逻辑：
+- 遍历 `runeLootItems` 中所有 `active` 的掉落物
+- 查找 `RUNE_DB` 获取符文名称，用于视觉反馈
+- 将符文转化为 `{ id: runeId, level: 1 }` 对象推入 `runeInventory`
+- 调用 `spawn_createFloatingText` 显示「+符文名称」浮动文字（颜色 `#fbbf24` 金色）
+- 清空 `runeLootItems` 数组
+
+**新增导入**：在文件顶部添加 `import { RUNE_DB } from './rune_config.js'`
+
+---
+
+## 设计决策
+
+1. **兼容性**：`runeInventory` 按设计文档要求存储 `{ id, level: 1 }` 对象格式，为 Task 1（数据结构重构）完成后的无缝集成做准备
+2. **防御性编程**：`spawnedEnemiesInRound` 使用 `|| Math.max(1, this.enemies.length)` 作为回退值，确保在未记录时也能正常工作
+3. **视觉反馈**：使用金色（`#fbbf24`）浮动文字显示拾取信息，与游戏整体视觉风格一致
+
+---
+
+## 测试建议
+
+1. 进入游戏战斗阶段，击杀敌人，观察符文掉落物是否出现
+2. 回合结束后，检查 `runeInventory` 是否包含 `{ id, level: 1 }` 格式的符文对象
+3. 观察回合结束时是否出现金色「+符文名称」浮动文字
+4. 验证高回合数时掉落率是否高于低回合数
+5. 验证符文库存接近满时掉落率是否降低

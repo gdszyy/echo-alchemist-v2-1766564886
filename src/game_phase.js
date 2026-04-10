@@ -10,6 +10,7 @@ import {
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus } from './event_bus.js';
+import { RUNE_DB } from './rune_config.js';
 
 export const game_phase = {
 /**
@@ -295,6 +296,9 @@ phase_gathering_getRandomPegType() {
         this.shotDamageHistory = [];
         this.currentViewingRound = 0; 
         
+        // [符文系统] 记录本回合开始时的敌人数量，用于动态掉落率计算
+        this.spawnedEnemiesInRound = this.enemies.filter(e => e.active).length;
+        
         if (this.ui) {
             this.ui.updateSkillPoints(this.skillPoints);
             this.ui.updateSkillBar(this.skillPoints);
@@ -495,6 +499,28 @@ phase_gathering_getRandomPegType() {
                 showToast("⚠️ 敵軍狂暴 (HASTE APPLIED) ⚠️");
                 audio.playPowerup(); // 播放警示音
             }
+        }
+
+        // --- [符文系统] 自动拾取掉落符文 ---
+        if (this.runeLootItems && this.runeLootItems.length > 0) {
+            this.runeLootItems.forEach(loot => {
+                if (!loot.active) return;
+                // 查找符文定义，获取名称用于视觉反馈
+                const runeDef = RUNE_DB.find(r => r.id === loot.runeId);
+                const runeName = runeDef ? runeDef.name : loot.runeId;
+                // 将符文转化为 { id, level: 1 } 对象并推入库存
+                this.runeInventory.push({ id: loot.runeId, level: 1 });
+                // 视觉反馈：FloatingText 显示「+符文名称」
+                this.spawn_createFloatingText(
+                    loot.x,
+                    loot.y - 20,
+                    `+${runeName}`,
+                    '#fbbf24'
+                );
+                loot.active = false;
+            });
+            // 清空 runeLootItems
+            this.runeLootItems = [];
         }
 
         // --- 以下保持原有的回合结算逻辑 ---
