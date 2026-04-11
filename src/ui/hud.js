@@ -778,67 +778,97 @@ export const hud_system = {
         });
 
         // ── 充能符文 UI 初始化 ──────────────────────────────────────────
-        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_INIT, ({ previewRunes }) => {
-            const rewardRow = document.getElementById('combat-rune-reward-row');
-            if (!rewardRow) return;
-            rewardRow.innerHTML = '';
-            previewRunes.forEach((runeDef, idx) => {
-                const slot = document.createElement('div');
-                slot.className = 'combat-rune-slot ghost';
-                slot.id = `combat-rune-slot-${idx}`;
-                slot.textContent = runeDef ? runeDef.icon : '🔮';
-                rewardRow.appendChild(slot);
-            });
+        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_INIT, () => {
+            const slot = document.getElementById('combat-rune-single-slot');
+            if (slot) {
+                slot.textContent = '';
+                slot.className = 'empty';
+            }
             const fill = document.getElementById('combat-charge-bar-fill');
             if (fill) {
                 fill.style.width = '0%';
-                fill.className = '';
-                fill.id = 'combat-charge-bar-fill';
+                fill.classList.remove('charge-burst');
             }
         });
 
-        // ── 充能等级提升 ──────────────────────────────────────────────
-        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_LEVEL_UP, ({ level }) => {
-            const slotIdx = level - 1;
-            const slot = document.getElementById(`combat-rune-slot-${slotIdx}`);
-            if (slot) {
-                slot.classList.remove('ghost', 'lit-1', 'lit-2', 'lit-3', 'lit-4');
-                slot.classList.add(`lit-${level}`);
-                slot.classList.add('level-up-flash');
-                setTimeout(() => slot.classList.remove('level-up-flash'), 400);
-            }
-            const fill = document.getElementById('combat-charge-bar-fill');
-            if (fill) {
-                fill.className = '';
-                fill.id = 'combat-charge-bar-fill';
-                if (level > 0) fill.classList.add(`level-${level}`);
-            }
+        // ── 充能满 → 刷新符文预览（带闪光特效）──────────────────────────────
+        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_LEVEL_UP, ({ runeDef }) => {
+            const slot = document.getElementById('combat-rune-single-slot');
             const shell = document.getElementById('combat-charge-bar-shell');
+            const fill = document.getElementById('combat-charge-bar-fill');
+
+            // 充能条闪光脱去动画
+            if (fill) {
+                fill.classList.remove('charge-burst');
+                void fill.offsetWidth; // 重流
+                fill.classList.add('charge-burst');
+                setTimeout(() => {
+                    fill.classList.remove('charge-burst');
+                    fill.style.width = '0%';
+                }, 400);
+            }
+
+            // 外壳发光
             if (shell) {
                 shell.classList.add('charge-full-flash');
-                setTimeout(() => shell.classList.remove('charge-full-flash'), 400);
+                setTimeout(() => shell.classList.remove('charge-full-flash'), 450);
+            }
+
+            // 符文槽刷新
+            if (slot) {
+                slot.classList.remove('rune-refresh');
+                void slot.offsetWidth; // 重流
+                if (runeDef) {
+                    slot.textContent = runeDef.icon || '🔮';
+                    slot.className = 'has-rune rune-refresh';
+                    setTimeout(() => slot.classList.remove('rune-refresh'), 600);
+                } else {
+                    slot.textContent = '';
+                    slot.className = 'empty';
+                }
             }
         });
 
-        // ── 充能条更新 ────────────────────────────────────────────────
+        // ── 充能条进度更新 ────────────────────────────────────────────────
         eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_UPDATE, ({ value }) => {
             const fill = document.getElementById('combat-charge-bar-fill');
-            if (fill) fill.style.width = `${value * 100}%`;
+            // 如果正在播放 burst 动画，不覆盖 width
+            if (fill && !fill.classList.contains('charge-burst')) {
+                fill.style.width = `${value * 100}%`;
+            }
         });
 
-        // ── 翻倍徽章 ──────────────────────────────────────────────────────
-        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_BADGE, ({ canvasX, canvasY, text, extraClass, gameWidth, gameHeight }) => {
-            const badge = document.createElement('div');
-            badge.className = `charge-multiplier-badge ${extraClass}`;
-            badge.textContent = text;
-            const canvas = document.getElementById('gameCanvas');
-            const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0, width: 400, height: 600 };
-            const scaleX = rect.width / gameWidth;
-            const scaleY = rect.height / gameHeight;
-            badge.style.left = `${rect.left + canvasX * scaleX - 16}px`;
-            badge.style.top = `${rect.top + canvasY * scaleY - 16}px`;
-            document.body.appendChild(badge);
-            setTimeout(() => badge.remove(), 500);
+        // ── 回合结束领取符文 → 入背包动画 ────────────────────────────────
+        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_CLAIM, ({ runeDef }) => {
+            const slot = document.getElementById('combat-rune-single-slot');
+            if (!slot || !runeDef) return;
+
+            // 获取符文槽屏幕位置
+            const slotRect = slot.getBoundingClientRect();
+            const startX = slotRect.left + slotRect.width / 2;
+            const startY = slotRect.top + slotRect.height / 2;
+
+            // 创建飞行符文元素
+            const flyEl = document.createElement('div');
+            flyEl.className = 'rune-claim-fly';
+            flyEl.textContent = runeDef.icon || '🔮';
+            flyEl.style.left = `${startX - 18}px`;
+            flyEl.style.top  = `${startY - 18}px`;
+            // 水平偏移量：小幅左右随机浮动
+            flyEl.style.setProperty('--fly-dx', `${(Math.random() - 0.5) * 30}px`);
+            document.body.appendChild(flyEl);
+
+            // 符文槽消失动画
+            slot.classList.remove('rune-refresh');
+            void slot.offsetWidth;
+            slot.classList.add('rune-claim-out');
+
+            // 动画结束后清理
+            setTimeout(() => {
+                flyEl.remove();
+                slot.textContent = '';
+                slot.className = 'empty';
+            }, 900);
         });
     },
 

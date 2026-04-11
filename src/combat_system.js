@@ -1984,34 +1984,27 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
      */
     combat_runeCharge_init() {
         this.runeChargeValue = 0;    // 充能值 0~1，自动衰减
-        this.runeChargeLevel = 0;    // 当前符文奖励等级：0=无，1=铜，2=银，3=金，4=彩虹
-        this.runeChargePreviewRunes = []; // 预生成的符文预览（虚影）
+        this.runeChargeLevel = 0;    // 当前充能满次数（每满一次+1，无上限）
+        this.runeChargeCurrentRune = null; // 当前预览符文（单个）
         this.combat_runeCharge_initUI();
     },
 
     /**
      * @method combat_runeCharge_initUI
-     * @description 初始化充能符文UI（生成虚影插槽）
+     * @description 初始化充能符文UI（单符文槽，初始为空）
      */
     combat_runeCharge_initUI() {
-        // 预生成4个符文预览（虚影），使用智能掉落预计算
-        this.runeChargePreviewRunes = [];
-        for (let i = 0; i < 4; i++) {
-            // loot_calcRuneDrop 返回 { runeId, level }，预览仅需符文定义
-            const dropResult = loot_calcRuneDrop(this);
-            const runeDef = dropResult.runeId ? RUNE_DB.find(r => r.id === dropResult.runeId) : null;
-            this.runeChargePreviewRunes.push(runeDef || null);
-        }
-        // [Task 3.2] 改为 EventBus 事件，由 hud.js 监听并初始化充能符文 DOM
+        this.runeChargeCurrentRune = null; // 初始为空，不预生成
+        // 通知 hud.js 初始化 UI（空状态）
         eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_INIT, {
-            previewRunes: this.runeChargePreviewRunes
+            runeDef: null
         });
     },
 
     /**
      * @method combat_runeCharge_onHit
-     * @description 子弹击中敌人时调用，充能并概率翻倍
-     * @param {number} hitX - 击中X坐标（用于显示徽章）
+     * @description 子弹击中敌人时调用，充能
+     * @param {number} hitX - 击中X坐标（保留参数，不再显示徽章）
      * @param {number} hitY - 击中Y坐标
      * @param {boolean} isKill - 是否为击杀
      */
@@ -2019,33 +2012,10 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         // 基础充能量（击杀给更多充能）
         const BASE_CHARGE = isKill ? 0.18 : 0.06;
 
-        // 概率翻倍机制：x1/x2/x4/x8，概率递减
-        // x1: 65%，x2: 25%，x4: 8%，x8: 2%
-        const roll = Math.random();
-        let multiplier = 1;
-        let badgeClass = '';
-        if (roll < 0.02) {
-            multiplier = 8;
-            badgeClass = 'x8';
-        } else if (roll < 0.10) {
-            multiplier = 4;
-            badgeClass = 'x4';
-        } else if (roll < 0.35) {
-            multiplier = 2;
-            badgeClass = 'x2';
-        }
-
-        const chargeAmount = BASE_CHARGE * multiplier;
-
-        // 显示翻倍徽章（当翻倍 > 1 时）
-        if (multiplier > 1) {
-            this.combat_runeCharge_showMultiplierBadge(hitX, hitY, `x${multiplier}`, badgeClass);
-        }
-
         // 累加充能值
-        this.runeChargeValue = Math.min(1.0, (this.runeChargeValue || 0) + chargeAmount);
+        this.runeChargeValue = Math.min(1.0, (this.runeChargeValue || 0) + BASE_CHARGE);
 
-        // 检查是否充能满（升级）
+        // 检查是否充能满 → 刷新符文预览
         if (this.runeChargeValue >= 1.0) {
             this.runeChargeValue = 0;
             this.combat_runeCharge_levelUp();
@@ -2057,19 +2027,20 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
 
     /**
      * @method combat_runeCharge_levelUp
-     * @description 充能满升级，提升符文奖励等级
+     * @description 充能条满，刷新当前预览符文（每次充满都会刷新一次符文）
      */
     combat_runeCharge_levelUp() {
-        if ((this.runeChargeLevel || 0) >= 4) return; // 已达最高等级
         this.runeChargeLevel = (this.runeChargeLevel || 0) + 1;
-        // [Task 3.2] 改为 EventBus 事件，由 hud.js 监听并更新充能等级 DOM
+        // 使用智能掉落算法抽取新符文
+        const runeId = loot_calcRuneDrop(this);
+        const runeDef = runeId ? RUNE_DB.find(r => r.id === runeId) : null;
+        this.runeChargeCurrentRune = runeDef || null;
+        // 通知 hud.js 刷新符文槽（带特效）
         eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_LEVEL_UP, {
-            level: this.runeChargeLevel
+            runeDef: this.runeChargeCurrentRune
         });
         // 音效反馈
-        try { if (audio && audio.playTone) audio.playTone(400 + this.runeChargeLevel * 120, 'sine', 0.08, 0.2); } catch(e) {}
-        const levelNames = ['', '铜级', '银级', '金级', '彩虹'];
-        showToast(`符文充能 → ${levelNames[this.runeChargeLevel]}奖励`);
+        try { if (audio && audio.playTone) audio.playTone(520, 'sine', 0.1, 0.25); } catch(e) {}
     },
 
     /**
@@ -2096,64 +2067,31 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         });
     },
 
-    /**
-     * @method combat_runeCharge_showMultiplierBadge
-     * @description 在击中位置显示翻倍徽章
-     */
-    combat_runeCharge_showMultiplierBadge(x, y, text, extraClass) {
-        // [Task 3.2] 改为 EventBus 事件，由 hud.js 监听并在页面坐标创建徽章 DOM
-        eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_BADGE, {
-            canvasX: x,
-            canvasY: y,
-            text,
-            extraClass,
-            gameWidth: this.width || 400,
-            gameHeight: this.height || 600
-        });
-    },
+    // combat_runeCharge_showMultiplierBadge 已移除（翻倍徽章功能已废弃）
 
     /**
      * @method combat_runeCharge_claimReward
-     * @description 战斗结束后按等级领取符文奖励
-     * 等级越高概率越小，但奖励越丰厚
+     * @description 战斗结束后领取当前预览符文（若有），并触发入背包动画
      */
     combat_runeCharge_claimReward() {
-        const level = this.runeChargeLevel || 0;
-        if (level === 0) return; // 无奖励
+        const runeDef = this.runeChargeCurrentRune;
+        if (!runeDef) return; // 未充能满过，无奖励
 
-        // 各等级对应的领取概率（已点亮的插槽）
-        // 等级越高概率越小，但奖励越好
-        const claimProbs = [0, 0.90, 0.65, 0.40, 0.20]; // index = 等级
+        // 将符文加入背包
+        this.runeInventory.push({ id: runeDef.id, level: 1 });
 
-        let claimedCount = 0;
-        for (let i = 0; i < level; i++) {
-            const prob = claimProbs[i + 1];
-            if (Math.random() < prob) {
-                const runeDef = this.runeChargePreviewRunes[i];
-                if (runeDef) {
-                    this.runeInventory.push({ id: runeDef.id, level: 1 });
-                    claimedCount++;
-                    const runeName = `${runeDef.icon || '🔮'} ${runeDef.name}`;
-                    this.spawn_createFloatingText(
-                        this.width / 2 + (Math.random() - 0.5) * 60,
-                        this.height / 2 + (Math.random() - 0.5) * 40,
-                        `+${runeName}`,
-                        '#fbbf24'
-                    );
-                }
-            }
-        }
+        // 触发入背包动画事件（由 hud.js 处理 DOM 动画）
+        eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_CLAIM, {
+            runeDef
+        });
 
-        if (claimedCount > 0) {
-            const levelNames = ['', '铜级', '银级', '金级', '彩虹'];
-            showToast(`符文奖励：${levelNames[level]} 共获得 ${claimedCount} 个符文`);
-            try { if (audio && audio.playPowerup) audio.playPowerup(); } catch(e) {}
-        }
+        // 音效
+        try { if (audio && audio.playPowerup) audio.playPowerup(); } catch(e) {}
 
         // 重置充能状态
         this.runeChargeValue = 0;
         this.runeChargeLevel = 0;
-        this.runeChargePreviewRunes = [];
+        this.runeChargeCurrentRune = null;
     },
 
     // =========================================

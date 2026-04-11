@@ -516,11 +516,13 @@ phase_gathering_getRandomPegType() {
             }
         }
 
-        // --- [充能符文系统] 战斗结束后领取充能奖励 ---
-        this.combat_runeCharge_claimReward();
-        // 将局内符文库存同步到存档（用于商店购买）
-        this.saveData.runeInventory = (this.runeInventory || []).slice();
-        this.sys_saveData();
+        // --- [充能符文系统] 战斗结束后领取充能奖励（延迟 300ms 让动画在战斗结束后播放） ---
+        setTimeout(() => {
+            this.combat_runeCharge_claimReward();
+            // 将局内符文库存同步到存档（用于商店购买）
+            this.saveData.runeInventory = (this.runeInventory || []).slice();
+            this.sys_saveData();
+        }, 300);
 
         // --- [符文系统] 自动拾取掉落符文 ---
         if (this.runeLootItems && this.runeLootItems.length > 0) {

@@ -42,10 +42,10 @@ export const EVENT_TYPES = {
     UI_MULTICAST_TRANSFER: 'ui:multicast_transfer',     // 播放倍率转移飞行特效
     UI_HIT_PROGRESS: 'ui:hit_progress',                // 更新命中进度条
     UI_AMMO_FIRED: 'ui:ammo_fired',                    // 弹药发射（触发动画+更新UI）
-    UI_RUNE_CHARGE_INIT: 'ui:rune_charge_init',        // 初始化充能符文UI
-    UI_RUNE_CHARGE_LEVEL_UP: 'ui:rune_charge_level_up', // 充能等级提升
-    UI_RUNE_CHARGE_UPDATE: 'ui:rune_charge_update',    // 更新充能条
-    UI_RUNE_CHARGE_BADGE: 'ui:rune_charge_badge',      // 显示翻倍徽章
+    UI_RUNE_CHARGE_INIT: 'ui:rune_charge_init',        // 初始化充能符文UI（单符文槽，空状态）
+    UI_RUNE_CHARGE_LEVEL_UP: 'ui:rune_charge_level_up', // 充能满 → 刷新符文预览（带特效）
+    UI_RUNE_CHARGE_UPDATE: 'ui:rune_charge_update',    // 更新充能条进度
+    UI_RUNE_CHARGE_CLAIM: 'ui:rune_charge_claim',      // 回合结束领取符文 → 入背包动画
     UI_CHROMATIC_ABERRATION: 'ui:chromatic_aberration', // CRT 色差特效
     UI_COMBAT_MESSAGE: 'ui:combat_message',            // 战斗消息文本
     UI_ROUND_NUM_UPDATE: 'ui:round_num_update',        // 更新回合数显示
