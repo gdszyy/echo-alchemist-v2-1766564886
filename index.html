@@ -1187,15 +1187,7 @@
                     <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-red-100">試煉場</span>
                 </button>
             </div>
-            <!-- 符文发射器入口按钮 -->
-            <button onclick="game.ui_openRuneLauncher()" class="mt-6 flex items-center gap-3 px-6 py-3 bg-slate-900/40 border border-purple-700/50 rounded-xl hover:bg-slate-800/60 hover:border-purple-400/60 transition-all duration-300 group backdrop-blur-sm">
-                <span class="text-2xl group-hover:scale-110 transition-transform inline-block">🔮</span>
-                <div class="text-left">
-                    <div class="text-sm font-bold text-purple-200 tracking-wider group-hover:text-purple-100">符文發射器</div>
-                    <div class="text-[10px] text-purple-400/60 tracking-widest uppercase">Rune Launcher</div>
-                </div>
-                <div id="meta-rune-active-badge" class="hidden ml-auto bg-purple-500/20 border border-purple-400/40 rounded-full px-2 py-0.5 text-[10px] text-purple-300 font-bold">激活中</div>
-            </button>
+
         </div>
         
         <div class="absolute bottom-4 w-full text-center text-slate-700 text-[10px] font-[Cinzel] tracking-widest opacity-50">
@@ -1331,7 +1323,14 @@
         <div class="w-full flex flex-col items-center pointer-events-auto shrink-0 z-10 bg-slate-900/80 backdrop-blur-sm border-t border-slate-700/50 pt-4 pb-6" 
              style="padding-bottom: max(24px, env(safe-area-inset-bottom));">
             
-            <p class="text-sm text-slate-400 mb-3">已選擇: <span id="selected-count" class="text-white font-bold">0</span> / 3</p>
+            <div class="flex items-center justify-between w-full px-4 mb-3">
+                <p class="text-sm text-slate-400">已選擇: <span id="selected-count" class="text-white font-bold">0</span> / 3</p>
+                <!-- 符文发射器入口（选择阶段） -->
+                <button onclick="game.ui_openRuneLauncher()" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 border border-purple-700/50 rounded-lg hover:bg-purple-900/30 hover:border-purple-400/70 transition-all duration-200 group">
+                    <span class="text-sm group-hover:scale-110 transition-transform inline-block">⚡</span>
+                    <span class="text-xs font-bold text-purple-300 tracking-wider group-hover:text-purple-100">符文發射器</span>
+                </button>
+            </div>
             <button id="confirm-selection-btn" class="btn-main" disabled>開始煉金</button>
         </div>
 
@@ -1390,6 +1389,10 @@
         <button onclick="game.ui_openRuneBackpack()" class="absolute bottom-24 right-2 w-10 h-10 bg-slate-800/90 hover:bg-purple-900/80 rounded-full border-2 border-purple-500/50 hover:border-purple-400 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg">
             <span class="text-lg">🔮</span>
         </button>
+        <!-- 研磨阶段符文发射器按钮 -->
+        <button onclick="game.ui_openRuneLauncher()" class="absolute bottom-36 right-2 w-10 h-10 bg-slate-800/90 hover:bg-purple-900/80 rounded-full border-2 border-purple-600/60 hover:border-purple-300 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg" title="符文發射器">
+            <span class="text-lg">⚡</span>
+        </button>
 
         <div class="bottom-panel">
         <div class="flex items-center w-full h-full">
@@ -1416,6 +1419,10 @@
         <!-- 战斗阶段符文背包按钮 -->
         <button onclick="game.ui_openRuneBackpack()" class="absolute bottom-2 right-2 w-10 h-10 bg-slate-800/90 hover:bg-purple-900/80 rounded-full border-2 border-purple-500/50 hover:border-purple-400 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg">
             <span class="text-lg">🔮</span>
+        </button>
+        <!-- 战斗阶段符文发射器按钮 -->
+        <button onclick="game.ui_openRuneLauncher()" class="absolute bottom-14 right-2 w-10 h-10 bg-slate-800/90 hover:bg-purple-900/80 rounded-full border-2 border-purple-600/60 hover:border-purple-300 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg" title="符文發射器">
+            <span class="text-lg">⚡</span>
         </button>
         
         <div class="text-center mt-4 pointer-events-none">
