@@ -179,6 +179,35 @@ export const combat_system = {
                 sword.addTarget(enemy);
             }
         });
+        // [Agent D] 剑刃风暴词条 Hook：为飞剑添加周期性范围斩击逻辑
+        const bladeStormFx = this.activeRunewordEffects && this.activeRunewordEffects['blade_storm'];
+        if (bladeStormFx) {
+            const radius = (bladeStormFx.params && bladeStormFx.params.radius) || 120;
+            const damageRatio = (bladeStormFx.params && bladeStormFx.params.damageRatio) || 0.6;
+            const interval = Math.max(0.1, (bladeStormFx.params && bladeStormFx.params.interval) || 0.5);
+            const now = Date.now();
+            // 使用节流器避免每帧触发
+            if (!this._bladeStormLastTick || (now - this._bladeStormLastTick) >= interval * 1000) {
+                this._bladeStormLastTick = now;
+                // 对飞剑周围 radius px 内的所有敌人造成风属性伤害
+                this.sonSwords.forEach(sword => {
+                    if (!sword.active || sword.isMotherBlade) return;
+                    const baseDmg = sword.config ? sword.config.damage : 2;
+                    const slashDmg = Math.ceil(baseDmg * damageRatio);
+                    this.enemies.forEach(e => {
+                        if (!e.active) return;
+                        if (sword.pos.dist(e.pos) < radius) {
+                            const slashResult = e.takeDamage(slashDmg);
+                            this.combat_recordDamage(slashResult.actualDamage, 'wind', 'flying_sword', null);
+                            this.spawn_createFloatingText(e.pos.x, e.pos.y - 20, `风斩+${Math.ceil(slashResult.actualDamage)}`, '#34d399');
+                        }
+                    });
+                    // 视觉特效
+                    const angle = Math.random() * Math.PI * 2;
+                    this.spawn_pushParticleWithLimit(new SlashAnim(sword.pos.x, sword.pos.y, angle, 0.35, '#34d399'));
+                });
+            }
+        }
     },
 
 // --- 新增方法：添加子剑 ---
@@ -1328,8 +1357,45 @@ export const combat_system = {
             'wind': '#34d399', 'flying_sword': '#0ea5e9', 'scatter': '#facc15'
         };
         const damageColor = colorMap[damageType] || '#ffffff';
-        
- 
+
+        // [Agent D] 炎光剑影词条 Hook：穿透命中时有概率召唤飞剑
+        if (isPierceHit && !projectile.isCopy) {
+            const flameSwordFx = this.activeRunewordEffects && this.activeRunewordEffects['flame_sword'];
+            if (flameSwordFx) {
+                const triggerChance = (flameSwordFx.params && flameSwordFx.params.triggerChance) || 0;
+                const damageRatio = (flameSwordFx.params && flameSwordFx.params.damageRatio) || 0.5;
+                if (Math.random() < triggerChance) {
+                    // 生成一把火系飞剑，目标为当前被穿透的敌人
+                    const swordConfig = {
+                        damage: Math.ceil(config.damage * damageRatio),
+                        pyro: Math.max(1, config.pyro || 1),
+                        cryo: 0, lightning: 0, wind: 0,
+                        multicast: 0
+                    };
+                    this.combat_flyingSword_addSon(hitX, hitY, null, lvl, swordConfig, 0);
+                    this.combat_flyingSword_assignTarget(enemy);
+                    this.spawn_createParticle(hitX, hitY, '#f97316', 'spark');
+                    this.spawn_createFloatingText(hitX, hitY - 20, '剑光!', '#f97316');
+                }
+            }
+        }
+
+        // [Agent D] 雷电护盾词条 Hook：弹跳命中时有概率在命中位置生成静电场
+        if (isBounceHit && config.lightning > 0 && !projectile.isCopy) {
+            const lightningShieldFx = this.activeRunewordEffects && this.activeRunewordEffects['lightning_shield'];
+            if (lightningShieldFx) {
+                const triggerChance = (lightningShieldFx.params && lightningShieldFx.params.triggerChance) || 0;
+                const damageRatio = (lightningShieldFx.params && lightningShieldFx.params.damageRatio) || 0.5;
+                if (Math.random() < triggerChance) {
+                    // 在命中位置生成静电场（复用 combat_wind_addAnchor，传入闪电属性）
+                    const staticDmg = Math.ceil(config.damage * damageRatio);
+                    const staticConfig = { lightning: Math.max(1, config.lightning), damage: staticDmg, wind: 0 };
+                    this.combat_wind_addAnchor(hitX, hitY, staticDmg, staticConfig);
+                    this.spawn_createFloatingText(hitX, hitY - 20, '静电场!', '#c084fc');
+                }
+            }
+        }
+
         this.combat_recordDamage(actualDmg, damageType, sourceType, shotId);
 
         // [新增] Boss 狂暴阶段即时掉落：HP 首次降至 50% 时生成 1 个 Lv1 符文并立即自动拾取
@@ -1384,18 +1450,22 @@ export const combat_system = {
 
         // --- 2. [火属性核心逻辑] 燃烧与过热爆炸 ---
         if (config.pyro > 0 && enemy.temp >= 34) {
-            
+            // [Agent D] 熔毁词条 Hook：计算火焰伤害倍率
+            let meltdownMult = 1.0;
+            const meltdownFx = this.activeRunewordEffects && this.activeRunewordEffects['meltdown'];
+            if (meltdownFx) {
+                const bonus = (meltdownFx.params && meltdownFx.params.damageBonus) || 0;
+                meltdownMult = 1.0 + bonus;
+            }
             // Step 1: 计算当前的基础额外火伤 (移除平方根以优化性能，改用线性比例 /150)
             const baseFireDmg = (config.pyro * enemy.temp) / 200;
-
-            // Step 2: 造成基础燃烧伤害
+            // Step 2: 造成基础燃烧伤害（应用熔毁倍率）
             if (baseFireDmg >= 1) {
-                const fireResult = enemy.takeDamage(baseFireDmg);
+                const fireResult = enemy.takeDamage(baseFireDmg * meltdownMult);
                 this.combat_recordDamage(fireResult.actualDamage, 'pyro', sourceType, shotId);
                 // 显示橙色燃烧字样
                 this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 25, `Burn ${Math.ceil(fireResult.actualDamage)}`, '#fb923c');
             }
-
             // Step 3: [新增] 过热爆炸机制 (Small Explosion)
             // 设定阈值 and 动态概率
             const pyroCfg = CONFIG.mechanics.pyro;
@@ -1417,8 +1487,8 @@ export const combat_system = {
                 // B. 执行消耗：先扣除
                 enemy.temp -= consumedHeat;
 
-                // C. 计算爆炸伤害
-                const explodeDmg = baseFireDmg * pyroCfg.damageMult;
+                // C. 计算爆炸伤害（应用熔毁倍率）
+                const explodeDmg = baseFireDmg * pyroCfg.damageMult * meltdownMult;
                 
                 if (explodeDmg >= 1) {
                     // --- 1. 视觉特效 (参考爆炸子弹) ---

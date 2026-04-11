@@ -177,9 +177,30 @@ export const CollisionSystem = {
             // 构造衰减后的配方，仅覆盖 damage 字段，其余属性保持不变
             const attenuatedRecipe = { ...recipe, damage: attenuatedDamage };
             this.combat_damageEnemy(hit.enemy, { config: attenuatedRecipe, pos: new Vec2(hit.projX, hit.projY), isCopy: false });
-
             // 视觉：受击点特效
             if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#fff', 'spark');
+            // [Agent D] 照射词条 Hook：激光累积照射同一敌人伤害加深
+            const irradiationFx = this.activeRunewordEffects && this.activeRunewordEffects['irradiation'];
+            if (irradiationFx) {
+                const amp = (irradiationFx.params && irradiationFx.params.damageAmp) || 0;
+                // 初始化敌人的累积照射计数器（每次激光发射时重置）
+                if (!hit.enemy._irradiationStacks) hit.enemy._irradiationStacks = 0;
+                hit.enemy._irradiationStacks++;
+                // 对敌人施加额外伤害：层数 × 单次加深比例 × 基础伤害
+                const stackDmg = hit.enemy._irradiationStacks * amp * recipe.damage;
+                if (stackDmg >= 1) {
+                    const stackResult = hit.enemy.takeDamage(stackDmg);
+                    this.combat_recordDamage(stackResult.actualDamage, 'pyro', 'main', null);
+                    this.spawn_createFloatingText(hit.enemy.pos.x, hit.enemy.pos.y - 35, `照射+${Math.ceil(stackResult.actualDamage)}`, '#fbbf24');
+                }
+            }
+            // [Agent D] 炽热光线词条 Hook：激光命中敌人时额外升温
+            const blazingBeamFx = this.activeRunewordEffects && this.activeRunewordEffects['blazing_beam'];
+            if (blazingBeamFx) {
+                const tempIncrease = (blazingBeamFx.params && blazingBeamFx.params.tempIncrease) || 0;
+                hit.enemy.applyTemp(tempIncrease);
+                if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#f97316', 'spark');
+            }
         });
     },
 

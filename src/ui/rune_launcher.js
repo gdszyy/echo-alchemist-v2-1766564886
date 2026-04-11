@@ -369,43 +369,50 @@ export const rune_launcher_system = {
 
             const card = document.createElement('div');
             card.className = [
-                'relative flex flex-col items-center gap-0.5 p-2',
-                'rounded-xl cursor-pointer select-none',
-                'transition-all duration-200',
-                isSelected
-                    ? 'bg-purple-900/40 border-2 border-purple-400/80 shadow-[0_0_8px_rgba(168,85,247,0.5)]'
-                    : 'bg-slate-800/60 border-2 border-slate-600/40 hover:border-purple-500/40',
+                'flex items-start gap-3 p-3',
+                'bg-purple-900/20 border border-purple-700/40 rounded-xl',
             ].join(' ');
-
+            // [Agent D] 根据 level 动态计算效果数值描述
+            const level = rw.level || 1;
+            const bp = rw.baseParams || {};
+            const lp = rw.perLevelParams || {};
+            const calcParam = (key) => (bp[key] || 0) + (lp[key] || 0) * (level - 1);
+            let dynamicDesc = '';
+            if (rw.effectId === 'meltdown') {
+                const bonus = Math.round(calcParam('damageBonus') * 100);
+                dynamicDesc = `火焰/过热伤害 +${bonus}%`;
+            } else if (rw.effectId === 'irradiation') {
+                const amp = Math.round(calcParam('damageAmp') * 100);
+                dynamicDesc = `激光累积伤害加深 +${amp}%/次`;
+            } else if (rw.effectId === 'blazing_beam') {
+                const temp = calcParam('tempIncrease');
+                dynamicDesc = `激光每次命中升温 +${temp}`;
+            } else if (rw.effectId === 'flame_sword') {
+                const chance = Math.round(calcParam('triggerChance') * 100);
+                const ratio = Math.round(calcParam('damageRatio') * 100);
+                dynamicDesc = `穿透触发率 ${chance}%，剑光伤害 ${ratio}%`;
+            } else if (rw.effectId === 'lightning_shield') {
+                const chance = Math.round(calcParam('triggerChance') * 100);
+                const ratio = Math.round(calcParam('damageRatio') * 100);
+                dynamicDesc = `弹跳触发率 ${chance}%，静电场伤害 ${ratio}%`;
+            } else if (rw.effectId === 'blade_storm') {
+                const radius = calcParam('radius');
+                const ratio = Math.round(calcParam('damageRatio') * 100);
+                const interval = Math.max(0.1, calcParam('interval')).toFixed(1);
+                dynamicDesc = `范围 ${radius}px，伤害 ${ratio}%，间隔 ${interval}s`;
+            }
+            const statsText = rw.stats
+                ? Object.entries(rw.stats).map(([k, v]) => `${k}+${v}`).join(', ')
+                : '';
             card.innerHTML = `
-                <span class="text-xl">${runeDef.icon || '?'}</span>
-                <span class="text-[9px] text-slate-300 text-center leading-tight">${runeDef.name}</span>
-                <span class="absolute top-0.5 right-0.5 text-[8px] font-bold px-1 rounded
-                    ${runeLevel > 1 ? 'text-amber-400 bg-slate-900/60' : 'text-slate-500 bg-slate-900/40'}">
-                    Lv.${runeLevel}
-                </span>
-                ${isSelected ? '<span class="absolute bottom-0.5 left-0.5 text-[8px] text-purple-300">✓</span>' : ''}
+                <div class="flex-1">
+                    <div class="text-sm font-bold text-purple-200">${rw.name} <span class="text-xs text-amber-400 font-normal">Lv.${level}</span></div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">${rw.effect_desc || ''}</div>
+                    ${dynamicDesc ? `<div class="text-[10px] text-emerald-400 mt-1">${dynamicDesc}</div>` : ''}
+                    ${statsText ? `<div class="text-[10px] text-amber-300 mt-1">${statsText}</div>` : ''}
+                </div>
+                <span class="text-green-400 text-xs font-bold whitespace-nowrap">激活</span>
             `;
-
-            card.addEventListener('click', () => {
-                if (!this._selectedRuneIndices) this._selectedRuneIndices = new Set();  // [Mixin 正常用法：读取 Game 实例状态]
-                if (this._selectedRuneIndices.has(idx)) {  // [Mixin 正常用法：读取 Game 实例状态]
-                    // 取消选中
-                    this._selectedRuneIndices.delete(idx);  // [Mixin 正常用法：读取 Game 实例状态]
-                } else {
-                    // 添加选中（最多 3 个）
-                    if (this._selectedRuneIndices.size >= 3) {  // [Mixin 正常用法：读取 Game 实例状态]
-                        // 移除最早选中的
-                        const first = this._selectedRuneIndices.values().next().value;  // [Mixin 正常用法：读取 Game 实例状态]
-                        this._selectedRuneIndices.delete(first);  // [Mixin 正常用法：读取 Game 实例状态]
-                    }
-                    this._selectedRuneIndices.add(idx);  // [Mixin 正常用法：读取 Game 实例状态]
-                }
-                // 刷新库存显示和按鈕状态
-                this._ui_updateRuneInventoryDisplay();
-                this._ui_updateRuneActionButtons();
-            });
-
             container.appendChild(card);
         });
 
@@ -439,15 +446,43 @@ export const rune_launcher_system = {
                 'flex items-start gap-3 p-3',
                 'bg-purple-900/20 border border-purple-700/40 rounded-xl',
             ].join(' ');
-
+            // [Agent D] 根据 level 动态计算效果数值描述
+            const level = rw.level || 1;
+            const bp = rw.baseParams || {};
+            const lp = rw.perLevelParams || {};
+            const calcParam = (key) => (bp[key] || 0) + (lp[key] || 0) * (level - 1);
+            let dynamicDesc = '';
+            if (rw.effectId === 'meltdown') {
+                const bonus = Math.round(calcParam('damageBonus') * 100);
+                dynamicDesc = `火焰/过热伤害 +${bonus}%`;
+            } else if (rw.effectId === 'irradiation') {
+                const amp = Math.round(calcParam('damageAmp') * 100);
+                dynamicDesc = `激光累积伤害加深 +${amp}%/次`;
+            } else if (rw.effectId === 'blazing_beam') {
+                const temp = calcParam('tempIncrease');
+                dynamicDesc = `激光每次命中升温 +${temp}`;
+            } else if (rw.effectId === 'flame_sword') {
+                const chance = Math.round(calcParam('triggerChance') * 100);
+                const ratio = Math.round(calcParam('damageRatio') * 100);
+                dynamicDesc = `穿透触发率 ${chance}%，剑光伤害 ${ratio}%`;
+            } else if (rw.effectId === 'lightning_shield') {
+                const chance = Math.round(calcParam('triggerChance') * 100);
+                const ratio = Math.round(calcParam('damageRatio') * 100);
+                dynamicDesc = `弹跳触发率 ${chance}%，静电场伤害 ${ratio}%`;
+            } else if (rw.effectId === 'blade_storm') {
+                const radius = calcParam('radius');
+                const ratio = Math.round(calcParam('damageRatio') * 100);
+                const interval = Math.max(0.1, calcParam('interval')).toFixed(1);
+                dynamicDesc = `范围 ${radius}px，伤害 ${ratio}%，间隔 ${interval}s`;
+            }
             const statsText = rw.stats
                 ? Object.entries(rw.stats).map(([k, v]) => `${k}+${v}`).join(', ')
                 : '';
-
             card.innerHTML = `
                 <div class="flex-1">
-                    <div class="text-sm font-bold text-purple-200">${rw.name}</div>
+                    <div class="text-sm font-bold text-purple-200">${rw.name} <span class="text-xs text-amber-400 font-normal">Lv.${level}</span></div>
                     <div class="text-[10px] text-slate-400 mt-0.5">${rw.effect_desc || ''}</div>
+                    ${dynamicDesc ? `<div class="text-[10px] text-emerald-400 mt-1">${dynamicDesc}</div>` : ''}
                     ${statsText ? `<div class="text-[10px] text-amber-300 mt-1">${statsText}</div>` : ''}
                 </div>
                 <span class="text-green-400 text-xs font-bold whitespace-nowrap">激活</span>
