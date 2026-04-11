@@ -51,6 +51,14 @@ export const game_phase = {
         // 事件总线广播阶段切换
         eventBus.emit('phase:change', { from: oldPhase, to: newPhase });
         
+        // [修复] 每次切换阶段时重置 container 的 3D 变换，防止研磨阶段的倾斜特效泄漏到其他阶段
+        const container = document.getElementById('game-container');
+        if (container) {
+            container.style.transform = '';
+            container.style.perspective = '';
+            container.style.transition = '';
+        }
+        
         this.ui_updateUI(); // 更新 UI 界面
         // [重构] 将阶段标题的 DOM 操作集中到 ui_system.js 的 ui_onPhaseChange 方法中
         this.ui_onPhaseChange(newPhase);
@@ -1191,9 +1199,10 @@ phase_gathering_getRandomPegType() {
         }
         this.ctx.restore();
 
-        // --- [新增] 手机偏移提示强化：绘制边缘泛光和水平仪指示器 ---
+        // --- [新增] 手机偏移提示强化：绘制边缘泛光 ---
         this.drawTiltVignette(this.ctx, this.boardTilt.current);
-        this.drawTiltIndicator(this.ctx, this.boardTilt.current);
+        // [移除] 删除底部倾斜指示条调用，设计上不够简洁且在战斗阶段会被结算 UI 遮挡
+        // this.drawTiltIndicator(this.ctx, this.boardTilt.current);
         
     },
 
@@ -1420,6 +1429,48 @@ phase_gathering_getRandomPegType() {
             //  绘制时也可以传入 tilt 做球体高光偏移 (可选)
             ball.draw(this.ctx, tilt);
             
+            // --- [新增] 绘制球体牵徕线（仅在研磨阶段绘制）---
+            if (ball.active && Math.abs(tilt.x) > 0.05) {
+                const tiltStrength = Math.abs(tilt.x); // 0 ~ 1
+                const lineAlpha = tiltStrength * 0.6;  // 透明度随倾斜增强
+                const lineWidth = 1 + tiltStrength * 2; // 线宽随倾斜增强
+                const dashLen = 6;
+                const gapLen = 8;
+                
+                this.ctx.save();
+                this.ctx.globalAlpha = lineAlpha;
+                this.ctx.lineWidth = lineWidth;
+                this.ctx.setLineDash([dashLen, gapLen]);
+                this.ctx.lineDashOffset = -(Date.now() / 80) % (dashLen + gapLen); // 动态流动效果
+                
+                let edgeX, gradStart, gradEnd;
+                if (tilt.x < 0) {
+                    // 向左倾斜：牵徕线连到左边缘
+                    edgeX = 0;
+                    gradStart = this.ctx.createLinearGradient(ball.pos.x, ball.pos.y, edgeX, ball.pos.y);
+                } else {
+                    // 向右倾斜：牵徕线连到右边缘
+                    edgeX = this.width;
+                    gradStart = this.ctx.createLinearGradient(ball.pos.x, ball.pos.y, edgeX, ball.pos.y);
+                }
+                
+                // 渐变颜色：球体中心为蓝紫色，边缘渐变透明
+                gradStart.addColorStop(0, `rgba(139, 92, 246, ${lineAlpha})`);
+                gradStart.addColorStop(0.5, `rgba(99, 102, 241, ${lineAlpha * 0.6})`);
+                gradStart.addColorStop(1, 'rgba(99, 102, 241, 0)');
+                
+                this.ctx.strokeStyle = gradStart;
+                this.ctx.shadowBlur = 4 + tiltStrength * 6;
+                this.ctx.shadowColor = 'rgba(139, 92, 246, 0.5)';
+                
+                this.ctx.beginPath();
+                this.ctx.moveTo(ball.pos.x, ball.pos.y);
+                this.ctx.lineTo(edgeX, ball.pos.y);
+                this.ctx.stroke();
+                
+                this.ctx.restore();
+            }
+            
             if (result) {
                 // 處理彈珠落出屏幕
                 if (result === 'finished') {
@@ -1556,19 +1607,13 @@ phase_gathering_getRandomPegType() {
                 if (s.alpha <= 0) this.shockwaves.splice(i, 1);
             }
         }
-        // 在 updateGathering 的末尾添加对 DOM 的操作
-        //const container = document.getElementById('game-container');
-        const tx = this.boardTilt.current.x * -10; // 负值产生视差
-        const ty = this.boardTilt.current.y * -5;
+        // [注意] 研磨阶段的 container 3D 变换已在函数头部设置，此处不再重复设置（避免覆盖主要的 3D 旋转特效）
+        // 之前的代码已在头部设置了正确的 rotateX/rotateY 特效
 
-        // 这里的 transform 会让整个 UI 产生微弱的悬浮感
-        container.style.perspective = "1000px";
-        // 甚至可以增加旋转感 (谨慎使用，可能会晕)
-        container.style.transform = `rotateY(${tx * 0.2}deg) rotateX(${-ty * 0.2}deg)`;
-
-        // --- [新增] 手机偏移提示强化：绘制边缘泛光和水平仪指示器 ---
+        // --- [新增] 手机偏移提示强化：绘制边缘泛光 ---
         this.drawTiltVignette(this.ctx, this.boardTilt.current);
-        this.drawTiltIndicator(this.ctx, this.boardTilt.current);
+        // [移除] 删除底部倾斜指示条调用，设计上不够简洁
+        // this.drawTiltIndicator(this.ctx, this.boardTilt.current);
 
     },
 };

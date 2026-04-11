@@ -491,10 +491,10 @@ render_singleWindMatrix(matrix) {
         if (absTilt < 0.02) return; // 偏移量极小时不绘制，避免性能浪费
 
         ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalCompositeOperation = 'source-over'; // [修改] 从 'lighter' 改为 'source-over'，避免过亮的叠加效果
 
-        const vignetteWidth = this.width * 0.45; // 泛光宽度最大为画布宽度的 45%
-        const maxAlpha = 0.55; // 最大透明度
+        const vignetteWidth = this.width * 0.35; // [修改] 泛光宽度从 0.45 降低到 0.35
+        const maxAlpha = 0.25; // [修改] 最大透明度从 0.55 降低到 0.25
         const alpha = absTilt * maxAlpha;
 
         if (tiltX < 0) {
