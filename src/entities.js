@@ -1716,7 +1716,7 @@ class DropBall {
             if (buffs.laser > 0) {
                 // ... (保持原有的激光绘制逻辑不变) ...
                 const laserColor = CONFIG.colors.laser || '#0ea5e9';
-                const pulse = (Math.sin(this.lifeTime * 5) + 1) / 1; 
+                const pulse = (Math.sin(this.lifeTime * 5) + 1) / 2; // [bugfix] 除数应为 2，使 pulse 范围为 [0,1]
                 const sizeMod = 1 + (buffs.laser * 0.15); 
                 ctx.save();
                 ctx.globalCompositeOperation = 'lighter'; 
@@ -4434,7 +4434,7 @@ class Projectile {
             ctx.beginPath();
             ctx.arc(0, 0, radius * 0.8 * sizeMod, 0, Math.PI * 2);
             ctx.fill();
-            // [fix] 删除此处的 restore+return，由函数末尾统一 restore
+            ctx.restore(); // [bugfix] orb 分支必须自行 restore，否则 else 块被跳过时状态栈泄漏
         } else {
         // 3. 绘制形状 (orb 的 else 分支，即正常绘制路径)
         ctx.scale(deformation.x, deformation.y);
