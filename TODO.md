@@ -16,10 +16,10 @@
 | :--- | :--- | :--- |
 | Task 2.1 entities.js 工具/特效 | `math_utils.js`(170行) + `particles.js`(781行) | ✅ 已验收 |
 | Task 2.2 entities.js 核心实体 | `enemy.js`(1321行) + `projectile.js`(784行)，entities.js 降至 3245 行 | ✅ 已验收 |
-| Task 2.3 combat_system.js 拆分 | `damage_calc.js`(273行) + `collision.js`(172行)，标记 TODO[Task 3.2] | ✅ 已验收 |
-| Task 2.4 ui_system.js 拆分 | `hud.js`(690行) + `shop.js`(328行) + `rune_launcher.js`(615行)，标记 98 处耦合点 | ✅ 已验收 |
+| Task 2.3 combat_system.js 拆分 | `damage_calc.js`(273行) + `collision.js`(172行) | ✅ 已验收 |
+| Task 2.4 ui_system.js 拆分 | `hud.js`(690行) + `shop.js`(328行) + `rune_launcher.js`(615行) | ✅ 已验收 |
 
-**阶段二成果：** entities.js 从 6141 行降至 3245 行（降幅 47%），所有巨型文件已完成物理拆分。
+**阶段二成果：** entities.js 从 6141 行降至 3245 行（降幅 47%），ui_system.js 从 ~2021 行降至 519 行（降幅 74%）。
 
 ---
 
@@ -29,10 +29,11 @@
   - 16 个标准事件，覆盖 119 处 TODO[Task 3.2] 标记
   - event_bus.js 新增 EVENT_TYPES 常量、调试模式、错误隔离
 
-- [ ] **Task 3.2** 消除 UI 层与业务层的强耦合 🚀 派发中 ([对话链接](https://manus.im/app/Xag9nL639MsGYgGYW6USEA))
-  - 将 119 处 TODO[Task 3.2] 标记的直接 DOM 操作改为 eventBus.emit
-  - 分三批次（低/中/高风险）逐步替换，每批验证功能
+- [x] **Task 3.2** 消除 UI 层与业务层的强耦合 ✅ 已验收（commit 2d8b226，分支已合并）
+  - combat_system.js 新增 11 处 eventBus.emit，hud.js 注册 8 个监听器
+  - event_bus.js 扩展 10 个 UI 类事件常量，所有 TODO[Task 3.2] 标记已清零
 
-- [ ] **Task 3.3** 移除 `Object.assign` Mixin 模式 ⏳ 等待 Task 3.2 完成
-  - 重构 core.js，将混入到 Game.prototype 的方法改为组合模式
-  - 修复 this 指向问题，更新 global.md 禁止使用 Mixin
+- [ ] **Task 3.3** 移除 `Object.assign` Mixin 模式 🚀 派发中 ([对话链接](https://manus.im/app/bkMXLYbuXCXyp3hFRWR2fe))
+  - 将 core.js 末尾的 Object.assign(Game.prototype, ...) 改为组合模式
+  - 10 个子系统（270+ 个方法）逐步迁移，采用渐进式 bind 方案
+  - 更新 global.md 明确禁止 Mixin 模式
