@@ -37,6 +37,10 @@ import { combat_system } from './combat_system.js';
 import { render_system } from './render_system.js';
 import { spawn_system } from './spawn_system.js';
 import { ui_system } from './ui_system.js';
+// [Task 2.4] 导入拆分后的 UI 子模块
+import { hud_system } from './ui/hud.js';
+import { shop_system } from './ui/shop.js';
+import { rune_launcher_system } from './ui/rune_launcher.js';
 import { calc_utils } from './calc_utils.js';
 
 // ==================== 延迟音频初始化 ====================
@@ -262,8 +266,11 @@ class Game {
     }
 }
 
+// [Task 2.4] UI 子模块通过 Object.assign 混入 Game 实例
 Object.assign(Game.prototype, 
-    game_system, game_phase, combat_system, render_system, spawn_system, ui_system, calc_utils
+    game_system, game_phase, combat_system, render_system, spawn_system,
+    ui_system, hud_system, shop_system, rune_launcher_system,
+    calc_utils
 );
 
 export { SoundManager, Game, audio, eventBus, initAudio };
