@@ -19,6 +19,34 @@
  * 4. 提供事件历史记录（可选，用于调试）
  */
 
+export const EVENT_TYPES = {
+    // 阶段类事件
+    PHASE_CHANGED: 'phase:change',
+    WAVE_ADVANCED: 'wave:advance',
+
+    // 战斗类事件
+    COMBAT_DAMAGE_DEALT: 'damage:dealt',
+    COMBAT_ENEMY_KILLED: 'enemy:killed',
+    COMBAT_AMMO_FIRED: 'combat:ammo_fired',
+    COMBAT_HIT_PROGRESS: 'combat:hit_progress',
+    COMBAT_RUNE_CHARGE: 'combat:rune_charge',
+    COMBAT_EFFECT_TRIGGER: 'combat:effect_trigger',
+
+    // UI 类事件
+    UI_HUD_UPDATE: 'ui:hud_update',
+    UI_SHOP_UPDATE: 'ui:shop_update',
+    UI_RUNE_UPDATE: 'ui:rune_update',
+
+    // 元数据类事件
+    META_CURRENCY_CHANGED: 'meta:currency_changed',
+    META_INVENTORY_CHANGED: 'meta:inventory_changed',
+    META_RELIC_ACQUIRED: 'meta:relic_acquired',
+
+    // 系统类事件
+    SYSTEM_AUDIO_READY: 'audio:ready',
+    SYSTEM_ERROR: 'system:error'
+};
+
 class EventBus {
     constructor(options = {}) {
         /** @type {Map<string, Set<Function>>} 事件 -> 处理函数集合 */
@@ -91,6 +119,7 @@ class EventBus {
      */
     emit(event, data) {
         if (this._debug) {
+            console.log(`[EventBus] emit('${event}')`, data);
             this._recordHistory(event, data);
         }
 
@@ -200,4 +229,5 @@ class EventBus {
 // 单例模式：整个游戏共享一个事件总线
 const eventBus = new EventBus();
 
+// 为了兼容现有的直接导入
 export { EventBus, eventBus };
