@@ -1240,7 +1240,8 @@ class DropBall {
                         ember.vel.y -= (buffs.pyro * 0.2);  
                         ember.size *= (0.42 + Math.random() * 4.2); // 大小随机
                         
-                        game.particles.push(ember);
+                        // [限制] 通过受限推送，风属性激活时自动压缩火焰配额
+                        game.spawn_pushParticleWithLimit(ember);
                         
                         // 3. 偶尔生成黑烟 (增加对比度，让亮色更亮)
                         if (Math.random() < 0.15) {
@@ -1268,14 +1269,14 @@ class DropBall {
                         
                         // 微调：根据 Cryo 层数，雾气可以更大一点
                         mist.size *= (1 + buffs.cryo * 0.1);
-
-                        game.particles.push(mist);
+                        // [限制] 通过受限推送，风属性激活时自动压缩冰雾配额
+                        game.spawn_pushParticleWithLimit(mist);
                         
                         // 3. 偶尔生成一点点晶莹的冰渣 (增加对比度)
                         if (Math.random() < 0.05) {
                             const shard = new Particle(spawnX, spawnY, '#a5f3fc', 'shard');
                             shard.size = 2; // 很小的冰晶
-                            game.particles.push(shard);
+                            game.spawn_pushParticleWithLimit(shard);
                         }
                     }
                 }
@@ -2285,7 +2286,8 @@ class Enemy {
                 heatSmoke.vel.y = -0.8 - Math.random() * 0.8; // 上升速度稍快
                 heatSmoke.vel.x = (Math.random() - 0.5) * 0.5; // 稍微左右飘
                 heatSmoke.size = this.width * 0.35; // 大团烟雾
-                game.particles.push(heatSmoke);
+                // [限制] 热浪烟雾也受风属性压制
+                game.spawn_pushParticleWithLimit(heatSmoke);
             }
 
             // 2.  燃烧时的黑烟 -> 改为 Ember (燃烧的余烬/火星)
@@ -2331,7 +2333,8 @@ class Enemy {
                     mist.size *= (1 + freezeIntensity * 0.2);
                     mist.vel = new Vec2((Math.random() - 0.5) * 0.3, 0.8 + Math.random() * 0.5); // 下沉
                     mist.decay *= 1.5; 
-                    game.particles.push(mist);
+                    // [限制] 冰雾受风属性压制
+                    game.spawn_pushParticleWithLimit(mist);
                 }
                 chancePool -= 1.0; 
             }
@@ -2339,7 +2342,8 @@ class Enemy {
             if (this.temp <= -80 && Math.random() < 0.08 * timeScale) {
                 const shard = new Particle(this.pos.x + (Math.random() - 0.5) * this.width, this.pos.y, '#a5f3fc', 'shard');
                 shard.size = 2.5; 
-                game.particles.push(shard);
+                // [限制] 冰渣受风属性压制
+                game.spawn_pushParticleWithLimit(shard);
             }
         }
     }
@@ -2392,7 +2396,8 @@ class Enemy {
                     for(let i=0; i<3; i++) {
                         const p = new Particle(this.pos.x, this.pos.y, '#a5f3fc', 'shard');
                         p.vel.y = -2; // 向上崩裂
-                        if (typeof game.particles !== 'undefined') game.particles.push(p);
+                        // [限制] 冰渣受风属性压制
+                        if (typeof game.particles !== 'undefined') game.spawn_pushParticleWithLimit(p);
                     }
                 }
             }
@@ -2718,13 +2723,15 @@ class Enemy {
             mist.vel = new Vec2(dirX * 1.5, 1.0); 
             mist.size = this.width * 0.5; 
             mist.life = 1.5; 
-            game.particles.push(mist);
+            // [限制] 冰冻雾气受风属性压制
+            game.spawn_pushParticleWithLimit(mist);
         }
         for(let i=0; i<8; i++) {
             const p = new Particle(this.pos.x + (Math.random()-0.5) * this.width, this.pos.y, '#a5f3fc', 'shard');
             // 给予一个向下的初速度，增强撞击感
             p.vel = new Vec2((Math.random()-0.5) * 4, 2 + Math.random() * 3);
-            game.particles.push(p);
+            // [限制] 冰冻冰渣受风属性压制
+            game.spawn_pushParticleWithLimit(p);
         }
     }
 
@@ -3528,7 +3535,8 @@ class SonSword {
                          if (distSq < hitDist * hitDist) {
                              this.hitEnemiesInDash.add(e);
                              game.combat_damageEnemy(e, { config: this.config, pos: this.pos, isCopy: true });
-                             game.particles.push(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.4));
+                             // [限制] SlashAnim 受全局粒子上限约束
+                             game.spawn_pushParticleWithLimit(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.4));
                              audio.playSlash();
                              
                              // [新增] 冲刺中击中敌人也消耗攻击次数
@@ -3703,12 +3711,12 @@ class SonSword {
             // 回收伤害设定
             const fsCfg = CONFIG.mechanics.flying_sword;
             game.combat_damageEnemy(enemy, { config: this.config, pos: this.pos, isCopy: true }, fsCfg.recallDamageMult);
-            game.particles.push(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.35));
+             // [限制] SlashAnim 受全局粒子上限约束
+            game.spawn_pushParticleWithLimit(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.35));
                 audio.playSlash();
             }
             return;
         }
-
         if (enemy === this.currentTarget && this.passingThroughEnemy !== enemy) {
             const fsCfg = CONFIG.mechanics.flying_sword;
             let dmg = this.config.damage * fsCfg.dashDamageMult;
@@ -3720,11 +3728,11 @@ class SonSword {
             }
 
             // 特效
-            game.particles.push(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.5));
+            // [限制] SlashAnim 受全局粒子上限约束
+            game.spawn_pushParticleWithLimit(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.5));
             game.spawn_createParticle(this.pos.x, this.pos.y, '#0ea5e9', 'spark');
             audio.playSlash();
-
-            this.passingThroughEnemy = enemy;
+            this.passingThroughEnemy = enemy;;
             this.vel = this.vel.norm().mult(this.dashSpeed);
             this.currentTarget = null; 
 
@@ -4087,7 +4095,8 @@ class Projectile {
             if (Math.random() < 0.7) {
                 const spark = new Particle(this.pos.x, this.pos.y, '#fbbf24', 'spark');
                 spark.vel = this.vel.mult(-0.2).add(new Vec2((Math.random()-0.5)*2, (Math.random()-0.5)*2));
-                game.particles.push(spark);
+                // [限制] 爆炸火花受全局粒子上限约束
+                game.spawn_pushParticleWithLimit(spark);
             }
         }
     }
@@ -4162,7 +4171,8 @@ class Projectile {
             if (this.config.lightning > 0) slashColor = '#c084fc'; 
             else if (this.config.pyro > 0) slashColor = '#f97316';
             else if (this.config.cryo > 0) slashColor = '#06b6d4';
-            game.particles.push(new SlashEffect(center.x, center.y, angle, length, slashColor));
+            // [限制] SlashEffect 受全局粒子上限约束
+            game.spawn_pushParticleWithLimit(new SlashEffect(center.x, center.y, angle, length, slashColor));
             audio.playSlash();
         }
 

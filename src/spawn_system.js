@@ -599,20 +599,91 @@ export const spawn_system = {
      * @param {string} [mode='normal'] - 粒子的行为模式 (e.g., 'normal', 'confetti')。
      */
     spawn_createParticle(x, y, color, mode = 'normal') {
-        // [优化] 限制粒子总数，防止高频触发（如火焰）导致卡顿
-        const MAX_PARTICLES = 800; // 粒子上限翻倍 (原 400)
-        const EMBER_LIMIT = 150; // 针对性能开销大的火焰粒子设置更严格的限制
-        
+        // ============================================================
+        // [粒子数量限制系统] v2 - 风属性有限供给 + 动态压制
+        // ============================================================
+        const MAX_PARTICLES = 800; // 全局粒子总上限
+
+        // --- 1. 全局上限检查 ---
         if (this.particles.length > MAX_PARTICLES) return null;
-        
+
+        // --- 2. 风属性粒子：有限供给 ---
+        // wind_slash（风刃）和 line（风道气流）为风属性专属粒子，设置独立配额
+        const WIND_PARTICLE_LIMIT = 120; // 风属性粒子最大存量
+        if (mode === 'wind_slash' || mode === 'line') {
+            const currentWind = this.particles.filter(p => p.mode === 'wind_slash' || p.mode === 'line').length;
+            if (currentWind >= WIND_PARTICLE_LIMIT) return null;
+        }
+
+        // --- 3. 检测场上是否存在活跃的风属性粒子 ---
+        // 当风属性粒子存在时，动态压缩火/冰粒子的可用配额
+        const activeWindCount = this.particles.filter(p => p.mode === 'wind_slash' || p.mode === 'line').length;
+        const windIsActive = activeWindCount > 0;
+
+        // --- 4. 火焰粒子（ember）限制 ---
+        // 基础上限较严格；风属性激活时进一步压缩
+        const EMBER_LIMIT_BASE = 80;  // 基础火焰粒子上限（比原 150 更严格）
+        const EMBER_LIMIT_WIND = 30;  // 风属性激活时的火焰粒子上限
         if (mode === 'ember') {
+            const limit = windIsActive ? EMBER_LIMIT_WIND : EMBER_LIMIT_BASE;
             const currentEmbers = this.particles.filter(p => p.mode === 'ember').length;
-            if (currentEmbers > EMBER_LIMIT) return null;
+            if (currentEmbers >= limit) return null;
+        }
+
+        // --- 5. 冰霜粒子（mist / shard）限制 ---
+        // 基础上限较严格；风属性激活时进一步压缩
+        const MIST_LIMIT_BASE = 80;   // 基础冰雾粒子上限
+        const MIST_LIMIT_WIND = 30;   // 风属性激活时的冰雾粒子上限
+        const SHARD_LIMIT_BASE = 60;  // 基础冰渣粒子上限
+        const SHARD_LIMIT_WIND = 20;  // 风属性激活时的冰渣粒子上限
+        if (mode === 'mist') {
+            const limit = windIsActive ? MIST_LIMIT_WIND : MIST_LIMIT_BASE;
+            const currentMist = this.particles.filter(p => p.mode === 'mist').length;
+            if (currentMist >= limit) return null;
+        }
+        if (mode === 'shard') {
+            const limit = windIsActive ? SHARD_LIMIT_WIND : SHARD_LIMIT_BASE;
+            const currentShard = this.particles.filter(p => p.mode === 'shard').length;
+            if (currentShard >= limit) return null;
         }
 
         const p = new Particle(x, y, color, mode);
         this.particles.push(p);
         return p;
+    },
+
+    /**
+     * [SPAWN] 受限粒子推送 - 供 entities.js 中直接 push 的场景使用。
+     * 对 ember / mist / shard 执行与 spawn_createParticle 相同的风属性压制检查，
+     * 返回 true 表示允许推送，返回 false 表示被限制。
+     * @param {Particle} p - 已构造好的粒子实例
+     */
+    spawn_pushParticleWithLimit(p) {
+        const MAX_PARTICLES = 800;
+        if (this.particles.length > MAX_PARTICLES) return false;
+
+        const mode = p.mode;
+        const activeWindCount = this.particles.filter(q => q.mode === 'wind_slash' || q.mode === 'line').length;
+        const windIsActive = activeWindCount > 0;
+
+        if (mode === 'ember') {
+            const limit = windIsActive ? 30 : 80;
+            const current = this.particles.filter(q => q.mode === 'ember').length;
+            if (current >= limit) return false;
+        }
+        if (mode === 'mist') {
+            const limit = windIsActive ? 30 : 80;
+            const current = this.particles.filter(q => q.mode === 'mist').length;
+            if (current >= limit) return false;
+        }
+        if (mode === 'shard') {
+            const limit = windIsActive ? 20 : 60;
+            const current = this.particles.filter(q => q.mode === 'shard').length;
+            if (current >= limit) return false;
+        }
+
+        this.particles.push(p);
+        return true;
     },
 
 /**
@@ -794,7 +865,8 @@ export const spawn_system = {
      */
     spawn_createExplosion(x, y, color) { 
         for(let i=0; i<10; i++) { 
-            this.particles.push(new Particle(x, y, color || '#f87171')); 
+            // [限制] 爆炸粒子受全局粒子上限约束
+            this.spawn_pushParticleWithLimit(new Particle(x, y, color || '#f87171')); 
         } 
     },
 
@@ -896,7 +968,8 @@ export const spawn_system = {
                 for(let i=0; i<3; i++) {
                     const p = new Particle(targetX, targetY, color, 'spark');
                     p.vel = new Vec2((Math.random()-0.5)*3, (Math.random()-0.5)*3);
-                    this.particles.push(p);
+                    // [限制] 收集粒子受全局粒子上限约束
+                    this.spawn_pushParticleWithLimit(p);
                 }
 
                 if (this.currentSession.currentHits >= this.currentSession.nextTriggerThreshold) {

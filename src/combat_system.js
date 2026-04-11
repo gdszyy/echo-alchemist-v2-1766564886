@@ -1387,9 +1387,9 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
                 // 颜色：随机在 青色 和 白色 之间跳动
                 const color = Math.random() > 0.5 ? '#cffafe' : '#ffffff';
                 const shard = new Particle(hitX, hitY, color, 'shard');
-                this.particles.push(shard);
+                // [限制] 冰刺受风属性压制
+                this.spawn_pushParticleWithLimit(shard);
             }
-
             // 3. 滞留寒雾 (Lingering Mist)
             // 在击中点生成一团慢慢扩散的雾气
             const mistCount = 3 + Math.floor(config.cryo / 2);
@@ -1401,7 +1401,8 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
                 const mist = new Particle(mx, my, null, 'mist');
                 // 初始给一个向外的扩散速度
                 mist.vel = new Vec2((mx - hitX)*0.05, (my - hitY)*0.05);
-                this.particles.push(mist);
+                // [限制] 寒雾受风属性压制
+                this.spawn_pushParticleWithLimit(mist);
             }
 
         } else if (config.pyro > 0) {
@@ -1617,7 +1618,8 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
                     else if (sword.config.pyro > 0) slashColor = '#f97316'; // 火属性
                     else if (sword.config.cryo > 0) slashColor = '#06b6d4'; // 冰属性
                     
-                    this.particles.push(new SlashAnim(sword.pos.x, sword.pos.y, angle, 0.35, slashColor));
+                    // [限制] SlashAnim 受全局粒子上限约束
+                    this.spawn_pushParticleWithLimit(new SlashAnim(sword.pos.x, sword.pos.y, angle, 0.35, slashColor));
                     this.spawn_createParticle(sword.pos.x, sword.pos.y, slashColor, 'spark');
                 }
             });
@@ -2193,7 +2195,8 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         }
 
         // --- 3. 生成视觉与音效 ---
-        this.particles.push(new LaserBeam(points, width, color));
+        // [限制] LaserBeam 受全局粒子上限约束
+        this.spawn_pushParticleWithLimit(new LaserBeam(points, width, color));
         
         // 音效：越粗越低沉
         audio.playTone(Math.max(100, 800 - width * 20), 'sawtooth', 0.15, 0.2 + width * 0.01);
