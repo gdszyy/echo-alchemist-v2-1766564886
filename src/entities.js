@@ -4368,7 +4368,8 @@ class Projectile {
             ctx.lineWidth = 2;
             ctx.lineCap = 'round';
             ctx.stroke();
-            // [fix] 删除此处的 restore+return，改为 else if 结构，由函数末尾统一 restore
+            ctx.restore(); // [bugfix] flying_sword 分支必须自行 restore，否则跳过 else 块时状态栈泄漏，导致后续 sonSwords/特效跟随大宝剑坐标系渲染
+            return; // flying_sword 分支结束，直接返回
         } else {
         
         // 1. 确定形状
