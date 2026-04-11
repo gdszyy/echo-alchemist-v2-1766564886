@@ -1,6 +1,6 @@
 # 事件总线与通信规范 (EventBus Architecture)
 
-> 最后更新：Task 3.1（完善 EventBus 机制，定义标准事件字典）
+> 最后更新：tsk-c146dd4f-d25（EventBus 魔法字符串替换与事件字典同步：修正 COMBAT_DAMAGE_DEALT 和 COMBAT_ENEMY_KILLED 的 Payload 描述，同步字符串值与实际代码）
 
 ## 1. 架构概述
 
@@ -22,8 +22,8 @@
 
 | 事件名常量 | 字符串值 | 触发时机 | Payload 结构 | 监听方 |
 | :--- | :--- | :--- | :--- | :--- |
-| `COMBAT_DAMAGE_DEALT` | `combat:damage_dealt` | 弹丸对敌人造成伤害时 | `{ enemy: object, damage: number, attr: string, killed: boolean, hitX: number, hitY: number }` | 核心引擎、UI 系统（伤害统计）、符文充能系统 |
-| `COMBAT_ENEMY_KILLED` | `combat:enemy_killed` | 敌人死亡时 | `{ enemy: object, hitX: number, hitY: number }` | 核心引擎、UI 系统、掉落系统 |
+| `COMBAT_DAMAGE_DEALT` | `damage:dealt` | 弹丸对敌人造成伤害时 | `{ enemy: object, amount: number, type: string, sourceType: string, shotId: number, hitX: number, hitY: number, killed: boolean }` | 核心引擎、UI 系统（伤害统计）、符文充能系统 |
+| `COMBAT_ENEMY_KILLED` | `enemy:killed` | 敌人死亡时 | `{ enemy: object, maxHp: number, shotId: number }` | 核心引擎、UI 系统、掉落系统 |
 | `COMBAT_AMMO_FIRED` | `combat:ammo_fired` | 玩家发射一发弹药时 | `{ recipe: object, shotId: number }` | UI 系统（更新弹药槽、播放动画） |
 | `COMBAT_HIT_PROGRESS` | `combat:hit_progress` | 连击进度更新时 | `{ current: number, target: number }` | UI 系统（更新连击进度条） |
 | `COMBAT_RUNE_CHARGE` | `combat:rune_charge` | 符文充能等级提升时 | `{ level: number, value: number }` | UI 系统（更新充能条、播放动画） |
@@ -64,16 +64,18 @@ import { eventBus, EVENT_TYPES } from './event_bus.js';
 // 派发事件
 eventBus.emit(EVENT_TYPES.COMBAT_DAMAGE_DEALT, {
     enemy: targetEnemy,
-    damage: 100,
-    attr: 'pyro',
-    killed: false,
+    amount: 100,
+    type: 'pyro',
+    sourceType: 'main',
+    shotId: 12345,
     hitX: targetEnemy.pos.x,
-    hitY: targetEnemy.pos.y
+    hitY: targetEnemy.pos.y,
+    killed: false
 });
 
 // 监听事件
 eventBus.on(EVENT_TYPES.COMBAT_DAMAGE_DEALT, (data) => {
-    console.log(`Dealt ${data.damage} ${data.attr} damage`);
+    console.log(`Dealt ${data.amount} ${data.type} damage`);
 });
 ```
 

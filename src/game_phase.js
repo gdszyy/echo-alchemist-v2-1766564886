@@ -9,7 +9,7 @@ import {
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
-import { eventBus } from './event_bus.js';
+import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
 
 export const game_phase = {
@@ -36,7 +36,7 @@ export const game_phase = {
         this.prevRoundDamage = this.roundDamage; // 记录上一回合伤害
         this.roundDamage = 0; // 重置本回合伤害
         // 事件总线广播波次推进（[BUGFIX #5b] 保留：不在此处更新 DOM，由 UI 监听 wave:advance 事件处理）
-        eventBus.emit('wave:advance', { round: this.round });
+        eventBus.emit(EVENT_TYPES.WAVE_ADVANCED, { round: this.round });
     },
 
 /**
@@ -49,7 +49,7 @@ export const game_phase = {
         this.phase = newPhase;
         
         // 事件总线广播阶段切换
-        eventBus.emit('phase:change', { from: oldPhase, to: newPhase });
+        eventBus.emit(EVENT_TYPES.PHASE_CHANGED, { from: oldPhase, to: newPhase });
         
         // [修复] 每次切换阶段时重置 container 的 3D 变换，防止研磨阶段的倾斜特效泄漏到其他阶段
         const container = document.getElementById('game-container');
@@ -591,7 +591,7 @@ phase_gathering_getRandomPegType() {
         this.round++;
         this.prevRoundDamage = this.roundDamage;
         this.roundDamage = 0;
-        eventBus.emit('ui:round_num_update', { round: this.round });
+        eventBus.emit(EVENT_TYPES.UI_ROUND_NUM_UPDATE, { round: this.round });
         document.getElementById("round-num").innerText = this.round;
         showToast(`Round ${this.round}`);
 
