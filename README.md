@@ -55,3 +55,16 @@
 更多技术细节和历史设计文档，请查阅 `docs/` 目录下的相关文件。
 
 > **注**：之前的 Godot 4.x 迁移尝试已归档至 `docs/archive/godot_migration/`，当前主干专注于 HTML5 Canvas 版本。
+
+## 4. 架构改造与 AI 协作流升级计划 (Ongoing)
+
+目前项目正在进行大规模的架构改造，旨在降低 AI 辅助开发时的 Token 消耗，彻底消除巨型 Mixin 模式，并建立基于 Git 的活文档（Living Documentation）知识库。
+
+改造工程分为三个主要阶段：
+1. **基础设施与知识库搭建**：建立 `.cursor/rules/` 目录和 `AGENTS.md` 索引，规范 AI 调度流程。
+2. **核心模块物理拆分**：将 `entities.js`、`combat_system.js` 等巨型文件拆分为更小粒度的文件。
+3. **架构解耦与通信重构**：完善 `EventBus` 机制，彻底分离 UI 层与业务逻辑。
+
+详细的改造规划和任务拆分，请参阅：
+- [架构改造规划](docs/refactoring_plan.md)
+- [TODO 任务清单](TODO.md)
