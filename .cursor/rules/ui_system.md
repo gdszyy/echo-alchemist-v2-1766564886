@@ -52,22 +52,28 @@ Object.assign(Game.prototype,
 由于 UI 模块是通过 `Object.assign` 混入到 Game 实例中的，**UI 模块直接读取 `this.xxx`（如 `this.ammoQueue`、`this.runeInventory`、`this.saveData`）是符合架构设计的正常用法**。
 这不属于强耦合，因为 UI 模块本身就是 Game 实例的一部分。在 Task 3.2 中，之前误标的 `TODO[Task 3.2]` 注释已被清理或替换为说明性注释。
 
-## 5. 修改规范
+## 5. 已知问题与修复记录
 
-### 5.1 新增 UI 功能
+| 日期 | 文件 | 问题描述 | 修复方式 |
+|---|---|---|---|
+| 2026-04-11 | `src/ui_system.js` | `_ui_updateRuneStatsDisplay` 函数体（约 47 行）被错误地遗留在 `ui_system.js` 中，缺少方法名声明，导致 `Uncaught SyntaxError: Unexpected identifier 'summary'` | 从 `ui_system.js` 删除游离函数体，并将其填充至 `rune_launcher.js` 中已声明但为空的同名方法 |
+
+## 6. 修改规范
+
+### 6.1 新增 UI 功能
 
 1. 判断功能属于哪个 UI 区域（HUD / 商店 / 符文发射器 / 核心协调）
 2. 在对应模块文件中添加方法
 3. 方法名遵循 `ui_` 或 `_ui_` 前缀约定
 4. 如果方法直接读取 Game 状态，添加 `// TODO[Task 3.2]: 改为监听 EventBus 事件` 注释
 
-### 5.2 修改现有 UI 函数
+### 6.2 修改现有 UI 函数
 
 - **微型修改（< 20 行）**：使用 `file edit` 工具的搜索替换
 - **中型修改（20-200 行）**：生成 diff 补丁
 - **禁止全量重写** `hud.js`（690行）、`rune_launcher.js`（615行）等大文件
 
-### 5.3 禁止行为
+### 6.3 禁止行为
 
 - 禁止在 `combat_system.js`、`game_phase.js` 等业务逻辑模块中直接操作 DOM
 - 禁止在 UI 模块中直接修改 `this.phase` 等核心状态（应通过 `phase_switchPhase` 或 EventBus）
