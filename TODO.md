@@ -1,6 +1,8 @@
 # Echo Alchemist V2 改造工程 TODO 清单
 
-**最后更新：** 2026年4月11日
+**最后更新：** 2026年4月11日 | **状态：🎉 全部完成**
+
+---
 
 ## 阶段一：基础设施与知识库搭建 ✅ 全部完成
 
@@ -23,17 +25,30 @@
 
 ---
 
-## 阶段三：架构解耦与通信重构
+## 阶段三：架构解耦与通信重构 ✅ 全部完成
 
 - [x] **Task 3.1** 完善 EventBus + 定义标准事件字典 ✅ 已验收
-  - 16 个标准事件，覆盖 119 处 TODO[Task 3.2] 标记
+  - 16 个标准事件（三段式命名），覆盖 119 处 TODO[Task 3.2] 标记
   - event_bus.js 新增 EVENT_TYPES 常量、调试模式、错误隔离
 
-- [x] **Task 3.2** 消除 UI 层与业务层的强耦合 ✅ 已验收（commit 2d8b226，分支已合并）
+- [x] **Task 3.2** 消除 UI 层与业务层的强耦合 ✅ 已验收（commit 2d8b226）
   - combat_system.js 新增 11 处 eventBus.emit，hud.js 注册 8 个监听器
-  - event_bus.js 扩展 10 个 UI 类事件常量，所有 TODO[Task 3.2] 标记已清零
+  - 所有 TODO[Task 3.2] 标记已清零（119 → 0）
 
-- [ ] **Task 3.3** 移除 `Object.assign` Mixin 模式 🚀 派发中 ([对话链接](https://manus.im/app/bkMXLYbuXCXyp3hFRWR2fe))
-  - 将 core.js 末尾的 Object.assign(Game.prototype, ...) 改为组合模式
-  - 10 个子系统（270+ 个方法）逐步迁移，采用渐进式 bind 方案
-  - 更新 global.md 明确禁止 Mixin 模式
+- [x] **Task 3.3** 移除 `Object.assign` Mixin 模式 ✅ 已验收（PR #48 已合并）
+  - core.js 末尾的 Object.assign(Game.prototype, ...) 已完全移除
+  - 改为构造函数中 bind(this) 组合模式，10 个子系统全部迁移
+  - global.md 新增第 5 节「子系统扩展规范」，明确禁止 Mixin 模式
+
+---
+
+## 改造工程总结
+
+| 指标 | 改造前 | 改造后 | 变化 |
+| :--- | :--- | :--- | :--- |
+| entities.js 行数 | 6,141 行 | 3,245 行 | **-47%** |
+| ui_system.js 行数 | ~2,021 行 | 519 行 | **-74%** |
+| 最大单文件 Token 估算 | ~63,000 | ~33,000 | **-48%** |
+| 模块规范文档 | 0 个 | 9 个 | +9 |
+| 标准事件类型 | 0 个 | 26 个 | +26 |
+| Game.prototype 方法来源 | Mixin（全局污染） | bind 组合（实例隔离） | 架构升级 |
