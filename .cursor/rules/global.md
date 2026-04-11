@@ -31,7 +31,7 @@
     *   **依赖关系**：依赖 `core.js` 中的全局状态，并通过事件总线与其他模块通信。
 *   **`game_phase.js`**
     *   **核心职责**：游戏阶段管理（命运抉择、研磨、战斗等阶段的具体逻辑与转场）。
-    *   **依赖关系**：依赖 `combat_system.js`、`ui_system.js` 和事件总线。
+    *   **依赖关系**：依赖 `entities.js`、`config.js`、`audio.js`、`event_bus.js`、`rune_config.js` 和 `systems.js`。**不直接依赖 `combat_system.js` 和 `ui_system.js`**，而是通过事件总线（EventBus）与它们通信（如 `phase:change`、`wave:advance` 等事件）。
 *   **`combat_system.js`**
     *   **核心职责**：战斗逻辑、技能触发、伤害计算、动态难度调整（DDA）评估。
     *   **依赖关系**：依赖 `entities.js`（实体行为）和事件总线。
@@ -39,8 +39,8 @@
     *   **核心职责**：UI 更新、商店渲染、HUD 管理，将视图渲染逻辑与业务逻辑分离。
     *   **依赖关系**：监听事件总线以更新视图，依赖 `config.js`。
 *   **`entities.js`**
-    *   **核心职责**：实体定义（如弹珠、钉子、敌人、特效粒子及特殊槽位）。包含高频调用的 `update` 方法，是性能优化的重点。
-    *   **依赖关系**：依赖 `audio.js`（通过注入）和 `config.js`。
+    *   **核心职责**：实体系统聚合入口，re-export 所有实体类。直接定义 `MarbleDefinition`、`SpecialSlot`、`FortuneWheel`、`Peg`、`DropBall`、飞剑系统（`SwordQi`、`SlashAnim`、`SonSword`）、`CloneSpore`、`Player`、`RuneLoot` 等实体；通过 import/re-export 聚合已拆分的子模块（`Enemy` → `entities/enemy.js`，`Projectile` → `entities/projectile.js`，工具函数 → `utils/math_utils.js`，特效类 → `effects/particles.js`）。包含高频调用的 `update` 方法，是性能优化的重点。
+    *   **依赖关系**：依赖 `audio.js`（通过 `setAudioProvider` 注入，并统一分发给 `enemy.js` 和 `projectile.js`）、`config.js`、`utils/math_utils.js`、`effects/particles.js`、`entities/enemy.js` 和 `entities/projectile.js`。
 *   **`config.js` / `rune_config.js`**
     *   **核心职责**：全局常量、属性字典、遗物、技能、商店配置及符文系统的数据字典。
     *   **依赖关系**：被几乎所有模块引用。
@@ -69,7 +69,7 @@
 
 为保障项目的稳定性和工程规范，特制定以下禁止行为清单。任何违反以下规定的行为都将被视为不合格：
 
-*   **禁止全量交付超大文件**：绝对禁止在未拆分的情况下，直接输出或覆盖超过 500 行的巨型文件（如 `entities.js` 约 6140 行，`combat_system.js` 约 2593 行）。对于此类文件，必须先拆分，再局部修改。
+*   **禁止全量交付超大文件**：绝对禁止在未拆分的情况下，直接输出或覆盖超过 500 行的巨型文件（如 `entities.js` 约 3249 行，`combat_system.js` 约 2216 行；另有子模块 `entities/enemy.js` 约 1702 行、`ui/hud.js` 约 879 行、`game_phase.js` 约 1674 行等）。对于此类文件，必须先拆分，再局部修改。
 *   **禁止跳过文档更新步骤**：任何对代码核心逻辑、API、架构或状态管理的修改，**必须在同一个 Commit 中同步更新对应模块的 `.cursor/rules/*.md` 文档**。代码与规范文档必须保持强一致性。
 *   **禁止直接修改全局状态**：严禁在子系统（如 `game_phase.js` 或 `combat_system.js`）中直接通过 `this` 或 `window` 访问并修改全局 `Game` 实例的状态。必须使用 `event_bus.js` 进行状态同步。
 *   **禁止业务逻辑操作 DOM**：严禁在非 UI 模块（特别是 `combat_system.js` 和 `entities.js`）中直接调用 DOM API（如 `innerHTML`、`classList.add` 等）。所有视图更新必须通过事件总线交由 `ui_system.js` 处理。
