@@ -18,6 +18,7 @@
 import { CONFIG } from '../config.js';
 import { Vec2, lerp, lerpColor } from '../utils/math_utils.js';
 import { Particle } from '../effects/particles.js';
+import { eventBus } from '../event_bus.js';
 
 // audio 代理由 entities.js 注入，通过模块级变量共享
 // 注意：Enemy 类使用的 audio 对象来自 entities.js 的依赖注入机制
@@ -81,6 +82,13 @@ class Enemy {
         this.telegraphTimer = 0;   // 预警倒计时
         this.actionIcon = '';      // 即将触发的动作图标
         this.actionName = '';      // 动作名称
+
+        // Boss 专属属性（普通敌人为 undefined）
+        this.bossType = undefined;      // Boss 类型 ID（如 'ignis', 'glacies' 等）
+        this.bossName = undefined;      // Boss 显示名称
+        this.berserked = false;         // 是否已进入狂暴阶段
+        this.rotationTurnCount = 0;     // 奥罗波罗斯词缀轮转计数器
+        this.rotationIndex = 0;         // 奥罗波罗斯当前词缀组索引
 
         this.swordMarks = 0; // 剑痕标记层数
         this.markTimer = 0;  // 标记持续时间
@@ -464,6 +472,11 @@ class Enemy {
         if (this.affixes.includes('haste')) actionCount = 2;
         else if (this.actionName === '狂暴') actionCount = 2;
 
+        // Boss 行为差异化：根据 bossType 修改行动次数
+        if (this.type === 'boss' && this.bossType) {
+            actionCount = this._getBossActionCount(actionCount);
+        }
+
         for (let i = 0; i < actionCount; i++) {
             const isSecondAction = (i === 1);
 
@@ -480,7 +493,12 @@ class Enemy {
 
             // --- 2. 治疗 ---
             if (this.affixes.includes('healer')) {
-                const range = this.width * afx.healerRange;
+                // Boss 维里迪斯特殊：狂暴后治疗范围扩大到全场
+                let effectiveHealerRange = afx.healerRange;
+                if (this.type === 'boss' && this.bossType === 'viridis' && this._berserkedHealerRange) {
+                    effectiveHealerRange = this._berserkedHealerRange;
+                }
+                const range = this.width * effectiveHealerRange;
                 let healedCount = 0;
                 game.enemies.forEach(other => {
                     if (other !== this && other.active && other.hp < other.maxHp && this.pos.dist(other.pos) < range) {
@@ -501,23 +519,50 @@ class Enemy {
 
             // --- 3. 吞噬 ---
             if (this.actionName === '吞噬') {
-                 const range = this.width * afx.devourRange;
-                 const neighbors = game.enemies.filter(e => 
-                     e !== this && e.active && e.type !== 'boss' && this.pos.dist(e.pos) < range
-                 );
-                 if (neighbors.length > 0) {
-                     const victim = neighbors[Math.floor(Math.random() * neighbors.length)];
-                     const absorbHp = victim.hp;
-                     const absorbMax = victim.maxHp;
-                     this.maxHp += absorbMax;
-                     this.hp += absorbHp;
-                     victim.affixes.forEach(af => { if (!this.affixes.includes(af)) this.affixes.push(af); });
-                     const isDead = victim.takeDamage(99999); 
-                     if (isDead) game.spawn_addScore(absorbMax); 
-                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, "DEVOUR!", "#ef4444");
-                     game.spawn_createParticle(victim.pos.x, victim.pos.y, '#ef4444', 'mist'); 
-                     game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
-                     audio.playEffect('split');
+                 // Boss 噬神者特殊行为：吞噬相邻敌人获得护盾层数
+                 if (this.type === 'boss' && this.bossType === 'devourer') {
+                     const bossDevourCfg = CONFIG.balance.bossConfigs && CONFIG.balance.bossConfigs.devourer;
+                     const rangeBonus = bossDevourCfg ? (bossDevourCfg.devourRangeBonus || 0) : 0;
+                     const devourRange = this._berserkedDevourRange || (afx.devourRange + rangeBonus);
+                     const range = this.width * devourRange;
+                     const neighbors = game.enemies.filter(e =>
+                         e !== this && e.active && e.type !== 'boss' && this.pos.dist(e.pos) < range
+                     );
+                     if (neighbors.length > 0) {
+                         const victim = neighbors[Math.floor(Math.random() * neighbors.length)];
+                         // 吸收护盾层数（而非血量）
+                         const absorbedShield = (victim.shieldCharges || 0) + 1;
+                         if (!this.affixes.includes('shield')) {
+                             this.affixes.push('shield');
+                         }
+                         this.shieldCharges = (this.shieldCharges || 0) + absorbedShield;
+                         const isDead = victim.takeDamage(99999);
+                         if (isDead) game.spawn_addScore(victim.maxHp);
+                         game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, 'DEVOUR! +Shield ' + absorbedShield, '#ef4444');
+                         game.spawn_createParticle(victim.pos.x, victim.pos.y, '#ef4444', 'mist');
+                         game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
+                         audio.playEffect('split');
+                     }
+                 } else {
+                     // 普通吞噬行为
+                     const range = this.width * afx.devourRange;
+                     const neighbors = game.enemies.filter(e => 
+                         e !== this && e.active && e.type !== 'boss' && this.pos.dist(e.pos) < range
+                     );
+                     if (neighbors.length > 0) {
+                         const victim = neighbors[Math.floor(Math.random() * neighbors.length)];
+                         const absorbHp = victim.hp;
+                         const absorbMax = victim.maxHp;
+                         this.maxHp += absorbMax;
+                         this.hp += absorbHp;
+                         victim.affixes.forEach(af => { if (!this.affixes.includes(af)) this.affixes.push(af); });
+                         const isDead = victim.takeDamage(99999); 
+                         if (isDead) game.spawn_addScore(absorbMax); 
+                         game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, 'DEVOUR!', '#ef4444');
+                         game.spawn_createParticle(victim.pos.x, victim.pos.y, '#ef4444', 'mist'); 
+                         game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
+                         audio.playEffect('split');
+                     }
                  }
             }
 
@@ -539,24 +584,29 @@ class Enemy {
                 this.advance(moveAmount);
             } else {
                 if (this.affixes.includes('jump')) {
-                    const jumpTargetY = this.dropTargetY + (moveAmount * afx.jumpRows);
+                    // Boss 格拉西斯特殊：狂暴后跳跃行数增加
+                    let effectiveJumpRows = afx.jumpRows;
+                    if (this.type === 'boss' && this.bossType === 'glacies') {
+                        effectiveJumpRows = this._berserkedJumpRows || effectiveJumpRows;
+                    }
+                    const jumpTargetY = this.dropTargetY + (moveAmount * effectiveJumpRows);
                     const isJumpBlocked = game.calc_isAreaOccupied(this.pos.x, jumpTargetY, this.width * 0.8, this.height * 0.8, this);
                     if (!isJumpBlocked) {
-                        this.advance(moveAmount * 2);
+                        this.advance(moveAmount * effectiveJumpRows);
                         this.bumpOffsetY = -30; 
-                        game.spawn_createFloatingText(this.pos.x, this.pos.y, "JUMP!", "#38bdf8");
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y, 'JUMP!', '#38bdf8');
                         game.spawn_createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist'); 
                         audio.playEffect('split');
                     } else {
                         if (i === 0) {
                             this.bumpOffsetY = -10;
-                            if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "⛔ BLOCKED", "#ef4444");
+                            if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
                         }
                     }
                 } else {
                     if (i === 0) {
                         this.bumpOffsetY = -10;
-                        if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "⛔ BLOCKED", "#ef4444");
+                        if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
                     }
                 }
             }
@@ -680,33 +730,103 @@ class Enemy {
                 // --- 5. 跳躍 (Jump) [新增] ---
                 // 如果被阻擋，且擁有 jump 詞條，檢查下下個格子
                 if (this.affixes.includes('jump')) {
-                    // [修改] 跳跃行数 (jumpRows)
-                    const jumpTargetY = this.dropTargetY + (moveAmount * afx.jumpRows);
+                    // Boss 格拉西斯特殊：狂暴后跳跃行数增加
+                    let effectiveJumpRows = afx.jumpRows;
+                    if (this.type === 'boss' && this.bossType === 'glacies') {
+                        effectiveJumpRows = this._berserkedJumpRows || effectiveJumpRows;
+                    }
+                    const jumpTargetY = this.dropTargetY + (moveAmount * effectiveJumpRows);
                     const isJumpBlocked = game.calc_isAreaOccupied(this.pos.x, jumpTargetY, this.width * 0.8, this.height * 0.8, this);
                     
                     if (!isJumpBlocked) {
-                        // 執行跳躍
-                        this.advance(moveAmount * 2);
-                        this.bumpOffsetY = -30; // 視覺上跳得更高
-                        game.spawn_createFloatingText(this.pos.x, this.pos.y, "JUMP!", "#38bdf8");
-                        game.spawn_createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist'); // 殘影
+                        this.advance(moveAmount * effectiveJumpRows);
+                        this.bumpOffsetY = -30;
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y, 'JUMP!', '#38bdf8');
+                        game.spawn_createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist');
                     } else {
-                        // 跳躍也被阻擋，撞牆
                         if (i === 0) {
                             this.bumpOffsetY = -10;
-                            if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "⛔ BLOCKED", "#ef4444");
+                            if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
                         }
                     }
                 } else {
-                    // 沒有跳躍詞條，正常撞牆
                     if (i === 0) {
                         this.bumpOffsetY = -10;
-                        if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "⛔ BLOCKED", "#ef4444");
+                        if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
                     }
                 }
             }
         }
     }
+
+    /**
+     * @method _getBossActionCount
+     * @description 根据 Boss 类型返回实际行动次数。
+     * @param {number} baseCount - 基础行动次数
+     * @returns {number} 最终行动次数
+     */
+    _getBossActionCount(baseCount) {
+        if (!this.bossType) return baseCount;
+        const bossConfigs = CONFIG.balance.bossConfigs;
+        const bossCfg = bossConfigs ? bossConfigs[this.bossType] : null;
+
+        switch (this.bossType) {
+            case 'tesla': {
+                // 特斯拉：行动次数 +1（狂暴后再+1）
+                const baseBonus = bossCfg ? (bossCfg.hasteActionsBonus || 1) : 1;
+                const berserkBonus = this.berserked ? (this._berserkedActionsBonus || 0) : 0;
+                return baseCount + baseBonus + berserkBonus;
+            }
+            case 'glacies': {
+                // 格拉西斯：狂暴后行动次数 +1
+                const bonus = (this.berserked && this._berserkedJumpRows) ? 1 : 0;
+                return baseCount + bonus;
+            }
+            default:
+                return baseCount;
+        }
+    },
+
+    /**
+     * @method _performOuroborosRotation
+     * @description 奥罗波罗斯词缀轮转逻辑。
+     * 每 N 回合切换一次词缀组。
+     * @param {object} game - 游戏实例
+     */
+    _performOuroborosRotation(game) {
+        const bossConfigs = CONFIG.balance.bossConfigs;
+        const bossCfg = bossConfigs ? bossConfigs.ouroboros : null;
+        if (!bossCfg) return;
+
+        this.rotationTurnCount = (this.rotationTurnCount || 0) + 1;
+        const interval = this.berserked
+            ? (bossCfg.berserkedRotationInterval || 1)
+            : (bossCfg.rotationInterval || 3);
+
+        if (this.rotationTurnCount >= interval) {
+            this.rotationTurnCount = 0;
+            const sets = bossCfg.rotationSets || [['shield', 'haste']];
+            this.rotationIndex = ((this.rotationIndex || 0) + 1) % sets.length;
+            this.affixes = [...sets[this.rotationIndex]];
+
+            // 重置护盾层数
+            if (this.affixes.includes('shield')) {
+                this.shieldCharges = 1 + (game.round || 0);
+            } else {
+                this.shieldCharges = 0;
+            }
+
+            game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, 'ROTATION!', '#a855f7');
+            game.spawn_createShockwave(this.pos.x, this.pos.y, '#a855f7');
+
+            // 通过 EventBus 广播轮转事件
+            eventBus.emit('boss:rotation', {
+                boss: this,
+                newAffixes: this.affixes,
+                rotationIndex: this.rotationIndex
+            });
+        }
+    },
 
     playFreezeBlockEffect(game) {
         this.bumpOffsetY = 6; 

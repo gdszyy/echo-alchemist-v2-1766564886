@@ -186,6 +186,10 @@ export const game_system = {
         document.getElementById('round-num').innerText = '1';
         // 更新符文数量显示
         this.ui_updateRuneCountDisplay();
+
+        // 重置 Boss 系统状态
+        this.bossHistory = [];
+        this._pendingBossSpawn = null;
     },
 
     /**

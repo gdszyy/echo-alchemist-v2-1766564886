@@ -1344,6 +1344,11 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
             killed: killed
         });
 
+        // Boss 阶段变化检测：伤害结算后检测是否触发狂暴
+        if (!killed && enemy.type === 'boss' && !enemy.berserked) {
+            this.combat_checkBossPhaseChange();
+        }
+
         // --- 2. [火属性核心逻辑] 燃烧与过热爆炸 ---
         if (config.pyro > 0 && enemy.temp >= 34) {
             
@@ -1551,6 +1556,13 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
                 }
             }
             if (enemy.type === 'boss') {
+                // 广播 Boss 被击杀事件
+                eventBus.emit('boss:defeated', {
+                    boss: enemy,
+                    bossId: enemy.bossType,
+                    bossName: enemy.bossName,
+                    round: this.round
+                });
                 setTimeout(() => {
                     // [fix] 修复命名不一致：openRelicSelection -> ui_showRelicSelection
                     // ui_showRelicSelection 内部已经会设置 stateBeforeRelic，无需在此重复设置
@@ -2075,6 +2087,104 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         this.runeChargeValue = 0;
         this.runeChargeLevel = 0;
         this.runeChargePreviewRunes = [];
+    },
+
+    // =========================================
+    // Boss 阶段变化系统
+    // =========================================
+
+    /**
+     * @method combat_checkBossPhaseChange
+     * @description 检测所有活跃 Boss 的阶段变化。
+     * 当 Boss HP < 50% 且未狂暴时，触发狂暴阶段。
+     * 应在每次伤害结算后调用。
+     */
+    combat_checkBossPhaseChange() {
+        const bosses = this.enemies.filter(e => e.active && e.type === 'boss' && !e.berserked);
+        for (const boss of bosses) {
+            if (boss.hp <= boss.maxHp * 0.5) {
+                this.combat_triggerBossEnrage(boss);
+            }
+        }
+    },
+
+    /**
+     * @method combat_triggerBossEnrage
+     * @description 触发 Boss 狂暴阶段。
+     * 根据 Boss 类型应用不同的狂暴效果。
+     * @param {Enemy} boss - 要狂暴的 Boss 实例
+     */
+    combat_triggerBossEnrage(boss) {
+        if (boss.berserked) return; // 防止重复触发
+        boss.berserked = true;
+
+        const bossId = boss.bossType;
+        const bossConfigs = CONFIG.balance.bossConfigs;
+        const bossCfg = bossConfigs ? bossConfigs[bossId] : null;
+
+        // 广播狂暴事件
+        eventBus.emit('boss:phase_change', {
+            boss: boss,
+            bossId: bossId,
+            bossName: boss.bossName,
+            phase: 'berserk',
+            round: this.round
+        });
+
+        // 视觉反馈
+        this.spawn_createShockwave(boss.pos.x, boss.pos.y, '#ff0000');
+        for (let i = 0; i < 15; i++) {
+            this.spawn_createParticle(boss.pos.x, boss.pos.y, '#ff4444', 'spark');
+        }
+        this.spawn_createFloatingText(boss.pos.x, boss.pos.y - 40, '❗ENRAGE!', '#ff0000');
+        showToast(`☠️ ${boss.bossName || 'Boss'} 进入狂暴阶段！`);
+
+        if (!bossCfg) return;
+
+        // 根据 Boss 类型应用狂暴效果
+        switch (bossId) {
+            case 'ignis':
+                // 狂暴后护盾层数翻倍
+                if (boss.affixes.includes('shield')) {
+                    boss.shieldCharges = Math.floor(boss.shieldCharges * (bossCfg.berserkedShieldMult || 2));
+                }
+                break;
+
+            case 'glacies':
+                // 狂暴后每回合跳跃 3 行
+                boss._berserkedJumpRows = bossCfg.berserkedJumpRows || 3;
+                break;
+
+            case 'mikro':
+                // 狂暴后分身概率 100%
+                boss._berserkedCloneChance = bossCfg.berserkedCloneChance || 1.0;
+                break;
+
+            case 'devourer':
+                // 狂暴后全屏吞噬
+                boss._berserkedDevourRange = bossCfg.berserkedDevourRange || 99;
+                break;
+
+            case 'viridis':
+                // 狂暴后治疗范围扩大到全场
+                boss._berserkedHealerRange = bossCfg.berserkedHealerRange || 999;
+                break;
+
+            case 'tesla':
+                // 狂暴后行动次数再+1
+                boss._berserkedActionsBonus = bossCfg.berserkedActionsBonus || 1;
+                break;
+
+            case 'chimera':
+                // 狂暴后温度直接达到阈值
+                boss.temp = bossCfg.berserkedTempThreshold || 100;
+                break;
+
+            case 'ouroboros':
+                // 狂暴后词缀轮转加速：每回合切换
+                boss._berserkedRotation = true;
+                break;
+        }
     },
 };
 

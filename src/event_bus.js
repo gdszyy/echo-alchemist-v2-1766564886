@@ -56,6 +56,12 @@ export const EVENT_TYPES = {
     META_INVENTORY_CHANGED: 'meta:inventory_changed',
     META_RELIC_ACQUIRED: 'meta:relic_acquired',
 
+    // Boss 系统事件
+    BOSS_SPAWNED: 'boss:spawned',           // Boss 生成
+    BOSS_PHASE_CHANGE: 'boss:phase_change', // Boss 进入狂暴阶段
+    BOSS_DEFEATED: 'boss:defeated',         // Boss 被击杀
+    BOSS_ROTATION: 'boss:rotation',         // 奥罗波罗斯词缀轮转
+
     // 系统类事件
     SYSTEM_AUDIO_READY: 'audio:ready',
     SYSTEM_ERROR: 'system:error'

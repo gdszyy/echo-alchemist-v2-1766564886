@@ -449,9 +449,13 @@ phase_gathering_getRandomPegType() {
             }
         }
 
-        // --- 2. 行動邏輯 ---
-        // 只有活著的敵人才移動
+        // --- 2. 行动逻辑 ---
+        // 只有活着的敌人才移动
         if (e.active && e.isFrozenCurrentTurn == false) {
+            // 奥罗波罗斯 Boss：回合开始时进行词缀轮转
+            if (e.type === 'boss' && e.bossType === 'ouroboros' && typeof e._performOuroborosRotation === 'function') {
+                e._performOuroborosRotation(this);
+            }
             e.startTurnAction(this);
         }
     },
@@ -542,11 +546,24 @@ phase_gathering_getRandomPegType() {
 
         // --- 以下保持原有的回合结算逻辑 ---
         
-        // 生成新敌人
-        const rowCountCurrent = uniqueRows.size;
-        let spawnCount = 1;
-        if (rowCountCurrent < 4) spawnCount = 3; // 稍微激进一点的生成
-        this.spawn_spawnEnemyRow(spawnCount);
+        // =========================================
+        // Boss 回合触发检测
+        // =========================================
+        // round++ 在下方执行，这里的 this.round 是即将到来的回合数
+        const nextRound = this.round + 1;
+        const bossCheck = this.spawn_checkBossRoundFor(nextRound);
+        if (bossCheck.shouldSpawn) {
+            // Boss 回合：不生成普通敌人行，改为生成 Boss
+            const bossId = this.spawn_selectBossForRound(bossCheck.isBigBoss);
+            // 延迟到回合切换后生成 Boss，确保 round++ 已执行
+            this._pendingBossSpawn = { bossId, isBigBoss: bossCheck.isBigBoss };
+        } else {
+            // 普通回合：生成敌人行
+            const rowCountCurrent = uniqueRows.size;
+            let spawnCount = 1;
+            if (rowCountCurrent < 4) spawnCount = 3;
+            this.spawn_spawnEnemyRow(spawnCount);
+        }
 
         // 重置倍率
         if (this.nextRoundHpMultiplier > 1) {
@@ -561,6 +578,7 @@ phase_gathering_getRandomPegType() {
         this.round++;
         this.prevRoundDamage = this.roundDamage;
         this.roundDamage = 0;
+        eventBus.emit('ui:round_num_update', { round: this.round });
         document.getElementById("round-num").innerText = this.round;
         showToast(`Round ${this.round}`);
 
@@ -573,10 +591,19 @@ phase_gathering_getRandomPegType() {
         document.getElementById('combat-message').innerHTML = '';
         this.phase_gathering_initPachinko(true);
 
+        // =========================================
+        // 待执行 Boss 生成（round++ 后执行）
+        // =========================================
+        if (this._pendingBossSpawn) {
+            const { bossId, isBigBoss } = this._pendingBossSpawn;
+            this._pendingBossSpawn = null;
+            this.spawn_spawnBoss(bossId, isBigBoss);
+        }
+
         this.isEnemyTurn = false;
         // 遗物事件检查
         if (this.round % CONFIG.gameplay.relicRoundInterval == 0) {
-            showToast("✨ 命運的饋贈 ✨");
+            showToast("✨ 命魔的馈赠 ✨");
             this.phase = 'relic_event';
             setTimeout(() => { this.ui_showRelicSelection(); }, 500);
             return;

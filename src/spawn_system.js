@@ -1014,4 +1014,214 @@ export const spawn_system = {
     this.spawn_createFloatingText(uiX, uiY - 50, "LEVEL UP!", "#fff");
     this.combat_updateHitProgress(0, this.currentSession.nextTriggerThreshold);
 },
+
+    // =========================================
+    // Boss 生成系统
+    // =========================================
+
+    /**
+     * @method spawn_checkBossRoundFor
+     * @description 检测指定回合数是否应触发 Boss（供 game_phase.js 使用）。
+     * @param {number} round - 要检测的回合数
+     * @returns {{ shouldSpawn: boolean, isBigBoss: boolean }}
+     */
+    spawn_checkBossRoundFor(round) {
+        const r = round;
+        const bossRounds = CONFIG.balance.bossRounds;
+        if (!bossRounds) return { shouldSpawn: false, isBigBoss: false };
+
+        if (r === bossRounds.miniBoss[0]) {
+            return { shouldSpawn: true, isBigBoss: false };
+        }
+
+        const [minR, maxR] = bossRounds.miniBoss[1];
+        if (r >= minR && r <= maxR) {
+            if (Math.random() < 0.33) {
+                return { shouldSpawn: true, isBigBoss: false };
+            }
+        }
+
+        if (r === bossRounds.bigBoss) {
+            return { shouldSpawn: true, isBigBoss: true };
+        }
+
+        if (r > bossRounds.bigBoss && (r - bossRounds.bigBoss) % bossRounds.cycleInterval === 0) {
+            return { shouldSpawn: true, isBigBoss: true };
+        }
+
+        return { shouldSpawn: false, isBigBoss: false };
+    },
+
+    /**
+     * @method spawn_checkBossRound
+     * @description 检测当前回合是否应触发 Boss。
+     * 触发规则：
+     *   - Round 5: 固定 Mini-Boss
+     *   - Round 9-11: 每回合 33% 概率随机 Mini-Boss
+     *   - Round 15: 固定大 Boss
+     *   - Round 20+: 每 5 回合循环大 Boss
+     * @returns {{ shouldSpawn: boolean, isBigBoss: boolean }}
+     */
+    spawn_checkBossRound() {
+        const r = this.round;
+        const bossRounds = CONFIG.balance.bossRounds;
+        if (!bossRounds) return { shouldSpawn: false, isBigBoss: false };
+
+        // Round 5: 固定 Mini-Boss
+        if (r === bossRounds.miniBoss[0]) {
+            return { shouldSpawn: true, isBigBoss: false };
+        }
+
+        // Round 9-11: 随机 Mini-Boss，每回合 33%
+        const [minR, maxR] = bossRounds.miniBoss[1];
+        if (r >= minR && r <= maxR) {
+            if (Math.random() < 0.33) {
+                return { shouldSpawn: true, isBigBoss: false };
+            }
+        }
+
+        // Round 15: 固定大 Boss
+        if (r === bossRounds.bigBoss) {
+            return { shouldSpawn: true, isBigBoss: true };
+        }
+
+        // Round 20+: 每 5 回合循环大 Boss
+        if (r > bossRounds.bigBoss && (r - bossRounds.bigBoss) % bossRounds.cycleInterval === 0) {
+            return { shouldSpawn: true, isBigBoss: true };
+        }
+
+        return { shouldSpawn: false, isBigBoss: false };
+    },
+
+    /**
+     * @method spawn_calculateBossHP
+     * @description 计算 Boss 血量。
+     * 公式: BossHP = (templateHP * 0.5) + (peakDPS * expectedKillRounds * 0.5)
+     * 保底: Math.max(BossHP, templateHP * 0.7)
+     * @param {boolean} isBigBoss - 是否为大 Boss
+     * @returns {number} 最终 Boss 血量
+     */
+    spawn_calculateBossHP(isBigBoss) {
+        const b = CONFIG.balance;
+        const f = b.bossHpFormula;
+        const r = this.round;
+
+        // 1. 计算模板血量
+        const hpExponent = b.hpExponent || 1.12;
+        const exponentialFactor = Math.pow(hpExponent, Math.max(0, r - 5));
+        const bossMult = isBigBoss ? f.bigBossMult : f.miniBossMult;
+        const templateHP = (b.enemyBaseHp + r * b.enemyHpPerRound) * exponentialFactor * bossMult;
+
+        // 2. 获取玩家峰値战力
+        const peakDPS = this.calc_getPeakAverageDamage();
+
+        // 3. 计算动态血量
+        const expectedTurns = isBigBoss ? f.bigBossKillRounds : f.miniBossKillRounds;
+        const dynamicHP = peakDPS * expectedTurns;
+
+        // 4. 混合计算 + 保底
+        const mixedHP = (templateHP * f.templateWeight) + (dynamicHP * f.dynamicWeight);
+        const finalHP = Math.max(templateHP * f.floorMultiplier, mixedHP);
+
+        return Math.floor(finalHP);
+    },
+
+    /**
+     * @method spawn_spawnBoss
+     * @description 在战场中心列生成一个 Boss。
+     * Boss 占据全宽，生成在最顶部行。
+     * @param {string} bossId - Boss 配置 ID（如 'ignis', 'glacies' 等）
+     * @param {boolean} isBigBoss - 是否为大 Boss
+     */
+    spawn_spawnBoss(bossId, isBigBoss) {
+        const bossConfigs = CONFIG.balance.bossConfigs;
+        const bossCfg = bossConfigs[bossId];
+        if (!bossCfg) {
+            console.warn(`[BossSystem] Unknown bossId: ${bossId}`);
+            return;
+        }
+
+        const w = this.enemyWidth * CONFIG.gameplay.enemyCols; // Boss 占据全宽
+        const bossW = Math.min(w, this.enemyWidth * 3);        // 实际宽度：3列宽
+        const bossH = this.enemyHeight * 1.5;                  // 高度为 1.5 行
+        const centerX = (CONFIG.gameplay.enemyCols / 2) * this.enemyWidth;
+        const spawnY = 80; // 生成在顶部
+
+        const bossHP = this.spawn_calculateBossHP(isBigBoss);
+
+        const boss = new Enemy(centerX, spawnY, bossW, bossH, bossHP);
+        boss.type = 'boss';
+        boss.bossType = bossId;
+        boss.bossName = bossCfg.name;
+        boss.isBigBoss = isBigBoss;
+        boss.berserked = false; // 狂暴阶段标志
+
+        // 赋予词缀
+        boss.affixes = [...bossCfg.affixes];
+
+        // 初始化护盾层数
+        if (boss.affixes.includes('shield')) {
+            const baseShield = 1 + this.round;
+            const bonus = bossCfg.shieldChargesBonus || 0;
+            boss.shieldCharges = baseShield + bonus;
+        }
+
+        // 奇美拉特殊：初始温度
+        if (bossId === 'chimera' && bossCfg.initTemp) {
+            boss.temp = bossCfg.initTemp;
+        }
+
+        // 奥罗波罗斯特殊：词缀轮转状态
+        if (bossId === 'ouroboros') {
+            boss.rotationIndex = 0;
+            boss.rotationTurnCount = 0;
+        }
+
+        this.enemies.push(boss);
+
+        // 通过 EventBus 广播 Boss 生成事件
+        eventBus.emit('boss:spawned', {
+            boss: boss,
+            bossId: bossId,
+            bossName: bossCfg.name,
+            isBigBoss: isBigBoss,
+            round: this.round
+        });
+
+        // 显示 Boss 出现提示
+        showToast(`☠️ ${bossCfg.name} 出现！`);
+        this.spawn_createFloatingText(centerX, spawnY, `☠️ ${bossCfg.name}`, '#ff4444');
+
+        return boss;
+    },
+
+    /**
+     * @method spawn_selectBossForRound
+     * @description 根据回合数和是否大 Boss 选择对应的 Boss ID。
+     * Mini-Boss 顺序: ignis -> glacies -> mikro -> devourer
+     * 大 Boss 顺序: viridis -> tesla -> chimera -> ouroboros
+     * @param {boolean} isBigBoss
+     * @returns {string} Boss ID
+     */
+    spawn_selectBossForRound(isBigBoss) {
+        const miniBossOrder = ['ignis', 'glacies', 'mikro', 'devourer'];
+        const bigBossOrder  = ['viridis', 'tesla', 'chimera', 'ouroboros'];
+        const order = isBigBoss ? bigBossOrder : miniBossOrder;
+
+        // 记录已出现的 Boss
+        if (!this.bossHistory) this.bossHistory = [];
+        const appeared = this.bossHistory.filter(id => order.includes(id));
+        const remaining = order.filter(id => !appeared.includes(id));
+
+        let selectedId;
+        if (remaining.length > 0) {
+            selectedId = remaining[0]; // 按顺序选取下一个
+        } else {
+            // 循环：重新从头
+            selectedId = order[appeared.length % order.length];
+        }
+
+        this.bossHistory.push(selectedId);
+        return selectedId;
+    },
 };

@@ -489,6 +489,108 @@ const CONFIG = {
             devourChance: 1,      // 吞噬触发概率
             devourRange: 2,       // 吞噬范围
             jumpRows: 2             // 跳跃距离 (行数)
+        },
+
+        // =========================================
+        // Boss 系统配置
+        // =========================================
+        /** Boss 出现回合配置 */
+        bossRounds: {
+            miniBoss: [5, [9, 11]],   // 固定 Round 5，以及 9-11 随机区间
+            bigBoss: 15,              // 首个大 Boss 固定 Round 15
+            cycleInterval: 5          // Round 20+ 每 5 回合循环一次
+        },
+
+        /** Boss 血量公式参数 */
+        bossHpFormula: {
+            templateWeight: 0.5,         // 模板血量权重
+            dynamicWeight: 0.5,          // 动态血量权重
+            miniBossKillRounds: 2.5,     // Mini-Boss 期望击杀回合数
+            bigBossKillRounds: 4.0,      // 大 Boss 期望击杀回合数
+            floorMultiplier: 0.7,        // 保底：模板血量的 70%
+            miniBossMult: 15,            // Mini-Boss 血量倍率
+            bigBossMult: 35              // 大 Boss 血量倍率
+        },
+
+        /** 8 个 Boss 专属配置 */
+        bossConfigs: {
+            ignis: {
+                name: '熔炉守卫·伊格尼斯',
+                isBigBoss: false,
+                affixes: ['shield', 'haste'],
+                weakness: ['pierce', 'pyro'],
+                shieldChargesBonus: 5,    // 额外护盾层数
+                berserkedShieldMult: 2,   // 狂暴后护盾层数翻倍系数
+                themeWeights: { pyro: 1.5, pierce: 1.5 }
+            },
+            glacies: {
+                name: '霜晶缝合怪·格拉西斯',
+                isBigBoss: false,
+                affixes: ['jump', 'regen'],
+                weakness: ['cryo', 'pierce'],
+                jumpRowsBonus: 2,         // 额外跳跃行数
+                berserkedJumpRows: 3,     // 狂暴后每回合跳跃行数
+                themeWeights: { cryo: 1.5, pierce: 1.3 }
+            },
+            mikro: {
+                name: '裂变母体·米克罗',
+                isBigBoss: false,
+                affixes: ['clone', 'healer'],
+                weakness: ['lightning', 'scatter'],
+                cloneChanceHitBonus: 0.3, // 额外受击分身概率
+                berserkedCloneChance: 1.0, // 狂暴后分身概率 100%
+                themeWeights: { lightning: 1.5, scatter: 1.5 }
+            },
+            devourer: {
+                name: '贪婪之渊·噬神者',
+                isBigBoss: false,
+                affixes: ['devour', 'shield'],
+                weakness: ['bounce', 'laser'],
+                devourRangeBonus: 2,      // 额外吞噬范围
+                berserkedDevourRange: 99, // 狂暴后全屏吞噬
+                themeWeights: { bounce: 1.5, laser: 1.5 }
+            },
+            viridis: {
+                name: '翠绿共生体·维里迪斯',
+                isBigBoss: true,
+                affixes: ['regen', 'healer'],
+                weakness: ['laser', 'pyro'],
+                regenPercentBonus: 0.2,   // 额外再生百分比
+                berserkedHealerRange: 999, // 狂暴后治疗范围扩大到全场
+                themeWeights: { laser: 1.5, pyro: 1.3 }
+            },
+            tesla: {
+                name: '雷霆幻影·特斯拉',
+                isBigBoss: true,
+                affixes: ['haste', 'clone'],
+                weakness: ['cryo', 'bounce'],
+                hasteActionsBonus: 1,     // 额外行动次数（共3次）
+                berserkedActionsBonus: 1, // 狂暴后再+1次行动
+                themeWeights: { cryo: 1.5, bounce: 1.3 }
+            },
+            chimera: {
+                name: '混沌融合体·奇美拉',
+                isBigBoss: true,
+                affixes: ['berserk', 'devour'],
+                weakness: ['pierce', 'laser'],
+                initTemp: 60,             // 初始温度（半狂暴状态）
+                berserkedTempThreshold: 100, // 狂暴后温度阈值
+                themeWeights: { pierce: 1.5, laser: 1.5 }
+            },
+            ouroboros: {
+                name: '永恒回声·奥罗波罗斯',
+                isBigBoss: true,
+                affixes: ['shield', 'haste'], // 初始词缀组（轮转起点）
+                weakness: ['dynamic'],        // 动态弱点
+                rotationSets: [             // 词缀轮转组
+                    ['shield', 'haste'],
+                    ['regen', 'healer'],
+                    ['clone', 'jump']
+                ],
+                rotationInterval: 3,        // 每 3 回合切换一次
+                berserkedRotationInterval: 1, // 狂暴后每回合切换
+                themeWeights: { pierce: 1.2, cryo: 1.2, lightning: 1.2 }
+            }
         }
     },
     /** 游戏玩法配置 */
