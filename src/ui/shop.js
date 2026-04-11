@@ -122,7 +122,7 @@ export const shop_system = {
         else if (relic.effect === 'combat_wall') {
             this.hasCombatWall = true;
         }else if (relic.effect === 'permanent_size_up') {
-    this.marbleSizeBonus = 4.2; // 每次获得增加 4 像素半径
+    this.marbleSizeBonus = 2.5; // 每次获得增加 2.5 像素半径（缩小以防卡墙）
 }else if (relic.effect === 'unlock_slot') {
             if (!this.unlockedSlots.includes(relic.slotType)) {
                 this.unlockedSlots.push(relic.slotType);
