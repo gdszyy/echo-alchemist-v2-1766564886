@@ -857,7 +857,7 @@ class Enemy {
             default:
                 return baseCount;
         }
-    },
+    }
 
     /**
      * @method _performOuroborosRotation
@@ -898,7 +898,7 @@ class Enemy {
                 rotationIndex: this.rotationIndex
             });
         }
-    },
+    }
 
     playFreezeBlockEffect(game) {
         this.bumpOffsetY = 6; 

@@ -268,7 +268,7 @@ export const combat_system = {
         });
     },
 
-combat_wind_triggerMagicCircle() {
+    combat_wind_triggerMagicCircle() {
         // 1. 数量检查
         if (this.windAnchors.length < 4) return;
 
@@ -365,7 +365,7 @@ combat_wind_triggerMagicCircle() {
         // if (this.soundManager) this.soundManager.playEffect('lock');
     },
 
-combat_wind_executeCircleEffect(x, y, w, h, size, shape, element, tunnelVector = null, bulletDamage = 2, bulletConfig = null, type = 'burst') {
+    combat_wind_executeCircleEffect(x, y, w, h, size, shape, element, tunnelVector = null, bulletDamage = 2, bulletConfig = null, type = 'burst') {
         const centerX = x + w/2;
         const centerY = y + h/2;
 
@@ -790,7 +790,7 @@ combat_wind_executeCircleEffect(x, y, w, h, size, shape, element, tunnelVector =
         }
     },
 
-combat_wind_updateButterflyCircles(timeScale) {
+    combat_wind_updateButterflyCircles(timeScale) {
         if (!this.butterflyCircles) return;
         
         for (let i = this.butterflyCircles.length - 1; i >= 0; i--) {
@@ -817,7 +817,7 @@ combat_wind_updateButterflyCircles(timeScale) {
         }
     },
 
-combat_wind_fireButterflyBlades(bc) {
+    combat_wind_fireButterflyBlades(bc) {
         const center = new Vec2(bc.center.x, bc.center.y);
         const directions = [
             new Vec2(bc.anchors[0].x, bc.anchors[0].y).sub(center).norm(),
@@ -864,7 +864,7 @@ combat_wind_fireButterflyBlades(bc) {
         });
     },
 
-combat_wind_updateButterflyBlades(timeScale) {
+    combat_wind_updateButterflyBlades(timeScale) {
         if (!this.butterflyBlades) return;
         
         for (let i = this.butterflyBlades.length - 1; i >= 0; i--) {
@@ -919,7 +919,7 @@ combat_wind_updateButterflyBlades(timeScale) {
         }
     },
 
-combat_wind_drawButterflyCircles(ctx) {
+    combat_wind_drawButterflyCircles(ctx) {
         if (!this.butterflyCircles) return;
         
         this.butterflyCircles.forEach(bc => {
@@ -962,7 +962,7 @@ combat_wind_drawButterflyCircles(ctx) {
         });
     },
 
-combat_wind_drawButterflyBlades(ctx) {
+    combat_wind_drawButterflyBlades(ctx) {
         if (!this.butterflyBlades) return;
         
         this.butterflyBlades.forEach(blade => {
@@ -1206,7 +1206,7 @@ combat_wind_drawButterflyBlades(ctx) {
     // [已迁移至 src/combat/collision.js] combat_tryMoveEnemy
     // 敌人移动碰撞检测 (AABB + 边界) —— 通过文件底部的 Object.assign(combat_system, CollisionSystem) 注入
 
-combat_damageEnemy(enemy, projectile, damageOverride = null) {
+    combat_damageEnemy(enemy, projectile, damageOverride = null) {
         if (!enemy || !enemy.active) return; 
         // --- [修復]：如果是光球/偽造子彈，補齊 chainHistory 防止報措 ---
         if (!projectile.chainHistory) projectile.chainHistory = [];
@@ -1653,11 +1653,11 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
                         this.runeLootItems.push(loot);
                     }
                 }
-            }}
+            }
         }
         
         // 爆炸逻辑 (保留并增强视觉)
-       if (config.explosive) {
+        if (config.explosive) {
             // --- 1. 解析爆炸主题 (Visual Theme Resolver) ---
             // 默认主题 (物理爆炸)
             let theme = {
@@ -1746,7 +1746,6 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
     // [已迁移至 src/combat/damage_calc.js] combat_lightning_triggerChain
     // 闪电链触发逻辑 —— 通过文件底部的 Object.assign(combat_system, DamageCalc) 注入
 
-/**
     /**
      * @method fireNextShot
      * @description 发射下一发弹丸 (处理多重射击)。
