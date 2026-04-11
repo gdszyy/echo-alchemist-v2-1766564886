@@ -59,11 +59,8 @@ export const ui_system = {
         flyer.style.transform = '';
         document.body.appendChild(flyer);
 
-        // 目标位置：顶部的符文计数显示
-        let targetEl = document.getElementById('rune-count-display');
-        if (!targetEl || targetEl.offsetParent === null) {
-            targetEl = document.getElementById('meta-currency-display');
-        }
+        // 目标位置：局外货币显示（首页）
+        let targetEl = document.getElementById('meta-currency-display');
         
         const targetRect = targetEl 
             ? targetEl.getBoundingClientRect() 
