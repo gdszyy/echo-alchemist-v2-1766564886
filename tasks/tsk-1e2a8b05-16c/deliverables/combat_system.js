@@ -1331,40 +1331,7 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         
  
         this.combat_recordDamage(actualDmg, damageType, sourceType, shotId);
-
-        // [新增] Boss 狂暴阶段即时掉落：HP 首次降至 50% 时生成 1 个 Lv1 符文并立即自动拾取
-        // 使用 enemy._bossEnrageDropped 标志确保每个 Boss 仅触发一次
-        if (
-            !killed &&
-            enemy.type === 'boss' &&
-            !enemy._bossEnrageDropped &&
-            enemy.hp > 0 &&
-            enemy.hp / enemy.maxHp < 0.5
-        ) {
-            enemy._bossEnrageDropped = true; // 标记已触发，防止重复掉落
-
-            // 生成 1 个标准 Lv1 符文（无 overrideOptions）
-            const enrageDropResult = loot_calcRuneDrop(this);
-            if (enrageDropResult.runeId) {
-                // 立即自动拾取：直接将符文推入库存，复用现有拾取逻辑
-                const enrageRuneDef = RUNE_DB.find(r => r.id === enrageDropResult.runeId);
-                if (enrageRuneDef) {
-                    this.runeInventory.push({ id: enrageDropResult.runeId, level: enrageDropResult.level });
-                    const runeName = enrageRuneDef.icon
-                        ? `${enrageRuneDef.icon} ${enrageRuneDef.name}`
-                        : enrageRuneDef.name;
-                    // 视觉反馈：显示狂暴掉落提示
-                    this.spawn_createFloatingText(
-                        enemy.pos.x,
-                        enemy.pos.y - 40,
-                        `狂暴! +${runeName}`,
-                        '#f59e0b'
-                    );
-                    showToast(`Boss 狂暴！获得符文：${runeName}`);
-                }
-            }
-        }
-
+        
         // 事件总线广播伤害事件
         eventBus.emit('damage:dealt', {
             enemy: enemy,
@@ -1601,59 +1568,26 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
                     // ui_showRelicSelection 内部已经会设置 stateBeforeRelic，无需在此重复设置
                     this.ui_showRelicSelection();
                 }, 500);
+            }
 
-                // [新增] Boss 死亡丰厚掉落：必定掉落 3 个符文
-                // 读取当前 Boss 的主题权重配置（如果有）
-                const bossThemeWeights = (enemy.bossConfig && enemy.bossConfig.themeWeights)
-                    ? enemy.bossConfig.themeWeights
-                    : {};
-
-                // 掉落 1：必定 Lv2 + 主题权重（主题符文）
-                const drop1 = loot_calcRuneDrop(this, { forcedLevel: 2, themeWeights: bossThemeWeights });
-                if (drop1.runeId) {
-                    const loot1 = new RuneLoot(enemy.pos.x - 20, enemy.pos.y, drop1.runeId);
-                    loot1.level = drop1.level;
-                    this.runeLootItems.push(loot1);
+            // [符文掉落] 三因子动态掉落率公式
+            // 因子1：基础掉落率（随回合数线性增长，上限 40%）
+            const BaseDropRate = Math.min(0.05 + (this.round / 10) * 0.05, 0.40);
+            // 因子2：敌人数量修正（敌人越多，单个掉落率越低）
+            const spawnedEnemiesInRound = this.spawnedEnemiesInRound || Math.max(1, this.enemies.length);
+            const EnemyModifier = Math.max(0.3, 1.0 / Math.sqrt(spawnedEnemiesInRound));
+            // 因子3：背包与网格占用率衰减（防溢出机制）
+            const MAX_RUNE_CAPACITY = 20;
+            const runesInGrid = (this.runeGrid || []).filter(r => r !== null).length;
+            const OccupancyPenalty = Math.max(0.2, 1.0 - (this.runeInventory.length + runesInGrid) / MAX_RUNE_CAPACITY);
+            // 最终掉落率
+            const FinalDropRate = BaseDropRate * EnemyModifier * OccupancyPenalty;
+            if (Math.random() < FinalDropRate) {
+                const runeId = loot_calcRuneDrop(this);
+                if (runeId) {
+                    this.runeLootItems.push(new RuneLoot(enemy.pos.x, enemy.pos.y, runeId));
                 }
-
-                // 掉落 2：20% 概率 Lv2，否则 Lv1（智能掉落）
-                const forcedLevel2 = Math.random() < 0.20 ? 2 : 1;
-                const drop2 = loot_calcRuneDrop(this, { forcedLevel: forcedLevel2 });
-                if (drop2.runeId) {
-                    const loot2 = new RuneLoot(enemy.pos.x, enemy.pos.y, drop2.runeId);
-                    loot2.level = drop2.level;
-                    this.runeLootItems.push(loot2);
-                }
-
-                // 掉落 3：标准掉落（无 overrideOptions）
-                const drop3 = loot_calcRuneDrop(this);
-                if (drop3.runeId) {
-                    const loot3 = new RuneLoot(enemy.pos.x + 20, enemy.pos.y, drop3.runeId);
-                    loot3.level = drop3.level;
-                    this.runeLootItems.push(loot3);
-                }
-            } else {
-                // 普通敌人：[符文掉落] 三因子动态掉落率公式
-                // 因子1：基础掉落率（随回合数线性增长，上限 40%）
-                const BaseDropRate = Math.min(0.05 + (this.round / 10) * 0.05, 0.40);
-                // 因子2：敌人数量修正（敌人越多，单个掉落率越低）
-                const spawnedEnemiesInRound = this.spawnedEnemiesInRound || Math.max(1, this.enemies.length);
-                const EnemyModifier = Math.max(0.3, 1.0 / Math.sqrt(spawnedEnemiesInRound));
-                // 因子3：背包与网格占用率衰减（防溢出机制）
-                const MAX_RUNE_CAPACITY = 20;
-                const runesInGrid = (this.runeGrid || []).filter(r => r !== null).length;
-                const OccupancyPenalty = Math.max(0.2, 1.0 - (this.runeInventory.length + runesInGrid) / MAX_RUNE_CAPACITY);
-                // 最终掉落率
-                const FinalDropRate = BaseDropRate * EnemyModifier * OccupancyPenalty;
-                if (Math.random() < FinalDropRate) {
-                    const dropResult = loot_calcRuneDrop(this);
-                    if (dropResult.runeId) {
-                        const loot = new RuneLoot(enemy.pos.x, enemy.pos.y, dropResult.runeId);
-                        loot.level = dropResult.level;
-                        this.runeLootItems.push(loot);
-                    }
-                }
-            }}
+            }
         }
         
         // 爆炸逻辑 (保留并增强视觉)
@@ -1997,9 +1931,8 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         // 预生成4个符文预览（虚影），使用智能掉落预计算
         this.runeChargePreviewRunes = [];
         for (let i = 0; i < 4; i++) {
-            // loot_calcRuneDrop 返回 { runeId, level }，预览仅需符文定义
-            const dropResult = loot_calcRuneDrop(this);
-            const runeDef = dropResult.runeId ? RUNE_DB.find(r => r.id === dropResult.runeId) : null;
+            const runeId = loot_calcRuneDrop(this);
+            const runeDef = runeId ? RUNE_DB.find(r => r.id === runeId) : null;
             this.runeChargePreviewRunes.push(runeDef || null);
         }
         // [Task 3.2] 改为 EventBus 事件，由 hud.js 监听并初始化充能符文 DOM

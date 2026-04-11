@@ -529,9 +529,8 @@ phase_gathering_getRandomPegType() {
                 // 查找符文定义，获取名称用于视觉反馈
                 const runeDef = RUNE_DB.find(r => r.id === loot.runeId);
                 const runeName = runeDef ? runeDef.name : loot.runeId;
-                // 将符文转化为 { id, level } 对象并推入库存
-                // loot.level 由掉落生成时设置（Boss 掉落可能为 2+），默认为 1
-                this.runeInventory.push({ id: loot.runeId, level: loot.level || 1 });
+                // 将符文转化为 { id, level: 1 } 对象并推入库存
+                this.runeInventory.push({ id: loot.runeId, level: 1 });
                 // 视觉反馈：FloatingText 显示「+符文名称」
                 this.spawn_createFloatingText(
                     loot.x,
@@ -1089,8 +1088,7 @@ phase_gathering_getRandomPegType() {
                 if (activeEnemies === 0 && loot.active) {
                     const runeDef = RUNE_DB.find(r => r.id === loot.runeId);
                     if (runeDef) {
-                        // loot.level 由掉落生成时设置（Boss 掉落可能为 2+），默认为 1
-                        const runeObj = { id: loot.runeId, level: loot.level || 1 };
+                        const runeObj = { id: loot.runeId, level: 1 };
                         this.runeInventory.push(runeObj);
                         loot.active = false;
                         const runeName = runeDef.icon ? `${runeDef.icon} ${runeDef.name}` : runeDef.name;

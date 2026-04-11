@@ -819,88 +819,6 @@ const SKILL_DB = [
 ];
 
 
-// ==================== Boss 配置数据库 ====================
-/**
- * BOSS_DB - Boss 配置数据库
- *
- * 每个 Boss 对象包含：
- *   id: 唯一标识符
- *   name: 显示名称（中文）
- *   affixes: 初始词缀数组（对应 Enemy.affixes）
- *   themeWeights: Boss 主题符文掉落权重加成（按符文 element 字段匹配）
- *     键为 RUNE_DB 中的 element 字段，值为额外权重加成量
- *     在 loot_calcRuneDrop 的第三层抽取中，与 BOSS_THEME_MULTIPLIER 相乘后叠加到符文权重
- *
- * 弹点属性来源：docs/boss_system_design.md
- * 对应 COUNTER_MAP 中的克制关系：
- *   pyro.shield=1.0, pierce.shield=1.0 → 伊格尼斯（护盾+极速）
- *   cryo.jump=0.8, pierce.jump=0.8   → 格拉西斯（跳跃+再生）
- *   lightning.clone=1.0, scatter.clone=1.0 → 米克罗（分身+治疗）
- *   bounce.devour=0.8, laser.devour=0.8  → 噬神者（吞噬+护盾）
- *   laser.regen=1.0, pyro.regen=0.8      → 维里迪斯（再生+治疗）
- *   cryo.haste=1.0, bounce.haste=0.4     → 特斯拉（极速+分身）
- *   pierce.shield=1.0, laser.shield=0.5  → 奇美拉（狂暴+吞噬）
- *   动态弹点                            → 奥罗波罗斯（全词缀轮转）
- */
-const BOSS_DB = [
-    {
-        id: 'boss_ignis',
-        name: '燕炉守卫·伊格尼斯',
-        affixes: ['shield', 'haste'],
-        // 弹点：穿透 (Pierce) 与 火焰 (Pyro) —— 克制护盾
-        themeWeights: { pierce: 3.0, pyro: 3.0 }
-    },
-    {
-        id: 'boss_glacies',
-        name: '霜晶缝合怪·格拉西斯',
-        affixes: ['jump', 'regen'],
-        // 弹点：冰霜 (Cryo) 与 穿透 (Pierce) —— 克制跳跃与再生
-        themeWeights: { cryo: 3.0, pierce: 3.0 }
-    },
-    {
-        id: 'boss_micro',
-        name: '裂变母体·米克罗',
-        affixes: ['clone', 'healer'],
-        // 弹点：闪电 (Lightning) 与 散射 (Scatter) —— 克制分身与治疗
-        themeWeights: { lightning: 3.0, scatter: 3.0 }
-    },
-    {
-        id: 'boss_devourer',
-        name: '贪婪之渊·噬神者',
-        affixes: ['devour', 'shield'],
-        // 弹点：弹射 (Bounce) 与 激光 (Laser) —— 克制吞噬
-        themeWeights: { bounce: 3.0, laser: 3.0 }
-    },
-    {
-        id: 'boss_viridis',
-        name: '翠绳共生体·维里迪斯',
-        affixes: ['regen', 'healer'],
-        // 弹点：激光 (Laser) 与 火焰 (Pyro) —— 克制再生与治疗
-        themeWeights: { laser: 3.0, pyro: 3.0 }
-    },
-    {
-        id: 'boss_tesla',
-        name: '雷霆幻影·特斯拉',
-        affixes: ['haste', 'clone'],
-        // 弹点：冰霜 (Cryo) 与 弹射 (Bounce) —— 克制极速与分身
-        themeWeights: { cryo: 3.0, bounce: 3.0 }
-    },
-    {
-        id: 'boss_chimera',
-        name: '混沌融合体·奇美拉',
-        affixes: ['devour'],
-        // 弹点：穿透 (Pierce) 与 激光 (Laser) —— 克制护盾与吞噬
-        themeWeights: { pierce: 3.0, laser: 3.0 }
-    },
-    {
-        id: 'boss_ouroboros',
-        name: '永恒回声·奥罗波罗斯',
-        affixes: ['shield', 'haste'], // 初始词缀，将按回合轮转
-        // 动态弹点，暂时配置均衡权重（待导演系统实现后可根据当前词缀动态调整）
-        themeWeights: { pierce: 1.5, pyro: 1.5, cryo: 1.5, lightning: 1.5, laser: 1.5, scatter: 1.5, bounce: 1.5 }
-    }
-];
-
 // ==================== 导出配置 ====================
 // 注意：TRUTH_BOOK_DATA 已移动到 systems.js，因为它需要使用 Enemy 类
 
@@ -911,5 +829,4 @@ export {
     CONFIG,
     RELIC_DB,
     SKILL_DB,
-    BOSS_DB,
 };
