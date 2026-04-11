@@ -1,15 +1,11 @@
 # 任务结果: tsk-699961b1-e5e
 
-**提交时间**: 2026-04-10 15:18
+**提交时间**: 2026-04-10 21:06
 
 ## 结果摘要
 
-Task 3 完成：实现 calcRuneBaseStats() 函数，在 combat_system.js 中叠加基础属性层数到 finalRecipe，在 ui_system.js 中展示基础加成汇总（蓝色标签）。修改了 rune_config.js（添加 baseStat 字段）、rune_system.js（新增 calcRuneBaseStats 函数）、combat_system.js（集成基础属性加成）、ui_system.js（UI 展示）、index.html（注释更新）。
+修复：清理 rune_config.js 中重复的 baseStat 字段（Task 1 已添加，Task 3 合并时重复添加）。calcRuneBaseStats() 函数逻辑已完全兼容 Task 1 的对象格式 { id, level }，测试验证通过。
 
 ## 交付物
 
-- [`rune_system.js`](deliverables/rune_system.js)
-- [`combat_system.js`](deliverables/combat_system.js)
-- [`ui_system.js`](deliverables/ui_system.js)
 - [`rune_config.js`](deliverables/rune_config.js)
-- [`CHANGES.md`](deliverables/CHANGES.md)
