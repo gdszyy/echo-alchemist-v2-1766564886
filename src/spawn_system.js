@@ -506,15 +506,15 @@ export const spawn_system = {
         this.score += finalScore;
         const resourceGain = Math.floor(0.523 * Math.pow(finalScore, 0.63));
         if (resourceGain > 0) {
+            // 保留局内货币逻辑，删除 meta_addCurrency 调用
             this.runCurrency += resourceGain;
-            this.meta_addCurrency(resourceGain);
-            const scoreEl = document.getElementById('score-num');
-            if (scoreEl) {
-                const rect = scoreEl.getBoundingClientRect();
+            // 飞行特效目标改为顶部符文计数显示
+            const runeEl = document.getElementById('rune-count-display');
+            if (runeEl) {
+                const rect = runeEl.getBoundingClientRect();
                 this.ui_playResourceFlyEffect(rect.left + rect.width/2, rect.top + rect.height/2, resourceGain);
             }
         } 
-        document.getElementById('score-num').innerText = this.score; 
         this.scoreMultiplier = parseFloat((this.scoreMultiplier + 0.2).toFixed(1)); // 乘数增加 0.2
         this.ui_updateMultiplierUI(); 
     },
@@ -865,9 +865,8 @@ export const spawn_system = {
                 this.currentSession.currentHits++;
                 this.currentSession.totalHits++; 
                 
-                // [META] 获得货币
+                // [META] 获得局内货币（删除 meta_addCurrency 调用）
                 this.runCurrency += 1;
-                this.meta_addCurrency(1);
                 this.ui_playResourceFlyEffect(targetX, targetY, 1);
                 
                 // 音效

@@ -176,7 +176,7 @@ class Game {
         this.frameDamageAccumulator = 0; 
         this.slowMotionTimer = 0;        
         this.slowMotionThreshold = 100;  
-        this.saveData = { currency: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0 };
+        this.saveData = { currency: 0, runeFragments: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0 };
         this.runCurrency = 0;   
 
         // ==================== 符文词条系统状态变量 ====================

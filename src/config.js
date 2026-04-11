@@ -15,7 +15,7 @@
 
 const META_SHOP_CONFIG = {
     resources: {
-        energy_essence: { id: 'energy_essence', name: '能量精粹', icon: '✨', color: '#fbbf24' }
+        rune_fragments: { id: 'rune_fragments', name: '符文碎片', icon: '🔮', color: '#a855f7' }
     },
     upgrades: [
         {
@@ -25,7 +25,7 @@ const META_SHOP_CONFIG = {
             desc: '增加初始彈珠中 [反彈] 屬性的權重。',
             icon: '🔄',
             maxLevel: 10,
-            cost: { resourceId: 'energy_essence', base: 50, growth: 1.4, type: 'exponential' },
+            cost: { resourceId: 'rune_fragments', base: 50, growth: 1.4, type: 'exponential' },
             effect: { path: 'probabilities.bounce', valuePerLevel: 10, type: 'add' }
         },
         {
@@ -35,7 +35,7 @@ const META_SHOP_CONFIG = {
             desc: '解鎖並增加初始 [穿透] 屬性的權重。',
             icon: '↗️',
             maxLevel: 10,
-            cost: { resourceId: 'energy_essence', base: 100, growth: 1.5, type: 'exponential' },
+            cost: { resourceId: 'rune_fragments', base: 100, growth: 1.5, type: 'exponential' },
             effect: { path: 'probabilities.pierce', valuePerLevel: 8, type: 'add' }
         },
         {
@@ -45,7 +45,7 @@ const META_SHOP_CONFIG = {
             desc: '提升所有屬性的基礎同化概率。',
             icon: '🧪',
             maxLevel: 5,
-            cost: { resourceId: 'energy_essence', base: 200, growth: 2.0, type: 'exponential' },
+            cost: { resourceId: 'rune_fragments', base: 200, growth: 2.0, type: 'exponential' },
             effect: { path: 'gameplay.assimilationChance', valuePerLevel: 0.02, type: 'add_all' }
         },
         {
@@ -55,7 +55,7 @@ const META_SHOP_CONFIG = {
             desc: '減少初始生成的敵人行數。',
             icon: '🛡️',
             maxLevel: 2,
-            cost: { resourceId: 'energy_essence', values: [500, 2000], type: 'fixed' },
+            cost: { resourceId: 'rune_fragments', values: [500, 2000], type: 'fixed' },
             effect: { path: 'gameplay.startRows', valuePerLevel: -1, type: 'add' }
         },
         {
@@ -65,7 +65,7 @@ const META_SHOP_CONFIG = {
             desc: '增加遺物選擇時的可選數量。',
             icon: '📚',
             maxLevel: 2,
-            cost: { resourceId: 'energy_essence', base: 1000, growth: 3000, type: 'linear' },
+            cost: { resourceId: 'rune_fragments', base: 1000, growth: 3000, type: 'linear' },
             effect: { path: 'gameplay.relicChoiceNum', valuePerLevel: 1, type: 'add' }
         }
     ,
@@ -77,7 +77,7 @@ const META_SHOP_CONFIG = {
             desc: '下一次游戏：收集阶段初始将 1 个普通钉子替换为 [风] 属性钉子。(每局可购买一次)',
             icon: '🌪️',
             maxLevel: 1,
-            cost: { resourceId: 'energy_essence', base: 200, growth: 1.0, type: 'exponential' },
+            cost: { resourceId: 'rune_fragments', base: 200, growth: 1.0, type: 'exponential' },
             effect: { path: 'gameplay.initWindPegs', valuePerLevel: 1, type: 'add' },
             temporary: true
         },
@@ -89,7 +89,7 @@ const META_SHOP_CONFIG = {
             desc: '下一次游戏：收集阶段初始将 1 个普通钉子替换为 [飞剑] 属性钉子。(每局可购买一次)',
             icon: '🗡️',
             maxLevel: 1,
-            cost: { resourceId: 'energy_essence', base: 300, growth: 1.0, type: 'exponential' },
+            cost: { resourceId: 'rune_fragments', base: 300, growth: 1.0, type: 'exponential' },
             effect: { path: 'gameplay.initSwordPegs', valuePerLevel: 1, type: 'add' },
             temporary: true
         },
@@ -101,7 +101,7 @@ const META_SHOP_CONFIG = {
             desc: '所有子弹的初始基础伤害提升。',
             icon: '💥',
             maxLevel: 5,
-            cost: { resourceId: 'energy_essence', base: 500, growth: 1.5, type: 'exponential' },
+            cost: { resourceId: 'rune_fragments', base: 500, growth: 1.5, type: 'exponential' },
             effect: { path: 'gameplay.baseDamage', valuePerLevel: 1, type: 'add' }
         },
         // (需求7) 冰火温度值升级
@@ -112,7 +112,7 @@ const META_SHOP_CONFIG = {
             desc: '提升 [火焰] 属性单层提供的热量值。',
             icon: '🔥',
             maxLevel: 5,
-            cost: { resourceId: 'energy_essence', base: 150, growth: 1.5, type: 'exponential' },
+            cost: { resourceId: 'rune_fragments', base: 150, growth: 1.5, type: 'exponential' },
             effect: { path: 'balance.pyroAmount', valuePerLevel: 0.2, type: 'add' }
         },
         {
@@ -122,7 +122,7 @@ const META_SHOP_CONFIG = {
             desc: '提升 [冰霜] 属性单层提供的冷冻值。',
             icon: '❄️',
             maxLevel: 5,
-            cost: { resourceId: 'energy_essence', base: 150, growth: 1.5, type: 'exponential' },
+            cost: { resourceId: 'rune_fragments', base: 150, growth: 1.5, type: 'exponential' },
             effect: { path: 'balance.cryoAmount', valuePerLevel: 0.2, type: 'add' }
         },
         // (需求8) 激光长度升级
@@ -133,7 +133,7 @@ const META_SHOP_CONFIG = {
             desc: '提升 [激光] 属性的初始射程/穿透深度。',
             icon: '🔦',
             maxLevel: 5,
-            cost: { resourceId: 'energy_essence', base: 200, growth: 1.5, type: 'exponential' },
+            cost: { resourceId: 'rune_fragments', base: 200, growth: 1.5, type: 'exponential' },
             effect: { path: 'gameplay.laserLengthBonus', valuePerLevel: 50, type: 'add' }
         },
         // (需求9) 连击需求降低
@@ -144,7 +144,7 @@ const META_SHOP_CONFIG = {
             desc: '降低连击充能条的初始触发需求值。',
             icon: '🔋',
             maxLevel: 3,
-            cost: { resourceId: 'energy_essence', base: 1000, growth: 2.0, type: 'exponential' },
+            cost: { resourceId: 'rune_fragments', base: 1000, growth: 2.0, type: 'exponential' },
             effect: { path: 'gameplay.initTriggerThreshold', valuePerLevel: -1, type: 'add' }
         },
         // (新增) SP上限提升
@@ -155,7 +155,7 @@ const META_SHOP_CONFIG = {
             desc: '提升技能点(SP)的最大存储上限。',
             icon: '⚡',
             maxLevel: 5,
-            cost: { resourceId: 'energy_essence', base: 800, growth: 2.0, type: 'exponential' },
+            cost: { resourceId: 'rune_fragments', base: 800, growth: 2.0, type: 'exponential' },
             effect: { path: 'gameplay.maxSkillPoints', valuePerLevel: 1, type: 'add' }
         }],
     categories: {
@@ -185,7 +185,7 @@ ATTRIBUTES_FOR_SHOP.forEach(attr => {
         desc: `增加收集阶段 [${attr.name}] 属性出现的概率权重。`,
         icon: attr.icon,
         maxLevel: 5,
-        cost: { resourceId: 'energy_essence', base: 100, growth: 1.3, type: 'exponential' },
+        cost: { resourceId: 'rune_fragments', base: 100, growth: 1.3, type: 'exponential' },
         effect: { path: `probabilities.${attr.id}`, valuePerLevel: 5, type: 'add' }
     });
 });

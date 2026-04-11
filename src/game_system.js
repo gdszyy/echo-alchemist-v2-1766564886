@@ -183,8 +183,9 @@ export const game_system = {
 
         // 重置 UI
         document.getElementById('combat-message').innerHTML = '';
-        document.getElementById('score-num').innerText = '0';
         document.getElementById('round-num').innerText = '1';
+        // 更新符文数量显示
+        this.ui_updateRuneCountDisplay();
     },
 
     /**
@@ -198,7 +199,7 @@ export const game_system = {
                 const parsed = JSON.parse(saved);
                 // 合并而非覆盖，确保新字段有默认值
                 this.saveData = Object.assign(
-                    { currency: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0 },
+                    { currency: 0, runeFragments: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0 },
                     parsed
                 );
             } catch (e) {

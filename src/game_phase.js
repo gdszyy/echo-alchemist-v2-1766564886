@@ -1065,9 +1065,11 @@ phase_gathering_getRandomPegType() {
 
         // --- UI Overlays ---
         if (this.gameOver) { 
-            // [META] 结算货币并保存
+            // [META] 结算：将 runCurrency 转换为符文碎片并保存
             if (this.runCurrency > 0) {
-                this.meta_addCurrency(this.runCurrency);
+                this.saveData.runeFragments = (this.saveData.runeFragments || 0) + this.runCurrency;
+                this.sys_saveData();
+                this.ui_updateMetaCurrency();
                 this.runCurrency = 0;
             }
 
@@ -1081,9 +1083,8 @@ phase_gathering_getRandomPegType() {
                 const leftoverCount = this.ammoQueue.length;
                 const scoreMult = Math.pow(CONFIG.balance.unusedAmmoScoreMult, leftoverCount);
                 this.score *= scoreMult;
-                document.getElementById('score-num').innerText = this.smartScientific(this.score,3); 
                 this.nextRoundHpMultiplier = CONFIG.balance.nextRoundDifficultyMult;
-                showToast(`完美清場! 分數 x${scoreMult} | 下輪難度 UP!`);
+                showToast(`完美清場! 下輪難度 UP!`);
                 audio.playPowerup();
                 this.ammoQueue = []; 
                 this.ui_updateAmmoUI();

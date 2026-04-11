@@ -59,8 +59,8 @@ export const ui_system = {
         flyer.style.transform = '';
         document.body.appendChild(flyer);
 
-        // 目标位置：顶部的资源图标
-        let targetEl = document.getElementById('run-currency-display');
+        // 目标位置：顶部的符文计数显示
+        let targetEl = document.getElementById('rune-count-display');
         if (!targetEl || targetEl.offsetParent === null) {
             targetEl = document.getElementById('meta-currency-display');
         }
@@ -153,10 +153,21 @@ ui_closeTruthBook() {
      * [UI] 更新主界面的货币显示
      */
     ui_updateMetaCurrency() {
+        const runeFragments = this.saveData.runeFragments || 0;
         const el = document.getElementById('meta-currency-display');
-        if (el) el.innerText = this.saveData.currency.toLocaleString();
-        const runEl = document.getElementById('run-currency-display');
-        if (runEl) runEl.innerText = this.runCurrency.toLocaleString();
+        if (el) el.innerText = runeFragments.toLocaleString();
+        const shopEl = document.getElementById('shop-currency-display');
+        if (shopEl) shopEl.innerText = runeFragments.toLocaleString();
+        // 同时更新顶部符文计数显示
+        this.ui_updateRuneCountDisplay();
+    },
+
+    /**
+     * [UI] 更新顶部符文数量显示
+     */
+    ui_updateRuneCountDisplay() {
+        const el = document.getElementById('rune-count-display');
+        if (el) el.innerText = (this.runeInventory ? this.runeInventory.length : 0);
     },
 
 /**
@@ -167,7 +178,7 @@ ui_closeTruthBook() {
         const itemsContainer = document.getElementById('shop-items-container');
         const currencyDisplay = document.getElementById('shop-currency-display');
         
-        if (currencyDisplay) currencyDisplay.innerText = this.saveData.currency.toLocaleString();
+        if (currencyDisplay) currencyDisplay.innerText = (this.saveData.runeFragments || 0).toLocaleString();
         
         // 1. 渲染分类标签
         if (categoryContainer) {
@@ -197,7 +208,7 @@ ui_closeTruthBook() {
                 const level = currentData[upgrade.id] || 0;
                 const isMax = level >= upgrade.maxLevel;
                 const cost = this.meta_calculateUpgradeCost(upgrade, level);
-                const canAfford = this.saveData.currency >= cost;
+                const canAfford = (this.saveData.runeFragments || 0) >= cost;
 
                 const card = document.createElement('div');
                 card.className = `bg-slate-900/60 border ${isMax ? 'border-slate-700 opacity-80' : 'border-slate-700/50'} p-4 rounded-xl flex flex-col gap-3 relative overflow-hidden group`;
@@ -256,8 +267,8 @@ ui_closeTruthBook() {
 
                 if (!isMax) {
                     const buyBtn = document.createElement('button');
-                    buyBtn.className = `px-4 py-2 rounded-lg text-xs font-bold transition-all ${canAfford ? 'bg-amber-500 text-slate-900 hover:scale-105 active:scale-95' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`;
-                    buyBtn.textContent = `✨ ${cost.toLocaleString()}`;
+                    buyBtn.className = `px-4 py-2 rounded-lg text-xs font-bold transition-all ${canAfford ? 'bg-purple-600 text-white hover:scale-105 active:scale-95' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`;
+                    buyBtn.textContent = `🔮 ${cost.toLocaleString()}`;
                     // [重构] 使用 addEventListener 替代内联 onclick="game.meta_buyUpgrade(...)"，移除 window.game 依赖
                     buyBtn.addEventListener('click', () => {
                         this.meta_buyUpgrade(upgrade.id);
@@ -803,7 +814,7 @@ ui_closeTruthBook() {
      */
     ui_skipRelic() {
         this.spawn_addScore(500);
-        showToast("獲得 500 分");
+        showToast("放棄遗物，获得局内货币");
         this.ui_closeRelicSelection();
     },
 
@@ -1206,7 +1217,8 @@ ui_closeTruthBook() {
      * [META] 增加货币并保存
      */
     meta_addCurrency(amount) {
-        this.saveData.currency += amount;
+        // 局外货币改为符文碎片
+        this.saveData.runeFragments = (this.saveData.runeFragments || 0) + amount;
         this.sys_saveData();
         this.ui_updateMetaCurrency();
     },
@@ -1254,12 +1266,12 @@ ui_closeTruthBook() {
         if (level >= upgrade.maxLevel) return;
         
         const cost = this.meta_calculateUpgradeCost(upgrade, level);
-        if (this.saveData.currency >= cost) {
-            this.saveData.currency -= cost;
+        if ((this.saveData.runeFragments || 0) >= cost) {
+            this.saveData.runeFragments = (this.saveData.runeFragments || 0) - cost;
             currentData[upgradeId] = level + 1;
             this.sys_saveData();
             
-            // [BUGFIX #2] 修复 setDeepValue 重复调用导致临时升级数值翻倍
+            // [BUGFIX #2] 修复 setDeepValue 重复调用导致临时升级数値翻倍
             // 原 Bug: isTemporary 分支内外各调用了一次 setDeepValue，导致临时升级效果被应用两次
             // 修复：统一在分支外调用一次
             const effectValue = upgrade.effect.valuePerLevel * (level + 1);
@@ -1273,12 +1285,75 @@ ui_closeTruthBook() {
             const typeText = isTemporary ? '下一局生效' : `LV.${level + 1}`;
             if (window.showToast) showToast(`购买成功: ${upgrade.name} ${typeText}`);
         } else {
-            if (window.showToast) showToast("能量精粹不足");
+            if (window.showToast) showToast("符文碎片不足");
             audio.playTone(200, 'sawtooth', 0.1, 0.2);
         }
     },
 
     // ==================== 符文发射器 UI ====================
+
+    /**
+     * 打开符文背包面板（只读查看，不支持合成/重铸）
+     */
+    ui_openRuneBackpack() {
+        const panel = document.getElementById('rune-backpack-panel');
+        if (!panel) return;
+        panel.style.removeProperty('display');
+        panel.style.display = 'flex';
+        this._ui_renderRuneBackpackList();
+    },
+
+    /**
+     * 关闭符文背包面板
+     */
+    ui_closeRuneBackpack() {
+        const panel = document.getElementById('rune-backpack-panel');
+        if (panel) panel.style.display = 'none';
+    },
+
+    /**
+     * 渲染符文背包内容（只读）
+     * @private
+     */
+    _ui_renderRuneBackpackList() {
+        const list = document.getElementById('rune-backpack-list');
+        const countEl = document.getElementById('rune-backpack-count');
+        if (!list) return;
+
+        const inventory = this.runeInventory || [];
+        if (countEl) countEl.textContent = inventory.length;
+
+        list.innerHTML = '';
+
+        if (inventory.length === 0) {
+            list.innerHTML = `<p class="text-center text-slate-500 text-xs py-4 italic">背包中没有符文</p>`;
+            return;
+        }
+
+        inventory.forEach((runeEntry, idx) => {
+            const runeId = typeof runeEntry === 'object' ? runeEntry.id : runeEntry;
+            if (!runeId) return;
+            const runeDef = RUNE_DB ? RUNE_DB.find(r => r.id === runeId) : null;
+            if (!runeDef) return;
+            const runeLevel = (typeof runeEntry === 'object' && runeEntry.level) ? runeEntry.level : 1;
+
+            const item = document.createElement('div');
+            item.className = 'flex items-center gap-3 bg-slate-800/60 border border-slate-700/40 rounded-xl p-2';
+            item.innerHTML = `
+                <div class="w-10 h-10 flex items-center justify-center bg-purple-950/50 rounded-lg border border-purple-500/30 text-xl shrink-0">
+                    ${runeDef.icon || '🔮'}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-bold text-purple-200">${runeDef.name}</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-400 font-mono">Lv.${runeLevel}</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 leading-tight mt-0.5 truncate">${runeDef.desc || ''}</p>
+                </div>
+            `;
+            list.appendChild(item);
+        });
+    },
 
     /**
      * 打开符文发射器面板
