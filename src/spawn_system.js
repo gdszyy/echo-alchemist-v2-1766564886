@@ -1152,11 +1152,12 @@ export const spawn_system = {
             return;
         }
 
-        const w = this.enemyWidth * CONFIG.gameplay.enemyCols; // Boss 占据全宽
-        const bossW = Math.min(w, this.enemyWidth * 3);        // 实际宽度：3列宽
-        const bossH = this.enemyHeight * 1.5;                  // 高度为 1.5 行
-        const centerX = (CONFIG.gameplay.enemyCols / 2) * this.enemyWidth;
-        const spawnY = 80; // 生成在顶部
+        const bossW = this.enemyWidth * 3;                        // 实际宽度：3列宽（固定）
+        const bossH = this.enemyHeight * 2;                        // 高度为 2 行（整数行，与网格对齐）
+        const centerX = this.width / 2;                            // 画布水平中心（更健壮，不依赖 enemyCols 为偶数）
+        // spawnY：boss 中心 Y 需满足 boss 上边界 = startY - enemyHeight/2
+        // 即 spawnY = startY + enemyHeight/2，确保 boss 占满第 0、1 行的完整网格
+        const spawnY = 80 + this.enemyHeight / 2; // 生成在顶部，上下边界与行网格边界对齐
 
         const bossHP = this.spawn_calculateBossHP(isBigBoss);
 
