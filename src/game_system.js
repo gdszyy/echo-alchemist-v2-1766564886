@@ -354,7 +354,7 @@ export const game_system = {
      */
     sys_resetMultiplier() {
         this.scoreMultiplier = 1.0;
-        this.ui_updateMultiplierUI();
+        this.ui_updateMultiplierUI(); // 内部已有 null 检查，安全
         const display = document.getElementById('multiplier-display');
         if (display) {
             display.classList.remove('opacity-100');

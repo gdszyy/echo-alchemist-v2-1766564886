@@ -342,7 +342,7 @@ phase_gathering_getRandomPegType() {
                  this.ui.closeDrawer();
                  return;
              }
-             if (this.ammoQueue.length > 0 && this.projectiles.length === 0 && this.burstQueue.length === 0) {
+             if (!this.isEnemyTurn && this.ammoQueue.length > 0 && this.projectiles.length === 0 && this.burstQueue.length === 0) {
                 this.isDragging = true; 
                 this.dragStart = new Vec2(this.width / 2, this.height - 80); 
                 this.dragCurrent = logicPos; 

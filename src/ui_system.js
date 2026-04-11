@@ -349,8 +349,10 @@ ui_closeTruthBook() {
      */
     ui_updateMultiplierUI() { 
         const el = document.getElementById('multiplier-val'); 
+        if (!el) return; // 元素已被移除（充能符文系统替代了 combo 显示）
         el.innerText = `x${this.scoreMultiplier.toFixed(1)}`; 
         const container = document.getElementById('multiplier-display'); 
+        if (!container) return;
         container.classList.remove('opacity-0'); 
         container.classList.add('opacity-100'); 
         el.classList.remove('pop-anim'); 
