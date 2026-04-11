@@ -35,7 +35,14 @@
 - `entities.js` 的 `setAudioProvider(provider)` 会同时调用上述两个函数，确保音频注入传播到所有子模块
 - `core.js` 只需调用 `setAudioProvider`，无需感知子模块的存在
 
-## 4. 开发规范
+## 4. 参数调整记录
+
+| 日期 | 文件 | 修改内容 |
+|------|------|----------|
+| 2026-04-11 | `src/entities.js` | `DropBall.update`：当 `this.radius > CONFIG.physics.marbleRadius`（即处于倍化状态）时，使用 `friction + 0.005`（上限 0.998）替代默认摩擦力，减少卡墙概率 |
+| 2026-04-11 | `src/ui/shop.js` | `permanent_size_up` 效果：`marbleSizeBonus` 从 `4.2` 调整为 `2.5`，防止倍化球在钉盘左右墙面间就少尺寸内将球夹住 |
+
+## 5. 开发规范
 *   **依赖管理**：
     *   `math_utils.js` 和 `particles.js` 作为底层模块，**严禁**引入 `entities.js`、`config.js` 或 `audio.js` 等高层业务模块，以避免循环依赖。
     *   `entities.js` 通过 ES Modules (`import`) 引入拆分出的工具和特效类，并对外重新导出 (`export`) 以保持对其他子系统（如 `combat_system.js`）的向后兼容性。

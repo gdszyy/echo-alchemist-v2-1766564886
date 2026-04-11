@@ -1219,7 +1219,11 @@ class DropBall {
             
             this.vel = this.vel.add(gravityStep);
             this.pos = this.pos.add(this.vel.mult(timeScale));
-            this.vel = this.vel.mult(Math.pow(CONFIG.physics.friction, timeScale));
+            // 当弹珠处于倍化状态（sizeBonus > 0）时，使用更低的摩擦力，防止卡墙
+            const effectiveFriction = (this.radius > CONFIG.physics.marbleRadius)
+                ? Math.min(CONFIG.physics.friction + 0.005, 0.998)
+                : CONFIG.physics.friction;
+            this.vel = this.vel.mult(Math.pow(effectiveFriction, timeScale));
 
             //  更新滚动音效
             // 计算当前速度的大小 (Magnitude)
