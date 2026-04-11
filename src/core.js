@@ -263,6 +263,12 @@ class Game {
         this.eventBus.on('audio:ready', (data) => {
             console.log('[Game] Audio system ready');
         });
+
+        // [Task 3.2] 注册 UI 层 EventBus 监听器
+        // ui_initEventListeners: 全局 UI 事件（色差特效、全屏闪光）
+        // hud_initEventListeners: HUD 事件（弹药动画、命中进度、充能符文）
+        this.ui_initEventListeners();
+        this.hud_initEventListeners();
     }
 }
 

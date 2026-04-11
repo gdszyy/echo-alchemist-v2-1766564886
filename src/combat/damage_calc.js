@@ -6,7 +6,7 @@
  *  - DDA（动态难度调整）期望伤害评估
  *  - 伤害记录与统计汇总
  *  - 闪电链触发逻辑（纯计算部分）
- *  - 色差特效触发（与伤害量挂钩的 DOM 操作，已标注 TODO[Task 3.2]）
+ *  - 色差特效触发（通过 EventBus 事件驱动，Task 3.2 已完成）
  *
  * 使用方式：通过 window.DamageCalc 访问，或直接 import。
  * 所有方法均以 mixin 形式设计，需绑定到 Game 实例（this）上调用。
@@ -15,7 +15,7 @@
 import { CONFIG } from '../config.js';
 import { LightningBolt } from '../entities.js';
 import { audio } from '../audio.js';
-import { eventBus } from '../event_bus.js';
+import { eventBus, EVENT_TYPES } from '../event_bus.js';
 
 /**
  * @namespace DamageCalc
@@ -222,7 +222,7 @@ export const DamageCalc = {
     },
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 4. 色差特效触发（DOM 操作，已标注 TODO[Task 3.2]）
+    // 4. 色差特效触发（通过 EventBus 事件，由 ui_system.js 监听并操作 DOM）
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
@@ -231,17 +231,10 @@ export const DamageCalc = {
      * @param {number} damage - 造成的伤害
      */
     combat_triggerChromaticAberration(damage) {
-        // TODO[Task 3.2]: 改为 EventBus 事件 eventBus.emit('ui:chromaticAberration', { damage })
-        // 检查CRT效果是否开启
-        const crtOverlay = document.getElementById('crt-overlay');
-        if (!crtOverlay || !crtOverlay.classList.contains('active')) return;
-
         // 频率限制：每100ms最多触发一次
         const now = Date.now();
         if (!this._lastChromaticTime) this._lastChromaticTime = 0;
         if (now - this._lastChromaticTime < 100) return;
-        this._lastChromaticTime = now;
-
         // 根据伤害大小决定效果强度
         let effectClass = '';
         if (damage >= 50) {
@@ -253,18 +246,9 @@ export const DamageCalc = {
         } else {
             return; // 伤害太小，不触发
         }
-
-        // 移除旧的效果类
-        crtOverlay.classList.remove('chromatic-light', 'chromatic-medium', 'chromatic-heavy');
-
-        // 添加新效果类
-        crtOverlay.classList.add(effectClass);
-
-        // 动画结束后移除类
-        // TODO[Task 3.2]: 改为 EventBus 事件驱动，避免直接 setTimeout 操作 DOM
-        setTimeout(() => {
-            crtOverlay.classList.remove(effectClass);
-        }, 500);
+        this._lastChromaticTime = now;
+        // [Task 3.2] 改为 EventBus 事件，由 ui_system.js 监听并操作 CRT overlay DOM
+        eventBus.emit(EVENT_TYPES.UI_CHROMATIC_ABERRATION, { effectClass, duration: 500 });
     },
 
 };

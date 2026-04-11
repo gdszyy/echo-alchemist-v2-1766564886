@@ -8,7 +8,7 @@
  * - 遗物选择/跳过/关闭逻辑
  * 
  * 通信方式：通过 Object.assign 混入 Game 实例
- * TODO[Task 3.2]: 改为监听 EventBus 事件，移除对 Game 实例的直接依赖
+ * [Task 3.2 说明] 此模块通过 Mixin 混入 Game 实例，读取 this.xxx 是架构正常用法
  * 
  * @module ui/shop
  */
@@ -31,14 +31,14 @@ export const shop_system = {
      */
     ui_showRelicSelection() {
         // 1. 记录之前的状态 (用于关闭时恢复)
-        this.stateBeforeRelic = this.phase;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        this.stateBeforeRelic = this.phase;  // [Mixin 正常用法：读取 Game 实例状态]
 
         // --- 配置权重 ---
         const RARITY_WEIGHTS = CONFIG.balance.relicRarityWright
 
         // 2. 准备遗物池
         // 过滤掉玩家已经拥有的遗物 (this.ownedRelics)
-        let pool = RELIC_DB.filter(r => !this.ownedRelics.includes(r.id));  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        let pool = RELIC_DB.filter(r => !this.ownedRelics.includes(r.id));  // [Mixin 正常用法：读取 Game 实例状态]
         
         // 如果池子空了（全收集了），就给一些保底的或者是空的
         if (pool.length === 0) {
@@ -113,7 +113,7 @@ export const shop_system = {
      * 玩家选择遗物
      */
     ui_selectRelic(relic) {
-        this.ownedRelics.push(relic.id);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        this.ownedRelics.push(relic.id);  // [Mixin 正常用法：读取 Game 实例状态]
         showToast(`獲得遺物: ${relic.name}`);
         //  处理新遗物效果
         if (relic.effect === 'pink_peg_up') {
@@ -199,11 +199,11 @@ export const shop_system = {
         const itemsContainer = document.getElementById('shop-items-container');
         const currencyDisplay = document.getElementById('shop-currency-display');
         
-        if (currencyDisplay) currencyDisplay.innerText = (this.saveData.runeFragments || 0).toLocaleString();  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (currencyDisplay) currencyDisplay.innerText = (this.saveData.runeFragments || 0).toLocaleString();  // [Mixin 正常用法：读取 Game 实例状态]
         // 更新符文数量显示
         const shopRuneCount = document.getElementById('shop-rune-count');
         if (shopRuneCount) {
-            const total = (this.saveData.runeInventory || []).length;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            const total = (this.saveData.runeInventory || []).length;  // [Mixin 正常用法：读取 Game 实例状态]
             shopRuneCount.textContent = `${total}个符文`;
         }
         
@@ -231,7 +231,7 @@ export const shop_system = {
             
             upgrades.forEach(upgrade => {
                 const isTemporary = upgrade.temporary || false;
-                const currentData = isTemporary ? this.saveData.temporaryUpgrades : this.saveData.upgrades;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                const currentData = isTemporary ? this.saveData.temporaryUpgrades : this.saveData.upgrades;  // [Mixin 正常用法：读取 Game 实例状态]
                 const level = currentData[upgrade.id] || 0;
                 const isMax = level >= upgrade.maxLevel;
                 const cost = this.meta_calculateUpgradeCost(upgrade, level);

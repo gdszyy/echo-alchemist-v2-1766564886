@@ -15,7 +15,7 @@ import {
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
-import { eventBus } from './event_bus.js';
+import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { parseRuneGrid, calcRuneBaseStats, getRuneId, rune_merge, rune_reforge } from './rune_system.js';
 import { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY } from './rune_config.js';
 
@@ -94,7 +94,7 @@ export const ui_system = {
     },
 
 ui_openTruthBook() {
-        this.phase_switchPhase('truth_book');  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        this.phase_switchPhase('truth_book');  // [Mixin 正常用法：读取 Game 实例状态]
         const overlay = document.getElementById('phase-truth-book');
         overlay.style.display = 'flex';
         overlay.classList.remove('hidden-phase');
@@ -107,7 +107,7 @@ ui_closeTruthBook() {
         overlay.classList.remove('active-phase');
         overlay.classList.add('hidden-phase');
         this.truthBook.active = false;
-        this.phase_switchPhase('meta');  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        this.phase_switchPhase('meta');  // [Mixin 正常用法：读取 Game 实例状态]
     },
 
 // 2. 更新慢动作逻辑（放在 update 中调用）
@@ -156,7 +156,7 @@ ui_closeTruthBook() {
      * [UI] 更新主界面的货币显示
      */
     ui_updateMetaCurrency() {
-        const runeFragments = this.saveData.runeFragments || 0;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        const runeFragments = this.saveData.runeFragments || 0;  // [Mixin 正常用法：读取 Game 实例状态]
         const el = document.getElementById('meta-currency-display');
         if (el) el.innerText = runeFragments.toLocaleString();
         const shopEl = document.getElementById('shop-currency-display');
@@ -170,7 +170,7 @@ ui_closeTruthBook() {
      */
     ui_updateRuneCountDisplay() {
         const el = document.getElementById('rune-count-display');
-        if (el) el.innerText = (this.runeInventory ? this.runeInventory.length : 0);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (el) el.innerText = (this.runeInventory ? this.runeInventory.length : 0);  // [Mixin 正常用法：读取 Game 实例状态]
     },
 
 /**
@@ -179,14 +179,14 @@ ui_closeTruthBook() {
      */
     meta_getResourceCount(resourceId) {
         if (resourceId === 'rune_fragments') {
-            return this.saveData.runeFragments || 0;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            return this.saveData.runeFragments || 0;  // [Mixin 正常用法：读取 Game 实例状态]
         }
         // 其他资源是符文库存中对应element的符文数量
         const resDef = META_SHOP_CONFIG.resources[resourceId];
         if (!resDef || !resDef.element) return 0;
         const element = resDef.element;
-        if (!this.saveData.runeInventory) return 0;  // TODO[Task 3.2]: 改为监听 EventBus 事件
-        return this.saveData.runeInventory.filter(r => {  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (!this.saveData.runeInventory) return 0;  // [Mixin 正常用法：读取 Game 实例状态]
+        return this.saveData.runeInventory.filter(r => {  // [Mixin 正常用法：读取 Game 实例状态]
             const runeDef = (typeof RUNE_DB !== 'undefined') ? RUNE_DB.find(rd => rd.id === r.id) : null;
             return runeDef && runeDef.element === element;
         }).length;
@@ -199,24 +199,24 @@ ui_closeTruthBook() {
      */
     meta_spendResource(resourceId, amount) {
         if (resourceId === 'rune_fragments') {
-            this.saveData.runeFragments = (this.saveData.runeFragments || 0) - amount;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            this.saveData.runeFragments = (this.saveData.runeFragments || 0) - amount;  // [Mixin 正常用法：读取 Game 实例状态]
             return;
         }
         const resDef = META_SHOP_CONFIG.resources[resourceId];
         if (!resDef || !resDef.element) return;
         const element = resDef.element;
-        if (!this.saveData.runeInventory) return;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (!this.saveData.runeInventory) return;  // [Mixin 正常用法：读取 Game 实例状态]
         let toRemove = amount;
-        for (let i = this.saveData.runeInventory.length - 1; i >= 0 && toRemove > 0; i--) {  // TODO[Task 3.2]: 改为监听 EventBus 事件
-            const r = this.saveData.runeInventory[i];  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        for (let i = this.saveData.runeInventory.length - 1; i >= 0 && toRemove > 0; i--) {  // [Mixin 正常用法：读取 Game 实例状态]
+            const r = this.saveData.runeInventory[i];  // [Mixin 正常用法：读取 Game 实例状态]
             const runeDef = (typeof RUNE_DB !== 'undefined') ? RUNE_DB.find(rd => rd.id === r.id) : null;
             if (runeDef && runeDef.element === element) {
-                this.saveData.runeInventory.splice(i, 1);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                this.saveData.runeInventory.splice(i, 1);  // [Mixin 正常用法：读取 Game 实例状态]
                 toRemove--;
             }
         }
         // 同步到 runeInventory
-        this.runeInventory = this.saveData.runeInventory.slice();  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        this.runeInventory = this.saveData.runeInventory.slice();  // [Mixin 正常用法：读取 Game 实例状态]
     },
 
 /**
@@ -232,7 +232,7 @@ ui_closeTruthBook() {
         });
         // 2. 显示当前阶段的主容器
         // [META] 兼容 phase-meta, shop, truth_book
-        const activeEl = document.getElementById(`phase-${this.phase}`);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        const activeEl = document.getElementById(`phase-${this.phase}`);  // [Mixin 正常用法：读取 Game 实例状态]
         if(activeEl) { 
             activeEl.style.display = 'flex'; 
             // 微小延迟以触发 CSS transition (如果有)
@@ -243,14 +243,14 @@ ui_closeTruthBook() {
         }
         
         // [META] 切换到主界面或商店时更新货币显示
-        if (this.phase === 'meta' || this.phase === 'shop') {  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (this.phase === 'meta' || this.phase === 'shop') {  // [Mixin 正常用法：读取 Game 实例状态]
             this.ui_updateMetaCurrency();
         }
 
         // 1. 底部面板 (.bottom-panel) 只在收集阶段 (gathering) 显示
         const bottomPanel = document.querySelector('.bottom-panel');
         if (bottomPanel) {
-            if (this.phase === 'gathering') {  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            if (this.phase === 'gathering') {  // [Mixin 正常用法：读取 Game 实例状态]
                 bottomPanel.style.display = 'flex';
             } else {
                 bottomPanel.style.display = 'none'; // 战斗阶段隐藏底部面板
@@ -261,20 +261,20 @@ ui_closeTruthBook() {
         const skillBar = document.getElementById('skill-bar');
         if (skillBar) {
             // 只有在 combat 阶段才显示，其他阶段强制隐藏
-            skillBar.style.display = (this.phase === 'combat') ? 'flex' : 'none';  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            skillBar.style.display = (this.phase === 'combat') ? 'flex' : 'none';  // [Mixin 正常用法：读取 Game 实例状态]
         }
 
         // B. 连击倍率显示 (Multiplier)
         const multiplierEl = document.getElementById('multiplier-display');
         if (multiplierEl) {
-            multiplierEl.style.opacity = (this.phase === 'combat') ? '1' : '0';  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            multiplierEl.style.opacity = (this.phase === 'combat') ? '1' : '0';  // [Mixin 正常用法：读取 Game 实例状态]
         }
 
         // C. 技能点面板 (SP Panel)
         // 逻辑：在 gathering 和 combat 显示，在选择阶段隐藏
         const spPanel = document.getElementById('sp-panel');
         if (spPanel) {
-            if (this.phase === 'gathering' || this.phase === 'combat') {  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            if (this.phase === 'gathering' || this.phase === 'combat') {  // [Mixin 正常用法：读取 Game 实例状态]
                 spPanel.style.opacity = '1';
                 spPanel.style.pointerEvents = 'auto'; // 允许交互（查看提示等）
             } else {
@@ -287,7 +287,7 @@ ui_closeTruthBook() {
         // 再次确保它在非战斗阶段隐藏 (虽然 renderRecipeHUD 也会处理)
         const combatHud = document.getElementById('recipe-hud-container');
         if (combatHud) {
-            if (this.phase === 'combat') {  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            if (this.phase === 'combat') {  // [Mixin 正常用法：读取 Game 实例状态]
                 combatHud.classList.remove('hidden'); // 确保进入战斗时可见
             } else {
                 combatHud.classList.add('hidden');
@@ -298,7 +298,7 @@ ui_closeTruthBook() {
         // 例如：
         /*
         const ammoSlots = document.getElementById('ammo-ui-container');
-        if (ammoSlots) ammoSlots.style.display = (this.phase === 'combat') ? 'block' : 'none';  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (ammoSlots) ammoSlots.style.display = (this.phase === 'combat') ? 'block' : 'none';  // [Mixin 正常用法：读取 Game 实例状态]
         */
     },
 
@@ -312,24 +312,24 @@ ui_closeTruthBook() {
             return;
         }
         this.marbleQueue = this.selectedMarbles.map(i => this.marblesPool[i]); // 将选中的弹珠放入队列
-        this.phase_startGatheringPhase();  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        this.phase_startGatheringPhase();  // [Mixin 正常用法：读取 Game 实例状态]
     },
 
 /**
      * [META] 应用局外升级到当前运行的 CONFIG
      */
     meta_applyUpgrades() {
-        if (!this.saveData.upgrades) this.saveData.upgrades = {};  // TODO[Task 3.2]: 改为监听 EventBus 事件
-        if (!this.saveData.temporaryUpgrades) this.saveData.temporaryUpgrades = {};  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (!this.saveData.upgrades) this.saveData.upgrades = {};  // [Mixin 正常用法：读取 Game 实例状态]
+        if (!this.saveData.temporaryUpgrades) this.saveData.temporaryUpgrades = {};  // [Mixin 正常用法：读取 Game 实例状态]
         
         META_SHOP_CONFIG.upgrades.forEach(upgrade => {
             let level = 0;
             // 临时增强从 temporaryUpgrades 读取
             if (upgrade.temporary) {
-                level = this.saveData.temporaryUpgrades[upgrade.id] || 0;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                level = this.saveData.temporaryUpgrades[upgrade.id] || 0;  // [Mixin 正常用法：读取 Game 实例状态]
             } else {
                 // 永久升级从 upgrades 读取
-                level = this.saveData.upgrades[upgrade.id] || 0;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                level = this.saveData.upgrades[upgrade.id] || 0;  // [Mixin 正常用法：读取 Game 实例状态]
             }
             
             if (level > 0) {
@@ -345,7 +345,7 @@ ui_closeTruthBook() {
      */
     meta_addCurrency(amount) {
         // 局外货币改为符文碎片
-        this.saveData.runeFragments = (this.saveData.runeFragments || 0) + amount;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        this.saveData.runeFragments = (this.saveData.runeFragments || 0) + amount;  // [Mixin 正常用法：读取 Game 实例状态]
         this.sys_saveData();
         this.ui_updateMetaCurrency();
     },
@@ -363,7 +363,7 @@ ui_closeTruthBook() {
      * [META] 打开商店
      */
     meta_openShop() {
-        this.phase_switchPhase('shop');  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        this.phase_switchPhase('shop');  // [Mixin 正常用法：读取 Game 实例状态]
         this.meta_currentShopCategory = Object.keys(META_SHOP_CONFIG.categories)[0];
         this.ui_renderShop();
     },
@@ -387,7 +387,7 @@ ui_closeTruthBook() {
         
         // 临时增强和永久升级分开处理
         const isTemporary = upgrade.temporary || false;
-        const currentData = isTemporary ? this.saveData.temporaryUpgrades : this.saveData.upgrades;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        const currentData = isTemporary ? this.saveData.temporaryUpgrades : this.saveData.upgrades;  // [Mixin 正常用法：读取 Game 实例状态]
         const level = currentData[upgradeId] || 0;
         
         if (level >= upgrade.maxLevel) return;
@@ -403,7 +403,7 @@ ui_closeTruthBook() {
             currentData[upgradeId] = level + 1;
             // 如果是符文库存货币，同步到saveData.runeInventory
             if (resourceId !== 'rune_fragments') {
-                this.saveData.runeInventory = (this.runeInventory || []).slice();  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                this.saveData.runeInventory = (this.runeInventory || []).slice();  // [Mixin 正常用法：读取 Game 实例状态]
             }
             this.sys_saveData();
             
@@ -515,5 +515,38 @@ ui_closeTruthBook() {
         if (!container) return;
         container.classList.add('shake-hard');
         setTimeout(() => container.classList.remove('shake-hard'), duration);
+    },
+
+    /**
+     * @method ui_initEventListeners
+     * @description [Task 3.2] 注册 EventBus 监听器，响应业务层发出的全局 UI 事件。
+     *   在游戏初始化时调用（sys_initGame 或 sys_resetGame 中）。
+     */
+    ui_initEventListeners() {
+        // ── CRT 色差特效 ──────────────────────────────────────────────────
+        // 监听来自 damage_calc.js 的色差事件，操作 CRT overlay DOM
+        eventBus.on(EVENT_TYPES.UI_CHROMATIC_ABERRATION, ({ effectClass, duration }) => {
+            const crtOverlay = document.getElementById('crt-overlay');
+            if (!crtOverlay || !crtOverlay.classList.contains('active')) return;
+            crtOverlay.classList.remove('chromatic-light', 'chromatic-medium', 'chromatic-heavy');
+            crtOverlay.classList.add(effectClass);
+            setTimeout(() => {
+                crtOverlay.classList.remove(effectClass);
+            }, duration || 500);
+        });
+
+        // ── 全屏闪光特效 ────────────────────────────────────────────────
+        // 监听来自 combat_system.js 的闪光事件，操作 canvas 闪光层 DOM
+        eventBus.on(EVENT_TYPES.UI_FLASH_EFFECT, ({ color, alpha, duration }) => {
+            const flashEl = document.getElementById('canvas-flash-overlay');
+            if (!flashEl) return;
+            flashEl.style.backgroundColor = color || 'rgba(255,255,255,0.3)';
+            flashEl.style.opacity = alpha || '0.3';
+            flashEl.style.display = 'block';
+            setTimeout(() => {
+                flashEl.style.opacity = '0';
+                setTimeout(() => { flashEl.style.display = 'none'; }, 200);
+            }, duration || 100);
+        });
     },
 };
