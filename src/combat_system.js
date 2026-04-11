@@ -13,64 +13,15 @@ import { RUNE_DB } from './rune_config.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus } from './event_bus.js';
+import { DamageCalc } from './combat/damage_calc.js';
+import { CollisionSystem } from './combat/collision.js';
 
 export const combat_system = {
-/**
-     * @method calculatePlayerExpectedDamage
-     * @description 计算玩家当前弹药队列的平均预期伤害 (DDA 核心算法)
-     */
-    combat_calculatePlayerExpectedDamage() {
-        if (this.ammoQueue.length === 0) return 0;
+// [已迁移至 src/combat/damage_calc.js] combat_calculatePlayerExpectedDamage
+    // DDA 核心算法 —— 通过文件底部的 Object.assign(combat_system, DamageCalc) 注入
 
-        // 1. 计算每一发弹药的单发期望评分 (Raw Score)
-        // 公式: 伤害 * (1 + 连射数 + 特效加成)
-        const scores = this.ammoQueue.map(recipe => {
-            let specialBonus = 0;
-            if (recipe.explosive) specialBonus += 2; // 爆炸权重 +2
-            if (recipe.cryo > 0 || recipe.pyro > 0 || recipe.isLaser) specialBonus += 1; // 元素权重 +1
-            
-            // 基础伤害 * (1 (本体) + 连射次数 + 特效系数)
-            // 注意：multicast 是额外发射次数，所以总量是 1 + multicast
-            return (recipe.damage || 2) * (1 + (recipe.multicast || 0) + specialBonus);
-        });
-
-        // 如果样本太少 (<3)，直接算平均值，不进行统计学剔除
-        if (scores.length < 3) {
-            return scores.reduce((a, b) => a + b, 0) / scores.length;
-        }
-
-        // 2. 排序并去除最高/最低值 (Trimmed Mean)
-        scores.sort((a, b) => a - b);
-        // 去掉第一个(最低)和最后一个(最高)
-        const trimmedScores = scores.slice(1, scores.length - 1);
-
-        // 3. 计算方差和标准差 (Variance Method)
-        const n = trimmedScores.length;
-        if (n === 0) return 0; // 防止切空
-
-        const mean = trimmedScores.reduce((a, b) => a + b, 0) / n;
-        const variance = trimmedScores.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / n;
-        const stdDev = Math.sqrt(variance);
-
-        // 4. 剔除离群值 (排除落在 Mean ± 1.5倍标准差 之外的数值)
-        // 1.5倍标准差通常能涵盖大多数正常波动，排除极端运气值
-        const filteredScores = trimmedScores.filter(val => Math.abs(val - mean) <= (stdDev * 1.5 || 1)); // ||1 防止标准差为0
-
-        // 5. 计算最终平均值
-        if (filteredScores.length === 0) return mean; // 如果全被剔除了(极其罕见)，返回修剪后的平均值
-        
-        const finalAverage = filteredScores.reduce((a, b) => a + b, 0) / filteredScores.length;
-        
-        return finalAverage;
-    },
-
-// 1. 汇报伤害（供敌人受伤时调用）
-    /**
-     * @param {any} amount - TODO: Describe this parameter.
-     */
-    combat_reportDamage(amount) {
-        this.frameDamageAccumulator += amount;
-    },
+// [已迁移至 src/combat/damage_calc.js] combat_reportDamage
+    // 汇报伤害 —— 通过文件底部的 Object.assign(combat_system, DamageCalc) 注入
 
 /**
      * @method combat_createFloatingText
@@ -88,8 +39,10 @@ export const combat_system = {
         // 基礎是 1，加上當前累積的 multicast
         const total = 1 + (this.currentSession ? this.currentSession.multicast : 0);
         
-        const ui = document.getElementById('multicast-ui');
-        const num = document.getElementById('multicast-num');
+        const ui =  // TODO[Task 3.2]: 改为 EventBus...
+        document.getElementById('multicast-ui');
+        const num =  // TODO[Task 3.2]: 改为 EventBus...
+        document.getElementById('multicast-num');
         
         if (ui && num) {
             // 顯示 UI
@@ -118,7 +71,8 @@ export const combat_system = {
      */
     combat_playMulticastTransferEffect(multicastValue) {
         // 1. 獲取起點 (右下角倍率 UI)
-        const startEl = document.getElementById('multicast-ui');
+        const startEl =  // TODO[Task 3.2]: 改为 EventBus...
+        document.getElementById('multicast-ui');
         // 2. 獲取終點 (左側當前配方卡片)
         // 注意：activeMarbleIndex 對應的是 gathering-hud-mount 裡的第 N 個子元素
         const targetEl = document.querySelector(`#gathering-hud-mount .recipe-card:nth-child(${this.activeMarbleIndex + 1})`);
@@ -1328,32 +1282,8 @@ combat_wind_drawButterflyBlades(ctx) {
         }
     },
 
-combat_tryMoveEnemy(enemy, delta) {
-        if (!enemy || !enemy.active) return false;
-
-        const newPos = enemy.pos.add(delta);
-        const halfW = enemy.width / 2;
-        const halfH = enemy.height / 2;
-
-        // 1. 边界检查 (确保不超出画布左右和上下边界)
-        if (newPos.x - halfW < 0 || newPos.x + halfW > this.width) return false;
-        if (newPos.y - halfH < 0 || newPos.y + halfH > this.height) return false;
-
-        // 2. 碰撞检查 (确保不与其他活跃敌人重叠)
-        // 使用简单的 AABB 碰撞检测
-        const hasCollision = this.enemies.some(other => {
-            if (other === enemy || !other.active) return false;
-            
-            return Math.abs(newPos.x - other.pos.x) < (enemy.width + other.width) * 0.45 &&
-                   Math.abs(newPos.y - other.pos.y) < (enemy.height + other.height) * 0.45;
-        });
-
-        if (hasCollision) return false;
-
-        // 3. 执行移动
-        enemy.pos = newPos;
-        return true;
-    },
+    // [已迁移至 src/combat/collision.js] combat_tryMoveEnemy
+    // 敌人移动碰撞检测 (AABB + 边界) —— 通过文件底部的 Object.assign(combat_system, CollisionSystem) 注入
 
 combat_damageEnemy(enemy, projectile, damageOverride = null) {
         if (!enemy || !enemy.active) return; 
@@ -1808,186 +1738,15 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         }
     },
     
-    /**
-     * @method combat_triggerChromaticAberration
-     * @description 根据伤害大小触发CRT色差效果，限制触发频率
-     * @param {number} damage - 造成的伤害
-     */
-    combat_triggerChromaticAberration(damage) {
-        // 检查CRT效果是否开启
-        const crtOverlay = document.getElementById('crt-overlay');
-        if (!crtOverlay || !crtOverlay.classList.contains('active')) return;
-        
-        // 频率限制：每100ms最多触发一次
-        const now = Date.now();
-        if (!this._lastChromaticTime) this._lastChromaticTime = 0;
-        if (now - this._lastChromaticTime < 100) return;
-        this._lastChromaticTime = now;
-        
-        // 根据伤害大小决定效果强度
-        let effectClass = '';
-        if (damage >= 50) {
-            effectClass = 'chromatic-heavy';
-        } else if (damage >= 20) {
-            effectClass = 'chromatic-medium';
-        } else if (damage >= 5) {
-            effectClass = 'chromatic-light';
-        } else {
-            return; // 伤害太小，不触发
-        }
-        
-        // 移除旧的效果类
-        crtOverlay.classList.remove('chromatic-light', 'chromatic-medium', 'chromatic-heavy');
-        
-        // 添加新效果类
-        crtOverlay.classList.add(effectClass);
-        
-        // 动画结束后移除类
-        setTimeout(() => {
-            crtOverlay.classList.remove(effectClass);
-        }, 500);
-    },
+    // [已迁移至 src/combat/damage_calc.js] combat_triggerChromaticAberration
+    // CRT 色差效果触发 —— 通过文件底部的 Object.assign(combat_system, DamageCalc) 注入
+    // TODO[Task 3.2]: 改为 EventBus 事件 eventBus.emit('ui:chromaticAberration', { damage })
 
-/**
-     * @method recordDamage
-     * @description 记录本回合造成的伤害。
-     * @param {number} amount - **重要参数** 伤害量。
-     * @param {string} attrType - 属性类型
-     * @param {string} sourceType - 来源类型
-     * @param {number} shotId - 子弹ID
-     */
-    combat_recordDamage(amount, attrType = 'damage', sourceType = 'main', shotId = null) {
-        if (amount <= 0) return;
+    // [已迁移至 src/combat/damage_calc.js] combat_recordDamage
+    // 伤害记录与统计汇总 —— 通过文件底部的 Object.assign(combat_system, DamageCalc) 注入
 
-        this.roundDamage += amount;
-        this.currentShotDamage += amount;
-
-        // --- 1. 更新实时显示的统计 (Game 实例级) ---
-        if (!this.currentShotDamageByAttr[attrType]) {
-            this.currentShotDamageByAttr[attrType] = {};
-        }
-        if (!this.currentShotDamageByAttr[attrType][sourceType]) {
-            this.currentShotDamageByAttr[attrType][sourceType] = 0;
-        }
-        this.currentShotDamageByAttr[attrType][sourceType] += amount;
-
-        // --- 2. 更新子弹历史统计 (Shot ID 级) ---
-        if (shotId !== null && this.shotDamageMap.has(shotId)) {
-            const shotStats = this.shotDamageMap.get(shotId);
-            shotStats.total += amount;
-            
-            if (!shotStats.byAttr[attrType]) {
-                shotStats.byAttr[attrType] = {};
-            }
-            if (!shotStats.byAttr[attrType][sourceType]) {
-                shotStats.byAttr[attrType][sourceType] = 0;
-            }
-            shotStats.byAttr[attrType][sourceType] += amount;
-        }
-
-        this.ui_updateRoundDamage();
-    },
-
-/**
-     * @method triggerLightningChain
-     * @description 触发连锁闪电效果 (修复单体报错版)
-     * @returns {boolean} 是否成功触发了闪电链
-     */
-    combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = null) {
-        // [修复1] 安全检查
-        if (!sourceEnemy || !sourceEnemy.pos) return false;
-
-        // [修复2] 容错处理
-        history = history || [];
-
-        // 查找范围内的所有有效敌人 (取消 !history.includes(e) 限制，允许重复命中)
-        const RANGE = 150;
-        let targets = this.enemies.filter(e => 
-            e.active &&             
-            e !== sourceEnemy &&
-            sourceEnemy.pos.dist(e.pos) < RANGE
-        ); 
-
-        // 如果没有有效目标
-        if (targets.length === 0) return false;
-
-        // --- 核心逻辑：距离越近概率越高，且降低跳回来源的概率 ---
-        // 获取上一个来源敌人 (history 的最后一个元素)
-        const lastSource = history.length > 0 ? history[history.length - 1] : null;
-
-        let totalWeight = 0;
-        const weightedTargets = targets.map(t => {
-            const dist = sourceEnemy.pos.dist(t.pos);
-            let weight = 1 / (Math.pow(dist, 2) + 1); // 基础权重：距离平方反比
-            
-            // [优化] 如果目标是上一个来源敌人，权重减半，防止来回跳
-            if (lastSource && t === lastSource) {
-                weight *= 0.5;
-            }
-            
-            totalWeight += weight;
-            return { target: t, weight: weight, dist: dist };
-        });
-
-        // 随机选择一个目标
-        let randomValue = Math.random() * totalWeight;
-        let selected = null;
-        for (const wt of weightedTargets) {
-            randomValue -= wt.weight;
-            if (randomValue <= 0) {
-                selected = wt.target;
-                break;
-            }
-        }
-        if (!selected) selected = targets[0];
-
-        // 判定连锁概率
-        const lightCfg = CONFIG.mechanics.lightning;
-        let p = lightCfg.baseChainChance; // 基础连锁概率
-        if (selected.temp < 0) p = Math.min(lightCfg.maxChainChance, lightCfg.baseChainChance + Math.abs(selected.temp) * lightCfg.tempChainMult); 
-        
-        if (Math.random() < p) { 
-            // [优化] 增加基础延迟，放慢连锁节奏，提升视觉快感
-            const chainCount = history.length;
-            // 基础延迟从 150ms 增加到 250ms，且减速曲线更平缓
-            const delay = Math.max(lightCfg.chainDelayMin, lightCfg.chainDelayBase - chainCount * lightCfg.chainDelayDecay); 
-
-            setTimeout(() => {
-                if (!selected.active) return;
-
-                // 视觉效果：闪电链
-                this.lightningBolts.push(new LightningBolt(sourceEnemy.pos.x, sourceEnemy.pos.y, selected.pos.x, selected.pos.y)); 
-                audio.playLightning(); 
-                
-                for(let i=0; i<5; i++) {
-                    this.spawn_createParticle(selected.pos.x, selected.pos.y, '#c084fc', 'spark');
-                }
-                
-                // 计算下一次伤害
-                const decayFactor = lightCfg.damageDecayBase + (lightCfg.damageDecayPerLevel * level);
-                const nextDmg = Math.max(1, Math.floor(dmg * decayFactor));
-
-                // 伤害与状态：提升温度 (公式：闪电层数 + 连锁次数/3)
-                const chainCount = history.length;
-                selected.applyTemp(level + chainCount / 3); 
-                
-                const result = selected.takeDamage(dmg); 
-                this.combat_recordDamage(result.actualDamage, 'lightning', 'main', shotId);
-                
-                if(result.killed) this.spawn_addScore(selected.maxHp);
-                
-                // 递归
-                history.push(selected); 
-                // 限制最大连锁次数防止死循环 (增加到 100 次)
-                if (history.length < 100) {
-                    this.combat_lightning_triggerChain(selected, nextDmg, history, level, shotId);
-                }
-            }, delay);
-            
-            return true;
-        } 
-        return false;
-    },
+    // [已迁移至 src/combat/damage_calc.js] combat_lightning_triggerChain
+    // 闪电链触发逻辑 —— 通过文件底部的 Object.assign(combat_system, DamageCalc) 注入
 
 /**
     /**
@@ -2061,7 +1820,8 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         }
 
         // --- 新增：触发UI动画 ---
-        const currentSlot = document.getElementById('current-ammo-render');
+        const currentSlot =  // TODO[Task 3.2]: 改为 EventBus...
+        document.getElementById('current-ammo-render');
         if (currentSlot) {
             // 1. 播放飞出动画
             currentSlot.classList.add('shoot-anim');
@@ -2072,7 +1832,8 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
                 this.ui_updateAmmoUI();
                 
                 // 3. 为新上膛的子弹添加"滑入"动画
-                const newCurrent = document.getElementById('current-ammo-render');
+                const newCurrent =  // TODO[Task 3.2]: 改为 EventBus...
+        document.getElementById('current-ammo-render');
                 if (newCurrent) {
                     newCurrent.classList.add('slide-in-anim');
                     setTimeout(() => newCurrent.classList.remove('slide-in-anim'), 400);
@@ -2221,124 +1982,11 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         }
     },
 
-// 辅助：寻找最近的反射面（墙壁或带盾敌人）
-    /**
-     * @param {any} start - TODO: Describe this parameter.
-     * @param {any} dir - TODO: Describe this parameter.
-     * @param {any} maxDist - TODO: Describe this parameter.
-     */
-    combat_laser_castRay(start, dir, maxDist) {
-        let closest = { dist: maxDist, hitType: 'none', normal: null, enemy: null };
+    // [已迁移至 src/combat/collision.js] combat_laser_castRay
+    // 激光射线检测（墙壁反射面 + 护盾敌人）—— 通过文件底部的 Object.assign(combat_system, CollisionSystem) 注入
 
-        // 1. 检测墙壁
-        // 左墙 (x=radius)
-        if (dir.x < 0) {
-            let d = (CONFIG.physics.bulletRadius - start.x) / dir.x;
-            if (d > 0 && d < closest.dist) closest = { dist: d, hitType: 'wall', normal: 'x' };
-        }
-        // 右墙 (x=width-radius)
-        if (dir.x > 0) {
-            let d = (this.width - CONFIG.physics.bulletRadius - start.x) / dir.x;
-            if (d > 0 && d < closest.dist) closest = { dist: d, hitType: 'wall', normal: 'x' };
-        }
-        // 顶墙 (y=radius)
-        if (dir.y < 0) {
-            let d = (CONFIG.physics.bulletRadius - start.y) / dir.y;
-            if (d > 0 && d < closest.dist) closest = { dist: d, hitType: 'wall', normal: 'y' };
-        }
-        // 底墙 (y=height-radius) - 只有在有 CombatWall 遗物时才反弹
-        if (this.hasCombatWall && dir.y > 0) {
-            let d = (this.height - CONFIG.physics.bulletRadius - start.y) / dir.y;
-            if (d > 0 && d < closest.dist) closest = { dist: d, hitType: 'wall', normal: 'y' };
-        }
-
-        // 2. 检测带盾敌人 (视为反射面)
-        this.enemies.forEach(e => {
-            if (!e.active || !e.affixes.includes('shield')) return;
-            
-            // 简单的 AABB 射线检测
-            // 扩展一下边界作为碰撞箱
-            const halfW = e.width / 2 + 5;
-            const halfH = e.height / 2 + 5;
-            
-            // 为了简化，我们把敌人看作一个圆或者简单的矩形
-            // 这里使用简化的矩形求交 (Slab method 的简化版)
-            // 实际上，为了游戏手感，我们可以遍历所有敌人的边界线
-            // 但最简单的方法是：检测射线是否穿过敌人中心附近
-            
-            // 使用线段与矩形相交检测
-            const t = this.calc_getLineRectIntersection(start, dir, e.pos.x - halfW, e.pos.y - halfH, e.width, e.height);
-            if (t !== null && t > 0 && t < closest.dist) {
-                // 确定法线 (简化：看击中点的相对位置)
-                const hitX = start.x + dir.x * t;
-                const hitY = start.y + dir.y * t;
-                const dx = Math.abs(hitX - e.pos.x);
-                const dy = Math.abs(hitY - e.pos.y);
-                // 如果 x 偏差比 y 偏差大，说明撞的是左右侧 (Normal X)，否则是上下侧
-                // 需归一化比较 (宽高比)
-                const nx = dx / halfW;
-                const ny = dy / halfH;
-                
-                closest = { 
-                    dist: t, 
-                    hitType: 'shield', 
-                    normal: nx > ny ? 'x' : 'y',
-                    enemy: e 
-                };
-            }
-        });
-
-        return closest;
-    },
-
-// 辅助：处理线段上的普通穿透
-    /**
-     * @param {any} p1 - TODO: Describe this parameter.
-     * @param {any} p2 - TODO: Describe this parameter.
-     * @param {any} recipe - TODO: Describe this parameter.
-     */
-    combat_laser_processPenetration(p1, p2, recipe) {
-        const laserVisualWidth = 3 + (recipe.laser * 4) + (recipe.explosive ? 10 : 0);
-    const laserLogicRadius = laserVisualWidth / 2;
-        // 构建线段包围盒用于快速剔除
-        const minX = Math.min(p1.x, p2.x) - 20;
-        const maxX = Math.max(p1.x, p2.x) + 20;
-        const minY = Math.min(p1.y, p2.y) - 20;
-        const maxY = Math.max(p1.y, p2.y) + 20;
-
-        this.enemies.forEach(e => {
-            if (!e.active) return;
-            // 如果是护盾怪，之前在反射逻辑里已经处理过了，这里跳过？
-            // 不，反射逻辑只处理了“最近”的一个。
-            // 激光原理是：它会穿透所有普通怪，直到遇到反射面。
-            // 所以这里要排除掉那个充当反射面的护盾怪（如果这束光正好终结于它）。
-            // 简单处理：全部检测一遍，伤害频率不高。
-            
-            if (e.pos.x < minX || e.pos.x > maxX || e.pos.y < minY || e.pos.y > maxY) return;
-
-            // 点到线段距离公式
-            const l2 = p1.dist(p2) * p1.dist(p2);
-            if (l2 == 0) return;
-            let t = ((e.pos.x - p1.x) * (p2.x - p1.x) + (e.pos.y - p1.y) * (p2.y - p1.y)) / l2;
-            t = Math.max(0, Math.min(1, t));
-            const projX = p1.x + t * (p2.x - p1.x);
-            const projY = p1.y + t * (p2.y - p1.y);
-            const dist = Math.sqrt(Math.pow(e.pos.x - projX, 2) + Math.pow(e.pos.y - projY, 2));
-
-            // 判定半径：敌人半径 + 激光粗细
-            const enemyRadius = Math.min(e.width, e.height) / 2;
-            const totalHitRadius = enemyRadius + laserLogicRadius;
-            if (dist < totalHitRadius) {
-                // 造成伤害
-                // 为了避免多重判定问题，我们可以在这里直接伤害
-                // 伪造一个 projectile 对象传给 damageEnemy
-                this.combat_damageEnemy(e, { config: recipe, pos: new Vec2(projX, projY), isCopy: false });
-                
-                // 视觉：受击点特效
-                if (Math.random() < 0.3) this.spawn_createParticle(projX, projY, '#fff', 'spark');
-            }
-        });
-    },
+    // [已迁移至 src/combat/collision.js] combat_laser_processPenetration
+    // 激光穿透伤害处理（线段与敌人碰撞）—— 通过文件底部的 Object.assign(combat_system, CollisionSystem) 注入
 
 /**
     /**
@@ -2349,11 +1997,13 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
      */
     combat_updateHitProgress(val, target) { 
         // 更新数字
+         // TODO[Task 3.2]: 改为 EventBus...
         document.getElementById('hit-text').innerText = `${val}/${target}`; 
         
         // 计算百分比
         const pct = target > 0 ? Math.min(100, (val/target)*100) : 0; 
-        const bar = document.getElementById('hit-bar');
+        const bar =  // TODO[Task 3.2]: 改为 EventBus...
+        document.getElementById('hit-bar');
         
         if(bar) {
             // 更新宽度
@@ -2386,7 +2036,8 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
      * @description 初始化充能符文UI（生成虚影插槽）
      */
     combat_runeCharge_initUI() {
-        const rewardRow = document.getElementById('combat-rune-reward-row');
+        const rewardRow =  // TODO[Task 3.2]: 改为 EventBus...
+        document.getElementById('combat-rune-reward-row');
         if (!rewardRow) return;
         rewardRow.innerHTML = '';
 
@@ -2408,7 +2059,8 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         });
 
         // 重置充能条
-        const fill = document.getElementById('combat-charge-bar-fill');
+        const fill =  // TODO[Task 3.2]: 改为 EventBus...
+        document.getElementById('combat-charge-bar-fill');
         if (fill) {
             fill.style.width = '0%';
             fill.className = '';
@@ -2473,7 +2125,8 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
 
         // 点亮对应等级的插槽
         const slotIdx = this.runeChargeLevel - 1;
-        const slot = document.getElementById(`combat-rune-slot-${slotIdx}`);
+        const slot =  // TODO[Task 3.2]: 改为 EventBus...
+        document.getElementById(`combat-rune-slot-${slotIdx}`);
         if (slot) {
             slot.classList.remove('ghost', 'lit-1', 'lit-2', 'lit-3', 'lit-4');
             slot.classList.add(`lit-${this.runeChargeLevel}`);
@@ -2483,7 +2136,8 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         }
 
         // 更新充能条颜色
-        const fill = document.getElementById('combat-charge-bar-fill');
+        const fill =  // TODO[Task 3.2]: 改为 EventBus...
+        document.getElementById('combat-charge-bar-fill');
         if (fill) {
             fill.className = '';
             fill.id = 'combat-charge-bar-fill';
@@ -2491,7 +2145,8 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         }
 
         // 充能满闪光效果
-        const shell = document.getElementById('combat-charge-bar-shell');
+        const shell =  // TODO[Task 3.2]: 改为 EventBus...
+        document.getElementById('combat-charge-bar-shell');
         if (shell) {
             shell.classList.add('charge-full-flash');
             setTimeout(() => shell.classList.remove('charge-full-flash'), 400);
@@ -2522,7 +2177,8 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
      * @description 更新充能条UI
      */
     combat_runeCharge_updateUI() {
-        const fill = document.getElementById('combat-charge-bar-fill');
+        const fill =  // TODO[Task 3.2]: 改为 EventBus...
+        document.getElementById('combat-charge-bar-fill');
         if (fill) {
             fill.style.width = `${(this.runeChargeValue || 0) * 100}%`;
         }
@@ -2537,7 +2193,8 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         badge.className = `charge-multiplier-badge ${extraClass}`;
         badge.textContent = text;
         // 将canvas坐标转换为页面坐标
-        const canvas = document.getElementById('gameCanvas');
+        const canvas =  // TODO[Task 3.2]: 改为 EventBus...
+        document.getElementById('gameCanvas');
         const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0, width: 400, height: 600 };
         const scaleX = rect.width / (this.width || 400);
         const scaleY = rect.height / (this.height || 600);
@@ -2591,3 +2248,11 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         this.runeChargePreviewRunes = [];
     },
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mixin 合并：将 DamageCalc 和 CollisionSystem 的方法注入到 combat_system
+// 这样 Game 实例通过 Object.assign(this, combat_system) 后，
+// 可以直接调用 this.combat_recordDamage / this.combat_tryMoveEnemy 等方法。
+// ─────────────────────────────────────────────────────────────────────────────
+Object.assign(combat_system, DamageCalc, CollisionSystem);
+
