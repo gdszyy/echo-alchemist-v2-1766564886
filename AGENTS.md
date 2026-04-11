@@ -63,6 +63,10 @@
 为了指导各个子模块的开发和重构，项目在 `.cursor/rules/` 目录下维护了详细的模块规范文档。以下是当前的文档索引：
 
 *   **全局规范**：[`.cursor/rules/global.md`](.cursor/rules/global.md) - 包含项目整体架构概述、模块依赖关系及全局禁止行为清单。
+*   **音频系统规范**：[`.cursor/rules/audio.md`](.cursor/rules/audio.md) - 音频系统架构约定（SoundManager 类、延迟初始化机制、已知问题与修改规范）。
+*   **配置模块规范**：[`.cursor/rules/config.md`](.cursor/rules/config.md) - 全局配置结构（ELEMENT_CONFIG、RELIC_DB、SKILL_DB 等数据字典格式和修改规范）。
+*   **符文系统规范**：[`.cursor/rules/rune_system.md`](.cursor/rules/rune_system.md) - 符文系统完整规范（智能掉落算法、网格拼图逻辑、合成重铸规则）。
+*   **游戏阶段规范**：[`.cursor/rules/game_phase.md`](.cursor/rules/game_phase.md) - 阶段转换逻辑（命运抉择→研磨→战斗的状态机、各阶段的入口/出口条件）。
 *   **事件总线规范**：预留位置（待创建）
 *   **实体系统规范**：预留位置（待创建）
 *   **战斗系统规范**：预留位置（待创建）
