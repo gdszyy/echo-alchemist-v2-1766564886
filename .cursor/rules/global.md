@@ -8,7 +8,7 @@
 
 为了解决这些问题，项目的目标架构如下：
 
-*   **事件驱动（Event-Driven）**：废弃 `Object.assign` 的巨型 Mixin 模式，引入 `event_bus.js` 作为事件总线（Event Bus）。各个子系统（如 UI、战斗、掉落等）通过事件进行通信，而不是直接修改全局 `Game` 实例的状态。
+*   **事件驱动（Event-Driven）**：已废弃 `Object.assign(Game.prototype, ...)` 的巨型 Mixin 模式（Task 3.3 已完成移除）。引入 `event_bus.js` 作为事件总线（Event Bus）。各个子系统（如 UI、战斗、掉落等）通过事件进行通信，而不是直接修改全局 `Game` 实例的状态。
 *   **视图与数据分离**：UI 渲染逻辑必须从业务模块中剥离，避免在业务逻辑中使用超长的 `innerHTML` 或直接操作 DOM 节点。
 *   **模块化封装**：将核心逻辑拆分为多个独立的子系统（如 `game_system.js`、`combat_system.js` 等），每个模块只负责单一职责，通过导出和导入函数进行协作。
 *   **资源与状态管理**：音频系统（`audio.js`）延迟初始化以适应浏览器策略，实体系统（`entities.js`）需进行性能优化（如空间分区），以应对高频碰撞检测。
@@ -75,3 +75,66 @@
 *   **禁止业务逻辑操作 DOM**：严禁在非 UI 模块（特别是 `combat_system.js` 和 `entities.js`）中直接调用 DOM API（如 `innerHTML`、`classList.add` 等）。所有视图更新必须通过事件总线交由 `ui_system.js` 处理。
 *   **禁止遗留魔法数字和 TODO**：在重构过程中，必须将硬编码的魔法数字提取到 `config.js` 中。严禁提交带有 `[AUTO-GENERATED] TODO:` 等无意义的机器生成注释的代码。
 *   **禁止不当的历史文档存放**：历史更新文档、废弃的设计方案必须归档到 `docs/archive/` 目录，禁止散落在项目根目录或活跃的 `docs/` 目录中。
+*   **禁止使用 Mixin 模式扩展 Game 类**：严禁在 `core.js` 文件末尾或任何地方使用 `Object.assign(Game.prototype, ...)` 将子系统方法批量混入 `Game` 原型。新增子系统必须遵循第 5 节「子系统扩展规范」中的组合模式。
+
+## 5. 子系统扩展规范（Task 3.3 新增）
+
+自 Task 3.3 起，`core.js` 已完全移除 `Object.assign(Game.prototype, ...)` Mixin 模式。当前采用的是**组合模式（Composition via bind）**。
+
+### 当前架构状态
+
+*   **已迁移完成的子系统（全部 10 个）**：
+    *   `game_system.js`、`game_phase.js`、`combat_system.js`、`render_system.js`、`spawn_system.js`
+    *   `ui_system.js`、`ui/hud.js`、`ui/shop.js`、`ui/rune_launcher.js`、`calc_utils.js`
+*   **待迁移子系统**：无（全部完成）
+
+### 组合模式实现方式
+
+在 `Game` 构造函数的第一段，通过以下模式将子系统注入为实例方法：
+
+```js
+// core.js 构造函数开头
+const _subsystems = [
+    game_system, game_phase, combat_system, render_system, spawn_system,
+    ui_system, hud_system, shop_system, rune_launcher_system,
+    calc_utils
+];
+for (const subsystem of _subsystems) {
+    for (const [key, val] of Object.entries(subsystem)) {
+        if (typeof val === 'function') {
+            this[key] = val.bind(this);  // 函数绑定到实例
+        } else if (typeof val !== 'undefined') {
+            this[key] = Array.isArray(val) ? [...val] : val;  // 非函数属性直接赋值
+        }
+    }
+}
+```
+
+### 新增子系统的正确方式
+
+如需新增子系统，必须遵循以下步骤：
+
+1.  创建新的子系统文件（如 `src/new_system.js`），以对象字面量形式导出：
+    ```js
+    export const new_system = {
+        newSystem_method() { /* 使用 this 访问 Game 实例 */ },
+    };
+    ```
+2.  在 `core.js` 中导入新子系统：
+    ```js
+    import { new_system } from './new_system.js';
+    ```
+3.  将新子系统添加到 `_subsystems` 数组中：
+    ```js
+    const _subsystems = [
+        ...,
+        new_system  // 新增
+    ];
+    ```
+4.  **严禁**在文件末尾添加 `Object.assign(Game.prototype, new_system)` 。
+
+### 注意事项
+
+*   组合模式创建的是**实例方法**（存在于实例上，而非原型链），每个 `Game` 实例拥有自己的方法副本。由于游戏只有一个实例，这不是问题。
+*   子系统中的非函数属性（如 `_flyEffectPool: []`）会被拷贝到实例上，每个实例拥有独立副本（数组会浅拷贝）。
+*   子系统方法中的 `this` 始终指向 `Game` 实例，无需修改子系统文件。
