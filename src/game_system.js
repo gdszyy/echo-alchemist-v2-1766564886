@@ -626,7 +626,7 @@ export const game_system = {
         const viewShiftY = this.boardTilt.current.y * -20;
         for (let e of this.enemies) {
             if (e.active && (e.pos.y + viewShiftY) > this.defeatLineY) {
-                // [难度平衡] Boss 越线：触发怡悯掉落
+                // [难度平衡] Boss 越线：触发怜悯掉落
                 if (e.type === 'boss') {
                     this._triggerPityDrop(e);
                 }
@@ -638,7 +638,7 @@ export const game_system = {
 
     /**
      * @method _triggerPityDrop
-     * @description [难度平衡] Boss 越线时触发怡悯掉落，生成一个克制属性符文。
+     * @description [难度平衡] Boss 越线时触发怜悯掉落，生成一个克制属性符文。
      * @param {Enemy} bossEnemy - 越线的 Boss 实体
      */
     _triggerPityDrop(bossEnemy) {
@@ -692,7 +692,7 @@ export const game_system = {
                 }
             }
 
-            // 3. 调用 loot_calcRuneDrop 生成1个怡悯符文
+            // 3. 调用 loot_calcRuneDrop 生成1个怜悯符文
             const themeWeights = counterElement ? { [counterElement]: 10.0 } : {};
             const drop = loot_calcRuneDrop(this, { forcedLevel: 1, themeWeights });
             if (drop && drop.runeId) {
@@ -700,11 +700,11 @@ export const game_system = {
                 loot.level = drop.level || 1;
                 this.runeLootItems.push(loot);
                 // 4. 通过 EventBus 显示提示
-                eventBus.emit('ui:toast', { message: '💔 怡悯掉落：获得克制符文' });
-                showToast('💔 怡悯掉落：获得克制符文');
+                eventBus.emit('ui:toast', { message: '💔 怜悯掉落：获得克制符文' });
+                showToast('💔 怜悯掉落：获得克制符文');
             }
         } catch (err) {
-            console.warn('[_triggerPityDrop] 怡悯掉落失败:', err);
+            console.warn('[_triggerPityDrop] 怜悯掉落失败:', err);
         }
     },
 
