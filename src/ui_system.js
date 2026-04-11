@@ -535,5 +535,97 @@ ui_closeTruthBook() {
                 setTimeout(() => { flashEl.style.display = 'none'; }, 200);
             }, duration || 100);
         });
+
+        // ── [Task 3.2] game_phase.js UI 解耦事件监听器 ──────────────────────
+
+        // ── 重置 game-container 3D 变换（阶段切换时调用）────────────────────
+        eventBus.on(EVENT_TYPES.UI_CONTAINER_TRANSFORM_RESET, () => {
+            const container = document.getElementById('game-container');
+            if (container) {
+                container.style.transform = '';
+                container.style.perspective = '';
+                container.style.transition = '';
+            }
+        });
+
+        // ── 更新 game-container 倾斜变换（研磨/战斗阶段每帧调用）────────────
+        eventBus.on(EVENT_TYPES.UI_BOARD_TILT_UPDATE, ({ perspective, rotateX, rotateY, translateZ, transition }) => {
+            const container = document.getElementById('game-container');
+            if (!container) return;
+            container.style.perspective = perspective || '1200px';
+            container.style.transform = `rotateX(${rotateX || 0}deg) rotateY(${rotateY || 0}deg) translateZ(${translateZ || 0}px)`;
+            if (transition) {
+                container.style.transition = transition;
+            }
+        });
+
+        // ── 全量 UI 刷新（等价于 ui_updateUI()）──────────────────────────────
+        eventBus.on(EVENT_TYPES.UI_UPDATE_REQUEST, () => {
+            this.ui_updateUI();
+        });
+
+        // ── 阶段切换 UI 更新（等价于 ui_onPhaseChange(phase)）────────────────
+        eventBus.on(EVENT_TYPES.UI_PHASE_CHANGE, ({ phase }) => {
+            this.ui_onPhaseChange(phase);
+        });
+
+        // ── UI 缓存更新（等价于 ui_updateUICache()，由 hud.js 实现）──────────
+        eventBus.on(EVENT_TYPES.UI_CACHE_UPDATE_REQUEST, () => {
+            if (typeof this.ui_updateUICache === 'function') {
+                this.ui_updateUICache();
+            }
+        });
+
+        // ── 收集队列 UI 更新（等价于 ui_updateGatheringQueueUI()，由 hud.js 实现）
+        eventBus.on(EVENT_TYPES.UI_GATHERING_QUEUE_UPDATE, () => {
+            if (typeof this.ui_updateGatheringQueueUI === 'function') {
+                this.ui_updateGatheringQueueUI();
+            }
+        });
+
+        // ── 配方 HUD 渲染（等价于 ui_renderRecipeHUD()，由 hud.js 实现）───────
+        eventBus.on(EVENT_TYPES.UI_RECIPE_HUD_RENDER, () => {
+            if (typeof this.ui_renderRecipeHUD === 'function') {
+                this.ui_renderRecipeHUD();
+            }
+        });
+
+        // ── 弹药 UI 更新（等价于 ui_updateAmmoUI()，由 hud.js 实现）───────────
+        eventBus.on(EVENT_TYPES.UI_AMMO_UPDATE, () => {
+            if (typeof this.ui_updateAmmoUI === 'function') {
+                this.ui_updateAmmoUI();
+            }
+        });
+
+        // ── 显示遗物选择界面（等价于 ui_showRelicSelection()，由 shop.js 实现）
+        eventBus.on(EVENT_TYPES.UI_SHOW_RELIC_SELECTION, () => {
+            if (typeof this.ui_showRelicSelection === 'function') {
+                this.ui_showRelicSelection();
+            }
+        });
+
+        // ── 局外货币更新（等价于 ui_updateMetaCurrency()）────────────────────
+        eventBus.on(EVENT_TYPES.UI_META_CURRENCY_UPDATE, () => {
+            this.ui_updateMetaCurrency();
+        });
+
+        // ── 战斗消息文本（UI_COMBAT_MESSAGE 已在 event_bus.js 中定义）──────────
+        // 注：UI_COMBAT_MESSAGE 事件已由 hud.js 或其他模块监听，此处补充 addClasses/removeClasses 支持
+        // 若 hud.js 中已有监听器，此处无需重复注册；若无，则在此处理
+        // 检查是否需要在此处理 classList 操作（ENEMY TURN 消息需要 pop-anim 类）
+        eventBus.on(EVENT_TYPES.UI_COMBAT_MESSAGE, ({ html, addClasses, removeClasses } = {}) => {
+            const msgEl = document.getElementById('combat-message');
+            if (!msgEl) return;
+            if (html !== undefined) msgEl.innerHTML = html;
+            if (removeClasses && removeClasses.length) msgEl.classList.remove(...removeClasses);
+            if (addClasses && addClasses.length) msgEl.classList.add(...addClasses);
+        });
+
+        // ── 回合数更新（UI_ROUND_NUM_UPDATE 已在 event_bus.js 中定义）──────────
+        // 注：确保 round-num DOM 元素被更新
+        eventBus.on(EVENT_TYPES.UI_ROUND_NUM_UPDATE, ({ round }) => {
+            const el = document.getElementById('round-num');
+            if (el) el.innerText = round;
+        });
     },
 };

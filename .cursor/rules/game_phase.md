@@ -27,9 +27,10 @@ globs: ["src/game_phase.js"]
   - 胜利: 敌人血量清零，触发掉落结算，进入下一回合的命运抉择阶段。
   - 失败: 玩家防线被突破，游戏结束 (Game Over)。
 
-## 3. 阶段转换规范
+## 3. 阶段转换与 UI 解耦规范
 - **清理与重置**: 每次阶段切换（`phase_switchPhase`）时，必须彻底清理上一个阶段的残留状态（如清空粒子特效容器、重置物理引擎状态）。
-- **UI 同步**: 阶段切换必须同步触发相应的 UI 更新事件，确保界面呼现与内部状态一致。
+- **UI 解耦 (Task 3.2)**: `game_phase.js` 作为纯业务逻辑模块，**严禁直接进行 DOM 操作（如 `document.getElementById`）和直接调用 UI 方法（如 `this.ui_xxx()`）**。
+- **事件驱动**: 所有 UI 更新（如阶段切换、刷新 HUD、显示战斗消息、更新 3D 倾斜效果等）必须通过 `eventBus.emit` 派发标准事件（如 `UI_UPDATE_REQUEST`、`UI_COMBAT_MESSAGE` 等），由 `ui_system.js` 或对应 UI 子模块监听并处理。
 
 ## 4. Boss 系统规范
 

@@ -62,6 +62,23 @@ export const EVENT_TYPES = {
     BOSS_DEFEATED: 'boss:defeated',         // Boss 被击杀
     BOSS_ROTATION: 'boss:rotation',         // 奥罗波罗斯词缀轮转
 
+    // game_phase.js UI 解耦事件（Task 3.2 彻底落地）
+    // 通用 UI 刷新
+    UI_UPDATE_REQUEST: 'ui:update_request',              // 请求全量 UI 刷新（等价于 ui_updateUI()）
+    UI_CACHE_UPDATE_REQUEST: 'ui:cache_update_request',  // 请求更新 UI 缓存（等价于 ui_updateUICache()）
+    UI_PHASE_CHANGE: 'ui:phase_change',                  // 阶段切换时触发 UI 更新（等价于 ui_onPhaseChange(phase)）
+    // HUD 子模块
+    UI_GATHERING_QUEUE_UPDATE: 'ui:gathering_queue_update', // 更新收集队列 UI（等价于 ui_updateGatheringQueueUI()）
+    UI_RECIPE_HUD_RENDER: 'ui:recipe_hud_render',           // 渲染配方 HUD（等价于 ui_renderRecipeHUD()）
+    UI_AMMO_UPDATE: 'ui:ammo_update',                       // 更新弹药 UI（等价于 ui_updateAmmoUI()）
+    // 遗物选择
+    UI_SHOW_RELIC_SELECTION: 'ui:show_relic_selection',  // 显示遗物选择界面（等价于 ui_showRelicSelection()）
+    // 元数据货币
+    UI_META_CURRENCY_UPDATE: 'ui:meta_currency_update',  // 更新局外货币显示（等价于 ui_updateMetaCurrency()）
+    // 容器变换（game-container 3D 倾斜/重置）
+    UI_CONTAINER_TRANSFORM_RESET: 'ui:container_transform_reset', // 重置 game-container 3D 变换
+    UI_BOARD_TILT_UPDATE: 'ui:board_tilt_update',                 // 更新 game-container 倾斜变换（payload: { tilt }）
+
     // 系统类事件
     SYSTEM_AUDIO_READY: 'audio:ready',
     SYSTEM_ERROR: 'system:error'

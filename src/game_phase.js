@@ -9,7 +9,7 @@ import {
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
-import { eventBus } from './event_bus.js';
+import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
 
 export const game_phase = {
@@ -51,17 +51,13 @@ export const game_phase = {
         // 事件总线广播阶段切换
         eventBus.emit('phase:change', { from: oldPhase, to: newPhase });
         
-        // [修复] 每次切换阶段时重置 container 的 3D 变换，防止研磨阶段的倾斜特效泄漏到其他阶段
-        const container = document.getElementById('game-container');
-        if (container) {
-            container.style.transform = '';
-            container.style.perspective = '';
-            container.style.transition = '';
-        }
+        // [重构 Task 3.2] 通过 EventBus 派发事件，由 ui_system.js 监听并重置 game-container 3D 变换
+        eventBus.emit(EVENT_TYPES.UI_CONTAINER_TRANSFORM_RESET);
         
-        this.ui_updateUI(); // 更新 UI 界面
-        // [重构] 将阶段标题的 DOM 操作集中到 ui_system.js 的 ui_onPhaseChange 方法中
-        this.ui_onPhaseChange(newPhase);
+        // [重构 Task 3.2] 通过 EventBus 派发事件，由 ui_system.js 监听并刷新全量 UI
+        eventBus.emit(EVENT_TYPES.UI_UPDATE_REQUEST);
+        // [重构 Task 3.2] 通过 EventBus 派发事件，由 ui_system.js 监听并处理阶段标题 DOM 更新
+        eventBus.emit(EVENT_TYPES.UI_PHASE_CHANGE, { phase: newPhase });
     },
 
 /**
@@ -77,13 +73,14 @@ export const game_phase = {
         
         this.phase_switchPhase('gathering');
         requestAnimationFrame(() => {
-            this.ui_updateUICache();
+            // [重构 Task 3.2] 通过 EventBus 派发事件，由 hud.js 监听并更新 UI 缓存
+            eventBus.emit(EVENT_TYPES.UI_CACHE_UPDATE_REQUEST);
         });
         // 确保每次进入收集阶段都初始化钉板，因为钉板可能在战斗阶段被清空
         // 或者在游戏重置后需要初始化。
         this.phase_gathering_initPachinko(this.round > 1);
         
-        // --- 新增：初始化持久阈值变量 ---
+        // --- 新增：初始化持久阈値变量 ---
         this.persistentThreshold = CONFIG.gameplay.initTriggerThreshold; 
         // -----------------------------
         this.ui.updateSkillPoints(this.skillPoints);
@@ -91,10 +88,12 @@ export const game_phase = {
         this.dropBalls = []; 
         this.activeMarbleIndex = 0; 
         this.combat_updateHitProgress(0, this.persistentThreshold); 
-        this.ui_updateGatheringQueueUI(); 
-        this.ui_renderRecipeHUD(); 
+        // [重构 Task 3.2] 通过 EventBus 派发事件，由 hud.js 监听并更新收集队列 UI
+        eventBus.emit(EVENT_TYPES.UI_GATHERING_QUEUE_UPDATE);
+        // [重构 Task 3.2] 通过 EventBus 派发事件，由 hud.js 监听并渲染配方 HUD
+        eventBus.emit(EVENT_TYPES.UI_RECIPE_HUD_RENDER);
         this.combat_updateMulticastDisplay(0);
-        this.ui_renderRecipeHUD();
+        eventBus.emit(EVENT_TYPES.UI_RECIPE_HUD_RENDER);
     },
 
 /**
@@ -232,8 +231,9 @@ export const game_phase = {
         } else {
             console.log(`[DEBUG] Skipping special slot creation: unlockedSlots.length=${this.unlockedSlots.length}, slotCount=${this.slotCount}`);
         }
-        this.ui_updateGatheringQueueUI();
-        this.ui_renderRecipeHUD();
+        // [重构 Task 3.2] 通过 EventBus 派发事件
+        eventBus.emit(EVENT_TYPES.UI_GATHERING_QUEUE_UPDATE);
+        eventBus.emit(EVENT_TYPES.UI_RECIPE_HUD_RENDER);
     },
 
 phase_gathering_getRandomPegType() { 
@@ -292,9 +292,10 @@ phase_gathering_getRandomPegType() {
         }
 
         // --- [核心修复 2]：UI 渲染 ---
-        // 修复后，上面的代码不再报错，这一行将被正确执行，HUD 会在进入战斗时立即出现
-        this.ui_updateUI();
-        this.ui_renderRecipeHUD(); 
+        // [重构 Task 3.2] 通过 EventBus 派发事件，由 ui_system.js 监听并刷新全量 UI
+        eventBus.emit(EVENT_TYPES.UI_UPDATE_REQUEST);
+        // [重构 Task 3.2] 通过 EventBus 派发事件，由 hud.js 监听并渲染配方 HUD
+        eventBus.emit(EVENT_TYPES.UI_RECIPE_HUD_RENDER); 
 
         this.sys_resetMultiplier(); 
         this.burstQueue = []; 
@@ -379,7 +380,8 @@ phase_gathering_getRandomPegType() {
                 }
                 this.combat_updateHitProgress(0, this.persistentThreshold);
                 this.dropBalls.push(new DropBall(pos.x, 30, marbleDef, this.currentSession));
-                this.ui_updateGatheringQueueUI();
+                // [重构 Task 3.2] 通过 EventBus 派发事件
+                eventBus.emit(EVENT_TYPES.UI_GATHERING_QUEUE_UPDATE);
                 audio.playShoot();
                 this.combat_updateMulticastDisplay(0);
             } else {
@@ -478,13 +480,12 @@ phase_gathering_getRandomPegType() {
             e.isFrozenCurrentTurn = false; // 重置上一轮的冰冻状态
         });
 
-        // UI 提示
-        const msgEl = document.getElementById('combat-message');
-        if (msgEl) {
-            msgEl.innerHTML = '<span class="text-yellow-400 font-bold text-xl drop-shadow-md">⚠️ ENEMY TURN</span>';
-            msgEl.classList.remove('opacity-0');
-            msgEl.classList.add('pop-anim'); 
-        }
+        // [重构 Task 3.2] 通过 EventBus 派发事件，由 ui_system.js 监听并更新战斗消息
+        eventBus.emit(EVENT_TYPES.UI_COMBAT_MESSAGE, {
+            html: '<span class="text-yellow-400 font-bold text-xl drop-shadow-md">⚠️ ENEMY TURN</span>',
+            addClasses: ['pop-anim'],
+            removeClasses: ['opacity-0']
+        });
     },
 
 /**
@@ -591,8 +592,7 @@ phase_gathering_getRandomPegType() {
         this.round++;
         this.prevRoundDamage = this.roundDamage;
         this.roundDamage = 0;
-        eventBus.emit('ui:round_num_update', { round: this.round });
-        document.getElementById("round-num").innerText = this.round;
+        eventBus.emit(EVENT_TYPES.UI_ROUND_NUM_UPDATE, { round: this.round });
         showToast(`Round ${this.round}`);
 
         // 检查失败
@@ -601,7 +601,8 @@ phase_gathering_getRandomPegType() {
             return;
         }
 
-        document.getElementById('combat-message').innerHTML = '';
+        // [重构 Task 3.2] 通过 EventBus 派发事件，由 ui_system.js 监听并清空战斗消息
+        eventBus.emit(EVENT_TYPES.UI_COMBAT_MESSAGE, { html: '' });
         this.phase_gathering_initPachinko(true);
 
         // =========================================
@@ -618,7 +619,8 @@ phase_gathering_getRandomPegType() {
         if (this.round % CONFIG.gameplay.relicRoundInterval == 0) {
             showToast("✨ 命魔的馈赠 ✨");
             this.phase = 'relic_event';
-            setTimeout(() => { this.ui_showRelicSelection(); }, 500);
+            // [重构 Task 3.2] 通过 EventBus 派发事件，由 shop.js 监听并显示遗物选择界面
+            setTimeout(() => { eventBus.emit(EVENT_TYPES.UI_SHOW_RELIC_SELECTION); }, 500);
             return;
         }
         
@@ -740,15 +742,14 @@ phase_gathering_getRandomPegType() {
             this.combat_runeCharge_decay(timeScale);
         }
         const tilt = this.boardTilt.current;
-        const container = document.getElementById('game-container');
-        if (container) {
-            container.style.perspective = "1200px";
-            const rotateX = tilt.y * -8;
-            const rotateY = tilt.x * 8;
-            const translateZ = -20;
-            // container.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(${translateZ}px)`;
-            container.style.transform = `rotateX(0deg) rotateY(0deg) translateZ(0px)`;
-        }
+        // [重构 Task 3.2] 通过 EventBus 派发事件，由 ui_system.js 监听并应用战斗阶段的倾斜变换
+        // 注：此处保持静止变换（rotateX/Y 均为 0），仅保持 perspective 设置
+        eventBus.emit(EVENT_TYPES.UI_BOARD_TILT_UPDATE, {
+            perspective: '1200px',
+            rotateX: 0,
+            rotateY: 0,
+            translateZ: 0
+        });
 
         // === 1. 计算视差参数 ===
         // 背景层 (地板)：正向移动
@@ -1123,11 +1124,15 @@ phase_gathering_getRandomPegType() {
             if (this.runCurrency > 0) {
                 this.saveData.runeFragments = (this.saveData.runeFragments || 0) + this.runCurrency;
                 this.sys_saveData();
-                this.ui_updateMetaCurrency();
+                // [重构 Task 3.2] 通过 EventBus 派发事件，由 ui_system.js 监听并更新局外货币显示
+                eventBus.emit(EVENT_TYPES.UI_META_CURRENCY_UPDATE);
                 this.runCurrency = 0;
             }
 
-            document.getElementById('combat-message').innerHTML = '<span class="text-red-400 font-bold text-4xl">防線失守</span><br><span class="text-sm">點擊返回主界面</span>'; 
+            // [重构 Task 3.2] 通过 EventBus 派发事件，由 ui_system.js 监听并显示防線失守消息
+            eventBus.emit(EVENT_TYPES.UI_COMBAT_MESSAGE, {
+                html: '<span class="text-red-400 font-bold text-4xl">防線失守</span><br><span class="text-sm">點擊返回主界面</span>'
+            });
             return; 
         }
 
@@ -1141,8 +1146,9 @@ phase_gathering_getRandomPegType() {
                 showToast(`完美清場! 下輪難度 UP!`);
                 audio.playPowerup();
                 this.ammoQueue = []; 
-                this.ui_updateAmmoUI();
-                this.ui_renderRecipeHUD();
+                // [重构 Task 3.2] 通过 EventBus 派发事件
+                eventBus.emit(EVENT_TYPES.UI_AMMO_UPDATE);
+                eventBus.emit(EVENT_TYPES.UI_RECIPE_HUD_RENDER);
                 this.data_clearProjectiles();
             }
         }
@@ -1199,9 +1205,13 @@ phase_gathering_getRandomPegType() {
         if (this.ammoQueue.length === 0 && this.projectiles.length === 0 && this.burstQueue.length === 0 && !this.gameOver) { 
             // 回合结束，风暴核心能量衰减
             this.combat_wind_decayStormCoresEnergy();
-            document.getElementById('combat-message').innerHTML = '<div class="bg-black/50 p-4 rounded-xl backdrop-blur-md border border-blue-500/50 pointer-events-none"><span class="text-blue-300 font-bold text-xl block mb-2">彈藥耗盡</span><span class="text-sm text-slate-300">點擊收集新彈药</span></div>'; 
+            // [重构 Task 3.2] 通过 EventBus 派发事件，由 ui_system.js 监听并显示弹药耗尽提示
+            eventBus.emit(EVENT_TYPES.UI_COMBAT_MESSAGE, {
+                html: '<div class="bg-black/50 p-4 rounded-xl backdrop-blur-md border border-blue-500/50 pointer-events-none"><span class="text-blue-300 font-bold text-xl block mb-2">彈药耗盡</span><span class="text-sm text-slate-300">點擊收集新彈药</span></div>'
+            });
         } else { 
-            if (!this.gameOver) document.getElementById('combat-message').innerHTML = ''; 
+            // [重构 Task 3.2] 通过 EventBus 派发事件，由 ui_system.js 监听并清空战斗消息
+            if (!this.gameOver) eventBus.emit(EVENT_TYPES.UI_COMBAT_MESSAGE, { html: '' });
         }
         // --- 修改开始：调整层级，先画轨道，再画炮台 ---
         this.ctx.save();
@@ -1305,7 +1315,8 @@ phase_gathering_getRandomPegType() {
         marbleDef.finalHits = this.currentSession.totalHits;
 
         this.activeMarbleIndex++;
-        this.ui_updateGatheringQueueUI();
+        // [重构 Task 3.2] 通过 EventBus 派发事件
+        eventBus.emit(EVENT_TYPES.UI_GATHERING_QUEUE_UPDATE);
         
         // [新增] 弹珠结算时，重置所有钉子的冷却
         this.pegs.forEach(p => p.resetCooldown());
@@ -1340,24 +1351,14 @@ phase_gathering_getRandomPegType() {
 
         const tilt = this.boardTilt.current;
 
-
-        const container = document.getElementById('game-container');
-        if (container) {
-            // 1. 设置透视距离，值越小 3D 感越强
-            container.style.perspective = "1200px"; 
-            
-            // 2. 根据倾斜值旋转容器
-            // rotateX 对应上下倾斜 (tilt.y)，rotateY 对应左右倾斜 (tilt.x)
-            // 乘以 5 或 8 增加旋转角度的体感
-            const rotateX = tilt.y * -8; 
-            const rotateY = tilt.x * 8;
-            const translateZ = -20; // 稍微向后退一点，防止边缘穿模
-
-            container.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(${translateZ}px)`;
-            container.style.transition = "transform 0.1s ease-out"; // 平滑动画
-        } else {
-            console.warn("[DEBUG] phase_gathering_update: 未找到 game-container");
-        }
+        // [重构 Task 3.2] 通过 EventBus 派发事件，由 ui_system.js 监听并应用研磨阶段的 3D 倾斜变换
+        eventBus.emit(EVENT_TYPES.UI_BOARD_TILT_UPDATE, {
+            perspective: '1200px',
+            rotateX: tilt.y * -8,
+            rotateY: tilt.x * 8,
+            translateZ: -20,
+            transition: 'transform 0.1s ease-out'
+        });
         // 模拟板子边缘受光不均
         const grad = this.ctx.createRadialGradient(
             this.width / 2 + (tilt.x * 100), // 光心随倾斜移动
@@ -1564,7 +1565,8 @@ phase_gathering_getRandomPegType() {
                     }
                     this.spawn_createHitFeedback(ball.pos.x, ball.pos.y, ball.vel, result.material); // 這裡也許要傳入屬性類型作為顏色依據
                     audio.playCollect();
-                    this.ui_renderRecipeHUD();
+                    // [重构 Task 3.2] 通过 EventBus 派发事件
+                    eventBus.emit(EVENT_TYPES.UI_RECIPE_HUD_RENDER);
                     
                 } else if (result.type === 'slot') {
                     // 彈珠擊中特殊槽位
@@ -1590,8 +1592,8 @@ phase_gathering_getRandomPegType() {
                         this.currentSession.activeBalls++;
                         showToast("分裂!");
                     } else if (result.slotType === 'relic') {
-                        // 調用遺物選擇
-                        this.ui_showRelicSelection(); 
+                        // [重构 Task 3.2] 通过 EventBus 派发事件，由 shop.js 监听并显示遗物选择界面
+                        eventBus.emit(EVENT_TYPES.UI_SHOW_RELIC_SELECTION);
                         
                         // 將彈珠移除
                         this.dropBalls.splice(i, 1);
@@ -1632,7 +1634,8 @@ phase_gathering_getRandomPegType() {
                     this.dropBalls.splice(i, 1);
                     
                     // --- [新增修复]：刷新 UI 以显示新收集到的材料 ---
-                    this.ui_renderRecipeHUD();
+                    // [重构 Task 3.2] 通过 EventBus 派发事件
+                    eventBus.emit(EVENT_TYPES.UI_RECIPE_HUD_RENDER);
                     
                     showToast("彩虹分裂!");
                 }

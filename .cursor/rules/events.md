@@ -36,6 +36,18 @@
 | `UI_HUD_UPDATE` | `ui:hud_update` | 需要刷新 HUD（如乘数、弹药队列）时 | `{ type: string, data: object }` | HUD 渲染模块 |
 | `UI_SHOP_UPDATE` | `ui:shop_update` | 商店状态更新（如购买、刷新）时 | `{ type: string, item: object }` | 商店渲染模块 |
 | `UI_RUNE_UPDATE` | `ui:rune_update` | 符文网格或背包发生变化时 | `{ type: string, source: string }` | 符文发射器渲染模块 |
+| `UI_UPDATE_REQUEST` | `ui:update_request` | 请求全量 UI 刷新时（替代 `ui_updateUI()`） | 无 | UI 系统 |
+| `UI_CACHE_UPDATE_REQUEST` | `ui:cache_update_request` | 请求更新 UI 缓存时（替代 `ui_updateUICache()`） | 无 | UI 系统 / HUD 模块 |
+| `UI_PHASE_CHANGE` | `ui:phase_change` | 阶段切换时触发 UI 更新（替代 `ui_onPhaseChange()`） | `{ phase: string }` | UI 系统 |
+| `UI_GATHERING_QUEUE_UPDATE` | `ui:gathering_queue_update` | 收集队列发生变化时（替代 `ui_updateGatheringQueueUI()`） | 无 | HUD 模块 |
+| `UI_RECIPE_HUD_RENDER` | `ui:recipe_hud_render` | 配方信息发生变化时（替代 `ui_renderRecipeHUD()`） | 无 | HUD 模块 |
+| `UI_AMMO_UPDATE` | `ui:ammo_update` | 弹药队列发生变化时（替代 `ui_updateAmmoUI()`） | 无 | HUD 模块 |
+| `UI_SHOW_RELIC_SELECTION` | `ui:show_relic_selection` | 需要显示遗物选择界面时（替代 `ui_showRelicSelection()`） | 无 | 商店 / UI 系统 |
+| `UI_META_CURRENCY_UPDATE` | `ui:meta_currency_update` | 局外货币变化需要更新显示时（替代 `ui_updateMetaCurrency()`） | 无 | UI 系统 |
+| `UI_CONTAINER_TRANSFORM_RESET` | `ui:container_transform_reset` | 阶段切换需要重置容器 3D 变换时 | 无 | UI 系统 |
+| `UI_BOARD_TILT_UPDATE` | `ui:board_tilt_update` | 研磨/战斗阶段需要更新容器倾斜效果时 | `{ perspective: string, rotateX: number, rotateY: number, translateZ: number, transition: string }` | UI 系统 |
+| `UI_COMBAT_MESSAGE` | `ui:combat_message` | 战斗消息文本更新（如 ENEMY TURN、防线失守等） | `{ html: string, addClasses: array, removeClasses: array }` | UI 系统 |
+| `UI_ROUND_NUM_UPDATE` | `ui:round_num_update` | 回合数发生变化时 | `{ round: number }` | UI 系统 |
 
 ### 2.4 元数据类事件 (Meta Events)
 
