@@ -37,6 +37,20 @@ export const EVENT_TYPES = {
     UI_SHOP_UPDATE: 'ui:shop_update',
     UI_RUNE_UPDATE: 'ui:rune_update',
 
+    // 战斗 UI 事件（Task 3.2：业务层 -> UI 层）
+    UI_MULTICAST_UPDATE: 'ui:multicast_update',         // 更新连射倍率显示
+    UI_MULTICAST_TRANSFER: 'ui:multicast_transfer',     // 播放倍率转移飞行特效
+    UI_HIT_PROGRESS: 'ui:hit_progress',                // 更新命中进度条
+    UI_AMMO_FIRED: 'ui:ammo_fired',                    // 弹药发射（触发动画+更新UI）
+    UI_RUNE_CHARGE_INIT: 'ui:rune_charge_init',        // 初始化充能符文UI
+    UI_RUNE_CHARGE_LEVEL_UP: 'ui:rune_charge_level_up', // 充能等级提升
+    UI_RUNE_CHARGE_UPDATE: 'ui:rune_charge_update',    // 更新充能条
+    UI_RUNE_CHARGE_BADGE: 'ui:rune_charge_badge',      // 显示翻倍徽章
+    UI_CHROMATIC_ABERRATION: 'ui:chromatic_aberration', // CRT 色差特效
+    UI_COMBAT_MESSAGE: 'ui:combat_message',            // 战斗消息文本
+    UI_ROUND_NUM_UPDATE: 'ui:round_num_update',        // 更新回合数显示
+    UI_FLASH_EFFECT: 'ui:flash_effect',                // 全屏闪光特效
+
     // 元数据类事件
     META_CURRENCY_CHANGED: 'meta:currency_changed',
     META_INVENTORY_CHANGED: 'meta:inventory_changed',

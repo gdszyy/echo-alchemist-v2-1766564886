@@ -12,7 +12,7 @@ import { calcRuneBaseStats } from './rune_system.js';
 import { RUNE_DB } from './rune_config.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
-import { eventBus } from './event_bus.js';
+import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { DamageCalc } from './combat/damage_calc.js';
 import { CollisionSystem } from './combat/collision.js';
 
@@ -38,31 +38,8 @@ export const combat_system = {
     combat_updateMulticastDisplay(bonusAmount = 0) {
         // 基礎是 1，加上當前累積的 multicast
         const total = 1 + (this.currentSession ? this.currentSession.multicast : 0);
-        
-        const ui =  // TODO[Task 3.2]: 改为 EventBus...
-        document.getElementById('multicast-ui');
-        const num =  // TODO[Task 3.2]: 改为 EventBus...
-        document.getElementById('multicast-num');
-        
-        if (ui && num) {
-            // 顯示 UI
-            ui.classList.add('multicast-visible');
-            
-            // 更新數字
-            num.innerText = `x${total}`;
-            
-            // 如果有增加 (bonusAmount > 0)，播放特效
-            if (bonusAmount > 0) {
-                // 1. 容器彈跳
-                ui.classList.remove('multicast-pop');
-                void ui.offsetWidth; // 重繪
-                ui.classList.add('multicast-pop');
-                
-                // 2. 文字閃白
-                num.classList.add('multicast-flash');
-                setTimeout(() => num.classList.remove('multicast-flash'), 300);
-            }
-        }
+        // [Task 3.2] 改为 EventBus 事件，由 hud.js 监听并更新 DOM
+        eventBus.emit(EVENT_TYPES.UI_MULTICAST_UPDATE, { total, bonusAmount });
     },
 
 // --- [新增] 播放倍率轉移飛行特效 ---
@@ -70,64 +47,12 @@ export const combat_system = {
      * @param {any} multicastValue - TODO: Describe this parameter.
      */
     combat_playMulticastTransferEffect(multicastValue) {
-        // 1. 獲取起點 (右下角倍率 UI)
-        const startEl =  // TODO[Task 3.2]: 改为 EventBus...
-        document.getElementById('multicast-ui');
-        // 2. 獲取終點 (左側當前配方卡片)
-        // 注意：activeMarbleIndex 對應的是 gathering-hud-mount 裡的第 N 個子元素
-        const targetEl = document.querySelector(`#gathering-hud-mount .recipe-card:nth-child(${this.activeMarbleIndex + 1})`);
-
-        if (!startEl || !targetEl) return;
-
-        const startRect = startEl.getBoundingClientRect();
-        const targetRect = targetEl.getBoundingClientRect();
-
-        // 3. 創建飛行元素
-        const flyer = document.createElement('div');
-        flyer.className = 'flying-badge';
-        flyer.innerText = `x${multicastValue}`;
-        
-        // 初始位置 (設置在起點)
-        // 計算中心點偏移
-        const startX = startRect.left + startRect.width / 2 - 20; // 20是寬度的一半
-        const startY = startRect.top + startRect.height / 2 - 20;
-        
-        flyer.style.left = `${startX}px`;
-        flyer.style.top = `${startY}px`;
-        flyer.style.transform = 'scale(1.2)'; // 起飛時稍微放大
-
-        document.body.appendChild(flyer);
-
-        // 4. 執行飛行 (下一幀設置終點位置以觸發 transition)
-        requestAnimationFrame(() => {
-            const targetX = targetRect.left + targetRect.width / 2 - 20;
-            const targetY = targetRect.top + targetRect.height / 2 - 20;
-
-            flyer.style.left = `${targetX}px`;
-            flyer.style.top = `${targetY}px`;
-            flyer.classList.add('arrived'); // 配合 CSS 變小變淡
+        // [Task 3.2] 改为 EventBus 事件，由 hud.js 监听并执行飞行特效 DOM 操作
+        eventBus.emit(EVENT_TYPES.UI_MULTICAST_TRANSFER, {
+            multicastValue,
+            activeMarbleIndex: this.activeMarbleIndex
         });
-
-        // 5. 飛行結束後清理並觸發卡片高亮
-        setTimeout(() => {
-            flyer.remove();
-            
-            // 讓目標卡片閃一下，表示接收到了倍率
-            targetEl.style.transition = 'none';
-            targetEl.style.filter = 'brightness(2) drop-shadow(0 0 10px orange)';
-            targetEl.style.transform = 'scale(1.1)';
-            
-            setTimeout(() => {
-                targetEl.style.transition = 'all 0.3s';
-                targetEl.style.filter = 'none';
-                targetEl.style.transform = 'scale(1)';
-            }, 100);
-
-            // 播放音效
-            audio.playCollect(); 
-        }, 600); // 這裡的時間要和 CSS transition 匹配
     },
-
 // 在 Game 类中
     /**
      * @param {any} skill - TODO: Describe this parameter.
@@ -170,12 +95,8 @@ export const combat_system = {
             // === [新增] 全屏闪电链逻辑 ===
             const dmg = p.baseDmg + (this.round * p.roundMult);
             
-            // 视觉：全屏微闪
-            const flash = document.createElement('div');
-            flash.className = 'absolute inset-0 z-50 pointer-events-none transition-opacity duration-200';
-            flash.style.backgroundColor = p.flashColor;
-            document.body.appendChild(flash);
-            setTimeout(() => { flash.style.opacity = '0'; setTimeout(() => flash.remove(), 200); }, 50);
+            // [Task 3.2] 视觉：全屏微闪 - 改为 EventBus 事件，由 ui_system.js 监听
+            eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 200 });
             // [重构] 将直接 DOM 操作提取到 ui_system.js 的 ui_triggerScreenShake 方法
             this.ui_triggerScreenShake(200);
             // 倒序遍历（防止数组变动影响）
@@ -1740,8 +1661,7 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
     
     // [已迁移至 src/combat/damage_calc.js] combat_triggerChromaticAberration
     // CRT 色差效果触发 —— 通过文件底部的 Object.assign(combat_system, DamageCalc) 注入
-    // TODO[Task 3.2]: 改为 EventBus 事件 eventBus.emit('ui:chromaticAberration', { damage })
-
+    // [Task 3.2 已完成] combat_triggerChromaticAberration 已在 damage_calc.js 中改为 EventBus 事件
     // [已迁移至 src/combat/damage_calc.js] combat_recordDamage
     // 伤害记录与统计汇总 —— 通过文件底部的 Object.assign(combat_system, DamageCalc) 注入
 
@@ -1819,31 +1739,9 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
             }
         }
 
-        // --- 新增：触发UI动画 ---
-        const currentSlot =  // TODO[Task 3.2]: 改为 EventBus...
-        document.getElementById('current-ammo-render');
-        if (currentSlot) {
-            // 1. 播放飞出动画
-            currentSlot.classList.add('shoot-anim');
-            
-            // 2. 延迟更新 UI (等待动画播放一部分，制造视觉连贯性)
-            // 实际子弹已经生成，但UI滞后一点点更新，让玩家看到"发射"的过程
-            setTimeout(() => {
-                this.ui_updateAmmoUI();
-                
-                // 3. 为新上膛的子弹添加"滑入"动画
-                const newCurrent =  // TODO[Task 3.2]: 改为 EventBus...
-        document.getElementById('current-ammo-render');
-                if (newCurrent) {
-                    newCurrent.classList.add('slide-in-anim');
-                    setTimeout(() => newCurrent.classList.remove('slide-in-anim'), 400);
-                }
-            }, 150); 
-        } else {
-            this.ui_updateAmmoUI();
-        }
-        
-        this.ui_renderRecipeHUD(); 
+        // --- [Task 3.2] 触发UI动画 - 改为 EventBus 事件，由 hud.js 监听 ---
+        eventBus.emit(EVENT_TYPES.UI_AMMO_FIRED, {});
+        this.ui_renderRecipeHUD();
         
         // [修复] 为这次发射创建独立的shotId
         const shotId = this.shotIdCounter++;
@@ -1996,26 +1894,8 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
      * @param {number} target - **重要参数** 目标命中次数。
      */
     combat_updateHitProgress(val, target) { 
-        // 更新数字
-         // TODO[Task 3.2]: 改为 EventBus...
-        document.getElementById('hit-text').innerText = `${val}/${target}`; 
-        
-        // 计算百分比
-        const pct = target > 0 ? Math.min(100, (val/target)*100) : 0; 
-        const bar =  // TODO[Task 3.2]: 改为 EventBus...
-        document.getElementById('hit-bar');
-        
-        if(bar) {
-            // 更新宽度
-            bar.style.width = `${pct}%`;
-            
-            // 状态切换：满能量 vs 普通
-            if (pct >= 99) {
-                bar.classList.add('bar-full');
-            } else {
-                bar.classList.remove('bar-full');
-            }
-        }
+        // [Task 3.2] 改为 EventBus 事件，由 hud.js 监听并更新命中进度条 DOM
+        eventBus.emit(EVENT_TYPES.UI_HIT_PROGRESS, { val, target });
     },
 
     // ==================== 充能符文系统 ====================
@@ -2036,11 +1916,6 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
      * @description 初始化充能符文UI（生成虚影插槽）
      */
     combat_runeCharge_initUI() {
-        const rewardRow =  // TODO[Task 3.2]: 改为 EventBus...
-        document.getElementById('combat-rune-reward-row');
-        if (!rewardRow) return;
-        rewardRow.innerHTML = '';
-
         // 预生成4个符文预览（虚影），使用智能掉落预计算
         this.runeChargePreviewRunes = [];
         for (let i = 0; i < 4; i++) {
@@ -2048,24 +1923,10 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
             const runeDef = runeId ? RUNE_DB.find(r => r.id === runeId) : null;
             this.runeChargePreviewRunes.push(runeDef || null);
         }
-
-        // 生成虚影插槽
-        this.runeChargePreviewRunes.forEach((runeDef, idx) => {
-            const slot = document.createElement('div');
-            slot.className = 'combat-rune-slot ghost';
-            slot.id = `combat-rune-slot-${idx}`;
-            slot.textContent = runeDef ? runeDef.icon : '🔮';
-            rewardRow.appendChild(slot);
+        // [Task 3.2] 改为 EventBus 事件，由 hud.js 监听并初始化充能符文 DOM
+        eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_INIT, {
+            previewRunes: this.runeChargePreviewRunes
         });
-
-        // 重置充能条
-        const fill =  // TODO[Task 3.2]: 改为 EventBus...
-        document.getElementById('combat-charge-bar-fill');
-        if (fill) {
-            fill.style.width = '0%';
-            fill.className = '';
-            fill.id = 'combat-charge-bar-fill';
-        }
     },
 
     /**
@@ -2122,39 +1983,12 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
     combat_runeCharge_levelUp() {
         if ((this.runeChargeLevel || 0) >= 4) return; // 已达最高等级
         this.runeChargeLevel = (this.runeChargeLevel || 0) + 1;
-
-        // 点亮对应等级的插槽
-        const slotIdx = this.runeChargeLevel - 1;
-        const slot =  // TODO[Task 3.2]: 改为 EventBus...
-        document.getElementById(`combat-rune-slot-${slotIdx}`);
-        if (slot) {
-            slot.classList.remove('ghost', 'lit-1', 'lit-2', 'lit-3', 'lit-4');
-            slot.classList.add(`lit-${this.runeChargeLevel}`);
-            // 闪光动画
-            slot.classList.add('level-up-flash');
-            setTimeout(() => slot.classList.remove('level-up-flash'), 400);
-        }
-
-        // 更新充能条颜色
-        const fill =  // TODO[Task 3.2]: 改为 EventBus...
-        document.getElementById('combat-charge-bar-fill');
-        if (fill) {
-            fill.className = '';
-            fill.id = 'combat-charge-bar-fill';
-            if (this.runeChargeLevel > 0) fill.classList.add(`level-${this.runeChargeLevel}`);
-        }
-
-        // 充能满闪光效果
-        const shell =  // TODO[Task 3.2]: 改为 EventBus...
-        document.getElementById('combat-charge-bar-shell');
-        if (shell) {
-            shell.classList.add('charge-full-flash');
-            setTimeout(() => shell.classList.remove('charge-full-flash'), 400);
-        }
-
+        // [Task 3.2] 改为 EventBus 事件，由 hud.js 监听并更新充能等级 DOM
+        eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_LEVEL_UP, {
+            level: this.runeChargeLevel
+        });
         // 音效反馈
         try { if (audio && audio.playTone) audio.playTone(400 + this.runeChargeLevel * 120, 'sine', 0.08, 0.2); } catch(e) {}
-
         const levelNames = ['', '铜级', '银级', '金级', '彩虹'];
         showToast(`符文充能 → ${levelNames[this.runeChargeLevel]}奖励`);
     },
@@ -2177,11 +2011,10 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
      * @description 更新充能条UI
      */
     combat_runeCharge_updateUI() {
-        const fill =  // TODO[Task 3.2]: 改为 EventBus...
-        document.getElementById('combat-charge-bar-fill');
-        if (fill) {
-            fill.style.width = `${(this.runeChargeValue || 0) * 100}%`;
-        }
+        // [Task 3.2] 改为 EventBus 事件，由 hud.js 监听并更新充能条宽度
+        eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_UPDATE, {
+            value: this.runeChargeValue || 0
+        });
     },
 
     /**
@@ -2189,19 +2022,15 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
      * @description 在击中位置显示翻倍徽章
      */
     combat_runeCharge_showMultiplierBadge(x, y, text, extraClass) {
-        const badge = document.createElement('div');
-        badge.className = `charge-multiplier-badge ${extraClass}`;
-        badge.textContent = text;
-        // 将canvas坐标转换为页面坐标
-        const canvas =  // TODO[Task 3.2]: 改为 EventBus...
-        document.getElementById('gameCanvas');
-        const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0, width: 400, height: 600 };
-        const scaleX = rect.width / (this.width || 400);
-        const scaleY = rect.height / (this.height || 600);
-        badge.style.left = `${rect.left + x * scaleX - 16}px`;
-        badge.style.top = `${rect.top + y * scaleY - 16}px`;
-        document.body.appendChild(badge);
-        setTimeout(() => badge.remove(), 500);
+        // [Task 3.2] 改为 EventBus 事件，由 hud.js 监听并在页面坐标创建徽章 DOM
+        eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_BADGE, {
+            canvasX: x,
+            canvasY: y,
+            text,
+            extraClass,
+            gameWidth: this.width || 400,
+            gameHeight: this.height || 600
+        });
     },
 
     /**
@@ -2255,4 +2084,3 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
 // 可以直接调用 this.combat_recordDamage / this.combat_tryMoveEnemy 等方法。
 // ─────────────────────────────────────────────────────────────────────────────
 Object.assign(combat_system, DamageCalc, CollisionSystem);
-

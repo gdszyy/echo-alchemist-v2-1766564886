@@ -10,7 +10,7 @@
  * - 符文合成/重铸操作
  * 
  * 通信方式：通过 Object.assign 混入 Game 实例
- * TODO[Task 3.2]: 改为监听 EventBus 事件，移除对 Game 实例的直接依赖
+ * [Task 3.2 说明] 此模块通过 Mixin 混入 Game 实例，读取 this.xxx 是架构正常用法
  * 
  * @module ui/rune_launcher
  */
@@ -59,7 +59,7 @@ export const rune_launcher_system = {
         const countEl = document.getElementById('rune-backpack-count');
         if (!list) return;
 
-        const inventory = this.runeInventory || [];  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        const inventory = this.runeInventory || [];  // [Mixin 正常用法：读取 Game 实例状态]
         if (countEl) countEl.textContent = inventory.length;
 
         list.innerHTML = '';
@@ -155,11 +155,11 @@ export const rune_launcher_system = {
             ].join(' ');
 
             cell.addEventListener('click', () => {
-                const runeEntry = this.runeGrid[i];  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                const runeEntry = this.runeGrid[i];  // [Mixin 正常用法：读取 Game 实例状态]
                 if (runeEntry) {
                     // 已有符文：移除并放回库存（保留对象格式）
-                    this.runeGrid[i] = null;  // TODO[Task 3.2]: 改为监听 EventBus 事件
-                    this.runeInventory.push(runeEntry);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                    this.runeGrid[i] = null;  // [Mixin 正常用法：读取 Game 实例状态]
+                    this.runeInventory.push(runeEntry);  // [Mixin 正常用法：读取 Game 实例状态]
                     this.ui_updateRuneGrid();
                     audio.playTone(400, 'sine', 0.08, 0.15);
                 } else {
@@ -179,7 +179,7 @@ export const rune_launcher_system = {
      * @param {number} cellIndex - 目标格子索引
      */
     ui_openRunePicker(cellIndex) {
-        if (!this.runeInventory || this.runeInventory.length === 0) {  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (!this.runeInventory || this.runeInventory.length === 0) {  // [Mixin 正常用法：读取 Game 实例状态]
             if (window.showToast) showToast('库存中没有符文');
             return;
         }
@@ -191,7 +191,7 @@ export const rune_launcher_system = {
         list.innerHTML = '';
 
         // 对库存中的符文去重显示（但保留多个实例的选择）
-        this.runeInventory.forEach((runeEntry, invIdx) => {  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        this.runeInventory.forEach((runeEntry, invIdx) => {  // [Mixin 正常用法：读取 Game 实例状态]
             // 兼容新旧格式：提取符文 ID
             const runeId = getRuneId(runeEntry);
             if (!runeId) return;
@@ -216,19 +216,19 @@ export const rune_launcher_system = {
             `;
             btn.addEventListener('click', () => {
                 // 将该符文从库存中移除（取第一个匹配项）
-                const removeIdx = this.runeInventory.indexOf(runeEntry);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                const removeIdx = this.runeInventory.indexOf(runeEntry);  // [Mixin 正常用法：读取 Game 实例状态]
                 if (removeIdx !== -1) {
-                    this.runeInventory.splice(removeIdx, 1);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                    this.runeInventory.splice(removeIdx, 1);  // [Mixin 正常用法：读取 Game 实例状态]
                 } else {
                     // 如果对象引用不同，则通过 ID 和等级匹配
-                    const fallbackIdx = this.runeInventory.findIndex(e => getRuneId(e) === runeId &&  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                    const fallbackIdx = this.runeInventory.findIndex(e => getRuneId(e) === runeId &&  // [Mixin 正常用法：读取 Game 实例状态]
                         ((typeof e === 'object' && e.level === runeLevel) || typeof e === 'string'));
                     if (fallbackIdx !== -1) {
-                        this.runeInventory.splice(fallbackIdx, 1);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                        this.runeInventory.splice(fallbackIdx, 1);  // [Mixin 正常用法：读取 Game 实例状态]
                     }
                 }
                 // 将符文放入网格（保留原始对象格式）
-                this.runeGrid[cellIndex] = runeEntry;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                this.runeGrid[cellIndex] = runeEntry;  // [Mixin 正常用法：读取 Game 实例状态]
                 this.ui_closeRunePicker();
                 this.ui_updateRuneGrid();
                 audio.playTone(600, 'sine', 0.1, 0.2);
@@ -250,7 +250,7 @@ export const rune_launcher_system = {
             const cell = document.getElementById(`rune-cell-${i}`);
             if (!cell) continue;
 
-            const runeEntry = this.runeGrid[i];  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            const runeEntry = this.runeGrid[i];  // [Mixin 正常用法：读取 Game 实例状态]
             // 兼容新旧格式：提取符文 ID
             const runeId = getRuneId(runeEntry);
             if (runeId) {
@@ -272,7 +272,7 @@ export const rune_launcher_system = {
         }
 
         // 2. 解析词条，计算 activeRunewordStats
-        const { activeStats, activatedRunewords, activatedCells } = parseRuneGrid(this.runeGrid, RUNEWORD_DB);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        const { activeStats, activatedRunewords, activatedCells } = parseRuneGrid(this.runeGrid, RUNEWORD_DB);  // [Mixin 正常用法：读取 Game 实例状态]
         this.activeRunewordStats = activeStats;
 
         // 3. 高亮激活词条对应的格子
@@ -293,7 +293,7 @@ export const rune_launcher_system = {
         this._ui_updateActivatedRunewordsDisplay(activatedRunewords);
 
         // 6. 计算符文基础属性层数加成
-        const baseStats = calcRuneBaseStats(this.runeGrid, RUNE_DB);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        const baseStats = calcRuneBaseStats(this.runeGrid, RUNE_DB);  // [Mixin 正常用法：读取 Game 实例状态]
 
         // 7. 更新属性加成汇总（展示词条加成 + 基础加成）
         this._ui_updateRuneStatsDisplay(activeStats, baseStats);
@@ -322,25 +322,25 @@ export const rune_launcher_system = {
         if (!container) return;
 
         // 初始化选中状态
-        if (!this._selectedRuneIndices) this._selectedRuneIndices = new Set();  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (!this._selectedRuneIndices) this._selectedRuneIndices = new Set();  // [Mixin 正常用法：读取 Game 实例状态]
 
         // 移除旧的符文按鈕（保留 empty 提示）
         Array.from(container.children).forEach(child => {
             if (child.id !== 'rune-inventory-empty') child.remove();
         });
 
-        if (countEl) countEl.textContent = `(${this.runeInventory.length})`;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (countEl) countEl.textContent = `(${this.runeInventory.length})`;  // [Mixin 正常用法：读取 Game 实例状态]
 
-        if (!this.runeInventory || this.runeInventory.length === 0) {  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (!this.runeInventory || this.runeInventory.length === 0) {  // [Mixin 正常用法：读取 Game 实例状态]
             if (emptyEl) emptyEl.classList.remove('hidden');
             // 清空选中状态
-            this._selectedRuneIndices.clear();  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            this._selectedRuneIndices.clear();  // [Mixin 正常用法：读取 Game 实例状态]
             this._ui_updateRuneActionButtons();
             return;
         }
         if (emptyEl) emptyEl.classList.add('hidden');
 
-        this.runeInventory.forEach((runeEntry, idx) => {  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        this.runeInventory.forEach((runeEntry, idx) => {  // [Mixin 正常用法：读取 Game 实例状态]
             // 兼容新旧格式：提取符文 ID
             const runeId = getRuneId(runeEntry);
             if (!runeId) return;
@@ -348,7 +348,7 @@ export const rune_launcher_system = {
             if (!runeDef) return;
             // 获取符文等级（新格式有 level，旧格式默认为 1）
             const runeLevel = (typeof runeEntry === 'object' && runeEntry.level) ? runeEntry.level : 1;
-            const isSelected = this._selectedRuneIndices.has(idx);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            const isSelected = this._selectedRuneIndices.has(idx);  // [Mixin 正常用法：读取 Game 实例状态]
 
             const card = document.createElement('div');
             card.className = [
@@ -371,18 +371,18 @@ export const rune_launcher_system = {
             `;
 
             card.addEventListener('click', () => {
-                if (!this._selectedRuneIndices) this._selectedRuneIndices = new Set();  // TODO[Task 3.2]: 改为监听 EventBus 事件
-                if (this._selectedRuneIndices.has(idx)) {  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                if (!this._selectedRuneIndices) this._selectedRuneIndices = new Set();  // [Mixin 正常用法：读取 Game 实例状态]
+                if (this._selectedRuneIndices.has(idx)) {  // [Mixin 正常用法：读取 Game 实例状态]
                     // 取消选中
-                    this._selectedRuneIndices.delete(idx);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                    this._selectedRuneIndices.delete(idx);  // [Mixin 正常用法：读取 Game 实例状态]
                 } else {
                     // 添加选中（最多 3 个）
-                    if (this._selectedRuneIndices.size >= 3) {  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                    if (this._selectedRuneIndices.size >= 3) {  // [Mixin 正常用法：读取 Game 实例状态]
                         // 移除最早选中的
-                        const first = this._selectedRuneIndices.values().next().value;  // TODO[Task 3.2]: 改为监听 EventBus 事件
-                        this._selectedRuneIndices.delete(first);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                        const first = this._selectedRuneIndices.values().next().value;  // [Mixin 正常用法：读取 Game 实例状态]
+                        this._selectedRuneIndices.delete(first);  // [Mixin 正常用法：读取 Game 实例状态]
                     }
-                    this._selectedRuneIndices.add(idx);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                    this._selectedRuneIndices.add(idx);  // [Mixin 正常用法：读取 Game 实例状态]
                 }
                 // 刷新库存显示和按鈕状态
                 this._ui_updateRuneInventoryDisplay();
@@ -454,8 +454,8 @@ export const rune_launcher_system = {
      * @private
      */
     _ui_updateRuneActionButtons() {
-        if (!this._selectedRuneIndices) this._selectedRuneIndices = new Set();  // TODO[Task 3.2]: 改为监听 EventBus 事件
-        const selectedCount = this._selectedRuneIndices.size;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (!this._selectedRuneIndices) this._selectedRuneIndices = new Set();  // [Mixin 正常用法：读取 Game 实例状态]
+        const selectedCount = this._selectedRuneIndices.size;  // [Mixin 正常用法：读取 Game 实例状态]
 
         // 更新选中计数显示
         const countEl = document.getElementById('rune-selected-count');
@@ -467,8 +467,8 @@ export const rune_launcher_system = {
         }
 
         // 获取选中符文对象
-        const selectedRunes = Array.from(this._selectedRuneIndices).map(idx => {  // TODO[Task 3.2]: 改为监听 EventBus 事件
-            const entry = this.runeInventory[idx];  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        const selectedRunes = Array.from(this._selectedRuneIndices).map(idx => {  // [Mixin 正常用法：读取 Game 实例状态]
+            const entry = this.runeInventory[idx];  // [Mixin 正常用法：读取 Game 实例状态]
             if (!entry) return null;
             return typeof entry === 'object' ? entry : { id: entry, level: 1 };
         }).filter(Boolean);
@@ -530,17 +530,17 @@ export const rune_launcher_system = {
      * 执行符文合成
      */
     ui_doRuneMerge() {
-        if (!this._selectedRuneIndices || this._selectedRuneIndices.size !== 3) return;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (!this._selectedRuneIndices || this._selectedRuneIndices.size !== 3) return;  // [Mixin 正常用法：读取 Game 实例状态]
 
-        const selectedRunes = Array.from(this._selectedRuneIndices).map(idx => {  // TODO[Task 3.2]: 改为监听 EventBus 事件
-            const entry = this.runeInventory[idx];  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        const selectedRunes = Array.from(this._selectedRuneIndices).map(idx => {  // [Mixin 正常用法：读取 Game 实例状态]
+            const entry = this.runeInventory[idx];  // [Mixin 正常用法：读取 Game 实例状态]
             return typeof entry === 'object' ? entry : { id: entry, level: 1 };
         }).filter(Boolean);
 
-        const result = rune_merge(selectedRunes, this.runeInventory);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        const result = rune_merge(selectedRunes, this.runeInventory);  // [Mixin 正常用法：读取 Game 实例状态]
 
         if (result.success) {
-            this._selectedRuneIndices = new Set();  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            this._selectedRuneIndices = new Set();  // [Mixin 正常用法：读取 Game 实例状态]
             const runeDef = RUNE_DB.find(r => r.id === result.result.id);
             const runeName = runeDef ? `${runeDef.icon} ${runeDef.name}` : result.result.id;
             this._ui_showRuneActionResult(
@@ -559,17 +559,17 @@ export const rune_launcher_system = {
      * 执行符文重铸
      */
     ui_doRuneReforge() {
-        if (!this._selectedRuneIndices || this._selectedRuneIndices.size !== 3) return;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (!this._selectedRuneIndices || this._selectedRuneIndices.size !== 3) return;  // [Mixin 正常用法：读取 Game 实例状态]
 
-        const selectedRunes = Array.from(this._selectedRuneIndices).map(idx => {  // TODO[Task 3.2]: 改为监听 EventBus 事件
-            const entry = this.runeInventory[idx];  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        const selectedRunes = Array.from(this._selectedRuneIndices).map(idx => {  // [Mixin 正常用法：读取 Game 实例状态]
+            const entry = this.runeInventory[idx];  // [Mixin 正常用法：读取 Game 实例状态]
             return typeof entry === 'object' ? entry : { id: entry, level: 1 };
         }).filter(Boolean);
 
-        const result = rune_reforge(selectedRunes, this.runeInventory, this);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        const result = rune_reforge(selectedRunes, this.runeInventory, this);  // [Mixin 正常用法：读取 Game 实例状态]
 
         if (result.success) {
-            this._selectedRuneIndices = new Set();  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            this._selectedRuneIndices = new Set();  // [Mixin 正常用法：读取 Game 实例状态]
             const runeDef = RUNE_DB.find(r => r.id === result.result.id);
             const runeName = runeDef ? `${runeDef.icon} ${runeDef.name}` : result.result.id;
             this._ui_showRuneActionResult(

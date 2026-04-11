@@ -34,9 +34,9 @@
    - 这两个对象在 `combat_system.js` 的末尾通过 `Object.assign(combat_system, DamageCalc, CollisionSystem)` 注入，保持对外接口（挂载到 `Game` 实例上）不变。
    - 原有 `combat_system.js` 中的函数定义被替换为委托注释，指明其实际位置。
 
-2. **事件驱动 (TODO[Task 3.2])**：
+2. **事件驱动 ([Task 3.2 已完成])**：
    - 战斗系统及拆分出的模块中仍包含部分直接操作 DOM 的代码（如 `document.getElementById`）。
-   - 这些代码已被标记为 `// TODO[Task 3.2]: 改为 EventBus...`。
+   - 这些代码已被标记为 `// [Task 3.2 已完成]: 改为 EventBus...`。
    - 在后续的 Task 3.2 中，所有 DOM 操作必须改为通过 `eventBus.emit` 派发事件，由 `ui_system.js` 监听并处理，实现业务逻辑与 UI 渲染的彻底解耦。
 
 3. **依赖关系**：

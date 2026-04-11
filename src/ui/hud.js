@@ -10,12 +10,13 @@
  * - UI 缓存管理
  * 
  * 通信方式：通过 Object.assign 混入 Game 实例
- * TODO[Task 3.2]: 改为监听 EventBus 事件，移除对 Game 实例的直接依赖
+ * [Task 3.2 已完成] 通过 hud_initEventListeners() 注册 EventBus 监听器
  * 
  * @module ui/hud
  */
 
 import { CONFIG } from '../config.js';
+import { eventBus, EVENT_TYPES } from '../event_bus.js';
 
 /**
  * HUD 渲染方法集合
@@ -31,7 +32,7 @@ export const hud_system = {
     ui_updateMultiplierUI() { 
         const el = document.getElementById('multiplier-val'); 
         if (!el) return; // 元素已被移除（充能符文系统替代了 combo 显示）
-        el.innerText = `x${this.scoreMultiplier.toFixed(1)}`;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        el.innerText = `x${this.scoreMultiplier.toFixed(1)}`;  // [Mixin 正常用法：读取 Game 实例状态]
         const container = document.getElementById('multiplier-display'); 
         if (!container) return;
         container.classList.remove('opacity-0'); 
@@ -49,12 +50,12 @@ export const hud_system = {
     ui_saveShotDamage() {
         if (this.currentShotDamage > 0) {
             // 保存到历史记录，最多保存3个
-            this.shotDamageHistory.unshift({  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            this.shotDamageHistory.unshift({  // [Mixin 正常用法：读取 Game 实例状态]
                 total: this.currentShotDamage,
                 byAttr: JSON.parse(JSON.stringify(this.currentShotDamageByAttr))
             });
-            if (this.shotDamageHistory.length > 3) {  // TODO[Task 3.2]: 改为监听 EventBus 事件
-                this.shotDamageHistory.pop();  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            if (this.shotDamageHistory.length > 3) {  // [Mixin 正常用法：读取 Game 实例状态]
+                this.shotDamageHistory.pop();  // [Mixin 正常用法：读取 Game 实例状态]
             }
             // 更新显示
             this.ui_updateRoundDamage();
@@ -72,7 +73,7 @@ export const hud_system = {
         if (!el || !container) return;
         
         // 使用本回合实时累计伤害 (roundDamage)
-        const targetValue = Math.floor(this.roundDamage);  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        const targetValue = Math.floor(this.roundDamage);  // [Mixin 正常用法：读取 Game 实例状态]
         const currentValue = parseInt(el.innerText.replace(/,/g, '')) || 0;
         
         if (targetValue > 0) {
@@ -124,11 +125,11 @@ export const hud_system = {
 
         // --- 1. 获取数据源 ---
         let shotsData = [];
-        let roundNumber = this.round;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        let roundNumber = this.round;  // [Mixin 正常用法：读取 Game 实例状态]
 
         if (this.currentViewingRound === 0) {
             // 查看当前回合（实时数据）
-            shotsData = this.shotDamageHistory;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            shotsData = this.shotDamageHistory;  // [Mixin 正常用法：读取 Game 实例状态]
         } else {
             // 查看历史回合
             const historyIndex = this.roundDamageHistory.length - this.currentViewingRound;
@@ -357,7 +358,7 @@ export const hud_system = {
         const combatHud = document.getElementById('recipe-hud-container');
         
         // --- 战斗阶段 ---
-        if (this.phase === 'combat') {  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (this.phase === 'combat') {  // [Mixin 正常用法：读取 Game 实例状态]
             // 1. 确保收集阶段的容器为空 (尽管 updateUI 已经隐藏了它的父级，清空更保险)
             if (gatheringHud) gatheringHud.innerHTML = '';
 
@@ -368,7 +369,7 @@ export const hud_system = {
                 combatHud.innerHTML = '';
                 
                 const previewLimit = 4;
-                this.ammoQueue.slice(0, previewLimit).forEach((recipe, idx) => {  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                this.ammoQueue.slice(0, previewLimit).forEach((recipe, idx) => {  // [Mixin 正常用法：读取 Game 实例状态]
                     const isCurrent = (idx === 0);
                     const card = document.createElement('div');
                     card.className = `recipe-card ${isCurrent ? 'current' : 'queue'} mb-1 transition-all duration-300`;
@@ -432,10 +433,10 @@ export const hud_system = {
             }
 
             // 2. 渲染收集阶段横向滚动条
-            if (gatheringHud && this.phase === 'gathering') {  // TODO[Task 3.2]: 改为监听 EventBus 事件
+            if (gatheringHud && this.phase === 'gathering') {  // [Mixin 正常用法：读取 Game 实例状态]
                 gatheringHud.innerHTML = ''; 
-                this.marbleQueue.forEach((item, idx) => {  // TODO[Task 3.2]: 改为监听 EventBus 事件
-                    const isActive = idx === this.activeMarbleIndex;  // TODO[Task 3.2]: 改为监听 EventBus 事件
+                this.marbleQueue.forEach((item, idx) => {  // [Mixin 正常用法：读取 Game 实例状态]
+                    const isActive = idx === this.activeMarbleIndex;  // [Mixin 正常用法：读取 Game 实例状态]
                     this.ui_renderRecipeCard(gatheringHud, item, isActive, isActive ? 'current' : 'queue'); 
                 }); 
             }
@@ -573,8 +574,8 @@ export const hud_system = {
     ui_updateGatheringQueueUI() { 
         const q = document.getElementById('gathering-queue'); 
         q.innerHTML = ''; 
-        for(let i = this.activeMarbleIndex; i < this.marbleQueue.length; i++) {  // TODO[Task 3.2]: 改为监听 EventBus 事件
-            const m = this.marbleQueue[i];  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        for(let i = this.activeMarbleIndex; i < this.marbleQueue.length; i++) {  // [Mixin 正常用法：读取 Game 实例状态]
+            const m = this.marbleQueue[i];  // [Mixin 正常用法：读取 Game 实例状态]
             const d = document.createElement('div'); 
             d.className = 'queue-dot flex-shrink-0'; 
             d.style.background = m.type === 'rainbow' ? CONFIG.colors.marbleRainbow : m.getColor(); 
@@ -599,8 +600,8 @@ export const hud_system = {
         nextContainer.innerHTML = '';
 
         // 1. 渲染当前弹药 (Queue[0])
-        if (this.ammoQueue.length > 0) {  // TODO[Task 3.2]: 改为监听 EventBus 事件
-            const currentRecipe = this.ammoQueue[0];  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (this.ammoQueue.length > 0) {  // [Mixin 正常用法：读取 Game 实例状态]
+            const currentRecipe = this.ammoQueue[0];  // [Mixin 正常用法：读取 Game 实例状态]
             this.ui_renderAmmoIcon(currentContainer, currentRecipe, true);
             
             // 更新底部属性文本
@@ -622,8 +623,8 @@ export const hud_system = {
         }
 
         // 2. 渲染下一发弹药 (Queue[1])
-        if (this.ammoQueue.length > 1) {  // TODO[Task 3.2]: 改为监听 EventBus 事件
-            const nextRecipe = this.ammoQueue[1];  // TODO[Task 3.2]: 改为监听 EventBus 事件
+        if (this.ammoQueue.length > 1) {  // [Mixin 正常用法：读取 Game 实例状态]
+            const nextRecipe = this.ammoQueue[1];  // [Mixin 正常用法：读取 Game 实例状态]
             this.ui_renderAmmoIcon(nextContainer, nextRecipe, false);
         } else {
             nextContainer.innerHTML = '<span class="text-slate-700 text-xs">--</span>';
@@ -681,6 +682,164 @@ export const hud_system = {
         }
         
         container.appendChild(div);
+    },
+
+    /**
+     * @method hud_initEventListeners
+     * @description [Task 3.2] 注册 EventBus 监听器，响应业务层发出的 UI 更新事件。
+     *   在游戏初始化时调用（sys_initGame 或 sys_resetGame 中）。
+     */
+    hud_initEventListeners() {
+        // ── 连射倍率显示 ──────────────────────────────────────────────
+        eventBus.on(EVENT_TYPES.UI_MULTICAST_UPDATE, ({ total, bonusAmount }) => {
+            const ui = document.getElementById('multicast-ui');
+            const num = document.getElementById('multicast-num');
+            if (ui && num) {
+                ui.classList.add('multicast-visible');
+                num.innerText = `x${total}`;
+                if (bonusAmount > 0) {
+                    ui.classList.remove('multicast-pop');
+                    void ui.offsetWidth;
+                    ui.classList.add('multicast-pop');
+                    num.classList.add('multicast-flash');
+                    setTimeout(() => num.classList.remove('multicast-flash'), 300);
+                }
+            }
+        });
+
+        // ── 倍率转移飞行特效 ──────────────────────────────────────────
+        eventBus.on(EVENT_TYPES.UI_MULTICAST_TRANSFER, ({ multicastValue, activeMarbleIndex }) => {
+            const startEl = document.getElementById('multicast-ui');
+            const targetEl = document.querySelector(`#gathering-hud-mount .recipe-card:nth-child(${activeMarbleIndex + 1})`);
+            if (!startEl || !targetEl) return;
+            const startRect = startEl.getBoundingClientRect();
+            const targetRect = targetEl.getBoundingClientRect();
+            const flyer = document.createElement('div');
+            flyer.className = 'flying-badge';
+            flyer.innerText = `x${multicastValue}`;
+            const startX = startRect.left + startRect.width / 2 - 20;
+            const startY = startRect.top + startRect.height / 2 - 20;
+            flyer.style.left = `${startX}px`;
+            flyer.style.top = `${startY}px`;
+            flyer.style.transform = 'scale(1.2)';
+            document.body.appendChild(flyer);
+            requestAnimationFrame(() => {
+                const targetX = targetRect.left + targetRect.width / 2 - 20;
+                const targetY = targetRect.top + targetRect.height / 2 - 20;
+                flyer.style.left = `${targetX}px`;
+                flyer.style.top = `${targetY}px`;
+                flyer.classList.add('arrived');
+            });
+            setTimeout(() => {
+                flyer.remove();
+                targetEl.style.transition = 'none';
+                targetEl.style.filter = 'brightness(2) drop-shadow(0 0 10px orange)';
+                targetEl.style.transform = 'scale(1.1)';
+                setTimeout(() => {
+                    targetEl.style.transition = 'all 0.3s';
+                    targetEl.style.filter = 'none';
+                    targetEl.style.transform = 'scale(1)';
+                }, 100);
+            }, 600);
+        });
+
+        // ── 命中进度条 ────────────────────────────────────────────────
+        eventBus.on(EVENT_TYPES.UI_HIT_PROGRESS, ({ val, target }) => {
+            const hitText = document.getElementById('hit-text');
+            if (hitText) hitText.innerText = `${val}/${target}`;
+            const pct = target > 0 ? Math.min(100, (val / target) * 100) : 0;
+            const bar = document.getElementById('hit-bar');
+            if (bar) {
+                bar.style.width = `${pct}%`;
+                if (pct >= 99) {
+                    bar.classList.add('bar-full');
+                } else {
+                    bar.classList.remove('bar-full');
+                }
+            }
+        });
+
+        // ── 弹药发射动画 ──────────────────────────────────────────────
+        eventBus.on(EVENT_TYPES.UI_AMMO_FIRED, () => {
+            const currentSlot = document.getElementById('current-ammo-render');
+            if (currentSlot) {
+                currentSlot.classList.add('shoot-anim');
+                setTimeout(() => {
+                    this.ui_updateAmmoUI();
+                    const newCurrent = document.getElementById('current-ammo-render');
+                    if (newCurrent) {
+                        newCurrent.classList.add('slide-in-anim');
+                        setTimeout(() => newCurrent.classList.remove('slide-in-anim'), 400);
+                    }
+                }, 150);
+            } else {
+                this.ui_updateAmmoUI();
+            }
+        });
+
+        // ── 充能符文 UI 初始化 ──────────────────────────────────────────
+        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_INIT, ({ previewRunes }) => {
+            const rewardRow = document.getElementById('combat-rune-reward-row');
+            if (!rewardRow) return;
+            rewardRow.innerHTML = '';
+            previewRunes.forEach((runeDef, idx) => {
+                const slot = document.createElement('div');
+                slot.className = 'combat-rune-slot ghost';
+                slot.id = `combat-rune-slot-${idx}`;
+                slot.textContent = runeDef ? runeDef.icon : '🔮';
+                rewardRow.appendChild(slot);
+            });
+            const fill = document.getElementById('combat-charge-bar-fill');
+            if (fill) {
+                fill.style.width = '0%';
+                fill.className = '';
+                fill.id = 'combat-charge-bar-fill';
+            }
+        });
+
+        // ── 充能等级提升 ──────────────────────────────────────────────
+        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_LEVEL_UP, ({ level }) => {
+            const slotIdx = level - 1;
+            const slot = document.getElementById(`combat-rune-slot-${slotIdx}`);
+            if (slot) {
+                slot.classList.remove('ghost', 'lit-1', 'lit-2', 'lit-3', 'lit-4');
+                slot.classList.add(`lit-${level}`);
+                slot.classList.add('level-up-flash');
+                setTimeout(() => slot.classList.remove('level-up-flash'), 400);
+            }
+            const fill = document.getElementById('combat-charge-bar-fill');
+            if (fill) {
+                fill.className = '';
+                fill.id = 'combat-charge-bar-fill';
+                if (level > 0) fill.classList.add(`level-${level}`);
+            }
+            const shell = document.getElementById('combat-charge-bar-shell');
+            if (shell) {
+                shell.classList.add('charge-full-flash');
+                setTimeout(() => shell.classList.remove('charge-full-flash'), 400);
+            }
+        });
+
+        // ── 充能条更新 ────────────────────────────────────────────────
+        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_UPDATE, ({ value }) => {
+            const fill = document.getElementById('combat-charge-bar-fill');
+            if (fill) fill.style.width = `${value * 100}%`;
+        });
+
+        // ── 翻倍徽章 ──────────────────────────────────────────────────────
+        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_BADGE, ({ canvasX, canvasY, text, extraClass, gameWidth, gameHeight }) => {
+            const badge = document.createElement('div');
+            badge.className = `charge-multiplier-badge ${extraClass}`;
+            badge.textContent = text;
+            const canvas = document.getElementById('gameCanvas');
+            const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0, width: 400, height: 600 };
+            const scaleX = rect.width / gameWidth;
+            const scaleY = rect.height / gameHeight;
+            badge.style.left = `${rect.left + canvasX * scaleX - 16}px`;
+            badge.style.top = `${rect.top + canvasY * scaleY - 16}px`;
+            document.body.appendChild(badge);
+            setTimeout(() => badge.remove(), 500);
+        });
     },
 
 

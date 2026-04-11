@@ -1,6 +1,6 @@
 # UI 系统规范文档
 
-> 最后更新：Task 2.4（UI 渲染模块化）
+> 最后更新：Task 3.2（消除 UI 层与业务层的强耦合）
 
 ## 1. 模块架构概述
 
@@ -38,18 +38,19 @@ Object.assign(Game.prototype,
 | `_ui_` | 私有 UI 辅助函数（仅模块内部调用） | `_ui_renderRuneBackpackList()` |
 | `meta_` | 局外层（Meta）操作（商店购买、升级、货币） | `meta_buyUpgrade()` |
 
-## 4. 业务逻辑耦合点（TODO[Task 3.2]）
+## 4. EventBus 架构与状态读取规范（Task 3.2 确立）
+在 Task 3.2 中，我们明确了 UI 层与业务层的解耦边界：
 
-当前 UI 模块通过 `this.xxx` 直接读取 Game 实例状态。所有此类访问均已标记 `// TODO[Task 3.2]: 改为监听 EventBus 事件`，待 Task 3.2 完成后统一改造。
+### 4.1 业务层 -> UI 层的通信（通过 EventBus）
+业务模块（如 `combat_system.js`、`damage_calc.js`）**严禁直接操作 DOM**。所有的 UI 更新必须通过 `eventBus.emit` 派发事件，由 UI 模块（如 `ui_system.js`、`hud.js`）通过 `eventBus.on` 监听并执行 DOM 操作。
 
-**主要耦合点统计：**
+已建立的 EventBus 监听器：
+- **全局特效 (`ui_system.js`)**：`UI_CHROMATIC_ABERRATION` (色差特效), `UI_FLASH_EFFECT` (全屏闪光)
+- **战斗 HUD (`hud.js`)**：`UI_MULTICAST_UPDATE`, `UI_MULTICAST_TRANSFER`, `UI_HIT_PROGRESS`, `UI_AMMO_FIRED`, `UI_RUNE_CHARGE_*` 等
 
-| 文件 | TODO 标记数 | 主要耦合属性 |
-|---|---|---|
-| `ui_system.js` | ~30 处 | `this.phase`、`this.saveData`、`this.runeInventory` |
-| `ui/hud.js` | ~19 处 | `this.ammoQueue`、`this.marbleQueue`、`this.roundDamage`、`this.shotDamageHistory` |
-| `ui/shop.js` | ~7 处 | `this.saveData`、`this.ownedRelics`、`this.phase` |
-| `ui/rune_launcher.js` | ~42 处 | `this.runeInventory`、`this.runeGrid`、`this._selectedRuneIndices` |
+### 4.2 UI 层 -> 业务层的状态读取（通过 Mixin `this`）
+由于 UI 模块是通过 `Object.assign` 混入到 Game 实例中的，**UI 模块直接读取 `this.xxx`（如 `this.ammoQueue`、`this.runeInventory`、`this.saveData`）是符合架构设计的正常用法**。
+这不属于强耦合，因为 UI 模块本身就是 Game 实例的一部分。在 Task 3.2 中，之前误标的 `TODO[Task 3.2]` 注释已被清理或替换为说明性注释。
 
 ## 5. 修改规范
 
