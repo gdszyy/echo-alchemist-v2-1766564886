@@ -286,6 +286,13 @@ class Game {
             console.log('[Game] Audio system ready');
         });
 
+        // [难度平衡] Boss 被击杀事件：触发战后高压因子
+        this.eventBus.on('boss:defeated', (data) => {
+            this.postBossMultiplier = 1.3;
+            this.postBossSurgeRoundsLeft = 3;
+            console.log('[DifficultyBalance] Boss击杀，战后高压因子激活: x1.3，持续3回合');
+        });
+
         // [Task 3.2] 注册 UI 层 EventBus 监听器
         // ui_initEventListeners: 全局 UI 事件（色差特效、全屏闪光）
         // hud_initEventListeners: HUD 事件（弹药动画、命中进度、充能符文）

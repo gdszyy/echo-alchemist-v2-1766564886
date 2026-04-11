@@ -69,3 +69,30 @@ globs: ["src/game_phase.js"]
 | `tesla` | 特斯拉山峡 | 大 Boss | 极速+多次行动，狂暴后行动次数再+1 |
 | `chimera` | 奇美拉 | 大 Boss | 初始高温，狂暴后温度直接达到阈值 |
 | `ouroboros` | 奥罗波罗斯 | 大 Boss | 每 N 回合切换词缀组，狂暴后切换加速 |
+
+## 5. 难度平衡系统 (Difficulty Balance System)
+### 5.1 战后高压因子 (Post-Boss Surge)
+- **触发时机**: 击杀 Boss 时（监听 `boss:defeated` 事件）
+- **机制**: 
+  - Boss 击杀后，激活战后高压因子 `postBossMultiplier = 1.3`，持续 `postBossSurgeRoundsLeft = 3` 回合。
+  - 在高压期间，普通敌人的基础血量 `finalBaseHP` 会乘以 `postBossMultiplier`。
+  - 在高压期间，双词缀精英怪的生成概率临时提升 25%。
+- **衰减逻辑**: 
+  - 在 `phase_finalizeRound` 中，每回合结束时 `postBossSurgeRoundsLeft` 减 1。
+  - `postBossMultiplier` 每次减 0.1，直到恢复至 1.0。
+
+### 5.2 Boss 底线怜悯掉落 (Pity Drop)
+- **触发时机**: 敌人越过失败线时（`input_checkDefeat` 检测到越线）
+- **机制**: 
+  - 如果越线的敌人是 Boss（`e.type === 'boss'`），触发 `_triggerPityDrop` 怜悯掉落。
+  - 系统分析玩家近期的伤害历史，找出主属性（占比最高的属性）。
+  - 根据 `COUNTER_MAP` 找到该主属性的克制属性。
+  - 调用 `loot_calcRuneDrop` 强制生成一个克制属性的 1 级符文，掉落在 Boss 越线位置。
+  - 触发 UI 提示："💔 怜悯掉落：获得克制符文"。
+
+### 5.3 掉落权重边际递减 (Marginal Decay)
+- **触发时机**: 计算符文掉落权重时（`loot_system.js` 中的 `_calcBuildVector`）
+- **机制**: 
+  - 统计玩家近期伤害占比 `buildVector` 时，如果某一属性的伤害占比超过阈值（默认 60%），则对超出部分进行衰减。
+  - 衰减系数为 0.5，即超出部分减半。
+  - 衰减后重新归一化 `buildVector`，防止玩家过度依赖单一属性导致掉落过于单一。
