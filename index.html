@@ -51,10 +51,10 @@
         .shake-hard { animation: shake-hard 0.2s; }
         /* --- [新增] 技能点宝石样式 --- */
         .sp-slot {
-            width: 20px;
-            height: 20px;
+            width: 12px;
+            height: 12px;
             background: rgba(15, 23, 42, 0.6); /* 深色底槽 */
-            border: 2px solid #475569;         /* 边框 */
+            border: 1.5px solid #475569;       /* 边框 */
             transform: rotate(45deg);          /* 旋转成菱形 */
             position: relative;
             box-shadow: 0 0 5px rgba(0,0,0,0.5);
@@ -66,7 +66,7 @@
             width: 100%;
             height: 100%;
             background: linear-gradient(135deg, #34d399 0%, #059669 100%); /* 翡翠绿宝石 */
-            box-shadow: 0 0 8px #10b981;
+            box-shadow: 0 0 4px #10b981;
             opacity: 0;
             transform: scale(0);
             transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); /* 弹性弹出动画 */
@@ -89,6 +89,7 @@
         }
 
         /* Animated Phase Title */
+        /* 阶段标题容器：居中淡入淡出（不再缩小到左上角） */
         #phase-title-container {
             position: absolute;
             top: 50%;
@@ -98,15 +99,8 @@
             z-index: 100;
             text-align: center;
             width: 100%;
-            transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        
-        #phase-title-container.minimized {
-            top: max(20px, env(safe-area-inset-top));
-            left: 20px;
-            transform: translate(0, 0) scale(0.4);
-            transform-origin: top left;
-            opacity: 0.6;
+            opacity: 0;
+            transition: opacity 0.5s ease;
         }
         /* --- [新增] 英雄充能条样式 --- */
         /* --- [修改] 英雄充能条样式 --- */
@@ -373,15 +367,128 @@
             transition: opacity 0.3s;
         }
 
-        /* Top Bar */
-        .top-bar {
+        /* ===== 统一顶部信息栏 ===== */
+        #unified-top-bar {
             position: absolute;
-            top: max(10px, env(safe-area-inset-top));
-            right: 10px; 
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: max(52px, calc(env(safe-area-inset-top) + 44px));
+            padding-top: env(safe-area-inset-top);
+            background: rgba(10, 15, 30, 0.82);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(71, 85, 105, 0.4);
             display: flex;
-            gap: 8px;
+            align-items: center;
+            justify-content: space-between;
+            padding-left: 10px;
+            padding-right: 10px;
             z-index: 500;
             pointer-events: auto;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+        }
+        /* 顶部栏三个区域 */
+        .top-bar-left, .top-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+        }
+        .top-bar-center {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+        .top-bar-right {
+            justify-content: flex-end;
+        }
+        /* 回合数胶囊 */
+        .round-pill {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid #475569;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-family: 'Cinzel', serif;
+            color: #e2e8f0;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+        /* 加速按钮（保持常驻） */
+        #speed-btn {
+            width: 28px; height: 28px;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid #475569;
+            border-radius: 50%;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 0.7rem;
+            padding: 0;
+            white-space: nowrap;
+            min-width: 28px;
+        }
+        /* 设置按钮 */
+        #settings-btn {
+            width: 28px; height: 28px;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid #475569;
+            border-radius: 50%;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 0.85rem;
+            position: relative;
+        }
+        /* 设置下拉面板 */
+        #settings-panel {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            background: rgba(15, 23, 42, 0.97);
+            border: 1px solid #475569;
+            border-radius: 10px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 140px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            z-index: 600;
+            pointer-events: auto;
+            backdrop-filter: blur(8px);
+        }
+        #settings-panel.hidden { display: none; }
+        .settings-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 5px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+            font-size: 0.78rem;
+            color: #cbd5e1;
+        }
+        .settings-item:hover { background: rgba(71, 85, 105, 0.4); }
+        .settings-item .s-icon { font-size: 1rem; width: 20px; text-align: center; }
+        .settings-item .s-label { flex: 1; }
+        .settings-item .s-badge {
+            font-size: 0.65rem;
+            background: rgba(71,85,105,0.5);
+            border: 1px solid #475569;
+            border-radius: 4px;
+            padding: 1px 5px;
+            color: #94a3b8;
+        }
+        .settings-item.active .s-badge {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: #10b981;
+            color: #34d399;
         }
 
         .stat-pill {
@@ -1103,16 +1210,11 @@
 
         /* ===== 战斗阶段充能符文系统 ===== */
         #combat-rune-charge-ui {
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 5px;
+            gap: 3px;
             pointer-events: none;
-            z-index: 30;
         }
         #combat-charge-label {
             font-size: 9px;
@@ -1268,22 +1370,59 @@
     <canvas id="gameCanvas"></canvas>
     <div id="crt-overlay"></div>
 
-    <!-- Phase Title Animation -->
+    <!-- Phase Title Animation (中央淡入淡出，不再缩小到左上角) -->
     <div id="phase-title-container">
         <div id="phase-title" class="phase-text">回聲煉金師</div>
         <div id="phase-sub" class="phase-sub">點擊開始</div>
     </div>
 
-    <!-- Top Bar -->
-    <div class="top-bar">
-        <div class="stat-pill">R <span id="round-num" class="stat-highlight">1</span></div>
-        <button id="speed-btn" class="btn-icon">⏩</button>
-        <button id="mute-btn" class="btn-icon">🔊</button>
-        <button id="damage-numbers-btn" class="btn-icon" title="切换伤害数字显示">🔢</button>
-        <button id="crt-btn" class="btn-icon" title="切換顯像管特效">📺</button>
-    </div>
+    <!-- 统一顶部信息栏 -->
+    <div id="unified-top-bar">
+        <!-- 左侧：阶段标题 + SP 宝石 -->
+        <div class="top-bar-left">
+            <div id="top-phase-label" class="text-xs font-bold text-amber-400/80 font-[Cinzel] tracking-wider whitespace-nowrap"></div>
+            <div id="sp-panel" class="flex flex-wrap gap-2 pointer-events-none transition-opacity duration-300"></div>
+        </div>
 
-    <div id="sp-panel" class="absolute top-16 left-4 flex flex-wrap gap-3 pointer-events-none z-50 transition-opacity duration-300">
+        <!-- 中间：战斗充能符文 UI（仅战斗阶段显示） -->
+        <div class="top-bar-center" id="top-bar-center-slot">
+            <div id="combat-rune-charge-ui" style="display:none;">
+                <div id="combat-charge-label">RUNE CHARGE</div>
+                <div id="combat-charge-bar-shell">
+                    <div id="combat-charge-bar-fill"></div>
+                </div>
+                <div id="combat-rune-reward-row">
+                    <!-- 由JS动态生成 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：回合数 + 加速 + 设置 -->
+        <div class="top-bar-right">
+            <div class="round-pill">R <span id="round-num" class="stat-highlight">1</span></div>
+            <button id="speed-btn">⏩</button>
+            <!-- 设置按钮容器（相对定位，为下拉面板提供锁定点） -->
+            <div style="position: relative;">
+                <button id="settings-btn" title="设置">⚙️</button>
+                <div id="settings-panel" class="hidden">
+                    <div class="settings-item" id="mute-item" onclick="game.sys_toggleMute()">
+                        <span class="s-icon" id="mute-icon">🔊</span>
+                        <span class="s-label">音效</span>
+                        <span class="s-badge active" id="mute-badge">开启</span>
+                    </div>
+                    <div class="settings-item" id="damage-numbers-item" onclick="game.sys_toggleDamageNumbers()">
+                        <span class="s-icon">🔢</span>
+                        <span class="s-label">伤害数字</span>
+                        <span class="s-badge active" id="damage-numbers-badge">开启</span>
+                    </div>
+                    <div class="settings-item" id="crt-item" onclick="game.sys_toggleCrt()">
+                        <span class="s-icon">📺</span>
+                        <span class="s-label">CRT 特效</span>
+                        <span class="s-badge" id="crt-badge">关闭</span>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="toast"></div>
@@ -1590,17 +1729,7 @@
             <span class="text-lg">⚡</span>
         </button>
 
-        <!-- 战斗阶段充能符文UI -->
-        <div id="combat-rune-charge-ui">
-            <div id="combat-charge-label">RUNE CHARGE</div>
-            <div id="combat-charge-bar-shell">
-                <div id="combat-charge-bar-fill"></div>
-            </div>
-            <!-- 符文奖励等级虚影显示（初始4个虚影） -->
-            <div id="combat-rune-reward-row">
-                <!-- 由JS动态生成 -->
-            </div>
-        </div>
+        <!-- combat-rune-charge-ui 已移至 #unified-top-bar 中间区域 -->
         
         <div class="text-center mt-4 pointer-events-none" style="margin-top: 80px;">
             <!-- Round Damage Display -->
@@ -1791,32 +1920,72 @@ if (typeof globalThis !== 'undefined') {
     globalThis.game = game;
 }
 
-// ==================== [新增] CRT 特效控制逻辑 ====================
-const crtBtn = document.getElementById('crt-btn');
+// ==================== 设置面板控制逻辑 ====================
 const crtOverlay = document.getElementById('crt-overlay');
+const settingsBtn = document.getElementById('settings-btn');
+const settingsPanel = document.getElementById('settings-panel');
 
-// 1. 从本地存储读取设置 (默认为开启 'true'，如果你想默认关闭则改为 'false')
-let isCrtOn = localStorage.getItem('ea_crt_enabled') !== 'false'; 
-
-// 2. 初始化状态
-updateCrtVisuals();
-
-// 3. 绑定点击事件
-crtBtn.addEventListener('click', () => {
-    isCrtOn = !isCrtOn;
-    localStorage.setItem('ea_crt_enabled', isCrtOn); // 保存设置
-    updateCrtVisuals();
-});
-
-// 4. 更新视觉效果函数
+// --- CRT 状态 ---
+let isCrtOn = localStorage.getItem('ea_crt_enabled') !== 'false';
 function updateCrtVisuals() {
+    const badge = document.getElementById('crt-badge');
+    const item = document.getElementById('crt-item');
     if (isCrtOn) {
         crtOverlay.classList.add('active');
-        crtBtn.classList.add('active');
+        if (badge) { badge.textContent = '开启'; badge.classList.add('active'); }
+        if (item) item.classList.add('active');
     } else {
         crtOverlay.classList.remove('active');
-        crtBtn.classList.remove('active');
+        if (badge) { badge.textContent = '关闭'; badge.classList.remove('active'); }
+        if (item) item.classList.remove('active');
     }
+}
+updateCrtVisuals();
+
+// 挂载到 game 对象，供 HTML onclick 调用
+game.sys_toggleCrt = () => {
+    isCrtOn = !isCrtOn;
+    localStorage.setItem('ea_crt_enabled', isCrtOn);
+    updateCrtVisuals();
+};
+
+// --- 静音切换 ---
+game.sys_toggleMute = () => {
+    audio.resume();
+    const isMuted = audio.toggleMute();
+    const icon = document.getElementById('mute-icon');
+    const badge = document.getElementById('mute-badge');
+    const item = document.getElementById('mute-item');
+    if (icon) icon.textContent = isMuted ? '🔇' : '🔊';
+    if (badge) { badge.textContent = isMuted ? '关闭' : '开启'; }
+    if (badge) isMuted ? badge.classList.remove('active') : badge.classList.add('active');
+    if (item) isMuted ? item.classList.remove('active') : item.classList.add('active');
+};
+
+// --- 伤害数字切换 ---
+game.sys_toggleDamageNumbers = () => {
+    game.showDamageNumbers = !game.showDamageNumbers;
+    const badge = document.getElementById('damage-numbers-badge');
+    const item = document.getElementById('damage-numbers-item');
+    const isOn = game.showDamageNumbers;
+    if (badge) { badge.textContent = isOn ? '开启' : '关闭'; }
+    if (badge) isOn ? badge.classList.add('active') : badge.classList.remove('active');
+    if (item) isOn ? item.classList.add('active') : item.classList.remove('active');
+    if (window.showToast) showToast(isOn ? '伤害数字：开启' : '伤害数字：关闭');
+};
+
+// --- 设置面板开关 ---
+if (settingsBtn && settingsPanel) {
+    settingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        settingsPanel.classList.toggle('hidden');
+    });
+    // 点击面板外关闭
+    document.addEventListener('click', (e) => {
+        if (!settingsPanel.contains(e.target) && e.target !== settingsBtn) {
+            settingsPanel.classList.add('hidden');
+        }
+    });
 }
 // ==============================================================
 </script>

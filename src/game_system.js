@@ -271,23 +271,27 @@ export const game_system = {
             };
         }
 
-        // 静音按钮
+        // 静音按钮（已迁移到设置面板，此处保留兼容处理）
         const muteBtn = document.getElementById('mute-btn');
         if (muteBtn) {
             muteBtn.onclick = () => {
-                audio.resume();
-                const isMuted = audio.toggleMute();
-                muteBtn.innerText = isMuted ? '🔇' : '🔊';
+                if (this.sys_toggleMute) this.sys_toggleMute();
+                else {
+                    audio.resume();
+                    audio.toggleMute();
+                }
             };
         }
 
-        // 伤害数字开关按钮
+        // 伤害数字开关按钮（已迁移到设置面板，此处保留兼容处理）
         const damageNumbersBtn = document.getElementById('damage-numbers-btn');
         if (damageNumbersBtn) {
             damageNumbersBtn.onclick = () => {
-                this.showDamageNumbers = !this.showDamageNumbers;
-                damageNumbersBtn.style.opacity = this.showDamageNumbers ? '1' : '0.5';
-                showToast(this.showDamageNumbers ? '伤害数字：开启' : '伤害数字：关闭');
+                if (this.sys_toggleDamageNumbers) this.sys_toggleDamageNumbers();
+                else {
+                    this.showDamageNumbers = !this.showDamageNumbers;
+                    showToast(this.showDamageNumbers ? '伤害数字：开启' : '伤害数字：关闭');
+                }
             };
         }
 
