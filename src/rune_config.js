@@ -16,12 +16,17 @@
  *   baseStat 表示该符文放置在网格中时，每级提供的属性层数加成类型（与 element 相同）
  *   供 Task 3 的 calcRuneBaseStats() 函数使用
  *
- * 变更记录 (稀有度层数加成)：
- * - 为每个符文增加 baseStatPerLevel 字段，表示每级提供的基础属性层数
- *   普通符文（baseDropWeight 7~8）：每级 1 层
- *   稀有符文（baseDropWeight 5~6）：每级 2 层
- *   史诗符文（baseDropWeight 3~4）：每级 3 层
- *   calcRuneBaseStats() 将使用此字段替代固定的 level 值进行累加
+ * 变更记录 (稀有度层数加成 + 传说级)：
+ * - 新增 rarity 字段标注稀有度：普通 / 稀有 / 史诗 / 传说
+ * - 新增 baseStatPerLevel 字段，表示每级提供的基础属性层数
+ * - 新增传说级（rarity: 'legendary'），baseDropWeight = 0.5
+ * - 掉落权重方案（方案H）：
+ *     普通（common）   : baseDropWeight = 12，baseStatPerLevel 按元素设定
+ *     稀有（rare）     : baseDropWeight = 5~6，baseStatPerLevel 按元素设定
+ *     史诗（epic）     : baseDropWeight = 2，baseStatPerLevel 按元素设定
+ *     传说（legendary）: baseDropWeight = 0.5，baseStatPerLevel 按元素设定
+ * - 概率分布（总权重≈61）：普通≈59%，稀有≈27.9%，史诗≈9.8%，传说≈3.3%
+ * - calcRuneBaseStats() 使用 level × baseStatPerLevel 计算层数
  */
 
 // ==================== 符文基础数据库 ====================
@@ -30,11 +35,12 @@
  * 每个符文对象包含：
  *   id: 唯一字符串标识符
  *   name: 显示名称（中文）
+ *   rarity: 稀有度（'common' | 'rare' | 'epic' | 'legendary'）
  *   element: 对应属性类型
  *   baseStat: 基础属性层数对应的弹药属性键（与 element 相同，用于 calcRuneBaseStats 累加）
- *   baseStatPerLevel: 每级提供的基础属性层数（普通=1, 稀有=2, 史诗=3）
+ *   baseStatPerLevel: 每级提供的基础属性层数（按元素强度与稀有度设定）
  *   icon: emoji 图标
- *   baseDropWeight: 基础掉落权重（1~10，越高越常见）
+ *   baseDropWeight: 基础掉落权重（普通=12, 稀有=5~6, 史诗=2, 传说=0.5）
  *   affinity_tags: 亲和标签数组（与敌人词缀对应，用于智能掉落权重计算）
  */
 const RUNE_DB = [
@@ -42,21 +48,23 @@ const RUNE_DB = [
     {
         id: 'rune_pyro_1',
         name: '烈焰符文',
+        rarity: 'common',
         element: 'pyro',
         baseStat: 'pyro',
-        baseStatPerLevel: 1, // 普通（weight 8）
+        baseStatPerLevel: 1,       // 普通，每级 1 层
         icon: '🔥',
-        baseDropWeight: 8,
+        baseDropWeight: 12,
         affinity_tags: ['shield', 'regen']
     },
     {
         id: 'rune_pyro_2',
         name: '炎核符文',
+        rarity: 'epic',
         element: 'pyro',
         baseStat: 'pyro',
-        baseStatPerLevel: 2, // 稀有（weight 5）
+        baseStatPerLevel: 2,       // 史诗，每级 2 层
         icon: '🌋',
-        baseDropWeight: 5,
+        baseDropWeight: 2,
         affinity_tags: ['shield', 'healer']
     },
 
@@ -64,21 +72,23 @@ const RUNE_DB = [
     {
         id: 'rune_cryo_1',
         name: '寒冰符文',
+        rarity: 'common',
         element: 'cryo',
         baseStat: 'cryo',
-        baseStatPerLevel: 1, // 普通（weight 8）
+        baseStatPerLevel: 1,       // 普通，每级 1 层
         icon: '❄️',
-        baseDropWeight: 8,
+        baseDropWeight: 12,
         affinity_tags: ['haste', 'jump']
     },
     {
         id: 'rune_cryo_2',
         name: '冰晶符文',
+        rarity: 'epic',
         element: 'cryo',
         baseStat: 'cryo',
-        baseStatPerLevel: 2, // 稀有（weight 5）
+        baseStatPerLevel: 2,       // 史诗，每级 2 层
         icon: '🧊',
-        baseDropWeight: 5,
+        baseDropWeight: 2,
         affinity_tags: ['haste', 'regen']
     },
 
@@ -86,21 +96,23 @@ const RUNE_DB = [
     {
         id: 'rune_lightning_1',
         name: '雷霆符文',
+        rarity: 'rare',
         element: 'lightning',
         baseStat: 'lightning',
-        baseStatPerLevel: 1, // 普通（weight 7）
+        baseStatPerLevel: 1,       // 稀有，每级 1 层
         icon: '⚡',
-        baseDropWeight: 7,
+        baseDropWeight: 6,
         affinity_tags: ['clone', 'healer']
     },
     {
         id: 'rune_lightning_2',
         name: '电弧符文',
+        rarity: 'legendary',
         element: 'lightning',
         baseStat: 'lightning',
-        baseStatPerLevel: 3, // 史诗（weight 4）
+        baseStatPerLevel: 4,       // 传说，每级 4 层
         icon: '🌩️',
-        baseDropWeight: 4,
+        baseDropWeight: 0.5,
         affinity_tags: ['clone', 'haste']
     },
 
@@ -108,19 +120,21 @@ const RUNE_DB = [
     {
         id: 'rune_bounce_1',
         name: '弹跃符文',
+        rarity: 'common',
         element: 'bounce',
         baseStat: 'bounce',
-        baseStatPerLevel: 1, // 普通（weight 8）
+        baseStatPerLevel: 2,       // 普通，每级 2 层（弹射加量）
         icon: '🔄',
-        baseDropWeight: 8,
+        baseDropWeight: 12,
         affinity_tags: ['clone', 'jump']
     },
     {
         id: 'rune_bounce_2',
         name: '回响符文',
+        rarity: 'rare',
         element: 'bounce',
         baseStat: 'bounce',
-        baseStatPerLevel: 2, // 稀有（weight 5）
+        baseStatPerLevel: 4,       // 稀有，每级 4 层（弹射加量）
         icon: '↩️',
         baseDropWeight: 5,
         affinity_tags: ['clone', 'devour']
@@ -130,21 +144,23 @@ const RUNE_DB = [
     {
         id: 'rune_pierce_1',
         name: '穿刺符文',
+        rarity: 'epic',
         element: 'pierce',
         baseStat: 'pierce',
-        baseStatPerLevel: 1, // 普通（weight 7）
+        baseStatPerLevel: 1,       // 史诗，每级 1 层（穿透强力，层数克制）
         icon: '↗️',
-        baseDropWeight: 7,
+        baseDropWeight: 2,
         affinity_tags: ['shield', 'jump']
     },
     {
         id: 'rune_pierce_2',
         name: '破甲符文',
+        rarity: 'legendary',
         element: 'pierce',
         baseStat: 'pierce',
-        baseStatPerLevel: 3, // 史诗（weight 4）
+        baseStatPerLevel: 3,       // 传说，每级 3 层
         icon: '🗡️',
-        baseDropWeight: 4,
+        baseDropWeight: 0.5,
         affinity_tags: ['shield', 'devour']
     },
 
@@ -152,11 +168,12 @@ const RUNE_DB = [
     {
         id: 'rune_scatter_1',
         name: '散裂符文',
+        rarity: 'legendary',
         element: 'scatter',
         baseStat: 'scatter',
-        baseStatPerLevel: 2, // 稀有（weight 6）
+        baseStatPerLevel: 2,       // 传说，每级 2 层
         icon: '🔱',
-        baseDropWeight: 6,
+        baseDropWeight: 0.5,
         affinity_tags: ['clone', 'healer']
     },
 
@@ -164,21 +181,23 @@ const RUNE_DB = [
     {
         id: 'rune_laser_1',
         name: '光束符文',
+        rarity: 'rare',
         element: 'laser',
         baseStat: 'laser',
-        baseStatPerLevel: 3, // 史诗（weight 4）
+        baseStatPerLevel: 1,       // 稀有，每级 1 层
         icon: '☄️',
-        baseDropWeight: 4,
+        baseDropWeight: 6,
         affinity_tags: ['regen', 'devour']
     },
     {
         id: 'rune_laser_2',
         name: '聚焦符文',
+        rarity: 'legendary',
         element: 'laser',
         baseStat: 'laser',
-        baseStatPerLevel: 3, // 史诗（weight 3）
+        baseStatPerLevel: 4,       // 传说，每级 4 层
         icon: '🔦',
-        baseDropWeight: 3,
+        baseDropWeight: 0.5,
         affinity_tags: ['shield', 'regen']
     }
 ];
@@ -354,5 +373,17 @@ const STAT_DISPLAY = {
     damage:    { name: '伤害', icon: '⚔️' },
 };
 
+// ==================== 稀有度显示映射 ====================
+/**
+ * RARITY_DISPLAY - 稀有度显示名称与颜色映射
+ * 用于 UI 展示符文稀有度
+ */
+const RARITY_DISPLAY = {
+    common:    { name: '普通',   color: '#aaaaaa' },
+    rare:      { name: '稀有',   color: '#4a90d9' },
+    epic:      { name: '史诗',   color: '#9b59b6' },
+    legendary: { name: '传说',   color: '#f39c12' },
+};
+
 // ==================== 导出 ====================
-export { RUNE_DB, RUNEWORD_DB, COUNTER_MAP, STAT_DISPLAY };
+export { RUNE_DB, RUNEWORD_DB, COUNTER_MAP, STAT_DISPLAY, RARITY_DISPLAY };
