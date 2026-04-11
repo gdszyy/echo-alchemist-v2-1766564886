@@ -231,6 +231,12 @@ class Game {
         // 伤害事件
         this.eventBus.on('damage:dealt', (data) => {
             // 可用于伤害统计面板的实时更新
+            // [充能符文系统] 子弹击中敌人时充能（仅战斗阶段）
+            if (this.phase === 'combat' && !data.killed) {
+                const hitX = data.hitX || (data.enemy ? data.enemy.pos.x : this.width / 2);
+                const hitY = data.hitY || (data.enemy ? data.enemy.pos.y : this.height / 2);
+                this.combat_runeCharge_onHit(hitX, hitY, false);
+            }
         });
 
         // 波次推进事件
@@ -241,6 +247,12 @@ class Game {
         // 敌人死亡事件
         this.eventBus.on('enemy:killed', (data) => {
             // 可用于成就系统、掉落系统等
+            // [充能符文系统] 击杀敌人时额外充能（仅战斗阶段）
+            if (this.phase === 'combat') {
+                const hitX = data.hitX || (data.enemy ? data.enemy.pos.x : this.width / 2);
+                const hitY = data.hitY || (data.enemy ? data.enemy.pos.y : this.height / 2);
+                this.combat_runeCharge_onHit(hitX, hitY, true);
+            }
         });
 
         // 音频就绪事件

@@ -307,6 +307,9 @@ phase_gathering_getRandomPegType() {
         // [符文系统] 记录本回合开始时的敌人数量，用于动态掉落率计算
         this.spawnedEnemiesInRound = this.enemies.filter(e => e.active).length;
         
+        // [充能符文系统] 初始化充能状态
+        this.combat_runeCharge_init();
+        
         if (this.ui) {
             this.ui.updateSkillPoints(this.skillPoints);
             this.ui.updateSkillBar(this.skillPoints);
@@ -509,6 +512,12 @@ phase_gathering_getRandomPegType() {
             }
         }
 
+        // --- [充能符文系统] 战斗结束后领取充能奖励 ---
+        this.combat_runeCharge_claimReward();
+        // 将局内符文库存同步到存档（用于商店购买）
+        this.saveData.runeInventory = (this.runeInventory || []).slice();
+        this.sys_saveData();
+
         // --- [符文系统] 自动拾取掉落符文 ---
         if (this.runeLootItems && this.runeLootItems.length > 0) {
             this.runeLootItems.forEach(loot => {
@@ -686,6 +695,10 @@ phase_gathering_getRandomPegType() {
         let currentFrameSpeed = baseSpeed + this.spinBoost;
         this.orbitalAngle += currentFrameSpeed * timeScale * 60; // *60 是为了适配 timeScale 的基准
         this.ui_updateSlowMotion();
+        // [充能符文系统] 充能条自动衰减
+        if (this.phase === 'combat') {
+            this.combat_runeCharge_decay(timeScale);
+        }
         const tilt = this.boardTilt.current;
         const container = document.getElementById('game-container');
         if (container) {

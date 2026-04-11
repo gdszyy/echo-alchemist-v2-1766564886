@@ -14,86 +14,39 @@
 // ==================== 商店配置 ====================
 
 const META_SHOP_CONFIG = {
+    // 商店货币定义：每种元素类型的符文均可作为货币
     resources: {
-        rune_fragments: { id: 'rune_fragments', name: '符文碎片', icon: '🔮', color: '#a855f7' }
+        rune_fragments: { id: 'rune_fragments', name: '符文碎片', icon: '🔮', color: '#a855f7' },
+        rune_pyro:      { id: 'rune_pyro',      name: '火焰符文', icon: '🔥', color: '#ef4444', element: 'pyro' },
+        rune_cryo:      { id: 'rune_cryo',      name: '冰霜符文', icon: '❄️', color: '#60a5fa', element: 'cryo' },
+        rune_lightning: { id: 'rune_lightning', name: '闪电符文', icon: '⚡',    color: '#facc15', element: 'lightning' },
+        rune_bounce:    { id: 'rune_bounce',    name: '弹射符文', icon: '🔄', color: '#a3e635', element: 'bounce' },
+        rune_pierce:    { id: 'rune_pierce',    name: '穿透符文', icon: '↗️', color: '#f97316', element: 'pierce' },
+        rune_scatter:   { id: 'rune_scatter',   name: '散射符文', icon: '🔱', color: '#c084fc', element: 'scatter' },
+        rune_laser:     { id: 'rune_laser',     name: '激光符文', icon: '☄️', color: '#34d399', element: 'laser' }
     },
     upgrades: [
-        {
-            id: 'init_weight_bounce',
-            category: 'attribute',
-            name: '彈性增幅',
-            desc: '增加初始彈珠中 [反彈] 屬性的權重。',
-            icon: '🔄',
-            maxLevel: 10,
-            cost: { resourceId: 'rune_fragments', base: 50, growth: 1.4, type: 'exponential' },
-            effect: { path: 'probabilities.bounce', valuePerLevel: 10, type: 'add' }
-        },
-        {
-            id: 'init_weight_pierce',
-            category: 'attribute',
-            name: '穿透解鎖',
-            desc: '解鎖並增加初始 [穿透] 屬性的權重。',
-            icon: '↗️',
-            maxLevel: 10,
-            cost: { resourceId: 'rune_fragments', base: 100, growth: 1.5, type: 'exponential' },
-            effect: { path: 'probabilities.pierce', valuePerLevel: 8, type: 'add' }
-        },
-        {
-            id: 'assimilation_boost',
-            category: 'attribute',
-            name: '同化共鳴',
-            desc: '提升所有屬性的基礎同化概率。',
-            icon: '🧪',
-            maxLevel: 5,
-            cost: { resourceId: 'rune_fragments', base: 200, growth: 2.0, type: 'exponential' },
-            effect: { path: 'gameplay.assimilationChance', valuePerLevel: 0.02, type: 'add_all' }
-        },
+        // ===== 通用升级（符文碎片） =====
         {
             id: 'defense_line',
             category: 'defense',
-            name: '防線加固',
-            desc: '減少初始生成的敵人行數。',
+            name: '防线加固',
+            desc: '減少初始生成的敌人行数。',
             icon: '🛡️',
             maxLevel: 2,
-            cost: { resourceId: 'rune_fragments', values: [500, 2000], type: 'fixed' },
+            cost: { resourceId: 'rune_fragments', values: [3, 8], type: 'fixed' },
             effect: { path: 'gameplay.startRows', valuePerLevel: -1, type: 'add' }
         },
         {
             id: 'relic_choice',
             category: 'resource',
-            name: '博學多才',
-            desc: '增加遺物選擇時的可選數量。',
+            name: '博学多才',
+            desc: '增加遗物选择时的可选数量。',
             icon: '📚',
             maxLevel: 2,
-            cost: { resourceId: 'rune_fragments', base: 1000, growth: 3000, type: 'linear' },
+            cost: { resourceId: 'rune_fragments', values: [5, 15], type: 'fixed' },
             effect: { path: 'gameplay.relicChoiceNum', valuePerLevel: 1, type: 'add' }
-        }
-    ,
-        // (需求3) 初始解锁风属性钉子 - 改为临时增强
-        {
-            id: 'init_wind_peg',
-            category: 'temporary',
-            name: '风暴之眼',
-            desc: '下一次游戏：收集阶段初始将 1 个普通钉子替换为 [风] 属性钉子。(每局可购买一次)',
-            icon: '🌪️',
-            maxLevel: 1,
-            cost: { resourceId: 'rune_fragments', base: 200, growth: 1.0, type: 'exponential' },
-            effect: { path: 'gameplay.initWindPegs', valuePerLevel: 1, type: 'add' },
-            temporary: true
         },
-        // (需求4) 初始解锁子母剑钉子 - 改为临时增强
-        {
-            id: 'init_sword_peg',
-            category: 'temporary',
-            name: '剑冢',
-            desc: '下一次游戏：收集阶段初始将 1 个普通钉子替换为 [飞剑] 属性钉子。(每局可购买一次)',
-            icon: '🗡️',
-            maxLevel: 1,
-            cost: { resourceId: 'rune_fragments', base: 300, growth: 1.0, type: 'exponential' },
-            effect: { path: 'gameplay.initSwordPegs', valuePerLevel: 1, type: 'add' },
-            temporary: true
-        },
-        // (需求6) 子弹初始伤害
         {
             id: 'base_damage_up',
             category: 'attribute',
@@ -101,31 +54,89 @@ const META_SHOP_CONFIG = {
             desc: '所有子弹的初始基础伤害提升。',
             icon: '💥',
             maxLevel: 5,
-            cost: { resourceId: 'rune_fragments', base: 500, growth: 1.5, type: 'exponential' },
+            cost: { resourceId: 'rune_fragments', base: 4, growth: 1.5, type: 'exponential' },
             effect: { path: 'gameplay.baseDamage', valuePerLevel: 1, type: 'add' }
         },
-        // (需求7) 冰火温度值升级
+        {
+            id: 'sp_capacity',
+            category: 'resource',
+            name: '能量容器',
+            desc: '插升技能点(SP)的最大存储上限。',
+            icon: '⚡',
+            maxLevel: 5,
+            cost: { resourceId: 'rune_fragments', base: 6, growth: 2.0, type: 'exponential' },
+            effect: { path: 'gameplay.maxSkillPoints', valuePerLevel: 1, type: 'add' }
+        },
+        {
+            id: 'assimilation_boost',
+            category: 'attribute',
+            name: '同化共鸣',
+            desc: '提升所有属性的基础同化概率。',
+            icon: '🧪',
+            maxLevel: 5,
+            cost: { resourceId: 'rune_fragments', base: 3, growth: 2.0, type: 'exponential' },
+            effect: { path: 'gameplay.assimilationChance', valuePerLevel: 0.02, type: 'add_all' }
+        },
+
+        // ===== 火焰系升级（火焰符文） =====
         {
             id: 'pyro_efficiency',
             category: 'attribute',
             name: '纯净燃油',
-            desc: '提升 [火焰] 属性单层提供的热量值。',
+            desc: '提升 [火焰] 属性单层提供的热量値。',
             icon: '🔥',
             maxLevel: 5,
-            cost: { resourceId: 'rune_fragments', base: 150, growth: 1.5, type: 'exponential' },
+            cost: { resourceId: 'rune_pyro', base: 2, growth: 1.5, type: 'exponential' },
             effect: { path: 'balance.pyroAmount', valuePerLevel: 0.2, type: 'add' }
         },
+        {
+            id: 'init_weight_bounce',
+            category: 'attribute',
+            name: '弹性增幅',
+            desc: '增加初始弹珠中 [反弹] 属性的权重。',
+            icon: '🔄',
+            maxLevel: 10,
+            cost: { resourceId: 'rune_bounce', base: 1, growth: 1.4, type: 'exponential' },
+            effect: { path: 'probabilities.bounce', valuePerLevel: 10, type: 'add' }
+        },
+
+        // ===== 冰霜系升级（冰霜符文） =====
         {
             id: 'cryo_efficiency',
             category: 'attribute',
             name: '极寒晶核',
-            desc: '提升 [冰霜] 属性单层提供的冷冻值。',
+            desc: '提升 [冰霜] 属性单层提供的冷冻値。',
             icon: '❄️',
             maxLevel: 5,
-            cost: { resourceId: 'rune_fragments', base: 150, growth: 1.5, type: 'exponential' },
+            cost: { resourceId: 'rune_cryo', base: 2, growth: 1.5, type: 'exponential' },
             effect: { path: 'balance.cryoAmount', valuePerLevel: 0.2, type: 'add' }
         },
-        // (需求8) 激光长度升级
+
+        // ===== 闪电系升级（闪电符文） =====
+        {
+            id: 'sp_regen',
+            category: 'resource',
+            name: '雷光充能',
+            desc: '提升每回合战斗开始时回复的技能点数量。',
+            icon: '⚡',
+            maxLevel: 3,
+            cost: { resourceId: 'rune_lightning', base: 2, growth: 1.8, type: 'exponential' },
+            effect: { path: 'gameplay.spRegenPerRound', valuePerLevel: 1, type: 'add' }
+        },
+
+        // ===== 穿透系升级（穿透符文） =====
+        {
+            id: 'init_weight_pierce',
+            category: 'attribute',
+            name: '穿透解鎖',
+            desc: '解锁并增加初始 [穿透] 属性的权重。',
+            icon: '↗️',
+            maxLevel: 10,
+            cost: { resourceId: 'rune_pierce', base: 2, growth: 1.5, type: 'exponential' },
+            effect: { path: 'probabilities.pierce', valuePerLevel: 8, type: 'add' }
+        },
+
+        // ===== 激光系升级（激光符文） =====
         {
             id: 'laser_focus',
             category: 'attribute',
@@ -133,35 +144,48 @@ const META_SHOP_CONFIG = {
             desc: '提升 [激光] 属性的初始射程/穿透深度。',
             icon: '🔦',
             maxLevel: 5,
-            cost: { resourceId: 'rune_fragments', base: 200, growth: 1.5, type: 'exponential' },
+            cost: { resourceId: 'rune_laser', base: 2, growth: 1.5, type: 'exponential' },
             effect: { path: 'gameplay.laserLengthBonus', valuePerLevel: 50, type: 'add' }
         },
-        // (需求9) 连击需求降低
+
+        // ===== 临时增强（混合符文） =====
+        {
+            id: 'init_wind_peg',
+            category: 'temporary',
+            name: '风暴之眼',
+            desc: '下一次游戏：收集阶段初始将 1 个普通钉子替换为 [风] 属性钉子。(每局可购买一次)',
+            icon: '🌪️',
+            maxLevel: 1,
+            cost: { resourceId: 'rune_scatter', base: 2, growth: 1.0, type: 'exponential' },
+            effect: { path: 'gameplay.initWindPegs', valuePerLevel: 1, type: 'add' },
+            temporary: true
+        },
+        {
+            id: 'init_sword_peg',
+            category: 'temporary',
+            name: '剑塚',
+            desc: '下一次游戏：收集阶段初始将 1 个普通钉子替换为 [飞剑] 属性钉子。(每局可购买一次)',
+            icon: '🗡️',
+            maxLevel: 1,
+            cost: { resourceId: 'rune_pierce', base: 3, growth: 1.0, type: 'exponential' },
+            effect: { path: 'gameplay.initSwordPegs', valuePerLevel: 1, type: 'add' },
+            temporary: true
+        },
         {
             id: 'combo_mastery',
             category: 'resource',
-            name: '节奏大师',
-            desc: '降低连击充能条的初始触发需求值。',
+            name: '充能加速',
+            desc: '降低充能条的衰减速度，让充能持续更久。',
             icon: '🔋',
             maxLevel: 3,
-            cost: { resourceId: 'rune_fragments', base: 1000, growth: 2.0, type: 'exponential' },
+            cost: { resourceId: 'rune_lightning', base: 3, growth: 2.0, type: 'exponential' },
             effect: { path: 'gameplay.initTriggerThreshold', valuePerLevel: -1, type: 'add' }
-        },
-        // (新增) SP上限提升
-        {
-            id: 'sp_capacity',
-            category: 'resource',
-            name: '能量容器',
-            desc: '提升技能点(SP)的最大存储上限。',
-            icon: '⚡',
-            maxLevel: 5,
-            cost: { resourceId: 'rune_fragments', base: 800, growth: 2.0, type: 'exponential' },
-            effect: { path: 'gameplay.maxSkillPoints', valuePerLevel: 1, type: 'add' }
-        }],
+        }
+    ],
     categories: {
-        attribute: { name: '屬性煉金', icon: '🧪' },
+        attribute: { name: '属性炼金', icon: '🧪' },
         defense: { name: '陣地防御', icon: '🏰' },
-        resource: { name: '資源調度', icon: '📦' },
+        resource: { name: '资源调度', icon: '📦' },
         temporary: { name: '临时增强', icon: '⏳' }
     }
 };
@@ -176,8 +200,11 @@ const ATTRIBUTES_FOR_SHOP = [
     { id: 'laser', icon: '🔦', name: '激光' }
 ];
 
-// 动态生成属性亲和升级
+// 动态生成属性亲和升级（使用对应element的符文作为货币）
 ATTRIBUTES_FOR_SHOP.forEach(attr => {
+    // 尝试匹配对应的符文资源ID
+    const runeResId = `rune_${attr.id}`;
+    const hasRuneRes = META_SHOP_CONFIG.resources[runeResId];
     META_SHOP_CONFIG.upgrades.push({
         id: `prob_${attr.id}`,
         category: 'attribute',
@@ -185,7 +212,8 @@ ATTRIBUTES_FOR_SHOP.forEach(attr => {
         desc: `增加收集阶段 [${attr.name}] 属性出现的概率权重。`,
         icon: attr.icon,
         maxLevel: 5,
-        cost: { resourceId: 'rune_fragments', base: 100, growth: 1.3, type: 'exponential' },
+        // 如果有对应符文资源，使用对应符文；否则使用符文碎片
+        cost: { resourceId: hasRuneRes ? runeResId : 'rune_fragments', base: 2, growth: 1.4, type: 'exponential' },
         effect: { path: `probabilities.${attr.id}`, valuePerLevel: 5, type: 'add' }
     });
 });

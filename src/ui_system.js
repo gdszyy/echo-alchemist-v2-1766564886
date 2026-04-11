@@ -168,6 +168,52 @@ ui_closeTruthBook() {
     },
 
 /**
+     * [META] 计算玩家拥有的某种资源符文数量
+     * @param {string} resourceId - 资源ID（如 'rune_fragments', 'rune_pyro' 等）
+     */
+    meta_getResourceCount(resourceId) {
+        if (resourceId === 'rune_fragments') {
+            return this.saveData.runeFragments || 0;
+        }
+        // 其他资源是符文库存中对应element的符文数量
+        const resDef = META_SHOP_CONFIG.resources[resourceId];
+        if (!resDef || !resDef.element) return 0;
+        const element = resDef.element;
+        if (!this.saveData.runeInventory) return 0;
+        return this.saveData.runeInventory.filter(r => {
+            const runeDef = (typeof RUNE_DB !== 'undefined') ? RUNE_DB.find(rd => rd.id === r.id) : null;
+            return runeDef && runeDef.element === element;
+        }).length;
+    },
+
+    /**
+     * [META] 消耗某种资源符文
+     * @param {string} resourceId - 资源ID
+     * @param {number} amount - 消耗数量
+     */
+    meta_spendResource(resourceId, amount) {
+        if (resourceId === 'rune_fragments') {
+            this.saveData.runeFragments = (this.saveData.runeFragments || 0) - amount;
+            return;
+        }
+        const resDef = META_SHOP_CONFIG.resources[resourceId];
+        if (!resDef || !resDef.element) return;
+        const element = resDef.element;
+        if (!this.saveData.runeInventory) return;
+        let toRemove = amount;
+        for (let i = this.saveData.runeInventory.length - 1; i >= 0 && toRemove > 0; i--) {
+            const r = this.saveData.runeInventory[i];
+            const runeDef = (typeof RUNE_DB !== 'undefined') ? RUNE_DB.find(rd => rd.id === r.id) : null;
+            if (runeDef && runeDef.element === element) {
+                this.saveData.runeInventory.splice(i, 1);
+                toRemove--;
+            }
+        }
+        // 同步到 runeInventory
+        this.runeInventory = this.saveData.runeInventory.slice();
+    },
+
+/**
      * [UI] 渲染商店内容
      */
     ui_renderShop() {
@@ -176,6 +222,12 @@ ui_closeTruthBook() {
         const currencyDisplay = document.getElementById('shop-currency-display');
         
         if (currencyDisplay) currencyDisplay.innerText = (this.saveData.runeFragments || 0).toLocaleString();
+        // 更新符文数量显示
+        const shopRuneCount = document.getElementById('shop-rune-count');
+        if (shopRuneCount) {
+            const total = (this.saveData.runeInventory || []).length;
+            shopRuneCount.textContent = `${total}个符文`;
+        }
         
         // 1. 渲染分类标签
         if (categoryContainer) {
@@ -205,7 +257,11 @@ ui_closeTruthBook() {
                 const level = currentData[upgrade.id] || 0;
                 const isMax = level >= upgrade.maxLevel;
                 const cost = this.meta_calculateUpgradeCost(upgrade, level);
-                const canAfford = (this.saveData.runeFragments || 0) >= cost;
+                // 支持多种货币类型
+                const resourceId = upgrade.cost.resourceId || 'rune_fragments';
+                const resDef = META_SHOP_CONFIG.resources[resourceId] || META_SHOP_CONFIG.resources.rune_fragments;
+                const playerHas = this.meta_getResourceCount(resourceId);
+                const canAfford = playerHas >= cost;
 
                 const card = document.createElement('div');
                 card.className = `bg-slate-900/60 border ${isMax ? 'border-slate-700 opacity-80' : 'border-slate-700/50'} p-4 rounded-xl flex flex-col gap-3 relative overflow-hidden group`;
@@ -249,24 +305,32 @@ ui_closeTruthBook() {
                 descEl.textContent = upgrade.desc;
                 card.appendChild(descEl);
 
-                // --- 底部区域：下一级信息 + 购买按钮 ---
+                // --- 底部区域：下一级信息 + 购买按鈕 ---
                 const bottomRow = document.createElement('div');
                 bottomRow.className = 'flex justify-between items-center mt-2';
 
+                // 左侧：显示玩家拥有的对应货币数量
                 const nextLevelEl = document.createElement('div');
                 nextLevelEl.className = 'text-[10px] text-slate-500';
                 if (!isMax) {
-                    nextLevelEl.innerHTML = `下一級: <span class="text-amber-400/80">+${upgrade.effect.valuePerLevel}${upgrade.effect.type === 'multiply' ? 'x' : ''}</span>`;
+                    const hasColor = canAfford ? 'text-green-400' : 'text-red-400';
+                    nextLevelEl.innerHTML = `下一级: <span class="text-amber-400/80">+${upgrade.effect.valuePerLevel}${upgrade.effect.type === 'multiply' ? 'x' : ''}</span> &nbsp; <span class="${hasColor}">${resDef.icon}${playerHas}</span>`;
                 } else {
-                    nextLevelEl.textContent = '已達最高等級';
+                    nextLevelEl.textContent = '已達最高等级';
                 }
                 bottomRow.appendChild(nextLevelEl);
 
                 if (!isMax) {
                     const buyBtn = document.createElement('button');
-                    buyBtn.className = `px-4 py-2 rounded-lg text-xs font-bold transition-all ${canAfford ? 'bg-purple-600 text-white hover:scale-105 active:scale-95' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`;
-                    buyBtn.textContent = `🔮 ${cost.toLocaleString()}`;
-                    // [重构] 使用 addEventListener 替代内联 onclick="game.meta_buyUpgrade(...)"，移除 window.game 依赖
+                    // 按鈕颜色根据资源类型变化
+                    const btnColor = canAfford
+                        ? (resourceId === 'rune_fragments' ? 'bg-purple-600' : `bg-opacity-90 bg-[${resDef.color}]`)
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed';
+                    buyBtn.className = `px-4 py-2 rounded-lg text-xs font-bold transition-all ${canAfford ? 'text-white hover:scale-105 active:scale-95 bg-purple-600' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`;
+                    if (canAfford && resourceId !== 'rune_fragments') {
+                        buyBtn.style.background = resDef.color;
+                    }
+                    buyBtn.innerHTML = `${resDef.icon} ${cost}`;
                     buyBtn.addEventListener('click', () => {
                         this.meta_buyUpgrade(upgrade.id);
                     });
@@ -1263,26 +1327,33 @@ ui_closeTruthBook() {
         if (level >= upgrade.maxLevel) return;
         
         const cost = this.meta_calculateUpgradeCost(upgrade, level);
-        if ((this.saveData.runeFragments || 0) >= cost) {
-            this.saveData.runeFragments = (this.saveData.runeFragments || 0) - cost;
+        const resourceId = upgrade.cost.resourceId || 'rune_fragments';
+        const resDef = META_SHOP_CONFIG.resources[resourceId] || META_SHOP_CONFIG.resources.rune_fragments;
+        const playerHas = this.meta_getResourceCount(resourceId);
+
+        if (playerHas >= cost) {
+            // 消耗对应资源
+            this.meta_spendResource(resourceId, cost);
             currentData[upgradeId] = level + 1;
+            // 如果是符文库存货币，同步到saveData.runeInventory
+            if (resourceId !== 'rune_fragments') {
+                this.saveData.runeInventory = (this.runeInventory || []).slice();
+            }
             this.sys_saveData();
             
             // [BUGFIX #2] 修复 setDeepValue 重复调用导致临时升级数値翻倍
-            // 原 Bug: isTemporary 分支内外各调用了一次 setDeepValue，导致临时升级效果被应用两次
-            // 修复：统一在分支外调用一次
             const effectValue = upgrade.effect.valuePerLevel * (level + 1);
             setDeepValue(CONFIG, upgrade.effect.path, effectValue, upgrade.effect.type);
             console.log(`[META] 立即应用升级: ${upgrade.id}, level: ${level + 1}, path: ${upgrade.effect.path}, value: ${effectValue}`);
 
-            
             this.ui_updateMetaCurrency();
             this.ui_renderShop();
             audio.playTone(800, 'sine', 0.1, 0.3);
             const typeText = isTemporary ? '下一局生效' : `LV.${level + 1}`;
             if (window.showToast) showToast(`购买成功: ${upgrade.name} ${typeText}`);
         } else {
-            if (window.showToast) showToast("符文碎片不足");
+            const resName = resDef ? resDef.name : '资源';
+            if (window.showToast) showToast(`${resName}不足 (${playerHas}/${cost})`);
             audio.playTone(200, 'sawtooth', 0.1, 0.2);
         }
     },

@@ -2367,4 +2367,227 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
             }
         }
     },
+
+    // ==================== 充能符文系统 ====================
+
+    /**
+     * @method combat_runeCharge_init
+     * @description 初始化充能符文系统状态（战斗阶段开始时调用）
+     */
+    combat_runeCharge_init() {
+        this.runeChargeValue = 0;    // 充能值 0~1，自动衰减
+        this.runeChargeLevel = 0;    // 当前符文奖励等级：0=无，1=铜，2=银，3=金，4=彩虹
+        this.runeChargePreviewRunes = []; // 预生成的符文预览（虚影）
+        this.combat_runeCharge_initUI();
+    },
+
+    /**
+     * @method combat_runeCharge_initUI
+     * @description 初始化充能符文UI（生成虚影插槽）
+     */
+    combat_runeCharge_initUI() {
+        const rewardRow = document.getElementById('combat-rune-reward-row');
+        if (!rewardRow) return;
+        rewardRow.innerHTML = '';
+
+        // 预生成4个符文预览（虚影），使用智能掉落预计算
+        this.runeChargePreviewRunes = [];
+        for (let i = 0; i < 4; i++) {
+            const runeId = loot_calcRuneDrop(this);
+            const runeDef = runeId ? RUNE_DB.find(r => r.id === runeId) : null;
+            this.runeChargePreviewRunes.push(runeDef || null);
+        }
+
+        // 生成虚影插槽
+        this.runeChargePreviewRunes.forEach((runeDef, idx) => {
+            const slot = document.createElement('div');
+            slot.className = 'combat-rune-slot ghost';
+            slot.id = `combat-rune-slot-${idx}`;
+            slot.textContent = runeDef ? runeDef.icon : '🔮';
+            rewardRow.appendChild(slot);
+        });
+
+        // 重置充能条
+        const fill = document.getElementById('combat-charge-bar-fill');
+        if (fill) {
+            fill.style.width = '0%';
+            fill.className = '';
+            fill.id = 'combat-charge-bar-fill';
+        }
+    },
+
+    /**
+     * @method combat_runeCharge_onHit
+     * @description 子弹击中敌人时调用，充能并概率翻倍
+     * @param {number} hitX - 击中X坐标（用于显示徽章）
+     * @param {number} hitY - 击中Y坐标
+     * @param {boolean} isKill - 是否为击杀
+     */
+    combat_runeCharge_onHit(hitX, hitY, isKill = false) {
+        // 基础充能量（击杀给更多充能）
+        const BASE_CHARGE = isKill ? 0.18 : 0.06;
+
+        // 概率翻倍机制：x1/x2/x4/x8，概率递减
+        // x1: 65%，x2: 25%，x4: 8%，x8: 2%
+        const roll = Math.random();
+        let multiplier = 1;
+        let badgeClass = '';
+        if (roll < 0.02) {
+            multiplier = 8;
+            badgeClass = 'x8';
+        } else if (roll < 0.10) {
+            multiplier = 4;
+            badgeClass = 'x4';
+        } else if (roll < 0.35) {
+            multiplier = 2;
+            badgeClass = 'x2';
+        }
+
+        const chargeAmount = BASE_CHARGE * multiplier;
+
+        // 显示翻倍徽章（当翻倍 > 1 时）
+        if (multiplier > 1) {
+            this.combat_runeCharge_showMultiplierBadge(hitX, hitY, `x${multiplier}`, badgeClass);
+        }
+
+        // 累加充能值
+        this.runeChargeValue = Math.min(1.0, (this.runeChargeValue || 0) + chargeAmount);
+
+        // 检查是否充能满（升级）
+        if (this.runeChargeValue >= 1.0) {
+            this.runeChargeValue = 0;
+            this.combat_runeCharge_levelUp();
+        }
+
+        // 更新UI
+        this.combat_runeCharge_updateUI();
+    },
+
+    /**
+     * @method combat_runeCharge_levelUp
+     * @description 充能满升级，提升符文奖励等级
+     */
+    combat_runeCharge_levelUp() {
+        if ((this.runeChargeLevel || 0) >= 4) return; // 已达最高等级
+        this.runeChargeLevel = (this.runeChargeLevel || 0) + 1;
+
+        // 点亮对应等级的插槽
+        const slotIdx = this.runeChargeLevel - 1;
+        const slot = document.getElementById(`combat-rune-slot-${slotIdx}`);
+        if (slot) {
+            slot.classList.remove('ghost', 'lit-1', 'lit-2', 'lit-3', 'lit-4');
+            slot.classList.add(`lit-${this.runeChargeLevel}`);
+            // 闪光动画
+            slot.classList.add('level-up-flash');
+            setTimeout(() => slot.classList.remove('level-up-flash'), 400);
+        }
+
+        // 更新充能条颜色
+        const fill = document.getElementById('combat-charge-bar-fill');
+        if (fill) {
+            fill.className = '';
+            fill.id = 'combat-charge-bar-fill';
+            if (this.runeChargeLevel > 0) fill.classList.add(`level-${this.runeChargeLevel}`);
+        }
+
+        // 充能满闪光效果
+        const shell = document.getElementById('combat-charge-bar-shell');
+        if (shell) {
+            shell.classList.add('charge-full-flash');
+            setTimeout(() => shell.classList.remove('charge-full-flash'), 400);
+        }
+
+        // 音效反馈
+        try { if (audio && audio.playTone) audio.playTone(400 + this.runeChargeLevel * 120, 'sine', 0.08, 0.2); } catch(e) {}
+
+        const levelNames = ['', '铜级', '银级', '金级', '彩虹'];
+        showToast(`符文充能 → ${levelNames[this.runeChargeLevel]}奖励`);
+    },
+
+    /**
+     * @method combat_runeCharge_decay
+     * @description 充能条自动衰减（每帧调用）
+     * @param {number} timeScale - 时间缩放
+     */
+    combat_runeCharge_decay(timeScale) {
+        if (!this.runeChargeValue) return;
+        // 衰减速度：每帧减少 0.003（约5秒内衰减完）
+        const DECAY_RATE = 0.003;
+        this.runeChargeValue = Math.max(0, this.runeChargeValue - DECAY_RATE * (timeScale || 1));
+        this.combat_runeCharge_updateUI();
+    },
+
+    /**
+     * @method combat_runeCharge_updateUI
+     * @description 更新充能条UI
+     */
+    combat_runeCharge_updateUI() {
+        const fill = document.getElementById('combat-charge-bar-fill');
+        if (fill) {
+            fill.style.width = `${(this.runeChargeValue || 0) * 100}%`;
+        }
+    },
+
+    /**
+     * @method combat_runeCharge_showMultiplierBadge
+     * @description 在击中位置显示翻倍徽章
+     */
+    combat_runeCharge_showMultiplierBadge(x, y, text, extraClass) {
+        const badge = document.createElement('div');
+        badge.className = `charge-multiplier-badge ${extraClass}`;
+        badge.textContent = text;
+        // 将canvas坐标转换为页面坐标
+        const canvas = document.getElementById('gameCanvas');
+        const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0, width: 400, height: 600 };
+        const scaleX = rect.width / (this.width || 400);
+        const scaleY = rect.height / (this.height || 600);
+        badge.style.left = `${rect.left + x * scaleX - 16}px`;
+        badge.style.top = `${rect.top + y * scaleY - 16}px`;
+        document.body.appendChild(badge);
+        setTimeout(() => badge.remove(), 500);
+    },
+
+    /**
+     * @method combat_runeCharge_claimReward
+     * @description 战斗结束后按等级领取符文奖励
+     * 等级越高概率越小，但奖励越丰厚
+     */
+    combat_runeCharge_claimReward() {
+        const level = this.runeChargeLevel || 0;
+        if (level === 0) return; // 无奖励
+
+        // 各等级对应的领取概率（已点亮的插槽）
+        // 等级越高概率越小，但奖励越好
+        const claimProbs = [0, 0.90, 0.65, 0.40, 0.20]; // index = 等级
+
+        let claimedCount = 0;
+        for (let i = 0; i < level; i++) {
+            const prob = claimProbs[i + 1];
+            if (Math.random() < prob) {
+                const runeDef = this.runeChargePreviewRunes[i];
+                if (runeDef) {
+                    this.runeInventory.push({ id: runeDef.id, level: 1 });
+                    claimedCount++;
+                    const runeName = `${runeDef.icon || '🔮'} ${runeDef.name}`;
+                    this.spawn_createFloatingText(
+                        this.width / 2 + (Math.random() - 0.5) * 60,
+                        this.height / 2 + (Math.random() - 0.5) * 40,
+                        `+${runeName}`,
+                        '#fbbf24'
+                    );
+                }
+            }
+        }
+
+        if (claimedCount > 0) {
+            const levelNames = ['', '铜级', '银级', '金级', '彩虹'];
+            showToast(`符文奖励：${levelNames[level]} 共获得 ${claimedCount} 个符文`);
+            try { if (audio && audio.playPowerup) audio.playPowerup(); } catch(e) {}
+        }
+
+        // 重置充能状态
+        this.runeChargeValue = 0;
+        this.runeChargeLevel = 0;
+        this.runeChargePreviewRunes = [];
+    },
 };
