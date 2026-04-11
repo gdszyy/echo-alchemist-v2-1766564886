@@ -1076,13 +1076,30 @@
             animation: crt-flicker 3s infinite, crt-flicker-random 8s infinite, crt-chromatic-aberration-heavy 0.5s ease-out;
         }
 
-        /* 激活时的按钮样式 */
+         /* 激活时的按钮样式 */
         #crt-btn.active {
             color: #fbbf24; /* Amber-400 */
             border-color: #fbbf24;
             text-shadow: 0 0 5px #fbbf24;
         }
-
+        /* 符文等级角标 - 显示在网格格子右上角 */
+        .rune-level-badge {
+            position: absolute;
+            top: 2px;
+            right: 3px;
+            font-size: 9px;
+            font-weight: 700;
+            color: #fbbf24; /* amber-400 */
+            background: rgba(15, 23, 42, 0.75);
+            border-radius: 4px;
+            padding: 0 3px;
+            line-height: 1.4;
+            pointer-events: none;
+        }
+        /* 网格格子需要 relative 定位以支持角标 */
+        .rune-grid-cell {
+            position: relative;
+        }
     </style>
 </head>
 <body>
@@ -1211,7 +1228,7 @@
             <div class="mb-4">
                 <div class="flex items-center justify-between mb-3">
                     <div class="text-xs text-slate-400/60 tracking-widest uppercase">符文庫存 <span id="rune-inventory-count" class="text-purple-300">(0)</span></div>
-                    <span id="rune-selected-count" class="text-xs text-slate-500">已選中 0/3</span>
+                    <span id="rune-selected-count" class="text-xs text-slate-500">已选中 0/3</span>
                 </div>
                 <div id="rune-inventory-container" class="flex flex-wrap gap-2 min-h-[60px] p-3 bg-slate-900/40 border border-slate-700/30 rounded-xl">
                     <!-- 库存符文由 JS 动态生成，支持点击选中/取消 -->
