@@ -13,7 +13,8 @@
  *
  * 变更记录 (Task 1: 数据结构升级)：
  * - 为每个符文增加 baseStat 字段，映射到对应的弹药属性
- *   baseStat 表示该符文放置在网格中时，每级提供的属性层数加成类型
+ *   baseStat 表示该符文放置在网格中时，每级提供的属性层数加成类型（与 element 相同）
+ *   供 Task 3 的 calcRuneBaseStats() 函数使用
  */
 
 // ==================== 符文基础数据库 ====================
@@ -27,7 +28,6 @@
  *   icon: emoji 图标
  *   baseDropWeight: 基础掉落权重（1~10，越高越常见）
  *   affinity_tags: 亲和标签数组（与敌人词缀对应，用于智能掉落权重计算）
- *   baseStat: 基础属性映射（符文放置在网格中时提供的属性层数类型，与 element 对应）
  */
 const RUNE_DB = [
     // ---- 火焰系 (Pyro) ----
@@ -38,8 +38,7 @@ const RUNE_DB = [
         baseStat: 'pyro',
         icon: '🔥',
         baseDropWeight: 8,
-        affinity_tags: ['shield', 'regen'],
-        baseStat: 'pyro'
+        affinity_tags: ['shield', 'regen']
     },
     {
         id: 'rune_pyro_2',
@@ -48,8 +47,7 @@ const RUNE_DB = [
         baseStat: 'pyro',
         icon: '🌋',
         baseDropWeight: 5,
-        affinity_tags: ['shield', 'healer'],
-        baseStat: 'pyro'
+        affinity_tags: ['shield', 'healer']
     },
 
     // ---- 冰霜系 (Cryo) ----
@@ -60,8 +58,7 @@ const RUNE_DB = [
         baseStat: 'cryo',
         icon: '❄️',
         baseDropWeight: 8,
-        affinity_tags: ['haste', 'jump'],
-        baseStat: 'cryo'
+        affinity_tags: ['haste', 'jump']
     },
     {
         id: 'rune_cryo_2',
@@ -70,8 +67,7 @@ const RUNE_DB = [
         baseStat: 'cryo',
         icon: '🧊',
         baseDropWeight: 5,
-        affinity_tags: ['haste', 'regen'],
-        baseStat: 'cryo'
+        affinity_tags: ['haste', 'regen']
     },
 
     // ---- 闪电系 (Lightning) ----
@@ -82,8 +78,7 @@ const RUNE_DB = [
         baseStat: 'lightning',
         icon: '⚡',
         baseDropWeight: 7,
-        affinity_tags: ['clone', 'healer'],
-        baseStat: 'lightning'
+        affinity_tags: ['clone', 'healer']
     },
     {
         id: 'rune_lightning_2',
@@ -92,8 +87,7 @@ const RUNE_DB = [
         baseStat: 'lightning',
         icon: '🌩️',
         baseDropWeight: 4,
-        affinity_tags: ['clone', 'haste'],
-        baseStat: 'lightning'
+        affinity_tags: ['clone', 'haste']
     },
 
     // ---- 弹射系 (Bounce) ----
@@ -104,8 +98,7 @@ const RUNE_DB = [
         baseStat: 'bounce',
         icon: '🔄',
         baseDropWeight: 8,
-        affinity_tags: ['clone', 'jump'],
-        baseStat: 'bounce'
+        affinity_tags: ['clone', 'jump']
     },
     {
         id: 'rune_bounce_2',
@@ -114,8 +107,7 @@ const RUNE_DB = [
         baseStat: 'bounce',
         icon: '↩️',
         baseDropWeight: 5,
-        affinity_tags: ['clone', 'devour'],
-        baseStat: 'bounce'
+        affinity_tags: ['clone', 'devour']
     },
 
     // ---- 穿透系 (Pierce) ----
@@ -126,8 +118,7 @@ const RUNE_DB = [
         baseStat: 'pierce',
         icon: '↗️',
         baseDropWeight: 7,
-        affinity_tags: ['shield', 'jump'],
-        baseStat: 'pierce'
+        affinity_tags: ['shield', 'jump']
     },
     {
         id: 'rune_pierce_2',
@@ -136,8 +127,7 @@ const RUNE_DB = [
         baseStat: 'pierce',
         icon: '🗡️',
         baseDropWeight: 4,
-        affinity_tags: ['shield', 'devour'],
-        baseStat: 'pierce'
+        affinity_tags: ['shield', 'devour']
     },
 
     // ---- 散射系 (Scatter) ----
@@ -148,8 +138,7 @@ const RUNE_DB = [
         baseStat: 'scatter',
         icon: '🔱',
         baseDropWeight: 6,
-        affinity_tags: ['clone', 'healer'],
-        baseStat: 'scatter'
+        affinity_tags: ['clone', 'healer']
     },
 
     // ---- 激光系 (Laser) ----
@@ -160,8 +149,7 @@ const RUNE_DB = [
         baseStat: 'laser',
         icon: '☄️',
         baseDropWeight: 4,
-        affinity_tags: ['regen', 'devour'],
-        baseStat: 'laser'
+        affinity_tags: ['regen', 'devour']
     },
     {
         id: 'rune_laser_2',
@@ -170,8 +158,7 @@ const RUNE_DB = [
         baseStat: 'laser',
         icon: '🔦',
         baseDropWeight: 3,
-        affinity_tags: ['shield', 'regen'],
-        baseStat: 'laser'
+        affinity_tags: ['shield', 'regen']
     }
 ];
 
