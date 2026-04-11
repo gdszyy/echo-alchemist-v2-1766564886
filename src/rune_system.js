@@ -354,7 +354,9 @@ function rune_reforge(runeObjects, runeInventory, game) {
     const newLevel = Math.max(1, Math.floor((lvA + lvB + lvC) / 3));
 
     // ---- 调用智能掉落算法获取新符文 ID ----
-    const newId = loot_calcRuneDrop(game);
+    // loot_calcRuneDrop 返回 { runeId, level }，重铸仅需 runeId，level 由三个输入符文算得
+    const reforgeDropResult = loot_calcRuneDrop(game);
+    const newId = reforgeDropResult.runeId;
     if (!newId) {
         return {
             success: false,

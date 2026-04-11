@@ -8,7 +8,13 @@
  * - 第三层：符文关联与抽取（基于权重池对 RUNE_DB 进行加权随机抽取）
  *
  * 导出：
- * - loot_calcRuneDrop(game): 计算并返回应掉落的符文 id
+ * - loot_calcRuneDrop(game, overrideOptions): 计算并返回应掉落的符文结果对象
+ *
+ * 变更记录 (Boss 符文掉落系统):
+ * - 新增 overrideOptions 参数支持：
+ *   - forcedLevel: 强制指定掉落等级（如 2），覆盖默认的 level: 1
+ *   - themeWeights: 注入额外的标签权重（如 { pyro: 3.0, laser: 3.0 }），
+ *     在第二层计算完成后叠加，放大 Boss 主题相关符文的掉落概率
  */
 
 import { RUNE_DB, COUNTER_MAP } from './rune_config.js';
@@ -26,6 +32,12 @@ const SMART_DROP_MULTIPLIER = 3.0;
  * 取最近 N 回合的伤害数据进行分析
  */
 const HISTORY_WINDOW = 5;
+
+/**
+ * Boss 主题权重注入乘数：themeWeights 的放大系数
+ * 控制 Boss 主题符文相对于智能掉落的优先级
+ */
+const BOSS_THEME_MULTIPLIER = 4.0;
 
 // ==================== 第一层：玩家套路成分识别 ====================
 
@@ -188,16 +200,19 @@ function _weightedRandomChoice(candidates) {
  * 第三层：符文关联与抽取
  *
  * 遍历 RUNE_DB，计算每个符文的最终权重：
- *   finalWeight = baseDropWeight + sum(affinity_tags 在 tagWeights 中的值) * SMART_DROP_MULTIPLIER
+ *   finalWeight = baseDropWeight
+ *               + sum(affinity_tags 在 tagWeights 中的值) * SMART_DROP_MULTIPLIER
+ *               + sum(affinity_tags 在 themeWeights 中的值) * BOSS_THEME_MULTIPLIER（可选）
  *
  * 使用加权随机算法抽取最终掉落的符文 id。
  *
  * @param {Object} tagWeights - 归一化后的标签权重池 { tag: normalizedWeight }
+ * @param {Object} [themeWeights={}] - Boss 主题额外权重注入 { elementKey: bonusWeight }
  * @returns {string} 被抽中的符文 id
  */
-function _selectRuneByWeight(tagWeights) {
+function _selectRuneByWeight(tagWeights, themeWeights = {}) {
     const candidates = RUNE_DB.map(rune => {
-        // 计算亲和标签在权重池中的累计贡献
+        // 计算亲和标签在权重池中的累计贡献（智能掉落）
         let affinityBonus = 0;
         if (rune.affinity_tags && Array.isArray(rune.affinity_tags)) {
             for (const tag of rune.affinity_tags) {
@@ -205,8 +220,16 @@ function _selectRuneByWeight(tagWeights) {
             }
         }
 
-        // 最终权重 = 基础掉落权重 + 亲和标签贡献 * 智能掉落乘数
-        const finalWeight = (rune.baseDropWeight || 1) + affinityBonus * SMART_DROP_MULTIPLIER;
+        // 计算 Boss 主题权重注入贡献（按符文 element 匹配 themeWeights 键）
+        let themeBonus = 0;
+        if (rune.element && themeWeights[rune.element]) {
+            themeBonus = themeWeights[rune.element] * BOSS_THEME_MULTIPLIER;
+        }
+
+        // 最终权重 = 基础掉落权重 + 亲和标签贡献 * 智能掉落乘数 + Boss 主题贡献
+        const finalWeight = (rune.baseDropWeight || 1)
+            + affinityBonus * SMART_DROP_MULTIPLIER
+            + themeBonus;
 
         return {
             id: rune.id,
@@ -220,7 +243,7 @@ function _selectRuneByWeight(tagWeights) {
 // ==================== 主函数：智能掉落权重计算 ====================
 
 /**
- * loot_calcRuneDrop - 计算并返回应掉落的符文 id
+ * loot_calcRuneDrop - 计算并返回应掉落的符文结果对象
  *
  * 三层逻辑：
  * 1. 玩家套路成分识别：分析近几回合伤害历史，得到套路成分向量
@@ -230,19 +253,32 @@ function _selectRuneByWeight(tagWeights) {
  * @param {Object} game - Game 实例，需包含以下属性：
  *   - game.roundDamageHistory: 历史回合伤害数据数组
  *   - game.currentShotDamageByAttr: 当前回合实时伤害数据（备用）
- * @returns {string} 被抽中的符文 id（对应 RUNE_DB 中的 id）
+ * @param {Object} [overrideOptions={}] - 可选覆盖参数（用于 Boss 特殊掉落）：
+ *   - forcedLevel {number}: 强制指定掉落等级（如 2），覆盖默认的 level: 1
+ *   - themeWeights {Object}: 注入额外的 Boss 主题标签权重（如 { pyro: 3.0, laser: 3.0 }），
+ *     按符文 element 字段匹配，放大对应属性符文的掉落概率
+ * @returns {{ runeId: string|null, level: number }} 掉落结果对象
+ *   - runeId: 被抽中的符文 id（对应 RUNE_DB 中的 id），抽取失败时为 null
+ *   - level: 掉落等级（默认 1，或由 forcedLevel 指定）
  */
-function loot_calcRuneDrop(game) {
+function loot_calcRuneDrop(game, overrideOptions = {}) {
+    const { forcedLevel, themeWeights } = overrideOptions;
+
     // 第一层：玩家套路成分识别
     const buildVector = _calcBuildVector(game);
 
     // 第二层：克制关系映射
     const tagWeights = _calcTagWeights(buildVector);
 
-    // 第三层：符文关联与抽取
-    const runeId = _selectRuneByWeight(tagWeights);
+    // 第三层：符文关联与抽取（注入 Boss 主题权重）
+    const runeId = _selectRuneByWeight(tagWeights, themeWeights || {});
 
-    return runeId;
+    // 确定掉落等级：优先使用 forcedLevel，否则默认 1
+    const level = (typeof forcedLevel === 'number' && forcedLevel >= 1)
+        ? forcedLevel
+        : 1;
+
+    return { runeId, level };
 }
 
 // ==================== 导出 ====================
