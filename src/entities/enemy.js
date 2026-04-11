@@ -72,6 +72,7 @@ class Enemy {
         this.temp = 0; 
         this.bumpOffsetY = 0; 
         this.isFrozenCurrentTurn = false; 
+        this.frozenCount = 0; // [温度衰减] 该敌人累计被冰冻的次数，每次被冰冻后温度降低效果乘以 0.9^frozenCount
 
         // 视觉种子
         this.visualSeed = Math.random(); 
@@ -1694,7 +1695,15 @@ class Enemy {
             actualDamage: actualDamage 
         };
     }
-    applyTemp(amount) { this.temp += amount; }
+    applyTemp(amount) {
+        if (amount < 0) {
+            // [温度衰减机制] 每被冰冻一次，降温效果额外乘以 0.9，叠加计算（冰冻 n 次后系数为 0.9^n）
+            const decayFactor = Math.pow(0.9, this.frozenCount);
+            this.temp += amount * decayFactor;
+        } else {
+            this.temp += amount;
+        }
+    }
     getBounds() { return { left: this.pos.x - this.width/2, right: this.pos.x + this.width/2, top: this.pos.y - this.height/2, bottom: this.pos.y + this.height/2 }; }
 }
 

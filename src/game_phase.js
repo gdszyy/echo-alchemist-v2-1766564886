@@ -421,6 +421,7 @@ phase_gathering_getRandomPegType() {
 
              if (shouldFreeze) { 
                  e.isFrozenCurrentTurn = true;
+                 e.frozenCount = (e.frozenCount || 0) + 1; // [温度衰减] 累计冰冻次数，后续降温效果将被衰减
                  this.spawn_createExplosion(e.pos.x, e.pos.y, '#06b6d4');
                  audio.playEffect('freeze');
              } else {

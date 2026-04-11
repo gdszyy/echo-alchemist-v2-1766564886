@@ -31,7 +31,19 @@ globs: ["src/game_phase.js"]
 - **清理与重置**: 每次阶段切换（`phase_switchPhase`）时，必须彻底清理上一个阶段的残留状态（如清空粒子特效容器、重置物理引擎状态）。
 - **UI 同步**: 阶段切换必须同步触发相应的 UI 更新事件，确保界面呼现与内部状态一致。
 
-## 4. Boss 系统规范
+## 4. 敌人回合逻辑与温度结算
+### 4.1 扫描波与行动
+- 敌人回合通过扫描波自下而上触发。
+- 只有未被冰冻（`isFrozenCurrentTurn === false`）且存活的敌人才能执行行动。
+
+### 4.2 温度结算与冰冻判定
+- 当敌人温度 `< 0` 时，进行冰冻判定：
+  - `temp <= -100`：强制冰冻（100%）。
+  - `-100 < temp <= -50`：根据温度概率冰冻（0% ~ 100% 线性增加）。
+- **冰冻衰减机制**：若判定被冰冻，则 `e.isFrozenCurrentTurn = true` 且 `e.frozenCount` 增加 1。该计数用于在 `Enemy.applyTemp` 中衰减后续的降温效果（系数为 `0.9 ^ frozenCount`）。
+- **温度回暖**：每回合结算时，负温度减半（`Math.ceil(e.temp / 2)`），正温度自然衰减或造成燃烧伤害。
+
+## 5. Boss 系统规范
 
 ### 4.1 Boss 回合触发规则
 - **Round 5**: 固定触发第一个 Mini-Boss
@@ -70,7 +82,7 @@ globs: ["src/game_phase.js"]
 | `chimera` | 奇美拉 | 大 Boss | 初始高温，狂暴后温度直接达到阈值 |
 | `ouroboros` | 奥罗波罗斯 | 大 Boss | 每 N 回合切换词缀组，狂暴后切换加速 |
 
-## 5. 难度平衡系统 (Difficulty Balance System)
+## 6. 难度平衡系统 (Difficulty Balance System)
 ### 5.1 战后高压因子 (Post-Boss Surge)
 - **触发时机**: 击杀 Boss 时（监听 `boss:defeated` 事件）
 - **机制**: 
