@@ -2,7 +2,7 @@
 // - src/ui/hud.js: HUD 渲染（弹药、配方、伤害统计等）
 // - src/ui/shop.js: 商店/遗物选择界面渲染
 // - src/ui/rune_launcher.js: 符文发射器界面渲染
-// 这些模块通过 Object.assign 混入 Game 实例，在 core.js 中完成
+// 这些模块通过 bind(this) 组合模式作为实例方法注入到 Game 实例，在 core.js 构造函数中完成
 
 import { 
     META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB 

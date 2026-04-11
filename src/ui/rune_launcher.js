@@ -9,8 +9,8 @@
  * - 符文库存显示（选中状态管理）
  * - 符文合成/重铸操作
  * 
- * 通信方式：通过 Object.assign 混入 Game 实例
- * [Task 3.2 说明] 此模块通过 Mixin 混入 Game 实例，读取 this.xxx 是架构正常用法
+ * 通信方式：通过 bind(this) 组合模式注入到 Game 实例
+ * [Task 3.2 说明] 此模块作为实例方法注入 Game 实例，读取 this.xxx 是架构正常用法
  * 
  * @module ui/rune_launcher
  */
@@ -22,7 +22,7 @@ import { showToast } from '../entities.js';
 
 /**
  * 符文发射器 UI 方法集合
- * 通过 Object.assign 混入到 Game 实例
+ * 通过 bind(this) 组合模式作为实例方法注入到 Game 实例
  */
 export const rune_launcher_system = {
 

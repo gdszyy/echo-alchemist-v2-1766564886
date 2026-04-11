@@ -7,8 +7,8 @@
  * - 价格显示和购买反馈
  * - 遗物选择/跳过/关闭逻辑
  * 
- * 通信方式：通过 Object.assign 混入 Game 实例
- * [Task 3.2 说明] 此模块通过 Mixin 混入 Game 实例，读取 this.xxx 是架构正常用法
+ * 通信方式：通过 bind(this) 组合模式注入到 Game 实例
+ * [Task 3.2 说明] 此模块作为实例方法注入 Game 实例，读取 this.xxx 是架构正常用法
  * 
  * @module ui/shop
  */
@@ -18,7 +18,7 @@ import { showToast } from '../entities.js';
 
 /**
  * 商店渲染方法集合
- * 通过 Object.assign 混入到 Game 实例
+ * 通过 bind(this) 组合模式作为实例方法注入到 Game 实例
  */
 export const shop_system = {
 

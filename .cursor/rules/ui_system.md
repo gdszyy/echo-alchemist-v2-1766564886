@@ -4,7 +4,7 @@
 
 ## 1. 模块架构概述
 
-UI 系统已按职责区域拆分为以下模块，均通过 `Object.assign` 混入 `Game.prototype`：
+UI 系统已按职责区域拆分为以下模块，均通过 `bind(this)` 组合模式作为实例方法注入到 `Game` 实例中：
 
 | 模块文件 | 职责 | 主要函数 |
 |---|---|---|
@@ -15,7 +15,7 @@ UI 系统已按职责区域拆分为以下模块，均通过 `Object.assign` 混
 
 ## 2. 模块加载方式
 
-所有 UI 子模块在 `src/core.js` 中统一 import 并混入：
+所有 UI 子模块在 `src/core.js` 中统一 import，并在 `Game` 构造函数中通过 `bind(this)` 组合模式注入：
 
 ```js
 import { ui_system } from './ui_system.js';
@@ -23,11 +23,21 @@ import { hud_system } from './ui/hud.js';
 import { shop_system } from './ui/shop.js';
 import { rune_launcher_system } from './ui/rune_launcher.js';
 
-Object.assign(Game.prototype, 
+// 在 Game 构造函数中：
+const _subsystems = [
     game_system, game_phase, combat_system, render_system, spawn_system,
     ui_system, hud_system, shop_system, rune_launcher_system,
     calc_utils
-);
+];
+for (const subsystem of _subsystems) {
+    for (const [key, val] of Object.entries(subsystem)) {
+        if (typeof val === 'function') {
+            this[key] = val.bind(this);
+        } else if (typeof val !== 'undefined') {
+            this[key] = Array.isArray(val) ? [...val] : val;
+        }
+    }
+}
 ```
 
 ## 3. 函数命名约定
@@ -48,9 +58,9 @@ Object.assign(Game.prototype,
 - **全局特效 (`ui_system.js`)**：`UI_CHROMATIC_ABERRATION` (色差特效), `UI_FLASH_EFFECT` (全屏闪光)
 - **战斗 HUD (`hud.js`)**：`UI_MULTICAST_UPDATE`, `UI_MULTICAST_TRANSFER`, `UI_HIT_PROGRESS`, `UI_AMMO_FIRED`, `UI_RUNE_CHARGE_*` 等
 
-### 4.2 UI 层 -> 业务层的状态读取（通过 Mixin `this`）
-由于 UI 模块是通过 `Object.assign` 混入到 Game 实例中的，**UI 模块直接读取 `this.xxx`（如 `this.ammoQueue`、`this.runeInventory`、`this.saveData`）是符合架构设计的正常用法**。
-这不属于强耦合，因为 UI 模块本身就是 Game 实例的一部分。在 Task 3.2 中，之前误标的 `TODO[Task 3.2]` 注释已被清理或替换为说明性注释。
+### 4.2 UI 层 -> 业务层的状态读取（通过组合模式的 `this`）
+由于 UI 模块已通过 `bind(this)` 组合模式作为实例方法注入到 Game 实例中，**UI 模块直接读取 `this.xxx`（如 `this.ammoQueue`、`this.runeInventory`、`this.saveData`）是符合架构设计的正常用法**。
+这不属于强耦合，因为 UI 模块的方法在运行时绑定到了 Game 实例上。在 Task 3.2 中，之前误标的 `TODO[Task 3.2]` 注释已被清理或替换为说明性注释。
 
 ## 5. 已知问题与修复记录
 

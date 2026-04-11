@@ -9,7 +9,7 @@
  * - 分数乘数显示
  * - UI 缓存管理
  * 
- * 通信方式：通过 Object.assign 混入 Game 实例
+ * 通信方式：通过 bind(this) 组合模式注入到 Game 实例
  * [Task 3.2 已完成] 通过 hud_initEventListeners() 注册 EventBus 监听器
  * 
  * @module ui/hud
@@ -20,7 +20,7 @@ import { eventBus, EVENT_TYPES } from '../event_bus.js';
 
 /**
  * HUD 渲染方法集合
- * 通过 Object.assign 混入到 Game 实例
+ * 通过 bind(this) 组合模式作为实例方法注入到 Game 实例
  */
 export const hud_system = {
 
