@@ -1,12 +1,13 @@
 # 任务结果: tsk-3b0fed00-b7e
 
-**提交时间**: 2026-04-11 12:19
+**提交时间**: 2026-04-11 12:21
 
 ## 结果摘要
 
-修复 UI 系统文档中对架构加载模式的错误描述
+补充交付物：src/ui/hud.js、shop.js、rune_launcher.js 的注释修改
 
 ## 交付物
 
-- [`ui_system.md`](deliverables/ui_system.md)
-- [`ui_system.js`](deliverables/ui_system.js)
+- [`hud.js`](deliverables/hud.js)
+- [`shop.js`](deliverables/shop.js)
+- [`rune_launcher.js`](deliverables/rune_launcher.js)
