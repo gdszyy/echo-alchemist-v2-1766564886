@@ -37,8 +37,9 @@
 
 ## 4. 温度系统与冰冻衰减机制 (Temperature & Freeze Decay)
 *   **核心属性**：`temp` (当前温度), `frozenCount` (累计冰冻次数), `isFrozenCurrentTurn` (当前回合是否被冰冻)。
-*   **降温衰减 (Freeze Decay)**：每次敌人被冰冻时（`temp <= -100` 或概率触发），`frozenCount` 会增加 1。后续该敌人受到的所有降温效果（`amount < 0`）都会乘以 `0.9 ^ frozenCount` 的衰减系数。即：被冰冻 1 次后降温效果为 90%，2 次为 81%，依此类推。
-*   **统一入口**：所有温度修改必须通过 `applyTemp(amount)` 方法，衰减逻辑已在该方法内集中处理。
+*   **降温衰减 (Freeze Decay)**：每次敌人被冰冻时（`temp <= -100` 或概率触发），`frozenCount` 会增加 1（逻辑在 `game_phase.js` 第 424 行）。后续该敌人受到的所有降温效果（`amount < 0`）都会乘以 `0.9 ^ frozenCount` 的衰减系数。即：被冰冻 1 次后降温效果为 90%，2 次为 81%，依此类推。
+*   **统一入口**：所有温度修改必须通过 `applyTemp(amount)` 方法，衰减逻辑已在该方法内集中处理（`entities/enemy.js` 第 1698 行）。
+*   **实现状态**：✅ 已完整实现（Task B1 确认，2026-04-11）。
 
 ## 5. 参数调整记录
 
@@ -48,7 +49,8 @@
 | 2026-04-11 | `src/ui/shop.js` | `permanent_size_up` 效果：`marbleSizeBonus` 从 `4.2` 调整为 `2.5`，防止倍化球在钉盘左右墙面间就少尺寸内将球夹住 |
 | 2026-04-12 | `src/spawn_system.js` | `spawn_spawnBoss`：修复 Boss 大小、位置与网格不对齐问题。`bossH` 从 `enemyHeight * 1.5`（非整数行）改为 `enemyHeight * 2`（占 2 整行）；`spawnY` 从硬编码 `80` 改为动态计算 `80 + enemyHeight / 2`，确保 Boss 上下边界与行网格边界完全对齐；`centerX` 从 `(enemyCols/2) * enemyWidth` 改为 `this.width / 2`（更健壮，不依赖 enemyCols 为偶数） |
 | 2026-04-12 | `src/spawn_system.js` | **激光机制修复**：`spawn_spawnBullet` 中激光分支（`recipe.isLaser && !recipe.wind`）末尾新增 `return` 语句。修复前，激光分支在执行 `combat_laser_fire` 后缺少 `return`，导致代码继续向下执行实体子弹生成逻辑，额外创建了 `Projectile` 实体。修复后，所有激光属性（`isLaser=true`）仅发射激光束，不再生成实体子弹。 |
-| 2026-04-12 | `src/systems.js` | **图鉴文案同步**：更新 `laser` 属性图鉴条目的描述文案，将旧文案“發射弹珠，命中时触发折射激光”改为“直接发射激光束”；同时为训练场激光演示的 `spawn_projectile` 配置添加 `isLaser: true` 标志位，确保训练场行为与主游戏逻辑一致。 |
+| 2026-04-12 | `src/systems.js` | **图鉴文案同步**：更新 `laser` 属性图鉴条目的描述文案，将旧文案"發射弹珠，命中时触发折射激光"改为"直接发射激光束"；同时为训练场激光演示的 `spawn_projectile` 配置添加 `isLaser: true` 标志位，确保训练场行为与主游戏逻辑一致。 |
+| 2026-04-11 | `src/entities/enemy.js` | **B1 冰冻衰减确认**：确认 `applyTemp(amount)` 方法（第 1698 行）已正确实现冰冻衰减公式 `Math.pow(0.9, this.frozenCount)`。`frozenCount` 自增逻辑在 `game_phase.js` 第 424 行，每次冰冻触发时自增 1。无需修改。 |
 
 ## 6. 开发规范
 *   **依赖管理**：

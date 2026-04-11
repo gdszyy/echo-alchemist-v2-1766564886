@@ -128,10 +128,12 @@ export const CollisionSystem = {
     /**
      * @method combat_laser_processPenetration
      * @description 处理激光线段路径上所有普通敌人的穿透伤害。
-     *   使用点到线段距离公式判定碰撞，对命中的敌人调用 combat_damageEnemy。
+     *   使用点到线段距离公式判定碰撞，对命中的敌人按穿透顺序施加衰减伤害。
+     *   穿透衰减公式：第 n 个目标受到的伤害 = 原始伤害 × (0.5)^(n-1)
+     *   （每层 pierce 属性可向后传递 50% 伤害，无 pierce 时仅首个目标受全伤害）
      * @param {Vec2} p1 - 线段起点
      * @param {Vec2} p2 - 线段终点
-     * @param {Object} recipe - 子弹配方（包含 laser、explosive 等属性）
+     * @param {Object} recipe - 子弹配方（包含 laser、explosive、pierce 等属性）
      */
     combat_laser_processPenetration(p1, p2, recipe) {
         const laserVisualWidth = 3 + (recipe.laser * 4) + (recipe.explosive ? 10 : 0);
@@ -141,13 +143,17 @@ export const CollisionSystem = {
         const maxX = Math.max(p1.x, p2.x) + 20;
         const minY = Math.min(p1.y, p2.y) - 20;
         const maxY = Math.max(p1.y, p2.y) + 20;
+
+        // [穿透衰减] 收集命中敌人及其在激光路径上的投影参数 t（0~1），按距离排序后依次衰减伤害
+        const hits = [];
+        const l2 = p1.dist(p2) * p1.dist(p2);
+        if (l2 === 0) return;
+
         this.enemies.forEach(e => {
             if (!e.active) return;
             // 快速包围盒剔除
             if (e.pos.x < minX || e.pos.x > maxX || e.pos.y < minY || e.pos.y > maxY) return;
             // 点到线段距离公式
-            const l2 = p1.dist(p2) * p1.dist(p2);
-            if (l2 == 0) return;
             let t = ((e.pos.x - p1.x) * (p2.x - p1.x) + (e.pos.y - p1.y) * (p2.y - p1.y)) / l2;
             t = Math.max(0, Math.min(1, t));
             const projX = p1.x + t * (p2.x - p1.x);
@@ -157,12 +163,23 @@ export const CollisionSystem = {
             const enemyRadius = Math.min(e.width, e.height) / 2;
             const totalHitRadius = enemyRadius + laserLogicRadius;
             if (dist < totalHitRadius) {
-                // 造成伤害（通过 combat_damageEnemy 统一处理）
-                this.combat_damageEnemy(e, { config: recipe, pos: new Vec2(projX, projY), isCopy: false });
-
-                // 视觉：受击点特效
-                if (Math.random() < 0.3) this.spawn_createParticle(projX, projY, '#fff', 'spark');
+                hits.push({ enemy: e, t, projX, projY });
             }
+        });
+
+        // 按激光路径顺序排序（t 值从小到大，即从激光起点到终点）
+        hits.sort((a, b) => a.t - b.t);
+
+        // 按穿透顺序施加衰减伤害：第 n 个目标（0-indexed）受到 原始伤害 × 0.5^n
+        hits.forEach((hit, index) => {
+            const damageMultiplier = Math.pow(0.5, index);
+            const attenuatedDamage = recipe.damage * damageMultiplier;
+            // 构造衰减后的配方，仅覆盖 damage 字段，其余属性保持不变
+            const attenuatedRecipe = { ...recipe, damage: attenuatedDamage };
+            this.combat_damageEnemy(hit.enemy, { config: attenuatedRecipe, pos: new Vec2(hit.projX, hit.projY), isCopy: false });
+
+            // 视觉：受击点特效
+            if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#fff', 'spark');
         });
     },
 

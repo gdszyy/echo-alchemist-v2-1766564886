@@ -24,7 +24,7 @@
 负责所有的空间计算与碰撞判定逻辑：
 - **敌人移动碰撞检测** (`combat_tryMoveEnemy`)：AABB 碰撞与边界检测。
 - **激光射线检测** (`combat_laser_castRay`)：墙壁与护盾敌人的反射面检测。
-- **激光穿透判定** (`combat_laser_processPenetration`)：线段与敌人包围盒的相交判定。
+- **激光穿透判定** (`combat_laser_processPenetration`)：线段与敌人包围盒的相交判定。已实现穿透衰减机制（Task B2，2026-04-11）：按激光路径顺序排序命中敌人，第 n 个目标（从 0 计）受到的伤害 = 原始伤害 × 0.5^n。
 
 ## 2. 架构约定
 
