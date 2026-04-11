@@ -2003,17 +2003,32 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
 
     /**
      * @method combat_runeCharge_onHit
-     * @description 子弹击中敌人时调用，充能
-     * @param {number} hitX - 击中X坐标（保留参数，不再显示徽章）
+     * @description 子弹击中敌人时调用，充能并概率翻倍
+     * @param {number} hitX - 击中X坐标（保留参数，徽章已移除）
      * @param {number} hitY - 击中Y坐标
      * @param {boolean} isKill - 是否为击杀
      */
     combat_runeCharge_onHit(hitX, hitY, isKill = false) {
         // 基础充能量（击杀给更多充能）
-        const BASE_CHARGE = isKill ? 0.18 : 0.06;
+        // 降低基数：击中 3%，击杀 10%（原来 6%/18%）
+        const BASE_CHARGE = isKill ? 0.10 : 0.03;
+
+        // 概率翻倍机制：x1/x2/x4/x8，概率降低
+        // x1: 82%，x2: 13%，x4: 4%，x8: 1%（原来 65%/25%/8%/2%）
+        const roll = Math.random();
+        let multiplier = 1;
+        if (roll < 0.01) {
+            multiplier = 8;
+        } else if (roll < 0.05) {
+            multiplier = 4;
+        } else if (roll < 0.18) {
+            multiplier = 2;
+        }
+
+        const chargeAmount = BASE_CHARGE * multiplier;
 
         // 累加充能值
-        this.runeChargeValue = Math.min(1.0, (this.runeChargeValue || 0) + BASE_CHARGE);
+        this.runeChargeValue = Math.min(1.0, (this.runeChargeValue || 0) + chargeAmount);
 
         // 检查是否充能满 → 刷新符文预览
         if (this.runeChargeValue >= 1.0) {
