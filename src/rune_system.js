@@ -120,24 +120,27 @@ function parseRuneGrid(grid, runewordDb) {
 /**
  * calcRuneBaseStats - 计算网格中所有符文的基础属性层数加成
  *
- * 遍历 runeGrid（9个格子），根据每个符文的 baseStat 字段和 level 值，
+ * 遍历 runeGrid（9个格子），根据每个符文的 baseStat、baseStatPerLevel 字段和 level 值，
  * 累加属性层数，返回基础属性加成对象。
+ *
+ * 层数计算公式：层数 = level × baseStatPerLevel
+ * 其中 baseStatPerLevel 按稀有度分级：普通=1, 稀有=2, 史诗=3
  *
  * 兼容两种网格格式：
  * - 字符串格式（旧）: 'rune_pyro_1' → level 默认为 1
  * - 对象格式（新）: { id: 'rune_pyro_1', level: 2 } → level 为对象中的值
  *
  * @param {Array<string|Object|null>} runeGrid - 长度为 9 的符文网格数组
- * @param {Array<Object>} runeDb - 符文数据库（RUNE_DB），每个符文含 id, baseStat 字段
+ * @param {Array<Object>} runeDb - 符文数据库（RUNE_DB），每个符文含 id, baseStat, baseStatPerLevel 字段
  * @returns {Object} 基础属性加成对象，如 { pyro: 3, bounce: 2 }
  *
  * @example
- * // 网格中有一个 Level 2 的烈焰符文和一个 Level 1 的弹跃符文
+ * // 网格中有一个 Level 2 的烈焰符文（普通, baseStatPerLevel=1）和一个 Level 1 的炎核符文（稀有, baseStatPerLevel=2）
  * calcRuneBaseStats(
- *   ['rune_pyro_1', null, null, null, null, null, null, null, { id: 'rune_bounce_1', level: 1 }],
+ *   [{ id: 'rune_pyro_1', level: 2 }, null, null, null, null, null, null, null, { id: 'rune_pyro_2', level: 1 }],
  *   RUNE_DB
  * )
- * // 返回: { pyro: 1, bounce: 1 }  （字符串格式默认 level=1）
+ * // 返回: { pyro: 4 }  （烈焰: 2×1=2 + 炎核: 1×2=2）
  */
 function calcRuneBaseStats(runeGrid, runeDb) {
     const baseStats = {};
@@ -166,8 +169,13 @@ function calcRuneBaseStats(runeGrid, runeDb) {
         const statKey = runeDef.baseStat || runeDef.element;
         if (!statKey) continue;
 
-        // 累加属性层数
-        baseStats[statKey] = (baseStats[statKey] || 0) + level;
+        // 获取 baseStatPerLevel（稀有度加成倍率，默认为 1 向后兼容）
+        const statPerLevel = (typeof runeDef.baseStatPerLevel === 'number' && runeDef.baseStatPerLevel > 0)
+            ? runeDef.baseStatPerLevel
+            : 1;
+
+        // 累加属性层数：层数 = level × baseStatPerLevel
+        baseStats[statKey] = (baseStats[statKey] || 0) + level * statPerLevel;
     }
 
     return baseStats;

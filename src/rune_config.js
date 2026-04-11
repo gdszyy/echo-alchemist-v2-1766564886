@@ -15,6 +15,13 @@
  * - 为每个符文增加 baseStat 字段，映射到对应的弹药属性
  *   baseStat 表示该符文放置在网格中时，每级提供的属性层数加成类型（与 element 相同）
  *   供 Task 3 的 calcRuneBaseStats() 函数使用
+ *
+ * 变更记录 (稀有度层数加成)：
+ * - 为每个符文增加 baseStatPerLevel 字段，表示每级提供的基础属性层数
+ *   普通符文（baseDropWeight 7~8）：每级 1 层
+ *   稀有符文（baseDropWeight 5~6）：每级 2 层
+ *   史诗符文（baseDropWeight 3~4）：每级 3 层
+ *   calcRuneBaseStats() 将使用此字段替代固定的 level 值进行累加
  */
 
 // ==================== 符文基础数据库 ====================
@@ -25,6 +32,7 @@
  *   name: 显示名称（中文）
  *   element: 对应属性类型
  *   baseStat: 基础属性层数对应的弹药属性键（与 element 相同，用于 calcRuneBaseStats 累加）
+ *   baseStatPerLevel: 每级提供的基础属性层数（普通=1, 稀有=2, 史诗=3）
  *   icon: emoji 图标
  *   baseDropWeight: 基础掉落权重（1~10，越高越常见）
  *   affinity_tags: 亲和标签数组（与敌人词缀对应，用于智能掉落权重计算）
@@ -36,6 +44,7 @@ const RUNE_DB = [
         name: '烈焰符文',
         element: 'pyro',
         baseStat: 'pyro',
+        baseStatPerLevel: 1, // 普通（weight 8）
         icon: '🔥',
         baseDropWeight: 8,
         affinity_tags: ['shield', 'regen']
@@ -45,6 +54,7 @@ const RUNE_DB = [
         name: '炎核符文',
         element: 'pyro',
         baseStat: 'pyro',
+        baseStatPerLevel: 2, // 稀有（weight 5）
         icon: '🌋',
         baseDropWeight: 5,
         affinity_tags: ['shield', 'healer']
@@ -56,6 +66,7 @@ const RUNE_DB = [
         name: '寒冰符文',
         element: 'cryo',
         baseStat: 'cryo',
+        baseStatPerLevel: 1, // 普通（weight 8）
         icon: '❄️',
         baseDropWeight: 8,
         affinity_tags: ['haste', 'jump']
@@ -65,6 +76,7 @@ const RUNE_DB = [
         name: '冰晶符文',
         element: 'cryo',
         baseStat: 'cryo',
+        baseStatPerLevel: 2, // 稀有（weight 5）
         icon: '🧊',
         baseDropWeight: 5,
         affinity_tags: ['haste', 'regen']
@@ -76,6 +88,7 @@ const RUNE_DB = [
         name: '雷霆符文',
         element: 'lightning',
         baseStat: 'lightning',
+        baseStatPerLevel: 1, // 普通（weight 7）
         icon: '⚡',
         baseDropWeight: 7,
         affinity_tags: ['clone', 'healer']
@@ -85,6 +98,7 @@ const RUNE_DB = [
         name: '电弧符文',
         element: 'lightning',
         baseStat: 'lightning',
+        baseStatPerLevel: 3, // 史诗（weight 4）
         icon: '🌩️',
         baseDropWeight: 4,
         affinity_tags: ['clone', 'haste']
@@ -96,6 +110,7 @@ const RUNE_DB = [
         name: '弹跃符文',
         element: 'bounce',
         baseStat: 'bounce',
+        baseStatPerLevel: 1, // 普通（weight 8）
         icon: '🔄',
         baseDropWeight: 8,
         affinity_tags: ['clone', 'jump']
@@ -105,6 +120,7 @@ const RUNE_DB = [
         name: '回响符文',
         element: 'bounce',
         baseStat: 'bounce',
+        baseStatPerLevel: 2, // 稀有（weight 5）
         icon: '↩️',
         baseDropWeight: 5,
         affinity_tags: ['clone', 'devour']
@@ -116,6 +132,7 @@ const RUNE_DB = [
         name: '穿刺符文',
         element: 'pierce',
         baseStat: 'pierce',
+        baseStatPerLevel: 1, // 普通（weight 7）
         icon: '↗️',
         baseDropWeight: 7,
         affinity_tags: ['shield', 'jump']
@@ -125,6 +142,7 @@ const RUNE_DB = [
         name: '破甲符文',
         element: 'pierce',
         baseStat: 'pierce',
+        baseStatPerLevel: 3, // 史诗（weight 4）
         icon: '🗡️',
         baseDropWeight: 4,
         affinity_tags: ['shield', 'devour']
@@ -136,6 +154,7 @@ const RUNE_DB = [
         name: '散裂符文',
         element: 'scatter',
         baseStat: 'scatter',
+        baseStatPerLevel: 2, // 稀有（weight 6）
         icon: '🔱',
         baseDropWeight: 6,
         affinity_tags: ['clone', 'healer']
@@ -147,6 +166,7 @@ const RUNE_DB = [
         name: '光束符文',
         element: 'laser',
         baseStat: 'laser',
+        baseStatPerLevel: 3, // 史诗（weight 4）
         icon: '☄️',
         baseDropWeight: 4,
         affinity_tags: ['regen', 'devour']
@@ -156,6 +176,7 @@ const RUNE_DB = [
         name: '聚焦符文',
         element: 'laser',
         baseStat: 'laser',
+        baseStatPerLevel: 3, // 史诗（weight 3）
         icon: '🔦',
         baseDropWeight: 3,
         affinity_tags: ['shield', 'regen']
