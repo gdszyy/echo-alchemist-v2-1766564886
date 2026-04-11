@@ -798,7 +798,8 @@ export const spawn_system = {
                     currentScatterIdx++;
                 }
             }
-		}
+            return; // [激光分支] 激光发射完毕，直接返回，不生成实体 Projectile
+        }
             // === [修改重点] 散射 (Scatter) 实体子弹优化 ===
         // 风属性子弹强制单发，不受 scatter 影响
         if (recipe.scatter > 0 && !recipe.wind) { 

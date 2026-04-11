@@ -308,7 +308,7 @@ const TRUTH_BOOK_DATA = {
         },
         {
             id: 'laser', name: '光球', icon: '🔦', tags: ['特殊', '瞬時'],
-            desc: '發射彈珠，命中時觸發折射激光，瞬間對路徑上的敵人造成傷害。',
+            desc: '直接發射激光束，瞬間對路徑上的敵人造成傷害。激光可被護盾反射。',
             setup: (game) => {
                 for(let i=0; i<6; i++) {
                     game.enemies.push(new Enemy(
@@ -319,8 +319,8 @@ const TRUTH_BOOK_DATA = {
                 }
             },
             loop: [
-                { type: 'log', text: '發射光學折射彈 (laser=true)' },
-                { type: 'spawn_projectile', config: { damage: 40, laser: 10 }, vel: {x: 2, y: -15} },
+                { type: 'log', text: '發射激光束 (isLaser=true)' },
+                { type: 'spawn_projectile', config: { damage: 40, laser: 10, isLaser: true }, vel: {x: 2, y: -15} },
                 { type: 'wait', frames: 150 }, { type: 'reset' }
             ]
         },
