@@ -90,6 +90,9 @@ function parseRuneGrid(grid, runewordDb) {
         const pattern = runeword.pattern;
         if (!pattern || pattern.length === 0) continue;
 
+        let matchCount = 0;
+        let localMatchedCells = new Set();
+
         // 检查每条路径
         for (const { indices, runes } of pathSequences) {
             if (runes.length < pattern.length) continue;
@@ -97,19 +100,24 @@ function parseRuneGrid(grid, runewordDb) {
             // 在路径的符文序列中查找正向或反向匹配
             const matched = findPatternInSequence(runes, pattern, indices, idGrid);
             if (matched) {
-                // 避免同一词条重复激活
-                if (!activatedRunewords.find(r => r.id === runeword.id)) {
-                    activatedRunewords.push(runeword);
-                    // 记录参与激活的格子索引
-                    matched.forEach(idx => activatedCells.add(idx));
-                    // 合并 stats
-                    if (runeword.stats) {
-                        for (const [key, val] of Object.entries(runeword.stats)) {
-                            activeStats[key] = (activeStats[key] || 0) + val;
-                        }
-                    }
+                matchCount++;
+                matched.forEach(idx => localMatchedCells.add(idx));
+            }
+        }
+
+        if (matchCount > 0) {
+            // 复制 runeword 对象，并注入 level 字段
+            const activatedRuneword = { ...runeword, level: matchCount };
+            activatedRunewords.push(activatedRuneword);
+            
+            // 记录参与激活的格子索引
+            localMatchedCells.forEach(idx => activatedCells.add(idx));
+            
+            // 合并 stats (如果新词条还有 stats 的话，兼容处理)
+            if (runeword.stats) {
+                for (const [key, val] of Object.entries(runeword.stats)) {
+                    activeStats[key] = (activeStats[key] || 0) + (val * matchCount);
                 }
-                break; // 一个词条只需激活一次
             }
         }
     }

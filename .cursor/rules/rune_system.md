@@ -29,7 +29,9 @@ globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js"]
 - **双重增益**:
   - **基础加成**: 网格内符文提供基础属性层数加成。
   - **符文之语**: 当符文排列满足特定形状（如直线、对角线）时，激活强力的组合词条（Runeword）。
-- **解析算法**: `parseRuneGrid` 函数负责遍历网格路径并进行正反向匹配，识别激活的符文之语。
+- **解析算法变更 (Task 1 升级)**: 
+  - `parseRuneGrid` 函数现在会统计同一词条被多条路径匹配的次数，将该次数作为词条的 `level` 写入返回的 `activatedRunewords` 数组中每个对象。
+  - 移除了「同一词条仅激活一次」的限制，允许通过天胡布局提升词条等级。
 
 ## 4. 合成与重铸规则
 - **合成 (`rune_merge`)**: 
@@ -43,7 +45,12 @@ globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js"]
 ## 5. 数据结构 (`rune_config.js`)
 - 符文对象标准格式: `{ id: String, level: Number }`。
 - `RUNE_DB`: 符文基础信息定义（包含 `baseStat`）。
-- `RUNEWORD_DB`: 符文之语组合规则定义。
+- **`RUNEWORD_DB` (Task 1 升级)**: 
+  - 废弃原有扁平的 `stats` 对象。
+  - 新增 `effectId` (字符串，效果唯一标识)。
+  - 新增 `baseParams` (对象，Lv.1 时的基础参数)。
+  - 新增 `perLevelParams` (对象，每级递增参数，Lv.N 时的参数 = baseParams + (N-1) * perLevelParams)。
+  - 包含 13 个全新设计的词条（7 个元素专属 + 6 个复合机制）。
 
 ## 6. Boss 符文掉落系统 (`combat_system.js` + `config.js`)
 

@@ -213,84 +213,125 @@ const RUNE_DB = [
  *   stats: 属性加成对象（键与现有弹药属性对应）
  */
 const RUNEWORD_DB = [
-    // ---- 火焰套路词条 ----
+    // ---- 元素专属词条 (7个) ----
     {
-        id: 'runeword_inferno',
-        name: '烈焰之语',
-        pattern: ['rune_pyro_1', 'rune_pyro_2'],
-        effect_desc: '双火共鸣，火焰伤害大幅提升，附加灼烧持续效果。',
-        stats: { pyro: 3, damage: 5 }
+        id: 'runeword_meltdown',
+        name: '熔毁',
+        effectId: 'meltdown',
+        pattern: ['rune_pyro_1', 'rune_pyro_2', 'rune_pyro_1'],
+        effect_desc: '【火焰系】火焰燃烧伤害与过热爆炸的最终伤害提升。',
+        baseParams: { damageBonus: 0.50 },
+        perLevelParams: { damageBonus: 0.25 }
     },
     {
-        id: 'runeword_blazing_pierce',
-        name: '炎刃之语',
-        pattern: ['rune_pyro_1', 'rune_pierce_1'],
-        effect_desc: '烈焰附着于穿刺之上，穿透敌人时留下灼烧痕迹。',
-        stats: { pyro: 2, pierce: 1 }
-    },
-
-    // ---- 冰霜套路词条 ----
-    {
-        id: 'runeword_glacial',
-        name: '冰封之语',
-        pattern: ['rune_cryo_1', 'rune_cryo_2'],
-        effect_desc: '双冰共鸣，冰霜效果增强，敌人减速效果延长。',
-        stats: { cryo: 3, damage: 3 }
+        id: 'runeword_absolute_zero',
+        name: '绝对零度',
+        effectId: 'absolute_zero',
+        pattern: ['rune_cryo_1', 'rune_cryo_2', 'rune_cryo_1'],
+        effect_desc: '【冰霜系】敌人处于冰冻状态时，每次受到物理伤害，都会令该敌人本回合受到的所有伤害加深。',
+        baseParams: { damageAmp: 0.01 },
+        perLevelParams: { damageAmp: 0.005 }
     },
     {
-        id: 'runeword_frozen_bounce',
-        name: '冰弹之语',
-        pattern: ['rune_cryo_1', 'rune_bounce_1'],
-        effect_desc: '冰霜弹珠每次弹跳时释放冰晶碎片，对周围敌人造成减速。',
-        stats: { cryo: 2, bounce: 1 }
+        id: 'runeword_frost_nova',
+        name: '冰霜新星',
+        effectId: 'frost_nova',
+        pattern: ['rune_cryo_1', 'rune_bounce_1', 'rune_cryo_2'],
+        effect_desc: '【冰霜系】弹珠每弹跳数次，释放一次冰霜新星，造成冰属性伤害并降温。',
+        baseParams: { requiredBounces: 5, radius: 80, tempDrop: 10, damageRatio: 0.30 },
+        perLevelParams: { requiredBounces: -1, radius: 0, tempDrop: 0, damageRatio: 0.10 }
     },
-
-    // ---- 闪电套路词条 ----
     {
         id: 'runeword_thunderstorm',
         name: '雷暴之语',
-        pattern: ['rune_lightning_1', 'rune_lightning_2'],
-        effect_desc: '双雷共鸣，闪电链效果增强，可在更多敌人间跳跃。',
-        stats: { lightning: 3, scatter: 1 }
+        effectId: 'thunderstorm',
+        pattern: ['rune_lightning_1', 'rune_lightning_2', 'rune_lightning_1'],
+        effect_desc: '【闪电系】闪电链的伤害衰减系数提升。',
+        baseParams: { decayBonus: 0.50 },
+        perLevelParams: { decayBonus: 0.10 }
     },
     {
-        id: 'runeword_chain_scatter',
-        name: '雷散之语',
-        pattern: ['rune_lightning_1', 'rune_scatter_1'],
-        effect_desc: '闪电与散射融合，散射弹丸携带电弧效果。',
-        stats: { lightning: 2, scatter: 2 }
+        id: 'runeword_thunder_scatter',
+        name: '雷霆散射',
+        effectId: 'thunder_scatter',
+        pattern: ['rune_lightning_1', 'rune_scatter_1', 'rune_lightning_2'],
+        effect_desc: '【闪电系】每次成功触发闪电链时，有概率额外释放一条同属性闪电链。',
+        baseParams: { extraChains: 1 },
+        perLevelParams: { extraChains: 1 }
+    },
+    {
+        id: 'runeword_kinetic_surge',
+        name: '动能激增',
+        effectId: 'kinetic_surge',
+        pattern: ['rune_bounce_1', 'rune_bounce_2', 'rune_bounce_1'],
+        effect_desc: '【弹射系】本次发射的弹珠，后续的每一次弹射伤害固定增加。',
+        baseParams: { flatDamage: 1 },
+        perLevelParams: { flatDamage: 1 }
+    },
+    {
+        id: 'runeword_irradiation',
+        name: '照射',
+        effectId: 'irradiation',
+        pattern: ['rune_laser_1', 'rune_laser_2', 'rune_laser_1'],
+        effect_desc: '【激光系】激光变为持续照射。累积照射同一个敌人，受到的伤害加深。',
+        baseParams: { damageAmp: 0.15 },
+        perLevelParams: { damageAmp: 0.05 }
     },
 
-    // ---- 弹射套路词条 ----
+    // ---- 复合机制词条 (6个) ----
     {
-        id: 'runeword_echo_bounce',
-        name: '回响之语',
-        pattern: ['rune_bounce_1', 'rune_bounce_2'],
-        effect_desc: '双弹共鸣，弹跳次数增加，每次弹跳伤害递增。',
-        stats: { bounce: 4, damage: 2 }
+        id: 'runeword_flame_sword',
+        name: '炎光剑影',
+        effectId: 'flame_sword',
+        pattern: ['rune_pyro_1', 'rune_pierce_1', 'rune_pyro_2'],
+        effect_desc: '【穿透系】穿透敌人时，有概率召唤一道火焰剑光。',
+        baseParams: { triggerChance: 0.30, damageRatio: 0.60, tempDamageRatio: 0.10 },
+        perLevelParams: { triggerChance: 0.10, damageRatio: 0, tempDamageRatio: 0.05 }
     },
     {
-        id: 'runeword_laser_focus',
-        name: '聚光之语',
-        pattern: ['rune_laser_1', 'rune_laser_2'],
-        effect_desc: '双激光共鸣，光束穿透力增强，持续时间延长。',
-        stats: { laser: 3, pierce: 1 }
-    },
-
-    // ---- 复合套路词条 ----
-    {
-        id: 'runeword_elemental_surge',
-        name: '元素涌动之语',
-        pattern: ['rune_pyro_1', 'rune_cryo_1', 'rune_lightning_1'],
-        effect_desc: '三元素共鸣，触发元素爆发，造成范围性混合元素伤害。',
-        stats: { pyro: 1, cryo: 1, lightning: 1, damage: 8 }
+        id: 'runeword_armor_piercing_meteor',
+        name: '穿甲流星',
+        effectId: 'armor_piercing_meteor',
+        pattern: ['rune_pierce_2', 'rune_scatter_1', 'rune_pierce_1'],
+        effect_desc: '【穿透系】散射出的子弹丸继承 100% 的穿透层数。',
+        baseParams: { damageBonus: 0 },
+        perLevelParams: { damageBonus: 0.15 }
     },
     {
-        id: 'runeword_piercing_storm',
-        name: '穿刺风暴之语',
+        id: 'runeword_blazing_beam',
+        name: '炽热光线',
+        effectId: 'blazing_beam',
+        pattern: ['rune_pyro_1', 'rune_laser_1', 'rune_laser_2'],
+        effect_desc: '【复合系】激光照射敌人时，除了造成伤害，每 0.5 秒还会额外提升敌人温度。',
+        baseParams: { tempIncrease: 5 },
+        perLevelParams: { tempIncrease: 2 }
+    },
+    {
+        id: 'runeword_lightning_shield',
+        name: '雷电护盾',
+        effectId: 'lightning_shield',
+        pattern: ['rune_lightning_2', 'rune_bounce_2', 'rune_bounce_1'],
+        effect_desc: '【复合系】弹珠弹射时有概率在自身周围生成静电场。',
+        baseParams: { triggerChance: 0.15, damageRatio: 0.20, shockStacks: 1 },
+        perLevelParams: { triggerChance: 0.05, damageRatio: 0.10, shockStacks: 0 }
+    },
+    {
+        id: 'runeword_blade_storm',
+        name: '剑刃风暴',
+        effectId: 'blade_storm',
         pattern: ['rune_pierce_1', 'rune_pierce_2', 'rune_scatter_1'],
-        effect_desc: '穿透与散射融合，弹丸穿透后分裂成多个散射弹。',
-        stats: { pierce: 2, scatter: 3, damage: 4 }
+        effect_desc: '【复合系】首个子弹定期对范围内所有敌人生成一次剑光斩击。',
+        baseParams: { radius: 120, damageRatio: 0.60, interval: 0.5 },
+        perLevelParams: { radius: 0, damageRatio: 0.20, interval: -0.1 }
+    },
+    {
+        id: 'runeword_elemental_fusion',
+        name: '元素聚变',
+        effectId: 'elemental_fusion',
+        pattern: ['rune_pyro_2', 'rune_cryo_2', 'rune_lightning_2'],
+        effect_desc: '【复合系】当敌人同时承受火、冰、雷三种状态时，引发元素聚变爆炸。',
+        baseParams: { trueDamageRatio: 0.10 },
+        perLevelParams: { trueDamageRatio: 0.05 }
     }
 ];
 
