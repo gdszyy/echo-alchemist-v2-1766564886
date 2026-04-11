@@ -300,6 +300,19 @@ ui_closeTruthBook() {
         const ammoSlots = document.getElementById('ammo-ui-container');
         if (ammoSlots) ammoSlots.style.display = (this.phase === 'combat') ? 'block' : 'none';  // [Mixin 正常用法：读取 Game 实例状态]
         */
+
+        // F. 统一顶部栏：在 meta/shop 全屏阶段隐藏，其他阶段显示
+        const unifiedTopBar = document.getElementById('unified-top-bar');
+        if (unifiedTopBar) {
+            const hideInPhases = ['meta', 'shop', 'truth_book', 'training', 'relic', 'selection'];
+            unifiedTopBar.style.display = hideInPhases.includes(this.phase) ? 'none' : 'flex';  // [Mixin 正常用法：读取 Game 实例状态]
+        }
+
+        // G. 战斗充能符文 UI 显隐同步（已在 ui_onPhaseChange 处理，此处备用兼容）
+        const runeChargeUi = document.getElementById('combat-rune-charge-ui');
+        if (runeChargeUi) {
+            runeChargeUi.style.display = (this.phase === 'combat') ? 'flex' : 'none';  // [Mixin 正常用法：读取 Game 实例状态]
+        }
     },
 
 /**
@@ -432,16 +445,11 @@ ui_closeTruthBook() {
      * @param {string} newPhase - 新阶段名称
      */
     ui_onPhaseChange(newPhase) {
+        // ===== A. 中央大标题：淡入后淡出（不再缩小到左上角） =====
         const titleContainer = document.getElementById('phase-title-container');
         const titleText = document.getElementById('phase-title');
         const subText = document.getElementById('phase-sub');
-        if (!titleContainer || !titleText || !subText) return;
 
-        // 显示阶段标题
-        titleContainer.classList.remove('minimized');
-
-        // 根据阶段设置标题文本
-        // 注：此处文字与 game_phase.js 原始内容保持一致
         const PHASE_TITLES = {
             'meta':       { text: '\u56de\u8072\u7149\u91d1\u5e2b', sub: 'Echo Alchemist' },
             'gathering':  { text: '\u7814\u78e8\u968e\u6bb5', sub: '\u6536\u96c6\u9b54\u529b' },
@@ -450,11 +458,37 @@ ui_closeTruthBook() {
             'training':   { text: '\u8a66\u7149\u5834', sub: '\u6975\u9650\u6230\u9b25\u6e2c\u8a66' },
         };
         const titleData = PHASE_TITLES[newPhase] || { text: '\u547d\u904b\u6289\u62e9', sub: '\u9078\u64c7\u4f60\u7684\u547d\u904b' };
-        titleText.innerText = titleData.text;
-        subText.innerText = titleData.sub;
 
-        // 1.2秒后隐藏阶段标题
-        setTimeout(() => { titleContainer.classList.add('minimized'); }, 1200);
+        if (titleContainer && titleText && subText) {
+            titleText.innerText = titleData.text;
+            subText.innerText = titleData.sub;
+            // 淡入
+            titleContainer.style.opacity = '1';
+            titleContainer.classList.remove('minimized');
+            // 1.2秒后淡出（不再缩小）
+            setTimeout(() => {
+                titleContainer.style.opacity = '0';
+            }, 1200);
+        }
+
+        // ===== B. 顶部栏左侧阶段标签同步更新 =====
+        const topPhaseLabel = document.getElementById('top-phase-label');
+        if (topPhaseLabel) {
+            const SHORT_LABELS = {
+                'meta':       '',
+                'gathering':  '\u7814\u78e8',
+                'combat':     '\u6230\u9b25',
+                'truth_book': '\u5716\u9451',
+                'training':   '\u8a66\u7149',
+            };
+            topPhaseLabel.textContent = SHORT_LABELS[newPhase] || '';
+        }
+
+        // ===== C. 战斗充能符文 UI 仅在战斗阶段显示 =====
+        const runeChargeUi = document.getElementById('combat-rune-charge-ui');
+        if (runeChargeUi) {
+            runeChargeUi.style.display = (newPhase === 'combat') ? 'flex' : 'none';
+        }
     },
 
     /**

@@ -513,7 +513,7 @@ this.affixDict = {
             if (i < current) {
                 gem.classList.add('active');
                 slot.style.borderColor = '#10b981'; // 亮绿色边框
-                slot.style.boxShadow = '0 0 10px rgba(16, 185, 129, 0.3)';
+                slot.style.boxShadow = '0 0 5px rgba(16, 185, 129, 0.3)';
             }
 
             slot.appendChild(gem);
