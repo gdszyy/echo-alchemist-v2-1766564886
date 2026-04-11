@@ -447,7 +447,53 @@ export const rune_launcher_system = {
      * @private
      */
     _ui_updateRuneStatsDisplay(activeStats, baseStats = {}) {
+        const summary = document.getElementById('rune-stats-summary');
+        const list = document.getElementById('rune-stats-list');
+        if (!summary || !list) return;
 
+        list.innerHTML = '';
+
+        const runewordEntries = Object.entries(activeStats || {});
+        const baseEntries = Object.entries(baseStats || {});
+
+        if (runewordEntries.length === 0 && baseEntries.length === 0) {
+            summary.classList.add('hidden');
+            return;
+        }
+        summary.classList.remove('hidden');
+
+        // 展示基础属性加成（来自符文等级）
+        if (baseEntries.length > 0) {
+            const baseLabel = document.createElement('div');
+            baseLabel.className = 'w-full text-[10px] text-slate-400/70 tracking-widest uppercase mb-1';
+            baseLabel.textContent = '基础属性（符文等级加成）';
+            list.appendChild(baseLabel);
+
+            baseEntries.forEach(([key, val]) => {
+                const statInfo = STAT_DISPLAY[key] || { name: key, icon: '' };
+                const tag = document.createElement('div');
+                tag.className = 'px-2 py-1 bg-blue-900/30 border border-blue-600/40 rounded-lg text-xs text-blue-200 font-bold';
+                tag.textContent = `${statInfo.icon} ${statInfo.name} +${val}`;
+                list.appendChild(tag);
+            });
+        }
+
+        // 展示词条加成（来自符文词条共鸣）
+        if (runewordEntries.length > 0) {
+            const runewordLabel = document.createElement('div');
+            runewordLabel.className = 'w-full text-[10px] text-slate-400/70 tracking-widest uppercase mb-1 mt-2';
+            runewordLabel.textContent = '词条共鸣（词条共鸣加成）';
+            list.appendChild(runewordLabel);
+
+            runewordEntries.forEach(([key, val]) => {
+                const statInfo = STAT_DISPLAY[key] || { name: key, icon: '' };
+                const tag = document.createElement('div');
+                tag.className = 'px-2 py-1 bg-amber-900/30 border border-amber-600/40 rounded-lg text-xs text-amber-200 font-bold';
+                tag.textContent = `${statInfo.icon} ${statInfo.name} +${val}`;
+                list.appendChild(tag);
+            });
+        }
+    },
 
     /**
      * 更新合成/重铸按鈕状态
