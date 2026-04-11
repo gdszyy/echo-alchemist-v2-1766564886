@@ -1366,7 +1366,7 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         }
 
         // 事件总线广播伤害事件
-        eventBus.emit('damage:dealt', {
+        eventBus.emit(EVENT_TYPES.COMBAT_DAMAGE_DEALT, {
             enemy: enemy,
             amount: actualDmg,
             type: damageType,
@@ -1540,7 +1540,7 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
             this.spawn_addScore(enemy.maxHp);
             
             // 事件总线广播敌人死亡
-            eventBus.emit('enemy:killed', {
+            eventBus.emit(EVENT_TYPES.COMBAT_ENEMY_KILLED, {
                 enemy: enemy,
                 maxHp: enemy.maxHp,
                 shotId: shotId
@@ -1590,7 +1590,7 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
             }
             if (enemy.type === 'boss') {
                 // 广播 Boss 被击杀事件
-                eventBus.emit('boss:defeated', {
+                eventBus.emit(EVENT_TYPES.BOSS_DEFEATED, {
                     boss: enemy,
                     bossId: enemy.bossType,
                     bossName: enemy.bossName,
@@ -2143,7 +2143,7 @@ combat_damageEnemy(enemy, projectile, damageOverride = null) {
         const bossCfg = bossConfigs ? bossConfigs[bossId] : null;
 
         // 广播狂暴事件
-        eventBus.emit('boss:phase_change', {
+        eventBus.emit(EVENT_TYPES.BOSS_PHASE_CHANGE, {
             boss: boss,
             bossId: bossId,
             bossName: boss.bossName,
