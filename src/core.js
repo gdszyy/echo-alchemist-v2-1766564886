@@ -89,7 +89,29 @@ setupAudioInitListener();
 
 class Game {
     constructor() {
-        // ==================== 事件总线挂载 ====================
+        // ==================== [Task 3.3] 组合模式：将子系统方法绑定到实例 ====================
+        // 替代原有的 Object.assign(Game.prototype, ...) Mixin 模式。
+        // 通过 bind(this) 将各子系统的方法作为实例方法注入，保持 this 指向正确。
+        // 各子系统仍以对象字面量形式维护，无需修改子系统文件。
+        const _subsystems = [
+            game_system, game_phase, combat_system, render_system, spawn_system,
+            ui_system, hud_system, shop_system, rune_launcher_system,
+            calc_utils
+        ];
+        for (const subsystem of _subsystems) {
+            for (const [key, val] of Object.entries(subsystem)) {
+                if (typeof val === 'function') {
+                    // 函数：绑定到当前实例，确保 this 指向正确
+                    this[key] = val.bind(this);
+                } else if (typeof val !== 'undefined') {
+                    // 非函数属性（如 _flyEffectPool、_flyEffectMaxNodes）：
+                    // 直接赋值到实例（数组/对象会居于实例上，而非原型链）
+                    this[key] = Array.isArray(val) ? [...val] : val;
+                }
+            }
+        }
+
+        // ==================== 事件总线挂载 =====================
         this.eventBus = eventBus;
         
         this.variantLevels = { flying_sword: 1 };
@@ -272,11 +294,8 @@ class Game {
     }
 }
 
-// [Task 2.4] UI 子模块通过 Object.assign 混入 Game 实例
-Object.assign(Game.prototype, 
-    game_system, game_phase, combat_system, render_system, spawn_system,
-    ui_system, hud_system, shop_system, rune_launcher_system,
-    calc_utils
-);
+// [Task 3.3] 已移除 Object.assign(Game.prototype, ...) Mixin 模式。
+// 各子系统方法现在通过构造函数中的 bind(this) 注入为实例方法（组合模式）。
+// 详见 .cursor/rules/global.md 第 5 节「子系统扩展规范」。
 
 export { SoundManager, Game, audio, eventBus, initAudio };

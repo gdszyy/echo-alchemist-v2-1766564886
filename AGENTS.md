@@ -52,6 +52,9 @@
 *   **游戏阶段规范**：[`.cursor/rules/game_phase.md`](.cursor/rules/game_phase.md) - 阶段转换逻辑（命运抉择→研磨→战斗的状态机、各阶段的入口/出口条件）。
 *   **事件总线规范**：[`.cursor/rules/events.md`](.cursor/rules/events.md) - 事件总线机制（EventBus）、标准事件字典与事件通信规范。（Task 3.1 完成）
 *   **实体系统规范**：[`.cursor/rules/entities.md`](.cursor/rules/entities.md) - 实体系统拆分状态、依赖管理与性能要求规范。（Task 2.2 完成：已提取 Enemy 和 Projectile 类，entities.js 减少约 2004 行）
-*   **战斗系统规范**：[`src/combat/combat.md`](src/combat/combat.md) - 包含战斗模块拆分结构、职责边界、Mixin 注入方式及 DOM 操作迁移计划。（Task 2.3 完成）
+*   **战斗系统规范**：[`src/combat/combat.md`](src/combat/combat.md) - 包含战斗模块拆分结构、职责边界、组合模式注入方式及 DOM 操作迁移计划。（Task 2.3 完成）
 *   **UI 系统规范**：[`.cursor/rules/ui_system.md`](.cursor/rules/ui_system.md) - UI 子模块架构（hud.js、shop.js、rune_launcher.js）、函数命名约定、耦合点标记规范。
+
+> **架构状态（Task 3.3 更新）**：`core.js` 已完全移除 `Object.assign(Game.prototype, ...)` Mixin 模式。全部 10 个子系统均已迁移至组合模式（Composition via bind）。新增子系统必须遵循 [`.cursor/rules/global.md`](.cursor/rules/global.md) 第 5 节「子系统扩展规范」。
+
 > **注意**：随着项目的拆分和重构，本索引应持续更新。每个子模块的负责 Agent 在完成初步重构后，需创建并维护对应的规则文档。
