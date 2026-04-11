@@ -103,9 +103,14 @@ export const spawn_system = {
         const chance1 = Math.min(0.6, 0.1 + r * 0.025);
         const chance2 = r > 10 ? Math.min(0.15, (r - 10) * 0.01) : 0;
         
+        // [难度平衡] Boss 战后，双词缀精英怪概率临时提升 25%
+        const postBossBonus = (this.postBossMultiplier && this.postBossMultiplier > 1.0) ? 0.25 : 0;
+        // 将 postBossBonus 叠加到 chance2（双词缀概率）
+        const effectiveChance2 = Math.min(chance2 + postBossBonus, 0.40);
+
         const roll = Math.random();
-        if (roll < chance2) count = 2;
-        else if (roll < chance1 + chance2) count = 1;
+        if (roll < effectiveChance2) count = 2;
+        else if (roll < chance1 + effectiveChance2) count = 1;
         
         if (count === 0) return [];
 
@@ -185,6 +190,12 @@ export const spawn_system = {
             finalBaseHP = (linearHP * 0.6) + (idealHP * 0.4);
         }
         
+        // [难度平衡] 战后高压因子（Post-Boss Surge）
+        // Boss 击杀后 2-3 回合内，普通敌人血量 ×1.3，每回合递减 0.1
+        if (this.postBossMultiplier && this.postBossMultiplier > 1.0) {
+            finalBaseHP *= this.postBossMultiplier;
+        }
+
         // 3. 应用最终倍率
         const baseHP = Math.floor(finalBaseHP * this.nextRoundHpMultiplier);
         

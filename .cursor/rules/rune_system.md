@@ -64,3 +64,11 @@ globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js"]
 - `BOSS_DB` 包含 8 个 Boss 的 `themeWeights` 配置。
 - `themeWeights` 键为 RUNE_DB 中的 `element` 字段，在 `loot_calcRuneDrop` 第三层抽取中放大对应属性符文的掉落权重。
 - Boss 实体需将对应的 `BOSS_DB` 条目引用为 `enemy.bossConfig`，供死亡掉落逻辑读取。
+
+## 7. 掉落权重边际递减 (Marginal Decay)
+### 7.1 触发时机
+- 计算符文掉落权重时（`loot_system.js` 中的 `_calcBuildVector`）。
+### 7.2 机制
+- 统计玩家近期伤害占比 `buildVector` 时，如果某一属性的伤害占比超过阈值（默认 60%），则对超出部分进行衰减。
+- 衰减系数为 0.5，即超出部分减半。
+- 衰减后重新归一化 `buildVector`，防止玩家过度依赖单一属性导致掉落过于单一。

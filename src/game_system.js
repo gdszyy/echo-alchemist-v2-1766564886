@@ -13,9 +13,12 @@
  * - 弹珠选择切换 (sys_toggleMarbleSelection)
  * - 分数乘数重置 (sys_resetMultiplier)
  */
-import { Vec2, showToast } from './entities.js';
+import { Vec2, showToast, RuneLoot } from './entities.js';
 import { CONFIG } from './config.js';
 import { audio } from './audio.js';
+import { loot_calcRuneDrop } from './loot_system.js';
+import { COUNTER_MAP } from './rune_config.js';
+import { eventBus } from './event_bus.js';
 
 export const game_system = {
 
@@ -190,6 +193,9 @@ export const game_system = {
         // 重置 Boss 系统状态
         this.bossHistory = [];
         this._pendingBossSpawn = null;
+        // [难度平衡] 重置战后高压因子
+        this.postBossMultiplier = 1.0;
+        this.postBossSurgeRoundsLeft = 0;
     },
 
     /**
@@ -620,10 +626,86 @@ export const game_system = {
         const viewShiftY = this.boardTilt.current.y * -20;
         for (let e of this.enemies) {
             if (e.active && (e.pos.y + viewShiftY) > this.defeatLineY) {
+                // [难度平衡] Boss 越线：触发怡悯掉落
+                if (e.type === 'boss') {
+                    this._triggerPityDrop(e);
+                }
                 return true;
             }
         }
         return false;
+    },
+
+    /**
+     * @method _triggerPityDrop
+     * @description [难度平衡] Boss 越线时触发怡悯掉落，生成一个克制属性符文。
+     * @param {Enemy} bossEnemy - 越线的 Boss 实体
+     */
+    _triggerPityDrop(bossEnemy) {
+        try {
+            // 1. 找到玩家当前 buildVector 中占比最高的属性
+            // 直接使用导入的 loot_calcRuneDrop 函数，它内部会调用 _calcBuildVector
+            // 这里我们手动计算 buildVector，以便找到主属性
+            const attrTotals = {};
+            const history = this.roundDamageHistory;
+            if (history && history.length > 0) {
+                const recentHistory = history.slice(-5);
+                for (const roundRecord of recentHistory) {
+                    if (roundRecord.shots && Array.isArray(roundRecord.shots)) {
+                        for (const shot of roundRecord.shots) {
+                            if (shot.byAttr) {
+                                for (const [attr, dmg] of Object.entries(shot.byAttr)) {
+                                    attrTotals[attr] = (attrTotals[attr] || 0) + (typeof dmg === 'number' ? dmg : 0);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            const grandTotal = Object.values(attrTotals).reduce((a, b) => a + b, 0);
+            const buildVector = {};
+            if (grandTotal > 0) {
+                for (const [attr, dmg] of Object.entries(attrTotals)) {
+                    buildVector[attr] = dmg / grandTotal;
+                }
+            }
+            let dominantAttr = null;
+            let maxWeight = -1;
+            for (const attr of Object.keys(buildVector)) {
+                if (buildVector[attr] > maxWeight) {
+                    maxWeight = buildVector[attr];
+                    dominantAttr = attr;
+                }
+            }
+            if (!dominantAttr) return;
+
+            // 2. 找到克制属性（COUNTER_MAP 中权重最高的 tag 对应的元素）
+            let counterElement = null;
+            if (COUNTER_MAP && COUNTER_MAP[dominantAttr]) {
+                const counterMap = COUNTER_MAP[dominantAttr];
+                let maxCounterWeight = -1;
+                for (const [tag, weight] of Object.entries(counterMap)) {
+                    if (weight > maxCounterWeight) {
+                        maxCounterWeight = weight;
+                        counterElement = tag;
+                    }
+                }
+            }
+
+            // 3. 调用 loot_calcRuneDrop 生成1个怡悯符文
+            const themeWeights = counterElement ? { [counterElement]: 10.0 } : {};
+            const drop = loot_calcRuneDrop(this, { forcedLevel: 1, themeWeights });
+            if (drop && drop.runeId) {
+                const loot = new RuneLoot(bossEnemy.pos.x, bossEnemy.pos.y, drop.runeId);
+                loot.level = drop.level || 1;
+                this.runeLootItems.push(loot);
+                // 4. 通过 EventBus 显示提示
+                eventBus.emit('ui:toast', { message: '💔 怡悯掉落：获得克制符文' });
+                showToast('💔 怡悯掉落：获得克制符文');
+            }
+        } catch (err) {
+            console.warn('[_triggerPityDrop] 怡悯掉落失败:', err);
+        }
     },
 
     /**

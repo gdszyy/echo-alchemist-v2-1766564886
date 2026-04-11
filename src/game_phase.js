@@ -572,9 +572,19 @@ phase_gathering_getRandomPegType() {
             this.nextRoundHpMultiplier = 1;
         }
 
-        // [修复] 回合切换时清空蝴蝶法阵和风刃，防止残留
+        // [修复] 回合切换时清空蝶蝶法阵和风刃，防止残留
         if (this.butterflyCircles) this.butterflyCircles = [];
         if (this.butterflyBlades) this.butterflyBlades = [];
+
+        // [难度平衡] 战后高压因子递减
+        if (this.postBossSurgeRoundsLeft > 0) {
+            this.postBossSurgeRoundsLeft--;
+            this.postBossMultiplier = Math.max(1.0, this.postBossMultiplier - 0.1);
+            if (this.postBossSurgeRoundsLeft === 0) {
+                this.postBossMultiplier = 1.0;
+                console.log('[DifficultyBalance] 战后高压因子已恢复正常');
+            }
+        }
         
         this.round++;
         this.prevRoundDamage = this.roundDamage;

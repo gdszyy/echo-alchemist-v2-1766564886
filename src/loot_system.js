@@ -122,6 +122,23 @@ function _calcBuildVector(game) {
         buildVector[attr] = dmg / grandTotal;
     }
 
+    // [难度平衡] 边际递减：当某属性伤害占比 > 60% 时，该属性的 buildVector 权重衰减
+    const MARGINAL_DECAY_THRESHOLD = 0.60;
+    const MARGINAL_DECAY_FACTOR = 0.5; // 超过阈値后权重减半
+    for (const attr of Object.keys(buildVector)) {
+        if (buildVector[attr] > MARGINAL_DECAY_THRESHOLD) {
+            buildVector[attr] = MARGINAL_DECAY_THRESHOLD +
+                (buildVector[attr] - MARGINAL_DECAY_THRESHOLD) * MARGINAL_DECAY_FACTOR;
+        }
+    }
+    // 重新归一化
+    const totalBV = Object.values(buildVector).reduce((a, b) => a + b, 0);
+    if (totalBV > 0) {
+        for (const attr of Object.keys(buildVector)) {
+            buildVector[attr] /= totalBV;
+        }
+    }
+
     return buildVector;
 }
 
