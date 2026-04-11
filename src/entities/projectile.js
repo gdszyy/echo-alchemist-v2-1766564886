@@ -196,7 +196,66 @@ class Projectile {
             }
             if (this.bouncesLeft > 0) {
                 this.bouncesLeft--;
-                
+
+                // ─────────────────────────────────────────────────────────────────────
+                // [词条 Hook] 动能激增（kinetic_surge）
+                // 效果：每次弹跳后，子弹伤害增加 damagePerBounce
+                // 实现：直接修改 this.config.damage，后续命中将使用新伤害值
+                // ─────────────────────────────────────────────────────────────────────
+                if (typeof game !== 'undefined' && game.activeRunewordEffects) {
+                    const kineticEffect = game.activeRunewordEffects['kinetic_surge'];
+                    if (kineticEffect) {
+                        // 参数字段：flatDamage（每次弹跳固定增加的伤害值）
+                        const flatDamage = kineticEffect.params.flatDamage || 0;
+                        if (flatDamage > 0) {
+                            this.config.damage += flatDamage;
+                        }
+                    }
+                }
+
+                // ─────────────────────────────────────────────────────────────────────
+                // [词条 Hook] 冰霜新星（frost_nova）
+                // 效果：每经过 bounceInterval 次弹跳，触发一次冰霜新星（范围冰冻）
+                // 实现：维护 this._frostNovaBounceCount 计数器，每次弹跳时自增
+                // ─────────────────────────────────────────────────────────────────────
+                if (typeof game !== 'undefined' && game.activeRunewordEffects) {
+                    const frostNovaEffect = game.activeRunewordEffects['frost_nova'];
+                    if (frostNovaEffect) {
+                        if (!this._frostNovaBounceCount) this._frostNovaBounceCount = 0;
+                        this._frostNovaBounceCount++;
+                        // 参数字段：requiredBounces（触发所需弹跳次数）、radius（范围）、tempDrop（降温量）、damageRatio（伤害比例）
+                        const requiredBounces = Math.max(1, Math.floor(frostNovaEffect.params.requiredBounces || 5));
+                        if (this._frostNovaBounceCount % requiredBounces === 0) {
+                            // 触发冰霜新星：对周围所有敌人施加冰冻状态
+                            const novaRadius = frostNovaEffect.params.radius || 80;
+                            const tempDrop = frostNovaEffect.params.tempDrop || 10;
+                            const damageRatio = frostNovaEffect.params.damageRatio || 0.30;
+                            const novaDmg = Math.max(1, Math.floor(this.config.damage * damageRatio));
+                            // 视觉特效：冰蓝冲击波
+                            game.spawn_createShockwave(this.pos.x, this.pos.y, '#06b6d4');
+                            for (let i = 0; i < 8; i++) {
+                                game.spawn_createParticle(this.pos.x, this.pos.y, '#a5f3fc', 'shard');
+                            }
+                            // 对范围内所有敌人施加冰冻和伤害
+                            game.enemies.forEach(ne => {
+                                if (ne.active && this.pos.dist(ne.pos) < novaRadius) {
+                                    ne.applyTemp(-tempDrop);
+                                    ne._cryoHitThisRound = true; // 标记冰属性命中（供元素聚变使用）
+                                    // 附加冰霜伤害
+                                    if (novaDmg > 0) {
+                                        const novaResult = ne.takeDamage(novaDmg);
+                                        game.combat_recordDamage(novaResult.actualDamage, 'cryo', 'main', null);
+                                    }
+                                }
+                            });
+                            game.spawn_createFloatingText(
+                                this.pos.x, this.pos.y - 20,
+                                `❄️ FROST NOVA!`, '#a5f3fc'
+                            );
+                        }
+                    }
+                }
+
                 // 风属性锤点逻辑
                 if (this.config.wind && this.isLast && typeof game !== 'undefined') {
                     game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage);
@@ -309,7 +368,34 @@ class Projectile {
     }
 
     onHit(enemy, allEnemies) {
-        game.combat_damageEnemy(enemy, this);
+        // ─────────────────────────────────────────────────────────────────────
+        // [词条 Hook] 元素聚变（elemental_fusion）——火/冰状态标记
+        // 在伤害结算前，标记该敌人本回合被火/冰属性命中
+        // 雷状态标记在 damage_calc.js 的 combat_lightning_triggerChain 中设置
+        // ─────────────────────────────────────────────────────────────────────
+        if (this.config.pyro > 0) {
+            enemy._pyroHitThisRound = true;
+        }
+        if (this.config.cryo > 0) {
+            enemy._cryoHitThisRound = true;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // [词条 Hook] 绝对零度（absolute_zero）
+        // 效果：敌人处于冰冻状态时，每次受到物理伤害，令该敌人本回合受到的所有伤害加深
+        // 实现：在 combat_damageEnemy 之前计算伤害加深系数，通过 damageOverride 传入
+        // ─────────────────────────────────────────────────────────────────────
+        let damageOverride = null;
+        if (typeof game !== 'undefined' && game.combat_runeword_absoluteZero_calcAmp) {
+            const amp = game.combat_runeword_absoluteZero_calcAmp(enemy);
+            if (amp > 0) {
+                // 计算加深后的伤害（包含 isCopy 平衡）
+                const baseDmg = this.isCopy ? this.config.damage * 0.5 : this.config.damage;
+                damageOverride = baseDmg * (1 + amp);
+            }
+        }
+
+        game.combat_damageEnemy(enemy, this, damageOverride);
     }
 
     performSlashAttack(target, enemies) {

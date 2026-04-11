@@ -211,6 +211,7 @@ class Game {
         this.runeInventory = [];
         this.runeGrid = Array(9).fill(null);
         this.activeRunewordStats = {};
+        this.activeRunewordEffects = {}; // [词条 Hook] effectId -> { level, params } 的映射，供战斗层读取
         this.runeLootItems = [];
 
         this.sys_loadSaveData();

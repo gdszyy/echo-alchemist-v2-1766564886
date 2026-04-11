@@ -817,12 +817,31 @@ export const spawn_system = {
                 r.chainPayload = null; // 清除普通连锁，防止无限循环 (套娃逻辑由 nestedPayload 负责)
                 r.isScatterChild = true; // 标记为散射子弹
                 
+                // ─────────────────────────────────────────────────────────────────────
+                // [词条 Hook] 穿甲流星（armor_piercing_meteor）
+                // 效果：散射子弹继承 100% 的穿透层数（默认缩放为 0）
+                // 实现：在 createScatterRecipe 中，如果激活了穿甲流星词条，
+                //         则将 pierce 属性从缩放改为完全继承（factor = 1.0）
+                // ─────────────────────────────────────────────────────────────────────
+                const armorPiercingEffect = this.activeRunewordEffects && this.activeRunewordEffects['armor_piercing_meteor'];
+                
                 // 批量缩放属性
                 scalableAttrs.forEach(attr => {
                     if (typeof r[attr] === 'number') {
                         if (attr === 'damage') {
                             // 伤害至少为 1
-                            r[attr] = Math.max(1, Math.floor(r[attr] * factor));
+                            let scaledDamage = Math.max(1, Math.floor(r[attr] * factor));
+                            // [词条 Hook] 穿甲流星：散射子弹额外伤害加成（damageBonus）
+                            if (armorPiercingEffect) {
+                                const damageBonus = armorPiercingEffect.params.damageBonus || 0;
+                                if (damageBonus > 0) {
+                                    scaledDamage = Math.max(1, Math.floor(scaledDamage * (1 + damageBonus)));
+                                }
+                            }
+                            r[attr] = scaledDamage;
+                        } else if (attr === 'pierce' && armorPiercingEffect) {
+                            // [词条 Hook] 穿甲流星：穿透层数完全继承（不缩放）
+                            r[attr] = base[attr]; // 保持原始穿透层数
                         } else {
                             // 其他层数向下取整
                             r[attr] = Math.floor(r[attr] * factor);

@@ -306,6 +306,15 @@ phase_gathering_getRandomPegType() {
         
         // [符文系统] 记录本回合开始时的敌人数量，用于动态掉落率计算
         this.spawnedEnemiesInRound = this.enemies.filter(e => e.active).length;
+
+        // [词条 Hook] 每回合开始时重置敌人的回合状态标记
+        // 包括元素聚变的火/冰/雷状态标记，以及绝对零度的命中计数器
+        this.enemies.forEach(e => {
+            e._pyroHitThisRound = false;
+            e._cryoHitThisRound = false;
+            e._lightningHitThisRound = false;
+            e._absoluteZeroHitCount = 0;
+        });
         
         // [充能符文系统] 初始化充能状态
         this.combat_runeCharge_init();

@@ -274,6 +274,23 @@ export const rune_launcher_system = {
         // 2. 解析词条，计算 activeRunewordStats
         const { activeStats, activatedRunewords, activatedCells } = parseRuneGrid(this.runeGrid, RUNEWORD_DB);  // [Mixin 正常用法：读取 Game 实例状态]
         this.activeRunewordStats = activeStats;
+        // [词条 Hook] 构建 activeRunewordEffects: effectId -> { level, params } 映射
+        // 供 damage_calc.js / projectile.js 在战斗层读取词条效果参数
+        const newEffects = {};
+        activatedRunewords.forEach(rw => {
+            if (rw.effectId) {
+                const level = rw.level || 1;
+                const baseParams = rw.baseParams || {};
+                const perLevelParams = rw.perLevelParams || {};
+                // 计算最终参数：baseParams + (level - 1) * perLevelParams
+                const params = {};
+                for (const key of Object.keys(baseParams)) {
+                    params[key] = (baseParams[key] || 0) + (level - 1) * (perLevelParams[key] || 0);
+                }
+                newEffects[rw.effectId] = { level, params };
+            }
+        });
+        this.activeRunewordEffects = newEffects;
 
         // 3. 高亮激活词条对应的格子
         for (let i = 0; i < 9; i++) {

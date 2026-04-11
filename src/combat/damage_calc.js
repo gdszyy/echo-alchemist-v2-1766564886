@@ -7,6 +7,11 @@
  *  - 伤害记录与统计汇总
  *  - 闪电链触发逻辑（纯计算部分）
  *  - 色差特效触发（通过 EventBus 事件驱动，Task 3.2 已完成）
+ *  - [词条 Hook] 7 个词条效果 Hook（Agent C 实现）
+ *    - thunderstorm（雷暴之语）：提升闪电链伤害衰减系数
+ *    - thunder_scatter（雷霆散射）：成功触发闪电链后额外触发一次
+ *    - absolute_zero（绝对零度）：冰冻状态下伤害加深
+ *    - elemental_fusion（元素聚变）：三元素共存时触发爆炸
  *
  * 使用方式：通过 window.DamageCalc 访问，或直接 import。
  * 所有方法均以 mixin 形式设计，需绑定到 Game 实例（this）上调用。
@@ -128,6 +133,12 @@ export const DamageCalc = {
      * @method combat_lightning_triggerChain
      * @description 触发连锁闪电效果（修复单体报错版）。
      *   使用距离加权随机选择目标，并递归触发连锁，最多 100 次。
+     *
+     *   [词条 Hook] 已注入以下词条效果：
+     *   - thunderstorm（雷暴之语）：提升 decayFactor，减少伤害衰减
+     *   - thunder_scatter（雷霆散射）：成功触发后，按概率额外触发一次闪电链
+     *   - elemental_fusion（元素聚变）：命中后检查三元素状态，触发聚变爆炸
+     *
      * @param {Enemy} sourceEnemy - 闪电来源敌人
      * @param {number} dmg - 当前段伤害
      * @param {Array} history - 已命中敌人历史（防止来回跳）
@@ -196,23 +207,70 @@ export const DamageCalc = {
                     this.spawn_createParticle(selected.pos.x, selected.pos.y, '#c084fc', 'spark');
                 }
 
-                // 计算下一次伤害
-                const decayFactor = lightCfg.damageDecayBase + (lightCfg.damageDecayPerLevel * level);
+                // ─────────────────────────────────────────────────────────────
+                // [词条 Hook] 雷暴之语（thunderstorm）
+                // 效果：提升闪电链的伤害衰减系数（decayBonus 越大，衰减越少）
+                // 公式：decayFactor = base + perLevel * level + thunderstorm.params.decayBonus
+                // ─────────────────────────────────────────────────────────────
+                let decayFactor = lightCfg.damageDecayBase + (lightCfg.damageDecayPerLevel * level);
+                const thunderstormEffect = this.activeRunewordEffects && this.activeRunewordEffects['thunderstorm'];
+                if (thunderstormEffect) {
+                    // decayBonus 增加衰减系数（越接近 1.0 衰减越少）
+                    // 限制最大值为 0.95，防止无限伤害
+                    decayFactor = Math.min(0.95, decayFactor + (thunderstormEffect.params.decayBonus || 0));
+                }
+
                 const nextDmg = Math.max(1, Math.floor(dmg * decayFactor));
                 // 伤害与状态：提升温度 (公式：闪电层数 + 连锁次数/3)
                 const chainCountInner = history.length;
                 selected.applyTemp(level + chainCountInner / 3);
+
+                // [词条 Hook] 元素聚变（elemental_fusion）
+                // 标记该敌人本回合被闪电命中（用于元素聚变的三元素判断）
+                selected._lightningHitThisRound = true;
 
                 const result = selected.takeDamage(dmg);
                 this.combat_recordDamage(result.actualDamage, 'lightning', 'main', shotId);
 
                 if (result.killed) this.spawn_addScore(selected.maxHp);
 
+                // ─────────────────────────────────────────────────────────────
+                // [词条 Hook] 元素聚变（elemental_fusion）
+                // 效果：当敌人同时承受火、冰、雷三种状态时，引发元素聚变爆炸
+                // 判断条件：
+                //   - 火：enemy.temp > 34（达到燃烧阈值）
+                //   - 冰：enemy.temp < -34（达到冰冻阈值）
+                //   - 雷：enemy._lightningHitThisRound === true
+                // 注意：火和冰的 temp 互斥，但闪电命中后会提升 temp，
+                //       所以实际触发条件是：_lightningHitThisRound && (temp > 34 || temp < -34)
+                //       即：闪电命中 + 火状态，或 闪电命中 + 冰状态（但冰会被闪电的温度提升抵消）
+                //       更合理的判断：_lightningHitThisRound && _pyroHitThisRound && _cryoHitThisRound
+                // ─────────────────────────────────────────────────────────────
+                this.combat_runeword_elementalFusion_check(selected, dmg, shotId);
+
                 // 递归
                 history.push(selected);
                 // 限制最大连锁次数防止死循环 (增加到 100 次)
                 if (history.length < 100) {
                     this.combat_lightning_triggerChain(selected, nextDmg, history, level, shotId);
+                }
+
+                // ─────────────────────────────────────────────────────────────
+                // [词条 Hook] 雷霆散射（thunder_scatter）
+                // 效果：每次成功触发闪电链时，有概率额外释放一条同属性闪电链
+                // 概率：extraChains 次额外触发（每次独立判定 50% 概率）
+                // ─────────────────────────────────────────────────────────────
+                const thunderScatterEffect = this.activeRunewordEffects && this.activeRunewordEffects['thunder_scatter'];
+                if (thunderScatterEffect && selected.active) {
+                    const extraChains = Math.floor(thunderScatterEffect.params.extraChains || 0);
+                    for (let i = 0; i < extraChains; i++) {
+                        // 每次额外触发有 50% 概率实际触发，防止过于强力
+                        if (Math.random() < 0.5) {
+                            // 额外闪电链使用相同的 dmg 和 level，但独立的 history
+                            const extraHistory = [...history];
+                            this.combat_lightning_triggerChain(selected, nextDmg, extraHistory, level, shotId);
+                        }
+                    }
                 }
             }, delay);
 
@@ -249,6 +307,106 @@ export const DamageCalc = {
         this._lastChromaticTime = now;
         // [Task 3.2] 改为 EventBus 事件，由 ui_system.js 监听并操作 CRT overlay DOM
         eventBus.emit(EVENT_TYPES.UI_CHROMATIC_ABERRATION, { effectClass, duration: 500 });
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 5. [词条 Hook] 绝对零度（absolute_zero）辅助方法
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * @method combat_runeword_absoluteZero_calcAmp
+     * @description [词条 Hook] 绝对零度（absolute_zero）
+     *   计算敌人当前的伤害加深系数。
+     *
+     *   效果：敌人处于冰冻状态时（temp <= -34），每次受到物理伤害，
+     *         令该敌人本回合受到的所有伤害加深。
+     *   实现：维护 enemy._absoluteZeroHitCount 计数器，
+     *         每次命中时累加，伤害加深 = hitCount * damageAmp。
+     *
+     * @param {Enemy} enemy - 目标敌人
+     * @returns {number} 伤害加深系数（0 表示不加深）
+     */
+    combat_runeword_absoluteZero_calcAmp(enemy) {
+        const effect = this.activeRunewordEffects && this.activeRunewordEffects['absolute_zero'];
+        if (!effect) return 0;
+
+        // 判断敌人是否处于冰冻状态（temp <= -34 或已被标记为本回合冰冻）
+        const isFrozen = enemy.temp <= -34 || enemy.isFrozenCurrentTurn;
+        if (!isFrozen) return 0;
+
+        // 累加命中计数
+        if (!enemy._absoluteZeroHitCount) enemy._absoluteZeroHitCount = 0;
+        enemy._absoluteZeroHitCount++;
+
+        // 计算伤害加深系数：hitCount * damageAmp
+        const damageAmp = effect.params.damageAmp || 0;
+        return enemy._absoluteZeroHitCount * damageAmp;
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 6. [词条 Hook] 元素聚变（elemental_fusion）触发检查
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * @method combat_runeword_elementalFusion_check
+     * @description [词条 Hook] 元素聚变（elemental_fusion）
+     *   当敌人同时承受火、冰、雷三种状态时，引发元素聚变爆炸。
+     *
+     *   触发条件：
+     *   - 火状态：enemy._pyroHitThisRound === true（本回合被火属性命中）
+     *   - 冰状态：enemy._cryoHitThisRound === true（本回合被冰属性命中）
+     *   - 雷状态：enemy._lightningHitThisRound === true（本回合被闪电命中）
+     *
+     *   爆炸伤害：enemy.maxHp * trueDamageRatio（真实伤害，无视护盾）
+     *
+     * @param {Enemy} enemy - 目标敌人
+     * @param {number} baseDmg - 触发伤害（用于计算爆炸伤害）
+     * @param {number|null} shotId - 子弹ID
+     */
+    combat_runeword_elementalFusion_check(enemy, baseDmg, shotId) {
+        const effect = this.activeRunewordEffects && this.activeRunewordEffects['elemental_fusion'];
+        if (!effect) return;
+        if (!enemy || !enemy.active) return;
+
+        // 检查三元素状态是否同时存在
+        const hasPyro = !!enemy._pyroHitThisRound;
+        const hasCryo = !!enemy._cryoHitThisRound;
+        const hasLightning = !!enemy._lightningHitThisRound;
+
+        if (!hasPyro || !hasCryo || !hasLightning) return;
+
+        // 防止同一帧多次触发（冷却 500ms）
+        const now = Date.now();
+        if (enemy._elementalFusionLastTrigger && now - enemy._elementalFusionLastTrigger < 500) return;
+        enemy._elementalFusionLastTrigger = now;
+
+        // 计算聚变爆炸伤害（基于敌人最大血量的百分比）
+        const trueDamageRatio = effect.params.trueDamageRatio || 0.10;
+        const fusionDmg = Math.max(1, Math.floor(enemy.maxHp * trueDamageRatio));
+
+        // 视觉特效：三色混合爆炸（橙 + 青 + 紫）
+        this.spawn_createShockwave(enemy.pos.x, enemy.pos.y, '#f0abfc'); // 紫粉色冲击波
+        for (let i = 0; i < 6; i++) this.spawn_createParticle(enemy.pos.x, enemy.pos.y, '#f97316', 'spark'); // 火
+        for (let i = 0; i < 6; i++) this.spawn_createParticle(enemy.pos.x, enemy.pos.y, '#06b6d4', 'shard'); // 冰
+        for (let i = 0; i < 6; i++) this.spawn_createParticle(enemy.pos.x, enemy.pos.y, '#c084fc', 'spark'); // 雷
+        audio.playExplosion && audio.playExplosion();
+
+        // 造成真实伤害（直接调用 takeDamage，不经过护盾）
+        const fusionResult = enemy.takeDamage(fusionDmg);
+        this.combat_recordDamage(fusionResult.actualDamage, 'lightning', 'main', shotId);
+        this.spawn_createFloatingText(
+            enemy.pos.x,
+            enemy.pos.y - 40,
+            `⚡🔥❄️ FUSION! ${Math.ceil(fusionResult.actualDamage)}`,
+            '#f0abfc'
+        );
+
+        if (fusionResult.killed) this.spawn_addScore(enemy.maxHp);
+
+        // 重置三元素状态标记（聚变后需要重新积累）
+        enemy._pyroHitThisRound = false;
+        enemy._cryoHitThisRound = false;
+        enemy._lightningHitThisRound = false;
     },
 
 };
