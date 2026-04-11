@@ -508,12 +508,7 @@ export const spawn_system = {
         if (resourceGain > 0) {
             // 保留局内货币逻辑，删除 meta_addCurrency 调用
             this.runCurrency += resourceGain;
-            // 飞行特效目标改为顶部符文计数显示
-            const runeEl = document.getElementById('rune-count-display');
-            if (runeEl) {
-                const rect = runeEl.getBoundingClientRect();
-                this.ui_playResourceFlyEffect(rect.left + rect.width/2, rect.top + rect.height/2, resourceGain);
-            }
+            // [移除] 飞行特效：runCurrency 仅在结算时转换为符文碎片，此处触发特效无意义
         } 
         this.scoreMultiplier = parseFloat((this.scoreMultiplier + 0.2).toFixed(1)); // 乘数增加 0.2
         this.ui_updateMultiplierUI(); 
@@ -867,7 +862,7 @@ export const spawn_system = {
                 
                 // [META] 获得局内货币（删除 meta_addCurrency 调用）
                 this.runCurrency += 1;
-                this.ui_playResourceFlyEffect(targetX, targetY, 1);
+                // [移除] 飞行特效：runCurrency 仅在结算时转换为符文碎片，此处触发特效无意义
                 
                 // 音效
                 const progress = Math.min(1, this.currentSession.currentHits / this.currentSession.nextTriggerThreshold);
