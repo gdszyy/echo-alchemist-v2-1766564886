@@ -1481,13 +1481,22 @@
     <div id="phase-rune-launcher" class="ui-overlay" style="display: none; background: #020617; pointer-events: auto; z-index: 300;">
         <div class="w-full max-w-md h-full flex flex-col p-6 overflow-y-auto">
             <!-- 顶部导航 -->
-            <div class="flex justify-between items-center mb-6">
+            <div class="flex justify-between items-center mb-4">
                 <button onclick="game.ui_closeRuneLauncher()" class="text-slate-400 hover:text-white transition-colors">
                     <span class="text-2xl">⬅️</span>
                 </button>
                 <h2 class="text-2xl font-[Cinzel] text-purple-100 tracking-widest">符文發射器</h2>
                 <div class="w-8"></div>
             </div>
+
+            <!-- Tab 导航 -->
+            <div class="flex gap-2 mb-5 border-b border-slate-700/50 pb-3">
+                <button id="rune-tab-launcher" onclick="game.ui_switchRuneTab('launcher')" class="flex-1 py-2 px-3 rounded-lg text-xs font-bold tracking-wider transition-all duration-200 bg-purple-700/60 text-purple-100 border border-purple-500/60">⚡ 發射器</button>
+                <button id="rune-tab-codex" onclick="game.ui_switchRuneTab('codex')" class="flex-1 py-2 px-3 rounded-lg text-xs font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">📖 詞條圖鑑</button>
+            </div>
+
+            <!-- 发射器内容区域 -->
+            <div id="rune-launcher-content">
 
             <!-- 符文网格区域 -->
             <div class="mb-6">
@@ -1557,6 +1566,20 @@
                     <!-- 由 JS 动态生成：包括基础属性（蓝色标签）和词条共鸣（金色标签） -->
                 </div>
             </div>
+
+            </div><!-- end #rune-launcher-content -->
+
+            <!-- 词条图鉴面板 -->
+            <div id="rune-codex-panel" class="hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="text-xs text-slate-400/60 tracking-widest uppercase">詞條圖鑑</div>
+                    <div class="text-xs text-purple-300/70">已發現 <span id="rune-codex-discovered-count" class="font-bold text-purple-200">0</span> / <span id="rune-codex-total-count" class="text-slate-400">0</span></div>
+                </div>
+                <div id="rune-codex-list" class="space-y-3">
+                    <!-- 由 JS 动态生成 -->
+                </div>
+            </div>
+
         </div>
 
         <!-- 符文选择弹出层 -->

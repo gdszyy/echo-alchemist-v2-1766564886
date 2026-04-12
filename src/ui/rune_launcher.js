@@ -292,6 +292,19 @@ export const rune_launcher_system = {
         });
         this.activeRunewordEffects = newEffects;
 
+        // 2.5 记录已发现词条（写入存档）
+        if (activatedRunewords.length > 0 && this.saveData) {
+            if (!this.saveData.discoveredRunewords) this.saveData.discoveredRunewords = [];
+            let newDiscovery = false;
+            activatedRunewords.forEach(rw => {
+                if (rw.id && !this.saveData.discoveredRunewords.includes(rw.id)) {
+                    this.saveData.discoveredRunewords.push(rw.id);
+                    newDiscovery = true;
+                }
+            });
+            if (newDiscovery) this.sys_saveData();
+        }
+
         // 3. 高亮激活词条对应的格子
         for (let i = 0; i < 9; i++) {
             const cell = document.getElementById(`rune-cell-${i}`);
@@ -369,50 +382,32 @@ export const rune_launcher_system = {
 
             const card = document.createElement('div');
             card.className = [
-                'flex items-start gap-3 p-3',
-                'bg-purple-900/20 border border-purple-700/40 rounded-xl',
+                'flex items-center gap-2 p-2 rounded-xl cursor-pointer select-none transition-all duration-150',
+                isSelected
+                    ? 'bg-purple-700/40 border-2 border-purple-400/80 shadow-[0_0_6px_rgba(168,85,247,0.5)]'
+                    : 'bg-slate-800/60 border-2 border-slate-700/40 hover:border-purple-600/50',
             ].join(' ');
-            // [Agent D] 根据 level 动态计算效果数值描述
-            const level = rw.level || 1;
-            const bp = rw.baseParams || {};
-            const lp = rw.perLevelParams || {};
-            const calcParam = (key) => (bp[key] || 0) + (lp[key] || 0) * (level - 1);
-            let dynamicDesc = '';
-            if (rw.effectId === 'meltdown') {
-                const bonus = Math.round(calcParam('damageBonus') * 100);
-                dynamicDesc = `火焰/过热伤害 +${bonus}%`;
-            } else if (rw.effectId === 'irradiation') {
-                const amp = Math.round(calcParam('damageAmp') * 100);
-                dynamicDesc = `激光累积伤害加深 +${amp}%/次`;
-            } else if (rw.effectId === 'blazing_beam') {
-                const temp = calcParam('tempIncrease');
-                dynamicDesc = `激光每次命中升温 +${temp}`;
-            } else if (rw.effectId === 'flame_sword') {
-                const chance = Math.round(calcParam('triggerChance') * 100);
-                const ratio = Math.round(calcParam('damageRatio') * 100);
-                dynamicDesc = `穿透触发率 ${chance}%，剑光伤害 ${ratio}%`;
-            } else if (rw.effectId === 'lightning_shield') {
-                const chance = Math.round(calcParam('triggerChance') * 100);
-                const ratio = Math.round(calcParam('damageRatio') * 100);
-                dynamicDesc = `弹跳触发率 ${chance}%，静电场伤害 ${ratio}%`;
-            } else if (rw.effectId === 'blade_storm') {
-                const radius = calcParam('radius');
-                const ratio = Math.round(calcParam('damageRatio') * 100);
-                const interval = Math.max(0.1, calcParam('interval')).toFixed(1);
-                dynamicDesc = `范围 ${radius}px，伤害 ${ratio}%，间隔 ${interval}s`;
-            }
-            const statsText = rw.stats
-                ? Object.entries(rw.stats).map(([k, v]) => `${k}+${v}`).join(', ')
-                : '';
             card.innerHTML = `
-                <div class="flex-1">
-                    <div class="text-sm font-bold text-purple-200">${rw.name} <span class="text-xs text-amber-400 font-normal">Lv.${level}</span></div>
-                    <div class="text-[10px] text-slate-400 mt-0.5">${rw.effect_desc || ''}</div>
-                    ${dynamicDesc ? `<div class="text-[10px] text-emerald-400 mt-1">${dynamicDesc}</div>` : ''}
-                    ${statsText ? `<div class="text-[10px] text-amber-300 mt-1">${statsText}</div>` : ''}
+                <div class="w-10 h-10 flex items-center justify-center bg-purple-950/50 rounded-lg border border-purple-500/30 text-xl shrink-0">
+                    ${runeDef.icon || '🔮'}
                 </div>
-                <span class="text-green-400 text-xs font-bold whitespace-nowrap">激活</span>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-bold text-purple-200 truncate">${runeDef.name}</span>
+                        <span class="text-[9px] px-1 py-0.5 rounded bg-amber-900/40 text-amber-400 font-mono shrink-0">Lv.${runeLevel}</span>
+                    </div>
+                    <div class="text-[9px] text-slate-500 truncate">${runeDef.element}</div>
+                </div>
+                ${isSelected ? '<span class="text-purple-300 text-sm shrink-0">✓</span>' : ''}
             `;
+            card.addEventListener('click', () => {
+                if (this._selectedRuneIndices.has(idx)) {  // [Mixin 正常用法：读取 Game 实例状态]
+                    this._selectedRuneIndices.delete(idx);  // [Mixin 正常用法：读取 Game 实例状态]
+                } else {
+                    this._selectedRuneIndices.add(idx);  // [Mixin 正常用法：读取 Game 实例状态]
+                }
+                this._ui_updateRuneInventoryDisplay();
+            });
             container.appendChild(card);
         });
 
@@ -704,6 +699,251 @@ export const rune_launcher_system = {
         this._runeActionResultTimer = setTimeout(() => {
             el.classList.add('hidden');
         }, 3000);
+    },
+
+
+    // ==================== 词条图鉴 ====================
+
+    /**
+     * ui_switchRuneTab - 切换符文发射器面板的 Tab
+     * @param {'launcher'|'codex'} tab - 目标 Tab
+     */
+    ui_switchRuneTab(tab) {
+        const launcherContent = document.getElementById('rune-launcher-content');
+        const codexPanel = document.getElementById('rune-codex-panel');
+        const tabLauncher = document.getElementById('rune-tab-launcher');
+        const tabCodex = document.getElementById('rune-tab-codex');
+        if (!launcherContent || !codexPanel) return;
+
+        const activeClass = ['bg-purple-700/60', 'text-purple-100', 'border-purple-500/60'];
+        const inactiveClass = ['bg-slate-800/60', 'text-slate-400', 'border-slate-700/40'];
+
+        if (tab === 'launcher') {
+            launcherContent.classList.remove('hidden');
+            codexPanel.classList.add('hidden');
+            if (tabLauncher) { tabLauncher.classList.add(...activeClass); tabLauncher.classList.remove(...inactiveClass); }
+            if (tabCodex) { tabCodex.classList.remove(...activeClass); tabCodex.classList.add(...inactiveClass); }
+        } else {
+            launcherContent.classList.add('hidden');
+            codexPanel.classList.remove('hidden');
+            if (tabCodex) { tabCodex.classList.add(...activeClass); tabCodex.classList.remove(...inactiveClass); }
+            if (tabLauncher) { tabLauncher.classList.remove(...activeClass); tabLauncher.classList.add(...inactiveClass); }
+            this.ui_renderRuneCodex();
+        }
+    },
+
+
+    /**
+     * ui_renderRuneCodex - 渲染词条图鉴面板
+     * 已发现的词条显示完整信息，未发现的显示隐藏卡片
+     */
+    ui_renderRuneCodex() {
+        const list = document.getElementById('rune-codex-list');
+        const discoveredCountEl = document.getElementById('rune-codex-discovered-count');
+        const totalCountEl = document.getElementById('rune-codex-total-count');
+        if (!list) return;
+
+        const discovered = (this.saveData && this.saveData.discoveredRunewords) ? this.saveData.discoveredRunewords : [];  // [Mixin 正常用法：读取 Game 实例状态]
+        const total = RUNEWORD_DB.length;
+        const discoveredCount = RUNEWORD_DB.filter(rw => discovered.includes(rw.id)).length;
+
+        if (discoveredCountEl) discoveredCountEl.textContent = discoveredCount;
+        if (totalCountEl) totalCountEl.textContent = total;
+
+        list.innerHTML = '';
+
+        RUNEWORD_DB.forEach(rw => {
+            const isDiscovered = discovered.includes(rw.id);
+            const card = document.createElement('div');
+
+            if (!isDiscovered) {
+                // 未发现：显示隐藏卡片
+                card.className = 'bg-slate-900/60 border border-slate-700/30 rounded-xl p-4 opacity-60';
+                // 显示 pattern 中符文的元素类型作为提示
+                const patternHint = rw.pattern.map(runeId => {
+                    const rd = RUNE_DB.find(r => r.id === runeId);
+                    return rd ? rd.icon : '?';
+                }).join(' ');
+                card.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 flex items-center justify-center bg-slate-800/80 rounded-lg border border-slate-600/30 text-xl">
+                            <span class="text-slate-500">🔒</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-sm font-bold text-slate-500 tracking-wider">??? 未发现</div>
+                            <div class="text-[10px] text-slate-600 mt-1">符文组合提示: ${patternHint}</div>
+                        </div>
+                        <span class="text-[10px] text-slate-600 bg-slate-800/60 px-2 py-1 rounded-lg">尚未解锁</span>
+                    </div>
+                `;
+            } else {
+                // 已发现：显示完整信息，默认展示 Lv.1 效果
+                const defaultLevel = 1;
+                card.className = 'bg-purple-900/20 border border-purple-700/40 rounded-xl p-4';
+                card.dataset.runewordId = rw.id;
+
+                const patternIcons = rw.pattern.map(runeId => {
+                    const rd = RUNE_DB.find(r => r.id === runeId);
+                    return rd ? `<span title="${rd.name}">${rd.icon}</span>` : '?';
+                }).join('<span class="text-slate-600 mx-0.5">→</span>');
+
+                const dynamicDesc = this._ui_calcRunewordDynamicDesc(rw, defaultLevel);
+
+                // 构建等级 Tab 按鈕区域
+                const maxLevel = 3;
+                const tabBtns = Array.from({ length: maxLevel }, (_, i) => {
+                    const lv = i + 1;
+                    const isActive = lv === defaultLevel;
+                    return `<button
+                        class="codex-lv-tab px-2 py-0.5 rounded text-[10px] font-bold transition-all duration-150 ${
+                            isActive
+                                ? 'bg-amber-600/70 text-amber-100 border border-amber-400/60'
+                                : 'bg-slate-800/60 text-slate-500 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-300'
+                        }"
+                        data-runeword-id="${rw.id}"
+                        data-level="${lv}"
+                        onclick="game.ui_switchRunewordCodexLevel('${rw.id}', ${lv})"
+                    >Lv.${lv}</button>`;
+                }).join('');
+
+                card.innerHTML = `
+                    <div class="flex items-start gap-3 mb-3">
+                        <div class="w-10 h-10 flex items-center justify-center bg-purple-950/60 rounded-lg border border-purple-500/40 text-xl shrink-0">
+                            ✨
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-sm font-bold text-purple-100">${rw.name}</span>
+                                <span class="text-[10px] text-slate-400 bg-slate-800/60 px-1.5 py-0.5 rounded">${rw.effect_desc.match(/【(.+?)】/)?.[1] || ''}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-400 mt-1">符文组合: ${patternIcons}</div>
+                        </div>
+                    </div>
+                    <div class="text-[10px] text-slate-300 leading-relaxed mb-3">${rw.effect_desc}</div>
+                    <div id="codex-desc-${rw.id}" class="text-[10px] text-emerald-400 font-bold mb-3 min-h-[16px]">${dynamicDesc}</div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] text-slate-500 mr-1">等级:</span>
+                        ${tabBtns}
+                    </div>
+                `;
+            }
+
+            list.appendChild(card);
+        });
+    },
+
+
+    /**
+     * ui_switchRunewordCodexLevel - 切换图鉴中某个词条的展示等级
+     * @param {string} runewordId - 词条 ID
+     * @param {number} level - 目标等级 (1-3)
+     */
+    ui_switchRunewordCodexLevel(runewordId, level) {
+        const rw = RUNEWORD_DB.find(r => r.id === runewordId);
+        if (!rw) return;
+
+        // 更新动态效果描述
+        const descEl = document.getElementById(`codex-desc-${runewordId}`);
+        if (descEl) {
+            descEl.textContent = this._ui_calcRunewordDynamicDesc(rw, level);
+        }
+
+        // 更新 Tab 按鈕样式
+        const allTabs = document.querySelectorAll(`.codex-lv-tab[data-runeword-id="${runewordId}"]`);
+        allTabs.forEach(btn => {
+            const btnLevel = parseInt(btn.dataset.level);
+            if (btnLevel === level) {
+                btn.className = btn.className
+                    .replace(/bg-slate-800\/60|text-slate-500|border-slate-700\/40|hover:bg-slate-700\/60|hover:text-slate-300/g, '')
+                    .trim();
+                btn.classList.add('bg-amber-600/70', 'text-amber-100', 'border-amber-400/60');
+            } else {
+                btn.classList.remove('bg-amber-600/70', 'text-amber-100', 'border-amber-400/60');
+                btn.classList.add('bg-slate-800/60', 'text-slate-500', 'border-slate-700/40');
+            }
+        });
+    },
+
+
+    /**
+     * _ui_calcRunewordDynamicDesc - 根据词条和等级计算动态效果描述
+     * @param {Object} rw - RUNEWORD_DB 中的词条对象
+     * @param {number} level - 目标等级 (1-3)
+     * @returns {string} 动态效果描述文本
+     * @private
+     */
+    _ui_calcRunewordDynamicDesc(rw, level) {
+        const bp = rw.baseParams || {};
+        const lp = rw.perLevelParams || {};
+        const calc = (key) => (bp[key] || 0) + (level - 1) * (lp[key] || 0);
+
+        switch (rw.effectId) {
+            case 'meltdown': {
+                const bonus = Math.round(calc('damageBonus') * 100);
+                return `火焰燃烧 / 过热爆炸最终伤害 +${bonus}%`;
+            }
+            case 'absolute_zero': {
+                const amp = (calc('damageAmp') * 100).toFixed(1);
+                return `冰冻状态下，每次物理伤害使本回全部伤害加深 +${amp}%`;
+            }
+            case 'frost_nova': {
+                const bounces = calc('requiredBounces');
+                const radius = calc('radius');
+                const ratio = Math.round(calc('damageRatio') * 100);
+                const tempDrop = calc('tempDrop');
+                return `每弹跳 ${bounces} 次释放冰霜新星，范围 ${radius}px，冒冰伤害 ${ratio}%，降温 ${tempDrop}`;
+            }
+            case 'thunderstorm': {
+                const decay = Math.round(calc('decayBonus') * 100);
+                return `闪电链伤害衰减系数提升 +${decay}%`;
+            }
+            case 'thunder_scatter': {
+                const chains = calc('extraChains');
+                return `闪电链触发时，额外释放 ${chains} 条闪电链`;
+            }
+            case 'kinetic_surge': {
+                const flat = calc('flatDamage');
+                return `每次弹跳伤害固定增加 +${flat}`;
+            }
+            case 'irradiation': {
+                const amp = Math.round(calc('damageAmp') * 100);
+                return `激光累积照射同一敌人，受到的伤害加深 +${amp}%/次`;
+            }
+            case 'flame_sword': {
+                const chance = Math.round(calc('triggerChance') * 100);
+                const ratio = Math.round(calc('damageRatio') * 100);
+                const tempRatio = Math.round(calc('tempDamageRatio') * 100);
+                return `穿透触发率 ${chance}%，剑光伤害 ${ratio}%，附加火焰伤害 ${tempRatio}%`;
+            }
+            case 'armor_piercing_meteor': {
+                const bonus = Math.round(calc('damageBonus') * 100);
+                return bonus > 0
+                    ? `散射子弹丸继承 100% 穿透层数，额外伤害 +${bonus}%`
+                    : `散射子弹丸继承 100% 穿透层数`;
+            }
+            case 'blazing_beam': {
+                const temp = calc('tempIncrease');
+                return `激光命中时每 0.5s 额外升温 +${temp}`;
+            }
+            case 'lightning_shield': {
+                const chance = Math.round(calc('triggerChance') * 100);
+                const ratio = Math.round(calc('damageRatio') * 100);
+                const stacks = calc('shockStacks');
+                return `弹跳触发率 ${chance}%，静电场伤害 ${ratio}%，附加 ${stacks} 层闪电`;
+            }
+            case 'blade_storm': {
+                const radius = calc('radius');
+                const ratio = Math.round(calc('damageRatio') * 100);
+                const interval = Math.max(0.1, calc('interval')).toFixed(1);
+                return `范围 ${radius}px，剑光斩击伤害 ${ratio}%，间隔 ${interval}s`;
+            }
+            case 'elemental_fusion': {
+                const ratio = Math.round(calc('trueDamageRatio') * 100);
+                return `元素聚变爆炸，真实伤害 = 敌人当前血量 × ${ratio}%`;
+            }
+            default:
+                return '';
+        }
     },
 
 

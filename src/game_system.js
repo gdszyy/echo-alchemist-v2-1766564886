@@ -209,11 +209,13 @@ export const game_system = {
                 const parsed = JSON.parse(saved);
                 // 合并而非覆盖，确保新字段有默认值
                 this.saveData = Object.assign(
-                    { currency: 0, runeFragments: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0, runeInventory: [] },
+                    { currency: 0, runeFragments: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0, runeInventory: [], discoveredRunewords: [] },
                     parsed
                 );
                 // 确保 runeInventory 字段存在
                 if (!this.saveData.runeInventory) this.saveData.runeInventory = [];
+                // 确保 discoveredRunewords 字段存在（存档升级兼容）
+                if (!this.saveData.discoveredRunewords) this.saveData.discoveredRunewords = [];
             } catch (e) {
                 console.error('[sys_loadSaveData] Save load failed:', e);
             }

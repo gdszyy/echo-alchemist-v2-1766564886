@@ -72,10 +72,33 @@ globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js", "src/c
 - `themeWeights` 键为 RUNE_DB 中的 `element` 字段，在 `loot_calcRuneDrop` 第三层抽取中放大对应属性符文的掉落权重。
 - Boss 实体需将对应的 `BOSS_DB` 条目引用为 `enemy.bossConfig`，供死亡掉落逻辑读取。
 
-## 7. 掉落权重边际递减 (Marginal Decay)
-### 7.1 触发时机
+## 7. 词条图鉴 (Runeword Codex)
+
+### 7.1 功能说明
+- 在符文发射器面板顶部新增 Tab 导航，分为「⚡ 發射器」和「📖 詞條圖鑑」两个 Tab。
+- 图鉴展示所有 13 个词条的卡片，已发现的展示完整信息，未发现的显示「???」隐藏卡片（仅显示符文组合图标提示）。
+- 已发现卡片底部提供 Lv.1 / Lv.2 / Lv.3 Tab 切换，动态计算并展示对应等级的效果数值。
+
+### 7.2 发现机制
+- 词条被激活时（`ui_updateRuneGrid` 中）自动将词条 ID 写入 `saveData.discoveredRunewords: string[]`。
+- 存档升级兼容：`sys_loadSaveData` 中确保旧存档没有该字段时自动初始化为空数组。
+
+### 7.3 新增函数（`src/ui/rune_launcher.js`）
+
+| 函数 | 说明 |
+|---|---|
+| `ui_switchRuneTab(tab)` | 切换发射器 / 图鉴 Tab，`tab` 为 `'launcher'` 或 `'codex'` |
+| `ui_renderRuneCodex()` | 渲染图鉴内容，切换到图鉴 Tab 时自动调用 |
+| `ui_switchRunewordCodexLevel(runewordId, level)` | 切换单个词条卡片的展示等级 |
+| `_ui_calcRunewordDynamicDesc(rw, level)` | 根据词条对象和等级返回动态效果描述字符串 |
+
+### 7.4 存档字段
+- `saveData.discoveredRunewords: string[]` —— 已发现词条的 ID 列表，持久化到 localStorage。
+
+## 8. 掉落权重边际递减 (Marginal Decay)
+### 8.1 触发时机
 - 计算符文掉落权重时（`loot_system.js` 中的 `_calcBuildVector`）。
-### 7.2 机制
+### 8.2 机制
 - 统计玩家近期伤害占比 `buildVector` 时，如果某一属性的伤害占比超过阈值（默认 60%），则对超出部分进行衰减。
 - 衰减系数为 0.5，即超出部分减半。
 - 衰减后重新归一化 `buildVector`，防止玩家过度依赖单一属性导致掉落过于单一。
