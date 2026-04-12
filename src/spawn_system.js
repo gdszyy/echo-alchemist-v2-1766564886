@@ -7,7 +7,7 @@ import {
     Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, showToast, 
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
 } from './entities.js';
-import { UIManager, TrainingGround, TruthBook } from './systems.js';
+import { UIManager, TrainingGround, TruthBook, TRUTH_BOOK_DATA } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus } from './event_bus.js';
 
@@ -522,12 +522,31 @@ export const spawn_system = {
     },
 
 /**
+     * [SPAWN] 生成弹珠选择界面的候选弹珠卡片，并初始化预览面板。
      */
     spawn_generateMarbleOptions() { 
         const container = document.getElementById('marble-selection-grid'); 
         container.innerHTML = ''; 
         this.marblesPool = []; 
-        
+
+        // 构建真理之书属性说明的快速查找表
+        const truthBookMap = {};
+        if (TRUTH_BOOK_DATA && TRUTH_BOOK_DATA.attributes) {
+            TRUTH_BOOK_DATA.attributes.forEach(entry => {
+                truthBookMap[entry.id] = entry;
+            });
+        }
+
+        // 各弹珠类型的补充说明（真理之书中未收录的类型）
+        const supplementDesc = {
+            'white':     { icon: '⚪', tags: ['基礎', '通用'], desc: '純淨彈珠，不帶任何屬性。在研磨階段可同化普通鉤釘，使其轉化為任意屬性。是最基礎的彈珠形態。' },
+            'damage':    { icon: '⚔️', tags: ['增幅', '強化'], desc: '增幅彈珠，直接提升子彈的基礎傷害數值。每層增幅屬性為戰鬥階段的子彈增加固定傷害加成。' },
+            'rainbow':   { icon: '🌈', tags: ['特殊', '分裂'], desc: '七彩彈珠，碰到鉤釘時會分裂為三顆子彈（彈性、穿透、散射），同時將三種屬性全部加入收集列表。' },
+            'resonance': { icon: '🔔', tags: ['特殊', '共鳴'], desc: '共鳴彈珠，每次碰撞普通鉤釘時有概率額外觸發能量球，加速連擊充能。飛劍命中時觸發共鳴追加傷害。' },
+            'matryoshka':{ icon: '🪆', tags: ['特殊', '連鎖'], desc: '套娃彈珠，子彈消失時會分裂出下一顆子彈，形成連鎖效果。外層子彈消失後，內層子彈繼承並擴展傷害。' },
+            'explosive': { icon: '🧨', tags: ['特殊', 'AOE'], desc: '爆破彈珠，子彈接觸敵人時引發劇烈爆炸，對周圍所有敵人造成大範圍傷害。' },
+        };
+
         // 定義屬性到彈珠定義的映射
         const typeMapping = {
             laser: () => new MarbleDefinition('laser'),
@@ -536,14 +555,12 @@ export const spawn_system = {
             rainbow: () => new MarbleDefinition('rainbow'),
             matryoshka: () => new MarbleDefinition('matryoshka'),
             resonance: () => new MarbleDefinition('resonance'),
-            // 剩下的都是 colored 類型，但 subtype 不同
             bounce: () => new MarbleDefinition('bounce'),
             pierce: () => new MarbleDefinition('pierce'),
             scatter: () => new MarbleDefinition('scatter'),
             damage: () => new MarbleDefinition('damage'),
             cryo: () => new MarbleDefinition('cryo'),
             pyro: () => new MarbleDefinition('pyro')
-
         };
 
         for(let i=0; i < CONFIG.gameplay.selectionCount; i++) {
@@ -557,11 +574,9 @@ export const spawn_system = {
             
             // 2. 加權隨機機制
             if (!m) {
-                // 計算總權重
                 let total = 0;
                 const keys = Object.keys(this.unlockedWeights);
                 keys.forEach(k => total += this.unlockedWeights[k]);
-                
                 let r = Math.random() * total;
                 for (const key of keys) {
                     r -= this.unlockedWeights[key];
@@ -576,20 +591,143 @@ export const spawn_system = {
             if (!m) m = new MarbleDefinition('white');
             
             this.marblesPool.push(m); 
-            
-            // ... (創建 UI 卡片代碼保持不變) ...
-            const card = document.createElement('div'); 
-            card.className = 'select-card'; 
-            card.onclick = () => this.sys_toggleMarbleSelection(i, card); 
-            const icon = document.createElement('div'); 
-            icon.className = 'select-icon flex-shrink-0'; 
-            icon.style.background = m.getColor(); 
-            const name = document.createElement('div'); 
-            name.className = 'text-xs font-bold text-center text-slate-200 mt-2'; 
-            name.innerText = m.getName(); 
-            card.append(icon, name); 
-            container.appendChild(card); 
-        } 
+
+            // 获取该弹珠的说明数据（优先真理之书，其次补充说明）
+            const tbEntry = truthBookMap[m.type] || supplementDesc[m.type] || null;
+            const attrDisplay = CONFIG.ui.attributeDisplay[m.type] || {};
+            const marbleIcon = attrDisplay.icon || (tbEntry && tbEntry.icon) || '🔮';
+
+            // --- 创建升级版弹珠卡片 ---
+            const card = document.createElement('div');
+            card.className = 'select-card';
+            card.dataset.marbleIndex = i;
+
+            // 弹珠球体（带光泽效果）
+            const iconWrap = document.createElement('div');
+            iconWrap.className = 'select-icon-wrap';
+            const iconEl = document.createElement('div');
+            iconEl.className = 'select-icon';
+            iconEl.style.background = m.getColor();
+            // 光泽高光层
+            const shine = document.createElement('div');
+            shine.className = 'select-icon-shine';
+            iconEl.appendChild(shine);
+            // 属性 emoji 覆盖在球体上
+            const emojiEl = document.createElement('div');
+            emojiEl.className = 'select-icon-emoji';
+            emojiEl.textContent = marbleIcon;
+            iconWrap.append(iconEl, emojiEl);
+
+            // 弹珠名称
+            const nameEl = document.createElement('div');
+            nameEl.className = 'select-card-name';
+            nameEl.textContent = m.getName();
+
+            // 属性标签（取前2个 tag）
+            const tagsEl = document.createElement('div');
+            tagsEl.className = 'select-card-tags';
+            if (tbEntry && tbEntry.tags) {
+                tbEntry.tags.slice(0, 2).forEach(tag => {
+                    const t = document.createElement('span');
+                    t.className = 'select-card-tag';
+                    t.textContent = tag;
+                    tagsEl.appendChild(t);
+                });
+            }
+
+            card.append(iconWrap, nameEl, tagsEl);
+
+            // 点击：切换选中 + 锁定预览
+            card.onclick = () => {
+                this.sys_toggleMarbleSelection(i, card);
+                this.spawn_showMarblePreview(m, tbEntry, supplementDesc);
+            };
+
+            // hover：预览（不锁定）
+            card.addEventListener('mouseenter', () => {
+                this.spawn_showMarblePreview(m, tbEntry, supplementDesc);
+            });
+            card.addEventListener('touchstart', () => {
+                this.spawn_showMarblePreview(m, tbEntry, supplementDesc);
+            }, { passive: true });
+
+            container.appendChild(card);
+        }
+
+        // 初始化时显示第一个弹珠的预览
+        if (this.marblesPool.length > 0) {
+            const firstM = this.marblesPool[0];
+            const firstTbEntry = truthBookMap[firstM.type] || supplementDesc[firstM.type] || null;
+            this.spawn_showMarblePreview(firstM, firstTbEntry, supplementDesc);
+        }
+    },
+
+    /**
+     * [SPAWN] 在选择阶段下方的预览面板中展示弹珠的详细说明。
+     * @param {MarbleDefinition} m - 弹珠定义对象
+     * @param {object|null} tbEntry - 真理之书中的对应条目
+     * @param {object} supplementDesc - 补充说明字典
+     */
+    spawn_showMarblePreview(m, tbEntry, supplementDesc) {
+        const panel = document.getElementById('marble-preview-panel');
+        if (!panel) return;
+
+        const attrDisplay = CONFIG.ui.attributeDisplay[m.type] || {};
+        const marbleColor = m.getColor();
+        const marbleName = m.getName();
+        const marbleIcon = attrDisplay.icon || (tbEntry && tbEntry.icon) || '🔮';
+
+        // 获取说明文字（优先真理之书）
+        const desc = (tbEntry && tbEntry.desc) || (supplementDesc && supplementDesc[m.type] && supplementDesc[m.type].desc) || '暫無說明。';
+        const tags = (tbEntry && tbEntry.tags) || (supplementDesc && supplementDesc[m.type] && supplementDesc[m.type].tags) || [];
+
+        // 同步钉子/子弹效果说明
+        const pegEffects = {
+            'bounce':    '同化鉤釘：使普通鉤釘轉化為【彈性鉤釘】。兩顆彈性球相撞彈性鉤釘可突變為【風屬性】。',
+            'pierce':    '同化鉤釘：使普通鉤釘轉化為【穿透鉤釘】。兩顆穿透球相撞穿透鉤釘可突變為【飛劍鉤釘】。',
+            'scatter':   '同化鉤釘：使普通鉤釘轉化為【散射鉤釘】。子彈命中後向兩側分裂出小型散射彈。',
+            'cryo':      '同化鉤釘：使普通鉤釘轉化為【冰霜鉤釘】。子彈命中時降低敵人溫度，觸發易傷或凍結狀態。',
+            'pyro':      '同化鉤釘：使普通鉤釘轉化為【火焰鉤釘】。子彈命中時升高敵人溫度，觸發燃燒或過熱爆炸。',
+            'lightning': '同化鉤釘：使普通鉤釘轉化為【閃電鉤釘】（冰+火合成）。子彈命中時觸發連鎖閃電。',
+            'laser':     '同化鉤釘：使普通鉤釘轉化為【光球鉤釘】。子彈命中時發射激光束，可被護盾反射。',
+            'wind':      '同化鉤釘：使普通鉤釘轉化為【風屬性鉤釘】（彈性突變）。命中後生成風暴法陣持續攻擊。',
+            'explosive': '同化鉤釘：使普通鉤釘轉化為【爆破鉤釘】。子彈命中時引發大範圍爆炸傷害。',
+            'damage':    '同化鉤釘：使普通鉤釘轉化為【增幅鉤釘】。子彈命中後增加基礎傷害加成。',
+            'matryoshka':'同化鉤釘：使普通鉤釘轉化為【套娃鉤釘】。子彈消失時分裂出下一顆子彈。',
+            'white':     '純淨彈珠可同化任意普通鉤釘，使其轉化為對應屬性鉤釘。同化概率受局外升級影響。',
+            'rainbow':   '七彩彈珠不同化鉤釘，而是在碰到鉤釘時直接分裂為三顆屬性子彈（彈性/穿透/散射）。',
+            'resonance': '共鳴彈珠碰撞普通鉤釘時有概率額外觸發能量球，加速連擊充能閾值達成。',
+        };
+        const pegEffect = pegEffects[m.type] || '可同化普通鉤釘，使其轉化為對應屬性。';
+
+        // 更新预览面板内容
+        const previewIcon = panel.querySelector('#preview-marble-icon');
+        const previewName = panel.querySelector('#preview-marble-name');
+        const previewTags = panel.querySelector('#preview-marble-tags');
+        const previewDesc = panel.querySelector('#preview-marble-desc');
+        const previewPeg = panel.querySelector('#preview-marble-peg');
+        const previewBall = panel.querySelector('#preview-marble-ball');
+
+        if (previewBall) {
+            previewBall.style.background = marbleColor;
+        }
+        if (previewIcon) previewIcon.textContent = marbleIcon;
+        if (previewName) previewName.textContent = marbleName;
+        if (previewTags) {
+            previewTags.innerHTML = '';
+            tags.forEach(tag => {
+                const t = document.createElement('span');
+                t.className = 'preview-tag';
+                t.textContent = tag;
+                previewTags.appendChild(t);
+            });
+        }
+        if (previewDesc) previewDesc.textContent = desc;
+        if (previewPeg) previewPeg.textContent = pegEffect;
+
+        // 显示面板（如果之前是隐藏的）
+        panel.classList.remove('marble-preview-hidden');
+        panel.classList.add('marble-preview-visible');
     },
 
 /**

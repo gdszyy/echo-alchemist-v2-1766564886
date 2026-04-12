@@ -657,28 +657,217 @@
             max-width: 400px; /* 限制最大宽度，防止在平板/PC上卡片太大 */
             margin: 0 auto;   /* 居中 */
         }
+        /* === 弹珠卡片升级样式 === */
         .select-card {
-            background: rgba(30, 41, 59, 0.8);
-            border: 2px solid #475569;
-            border-radius: 12px;
-            /* 修改: 不强制宽高比，改用固定高度范围，更省空间 */
-            /* aspect-ratio: 3/4; */ 
-            height: 110px; /* 固定高度，防止被挤压或撑得太高 */
-            
+            background: rgba(15, 23, 42, 0.85);
+            border: 1.5px solid rgba(71, 85, 105, 0.7);
+            border-radius: 14px;
+            height: 118px;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            cursor: pointer; transition: all 0.2s;
+            cursor: pointer; transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
             position: relative;
+            gap: 4px;
+            padding: 8px 4px 6px;
+            overflow: hidden;
+        }
+        .select-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 14px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, transparent 60%);
+            pointer-events: none;
+        }
+        .select-card:hover {
+            border-color: rgba(148, 163, 184, 0.8);
+            background: rgba(30, 41, 59, 0.9);
+            transform: translateY(-3px) scale(1.03);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
         }
         .select-card.selected {
-            border-color: #fbbf24; background: rgba(50, 60, 90, 0.9);
-            box-shadow: 0 0 15px rgba(251, 191, 36, 0.3);
-            transform: translateY(-4px);
+            border-color: #fbbf24;
+            background: rgba(45, 55, 80, 0.95);
+            box-shadow: 0 0 18px rgba(251, 191, 36, 0.35), 0 4px 16px rgba(0,0,0,0.4);
+            transform: translateY(-4px) scale(1.04);
+        }
+        /* 球体容器 */
+        .select-icon-wrap {
+            position: relative;
+            width: 48px; height: 48px;
+            flex-shrink: 0;
         }
         .select-icon {
-            width: 40px; height: 40px; /* 稍微调小图标 */
-            border-radius: 50%; margin-bottom: 6px;
-            box-shadow: inset -2px -2px 6px rgba(0,0,0,0.5), 2px 2px 6px rgba(255,255,255,0.3);
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            box-shadow:
+                inset -4px -4px 8px rgba(0,0,0,0.55),
+                inset 3px 3px 6px rgba(255,255,255,0.25),
+                0 4px 12px rgba(0,0,0,0.4);
+            position: relative;
+            overflow: hidden;
+        }
+        /* 高光层 */
+        .select-icon-shine {
+            position: absolute;
+            top: 6px; left: 8px;
+            width: 14px; height: 9px;
+            background: radial-gradient(ellipse, rgba(255,255,255,0.65) 0%, transparent 80%);
+            border-radius: 50%;
+            transform: rotate(-30deg);
+            pointer-events: none;
+        }
+        /* 属性 emoji 浮层 */
+        .select-icon-emoji {
+            position: absolute;
+            bottom: -2px; right: -4px;
+            font-size: 16px;
+            line-height: 1;
+            filter: drop-shadow(0 1px 3px rgba(0,0,0,0.7));
+            pointer-events: none;
+        }
+        /* 弹珠名称 */
+        .select-card-name {
+            font-size: 11px;
+            font-weight: 700;
+            color: #e2e8f0;
+            text-align: center;
+            letter-spacing: 0.03em;
+            line-height: 1.2;
+        }
+        /* 属性标签行 */
+        .select-card-tags {
+            display: flex;
+            gap: 3px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .select-card-tag {
+            font-size: 9px;
+            padding: 1px 5px;
+            border-radius: 4px;
+            background: rgba(71, 85, 105, 0.6);
+            color: #94a3b8;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        /* === 弹珠预览面板 === */
+        #marble-preview-panel {
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto 4px;
+            padding: 12px 16px 14px;
+            background: rgba(10, 15, 30, 0.92);
+            border: 1px solid rgba(71, 85, 105, 0.5);
+            border-radius: 16px;
+            pointer-events: auto;
+            transition: opacity 0.25s, transform 0.25s;
+        }
+        .marble-preview-hidden {
+            opacity: 0;
+            transform: translateY(6px);
+            pointer-events: none !important;
+        }
+        .marble-preview-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        /* 预览面板 - 顶部行 */
+        .preview-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        /* 预览球体 */
+        #preview-marble-ball {
+            width: 36px; height: 36px;
+            border-radius: 50%;
             flex-shrink: 0;
+            box-shadow:
+                inset -3px -3px 6px rgba(0,0,0,0.5),
+                inset 2px 2px 5px rgba(255,255,255,0.2),
+                0 3px 8px rgba(0,0,0,0.4);
+            position: relative;
+            overflow: hidden;
+        }
+        #preview-marble-ball::after {
+            content: '';
+            position: absolute;
+            top: 5px; left: 7px;
+            width: 10px; height: 6px;
+            background: radial-gradient(ellipse, rgba(255,255,255,0.6) 0%, transparent 80%);
+            border-radius: 50%;
+            transform: rotate(-30deg);
+        }
+        .preview-header-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .preview-name-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+        #preview-marble-icon {
+            font-size: 14px;
+            line-height: 1;
+        }
+        #preview-marble-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #f1f5f9;
+            letter-spacing: 0.04em;
+        }
+        #preview-marble-tags {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .preview-tag {
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 5px;
+            background: rgba(99, 102, 241, 0.25);
+            color: #a5b4fc;
+            font-weight: 600;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+        /* 分隔线 */
+        .preview-divider {
+            height: 1px;
+            background: rgba(71, 85, 105, 0.4);
+            margin: 8px 0;
+        }
+        /* 真理之书说明区 */
+        .preview-truth-label {
+            font-size: 9px;
+            font-weight: 700;
+            color: #f59e0b;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 3px;
+        }
+        #preview-marble-desc {
+            font-size: 11px;
+            color: #cbd5e1;
+            line-height: 1.55;
+            margin-bottom: 8px;
+        }
+        /* 同步钉子效果区 */
+        .preview-peg-label {
+            font-size: 9px;
+            font-weight: 700;
+            color: #34d399;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 3px;
+        }
+        #preview-marble-peg {
+            font-size: 10.5px;
+            color: #94a3b8;
+            line-height: 1.5;
         }
 
         /* Buttons */
@@ -1019,10 +1208,13 @@
          /* --- 针对移动端横屏/矮屏幕的终极适配 --- */
         @media (max-height: 600px) {
             .select-card {
-                height: 90px; /* 矮屏模式下卡片变矮 */
+                height: 96px; /* 矮屏模式下卡片变矮 */
+            }
+            .select-icon-wrap, .select-icon {
+                width: 38px; height: 38px;
             }
             .select-icon {
-                width: 32px; height: 32px; margin-bottom: 2px;
+                width: 38px; height: 38px;
             }
             #phase-selection p {
                 margin-bottom: 4px; /* 压缩文字间距 */
@@ -1736,7 +1928,26 @@
     
         <div class="flex-1 w-full min-h-0 overflow-y-auto flex flex-col items-center py-4">
             <div id="marble-selection-grid" class="marble-grid"></div>
-            <div class="h-4 shrink-0"></div> 
+            <div class="h-2 shrink-0"></div>
+            <!-- 弹珠预览面板 -->
+            <div id="marble-preview-panel" class="marble-preview-hidden" style="pointer-events: auto;">
+                <div class="preview-header">
+                    <div id="preview-marble-ball"></div>
+                    <div class="preview-header-info">
+                        <div class="preview-name-row">
+                            <span id="preview-marble-icon"></span>
+                            <span id="preview-marble-name"></span>
+                        </div>
+                        <div id="preview-marble-tags"></div>
+                    </div>
+                </div>
+                <div class="preview-divider"></div>
+                <div class="preview-truth-label">真理之書</div>
+                <div id="preview-marble-desc"></div>
+                <div class="preview-peg-label">鉤釘 / 子彈效果</div>
+                <div id="preview-marble-peg"></div>
+            </div>
+            <div class="h-2 shrink-0"></div>
         </div>
 
         <div class="w-full flex flex-col items-center pointer-events-auto shrink-0 z-10 bg-slate-900/80 backdrop-blur-sm border-t border-slate-700/50 pt-4 pb-6" 
