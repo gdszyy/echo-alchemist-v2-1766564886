@@ -15,10 +15,28 @@
  * @module ui/rune_launcher
  */
 
-import { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY } from '../rune_config.js';
+import { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY, RARITY_DISPLAY } from '../rune_config.js';
 import { parseRuneGrid, calcRuneBaseStats, getRuneId, rune_merge, rune_reforge } from '../rune_system.js';
 import { audio } from '../audio.js';
 import { showToast } from '../entities.js';
+
+/**
+ * 构建符文图标 HTML（统一的符文展示辅助函数）
+ * 生成带黑底、稀有度边框、等级角标的 .rune-icon-frame 元素 HTML字符串。
+ * @param {object} runeDef - RUNE_DB 中的符文定义对象（包含 icon, rarity 字段）
+ * @param {number} runeLevel - 符文等级（1/2/3）
+ * @param {string} [extraClass=''] - 额外的 CSS class（如尺寸类）
+ * @returns {string} HTML 字符串
+ */
+function _ui_buildRuneIconHTML(runeDef, runeLevel, extraClass = '') {
+    const rarity = (runeDef && runeDef.rarity) ? runeDef.rarity : 'common';
+    const icon   = (runeDef && runeDef.icon)   ? runeDef.icon   : '🔮';
+    const lv     = runeLevel || 1;
+    const lvClass = `lv-${Math.min(lv, 3)}`;
+    const rarityClass = `rarity-${rarity}`;
+    const lvLabel = `Lv.${lv}`;
+    return `<span class="rune-icon-frame ${rarityClass} ${lvClass}${extraClass ? ' ' + extraClass : ''}">${icon}<span class="rune-lv-badge">${lvLabel}</span></span>`;
+}
 
 /**
  * 符文发射器 UI 方法集合
@@ -79,13 +97,12 @@ export const rune_launcher_system = {
             const item = document.createElement('div');
             item.className = 'flex items-center gap-3 bg-slate-800/60 border border-slate-700/40 rounded-xl p-2';
             item.innerHTML = `
-                <div class="w-10 h-10 flex items-center justify-center bg-purple-950/50 rounded-lg border border-purple-500/30 text-xl shrink-0">
-                    ${runeDef.icon || '🔮'}
+                <div class="w-10 h-10 flex items-center justify-center shrink-0" style="font-size:22px;">
+                    ${_ui_buildRuneIconHTML(runeDef, runeLevel)}
                 </div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-bold text-purple-200">${runeDef.name}</span>
-                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-400 font-mono">Lv.${runeLevel}</span>
                     </div>
                     <p class="text-[10px] text-slate-400 leading-tight mt-0.5 truncate">${runeDef.desc || ''}</p>
                 </div>
@@ -223,10 +240,9 @@ export const rune_launcher_system = {
                 'transition-all duration-200 min-w-[72px]',
             ].join(' ');
             btn.innerHTML = `
-                <span class="text-2xl">${runeDef.icon || '?'}</span>
+                <span style="font-size:24px;">${_ui_buildRuneIconHTML(runeDef, runeLevel)}</span>
                 <span class="text-[10px] text-slate-300 text-center leading-tight">${runeDef.name}</span>
                 <span class="text-[9px] text-purple-400/70">${runeDef.element}</span>
-                <span class="text-[9px] text-amber-400/80">Lv.${runeLevel}</span>
             `;
             btn.addEventListener('click', () => {
                 // 将该符文从库存中移除（取第一个匹配项）
@@ -272,7 +288,8 @@ export const rune_launcher_system = {
                 // 获取符文等级（新格式有 level，旧格式默认为 1）
                 const runeLevel = (typeof runeEntry === 'object' && runeEntry.level) ? runeEntry.level : 1;
                 if (runeDef) {
-                    cell.innerHTML = `<span title="${runeDef.name} Lv.${runeLevel}">${runeDef.icon || '?'}</span>${runeLevel > 1 ? `<span class="rune-level-badge">${runeLevel}</span>` : ''}`;
+                    // 使用统一的符文图标框架，黑底+稀有度边框+等级角标
+                    cell.innerHTML = `<span title="${runeDef.name} Lv.${runeLevel}" style="font-size:26px;">${_ui_buildRuneIconHTML(runeDef, runeLevel)}</span>`;
                 } else {
                     cell.innerHTML = '?';
                 }
@@ -402,13 +419,12 @@ export const rune_launcher_system = {
                     : 'bg-slate-800/60 border-2 border-slate-700/40 hover:border-purple-600/50',
             ].join(' ');
             card.innerHTML = `
-                <div class="w-10 h-10 flex items-center justify-center bg-purple-950/50 rounded-lg border border-purple-500/30 text-xl shrink-0">
-                    ${runeDef.icon || '🔮'}
+                <div class="w-10 h-10 flex items-center justify-center shrink-0" style="font-size:22px;">
+                    ${_ui_buildRuneIconHTML(runeDef, runeLevel)}
                 </div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-1.5">
                         <span class="text-xs font-bold text-purple-200 truncate">${runeDef.name}</span>
-                        <span class="text-[9px] px-1 py-0.5 rounded bg-amber-900/40 text-amber-400 font-mono shrink-0">Lv.${runeLevel}</span>
                     </div>
                     <div class="text-[9px] text-slate-500 truncate">${runeDef.element}</div>
                 </div>
@@ -894,7 +910,7 @@ export const rune_launcher_system = {
 
                 const patternIcons = rw.pattern.map(runeId => {
                     const rd = RUNE_DB.find(r => r.id === runeId);
-                    return rd ? `<span title="${rd.name}">${rd.icon}</span>` : '?';
+                    return rd ? `<span title="${rd.name}" style="font-size:18px;">${_ui_buildRuneIconHTML(rd, 1)}</span>` : '?';
                 }).join('<span class="text-slate-600 mx-0.5">→</span>');
 
                 const dynamicDesc = this._ui_calcRunewordDynamicDesc(rw, defaultLevel);

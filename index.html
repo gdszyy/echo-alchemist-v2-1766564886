@@ -1189,14 +1189,111 @@
             border-color: #fbbf24;
             text-shadow: 0 0 5px #fbbf24;
         }
-        /* 符文等级角标 - 显示在网格格子右上角 */
+        /* =====================================================
+         * 符文图标框架系统 (Rune Icon Frame System)
+         * 统一所有符文展示位置的视觉语言：
+         *   - 黑底隔离 emoji，防止与背景融为一体
+         *   - 稀有度边框颜色：common=灰 / rare=蓝 / epic=紫 / legendary=金
+         *   - 等级装饰：Lv1=单线 / Lv2=双线发光 / Lv3=三重光晕+脉冲
+         * ===================================================== */
+
+        /* 基础框架 */
+        .rune-icon-frame {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            border-radius: 8px;
+            border: 2px solid #555;
+            box-shadow: inset 0 0 4px rgba(0,0,0,0.8);
+            overflow: visible;
+            flex-shrink: 0;
+        }
+        /* 稀有度边框颜色 */
+        .rune-icon-frame.rarity-common  { border-color: #888; }
+        .rune-icon-frame.rarity-rare    { border-color: #4a90d9; box-shadow: 0 0 6px rgba(74,144,217,0.4), inset 0 0 4px rgba(0,0,0,0.8); }
+        .rune-icon-frame.rarity-epic    { border-color: #9b59b6; box-shadow: 0 0 8px rgba(155,89,182,0.5), inset 0 0 4px rgba(0,0,0,0.8); }
+        .rune-icon-frame.rarity-legendary {
+            border-color: #f39c12;
+            box-shadow: 0 0 10px rgba(243,156,18,0.6), 0 0 20px rgba(243,156,18,0.2), inset 0 0 4px rgba(0,0,0,0.8);
+            animation: rune-legendary-pulse 2s ease-in-out infinite;
+        }
+        @keyframes rune-legendary-pulse {
+            0%, 100% { box-shadow: 0 0 10px rgba(243,156,18,0.6), 0 0 20px rgba(243,156,18,0.2), inset 0 0 4px rgba(0,0,0,0.8); }
+            50%       { box-shadow: 0 0 16px rgba(243,156,18,0.9), 0 0 30px rgba(243,156,18,0.35), inset 0 0 4px rgba(0,0,0,0.8); }
+        }
+
+        /* 等级角标 - 右下角 */
+        .rune-icon-frame .rune-lv-badge {
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            font-size: 8px;
+            font-weight: 900;
+            line-height: 1;
+            padding: 1px 3px;
+            border-radius: 3px;
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 2;
+        }
+        /* Lv1 角标：灰色低调 */
+        .rune-icon-frame.lv-1 .rune-lv-badge {
+            background: #1e293b;
+            color: #94a3b8;
+            border: 1px solid #475569;
+        }
+        /* Lv2 角标：蓝色发光 */
+        .rune-icon-frame.lv-2 .rune-lv-badge {
+            background: #1e3a5f;
+            color: #60a5fa;
+            border: 1px solid #3b82f6;
+            box-shadow: 0 0 4px rgba(59,130,246,0.6);
+        }
+        /* Lv3 角标：金色发光 */
+        .rune-icon-frame.lv-3 .rune-lv-badge {
+            background: #3d2000;
+            color: #fbbf24;
+            border: 1px solid #f59e0b;
+            box-shadow: 0 0 6px rgba(251,191,36,0.8);
+        }
+
+        /* Lv2 边框双线效果：内层伪元素 */
+        .rune-icon-frame.lv-2::before {
+            content: '';
+            position: absolute;
+            inset: 2px;
+            border-radius: 5px;
+            border: 1px solid rgba(255,255,255,0.12);
+            pointer-events: none;
+        }
+        /* Lv3 边框三重效果：内层 + 外层光晕 */
+        .rune-icon-frame.lv-3::before {
+            content: '';
+            position: absolute;
+            inset: 2px;
+            border-radius: 5px;
+            border: 1px solid rgba(255,255,255,0.2);
+            pointer-events: none;
+        }
+        .rune-icon-frame.lv-3::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 11px;
+            border: 1px solid rgba(255,255,255,0.08);
+            pointer-events: none;
+        }
+
+        /* 旧版 rune-level-badge（保留兼容，但不再主要使用） */
         .rune-level-badge {
             position: absolute;
             top: 2px;
             right: 3px;
             font-size: 9px;
             font-weight: 700;
-            color: #fbbf24; /* amber-400 */
+            color: #fbbf24;
             background: rgba(15, 23, 42, 0.75);
             border-radius: 4px;
             padding: 0 3px;
@@ -1230,19 +1327,18 @@
             text-transform: uppercase;
             white-space: nowrap;
         }
-        /* 单符文槽 */
+        /* 单符文槽 - 作为外层容器，内部放 .rune-icon-frame */
         #combat-rune-single-slot {
-            width: 34px;
-            height: 34px;
+            width: 36px;
+            height: 36px;
             border-radius: 9px;
             border: 1.5px solid rgba(100, 116, 139, 0.35);
             background: rgba(15, 23, 42, 0.7);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
             position: relative;
-            overflow: hidden;
+            overflow: visible;
             transition: border-color 0.3s ease, box-shadow 0.3s ease;
         }
         /* 空状态：虚线边框 */
@@ -1250,12 +1346,18 @@
             border-style: dashed;
             border-color: rgba(100, 116, 139, 0.3);
         }
-        /* 已有符文：就绪光效果 */
+        /* 已有符文：外层容器仅保留轻微背景，视觉主体由内部 .rune-icon-frame 承担 */
         #combat-rune-single-slot.has-rune {
             border-style: solid;
-            border-color: rgba(168, 85, 247, 0.7);
-            background: rgba(88, 28, 135, 0.35);
-            box-shadow: 0 0 10px rgba(168, 85, 247, 0.45), inset 0 0 8px rgba(168, 85, 247, 0.15);
+            border-color: rgba(100, 116, 139, 0.2);
+            background: rgba(10, 15, 30, 0.5);
+        }
+        /* 充能槽内的符文框架尺寸 */
+        #combat-rune-single-slot .rune-icon-frame {
+            width: 30px;
+            height: 30px;
+            font-size: 16px;
+            border-radius: 7px;
         }
         /* 充能满刷新闪光动画 */
         #combat-rune-single-slot.rune-refresh {
@@ -1267,17 +1369,17 @@
             70%  { transform: scale(0.95); filter: brightness(1.2); }
             100% { transform: scale(1);   filter: brightness(1); }
         }
-        /* 充能满时背景闪光 */
-        #combat-rune-single-slot::after {
-            content: '';
+        /* 充能满时背景闪光（使用 .rune-slot-glow-overlay 替代 ::after，避免与 rune-icon-frame::after 冲突） */
+        .rune-slot-glow-overlay {
             position: absolute;
             inset: 0;
             border-radius: 8px;
             background: rgba(168, 85, 247, 0);
             pointer-events: none;
             transition: background 0.2s;
+            z-index: 1;
         }
-        #combat-rune-single-slot.rune-refresh::after {
+        #combat-rune-single-slot.rune-refresh .rune-slot-glow-overlay {
             animation: runeSlotGlow 0.55s ease-out forwards;
         }
         @keyframes runeSlotGlow {
@@ -1376,7 +1478,9 @@
                 <!-- 符文槽行：左侧标签 + 右侧符文位 -->
                 <div id="combat-rune-slot-row">
                     <span id="combat-rune-get-label">GET RUNE</span>
-                    <div id="combat-rune-single-slot" class="empty"></div>
+                    <div id="combat-rune-single-slot" class="empty">
+                        <div class="rune-slot-glow-overlay"></div>
+                    </div>
                 </div>
             </div>
         </div>

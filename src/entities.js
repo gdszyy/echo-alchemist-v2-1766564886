@@ -37,6 +37,7 @@ import {
 } from './effects/particles.js';
 import { Enemy, setEnemyAudioProvider } from './entities/enemy.js';
 import { Projectile, setProjectileAudioProvider } from './entities/projectile.js';
+import { RUNE_DB } from './rune_config.js';
 
 // ==================== 音频依赖注入 (重构 v2) ====================
 // 移除 Proxy 方案和 window.audio 依赖
@@ -3160,38 +3161,84 @@ class RuneLoot {
 
         const drawY = this.y + this._floatOffset;
 
+        // 从 RUNE_DB 获取符文定义（图标和稀有度）
+        const runeDef = RUNE_DB ? RUNE_DB.find(r => r.id === this.runeId) : null;
+        const icon    = (runeDef && runeDef.icon) ? runeDef.icon : '❆';
+        const rarity  = (runeDef && runeDef.rarity) ? runeDef.rarity : 'common';
+        const level   = this.level || 1;
+
+        // 稀有度对应发光颜色
+        const RARITY_GLOW = {
+            common:    { r: 160, g: 160, b: 160 },
+            rare:      { r: 74,  g: 144, b: 217 },
+            epic:      { r: 155, g: 89,  b: 182 },
+            legendary: { r: 243, g: 156, b: 18  },
+        };
+        const glow = RARITY_GLOW[rarity] || RARITY_GLOW.common;
+
         ctx.save();
 
-        // 外圈发光效果
+        // 外圈发光效果（稀有度颜色）
         const glowPulse = 0.5 + 0.5 * Math.sin(this._animTimer * 1.5);
         const gradient = ctx.createRadialGradient(
             this.x, drawY, 0,
             this.x, drawY, this._glowRadius + glowPulse * 6
         );
-        gradient.addColorStop(0, `rgba(255, 220, 80, ${0.5 + glowPulse * 0.3})`);
-        gradient.addColorStop(0.5, `rgba(255, 160, 30, ${0.3 + glowPulse * 0.2})`);
-        gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+        gradient.addColorStop(0, `rgba(${glow.r}, ${glow.g}, ${glow.b}, ${0.55 + glowPulse * 0.3})`);
+        gradient.addColorStop(0.5, `rgba(${glow.r}, ${glow.g}, ${glow.b}, ${0.25 + glowPulse * 0.15})`);
+        gradient.addColorStop(1, `rgba(${glow.r}, ${glow.g}, ${glow.b}, 0)`);
 
         ctx.beginPath();
         ctx.arc(this.x, drawY, this._glowRadius + glowPulse * 6, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
         ctx.fill();
 
-        // 内圈背景
+        // 内圈黑底（黑底隔离 emoji）
         ctx.beginPath();
         ctx.arc(this.x, drawY, 14, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(30, 20, 10, 0.75)';
+        ctx.fillStyle = '#000';
         ctx.fill();
-        ctx.strokeStyle = `rgba(255, 200, 60, ${0.7 + glowPulse * 0.3})`;
+        // 稀有度边框
+        ctx.strokeStyle = `rgba(${glow.r}, ${glow.g}, ${glow.b}, ${0.75 + glowPulse * 0.25})`;
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // 绘制符文图标（emoji 字符）
+        // Lv2/Lv3 内圈双线效果
+        if (level >= 2) {
+            ctx.beginPath();
+            ctx.arc(this.x, drawY, 11, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255,255,255,${level >= 3 ? 0.25 : 0.12})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+        // Lv3 外圈光晕
+        if (level >= 3) {
+            ctx.beginPath();
+            ctx.arc(this.x, drawY, 17, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255,255,255,0.08)`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        // 绘制符文图标（真实 emoji）
         ctx.font = '14px serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText('✦', this.x, drawY); // 默认符文占位符，实际应从 RUNE_DB 获取 icon
+        ctx.fillText(icon, this.x, drawY);
+
+        // 等级角标（右下角小文字）
+        if (level >= 1) {
+            const LV_COLORS = ['', '#94a3b8', '#60a5fa', '#fbbf24'];
+            const lvColor = LV_COLORS[Math.min(level, 3)] || '#94a3b8';
+            ctx.font = 'bold 7px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'bottom';
+            ctx.fillStyle = '#000';
+            ctx.fillText(`L${level}`, this.x + 14.5, drawY + 14.5);
+            ctx.fillStyle = lvColor;
+            ctx.fillText(`L${level}`, this.x + 14, drawY + 14);
+        }
 
         ctx.restore();
     }
