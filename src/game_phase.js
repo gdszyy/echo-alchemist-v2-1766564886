@@ -626,7 +626,48 @@ phase_gathering_getRandomPegType() {
             this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, '+20℃', '#f97316');
         }
 
-        // --- 2. 行动逻辑 ---
+        // --- 2. Ignis 狂暴阶段：温度急升 + 火焰溅射 ---
+        if (e.active && e.type === 'boss' && e.bossType === 'ignis' && e._berserkedTempRise) {
+            // 每回合温度上升
+            e.temp += e._berserkedTempRise;
+            this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, `+${e._berserkedTempRise}℃`, '#f97316');
+
+            // 火焰溅射：对周围半径内的其他活跃敌人造成火焰伤害
+            if (e._berserkedFireSplash) {
+                const { radius, damage } = e._berserkedFireSplash;
+                // 橙红色火焰粒子视觉反馈（在 Ignis 周围生成）
+                for (let i = 0; i < 12; i++) {
+                    const angle = (i / 12) * Math.PI * 2;
+                    const px = e.pos.x + Math.cos(angle) * (radius * 0.5);
+                    const py = e.pos.y + Math.sin(angle) * (radius * 0.5);
+                    this.spawn_createParticle(px, py, '#ff4500', 'ember');
+                }
+                for (let i = 0; i < 8; i++) {
+                    this.spawn_createParticle(e.pos.x, e.pos.y, '#ff6b00', 'spark');
+                }
+
+                // 对周围敌人造成火焰溅射伤害
+                const activeEnemies = this.enemies.filter(other =>
+                    other.active && other !== e
+                );
+                activeEnemies.forEach(other => {
+                    const dx = other.pos.x - e.pos.x;
+                    const dy = other.pos.y - e.pos.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist <= radius) {
+                        other.takeDamage(damage);
+                        this.combat_recordDamage(damage, 'pyro', 'main');
+                        // 被溅射敌人的火焰粒子特效
+                        for (let i = 0; i < 4; i++) {
+                            this.spawn_createParticle(other.pos.x, other.pos.y, '#ff4500', 'spark');
+                        }
+                        this.spawn_createFloatingText(other.pos.x, other.pos.y - 20, `🔥-${damage}`, '#f97316');
+                    }
+                });
+            }
+        }
+
+        // --- 3. 行动逻辑 ---
         // 只有活着的敌人才移动
         if (e.active && e.isFrozenCurrentTurn == false) {
             // 奥罗波罗斯 Boss：回合开始时进行词缀轮转

@@ -73,7 +73,7 @@ globs: ["src/game_phase.js"]
 ### 4.5 8 个 Boss 特性摘要
 | Boss ID | 名称 | 类型 | 核心特性 |
 |---|---|---|---|
-| `ignis` | 烈焰之心 | Mini-Boss | 护盾+狂暴，狂暴后护盾翻倍 |
+| `ignis` | 烈焰之心 | Mini-Boss | 护盾+狂暴，狂暴后护盾翻倍，每回合温度急剧上升并对周围敌人造成火焰溅射伤害 |
 | `glacies` | 冰封山峡 | Mini-Boss | 跳跃+再生，狂暴后跳跃行数+1 |
 | `mikro` | 细胞山峡 | Mini-Boss | 分裂+极速，狂暴后分裂概率 100% |
 | `devourer` | 噬神者 | Mini-Boss | 吞噬相邻敌人获得护盾层数 |

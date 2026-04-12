@@ -530,6 +530,9 @@ const CONFIG = {
                 weakness: ['pierce', 'pyro'],
                 shieldChargesBonus: 5,    // 额外护盾层数
                 berserkedShieldMult: 2,   // 狂暴后护盾层数翻倍系数
+                berserkedTempRisePerTurn: 30, // 狂暴后每回合温度上升值
+                berserkedFireSplashRadius: 80, // 狂暴后火焰溅射半径（像素）
+                berserkedFireSplashDamage: 5,  // 狂暴后火焰溅射伤害
                 themeWeights: { pyro: 1.5, pierce: 1.5 }
             },
             glacies: {

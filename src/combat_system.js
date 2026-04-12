@@ -2269,6 +2269,13 @@ export const combat_system = {
                 if (boss.affixes.includes('shield')) {
                     boss.shieldCharges = Math.floor(boss.shieldCharges * (bossCfg.berserkedShieldMult || 2));
                 }
+                // 狂暴后每回合温度急升标志
+                boss._berserkedTempRise = bossCfg.berserkedTempRisePerTurn || 30;
+                // 狂暴后火焰溅射标志（存储半径和伤害）
+                boss._berserkedFireSplash = {
+                    radius: bossCfg.berserkedFireSplashRadius || 80,
+                    damage: bossCfg.berserkedFireSplashDamage || 5
+                };
                 break;
 
             case 'glacies':
