@@ -15,6 +15,7 @@
 
 import { META_SHOP_CONFIG, CONFIG, RELIC_DB, BOARD_STRUCTURE_RELICS } from '../config.js';
 import { showToast } from '../entities.js';
+import { eventBus } from '../event_bus.js';
 
 /**
  * 商店渲染方法集合
@@ -118,6 +119,8 @@ export const shop_system = {
             overlay.classList.remove('hidden-phase');
             overlay.classList.add('active-phase');
         }
+        // 通知教程系统：遗物选择界面已打开
+        eventBus.emit('tutorial:relic_shown');
     },
 
     /**
