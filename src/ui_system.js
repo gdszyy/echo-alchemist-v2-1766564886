@@ -565,3 +565,4 @@ ui_closeTruthBook() {
             setTimeout(() => audio.playTone(isBigBoss ? 150 : 120, 'square', 0.25, 0.5), 600);
         });
     },
+};
