@@ -205,8 +205,9 @@ export const game_system = {
         // 重置 Boss 系统状态
         this.bossHistory = [];
         this._pendingBossSpawn = null;
-        // [BUGFIX] 重置 Boss 遗物待领取标志
+        // 重置 遗物串行标志
         this._pendingBossRelic = false;
+        this._pendingRelicEvent = false;
         // [难度平衡] 重置战后高压因子
         this.postBossMultiplier = 1.0;
         this.postBossSurgeRoundsLeft = 0;

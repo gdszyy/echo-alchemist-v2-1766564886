@@ -631,13 +631,12 @@ phase_gathering_getRandomPegType() {
 
         this.isEnemyTurn = false;
         // 遗物事件检查
-        // [BUGFIX] 若本回合已因击杀 Boss 而弹出遗物界面（_pendingBossRelic 标志），
-        // 则跳过固定回合遗物事件，避免双重触发导致 stateBeforeRelic 被覆盖、
-        // 玩家来不及领取就被强制跳转到下一阶段。
         if (this.round % CONFIG.gameplay.relicRoundInterval == 0) {
             if (this._pendingBossRelic) {
-                // Boss 遗物已在弹出队列中，本次固定遗物事件延后到下一个间隔
-                console.log('[RelicEvent] 本回合 Boss 遗物优先，固定遗物事件已跳过。');
+                // [串行遗物] Boss 遗物待领取，将固定遗物事件存入标志位。
+                // ui_closeRelicSelection 关闭 Boss 遗物后会检测此标志并自动串行弹出固定遗物事件。
+                this._pendingRelicEvent = true;
+                console.log('[RelicEvent] 本回合 Boss 遗物优先，固定遗物事件将在 Boss 遗物关闭后串行弹出。');
             } else {
                 showToast("✨ 命魔的馈赠 ✨");
                 this.phase = 'relic_event';

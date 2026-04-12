@@ -92,14 +92,25 @@ globs: ["src/game_phase.js"]
 
 第二个 `ui_showRelicSelection` 会覆盖 `stateBeforeRelic` 为 `'relic_event'`，导致玩家选择或跳过遗物后，`ui_closeRelicSelection` 走入 `else` 分支直接调用 `sys_initSelectionPhase()`，玩家看起来就像“还没来得及领取遗物就跳到下一个阶段”。
 
-### 6.2 修复方案：`_pendingBossRelic` 标志位
+### 6.2 处理方案：串行触发（两个都给）
 
-- **`combat_system.js`**：Boss 击杀时设置 `this._pendingBossRelic = true`。
-- **`game_phase.js`**：`phase_finalizeRound` 的固定遗物事件判断中，若 `_pendingBossRelic === true`，则跳过本次固定遗物事件（不弹窗、不 return）。
-- **`shop.js`**：`ui_closeRelicSelection` 关闭遗物界面时重置 `this._pendingBossRelic = false`。
-- **`game_system.js`**：`sys_resetGame` 中初始化 `this._pendingBossRelic = false`。
+**设计决策**：Boss 遗物和固定回合遗物事件均不丢弃，改为串行弹出：玩家领完 Boss 遗物后，再接着弹出固定遗物事件。
 
-> **注意**：固定遗物事件被跳过后不会补发，属于设计取舍（Boss 遗物已是額外奖励）。如需未来补发逻辑，可在 `ui_closeRelicSelection` 中判断 `_pendingBossRelic` 并延迟触发下一次固定遗物事件。
+**涉及标志位**：
+
+| 标志位 | 设置时机 | 清除时机 |
+|---|---|---|
+| `_pendingBossRelic` | `combat_system.js` Boss 击杀时 | `shop.js` `ui_closeRelicSelection` 关闭时 |
+| `_pendingRelicEvent` | `game_phase.js` `phase_finalizeRound` 检测到冲突时 | `shop.js` `ui_closeRelicSelection` 串行弹出时 |
+
+**执行流程**：
+1. Boss 击杀 → `_pendingBossRelic = true` + `setTimeout(ui_showRelicSelection, 500)`
+2. `phase_finalizeRound` 检测到 `round % 3 == 0` 且 `_pendingBossRelic` 为真 → `_pendingRelicEvent = true`（不立即弹窗）
+3. Boss 遗物弹窗弹出，玩家选择/跳过
+4. `ui_closeRelicSelection` 检测到 `hadPendingBossRelic && _pendingRelicEvent` → 串行弹出固定遗物事件
+5. 玩家再次选择/跳过 → `ui_closeRelicSelection` 走入正常 `else` 分支 → `sys_initSelectionPhase()`
+
+**初始化**：`sys_resetGame` 中同时重置两个标志位为 `false`。
 
 ## 7. 难度平衡系统 (Difficulty Balance System)
 ### 5.1 战后高压因子 (Post-Boss Surge)

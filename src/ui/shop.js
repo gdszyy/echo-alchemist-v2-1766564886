@@ -206,17 +206,24 @@ export const shop_system = {
         overlay.classList.remove('active-phase');
         overlay.classList.add('hidden-phase');
         
-        // [BUGFIX] 遗物界面关闭时，清除 Boss 遗物待领取标志
+        // [修改] 遗物界面关闭时，检查是否有固定回合遗物事件待串行触发
+        const hadPendingBossRelic = this._pendingBossRelic;
         this._pendingBossRelic = false;
         
         // [核心修复] 根据打开前的状态决定去向
         if (this.stateBeforeRelic === 'gathering') {
             // 情况 A: 在收集阶段(打中遗物槽)打开的
             // 不需要跳转阶段，只需要尝试结算当前回合
-            // (因为在 updateGathering 里，球已经被移除并 activeBalls-- 了，这里检查是否需要发射)
             this.phase_gathering_attemptComplete();
+        } else if (hadPendingBossRelic && this._pendingRelicEvent) {
+            // 情况 C: 刚刚关闭的是 Boss 遗物，且本回合恢好是固定遗物事件回合
+            // 串行弹出固定遗物事件，让玩家两个都能领取
+            this._pendingRelicEvent = false;
+            showToast("✨ 命魔的馈赠 ✨");
+            this.phase = 'relic_event';
+            setTimeout(() => { this.ui_showRelicSelection(); }, 300);
         } else {
-            // 情况 B: 在回合结束(打完BOSS/固定回合事件)打开的
+            // 情况 B: 在回合结束(固定回合事件)打开的
             // 正常进入下一轮的选弹珠阶段
             this.sys_initSelectionPhase(); 
         }
