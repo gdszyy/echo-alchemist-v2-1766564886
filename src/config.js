@@ -656,7 +656,7 @@ const CONFIG = {
         // 物理系 (初始鎖定，通過遺物解鎖)
         pierce: 0, 
         scatter: 0,
-        damage: 7,
+        damage: 3,
         
         // 元素系 (初始鎖定，通過遺物獨立解鎖)
         cryo: 0, 
