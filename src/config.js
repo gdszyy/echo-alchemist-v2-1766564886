@@ -643,12 +643,12 @@ const CONFIG = {
         //  固定回合遗物事件 (每多少回合触发一次)
         relicRoundInterval: 3,
         assimilationChance: {
-            bounce: 0.2,
-            pierce: 0.12,
-            scatter: 0.12,
-            damage: 0.2,
-            cryo: 0.2,  
-            pyro: 0.2
+            bounce: 0.13,
+            pierce: 0.078,
+            scatter: 0.078,
+            damage: 0.13,
+            cryo: 0.13,  
+            pyro: 0.13
         },
         // [新增] 特殊变体概率乘子
         specialMutationMult: 0.1, // 变异概率乘子 (基于同化概率)

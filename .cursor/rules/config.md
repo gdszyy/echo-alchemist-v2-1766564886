@@ -17,7 +17,7 @@ globs: ["src/config.js"]
 
 ## 3. 修改规范
 - **集中管理**: 严禁在业务逻辑中硬编码魔法数字（Magic Numbers）或颜色値，必须提取到 `config.js`。
-- **格式一致性**: 添加新数据字典条目时，必须严格遵循现有对象的键名和数据类型结构。
+- **格式一致性**: 添加新数据字典条目时，必须严格遵循现有对象的键名 and 数据类型结构。
 - **注释说明**: 修改核心数値或添加新配置项时，必须添加注释说明其用途和影响范围。
 
 ## 6. Boss 血量公式参数说明（bossHpFormula）
@@ -39,7 +39,7 @@ globs: ["src/config.js"]
 - `round <= earlyRound`：`dynamicWeight = earlyDynamicWeight`（前期小 Boss 血量高度跨随玩家实时战力）。
 - `round >= lateRound`：`dynamicWeight = dynamicWeight`（后期平衡权重）。
 - 模板权重 = `1 - dynamicWeight`，两者互补且总和始终为 1。
-- 前期低保底将保底下限从 70% 降至 45%，使血量更自由地跨随玩家战力浮动。
+- 前期低保底将保底下限 from 70% 降至 45%，使血量更自由地跨随玩家战力浮动。
 
 ## 4. RELIC_DB 钉盘形态遗物规范（异型布局版）
 
@@ -89,8 +89,9 @@ globs: ["src/config.js"]
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
-| 2026-04-13 | `src/entities.js` | **调低涌潮遗物同化概率**：将 `assimilationBoostRounds` 触发的同化概率加成从 `0.5` 降低至 `0.3`，以平衡游戏后期属性钉子过度同化的问题。 |
-| 2026-04-13 | `src/config.js`, `src/ui/shop.js` | **钉盘结构遗物单局互斥限制**：新增 `BOARD_STRUCTURE_RELICS` 集合（包含 `dimension_shard`、`triangle_formation`、`diamond_formation`、`sparse_interval`、`mirror_sync`、`wide_narrow`）并导出。`shop.js` 的 `ui_showRelicSelection` 在遗物池过滤时增加互斥判断：若玩家本局已选过任意一个钉盘结构遗物，则所有其他钉盘结构遗物从候选池中排除。同时将 `dimension_shard` 的 `maxStacks` 从 `3` 改为 `1`。 |
+| 2026-04-13 | `src/config.js`, `src/entities.js` | **全局调低弹珠同化概率**：将所有弹珠的基础同化概率及涌潮遗物加成均降低为当前值的 0.65 倍（如 0.2->0.13, 0.3->0.195），以平衡游戏后期同化过快的问题。 |
+| 2026-04-13 | `src/config.js`, `src/ui/shop.js` | **钉盘结构遗物单局互斥限制**：新增 `BOARD_STRUCTURE_RELICS` 集合（包含 `dimension_shard`、`triangle_formation`、`diamond_formation`、`sparse_interval`、`mirror_sync`、`wide_narrow`）并导出。`shop.js` 的 `ui_showRelicSelection` 在遗物池过滤时增加互斥判断：若玩家本局已选过任意一个钉盘结构遗物，则所有其他钉盘结构遗物从候选池中排除。同时将 `dimension_shard` 的 `maxStacks` 从 `3` 改为 `1` |
+| 2026-04-13 | `src/config.js` | **提升穿透与散射遗物稀有度**：将 `tactical_kit_pierce`、`tactical_kit_scatter`（解锁遗物）以及 `surge_pierce`、`surge_scatter`（涌潮遗物）的稀有度从 `common`/`rare` 提升至 `legendary`，以匹配其作为稀有属性的定位。 |
 | 2026-04-12 | `src/config.js` | **Mikro 减伤机制**：在 `bossConfigs.mikro` 中新增 `cloneDamageReductionPerClone` (0.10) 和 `cloneDamageReductionMax` (0.50) 参数，用于控制 Mikro 母体根据场上存活分身数量获得的伤害减免效果。 |
 | 2026-04-12 | `src/config.js` | **初始钉子行数减少 1**：`CONFIG.gameplay.rows` 从 `6` 改为 `5`，降低游戏初始复杂度，改善早期游戏体验。 |
 | 2026-04-12 | `src/spawn_system.js` | **修复 mikro/micro 命名不一致 Bug**：将 `spawn_system.js` 中的 `switch case 'micro'` 改为 `mikro`，与 `config.js` 中的 Boss ID 保持一致。 |
@@ -107,9 +108,8 @@ globs: ["src/config.js"]
 
 ## 6. 同化涌潮遗物规范
 - **设计意图**: 每种可同化钉子的弹珠（`bounce`、`pierce`、`scatter`、`damage`、`cryo`、`pyro`）各对应一个遗物，命名格式为 `surge_{type}`。
-- **effect 字段**: 一律使用 `effect: 'assimilation_surge'`，配合 `marbleType` 字段指定弹珠类型。
+- **effect 字段**: 一律使用 `effect: 'assimilation_surge'`，配合 `marbleType` 字段指定弹珠类型.
 - **状态变量**: `game.assimilationBoostRounds` 是一个对象 `{ marbleType: roundsLeft }`，不是数字。
 - **涌潮效果**: 获取遗物时向 `guaranteedNextRound` 注入两个该弹珠类型，并将 `assimilationBoostRounds[marbleType]` 设为 2。
-- **同化加成**: `entities.js` 中判断 `game.assimilationBoostRounds[ballType] > 0` 时，对该弹珠类型的同化概率 +0.3 (由 0.5 调低)。
+- **同化加成**: `entities.js` 中判断 `game.assimilationBoostRounds[ballType] > 0` 时，对该弹珠类型的同化概率 +0.195 (由 0.3 调低，原始 0.5 * 0.65 = 0.325 -> 0.3 * 0.65 = 0.195)。
 - **递减逻辑**: `game_phase.js` 的 `phase_finalizeRound` 中遍历 `assimilationBoostRounds` 对象，对每个类型递减回合数，归零时弹出提示。
-| 2026-04-13 | `src/config.js` | **提升穿透与散射遗物稀有度**：将 `tactical_kit_pierce`、`tactical_kit_scatter`（解锁遗物）以及 `surge_pierce`、`surge_scatter`（涌潮遗物）的稀有度从 `common`/`rare` 提升至 `legendary`，以匹配其作为稀有属性的定位。 |

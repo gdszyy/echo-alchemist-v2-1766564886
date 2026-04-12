@@ -1075,7 +1075,7 @@ class DropBall {
                 const rule = rules[peg.type];
                 
                 // 概率设定：使用配置中的乘子
-                const assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0.2;
+                const assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0.13;
                 const mutationMult = CONFIG.gameplay.specialMutationMult || 0.5;
                 const upgradeMult = CONFIG.gameplay.specialUpgradeMult || 1.0;
                 const chance = rule.type === 'upgrade' ? assimilationChance * upgradeMult : assimilationChance * mutationMult;
@@ -1150,7 +1150,7 @@ class DropBall {
                 let assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0;
                 // [新增] 同化涌潮遗物加成：仅对该弹珠类型生效
                 if (game.assimilationBoostRounds && game.assimilationBoostRounds[ballType] > 0) {
-                    assimilationChance += 0.3; // 提升 30% 同化概率 (从 0.5 调低)
+                    assimilationChance += 0.195; // 提升 19.5% 同化概率 (从 0.3 调低，原始 0.5 * 0.65 = 0.325 -> 0.3 * 0.65 = 0.195)
                 }
                 if (Math.random() < assimilationChance && assimilationChance>0) {
 	                    peg.type = ballType;
