@@ -99,10 +99,11 @@ const TUTORIAL_STEPS = [
         waitForEvent: EVENT_TYPES.PHASE_CHANGED,
         waitForEventFilter: (data) => data && data.to === 'selection',
         autoAdvance: true,
-        actionLabel: null,          // 纯等待玩家点击遗物
+        actionLabel: null,
         actionFn: null,
     },
-    // ── 第 3 步：弹珠选择 ─────────────────────────────────────────────────────
+    // ── 第 3 步：弹珠选择 ──────────────────────────────────────────────────────────────────────────────────────
+    // 选中3枚弹珠后自动推进，无「下一步」按鈕
     {
         id: 'marble_selection',
         phase: 'selection',
@@ -111,17 +112,18 @@ const TUTORIAL_STEPS = [
         title: '选择你的弹珠',
         content: `
             <p><strong>弹珠</strong>是你的主要攻击单位，每种弹珠有独特的属性和技能。</p>
-            <p class="mt-2">你需要选择 <strong>3 枚弹珠</strong>组成本局的弹药库。</p>
+            <p class="mt-2">选择 <strong>3 枚弹珠</strong>组成本局弹药库，选齐后教程自动继续。</p>
             <p class="mt-2 text-cyan-300/80 text-xs">💡 点击弹珠可预览详细属性，再次点击选中</p>
         `,
         position: 'bottom',
         noOverlay: false,
-        waitForEvent: null,
-        autoAdvance: false,
+        waitForEvent: 'tutorial:marbles_ready',
+        waitForEventFilter: null,
+        autoAdvance: true,
         actionLabel: null,
         actionFn: null,
     },
-    // ── 第 4 步：确认选择 ─────────────────────────────────────────────────────
+    // ── 第 4 步：确认选择 ──────────────────────────────────────────────────────────────────────────────────────
     {
         id: 'confirm_selection',
         phase: 'selection',
@@ -414,7 +416,7 @@ export const tutorial_system = {
      * @private
      */
     _tutorial_removeDOM() {
-        ['tutorial-overlay', 'tutorial-highlight', 'tutorial-card'].forEach(id => {
+        ['tutorial-overlay', 'tutorial-highlight', 'tutorial-card', 'tutorial-launch-guide'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.remove();
         });
@@ -434,13 +436,86 @@ export const tutorial_system = {
         if (!step) return;
 
         this._tutorial_cleanupListeners();
+        // 移除上一步可能残留的钉盘引导框
+        const oldGuide = document.getElementById('tutorial-launch-guide');
+        if (oldGuide) oldGuide.remove();
+
         this._tutorial_updateCard(step, index);
         this._tutorial_updateHighlight(step);
         this._tutorial_positionCard(step);
 
+        // 研磨阶段引导：在钉盘顶部创建点击引导框
+        if (step.id === 'gathering_intro') {
+            this._tutorial_createLaunchGuide();
+        }
+
         if (step.waitForEvent) {
             this._tutorial_registerWaitEvent(step);
         }
+    },
+
+    /**
+     * @method _tutorial_createLaunchGuide
+     * @description 在钉盘顶部创建动态引导框，提示玩家点击上方区域投入弹珠。
+     * 引导框占据 canvas 高度的上 40%（与游戏内部发射判断逻辑一致）。
+     * @private
+     */
+    _tutorial_createLaunchGuide() {
+        const canvas = document.querySelector('canvas');
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        const guideH = rect.height * 0.4;
+
+        const guide = document.createElement('div');
+        guide.id = 'tutorial-launch-guide';
+        guide.style.cssText = `
+            position: fixed;
+            left: ${rect.left}px;
+            top: ${rect.top}px;
+            width: ${rect.width}px;
+            height: ${guideH}px;
+            border: 2.5px dashed rgba(251,191,36,0.85);
+            border-radius: 12px;
+            pointer-events: none;
+            z-index: 9998;
+            box-sizing: border-box;
+            animation: tutorial-pulse-border 1.2s ease-in-out infinite;
+        `;
+
+        // 内部文字提示
+        guide.innerHTML = `
+            <div style="
+                position: absolute;
+                bottom: 10px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(15,23,42,0.85);
+                color: #fbbf24;
+                font-size: 12px;
+                font-weight: 700;
+                padding: 4px 14px;
+                border-radius: 20px;
+                white-space: nowrap;
+                font-family: 'Noto Serif TC', serif;
+                letter-spacing: 0.05em;
+                pointer-events: none;
+            ">点击此区域投入弹珠 ↓</div>
+        `;
+
+        // 注入脉冲动画 CSS（如果尚未注入）
+        if (!document.getElementById('tutorial-launch-guide-style')) {
+            const style = document.createElement('style');
+            style.id = 'tutorial-launch-guide-style';
+            style.textContent = `
+                @keyframes tutorial-pulse-border {
+                    0%, 100% { border-color: rgba(251,191,36,0.85); box-shadow: 0 0 0 0 rgba(251,191,36,0); }
+                    50% { border-color: rgba(251,191,36,1); box-shadow: 0 0 0 6px rgba(251,191,36,0.15); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        document.body.appendChild(guide);
     },
 
     /**

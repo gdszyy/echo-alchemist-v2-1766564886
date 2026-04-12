@@ -387,6 +387,8 @@ export const game_system = {
         const confirmBtn = document.getElementById('confirm-selection-btn');
         if (countEl) countEl.innerText = count;
         if (confirmBtn) confirmBtn.disabled = count !== 3;
+        // 通知教程系统：已选中3枚弹珠
+        if (count === 3) eventBus.emit('tutorial:marbles_ready');
     },
 
     /**
