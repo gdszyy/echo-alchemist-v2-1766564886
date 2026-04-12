@@ -159,28 +159,30 @@ export const game_phase = {
 
             } else if (boardLayout === 'sparse') {
                 // 稀疏间隔：偶数行正常列数，奇数行减 4 列居中
+                // [修复] 奇数行加标准交错偏移，防止弹珠直线穿透
                 if (!isOddRow) {
                     rowCols = baseCols;
                     rowOffsetX = 0; // 偶数行正常，不交错偏移
                 } else {
                     const narrowCols = Math.max(3, baseCols - 4);
                     rowCols = narrowCols;
-                    // 奇数行居中对齐
+                    // 奇数行居中后再加标准交错偏移
                     const rowWidth = (narrowCols - 1) * spacingX;
-                    rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX;
+                    rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX + spacingX / 2;
                 }
 
             } else if (boardLayout === 'mirror_sync') {
-                // 镜像同步：列数减 2，奇偶行均不交错（对齐排列）
+                // 镜像同步：列数减 2，奇数行加标准交错偏移
+                // [修复] 恢复奇偶行交错，防止弹珠直线穿透；镜像基于 x 坐标对称
                 const syncCols = Math.max(3, baseCols - 2);
                 rowCols = syncCols;
-                // 水平居中，奇偶行都不交错
                 const rowWidth = (syncCols - 1) * spacingX;
                 rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX;
-                // 注意：不加 isOddRow 偏移，奇偶行对齐
+                rowOffsetX += isOddRow ? spacingX / 2 : 0; // 恢复标准交错
 
             } else if (boardLayout === 'wide_narrow') {
                 // 宽窄交替：偶数行 +2 列，奇数行 -2 列
+                // [修复] 奇数行加标准交错偏移，防止弹珠直线穿透
                 if (!isOddRow) {
                     const wideCols = baseCols + 2;
                     rowCols = wideCols;
@@ -190,7 +192,7 @@ export const game_phase = {
                     const narrowCols = Math.max(3, baseCols - 2);
                     rowCols = narrowCols;
                     const rowWidth = (narrowCols - 1) * spacingX;
-                    rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX;
+                    rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX + spacingX / 2;
                 }
 
             } else {
@@ -236,18 +238,26 @@ export const game_phase = {
         }
 
         // [镜像同步] 预计算钉子的镜像索引
+        // [修复] 交错后奇偶行的 x 坐标不再简单对称于列号，改为基于 x 坐标对称于画布中心
         if (boardLayout === 'mirror_sync') {
+            const centerX = (this.width && this.width > 0) ? this.width / 2 : 200;
             for (let i = 0; i < this.pegs.length; i++) {
                 const p = this.pegs[i];
-                // 在同一行寻找镜像列的钉子
-                // 镜像列 = (rowCols - 1) - currentCol
-                // 注意：mirror_sync 布局下每行的 rowCols 是固定的
-                const mirrorCol = (rowCols - 1) - p.col;
-                if (mirrorCol !== p.col) {
-                    const mirrorPeg = this.pegs.find(mp => mp.row === p.row && mp.col === mirrorCol);
-                    if (mirrorPeg) {
-                        p.mirrorIdx = this.pegs.indexOf(mirrorPeg);
+                // 镜像 x = 2 * centerX - p.x，在同行中寻找 x 最近的钉子作为镜像
+                const mirrorX = 2 * centerX - p.pos.x;
+                const samRowPegs = this.pegs.filter((mp, mi) => mi !== i && mp.row === p.row);
+                let bestMirror = null;
+                let bestDist = Infinity;
+                for (const mp of samRowPegs) {
+                    const dist = Math.abs(mp.pos.x - mirrorX);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        bestMirror = mp;
                     }
+                }
+                // 容差：半个钉子间距内才认为是有效镜像
+                if (bestMirror && bestDist < spacingX * 0.6 && bestMirror !== p) {
+                    p.mirrorIdx = this.pegs.indexOf(bestMirror);
                 }
             }
         }
