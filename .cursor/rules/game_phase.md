@@ -82,7 +82,26 @@ globs: ["src/game_phase.js"]
 | `chimera` | 奇美拉 | 大 Boss | 初始高温，狂暴后温度直接达到阈值 |
 | `ouroboros` | 奥罗波罗斯 | 大 Boss | 每 N 回合切换词缀组，狂暴后切换加速 |
 
-## 6. 难度平衡系统 (Difficulty Balance System)
+## 6. Boss 遗物与固定回合遗物事件的冲突处理
+
+### 6.1 问题描述
+当 Boss 被击杀的回合数恰好是 `relicRoundInterval`（默认为 3）的倍数时（例如：第 5 回合击杀 Boss，`phase_finalizeRound` 后 `round++` 变为 6，而 `6 % 3 == 0`），会同时触发两个遗物弹窗：
+
+1. `combat_system.js` 中 Boss 击杀后的 `setTimeout(() => this.ui_showRelicSelection(), 500)`；
+2. `phase_finalizeRound` 中固定回合遗物事件的 `setTimeout(() => this.ui_showRelicSelection(), 500)`。
+
+第二个 `ui_showRelicSelection` 会覆盖 `stateBeforeRelic` 为 `'relic_event'`，导致玩家选择或跳过遗物后，`ui_closeRelicSelection` 走入 `else` 分支直接调用 `sys_initSelectionPhase()`，玩家看起来就像“还没来得及领取遗物就跳到下一个阶段”。
+
+### 6.2 修复方案：`_pendingBossRelic` 标志位
+
+- **`combat_system.js`**：Boss 击杀时设置 `this._pendingBossRelic = true`。
+- **`game_phase.js`**：`phase_finalizeRound` 的固定遗物事件判断中，若 `_pendingBossRelic === true`，则跳过本次固定遗物事件（不弹窗、不 return）。
+- **`shop.js`**：`ui_closeRelicSelection` 关闭遗物界面时重置 `this._pendingBossRelic = false`。
+- **`game_system.js`**：`sys_resetGame` 中初始化 `this._pendingBossRelic = false`。
+
+> **注意**：固定遗物事件被跳过后不会补发，属于设计取舍（Boss 遗物已是額外奖励）。如需未来补发逻辑，可在 `ui_closeRelicSelection` 中判断 `_pendingBossRelic` 并延迟触发下一次固定遗物事件。
+
+## 7. 难度平衡系统 (Difficulty Balance System)
 ### 5.1 战后高压因子 (Post-Boss Surge)
 - **触发时机**: 击杀 Boss 时（监听 `boss:defeated` 事件）
 - **机制**: 

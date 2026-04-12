@@ -177,6 +177,9 @@ export const shop_system = {
         overlay.classList.remove('active-phase');
         overlay.classList.add('hidden-phase');
         
+        // [BUGFIX] 遗物界面关闭时，清除 Boss 遗物待领取标志
+        this._pendingBossRelic = false;
+        
         // [核心修复] 根据打开前的状态决定去向
         if (this.stateBeforeRelic === 'gathering') {
             // 情况 A: 在收集阶段(打中遗物槽)打开的

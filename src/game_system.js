@@ -119,13 +119,6 @@ export const game_system = {
 
         this.enemyWidth = (this.width / CONFIG.gameplay.enemyCols);
         this.enemyHeight = this.enemyWidth;
-
-        // 动态计算战斗网格顶部安全起始 Y（避免被顶部半透明栏遮挡）
-        // 读取 #unified-top-bar 的实际渲染高度，加上 8px 安全间距
-        const topBarEl = document.getElementById('unified-top-bar');
-        const topBarH = topBarEl ? topBarEl.getBoundingClientRect().height : 52;
-        this.combatGridTopY = topBarH + 8;
-
         this.ui_updateUICache();
 
         if (this.phase === 'gathering') {
@@ -141,8 +134,8 @@ export const game_system = {
         // 注入局外升级效果
         this.meta_applyUpgrades();
 
-        // 生成初始敌人（使用 combatGridTopY 确保不被顶部半透明栏遮挡）
-        const startY = this.combatGridTopY;
+        // 生成初始敌人
+        const startY = 80;
         for (let i = 0; i < CONFIG.gameplay.startRows; i++) {
             this.spawn_spawnEnemyRowAt(startY + i * this.enemyHeight);
         }
@@ -200,6 +193,8 @@ export const game_system = {
         // 重置 Boss 系统状态
         this.bossHistory = [];
         this._pendingBossSpawn = null;
+        // [BUGFIX] 重置 Boss 遗物待领取标志
+        this._pendingBossRelic = false;
         // [难度平衡] 重置战后高压因子
         this.postBossMultiplier = 1.0;
         this.postBossSurgeRoundsLeft = 0;

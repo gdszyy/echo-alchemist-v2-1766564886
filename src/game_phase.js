@@ -200,94 +200,34 @@ export const game_phase = {
         console.log(`[DEBUG] Starting special slot creation: unlockedSlots=${JSON.stringify(this.unlockedSlots)}, slotCount=${this.slotCount}`);
         if (this.unlockedSlots.length > 0 && this.slotCount > 0) {
             const slotTypes = this.unlockedSlots;
+            
+            // [重构] 不再使用随机坐标匹配，而是直接从合法候选钉子池中抽取
+            // 1. 筛选出所有合法的候选钉子索引 (非粉色且未被占用)
+            let validPegIndices = this.pegs
+                .map((p, index) => ({ type: p.type, index }))
+                .filter(item => item.type !== 'pink')
+                .map(item => item.index);
 
-            // [双钉子连线模式] 为每个槽位选取一对相邻钉子，在它们之间建立连线。
-            // 相邻定义：同行水平相邻（差一列）或上下行断对角相邻（差一行 + 差一列）
+            console.log(`[DEBUG] Found ${validPegIndices.length} valid candidate pegs for special slots`);
 
-            // 1. 筛选候选钉子（非粉色）
-            const validPegSet = new Set(
-                this.pegs
-                    .map((p, i) => i)
-                    .filter(i => this.pegs[i].type !== 'pink')
-            );
-
-            // 2. 构建相邻钉子对列表
-            //    判断相邻的依据：两个钉子的坐标距离 ≤ spacingX * 1.6（包含同行和断对角）
-            const adjacentThreshold = spacingX * 1.6;
-            const pegPairs = [];
-            const usedInPairs = new Set(); // 记录已被分配的钉子索引
-
-            const validIndices = [...validPegSet];
-            // 打乱候选钉子顺序，避免总是选择相同区域
-            for (let i = validIndices.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [validIndices[i], validIndices[j]] = [validIndices[j], validIndices[i]];
-            }
-
-            for (const idxA of validIndices) {
-                if (usedInPairs.has(idxA)) continue;
-                const pegA = this.pegs[idxA];
-                // 在剩余候选钉子中找最近的相邻钉子
-                let bestIdxB = -1;
-                let bestDist = Infinity;
-                for (const idxB of validIndices) {
-                    if (idxB === idxA || usedInPairs.has(idxB)) continue;
-                    const pegB = this.pegs[idxB];
-                    const dist = Math.hypot(pegA.pos.x - pegB.pos.x, pegA.pos.y - pegB.pos.y);
-                    if (dist <= adjacentThreshold && dist < bestDist) {
-                        bestDist = dist;
-                        bestIdxB = idxB;
-                    }
-                }
-                if (bestIdxB !== -1) {
-                    pegPairs.push([idxA, bestIdxB]);
-                    usedInPairs.add(idxA);
-                    usedInPairs.add(bestIdxB);
-                }
-            }
-
-            console.log(`[DEBUG] Found ${pegPairs.length} adjacent peg pairs for special slots`);
-
-            // 3. 从对列表中随机抖取，创建连线槽位
             let createdCount = 0;
-            // 打乱对列表
-            for (let i = pegPairs.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [pegPairs[i], pegPairs[j]] = [pegPairs[j], pegPairs[i]];
-            }
-
-            for (const [idxA, idxB] of pegPairs) {
-                if (createdCount >= this.slotCount) break;
-                const pegA = this.pegs[idxA];
-                const pegB = this.pegs[idxB];
+            while (createdCount < this.slotCount && validPegIndices.length > 0) {
+                // 2. 从候选池中随机抽取一个索引
+                const randIdxInPool = Math.floor(Math.random() * validPegIndices.length);
+                const pegIdx = validPegIndices.splice(randIdxInPool, 1)[0];
+                
                 const type = slotTypes[Math.floor(Math.random() * slotTypes.length)];
-
-                const slot = new SpecialSlot(pegA.pos.x, pegA.pos.y, pegB.pos.x, pegB.pos.y, type);
-                slot.pegIndex  = idxA; // 主钉子索引（向后兼容）
-                slot.pegIndex2 = idxB; // 第二个钉子索引
+                const peg = this.pegs[pegIdx];
+                
+                // 3. 实例化 SpecialSlot
+                const slot = new SpecialSlot(peg.pos.x, peg.pos.y, spacingX * 0.8, type);
+                slot.pegIndex = pegIdx;
                 this.specialSlots.push(slot);
+                
                 createdCount++;
-                console.log(`[DEBUG] Created link slot: type=${type}, pegs=[${idxA},${idxB}], pos=(${pegA.pos.x.toFixed(0)},${pegA.pos.y.toFixed(0)})->(${pegB.pos.x.toFixed(0)},${pegB.pos.y.toFixed(0)})`);
+                console.log(`[DEBUG] Created special slot: type=${type}, pegIdx=${pegIdx}, pos=(${peg.pos.x}, ${peg.pos.y})`);
             }
-
-            // 如果相邻对不够，尝试将剩余槽位放到任意单钉子上（将单钉子自身两端小偏移形成短连线）
-            if (createdCount < this.slotCount) {
-                const remaining = validIndices.filter(i => !usedInPairs.has(i));
-                for (const idxA of remaining) {
-                    if (createdCount >= this.slotCount) break;
-                    const pegA = this.pegs[idxA];
-                    const type = slotTypes[Math.floor(Math.random() * slotTypes.length)];
-                    // 将单钉子两端小偏移，形成一段短连线
-                    const halfW = spacingX * 0.35;
-                    const slot = new SpecialSlot(pegA.pos.x - halfW, pegA.pos.y, pegA.pos.x + halfW, pegA.pos.y, type);
-                    slot.pegIndex  = idxA;
-                    slot.pegIndex2 = idxA;
-                    this.specialSlots.push(slot);
-                    createdCount++;
-                    console.log(`[DEBUG] Created fallback single-peg slot: type=${type}, pegIdx=${idxA}`);
-                }
-            }
-
+            
             console.log(`[DEBUG] Finished special slot creation: final count=${this.specialSlots.length}, target=${this.slotCount}`);
         } else {
             console.log(`[DEBUG] Skipping special slot creation: unlockedSlots.length=${this.unlockedSlots.length}, slotCount=${this.slotCount}`);
@@ -682,11 +622,19 @@ phase_gathering_getRandomPegType() {
 
         this.isEnemyTurn = false;
         // 遗物事件检查
+        // [BUGFIX] 若本回合已因击杀 Boss 而弹出遗物界面（_pendingBossRelic 标志），
+        // 则跳过固定回合遗物事件，避免双重触发导致 stateBeforeRelic 被覆盖、
+        // 玩家来不及领取就被强制跳转到下一阶段。
         if (this.round % CONFIG.gameplay.relicRoundInterval == 0) {
-            showToast("✨ 命魔的馈赠 ✨");
-            this.phase = 'relic_event';
-            setTimeout(() => { this.ui_showRelicSelection(); }, 500);
-            return;
+            if (this._pendingBossRelic) {
+                // Boss 遗物已在弹出队列中，本次固定遗物事件延后到下一个间隔
+                console.log('[RelicEvent] 本回合 Boss 遗物优先，固定遗物事件已跳过。');
+            } else {
+                showToast("✨ 命魔的馈赠 ✨");
+                this.phase = 'relic_event';
+                setTimeout(() => { this.ui_showRelicSelection(); }, 500);
+                return;
+            }
         }
         
         
@@ -1505,10 +1453,10 @@ phase_gathering_getRandomPegType() {
             p.draw(this.ctx, pegRadius); 
             p.resetLight();
             
-            // 调试日志：检查是否有连线槽位的两端钉子包含当前钉子
-            const hasSlot = this.specialSlots.some(s => s.pegIndex === idx || s.pegIndex2 === idx);
+            // 调试日志：检查是否有槽位叠加在当前钉子上
+            const hasSlot = this.specialSlots.some(s => s.pegIndex === idx);
             if (hasSlot && Math.random() < 0.01) {
-                console.log(`[DEBUG] Rendering peg ${idx} linked to special slot at (${p.pos.x.toFixed(1)}, ${p.pos.y.toFixed(1)})`);
+                console.log(`[DEBUG] Rendering peg ${idx} with overlaid special slot at (${p.pos.x.toFixed(1)}, ${p.pos.y.toFixed(1)})`);
             }
         });
 
