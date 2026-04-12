@@ -46,6 +46,7 @@ export const EVENT_TYPES = {
     UI_RUNE_CHARGE_LEVEL_UP: 'ui:rune_charge_level_up', // 充能满 → 刷新符文预览（带特效）
     UI_RUNE_CHARGE_UPDATE: 'ui:rune_charge_update',    // 更新充能条进度
     UI_RUNE_CHARGE_CLAIM: 'ui:rune_charge_claim',      // 回合结束领取符文 → 入背包动画
+    UI_RUNE_CLAIM_AFTER_ENEMY: 'ui:rune_claim_after_enemy', // 敌人动作后领取符文（充能/掉落）→ 飞入背包动画
     UI_CHROMATIC_ABERRATION: 'ui:chromatic_aberration', // CRT 色差特效
     UI_COMBAT_MESSAGE: 'ui:combat_message',            // 战斗消息文本
     UI_ROUND_NUM_UPDATE: 'ui:round_num_update',        // 更新回合数显示

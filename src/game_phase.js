@@ -710,6 +710,53 @@ phase_gathering_getRandomPegType() {
     },
 
 /**
+     * @method phase_claimPendingRunes
+     * @description 敌人动作后领取待入库符文：
+     *   1. 充能符文（combo充能奖励）
+     *   2. 场地掉落符文（回合结算自动拾取）
+     * 对每个符文触发飞入背包动画，让玩家知道获得了这些符文。
+     * 应在 phase_finalizeRound 之前调用（敌人动作后）。
+     */
+    phase_claimPendingRunes() {
+        // 收集所有待领取符文（充能符文 + 掉落符文）
+        const pendingRunes = [];
+
+        // 1. 充能符文：如果充能有奖励，先入库再加入动画队列
+        const chargeDef = this.runeChargeCurrentRune;
+        if (chargeDef) {
+            const chargeLevel = this.runeChargeCurrentLevel || 1;
+            this.runeInventory.push({ id: chargeDef.id, level: chargeLevel });
+            pendingRunes.push({ runeDef: chargeDef, level: chargeLevel, source: 'charge' });
+            // 重置充能状态（不再在 combat_runeCharge_claimReward 中重复入库）
+            this.runeChargeValue        = 0;
+            this.runeChargeLevel        = 0;
+            this.runeChargeCurrentRune  = null;
+            this.runeChargeCurrentLevel = 1;
+            // 音效
+            try { if (audio?.playPowerup) audio.playPowerup(); } catch(e) {}
+        }
+
+        // 2. 掉落符文：将场地掉落符文入库，加入动画队列
+        if (this.runeLootItems && this.runeLootItems.length > 0) {
+            this.runeLootItems.forEach(loot => {
+                if (!loot.active) return;
+                const runeDef = RUNE_DB.find(r => r.id === loot.runeId);
+                if (!runeDef) { loot.active = false; return; }
+                const level = loot.level || 1;
+                this.runeInventory.push({ id: loot.runeId, level });
+                pendingRunes.push({ runeDef, level, source: 'loot', x: loot.x, y: loot.y });
+                loot.active = false;
+            });
+            this.runeLootItems = [];
+        }
+
+        // 3. 如果有待领取符文，触发飞入背包动画事件
+        if (pendingRunes.length > 0) {
+            eventBus.emit(EVENT_TYPES.UI_RUNE_CLAIM_AFTER_ENEMY, { runes: pendingRunes });
+        }
+    },
+
+/**
      * @method startEnemyTurnLogic
      * @description 启动敌人回合：锁定状态、显示UI提示、并计算所有敌人的移动与技能
      */
@@ -765,36 +812,10 @@ phase_gathering_getRandomPegType() {
             }
         }
 
-        // --- [充能符文系统] 战斗结束后领取充能奖励（延迟 300ms 让动画在战斗结束后播放） ---
-        setTimeout(() => {
-            this.combat_runeCharge_claimReward();
-            // 将局内符文库存同步到存档（用于商店购买）
-            this.saveData.runeInventory = (this.runeInventory || []).slice();
-            this.sys_saveData();
-        }, 300);
-
-        // --- [符文系统] 自动拾取掉落符文 ---
-        if (this.runeLootItems && this.runeLootItems.length > 0) {
-            this.runeLootItems.forEach(loot => {
-                if (!loot.active) return;
-                // 查找符文定义，获取名称用于视觉反馈
-                const runeDef = RUNE_DB.find(r => r.id === loot.runeId);
-                const runeName = runeDef ? runeDef.name : loot.runeId;
-                // 将符文转化为 { id, level } 对象并推入库存
-                // loot.level 由掉落生成时设置（Boss 掉落可能为 2+），默认为 1
-                this.runeInventory.push({ id: loot.runeId, level: loot.level || 1 });
-                // 视觉反馈：FloatingText 显示「+符文名称」
-                this.spawn_createFloatingText(
-                    loot.x,
-                    loot.y - 20,
-                    `+${runeName}`,
-                    '#fbbf24'
-                );
-                loot.active = false;
-            });
-            // 清空 runeLootItems
-            this.runeLootItems = [];
-        }
+        // --- [符文领取] 充能符文和掉落符文的领取已提前到敌人动作后（phase_claimPendingRunes）执行
+        // 仅将库存同步到存档（符文已在 phase_claimPendingRunes 中入库）
+        this.saveData.runeInventory = (this.runeInventory || []).slice();
+        this.sys_saveData();
 
         // --- [Glacies 狂暴] Peg 冻结回合数递减 ---
         if (this.pegs && Array.isArray(this.pegs)) {
@@ -1481,7 +1502,17 @@ phase_gathering_getRandomPegType() {
                         this.enemyTurnTimer = 0;
                         this.enemies.forEach(e => e.hasActedThisTurn = false);
                     } else {
-                        this.phase_finalizeRound(); 
+                        // [敌人动作后领取符文] 先领取待入库符文（飞入背包动画），再进入回合结算
+                        // 使用 _runeClaimPending 标志防止重复触发
+                        if (!this._runeClaimPending) {
+                            this._runeClaimPending = true;
+                            this.phase_claimPendingRunes();
+                            // 延迟 600ms 让符文飞入动画播放完毕，再进入回合结算
+                            setTimeout(() => {
+                                this._runeClaimPending = false;
+                                this.phase_finalizeRound();
+                            }, 600);
+                        }
                     }
                     return;
                 }

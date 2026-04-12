@@ -216,6 +216,8 @@ export const game_system = {
         // 重置 遗物串行标志
         this._pendingBossRelic = false;
         this._pendingRelicEvent = false;
+        // 重置 敌人动作后符文领取标志
+        this._runeClaimPending = false;
         // [难度平衡] 重置战后高压因子
         this.postBossMultiplier = 1.0;
         this.postBossSurgeRoundsLeft = 0;

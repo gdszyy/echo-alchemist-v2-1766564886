@@ -907,6 +907,103 @@ export const hud_system = {
                 slot.className = 'empty';
             }, 900);
         });
+
+        // ── 敌人动作后领取符文 → 多个符文依次飞入背包动画 ────────────────
+        eventBus.on(EVENT_TYPES.UI_RUNE_CLAIM_AFTER_ENEMY, ({ runes }) => {
+            if (!runes || runes.length === 0) return;
+
+            // 获取目标区域：符文库存计数显示元素（飞入背包的终点）
+            const targetEl = document.getElementById('rune-inventory-count') 
+                          || document.getElementById('rune-inventory-container');
+
+            runes.forEach((runeInfo, index) => {
+                const { runeDef, level, source, x: lootX, y: lootY } = runeInfo;
+                if (!runeDef) return;
+
+                // 延迟播放，多个符文依次错开（每个间隔 150ms）
+                setTimeout(() => {
+                    // 确定起始位置
+                    let startX, startY;
+                    if (source === 'charge') {
+                        // 充能符文：从充能槽位置出发
+                        const chargeSlot = document.getElementById('combat-rune-single-slot');
+                        if (chargeSlot) {
+                            const rect = chargeSlot.getBoundingClientRect();
+                            startX = rect.left + rect.width / 2;
+                            startY = rect.top + rect.height / 2;
+                        } else {
+                            startX = window.innerWidth / 2;
+                            startY = window.innerHeight / 2;
+                        }
+                    } else {
+                        // 掉落符文：从 canvas 坐标转换为屏幕坐标
+                        const canvas = document.getElementById('gameCanvas');
+                        if (canvas && lootX != null && lootY != null) {
+                            const canvasRect = canvas.getBoundingClientRect();
+                            const scaleX = canvasRect.width  / (canvas.width  || canvasRect.width);
+                            const scaleY = canvasRect.height / (canvas.height || canvasRect.height);
+                            startX = canvasRect.left + lootX * scaleX;
+                            startY = canvasRect.top  + lootY * scaleY;
+                        } else {
+                            startX = window.innerWidth / 2;
+                            startY = window.innerHeight / 3;
+                        }
+                    }
+
+                    // 确定终点位置：符文库存区域
+                    let endX = window.innerWidth - 60;
+                    let endY = window.innerHeight - 60;
+                    if (targetEl) {
+                        const targetRect = targetEl.getBoundingClientRect();
+                        endX = targetRect.left + targetRect.width / 2;
+                        endY = targetRect.top  + targetRect.height / 2;
+                    }
+
+                    // 创建飞行符文元素
+                    const flyEl = document.createElement('div');
+                    flyEl.className = 'rune-claim-fly rune-claim-fly--to-bag';
+                    flyEl.style.left = `${startX - 18}px`;
+                    flyEl.style.top  = `${startY - 18}px`;
+                    // 设置飞入背包的终点偏移量
+                    flyEl.style.setProperty('--fly-to-x', `${endX - startX}px`);
+                    flyEl.style.setProperty('--fly-to-y', `${endY - startY}px`);
+                    flyEl.style.fontSize = '22px';
+
+                    // 符文图标（带稀有度边框和等级角标）
+                    const flyIconFrame = _buildRuneIconEl(runeDef, level);
+                    flyEl.appendChild(flyIconFrame);
+                    document.body.appendChild(flyEl);
+
+                    // 充能槽消失动画（仅充能符文）
+                    if (source === 'charge') {
+                        const slot = document.getElementById('combat-rune-single-slot');
+                        if (slot) {
+                            slot.classList.remove('rune-refresh');
+                            void slot.offsetWidth;
+                            slot.classList.add('rune-claim-out');
+                        }
+                    }
+
+                    // 动画结束后清理，并刷新背包显示
+                    setTimeout(() => {
+                        flyEl.remove();
+                        if (source === 'charge') {
+                            const slot = document.getElementById('combat-rune-single-slot');
+                            if (slot) {
+                                const glowOverlay = slot.querySelector('.rune-slot-glow-overlay');
+                                slot.innerHTML = '';
+                                if (glowOverlay) slot.appendChild(glowOverlay);
+                                slot.className = 'empty';
+                            }
+                        }
+                        // 最后一个符文飞入后刷新背包显示
+                        if (index === runes.length - 1) {
+                            this.ui_updateRuneGrid && this.ui_updateRuneGrid();
+                        }
+                    }, 900);
+                }, index * 150);
+            });
+        });
     },
 
 

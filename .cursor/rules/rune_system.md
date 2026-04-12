@@ -106,7 +106,7 @@ globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js", "src/c
 
 ## 8. 战斗阶段充能符文系统 (`combat_system.js`)
 
-> **状态**: 待实现（当前代码存在 Bug，功能完全失效）
+> **状态**: 已实现（充能奖励在敌人动作后领取，伴飞入背包动画）
 
 ### 8.1 系统概述
 
@@ -234,24 +234,22 @@ combat_runeCharge_levelUp() {
 },
 ```
 
-**修改 `combat_runeCharge_claimReward`（使用动态等级入库）：**
+**充能符文领取时机（新方案）：**
 
-```js
-combat_runeCharge_claimReward() {
-    const runeDef = this.runeChargeCurrentRune;
-    if (!runeDef) return;
-    const level = this.runeChargeCurrentLevel || 1;
-    this.runeInventory.push({ id: runeDef.id, level });
-    eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_CLAIM, { runeDef, level });
-    try { if (audio?.playPowerup) audio.playPowerup(); } catch(e) {}
-    this.runeChargeValue        = 0;
-    this.runeChargeLevel        = 0;
-    this.runeChargeCurrentRune  = null;
-    this.runeChargeCurrentLevel = 1;
-},
-```
+充能符文不再在 `phase_finalizeRound` 中领取，改为在敌人动作后由 `phase_claimPendingRunes` 统一领取：
+
+- `phase_claimPendingRunes()` 在 `enemyTurnTimer > 60` 时被调用（即敌人动作完毕后）
+- 它检查 `runeChargeCurrentRune` 是否有奖励，有则直接入库并重置充能状态
+- 同时检查 `runeLootItems` 中的掉落符文，一并入库
+- 对所有待领取符文触发 `UI_RUNE_CLAIM_AFTER_ENEMY` 事件，由 `hud.js` 处理飞入背包动画
+- 延迟 600ms 后进入 `phase_finalizeRound`
+
+**`combat_runeCharge_claimReward`（已废弃，不再调用）：**
+
+该函数仍保留在 `combat_system.js` 中但不再被任何地方调用。充能符文的入库和动画已全部转移到 `phase_claimPendingRunes` + `UI_RUNE_CLAIM_AFTER_ENEMY` 事件流。
 
 ### 8.6 UI 事件变更
 
 - `UI_RUNE_CHARGE_LEVEL_UP` 事件新增 `runeLevel` 字段，`hud.js` 需同步在符文槽上展示等级角标（如 "Lv.2"）。
-- `UI_RUNE_CHARGE_CLAIM` 事件新增 `level` 字段，入背包动画需展示正确等级。
+- `UI_RUNE_CHARGE_CLAIM` 事件已废弃，改由 `UI_RUNE_CLAIM_AFTER_ENEMY` 事件统一处理充能符文和掉落符文的领取动画。
+- `UI_RUNE_CLAIM_AFTER_ENEMY` 事件载荷：`{ runes: [{ runeDef, level, source: 'charge'|'loot', x?, y? }] }`，由 `hud.js` 监听并对每个符文创建飞入背包动画。
