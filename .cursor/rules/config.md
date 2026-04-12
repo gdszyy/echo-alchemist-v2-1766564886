@@ -20,31 +20,29 @@ globs: ["src/config.js"]
 - **格式一致性**: 添加新数据字典条目时，必须严格遵循现有对象的键名和数据类型结构。
 - **注释说明**: 修改核心数値或添加新配置项时，必须添加注释说明其用途和影响范围。
 
-## 4. RELIC_DB 钉盘形态遗物规范（新增）
+## 4. RELIC_DB 钉盘形态遗物规范（异型布局版）
 
-钉盘形态遗物通过修改 `Game` 实例上的以下字段来动态调整钉盘布局，这些字段在 `core.js` 中初始化，在 `game_system.js` 的 `sys_resetGame` 中重置：
+钉盘形态遗物通过修改 `Game` 实例上的 `boardLayout` 字段来切换钉盘布局模式。该字段在 `core.js` 中初始化，在 `game_system.js` 的 `sys_resetGame` 中重置。**所有钉盘形态遗物只能获取一次（maxStacks: 1）**。
 
 | 字段 | 类型 | 默认值 | 用途 |
 | :--- | :--- | :--- | :--- |
-| `boardSpacingXMult` | number | `1.0` | 水平间距乘数，密集阵列遗物缩小、宽幅延展遗物增大 |
-| `boardSpacingYMult` | number | `1.0` | 垂直间距乘数，垂直压缩遗物缩小 |
-| `boardColsBonus` | number | `0` | 额外列数，菱形矩阵和宽幅延展遗物增加 |
-| `boardDoubleStagger` | boolean | `false` | 开启双重交错模式，镜像交错遗物开启 |
+| `boardLayout` | string | `'default'` | 异型布局枚举，可选値见下表 |
 
-**钉盘形态遗物列表**：
+**布局枚举列表**：
 
-| 遗物 ID | 效果标识 | 策略定位 | 与行数遗物联合效果 |
-| :--- | :--- | :--- | :--- |
-| `dense_array` | `board_spacing_down` | 高频触发流 | 行数多+间距小=超密集钉盘 |
-| `wide_spread` | `board_spacing_up` | 路径控制流 | 行数多+间距大=超宽广钉盘 |
-| `diamond_matrix` | `board_cols_up` | 槽位流 | 行数多+列数多=最大面积 |
-| `vertical_compress` | `board_spacing_y_down` | 极限触发流 | 行数多+垂直压缩=有限空间内最多行 |
-| `mirror_stagger` | `board_double_stagger` | 随机爆发流 | 行数多+双重交错=最大随机化 |
+| `boardLayout` 値 | 遗物 ID | 布局逻辑 | 策略定位 | 与行数遗物联合效果 |
+| :--- | :--- | :--- | :--- | :--- |
+| `'default'` | （默认） | 标准交错矩形 | 通用 | 行数多=更多行的标准钉盘 |
+| `'triangle'` | `triangle_formation` | 顶行最宽，每行递减 1 列 | 漏斗流 | 行越多三角越尖，弹珠越集中于底部中央 |
+| `'diamond'` | `diamond_formation` | 前半段扩展，后半段收缩 | 中段爆发流 | 行越多菱形越饱满，中段宽度越大 |
+| `'sparse'` | `sparse_interval` | 偶数行正常，奇数行减 4 列居中 | 通道流 | 行越多通道节奏越强 |
+| `'mirror_sync'` | `mirror_sync` | 列数减 2，奇偶行对齐不交错 | 直线穿透流 | 行越多直线通道越长 |
+| `'wide_narrow'` | `wide_narrow` | 偶数行 +2 列，奇数行 -2 列 | 边缘捕获流 | 行越多宽窄层次越丰富 |
 
-**修改警告**：
-- `boardSpacingXMult` 和 `boardSpacingYMult` 每次叠加是乘法关系，不是加法。三层密集阵列后 spacingX 为基础值的 `0.8^3 = 51.2%`。
-- 严禁将 `boardSpacingXMult` 设置为小于 `0.3`，否则钉子会重叠。
-- `boardColsBonus` 增加后，钉盘宽度不得超过 Canvas 宽度，否则钉子会超出屏幕。
+**实现警告**：
+- 异型布局不修改 `spacingX`/`spacingY`，仅通过逐行控制列数和水平偏移实现形状变化。严禁在遗物效果中修改间距値，否则弹珠会卡在钉子之间。
+- `boardLayout` 是互斥枚举，同时只能激活一种布局。玩家获得第二个钉盘形态遗物时，新布局会覆盖旧布局。
+- 各布局均保留标准交错偏移（`isOddRow` 逻辑），除非该布局明确需要对齐排列（`mirror_sync`）。
 
 ## 5. probabilities 初始权重设计规范
 

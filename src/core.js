@@ -221,10 +221,14 @@ class Game {
         this.currentRows = CONFIG.gameplay.rows; 
         this.boardBottomY = 0;
         // ==================== 钉盘形态遗物状态字段 ====================
-        this.boardSpacingXMult = 1.0;   // 水平间距乘数（密集阵列/宽幅延展遗物）
-        this.boardSpacingYMult = 1.0;   // 垂直间距乘数（垂直压缩遗物）
-        this.boardColsBonus = 0;        // 额外列数（菱形矩阵/宽幅延展遗物）
-        this.boardDoubleStagger = false; // 双重交错模式（镜像交错遗物）
+        // boardLayout: 异型布局枚举，可选値：
+        //   'default'         - 标准交错矩形（默认）
+        //   'triangle'        - 三角形布局（顶行最宽，每行递减1列）
+        //   'diamond'         - 菱形布局（前半扩展，后半收缩）
+        //   'sparse'          - 稀疏间隔（偶数行正常，奇数行减4列居中）
+        //   'mirror_sync'     - 镜像同步（列数减2，奇偶行对齐不交错）
+        //   'wide_narrow'     - 宽窄交替（偶数行+2列，奇数行-2列）
+        this.boardLayout = 'default';
         
         // [修复] 确保所有 UI 覆盖层在游戏开始时都被隐藏
         document.querySelectorAll('.ui-overlay').forEach(el => { 

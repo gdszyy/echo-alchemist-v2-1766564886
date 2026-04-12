@@ -102,24 +102,19 @@ export const game_phase = {
     phase_gathering_initPachinko(shouldInherit = false) {
         // [修复] 使用动态行数
         const rows = this.currentRows || CONFIG.gameplay.rows;
-        // [钉盘形态遗物] 读取遗物状态字段，动态计算列数与间距
         const baseCols = CONFIG.gameplay.cols || 10;
-        const totalCols = baseCols + (this.boardColsBonus || 0);
-        const baseSpacingX = CONFIG.gameplay.spacingX || 45;
-        const baseSpacingY = CONFIG.gameplay.spacingY || 45;
-        // 应用间距乘数（密集阵列/宽幅延展/垂直压缩遗物）
-        const spacingX = baseSpacingX * (this.boardSpacingXMult || 1.0);
-        const spacingY = baseSpacingY * (this.boardSpacingYMult || 1.0);
-        // 镜像交错遗物：偶数行也向右偏移半格
-        const doubleStagger = this.boardDoubleStagger || false;
+        const spacingX = CONFIG.gameplay.spacingX || 35;
+        const spacingY = CONFIG.gameplay.spacingY || 32;
+        // [钉盘形态遗物] 读取异型布局模式
+        const boardLayout = this.boardLayout || 'default';
         
         // [修复] 修正 width 引用
         // 确保 this.width 在初始化时已正确设置，否则使用默认值 400
         const canvasWidth = (this.width && this.width > 0) ? this.width : 400; 
         const canvasHeight = (this.height && this.height > 0) ? this.height : 600;
         
-        // [钉盘形态遗物] 使用 totalCols 计算水平居中偏移
-        const offsetX = (canvasWidth - (totalCols - 1) * spacingX) / 2;
+        // [钉盘形态遗物] 使用 baseCols 计算水平居中偏移（布局基准宽度）
+        const offsetX = (canvasWidth - (baseCols - 1) * spacingX) / 2;
         
         // [优化] 动态计算 offsetY，确保在矮屏幕下钉子不会被挤出屏幕
         // 预留顶部空间 (约占高度的 20%，但不超过 120px)
@@ -137,13 +132,72 @@ export const game_phase = {
         let maxPegY = 0;
 
         for (let r = 0; r < rows; r++) {
+            // ==================== [钉盘形态遗物] 异型布局逻辑 ====================
+            // 根据 boardLayout 计算每行的列数和水平偏移
+            let rowCols, rowOffsetX;
             const isOddRow = r % 2 !== 0;
-            // [钉盘形态遗物] 使用 totalCols 计算每行列数
-            const rowCols = isOddRow ? totalCols - 1 : totalCols;
-            // [镜像交错遗物] 偶数行也向右偏移半格（doubleStagger 模式）
-            // 普通模式：奇数行偏移 spacingX/2，偶数行不偏移
-            // 双重交错：奇数行偏移 spacingX/2，偶数行偏移 spacingX/4
-            const rowOffsetX = isOddRow ? spacingX / 2 : (doubleStagger ? spacingX / 4 : 0);
+
+            if (boardLayout === 'triangle') {
+                // 三角形：顶行最宽，每行递减 1 列，最少保留 3 列
+                const colsThisRow = Math.max(3, baseCols - r);
+                rowCols = colsThisRow;
+                // 水平居中：计算该行实际宽度，居中对齐
+                const rowWidth = (colsThisRow - 1) * spacingX;
+                rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX;
+                // 保持标准交错偏移
+                rowOffsetX += isOddRow ? spacingX / 2 : 0;
+
+            } else if (boardLayout === 'diamond') {
+                // 菱形：前半段每行 +1 列，后半段每行 -1 列
+                const half = Math.floor(rows / 2);
+                const colsDelta = r <= half ? r : (rows - 1 - r);
+                const colsThisRow = Math.max(3, (baseCols - half) + colsDelta);
+                rowCols = colsThisRow;
+                const rowWidth = (colsThisRow - 1) * spacingX;
+                rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX;
+                rowOffsetX += isOddRow ? spacingX / 2 : 0;
+
+            } else if (boardLayout === 'sparse') {
+                // 稀疏间隔：偶数行正常列数，奇数行减 4 列居中
+                if (!isOddRow) {
+                    rowCols = baseCols;
+                    rowOffsetX = 0; // 偶数行正常，不交错偏移
+                } else {
+                    const narrowCols = Math.max(3, baseCols - 4);
+                    rowCols = narrowCols;
+                    // 奇数行居中对齐
+                    const rowWidth = (narrowCols - 1) * spacingX;
+                    rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX;
+                }
+
+            } else if (boardLayout === 'mirror_sync') {
+                // 镜像同步：列数减 2，奇偶行均不交错（对齐排列）
+                const syncCols = Math.max(3, baseCols - 2);
+                rowCols = syncCols;
+                // 水平居中，奇偶行都不交错
+                const rowWidth = (syncCols - 1) * spacingX;
+                rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX;
+                // 注意：不加 isOddRow 偏移，奇偶行对齐
+
+            } else if (boardLayout === 'wide_narrow') {
+                // 宽窄交替：偶数行 +2 列，奇数行 -2 列
+                if (!isOddRow) {
+                    const wideCols = baseCols + 2;
+                    rowCols = wideCols;
+                    const rowWidth = (wideCols - 1) * spacingX;
+                    rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX;
+                } else {
+                    const narrowCols = Math.max(3, baseCols - 2);
+                    rowCols = narrowCols;
+                    const rowWidth = (narrowCols - 1) * spacingX;
+                    rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX;
+                }
+
+            } else {
+                // default：标准交错矩形
+                rowCols = isOddRow ? baseCols - 1 : baseCols;
+                rowOffsetX = isOddRow ? spacingX / 2 : 0;
+            }
 
             for (let c = 0; c < rowCols; c++) {
                 const x = offsetX + rowOffsetX + c * spacingX;
