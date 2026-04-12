@@ -164,6 +164,13 @@ export const game_system = {
         this.unlockedWeights = { ...CONFIG.probabilities };
         this.guaranteedNextRound = [];
         this.ownedRelics = [];
+        
+        // 补充遗物相关的重置字段
+        this.pinkPegCount = 0;
+        this.hasCombatWall = false;
+        this.unlockedSlots = ['skill_point','wheel'];
+        this.slotCount = 1;
+        this.marbleSizeBonus = 0;
 
         // 清空实体
         this.enemies = [];

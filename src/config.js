@@ -708,12 +708,12 @@ const RELIC_DB = [
         icon: '🌌', 
         desc: '收集階段：釘板高度延伸，額外增加 2 行釘子。', 
         rarity: 'rare', 
-        effect: 'row_count_up' ,maxStacks: 1
+        effect: 'row_count_up', maxStacks: 3
     },
     { id: 'stars_shines', name: '群星闪烁', icon: '✨', desc: '解鎖 [回响弹珠]：双倍获得连击充能。', rarity: 'rare', unlocks: 'resonance', boost: 8 ,maxStacks: 1},
     { id: 'optical_lens', name: '聚焦透鏡', icon: '🔭', desc: '解鎖 [光球]：發射瞬間穿透的折射光束。', rarity: 'legendary', unlocks: 'laser', boost: 10 ,maxStacks: 1},
     //  1. 粉色钉子遗物
-    { id: 'pink_slime', name: '粉紅凝膠', icon: '💗', desc: '收集階段：出現 3 個高彈性粉色釘子 (可疊加)。', rarity: 'common', effect: 'pink_peg_up' ,maxStacks: 1},
+    { id: 'pink_slime', name: '粉紅凝膠', icon: '💗', desc: '收集階段：出現 3 個高彈性粉色釘子 (可疊加)。', rarity: 'common', effect: 'pink_peg_up', maxStacks: 5},
 
     //  2. 战斗底部反弹墙
     { id: 'energy_shield', name: '力場護盾', icon: '🛡️', desc: '戰鬥階段：底部邊界可消耗彈性/穿透次數來反彈子彈。', rarity: 'cursed', effect: 'combat_wall' ,maxStacks: 1},
@@ -724,16 +724,16 @@ const RELIC_DB = [
     { id: 'unlock_split', name: '裂變核心', icon: '☢️', desc: '收集階段：解鎖 [分裂槽] 的出現 (若無槽位則+1)。', rarity: 'rare', effect: 'unlock_slot', slotType: 'split' ,maxStacks: 1},
 
     //  4. 增加特殊槽数量
-    { id: 'slot_expander', name: '空間鑿子', icon: '🔨', desc: '收集階段：特殊槽出現數量 +1。', rarity: 'common', effect: 'slot_count_up' ,maxStacks: 1},
+    { id: 'slot_expander', name: '空間鑿子', icon: '🔨', desc: '收集階段：特殊槽出現數量 +1。', rarity: 'common', effect: 'slot_count_up', maxStacks: 3},
     //  獨立元素遺物
     { id: 'cryo_stone', name: '永恆凍土', icon: '❄️', desc: '解鎖 [冰霜] 屬性 (彈珠與釘子)。', rarity: 'rare', unlocks: 'cryo', boost: 15 ,maxStacks: 1},
     { id: 'pyro_stone', name: '不滅火種', icon: '🔥', desc: '解鎖 [火焰] 屬性 (彈珠與釘子)。', rarity: 'rare', unlocks: 'pyro', boost: 15 ,maxStacks: 1},
     // { id: 'lightning_stone', name: '雷霆之怒', icon: '⚡', desc: '解鎖 [閃電] 屬性 (彈珠與釘子)。', rarity: 'rare', unlocks: 'lightning', boost: 15 },
     
     //  物理套裝遺物 (一次解鎖三種，或者你可以拆開)
-    { id: 'tactical_kit', name: '穿透補給', icon: '↗', desc: '解鎖 [穿透] 屬性。', rarity: 'common', unlocks: ['pierce'], boost: 5 ,maxStacks: 1},
-    { id: 'tactical_kit', name: '散射補給', icon: '🔱', desc: '解鎖 [散射] 屬性。', rarity: 'common', unlocks: ['scatter'], boost: 5 ,maxStacks: 1},
-    { id: 'tactical_kit', name: '增幅補給', icon: '⚔️', desc: '解鎖 [增幅] 屬性。', rarity: 'common', unlocks: ['damage'], boost: 5 ,maxStacks: 1},
+    { id: 'tactical_kit_pierce', name: '穿透補給', maxStacks: 3 , icon: '↗', desc: '解鎖 [穿透] 屬性。', rarity: 'common', unlocks: ['pierce'], boost: 5 ,maxStacks: 1},
+    { id: 'tactical_kit_scatter', name: '散射補給', maxStacks: 3 , icon: '🔱', desc: '解鎖 [散射] 屬性。', rarity: 'common', unlocks: ['scatter'], boost: 5 ,maxStacks: 1},
+    { id: 'tactical_kit_damage', name: '增幅補給', maxStacks: 3 , icon: '⚔️', desc: '解鎖 [增幅] 屬性。', rarity: 'common', unlocks: ['damage'], boost: 5 ,maxStacks: 1},
 
     { id: 'explosive_ammo', name: '高爆火藥', icon: '🧨', desc: '解鎖 [爆破彈珠] 出現，且獲得一顆。', rarity: 'rare', unlocks: 'explosive', boost: 10 ,maxStacks: 1},
     { id: 'prism_shard', name: '七彩稜鏡', icon: '🌈', desc: '解鎖 [彩虹彈珠] 出現，且獲得一顆。', rarity: 'legendary', unlocks: 'rainbow', boost: 5 ,maxStacks: 1},

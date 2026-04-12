@@ -38,7 +38,11 @@ export const shop_system = {
 
         // 2. 准备遗物池
         // 过滤掉玩家已经拥有的遗物 (this.ownedRelics)
-        let pool = RELIC_DB.filter(r => !this.ownedRelics.includes(r.id));  // [Mixin 正常用法：读取 Game 实例状态]
+        let pool = RELIC_DB.filter(r => {
+            const count = this.ownedRelics.filter(id => id === r.id).length;
+            const max = r.maxStacks || 1;
+            return count < max;
+        });  // [Mixin 正常用法：读取 Game 实例状态]
         
         // 如果池子空了（全收集了），就给一些保底的或者是空的
         if (pool.length === 0) {
@@ -89,10 +93,14 @@ export const shop_system = {
             const el = document.createElement('div');
             // 加上 rarity 类名以便 CSS 显示不同边框颜色
             el.className = `relic-card ${relic.rarity || 'common'}`; 
+            const count = this.ownedRelics.filter(id => id === relic.id).length;
+            const max = relic.maxStacks || 1;
+            const stackInfo = max > 1 ? `<div class="relic-stack text-xs text-amber-400 mt-1">当前层数: ${count} / ${max}</div>` : '';
             el.innerHTML = `
                 <div class="relic-icon">${relic.icon}</div>
                 <div class="relic-name">${relic.name}</div>
                 <div class="relic-desc">${relic.desc}</div>
+                ${stackInfo}
             `;
             el.onclick = (e) => { 
                 e.stopPropagation(); 
@@ -122,7 +130,7 @@ export const shop_system = {
         else if (relic.effect === 'combat_wall') {
             this.hasCombatWall = true;
         }else if (relic.effect === 'permanent_size_up') {
-    this.marbleSizeBonus = 2.5; // 每次获得增加 2.5 像素半径（缩小以防卡墙）
+    this.marbleSizeBonus += 2.5; // 每次获得增加 2.5 像素半径（缩小以防卡墙）
 }else if (relic.effect === 'unlock_slot') {
             if (!this.unlockedSlots.includes(relic.slotType)) {
                 this.unlockedSlots.push(relic.slotType);
