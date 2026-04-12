@@ -1259,8 +1259,16 @@ export const spawn_system = {
     /**
      * @method spawn_calculateBossHP
      * @description 计算 Boss 血量。
-     * 公式: BossHP = (templateHP * 0.5) + (peakDPS * expectedKillRounds * 0.5)
-     * 保底: Math.max(BossHP, templateHP * 0.7)
+     *
+     * 后期公式: BossHP = (templateHP * 0.5) + (peakDPS * expectedKillRounds * 0.5)
+     * 前期公式: BossHP = (templateHP * 0.15) + (currentDPS * expectedKillRounds * 0.85)
+     * 保底: Math.max(BossHP, templateHP * floorMultiplier)
+     *
+     * 前期保护机制（Early-Game Protection）:
+     * - 在 [earlyRound, lateRound] 区间内，动态权重和保底倍率均进行线性插展
+     * - 前期高动态权重：血量更贴近玩家实时战力，避免模板血量过高卡死新手
+     * - 前期低保底倍率：降低保底下限，使血量更自由地跡随玩家战力浮动
+     *
      * @param {boolean} isBigBoss - 是否为大 Boss
      * @returns {number} 最终 Boss 血量
      */
@@ -1275,16 +1283,38 @@ export const spawn_system = {
         const bossMult = isBigBoss ? f.bigBossMult : f.miniBossMult;
         const templateHP = (b.enemyBaseHp + r * b.enemyHpPerRound) * exponentialFactor * bossMult;
 
-        // 2. 获取玩家峰値战力
+        // 2. 获取玩家战力（前期优先使用实时弹药期望伤害，后期使用峰値历史均値）
         const peakDPS = this.calc_getPeakAverageDamage();
+        // 实时期望伤害：基于当前弹药队列的预期单发得分，前期样本少时更准确反映玩家实力
+        const currentDPS = this.combat_calculatePlayerExpectedDamage();
+        // 当 peakDPS 为 0（无历史记录）时，回落到 currentDPS
+        const effectiveDPS = peakDPS > 0 ? peakDPS : currentDPS;
 
         // 3. 计算动态血量
         const expectedTurns = isBigBoss ? f.bigBossKillRounds : f.miniBossKillRounds;
-        const dynamicHP = peakDPS * expectedTurns;
+        const dynamicHP = effectiveDPS * expectedTurns;
 
-        // 4. 混合计算 + 保底
-        const mixedHP = (templateHP * f.templateWeight) + (dynamicHP * f.dynamicWeight);
-        const finalHP = Math.max(templateHP * f.floorMultiplier, mixedHP);
+        // 4. 前期保护：根据回合数对动态权重和保底倍率进行线性插展
+        //    round <= earlyRound: 使用前期参数（高动态权重 + 低保底）
+        //    round >= lateRound:  使用后期参数（平衡权重 + 正常保底）
+        const earlyRound = f.earlyRound || 5;
+        const lateRound  = f.lateRound  || 20;
+        // t = 0 表示完全前期，t = 1 表示完全后期
+        const t = Math.max(0, Math.min(1, (r - earlyRound) / (lateRound - earlyRound)));
+
+        const earlyDynW  = f.earlyDynamicWeight  || 0.85;
+        const lateDynW   = f.dynamicWeight        || 0.5;
+        const earlyFloor = f.earlyFloorMultiplier || 0.45;
+        const lateFloor  = f.floorMultiplier       || 0.7;
+
+        // 线性插展得到当前回合的实际权重
+        const effectiveDynW   = earlyDynW  + (lateDynW  - earlyDynW)  * t;
+        const effectiveTplW   = 1 - effectiveDynW;  // 模板权重与动态权重互补，总和始终 = 1
+        const effectiveFloor  = earlyFloor + (lateFloor - earlyFloor)  * t;
+
+        // 5. 混合计算 + 保底
+        const mixedHP = (templateHP * effectiveTplW) + (dynamicHP * effectiveDynW);
+        const finalHP = Math.max(templateHP * effectiveFloor, mixedHP);
 
         return Math.floor(finalHP);
     },
