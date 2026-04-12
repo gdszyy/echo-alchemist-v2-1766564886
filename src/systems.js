@@ -989,19 +989,17 @@ class TrainingGround {
         }
 
         // 试炼场发射逻辑：从底部中央向上发射
-        const x = this.game.width / 2;
-        const y = this.game.height - 100;
-        
-        // [优化] 随机角度发射 (-30度 到 30度)，模拟真实散布
+        // [修复] 随机角度发射 (-30度 到 30度)，模拟真实散布
         const angle = (Math.random() - 0.5) * Math.PI / 3;
         const vel = new Vec2(0, -15).rotate(angle);
 
-        // --- [修复 2]：修正参数传递顺序 ---
-        // spawnBullet 定义: (x, y, vel, recipe, shotId, isLast)
-        // 我们需要传递:
-        // shotId: null (或生成的唯一ID，这里null即可)
-        // isLast: true (关键！必须为 true 才能触发风属性锚点生成)
-        this.game.spawn_spawnBullet(x, y, vel, recipe, null, true);
+        // --- [修复]：通过 ammoQueue + combat_fireNextShot 触发完整发射流程 ---
+        // 原来直接调用 spawn_spawnBullet 绕过了：充能动画、multicast、spinBoost 等效果
+        // 现在改为：将配方推入 ammoQueue，再设置充能动画状态，由 phase_combat_update 自动触发发射
+        this.game.ammoQueue.push(recipe);
+        this.game.pendingFireVelocity = vel;
+        this.game.isChargingShot = true;
+        this.game.chargeProgress = 0;
 
         // 记录开始时间用于计算 DPS
         if (this.stats.startTime === 0) this.stats.startTime = Date.now();
@@ -1056,13 +1054,24 @@ class TrainingGround {
         this.game.particles = [];
         this.game.sonSwordQueue = [];
         this.game.swordQis = [];
-        this.game.windAnchors = []; // [修复] 清空风锚点
+        this.game.windAnchors = []; // [修复] 清空风锁点
         this.game.activeWindMatrices = []; // [修复] 清空风阵
         this.game.roundDamage = 0;
         this.stats.totalDamage = 0;
         this.stats.lastTotal = 0;
         this.stats.dps = 0;
         this.stats.startTime = 0;
+        // [修复] 初始化发射相关状态，确保 ammoQueue + combat_fireNextShot 流程正常工作
+        this.game.ammoQueue = [];
+        this.game.burstQueue = [];
+        this.game.isChargingShot = false;
+        this.game.chargeProgress = 0;
+        this.game.pendingFireVelocity = null;
+        this.game.isReloading = false;
+        this.game.reloadProgress = 0;
+        this.game.isEnemyTurn = false;
+        // [修复] 初始化充能符文系统
+        this.game.combat_runeCharge_init();
     }
 
     exit() {

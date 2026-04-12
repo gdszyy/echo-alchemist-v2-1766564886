@@ -743,7 +743,7 @@ phase_gathering_getRandomPegType() {
         this.orbitalAngle += currentFrameSpeed * timeScale * 60; // *60 是为了适配 timeScale 的基准
         this.ui_updateSlowMotion();
         // [充能符文系统] 充能条自动衰减
-        if (this.phase === 'combat') {
+        if (this.phase === 'combat' || this.phase === 'training') {
             this.combat_runeCharge_decay(timeScale);
         }
         const tilt = this.boardTilt.current;
