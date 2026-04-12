@@ -503,13 +503,22 @@ const CONFIG = {
 
         /** Boss 血量公式参数 */
         bossHpFormula: {
-            templateWeight: 0.5,         // 模板血量权重
-            dynamicWeight: 0.5,          // 动态血量权重
+            templateWeight: 0.5,         // 模板血量权重（后期稳定值）
+            dynamicWeight: 0.5,          // 动态血量权重（后期稳定值）
             miniBossKillRounds: 2.5,     // Mini-Boss 期望击杀回合数
             bigBossKillRounds: 4.0,      // 大 Boss 期望击杀回合数
-            floorMultiplier: 0.7,        // 保底：模板血量的 70%
+            floorMultiplier: 0.7,        // 保底：模板血量的 70%（后期稳定值）
             miniBossMult: 15,            // Mini-Boss 血量倍率
-            bigBossMult: 35              // 大 Boss 血量倍率
+            bigBossMult: 35,             // 大 Boss 血量倍率
+            // ── 前期保护参数（Early-Game Protection）──
+            // 越早期的 Boss，动态权重越高（更贴近玩家实时战力），模板权重越低
+            // 线性插值区间：[earlyRound, lateRound]
+            // round <= earlyRound 时：dynamicWeight = earlyDynamicWeight
+            // round >= lateRound  时：dynamicWeight = dynamicWeight（后期稳定值）
+            earlyRound: 5,               // 前期保护生效的最大回合数（第一个 Boss 所在回合）
+            lateRound: 20,               // 过渡结束回合（完全切换为后期稳定权重）
+            earlyDynamicWeight: 0.85,    // 前期动态权重（高度依赖玩家实时伤害）
+            earlyFloorMultiplier: 0.45   // 前期保底倍率（降低保底，避免卡死新手）
         },
 
         /** 8 个 Boss 专属配置 */

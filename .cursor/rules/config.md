@@ -20,6 +20,27 @@ globs: ["src/config.js"]
 - **格式一致性**: 添加新数据字典条目时，必须严格遵循现有对象的键名和数据类型结构。
 - **注释说明**: 修改核心数値或添加新配置项时，必须添加注释说明其用途和影响范围。
 
+## 6. Boss 血量公式参数说明（bossHpFormula）
+
+`CONFIG.balance.bossHpFormula` 控制 Boss 血量的混合计算公式。实际计算在 `src/spawn_system.js` 的 `spawn_calculateBossHP` 方法中执行。
+
+| 参数 | 类型 | 默认値 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `templateWeight` | number | 0.5 | 模板血量权重（后期稳定値） |
+| `dynamicWeight` | number | 0.5 | 动态血量权重（后期稳定値） |
+| `floorMultiplier` | number | 0.7 | 保底倍率（后期稳定値） |
+| `earlyRound` | number | 5 | 前期保护完全生效的最大回合数（第一个 Boss 回合） |
+| `lateRound` | number | 20 | 过渡结束回合，完全切换为后期稳定权重 |
+| `earlyDynamicWeight` | number | 0.85 | 前期动态权重（高度依赖玩家实时伤害） |
+| `earlyFloorMultiplier` | number | 0.45 | 前期保底倍率（降低保底，避免卡死新手） |
+
+**前期保护机制原理**：
+- 在 `[earlyRound, lateRound]` 区间内，`dynamicWeight` 和 `floorMultiplier` 均进行线性插展。
+- `round <= earlyRound`：`dynamicWeight = earlyDynamicWeight`（前期小 Boss 血量高度跨随玩家实时战力）。
+- `round >= lateRound`：`dynamicWeight = dynamicWeight`（后期平衡权重）。
+- 模板权重 = `1 - dynamicWeight`，两者互补且总和始终为 1。
+- 前期低保底将保底下限从 70% 降至 45%，使血量更自由地跨随玩家战力浮动。
+
 ## 4. RELIC_DB 钉盘形态遗物规范（异型布局版）
 
 钉盘形态遗物通过修改 `Game` 实例上的 `boardLayout` 字段来切换钉盘布局模式。该字段在 `core.js` 中初始化，在 `game_system.js` 的 `sys_resetGame` 中重置。**所有钉盘形态遗物只能获取一次（maxStacks: 1）**。
