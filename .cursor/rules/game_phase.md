@@ -58,6 +58,18 @@ globs: ["src/game_phase.js"]
 4. Boss 回合不生成普通敌人行
 5. **选择性清场**：`spawn_spawnBoss` 出场时，仅移除与 Boss 最终落点区域（AABB）发生重叠的敌人，保留其余敌人。这确保了玩家前期战斗对场面的影响（如冻结、血量耗损）仍有意义。Boss 占据区域：水平中心为 `centerX`，宽 `bossW = enemyWidth * 3`，高 `bossH = enemyHeight * 2`，垂直中心为 `spawnY`。
 
+### 4.2.1 Boss 出场演出时机（重要）
+
+**问题背景**：原来 `spawn_spawnBoss()` 在生成 Boss 时立即发射 `boss:spawned` 事件并设置 `entranceTimer = 90`，导致全部演出在研磨阶段就播放完毕，进入战斗阶段时完全看不到任何演出。
+
+**修复方案**：引入 `_pendingEntrance` 标志位，将演出触发时机延迟到进入战斗阶段时。
+
+**实现细节**：
+- `spawn_spawnBoss()`：设置 `boss.entranceTimer = 0`，`boss._pendingEntrance = true`，不发射事件和 showToast
+- `entities/enemy.js` `update()`：当 `_pendingEntrance === true` 时，将 Boss 保持在 `_entranceStartY`（屏幕外）不移动
+- `phase_startCombatPhase()`：检测到 `_pendingEntrance` 后，设置 `entranceTimer = 90`、清除标志、延迟 100ms 发射 `boss:spawned` 事件和 showToast
+- `phase_combat_update()` 中活跃敌人计数：将 `_pendingEntrance` 状态的 Boss 也计入活跃敌人，防止误判完美清场
+
 ### 4.3 Boss 阶段变化
 - **狂暴阶段**: Boss HP < 50% 时自动触发，通过 `combat_triggerBossEnrage` 处理
 - 狂暴状态存储在 `boss.berserked` 属性中，防止重复触发

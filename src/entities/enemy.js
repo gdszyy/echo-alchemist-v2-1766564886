@@ -240,6 +240,16 @@ class Enemy {
             return; // 预警期间不处理其他移动逻辑
         }
 
+        // [演出时机修复] Boss 待机状态：_pendingEntrance 为 true 时，保持在屏幕外不移动，
+        // 等待 phase_startCombatPhase() 进入战斗阶段后激活入场动画。
+        if (this._pendingEntrance) {
+            // 保持在入场起始位置（屏幕外），不执行任何移动逻辑
+            this.pos.y = this._entranceStartY;
+            if (this.hitTimer > 0) this.hitTimer -= timeScale;
+            if (this.shieldHitTimer > 0) this.shieldHitTimer -= timeScale;
+            return;
+        }
+
         // Boss 入场动画期间：控制坐标，阶段 1 (90→60) 高速坠入
         if (this.entranceTimer > 0) {
             this.entranceTimer -= timeScale;

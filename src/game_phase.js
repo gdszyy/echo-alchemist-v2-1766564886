@@ -502,6 +502,28 @@ phase_gathering_getRandomPegType() {
             this.ui.updateSkillPoints(this.skillPoints);
             this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
         }
+
+        // [演出时机修复] 在进入战斗阶段时，检测是否有待播放入场演出的 Boss。
+        // 原来的 boss:spawned 事件和入场动画在 spawn_spawnBoss() 中立即触发，
+        // 导致在研磨阶段就播放完毕而战斗时完全看不到演出。
+        // 现在统一延迟到此处触发，确保玩家进入战斗阶段时能看到完整的 Boss 出场演出。
+        const pendingBoss = this.enemies.find(e => e.active && e.type === 'boss' && e._pendingEntrance);
+        if (pendingBoss) {
+            pendingBoss._pendingEntrance = false;
+            // 激活入场动画计时器
+            pendingBoss.entranceTimer = 90;
+            // 延迟一帧再触发事件，确保战斗阶段已完全切换后再播放全屏演出
+            setTimeout(() => {
+                eventBus.emit('boss:spawned', {
+                    boss: pendingBoss,
+                    bossId: pendingBoss.bossType,
+                    bossName: pendingBoss.bossName,
+                    isBigBoss: pendingBoss.isBigBoss,
+                    round: this.round
+                });
+                showToast(`☠️ ${pendingBoss.bossName} 出现！`);
+            }, 100);
+        }
     },
 
 /**
@@ -1206,7 +1228,8 @@ phase_gathering_getRandomPegType() {
                     e.update(this.timeScale, this);
                     e.draw(this.ctx);
                     // Boss 入场动画期间（pos.y 在屏幕外）也计入活跃敌人，防止误判完美清场
-                    if (e.pos.y > 0 || (e.type === 'boss' && e.entranceTimer > 0)) {
+                    // [演出时机修复] 同时兼容 _pendingEntrance 状态（Boss 在屏幕外待机）
+                    if (e.pos.y > 0 || (e.type === 'boss' && (e.entranceTimer > 0 || e._pendingEntrance))) {
                         activeEnemies++;
                     }
                     if (Math.abs(e.pos.y - e.dropTargetY) > 1) anyEnemyMoving = true;

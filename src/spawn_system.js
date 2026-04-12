@@ -1498,21 +1498,19 @@ export const spawn_system = {
         // 设置入场动画状态
         boss.dropTargetY = spawnY;       // 目标位置：网格对齐的顶部
         boss._entranceStartY = entranceStartY; // 入场起始 Y
-        boss.entranceTimer = 90;         // 入场动画帧数：90 帧（约 1.5s @60fps）
+        // [演出时机修复] entranceTimer 初始为 0，不在生成时立即开始动画。
+        // 动画将在 phase_startCombatPhase() 进入战斗阶段时才激活，确保演出完整可见。
+        boss.entranceTimer = 0;
+        // 标记此 Boss 有待播放的入场演出（事件、音效、动画），等待战斗阶段开始时触发
+        boss._pendingEntrance = true;
 
         this.enemies.push(boss);
 
-        // 通过 EventBus 广播 Boss 生成事件（听众在 ui_system.js 中触发全屏遗罩和震动）
-        eventBus.emit('boss:spawned', {
-            boss: boss,
-            bossId: bossId,
-            bossName: bossCfg.name,
-            isBigBoss: isBigBoss,
-            round: this.round
-        });
-
-        // 显示 Boss 出现提示
-        showToast(`☠️ ${bossCfg.name} 出现！`);
+        // [演出时机修复] 不在此处发射 boss:spawned 事件和 showToast。
+        // 这些演出将在 phase_startCombatPhase() 中检测到 _pendingEntrance 后统一触发。
+        // 原代码（已移至 game_phase.js）：
+        //   eventBus.emit('boss:spawned', { boss, bossId, bossName, isBigBoss, round })
+        //   showToast(`☠️ ${bossCfg.name} 出现！`)
 
         return boss;
     },
