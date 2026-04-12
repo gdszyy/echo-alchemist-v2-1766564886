@@ -47,8 +47,10 @@ class Enemy {
     constructor(x, y, width, height, hp, maxHp = hp, type = 'normal', affixes = []) {
         this.pos = new Vec2(x, y); 
         this.width = width; 
-        this.height = height; 
-        this.hp = hp;       
+        this.height = height;
+        this.collisionShape = 'aabb'; // 默认碰撞形状为 AABB
+        this.collisionData = null; // 碰撞形状数据
+        this.hp = hp;
         this.maxHp = maxHp; 
 
         // [新增] 护盾充能层数 (默认为0，生成时在core.js中赋值)
@@ -459,6 +461,48 @@ class Enemy {
 
     // --- [核心修改] 第一步：启动预警 (Trigger Telegraph) ---
     startTurnAction(game) {
+        // [新增] 更新 Boss 专属物理状态机
+        if (this.type === 'boss') {
+            if (this.bossType === 'devourer' && this.collisionShape === 'arc') {
+                const isBerserk = (this.hp / this.maxHp) < 0.5;
+                const cooldownTime = isBerserk ? 2 : 4;
+                
+                if (this.devourState === 'IDLE') {
+                    this.devourTimer++;
+                    if (this.devourTimer > 3) {
+                        this.devourState = 'OPENING';
+                        this.devourTimer = 0;
+                    }
+                } else if (this.devourState === 'OPENING') {
+                    this.devourState = 'DEVOURING';
+                    this.collisionData.startAngle = Math.PI * 0.1;
+                    this.collisionData.endAngle = Math.PI * 1.9;
+                } else if (this.devourState === 'DEVOURING') {
+                    this.devourState = 'COOLDOWN';
+                    this.devourTimer = 0;
+                    this.collisionData.startAngle = 0;
+                    this.collisionData.endAngle = Math.PI * 2;
+                } else if (this.devourState === 'COOLDOWN') {
+                    this.devourTimer++;
+                    if (this.devourTimer >= cooldownTime) {
+                        this.devourState = 'IDLE';
+                        this.devourTimer = 0;
+                        this.collisionData.startAngle = Math.PI * 0.25;
+                        this.collisionData.endAngle = Math.PI * 1.75;
+                    }
+                }
+            } else if (this.bossType === 'ouroboros' && this.collisionShape === 'arc') {
+                const isBerserk = (this.hp / this.maxHp) < 0.5;
+                const rotationSpeed = isBerserk ? Math.PI * 0.5 : Math.PI * 0.25;
+                
+                this.gapAngle += rotationSpeed;
+                if (this.gapAngle > Math.PI * 2) this.gapAngle -= Math.PI * 2;
+                
+                this.collisionData.startAngle = this.gapAngle;
+                this.collisionData.endAngle = this.gapAngle + Math.PI * 1.5;
+            }
+        }
+
         // 如果被冻结，直接跳过
         if (this.isFrozenCurrentTurn) {
             this.playFreezeBlockEffect(game);

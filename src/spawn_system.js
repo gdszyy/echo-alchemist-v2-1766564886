@@ -1,3 +1,4 @@
+import { Vec2 } from './utils/math_utils.js';
 import { 
     META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB 
 } from './config.js';
@@ -1364,6 +1365,101 @@ export const spawn_system = {
         boss.bossName = bossCfg.name;
         boss.isBigBoss = isBigBoss;
         boss.berserked = false; // 狂暴阶段标志
+        
+        // 分配异型碰撞形状
+        switch(bossId) {
+            case 'ignis':
+                boss.collisionShape = 'polygon';
+                boss.collisionData = {
+                    vertices: [
+                        new Vec2(centerX - bossW * 0.4, spawnY + bossH * 0.5), // 左下
+                        new Vec2(centerX - bossW * 0.2, spawnY - bossH * 0.5), // 左上
+                        new Vec2(centerX + bossW * 0.2, spawnY - bossH * 0.5), // 右上
+                        new Vec2(centerX + bossW * 0.4, spawnY + bossH * 0.5)  // 右下
+                    ]
+                };
+                break;
+            case 'glacies':
+                boss.collisionShape = 'polygon';
+                boss.collisionData = {
+                    vertices: [
+                        new Vec2(centerX, spawnY - bossH * 0.5), // 顶
+                        new Vec2(centerX + bossW * 0.4, spawnY - bossH * 0.1), // 右上
+                        new Vec2(centerX + bossW * 0.3, spawnY + bossH * 0.5), // 右下
+                        new Vec2(centerX - bossW * 0.3, spawnY + bossH * 0.5), // 左下
+                        new Vec2(centerX - bossW * 0.4, spawnY - bossH * 0.1)  // 左上
+                    ]
+                };
+                break;
+            case 'micro':
+                boss.collisionShape = 'arc';
+                boss.collisionData = {
+                    radius: bossW * 0.3,
+                    startAngle: 0,
+                    endAngle: Math.PI * 2,
+                    thickness: bossH * 0.1
+                };
+                break;
+            case 'devourer':
+                boss.collisionShape = 'arc';
+                boss.collisionData = {
+                    radius: bossW * 0.35,
+                    startAngle: Math.PI * 0.25, // 下方缺口
+                    endAngle: Math.PI * 1.75,
+                    thickness: bossH * 0.15
+                };
+                boss.devourState = 'IDLE';
+                boss.devourTimer = 0;
+                break;
+            case 'viridis':
+                boss.collisionShape = 'polygon';
+                boss.collisionData = {
+                    vertices: [
+                        new Vec2(centerX - bossW * 0.4, spawnY + bossH * 0.5), // 左底
+                        new Vec2(centerX - bossW * 0.3, spawnY), // 左中
+                        new Vec2(centerX, spawnY - bossH * 0.4), // 顶
+                        new Vec2(centerX + bossW * 0.3, spawnY), // 右中
+                        new Vec2(centerX + bossW * 0.4, spawnY + bossH * 0.5)  // 右底
+                    ]
+                };
+                break;
+            case 'tesla':
+                boss.collisionShape = 'polygon';
+                boss.collisionData = {
+                    vertices: [
+                        new Vec2(centerX, spawnY - bossH * 0.5), // 顶
+                        new Vec2(centerX + bossW * 0.2, spawnY), // 右
+                        new Vec2(centerX, spawnY + bossH * 0.5), // 底
+                        new Vec2(centerX - bossW * 0.2, spawnY)  // 左
+                    ]
+                };
+                break;
+            case 'chimera':
+                boss.collisionShape = 'polygon';
+                boss.collisionData = {
+                    vertices: [
+                        new Vec2(centerX - bossW * 0.3, spawnY - bossH * 0.3),
+                        new Vec2(centerX + bossW * 0.3, spawnY - bossH * 0.3),
+                        new Vec2(centerX + bossW * 0.4, spawnY + bossH * 0.3),
+                        new Vec2(centerX, spawnY + bossH * 0.5),
+                        new Vec2(centerX - bossW * 0.4, spawnY + bossH * 0.3)
+                    ]
+                };
+                break;
+            case 'ouroboros':
+                boss.collisionShape = 'arc';
+                boss.collisionData = {
+                    radius: bossW * 0.4,
+                    startAngle: 0,
+                    endAngle: Math.PI * 1.5, // 缺口 90 度
+                    thickness: bossH * 0.2
+                };
+                boss.gapAngle = 0; // 缺口旋转角度
+                break;
+            default:
+                boss.collisionShape = 'aabb';
+                break;
+        }
 
         // 赋予词缀
         boss.affixes = [...bossCfg.affixes];

@@ -42,6 +42,8 @@ const audio = new Proxy({}, {
     }
 });
 
+import { calc_getCirclePolygonCollision, calc_getCircleArcCollision } from '../combat/collision_shapes.js';
+
 class Projectile {
     constructor(x, y, vel, config, isCopy = false, shotId = null, isLast = false) {
         this.pos = new Vec2(x, y);
@@ -157,23 +159,44 @@ class Projectile {
      * @returns {'destroyed'|undefined} 若子弹被销毁则返回 'destroyed'
      */
     _handleCollision(e, enemies, spawnCallback) {
-        const halfW = e.width / 2;
-        const halfH = e.height / 2;
-
-        // 1. 寻找矩形上离圆心最近的点 (Closest Point)
-        const closestX = Math.max(e.pos.x - halfW, Math.min(this.pos.x, e.pos.x + halfW));
-        const closestY = Math.max(e.pos.y - halfH, Math.min(this.pos.y, e.pos.y + halfH));
-
-        // 2. 计算距离向量 (圆心 到 最近点)
-        const distVecX = this.pos.x - closestX;
-        const distVecY = this.pos.y - closestY;
-        const distSq = distVecX * distVecX + distVecY * distVecY;
-
-        // 3. 判定碰撞 (距离平方 < 半径平方)
-        // 注意：这里稍微加大了判定半径 (+2)，让碰撞手感更"实"，不容易漏
+        let hitResult = null;
         const hitRadius = this.radius + 2;
 
-        if (distSq < hitRadius * hitRadius) {
+        // 多态碰撞检测：根据敌人的 collisionShape 进行不同的检测
+        if (e.collisionShape === 'polygon' && e.collisionData) {
+            hitResult = calc_getCirclePolygonCollision(this.pos, this.radius, e.collisionData.vertices);
+            if (hitResult) {
+                hitResult.distVecX = this.pos.x - hitResult.closestX;
+                hitResult.distVecY = this.pos.y - hitResult.closestY;
+            }
+        } else if (e.collisionShape === 'arc' && e.collisionData) {
+            hitResult = calc_getCircleArcCollision(
+                this.pos, this.radius, 
+                e.pos, e.collisionData.radius, 
+                e.collisionData.startAngle, e.collisionData.endAngle, 
+                e.collisionData.thickness
+            );
+            if (hitResult) {
+                hitResult.distVecX = this.pos.x - hitResult.closestX;
+                hitResult.distVecY = this.pos.y - hitResult.closestY;
+            }
+        } else {
+            // 默认 AABB 碰撞检测
+            const halfW = e.width / 2;
+            const halfH = e.height / 2;
+            const closestX = Math.max(e.pos.x - halfW, Math.min(this.pos.x, e.pos.x + halfW));
+            const closestY = Math.max(e.pos.y - halfH, Math.min(this.pos.y, e.pos.y + halfH));
+            const distVecX = this.pos.x - closestX;
+            const distVecY = this.pos.y - closestY;
+            const distSq = distVecX * distVecX + distVecY * distVecY;
+            
+            if (distSq < hitRadius * hitRadius) {
+                hitResult = { closestX, closestY, distSq, distVecX, distVecY };
+            }
+        }
+
+        if (hitResult) {
+            const { closestX, closestY, distSq, distVecX, distVecY, normal: shapeNormal } = hitResult;
             if (this.hitCooldowns.has(e)) return;
             this.hitCooldowns.set(e, CONFIG.gameplay.hitCooldowns);
             this.lastHitEnemy = e;
