@@ -36,7 +36,7 @@ globs: ["src/config.js"]
 | `'triangle'` | `triangle_formation` | 顶行最宽，每行递减 1 列 | 漏斗流 | 行越多三角越尖，弹珠越集中于底部中央 |
 | `'diamond'` | `diamond_formation` | 前半段扩展，后半段收缩 | 中段爆发流 | 行越多菱形越饱满，中段宽度越大 |
 | `'sparse'` | `sparse_interval` | 偶数行正常，奇数行减 4 列居中 | 通道流 | 行越多通道节奏越强 |
-| `'mirror_sync'` | `mirror_sync` | 列数减 2，奇偶行对齐不交错 | 直线穿透流 | 行越多直线通道越长 |
+| `'mirror_sync'` | `mirror_sync` | 列数减 2，对齐排列；钉子同步；特殊槽镜像 | 镜像同步流 | 行越多直线通道越长，镜像效果越强 |
 | `'wide_narrow'` | `wide_narrow` | 偶数行 +2 列，奇数行 -2 列 | 边缘捕获流 | 行越多宽窄层次越丰富 |
 
 **实现警告**：

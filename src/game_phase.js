@@ -223,8 +223,8 @@ export const game_phase = {
 
                 let p = new Peg(x, y, type);
                 p.level = level;
-                p.row = r;   // [新增] 存储行号，用于相邻钉子对筛选
-                p.col = c;   // [新增] 存储列号
+                p.row = r;
+                p.col = c;
                 // [继承逻辑] 如果继承，保留当前的冷却状态
                 if (shouldInherit && previousPegs[pegIndex]) {
                      p.cooldownTimer = previousPegs[pegIndex].cooldownTimer;
@@ -232,6 +232,23 @@ export const game_phase = {
                 
                 this.pegs.push(p);
                 pegIndex++;
+            }
+        }
+
+        // [镜像同步] 预计算钉子的镜像索引
+        if (boardLayout === 'mirror_sync') {
+            for (let i = 0; i < this.pegs.length; i++) {
+                const p = this.pegs[i];
+                // 在同一行寻找镜像列的钉子
+                // 镜像列 = (rowCols - 1) - currentCol
+                // 注意：mirror_sync 布局下每行的 rowCols 是固定的
+                const mirrorCol = (rowCols - 1) - p.col;
+                if (mirrorCol !== p.col) {
+                    const mirrorPeg = this.pegs.find(mp => mp.row === p.row && mp.col === mirrorCol);
+                    if (mirrorPeg) {
+                        p.mirrorIdx = this.pegs.indexOf(mirrorPeg);
+                    }
+                }
             }
         }
 
@@ -316,8 +333,12 @@ export const game_phase = {
             }
 
             let createdCount = 0;
+            const usedPegs = new Set();
+
             for (const [idxA, idxB] of strictPairs) {
                 if (createdCount >= this.slotCount) break;
+                if (usedPegs.has(idxA) || usedPegs.has(idxB)) continue;
+
                 const pegA = this.pegs[idxA];
                 const pegB = this.pegs[idxB];
                 const type = slotTypes[Math.floor(Math.random() * slotTypes.length)];
@@ -327,7 +348,25 @@ export const game_phase = {
                 slot.pegIndex2 = idxB;
                 this.specialSlots.push(slot);
                 createdCount++;
-                console.log(`[DEBUG] Created link slot: type=${type}, pegs=[${idxA}(r${pegA.row}c${pegA.col}),${idxB}(r${pegB.row}c${pegB.col})], pos=(${pegA.pos.x.toFixed(0)},${pegA.pos.y.toFixed(0)})->(${pegB.pos.x.toFixed(0)},${pegB.pos.y.toFixed(0)})`);
+                usedPegs.add(idxA);
+                usedPegs.add(idxB);
+
+                // [镜像同步] 如果是镜像布局，尝试在镜像位置也生成一个
+                if (boardLayout === 'mirror_sync') {
+                    const mIdxA = pegA.mirrorIdx;
+                    const mIdxB = pegB.mirrorIdx;
+                    if (mIdxA !== -1 && mIdxB !== -1 && !usedPegs.has(mIdxA) && !usedPegs.has(mIdxB)) {
+                        const mPegA = this.pegs[mIdxA];
+                        const mPegB = this.pegs[mIdxB];
+                        const mSlot = new SpecialSlot(mPegA.pos.x, mPegA.pos.y, mPegB.pos.x, mPegB.pos.y, type);
+                        mSlot.pegIndex = mIdxA;
+                        mSlot.pegIndex2 = mIdxB;
+                        this.specialSlots.push(mSlot);
+                        usedPegs.add(mIdxA);
+                        usedPegs.add(mIdxB);
+                        // 注意：镜像生成的槽位不计入 createdCount 限制，从而实现数量 x2
+                    }
+                }
             }
 
             // 如果严格对不够，退化为单钉子水平短连线

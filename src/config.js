@@ -748,7 +748,7 @@ const RELIC_DB = [
     // 策略3：稀疏间隔 - 通道流（宽窄行交替，形成弹珠通道）
     { id: 'sparse_interval', name: '稀疏間隔', icon: '〰️', desc: '收集階段：偶數行保持正常列數，奇數行減少 4 列並居中，形成「寬-窄」交替通道。弹珠在寬行密集碰撞後可穿越窄行通道。', rarity: 'rare', effect: 'board_layout_sparse', maxStacks: 1 },
     // 策略4：镜像同步 - 直线穿透流（列数减少但行对齐，弹珠更易直线下落）
-    { id: 'mirror_sync', name: '鏡像同步', icon: '🪞', desc: '收集階段：釘盤列數減少 2，但奇偶行不再交錯而是對齊，形成平行列。弹珠更易直線下落，穿透弹珠效果極強，但觸發次數略減。', rarity: 'legendary', effect: 'board_layout_mirror_sync', maxStacks: 1 },
+    { id: 'mirror_sync', name: '鏡像同步', icon: '🪞', desc: '收集階段：釘盤列數減少且對齊。釘子被同化/突變時，鏡像位置的釘子同步轉化；特殊槽位鏡像呈現（數量翻倍）。', rarity: 'legendary', effect: 'board_layout_mirror_sync', maxStacks: 1 },
     // 策略5：宽窄交替 - 边缘捕获流（宽行捕获偏移弹珠，窄行提供通道）
     { id: 'wide_narrow', name: '寬窄交替', icon: '📐', desc: '收集階段：偶數行增加 2 列，奇數行減少 2 列，形成寬窄交替結構。寬行的邊緣釘子能捕獲偏移的弹珠，窄行讓弹珠有更多橫向空間。', rarity: 'common', effect: 'board_layout_wide_narrow', maxStacks: 1 },
 ];

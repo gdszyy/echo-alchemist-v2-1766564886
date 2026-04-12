@@ -522,6 +522,9 @@ class Peg {
         this.lightAngle = 0;     // 光源方向 (弧度)
         this.level = 1;
         this.maxLevel = 3;
+        this.row = -1;
+        this.col = -1;
+        this.mirrorIdx = -1; // 存储镜像钉子在 game.pegs 中的索引
     }
     getColor() {
         let color = CONFIG.colors.peg;
@@ -1083,6 +1086,16 @@ class DropBall {
                             game.spawn_createExplosion(peg.pos.x, peg.pos.y, CONFIG.colors[rule.result]);
                             game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 20, "Mutation!", CONFIG.colors[rule.result]);
                             audio.playMagic();
+
+                            // [镜像同步]
+                            if (game.boardLayout === 'mirror_sync' && peg.mirrorIdx !== -1) {
+                                const mirrorPeg = game.pegs[peg.mirrorIdx];
+                                if (mirrorPeg && mirrorPeg.type !== rule.result) {
+                                    mirrorPeg.type = rule.result;
+                                    mirrorPeg.level = 1;
+                                    game.spawn_createExplosion(mirrorPeg.pos.x, mirrorPeg.pos.y, CONFIG.colors[rule.result]);
+                                }
+                            }
                         } else {
                             // 场上已有同类唯一实体 -> 禁止突变，退化为普通同化 (变成 Pierce)
                             if (peg.type === 'normal') {
@@ -1100,6 +1113,16 @@ class DropBall {
                             game.spawn_createExplosion(peg.pos.x, peg.pos.y, '#fbbf24');
                             game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 15, `Lv${peg.level} 剑意!`, '#fbbf24');
                             audio.playPowerup(peg.level + 3); // 音调更高
+
+                            // [镜像同步]
+                            if (game.boardLayout === 'mirror_sync' && peg.mirrorIdx !== -1) {
+                                const mirrorPeg = game.pegs[peg.mirrorIdx];
+                                if (mirrorPeg && mirrorPeg.level < peg.level) {
+                                    mirrorPeg.level = peg.level;
+                                    mirrorPeg.type = peg.type;
+                                    game.spawn_createExplosion(mirrorPeg.pos.x, mirrorPeg.pos.y, '#fbbf24');
+                                }
+                            }
                         } else {
                             // 已满级特效 (可选)
                             game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 15, "MAX!", '#ef4444');
@@ -1111,19 +1134,29 @@ class DropBall {
             else if (peg.type === 'normal' && ballType) {
                 // 这里保留原有的逻辑：普通弹珠同化普通钉子
                 const assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0;
-                if (Math.random() < assimilationChance && assimilationChance>0) {
-                    peg.type = ballType;
-                    
-                    // [新增] 同化钉子特效：爆炸 + 浮动文字
-                    const attrColor = this.def.getColor();
-                    const attrName = CONFIG.ui.attributeDisplay[ballType] ? CONFIG.ui.attributeDisplay[ballType].name : "Assimilation";
-                    game.spawn_createExplosion(peg.pos.x, peg.pos.y, attrColor);
-					game.spawn_createShockwave(peg.pos.x, peg.pos.y, attrColor);
-                    game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 20, attrName, attrColor);
-                    
-                    game.spawn_createParticle(peg.pos.x, peg.pos.y, attrColor);
-                    audio.playMagic();
-                }
+	                if (Math.random() < assimilationChance && assimilationChance>0) {
+	                    peg.type = ballType;
+	                    
+	                    // [新增] 同化钉子特效：爆炸 + 浮动文字
+	                    const attrColor = this.def.getColor();
+	                    const attrName = CONFIG.ui.attributeDisplay[ballType] ? CONFIG.ui.attributeDisplay[ballType].name : "Assimilation";
+	                    game.spawn_createExplosion(peg.pos.x, peg.pos.y, attrColor);
+						game.spawn_createShockwave(peg.pos.x, peg.pos.y, attrColor);
+	                    game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 20, attrName, attrColor);
+	                    
+	                    game.spawn_createParticle(peg.pos.x, peg.pos.y, attrColor);
+	                    audio.playMagic();
+
+                        // [镜像同步]
+                        if (game.boardLayout === 'mirror_sync' && peg.mirrorIdx !== -1) {
+                            const mirrorPeg = game.pegs[peg.mirrorIdx];
+                            if (mirrorPeg && mirrorPeg.type !== ballType) {
+                                mirrorPeg.type = ballType;
+                                game.spawn_createExplosion(mirrorPeg.pos.x, mirrorPeg.pos.y, attrColor);
+                                game.spawn_createParticle(mirrorPeg.pos.x, mirrorPeg.pos.y, attrColor);
+                            }
+                        }
+	                }
             }
         }
 	    /**
