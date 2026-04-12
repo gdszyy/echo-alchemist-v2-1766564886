@@ -371,8 +371,14 @@ class Projectile {
             if(this.config.bounce > 0) this.deformation = { x: 0.7, y: 1.3 };
             this.hitCooldowns.clear();
         }
-        if (this.pos.y < this.radius) { 
-            this.pos.y = this.radius; this.vel.y = Math.abs(this.vel.y); 
+        // [修复] 顶部边界使用 combatGridTopY 计算真实反弹墙位置，与绘制位置保持一致
+        // 绘制层：wallTopY = combatGridTopY - enemyHeight/2（见 game_phase.js）
+        // 若 game 未就绪则回退到 y=0（this.radius）
+        const topBound = (typeof game !== 'undefined' && game.combatGridTopY != null && game.enemyHeight != null)
+            ? (game.combatGridTopY - game.enemyHeight / 2 + this.radius)
+            : this.radius;
+        if (this.pos.y < topBound) { 
+            this.pos.y = topBound; this.vel.y = Math.abs(this.vel.y); 
             if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
             if(this.config.bounce > 0) this.deformation = { x: 1.3, y: 0.7 };
         }

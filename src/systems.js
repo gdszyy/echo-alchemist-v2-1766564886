@@ -1402,6 +1402,7 @@ function createCombatContext(mainGame, canvas) {
         height: canvas ? (canvas.height || 800) : 800,
         enemyWidth: 60,
         enemyHeight: 60,
+        combatGridTopY: 90, // [修复] Demo 模式下顶部反弹墙碰撞边界（与 projectile.js 的 topBound 计算保持一致）
 
         // ── 实体数组 ──────────────────────────────────────────────────────────
         enemies: [],
