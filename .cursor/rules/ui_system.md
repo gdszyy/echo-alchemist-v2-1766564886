@@ -81,6 +81,7 @@ for (const subsystem of _subsystems) {
 | 2026-04-12 | `src/game_system.js`, `src/spawn_system.js`, `src/combat_system.js`, `src/core.js` | 战斗阶段顶部半透明栏（`#unified-top-bar`，高约 52px）遮挡最顶部 1-2 行敌人：所有敌人生成、Boss 生成、分身生成、斥力技能上限均硬编码 `startY = 80`，导致顶部敌人行与顶部栏重叠 | 引入 `this.combatGridTopY`（语义：第一行敌人中心 Y），在 `sys_resize()` 中动态计算为 `topBarH + 8 + enemyHeight/2`（顶部栏高度 + 8px 安全间距 + 半个敌人高度），确保第一行上边界恰好在顶部栏下方且与后续行网格对齐；将 `game_system.js`、`spawn_system.js`（×3 处）、`combat_system.js` 中所有硬编码 `80` 替换为 `this.combatGridTopY`；`core.js` 初始化默认值 90 |
 | 2026-04-12 | `src/game_phase.js` | 顶部墙壁（左右墙渐变 + 发光边框）仍从 `y=-100/y=1` 开始绘制，导致墙壁在顶部栏区域内也有渲染，视觉上顶部栏依旧遮挡了墙壁展示区域 | 引入 `wallTopY = combatGridTopY - enemyHeight/2`（即第一行敌人上边界 = 顶部栏下边界），将左右墙 `fillRect` 和三条边线的起始 Y 均改为 `wallTopY`，确保墙壁只在顶部栏下方绘制 |
 | 2026-04-12 | `src/core.js`, `src/game_system.js`, `src/game_phase.js` | 初始特殊槽为 `['skill_point','wheel']` 且 `slotCount=1`，每局只随机生成 1 个技能点或幸运轮盘槽 | 将 `unlockedSlots` 改为 `['skill_point', 'multicast']`，`slotCount` 改为 `2`；同时将 `game_phase.js` 中槽类型分配从随机改为按顺序（`slotTypes[createdCount % slotTypes.length]`），确保每局初始生成 1 个技能点槽 + 1 个加连击槽 |
+| 2026-04-12 | `src/systems.js`, `src/ui/shop.js` | 生产环境在缺失部分 UI 元素时启动崩溃或运行时报错：`UIManager`、`TruthBook`、`TrainingGround` 及 `shop_system` 在访问不存在的 DOM 节点（如 `#phase-training`、`#relic-container`）时未作空值保护，导致脚本中断。 | 为 `systems.js` 中的三个 UI 类及 `shop.js` 中的所有方法添加了全面的空值防御（null guards）；统一了 `shop.js` 的接口名为 `meta_buyUpgrade` 并修正参数传递。 |
 
 ## 6. 修改规范
 
@@ -150,7 +151,7 @@ for (const subsystem of _subsystems) {
 |---|---|
 | `ui_renderShop()` | 渲染商店物品列表 |
 | `ui_showRelicSelection()` | 显示遗物选择界面 |
-| `ui_selectRelic(relicId)` | 选择并获取遗物 |
+| `ui_selectRelic(relic)` | 选择并获取遗物（参数为遗物对象） |
 | `ui_skipRelic()` | 跳过遗物选择 |
 | `ui_closeRelicSelection()` | 关闭遗物选择界面 |
 

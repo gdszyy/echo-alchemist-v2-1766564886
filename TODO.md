@@ -52,3 +52,12 @@
 | 模块规范文档 | 0 个 | 9 个 | +9 |
 | 标准事件类型 | 0 个 | 26 个 | +26 |
 | Game.prototype 方法来源 | Mixin（全局污染） | bind 组合（实例隔离） | 架构升级 |
+
+---
+
+## 维护与修复记录 (2026.04.12) ✅
+
+- [x] **BugFix 4.1** 生产环境 UI 崩溃修复 ✅
+  - 修复了 `systems.js` 和 `shop.js` 在缺失 DOM 元素时的脚本中断问题。
+  - 统一了商店购买接口 `meta_buyUpgrade` 的命名与参数传递。
+  - 补全了 `systems.js` 中 `UIManager`、`TruthBook`、`TrainingGround` 的空值防御。

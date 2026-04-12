@@ -437,7 +437,8 @@ this.affixDict = {
         });
         // 切换内容显示
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-        document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+        const tabEl = document.getElementById(`tab-${tabName}`);
+        if (tabEl) tabEl.classList.remove('hidden');
         
         // 如果切换到伤害统计标签，更新显示
         if (tabName === 'damage') {
@@ -894,35 +895,41 @@ class TrainingGround {
             </div>
         `).join('');
     }
-
     toggleAffix(id) {
         const idx = this.enemyConfig.affixes.indexOf(id);
         const btn = document.getElementById(`affix-btn-${id}`);
         if (idx === -1) {
             this.enemyConfig.affixes.push(id);
-            btn.classList.add('border-indigo-500', 'bg-indigo-900/40');
-            btn.classList.remove('border-slate-700', 'bg-slate-800');
+            if (btn) {
+                btn.classList.add('border-indigo-500', 'bg-indigo-900/40');
+                btn.classList.remove('border-slate-700', 'bg-slate-800');
+            }
         } else {
             this.enemyConfig.affixes.splice(idx, 1);
-            btn.classList.remove('border-indigo-500', 'bg-indigo-900/40');
-            btn.classList.add('border-slate-700', 'bg-slate-800');
+            if (btn) {
+                btn.classList.remove('border-indigo-500', 'bg-indigo-900/40');
+                btn.classList.add('border-slate-700', 'bg-slate-800');
+            }
         }
     }
 
     updateBulletAttr(id, val) {
         this.bulletConfig[id] = parseInt(val);
-        document.getElementById(`val-${id}`).innerText = val;
+        const valEl = document.getElementById(`val-${id}`);
+        if (valEl) valEl.innerText = val;
         this.updateBulletPreview();
     }
 
     toggleAttr(id) {
         this.bulletConfig[id] = !this.bulletConfig[id];
-        document.getElementById(`val-${id}`).innerText = this.bulletConfig[id] ? 'ON' : 'OFF';
+        const valEl = document.getElementById(`val-${id}`);
+        if (valEl) valEl.innerText = this.bulletConfig[id] ? 'ON' : 'OFF';
         this.updateBulletPreview();
     }
 
     updateBulletPreview() {
         const preview = document.getElementById('preview-bullet-render');
+        if (!preview) return;
         // 根据属性调整预览效果
         let color = '#ffffff';
         if (this.bulletConfig.pyro > 0) color = '#f97316';
@@ -936,7 +943,8 @@ class TrainingGround {
     }
 
     spawnEnemy() {
-        const hp = parseInt(document.getElementById('train-enemy-hp').value) || 100;
+        const hpEl = document.getElementById('train-enemy-hp');
+        const hp = hpEl ? (parseInt(hpEl.value) || 100) : 100;
         const width = 60;
         const height = 60;
         
@@ -1117,7 +1125,7 @@ class TruthBook {
     constructor(mainGame) {
         this.mainGame = mainGame;
         this.canvas = document.getElementById('truth-demo-canvas');
-        this.ctx = this.canvas.getContext('2d');
+        this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
         this.active = false;
         this.currentEntry = null;
         this.demoGame = null;
@@ -1143,10 +1151,10 @@ class TruthBook {
 
         if (typeof TRUTH_BOOK_DATA !== 'undefined') {
             TRUTH_BOOK_DATA.enemies.forEach(entry => {
-                enemyList.appendChild(this.createListButton(entry));
+                if (enemyList) enemyList.appendChild(this.createListButton(entry));
             });
             TRUTH_BOOK_DATA.attributes.forEach(entry => {
-                attrList.appendChild(this.createListButton(entry));
+                if (attrList) attrList.appendChild(this.createListButton(entry));
             });
         }
     }
@@ -1167,20 +1175,31 @@ class TruthBook {
 
     showEntry(entry, btnElement) {
         this.currentEntry = entry;
-        document.getElementById('truth-empty-state').classList.add('hidden');
-        document.getElementById('truth-content').classList.remove('hidden');
-        document.getElementById('truth-item-icon').innerText = entry.icon;
-        document.getElementById('truth-item-name').innerText = entry.name;
-        document.getElementById('truth-item-desc').innerText = entry.desc;
+        const emptyState = document.getElementById('truth-empty-state');
+        if (emptyState) emptyState.classList.add('hidden');
+        
+        const content = document.getElementById('truth-content');
+        if (content) content.classList.remove('hidden');
+        
+        const iconEl = document.getElementById('truth-item-icon');
+        if (iconEl) iconEl.innerText = entry.icon;
+        
+        const nameEl = document.getElementById('truth-item-name');
+        if (nameEl) nameEl.innerText = entry.name;
+        
+        const descEl = document.getElementById('truth-item-desc');
+        if (descEl) descEl.innerText = entry.desc;
         
         const tagsCont = document.getElementById('truth-item-tags');
-        tagsCont.innerHTML = '';
-        entry.tags.forEach(tag => {
-            const s = document.createElement('span');
-            s.className = 'text-[9px] font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700 shadow-sm tracking-wide';
-            s.innerText = tag.toUpperCase();
-            tagsCont.appendChild(s);
-        });
+        if (tagsCont) {
+            tagsCont.innerHTML = '';
+            entry.tags.forEach(tag => {
+                const s = document.createElement('span');
+                s.className = 'text-[9px] font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700 shadow-sm tracking-wide';
+                s.innerText = tag.toUpperCase();
+                tagsCont.appendChild(s);
+            });
+        }
 
         document.querySelectorAll('.truth-list-btn').forEach(b => {
             b.classList.remove('border-cyan-500', 'bg-cyan-900/30');
@@ -1315,6 +1334,7 @@ class TruthBook {
 
     addLog(text, colorClass = 'text-cyan-400') {
         const logCont = document.getElementById('truth-demo-log');
+        if (!logCont) return;
         const div = document.createElement('div');
         div.className = `flex items-center gap-2 ${colorClass}`;
         div.innerHTML = `<span class="text-slate-600 text-[8px]">[${this.simFrame}]</span> <span>${text}</span>`;
