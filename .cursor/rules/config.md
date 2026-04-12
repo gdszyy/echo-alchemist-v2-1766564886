@@ -112,3 +112,4 @@ globs: ["src/config.js"]
 - **涌潮效果**: 获取遗物时向 `guaranteedNextRound` 注入两个该弹珠类型，并将 `assimilationBoostRounds[marbleType]` 设为 2。
 - **同化加成**: `entities.js` 中判断 `game.assimilationBoostRounds[ballType] > 0` 时，对该弹珠类型的同化概率 +0.3 (由 0.5 调低)。
 - **递减逻辑**: `game_phase.js` 的 `phase_finalizeRound` 中遍历 `assimilationBoostRounds` 对象，对每个类型递减回合数，归零时弹出提示。
+| 2026-04-13 | `src/config.js` | **提升穿透与散射遗物稀有度**：将 `tactical_kit_pierce`、`tactical_kit_scatter`（解锁遗物）以及 `surge_pierce`、`surge_scatter`（涌潮遗物）的稀有度从 `common`/`rare` 提升至 `legendary`，以匹配其作为稀有属性的定位。 |
