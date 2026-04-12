@@ -17,6 +17,7 @@
  * - waitForEvent 有值 + actionLabel 有值：显示具体操作提示按钮（如「点击开始游戏」），
  *   按钮本身不前进教程，而是调用对应的游戏操作；教程在事件触发后自动前进
  * - waitForEvent 有值 + actionLabel 为 null：隐藏按钮，纯等待事件自动前进
+ * - 「上一步」按钮已移除，教程只支持单向前进
  *
  * @module tutorial_system
  */
@@ -191,26 +192,7 @@ const TUTORIAL_STEPS = [
         actionLabel: null,
         actionFn: null,
     },
-    // ── 第 7 步：技能点 ───────────────────────────────────────────────────────
-    {
-        id: 'skill_points',
-        phase: 'gathering',
-        targetId: 'phase-gathering',
-        highlightSelector: '#gauge-shell',
-        title: '命中进度条',
-        content: `
-            <p>中央的<strong>命中进度条</strong>记录弹珠在研磨中碰撞钉子的次数。</p>
-            <p class="mt-2">进度条满格后，自动进入战斗阶段发动攻击。</p>
-            <p class="mt-2 text-cyan-300/80 text-xs">💡 让弹珠多碰钉子，可以更快积累进度</p>
-        `,
-        position: 'bottom-fixed',
-        noOverlay: true,
-        waitForEvent: null,
-        autoAdvance: false,
-        actionLabel: null,
-        actionFn: null,
-    },
-    // ── 第 8 步：教程完成 ─────────────────────────────────────────────────────
+    // ── 第 7 步：教程完成 ─────────────────────────────────────────────────────
     {
         id: 'tutorial_complete',
         phase: null,
@@ -389,16 +371,6 @@ export const tutorial_system = {
                     font-size: 13px; line-height: 1.7; color: #cbd5e1;
                 "></div>
                 <div style="display:flex; justify-content:flex-end; margin-top:18px; gap:8px;">
-                    <button id="tutorial-prev-btn" onclick="game._tutorial_prevStep()" style="
-                        display: none;
-                        padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 700;
-                        background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
-                        color: #94a3b8; cursor: pointer; transition: all 0.2s;
-                        font-family: 'Noto Serif TC', serif;
-                    " onmouseover="this.style.background='rgba(255,255,255,0.1)'"
-                       onmouseout="this.style.background='rgba(255,255,255,0.05)'">
-                        ← 上一步
-                    </button>
                     <button id="tutorial-next-btn" style="
                         padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 700;
                         background: linear-gradient(135deg, #d97706, #f59e0b);
@@ -535,6 +507,7 @@ export const tutorial_system = {
      * - waitForEvent 有值但 actionLabel 为 null：
      *     隐藏按钮区域，显示等待提示文字
      * - 普通步骤：「下一步」按钮
+     * - 「上一步」按钮已移除，教程只支持单向前进
      * @private
      */
     _tutorial_updateCard(step, index) {
@@ -544,7 +517,6 @@ export const tutorial_system = {
         const total = TUTORIAL_STEPS.length;
         const progress = ((index + 1) / total) * 100;
         const isLast = index === total - 1;
-        const isFirst = index === 0;
 
         const indicator = document.getElementById('tutorial-step-indicator');
         if (indicator) indicator.textContent = `Step ${index + 1} / ${total}`;
@@ -557,9 +529,6 @@ export const tutorial_system = {
 
         const contentEl = document.getElementById('tutorial-content');
         if (contentEl) contentEl.innerHTML = step.content;
-
-        const prevBtn = document.getElementById('tutorial-prev-btn');
-        if (prevBtn) prevBtn.style.display = isFirst ? 'none' : 'inline-block';
 
         const nextBtn = document.getElementById('tutorial-next-btn');
         if (!nextBtn) return;
@@ -790,12 +759,4 @@ export const tutorial_system = {
         this._tutorialUnsubscribers = [];
     },
 
-    /**
-     * @method _tutorial_prevStep
-     * @private
-     */
-    _tutorial_prevStep() {
-        if (!this._tutorialActive || this._tutorialStepIndex <= 0) return;
-        this._tutorial_showStep(this._tutorialStepIndex - 1);
-    },
 };
