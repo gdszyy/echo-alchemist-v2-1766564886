@@ -164,7 +164,9 @@ class Projectile {
 
         // 多态碰撞检测：根据敌人的 collisionShape 进行不同的检测
         if (e.collisionShape === 'polygon' && e.collisionData) {
-            hitResult = calc_getCirclePolygonCollision(this.pos, this.radius, e.collisionData.vertices);
+            // 获取绝对坐标顶点（修复 Boss 移动后碰撞框不跟随的问题）
+            const absoluteVertices = e.getAbsoluteVertices();
+            hitResult = calc_getCirclePolygonCollision(this.pos, this.radius, absoluteVertices);
             if (hitResult) {
                 hitResult.distVecX = this.pos.x - hitResult.closestX;
                 hitResult.distVecY = this.pos.y - hitResult.closestY;

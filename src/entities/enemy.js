@@ -1998,6 +1998,20 @@ class Enemy {
         }
     }
     getBounds() { return { left: this.pos.x - this.width/2, right: this.pos.x + this.width/2, top: this.pos.y - this.height/2, bottom: this.pos.y + this.height/2 }; }
+
+    /**
+     * 获取多边形碰撞形状的绝对坐标顶点
+     * 如果 collisionData.vertices 存储的是相对坐标，则加上当前位置
+     */
+    getAbsoluteVertices() {
+        if (!this.collisionData || !this.collisionData.vertices) return [];
+        // 如果顶点已经是绝对坐标（旧逻辑兼容），或者需要转换为绝对坐标
+        return this.collisionData.vertices.map(v => {
+            // 如果 vertices 存储的是相对于 (0,0) 的偏移量，则加上 this.pos
+            // 我们约定新逻辑下 vertices 存储的是相对中心点的偏移
+            return new Vec2(this.pos.x + v.x, this.pos.y + v.y);
+        });
+    }
 }
 
 // ==================== 导出 ====================

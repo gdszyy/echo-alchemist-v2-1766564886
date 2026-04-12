@@ -1385,10 +1385,10 @@ export const spawn_system = {
                 boss.collisionShape = 'polygon';
                 boss.collisionData = {
                     vertices: [
-                        new Vec2(centerX - bossW * 0.4, spawnY + bossH * 0.5), // 左下
-                        new Vec2(centerX - bossW * 0.2, spawnY - bossH * 0.5), // 左上
-                        new Vec2(centerX + bossW * 0.2, spawnY - bossH * 0.5), // 右上
-                        new Vec2(centerX + bossW * 0.4, spawnY + bossH * 0.5)  // 右下
+                        new Vec2(-bossW * 0.4,  bossH * 0.5), // 左下
+                        new Vec2(-bossW * 0.2, -bossH * 0.5), // 左上
+                        new Vec2( bossW * 0.2, -bossH * 0.5), // 右上
+                        new Vec2( bossW * 0.4,  bossH * 0.5)  // 右下
                     ]
                 };
                 break;
@@ -1396,11 +1396,11 @@ export const spawn_system = {
                 boss.collisionShape = 'polygon';
                 boss.collisionData = {
                     vertices: [
-                        new Vec2(centerX, spawnY - bossH * 0.5), // 顶
-                        new Vec2(centerX + bossW * 0.4, spawnY - bossH * 0.1), // 右上
-                        new Vec2(centerX + bossW * 0.3, spawnY + bossH * 0.5), // 右下
-                        new Vec2(centerX - bossW * 0.3, spawnY + bossH * 0.5), // 左下
-                        new Vec2(centerX - bossW * 0.4, spawnY - bossH * 0.1)  // 左上
+                        new Vec2( 0,          -bossH * 0.5), // 顶
+                        new Vec2( bossW * 0.4, -bossH * 0.1), // 右上
+                        new Vec2( bossW * 0.3,  bossH * 0.5), // 右下
+                        new Vec2(-bossW * 0.3,  bossH * 0.5), // 左下
+                        new Vec2(-bossW * 0.4, -bossH * 0.1)  // 左上
                     ]
                 };
                 break;
@@ -1428,11 +1428,11 @@ export const spawn_system = {
                 boss.collisionShape = 'polygon';
                 boss.collisionData = {
                     vertices: [
-                        new Vec2(centerX - bossW * 0.4, spawnY + bossH * 0.5), // 左底
-                        new Vec2(centerX - bossW * 0.3, spawnY), // 左中
-                        new Vec2(centerX, spawnY - bossH * 0.4), // 顶
-                        new Vec2(centerX + bossW * 0.3, spawnY), // 右中
-                        new Vec2(centerX + bossW * 0.4, spawnY + bossH * 0.5)  // 右底
+                        new Vec2(-bossW * 0.4,  bossH * 0.5), // 左底
+                        new Vec2(-bossW * 0.3,  0),           // 左中
+                        new Vec2( 0,          -bossH * 0.4), // 顶
+                        new Vec2( bossW * 0.3,  0),           // 右中
+                        new Vec2( bossW * 0.4,  bossH * 0.5)  // 右底
                     ]
                 };
                 break;
@@ -1440,10 +1440,10 @@ export const spawn_system = {
                 boss.collisionShape = 'polygon';
                 boss.collisionData = {
                     vertices: [
-                        new Vec2(centerX, spawnY - bossH * 0.5), // 顶
-                        new Vec2(centerX + bossW * 0.2, spawnY), // 右
-                        new Vec2(centerX, spawnY + bossH * 0.5), // 底
-                        new Vec2(centerX - bossW * 0.2, spawnY)  // 左
+                        new Vec2( 0,          -bossH * 0.5), // 顶
+                        new Vec2( bossW * 0.2,  0),           // 右
+                        new Vec2( 0,           bossH * 0.5), // 底
+                        new Vec2(-bossW * 0.2,  0)            // 左
                     ]
                 };
                 break;
@@ -1451,11 +1451,11 @@ export const spawn_system = {
                 boss.collisionShape = 'polygon';
                 boss.collisionData = {
                     vertices: [
-                        new Vec2(centerX - bossW * 0.3, spawnY - bossH * 0.3),
-                        new Vec2(centerX + bossW * 0.3, spawnY - bossH * 0.3),
-                        new Vec2(centerX + bossW * 0.4, spawnY + bossH * 0.3),
-                        new Vec2(centerX, spawnY + bossH * 0.5),
-                        new Vec2(centerX - bossW * 0.4, spawnY + bossH * 0.3)
+                        new Vec2(-bossW * 0.3, -bossH * 0.3),
+                        new Vec2( bossW * 0.3, -bossH * 0.3),
+                        new Vec2( bossW * 0.4,  bossH * 0.3),
+                        new Vec2( 0,           bossH * 0.5),
+                        new Vec2(-bossW * 0.4,  bossH * 0.3)
                     ]
                 };
                 break;
