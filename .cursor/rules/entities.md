@@ -109,3 +109,28 @@
 *   **多词缀叠加**：当词缀数量 > 3 时透明度乘以 0.65，> 1 时乘以 0.8，防止视觉过曝。
 *   **严格边界**：所有词缀特效均在 `ctx.clip()` 裁剪区内绘制（Layer 3.5 在 Layer 1 `clip()` 之后、`ctx.restore()` 裁剪结束之前），不会渗出方块边界。
 *   **混合模式**：`regen`/`haste`/`healer`/`clone`/`berserk` 使用 `screen` 模式增强亮度而不遮盖血条；`devour` 使用 `multiply` 模式增强暗色漩涡感。
+
+## 8. 随从异型几何化 (Minion Polygon Shapes)
+
+根据 Task tsk-bbd1ce26-997，`spawn_system.js` 新增 `spawn_applyMinionShape(e)` 方法，在 `spawn_spawnEnemyRowAt` 中为每个普通随从分配与当前 Boss 历史对应的几何形状。
+
+### 形状分配规则
+
+| 最后一个 Boss | 随从形状 | 顶点数 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `ignis` | 等腰三角形 | 3 | 顶点居中，底边对称 |
+| `glacies` | 菱形 | 4 | 4顶点菱形冰晶 |
+| `mikro` | 正六边形 | 6 | 6顶点小六边形 |
+| `devourer` | 残缺矩形 | 5 | 右上角被切掉 |
+| `viridis` | 水滴形 | 7 | 多边形近似水滴（顶尖+圆底） |
+| `tesla` | 平行四边形 | 4 | 倒斜刀片形 |
+| `chimera` | 不规则五边形 | 5 | 不对称碎片 |
+| `ouroboros` | 八角形 | 8 | 标准八角形 |
+| 无历史 | 默认 AABB | - | `collisionShape='aabb'`, `collisionData=null` |
+
+### 实现细节
+
+*   **`spawn_system.js`**：`spawn_applyMinionShape(e)` 读取 `this.bossHistory` 最后一个元素，使用 `e.width`/`e.height` 计算相对坐标顶点（范围 `[-w/2, w/2]` × `[-h/2, h/2]`），写入 `e.collisionShape = 'polygon'` 和 `e.collisionData.vertices`（`Vec2` 数组）。
+*   **`entities/enemy.js`**：`draw()` 方法的 **Layer 1 裁剪** 和 **Layer 5 边框** 均已升级：当 `type` 为 `'normal'` 或 `'elite'` 且 `collisionShape === 'polygon'` 时，使用 `moveTo/lineTo/closePath` 多边形路径替代 `roundRect`/`strokeRect`。
+*   **碰撞检测**：`projectile.js` 的 `_handleCollision` 已有 `polygon` 分支（调用 `calc_getCirclePolygonCollision`），无需修改。
+*   **顶点坐标约定**：均为相对中心点 `(0,0)` 的偏移量，由 `Enemy.getAbsoluteVertices()` 转换为绝对坐标供碰撞检测使用。

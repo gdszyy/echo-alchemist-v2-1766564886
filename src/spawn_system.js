@@ -368,6 +368,9 @@ export const spawn_system = {
                     e.shieldCharges = 1 + this.round;
                 }
 
+                // [新增] 根据 Boss 历史分配随从异型几何形状
+                this.spawn_applyMinionShape(e);
+
                 if (e.affixes.length > 0) e.type = 'elite';
                 
                 this.enemies.push(e);
@@ -388,6 +391,9 @@ export const spawn_system = {
                 if (e.affixes.includes('shield')) {
                     e.shieldCharges = 1 + this.round;
                 }
+
+                // [新增] 根据 Boss 历史分配随从异型几何形状
+                this.spawn_applyMinionShape(e);
 
                 if (e.affixes.length > 0) e.type = 'elite';
                 this.enemies.push(e);
@@ -1539,5 +1545,144 @@ export const spawn_system = {
 
         this.bossHistory.push(selectedId);
         return selectedId;
+    },
+
+    /**
+     * @method spawn_applyMinionShape
+     * @description 根据 bossHistory 最后一个 Boss 类型，为普通随从分配对应的异型几何形状。
+     * 形状均基于敌人中心点 (0,0) 的相对坐标，由 getAbsoluteVertices() 转换为绝对坐标。
+     * @param {Enemy} e - 要分配形状的随从实体
+     */
+    spawn_applyMinionShape(e) {
+        // 获取最后一个 Boss 类型
+        const lastBoss = (this.bossHistory && this.bossHistory.length > 0)
+            ? this.bossHistory[this.bossHistory.length - 1]
+            : null;
+
+        const w = e.width;
+        const h = e.height;
+
+        switch (lastBoss) {
+            case 'ignis':
+                // 三角形随从：等腰三角形（顶点居中，底边对称）
+                e.collisionShape = 'polygon';
+                e.collisionData = {
+                    vertices: [
+                        new Vec2(0,       -h * 0.5), // 顶
+                        new Vec2( w * 0.5, h * 0.5), // 右下
+                        new Vec2(-w * 0.5, h * 0.5)  // 左下
+                    ]
+                };
+                break;
+
+            case 'glacies':
+                // 菱形随从：4顶点菱形冰晶
+                e.collisionShape = 'polygon';
+                e.collisionData = {
+                    vertices: [
+                        new Vec2(0,       -h * 0.5), // 顶
+                        new Vec2( w * 0.5, 0),       // 右
+                        new Vec2(0,        h * 0.5), // 底
+                        new Vec2(-w * 0.5, 0)        // 左
+                    ]
+                };
+                break;
+
+            case 'mikro':
+                // 正六边形随从：6顶点小六边形
+                e.collisionShape = 'polygon';
+                e.collisionData = {
+                    vertices: [
+                        new Vec2(0,        -h * 0.5),                                    // 顶
+                        new Vec2( w * 0.5, -h * 0.25),                                   // 右上
+                        new Vec2( w * 0.5,  h * 0.25),                                   // 右下
+                        new Vec2(0,         h * 0.5),                                    // 底
+                        new Vec2(-w * 0.5,  h * 0.25),                                   // 左下
+                        new Vec2(-w * 0.5, -h * 0.25)                                    // 左上
+                    ]
+                };
+                break;
+
+            case 'devourer':
+                // 残缺矩形随从：5顶点，一角被切掉
+                e.collisionShape = 'polygon';
+                e.collisionData = {
+                    vertices: [
+                        new Vec2(-w * 0.5, -h * 0.5), // 左上
+                        new Vec2( w * 0.2, -h * 0.5), // 右上（切角左侧）
+                        new Vec2( w * 0.5, -h * 0.2), // 右上（切角下侧）
+                        new Vec2( w * 0.5,  h * 0.5), // 右下
+                        new Vec2(-w * 0.5,  h * 0.5)  // 左下
+                    ]
+                };
+                break;
+
+            case 'viridis':
+                // 水滴形随从：用 arc 近似水滴（圆形 + 尖顶）
+                // 用多边形近似水滴：上半圆形，下半尖顶
+                e.collisionShape = 'polygon';
+                e.collisionData = {
+                    vertices: [
+                        new Vec2(0,        -h * 0.5),  // 顶尖
+                        new Vec2( w * 0.4, -h * 0.1),  // 右上
+                        new Vec2( w * 0.5,  h * 0.2),  // 右中
+                        new Vec2( w * 0.3,  h * 0.5),  // 右下
+                        new Vec2(-w * 0.3,  h * 0.5),  // 左下
+                        new Vec2(-w * 0.5,  h * 0.2),  // 左中
+                        new Vec2(-w * 0.4, -h * 0.1)   // 左上
+                    ]
+                };
+                break;
+
+            case 'tesla':
+                // 平行四边形随从：4顶点倒斜平行四边形（刀片形）
+                e.collisionShape = 'polygon';
+                e.collisionData = {
+                    vertices: [
+                        new Vec2( w * 0.2, -h * 0.5), // 右上
+                        new Vec2( w * 0.5, -h * 0.5), // 右上角
+                        new Vec2(-w * 0.2,  h * 0.5), // 左下
+                        new Vec2(-w * 0.5,  h * 0.5)  // 左下角
+                    ]
+                };
+                break;
+
+            case 'chimera':
+                // 不规则五边形随从：不对称锟齿状碎片
+                e.collisionShape = 'polygon';
+                e.collisionData = {
+                    vertices: [
+                        new Vec2(-w * 0.5, -h * 0.5), // 左上
+                        new Vec2( w * 0.3, -h * 0.5), // 右上
+                        new Vec2( w * 0.5,  0),        // 右中
+                        new Vec2( w * 0.2,  h * 0.5), // 右下
+                        new Vec2(-w * 0.5,  h * 0.5)  // 左下
+                    ]
+                };
+                break;
+
+            case 'ouroboros':
+                // 小八角形随从：8顶点八角形
+                e.collisionShape = 'polygon';
+                e.collisionData = {
+                    vertices: [
+                        new Vec2(-w * 0.2, -h * 0.5), // 上左
+                        new Vec2( w * 0.2, -h * 0.5), // 上右
+                        new Vec2( w * 0.5, -h * 0.2), // 右上
+                        new Vec2( w * 0.5,  h * 0.2), // 右下
+                        new Vec2( w * 0.2,  h * 0.5), // 下右
+                        new Vec2(-w * 0.2,  h * 0.5), // 下左
+                        new Vec2(-w * 0.5,  h * 0.2), // 左下
+                        new Vec2(-w * 0.5, -h * 0.2)  // 左上
+                    ]
+                };
+                break;
+
+            default:
+                // 无 Boss 历史或未知 Boss：默认 AABB
+                e.collisionShape = 'aabb';
+                e.collisionData = null;
+                break;
+        }
     },
 };

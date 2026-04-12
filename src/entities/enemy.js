@@ -1062,10 +1062,11 @@ class Enemy {
         const r = 6;
 
         // === Layer 1: 容器裁剪 ===
-        // 根据 collisionShape 选择裁剪路径：polygon/arc 用异型，其余用 roundRect
+        // 根据 collisionShape 选择裁剪路径：polygon 用多边形，arc 用环形，其余用 roundRect
         ctx.beginPath();
-        if (this.type === 'boss' && this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
-            // 多边形路径（顶点为相对中心的本地坐标）
+        if (this.collisionShape === 'polygon' &&
+            this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+            // 多边形路径（顶点为相对中心的本地坐标）—— Boss 和随从均适用
             const verts = this.collisionData.vertices;
             ctx.moveTo(verts[0].x, verts[0].y);
             for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x, verts[i].y);
@@ -1501,8 +1502,10 @@ class Enemy {
             ctx.shadowBlur = 15;
         }
 
-        // 根据形状类型选择边框绘制方式
-        if (this.type === 'boss' && this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+        // 根据形状类型选择边框绘制方式：polygon 用多边形，arc 用圆弧，其余用 strokeRect
+        if (this.collisionShape === 'polygon' &&
+            this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+            // 多边形边框—— Boss 和随从均适用
             ctx.beginPath();
             const verts = this.collisionData.vertices;
             ctx.moveTo(verts[0].x, verts[0].y);
