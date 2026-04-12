@@ -43,6 +43,7 @@ import { shop_system } from './ui/shop.js';
 import { rune_launcher_system } from './ui/rune_launcher.js';
 import { calc_utils } from './calc_utils.js';
 import { tutorial_system } from './tutorial_system.js';
+import { game_over_mixin } from './ui/game_over.js';
 
 // ==================== 延迟音频初始化 ====================
 let _audioInitialized = false;
@@ -97,7 +98,7 @@ class Game {
         const _subsystems = [
             game_system, game_phase, combat_system, render_system, spawn_system,
             ui_system, hud_system, shop_system, rune_launcher_system,
-            calc_utils, tutorial_system
+            calc_utils, tutorial_system, game_over_mixin
         ];
         for (const subsystem of _subsystems) {
             for (const [key, val] of Object.entries(subsystem)) {
@@ -208,6 +209,10 @@ class Game {
         this.slowMotionThreshold = 100;  
         this.saveData = { currency: 0, runeFragments: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0 };
         this.runCurrency = 0;   
+        // ==================== 本局统计字段 ====================
+        this.runKillCount = 0;          // 本局击杀数
+        this.runRuneFragmentsGained = 0; // 本局获得的符文碎片数
+        this.bossDefeatedLog = [];       // 本局击败的 Boss 记录 [{bossId, bossName, round, isBigBoss}]
 
         // ==================== 符文词条系统状态变量 ====================
         // Task 1: 数据结构升级 - runeInventory 和 runeGrid 存储对象格式 { id: string, level: number }
@@ -295,6 +300,8 @@ class Game {
                 const hitY = data.hitY || (data.enemy ? data.enemy.pos.y : this.height / 2);
                 this.combat_runeCharge_onHit(hitX, hitY, true);
             }
+            // [本局统计] 累计击杀数
+            this.runKillCount = (this.runKillCount || 0) + 1;
         });
 
         // 音频就绪事件
@@ -307,6 +314,14 @@ class Game {
             this.postBossMultiplier = 1.3;
             this.postBossSurgeRoundsLeft = 3;
             console.log('[DifficultyBalance] Boss击杀，战后高压因子激活: x1.3，持续3回合');
+            // [本局统计] 记录 Boss 击败日志
+            if (!this.bossDefeatedLog) this.bossDefeatedLog = [];
+            this.bossDefeatedLog.push({
+                bossId:    data.bossId || (data.boss && data.boss.bossType) || 'unknown',
+                bossName:  data.bossName || (data.boss && data.boss.bossName) || 'Boss',
+                round:     this.round,
+                isBigBoss: !!(data.isBigBoss || (data.boss && data.boss.isBigBoss) || false),
+            });
         });
 
         // [Task 3.2] 注册 UI 层 EventBus 监听器

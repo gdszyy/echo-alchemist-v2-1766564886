@@ -2117,6 +2117,48 @@
             40%  { transform: scale(1.2); opacity: 1; filter: brightness(2); }
             100% { transform: scale(0.5); opacity: 0; }
         }
+        /* ===== Game Over 结算页面样式 ===== */
+        #phase-gameover {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
+        }
+        #gameover-content {
+            animation: gameover-fadein 0.6s ease-out forwards;
+        }
+        @keyframes gameover-fadein {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        /* 回合节点图横向滚动容器 */
+        .gameover-timeline {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        /* Boss 节点悬停动画 */
+        .gameover-node-boss {
+            animation: boss-node-pulse 2s ease-in-out infinite;
+        }
+        @keyframes boss-node-pulse {
+            0%, 100% { box-shadow: 0 0 6px currentColor; }
+            50%       { box-shadow: 0 0 16px currentColor; }
+        }
+        /* 统计卡片动画 */
+        .gameover-stat-card {
+            animation: stat-card-in 0.5s ease-out forwards;
+        }
+        @keyframes stat-card-in {
+            from { opacity: 0; transform: scale(0.95); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+        /* 慢速闪烁动画 */
+        .animate-pulse-slow {
+            animation: pulse-slow 2.5s ease-in-out infinite;
+        }
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%       { opacity: 0.7; transform: scale(1.08); }
+        }
     </style>
 </head>
 <body>
@@ -2643,6 +2685,13 @@
             </button>
         </div>
     </div>
+    <!-- Phase: Game Over (每局结束结算页面) -->
+    <div id="phase-gameover" class="ui-overlay hidden-phase" style="display: none; z-index: 400; background: #020617; pointer-events: auto; overflow-y: auto;">
+        <div id="gameover-content" class="w-full max-w-md mx-auto flex flex-col">
+            <!-- 内容由 game_over.js 动态渲染 -->
+        </div>
+    </div>
+
     <div id="info-drawer" class="absolute bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-600 text-slate-200 transform transition-transform duration-300 translate-y-full z-50 flex flex-col h-[75vh] safe-area-pb">
     
         <button onclick="game.ui.closeDrawer()" class="absolute top-2 right-2 text-slate-400 hover:text-white p-2">✕</button>

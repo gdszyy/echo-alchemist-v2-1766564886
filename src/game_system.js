@@ -221,6 +221,10 @@ export const game_system = {
         // [难度平衡] 重置战后高压因子
         this.postBossMultiplier = 1.0;
         this.postBossSurgeRoundsLeft = 0;
+        // [本局统计] 重置本局统计字段
+        this.runKillCount = 0;
+        this.runRuneFragmentsGained = 0;
+        this.bossDefeatedLog = [];
     },
 
     /**

@@ -537,11 +537,8 @@ phase_gathering_getRandomPegType() {
         
         this.lastMousePos = logicPos;
 
-        // 处理 gameOver 状态的点击返回主界面
+        // 处理 gameOver 状态的点击（gameover 阶段由其自身 UI 按鈕处理，此处直接忽略）
         if (this.gameOver) {
-            this.phase_switchPhase('meta');
-            // 注意：这里不再调用 sys_resetGame，因为重置逻辑应该在点击“开始炼成”时触发
-            // 这样可以确保返回的是首页，而不是直接进入下一局
             return;
         }
 
@@ -890,6 +887,8 @@ phase_gathering_getRandomPegType() {
         // 检查失败
         if (this.input_checkDefeat()) {
             this.gameOver = true;
+            // [游戏结束] 切换到结算阶段
+            this._gameover_triggerPhase();
             return;
         }
 
@@ -1257,7 +1256,11 @@ phase_gathering_getRandomPegType() {
                 }
             });
 
-            if (this.input_checkDefeat()) this.gameOver = true;
+            if (this.input_checkDefeat()) {
+                this.gameOver = true;
+                // [游戏结束] 切换到结算阶段
+                this._gameover_triggerPhase();
+            }
 
             // 更新和绘制弹丸
             for (let i = this.projectiles.length - 1; i >= 0; i--) { 
@@ -1439,9 +1442,7 @@ phase_gathering_getRandomPegType() {
 
         // --- UI Overlays ---
         if (this.gameOver) { 
-            // [已移除] runCurrency 结算：符文碎片改为局内符文合成时直接获取，不再在游戏结算时转换
-
-            document.getElementById('combat-message').innerHTML = '<span class="text-red-400 font-bold text-4xl">防線失守</span><br><span class="text-sm">點擊返回主界面</span>'; 
+            // [游戏结束] 已切换到 gameover 阶段，combat 渲染循环直接返回
             return; 
         }
 

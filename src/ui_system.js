@@ -234,7 +234,8 @@ ui_closeTruthBook() {
         // [META] 兼容 phase-meta, shop, truth_book
         const activeEl = document.getElementById(`phase-${this.phase}`);  // [Mixin 正常用法：读取 Game 实例状态]
         if(activeEl) { 
-            activeEl.style.display = 'flex'; 
+            // gameover 阶段需要滚动，使用 block 布局
+            activeEl.style.display = (this.phase === 'gameover') ? 'block' : 'flex';  // [Mixin 正常用法]
             // 微小延迟以触发 CSS transition (如果有)
             setTimeout(() => { 
                 activeEl.classList.remove('hidden-phase'); 
@@ -306,7 +307,7 @@ ui_closeTruthBook() {
         // F. 统一顶部栏：在 meta/shop 全屏阶段隐藏，其他阶段显示
         const unifiedTopBar = document.getElementById('unified-top-bar');
         if (unifiedTopBar) {
-            const hideInPhases = ['meta', 'shop', 'truth_book', 'training', 'relic', 'selection'];
+            const hideInPhases = ['meta', 'shop', 'truth_book', 'training', 'relic', 'selection', 'gameover'];
             unifiedTopBar.style.display = hideInPhases.includes(this.phase) ? 'none' : 'flex';  // [Mixin 正常用法：读取 Game 实例状态]
         }
 
@@ -361,6 +362,8 @@ ui_closeTruthBook() {
     meta_addCurrency(amount) {
         // 局外货币改为符文碎片
         this.saveData.runeFragments = (this.saveData.runeFragments || 0) + amount;  // [Mixin 正常用法：读取 Game 实例状态]
+        // [本局统计] 累计本局获得的符文碎片数
+        this.runRuneFragmentsGained = (this.runRuneFragmentsGained || 0) + amount;
         this.sys_saveData();
         this.ui_updateMetaCurrency();
     },
@@ -458,6 +461,7 @@ ui_closeTruthBook() {
             'combat':     { text: '\u6230\u9b25\u968e\u6bb5', sub: '\u6297\u79a6\u9b54\u50cf' },
             'truth_book': { text: '\u771f\u7406\u4e4b\u66f8', sub: '\u6d1e\u6089\u842c\u7269\u4e4b\u7406' },
             'training':   { text: '\u8a66\u7149\u5834', sub: '\u6975\u9650\u6230\u9b25\u6e2c\u8a66' },
+            'gameover':   { text: '\u9632\u7dda\u5931\u5b88', sub: 'Run Over' },
         };
         const titleData = PHASE_TITLES[newPhase] || { text: '\u547d\u904b\u6289\u62e9', sub: '\u9078\u64c7\u4f60\u7684\u547d\u904b' };
 
@@ -482,6 +486,7 @@ ui_closeTruthBook() {
                 'combat':     '\u6230\u9b25',
                 'truth_book': '\u5716\u9451',
                 'training':   '\u8a66\u7149',
+                'gameover':   '\u7ed3\u7b97',
             };
             topPhaseLabel.textContent = SHORT_LABELS[newPhase] || '';
         }
