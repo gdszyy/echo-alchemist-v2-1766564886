@@ -80,3 +80,11 @@ globs: ["src/config.js"]
 - **UI 显示**: `ui_showRelicSelection` 在渲染遗物卡片时，若 `maxStacks > 1`，将显示当前层数与最大层数的进度提示。
 - **重置逻辑**: `game_system.js` 中的 `sys_resetGame` 方法除了清空 `ownedRelics` 外，还必须重置受遗物影响的状态变量（如 `pinkPegCount`、`marbleSizeBonus`、`hasCombatWall`、`slotCount`、`unlockedSlots`、`assimilationBoostRounds`）。
 - **ID 唯一性**: 确保 `RELIC_DB` 中每个遗物的 `id` 唯一，避免因同名 ID 导致去重或计数逻辑错误（如原有的三个 `tactical_kit` 已拆分为 `tactical_kit_pierce`、`tactical_kit_scatter`、`tactical_kit_damage`）。
+
+## 6. 同化涌潮遗物规范
+- **设计意图**: 每种可同化钉子的弹珠（`bounce`、`pierce`、`scatter`、`damage`、`cryo`、`pyro`）各对应一个遗物，命名格式为 `surge_{type}`。
+- **effect 字段**: 一律使用 `effect: 'assimilation_surge'`，配合 `marbleType` 字段指定弹珠类型。
+- **状态变量**: `game.assimilationBoostRounds` 是一个对象 `{ marbleType: roundsLeft }`，不是数字。
+- **涌潮效果**: 获取遗物时向 `guaranteedNextRound` 注入两个该弹珠类型，并将 `assimilationBoostRounds[marbleType]` 设为 2。
+- **同化加成**: `entities.js` 中判断 `game.assimilationBoostRounds[ballType] > 0` 时，对该弹珠类型的同化概率 +0.5。
+- **递减逻辑**: `game_phase.js` 的 `phase_finalizeRound` 中遍历 `assimilationBoostRounds` 对象，对每个类型递减回合数，归零时弹出提示。

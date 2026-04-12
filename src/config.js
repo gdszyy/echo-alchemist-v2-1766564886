@@ -760,7 +760,15 @@ const RELIC_DB = [
     { id: 'mirror_sync', name: '鏡像同步', icon: '🪞', desc: '收集階段：釘盤列數減少且對齊。釘子被同化/突變時，鏡像位置的釘子同步轉化；特殊槽位鏡像呈現（數量翻倍）。', rarity: 'legendary', effect: 'board_layout_mirror_sync', maxStacks: 1 },
     // 策略5：宽窄交替 - 边缘捕获流（宽行捕获偏移弹珠，窄行提供通道）
     { id: 'wide_narrow', name: '寬窄交替', icon: '📐', desc: '收集階段：偶數行增加 2 列，奇數行減少 2 列，形成寬窄交替結構。寬行的邊緣釘子能捕獲偏移的弹珠，窄行讓弹珠有更多橫向空間。', rarity: 'common', effect: 'board_layout_wide_narrow', maxStacks: 1 },
-    { id: 'resonance_stone', name: '共鳴之石', icon: '💎', desc: '下兩個回合必定刷新出一個 [共鳴彈珠]，且同化概率大幅提升（持續兩回合）。', rarity: 'rare', effect: 'resonance_stone_effect', maxStacks: 1 },
+    // ==================== 弹珠同化涌潮遗物 ====================
+    // 每种可同化钉子的弹珠各对应一个遗物
+    // 效果：下两回合必定刷新出该种弹珠，且该弹珠的同化概率大幅提升（持續两回合）
+    { id: 'surge_bounce',  name: '弹性涌潮', icon: '🔵', desc: '下兩回合必定刷新出「弹性彈珠」，且弹性彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'bounce',  maxStacks: 1 },
+    { id: 'surge_pierce',  name: '穿透涌潮', icon: '↗',       desc: '下兩回合必定刷新出「穿透彈珠」，且穿透彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'pierce',  maxStacks: 1 },
+    { id: 'surge_scatter', name: '散射涌潮', icon: '🔱',       desc: '下兩回合必定刷新出「散射彈珠」，且散射彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'scatter', maxStacks: 1 },
+    { id: 'surge_damage',  name: '增幅涌潮', icon: '⚔️',       desc: '下兩回合必定刷新出「增幅彈珠」，且增幅彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'damage',  maxStacks: 1 },
+    { id: 'surge_cryo',    name: '冰霜涌潮', icon: '❄️',       desc: '下兩回合必定刷新出「冰霜彈珠」，且冰霜彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'cryo',    maxStacks: 1 },
+    { id: 'surge_pyro',    name: '火焰涌潮', icon: '🔥',       desc: '下兩回合必定刷新出「火焰彈珠」，且火焰彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'pyro',    maxStacks: 1 },
 ];
 
 // ==================== 技能数据库 ====================

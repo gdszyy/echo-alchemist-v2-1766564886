@@ -754,11 +754,16 @@ phase_gathering_getRandomPegType() {
             }
         }
 
-        // [新增] 遗物效果递减：共鸣之石
-        if (this.assimilationBoostRounds > 0) {
-            this.assimilationBoostRounds--;
-            if (this.assimilationBoostRounds === 0) {
-                showToast('共鳴共振效果已結束。');
+        // [新增] 遗物效果递减：同化涌潮系列
+        if (this.assimilationBoostRounds && typeof this.assimilationBoostRounds === 'object') {
+            for (const mt of Object.keys(this.assimilationBoostRounds)) {
+                if (this.assimilationBoostRounds[mt] > 0) {
+                    this.assimilationBoostRounds[mt]--;
+                    if (this.assimilationBoostRounds[mt] === 0) {
+                        const display = CONFIG.ui?.attributeDisplay?.[mt]?.name ?? mt;
+                        showToast(`${display}涌潮效果已結束。`);
+                    }
+                }
             }
         }
         

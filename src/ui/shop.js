@@ -163,12 +163,15 @@ export const shop_system = {
             // 宽窄交替：切换到宽窄交替布局
             this.boardLayout = 'wide_narrow';
             this.phase_gathering_initPachinko(true);
-        } else if (relic.effect === 'resonance_stone_effect') {
-            // 共鸣之石：下两回合保底共鸣弹珠 + 同化概率提升
-            this.guaranteedNextRound.push('resonance');
-            this.guaranteedNextRound.push('resonance');
-            this.assimilationBoostRounds = 2;
-            showToast('共鳴共振已啟動！同化概率大幅提升。');
+        } else if (relic.effect === 'assimilation_surge') {
+            // 同化涌潮：下两回合保底该弹珠类型 + 该类型同化概率提升
+            const mt = relic.marbleType;
+            this.guaranteedNextRound.push(mt);
+            this.guaranteedNextRound.push(mt);
+            // assimilationBoostRounds 是一个对象，记录每种弹珠类型的副加回合数
+            if (!this.assimilationBoostRounds) this.assimilationBoostRounds = {};
+            this.assimilationBoostRounds[mt] = 2;
+            showToast(`${relic.name}已啟動！${mt} 同化概率大幅提升。`);
         }
         //  支持單個字串或數組的解鎖邏輯
         if (relic.unlocks) {

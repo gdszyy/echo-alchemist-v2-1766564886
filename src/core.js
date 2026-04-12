@@ -168,7 +168,7 @@ class Game {
         this.fortuneWheel = new FortuneWheel(this);
         this.unlockedWeights = { ...CONFIG.probabilities };
         this.guaranteedNextRound = [];
-        this.assimilationBoostRounds = 0;
+        this.assimilationBoostRounds = {}; // { marbleType: roundsLeft }
         this.isDragging = false; 
         this.dragStart = new Vec2(0,0); 
         this.dragCurrent = new Vec2(0,0); 

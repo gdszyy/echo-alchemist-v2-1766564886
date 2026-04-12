@@ -1124,8 +1124,8 @@ class DropBall {
             else if (peg.type === 'normal' && ballType) {
                 // 这里保留原有的逻辑：普通弹珠同化普通钉子
                 let assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0;
-                // [新增] 共鸣之石遗物加成
-                if (game.assimilationBoostRounds > 0) {
+                // [新增] 同化涌潮遗物加成：仅对该弹珠类型生效
+                if (game.assimilationBoostRounds && game.assimilationBoostRounds[ballType] > 0) {
                     assimilationChance += 0.5; // 大幅提升 50% 同化概率
                 }
                 if (Math.random() < assimilationChance && assimilationChance>0) {
