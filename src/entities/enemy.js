@@ -1827,7 +1827,28 @@ class Enemy {
             }
         }
         
-        // 2. 计算冰冻易伤
+        // 2. [Mikro联动] 分身减伤：Mikro 母体受击时，根据场上存活分身数量减少伤害
+        if (this.type === 'boss' && this.bossType === 'mikro' && typeof game !== 'undefined') {
+            const mikroCfg = CONFIG.balance.bossConfigs && CONFIG.balance.bossConfigs.mikro;
+            const reductionPerClone = mikroCfg ? mikroCfg.cloneDamageReductionPerClone : 0.10;
+            const reductionMax = mikroCfg ? mikroCfg.cloneDamageReductionMax : 0.50;
+            // 统计场上存活的 clone 分身数量
+            const cloneCount = game.enemies.filter(e => e.active && e.isClone).length;
+            if (cloneCount > 0) {
+                const damageReduction = Math.min(cloneCount * reductionPerClone, reductionMax);
+                actualDamage *= (1 - damageReduction);
+                // 显示减伤视觉反馈（限制频率）
+                if (!this._cloneReductionTimer || this._cloneReductionTimer <= 0) {
+                    this._cloneReductionTimer = 8; // 8帧内不重复显示
+                    const pct = Math.round(damageReduction * 100);
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 35, `🧬-${pct}%`, '#c084fc');
+                } else {
+                    this._cloneReductionTimer--;
+                }
+            }
+        }
+
+        // 3. 计算冰冻易伤
         if (this.temp < 0) {
             // 冰冻增加伤害 (根据温度线性增加)
             actualDamage *= (1 + Math.abs(this.temp) * 0.005);
@@ -1838,11 +1859,10 @@ class Enemy {
             }
         }
 
-        // 3. 执行扣血
+          // 4. 执行扣血
         this.hp -= actualDamage; 
         this.hitTimer = 10; 
         this.whiteBarTimer = 45; 
-
         if (typeof game !== 'undefined') {
             game.combat_reportDamage(actualDamage);
             
@@ -1875,8 +1895,7 @@ class Enemy {
             }
             // ----------------------------------------
         }
-
-        // 4. 返回详细结果
+        // 5. 返回详细结果
         const killed = this.hp <= 0;
         if (killed) this.active = false;
 

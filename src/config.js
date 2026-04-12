@@ -551,6 +551,8 @@ const CONFIG = {
                 weakness: ['lightning', 'scatter'],
                 cloneChanceHitBonus: 0.3, // 额外受击分身概率
                 berserkedCloneChance: 1.0, // 狂暴后分身概率 100%
+                cloneDamageReductionPerClone: 0.10, // 每个存活分身提供的减伤比例
+                cloneDamageReductionMax: 0.50,       // 分身减伤上限（5个分身即达上限）
                 themeWeights: { lightning: 1.5, scatter: 1.5 }
             },
             devourer: {

@@ -439,6 +439,7 @@ export const spawn_system = {
             this.spores.push(new CloneSpore(sourceEnemy.pos.x, sourceEnemy.pos.y, pos.x, pos.y, () => {
                 const clone = new Enemy(pos.x, pos.y, w, this.enemyHeight, cloneHp, cloneHp);
                 clone.affixes = []; // 分身没有词缀
+                clone.isClone = true; // [Mikro联动] 标记为分身，用于母体减伤计算
                 this.enemies.push(clone);
                 this.spawn_createFloatingText(pos.x, pos.y, "SPAWN", "#a855f7");
             }));

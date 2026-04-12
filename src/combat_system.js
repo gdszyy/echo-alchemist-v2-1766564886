@@ -1635,7 +1635,8 @@ export const combat_system = {
                  const pos = validCols[Math.floor(Math.random() * validCols.length)];
                  this.spores.push(new CloneSpore(enemy.pos.x, enemy.pos.y, pos.x, pos.y, () => {
                     const clone = new Enemy(pos.x, pos.y, w, this.enemyHeight, cloneHp, cloneHp);
-                    clone.affixes = []; 
+                    clone.affixes = [];
+                    clone.isClone = true; // [Mikro联动] 标记为分身，用于母体减伤计算
                     this.enemies.push(clone);
                 }));
              }

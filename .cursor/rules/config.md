@@ -74,10 +74,21 @@ globs: ["src/config.js"]
 - **遗物解锁机制**：玩家选择遗物时，`shop.js` 中的 `ui_selectRelic` 会通过 `this.unlockedWeights[key]` 增加对应属性的权重，从而在后续回合的钉板刷新中按概率生成对应属性钉子。
 - **修改警告**：严禁将除 `bounce` 和 `white` 以外的属性初始权重设置为大于 0 的数値，否则会破坏“遗物解锁属性”的游戏设计意图。
 
-## 7. 参数调整记录
+## 7. Boss 配置参数说明 (bossConfigs)
+
+`CONFIG.balance.bossConfigs` 控制各个特殊 Boss 的专有参数和机制系数。
+
+**Mikro (裂变母体·米克罗) 专有参数**:
+- `cloneChanceHitBonus`: 额外受击分身概率 (默认 0.3)
+- `berserkedCloneChance`: 狂暴后分身概率 (默认 1.0)
+- `cloneDamageReductionPerClone`: 每个存活分身提供的减伤比例 (默认 0.10)
+- `cloneDamageReductionMax`: 分身减伤上限 (默认 0.50)
+
+## 8. 参数调整记录
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
+| 2026-04-12 | `src/config.js` | **Mikro 减伤机制**：在 `bossConfigs.mikro` 中新增 `cloneDamageReductionPerClone` (0.10) 和 `cloneDamageReductionMax` (0.50) 参数，用于控制 Mikro 母体根据场上存活分身数量获得的伤害减免效果。 |
 | 2026-04-12 | `src/config.js` | **初始钉子行数减少 1**：`CONFIG.gameplay.rows` 从 `6` 改为 `5`，降低游戏初始复杂度，改善早期游戏体验。 |
 | 2026-04-12 | `src/spawn_system.js` | **修复 mikro/micro 命名不一致 Bug**：将 `spawn_system.js` 中的 `switch case 'micro'` 改为 `mikro`，与 `config.js` 中的 Boss ID 保持一致。 |
 | 2026-04-12 | `src/config.js` | **Chimera 狂暴爆炸概率配置**：`CONFIG.balance.bossConfigs.chimera` 中新增 `berserkedBlastOnHitChance: 0.25`，表示 Chimera 狂暴后每次受击有 25% 概率触发全场爆炸。 |
