@@ -1126,13 +1126,7 @@ phase_gathering_getRandomPegType() {
 
         // --- UI Overlays ---
         if (this.gameOver) { 
-            // [META] 结算：将 runCurrency 转换为符文碎片并保存
-            if (this.runCurrency > 0) {
-                this.saveData.runeFragments = (this.saveData.runeFragments || 0) + this.runCurrency;
-                this.sys_saveData();
-                this.ui_updateMetaCurrency();
-                this.runCurrency = 0;
-            }
+            // [已移除] runCurrency 结算：符文碎片改为局内符文合成时直接获取，不再在游戏结算时转换
 
             document.getElementById('combat-message').innerHTML = '<span class="text-red-400 font-bold text-4xl">防線失守</span><br><span class="text-sm">點擊返回主界面</span>'; 
             return; 

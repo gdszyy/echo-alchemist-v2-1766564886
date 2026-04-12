@@ -516,11 +516,7 @@ export const spawn_system = {
         const finalScore = Math.floor(amount * this.scoreMultiplier);
         this.score += finalScore;
         const resourceGain = Math.floor(0.523 * Math.pow(finalScore, 0.63));
-        if (resourceGain > 0) {
-            // 保留局内货币逻辑，删除 meta_addCurrency 调用
-            this.runCurrency += resourceGain;
-            // [移除] 飞行特效：runCurrency 仅在结算时转换为符文碎片，此处触发特效无意义
-        } 
+        // [已移除] runCurrency 累积：符文碎片改为合成时直接获取，不再通过局内货币结算
         this.scoreMultiplier = parseFloat((this.scoreMultiplier + 0.2).toFixed(1)); // 乘数增加 0.2
         this.ui_updateMultiplierUI(); 
     },
@@ -963,9 +959,7 @@ export const spawn_system = {
                 this.currentSession.currentHits++;
                 this.currentSession.totalHits++; 
                 
-                // [META] 获得局内货币（删除 meta_addCurrency 调用）
-                this.runCurrency += 1;
-                // [移除] 飞行特效：runCurrency 仅在结算时转换为符文碎片，此处触发特效无意义
+                // [已移除] runCurrency 累积：符文碎片改为合成时直接获取，不再通过局内货币结算
                 
                 // 音效
                 const progress = Math.min(1, this.currentSession.currentHits / this.currentSession.nextTriggerThreshold);

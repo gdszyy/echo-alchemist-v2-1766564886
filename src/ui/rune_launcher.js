@@ -103,8 +103,22 @@ export const rune_launcher_system = {
         if (panel) {
             panel.style.display = 'flex';
         }
+        // 初始化发射器内符文碎片计数显示
+        this._ui_updateLauncherShardCount();
         this.ui_initRuneGrid();
         this.ui_updateRuneGrid();
+    },
+
+
+    /**
+     * 更新符文发射器面板顶部的符文碎片计数显示
+     * @private
+     */
+    _ui_updateLauncherShardCount() {
+        const el = document.getElementById('launcher-shard-count');
+        if (el) {
+            el.textContent = (this.saveData && this.saveData.runeFragments) ? this.saveData.runeFragments.toLocaleString() : '0';  // [Mixin 正常用法：读取 Game 实例状态]
+        }
     },
 
 
@@ -636,8 +650,36 @@ export const rune_launcher_system = {
             this._selectedRuneIndices = new Set();  // [Mixin 正常用法：读取 Game 实例状态]
             const runeDef = RUNE_DB.find(r => r.id === result.result.id);
             const runeName = runeDef ? `${runeDef.icon} ${runeDef.name}` : result.result.id;
+
+            // [局内合成 -> 局外符文碎片奖励]
+            // 奖励公式：Lv.1 得 1 片，Lv.2 得 3 片，Lv.3 得 6 片
+            const mergedLevel = result.result.level;
+            const MERGE_SHARD_REWARDS = [0, 1, 3, 6]; // 索引即符文等级
+            const shardReward = MERGE_SHARD_REWARDS[Math.min(mergedLevel, 3)] || 1;
+            this.meta_addCurrency(shardReward);
+
+            // 合成动画：符文碎片从合成按鈕飞向局外货币显示区
+            const mergeBtn = document.getElementById('rune-merge-btn');
+            if (mergeBtn) {
+                const rect = mergeBtn.getBoundingClientRect();
+                const startX = rect.left + rect.width / 2;
+                const startY = rect.top + rect.height / 2;
+                // 多片碎片错开飞出，增强视觉层次感
+                for (let i = 0; i < shardReward; i++) {
+                    const offsetX = (Math.random() - 0.5) * 40;
+                    const offsetY = (Math.random() - 0.5) * 20;
+                    setTimeout(() => {
+                        this._ui_playMergeShardFlyEffect(
+                            startX + offsetX,
+                            startY + offsetY,
+                            1
+                        );
+                    }, i * 80); // 每片间隔 80ms 错开飞出
+                }
+            }
+
             this._ui_showRuneActionResult(
-                `⚗️ 合成成功！获得 ${runeName} Lv.${result.result.level}`,
+                `⚗️ 合成成功！获得 ${runeName} Lv.${mergedLevel}，+${shardReward} 🔮 符文碎片`,
                 'success'
             );
             audio.playTone(880, 'sine', 0.15, 0.3);
@@ -674,6 +716,74 @@ export const rune_launcher_system = {
         } else {
             this._ui_showRuneActionResult(`⚠️ 重铸失败：${result.error}`, 'error');
         }
+    },
+
+
+    /**
+     * 局内符文合成成功时，符文碎片飞向局外货币显示区的动画
+     * 与 ui_playResourceFlyEffect 的区别：这里使用独立的 DOM 节点，
+     * 并应用合成主题的紫色光晓特效，以区分普通资源飞行动画。
+     * @param {number} startX - 起始 X 坐标（页面坐标）
+     * @param {number} startY - 起始 Y 坐标（页面坐标）
+     * @param {number} amount - 碎片数量（显示用）
+     * @private
+     */
+    _ui_playMergeShardFlyEffect(startX, startY, amount) {
+        const node = document.createElement('div');
+        node.textContent = '🔮';
+        node.style.cssText = [
+            'position: fixed;',
+            `left: ${startX}px;`,
+            `top: ${startY}px;`,
+            'font-size: 18px;',
+            'pointer-events: none;',
+            'z-index: 9999;',
+            'opacity: 1;',
+            'transform: translate(-50%, -50%) scale(1.2);',
+            'transition: all 0.75s cubic-bezier(0.16, 1, 0.3, 1);',
+            'filter: drop-shadow(0 0 6px rgba(168,85,247,0.9)) drop-shadow(0 0 12px rgba(168,85,247,0.5));',
+            'will-change: transform, opacity;',
+        ].join(' ');
+        document.body.appendChild(node);
+
+        // 目标元素：优先飞向发射器面板内的碎片计数显示，其次才是局外货币显示区
+        const launcherShardEl = document.getElementById('launcher-shard-count');
+        const metaCurrencyEl = document.getElementById('meta-currency-display');
+        const targetEl = launcherShardEl || metaCurrencyEl;
+        const targetRect = targetEl
+            ? targetEl.getBoundingClientRect()
+            : { left: window.innerWidth - 80, top: 30, width: 0, height: 0 };
+        const targetX = targetRect.left + targetRect.width / 2;
+        const targetY = targetRect.top + targetRect.height / 2;
+
+        // 强制重排以触发过渡
+        void node.offsetWidth;
+
+        // 开始飞行动画
+        node.style.left = `${targetX}px`;
+        node.style.top = `${targetY}px`;
+        node.style.opacity = '0';
+        node.style.transform = 'translate(-50%, -50%) scale(0.4)';
+
+        // 动画结束后清理 DOM 并播放货币闪烁反馈
+        setTimeout(() => {
+            if (node.parentNode) node.parentNode.removeChild(node);
+            // 更新发射器内碎片计数显示
+            this._ui_updateLauncherShardCount();
+            // 货币显示区闪烁反馈
+            if (targetEl) {
+                const parent = targetEl.parentElement;
+                if (parent) {
+                    parent.style.transition = 'transform 0.1s ease, filter 0.1s ease';
+                    parent.style.transform = 'scale(1.25)';
+                    parent.style.filter = 'brightness(1.8) drop-shadow(0 0 8px rgba(168,85,247,0.9))';
+                    setTimeout(() => {
+                        parent.style.transform = 'scale(1)';
+                        parent.style.filter = 'none';
+                    }, 160);
+                }
+            }
+        }, 750);
     },
 
 

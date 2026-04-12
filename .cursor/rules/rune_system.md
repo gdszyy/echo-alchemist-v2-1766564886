@@ -37,9 +37,10 @@ globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js", "src/c
 - **合成 (`rune_merge`)**: 
   - 条件: 3个同 ID、同等级的符文。
   - 结果: 合成为1个高一等级的同 ID 符文。
+  - **局外奖励**: 合成成功后，根据合成结果等级自动发放符文碎片：Lv.1 得 1 片，Lv.2 得 3 片，Lv.3 得 6 片。奖励在 `ui_doRuneMerge` 中通过 `meta_addCurrency` 发放，并伴随符文碎片飞向局外货币显示区的动画。
 - **重铸 (`rune_reforge`)**: 
   - 条件: 任意3个符文。
-  - 结果: 消耗这3个符文，产出1个新符文，等级为这3个符文等级的平均值（向下取整）。新符文 ID 通过 `loot_calcRuneDrop` 获取。
+  - 结果: 消耗这3个符文，产出1个新符文，等级为这3个符文等级的平均値（向下取整）。新符文 ID 通过 `loot_calcRuneDrop` 获取。
 - **原子性**: 两个操作都必须有严格的预检机制，确保扣除和产出同时成功或失败。
 
 ## 5. 数据结构 (`rune_config.js`)

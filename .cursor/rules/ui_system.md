@@ -67,7 +67,8 @@ for (const subsystem of _subsystems) {
 | 日期 | 文件 | 问题描述 | 修复方式 |
 |---|---|---|---|
 | 2026-04-11 | `src/ui_system.js` | `_ui_updateRuneStatsDisplay` 函数体（约 47 行）被错误地遗留在 `ui_system.js` 中，缺少方法名声明，导致 `Uncaught SyntaxError: Unexpected identifier 'summary'` | 从 `ui_system.js` 删除游离函数体，并将其填充至 `rune_launcher.js` 中已声明但为空的同名方法 |
-| 2026-04-12 | `index.html` | 研磨阶段（`#phase-gathering`）两个符文词条系统浮动按钮与底部面板（`.bottom-panel` 高度 115px）及英雄充能条（`#hero-gauge-container` bottom:145px）重叠：背包按钮 `bottom-24`(96px) 低于底部面板被遮挡，发射器按钮 `bottom-36`(144px) 与充能条几乎完全重叠 | 将背包按钮改为 `bottom-32`(128px)，发射器按钮改为 `bottom-44`(176px)，两者均高于各自遮挡元素，保持安全间距 |
+| 2026-04-12 | `index.html` | 研磨阶段（`#phase-gathering`）两个符文词条系统浮动按鈕与底部面板（`.bottom-panel` 高度 115px）及英雄充能条（`#hero-gauge-container` bottom:145px）重叠：背包按鈕 `bottom-24`(96px) 低于底部面板被遮挡，发射器按鈕 `bottom-36`(144px) 与充能条几乎完全重叠 | 将背包按鈕改为 `bottom-32`(128px)，发射器按鈕改为 `bottom-44`(176px)，两者均高于各自遮挡元素，保持安全间距 |
+| 2026-04-12 | `src/ui/rune_launcher.js`, `src/spawn_system.js`, `src/game_phase.js` | 符文碎片获取量过大：原来通过 `spawn_addScore`、能量球命中累积 `runCurrency`，结算时批量转换为符文碎片 | 移除两处 `runCurrency` 累积及结算转换逻辑；改为局内符文合成成功时自动发放碎片（Lv.1→1片，Lv.2→3片，Lv.3→6片），并添加符文碎片飞向局外货币区的动画及发射器内碎片计数显示 |
 
 ## 6. 修改规范
 
@@ -155,7 +156,9 @@ for (const subsystem of _subsystems) {
 | `_ui_updateRuneInventoryDisplay()` | 更新符文库存显示 |
 | `_ui_updateActivatedRunewordsDisplay(rws)` | 更新已激活词条列表 |
 | `_ui_updateRuneStatsDisplay(stats, base)` | 更新属性加成汇总显示 |
-| `_ui_updateRuneActionButtons()` | 更新合成/重铸按钮状态 |
-| `ui_doRuneMerge()` | 执行符文合成 |
+| `_ui_updateRuneActionButtons()` | 更新合成/重铸按鈕状态 |
+| `ui_doRuneMerge()` | 执行符文合成（合成成功后自动发放符文碎片并触发飞行动画） |
 | `ui_doRuneReforge()` | 执行符文重铸 |
 | `_ui_showRuneActionResult(msg, type)` | 显示操作结果提示 |
+| `_ui_playMergeShardFlyEffect(startX, startY, amount)` | 合成时符文碎片飞向局外货币显示区的动画 |
+| `_ui_updateLauncherShardCount()` | 更新发射器面板内符文碎片计数显示 |
