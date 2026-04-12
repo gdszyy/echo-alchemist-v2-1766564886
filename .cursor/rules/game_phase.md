@@ -29,7 +29,14 @@ globs: ["src/game_phase.js"]
 
 ## 3. 阶段转换规范
 - **清理与重置**: 每次阶段切换（`phase_switchPhase`）时，必须彻底清理上一个阶段的残留状态（如清空粒子特效容器、重置物理引擎状态）。
-- **UI 同步**: 阶段切换必须同步触发相应的 UI 更新事件，确保界面呼现与内部状态一致。
+- **UI 同步**: 阶段切换必须同步触发相应的 UI 更新事件，确保界面展现与内部状态一致。
+
+## 3.1 暂停机制 (Pause)
+- 暂停**不是阶段切换**，而是以 DOM-only overlay 方式叠加在当前阶段上方。
+- 暂停由 `ui_openPause()` 触发，设置 `this.isPaused = true`，`sys_loop` 将跳过所有物理更新。
+- 恢复由 `ui_closePause()` 触发，设置 `this.isPaused = false`。
+- 仅允许在 `gathering`、`combat`、`training` 阶段暂停；其他阶段调用 `ui_openPause()` 无效。
+- `sys_resetGame()` 中会自动重置 `isPaused = false`。
 
 ## 4. 敌人回合逻辑与温度结算
 ### 4.1 扫描波与行动

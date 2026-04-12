@@ -1673,6 +1673,155 @@
             z-index: 1000;
         }
 
+        /* ==================== [新增] 暂停页面样式 ==================== */
+        #phase-pause {
+            pointer-events: auto !important;
+            z-index: 1000 !important;
+            overflow-y: auto;
+            background: rgba(2, 6, 23, 0.97);
+        }
+        .pause-section-title {
+            font-family: 'Cinzel', serif;
+            font-size: 0.65rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: #475569;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+        }
+        .pause-setting-row {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.15s;
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(71, 85, 105, 0.3);
+            margin-bottom: 6px;
+        }
+        .pause-setting-row:hover { background: rgba(51, 65, 85, 0.7); }
+        .pause-setting-row .ps-icon { font-size: 1.1rem; width: 24px; text-align: center; flex-shrink: 0; }
+        .pause-setting-row .ps-label { flex: 1; margin-left: 10px; font-size: 0.82rem; color: #cbd5e1; }
+        .pause-setting-row .ps-badge {
+            font-size: 0.68rem;
+            background: rgba(71,85,105,0.5);
+            border: 1px solid #475569;
+            border-radius: 5px;
+            padding: 2px 8px;
+            color: #94a3b8;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .pause-setting-row.active .ps-badge {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: #10b981;
+            color: #34d399;
+        }
+        .pause-relic-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 12px;
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+            border: 1px solid #334155;
+            border-radius: 10px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            margin-bottom: 6px;
+        }
+        .pause-relic-card:hover { border-color: #64748b; }
+        .pause-relic-card.rare { border-color: rgba(59, 130, 246, 0.5); }
+        .pause-relic-card.rare:hover { box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15); }
+        .pause-relic-card.legendary { border-color: rgba(250, 204, 21, 0.5); }
+        .pause-relic-card.legendary:hover { box-shadow: 0 4px 16px rgba(250, 204, 21, 0.2); }
+        .pause-relic-card.cursed { border-color: rgba(239, 68, 68, 0.5); }
+        .pause-relic-card.cursed:hover { box-shadow: 0 4px 16px rgba(239, 68, 68, 0.15); }
+        .pause-relic-icon {
+            font-size: 1.6rem;
+            line-height: 1;
+            flex-shrink: 0;
+            width: 36px;
+            text-align: center;
+            filter: drop-shadow(0 0 6px rgba(255,255,255,0.2));
+        }
+        .pause-relic-info { flex: 1; min-width: 0; }
+        .pause-relic-name {
+            font-family: 'Cinzel', serif;
+            font-size: 0.82rem;
+            font-weight: bold;
+            color: #e2e8f0;
+            margin-bottom: 3px;
+        }
+        .pause-relic-desc {
+            font-size: 0.72rem;
+            color: #94a3b8;
+            line-height: 1.4;
+        }
+        .pause-relic-badge {
+            font-size: 0.6rem;
+            padding: 1px 6px;
+            border-radius: 4px;
+            border: 1px solid;
+            flex-shrink: 0;
+            align-self: flex-start;
+            margin-top: 2px;
+        }
+        .pause-relic-badge.common { background: rgba(71,85,105,0.3); border-color: #475569; color: #94a3b8; }
+        .pause-relic-badge.rare { background: rgba(59,130,246,0.15); border-color: #3b82f6; color: #93c5fd; }
+        .pause-relic-badge.legendary { background: rgba(250,204,21,0.15); border-color: #facc15; color: #fde68a; }
+        .pause-relic-badge.cursed { background: rgba(239,68,68,0.15); border-color: #ef4444; color: #fca5a5; }
+        .pause-relic-stack {
+            font-size: 0.62rem;
+            color: #f59e0b;
+            margin-top: 3px;
+        }
+        .pause-empty-relics {
+            text-align: center;
+            padding: 32px 16px;
+            color: #475569;
+            font-size: 0.8rem;
+        }
+        .pause-btn-resume {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.3) 0%, rgba(99, 102, 241, 0.2) 100%);
+            border: 1px solid rgba(99, 102, 241, 0.5);
+            border-radius: 12px;
+            color: #a5b4fc;
+            font-family: 'Cinzel', serif;
+            font-size: 1rem;
+            font-weight: bold;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .pause-btn-resume:hover {
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.5) 0%, rgba(99, 102, 241, 0.4) 100%);
+            border-color: rgba(99, 102, 241, 0.8);
+            color: #e0e7ff;
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+        }
+        .pause-btn-abandon {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background: transparent;
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            border-radius: 10px;
+            color: #ef4444;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            margin-top: 8px;
+        }
+        .pause-btn-abandon:hover {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.5);
+        }
         /* ==================== [新增] CRT 显像管特效 ==================== */
 
         /* 特效遮罩层 */
@@ -2767,6 +2916,75 @@
         </div>
     </div>
 
+    <!-- ==================== 暂停页面 ==================== -->
+    <div id="phase-pause" class="ui-overlay hidden-phase" style="display: none;">
+        <div class="flex flex-col w-full h-full" style="padding-top: max(60px, env(safe-area-inset-top)); padding-bottom: max(20px, env(safe-area-inset-bottom));">
+            
+            <!-- 页头 -->
+            <div class="flex items-center justify-between px-5 mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-100 font-[Cinzel] tracking-wide">游戏暂停</h2>
+                    <p class="text-slate-500 text-xs mt-0.5">PAUSED</p>
+                </div>
+                <button onclick="game.ui_closePause()" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-800 border border-slate-600 text-slate-400 hover:text-white hover:bg-slate-700 transition-all text-lg">&#x2715;</button>
+            </div>
+
+            <!-- 可滚动内容区 -->
+            <div class="flex-1 overflow-y-auto px-5" style="-webkit-overflow-scrolling: touch;">
+
+                <!-- 设置区 -->
+                <div class="mb-6">
+                    <div class="pause-section-title">设置</div>
+
+                    <div class="pause-setting-row active" id="pause-mute-row" onclick="game.sys_toggleMute(); game.ui_syncPauseSettings();">
+                        <span class="ps-icon" id="pause-mute-icon">🔊</span>
+                        <span class="ps-label">音效</span>
+                        <span class="ps-badge" id="pause-mute-badge">开启</span>
+                    </div>
+
+                    <div class="pause-setting-row active" id="pause-damage-numbers-row" onclick="game.sys_toggleDamageNumbers(); game.ui_syncPauseSettings();">
+                        <span class="ps-icon">🔢</span>
+                        <span class="ps-label">伤害数字</span>
+                        <span class="ps-badge" id="pause-damage-numbers-badge">开启</span>
+                    </div>
+
+                    <div class="pause-setting-row" id="pause-crt-row" onclick="game.sys_toggleCrt(); game.ui_syncPauseSettings();">
+                        <span class="ps-icon">📺</span>
+                        <span class="ps-label">CRT 特效</span>
+                        <span class="ps-badge" id="pause-crt-badge">关闭</span>
+                    </div>
+
+                    <div class="pause-setting-row" style="border-top: 1px solid rgba(245,158,11,0.15); margin-top: 8px; padding-top: 10px;" onclick="game.ui_closePause(); game.tutorial_start();">
+                        <span class="ps-icon">📖</span>
+                        <span class="ps-label">新手教程</span>
+                        <span class="ps-badge" style="background:rgba(245,158,11,0.2);color:#fbbf24;border-color:rgba(245,158,11,0.4);">重播</span>
+                    </div>
+                </div>
+
+                <!-- 遗物区 -->
+                <div class="mb-6">
+                    <div class="pause-section-title">当前遗物</div>
+                    <div id="pause-relic-list">
+                        <div class="pause-empty-relics">尚未获得任何遗物</div>
+                    </div>
+                </div>
+
+                <!-- 放弃本局按钮 -->
+                <div class="mb-4">
+                    <button onclick="if(confirm('确定放弃本局并返回主界面？')) { game.ui_closePause(); game.phase_switchPhase(\'meta\'); }" class="pause-btn-abandon">
+                        放弃本局
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- 继续游戏按钮（固定底部） -->
+            <div class="px-5 mt-3" style="padding-bottom: max(16px, env(safe-area-inset-bottom));">
+                <button onclick="game.ui_closePause()" class="pause-btn-resume">继续游戏</button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 
@@ -2841,17 +3059,13 @@ game.sys_toggleDamageNumbers = () => {
     if (window.showToast) showToast(isOn ? '伤害数字：开启' : '伤害数字：关闭');
 };
 
-// --- 设置面板开关 ---
-if (settingsBtn && settingsPanel) {
+// --- 设置按钮改为打开暂停页面 ---
+if (settingsBtn) {
     settingsBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        settingsPanel.classList.toggle('hidden');
-    });
-    // 点击面板外关闭
-    document.addEventListener('click', (e) => {
-        if (!settingsPanel.contains(e.target) && e.target !== settingsBtn) {
-            settingsPanel.classList.add('hidden');
-        }
+        // 如果当前有老设置面板，就先关闭它
+        if (settingsPanel) settingsPanel.classList.add('hidden');
+        game.ui_openPause();
     });
 }
 // ==============================================================

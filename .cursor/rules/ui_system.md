@@ -130,6 +130,10 @@ for (const subsystem of _subsystems) {
 | `meta_buyUpgrade(upgradeId)` | 购买升级 |
 | `ui_onPhaseChange(newPhase)` | 阶段切换时的 UI 响应 |
 | `ui_triggerScreenShake(duration)` | 触发屏幕震动效果 |
+| `ui_openPause()` | 打开暂停页面（仅在 gathering/combat/training 阶段有效），设置 `isPaused=true` 冻结物理更新 |
+| `ui_closePause()` | 关闭暂停页面，恢复游戏运行 |
+| `ui_syncPauseSettings()` | 同步暂停页面中各设置项的开关状态（音效、伤害数字、CRT） |
+| `ui_renderPauseRelics()` | 渲染暂停页面中的遗物列表，展示当前遗物及其效果、稀有度、叠层数 |
 
 ### 6.2 src/ui/hud.js（HUD 渲染）
 

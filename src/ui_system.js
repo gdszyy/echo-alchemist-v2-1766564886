@@ -572,4 +572,140 @@ ui_closeTruthBook() {
             setTimeout(() => audio.playTone(isBigBoss ? 150 : 120, 'square', 0.25, 0.5), 600);
         });
     },
+
+    /**
+     * @method ui_openPause
+     * @description 打开暂停页面。以 DOM-only overlay 方式叠加在当前阶段之上，
+     *   不调用 phase_switchPhase，避免触发全局阶段切换副作用。
+     *   同时设置 isPaused 标志位，让 sys_loop 跳过物理更新。
+     */
+    ui_openPause() {
+        // 仅在游戏进行中的阶段允许暂停（不在 meta/shop/relic/selection 等全屏 UI 阶段）
+        const pausablePhases = ['gathering', 'combat', 'training'];
+        if (!pausablePhases.includes(this.phase)) return;
+
+        // 记录暂停前的阶段，以便恢复
+        this._pausedFromPhase = this.phase;
+        this.isPaused = true;
+
+        // 渲染遗物列表
+        this.ui_renderPauseRelics();
+
+        // 同步设置项状态
+        this.ui_syncPauseSettings();
+
+        // 显示暂停覆盖层
+        const overlay = document.getElementById('phase-pause');
+        if (overlay) {
+            overlay.style.display = 'flex';
+            overlay.classList.remove('hidden-phase');
+            overlay.classList.add('active-phase');
+        }
+
+        // 关闭底部信息抽屉（如果打开）
+        if (this.ui && this.ui.isOpen) {
+            this.ui.closeDrawer();
+        }
+    },
+
+    /**
+     * @method ui_closePause
+     * @description 关闭暂停页面，恢复游戏运行。
+     */
+    ui_closePause() {
+        this.isPaused = false;
+
+        const overlay = document.getElementById('phase-pause');
+        if (overlay) {
+            overlay.style.display = 'none';
+            overlay.classList.remove('active-phase');
+            overlay.classList.add('hidden-phase');
+        }
+    },
+
+    /**
+     * @method ui_syncPauseSettings
+     * @description 同步暂停页面中各设置项的视觉状态（开启/关闭徽章）。
+     */
+    ui_syncPauseSettings() {
+        // 音效（audio.muted 属性直接读取）
+        const muteRow = document.getElementById('pause-mute-row');
+        const muteBadge = document.getElementById('pause-mute-badge');
+        const isMuted = audio && audio.muted;
+        if (muteRow) isMuted ? muteRow.classList.remove('active') : muteRow.classList.add('active');
+        if (muteBadge) muteBadge.textContent = isMuted ? '关闭' : '开启';
+
+        // 伤害数字
+        const dmgRow = document.getElementById('pause-damage-numbers-row');
+        const dmgBadge = document.getElementById('pause-damage-numbers-badge');
+        const isDmgOn = this.showDamageNumbers;
+        if (dmgRow) isDmgOn ? dmgRow.classList.add('active') : dmgRow.classList.remove('active');
+        if (dmgBadge) dmgBadge.textContent = isDmgOn ? '开启' : '关闭';
+
+        // CRT 特效（从 localStorage 读取）
+        const crtRow = document.getElementById('pause-crt-row');
+        const crtBadge = document.getElementById('pause-crt-badge');
+        const isCrtOn = localStorage.getItem('ea_crt_enabled') !== 'false';
+        if (crtRow) isCrtOn ? crtRow.classList.add('active') : crtRow.classList.remove('active');
+        if (crtBadge) crtBadge.textContent = isCrtOn ? '开启' : '关闭';
+    },
+
+    /**
+     * @method ui_renderPauseRelics
+     * @description 渲染暂停页面中的遗物列表，展示玩家当前拥有的所有遗物及其效果。
+     */
+    ui_renderPauseRelics() {
+        const container = document.getElementById('pause-relic-list');
+        if (!container) return;
+
+        const ownedRelics = this.ownedRelics || [];
+
+        if (ownedRelics.length === 0) {
+            container.innerHTML = '<div class="pause-empty-relics">尚未获得任何遗物</div>';
+            return;
+        }
+
+        // 统计每种遗物的叠层数
+        const stackCount = {};
+        for (const id of ownedRelics) {
+            stackCount[id] = (stackCount[id] || 0) + 1;
+        }
+
+        // 去重，保留唯一 ID
+        const uniqueIds = [...new Set(ownedRelics)];
+
+        const RARITY_LABELS = {
+            common:    '普通',
+            rare:      '稀有',
+            legendary: '传说',
+            cursed:    '诅咒',
+        };
+
+        const html = uniqueIds.map(id => {
+            const def = RELIC_DB.find(r => r.id === id);
+            if (!def) return '';
+
+            const rarity = def.rarity || 'common';
+            const stacks = stackCount[id];
+            const maxStacks = def.maxStacks || 1;
+            const rarityLabel = RARITY_LABELS[rarity] || rarity;
+            const stackHtml = (maxStacks > 1)
+                ? `<div class="pause-relic-stack">叠层：${stacks} / ${maxStacks}</div>`
+                : '';
+
+            return `
+                <div class="pause-relic-card ${rarity}">
+                    <div class="pause-relic-icon">${def.icon || '🔮'}</div>
+                    <div class="pause-relic-info">
+                        <div class="pause-relic-name">${def.name}</div>
+                        <div class="pause-relic-desc">${def.desc || ''}</div>
+                        ${stackHtml}
+                    </div>
+                    <div class="pause-relic-badge ${rarity}">${rarityLabel}</div>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = html;
+    },
 };

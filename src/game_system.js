@@ -27,6 +27,11 @@ export const game_system = {
      * @description 游戏主循环，由 requestAnimationFrame 驱动。
      */
     sys_loop() {
+        // 暂停时跳过物理更新，但继续请求下一帧以保持 rAF 循环活跃
+        if (this.isPaused) {
+            requestAnimationFrame(() => this.sys_loop());
+            return;
+        }
         const timeScale = this.timeScale;
 
         // 处理震动衰减
@@ -160,6 +165,15 @@ export const game_system = {
     sys_resetGame() {
         this.runCurrency = 0;
         this.gameOver = false;
+        // 重置暂停状态
+        this.isPaused = false;
+        this._pausedFromPhase = null;
+        const pauseOverlay = document.getElementById('phase-pause');
+        if (pauseOverlay) {
+            pauseOverlay.style.display = 'none';
+            pauseOverlay.classList.remove('active-phase');
+            pauseOverlay.classList.add('hidden-phase');
+        }
 
         // 清空临时增强
         this.saveData.temporaryUpgrades = {};
