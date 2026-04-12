@@ -587,6 +587,7 @@ const CONFIG = {
                 weakness: ['pierce', 'laser'],
                 initTemp: 60,             // 初始温度（半狂暴状态）
                 berserkedTempThreshold: 100, // 狂暴后温度阈值
+                berserkedBlastOnHitChance: 0.25, // 狂暴后受击触发全场爆炸概率
                 themeWeights: { pierce: 1.5, laser: 1.5 }
             },
             ouroboros: {

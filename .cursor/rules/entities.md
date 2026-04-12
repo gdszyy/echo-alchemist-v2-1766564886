@@ -57,6 +57,7 @@
 | 2026-04-11 | `src/entities/enemy.js` | **B1 冰冻衰减确认**：确认 `applyTemp(amount)` 方法（第 1698 行）已正确实现冰冻衰减公式 `Math.pow(0.9, this.frozenCount)`。`frozenCount` 自增逻辑在 `game_phase.js` 第 424 行，每次冰冻触发时自增 1。无需修改。 |
 
 | 2026-04-12 | `src/entities/enemy.js`, `src/game_phase.js` | **极速/狂暴词条重设计**：`haste` 不再增加行动次数，改为仅在移动阶段额外触发一次移动（显示 `⚡DASH!`）；`berserk` 改为触发时对非移动行动结算两次（不包含移动），并在温度结算阶段每回合 +20℃ 且温度结算执行两次。 |
+| 2026-04-12 | `src/entities/enemy.js`, `src/combat_system.js`, `src/config.js` | **Chimera 狂暴阶段受击全场爆炸**：`config.js` 的 `bossConfigs.chimera` 中新增 `berserkedBlastOnHitChance: 0.25`（受击爆炸概率）。`combat_triggerBossEnrage` 的 chimera case 中新增 `boss._berserkedBlastOnHitChance` 标志。`enemy.js` 的 `takeDamage` 中，检测 Chimera 狂暴标志：若触发概率，调用 `game.spawn_createShockwave` 生成橙色冲击波，生成 20 个红橙色 ember 粒子，显示 `💥CHAOS BLAST!` 浮动文字，并随机禁用 3 个钉子（设置高额 cooldownTimer=1000）持续 1 回合。 |
 
 ## 6. 开发规范
 *   **依赖管理**：

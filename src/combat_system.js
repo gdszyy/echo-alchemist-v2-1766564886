@@ -2306,6 +2306,8 @@ export const combat_system = {
             case 'chimera':
                 // 狂暴后温度直接达到阈值
                 boss.temp = bossCfg.berserkedTempThreshold || 100;
+                // 记录受击触发全场爆炸概率
+                boss._berserkedBlastOnHitChance = bossCfg.berserkedBlastOnHitChance || 0.25;
                 break;
 
             case 'ouroboros':

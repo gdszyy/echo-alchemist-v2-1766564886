@@ -1845,6 +1845,35 @@ class Enemy {
 
         if (typeof game !== 'undefined') {
             game.combat_reportDamage(actualDamage);
+            
+            // --- [新增] Chimera 狂暴受击全场爆炸逻辑 ---
+            if (this.type === 'boss' && this.bossType === 'chimera' && this.berserked && this._berserkedBlastOnHitChance) {
+                if (Math.random() < this._berserkedBlastOnHitChance) {
+                    // 视觉反馈：冲击波和粒子
+                    game.spawn_createShockwave(this.pos.x, this.pos.y, '#f97316'); // 橙色冲击波
+                    for (let i = 0; i < 20; i++) {
+                        game.spawn_createParticle(this.pos.x, this.pos.y, Math.random() > 0.5 ? '#ef4444' : '#f97316', 'ember');
+                    }
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 60, '💥CHAOS BLAST!', '#f97316');
+                    
+                    // 逻辑反馈：随机禁用 3 个钉子持续 1 回合
+                    if (game.pegs && game.pegs.length > 0) {
+                        // 过滤出未被禁用的正常钉子
+                        const activePegs = game.pegs.filter(p => p.cooldownTimer <= 0);
+                        // 随机打乱并取前 3 个
+                        activePegs.sort(() => Math.random() - 0.5);
+                        const pegsToDisable = activePegs.slice(0, 3);
+                        
+                        pegsToDisable.forEach(peg => {
+                            // 设置高额冷却时间，使其在本回合内无法被触发
+                            peg.cooldownTimer = 1000; // 足够长的时间，或者可以考虑其他状态标志
+                            peg.scale = 0.5; // 视觉上变小
+                            game.spawn_createFloatingText(peg.pos.x, peg.pos.y, '🚫', '#ef4444');
+                        });
+                    }
+                }
+            }
+            // ----------------------------------------
         }
 
         // 4. 返回详细结果
