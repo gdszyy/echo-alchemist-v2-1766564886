@@ -767,6 +767,194 @@ class FireWave {
 }
 
 
+// ==================== 冰冻死亡波 ====================
+/**
+ * IceWave - 冰冻状态死亡时的冰晶爆炸波
+ * 表现为蓝白色冰晶碎片扩散环 + 冰雾扩散
+ */
+class IceWave {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 5;
+        this.maxRadius = 90;
+        this.life = 1.0;
+        // 内圈冰晶环
+        this.innerRadius = 2;
+        this.innerLife = 1.2;
+    }
+
+    update(timeScale) {
+        this.radius += 6 * timeScale;
+        this.life -= 0.045 * timeScale;
+        this.innerRadius += 3.5 * timeScale;
+        this.innerLife -= 0.06 * timeScale;
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+
+        // 外圈：蓝白冰晶爆炸环
+        if (this.life > 0) {
+            ctx.globalAlpha = Math.max(0, this.life);
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(186, 230, 253, ${this.life})`; // 淡蓝
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // 外圈填充（极淡）
+            const grad = ctx.createRadialGradient(this.x, this.y, this.radius * 0.5, this.x, this.y, this.radius);
+            grad.addColorStop(0, `rgba(224, 242, 254, 0)`);
+            grad.addColorStop(0.6, `rgba(125, 211, 252, ${this.life * 0.25})`);
+            grad.addColorStop(1, `rgba(56, 189, 248, 0)`);
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 内圈：更亮的冰核闪光
+        if (this.innerLife > 0) {
+            ctx.globalAlpha = Math.max(0, Math.min(1, this.innerLife));
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.innerRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${this.innerLife * 0.8})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+}
+
+// ==================== 分级死亡爆炸特效 ====================
+/**
+ * DeathExplosion - 敌人死亡时的分级爆炸特效
+ * tier: 'normal' | 'elite' | 'boss'
+ * 内部自包含 update/draw，由 game_phase.js 的 deathExplosions 数组管理
+ */
+class DeathExplosion {
+    /**
+     * @param {number} x
+     * @param {number} y
+     * @param {'normal'|'elite'|'boss'} tier - 敌人等级
+     */
+    constructor(x, y, tier = 'normal') {
+        this.x = x;
+        this.y = y;
+        this.tier = tier;
+        this.life = 1.0;
+        this.timer = 0;
+
+        // 按等级配置参数
+        if (tier === 'boss') {
+            this.decay = 0.018;
+            this.rings = [
+                { r: 1, maxR: 220, speed: 7, color: '#fca5a5', lw: 5, alpha: 1.0 },
+                { r: 1, maxR: 160, speed: 5, color: '#f97316', lw: 3, alpha: 0.85 },
+                { r: 1, maxR: 100, speed: 3.5, color: '#fbbf24', lw: 2, alpha: 0.7 },
+            ];
+            this.flashLife = 1.0;  // 白色闪光
+            this.flashDecay = 0.06;
+            this.coreLife = 1.0;
+            this.coreDecay = 0.025;
+            this.coreRadius = 40;
+        } else if (tier === 'elite') {
+            this.decay = 0.025;
+            this.rings = [
+                { r: 1, maxR: 130, speed: 5.5, color: '#c084fc', lw: 3.5, alpha: 1.0 },
+                { r: 1, maxR: 80,  speed: 3.5, color: '#fbbf24', lw: 2,   alpha: 0.8 },
+            ];
+            this.flashLife = 0.7;
+            this.flashDecay = 0.08;
+            this.coreLife = 0.8;
+            this.coreDecay = 0.04;
+            this.coreRadius = 22;
+        } else {
+            // normal
+            this.decay = 0.05;
+            this.rings = [
+                { r: 1, maxR: 70, speed: 4, color: '#94a3b8', lw: 2, alpha: 0.8 },
+            ];
+            this.flashLife = 0.4;
+            this.flashDecay = 0.12;
+            this.coreLife = 0;
+            this.coreDecay = 0;
+            this.coreRadius = 0;
+        }
+    }
+
+    update(timeScale) {
+        this.timer += timeScale;
+        this.life -= this.decay * timeScale;
+        if (this.flashLife > 0) this.flashLife -= this.flashDecay * timeScale;
+        if (this.coreLife > 0) this.coreLife -= this.coreDecay * timeScale;
+        for (const ring of this.rings) {
+            if (ring.r < ring.maxR) ring.r += ring.speed * timeScale;
+        }
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+
+        // 1. 白色闪光（初始帧）
+        if (this.flashLife > 0) {
+            const fl = Math.max(0, this.flashLife);
+            const flashR = this.coreRadius * 2 + 20;
+            const fGrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, flashR);
+            fGrad.addColorStop(0, `rgba(255,255,255,${fl * 0.9})`);
+            fGrad.addColorStop(0.4, `rgba(255,255,220,${fl * 0.5})`);
+            fGrad.addColorStop(1, `rgba(255,255,255,0)`);
+            ctx.fillStyle = fGrad;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, flashR, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 2. 核心光球（精英/Boss）
+        if (this.coreLife > 0 && this.coreRadius > 0) {
+            const cl = Math.max(0, this.coreLife);
+            const cColor = this.tier === 'boss' ? '251,146,60' : '192,132,252';
+            const cGrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.coreRadius);
+            cGrad.addColorStop(0, `rgba(255,255,255,${cl * 0.8})`);
+            cGrad.addColorStop(0.5, `rgba(${cColor},${cl * 0.6})`);
+            cGrad.addColorStop(1, `rgba(${cColor},0)`);
+            ctx.fillStyle = cGrad;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.coreRadius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 3. 冲击波环
+        for (const ring of this.rings) {
+            if (ring.r >= ring.maxR) continue;
+            const ringAlpha = ring.alpha * Math.max(0, 1 - ring.r / ring.maxR);
+            if (ringAlpha <= 0) continue;
+            ctx.globalAlpha = ringAlpha;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, ring.r, 0, Math.PI * 2);
+            ctx.strokeStyle = ring.color;
+            ctx.lineWidth = ring.lw;
+            ctx.stroke();
+            // 内圈细线增加层次感
+            if (ring.r > 15) {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, ring.r * 0.75, 0, Math.PI * 2);
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = ringAlpha * 0.4;
+                ctx.stroke();
+            }
+        }
+
+        ctx.restore();
+    }
+}
+
 // ==================== 导出 ====================
 export {
     Particle,
@@ -777,5 +965,7 @@ export {
     FloatingText,
     EnergyOrb,
     LightningBolt,
-    FireWave
+    FireWave,
+    IceWave,
+    DeathExplosion
 };

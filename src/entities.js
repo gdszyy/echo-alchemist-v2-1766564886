@@ -33,7 +33,8 @@ import {
 } from './utils/math_utils.js';
 import { 
     Particle, SlashEffect, CollectionBeam, Shockwave, LaserBeam, 
-    FloatingText, EnergyOrb, LightningBolt, FireWave 
+    FloatingText, EnergyOrb, LightningBolt, FireWave,
+    IceWave, DeathExplosion
 } from './effects/particles.js';
 import { Enemy, setEnemyAudioProvider } from './entities/enemy.js';
 import { Projectile, setProjectileAudioProvider } from './entities/projectile.js';
@@ -3231,18 +3232,46 @@ class RuneLoot {
         this._animTimer = 0;         // 动画计时器（用于悬浮/发光效果）
         this._glowRadius = 18;       // 发光圈半径
         this._floatOffset = 0;       // 悬浮偏移量
+        // [spawn 入场动画] 新增字段
+        this._spawnTimer = 0;        // spawn 入场计时（单位：0~1）
+        this._spawnDuration = 0.35;  // 入场动画持续时间（单位：秒）——用 _animTimer 递增模拟
+        this._spawnBurst = 1.0;      // 入场爆发光效生命周期
     }
 
     /**
      * 在画布上绘制发光的符文图标
+     * 包含 spawn 入场动画：旋转放大 + 爆发光效
      * @param {CanvasRenderingContext2D} ctx - 绘图上下文
      */
     draw(ctx) {
         if (!this.active) return;
 
         this._animTimer += 0.05;
-        this._floatOffset = Math.sin(this._animTimer) * 4; // 上下悬浮 ±4px
 
+        // ============================================================
+        // [spawn 入场动画] 入场进度（用 _animTimer 模拟，前 7 帧为入场阶段）
+        // _animTimer 每帧 +0.05，约 0.35（即 7 帧）内完成入场
+        // ============================================================
+        const SPAWN_END = 0.35; // 入场动画结束时间
+        const spawnProgress = Math.min(1, this._animTimer / SPAWN_END); // 0~1
+        const isSpawning = this._animTimer < SPAWN_END;
+
+        // 入场缩放：从 0 到 1.15 再回弹到 1.0（弹算曲线）
+        let spawnScale;
+        if (spawnProgress < 0.7) {
+            // 快速放大：0 → 1.15
+            spawnScale = (spawnProgress / 0.7) * 1.15;
+        } else {
+            // 回弹到 1.0
+            spawnScale = 1.15 - ((spawnProgress - 0.7) / 0.3) * 0.15;
+        }
+        // 入场旋转角度：从 -π/2 旋转到 0
+        const spawnRotation = isSpawning ? (1 - spawnProgress) * (-Math.PI * 0.5) : 0;
+        // 入场爆发光效强度：入场开始时强，快速消退
+        const burstAlpha = isSpawning ? Math.max(0, 1 - spawnProgress * 2.5) : 0;
+
+        // 悬浮偏移（入场完成后才开始悬浮）
+        this._floatOffset = isSpawning ? 0 : Math.sin(this._animTimer) * 4;
         const drawY = this.y + this._floatOffset;
 
         // 从 RUNE_DB 获取符文定义（图标和稀有度）
@@ -3262,20 +3291,63 @@ class RuneLoot {
 
         ctx.save();
 
-        // 外圈发光效果（稀有度颜色）
+        // ============================================================
+        // [spawn 入场爆发光效]（入场开始时的外圈光晕）
+        // ============================================================
+        if (burstAlpha > 0) {
+            ctx.globalCompositeOperation = 'lighter';
+            const burstR = this._glowRadius * 2.5 * (1 - burstAlpha * 0.5 + 0.5);
+            const burstGrad = ctx.createRadialGradient(this.x, drawY, 0, this.x, drawY, burstR);
+            burstGrad.addColorStop(0, `rgba(255,255,255,${burstAlpha * 0.8})`);
+            burstGrad.addColorStop(0.3, `rgba(${glow.r},${glow.g},${glow.b},${burstAlpha * 0.6})`);
+            burstGrad.addColorStop(1, `rgba(${glow.r},${glow.g},${glow.b},0)`);
+            ctx.fillStyle = burstGrad;
+            ctx.beginPath();
+            ctx.arc(this.x, drawY, burstR, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        // ============================================================
+        // 应用入场缩放和旋转变换
+        // ============================================================
+        ctx.translate(this.x, drawY);
+        ctx.rotate(spawnRotation);
+        ctx.scale(spawnScale, spawnScale);
+        ctx.translate(-this.x, -drawY);
+
+        // 外圈发光效果（稀有度颜色 + 呼吸脉冲）
         const glowPulse = 0.5 + 0.5 * Math.sin(this._animTimer * 1.5);
-        const gradient = ctx.createRadialGradient(
-            this.x, drawY, 0,
-            this.x, drawY, this._glowRadius + glowPulse * 6
-        );
+        const glowR = this._glowRadius + glowPulse * 6;
+        const gradient = ctx.createRadialGradient(this.x, drawY, 0, this.x, drawY, glowR);
         gradient.addColorStop(0, `rgba(${glow.r}, ${glow.g}, ${glow.b}, ${0.55 + glowPulse * 0.3})`);
         gradient.addColorStop(0.5, `rgba(${glow.r}, ${glow.g}, ${glow.b}, ${0.25 + glowPulse * 0.15})`);
         gradient.addColorStop(1, `rgba(${glow.r}, ${glow.g}, ${glow.b}, 0)`);
-
         ctx.beginPath();
-        ctx.arc(this.x, drawY, this._glowRadius + glowPulse * 6, 0, Math.PI * 2);
+        ctx.arc(this.x, drawY, glowR, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
         ctx.fill();
+
+        // 稀有度旋转光环（入场完成后展示）
+        if (!isSpawning) {
+            const ringAngle = this._animTimer * 0.8;
+            const ringCount = rarity === 'legendary' ? 6 : (rarity === 'epic' ? 4 : (rarity === 'rare' ? 3 : 0));
+            if (ringCount > 0) {
+                ctx.save();
+                ctx.translate(this.x, drawY);
+                for (let i = 0; i < ringCount; i++) {
+                    const a = ringAngle + (i / ringCount) * Math.PI * 2;
+                    const rx = Math.cos(a) * (this._glowRadius - 2);
+                    const ry = Math.sin(a) * (this._glowRadius - 2) * 0.5; // 源圆压扁
+                    const dotAlpha = 0.3 + 0.4 * Math.sin(this._animTimer * 2 + i);
+                    ctx.beginPath();
+                    ctx.arc(rx, ry, 2, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(${glow.r},${glow.g},${glow.b},${dotAlpha})`;
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+        }
 
         // 内圈黑底（黑底隔离 emoji）
         ctx.beginPath();
@@ -3366,6 +3438,8 @@ export {
     EnergyOrb,
     LightningBolt,
     FireWave,
+    IceWave,
+    DeathExplosion,
     Player,
     RuneLoot,
     showToast,

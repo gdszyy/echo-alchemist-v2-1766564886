@@ -4,7 +4,8 @@ import {
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
-    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, showToast, 
+    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave,
+    IceWave, DeathExplosion, showToast, 
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba, RuneLoot
 } from './entities.js';
 import { loot_calcRuneDrop } from './loot_system.js';
@@ -1670,21 +1671,10 @@ export const combat_system = {
                 enemy.stuckSwords = [];
             }
 
-            // 燃烧扩散逻辑 (保留)
-            if (enemy.temp >= 100) {
-                this.fireWaves.push(new FireWave(enemy.pos.x, enemy.pos.y));
-                this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 20, "🔥SPREAD!", "#f97316");
-                audio.playExplosion();
-                this.enemies.forEach(other => {
-                    if (other.active && other !== enemy && enemy.pos.dist(other.pos) < CONFIG.gameplay.fireSpreadRadius) {
-                        other.applyTemp(CONFIG.gameplay.fireSpreadTempIncrease);
-                        const spreadDmg = enemy.maxHp*CONFIG.gameplay.fireSpreadDamagePercent;
-                        other.takeDamage(spreadDmg);
-                        // 记录火焰扩散伤害
-                        this.combat_recordDamage(spreadDmg, 'pyro', 'main', shotId);
-                    }
-                });
-            }
+            // ============================================================
+            // [分级死亡特效系统] v2 - 区分普通/精英/Boss，支持冰冻/燃烧状态
+            // ============================================================
+            this._triggerDeathFX(enemy, shotId);
             const activeCount = this.enemies.filter(e => e.active && (e.pos.y > 0)).length;
             if(activeCount === 0) {
                 this.data_clearProjectiles(); 
@@ -2315,6 +2305,175 @@ export const combat_system = {
                 // 狂暴后词缀轮转加速：每回合切换
                 boss._berserkedRotation = true;
                 break;
+        }
+    },
+
+    // ============================================================
+    // [分级死亡特效系统] v2
+    // 内部辅助方法，由 killed 分支调用
+    // ============================================================
+    /**
+     * 触发敌人死亡特效
+     * @param {Enemy} enemy - 死亡的敌人实例
+     * @param {string} shotId - 弹丸射击 ID
+     */
+    _triggerDeathFX(enemy, shotId) {
+        const x = enemy.pos.x;
+        const y = enemy.pos.y;
+        const tier = enemy.type; // 'normal' | 'elite' | 'boss'
+        const isFrozen = enemy.temp <= -80;  // 冰冻状态门槛
+        const isBurning = enemy.temp >= 100; // 燃烧状态门槛
+
+        // --- 1. 冰冻状态死亡：冰晶碎片炸裂 ---
+        if (isFrozen) {
+            // 冰波扩散环
+            if (!this.iceWaves) this.iceWaves = [];
+            this.iceWaves.push(new IceWave(x, y));
+            // 冰晶碎片爆发
+            const shardCount = tier === 'boss' ? 20 : (tier === 'elite' ? 12 : 8);
+            for (let i = 0; i < shardCount; i++) {
+                const p = this.spawn_createParticle(x, y, '#bae6fd', 'shard');
+                if (p) {
+                    const angle = (i / shardCount) * Math.PI * 2 + Math.random() * 0.4;
+                    const speed = 3 + Math.random() * 4;
+                    p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
+                    p.size = 2 + Math.random() * 3;
+                    p.scaleX = 0.4 + Math.random() * 0.6;
+                    p.scaleY = 1.2 + Math.random() * 1.5;
+                    p.decay = 0.018 + Math.random() * 0.015;
+                }
+            }
+            // 冰雾扩散
+            const mistCount = tier === 'boss' ? 10 : (tier === 'elite' ? 6 : 4);
+            for (let i = 0; i < mistCount; i++) {
+                this.spawn_createParticle(
+                    x + (Math.random() - 0.5) * 20,
+                    y + (Math.random() - 0.5) * 20,
+                    'rgba(186,230,253,0.6)', 'mist'
+                );
+            }
+            // 冰冻冲击波
+            this.spawn_createShockwave(x, y, '#7dd3fc');
+            // 冰冻音效
+            audio.playEffect('shatter');
+            this.spawn_createFloatingText(x, y - 24, '❄️SHATTER!', '#7dd3fc');
+        }
+
+        // --- 2. 燃烧状态死亡：火焰爆炸扩散 ---
+        if (isBurning) {
+            this.fireWaves.push(new FireWave(x, y));
+            // 火焰燃烧爆炸粒子
+            const emberCount = tier === 'boss' ? 25 : (tier === 'elite' ? 15 : 8);
+            for (let i = 0; i < emberCount; i++) {
+                this.spawn_createParticle(
+                    x + (Math.random() - 0.5) * 15,
+                    y + (Math.random() - 0.5) * 15,
+                    '#f97316', 'ember'
+                );
+            }
+            // 黑烟
+            const smokeCount = tier === 'boss' ? 8 : (tier === 'elite' ? 5 : 3);
+            for (let i = 0; i < smokeCount; i++) {
+                this.spawn_createParticle(
+                    x + (Math.random() - 0.5) * 20,
+                    y - 10,
+                    'rgba(0,0,0,0.5)', 'mist'
+                );
+            }
+            // 燃烧扩散伤害
+            audio.playExplosion();
+            this.spawn_createFloatingText(x, y - 24, '🔥SPREAD!', '#f97316');
+            this.enemies.forEach(other => {
+                if (other.active && other !== enemy && enemy.pos.dist(other.pos) < CONFIG.gameplay.fireSpreadRadius) {
+                    other.applyTemp(CONFIG.gameplay.fireSpreadTempIncrease);
+                    const spreadDmg = enemy.maxHp * CONFIG.gameplay.fireSpreadDamagePercent;
+                    other.takeDamage(spreadDmg);
+                    this.combat_recordDamage(spreadDmg, 'pyro', 'main', shotId);
+                }
+            });
+        }
+
+        // --- 3. 分级死亡爆炸特效（在冰冻/燃烧特效之外叠加）---
+        if (!this.deathExplosions) this.deathExplosions = [];
+
+        if (tier === 'boss') {
+            // Boss：震撕级特效
+            this.deathExplosions.push(new DeathExplosion(x, y, 'boss'));
+            // 多层冲击波
+            this.spawn_createShockwave(x, y, '#fca5a5');
+            this.spawn_createShockwave(x, y, '#fbbf24');
+            // 大量火花粒子
+            for (let i = 0; i < 30; i++) {
+                const p = this.spawn_createParticle(x, y, '#f97316', 'spark');
+                if (p) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 4 + Math.random() * 8;
+                    p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
+                    p.size = 2 + Math.random() * 3;
+                    p.decay = 0.015 + Math.random() * 0.01;
+                }
+            }
+            // 金色光晖粒子
+            for (let i = 0; i < 20; i++) {
+                const p = this.spawn_createParticle(x, y, '#fbbf24', 'spark');
+                if (p) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 2 + Math.random() * 5;
+                    p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
+                    p.size = 1.5 + Math.random() * 2;
+                    p.decay = 0.02;
+                }
+            }
+            // 屏幕震动
+            this.triggerScreenShake(18);
+            audio.playExplosion();
+
+        } else if (tier === 'elite') {
+            // 精英：金色光环爆散 + 紫色能量波
+            this.deathExplosions.push(new DeathExplosion(x, y, 'elite'));
+            this.spawn_createShockwave(x, y, '#c084fc');
+            // 金色火花
+            for (let i = 0; i < 14; i++) {
+                const p = this.spawn_createParticle(x, y, '#fbbf24', 'spark');
+                if (p) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 3 + Math.random() * 5;
+                    p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
+                    p.size = 1.5 + Math.random() * 2;
+                    p.decay = 0.025;
+                }
+            }
+            // 紫色能量粒子
+            for (let i = 0; i < 10; i++) {
+                const p = this.spawn_createParticle(x, y, '#c084fc', 'spark');
+                if (p) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 2 + Math.random() * 4;
+                    p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
+                    p.size = 1 + Math.random() * 1.5;
+                    p.decay = 0.03;
+                }
+            }
+            this.triggerScreenShake(8);
+            audio.playExplosion();
+
+        } else {
+            // 普通敌人：干净利落的小爆炸
+            this.deathExplosions.push(new DeathExplosion(x, y, 'normal'));
+            // 少量火花粒子
+            const sparkCount = 5 + Math.floor(Math.random() * 4);
+            for (let i = 0; i < sparkCount; i++) {
+                const p = this.spawn_createParticle(x, y, '#94a3b8', 'spark');
+                if (p) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 2 + Math.random() * 3;
+                    p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
+                    p.size = 1 + Math.random() * 1.5;
+                    p.decay = 0.04 + Math.random() * 0.03;
+                }
+            }
+            // 普通冲击波（极淡）
+            this.spawn_createShockwave(x, y, '#64748b');
         }
     },
 };

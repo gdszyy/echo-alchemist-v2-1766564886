@@ -1191,6 +1191,24 @@ phase_gathering_getRandomPegType() {
                 fw.draw(this.ctx);
                 if (fw.life <= 0) this.fireWaves.splice(i, 1);
             }
+            // 更新和绘制 IceWaves（冰冻状态死亡特效）
+            if (this.iceWaves) {
+                for (let i = this.iceWaves.length - 1; i >= 0; i--) {
+                    const iw = this.iceWaves[i];
+                    iw.update(timeScale);
+                    iw.draw(this.ctx);
+                    if (iw.life <= 0) this.iceWaves.splice(i, 1);
+                }
+            }
+            // 更新和绘制 DeathExplosions（分级死亡爆炸特效）
+            if (this.deathExplosions) {
+                for (let i = this.deathExplosions.length - 1; i >= 0; i--) {
+                    const de = this.deathExplosions[i];
+                    de.update(timeScale);
+                    de.draw(this.ctx);
+                    if (de.life <= 0) this.deathExplosions.splice(i, 1);
+                }
+            }
 
             // 更新和绘制特效
             for(let i=this.particles.length-1; i>=0; i--) { let p = this.particles[i]; if(p) { p.update(timeScale); p.draw(this.ctx); if(p.life <= 0) this.particles.splice(i,1); } } 
