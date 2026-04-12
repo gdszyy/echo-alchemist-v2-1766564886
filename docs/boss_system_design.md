@@ -36,7 +36,7 @@
   - 冰霜属性的减速和冻结可以极大克制其跳跃能力（`COUNTER_MAP.cryo.jump = 0.8`），同时穿透属性也能有效打击跳跃中的目标（`COUNTER_MAP.pierce.jump = 0.8`）。
 - **设计意图**：测试玩家的控制能力。如果不使用冰霜进行限制，它会在战场上乱跳并回满血量。
 
-### 2.3 裂变母体·米克罗 (Micro, the Fission Matriarch)
+### 2.3 裂变母体·米克罗 (Mikro, the Fission Matriarch)
 - **主题设定**：一个失败的炼金生命实验体，拥有无限增殖的能力，企图吞噬整个战场。
 - **核心机制**：**分身 (Clone) + 治疗者 (Healer)**
   - 极高的分身触发概率（强化版 `cloneChanceHit` 和 `cloneChanceTurn`），并且能为所有分身提供高额治疗。

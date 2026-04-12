@@ -1391,7 +1391,7 @@ export const spawn_system = {
                     ]
                 };
                 break;
-            case 'micro':
+            case 'mikro':
                 boss.collisionShape = 'arc';
                 boss.collisionData = {
                     radius: bossW * 0.3,
