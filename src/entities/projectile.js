@@ -288,8 +288,13 @@ class Projectile {
                 const dist = Math.sqrt(distSq);
                 let normal;
 
-                if (dist === 0) {
-                    // 特殊情况：圆心在矩形内部 (Deep Penetration)
+                if (shapeNormal) {
+                    // 1. 如果碰撞检测已经提供了法线（如 Polygon, Arc），优先使用
+                    normal = shapeNormal;
+                } else if (dist === 0) {
+                    // 2. 特殊情况：圆心在矩形内部 (Deep Penetration) 且为 AABB
+                    const halfW = e.width / 2;
+                    const halfH = e.height / 2;
                     const dx = this.pos.x - e.pos.x;
                     const dy = this.pos.y - e.pos.y;
                     const overlapX = halfW - Math.abs(dx);
@@ -301,7 +306,7 @@ class Projectile {
                         normal = new Vec2(0, Math.sign(dy) || 1);
                     }
                 } else {
-                    // 正常情况：法线就是 "最近点 -> 圆心" 的单位向量
+                    // 3. 正常情况：法线就是 "最近点 -> 圆心" 的单位向量
                     normal = new Vec2(distVecX / dist, distVecY / dist);
                 }
 

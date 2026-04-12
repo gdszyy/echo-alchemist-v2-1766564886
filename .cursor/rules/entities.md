@@ -45,25 +45,21 @@
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
-| 2026-04-12 | `src/entities/enemy.js` | **Mikro 分身减伤机制**：在 `takeDamage` 中新增逻辑，当当前敌人为 Mikro 母体时，根据场上存活的 clone 分身数量（通过 `e.isClone` 标记过滤）计算减伤。每个分身提供 10% 减伤，上限 50%，并显示 `🧬-XX%` 视觉反馈。同时在 `spawn_system.js` 和 `combat_system.js` 的 clone 生成逻辑中补充 `clone.isClone = true` 标记。 |
-|------|------|----------|
-| 2026-04-12 | `src/entities.js` | **变异需要词条解锁**：`DropBall.handlePegInteraction` 中的突变（Mutation）分支新增前置条件检查 `hasActiveRunewords`（即 `game.activeRunewordEffects` 不为空）。没有激活词条时禁止变异，变异属于高级机制需要词条解锁。升级（Upgrade）分支不受影响。 |
-|------|------|----------|
-| 2026-04-12 | `src/entities.js`, `src/game_phase.js` | **SpecialSlot 双钉子连线模式重设计**：`SpecialSlot` 类构造函数参数从 `(x, y, width, type)` 改为 `(x, y, x2, y2, type)`，代表两个钉子的坐标而非单个钉子的圆心+宽度。`draw()` 方法改为在两钉子间绘制流动虚线发光连线，并在中点显示符号背景圆。`DropBall.update` 中的碰撞检测从矩形包围盒改为圆心到线段的最短距离检测（阈值 = `ball.radius + slot.height`）。`game_phase.js` 的生成逻辑改为选取一对相邻钉子（距离 ≤ `spacingX * 1.6`）并存储 `slot.pegIndex2`。 |
-|------|------|----------|
+| 2026-04-13 | `src/entities/projectile.js` | **子弹碰撞反弹逻辑作用域修复**：修复战斗阶段偶发的 `halfW is not defined` 报错。该错误源于 `_handleCollision` 中 AABB 碰撞的局部变量 `halfW/halfH` 在 `if (dist === 0)` 深度穿透处理逻辑中被跨作用域引用。修复方案：重构反弹逻辑，优先使用多态碰撞检测（Polygon/Arc）返回的 `shapeNormal`；若为 AABB 且触发 `dist === 0`，则在当前作用域重新计算 `halfW/halfH`，确保变量定义完备且逻辑正确。 |
 | 2026-04-13 | `src/entities.js` | **SpecialSlot 端点钉子误触发修复**：修复特殊槽仅碰撞连线端点钉子就触发的 Bug。在 `DropBall.update` 的连线碰撞检测中，新增 `_onSegmentInterior` 判断：计算球在线段上的投影参数 `_t` 后，要求 `_t` 必须落在 `(_tMargin, 1 - _tMargin)` 的内部区间（`_tMargin = pegRadius / segLen = 6 / segLen`），排除两端钉子半径范围。只有当 `_onSegmentInterior === true` 且 `_distToLine < _triggerThreshold` 时才触发，确保球必须真正穿越两钉之间的连线区域。 |
-|------|------|----------|
-| 2026-04-11 | `src/entities.js` | `DropBall.update`：当 `this.radius > CONFIG.physics.marbleRadius`（即处于倍化状态）时，使用 `friction + 0.005`（上限 0.998）替代默认摩擦力，减少卡墙概率 |
-| 2026-04-11 | `src/ui/shop.js` | `permanent_size_up` 效果：`marbleSizeBonus` 从 `4.2` 调整为 `2.5`，防止倍化球在钉盘左右墙面间就少尺寸内将球夹住 |
+| 2026-04-13 | `src/entities/projectile.js`, `src/systems.js` | **顶部反弹墙碰撞检测修复**：修复顶部反弹墙绘制位置与实际碰撞检测位置不一致的 Bug。绘制层（`game_phase.js`）使用 `wallTopY = combatGridTopY - enemyHeight/2` 作为顶部墙位置，而碰撞检测层（`projectile.js`）原使用 `this.pos.y < this.radius`（即 y≈0，画面顶部）。修复方案：在 `_applyMove` 中新增 `topBound` 计算，读取 `game.combatGridTopY - game.enemyHeight / 2 + this.radius`，若 `game` 未就绪则回退到 `this.radius`（y=0）。同时在 `systems.js` 的 `createCombatContext` 中补充 `combatGridTopY: 90` 字段，确保 Demo 模式下碰撞检测正常工作。 |
+| 2026-04-12 | `src/entities/enemy.js` | **Mikro 分身减伤机制**：在 `takeDamage` 中新增逻辑，当当前敌人为 Mikro 母体时，根据场上存活的 clone 分身数量（通过 `e.isClone` 标记过滤）计算减伤。每个分身提供 10% 减伤，上限 50%，并显示 `🧬-XX%` 视觉反馈。同时在 `spawn_system.js` 和 `combat_system.js` 的 clone 生成逻辑中补充 `clone.isClone = true` 标记。 |
+| 2026-04-12 | `src/entities.js` | **变异需要词条解锁**：`DropBall.handlePegInteraction` 中的突变（Mutation）分支新增前置条件检查 `hasActiveRunewords`（即 `game.activeRunewordEffects` 不为空）。没有激活词条时禁止变异，变异属于高级机制需要词条解锁。升级（Upgrade）分支不受影响。 |
+| 2026-04-12 | `src/entities.js`, `src/game_phase.js` | **SpecialSlot 双钉子连线模式重设计**：`SpecialSlot` 类构造函数参数从 `(x, y, width, type)` 改为 `(x, y, x2, y2, type)`，代表两个钉子的坐标而非单个钉子的圆心+宽度。`draw()` 方法改为在两钉子间绘制流动虚线发光连线，并在中点显示符号背景圆。`DropBall.update` 中的碰撞检测从矩形包围盒改为圆心到线段的最短距离检测（阈值 = `ball.radius + slot.height`）。`game_phase.js` 的生成逻辑改为选取一对相邻钉子（距离 ≤ `spacingX * 1.6`）并存储 `slot.pegIndex2`。 |
+| 2026-04-12 | `src/entities/enemy.js`, `src/game_phase.js` | **极速/狂暴词条重设计**：`haste` 不再增加行动次数，改为仅在移动阶段额外触发一次移动（显示 `⚡DASH!`）；`berserk` 改为触发时对非移动行动结算两次（不包含移动），并在温度结算阶段每回合 +20℃ 且温度结算执行两次。 |
+| 2026-04-12 | `src/entities/enemy.js`, `src/combat_system.js`, `src/config.js` | **Chimera 狂暴阶段受击全场爆炸**：`config.js` 的 `bossConfigs.chimera` 中新增 `berserkedBlastOnHitChance: 0.25`（受击爆炸概率）。`combat_triggerBossEnrage` 的 chimera case 中新增 `boss._berserkedBlastOnHitChance` 标志。`enemy.js` 的 `takeDamage` 中，检测 Chimera 狂暴标志：若触发概率，调用 `game.spawn_createShockwave` 生成橙色冲击波，生成 20 个红橙色 ember 粒子，显示 `💥CHAOS BLAST!` 浮动文字，并随机禁用 3 个钉子（设置高额 cooldownTimer=1000）持续 1 回合。 |
+| 2026-04-12 | `src/entities/enemy.js`, `src/combat_system.js`, `src/config.js` | **Viridis 狂暴逻辑修正**：狂暴后 Viridis 不再治疗其他敌人，改为集中治疗自身并加速再生。具体：（1）`config.js` 中 `bossConfigs.viridis.berserkedHealerRange` 从 `999` 改为 `0`，新增 `berserkedSelfRegenMult: 3.0`；（2）`combat_system.js` 的 `combat_triggerBossEnrage` viridis case 中设置 `boss._berserkedHealerRange = 0` 并新增 `boss._berserkedSelfRegenMult = bossCfg.berserkedSelfRegenMult || 3.0`；（3）`enemy.js` 的 regen affix 处理中，检测 Viridis 狂暴时应用 `_berserkedSelfRegenMult` 倍率加速自身回血；（4）Layer 6 新增 Viridis 狂暴绿色脉冲光晕视觉反馈（双层脉冲：外层 `#22c55e` 慢脉冲 + 内层 `#4ade80` 快脉冲）。 |
 | 2026-04-12 | `src/spawn_system.js` | `spawn_spawnBoss`：修复 Boss 大小、位置与网格不对齐问题。`bossH` 从 `enemyHeight * 1.5`（非整数行）改为 `enemyHeight * 2`（占 2 整行）；`spawnY` 从硬编码 `80` 改为动态计算 `80 + enemyHeight / 2`，确保 Boss 上下边界与行网格边界完全对齐；`centerX` 从 `(enemyCols/2) * enemyWidth` 改为 `this.width / 2`（更健壮，不依赖 enemyCols 为偶数） |
 | 2026-04-12 | `src/spawn_system.js` | **激光机制修复**：`spawn_spawnBullet` 中激光分支（`recipe.isLaser && !recipe.wind`）末尾新增 `return` 语句。修复前，激光分支在执行 `combat_laser_fire` 后缺少 `return`，导致代码继续向下执行实体子弹生成逻辑，额外创建了 `Projectile` 实体。修复后，所有激光属性（`isLaser=true`）仅发射激光束，不再生成实体子弹。 |
 | 2026-04-12 | `src/systems.js` | **图鉴文案同步**：更新 `laser` 属性图鉴条目的描述文案，将旧文案"發射弹珠，命中时触发折射激光"改为"直接发射激光束"；同时为训练场激光演示的 `spawn_projectile` 配置添加 `isLaser: true` 标志位，确保训练场行为与主游戏逻辑一致。 |
-| 2026-04-11 | `src/entities/enemy.js` | **B1 冰冻衰减确认**：确认 `applyTemp(amount)` 方法（第 1698 行）已正确实现冰冻衰减公式 `Math.pow(0.9, this.frozenCount)`。`frozenCount` 自增逻辑在 `game_phase.js` 第 424 行，每次冰冻触发时自增 1。无需修改。 |
-
-| 2026-04-12 | `src/entities/enemy.js`, `src/game_phase.js` | **极速/狂暴词条重设计**：`haste` 不再增加行动次数，改为仅在移动阶段额外触发一次移动（显示 `⚡DASH!`）；`berserk` 改为触发时对非移动行动结算两次（不包含移动），并在温度结算阶段每回合 +20℃ 且温度结算执行两次。 |
-| 2026-04-12 | `src/entities/enemy.js`, `src/combat_system.js`, `src/config.js` | **Chimera 狂暴阶段受击全场爆炸**：`config.js` 的 `bossConfigs.chimera` 中新增 `berserkedBlastOnHitChance: 0.25`（受击爆炸概率）。`combat_triggerBossEnrage` 的 chimera case 中新增 `boss._berserkedBlastOnHitChance` 标志。`enemy.js` 的 `takeDamage` 中，检测 Chimera 狂暴标志：若触发概率，调用 `game.spawn_createShockwave` 生成橙色冲击波，生成 20 个红橙色 ember 粒子，显示 `💥CHAOS BLAST!` 浮动文字，并随机禁用 3 个钉子（设置高额 cooldownTimer=1000）持续 1 回合。 |
-| 2026-04-13 | `src/entities/projectile.js`, `src/systems.js` | **顶部反弹墙碰撞检测修复**：修复顶部反弹墙绘制位置与实际碰撞检测位置不一致的 Bug。绘制层（`game_phase.js`）使用 `wallTopY = combatGridTopY - enemyHeight/2` 作为顶部墙位置，而碰撞检测层（`projectile.js`）原使用 `this.pos.y < this.radius`（即 y≈0，画面顶部）。修复方案：在 `_applyMove` 中新增 `topBound` 计算，读取 `game.combatGridTopY - game.enemyHeight / 2 + this.radius`，若 `game` 未就绪则回退到 `this.radius`（y=0）。同时在 `systems.js` 的 `createCombatContext` 中补充 `combatGridTopY: 90` 字段，确保 Demo 模式下碰撞检测正常工作。 |
-| 2026-04-12 | `src/entities/enemy.js`, `src/combat_system.js`, `src/config.js` | **Viridis 狂暴逻辑修正**：狂暴后 Viridis 不再治疗其他敌人，改为集中治疗自身并加速再生。具体：（1）`config.js` 中 `bossConfigs.viridis.berserkedHealerRange` 从 `999` 改为 `0`，新增 `berserkedSelfRegenMult: 3.0`；（2）`combat_system.js` 的 `combat_triggerBossEnrage` viridis case 中设置 `boss._berserkedHealerRange = 0` 并新增 `boss._berserkedSelfRegenMult = bossCfg.berserkedSelfRegenMult || 3.0`；（3）`enemy.js` 的 regen affix 处理中，检测 Viridis 狂暴时应用 `_berserkedSelfRegenMult` 倍率加速自身回血；（4）Layer 6 新增 Viridis 狂暴绿色脉冲光晕视觉反馈（双层脉冲：外层 `#22c55e` 慢脉冲 + 内层 `#4ade80` 快脉冲）。 |
+| 2026-04-11 | `src/entities/enemy.js` | **B1 冰冻衰减确认**：确认 `applyTemp(amount)` 方法（第 1698 行）已正确实现冰冻衰减公式 `Math.pow(0.9, this.frozenCount)`。`frozenCount` 自增逻辑 in `game_phase.js` 第 424 行，每次冰冻触发时自增 1。无需修改。 |
+| 2026-04-11 | `src/entities.js` | `DropBall.update`：当 `this.radius > CONFIG.physics.marbleRadius`（即处于倍化状态）时，使用 `friction + 0.005`（上限 0.998）替代默认摩擦力，减少卡墙概率 |
+| 2026-04-11 | `src/ui/shop.js` | `permanent_size_up` 效果：`marbleSizeBonus` 从 `4.2` 调整为 `2.5`，防止倍化球在钉盘左右墙面间就少尺寸内将球夹住 |
 
 ## 6. 开发规范
 *   **依赖管理**：
@@ -104,7 +100,7 @@
 | `healer` | 十字形脉冲扩散波，从中心向外 | 粉 `#f472b6` | 治疗=医疗脉冲 |
 | `jump` | 底部弹力压缩水平线组 | 青 `#2dd4bf` | 跳跃=弹簧压缩 |
 | `clone` | 内部游离细胞斑点，带外层光晕 | 紫 `#c084fc` | 分身=细胞分裂 |
-| `berserk` | 底部火焰形燃烧纹路 | 橙红 `#ef4444` | 狂暴=火焰（每回合+20℃，温度结算两次） |
+| `berserk` | 底部火焰形燃烧纹路 | 橙红 `#ef4444` | 狂拜=火焰（每回合+20℃，温度结算两次） |
 
 **性能优化说明**：
 *   **Layer 1.5**：使用 `OffscreenCanvas` 在 `Enemy` 构造函数中进行预计算，每帧仅执行一次 `drawImage`，性能开销极低。
