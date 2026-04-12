@@ -830,9 +830,15 @@ class IceWave {
     }
 }
 
-// ==================== 分级死亡爆炸特效 ====================
+// ==================== 分级死亡「消散」特效 ====================
 /**
- * DeathExplosion - 敌人死亡时的分级爆炸特效
+ * DeathExplosion - 敌人死亡时的分级「消散」特效
+ *
+ * 设计理念：不是向外爆炸，而是内爆收缩 + 粒子内吸 + 灵魂消散
+ *   - 普通：小圆圈内缩消失 + 灰色烟尘向内漂散
+ *   - 精英：能量环内缩收紧 + 紫色虚空孔洞残留 + 灵魂粒子内吸
+ *   - Boss：先膨胀挥扎，再猛烈内爆塑陷 + 黑洞涡旋 + 缓慢消散
+ *
  * tier: 'normal' | 'elite' | 'boss'
  * 内部自包含 update/draw，由 game_phase.js 的 deathExplosions 数组管理
  */
@@ -849,108 +855,217 @@ class DeathExplosion {
         this.life = 1.0;
         this.timer = 0;
 
-        // 按等级配置参数
         if (tier === 'boss') {
-            this.decay = 0.018;
-            this.rings = [
-                { r: 1, maxR: 220, speed: 7, color: '#fca5a5', lw: 5, alpha: 1.0 },
-                { r: 1, maxR: 160, speed: 5, color: '#f97316', lw: 3, alpha: 0.85 },
-                { r: 1, maxR: 100, speed: 3.5, color: '#fbbf24', lw: 2, alpha: 0.7 },
+            // Boss：先膨胀挥扎，再猛烈内爆塑陷
+            this.decay = 0.012;
+            // 膨胀阶段：圆圈从 0 展开到 maxR，再内缩回 0
+            this.expandR = 0;        // 当前膨胀半径
+            this.expandMax = 80;     // 最大膨胀半径
+            this.expandSpeed = 5;    // 膨胀速度
+            this.expanding = true;   // 是否处于膨胀阶段
+            // 内爆收缩环：从 maxR 向内收缩到 0
+            this.collapseRings = [
+                { r: 90,  color: '#fca5a5', lw: 4,   alpha: 0.9 },
+                { r: 65,  color: '#f87171', lw: 2.5, alpha: 0.7 },
+                { r: 40,  color: '#fbbf24', lw: 1.5, alpha: 0.5 },
             ];
-            this.flashLife = 1.0;  // 白色闪光
-            this.flashDecay = 0.06;
-            this.coreLife = 1.0;
-            this.coreDecay = 0.025;
-            this.coreRadius = 40;
+            this.collapseSpeed = 4.5; // 收缩速度
+            this.collapseStarted = false;
+            // 虚空涡旋：内爆后中心残留的黑洞感
+            this.voidLife = 0;       // 虚空孔洞生命（内爆后激活）
+            this.voidRadius = 0;
+            this.voidMaxRadius = 30;
+            this.voidDecay = 0.022;
+            // 灵魂粒子：小圆点向心漂移
+            this.souls = Array.from({ length: 18 }, () => ({
+                angle: Math.random() * Math.PI * 2,
+                dist: 55 + Math.random() * 35,
+                speed: 1.8 + Math.random() * 1.5,
+                size: 1.5 + Math.random() * 2,
+                alpha: 0.7 + Math.random() * 0.3,
+                color: Math.random() < 0.5 ? '#fca5a5' : '#fbbf24',
+            }));
         } else if (tier === 'elite') {
-            this.decay = 0.025;
-            this.rings = [
-                { r: 1, maxR: 130, speed: 5.5, color: '#c084fc', lw: 3.5, alpha: 1.0 },
-                { r: 1, maxR: 80,  speed: 3.5, color: '#fbbf24', lw: 2,   alpha: 0.8 },
+            // 精英：能量环内缩 + 紫色虚空孔洞
+            this.decay = 0.02;
+            this.collapseRings = [
+                { r: 60,  color: '#c084fc', lw: 3,   alpha: 0.9 },
+                { r: 38,  color: '#a78bfa', lw: 2,   alpha: 0.65 },
             ];
-            this.flashLife = 0.7;
-            this.flashDecay = 0.08;
-            this.coreLife = 0.8;
-            this.coreDecay = 0.04;
-            this.coreRadius = 22;
+            this.collapseSpeed = 4.0;
+            this.collapseStarted = true; // 精英直接内缩
+            this.expanding = false;
+            this.expandR = 0;
+            this.voidLife = 0.85;
+            this.voidRadius = 0;
+            this.voidMaxRadius = 18;
+            this.voidDecay = 0.03;
+            this.souls = Array.from({ length: 10 }, () => ({
+                angle: Math.random() * Math.PI * 2,
+                dist: 40 + Math.random() * 20,
+                speed: 1.5 + Math.random() * 1.2,
+                size: 1.2 + Math.random() * 1.5,
+                alpha: 0.6 + Math.random() * 0.3,
+                color: Math.random() < 0.6 ? '#c084fc' : '#e9d5ff',
+            }));
         } else {
-            // normal
-            this.decay = 0.05;
-            this.rings = [
-                { r: 1, maxR: 70, speed: 4, color: '#94a3b8', lw: 2, alpha: 0.8 },
+            // 普通：小圆圈内缩消失 + 灰烟尘
+            this.decay = 0.04;
+            this.collapseRings = [
+                { r: 28, color: '#94a3b8', lw: 2, alpha: 0.7 },
             ];
-            this.flashLife = 0.4;
-            this.flashDecay = 0.12;
-            this.coreLife = 0;
-            this.coreDecay = 0;
-            this.coreRadius = 0;
+            this.collapseSpeed = 3.5;
+            this.collapseStarted = true;
+            this.expanding = false;
+            this.expandR = 0;
+            this.voidLife = 0.5;
+            this.voidRadius = 0;
+            this.voidMaxRadius = 8;
+            this.voidDecay = 0.06;
+            this.souls = Array.from({ length: 5 }, () => ({
+                angle: Math.random() * Math.PI * 2,
+                dist: 18 + Math.random() * 10,
+                speed: 1.2 + Math.random() * 0.8,
+                size: 0.8 + Math.random() * 1,
+                alpha: 0.4 + Math.random() * 0.3,
+                color: '#94a3b8',
+            }));
         }
     }
 
     update(timeScale) {
         this.timer += timeScale;
         this.life -= this.decay * timeScale;
-        if (this.flashLife > 0) this.flashLife -= this.flashDecay * timeScale;
-        if (this.coreLife > 0) this.coreLife -= this.coreDecay * timeScale;
-        for (const ring of this.rings) {
-            if (ring.r < ring.maxR) ring.r += ring.speed * timeScale;
+
+        // Boss 膨胀阶段
+        if (this.expanding) {
+            this.expandR += this.expandSpeed * timeScale;
+            if (this.expandR >= this.expandMax) {
+                this.expanding = false;
+                this.collapseStarted = true;
+                // 膨胀结束后激活虚空孔洞
+                this.voidLife = 1.0;
+                this.voidRadius = 0;
+            }
+        }
+
+        // 内爆收缩环
+        if (this.collapseStarted) {
+            for (const ring of this.collapseRings) {
+                ring.r -= this.collapseSpeed * timeScale;
+                if (ring.r < 0) ring.r = 0;
+            }
+            // 精英/普通内缩开始后激活虚空
+            if (this.voidLife <= 0 && !this.expanding && this.tier !== 'boss') {
+                this.voidLife = this.tier === 'elite' ? 0.85 : 0.5;
+                this.voidRadius = 0;
+            }
+        }
+
+        // 虚空孔洞生长并消退
+        if (this.voidLife > 0) {
+            this.voidLife -= this.voidDecay * timeScale;
+            // 先展开到 maxRadius，再缓慢收缩
+            if (this.voidRadius < this.voidMaxRadius) {
+                this.voidRadius += (this.voidMaxRadius / 8) * timeScale;
+            }
+        }
+
+        // 灵魂粒子向心移动
+        for (const s of this.souls) {
+            s.dist -= s.speed * timeScale;
+            if (s.dist < 0) s.dist = 0;
         }
     }
 
     draw(ctx) {
         if (this.life <= 0) return;
         ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
 
-        // 1. 白色闪光（初始帧）
-        if (this.flashLife > 0) {
-            const fl = Math.max(0, this.flashLife);
-            const flashR = this.coreRadius * 2 + 20;
-            const fGrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, flashR);
-            fGrad.addColorStop(0, `rgba(255,255,255,${fl * 0.9})`);
-            fGrad.addColorStop(0.4, `rgba(255,255,220,${fl * 0.5})`);
-            fGrad.addColorStop(1, `rgba(255,255,255,0)`);
-            ctx.fillStyle = fGrad;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, flashR, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        // 2. 核心光球（精英/Boss）
-        if (this.coreLife > 0 && this.coreRadius > 0) {
-            const cl = Math.max(0, this.coreLife);
-            const cColor = this.tier === 'boss' ? '251,146,60' : '192,132,252';
-            const cGrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.coreRadius);
-            cGrad.addColorStop(0, `rgba(255,255,255,${cl * 0.8})`);
-            cGrad.addColorStop(0.5, `rgba(${cColor},${cl * 0.6})`);
-            cGrad.addColorStop(1, `rgba(${cColor},0)`);
-            ctx.fillStyle = cGrad;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.coreRadius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        // 3. 冲击波环
-        for (const ring of this.rings) {
-            if (ring.r >= ring.maxR) continue;
-            const ringAlpha = ring.alpha * Math.max(0, 1 - ring.r / ring.maxR);
-            if (ringAlpha <= 0) continue;
+        // ---- 1. Boss 膨胀阶段：向外的气带圆圈（最后挥扎）----
+        if (this.expanding && this.expandR > 0) {
+            ctx.globalCompositeOperation = 'lighter';
+            const t = this.expandR / this.expandMax; // 0~1
+            const ringAlpha = (1 - t) * 0.7;
             ctx.globalAlpha = ringAlpha;
             ctx.beginPath();
-            ctx.arc(this.x, this.y, ring.r, 0, Math.PI * 2);
-            ctx.strokeStyle = ring.color;
-            ctx.lineWidth = ring.lw;
+            ctx.arc(this.x, this.y, this.expandR, 0, Math.PI * 2);
+            ctx.strokeStyle = '#fca5a5';
+            ctx.lineWidth = 5 * (1 - t * 0.5);
             ctx.stroke();
-            // 内圈细线增加层次感
-            if (ring.r > 15) {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, ring.r * 0.75, 0, Math.PI * 2);
-                ctx.lineWidth = 1;
-                ctx.globalAlpha = ringAlpha * 0.4;
-                ctx.stroke();
-            }
+            // 内充光晕
+            const eGrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.expandR);
+            eGrad.addColorStop(0, `rgba(255,200,150,${ringAlpha * 0.4})`);
+            eGrad.addColorStop(0.6, `rgba(251,146,60,${ringAlpha * 0.15})`);
+            eGrad.addColorStop(1, 'rgba(251,146,60,0)');
+            ctx.fillStyle = eGrad;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.expandR, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1;
         }
 
+        // ---- 2. 内爆收缩环（从外向内收紧）----
+        if (this.collapseStarted) {
+            ctx.globalCompositeOperation = 'lighter';
+            for (const ring of this.collapseRings) {
+                if (ring.r <= 0) continue;
+                // 越小越亮（内爆收紧感）
+                const progress = 1 - ring.r / (this.tier === 'boss' ? 90 : (this.tier === 'elite' ? 60 : 28));
+                const ringAlpha = ring.alpha * Math.min(1, progress * 2) * Math.max(0, this.life);
+                ctx.globalAlpha = ringAlpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, ring.r, 0, Math.PI * 2);
+                ctx.strokeStyle = ring.color;
+                ctx.lineWidth = ring.lw * (0.5 + progress * 0.5);
+                ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        // ---- 3. 虚空孔洞（中心暗色消失感）----
+        if (this.voidLife > 0 && this.voidRadius > 0) {
+            const vl = Math.max(0, this.voidLife);
+            const vColor = this.tier === 'boss' ? '120,40,40' : (this.tier === 'elite' ? '88,28,135' : '30,30,40');
+            // 外圈暗色渐变圈（表现被吸入虚空的感觉）
+            ctx.globalCompositeOperation = 'source-over';
+            const vGrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.voidRadius * 2.5);
+            vGrad.addColorStop(0,   `rgba(${vColor},${vl * 0.85})`);
+            vGrad.addColorStop(0.4, `rgba(${vColor},${vl * 0.45})`);
+            vGrad.addColorStop(1,   `rgba(${vColor},0)`);
+            ctx.fillStyle = vGrad;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.voidRadius * 2.5, 0, Math.PI * 2);
+            ctx.fill();
+            // 内圈最暗心
+            ctx.globalAlpha = vl * 0.9;
+            ctx.fillStyle = `rgba(${vColor},1)`;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.voidRadius * 0.6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+
+        // ---- 4. 灵魂粒子（小圆点向心漂移）----
+        ctx.globalCompositeOperation = 'lighter';
+        for (const s of this.souls) {
+            if (s.dist <= 0) continue;
+            const sx = this.x + Math.cos(s.angle) * s.dist;
+            const sy = this.y + Math.sin(s.angle) * s.dist;
+            // 越靠近中心越透明（消失感）
+            const distRatio = s.dist / (this.tier === 'boss' ? 90 : (this.tier === 'elite' ? 60 : 28));
+            const sAlpha = s.alpha * distRatio * Math.max(0, this.life);
+            ctx.globalAlpha = Math.max(0, sAlpha);
+            ctx.fillStyle = s.color;
+            ctx.beginPath();
+            ctx.arc(sx, sy, s.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
         ctx.restore();
     }
 }

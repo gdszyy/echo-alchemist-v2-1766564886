@@ -2397,83 +2397,63 @@ export const combat_system = {
         if (!this.deathExplosions) this.deathExplosions = [];
 
         if (tier === 'boss') {
-            // Boss：震撕级特效
+            // Boss：内爆消散，先膨胀挥扎再塑陷
             this.deathExplosions.push(new DeathExplosion(x, y, 'boss'));
-            // 多层冲击波
-            this.spawn_createShockwave(x, y, '#fca5a5');
-            this.spawn_createShockwave(x, y, '#fbbf24');
-            // 大量火花粒子
-            for (let i = 0; i < 30; i++) {
-                const p = this.spawn_createParticle(x, y, '#f97316', 'spark');
+            // 少量向外漂出的灵魂烟雾（不是爆炸，而是最后挥扎时的气息）
+            for (let i = 0; i < 8; i++) {
+                const p = this.spawn_createParticle(
+                    x + (Math.random() - 0.5) * 20,
+                    y + (Math.random() - 0.5) * 20,
+                    'rgba(252,165,165,0.6)', 'mist'
+                );
                 if (p) {
+                    // 慢慢向外漂移，不是爆炸
                     const angle = Math.random() * Math.PI * 2;
-                    const speed = 4 + Math.random() * 8;
-                    p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
-                    p.size = 2 + Math.random() * 3;
-                    p.decay = 0.015 + Math.random() * 0.01;
+                    p.vel = new Vec2(Math.cos(angle) * 0.6, Math.sin(angle) * 0.6 - 0.3);
+                    p.decay = 0.012;
+                    p.size = 10 + Math.random() * 8;
                 }
             }
-            // 金色光晖粒子
-            for (let i = 0; i < 20; i++) {
-                const p = this.spawn_createParticle(x, y, '#fbbf24', 'spark');
-                if (p) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const speed = 2 + Math.random() * 5;
-                    p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
-                    p.size = 1.5 + Math.random() * 2;
-                    p.decay = 0.02;
-                }
-            }
-            // 屏幕震动
-            this.triggerScreenShake(18);
+            // 屏幕震动（内爆感）
+            this.triggerScreenShake(12);
             audio.playExplosion();
 
         } else if (tier === 'elite') {
-            // 精英：金色光环爆散 + 紫色能量波
+            // 精英：能量环内缩 + 紫色灵魂烟雾
             this.deathExplosions.push(new DeathExplosion(x, y, 'elite'));
-            this.spawn_createShockwave(x, y, '#c084fc');
-            // 金色火花
-            for (let i = 0; i < 14; i++) {
-                const p = this.spawn_createParticle(x, y, '#fbbf24', 'spark');
+            // 紫色灵魂烟雾（向内漂移）
+            for (let i = 0; i < 5; i++) {
+                const p = this.spawn_createParticle(
+                    x + (Math.random() - 0.5) * 30,
+                    y + (Math.random() - 0.5) * 30,
+                    'rgba(192,132,252,0.55)', 'mist'
+                );
                 if (p) {
                     const angle = Math.random() * Math.PI * 2;
-                    const speed = 3 + Math.random() * 5;
-                    p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
-                    p.size = 1.5 + Math.random() * 2;
-                    p.decay = 0.025;
+                    p.vel = new Vec2(Math.cos(angle) * 0.4, Math.sin(angle) * 0.4 - 0.2);
+                    p.decay = 0.018;
+                    p.size = 8 + Math.random() * 6;
                 }
             }
-            // 紫色能量粒子
-            for (let i = 0; i < 10; i++) {
-                const p = this.spawn_createParticle(x, y, '#c084fc', 'spark');
-                if (p) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const speed = 2 + Math.random() * 4;
-                    p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
-                    p.size = 1 + Math.random() * 1.5;
-                    p.decay = 0.03;
-                }
-            }
-            this.triggerScreenShake(8);
-            audio.playExplosion();
+            this.triggerScreenShake(5);
 
         } else {
-            // 普通敌人：干净利落的小爆炸
+            // 普通敌人：内缩消散，极少的烟尘
             this.deathExplosions.push(new DeathExplosion(x, y, 'normal'));
-            // 少量火花粒子
-            const sparkCount = 5 + Math.floor(Math.random() * 4);
-            for (let i = 0; i < sparkCount; i++) {
-                const p = this.spawn_createParticle(x, y, '#94a3b8', 'spark');
+            // 1~2 缕烟尘（不向外爆，而是小幅漂移）
+            const dustCount = 1 + Math.floor(Math.random() * 2);
+            for (let i = 0; i < dustCount; i++) {
+                const p = this.spawn_createParticle(
+                    x + (Math.random() - 0.5) * 10,
+                    y + (Math.random() - 0.5) * 10,
+                    'rgba(148,163,184,0.4)', 'mist'
+                );
                 if (p) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const speed = 2 + Math.random() * 3;
-                    p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
-                    p.size = 1 + Math.random() * 1.5;
-                    p.decay = 0.04 + Math.random() * 0.03;
+                    p.vel = new Vec2((Math.random() - 0.5) * 0.3, -0.2 - Math.random() * 0.3);
+                    p.decay = 0.025;
+                    p.size = 5 + Math.random() * 4;
                 }
             }
-            // 普通冲击波（极淡）
-            this.spawn_createShockwave(x, y, '#64748b');
         }
     },
 };
