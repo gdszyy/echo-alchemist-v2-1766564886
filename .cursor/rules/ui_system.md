@@ -17,6 +17,14 @@ UI 系统已按职责区域拆分为以下模块，均通过 `bind(this)` 组合
 
 所有 UI 子模块在 `src/core.js` 中统一 import，并在 `Game` 构造函数中通过 `bind(this)` 组合模式注入：
 
+> **注意**：`systems.js` 中的全屏覆盖层类（`TruthBook`、`TrainingGround`）**不属于** `bind(this)` 注入的子系统，而是在 `Game` 构造函数中**显式实例化**并挂载到实例属性上：
+> ```js
+> this.ui = new UIManager();
+> this.truthBook = new TruthBook(this);       // 真理之书覆盖层
+> this.trainingGround = new TrainingGround(this); // 试炼场覆盖层
+> ```
+> 这三个对象均需要 `Game` 实例作为构造参数，且拥有独立的内部状态（如 `active`、`demoGame`），因此不适合通过 `bind(this)` 模式注入。
+
 ```js
 import { ui_system } from './ui_system.js';
 import { hud_system } from './ui/hud.js';
@@ -69,6 +77,7 @@ for (const subsystem of _subsystems) {
 | 2026-04-11 | `src/ui_system.js` | `_ui_updateRuneStatsDisplay` 函数体（约 47 行）被错误地遗留在 `ui_system.js` 中，缺少方法名声明，导致 `Uncaught SyntaxError: Unexpected identifier 'summary'` | 从 `ui_system.js` 删除游离函数体，并将其填充至 `rune_launcher.js` 中已声明但为空的同名方法 |
 | 2026-04-12 | `index.html` | 研磨阶段（`#phase-gathering`）两个符文词条系统浮动按鈕与底部面板（`.bottom-panel` 高度 115px）及英雄充能条（`#hero-gauge-container` bottom:145px）重叠：背包按鈕 `bottom-24`(96px) 低于底部面板被遮挡，发射器按鈕 `bottom-36`(144px) 与充能条几乎完全重叠 | 将背包按鈕改为 `bottom-32`(128px)，发射器按鈕改为 `bottom-44`(176px)，两者均高于各自遮挡元素，保持安全间距 |
 | 2026-04-12 | `src/ui/rune_launcher.js`, `src/spawn_system.js`, `src/game_phase.js` | 符文碎片获取量过大：原来通过 `spawn_addScore`、能量球命中累积 `runCurrency`，结算时批量转换为符文碎片 | 移除两处 `runCurrency` 累积及结算转换逻辑；改为局内符文合成成功时自动发放碎片（Lv.1→1片，Lv.2→3片，Lv.3→6片），并添加符文碎片飞向局外货币区的动画及发射器内碎片计数显示 |
+| 2026-04-12 | `src/core.js` | 点击"真理之术"按钮后报错 `Uncaught TypeError: Cannot read properties of undefined (reading 'update')`：`Game` 构造函数中只初始化了 `this.ui = new UIManager()`，但遗漏了 `this.truthBook` 和 `this.trainingGround` 的实例化，导致主循环 `sys_loop` 在 `truth_book` / `training` 阶段调用 `.update()` 时访问 `undefined` | 在 `core.js` 构造函数中 `this.ui = new UIManager()` 之后，补充 `this.truthBook = new TruthBook(this)` 和 `this.trainingGround = new TrainingGround(this)` 的显式实例化 |
 
 ## 6. 修改规范
 

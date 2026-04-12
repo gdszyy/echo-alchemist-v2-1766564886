@@ -232,8 +232,9 @@ class Game {
             if (this.phase === 'gathering') this.phase_gathering_initPachinko(); 
         });
         this.ui = new UIManager();
-        this.trainingGround = new TrainingGround(this);
         this.truthBook = new TruthBook(this);
+        this.trainingGround = new TrainingGround(this);
+
         // ==================== 注册事件总线监听器 ====================
         this._setupEventListeners();
 
