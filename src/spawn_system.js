@@ -606,7 +606,7 @@ export const spawn_system = {
             const iconWrap = document.createElement('div');
             iconWrap.className = 'select-icon-wrap';
             const iconEl = document.createElement('div');
-            iconEl.className = 'select-icon';
+            iconEl.className = `select-icon marble-fx-${m.type}`;
             iconEl.style.background = m.getColor();
             // 光泽高光层
             const shine = document.createElement('div');
