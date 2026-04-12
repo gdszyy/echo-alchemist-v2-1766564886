@@ -1062,11 +1062,42 @@ class Enemy {
         const r = 6;
 
         // === Layer 1: 容器裁剪 ===
-        ctx.beginPath(); 
-        ctx.roundRect(-w/2, -h/2, w, h, r);
+        // 根据 collisionShape 选择裁剪路径：polygon/arc 用异型，其余用 roundRect
+        ctx.beginPath();
+        if (this.type === 'boss' && this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+            // 多边形路径（顶点为相对中心的本地坐标）
+            const verts = this.collisionData.vertices;
+            ctx.moveTo(verts[0].x, verts[0].y);
+            for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x, verts[i].y);
+            ctx.closePath();
+        } else if (this.type === 'boss' && this.collisionShape === 'arc' && this.collisionData) {
+            // 圆弧路径：绘制环形（外圆 + 内圆）
+            const cd = this.collisionData;
+            const outerR = cd.radius + cd.thickness * 0.5;
+            const innerR = Math.max(0, cd.radius - cd.thickness * 0.5);
+            if (cd.endAngle - cd.startAngle >= Math.PI * 1.99) {
+                // 完整圆环：外圆顺时针 + 内圆逆时针（形成环形区域）
+                ctx.arc(0, 0, outerR, 0, Math.PI * 2, false);
+                if (innerR > 0) {
+                    ctx.moveTo(innerR, 0);
+                    ctx.arc(0, 0, innerR, 0, Math.PI * 2, true);
+                }
+            } else {
+                // 缺口圆弧：用扇形近似（从圆心到弧线两端）
+                const sa = cd.startAngle;
+                const ea = cd.endAngle;
+                ctx.moveTo(Math.cos(sa) * outerR, Math.sin(sa) * outerR);
+                ctx.arc(0, 0, outerR, sa, ea, false);
+                ctx.lineTo(Math.cos(ea) * innerR, Math.sin(ea) * innerR);
+                ctx.arc(0, 0, innerR, ea, sa, true);
+                ctx.closePath();
+            }
+        } else {
+            ctx.roundRect(-w/2, -h/2, w, h, r);
+        }
         ctx.fillStyle = '#0f172a'; 
         ctx.fill(); 
-        ctx.clip(); 
+        ctx.clip();
 
         // === Layer 1.5: 底层纹理 (预计算 OffscreenCanvas) ===
         if (this._textureCanvas) {
@@ -1378,6 +1409,11 @@ class Enemy {
             }
         }
 
+        // === Layer 3.8: Boss 专属装饰 ===
+        if (this.type === 'boss' && this.bossType) {
+            this._drawBossDecoration(ctx, w, h);
+        }
+
         // === Layer 4: 裂纹绘制 (Fissures) - [保持不变] ===
 
         // **过热 Stage 3**
@@ -1453,7 +1489,7 @@ class Enemy {
             
             ctx.restore();
         }
-        // === Layer 5: 内部边框 (保持不变) ===
+        // === Layer 5: 内部边框 ===
         ctx.strokeStyle = '#334155'; ctx.lineWidth = 2;
         if (this.type === 'elite') { ctx.strokeStyle = '#facc15'; ctx.lineWidth = 3; }
         if (this.type === 'boss') { ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 4; }
@@ -1465,7 +1501,40 @@ class Enemy {
             ctx.shadowBlur = 15;
         }
 
-        ctx.strokeRect(-w/2, -h/2, w, h);
+        // 根据形状类型选择边框绘制方式
+        if (this.type === 'boss' && this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+            ctx.beginPath();
+            const verts = this.collisionData.vertices;
+            ctx.moveTo(verts[0].x, verts[0].y);
+            for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x, verts[i].y);
+            ctx.closePath();
+            ctx.stroke();
+        } else if (this.type === 'boss' && this.collisionShape === 'arc' && this.collisionData) {
+            const cd = this.collisionData;
+            const outerR = cd.radius + cd.thickness * 0.5;
+            const innerR = Math.max(0, cd.radius - cd.thickness * 0.5);
+            ctx.beginPath();
+            if (cd.endAngle - cd.startAngle >= Math.PI * 1.99) {
+                ctx.arc(0, 0, outerR, 0, Math.PI * 2, false);
+                ctx.stroke();
+                if (innerR > 0) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, innerR, 0, Math.PI * 2, false);
+                    ctx.stroke();
+                }
+            } else {
+                const sa = cd.startAngle;
+                const ea = cd.endAngle;
+                ctx.moveTo(Math.cos(sa) * outerR, Math.sin(sa) * outerR);
+                ctx.arc(0, 0, outerR, sa, ea, false);
+                ctx.lineTo(Math.cos(ea) * innerR, Math.sin(ea) * innerR);
+                ctx.arc(0, 0, innerR, ea, sa, true);
+                ctx.closePath();
+                ctx.stroke();
+            }
+        } else {
+            ctx.strokeRect(-w/2, -h/2, w, h);
+        }
         ctx.shadowBlur = 0; // 重置
 
         if (this.swordCracks.length > 0) {
@@ -1616,12 +1685,31 @@ class Enemy {
             ctx.shadowBlur = 20 + outerPulse * 15;
             ctx.strokeStyle = `rgba(34, 197, 94, ${0.4 + outerPulse * 0.35})`;
             ctx.lineWidth = 3;
-            ctx.beginPath(); ctx.roundRect(-w/2 - 5, -h/2 - 5, w + 10, h + 10, r + 3); ctx.stroke();
+            // 外层光晕：跟随 Boss 形状
+            if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                const verts = this.collisionData.vertices;
+                ctx.beginPath();
+                ctx.moveTo(verts[0].x * 1.08, verts[0].y * 1.08);
+                for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x * 1.08, verts[i].y * 1.08);
+                ctx.closePath();
+                ctx.stroke();
+            } else {
+                ctx.beginPath(); ctx.roundRect(-w/2 - 5, -h/2 - 5, w + 10, h + 10, r + 3); ctx.stroke();
+            }
             // 内层光晕（小圆，较亮）
             ctx.shadowBlur = 10 + innerPulse * 8;
             ctx.strokeStyle = `rgba(74, 222, 128, ${0.3 + innerPulse * 0.4})`;
             ctx.lineWidth = 1.5;
-            ctx.beginPath(); ctx.roundRect(-w/2 - 2, -h/2 - 2, w + 4, h + 4, r + 1); ctx.stroke();
+            if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                const verts = this.collisionData.vertices;
+                ctx.beginPath();
+                ctx.moveTo(verts[0].x * 1.03, verts[0].y * 1.03);
+                for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x * 1.03, verts[i].y * 1.03);
+                ctx.closePath();
+                ctx.stroke();
+            } else {
+                ctx.beginPath(); ctx.roundRect(-w/2 - 2, -h/2 - 2, w + 4, h + 4, r + 1); ctx.stroke();
+            }
             ctx.restore();
         }
 
@@ -1634,7 +1722,22 @@ class Enemy {
             ctx.shadowBlur = 15 + pulse * 10;
             ctx.strokeStyle = `rgba(251, 146, 60, ${0.6 + pulse * 0.4})`;
             ctx.lineWidth = 3;
-            ctx.beginPath(); ctx.roundRect(-w/2 - 2, -h/2 - 2, w + 4, h + 4, r); ctx.stroke();
+            if (this.type === 'boss' && this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                const verts = this.collisionData.vertices;
+                ctx.beginPath();
+                ctx.moveTo(verts[0].x * 1.04, verts[0].y * 1.04);
+                for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x * 1.04, verts[i].y * 1.04);
+                ctx.closePath();
+                ctx.stroke();
+            } else if (this.type === 'boss' && this.collisionShape === 'arc' && this.collisionData) {
+                const cd = this.collisionData;
+                const outerR = (cd.radius + cd.thickness * 0.5) * 1.05;
+                ctx.beginPath();
+                ctx.arc(0, 0, outerR, 0, Math.PI * 2);
+                ctx.stroke();
+            } else {
+                ctx.beginPath(); ctx.roundRect(-w/2 - 2, -h/2 - 2, w + 4, h + 4, r); ctx.stroke();
+            }
             ctx.restore();
         }
 
@@ -2166,9 +2269,31 @@ class Enemy {
             ctx.shadowBlur = 30 * pulseAlpha * flashPulse;
             ctx.strokeStyle = `rgba(239, 68, 68, ${pulseAlpha * flashPulse})`;
             ctx.lineWidth = 5;
-            ctx.beginPath();
-            ctx.roundRect(-w/2 - 3, -h/2 - 3, w + 6, h + 6, r + 2);
-            ctx.stroke();
+            // 入场动画边框跟随 Boss 形状
+            if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                const verts = this.collisionData.vertices;
+                ctx.beginPath();
+                ctx.moveTo(verts[0].x * 1.06, verts[0].y * 1.06);
+                for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x * 1.06, verts[i].y * 1.06);
+                ctx.closePath();
+                ctx.stroke();
+            } else if (this.collisionShape === 'arc' && this.collisionData) {
+                const cd = this.collisionData;
+                const outerR = (cd.radius + cd.thickness * 0.5) * 1.08;
+                const innerR = Math.max(0, cd.radius - cd.thickness * 0.5) * 0.92;
+                ctx.beginPath();
+                ctx.arc(0, 0, outerR, 0, Math.PI * 2);
+                ctx.stroke();
+                if (innerR > 0) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, innerR, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            } else {
+                ctx.beginPath();
+                ctx.roundRect(-w/2 - 3, -h/2 - 3, w + 6, h + 6, r + 2);
+                ctx.stroke();
+            }
             ctx.restore();
         }
 
@@ -2324,6 +2449,377 @@ class Enemy {
         }
     }
     getBounds() { return { left: this.pos.x - this.width/2, right: this.pos.x + this.width/2, top: this.pos.y - this.height/2, bottom: this.pos.y + this.height/2 }; }
+
+    /**
+     * 绘制 Boss 专属装饰（Layer 3.8）
+     * 每个 Boss 根据其 bossType 绘制独特的内部装饰
+     * @param {CanvasRenderingContext2D} ctx - 画布上下文（已经 translate 到 Boss 中心）
+     * @param {number} w - Boss 宽度（已减去边距）
+     * @param {number} h - Boss 高度（已减去边距）
+     */
+    _drawBossDecoration(ctx, w, h) {
+        const t = Date.now() / 1000;
+        const isBerserk = this.berserked || (this.hp / this.maxHp) < 0.5;
+
+        switch (this.bossType) {
+            case 'ignis': {
+                // === Ignis: 燕火之心 + 火星喷射 ===
+                const heartPulse = Math.sin(t * (isBerserk ? 5 : 2.5)) * 0.25 + 0.75;
+                const heartR = Math.min(w, h) * 0.18 * heartPulse;
+                // 外圈火焰光晕
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                const ignisGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, heartR * 2.5);
+                ignisGrad.addColorStop(0, `rgba(255, 200, 50, ${0.7 * heartPulse})`);
+                ignisGrad.addColorStop(0.4, `rgba(255, 100, 20, ${0.5 * heartPulse})`);
+                ignisGrad.addColorStop(1, 'rgba(255, 50, 0, 0)');
+                ctx.fillStyle = ignisGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, heartR * 2.5, 0, Math.PI * 2);
+                ctx.fill();
+                // 心核实体
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.beginPath();
+                ctx.arc(0, 0, heartR, 0, Math.PI * 2);
+                const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, heartR);
+                coreGrad.addColorStop(0, '#fffde7');
+                coreGrad.addColorStop(0.4, '#ffb300');
+                coreGrad.addColorStop(1, '#e65100');
+                ctx.fillStyle = coreGrad;
+                ctx.shadowColor = '#ff6d00';
+                ctx.shadowBlur = 15;
+                ctx.fill();
+                ctx.restore();
+                // 火星喷射（狂暴时加强）
+                if (isBerserk) {
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
+                    const sparkCount = 6;
+                    for (let i = 0; i < sparkCount; i++) {
+                        const angle = (i / sparkCount) * Math.PI * 2 + t * 3;
+                        const dist = heartR * (1.5 + Math.sin(t * 4 + i) * 0.5);
+                        const sx = Math.cos(angle) * dist;
+                        const sy = Math.sin(angle) * dist;
+                        const sr = 2 + Math.random() * 2;
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+                        ctx.fillStyle = `rgba(255, ${150 + Math.floor(Math.random() * 100)}, 0, 0.9)`;
+                        ctx.fill();
+                    }
+                    ctx.restore();
+                }
+                break;
+            }
+
+            case 'glacies': {
+                // === Glacies: 冰尖突破 + 冰雾覆盖 ===
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                // 内部冰晶反射光
+                const glaciesGrad = ctx.createRadialGradient(w * 0.1, -h * 0.1, 0, 0, 0, Math.max(w, h) * 0.6);
+                glaciesGrad.addColorStop(0, `rgba(200, 240, 255, ${0.3 + Math.sin(t * 1.5) * 0.1})`);
+                glaciesGrad.addColorStop(0.5, `rgba(100, 180, 255, 0.15)`);
+                glaciesGrad.addColorStop(1, 'rgba(50, 100, 200, 0)');
+                ctx.fillStyle = glaciesGrad;
+                ctx.fillRect(-w/2, -h/2, w, h);
+                // 冰尖突出效果（在形状内部画尖刺）
+                ctx.strokeStyle = `rgba(180, 230, 255, ${0.6 + Math.sin(t * 2) * 0.2})`;
+                ctx.lineWidth = 1.5;
+                ctx.shadowColor = '#a5f3fc';
+                ctx.shadowBlur = 8;
+                const spikePositions = [
+                    { x: 0, y: -h * 0.35, angle: -Math.PI / 2, len: h * 0.25 },
+                    { x: w * 0.3, y: -h * 0.2, angle: -Math.PI / 4, len: h * 0.18 },
+                    { x: -w * 0.3, y: -h * 0.2, angle: -Math.PI * 3/4, len: h * 0.18 },
+                ];
+                spikePositions.forEach(sp => {
+                    ctx.beginPath();
+                    ctx.moveTo(sp.x, sp.y);
+                    ctx.lineTo(sp.x + Math.cos(sp.angle) * sp.len, sp.y + Math.sin(sp.angle) * sp.len);
+                    ctx.stroke();
+                });
+                ctx.restore();
+                break;
+            }
+
+            case 'mikro': {
+                // === Mikro: 孢子囊 + 六边形细胞网格 ===
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                // 六边形细胞网格
+                const hexR2 = Math.min(w, h) * 0.18;
+                const hexW2 = hexR2 * Math.sqrt(3);
+                const hexH2 = hexR2 * 2;
+                ctx.strokeStyle = `rgba(192, 132, 252, ${0.4 + Math.sin(t * 1.2) * 0.15})`;
+                ctx.lineWidth = 1;
+                ctx.shadowColor = '#a855f7';
+                ctx.shadowBlur = 5;
+                for (let row = -2; row <= 2; row++) {
+                    for (let col = -2; col <= 2; col++) {
+                        const hx = col * hexW2 + (row % 2 === 0 ? 0 : hexW2 / 2);
+                        const hy = row * hexH2 * 0.75;
+                        if (Math.abs(hx) > w * 0.45 || Math.abs(hy) > h * 0.45) continue;
+                        ctx.beginPath();
+                        for (let k = 0; k < 6; k++) {
+                            const ang = Math.PI / 180 * (60 * k - 30);
+                            const px2 = hx + hexR2 * Math.cos(ang);
+                            const py2 = hy + hexR2 * Math.sin(ang);
+                            k === 0 ? ctx.moveTo(px2, py2) : ctx.lineTo(px2, py2);
+                        }
+                        ctx.closePath();
+                        ctx.stroke();
+                    }
+                }
+                // 孢子囊发光点
+                const sporeCount = isBerserk ? 6 : 4;
+                const sporePositions = [
+                    { x: -w * 0.25, y: -h * 0.15 }, { x: w * 0.2, y: h * 0.1 },
+                    { x: -w * 0.05, y: h * 0.25 }, { x: w * 0.28, y: -h * 0.25 },
+                    { x: w * 0.05, y: -h * 0.05 }, { x: -w * 0.3, y: h * 0.2 }
+                ];
+                for (let i = 0; i < sporeCount; i++) {
+                    const sp = sporePositions[i];
+                    const pulse = Math.sin(t * 1.5 + i * 1.2) * 0.3 + 0.7;
+                    const spR = (4 + this.visualSeed * 3) * pulse;
+                    const spGrad = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, spR * 2);
+                    spGrad.addColorStop(0, `rgba(216, 180, 254, ${0.8 * pulse})`);
+                    spGrad.addColorStop(1, 'rgba(168, 85, 247, 0)');
+                    ctx.fillStyle = spGrad;
+                    ctx.beginPath();
+                    ctx.arc(sp.x, sp.y, spR * 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+                break;
+            }
+
+            case 'devourer': {
+                // === Devourer: V型引力线 + 漩涡吸入特效 ===
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                const devourerPhase = (t * 0.8) % 1;
+                // 引力线（从外圈向内圈流入）
+                const cd = this.collisionData;
+                const outerR2 = cd ? cd.radius + cd.thickness * 0.5 : w * 0.4;
+                const lineCount = 8;
+                for (let i = 0; i < lineCount; i++) {
+                    const angle = (i / lineCount) * Math.PI * 2 + t * 0.5;
+                    const linePhase = (devourerPhase + i / lineCount) % 1;
+                    const startDist = outerR2 * (0.5 + linePhase * 0.5);
+                    const endDist = outerR2 * 0.1;
+                    const alpha = (1 - linePhase) * 0.4;
+                    const grad = ctx.createLinearGradient(
+                        Math.cos(angle) * startDist, Math.sin(angle) * startDist,
+                        Math.cos(angle) * endDist, Math.sin(angle) * endDist
+                    );
+                    grad.addColorStop(0, `rgba(88, 28, 135, 0)`);
+                    grad.addColorStop(1, `rgba(139, 92, 246, ${alpha})`);
+                    ctx.strokeStyle = grad;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(angle) * startDist, Math.sin(angle) * startDist);
+                    ctx.lineTo(Math.cos(angle) * endDist, Math.sin(angle) * endDist);
+                    ctx.stroke();
+                }
+                // 中心吸入点
+                const devGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, outerR2 * 0.3);
+                devGrad.addColorStop(0, `rgba(0, 0, 0, ${0.8 + Math.sin(t * 2) * 0.1})`);
+                devGrad.addColorStop(0.5, `rgba(88, 28, 135, 0.4)`);
+                devGrad.addColorStop(1, 'rgba(88, 28, 135, 0)');
+                ctx.fillStyle = devGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, outerR2 * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                break;
+            }
+
+            case 'viridis': {
+                // === Viridis: 能量藤蔓 + 生命光晕 ===
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                // 中心生命光晕
+                const viridisGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.min(w, h) * 0.4);
+                viridisGrad.addColorStop(0, `rgba(74, 222, 128, ${0.4 + Math.sin(t * 2) * 0.15})`);
+                viridisGrad.addColorStop(0.6, `rgba(34, 197, 94, 0.2)`);
+                viridisGrad.addColorStop(1, 'rgba(21, 128, 61, 0)');
+                ctx.fillStyle = viridisGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, Math.min(w, h) * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+                // 能量藤蔓
+                const vineCount = isBerserk ? 5 : 3;
+                ctx.strokeStyle = `rgba(74, 222, 128, ${0.6 + Math.sin(t * 1.5) * 0.2})`;
+                ctx.lineWidth = 1.5;
+                ctx.shadowColor = '#22c55e';
+                ctx.shadowBlur = 6;
+                for (let i = 0; i < vineCount; i++) {
+                    const vineAngle = (i / vineCount) * Math.PI * 2 + t * 0.3;
+                    const vineLen = Math.min(w, h) * (0.3 + Math.sin(t * 1.2 + i) * 0.1);
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    const cp1x = Math.cos(vineAngle + 0.5) * vineLen * 0.5;
+                    const cp1y = Math.sin(vineAngle + 0.5) * vineLen * 0.5;
+                    const endX = Math.cos(vineAngle) * vineLen;
+                    const endY = Math.sin(vineAngle) * vineLen;
+                    ctx.quadraticCurveTo(cp1x, cp1y, endX, endY);
+                    ctx.stroke();
+                }
+                ctx.restore();
+                break;
+            }
+
+            case 'tesla': {
+                // === Tesla: 电弧残影 + 等离子体闪烁 ===
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                // 闪烁电光核心
+                const teslaFlash = Math.random() < 0.3 ? 1 : (Math.sin(t * 8) * 0.5 + 0.5);
+                const teslaGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.min(w, h) * 0.35);
+                teslaGrad.addColorStop(0, `rgba(250, 204, 21, ${0.8 * teslaFlash})`);
+                teslaGrad.addColorStop(0.3, `rgba(99, 102, 241, ${0.5 * teslaFlash})`);
+                teslaGrad.addColorStop(1, 'rgba(99, 102, 241, 0)');
+                ctx.fillStyle = teslaGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, Math.min(w, h) * 0.35, 0, Math.PI * 2);
+                ctx.fill();
+                // 电弧达到顶点
+                const verts = this.collisionData && this.collisionData.vertices;
+                if (verts && verts.length > 0) {
+                    ctx.strokeStyle = `rgba(250, 204, 21, ${0.6 * teslaFlash})`;
+                    ctx.lineWidth = 1;
+                    ctx.shadowColor = '#fbbf24';
+                    ctx.shadowBlur = 8;
+                    verts.forEach(v => {
+                        if (Math.random() < 0.4) {
+                            ctx.beginPath();
+                            ctx.moveTo(0, 0);
+                            // 折线闪电
+                            const midX = v.x * 0.5 + (Math.random() - 0.5) * w * 0.2;
+                            const midY = v.y * 0.5 + (Math.random() - 0.5) * h * 0.2;
+                            ctx.lineTo(midX, midY);
+                            ctx.lineTo(v.x, v.y);
+                            ctx.stroke();
+                        }
+                    });
+                }
+                ctx.restore();
+                break;
+            }
+
+            case 'chimera': {
+                // === Chimera: 缝合线 + 双色能量渗出 ===
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                // 缝合线（垂直分割线）
+                const chimeraShift = Math.sin(t * 0.8) * 3;
+                const lineGrad = ctx.createLinearGradient(chimeraShift, -h/2, chimeraShift, h/2);
+                lineGrad.addColorStop(0, 'rgba(239, 68, 68, 0)');
+                lineGrad.addColorStop(0.3, `rgba(239, 68, 68, ${0.5 + Math.sin(t * 2) * 0.2})`);
+                lineGrad.addColorStop(0.5, `rgba(255, 255, 255, ${0.7 + Math.sin(t * 3) * 0.2})`);
+                lineGrad.addColorStop(0.7, `rgba(99, 102, 241, ${0.5 + Math.sin(t * 2) * 0.2})`);
+                lineGrad.addColorStop(1, 'rgba(99, 102, 241, 0)');
+                ctx.strokeStyle = lineGrad;
+                ctx.lineWidth = 2;
+                ctx.shadowColor = '#a855f7';
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.moveTo(chimeraShift, -h/2);
+                ctx.lineTo(chimeraShift, h/2);
+                ctx.stroke();
+                // 左侧机械能量（蓝色）
+                const leftGrad = ctx.createRadialGradient(-w * 0.2, 0, 0, -w * 0.2, 0, w * 0.3);
+                leftGrad.addColorStop(0, `rgba(59, 130, 246, ${0.3 + Math.sin(t * 1.5) * 0.1})`);
+                leftGrad.addColorStop(1, 'rgba(59, 130, 246, 0)');
+                ctx.fillStyle = leftGrad;
+                ctx.fillRect(-w/2, -h/2, w/2, h);
+                // 右侧生物能量（红色）
+                const rightGrad = ctx.createRadialGradient(w * 0.2, 0, 0, w * 0.2, 0, w * 0.3);
+                rightGrad.addColorStop(0, `rgba(239, 68, 68, ${0.3 + Math.sin(t * 1.8) * 0.1})`);
+                rightGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+                ctx.fillStyle = rightGrad;
+                ctx.fillRect(0, -h/2, w/2, h);
+                ctx.restore();
+                break;
+            }
+
+            case 'ouroboros': {
+                // === Ouroboros: 符文光环 + 动态缺口指示 ===
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                const cd2 = this.collisionData;
+                const ouroR = cd2 ? cd2.radius : Math.min(w, h) * 0.4;
+                const gapAngle = this.gapAngle || 0;
+                // 符文光环：在环形上绘制旋转符文
+                const runeCount = 8;
+                ctx.fillStyle = `rgba(167, 139, 250, ${0.7 + Math.sin(t * 2) * 0.2})`;
+                ctx.font = `bold ${Math.floor(ouroR * 0.3)}px monospace`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const runeChars = ['ᚠ', 'ᚷ', 'ᛉ', 'ᛚ', 'ᛣ', 'ᛱ', 'ᚢ', 'ᚹ'];
+                for (let i = 0; i < runeCount; i++) {
+                    const angle = (i / runeCount) * Math.PI * 2 + gapAngle + t * 0.5;
+                    const rx = Math.cos(angle) * ouroR;
+                    const ry = Math.sin(angle) * ouroR;
+                    ctx.save();
+                    ctx.translate(rx, ry);
+                    ctx.rotate(angle + Math.PI / 2);
+                    ctx.globalAlpha = 0.6 + Math.sin(t * 3 + i) * 0.3;
+                    ctx.shadowColor = '#7c3aed';
+                    ctx.shadowBlur = 8;
+                    ctx.fillText(runeChars[i % runeChars.length], 0, 0);
+                    ctx.restore();
+                }
+                // 缺口指示箭头
+                const gapMidAngle = gapAngle + Math.PI * 0.75; // 缺口中间角度
+                const arrowDist = ouroR * 1.15;
+                ctx.save();
+                ctx.translate(Math.cos(gapMidAngle) * arrowDist, Math.sin(gapMidAngle) * arrowDist);
+                ctx.rotate(gapMidAngle);
+                ctx.fillStyle = `rgba(250, 204, 21, ${0.6 + Math.sin(t * 4) * 0.3})`;
+                ctx.shadowColor = '#fbbf24';
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.moveTo(0, -5);
+                ctx.lineTo(5, 5);
+                ctx.lineTo(-5, 5);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+                ctx.restore();
+                break;
+            }
+
+            case 'prism': {
+                // === Prism Monarch: 彩虹光谱流转 ===
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                const prismColors = [
+                    '#ef4444', '#f97316', '#eab308', '#22c55e',
+                    '#06b6d4', '#3b82f6', '#a855f7'
+                ];
+                const prismAngle = t * 0.5;
+                for (let i = 0; i < 7; i++) {
+                    const angle = prismAngle + (i / 7) * Math.PI * 2;
+                    const r2 = Math.min(w, h) * 0.35;
+                    const grad = ctx.createLinearGradient(
+                        Math.cos(angle) * r2, Math.sin(angle) * r2,
+                        Math.cos(angle + Math.PI) * r2, Math.sin(angle + Math.PI) * r2
+                    );
+                    grad.addColorStop(0, `${prismColors[i]}00`);
+                    grad.addColorStop(0.5, `${prismColors[i]}66`);
+                    grad.addColorStop(1, `${prismColors[i]}00`);
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(-w/2, -h/2, w, h);
+                }
+                ctx.restore();
+                break;
+            }
+
+            default:
+                break;
+        }
+    }
 
     /**
      * 获取多边形碰撞形状的绝对坐标顶点
