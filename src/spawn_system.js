@@ -409,7 +409,7 @@ export const spawn_system = {
      * @description 生成指定数量的敌人行。
      * @param {number} [count=1] - **重要参数** 要生成的敌人行数。
      */
-    spawn_spawnEnemyRow(count = 1) { for(let i=0; i<count; i++) { this.spawn_spawnEnemyRowAt(80 - (i * this.enemyHeight)); } },
+    spawn_spawnEnemyRow(count = 1) { for(let i=0; i<count; i++) { this.spawn_spawnEnemyRowAt(this.combatGridTopY - (i * this.enemyHeight)); } },
 
 /**
      * @method triggerCloneSpawn
@@ -424,7 +424,7 @@ export const spawn_system = {
         for(let r = 0; r < 3; r++) {
              for(let c = 0; c < CONFIG.gameplay.enemyCols; c++) {
                  const tx = c * w + w/2;
-                 const ty = 80 + r * this.enemyHeight;
+                 const ty = this.combatGridTopY + r * this.enemyHeight;
                  if (!this.calc_isAreaOccupied(tx, ty, w * 0.9, this.enemyHeight * 0.9)) {
                      validCols.push({x: tx, y: ty});
                  }
@@ -1309,7 +1309,7 @@ export const spawn_system = {
         const centerX = this.width / 2;                            // 画布水平中心（更健壮，不依赖 enemyCols 为偶数）
         // spawnY：boss 中心 Y 需满足 boss 上边界 = startY - enemyHeight/2
         // 即 spawnY = startY + enemyHeight/2，确保 boss 占满第 0、1 行的完整网格
-        const spawnY = 80 + this.enemyHeight / 2; // 生成在顶部，上下边界与行网格边界对齐
+        const spawnY = this.combatGridTopY + this.enemyHeight / 2; // 生成在顶部，上下边界与行网格边界对齐
 
         const bossHP = this.spawn_calculateBossHP(isBigBoss);
 

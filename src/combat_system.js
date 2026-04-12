@@ -113,7 +113,7 @@ export const combat_system = {
             let pushedCount = 0;
             this.enemies.forEach(e => {
                 if (e.active) {
-                    e.dropTargetY = Math.max(80, e.dropTargetY - pushDistance); 
+                    e.dropTargetY = Math.max(this.combatGridTopY, e.dropTargetY - pushDistance); 
                     e.pos.y = e.dropTargetY; 
                     e.bumpOffsetY = p.visualShake;
                     pushedCount++;
