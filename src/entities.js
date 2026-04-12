@@ -187,23 +187,13 @@ class SpecialSlot {
             ctx.fill();
         });
 
-        // ===== 第四层：中点背景圆 + 符号文字 =====
-        ctx.globalAlpha = 1.0;
-        ctx.shadowBlur  = glow;
-        ctx.shadowColor = color;
-
-        ctx.beginPath();
-        ctx.arc(midX, midY, 13, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(10, 15, 40, 0.8)';
-        ctx.fill();
-        ctx.strokeStyle = color;
-        ctx.lineWidth   = 2;
-        ctx.stroke();
-
-        ctx.shadowBlur   = 0;
+        // ===== 第四层：中点符号文字（无背景圆）=====
+        ctx.globalAlpha  = 1.0;
+        ctx.shadowBlur   = glow;
+        ctx.shadowColor  = color;
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
-        ctx.font         = 'bold 12px sans-serif';
+        ctx.font         = 'bold 13px sans-serif';
         ctx.fillStyle    = '#fff';
         ctx.fillText(text, midX, midY);
 
