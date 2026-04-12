@@ -154,6 +154,7 @@ const TUTORIAL_STEPS = [
         content: `
             <p>点击<strong>钉板上方区域</strong>投入弹珠，让它在钉盘中弹跳。</p>
             <p class="mt-2">每枚弹珠会根据碰撞到的钉子属性，<strong>装载对应的子弹效果</strong>。</p>
+            <p class="mt-2"><strong>💡 提示：左右倾斜手机可以让弹珠向左或向右移动。</strong></p>
             <p class="mt-2">三枚弹珠全部装载完毕后，自动进入<strong>战斗阶段</strong>！</p>
             <p class="mt-2 text-amber-300/80 text-xs">👆 现在试着点击上方区域投入弹珠吧！</p>
         `,
