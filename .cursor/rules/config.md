@@ -89,6 +89,7 @@ globs: ["src/config.js"]
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
+| 2026-04-13 | `src/entities.js` | **调低涌潮遗物同化概率**：将 `assimilationBoostRounds` 触发的同化概率加成从 `0.5` 降低至 `0.3`，以平衡游戏后期属性钉子过度同化的问题。 |
 | 2026-04-13 | `src/config.js`, `src/ui/shop.js` | **钉盘结构遗物单局互斥限制**：新增 `BOARD_STRUCTURE_RELICS` 集合（包含 `dimension_shard`、`triangle_formation`、`diamond_formation`、`sparse_interval`、`mirror_sync`、`wide_narrow`）并导出。`shop.js` 的 `ui_showRelicSelection` 在遗物池过滤时增加互斥判断：若玩家本局已选过任意一个钉盘结构遗物，则所有其他钉盘结构遗物从候选池中排除。同时将 `dimension_shard` 的 `maxStacks` 从 `3` 改为 `1`。 |
 | 2026-04-12 | `src/config.js` | **Mikro 减伤机制**：在 `bossConfigs.mikro` 中新增 `cloneDamageReductionPerClone` (0.10) 和 `cloneDamageReductionMax` (0.50) 参数，用于控制 Mikro 母体根据场上存活分身数量获得的伤害减免效果。 |
 | 2026-04-12 | `src/config.js` | **初始钉子行数减少 1**：`CONFIG.gameplay.rows` 从 `6` 改为 `5`，降低游戏初始复杂度，改善早期游戏体验。 |
@@ -109,5 +110,5 @@ globs: ["src/config.js"]
 - **effect 字段**: 一律使用 `effect: 'assimilation_surge'`，配合 `marbleType` 字段指定弹珠类型。
 - **状态变量**: `game.assimilationBoostRounds` 是一个对象 `{ marbleType: roundsLeft }`，不是数字。
 - **涌潮效果**: 获取遗物时向 `guaranteedNextRound` 注入两个该弹珠类型，并将 `assimilationBoostRounds[marbleType]` 设为 2。
-- **同化加成**: `entities.js` 中判断 `game.assimilationBoostRounds[ballType] > 0` 时，对该弹珠类型的同化概率 +0.5。
+- **同化加成**: `entities.js` 中判断 `game.assimilationBoostRounds[ballType] > 0` 时，对该弹珠类型的同化概率 +0.3 (由 0.5 调低)。
 - **递减逻辑**: `game_phase.js` 的 `phase_finalizeRound` 中遍历 `assimilationBoostRounds` 对象，对每个类型递减回合数，归零时弹出提示。

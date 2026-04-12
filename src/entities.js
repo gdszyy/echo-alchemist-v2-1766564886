@@ -1150,7 +1150,7 @@ class DropBall {
                 let assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0;
                 // [新增] 同化涌潮遗物加成：仅对该弹珠类型生效
                 if (game.assimilationBoostRounds && game.assimilationBoostRounds[ballType] > 0) {
-                    assimilationChance += 0.5; // 大幅提升 50% 同化概率
+                    assimilationChance += 0.3; // 提升 30% 同化概率 (从 0.5 调低)
                 }
                 if (Math.random() < assimilationChance && assimilationChance>0) {
 	                    peg.type = ballType;
