@@ -13,7 +13,7 @@
  * @module ui/shop
  */
 
-import { META_SHOP_CONFIG, CONFIG, RELIC_DB } from '../config.js';
+import { META_SHOP_CONFIG, CONFIG, RELIC_DB, BOARD_STRUCTURE_RELICS } from '../config.js';
 import { showToast } from '../entities.js';
 
 /**
@@ -39,6 +39,12 @@ export const shop_system = {
             const max = r.maxStacks || 1;
             return count < max;
         });
+
+        // 钉盘结构遗物互斥：若玩家本局已选过任意一个钉盘结构遗物，则排除所有其他钉盘结构遗物
+        const hasBoardStructureRelic = (this.ownedRelics || []).some(id => BOARD_STRUCTURE_RELICS.has(id));
+        if (hasBoardStructureRelic) {
+            pool = pool.filter(r => !BOARD_STRUCTURE_RELICS.has(r.id));
+        }
         
         // 如果池子空了（全收集了），就给一些保底的或者是空的
         if (pool.length === 0) {

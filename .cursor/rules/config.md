@@ -64,6 +64,7 @@ globs: ["src/config.js"]
 - 异型布局不修改 `spacingX`/`spacingY`，仅通过逐行控制列数和水平偏移实现形状变化。严禁在遗物效果中修改间距値，否则弹珠会卡在钉子之间。
 - `boardLayout` 是互斥枚举，同时只能激活一种布局。玩家获得第二个钉盘形态遗物时，新布局会覆盖旧布局。
 - 各布局均保留标准交错偏移（`isOddRow` 逻辑），除非该布局明确需要对齐排列（`mirror_sync`）。
+- **单局互斥限制**：`dimension_shard`（行数遗物）与所有布局形态遗物共同构成 `BOARD_STRUCTURE_RELICS` 集合（定义于 `config.js`）。`shop.js` 的 `ui_showRelicSelection` 在过滤遗物池时，若玩家本局已拥有任意一个钉盘结构遗物，则将所有其他钉盘结构遗物从候选池中排除。此外 `dimension_shard` 的 `maxStacks` 已从 `3` 改为 `1`。
 
 ## 5. probabilities 初始权重设计规范
 
@@ -88,6 +89,7 @@ globs: ["src/config.js"]
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
+| 2026-04-13 | `src/config.js`, `src/ui/shop.js` | **钉盘结构遗物单局互斥限制**：新增 `BOARD_STRUCTURE_RELICS` 集合（包含 `dimension_shard`、`triangle_formation`、`diamond_formation`、`sparse_interval`、`mirror_sync`、`wide_narrow`）并导出。`shop.js` 的 `ui_showRelicSelection` 在遗物池过滤时增加互斥判断：若玩家本局已选过任意一个钉盘结构遗物，则所有其他钉盘结构遗物从候选池中排除。同时将 `dimension_shard` 的 `maxStacks` 从 `3` 改为 `1`。 |
 | 2026-04-12 | `src/config.js` | **Mikro 减伤机制**：在 `bossConfigs.mikro` 中新增 `cloneDamageReductionPerClone` (0.10) 和 `cloneDamageReductionMax` (0.50) 参数，用于控制 Mikro 母体根据场上存活分身数量获得的伤害减免效果。 |
 | 2026-04-12 | `src/config.js` | **初始钉子行数减少 1**：`CONFIG.gameplay.rows` 从 `6` 改为 `5`，降低游戏初始复杂度，改善早期游戏体验。 |
 | 2026-04-12 | `src/spawn_system.js` | **修复 mikro/micro 命名不一致 Bug**：将 `spawn_system.js` 中的 `switch case 'micro'` 改为 `mikro`，与 `config.js` 中的 Boss ID 保持一致。 |

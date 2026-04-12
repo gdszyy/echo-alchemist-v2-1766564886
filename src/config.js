@@ -697,6 +697,17 @@ const CONFIG = {
 };
 
 
+// ==================== 钉盘结构遗物互斥集合 ====================
+// 所有影响钉盘结构（行数、布局形态）的遗物 ID，单局内只能选择其中一个
+const BOARD_STRUCTURE_RELICS = new Set([
+    'dimension_shard',       // 行数遗物：增加钉盘行数
+    'triangle_formation',    // 布局遗物：三角阵形
+    'diamond_formation',     // 布局遗物：菱形阵形
+    'sparse_interval',       // 布局遗物：稀疏间隔
+    'mirror_sync',           // 布局遗物：镜像同步
+    'wide_narrow',           // 布局遗物：宽窄交替
+]);
+
 // ==================== 遗物数据库 ====================
 
 const RELIC_DB = [
@@ -725,7 +736,7 @@ const RELIC_DB = [
         icon: '🌌', 
         desc: '收集階段：釘板高度延伸，額外增加 2 行釘子。', 
         rarity: 'rare', 
-        effect: 'row_count_up', maxStacks: 3
+        effect: 'row_count_up', maxStacks: 1
     },
     { id: 'stars_shines', name: '群星闪烁', icon: '✨', desc: '解鎖 [回响弹珠]：双倍获得连击充能。', rarity: 'rare', unlocks: 'resonance', boost: 8 ,maxStacks: 1},
     { id: 'optical_lens', name: '聚焦透鏡', icon: '🔭', desc: '解鎖 [光球]：發射瞬間穿透的折射光束。', rarity: 'legendary', unlocks: 'laser', boost: 10 ,maxStacks: 1},
@@ -951,6 +962,7 @@ export {
     setDeepValue,
     CONFIG,
     RELIC_DB,
+    BOARD_STRUCTURE_RELICS,
     SKILL_DB,
     BOSS_DB,
 };
