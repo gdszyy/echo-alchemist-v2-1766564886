@@ -791,8 +791,8 @@ export const hud_system = {
             }
         });
 
-        // ── 充能满 → 刷新符文预览（带闪光特效）──────────────────────────────
-        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_LEVEL_UP, ({ runeDef }) => {
+        // ── 充能满 → 刷新符文预览（带闪光特效）──────────────────────────────────
+        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_LEVEL_UP, ({ runeDef, runeLevel }) => {
             const slot = document.getElementById('combat-rune-single-slot');
             const shell = document.getElementById('combat-charge-bar-shell');
             const fill = document.getElementById('combat-charge-bar-fill');
@@ -814,16 +814,28 @@ export const hud_system = {
                 setTimeout(() => shell.classList.remove('charge-full-flash'), 450);
             }
 
-            // 符文槽刷新
+            // 符文槽刷新（展示符文图标 + 等级角标）
             if (slot) {
                 slot.classList.remove('rune-refresh');
                 void slot.offsetWidth; // 重流
                 if (runeDef) {
-                    slot.textContent = runeDef.icon || '🔮';
+                    // 清空内容，重建图标 + 角标
+                    slot.innerHTML = '';
+                    const iconEl = document.createElement('span');
+                    iconEl.className = 'rune-slot-icon';
+                    iconEl.textContent = runeDef.icon || '🔮';
+                    slot.appendChild(iconEl);
+                    // 仅当等级 >= 2 时展示角标
+                    if (runeLevel && runeLevel >= 2) {
+                        const lvBadge = document.createElement('span');
+                        lvBadge.className = 'rune-slot-level-badge';
+                        lvBadge.textContent = `Lv.${runeLevel}`;
+                        slot.appendChild(lvBadge);
+                    }
                     slot.className = 'has-rune rune-refresh';
                     setTimeout(() => slot.classList.remove('rune-refresh'), 600);
                 } else {
-                    slot.textContent = '';
+                    slot.innerHTML = '';
                     slot.className = 'empty';
                 }
             }
@@ -838,8 +850,8 @@ export const hud_system = {
             }
         });
 
-        // ── 回合结束领取符文 → 入背包动画 ────────────────────────────────
-        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_CLAIM, ({ runeDef }) => {
+         // ── 回合结束领取符文 → 入背包动画 ────────────────────────────
+        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_CLAIM, ({ runeDef, level }) => {
             const slot = document.getElementById('combat-rune-single-slot');
             if (!slot || !runeDef) return;
 
@@ -848,14 +860,23 @@ export const hud_system = {
             const startX = slotRect.left + slotRect.width / 2;
             const startY = slotRect.top + slotRect.height / 2;
 
-            // 创建飞行符文元素
+            // 创建飞行符文元素（包含图标 + 等级展示）
             const flyEl = document.createElement('div');
             flyEl.className = 'rune-claim-fly';
-            flyEl.textContent = runeDef.icon || '🔮';
             flyEl.style.left = `${startX - 18}px`;
             flyEl.style.top  = `${startY - 18}px`;
             // 水平偏移量：小幅左右随机浮动
             flyEl.style.setProperty('--fly-dx', `${(Math.random() - 0.5) * 30}px`);
+            // 飞行元素内容：图标 + 等级角标
+            const flyIcon = document.createElement('span');
+            flyIcon.textContent = runeDef.icon || '🔮';
+            flyEl.appendChild(flyIcon);
+            if (level && level >= 2) {
+                const flyLvBadge = document.createElement('span');
+                flyLvBadge.className = 'rune-slot-level-badge';
+                flyLvBadge.textContent = `Lv.${level}`;
+                flyEl.appendChild(flyLvBadge);
+            }
             document.body.appendChild(flyEl);
 
             // 符文槽消失动画
@@ -866,7 +887,7 @@ export const hud_system = {
             // 动画结束后清理
             setTimeout(() => {
                 flyEl.remove();
-                slot.textContent = '';
+                slot.innerHTML = '';
                 slot.className = 'empty';
             }, 900);
         });

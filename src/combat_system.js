@@ -16,6 +16,40 @@ import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { DamageCalc } from './combat/damage_calc.js';
 import { CollisionSystem } from './combat/collision.js';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 充能符文系统常量（§8.5）
+// ─────────────────────────────────────────────────────────────────────────────
+const RUNE_CHARGE_THRESHOLDS = [999, 999, 6.1, 5.1, 2.6, 2.15, 0.9, 0.4];
+const RUNE_CHARGE_DECAY      = 1.26 / 3;   // ≈ 0.42
+const RUNE_CHARGE_MAX_LEVEL  = 3;
+
+/**
+ * 充能符文抽取算法（§8.5）
+ * 按权重上限门槛筛选入池符文，加权随机抽取符文定义和等级。
+ * @param {number} chargeLevel - 当前充能等级（充能条已满次数）
+ * @returns {{ runeDef: object|null, runeLevel: number }}
+ */
+function _runeCharge_draw(chargeLevel) {
+    const threshold = RUNE_CHARGE_THRESHOLDS[Math.min(chargeLevel, 7)];
+    const maxRuneLv = Math.min(chargeLevel, RUNE_CHARGE_MAX_LEVEL);
+    const pool = [];
+    for (const rune of RUNE_DB) {
+        for (let lv = 1; lv <= maxRuneLv; lv++) {
+            const w = rune.baseDropWeight * Math.pow(RUNE_CHARGE_DECAY, lv - 1);
+            if (w < threshold) pool.push({ runeDef: rune, runeLevel: lv, weight: w });
+        }
+    }
+    if (!pool.length) return { runeDef: null, runeLevel: 1 };
+    const total = pool.reduce((s, c) => s + c.weight, 0);
+    let rand = Math.random() * total;
+    for (const c of pool) {
+        rand -= c.weight;
+        if (rand <= 0) return { runeDef: c.runeDef, runeLevel: c.runeLevel };
+    }
+    const last = pool[pool.length - 1];
+    return { runeDef: last.runeDef, runeLevel: last.runeLevel };
+}
+
 export const combat_system = {
 // [已迁移至 src/combat/damage_calc.js] combat_calculatePlayerExpectedDamage
     // DDA 核心算法 —— 通过文件底部的 Object.assign(combat_system, DamageCalc) 注入
@@ -2052,9 +2086,10 @@ export const combat_system = {
      * @description 初始化充能符文系统状态（战斗阶段开始时调用）
      */
     combat_runeCharge_init() {
-        this.runeChargeValue = 0;    // 充能值 0~1，自动衰减
-        this.runeChargeLevel = 0;    // 当前充能满次数（每满一次+1，无上限）
-        this.runeChargeCurrentRune = null; // 当前预览符文（单个）
+        this.runeChargeValue        = 0;    // 充能值 0~1，自动衰减
+        this.runeChargeLevel        = 0;    // 当前充能满次数（每满一次+1，无上限）
+        this.runeChargeCurrentRune  = null; // 当前预览符文（单个）
+        this.runeChargeCurrentLevel = 1;    // 当前预览符文等级（新增，§8.5）
         this.combat_runeCharge_initUI();
     },
 
@@ -2115,16 +2150,17 @@ export const combat_system = {
      */
     combat_runeCharge_levelUp() {
         this.runeChargeLevel = (this.runeChargeLevel || 0) + 1;
-        // 使用智能掉落算法抽取新符文
-        const runeId = loot_calcRuneDrop(this);
-        const runeDef = runeId ? RUNE_DB.find(r => r.id === runeId) : null;
-        this.runeChargeCurrentRune = runeDef || null;
+        // 使用新充能抽取算法（修复 Bug：原调用 loot_calcRuneDrop 返回字符串，新接口返回对象）
+        const { runeDef, runeLevel } = _runeCharge_draw(this.runeChargeLevel);
+        this.runeChargeCurrentRune  = runeDef  || null;
+        this.runeChargeCurrentLevel = runeLevel || 1;
         // 通知 hud.js 刷新符文槽（带特效）
         eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_LEVEL_UP, {
-            runeDef: this.runeChargeCurrentRune
+            runeDef:   this.runeChargeCurrentRune,
+            runeLevel: this.runeChargeCurrentLevel
         });
         // 音效反馈
-        try { if (audio && audio.playTone) audio.playTone(520, 'sine', 0.1, 0.25); } catch(e) {}
+        try { if (audio?.playTone) audio.playTone(520, 'sine', 0.1, 0.25); } catch(e) {}
     },
 
     /**
@@ -2161,21 +2197,24 @@ export const combat_system = {
         const runeDef = this.runeChargeCurrentRune;
         if (!runeDef) return; // 未充能满过，无奖励
 
-        // 将符文加入背包
-        this.runeInventory.push({ id: runeDef.id, level: 1 });
+        // 使用动态等级入库（修复原硬编码 level: 1 的 Bug）
+        const level = this.runeChargeCurrentLevel || 1;
+        this.runeInventory.push({ id: runeDef.id, level });
 
         // 触发入背包动画事件（由 hud.js 处理 DOM 动画）
         eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_CLAIM, {
-            runeDef
+            runeDef,
+            level
         });
 
         // 音效
-        try { if (audio && audio.playPowerup) audio.playPowerup(); } catch(e) {}
+        try { if (audio?.playPowerup) audio.playPowerup(); } catch(e) {}
 
         // 重置充能状态
-        this.runeChargeValue = 0;
-        this.runeChargeLevel = 0;
-        this.runeChargeCurrentRune = null;
+        this.runeChargeValue        = 0;
+        this.runeChargeLevel        = 0;
+        this.runeChargeCurrentRune  = null;
+        this.runeChargeCurrentLevel = 1;
     },
 
     // =========================================
