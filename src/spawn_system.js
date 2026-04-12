@@ -1346,27 +1346,6 @@ export const spawn_system = {
         //   得 spawnY = combatGridTopY + enemyHeight/2，Boss 占满第 0、1 行完整网格
         const spawnY = this.combatGridTopY + this.enemyHeight / 2; // Boss 上边界与第一行上边界对齐
 
-        // ===== Boss 出场：仅清除与 Boss 占位区域重叠的敌人 =====
-        // Boss 最终落点区域（AABB）：水平中心 centerX，宽 bossW，高 bossH，垂直中心 spawnY
-        // 只移除与该矩形发生重叠的普通敌人，保留场上其余敌人，维持玩家前期战斗的影响
-        if (this.enemies.length > 0) {
-            const bossLeft   = centerX - bossW / 2;
-            const bossRight  = centerX + bossW / 2;
-            const bossTop    = spawnY  - bossH / 2;
-            const bossBottom = spawnY  + bossH / 2;
-            this.enemies = this.enemies.filter(e => {
-                const eLeft   = e.pos.x - e.width  / 2;
-                const eRight  = e.pos.x + e.width  / 2;
-                const eTop    = e.pos.y - e.height / 2;
-                const eBottom = e.pos.y + e.height / 2;
-                // AABB 重叠检测：两矩形在 X 轴和 Y 轴上均有交叠则视为重叠
-                const overlaps = eRight > bossLeft && eLeft < bossRight &&
-                                 eBottom > bossTop  && eTop  < bossBottom;
-                if (overlaps) { e.active = false; }
-                return !overlaps;
-            });
-        }
-
         const bossHP = this.spawn_calculateBossHP(isBigBoss);
 
         // ===== 问题 1 修复：Boss 入场动画初始化 =====
@@ -1498,6 +1477,23 @@ export const spawn_system = {
         // 设置入场动画状态
         boss.dropTargetY = spawnY;       // 目标位置：网格对齐的顶部
         boss._entranceStartY = entranceStartY; // 入场起始 Y
+
+        // ===== Boss 出场：仅清除与 Boss 最终落点区域重叠的敌人 =====
+        // 直接使用 boss 对象自身的真实尺寸（boss.width/height）和最终落点（boss.dropTargetY）进行 AABB 相交检测
+        // 敌人则使用 e.getBounds()（基于 e.pos 和 e.width/height）获取当前实际占据范围
+        if (this.enemies.length > 0) {
+            const bL = boss.pos.x     - boss.width  / 2;
+            const bR = boss.pos.x     + boss.width  / 2;
+            const bT = boss.dropTargetY - boss.height / 2;
+            const bB = boss.dropTargetY + boss.height / 2;
+            this.enemies = this.enemies.filter(e => {
+                const eb = e.getBounds();
+                const overlaps = eb.right > bL && eb.left < bR &&
+                                 eb.bottom > bT && eb.top  < bB;
+                if (overlaps) { e.active = false; }
+                return !overlaps;
+            });
+        }
         // [演出时机修复] entranceTimer 初始为 0，不在生成时立即开始动画。
         // 动画将在 phase_startCombatPhase() 进入战斗阶段时才激活，确保演出完整可见。
         boss.entranceTimer = 0;
