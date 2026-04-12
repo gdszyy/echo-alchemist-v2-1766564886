@@ -92,6 +92,7 @@ globs: ["src/config.js"]
 | 2026-04-12 | `src/config.js` | **初始钉子行数减少 1**：`CONFIG.gameplay.rows` 从 `6` 改为 `5`，降低游戏初始复杂度，改善早期游戏体验。 |
 | 2026-04-12 | `src/spawn_system.js` | **修复 mikro/micro 命名不一致 Bug**：将 `spawn_system.js` 中的 `switch case 'micro'` 改为 `mikro`，与 `config.js` 中的 Boss ID 保持一致。 |
 | 2026-04-12 | `src/config.js` | **Chimera 狂暴爆炸概率配置**：`CONFIG.balance.bossConfigs.chimera` 中新增 `berserkedBlastOnHitChance: 0.25`，表示 Chimera 狂暴后每次受击有 25% 概率触发全场爆炸。 |
+| 2026-04-12 | `src/config.js` | **Viridis Boss 狂暴配置修正**：`bossConfigs.viridis.berserkedHealerRange` 从 `999` 改为 `0`（狂暴后停止治疗其他敌人），新增 `berserkedSelfRegenMult: 3.0`（狂暴后自身回血速度倍率）。 |
 
 ## 5. 遗物重复获取机制规范
 - **数据结构**: 遗物数据字典 (`RELIC_DB`) 中使用 `maxStacks` 字段控制遗物的最大可获取次数。

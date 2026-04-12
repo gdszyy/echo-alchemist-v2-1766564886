@@ -626,7 +626,11 @@ class Enemy {
 
             // --- 1. 再生 ---
             if(this.affixes.includes('regen')) {
-                const heal = Math.floor(this.maxHp * afx.regenPercent) || 1;
+                // Boss 维里迪斯狂暴后自身回血速度加速（_berserkedSelfRegenMult 倍率）
+                const selfRegenMult = (this.type === 'boss' && this.bossType === 'viridis' && this.berserked && this._berserkedSelfRegenMult)
+                    ? this._berserkedSelfRegenMult
+                    : 1;
+                const heal = Math.floor(this.maxHp * afx.regenPercent * selfRegenMult) || 1;
                 if(this.hp < this.maxHp) {
                     this.hp = Math.min(this.maxHp, this.hp + heal);
                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 30, `+${heal}`, '#4ade80');
@@ -637,10 +641,10 @@ class Enemy {
 
             // --- 2. 治疗 ---
             if (this.affixes.includes('healer')) {
-                // Boss 维里迪斯特殊：狂暴后治疗范围扩大到全场
+                // Boss 维里迪斯特殊：狂暴后 _berserkedHealerRange = 0，停止治疗其他敌人
                 let effectiveHealerRange = afx.healerRange;
-                if (this.type === 'boss' && this.bossType === 'viridis' && this._berserkedHealerRange) {
-                    effectiveHealerRange = this._berserkedHealerRange;
+                if (this.type === 'boss' && this.bossType === 'viridis' && this.berserked) {
+                    effectiveHealerRange = this._berserkedHealerRange !== undefined ? this._berserkedHealerRange : 0;
                 }
                 const range = this.width * effectiveHealerRange;
                 let healedCount = 0;
@@ -1547,6 +1551,28 @@ class Enemy {
         ctx.restore(); // <--- 裁剪结束
 
         // === Layer 6: 外部特效 (光环/冰壳) ===
+
+        // **Viridis 狂暴状态: 绿色脉冲光晕**
+        if (this.type === 'boss' && this.bossType === 'viridis' && this.berserked) {
+            ctx.save();
+            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            const viridisTime = Date.now() / 1000;
+            // 双层脉冲光晕：外层慢脉冲 + 内层快脉冲
+            const outerPulse = (Math.sin(viridisTime * 1.8) + 1) * 0.5;  // 慢脉冲
+            const innerPulse = (Math.sin(viridisTime * 3.5 + 1.2) + 1) * 0.5; // 快脉冲
+            // 外层光晕（大圆，半透明）
+            ctx.shadowColor = '#22c55e';
+            ctx.shadowBlur = 20 + outerPulse * 15;
+            ctx.strokeStyle = `rgba(34, 197, 94, ${0.4 + outerPulse * 0.35})`;
+            ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.roundRect(-w/2 - 5, -h/2 - 5, w + 10, h + 10, r + 3); ctx.stroke();
+            // 内层光晕（小圆，较亮）
+            ctx.shadowBlur = 10 + innerPulse * 8;
+            ctx.strokeStyle = `rgba(74, 222, 128, ${0.3 + innerPulse * 0.4})`;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.roundRect(-w/2 - 2, -h/2 - 2, w + 4, h + 4, r + 1); ctx.stroke();
+            ctx.restore();
+        }
 
         // **过热 Stage 4: 炙热发光边框**
         if (this.temp >= 100) {

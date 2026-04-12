@@ -2295,8 +2295,9 @@ export const combat_system = {
                 break;
 
             case 'viridis':
-                // 狂暴后治疗范围扩大到全场
-                boss._berserkedHealerRange = bossCfg.berserkedHealerRange || 999;
+                // 狂暴后放弃治疗他人，集中治疗自身并加速再生
+                boss._berserkedHealerRange = 0; // 治疗范围设为 0，停止治疗其他敌人
+                boss._berserkedSelfRegenMult = bossCfg.berserkedSelfRegenMult || 3.0; // 自身再生倍率
                 break;
 
             case 'tesla':

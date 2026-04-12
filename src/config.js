@@ -570,7 +570,8 @@ const CONFIG = {
                 affixes: ['regen', 'healer'],
                 weakness: ['laser', 'pyro'],
                 regenPercentBonus: 0.2,   // 额外再生百分比
-                berserkedHealerRange: 999, // 狂暴后治疗范围扩大到全场
+                berserkedHealerRange: 0,   // 狂暴后停止治疗其他敌人（放弃治疗他人）
+                berserkedSelfRegenMult: 3.0, // 狂暴后自身回血速度倍率（集中治疗自身）
                 themeWeights: { laser: 1.5, pyro: 1.3 }
             },
             tesla: {

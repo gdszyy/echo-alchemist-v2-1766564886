@@ -60,6 +60,7 @@
 
 | 2026-04-12 | `src/entities/enemy.js`, `src/game_phase.js` | **极速/狂暴词条重设计**：`haste` 不再增加行动次数，改为仅在移动阶段额外触发一次移动（显示 `⚡DASH!`）；`berserk` 改为触发时对非移动行动结算两次（不包含移动），并在温度结算阶段每回合 +20℃ 且温度结算执行两次。 |
 | 2026-04-12 | `src/entities/enemy.js`, `src/combat_system.js`, `src/config.js` | **Chimera 狂暴阶段受击全场爆炸**：`config.js` 的 `bossConfigs.chimera` 中新增 `berserkedBlastOnHitChance: 0.25`（受击爆炸概率）。`combat_triggerBossEnrage` 的 chimera case 中新增 `boss._berserkedBlastOnHitChance` 标志。`enemy.js` 的 `takeDamage` 中，检测 Chimera 狂暴标志：若触发概率，调用 `game.spawn_createShockwave` 生成橙色冲击波，生成 20 个红橙色 ember 粒子，显示 `💥CHAOS BLAST!` 浮动文字，并随机禁用 3 个钉子（设置高额 cooldownTimer=1000）持续 1 回合。 |
+| 2026-04-12 | `src/entities/enemy.js`, `src/combat_system.js`, `src/config.js` | **Viridis 狂暴逻辑修正**：狂暴后 Viridis 不再治疗其他敌人，改为集中治疗自身并加速再生。具体：（1）`config.js` 中 `bossConfigs.viridis.berserkedHealerRange` 从 `999` 改为 `0`，新增 `berserkedSelfRegenMult: 3.0`；（2）`combat_system.js` 的 `combat_triggerBossEnrage` viridis case 中设置 `boss._berserkedHealerRange = 0` 并新增 `boss._berserkedSelfRegenMult = bossCfg.berserkedSelfRegenMult || 3.0`；（3）`enemy.js` 的 regen affix 处理中，检测 Viridis 狂暴时应用 `_berserkedSelfRegenMult` 倍率加速自身回血；（4）Layer 6 新增 Viridis 狂暴绿色脉冲光晕视觉反馈（双层脉冲：外层 `#22c55e` 慢脉冲 + 内层 `#4ade80` 快脉冲）。 |
 
 ## 6. 开发规范
 *   **依赖管理**：
