@@ -541,9 +541,8 @@ class Enemy {
         const afx = CONFIG.balance.affixes;
         let actionCount = 1;
         
-        // 狂暴判定
-        if (this.affixes.includes('haste')) actionCount = 2;
-        else if (this.actionName === '狂暴') actionCount = 2;
+        // [改动] 狂暴词条：触发时行动两次（仅非移动行动）；haste 不再影响行动次数
+        if (this.actionName === '狂暴') actionCount = 2;
 
         // Boss 行为差异化：根据 bossType 修改行动次数
         if (this.type === 'boss' && this.bossType) {
@@ -645,14 +644,16 @@ class Enemy {
             }
 
             if (isSecondAction) {
-                game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡DOUBLE!", "#facc15");
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "😡RAGE!", "#ef4444");
             }
+        }
 
-            // --- 移动与跳跃 ---
-            let moveAmount = game.enemyHeight;
+        // --- [改动] 移动与跳跃：移出循环，始终只执行一次 ---
+        // haste 词条：额外触发一次移动（速度加快，不重复结算其他词条）
+        const _doMove = () => {
+            const moveAmount = game.enemyHeight;
             const targetY = this.dropTargetY + moveAmount;
             const isBlocked = game.calc_isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
-
             if (!isBlocked) {
                 this.advance(moveAmount);
             } else {
@@ -666,35 +667,34 @@ class Enemy {
                     const isJumpBlocked = game.calc_isAreaOccupied(this.pos.x, jumpTargetY, this.width * 0.8, this.height * 0.8, this);
                     if (!isJumpBlocked) {
                         this.advance(moveAmount * effectiveJumpRows);
-                        this.bumpOffsetY = -30; 
+                        this.bumpOffsetY = -30;
                         game.spawn_createFloatingText(this.pos.x, this.pos.y, 'JUMP!', '#38bdf8');
-                        game.spawn_createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist'); 
+                        game.spawn_createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist');
                         audio.playEffect('split');
                     } else {
-                        if (i === 0) {
-                            this.bumpOffsetY = -10;
-                            if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
-                        }
-                    }
-                } else {
-                    if (i === 0) {
                         this.bumpOffsetY = -10;
                         if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
                     }
+                } else {
+                    this.bumpOffsetY = -10;
+                    if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
                 }
             }
+        };
+        _doMove();
+        // [改动] haste 词条：仅额外触发一次移动，不重复结算其他词条
+        if (this.affixes.includes('haste')) {
+            game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡DASH!", "#facc15");
+            _doMove();
         }
-        
+
         this.hasActedThisTurn = true;
     }
 
     performTurnActionAndMove(game) {
         const afx=CONFIG.balance.affixes
+        // [改动] haste 不再增加行动次数，狂暴词条也不在此处判定（由 startTurnAction 处理）
         let actionCount = 1;
-        if (this.affixes.includes('haste')) actionCount = 2;
-        else if (this.temp > 0 && this.temp < 100 && this.affixes.includes('berserk')) {
-            if (Math.random() < (this.temp / 100) * afx.berserkChanceMult) actionCount = 2;
-        }
 
         if (this.isFrozenCurrentTurn) {
             actionCount = 0;
@@ -715,119 +715,93 @@ class Enemy {
                 }
             }
 
-            // --- 2. 範圍治療 (Healer) [新增] ---
+            // --- 2. 範圍治療 (Healer) ---
             if (this.affixes.includes('healer')) {
-                // 定義範圍：自身寬度的 1.5 倍 (大約覆蓋周圍 8 格)
                 const range = this.width * afx.healerRange;
                 let healedCount = 0;
                 
                 game.enemies.forEach(other => {
                     if (other !== this && other.active && other.hp < other.maxHp && this.pos.dist(other.pos) < range) {
-                            const healAmt = Math.ceil(other.maxHp * afx.healerPercent); // [修改]
-                    
+                        const healAmt = Math.ceil(other.maxHp * afx.healerPercent);
                         other.hp = Math.min(other.maxHp, other.hp + healAmt);
-                        
-                        // 特效：發射治療粒子飛向隊友
-                        game.spawn_createParticle(other.pos.x, other.pos.y, '#f472b6', 'spark'); // 粉色粒子
+                        game.spawn_createParticle(other.pos.x, other.pos.y, '#f472b6', 'spark');
                         game.spawn_createFloatingText(other.pos.x, other.pos.y - 20, `+${healAmt}`, '#f472b6');
                         healedCount++;
                     }
                 });
                 
                 if (healedCount > 0) {
-                     audio.playEffect('regen'); // 復用治療音效
-                     game.spawn_createShockwave(this.pos.x, this.pos.y, '#f472b6'); // 自身粉色波動
+                     audio.playEffect('regen');
+                     game.spawn_createShockwave(this.pos.x, this.pos.y, '#f472b6');
                 }
             }
 
-            // --- 3. 吞噬 (Devour) [新增] ---
-            // 50% 概率觸發，且必須不是滿血或者想獲取詞條
+            // --- 3. 吞噬 (Devour) ---
             if (this.affixes.includes('devour') && Math.random() < afx.devourChance) {
-                     const range = this.width * afx.devourRange;
-                 // 尋找鄰居 (不能吞噬 Boss)
-                 const neighbors = game.enemies.filter(e => 
-                     e !== this && e.active && e.type !== 'boss' && this.pos.dist(e.pos) < range
-                 );
-
-                 if (neighbors.length > 0) {
-                     const victim = neighbors[Math.floor(Math.random() * neighbors.length)];
-                     
-                     // 吞噬數值
-                     const absorbHp = victim.hp;
-                     const absorbMax = victim.maxHp;
-                     
-                     this.maxHp += absorbMax;
-                     this.hp += absorbHp;
-                     
-                     victim.affixes.forEach(af => {
+                const range = this.width * afx.devourRange;
+                const neighbors = game.enemies.filter(e => 
+                    e !== this && e.active && e.type !== 'boss' && this.pos.dist(e.pos) < range
+                );
+                if (neighbors.length > 0) {
+                    const victim = neighbors[Math.floor(Math.random() * neighbors.length)];
+                    const absorbHp = victim.hp;
+                    const absorbMax = victim.maxHp;
+                    this.maxHp += absorbMax;
+                    this.hp += absorbHp;
+                    victim.affixes.forEach(af => {
                         if (!this.affixes.includes(af)) this.affixes.push(af);
                     });
-
-                    // 2. 【核心修正】：调用带逻辑的死亡
-                    // 使用 victim.takeDamage 触发正常的死亡逻辑（加分、上报、特效）
-                    // 传递一个极高的数值确保它死亡
                     const isDead = victim.takeDamage(99999); 
-                    
-                    if (isDead) {
-                        game.spawn_addScore(absorbMax); // 补偿吞噬者的分数
-                    }
-
-                    // 3. 特效反馈
+                    if (isDead) game.spawn_addScore(absorbMax);
                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, "DEVOUR!", "#ef4444");
                     game.spawn_createParticle(victim.pos.x, victim.pos.y, '#ef4444', 'mist'); 
                     game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
                     audio.playEffect('split');
-                 }
+                }
             }
 
             // --- 4. 增殖 (Clone) ---
             if(this.affixes.includes('clone') && Math.random() < afx.cloneChanceTurn) {
-                    game.spawn_triggerCloneSpawn(this);
-                }
-
-            if (isSecondAction) {
-                game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡DOUBLE!", "#facc15");
+                game.spawn_triggerCloneSpawn(this);
             }
+        }
 
-            // --- 移動與跳躍邏輯 ---
-            let moveAmount = game.enemyHeight;
+        // --- [改动] 移动与跳跃：移出循环，始终只执行一次 ---
+        // haste 词条：额外触发一次移动
+        const _doMoveP = () => {
+            const moveAmount = game.enemyHeight;
             const targetY = this.dropTargetY + moveAmount;
-            
-            // 檢查前方是否被阻擋
             const isBlocked = game.calc_isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
-
             if (!isBlocked) {
-                // 正常移動
                 this.advance(moveAmount);
             } else {
-                // --- 5. 跳躍 (Jump) [新增] ---
-                // 如果被阻擋，且擁有 jump 詞條，檢查下下個格子
                 if (this.affixes.includes('jump')) {
-                    // Boss 格拉西斯特殊：狂暴后跳跃行数增加
                     let effectiveJumpRows = afx.jumpRows;
                     if (this.type === 'boss' && this.bossType === 'glacies') {
                         effectiveJumpRows = this._berserkedJumpRows || effectiveJumpRows;
                     }
                     const jumpTargetY = this.dropTargetY + (moveAmount * effectiveJumpRows);
                     const isJumpBlocked = game.calc_isAreaOccupied(this.pos.x, jumpTargetY, this.width * 0.8, this.height * 0.8, this);
-                    
                     if (!isJumpBlocked) {
                         this.advance(moveAmount * effectiveJumpRows);
                         this.bumpOffsetY = -30;
                         game.spawn_createFloatingText(this.pos.x, this.pos.y, 'JUMP!', '#38bdf8');
                         game.spawn_createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist');
                     } else {
-                        if (i === 0) {
-                            this.bumpOffsetY = -10;
-                            if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
-                        }
-                    }
-                } else {
-                    if (i === 0) {
                         this.bumpOffsetY = -10;
                         if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
                     }
+                } else {
+                    this.bumpOffsetY = -10;
+                    if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
                 }
+            }
+        };
+        if (!this.isFrozenCurrentTurn) {
+            _doMoveP();
+            if (this.affixes.includes('haste')) {
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡DASH!", "#facc15");
+                _doMoveP();
             }
         }
     }

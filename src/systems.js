@@ -391,7 +391,7 @@ this.affixDict = {
     },
     'haste': { 
         name: '⚡ 極速', 
-        desc: `每回合固定行移動 ${afx.hasteActions} 次。` 
+        desc: '每回合移动两次（仅加速移动，不重复结算其他词条）。' 
     },
     'regen': { 
         name: '💚 再生', 
@@ -403,7 +403,7 @@ this.affixDict = {
     },
     'berserk': { 
         name: '😡 狂暴', 
-        desc: '有概率行动两次 (概率随温度升高)' 
+        desc: '每回合 +20℃，温度结算执行两次；有概率对非移动行动结算两次（概率随温度升高）。' 
     },
     'healer': { 
         name: '💖 治癒', 

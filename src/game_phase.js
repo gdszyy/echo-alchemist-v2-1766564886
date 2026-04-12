@@ -413,50 +413,51 @@ phase_gathering_getRandomPegType() {
         // 這樣即使敵人被燒死消失了，波浪也會慢慢掃過屍體位置，展現"擊殺確認"的感覺
         this.waveMomentumTimer = 45; 
 
-        // --- 1. 溫度結算邏輯 ---
-        if (e.temp < 0) {
-            // 1. 深度冻结 (-100以下)：视觉上有冰块，逻辑上必须 100% 冻结
-             // 2. 浅度冻结 (-50 ~ -99)：视觉上无冰块，逻辑上概率冻结
-             
-             let shouldFreeze = false;
-
-             if (e.temp <= -100) {
-                 shouldFreeze = true; // 强制冻结
-             } else if (e.temp <= -50) {
-                 // 概率计算：从 -50 的 0% 到 -100 的 100% 线性增加
-                 const chance = (Math.abs(e.temp) - 50) / 50; 
-                 if (Math.random() < chance) shouldFreeze = true;
-             }
-
-             if (shouldFreeze) { 
-                 e.isFrozenCurrentTurn = true;
-                 e.frozenCount = (e.frozenCount || 0) + 1; // [温度衰减] 累计冰冻次数，后续降温效果将被衰减
-                 this.spawn_createExplosion(e.pos.x, e.pos.y, '#06b6d4');
-                 audio.playEffect('freeze');
-             } else {
-                 e.isFrozenCurrentTurn = false;
-             }
-             
-             // 温度衰减 (保持不变)
-             e.temp = Math.ceil(e.temp / 2);
+        // --- 1. 温度结算逻辑 ---
+        // [改动] berserk 词条：每回合先对该敌人 +20 度，并将温度结算执行两次
+        if (e.affixes && e.affixes.includes('berserk')) {
+            e.temp += 20;
+            this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, '+20℃', '#f97316');
         }
 
-        if (e.temp > 0) {
-            if (e.temp < 100) {
-                 e.temp = Math.max(0, e.temp - 5);
-            } else {
-                const dot = 5 + (e.temp - 100);
-                e.takeDamage(dot); // <--- 敵人可能在這裡死亡 (active = false)
-                
-                // 记录火焰持续伤害
-                this.combat_recordDamage(dot, 'pyro', 'main');
-                
-                // 觸發燃燒特效
-                e.playBurnTickEffect(this, Math.floor(dot));
-                
-                const decay = Math.floor(e.temp / 20);
-                e.temp = Math.max(0, e.temp - decay);
+        // 封装单次温度结算逻辑为函数，便于 berserk 重复执行
+        const _processTempOnce = () => {
+            if (e.temp < 0) {
+                let shouldFreeze = false;
+                if (e.temp <= -100) {
+                    shouldFreeze = true;
+                } else if (e.temp <= -50) {
+                    const chance = (Math.abs(e.temp) - 50) / 50;
+                    if (Math.random() < chance) shouldFreeze = true;
+                }
+                if (shouldFreeze) {
+                    e.isFrozenCurrentTurn = true;
+                    e.frozenCount = (e.frozenCount || 0) + 1;
+                    this.spawn_createExplosion(e.pos.x, e.pos.y, '#06b6d4');
+                    audio.playEffect('freeze');
+                } else {
+                    e.isFrozenCurrentTurn = false;
+                }
+                e.temp = Math.ceil(e.temp / 2);
             }
+            if (e.temp > 0 && e.active) {
+                if (e.temp < 100) {
+                    e.temp = Math.max(0, e.temp - 5);
+                } else {
+                    const dot = 5 + (e.temp - 100);
+                    e.takeDamage(dot);
+                    this.combat_recordDamage(dot, 'pyro', 'main');
+                    e.playBurnTickEffect(this, Math.floor(dot));
+                    const decay = Math.floor(e.temp / 20);
+                    e.temp = Math.max(0, e.temp - decay);
+                }
+            }
+        };
+
+        _processTempOnce();
+        // [改动] berserk 词条：温度结算执行两次
+        if (e.affixes && e.affixes.includes('berserk')) {
+            _processTempOnce();
         }
 
         // --- 2. 行动逻辑 ---
