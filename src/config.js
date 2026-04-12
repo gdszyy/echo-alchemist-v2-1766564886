@@ -638,21 +638,23 @@ const CONFIG = {
         specialUpgradeMult: 0.42   // 升级概率乘子 (基于同化概率)
     },
     //  初始概率配置 (現在這些是基礎權重，解鎖後會增加)
+    // [DESIGN] 初始状态只提供 bounce（反弹）属性。
+    // 其余属性权重均为 0，需通过遗物解锁后才会按概率刷新对应属性钉子。
     probabilities: { 
         white: 100,       // 基礎
-        bounce: 20,       // 初始解鎖
+        bounce: 20,       // 初始解鎖（唯一初始可用属性）
         laser: 0,
         // 物理系 (初始鎖定，通過遺物解鎖)
-        pierce: 7, 
-        scatter: 7,
-        damage: 12, // 保持概率权重不变
+        pierce: 0, 
+        scatter: 0,
+        damage: 0,
         
         // 元素系 (初始鎖定，通過遺物獨立解鎖)
-        cryo: 5, 
-        pyro: 5, 
+        cryo: 0, 
+        pyro: 0, 
         
         // 特殊系 (初始鎖定)
-        explosive: 2, 
+        explosive: 0, 
         rainbow: 0, 
         matryoshka: 0,
         resonance: 0,
