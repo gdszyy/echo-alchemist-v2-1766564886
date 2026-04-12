@@ -351,8 +351,8 @@ export const game_phase = {
 
                 const pegA = this.pegs[idxA];
                 const pegB = this.pegs[idxB];
-                const type = slotTypes[Math.floor(Math.random() * slotTypes.length)];
-
+                 // 按顺序分配类型：第 i 个槽使用 slotTypes[i]，确保类型确定性
+                const type = slotTypes[createdCount % slotTypes.length];
                 const slot = new SpecialSlot(pegA.pos.x, pegA.pos.y, pegB.pos.x, pegB.pos.y, type);
                 slot.pegIndex  = idxA;
                 slot.pegIndex2 = idxB;
@@ -386,7 +386,8 @@ export const game_phase = {
                 for (const idxA of remaining) {
                     if (createdCount >= this.slotCount) break;
                     const pegA = this.pegs[idxA];
-                    const type = slotTypes[Math.floor(Math.random() * slotTypes.length)];
+                    // 按顺序分配类型，与主逻辑保持一致
+                    const type = slotTypes[createdCount % slotTypes.length];
                     const halfW = spacingX * 0.35;
                     const slot = new SpecialSlot(pegA.pos.x - halfW, pegA.pos.y, pegA.pos.x + halfW, pegA.pos.y, type);
                     slot.pegIndex  = idxA;
@@ -1104,21 +1105,23 @@ phase_gathering_getRandomPegType() {
         this.ctx.save();
         this.ctx.translate(entityShiftX, entityShiftY); 
 
-            // --- [新增]：绘制可视化的边界墙壁 ---
+            // --- [修复]：绘制可视化的边界墙壁（从顶部栏下边界开始，不遮挡顶部栏内容）---
             this.ctx.save();
+            // 顶部栏下边界 Y（combatGridTopY - enemyHeight/2 即第一行敌人上边界，也是顶部栏底部）
+            const wallTopY = this.combatGridTopY - this.enemyHeight / 2;
             // 左墙 (半透明渐变)
             const wallGradLeft = this.ctx.createLinearGradient(0, 0, 20, 0);
             wallGradLeft.addColorStop(0, 'rgba(148, 163, 184, 0.2)');
             wallGradLeft.addColorStop(1, 'rgba(148, 163, 184, 0)');
             this.ctx.fillStyle = wallGradLeft;
-            this.ctx.fillRect(0, -100, 20, this.height + 100);
+            this.ctx.fillRect(0, wallTopY, 20, this.height - wallTopY);
             
             // 右墙 (半透明渐变)
             const wallGradRight = this.ctx.createLinearGradient(this.width, 0, this.width - 20, 0);
             wallGradRight.addColorStop(0, 'rgba(148, 163, 184, 0.2)');
             wallGradRight.addColorStop(1, 'rgba(148, 163, 184, 0)');
             this.ctx.fillStyle = wallGradRight;
-            this.ctx.fillRect(this.width - 20, -100, 20, this.height + 100);
+            this.ctx.fillRect(this.width - 20, wallTopY, 20, this.height - wallTopY);
 
             // 墙壁发光边框 (明确反弹线)
             this.ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)'; // Slate-400
@@ -1126,12 +1129,12 @@ phase_gathering_getRandomPegType() {
             this.ctx.shadowColor = '#94a3b8';
             this.ctx.shadowBlur = 10;
             this.ctx.beginPath();
-            // 左边线
-            this.ctx.moveTo(1, -100); this.ctx.lineTo(1, this.height);
-            // 右边线
-            this.ctx.moveTo(this.width - 1, -100); this.ctx.lineTo(this.width - 1, this.height);
-            // 顶部线 (封顶)
-            this.ctx.moveTo(0, 1); this.ctx.lineTo(this.width, 1);
+            // 左边线（从顶部栏下边界开始）
+            this.ctx.moveTo(1, wallTopY); this.ctx.lineTo(1, this.height);
+            // 右边线（从顶部栏下边界开始）
+            this.ctx.moveTo(this.width - 1, wallTopY); this.ctx.lineTo(this.width - 1, this.height);
+            // 顶部线 (顶部栏下边界，不遮挡顶部栏)
+            this.ctx.moveTo(0, wallTopY); this.ctx.lineTo(this.width, wallTopY);
             this.ctx.stroke();
             this.ctx.restore();
             // ------------------------------------

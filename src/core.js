@@ -132,8 +132,8 @@ class Game {
         this.currentPlayerPower = 0;
         this.pinkPegCount = 0;      
         this.hasCombatWall = false; 
-        this.unlockedSlots = ['skill_point','wheel'];
-        this.slotCount = 1;
+        this.unlockedSlots = ['skill_point', 'multicast']; // 初始特殊槽：技能点 + 加连击
+        this.slotCount = 2; // 初始2个槽位
         this.pegs = []; 
         this.enemies = []; 
         this.specialSlots = []; 
