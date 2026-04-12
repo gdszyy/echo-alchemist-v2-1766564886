@@ -108,58 +108,97 @@ class MarbleDefinition {
 
 class SpecialSlot {
     /**
-     * 特殊槽位类 (底部收集槽)
-     * @param {number} x - **重要参数** 中心 x 坐标
-     * @param {number} y - **重要参数** 中心 y 坐标
-     * @param {number} width - **重要参数** 槽位宽度
-     * @param {string} type - **重要参数** 槽位类型 ('recall': 回溯, 'multicast': 多重发射, 'split': 分裂)
+     * 特殊槽位类（双钉子连线触发模式）
+     * 弹珠穿越两个相邻钉子之间的连线区域时触发效果。
+     * @param {number} x  - 第一个钉子的 x 坐标
+     * @param {number} y  - 第一个钉子的 y 坐标
+     * @param {number} x2 - 第二个钉子的 x 坐标
+     * @param {number} y2 - 第二个钉子的 y 坐标
+     * @param {string} type - 槽位类型 ('recall' | 'multicast' | 'split' | 'relic' | 'giant' | 'skill_point' | 'wheel')
      */
-    constructor(x, y, width, type) {
-        this.x = x; this.y = y; this.width = width; this.height = 12; this.type = type; this.animTimer = 0;this.hit = false;
+    constructor(x, y, x2, y2, type) {
+        this.x = x;   this.y = y;
+        this.x2 = x2; this.y2 = y2;
+        // 保留 width 以便旧代码兼容（取两点距离）
+        this.width = Math.hypot(x2 - x, y2 - y);
+        this.height = 12; // 触发带宽（点到线段距离阈值）
+        this.type = type;
+        this.animTimer = 0;
+        this.hit = false;
     }
+
     /**
-     * 绘制槽位
-     * @param {CanvasRenderingContext2D} ctx - 绘图上下文
+     * 绘制连线槽位：在两个钉子之间画发光连线，并在中点显示符号。
+     * @param {CanvasRenderingContext2D} ctx
      */
     draw(ctx) {
         if (this.hit) return;
-        
-        this.animTimer += 0.05;
-        ctx.save();
-        let color = '#fff'; let text = '';
-        if (this.type === 'recall') { color = CONFIG.colors.slotRecall; text = "↺"; }
-        else if (this.type === 'multicast') { color = CONFIG.colors.slotMulticast; text = "+2"; }
-        else if (this.type === 'split') { color = CONFIG.colors.slotSplit; text = "⑂"; }
-        else if (this.type === 'relic') { color = '#facc15'; text = '🏆'; }
-        else if (this.type === 'giant') { color = CONFIG.colors.slotGiant; text = "⬆️"; }
-        else if (this.type === 'skill_point') { color = CONFIG.colors.slotSkill; text = "★"; }
-        else if (this.type === 'wheel') { color = CONFIG.colors.slotWheel; text = "🎡"; }
 
-        const glow = Math.sin(this.animTimer) * 5 + 10;
-        
-        // [叠加视觉优化] 绘制一个环绕钉子的发光圈，而不是实心方块
-        ctx.shadowBlur = glow; 
-        ctx.shadowColor = color; 
-        ctx.strokeStyle = color; 
-        ctx.lineWidth = 2;
-        ctx.globalAlpha = 0.6;
-        
-        // 绘制一个圆环，刚好包围钉子
+        this.animTimer += 0.05;
+        let color = '#fff'; let text = '';
+        if (this.type === 'recall')      { color = CONFIG.colors.slotRecall;    text = '↺'; }
+        else if (this.type === 'multicast') { color = CONFIG.colors.slotMulticast; text = '+2'; }
+        else if (this.type === 'split')     { color = CONFIG.colors.slotSplit;     text = '⑂'; }
+        else if (this.type === 'relic')     { color = '#facc15';                   text = '🏆'; }
+        else if (this.type === 'giant')     { color = CONFIG.colors.slotGiant;     text = '⬆️'; }
+        else if (this.type === 'skill_point') { color = CONFIG.colors.slotSkill;   text = '★'; }
+        else if (this.type === 'wheel')     { color = CONFIG.colors.slotWheel;     text = '🎡'; }
+
+        const glow   = Math.sin(this.animTimer) * 4 + 8;   // 呼吸光晕幅度
+        const pulse  = 0.5 + Math.sin(this.animTimer) * 0.25; // 透明度脉冲 0.25~0.75
+        const midX   = (this.x + this.x2) / 2;
+        const midY   = (this.y + this.y2) / 2;
+
+        ctx.save();
+
+        // --- 1. 绘制发光连线 ---
+        ctx.shadowBlur  = glow;
+        ctx.shadowColor = color;
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = 2.5;
+        ctx.globalAlpha = pulse;
+        ctx.setLineDash([6, 4]); // 虚线样式，增加魔法感
+        ctx.lineDashOffset = -(Date.now() / 60) % 10; // 流动动画
+
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.width / 2 + 2, 0, Math.PI * 2);
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x2, this.y2);
         ctx.stroke();
-        
-        // 绘制半透明填充
-        ctx.globalAlpha = 0.2;
+
+        ctx.setLineDash([]); // 恢复实线
+
+        // --- 2. 在两端钉子处绘制小圆点锚点 ---
+        ctx.globalAlpha = pulse * 0.8;
+        ctx.fillStyle   = color;
+        ctx.shadowBlur  = glow * 0.6;
+        [[this.x, this.y], [this.x2, this.y2]].forEach(([ax, ay]) => {
+            ctx.beginPath();
+            ctx.arc(ax, ay, 4, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // --- 3. 在连线中点绘制符号背景圆 + 文字 ---
+        ctx.globalAlpha = 1.0;
+        ctx.shadowBlur  = glow * 1.5;
+        ctx.shadowColor = color;
+
+        // 中点背景圆
+        ctx.beginPath();
+        ctx.arc(midX, midY, 12, 0, Math.PI * 2);
+        ctx.fillStyle   = 'rgba(0,0,0,0.55)';
         ctx.fill();
-        
-        ctx.globalAlpha = 1.0; 
-        ctx.shadowBlur = 0; 
-        ctx.textAlign = 'center'; 
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = 1.5;
+        ctx.stroke();
+
+        // 符号文字
+        ctx.shadowBlur = 0;
+        ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
-        ctx.font = 'bold 14px sans-serif'; 
-        ctx.fillStyle = '#fff'; 
-        ctx.fillText(text, this.x, this.y);
+        ctx.font         = 'bold 12px sans-serif';
+        ctx.fillStyle    = '#fff';
+        ctx.fillText(text, midX, midY);
+
         ctx.restore();
     }
 }
@@ -1249,9 +1288,19 @@ class DropBall {
             for (let slot of slots) {
                 if (slot.hit) continue;
                 if (this.portalCooldown <= 0) {
-                    let dx = Math.abs(this.pos.x - slot.x);
-                    let dy = Math.abs(this.pos.y - slot.y);
-                    if (dy < 12 && dx < slot.width / 2) {
+                    // [连线触发] 计算弹珠圆心到连线线段的最短距离，替代旧的矩形包围盒检测
+                    const _sx = slot.x2 - slot.x, _sy = slot.y2 - slot.y;
+                    const _segLenSq = _sx * _sx + _sy * _sy;
+                    let _t = 0;
+                    if (_segLenSq > 0) {
+                        _t = ((this.pos.x - slot.x) * _sx + (this.pos.y - slot.y) * _sy) / _segLenSq;
+                        _t = Math.max(0, Math.min(1, _t));
+                    }
+                    const _closestX = slot.x + _t * _sx;
+                    const _closestY = slot.y + _t * _sy;
+                    const _distToLine = Math.hypot(this.pos.x - _closestX, this.pos.y - _closestY);
+                    const _triggerThreshold = this.radius + slot.height; // slot.height = 12 为触发带宽
+                    if (_distToLine < _triggerThreshold) {
                         slot.hit = true;
                         this.portalCooldown = 40; 
                         if (slot.type === 'recall') {
