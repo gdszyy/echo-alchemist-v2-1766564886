@@ -67,6 +67,7 @@ for (const subsystem of _subsystems) {
 | 日期 | 文件 | 问题描述 | 修复方式 |
 |---|---|---|---|
 | 2026-04-11 | `src/ui_system.js` | `_ui_updateRuneStatsDisplay` 函数体（约 47 行）被错误地遗留在 `ui_system.js` 中，缺少方法名声明，导致 `Uncaught SyntaxError: Unexpected identifier 'summary'` | 从 `ui_system.js` 删除游离函数体，并将其填充至 `rune_launcher.js` 中已声明但为空的同名方法 |
+| 2026-04-12 | `index.html` | 研磨阶段（`#phase-gathering`）两个符文词条系统浮动按钮与底部面板（`.bottom-panel` 高度 115px）及英雄充能条（`#hero-gauge-container` bottom:145px）重叠：背包按钮 `bottom-24`(96px) 低于底部面板被遮挡，发射器按钮 `bottom-36`(144px) 与充能条几乎完全重叠 | 将背包按钮改为 `bottom-32`(128px)，发射器按钮改为 `bottom-44`(176px)，两者均高于各自遮挡元素，保持安全间距 |
 
 ## 6. 修改规范
 

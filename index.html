@@ -1697,11 +1697,13 @@
         </div>
         
         <!-- 研磨阶段符文背包按钮 -->
-        <button onclick="game.ui_openRuneBackpack()" class="absolute bottom-24 right-2 w-10 h-10 bg-slate-800/90 hover:bg-purple-900/80 rounded-full border-2 border-purple-500/50 hover:border-purple-400 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg">
+        <!-- bottom-32 = 128px，高于底部面板(115px)，确保不被遮挡 -->
+        <button onclick="game.ui_openRuneBackpack()" class="absolute bottom-32 right-2 w-10 h-10 bg-slate-800/90 hover:bg-purple-900/80 rounded-full border-2 border-purple-500/50 hover:border-purple-400 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg">
             <span class="text-lg">🔮</span>
         </button>
         <!-- 研磨阶段符文发射器按钮 -->
-        <button onclick="game.ui_openRuneLauncher()" class="absolute bottom-36 right-2 w-10 h-10 bg-slate-800/90 hover:bg-purple-900/80 rounded-full border-2 border-purple-600/60 hover:border-purple-300 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg" title="符文發射器">
+        <!-- bottom-44 = 176px，高于充能条(bottom:145px)，确保不与充能条重叠 -->
+        <button onclick="game.ui_openRuneLauncher()" class="absolute bottom-44 right-2 w-10 h-10 bg-slate-800/90 hover:bg-purple-900/80 rounded-full border-2 border-purple-600/60 hover:border-purple-300 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg" title="符文發射器">
             <span class="text-lg">⚡</span>
         </button>
 
