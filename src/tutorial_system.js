@@ -167,22 +167,26 @@ const TUTORIAL_STEPS = [
         actionFn: null,
     },
     // ── 第 6 步：战斗阶段 ─────────────────────────────────────────────────────
+    // noOverlay: true  → 不遮挡界面，玩家可直接操作
+    // position: 'bottom-fixed' → 固定在底部，不遮挡战斗区域
+    // waitForEvent: UI_AMMO_FIRED → 等玩家真正发射一颗子弹后自动推进
     {
         id: 'combat_intro',
         phase: 'combat',
         targetId: null,
         highlightSelector: null,
-        title: '战斗阶段',
+        title: '战斗阶段 — 发射子弹！',
         content: `
-            <p>弹珠装载完毕，自动进入<strong>战斗阶段</strong>！</p>
-            <p class="mt-2">你在研磨阶段积累的子弹效果将对敌人造成攻击。</p>
-            <p class="mt-2">消灭所有敌人后，进入下一回合的研磨。</p>
-            <p class="mt-2 text-red-300/80 text-xs">⚠️ 若敌人到达底部，游戏结束！</p>
+            <p>弹珠装载完毕，进入<strong>战斗阶段</strong>！</p>
+            <p class="mt-2"><strong>🎯 如何发射子弹：</strong></p>
+            <p class="mt-1 text-cyan-300">在画布上<strong>按住并拖拽</strong>，瞄准敌人后<strong>松手</strong>即可发射。</p>
+            <p class="mt-2 text-amber-300/80 text-xs">💡 拖拽方向决定发射角度，消灭所有敌人后进入下一回合</p>
+            <p class="mt-1 text-red-300/80 text-xs">⚠️ 若敌人到达底部，游戏结束！</p>
         `,
-        position: 'center',
-        noOverlay: false,
-        waitForEvent: EVENT_TYPES.PHASE_CHANGED,
-        waitForEventFilter: (data) => data && data.to === 'gathering',
+        position: 'bottom-fixed',
+        noOverlay: true,
+        waitForEvent: EVENT_TYPES.UI_AMMO_FIRED,
+        waitForEventFilter: null,
         autoAdvance: true,
         actionLabel: null,
         actionFn: null,
