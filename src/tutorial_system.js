@@ -61,8 +61,8 @@ const TUTORIAL_STEPS = [
         actionLabel: null,
         actionFn: null,
     },
-    // ── 第 1 步：开始游戏按钮 ─────────────────────────────────────────────────
-    // 高亮「開始煉成」按钮，玩家点击后触发 PHASE_CHANGED → relic，自动前进到第 2 步
+    // ── 第 1 步：开始游戏按鈕 ─────────────────────────────────────────────────────
+    // 高亮「開始練成」按鈕，卡片提示玩家直接点击即可，教程等待事件自动前进
     {
         id: 'start_run',
         phase: 'meta',
@@ -70,18 +70,18 @@ const TUTORIAL_STEPS = [
         highlightSelector: 'button[onclick="game.meta_startRun()"]',
         title: '开始一局游戏',
         content: `
-            <p>点击下方的「<strong>開始煉成</strong>」按钮，开始新的一局冒险。</p>
+            <p>点击高亮的「<strong>開始練成</strong>」按鈕，开始新的一局冒险。</p>
             <p class="mt-2">每一局都是独立的旅程，你需要收集弹珠、击败敌人。</p>
+            <p class="mt-2 text-amber-300/80 text-xs">↑ 直接点击上方按鈕，教程自动继续</p>
         `,
         position: 'top',
         noOverlay: false,
         waitForEvent: EVENT_TYPES.PHASE_CHANGED,
         waitForEventFilter: (data) => data && data.to === 'relic',
         autoAdvance: true,
-        actionLabel: '点击「開始煉成」▶',
-        actionFn: 'meta_startRun',
-    },
-    // ── 第 2 步：遗物选择 ─────────────────────────────────────────────────────
+        actionLabel: null,
+        actionFn: null,
+    }, // ── 第 2 步：遗物选择 ─────────────────────────────────────────────────────
     // 遗物面板全屏显示，卡片固定在底部中央，避免遮挡遗物
     {
         id: 'relic_selection',
@@ -129,16 +129,17 @@ const TUTORIAL_STEPS = [
         highlightSelector: '#confirm-selection-btn',
         title: '确认选择，开始研磨！',
         content: `
-            <p>选好 3 枚弹珠后，点击「<strong>開始煉金</strong>」进入研磨阶段。</p>
+            <p>选好 3 枚弹珠后，点击高亮的「<strong>開始練金</strong>」按鈕进入研磨阶段。</p>
             <p class="mt-2">研磨阶段中，你的弹珠将在钉盘中弹跳，装载战斗子弹。</p>
+            <p class="mt-2 text-amber-300/80 text-xs">↑ 直接点击上方按鈕，教程自动继续</p>
         `,
         position: 'top',
         noOverlay: false,
         waitForEvent: EVENT_TYPES.PHASE_CHANGED,
         waitForEventFilter: (data) => data && data.to === 'gathering',
         autoAdvance: true,
-        actionLabel: '选好后点击「開始煉金」▶',
-        actionFn: null,   // 不自动触发，等玩家自己操作
+        actionLabel: null,
+        actionFn: null,
     },
     // ── 第 5 步：研磨阶段说明 ─────────────────────────────────────────────────
     // 取消遮罩，让玩家能直接操作钉板
