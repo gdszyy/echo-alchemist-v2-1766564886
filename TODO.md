@@ -61,3 +61,6 @@
   - 修复了 `systems.js` 和 `shop.js` 在缺失 DOM 元素时的脚本中断问题。
   - 统一了商店购买接口 `meta_buyUpgrade` 的命名与参数传递。
   - 补全了 `systems.js` 中 `UIManager`、`TruthBook`、`TrainingGround` 的空值防御。
+- [x] **BugFix 4.2** 修复 `src/ui_system.js` 语法错误 ✅
+  - 修复了 `src/ui_system.js` 因缺失闭合括号 `};` 导致的 `Uncaught SyntaxError: Unexpected end of input`。
+  - 验证了项目中所有 `.js` 文件的语法完整性。
