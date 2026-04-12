@@ -1736,6 +1736,330 @@ class Enemy {
             ctx.restore();
         }
 
+        // === Layer 6.5: Boss 专属视觉特效 (Devourer & Ouroboros) ===
+
+        // **Devourer 噬神者: 漏斗缺口状态动画**
+        if (this.type === 'boss' && this.bossType === 'devourer' && this.collisionShape === 'arc') {
+            ctx.save();
+            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            const devTime = Date.now() / 1000;
+            const devRadius = this.collisionData ? this.collisionData.radius : (this.width * 0.35);
+            const devThickness = this.collisionData ? this.collisionData.thickness : (this.height * 0.15);
+            const devState = this.devourState || 'IDLE';
+            const devTimer = this.devourTimer || 0;
+
+            if (devState === 'IDLE') {
+                // IDLE: 漏斗缺口闭合，绘制深色凹陷区域
+                ctx.save();
+                ctx.globalAlpha = 0.7;
+                const idleGrad = ctx.createRadialGradient(0, 0, devRadius * 0.3, 0, 0, devRadius * 0.8);
+                idleGrad.addColorStop(0, 'rgba(15, 5, 30, 0.9)');
+                idleGrad.addColorStop(0.6, 'rgba(40, 10, 60, 0.5)');
+                idleGrad.addColorStop(1, 'rgba(60, 20, 80, 0)');
+                ctx.fillStyle = idleGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, devRadius * 0.75, 0, Math.PI * 2);
+                ctx.fill();
+                // 绘制闭合缺口的深色封印线
+                ctx.strokeStyle = 'rgba(80, 20, 120, 0.6)';
+                ctx.lineWidth = 3;
+                ctx.shadowColor = '#4b0082';
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.moveTo(-devRadius * 0.3, -devRadius * 0.1);
+                ctx.lineTo(0, devRadius * 0.15);
+                ctx.lineTo(devRadius * 0.3, -devRadius * 0.1);
+                ctx.stroke();
+                ctx.restore();
+
+            } else if (devState === 'OPENING') {
+                // OPENING: 缺口逐渐扩张，周围出现引力粒子
+                // devourTimer 在 OPENING 状态下为 0（立即转 DEVOURING），用时间做动画
+                const openPulse = (Math.sin(devTime * 8) + 1) * 0.5;
+                const openAngle = Math.PI * 0.25 + openPulse * Math.PI * 0.15; // 缺口角度扩张
+
+                ctx.save();
+                // 绘制扩张中的缺口弧形
+                ctx.strokeStyle = `rgba(138, 43, 226, ${0.5 + openPulse * 0.4})`;
+                ctx.lineWidth = devThickness * 0.6;
+                ctx.shadowColor = '#8b00ff';
+                ctx.shadowBlur = 15 + openPulse * 10;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.arc(0, 0, devRadius, openAngle, Math.PI * 2 - openAngle);
+                ctx.stroke();
+                // 缺口处的扭曲光晕
+                const gapGrad = ctx.createRadialGradient(0, devRadius * 0.1, 0, 0, devRadius * 0.1, devRadius * 0.5);
+                gapGrad.addColorStop(0, `rgba(75, 0, 130, ${0.6 + openPulse * 0.3})`);
+                gapGrad.addColorStop(1, 'rgba(75, 0, 130, 0)');
+                ctx.fillStyle = gapGrad;
+                ctx.beginPath();
+                ctx.arc(0, devRadius * 0.1, devRadius * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                // 引力粒子（每帧随机生成）
+                if (typeof game !== 'undefined' && Math.random() < 0.4) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = devRadius * (1.2 + Math.random() * 0.8);
+                    const px = this.pos.x + Math.cos(angle) * dist;
+                    const py = this.pos.y + this.bumpOffsetY + Math.sin(angle) * dist;
+                    const gravP = new Particle(px, py, '#9333ea', 'spark');
+                    gravP.vel.x = (this.pos.x - px) * 0.08;
+                    gravP.vel.y = (this.pos.y + this.bumpOffsetY - py) * 0.08;
+                    gravP.drag = 0.95;
+                    gravP.gravity = 0;
+                    gravP.decay = 0.04;
+                    gravP.size = Math.random() * 2 + 1;
+                    game.spawn_pushParticleWithLimit(gravP);
+                }
+
+            } else if (devState === 'DEVOURING') {
+                // DEVOURING: 全口张开，绘制紫黑色光芒 + 吸入粒子特效
+                const devourPulse = (Math.sin(devTime * 12) + 1) * 0.5;
+
+                ctx.save();
+                // 外层紫黑色 radialGradient 光芒
+                const devourGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, devRadius * 1.4);
+                devourGrad.addColorStop(0, `rgba(20, 0, 40, ${0.9 + devourPulse * 0.1})`);
+                devourGrad.addColorStop(0.3, `rgba(75, 0, 130, ${0.7 + devourPulse * 0.2})`);
+                devourGrad.addColorStop(0.7, `rgba(139, 0, 139, ${0.3 + devourPulse * 0.3})`);
+                devourGrad.addColorStop(1, 'rgba(75, 0, 130, 0)');
+                ctx.fillStyle = devourGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, devRadius * 1.4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 内层深渊核心
+                const voidGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, devRadius * 0.5);
+                voidGrad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+                voidGrad.addColorStop(0.5, 'rgba(20, 0, 40, 0.9)');
+                voidGrad.addColorStop(1, 'rgba(75, 0, 130, 0)');
+                ctx.fillStyle = voidGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, devRadius * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 脉冲光环
+                ctx.strokeStyle = `rgba(180, 0, 255, ${0.6 + devourPulse * 0.4})`;
+                ctx.lineWidth = 3 + devourPulse * 3;
+                ctx.shadowColor = '#9400d3';
+                ctx.shadowBlur = 25 + devourPulse * 20;
+                ctx.beginPath();
+                ctx.arc(0, 0, devRadius * (0.9 + devourPulse * 0.1), 0, Math.PI * 2);
+                ctx.stroke();
+
+                // 旋转能量线
+                const lineCount = 6;
+                for (let li = 0; li < lineCount; li++) {
+                    const lineAngle = devTime * 3 + (li / lineCount) * Math.PI * 2;
+                    const lineGrad = ctx.createLinearGradient(
+                        Math.cos(lineAngle) * devRadius * 1.2, Math.sin(lineAngle) * devRadius * 1.2,
+                        0, 0
+                    );
+                    lineGrad.addColorStop(0, 'rgba(139, 0, 139, 0)');
+                    lineGrad.addColorStop(1, `rgba(200, 0, 255, ${0.5 + devourPulse * 0.3})`);
+                    ctx.strokeStyle = lineGrad;
+                    ctx.lineWidth = 1.5;
+                    ctx.shadowBlur = 8;
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(lineAngle) * devRadius * 1.2, Math.sin(lineAngle) * devRadius * 1.2);
+                    ctx.lineTo(0, 0);
+                    ctx.stroke();
+                }
+                ctx.restore();
+
+                // 吸入粒子特效（高密度）
+                if (typeof game !== 'undefined' && Math.random() < 0.7) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = devRadius * (1.5 + Math.random() * 1.0);
+                    const px = this.pos.x + Math.cos(angle) * dist;
+                    const py = this.pos.y + this.bumpOffsetY + Math.sin(angle) * dist;
+                    const suckP = new Particle(px, py, Math.random() < 0.5 ? '#9333ea' : '#c084fc', 'spark');
+                    suckP.vel.x = (this.pos.x - px) * 0.12;
+                    suckP.vel.y = (this.pos.y + this.bumpOffsetY - py) * 0.12;
+                    suckP.drag = 0.93;
+                    suckP.gravity = 0;
+                    suckP.decay = 0.035;
+                    suckP.size = Math.random() * 3 + 1;
+                    game.spawn_pushParticleWithLimit(suckP);
+                }
+                // 额外的暗色烟雾粒子
+                if (typeof game !== 'undefined' && Math.random() < 0.3) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = devRadius * (0.6 + Math.random() * 0.4);
+                    const px = this.pos.x + Math.cos(angle) * dist;
+                    const py = this.pos.y + this.bumpOffsetY + Math.sin(angle) * dist;
+                    const smokeP = new Particle(px, py, '#4b0082', 'mist');
+                    smokeP.vel.x = (this.pos.x - px) * 0.05;
+                    smokeP.vel.y = (this.pos.y + this.bumpOffsetY - py) * 0.05;
+                    smokeP.drag = 0.97;
+                    smokeP.gravity = -0.01;
+                    smokeP.decay = 0.02;
+                    smokeP.size = Math.random() * 10 + 6;
+                    game.spawn_pushParticleWithLimit(smokeP);
+                }
+
+            } else if (devState === 'COOLDOWN') {
+                // COOLDOWN: 缺口闭合，绘制红色警示光晕
+                const coolPulse = (Math.sin(devTime * 6) + 1) * 0.5;
+
+                ctx.save();
+                // 红色警示光晕（外层）
+                const coolGrad = ctx.createRadialGradient(0, 0, devRadius * 0.4, 0, 0, devRadius * 1.2);
+                coolGrad.addColorStop(0, 'rgba(220, 20, 60, 0)');
+                coolGrad.addColorStop(0.5, `rgba(220, 20, 60, ${0.2 + coolPulse * 0.3})`);
+                coolGrad.addColorStop(1, 'rgba(220, 20, 60, 0)');
+                ctx.fillStyle = coolGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, devRadius * 1.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 警示脉冲环
+                ctx.strokeStyle = `rgba(255, 50, 50, ${0.5 + coolPulse * 0.5})`;
+                ctx.lineWidth = 2 + coolPulse * 2;
+                ctx.shadowColor = '#ff1a1a';
+                ctx.shadowBlur = 12 + coolPulse * 15;
+                ctx.beginPath();
+                ctx.arc(0, 0, devRadius * (0.85 + coolPulse * 0.1), 0, Math.PI * 2);
+                ctx.stroke();
+
+                // 闭合弧形（表示缺口正在收缩）
+                ctx.strokeStyle = `rgba(255, 100, 100, ${0.4 + coolPulse * 0.3})`;
+                ctx.lineWidth = devThickness * 0.5;
+                ctx.lineCap = 'round';
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.arc(0, 0, devRadius, Math.PI * 0.15, Math.PI * 1.85);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            ctx.restore();
+        }
+
+        // **Ouroboros 永恒回声: 旋转环形缺口 + 狂暴残影 + 缺口核心**
+        if (this.type === 'boss' && this.bossType === 'ouroboros' && this.collisionShape === 'arc') {
+            ctx.save();
+            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            const ouroTime = Date.now() / 1000;
+            const ouroRadius = this.collisionData ? this.collisionData.radius : (this.width * 0.4);
+            const ouroThickness = this.collisionData ? this.collisionData.thickness : (this.height * 0.2);
+            const gapAngle = this.gapAngle || 0;
+            const gapSize = Math.PI * 0.5; // 缺口角度（90度）
+            const arcStart = gapAngle + gapSize; // 实体弧起始角
+            const arcEnd = gapAngle + Math.PI * 2; // 实体弧结束角（绕回缺口前）
+            const isBerserk = (this.hp / this.maxHp) < 0.5;
+            const ringPulse = (Math.sin(ouroTime * (isBerserk ? 4 : 2)) + 1) * 0.5;
+
+            // --- 1. 绘制旋转残影（狂暴时多层半透明历史弧）---
+            if (isBerserk) {
+                const trailCount = 5;
+                for (let ti = 0; ti < trailCount; ti++) {
+                    const trailOffset = (ti + 1) * (Math.PI * 0.12); // 每层残影偏移角度
+                    const trailAlpha = (1 - (ti + 1) / (trailCount + 1)) * 0.35;
+                    const trailStart = arcStart - trailOffset;
+                    const trailEnd = arcEnd - trailOffset;
+
+                    ctx.save();
+                    ctx.globalAlpha = trailAlpha;
+                    ctx.strokeStyle = '#a855f7'; // 紫色残影
+                    ctx.lineWidth = ouroThickness * 0.7;
+                    ctx.lineCap = 'butt';
+                    ctx.shadowColor = '#7c3aed';
+                    ctx.shadowBlur = 8;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, ouroRadius, trailStart, trailEnd);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+
+            // --- 2. 绘制主环形实体（带缺口）---
+            ctx.save();
+            // 主环颜色：狂暴时更亮更紫
+            const ringColor = isBerserk ? '#c084fc' : '#818cf8';
+            const ringGlowColor = isBerserk ? '#9333ea' : '#6366f1';
+            ctx.strokeStyle = ringColor;
+            ctx.lineWidth = ouroThickness;
+            ctx.lineCap = 'butt';
+            ctx.shadowColor = ringGlowColor;
+            ctx.shadowBlur = 12 + ringPulse * 10;
+            ctx.globalAlpha = 0.85 + ringPulse * 0.15;
+            ctx.beginPath();
+            ctx.arc(0, 0, ouroRadius, arcStart, arcEnd);
+            ctx.stroke();
+
+            // 内层高光
+            ctx.strokeStyle = isBerserk ? 'rgba(233, 213, 255, 0.5)' : 'rgba(199, 210, 254, 0.35)';
+            ctx.lineWidth = ouroThickness * 0.3;
+            ctx.shadowBlur = 5;
+            ctx.beginPath();
+            ctx.arc(0, 0, ouroRadius - ouroThickness * 0.15, arcStart, arcEnd);
+            ctx.stroke();
+            ctx.restore();
+
+            // --- 3. 缺口处绘制发光核心（攻击目标提示）---
+            // 缺口中心角度
+            const gapCenterAngle = gapAngle + gapSize * 0.5;
+            const coreX = Math.cos(gapCenterAngle) * ouroRadius;
+            const coreY = Math.sin(gapCenterAngle) * ouroRadius;
+            const corePulse = (Math.sin(ouroTime * (isBerserk ? 8 : 4)) + 1) * 0.5;
+            const coreRadius = ouroThickness * (0.5 + corePulse * 0.3);
+
+            ctx.save();
+            // 核心发光球
+            const coreGrad = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, coreRadius * 2);
+            coreGrad.addColorStop(0, isBerserk ? 'rgba(255, 200, 255, 1)' : 'rgba(200, 220, 255, 1)');
+            coreGrad.addColorStop(0.3, isBerserk ? 'rgba(200, 50, 255, 0.9)' : 'rgba(100, 130, 255, 0.8)');
+            coreGrad.addColorStop(1, 'rgba(100, 50, 200, 0)');
+            ctx.fillStyle = coreGrad;
+            ctx.shadowColor = isBerserk ? '#ff00ff' : '#818cf8';
+            ctx.shadowBlur = 15 + corePulse * 15;
+            ctx.beginPath();
+            ctx.arc(coreX, coreY, coreRadius * 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 核心闪烁光点
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.arc(coreX, coreY, coreRadius * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 狂暴时核心周围添加旋转光环
+            if (isBerserk) {
+                ctx.strokeStyle = `rgba(255, 100, 255, ${0.4 + corePulse * 0.5})`;
+                ctx.lineWidth = 1.5;
+                ctx.shadowColor = '#ff00ff';
+                ctx.shadowBlur = 10;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.arc(coreX, coreY, coreRadius * 2.5, ouroTime * 3, ouroTime * 3 + Math.PI * 1.5);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+            ctx.restore();
+
+            // --- 4. 缺口两端的能量断口特效 ---
+            const endAngles = [arcStart, arcEnd];
+            endAngles.forEach(endAngle => {
+                const ex = Math.cos(endAngle) * ouroRadius;
+                const ey = Math.sin(endAngle) * ouroRadius;
+                const endGrad = ctx.createRadialGradient(ex, ey, 0, ex, ey, ouroThickness * 0.8);
+                endGrad.addColorStop(0, isBerserk ? 'rgba(255, 150, 255, 0.8)' : 'rgba(150, 180, 255, 0.7)');
+                endGrad.addColorStop(1, 'rgba(100, 50, 200, 0)');
+                ctx.fillStyle = endGrad;
+                ctx.shadowColor = isBerserk ? '#cc00cc' : '#6366f1';
+                ctx.shadowBlur = 10 + ringPulse * 8;
+                ctx.beginPath();
+                ctx.arc(ex, ey, ouroThickness * 0.8, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            ctx.restore();
+        }
+
         // === Layer 8: Boss 入场动画特效 ===
         if (this.type === 'boss' && this.entranceTimer > 0) {
             const t = this.entranceTimer;
