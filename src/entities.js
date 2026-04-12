@@ -1062,7 +1062,9 @@ class DropBall {
                 if (Math.random() < chance) {
                     
                     // === 逻辑 A: 突变 (Mutation) ===
-                    if (rule.type === 'mutation') {
+                    // [修复] 没有激活词条时禁止变异：变异属于高级机制，需要词条解锁
+                    const hasActiveRunewords = game.activeRunewordEffects && Object.keys(game.activeRunewordEffects).length > 0;
+                    if (rule.type === 'mutation' && hasActiveRunewords) {
                         // [全场唯一性检查]
                         // 只有 flying_sword 需要全场唯一性检查
                         const needsUniqueness = (rule.result === 'flying_sword' || rule.result === 'wind');

@@ -613,7 +613,7 @@ const CONFIG = {
         relicChoiceNum:4,
         enemyCols:6,
         cols: 10,           // 网格列数 
-        rows: 6,           // 钉子行数
+        rows: 5,           // 钉子行数
         spacingX: 35,      // 钉子水平间距
         spacingY: 32,      // 钉子垂直间距
         startRows: 4,       // 初始生成的敌人行数

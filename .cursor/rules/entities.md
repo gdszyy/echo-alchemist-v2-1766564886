@@ -45,6 +45,8 @@
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
+| 2026-04-12 | `src/entities.js` | **变异需要词条解锁**：`DropBall.handlePegInteraction` 中的突变（Mutation）分支新增前置条件检查 `hasActiveRunewords`（即 `game.activeRunewordEffects` 不为空）。没有激活词条时禁止变异，变异属于高级机制需要词条解锁。升级（Upgrade）分支不受影响。 |
+|------|------|----------|
 | 2026-04-12 | `src/entities.js`, `src/game_phase.js` | **SpecialSlot 双钉子连线模式重设计**：`SpecialSlot` 类构造函数参数从 `(x, y, width, type)` 改为 `(x, y, x2, y2, type)`，代表两个钉子的坐标而非单个钉子的圆心+宽度。`draw()` 方法改为在两钉子间绘制流动虚线发光连线，并在中点显示符号背景圆。`DropBall.update` 中的碰撞检测从矩形包围盒改为圆心到线段的最短距离检测（阈值 = `ball.radius + slot.height`）。`game_phase.js` 的生成逻辑改为选取一对相邻钉子（距离 ≤ `spacingX * 1.6`）并存储 `slot.pegIndex2`。 |
 |------|------|----------|
 | 2026-04-11 | `src/entities.js` | `DropBall.update`：当 `this.radius > CONFIG.physics.marbleRadius`（即处于倍化状态）时，使用 `friction + 0.005`（上限 0.998）替代默认摩擦力，减少卡墙概率 |
