@@ -516,6 +516,7 @@ class Peg {
         this.row = -1;
         this.col = -1;
         this.mirrorIdx = -1; // 存储镜像钉子在 game.pegs 中的索引
+        this.frozenTurns = 0;  // Glacies 狂暴冻结剩余回合数（> 0 时不可触发）
     }
     getColor() {
         let color = CONFIG.colors.peg;
@@ -769,6 +770,26 @@ class Peg {
         // 特殊绘制：如果是风属性钉子，绘制风旋图标
         if (this.type === 'wind') {
             this.drawWindPeg(ctx, currentRadius, isLit);
+        }
+
+        // [Glacies 狂暴] 冻结 Peg 蓝色光晕
+        if (this.frozenTurns > 0) {
+            const pulse = (Math.sin(Date.now() / 400) + 1) / 2;
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(this.pos.x, this.pos.y, currentRadius + 3 + pulse * 2, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(56, 189, 248, ${0.6 + pulse * 0.4})`; // 冰蓝色
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 10 + pulse * 8;
+            ctx.shadowColor = '#38bdf8';
+            ctx.stroke();
+            // 绘制冻结回合数角标
+            ctx.font = 'bold 7px sans-serif';
+            ctx.fillStyle = '#a5f3fc';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(this.frozenTurns, this.pos.x + currentRadius * 0.8, this.pos.y - currentRadius * 0.8);
+            ctx.restore();
         }
 
         // --- 2. 绘制光照反光 (Rim Light) ---
@@ -1498,7 +1519,7 @@ class DropBall {
                         this.vel.x += (Math.random() - 0.5) * 0.5;
                     }
 
-                    if (peg.cooldownTimer <= 0) {
+                    if (peg.cooldownTimer <= 0 && peg.frozenTurns <= 0) {
                         // --- [关键修改：传递速度参数] ---
                         const impactSpeedVal = impactVel.mag(); 
                         peg.hit(impactSpeedVal);

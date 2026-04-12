@@ -765,6 +765,15 @@ phase_gathering_getRandomPegType() {
             this.runeLootItems = [];
         }
 
+        // --- [Glacies 狂暴] Peg 冻结回合数递减 ---
+        if (this.pegs && Array.isArray(this.pegs)) {
+            this.pegs.forEach(peg => {
+                if (peg && peg.frozenTurns > 0) {
+                    peg.frozenTurns--;
+                }
+            });
+        }
+
         // --- 以下保持原有的回合结算逻辑 ---
         
         // =========================================

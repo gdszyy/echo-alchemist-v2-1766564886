@@ -2282,6 +2282,8 @@ export const combat_system = {
             case 'glacies':
                 // 狂暴后每回合跳跃 3 行
                 boss._berserkedJumpRows = bossCfg.berserkedJumpRows || 3;
+                // 狂暴后跳跃落地时冻结周围 Peg
+                boss._berserkedFreezePegs = true;
                 break;
 
             case 'mikro':

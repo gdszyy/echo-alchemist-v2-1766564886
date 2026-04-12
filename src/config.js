@@ -542,6 +542,7 @@ const CONFIG = {
                 weakness: ['cryo', 'pierce'],
                 jumpRowsBonus: 2,         // 额外跳跃行数
                 berserkedJumpRows: 3,     // 狂暴后每回合跳跃行数
+                berserkedFreezePegRadius: 120, // 狂暴后跳跃落地冻结周围 Peg 的范围（像素）
                 themeWeights: { cryo: 1.5, pierce: 1.3 }
             },
             mikro: {

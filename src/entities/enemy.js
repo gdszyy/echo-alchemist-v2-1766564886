@@ -747,6 +747,10 @@ class Enemy {
                         game.spawn_createFloatingText(this.pos.x, this.pos.y, 'JUMP!', '#38bdf8');
                         game.spawn_createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist');
                         audio.playEffect('split');
+                        // [Glacies 狂暴] 落地后冻结周围 Peg
+                        if (this.type === 'boss' && this.bossType === 'glacies' && this._berserkedFreezePegs) {
+                            this._glaciesFreezePegsOnLanding(game);
+                        }
                     } else {
                         this.bumpOffsetY = -10;
                         if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
@@ -863,6 +867,10 @@ class Enemy {
                         this.bumpOffsetY = -30;
                         game.spawn_createFloatingText(this.pos.x, this.pos.y, 'JUMP!', '#38bdf8');
                         game.spawn_createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist');
+                        // [Glacies 狂暴] 落地后冻结周围 Peg
+                        if (this.type === 'boss' && this.bossType === 'glacies' && this._berserkedFreezePegs) {
+                            this._glaciesFreezePegsOnLanding(game);
+                        }
                     } else {
                         this.bumpOffsetY = -10;
                         if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
@@ -948,6 +956,37 @@ class Enemy {
                 newAffixes: this.affixes,
                 rotationIndex: this.rotationIndex
             });
+        }
+    }
+
+    /**
+     * @method _glaciesFreezePegsOnLanding
+     * @description [Glacies 狂暴] 跳跃落地时，冻结周围一定范围内的 Peg，持续 2 回合。
+     * @param {object} game - 游戏实例
+     */
+    _glaciesFreezePegsOnLanding(game) {
+        const bossConfigs = CONFIG.balance.bossConfigs;
+        const bossCfg = bossConfigs ? bossConfigs.glacies : null;
+        const radius = (bossCfg && bossCfg.berserkedFreezePegRadius) ? bossCfg.berserkedFreezePegRadius : 120;
+        const FREEZE_TURNS = 2;
+
+        if (!game.pegs || !Array.isArray(game.pegs)) return;
+
+        let frozenCount = 0;
+        game.pegs.forEach(peg => {
+            if (!peg || typeof peg.pos === 'undefined') return;
+            const dx = peg.pos.x - this.pos.x;
+            const dy = peg.pos.y - this.pos.y;
+            if (Math.sqrt(dx * dx + dy * dy) <= radius) {
+                peg.frozenTurns = FREEZE_TURNS;
+                frozenCount++;
+            }
+        });
+
+        if (frozenCount > 0) {
+            game.spawn_createShockwave(this.pos.x, this.pos.y, '#38bdf8');
+            game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, `❄️FREEZE x${frozenCount}`, '#a5f3fc');
+            audio.playEffect('freeze');
         }
     }
 
