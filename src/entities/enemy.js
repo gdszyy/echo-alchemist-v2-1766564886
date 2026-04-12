@@ -1075,35 +1075,206 @@ class Enemy {
             ctx.restore();
         }
 
-        // === Layer 3.5: 内部词缀特效 (clone 细胞斑点) ===
-        if (this.affixes.includes('clone')) {
+        // === Layer 3.5: 内部词缀特效（严格裁剪在方块内，所有词缀统一处理）===
+        if (this.affixes.length > 0) {
             const t35 = Date.now() / 1000;
-            const affixAlpha35 = this.affixes.length > 3 ? 0.8 : 1.0;
-            ctx.save();
-            // 使用 visualSeed 确定斑点位置，保证每个敌人的斑点布局固定
-            const spotPositions = [
-                { x: -w * 0.25, y: -h * 0.15 },
-                { x:  w * 0.20, y:  h * 0.10 },
-                { x: -w * 0.10, y:  h * 0.25 },
-                { x:  w * 0.30, y: -h * 0.25 }
-            ];
-            spotPositions.forEach((sp, i) => {
-                // 收缩/膨胀动态：每个斑点相位不同
-                const pulse = Math.sin(t35 + i * 1.3 + this.visualSeed * 6) * 0.3 + 0.7;
-                const baseR = (3 + this.visualSeed * 3 + i * 1.5) * pulse;
-                // 轻微游离
-                const driftX = Math.sin(t35 * 0.7 + i * 2.1) * 2;
-                const driftY = Math.cos(t35 * 0.5 + i * 1.7) * 2;
-                ctx.beginPath();
-                ctx.arc(sp.x + driftX, sp.y + driftY, Math.max(1, baseR), 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(192, 132, 252, ${0.25 * affixAlpha35})`; // #c084fc 紫色
-                ctx.fill();
-                // 边缘微光
-                ctx.strokeStyle = `rgba(216, 180, 254, ${0.4 * affixAlpha35})`;
+            // 多词缀时各效果透明度衰减，防止视觉过曝
+            const affixAlpha35 = this.affixes.length > 3 ? 0.65 : (this.affixes.length > 1 ? 0.8 : 1.0);
+
+            // --- shield: 内壁蜂巢格纹（护盾=防御格栅）浅蓝色六边形网格 ---
+            if (this.affixes.includes('shield') && this.shieldCharges > 0) {
+                ctx.save();
+                const shieldPulse = Math.sin(t35 * 1.2) * 0.15 + 0.35;
+                ctx.globalAlpha = shieldPulse * affixAlpha35;
+                ctx.strokeStyle = '#93c5fd';
                 ctx.lineWidth = 1;
-                ctx.stroke();
-            });
-            ctx.restore();
+                const hexR = 8;
+                const hexW = hexR * Math.sqrt(3);
+                const hexH = hexR * 2;
+                for (let row = -2; row <= 3; row++) {
+                    for (let col = -3; col <= 3; col++) {
+                        const hx = col * hexW + (row % 2 === 0 ? 0 : hexW / 2);
+                        const hy = row * hexH * 0.75;
+                        if (Math.abs(hx) > w / 2 + hexR || Math.abs(hy) > h / 2 + hexR) continue;
+                        ctx.beginPath();
+                        for (let k = 0; k < 6; k++) {
+                            const angle = Math.PI / 180 * (60 * k - 30);
+                            const px = hx + hexR * Math.cos(angle);
+                            const py = hy + hexR * Math.sin(angle);
+                            k === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+                        }
+                        ctx.closePath();
+                        ctx.stroke();
+                    }
+                }
+                ctx.restore();
+            }
+
+            // --- regen: 从底部向上涌动的绿色液体波纹（回血=液体涌动）---
+            if (this.affixes.includes('regen')) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                const regenPhase = (t35 * 0.6) % 1;
+                for (let wave = 0; wave < 3; wave++) {
+                    const wavePhase = (regenPhase + wave / 3) % 1;
+                    const waveY = h / 2 - wavePhase * h * 1.2;
+                    const waveAlpha = (1 - Math.abs(wavePhase - 0.5) * 2) * 0.35 * affixAlpha35;
+                    if (waveAlpha <= 0) continue;
+                    const grad = ctx.createLinearGradient(0, waveY - 8, 0, waveY + 8);
+                    grad.addColorStop(0, `rgba(74, 222, 128, 0)`);
+                    grad.addColorStop(0.5, `rgba(74, 222, 128, ${waveAlpha})`);
+                    grad.addColorStop(1, `rgba(74, 222, 128, 0)`);
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(-w / 2, waveY - 8, w, 16);
+                }
+                ctx.restore();
+            }
+
+            // --- haste: 横向扫过的速度残影线（极速=运动模糊）金黄色 ---
+            if (this.affixes.includes('haste')) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                const hastePhase = (t35 * 2.5 + this.visualSeed * 3) % 1;
+                const lineAlpha = Math.sin(hastePhase * Math.PI) * 0.5 * affixAlpha35;
+                ctx.globalAlpha = lineAlpha;
+                const lineY = -h / 2 + hastePhase * h;
+                const grad = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
+                grad.addColorStop(0, 'rgba(250, 204, 21, 0)');
+                grad.addColorStop(0.3, 'rgba(250, 204, 21, 0.9)');
+                grad.addColorStop(0.7, 'rgba(250, 204, 21, 0.9)');
+                grad.addColorStop(1, 'rgba(250, 204, 21, 0)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(-w / 2, lineY - 1.5, w, 3);
+                const phase2 = (hastePhase + 0.4) % 1;
+                const lineY2 = -h / 2 + phase2 * h;
+                ctx.globalAlpha = Math.sin(phase2 * Math.PI) * 0.3 * affixAlpha35;
+                ctx.fillRect(-w / 2, lineY2 - 1, w, 2);
+                ctx.restore();
+            }
+
+            // --- devour: 从四周向中心收缩的暗红色漩涡（吞噬=向心力）---
+            if (this.affixes.includes('devour')) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'multiply';
+                const devourAngle = t35 * 1.8 + this.visualSeed * Math.PI;
+                ctx.globalAlpha = 0.55 * affixAlpha35;
+                for (let arm = 0; arm < 4; arm++) {
+                    const armAngle = devourAngle + arm * Math.PI / 2;
+                    const startR = Math.max(w, h) * 0.6;
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(armAngle) * startR, Math.sin(armAngle) * startR);
+                    ctx.quadraticCurveTo(
+                        Math.cos(armAngle + 0.8) * startR * 0.4,
+                        Math.sin(armAngle + 0.8) * startR * 0.4,
+                        0, 0
+                    );
+                    const armGrad = ctx.createLinearGradient(
+                        Math.cos(armAngle) * startR, Math.sin(armAngle) * startR, 0, 0
+                    );
+                    armGrad.addColorStop(0, 'rgba(153, 27, 27, 0)');
+                    armGrad.addColorStop(1, 'rgba(220, 38, 38, 0.8)');
+                    ctx.strokeStyle = armGrad;
+                    ctx.lineWidth = 2.5;
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // --- healer: 十字形脉冲扩散波（治疗=医疗脉冲）粉色，从中心向外 ---
+            if (this.affixes.includes('healer')) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                const healPhase = (t35 * 0.8 + this.visualSeed) % 1;
+                const healAlpha = (1 - healPhase) * 0.5 * affixAlpha35;
+                ctx.globalAlpha = healAlpha;
+                const crossW = 6 * (1 - healPhase * 0.5);
+                const crossGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(w, h) * 0.6 * healPhase + 1);
+                crossGrad.addColorStop(0, 'rgba(244, 114, 182, 0.9)');
+                crossGrad.addColorStop(1, 'rgba(244, 114, 182, 0)');
+                ctx.fillStyle = crossGrad;
+                ctx.fillRect(-crossW / 2, -h / 2, crossW, h);
+                ctx.fillRect(-w / 2, -crossW / 2, w, crossW);
+                ctx.restore();
+            }
+
+            // --- jump: 底部弹力压缩线（跳跃=弹簧压缩）青色，底部区域 ---
+            if (this.affixes.includes('jump')) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                const jumpBounce = Math.abs(Math.sin(t35 * 1.5 + this.visualSeed * 2));
+                const lineCount = 4;
+                for (let li = 0; li < lineCount; li++) {
+                    const lineProgress = li / lineCount;
+                    const lineY = h / 2 - lineProgress * h * 0.28 * (1 - jumpBounce * 0.4);
+                    const lineW = w * (1 - lineProgress * 0.4);
+                    const lineAlpha2 = (1 - lineProgress) * 0.7 * (jumpBounce * 0.4 + 0.15) * affixAlpha35;
+                    ctx.globalAlpha = lineAlpha2;
+                    ctx.strokeStyle = '#2dd4bf';
+                    ctx.lineWidth = 1.5 - lineProgress * 0.5;
+                    ctx.beginPath();
+                    ctx.moveTo(-lineW / 2, lineY);
+                    ctx.lineTo(lineW / 2, lineY);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // --- clone: 细胞斑点（分身=细胞分裂），增强质感 ---
+            if (this.affixes.includes('clone')) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                const spotPositions = [
+                    { x: -w * 0.28, y: -h * 0.18 },
+                    { x:  w * 0.22, y:  h * 0.12 },
+                    { x: -w * 0.08, y:  h * 0.28 },
+                    { x:  w * 0.32, y: -h * 0.28 },
+                    { x:  w * 0.05, y: -h * 0.05 }
+                ];
+                spotPositions.forEach((sp, i) => {
+                    const pulse = Math.sin(t35 * 0.9 + i * 1.3 + this.visualSeed * 6) * 0.3 + 0.7;
+                    const baseR = (4 + this.visualSeed * 4 + i * 1.8) * pulse;
+                    const driftX = Math.sin(t35 * 0.7 + i * 2.1) * 2;
+                    const driftY = Math.cos(t35 * 0.5 + i * 1.7) * 2;
+                    const glowGrad = ctx.createRadialGradient(sp.x + driftX, sp.y + driftY, 0, sp.x + driftX, sp.y + driftY, baseR * 2);
+                    glowGrad.addColorStop(0, `rgba(192, 132, 252, ${0.35 * affixAlpha35})`);
+                    glowGrad.addColorStop(1, 'rgba(192, 132, 252, 0)');
+                    ctx.fillStyle = glowGrad;
+                    ctx.beginPath();
+                    ctx.arc(sp.x + driftX, sp.y + driftY, baseR * 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(sp.x + driftX, sp.y + driftY, Math.max(1.5, baseR), 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(216, 180, 254, ${0.5 * affixAlpha35})`;
+                    ctx.fill();
+                });
+                ctx.restore();
+            }
+
+            // --- berserk: 橙红色燃烧纹路（狂暴=火焰），从底部蔓延 ---
+            if (this.affixes.includes('berserk') && this.temp > 0) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                const berserkIntensity = Math.min(1, this.temp / 100);
+                const berserkPhase = (t35 * 1.5 + this.visualSeed * 2) % 1;
+                const flameH = h * (0.3 + berserkIntensity * 0.5);
+                const grad = ctx.createLinearGradient(0, h / 2, 0, h / 2 - flameH);
+                grad.addColorStop(0, `rgba(239, 68, 68, ${0.6 * berserkIntensity * affixAlpha35})`);
+                grad.addColorStop(0.5, `rgba(249, 115, 22, ${0.3 * berserkIntensity * affixAlpha35})`);
+                grad.addColorStop(1, 'rgba(251, 191, 36, 0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.moveTo(-w / 2, h / 2);
+                const steps = 12;
+                for (let si = 0; si <= steps; si++) {
+                    const sx = -w / 2 + (si / steps) * w;
+                    const flameTop = h / 2 - flameH * (0.6 + Math.sin(berserkPhase * Math.PI * 2 + si * 0.8) * 0.4);
+                    ctx.lineTo(sx, flameTop);
+                }
+                ctx.lineTo(w / 2, h / 2);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
         }
 
         // === Layer 4: 裂纹绘制 (Fissures) - [保持不变] ===
@@ -1224,7 +1395,7 @@ class Enemy {
             ctx.restore();
         }
 
-        // 文字层：移除 emoji 角标，保留血量数字显示（emoji 角标已由 Layer 8 词缀光环替代）
+        // 文字层：保留血量数字显示
         // [修复] 即使被冻结也显示生命值数字，除非生命值为 0
         if (this.displayHp > 0) {
             ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; 
@@ -1442,172 +1613,6 @@ class Enemy {
             ctx.moveTo(-hw + bracketSize, hh); ctx.lineTo(-hw, hh); ctx.lineTo(-hw, hh - bracketSize);
             ctx.stroke();
             ctx.restore();
-        }
-
-        // === Layer 8: 外部词缀光环层 ===
-        // 绘制在 Layer 7 扫描反馈之后，常驻可见
-        if (this.affixes.length > 0) {
-            const t8 = Date.now() / 1000;
-            // 多词缀叠加透明度衰减规则
-            const affixAlpha = this.affixes.length > 3 ? 0.8 : 1.0;
-            const ex = this.pos.x;
-            const ey = this.pos.y + this.bumpOffsetY;
-
-            // --- shield: 外围六边形虚线框，浅蓝 #93c5fd，呼吸脉冲 (透明度 0.6-0.9) ---
-            if (this.affixes.includes('shield') && this.shieldCharges > 0) {
-                ctx.save();
-                ctx.translate(ex, ey);
-                const shieldPulse = Math.sin(t8) * 0.15 + 0.75;
-                ctx.globalAlpha = shieldPulse * affixAlpha;
-                ctx.strokeStyle = '#93c5fd';
-                ctx.lineWidth = 2;
-                ctx.shadowColor = '#93c5fd';
-                ctx.shadowBlur = 8;
-                ctx.setLineDash([5, 4]);
-                const sx = w / 2 + 8, sy = h / 2 + 8;
-                const cut = 10;
-                ctx.beginPath();
-                ctx.moveTo(-sx + cut, -sy);
-                ctx.lineTo(sx - cut, -sy);
-                ctx.lineTo(sx, -sy + cut);
-                ctx.lineTo(sx, sy - cut);
-                ctx.lineTo(sx - cut, sy);
-                ctx.lineTo(-sx + cut, sy);
-                ctx.lineTo(-sx, sy - cut);
-                ctx.lineTo(-sx, -sy + cut);
-                ctx.closePath();
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.restore();
-            }
-
-            // --- regen: 底部四角藤蔓折线，绿色 #4ade80，末端闪烁 ---
-            if (this.affixes.includes('regen')) {
-                ctx.save();
-                ctx.translate(ex, ey);
-                const regenFlicker = Math.sin(t8 * 2.5 + this.visualSeed * 5) * 0.3 + 0.7;
-                ctx.strokeStyle = '#4ade80';
-                ctx.lineWidth = 1.5;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                const corners = [
-                    { ox: -w/2, oy: h/2, dx: -1, dy: 1 },
-                    { ox:  w/2, oy: h/2, dx:  1, dy: 1 },
-                    { ox: -w/2, oy: h/2 - 10, dx: -1, dy: 1 },
-                    { ox:  w/2, oy: h/2 - 10, dx:  1, dy: 1 }
-                ];
-                corners.forEach((c, i) => {
-                    const alpha = (i < 2 ? 0.7 : 0.4) * affixAlpha;
-                    ctx.globalAlpha = alpha;
-                    ctx.beginPath();
-                    ctx.moveTo(c.ox, c.oy);
-                    ctx.lineTo(c.ox + c.dx * 8, c.oy + c.dy * 5);
-                    ctx.lineTo(c.ox + c.dx * 12, c.oy + c.dy * 12);
-                    ctx.stroke();
-                    ctx.globalAlpha = regenFlicker * alpha;
-                    ctx.fillStyle = '#4ade80';
-                    ctx.beginPath();
-                    ctx.arc(c.ox + c.dx * 12, c.oy + c.dy * 12, 2, 0, Math.PI * 2);
-                    ctx.fill();
-                });
-                ctx.restore();
-            }
-
-            // --- haste: 左右两侧速度线，黄色 #facc15，快速微位移 ---
-            if (this.affixes.includes('haste')) {
-                ctx.save();
-                ctx.translate(ex, ey);
-                const hasteShift = Math.sin(Date.now() / 300) * 3;
-                const lineAlpha = (Math.sin(t8 * 0.8) * 0.2 + 0.6) * affixAlpha;
-                ctx.strokeStyle = '#facc15';
-                ctx.lineWidth = 1.5;
-                ctx.lineCap = 'round';
-                ctx.globalAlpha = lineAlpha;
-                [-1, 1].forEach(side => {
-                    const bx = side * (w / 2 + 6 + hasteShift * side);
-                    [-h * 0.2, h * 0.1].forEach(ly => {
-                        ctx.beginPath();
-                        ctx.moveTo(bx, ly - 8);
-                        ctx.lineTo(bx + side * 6, ly);
-                        ctx.lineTo(bx, ly + 8);
-                        ctx.stroke();
-                    });
-                });
-                ctx.restore();
-            }
-
-            // --- devour: 底部边缘锯齿阴影，暗红 #991b1b，蠕动变化 ---
-            if (this.affixes.includes('devour')) {
-                ctx.save();
-                ctx.translate(ex, ey);
-                ctx.globalAlpha = 0.7 * affixAlpha;
-                ctx.fillStyle = '#991b1b';
-                ctx.beginPath();
-                const toothCount = 7;
-                const toothW = w / toothCount;
-                ctx.moveTo(-w / 2, h / 2);
-                for (let i = 0; i < toothCount; i++) {
-                    const tx = -w / 2 + i * toothW;
-                    const toothH = 6 + Math.sin(t8 * 1.5 + i * 0.9 + this.visualSeed * 4) * 3;
-                    ctx.lineTo(tx + toothW * 0.5, h / 2 + toothH);
-                    ctx.lineTo(tx + toothW, h / 2);
-                }
-                ctx.lineTo(w / 2, h / 2 + 14);
-                ctx.lineTo(-w / 2, h / 2 + 14);
-                ctx.closePath();
-                ctx.fill();
-                ctx.restore();
-            }
-
-            // --- healer: 顶部中心十字星，粉色 #f472b6，缓慢旋转 ---
-            if (this.affixes.includes('healer')) {
-                ctx.save();
-                ctx.translate(ex, ey - h / 2 - 14);
-                const healRot = t8 * 0.5;
-                ctx.rotate(healRot);
-                const healPulse = Math.sin(t8) * 0.2 + 0.7;
-                ctx.globalAlpha = healPulse * affixAlpha;
-                ctx.strokeStyle = '#f472b6';
-                ctx.lineWidth = 2;
-                ctx.lineCap = 'round';
-                ctx.shadowColor = '#f472b6';
-                ctx.shadowBlur = 6;
-                [0, Math.PI / 2, Math.PI, Math.PI * 1.5].forEach(angle => {
-                    ctx.beginPath();
-                    ctx.moveTo(0, 0);
-                    ctx.lineTo(Math.cos(angle) * 8, Math.sin(angle) * 8);
-                    ctx.stroke();
-                });
-                ctx.beginPath();
-                ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
-                ctx.fillStyle = '#f472b6';
-                ctx.fill();
-                ctx.restore();
-            }
-
-            // --- jump: 正下方弧线弹簧，青色 #2dd4bf，曲率周期变化 ---
-            if (this.affixes.includes('jump')) {
-                ctx.save();
-                ctx.translate(ex, ey + h / 2 + 4);
-                const jumpCurve = Math.sin(t8) * 8 + 12;
-                const jumpAlpha = (Math.sin(t8 * 0.7) * 0.2 + 0.6) * affixAlpha;
-                ctx.globalAlpha = jumpAlpha;
-                ctx.strokeStyle = '#2dd4bf';
-                ctx.lineWidth = 2;
-                ctx.lineCap = 'round';
-                ctx.shadowColor = '#2dd4bf';
-                ctx.shadowBlur = 5;
-                [-1, 1].forEach(side => {
-                    ctx.beginPath();
-                    ctx.moveTo(side * w * 0.1, 0);
-                    ctx.quadraticCurveTo(
-                        side * w * 0.3, jumpCurve,
-                        side * w * 0.45, jumpCurve * 0.6
-                    );
-                    ctx.stroke();
-                });
-                ctx.restore();
-            }
         }
 
     }
