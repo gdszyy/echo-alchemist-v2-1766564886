@@ -332,6 +332,24 @@ const RUNEWORD_DB = [
         effect_desc: '【复合系】当敌人同时承受火、冰、雷三种状态时，引发元素聚变爆炸。',
         baseParams: { trueDamageRatio: 0.10 },
         perLevelParams: { trueDamageRatio: 0.05 }
+    },
+    {
+        id: 'runeword_sword_resonance',
+        name: '剑意共鸣',
+        effectId: 'flying_sword_unlock',
+        pattern: ['rune_pierce_1', 'rune_pierce_1', 'rune_pierce_1'],
+        effect_desc: '【特殊系】解锁飞剑变异。收集阶段穿透弹珠碰撞穿透钉子时，有70%概率使其变异为飞剑钉子。词条等级提升时，飞剑将解锁自动索敌与全自动猎杀模式。',
+        baseParams: { level: 1, mutationChance: 0.7 },
+        perLevelParams: { level: 1, mutationChance: 0.1 }
+    },
+    {
+        id: 'runeword_storm_resonance',
+        name: '风暴共鸣',
+        effectId: 'wind_unlock',
+        pattern: ['rune_bounce_1', 'rune_bounce_1', 'rune_bounce_1'],
+        effect_desc: '【特殊系】解锁风属性变异。收集阶段反弹弹珠碰撞反弹钉子时，有70%概率使其变异为风属性钉子。词条等级提升时，解锁蝶蝶法阵与风道形态。',
+        baseParams: { level: 1, mutationChance: 0.7 },
+        perLevelParams: { level: 1, mutationChance: 0.1 }
     }
 ];
 

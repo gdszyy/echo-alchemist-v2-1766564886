@@ -1022,6 +1022,12 @@ phase_gathering_getRandomPegType() {
             // 风暴核心更新和绘制
             this.combat_wind_updateStormCores(timeScale);
             this.combat_wind_drawStormCores(this.ctx);
+            // 活跃大旋风更新（基于 Tick 的同步伤害与粒子）
+            this.combat_wind_updateActiveCyclones(timeScale);
+            // 活跃暴风绞杀更新（基于 Tick 的同步切割伤害）
+            this.combat_wind_updateActiveStrangles(timeScale);
+            // 活跃风道更新（基于 Tick 的同步切割伤害）
+            this.combat_wind_updateActiveTunnels(timeScale);
             // 拖拽瞄准线
             if (this.isDragging && this.projectiles.length === 0 && this.ammoQueue.length > 0 && this.burstQueue.length === 0) {
                 const start = new Vec2(this.width / 2, this.height - 80);
@@ -1207,7 +1213,8 @@ phase_gathering_getRandomPegType() {
         }
 
         if (this.ammoQueue.length === 0 && this.projectiles.length === 0 && this.burstQueue.length === 0 && !this.gameOver) { 
-            // 回合结束，风暴核心能量衰减
+            // 回合结束：先合并相交风暴核心，再衰减能量
+            this.combat_wind_mergeStormCores();
             this.combat_wind_decayStormCoresEnergy();
             document.getElementById('combat-message').innerHTML = '<div class="bg-black/50 p-4 rounded-xl backdrop-blur-md border border-blue-500/50 pointer-events-none"><span class="text-blue-300 font-bold text-xl block mb-2">彈藥耗盡</span><span class="text-sm text-slate-300">點擊收集新彈药</span></div>'; 
         } else { 

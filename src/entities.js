@@ -803,28 +803,46 @@ class Peg {
     }
     // [新增] 绘制剑形钉子
     drawSwordPeg(ctx, r, isLit) {
-        // 剑纹颜色：如果是点亮状态用深色，否则用浅色/白色
-        ctx.fillStyle = isLit ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.8)';
-        
+        const time = Date.now() / 1000;
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
-        
-        // 缩小剑纹比例，使其待在圆钉子内部
-        const sr = r * 0.6; 
-        
+
+        // 高等级（等级≥ 2）时增加金色外发光效果
+        if (this.level >= 2) {
+            const pulse = (Math.sin(time * 3) + 1) / 2;
+            ctx.shadowBlur = 12 + pulse * 10;
+            ctx.shadowColor = '#fbbf24';
+        }
+
+        // 剑纹颜色：高等级用金色，否则按点亮状态切换
+        ctx.fillStyle = this.level >= 2 ? '#fbbf24' : (isLit ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.8)');
+
+        const sr = r * 0.6;
         ctx.beginPath();
-        // 剑刃 (指向下方或上方，这里保持原逻辑方向但缩小)
         ctx.moveTo(0, -sr * 1.2); // 剑尖
         ctx.lineTo(sr * 0.4, -sr * 0.2);
         ctx.lineTo(sr * 0.1, -sr * 0.2);
-        // 剑柄
-        ctx.lineTo(sr * 0.1, sr * 0.8); 
+        ctx.lineTo(sr * 0.1, sr * 0.8);
         ctx.lineTo(-sr * 0.1, sr * 0.8);
         ctx.lineTo(-sr * 0.1, -sr * 0.2);
         ctx.lineTo(-sr * 0.4, -sr * 0.2);
         ctx.closePath();
-        
         ctx.fill();
+
+        // 高等级时加绘旋转剑气小圆弧
+        if (this.level >= 3) {
+            ctx.rotate(time * 3);
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.6)';
+            ctx.lineWidth = r * 0.1;
+            ctx.lineCap = 'round';
+            for (let i = 0; i < 4; i++) {
+                const a = i * (Math.PI / 2);
+                ctx.beginPath();
+                ctx.arc(0, 0, r * 0.8, a, a + 0.8);
+                ctx.stroke();
+            }
+        }
+
         ctx.restore();
     }
     // [优化] 绘制风属性钉子图标 - 螺旋风刃纹章 (方案升级版)
@@ -853,8 +871,9 @@ class Peg {
         ctx.rotate(time * 2.5); // 持续旋转
         
         const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
-        ctx.shadowBlur = 8 + pulse * 10;
-        ctx.shadowColor = '#34d399';
+        // 高等级时增强光晓
+        ctx.shadowBlur = (this.level >= 2 ? 16 : 8) + pulse * 10;
+        ctx.shadowColor = this.level >= 2 ? '#a7f3d0' : '#34d399';
         
         ctx.strokeStyle = isLit ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.8)';
         ctx.lineWidth = r * 0.15;
@@ -867,9 +886,23 @@ class Peg {
             ctx.arc(0, 0, r * 0.65, startAngle, startAngle + 1.2); 
             ctx.stroke();
         }
+
+        // 高等级时加绘外圈风刃
+        if (this.level >= 2) {
+            ctx.strokeStyle = 'rgba(167, 243, 208, 0.7)';
+            ctx.lineWidth = r * 0.1;
+            for (let i = 0; i < 3; i++) {
+                const startAngle = i * (Math.PI * 2 / 3) + 0.5;
+                ctx.beginPath();
+                ctx.arc(0, 0, r * 0.9, startAngle, startAngle + 1.0);
+                ctx.stroke();
+            }
+        }
         
         // 绘制中心气旋
         ctx.rotate(-time * 4); // 反向旋转中心
+        ctx.strokeStyle = isLit ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.8)';
+        ctx.lineWidth = r * 0.15;
         ctx.beginPath();
         for(let i=0; i<3; i++) {
             const a = i * (Math.PI * 2 / 3);
@@ -1011,13 +1044,27 @@ class DropBall {
             if (rules && rules[peg.type]) {
                 const rule = rules[peg.type];
                 
-                // 概率设定：使用配置中的乘子
+                // 概率设定：变异概率完全由符文词条控制，升级概率保持原逻辑
                 const assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0.2;
-                const mutationMult = CONFIG.gameplay.specialMutationMult || 0.5;
                 const upgradeMult = CONFIG.gameplay.specialUpgradeMult || 1.0;
-                const chance = rule.type === 'upgrade' ? assimilationChance * upgradeMult : assimilationChance * mutationMult;
+                let chance = 0;
 
-                if (Math.random() < chance) {
+                if (rule.type === 'mutation') {
+                    // 变异概率：完全由 activeRunewordEffects 中的词条控制
+                    if (typeof game !== 'undefined' && game.activeRunewordEffects) {
+                        if (rule.result === 'flying_sword' && game.activeRunewordEffects['flying_sword_unlock']) {
+                            chance = game.activeRunewordEffects['flying_sword_unlock'].params.mutationChance || 0.7;
+                        } else if (rule.result === 'wind' && game.activeRunewordEffects['wind_unlock']) {
+                            chance = game.activeRunewordEffects['wind_unlock'].params.mutationChance || 0.7;
+                        }
+                    }
+                    // 无对应词条时 chance 保持为 0，即不发生变异
+                } else if (rule.type === 'upgrade') {
+                    // 升级概率保持原逻辑（基于同化概率 * 升级乘子）
+                    chance = assimilationChance * upgradeMult;
+                }
+
+                if (chance > 0 && Math.random() < chance) {
                     
                     // === 逻辑 A: 突变 (Mutation) ===
                     if (rule.type === 'mutation') {
@@ -1029,11 +1076,21 @@ class DropBall {
                         if (!alreadyExists) {
                             // 允许突变
                             peg.type = rule.result;
-                            peg.level = 1; 
-                            
-                            // 特效
-                            game.spawn_createExplosion(peg.pos.x, peg.pos.y, CONFIG.colors[rule.result]);
-                            game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 20, "Mutation!", CONFIG.colors[rule.result]);
+                            // 将词条等级注入到钉子等级，以便生成高等级配方
+                            if (rule.result === 'flying_sword' && game.activeRunewordEffects && game.activeRunewordEffects['flying_sword_unlock']) {
+                                peg.level = game.activeRunewordEffects['flying_sword_unlock'].params.level || 1;
+                            } else if (rule.result === 'wind' && game.activeRunewordEffects && game.activeRunewordEffects['wind_unlock']) {
+                                peg.level = game.activeRunewordEffects['wind_unlock'].params.level || 1;
+                            } else {
+                                peg.level = 1;
+                            }
+
+                            // 强化变异瞬间特效：冲击波 + 大型爆破 + 高亮浮动文字
+                            const mutColor = CONFIG.colors[rule.result] || '#ffffff';
+                            game.spawn_createShockwave(peg.pos.x, peg.pos.y, mutColor);
+                            game.spawn_createExplosion(peg.pos.x, peg.pos.y, mutColor);
+                            game.spawn_createExplosion(peg.pos.x, peg.pos.y, mutColor); // 双重爆破增强视觉冲击
+                            game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 30, '✨ MUTATION!', mutColor);
                             audio.playMagic();
                         } else {
                             // 场上已有同类唯一实体 -> 禁止突变，退化为普通同化 (变成 Pierce)

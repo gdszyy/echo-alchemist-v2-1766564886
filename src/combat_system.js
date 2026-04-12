@@ -530,62 +530,19 @@ export const combat_system = {
                     }
                 }
 
-                for(let i=0; i<tickCount; i++) {
-                    setTimeout(() => {
-                        // 每一段伤害使用独立的 shotId 确保不被过滤
-                        const currentTickShotId = this._currentDamageShotId ? `${this._currentDamageShotId}_strangle_${i}` : `strangle_${Date.now()}_${i}`;
-                        
-                        this.enemies.forEach(e => {
-                            if (e.active && e.pos.x > expandedX && e.pos.x < expandedX + expandedW && e.pos.y > expandedY && e.pos.y < expandedY + expandedH) {
-                                let dmg = tickDmg;
-                                // 属性联动逻辑保持
-                                if (e.temp >= 100) { 
-                                    dmg *= 2; 
-                                    e.applyTemp(-50); 
-                                    this.spawn_createFloatingText(e.pos.x, e.pos.y, "🔥火旋风", "#f97316"); 
-                                    for(let k=0; k<30; k++) {
-                                        const angle = Math.random() * Math.PI * 2;
-                                        const radius = Math.random() * 100;
-                                        const px = centerX + Math.cos(angle) * radius;
-                                        const py = centerY + Math.sin(angle) * radius;
-                                        this.spawn_createParticle(px, py, '#f97316', 'spark');
-                                    }
-                                }
-                                else if (e.temp <= -100) { 
-                                    dmg *= 2; 
-                                    e.applyTemp(50); 
-                                    this.spawn_createFloatingText(e.pos.x, e.pos.y, "❄️冰旋风", "#06b6d4"); 
-                                    for(let k=0; k<30; k++) {
-                                        const angle = Math.random() * Math.PI * 2;
-                                        const radius = Math.random() * 100;
-                                        const px = centerX + Math.cos(angle) * radius;
-                                        const py = centerY + Math.sin(angle) * radius;
-                                        this.spawn_createParticle(px, py, '#06b6d4', 'shard');
-                                    }
-                                }
-                                
-                                // 视觉：身上爆出逆向的风刃
-                                for(let k=0; k<3; k++) {
-                                    const p = this.spawn_createParticle(e.pos.x, e.pos.y, '#fff', 'wind_slash');
-                                    if (p) {
-                                        p.vel = new Vec2((Math.random()-0.5)*20, (Math.random()-0.5)*20);
-                                        p.size = 15;
-                                        p.life = 0.2;
-                                    }
-                                }
-
-                                // [修改 1] 套用子弹完整属性配置
-                                const windConfig = { ...bulletConfig, damage: dmg };
-                                this.combat_damageEnemy(e, { 
-                                    config: windConfig, 
-                                    pos: e.pos, 
-                                    isCopy: false,
-                                    shotId: currentTickShotId 
-                                });
-                            }
-                        });
-                    }, i * tickInterval);
-                }
+                // [重构] 将 setTimeout 改为基于 Tick 的同步伤害实体
+                if (!this.activeStrangles) this.activeStrangles = [];
+                this.activeStrangles.push({
+                    centerX, centerY,
+                    expandedX, expandedY, expandedW, expandedH,
+                    bulletConfig: { ...bulletConfig },
+                    tickDmg,
+                    totalTicks: tickCount,
+                    currentTick: 0,
+                    tickInterval: Math.round(tickInterval / (1000 / 60)), // 转换为帧数
+                    tickTimer: 0,
+                    baseShotId: this._currentDamageShotId || `strangle_${Date.now()}`
+                });
             } else if (element === 'wind_explosive') {
                 this.spawn_createFloatingText(centerX, centerY, "💥内爆", "#fca5a5");
                 this.enemies.forEach(e => {
@@ -642,46 +599,19 @@ export const combat_system = {
                 const tickDmg = Math.max(1, Math.floor(totalDmg / tickCount));
                 const tickInterval = 210; // 每100ms切割一次
                 
-                for(let i=0; i<tickCount; i++) {
-                    setTimeout(() => {
-                        let hitCount = 0;
-                        const currentTickShotId = this._currentDamageShotId ? `${this._currentDamageShotId}_tunnel_${i}` : `tunnel_${Date.now()}_${i}`;
-                        
-                        this.enemies.forEach(e => {
-                            const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y+h) : (e.pos.x > x && e.pos.x < x+w);
-                            if (e.active && inPath) {
-                                hitCount++;
-                                // 伤害挂钩子弹伤害倍率与多段公式
-                                const dmg = tickDmg;
-                                
-                                const windConfig = { ...bulletConfig, damage: dmg, wind: 1 };
-                                this.combat_damageEnemy(e, { 
-                                    config: windConfig, 
-                                    pos: e.pos, 
-                                    isCopy: false, 
-                                    shotId: currentTickShotId 
-                                });
-                                
-                                // 受击特效
-                                for(let k=0; k<3; k++) {
-                                    const p = this.spawn_createParticle(e.pos.x, e.pos.y, '#34d399', 'wind_slash');
-                                    if (p) {
-                                        p.vel = new Vec2((Math.random()-0.5)*15, (Math.random()-0.5)*15);
-                                        p.size = 8 + Math.random() * 8;
-                                        p.life = 0.3;
-                                    }
-                                }
-                            }
-                        });
-
-                        // 每次切割触发顿挫感
-                        if (hitCount > 0) {
-                            this.slowMotionTimer = 5; 
-                            this.timeScale = cfg.hitStopScale;     
-                            this.triggerScreenShake(10);
-                        }
-                    }, i * tickInterval);
-                }
+                // [重构] 将 setTimeout 改为基于 Tick 的同步伤害实体
+                if (!this.activeTunnels) this.activeTunnels = [];
+                this.activeTunnels.push({
+                    x, y, w, h,
+                    isHorizontal,
+                    bulletConfig: { ...bulletConfig },
+                    tickDmg,
+                    totalTicks: tickCount,
+                    currentTick: 0,
+                    tickInterval: Math.round(tickInterval / (1000 / 60)), // 转换为帧数
+                    tickTimer: 0,
+                    baseShotId: this._currentDamageShotId || `tunnel_${Date.now()}`
+                });
 
                 // 4. 生成贯穿全屏的【暴风粒子流】
                 const particleCount = 150; // 加大密度
@@ -1129,65 +1059,186 @@ export const combat_system = {
 
 /**
      * 释放风暴核心的大旋风
+     * [重构] 将 setTimeout 改为基于 Tick 的同步机制，确保特效与伤害生命周期完全一致。
+     * 读取 bonusTicks 属性，动态增加总 Tick 数和持续时间。
      */
     combat_wind_releaseStormCoreCyclone(core) {
         const cfg = CONFIG.wind_system.storm_core;
         const centerX = core.pos.x;
         const centerY = core.pos.y;
         const radius = core.radius * cfg.cycloneRadiusMult;
-        
+
         this.spawn_createFloatingText(centerX, centerY, "🌀大旋风", "#10b981");
         this.spawn_createShockwave(centerX, centerY, '#10b981');
-        
-        // [重构] 大旋风爆发：多段高频伤害 + 疯狂旋转粒子
-        const tickCount = 12;
-        const tickInterval = 100;
-        
-        for(let i=0; i<tickCount; i++) {
-            setTimeout(() => {
-                // 1. 造成伤害
-                this.enemies.forEach(e => {
-                    if (!e.active) return;
-                    const dist = e.pos.dist(core.pos);
-                    if (dist < radius) {
-                        // 每段伤害为总伤害的 1/4，总计 3 倍爆发伤害
-                        const dmg = Math.max(1, Math.floor(core.bulletDamage * (CONFIG.wind_system.storm_core.damageMult || 4.0) * 0.25));
-                        const windConfig = { ...core.bulletConfig, damage: dmg };
-                        this.combat_damageEnemy(e, { 
-                            config: windConfig, 
-                            pos: e.pos, 
-                            isCopy: false,
-                            shotId: this._currentDamageShotId 
-                        });
-                        e.hitTimer = 10;
-                    }
-                });
 
-                // 2. 疯狂旋转粒子视觉
-                const intensity = 1.0 - (i / tickCount); // 随时间减弱
-                const particleCount = 20;
-                for(let j=0; j<particleCount; j++) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const dist = Math.random() * radius;
-                    const px = centerX + Math.cos(angle) * dist;
-                    const py = centerY + Math.sin(angle) * dist;
-                    
-                    const p = this.spawn_createParticle(px, py, '#10b981', 'wind_slash');
-                    if (p) {
-                        const tangent = new Vec2(-Math.sin(angle), Math.cos(angle));
-                        p.vel = tangent.mult(15 + Math.random() * 10);
-                        p.size = 8 + Math.random() * 8;
-                        p.life = 0.6;
-                        p.turbulence = 2 + Math.random() * 3;
+        // 读取 bonusTicks，动态增加总打击次数
+        const baseTickCount = 12;
+        const bonusTicks = core.bonusTicks || 0;
+        const totalTickCount = baseTickCount + bonusTicks;
+
+        // [重构] 基于 Tick 的同步伤害：将旋风作为持续性特效实体存入 activeCyclones 列表
+        if (!this.activeCyclones) this.activeCyclones = [];
+        this.activeCyclones.push({
+            pos: { x: centerX, y: centerY },
+            radius,
+            bulletDamage: core.bulletDamage,
+            bulletConfig: core.bulletConfig,
+            totalTicks: totalTickCount,
+            currentTick: 0,
+            tickInterval: 6, // 每 6 帧触发一次（约60fps 下为 100ms）
+            tickTimer: 0,
+            damageMult: cfg.damageMult || 2.0
+        });
+    },
+
+/**
+     * 更新活跃大旋风列表（每帧调用）
+     * 基于 Tick 计数同步伤害与粒子特效，确保两者生命周期一致。
+     */
+    combat_wind_updateActiveCyclones(timeScale) {
+        if (!this.activeCyclones || this.activeCyclones.length === 0) return;
+        for (let i = this.activeCyclones.length - 1; i >= 0; i--) {
+            const cyclone = this.activeCyclones[i];
+            cyclone.tickTimer += timeScale;
+            if (cyclone.tickTimer < cyclone.tickInterval) continue;
+            cyclone.tickTimer = 0;
+
+            const { pos, radius, bulletDamage, bulletConfig, damageMult, currentTick, totalTicks } = cyclone;
+            const intensity = 1.0 - (currentTick / totalTicks);
+
+            // 1. 造成伤害
+            const tickShotId = this._currentDamageShotId ? `${this._currentDamageShotId}_cyclone_${currentTick}` : `cyclone_${Date.now()}_${currentTick}`;
+            this.enemies.forEach(e => {
+                if (!e.active) return;
+                const dist = Math.hypot(e.pos.x - pos.x, e.pos.y - pos.y);
+                if (dist < radius) {
+                    const dmg = Math.max(1, Math.floor(bulletDamage * damageMult * 0.25));
+                    const windConfig = { ...bulletConfig, damage: dmg };
+                    this.combat_damageEnemy(e, { config: windConfig, pos: e.pos, isCopy: false, shotId: tickShotId });
+                    e.hitTimer = 10;
+                }
+            });
+
+            // 2. 旋转粒子视觉（随时间减弱）
+            const particleCount = Math.floor(20 * intensity) + 5;
+            for (let j = 0; j < particleCount; j++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * radius;
+                const px = pos.x + Math.cos(angle) * dist;
+                const py = pos.y + Math.sin(angle) * dist;
+                const p = this.spawn_createParticle(px, py, '#10b981', 'wind_slash');
+                if (p) {
+                    const tangent = new Vec2(-Math.sin(angle), Math.cos(angle));
+                    p.vel = tangent.mult(15 + Math.random() * 10);
+                    p.size = 8 + Math.random() * 8;
+                    p.life = 0.6;
+                    p.turbulence = 2 + Math.random() * 3;
+                }
+            }
+
+            if (currentTick % 3 === 0) {
+                this.slowMotionTimer = 5;
+                this.timeScale = 0.2;
+                this.triggerScreenShake(8);
+            }
+
+            cyclone.currentTick++;
+            if (cyclone.currentTick >= cyclone.totalTicks) {
+                this.activeCyclones.splice(i, 1);
+            }
+        }
+    },
+
+/**
+     * 更新活跃暴风绞杀列表（每帧调用）
+     * 基于 Tick 计数同步切割伤害与视觉特效。
+     */
+    combat_wind_updateActiveStrangles(timeScale) {
+        if (!this.activeStrangles || this.activeStrangles.length === 0) return;
+        const cfg = CONFIG.wind_system.base;
+        for (let i = this.activeStrangles.length - 1; i >= 0; i--) {
+            const s = this.activeStrangles[i];
+            s.tickTimer += timeScale;
+            if (s.tickTimer < s.tickInterval) continue;
+            s.tickTimer = 0;
+
+            const { centerX, centerY, expandedX, expandedY, expandedW, expandedH, bulletConfig, tickDmg, currentTick, baseShotId } = s;
+            const currentTickShotId = `${baseShotId}_strangle_${currentTick}`;
+
+            this.enemies.forEach(e => {
+                if (!e.active) return;
+                if (e.pos.x > expandedX && e.pos.x < expandedX + expandedW && e.pos.y > expandedY && e.pos.y < expandedY + expandedH) {
+                    let dmg = tickDmg;
+                    if (e.temp >= 100) {
+                        dmg *= 2; e.applyTemp(-50);
+                        this.spawn_createFloatingText(e.pos.x, e.pos.y, "🔥火旋风", "#f97316");
+                        for (let k = 0; k < 30; k++) {
+                            const angle = Math.random() * Math.PI * 2;
+                            this.spawn_createParticle(centerX + Math.cos(angle) * Math.random() * 100, centerY + Math.sin(angle) * Math.random() * 100, '#f97316', 'spark');
+                        }
+                    } else if (e.temp <= -100) {
+                        dmg *= 2; e.applyTemp(50);
+                        this.spawn_createFloatingText(e.pos.x, e.pos.y, "❄️冰旋风", "#06b6d4");
+                        for (let k = 0; k < 30; k++) {
+                            const angle = Math.random() * Math.PI * 2;
+                            this.spawn_createParticle(centerX + Math.cos(angle) * Math.random() * 100, centerY + Math.sin(angle) * Math.random() * 100, '#06b6d4', 'shard');
+                        }
+                    }
+                    for (let k = 0; k < 3; k++) {
+                        const p = this.spawn_createParticle(e.pos.x, e.pos.y, '#fff', 'wind_slash');
+                        if (p) { p.vel = new Vec2((Math.random()-0.5)*20, (Math.random()-0.5)*20); p.size = 15; p.life = 0.2; }
+                    }
+                    const windConfig = { ...bulletConfig, damage: dmg };
+                    this.combat_damageEnemy(e, { config: windConfig, pos: e.pos, isCopy: false, shotId: currentTickShotId });
+                }
+            });
+
+            s.currentTick++;
+            if (s.currentTick >= s.totalTicks) {
+                this.activeStrangles.splice(i, 1);
+            }
+        }
+    },
+
+/**
+     * 更新活跃风道列表（每帧调用）
+     * 基于 Tick 计数同步切割伤害与视觉特效。
+     */
+    combat_wind_updateActiveTunnels(timeScale) {
+        if (!this.activeTunnels || this.activeTunnels.length === 0) return;
+        const cfg = CONFIG.wind_system.base;
+        for (let i = this.activeTunnels.length - 1; i >= 0; i--) {
+            const t = this.activeTunnels[i];
+            t.tickTimer += timeScale;
+            if (t.tickTimer < t.tickInterval) continue;
+            t.tickTimer = 0;
+
+            const { x, y, w, h, isHorizontal, bulletConfig, tickDmg, currentTick, baseShotId } = t;
+            const currentTickShotId = `${baseShotId}_tunnel_${currentTick}`;
+            let hitCount = 0;
+
+            this.enemies.forEach(e => {
+                const inPath = isHorizontal ? (e.pos.y > y && e.pos.y < y + h) : (e.pos.x > x && e.pos.x < x + w);
+                if (e.active && inPath) {
+                    hitCount++;
+                    const windConfig = { ...bulletConfig, damage: tickDmg, wind: 1 };
+                    this.combat_damageEnemy(e, { config: windConfig, pos: e.pos, isCopy: false, shotId: currentTickShotId });
+                    for (let k = 0; k < 3; k++) {
+                        const p = this.spawn_createParticle(e.pos.x, e.pos.y, '#34d399', 'wind_slash');
+                        if (p) { p.vel = new Vec2((Math.random()-0.5)*15, (Math.random()-0.5)*15); p.size = 8 + Math.random() * 8; p.life = 0.3; }
                     }
                 }
-                
-                if (i % 3 === 0) {
-                    this.slowMotionTimer = 5;
-                    this.timeScale = 0.2;
-                    this.triggerScreenShake(8);
-                }
-            }, i * tickInterval);
+            });
+            if (hitCount > 0) {
+                this.slowMotionTimer = 5;
+                this.timeScale = cfg.hitStopScale;
+                this.triggerScreenShake(10);
+            }
+
+            t.currentTick++;
+            if (t.currentTick >= t.totalTicks) {
+                this.activeTunnels.splice(i, 1);
+            }
         }
     },
 
@@ -1248,6 +1299,68 @@ export const combat_system = {
             
             ctx.restore();
         });
+    },
+
+/**
+     * 回合结束时合并相交的风暴核心
+     * 两两检测距离，若 dist < (r1+r2)*mergeDistanceMult 则合并：
+     * - 位置取加权中点（按能量加权）
+     * - 半径和能量累加，受 radiusMax / energyMax 上限约束
+     * - 达到上限时记录 bonusTicks，用于大旋风额外打击
+     */
+    combat_wind_mergeStormCores() {
+        if (!this.stormCores || this.stormCores.length < 2) return;
+        const cfg = CONFIG.wind_system.storm_core;
+        let merged = true;
+        // 迭代合并，直到没有可合并的对为止
+        while (merged) {
+            merged = false;
+            for (let i = 0; i < this.stormCores.length; i++) {
+                for (let j = i + 1; j < this.stormCores.length; j++) {
+                    const a = this.stormCores[i];
+                    const b = this.stormCores[j];
+                    const dist = a.pos.dist(b.pos);
+                    const mergeThreshold = (a.radius + b.radius) * (cfg.mergeDistanceMult || 1.0);
+                    if (dist < mergeThreshold) {
+                        // 按能量加权取中点
+                        const totalEnergy = a.energy + b.energy || 1;
+                        const wx = (a.pos.x * a.energy + b.pos.x * b.energy) / totalEnergy;
+                        const wy = (a.pos.y * a.energy + b.pos.y * b.energy) / totalEnergy;
+
+                        // 累加属性，受上限约束
+                        const newRadius = Math.min(cfg.radiusMax || 80, a.radius + b.radius * 0.5 + (cfg.mergeRadiusGrowth || 10));
+                        const newEnergy = a.energy + b.energy;
+                        const newEnergyRequired = Math.max(a.energyRequired, b.energyRequired);
+                        const cappedEnergy = Math.min(cfg.energyMax || 20, newEnergy);
+
+                        // 溢出处理：超出上限时记录 bonusTicks
+                        let bonusTicks = (a.bonusTicks || 0) + (b.bonusTicks || 0);
+                        if (newEnergy >= (cfg.bonusTickThreshold || 15)) {
+                            bonusTicks += cfg.bonusTicksOnMax || 4;
+                        }
+
+                        // 合并为 a，删除 b
+                        a.pos.x = wx;
+                        a.pos.y = wy;
+                        a.radius = newRadius;
+                        a.energy = cappedEnergy;
+                        a.energyRequired = newEnergyRequired;
+                        a.bonusTicks = bonusTicks;
+                        // 取较大的 bulletDamage
+                        a.bulletDamage = Math.max(a.bulletDamage || 1, b.bulletDamage || 1);
+
+                        // 合并特效
+                        this.spawn_createShockwave(wx, wy, '#10b981');
+                        this.spawn_createFloatingText(wx, wy, '⚡ 风暴核合并!', '#34d399');
+
+                        this.stormCores.splice(j, 1);
+                        merged = true;
+                        break;
+                    }
+                }
+                if (merged) break;
+            }
+        }
     },
 
 /**

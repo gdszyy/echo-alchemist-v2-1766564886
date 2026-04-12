@@ -370,10 +370,17 @@ const CONFIG = {
         // 风暴核心参数
         storm_core: {
             damageMult: 2.0,      // 大旋风伤害倍率
-            radiusMax: 80,        // 最大核心半径
+            radiusMax: 80,        // 最大核心半径（合并上限）
             energyPerSecond: 1,   // 每秒充能值
+            energyMax: 20,        // 最大能量上限（合并累加上限）
             decayPerRound: 1,     // 每回合能量衰减
-            cycloneRadiusMult: 1.5 // 大旋风半径相对于核心的倍率
+            cycloneRadiusMult: 1.5, // 大旋风半径相对于核心的倍率
+            // 合并机制参数
+            mergeDistanceMult: 1.0, // 合并触发距离 = (r1 + r2) * mergeDistanceMult
+            mergeRadiusGrowth: 10,  // 合并后半径增量
+            bonusTickThreshold: 15, // 能量达到此值时触发 bonusTicks
+            bonusTicksOnMax: 4,     // 达到上限时额外增加的打击次数
+            bonusDurationOnMax: 3   // 达到上限时额外增加的持续时间（秒）
         },
         // 基础风属性参数
         base: {
@@ -634,7 +641,8 @@ const CONFIG = {
             pyro: 0.2
         },
         // [新增] 特殊变体概率乘子
-        specialMutationMult: 0.1, // 变异概率乘子 (基于同化概率)
+        // [重要] 设为 0 彻底关闭无词条时的默认变异；变异概率完全由符文词条控制
+        specialMutationMult: 0, // 变异概率乘子 (基于同化概率)
         specialUpgradeMult: 0.42   // 升级概率乘子 (基于同化概率)
     },
     //  初始概率配置 (現在這些是基礎權重，解鎖後會增加)
