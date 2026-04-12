@@ -485,8 +485,10 @@ class Enemy {
                     }
                 } else if (this.devourState === 'OPENING') {
                     this.devourState = 'DEVOURING';
-                    this.collisionData.startAngle = Math.PI * 0.1;
-                    this.collisionData.endAngle = Math.PI * 1.9;
+                    // [修复] 缺口扩大至 324°（圆弧实体 36°，在左方 162°-198°）
+                    // 设计文档：DEVOURING 缺口324°，嘴巴大张，弹珠直接命中核心
+                    this.collisionData.startAngle = Math.PI * 0.9;  // 162°
+                    this.collisionData.endAngle = Math.PI * 1.1;    // 198°
                 } else if (this.devourState === 'DEVOURING') {
                     this.devourState = 'COOLDOWN';
                     this.devourTimer = 0;

@@ -182,6 +182,41 @@ class Projectile {
                 hitResult.distVecX = this.pos.x - hitResult.closestX;
                 hitResult.distVecY = this.pos.y - hitResult.closestY;
             }
+
+            // ─────────────────────────────────────────────────────────────────────
+            // [Devourer 吞噬逻辑] DEVOURING 状态：子弹进入缺口区域时直接消失
+            // 条件：没有碰撞（hitResult=null）+ Devourer处于 DEVOURING 状态
+            //       + 子弹到 Devourer 中心的距离在圆弧半径范围内（进入缺口）
+            // ─────────────────────────────────────────────────────────────────────
+            if (!hitResult && e.bossType === 'devourer' && e.devourState === 'DEVOURING') {
+                const dx = this.pos.x - e.pos.x;
+                const dy = this.pos.y - e.pos.y;
+                const distToCenter = Math.sqrt(dx * dx + dy * dy);
+                const halfThick = e.collisionData.thickness / 2;
+                const innerRadius = e.collisionData.radius - halfThick - this.radius;
+                const outerRadius = e.collisionData.radius + halfThick + this.radius;
+
+                if (distToCenter >= innerRadius && distToCenter <= outerRadius) {
+                    // 子弹进入缺口区域，触发吞噬效果
+                    this.active = false;
+                    if (typeof game !== 'undefined') {
+                        // 吞噬特效：紫色冲击波 + 粒子散射
+                        game.spawn_createShockwave(this.pos.x, this.pos.y, '#a855f7');
+                        for (let i = 0; i < 6; i++) {
+                            game.spawn_createParticle(
+                                this.pos.x + (Math.random() - 0.5) * 20,
+                                this.pos.y + (Math.random() - 0.5) * 20,
+                                '#c084fc', 'mist'
+                            );
+                        }
+                        game.spawn_createFloatingText(
+                            this.pos.x, this.pos.y - 20,
+                            'DEVOURED', '#a855f7'
+                        );
+                    }
+                    return; // 子弹被吞噬，不造成伤害
+                }
+            }
         } else {
             // 默认 AABB 碰撞检测
             const halfW = e.width / 2;
