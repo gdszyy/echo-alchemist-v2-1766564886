@@ -1197,144 +1197,14 @@ class TruthBook {
     resetDemo() { if (this.currentEntry) this.startDemo(this.currentEntry); }
 
     startDemo(entry) {
-        // --- 核心修復：構建全功能 Mock Game ---
-        this.demoGame = {
-            width: 600, height: 800,
-            enemies: [], projectiles: [], particles: [], floatingTexts: [], 
-            shockwaves: [], spores: [], fireWaves: [], sonSwords: [], 
-            sonSwordQueue: [], swordQis: [], lightningBolts: [],
-            activeWindMatrices: [], windAnchors: [],
-            enemyHeight: 60, enemyWidth: 60, timeScale: 1.0,
-            hasCombatWall: true, isDemo: true,
-            roundDamage: 0, currentShotDamage: 0, currentShotDamageByAttr: {},
-            shotDamageMap: new Map(),
-            
-            // 粒子與特效
-            spawn_createParticle: (x, y, color, mode) => {
-                // 確保粒子生成在模擬器區域內
-                const p = new Particle(x, y, color, mode);
-                this.demoGame.particles.push(p);
-                return p;
-            },
-            spawn_createShockwave: (x, y, color) => {
-                const sw = new Shockwave(x, y, color);
-                this.demoGame.shockwaves.push(sw);
-            },
-            spawn_createFloatingText: (x, y, text, color) => {
-                this.demoGame.floatingTexts.push(new FloatingText(x, y, text, color));
-            },
-            spawn_createExplosion: (x, y, color) => {
-                this.demoGame.spawn_createShockwave(x, y, color);
-                for(let i=0; i<10; i++) this.demoGame.spawn_createParticle(x, y, color, 'spark');
-            },
-            
-            // 子彈生成
-            spawn_spawnBullet: (arg1, arg2, arg3, arg4, arg5, arg6) => {
-                let x, y, vel, config, id, isLast;
-                if (typeof arg1 === 'object' && arg1.config) {
-                    x = arg1.x; y = arg1.y; vel = arg1.vel; config = arg1.config;
-                    id = arg1.id || null; isLast = arg1.isLast || false;
-                } else {
-                    x = arg1; y = arg2; vel = arg3; config = arg4; id = arg5; isLast = arg6;
-                }
-                
-                // [修復] 確保 vel 是 Vec2 實例，防止 .len() 等方法報錯
-                if (!(vel instanceof Vec2)) {
-                    vel = new Vec2(vel.x, vel.y);
-                }
-                
-                // [修復] 處理散射邏輯：如果 config 中有 scatter，則生成多個子彈
-                if (config.scatter && !config._isScatterSub) {
-                    const count = config.scatter;
-                    const baseAngle = Math.atan2(vel.y, vel.x);
-                    const spread = Math.PI / 4;
-                    const speed = vel.len();
-                    for (let i = 0; i < count; i++) {
-                        const angle = baseAngle + (i - (count - 1) / 2) * (spread / count);
-                        const newVel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
-                        const newConfig = { ...config, scatter: 0, _isScatterSub: true };
-                        const p = new Projectile(x, y, newVel, newConfig, false, id, i === count - 1);
-                        p.game = this.demoGame;
-                        this.demoGame.projectiles.push(p);
-                    }
-                    return;
-                }
-
-                const p = new Projectile(x, y, vel, config, false, id, isLast);
-                p.game = this.demoGame; 
-                this.demoGame.projectiles.push(p);
-            },
-            
-            // [核心重構] 傷害與戰鬥：直接調用主遊戲的戰鬥邏輯
-            combat_damageEnemy: (enemy, proj, multiplier = 1.0) => {
-                // 將當前上下文切換為 demoGame 並調用主遊戲的戰鬥方法
-                this.mainGame.combat_damageEnemy.call(this.demoGame, enemy, proj, multiplier);
-            },
-            
-            // 補充主遊戲邏輯依賴的其他方法
-            combat_lightning_triggerChain: (enemy, dmg, history, level) => {
-                this.mainGame.combat_lightning_triggerChain.call(this.demoGame, enemy, dmg, history, level);
-            },
-            
-            combat_wind_addAnchor: (x, y, dmg, config) => {
-                this.mainGame.combat_wind_addAnchor.call(this.demoGame, x, y, dmg, config);
-            },
-            
-            combat_recordDamage: (amount, attrType = 'damage') => {
-                this.demoGame.roundDamage += amount;
-                if (!this.demoGame.currentShotDamageByAttr[attrType]) this.demoGame.currentShotDamageByAttr[attrType] = 0;
-                this.demoGame.currentShotDamageByAttr[attrType] += amount;
-            },
-            
-            combat_lightning_triggerChain: (currentEnemy, dmg, history, level) => {
-                if (level <= 0) return;
-                const range = 150; // 縮小閃電跳躍範圍，要求敵人靠得近
-                let closest = null;
-                let minDist = Infinity;
-                this.demoGame.enemies.forEach(e => {
-                    if (e !== currentEnemy && e.active && !history.includes(e)) {
-                        const d = currentEnemy.pos.dist(e.pos);
-                        if (d < range && d < minDist) { minDist = d; closest = e; }
-                    }
-                });
-                if (closest) {
-                    this.demoGame.lightningBolts.push(new LightningBolt(currentEnemy.pos, closest.pos));
-                    const nextDmg = Math.floor(dmg * 0.8);
-                    closest.takeDamage(nextDmg);
-                    this.demoGame.spawn_createFloatingText(closest.pos.x, closest.pos.y, `-${nextDmg}`, '#c084fc');
-                    history.push(closest);
-                    // 遞歸跳躍
-                    setTimeout(() => {
-                        this.demoGame.combat_lightning_triggerChain(closest, nextDmg, history, level - 1);
-                    }, 60);
-                }
-            },
-            
-            combat_wind_addAnchor: (x, y, bulletDamage, bulletConfig) => {
-                this.demoGame.windAnchors.push({ x, y, life: 1.0, bulletDamage, bulletConfig });
-                this.demoGame.spawn_createParticle(x, y, '#34d399', 'spark');
-                if (this.demoGame.windAnchors.length >= 4) {
-                    this.demoGame.spawn_createShockwave(x, y, '#34d399');
-                    this.demoGame.windAnchors = []; // 簡化：滿4個直接重置
-                }
-            },
-
-            spawn_triggerCloneSpawn: (parent) => {
-                const cloneHp = Math.floor(parent.maxHp * 0.2);
-                const clone = new Enemy(parent.pos.x + 60, parent.pos.y, 50, 50, cloneHp, cloneHp);
-                clone.affixes = [];
-                this.demoGame.enemies.push(clone);
-                this.demoGame.spawn_createFloatingText(parent.pos.x, parent.pos.y, "CLONE!", "#a855f7");
-            },
-
-            spawn_addScore: (amt) => {},
-            ui_updateRoundDamage: () => {},
-            calc_isAreaOccupied: (x, y, w, h, exclude) => {
-                return this.demoGame.enemies.some(e => e !== exclude && e.active && 
-                    Math.abs(e.pos.x - x) < (e.width + w)/2 && 
-                    Math.abs(e.pos.y - y) < (e.height + h)/2);
-            }
-        };
+        // 通过 createCombatContext 工厂函数构建演示上下文，
+        // 直接复用主游戏的真实战斗方法，避免手动 Mock 带来的逻辑漂移。
+        this.demoGame = createCombatContext(this.mainGame, this.canvas);
+        // 根据画布实际尺寸更新宽高（canvas 可能在 resize 后才有正确值）
+        if (this.canvas && this.canvas.width > 0) {
+            this.demoGame.width = this.viewWidth || this.canvas.width;
+            this.demoGame.height = this.viewHeight || this.canvas.height;
+        }
 
         if (entry.setup) entry.setup(this.demoGame);
         this.instructionIdx = 0;
@@ -1489,10 +1359,228 @@ class TruthBook {
 }
 
 //// 注意：辅助函数（adjustColorBrightness, lerpColor, lerp, hexToRgba）已移动到 entities.js
+
+// ==================== createCombatContext 工厂函数 ====================
+/**
+ * 创建演示用的战斗上下文对象。
+ *
+ * 通过 .call(context, ...) 借用 mainGame 的真实战斗方法，避免手动 Mock 带来的
+ * 逻辑漂移问题。UI 类方法统一屏蔽为空函数，不影响演示逻辑。
+ *
+ * @param {object} mainGame - 主游戏实例（已混入所有 Mixin 方法）
+ * @param {HTMLCanvasElement} canvas - 演示画布（供 combat_wind 系列方法读取尺寸）
+ * @returns {object} 包含完整战斗状态与方法的演示上下文
+ */
+function createCombatContext(mainGame, canvas) {
+    const context = {
+        // ── 画布与尺寸 ────────────────────────────────────────────────────────
+        canvas: canvas,
+        ctx: canvas ? canvas.getContext('2d') : null,
+        width: canvas ? (canvas.width || 600) : 600,
+        height: canvas ? (canvas.height || 800) : 800,
+        enemyWidth: 60,
+        enemyHeight: 60,
+
+        // ── 实体数组 ──────────────────────────────────────────────────────────
+        enemies: [],
+        projectiles: [],
+        particles: [],
+        floatingTexts: [],
+        shockwaves: [],
+        lightningBolts: [],
+        spores: [],
+        fireWaves: [],
+        sonSwords: [],
+        sonSwordQueue: [],
+        swordQis: [],
+        runeLootItems: [],
+
+        // ── 风系统状态 ────────────────────────────────────────────────────────
+        windAnchors: [],
+        activeWindMatrices: [],
+        windMatrixDuration: 40,
+        butterflyCircles: [],
+        butterflyBlades: [],
+        stormCores: [],
+
+        // ── 战斗状态 ──────────────────────────────────────────────────────────
+        phase: 'combat',
+        isEnemyTurn: false,
+        hasCombatWall: true,
+        isDemo: true,
+        round: 1,
+        timeScale: 1.0,
+        slowMotionTimer: 0,
+        screenShake: 0,
+        waveMomentumTimer: 0,
+        defeatLineY: 570,
+
+        // ── 伤害统计 ──────────────────────────────────────────────────────────
+        roundDamage: 0,
+        currentShotDamage: 0,
+        currentShotDamageByAttr: {},
+        shotDamageHistory: [],
+        shotIdCounter: 0,
+        shotDamageMap: new Map(),
+        frameDamageAccumulator: 0,
+
+        // ── 符文系统 ──────────────────────────────────────────────────────────
+        runeGrid: Array(9).fill(null),
+        runeInventory: [],
+        activeRunewordEffects: {},
+        activeRunewordStats: {},
+        runeChargeValue: 0,
+        runeChargeLevel: 0,
+        runeChargeCurrentRune: null,
+        runeChargeCurrentLevel: 1,
+
+        // ── 弹药队列 ──────────────────────────────────────────────────────────
+        ammoQueue: [],
+        burstQueue: [],
+
+        // ── 其他状态 ──────────────────────────────────────────────────────────
+        ownedRelics: [],
+        score: 0,
+        scoreMultiplier: 1.0,
+        spawnedEnemiesInRound: 0,
+        postBossMultiplier: 1.0,
+        uiCache: null,
+
+        // ── 屏幕震动（兼容 triggerScreenShake 和 ui_triggerScreenShake）────────
+        triggerScreenShake(amount) {
+            this.screenShake = amount;
+        },
+        ui_triggerScreenShake() {},
+
+        // ── 粒子与特效方法（借用 mainGame 真实实现）──────────────────────────
+        spawn_createParticle(...args) {
+            return mainGame.spawn_createParticle.call(this, ...args);
+        },
+        spawn_pushParticleWithLimit(...args) {
+            return mainGame.spawn_pushParticleWithLimit.call(this, ...args);
+        },
+        spawn_createShockwave(...args) {
+            return mainGame.spawn_createShockwave.call(this, ...args);
+        },
+        spawn_createFloatingText(...args) {
+            return mainGame.spawn_createFloatingText.call(this, ...args);
+        },
+        spawn_createExplosion(...args) {
+            return mainGame.spawn_createExplosion.call(this, ...args);
+        },
+        spawn_smallWhirlwind(...args) {
+            return mainGame.spawn_smallWhirlwind.call(this, ...args);
+        },
+        // uiCache 在演示环境中不可用，直接跳过
+        spawn_createHitFeedback() {},
+
+        // ── 子弹生成（借用 mainGame 真实实现）───────────────────────────────
+        spawn_spawnBullet(...args) {
+            return mainGame.spawn_spawnBullet.call(this, ...args);
+        },
+
+        // ── 分身生成（借用 mainGame 真实实现）───────────────────────────────
+        spawn_triggerCloneSpawn(...args) {
+            return mainGame.spawn_triggerCloneSpawn.call(this, ...args);
+        },
+
+        // ── 风暴核心（借用 mainGame 真实实现）───────────────────────────────
+        spawn_stormCore(...args) {
+            return mainGame.spawn_stormCore.call(this, ...args);
+        },
+        combat_wind_updateStormCores(...args) {
+            return mainGame.combat_wind_updateStormCores.call(this, ...args);
+        },
+        combat_wind_drawStormCores(...args) {
+            return mainGame.combat_wind_drawStormCores.call(this, ...args);
+        },
+
+        // ── 战斗核心方法（借用 mainGame 真实实现）────────────────────────────
+        combat_damageEnemy(...args) {
+            return mainGame.combat_damageEnemy.call(this, ...args);
+        },
+        combat_lightning_triggerChain(...args) {
+            return mainGame.combat_lightning_triggerChain.call(this, ...args);
+        },
+        combat_wind_addAnchor(...args) {
+            return mainGame.combat_wind_addAnchor.call(this, ...args);
+        },
+        combat_wind_triggerSmallWhirlwindDamage(...args) {
+            return mainGame.combat_wind_triggerSmallWhirlwindDamage.call(this, ...args);
+        },
+        combat_wind_triggerMagicCircle(...args) {
+            return mainGame.combat_wind_triggerMagicCircle.call(this, ...args);
+        },
+        combat_wind_triggerButterflyCircle(...args) {
+            return mainGame.combat_wind_triggerButterflyCircle.call(this, ...args);
+        },
+        combat_wind_updateButterflyCircles(...args) {
+            return mainGame.combat_wind_updateButterflyCircles.call(this, ...args);
+        },
+        combat_wind_updateButterflyBlades(...args) {
+            return mainGame.combat_wind_updateButterflyBlades.call(this, ...args);
+        },
+        combat_flyingSword_assignTarget(...args) {
+            return mainGame.combat_flyingSword_assignTarget.call(this, ...args);
+        },
+        combat_flyingSword_addSon(...args) {
+            return mainGame.combat_flyingSword_addSon.call(this, ...args);
+        },
+        combat_laser_fire(...args) {
+            return mainGame.combat_laser_fire.call(this, ...args);
+        },
+        combat_recordDamage(...args) {
+            return mainGame.combat_recordDamage.call(this, ...args);
+        },
+        combat_reportDamage(...args) {
+            return mainGame.combat_reportDamage.call(this, ...args);
+        },
+        combat_runeCharge_onHit(...args) {
+            return mainGame.combat_runeCharge_onHit.call(this, ...args);
+        },
+        combat_checkBossPhaseChange(...args) {
+            return mainGame.combat_checkBossPhaseChange.call(this, ...args);
+        },
+        combat_tryMoveEnemy(...args) {
+            return mainGame.combat_tryMoveEnemy.call(this, ...args);
+        },
+
+        // ── 计算工具（借用 mainGame 真实实现）───────────────────────────────
+        calc_isAreaOccupied(...args) {
+            return mainGame.calc_isAreaOccupied.call(this, ...args);
+        },
+
+        // ── 分数（演示中不累计，屏蔽 UI 更新）──────────────────────────────
+        spawn_addScore() {},
+
+        // ── 数据清理（内联实现，避免依赖 mainGame 状态）─────────────────────
+        data_clearProjectiles() {
+            this.sonSwords = [];
+            this.projectiles = [];
+            this.burstQueue = [];
+            this.spores = [];
+            this.fireWaves = [];
+        },
+
+        // ── UI 方法（演示中屏蔽，避免操作主游戏 DOM）────────────────────────
+        ui_updateRoundDamage() {},
+        ui_renderRecipeHUD() {},
+        hud_initEventListeners() {},
+        ui_updateAmmoUI() {},
+        ui_updateUICache() {},
+        ui_updateMultiplierUI() {},
+        ui_showRelicSelection() {},
+        ui_updateDamageStats() {},
+    };
+
+    return context;
+}
+
 // ==================== 导出系统类 ====================
 export {
     UIManager,
     TrainingGround,
     TruthBook,
-    TRUTH_BOOK_DATA
+    TRUTH_BOOK_DATA,
+    createCombatContext
 };
