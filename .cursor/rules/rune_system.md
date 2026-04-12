@@ -1,11 +1,11 @@
 ---
-description: "符文系统完整规范（智能掉落、网格拼图、合成重铸）"
-globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js"]
+description: "符文系统完整规范（智能掉落、网格拼图、合成重铸、充能符文）"
+globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js", "src/combat_system.js"]
 ---
 # 符文系统规范 (Rune System)
 
 ## 1. 系统概述
-符文系统是游戏局内的核心策略维度，包含智能掉落算法、网格拼图逻辑以及合成重铸规则。
+符文系统是游戏局内的核心策略维度，包含智能掉落算法、网格拼图逻辑、合成重铸规则以及战斗阶段充能符文系统。
 
 ## 2. 智能掉落算法 (`loot_system.js`)
 - **机制**: 敌人的符文掉落并非纯随机。
@@ -79,3 +79,155 @@ globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js"]
 - 统计玩家近期伤害占比 `buildVector` 时，如果某一属性的伤害占比超过阈值（默认 60%），则对超出部分进行衰减。
 - 衰减系数为 0.5，即超出部分减半。
 - 衰减后重新归一化 `buildVector`，防止玩家过度依赖单一属性导致掉落过于单一。
+
+## 8. 战斗阶段充能符文系统 (`combat_system.js`)
+
+> **状态**: 待实现（当前代码存在 Bug，功能完全失效）
+
+### 8.1 系统概述
+
+战斗阶段顶部 UI 的"GET RUNE"充能条系统。玩家通过击中/击杀敌人积累充能值，充能条满时刷新一次预览符文（并记录充能次数），战斗结束后领取最终预览符文进入背包。
+
+### 8.2 当前 Bug（必须修复）
+
+`combat_runeCharge_levelUp` 中调用 `loot_calcRuneDrop` 时，未适配其新返回值格式 `{ runeId, level }`，仍按旧的字符串格式处理，导致 `runeChargeCurrentRune` 永远为 `null`，充能奖励系统完全失效。
+
+### 8.3 状态字段
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `runeChargeValue` | number (0~1) | 当前充能进度，每帧自动衰减 |
+| `runeChargeLevel` | number | 本场战斗中充能条已满的次数（每满一次 +1） |
+| `runeChargeCurrentRune` | object\|null | 当前预览符文定义（来自 RUNE_DB） |
+| `runeChargeCurrentLevel` | number | 当前预览符文的等级（**新增字段**，需在 `combat_runeCharge_init` 中初始化为 1） |
+
+### 8.4 抽取算法设计
+
+**核心公式：**
+
+```
+最终权重 = baseDropWeight × (1.26/3)^(符文等级 - 1)
+         = baseDropWeight × 0.42^(lv - 1)
+```
+
+**入池条件（门槛为权重上限）：**
+
+```
+最终权重 < threshold(充能等级)
+```
+
+门槛随充能等级升高而单调递减。权重越低（稀有度越高或等级越高）的符文越先通过门槛。低稀有度高等级的符文（如 common Lv.3 权重 ≈ 2.12）在高充能等级下仍可入池。
+
+**门槛序列（充能等级 1 → 7+）：**
+
+```js
+const RUNE_CHARGE_THRESHOLDS = [999, 999, 6.1, 5.1, 2.6, 2.15, 0.9, 0.4];
+// 索引即充能等级，超过 7 时取 index 7
+```
+
+| 充能等级 | 门槛值 | 入池变化 |
+|---|---|---|
+| Lv.1 | 999（无限制） | 全部 Lv.1 符文 |
+| Lv.2 | 6.1 | common Lv.1(12.0) 出局；解锁 Lv.2 符文 |
+| Lv.3 | 5.1 | rare(w=6) Lv.1(6.0) 出局；解锁 Lv.3 符文 |
+| Lv.4 | 2.6 | common Lv.2(5.04)、rare(w=5) Lv.1(5.0) 出局 |
+| Lv.5 | 2.15 | common Lv.3(2.12)、rare Lv.2 出局 |
+| Lv.6 | 0.9 | epic Lv.1(2.0)、rare Lv.3 出局 |
+| Lv.7+ | 0.4 | epic Lv.2(0.84) 出局；仅剩 epic Lv.3 + legendary 全系 |
+
+**可出最高符文等级：** `min(充能等级, 3)`
+
+**各稀有度各等级权重参考：**
+
+| 稀有度 | Lv.1 | Lv.2 | Lv.3 |
+|---|---|---|---|
+| common (baseDropWeight=12) | 12.00 | 5.04 | 2.12 |
+| rare (baseDropWeight=6) | 6.00 | 2.52 | 1.06 |
+| rare (baseDropWeight=5) | 5.00 | 2.10 | 0.88 |
+| epic (baseDropWeight=2) | 2.00 | 0.84 | 0.35 |
+| legendary (baseDropWeight=0.5) | 0.50 | 0.21 | 0.09 |
+
+### 8.5 实现规范
+
+**新增常量（`combat_system.js` 顶部常量区）：**
+
+```js
+const RUNE_CHARGE_THRESHOLDS = [999, 999, 6.1, 5.1, 2.6, 2.15, 0.9, 0.4];
+const RUNE_CHARGE_DECAY      = 1.26 / 3;   // ≈ 0.42
+const RUNE_CHARGE_MAX_LEVEL  = 3;
+```
+
+**新增辅助函数 `_runeCharge_draw(chargeLevel)`（模块内函数，非 game 对象方法）：**
+
+```js
+function _runeCharge_draw(chargeLevel) {
+    const threshold = RUNE_CHARGE_THRESHOLDS[Math.min(chargeLevel, 7)];
+    const maxRuneLv = Math.min(chargeLevel, RUNE_CHARGE_MAX_LEVEL);
+    const pool = [];
+    for (const rune of RUNE_DB) {
+        for (let lv = 1; lv <= maxRuneLv; lv++) {
+            const w = rune.baseDropWeight * Math.pow(RUNE_CHARGE_DECAY, lv - 1);
+            if (w < threshold) pool.push({ runeDef: rune, runeLevel: lv, weight: w });
+        }
+    }
+    if (!pool.length) return { runeDef: null, runeLevel: 1 };
+    const total = pool.reduce((s, c) => s + c.weight, 0);
+    let rand = Math.random() * total;
+    for (const c of pool) {
+        rand -= c.weight;
+        if (rand <= 0) return { runeDef: c.runeDef, runeLevel: c.runeLevel };
+    }
+    const last = pool[pool.length - 1];
+    return { runeDef: last.runeDef, runeLevel: last.runeLevel };
+}
+```
+
+**修改 `combat_runeCharge_init`（新增 `runeChargeCurrentLevel` 初始化）：**
+
+```js
+combat_runeCharge_init() {
+    this.runeChargeValue        = 0;
+    this.runeChargeLevel        = 0;
+    this.runeChargeCurrentRune  = null;
+    this.runeChargeCurrentLevel = 1;   // 新增
+    this.combat_runeCharge_initUI();
+},
+```
+
+**修改 `combat_runeCharge_levelUp`（修复 Bug + 接入新抽取逻辑）：**
+
+```js
+combat_runeCharge_levelUp() {
+    this.runeChargeLevel = (this.runeChargeLevel || 0) + 1;
+    const { runeDef, runeLevel } = _runeCharge_draw(this.runeChargeLevel);
+    this.runeChargeCurrentRune  = runeDef  || null;
+    this.runeChargeCurrentLevel = runeLevel || 1;
+    eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_LEVEL_UP, {
+        runeDef:   this.runeChargeCurrentRune,
+        runeLevel: this.runeChargeCurrentLevel
+    });
+    try { if (audio?.playTone) audio.playTone(520, 'sine', 0.1, 0.25); } catch(e) {}
+},
+```
+
+**修改 `combat_runeCharge_claimReward`（使用动态等级入库）：**
+
+```js
+combat_runeCharge_claimReward() {
+    const runeDef = this.runeChargeCurrentRune;
+    if (!runeDef) return;
+    const level = this.runeChargeCurrentLevel || 1;
+    this.runeInventory.push({ id: runeDef.id, level });
+    eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_CLAIM, { runeDef, level });
+    try { if (audio?.playPowerup) audio.playPowerup(); } catch(e) {}
+    this.runeChargeValue        = 0;
+    this.runeChargeLevel        = 0;
+    this.runeChargeCurrentRune  = null;
+    this.runeChargeCurrentLevel = 1;
+},
+```
+
+### 8.6 UI 事件变更
+
+- `UI_RUNE_CHARGE_LEVEL_UP` 事件新增 `runeLevel` 字段，`hud.js` 需同步在符文槽上展示等级角标（如 "Lv.2"）。
+- `UI_RUNE_CHARGE_CLAIM` 事件新增 `level` 字段，入背包动画需展示正确等级。
