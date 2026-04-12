@@ -136,63 +136,71 @@ class SpecialSlot {
 
         this.animTimer += 0.05;
         let color = '#fff'; let text = '';
-        if (this.type === 'recall')      { color = CONFIG.colors.slotRecall;    text = '↺'; }
-        else if (this.type === 'multicast') { color = CONFIG.colors.slotMulticast; text = '+2'; }
-        else if (this.type === 'split')     { color = CONFIG.colors.slotSplit;     text = '⑂'; }
-        else if (this.type === 'relic')     { color = '#facc15';                   text = '🏆'; }
-        else if (this.type === 'giant')     { color = CONFIG.colors.slotGiant;     text = '⬆️'; }
-        else if (this.type === 'skill_point') { color = CONFIG.colors.slotSkill;   text = '★'; }
-        else if (this.type === 'wheel')     { color = CONFIG.colors.slotWheel;     text = '🎡'; }
+        if (this.type === 'recall')        { color = CONFIG.colors.slotRecall;    text = '↺'; }
+        else if (this.type === 'multicast')  { color = CONFIG.colors.slotMulticast; text = '+2'; }
+        else if (this.type === 'split')      { color = CONFIG.colors.slotSplit;     text = '⑂'; }
+        else if (this.type === 'relic')      { color = '#facc15';                   text = '🏆'; }
+        else if (this.type === 'giant')      { color = CONFIG.colors.slotGiant;     text = '⬆️'; }
+        else if (this.type === 'skill_point'){ color = CONFIG.colors.slotSkill;     text = '★'; }
+        else if (this.type === 'wheel')      { color = CONFIG.colors.slotWheel;     text = '🎡'; }
 
-        const glow   = Math.sin(this.animTimer) * 4 + 8;   // 呼吸光晕幅度
-        const pulse  = 0.5 + Math.sin(this.animTimer) * 0.25; // 透明度脉冲 0.25~0.75
-        const midX   = (this.x + this.x2) / 2;
-        const midY   = (this.y + this.y2) / 2;
+        const glow  = Math.sin(this.animTimer) * 5 + 12;          // 呼吸光晕 7~17
+        const pulse = 0.65 + Math.sin(this.animTimer) * 0.2;      // 透明度脉冲 0.45~0.85
+        const midX  = (this.x + this.x2) / 2;
+        const midY  = (this.y + this.y2) / 2;
 
         ctx.save();
 
-        // --- 1. 绘制发光连线 ---
-        ctx.shadowBlur  = glow;
+        // ===== 第一层：实线底层（保证连线始终可见） =====
+        ctx.globalAlpha = pulse * 0.5;
+        ctx.shadowBlur  = glow * 0.8;
         ctx.shadowColor = color;
         ctx.strokeStyle = color;
-        ctx.lineWidth   = 2.5;
-        ctx.globalAlpha = pulse;
-        ctx.setLineDash([6, 4]); // 虚线样式，增加魔法感
-        ctx.lineDashOffset = -(Date.now() / 60) % 10; // 流动动画
-
+        ctx.lineWidth   = 1.5;
+        ctx.setLineDash([]);
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);
         ctx.lineTo(this.x2, this.y2);
         ctx.stroke();
 
-        ctx.setLineDash([]); // 恢复实线
+        // ===== 第二层：流动虚线叠层（魔法流动感） =====
+        ctx.globalAlpha = pulse;
+        ctx.shadowBlur  = glow;
+        ctx.lineWidth   = 2.5;
+        ctx.setLineDash([5, 5]);
+        // 流动速度：每帧向前移动，使用 animTimer 驱动而非 Date.now()
+        ctx.lineDashOffset = -(this.animTimer * 3) % 10;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x2, this.y2);
+        ctx.stroke();
 
-        // --- 2. 在两端钉子处绘制小圆点锚点 ---
-        ctx.globalAlpha = pulse * 0.8;
+        ctx.setLineDash([]);
+
+        // ===== 第三层：两端钉子锚点圆 =====
+        ctx.globalAlpha = pulse;
         ctx.fillStyle   = color;
         ctx.shadowBlur  = glow * 0.6;
         [[this.x, this.y], [this.x2, this.y2]].forEach(([ax, ay]) => {
             ctx.beginPath();
-            ctx.arc(ax, ay, 4, 0, Math.PI * 2);
+            ctx.arc(ax, ay, 5, 0, Math.PI * 2);
             ctx.fill();
         });
 
-        // --- 3. 在连线中点绘制符号背景圆 + 文字 ---
+        // ===== 第四层：中点背景圆 + 符号文字 =====
         ctx.globalAlpha = 1.0;
-        ctx.shadowBlur  = glow * 1.5;
+        ctx.shadowBlur  = glow;
         ctx.shadowColor = color;
 
-        // 中点背景圆
         ctx.beginPath();
-        ctx.arc(midX, midY, 12, 0, Math.PI * 2);
-        ctx.fillStyle   = 'rgba(0,0,0,0.55)';
+        ctx.arc(midX, midY, 13, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(10, 15, 40, 0.8)';
         ctx.fill();
         ctx.strokeStyle = color;
-        ctx.lineWidth   = 1.5;
+        ctx.lineWidth   = 2;
         ctx.stroke();
 
-        // 符号文字
-        ctx.shadowBlur = 0;
+        ctx.shadowBlur   = 0;
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
         ctx.font         = 'bold 12px sans-serif';

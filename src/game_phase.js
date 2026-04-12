@@ -223,6 +223,8 @@ export const game_phase = {
 
                 let p = new Peg(x, y, type);
                 p.level = level;
+                p.row = r;   // [新增] 存储行号，用于相邻钉子对筛选
+                p.col = c;   // [新增] 存储列号
                 // [继承逻辑] 如果继承，保留当前的冷却状态
                 if (shouldInherit && previousPegs[pegIndex]) {
                      p.cooldownTimer = previousPegs[pegIndex].cooldownTimer;
@@ -266,31 +268,86 @@ export const game_phase = {
             
             // [重构] 不再使用随机坐标匹配，而是直接从合法候选钉子池中抽取
             // 1. 筛选出所有合法的候选钉子索引 (非粉色且未被占用)
-            let validPegIndices = this.pegs
-                .map((p, index) => ({ type: p.type, index }))
-                .filter(item => item.type !== 'pink')
-                .map(item => item.index);
+            // [双钉子连线模式 v2] 基于行列坐标的严格相邻匹配
+            // 相邻定义：
+            //   同行水平相邻：同一行，列号相差 1
+            //   上下行断对角相邻：行号相差 1，列号相差 0 或 1（奇偶行偏移导致）
 
-            console.log(`[DEBUG] Found ${validPegIndices.length} valid candidate pegs for special slots`);
+            // 1. 筛选候选钉子（非粉色）
+            const validPegIndices2 = this.pegs
+                .map((p, i) => i)
+                .filter(i => this.pegs[i].type !== 'pink');
+
+            // 2. 构建严格相邻对列表：只允许同行相邻或上下行断对角
+            const strictPairs = [];
+            const addedPairKeys = new Set();
+
+            for (const idxA of validPegIndices2) {
+                const pegA = this.pegs[idxA];
+                if (pegA.row === undefined) continue;
+
+                for (const idxB of validPegIndices2) {
+                    if (idxB <= idxA) continue;
+                    const pegB = this.pegs[idxB];
+                    if (pegB.row === undefined) continue;
+
+                    const dr = Math.abs(pegA.row - pegB.row);
+                    const dc = Math.abs(pegA.col - pegB.col);
+
+                    const isSameRowAdj = (dr === 0 && dc === 1);
+                    const isDiagAdj   = (dr === 1 && dc <= 1);
+
+                    if (isSameRowAdj || isDiagAdj) {
+                        const key = `${idxA}-${idxB}`;
+                        if (!addedPairKeys.has(key)) {
+                            strictPairs.push([idxA, idxB]);
+                            addedPairKeys.add(key);
+                        }
+                    }
+                }
+            }
+
+            console.log(`[DEBUG] Found ${strictPairs.length} strict adjacent peg pairs`);
+
+            // 3. 打乱对列表，随机选取所需数量的对
+            for (let i = strictPairs.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [strictPairs[i], strictPairs[j]] = [strictPairs[j], strictPairs[i]];
+            }
 
             let createdCount = 0;
-            while (createdCount < this.slotCount && validPegIndices.length > 0) {
-                // 2. 从候选池中随机抽取一个索引
-                const randIdxInPool = Math.floor(Math.random() * validPegIndices.length);
-                const pegIdx = validPegIndices.splice(randIdxInPool, 1)[0];
-                
+            for (const [idxA, idxB] of strictPairs) {
+                if (createdCount >= this.slotCount) break;
+                const pegA = this.pegs[idxA];
+                const pegB = this.pegs[idxB];
                 const type = slotTypes[Math.floor(Math.random() * slotTypes.length)];
-                const peg = this.pegs[pegIdx];
-                
-                // 3. 实例化 SpecialSlot
-                const slot = new SpecialSlot(peg.pos.x, peg.pos.y, spacingX * 0.8, type);
-                slot.pegIndex = pegIdx;
+
+                const slot = new SpecialSlot(pegA.pos.x, pegA.pos.y, pegB.pos.x, pegB.pos.y, type);
+                slot.pegIndex  = idxA;
+                slot.pegIndex2 = idxB;
                 this.specialSlots.push(slot);
-                
                 createdCount++;
-                console.log(`[DEBUG] Created special slot: type=${type}, pegIdx=${pegIdx}, pos=(${peg.pos.x}, ${peg.pos.y})`);
+                console.log(`[DEBUG] Created link slot: type=${type}, pegs=[${idxA}(r${pegA.row}c${pegA.col}),${idxB}(r${pegB.row}c${pegB.col})], pos=(${pegA.pos.x.toFixed(0)},${pegA.pos.y.toFixed(0)})->(${pegB.pos.x.toFixed(0)},${pegB.pos.y.toFixed(0)})`);
             }
-            
+
+            // 如果严格对不够，退化为单钉子水平短连线
+            if (createdCount < this.slotCount) {
+                const usedIdx = new Set(this.specialSlots.flatMap(s => [s.pegIndex, s.pegIndex2]));
+                const remaining = validPegIndices2.filter(i => !usedIdx.has(i));
+                for (const idxA of remaining) {
+                    if (createdCount >= this.slotCount) break;
+                    const pegA = this.pegs[idxA];
+                    const type = slotTypes[Math.floor(Math.random() * slotTypes.length)];
+                    const halfW = spacingX * 0.35;
+                    const slot = new SpecialSlot(pegA.pos.x - halfW, pegA.pos.y, pegA.pos.x + halfW, pegA.pos.y, type);
+                    slot.pegIndex  = idxA;
+                    slot.pegIndex2 = idxA;
+                    this.specialSlots.push(slot);
+                    createdCount++;
+                    console.log(`[DEBUG] Created fallback single-peg slot: type=${type}, pegIdx=${idxA}`);
+                }
+            }
+
             console.log(`[DEBUG] Finished special slot creation: final count=${this.specialSlots.length}, target=${this.slotCount}`);
         } else {
             console.log(`[DEBUG] Skipping special slot creation: unlockedSlots.length=${this.unlockedSlots.length}, slotCount=${this.slotCount}`);
