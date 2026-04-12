@@ -140,6 +140,12 @@ class Enemy {
         this.hasActedThisTurn = false;
         this.scanFeedbackTimer = 0;
         this.shieldHitTimer = 0; // 护盾受击反馈计时器
+        // === Boss 入场动画 ===
+        // entranceTimer: 入场动画帧计数器，>0 时播放入场动画
+        // 阶段 1 (90→60): Boss 从屏幕外高速坠入
+        // 阶段 2 (60→30): 落地冲击波 + 红色光圈扩散
+        // 阶段 3 (30→0):  Boss 名称文字放大淡出
+        this.entranceTimer = 0;
 
         // === Layer 1.5: 预计算底层纹理 (OffscreenCanvas) ===
         // 基于 visualSeed 一次性生成静态纹理，每帧仅执行一次 drawImage
@@ -230,6 +236,28 @@ class Enemy {
                 this.bumpOffsetY = 0;
             }
             return; // 预警期间不处理其他移动逻辑
+        }
+
+        // Boss 入场动画期间：控制坐标，阶段 1 (90→60) 高速坠入
+        if (this.entranceTimer > 0) {
+            this.entranceTimer -= timeScale;
+            if (this.entranceTimer > 60) {
+                // 阶段 1：从屏幕外坠入 —— 利用 easeOutQuart 让落地有冲击感
+                const t = (90 - this.entranceTimer) / 30; // 0→1
+                const eased = 1 - Math.pow(1 - t, 4);   // easeOutQuart
+                this.pos.y = this._entranceStartY + (this.dropTargetY - this._entranceStartY) * eased;
+            } else if (this.entranceTimer > 30) {
+                // 阶段 2：落地，保持在目标位置
+                this.pos.y = this.dropTargetY;
+            } else {
+                // 阶段 3：名称文字淡出，保持位置
+                this.pos.y = this.dropTargetY;
+            }
+            if (this.entranceTimer <= 0) this.entranceTimer = 0;
+            // 入场动画期间不进行其他移动逻辑
+            if (this.hitTimer > 0) this.hitTimer -= timeScale;
+            if (this.shieldHitTimer > 0) this.shieldHitTimer -= timeScale;
+            return;
         }
 
         // 移动逻辑：吸附目标位置
@@ -1585,6 +1613,116 @@ class Enemy {
             ctx.moveTo(hw - bracketSize, -hh); ctx.lineTo(hw, -hh); ctx.lineTo(hw, -hh + bracketSize);
             ctx.moveTo(hw, hh - bracketSize); ctx.lineTo(hw, hh); ctx.lineTo(hw - bracketSize, hh);
             ctx.moveTo(-hw + bracketSize, hh); ctx.lineTo(-hw, hh); ctx.lineTo(-hw, hh - bracketSize);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // === Layer 8: Boss 入场动画特效 ===
+        if (this.type === 'boss' && this.entranceTimer > 0) {
+            const t = this.entranceTimer;
+
+            // —— 阶段 2 (60→30): 落地冲击波 + 红色光圈扩散 ——
+            if (t <= 60 && t > 30) {
+                const progress = (60 - t) / 30; // 0→1
+                ctx.save();
+                ctx.translate(this.pos.x, this.pos.y);
+
+                // 1. 冲击波圈：从 Boss 中心向外扩散
+                const maxRadius = this.width * 2.5;
+                const waveRadius = maxRadius * progress;
+                const waveAlpha = (1 - progress) * 0.8;
+                ctx.beginPath();
+                ctx.arc(0, 0, waveRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(239, 68, 68, ${waveAlpha})`;
+                ctx.lineWidth = 4 * (1 - progress);
+                ctx.shadowColor = '#ef4444';
+                ctx.shadowBlur = 20;
+                ctx.stroke();
+
+                // 2. 第二圈（延迟半圈）
+                if (progress > 0.2) {
+                    const wave2Progress = (progress - 0.2) / 0.8;
+                    const wave2Radius = maxRadius * 0.6 * wave2Progress;
+                    const wave2Alpha = (1 - wave2Progress) * 0.6;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, wave2Radius, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(251, 191, 36, ${wave2Alpha})`;
+                    ctx.lineWidth = 3 * (1 - wave2Progress);
+                    ctx.shadowColor = '#fbbf24';
+                    ctx.shadowBlur = 15;
+                    ctx.stroke();
+                }
+
+                // 3. 地面裂纹辐射线（从中心向外放射）
+                const crackCount = 8;
+                ctx.save();
+                ctx.globalAlpha = (1 - progress) * 0.7;
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 2;
+                ctx.shadowColor = '#ef4444';
+                ctx.shadowBlur = 8;
+                for (let i = 0; i < crackCount; i++) {
+                    const angle = (i / crackCount) * Math.PI * 2 + this.visualSeed * Math.PI;
+                    const crackLen = (this.width * 0.8 + waveRadius * 0.4) * (0.6 + this.visualSeed * 0.4);
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    // 折线裂纹
+                    const midX = Math.cos(angle + 0.15) * crackLen * 0.5;
+                    const midY = Math.sin(angle + 0.15) * crackLen * 0.5;
+                    ctx.lineTo(midX, midY);
+                    ctx.lineTo(Math.cos(angle) * crackLen, Math.sin(angle) * crackLen);
+                    ctx.stroke();
+                }
+                ctx.restore();
+
+                ctx.restore();
+            }
+
+            // —— 阶段 3 (30→0): Boss 名称文字放大淡出 ——
+            if (t <= 30 && t > 0 && this.bossName) {
+                const progress = (30 - t) / 30; // 0→1
+                const textAlpha = 1 - progress;
+                const textScale = 1.0 + progress * 0.8; // 从 1.0 放大到 1.8
+
+                ctx.save();
+                ctx.translate(this.pos.x, this.pos.y);
+                ctx.scale(textScale, textScale);
+                ctx.globalAlpha = textAlpha;
+
+                // 文字外发光
+                ctx.shadowColor = '#ef4444';
+                ctx.shadowBlur = 20 * textAlpha;
+
+                // 大字标题
+                ctx.font = `bold ${Math.floor(this.width * 0.22)}px 'Cinzel', serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = `rgba(255, 255, 255, ${textAlpha})`;
+                ctx.fillText(this.bossName, 0, 0);
+
+                // 底部小字
+                ctx.font = `bold ${Math.floor(this.width * 0.12)}px monospace`;
+                ctx.fillStyle = `rgba(239, 68, 68, ${textAlpha})`;
+                ctx.fillText(this.isBigBoss ? '\u2620 BOSS' : '\u2620 MINI-BOSS', 0, this.height * 0.22);
+
+                ctx.restore();
+            }
+
+            // —— 全程光晕边框脉冲（入场期间 Boss 边框强化闪烁） ——
+            const pulseAlpha = t > 60
+                ? (90 - t) / 30 * 0.9          // 阶段 1：淡入
+                : t > 30
+                ? 0.9                            // 阶段 2：持续强亮
+                : (t / 30) * 0.9;               // 阶段 3：淡出
+            ctx.save();
+            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            const flashPulse = Math.sin(Date.now() / 60) * 0.3 + 0.7;
+            ctx.shadowColor = '#ef4444';
+            ctx.shadowBlur = 30 * pulseAlpha * flashPulse;
+            ctx.strokeStyle = `rgba(239, 68, 68, ${pulseAlpha * flashPulse})`;
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.roundRect(-w/2 - 3, -h/2 - 3, w + 6, h + 6, r + 2);
             ctx.stroke();
             ctx.restore();
         }

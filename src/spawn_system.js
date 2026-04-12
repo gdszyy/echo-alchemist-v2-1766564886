@@ -1337,13 +1337,28 @@ export const spawn_system = {
         const bossW = this.enemyWidth * 3;                        // 实际宽度：3列宽（固定）
         const bossH = this.enemyHeight * 2;                        // 高度为 2 行（整数行，与网格对齐）
         const centerX = this.width / 2;                            // 画布水平中心（更健壮，不依赖 enemyCols 为偶数）
-        // spawnY：boss 中心 Y 需满足 boss 上边界 = startY - enemyHeight/2
-        // 即 spawnY = startY + enemyHeight/2，确保 boss 占满第 0、1 行的完整网格
-        const spawnY = this.combatGridTopY + this.enemyHeight / 2; // 生成在顶部，上下边界与行网格边界对齐
+        // spawnY 数学推导：
+        //   combatGridTopY = 第一行中心 Y
+        //   第一行上边界 = combatGridTopY - enemyHeight/2
+        //   Boss 上边界 = spawnY - bossH/2 = spawnY - enemyHeight
+        //   令 Boss 上边界 = 第一行上边界： spawnY - enemyHeight = combatGridTopY - enemyHeight/2
+        //   得 spawnY = combatGridTopY + enemyHeight/2，Boss 占满第 0、1 行完整网格
+        const spawnY = this.combatGridTopY + this.enemyHeight / 2; // Boss 上边界与第一行上边界对齐
+
+        // ===== 问题 2 修复：Boss 出场前清除場上所有现有敌人 =====
+        // 规范依据：game_phase.md 明确“Boss 回合不生成普通敌人行”
+        // Boss 出场是特殊关卡，不应与残留的普通敌人共存重叠
+        if (this.enemies.length > 0) {
+            this.enemies.forEach(e => { e.active = false; });
+            this.enemies = [];
+        }
 
         const bossHP = this.spawn_calculateBossHP(isBigBoss);
 
-        const boss = new Enemy(centerX, spawnY, bossW, bossH, bossHP);
+        // ===== 问题 1 修复：Boss 入场动画初始化 =====
+        // Boss 从屏幕顶部外坠入，_entranceStartY 为屏幕外上方
+        const entranceStartY = this.combatGridTopY - bossH * 2; // 屏幕外上方（Boss 高度的 2 倍）
+        const boss = new Enemy(centerX, entranceStartY, bossW, bossH, bossHP);
         boss.type = 'boss';
         boss.bossType = bossId;
         boss.bossName = bossCfg.name;
@@ -1371,9 +1386,14 @@ export const spawn_system = {
             boss.rotationTurnCount = 0;
         }
 
+        // 设置入场动画状态
+        boss.dropTargetY = spawnY;       // 目标位置：网格对齐的顶部
+        boss._entranceStartY = entranceStartY; // 入场起始 Y
+        boss.entranceTimer = 90;         // 入场动画帧数：90 帧（约 1.5s @60fps）
+
         this.enemies.push(boss);
 
-        // 通过 EventBus 广播 Boss 生成事件
+        // 通过 EventBus 广播 Boss 生成事件（听众在 ui_system.js 中触发全屏遗罩和震动）
         eventBus.emit('boss:spawned', {
             boss: boss,
             bossId: bossId,
@@ -1384,7 +1404,6 @@ export const spawn_system = {
 
         // 显示 Boss 出现提示
         showToast(`☠️ ${bossCfg.name} 出现！`);
-        this.spawn_createFloatingText(centerX, spawnY, `☠️ ${bossCfg.name}`, '#ff4444');
 
         return boss;
     },

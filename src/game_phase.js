@@ -1146,8 +1146,8 @@ phase_gathering_getRandomPegType() {
                 if (e.active) {
                     e.update(this.timeScale, this);
                     e.draw(this.ctx);
-                    // e.dropTargetY > 0 || 
-                    if (e.pos.y > 0) {
+                    // Boss 入场动画期间（pos.y 在屏幕外）也计入活跃敌人，防止误判完美清场
+                    if (e.pos.y > 0 || (e.type === 'boss' && e.entranceTimer > 0)) {
                         activeEnemies++;
                     }
                     if (Math.abs(e.pos.y - e.dropTargetY) > 1) anyEnemyMoving = true;

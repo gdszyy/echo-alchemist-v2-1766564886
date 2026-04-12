@@ -522,7 +522,7 @@ ui_closeTruthBook() {
             }, duration || 500);
         });
 
-        // ── 全屏闪光特效 ────────────────────────────────────────────────
+         // ── 全屏闪光特效 ─────────────────────────────────────
         // 监听来自 combat_system.js 的闪光事件，操作 canvas 闪光层 DOM
         eventBus.on(EVENT_TYPES.UI_FLASH_EFFECT, ({ color, alpha, duration }) => {
             const flashEl = document.getElementById('canvas-flash-overlay');
@@ -535,5 +535,33 @@ ui_closeTruthBook() {
                 setTimeout(() => { flashEl.style.display = 'none'; }, 200);
             }, duration || 100);
         });
+
+        // ── Boss 入场全屏特效 ─────────────────────────────────
+        // 监听 BOSS_SPAWNED 事件，触发：
+        //   1. 全屏暗化遗罩（深红色闪烁）
+        //   2. 屏幕震动
+        //   3. Boss 入场音效（使用现有音效系统合成）
+        eventBus.on(EVENT_TYPES.BOSS_SPAWNED, ({ bossName, isBigBoss }) => {
+            const overlay = document.getElementById('boss-entrance-overlay');
+            if (overlay) {
+                // 深红色暗化遗罩：淡入 -> 保持 -> 淡出
+                overlay.classList.remove('boss-entrance-active');
+                // 强制重流
+                void overlay.offsetWidth;
+                overlay.classList.add('boss-entrance-active');
+            }
+
+            // 屏幕震动：大 Boss 更强烈
+            if (typeof this.triggerScreenShake === 'function') {
+                this.triggerScreenShake(isBigBoss ? 18 : 10);
+            }
+
+            // Boss 入场音效：利用现有音效工具合成威联感音效
+            // 阶段 1：低频威联弦
+            audio.playTone(60, 'sawtooth', 0.4, 0.8);
+            // 阶段 2：延迟 0.3s 后叠加中频威联弦
+            setTimeout(() => audio.playTone(90, 'sawtooth', 0.3, 0.6), 300);
+            // 阶段 3：延迟 0.6s 后叠加高频威联弦
+            setTimeout(() => audio.playTone(isBigBoss ? 150 : 120, 'square', 0.25, 0.5), 600);
+        });
     },
-};
