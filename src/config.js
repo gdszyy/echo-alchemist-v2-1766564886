@@ -751,6 +751,7 @@ const RELIC_DB = [
     { id: 'mirror_sync', name: '鏡像同步', icon: '🪞', desc: '收集階段：釘盤列數減少且對齊。釘子被同化/突變時，鏡像位置的釘子同步轉化；特殊槽位鏡像呈現（數量翻倍）。', rarity: 'legendary', effect: 'board_layout_mirror_sync', maxStacks: 1 },
     // 策略5：宽窄交替 - 边缘捕获流（宽行捕获偏移弹珠，窄行提供通道）
     { id: 'wide_narrow', name: '寬窄交替', icon: '📐', desc: '收集階段：偶數行增加 2 列，奇數行減少 2 列，形成寬窄交替結構。寬行的邊緣釘子能捕獲偏移的弹珠，窄行讓弹珠有更多橫向空間。', rarity: 'common', effect: 'board_layout_wide_narrow', maxStacks: 1 },
+    { id: 'resonance_stone', name: '共鳴之石', icon: '💎', desc: '下兩個回合必定刷新出一個 [共鳴彈珠]，且同化概率大幅提升（持續兩回合）。', rarity: 'rare', effect: 'resonance_stone_effect', maxStacks: 1 },
 ];
 
 // ==================== 技能数据库 ====================

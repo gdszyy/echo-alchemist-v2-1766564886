@@ -753,6 +753,14 @@ phase_gathering_getRandomPegType() {
                 console.log('[DifficultyBalance] 战后高压因子已恢复正常');
             }
         }
+
+        // [新增] 遗物效果递减：共鸣之石
+        if (this.assimilationBoostRounds > 0) {
+            this.assimilationBoostRounds--;
+            if (this.assimilationBoostRounds === 0) {
+                showToast('共鳴共振效果已結束。');
+            }
+        }
         
         this.round++;
         this.prevRoundDamage = this.roundDamage;

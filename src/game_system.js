@@ -172,6 +172,7 @@ export const game_system = {
         // 重置解锁权重回初始状态
         this.unlockedWeights = { ...CONFIG.probabilities };
         this.guaranteedNextRound = [];
+        this.assimilationBoostRounds = 0;
         this.ownedRelics = [];
         
         // 补充遗物相关的重置字段
