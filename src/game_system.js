@@ -119,6 +119,15 @@ export const game_system = {
 
         this.enemyWidth = (this.width / CONFIG.gameplay.enemyCols);
         this.enemyHeight = this.enemyWidth;
+
+        // 动态计算战斗网格第一行敌人的中心 Y（避免被顶部半透明栏遮挡）
+        // 语义：combatGridTopY = 第一行敌人中心点 Y
+        // 计算：顶部栏高度 + 8px 安全间距 + 半个敌人高度（中心点偏移）
+        // 这样第一行上边界 = topBarH + 8，恰好在顶部栏下方，且与后续行网格完全对齐
+        const topBarEl = document.getElementById('unified-top-bar');
+        const topBarH = topBarEl ? topBarEl.getBoundingClientRect().height : 52;
+        this.combatGridTopY = topBarH + 8 + this.enemyHeight / 2;
+
         this.ui_updateUICache();
 
         if (this.phase === 'gathering') {
@@ -134,8 +143,8 @@ export const game_system = {
         // 注入局外升级效果
         this.meta_applyUpgrades();
 
-        // 生成初始敌人
-        const startY = 80;
+        // 生成初始敌人（使用 combatGridTopY 确保不被顶部半透明栏遮挡）
+        const startY = this.combatGridTopY;
         for (let i = 0; i < CONFIG.gameplay.startRows; i++) {
             this.spawn_spawnEnemyRowAt(startY + i * this.enemyHeight);
         }

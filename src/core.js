@@ -177,7 +177,7 @@ class Game {
         this.gripStartPos = new Vec2(0, 0); 
         this.gameOver = false; 
         this.defeatLineY = 570; 
-        this.combatGridTopY = 60; // 战斗网格顶部安全起始 Y（由 sys_resize 动态更新）
+        this.combatGridTopY = 90; // 战斗网格第一行敌人中心 Y（由 sys_resize 动态计算并覆盖）
         this.timeScale = 1.0; 
         this.round = 1; 
         this.score = 0; 
