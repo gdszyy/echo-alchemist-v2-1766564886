@@ -402,6 +402,10 @@ class Projectile {
         if (this.config.cryo > 0) {
             enemy._cryoHitThisRound = true;
         }
+        // [技能系统迭代] 棱光炮技能的 _forceFusion 标记传递到敌人
+        if (this.config._forceFusion) {
+            enemy._forceFusionThisRound = true;
+        }
 
         // ─────────────────────────────────────────────────────────────────────
         // [词条 Hook] 绝对零度（absolute_zero）

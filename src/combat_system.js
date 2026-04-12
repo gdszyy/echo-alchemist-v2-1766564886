@@ -98,7 +98,7 @@ export const combat_system = {
         // 1. 扣除消耗
         this.skillPoints -= skill.cost;
         this.ui.updateSkillPoints(this.skillPoints);
-        this.ui.updateSkillBar(this.skillPoints);
+        this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
         
         audio.playPowerup(5); 
         showToast(`釋放: ${skill.name}!`);
@@ -171,7 +171,7 @@ export const combat_system = {
                 
                 // 1. 遍历并应用 buffs (包含 scatter)
                 for (const [key, val] of Object.entries(p.buffs)) {
-                    // 如果是 damage, scatter, bounce 等数值属性，直接累加
+                    // 如果是 damage, scatter, bounce 等数局属性，直接累加
                     if (typeof nextAmmo[key] === 'number' || nextAmmo[key] === undefined) {
                         nextAmmo[key] = (nextAmmo[key] || 0) + val;
                     }
@@ -198,8 +198,149 @@ export const combat_system = {
                 // 返还 SP
                 this.skillPoints += skill.cost;
                 this.ui.updateSkillPoints(this.skillPoints);
-                this.ui.updateSkillBar(this.skillPoints);
+                this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
                 showToast("無彈藥可強化");
+            }
+        }
+
+        // ==================== [技能系统迭代] 新技能方法分发 ====================
+
+        else if (method === 'skill_frost_prison') {
+            // 冰牢封印：冻结所有敢人 + 冻结期伤害加成
+            const freezeFrames = Math.round(p.freezeDuration * 60); // 秒 -> 帧
+            eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 300 });
+            this.ui_triggerScreenShake(150);
+            let frozenCount = 0;
+            this.enemies.forEach(e => {
+                if (e.active) {
+                    // 利用现有温度机制：将温度拉满至冰结阈值 -100
+                    e.temp = -100;
+                    // 设置冻结计时（复用 frozenTurns 字段，单位为帧）
+                    e.frozenTurns = Math.max(e.frozenTurns || 0, freezeFrames);
+                    // 标记冻结期伤害加成
+                    e._frostPrisonAmp = p.damageAmpBonus;
+                    frozenCount++;
+                    this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'mist');
+                    this.spawn_createFloatingText(e.pos.x, e.pos.y - 20, '❄️冻结!', '#67e8f9');
+                }
+            });
+            if (frozenCount > 0) {
+                try { audio.playEffect('cryo'); } catch(e2) {}
+            }
+        }
+
+        else if (method === 'skill_thunder_call') {
+            // 雷神降临：对所有敢人各落一道天雷 + 感电
+            const dmg = p.baseDmg + (this.round * p.roundMult);
+            eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 200 });
+            this.ui_triggerScreenShake(200);
+            for (let i = this.enemies.length - 1; i >= 0; i--) {
+                const e = this.enemies[i];
+                if (e.active) {
+                    const startX = e.pos.x + (Math.random() - 0.5) * 50;
+                    this.lightningBolts.push(new LightningBolt(startX, 0, e.pos.x, e.pos.y));
+                    const killed = e.takeDamage(dmg);
+                    this.combat_recordDamage(dmg, 'lightning', 'main', this._currentDamageShotId);
+                    this.spawn_createFloatingText(e.pos.x, e.pos.y, `-${dmg}`, p.boltColor);
+                    e.applyTemp(CONFIG.balance.lightningTempIncrease || 3);
+                    const skillChainLevel = p.chainLevel || 10;
+                    this.combat_lightning_triggerChain(e, dmg, [e], skillChainLevel);
+                    if (killed) this.spawn_addScore(e.maxHp);
+                }
+            }
+            try { audio.playLightning(); } catch(e2) {}
+        }
+
+        else if (method === 'skill_kinetic_burst') {
+            // 动能爆发：下一发弹珠弹跳次数上限 + 每次弹跳额外伤害
+            if (this.ammoQueue.length > 0) {
+                const nextAmmo = this.ammoQueue[0];
+                nextAmmo.bounce = (nextAmmo.bounce || 0) + p.bounceBonus;
+                // 将每次弹跳额外伤害存入弹珠定义，供 projectile.js 读取
+                nextAmmo._kineticBurstDmg = (nextAmmo._kineticBurstDmg || 0) + p.flatDamagePerBounce;
+                this.spawn_createExplosion(this.width/2, this.height - 80, p.particleColor);
+                this.ui_updateAmmoUI();
+                this.spawn_createFloatingText(this.width/2, this.height - 120, p.floatText, p.particleColor);
+                try { audio.playPowerup(3); } catch(e2) {}
+            } else {
+                this.skillPoints += skill.cost;
+                this.ui.updateSkillPoints(this.skillPoints);
+                this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
+                showToast('無彈藥可強化');
+            }
+        }
+
+        else if (method === 'skill_meltdown_nova') {
+            // 熔毀新星：对所有敢人施加过热状态
+            const overheatThreshold = 100; // 爆炸阈值
+            const targetTemp = Math.round(overheatThreshold * p.tempRatio);
+            eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 250 });
+            this.ui_triggerScreenShake(180);
+            let heatedCount = 0;
+            this.enemies.forEach(e => {
+                if (e.active) {
+                    // 只向上拉温度，不降温
+                    if (e.temp < targetTemp) {
+                        e.temp = targetTemp;
+                    }
+                    heatedCount++;
+                    this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'spark');
+                    this.spawn_createFloatingText(e.pos.x, e.pos.y - 20, '🔥过热!', '#fb923c');
+                }
+            });
+            if (heatedCount > 0) {
+                try { audio.playEffect('pyro'); } catch(e2) {}
+            }
+        }
+
+        else if (method === 'skill_blade_rain') {
+            // 剑刃雨：召唤多道飞剑斩击随机敢人
+            const swordDmg = Math.round(this.round * p.roundMult);
+            const activeEnemies = this.enemies.filter(e => e.active);
+            if (activeEnemies.length === 0) {
+                this.skillPoints += skill.cost;
+                this.ui.updateSkillPoints(this.skillPoints);
+                this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
+                showToast('沒有敢人可攻擊');
+                return;
+            }
+            for (let i = 0; i < p.swordCount; i++) {
+                // 随机选择目标敢人
+                const target = activeEnemies[Math.floor(Math.random() * activeEnemies.length)];
+                const spawnX = target.pos.x + (Math.random() - 0.5) * 60;
+                const spawnY = Math.max(30, target.pos.y - 80);
+                const swordConfig = {
+                    damage: swordDmg,
+                    pyro: 0, cryo: 0, lightning: 0, wind: 0,
+                    multicast: 0,
+                    type: 'flying_sword'
+                };
+                const lvl = this.variantLevels ? (this.variantLevels.flying_sword || 1) : 1;
+                this.combat_flyingSword_addSon(spawnX, spawnY, null, lvl, swordConfig, i * 5);
+                this.combat_flyingSword_assignTarget(target);
+            }
+            this.spawn_createFloatingText(this.width/2, this.height/2, '剑刃雨!', p.particleColor);
+            try { audio.playEffect('split'); } catch(e2) {}
+        }
+
+        else if (method === 'skill_prismatic_shot') {
+            // 棱光炮：下一发弹珠同时携带火/冰/雷三种属性
+            if (this.ammoQueue.length > 0) {
+                const nextAmmo = this.ammoQueue[0];
+                nextAmmo.pyro = (nextAmmo.pyro || 0) + p.pyroStacks;
+                nextAmmo.cryo = (nextAmmo.cryo || 0) + p.cryoStacks;
+                nextAmmo.lightning = (nextAmmo.lightning || 0) + p.lightningStacks;
+                // 标记强制触发元素聚变判定
+                nextAmmo._forceFusion = p.forceFusion;
+                this.spawn_createExplosion(this.width/2, this.height - 80, p.explosionColor);
+                this.ui_updateAmmoUI();
+                this.spawn_createFloatingText(this.width/2, this.height - 120, p.floatText, p.explosionColor);
+                try { audio.playPowerup(4); } catch(e2) {}
+            } else {
+                this.skillPoints += skill.cost;
+                this.ui.updateSkillPoints(this.skillPoints);
+                this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
+                showToast('無彈藥可強化');
             }
         }
     },
@@ -1278,6 +1419,14 @@ export const combat_system = {
 		const shotId = projectile.shotId !== undefined ? projectile.shotId : null;
         const config = projectile.config;
         let dmg = damageOverride !== null ? damageOverride : (projectile.isCopy ? config.damage * 0.5 : config.damage);
+
+        // [技能系统迭代] 动能爆发技能：弹跳命中时额外加伤
+        if (config._kineticBurstDmg && config._kineticBurstDmg > 0) {
+            const isBounce = config.bounce > 0 && projectile.bouncesLeft !== undefined && projectile.bouncesLeft < config.bounce;
+            if (isBounce) {
+                dmg += config._kineticBurstDmg;
+            }
+        }
 
         // --- [新增] 确定伤害来源类型 (用于统计图表颜色) ---
         let sourceType = 'main';

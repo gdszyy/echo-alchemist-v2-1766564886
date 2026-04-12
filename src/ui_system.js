@@ -257,11 +257,12 @@ ui_closeTruthBook() {
             }
         }
 
-        // A. 技能栏 (Skill Bar) - 仅在战斗且非敌人回合显示
+        // A. 技能杠 (Skill Bar) - 仅在战斗且有已解锁技能时显示
         const skillBar = document.getElementById('skill-bar');
         if (skillBar) {
-            // 只有在 combat 阶段才显示，其他阶段强制隐藏
-            skillBar.style.display = (this.phase === 'combat') ? 'flex' : 'none';  // [Mixin 正常用法：读取 Game 实例状态]
+            // [技能系统迭代] 必须在 combat 阶段且有已解锁技能才显示
+            const hasSkills = this.activeSkills && this.activeSkills.length > 0;
+            skillBar.style.display = (this.phase === 'combat' && hasSkills) ? 'flex' : 'none';  // [Mixin 正常用法：读取 Game 实例状态]
         }
 
         // B. 连击倍率显示 (Multiplier)
@@ -271,10 +272,11 @@ ui_closeTruthBook() {
         }
 
         // C. 技能点面板 (SP Panel)
-        // 逻辑：在 gathering 和 combat 显示，在选择阶段隐藏
+        // [技能系统迭代] 仅当有已解锁技能时，在 gathering 和 combat 阶段显示
         const spPanel = document.getElementById('sp-panel');
         if (spPanel) {
-            if (this.phase === 'gathering' || this.phase === 'combat') {  // [Mixin 正常用法：读取 Game 实例状态]
+            const hasSkillsForSP = this.activeSkills && this.activeSkills.length > 0;
+            if ((this.phase === 'gathering' || this.phase === 'combat') && hasSkillsForSP) {  // [Mixin 正常用法：读取 Game 实例状态]
                 spPanel.style.opacity = '1';
                 spPanel.style.pointerEvents = 'auto'; // 允许交互（查看提示等）
             } else {

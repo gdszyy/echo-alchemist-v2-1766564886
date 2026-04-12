@@ -445,12 +445,14 @@ this.affixDict = {
             game.ui_updateDamageStats();
         }
     }
-    updateSkillBar(currentSP) {
+    updateSkillBar(currentSP, activeSkills) {
         const container = document.getElementById('skill-bar');
         if (!container) return;
         container.innerHTML = '';
 
-        SKILL_DB.forEach(skill => {
+        // [技能系统迭代] 仅渲染已解锁的技能，而非遍历全部 SKILL_DB
+        const skillsToRender = activeSkills || [];
+        skillsToRender.forEach(skill => {
             const btn = document.createElement('div');
             // 样式：圆形按钮，带冷却遮罩效果
             const isDisabled = currentSP < skill.cost;

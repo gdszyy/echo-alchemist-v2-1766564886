@@ -401,7 +401,7 @@ export const spawn_system = {
     spawn_addSkillPoint(amount = 1) {
         this.skillPoints += amount;
         this.ui.updateSkillPoints(this.skillPoints);
-        this.ui.updateSkillBar(this.skillPoints); // <--- [新增] 更新技能栏状态
+        this.ui.updateSkillBar(this.skillPoints, this.activeSkills); // 更新技能杠状态
     },
 
 /**

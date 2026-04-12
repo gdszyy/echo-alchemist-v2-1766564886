@@ -289,9 +289,15 @@ export const game_phase = {
             }
         }
 
-        console.log(`[DEBUG] Starting special slot creation: unlockedSlots=${JSON.stringify(this.unlockedSlots)}, slotCount=${this.slotCount}`);
-        if (this.unlockedSlots.length > 0 && this.slotCount > 0) {
-            const slotTypes = this.unlockedSlots;
+        // [技能系统迭代] 动态过滤 skill_point 槽：仅当玩家有已解锁技能时才生成技能点槽
+        let effectiveSlots = [...this.unlockedSlots];
+        if (!this.activeSkills || this.activeSkills.length === 0) {
+            effectiveSlots = effectiveSlots.filter(t => t !== 'skill_point');
+        }
+        const effectiveSlotCount = Math.min(this.slotCount, effectiveSlots.length > 0 ? this.slotCount : 0);
+        console.log(`[DEBUG] Starting special slot creation: effectiveSlots=${JSON.stringify(effectiveSlots)}, slotCount=${effectiveSlotCount}`);
+        if (effectiveSlots.length > 0 && effectiveSlotCount > 0) {
+            const slotTypes = effectiveSlots;
             
             // [重构] 不再使用随机坐标匹配，而是直接从合法候选钉子池中抽取
             // 1. 筛选出所有合法的候选钉子索引 (非粉色且未被占用)
@@ -346,7 +352,7 @@ export const game_phase = {
             const usedPegs = new Set();
 
             for (const [idxA, idxB] of strictPairs) {
-                if (createdCount >= this.slotCount) break;
+                if (createdCount >= effectiveSlotCount) break;
                 if (usedPegs.has(idxA) || usedPegs.has(idxB)) continue;
 
                 const pegA = this.pegs[idxA];
@@ -380,11 +386,11 @@ export const game_phase = {
             }
 
             // 如果严格对不够，退化为单钉子水平短连线
-            if (createdCount < this.slotCount) {
+            if (createdCount < effectiveSlotCount) {
                 const usedIdx = new Set(this.specialSlots.flatMap(s => [s.pegIndex, s.pegIndex2]));
                 const remaining = validPegIndices2.filter(i => !usedIdx.has(i));
                 for (const idxA of remaining) {
-                    if (createdCount >= this.slotCount) break;
+                    if (createdCount >= effectiveSlotCount) break;
                     const pegA = this.pegs[idxA];
                     // 按顺序分配类型，与主逻辑保持一致
                     const type = slotTypes[createdCount % slotTypes.length];
@@ -398,9 +404,9 @@ export const game_phase = {
                 }
             }
 
-            console.log(`[DEBUG] Finished special slot creation: final count=${this.specialSlots.length}, target=${this.slotCount}`);
+            console.log(`[DEBUG] Finished special slot creation: final count=${this.specialSlots.length}, target=${effectiveSlotCount}`);
         } else {
-            console.log(`[DEBUG] Skipping special slot creation: unlockedSlots.length=${this.unlockedSlots.length}, slotCount=${this.slotCount}`);
+            console.log(`[DEBUG] Skipping special slot creation: effectiveSlots.length=${effectiveSlots.length}, effectiveSlotCount=${effectiveSlotCount}`);
         }
         this.ui_updateGatheringQueueUI();
         this.ui_renderRecipeHUD();
@@ -484,6 +490,9 @@ phase_gathering_getRandomPegType() {
             e._cryoHitThisRound = false;
             e._lightningHitThisRound = false;
             e._absoluteZeroHitCount = 0;
+            // [技能系统迭代] 重置技能相关状态标记
+            e._forceFusionThisRound = false; // 棱光炮强制聚变标记
+            if (e._frostPrisonAmp) e._frostPrisonAmp = 0; // 冰牢封印伤害加成每回合清除
         });
         
         // [充能符文系统] 初始化充能状态
@@ -491,7 +500,7 @@ phase_gathering_getRandomPegType() {
         
         if (this.ui) {
             this.ui.updateSkillPoints(this.skillPoints);
-            this.ui.updateSkillBar(this.skillPoints);
+            this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
         }
     },
 

@@ -1924,6 +1924,15 @@ class Enemy {
             }
         }
 
+        // 3b. [技能系统迭代] 冰牢封印技能的冻结期伤害加成
+        if (this._frostPrisonAmp && this._frostPrisonAmp > 0 && (this.temp <= -100 || (this.frozenTurns && this.frozenTurns > 0))) {
+            const beforeAmp = actualDamage;
+            actualDamage *= (1 + this._frostPrisonAmp);
+            if (typeof game !== 'undefined') {
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - 45, `❄️+${Math.round(this._frostPrisonAmp * 100)}%`, '#67e8f9');
+            }
+        }
+
           // 4. 执行扣血
         this.hp -= actualDamage; 
         this.hitTimer = 10; 

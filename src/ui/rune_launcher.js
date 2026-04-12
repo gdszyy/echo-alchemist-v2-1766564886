@@ -19,6 +19,7 @@ import { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY, RARITY_DISPLAY } from '../rune_conf
 import { parseRuneGrid, calcRuneBaseStats, getRuneId, rune_merge, rune_reforge } from '../rune_system.js';
 import { audio } from '../audio.js';
 import { showToast } from '../entities.js';
+import { SKILL_DB } from '../config.js'; // [技能系统迭代] 用于符文解锁技能派生
 
 /**
  * 构建符文图标 HTML（统一的符文展示辅助函数）
@@ -368,6 +369,36 @@ export const rune_launcher_system = {
             } else {
                 badge.classList.add('hidden');
             }
+        }
+
+        // 9. [技能系统迭代] 根据激活的符文词条派生已解锁技能列表
+        //    SKILL_DB 中每个技能的 unlockRuneword 字段指向一个 RUNEWORD_DB 的 id
+        //    当该词条被激活时，对应技能自动解锁
+        const prevSkillCount = this.activeSkills ? this.activeSkills.length : 0;
+        const activatedRunewordIds = new Set(activatedRunewords.map(rw => rw.id));
+        const newActiveSkills = SKILL_DB.filter(sk => sk.unlockRuneword && activatedRunewordIds.has(sk.unlockRuneword));
+        this.activeSkills = newActiveSkills;
+
+        // 如果技能列表发生变化，同步更新技能杠和 SP 面板显隐
+        if (newActiveSkills.length !== prevSkillCount) {
+            // 如果有新解锁的技能，确保 skill_point 槽在下一回合中生成
+            if (newActiveSkills.length > 0 && !this.unlockedSlots.includes('skill_point')) {
+                this.unlockedSlots.push('skill_point');
+                // 增加槽位数量以容纳技能点槽
+                if (this.slotCount < this.unlockedSlots.length) {
+                    this.slotCount = this.unlockedSlots.length;
+                }
+                showToast('✨ 符文解锁技能！下一回合将出现技能点槽');
+            } else if (newActiveSkills.length === 0 && this.unlockedSlots.includes('skill_point')) {
+                this.unlockedSlots = this.unlockedSlots.filter(t => t !== 'skill_point');
+                this.slotCount = Math.max(1, this.unlockedSlots.length);
+            }
+            // 同步更新技能杠显示
+            if (this.ui) {
+                this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
+            }
+            // 触发 UI 更新（显隐 SP 面板和技能杠）
+            this.ui_updateUI();
         }
     },
 

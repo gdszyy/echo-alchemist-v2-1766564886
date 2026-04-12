@@ -793,79 +793,101 @@ const RELIC_DB = [
 // ==================== 技能数据库 ====================
 
 const SKILL_DB = [
-    { 
-        id: 'repulsion', 
-        methodId: 'repulsion', // 逻辑ID
-        name: '重力反轉', 
-        icon: '🌬️', 
-        cost: 2, 
-        color: '#60a5fa',
-        desc: '將所有敵人強制向上推回 2 行。',
+    {
+        id: 'skill_frost_prison',
+        methodId: 'skill_frost_prison',
+        unlockRuneword: 'runeword_absolute_zero', // 解锁词条：绝对零度
+        name: '冰牢封印',
+        icon: '🧊',
+        cost: 2,
+        color: '#67e8f9',
+        desc: '冻结所有敌人 3 秒，冻结期间受到的伤害提升 30%。',
         params: {
-            pushRows: 2,
-            visualShake: -20,
-            particleColor: '#60a5fa',
-            shockwaveColor: '#60a5fa'
+            freezeDuration: 3,
+            damageAmpBonus: 0.30,
+            particleColor: '#67e8f9',
+            flashColor: 'rgba(103, 232, 249, 0.15)'
         }
     },
-    { 
-        id: 'storm', 
-        methodId: 'chain_lightning_all', // 逻辑ID：全屏闪电链
-        name: '以太風暴', 
-        icon: '⚡', 
-        cost: 3, 
-        color: '#c084fc',
-        desc: '召喚雷擊命中所有敵人，並觸發連鎖閃電。',
+    {
+        id: 'skill_thunder_call',
+        methodId: 'skill_thunder_call',
+        unlockRuneword: 'runeword_thunderstorm', // 解锁词条：雷暴之语
+        name: '雷神降臨',
+        icon: '🌩️',
+        cost: 3,
+        color: '#a78bfa',
+        desc: '对所有敌人各落一道天雷，伤害基于回合数 × 8，并施加感电。',
         params: {
-            baseDmg: 10,
-            roundMult: 5,
-            // 闪电相关参数
-            boltColor: '#c084fc', // 闪电颜色
-            flashColor: 'rgba(192, 132, 252, 0.2)',
-            chainLevel: 15 // [新增] 技能自带的闪电等级 (15级 = 每次弹跳伤害+20%)
+            baseDmg: 8,
+            roundMult: 8,
+            boltColor: '#a78bfa',
+            flashColor: 'rgba(167, 139, 250, 0.2)',
+            chainLevel: 10
         }
     },
-    { 
-        id: 'enhance_normal', // 技能ID：普通强化
-        methodId: 'enhance_ammo', // 逻辑ID：强化逻辑
-        name: '賢者充能', 
-        icon: '💎', 
-        cost: 2, 
-        color: '#facc15',
-        desc: '下一發子彈強化：散射、連射與全屬性提升。',
+    {
+        id: 'skill_kinetic_burst',
+        methodId: 'skill_kinetic_burst',
+        unlockRuneword: 'runeword_kinetic_surge', // 解锁词条：动能激增
+        name: '動能爆發',
+        icon: '🔄',
+        cost: 1,
+        color: '#34d399',
+        desc: '下一发弹珠弹跳次数上限 +15，且每次弹跳伤害额外 +3。',
         params: {
-            buffs: {
-                damage: 5,
-                bounce: 3,
-                pierce: 2,
-                multicast: 1,
-                scatter: 4 
-            },
-            forceExplosive: true,
-            forceLaser: false, // [新增] 是否开启光属性
-            explosionColor: '#facc15',
-            floatText: "ENHANCED!"
+            bounceBonus: 15,
+            flatDamagePerBounce: 3,
+            particleColor: '#34d399',
+            floatText: 'KINETIC!'
         }
     },
-    { 
-        id: 'enhance_laser', 
-        methodId: 'enhance_ammo', 
-        name: '光之充能', 
-        icon: '🔦', 
-        cost: 1, 
-        color: '#0ea5e9', 
-        desc: '下一發子彈轉化為高能激光。',
+    {
+        id: 'skill_meltdown_nova',
+        methodId: 'skill_meltdown_nova',
+        unlockRuneword: 'runeword_meltdown', // 解锁词条：熔毁
+        name: '熔毀新星',
+        icon: '🌋',
+        cost: 2,
+        color: '#fb923c',
+        desc: '对所有敌人施加过热状态，温度直接拉至爆炸阈值的 80%。',
         params: {
-            buffs: { 
-                damage: 5,
-                pierce: 8,
-                multicast: 2,
-                laser: 5
-             }, // 加激光层数
-            forceLaser: true, // [新增] 强制开启激光
-            forceExplosive: false,
-            explosionColor: '#0ea5e9',
-            floatText: "LASER READY!"
+            tempRatio: 0.80,
+            particleColor: '#fb923c',
+            flashColor: 'rgba(251, 146, 60, 0.15)'
+        }
+    },
+    {
+        id: 'skill_blade_rain',
+        methodId: 'skill_blade_rain',
+        unlockRuneword: 'runeword_blade_storm', // 解锁词条：剑刃风暴
+        name: '劍刃雨',
+        icon: '⚔️',
+        cost: 2,
+        color: '#e2e8f0',
+        desc: '召唤 5 道飞剑同时斩击随机敌人，每道伤害为回合数 × 4。',
+        params: {
+            swordCount: 5,
+            roundMult: 4,
+            particleColor: '#e2e8f0'
+        }
+    },
+    {
+        id: 'skill_prismatic_shot',
+        methodId: 'skill_prismatic_shot',
+        unlockRuneword: 'runeword_elemental_fusion', // 解锁词条：元素聚变
+        name: '棱光炮',
+        icon: '🌈',
+        cost: 3,
+        color: '#f0abfc',
+        desc: '下一发弹珠同时携带火/冰/雷三种属性，强制触发元素聚变判定。',
+        params: {
+            pyroStacks: 5,
+            cryoStacks: 5,
+            lightningStacks: 5,
+            forceFusion: true,
+            floatText: 'PRISMATIC!',
+            explosionColor: '#f0abfc'
         }
     }
 ];

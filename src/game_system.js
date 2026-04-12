@@ -178,8 +178,9 @@ export const game_system = {
         // 补充遗物相关的重置字段
         this.pinkPegCount = 0;
         this.hasCombatWall = false;
-        this.unlockedSlots = ['skill_point', 'multicast']; // 初始特殊槽：技能点 + 加连击
-        this.slotCount = 2; // 初始2个槽位
+        this.unlockedSlots = ['multicast']; // 初始特殊槽：仅连击槽
+        this.slotCount = 1; // 初始1个槽位
+        this.activeSkills = []; // 重置已解锁技能列表
         this.marbleSizeBonus = 0;
 
         // 清空实体

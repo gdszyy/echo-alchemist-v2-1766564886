@@ -373,7 +373,9 @@ export const DamageCalc = {
         const hasCryo = !!enemy._cryoHitThisRound;
         const hasLightning = !!enemy._lightningHitThisRound;
 
-        if (!hasPyro || !hasCryo || !hasLightning) return;
+        // [技能系统迭代] 棱光炮技能的 _forceFusion 标记强制触发元素聚变
+        const isForceFusion = !!(enemy._forceFusionThisRound);
+        if (!isForceFusion && (!hasPyro || !hasCryo || !hasLightning)) return;
 
         // 防止同一帧多次触发（冷却 500ms）
         const now = Date.now();
@@ -407,6 +409,7 @@ export const DamageCalc = {
         enemy._pyroHitThisRound = false;
         enemy._cryoHitThisRound = false;
         enemy._lightningHitThisRound = false;
+        enemy._forceFusionThisRound = false; // [技能系统迭代] 重置棱光炮强制聚变标记
     },
 
 };

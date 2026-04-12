@@ -133,8 +133,9 @@ class Game {
         this.currentPlayerPower = 0;
         this.pinkPegCount = 0;      
         this.hasCombatWall = false; 
-        this.unlockedSlots = ['skill_point', 'multicast']; // 初始特殊槽：技能点 + 加连击
-        this.slotCount = 2; // 初始2个槽位
+        this.unlockedSlots = ['multicast']; // 初始特殊槽：仅连击槽（技能点槽由符文词条解锁后动态加入）
+        this.slotCount = 1; // 初始1个槽位
+        this.activeSkills = []; // 当前局内已解锁的技能列表（由符文词条激活驱动）
         this.pegs = []; 
         this.enemies = []; 
         this.specialSlots = []; 
