@@ -1348,18 +1348,27 @@ class DropBall {
                 if (slot.hit) continue;
                 if (this.portalCooldown <= 0) {
                     // [连线触发] 计算弹珠圆心到连线线段的最短距离，替代旧的矩形包围盒检测
+                    // [修复] 排除端点钉子区域：_t 必须落在连线内部（排除两端钉子半径范围），
+                    //        防止球仅碰撞端点钉子时错误触发特殊槽。
                     const _sx = slot.x2 - slot.x, _sy = slot.y2 - slot.y;
                     const _segLenSq = _sx * _sx + _sy * _sy;
                     let _t = 0;
+                    let _onSegmentInterior = false;
                     if (_segLenSq > 0) {
                         _t = ((this.pos.x - slot.x) * _sx + (this.pos.y - slot.y) * _sy) / _segLenSq;
+                        // 钉子半径 / 线段长度 = 端点排除区间宽度
+                        const _pegR = 6; // Peg.radius
+                        const _segLen = Math.sqrt(_segLenSq);
+                        const _tMargin = _pegR / _segLen;
+                        // 只有投影落在两端钉子之间的内部区间时才触发
+                        _onSegmentInterior = (_t > _tMargin && _t < 1 - _tMargin);
                         _t = Math.max(0, Math.min(1, _t));
                     }
                     const _closestX = slot.x + _t * _sx;
                     const _closestY = slot.y + _t * _sy;
                     const _distToLine = Math.hypot(this.pos.x - _closestX, this.pos.y - _closestY);
                     const _triggerThreshold = this.radius + slot.height; // slot.height = 12 为触发带宽
-                    if (_distToLine < _triggerThreshold) {
+                    if (_onSegmentInterior && _distToLine < _triggerThreshold) {
                         slot.hit = true;
                         this.portalCooldown = 40; 
                         if (slot.type === 'recall') {

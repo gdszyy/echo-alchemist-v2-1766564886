@@ -51,6 +51,8 @@
 |------|------|----------|
 | 2026-04-12 | `src/entities.js`, `src/game_phase.js` | **SpecialSlot 双钉子连线模式重设计**：`SpecialSlot` 类构造函数参数从 `(x, y, width, type)` 改为 `(x, y, x2, y2, type)`，代表两个钉子的坐标而非单个钉子的圆心+宽度。`draw()` 方法改为在两钉子间绘制流动虚线发光连线，并在中点显示符号背景圆。`DropBall.update` 中的碰撞检测从矩形包围盒改为圆心到线段的最短距离检测（阈值 = `ball.radius + slot.height`）。`game_phase.js` 的生成逻辑改为选取一对相邻钉子（距离 ≤ `spacingX * 1.6`）并存储 `slot.pegIndex2`。 |
 |------|------|----------|
+| 2026-04-13 | `src/entities.js` | **SpecialSlot 端点钉子误触发修复**：修复特殊槽仅碰撞连线端点钉子就触发的 Bug。在 `DropBall.update` 的连线碰撞检测中，新增 `_onSegmentInterior` 判断：计算球在线段上的投影参数 `_t` 后，要求 `_t` 必须落在 `(_tMargin, 1 - _tMargin)` 的内部区间（`_tMargin = pegRadius / segLen = 6 / segLen`），排除两端钉子半径范围。只有当 `_onSegmentInterior === true` 且 `_distToLine < _triggerThreshold` 时才触发，确保球必须真正穿越两钉之间的连线区域。 |
+|------|------|----------|
 | 2026-04-11 | `src/entities.js` | `DropBall.update`：当 `this.radius > CONFIG.physics.marbleRadius`（即处于倍化状态）时，使用 `friction + 0.005`（上限 0.998）替代默认摩擦力，减少卡墙概率 |
 | 2026-04-11 | `src/ui/shop.js` | `permanent_size_up` 效果：`marbleSizeBonus` 从 `4.2` 调整为 `2.5`，防止倍化球在钉盘左右墙面间就少尺寸内将球夹住 |
 | 2026-04-12 | `src/spawn_system.js` | `spawn_spawnBoss`：修复 Boss 大小、位置与网格不对齐问题。`bossH` 从 `enemyHeight * 1.5`（非整数行）改为 `enemyHeight * 2`（占 2 整行）；`spawnY` 从硬编码 `80` 改为动态计算 `80 + enemyHeight / 2`，确保 Boss 上下边界与行网格边界完全对齐；`centerX` 从 `(enemyCols/2) * enemyWidth` 改为 `this.width / 2`（更健壮，不依赖 enemyCols 为偶数） |
