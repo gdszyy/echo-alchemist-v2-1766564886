@@ -414,12 +414,6 @@ phase_gathering_getRandomPegType() {
         this.waveMomentumTimer = 45; 
 
         // --- 1. 温度结算逻辑 ---
-        // [改动] berserk 词条：每回合先对该敌人 +20 度，并将温度结算执行两次
-        if (e.affixes && e.affixes.includes('berserk')) {
-            e.temp += 20;
-            this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, '+20℃', '#f97316');
-        }
-
         // 封装单次温度结算逻辑为函数，便于 berserk 重复执行
         const _processTempOnce = () => {
             if (e.temp < 0) {
@@ -454,10 +448,12 @@ phase_gathering_getRandomPegType() {
             }
         };
 
+        // [改动] berserk 词条：先执行两次温度结算，再 +20℃
         _processTempOnce();
-        // [改动] berserk 词条：温度结算执行两次
         if (e.affixes && e.affixes.includes('berserk')) {
             _processTempOnce();
+            e.temp += 20;
+            this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, '+20℃', '#f97316');
         }
 
         // --- 2. 行动逻辑 ---
