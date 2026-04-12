@@ -1,4 +1,3 @@
-import { Vec2 } from './utils/math_utils.js';
 import { 
     META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB 
 } from './config.js';
