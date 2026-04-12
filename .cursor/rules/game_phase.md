@@ -56,6 +56,7 @@ globs: ["src/game_phase.js"]
 2. 若是 Boss 回合，将生成信息存入 `this._pendingBossSpawn`
 3. `round++` 执行后，检查 `_pendingBossSpawn` 并调用 `spawn_spawnBoss`
 4. Boss 回合不生成普通敌人行
+5. **选择性清场**：`spawn_spawnBoss` 出场时，仅移除与 Boss 最终落点区域（AABB）发生重叠的敌人，保留其余敌人。这确保了玩家前期战斗对场面的影响（如冻结、血量耗损）仍有意义。Boss 占据区域：水平中心为 `centerX`，宽 `bossW = enemyWidth * 3`，高 `bossH = enemyHeight * 2`，垂直中心为 `spawnY`。
 
 ### 4.3 Boss 阶段变化
 - **狂暴阶段**: Boss HP < 50% 时自动触发，通过 `combat_triggerBossEnrage` 处理

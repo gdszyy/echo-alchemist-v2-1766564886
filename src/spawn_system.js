@@ -1346,12 +1346,25 @@ export const spawn_system = {
         //   得 spawnY = combatGridTopY + enemyHeight/2，Boss 占满第 0、1 行完整网格
         const spawnY = this.combatGridTopY + this.enemyHeight / 2; // Boss 上边界与第一行上边界对齐
 
-        // ===== 问题 2 修复：Boss 出场前清除場上所有现有敌人 =====
-        // 规范依据：game_phase.md 明确“Boss 回合不生成普通敌人行”
-        // Boss 出场是特殊关卡，不应与残留的普通敌人共存重叠
+        // ===== Boss 出场：仅清除与 Boss 占位区域重叠的敌人 =====
+        // Boss 最终落点区域（AABB）：水平中心 centerX，宽 bossW，高 bossH，垂直中心 spawnY
+        // 只移除与该矩形发生重叠的普通敌人，保留场上其余敌人，维持玩家前期战斗的影响
         if (this.enemies.length > 0) {
-            this.enemies.forEach(e => { e.active = false; });
-            this.enemies = [];
+            const bossLeft   = centerX - bossW / 2;
+            const bossRight  = centerX + bossW / 2;
+            const bossTop    = spawnY  - bossH / 2;
+            const bossBottom = spawnY  + bossH / 2;
+            this.enemies = this.enemies.filter(e => {
+                const eLeft   = e.x - e.width  / 2;
+                const eRight  = e.x + e.width  / 2;
+                const eTop    = e.y - e.height / 2;
+                const eBottom = e.y + e.height / 2;
+                // AABB 重叠检测：两矩形在 X 轴和 Y 轴上均有交叠则视为重叠
+                const overlaps = eRight > bossLeft && eLeft < bossRight &&
+                                 eBottom > bossTop  && eTop  < bossBottom;
+                if (overlaps) { e.active = false; }
+                return !overlaps;
+            });
         }
 
         const bossHP = this.spawn_calculateBossHP(isBigBoss);
