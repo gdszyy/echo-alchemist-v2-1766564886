@@ -135,6 +135,27 @@ export const shop_system = {
         } else if (relic.effect === 'row_count_up') {
             this.currentRows += 2;
             this.phase_gathering_initPachinko(true);
+        } else if (relic.effect === 'board_spacing_down') {
+            // 密集阵列：水平间距缩小 20%
+            this.boardSpacingXMult = (this.boardSpacingXMult || 1.0) * 0.80;
+            this.phase_gathering_initPachinko(true);
+        } else if (relic.effect === 'board_spacing_up') {
+            // 宽幅延展：水平间距增加 25%，列数 +2
+            this.boardSpacingXMult = (this.boardSpacingXMult || 1.0) * 1.25;
+            this.boardColsBonus = (this.boardColsBonus || 0) + 2;
+            this.phase_gathering_initPachinko(true);
+        } else if (relic.effect === 'board_cols_up') {
+            // 菱形矩阵：列数 +2
+            this.boardColsBonus = (this.boardColsBonus || 0) + 2;
+            this.phase_gathering_initPachinko(true);
+        } else if (relic.effect === 'board_spacing_y_down') {
+            // 垂直压缩：垂直间距缩小 20%
+            this.boardSpacingYMult = (this.boardSpacingYMult || 1.0) * 0.80;
+            this.phase_gathering_initPachinko(true);
+        } else if (relic.effect === 'board_double_stagger') {
+            // 镜像交错：开启双重交错模式
+            this.boardDoubleStagger = true;
+            this.phase_gathering_initPachinko(true);
         }
         //  支持單個字串或數組的解鎖邏輯
         if (relic.unlocks) {

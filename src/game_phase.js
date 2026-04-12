@@ -102,19 +102,24 @@ export const game_phase = {
     phase_gathering_initPachinko(shouldInherit = false) {
         // [修复] 使用动态行数
         const rows = this.currentRows || CONFIG.gameplay.rows;
-        const cols = CONFIG.gameplay.cols || 10;
-        // [修复] 获取间距配置
-        const spacingX = CONFIG.gameplay.spacingX || 45;
-        const spacingY = CONFIG.gameplay.spacingY || 45;
+        // [钉盘形态遗物] 读取遗物状态字段，动态计算列数与间距
+        const baseCols = CONFIG.gameplay.cols || 10;
+        const totalCols = baseCols + (this.boardColsBonus || 0);
+        const baseSpacingX = CONFIG.gameplay.spacingX || 45;
+        const baseSpacingY = CONFIG.gameplay.spacingY || 45;
+        // 应用间距乘数（密集阵列/宽幅延展/垂直压缩遗物）
+        const spacingX = baseSpacingX * (this.boardSpacingXMult || 1.0);
+        const spacingY = baseSpacingY * (this.boardSpacingYMult || 1.0);
+        // 镜像交错遗物：偶数行也向右偏移半格
+        const doubleStagger = this.boardDoubleStagger || false;
         
-        // [监控] 打印初始化关键参数
-
         // [修复] 修正 width 引用
         // 确保 this.width 在初始化时已正确设置，否则使用默认值 400
         const canvasWidth = (this.width && this.width > 0) ? this.width : 400; 
         const canvasHeight = (this.height && this.height > 0) ? this.height : 600;
         
-        const offsetX = (canvasWidth - (cols - 1) * spacingX) / 2;
+        // [钉盘形态遗物] 使用 totalCols 计算水平居中偏移
+        const offsetX = (canvasWidth - (totalCols - 1) * spacingX) / 2;
         
         // [优化] 动态计算 offsetY，确保在矮屏幕下钉子不会被挤出屏幕
         // 预留顶部空间 (约占高度的 20%，但不超过 120px)
@@ -133,10 +138,14 @@ export const game_phase = {
 
         for (let r = 0; r < rows; r++) {
             const isOddRow = r % 2 !== 0;
-            const cols = isOddRow ? CONFIG.gameplay.cols - 1 : CONFIG.gameplay.cols;
-            const rowOffsetX = isOddRow ? spacingX / 2 : 0;
+            // [钉盘形态遗物] 使用 totalCols 计算每行列数
+            const rowCols = isOddRow ? totalCols - 1 : totalCols;
+            // [镜像交错遗物] 偶数行也向右偏移半格（doubleStagger 模式）
+            // 普通模式：奇数行偏移 spacingX/2，偶数行不偏移
+            // 双重交错：奇数行偏移 spacingX/2，偶数行偏移 spacingX/4
+            const rowOffsetX = isOddRow ? spacingX / 2 : (doubleStagger ? spacingX / 4 : 0);
 
-            for (let c = 0; c < cols; c++) {
+            for (let c = 0; c < rowCols; c++) {
                 const x = offsetX + rowOffsetX + c * spacingX;
                 const y = offsetY + r * adjustedSpacingY;
                 maxPegY = Math.max(maxPegY, y);

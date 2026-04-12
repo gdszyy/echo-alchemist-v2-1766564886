@@ -737,7 +737,19 @@ const RELIC_DB = [
 
     { id: 'explosive_ammo', name: '高爆火藥', icon: '🧨', desc: '解鎖 [爆破彈珠] 出現，且獲得一顆。', rarity: 'rare', unlocks: 'explosive', boost: 10 ,maxStacks: 1},
     { id: 'prism_shard', name: '七彩稜鏡', icon: '🌈', desc: '解鎖 [彩虹彈珠] 出現，且獲得一顆。', rarity: 'legendary', unlocks: 'rainbow', boost: 5 ,maxStacks: 1},
-    { id: 'russian_doll', name: '俄羅斯套娃', icon: '🪆', desc: '解鎖 [套娃彈珠]，子彈消失時會發射下一顆子彈。', rarity: 'legendary', unlocks: 'matryoshka', boost: 5 ,maxStacks: 1}
+    { id: 'russian_doll', name: '俄羅斯套娃', icon: '🪆', desc: '解鎖 [套娃彈珠]，子彈消失時會發射下一顆子彈。', rarity: 'legendary', unlocks: 'matryoshka', boost: 5 ,maxStacks: 1},
+
+    // ==================== 钉盘形态遗物 ====================
+    // 策略1：密集阵列 - 高频触发流（配合行数遗物：超密集钉盘）
+    { id: 'dense_array', name: '密集陣列', icon: '🔩', desc: '收集階段：釘子水平間距縮小 20%，弹珠碰撞更頻繁。與行數遺物疊加效果顯著。', rarity: 'rare', effect: 'board_spacing_down', maxStacks: 3 },
+    // 策略2：宽幅延展 - 路径控制流（配合行数遗物：超宽广钉盘）
+    { id: 'wide_spread', name: '寬幅延展', icon: '↔️', desc: '收集階段：釘子水平間距增大 25% 且額外增加 2 列，弹珠路徑更多樣。', rarity: 'rare', effect: 'board_spacing_up', maxStacks: 2 },
+    // 策略3：菱形矩阵 - 槽位流（配合行数遗物：最大钉盘面积）
+    { id: 'diamond_matrix', name: '菱形矩陣', icon: '💠', desc: '收集階段：釘盤額外增加 2 列，特殊槽出現位置更豐富。與行數遺物疊加可獲最大釘盤面積。', rarity: 'legendary', effect: 'board_cols_up', maxStacks: 3 },
+    // 策略4：垂直压缩 - 极限触发流（配合行数遗物：有限空间内最多行数）
+    { id: 'vertical_compress', name: '垂直壓縮', icon: '⬆️', desc: '收集階段：釘子垂直間距縮小 20%，相同螢幕高度內可容納更多行。與行數遺物疊加可在有限空間內堆疊極多行釘子。', rarity: 'common', effect: 'board_spacing_y_down', maxStacks: 3 },
+    // 策略5：镜像交错 - 随机爆发流（配合行数遗物：最大随机化）
+    { id: 'mirror_stagger', name: '鏡像交錯', icon: '🪞', desc: '收集階段：偶數行也向右偏移半格，形成雙重交錯網格，弹珠路徑極度隨機化。與行數遺物疊加後弹珠軌跡近乎不可預測。', rarity: 'legendary', effect: 'board_double_stagger', maxStacks: 1 },
 ];
 
 // ==================== 技能数据库 ====================

@@ -220,6 +220,11 @@ class Game {
         this.sys_setupInputs(); 
         this.currentRows = CONFIG.gameplay.rows; 
         this.boardBottomY = 0;
+        // ==================== 钉盘形态遗物状态字段 ====================
+        this.boardSpacingXMult = 1.0;   // 水平间距乘数（密集阵列/宽幅延展遗物）
+        this.boardSpacingYMult = 1.0;   // 垂直间距乘数（垂直压缩遗物）
+        this.boardColsBonus = 0;        // 额外列数（菱形矩阵/宽幅延展遗物）
+        this.boardDoubleStagger = false; // 双重交错模式（镜像交错遗物）
         
         // [修复] 确保所有 UI 覆盖层在游戏开始时都被隐藏
         document.querySelectorAll('.ui-overlay').forEach(el => { 
