@@ -1355,10 +1355,10 @@ export const spawn_system = {
             const bossTop    = spawnY  - bossH / 2;
             const bossBottom = spawnY  + bossH / 2;
             this.enemies = this.enemies.filter(e => {
-                const eLeft   = e.x - e.width  / 2;
-                const eRight  = e.x + e.width  / 2;
-                const eTop    = e.y - e.height / 2;
-                const eBottom = e.y + e.height / 2;
+                const eLeft   = e.pos.x - e.width  / 2;
+                const eRight  = e.pos.x + e.width  / 2;
+                const eTop    = e.pos.y - e.height / 2;
+                const eBottom = e.pos.y + e.height / 2;
                 // AABB 重叠检测：两矩形在 X 轴和 Y 轴上均有交叠则视为重叠
                 const overlaps = eRight > bossLeft && eLeft < bossRight &&
                                  eBottom > bossTop  && eTop  < bossBottom;
