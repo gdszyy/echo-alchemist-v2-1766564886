@@ -42,6 +42,7 @@ import { hud_system } from './ui/hud.js';
 import { shop_system } from './ui/shop.js';
 import { rune_launcher_system } from './ui/rune_launcher.js';
 import { calc_utils } from './calc_utils.js';
+import { tutorial_system } from './tutorial_system.js';
 
 // ==================== 延迟音频初始化 ====================
 let _audioInitialized = false;
@@ -96,7 +97,7 @@ class Game {
         const _subsystems = [
             game_system, game_phase, combat_system, render_system, spawn_system,
             ui_system, hud_system, shop_system, rune_launcher_system,
-            calc_utils
+            calc_utils, tutorial_system
         ];
         for (const subsystem of _subsystems) {
             for (const [key, val] of Object.entries(subsystem)) {
@@ -312,6 +313,8 @@ class Game {
         // hud_initEventListeners: HUD 事件（弹药动画、命中进度、充能符文）
         this.ui_initEventListeners();
         this.hud_initEventListeners();
+        // [新手教程] 检测是否为首次游玩，触发教程
+        this.tutorial_checkAndStart();
     }
 }
 

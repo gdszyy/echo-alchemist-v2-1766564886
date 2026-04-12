@@ -238,6 +238,8 @@ export const game_system = {
                 if (!this.saveData.runeInventory) this.saveData.runeInventory = [];
                 // 确保 discoveredRunewords 字段存在（存档升级兼容）
                 if (!this.saveData.discoveredRunewords) this.saveData.discoveredRunewords = [];
+                // 确保 tutorialCompleted 字段存在（存档升级兼容：老存档默认视为已完成，不重复触发教程）
+                if (this.saveData.tutorialCompleted === undefined) this.saveData.tutorialCompleted = true;
             } catch (e) {
                 console.error('[sys_loadSaveData] Save load failed:', e);
             }
