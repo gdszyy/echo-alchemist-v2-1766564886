@@ -2042,6 +2042,52 @@ class DropBall {
                         }
                     }
 
+                    // ==================== [布局位置物理修正] ====================
+                    // 根据 peg.layoutRole 在碰撞解算完成后施加额外物理修正
+                    // 这是真实的力学差异，不只是视觉效果
+                    if (peg.layoutRole && d < 0) {
+                        const role = peg.layoutRole;
+                        const boardCenterX = width / 2;
+
+                        if (role === 'wide_edge') {
+                            // 宽行边缘钉子：施加朝向内侧的横向冲量
+                            // 模拟「括号」将偏移弹珠弹回中央的物理效果
+                            // 冲量方向：从边缘指向中轴线
+                            const toCenter = boardCenterX - this.pos.x;
+                            const pushStrength = 0.55 + Math.abs(d) * 0.08; // 撞得越猛，回弹越强
+                            this.vel.x += Math.sign(toCenter) * pushStrength;
+
+                        } else if (role === 'sparse_narrow') {
+                            // 窄行钉子：弹性增强 +18%，弹珠穿越窄行时速度损失更少
+                            // 模拟「通道加速」效果：窄行间距大，弹珠在此加速蓄能
+                            const speedBoost = 1.18;
+                            this.vel.x *= speedBoost;
+                            this.vel.y *= speedBoost;
+                            // 同时轻微增加向下速度，保持下落动能
+                            this.vel.y += 0.3;
+
+                        } else if (role === 'diamond_mid') {
+                            // 菱形中段钉子：施加轻微向下的额外冲量
+                            // 模拟「中段密集区」将弹珠沉入菱形核心的物理效果
+                            this.vel.y += 0.45;
+                            // 同时轻微收拢横向速度，让弹珠在中段更集中
+                            this.vel.x *= 0.88;
+
+                        } else if (role === 'triangle_funnel') {
+                            // 漏斗区钉子：施加朝向中轴线的横向收拢力
+                            // 越往下（row 越大）收拢力越强，模拟漏斗物理
+                            const toCenter = boardCenterX - this.pos.x;
+                            // 收拢力随行号增大而增强（漏斗越窄越聚）
+                            const funnelStrength = 0.35 + (peg.row / 20) * 0.25;
+                            this.vel.x += Math.sign(toCenter) * funnelStrength;
+
+                        } else if (role === 'mirror_center') {
+                            // 镜像轴边缘钉子：横向速度取反（镜像反射）
+                            // 强化对称感：弹珠碰到对称轴边缘后被「镜像」弹回
+                            this.vel.x *= -0.85; // 镜像反转 + 轻微衰减
+                        }
+                    }
+
                     if (peg.cooldownTimer <= 0 && peg.frozenTurns <= 0) {
                         // --- [关键修改：传递速度参数] ---
                         const impactSpeedVal = impactVel.mag(); 
