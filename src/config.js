@@ -533,6 +533,7 @@ const CONFIG = {
                 berserkedTempRisePerTurn: 30, // 狂暴后每回合温度上升值
                 berserkedFireSplashRadius: 80, // 狂暴后火焰溅射半径（像素）
                 berserkedFireSplashDamage: 5,  // 狂暴后火焰溅射伤害
+                moveInterval: 2,          // 常规模式：每 2 回合移动一次（有 haste 词缀，移动较频繁）
                 themeWeights: { pyro: 1.5, pierce: 1.5 }
             },
             glacies: {
@@ -543,6 +544,7 @@ const CONFIG = {
                 jumpRowsBonus: 2,         // 额外跳跃行数
                 berserkedJumpRows: 3,     // 狂暴后每回合跳跃行数
                 berserkedFreezePegRadius: 120, // 狂暴后跳跃落地冻结周围 Peg 的范围（像素）
+                moveInterval: 3,          // 常规模式：每 3 回合移动一次（有 regen 词缀，移动较慢）
                 themeWeights: { cryo: 1.5, pierce: 1.3 }
             },
             mikro: {
@@ -554,6 +556,7 @@ const CONFIG = {
                 berserkedCloneChance: 1.0, // 狂暴后分身概率 100%
                 cloneDamageReductionPerClone: 0.10, // 每个存活分身提供的减伤比例
                 cloneDamageReductionMax: 0.50,       // 分身减伤上限（5个分身即达上限）
+                moveInterval: 3,          // 常规模式：每 3 回合移动一次（专注分裂，移动较慢）
                 themeWeights: { lightning: 1.5, scatter: 1.5 }
             },
             devourer: {
@@ -563,6 +566,7 @@ const CONFIG = {
                 weakness: ['bounce', 'laser'],
                 devourRangeBonus: 2,      // 额外吞噬范围
                 berserkedDevourRange: 99, // 狂暴后全屏吞噬
+                moveInterval: 2,          // 常规模式：每 2 回合移动一次（吞噬后需要靠近）
                 themeWeights: { bounce: 1.5, laser: 1.5 }
             },
             viridis: {
@@ -573,6 +577,7 @@ const CONFIG = {
                 regenPercentBonus: 0.2,   // 额外再生百分比
                 berserkedHealerRange: 0,   // 狂暴后停止治疗其他敌人（放弃治疗他人）
                 berserkedSelfRegenMult: 3.0, // 狂暴后自身回血速度倍率（集中治疗自身）
+                moveInterval: 3,          // 常规模式：每 3 回合移动一次（专注治疗，移动缓慢）
                 themeWeights: { laser: 1.5, pyro: 1.3 }
             },
             tesla: {
@@ -582,6 +587,7 @@ const CONFIG = {
                 weakness: ['cryo', 'bounce'],
                 hasteActionsBonus: 1,     // 额外行动次数（共3次）
                 berserkedActionsBonus: 1, // 狂暴后再+1次行动
+                moveInterval: 2,          // 常规模式：每 2 回合移动一次（有 haste 词缀，移动较快）
                 themeWeights: { cryo: 1.5, bounce: 1.3 }
             },
             chimera: {
@@ -592,6 +598,7 @@ const CONFIG = {
                 initTemp: 60,             // 初始温度（半狂暴状态）
                 berserkedTempThreshold: 100, // 狂暴后温度阈值
                 berserkedBlastOnHitChance: 0.25, // 狂暴后受击触发全场爆炸概率
+                moveInterval: 2,          // 常规模式：每 2 回合移动一次（混沌体，移动较频繁）
                 themeWeights: { pierce: 1.5, laser: 1.5 }
             },
             ouroboros: {
@@ -606,6 +613,7 @@ const CONFIG = {
                 ],
                 rotationInterval: 3,        // 每 3 回合切换一次
                 berserkedRotationInterval: 1, // 狂暴后每回合切换
+                moveInterval: 3,          // 常规模式：每 3 回合移动一次（永恒回声，移动最慢）
                 themeWeights: { pierce: 1.2, cryo: 1.2, lightning: 1.2 }
             }
         },

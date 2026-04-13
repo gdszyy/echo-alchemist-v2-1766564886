@@ -787,6 +787,16 @@ phase_gathering_getRandomPegType() {
         this.enemies.forEach(e => {
             e.hasActedThisTurn = false;
             e.isFrozenCurrentTurn = false; // 重置上一轮的冰冻状态
+
+            // [Boss 移动提示预计算]
+            // 在回合开始时预计算 Boss 本回合是否会移动，以便 UI 标签能在回合开始时就显示正确提示
+            if (e.type === 'boss' && e.bossType && typeof e._moveCooldown !== 'undefined') {
+                if (e.berserked) {
+                    e._willMoveThisTurn = true;
+                } else {
+                    e._willMoveThisTurn = (e._moveCooldown === 0);
+                }
+            }
         });
 
         // UI 提示

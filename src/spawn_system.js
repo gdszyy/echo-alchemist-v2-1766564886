@@ -1480,6 +1480,13 @@ export const spawn_system = {
             boss.rotationTurnCount = 0;
         }
 
+        // Boss 移动冷却计数器初始化
+        // _moveCooldown: 当前剩余冷却回合数（0 = 本回合可以移动）
+        // _moveInterval: 当前生效的移动间隔（从 bossCfg.moveInterval 读取，默认 2）
+        const defaultMoveInterval = bossCfg.moveInterval || 2;
+        boss._moveInterval = defaultMoveInterval;
+        boss._moveCooldown = 0; // 首回合直接可以移动
+
         // 设置入场动画状态
         boss.dropTargetY = spawnY;       // 目标位置：网格对齐的顶部
         boss._entranceStartY = entranceStartY; // 入场起始 Y

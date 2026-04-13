@@ -742,6 +742,26 @@ class Enemy {
         }
 
         // --- [改动] 移动与跳跃：移出循环，始终只执行一次 ---
+        // [Boss 移动冷却逻辑]
+        // 狂暴模式下：每回合必定移动（_moveCooldown 始终为 0）
+        // 常规模式下：检查冷却计数器，未到间隔则跳过移动
+        let _shouldMove = true;
+        if (this.type === 'boss' && this.bossType) {
+            if (this.berserked) {
+                // 狂暴模式：每回合移动，重置冷却为 0
+                this._moveCooldown = 0;
+            } else {
+                // 常规模式：检查冷却
+                if (this._moveCooldown > 0) {
+                    _shouldMove = false;
+                    this._moveCooldown--;
+                } else {
+                    // 冷却到期，本回合移动，重置冷却计数器
+                    const interval = this._moveInterval || 2;
+                    this._moveCooldown = interval - 1; // 下次移动需要等待的回合数
+                }
+            }
+        }
         // haste 词条：额外触发一次移动（速度加快，不重复结算其他词条）
         const _doMove = () => {
             const moveAmount = game.enemyHeight;
@@ -778,11 +798,19 @@ class Enemy {
                 }
             }
         };
-        _doMove();
-        // [改动] haste 词条：仅额外触发一次移动，不重复结算其他词条
-        if (this.affixes.includes('haste')) {
-            game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡DASH!", "#facc15");
+        if (_shouldMove) {
             _doMove();
+            // [改动] haste 词条：仅额外触发一次移动，不重复结算其他词条
+            if (this.affixes.includes('haste')) {
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡DASH!", "#facc15");
+                _doMove();
+            }
+        }
+
+        // [Boss 移动提示] 执行完毕后重置预计算标志
+        // 玩家回合期间显示的是下一次移动的倒计时，而不是当前回合的状态
+        if (this.type === 'boss' && this.bossType) {
+            this._willMoveThisTurn = false;
         }
 
         this.hasActedThisTurn = true;
@@ -2302,6 +2330,104 @@ class Enemy {
                 ctx.roundRect(-w/2 - 3, -h/2 - 3, w + 6, h + 6, r + 2);
                 ctx.stroke();
             }
+            ctx.restore();
+        }
+
+        // === Layer 9: Boss 移动提示标签 ===
+        // 仅对 Boss 类型敌人且入场动画完成后显示
+        if (this.type === 'boss' && this.bossType && this.entranceTimer <= 0 &&
+            typeof this._moveCooldown !== 'undefined') {
+
+            const now = Date.now();
+            const pulse = (Math.sin(now / 400) + 1) * 0.5; // 0~1 脉冲动画
+
+            // 标签显示在 Boss 底部下方
+            const labelX = this.pos.x;
+            const labelY = this.pos.y + this.bumpOffsetY + this.height / 2 + 22;
+
+            ctx.save();
+
+            if (this.berserked) {
+                // 狂暴模式：每回合移动，显示橙红警告
+                const alpha = 0.75 + pulse * 0.25;
+                const bgColor = `rgba(239, 68, 68, ${0.25 + pulse * 0.15})`;
+                const textColor = `rgba(255, 200, 100, ${alpha})`;
+                const glowColor = '#ef4444';
+
+                // 背景圆角矩形
+                const labelW = 110;
+                const labelH = 18;
+                ctx.fillStyle = bgColor;
+                ctx.shadowColor = glowColor;
+                ctx.shadowBlur = 8 + pulse * 6;
+                ctx.beginPath();
+                ctx.roundRect(labelX - labelW / 2, labelY - labelH / 2, labelW, labelH, 4);
+                ctx.fill();
+
+                // 文字
+                ctx.shadowBlur = 6 + pulse * 4;
+                ctx.shadowColor = glowColor;
+                ctx.font = 'bold 11px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = textColor;
+                ctx.fillText('⚡ 狂暴：每回合移动', labelX, labelY);
+
+            } else if (this._willMoveThisTurn === true) {
+                // 本回合移动（回合开始时预计算）：红色警告
+                const alpha = 0.85 + pulse * 0.15;
+                const bgColor = `rgba(220, 38, 38, ${0.3 + pulse * 0.2})`;
+                const textColor = `rgba(255, 220, 220, ${alpha})`;
+                const glowColor = '#dc2626';
+
+                const labelW = 100;
+                const labelH = 18;
+                ctx.fillStyle = bgColor;
+                ctx.shadowColor = glowColor;
+                ctx.shadowBlur = 10 + pulse * 8;
+                ctx.beginPath();
+                ctx.roundRect(labelX - labelW / 2, labelY - labelH / 2, labelW, labelH, 4);
+                ctx.fill();
+
+                ctx.shadowBlur = 8 + pulse * 6;
+                ctx.shadowColor = glowColor;
+                ctx.font = 'bold 11px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = textColor;
+                ctx.fillText('➡ 本回合移动', labelX, labelY);
+
+            } else {
+                // 还需 N 回合才移动：蓝色提示
+                // 使用 _moveCooldown 显示剩余回合数
+                const alpha = 0.6 + pulse * 0.15;
+                const bgColor = `rgba(30, 64, 175, ${0.2 + pulse * 0.1})`;
+                const textColor = `rgba(147, 197, 253, ${alpha})`;
+                const glowColor = '#3b82f6';
+
+                // 回合开始前：_moveCooldown 还未被消耗，直接显示其值
+                // 回合结束后：_moveCooldown 已被重置，显示新的剩余回合数
+                const turnsLeft = this._moveCooldown;
+                const labelText = turnsLeft === 1 ? '⏳ 下回合移动' : `⏳ ${turnsLeft}回合后移动`;
+                const labelW = turnsLeft === 1 ? 100 : 110;
+                const labelH = 18;
+
+                ctx.fillStyle = bgColor;
+                ctx.shadowColor = glowColor;
+                ctx.shadowBlur = 5 + pulse * 3;
+                ctx.beginPath();
+                ctx.roundRect(labelX - labelW / 2, labelY - labelH / 2, labelW, labelH, 4);
+                ctx.fill();
+
+                ctx.shadowBlur = 4 + pulse * 2;
+                ctx.shadowColor = glowColor;
+                ctx.font = '11px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = textColor;
+                ctx.fillText(labelText, labelX, labelY);
+            }
+
             ctx.restore();
         }
 
