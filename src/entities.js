@@ -796,6 +796,18 @@ class Peg {
             this.drawWindPeg(ctx, currentRadius, isLit);
         }
 
+        // ==================== [特殊钉子样式标识] ====================
+        // 每种属性钉子在圆形内部绘制专属几何符文，一眼可辨
+        if (this.type === 'cryo')      this.drawCryoPeg(ctx, currentRadius, isLit);
+        if (this.type === 'pyro')      this.drawPyroPeg(ctx, currentRadius, isLit);
+        if (this.type === 'lightning') this.drawLightningPeg(ctx, currentRadius, isLit);
+        if (this.type === 'bounce')    this.drawBouncePeg(ctx, currentRadius, isLit);
+        if (this.type === 'pierce')    this.drawPiercePeg(ctx, currentRadius, isLit);
+        if (this.type === 'scatter')   this.drawScatterPeg(ctx, currentRadius, isLit);
+        if (this.type === 'damage')    this.drawDamagePeg(ctx, currentRadius, isLit);
+        if (this.type === 'laser')     this.drawLaserPeg(ctx, currentRadius, isLit);
+        if (this.type === 'pink')      this.drawPinkPeg(ctx, currentRadius, isLit);
+
         // [Glacies 狂暴] 冻结 Peg 蓝色光晕
         if (this.frozenTurns > 0) {
             const pulse = (Math.sin(Date.now() / 400) + 1) / 2;
@@ -972,6 +984,285 @@ class Peg {
         
         ctx.restore();
     }
+    // ==================== [特殊钉子样式标识] ====================
+    // 每种属性钉子在圆形内部绘制专属几何符文，一眼可辨
+    // 设计原则：形状语言与属性语义对应，不依赖 emoji（Canvas 渲染一致性）
+
+    /**
+     * [cryo] 冰属性：六角雪花
+     * 六条对称线段 + 端点小圆，模拟冰晶结构
+     */
+    drawCryoPeg(ctx, r, isLit) {
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
+        ctx.strokeStyle = ic;
+        ctx.lineWidth = r * 0.14;
+        ctx.lineCap = 'round';
+        // 六条主轴线
+        for (let i = 0; i < 6; i++) {
+            const a = i * Math.PI / 3;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(a) * r * 0.68, Math.sin(a) * r * 0.68);
+            ctx.stroke();
+            // 每条轴线上的小分叉
+            const mx = Math.cos(a) * r * 0.42;
+            const my = Math.sin(a) * r * 0.42;
+            const pa = a + Math.PI / 2;
+            ctx.beginPath();
+            ctx.moveTo(mx + Math.cos(pa) * r * 0.2, my + Math.sin(pa) * r * 0.2);
+            ctx.lineTo(mx - Math.cos(pa) * r * 0.2, my - Math.sin(pa) * r * 0.2);
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    /**
+     * [pyro] 火属性：三角火焰
+     * 向上的三角形 + 底部弧线，模拟火焰轮廓
+     */
+    drawPyroPeg(ctx, r, isLit) {
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
+        ctx.fillStyle = ic;
+        ctx.beginPath();
+        // 主火焰三角
+        ctx.moveTo(0, -r * 0.72);
+        ctx.lineTo(r * 0.48, r * 0.38);
+        ctx.lineTo(-r * 0.48, r * 0.38);
+        ctx.closePath();
+        ctx.fill();
+        // 底部小圆弧（火苗基部）
+        ctx.beginPath();
+        ctx.arc(0, r * 0.38, r * 0.28, 0, Math.PI);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    /**
+     * [lightning] 雷属性：闪电折线
+     * Z 形折线，经典闪电符号
+     */
+    drawLightningPeg(ctx, r, isLit) {
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
+        ctx.fillStyle = ic;
+        ctx.beginPath();
+        ctx.moveTo(r * 0.18, -r * 0.72);
+        ctx.lineTo(-r * 0.28, -r * 0.04);
+        ctx.lineTo(r * 0.12, -r * 0.04);
+        ctx.lineTo(-r * 0.18, r * 0.72);
+        ctx.lineTo(r * 0.28, r * 0.04);
+        ctx.lineTo(-r * 0.12, r * 0.04);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+
+    /**
+     * [bounce] 弹性属性：双弧箭头（回旋）
+     * 两段反向圆弧 + 箭头，表示弹射
+     */
+    drawBouncePeg(ctx, r, isLit) {
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
+        ctx.strokeStyle = ic;
+        ctx.lineWidth = r * 0.16;
+        ctx.lineCap = 'round';
+        // 上弧（向右）
+        ctx.beginPath();
+        ctx.arc(-r * 0.12, -r * 0.22, r * 0.42, Math.PI * 1.1, Math.PI * 0.1, false);
+        ctx.stroke();
+        // 上弧箭头
+        ctx.beginPath();
+        ctx.moveTo(r * 0.28, -r * 0.55);
+        ctx.lineTo(r * 0.42, -r * 0.28);
+        ctx.lineTo(r * 0.12, -r * 0.28);
+        ctx.fill();
+        // 下弧（向左）
+        ctx.beginPath();
+        ctx.arc(r * 0.12, r * 0.22, r * 0.42, Math.PI * 0.1, Math.PI * 1.1, false);
+        ctx.stroke();
+        // 下弧箭头
+        ctx.fillStyle = ic;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.28, r * 0.55);
+        ctx.lineTo(-r * 0.42, r * 0.28);
+        ctx.lineTo(-r * 0.12, r * 0.28);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    /**
+     * [pierce] 穿透属性：斜向箭头
+     * 对角线 + 箭头头，表示穿透
+     */
+    drawPiercePeg(ctx, r, isLit) {
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
+        ctx.strokeStyle = ic;
+        ctx.fillStyle = ic;
+        ctx.lineWidth = r * 0.16;
+        ctx.lineCap = 'round';
+        // 主箭杆（左下 → 右上）
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.52, r * 0.52);
+        ctx.lineTo(r * 0.38, -r * 0.38);
+        ctx.stroke();
+        // 箭头
+        ctx.beginPath();
+        ctx.moveTo(r * 0.52, -r * 0.52);
+        ctx.lineTo(r * 0.14, -r * 0.52);
+        ctx.lineTo(r * 0.52, -r * 0.14);
+        ctx.closePath();
+        ctx.fill();
+        // 尾羽（两条短线）
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.52, r * 0.52);
+        ctx.lineTo(-r * 0.68, r * 0.28);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.52, r * 0.52);
+        ctx.lineTo(-r * 0.28, r * 0.68);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    /**
+     * [scatter] 散射属性：放射线（三向扇形）
+     * 从中心向三个方向发散的线条，表示散射
+     */
+    drawScatterPeg(ctx, r, isLit) {
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
+        ctx.strokeStyle = ic;
+        ctx.fillStyle = ic;
+        ctx.lineWidth = r * 0.14;
+        ctx.lineCap = 'round';
+        // 中心圆点
+        ctx.beginPath();
+        ctx.arc(0, r * 0.28, r * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+        // 三条发散线（向右上、正上、左上）
+        const angles = [-Math.PI / 4, -Math.PI / 2, -Math.PI * 3 / 4];
+        angles.forEach(a => {
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a + Math.PI) * r * 0.18, r * 0.28 + Math.sin(a + Math.PI) * r * 0.18);
+            ctx.lineTo(Math.cos(a) * r * 0.62, r * 0.28 + Math.sin(a) * r * 0.62);
+            ctx.stroke();
+            // 箭头小三角
+            const ex = Math.cos(a) * r * 0.62;
+            const ey = r * 0.28 + Math.sin(a) * r * 0.62;
+            const pa = a + Math.PI / 2;
+            ctx.beginPath();
+            ctx.moveTo(ex + Math.cos(a) * r * 0.16, ey + Math.sin(a) * r * 0.16);
+            ctx.lineTo(ex + Math.cos(pa) * r * 0.1, ey + Math.sin(pa) * r * 0.1);
+            ctx.lineTo(ex - Math.cos(pa) * r * 0.1, ey - Math.sin(pa) * r * 0.1);
+            ctx.closePath();
+            ctx.fill();
+        });
+        ctx.restore();
+    }
+
+    /**
+     * [damage] 增幅属性：双剑交叉
+     * 两条对角线交叉，表示攻击增幅
+     */
+    drawDamagePeg(ctx, r, isLit) {
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
+        ctx.strokeStyle = ic;
+        ctx.fillStyle = ic;
+        ctx.lineWidth = r * 0.15;
+        ctx.lineCap = 'round';
+        // 左斜剑（左下 → 右上）
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.55, r * 0.55);
+        ctx.lineTo(r * 0.55, -r * 0.55);
+        ctx.stroke();
+        // 右斜剑（右下 → 左上）
+        ctx.beginPath();
+        ctx.moveTo(r * 0.55, r * 0.55);
+        ctx.lineTo(-r * 0.55, -r * 0.55);
+        ctx.stroke();
+        // 中心菱形（增幅核心）
+        ctx.beginPath();
+        ctx.moveTo(0, -r * 0.22);
+        ctx.lineTo(r * 0.22, 0);
+        ctx.lineTo(0, r * 0.22);
+        ctx.lineTo(-r * 0.22, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+
+    /**
+     * [laser] 激光属性：十字准星
+     * 水平+垂直线 + 中心小圆，表示精准激光
+     */
+    drawLaserPeg(ctx, r, isLit) {
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
+        ctx.strokeStyle = ic;
+        ctx.lineWidth = r * 0.14;
+        ctx.lineCap = 'round';
+        // 水平线（中间留缺口）
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.68, 0);
+        ctx.lineTo(-r * 0.22, 0);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(r * 0.22, 0);
+        ctx.lineTo(r * 0.68, 0);
+        ctx.stroke();
+        // 垂直线（中间留缺口）
+        ctx.beginPath();
+        ctx.moveTo(0, -r * 0.68);
+        ctx.lineTo(0, -r * 0.22);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, r * 0.22);
+        ctx.lineTo(0, r * 0.68);
+        ctx.stroke();
+        // 中心小圆
+        ctx.fillStyle = ic;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.16, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    /**
+     * [pink] 粉色钉子：心形
+     * 两个圆弧 + 底部尖角，经典心形
+     */
+    drawPinkPeg(ctx, r, isLit) {
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.85)';
+        ctx.fillStyle = ic;
+        const s = r * 0.55;
+        ctx.beginPath();
+        ctx.moveTo(0, s * 0.4);
+        // 左半心
+        ctx.bezierCurveTo(-s * 0.1, -s * 0.1, -s, -s * 0.1, -s, -s * 0.5);
+        ctx.bezierCurveTo(-s, -s * 1.0, 0, -s * 0.9, 0, -s * 0.4);
+        // 右半心
+        ctx.bezierCurveTo(0, -s * 0.9, s, -s * 1.0, s, -s * 0.5);
+        ctx.bezierCurveTo(s, -s * 0.1, s * 0.1, -s * 0.1, 0, s * 0.4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+
     // [新增] 绘制等级星级/点数
     drawLevelPips(ctx, r) {
         ctx.save();
@@ -1062,6 +1353,7 @@ class DropBall {
             // --- [布局补偿] 布局专属效果状态 ---
             this.channelCharged = false;     // [sparse] 通道蓄力：穿越窄行后下次碰撞属性等级+1
             this._lastRowPassed = -1;        // [sparse] 记录上次经过的行号，用于检测穿越窄行
+            this._pendingChannelBoost = false; // [sparse] 待处理的通道蓄力等级加成
 	    }
         /**
          * [核心方法] 获取当前所有属性的层数
@@ -1683,17 +1975,13 @@ class DropBall {
                         }
 
                         // --- [sparse] 通道蓄力 ---
-                        // 弹珠碰撞钉子时，如果之前穿越了窄行（channelCharged=true）
-                        // 则此次收集的属性等级 +1
+                        // [sparse] 通道蓄力：穿越窄行（奇数行）未碰任何钉子后，激活蓄力状态
+                        // 触发时机：本次碰撞到属性钉子，且 channelCharged=true
+                        // 效果：本次收集的属性等级 +1（蓄力后爆发，最高 Lv.3）
+                        // 注意：蓄力状态在收集完成后消耗，不影响 normal/pink 钉子
                         if (boardLayout === 'sparse' && this.channelCharged && peg.type !== 'normal' && peg.type !== 'pink') {
-                            const lastIdx = this.session.collected.length - 1;
-                            if (lastIdx >= 0) {
-                                const lastItem = this.session.collected[lastIdx];
-                                if (typeof lastItem === 'object' && lastItem.level !== undefined) {
-                                    lastItem.level = Math.min(lastItem.level + 1, 3);
-                                    game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 24, '通道蓄力! +Lv', '#34d399');
-                                }
-                            }
+                            // 标记本次碰撞需要等级加成，在下方收集逻辑执行后提升
+                            this._pendingChannelBoost = true;
                             this.channelCharged = false;
                         }
 
@@ -1771,9 +2059,20 @@ class DropBall {
                             }
 
                             // 将最终结果加入收集列表
-                            const collectedItem = { type: finalType, level: peg.level || 1 };
+                            // [sparse 通道蓄力] 如果有待处理的等级加成，提升本次收集的属性等级
+                            const baseLevel = peg.level || 1;
+                            const boostedLevel = (this._pendingChannelBoost) 
+                                ? Math.min(baseLevel + 1, 3) 
+                                : baseLevel;
+                            const collectedItem = { type: finalType, level: boostedLevel };
                             this.session.collected.push(collectedItem); 
                             this.def.collected.push(finalType); 
+
+                            // [sparse 通道蓄力] 消耗蓄力并显示反馈
+                            if (this._pendingChannelBoost) {
+                                this._pendingChannelBoost = false;
+                                game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 24, '通道蓄力! +Lv', '#34d399');
+                            }
 
                             // ---  合成反馈 ---
                             if (isSynthesized) {
