@@ -46,23 +46,21 @@ export const shop_system = {
         });
 
         // 钉盘结构遗物互斥规则：
-        // - 行数遗物（dimension_shard / dimension_crystal）可叠加，但两者互斥（选了其中一个就不能选另一个）
-        // - 布局遗物（triangle/diamond/sparse/mirror_sync/wide_narrow）全局互斥
+        // - 布局遗物（triangle/diamond/sparse/mirror_sync/wide_narrow）内部互斥：选了一种布局就不能选其他布局
+        // - 行数遗物（dimension_shard / dimension_crystal）内部互斥：两者不能同时拥有，但同种可叠加
+        // - 布局遗物与行数遗物不互斥，可同时拥有
         const LAYOUT_RELICS = new Set(['triangle_formation','diamond_formation','sparse_interval','mirror_sync','wide_narrow']);
         const ROW_RELICS = new Set(['dimension_shard','dimension_crystal']);
         const ownedSet = new Set(this.ownedRelics || []);
         const hasLayoutRelic = [...ownedSet].some(id => LAYOUT_RELICS.has(id));
-        const ownedRowRelic = [...ownedSet].find(id => ROW_RELICS.has(id)); // 已拥有的行数遗物类型
+        const ownedRowRelic = [...ownedSet].find(id => ROW_RELICS.has(id));
+        // 已选布局遗物：仅排除其他布局遗物（不影响行数遗物）
         if (hasLayoutRelic) {
-            // 已选布局遗物：排除所有布局和行数遗物
-            pool = pool.filter(r => !BOARD_STRUCTURE_RELICS.has(r.id));
-        } else if (ownedRowRelic) {
-            // 已选行数遗物：排除布局遗物和另一种行数遗物，但允许叠加相同的行数遗物
-            pool = pool.filter(r => {
-                if (LAYOUT_RELICS.has(r.id)) return false; // 排除布局遗物
-                if (ROW_RELICS.has(r.id) && r.id !== ownedRowRelic) return false; // 排除另一种行数遗物
-                return true;
-            });
+            pool = pool.filter(r => !LAYOUT_RELICS.has(r.id));
+        }
+        // 已选行数遗物：仅排除另一种行数遗物（不影响布局遗物）
+        if (ownedRowRelic) {
+            pool = pool.filter(r => !(ROW_RELICS.has(r.id) && r.id !== ownedRowRelic));
         }
         
         // 如果池子空了（全收集了），就给一些保底的或者是空的
