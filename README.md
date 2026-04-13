@@ -50,7 +50,8 @@
 | [`src/game_phase.js`](src/game_phase.js) | 命运抉择、研磨、战斗等各个阶段的具体逻辑与转场。 |
 | [`src/combat_system.js`](src/combat_system.js) | 战斗结算、伤害统计、动态难度调整（DDA）评估。 |
 | [`src/config.js`](src/config.js) | 全局常量、属性字典、遗物（`RELIC_DB`）、技能（`SKILL_DB`）与商店配置。 |
-| [`src/entities.js`](src/entities.js) | 实体定义（如弹珠、钉子、敌人、特效粒子及特殊槽位）。 |
+| [`src/entities.js`](src/entities.js) | 实体定义（如弹珠、鑉子、敌人、特效粒子及特殊槽位）。 |
+| [`src/plinko_physics.js`](src/plinko_physics.js) | **鑉盘物理引擎与概率分析模块**。基于 Galton Board 理论，提供增强版碰撞物理（角动量、速度依赖弹性、表面摩擦、Magnus 效应）、二项分布落点预测和布局专属物理参数配置。 |
 
 更多技术细节和历史设计文档，请查阅 `docs/` 目录下的相关文件。
 

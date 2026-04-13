@@ -238,6 +238,11 @@ class Game {
         //   'mirror_sync'     - 镜像同步（列数减2，奇偶行对齐不交错）
         //   'wide_narrow'     - 宽窄交替（偶数行+2列，奇数行-2列）
         this.boardLayout = 'default';
+        // [概率分析] 当前布局类型（由 phase_gathering_initPachinko 存储）
+        this.currentLayout = 'default';
+        // [概率分析] 落点分布缓存（由 _updateDropDistribution 更新）
+        this._dropDistribution = null;
+        this._heatmapData = null;
         
         // [修复] 确保所有 UI 覆盖层在游戏开始时都被隐藏
         document.querySelectorAll('.ui-overlay').forEach(el => { 

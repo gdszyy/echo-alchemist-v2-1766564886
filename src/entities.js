@@ -39,6 +39,12 @@ import {
 import { Enemy, setEnemyAudioProvider } from './entities/enemy.js';
 import { Projectile, setProjectileAudioProvider } from './entities/projectile.js';
 import { RUNE_DB } from './rune_config.js';
+import {
+    resolveEnhancedCollision,
+    calcMagnusForce,
+    decaySpin,
+    getLayoutParams,
+} from './plinko_physics.js';
 
 // ==================== 音频依赖注入 (重构 v2) ====================
 // 移除 Proxy 方案和 window.audio 依赖
@@ -517,6 +523,9 @@ class Peg {
         this.col = -1;
         this.mirrorIdx = -1; // 存储镜像钉子在 game.pegs 中的索引
         this.frozenTurns = 0;  // Glacies 狂暴冻结剩余回合数（> 0 时不可触发）
+        // --- [物理增强] 钉子被击中时的旋转角度（视觉反馈）---
+        this.impactAngle = 0;    // 当前旋转角度（弧度）
+        this.impactSpin = 0;     // 被击中时的角速度（逐帧衰减）
     }
     getColor() {
         let color = CONFIG.colors.peg;
@@ -701,7 +710,13 @@ class Peg {
         
         // 速度越快，视觉缩放越大 (最大 1.8)
         this.scale = 1.6 + Math.min(impactSpeed / 20, 0.2); 
-        
+
+        // --- [物理增强] 被击中时产生旋转角速度（视觉反馈）---
+        // 弹珠被切向摩擦力作用后，钉子会轻微旋转，这是真实物理现象
+        // 旋转方向随机（模拟切向力方向不确定性），速度越大旋转越快
+        const spinDir = Math.random() < 0.5 ? 1 : -1;
+        this.impactSpin = spinDir * Math.min(impactSpeed * 0.04, 0.25);
+
         // 将速度传递给音效管理器
         audio.playHit(this.type, impactSpeed); 
     }
@@ -712,7 +727,16 @@ class Peg {
         const isLit = this.lit;
         const color = this.getColor();
 
-        // 1. 绘制基础圆形钉子
+        // --- [物理增强] 被击中旋转变换 ---
+        // 弹珠碰击鑉子时，鑉子会轻微旋转（切向摩擦力的视觉表现）
+        if (this.impactAngle !== 0) {
+            ctx.save();
+            ctx.translate(this.pos.x, this.pos.y);
+            ctx.rotate(this.impactAngle);
+            ctx.translate(-this.pos.x, -this.pos.y);
+        }
+
+        // 1. 绘制基础圆形鑉子
         ctx.beginPath(); 
         ctx.arc(this.pos.x, this.pos.y, currentRadius, 0, Math.PI * 2);
         
@@ -859,12 +883,17 @@ class Peg {
         }
 
         // 2. [新增] 绘制等级指示器 (Level Indicator)
-        // 只有特殊且等级>1的钉子才显示
+        // 只有特殊且等级>1的鑉子才显示
         if (this.level > 1 && this.type !== 'normal') {
             this.drawLevelPips(ctx, currentRadius);
         }
+
+        // [物理增强] 恢复旋转变换
+        if (this.impactAngle !== 0) {
+            ctx.restore();
+        }
     }
-    // [新增] 绘制剑形钉子
+    // [新增] 绘制剑形鑉子
     drawSwordPeg(ctx, r, isLit) {
         // 剑纹颜色：如果是点亮状态用深色，否则用浅色/白色
         ctx.fillStyle = isLit ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.8)';
@@ -963,6 +992,18 @@ class Peg {
 
     update() { 
         if (this.litTimer > 0) this.litTimer--; else this.lit = false; 
+
+        // --- [物理增强] 被击中旋转角度更新 ---
+        if (this.impactSpin !== 0) {
+            this.impactAngle += this.impactSpin;
+            this.impactSpin *= 0.88; // 旋转衰减（类似钉子回弹到原位置）
+            if (Math.abs(this.impactSpin) < 0.001) {
+                this.impactSpin = 0;
+                // 旋转停止后慢慢回到默认角度
+                this.impactAngle *= 0.9;
+                if (Math.abs(this.impactAngle) < 0.005) this.impactAngle = 0;
+            }
+        }
         
         // [修改] 冷却计时器递减 (每帧执行)
         if (this.cooldownTimer > 0) this.cooldownTimer--;
@@ -1015,6 +1056,9 @@ class DropBall {
             // --- Tilt Boost (偏移加速度加成衰减机制) ---
             this.tiltBoostMultiplier = 1.0;  // 当前加成倍率，1.0 = 无加成
             this.lastTiltDirection = 0;      // 上一帧的倾斜方向：-1（左）/ 0（平衡）/ 1（右）
+            // --- [物理增强] Galton Board 物理属性 ---
+            this.spin = 0;                   // 角速度（顺时针为正），驱动 Magnus 效应
+            this.layoutParams = null;        // 当前布局物理参数（由 game_phase 注入）
 	    }
         /**
          * [核心方法] 获取当前所有属性的层数
@@ -1315,7 +1359,26 @@ class DropBall {
             // gy += tilt.y * 0.1;
 
             let gravityStep = new Vec2(gx * timeScale, gy * timeScale);
-            
+
+            // --- [物理增强] Magnus 效应：自旋导致轨迹偶尔 ---
+            // 自旋弹珠在空气中受到与速度垂直的升力（Magnus Force）
+            // 这是真实 Plinko 弹珠的物理特性：高速旋转的弹珠轨迹会偷偷弯曲
+            if (this.spin !== 0 && this.layoutParams) {
+                const magnus = calcMagnusForce(
+                    this.spin,
+                    { x: this.vel.x, y: this.vel.y },
+                    this.layoutParams.magnusStrength
+                );
+                gravityStep.x += magnus.fx * timeScale;
+                gravityStep.y += magnus.fy * timeScale;
+            }
+            // 自旋衰减（空气阻力使角速度逐渐减小）
+            if (this.spin !== 0) {
+                this.spin = decaySpin(this.spin, 0.018 * timeScale);
+                // 自旋极小时清零，避免浮点误差累积
+                if (Math.abs(this.spin) < 0.001) this.spin = 0;
+            }
+
             this.vel = this.vel.add(gravityStep);
             this.pos = this.pos.add(this.vel.mult(timeScale));
             // 当弹珠处于倍化状态（sizeBonus > 0）时，使用更低的摩擦力，防止卡墙
@@ -1511,21 +1574,38 @@ class DropBall {
                 }
             }
 
-            // ... (钉子碰撞检测逻辑保持不变，注意 rainbow_split 返回前停止声音) ...
+            // --- [物理增强] Galton Board 钉子碰撞检测（增强版）---
+            // 在原有法向反弹基础上，增加：
+            //   1. 速度依赖弹性系数（高速碰撞更弹，低速碰撞更粘）
+            //   2. 切向摩擦力（减小切向速度，产生角动量）
+            //   3. 微观噪声（模拟钉子表面不规则）
             for (let peg of pegs) {
                 let dist = this.pos.dist(peg.pos); let minDist = this.radius + peg.radius;
                 if (dist < minDist) {
-                    // ... (反弹逻辑不变) ...
                     let n = this.pos.sub(peg.pos).norm();
                     this.pos = peg.pos.add(n.mult(minDist + 0.1));
                     const impactVel = new Vec2(this.vel.x, this.vel.y);
 
                     let d = this.vel.dot(n);
                     if (d < 0) {
-                        let elasticity = CONFIG.physics.elasticity; 
-                        if (peg.type === 'pink') elasticity *= CONFIG.physics.pinkpegElasticityMuti; 
-                        this.vel = this.vel.sub(n.mult(2 * d)).mult(elasticity);
-                        this.vel.x += (Math.random() - 0.5) * 0.5;
+                        // [增强版碰撞解算]
+                        // 籁钉（pink）保持原有特殊弹性倍率逻辑
+                        if (peg.type === 'pink') {
+                            const elasticity = CONFIG.physics.elasticity * CONFIG.physics.pinkpegElasticityMuti;
+                            this.vel = this.vel.sub(n.mult(2 * d)).mult(elasticity);
+                            this.vel.x += (Math.random() - 0.5) * 0.5;
+                        } else {
+                            // 普通钉子：使用增强版物理碰撞（速度依赖弹性 + 切向摩擦 + 角动量）
+                            const params = this.layoutParams || getLayoutParams('default');
+                            const collResult = resolveEnhancedCollision(
+                                { pos: this.pos, vel: this.vel, spin: this.spin },
+                                peg,
+                                params
+                            );
+                            this.vel.x = collResult.newVel.x;
+                            this.vel.y = collResult.newVel.y;
+                            this.spin  = collResult.newSpin;
+                        }
                     }
 
                     if (peg.cooldownTimer <= 0 && peg.frozenTurns <= 0) {

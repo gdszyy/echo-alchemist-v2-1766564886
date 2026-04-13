@@ -24,12 +24,16 @@ graph TD
 
 ## 2. 研磨阶段 (Gathering Phase)
 **阶段标识**: `gathering`
-- **描述**: 弹珠台玩法，玩家发射弹珠碰撞钉子以收集/变异属性，填充弹药队列。
+- **描述**: 弹珠台玩法，玩家发射弹珠碰撞鑉子以收集/变异属性，填充弹药队列。鑉盘采用基于 Galton Board 理论的物理引擎，弹珠碰撞具备角动量、速度依赖弹性和 Magnus 效应。
 - **核心函数**:
-    - **初始化**: `phase_gathering_initPachinko()` (重置钉子板、生成特殊槽位)。
-    - **逻辑更新**: `phase_gathering_update()` (处理 3D 倾斜效果、背景渲染)。
-    - **交互**: `spawn_dropBall()` (玩家点击发射弹珠)。
+    - **初始化**: `phase_gathering_initPachinko()` (重置鑉子板、生成特殊槽位、存储布局类型到 `currentLayout`)。
+    - **逻辑更新**: `phase_gathering_update()` (处理 3D 倾斜效果、背景渲染、落点热力图绘制)。
+    - **交互**: `spawn_dropBall()` (玩家点击发射弹珠，同时注入布局物理参数并计算落点分布)。
     - **结束判定**: 当所有弹珠停止运动且发射次数用尽时，触发 `phase_startCombatPhase()`。
+- **物理引擎** (`src/plinko_physics.js`):
+    - **布局专属物理**: 每种布局（default/triangle/diamond/sparse/mirror_sync/wide_narrow）拥有独立的弹性、摩擦、角动量转移和 Magnus 强度参数。
+    - **概率分布预测**: 基于二项分布 B(n, p) 计算弹珠落点概率，并根据布局类型施加修正（收敛分布/双峰/均匀/对称/多峰）。
+    - **落点热力图**: 弹珠发射后在鑉盘底部显示概率分布可视化，帮助玩家理解当前布局的落点特征。
 
 ## 3. 战斗阶段 (Combat Phase)
 **阶段标识**: `combat`

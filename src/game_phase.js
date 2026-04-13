@@ -11,6 +11,13 @@ import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
+import {
+    calcDropDistribution,
+    generateHeatmapData,
+    adjustDistributionForEntry,
+    getLayoutParams,
+    getAllLayoutHints,
+} from './plinko_physics.js';
 
 export const game_phase = {
 /**
@@ -410,6 +417,12 @@ export const game_phase = {
         }
         this.ui_updateGatheringQueueUI();
         this.ui_renderRecipeHUD();
+
+        // [概率分析] 存储当前布局类型，并初始化落点分布缓存
+        this.currentLayout = boardLayout;
+        this._dropDistribution = null;  // 待首次发射时计算
+        this._heatmapData = null;
+        console.log(`[Plinko] 布局初始化完成: ${boardLayout}，物理参数:`, getLayoutParams(boardLayout).distributionHint);
     },
 
 phase_gathering_getRandomPegType() { 
@@ -585,7 +598,12 @@ phase_gathering_getRandomPegType() {
                     this.currentSession.collected.push(marbleDef.type);
                 }
                 this.combat_updateHitProgress(0, this.persistentThreshold);
-                this.dropBalls.push(new DropBall(pos.x, 30, marbleDef, this.currentSession));
+                const newBall = new DropBall(pos.x, 30, marbleDef, this.currentSession);
+                // [物理增强] 注入当前布局的物理参数，使弹珠具备布局专属的物理特性
+                newBall.layoutParams = getLayoutParams(this.currentLayout || 'default');
+                this.dropBalls.push(newBall);
+                // [概率分析] 计算当前布局的落点分布，用于热力图显示
+                this._updateDropDistribution(pos.x);
                 this.ui_updateGatheringQueueUI();
                 audio.playShoot();
                 this.combat_updateMulticastDisplay(0);
@@ -1994,8 +2012,90 @@ phase_gathering_getRandomPegType() {
 
         // --- [新增] 手机偏移提示强化：绘制边缘泛光 ---
         this.drawTiltVignette(this.ctx, this.boardTilt.current);
-        // [移除] 删除底部倾斜指示条调用，设计上不够简洁
-        // this.drawTiltIndicator(this.ctx, this.boardTilt.current);
 
+        // --- [概率分析] 绘制落点热力图 ---
+        // 只在没有弹珠正在运动时显示，避免干扰视觉
+        if (this.dropBalls.length === 0 && this._heatmapData) {
+            this._drawDropHeatmap(this.ctx);
+        }
+
+    },
+
+    /**
+     * [概率分析] 更新落点分布缓存
+     * 在弹珠发射时调用，计算当前布局的落点概率分布
+     *
+     * @param {number} entryX - 弹珠入射 X 坐标
+     */
+    _updateDropDistribution(entryX) {
+        const rows = this.currentRows || CONFIG.gameplay.rows;
+        const cols = CONFIG.gameplay.cols || 10;
+        const layout = this.currentLayout || 'default';
+        const tiltBias = this.boardTilt ? this.boardTilt.current.x : 0;
+
+        // 计算基础分布（基于当前布局和倾斜）
+        const baseDistrib = calcDropDistribution(rows, cols, layout, tiltBias);
+
+        // 根据入射位置修正分布
+        this._dropDistribution = adjustDistributionForEntry(entryX, this.width, baseDistrib);
+
+        // 生成热力图数据
+        const boardBottomY = this.boardBottomY || (this.height * 0.7);
+        this._heatmapData = generateHeatmapData(
+            this._dropDistribution,
+            this.width,
+            boardBottomY,
+            this.height,
+            layout
+        );
+    },
+
+    /**
+     * [概率分析] 绘制落点热力图
+     * 在钉盘底部显示概率分布可视化
+     *
+     * @param {CanvasRenderingContext2D} ctx
+     */
+    _drawDropHeatmap(ctx) {
+        if (!this._heatmapData || this._heatmapData.length === 0) return;
+
+        const layout = this.currentLayout || 'default';
+        const hints = getAllLayoutHints();
+        const hint = hints[layout] || hints.default;
+
+        ctx.save();
+
+        // 绘制分布柱状图
+        for (const bar of this._heatmapData) {
+            if (bar.height < 1) continue;
+
+            // 渐变颜色：从底部向上渐变
+            const grad = ctx.createLinearGradient(bar.x, bar.y + bar.height, bar.x, bar.y);
+            grad.addColorStop(0, `${hint.color}00`);  // 底部透明
+            grad.addColorStop(0.4, `${hint.color}${Math.round(bar.alpha * 0.6 * 255).toString(16).padStart(2, '0')}`);
+            grad.addColorStop(1, `${hint.color}${Math.round(bar.alpha * 255).toString(16).padStart(2, '0')}`);
+
+            ctx.fillStyle = grad;
+            ctx.fillRect(bar.x, bar.y, bar.width, bar.height);
+
+            // 高概率槽位添加光晕效果
+            if (bar.alpha > 0.5) {
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = hint.color;
+                ctx.fillStyle = `${hint.color}${Math.round(bar.alpha * 0.3 * 255).toString(16).padStart(2, '0')}`;
+                ctx.fillRect(bar.x, bar.y, bar.width, 2);
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        // 绘制布局分布特征标签
+        const boardBottomY = this.boardBottomY || (this.height * 0.7);
+        const labelY = boardBottomY + 8;
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = `${hint.color}99`;
+        ctx.fillText(hint.hint, this.width / 2, labelY);
+
+        ctx.restore();
     },
 };
