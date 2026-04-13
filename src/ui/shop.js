@@ -205,19 +205,31 @@ export const shop_system = {
             if (window.showToast) showToast(`获得 ${relic.grantCount} 个${relic.grantRarity === 'common' ? '普通' : relic.grantRarity === 'rare' ? '稀有' : relic.grantRarity === 'epic' ? '史诗' : '传说'}符文！`);
         } else if (relic.effect === 'board_layout_triangle') {
             this.boardLayout = 'triangle';
+            // [补偿] 三角形底部钉子极少，+3 行补偿漏斗深度
+            this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 3;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
+            if (window.showToast) showToast('三角陣形啟動！釘盤 +3 行，漏斗共鳴激活。');
         } else if (relic.effect === 'board_layout_diamond') {
             this.boardLayout = 'diamond';
+            // [补偿] 菱形顶底稀疏，+2 行让菱形更饱满
+            this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 2;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
+            if (window.showToast) showToast('菱形陣形啟動！釘盤 +2 行，中段爆發激活。');
         } else if (relic.effect === 'board_layout_sparse') {
             this.boardLayout = 'sparse';
+            // [补偿] 稀疏布局钉子总数约为 default 的 75%，+4 行补偿总量
+            this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 4;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
+            if (window.showToast) showToast('稀疏間隔啟動！釘盤 +4 行，通道蓄力激活。');
         } else if (relic.effect === 'board_layout_mirror_sync') {
             this.boardLayout = 'mirror_sync';
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
         } else if (relic.effect === 'board_layout_wide_narrow') {
             this.boardLayout = 'wide_narrow';
+            // [补偿] 宽窄交替分布不均，+2 行轻度补偿
+            this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 2;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
+            if (window.showToast) showToast('寬窄交替啟動！釘盤 +2 行，邊緣共振激活。');
         } else if (relic.effect === 'assimilation_surge') {
             const mt = relic.marbleType;
             if (!this.guaranteedNextRound) this.guaranteedNextRound = [];

@@ -815,15 +815,15 @@ const RELIC_DB = [
     // ==================== 钉盘形态遗物（异型布局）====================
     // 每种只能获取一次（maxStacks: 1），均与行数遗物有联合效果
     // 策略1：三角阵形 - 漏斗流（行越多三角越尖，弹珠越集中于底部中央）
-    { id: 'triangle_formation', name: '三角陣形', icon: '🔺', desc: '收集階段：釘盤呈三角形排列，頂行最寬，每行遞減 1 列。弹珠越往下越向中央匯聚。與行數遺物疊加後漏斗效果更強。', rarity: 'rare', effect: 'board_layout_triangle', maxStacks: 1 },
+    { id: 'triangle_formation', name: '三角陣形', icon: '🔺', desc: '釘盤展開為三角形，頂行最寬，每行遞減 1 列。「漏斗共鳴」：弹珠碰撞屬性釘子時，20% 機率額外再收集一次該屬性（漏斗收窄效果）。釘盤 +3 行。', rarity: 'rare', effect: 'board_layout_triangle', maxStacks: 1 },
     // 策略2：菱形阵形 - 中段爆发流（行越多菱形越饱满，中段碰撞最频繁）
-    { id: 'diamond_formation', name: '菱形陣形', icon: '🔷', desc: '收集階段：釘盤呈菱形排列，前半段逐行擴展，後半段逐行收縮。弹珠在中段碰撞最頻繁。與行數遺物疊加後菱形更飽滿。', rarity: 'legendary', effect: 'board_layout_diamond', maxStacks: 1 },
+    { id: 'diamond_formation', name: '菱形陣形', icon: '🔷', desc: '釘盤展開為菱形，前半段擴展、後半段收縮。「中段爆發」：弹珠碰撞菱形中段（行數的 25%~75%）的釘子時，充能計數額外 +1，加速多播累積。釘盤 +2 行。', rarity: 'legendary', effect: 'board_layout_diamond', maxStacks: 1 },
     // 策略3：稀疏间隔 - 通道流（宽窄行交替，形成弹珠通道）
-    { id: 'sparse_interval', name: '稀疏間隔', icon: '〰️', desc: '收集階段：偶數行保持正常列數，奇數行減少 4 列並居中，形成「寬-窄」交替通道。弹珠在寬行密集碰撞後可穿越窄行通道。', rarity: 'rare', effect: 'board_layout_sparse', maxStacks: 1 },
+    { id: 'sparse_interval', name: '稀疏間隔', icon: '〰️', desc: '偶數行正常列數，奇數行減 4 列形成寬窄通道。「通道蓄力」：弹珠穿越窄行未碰撞任何釘子時，下次碰撞收集的屬性等級 +1（加速蓄力後爆發）。釘盤 +4 行。', rarity: 'rare', effect: 'board_layout_sparse', maxStacks: 1 },
     // 策略4：镜像同步 - 直线穿透流（列数减少但行对齐，弹珠更易直线下落）
     { id: 'mirror_sync', name: '鏡像同步', icon: '🪞', desc: '收集階段：釘盤列數減少且對齊。釘子被同化/突變時，鏡像位置的釘子同步轉化；特殊槽位鏡像呈現（數量翻倍）。', rarity: 'legendary', effect: 'board_layout_mirror_sync', maxStacks: 1 },
     // 策略5：宽窄交替 - 边缘捕获流（宽行捕获偏移弹珠，窄行提供通道）
-    { id: 'wide_narrow', name: '寬窄交替', icon: '📐', desc: '收集階段：偶數行增加 2 列，奇數行減少 2 列，形成寬窄交替結構。寬行的邊緣釘子能捕獲偏移的弹珠，窄行讓弹珠有更多橫向空間。', rarity: 'common', effect: 'board_layout_wide_narrow', maxStacks: 1 },
+    { id: 'wide_narrow', name: '寬窄交替', icon: '📐', desc: '偶數行 +2 列，奇數行 -2 列，寬窄交替。「邊緣共振」：弹珠碰撞寬行邊緣釘子（列號 0/1 或倒數 0/1）時，65% 機率額外再收集一次該屬性。釘盤 +2 行。', rarity: 'common', effect: 'board_layout_wide_narrow', maxStacks: 1 },
     // ==================== 弹珠同化涌潮遗物 ====================
     // 每种可同化钉子的弹珠各对应一个遗物
     // 效果：下两回合必定刷新出该种弹珠，且该弹珠的同化概率大幅提升（持續两回合）

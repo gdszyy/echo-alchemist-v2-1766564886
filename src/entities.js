@@ -1059,6 +1059,9 @@ class DropBall {
             // --- [物理增强] Galton Board 物理属性 ---
             this.spin = 0;                   // 角速度（顺时针为正），驱动 Magnus 效应
             this.layoutParams = null;        // 当前布局物理参数（由 game_phase 注入）
+            // --- [布局补偿] 布局专属效果状态 ---
+            this.channelCharged = false;     // [sparse] 通道蓄力：穿越窄行后下次碰撞属性等级+1
+            this._lastRowPassed = -1;        // [sparse] 记录上次经过的行号，用于检测穿越窄行
 	    }
         /**
          * [核心方法] 获取当前所有属性的层数
@@ -1644,6 +1647,75 @@ class DropBall {
                             this.handlePegInteraction(peg, game); // 传入 game
                         }
 
+                        // ==================== [布局补偿] 布局专属特殊效果 ====================
+                        const boardLayout = game.boardLayout || 'default';
+
+                        // --- [triangle] 漏斗共鸣 ---
+                        // 弹珠碰撞任意钉子时，20% 概率额外再收集一次该钉子的属性
+                        // 模拟弹珠在收窄通道中被多次反弹的物理效果
+                        if (boardLayout === 'triangle' && peg.type !== 'normal' && peg.type !== 'pink') {
+                            if (Math.random() < 0.20) {
+                                const bonusItem = { type: peg.type, level: peg.level || 1 };
+                                this.session.collected.push(bonusItem);
+                                this.def.collected.push(peg.type);
+                                game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 24, '漏斗共鸣!', '#f59e0b');
+                            }
+                        }
+
+                        // --- [diamond] 中段爆发 ---
+                        // 弹珠碰撞菱形中段（行号在 rows/4 ~ 3*rows/4 范围内）的钉子时
+                        // 充能计数额外 +1，加速多播积累
+                        if (boardLayout === 'diamond') {
+                            const totalRows = game.currentRows || CONFIG.gameplay.rows;
+                            const rowQ1 = Math.floor(totalRows * 0.25);
+                            const rowQ3 = Math.floor(totalRows * 0.75);
+                            if (peg.row !== undefined && peg.row >= rowQ1 && peg.row <= rowQ3) {
+                                this.session.currentHits++;
+                                if (this.session.currentHits >= this.session.nextTriggerThreshold) {
+                                    this.session.currentHits = 0;
+                                    this.session.multicast++;
+                                    this.session.nextTriggerThreshold += CONFIG.gameplay.nextTriggerThresholdIncrease;
+                                    game.persistentThreshold = this.session.nextTriggerThreshold;
+                                    game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 24, '中段爆发!', '#a78bfa');
+                                    audio.playPowerup();
+                                }
+                            }
+                        }
+
+                        // --- [sparse] 通道蓄力 ---
+                        // 弹珠碰撞钉子时，如果之前穿越了窄行（channelCharged=true）
+                        // 则此次收集的属性等级 +1
+                        if (boardLayout === 'sparse' && this.channelCharged && peg.type !== 'normal' && peg.type !== 'pink') {
+                            const lastIdx = this.session.collected.length - 1;
+                            if (lastIdx >= 0) {
+                                const lastItem = this.session.collected[lastIdx];
+                                if (typeof lastItem === 'object' && lastItem.level !== undefined) {
+                                    lastItem.level = Math.min(lastItem.level + 1, 3);
+                                    game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 24, '通道蓄力! +Lv', '#34d399');
+                                }
+                            }
+                            this.channelCharged = false;
+                        }
+
+                        // --- [wide_narrow] 边缘共振 ---
+                        // 弹珠碰撞偶数行（宽行）的边缘钉子（列号 0/1 或倒数 0/1）时
+                        // 65% 概率额外收集一次该钉子属性
+                        if (boardLayout === 'wide_narrow' && peg.type !== 'normal' && peg.type !== 'pink') {
+                            const isWideRow = (peg.row !== undefined && peg.row % 2 === 0);
+                            if (isWideRow) {
+                                const rowPegs = pegs.filter(p => p.row === peg.row);
+                                const isEdge = rowPegs.length > 0 && (
+                                    peg.col <= 1 || peg.col >= rowPegs.length - 2
+                                );
+                                if (isEdge && Math.random() < 0.65) {
+                                    const bonusItem = { type: peg.type, level: peg.level || 1 };
+                                    this.session.collected.push(bonusItem);
+                                    this.def.collected.push(peg.type);
+                                    game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 24, '边缘共振!', '#fb923c');
+                                }
+                            }
+                        }
+
                         if (peg.type !== 'normal' && peg.type !== 'pink') { 
                             // --- [新增/修改] 实时合成逻辑 ---
                             let finalType = peg.type;
@@ -1719,6 +1791,29 @@ class DropBall {
                         }
                     }
                 }
+
+            // ==================== [布局补偿] sparse 通道蓄力检测 ====================
+            // 检测弹珠是否穿越了奇数行（窄行）而没有碰到任何钉子
+            // 原理：记录弹珠当前 Y 坐标对应的行号，如果跨越了奇数行且该行没有碰撞，则激活蓄力
+            if ((game.boardLayout || 'default') === 'sparse') {
+                const spacingY = CONFIG.gameplay.spacingY || 32;
+                const offsetY = Math.min(120, (this.pos.y > 0 ? this.pos.y : 0) * 0.2);
+                // 估算当前行号（粗略）
+                const estimatedRow = Math.floor((this.pos.y - offsetY) / spacingY);
+                if (estimatedRow !== this._lastRowPassed && estimatedRow >= 0) {
+                    // 如果刚经过的行是奇数行（窄行），且本帧没有碰到钉子，则激活蓄力
+                    const isOddRow = (this._lastRowPassed % 2 !== 0);
+                    if (isOddRow && this._lastRowPassed >= 0) {
+                        // 检查上一行是否有碰撞（通过检查该行钉子的 litTimer）
+                        const lastRowPegs = pegs.filter(p => p.row === this._lastRowPassed);
+                        const hadCollision = lastRowPegs.some(p => p.litTimer > 0);
+                        if (!hadCollision && lastRowPegs.length > 0) {
+                            this.channelCharged = true;
+                        }
+                    }
+                    this._lastRowPassed = estimatedRow;
+                }
+            }
             }
             return null;
         }
