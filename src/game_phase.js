@@ -333,9 +333,24 @@ export const game_phase = {
                     normalPegs[i].level = 1;
                 }
             };
-            console.log(CONFIG.gameplay.initWindPegs,CONFIG.gameplay.initSwordPegs)
-            replaceWithSpecial(CONFIG.gameplay.initWindPegs, 'wind');
-            replaceWithSpecial(CONFIG.gameplay.initSwordPegs, 'flying_sword');
+            // [爽游模式] 新手教程局使用专属字段的钉子数量，避免全局 CONFIG 被污染
+            const windPegsCount = this._isTutorialRun && this._tutorialInitWindPegs
+                ? this._tutorialInitWindPegs
+                : CONFIG.gameplay.initWindPegs;
+            const swordPegsCount = this._isTutorialRun && this._tutorialInitSwordPegs
+                ? this._tutorialInitSwordPegs
+                : CONFIG.gameplay.initSwordPegs;
+            console.log('[PachinkoInit] wind:', windPegsCount, 'sword:', swordPegsCount);
+            replaceWithSpecial(windPegsCount, 'wind');
+            replaceWithSpecial(swordPegsCount, 'flying_sword');
+            // [爽游模式] 新手教程局：将 wind/flying_sword 钉子等级提升到 3
+            if (this._isTutorialRun) {
+                this.pegs.forEach(p => {
+                    if (p.type === 'wind' || p.type === 'flying_sword') {
+                        p.level = 3;
+                    }
+                });
+            }
         }
 
         this.boardBottomY = maxPegY;
@@ -1000,6 +1015,14 @@ phase_gathering_getRandomPegType() {
         eventBus.emit(EVENT_TYPES.UI_ROUND_NUM_UPDATE, { round: this.round });
         document.getElementById("round-num").innerText = this.round;
         showToast(`Round ${this.round}`);
+
+        // [爽游模式] 新手教程局：第 5 回合结算后触发胜利
+        if (this._isTutorialRun && this.round > 5) {
+            this.gameOver = true;
+            this._isTutorialRunCleared = true; // 标记为胜利结局
+            this._gameover_triggerPhase();
+            return;
+        }
 
         // 检查失败
         if (this.input_checkDefeat()) {

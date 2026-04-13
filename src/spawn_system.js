@@ -169,14 +169,16 @@ export const spawn_system = {
         const b = CONFIG.balance;
         
         // --- [优化] 动态血量修正逻辑 (V2: 指数膨胀) ---
+        // [爽游模式] 新手教程局：始终按第 10 回合的强度生成敌人
+        const effectiveRound = this._isTutorialRun ? 10 : this.round;
         // 1. [修改] 引入指数曲线
         // 设定一个基础膨胀率（从 config 读取，默认 1.12 即 12%），随回合数呈指数级放大
         // 前5回合保护期不膨胀，Math.max(0, ...) 确保前期不会变成小数
         const hpExponent = b.hpExponent || 1.12;
-        const exponentialFactor = Math.pow(hpExponent, Math.max(0, this.round - 5));
+        const exponentialFactor = Math.pow(hpExponent, Math.max(0, effectiveRound - 5));
         
         // 2. 新公式：(基础 + 线性) * 指数 * 难度系数
-        const linearHP = (b.enemyBaseHp + (this.round * b.enemyHpPerRound)) * exponentialFactor * this.difficultyGrowthFactor;
+        const linearHP = (b.enemyBaseHp + (effectiveRound * b.enemyHpPerRound)) * exponentialFactor * this.difficultyGrowthFactor;
         
         // 3. 计算基于近3回合滑动平均伤害的理想血量
         const peakAvg = this.calc_getRecentAverageDamage(3);
@@ -570,23 +572,35 @@ export const spawn_system = {
             pyro: () => new MarbleDefinition('pyro')
         };
 
+        // [爽游模式] 新手教程局：只展示爆炸/激光/彩虹/回响弹珠
+        const tutorialOnlyTypes = ['explosive', 'laser', 'rainbow', 'resonance'];
+        const tutorialWeights = {};
+        if (this._isTutorialRun) {
+            tutorialOnlyTypes.forEach(type => { tutorialWeights[type] = 25; });
+        }
+
         for(let i=0; i < CONFIG.gameplay.selectionCount; i++) {
             let m;
             
             // 1. 保底機制
             if (this.guaranteedNextRound.length > 0) {
                 const key = this.guaranteedNextRound.shift();
-                if (typeMapping[key]) m = typeMapping[key]();
+                // [爽游模式] 教程局中保底弹珠也限制在允许的类型内
+                if (typeMapping[key] && (!this._isTutorialRun || tutorialOnlyTypes.includes(key))) {
+                    m = typeMapping[key]();
+                }
             } 
             
             // 2. 加權隨機機制
             if (!m) {
+                // [爽游模式] 教程局使用限定权重表
+                const activeWeights = this._isTutorialRun ? tutorialWeights : this.unlockedWeights;
                 let total = 0;
-                const keys = Object.keys(this.unlockedWeights);
-                keys.forEach(k => total += this.unlockedWeights[k]);
+                const keys = Object.keys(activeWeights);
+                keys.forEach(k => total += activeWeights[k]);
                 let r = Math.random() * total;
                 for (const key of keys) {
-                    r -= this.unlockedWeights[key];
+                    r -= activeWeights[key];
                     if (r <= 0) {
                         if (typeMapping[key]) m = typeMapping[key]();
                         break;
@@ -594,7 +608,7 @@ export const spawn_system = {
                 }
             }
             
-            // 兜底防止出錯
+            // 屌底防止出錯
             if (!m) m = new MarbleDefinition('white');
             
             this.marblesPool.push(m); 
@@ -1213,6 +1227,18 @@ export const spawn_system = {
         const cfg = CONFIG.balance.bossRounds;
         if (!cfg) return;
 
+        // [爽游模式] 新手教程局：第一个 Boss 固定在第 2 回合，后续不再调度（局只有 5 回合）
+        if (this._isTutorialRun) {
+            if (!this._bossSpawnCount || this._bossSpawnCount === 0) {
+                this._nextBossRound = 2;
+                console.log('[TutorialRun][BossSchedule] 最终 Boss 预定在 Round 2');
+            } else {
+                // 已经出现过 Boss，不再调度（局内只有一个 Boss）
+                this._nextBossRound = 9999;
+            }
+            return;
+        }
+
         // 第一个 Boss 固定回合
         if (!this._bossSpawnCount || this._bossSpawnCount === 0) {
             this._nextBossRound = cfg.firstBoss || 5;
@@ -1242,6 +1268,10 @@ export const spawn_system = {
             this.spawn_scheduleNextBoss(0);
         }
         if (round === this._nextBossRound) {
+            // [爽游模式] 新手教程局：强制为大 Boss（ouroboros）
+            if (this._isTutorialRun) {
+                return { shouldSpawn: true, isBigBoss: true };
+            }
             // 第四个 Boss 起为大 Boss（第 1-3 个为 Mini-Boss）
             const isBigBoss = (this._bossSpawnCount || 0) >= 3;
             return { shouldSpawn: true, isBigBoss };
@@ -1282,7 +1312,8 @@ export const spawn_system = {
     spawn_calculateBossHP(isBigBoss) {
         const b = CONFIG.balance;
         const f = b.bossHpFormula;
-        const r = this.round;
+        // [爽游模式] 新手教程局：始终按第 10 回合强度计算 Boss 血量
+        const r = this._isTutorialRun ? 10 : this.round;
 
         // 1. 计算基础模板血量（使用原始 bossMult，后续梯度调整）
         const hpExponent = b.hpExponent || 1.12;

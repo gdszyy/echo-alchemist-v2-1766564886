@@ -148,6 +148,46 @@ export const game_system = {
         // 注入局外升级效果
         this.meta_applyUpgrades();
 
+        // ==================== [爽游模式] 新手教程专属配置注入 ====================
+        // 仅在新手教程局（_tutorialActive === true）时生效，不影响正常局
+        // 在此处根据 _tutorialActive 设置 _isTutorialRun，确保整个 5 回合内爽游配置持续生效
+        if (this._tutorialActive) {
+            this._isTutorialRun = true;
+        }
+        if (this._isTutorialRun) {
+            // 1. 符文钉：3 个三级风属性 + 3 个三级飞剑属性
+            //    使用专属字段存储教程局钉子数量，避免直接修改全局 CONFIG（防止影响正常局）
+            //    game_phase.js 的 phase_gathering_initPachinko 会在 round===1 时读取这两个字段
+            this._tutorialInitWindPegs = 3;
+            this._tutorialInitSwordPegs = 3;
+
+            // 2. 解锁所有弹珠类型（向 unlockedWeights 注入全部权重）
+            const allMarbleTypes = ['explosive', 'rainbow', 'resonance', 'matryoshka',
+                                    'laser', 'bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro'];
+            allMarbleTypes.forEach(type => {
+                if (!this.unlockedWeights[type] || this.unlockedWeights[type] === 0) {
+                    this.unlockedWeights[type] = 10;
+                }
+            });
+
+            // 3. 添加倍化遗物（gigantism_relic）
+            if (!this.ownedRelics.includes('gigantism_relic')) {
+                this.ownedRelics.push('gigantism_relic');
+                // 应用倍化遗物效果：弹珠体积增大（与 shop.js 中 permanent_size_up 效果保持一致）
+                this.marbleSizeBonus = (this.marbleSizeBonus || 0) + 2.5;
+            }
+
+            // 4. 添加三层炼金火药管（flat_damage_up，每层 +2 基础伤害）
+            const tubesToAdd = 3;
+            for (let i = 0; i < tubesToAdd; i++) {
+                this.ownedRelics.push('alchemist_powder_tube');
+                this.flatDamageBonus = (this.flatDamageBonus || 0) + 2;
+            }
+
+            console.log('[TutorialRun] 爽游配置已注入：wind×3, sword×3, 所有弹珠解锁, 倍化遗物, 炼金火药管×3');
+        }
+        // ==================== [爽游模式] 结束 ====================
+
         // 生成初始敌人（使用 combatGridTopY 确保不被顶部半透明栏遮挡）
         const startY = this.combatGridTopY;
         for (let i = 0; i < CONFIG.gameplay.startRows; i++) {
@@ -234,6 +274,13 @@ export const game_system = {
         // 重置 遗物串行标志
         this._pendingBossRelic = false;
         this._pendingRelicEvent = false;
+        // [爽游模式] 重置爽游胜利标志（防止下一局正常局也显示胜利标题）
+        this._isTutorialRunCleared = false;
+        // [爽游模式] 重置爽游局标志（新开一局时始终清除，在 sys_initGameStart 中根据 _tutorialActive 重新设置）
+        this._isTutorialRun = false;
+        // [爽游模式] 重置教程局钉子数量临时字段
+        this._tutorialInitWindPegs = 0;
+        this._tutorialInitSwordPegs = 0;
         // 重置 遗物选择计数器（用于前三次推荐逻辑）
         this.relicSelectionCount = 0;
         // 重置 炼金火药管平坦伤害加成

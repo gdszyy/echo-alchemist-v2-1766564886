@@ -137,11 +137,24 @@ export const game_over_mixin = {
      * @description 渲染顶部标题区域。
      */
     _gameover_renderHeader() {
+        // [爽游模式] 新手教程局胜利时显示胜利标题
+        if (this._isTutorialRunCleared) {
+            return `
+            <div class="gameover-header text-center mb-6 pt-8">
+                <div class="text-6xl mb-3 animate-pulse-slow">⚡</div>
+                <h1 class="text-4xl font-bold text-amber-400 font-[Cinzel] tracking-widest drop-shadow-[0_0_20px_rgba(251,191,36,0.6)] mb-1">
+                    爽游通关！
+                </h1>
+                <p class="text-slate-400 text-sm tracking-[0.4em] uppercase">Tutorial Cleared</p>
+                <p class="text-amber-300/70 text-xs mt-2">你已穿越 5 回合的炼金考验！现在可以开始真正的冒险了。</p>
+            </div>
+            `;
+        }
         return `
         <div class="gameover-header text-center mb-6 pt-8">
             <div class="text-6xl mb-3 animate-pulse-slow">💀</div>
             <h1 class="text-4xl font-bold text-red-400 font-[Cinzel] tracking-widest drop-shadow-[0_0_20px_rgba(248,113,113,0.5)] mb-1">
-                防線失守
+                防线失守
             </h1>
             <p class="text-slate-500 text-sm tracking-[0.4em] uppercase">Run Over</p>
         </div>

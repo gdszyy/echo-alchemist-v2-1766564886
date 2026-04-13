@@ -244,6 +244,8 @@ export const tutorial_system = {
         if (this._tutorialActive) this.tutorial_end(false);
         this._tutorialActive = true;
         this._tutorialStepIndex = 0;
+        // [爽游模式] 标记当前局为新手教程专属爽游局
+        this._isTutorialRun = true;
         this._tutorial_createDOM();
         this._tutorial_showStep(0);
     },
@@ -257,6 +259,8 @@ export const tutorial_system = {
         this._tutorialActive = false;
         this._tutorial_cleanupListeners();
         this._tutorial_removeDOM();
+        // [爽游模式] 注意：_isTutorialRun 不在此处清除，而是在 sys_resetGame 中清除
+        // 这样可以确保整个 5 回合内爽游配置持续生效，不因教程卡片关闭而失效
         if (markCompleted) {
             this.saveData.tutorialCompleted = true;
             this.sys_saveData();
