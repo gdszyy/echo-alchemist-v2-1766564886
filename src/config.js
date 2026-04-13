@@ -681,7 +681,15 @@ const CONFIG = {
         },
         // [新增] 特殊变体概率乘子
         specialMutationMult: 0.1, // 变异概率乘子 (基于同化概率)
-        specialUpgradeMult: 0.42   // 升级概率乘子 (基于同化概率)
+        specialUpgradeMult: 0.42,   // 升级概率乘子 (基于同化概率)
+        // [激光折射系统] 折射机制参数
+        laserRefractionBaseChance: 0.30,  // 折射基础触发概率 (30%)
+        laserRefractionBounceBonus: 0.05, // 每层 bounce 增加的触发概率 (+5%)
+        laserRefractionMaxChance: 0.80,   // 折射触发概率上限 (80%)
+        laserRefractionRadius: 150,       // 折射搜寻范围半径 (px)
+        laserRefractionDamageDecay: 0.75, // 每次折射的伤害衰减系数 (75%)
+        laserRefractionWidthDecay: 0.85,  // 每次折射的光线宽度衰减系数 (85%)
+        laserRefractionMaxTotal: 50       // 单次发射最大折射总次数 (防止极端情况)
     },
     //  初始概率配置 (現在這些是基礎權重，解鎖後會增加)
     // [DESIGN] 初始状态只提供 bounce（反弹）属性。

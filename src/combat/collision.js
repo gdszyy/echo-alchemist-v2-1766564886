@@ -6,6 +6,7 @@
  *  - 敌人移动碰撞检测（AABB + 边界检测）
  *  - 激光射线检测（墙壁反射面 + 护盾敌人）
  *  - 激光穿透伤害处理（线段与敌人的碰撞判定）
+ *  - 激光折射任务生成（击中敌人后概率触发，消耗 bounce 层数）
  *
  * 使用方式：通过 window.CollisionSystem 访问，或直接 import。
  * 所有方法均以 mixin 形式设计，需绑定到 Game 实例（this）上调用。
@@ -122,22 +123,42 @@ export const CollisionSystem = {
     },
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 3. 激光穿透伤害处理（线段与敌人碰撞）
+    // 3. 激光穿透伤害处理（线段与敌人碰撞）+ 折射任务生成
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * @method combat_laser_processPenetration
-     * @description 处理激光线段路径上所有普通敌人的穿透伤害。
-     *   使用点到线段距离公式判定碰撞，对命中的敌人按穿透顺序施加衰减伤害。
-     *   穿透衰减公式：第 n 个目标受到的伤害 = 原始伤害 × (0.5)^(n-1)
-     *   （每层 pierce 属性可向后传递 50% 伤害，无 pierce 时仅首个目标受全伤害）
+     * @description 处理激光线段路径上所有普通敌人的穿透伤害，并在命中后尝试触发折射。
+     *
+     *   穿透衰减：第 n 个目标（0-indexed）受到的伤害 = 原始伤害 × (0.5)^n
+     *
+     *   折射机制：
+     *     - 每个被命中的敌人独立判定折射概率。
+     *     - 概率公式：min(maxChance, baseChance + bounce × bonusPerBounce)
+     *     - 触发时消耗 1 层 bounce，在折射搜寻半径内随机选取一个未被本次激光击中的敌人。
+     *     - 折射光线继承剩余长度，伤害按 laserRefractionDamageDecay 衰减，宽度按 laserRefractionWidthDecay 衰减。
+     *     - 返回折射任务列表，由 combat_laser_fire 的队列循环处理，避免深度递归。
+     *
      * @param {Vec2} p1 - 线段起点
      * @param {Vec2} p2 - 线段终点
-     * @param {Object} recipe - 子弹配方（包含 laser、explosive、pierce 等属性）
+     * @param {Object} recipe - 子弹配方（包含 laser、explosive、pierce、bounce 等属性）
+     * @param {number} remainLen - 当前射线的剩余长度（用于折射继承）
+     * @param {number} bouncesLeft - 当前射线剩余的反弹次数
+     * @param {Set<Enemy>} hitEnemiesSet - 本次激光（含所有折射链）已命中的敌人集合（防循环）
+     * @param {number} currentWidth - 当前射线的视觉宽度（折射时衰减）
+     * @returns {{ refractionTasks: Array, bouncesLeft: number }}
+     *   refractionTasks: 折射任务列表，每项为 { startPos, dir, remainLen, recipe, bouncesLeft, hitEnemiesSet, width }
+     *   bouncesLeft: 处理后剩余的反弹次数（已被折射消耗）
      */
-    combat_laser_processPenetration(p1, p2, recipe) {
-        const laserVisualWidth = 3 + (recipe.laser * 4) + (recipe.explosive ? 10 : 0);
+    combat_laser_processPenetration(p1, p2, recipe, remainLen = 0, bouncesLeft = 0, hitEnemiesSet = null, currentWidth = null) {
+        const laserVisualWidth = currentWidth !== null
+            ? currentWidth
+            : 3 + (recipe.laser * 4) + (recipe.explosive ? 10 : 0);
         const laserLogicRadius = laserVisualWidth / 2;
+
+        // 初始化已命中集合（首次调用时创建）
+        if (!hitEnemiesSet) hitEnemiesSet = new Set();
+
         // 构建线段包围盒用于快速剔除
         const minX = Math.min(p1.x, p2.x) - 20;
         const maxX = Math.max(p1.x, p2.x) + 20;
@@ -147,7 +168,7 @@ export const CollisionSystem = {
         // [穿透衰减] 收集命中敌人及其在激光路径上的投影参数 t（0~1），按距离排序后依次衰减伤害
         const hits = [];
         const l2 = p1.dist(p2) * p1.dist(p2);
-        if (l2 === 0) return;
+        if (l2 === 0) return { refractionTasks: [], bouncesLeft };
 
         this.enemies.forEach(e => {
             if (!e.active) return;
@@ -170,6 +191,18 @@ export const CollisionSystem = {
         // 按激光路径顺序排序（t 值从小到大，即从激光起点到终点）
         hits.sort((a, b) => a.t - b.t);
 
+        // 折射任务列表
+        const refractionTasks = [];
+
+        // 读取折射配置
+        const rfCfg = CONFIG.gameplay;
+        const rfBaseChance = rfCfg.laserRefractionBaseChance || 0.30;
+        const rfBounceBonus = rfCfg.laserRefractionBounceBonus || 0.05;
+        const rfMaxChance = rfCfg.laserRefractionMaxChance || 0.80;
+        const rfRadius = rfCfg.laserRefractionRadius || 150;
+        const rfDmgDecay = rfCfg.laserRefractionDamageDecay || 0.75;
+        const rfWidthDecay = rfCfg.laserRefractionWidthDecay || 0.85;
+
         // 按穿透顺序施加衰减伤害：第 n 个目标（0-indexed）受到 原始伤害 × 0.5^n
         hits.forEach((hit, index) => {
             const damageMultiplier = Math.pow(0.5, index);
@@ -177,6 +210,8 @@ export const CollisionSystem = {
             // 构造衰减后的配方，仅覆盖 damage 字段，其余属性保持不变
             const attenuatedRecipe = { ...recipe, damage: attenuatedDamage };
             this.combat_damageEnemy(hit.enemy, { config: attenuatedRecipe, pos: new Vec2(hit.projX, hit.projY), isCopy: false });
+            // 将此敌人加入已命中集合
+            hitEnemiesSet.add(hit.enemy);
             // 视觉：受击点特效
             if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#fff', 'spark');
             // [Agent D] 照射词条 Hook：激光累积照射同一敌人伤害加深
@@ -201,7 +236,57 @@ export const CollisionSystem = {
                 hit.enemy.applyTemp(tempIncrease);
                 if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#f97316', 'spark');
             }
+
+            // ─────────────────────────────────────────────────────────────────
+            // [激光折射] 击中敌人后，独立判定折射触发
+            // ─────────────────────────────────────────────────────────────────
+            if (bouncesLeft > 0 && remainLen > 10) {
+                // 折射概率：基础 + 每层 bounce 加成，上限 maxChance
+                const triggerChance = Math.min(rfMaxChance, rfBaseChance + bouncesLeft * rfBounceBonus);
+                if (Math.random() < triggerChance) {
+                    // 在折射半径内寻找合法目标（排除已命中的敌人）
+                    const candidates = this.enemies.filter(e =>
+                        e.active &&
+                        e !== hit.enemy &&
+                        !hitEnemiesSet.has(e) &&
+                        e.pos.dist(hit.enemy.pos) <= rfRadius
+                    );
+
+                    if (candidates.length > 0) {
+                        // 随机选取一个目标
+                        const target = candidates[Math.floor(Math.random() * candidates.length)];
+                        // 计算折射方向（从当前命中点指向目标中心）
+                        const rfDir = target.pos.sub(new Vec2(hit.projX, hit.projY)).norm();
+                        // 折射光线的剩余长度：当前射线剩余长度 × 命中点之后的比例
+                        const rfRemainLen = remainLen * (1 - hit.t);
+                        // 折射伤害：当前衰减后伤害 × 折射衰减系数
+                        const rfDamage = attenuatedDamage * rfDmgDecay;
+                        // 折射光线宽度：当前宽度 × 宽度衰减系数（最小 1px）
+                        const rfWidth = Math.max(1, laserVisualWidth * rfWidthDecay);
+
+                        // 消耗一层 bounce
+                        bouncesLeft--;
+
+                        // 折射特效：在折射点生成绿色火花（代表 Bounce 属性触发）
+                        this.spawn_createParticle(hit.projX, hit.projY, '#a3e635', 'spark');
+                        this.spawn_createParticle(hit.projX, hit.projY, '#22c55e', 'spark');
+
+                        // 将折射任务加入队列
+                        refractionTasks.push({
+                            startPos: new Vec2(hit.projX, hit.projY),
+                            dir: rfDir,
+                            remainLen: rfRemainLen,
+                            recipe: { ...recipe, damage: rfDamage },
+                            bouncesLeft,
+                            hitEnemiesSet,
+                            width: rfWidth
+                        });
+                    }
+                }
+            }
         });
+
+        return { refractionTasks, bouncesLeft };
     },
 
 };

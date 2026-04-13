@@ -2101,111 +2101,159 @@ export const combat_system = {
     },
 
 /**
-     * @param {any} startY - TODO: Describe this parameter.
-     * @param {any} vel - TODO: Describe this parameter.
-     * @param {any} recipe - TODO: Describe this parameter.
+     * @method combat_laser_fire
+     * @description 发射激光束，进行射线检测、穿透伤害和折射处理。
+     *
+     *   折射机制（Refraction）：
+     *     - 激光击中普通敌人后，有概率触发折射，消耗 1 层 bounce 属性。
+     *     - 折射光线从命中点出发，指向折射搜寻半径内的随机敌人。
+     *     - 折射光线继承剩余长度，伤害和宽度按配置系数衰减。
+     *     - 采用队列（BFS）而非递归，避免栈溢出，并受最大折射总次数限制。
+     *
+     * @param {number} startX - 激光起点 X
+     * @param {number} startY - 激光起点 Y
+     * @param {Vec2} vel - 初始速度向量（用于确定方向）
+     * @param {Object} recipe - 子弹配方
+     * @param {string|null} shotId - 本次发射的统计 ID
      */
     combat_laser_fire(startX, startY, vel, recipe, shotId = null) {
-        // [新增] 保存shotId供伤害记录使用
-        // this._currentDamageShotId = shotId; // 移除：不再需要全局缓存 shotId
-        
-        // [新增] 激光统计处理：激光是即时的，手动增加计数并在完成后减少
+        // [统计] 激光是即时的，手动增加计数并在完成后减少
         if (shotId !== null && this.shotDamageMap.has(shotId)) {
             this.shotDamageMap.get(shotId).projectileCount++;
         }
-        
+
         // --- 1. 参数计算 ---
         this.isVisualEffectActive = true;
         // [射程] 基础 500 * 1.35 + 每层穿透 250 (决定光线能跑多远)
-        let maxLen = (500 * 1.35) + (recipe.pierce * 250) + (CONFIG.gameplay.laserLengthBonus || 0); 
-        
+        const maxLen = (500 * 1.35) + (recipe.pierce * 250) + (CONFIG.gameplay.laserLengthBonus || 0);
+
         // [粗细] 基础 3px + 每层激光 4px + 爆破加成 (决定光线视觉宽度)
-        let width = 3 + (recipe.laser * 4) + (recipe.explosive ? 10 : 0);
-        
-        // [反弹] 直接读取配方中的 bounce 值 (决定折射次数)
-        let bounces = recipe.bounce; 
+        const mainWidth = 3 + (recipe.laser * 4) + (recipe.explosive ? 10 : 0);
 
         // [颜色] 优先级：爆破 > 元素 > 默认蓝
-        let color = '#0ea5e9'; 
+        let color = '#0ea5e9';
         if (recipe.pyro > 0) color = '#f97316';
         else if (recipe.cryo > 0) color = '#06b6d4';
         else if (recipe.lightning > 0) color = '#d8b4fe';
         else if (recipe.explosive) color = '#ef4444';
 
-        // --- 2. 射线检测 (Raycasting Logic) ---
-        let points = [new Vec2(startX, startY)]; 
-        let currPos = new Vec2(startX, startY);
-        let currDir = vel.norm(); 
-        let remainLen = maxLen;
-        
-        // 循环条件：只要还有剩余长度 (remainLen > 0) 就继续
-        // 内部会判断是否撞墙/次数耗尽来 break
-        while (remainLen > 0) {
-            // A. 寻找最近的反射面 (墙壁 或 护盾敌人)
-            let hitResult = this.combat_laser_castRay(currPos, currDir, remainLen);
-            
-            // B. 结算这一段路径 (移动光标)
-            let segmentLen = hitResult.dist;
-            let nextPos = currPos.add(currDir.mult(segmentLen));
-            
-            // C. 伤害路径上的普通敌人 (穿透所有)
-            this.combat_laser_processPenetration(currPos, nextPos, recipe);
+        // --- 2. 队列式射线处理（主射线 + 折射链）---
+        // 已命中敌人集合：整条折射链共享，防止同一敌人被重复折射
+        const hitEnemiesSet = new Set();
+        // 最大折射总次数限制（防止极端情况导致性能问题）
+        const maxRefractionTotal = CONFIG.gameplay.laserRefractionMaxTotal || 50;
+        let refractionCount = 0;
 
-            // 记录路径点用于绘制
-            points.push(nextPos);
-            
-            // 扣除长度
-            remainLen -= segmentLen;
-            currPos = nextPos;
+        // 所有射线的路径点集合，用于批量绘制
+        // 每条折射光线单独绘制，以支持不同宽度
+        const beamsToRender = [];
 
-            // D. 处理撞击结果
-            if (hitResult.hitType === 'none') {
-                // 没撞到任何反射面，光线在空气中耗尽长度，结束
-                break; 
-            } else {
-                // 撞到了反射面！检查是否有剩余反弹次数
-                if (bounces <= 0) {
-                    // 次数耗尽，光线在这里终止 (虽有长度但无法折射)
-                    // 可以在末端加个小火花表示能量耗尽
-                    this.spawn_createParticle(nextPos.x, nextPos.y, color, 'spark');
+        // 初始化任务队列：主射线
+        const laserQueue = [{
+            startPos: new Vec2(startX, startY),
+            dir: vel.norm(),
+            remainLen: maxLen,
+            recipe: recipe,
+            bouncesLeft: recipe.bounce || 0,
+            width: mainWidth,
+            isMain: true
+        }];
+
+        while (laserQueue.length > 0) {
+            const task = laserQueue.shift();
+            let { startPos, dir, remainLen, recipe: taskRecipe, bouncesLeft, width, isMain } = task;
+
+            let points = [startPos];
+            let currPos = startPos;
+            let currDir = dir;
+
+            // 单条射线的射线追踪循环
+            while (remainLen > 0) {
+                // A. 寻找最近的反射面（墙壁或护盾敌人）
+                const hitResult = this.combat_laser_castRay(currPos, currDir, remainLen);
+
+                // B. 结算这一段路径
+                const segmentLen = hitResult.dist;
+                const nextPos = currPos.add(currDir.mult(segmentLen));
+
+                // C. 伤害路径上的普通敌人，并尝试触发折射
+                if (refractionCount < maxRefractionTotal) {
+                    const penetrationResult = this.combat_laser_processPenetration(
+                        currPos, nextPos, taskRecipe,
+                        remainLen, bouncesLeft, hitEnemiesSet, width
+                    );
+                    // 接收折射任务并加入队列
+                    if (penetrationResult.refractionTasks && penetrationResult.refractionTasks.length > 0) {
+                        for (const rfTask of penetrationResult.refractionTasks) {
+                            if (refractionCount < maxRefractionTotal) {
+                                laserQueue.push(rfTask);
+                                refractionCount++;
+                            }
+                        }
+                        // 同步更新当前射线的剩余反弹次数
+                        bouncesLeft = penetrationResult.bouncesLeft;
+                    }
+                } else {
+                    // 已达折射上限，仅处理穿透伤害，不再生成折射
+                    this.combat_laser_processPenetration(
+                        currPos, nextPos, taskRecipe,
+                        0, 0, hitEnemiesSet, width
+                    );
+                }
+
+                // 记录路径点
+                points.push(nextPos);
+                remainLen -= segmentLen;
+                currPos = nextPos;
+
+                // D. 处理撞击结果（墙壁/护盾镜面反射，仍消耗 bounce）
+                if (hitResult.hitType === 'none') {
                     break;
-                }
+                } else {
+                    if (bouncesLeft <= 0) {
+                        // 反弹次数耗尽，光线终止
+                        this.spawn_createParticle(nextPos.x, nextPos.y, color, 'spark');
+                        break;
+                    }
+                    bouncesLeft--;
 
-                // 消耗一次反弹次数
-                bounces--;
-                
-                // 触发撞击反馈
-                if (hitResult.hitType === 'wall') {
-                    audio.playHit('bounce');
-                    this.spawn_createParticle(nextPos.x, nextPos.y, color, 'spark');
-                } else if (hitResult.hitType === 'shield') {
-                    // 击中护盾敌人
-                    this.combat_damageEnemy(hitResult.enemy, { config: recipe, pos: nextPos, isCopy: false }); 
-                    audio.playHit('bounce'); // 听起来像打铁
-                    this.spawn_createParticle(nextPos.x, nextPos.y, '#3b82f6', 'spark');
-                }
+                    if (hitResult.hitType === 'wall') {
+                        audio.playHit('bounce');
+                        this.spawn_createParticle(nextPos.x, nextPos.y, color, 'spark');
+                    } else if (hitResult.hitType === 'shield') {
+                        this.combat_damageEnemy(hitResult.enemy, { config: taskRecipe, pos: nextPos, isCopy: false });
+                        audio.playHit('bounce');
+                        this.spawn_createParticle(nextPos.x, nextPos.y, '#3b82f6', 'spark');
+                    }
 
-                // 计算反射向量 (镜面反射)
-                if (hitResult.normal === 'x') currDir.x *= -1;
-                else currDir.y *= -1;
+                    // 镜面反射方向
+                    if (hitResult.normal === 'x') currDir = new Vec2(-currDir.x, currDir.y);
+                    else currDir = new Vec2(currDir.x, -currDir.y);
+                }
             }
+
+            // 收集本条射线的绘制信息
+            beamsToRender.push({ points, width, isMain });
         }
 
         // --- 3. 生成视觉与音效 ---
-        // [限制] LaserBeam 受全局粒子上限约束
-        this.spawn_pushParticleWithLimit(new LaserBeam(points, width, color));
-        
+        // 绘制所有射线（主射线 + 折射链）
+        for (const beam of beamsToRender) {
+            // 折射光线颜色略微偏绿（混入 bounce 属性的绿色），主射线保持原色
+            const beamColor = beam.isMain ? color : this._laser_blendRefractionColor(color);
+            this.spawn_pushParticleWithLimit(new LaserBeam(beam.points, beam.width, beamColor));
+        }
+
         // 音效：越粗越低沉
-        audio.playTone(Math.max(100, 800 - width * 20), 'sawtooth', 0.15, 0.2 + width * 0.01);
+        audio.playTone(Math.max(100, 800 - mainWidth * 20), 'sawtooth', 0.15, 0.2 + mainWidth * 0.01);
         setTimeout(() => {
             this.isVisualEffectActive = false;
-        }, 600); 
-        
-        // [新增] 激光发射完成，增加销毁计数以触发统计保存
+        }, 600);
+
+        // [统计] 激光发射完成，增加销毁计数以触发统计保存
         if (shotId !== null && this.shotDamageMap.has(shotId)) {
             const shotStats = this.shotDamageMap.get(shotId);
             shotStats.destroyedCount++;
-            // 检查是否所有子弹都已销毁
             if (shotStats.destroyedCount >= shotStats.projectileCount && shotStats.total > 0) {
                 this.shotDamageHistory.push({
                     total: shotStats.total,
@@ -2215,6 +2263,34 @@ export const combat_system = {
                 this.ui_updateDamageStats();
                 this.shotDamageMap.delete(shotId);
             }
+        }
+    },
+
+    /**
+     * @method _laser_blendRefractionColor
+     * @description 将激光颜色与折射绿色（bounce 属性色）混合，用于区分折射光线。
+     *   混合比例：原色 70% + 绿色 30%，保持视觉辨识度的同时体现折射特性。
+     * @param {string} baseColor - 原始激光颜色（hex 格式）
+     * @returns {string} 混合后的颜色（hex 格式）
+     */
+    _laser_blendRefractionColor(baseColor) {
+        // 将 hex 颜色解析为 RGB
+        const parseHex = (hex) => {
+            const h = hex.replace('#', '');
+            return [
+                parseInt(h.substring(0, 2), 16),
+                parseInt(h.substring(2, 4), 16),
+                parseInt(h.substring(4, 6), 16)
+            ];
+        };
+        const toHex = (r, g, b) => '#' + [r, g, b].map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('');
+        try {
+            const [r1, g1, b1] = parseHex(baseColor);
+            // 折射绿色（bounce 属性颜色 #22c55e）
+            const [r2, g2, b2] = [34, 197, 94];
+            return toHex(r1 * 0.7 + r2 * 0.3, g1 * 0.7 + g2 * 0.3, b1 * 0.7 + b2 * 0.3);
+        } catch (e) {
+            return baseColor;
         }
     },
 
