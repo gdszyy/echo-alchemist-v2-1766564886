@@ -2156,12 +2156,13 @@ export const combat_system = {
             recipe: recipe,
             bouncesLeft: recipe.bounce || 0,
             width: mainWidth,
-            isMain: true
+            isMain: true,
+            refractionDepth: 0   // 主射线深度为 0
         }];
 
         while (laserQueue.length > 0) {
             const task = laserQueue.shift();
-            let { startPos, dir, remainLen, recipe: taskRecipe, bouncesLeft, width, isMain } = task;
+            let { startPos, dir, remainLen, recipe: taskRecipe, bouncesLeft, width, isMain, refractionDepth = 0 } = task;
 
             let points = [startPos];
             let currPos = startPos;
@@ -2180,7 +2181,7 @@ export const combat_system = {
                 if (refractionCount < maxRefractionTotal) {
                     const penetrationResult = this.combat_laser_processPenetration(
                         currPos, nextPos, taskRecipe,
-                        remainLen, bouncesLeft, hitEnemiesSet, width
+                        remainLen, bouncesLeft, hitEnemiesSet, width, refractionDepth
                     );
                     // 接收折射任务并加入队列
                     if (penetrationResult.refractionTasks && penetrationResult.refractionTasks.length > 0) {
@@ -2197,7 +2198,7 @@ export const combat_system = {
                     // 已达折射上限，仅处理穿透伤害，不再生成折射
                     this.combat_laser_processPenetration(
                         currPos, nextPos, taskRecipe,
-                        0, 0, hitEnemiesSet, width
+                        0, 0, hitEnemiesSet, width, refractionDepth
                     );
                 }
 

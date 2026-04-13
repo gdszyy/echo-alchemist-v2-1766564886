@@ -146,11 +146,12 @@ export const CollisionSystem = {
      * @param {number} bouncesLeft - 当前射线剩余的反弹次数
      * @param {Set<Enemy>} hitEnemiesSet - 本次激光（含所有折射链）已命中的敌人集合（防循环）
      * @param {number} currentWidth - 当前射线的视觉宽度（折射时衰减）
+     * @param {number} refractionDepth - 当前折射深度（0 为主射线），用于概率衰减计算
      * @returns {{ refractionTasks: Array, bouncesLeft: number }}
-     *   refractionTasks: 折射任务列表，每项为 { startPos, dir, remainLen, recipe, bouncesLeft, hitEnemiesSet, width }
+     *   refractionTasks: 折射任务列表，每项为 { startPos, dir, remainLen, recipe, bouncesLeft, hitEnemiesSet, width, refractionDepth }
      *   bouncesLeft: 处理后剩余的反弹次数（已被折射消耗）
      */
-    combat_laser_processPenetration(p1, p2, recipe, remainLen = 0, bouncesLeft = 0, hitEnemiesSet = null, currentWidth = null) {
+    combat_laser_processPenetration(p1, p2, recipe, remainLen = 0, bouncesLeft = 0, hitEnemiesSet = null, currentWidth = null, refractionDepth = 0) {
         const laserVisualWidth = currentWidth !== null
             ? currentWidth
             : 3 + (recipe.laser * 4) + (recipe.explosive ? 10 : 0);
@@ -202,6 +203,7 @@ export const CollisionSystem = {
         const rfRadius = rfCfg.laserRefractionRadius || 150;
         const rfDmgDecay = rfCfg.laserRefractionDamageDecay || 0.75;
         const rfWidthDecay = rfCfg.laserRefractionWidthDecay || 0.85;
+        const rfDepthDecay = rfCfg.laserRefractionDepthDecay || 0.65;
 
         // 按穿透顺序施加衰减伤害：第 n 个目标（0-indexed）受到 原始伤害 × 0.5^n
         hits.forEach((hit, index) => {
@@ -229,7 +231,7 @@ export const CollisionSystem = {
                     this.spawn_createFloatingText(hit.enemy.pos.x, hit.enemy.pos.y - 35, `照射+${Math.ceil(stackResult.actualDamage)}`, '#fbbf24');
                 }
             }
-            // [Agent D] 炽热光线词条 Hook：激光命中敌人时额外升温
+            // [Agent D] 笼热光线词条 Hook：激光命中敌人时额外升温
             const blazingBeamFx = this.activeRunewordEffects && this.activeRunewordEffects['blazing_beam'];
             if (blazingBeamFx) {
                 const tempIncrease = (blazingBeamFx.params && blazingBeamFx.params.tempIncrease) || 0;
@@ -238,11 +240,13 @@ export const CollisionSystem = {
             }
 
             // ─────────────────────────────────────────────────────────────────
-            // [激光折射] 击中敌人后，独立判定折射触发
+            // [激光折射] 仅对激光路径上最后一个命中的敌人判定折射
             // ─────────────────────────────────────────────────────────────────
-            if (bouncesLeft > 0 && remainLen > 10) {
-                // 折射概率：基础 + 每层 bounce 加成，上限 maxChance
-                const triggerChance = Math.min(rfMaxChance, rfBaseChance + bouncesLeft * rfBounceBonus);
+            const isLastHit = (index === hits.length - 1);
+            if (isLastHit && bouncesLeft > 0 && remainLen > 10) {
+                // 折射概率：(基础 + 每层 bounce 加成) × 层级衰减系数^depth，上限 maxChance
+                const baseChance = Math.min(rfMaxChance, rfBaseChance + bouncesLeft * rfBounceBonus);
+                const triggerChance = baseChance * Math.pow(rfDepthDecay, refractionDepth);
                 if (Math.random() < triggerChance) {
                     // 在折射半径内寻找合法目标（排除已命中的敌人）
                     const candidates = this.enemies.filter(e =>
@@ -271,7 +275,7 @@ export const CollisionSystem = {
                         this.spawn_createParticle(hit.projX, hit.projY, '#a3e635', 'spark');
                         this.spawn_createParticle(hit.projX, hit.projY, '#22c55e', 'spark');
 
-                        // 将折射任务加入队列
+                        // 将折射任务加入队列，并传递折射深度 +1
                         refractionTasks.push({
                             startPos: new Vec2(hit.projX, hit.projY),
                             dir: rfDir,
@@ -279,7 +283,8 @@ export const CollisionSystem = {
                             recipe: { ...recipe, damage: rfDamage },
                             bouncesLeft,
                             hitEnemiesSet,
-                            width: rfWidth
+                            width: rfWidth,
+                            refractionDepth: refractionDepth + 1
                         });
                     }
                 }

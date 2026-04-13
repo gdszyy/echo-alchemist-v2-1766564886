@@ -62,14 +62,18 @@
 | `laserRefractionDamageDecay` | `0.75` | 每次折射的伤害衰减系数 |
 | `laserRefractionWidthDecay` | `0.85` | 每次折射的光线宽度衰减系数 |
 | `laserRefractionMaxTotal` | `50` | 单次发射最大折射总次数 |
+| `laserRefractionDepthDecay` | `0.65` | 每增加一层折射深度，概率乘以该系数 |
 
 ### 3.2 折射概率公式
 
 ```
-P(折射) = min(laserRefractionMaxChance, laserRefractionBaseChance + bouncesLeft × laserRefractionBounceBonus)
+baseChance = min(laserRefractionMaxChance, laserRefractionBaseChance + bouncesLeft × laserRefractionBounceBonus)
+P(折射) = baseChance × laserRefractionDepthDecay ^ depth
 ```
 
-示例：拥有 4 层 bounce 时，折射概率 = min(0.80, 0.30 + 4 × 0.05) = 50%。
+其中 `depth` 为当前折射深度（主射线为 0，每折射一次 +1）。示例：拥有 4 层 bounce、depth=0 时，概率 = min(0.80, 0.50) × 0.65^0 = 50%；depth=1 时概率降为 50% × 0.65 = 32.5%；depth=2 时降为 21.1%，以此类推。
+
+**折射触发位置**：仅对激光路径上**最后一个命中的敌人**判定折射。穿透路径中间的敌人仅受穿透衰减伤害，不会成为折射起点。
 
 ### 3.3 折射链处理流程
 
