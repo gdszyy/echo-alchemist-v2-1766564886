@@ -178,15 +178,15 @@ export const spawn_system = {
         // 2. 新公式：(基础 + 线性) * 指数 * 难度系数
         const linearHP = (b.enemyBaseHp + (this.round * b.enemyHpPerRound)) * exponentialFactor * this.difficultyGrowthFactor;
         
-        // 3. 计算基于玩家峰值伤害的理想血量
-        const peakAvg = this.calc_getPeakAverageDamage();
+        // 3. 计算基于近3回合滑动平均伤害的理想血量
+        const peakAvg = this.calc_getRecentAverageDamage(3);
         const fullRowsCapacity = 2 * CONFIG.gameplay.enemyCols; // 以 2 行满员为对标
         
         let finalBaseHP = linearHP;
         let idealHP = 0;
         if (peakAvg > 0) {
             idealHP = peakAvg / fullRowsCapacity;
-            // 混合：60% 指数线性增长 + 40% 动态调整，提高硬数值权重
+            // 混合：60% 指数线性增长 + 40% 动态调整，提高硬数値权重
             finalBaseHP = (linearHP * 0.6) + (idealHP * 0.4);
         }
         
@@ -1267,14 +1267,19 @@ export const spawn_system = {
      * @method spawn_calculateBossHP
      * @description 计算 Boss 血量。
      *
-     * 后期公式: BossHP = (templateHP * 0.5) + (peakDPS * expectedKillRounds * 0.5)
-     * 前期公式: BossHP = (templateHP * 0.15) + (currentDPS * expectedKillRounds * 0.85)
+     * 后期公式: BossHP = (templateHP * 0.5) + (recentDPS * expectedKillRounds * 0.5)
+     * 前期公式: BossHP = (templateHP * 0.15) + (recentDPS * expectedKillRounds * 0.85)
      * 保底: Math.max(BossHP, templateHP * floorMultiplier)
      *
      * 前期保护机制（Early-Game Protection）:
      * - 在 [earlyRound, lateRound] 区间内，动态权重和保底倍率均进行线性插展
      * - 前期高动态权重：血量更贴近玩家实时战力，避免模板血量过高卡死新手
-     * - 前期低保底倍率：降低保底下限，使血量更自由地跡随玩家战力浮动
+     * - 前期低保底倍率：降低保底下限，使血量更自由地跟随玩家战力浮动
+     *
+     * Boss 倍率梯度调整（Mult Gradient）:
+     * - 在 [earlyRound, lateRound] 前期区间，根据玩家实时战力与模板预期的比値动态缩放 bossMult
+     * - 当玩家战力偏弱时，前期模板血量自动降低，避免前几个 Boss 血量就已远超玩家战力
+     * - 缩放上限为 1.0（不超过原倍率），下限为 bossMultGradientMin（默认 0.5）
      *
      * @param {boolean} isBigBoss - 是否为大 Boss
      * @returns {number} 最终 Boss 血量
@@ -1284,26 +1289,22 @@ export const spawn_system = {
         const f = b.bossHpFormula;
         const r = this.round;
 
-        // 1. 计算模板血量
+        // 1. 计算基础模板血量（使用原始 bossMult，后续梯度调整）
         const hpExponent = b.hpExponent || 1.12;
         const exponentialFactor = Math.pow(hpExponent, Math.max(0, r - 5));
-        const bossMult = isBigBoss ? f.bigBossMult : f.miniBossMult;
-        const templateHP = (b.enemyBaseHp + r * b.enemyHpPerRound) * exponentialFactor * bossMult;
+        const rawBossMult = isBigBoss ? f.bigBossMult : f.miniBossMult;
+        const templateHP = (b.enemyBaseHp + r * b.enemyHpPerRound) * exponentialFactor * rawBossMult;
 
-        // 2. 获取玩家战力（前期优先使用实时弹药期望伤害，后期使用峰値历史均値）
-        const peakDPS = this.calc_getPeakAverageDamage();
-        // 实时期望伤害：基于当前弹药队列的预期单发得分，前期样本少时更准确反映玩家实力
+        // 2. 获取玩家战力：使用近3回合滑动平均，无历史时回落到实时期望伤害
+        const recentDPS = this.calc_getRecentAverageDamage(3);
         const currentDPS = this.combat_calculatePlayerExpectedDamage();
-        // 当 peakDPS 为 0（无历史记录）时，回落到 currentDPS
-        const effectiveDPS = peakDPS > 0 ? peakDPS : currentDPS;
+        const effectiveDPS = recentDPS > 0 ? recentDPS : currentDPS;
 
         // 3. 计算动态血量
         const expectedTurns = isBigBoss ? f.bigBossKillRounds : f.miniBossKillRounds;
         const dynamicHP = effectiveDPS * expectedTurns;
 
         // 4. 前期保护：根据回合数对动态权重和保底倍率进行线性插展
-        //    round <= earlyRound: 使用前期参数（高动态权重 + 低保底）
-        //    round >= lateRound:  使用后期参数（平衡权重 + 正常保底）
         const earlyRound = f.earlyRound || 5;
         const lateRound  = f.lateRound  || 20;
         // t = 0 表示完全前期，t = 1 表示完全后期
@@ -1316,12 +1317,34 @@ export const spawn_system = {
 
         // 线性插展得到当前回合的实际权重
         const effectiveDynW   = earlyDynW  + (lateDynW  - earlyDynW)  * t;
-        const effectiveTplW   = 1 - effectiveDynW;  // 模板权重与动态权重互补，总和始终 = 1
+        const effectiveTplW   = 1 - effectiveDynW;
         const effectiveFloor  = earlyFloor + (lateFloor - earlyFloor)  * t;
 
-        // 5. 混合计算 + 保底
-        const mixedHP = (templateHP * effectiveTplW) + (dynamicHP * effectiveDynW);
-        const finalHP = Math.max(templateHP * effectiveFloor, mixedHP);
+        // 5. Boss 倍率梯度调整（Mult Gradient）
+        //    前期区间（t < 1）根据玩家实时战力与模板预期的比値，动态缩放 bossMult
+        //    比値 ratio = effectiveDPS / (templateHP / rawBossMult)
+        //      ratio 越小表示玩家远弱于模板预期，应降低 bossMult
+        //      ratio 越大表示玩家超过预期，不超过原始倍率
+        //    后期（t = 1）完全使用原始 rawBossMult，不做梯度调整
+        let effectiveBossMult = rawBossMult;
+        if (t < 1 && effectiveDPS > 0) {
+            // 模板单位血量：去掉 bossMult 后的每单位血量（即普通指数线性血量）
+            const unitHP = (b.enemyBaseHp + r * b.enemyHpPerRound) * exponentialFactor;
+            // 玩家战力对应的「应当能打多少倍率的 Boss」
+            const playerImpliedMult = (effectiveDPS * expectedTurns) / unitHP;
+            // 将比値限制在 [gradientMin, 1.0] 区间，再与 rawBossMult 相乘
+            const gradientMin = f.bossMultGradientMin || 0.5;
+            const multRatio = Math.max(gradientMin, Math.min(1.0, playerImpliedMult / rawBossMult));
+            // 前期梯度与后期原始倍率线性插展
+            effectiveBossMult = rawBossMult * (multRatio + (1.0 - multRatio) * t);
+        }
+
+        // 用梯度调整后的 effectiveBossMult 重新计算模板血量
+        const adjustedTemplateHP = (b.enemyBaseHp + r * b.enemyHpPerRound) * exponentialFactor * effectiveBossMult;
+
+        // 6. 混合计算 + 保底
+        const mixedHP = (adjustedTemplateHP * effectiveTplW) + (dynamicHP * effectiveDynW);
+        const finalHP = Math.max(adjustedTemplateHP * effectiveFloor, mixedHP);
 
         return Math.floor(finalHP);
     },

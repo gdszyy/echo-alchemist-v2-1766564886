@@ -518,7 +518,11 @@ const CONFIG = {
             earlyRound: 5,               // 前期保护生效的最大回合数（第一个 Boss 所在回合）
             lateRound: 20,               // 过渡结束回合（完全切换为后期稳定权重）
             earlyDynamicWeight: 0.85,    // 前期动态权重（高度依赖玩家实时伤害）
-            earlyFloorMultiplier: 0.45   // 前期保底倍率（降低保底，避免卡死新手）
+            earlyFloorMultiplier: 0.45,  // 前期保底倍率（降低保底，避免卡死新手）
+            // ── Boss 倍率梯度调整（Mult Gradient）──
+            // 前期区间内，根据玩家实时战力动态缩放 bossMult，使前几个 Boss 血量更贴近玩家实际战力
+            // 缩放比値下限：即使玩家战力极弱， bossMult 也不低于原始倍率的该比例
+            bossMultGradientMin: 0.5     // Boss 倍率梯度下限（即最少为原始倍率的 50%）
         },
 
         /** 8 个 Boss 专属配置 */

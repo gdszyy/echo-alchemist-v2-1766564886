@@ -12,26 +12,38 @@ import { audio } from './audio.js';
 
 export const calc_utils = {
 /**
+     * @method calc_getRecentAverageDamage
+     * @description 计算近 N 回合伤害的滑动平均值，用于动态调整敌人血量。
+     *   相比旧的「历史峰值均值」，滑动平均能更及时地反映玩家当前战力，
+     *   避免早期一次超强输出长期压制后续敌人血量。
+     * @param {number} [window=3] - 滑动窗口大小（默认近 3 回合）
+     * @returns {number} 近 window 回合的平均总伤害；无历史时返回 0
+     */
+    calc_getRecentAverageDamage(window = 3) {
+        // 1. 从历史记录中提取每轮总伤害（按时间顺序，最新在末尾）
+        const damages = this.roundDamageHistory.map(r =>
+            r.shots.reduce((sum, s) => sum + (s.total || 0), 0)
+        );
+
+        // 2. 补充上一轮的实时伤害（尚未写入 history 的最新一轮）
+        if (this.prevRoundDamage > 0) damages.push(this.prevRoundDamage);
+
+        if (damages.length === 0) return 0;
+
+        // 3. 取最近 window 条记录（时间上最近的 N 回合）
+        const recent = damages.slice(-window);
+        const sum = recent.reduce((a, b) => a + b, 0);
+        return sum / recent.length;
+    },
+
+    /**
      * @method calc_getPeakAverageDamage
-     * @description 计算最高三轮伤害的平均值，用于动态调整敌人血量。
+     * @description [已废弃，保留作兼容别名] 原实现取历史最高3轮均值。
+     *   现在统一委托给 calc_getRecentAverageDamage(3)，行为等价于近3回合滑动平均。
+     * @deprecated 请直接调用 calc_getRecentAverageDamage()
      */
     calc_getPeakAverageDamage() {
-        // 1. 从历史记录中提取每轮总伤害
-        const damages = this.roundDamageHistory.map(r => {
-            return r.shots.reduce((sum, s) => sum + (s.total || 0), 0);
-        });
-        
-        // 2. 包含上一轮的实时伤害
-        if (this.prevRoundDamage > 0) damages.push(this.prevRoundDamage);
-        
-        if (damages.length === 0) return 0;
-        
-        // 3. 降序排列并取前 3 名
-        damages.sort((a, b) => b - a);
-        const top3 = damages.slice(0, 3);
-        const sum = top3.reduce((a, b) => a + b, 0);
-        
-        return sum / top3.length;
+        return this.calc_getRecentAverageDamage(3);
     },
 
 /**
