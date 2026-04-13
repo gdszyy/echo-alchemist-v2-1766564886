@@ -1008,6 +1008,8 @@ phase_gathering_getRandomPegType() {
         
         
         if (this.ammoQueue.length === 0) {
+            // [局内存档] 每回合结算完毕后自动存档，防止刷新丢失进度
+            this.sys_saveRunState();
             this.sys_initSelectionPhase();
         }
     },

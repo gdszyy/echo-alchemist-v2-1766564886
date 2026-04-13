@@ -13,7 +13,7 @@
  * - 弹珠选择切换 (sys_toggleMarbleSelection)
  * - 分数乘数重置 (sys_resetMultiplier)
  */
-import { Vec2, showToast, RuneLoot } from './entities.js';
+import { Vec2, showToast, RuneLoot, Enemy } from './entities.js';
 import { CONFIG } from './config.js';
 import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
@@ -769,10 +769,322 @@ export const game_system = {
         }
     },
 
+    // ==================== [局内存档] ====================
+
     /**
-     * @method input_checkEnemyHover
-     * @description 检测鼠标/触摸位置是否悬浮在敌人上。
+     * @method sys_saveRunState
+     * @description 将当前局内关键状态序列化到 localStorage，供刷新后恢复。
+     * 应在每回合结算完毕（phase_finalizeRound 末尾）调用。
      */
+    sys_saveRunState() {
+        try {
+            // --- 序列化 enemies ---
+            const enemiesData = (this.enemies || []).map(e => {
+                const d = {
+                    x: e.pos.x, y: e.pos.y,
+                    width: e.width, height: e.height,
+                    hp: e.hp, maxHp: e.maxHp,
+                    type: e.type, affixes: e.affixes ? [...e.affixes] : [],
+                    shieldCharges: e.shieldCharges || 0,
+                    temp: e.temp || 0,
+                    frozenCount: e.frozenCount || 0,
+                    berserked: e.berserked || false,
+                    rotationIndex: e.rotationIndex || 0,
+                    rotationTurnCount: e.rotationTurnCount || 0,
+                    swordMarks: e.swordMarks || 0,
+                    markTimer: e.markTimer || 0,
+                    collisionShape: e.collisionShape || 'aabb',
+                    collisionData: null,
+                    // Boss 专属
+                    bossType: e.bossType,
+                    bossName: e.bossName,
+                    isBigBoss: e.isBigBoss || false,
+                    devourState: e.devourState,
+                    devourTimer: e.devourTimer,
+                    gapAngle: e.gapAngle,
+                    _moveInterval: e._moveInterval,
+                    _moveCooldown: e._moveCooldown,
+                };
+                // 序列化 collisionData（将 Vec2 转为 {x,y}）
+                if (e.collisionData) {
+                    if (e.collisionShape === 'polygon') {
+                        d.collisionData = {
+                            vertices: (e.collisionData.vertices || []).map(v => ({ x: v.x, y: v.y }))
+                        };
+                    } else if (e.collisionShape === 'arc') {
+                        d.collisionData = {
+                            radius: e.collisionData.radius,
+                            startAngle: e.collisionData.startAngle,
+                            endAngle: e.collisionData.endAngle,
+                            thickness: e.collisionData.thickness,
+                        };
+                    }
+                }
+                return d;
+            });
+
+            // --- 序列化 pegs（仅保存 type/level/frozenTurns/row/col，坐标由 initPachinko 重建）---
+            const pegsData = (this.pegs || []).map(p => ({
+                type: p.type,
+                level: p.level || 1,
+                frozenTurns: p.frozenTurns || 0,
+                row: p.row,
+                col: p.col,
+            }));
+
+            // --- 序列化 marbleQueue（MarbleDefinition 对象）---
+            const marbleQueueData = (this.marbleQueue || []).map(m => ({
+                type: m.type,
+                collected: m.collected ? [...m.collected] : [],
+                compiled: m.compiled || false,
+                recipe: m.recipe ? { ...m.recipe } : null,
+                multicast: m.multicast || 0,
+                finalHits: m.finalHits || 0,
+            }));
+
+            const state = {
+                // 基础
+                round: this.round,
+                score: this.score,
+                scoreMultiplier: this.scoreMultiplier || 1.0,
+                // 实体
+                enemies: enemiesData,
+                pegs: pegsData,
+                marbleQueue: marbleQueueData,
+                activeMarbleIndex: this.activeMarbleIndex || 0,
+                // 遗物
+                ownedRelics: (this.ownedRelics || []).slice(),
+                pinkPegCount: this.pinkPegCount || 0,
+                hasCombatWall: this.hasCombatWall || false,
+                unlockedSlots: (this.unlockedSlots || []).slice(),
+                slotCount: this.slotCount || 1,
+                marbleSizeBonus: this.marbleSizeBonus || 0,
+                flatDamageBonus: this.flatDamageBonus || 0,
+                // 符文
+                runeInventory: (this.runeInventory || []).slice(),
+                runeGrid: (this.runeGrid || Array(9).fill(null)).slice(),
+                // 弹珠解锁
+                unlockedWeights: { ...(this.unlockedWeights || {}) },
+                guaranteedNextRound: (this.guaranteedNextRound || []).slice(),
+                assimilationBoostRounds: { ...(this.assimilationBoostRounds || {}) },
+                // Boss 系统
+                bossHistory: (this.bossHistory || []).slice(),
+                _pendingBossSpawn: this._pendingBossSpawn ? { ...this._pendingBossSpawn } : null,
+                _nextBossRound: this._nextBossRound || null,
+                _lastBossSpawnRound: this._lastBossSpawnRound || null,
+                _bossSpawnCount: this._bossSpawnCount || 0,
+                _pendingBossRelic: this._pendingBossRelic || false,
+                _pendingRelicEvent: this._pendingRelicEvent || false,
+                // 难度
+                postBossMultiplier: this.postBossMultiplier || 1.0,
+                postBossSurgeRoundsLeft: this.postBossSurgeRoundsLeft || 0,
+                nextRoundHpMultiplier: this.nextRoundHpMultiplier || 1,
+                difficultyGrowthFactor: this.difficultyGrowthFactor || 1.0,
+                variantLevels: { ...(this.variantLevels || {}) },
+                // 钉盘形态
+                currentRows: this.currentRows || 0,
+                boardLayout: this.boardLayout || 'default',
+                // 技能
+                skillPoints: this.skillPoints || 0,
+                activeSkills: (this.activeSkills || []).map(sk => sk.id || sk),
+                // 统计
+                runKillCount: this.runKillCount || 0,
+                runRuneFragmentsGained: this.runRuneFragmentsGained || 0,
+                bossDefeatedLog: (this.bossDefeatedLog || []).slice(),
+                roundDamageHistory: (this.roundDamageHistory || []).slice(),
+                prevRoundDamage: this.prevRoundDamage || 0,
+                // 遗物选择计数
+                relicSelectionCount: this.relicSelectionCount || 0,
+                // 时间戳
+                savedAt: Date.now(),
+            };
+            localStorage.setItem('echo_alchemist_run_state', JSON.stringify(state));
+            console.log(`[RunSave] 回合 ${this.round} 存档成功`);
+        } catch (e) {
+            console.error('[RunSave] 存档失败:', e);
+        }
+    },
+
+    /**
+     * @method sys_clearRunState
+     * @description 清除局内存档（游戏结束或新开一局时调用）。
+     */
+    sys_clearRunState() {
+        localStorage.removeItem('echo_alchemist_run_state');
+        console.log('[RunSave] 局内存档已清除');
+    },
+
+    /**
+     * @method sys_hasRunState
+     * @description 检查是否存在可恢复的局内存档。
+     * @returns {boolean}
+     */
+    sys_hasRunState() {
+        return !!localStorage.getItem('echo_alchemist_run_state');
+    },
+
+    /**
+     * @method sys_loadRunState
+     * @description 从 localStorage 读取局内存档并恢复游戏状态，然后进入选牌阶段。
+     * 由 meta_continueRun() 调用。
+     */
+    sys_loadRunState() {
+        const raw = localStorage.getItem('echo_alchemist_run_state');
+        if (!raw) {
+            console.warn('[RunSave] 无局内存档可恢复');
+            return false;
+        }
+        try {
+            const state = JSON.parse(raw);
+
+            // --- 先重置游戏（清空实体、重置 UI）---
+            this.sys_resetGame();
+            // 注入局外升级（确保 CONFIG 参数正确）
+            this.meta_applyUpgrades();
+
+            // --- 恢复基础字段 ---
+            this.round = state.round || 1;
+            this.score = state.score || 0;
+            this.scoreMultiplier = state.scoreMultiplier || 1.0;
+
+            // --- 恢复遗物 ---
+            this.ownedRelics = (state.ownedRelics || []).slice();
+            this.pinkPegCount = state.pinkPegCount || 0;
+            this.hasCombatWall = state.hasCombatWall || false;
+            this.unlockedSlots = (state.unlockedSlots || ['multicast']).slice();
+            this.slotCount = state.slotCount || 1;
+            this.marbleSizeBonus = state.marbleSizeBonus || 0;
+            this.flatDamageBonus = state.flatDamageBonus || 0;
+
+            // --- 恢复符文 ---
+            this.runeInventory = (state.runeInventory || []).slice();
+            this.runeGrid = (state.runeGrid || Array(9).fill(null)).slice();
+
+            // --- 恢复弹珠解锁 ---
+            this.unlockedWeights = { ...(state.unlockedWeights || {}) };
+            this.guaranteedNextRound = (state.guaranteedNextRound || []).slice();
+            this.assimilationBoostRounds = { ...(state.assimilationBoostRounds || {}) };
+
+            // --- 恢复 Boss 系统 ---
+            this.bossHistory = (state.bossHistory || []).slice();
+            this._pendingBossSpawn = state._pendingBossSpawn ? { ...state._pendingBossSpawn } : null;
+            this._nextBossRound = state._nextBossRound || null;
+            this._lastBossSpawnRound = state._lastBossSpawnRound || null;
+            this._bossSpawnCount = state._bossSpawnCount || 0;
+            this._pendingBossRelic = state._pendingBossRelic || false;
+            this._pendingRelicEvent = state._pendingRelicEvent || false;
+
+            // --- 恢复难度 ---
+            this.postBossMultiplier = state.postBossMultiplier || 1.0;
+            this.postBossSurgeRoundsLeft = state.postBossSurgeRoundsLeft || 0;
+            this.nextRoundHpMultiplier = state.nextRoundHpMultiplier || 1;
+            this.difficultyGrowthFactor = state.difficultyGrowthFactor || 1.0;
+            this.variantLevels = { ...(state.variantLevels || { flying_sword: 1 }) };
+
+            // --- 恢复钉盘形态 ---
+            this.currentRows = state.currentRows || 0;
+            this.boardLayout = state.boardLayout || 'default';
+
+            // --- 恢复技能 ---
+            this.skillPoints = state.skillPoints || 0;
+            this.ui.updateSkillPoints(this.skillPoints);
+
+            // --- 恢复统计 ---
+            this.runKillCount = state.runKillCount || 0;
+            this.runRuneFragmentsGained = state.runRuneFragmentsGained || 0;
+            this.bossDefeatedLog = (state.bossDefeatedLog || []).slice();
+            this.roundDamageHistory = (state.roundDamageHistory || []).slice();
+            this.prevRoundDamage = state.prevRoundDamage || 0;
+            this.relicSelectionCount = state.relicSelectionCount || 0;
+
+            // --- 恢复 enemies ---
+            this.enemies = (state.enemies || []).map(d => {
+                const e = new Enemy(d.x, d.y, d.width, d.height, d.hp, d.maxHp, d.type, d.affixes || []);
+                e.shieldCharges = d.shieldCharges || 0;
+                e.temp = d.temp || 0;
+                e.frozenCount = d.frozenCount || 0;
+                e.berserked = d.berserked || false;
+                e.rotationIndex = d.rotationIndex || 0;
+                e.rotationTurnCount = d.rotationTurnCount || 0;
+                e.swordMarks = d.swordMarks || 0;
+                e.markTimer = d.markTimer || 0;
+                e.collisionShape = d.collisionShape || 'aabb';
+                // 恢复 collisionData（将 {x,y} 还原为 Vec2）
+                if (d.collisionData) {
+                    if (d.collisionShape === 'polygon') {
+                        e.collisionData = {
+                            vertices: (d.collisionData.vertices || []).map(v => new Vec2(v.x, v.y))
+                        };
+                    } else if (d.collisionShape === 'arc') {
+                        e.collisionData = { ...d.collisionData };
+                    }
+                }
+                // Boss 专属
+                if (d.bossType) {
+                    e.bossType = d.bossType;
+                    e.bossName = d.bossName;
+                    e.isBigBoss = d.isBigBoss || false;
+                }
+                if (d.devourState !== undefined) e.devourState = d.devourState;
+                if (d.devourTimer !== undefined) e.devourTimer = d.devourTimer;
+                if (d.gapAngle !== undefined) e.gapAngle = d.gapAngle;
+                if (d._moveInterval !== undefined) e._moveInterval = d._moveInterval;
+                if (d._moveCooldown !== undefined) e._moveCooldown = d._moveCooldown;
+                e.justSpawned = false; // 恢复时不播放入场动画
+                return e;
+            });
+
+            // --- 恢复 marbleQueue（重建 MarbleDefinition 对象）---
+            // 注意：恢复后进入 selection 阶段，marbleQueue 会被重新生成
+            // 此处恢复是为了保证 UI 一致性（如果需要显示上回合队列）
+            this.marbleQueue = [];
+            this.activeMarbleIndex = 0;
+
+            // --- 恢复 pegs（通过 initPachinko 重建，然后覆盖 type/level/frozenTurns）---
+            // 先初始化钉盘（生成正确数量的钉子）
+            this.phase_gathering_initPachinko(false);
+            // 再将存档中的 type/level/frozenTurns 覆盖到对应钉子
+            if (state.pegs && state.pegs.length > 0 && this.pegs) {
+                const minLen = Math.min(state.pegs.length, this.pegs.length);
+                for (let i = 0; i < minLen; i++) {
+                    const saved = state.pegs[i];
+                    const peg = this.pegs[i];
+                    if (peg && saved) {
+                        if (saved.type !== 'pink') {
+                            peg.type = saved.type || 'normal';
+                        }
+                        peg.level = saved.level || 1;
+                        peg.frozenTurns = saved.frozenTurns || 0;
+                    }
+                }
+            }
+
+            // --- 更新 UI ---
+            document.getElementById('round-num').innerText = this.round;
+            this.ui_updateRuneCountDisplay();
+            this.ui_updateMetaCurrency();
+
+            // --- 恢复符文词条效果（activeRunewordStats / activeRunewordEffects / activeSkills）---
+            // ui_updateRuneGrid 需要 DOM 中的 rune-cell-* 元素存在
+            // 这些元素在 ui_openRuneLauncher 时才会创建，此处用 setTimeout 延迟执行
+            setTimeout(() => {
+                if (typeof this.ui_initRuneGrid === 'function') this.ui_initRuneGrid();
+                if (typeof this.ui_updateRuneGrid === 'function') this.ui_updateRuneGrid();
+            }, 100);
+
+            // --- 进入选牌阶段 ---
+            this.sys_initSelectionPhase();
+
+            showToast(`✅ 已恢復 Round ${this.round} 的進度！`);
+            console.log(`[RunSave] 成功恢復回合 ${this.round} 的存档`);
+            return true;
+        } catch (e) {
+            console.error('[RunSave] 恢复存档失败:', e);
+            this.sys_clearRunState();
+            return false;
+        }
+    },
+
     input_checkEnemyHover(pos) {
         if (this.phase !== 'combat' || this.isEnemyTurn) return null;
         let hit = null;

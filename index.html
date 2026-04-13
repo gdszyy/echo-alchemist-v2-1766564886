@@ -2514,10 +2514,19 @@
                 <div class="absolute -right-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transparent via-amber-500/30 to-transparent"></div>
             </div>
 
-            <button onclick="game.meta_startRun()" class="btn-main w-72 py-5 mb-12 border border-indigo-400/30 shadow-[0_0_40px_rgba(79,70,229,0.2)] hover:scale-105 hover:shadow-[0_0_60px_rgba(79,70,229,0.4)] transition-all duration-300 group relative overflow-hidden bg-slate-900/80 rounded-xl">
+            <button onclick="game.meta_startRun()" class="btn-main w-72 py-5 mb-4 border border-indigo-400/30 shadow-[0_0_40px_rgba(79,70,229,0.2)] hover:scale-105 hover:shadow-[0_0_60px_rgba(79,70,229,0.4)] transition-all duration-300 group relative overflow-hidden bg-slate-900/80 rounded-xl">
                 <div class="absolute inset-0 bg-gradient-to-r from-indigo-600/0 via-indigo-400/10 to-indigo-600/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                 <span class="text-2xl font-[Cinzel] tracking-widest relative z-10 text-indigo-50 group-hover:text-white">開始煉成</span>
                 <div class="text-[10px] text-indigo-300/70 mt-1 font-sans tracking-wider uppercase">Initialize Sequence</div>
+            </button>
+            <!-- [局内存档] 继续游戏按鈕，默认隐藏，有存档时由 JS 显示 -->
+            <button id="meta-continue-btn" onclick="game.meta_continueRun()" style="display:none" class="w-72 py-3 mb-8 flex flex-col items-center justify-center border border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.15)] hover:scale-105 hover:shadow-[0_0_50px_rgba(16,185,129,0.3)] transition-all duration-300 group relative overflow-hidden bg-slate-900/70 rounded-xl cursor-pointer">
+                <div class="absolute inset-0 bg-gradient-to-r from-emerald-600/0 via-emerald-400/8 to-emerald-600/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                <div class="flex items-center gap-2 relative z-10">
+                    <span class="text-emerald-400 text-lg">▶</span>
+                    <span class="text-base font-bold tracking-widest text-emerald-100 group-hover:text-white">繼續上次游戲</span>
+                </div>
+                <div class="continue-round text-[10px] text-emerald-400/70 mt-0.5 font-sans tracking-wider">Round ?</div>
             </button>
 
             <div class="grid grid-cols-3 gap-6 w-full max-w-lg px-8">

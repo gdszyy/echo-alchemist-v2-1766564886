@@ -246,6 +246,8 @@ ui_closeTruthBook() {
         // [META] 切换到主界面或商店时更新货币显示
         if (this.phase === 'meta' || this.phase === 'shop') {  // [Mixin 正常用法：读取 Game 实例状态]
             this.ui_updateMetaCurrency();
+            // [局内存档] 进入 meta 页时同步更新“继续游戏”按鈕显隐
+            if (this.phase === 'meta') this.meta_updateContinueButton();
         }
 
         // 1. 底部面板 (.bottom-panel) 只在收集阶段 (gathering) 显示
@@ -372,9 +374,43 @@ ui_closeTruthBook() {
      * [META] 点击"开始炼成"按钮
      */
     meta_startRun() {
+        // [局内存档] 新开一局时清除旧存档
+        this.sys_clearRunState();
         this.sys_resetGame(); 
         this.sys_initGameStart();
         // sys_initGameStart 内部已经调用了 ui_showRelicSelection
+    },
+
+/**
+     * [META] 点击“继续上次游戏”按鈕
+     */
+    meta_continueRun() {
+        const ok = this.sys_loadRunState();
+        if (!ok) {
+            showToast('⚠️ 存档读取失败，请开始新游戏');
+        }
+    },
+
+/**
+     * [META] 更新“继续游戏”按鈕的显隐状态
+     */
+    meta_updateContinueButton() {
+        const btn = document.getElementById('meta-continue-btn');
+        if (!btn) return;
+        if (this.sys_hasRunState()) {
+            btn.style.display = 'flex';
+            // 读取存档中的回合数显示
+            try {
+                const raw = localStorage.getItem('echo_alchemist_run_state');
+                if (raw) {
+                    const s = JSON.parse(raw);
+                    const roundEl = btn.querySelector('.continue-round');
+                    if (roundEl) roundEl.textContent = `Round ${s.round || '?'}`;
+                }
+            } catch(e) { /* 忽略解析错误 */ }
+        } else {
+            btn.style.display = 'none';
+        }
     },
 
 /**
