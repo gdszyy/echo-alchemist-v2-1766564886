@@ -503,6 +503,308 @@ class FortuneWheel {
     }
 }
 
+// ==================== GhostPeg 菱形布局裂变回响虚影钉子 ====================
+/**
+ * 菱形钉盘专属：中段属性钉子被碰撞后有概率裂变出虚影钉子。
+ * 虚影钉子半透明闪烁，存活 3 秒，弹珠碰撞后额外收集一次属性并消失。
+ */
+class GhostPeg {
+    /**
+     * @param {number} x - 虚影钉子 x
+     * @param {number} y - 虚影钉子 y
+     * @param {string} type - 属性类型（继承自来源钉子）
+     * @param {number} level - 属性等级
+     */
+    constructor(x, y, type, level) {
+        this.pos = new Vec2(x, y);
+        this.radius = 6;
+        this.type = type;
+        this.level = level || 1;
+        this.life = 180;       // 存活 180 帧（约 3 秒）
+        this.maxLife = 180;
+        this.active = true;
+        this.triggered = false; // 是否已被触发（触发后消失）
+        this.angle = Math.random() * Math.PI * 2; // 旋转起始角
+    }
+
+    update(timeScale) {
+        this.life -= timeScale;
+        this.angle += 0.04 * timeScale;
+        if (this.life <= 0 || this.triggered) this.active = false;
+    }
+
+    draw(ctx) {
+        if (!this.active) return;
+        const x = this.pos.x, y = this.pos.y, r = this.radius;
+        const lifeRatio = this.life / this.maxLife;
+        const pulse = (Math.sin(Date.now() / 200) + 1) / 2;
+        const alpha = lifeRatio * (0.5 + pulse * 0.35); // 生命越少越透明
+
+        ctx.save();
+
+        // 外圈旋转光晕（橙紫色）
+        ctx.globalAlpha = alpha * 0.7;
+        ctx.strokeStyle = '#c084fc'; // 紫色
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 8 + pulse * 6;
+        ctx.shadowColor = '#a855f7';
+        ctx.setLineDash([3, 3]);
+        ctx.lineDashOffset = -(this.angle * 10) % 6;
+        ctx.beginPath();
+        ctx.arc(x, y, r * 1.8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 内圈虚影主体
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+        grad.addColorStop(0, 'rgba(251, 146, 60, 0.9)');  // 内心橙色
+        grad.addColorStop(0.6, 'rgba(168, 85, 247, 0.6)'); // 中间紫色
+        grad.addColorStop(1, 'rgba(168, 85, 247, 0.1)');   // 边缘渐隐
+        ctx.fillStyle = grad;
+        ctx.shadowBlur = 10 + pulse * 8;
+        ctx.shadowColor = '#f97316';
+        ctx.fill();
+
+        // 中心小圆
+        ctx.globalAlpha = alpha * 0.9;
+        ctx.beginPath();
+        ctx.arc(x, y, r * 0.35, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.shadowBlur = 4;
+        ctx.fill();
+
+        // 旋转小光点（两个对称小圆）
+        const dotR = r * 0.18;
+        const dotDist = r * 1.3;
+        for (let i = 0; i < 2; i++) {
+            const da = this.angle + i * Math.PI;
+            const dx = Math.cos(da) * dotDist;
+            const dy = Math.sin(da) * dotDist;
+            ctx.globalAlpha = alpha * 0.8;
+            ctx.beginPath();
+            ctx.arc(x + dx, y + dy, dotR, 0, Math.PI * 2);
+            ctx.fillStyle = '#fbbf24';
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = '#fbbf24';
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+}
+
+// ==================== TriangleSideWheel 三角局布底部倍率转盘 ====================
+/**
+ * 三角钉盘专属：底部左右各一个小型倍率转盘。
+ * 弹珠落入底部左右区域时自动触发，对当前已收集属性按倍率翻倍。
+ * 转盘层次（从中心到边缘）：空（高概率）→ 1x → 2x → 3x → 5x（低概率）
+ */
+class TriangleSideWheel {
+    /**
+     * @param {number} x - 转盘中心 x
+     * @param {number} y - 转盘中心 y
+     * @param {'left'|'right'} side - 左側还是右側
+     * @param {object} game - Game 实例
+     */
+    constructor(x, y, side, game) {
+        this.x = x;
+        this.y = y;
+        this.side = side;
+        this.game = game;
+        this.radius = 48;          // 转盘展示半径（较小，不遇挡钉盘）
+        this.triggerRadius = 55;   // 触发半径（稍大于展示半径）
+        this.angle = 0;
+        this.spinning = false;
+        this.spinVelocity = 0;
+        this.friction = 0.975;
+        this.onFinish = null;
+        this.active = true;        // 本转盘是否可被触发
+        this.triggered = false;    // 当前帧是否已被触发（防重复）
+        this.cooldown = 0;         // 触发后冷却帧数
+        this.resultMultiplier = 0; // 最后一次结果倍率（用于展示）
+        this.resultTimer = 0;      // 结果展示计时
+
+        // 转盘层次配置：[{label, multiplier, weight, color}]
+        // 设计原则：越边缘概率越低但倍率越高
+        this.slices = [
+            { label: '空',  multiplier: 0, weight: 30, color: '#475569' },  // 空（高概率，靠近中心）
+            { label: '1x',  multiplier: 1, weight: 25, color: '#3b82f6' },  // 1倍
+            { label: '2x',  multiplier: 2, weight: 20, color: '#10b981' },  // 2倍
+            { label: '3x',  multiplier: 3, weight: 15, color: '#f59e0b' },  // 3倍
+            { label: '5x',  multiplier: 5, weight: 10, color: '#ef4444' },  // 5倍（低概率，边缘）
+        ];
+        // 根据 weight 计算每个层的弧度
+        const totalWeight = this.slices.reduce((s, sl) => s + sl.weight, 0);
+        let ang = 0;
+        this.slices.forEach(sl => {
+            sl.startAngle = ang;
+            sl.arc = (sl.weight / totalWeight) * Math.PI * 2;
+            sl.endAngle = ang + sl.arc;
+            ang += sl.arc;
+        });
+    }
+
+    /**
+     * 触发转盘旋转
+     * @param {Function} callback - 结束回调，传入 multiplier
+     */
+    spin(callback) {
+        if (this.spinning) return;
+        this.spinning = true;
+        this.spinVelocity = 0.35 + Math.random() * 0.15;
+        this.angle = Math.random() * Math.PI * 2;
+        this.onFinish = callback;
+        this.triggered = true;
+        this.cooldown = 90; // 触发后 90 帧冷却
+    }
+
+    /**
+     * 获取当前指针指向的层
+     */
+    getCurrentSlice() {
+        // 指针在顶部（-PI/2），转盘顺时针旋转
+        let relAngle = (-Math.PI / 2 - this.angle) % (Math.PI * 2);
+        if (relAngle < 0) relAngle += Math.PI * 2;
+        return this.slices.find(s => relAngle >= s.startAngle && relAngle < s.endAngle) || this.slices[0];
+    }
+
+    update(timeScale) {
+        if (this.cooldown > 0) this.cooldown -= timeScale;
+        if (this.resultTimer > 0) this.resultTimer -= timeScale;
+        if (!this.spinning) return;
+
+        this.angle += this.spinVelocity * timeScale;
+        this.angle %= Math.PI * 2;
+        this.spinVelocity *= Math.pow(this.friction, timeScale);
+
+        if (this.spinVelocity < 0.005) {
+            this.spinVelocity = 0;
+            this.spinning = false;
+            const winner = this.getCurrentSlice();
+            this.resultMultiplier = winner.multiplier;
+            this.resultTimer = 120; // 展示 120 帧
+            if (this.onFinish) this.onFinish(winner.multiplier, winner.label, winner.color);
+        }
+    }
+
+    draw(ctx) {
+        const x = this.x, y = this.y, r = this.radius;
+        const pulse = (Math.sin(Date.now() / 500) + 1) / 2;
+
+        ctx.save();
+
+        // 外发光
+        ctx.shadowBlur = 10 + pulse * 8;
+        ctx.shadowColor = this.spinning ? '#fbbf24' : 'rgba(100,150,255,0.5)';
+
+        // 外框
+        ctx.beginPath();
+        ctx.arc(x, y, r + 6, 0, Math.PI * 2);
+        const rimGrad = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+        rimGrad.addColorStop(0, '#f59e0b');
+        rimGrad.addColorStop(0.5, '#fef3c7');
+        rimGrad.addColorStop(1, '#b45309');
+        ctx.fillStyle = rimGrad;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // 内圈底色
+        ctx.beginPath();
+        ctx.arc(x, y, r + 1, 0, Math.PI * 2);
+        ctx.fillStyle = '#1e1b4b';
+        ctx.fill();
+
+        // 绘制层级山带（旋转部分）
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(this.angle);
+        this.slices.forEach(sl => {
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, r, sl.startAngle, sl.endAngle);
+            ctx.closePath();
+            ctx.fillStyle = sl.color;
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // 文字标注
+            const midAngle = sl.startAngle + sl.arc / 2;
+            const tx = Math.cos(midAngle) * r * 0.62;
+            const ty = Math.sin(midAngle) * r * 0.62;
+            ctx.save();
+            ctx.translate(tx, ty);
+            ctx.rotate(midAngle + Math.PI / 2);
+            ctx.fillStyle = '#fff';
+            ctx.font = `bold ${sl.arc > 0.5 ? 11 : 9}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowBlur = 3;
+            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.fillText(sl.label, 0, 0);
+            ctx.restore();
+        });
+        ctx.restore();
+
+        // 中心装饰
+        ctx.beginPath();
+        ctx.arc(x, y, 9, 0, Math.PI * 2);
+        ctx.fillStyle = '#fef3c7';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#f59e0b';
+        ctx.fill();
+
+        // 指针（小三角，指向顶部）
+        ctx.save();
+        ctx.translate(x, y - r - 3);
+        ctx.beginPath();
+        ctx.moveTo(-6, -4);
+        ctx.lineTo(6, -4);
+        ctx.lineTo(0, 8);
+        ctx.closePath();
+        ctx.fillStyle = '#ef4444';
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = '#ef4444';
+        ctx.fill();
+        ctx.restore();
+
+        // 如果刚出结果，展示大字
+        if (this.resultTimer > 0 && !this.spinning) {
+            const alpha = Math.min(1, this.resultTimer / 30);
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.font = 'bold 22px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#fff';
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = '#fbbf24';
+            const label = this.resultMultiplier === 0 ? '空' : `${this.resultMultiplier}x!`;
+            ctx.fillText(label, x, y - r - 20);
+            ctx.restore();
+        }
+
+        // 待触发时的呼吸光晕
+        if (!this.spinning && this.cooldown <= 0 && this.resultTimer <= 0) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x, y, r + 6 + pulse * 4, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(251, 191, 36, ${0.3 + pulse * 0.4})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        ctx.restore();
+    }
+}
+
 class Peg {
     constructor(x, y, type = 'normal') {
         this.pos = new Vec2(x, y); 
@@ -1833,6 +2135,46 @@ class DropBall {
             if (this.pos.x < this.radius) { this.pos.x = this.radius; this.vel.x *= -0.6; }
             if (this.pos.x > width - this.radius) { this.pos.x = width - this.radius; this.vel.x *= -0.6; }
             
+            // ==================== [triangle 布局专属] 底部侧边转盘触发检测 ====================
+            // 弹珠进入转盘触发半径内且转盘处于冷却完成状态时，自动触发转盘旋转
+            const _game = this.session && this.session.game;
+            if (_game && _game.triangleSideWheels && _game.triangleSideWheels.length > 0) {
+                for (const wheel of _game.triangleSideWheels) {
+                    if (!wheel.spinning && wheel.cooldown <= 0) {
+                        const dx = this.pos.x - wheel.x;
+                        const dy = this.pos.y - wheel.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < wheel.triggerRadius) {
+                            // 触发转盘！
+                            const ball = this;
+                            wheel.spin((multiplier, label, color) => {
+                                if (multiplier > 0 && ball.session && ball.session.collected) {
+                                    // 将当前已收集的属性按倍率复制
+                                    const currentCollected = [...ball.session.collected];
+                                    for (let _k = 0; _k < multiplier - 1; _k++) {
+                                        currentCollected.forEach(item => {
+                                            ball.session.collected.push(typeof item === 'string' ? item : { ...item });
+                                            ball.def.collected.push(typeof item === 'string' ? item : item.type);
+                                        });
+                                    }
+                                    _game.spawn_createFloatingText(
+                                        wheel.x, wheel.y - wheel.radius - 30,
+                                        `属性 x${multiplier}!`, color || '#fbbf24'
+                                    );
+                                    _game.spawn_createExplosion(wheel.x, wheel.y, color || '#fbbf24');
+                                    _game.ui_renderRecipeHUD();
+                                } else if (multiplier === 0) {
+                                    _game.spawn_createFloatingText(
+                                        wheel.x, wheel.y - wheel.radius - 30,
+                                        '空转~', '#94a3b8'
+                                    );
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+
             // 底部退出
             if (this.pos.y > height + 150) { 
                 this.active = false; 
@@ -2156,6 +2498,25 @@ class DropBall {
                                     game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 24, '中段爆发!', '#a78bfa');
                                     audio.playPowerup();
                                 }
+
+                                // ==================== [菱形裂变回响] 生成虚影钉子 ====================
+                                // 中段属性钉子被碰撞时，30% 概率在对角方向裂变出虚影钉子
+                                if (peg.type !== 'normal' && peg.type !== 'pink' && Math.random() < 0.30) {
+                                    if (game.ghostPegs && game.ghostPegs.length < 8) { // 最多 8 个虚影，防止堆积
+                                        // 随机选择对角方向：左上/右上/左下/右下
+                                        const diagDirs = [[-1,-1],[1,-1],[-1,1],[1,1]];
+                                        const dir = diagDirs[Math.floor(Math.random() * 4)];
+                                        const spacing = (CONFIG.gameplay.spacingX || 35); // 钉子间距
+                                        const gx = peg.pos.x + dir[0] * spacing * 0.8;
+                                        const gy = peg.pos.y + dir[1] * spacing * 0.6;
+                                        // 边界检查：虚影钉子不能超出钉盘范围
+                                        if (gx > 20 && gx < (game.width - 20) && gy > 40 && gy < (game.boardBottomY + 20)) {
+                                            const ghost = new GhostPeg(gx, gy, peg.type, peg.level || 1);
+                                            game.ghostPegs.push(ghost);
+                                            game.spawn_createFloatingText(gx, gy - 20, '裂变!', '#c084fc');
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -2299,6 +2660,34 @@ class DropBall {
                 }
             }
             }
+
+            // ==================== [diamond 布局专属] 虚影钉子碰撞检测 ====================
+            // 弹珠碰撞虚影钉子时，额外收集一次属性并消除虚影
+            if (_game && _game.ghostPegs && _game.ghostPegs.length > 0) {
+                for (const ghost of _game.ghostPegs) {
+                    if (!ghost.active || ghost.triggered) continue;
+                    const gdx = this.pos.x - ghost.pos.x;
+                    const gdy = this.pos.y - ghost.pos.y;
+                    const gdist = Math.sqrt(gdx * gdx + gdy * gdy);
+                    if (gdist < this.radius + ghost.radius) {
+                        ghost.triggered = true;
+                        ghost.active = false;
+                        // 额外收集一次虚影钉子的属性
+                        if (this.session && ghost.type !== 'normal') {
+                            const ghostItem = { type: ghost.type, level: ghost.level || 1 };
+                            this.session.collected.push(ghostItem);
+                            this.def.collected.push(ghost.type);
+                            _game.spawn_createFloatingText(
+                                ghost.pos.x, ghost.pos.y - 20,
+                                '回响!', '#c084fc'
+                            );
+                            _game.spawn_createExplosion(ghost.pos.x, ghost.pos.y, '#a855f7');
+                            _game.ui_renderRecipeHUD();
+                        }
+                    }
+                }
+            }
+
             return null;
         }
         stopSound() {
@@ -4112,6 +4501,8 @@ export {
     MarbleDefinition,
     SpecialSlot,
     FortuneWheel,
+    TriangleSideWheel,
+    GhostPeg,
     Peg,
     DropBall,
     Enemy,

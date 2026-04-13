@@ -15,7 +15,7 @@ import {
 import { RUNE_DB, RUNEWORD_DB, COUNTER_MAP } from './rune_config.js';
 
 import { 
-    Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
+    Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, TriangleSideWheel, GhostPeg, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
     Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, RuneLoot, showToast, 
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba,
@@ -171,6 +171,10 @@ class Game {
         this.showDamageNumbers = true;  
         this.energyOrbs = []; 
         this.fortuneWheel = new FortuneWheel(this);
+        // [triangle 布局专属] 底部左右倍率转盘（初始为空数组，在 phase_gathering_initPachinko 中根据布局初始化）
+        this.triangleSideWheels = [];
+        // [diamond 布局专属] 裂变回响虚影钉子数组
+        this.ghostPegs = [];
         this.unlockedWeights = { ...CONFIG.probabilities };
         this.guaranteedNextRound = [];
         this.assimilationBoostRounds = {}; // { marbleType: roundsLeft }

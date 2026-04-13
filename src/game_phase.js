@@ -2,7 +2,7 @@ import {
     META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB 
 } from './config.js';
 import { 
-    Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
+    Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, TriangleSideWheel, GhostPeg, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
     Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, showToast, 
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
@@ -347,6 +347,26 @@ export const game_phase = {
             }
         }
 
+        // ==================== [sparse 布局专属] 最后两行强制交错粉色钉子 ====================
+        // 设计意图：直道钉盘（sparse_interval）的最后两行永远有交错的粉色钉子，
+        // 形成「底部粉色陷阱」，让弹珠在落底前必经一段高弹性区域，增加策略性。
+        // 交错规则：倒数第2行（偶数列为粉色），倒数第1行（奇数列为粉色）
+        if (boardLayout === 'sparse') {
+            const lastRow = rows - 1;
+            const secondLastRow = rows - 2;
+            for (const p of this.pegs) {
+                if (p.row === lastRow || p.row === secondLastRow) {
+                    // 交错：最后一行奇数列粉色，倒数第二行偶数列粉色
+                    const isLastRow = (p.row === lastRow);
+                    const shouldBePink = isLastRow ? (p.col % 2 === 1) : (p.col % 2 === 0);
+                    if (shouldBePink) {
+                        p.type = 'pink';
+                        p.level = 1;
+                    }
+                }
+            }
+        }
+
         // [技能系统迭代] 动态过滤 skill_point 槽：仅当玩家有已解锁技能时才生成技能点槽
         let effectiveSlots = [...this.unlockedSlots];
         if (!this.activeSkills || this.activeSkills.length === 0) {
@@ -474,6 +494,24 @@ export const game_phase = {
         this._dropDistribution = null;  // 待首次发射时计算
         this._heatmapData = null;
         console.log(`[Plinko] 布局初始化完成: ${boardLayout}，物理参数:`, getLayoutParams(boardLayout).distributionHint);
+
+        // ==================== [diamond 布局专属] 清空虚影钉子数组 ====================
+        this.ghostPegs = [];
+
+        // ==================== [triangle 布局专属] 底部左右倍率转盘初始化 ====================
+        // 设计：三角钉盘底部左右各放一个倍率转盘，弹珠落入后触发属性翻倍
+        // 转盘位置：底部最后一行的左侧和右侧，紧贴三角形底部边缘
+        this.triangleSideWheels = [];
+        if (boardLayout === 'triangle') {
+            const wheelY = maxPegY + 40; // 转盘在最后一行钉子下方 40px
+            const wheelXLeft  = canvasWidth * 0.15; // 左侧转盘：距左边缘 15%
+            const wheelXRight = canvasWidth * 0.85; // 右侧转盘：距右边缘 15%
+            this.triangleSideWheels = [
+                new TriangleSideWheel(wheelXLeft,  wheelY, 'left',  this),
+                new TriangleSideWheel(wheelXRight, wheelY, 'right', this),
+            ];
+            console.log(`[Triangle] 侧边倍率转盘已初始化: left=(${wheelXLeft.toFixed(0)}, ${wheelY.toFixed(0)}), right=(${wheelXRight.toFixed(0)}, ${wheelY.toFixed(0)})`);
+        }
     },
 
 phase_gathering_getRandomPegType() { 
@@ -1802,6 +1840,14 @@ phase_gathering_getRandomPegType() {
             this.fortuneWheel.update(timeScale);
             this.fortuneWheel.draw(this.ctx);
         }
+
+        // --- [triangle 布局专属] 绘制底部侧边倍率转盘 ---
+        if (this.triangleSideWheels && this.triangleSideWheels.length > 0) {
+            for (const wheel of this.triangleSideWheels) {
+                wheel.update(timeScale);
+                wheel.draw(this.ctx);
+            }
+        }
         // 2.  计算动态光源位置
         // 假设光源在屏幕上方很远的地方。当板子向左倾斜 (tilt.x < 0) 时，
         // 阴影应该向左移动，或者说光源看起来像是在右边。
@@ -1886,6 +1932,19 @@ phase_gathering_getRandomPegType() {
         this.specialSlots = this.specialSlots.filter(s => !s.hit);
         // 繪製特殊槽位
         this.specialSlots.forEach(s => s.draw(this.ctx));
+
+        // --- [diamond 布局专属] 绘制裂变回响虚影钉子 ---
+        if (this.ghostPegs && this.ghostPegs.length > 0) {
+            for (let i = this.ghostPegs.length - 1; i >= 0; i--) {
+                const gp = this.ghostPegs[i];
+                gp.update(this.timeScale || 1);
+                if (gp.active) {
+                    gp.draw(this.ctx);
+                } else {
+                    this.ghostPegs.splice(i, 1);
+                }
+            }
+        }
 
         // [修复] 结束收集阶段渲染，恢复 Canvas 状态
         this.ctx.restore();
