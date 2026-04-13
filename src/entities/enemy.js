@@ -261,6 +261,11 @@ class Enemy {
             } else if (this.entranceTimer > 30) {
                 // 阶段 2：落地，保持在目标位置
                 this.pos.y = this.dropTargetY;
+                // 落地的第一帧：触发冲击波效果（一次性标志防止重复触发）
+                if (!this._entranceShockwaveFired && game && typeof game.spawn_triggerBossEntranceShockwave === 'function') {
+                    this._entranceShockwaveFired = true;
+                    game.spawn_triggerBossEntranceShockwave(this);
+                }
             } else {
                 // 阶段 3：名称文字淡出，保持位置
                 this.pos.y = this.dropTargetY;

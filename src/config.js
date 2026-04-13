@@ -608,6 +608,16 @@ const CONFIG = {
                 berserkedRotationInterval: 1, // 狂暴后每回合切换
                 themeWeights: { pierce: 1.2, cryo: 1.2, lightning: 1.2 }
             }
+        },
+        /** Boss 进场冲击波效果配置 */
+        bossEntranceShockwave: {
+            waveCount: 3,           // 冲击波波数
+            waveDelay: 120,         // 每圈延迟间隔（毫秒）
+            shockwaveMaxRadius: 600, // 冲击波最大半径（像素）
+            shakeDuration: 400,     // 屏幕震动持续时间（毫秒）
+            affixChance: 0.35,      // 被冲击波命中后获得 Boss 特殊词条的概率
+            minionChance: 0.15,     // 被冲击波命中后直接转化为 Boss 随从的概率
+            bigBossBonus: 0.10      // 大 Boss 进场时概率加成
         }
     },
     /** 游戏玩法配置 */

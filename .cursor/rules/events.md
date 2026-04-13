@@ -1,6 +1,6 @@
 # 事件总线与通信规范 (EventBus Architecture)
 
-> 最后更新：tsk-c146dd4f-d25（EventBus 魔法字符串替换与事件字典同步：修正 COMBAT_DAMAGE_DEALT 和 COMBAT_ENEMY_KILLED 的 Payload 描述，同步字符串值与实际代码）
+> 最后更新：tsk-boss-entrance-shockwave（Boss 进场冲击波效果：新增 BOSS_ENTRANCE_SHOCKWAVE 事件类型及 2.6 Boss 系统事件表格）
 
 ## 1. 架构概述
 
@@ -47,10 +47,20 @@
 
 ### 2.5 系统类事件 (System Events)
 
-| 事件名常量 | 字符串值 | 触发时机 | Payload 结构 | 监听方 |
+| 事件名常量 | 字符串値 | 触发时机 | Payload 结构 | 监听方 |
 | :--- | :--- | :--- | :--- | :--- |
 | `SYSTEM_AUDIO_READY` | `system:audio_ready` | 音频系统初始化完成时 | `{ audio: object }` | 核心引擎 |
 | `SYSTEM_ERROR` | `system:error` | 发生非致命系统错误时 | `{ error: Error, context: string }` | 错误收集/日志系统 |
+
+### 2.6 Boss 系统事件 (Boss Events)
+
+| 事件名常量 | 字符串値 | 触发时机 | Payload 结构 | 监听方 |
+| :--- | :--- | :--- | :--- | :--- |
+| `BOSS_SPAWNED` | `boss:spawned` | Boss 实体生成时 | `{ bossId: string, isBigBoss: boolean }` | UI 系统（入场音效、震动） |
+| `BOSS_PHASE_CHANGE` | `boss:phase_change` | Boss 进入狂暴阶段时 | `{ bossId: string }` | UI 系统 |
+| `BOSS_DEFEATED` | `boss:defeated` | Boss 被击杀时 | `{ bossId: string }` | 核心引擎、UI 系统 |
+| `BOSS_ROTATION` | `boss:rotation` | 奥罗波罗斯词缀轮转时 | `{ bossId: string, affixes: string[] }` | UI 系统 |
+| `BOSS_ENTRANCE_SHOCKWAVE` | `boss:entrance_shockwave` | Boss 落地冲击波扩散时（entranceTimer 从阶段 1 进入阶段 2 的第一帧） | `{ bossId: string, isBigBoss: boolean, bossColor: string, shakeDuration: number }` | UI 系统（屏幕震动、属性色闪光） |
 
 ## 3. EventBus 使用规范
 

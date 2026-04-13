@@ -62,6 +62,7 @@ export const EVENT_TYPES = {
     BOSS_PHASE_CHANGE: 'boss:phase_change', // Boss 进入狂暴阶段
     BOSS_DEFEATED: 'boss:defeated',         // Boss 被击杀
     BOSS_ROTATION: 'boss:rotation',         // 奥罗波罗斯词缀轮转
+    BOSS_ENTRANCE_SHOCKWAVE: 'boss:entrance_shockwave', // Boss 进场冲击波落地
 
     // 系统类事件
     SYSTEM_AUDIO_READY: 'audio:ready',

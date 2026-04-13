@@ -9,7 +9,7 @@ import {
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook, TRUTH_BOOK_DATA } from './systems.js';
 import { audio } from './audio.js';
-import { eventBus } from './event_bus.js';
+import { eventBus, EVENT_TYPES } from './event_bus.js';
 
 export const spawn_system = {
 /**
@@ -1684,5 +1684,140 @@ export const spawn_system = {
                 e.collisionData = null;
                 break;
         }
+    },
+
+    /**
+     * @method spawn_triggerBossEntranceShockwave
+     * @description Boss 进场落地时触发冲击波效果。
+     *   1. 生成多圈属性色冲击波，视觉上覆盖整个战场
+     *   2. 通过 EventBus 触发屏幕震动
+     *   3. 遇到冲击波的普通敌人：
+     *      - 有概率获得与 Boss 属性匹配的特殊词条
+     *      - 有概率直接转化为该 Boss 的随从（形状、词条均匹配）
+     * @param {Enemy} boss - 进场的 Boss 实体
+     */
+    spawn_triggerBossEntranceShockwave(boss) {
+        if (!boss || boss.type !== 'boss') return;
+
+        const cfg = CONFIG.balance.bossEntranceShockwave;
+        const bossId = boss.bossType;
+        const isBigBoss = boss.isBigBoss;
+
+        // === Boss 属性颜色映射 ===
+        const BOSS_ELEMENT_COLORS = {
+            ignis:    '#f97316', // 火焰橙
+            glacies:  '#06b6d4', // 冰霜青
+            mikro:    '#c084fc', // 闪电紫
+            devourer: '#22c55e', // 弹射绿
+            viridis:  '#34d399', // 激光绿
+            tesla:    '#60a5fa', // 冰霜蓝
+            chimera:  '#ef4444', // 穿透红
+            ouroboros:'#facc15', // 散射金
+        };
+        const bossColor = BOSS_ELEMENT_COLORS[bossId] || '#ffffff';
+
+        // === Boss 词条池（符合 Boss 主题的特殊词条）===
+        const BOSS_AFFIX_POOLS = {
+            ignis:    ['shield', 'berserk'],
+            glacies:  ['regen', 'jump'],
+            mikro:    ['clone', 'healer'],
+            devourer: ['devour', 'shield'],
+            viridis:  ['regen', 'healer'],
+            tesla:    ['haste', 'clone'],
+            chimera:  ['berserk', 'devour'],
+            ouroboros:['shield', 'haste', 'regen'],
+        };
+        const affixPool = BOSS_AFFIX_POOLS[bossId] || ['shield'];
+
+        // === 概率加成 ===
+        const bonus = isBigBoss ? cfg.bigBossBonus : 0;
+        const affixChance = Math.min(0.9, cfg.affixChance + bonus);
+        const minionChance = Math.min(0.5, cfg.minionChance + bonus);
+
+        // === 生成多圈冲击波 ===
+        const bossX = boss.pos.x;
+        const bossY = boss.pos.y;
+        for (let i = 0; i < cfg.waveCount; i++) {
+            setTimeout(() => {
+                // 创建冲击波对象，并覆盖其 maxRadius
+                const sw = new Shockwave(bossX, bossY, bossColor);
+                sw.maxRadius = cfg.shockwaveMaxRadius;
+                // 每圈冲击波稍微小一些，形成层次感
+                sw.alpha = 1.0 - i * 0.2;
+                this.shockwaves.push(sw);
+            }, i * cfg.waveDelay);
+        }
+
+        // === 触发屏幕震动事件 ===
+        eventBus.emit(EVENT_TYPES.BOSS_ENTRANCE_SHOCKWAVE, {
+            bossId,
+            isBigBoss,
+            bossColor,
+            shakeDuration: cfg.shakeDuration
+        });
+
+        // === 处理被冲击波命中的普通敌人 ===
+        // 延迟一圈冲击波扩散时间后再判断（让冲击波视觉先打到）
+        setTimeout(() => {
+            const affixNames = {
+                shield: '护盾', haste: '极速', regen: '再生',
+                healer: '治疗', jump: '跳跃', clone: '分身',
+                devour: '吞噬', berserk: '狂暴'
+            };
+
+            this.enemies.forEach(e => {
+                // 跳过 Boss 自身、已死亡、已处于屏幕外的敌人
+                if (!e.active || e.type === 'boss' || e.pos.y <= 0) return;
+
+                // 判断是否在冲击波覆盖范围内（冲击波从 Boss 中心出发，全场全覆盖）
+                const dx = e.pos.x - bossX;
+                const dy = e.pos.y - bossY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > cfg.shockwaveMaxRadius) return;
+
+                const roll = Math.random();
+
+                if (roll < minionChance) {
+                    // === 转化为 Boss 随从 ===
+                    // 保留位置和尺寸，重置词条为 Boss 属性词条
+                    e.affixes = [...affixPool];
+                    e.type = 'elite';
+                    // 应用 Boss 对应的随从形状（修改 bossHistory 临时指向当前 Boss）
+                    const savedHistory = this.bossHistory ? [...this.bossHistory] : [];
+                    if (!this.bossHistory) this.bossHistory = [];
+                    // 确保 bossHistory 最后一个是当前 Boss
+                    const tempHistory = [...savedHistory.filter(id => id !== bossId), bossId];
+                    this.bossHistory = tempHistory;
+                    this.spawn_applyMinionShape(e);
+                    this.bossHistory = savedHistory; // 恢复原始 bossHistory
+                    // 初始化护盾层数
+                    if (e.affixes.includes('shield')) {
+                        e.shieldCharges = Math.max(1, Math.floor((1 + this.round) * 0.5));
+                    }
+                    // 浮动文字提示
+                    this.spawn_createFloatingText(
+                        e.pos.x, e.pos.y - e.height / 2 - 10,
+                        '随从!', bossColor
+                    );
+                } else if (roll < minionChance + affixChance) {
+                    // === 赋予 Boss 特殊词条 ===
+                    const newAffix = affixPool[Math.floor(Math.random() * affixPool.length)];
+                    if (!e.affixes.includes(newAffix)) {
+                        e.affixes.push(newAffix);
+                        if (e.affixes.length > 0) e.type = 'elite';
+                        // 初始化护盾层数
+                        if (newAffix === 'shield') {
+                            e.shieldCharges = Math.max(1, 1 + Math.floor(this.round * 0.5));
+                        }
+                        // 浮动文字提示
+                        const affixLabel = affixNames[newAffix] || newAffix;
+                        this.spawn_createFloatingText(
+                            e.pos.x, e.pos.y - e.height / 2 - 10,
+                            `「${affixLabel}」`, bossColor
+                        );
+                    }
+                }
+            });
+        }, cfg.waveDelay * 1.5); // 在第一圈冲击波扩散到中场后处理
     },
 };

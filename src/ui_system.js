@@ -571,6 +571,28 @@ ui_closeTruthBook() {
             // 阶段 3：延迟 0.6s 后叠加高频威联弦
             setTimeout(() => audio.playTone(isBigBoss ? 150 : 120, 'square', 0.25, 0.5), 600);
         });
+
+        // ── Boss 进场冲击波落地震动 ──────────────────────────────────────
+        // 监听 Boss 落地冲击波事件，触发屏幕震动和属性色闪光
+        eventBus.on(EVENT_TYPES.BOSS_ENTRANCE_SHOCKWAVE, ({ bossId, isBigBoss, bossColor, shakeDuration }) => {
+            // 屏幕震动：落地冲击波比入场震动更强烈
+            if (typeof this.ui_triggerScreenShake === 'function') {
+                this.ui_triggerScreenShake(shakeDuration || 400);
+            } else if (typeof this.triggerScreenShake === 'function') {
+                this.triggerScreenShake(isBigBoss ? 22 : 15);
+            }
+            // 属性色全屏闪光：用 Boss 属性颜色闪烁屏幕
+            const flashEl = document.getElementById('canvas-flash-overlay');
+            if (flashEl && bossColor) {
+                flashEl.style.backgroundColor = bossColor;
+                flashEl.style.opacity = isBigBoss ? '0.35' : '0.25';
+                flashEl.style.display = 'block';
+                setTimeout(() => {
+                    flashEl.style.opacity = '0';
+                    setTimeout(() => { flashEl.style.display = 'none'; }, 300);
+                }, isBigBoss ? 150 : 100);
+            }
+        });
     },
 
     /**
