@@ -1589,6 +1589,13 @@ export const spawn_system = {
             ? this.bossHistory[this.bossHistory.length - 1]
             : null;
 
+        // [减少异型敌人] 概率控制：只有 50% 的概率应用异型形状，其余保持默认 AABB
+        if (!lastBoss || Math.random() > 0.5) {
+            e.collisionShape = 'aabb';
+            e.collisionData = null;
+            return;
+        }
+
         const w = e.width;
         const h = e.height;
 
