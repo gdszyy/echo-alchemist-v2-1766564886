@@ -526,6 +526,9 @@ class Peg {
         // --- [物理增强] 钉子被击中时的旋转角度（视觉反馈）---
         this.impactAngle = 0;    // 当前旋转角度（弧度）
         this.impactSpin = 0;     // 被击中时的角速度（逐帧衰减）
+        // --- [布局位置标记] 特殊钉盘中功能性位置的视觉标识 ---
+        // 由 game_phase.initPachinko 在钉子创建后写入，用于 draw 方法绘制专属样式
+        this.layoutRole = null;  // 'diamond_mid'|'sparse_narrow'|'wide_edge'|'triangle_funnel'|'mirror_center'
     }
     getColor() {
         let color = CONFIG.colors.peg;
@@ -826,6 +829,12 @@ class Peg {
             ctx.textBaseline = 'middle';
             ctx.fillText(this.frozenTurns, this.pos.x + currentRadius * 0.8, this.pos.y - currentRadius * 0.8);
             ctx.restore();
+        }
+
+        // ==================== [布局位置标记] 功能性位置钉子专属视觉 ====================
+        // 根据 layoutRole 绘制外圈样式标识，让玩家一眼识别哪些钉子会触发特殊效果
+        if (this.layoutRole) {
+            this.drawLayoutRoleStyle(ctx, currentRadius);
         }
 
         // --- 2. 绘制光照反光 (Rim Light) ---
@@ -1260,6 +1269,136 @@ class Peg {
         ctx.bezierCurveTo(s, -s * 0.1, s * 0.1, -s * 0.1, 0, s * 0.4);
         ctx.closePath();
         ctx.fill();
+        ctx.restore();
+    }
+
+    /**
+     * [布局位置标记] 根据 layoutRole 绘制功能性位置的专属视觉样式
+     *
+     * 设计原则：
+     *  - 外圈样式不遮挡属性图标，只在圆形外侧叠加
+     *  - 每种 role 有独特的形状语言，与其效果语义对应
+     *  - 使用半透明+脉冲动画，静止时不干扰阅读，碰撞时更醒目
+     *
+     * layoutRole 对应关系：
+     *  diamond_mid    → 橙色菱形外框（中段爆发区）
+     *  sparse_narrow  → 绿色虚线外圈（通道蓄力行）
+     *  wide_edge      → 橙色双侧括号（边缘共振钉）
+     *  triangle_funnel→ 琥珀色向下三角标（漏斗共鸣区）
+     *  mirror_center  → 粉色对称轴线（镜像同步边缘）
+     */
+    drawLayoutRoleStyle(ctx, r) {
+        const x = this.pos.x;
+        const y = this.pos.y;
+        const pulse = (Math.sin(Date.now() / 600) + 1) / 2; // 0~1 脉冲
+        const role = this.layoutRole;
+
+        ctx.save();
+
+        if (role === 'diamond_mid') {
+            // ── 橙色菱形外框 ──
+            // 菱形四顶点绕钉子旋转 45°，表示「中段爆发」的能量聚集
+            const d = r * 1.72; // 菱形外接圆半径
+            const alpha = 0.45 + pulse * 0.35;
+            ctx.strokeStyle = `rgba(251, 146, 60, ${alpha})`; // 橙色
+            ctx.lineWidth = 1.4;
+            ctx.shadowBlur = 4 + pulse * 6;
+            ctx.shadowColor = 'rgba(251, 146, 60, 0.7)';
+            ctx.beginPath();
+            ctx.moveTo(x,     y - d); // 顶
+            ctx.lineTo(x + d, y);     // 右
+            ctx.lineTo(x,     y + d); // 底
+            ctx.lineTo(x - d, y);     // 左
+            ctx.closePath();
+            ctx.stroke();
+
+        } else if (role === 'sparse_narrow') {
+            // ── 绿色虚线外圈 ──
+            // 虚线表示「通道」（间隔感），绿色对应 sparse 布局主色
+            const alpha = 0.40 + pulse * 0.30;
+            ctx.strokeStyle = `rgba(52, 211, 153, ${alpha})`; // 翠绿
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([3, 3]);
+            ctx.lineDashOffset = (Date.now() / 80) % 6; // 虚线流动动画
+            ctx.shadowBlur = 3 + pulse * 5;
+            ctx.shadowColor = 'rgba(52, 211, 153, 0.6)';
+            ctx.beginPath();
+            ctx.arc(x, y, r * 1.55, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]); // 重置虚线
+
+        } else if (role === 'wide_edge') {
+            // ── 橙色双侧括号 ──
+            // 左右各一段圆弧，像「( )」括号，表示边缘捕获
+            const alpha = 0.50 + pulse * 0.35;
+            ctx.strokeStyle = `rgba(251, 113, 133, ${alpha})`; // 玫瑰红
+            ctx.lineWidth = 2.0;
+            ctx.lineCap = 'round';
+            ctx.shadowBlur = 4 + pulse * 7;
+            ctx.shadowColor = 'rgba(251, 113, 133, 0.7)';
+            const arcR = r * 1.6;
+            const arcSpan = Math.PI * 0.55; // 弧长约 99°
+            // 左侧括号（朝左开口）
+            ctx.beginPath();
+            ctx.arc(x, y, arcR, Math.PI * 0.72, Math.PI * 1.28);
+            ctx.stroke();
+            // 右侧括号（朝右开口）
+            ctx.beginPath();
+            ctx.arc(x, y, arcR, -Math.PI * 0.28, Math.PI * 0.28);
+            ctx.stroke();
+
+        } else if (role === 'triangle_funnel') {
+            // ── 琥珀色向下三角标 ──
+            // 钉子下方绘制小三角箭头，表示「漏斗收窄，向下聚焦」
+            const alpha = 0.50 + pulse * 0.35;
+            ctx.fillStyle = `rgba(245, 158, 11, ${alpha})`; // 琥珀色
+            ctx.shadowBlur = 3 + pulse * 5;
+            ctx.shadowColor = 'rgba(245, 158, 11, 0.6)';
+            const ty = y + r * 1.55; // 三角形顶点 Y（钉子正下方）
+            const tw = r * 0.55;     // 三角形半宽
+            const th = r * 0.55;     // 三角形高度
+            ctx.beginPath();
+            ctx.moveTo(x - tw, ty);
+            ctx.lineTo(x + tw, ty);
+            ctx.lineTo(x,      ty + th);
+            ctx.closePath();
+            ctx.fill();
+            // 外圈细线（漏斗感）
+            ctx.strokeStyle = `rgba(245, 158, 11, ${alpha * 0.6})`;
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.arc(x, y, r * 1.45, Math.PI * 0.15, Math.PI * 0.85);
+            ctx.stroke();
+
+        } else if (role === 'mirror_center') {
+            // ── 粉紫色对称轴双线 ──
+            // 钉子两侧各一条短竖线，表示「镜像对称轴」边缘
+            const alpha = 0.45 + pulse * 0.35;
+            ctx.strokeStyle = `rgba(192, 132, 252, ${alpha})`; // 紫色
+            ctx.lineWidth = 1.5;
+            ctx.lineCap = 'round';
+            ctx.shadowBlur = 4 + pulse * 6;
+            ctx.shadowColor = 'rgba(192, 132, 252, 0.6)';
+            const lx = r * 1.55;
+            const lh = r * 0.8;
+            // 左侧竖线
+            ctx.beginPath();
+            ctx.moveTo(x - lx, y - lh);
+            ctx.lineTo(x - lx, y + lh);
+            ctx.stroke();
+            // 右侧竖线
+            ctx.beginPath();
+            ctx.moveTo(x + lx, y - lh);
+            ctx.lineTo(x + lx, y + lh);
+            ctx.stroke();
+            // 连接两竖线的顶部横线（Π 形）
+            ctx.globalAlpha = alpha * 0.5;
+            ctx.beginPath();
+            ctx.moveTo(x - lx, y - lh);
+            ctx.lineTo(x + lx, y - lh);
+            ctx.stroke();
+        }
+
         ctx.restore();
     }
 

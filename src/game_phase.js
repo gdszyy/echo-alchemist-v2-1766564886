@@ -244,6 +244,57 @@ export const game_phase = {
             }
         }
 
+        // ==================== [布局位置标记] ====================
+        // 在所有钉子创建完成后，根据布局类型标记功能性位置的 layoutRole
+        // 供 Peg.draw 方法绘制专属视觉样式
+        if (boardLayout !== 'default') {
+            const totalRows = rows;
+            const rowQ1 = Math.floor(totalRows * 0.25);
+            const rowQ3 = Math.floor(totalRows * 0.75);
+
+            for (const p of this.pegs) {
+                const r = p.row;
+                const c = p.col;
+
+                if (boardLayout === 'diamond') {
+                    // 中段（25%~75% 行）：触发「中段爆发」效果的区域
+                    if (r >= rowQ1 && r <= rowQ3) {
+                        p.layoutRole = 'diamond_mid';
+                    }
+
+                } else if (boardLayout === 'sparse') {
+                    // 奇数行（窄行）：弹珠穿越此行未碰撞则蓄力
+                    if (r % 2 !== 0) {
+                        p.layoutRole = 'sparse_narrow';
+                    }
+
+                } else if (boardLayout === 'wide_narrow') {
+                    // 偶数行（宽行）的边缘钉子（列号 0/1 或倒数 0/1）：触发「边缘共振」
+                    if (r % 2 === 0) {
+                        const rowPegs = this.pegs.filter(rp => rp.row === r);
+                        const rowLen = rowPegs.length;
+                        if (c <= 1 || c >= rowLen - 2) {
+                            p.layoutRole = 'wide_edge';
+                        }
+                    }
+
+                } else if (boardLayout === 'triangle') {
+                    // 下半段（50%~100% 行）：漏斗收窄区，触发「漏斗共鸣」
+                    if (r >= Math.floor(totalRows * 0.5)) {
+                        p.layoutRole = 'triangle_funnel';
+                    }
+
+                } else if (boardLayout === 'mirror_sync') {
+                    // 中轴附近钉子（列号 0 或最后一列）：镜像同步的对称轴标识
+                    const rowPegs = this.pegs.filter(rp => rp.row === r);
+                    const rowLen = rowPegs.length;
+                    if (c === 0 || c === rowLen - 1) {
+                        p.layoutRole = 'mirror_center';
+                    }
+                }
+            }
+        }
+
         // [镜像同步] 预计算钉子的镜像索引
         // [修复] 交错后奇偶行的 x 坐标不再简单对称于列号，改为基于 x 坐标对称于画布中心
         if (boardLayout === 'mirror_sync') {
