@@ -4,7 +4,7 @@ import {
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
-    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, showToast, 
+    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, HealWave, showToast, 
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook, TRUTH_BOOK_DATA } from './systems.js';
@@ -1050,6 +1050,18 @@ export const spawn_system = {
      */
     spawn_createShockwave(x, y, color = null) { 
         this.shockwaves.push(new Shockwave(x, y, color)); 
+    },
+
+    /**
+     * @method spawn_createHealWave
+     * @description 创建扩散治疗波特效（专用于 healer 词缀的范围治疗动画）。
+     * @param {number} x - 施法者中心 X 坐标
+     * @param {number} y - 施法者中心 Y 坐标
+     * @param {number} range - 治疗范围（像素），决定波的最大扩散半径
+     */
+    spawn_createHealWave(x, y, range = 120) {
+        if (!this.healWaves) this.healWaves = [];
+        this.healWaves.push(new HealWave(x, y, range));
     },
 
 // ---  createHitFeedback ---

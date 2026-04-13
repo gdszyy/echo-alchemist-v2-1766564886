@@ -1070,6 +1070,147 @@ class DeathExplosion {
     }
 }
 
+// ==================== 扩散治疗波 ====================
+/**
+ * HealWave - 范围治疗技能触发时的扩散治疗波特效
+ *
+ * 设计理念：柔和的粉绿色治疗能量从施法者中心向外扩散，
+ * 包含多圈同心扩散环 + 中心光晕 + 十字脉冲光线，
+ * 视觉上比普通冲击波更「治愈」，扩散更慢、持续更久。
+ *
+ * 参数：
+ *   x, y   - 施法者中心坐标
+ *   range  - 治疗范围（像素），决定最大扩散半径
+ */
+class HealWave {
+    constructor(x, y, range = 120) {
+        this.x = x;
+        this.y = y;
+        this.maxRadius = range * 1.1; // 略超出治疗范围，给玩家清晰的视觉反馈
+        // 主扩散环
+        this.radius = 8;
+        this.life = 1.0;
+        this.decay = 0.022; // 比 Shockwave(0.04) 慢一倍，持续更久
+        // 内圈（稍慢，形成层次感）
+        this.innerRadius = 4;
+        this.innerLife = 1.2;
+        // 中心光晕（先膨胀后消退）
+        this.glowRadius = 0;
+        this.glowMaxRadius = range * 0.35;
+        this.glowLife = 1.0;
+        // 十字脉冲光线（4 条，向外延伸）
+        this.crossLife = 1.0;
+        this.crossLen = 0;
+        this.crossMaxLen = range * 0.5;
+    }
+
+    update(timeScale) {
+        const speed = (this.maxRadius / 28) * timeScale; // 约 28 帧扩散到最大半径
+        this.radius += speed;
+        this.life -= this.decay * timeScale;
+        this.innerRadius += speed * 0.6;
+        this.innerLife -= this.decay * 1.3 * timeScale;
+        // 中心光晕：先快速膨胀，再随 life 消退
+        if (this.glowRadius < this.glowMaxRadius) {
+            this.glowRadius += (this.glowMaxRadius / 10) * timeScale;
+        }
+        this.glowLife -= this.decay * 1.1 * timeScale;
+        // 十字光线：随主环同步延伸
+        this.crossLen = this.radius * 0.55;
+        this.crossLife = this.life * 1.1;
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+
+        // ---- 1. 中心柔光晕 ----
+        if (this.glowLife > 0 && this.glowRadius > 0) {
+            const gAlpha = Math.max(0, this.glowLife * 0.45);
+            ctx.globalAlpha = gAlpha;
+            const gGrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.glowRadius);
+            gGrad.addColorStop(0, 'rgba(134, 239, 172, 0.9)');  // 绿白核心
+            gGrad.addColorStop(0.4, 'rgba(244, 114, 182, 0.6)'); // 粉色中间
+            gGrad.addColorStop(1, 'rgba(244, 114, 182, 0)');     // 边缘透明
+            ctx.fillStyle = gGrad;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.glowRadius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // ---- 2. 主扩散环（粉绿渐变描边 + 淡填充） ----
+        if (this.life > 0 && this.radius > 0) {
+            const rAlpha = Math.max(0, this.life);
+            // 淡填充（环形渐变，仅边缘有色）
+            const rGrad = ctx.createRadialGradient(
+                this.x, this.y, this.radius * 0.55,
+                this.x, this.y, this.radius
+            );
+            rGrad.addColorStop(0, 'rgba(134, 239, 172, 0)');
+            rGrad.addColorStop(0.5, `rgba(134, 239, 172, ${rAlpha * 0.18})`);
+            rGrad.addColorStop(0.8, `rgba(244, 114, 182, ${rAlpha * 0.22})`);
+            rGrad.addColorStop(1, 'rgba(244, 114, 182, 0)');
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = rGrad;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            // 主环描边（粉色，较粗）
+            ctx.globalAlpha = rAlpha * 0.9;
+            ctx.strokeStyle = `rgba(244, 114, 182, ${rAlpha})`;
+            ctx.lineWidth = 3.5;
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = '#f472b6';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        // ---- 3. 内圈（绿色，稍慢，层次感） ----
+        if (this.innerLife > 0 && this.innerRadius > 0) {
+            const iAlpha = Math.max(0, Math.min(1, this.innerLife * 0.75));
+            ctx.globalAlpha = iAlpha;
+            ctx.strokeStyle = `rgba(134, 239, 172, ${iAlpha})`;
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#86efac';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.innerRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        // ---- 4. 十字脉冲光线（4 方向，随主环延伸） ----
+        if (this.crossLife > 0 && this.crossLen > 0) {
+            const cAlpha = Math.max(0, this.crossLife * 0.6);
+            ctx.globalAlpha = cAlpha;
+            const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+            for (const [dx, dy] of dirs) {
+                const startR = this.radius * 0.3;
+                const endR = this.radius * 0.3 + this.crossLen;
+                const grad = ctx.createLinearGradient(
+                    this.x + dx * startR, this.y + dy * startR,
+                    this.x + dx * endR,   this.y + dy * endR
+                );
+                grad.addColorStop(0, `rgba(134, 239, 172, ${cAlpha})`);
+                grad.addColorStop(1, 'rgba(244, 114, 182, 0)');
+                ctx.strokeStyle = grad;
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(this.x + dx * startR, this.y + dy * startR);
+                ctx.lineTo(this.x + dx * endR,   this.y + dy * endR);
+                ctx.stroke();
+            }
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+}
+
 // ==================== 导出 ====================
 export {
     Particle,
@@ -1082,5 +1223,6 @@ export {
     LightningBolt,
     FireWave,
     IceWave,
-    DeathExplosion
+    DeathExplosion,
+    HealWave
 };

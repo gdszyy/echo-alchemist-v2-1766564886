@@ -155,6 +155,7 @@ class Game {
         this.relicSelectionCount = 0; // 遗物选择计数器（用于前三次推荐逻辑）
         this.spores = []; 
         this.fireWaves = []; 
+        this.healWaves = []; // 扩散治疗波特效数组
         this.sonSwords = [];
         this.windAnchors = []; 
         this.activeWindMatrices = []; 

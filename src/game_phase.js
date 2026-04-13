@@ -1344,6 +1344,15 @@ phase_gathering_getRandomPegType() {
                     if (iw.life <= 0) this.iceWaves.splice(i, 1);
                 }
             }
+            // 更新和绘制 HealWaves（范围治疗扩散波特效）
+            if (this.healWaves) {
+                for (let i = this.healWaves.length - 1; i >= 0; i--) {
+                    const hw = this.healWaves[i];
+                    hw.update(timeScale);
+                    hw.draw(this.ctx);
+                    if (hw.life <= 0) this.healWaves.splice(i, 1);
+                }
+            }
             // 更新和绘制 DeathExplosions（分级死亡爆炸特效）
             if (this.deathExplosions) {
                 for (let i = this.deathExplosions.length - 1; i >= 0; i--) {

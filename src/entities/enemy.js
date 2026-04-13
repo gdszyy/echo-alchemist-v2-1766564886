@@ -671,14 +671,24 @@ class Enemy {
                         // [修复] 回血前同步 greenHp，确保动画正常触发
                         if (other.hp > other.greenHp) other.greenHp = other.hp;
                         other.hp = Math.min(other.maxHp, other.hp + healAmt);
-                        game.spawn_createParticle(other.pos.x, other.pos.y, '#f472b6', 'spark');
-                        game.spawn_createFloatingText(other.pos.x, other.pos.y - 20, `+${healAmt}`, '#f472b6');
+                        // 被治疗目标：多个粉绿火花粒子 + 治疗数字
+                        for (let _i = 0; _i < 4; _i++) {
+                            game.spawn_createParticle(
+                                other.pos.x + (Math.random() - 0.5) * other.width,
+                                other.pos.y + (Math.random() - 0.5) * other.height * 0.5,
+                                Math.random() < 0.5 ? '#f472b6' : '#86efac', 'spark'
+                            );
+                        }
+                        game.spawn_createFloatingText(other.pos.x, other.pos.y - 20, `❤️+${healAmt}`, '#f472b6');
                         healedCount++;
                     }
                 });
                 if (healedCount > 0) {
-                     audio.playEffect('regen');
-                     game.spawn_createShockwave(this.pos.x, this.pos.y, '#f472b6');
+                    audio.playEffect('regen');
+                    // 扩散治疗波：以治疗范围为参数，明确展示治疗覆盖范围
+                    game.spawn_createHealWave(this.pos.x, this.pos.y, range);
+                    // 额外一圈粉色冲击波增强打击感
+                    game.spawn_createShockwave(this.pos.x, this.pos.y, '#f472b6');
                 }
             }
 
@@ -848,16 +858,28 @@ class Enemy {
                 game.enemies.forEach(other => {
                     if (other !== this && other.active && other.hp < other.maxHp && this.pos.dist(other.pos) < range) {
                         const healAmt = Math.ceil(other.maxHp * afx.healerPercent);
+                        // [修复] 回血前同步 greenHp，确保动画正常触发
+                        if (other.hp > other.greenHp) other.greenHp = other.hp;
                         other.hp = Math.min(other.maxHp, other.hp + healAmt);
-                        game.spawn_createParticle(other.pos.x, other.pos.y, '#f472b6', 'spark');
-                        game.spawn_createFloatingText(other.pos.x, other.pos.y - 20, `+${healAmt}`, '#f472b6');
+                        // 被治疗目标：多个粉绿火花粒子 + 治疗数字
+                        for (let _i = 0; _i < 4; _i++) {
+                            game.spawn_createParticle(
+                                other.pos.x + (Math.random() - 0.5) * other.width,
+                                other.pos.y + (Math.random() - 0.5) * other.height * 0.5,
+                                Math.random() < 0.5 ? '#f472b6' : '#86efac', 'spark'
+                            );
+                        }
+                        game.spawn_createFloatingText(other.pos.x, other.pos.y - 20, `❤️+${healAmt}`, '#f472b6');
                         healedCount++;
                     }
                 });
                 
                 if (healedCount > 0) {
-                     audio.playEffect('regen');
-                     game.spawn_createShockwave(this.pos.x, this.pos.y, '#f472b6');
+                    audio.playEffect('regen');
+                    // 扩散治疗波：以治疗范围为参数，明确展示治疗覆盖范围
+                    game.spawn_createHealWave(this.pos.x, this.pos.y, range);
+                    // 额外一圈粉色冲击波增强打击感
+                    game.spawn_createShockwave(this.pos.x, this.pos.y, '#f472b6');
                 }
             }
 
