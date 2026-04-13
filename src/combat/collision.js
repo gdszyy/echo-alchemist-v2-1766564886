@@ -240,10 +240,20 @@ export const CollisionSystem = {
             }
 
             // ─────────────────────────────────────────────────────────────────
-            // [激光折射] 仅对激光路径上最后一个命中的敌人判定折射
+            // [激光折射] 根据 pierce 与 bounce 大小关系决定折射触发位置：
+            //   pierce > bounce：穿透主导，不触发折射
+            //   bounce > pierce：折射主导，第一个命中的敌人即触发
+            //   bounce === pierce（含两者均为 0）：最后一个命中的敌人触发
             // ─────────────────────────────────────────────────────────────────
-            const isLastHit = (index === hits.length - 1);
-            if (isLastHit && bouncesLeft > 0 && remainLen > 10) {
+            const pierce = recipe.pierce || 0;
+            const bounce = recipe.bounce || 0;
+            // pierce > bounce：穿透主导，完全不折射
+            const refractionAllowed = pierce <= bounce;
+            // bounce > pierce：折射主导，第一个命中即触发；否则最后一个命中触发
+            const isFirstHit = (index === 0);
+            const isLastHit  = (index === hits.length - 1);
+            const isRefractionTriggerHit = bounce > pierce ? isFirstHit : isLastHit;
+            if (refractionAllowed && isRefractionTriggerHit && bouncesLeft > 0 && remainLen > 10) {
                 // 折射概率：(基础 + 每层 bounce 加成) × 层级衰减系数^depth，上限 maxChance
                 const baseChance = Math.min(rfMaxChance, rfBaseChance + bouncesLeft * rfBounceBonus);
                 const triggerChance = baseChance * Math.pow(rfDepthDecay, refractionDepth);
