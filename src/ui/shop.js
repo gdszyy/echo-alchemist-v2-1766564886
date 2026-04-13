@@ -33,6 +33,9 @@ export const shop_system = {
         // --- 配置权重 ---
         const RARITY_WEIGHTS = CONFIG.balance.relicRarityWright;
 
+        // 判断是否处于前三次遗物选择（计数器尚未超过3）
+        const isEarlyGame = (this.relicSelectionCount || 0) < 3;
+
         // 2. 准备遗物池
         // 过滤掉玩家已经拥有的遗物 (this.ownedRelics)
         let pool = RELIC_DB.filter(r => {
@@ -57,14 +60,19 @@ export const shop_system = {
         const choices = [];
         const choiceNum = (CONFIG.gameplay && CONFIG.gameplay.relicChoiceNum) || 3;
         
-        // 3. 抽取 3 个遗物 (加权随机 & 不放回)
+        // 3. 抄取遗物 (加权随机 & 不放回)
+        // 早期游戏：提高推荐遗物的权重，确保至少出现一个推荐遗物
+        const RECOMMENDED_WEIGHT_BOOST = 3; // 推荐遗物权重倍数
         for(let i=0; i < choiceNum; i++) {
             if(pool.length === 0) break;
 
             // A. 计算当前临时池子的总权重
             let totalWeight = 0;
             pool.forEach(r => {
-                totalWeight += (RARITY_WEIGHTS[r.rarity] || 10);
+                let w = RARITY_WEIGHTS[r.rarity] || 10;
+                // 早期游戏且该遗物标记为推荐，则提升权重
+                if (isEarlyGame && r.recommended) w *= RECOMMENDED_WEIGHT_BOOST;
+                totalWeight += w;
             });
 
             // B. 生成随机数 [0, totalWeight)
@@ -73,8 +81,9 @@ export const shop_system = {
 
             // C. 遍历寻找命中的遗物
             for (let j = 0; j < pool.length; j++) {
-                const weight = RARITY_WEIGHTS[pool[j].rarity] || 10;
-                randomVal -= weight;
+                let w = RARITY_WEIGHTS[pool[j].rarity] || 10;
+                if (isEarlyGame && pool[j].recommended) w *= RECOMMENDED_WEIGHT_BOOST;
+                randomVal -= w;
                 if (randomVal <= 0) {
                     selectedIdx = j;
                     break;
@@ -87,6 +96,10 @@ export const shop_system = {
             pool.splice(selectedIdx, 1);
         }
 
+        // 计数器自增（每次打开遗物选择界面时计数）
+        this.relicSelectionCount = (this.relicSelectionCount || 0) + 1;
+        const showRecommendation = this.relicSelectionCount <= 3;
+
         // 4. 生成 HTML
         const container = document.getElementById('relic-container');
         if (container) {
@@ -98,11 +111,24 @@ export const shop_system = {
                 const count = (this.ownedRelics || []).filter(id => id === relic.id).length;
                 const max = relic.maxStacks || 1;
                 const stackInfo = max > 1 ? `<div class="relic-stack text-xs text-amber-400 mt-1">当前层数: ${count} / ${max}</div>` : '';
+                
+                // 推荐标签和 Tip（仅前三次遗物选择且遗物标记为推荐时显示）
+                let recommendHtml = '';
+                if (showRecommendation && relic.recommended) {
+                    const tagsHtml = (relic.tags || []).map(tag => `<span class="relic-tag">${tag}</span>`).join('');
+                    recommendHtml = `
+                        <div class="relic-recommend-badge">★ 新手推荐</div>
+                        <div class="relic-tags">${tagsHtml}</div>
+                        <div class="relic-tip">💡 ${relic.recommendTip}</div>
+                    `;
+                }
+                
                 el.innerHTML = `
                     <div class="relic-icon">${relic.icon}</div>
                     <div class="relic-name">${relic.name}</div>
                     <div class="relic-desc">${relic.desc}</div>
                     ${stackInfo}
+                    ${recommendHtml}
                 `;
                 el.onclick = (e) => { 
                     e.stopPropagation(); 

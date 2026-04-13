@@ -151,7 +151,8 @@ class Game {
         this.burstQueue = []; 
         this.sonSwordQueue = []; 
         this.swordQis = []; 
-        this.ownedRelics = []; 
+        this.ownedRelics = [];
+        this.relicSelectionCount = 0; // 遗物选择计数器（用于前三次推荐逻辑）
         this.spores = []; 
         this.fireWaves = []; 
         this.sonSwords = [];

@@ -105,7 +105,10 @@ globs: ["src/game_phase.js"]
 ## 6. Boss 遗物与固定回合遗物事件的冲突处理
 
 ### 6.1 问题描述
-当 Boss 被击杀的回合数恰好是 `relicRoundInterval`（默认为 3）的倍数时（例如：第 5 回合击杀 Boss，`phase_finalizeRound` 后 `round++` 变为 6，而 `6 % 3 == 0`），会同时触发两个遗物弹窗：
+
+**遗物触发时机（已更新）**：遗物触发逻辑已改为「初始回合给予一次，第 3 回合起每 5 回合给予一次」，以改善新手玩家早期体验。
+
+当 Boss 被击杀的回合数恰好是遗物触发条件时（例如：第 5 回合击杀 Boss，`phase_finalizeRound` 后 `round++` 变为 6，而 `(round - 3) % 5 == 0`），会同时触发两个遗物弹窗：
 
 1. `combat_system.js` 中 Boss 击杀后的 `setTimeout(() => this.ui_showRelicSelection(), 500)`；
 2. `phase_finalizeRound` 中固定回合遗物事件的 `setTimeout(() => this.ui_showRelicSelection(), 500)`。

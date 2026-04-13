@@ -718,7 +718,10 @@ const RELIC_DB = [
     desc: '永久提升弹珠体积，更容易击中钉子与槽位。', 
     rarity: 'rare', 
     effect: 'permanent_size_up',
-    maxStacks: 1
+    maxStacks: 1,
+    recommended: true,
+    tags: ['伤害提升', '新手友好'],
+    recommendTip: '弹珠变大后更容易命中钉子，大幅提升每回合伤害输出！'
 },
     { 
     id: 'fortune_wheel_relic', 
@@ -732,11 +735,14 @@ const RELIC_DB = [
     },
     { 
         id: 'dimension_shard', 
-        name: '維度碎片', 
+        name: '維度磎片', 
         icon: '🌌', 
         desc: '收集階段：釘板高度延伸，額外增加 2 行釘子。', 
         rarity: 'rare', 
-        effect: 'row_count_up', maxStacks: 1
+        effect: 'row_count_up', maxStacks: 1,
+        recommended: true,
+        tags: ['收益增幅', '新手友好'],
+        recommendTip: '更多行釘子意味着每回合可收集更多属性，弹珠伤害将大幅提升！'
     },
     { id: 'stars_shines', name: '群星闪烁', icon: '✨', desc: '解鎖 [回响弹珠]：双倍获得连击充能。', rarity: 'rare', unlocks: 'resonance', boost: 8 ,maxStacks: 1},
     { id: 'optical_lens', name: '聚焦透鏡', icon: '🔭', desc: '解鎖 [光球]：發射瞬間穿透的折射光束。', rarity: 'legendary', unlocks: 'laser', boost: 10 ,maxStacks: 1},
@@ -752,7 +758,7 @@ const RELIC_DB = [
     { id: 'unlock_split', name: '裂變核心', icon: '☢️', desc: '收集階段：解鎖 [分裂槽] 的出現 (若無槽位則+1)。', rarity: 'rare', effect: 'unlock_slot', slotType: 'split' ,maxStacks: 1},
 
     //  4. 增加特殊槽数量
-    { id: 'slot_expander', name: '空間鑿子', icon: '🔨', desc: '收集階段：特殊槽出現數量 +1。', rarity: 'common', effect: 'slot_count_up', maxStacks: 3},
+    { id: 'slot_expander', name: '空間鑿子', icon: '🔨', desc: '收集階段：特殊槽出現數量 +1。', rarity: 'common', effect: 'slot_count_up', maxStacks: 3, recommended: true, tags: ['连击增幅', '新手友好'], recommendTip: '更多特殊槽意味着更多触发机会，是快速提升伤害的关键！'},
     //  獨立元素遺物
     { id: 'cryo_stone', name: '永恆凍土', icon: '❄️', desc: '解鎖 [冰霜] 屬性 (彈珠與釘子)。', rarity: 'rare', unlocks: 'cryo', boost: 15 ,maxStacks: 1},
     { id: 'pyro_stone', name: '不滅火種', icon: '🔥', desc: '解鎖 [火焰] 屬性 (彈珠與釘子)。', rarity: 'rare', unlocks: 'pyro', boost: 15 ,maxStacks: 1},
@@ -761,7 +767,7 @@ const RELIC_DB = [
     //  物理套裝遺物 (一次解鎖三種，或者你可以拆開)
     { id: 'tactical_kit_pierce', name: '穿透補給', maxStacks: 3 , icon: '↗', desc: '解鎖 [穿透] 屬性。', rarity: 'legendary', unlocks: ['pierce'], boost: 5 ,maxStacks: 1},
     { id: 'tactical_kit_scatter', name: '散射補給', maxStacks: 3 , icon: '🔱', desc: '解鎖 [散射] 屬性。', rarity: 'legendary', unlocks: ['scatter'], boost: 5 ,maxStacks: 1},
-    { id: 'tactical_kit_damage', name: '增幅補給', maxStacks: 3 , icon: '⚔️', desc: '解鎖 [增幅] 屬性。', rarity: 'common', unlocks: ['damage'], boost: 5 ,maxStacks: 1},
+    { id: 'tactical_kit_damage', name: '增幅補給', icon: '⚔️', desc: '解鎖 [增幅] 屬性。', rarity: 'common', unlocks: ['damage'], boost: 5, maxStacks: 1, recommended: true, tags: ['伤害核心', '新手友好'], recommendTip: '解锁增幅属性，让你的弹珠造成更高的基础伤害！'},
 
     { id: 'explosive_ammo', name: '高爆火藥', icon: '🧨', desc: '解鎖 [爆破彈珠] 出現，且獲得一顆。', rarity: 'rare', unlocks: 'explosive', boost: 10 ,maxStacks: 1},
     { id: 'prism_shard', name: '七彩稜鏡', icon: '🌈', desc: '解鎖 [彩虹彈珠] 出現，且獲得一顆。', rarity: 'legendary', unlocks: 'rainbow', boost: 5 ,maxStacks: 1},
@@ -785,7 +791,7 @@ const RELIC_DB = [
     { id: 'surge_bounce',  name: '弹性涌潮', icon: '🔵', desc: '下兩回合必定刷新出「弹性彈珠」，且弹性彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'bounce',  maxStacks: 1 },
     { id: 'surge_pierce',  name: '穿透涌潮', icon: '↗',       desc: '下兩回合必定刷新出「穿透彈珠」，且穿透彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'legendary',  effect: 'assimilation_surge', marbleType: 'pierce',  maxStacks: 1 },
     { id: 'surge_scatter', name: '散射涌潮', icon: '🔱',       desc: '下兩回合必定刷新出「散射彈珠」，且散射彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'legendary',  effect: 'assimilation_surge', marbleType: 'scatter', maxStacks: 1 },
-    { id: 'surge_damage',  name: '增幅涌潮', icon: '⚔️',       desc: '下兩回合必定刷新出「增幅彈珠」，且增幅彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'damage',  maxStacks: 1 },
+    { id: 'surge_damage',  name: '增幅涌潮', icon: '⚔️',       desc: '下兩回合必定刷新出「增幅彈珠」，且增幅彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'damage',  maxStacks: 1, recommended: true, tags: ['伤害爆发', '属性强化'], recommendTip: '快速将钉子同化为增幅属性，爆发期间伤害大幅飙升！' },
     { id: 'surge_cryo',    name: '冰霜涌潮', icon: '❄️',       desc: '下兩回合必定刷新出「冰霜彈珠」，且冰霜彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'cryo',    maxStacks: 1 },
     { id: 'surge_pyro',    name: '火焰涌潮', icon: '🔥',       desc: '下兩回合必定刷新出「火焰彈珠」，且火焰彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'pyro',    maxStacks: 1 },
 ];

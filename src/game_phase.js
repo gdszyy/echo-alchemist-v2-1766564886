@@ -905,8 +905,10 @@ phase_gathering_getRandomPegType() {
         }
 
         this.isEnemyTurn = false;
-        // 遗物事件检查
-        if (this.round % CONFIG.gameplay.relicRoundInterval == 0) {
+        // 遗物事件检查：从第3回合起，每5回合触发一次（第3、8、13、18...回合）
+        // 初始回合的遗物选择由 sys_initGameStart 直接调用 ui_showRelicSelection 处理
+        const isRelicRound = this.round >= 3 && (this.round - 3) % 5 === 0;
+        if (isRelicRound) {
             if (this._pendingBossRelic) {
                 // [串行遗物] Boss 遗物待领取，将固定遗物事件存入标志位。
                 // ui_closeRelicSelection 关闭 Boss 遗物后会检测此标志并自动串行弹出固定遗物事件。

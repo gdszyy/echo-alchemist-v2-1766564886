@@ -1637,15 +1637,114 @@
             overflow: hidden;
         }
 
-        /* 稀有度光效 */
-        .relic-card.rare { border-color: #3b82f6; } /* 蓝色 */
-        .relic-card.rare:hover { box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.3); }
+        /* 稀有度光效 —— 增强版 */
 
-        .relic-card.legendary { border-color: #facc15; } /* 金色 */
-        .relic-card.legendary:hover { box-shadow: 0 10px 30px -10px rgba(250, 204, 21, 0.5); }
+        /* 常规遗物：蓝色边框 + 脉冲光效 */
+        @keyframes rare-pulse {
+            0%   { box-shadow: 0 0 8px 1px rgba(59, 130, 246, 0.25), 0 0 0 0 rgba(59, 130, 246, 0.15); }
+            50%  { box-shadow: 0 0 18px 4px rgba(59, 130, 246, 0.55), 0 0 0 6px rgba(59, 130, 246, 0.05); }
+            100% { box-shadow: 0 0 8px 1px rgba(59, 130, 246, 0.25), 0 0 0 0 rgba(59, 130, 246, 0.15); }
+        }
+        .relic-card.rare {
+            border-color: #3b82f6;
+            border-width: 2px;
+            animation: rare-pulse 2.8s ease-in-out infinite;
+        }
+        .relic-card.rare:hover {
+            box-shadow: 0 10px 35px -8px rgba(59, 130, 246, 0.6);
+            border-color: #60a5fa;
+            animation: none;
+        }
 
-        .relic-card.cursed { border-color: #ef4444; } /* 红色 */
-        .relic-card.cursed:hover { box-shadow: 0 10px 30px -10px rgba(239, 68, 68, 0.4); }
+        /* 传奇遗物：金色边框 + 强烁光效 + 光晓扫描 */
+        @keyframes legendary-glow {
+            0%   { box-shadow: 0 0 12px 2px rgba(250, 204, 21, 0.4), inset 0 0 12px rgba(250, 204, 21, 0.05); }
+            40%  { box-shadow: 0 0 28px 8px rgba(250, 204, 21, 0.75), inset 0 0 20px rgba(250, 204, 21, 0.12); }
+            100% { box-shadow: 0 0 12px 2px rgba(250, 204, 21, 0.4), inset 0 0 12px rgba(250, 204, 21, 0.05); }
+        }
+        @keyframes legendary-shimmer {
+            0%   { background-position: -200% center; }
+            100% { background-position: 200% center; }
+        }
+        .relic-card.legendary {
+            border-color: #facc15;
+            border-width: 2px;
+            animation: legendary-glow 2.2s ease-in-out infinite;
+            background: linear-gradient(180deg, rgba(40, 35, 15, 0.97) 0%, rgba(15, 12, 3, 0.99) 100%);
+        }
+        .relic-card.legendary::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 12px;
+            background: linear-gradient(105deg, transparent 40%, rgba(250, 204, 21, 0.12) 50%, transparent 60%);
+            background-size: 200% 100%;
+            animation: legendary-shimmer 3s linear infinite;
+            pointer-events: none;
+        }
+        .relic-card.legendary:hover {
+            box-shadow: 0 12px 40px -8px rgba(250, 204, 21, 0.8);
+            border-color: #fde68a;
+            animation: none;
+        }
+        .relic-card.legendary .relic-name { color: #fde68a; }
+        .relic-card.legendary .relic-icon { filter: drop-shadow(0 0 10px rgba(250, 204, 21, 0.7)); }
+
+        /* 诅咒遗物：红色边框 + 闪烁效果 */
+        @keyframes cursed-flicker {
+            0%, 100% { box-shadow: 0 0 8px 1px rgba(239, 68, 68, 0.3); }
+            30%       { box-shadow: 0 0 20px 5px rgba(239, 68, 68, 0.6); }
+            60%       { box-shadow: 0 0 10px 2px rgba(239, 68, 68, 0.4); }
+        }
+        .relic-card.cursed {
+            border-color: #ef4444;
+            border-width: 2px;
+            animation: cursed-flicker 3.5s ease-in-out infinite;
+        }
+        .relic-card.cursed:hover {
+            box-shadow: 0 10px 35px -8px rgba(239, 68, 68, 0.7);
+            animation: none;
+        }
+
+        /* ==================== 遗物推荐标签与 Tip 样式 ==================== */
+        .relic-recommend-badge {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 2px 8px;
+            background: linear-gradient(90deg, rgba(251, 191, 36, 0.2), rgba(251, 191, 36, 0.1));
+            border: 1px solid rgba(251, 191, 36, 0.6);
+            border-radius: 20px;
+            color: #fbbf24;
+            font-size: 0.65rem;
+            font-weight: bold;
+            letter-spacing: 0.05em;
+        }
+        .relic-tags {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 4px;
+            margin-top: 5px;
+        }
+        .relic-tag {
+            padding: 1px 6px;
+            background: rgba(100, 116, 139, 0.3);
+            border: 1px solid rgba(100, 116, 139, 0.5);
+            border-radius: 10px;
+            color: #94a3b8;
+            font-size: 0.6rem;
+        }
+        .relic-tip {
+            margin-top: 6px;
+            padding: 5px 8px;
+            background: rgba(30, 58, 138, 0.25);
+            border-left: 2px solid rgba(96, 165, 250, 0.6);
+            border-radius: 0 6px 6px 0;
+            color: #93c5fd;
+            font-size: 0.65rem;
+            line-height: 1.4;
+            text-align: left;
+        }
          /* --- 针对移动端横屏/矮屏幕的终极适配 --- */
         @media (max-height: 600px) {
             .select-card {

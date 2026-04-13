@@ -157,7 +157,7 @@ for (const subsystem of _subsystems) {
 | 函数 | 描述 |
 |---|---|
 | `ui_renderShop()` | 渲染商店物品列表 |
-| `ui_showRelicSelection()` | 显示遗物选择界面 |
+| `ui_showRelicSelection()` | 显示遗物选择界面（前三次自动提升推荐遗物权重并展示推荐标签/Tip） |
 | `ui_selectRelic(relic)` | 选择并获取遗物（参数为遗物对象） |
 | `ui_skipRelic()` | 跳过遗物选择 |
 | `ui_closeRelicSelection()` | 关闭遗物选择界面 |
