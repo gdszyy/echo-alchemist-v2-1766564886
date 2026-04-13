@@ -1,6 +1,6 @@
 # UI 系统规范文档
 
-> 最后更新：2026-04-13（敌人动作后符文领取动画）
+> 最后更新：2026-04-13（局内存档与继续游戏功能）
 
 ## 1. 模块架构概述
 
@@ -83,7 +83,8 @@ for (const subsystem of _subsystems) {
 | 2026-04-12 | `src/core.js`, `src/game_system.js`, `src/game_phase.js` | 初始特殊槽为 `['skill_point','wheel']` 且 `slotCount=1`，每局只随机生成 1 个技能点或幸运轮盘槽 | 将 `unlockedSlots` 改为 `['skill_point', 'multicast']`，`slotCount` 改为 `2`；同时将 `game_phase.js` 中槽类型分配从随机改为按顺序（`slotTypes[createdCount % slotTypes.length]`），确保每局初始生成 1 个技能点槽 + 1 个加连击槽 |
 | 2026-04-13 | `src/config.js`, `src/core.js`, `src/game_system.js`, `src/ui/rune_launcher.js`, `src/combat_system.js`, `src/game_phase.js`, `src/ui_system.js`, `src/systems.js`, `src/combat/damage_calc.js`, `src/entities/enemy.js`, `src/entities/projectile.js` | 技能系统重构 | 1. `SKILL_DB` 中的技能改为通过符文组合（`unlockRuneword`）解锁派生，新增 6 个新技能。2. `core.js` 和 `game_system.js` 初始 `unlockedSlots` 移除 `skill_point`，`slotCount` 改为 1，并新增 `activeSkills` 数组。3. `rune_launcher.js` 中激活符文时动态派生 `activeSkills`，有技能时才向 `unlockedSlots` 注入 `skill_point` 并增加 `slotCount`。4. `game_phase.js` 生成特殊槽时，若无技能则过滤掉 `skill_point` 槽。5. `ui_system.js` 中技能杠和 SP 面板仅在有已解锁技能时显示。6. `combat_system.js` 增加新技能逻辑，支持冻结加伤、全屏落雷、弹跳加伤、强制过热、剑刃雨和强制元素聚变。 |
 | 2026-04-13 | `src/game_phase.js`, `src/combat_system.js`, `src/ui/hud.js`, `index.html` | 回合结算时领取的充能符文和掉落符文没有专门的领取时机，玩家不知道获得了哪些符文 | 新增 `phase_claimPendingRunes()` 方法，在敌人动作后（`enemyTurnTimer > 60`）先领取充能符文和掉落符文并触发 `UI_RUNE_CLAIM_AFTER_ENEMY` 事件，再延迟 600ms 进入 `phase_finalizeRound()`；`hud.js` 监听该事件，对每个符文创建飞入背包动画（充能符文从充能槽飞出，掉落符文从场地位置飞出，终点均为符文库存区域）；`index.html` 新增 `runeClaimFlyToBag` 动画支持任意 XY 方向飞行 |
-| 2026-04-13 | `src/tutorial_system.js` | 战斗阶段引导窗口（`combat_intro` 步骤）居中全屏遮罩，完全挡住战斗界面，且未教学如何发射子弹 | 将 `position` 改为 `'bottom-fixed'`（固定在底部不遮挡战斗区域），`noOverlay` 改为 `true`（移除全屏遮罩），`waitForEvent` 改为 `EVENT_TYPES.UI_AMMO_FIRED`（等玩家实际发射后自动推进），并在内容中添加「按住并拖拽画布，瞄准后松手发射」的操作说明 |
+| 2026-04-13 | `src/tutorial_system.js` | 战斗阶段引导窗口（`combat_intro` 步骤）居中全屏遗罩，完全挡住战斗界面，且未教学如何发射子弹 | 将 `position` 改为 `'bottom-fixed'`（固定在底部不遗挡战斗区域），`noOverlay` 改为 `true`（移除全屏遗罩），`waitForEvent` 改为 `EVENT_TYPES.UI_AMMO_FIRED`（等玩家实际发射后自动推进），并在内容中添加「按住并拖拽画布，瞄准后松手发射」的操作说明 |
+| 2026-04-13 | `src/game_system.js`, `src/game_phase.js`, `src/ui_system.js`, `src/ui/game_over.js`, `index.html` | 刷新页面后局内进度全部丢失 | 新增局内存档系统：`game_system.js` 新增 `sys_saveRunState / sys_loadRunState / sys_clearRunState / sys_hasRunState` 四个方法，将全量局内状态（enemies、pegs、ownedRelics、runeGrid、Boss系统、难度字段等）序列化到 localStorage（key: `echo_alchemist_run_state`）；`game_phase.js` 的 `phase_finalizeRound` 在 ammoQueue 为空时自动调用 `sys_saveRunState()`；`game_over.js` 的 `_gameover_triggerPhase` 调用 `sys_clearRunState()` 游戏结束时清除存档；`ui_system.js` 的 `meta_startRun` 新开一局时清除旧存档，新增 `meta_continueRun`（继续游戏入口）和 `meta_updateContinueButton`（检测存档并更新按鈕显隐）；`ui_updateUI` 进入 meta 阶段时同步调用 `meta_updateContinueButton`；`index.html` 在「開始煉成」按鈕下方新增「继续上次游戲」按鈕（id: `meta-continue-btn`，默认隐藏） |
 | 2026-04-12 | `src/systems.js`, `src/ui/shop.js` | 生产环境在缺失部分 UI 元素时启动崩溃或运行时报错：`UIManager`、`TruthBook`、`TrainingGround` 及 `shop_system` 在访问不存在的 DOM 节点（如 `#phase-training`、`#relic-container`）时未作空值保护，导致脚本中断。 | 为 `systems.js` 中的三个 UI 类及 `shop.js` 中的所有方法添加了全面的空值防御（null guards）；统一了 `shop.js` 的接口名为 `meta_buyUpgrade` 并修正参数传递。 |
 
 ## 6. 修改规范
@@ -124,7 +125,9 @@ for (const subsystem of _subsystems) {
 | `ui_confirmSelection()` | 确认弹珠选择 |
 | `meta_applyUpgrades()` | 应用升级效果 |
 | `meta_addCurrency(amount)` | 增加局外货币 |
-| `meta_startRun()` | 开始新一局游戏 |
+| `meta_startRun()` | 开始新一局游戏（同时清除旧存档） |
+| `meta_continueRun()` | 继续上次游戏（读取 localStorage 存档并恢复状态） |
+| `meta_updateContinueButton()` | 检测存档并更新「继续游戏」按鈕显隐及回合数显示 |
 | `meta_openShop()` | 打开商店 |
 | `meta_calculateUpgradeCost(upgrade, level)` | 计算升级费用 |
 | `meta_buyUpgrade(upgradeId)` | 购买升级 |

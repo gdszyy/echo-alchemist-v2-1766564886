@@ -24,8 +24,15 @@ globs: ["src/game_phase.js"]
 - **职责**: 使用收集到的弹药队列攻击敌人，进行回合制结算。
 - **入口**: 研磨阶段结束，弹药队列生成，敌人刷新。
 - **出口**: 
-  - 胜利: 敌人血量清零，触发掉落结算，进入下一回合的命运抉择阶段。
-  - 失败: 玩家防线被突破，游戏结束 (Game Over)。
+  - 胜利: 敌人血量清零，触发掉落结算，`phase_finalizeRound()` 在 `ammoQueue` 为空时自动调用 `sys_saveRunState()` 将局内全量状态写入 `localStorage`，然后进入下一回合的命运抉择阶段。
+  - 失败: 玩家防线被突破，调用 `sys_clearRunState()` 清除局内存档，游戏结束 (Game Over)。
+
+### 2.4 局内存档与刷新恢复
+- **存档时机**: `phase_finalizeRound()` 末尾，`round++` 之后、`sys_initSelectionPhase()` 之前。
+- **存档内容**: round、score、enemies（含 Vec2 坐标）、pegs（type/level/frozenTurns）、ownedRelics、runeInventory、runeGrid、unlockedWeights、guaranteedNextRound、Boss 系统字段、难度字段、钉盘形态、技能、统计数据等。
+- **恢复入口**: Meta 页面「繼續上次游戲」按钮（`#meta-continue-btn`），调用 `meta_continueRun()`。
+- **恢复流程**: `sys_resetGame()` + `meta_applyUpgrades()` → 注入存档状态 → `phase_gathering_initPachinko(true)` 重建钉盘 → `sys_initSelectionPhase()` 进入选牌阶段。
+- **清档时机**: 游戏结束（`_gameover_triggerPhase`）或新开一局（`meta_startRun`）时自动清除。
 
 ## 3. 阶段转换规范
 - **清理与重置**: 每次阶段切换（`phase_switchPhase`）时，必须彻底清理上一个阶段的残留状态（如清空粒子特效容器、重置物理引擎状态）。
