@@ -930,6 +930,11 @@ phase_gathering_getRandomPegType() {
             const { bossId, isBigBoss } = this._pendingBossSpawn;
             this._pendingBossSpawn = null;
             this.spawn_spawnBoss(bossId, isBigBoss);
+            // [Boss 调度] 记录本次 Boss 生成回合，用于计算击杀用时
+            this._lastBossSpawnRound = this.round;
+            if (!this._bossSpawnCount) this._bossSpawnCount = 0;
+            this._bossSpawnCount++;
+            console.log(`[BossSchedule] Boss #${this._bossSpawnCount} 已在 Round ${this.round} 生成`);
         }
 
         this.isEnemyTurn = false;

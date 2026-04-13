@@ -53,17 +53,26 @@ globs: ["src/game_phase.js"]
 ## 5. Boss 系统规范
 
 ### 4.1 Boss 回合触发规则
-- **Round 5**: 固定触发第一个 Mini-Boss
-- **Round 9-11**: 每回合 33% 概率随机触发 Mini-Boss
-- **Round 15**: 固定触发第一个大 Boss
-- **Round 20+**: 每 5 回合循环触发大 Boss
+- **第一个 Boss**：固定在 Round 5
+- **后续 Boss**：基础间隔为 7-9 回合（均匀随机），并根据玩家击杀上个 Boss 的速度动态延期
+- **延期规则**：快速击杀（≤ 2 回合）延期 2 回合；中速（3 回合）延期 1 回合；慢速（≥ 4 回合）不延期
+- **延期限制**：第三个 Boss 之后（已生成数量 >= 3）不再延期，固定使用 7-9 回合基础间隔
+- **Boss 类型**：第 1-3 个为 Mini-Boss，第 4 个起为大 Boss
 
 ### 4.2 Boss 生成流程
-1. `phase_finalizeRound` 在 `round++` 之前检测下一回合是否为 Boss 回合
+1. `phase_finalizeRound` 在 `round++` 之前检测下一回合是否为 Boss 回合（与 `_nextBossRound` 匹配）
 2. 若是 Boss 回合，将生成信息存入 `this._pendingBossSpawn`
 3. `round++` 执行后，检查 `_pendingBossSpawn` 并调用 `spawn_spawnBoss`
-4. Boss 回合不生成普通敌人行
-5. **选择性清场**：`spawn_spawnBoss` 出场时，仅移除与 Boss 最终落点区域（AABB）发生重叠的敌人，保留其余敌人。这确保了玩家前期战斗对场面的影响（如冻结、血量耗损）仍有意义。Boss 占据区域：水平中心为 `centerX`，宽 `bossW = enemyWidth * 3`，高 `bossH = enemyHeight * 2`，垂直中心为 `spawnY`。
+4. Boss 生成后记录 `_lastBossSpawnRound`（生成回合）和 `_bossSpawnCount`（已生成数量）
+5. Boss 回合不生成普通敌人行
+6. **选择性清场**：`spawn_spawnBoss` 出场时，仅移除与 Boss 最终落点区域（AABB）发生重叠的敌人，保留其余敌人。这确保了玩家前期战斗对场面的影响（如冻结、血量耗损）仍有意义。Boss 占据区域：水平中心为 `centerX`，宽 `bossW = enemyWidth * 3`，高 `bossH = enemyHeight * 2`，垂直中心为 `spawnY`。
+
+**Boss 调度相关状态变量**：
+| 变量名 | 说明 | 初始化位置 |
+|---|---|---|
+| `_nextBossRound` | 下一个 Boss 预定出现的回合数 | `sys_resetGame` 中置 null，首次调用 `spawn_checkBossRoundFor` 时自动初始化 |
+| `_lastBossSpawnRound` | 上一个 Boss 生成时的回合数 | `sys_resetGame` 中置 null，在 Boss 生成后由 `game_phase.js` 设置 |
+| `_bossSpawnCount` | 本局已生成的 Boss 数量 | `sys_resetGame` 中置 0，在 Boss 生成后由 `game_phase.js` 自增 |
 
 ### 4.2.1 Boss 出场演出时机（重要）
 

@@ -1190,77 +1190,60 @@ export const spawn_system = {
     // =========================================
 
     /**
+     * @method spawn_scheduleNextBoss
+     * @description 预计算下一个 Boss 应在哪个回合出现，并将结果存入 this._nextBossRound。
+     *   - 第一个 Boss：固定在 Round firstBoss（默认 5）
+     *   - 后续 Boss：基础间隔为 [intervalMin, intervalMax] 随机回合，加上延期回合数
+     *   - 延期规则：第三个 Boss 之后（bossSpawnCount >= delayMaxBossIndex）不再延期
+     * @param {number} [extraDelay=0] - 额外延期回合数（由 boss:defeated 事件根据击杀速度计算后传入）
+     */
+    spawn_scheduleNextBoss(extraDelay = 0) {
+        const cfg = CONFIG.balance.bossRounds;
+        if (!cfg) return;
+
+        // 第一个 Boss 固定回合
+        if (!this._bossSpawnCount || this._bossSpawnCount === 0) {
+            this._nextBossRound = cfg.firstBoss || 5;
+            console.log(`[BossSchedule] 第一个 Boss 预定在 Round ${this._nextBossRound}`);
+            return;
+        }
+
+        // 后续 Boss：基础间隔随机，加上延期
+        const intervalMin = cfg.intervalMin || 7;
+        const intervalMax = cfg.intervalMax || 9;
+        const baseInterval = intervalMin + Math.floor(Math.random() * (intervalMax - intervalMin + 1));
+        const lastSpawnRound = this._lastBossSpawnRound || this.round;
+        this._nextBossRound = lastSpawnRound + baseInterval + extraDelay;
+        console.log(`[BossSchedule] 下一个 Boss 预定在 Round ${this._nextBossRound}（基础间隔=${baseInterval}, 延期=${extraDelay}, 上次生成回合=${lastSpawnRound}）`);
+    },
+
+    /**
      * @method spawn_checkBossRoundFor
      * @description 检测指定回合数是否应触发 Boss（供 game_phase.js 使用）。
+     *   采用预计算的 _nextBossRound 进行匹配。
      * @param {number} round - 要检测的回合数
      * @returns {{ shouldSpawn: boolean, isBigBoss: boolean }}
      */
     spawn_checkBossRoundFor(round) {
-        const r = round;
-        const bossRounds = CONFIG.balance.bossRounds;
-        if (!bossRounds) return { shouldSpawn: false, isBigBoss: false };
-
-        if (r === bossRounds.miniBoss[0]) {
-            return { shouldSpawn: true, isBigBoss: false };
+        // 如果 _nextBossRound 尚未初始化（游戏开始第一次），先调度
+        if (this._nextBossRound === undefined || this._nextBossRound === null) {
+            this.spawn_scheduleNextBoss(0);
         }
-
-        const [minR, maxR] = bossRounds.miniBoss[1];
-        if (r >= minR && r <= maxR) {
-            if (Math.random() < 0.33) {
-                return { shouldSpawn: true, isBigBoss: false };
-            }
+        if (round === this._nextBossRound) {
+            // 第四个 Boss 起为大 Boss（第 1-3 个为 Mini-Boss）
+            const isBigBoss = (this._bossSpawnCount || 0) >= 3;
+            return { shouldSpawn: true, isBigBoss };
         }
-
-        if (r === bossRounds.bigBoss) {
-            return { shouldSpawn: true, isBigBoss: true };
-        }
-
-        if (r > bossRounds.bigBoss && (r - bossRounds.bigBoss) % bossRounds.cycleInterval === 0) {
-            return { shouldSpawn: true, isBigBoss: true };
-        }
-
         return { shouldSpawn: false, isBigBoss: false };
     },
 
     /**
      * @method spawn_checkBossRound
-     * @description 检测当前回合是否应触发 Boss。
-     * 触发规则：
-     *   - Round 5: 固定 Mini-Boss
-     *   - Round 9-11: 每回合 33% 概率随机 Mini-Boss
-     *   - Round 15: 固定大 Boss
-     *   - Round 20+: 每 5 回合循环大 Boss
+     * @description 检测当前回合是否应触发 Boss（直接使用 this.round）。
      * @returns {{ shouldSpawn: boolean, isBigBoss: boolean }}
      */
     spawn_checkBossRound() {
-        const r = this.round;
-        const bossRounds = CONFIG.balance.bossRounds;
-        if (!bossRounds) return { shouldSpawn: false, isBigBoss: false };
-
-        // Round 5: 固定 Mini-Boss
-        if (r === bossRounds.miniBoss[0]) {
-            return { shouldSpawn: true, isBigBoss: false };
-        }
-
-        // Round 9-11: 随机 Mini-Boss，每回合 33%
-        const [minR, maxR] = bossRounds.miniBoss[1];
-        if (r >= minR && r <= maxR) {
-            if (Math.random() < 0.33) {
-                return { shouldSpawn: true, isBigBoss: false };
-            }
-        }
-
-        // Round 15: 固定大 Boss
-        if (r === bossRounds.bigBoss) {
-            return { shouldSpawn: true, isBigBoss: true };
-        }
-
-        // Round 20+: 每 5 回合循环大 Boss
-        if (r > bossRounds.bigBoss && (r - bossRounds.bigBoss) % bossRounds.cycleInterval === 0) {
-            return { shouldSpawn: true, isBigBoss: true };
-        }
-
-        return { shouldSpawn: false, isBigBoss: false };
+        return this.spawn_checkBossRoundFor(this.round);
     },
 
     /**

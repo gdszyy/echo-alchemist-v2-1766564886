@@ -496,9 +496,16 @@ const CONFIG = {
         // =========================================
         /** Boss 出现回合配置 */
         bossRounds: {
-            miniBoss: [5, [9, 11]],   // 固定 Round 5，以及 9-11 随机区间
-            bigBoss: 15,              // 首个大 Boss 固定 Round 15
-            cycleInterval: 5          // Round 20+ 每 5 回合循环一次
+            firstBoss: 5,             // 第一个 Boss 固定在 Round 5
+            intervalMin: 7,           // 后续 Boss 最小间隔回合数
+            intervalMax: 9,           // 后续 Boss 最大间隔回合数
+            // 延期机制：根据玩家击杀上个 Boss 的速度动态延期
+            // 快速击杀（≤ 2 回合）：延期 2 回合；中速（3 回合）：延期 1 回合；慢速（≥ 4 回合）：不延期
+            delayFastKillThreshold: 2,  // 快速击杀阈值（回合数）
+            delayFastKillRounds: 2,     // 快速击杀时延期回合数
+            delayMidKillThreshold: 3,   // 中速击杀阈值（回合数）
+            delayMidKillRounds: 1,      // 中速击杀时延期回合数
+            delayMaxBossIndex: 3,       // 第几个 Boss 之后不再延期（含）：第 3 个 Boss 之后（即第 4 个起）不延期
         },
 
         /** Boss 血量公式参数 */

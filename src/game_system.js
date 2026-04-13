@@ -227,6 +227,10 @@ export const game_system = {
         // 重置 Boss 系统状态
         this.bossHistory = [];
         this._pendingBossSpawn = null;
+        // [Boss 调度] 重置动态间隔调度状态
+        this._nextBossRound = null;      // 下一个 Boss 预定回合
+        this._lastBossSpawnRound = null; // 上一个 Boss 生成回合
+        this._bossSpawnCount = 0;        // 已生成 Boss 数量
         // 重置 遗物串行标志
         this._pendingBossRelic = false;
         this._pendingRelicEvent = false;
