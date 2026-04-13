@@ -232,6 +232,8 @@ export const game_system = {
         this._pendingRelicEvent = false;
         // 重置 遗物选择计数器（用于前三次推荐逻辑）
         this.relicSelectionCount = 0;
+        // 重置 炼金火药管平坦伤害加成
+        this.flatDamageBonus = 0;
         // 重置 敌人动作后符文领取标志
         this._runeClaimPending = false;
         // [难度平衡] 重置战后高压因子
@@ -781,10 +783,41 @@ export const game_system = {
                 break;
             }
         }
-        if (hit) {
+         if (hit) {
             this.ui.showEnemyInfo(hit);
         }
         return hit;
     },
 
+    /**
+     * @method _calcDesperationMult
+     * @description [绝境之刃] 计算当前最近敌人距离失败线的格数，返回伤害倍率。
+     * 距离 0 格: x1.5，距离 1 格: x1.25，距离 2 格: x1.125，距离 3 格以上: x1.0
+     * @returns {number} 伤害倍率（最小为 1.0）
+     */
+    _calcDesperationMult() {
+        if (!this.enemies || this.enemies.length === 0) return 1.0;
+        const viewShiftY = this.boardTilt ? this.boardTilt.current.y * -20 : 0;
+        const defeatY = this.defeatLineY || (this.height - 120);
+        const enemyH = this.enemyHeight || 50;
+
+        // 找到最靠近失败线的活跃敌人
+        let minDist = Infinity;
+        for (const e of this.enemies) {
+            if (!e.active) continue;
+            const ey = e.pos.y + viewShiftY;
+            const dist = defeatY - ey; // 距离失败线的像素距离
+            if (dist < minDist) minDist = dist;
+        }
+
+        // 将像素距离转换为格数（以 enemyHeight 为一格）
+        const gridDist = minDist / enemyH;
+
+        // 按格数返回倍率：0格 +50%, 1格 +25%, 2格 +12.5%, 3格以上无加成
+        if (gridDist < 0.5)       return 1.50;  // 0 格（几乎贴着失败线）
+        else if (gridDist < 1.5)  return 1.25;  // 1 格
+        else if (gridDist < 2.5)  return 1.125; // 2 格
+        else if (gridDist < 3.5)  return 1.0625;// 3 格（轻微加成，让玩家感知到效果）
+        return 1.0; // 3 格以上：无加成
+    },
 };

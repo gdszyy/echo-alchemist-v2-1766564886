@@ -14,6 +14,7 @@
  */
 
 import { META_SHOP_CONFIG, CONFIG, RELIC_DB, BOARD_STRUCTURE_RELICS } from '../config.js';
+import { RUNE_DB } from '../rune_config.js';
 import { showToast } from '../entities.js';
 import { eventBus } from '../event_bus.js';
 
@@ -44,10 +45,24 @@ export const shop_system = {
             return count < max;
         });
 
-        // 钉盘结构遗物互斥：若玩家本局已选过任意一个钉盘结构遗物，则排除所有其他钉盘结构遗物
-        const hasBoardStructureRelic = (this.ownedRelics || []).some(id => BOARD_STRUCTURE_RELICS.has(id));
-        if (hasBoardStructureRelic) {
+        // 钉盘结构遗物互斥规则：
+        // - 行数遗物（dimension_shard / dimension_crystal）可叠加，但两者互斥（选了其中一个就不能选另一个）
+        // - 布局遗物（triangle/diamond/sparse/mirror_sync/wide_narrow）全局互斥
+        const LAYOUT_RELICS = new Set(['triangle_formation','diamond_formation','sparse_interval','mirror_sync','wide_narrow']);
+        const ROW_RELICS = new Set(['dimension_shard','dimension_crystal']);
+        const ownedSet = new Set(this.ownedRelics || []);
+        const hasLayoutRelic = [...ownedSet].some(id => LAYOUT_RELICS.has(id));
+        const ownedRowRelic = [...ownedSet].find(id => ROW_RELICS.has(id)); // 已拥有的行数遗物类型
+        if (hasLayoutRelic) {
+            // 已选布局遗物：排除所有布局和行数遗物
             pool = pool.filter(r => !BOARD_STRUCTURE_RELICS.has(r.id));
+        } else if (ownedRowRelic) {
+            // 已选行数遗物：排除布局遗物和另一种行数遗物，但允许叠加相同的行数遗物
+            pool = pool.filter(r => {
+                if (LAYOUT_RELICS.has(r.id)) return false; // 排除布局遗物
+                if (ROW_RELICS.has(r.id) && r.id !== ownedRowRelic) return false; // 排除另一种行数遗物
+                return true;
+            });
         }
         
         // 如果池子空了（全收集了），就给一些保底的或者是空的
@@ -177,6 +192,19 @@ export const shop_system = {
         } else if (relic.effect === 'row_count_up') {
             this.currentRows = (this.currentRows || 0) + 2;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
+        } else if (relic.effect === 'row_count_up_1') {
+            // 维度碎片（rare）：每次只加 1 行
+            this.currentRows = (this.currentRows || 0) + 1;
+            if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
+        } else if (relic.effect === 'flat_damage_up') {
+            // 炼金火药管：所有弹珠基础伤害 +N
+            const val = relic.flatDamageValue || 2;
+            this.flatDamageBonus = (this.flatDamageBonus || 0) + val;
+            if (window.showToast) showToast(`炼金火药管已装填！基础伤害 +${val}。`);
+        } else if (relic.effect === 'grant_runes') {
+            // 走私者系列：立即给予指定稀有度的符文
+            this._grantRunesByRarity(relic.grantRarity || 'common', relic.grantCount || 2);
+            if (window.showToast) showToast(`获得 ${relic.grantCount} 个${relic.grantRarity === 'common' ? '普通' : relic.grantRarity === 'rare' ? '稀有' : relic.grantRarity === 'epic' ? '史诗' : '传说'}符文！`);
         } else if (relic.effect === 'board_layout_triangle') {
             this.boardLayout = 'triangle';
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
@@ -364,5 +392,32 @@ export const shop_system = {
                 itemsContainer.appendChild(card);
             });
         }
-    }
+    },
+
+    /**
+     * 走私者系列辅助方法：按稀有度立即给予符文
+     * @param {string} rarity - 'common' | 'rare' | 'epic' | 'legendary'
+     * @param {number} count - 给予数量
+     */
+    _grantRunesByRarity(rarity, count) {
+        try {
+            // 直接使用模块级导入的 RUNE_DB
+            const pool = RUNE_DB.filter(r => r.rarity === rarity);
+            if (pool.length === 0) {
+                console.warn('[_grantRunesByRarity] 没有匹配的符文：', rarity);
+                return;
+            }
+            if (!this.runeInventory) this.runeInventory = [];
+            if (!this.runeLootItems) this.runeLootItems = [];
+            for (let i = 0; i < count; i++) {
+                const picked = pool[Math.floor(Math.random() * pool.length)];
+                // 直接添加到背包（跳过掉落动画）
+                this.runeInventory.push({ id: picked.id, level: 1 });
+            }
+            // 触发 UI 更新
+            if (typeof this.ui_updateRuneInventory === 'function') this.ui_updateRuneInventory();
+        } catch(e) {
+            console.error('[_grantRunesByRarity] 异常:', e);
+        }
+    },
 };

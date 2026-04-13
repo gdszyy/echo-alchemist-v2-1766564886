@@ -700,7 +700,8 @@ const CONFIG = {
 // ==================== 钉盘结构遗物互斥集合 ====================
 // 所有影响钉盘结构（行数、布局形态）的遗物 ID，单局内只能选择其中一个
 const BOARD_STRUCTURE_RELICS = new Set([
-    'dimension_shard',       // 行数遗物：增加钉盘行数
+    'dimension_shard',       // 行数遗物：增加钉盘行数（1行）
+    'dimension_crystal',     // 行数遗物：增加钉盘行数（2行）
     'triangle_formation',    // 布局遗物：三角阵形
     'diamond_formation',     // 布局遗物：菱形阵形
     'sparse_interval',       // 布局遗物：稀疏间隔
@@ -733,16 +734,25 @@ const RELIC_DB = [
     slotType: 'wheel',
     maxStacks: 1
     },
+    // 维度碎片拆分为 rare(+1行×3) 和 legendary(+2行×2)
     { 
         id: 'dimension_shard', 
-        name: '維度磎片', 
+        name: '維度碎片', 
         icon: '🌌', 
-        desc: '收集階段：釘板高度延伸，額外增加 2 行釘子。', 
+        desc: '收集階段：釘板高度延伸，額外增加 1 行釘子。（最多疊加 3 次）', 
         rarity: 'rare', 
-        effect: 'row_count_up', maxStacks: 1,
+        effect: 'row_count_up_1', maxStacks: 3,
         recommended: true,
         tags: ['收益增幅', '新手友好'],
         recommendTip: '更多行釘子意味着每回合可收集更多属性，弹珠伤害将大幅提升！'
+    },
+    { 
+        id: 'dimension_crystal', 
+        name: '維度結晶', 
+        icon: '💠', 
+        desc: '收集階段：釘板高度大幅延伸，額外增加 2 行釘子。（最多疊加 2 次）', 
+        rarity: 'legendary', 
+        effect: 'row_count_up', maxStacks: 2
     },
     { id: 'stars_shines', name: '群星闪烁', icon: '✨', desc: '解鎖 [回响弹珠]：双倍获得连击充能。', rarity: 'rare', unlocks: 'resonance', boost: 8 ,maxStacks: 1},
     { id: 'optical_lens', name: '聚焦透鏡', icon: '🔭', desc: '解鎖 [光球]：發射瞬間穿透的折射光束。', rarity: 'legendary', unlocks: 'laser', boost: 10 ,maxStacks: 1},
@@ -789,11 +799,87 @@ const RELIC_DB = [
     // 每种可同化钉子的弹珠各对应一个遗物
     // 效果：下两回合必定刷新出该种弹珠，且该弹珠的同化概率大幅提升（持續两回合）
     { id: 'surge_bounce',  name: '弹性涌潮', icon: '🔵', desc: '下兩回合必定刷新出「弹性彈珠」，且弹性彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'bounce',  maxStacks: 1 },
-    { id: 'surge_pierce',  name: '穿透涌潮', icon: '↗',       desc: '下兩回合必定刷新出「穿透彈珠」，且穿透彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'legendary',  effect: 'assimilation_surge', marbleType: 'pierce',  maxStacks: 1 },
+    { id: 'surge_pierce',  name: '穿透涌潮', icon: '↗',       desc: '下兩回合必定刷新出「穿透彈珠」，且穿透彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'cursed',  effect: 'assimilation_surge', marbleType: 'pierce',  maxStacks: 1 },
     { id: 'surge_scatter', name: '散射涌潮', icon: '🔱',       desc: '下兩回合必定刷新出「散射彈珠」，且散射彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'legendary',  effect: 'assimilation_surge', marbleType: 'scatter', maxStacks: 1 },
     { id: 'surge_damage',  name: '增幅涌潮', icon: '⚔️',       desc: '下兩回合必定刷新出「增幅彈珠」，且增幅彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'damage',  maxStacks: 1, recommended: true, tags: ['伤害爆发', '属性强化'], recommendTip: '快速将钉子同化为增幅属性，爆发期间伤害大幅飙升！' },
     { id: 'surge_cryo',    name: '冰霜涌潮', icon: '❄️',       desc: '下兩回合必定刷新出「冰霜彈珠」，且冰霜彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'cryo',    maxStacks: 1 },
     { id: 'surge_pyro',    name: '火焰涌潮', icon: '🔥',       desc: '下兩回合必定刷新出「火焰彈珠」，且火焰彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'pyro',    maxStacks: 1 },
+
+    // ==================== 新手前期过渡遗物 ====================
+    // 炼金火药管：所有弹珠基础伤害 +2（可叠加3次），后期自然稀释
+    {
+        id: 'alchemist_powder_tube',
+        name: '炼金火药管',
+        icon: '⚗️',
+        desc: '你的所有弹珠基础伤害 +2。（最多疊加 3 次）',
+        rarity: 'common',
+        effect: 'flat_damage_up',
+        flatDamageValue: 2,
+        maxStacks: 3,
+        recommended: true,
+        tags: ['伤害提升', '新手友好'],
+        recommendTip: '立即提升所有弹珠的基础伤害，前期最稳定的输出加成！'
+    },
+
+    // 走私者系列：立即给予符文（按稀有度分为4个版本）
+    {
+        id: 'smuggler_pouch_common',
+        name: '走私者的行囊',
+        icon: '🎒',
+        desc: '立即获得 2 个随机普通符文。',
+        rarity: 'common',
+        effect: 'grant_runes',
+        grantRarity: 'common',
+        grantCount: 2,
+        maxStacks: 3,
+        recommended: true,
+        tags: ['符文加速', '新手友好'],
+        recommendTip: '立即获得符文，快速激活符文词条，大幅提升战斗力！'
+    },
+    {
+        id: 'smuggler_chest_rare',
+        name: '走私者的宝箱',
+        icon: '📦',
+        desc: '立即获得 2 个随机稀有符文。',
+        rarity: 'rare',
+        effect: 'grant_runes',
+        grantRarity: 'rare',
+        grantCount: 2,
+        maxStacks: 2
+    },
+    {
+        id: 'smuggler_vault_epic',
+        name: '走私者的密库',
+        icon: '🗝️',
+        desc: '立即获得 2 个随机史诗符文。',
+        rarity: 'epic',
+        effect: 'grant_runes',
+        grantRarity: 'epic',
+        grantCount: 2,
+        maxStacks: 1
+    },
+    {
+        id: 'smuggler_sanctum_legendary',
+        name: '走私者的圣所',
+        icon: '🏛️',
+        desc: '立即获得 2 个随机传说符文。',
+        rarity: 'legendary',
+        effect: 'grant_runes',
+        grantRarity: 'legendary',
+        grantCount: 2,
+        maxStacks: 1
+    },
+
+    // 绝境之刃：距离失败线越近，伤害加成越高（距离3格内才有明显加成）
+    {
+        id: 'desperation_blade',
+        name: '绝境之刃',
+        icon: '🩸',
+        desc: '战斗阶段：距离失败线越近，所有子弹伤害加成越高。距离 0 格 +50%，1 格 +25%，2 格 +12.5%，3 格以上无加成。',
+        rarity: 'cursed',
+        effect: 'desperation_damage',
+        maxStacks: 1
+    },
 ];
 
 // ==================== 技能数据库 ====================

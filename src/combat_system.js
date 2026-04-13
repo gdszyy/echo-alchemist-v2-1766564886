@@ -2063,6 +2063,20 @@ export const combat_system = {
             }
         }
 
+        // --- [炼金火药管] 平坦伤害加成 ---
+        if (this.flatDamageBonus && this.flatDamageBonus > 0) {
+            finalRecipe.damage = (finalRecipe.damage || 0) + this.flatDamageBonus;
+        }
+
+        // --- [绝境之刃] 距离失败线越近，伤害加成越高 ---
+        if (this.ownedRelics && this.ownedRelics.includes('desperation_blade')) {
+            const desperationMult = this._calcDesperationMult();
+            if (desperationMult > 1.0) {
+                finalRecipe.damage = Math.ceil((finalRecipe.damage || 1) * desperationMult);
+                finalRecipe._desperationMult = desperationMult; // 保存之前以供调试
+            }
+        }
+
         // --- [Task 3.2] 触发UI动画 - 改为 EventBus 事件，由 hud.js 监听 ---
         eventBus.emit(EVENT_TYPES.UI_AMMO_FIRED, {});
         this.ui_renderRecipeHUD();
