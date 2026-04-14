@@ -1066,7 +1066,37 @@ export const spawn_system = {
         // 注意：散射共鸣的 effectiveRecipe 定义在 if(recipe.scatter > 0) 块内，此处不可访问。
         // 主子弹直接使用原始 recipe，属性共鸣伤害加成已在副子弹中应用。
         shotStats.projectileCount++;
-        const mainRecipe = { ...recipe, isScatterChild: false };
+        let mainRecipe = { ...recipe, isScatterChild: false };
+        // --- [属性共鸣] 弹跳/穿透共鸣：注入 baseBounceBonus / extraBounces / basePierceBonus / extraPierces ---
+        // bounceDecayReduction 通过 _bounceDecayReduction 字段传递给 Projectile，在 combat_system.js 中消费
+        if (mainRecipe.bounce > 0) {
+            const _bounceRes = this.activeElementResonances && this.activeElementResonances['bounce'];
+            const _bounceResP = _bounceRes ? _bounceRes.params : null;
+            if (_bounceResP) {
+                const baseBounceBonus = _bounceResP.baseBounceBonus || 0;
+                const extraBounces = _bounceResP.extraBounces || 0;
+                const bounceDecayReduction = _bounceResP.bounceDecayReduction || 0;
+                mainRecipe = {
+                    ...mainRecipe,
+                    bounce: mainRecipe.bounce + baseBounceBonus + extraBounces,
+                    _bounceDecayReduction: bounceDecayReduction,
+                };
+            }
+        }
+        if (mainRecipe.pierce > 0) {
+            const _pierceRes = this.activeElementResonances && this.activeElementResonances['pierce'];
+            const _pierceResP = _pierceRes ? _pierceRes.params : null;
+            if (_pierceResP) {
+                const basePierceBonus = _pierceResP.basePierceBonus || 0;
+                const extraPierces = _pierceResP.extraPierces || 0;
+                const pierceDecayReduction = _pierceResP.pierceDecayReduction || 0;
+                mainRecipe = {
+                    ...mainRecipe,
+                    pierce: mainRecipe.pierce + basePierceBonus + extraPierces,
+                    _pierceDecayReduction: pierceDecayReduction,
+                };
+            }
+        }
         this.projectiles.push(new Projectile(x, y, vel, mainRecipe, false, shotId, isLast)); 
     },
 

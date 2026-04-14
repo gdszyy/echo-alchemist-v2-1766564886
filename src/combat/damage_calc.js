@@ -217,8 +217,16 @@ export const DamageCalc = {
                 const thunderstormEffect = this.activeRunewordEffects && this.activeRunewordEffects['thunderstorm'];
                 if (thunderstormEffect) {
                     // decayBonus 增加衰减系数（越接近 1.0 衰减越少）
-                    // 限制最大值为 0.95，防止无限伤害
+                    // 限制最大値为 0.95，防止无限伤害
                     decayFactor = Math.min(0.95, decayFactor + (thunderstormEffect.params.decayBonus || 0));
+                }
+                // --- [属性共鸣] 雷霆共鸣：读取 chainDecayReduction，降低闪电链伤害衰减 ---
+                // 三阶共鸣：衰减系数额外 +0.2（默认 0.45 提升至 0.65）
+                const _lightningRes = this.activeElementResonances && this.activeElementResonances['lightning'];
+                const _lightningResParams = _lightningRes ? _lightningRes.params : null;
+                const _chainDecayReduction = _lightningResParams ? (_lightningResParams.chainDecayReduction || 0) : 0;
+                if (_chainDecayReduction > 0) {
+                    decayFactor = Math.min(0.95, decayFactor + _chainDecayReduction);
                 }
 
                 const nextDmg = Math.max(1, Math.floor(dmg * decayFactor));

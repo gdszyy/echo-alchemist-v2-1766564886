@@ -303,8 +303,14 @@ export const CollisionSystem = {
         const laserMultiplier = laserResParams ? (laserResParams.laserMultiplier || 1.0) : 1.0;
 
         // 按穿透顺序施加衰减伤害：第 n 个目标（0-indexed）受到 原始伤害 × 0.5^n
+        // --- [属性共鸣] 穿透共鸣：读取 pierceDecayReduction，降低激光穿透衰减 ---
+        const _pierceResForLaser = this.activeElementResonances && this.activeElementResonances['pierce'];
+        const _pierceResParamsForLaser = _pierceResForLaser ? _pierceResForLaser.params : null;
+        const _laserPierceDecayReduction = _pierceResParamsForLaser ? (_pierceResParamsForLaser.pierceDecayReduction || 0) : 0;
+        // 衰减底数：默认 0.5，共鸣可提升至 0.7（二阶 +0.2）或 0.9（三阶 +0.4）
+        const _laserDecayBase = Math.min(0.95, 0.5 + _laserPierceDecayReduction);
         hits.forEach((hit, index) => {
-            const damageMultiplier = Math.pow(0.5, index);
+            const damageMultiplier = Math.pow(_laserDecayBase, index);
             // [属性共鸣] 应用激光共鸣伤害倍率
             const attenuatedDamage = recipe.damage * damageMultiplier * laserMultiplier;
             // 构造衰减后的配方，仅覆盖 damage 字段，其余属性保持不变
@@ -346,8 +352,12 @@ export const CollisionSystem = {
             const isLastHit  = (index === hits.length - 1);
             const isRefractionTriggerHit = bounce > pierce ? isFirstHit : isLastHit;
             if (refractionAllowed && isRefractionTriggerHit && bouncesLeft > 0 && remainLen > 10) {
-                // 折射概率：(基础 + 每层 bounce 加成) × 层级衰减系数^depth，上限 maxChance
-                const baseChance = Math.min(rfMaxChance, rfBaseChance + bouncesLeft * rfBounceBonus);
+                // 折射概率：(基础 + 每层 bounce 加成 + 共鸣加成) × 层级衰减系数^depth，上限 maxChance
+                // --- [属性共鸣] 激光共鸣：读取 laserRefractionBonus 提升折射基础概率 ---
+                const _laserResForRf = this.activeElementResonances && this.activeElementResonances['laser'];
+                const _laserResParamsForRf = _laserResForRf ? _laserResForRf.params : null;
+                const _laserRfBonus = _laserResParamsForRf ? (_laserResParamsForRf.laserRefractionBonus || 0) : 0;
+                const baseChance = Math.min(rfMaxChance, rfBaseChance + _laserRfBonus + bouncesLeft * rfBounceBonus);
                 const triggerChance = baseChance * Math.pow(rfDepthDecay, refractionDepth);
                 if (Math.random() < triggerChance) {
                     // 在折射半径内寻找合法目标（排除已命中的敌人）

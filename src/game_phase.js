@@ -752,13 +752,19 @@ phase_gathering_getRandomPegType() {
 
         // --- 1. 温度结算逻辑 ---
         // 封装单次温度结算逻辑为函数，便于 berserk 重复执行
+        // --- [属性共鸣] 冰霜共鸣：读取 freezeTempThreshold，动态调整冰冻触发门槛 ---
+        const _cryoRes = this.activeElementResonances && this.activeElementResonances['cryo'];
+        const _cryoResParams = _cryoRes ? _cryoRes.params : null;
+        // 一阶: -60, 二阶: -40, 三阶: -20（默认: -100 必冻 / -50~-100 概率冻）
+        const _freezeHardThreshold = _cryoResParams ? (_cryoResParams.freezeTempThreshold || -100) : -100;
+        const _freezeSoftThreshold = _freezeHardThreshold + 50; // 概率触发起始点（比必冻阈值高50度）
         const _processTempOnce = () => {
             if (e.temp < 0) {
                 let shouldFreeze = false;
-                if (e.temp <= -100) {
+                if (e.temp <= _freezeHardThreshold) {
                     shouldFreeze = true;
-                } else if (e.temp <= -50) {
-                    const chance = (Math.abs(e.temp) - 50) / 50;
+                } else if (e.temp <= _freezeSoftThreshold) {
+                    const chance = (Math.abs(e.temp) - Math.abs(_freezeSoftThreshold)) / 50;
                     if (Math.random() < chance) shouldFreeze = true;
                 }
                 if (shouldFreeze) {
