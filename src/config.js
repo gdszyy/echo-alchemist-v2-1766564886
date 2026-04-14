@@ -450,6 +450,8 @@ const CONFIG = {
     /** 游戏平衡性：敌人与数值 */
     balance: {
         normalPegSecondEnergChancey:0.42,
+        // [镜像同步] 中轴线特殊钉子：弹珠撞击后在对称位置复制弹珠的概率
+        mirrorAxisCloneChance: 0.35,
         // 敌人血量 = (baseHp + 当前回合数 * hpPerRound) * 指数因子 * 难度系数
         // [修改] 提高基础血量，降低线性斜率，依靠指数在后期发力
         enemyBaseHp: 10,       // 原 5 -> 稍微提高基础，防止第1回合太脆
@@ -838,7 +840,7 @@ const RELIC_DB = [
     // 策略3：稀疏间隔 - 通道流（宽窄行交替，形成弹珠通道）
     { id: 'sparse_interval', name: '稀疏間隔', icon: '〰️', desc: '偶數行正常列數，奇數行減 4 列形成寬窄通道。「通道蓄力」：弹珠穿越窄行未碰撞任何釘子時，下次碰撞收集的屬性等級 +1（加速蓄力後爆發）。「底部粉色陷阱」：最後兩行永遠交錯排列粉色釘子，弹珠落底前必經高彈性區域。釘盤 +4 行。', rarity: 'rare', effect: 'board_layout_sparse', maxStacks: 1 },
     // 策略4：镜像同步 - 直线穿透流（列数减少但行对齐，弹珠更易直线下落）
-    { id: 'mirror_sync', name: '鏡像同步', icon: '🪞', desc: '收集階段：釘盤列數減少且對齊。釘子被同化/突變時，鏡像位置的釘子同步轉化；特殊槽位鏡像呈現（數量翻倍）。', rarity: 'legendary', effect: 'board_layout_mirror_sync', maxStacks: 1 },
+    { id: 'mirror_sync', name: '鏡像同步', icon: '🪞', desc: '收集階段：釘盤列數減少且對齊。釘子被同化/突變時，鏡像位置的釘子同步轉化；特殊槽位鏡像呈現（數量翻倍）。「鏡像裂分」：中軸線設有特殊鏡像釘（✦），弹珠撞擊後有 35% 機率在對稱位置複製出一顆相同速度的分身弹珠，分身弹珠的後續收集屬性歸入原弹珠。', rarity: 'legendary', effect: 'board_layout_mirror_sync', maxStacks: 1 },
     // 策略5：宽窄交替 - 边缘捕获流（宽行捕获偏移弹珠，窄行提供通道）
     { id: 'wide_narrow', name: '寬窄交替', icon: '📐', desc: '偶數行 +2 列，奇數行 -2 列，寬窄交替。「邊緣共振」：弹珠碰撞寬行邊緣釘子（列號 0/1 或倒數 0/1）時，65% 機率額外再收集一次該屬性。釘盤 +2 行。', rarity: 'common', effect: 'board_layout_wide_narrow', maxStacks: 1 },
     // ==================== 弹珠同化涌潮遗物 ====================

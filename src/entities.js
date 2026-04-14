@@ -1621,6 +1621,7 @@ class Peg {
      *  wide_edge      → 橙色双侧括号（边缘共振钉）
      *  triangle_funnel→ 琥珀色向下三角标（漏斗共鸣区）
      *  mirror_center  → 粉色对称轴线（镜像同步边缘）
+     *  mirror_axis    → 金色四芒星（镜像裂分中轴钉）
      */
     drawLayoutRoleStyle(ctx, r) {
         const x = this.pos.x;
@@ -1732,6 +1733,46 @@ class Peg {
             ctx.moveTo(x - lx, y - lh);
             ctx.lineTo(x + lx, y - lh);
             ctx.stroke();
+
+        } else if (role === 'mirror_axis') {
+            // ── 镜像轴线特殊钉子：金色四芒星形 + 外圈脉冲光晕 ──
+            // 设计语言：金色四芒星（✦）表示「镜像裂分」的神秘力量，外圈脉冲光晕强调其特殊性
+            const axisAlpha = 0.6 + pulse * 0.4;
+            const starR = r * 1.4;
+
+            // 外圈脉冲光晕（金色）
+            ctx.beginPath();
+            ctx.arc(x, y, r * 1.7 + pulse * r * 0.3, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(251, 191, 36, ${axisAlpha * 0.5})`;
+            ctx.lineWidth = 1.5;
+            ctx.shadowBlur = 8 + pulse * 10;
+            ctx.shadowColor = 'rgba(251, 191, 36, 0.8)';
+            ctx.stroke();
+
+            // 四芒星形（✦）路径
+            ctx.shadowBlur = 6 + pulse * 8;
+            ctx.shadowColor = 'rgba(251, 191, 36, 0.9)';
+            ctx.fillStyle = `rgba(251, 191, 36, ${axisAlpha})`;
+            ctx.beginPath();
+            const arms = 4;
+            for (let i = 0; i < arms * 2; i++) {
+                const angle = (i * Math.PI / arms) - Math.PI / 2;
+                const rr = (i % 2 === 0) ? starR : starR * 0.42;
+                const sx = x + Math.cos(angle) * rr;
+                const sy = y + Math.sin(angle) * rr;
+                if (i === 0) ctx.moveTo(sx, sy);
+                else ctx.lineTo(sx, sy);
+            }
+            ctx.closePath();
+            ctx.fill();
+
+            // 中心小圆（强调中心）
+            ctx.beginPath();
+            ctx.arc(x, y, r * 0.35, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${axisAlpha})`;
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = '#ffffff';
+            ctx.fill();
         }
 
         ctx.restore();
@@ -1828,6 +1869,7 @@ class DropBall {
             this.channelCharged = false;     // [sparse] 通道蓄力：穿越窄行后下次碰撞属性等级+1
             this._lastRowPassed = -1;        // [sparse] 记录上次经过的行号，用于检测穿越窄行
             this._pendingChannelBoost = false; // [sparse] 待处理的通道蓄力等级加成
+            this._mirrorAxisCooldown = 0;    // [mirror_sync] 镜像裂分冷却，防止同一钉子连续触发
 	    }
         /**
          * [核心方法] 获取当前所有属性的层数
@@ -2113,6 +2155,8 @@ class DropBall {
                 }
             }
             if (this.portalCooldown > 0) this.portalCooldown -= timeScale;
+            // [镜像裂分] 冷却递减
+            if (this._mirrorAxisCooldown > 0) this._mirrorAxisCooldown -= timeScale;
             // 重力计算
             // 基础重力
             let gx = 0;
@@ -2482,8 +2526,37 @@ class DropBall {
 
                         } else if (role === 'mirror_center') {
                             // 镜像轴边缘钉子：横向速度取反（镜像反射）
-                            // 强化对称感：弹珠碰到对称轴边缘后被「镜像」弹回
+                            // 强化对称感：弹珠碘到对称轴边缘后被「镜像」射回
                             this.vel.x *= -0.85; // 镜像反转 + 轻微衰减
+
+                        } else if (role === 'mirror_axis') {
+                            // [镜像裂分] 中轴线特殊钉子：有概率在对称位置复制弹珠
+                            // 复制出的弹珠仅复制当前速度，不复制属性；其后续收集属性归入原弹珠
+                            if (!this._mirrorAxisCooldown && Math.random() < CONFIG.balance.mirrorAxisCloneChance) {
+                                // 计算对称位置：关于中轴线水平镜像
+                                const centerX = width / 2;
+                                const mirrorX = 2 * centerX - this.pos.x;
+                                // 弹珠速度水平分量取反（对称运动）
+                                const cloneVelX = -this.vel.x;
+                                const cloneVelY = this.vel.y;
+
+                                // 返回复制指令，由 game_phase.js 处理实际生成
+                                // 设置短暂冷却，防止同一弹珠在同一钉子上连续触发
+                                this._mirrorAxisCooldown = 20; // 20帧冷却
+
+                                // 触发视觉特效
+                                game.spawn_createExplosion(peg.pos.x, peg.pos.y, '#fbbf24');
+                                game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 28, '镜像裂分!', '#fbbf24');
+                                audio.playPowerup();
+
+                                return {
+                                    action: 'mirror_clone',
+                                    pos: this.pos,
+                                    mirrorX: mirrorX,
+                                    vel: new Vec2(cloneVelX, cloneVelY),
+                                    originalBall: this
+                                };
+                            }
                         }
                     }
 
@@ -3129,13 +3202,31 @@ class DropBall {
                     ctx.fill();
                     ctx.stroke();
                     
-                    ctx.restore();
-                }
-                
-                ctx.restore();
-            }
+            ctx.restore();
+        }
             
             ctx.restore();
+        }
+
+            // ==========================================
+            //  LAYER 6: ✦ Mirror Clone Badge (镜像分身标记)
+            // ==========================================
+            if (this.isMirrorClone) {
+                const pulse = (Math.sin(Date.now() / 250) + 1) / 2;
+                ctx.save();
+                ctx.strokeStyle = `rgba(251, 191, 36, ${0.5 + pulse * 0.5})`;
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([3, 3]);
+                ctx.shadowBlur = 6 + pulse * 8;
+                ctx.shadowColor = 'rgba(251, 191, 36, 0.8)';
+                ctx.beginPath();
+                ctx.arc(0, 0, r + 3 + pulse * 1.5, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+            }
+        
+        ctx.restore();
         }
 
    _drawBaseBall(ctx, r, cLight, cDark) {

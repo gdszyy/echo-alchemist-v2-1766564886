@@ -291,6 +291,12 @@ export const game_phase = {
                     if (c === 0 || c === rowLen - 1) {
                         p.layoutRole = 'mirror_center';
                     }
+                    // [镜像裂分] 中轴线特殊钉子：距离中心最近的钉子标记为 mirror_axis
+                    // 每行只标记一颗最靠近中轴的钉子（奇数列数取中间列，偶数列数取中间偏左）
+                    const midCol = Math.floor((rowLen - 1) / 2);
+                    if (c === midCol) {
+                        p.layoutRole = 'mirror_axis';
+                    }
                 }
             }
         }
@@ -2120,6 +2126,23 @@ phase_gathering_getRandomPegType() {
                     this.currentSession.activeBalls += 1; 
                     this.dropBalls.splice(i, 1);
                     showToast("分裂!");
+                } else if (result.action === 'mirror_clone') {
+                    // [镜像裂分] 处理镜像轴线钉子触发的弹珠复制
+                    // 复制弹珠：仅复制当前速度，不复制属性
+                    // 分身弹珠的后续收集属性归入原弹珠（共享同一 session 实现）
+                    const originalBall = result.originalBall;
+                    // 创建分身弹珠：使用原弹珠的 def（属性定义）和 session（共享收集属性）
+                    const cloneBall = new DropBall(result.mirrorX, result.pos.y, originalBall.def, this.currentSession);
+                    // 仅复制当前速度（水平分量取反，垂直分量相同）
+                    cloneBall.vel = new Vec2(result.vel.x, result.vel.y);
+                    // 分身弹珠不能再次触发镜像裂分，防止连锁增幅
+                    cloneBall._mirrorAxisCooldown = 60; // 分身弹珠有更长冷却
+                    cloneBall.canTriggerSplitSlot = false;
+                    cloneBall.isMirrorClone = true; // 标记为镜像分身
+                    this.dropBalls.push(cloneBall);
+                    this.currentSession.activeBalls++;
+                    this.ui_renderRecipeHUD();
+
                 } else if (result.action === 'rainbow_split') {
                     // 處理彩虹彈珠分裂
                     const colors = ['bounce', 'pierce', 'scatter'];
