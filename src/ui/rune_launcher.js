@@ -498,8 +498,23 @@ export const rune_launcher_system = {
             if (this.ui) {
                 this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
             }
-            // 触发 UI 更新（显隐 SP 面板和技能杠）
-            this.ui_updateUI();
+            // [fix] 精确更新技能杠和 SP 面板的显隐，避免调用 ui_updateUI() 导致
+            // 所有 .ui-overlay 被全局隐藏，从而意外关闭符文发射器面板。
+            const hasSkills = this.activeSkills && this.activeSkills.length > 0;
+            const skillBar = document.getElementById('skill-bar');
+            if (skillBar) {
+                skillBar.style.display = (this.phase === 'combat' && hasSkills) ? 'flex' : 'none';
+            }
+            const spPanel = document.getElementById('sp-panel');
+            if (spPanel) {
+                if ((this.phase === 'gathering' || this.phase === 'combat') && hasSkills) {
+                    spPanel.style.opacity = '1';
+                    spPanel.style.pointerEvents = 'auto';
+                } else {
+                    spPanel.style.opacity = '0';
+                    spPanel.style.pointerEvents = 'none';
+                }
+            }
         }
     },
 
