@@ -16,7 +16,7 @@
  */
 
 import { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY, RARITY_DISPLAY } from '../rune_config.js';
-import { parseRuneGrid, calcRuneBaseStats, getRuneId, rune_merge, rune_reforge } from '../rune_system.js';
+import { parseRuneGrid, calcRuneBaseStats, getRuneId, rune_merge, rune_reforge, getNewRunewordsOnPlacement } from '../rune_system.js';
 import { audio } from '../audio.js';
 import { showToast } from '../entities.js';
 import { SKILL_DB } from '../config.js'; // [技能系统迭代] 用于符文解锁技能派生
@@ -208,62 +208,129 @@ export const rune_launcher_system = {
 
     /**
      * ui_openRunePicker - 打开符文选择弹出层
+     * [优化]：增加触发预测、前置显示、闪烁特效、长按预览功能
      * @param {number} cellIndex - 目标格子索引
      */
     ui_openRunePicker(cellIndex) {
-        if (!this.runeInventory || this.runeInventory.length === 0) {  // [Mixin 正常用法：读取 Game 实例状态]
+        if (!this.runeInventory || this.runeInventory.length === 0) {
             if (window.showToast) showToast('库存中没有符文');
             return;
         }
 
         const overlay = document.getElementById('rune-picker-overlay');
         const list = document.getElementById('rune-picker-list');
+        const tooltip = document.getElementById('runeword-preview-tooltip');
+        const tooltipContent = document.getElementById('runeword-preview-content');
         if (!overlay || !list) return;
 
         list.innerHTML = '';
+        if (tooltip) tooltip.classList.add('hidden');
 
-        // 对库存中的符文去重显示（但保留多个实例的选择）
-        this.runeInventory.forEach((runeEntry, invIdx) => {  // [Mixin 正常用法：读取 Game 实例状态]
-            // 兼容新旧格式：提取符文 ID
+        // 1. 预处理库存：计算每个符文放入该格子后能触发的新词条
+        const analyzedInventory = this.runeInventory.map((runeEntry, originalIdx) => {
+            const newRunewords = getNewRunewordsOnPlacement(this.runeGrid, cellIndex, runeEntry, RUNEWORD_DB);
+            return {
+                runeEntry,
+                originalIdx,
+                newRunewords,
+                isTrigger: newRunewords.length > 0
+            };
+        });
+
+        // 2. 排序：能触发新词条的符文排在前面
+        analyzedInventory.sort((a, b) => {
+            if (a.isTrigger && !b.isTrigger) return -1;
+            if (!a.isTrigger && b.isTrigger) return 1;
+            return 0;
+        });
+
+        // 3. 渲染列表
+        analyzedInventory.forEach(({ runeEntry, newRunewords, isTrigger }) => {
             const runeId = getRuneId(runeEntry);
             if (!runeId) return;
             const runeDef = RUNE_DB.find(r => r.id === runeId);
             if (!runeDef) return;
-
-            // 获取符文等级（新格式有 level，旧格式默认为 1）
             const runeLevel = (typeof runeEntry === 'object' && runeEntry.level) ? runeEntry.level : 1;
 
             const btn = document.createElement('button');
             btn.className = [
-                'flex flex-col items-center gap-1 p-3',
+                'flex flex-col items-center gap-1 p-3 relative',
                 'bg-slate-800/80 border border-slate-600/50 rounded-xl',
                 'hover:border-purple-400/60 hover:bg-slate-700/80',
                 'transition-all duration-200 min-w-[72px]',
+                isTrigger ? 'rune-glow-active' : ''
             ].join(' ');
+
             btn.innerHTML = `
                 <span style="font-size:24px;">${_ui_buildRuneIconHTML(runeDef, runeLevel)}</span>
                 <span class="text-[10px] text-slate-300 text-center leading-tight">${runeDef.name}</span>
-                <span class="text-[9px] text-purple-400/70">${runeDef.element}</span>
+                ${isTrigger ? `<span class="absolute -top-1 -right-1 bg-amber-500 text-black text-[8px] font-bold px-1 rounded-full shadow-sm">NEW</span>` : ''}
             `;
-            btn.addEventListener('click', () => {
-                // 将该符文从库存中移除（取第一个匹配项）
-                const removeIdx = this.runeInventory.indexOf(runeEntry);  // [Mixin 正常用法：读取 Game 实例状态]
+
+            // --- 交互逻辑 ---
+            let longPressTimer = null;
+
+            const handleSelect = () => {
+                const removeIdx = this.runeInventory.indexOf(runeEntry);
                 if (removeIdx !== -1) {
-                    this.runeInventory.splice(removeIdx, 1);  // [Mixin 正常用法：读取 Game 实例状态]
-                } else {
-                    // 如果对象引用不同，则通过 ID 和等级匹配
-                    const fallbackIdx = this.runeInventory.findIndex(e => getRuneId(e) === runeId &&  // [Mixin 正常用法：读取 Game 实例状态]
-                        ((typeof e === 'object' && e.level === runeLevel) || typeof e === 'string'));
-                    if (fallbackIdx !== -1) {
-                        this.runeInventory.splice(fallbackIdx, 1);  // [Mixin 正常用法：读取 Game 实例状态]
-                    }
+                    this.runeInventory.splice(removeIdx, 1);
                 }
-                // 将符文放入网格（保留原始对象格式）
-                this.runeGrid[cellIndex] = runeEntry;  // [Mixin 正常用法：读取 Game 实例状态]
+                this.runeGrid[cellIndex] = runeEntry;
                 this.ui_closeRunePicker();
                 this.ui_updateRuneGrid();
                 audio.playTone(600, 'sine', 0.1, 0.2);
+            };
+
+            const showPreview = () => {
+                if (!isTrigger || !tooltip || !tooltipContent) return;
+                tooltipContent.innerHTML = newRunewords.map(rw => `
+                    <div class="bg-slate-900/60 p-2 rounded-lg border border-amber-500/30">
+                        <div class="text-amber-200 text-xs font-bold">${rw.name} <span class="text-amber-500/70 font-normal">Lv.${rw.level}</span></div>
+                        <div class="text-[10px] text-slate-400 mt-1">${rw.effect_desc}</div>
+                    </div>
+                `).join('');
+                tooltip.classList.remove('hidden');
+                try { if (audio?.playTone) audio.playTone(880, 'sine', 0.05, 0.1); } catch(e) {}
+            };
+
+            const hidePreview = () => {
+                if (tooltip) tooltip.classList.add('hidden');
+            };
+
+            // 鼠标/触摸事件处理
+            const startPress = (e) => {
+                longPressTimer = setTimeout(showPreview, 500);
+            };
+            const endPress = (e) => {
+                if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+                hidePreview();
+            };
+
+            btn.addEventListener('mousedown', startPress);
+            btn.addEventListener('mouseup', endPress);
+            btn.addEventListener('mouseleave', endPress);
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // 防止触发 click
+                startPress(e);
+            }, { passive: false });
+            btn.addEventListener('touchend', (e) => {
+                endPress(e);
+                // 如果没有触发长按（tooltip 还是隐藏的），则视为点击
+                if (tooltip && tooltip.classList.contains('hidden')) {
+                    handleSelect();
+                }
             });
+
+            btn.addEventListener('click', (e) => {
+                // 只有非触摸设备才在这里处理点击
+                if (e.pointerType !== 'touch') {
+                    handleSelect();
+                }
+            });
+
             list.appendChild(btn);
         });
 

@@ -411,4 +411,34 @@ function rune_reforge(runeObjects, runeInventory, game) {
     return { success: true, result: reforgedRune, error: null };
 }
 
-export { parseRuneGrid, calcRuneBaseStats, getRuneId, rune_merge, rune_reforge };
+/**
+ * getNewRunewordsOnPlacement - 预测在特定格子放入特定符文后，会新增哪些词条
+ *
+ * @param {Array<string|Object|null>} currentGrid - 当前 9 格网格
+ * @param {number} cellIndex - 要放入的格子索引 (0-8)
+ * @param {string|Object} runeEntry - 要放入的符文
+ * @param {Array<Object>} runewordDb - 词条数据库
+ * @returns {Array<Object>} 新增激活的词条对象数组
+ */
+function getNewRunewordsOnPlacement(currentGrid, cellIndex, runeEntry, runewordDb) {
+    // 1. 获取当前激活的词条 ID 集合
+    const { activatedRunewords: currentActive } = parseRuneGrid(currentGrid, runewordDb);
+    const currentIds = new Set(currentActive.map(rw => rw.id));
+
+    // 2. 模拟放入符文后的网格
+    const nextGrid = [...currentGrid];
+    nextGrid[cellIndex] = runeEntry;
+
+    // 3. 获取放入后激活的词条
+    const { activatedRunewords: nextActive } = parseRuneGrid(nextGrid, runewordDb);
+
+    // 4. 找出新增的词条（ID 不在原集合中，或者等级提升了）
+    // 注意：由于 parseRuneGrid 返回的 level 是匹配路径数，如果同一个词条激活了更多路径，也算“新触发/增强”
+    return nextActive.filter(rw => {
+        const oldRw = currentActive.find(old => old.id === rw.id);
+        if (!oldRw) return true; // 完全新增
+        return rw.level > oldRw.level; // 等级提升（激活了更多路径）
+    });
+}
+
+export { parseRuneGrid, calcRuneBaseStats, getRuneId, rune_merge, rune_reforge, getNewRunewordsOnPlacement };

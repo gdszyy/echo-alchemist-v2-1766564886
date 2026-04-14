@@ -49,6 +49,18 @@
             100% { transform: translate(0, 0); }
         }
         .shake-hard { animation: shake-hard 0.2s; }
+
+        /* --- [新增] 符文发光闪烁特效 --- */
+        @keyframes rune-glow-pulse {
+            0% { box-shadow: 0 0 5px rgba(168, 85, 247, 0.4); border-color: rgba(168, 85, 247, 0.4); }
+            50% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.8); border-color: rgba(168, 85, 247, 1); }
+            100% { box-shadow: 0 0 5px rgba(168, 85, 247, 0.4); border-color: rgba(168, 85, 247, 0.4); }
+        }
+        .rune-glow-active {
+            animation: rune-glow-pulse 1.5s infinite ease-in-out;
+            z-index: 10;
+        }
+
         /* --- [新增] 技能点宝石样式 --- */
         .sp-slot {
             width: 12px;
@@ -2673,9 +2685,24 @@
 
         <!-- 符文选择弹出层 -->
         <div id="rune-picker-overlay" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-[400] flex items-end justify-center" onclick="game.ui_closeRunePicker()">
-            <div class="w-full max-w-md bg-slate-900 border border-purple-700/50 rounded-t-2xl p-5" onclick="event.stopPropagation()">
-                <div class="text-sm text-purple-200 font-bold mb-4 tracking-wider">選擇符文放入格子</div>
-                <div id="rune-picker-list" class="flex flex-wrap gap-3 max-h-48 overflow-y-auto">
+            <div class="w-full max-w-md bg-slate-900 border border-purple-700/50 rounded-t-2xl p-5 relative" onclick="event.stopPropagation()">
+                <!-- [新增] 词条预览提示框 -->
+                <div id="runeword-preview-tooltip" class="hidden absolute left-1/2 -translate-x-1/2 bottom-full mb-4 w-[90%] bg-slate-800 border-2 border-amber-500/50 rounded-xl p-3 shadow-[0_0_30px_rgba(0,0,0,0.8)] z-[500] pointer-events-none">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-amber-400 text-sm">✨</span>
+                        <span class="text-amber-200 text-xs font-bold tracking-widest uppercase">預覽新觸發詞條</span>
+                    </div>
+                    <div id="runeword-preview-content" class="space-y-2">
+                        <!-- 预览内容由 JS 动态生成 -->
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center mb-4">
+                    <div class="text-sm text-purple-200 font-bold tracking-wider">選擇符文放入格子</div>
+                    <div class="text-[10px] text-slate-500 italic">長按可預覽詞条效果</div>
+                </div>
+                
+                <div id="rune-picker-list" class="flex flex-wrap gap-3 max-h-48 overflow-y-auto custom-scrollbar">
                     <!-- 由 JS 动态生成 -->
                 </div>
                 <button onclick="game.ui_closeRunePicker()" class="mt-4 w-full py-2 text-slate-400 hover:text-white text-sm border border-slate-700 rounded-lg transition-colors">取消</button>
