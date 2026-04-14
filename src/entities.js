@@ -853,7 +853,7 @@ class Peg {
             case 'damage': color = CONFIG.colors.matDamage; break;
             case 'cryo': color = CONFIG.colors.matCryo; break;
             case 'pyro': color = CONFIG.colors.matPyro; break;
-            case 'lightning': color = CONFIG.colors.matLightning; break;
+
             case 'wind': color = CONFIG.colors.matWind; break;
             case 'pink': color = CONFIG.colors.pegPink; break;
             case 'laser': color = CONFIG.colors.laser; break;
@@ -1105,7 +1105,7 @@ class Peg {
         // 每种属性钉子在圆形内部绘制专属几何符文，一眼可辨
         if (this.type === 'cryo')      this.drawCryoPeg(ctx, currentRadius, isLit);
         if (this.type === 'pyro')      this.drawPyroPeg(ctx, currentRadius, isLit);
-        if (this.type === 'lightning') this.drawLightningPeg(ctx, currentRadius, isLit);
+
         if (this.type === 'bounce')    this.drawBouncePeg(ctx, currentRadius, isLit);
         if (this.type === 'pierce')    this.drawPiercePeg(ctx, currentRadius, isLit);
         if (this.type === 'scatter')   this.drawScatterPeg(ctx, currentRadius, isLit);
@@ -1381,27 +1381,6 @@ class Peg {
         // 底部小圆弧（火苗基部）
         ctx.beginPath();
         ctx.arc(0, r * 0.38, r * 0.28, 0, Math.PI);
-        ctx.fill();
-        ctx.restore();
-    }
-
-    /**
-     * [lightning] 雷属性：闪电折线
-     * Z 形折线，经典闪电符号
-     */
-    drawLightningPeg(ctx, r, isLit) {
-        ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
-        ctx.fillStyle = ic;
-        ctx.beginPath();
-        ctx.moveTo(r * 0.18, -r * 0.72);
-        ctx.lineTo(-r * 0.28, -r * 0.04);
-        ctx.lineTo(r * 0.12, -r * 0.04);
-        ctx.lineTo(-r * 0.18, r * 0.72);
-        ctx.lineTo(r * 0.28, r * 0.04);
-        ctx.lineTo(-r * 0.12, r * 0.04);
-        ctx.closePath();
         ctx.fill();
         ctx.restore();
     }

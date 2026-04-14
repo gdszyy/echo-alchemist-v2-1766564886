@@ -542,7 +542,7 @@ export const game_phase = {
 phase_gathering_getRandomPegType() { 
     // [BUGFIX #1] 恢复完整 pegTypes 数组，根据玩家已解锁属性动态过滤
     // 原 Bug: pegTypes 被硬编码为 ['bounce']，导致所有元素属性钉子无法生成
-    const allPegTypes = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind'];
+    const allPegTypes = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'laser', 'wind'];
     const pegTypes = allPegTypes.filter(t => (this.unlockedWeights[t] || 0) > 0);
     // 1. 获取 normal 的基础权重
     // 我们手动从 unlockedWeights 中取 white 作为普通钉子的权重基准（默认 100）
