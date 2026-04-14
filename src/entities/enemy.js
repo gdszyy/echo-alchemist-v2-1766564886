@@ -1780,78 +1780,114 @@ class Enemy {
             ctx.shadowBlur = 15 + pulse * 10;
             ctx.strokeStyle = `rgba(251, 146, 60, ${0.6 + pulse * 0.4})`;
             ctx.lineWidth = 3;
-            if (this.type === 'boss' && this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+            if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                // 多边形敌人（Boss 或异形随从）：沿多边形轮廓绘制，略微放大
                 const verts = this.collisionData.vertices;
                 ctx.beginPath();
                 ctx.moveTo(verts[0].x * 1.04, verts[0].y * 1.04);
                 for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x * 1.04, verts[i].y * 1.04);
                 ctx.closePath();
                 ctx.stroke();
-            } else if (this.type === 'boss' && this.collisionShape === 'arc' && this.collisionData) {
+            } else if (this.collisionShape === 'arc' && this.collisionData) {
+                // 圆弧形 Boss：沿外圆弧绘制
                 const cd = this.collisionData;
                 const outerR = (cd.radius + cd.thickness * 0.5) * 1.05;
                 ctx.beginPath();
                 ctx.arc(0, 0, outerR, 0, Math.PI * 2);
                 ctx.stroke();
             } else {
+                // 默认 AABB 矩形敌人
                 ctx.beginPath(); ctx.roundRect(-w/2 - 2, -h/2 - 2, w + 4, h + 4, r); ctx.stroke();
             }
             ctx.restore();
         }
 
-        // **过冷 Stage 4: 冰封外壳 - [核心修改：晶体冰块]**
+        // **过冷 Stage 4: 冰封外壳 - [修复：贴合敌人形状绘制]**
         if (this.temp <= -100 || this.isFrozenCurrentTurn) {
             ctx.save();
             ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
             
-            // --- 1. 绘制冰块轮廓 (硬朗的多边形) ---
-            const borderW = w + 8;
-            const borderH = h + 8;
-            
-            // 使用 bevel 连接，产生硬角，不使用 spike 正弦波
-            ctx.lineJoin = 'bevel'; 
-            ctx.lineWidth = 2;
-            
             // 冰的颜色：边框亮白/青，内部半透明
             ctx.strokeStyle = 'rgba(207, 250, 254, 0.9)'; // 亮青白
             ctx.fillStyle = 'rgba(165, 243, 252, 0.25)';  // 内部淡淡的冻结感
-            
-            // 给整个冰块加一点发光
             ctx.shadowColor = '#06b6d4';
             ctx.shadowBlur = 10;
+            ctx.lineJoin = 'bevel';
+            ctx.lineWidth = 2;
 
-            ctx.beginPath();
-            // 左上角 (切角)
-            ctx.moveTo(-borderW/2 + 5, -borderH/2);
-            // 右上角
-            ctx.lineTo(borderW/2 - 2, -borderH/2);
-            ctx.lineTo(borderW/2, -borderH/2 + 5);
-            // 右下角
-            ctx.lineTo(borderW/2, borderH/2 - 3);
-            ctx.lineTo(borderW/2 - 5, borderH/2);
-            // 左下角
-            ctx.lineTo(-borderW/2 + 2, borderH/2);
-            ctx.lineTo(-borderW/2, borderH/2 - 5);
-            // 回到左上
-            ctx.lineTo(-borderW/2, -borderH/2 + 5);
-            ctx.closePath();
-            
-            ctx.fill();
-            ctx.stroke();
+            if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                // --- 多边形敌人（Boss 或异形随从）：沿多边形轮廓绘制冰壳，略微放大 ---
+                const verts = this.collisionData.vertices;
+                const scale = 1.06; // 冰壳略大于本体
+                ctx.beginPath();
+                ctx.moveTo(verts[0].x * scale, verts[0].y * scale);
+                for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x * scale, verts[i].y * scale);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
 
-            // --- 2. 绘制冰面反光 (Glossy Highlight) ---
-            // 在冰块表面画两道斜着的亮光，增加质感
-            ctx.shadowBlur = 0; // 反光不需要发光
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            // 斜线 1
-            ctx.moveTo(-w/4, -h/2);
-            ctx.lineTo(-w/2, -h/4);
-            // 斜线 2
-            ctx.moveTo(w/4, h/2);
-            ctx.lineTo(w/2, h/4);
-            ctx.stroke();
+                // 冰面反光：沿多边形第一条边方向绘制斜光
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(verts[0].x * 0.5, verts[0].y * 0.5);
+                ctx.lineTo(verts[1].x * 0.5, verts[1].y * 0.5);
+                ctx.stroke();
+            } else if (this.collisionShape === 'arc' && this.collisionData) {
+                // --- 圆弧形 Boss：沿外圆绘制冰壳 ---
+                const cd = this.collisionData;
+                const outerR = (cd.radius + cd.thickness * 0.5) * 1.06;
+                const innerR = Math.max(0, cd.radius - cd.thickness * 0.5) * 0.94;
+                ctx.beginPath();
+                ctx.arc(0, 0, outerR, 0, Math.PI * 2, false);
+                if (innerR > 0) {
+                    ctx.moveTo(innerR, 0);
+                    ctx.arc(0, 0, innerR, 0, Math.PI * 2, true);
+                }
+                ctx.fill();
+                ctx.stroke();
+
+                // 冰面反光
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(0, 0, outerR * 0.85, Math.PI * 1.1, Math.PI * 1.4);
+                ctx.stroke();
+            } else {
+                // --- 默认 AABB 矩形敌人：切角冰块多边形 ---
+                const borderW = w + 8;
+                const borderH = h + 8;
+                ctx.beginPath();
+                // 左上角 (切角)
+                ctx.moveTo(-borderW/2 + 5, -borderH/2);
+                // 右上角
+                ctx.lineTo(borderW/2 - 2, -borderH/2);
+                ctx.lineTo(borderW/2, -borderH/2 + 5);
+                // 右下角
+                ctx.lineTo(borderW/2, borderH/2 - 3);
+                ctx.lineTo(borderW/2 - 5, borderH/2);
+                // 左下角
+                ctx.lineTo(-borderW/2 + 2, borderH/2);
+                ctx.lineTo(-borderW/2, borderH/2 - 5);
+                // 回到左上
+                ctx.lineTo(-borderW/2, -borderH/2 + 5);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                // 冰面反光
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(-w/4, -h/2);
+                ctx.lineTo(-w/2, -h/4);
+                ctx.moveTo(w/4, h/2);
+                ctx.lineTo(w/2, h/4);
+                ctx.stroke();
+            }
 
             ctx.restore();
         }
