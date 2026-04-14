@@ -560,32 +560,32 @@ const ELEMENT_RESONANCE_DB = {
             {
                 threshold: 3,
                 label: '冰霜共鸣·一阶',
-                desc: '冰冻触发温度提升至 -25°，基础冰霜属性 +5',
+                desc: '冰冻触发温度提升至 -60°，基础冰霜属性 +5',
                 params: {
-                    freezeTempThreshold: -25,  // 原 -34，更容易触发冰冻
-                    baseCryoBonus: 5,
-                    cryoMultiplier: 1.0,
+                    freezeTempThreshold: -60,  // 默认冰冻阈值 -80，提升至 -60 更容易触发
+                    baseCryoBonus: 5,          // 基础冰霜属性层数 +5
+                    cryoMultiplier: 1.0,       // 整体冰霜伤害倍率（无额外加成）
                 }
             },
             {
                 threshold: 6,
                 label: '冰霜共鸣·二阶',
-                desc: '冰冻触发温度提升至 -15°，基础冰霜属性 +10，冰霜伤害整体 +20%',
+                desc: '冰冻触发温度提升至 -40°，基础冰霜属性 +10，冰霜伤害整体 +20%',
                 params: {
-                    freezeTempThreshold: -15,
-                    baseCryoBonus: 10,
-                    cryoMultiplier: 1.2,
+                    freezeTempThreshold: -40,  // 进一步提升至 -40
+                    baseCryoBonus: 10,         // 基础冰霜属性层数 +10
+                    cryoMultiplier: 1.2,       // 整体冰霜伤害 +20%
                 }
             },
             {
                 threshold: 9,
                 label: '冰霜共鸣·三阶',
-                desc: '冰冻触发温度提升至 -5°，基础冰霜属性 +25，冰霜伤害整体 +50%，冻结状态下物理伤害加深 +30%',
+                desc: '冰冻触发温度提升至 -20°，基础冰霜属性 +25，冰霜伤害整体 +50%，冰冻状态下受到伤害额外 +30%',
                 params: {
-                    freezeTempThreshold: -5,
-                    baseCryoBonus: 25,
-                    cryoMultiplier: 1.5,
-                    frozenPhysDmgBonus: 0.3,  // 冻结状态下物理伤害额外加深
+                    freezeTempThreshold: -20,  // 最大化提升至 -20，极易触发冰冻
+                    baseCryoBonus: 25,         // 基础冰霜属性层数 +25
+                    cryoMultiplier: 1.5,       // 整体冰霜伤害 +50%
+                    frozenDmgAmp: 0.3,         // 冰冻状态下受到伤害额外加深 30%（供 Step3 在 takeDamage 中读取）
                 }
             },
         ]
@@ -617,12 +617,12 @@ const ELEMENT_RESONANCE_DB = {
             {
                 threshold: 9,
                 label: '雷霆共鸣·三阶',
-                desc: '闪电链基础触发概率 +50%，基础闪电属性 +25，闪电伤害整体 +50%，闪电链可对同一目标二次触发',
+                desc: '闪电链基础触发概率 +50%，基础闪电属性 +25，闪电伤害整体 +50%，闪电链伤害衰减降低 20%',
                 params: {
-                    chainChanceBonus: 0.50,
-                    baseLightningBonus: 25,
-                    lightningMultiplier: 1.5,
-                    allowDoubleChain: true,
+                    chainChanceBonus: 0.50,    // 闪电链基础触发概率 +50%（叠加到 CONFIG.mechanics.lightning.baseChainChance 上）
+                    baseLightningBonus: 25,    // 基础闪电属性层数 +25
+                    lightningMultiplier: 1.5,  // 整体闪电伤害 +50%
+                    chainDecayReduction: 0.2,  // 闪电链伤害衰减降低 20%（decayFactor 提升 0.2，供 Step3 在 combat_lightning_triggerChain 中读取）
                 }
             },
         ]
@@ -636,29 +636,29 @@ const ELEMENT_RESONANCE_DB = {
                 label: '弹跳共鸣·一阶',
                 desc: '弹跳伤害加成 +15%，基础弹跳属性 +5',
                 params: {
-                    bounceDmgBonus: 0.15,
-                    baseBounceBonus: 5,
+                    bounceDmgBonus: 0.15,  // 弹跳伤害加成 +15%（供 Step3 在弹跳伤害计算中读取）
+                    baseBounceBonus: 5,    // 基础弹跳属性层数 +5
                 }
             },
             {
                 threshold: 6,
                 label: '弹跳共鸣·二阶',
-                desc: '弹跳伤害加成 +30%，基础弹跳属性 +10，每次弹跳后伤害不衰减',
+                desc: '弹跳伤害加成 +30%，基础弹跳属性 +10，弹跳伤害衰减降低 50%',
                 params: {
-                    bounceDmgBonus: 0.30,
-                    baseBounceBonus: 10,
-                    noBounceDecay: true,
+                    bounceDmgBonus: 0.30,      // 弹跳伤害加成 +30%
+                    baseBounceBonus: 10,       // 基础弹跳属性层数 +10
+                    bounceDecayReduction: 0.5, // 弹跳伤害衰减降低 50%（即 0.5^n 衰减系数的指数 n 减半）
                 }
             },
             {
                 threshold: 9,
                 label: '弹跳共鸣·三阶',
-                desc: '弹跳伤害加成 +50%，基础弹跳属性 +25，每次弹跳后伤害不衰减，弹跳次数 +2',
+                desc: '弹跳伤害加成 +50%，基础弹跳属性 +25，弹跳次数额外 +2，弹跳后伤害不衰减',
                 params: {
-                    bounceDmgBonus: 0.50,
-                    baseBounceBonus: 25,
-                    noBounceDecay: true,
-                    extraBounces: 2,
+                    bounceDmgBonus: 0.50,  // 弹跳伤害加成 +50%
+                    baseBounceBonus: 25,   // 基础弹跳属性层数 +25
+                    extraBounces: 2,       // 弹跳次数额外 +2（叠加到 recipe.bounce 上）
+                    noBounceDecay: true,   // 弹跳后伤害不衰减（覆盖 0.5^n 衰减机制）
                 }
             },
         ]
@@ -672,29 +672,29 @@ const ELEMENT_RESONANCE_DB = {
                 label: '穿透共鸣·一阶',
                 desc: '穿透伤害加成 +15%，基础穿透属性 +5',
                 params: {
-                    pierceDmgBonus: 0.15,
-                    basePierceBonus: 5,
+                    pierceDmgBonus: 0.15,  // 穿透伤害加成 +15%（供 Step3 在穿透伤害计算中读取）
+                    basePierceBonus: 5,    // 基础穿透属性层数 +5
                 }
             },
             {
                 threshold: 6,
                 label: '穿透共鸣·二阶',
-                desc: '穿透伤害加成 +30%，基础穿透属性 +10，穿透命中后额外施加 5 点火焰温度',
+                desc: '穿透伤害加成 +30%，基础穿透属性 +10，穿透伤害衰减降低 20%（原为 50%）',
                 params: {
-                    pierceDmgBonus: 0.30,
-                    basePierceBonus: 10,
-                    pierceApplyTemp: 5,
+                    pierceDmgBonus: 0.30,      // 穿透伤害加成 +30%
+                    basePierceBonus: 10,       // 基础穿透属性层数 +10
+                    pierceDecayReduction: 0.2, // 穿透伤害衰减降低 20%（即 0.5^n 中的衰减系数从 0.5 提升至 0.7）
                 }
             },
             {
                 threshold: 9,
                 label: '穿透共鸣·三阶',
-                desc: '穿透伤害加成 +50%，基础穿透属性 +25，穿透命中后额外施加 15 点火焰温度，穿透次数 +1',
+                desc: '穿透伤害加成 +50%，基础穿透属性 +25，穿透次数额外 +1，穿透伤害衰减降低 40%（原为 50%）',
                 params: {
-                    pierceDmgBonus: 0.50,
-                    basePierceBonus: 25,
-                    pierceApplyTemp: 15,
-                    extraPierces: 1,
+                    pierceDmgBonus: 0.50,      // 穿透伤害加成 +50%
+                    basePierceBonus: 25,       // 基础穿透属性层数 +25
+                    extraPierces: 1,           // 穿透次数额外 +1（叠加到 recipe.pierce 上）
+                    pierceDecayReduction: 0.4, // 穿透伤害衰减降低 40%（衰减系数从 0.5 提升至 0.9）
                 }
             },
         ]
@@ -706,31 +706,32 @@ const ELEMENT_RESONANCE_DB = {
             {
                 threshold: 3,
                 label: '散射共鸣·一阶',
-                desc: '散射子弹数量 +1，基础散射属性 +5',
+                desc: '散射子弹数量额外 +1，基础散射属性 +5',
                 params: {
-                    extraScatterShots: 1,
-                    baseScatterBonus: 5,
+                    extraScatterShots: 1,      // 额外散射子弹 +1（叠加到 recipe.scatter 上）
+                    baseScatterBonus: 5,       // 基础散射属性层数 +5
+                    scatterMultiplier: 1.0,    // 散射伤害倍率（无额外加成）
                 }
             },
             {
                 threshold: 6,
                 label: '散射共鸣·二阶',
-                desc: '散射子弹数量 +2，基础散射属性 +10，散射伤害整体 +20%',
+                desc: '散射子弹数量额外 +2，基础散射属性 +10，散射伤害整体 +20%',
                 params: {
-                    extraScatterShots: 2,
-                    baseScatterBonus: 10,
-                    scatterMultiplier: 1.2,
+                    extraScatterShots: 2,      // 额外散射子弹 +2
+                    baseScatterBonus: 10,      // 基础散射属性层数 +10
+                    scatterMultiplier: 1.2,    // 散射伤害 +20%
                 }
             },
             {
                 threshold: 9,
                 label: '散射共鸣·三阶',
-                desc: '散射子弹数量 +3，基础散射属性 +25，散射伤害整体 +50%，散射角度收窄 20%',
+                desc: '散射子弹数量额外 +3，基础散射属性 +25，散射伤害整体 +50%，散射角度收窄 30%',
                 params: {
-                    extraScatterShots: 3,
-                    baseScatterBonus: 25,
-                    scatterMultiplier: 1.5,
-                    scatterAngleReduction: 0.2,
+                    extraScatterShots: 3,         // 额外散射子弹 +3
+                    baseScatterBonus: 25,         // 基础散射属性层数 +25
+                    scatterMultiplier: 1.5,       // 散射伤害 +50%
+                    scatterAngleReduction: 0.3,   // 散射角度收窄 30%（即 _scatterAngleMultiplier = 0.7，供 Step3 在 spawn_system.js 中读取）
                 }
             },
         ]
@@ -742,31 +743,32 @@ const ELEMENT_RESONANCE_DB = {
             {
                 threshold: 3,
                 label: '激光共鸣·一阶',
-                desc: '激光每次命中额外升温 +3°，基础激光属性 +5',
+                desc: '激光每次命中额外升温 +5°，基础激光属性 +5',
                 params: {
-                    laserTempBonus: 3,
-                    baseLaserBonus: 5,
+                    laserTempBonus: 5,         // 激光命中额外升温 +5°（供 Step3 在 collision.js 中读取，类似 blazing_beam 机制）
+                    baseLaserBonus: 5,         // 基础激光属性层数 +5
+                    laserMultiplier: 1.0,      // 激光伤害倍率（无额外加成）
                 }
             },
             {
                 threshold: 6,
                 label: '激光共鸣·二阶',
-                desc: '激光每次命中额外升温 +8°，基础激光属性 +10，激光伤害整体 +20%',
+                desc: '激光每次命中额外升温 +10°，基础激光属性 +10，激光伤害整体 +20%',
                 params: {
-                    laserTempBonus: 8,
-                    baseLaserBonus: 10,
-                    laserMultiplier: 1.2,
+                    laserTempBonus: 10,        // 激光命中额外升温 +10°
+                    baseLaserBonus: 10,        // 基础激光属性层数 +10
+                    laserMultiplier: 1.2,      // 激光伤害 +20%
                 }
             },
             {
                 threshold: 9,
                 label: '激光共鸣·三阶',
-                desc: '激光每次命中额外升温 +15°，基础激光属性 +25，激光伤害整体 +50%，激光穿透次数 +1',
+                desc: '激光每次命中额外升温 +20°，基础激光属性 +25，激光伤害整体 +50%，激光折射基础概率 +20%',
                 params: {
-                    laserTempBonus: 15,
-                    baseLaserBonus: 25,
-                    laserMultiplier: 1.5,
-                    extraLaserPierces: 1,
+                    laserTempBonus: 20,           // 激光命中额外升温 +20°
+                    baseLaserBonus: 25,           // 基础激光属性层数 +25
+                    laserMultiplier: 1.5,         // 激光伤害 +50%
+                    laserRefractionBonus: 0.2,    // 激光折射基础概率 +20%（叠加到 laserRefractionBaseChance 上，供 Step3 在 collision.js 中读取）
                 }
             },
         ]
