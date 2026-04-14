@@ -151,7 +151,18 @@ globs: ["src/game_phase.js"]
 
 **初始化**：`sys_resetGame` 中同时重置两个标志位为 `false`。
 
-## 7. 难度平衡系统 (Difficulty Balance System)
+## 7. 清屏奖励规则 (Full-Clear Bonus)
+
+**规则描述**：若玩家在上一回合战斗阶段结束时完成了全场清屏（`activeEnemies.length === 0`），则本回合普通敌人行生成数量至少为 3 行。
+
+**实现机制**：
+- **标志位**：`this._prevRoundCleared`（布尔型）
+  - 在 `phase_finalizeRound` 结尾将 `clearedThisRound` 写入该标志位。
+  - 在 `sys_resetGame` 中初始化为 `false`。
+- **应用时机**：在 `phase_finalizeRound` 的普通敌人行生成逻辑中，若 `this._prevRoundCleared === true` 且当前计算得到的 `spawnCount < 3`，则强制将 `spawnCount` 提升至 3。
+- **与 Boss 回合的关系**：该规则仅在普通回合（非 Boss 回合）下生效，Boss 回合不生成普通敌人行，不受此规则影响。
+
+## 8. 难度平衡系统 (Difficulty Balance System)
 ### 5.1 战后高压因子 (Post-Boss Surge)
 - **触发时机**: 击杀 Boss 时（监听 `boss:defeated` 事件）
 - **机制**: 

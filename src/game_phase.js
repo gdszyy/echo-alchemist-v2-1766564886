@@ -929,6 +929,8 @@ phase_gathering_getRandomPegType() {
     phase_finalizeRound() {
         // 1. 统计当前存活敌人数据
         const activeEnemies = this.enemies.filter(e => e.active);
+        // [清屏检测] 记录本回合是否完成了清屏，供下一回合生成逻辑使用
+        const clearedThisRound = activeEnemies.length === 0;
         // 使用 Set 统计有多少个不同的 Y 坐标（即有多少行）
         // Math.round 处理浮点误差，/50 是行高，确保归类准确
         const uniqueRows = new Set(activeEnemies.map(e => Math.round(e.pos.y / this.enemyHeight)));
@@ -983,8 +985,12 @@ phase_gathering_getRandomPegType() {
             const rowCountCurrent = uniqueRows.size;
             let spawnCount = 1;
             if (rowCountCurrent < 4) spawnCount = 3;
+            // [清屏奖励] 上一回合完成清屏，本回合至少推进 3 行敌人
+            if (this._prevRoundCleared && spawnCount < 3) spawnCount = 3;
             this.spawn_spawnEnemyRow(spawnCount);
         }
+        // [清屏状态] 将本回合清屏结果写入标志位，供下一回合读取
+        this._prevRoundCleared = clearedThisRound;
 
         // 重置倍率
         if (this.nextRoundHpMultiplier > 1) {
