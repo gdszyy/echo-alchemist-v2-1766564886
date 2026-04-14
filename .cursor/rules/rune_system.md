@@ -32,11 +32,14 @@ globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js", "src/c
 - **解析算法变更 (Task 1 升级)**: 
   - `parseRuneGrid` 函数现在会统计同一词条被多条路径匹配的次数，将该次数作为词条的 `level` 写入返回的 `activatedRunewords` 数组中每个对象。
   - 移除了「同一词条仅激活一次」的限制，允许通过天胡布局提升词条等级。
+- **匹配逻辑优化 (当前)**:
+  - **无序匹配**: 移除了对符文顺序的严格限制。现在只要在同一条路径（横、竖、斜）上凑齐词条所需的符文，无论顺序如何均可激活。
+  - **内部实现**: 由 `sequenceMatchesPattern` (严格顺序) 升级为 `sequenceMatchesPatternUnordered` (基于频率统计的无序匹配)。
 
 ## 4. 合成与重铸规则
 - **合成 (`rune_merge`)**: 
   - 条件: 3个同 ID、同等级的符文。
-  - 结果: 合成为1个高一等级的同 ID 符文。
+  - 结果: 合成为1个高一等级 of 同 ID 符文。
   - **局外奖励**: 合成成功后，根据合成结果等级自动发放符文碎片：Lv.1 得 1 片，Lv.2 得 3 片，Lv.3 得 6 片。奖励在 `ui_doRuneMerge` 中通过 `meta_addCurrency` 发放，并伴随符文碎片飞向局外货币显示区的动画。
 - **重铸 (`rune_reforge`)**: 
   - 条件: 任意3个符文。

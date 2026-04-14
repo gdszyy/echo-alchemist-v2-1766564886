@@ -200,14 +200,11 @@ function calcRuneBaseStats(runeGrid, runeDb) {
  */
 function findPatternInSequence(runes, pattern, indices, idGrid) {
     const patternLen = pattern.length;
-    const runesLen = runes.length;
-
-    // 构建路径上所有格子（含 null）的索引序列，用于精确定位
-    // indices 是路径上所有格子的索引（包含 null 格）
-    // 我们需要在 indices 中找到连续的非 null 格子序列匹配 pattern
 
     // 策略：在 indices 数组中，找到一个子序列（连续索引），
-    // 其对应的非 null 符文恰好等于 pattern（正向或反向）
+    // 其对应的非 null 符文集合（忽略顺序）与 pattern 集合一致。
+    // 由于 3x3 网格中路径长度固定为 3，且大部分 pattern 长度也为 3，
+    // 这里依然支持在较长路径中滑动窗口查找（虽然目前路径都是 3）。
 
     // 枚举所有可能的起始位置
     for (let start = 0; start <= indices.length - patternLen; start++) {
@@ -215,12 +212,8 @@ function findPatternInSequence(runes, pattern, indices, idGrid) {
         const slice = indices.slice(start, start + patternLen);
         const sliceRunes = slice.map(i => idGrid[i]);
 
-        // 正向匹配：slice 中的符文（忽略 null）与 pattern 完全一致
-        if (sequenceMatchesPattern(sliceRunes, pattern)) {
-            return slice;
-        }
-        // 反向匹配：slice 中的符文（忽略 null）与 pattern 反转后完全一致
-        if (sequenceMatchesPattern(sliceRunes, [...pattern].reverse())) {
+        // 无序匹配：slice 中的符文（忽略 null 和顺序）与 pattern 组成一致
+        if (sequenceMatchesPatternUnordered(sliceRunes, pattern)) {
             return slice;
         }
     }
@@ -229,18 +222,36 @@ function findPatternInSequence(runes, pattern, indices, idGrid) {
 }
 
 /**
- * sequenceMatchesPattern - 检查格子序列（含 null）是否与 pattern 完全匹配
+ * sequenceMatchesPatternUnordered - 检查格子序列（含 null）是否与 pattern 无序匹配
  *
- * 规则：过滤掉 null 后，剩余符文与 pattern 完全相同（顺序一致，数量相等）
+ * 规则：过滤掉 null 后，剩余符文的种类和数量与 pattern 完全相同（忽略顺序）
  *
  * @param {Array<string|null>} sliceRunes - 格子序列中的符文（可含 null，已统一为字符串格式）
  * @param {string[]} pattern - 目标 pattern
  * @returns {boolean}
  */
-function sequenceMatchesPattern(sliceRunes, pattern) {
+function sequenceMatchesPatternUnordered(sliceRunes, pattern) {
     const filtered = sliceRunes.filter(r => r !== null && r !== undefined);
     if (filtered.length !== pattern.length) return false;
-    return filtered.every((r, i) => r === pattern[i]);
+
+    // 统计 pattern 中各符文出现的次数
+    const patternCounts = {};
+    for (const id of pattern) {
+        patternCounts[id] = (patternCounts[id] || 0) + 1;
+    }
+
+    // 统计 filtered 中各符文出现的次数
+    const filteredCounts = {};
+    for (const id of filtered) {
+        filteredCounts[id] = (filteredCounts[id] || 0) + 1;
+    }
+
+    // 比较两个统计对象是否一致
+    const patternKeys = Object.keys(patternCounts);
+    const filteredKeys = Object.keys(filteredCounts);
+    if (patternKeys.length !== filteredKeys.length) return false;
+
+    return patternKeys.every(key => patternCounts[key] === filteredCounts[key]);
 }
 
 // ==================== 符文合成与重铸系统 ====================
