@@ -602,6 +602,9 @@ phase_gathering_getRandomPegType() {
         this.sys_resetMultiplier(); 
         this.burstQueue = []; 
         this.pendingShots = [];
+        // [照射词条] 每回合开始时重置持续照射状态
+        this._continuousLaserFiring = false;
+        this._continuousLaserState = null;
         
         // 初始化当前回合伤害记录
         this.shotDamageHistory = [];
@@ -1515,6 +1518,10 @@ phase_gathering_getRandomPegType() {
             this.combat_wind_updateActiveStrangles(timeScale);
             // 活跃风道更新（基于 Tick 的同步切割伤害）
             this.combat_wind_updateActiveTunnels(timeScale);
+            // [照射词条] 持续照射状态机驱动（每 0.5s 重算一次激光）
+            if (this._continuousLaserFiring) {
+                this.combat_continuousLaser_update(timeScale);
+            }
             // 拖拽瞄准线
             if (this.isDragging && this.projectiles.length === 0 && this.ammoQueue.length > 0 && this.burstQueue.length === 0) {
                 const start = new Vec2(this.width / 2, this.height - 80);

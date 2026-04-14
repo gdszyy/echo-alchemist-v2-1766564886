@@ -2235,6 +2235,24 @@ export const combat_system = {
             this.shotDamageMap.get(shotId).projectileCount++;
         }
 
+        // ─────────────────────────────────────────────────────────────────
+        // [照射词条] 持续照射模式：启动状态机，每 0.5s 重新计算一次激光
+        // 只在「首次发射」时启动（非持续照射内部的重算调用）
+        // ─────────────────────────────────────────────────────────────────
+        const irradiationFx = this.activeRunewordEffects && this.activeRunewordEffects['irradiation'];
+        if (irradiationFx && !this._continuousLaserFiring) {
+            this._continuousLaserFiring = true;
+            this._continuousLaserState = {
+                startX, startY, vel, recipe,
+                tickFrames: 0,
+                tickInterval: Math.round(0.5 * 60), // 0.5s = 30帧
+                totalDuration: Math.round(3.0 * 60), // 持续 3s = 180帧
+                elapsedFrames: 0,
+                shotId
+            };
+            // isVisualEffectActive 由持续照射状态机维持，不再用 setTimeout 清除
+        }
+
         // --- 1. 参数计算 ---
         this.isVisualEffectActive = true;
         // [射程] 基础 500 * 1.35 + 每层穿透 250 (决定光线能跑多远)
@@ -2360,9 +2378,12 @@ export const combat_system = {
 
         // 音效：越粗越低沉
         audio.playTone(Math.max(100, 800 - mainWidth * 20), 'sawtooth', 0.15, 0.2 + mainWidth * 0.01);
-        setTimeout(() => {
-            this.isVisualEffectActive = false;
-        }, 600);
+        // [照射词条] 持续照射模式下，isVisualEffectActive 由状态机维持，不在此清除
+        if (!this._continuousLaserFiring) {
+            setTimeout(() => {
+                this.isVisualEffectActive = false;
+            }, 600);
+        }
 
         // [统计] 激光发射完成，增加销毁计数以触发统计保存
         if (shotId !== null && this.shotDamageMap.has(shotId)) {
@@ -2377,6 +2398,44 @@ export const combat_system = {
                 this.ui_updateDamageStats();
                 this.shotDamageMap.delete(shotId);
             }
+        }
+    },
+
+    /**
+     * @method combat_continuousLaser_update
+     * @description 持续照射状态机的每帧驱动函数。
+     *   由 game_phase.js 的 combat update 循环调用。
+     *   每 0.5s（30帧）重新执行一次 combat_laser_fire 进行伤害计算和视觉刷新。
+     *   持续 3s 后自动结束，清理状态并释放 isVisualEffectActive。
+     * @param {number} timeScale - 当前帧时间缩放（通常为 1）
+     */
+    combat_continuousLaser_update(timeScale = 1) {
+        if (!this._continuousLaserFiring || !this._continuousLaserState) return;
+
+        const state = this._continuousLaserState;
+        state.elapsedFrames += timeScale;
+        state.tickFrames += timeScale;
+
+        // 维持 isVisualEffectActive 为 true（阻止回合结束判定）
+        this.isVisualEffectActive = true;
+
+        // 每 tickInterval 帧重新计算一次激光（伤害 + 视觉）
+        if (state.tickFrames >= state.tickInterval) {
+            state.tickFrames = 0;
+            // 重新执行激光射线计算（_continuousLaserFiring 已为 true，不会再次启动状态机）
+            this.combat_laser_fire(state.startX, state.startY, state.vel, state.recipe, state.shotId);
+        }
+
+        // 持续时间结束，清理状态
+        if (state.elapsedFrames >= state.totalDuration) {
+            this._continuousLaserFiring = false;
+            this._continuousLaserState = null;
+            // 重置所有敌人的照射叠加层数
+            this.enemies.forEach(e => { if (e._irradiationStacks) e._irradiationStacks = 0; });
+            // 延迟 600ms 释放 isVisualEffectActive（等待最后一帧激光视觉消失）
+            setTimeout(() => {
+                this.isVisualEffectActive = false;
+            }, 600);
         }
     },
 

@@ -10,6 +10,7 @@
 保留核心的战斗循环控制逻辑，主要包括：
 - **战斗回合推进** (`combat_activateSkill`, `combat_updateHitProgress`)
 - **弹药队列消耗与发射** (`combat_fireNextShot`, `combat_laser_fire`)
+- **持续照射状态机** (`combat_continuousLaser_update`)：照射词条激活时，每 0.5s 重算一次激光
 - **风系技能核心逻辑** (`combat_wind_triggerMagicCircle`, `combat_wind_executeCircleEffect`)
 - **战斗状态管理**（符文充能状态初始化等）
 
@@ -26,7 +27,7 @@
 
 - **敌人移动碰撞检测** (`combat_tryMoveEnemy`)：AABB 碰撞与边界检测。
 - **激光射线检测** (`combat_laser_castRay`)：墙壁与护盾敌人的反射面检测。
-- **激光穿透判定与折射任务生成** (`combat_laser_processPenetration`)：线段与敌人包围盒的相交判定。已实现穿透衰减机制（Task B2，2026-04-11）：按激光路径顺序排序命中敌人，第 n 个目标（从 0 计）受到的伤害 = 原始伤害 × 0.5^n。已新增折射机制（Task B3，2026-04-13）：击中敌人后独立判定折射概率，触发时消耗 1 层 bounce 属性，返回折射任务列表供主函数队列处理。
+- **激光穿透判定与折射任务生成** (`combat_laser_processPenetration`)：线段与敌人包围盒的相交判定。已实现穿透衰减机制（Task B2，2026-04-11）：按激光路径顺序排序命中敌人，第 n 个目标（从 0 计）受到的伤害 = 原始伤害 × 0.5^n。已新增折射机制（Task B3，2026-04-13）：击中敌人后独立判定折射概率，触发时消耗 1 层 bounce 属性，返回折射任务列表供主函数队列处理。已重构照射词条行为（2026-04-14，见第 5 节）。
 
 函数签名变更：`combat_laser_processPenetration(p1, p2, recipe, remainLen, bouncesLeft, hitEnemiesSet, currentWidth)` 返回 `{ refractionTasks, bouncesLeft }`。
 
@@ -96,3 +97,35 @@ P(折射) = baseChance × laserRefractionDepthDecay ^ depth
 - **新增战斗阶段控制**：请在 `combat_system.js` 中添加。
 - **调整折射参数**：请修改 `config.js` 中 `gameplay` 对象的 `laserRefraction*` 字段，无需修改战斗逻辑代码。
 - **UI 表现修改**：禁止在战斗模块中直接修改 DOM，请抛出 `eventBus` 事件并在 UI 系统中处理。
+
+## 5. 照射词条重构详解（2026-04-14）
+
+照射词条（`runeword_irradiation`）的激光行为已从「一次性穿透射线」完全重构为「持续照射 + 随机折射」模式。
+
+### 5.1 持续照射状态机
+
+**状态变量**（挂载于 `Game` 实例）：
+
+| 变量 | 类型 | 说明 |
+|---|---|---|
+| `_continuousLaserFiring` | `boolean` | 是否处于持续照射状态 |
+| `_continuousLaserState` | `Object\|null` | 持续照射状态机数据（startX/Y、vel、recipe、tickFrames、elapsedFrames 等） |
+
+**生命周期**：
+1. 玩家发射激光弹药时，若照射词条激活且 `_continuousLaserFiring === false`，则启动状态机。
+2. `game_phase.js` 的 combat update 循环每帧调用 `combat_continuousLaser_update(timeScale)`。
+3. 每 30 帧（0.5s）重新执行一次 `combat_laser_fire`，刷新伤害计算和视觉。
+4. 持续 180 帧（3s）后自动结束，重置所有敌人的 `_irradiationStacks`，延迟 600ms 释放 `isVisualEffectActive`。
+5. 每回合开始时（`phase_switchPhase` 进入 combat 阶段）强制清理状态。
+
+### 5.2 照射模式下的碰撞行为（`collision.js`）
+
+当 `activeRunewordEffects['irradiation']` 激活时，`combat_laser_processPenetration` 进入照射模式：
+
+| 特性 | 普通模式 | 照射模式 |
+|---|---|---|
+| 穿透 | 命中所有路径上的敌人，第 n 个受 0.5^n 衰减 | **不穿透**：仅命中第一个敌人 |
+| 穿透层数（pierce）效果 | 增加射程（每层 +250px） | **伤害加深**：每层 pierce +1% 伤害 |
+| 折射 | 概率触发，消耗 bounce 层数 | **强制随机折射**：命中后必定在半径内随机选取目标折射，不消耗 bounce |
+| 折射颜色 | 偏绿（bounce 属性色） | 金色（`#fbbf24`，照射词条色） |
+| 累积伤害叠加 | 无 | 每次照射同一敌人 `_irradiationStacks++`，额外伤害 = 层数 × damageAmp × 基础伤害 |

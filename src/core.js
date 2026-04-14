@@ -119,6 +119,8 @@ class Game {
         this.variantLevels = { flying_sword: 1 };
         this.marbleSizeBonus=0;
         this.isVisualEffectActive = false;
+        this._continuousLaserFiring = false;  // [照射词条] 持续照射状态标志
+        this._continuousLaserState = null;    // [照射词条] 持续照射状态机数据
         this.isWheelSpinning = false;
         this.canvas = document.getElementById('gameCanvas'); 
         this.ctx = this.canvas.getContext('2d');

@@ -130,14 +130,15 @@ export const CollisionSystem = {
      * @method combat_laser_processPenetration
      * @description 处理激光线段路径上所有普通敌人的穿透伤害，并在命中后尝试触发折射。
      *
-     *   穿透衰减：第 n 个目标（0-indexed）受到的伤害 = 原始伤害 × (0.5)^n
+     *   【照射词条激活时的特殊行为】：
+     *     - 不穿透：激光命中第一个敌人后立即停止，不继续伤害后续敌人。
+     *     - 强制随机折射：命中第一个敌人后，在折射搜寻半径内随机选取一个目标进行折射，
+     *       不消耗 bounce 层数，折射方向每次重新计算（由持续照射状态机每 0.5s 重调本函数）。
+     *     - 穿透层数改为伤害加深：每层 pierce 使该次命中伤害额外 +1%。
      *
-     *   折射机制：
-     *     - 每个被命中的敌人独立判定折射概率。
-     *     - 概率公式：min(maxChance, baseChance + bounce × bonusPerBounce)
-     *     - 触发时消耗 1 层 bounce，在折射搜寻半径内随机选取一个未被本次激光击中的敌人。
-     *     - 折射光线继承剩余长度，伤害按 laserRefractionDamageDecay 衰减，宽度按 laserRefractionWidthDecay 衰减。
-     *     - 返回折射任务列表，由 combat_laser_fire 的队列循环处理，避免深度递归。
+     *   【普通模式（无照射词条）】：
+     *     穿透衰减：第 n 个目标（0-indexed）受到的伤害 = 原始伤害 × (0.5)^n
+     *     折射机制：每个被命中的敌人独立判定折射概率，触发时消耗 1 层 bounce。
      *
      * @param {Vec2} p1 - 线段起点
      * @param {Vec2} p2 - 线段终点
@@ -166,7 +167,7 @@ export const CollisionSystem = {
         const minY = Math.min(p1.y, p2.y) - 20;
         const maxY = Math.max(p1.y, p2.y) + 20;
 
-        // [穿透衰减] 收集命中敌人及其在激光路径上的投影参数 t（0~1），按距离排序后依次衰减伤害
+        // 收集命中敌人及其在激光路径上的投影参数 t（0~1），按距离排序
         const hits = [];
         const l2 = p1.dist(p2) * p1.dist(p2);
         if (l2 === 0) return { refractionTasks: [], bouncesLeft };
@@ -205,6 +206,94 @@ export const CollisionSystem = {
         const rfWidthDecay = rfCfg.laserRefractionWidthDecay || 0.85;
         const rfDepthDecay = rfCfg.laserRefractionDepthDecay || 0.65;
 
+        // ─────────────────────────────────────────────────────────────────────
+        // [照射词条] 检查是否激活
+        // ─────────────────────────────────────────────────────────────────────
+        const irradiationFx = this.activeRunewordEffects && this.activeRunewordEffects['irradiation'];
+
+        if (irradiationFx) {
+            // ═════════════════════════════════════════════════════════════════
+            // 【照射模式】：不穿透，命中第一个敌人后强制随机折射
+            // ═════════════════════════════════════════════════════════════════
+            if (hits.length === 0) return { refractionTasks: [], bouncesLeft };
+
+            // 只取第一个命中的敌人
+            const hit = hits[0];
+            const amp = (irradiationFx.params && irradiationFx.params.damageAmp) || 0;
+
+            // 穿透层数改为伤害加深：每层 pierce +1% 伤害
+            const pierce = recipe.pierce || 0;
+            const pierceBonus = 1 + pierce * 0.01;
+            const finalDamage = recipe.damage * pierceBonus;
+            const finalRecipe = { ...recipe, damage: finalDamage };
+
+            // 对第一个敌人造成伤害
+            this.combat_damageEnemy(hit.enemy, { config: finalRecipe, pos: new Vec2(hit.projX, hit.projY), isCopy: false });
+            hitEnemiesSet.add(hit.enemy);
+
+            // 视觉：受击点特效
+            if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#fff', 'spark');
+
+            // 照射词条 Hook：累积照射同一敌人伤害加深
+            if (!hit.enemy._irradiationStacks) hit.enemy._irradiationStacks = 0;
+            hit.enemy._irradiationStacks++;
+            const stackDmg = hit.enemy._irradiationStacks * amp * finalDamage;
+            if (stackDmg >= 1) {
+                const stackResult = hit.enemy.takeDamage(stackDmg);
+                this.combat_recordDamage(stackResult.actualDamage, 'pyro', 'main', null);
+                this.spawn_createFloatingText(hit.enemy.pos.x, hit.enemy.pos.y - 35, `照射+${Math.ceil(stackResult.actualDamage)}`, '#fbbf24');
+            }
+
+            // 炽热光线词条 Hook：激光命中敌人时额外升温
+            const blazingBeamFx = this.activeRunewordEffects && this.activeRunewordEffects['blazing_beam'];
+            if (blazingBeamFx) {
+                const tempIncrease = (blazingBeamFx.params && blazingBeamFx.params.tempIncrease) || 0;
+                hit.enemy.applyTemp(tempIncrease);
+                if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#f97316', 'spark');
+            }
+
+            // 强制随机折射：在折射半径内随机选取一个未被命中的敌人
+            const rfSearchRadius = rfCfg.laserRefractionRadius || 150;
+            const candidates = this.enemies.filter(e =>
+                e.active &&
+                e !== hit.enemy &&
+                !hitEnemiesSet.has(e) &&
+                e.pos.dist(hit.enemy.pos) <= rfSearchRadius
+            );
+
+            if (candidates.length > 0) {
+                // 随机选取目标
+                const target = candidates[Math.floor(Math.random() * candidates.length)];
+                const rfDir = target.pos.sub(new Vec2(hit.projX, hit.projY)).norm();
+                const rfRemainLen = remainLen * (1 - hit.t);
+                // 折射伤害：继承当前伤害 × 折射衰减系数
+                const rfDamage = finalDamage * rfDmgDecay;
+                const rfWidth = Math.max(1, laserVisualWidth * rfWidthDecay);
+
+                // 折射特效：金色火花（代表照射词条触发）
+                this.spawn_createParticle(hit.projX, hit.projY, '#fbbf24', 'spark');
+                this.spawn_createParticle(hit.projX, hit.projY, '#fde68a', 'spark');
+
+                // 折射任务加入队列（不消耗 bounce，bouncesLeft 保持不变）
+                refractionTasks.push({
+                    startPos: new Vec2(hit.projX, hit.projY),
+                    dir: rfDir,
+                    remainLen: rfRemainLen,
+                    recipe: { ...recipe, damage: rfDamage },
+                    bouncesLeft,
+                    hitEnemiesSet,
+                    width: rfWidth,
+                    refractionDepth: refractionDepth + 1
+                });
+            }
+
+            return { refractionTasks, bouncesLeft };
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // 【普通模式】：穿透衰减 + 概率折射（原有逻辑）
+        // ═════════════════════════════════════════════════════════════════════
+
         // 按穿透顺序施加衰减伤害：第 n 个目标（0-indexed）受到 原始伤害 × 0.5^n
         hits.forEach((hit, index) => {
             const damageMultiplier = Math.pow(0.5, index);
@@ -216,21 +305,7 @@ export const CollisionSystem = {
             hitEnemiesSet.add(hit.enemy);
             // 视觉：受击点特效
             if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#fff', 'spark');
-            // [Agent D] 照射词条 Hook：激光累积照射同一敌人伤害加深
-            const irradiationFx = this.activeRunewordEffects && this.activeRunewordEffects['irradiation'];
-            if (irradiationFx) {
-                const amp = (irradiationFx.params && irradiationFx.params.damageAmp) || 0;
-                // 初始化敌人的累积照射计数器（每次激光发射时重置）
-                if (!hit.enemy._irradiationStacks) hit.enemy._irradiationStacks = 0;
-                hit.enemy._irradiationStacks++;
-                // 对敌人施加额外伤害：层数 × 单次加深比例 × 基础伤害
-                const stackDmg = hit.enemy._irradiationStacks * amp * recipe.damage;
-                if (stackDmg >= 1) {
-                    const stackResult = hit.enemy.takeDamage(stackDmg);
-                    this.combat_recordDamage(stackResult.actualDamage, 'pyro', 'main', null);
-                    this.spawn_createFloatingText(hit.enemy.pos.x, hit.enemy.pos.y - 35, `照射+${Math.ceil(stackResult.actualDamage)}`, '#fbbf24');
-                }
-            }
+
             // [Agent D] 笼热光线词条 Hook：激光命中敌人时额外升温
             const blazingBeamFx = this.activeRunewordEffects && this.activeRunewordEffects['blazing_beam'];
             if (blazingBeamFx) {
