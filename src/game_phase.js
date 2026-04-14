@@ -166,16 +166,20 @@ export const game_phase = {
 
             } else if (boardLayout === 'sparse') {
                 // 稀疏间隔：偶数行正常列数，奇数行减 4 列居中
-                // [修复] 奇数行加标准交错偏移，防止弹珠直线穿透
+                // 设计意图：行与行之间不交错（奇数行纯居中），只有最后两行交错，
+                // 以便弹珠顺利触发底部粉色陷阱效果并被底部反弹。
+                const isLastTwoRows = (r >= rows - 2);
                 if (!isOddRow) {
                     rowCols = baseCols;
                     rowOffsetX = 0; // 偶数行正常，不交错偏移
                 } else {
                     const narrowCols = Math.max(3, baseCols - 4);
                     rowCols = narrowCols;
-                    // 奇数行居中后再加标准交错偏移
                     const rowWidth = (narrowCols - 1) * spacingX;
-                    rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX + spacingX / 2;
+                    // 普通奇数行：纯居中，不加交错偏移（行间对齐，弹珠可直线穿越蓄力）
+                    // 最后两行：加标准交错偏移，形成「底部粉色陷阱」必经区
+                    const staggerOffset = isLastTwoRows ? spacingX / 2 : 0;
+                    rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX + staggerOffset;
                 }
 
             } else if (boardLayout === 'mirror_sync') {
