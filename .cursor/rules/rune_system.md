@@ -304,7 +304,6 @@ peg.level = game.activeRunewordEffects['flying_sword_unlock'].params.level || 1;
 
 这使高等级词条（如词条等级 3）能直接生成 Lv.3 的特殊钉子，解锁更强的视觉效果和战斗行为。
 
-<<<<<<< HEAD
 ## 10. 成长型低级词条规范 (Task A + Task B)
 
 > **状态**: 已实现（配置注册 + 核心战斗发射流拦截 Task A，实体行为与机制结算 Task B）
@@ -372,52 +371,79 @@ peg.level = game.activeRunewordEffects['flying_sword_unlock'].params.level || 1;
 | `_kineticDecayBonus` | number (0~1) | `kinetic_decay` | Projectile 命中 |
 | `_kineticDecayRate` | number (0~1) | `kinetic_decay` | Projectile 命中 |
 | `_echoShotChance` | number (0~1) | `echo_shot` | Projectile 首次命中 |
-=======
-## 10. 符文词条-C：暴击机制与散射夹角缩小
 
-### 10.1 专注射击（focused_fire）— 暴击判定与视觉特效
+## 11. 属性共鸣系统 (Element Resonance)
 
-**实现位置：** `src/combat_system.js` → `combat_damageEnemy` 函数，`takeDamage` 调用前。
+> **状态**: 已实现（数据字典 + 状态计算 + 火焰战斗集成）
 
-**配方字段（由任务 A 写入 finalRecipe）：**
-- `_critChance`：暴击概率（0.0 ~ 1.0），默认 0（不暴击）
-- `_critDamage`：暴击伤害倍率（如 2.0 = 200%），默认 1.0
+### 11.1 系统概述
 
-**暴击判定逻辑：**
+属性共鸣是符文系统的横向增益维度。当玩家在 3x3 网格中放置同属性符文，累计属性层数（由 `calcRuneBaseStats` 计算）达到 **3 / 6 / 9** 时，分别激活 Tier1 / Tier2 / Tier3 共鸣效果，提供属于该属性的专属加强。
+
+### 11.2 数据结构 (`rune_config.js`)
+
+新增导出常量 `ELEMENT_RESONANCE_DB`，格式如下：
+
 ```js
-// 在 combat_damageEnemy 中，takeDamage 调用前
-let isCrit = false;
-const critChance = config._critChance || 0;
-const critDamage = config._critDamage || 1.0;
-if (critChance > 0 && Math.random() < critChance) {
-    isCrit = true;
-    dmg = dmg * critDamage;
+{
+  [element]: {
+    name: string,   // 共鸣名称
+    icon: string,   // 图标
+    tiers: [
+      { threshold: 3, label: string, desc: string, params: Object },  // Tier1
+      { threshold: 6, label: string, desc: string, params: Object },  // Tier2
+      { threshold: 9, label: string, desc: string, params: Object },  // Tier3
+    ]
+  }
 }
 ```
 
-**暴击视觉特效（isCrit === true 时触发）：**
-1. 浮动文字：`spawn_createFloatingText(hitX, hitY - 10, 'CRIT! -XXX', '#FFD700')`（金色，替代普通伤害数字）
-2. 粒子爆发：12 个 spark 粒子，金色（`#FFD700`）和红色（`#FF4444`）交替
-3. 金色冲击波：`new Shockwave(hitX, hitY, '#FFD700')`，`maxRadius` 覆写为 60，直接 push 到 `this.shockwaves`
+目前已定义 7 种属性的共鸣：`pyro`、`cryo`、`lightning`、`bounce`、`pierce`、`scatter`、`laser`。
 
-**注意：** 暴击时不再显示普通白色伤害数字，避免重复。
+### 11.3 状态计算入口 (`src/ui/rune_launcher.js`)
 
-### 10.2 散射矩阵（scatter_matrix）— 散射夹角缩小
+在 `ui_updateRuneGrid()` 的步骤 6.5 中，基于 `calcRuneBaseStats` 返回的 `baseStats` 计算当前激活的共鸣等级，并写入 `this.activeElementResonances`：
 
-**实现位置：** `src/spawn_system.js` → `spawn_spawnBullet` 函数中的散射子弹生成逻辑（实体子弹和激光散射两处）。
-
-**配方字段（由任务 A 写入 finalRecipe）：**
-- `_scatterAngleMultiplier`：散射夹角乘数（0.0 ~ 1.0），默认 1.0（不缩小）
-
-**散射角度修改逻辑：**
 ```js
-// 实体子弹散射（recipe.scatter > 0 && !recipe.wind 分支）
-const scatterAngleMult = recipe._scatterAngleMultiplier !== undefined ? recipe._scatterAngleMultiplier : 1.0;
-// 在 angleOffset 计算时乘以 scatterAngleMult
-const angleOffset = 0.2 * multiplier * sign * scatterAngleMult;
+// 结构：{ [element]: { label, desc, threshold, statCount, params } }
+this.activeElementResonances = newResonances;
 ```
 
-同样适用于激光散射分支（`recipe.isLaser && !recipe.wind` 内的散射处理）。
+- 从高阶到低阶逐一检查，取满足阈值的**最高阶**共鸣。
+- 共鸣等级变化时自动弹出 Toast 提示（如 `✨ 🔥 炎焰共鸣·一阶已激活！`）。
 
-**效果：** `_scatterAngleMultiplier = 0.3` 时，散射子弹夹角缩小 70%，形成更集中的弹幕。
->>>>>>> debe66b (feat(runeword-C): 实现暴击机制与散射夹角缩小)
+### 11.4 战斗层消费规范 (`src/combat_system.js`)
+
+在 `combat_damageEnemy` 的火焰伤害段，通过 `this.activeElementResonances['pyro']` 读取共鸣参数：
+
+| 共鸣参数 | 类型 | 作用 |
+|---|---|---|
+| `burnTempThreshold` | number | 火焰额外伤害触发温度（Tier1: 30°，Tier2/3: 0°，默认: 34°） |
+| `basePyroBonus` | number | 叠加到 `config.pyro` 上的基础属性加成（影响 `baseFireDmg` 计算） |
+| `pyroMultiplier` | number | 整体火焰伤害倍率（Tier1: 1.0，Tier2: 1.2，Tier3: 1.5） |
+| `explodeThreshold` | number\|null | 爆燃触发温度阈值（Tier3: 100，其余: null → 使用全局默认值 200） |
+
+**关键公式变化：**
+```js
+const effectivePyro = config.pyro + pyroBonus;           // 基础属性叠加共鸣加成
+const baseFireDmg = (effectivePyro * enemy.temp) / 200;  // 使用增强后的 pyro
+const finalFireDmg = baseFireDmg * meltdownMult * pyroResMult;  // 叠加熔毁词条 × 共鸣倍率
+```
+
+### 11.5 火焰共鸣效果速查
+
+| 共鸣等级 | 触发层数 | 燃烧触发温度 | 基础火焰属性 | 整体火焰伤害 | 爆燃阈值 |
+|---|---|---|---|---|---|
+| 无共鸣 | < 3 | ≥ 34° | +0 | ×1.0 | 200° |
+| 炎焰共鸣·一阶 | ≥ 3 | ≥ 30° | +5 | ×1.0 | 200° |
+| 炎焰共鸣·二阶 | ≥ 6 | ≥ 0° | +10 | ×1.2 | 200° |
+| 炎焰共鸣·三阶 | ≥ 9 | ≥ 0° | +25 | ×1.5 | 100° |
+
+### 11.6 重置规范
+
+- `sys_resetGame` 中已添加 `this.activeElementResonances = {}` 重置。
+- 存档恢复时通过 `ui_updateRuneGrid()` 自动重建共鸣状态，无需额外处理。
+
+### 11.7 扩展指引
+
+其余属性（cryo、lightning、bounce、pierce、scatter、laser）的共鸣参数已在 `ELEMENT_RESONANCE_DB` 中定义，战斗层集成留待后续迭代。集成时仿照 `pyro` 的模式，在对应伤害段读取 `this.activeElementResonances['<element>']` 即可。

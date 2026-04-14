@@ -500,5 +500,278 @@ const RARITY_DISPLAY = {
     legendary: { name: '传说',   color: '#f39c12' },
 };
 
+// ==================== 属性共鸣数据库 ====================
+/**
+ * ELEMENT_RESONANCE_DB - 属性共鸣效果数据库
+ *
+ * 当玩家在 3x3 网格中放置同属性符文，累计属性层数（由 calcRuneBaseStats 计算）
+ * 达到 3/6/9 时，分别激活 Tier1/Tier2/Tier3 共鸣效果。
+ *
+ * params 字段说明（以 pyro 为例）：
+ *   burnTempThreshold  {number}  触发火焰额外伤害所需的最低温度（默认 34）
+ *   basePyroBonus      {number}  基础火焰属性层数加成（叠加到 config.pyro 上）
+ *   pyroMultiplier     {number}  整体火焰伤害倍率（1.0 = 无加成）
+ *   explodeThreshold   {number}  爆燃触发温度阈值（null = 使用全局默认值 200）
+ */
+const ELEMENT_RESONANCE_DB = {
+    pyro: {
+        name: '炎焰共鸣',
+        icon: '🔥',
+        tiers: [
+            {
+                threshold: 3,
+                label: '炎焰共鸣·一阶',
+                desc: '火焰额外伤害触发温度降至 30°，基础火焰属性 +5',
+                params: {
+                    burnTempThreshold: 30,   // 原 34，降低为 30
+                    basePyroBonus: 5,        // 基础火焰属性层数 +5
+                    pyroMultiplier: 1.0,     // 整体火焰伤害倍率（无额外加成）
+                    explodeThreshold: null,  // 使用全局默认值 200
+                }
+            },
+            {
+                threshold: 6,
+                label: '炎焰共鸣·二阶',
+                desc: '火焰额外伤害触发温度降至 0°，基础火焰属性 +10，火焰伤害整体 +20%',
+                params: {
+                    burnTempThreshold: 0,    // 温度 >= 0 即触发
+                    basePyroBonus: 10,       // 基础火焰属性层数 +10
+                    pyroMultiplier: 1.2,     // 整体火焰伤害 +20%
+                    explodeThreshold: null,  // 使用全局默认值 200
+                }
+            },
+            {
+                threshold: 9,
+                label: '炎焰共鸣·三阶',
+                desc: '火焰额外伤害触发温度降至 0°，爆燃阈值降至 100°，基础火焰属性 +25，火焰伤害整体 +50%',
+                params: {
+                    burnTempThreshold: 0,    // 温度 >= 0 即触发
+                    basePyroBonus: 25,       // 基础火焰属性层数 +25
+                    pyroMultiplier: 1.5,     // 整体火焰伤害 +50%
+                    explodeThreshold: 100,   // 爆燃阈值降至 100
+                }
+            },
+        ]
+    },
+    cryo: {
+        name: '冰霜共鸣',
+        icon: '❄️',
+        tiers: [
+            {
+                threshold: 3,
+                label: '冰霜共鸣·一阶',
+                desc: '冰冻触发温度提升至 -25°，基础冰霜属性 +5',
+                params: {
+                    freezeTempThreshold: -25,  // 原 -34，更容易触发冰冻
+                    baseCryoBonus: 5,
+                    cryoMultiplier: 1.0,
+                }
+            },
+            {
+                threshold: 6,
+                label: '冰霜共鸣·二阶',
+                desc: '冰冻触发温度提升至 -15°，基础冰霜属性 +10，冰霜伤害整体 +20%',
+                params: {
+                    freezeTempThreshold: -15,
+                    baseCryoBonus: 10,
+                    cryoMultiplier: 1.2,
+                }
+            },
+            {
+                threshold: 9,
+                label: '冰霜共鸣·三阶',
+                desc: '冰冻触发温度提升至 -5°，基础冰霜属性 +25，冰霜伤害整体 +50%，冻结状态下物理伤害加深 +30%',
+                params: {
+                    freezeTempThreshold: -5,
+                    baseCryoBonus: 25,
+                    cryoMultiplier: 1.5,
+                    frozenPhysDmgBonus: 0.3,  // 冻结状态下物理伤害额外加深
+                }
+            },
+        ]
+    },
+    lightning: {
+        name: '雷霆共鸣',
+        icon: '⚡',
+        tiers: [
+            {
+                threshold: 3,
+                label: '雷霆共鸣·一阶',
+                desc: '闪电链基础触发概率 +15%，基础闪电属性 +5',
+                params: {
+                    chainChanceBonus: 0.15,
+                    baseLightningBonus: 5,
+                    lightningMultiplier: 1.0,
+                }
+            },
+            {
+                threshold: 6,
+                label: '雷霆共鸣·二阶',
+                desc: '闪电链基础触发概率 +30%，基础闪电属性 +10，闪电伤害整体 +20%',
+                params: {
+                    chainChanceBonus: 0.30,
+                    baseLightningBonus: 10,
+                    lightningMultiplier: 1.2,
+                }
+            },
+            {
+                threshold: 9,
+                label: '雷霆共鸣·三阶',
+                desc: '闪电链基础触发概率 +50%，基础闪电属性 +25，闪电伤害整体 +50%，闪电链可对同一目标二次触发',
+                params: {
+                    chainChanceBonus: 0.50,
+                    baseLightningBonus: 25,
+                    lightningMultiplier: 1.5,
+                    allowDoubleChain: true,
+                }
+            },
+        ]
+    },
+    bounce: {
+        name: '弹跳共鸣',
+        icon: '🔄',
+        tiers: [
+            {
+                threshold: 3,
+                label: '弹跳共鸣·一阶',
+                desc: '弹跳伤害加成 +15%，基础弹跳属性 +5',
+                params: {
+                    bounceDmgBonus: 0.15,
+                    baseBounceBonus: 5,
+                }
+            },
+            {
+                threshold: 6,
+                label: '弹跳共鸣·二阶',
+                desc: '弹跳伤害加成 +30%，基础弹跳属性 +10，每次弹跳后伤害不衰减',
+                params: {
+                    bounceDmgBonus: 0.30,
+                    baseBounceBonus: 10,
+                    noBounceDecay: true,
+                }
+            },
+            {
+                threshold: 9,
+                label: '弹跳共鸣·三阶',
+                desc: '弹跳伤害加成 +50%，基础弹跳属性 +25，每次弹跳后伤害不衰减，弹跳次数 +2',
+                params: {
+                    bounceDmgBonus: 0.50,
+                    baseBounceBonus: 25,
+                    noBounceDecay: true,
+                    extraBounces: 2,
+                }
+            },
+        ]
+    },
+    pierce: {
+        name: '穿透共鸣',
+        icon: '💠',
+        tiers: [
+            {
+                threshold: 3,
+                label: '穿透共鸣·一阶',
+                desc: '穿透伤害加成 +15%，基础穿透属性 +5',
+                params: {
+                    pierceDmgBonus: 0.15,
+                    basePierceBonus: 5,
+                }
+            },
+            {
+                threshold: 6,
+                label: '穿透共鸣·二阶',
+                desc: '穿透伤害加成 +30%，基础穿透属性 +10，穿透命中后额外施加 5 点火焰温度',
+                params: {
+                    pierceDmgBonus: 0.30,
+                    basePierceBonus: 10,
+                    pierceApplyTemp: 5,
+                }
+            },
+            {
+                threshold: 9,
+                label: '穿透共鸣·三阶',
+                desc: '穿透伤害加成 +50%，基础穿透属性 +25，穿透命中后额外施加 15 点火焰温度，穿透次数 +1',
+                params: {
+                    pierceDmgBonus: 0.50,
+                    basePierceBonus: 25,
+                    pierceApplyTemp: 15,
+                    extraPierces: 1,
+                }
+            },
+        ]
+    },
+    scatter: {
+        name: '散射共鸣',
+        icon: '🌟',
+        tiers: [
+            {
+                threshold: 3,
+                label: '散射共鸣·一阶',
+                desc: '散射子弹数量 +1，基础散射属性 +5',
+                params: {
+                    extraScatterShots: 1,
+                    baseScatterBonus: 5,
+                }
+            },
+            {
+                threshold: 6,
+                label: '散射共鸣·二阶',
+                desc: '散射子弹数量 +2，基础散射属性 +10，散射伤害整体 +20%',
+                params: {
+                    extraScatterShots: 2,
+                    baseScatterBonus: 10,
+                    scatterMultiplier: 1.2,
+                }
+            },
+            {
+                threshold: 9,
+                label: '散射共鸣·三阶',
+                desc: '散射子弹数量 +3，基础散射属性 +25，散射伤害整体 +50%，散射角度收窄 20%',
+                params: {
+                    extraScatterShots: 3,
+                    baseScatterBonus: 25,
+                    scatterMultiplier: 1.5,
+                    scatterAngleReduction: 0.2,
+                }
+            },
+        ]
+    },
+    laser: {
+        name: '激光共鸣',
+        icon: '🔦',
+        tiers: [
+            {
+                threshold: 3,
+                label: '激光共鸣·一阶',
+                desc: '激光每次命中额外升温 +3°，基础激光属性 +5',
+                params: {
+                    laserTempBonus: 3,
+                    baseLaserBonus: 5,
+                }
+            },
+            {
+                threshold: 6,
+                label: '激光共鸣·二阶',
+                desc: '激光每次命中额外升温 +8°，基础激光属性 +10，激光伤害整体 +20%',
+                params: {
+                    laserTempBonus: 8,
+                    baseLaserBonus: 10,
+                    laserMultiplier: 1.2,
+                }
+            },
+            {
+                threshold: 9,
+                label: '激光共鸣·三阶',
+                desc: '激光每次命中额外升温 +15°，基础激光属性 +25，激光伤害整体 +50%，激光穿透次数 +1',
+                params: {
+                    laserTempBonus: 15,
+                    baseLaserBonus: 25,
+                    laserMultiplier: 1.5,
+                    extraLaserPierces: 1,
+                }
+            },
+        ]
+    },
+};
+
 // ==================== 导出 ====================
-export { RUNE_DB, RUNEWORD_DB, COUNTER_MAP, STAT_DISPLAY, RARITY_DISPLAY };
+export { RUNE_DB, RUNEWORD_DB, COUNTER_MAP, STAT_DISPLAY, RARITY_DISPLAY, ELEMENT_RESONANCE_DB };

@@ -15,7 +15,7 @@
  * @module ui/rune_launcher
  */
 
-import { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY, RARITY_DISPLAY } from '../rune_config.js';
+import { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY, RARITY_DISPLAY, ELEMENT_RESONANCE_DB } from '../rune_config.js';
 import { parseRuneGrid, calcRuneBaseStats, getRuneId, rune_merge, rune_reforge, getNewRunewordsOnPlacement } from '../rune_system.js';
 import { audio } from '../audio.js';
 import { showToast } from '../entities.js';
@@ -423,6 +423,40 @@ export const rune_launcher_system = {
 
         // 6. 计算符文基础属性层数加成
         const baseStats = calcRuneBaseStats(this.runeGrid, RUNE_DB);  // [Mixin 正常用法：读取 Game 实例状态]
+
+        // 6.5 计算属性共鸣等级并写入 activeElementResonances
+        // 供战斗层（combat_system.js）读取共鸣参数
+        const newResonances = {};
+        for (const [element, resonanceDef] of Object.entries(ELEMENT_RESONANCE_DB)) {
+            const statCount = baseStats[element] || 0;
+            // 从高阶到低阶逐一检查，取满足阈值的最高阶
+            let activeTier = null;
+            for (let i = resonanceDef.tiers.length - 1; i >= 0; i--) {
+                if (statCount >= resonanceDef.tiers[i].threshold) {
+                    activeTier = resonanceDef.tiers[i];
+                    break;
+                }
+            }
+            if (activeTier) {
+                newResonances[element] = {
+                    label: activeTier.label,
+                    desc: activeTier.desc,
+                    threshold: activeTier.threshold,
+                    statCount,
+                    params: activeTier.params,
+                };
+            }
+        }
+        // 检测共鸣变化并弹出 Toast 提示
+        const prevResonances = this.activeElementResonances || {};
+        for (const [element, res] of Object.entries(newResonances)) {
+            const prev = prevResonances[element];
+            if (!prev || prev.threshold !== res.threshold) {
+                const def = ELEMENT_RESONANCE_DB[element];
+                showToast(`✨ ${def ? def.icon : ''} ${res.label}已激活！`);
+            }
+        }
+        this.activeElementResonances = newResonances;
 
         // 7. 更新属性加成汇总（展示词条加成 + 基础加成）
         this._ui_updateRuneStatsDisplay(activeStats, baseStats);

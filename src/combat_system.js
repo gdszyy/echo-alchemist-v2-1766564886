@@ -1755,30 +1755,44 @@ export const combat_system = {
         }
 
         // --- 2. [火属性核心逻辑] 燃烧与过热爆炸 ---
-        if (config.pyro > 0 && enemy.temp >= 34) {
-            // [Agent D] 熔毁词条 Hook：计算火焰伤害倍率
+        // [属性共鸣] 读取火焰共鸣参数，动态调整触发阈值、基础属性和伤害倍率
+        const pyroResonance = this.activeElementResonances && this.activeElementResonances['pyro'];
+        const pyroResParams = pyroResonance ? pyroResonance.params : null;
+        // 火焰额外伤害触发温度：共鸣可降至 30 或 0，默认 34
+        const burnTempThreshold = pyroResParams ? pyroResParams.burnTempThreshold : 34;
+        // 共鸣提供的基础火焰属性加成（叠加到实际 pyro 层数上）
+        const pyroBonus = pyroResParams ? (pyroResParams.basePyroBonus || 0) : 0;
+        const effectivePyro = config.pyro + pyroBonus;
+        // 共鸣整体火焰伤害倍率：1.0/1.2/1.5
+        const pyroResMult = pyroResParams ? (pyroResParams.pyroMultiplier || 1.0) : 1.0;
+
+        if (config.pyro > 0 && enemy.temp >= burnTempThreshold) {
+            // [Agent D] 熱毁词条 Hook：计算火焰伤害倍率
             let meltdownMult = 1.0;
             const meltdownFx = this.activeRunewordEffects && this.activeRunewordEffects['meltdown'];
             if (meltdownFx) {
                 const bonus = (meltdownFx.params && meltdownFx.params.damageBonus) || 0;
                 meltdownMult = 1.0 + bonus;
             }
-            // Step 1: 计算当前的基础额外火伤 (移除平方根以优化性能，改用线性比例 /150)
-            const baseFireDmg = (config.pyro * enemy.temp) / 200;
-            // Step 2: 造成基础燃烧伤害（应用熔毁倍率）
+            // Step 1: 计算当前的基础额外火伤（应用共鸣加成后的 effectivePyro）
+            const baseFireDmg = (effectivePyro * enemy.temp) / 200;
+            // Step 2: 造成基础燃烧伤害（应用熱毁倍率 × 共鸣倍率）
             if (baseFireDmg >= 1) {
-                const fireResult = enemy.takeDamage(baseFireDmg * meltdownMult);
+                const fireResult = enemy.takeDamage(baseFireDmg * meltdownMult * pyroResMult);
                 this.combat_recordDamage(fireResult.actualDamage, 'pyro', sourceType, shotId);
-                // 显示橙色燃烧字样
-                this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 25, `Burn ${Math.ceil(fireResult.actualDamage)}`, '#fb923c');
+                // 显示橙色燃烧字样（共鸣激活时展示共鸣等级标记）
+                const burnLabel = pyroResonance ? `🔥Burn ${Math.ceil(fireResult.actualDamage)}` : `Burn ${Math.ceil(fireResult.actualDamage)}`;
+                this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 25, burnLabel, '#fb923c');
             }
             // Step 3: [新增] 过热爆炸机制 (Small Explosion)
-            // 设定阈值 and 动态概率
+            // [属性共鸣] 三阶共鸣可将爆燃阈值从 200 降至 100
             const pyroCfg = CONFIG.mechanics.pyro;
-            const EXPLODE_THRESHOLD = pyroCfg.explodeThreshold; 
+            const EXPLODE_THRESHOLD = (pyroResParams && pyroResParams.explodeThreshold !== null && pyroResParams.explodeThreshold !== undefined)
+                ? pyroResParams.explodeThreshold
+                : pyroCfg.explodeThreshold;
             let explodeChance = 0;
             if (enemy.temp > EXPLODE_THRESHOLD) {
-                // 线性插值计算概率
+                // 线性插値计算概率
                 const range = pyroCfg.tempForMaxChance - EXPLODE_THRESHOLD;
                 const chanceRange = pyroCfg.maxExplodeChance - pyroCfg.baseExplodeChance;
                 explodeChance = pyroCfg.baseExplodeChance + (enemy.temp - EXPLODE_THRESHOLD) * (chanceRange / range);
@@ -1793,8 +1807,8 @@ export const combat_system = {
                 // B. 执行消耗：先扣除
                 enemy.temp -= consumedHeat;
 
-                // C. 计算爆炸伤害（应用熔毁倍率）
-                const explodeDmg = baseFireDmg * pyroCfg.damageMult * meltdownMult;
+                // C. 计算爆炸伤害（应用熱毁倍率 × 共鸣倍率）
+                const explodeDmg = baseFireDmg * pyroCfg.damageMult * meltdownMult * pyroResMult;
                 
                 if (explodeDmg >= 1) {
                     // --- 1. 视觉特效 (参考爆炸子弹) ---

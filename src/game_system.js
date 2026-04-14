@@ -254,6 +254,7 @@ export const game_system = {
         this.runeInventory = [];
         this.runeGrid = Array(9).fill(null);
         this.activeRunewordStats = {};
+        this.activeElementResonances = {};  // [属性共鸣] 重置属性共鸣状态
         this.runeLootItems = [];
         this.skillPoints = 0;
         this.ui.updateSkillPoints(this.skillPoints);
