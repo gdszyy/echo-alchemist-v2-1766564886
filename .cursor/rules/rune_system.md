@@ -304,9 +304,9 @@ peg.level = game.activeRunewordEffects['flying_sword_unlock'].params.level || 1;
 
 这使高等级词条（如词条等级 3）能直接生成 Lv.3 的特殊钉子，解锁更强的视觉效果和战斗行为。
 
-## 10. 成长型低级词条规范 (Task A)
+## 10. 成长型低级词条规范 (Task A + Task B)
 
-> **状态**: 已实现（配置注册 + 核心战斗发射流拦截，Task A 完成）
+> **状态**: 已实现（配置注册 + 核心战斗发射流拦截 Task A，实体行为与机制结算 Task B）
 
 ### 10.1 新增词条列表
 
@@ -338,7 +338,7 @@ peg.level = game.activeRunewordEffects['flying_sword_unlock'].params.level || 1;
 - `finalRecipe.bounce = 0`，`finalRecipe.multicast = 0`。
 - `finalRecipe._critChance = critChance`，`finalRecipe._critDamage = critDamage`（由 Projectile 命中逻辑读取）。
 
-**质量坍缩 (`mass_collapse`)**:
+**质量崩塌 (`mass_collapse`)**:
 - `layersCleared = (finalRecipe.multicast || 0) + (finalRecipe.scatter || 0)`。
 - `finalRecipe.multicast = 0`，`finalRecipe.scatter = 0`。
 - `finalRecipe.explosive = true`。
@@ -348,17 +348,17 @@ peg.level = game.activeRunewordEffects['flying_sword_unlock'].params.level || 1;
 **动能衰变 (`kinetic_decay`)**:
 - `finalRecipe._kineticDecayBonus = initialBonus`。
 - `finalRecipe._kineticDecayRate = decayPerHit`。
-- 由 `Projectile` 命中逻辑（`src/entities/projectile.js`）读取并在每次命中后衰减（待 Task B 实现）。
+- 由 `Projectile` 命中逻辑（`src/entities/projectile.js`）读取并在每次命中后衰减（**Task B 已实现**）。
 
 **回响射击 (`echo_shot`)**:
 - `finalRecipe._echoShotChance = triggerChance`。
-- 由 `Projectile` 首次命中逻辑（`src/entities/projectile.js`）读取并触发回响子弹（待 Task B 实现）。
+- 由 `Projectile` 首次命中逻辑（`src/entities/projectile.js`）读取并触发回响子弹（**Task B 已实现**）。
 
 ### 10.3 嗜血初锋击杀计数规范
 
 - 字段：`game.runewordKillCount`（number，本局战斗开始时初始化为 0）。
-- 每次敌人死亡时（`combat_damageEnemy` 中 `k` 为 true 时），若 `bloodthirst_growth` 词条激活，则 `this.runewordKillCount++`。
-- 战斗结束时随其他战斗状态一起重置。
+- 每次敌人死亡时（`combat_damageEnemy` 中 `killed` 为 true 时），若 `bloodthirst_growth` 词条激活，则 `this.runewordKillCount++`（**Task B 已实现**）。
+- `phase_startCombatPhase` 开始时重置 `this.runewordKillCount = 0`（**Task B 已实现**）。
 
 ### 10.4 配方元数据字段速查
 

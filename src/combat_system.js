@@ -1907,6 +1907,12 @@ export const combat_system = {
         if (killed) { 
             this.spawn_addScore(enemy.maxHp);
             
+            // [词条 Hook] 嗜血初锋 (bloodthirst_growth)
+            if (this.activeRunewordEffects && this.activeRunewordEffects['bloodthirst_growth']) {
+                if (typeof this.runewordKillCount === 'undefined') this.runewordKillCount = 0;
+                this.runewordKillCount++;
+            }
+            
             // 事件总线广播敌人死亡
             eventBus.emit(EVENT_TYPES.COMBAT_ENEMY_KILLED, {
                 enemy: enemy,

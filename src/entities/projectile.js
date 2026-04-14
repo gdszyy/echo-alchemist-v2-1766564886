@@ -63,6 +63,12 @@ class Projectile {
         this.hasAreaDamage = config.damage > 0;
         this.maxDurability = (this.maxBounces + this.maxPierces) || 1;
         this.hitCooldowns = new Map();
+        
+        // [词条 Hook] 动能衰变 (kinetic_decay)
+        this._kineticDecayCurrentBonus = config._kineticDecayBonus || 0;
+        
+        // [词条 Hook] 回响射击 (echo_shot)
+        this._echoShotFired = config._echoShotFired || false;
         this.rotation = 0;
         this.windBladeAngle = 0; // 风属性环绕风刃的旋转角度
         this.lifeTime = 60 * 30; // [修改] 加倍子弹生命时间 (从15秒增加到30秒)
@@ -238,6 +244,42 @@ class Projectile {
             this.hitCooldowns.set(e, CONFIG.gameplay.hitCooldowns);
             this.lastHitEnemy = e;
             this.onHit(e, enemies);
+
+            // [词条 Hook] 回响射击 (echo_shot)
+            // 首次命中时，有概率触发回响射击，按原角度额外发射一颗子弹
+            if (!this._echoShotFired && this.config._echoShotChance && Math.random() < this.config._echoShotChance) {
+                this._echoShotFired = true; // 标记已触发，防止重复触发
+                if (typeof game !== 'undefined' && game.burstQueue) {
+                    // 创建新的配方，继承原配方，但清空分裂属性并标记已回响
+                    const echoRecipe = {
+                        ...this.config,
+                        multicast: 0,
+                        scatter: 0,
+                        bounce: 0,
+                        _echoShotFired: true // 传递标记给新子弹
+                    };
+                    
+                    // 速度方向：当前速度方向
+                    const speed = this.vel.mag();
+                    const dir = speed > 0 ? this.vel.mult(1 / speed) : new Vec2(0, 1);
+                    const newVel = dir.mult(speed > 0 ? speed : 10);
+                    
+                    // 推入 burstQueue
+                    game.burstQueue.push({
+                        delay: 0,
+                        vel: newVel,
+                        recipe: echoRecipe,
+                        shotId: this.shotId,
+                        isLast: false
+                    });
+                    
+                    // 视觉反馈
+                    if (game.spawn_createFloatingText) {
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'ECHO!', '#facc15');
+                    }
+                }
+            }
+
             if (this.config.flying_sword) {
                 if (typeof game !== 'undefined') game.combat_flyingSword_assignTarget(e);
             }
@@ -461,11 +503,22 @@ class Projectile {
         // 实现：在 combat_damageEnemy 之前计算伤害加深系数，通过 damageOverride 传入
         // ─────────────────────────────────────────────────────────────────────
         let damageOverride = null;
+        
+        // 计算基础伤害（包含 isCopy 平衡）
+        let baseDmg = this.isCopy ? this.config.damage * 0.5 : this.config.damage;
+        
+        // [词条 Hook] 动能衰变 (kinetic_decay)
+        // 伤害值乘以 (1 + _kineticDecayCurrentBonus)，然后衰减
+        if (this._kineticDecayCurrentBonus > 0) {
+            baseDmg = baseDmg * (1 + this._kineticDecayCurrentBonus);
+            this._kineticDecayCurrentBonus -= (this.config._kineticDecayRate || 0);
+            if (this._kineticDecayCurrentBonus < 0) this._kineticDecayCurrentBonus = 0;
+            damageOverride = baseDmg;
+        }
+
         if (typeof game !== 'undefined' && game.combat_runeword_absoluteZero_calcAmp) {
             const amp = game.combat_runeword_absoluteZero_calcAmp(enemy);
             if (amp > 0) {
-                // 计算加深后的伤害（包含 isCopy 平衡）
-                const baseDmg = this.isCopy ? this.config.damage * 0.5 : this.config.damage;
                 damageOverride = baseDmg * (1 + amp);
             }
         }

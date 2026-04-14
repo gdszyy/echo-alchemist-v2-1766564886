@@ -610,6 +610,10 @@ phase_gathering_getRandomPegType() {
         this.shotDamageHistory = [];
         this.currentViewingRound = 0; 
         
+        // [词条 Hook] 嗜血初锋 (bloodthirst_growth)
+        // 每局开始时重置击杀计数
+        this.runewordKillCount = 0;
+        
         // [符文系统] 记录本回合开始时的敌人数量，用于动态掉落率计算
         this.spawnedEnemiesInRound = this.enemies.filter(e => e.active).length;
 
