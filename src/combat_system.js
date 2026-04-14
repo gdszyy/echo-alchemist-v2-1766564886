@@ -2069,7 +2069,7 @@ export const combat_system = {
             // --- 3. 造成范围伤害与效果 ---
             this.enemies.forEach(other => {
                 // 排除自身 & 距离检测 (爆炸半径 100)
-                if (other !== enemy && other.active && projectile.pos.dist(other.pos) < 100) { 
+                if (other !== enemy && other.active && projectile.pos.dist(other.pos) < 100 * (config._explosionRadiusMult || 1.0)) { 
                     
                     // 造成 AOE 伤害 (减半)
                     const aoeDmg = dmg * 0.5;
@@ -2180,6 +2180,97 @@ export const combat_system = {
         if (this.flatDamageBonus && this.flatDamageBonus > 0) {
             finalRecipe.damage = (finalRecipe.damage || 0) + this.flatDamageBonus;
         }
+
+        // --- [符文词条-A] 核心战斗发射流拦截逻辑 ---
+        if (this.activeRunewordEffects) {
+
+            // 1. 嗜血初锋 (bloodthirst_growth)
+            // 读取本局击杀累计数，将 damagePerKill * killCount 加到 flatDamageBonus
+            // 同时将冰霜（cryo）和火焰（pyro）属性层数乘以 (1 - elementPenalty)
+            const bloodthirstFx = this.activeRunewordEffects['bloodthirst_growth'];
+            if (bloodthirstFx) {
+                const { damagePerKill, elementPenalty } = bloodthirstFx.params;
+                const killCount = this.runewordKillCount || 0;
+                if (killCount > 0 && damagePerKill > 0) {
+                    finalRecipe.damage = (finalRecipe.damage || 0) + damagePerKill * killCount;
+                }
+                if (elementPenalty > 0) {
+                    if (finalRecipe.cryo > 0) {
+                        finalRecipe.cryo = Math.max(0, Math.floor(finalRecipe.cryo * (1 - elementPenalty)));
+                    }
+                    if (finalRecipe.pyro > 0) {
+                        finalRecipe.pyro = Math.max(0, Math.floor(finalRecipe.pyro * (1 - elementPenalty)));
+                    }
+                }
+            }
+
+            // 2. 散射矩阵 (multicast_to_scatter)
+            // 将 finalRecipe.multicast 全部转移到 finalRecipe.scatter
+            // 将 finalRecipe.damage 乘以 (1 - damagePenalty)
+            // 将 _scatterAngleMultiplier = angleMultiplier 写入配方
+            const scatterMatrixFx = this.activeRunewordEffects['multicast_to_scatter'];
+            if (scatterMatrixFx) {
+                const { damagePenalty, angleMultiplier } = scatterMatrixFx.params;
+                const multicastToTransfer = finalRecipe.multicast || 0;
+                if (multicastToTransfer > 0) {
+                    finalRecipe.scatter = (finalRecipe.scatter || 0) + multicastToTransfer;
+                    finalRecipe.multicast = 0;
+                }
+                if (damagePenalty > 0) {
+                    finalRecipe.damage = Math.ceil((finalRecipe.damage || 1) * (1 - damagePenalty));
+                }
+                finalRecipe._scatterAngleMultiplier = angleMultiplier;
+            }
+
+            // 3. 专注射击 (focused_fire)
+            // 将 finalRecipe.bounce 和 finalRecipe.multicast 累加到 finalRecipe.damage（每层 +1 伤害），然后清零
+            // 将 critChance 和 critDamage 写入 finalRecipe._critChance 和 finalRecipe._critDamage
+            const focusedFireFx = this.activeRunewordEffects['focused_fire'];
+            if (focusedFireFx) {
+                const { critChance, critDamage } = focusedFireFx.params;
+                const bounceLayers = finalRecipe.bounce || 0;
+                const multicastLayers = finalRecipe.multicast || 0;
+                if (bounceLayers > 0 || multicastLayers > 0) {
+                    finalRecipe.damage = (finalRecipe.damage || 0) + bounceLayers + multicastLayers;
+                    finalRecipe.bounce = 0;
+                    finalRecipe.multicast = 0;
+                }
+                finalRecipe._critChance = critChance;
+                finalRecipe._critDamage = critDamage;
+            }
+
+            // 4. 质量坍缩 (mass_collapse)
+            // 计算 layersCleared = multicast + scatter，清零两者
+            // 设置 finalRecipe.explosive = true
+            // 将 _explosionRadiusMult = baseRadiusRatio + layersCleared * radiusBonusPerLayer 写入配方
+            const massCollapseFx = this.activeRunewordEffects['mass_collapse'];
+            if (massCollapseFx) {
+                const { baseRadiusRatio, radiusBonusPerLayer } = massCollapseFx.params;
+                const layersCleared = (finalRecipe.multicast || 0) + (finalRecipe.scatter || 0);
+                finalRecipe.multicast = 0;
+                finalRecipe.scatter = 0;
+                finalRecipe.explosive = true;
+                finalRecipe._explosionRadiusMult = baseRadiusRatio + layersCleared * radiusBonusPerLayer;
+            }
+
+            // 5. 动能衰变 (kinetic_decay)
+            // 将 initialBonus 和 decayPerHit 写入 finalRecipe._kineticDecayBonus 和 finalRecipe._kineticDecayRate
+            const kineticDecayFx = this.activeRunewordEffects['kinetic_decay'];
+            if (kineticDecayFx) {
+                const { initialBonus, decayPerHit } = kineticDecayFx.params;
+                finalRecipe._kineticDecayBonus = initialBonus;
+                finalRecipe._kineticDecayRate = decayPerHit;
+            }
+
+            // 6. 回响射击 (echo_shot)
+            // 将 triggerChance 写入 finalRecipe._echoShotChance
+            const echoShotFx = this.activeRunewordEffects['echo_shot'];
+            if (echoShotFx) {
+                const { triggerChance } = echoShotFx.params;
+                finalRecipe._echoShotChance = triggerChance;
+            }
+        }
+        // --- [符文词条-A] 拦截逻辑结束 ---
 
         // --- [绝境之刃] 距离失败线越近，伤害加成越高 ---
         if (this.ownedRelics && this.ownedRelics.includes('desperation_blade')) {

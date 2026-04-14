@@ -303,3 +303,71 @@ peg.level = game.activeRunewordEffects['flying_sword_unlock'].params.level || 1;
 ```
 
 这使高等级词条（如词条等级 3）能直接生成 Lv.3 的特殊钉子，解锁更强的视觉效果和战斗行为。
+
+## 10. 成长型低级词条规范 (Task A)
+
+> **状态**: 已实现（配置注册 + 核心战斗发射流拦截，Task A 完成）
+
+### 10.1 新增词条列表
+
+| 词条 ID | effectId | 符文组合 | 核心机制 |
+|---|---|---|---|
+| `runeword_bloodthirst_edge` | `bloodthirst_growth` | pierce_1, pyro_1, pierce_1 | 击杀累计伤害加成，但惩罚冰/火属性层数 |
+| `runeword_scatter_matrix` | `multicast_to_scatter` | bounce_1, lightning_1, bounce_1 | 连射转散射，伤害惩罚，散射角度收窄 |
+| `runeword_focused_fire` | `focused_fire` | laser_1, pierce_1, laser_1 | 弹跳/连射转伤害，暴击机制 |
+| `runeword_mass_collapse` | `mass_collapse` | bounce_1, pyro_1, bounce_1 | 强制爆炸，连射/散射层数转爆炸范围 |
+| `runeword_kinetic_decay` | `kinetic_decay` | bounce_1, pierce_1, bounce_1 | 子弹初始伤害加成，每次命中后衰减 |
+| `runeword_echo_shot` | `echo_shot` | scatter_1, bounce_1, scatter_1 | 首次命中有概率额外发射一颗子弹 |
+
+### 10.2 战斗发射流拦截规范 (`combat_fireNextShot`)
+
+所有词条的拦截逻辑统一位于 `combat_system.js` 的 `combat_fireNextShot` 函数中，在 `flatDamageBonus` 叠加之后、`desperation_blade` 遗物处理之前执行。
+
+**嗜血初锋 (`bloodthirst_growth`)**:
+- 读取 `this.runewordKillCount`（本局击杀累计数）。
+- `finalRecipe.damage += damagePerKill * killCount`。
+- 若 `elementPenalty > 0`，则 `finalRecipe.cryo` 和 `finalRecipe.pyro` 乘以 `(1 - elementPenalty)` 并向下取整（最低为 0）。
+
+**散射矩阵 (`multicast_to_scatter`)**:
+- `finalRecipe.scatter += finalRecipe.multicast`，`finalRecipe.multicast = 0`。
+- `finalRecipe.damage = Math.ceil(damage * (1 - damagePenalty))`。
+- `finalRecipe._scatterAngleMultiplier = angleMultiplier`（由散射发射逻辑读取）。
+
+**专注射击 (`focused_fire`)**:
+- `finalRecipe.damage += (finalRecipe.bounce || 0) + (finalRecipe.multicast || 0)`。
+- `finalRecipe.bounce = 0`，`finalRecipe.multicast = 0`。
+- `finalRecipe._critChance = critChance`，`finalRecipe._critDamage = critDamage`（由 Projectile 命中逻辑读取）。
+
+**质量坍缩 (`mass_collapse`)**:
+- `layersCleared = (finalRecipe.multicast || 0) + (finalRecipe.scatter || 0)`。
+- `finalRecipe.multicast = 0`，`finalRecipe.scatter = 0`。
+- `finalRecipe.explosive = true`。
+- `finalRecipe._explosionRadiusMult = baseRadiusRatio + layersCleared * radiusBonusPerLayer`。
+- 爆炸 AOE 判定处（`combat_system.js` 爆炸逻辑）：半径改为 `100 * (config._explosionRadiusMult || 1.0)`。
+
+**动能衰变 (`kinetic_decay`)**:
+- `finalRecipe._kineticDecayBonus = initialBonus`。
+- `finalRecipe._kineticDecayRate = decayPerHit`。
+- 由 `Projectile` 命中逻辑（`src/entities/projectile.js`）读取并在每次命中后衰减（待 Task B 实现）。
+
+**回响射击 (`echo_shot`)**:
+- `finalRecipe._echoShotChance = triggerChance`。
+- 由 `Projectile` 首次命中逻辑（`src/entities/projectile.js`）读取并触发回响子弹（待 Task B 实现）。
+
+### 10.3 嗜血初锋击杀计数规范
+
+- 字段：`game.runewordKillCount`（number，本局战斗开始时初始化为 0）。
+- 每次敌人死亡时（`combat_damageEnemy` 中 `k` 为 true 时），若 `bloodthirst_growth` 词条激活，则 `this.runewordKillCount++`。
+- 战斗结束时随其他战斗状态一起重置。
+
+### 10.4 配方元数据字段速查
+
+| 字段 | 类型 | 来源词条 | 消费方 |
+|---|---|---|---|
+| `_scatterAngleMultiplier` | number | `multicast_to_scatter` | 散射发射逻辑 |
+| `_critChance` | number (0~1) | `focused_fire` | Projectile 命中 |
+| `_critDamage` | number (倍率) | `focused_fire` | Projectile 命中 |
+| `_explosionRadiusMult` | number | `mass_collapse` | 爆炸 AOE 判定 |
+| `_kineticDecayBonus` | number (0~1) | `kinetic_decay` | Projectile 命中 |
+| `_kineticDecayRate` | number (0~1) | `kinetic_decay` | Projectile 命中 |
+| `_echoShotChance` | number (0~1) | `echo_shot` | Projectile 首次命中 |

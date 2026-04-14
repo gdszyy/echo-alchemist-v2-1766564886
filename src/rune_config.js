@@ -350,6 +350,62 @@ const RUNEWORD_DB = [
         effect_desc: '【特殊系】解锁风属性变异。收集阶段反弹弹珠碰撞反弹钉子时，有70%概率使其变异为风属性钉子。词条等级提升时，解锁蝶蝶法阵与风道形态。',
         baseParams: { level: 1, mutationChance: 0.7 },
         perLevelParams: { level: 1, mutationChance: 0.1 }
+    },
+
+    // ---- 成长型低级词条 (6个，Task A) ----
+    {
+        id: 'runeword_bloodthirst_edge',
+        name: '嗜血初锋',
+        effectId: 'bloodthirst_growth',
+        pattern: ['rune_pierce_1', 'rune_pyro_1', 'rune_pierce_1'],
+        effect_desc: '每次击杀敌人，本局全局基础伤害永久 +1。但你的冰霜与火焰属性层数降低 30%。',
+        baseParams: { damagePerKill: 1, elementPenalty: 0.3 },
+        perLevelParams: { damagePerKill: 1, elementPenalty: -0.1 }
+    },
+    {
+        id: 'runeword_scatter_matrix',
+        name: '散射矩阵',
+        effectId: 'multicast_to_scatter',
+        pattern: ['rune_bounce_1', 'rune_lightning_1', 'rune_bounce_1'],
+        effect_desc: '连射次数全部转化为散射层数。该词条存在时，基础伤害降低 25%，散射子弹的发射夹角缩小 70%。',
+        baseParams: { damagePenalty: 0.25, angleMultiplier: 0.3 },
+        perLevelParams: { damagePenalty: -0.05, angleMultiplier: -0.1 }
+    },
+    {
+        id: 'runeword_focused_fire',
+        name: '专注射击',
+        effectId: 'focused_fire',
+        pattern: ['rune_laser_1', 'rune_pierce_1', 'rune_laser_1'],
+        effect_desc: '将所有弹跳和连射层数转化为基础伤害。伤害有 20% 概率暴击，造成 200% 伤害。',
+        baseParams: { critChance: 0.20, critDamage: 2.0 },
+        perLevelParams: { critChance: 0.10, critDamage: 0.5 }
+    },
+    {
+        id: 'runeword_mass_collapse',
+        name: '质量坍缩',
+        effectId: 'mass_collapse',
+        pattern: ['rune_bounce_1', 'rune_pyro_1', 'rune_bounce_1'],
+        effect_desc: '强制获得爆炸属性（范围减半）。清空连射与散射，每清空 1 层，爆炸范围 +10%。',
+        baseParams: { baseRadiusRatio: 0.5, radiusBonusPerLayer: 0.10 },
+        perLevelParams: { baseRadiusRatio: 0.2, radiusBonusPerLayer: 0.05 }
+    },
+    {
+        id: 'runeword_kinetic_decay',
+        name: '动能衰变',
+        effectId: 'kinetic_decay',
+        pattern: ['rune_bounce_1', 'rune_pierce_1', 'rune_bounce_1'],
+        effect_desc: '子弹初始获得 25% 的伤害加成。但该子弹每次对敌人造成伤害后，此加成会衰减 7%（最低衰减至 0% 加成）。',
+        baseParams: { initialBonus: 0.25, decayPerHit: 0.07 },
+        perLevelParams: { initialBonus: 0.10, decayPerHit: -0.02 }
+    },
+    {
+        id: 'runeword_echo_shot',
+        name: '回响射击',
+        effectId: 'echo_shot',
+        pattern: ['rune_scatter_1', 'rune_bounce_1', 'rune_scatter_1'],
+        effect_desc: '子弹首次击中敌人时，有 25% 概率按原角度额外发射一颗单发子弹。',
+        baseParams: { triggerChance: 0.25 },
+        perLevelParams: { triggerChance: 0.07 }
     }
 ];
 
