@@ -1767,6 +1767,10 @@ phase_gathering_getRandomPegType() {
      */
     phase_gathering_attemptComplete() {
         if (this.isWheelSpinning) return;
+        // [修复] 检查底部侧边转盘（triangleSideWheels）是否还在旋转
+        // Bug 根因：弹珠落底后立即触发结算，但底部转盘的回调（翻倍逻辑）尚未执行
+        // 导致：1) 传给战斗子弹的属性是翻倍前的值；2) 最后一个转盘未停就进入战斗阶段
+        if (this.triangleSideWheels && this.triangleSideWheels.some(w => w.spinning)) return;
         // 解决方法：只计算 active 为 true 的能量球。
         const activeOrbsCount = this.energyOrbs.filter(orb => orb.active).length;
 

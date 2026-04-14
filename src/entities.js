@@ -2270,6 +2270,12 @@ class DropBall {
                                         '空转~', '#94a3b8'
                                     );
                                 }
+                                // [修复] 转盘停止后重新尝试结算
+                                // 原因：弹珠落底时 attemptComplete 因转盘旋转被拦截，
+                                // 转盘停止后需要在此处重新触发，否则结算永远不会执行
+                                if (_game.dropBalls.length === 0 && _game.currentSession) {
+                                    _game.phase_gathering_attemptComplete();
+                                }
                             });
                         }
                     }
