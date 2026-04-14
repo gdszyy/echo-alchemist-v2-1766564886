@@ -2,7 +2,7 @@ import {
     META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB 
 } from './config.js';
 import { 
-    Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, TriangleSideWheel, GhostPeg, Peg, DropBall, Enemy, SwordQi, 
+    Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
     Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, showToast, 
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
@@ -11,13 +11,6 @@ import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
-import {
-    calcDropDistribution,
-    generateHeatmapData,
-    adjustDistributionForEntry,
-    getLayoutParams,
-    getAllLayoutHints,
-} from './plinko_physics.js';
 
 export const game_phase = {
 /**
@@ -109,19 +102,19 @@ export const game_phase = {
     phase_gathering_initPachinko(shouldInherit = false) {
         // [修复] 使用动态行数
         const rows = this.currentRows || CONFIG.gameplay.rows;
-        const baseCols = CONFIG.gameplay.cols || 10;
-        const spacingX = CONFIG.gameplay.spacingX || 35;
-        const spacingY = CONFIG.gameplay.spacingY || 32;
-        // [钉盘形态遗物] 读取异型布局模式
-        const boardLayout = this.boardLayout || 'default';
+        const cols = CONFIG.gameplay.cols || 10;
+        // [修复] 获取间距配置
+        const spacingX = CONFIG.gameplay.spacingX || 45;
+        const spacingY = CONFIG.gameplay.spacingY || 45;
         
+        // [监控] 打印初始化关键参数
+
         // [修复] 修正 width 引用
         // 确保 this.width 在初始化时已正确设置，否则使用默认值 400
         const canvasWidth = (this.width && this.width > 0) ? this.width : 400; 
         const canvasHeight = (this.height && this.height > 0) ? this.height : 600;
         
-        // [钉盘形态遗物] 使用 baseCols 计算水平居中偏移（布局基准宽度）
-        const offsetX = (canvasWidth - (baseCols - 1) * spacingX) / 2;
+        const offsetX = (canvasWidth - (cols - 1) * spacingX) / 2;
         
         // [优化] 动态计算 offsetY，确保在矮屏幕下钉子不会被挤出屏幕
         // 预留顶部空间 (约占高度的 20%，但不超过 120px)
@@ -139,76 +132,11 @@ export const game_phase = {
         let maxPegY = 0;
 
         for (let r = 0; r < rows; r++) {
-            // ==================== [钉盘形态遗物] 异型布局逻辑 ====================
-            // 根据 boardLayout 计算每行的列数和水平偏移
-            let rowCols, rowOffsetX;
             const isOddRow = r % 2 !== 0;
+            const cols = isOddRow ? CONFIG.gameplay.cols - 1 : CONFIG.gameplay.cols;
+            const rowOffsetX = isOddRow ? spacingX / 2 : 0;
 
-            if (boardLayout === 'triangle') {
-                // 三角形：顶行最宽，每行递减 1 列，最少保留 3 列
-                const colsThisRow = Math.max(3, baseCols - r);
-                rowCols = colsThisRow;
-                // 水平居中：计算该行实际宽度，居中对齐
-                const rowWidth = (colsThisRow - 1) * spacingX;
-                rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX;
-                // 保持标准交错偏移
-                rowOffsetX += isOddRow ? spacingX / 2 : 0;
-
-            } else if (boardLayout === 'diamond') {
-                // 菱形：前半段每行 +1 列，后半段每行 -1 列
-                const half = Math.floor(rows / 2);
-                const colsDelta = r <= half ? r : (rows - 1 - r);
-                const colsThisRow = Math.max(3, (baseCols - half) + colsDelta);
-                rowCols = colsThisRow;
-                const rowWidth = (colsThisRow - 1) * spacingX;
-                rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX;
-                rowOffsetX += isOddRow ? spacingX / 2 : 0;
-
-            } else if (boardLayout === 'sparse') {
-                // 稀疏间隔：偶数行正常列数，奇数行减 4 列居中
-                // [修复] 奇数行加标准交错偏移，防止弹珠直线穿透
-                if (!isOddRow) {
-                    rowCols = baseCols;
-                    rowOffsetX = 0; // 偶数行正常，不交错偏移
-                } else {
-                    const narrowCols = Math.max(3, baseCols - 4);
-                    rowCols = narrowCols;
-                    // 奇数行居中后再加标准交错偏移
-                    const rowWidth = (narrowCols - 1) * spacingX;
-                    rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX + spacingX / 2;
-                }
-
-            } else if (boardLayout === 'mirror_sync') {
-                // 镜像同步：列数减 2，奇数行加标准交错偏移
-                // [修复] 恢复奇偶行交错，防止弹珠直线穿透；镜像基于 x 坐标对称
-                const syncCols = Math.max(3, baseCols - 2);
-                rowCols = syncCols;
-                const rowWidth = (syncCols - 1) * spacingX;
-                rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX;
-                rowOffsetX += isOddRow ? spacingX / 2 : 0; // 恢复标准交错
-
-            } else if (boardLayout === 'wide_narrow') {
-                // 宽窄交替：偶数行 +2 列，奇数行 -2 列
-                // [修复] 奇数行加标准交错偏移，防止弹珠直线穿透
-                if (!isOddRow) {
-                    const wideCols = baseCols + 2;
-                    rowCols = wideCols;
-                    const rowWidth = (wideCols - 1) * spacingX;
-                    rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX;
-                } else {
-                    const narrowCols = Math.max(3, baseCols - 2);
-                    rowCols = narrowCols;
-                    const rowWidth = (narrowCols - 1) * spacingX;
-                    rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX + spacingX / 2;
-                }
-
-            } else {
-                // default：标准交错矩形
-                rowCols = isOddRow ? baseCols - 1 : baseCols;
-                rowOffsetX = isOddRow ? spacingX / 2 : 0;
-            }
-
-            for (let c = 0; c < rowCols; c++) {
+            for (let c = 0; c < cols; c++) {
                 const x = offsetX + rowOffsetX + c * spacingX;
                 const y = offsetY + r * adjustedSpacingY;
                 maxPegY = Math.max(maxPegY, y);
@@ -232,8 +160,6 @@ export const game_phase = {
 
                 let p = new Peg(x, y, type);
                 p.level = level;
-                p.row = r;
-                p.col = c;
                 // [继承逻辑] 如果继承，保留当前的冷却状态
                 if (shouldInherit && previousPegs[pegIndex]) {
                      p.cooldownTimer = previousPegs[pegIndex].cooldownTimer;
@@ -241,82 +167,6 @@ export const game_phase = {
                 
                 this.pegs.push(p);
                 pegIndex++;
-            }
-        }
-
-        // ==================== [布局位置标记] ====================
-        // 在所有钉子创建完成后，根据布局类型标记功能性位置的 layoutRole
-        // 供 Peg.draw 方法绘制专属视觉样式
-        if (boardLayout !== 'default') {
-            const totalRows = rows;
-            const rowQ1 = Math.floor(totalRows * 0.25);
-            const rowQ3 = Math.floor(totalRows * 0.75);
-
-            for (const p of this.pegs) {
-                const r = p.row;
-                const c = p.col;
-
-                if (boardLayout === 'diamond') {
-                    // 中段（25%~75% 行）：触发「中段爆发」效果的区域
-                    if (r >= rowQ1 && r <= rowQ3) {
-                        p.layoutRole = 'diamond_mid';
-                    }
-
-                } else if (boardLayout === 'sparse') {
-                    // 奇数行（窄行）：弹珠穿越此行未碰撞则蓄力
-                    if (r % 2 !== 0) {
-                        p.layoutRole = 'sparse_narrow';
-                    }
-
-                } else if (boardLayout === 'wide_narrow') {
-                    // 偶数行（宽行）的边缘钉子（列号 0/1 或倒数 0/1）：触发「边缘共振」
-                    if (r % 2 === 0) {
-                        const rowPegs = this.pegs.filter(rp => rp.row === r);
-                        const rowLen = rowPegs.length;
-                        if (c <= 1 || c >= rowLen - 2) {
-                            p.layoutRole = 'wide_edge';
-                        }
-                    }
-
-                } else if (boardLayout === 'triangle') {
-                    // 下半段（50%~100% 行）：漏斗收窄区，触发「漏斗共鸣」
-                    if (r >= Math.floor(totalRows * 0.5)) {
-                        p.layoutRole = 'triangle_funnel';
-                    }
-
-                } else if (boardLayout === 'mirror_sync') {
-                    // 中轴附近钉子（列号 0 或最后一列）：镜像同步的对称轴标识
-                    const rowPegs = this.pegs.filter(rp => rp.row === r);
-                    const rowLen = rowPegs.length;
-                    if (c === 0 || c === rowLen - 1) {
-                        p.layoutRole = 'mirror_center';
-                    }
-                }
-            }
-        }
-
-        // [镜像同步] 预计算钉子的镜像索引
-        // [修复] 交错后奇偶行的 x 坐标不再简单对称于列号，改为基于 x 坐标对称于画布中心
-        if (boardLayout === 'mirror_sync') {
-            const centerX = (this.width && this.width > 0) ? this.width / 2 : 200;
-            for (let i = 0; i < this.pegs.length; i++) {
-                const p = this.pegs[i];
-                // 镜像 x = 2 * centerX - p.x，在同行中寻找 x 最近的钉子作为镜像
-                const mirrorX = 2 * centerX - p.pos.x;
-                const samRowPegs = this.pegs.filter((mp, mi) => mi !== i && mp.row === p.row);
-                let bestMirror = null;
-                let bestDist = Infinity;
-                for (const mp of samRowPegs) {
-                    const dist = Math.abs(mp.pos.x - mirrorX);
-                    if (dist < bestDist) {
-                        bestDist = dist;
-                        bestMirror = mp;
-                    }
-                }
-                // 容差：半个钉子间距内才认为是有效镜像
-                if (bestMirror && bestDist < spacingX * 0.6 && bestMirror !== p) {
-                    p.mirrorIdx = this.pegs.indexOf(bestMirror);
-                }
             }
         }
 
@@ -333,24 +183,9 @@ export const game_phase = {
                     normalPegs[i].level = 1;
                 }
             };
-            // [爽游模式] 新手教程局使用专属字段的钉子数量，避免全局 CONFIG 被污染
-            const windPegsCount = this._isTutorialRun && this._tutorialInitWindPegs
-                ? this._tutorialInitWindPegs
-                : CONFIG.gameplay.initWindPegs;
-            const swordPegsCount = this._isTutorialRun && this._tutorialInitSwordPegs
-                ? this._tutorialInitSwordPegs
-                : CONFIG.gameplay.initSwordPegs;
-            console.log('[PachinkoInit] wind:', windPegsCount, 'sword:', swordPegsCount);
-            replaceWithSpecial(windPegsCount, 'wind');
-            replaceWithSpecial(swordPegsCount, 'flying_sword');
-            // [爽游模式] 新手教程局：将 wind/flying_sword 钉子等级提升到 3
-            if (this._isTutorialRun) {
-                this.pegs.forEach(p => {
-                    if (p.type === 'wind' || p.type === 'flying_sword') {
-                        p.level = 3;
-                    }
-                });
-            }
+            console.log(CONFIG.gameplay.initWindPegs,CONFIG.gameplay.initSwordPegs)
+            replaceWithSpecial(CONFIG.gameplay.initWindPegs, 'wind');
+            replaceWithSpecial(CONFIG.gameplay.initSwordPegs, 'flying_sword');
         }
 
         this.boardBottomY = maxPegY;
@@ -362,171 +197,43 @@ export const game_phase = {
             }
         }
 
-        // ==================== [sparse 布局专属] 最后两行强制交错粉色钉子 ====================
-        // 设计意图：直道钉盘（sparse_interval）的最后两行永远有交错的粉色钉子，
-        // 形成「底部粉色陷阱」，让弹珠在落底前必经一段高弹性区域，增加策略性。
-        // 交错规则：倒数第2行（偶数列为粉色），倒数第1行（奇数列为粉色）
-        if (boardLayout === 'sparse') {
-            const lastRow = rows - 1;
-            const secondLastRow = rows - 2;
-            for (const p of this.pegs) {
-                if (p.row === lastRow || p.row === secondLastRow) {
-                    // 交错：最后一行奇数列粉色，倒数第二行偶数列粉色
-                    const isLastRow = (p.row === lastRow);
-                    const shouldBePink = isLastRow ? (p.col % 2 === 1) : (p.col % 2 === 0);
-                    if (shouldBePink) {
-                        p.type = 'pink';
-                        p.level = 1;
-                    }
-                }
-            }
-        }
-
-        // [技能系统迭代] 动态过滤 skill_point 槽：仅当玩家有已解锁技能时才生成技能点槽
-        let effectiveSlots = [...this.unlockedSlots];
-        if (!this.activeSkills || this.activeSkills.length === 0) {
-            effectiveSlots = effectiveSlots.filter(t => t !== 'skill_point');
-        }
-        const effectiveSlotCount = Math.min(this.slotCount, effectiveSlots.length > 0 ? this.slotCount : 0);
-        console.log(`[DEBUG] Starting special slot creation: effectiveSlots=${JSON.stringify(effectiveSlots)}, slotCount=${effectiveSlotCount}`);
-        if (effectiveSlots.length > 0 && effectiveSlotCount > 0) {
-            const slotTypes = effectiveSlots;
+        console.log(`[DEBUG] Starting special slot creation: unlockedSlots=${JSON.stringify(this.unlockedSlots)}, slotCount=${this.slotCount}`);
+        if (this.unlockedSlots.length > 0 && this.slotCount > 0) {
+            const slotTypes = this.unlockedSlots;
             
             // [重构] 不再使用随机坐标匹配，而是直接从合法候选钉子池中抽取
             // 1. 筛选出所有合法的候选钉子索引 (非粉色且未被占用)
-            // [双钉子连线模式 v2] 基于行列坐标的严格相邻匹配
-            // 相邻定义：
-            //   同行水平相邻：同一行，列号相差 1
-            //   上下行断对角相邻：行号相差 1，列号相差 0 或 1（奇偶行偏移导致）
+            let validPegIndices = this.pegs
+                .map((p, index) => ({ type: p.type, index }))
+                .filter(item => item.type !== 'pink')
+                .map(item => item.index);
 
-            // 1. 筛选候选钉子（非粉色）
-            const validPegIndices2 = this.pegs
-                .map((p, i) => i)
-                .filter(i => this.pegs[i].type !== 'pink');
-
-            // 2. 构建严格相邻对列表：只允许同行相邻或上下行断对角
-            const strictPairs = [];
-            const addedPairKeys = new Set();
-
-            for (const idxA of validPegIndices2) {
-                const pegA = this.pegs[idxA];
-                if (pegA.row === undefined) continue;
-
-                for (const idxB of validPegIndices2) {
-                    if (idxB <= idxA) continue;
-                    const pegB = this.pegs[idxB];
-                    if (pegB.row === undefined) continue;
-
-                    const dr = Math.abs(pegA.row - pegB.row);
-                    const dc = Math.abs(pegA.col - pegB.col);
-
-                    const isSameRowAdj = (dr === 0 && dc === 1);
-                    const isDiagAdj   = (dr === 1 && dc <= 1);
-
-                    if (isSameRowAdj || isDiagAdj) {
-                        const key = `${idxA}-${idxB}`;
-                        if (!addedPairKeys.has(key)) {
-                            strictPairs.push([idxA, idxB]);
-                            addedPairKeys.add(key);
-                        }
-                    }
-                }
-            }
-
-            console.log(`[DEBUG] Found ${strictPairs.length} strict adjacent peg pairs`);
-
-            // 3. 打乱对列表，随机选取所需数量的对
-            for (let i = strictPairs.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [strictPairs[i], strictPairs[j]] = [strictPairs[j], strictPairs[i]];
-            }
+            console.log(`[DEBUG] Found ${validPegIndices.length} valid candidate pegs for special slots`);
 
             let createdCount = 0;
-            const usedPegs = new Set();
-
-            for (const [idxA, idxB] of strictPairs) {
-                if (createdCount >= effectiveSlotCount) break;
-                if (usedPegs.has(idxA) || usedPegs.has(idxB)) continue;
-
-                const pegA = this.pegs[idxA];
-                const pegB = this.pegs[idxB];
-                 // 按顺序分配类型：第 i 个槽使用 slotTypes[i]，确保类型确定性
-                const type = slotTypes[createdCount % slotTypes.length];
-                const slot = new SpecialSlot(pegA.pos.x, pegA.pos.y, pegB.pos.x, pegB.pos.y, type);
-                slot.pegIndex  = idxA;
-                slot.pegIndex2 = idxB;
+            while (createdCount < this.slotCount && validPegIndices.length > 0) {
+                // 2. 从候选池中随机抽取一个索引
+                const randIdxInPool = Math.floor(Math.random() * validPegIndices.length);
+                const pegIdx = validPegIndices.splice(randIdxInPool, 1)[0];
+                
+                const type = slotTypes[Math.floor(Math.random() * slotTypes.length)];
+                const peg = this.pegs[pegIdx];
+                
+                // 3. 实例化 SpecialSlot
+                const slot = new SpecialSlot(peg.pos.x, peg.pos.y, spacingX * 0.8, type);
+                slot.pegIndex = pegIdx;
                 this.specialSlots.push(slot);
+                
                 createdCount++;
-                usedPegs.add(idxA);
-                usedPegs.add(idxB);
-
-                // [镜像同步] 如果是镜像布局，尝试在镜像位置也生成一个
-                if (boardLayout === 'mirror_sync') {
-                    const mIdxA = pegA.mirrorIdx;
-                    const mIdxB = pegB.mirrorIdx;
-                    if (mIdxA !== -1 && mIdxB !== -1 && !usedPegs.has(mIdxA) && !usedPegs.has(mIdxB)) {
-                        const mPegA = this.pegs[mIdxA];
-                        const mPegB = this.pegs[mIdxB];
-                        const mSlot = new SpecialSlot(mPegA.pos.x, mPegA.pos.y, mPegB.pos.x, mPegB.pos.y, type);
-                        mSlot.pegIndex = mIdxA;
-                        mSlot.pegIndex2 = mIdxB;
-                        this.specialSlots.push(mSlot);
-                        usedPegs.add(mIdxA);
-                        usedPegs.add(mIdxB);
-                        // 注意：镜像生成的槽位不计入 createdCount 限制，从而实现数量 x2
-                    }
-                }
+                console.log(`[DEBUG] Created special slot: type=${type}, pegIdx=${pegIdx}, pos=(${peg.pos.x}, ${peg.pos.y})`);
             }
-
-            // 如果严格对不够，退化为单钉子水平短连线
-            if (createdCount < effectiveSlotCount) {
-                const usedIdx = new Set(this.specialSlots.flatMap(s => [s.pegIndex, s.pegIndex2]));
-                const remaining = validPegIndices2.filter(i => !usedIdx.has(i));
-                for (const idxA of remaining) {
-                    if (createdCount >= effectiveSlotCount) break;
-                    const pegA = this.pegs[idxA];
-                    // 按顺序分配类型，与主逻辑保持一致
-                    const type = slotTypes[createdCount % slotTypes.length];
-                    const halfW = spacingX * 0.35;
-                    const slot = new SpecialSlot(pegA.pos.x - halfW, pegA.pos.y, pegA.pos.x + halfW, pegA.pos.y, type);
-                    slot.pegIndex  = idxA;
-                    slot.pegIndex2 = idxA;
-                    this.specialSlots.push(slot);
-                    createdCount++;
-                    console.log(`[DEBUG] Created fallback single-peg slot: type=${type}, pegIdx=${idxA}`);
-                }
-            }
-
-            console.log(`[DEBUG] Finished special slot creation: final count=${this.specialSlots.length}, target=${effectiveSlotCount}`);
+            
+            console.log(`[DEBUG] Finished special slot creation: final count=${this.specialSlots.length}, target=${this.slotCount}`);
         } else {
-            console.log(`[DEBUG] Skipping special slot creation: effectiveSlots.length=${effectiveSlots.length}, effectiveSlotCount=${effectiveSlotCount}`);
+            console.log(`[DEBUG] Skipping special slot creation: unlockedSlots.length=${this.unlockedSlots.length}, slotCount=${this.slotCount}`);
         }
         this.ui_updateGatheringQueueUI();
         this.ui_renderRecipeHUD();
-
-        // [概率分析] 存储当前布局类型，并初始化落点分布缓存
-        this.currentLayout = boardLayout;
-        this._dropDistribution = null;  // 待首次发射时计算
-        this._heatmapData = null;
-        console.log(`[Plinko] 布局初始化完成: ${boardLayout}，物理参数:`, getLayoutParams(boardLayout).distributionHint);
-
-        // ==================== [diamond 布局专属] 清空虚影钉子数组 ====================
-        this.ghostPegs = [];
-
-        // ==================== [triangle 布局专属] 底部左右倍率转盘初始化 ====================
-        // 设计：三角钉盘底部左右各放一个倍率转盘，弹珠落入后触发属性翻倍
-        // 转盘位置：底部最后一行的左侧和右侧，紧贴三角形底部边缘
-        this.triangleSideWheels = [];
-        if (boardLayout === 'triangle') {
-            const wheelY = maxPegY + 40; // 转盘在最后一行钉子下方 40px
-            const wheelXLeft  = canvasWidth * 0.15; // 左侧转盘：距左边缘 15%
-            const wheelXRight = canvasWidth * 0.85; // 右侧转盘：距右边缘 15%
-            this.triangleSideWheels = [
-                new TriangleSideWheel(wheelXLeft,  wheelY, 'left',  this),
-                new TriangleSideWheel(wheelXRight, wheelY, 'right', this),
-            ];
-            console.log(`[Triangle] 侧边倍率转盘已初始化: left=(${wheelXLeft.toFixed(0)}, ${wheelY.toFixed(0)}), right=(${wheelXRight.toFixed(0)}, ${wheelY.toFixed(0)})`);
-        }
     },
 
 phase_gathering_getRandomPegType() { 
@@ -607,9 +314,6 @@ phase_gathering_getRandomPegType() {
             e._cryoHitThisRound = false;
             e._lightningHitThisRound = false;
             e._absoluteZeroHitCount = 0;
-            // [技能系统迭代] 重置技能相关状态标记
-            e._forceFusionThisRound = false; // 棱光炮强制聚变标记
-            if (e._frostPrisonAmp) e._frostPrisonAmp = 0; // 冰牢封印伤害加成每回合清除
         });
         
         // [充能符文系统] 初始化充能状态
@@ -617,29 +321,7 @@ phase_gathering_getRandomPegType() {
         
         if (this.ui) {
             this.ui.updateSkillPoints(this.skillPoints);
-            this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
-        }
-
-        // [演出时机修复] 在进入战斗阶段时，检测是否有待播放入场演出的 Boss。
-        // 原来的 boss:spawned 事件和入场动画在 spawn_spawnBoss() 中立即触发，
-        // 导致在研磨阶段就播放完毕而战斗时完全看不到演出。
-        // 现在统一延迟到此处触发，确保玩家进入战斗阶段时能看到完整的 Boss 出场演出。
-        const pendingBoss = this.enemies.find(e => e.active && e.type === 'boss' && e._pendingEntrance);
-        if (pendingBoss) {
-            pendingBoss._pendingEntrance = false;
-            // 激活入场动画计时器
-            pendingBoss.entranceTimer = 90;
-            // 延迟一帧再触发事件，确保战斗阶段已完全切换后再播放全屏演出
-            setTimeout(() => {
-                eventBus.emit('boss:spawned', {
-                    boss: pendingBoss,
-                    bossId: pendingBoss.bossType,
-                    bossName: pendingBoss.bossName,
-                    isBigBoss: pendingBoss.isBigBoss,
-                    round: this.round
-                });
-                showToast(`☠️ ${pendingBoss.bossName} 出现！`);
-            }, 100);
+            this.ui.updateSkillBar(this.skillPoints);
         }
     },
 
@@ -654,8 +336,11 @@ phase_gathering_getRandomPegType() {
         
         this.lastMousePos = logicPos;
 
-        // 处理 gameOver 状态的点击（gameover 阶段由其自身 UI 按鈕处理，此处直接忽略）
+        // 处理 gameOver 状态的点击返回主界面
         if (this.gameOver) {
+            this.phase_switchPhase('meta');
+            // 注意：这里不再调用 sys_resetGame，因为重置逻辑应该在点击“开始炼成”时触发
+            // 这样可以确保返回的是首页，而不是直接进入下一局
             return;
         }
 
@@ -702,12 +387,7 @@ phase_gathering_getRandomPegType() {
                     this.currentSession.collected.push(marbleDef.type);
                 }
                 this.combat_updateHitProgress(0, this.persistentThreshold);
-                const newBall = new DropBall(pos.x, 30, marbleDef, this.currentSession);
-                // [物理增强] 注入当前布局的物理参数，使弹珠具备布局专属的物理特性
-                newBall.layoutParams = getLayoutParams(this.currentLayout || 'default');
-                this.dropBalls.push(newBall);
-                // [概率分析] 计算当前布局的落点分布，用于热力图显示
-                this._updateDropDistribution(pos.x);
+                this.dropBalls.push(new DropBall(pos.x, 30, marbleDef, this.currentSession));
                 this.ui_updateGatheringQueueUI();
                 audio.playShoot();
                 this.combat_updateMulticastDisplay(0);
@@ -733,91 +413,53 @@ phase_gathering_getRandomPegType() {
         // 這樣即使敵人被燒死消失了，波浪也會慢慢掃過屍體位置，展現"擊殺確認"的感覺
         this.waveMomentumTimer = 45; 
 
-        // --- 1. 温度结算逻辑 ---
-        // 封装单次温度结算逻辑为函数，便于 berserk 重复执行
-        const _processTempOnce = () => {
-            if (e.temp < 0) {
-                let shouldFreeze = false;
-                if (e.temp <= -100) {
-                    shouldFreeze = true;
-                } else if (e.temp <= -50) {
-                    const chance = (Math.abs(e.temp) - 50) / 50;
-                    if (Math.random() < chance) shouldFreeze = true;
-                }
-                if (shouldFreeze) {
-                    e.isFrozenCurrentTurn = true;
-                    e.frozenCount = (e.frozenCount || 0) + 1;
-                    this.spawn_createExplosion(e.pos.x, e.pos.y, '#06b6d4');
-                    audio.playEffect('freeze');
-                } else {
-                    e.isFrozenCurrentTurn = false;
-                }
-                e.temp = Math.ceil(e.temp / 2);
-            }
-            if (e.temp > 0 && e.active) {
-                if (e.temp < 100) {
-                    e.temp = Math.max(0, e.temp - 5);
-                } else {
-                    const dot = 5 + (e.temp - 100);
-                    e.takeDamage(dot);
-                    this.combat_recordDamage(dot, 'pyro', 'main');
-                    e.playBurnTickEffect(this, Math.floor(dot));
-                    const decay = Math.floor(e.temp / 20);
-                    e.temp = Math.max(0, e.temp - decay);
-                }
-            }
-        };
+        // --- 1. 溫度結算邏輯 ---
+        if (e.temp < 0) {
+            // 1. 深度冻结 (-100以下)：视觉上有冰块，逻辑上必须 100% 冻结
+             // 2. 浅度冻结 (-50 ~ -99)：视觉上无冰块，逻辑上概率冻结
+             
+             let shouldFreeze = false;
 
-        // [改动] berserk 词条：先执行两次温度结算，再 +20℃
-        _processTempOnce();
-        if (e.affixes && e.affixes.includes('berserk')) {
-            _processTempOnce();
-            e.temp += 20;
-            this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, '+20℃', '#f97316');
+             if (e.temp <= -100) {
+                 shouldFreeze = true; // 强制冻结
+             } else if (e.temp <= -50) {
+                 // 概率计算：从 -50 的 0% 到 -100 的 100% 线性增加
+                 const chance = (Math.abs(e.temp) - 50) / 50; 
+                 if (Math.random() < chance) shouldFreeze = true;
+             }
+
+             if (shouldFreeze) { 
+                 e.isFrozenCurrentTurn = true;
+                 e.frozenCount = (e.frozenCount || 0) + 1; // [温度衰减] 累计冰冻次数，后续降温效果将被衰减
+                 this.spawn_createExplosion(e.pos.x, e.pos.y, '#06b6d4');
+                 audio.playEffect('freeze');
+             } else {
+                 e.isFrozenCurrentTurn = false;
+             }
+             
+             // 温度衰减 (保持不变)
+             e.temp = Math.ceil(e.temp / 2);
         }
 
-        // --- 2. Ignis 狂暴阶段：温度急升 + 火焰溅射 ---
-        if (e.active && e.type === 'boss' && e.bossType === 'ignis' && e._berserkedTempRise) {
-            // 每回合温度上升
-            e.temp += e._berserkedTempRise;
-            this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, `+${e._berserkedTempRise}℃`, '#f97316');
-
-            // 火焰溅射：对周围半径内的其他活跃敌人造成火焰伤害
-            if (e._berserkedFireSplash) {
-                const { radius, damage } = e._berserkedFireSplash;
-                // 橙红色火焰粒子视觉反馈（在 Ignis 周围生成）
-                for (let i = 0; i < 12; i++) {
-                    const angle = (i / 12) * Math.PI * 2;
-                    const px = e.pos.x + Math.cos(angle) * (radius * 0.5);
-                    const py = e.pos.y + Math.sin(angle) * (radius * 0.5);
-                    this.spawn_createParticle(px, py, '#ff4500', 'ember');
-                }
-                for (let i = 0; i < 8; i++) {
-                    this.spawn_createParticle(e.pos.x, e.pos.y, '#ff6b00', 'spark');
-                }
-
-                // 对周围敌人造成火焰溅射伤害
-                const activeEnemies = this.enemies.filter(other =>
-                    other.active && other !== e
-                );
-                activeEnemies.forEach(other => {
-                    const dx = other.pos.x - e.pos.x;
-                    const dy = other.pos.y - e.pos.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist <= radius) {
-                        other.takeDamage(damage);
-                        this.combat_recordDamage(damage, 'pyro', 'main');
-                        // 被溅射敌人的火焰粒子特效
-                        for (let i = 0; i < 4; i++) {
-                            this.spawn_createParticle(other.pos.x, other.pos.y, '#ff4500', 'spark');
-                        }
-                        this.spawn_createFloatingText(other.pos.x, other.pos.y - 20, `🔥-${damage}`, '#f97316');
-                    }
-                });
+        if (e.temp > 0) {
+            if (e.temp < 100) {
+                 e.temp = Math.max(0, e.temp - 5);
+            } else {
+                const dot = 5 + (e.temp - 100);
+                e.takeDamage(dot); // <--- 敵人可能在這裡死亡 (active = false)
+                
+                // 记录火焰持续伤害
+                this.combat_recordDamage(dot, 'pyro', 'main');
+                
+                // 觸發燃燒特效
+                e.playBurnTickEffect(this, Math.floor(dot));
+                
+                const decay = Math.floor(e.temp / 20);
+                e.temp = Math.max(0, e.temp - decay);
             }
         }
 
-        // --- 3. 行动逻辑 ---
+        // --- 2. 行动逻辑 ---
         // 只有活着的敌人才移动
         if (e.active && e.isFrozenCurrentTurn == false) {
             // 奥罗波罗斯 Boss：回合开始时进行词缀轮转
@@ -825,53 +467,6 @@ phase_gathering_getRandomPegType() {
                 e._performOuroborosRotation(this);
             }
             e.startTurnAction(this);
-        }
-    },
-
-/**
-     * @method phase_claimPendingRunes
-     * @description 敌人动作后领取待入库符文：
-     *   1. 充能符文（combo充能奖励）
-     *   2. 场地掉落符文（回合结算自动拾取）
-     * 对每个符文触发飞入背包动画，让玩家知道获得了这些符文。
-     * 应在 phase_finalizeRound 之前调用（敌人动作后）。
-     */
-    phase_claimPendingRunes() {
-        // 收集所有待领取符文（充能符文 + 掉落符文）
-        const pendingRunes = [];
-
-        // 1. 充能符文：如果充能有奖励，先入库再加入动画队列
-        const chargeDef = this.runeChargeCurrentRune;
-        if (chargeDef) {
-            const chargeLevel = this.runeChargeCurrentLevel || 1;
-            this.runeInventory.push({ id: chargeDef.id, level: chargeLevel });
-            pendingRunes.push({ runeDef: chargeDef, level: chargeLevel, source: 'charge' });
-            // 重置充能状态（不再在 combat_runeCharge_claimReward 中重复入库）
-            this.runeChargeValue        = 0;
-            this.runeChargeLevel        = 0;
-            this.runeChargeCurrentRune  = null;
-            this.runeChargeCurrentLevel = 1;
-            // 音效
-            try { if (audio?.playPowerup) audio.playPowerup(); } catch(e) {}
-        }
-
-        // 2. 掉落符文：将场地掉落符文入库，加入动画队列
-        if (this.runeLootItems && this.runeLootItems.length > 0) {
-            this.runeLootItems.forEach(loot => {
-                if (!loot.active) return;
-                const runeDef = RUNE_DB.find(r => r.id === loot.runeId);
-                if (!runeDef) { loot.active = false; return; }
-                const level = loot.level || 1;
-                this.runeInventory.push({ id: loot.runeId, level });
-                pendingRunes.push({ runeDef, level, source: 'loot', x: loot.x, y: loot.y });
-                loot.active = false;
-            });
-            this.runeLootItems = [];
-        }
-
-        // 3. 如果有待领取符文，触发飞入背包动画事件
-        if (pendingRunes.length > 0) {
-            eventBus.emit(EVENT_TYPES.UI_RUNE_CLAIM_AFTER_ENEMY, { runes: pendingRunes });
         }
     },
 
@@ -891,16 +486,6 @@ phase_gathering_getRandomPegType() {
         this.enemies.forEach(e => {
             e.hasActedThisTurn = false;
             e.isFrozenCurrentTurn = false; // 重置上一轮的冰冻状态
-
-            // [Boss 移动提示预计算]
-            // 在回合开始时预计算 Boss 本回合是否会移动，以便 UI 标签能在回合开始时就显示正确提示
-            if (e.type === 'boss' && e.bossType && typeof e._moveCooldown !== 'undefined') {
-                if (e.berserked) {
-                    e._willMoveThisTurn = true;
-                } else {
-                    e._willMoveThisTurn = (e._moveCooldown === 0);
-                }
-            }
         });
 
         // UI 提示
@@ -941,18 +526,35 @@ phase_gathering_getRandomPegType() {
             }
         }
 
-        // --- [符文领取] 充能符文和掉落符文的领取已提前到敌人动作后（phase_claimPendingRunes）执行
-        // 仅将库存同步到存档（符文已在 phase_claimPendingRunes 中入库）
-        this.saveData.runeInventory = (this.runeInventory || []).slice();
-        this.sys_saveData();
+        // --- [充能符文系统] 战斗结束后领取充能奖励（延迟 300ms 让动画在战斗结束后播放） ---
+        setTimeout(() => {
+            this.combat_runeCharge_claimReward();
+            // 将局内符文库存同步到存档（用于商店购买）
+            this.saveData.runeInventory = (this.runeInventory || []).slice();
+            this.sys_saveData();
+        }, 300);
 
-        // --- [Glacies 狂暴] Peg 冻结回合数递减 ---
-        if (this.pegs && Array.isArray(this.pegs)) {
-            this.pegs.forEach(peg => {
-                if (peg && peg.frozenTurns > 0) {
-                    peg.frozenTurns--;
-                }
+        // --- [符文系统] 自动拾取掉落符文 ---
+        if (this.runeLootItems && this.runeLootItems.length > 0) {
+            this.runeLootItems.forEach(loot => {
+                if (!loot.active) return;
+                // 查找符文定义，获取名称用于视觉反馈
+                const runeDef = RUNE_DB.find(r => r.id === loot.runeId);
+                const runeName = runeDef ? runeDef.name : loot.runeId;
+                // 将符文转化为 { id, level } 对象并推入库存
+                // loot.level 由掉落生成时设置（Boss 掉落可能为 2+），默认为 1
+                this.runeInventory.push({ id: loot.runeId, level: loot.level || 1 });
+                // 视觉反馈：FloatingText 显示「+符文名称」
+                this.spawn_createFloatingText(
+                    loot.x,
+                    loot.y - 20,
+                    `+${runeName}`,
+                    '#fbbf24'
+                );
+                loot.active = false;
             });
+            // 清空 runeLootItems
+            this.runeLootItems = [];
         }
 
         // --- 以下保持原有的回合结算逻辑 ---
@@ -995,19 +597,6 @@ phase_gathering_getRandomPegType() {
                 console.log('[DifficultyBalance] 战后高压因子已恢复正常');
             }
         }
-
-        // [新增] 遗物效果递减：同化涌潮系列
-        if (this.assimilationBoostRounds && typeof this.assimilationBoostRounds === 'object') {
-            for (const mt of Object.keys(this.assimilationBoostRounds)) {
-                if (this.assimilationBoostRounds[mt] > 0) {
-                    this.assimilationBoostRounds[mt]--;
-                    if (this.assimilationBoostRounds[mt] === 0) {
-                        const display = CONFIG.ui?.attributeDisplay?.[mt]?.name ?? mt;
-                        showToast(`${display}涌潮效果已結束。`);
-                    }
-                }
-            }
-        }
         
         this.round++;
         this.prevRoundDamage = this.roundDamage;
@@ -1016,19 +605,9 @@ phase_gathering_getRandomPegType() {
         document.getElementById("round-num").innerText = this.round;
         showToast(`Round ${this.round}`);
 
-        // [爽游模式] 新手教程局：第 5 回合结算后触发胜利
-        if (this._isTutorialRun && this.round > 5) {
-            this.gameOver = true;
-            this._isTutorialRunCleared = true; // 标记为胜利结局
-            this._gameover_triggerPhase();
-            return;
-        }
-
         // 检查失败
         if (this.input_checkDefeat()) {
             this.gameOver = true;
-            // [游戏结束] 切换到结算阶段
-            this._gameover_triggerPhase();
             return;
         }
 
@@ -1042,35 +621,19 @@ phase_gathering_getRandomPegType() {
             const { bossId, isBigBoss } = this._pendingBossSpawn;
             this._pendingBossSpawn = null;
             this.spawn_spawnBoss(bossId, isBigBoss);
-            // [Boss 调度] 记录本次 Boss 生成回合，用于计算击杀用时
-            this._lastBossSpawnRound = this.round;
-            if (!this._bossSpawnCount) this._bossSpawnCount = 0;
-            this._bossSpawnCount++;
-            console.log(`[BossSchedule] Boss #${this._bossSpawnCount} 已在 Round ${this.round} 生成`);
         }
 
         this.isEnemyTurn = false;
-        // 遗物事件检查：从第3回合起，每5回合触发一次（第3、8、13、18...回合）
-        // 初始回合的遗物选择由 sys_initGameStart 直接调用 ui_showRelicSelection 处理
-        const isRelicRound = this.round >= 3 && (this.round - 3) % 5 === 0;
-        if (isRelicRound) {
-            if (this._pendingBossRelic) {
-                // [串行遗物] Boss 遗物待领取，将固定遗物事件存入标志位。
-                // ui_closeRelicSelection 关闭 Boss 遗物后会检测此标志并自动串行弹出固定遗物事件。
-                this._pendingRelicEvent = true;
-                console.log('[RelicEvent] 本回合 Boss 遗物优先，固定遗物事件将在 Boss 遗物关闭后串行弹出。');
-            } else {
-                showToast("✨ 命魔的馈赠 ✨");
-                this.phase = 'relic_event';
-                setTimeout(() => { this.ui_showRelicSelection(); }, 500);
-                return;
-            }
+        // 遗物事件检查
+        if (this.round % CONFIG.gameplay.relicRoundInterval == 0) {
+            showToast("✨ 命魔的馈赠 ✨");
+            this.phase = 'relic_event';
+            setTimeout(() => { this.ui_showRelicSelection(); }, 500);
+            return;
         }
         
         
         if (this.ammoQueue.length === 0) {
-            // [局内存档] 每回合结算完毕后自动存档，防止刷新丢失进度
-            this.sys_saveRunState();
             this.sys_initSelectionPhase();
         }
     },
@@ -1183,7 +746,7 @@ phase_gathering_getRandomPegType() {
         this.orbitalAngle += currentFrameSpeed * timeScale * 60; // *60 是为了适配 timeScale 的基准
         this.ui_updateSlowMotion();
         // [充能符文系统] 充能条自动衰减
-        if (this.phase === 'combat' || this.phase === 'training') {
+        if (this.phase === 'combat') {
             this.combat_runeCharge_decay(timeScale);
         }
         const tilt = this.boardTilt.current;
@@ -1355,23 +918,21 @@ phase_gathering_getRandomPegType() {
         this.ctx.save();
         this.ctx.translate(entityShiftX, entityShiftY); 
 
-            // --- [修复]：绘制可视化的边界墙壁（从顶部栏下边界开始，不遮挡顶部栏内容）---
+            // --- [新增]：绘制可视化的边界墙壁 ---
             this.ctx.save();
-            // 顶部栏下边界 Y（combatGridTopY - enemyHeight/2 即第一行敌人上边界，也是顶部栏底部）
-            const wallTopY = this.combatGridTopY - this.enemyHeight / 2;
             // 左墙 (半透明渐变)
             const wallGradLeft = this.ctx.createLinearGradient(0, 0, 20, 0);
             wallGradLeft.addColorStop(0, 'rgba(148, 163, 184, 0.2)');
             wallGradLeft.addColorStop(1, 'rgba(148, 163, 184, 0)');
             this.ctx.fillStyle = wallGradLeft;
-            this.ctx.fillRect(0, wallTopY, 20, this.height - wallTopY);
+            this.ctx.fillRect(0, -100, 20, this.height + 100);
             
             // 右墙 (半透明渐变)
             const wallGradRight = this.ctx.createLinearGradient(this.width, 0, this.width - 20, 0);
             wallGradRight.addColorStop(0, 'rgba(148, 163, 184, 0.2)');
             wallGradRight.addColorStop(1, 'rgba(148, 163, 184, 0)');
             this.ctx.fillStyle = wallGradRight;
-            this.ctx.fillRect(this.width - 20, wallTopY, 20, this.height - wallTopY);
+            this.ctx.fillRect(this.width - 20, -100, 20, this.height + 100);
 
             // 墙壁发光边框 (明确反弹线)
             this.ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)'; // Slate-400
@@ -1379,12 +940,12 @@ phase_gathering_getRandomPegType() {
             this.ctx.shadowColor = '#94a3b8';
             this.ctx.shadowBlur = 10;
             this.ctx.beginPath();
-            // 左边线（从顶部栏下边界开始）
-            this.ctx.moveTo(1, wallTopY); this.ctx.lineTo(1, this.height);
-            // 右边线（从顶部栏下边界开始）
-            this.ctx.moveTo(this.width - 1, wallTopY); this.ctx.lineTo(this.width - 1, this.height);
-            // 顶部线 (顶部栏下边界，不遮挡顶部栏)
-            this.ctx.moveTo(0, wallTopY); this.ctx.lineTo(this.width, wallTopY);
+            // 左边线
+            this.ctx.moveTo(1, -100); this.ctx.lineTo(1, this.height);
+            // 右边线
+            this.ctx.moveTo(this.width - 1, -100); this.ctx.lineTo(this.width - 1, this.height);
+            // 顶部线 (封顶)
+            this.ctx.moveTo(0, 1); this.ctx.lineTo(this.width, 1);
             this.ctx.stroke();
             this.ctx.restore();
             // ------------------------------------
@@ -1396,20 +957,15 @@ phase_gathering_getRandomPegType() {
                 if (e.active) {
                     e.update(this.timeScale, this);
                     e.draw(this.ctx);
-                    // Boss 入场动画期间（pos.y 在屏幕外）也计入活跃敌人，防止误判完美清场
-                    // [演出时机修复] 同时兼容 _pendingEntrance 状态（Boss 在屏幕外待机）
-                    if (e.pos.y > 0 || (e.type === 'boss' && (e.entranceTimer > 0 || e._pendingEntrance))) {
+                    // e.dropTargetY > 0 || 
+                    if (e.pos.y > 0) {
                         activeEnemies++;
                     }
                     if (Math.abs(e.pos.y - e.dropTargetY) > 1) anyEnemyMoving = true;
                 }
             });
 
-            if (this.input_checkDefeat()) {
-                this.gameOver = true;
-                // [游戏结束] 切换到结算阶段
-                this._gameover_triggerPhase();
-            }
+            if (this.input_checkDefeat()) this.gameOver = true;
 
             // 更新和绘制弹丸
             for (let i = this.projectiles.length - 1; i >= 0; i--) { 
@@ -1448,33 +1004,6 @@ phase_gathering_getRandomPegType() {
                 fw.update(timeScale);
                 fw.draw(this.ctx);
                 if (fw.life <= 0) this.fireWaves.splice(i, 1);
-            }
-            // 更新和绘制 IceWaves（冰冻状态死亡特效）
-            if (this.iceWaves) {
-                for (let i = this.iceWaves.length - 1; i >= 0; i--) {
-                    const iw = this.iceWaves[i];
-                    iw.update(timeScale);
-                    iw.draw(this.ctx);
-                    if (iw.life <= 0) this.iceWaves.splice(i, 1);
-                }
-            }
-            // 更新和绘制 HealWaves（范围治疗扩散波特效）
-            if (this.healWaves) {
-                for (let i = this.healWaves.length - 1; i >= 0; i--) {
-                    const hw = this.healWaves[i];
-                    hw.update(timeScale);
-                    hw.draw(this.ctx);
-                    if (hw.life <= 0) this.healWaves.splice(i, 1);
-                }
-            }
-            // 更新和绘制 DeathExplosions（分级死亡爆炸特效）
-            if (this.deathExplosions) {
-                for (let i = this.deathExplosions.length - 1; i >= 0; i--) {
-                    const de = this.deathExplosions[i];
-                    de.update(timeScale);
-                    de.draw(this.ctx);
-                    if (de.life <= 0) this.deathExplosions.splice(i, 1);
-                }
             }
 
             // 更新和绘制特效
@@ -1606,7 +1135,15 @@ phase_gathering_getRandomPegType() {
 
         // --- UI Overlays ---
         if (this.gameOver) { 
-            // [游戏结束] 已切换到 gameover 阶段，combat 渲染循环直接返回
+            // [META] 结算：将 runCurrency 转换为符文碎片并保存
+            if (this.runCurrency > 0) {
+                this.saveData.runeFragments = (this.saveData.runeFragments || 0) + this.runCurrency;
+                this.sys_saveData();
+                this.ui_updateMetaCurrency();
+                this.runCurrency = 0;
+            }
+
+            document.getElementById('combat-message').innerHTML = '<span class="text-red-400 font-bold text-4xl">防線失守</span><br><span class="text-sm">點擊返回主界面</span>'; 
             return; 
         }
 
@@ -1667,17 +1204,7 @@ phase_gathering_getRandomPegType() {
                         this.enemyTurnTimer = 0;
                         this.enemies.forEach(e => e.hasActedThisTurn = false);
                     } else {
-                        // [敌人动作后领取符文] 先领取待入库符文（飞入背包动画），再进入回合结算
-                        // 使用 _runeClaimPending 标志防止重复触发
-                        if (!this._runeClaimPending) {
-                            this._runeClaimPending = true;
-                            this.phase_claimPendingRunes();
-                            // 延迟 600ms 让符文飞入动画播放完毕，再进入回合结算
-                            setTimeout(() => {
-                                this._runeClaimPending = false;
-                                this.phase_finalizeRound();
-                            }, 600);
-                        }
+                        this.phase_finalizeRound(); 
                     }
                     return;
                 }
@@ -1870,14 +1397,6 @@ phase_gathering_getRandomPegType() {
             this.fortuneWheel.update(timeScale);
             this.fortuneWheel.draw(this.ctx);
         }
-
-        // --- [triangle 布局专属] 绘制底部侧边倍率转盘 ---
-        if (this.triangleSideWheels && this.triangleSideWheels.length > 0) {
-            for (const wheel of this.triangleSideWheels) {
-                wheel.update(timeScale);
-                wheel.draw(this.ctx);
-            }
-        }
         // 2.  计算动态光源位置
         // 假设光源在屏幕上方很远的地方。当板子向左倾斜 (tilt.x < 0) 时，
         // 阴影应该向左移动，或者说光源看起来像是在右边。
@@ -1962,19 +1481,6 @@ phase_gathering_getRandomPegType() {
         this.specialSlots = this.specialSlots.filter(s => !s.hit);
         // 繪製特殊槽位
         this.specialSlots.forEach(s => s.draw(this.ctx));
-
-        // --- [diamond 布局专属] 绘制裂变回响虚影钉子 ---
-        if (this.ghostPegs && this.ghostPegs.length > 0) {
-            for (let i = this.ghostPegs.length - 1; i >= 0; i--) {
-                const gp = this.ghostPegs[i];
-                gp.update(this.timeScale || 1);
-                if (gp.active) {
-                    gp.draw(this.ctx);
-                } else {
-                    this.ghostPegs.splice(i, 1);
-                }
-            }
-        }
 
         // [修复] 结束收集阶段渲染，恢复 Canvas 状态
         this.ctx.restore();
@@ -2178,90 +1684,8 @@ phase_gathering_getRandomPegType() {
 
         // --- [新增] 手机偏移提示强化：绘制边缘泛光 ---
         this.drawTiltVignette(this.ctx, this.boardTilt.current);
+        // [移除] 删除底部倾斜指示条调用，设计上不够简洁
+        // this.drawTiltIndicator(this.ctx, this.boardTilt.current);
 
-        // --- [概率分析] 绘制落点热力图 ---
-        // 只在没有弹珠正在运动时显示，避免干扰视觉
-        if (this.dropBalls.length === 0 && this._heatmapData) {
-            this._drawDropHeatmap(this.ctx);
-        }
-
-    },
-
-    /**
-     * [概率分析] 更新落点分布缓存
-     * 在弹珠发射时调用，计算当前布局的落点概率分布
-     *
-     * @param {number} entryX - 弹珠入射 X 坐标
-     */
-    _updateDropDistribution(entryX) {
-        const rows = this.currentRows || CONFIG.gameplay.rows;
-        const cols = CONFIG.gameplay.cols || 10;
-        const layout = this.currentLayout || 'default';
-        const tiltBias = this.boardTilt ? this.boardTilt.current.x : 0;
-
-        // 计算基础分布（基于当前布局和倾斜）
-        const baseDistrib = calcDropDistribution(rows, cols, layout, tiltBias);
-
-        // 根据入射位置修正分布
-        this._dropDistribution = adjustDistributionForEntry(entryX, this.width, baseDistrib);
-
-        // 生成热力图数据
-        const boardBottomY = this.boardBottomY || (this.height * 0.7);
-        this._heatmapData = generateHeatmapData(
-            this._dropDistribution,
-            this.width,
-            boardBottomY,
-            this.height,
-            layout
-        );
-    },
-
-    /**
-     * [概率分析] 绘制落点热力图
-     * 在钉盘底部显示概率分布可视化
-     *
-     * @param {CanvasRenderingContext2D} ctx
-     */
-    _drawDropHeatmap(ctx) {
-        if (!this._heatmapData || this._heatmapData.length === 0) return;
-
-        const layout = this.currentLayout || 'default';
-        const hints = getAllLayoutHints();
-        const hint = hints[layout] || hints.default;
-
-        ctx.save();
-
-        // 绘制分布柱状图
-        for (const bar of this._heatmapData) {
-            if (bar.height < 1) continue;
-
-            // 渐变颜色：从底部向上渐变
-            const grad = ctx.createLinearGradient(bar.x, bar.y + bar.height, bar.x, bar.y);
-            grad.addColorStop(0, `${hint.color}00`);  // 底部透明
-            grad.addColorStop(0.4, `${hint.color}${Math.round(bar.alpha * 0.6 * 255).toString(16).padStart(2, '0')}`);
-            grad.addColorStop(1, `${hint.color}${Math.round(bar.alpha * 255).toString(16).padStart(2, '0')}`);
-
-            ctx.fillStyle = grad;
-            ctx.fillRect(bar.x, bar.y, bar.width, bar.height);
-
-            // 高概率槽位添加光晕效果
-            if (bar.alpha > 0.5) {
-                ctx.shadowBlur = 8;
-                ctx.shadowColor = hint.color;
-                ctx.fillStyle = `${hint.color}${Math.round(bar.alpha * 0.3 * 255).toString(16).padStart(2, '0')}`;
-                ctx.fillRect(bar.x, bar.y, bar.width, 2);
-                ctx.shadowBlur = 0;
-            }
-        }
-
-        // 绘制布局分布特征标签
-        const boardBottomY = this.boardBottomY || (this.height * 0.7);
-        const labelY = boardBottomY + 8;
-        ctx.font = '10px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = `${hint.color}99`;
-        ctx.fillText(hint.hint, this.width / 2, labelY);
-
-        ctx.restore();
     },
 };

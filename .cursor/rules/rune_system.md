@@ -253,3 +253,45 @@ combat_runeCharge_levelUp() {
 - `UI_RUNE_CHARGE_LEVEL_UP` 事件新增 `runeLevel` 字段，`hud.js` 需同步在符文槽上展示等级角标（如 "Lv.2"）。
 - `UI_RUNE_CHARGE_CLAIM` 事件已废弃，改由 `UI_RUNE_CLAIM_AFTER_ENEMY` 事件统一处理充能符文和掉落符文的领取动画。
 - `UI_RUNE_CLAIM_AFTER_ENEMY` 事件载荷：`{ runes: [{ runeDef, level, source: 'charge'|'loot', x?, y? }] }`，由 `hud.js` 监听并对每个符文创建飞入背包动画。
+
+## 9. 特殊变异解锁词条规范
+
+### 9.1 设计原则
+
+飞剑（`flying_sword`）和风属性（`wind`）钉子的变异，**不再由全局概率乘子 `specialMutationMult` 控制**，而是完全依赖符文词条解锁。`config.js` 中 `specialMutationMult` 已设为 `0`，确保无词条时变异概率为零。
+
+### 9.2 新增词条
+
+| 词条 ID | 名称 | 符文组合 | effectId | 基础变异概率 | 每级增量 |
+|---|---|---|---|---|---|
+| `runeword_sword_resonance` | 剑意共鸣 | `rune_pierce_1 × 3` | `flying_sword_unlock` | 70% | +10% |
+| `runeword_storm_resonance` | 风暴共鸣 | `rune_bounce_1 × 3` | `wind_unlock` | 70% | +10% |
+
+词条等级（`level`）通过 `parseRuneGrid` 的多路径匹配机制累加，最终写入 `activeRunewordEffects[effectId].params`。
+
+### 9.3 变异概率读取规范
+
+`entities.js` 的 `handlePegInteraction` 中，变异概率从 `game.activeRunewordEffects` 读取：
+
+```js
+// 飞剑变异
+if (rule.result === 'flying_sword' && game.activeRunewordEffects['flying_sword_unlock']) {
+    chance = game.activeRunewordEffects['flying_sword_unlock'].params.mutationChance || 0.7;
+}
+// 风属性变异
+if (rule.result === 'wind' && game.activeRunewordEffects['wind_unlock']) {
+    chance = game.activeRunewordEffects['wind_unlock'].params.mutationChance || 0.7;
+}
+```
+
+无对应词条时 `chance` 保持为 `0`，即不触发变异。
+
+### 9.4 等级注入规范
+
+变异成功时，钉子等级（`peg.level`）从词条 `params.level` 读取，而非固定为 `1`：
+
+```js
+peg.level = game.activeRunewordEffects['flying_sword_unlock'].params.level || 1;
+```
+
+这使高等级词条（如词条等级 3）能直接生成 Lv.3 的特殊钉子，解锁更强的视觉效果和战斗行为。

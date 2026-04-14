@@ -1,4 +1,4 @@
-# Echo Alchemist V2 任务拆分规划：风暴核机制优化与飞剑/风属性等级重构
+# 风属性/飞剑变异机制与伤害同步开发任务规划
 
 ## 1. 任务背景与目标
 
@@ -77,3 +77,62 @@
 -   **测试重点**：
     -   在训练场（Training Ground）中生成多个风暴核，强制结束回合，观察合并位置和特效。
     -   在符文背包中摆放三个穿透/反弹符文，观察发射的子弹是否正确升级为高级飞剑/风属性。
+
+## 5. 实现记录（已完成）
+
+> 本章节记录 `feature/wind-sword-rework` 分支上的实际实现内容，由开发 Agent 于 2026-04-12 完成。
+
+### 5.1 任务 A：风暴核合并机制与伤害同步
+
+#### 5.1.1 `src/config.js` — `wind_system.storm_core` 新增参数
+
+| 参数 | 值 | 说明 |
+|---|---|---|
+| `energyMax` | 20 | 合并累加能量上限 |
+| `mergeDistanceMult` | 1.0 | 合并触发距离倍率 `(r1+r2)*mult` |
+| `mergeRadiusGrowth` | 10 | 合并后半径增量 |
+| `bonusTickThreshold` | 15 | 能量达到此值时触发 bonusTicks |
+| `bonusTicksOnMax` | 4 | 达到上限时额外增加的打击次数 |
+| `bonusDurationOnMax` | 3 | 达到上限时额外增加的持续时间（秒） |
+
+#### 5.1.2 `src/combat_system.js` — 新增函数
+
+- **`combat_wind_mergeStormCores()`**：回合结束时调用，迭代合并所有相交风暴核。按能量加权取中点，累加半径和能量（受上限约束），溢出时记录 `bonusTicks`。
+- **`combat_wind_updateActiveCyclones(timeScale)`**：每帧调用，基于 Tick 计数同步大旋风的伤害与粒子特效。替代原 `setTimeout` 方案。
+- **`combat_wind_updateActiveStrangles(timeScale)`**：每帧调用，基于 Tick 计数同步暴风绞杀的切割伤害。替代原 `setTimeout` 方案。
+- **`combat_wind_updateActiveTunnels(timeScale)`**：每帧调用，基于 Tick 计数同步风道的切割伤害。替代原 `setTimeout` 方案。
+
+#### 5.1.3 `src/combat_system.js` — 重构函数
+
+- **`combat_wind_releaseStormCoreCyclone(core)`**：不再直接执行 `setTimeout`，改为将旋风实体推入 `this.activeCyclones` 列表，由 `updateActiveCyclones` 每帧驱动。读取 `core.bonusTicks` 动态增加总 Tick 数。
+- **`combat_wind_executeCircleEffect(...)` 中的暴风绞杀分支**：改为将绞杀实体推入 `this.activeStrangles` 列表。
+- **风道分支**：改为将风道实体推入 `this.activeTunnels` 列表。
+
+#### 5.1.4 `src/game_phase.js` — 调用集成
+
+- 在回合结束判断处，于 `decayStormCoresEnergy` 之前调用 `mergeStormCores`。
+- 在主循环中，于 `updateStormCores` 之后依次调用 `updateActiveCyclones`、`updateActiveStrangles`、`updateActiveTunnels`。
+
+### 5.2 任务 B：飞剑/风属性符文词条变异解锁机制
+
+#### 5.2.1 `src/rune_config.js` — 新增词条
+
+| 词条 ID | 名称 | 符文组合 | effectId | 效果 |
+|---|---|---|---|---|
+| `runeword_sword_resonance` | 剑意共鸣 | `pierce_1 × 3` | `flying_sword_unlock` | 解锁飞剑变异，变异概率 70%（每级+10%） |
+| `runeword_storm_resonance` | 风暴共鸣 | `bounce_1 × 3` | `wind_unlock` | 解锁风属性变异，变异概率 70%（每级+10%） |
+
+#### 5.2.2 `src/config.js` — 关闭默认变异
+
+- `specialMutationMult` 设为 `0`，彻底关闭无词条时的默认变异。变异概率完全由 `activeRunewordEffects` 中的词条控制。
+
+#### 5.2.3 `src/entities.js` — 重构 `handlePegInteraction`
+
+- **变异概率**：改为读取 `game.activeRunewordEffects['flying_sword_unlock']` 或 `['wind_unlock']` 的 `params.mutationChance`。无对应词条时 `chance = 0`，即不发生变异。
+- **等级注入**：变异成功时，从词条的 `params.level` 读取并写入 `peg.level`，使高等级词条能直接生成高等级特殊钉子。
+- **强化特效**：变异瞬间触发双重爆破 + 冲击波 + 高亮浮动文字 `✨ MUTATION!`。
+
+#### 5.2.4 `src/entities.js` — 强化特殊钉子视觉
+
+- **`drawSwordPeg`**：等级 ≥ 2 时，剑纹变为金色并增加脉冲发光；等级 ≥ 3 时，加绘旋转剑气圆弧。
+- **`drawWindPeg`**：等级 ≥ 2 时，增强光晕强度并加绘外圈风刃圆弧。

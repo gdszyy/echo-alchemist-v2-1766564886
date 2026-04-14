@@ -4,8 +4,7 @@ import {
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
-    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave,
-    IceWave, DeathExplosion, showToast, 
+    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, showToast, 
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba, RuneLoot
 } from './entities.js';
 import { loot_calcRuneDrop } from './loot_system.js';
@@ -98,7 +97,7 @@ export const combat_system = {
         // 1. 扣除消耗
         this.skillPoints -= skill.cost;
         this.ui.updateSkillPoints(this.skillPoints);
-        this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
+        this.ui.updateSkillBar(this.skillPoints);
         
         audio.playPowerup(5); 
         showToast(`釋放: ${skill.name}!`);
@@ -171,7 +170,7 @@ export const combat_system = {
                 
                 // 1. 遍历并应用 buffs (包含 scatter)
                 for (const [key, val] of Object.entries(p.buffs)) {
-                    // 如果是 damage, scatter, bounce 等数局属性，直接累加
+                    // 如果是 damage, scatter, bounce 等数值属性，直接累加
                     if (typeof nextAmmo[key] === 'number' || nextAmmo[key] === undefined) {
                         nextAmmo[key] = (nextAmmo[key] || 0) + val;
                     }
@@ -198,149 +197,8 @@ export const combat_system = {
                 // 返还 SP
                 this.skillPoints += skill.cost;
                 this.ui.updateSkillPoints(this.skillPoints);
-                this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
+                this.ui.updateSkillBar(this.skillPoints);
                 showToast("無彈藥可強化");
-            }
-        }
-
-        // ==================== [技能系统迭代] 新技能方法分发 ====================
-
-        else if (method === 'skill_frost_prison') {
-            // 冰牢封印：冻结所有敢人 + 冻结期伤害加成
-            const freezeFrames = Math.round(p.freezeDuration * 60); // 秒 -> 帧
-            eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 300 });
-            this.ui_triggerScreenShake(150);
-            let frozenCount = 0;
-            this.enemies.forEach(e => {
-                if (e.active) {
-                    // 利用现有温度机制：将温度拉满至冰结阈值 -100
-                    e.temp = -100;
-                    // 设置冻结计时（复用 frozenTurns 字段，单位为帧）
-                    e.frozenTurns = Math.max(e.frozenTurns || 0, freezeFrames);
-                    // 标记冻结期伤害加成
-                    e._frostPrisonAmp = p.damageAmpBonus;
-                    frozenCount++;
-                    this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'mist');
-                    this.spawn_createFloatingText(e.pos.x, e.pos.y - 20, '❄️冻结!', '#67e8f9');
-                }
-            });
-            if (frozenCount > 0) {
-                try { audio.playEffect('cryo'); } catch(e2) {}
-            }
-        }
-
-        else if (method === 'skill_thunder_call') {
-            // 雷神降临：对所有敢人各落一道天雷 + 感电
-            const dmg = p.baseDmg + (this.round * p.roundMult);
-            eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 200 });
-            this.ui_triggerScreenShake(200);
-            for (let i = this.enemies.length - 1; i >= 0; i--) {
-                const e = this.enemies[i];
-                if (e.active) {
-                    const startX = e.pos.x + (Math.random() - 0.5) * 50;
-                    this.lightningBolts.push(new LightningBolt(startX, 0, e.pos.x, e.pos.y));
-                    const killed = e.takeDamage(dmg);
-                    this.combat_recordDamage(dmg, 'lightning', 'main', this._currentDamageShotId);
-                    this.spawn_createFloatingText(e.pos.x, e.pos.y, `-${dmg}`, p.boltColor);
-                    e.applyTemp(CONFIG.balance.lightningTempIncrease || 3);
-                    const skillChainLevel = p.chainLevel || 10;
-                    this.combat_lightning_triggerChain(e, dmg, [e], skillChainLevel);
-                    if (killed) this.spawn_addScore(e.maxHp);
-                }
-            }
-            try { audio.playLightning(); } catch(e2) {}
-        }
-
-        else if (method === 'skill_kinetic_burst') {
-            // 动能爆发：下一发弹珠弹跳次数上限 + 每次弹跳额外伤害
-            if (this.ammoQueue.length > 0) {
-                const nextAmmo = this.ammoQueue[0];
-                nextAmmo.bounce = (nextAmmo.bounce || 0) + p.bounceBonus;
-                // 将每次弹跳额外伤害存入弹珠定义，供 projectile.js 读取
-                nextAmmo._kineticBurstDmg = (nextAmmo._kineticBurstDmg || 0) + p.flatDamagePerBounce;
-                this.spawn_createExplosion(this.width/2, this.height - 80, p.particleColor);
-                this.ui_updateAmmoUI();
-                this.spawn_createFloatingText(this.width/2, this.height - 120, p.floatText, p.particleColor);
-                try { audio.playPowerup(3); } catch(e2) {}
-            } else {
-                this.skillPoints += skill.cost;
-                this.ui.updateSkillPoints(this.skillPoints);
-                this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
-                showToast('無彈藥可強化');
-            }
-        }
-
-        else if (method === 'skill_meltdown_nova') {
-            // 熔毀新星：对所有敢人施加过热状态
-            const overheatThreshold = 100; // 爆炸阈值
-            const targetTemp = Math.round(overheatThreshold * p.tempRatio);
-            eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 250 });
-            this.ui_triggerScreenShake(180);
-            let heatedCount = 0;
-            this.enemies.forEach(e => {
-                if (e.active) {
-                    // 只向上拉温度，不降温
-                    if (e.temp < targetTemp) {
-                        e.temp = targetTemp;
-                    }
-                    heatedCount++;
-                    this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'spark');
-                    this.spawn_createFloatingText(e.pos.x, e.pos.y - 20, '🔥过热!', '#fb923c');
-                }
-            });
-            if (heatedCount > 0) {
-                try { audio.playEffect('pyro'); } catch(e2) {}
-            }
-        }
-
-        else if (method === 'skill_blade_rain') {
-            // 剑刃雨：召唤多道飞剑斩击随机敢人
-            const swordDmg = Math.round(this.round * p.roundMult);
-            const activeEnemies = this.enemies.filter(e => e.active);
-            if (activeEnemies.length === 0) {
-                this.skillPoints += skill.cost;
-                this.ui.updateSkillPoints(this.skillPoints);
-                this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
-                showToast('沒有敢人可攻擊');
-                return;
-            }
-            for (let i = 0; i < p.swordCount; i++) {
-                // 随机选择目标敢人
-                const target = activeEnemies[Math.floor(Math.random() * activeEnemies.length)];
-                const spawnX = target.pos.x + (Math.random() - 0.5) * 60;
-                const spawnY = Math.max(30, target.pos.y - 80);
-                const swordConfig = {
-                    damage: swordDmg,
-                    pyro: 0, cryo: 0, lightning: 0, wind: 0,
-                    multicast: 0,
-                    type: 'flying_sword'
-                };
-                const lvl = this.variantLevels ? (this.variantLevels.flying_sword || 1) : 1;
-                this.combat_flyingSword_addSon(spawnX, spawnY, null, lvl, swordConfig, i * 5);
-                this.combat_flyingSword_assignTarget(target);
-            }
-            this.spawn_createFloatingText(this.width/2, this.height/2, '剑刃雨!', p.particleColor);
-            try { audio.playEffect('split'); } catch(e2) {}
-        }
-
-        else if (method === 'skill_prismatic_shot') {
-            // 棱光炮：下一发弹珠同时携带火/冰/雷三种属性
-            if (this.ammoQueue.length > 0) {
-                const nextAmmo = this.ammoQueue[0];
-                nextAmmo.pyro = (nextAmmo.pyro || 0) + p.pyroStacks;
-                nextAmmo.cryo = (nextAmmo.cryo || 0) + p.cryoStacks;
-                nextAmmo.lightning = (nextAmmo.lightning || 0) + p.lightningStacks;
-                // 标记强制触发元素聚变判定
-                nextAmmo._forceFusion = p.forceFusion;
-                this.spawn_createExplosion(this.width/2, this.height - 80, p.explosionColor);
-                this.ui_updateAmmoUI();
-                this.spawn_createFloatingText(this.width/2, this.height - 120, p.floatText, p.explosionColor);
-                try { audio.playPowerup(4); } catch(e2) {}
-            } else {
-                this.skillPoints += skill.cost;
-                this.ui.updateSkillPoints(this.skillPoints);
-                this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
-                showToast('無彈藥可強化');
             }
         }
     },
@@ -1533,14 +1391,6 @@ export const combat_system = {
         const config = projectile.config;
         let dmg = damageOverride !== null ? damageOverride : (projectile.isCopy ? config.damage * 0.5 : config.damage);
 
-        // [技能系统迭代] 动能爆发技能：弹跳命中时额外加伤
-        if (config._kineticBurstDmg && config._kineticBurstDmg > 0) {
-            const isBounce = config.bounce > 0 && projectile.bouncesLeft !== undefined && projectile.bouncesLeft < config.bounce;
-            if (isBounce) {
-                dmg += config._kineticBurstDmg;
-            }
-        }
-
         // --- [新增] 确定伤害来源类型 (用于统计图表颜色) ---
         let sourceType = 'main';
         if (config.isScatterChild) sourceType = 'scatter';
@@ -1897,8 +1747,7 @@ export const combat_system = {
                  const pos = validCols[Math.floor(Math.random() * validCols.length)];
                  this.spores.push(new CloneSpore(enemy.pos.x, enemy.pos.y, pos.x, pos.y, () => {
                     const clone = new Enemy(pos.x, pos.y, w, this.enemyHeight, cloneHp, cloneHp);
-                    clone.affixes = [];
-                    clone.isClone = true; // [Mikro联动] 标记为分身，用于母体减伤计算
+                    clone.affixes = []; 
                     this.enemies.push(clone);
                 }));
              }
@@ -1934,10 +1783,21 @@ export const combat_system = {
                 enemy.stuckSwords = [];
             }
 
-            // ============================================================
-            // [分级死亡特效系统] v2 - 区分普通/精英/Boss，支持冰冻/燃烧状态
-            // ============================================================
-            this._triggerDeathFX(enemy, shotId);
+            // 燃烧扩散逻辑 (保留)
+            if (enemy.temp >= 100) {
+                this.fireWaves.push(new FireWave(enemy.pos.x, enemy.pos.y));
+                this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 20, "🔥SPREAD!", "#f97316");
+                audio.playExplosion();
+                this.enemies.forEach(other => {
+                    if (other.active && other !== enemy && enemy.pos.dist(other.pos) < CONFIG.gameplay.fireSpreadRadius) {
+                        other.applyTemp(CONFIG.gameplay.fireSpreadTempIncrease);
+                        const spreadDmg = enemy.maxHp*CONFIG.gameplay.fireSpreadDamagePercent;
+                        other.takeDamage(spreadDmg);
+                        // 记录火焰扩散伤害
+                        this.combat_recordDamage(spreadDmg, 'pyro', 'main', shotId);
+                    }
+                });
+            }
             const activeCount = this.enemies.filter(e => e.active && (e.pos.y > 0)).length;
             if(activeCount === 0) {
                 this.data_clearProjectiles(); 
@@ -1953,9 +1813,6 @@ export const combat_system = {
                     bossName: enemy.bossName,
                     round: this.round
                 });
-                // [BUGFIX] 设置标志位：通知 phase_finalizeRound 本回合已有 Boss 遗物待领取，
-                // 避免固定回合遗物事件同时触发导致双重弹窗。
-                this._pendingBossRelic = true;
                 setTimeout(() => {
                     // [fix] 修复命名不一致：openRelicSelection -> ui_showRelicSelection
                     // ui_showRelicSelection 内部已经会设置 stateBeforeRelic，无需在此重复设置
@@ -2176,20 +2033,6 @@ export const combat_system = {
             }
         }
 
-        // --- [炼金火药管] 平坦伤害加成 ---
-        if (this.flatDamageBonus && this.flatDamageBonus > 0) {
-            finalRecipe.damage = (finalRecipe.damage || 0) + this.flatDamageBonus;
-        }
-
-        // --- [绝境之刃] 距离失败线越近，伤害加成越高 ---
-        if (this.ownedRelics && this.ownedRelics.includes('desperation_blade')) {
-            const desperationMult = this._calcDesperationMult();
-            if (desperationMult > 1.0) {
-                finalRecipe.damage = Math.ceil((finalRecipe.damage || 1) * desperationMult);
-                finalRecipe._desperationMult = desperationMult; // 保存之前以供调试
-            }
-        }
-
         // --- [Task 3.2] 触发UI动画 - 改为 EventBus 事件，由 hud.js 监听 ---
         eventBus.emit(EVENT_TYPES.UI_AMMO_FIRED, {});
         this.ui_renderRecipeHUD();
@@ -2214,160 +2057,111 @@ export const combat_system = {
     },
 
 /**
-     * @method combat_laser_fire
-     * @description 发射激光束，进行射线检测、穿透伤害和折射处理。
-     *
-     *   折射机制（Refraction）：
-     *     - 激光击中普通敌人后，有概率触发折射，消耗 1 层 bounce 属性。
-     *     - 折射光线从命中点出发，指向折射搜寻半径内的随机敌人。
-     *     - 折射光线继承剩余长度，伤害和宽度按配置系数衰减。
-     *     - 采用队列（BFS）而非递归，避免栈溢出，并受最大折射总次数限制。
-     *
-     * @param {number} startX - 激光起点 X
-     * @param {number} startY - 激光起点 Y
-     * @param {Vec2} vel - 初始速度向量（用于确定方向）
-     * @param {Object} recipe - 子弹配方
-     * @param {string|null} shotId - 本次发射的统计 ID
+     * @param {any} startY - TODO: Describe this parameter.
+     * @param {any} vel - TODO: Describe this parameter.
+     * @param {any} recipe - TODO: Describe this parameter.
      */
     combat_laser_fire(startX, startY, vel, recipe, shotId = null) {
-        // [统计] 激光是即时的，手动增加计数并在完成后减少
+        // [新增] 保存shotId供伤害记录使用
+        // this._currentDamageShotId = shotId; // 移除：不再需要全局缓存 shotId
+        
+        // [新增] 激光统计处理：激光是即时的，手动增加计数并在完成后减少
         if (shotId !== null && this.shotDamageMap.has(shotId)) {
             this.shotDamageMap.get(shotId).projectileCount++;
         }
-
+        
         // --- 1. 参数计算 ---
         this.isVisualEffectActive = true;
         // [射程] 基础 500 * 1.35 + 每层穿透 250 (决定光线能跑多远)
-        const maxLen = (500 * 1.35) + (recipe.pierce * 250) + (CONFIG.gameplay.laserLengthBonus || 0);
-
+        let maxLen = (500 * 1.35) + (recipe.pierce * 250) + (CONFIG.gameplay.laserLengthBonus || 0); 
+        
         // [粗细] 基础 3px + 每层激光 4px + 爆破加成 (决定光线视觉宽度)
-        const mainWidth = 3 + (recipe.laser * 4) + (recipe.explosive ? 10 : 0);
+        let width = 3 + (recipe.laser * 4) + (recipe.explosive ? 10 : 0);
+        
+        // [反弹] 直接读取配方中的 bounce 值 (决定折射次数)
+        let bounces = recipe.bounce; 
 
         // [颜色] 优先级：爆破 > 元素 > 默认蓝
-        let color = '#0ea5e9';
+        let color = '#0ea5e9'; 
         if (recipe.pyro > 0) color = '#f97316';
         else if (recipe.cryo > 0) color = '#06b6d4';
         else if (recipe.lightning > 0) color = '#d8b4fe';
         else if (recipe.explosive) color = '#ef4444';
 
-        // --- 2. 队列式射线处理（主射线 + 折射链）---
-        // 已命中敌人集合：整条折射链共享，防止同一敌人被重复折射
-        const hitEnemiesSet = new Set();
-        // 最大折射总次数限制（防止极端情况导致性能问题）
-        const maxRefractionTotal = CONFIG.gameplay.laserRefractionMaxTotal || 50;
-        let refractionCount = 0;
+        // --- 2. 射线检测 (Raycasting Logic) ---
+        let points = [new Vec2(startX, startY)]; 
+        let currPos = new Vec2(startX, startY);
+        let currDir = vel.norm(); 
+        let remainLen = maxLen;
+        
+        // 循环条件：只要还有剩余长度 (remainLen > 0) 就继续
+        // 内部会判断是否撞墙/次数耗尽来 break
+        while (remainLen > 0) {
+            // A. 寻找最近的反射面 (墙壁 或 护盾敌人)
+            let hitResult = this.combat_laser_castRay(currPos, currDir, remainLen);
+            
+            // B. 结算这一段路径 (移动光标)
+            let segmentLen = hitResult.dist;
+            let nextPos = currPos.add(currDir.mult(segmentLen));
+            
+            // C. 伤害路径上的普通敌人 (穿透所有)
+            this.combat_laser_processPenetration(currPos, nextPos, recipe);
 
-        // 所有射线的路径点集合，用于批量绘制
-        // 每条折射光线单独绘制，以支持不同宽度
-        const beamsToRender = [];
+            // 记录路径点用于绘制
+            points.push(nextPos);
+            
+            // 扣除长度
+            remainLen -= segmentLen;
+            currPos = nextPos;
 
-        // 初始化任务队列：主射线
-        const laserQueue = [{
-            startPos: new Vec2(startX, startY),
-            dir: vel.norm(),
-            remainLen: maxLen,
-            recipe: recipe,
-            bouncesLeft: recipe.bounce || 0,
-            width: mainWidth,
-            isMain: true,
-            refractionDepth: 0   // 主射线深度为 0
-        }];
-
-        while (laserQueue.length > 0) {
-            const task = laserQueue.shift();
-            let { startPos, dir, remainLen, recipe: taskRecipe, bouncesLeft, width, isMain, refractionDepth = 0 } = task;
-
-            let points = [startPos];
-            let currPos = startPos;
-            let currDir = dir;
-
-            // 单条射线的射线追踪循环
-            while (remainLen > 0) {
-                // A. 寻找最近的反射面（墙壁或护盾敌人）
-                const hitResult = this.combat_laser_castRay(currPos, currDir, remainLen);
-
-                // B. 结算这一段路径
-                const segmentLen = hitResult.dist;
-                const nextPos = currPos.add(currDir.mult(segmentLen));
-
-                // C. 伤害路径上的普通敌人，并尝试触发折射
-                if (refractionCount < maxRefractionTotal) {
-                    const penetrationResult = this.combat_laser_processPenetration(
-                        currPos, nextPos, taskRecipe,
-                        remainLen, bouncesLeft, hitEnemiesSet, width, refractionDepth
-                    );
-                    // 接收折射任务并加入队列
-                    if (penetrationResult.refractionTasks && penetrationResult.refractionTasks.length > 0) {
-                        for (const rfTask of penetrationResult.refractionTasks) {
-                            if (refractionCount < maxRefractionTotal) {
-                                laserQueue.push(rfTask);
-                                refractionCount++;
-                            }
-                        }
-                        // 同步更新当前射线的剩余反弹次数
-                        bouncesLeft = penetrationResult.bouncesLeft;
-                    }
-                } else {
-                    // 已达折射上限，仅处理穿透伤害，不再生成折射
-                    this.combat_laser_processPenetration(
-                        currPos, nextPos, taskRecipe,
-                        0, 0, hitEnemiesSet, width, refractionDepth
-                    );
-                }
-
-                // 记录路径点
-                points.push(nextPos);
-                remainLen -= segmentLen;
-                currPos = nextPos;
-
-                // D. 处理撞击结果（墙壁/护盾镜面反射，仍消耗 bounce）
-                if (hitResult.hitType === 'none') {
+            // D. 处理撞击结果
+            if (hitResult.hitType === 'none') {
+                // 没撞到任何反射面，光线在空气中耗尽长度，结束
+                break; 
+            } else {
+                // 撞到了反射面！检查是否有剩余反弹次数
+                if (bounces <= 0) {
+                    // 次数耗尽，光线在这里终止 (虽有长度但无法折射)
+                    // 可以在末端加个小火花表示能量耗尽
+                    this.spawn_createParticle(nextPos.x, nextPos.y, color, 'spark');
                     break;
-                } else {
-                    if (bouncesLeft <= 0) {
-                        // 反弹次数耗尽，光线终止
-                        this.spawn_createParticle(nextPos.x, nextPos.y, color, 'spark');
-                        break;
-                    }
-                    bouncesLeft--;
-
-                    if (hitResult.hitType === 'wall') {
-                        audio.playHit('bounce');
-                        this.spawn_createParticle(nextPos.x, nextPos.y, color, 'spark');
-                    } else if (hitResult.hitType === 'shield') {
-                        this.combat_damageEnemy(hitResult.enemy, { config: taskRecipe, pos: nextPos, isCopy: false });
-                        audio.playHit('bounce');
-                        this.spawn_createParticle(nextPos.x, nextPos.y, '#3b82f6', 'spark');
-                    }
-
-                    // 镜面反射方向
-                    if (hitResult.normal === 'x') currDir = new Vec2(-currDir.x, currDir.y);
-                    else currDir = new Vec2(currDir.x, -currDir.y);
                 }
-            }
 
-            // 收集本条射线的绘制信息
-            beamsToRender.push({ points, width, isMain });
+                // 消耗一次反弹次数
+                bounces--;
+                
+                // 触发撞击反馈
+                if (hitResult.hitType === 'wall') {
+                    audio.playHit('bounce');
+                    this.spawn_createParticle(nextPos.x, nextPos.y, color, 'spark');
+                } else if (hitResult.hitType === 'shield') {
+                    // 击中护盾敌人
+                    this.combat_damageEnemy(hitResult.enemy, { config: recipe, pos: nextPos, isCopy: false }); 
+                    audio.playHit('bounce'); // 听起来像打铁
+                    this.spawn_createParticle(nextPos.x, nextPos.y, '#3b82f6', 'spark');
+                }
+
+                // 计算反射向量 (镜面反射)
+                if (hitResult.normal === 'x') currDir.x *= -1;
+                else currDir.y *= -1;
+            }
         }
 
         // --- 3. 生成视觉与音效 ---
-        // 绘制所有射线（主射线 + 折射链）
-        for (const beam of beamsToRender) {
-            // 折射光线颜色略微偏绿（混入 bounce 属性的绿色），主射线保持原色
-            const beamColor = beam.isMain ? color : this._laser_blendRefractionColor(color);
-            this.spawn_pushParticleWithLimit(new LaserBeam(beam.points, beam.width, beamColor));
-        }
-
+        // [限制] LaserBeam 受全局粒子上限约束
+        this.spawn_pushParticleWithLimit(new LaserBeam(points, width, color));
+        
         // 音效：越粗越低沉
-        audio.playTone(Math.max(100, 800 - mainWidth * 20), 'sawtooth', 0.15, 0.2 + mainWidth * 0.01);
+        audio.playTone(Math.max(100, 800 - width * 20), 'sawtooth', 0.15, 0.2 + width * 0.01);
         setTimeout(() => {
             this.isVisualEffectActive = false;
-        }, 600);
-
-        // [统计] 激光发射完成，增加销毁计数以触发统计保存
+        }, 600); 
+        
+        // [新增] 激光发射完成，增加销毁计数以触发统计保存
         if (shotId !== null && this.shotDamageMap.has(shotId)) {
             const shotStats = this.shotDamageMap.get(shotId);
             shotStats.destroyedCount++;
+            // 检查是否所有子弹都已销毁
             if (shotStats.destroyedCount >= shotStats.projectileCount && shotStats.total > 0) {
                 this.shotDamageHistory.push({
                     total: shotStats.total,
@@ -2377,34 +2171,6 @@ export const combat_system = {
                 this.ui_updateDamageStats();
                 this.shotDamageMap.delete(shotId);
             }
-        }
-    },
-
-    /**
-     * @method _laser_blendRefractionColor
-     * @description 将激光颜色与折射绿色（bounce 属性色）混合，用于区分折射光线。
-     *   混合比例：原色 70% + 绿色 30%，保持视觉辨识度的同时体现折射特性。
-     * @param {string} baseColor - 原始激光颜色（hex 格式）
-     * @returns {string} 混合后的颜色（hex 格式）
-     */
-    _laser_blendRefractionColor(baseColor) {
-        // 将 hex 颜色解析为 RGB
-        const parseHex = (hex) => {
-            const h = hex.replace('#', '');
-            return [
-                parseInt(h.substring(0, 2), 16),
-                parseInt(h.substring(2, 4), 16),
-                parseInt(h.substring(4, 6), 16)
-            ];
-        };
-        const toHex = (r, g, b) => '#' + [r, g, b].map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('');
-        try {
-            const [r1, g1, b1] = parseHex(baseColor);
-            // 折射绿色（bounce 属性颜色 #22c55e）
-            const [r2, g2, b2] = [34, 197, 94];
-            return toHex(r1 * 0.7 + r2 * 0.3, g1 * 0.7 + g2 * 0.3, b1 * 0.7 + b2 * 0.3);
-        } catch (e) {
-            return baseColor;
         }
     },
 
@@ -2623,20 +2389,11 @@ export const combat_system = {
                 if (boss.affixes.includes('shield')) {
                     boss.shieldCharges = Math.floor(boss.shieldCharges * (bossCfg.berserkedShieldMult || 2));
                 }
-                // 狂暴后每回合温度急升标志
-                boss._berserkedTempRise = bossCfg.berserkedTempRisePerTurn || 30;
-                // 狂暴后火焰溅射标志（存储半径和伤害）
-                boss._berserkedFireSplash = {
-                    radius: bossCfg.berserkedFireSplashRadius || 80,
-                    damage: bossCfg.berserkedFireSplashDamage || 5
-                };
                 break;
 
             case 'glacies':
                 // 狂暴后每回合跳跃 3 行
                 boss._berserkedJumpRows = bossCfg.berserkedJumpRows || 3;
-                // 狂暴后跳跃落地时冻结周围 Peg
-                boss._berserkedFreezePegs = true;
                 break;
 
             case 'mikro':
@@ -2650,9 +2407,8 @@ export const combat_system = {
                 break;
 
             case 'viridis':
-                // 狂暴后放弃治疗他人，集中治疗自身并加速再生
-                boss._berserkedHealerRange = 0; // 治疗范围设为 0，停止治疗其他敌人
-                boss._berserkedSelfRegenMult = bossCfg.berserkedSelfRegenMult || 3.0; // 自身再生倍率
+                // 狂暴后治疗范围扩大到全场
+                boss._berserkedHealerRange = bossCfg.berserkedHealerRange || 999;
                 break;
 
             case 'tesla':
@@ -2663,163 +2419,12 @@ export const combat_system = {
             case 'chimera':
                 // 狂暴后温度直接达到阈值
                 boss.temp = bossCfg.berserkedTempThreshold || 100;
-                // 记录受击触发全场爆炸概率
-                boss._berserkedBlastOnHitChance = bossCfg.berserkedBlastOnHitChance || 0.25;
                 break;
 
             case 'ouroboros':
                 // 狂暴后词缀轮转加速：每回合切换
                 boss._berserkedRotation = true;
                 break;
-        }
-    },
-
-    // ============================================================
-    // [分级死亡特效系统] v2
-    // 内部辅助方法，由 killed 分支调用
-    // ============================================================
-    /**
-     * 触发敌人死亡特效
-     * @param {Enemy} enemy - 死亡的敌人实例
-     * @param {string} shotId - 弹丸射击 ID
-     */
-    _triggerDeathFX(enemy, shotId) {
-        const x = enemy.pos.x;
-        const y = enemy.pos.y;
-        const tier = enemy.type; // 'normal' | 'elite' | 'boss'
-        const isFrozen = enemy.temp <= -80;  // 冰冻状态门槛
-        const isBurning = enemy.temp >= 100; // 燃烧状态门槛
-
-        // --- 1. 冰冻状态死亡：冰晶碎片炸裂 ---
-        if (isFrozen) {
-            // 冰波扩散环
-            if (!this.iceWaves) this.iceWaves = [];
-            this.iceWaves.push(new IceWave(x, y));
-            // 冰晶碎片爆发
-            const shardCount = tier === 'boss' ? 20 : (tier === 'elite' ? 12 : 8);
-            for (let i = 0; i < shardCount; i++) {
-                const p = this.spawn_createParticle(x, y, '#bae6fd', 'shard');
-                if (p) {
-                    const angle = (i / shardCount) * Math.PI * 2 + Math.random() * 0.4;
-                    const speed = 3 + Math.random() * 4;
-                    p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
-                    p.size = 2 + Math.random() * 3;
-                    p.scaleX = 0.4 + Math.random() * 0.6;
-                    p.scaleY = 1.2 + Math.random() * 1.5;
-                    p.decay = 0.018 + Math.random() * 0.015;
-                }
-            }
-            // 冰雾扩散
-            const mistCount = tier === 'boss' ? 10 : (tier === 'elite' ? 6 : 4);
-            for (let i = 0; i < mistCount; i++) {
-                this.spawn_createParticle(
-                    x + (Math.random() - 0.5) * 20,
-                    y + (Math.random() - 0.5) * 20,
-                    'rgba(186,230,253,0.6)', 'mist'
-                );
-            }
-            // 冰冻冲击波
-            this.spawn_createShockwave(x, y, '#7dd3fc');
-            // 冰冻音效
-            audio.playEffect('shatter');
-            this.spawn_createFloatingText(x, y - 24, '❄️SHATTER!', '#7dd3fc');
-        }
-
-        // --- 2. 燃烧状态死亡：火焰爆炸扩散 ---
-        if (isBurning) {
-            this.fireWaves.push(new FireWave(x, y));
-            // 火焰燃烧爆炸粒子
-            const emberCount = tier === 'boss' ? 25 : (tier === 'elite' ? 15 : 8);
-            for (let i = 0; i < emberCount; i++) {
-                this.spawn_createParticle(
-                    x + (Math.random() - 0.5) * 15,
-                    y + (Math.random() - 0.5) * 15,
-                    '#f97316', 'ember'
-                );
-            }
-            // 黑烟
-            const smokeCount = tier === 'boss' ? 8 : (tier === 'elite' ? 5 : 3);
-            for (let i = 0; i < smokeCount; i++) {
-                this.spawn_createParticle(
-                    x + (Math.random() - 0.5) * 20,
-                    y - 10,
-                    'rgba(0,0,0,0.5)', 'mist'
-                );
-            }
-            // 燃烧扩散伤害
-            audio.playExplosion();
-            this.spawn_createFloatingText(x, y - 24, '🔥SPREAD!', '#f97316');
-            this.enemies.forEach(other => {
-                if (other.active && other !== enemy && enemy.pos.dist(other.pos) < CONFIG.gameplay.fireSpreadRadius) {
-                    other.applyTemp(CONFIG.gameplay.fireSpreadTempIncrease);
-                    const spreadDmg = enemy.maxHp * CONFIG.gameplay.fireSpreadDamagePercent;
-                    other.takeDamage(spreadDmg);
-                    this.combat_recordDamage(spreadDmg, 'pyro', 'main', shotId);
-                }
-            });
-        }
-
-        // --- 3. 分级死亡爆炸特效（在冰冻/燃烧特效之外叠加）---
-        if (!this.deathExplosions) this.deathExplosions = [];
-
-        if (tier === 'boss') {
-            // Boss：内爆消散，先膨胀挥扎再塑陷
-            this.deathExplosions.push(new DeathExplosion(x, y, 'boss'));
-            // 少量向外漂出的灵魂烟雾（不是爆炸，而是最后挥扎时的气息）
-            for (let i = 0; i < 8; i++) {
-                const p = this.spawn_createParticle(
-                    x + (Math.random() - 0.5) * 20,
-                    y + (Math.random() - 0.5) * 20,
-                    'rgba(252,165,165,0.6)', 'mist'
-                );
-                if (p) {
-                    // 慢慢向外漂移，不是爆炸
-                    const angle = Math.random() * Math.PI * 2;
-                    p.vel = new Vec2(Math.cos(angle) * 0.6, Math.sin(angle) * 0.6 - 0.3);
-                    p.decay = 0.012;
-                    p.size = 10 + Math.random() * 8;
-                }
-            }
-            // 屏幕震动（内爆感）
-            this.triggerScreenShake(12);
-            audio.playExplosion();
-
-        } else if (tier === 'elite') {
-            // 精英：能量环内缩 + 紫色灵魂烟雾
-            this.deathExplosions.push(new DeathExplosion(x, y, 'elite'));
-            // 紫色灵魂烟雾（向内漂移）
-            for (let i = 0; i < 5; i++) {
-                const p = this.spawn_createParticle(
-                    x + (Math.random() - 0.5) * 30,
-                    y + (Math.random() - 0.5) * 30,
-                    'rgba(192,132,252,0.55)', 'mist'
-                );
-                if (p) {
-                    const angle = Math.random() * Math.PI * 2;
-                    p.vel = new Vec2(Math.cos(angle) * 0.4, Math.sin(angle) * 0.4 - 0.2);
-                    p.decay = 0.018;
-                    p.size = 8 + Math.random() * 6;
-                }
-            }
-            this.triggerScreenShake(5);
-
-        } else {
-            // 普通敌人：内缩消散，极少的烟尘
-            this.deathExplosions.push(new DeathExplosion(x, y, 'normal'));
-            // 1~2 缕烟尘（不向外爆，而是小幅漂移）
-            const dustCount = 1 + Math.floor(Math.random() * 2);
-            for (let i = 0; i < dustCount; i++) {
-                const p = this.spawn_createParticle(
-                    x + (Math.random() - 0.5) * 10,
-                    y + (Math.random() - 0.5) * 10,
-                    'rgba(148,163,184,0.4)', 'mist'
-                );
-                if (p) {
-                    p.vel = new Vec2((Math.random() - 0.5) * 0.3, -0.2 - Math.random() * 0.3);
-                    p.decay = 0.025;
-                    p.size = 5 + Math.random() * 4;
-                }
-            }
         }
     },
 };

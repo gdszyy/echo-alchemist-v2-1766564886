@@ -503,40 +503,20 @@ const CONFIG = {
         // =========================================
         /** Boss 出现回合配置 */
         bossRounds: {
-            firstBoss: 5,             // 第一个 Boss 固定在 Round 5
-            intervalMin: 7,           // 后续 Boss 最小间隔回合数
-            intervalMax: 9,           // 后续 Boss 最大间隔回合数
-            // 延期机制：根据玩家击杀上个 Boss 的速度动态延期
-            // 快速击杀（≤ 2 回合）：延期 2 回合；中速（3 回合）：延期 1 回合；慢速（≥ 4 回合）：不延期
-            delayFastKillThreshold: 2,  // 快速击杀阈值（回合数）
-            delayFastKillRounds: 2,     // 快速击杀时延期回合数
-            delayMidKillThreshold: 3,   // 中速击杀阈值（回合数）
-            delayMidKillRounds: 1,      // 中速击杀时延期回合数
-            delayMaxBossIndex: 3,       // 第几个 Boss 之后不再延期（含）：第 3 个 Boss 之后（即第 4 个起）不延期
+            miniBoss: [5, [9, 11]],   // 固定 Round 5，以及 9-11 随机区间
+            bigBoss: 15,              // 首个大 Boss 固定 Round 15
+            cycleInterval: 5          // Round 20+ 每 5 回合循环一次
         },
 
         /** Boss 血量公式参数 */
         bossHpFormula: {
-            templateWeight: 0.5,         // 模板血量权重（后期稳定值）
-            dynamicWeight: 0.5,          // 动态血量权重（后期稳定值）
+            templateWeight: 0.5,         // 模板血量权重
+            dynamicWeight: 0.5,          // 动态血量权重
             miniBossKillRounds: 2.5,     // Mini-Boss 期望击杀回合数
             bigBossKillRounds: 4.0,      // 大 Boss 期望击杀回合数
-            floorMultiplier: 0.7,        // 保底：模板血量的 70%（后期稳定值）
+            floorMultiplier: 0.7,        // 保底：模板血量的 70%
             miniBossMult: 15,            // Mini-Boss 血量倍率
-            bigBossMult: 35,             // 大 Boss 血量倍率
-            // ── 前期保护参数（Early-Game Protection）──
-            // 越早期的 Boss，动态权重越高（更贴近玩家实时战力），模板权重越低
-            // 线性插值区间：[earlyRound, lateRound]
-            // round <= earlyRound 时：dynamicWeight = earlyDynamicWeight
-            // round >= lateRound  时：dynamicWeight = dynamicWeight（后期稳定值）
-            earlyRound: 5,               // 前期保护生效的最大回合数（第一个 Boss 所在回合）
-            lateRound: 20,               // 过渡结束回合（完全切换为后期稳定权重）
-            earlyDynamicWeight: 0.85,    // 前期动态权重（高度依赖玩家实时伤害）
-            earlyFloorMultiplier: 0.45,  // 前期保底倍率（降低保底，避免卡死新手）
-            // ── Boss 倍率梯度调整（Mult Gradient）──
-            // 前期区间内，根据玩家实时战力动态缩放 bossMult，使前几个 Boss 血量更贴近玩家实际战力
-            // 缩放比値下限：即使玩家战力极弱， bossMult 也不低于原始倍率的该比例
-            bossMultGradientMin: 0.5     // Boss 倍率梯度下限（即最少为原始倍率的 50%）
+            bigBossMult: 35              // 大 Boss 血量倍率
         },
 
         /** 8 个 Boss 专属配置 */
@@ -548,10 +528,6 @@ const CONFIG = {
                 weakness: ['pierce', 'pyro'],
                 shieldChargesBonus: 5,    // 额外护盾层数
                 berserkedShieldMult: 2,   // 狂暴后护盾层数翻倍系数
-                berserkedTempRisePerTurn: 30, // 狂暴后每回合温度上升值
-                berserkedFireSplashRadius: 80, // 狂暴后火焰溅射半径（像素）
-                berserkedFireSplashDamage: 5,  // 狂暴后火焰溅射伤害
-                moveInterval: 2,          // 常规模式：每 2 回合移动一次（有 haste 词缀，移动较频繁）
                 themeWeights: { pyro: 1.5, pierce: 1.5 }
             },
             glacies: {
@@ -561,8 +537,6 @@ const CONFIG = {
                 weakness: ['cryo', 'pierce'],
                 jumpRowsBonus: 2,         // 额外跳跃行数
                 berserkedJumpRows: 3,     // 狂暴后每回合跳跃行数
-                berserkedFreezePegRadius: 120, // 狂暴后跳跃落地冻结周围 Peg 的范围（像素）
-                moveInterval: 3,          // 常规模式：每 3 回合移动一次（有 regen 词缀，移动较慢）
                 themeWeights: { cryo: 1.5, pierce: 1.3 }
             },
             mikro: {
@@ -572,9 +546,6 @@ const CONFIG = {
                 weakness: ['lightning', 'scatter'],
                 cloneChanceHitBonus: 0.3, // 额外受击分身概率
                 berserkedCloneChance: 1.0, // 狂暴后分身概率 100%
-                cloneDamageReductionPerClone: 0.10, // 每个存活分身提供的减伤比例
-                cloneDamageReductionMax: 0.50,       // 分身减伤上限（5个分身即达上限）
-                moveInterval: 3,          // 常规模式：每 3 回合移动一次（专注分裂，移动较慢）
                 themeWeights: { lightning: 1.5, scatter: 1.5 }
             },
             devourer: {
@@ -584,7 +555,6 @@ const CONFIG = {
                 weakness: ['bounce', 'laser'],
                 devourRangeBonus: 2,      // 额外吞噬范围
                 berserkedDevourRange: 99, // 狂暴后全屏吞噬
-                moveInterval: 2,          // 常规模式：每 2 回合移动一次（吞噬后需要靠近）
                 themeWeights: { bounce: 1.5, laser: 1.5 }
             },
             viridis: {
@@ -593,9 +563,7 @@ const CONFIG = {
                 affixes: ['regen', 'healer'],
                 weakness: ['laser', 'pyro'],
                 regenPercentBonus: 0.2,   // 额外再生百分比
-                berserkedHealerRange: 0,   // 狂暴后停止治疗其他敌人（放弃治疗他人）
-                berserkedSelfRegenMult: 3.0, // 狂暴后自身回血速度倍率（集中治疗自身）
-                moveInterval: 3,          // 常规模式：每 3 回合移动一次（专注治疗，移动缓慢）
+                berserkedHealerRange: 999, // 狂暴后治疗范围扩大到全场
                 themeWeights: { laser: 1.5, pyro: 1.3 }
             },
             tesla: {
@@ -605,7 +573,6 @@ const CONFIG = {
                 weakness: ['cryo', 'bounce'],
                 hasteActionsBonus: 1,     // 额外行动次数（共3次）
                 berserkedActionsBonus: 1, // 狂暴后再+1次行动
-                moveInterval: 2,          // 常规模式：每 2 回合移动一次（有 haste 词缀，移动较快）
                 themeWeights: { cryo: 1.5, bounce: 1.3 }
             },
             chimera: {
@@ -615,8 +582,6 @@ const CONFIG = {
                 weakness: ['pierce', 'laser'],
                 initTemp: 60,             // 初始温度（半狂暴状态）
                 berserkedTempThreshold: 100, // 狂暴后温度阈值
-                berserkedBlastOnHitChance: 0.25, // 狂暴后受击触发全场爆炸概率
-                moveInterval: 2,          // 常规模式：每 2 回合移动一次（混沌体，移动较频繁）
                 themeWeights: { pierce: 1.5, laser: 1.5 }
             },
             ouroboros: {
@@ -631,19 +596,8 @@ const CONFIG = {
                 ],
                 rotationInterval: 3,        // 每 3 回合切换一次
                 berserkedRotationInterval: 1, // 狂暴后每回合切换
-                moveInterval: 3,          // 常规模式：每 3 回合移动一次（永恒回声，移动最慢）
                 themeWeights: { pierce: 1.2, cryo: 1.2, lightning: 1.2 }
             }
-        },
-        /** Boss 进场冲击波效果配置 */
-        bossEntranceShockwave: {
-            waveCount: 3,           // 冲击波波数
-            waveDelay: 120,         // 每圈延迟间隔（毫秒）
-            shockwaveMaxRadius: 600, // 冲击波最大半径（像素）
-            shakeDuration: 400,     // 屏幕震动持续时间（毫秒）
-            affixChance: 0.35,      // 被冲击波命中后获得 Boss 特殊词条的概率
-            minionChance: 0.05,     // 被冲击波命中后直接转化为 Boss 随从的概率（降低：减少异型敌人数量）
-            bigBossBonus: 0.10      // 大 Boss 进场时概率加成
         }
     },
     /** 游戏玩法配置 */
@@ -657,7 +611,7 @@ const CONFIG = {
         relicChoiceNum:4,
         enemyCols:6,
         cols: 10,           // 网格列数 
-        rows: 5,           // 钉子行数
+        rows: 6,           // 钉子行数
         spacingX: 35,      // 钉子水平间距
         spacingY: 32,      // 钉子垂直间距
         startRows: 4,       // 初始生成的敌人行数
@@ -679,45 +633,34 @@ const CONFIG = {
         //  固定回合遗物事件 (每多少回合触发一次)
         relicRoundInterval: 3,
         assimilationChance: {
-            bounce: 0.13,
-            pierce: 0.078,
-            scatter: 0.078,
-            damage: 0.13,
-            cryo: 0.13,  
-            pyro: 0.13
+            bounce: 0.2,
+            pierce: 0.12,
+            scatter: 0.12,
+            damage: 0.2,
+            cryo: 0.2,  
+            pyro: 0.2
         },
         // [新增] 特殊变体概率乘子
         // [重要] 设为 0 彻底关闭无词条时的默认变异；变异概率完全由符文词条控制
         specialMutationMult: 0, // 变异概率乘子 (基于同化概率)
-        specialUpgradeMult: 0.42,   // 升级概率乘子 (基于同化概率)
-        // [激光折射系统] 折射机制参数
-        laserRefractionBaseChance: 0.30,  // 折射基础触发概率 (30%)
-        laserRefractionBounceBonus: 0.05, // 每层 bounce 增加的触发概率 (+5%)
-        laserRefractionMaxChance: 0.80,   // 折射触发概率上限 (80%)
-        laserRefractionRadius: 150,       // 折射搜寻范围半径 (px)
-        laserRefractionDamageDecay: 0.75, // 每次折射的伤害衰减系数 (75%)
-        laserRefractionWidthDecay: 0.85,  // 每次折射的光线宽度衰减系数 (85%)
-        laserRefractionMaxTotal: 50,      // 单次发射最大折射总次数 (防止极端情况)
-        laserRefractionDepthDecay: 0.65    // 每增加一层折射深度，概率乘以该系数 (65%)。第 1 层折射概率 × 0.65，第 2 层 × 0.65^2，以此类推
+        specialUpgradeMult: 0.42   // 升级概率乘子 (基于同化概率)
     },
     //  初始概率配置 (現在這些是基礎權重，解鎖後會增加)
-    // [DESIGN] 初始状态只提供 bounce（反弹）属性。
-    // 其余属性权重均为 0，需通过遗物解锁后才会按概率刷新对应属性钉子。
     probabilities: { 
         white: 100,       // 基礎
-        bounce: 20,       // 初始解鎖（唯一初始可用属性）
+        bounce: 20,       // 初始解鎖
         laser: 0,
         // 物理系 (初始鎖定，通過遺物解鎖)
-        pierce: 0, 
-        scatter: 0,
-        damage: 3,
+        pierce: 7, 
+        scatter: 7,
+        damage: 12, // 保持概率权重不变
         
         // 元素系 (初始鎖定，通過遺物獨立解鎖)
-        cryo: 0, 
-        pyro: 0, 
+        cryo: 5, 
+        pyro: 5, 
         
         // 特殊系 (初始鎖定)
-        explosive: 0, 
+        explosive: 2, 
         rainbow: 0, 
         matryoshka: 0,
         resonance: 0,
@@ -743,18 +686,6 @@ const CONFIG = {
 };
 
 
-// ==================== 钉盘结构遗物互斥集合 ====================
-// 所有影响钉盘结构（行数、布局形态）的遗物 ID，单局内只能选择其中一个
-const BOARD_STRUCTURE_RELICS = new Set([
-    'dimension_shard',       // 行数遗物：增加钉盘行数（1行）
-    'dimension_crystal',     // 行数遗物：增加钉盘行数（2行）
-    'triangle_formation',    // 布局遗物：三角阵形
-    'diamond_formation',     // 布局遗物：菱形阵形
-    'sparse_interval',       // 布局遗物：稀疏间隔
-    'mirror_sync',           // 布局遗物：镜像同步
-    'wide_narrow',           // 布局遗物：宽窄交替
-]);
-
 // ==================== 遗物数据库 ====================
 
 const RELIC_DB = [
@@ -765,10 +696,7 @@ const RELIC_DB = [
     desc: '永久提升弹珠体积，更容易击中钉子与槽位。', 
     rarity: 'rare', 
     effect: 'permanent_size_up',
-    maxStacks: 1,
-    recommended: true,
-    tags: ['伤害提升', '新手友好'],
-    recommendTip: '弹珠变大后更容易命中钉子，大幅提升每回合伤害输出！'
+    maxStacks: 1
 },
     { 
     id: 'fortune_wheel_relic', 
@@ -780,30 +708,18 @@ const RELIC_DB = [
     slotType: 'wheel',
     maxStacks: 1
     },
-    // 维度碎片拆分为 rare(+1行×3) 和 legendary(+2行×2)
     { 
         id: 'dimension_shard', 
         name: '維度碎片', 
         icon: '🌌', 
-        desc: '收集階段：釘板高度延伸，額外增加 1 行釘子。（最多疊加 3 次）', 
+        desc: '收集階段：釘板高度延伸，額外增加 2 行釘子。', 
         rarity: 'rare', 
-        effect: 'row_count_up_1', maxStacks: 3,
-        recommended: true,
-        tags: ['收益增幅', '新手友好'],
-        recommendTip: '更多行釘子意味着每回合可收集更多属性，弹珠伤害将大幅提升！'
-    },
-    { 
-        id: 'dimension_crystal', 
-        name: '維度結晶', 
-        icon: '💠', 
-        desc: '收集階段：釘板高度大幅延伸，額外增加 2 行釘子。（最多疊加 2 次）', 
-        rarity: 'legendary', 
-        effect: 'row_count_up', maxStacks: 2
+        effect: 'row_count_up' ,maxStacks: 1
     },
     { id: 'stars_shines', name: '群星闪烁', icon: '✨', desc: '解鎖 [回响弹珠]：双倍获得连击充能。', rarity: 'rare', unlocks: 'resonance', boost: 8 ,maxStacks: 1},
     { id: 'optical_lens', name: '聚焦透鏡', icon: '🔭', desc: '解鎖 [光球]：發射瞬間穿透的折射光束。', rarity: 'legendary', unlocks: 'laser', boost: 10 ,maxStacks: 1},
     //  1. 粉色钉子遗物
-    { id: 'pink_slime', name: '粉紅凝膠', icon: '💗', desc: '收集階段：出現 3 個高彈性粉色釘子 (可疊加)。', rarity: 'common', effect: 'pink_peg_up', maxStacks: 5},
+    { id: 'pink_slime', name: '粉紅凝膠', icon: '💗', desc: '收集階段：出現 3 個高彈性粉色釘子 (可疊加)。', rarity: 'common', effect: 'pink_peg_up' ,maxStacks: 1},
 
     //  2. 战斗底部反弹墙
     { id: 'energy_shield', name: '力場護盾', icon: '🛡️', desc: '戰鬥階段：底部邊界可消耗彈性/穿透次數來反彈子彈。', rarity: 'cursed', effect: 'combat_wall' ,maxStacks: 1},
@@ -814,218 +730,98 @@ const RELIC_DB = [
     { id: 'unlock_split', name: '裂變核心', icon: '☢️', desc: '收集階段：解鎖 [分裂槽] 的出現 (若無槽位則+1)。', rarity: 'rare', effect: 'unlock_slot', slotType: 'split' ,maxStacks: 1},
 
     //  4. 增加特殊槽数量
-    { id: 'slot_expander', name: '空間鑿子', icon: '🔨', desc: '收集階段：特殊槽出現數量 +1。', rarity: 'common', effect: 'slot_count_up', maxStacks: 3, recommended: true, tags: ['连击增幅', '新手友好'], recommendTip: '更多特殊槽意味着更多触发机会，是快速提升伤害的关键！'},
+    { id: 'slot_expander', name: '空間鑿子', icon: '🔨', desc: '收集階段：特殊槽出現數量 +1。', rarity: 'common', effect: 'slot_count_up' ,maxStacks: 1},
     //  獨立元素遺物
     { id: 'cryo_stone', name: '永恆凍土', icon: '❄️', desc: '解鎖 [冰霜] 屬性 (彈珠與釘子)。', rarity: 'rare', unlocks: 'cryo', boost: 15 ,maxStacks: 1},
     { id: 'pyro_stone', name: '不滅火種', icon: '🔥', desc: '解鎖 [火焰] 屬性 (彈珠與釘子)。', rarity: 'rare', unlocks: 'pyro', boost: 15 ,maxStacks: 1},
     // { id: 'lightning_stone', name: '雷霆之怒', icon: '⚡', desc: '解鎖 [閃電] 屬性 (彈珠與釘子)。', rarity: 'rare', unlocks: 'lightning', boost: 15 },
     
     //  物理套裝遺物 (一次解鎖三種，或者你可以拆開)
-    { id: 'tactical_kit_pierce', name: '穿透補給', maxStacks: 3 , icon: '↗', desc: '解鎖 [穿透] 屬性。', rarity: 'legendary', unlocks: ['pierce'], boost: 5 ,maxStacks: 1},
-    { id: 'tactical_kit_scatter', name: '散射補給', maxStacks: 3 , icon: '🔱', desc: '解鎖 [散射] 屬性。', rarity: 'legendary', unlocks: ['scatter'], boost: 5 ,maxStacks: 1},
-    { id: 'tactical_kit_damage', name: '增幅補給', icon: '⚔️', desc: '解鎖 [增幅] 屬性。', rarity: 'common', unlocks: ['damage'], boost: 5, maxStacks: 1, recommended: true, tags: ['伤害核心', '新手友好'], recommendTip: '解锁增幅属性，让你的弹珠造成更高的基础伤害！'},
+    { id: 'tactical_kit', name: '穿透補給', icon: '↗', desc: '解鎖 [穿透] 屬性。', rarity: 'common', unlocks: ['pierce'], boost: 5 ,maxStacks: 1},
+    { id: 'tactical_kit', name: '散射補給', icon: '🔱', desc: '解鎖 [散射] 屬性。', rarity: 'common', unlocks: ['scatter'], boost: 5 ,maxStacks: 1},
+    { id: 'tactical_kit', name: '增幅補給', icon: '⚔️', desc: '解鎖 [增幅] 屬性。', rarity: 'common', unlocks: ['damage'], boost: 5 ,maxStacks: 1},
 
     { id: 'explosive_ammo', name: '高爆火藥', icon: '🧨', desc: '解鎖 [爆破彈珠] 出現，且獲得一顆。', rarity: 'rare', unlocks: 'explosive', boost: 10 ,maxStacks: 1},
     { id: 'prism_shard', name: '七彩稜鏡', icon: '🌈', desc: '解鎖 [彩虹彈珠] 出現，且獲得一顆。', rarity: 'legendary', unlocks: 'rainbow', boost: 5 ,maxStacks: 1},
-    { id: 'russian_doll', name: '俄羅斯套娃', icon: '🪆', desc: '解鎖 [套娃彈珠]，子彈消失時會發射下一顆子彈。', rarity: 'legendary', unlocks: 'matryoshka', boost: 5 ,maxStacks: 1},
-
-    // ==================== 钉盘形态遗物（异型布局）====================
-    // 每种只能获取一次（maxStacks: 1），均与行数遗物有联合效果
-    // 策略1：三角阵形 - 漏斗流（行越多三角越尖，弹珠越集中于底部中央）
-    { id: 'triangle_formation', name: '三角陣形', icon: '🔺', desc: '釘盤展開為三角形，頂行最寬，每行遞減 1 列。「漏斗共鳴」：弹珠碰撞屬性釘子時，20% 機率額外再收集一次該屬性。「底部倍率轉盤」：底部左右各有一個小型轉盤，弹珠落入即觸發；轉盤層次由內到外：空（高機率）→1x→2x→3x→5x（低機率），中獎後對已收集屬性翻倍。釘盤 +3 行。', rarity: 'rare', effect: 'board_layout_triangle', maxStacks: 1 },
-    // 策略2：菱形阵形 - 中段爆发流（行越多菱形越饱满，中段碰撞最频繁）
-    { id: 'diamond_formation', name: '菱形陣形', icon: '🔷', desc: '釘盤展開為菱形，前半段擴展、後半段收縮。「中段爆發」：弹珠碰撞菱形中段釘子時，充能計數額外 +1。「裂變回響」：中段屬性釘子被碰撞時，30% 機率在對角方向裂變出虚影釘子（半透明閃爍），弹珠碰撞虚影即額外收集一次該屬性。釘盤 +2 行。', rarity: 'legendary', effect: 'board_layout_diamond', maxStacks: 1 },
-    // 策略3：稀疏间隔 - 通道流（宽窄行交替，形成弹珠通道）
-    { id: 'sparse_interval', name: '稀疏間隔', icon: '〰️', desc: '偶數行正常列數，奇數行減 4 列形成寬窄通道。「通道蓄力」：弹珠穿越窄行未碰撞任何釘子時，下次碰撞收集的屬性等級 +1（加速蓄力後爆發）。「底部粉色陷阱」：最後兩行永遠交錯排列粉色釘子，弹珠落底前必經高彈性區域。釘盤 +4 行。', rarity: 'rare', effect: 'board_layout_sparse', maxStacks: 1 },
-    // 策略4：镜像同步 - 直线穿透流（列数减少但行对齐，弹珠更易直线下落）
-    { id: 'mirror_sync', name: '鏡像同步', icon: '🪞', desc: '收集階段：釘盤列數減少且對齊。釘子被同化/突變時，鏡像位置的釘子同步轉化；特殊槽位鏡像呈現（數量翻倍）。', rarity: 'legendary', effect: 'board_layout_mirror_sync', maxStacks: 1 },
-    // 策略5：宽窄交替 - 边缘捕获流（宽行捕获偏移弹珠，窄行提供通道）
-    { id: 'wide_narrow', name: '寬窄交替', icon: '📐', desc: '偶數行 +2 列，奇數行 -2 列，寬窄交替。「邊緣共振」：弹珠碰撞寬行邊緣釘子（列號 0/1 或倒數 0/1）時，65% 機率額外再收集一次該屬性。釘盤 +2 行。', rarity: 'common', effect: 'board_layout_wide_narrow', maxStacks: 1 },
-    // ==================== 弹珠同化涌潮遗物 ====================
-    // 每种可同化钉子的弹珠各对应一个遗物
-    // 效果：下两回合必定刷新出该种弹珠，且该弹珠的同化概率大幅提升（持續两回合）
-    { id: 'surge_bounce',  name: '弹性涌潮', icon: '🔵', desc: '下兩回合必定刷新出「弹性彈珠」，且弹性彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'bounce',  maxStacks: 1 },
-    { id: 'surge_pierce',  name: '穿透涌潮', icon: '↗',       desc: '下兩回合必定刷新出「穿透彈珠」，且穿透彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'cursed',  effect: 'assimilation_surge', marbleType: 'pierce',  maxStacks: 1 },
-    { id: 'surge_scatter', name: '散射涌潮', icon: '🔱',       desc: '下兩回合必定刷新出「散射彈珠」，且散射彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'legendary',  effect: 'assimilation_surge', marbleType: 'scatter', maxStacks: 1 },
-    { id: 'surge_damage',  name: '增幅涌潮', icon: '⚔️',       desc: '下兩回合必定刷新出「增幅彈珠」，且增幅彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'damage',  maxStacks: 1, recommended: true, tags: ['伤害爆发', '属性强化'], recommendTip: '快速将钉子同化为增幅属性，爆发期间伤害大幅飙升！' },
-    { id: 'surge_cryo',    name: '冰霜涌潮', icon: '❄️',       desc: '下兩回合必定刷新出「冰霜彈珠」，且冰霜彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'cryo',    maxStacks: 1 },
-    { id: 'surge_pyro',    name: '火焰涌潮', icon: '🔥',       desc: '下兩回合必定刷新出「火焰彈珠」，且火焰彈珠的同化概率大幅提升（持續兩回合）。', rarity: 'rare',  effect: 'assimilation_surge', marbleType: 'pyro',    maxStacks: 1 },
-
-    // ==================== 新手前期过渡遗物 ====================
-    // 炼金火药管：所有弹珠基础伤害 +2（可叠加3次），后期自然稀释
-    {
-        id: 'alchemist_powder_tube',
-        name: '炼金火药管',
-        icon: '⚗️',
-        desc: '你的所有弹珠基础伤害 +2。（最多疊加 3 次）',
-        rarity: 'common',
-        effect: 'flat_damage_up',
-        flatDamageValue: 2,
-        maxStacks: 3,
-        recommended: true,
-        tags: ['伤害提升', '新手友好'],
-        recommendTip: '立即提升所有弹珠的基础伤害，前期最稳定的输出加成！'
-    },
-
-    // 走私者系列：立即给予符文（按稀有度分为4个版本）
-    {
-        id: 'smuggler_pouch_common',
-        name: '走私者的行囊',
-        icon: '🎒',
-        desc: '立即获得 2 个随机普通符文。',
-        rarity: 'common',
-        effect: 'grant_runes',
-        grantRarity: 'common',
-        grantCount: 2,
-        maxStacks: 3,
-        recommended: true,
-        tags: ['符文加速', '新手友好'],
-        recommendTip: '立即获得符文，快速激活符文词条，大幅提升战斗力！'
-    },
-    {
-        id: 'smuggler_chest_rare',
-        name: '走私者的宝箱',
-        icon: '📦',
-        desc: '立即获得 2 个随机稀有符文。',
-        rarity: 'rare',
-        effect: 'grant_runes',
-        grantRarity: 'rare',
-        grantCount: 2,
-        maxStacks: 2
-    },
-    {
-        id: 'smuggler_vault_epic',
-        name: '走私者的密库',
-        icon: '🗝️',
-        desc: '立即获得 2 个随机史诗符文。',
-        rarity: 'epic',
-        effect: 'grant_runes',
-        grantRarity: 'epic',
-        grantCount: 2,
-        maxStacks: 1
-    },
-    {
-        id: 'smuggler_sanctum_legendary',
-        name: '走私者的圣所',
-        icon: '🏛️',
-        desc: '立即获得 2 个随机传说符文。',
-        rarity: 'legendary',
-        effect: 'grant_runes',
-        grantRarity: 'legendary',
-        grantCount: 2,
-        maxStacks: 1
-    },
-
-    // 绝境之刃：距离失败线越近，伤害加成越高（距离3格内才有明显加成）
-    {
-        id: 'desperation_blade',
-        name: '绝境之刃',
-        icon: '🩸',
-        desc: '战斗阶段：距离失败线越近，所有子弹伤害加成越高。距离 0 格 +50%，1 格 +25%，2 格 +12.5%，3 格以上无加成。',
-        rarity: 'cursed',
-        effect: 'desperation_damage',
-        maxStacks: 1
-    },
+    { id: 'russian_doll', name: '俄羅斯套娃', icon: '🪆', desc: '解鎖 [套娃彈珠]，子彈消失時會發射下一顆子彈。', rarity: 'legendary', unlocks: 'matryoshka', boost: 5 ,maxStacks: 1}
 ];
 
 // ==================== 技能数据库 ====================
 
 const SKILL_DB = [
-    {
-        id: 'skill_frost_prison',
-        methodId: 'skill_frost_prison',
-        unlockRuneword: 'runeword_absolute_zero', // 解锁词条：绝对零度
-        name: '冰牢封印',
-        icon: '🧊',
-        cost: 2,
-        color: '#67e8f9',
-        desc: '冻结所有敌人 3 秒，冻结期间受到的伤害提升 30%。',
+    { 
+        id: 'repulsion', 
+        methodId: 'repulsion', // 逻辑ID
+        name: '重力反轉', 
+        icon: '🌬️', 
+        cost: 2, 
+        color: '#60a5fa',
+        desc: '將所有敵人強制向上推回 2 行。',
         params: {
-            freezeDuration: 3,
-            damageAmpBonus: 0.30,
-            particleColor: '#67e8f9',
-            flashColor: 'rgba(103, 232, 249, 0.15)'
+            pushRows: 2,
+            visualShake: -20,
+            particleColor: '#60a5fa',
+            shockwaveColor: '#60a5fa'
         }
     },
-    {
-        id: 'skill_thunder_call',
-        methodId: 'skill_thunder_call',
-        unlockRuneword: 'runeword_thunderstorm', // 解锁词条：雷暴之语
-        name: '雷神降臨',
-        icon: '🌩️',
-        cost: 3,
-        color: '#a78bfa',
-        desc: '对所有敌人各落一道天雷，伤害基于回合数 × 8，并施加感电。',
+    { 
+        id: 'storm', 
+        methodId: 'chain_lightning_all', // 逻辑ID：全屏闪电链
+        name: '以太風暴', 
+        icon: '⚡', 
+        cost: 3, 
+        color: '#c084fc',
+        desc: '召喚雷擊命中所有敵人，並觸發連鎖閃電。',
         params: {
-            baseDmg: 8,
-            roundMult: 8,
-            boltColor: '#a78bfa',
-            flashColor: 'rgba(167, 139, 250, 0.2)',
-            chainLevel: 10
+            baseDmg: 10,
+            roundMult: 5,
+            // 闪电相关参数
+            boltColor: '#c084fc', // 闪电颜色
+            flashColor: 'rgba(192, 132, 252, 0.2)',
+            chainLevel: 15 // [新增] 技能自带的闪电等级 (15级 = 每次弹跳伤害+20%)
         }
     },
-    {
-        id: 'skill_kinetic_burst',
-        methodId: 'skill_kinetic_burst',
-        unlockRuneword: 'runeword_kinetic_surge', // 解锁词条：动能激增
-        name: '動能爆發',
-        icon: '🔄',
-        cost: 1,
-        color: '#34d399',
-        desc: '下一发弹珠弹跳次数上限 +15，且每次弹跳伤害额外 +3。',
+    { 
+        id: 'enhance_normal', // 技能ID：普通强化
+        methodId: 'enhance_ammo', // 逻辑ID：强化逻辑
+        name: '賢者充能', 
+        icon: '💎', 
+        cost: 2, 
+        color: '#facc15',
+        desc: '下一發子彈強化：散射、連射與全屬性提升。',
         params: {
-            bounceBonus: 15,
-            flatDamagePerBounce: 3,
-            particleColor: '#34d399',
-            floatText: 'KINETIC!'
+            buffs: {
+                damage: 5,
+                bounce: 3,
+                pierce: 2,
+                multicast: 1,
+                scatter: 4 
+            },
+            forceExplosive: true,
+            forceLaser: false, // [新增] 是否开启光属性
+            explosionColor: '#facc15',
+            floatText: "ENHANCED!"
         }
     },
-    {
-        id: 'skill_meltdown_nova',
-        methodId: 'skill_meltdown_nova',
-        unlockRuneword: 'runeword_meltdown', // 解锁词条：熔毁
-        name: '熔毀新星',
-        icon: '🌋',
-        cost: 2,
-        color: '#fb923c',
-        desc: '对所有敌人施加过热状态，温度直接拉至爆炸阈值的 80%。',
+    { 
+        id: 'enhance_laser', 
+        methodId: 'enhance_ammo', 
+        name: '光之充能', 
+        icon: '🔦', 
+        cost: 1, 
+        color: '#0ea5e9', 
+        desc: '下一發子彈轉化為高能激光。',
         params: {
-            tempRatio: 0.80,
-            particleColor: '#fb923c',
-            flashColor: 'rgba(251, 146, 60, 0.15)'
-        }
-    },
-    {
-        id: 'skill_blade_rain',
-        methodId: 'skill_blade_rain',
-        unlockRuneword: 'runeword_blade_storm', // 解锁词条：剑刃风暴
-        name: '劍刃雨',
-        icon: '⚔️',
-        cost: 2,
-        color: '#e2e8f0',
-        desc: '召唤 5 道飞剑同时斩击随机敌人，每道伤害为回合数 × 4。',
-        params: {
-            swordCount: 5,
-            roundMult: 4,
-            particleColor: '#e2e8f0'
-        }
-    },
-    {
-        id: 'skill_prismatic_shot',
-        methodId: 'skill_prismatic_shot',
-        unlockRuneword: 'runeword_elemental_fusion', // 解锁词条：元素聚变
-        name: '棱光炮',
-        icon: '🌈',
-        cost: 3,
-        color: '#f0abfc',
-        desc: '下一发弹珠同时携带火/冰/雷三种属性，强制触发元素聚变判定。',
-        params: {
-            pyroStacks: 5,
-            cryoStacks: 5,
-            lightningStacks: 5,
-            forceFusion: true,
-            floatText: 'PRISMATIC!',
-            explosionColor: '#f0abfc'
+            buffs: { 
+                damage: 5,
+                pierce: 8,
+                multicast: 2,
+                laser: 5
+             }, // 加激光层数
+            forceLaser: true, // [新增] 强制开启激光
+            forceExplosive: false,
+            explosionColor: '#0ea5e9',
+            floatText: "LASER READY!"
         }
     }
 ];
@@ -1122,7 +918,6 @@ export {
     setDeepValue,
     CONFIG,
     RELIC_DB,
-    BOARD_STRUCTURE_RELICS,
     SKILL_DB,
     BOSS_DB,
 };

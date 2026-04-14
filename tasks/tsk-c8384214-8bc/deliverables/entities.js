@@ -33,18 +33,10 @@ import {
 } from './utils/math_utils.js';
 import { 
     Particle, SlashEffect, CollectionBeam, Shockwave, LaserBeam, 
-    FloatingText, EnergyOrb, LightningBolt, FireWave,
-    IceWave, DeathExplosion, HealWave
+    FloatingText, EnergyOrb, LightningBolt, FireWave 
 } from './effects/particles.js';
 import { Enemy, setEnemyAudioProvider } from './entities/enemy.js';
 import { Projectile, setProjectileAudioProvider } from './entities/projectile.js';
-import { RUNE_DB } from './rune_config.js';
-import {
-    resolveEnhancedCollision,
-    calcMagnusForce,
-    decaySpin,
-    getLayoutParams,
-} from './plinko_physics.js';
 
 // ==================== 音频依赖注入 (重构 v2) ====================
 // 移除 Proxy 方案和 window.audio 依赖
@@ -115,95 +107,58 @@ class MarbleDefinition {
 
 class SpecialSlot {
     /**
-     * 特殊槽位类（双钉子连线触发模式）
-     * 弹珠穿越两个相邻钉子之间的连线区域时触发效果。
-     * @param {number} x  - 第一个钉子的 x 坐标
-     * @param {number} y  - 第一个钉子的 y 坐标
-     * @param {number} x2 - 第二个钉子的 x 坐标
-     * @param {number} y2 - 第二个钉子的 y 坐标
-     * @param {string} type - 槽位类型 ('recall' | 'multicast' | 'split' | 'relic' | 'giant' | 'skill_point' | 'wheel')
+     * 特殊槽位类 (底部收集槽)
+     * @param {number} x - **重要参数** 中心 x 坐标
+     * @param {number} y - **重要参数** 中心 y 坐标
+     * @param {number} width - **重要参数** 槽位宽度
+     * @param {string} type - **重要参数** 槽位类型 ('recall': 回溯, 'multicast': 多重发射, 'split': 分裂)
      */
-    constructor(x, y, x2, y2, type) {
-        this.x = x;   this.y = y;
-        this.x2 = x2; this.y2 = y2;
-        // 保留 width 以便旧代码兼容（取两点距离）
-        this.width = Math.hypot(x2 - x, y2 - y);
-        this.height = 12; // 触发带宽（点到线段距离阈值）
-        this.type = type;
-        this.animTimer = 0;
-        this.hit = false;
+    constructor(x, y, width, type) {
+        this.x = x; this.y = y; this.width = width; this.height = 12; this.type = type; this.animTimer = 0;this.hit = false;
     }
-
     /**
-     * 绘制连线槽位：在两个钉子之间画发光连线，并在中点显示符号。
-     * @param {CanvasRenderingContext2D} ctx
+     * 绘制槽位
+     * @param {CanvasRenderingContext2D} ctx - 绘图上下文
      */
     draw(ctx) {
         if (this.hit) return;
-
+        
         this.animTimer += 0.05;
-        let color = '#fff'; let text = '';
-        if (this.type === 'recall')        { color = CONFIG.colors.slotRecall;    text = '↺'; }
-        else if (this.type === 'multicast')  { color = CONFIG.colors.slotMulticast; text = '+2'; }
-        else if (this.type === 'split')      { color = CONFIG.colors.slotSplit;     text = '⑂'; }
-        else if (this.type === 'relic')      { color = '#facc15';                   text = '🏆'; }
-        else if (this.type === 'giant')      { color = CONFIG.colors.slotGiant;     text = '⬆️'; }
-        else if (this.type === 'skill_point'){ color = CONFIG.colors.slotSkill;     text = '★'; }
-        else if (this.type === 'wheel')      { color = CONFIG.colors.slotWheel;     text = '🎡'; }
-
-        const glow  = Math.sin(this.animTimer) * 5 + 12;          // 呼吸光晕 7~17
-        const pulse = 0.65 + Math.sin(this.animTimer) * 0.2;      // 透明度脉冲 0.45~0.85
-        const midX  = (this.x + this.x2) / 2;
-        const midY  = (this.y + this.y2) / 2;
-
         ctx.save();
+        let color = '#fff'; let text = '';
+        if (this.type === 'recall') { color = CONFIG.colors.slotRecall; text = "↺"; }
+        else if (this.type === 'multicast') { color = CONFIG.colors.slotMulticast; text = "+2"; }
+        else if (this.type === 'split') { color = CONFIG.colors.slotSplit; text = "⑂"; }
+        else if (this.type === 'relic') { color = '#facc15'; text = '🏆'; }
+        else if (this.type === 'giant') { color = CONFIG.colors.slotGiant; text = "⬆️"; }
+        else if (this.type === 'skill_point') { color = CONFIG.colors.slotSkill; text = "★"; }
+        else if (this.type === 'wheel') { color = CONFIG.colors.slotWheel; text = "🎡"; }
 
-        // ===== 第一层：实线底层（保证连线始终可见） =====
-        ctx.globalAlpha = pulse * 0.5;
-        ctx.shadowBlur  = glow * 0.8;
-        ctx.shadowColor = color;
-        ctx.strokeStyle = color;
-        ctx.lineWidth   = 1.5;
-        ctx.setLineDash([]);
+        const glow = Math.sin(this.animTimer) * 5 + 10;
+        
+        // [叠加视觉优化] 绘制一个环绕钉子的发光圈，而不是实心方块
+        ctx.shadowBlur = glow; 
+        ctx.shadowColor = color; 
+        ctx.strokeStyle = color; 
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.6;
+        
+        // 绘制一个圆环，刚好包围钉子
         ctx.beginPath();
-        ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x2, this.y2);
+        ctx.arc(this.x, this.y, this.width / 2 + 2, 0, Math.PI * 2);
         ctx.stroke();
-
-        // ===== 第二层：流动虚线叠层（魔法流动感） =====
-        ctx.globalAlpha = pulse;
-        ctx.shadowBlur  = glow;
-        ctx.lineWidth   = 2.5;
-        ctx.setLineDash([5, 5]);
-        // 流动速度：每帧向前移动，使用 animTimer 驱动而非 Date.now()
-        ctx.lineDashOffset = -(this.animTimer * 3) % 10;
-        ctx.beginPath();
-        ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x2, this.y2);
-        ctx.stroke();
-
-        ctx.setLineDash([]);
-
-        // ===== 第三层：两端钉子锚点圆 =====
-        ctx.globalAlpha = pulse;
-        ctx.fillStyle   = color;
-        ctx.shadowBlur  = glow * 0.6;
-        [[this.x, this.y], [this.x2, this.y2]].forEach(([ax, ay]) => {
-            ctx.beginPath();
-            ctx.arc(ax, ay, 5, 0, Math.PI * 2);
-            ctx.fill();
-        });
-
-        // ===== 第四层：中点符号文字（无背景圆）=====
-        ctx.globalAlpha  = 1.0;
-        ctx.shadowBlur   = glow;
-        ctx.shadowColor  = color;
-        ctx.textAlign    = 'center';
+        
+        // 绘制半透明填充
+        ctx.globalAlpha = 0.2;
+        ctx.fill();
+        
+        ctx.globalAlpha = 1.0; 
+        ctx.shadowBlur = 0; 
+        ctx.textAlign = 'center'; 
         ctx.textBaseline = 'middle';
-        ctx.font         = 'bold 13px sans-serif';
-        ctx.fillStyle    = '#fff';
-        ctx.fillText(text, midX, midY);
-
+        ctx.font = 'bold 14px sans-serif'; 
+        ctx.fillStyle = '#fff'; 
+        ctx.fillText(text, this.x, this.y);
         ctx.restore();
     }
 }
@@ -503,308 +458,6 @@ class FortuneWheel {
     }
 }
 
-// ==================== GhostPeg 菱形布局裂变回响虚影钉子 ====================
-/**
- * 菱形钉盘专属：中段属性钉子被碰撞后有概率裂变出虚影钉子。
- * 虚影钉子半透明闪烁，存活 3 秒，弹珠碰撞后额外收集一次属性并消失。
- */
-class GhostPeg {
-    /**
-     * @param {number} x - 虚影钉子 x
-     * @param {number} y - 虚影钉子 y
-     * @param {string} type - 属性类型（继承自来源钉子）
-     * @param {number} level - 属性等级
-     */
-    constructor(x, y, type, level) {
-        this.pos = new Vec2(x, y);
-        this.radius = 6;
-        this.type = type;
-        this.level = level || 1;
-        this.life = 180;       // 存活 180 帧（约 3 秒）
-        this.maxLife = 180;
-        this.active = true;
-        this.triggered = false; // 是否已被触发（触发后消失）
-        this.angle = Math.random() * Math.PI * 2; // 旋转起始角
-    }
-
-    update(timeScale) {
-        this.life -= timeScale;
-        this.angle += 0.04 * timeScale;
-        if (this.life <= 0 || this.triggered) this.active = false;
-    }
-
-    draw(ctx) {
-        if (!this.active) return;
-        const x = this.pos.x, y = this.pos.y, r = this.radius;
-        const lifeRatio = this.life / this.maxLife;
-        const pulse = (Math.sin(Date.now() / 200) + 1) / 2;
-        const alpha = lifeRatio * (0.5 + pulse * 0.35); // 生命越少越透明
-
-        ctx.save();
-
-        // 外圈旋转光晕（橙紫色）
-        ctx.globalAlpha = alpha * 0.7;
-        ctx.strokeStyle = '#c084fc'; // 紫色
-        ctx.lineWidth = 1.5;
-        ctx.shadowBlur = 8 + pulse * 6;
-        ctx.shadowColor = '#a855f7';
-        ctx.setLineDash([3, 3]);
-        ctx.lineDashOffset = -(this.angle * 10) % 6;
-        ctx.beginPath();
-        ctx.arc(x, y, r * 1.8, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // 内圈虚影主体
-        ctx.globalAlpha = alpha;
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-        grad.addColorStop(0, 'rgba(251, 146, 60, 0.9)');  // 内心橙色
-        grad.addColorStop(0.6, 'rgba(168, 85, 247, 0.6)'); // 中间紫色
-        grad.addColorStop(1, 'rgba(168, 85, 247, 0.1)');   // 边缘渐隐
-        ctx.fillStyle = grad;
-        ctx.shadowBlur = 10 + pulse * 8;
-        ctx.shadowColor = '#f97316';
-        ctx.fill();
-
-        // 中心小圆
-        ctx.globalAlpha = alpha * 0.9;
-        ctx.beginPath();
-        ctx.arc(x, y, r * 0.35, 0, Math.PI * 2);
-        ctx.fillStyle = '#fff';
-        ctx.shadowBlur = 4;
-        ctx.fill();
-
-        // 旋转小光点（两个对称小圆）
-        const dotR = r * 0.18;
-        const dotDist = r * 1.3;
-        for (let i = 0; i < 2; i++) {
-            const da = this.angle + i * Math.PI;
-            const dx = Math.cos(da) * dotDist;
-            const dy = Math.sin(da) * dotDist;
-            ctx.globalAlpha = alpha * 0.8;
-            ctx.beginPath();
-            ctx.arc(x + dx, y + dy, dotR, 0, Math.PI * 2);
-            ctx.fillStyle = '#fbbf24';
-            ctx.shadowBlur = 5;
-            ctx.shadowColor = '#fbbf24';
-            ctx.fill();
-        }
-
-        ctx.restore();
-    }
-}
-
-// ==================== TriangleSideWheel 三角局布底部倍率转盘 ====================
-/**
- * 三角钉盘专属：底部左右各一个小型倍率转盘。
- * 弹珠落入底部左右区域时自动触发，对当前已收集属性按倍率翻倍。
- * 转盘层次（从中心到边缘）：空（高概率）→ 1x → 2x → 3x → 5x（低概率）
- */
-class TriangleSideWheel {
-    /**
-     * @param {number} x - 转盘中心 x
-     * @param {number} y - 转盘中心 y
-     * @param {'left'|'right'} side - 左側还是右側
-     * @param {object} game - Game 实例
-     */
-    constructor(x, y, side, game) {
-        this.x = x;
-        this.y = y;
-        this.side = side;
-        this.game = game;
-        this.radius = 48;          // 转盘展示半径（较小，不遇挡钉盘）
-        this.triggerRadius = 55;   // 触发半径（稍大于展示半径）
-        this.angle = 0;
-        this.spinning = false;
-        this.spinVelocity = 0;
-        this.friction = 0.975;
-        this.onFinish = null;
-        this.active = true;        // 本转盘是否可被触发
-        this.triggered = false;    // 当前帧是否已被触发（防重复）
-        this.cooldown = 0;         // 触发后冷却帧数
-        this.resultMultiplier = 0; // 最后一次结果倍率（用于展示）
-        this.resultTimer = 0;      // 结果展示计时
-
-        // 转盘层次配置：[{label, multiplier, weight, color}]
-        // 设计原则：越边缘概率越低但倍率越高
-        this.slices = [
-            { label: '空',  multiplier: 0, weight: 30, color: '#475569' },  // 空（高概率，靠近中心）
-            { label: '1x',  multiplier: 1, weight: 25, color: '#3b82f6' },  // 1倍
-            { label: '2x',  multiplier: 2, weight: 20, color: '#10b981' },  // 2倍
-            { label: '3x',  multiplier: 3, weight: 15, color: '#f59e0b' },  // 3倍
-            { label: '5x',  multiplier: 5, weight: 10, color: '#ef4444' },  // 5倍（低概率，边缘）
-        ];
-        // 根据 weight 计算每个层的弧度
-        const totalWeight = this.slices.reduce((s, sl) => s + sl.weight, 0);
-        let ang = 0;
-        this.slices.forEach(sl => {
-            sl.startAngle = ang;
-            sl.arc = (sl.weight / totalWeight) * Math.PI * 2;
-            sl.endAngle = ang + sl.arc;
-            ang += sl.arc;
-        });
-    }
-
-    /**
-     * 触发转盘旋转
-     * @param {Function} callback - 结束回调，传入 multiplier
-     */
-    spin(callback) {
-        if (this.spinning) return;
-        this.spinning = true;
-        this.spinVelocity = 0.35 + Math.random() * 0.15;
-        this.angle = Math.random() * Math.PI * 2;
-        this.onFinish = callback;
-        this.triggered = true;
-        this.cooldown = 90; // 触发后 90 帧冷却
-    }
-
-    /**
-     * 获取当前指针指向的层
-     */
-    getCurrentSlice() {
-        // 指针在顶部（-PI/2），转盘顺时针旋转
-        let relAngle = (-Math.PI / 2 - this.angle) % (Math.PI * 2);
-        if (relAngle < 0) relAngle += Math.PI * 2;
-        return this.slices.find(s => relAngle >= s.startAngle && relAngle < s.endAngle) || this.slices[0];
-    }
-
-    update(timeScale) {
-        if (this.cooldown > 0) this.cooldown -= timeScale;
-        if (this.resultTimer > 0) this.resultTimer -= timeScale;
-        if (!this.spinning) return;
-
-        this.angle += this.spinVelocity * timeScale;
-        this.angle %= Math.PI * 2;
-        this.spinVelocity *= Math.pow(this.friction, timeScale);
-
-        if (this.spinVelocity < 0.005) {
-            this.spinVelocity = 0;
-            this.spinning = false;
-            const winner = this.getCurrentSlice();
-            this.resultMultiplier = winner.multiplier;
-            this.resultTimer = 120; // 展示 120 帧
-            if (this.onFinish) this.onFinish(winner.multiplier, winner.label, winner.color);
-        }
-    }
-
-    draw(ctx) {
-        const x = this.x, y = this.y, r = this.radius;
-        const pulse = (Math.sin(Date.now() / 500) + 1) / 2;
-
-        ctx.save();
-
-        // 外发光
-        ctx.shadowBlur = 10 + pulse * 8;
-        ctx.shadowColor = this.spinning ? '#fbbf24' : 'rgba(100,150,255,0.5)';
-
-        // 外框
-        ctx.beginPath();
-        ctx.arc(x, y, r + 6, 0, Math.PI * 2);
-        const rimGrad = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
-        rimGrad.addColorStop(0, '#f59e0b');
-        rimGrad.addColorStop(0.5, '#fef3c7');
-        rimGrad.addColorStop(1, '#b45309');
-        ctx.fillStyle = rimGrad;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-
-        // 内圈底色
-        ctx.beginPath();
-        ctx.arc(x, y, r + 1, 0, Math.PI * 2);
-        ctx.fillStyle = '#1e1b4b';
-        ctx.fill();
-
-        // 绘制层级山带（旋转部分）
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(this.angle);
-        this.slices.forEach(sl => {
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.arc(0, 0, r, sl.startAngle, sl.endAngle);
-            ctx.closePath();
-            ctx.fillStyle = sl.color;
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // 文字标注
-            const midAngle = sl.startAngle + sl.arc / 2;
-            const tx = Math.cos(midAngle) * r * 0.62;
-            const ty = Math.sin(midAngle) * r * 0.62;
-            ctx.save();
-            ctx.translate(tx, ty);
-            ctx.rotate(midAngle + Math.PI / 2);
-            ctx.fillStyle = '#fff';
-            ctx.font = `bold ${sl.arc > 0.5 ? 11 : 9}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.shadowBlur = 3;
-            ctx.shadowColor = 'rgba(0,0,0,0.8)';
-            ctx.fillText(sl.label, 0, 0);
-            ctx.restore();
-        });
-        ctx.restore();
-
-        // 中心装饰
-        ctx.beginPath();
-        ctx.arc(x, y, 9, 0, Math.PI * 2);
-        ctx.fillStyle = '#fef3c7';
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(x, y, 5, 0, Math.PI * 2);
-        ctx.fillStyle = '#f59e0b';
-        ctx.fill();
-
-        // 指针（小三角，指向顶部）
-        ctx.save();
-        ctx.translate(x, y - r - 3);
-        ctx.beginPath();
-        ctx.moveTo(-6, -4);
-        ctx.lineTo(6, -4);
-        ctx.lineTo(0, 8);
-        ctx.closePath();
-        ctx.fillStyle = '#ef4444';
-        ctx.shadowBlur = 4;
-        ctx.shadowColor = '#ef4444';
-        ctx.fill();
-        ctx.restore();
-
-        // 如果刚出结果，展示大字
-        if (this.resultTimer > 0 && !this.spinning) {
-            const alpha = Math.min(1, this.resultTimer / 30);
-            ctx.save();
-            ctx.globalAlpha = alpha;
-            ctx.font = 'bold 22px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillStyle = '#fff';
-            ctx.shadowBlur = 12;
-            ctx.shadowColor = '#fbbf24';
-            const label = this.resultMultiplier === 0 ? '空' : `${this.resultMultiplier}x!`;
-            ctx.fillText(label, x, y - r - 20);
-            ctx.restore();
-        }
-
-        // 待触发时的呼吸光晕
-        if (!this.spinning && this.cooldown <= 0 && this.resultTimer <= 0) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(x, y, r + 6 + pulse * 4, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(251, 191, 36, ${0.3 + pulse * 0.4})`;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.restore();
-        }
-
-        ctx.restore();
-    }
-}
-
 class Peg {
     constructor(x, y, type = 'normal') {
         this.pos = new Vec2(x, y); 
@@ -821,16 +474,6 @@ class Peg {
         this.lightAngle = 0;     // 光源方向 (弧度)
         this.level = 1;
         this.maxLevel = 3;
-        this.row = -1;
-        this.col = -1;
-        this.mirrorIdx = -1; // 存储镜像钉子在 game.pegs 中的索引
-        this.frozenTurns = 0;  // Glacies 狂暴冻结剩余回合数（> 0 时不可触发）
-        // --- [物理增强] 钉子被击中时的旋转角度（视觉反馈）---
-        this.impactAngle = 0;    // 当前旋转角度（弧度）
-        this.impactSpin = 0;     // 被击中时的角速度（逐帧衰减）
-        // --- [布局位置标记] 特殊钉盘中功能性位置的视觉标识 ---
-        // 由 game_phase.initPachinko 在钉子创建后写入，用于 draw 方法绘制专属样式
-        this.layoutRole = null;  // 'diamond_mid'|'sparse_narrow'|'wide_edge'|'triangle_funnel'|'mirror_center'
     }
     getColor() {
         let color = CONFIG.colors.peg;
@@ -1015,13 +658,7 @@ class Peg {
         
         // 速度越快，视觉缩放越大 (最大 1.8)
         this.scale = 1.6 + Math.min(impactSpeed / 20, 0.2); 
-
-        // --- [物理增强] 被击中时产生旋转角速度（视觉反馈）---
-        // 弹珠被切向摩擦力作用后，钉子会轻微旋转，这是真实物理现象
-        // 旋转方向随机（模拟切向力方向不确定性），速度越大旋转越快
-        const spinDir = Math.random() < 0.5 ? 1 : -1;
-        this.impactSpin = spinDir * Math.min(impactSpeed * 0.04, 0.25);
-
+        
         // 将速度传递给音效管理器
         audio.playHit(this.type, impactSpeed); 
     }
@@ -1032,16 +669,7 @@ class Peg {
         const isLit = this.lit;
         const color = this.getColor();
 
-        // --- [物理增强] 被击中旋转变换 ---
-        // 弹珠碰击鑉子时，鑉子会轻微旋转（切向摩擦力的视觉表现）
-        if (this.impactAngle !== 0) {
-            ctx.save();
-            ctx.translate(this.pos.x, this.pos.y);
-            ctx.rotate(this.impactAngle);
-            ctx.translate(-this.pos.x, -this.pos.y);
-        }
-
-        // 1. 绘制基础圆形鑉子
+        // 1. 绘制基础圆形钉子
         ctx.beginPath(); 
         ctx.arc(this.pos.x, this.pos.y, currentRadius, 0, Math.PI * 2);
         
@@ -1099,44 +727,6 @@ class Peg {
         // 特殊绘制：如果是风属性钉子，绘制风旋图标
         if (this.type === 'wind') {
             this.drawWindPeg(ctx, currentRadius, isLit);
-        }
-
-        // ==================== [特殊钉子样式标识] ====================
-        // 每种属性钉子在圆形内部绘制专属几何符文，一眼可辨
-        if (this.type === 'cryo')      this.drawCryoPeg(ctx, currentRadius, isLit);
-        if (this.type === 'pyro')      this.drawPyroPeg(ctx, currentRadius, isLit);
-        if (this.type === 'lightning') this.drawLightningPeg(ctx, currentRadius, isLit);
-        if (this.type === 'bounce')    this.drawBouncePeg(ctx, currentRadius, isLit);
-        if (this.type === 'pierce')    this.drawPiercePeg(ctx, currentRadius, isLit);
-        if (this.type === 'scatter')   this.drawScatterPeg(ctx, currentRadius, isLit);
-        if (this.type === 'damage')    this.drawDamagePeg(ctx, currentRadius, isLit);
-        if (this.type === 'laser')     this.drawLaserPeg(ctx, currentRadius, isLit);
-        if (this.type === 'pink')      this.drawPinkPeg(ctx, currentRadius, isLit);
-
-        // [Glacies 狂暴] 冻结 Peg 蓝色光晕
-        if (this.frozenTurns > 0) {
-            const pulse = (Math.sin(Date.now() / 400) + 1) / 2;
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(this.pos.x, this.pos.y, currentRadius + 3 + pulse * 2, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(56, 189, 248, ${0.6 + pulse * 0.4})`; // 冰蓝色
-            ctx.lineWidth = 2;
-            ctx.shadowBlur = 10 + pulse * 8;
-            ctx.shadowColor = '#38bdf8';
-            ctx.stroke();
-            // 绘制冻结回合数角标
-            ctx.font = 'bold 7px sans-serif';
-            ctx.fillStyle = '#a5f3fc';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(this.frozenTurns, this.pos.x + currentRadius * 0.8, this.pos.y - currentRadius * 0.8);
-            ctx.restore();
-        }
-
-        // ==================== [布局位置标记] 功能性位置钉子专属视觉 ====================
-        // 根据 layoutRole 绘制外圈样式标识，让玩家一眼识别哪些钉子会触发特殊效果
-        if (this.layoutRole) {
-            this.drawLayoutRoleStyle(ctx, currentRadius);
         }
 
         // --- 2. 绘制光照反光 (Rim Light) ---
@@ -1206,17 +796,12 @@ class Peg {
         }
 
         // 2. [新增] 绘制等级指示器 (Level Indicator)
-        // 只有特殊且等级>1的鑉子才显示
+        // 只有特殊且等级>1的钉子才显示
         if (this.level > 1 && this.type !== 'normal') {
             this.drawLevelPips(ctx, currentRadius);
         }
-
-        // [物理增强] 恢复旋转变换
-        if (this.impactAngle !== 0) {
-            ctx.restore();
-        }
     }
-    // [新增] 绘制剑形鑉子
+    // [新增] 绘制剑形钉子
     drawSwordPeg(ctx, r, isLit) {
         const time = Date.now() / 1000;
         ctx.save();
@@ -1328,415 +913,6 @@ class Peg {
         
         ctx.restore();
     }
-    // ==================== [特殊钉子样式标识] ====================
-    // 每种属性钉子在圆形内部绘制专属几何符文，一眼可辨
-    // 设计原则：形状语言与属性语义对应，不依赖 emoji（Canvas 渲染一致性）
-
-    /**
-     * [cryo] 冰属性：六角雪花
-     * 六条对称线段 + 端点小圆，模拟冰晶结构
-     */
-    drawCryoPeg(ctx, r, isLit) {
-        ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
-        ctx.strokeStyle = ic;
-        ctx.lineWidth = r * 0.14;
-        ctx.lineCap = 'round';
-        // 六条主轴线
-        for (let i = 0; i < 6; i++) {
-            const a = i * Math.PI / 3;
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(Math.cos(a) * r * 0.68, Math.sin(a) * r * 0.68);
-            ctx.stroke();
-            // 每条轴线上的小分叉
-            const mx = Math.cos(a) * r * 0.42;
-            const my = Math.sin(a) * r * 0.42;
-            const pa = a + Math.PI / 2;
-            ctx.beginPath();
-            ctx.moveTo(mx + Math.cos(pa) * r * 0.2, my + Math.sin(pa) * r * 0.2);
-            ctx.lineTo(mx - Math.cos(pa) * r * 0.2, my - Math.sin(pa) * r * 0.2);
-            ctx.stroke();
-        }
-        ctx.restore();
-    }
-
-    /**
-     * [pyro] 火属性：三角火焰
-     * 向上的三角形 + 底部弧线，模拟火焰轮廓
-     */
-    drawPyroPeg(ctx, r, isLit) {
-        ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
-        ctx.fillStyle = ic;
-        ctx.beginPath();
-        // 主火焰三角
-        ctx.moveTo(0, -r * 0.72);
-        ctx.lineTo(r * 0.48, r * 0.38);
-        ctx.lineTo(-r * 0.48, r * 0.38);
-        ctx.closePath();
-        ctx.fill();
-        // 底部小圆弧（火苗基部）
-        ctx.beginPath();
-        ctx.arc(0, r * 0.38, r * 0.28, 0, Math.PI);
-        ctx.fill();
-        ctx.restore();
-    }
-
-    /**
-     * [lightning] 雷属性：闪电折线
-     * Z 形折线，经典闪电符号
-     */
-    drawLightningPeg(ctx, r, isLit) {
-        ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
-        ctx.fillStyle = ic;
-        ctx.beginPath();
-        ctx.moveTo(r * 0.18, -r * 0.72);
-        ctx.lineTo(-r * 0.28, -r * 0.04);
-        ctx.lineTo(r * 0.12, -r * 0.04);
-        ctx.lineTo(-r * 0.18, r * 0.72);
-        ctx.lineTo(r * 0.28, r * 0.04);
-        ctx.lineTo(-r * 0.12, r * 0.04);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-    }
-
-    /**
-     * [bounce] 弹性属性：双弧箭头（回旋）
-     * 两段反向圆弧 + 箭头，表示弹射
-     */
-    drawBouncePeg(ctx, r, isLit) {
-        ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
-        ctx.strokeStyle = ic;
-        ctx.lineWidth = r * 0.16;
-        ctx.lineCap = 'round';
-        // 上弧（向右）
-        ctx.beginPath();
-        ctx.arc(-r * 0.12, -r * 0.22, r * 0.42, Math.PI * 1.1, Math.PI * 0.1, false);
-        ctx.stroke();
-        // 上弧箭头
-        ctx.beginPath();
-        ctx.moveTo(r * 0.28, -r * 0.55);
-        ctx.lineTo(r * 0.42, -r * 0.28);
-        ctx.lineTo(r * 0.12, -r * 0.28);
-        ctx.fill();
-        // 下弧（向左）
-        ctx.beginPath();
-        ctx.arc(r * 0.12, r * 0.22, r * 0.42, Math.PI * 0.1, Math.PI * 1.1, false);
-        ctx.stroke();
-        // 下弧箭头
-        ctx.fillStyle = ic;
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.28, r * 0.55);
-        ctx.lineTo(-r * 0.42, r * 0.28);
-        ctx.lineTo(-r * 0.12, r * 0.28);
-        ctx.fill();
-        ctx.restore();
-    }
-
-    /**
-     * [pierce] 穿透属性：斜向箭头
-     * 对角线 + 箭头头，表示穿透
-     */
-    drawPiercePeg(ctx, r, isLit) {
-        ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
-        ctx.strokeStyle = ic;
-        ctx.fillStyle = ic;
-        ctx.lineWidth = r * 0.16;
-        ctx.lineCap = 'round';
-        // 主箭杆（左下 → 右上）
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.52, r * 0.52);
-        ctx.lineTo(r * 0.38, -r * 0.38);
-        ctx.stroke();
-        // 箭头
-        ctx.beginPath();
-        ctx.moveTo(r * 0.52, -r * 0.52);
-        ctx.lineTo(r * 0.14, -r * 0.52);
-        ctx.lineTo(r * 0.52, -r * 0.14);
-        ctx.closePath();
-        ctx.fill();
-        // 尾羽（两条短线）
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.52, r * 0.52);
-        ctx.lineTo(-r * 0.68, r * 0.28);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.52, r * 0.52);
-        ctx.lineTo(-r * 0.28, r * 0.68);
-        ctx.stroke();
-        ctx.restore();
-    }
-
-    /**
-     * [scatter] 散射属性：放射线（三向扇形）
-     * 从中心向三个方向发散的线条，表示散射
-     */
-    drawScatterPeg(ctx, r, isLit) {
-        ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
-        ctx.strokeStyle = ic;
-        ctx.fillStyle = ic;
-        ctx.lineWidth = r * 0.14;
-        ctx.lineCap = 'round';
-        // 中心圆点
-        ctx.beginPath();
-        ctx.arc(0, r * 0.28, r * 0.12, 0, Math.PI * 2);
-        ctx.fill();
-        // 三条发散线（向右上、正上、左上）
-        const angles = [-Math.PI / 4, -Math.PI / 2, -Math.PI * 3 / 4];
-        angles.forEach(a => {
-            ctx.beginPath();
-            ctx.moveTo(Math.cos(a + Math.PI) * r * 0.18, r * 0.28 + Math.sin(a + Math.PI) * r * 0.18);
-            ctx.lineTo(Math.cos(a) * r * 0.62, r * 0.28 + Math.sin(a) * r * 0.62);
-            ctx.stroke();
-            // 箭头小三角
-            const ex = Math.cos(a) * r * 0.62;
-            const ey = r * 0.28 + Math.sin(a) * r * 0.62;
-            const pa = a + Math.PI / 2;
-            ctx.beginPath();
-            ctx.moveTo(ex + Math.cos(a) * r * 0.16, ey + Math.sin(a) * r * 0.16);
-            ctx.lineTo(ex + Math.cos(pa) * r * 0.1, ey + Math.sin(pa) * r * 0.1);
-            ctx.lineTo(ex - Math.cos(pa) * r * 0.1, ey - Math.sin(pa) * r * 0.1);
-            ctx.closePath();
-            ctx.fill();
-        });
-        ctx.restore();
-    }
-
-    /**
-     * [damage] 增幅属性：双剑交叉
-     * 两条对角线交叉，表示攻击增幅
-     */
-    drawDamagePeg(ctx, r, isLit) {
-        ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
-        ctx.strokeStyle = ic;
-        ctx.fillStyle = ic;
-        ctx.lineWidth = r * 0.15;
-        ctx.lineCap = 'round';
-        // 左斜剑（左下 → 右上）
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.55, r * 0.55);
-        ctx.lineTo(r * 0.55, -r * 0.55);
-        ctx.stroke();
-        // 右斜剑（右下 → 左上）
-        ctx.beginPath();
-        ctx.moveTo(r * 0.55, r * 0.55);
-        ctx.lineTo(-r * 0.55, -r * 0.55);
-        ctx.stroke();
-        // 中心菱形（增幅核心）
-        ctx.beginPath();
-        ctx.moveTo(0, -r * 0.22);
-        ctx.lineTo(r * 0.22, 0);
-        ctx.lineTo(0, r * 0.22);
-        ctx.lineTo(-r * 0.22, 0);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-    }
-
-    /**
-     * [laser] 激光属性：十字准星
-     * 水平+垂直线 + 中心小圆，表示精准激光
-     */
-    drawLaserPeg(ctx, r, isLit) {
-        ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
-        ctx.strokeStyle = ic;
-        ctx.lineWidth = r * 0.14;
-        ctx.lineCap = 'round';
-        // 水平线（中间留缺口）
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.68, 0);
-        ctx.lineTo(-r * 0.22, 0);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(r * 0.22, 0);
-        ctx.lineTo(r * 0.68, 0);
-        ctx.stroke();
-        // 垂直线（中间留缺口）
-        ctx.beginPath();
-        ctx.moveTo(0, -r * 0.68);
-        ctx.lineTo(0, -r * 0.22);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(0, r * 0.22);
-        ctx.lineTo(0, r * 0.68);
-        ctx.stroke();
-        // 中心小圆
-        ctx.fillStyle = ic;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.16, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-    }
-
-    /**
-     * [pink] 粉色钉子：心形
-     * 两个圆弧 + 底部尖角，经典心形
-     */
-    drawPinkPeg(ctx, r, isLit) {
-        ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.85)';
-        ctx.fillStyle = ic;
-        const s = r * 0.55;
-        ctx.beginPath();
-        ctx.moveTo(0, s * 0.4);
-        // 左半心
-        ctx.bezierCurveTo(-s * 0.1, -s * 0.1, -s, -s * 0.1, -s, -s * 0.5);
-        ctx.bezierCurveTo(-s, -s * 1.0, 0, -s * 0.9, 0, -s * 0.4);
-        // 右半心
-        ctx.bezierCurveTo(0, -s * 0.9, s, -s * 1.0, s, -s * 0.5);
-        ctx.bezierCurveTo(s, -s * 0.1, s * 0.1, -s * 0.1, 0, s * 0.4);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-    }
-
-    /**
-     * [布局位置标记] 根据 layoutRole 绘制功能性位置的专属视觉样式
-     *
-     * 设计原则：
-     *  - 外圈样式不遮挡属性图标，只在圆形外侧叠加
-     *  - 每种 role 有独特的形状语言，与其效果语义对应
-     *  - 使用半透明+脉冲动画，静止时不干扰阅读，碰撞时更醒目
-     *
-     * layoutRole 对应关系：
-     *  diamond_mid    → 橙色菱形外框（中段爆发区）
-     *  sparse_narrow  → 绿色虚线外圈（通道蓄力行）
-     *  wide_edge      → 橙色双侧括号（边缘共振钉）
-     *  triangle_funnel→ 琥珀色向下三角标（漏斗共鸣区）
-     *  mirror_center  → 粉色对称轴线（镜像同步边缘）
-     */
-    drawLayoutRoleStyle(ctx, r) {
-        const x = this.pos.x;
-        const y = this.pos.y;
-        const pulse = (Math.sin(Date.now() / 600) + 1) / 2; // 0~1 脉冲
-        const role = this.layoutRole;
-
-        ctx.save();
-
-        if (role === 'diamond_mid') {
-            // ── 橙色菱形外框 ──
-            // 菱形四顶点绕钉子旋转 45°，表示「中段爆发」的能量聚集
-            const d = r * 1.72; // 菱形外接圆半径
-            const alpha = 0.45 + pulse * 0.35;
-            ctx.strokeStyle = `rgba(251, 146, 60, ${alpha})`; // 橙色
-            ctx.lineWidth = 1.4;
-            ctx.shadowBlur = 4 + pulse * 6;
-            ctx.shadowColor = 'rgba(251, 146, 60, 0.7)';
-            ctx.beginPath();
-            ctx.moveTo(x,     y - d); // 顶
-            ctx.lineTo(x + d, y);     // 右
-            ctx.lineTo(x,     y + d); // 底
-            ctx.lineTo(x - d, y);     // 左
-            ctx.closePath();
-            ctx.stroke();
-
-        } else if (role === 'sparse_narrow') {
-            // ── 绿色虚线外圈 ──
-            // 虚线表示「通道」（间隔感），绿色对应 sparse 布局主色
-            const alpha = 0.40 + pulse * 0.30;
-            ctx.strokeStyle = `rgba(52, 211, 153, ${alpha})`; // 翠绿
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([3, 3]);
-            ctx.lineDashOffset = (Date.now() / 80) % 6; // 虚线流动动画
-            ctx.shadowBlur = 3 + pulse * 5;
-            ctx.shadowColor = 'rgba(52, 211, 153, 0.6)';
-            ctx.beginPath();
-            ctx.arc(x, y, r * 1.55, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.setLineDash([]); // 重置虚线
-
-        } else if (role === 'wide_edge') {
-            // ── 橙色双侧括号 ──
-            // 左右各一段圆弧，像「( )」括号，表示边缘捕获
-            const alpha = 0.50 + pulse * 0.35;
-            ctx.strokeStyle = `rgba(251, 113, 133, ${alpha})`; // 玫瑰红
-            ctx.lineWidth = 2.0;
-            ctx.lineCap = 'round';
-            ctx.shadowBlur = 4 + pulse * 7;
-            ctx.shadowColor = 'rgba(251, 113, 133, 0.7)';
-            const arcR = r * 1.6;
-            const arcSpan = Math.PI * 0.55; // 弧长约 99°
-            // 左侧括号（朝左开口）
-            ctx.beginPath();
-            ctx.arc(x, y, arcR, Math.PI * 0.72, Math.PI * 1.28);
-            ctx.stroke();
-            // 右侧括号（朝右开口）
-            ctx.beginPath();
-            ctx.arc(x, y, arcR, -Math.PI * 0.28, Math.PI * 0.28);
-            ctx.stroke();
-
-        } else if (role === 'triangle_funnel') {
-            // ── 琥珀色向下三角标 ──
-            // 钉子下方绘制小三角箭头，表示「漏斗收窄，向下聚焦」
-            const alpha = 0.50 + pulse * 0.35;
-            ctx.fillStyle = `rgba(245, 158, 11, ${alpha})`; // 琥珀色
-            ctx.shadowBlur = 3 + pulse * 5;
-            ctx.shadowColor = 'rgba(245, 158, 11, 0.6)';
-            const ty = y + r * 1.55; // 三角形顶点 Y（钉子正下方）
-            const tw = r * 0.55;     // 三角形半宽
-            const th = r * 0.55;     // 三角形高度
-            ctx.beginPath();
-            ctx.moveTo(x - tw, ty);
-            ctx.lineTo(x + tw, ty);
-            ctx.lineTo(x,      ty + th);
-            ctx.closePath();
-            ctx.fill();
-            // 外圈细线（漏斗感）
-            ctx.strokeStyle = `rgba(245, 158, 11, ${alpha * 0.6})`;
-            ctx.lineWidth = 1.2;
-            ctx.beginPath();
-            ctx.arc(x, y, r * 1.45, Math.PI * 0.15, Math.PI * 0.85);
-            ctx.stroke();
-
-        } else if (role === 'mirror_center') {
-            // ── 粉紫色对称轴双线 ──
-            // 钉子两侧各一条短竖线，表示「镜像对称轴」边缘
-            const alpha = 0.45 + pulse * 0.35;
-            ctx.strokeStyle = `rgba(192, 132, 252, ${alpha})`; // 紫色
-            ctx.lineWidth = 1.5;
-            ctx.lineCap = 'round';
-            ctx.shadowBlur = 4 + pulse * 6;
-            ctx.shadowColor = 'rgba(192, 132, 252, 0.6)';
-            const lx = r * 1.55;
-            const lh = r * 0.8;
-            // 左侧竖线
-            ctx.beginPath();
-            ctx.moveTo(x - lx, y - lh);
-            ctx.lineTo(x - lx, y + lh);
-            ctx.stroke();
-            // 右侧竖线
-            ctx.beginPath();
-            ctx.moveTo(x + lx, y - lh);
-            ctx.lineTo(x + lx, y + lh);
-            ctx.stroke();
-            // 连接两竖线的顶部横线（Π 形）
-            ctx.globalAlpha = alpha * 0.5;
-            ctx.beginPath();
-            ctx.moveTo(x - lx, y - lh);
-            ctx.lineTo(x + lx, y - lh);
-            ctx.stroke();
-        }
-
-        ctx.restore();
-    }
-
     // [新增] 绘制等级星级/点数
     drawLevelPips(ctx, r) {
         ctx.save();
@@ -1757,18 +933,6 @@ class Peg {
 
     update() { 
         if (this.litTimer > 0) this.litTimer--; else this.lit = false; 
-
-        // --- [物理增强] 被击中旋转角度更新 ---
-        if (this.impactSpin !== 0) {
-            this.impactAngle += this.impactSpin;
-            this.impactSpin *= 0.88; // 旋转衰减（类似钉子回弹到原位置）
-            if (Math.abs(this.impactSpin) < 0.001) {
-                this.impactSpin = 0;
-                // 旋转停止后慢慢回到默认角度
-                this.impactAngle *= 0.9;
-                if (Math.abs(this.impactAngle) < 0.005) this.impactAngle = 0;
-            }
-        }
         
         // [修改] 冷却计时器递减 (每帧执行)
         if (this.cooldownTimer > 0) this.cooldownTimer--;
@@ -1821,13 +985,6 @@ class DropBall {
             // --- Tilt Boost (偏移加速度加成衰减机制) ---
             this.tiltBoostMultiplier = 1.0;  // 当前加成倍率，1.0 = 无加成
             this.lastTiltDirection = 0;      // 上一帧的倾斜方向：-1（左）/ 0（平衡）/ 1（右）
-            // --- [物理增强] Galton Board 物理属性 ---
-            this.spin = 0;                   // 角速度（顺时针为正），驱动 Magnus 效应
-            this.layoutParams = null;        // 当前布局物理参数（由 game_phase 注入）
-            // --- [布局补偿] 布局专属效果状态 ---
-            this.channelCharged = false;     // [sparse] 通道蓄力：穿越窄行后下次碰撞属性等级+1
-            this._lastRowPassed = -1;        // [sparse] 记录上次经过的行号，用于检测穿越窄行
-            this._pendingChannelBoost = false; // [sparse] 待处理的通道蓄力等级加成
 	    }
         /**
          * [核心方法] 获取当前所有属性的层数
@@ -1910,9 +1067,7 @@ class DropBall {
                 if (chance > 0 && Math.random() < chance) {
                     
                     // === 逻辑 A: 突变 (Mutation) ===
-                    // [修复] 没有激活词条时禁止变异：变异属于高级机制，需要词条解锁
-                    const hasActiveRunewords = game.activeRunewordEffects && Object.keys(game.activeRunewordEffects).length > 0;
-                    if (rule.type === 'mutation' && hasActiveRunewords) {
+                    if (rule.type === 'mutation') {
                         // [全场唯一性检查]
                         // 只有 flying_sword 需要全场唯一性检查
                         const needsUniqueness = (rule.result === 'flying_sword' || rule.result === 'wind');
@@ -1937,16 +1092,6 @@ class DropBall {
                             game.spawn_createExplosion(peg.pos.x, peg.pos.y, mutColor); // 双重爆破增强视觉冲击
                             game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 30, '✨ MUTATION!', mutColor);
                             audio.playMagic();
-
-                            // [镜像同步]
-                            if (game.boardLayout === 'mirror_sync' && peg.mirrorIdx !== -1) {
-                                const mirrorPeg = game.pegs[peg.mirrorIdx];
-                                if (mirrorPeg && mirrorPeg.type !== rule.result) {
-                                    mirrorPeg.type = rule.result;
-                                    mirrorPeg.level = 1;
-                                    game.spawn_createExplosion(mirrorPeg.pos.x, mirrorPeg.pos.y, CONFIG.colors[rule.result]);
-                                }
-                            }
                         } else {
                             // 场上已有同类唯一实体 -> 禁止突变，退化为普通同化 (变成 Pierce)
                             if (peg.type === 'normal') {
@@ -1964,16 +1109,6 @@ class DropBall {
                             game.spawn_createExplosion(peg.pos.x, peg.pos.y, '#fbbf24');
                             game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 15, `Lv${peg.level} 剑意!`, '#fbbf24');
                             audio.playPowerup(peg.level + 3); // 音调更高
-
-                            // [镜像同步]
-                            if (game.boardLayout === 'mirror_sync' && peg.mirrorIdx !== -1) {
-                                const mirrorPeg = game.pegs[peg.mirrorIdx];
-                                if (mirrorPeg && mirrorPeg.level < peg.level) {
-                                    mirrorPeg.level = peg.level;
-                                    mirrorPeg.type = peg.type;
-                                    game.spawn_createExplosion(mirrorPeg.pos.x, mirrorPeg.pos.y, '#fbbf24');
-                                }
-                            }
                         } else {
                             // 已满级特效 (可选)
                             game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 15, "MAX!", '#ef4444');
@@ -1984,34 +1119,20 @@ class DropBall {
             // 3. 原有的普通同化逻辑 (Fallback)
             else if (peg.type === 'normal' && ballType) {
                 // 这里保留原有的逻辑：普通弹珠同化普通钉子
-                let assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0;
-                // [新增] 同化涌潮遗物加成：仅对该弹珠类型生效
-                if (game.assimilationBoostRounds && game.assimilationBoostRounds[ballType] > 0) {
-                    assimilationChance += 0.195; // 提升 19.5% 同化概率 (从 0.3 调低，原始 0.5 * 0.65 = 0.325 -> 0.3 * 0.65 = 0.195)
-                }
+                const assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0;
                 if (Math.random() < assimilationChance && assimilationChance>0) {
-	                    peg.type = ballType;
-	                    
-	                    // [新增] 同化钉子特效：爆炸 + 浮动文字
-	                    const attrColor = this.def.getColor();
-	                    const attrName = CONFIG.ui.attributeDisplay[ballType] ? CONFIG.ui.attributeDisplay[ballType].name : "Assimilation";
-	                    game.spawn_createExplosion(peg.pos.x, peg.pos.y, attrColor);
-						game.spawn_createShockwave(peg.pos.x, peg.pos.y, attrColor);
-	                    game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 20, attrName, attrColor);
-	                    
-	                    game.spawn_createParticle(peg.pos.x, peg.pos.y, attrColor);
-	                    audio.playMagic();
-
-                        // [镜像同步]
-                        if (game.boardLayout === 'mirror_sync' && peg.mirrorIdx !== -1) {
-                            const mirrorPeg = game.pegs[peg.mirrorIdx];
-                            if (mirrorPeg && mirrorPeg.type !== ballType) {
-                                mirrorPeg.type = ballType;
-                                game.spawn_createExplosion(mirrorPeg.pos.x, mirrorPeg.pos.y, attrColor);
-                                game.spawn_createParticle(mirrorPeg.pos.x, mirrorPeg.pos.y, attrColor);
-                            }
-                        }
-	                }
+                    peg.type = ballType;
+                    
+                    // [新增] 同化钉子特效：爆炸 + 浮动文字
+                    const attrColor = this.def.getColor();
+                    const attrName = CONFIG.ui.attributeDisplay[ballType] ? CONFIG.ui.attributeDisplay[ballType].name : "Assimilation";
+                    game.spawn_createExplosion(peg.pos.x, peg.pos.y, attrColor);
+					game.spawn_createShockwave(peg.pos.x, peg.pos.y, attrColor);
+                    game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 20, attrName, attrColor);
+                    
+                    game.spawn_createParticle(peg.pos.x, peg.pos.y, attrColor);
+                    audio.playMagic();
+                }
             }
         }
 	    /**
@@ -2152,26 +1273,7 @@ class DropBall {
             // gy += tilt.y * 0.1;
 
             let gravityStep = new Vec2(gx * timeScale, gy * timeScale);
-
-            // --- [物理增强] Magnus 效应：自旋导致轨迹偶尔 ---
-            // 自旋弹珠在空气中受到与速度垂直的升力（Magnus Force）
-            // 这是真实 Plinko 弹珠的物理特性：高速旋转的弹珠轨迹会偷偷弯曲
-            if (this.spin !== 0 && this.layoutParams) {
-                const magnus = calcMagnusForce(
-                    this.spin,
-                    { x: this.vel.x, y: this.vel.y },
-                    this.layoutParams.magnusStrength
-                );
-                gravityStep.x += magnus.fx * timeScale;
-                gravityStep.y += magnus.fy * timeScale;
-            }
-            // 自旋衰减（空气阻力使角速度逐渐减小）
-            if (this.spin !== 0) {
-                this.spin = decaySpin(this.spin, 0.018 * timeScale);
-                // 自旋极小时清零，避免浮点误差累积
-                if (Math.abs(this.spin) < 0.001) this.spin = 0;
-            }
-
+            
             this.vel = this.vel.add(gravityStep);
             this.pos = this.pos.add(this.vel.mult(timeScale));
             // 当弹珠处于倍化状态（sizeBonus > 0）时，使用更低的摩擦力，防止卡墙
@@ -2192,46 +1294,6 @@ class DropBall {
             if (this.pos.x < this.radius) { this.pos.x = this.radius; this.vel.x *= -0.6; }
             if (this.pos.x > width - this.radius) { this.pos.x = width - this.radius; this.vel.x *= -0.6; }
             
-            // ==================== [triangle 布局专属] 底部侧边转盘触发检测 ====================
-            // 弹珠进入转盘触发半径内且转盘处于冷却完成状态时，自动触发转盘旋转
-            const _game = this.session && this.session.game;
-            if (_game && _game.triangleSideWheels && _game.triangleSideWheels.length > 0) {
-                for (const wheel of _game.triangleSideWheels) {
-                    if (!wheel.spinning && wheel.cooldown <= 0) {
-                        const dx = this.pos.x - wheel.x;
-                        const dy = this.pos.y - wheel.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        if (dist < wheel.triggerRadius) {
-                            // 触发转盘！
-                            const ball = this;
-                            wheel.spin((multiplier, label, color) => {
-                                if (multiplier > 0 && ball.session && ball.session.collected) {
-                                    // 将当前已收集的属性按倍率复制
-                                    const currentCollected = [...ball.session.collected];
-                                    for (let _k = 0; _k < multiplier - 1; _k++) {
-                                        currentCollected.forEach(item => {
-                                            ball.session.collected.push(typeof item === 'string' ? item : { ...item });
-                                            ball.def.collected.push(typeof item === 'string' ? item : item.type);
-                                        });
-                                    }
-                                    _game.spawn_createFloatingText(
-                                        wheel.x, wheel.y - wheel.radius - 30,
-                                        `属性 x${multiplier}!`, color || '#fbbf24'
-                                    );
-                                    _game.spawn_createExplosion(wheel.x, wheel.y, color || '#fbbf24');
-                                    _game.ui_renderRecipeHUD();
-                                } else if (multiplier === 0) {
-                                    _game.spawn_createFloatingText(
-                                        wheel.x, wheel.y - wheel.radius - 30,
-                                        '空转~', '#94a3b8'
-                                    );
-                                }
-                            });
-                        }
-                    }
-                }
-            }
-
             // 底部退出
             if (this.pos.y > height + 150) { 
                 this.active = false; 
@@ -2243,28 +1305,9 @@ class DropBall {
             for (let slot of slots) {
                 if (slot.hit) continue;
                 if (this.portalCooldown <= 0) {
-                    // [连线触发] 计算弹珠圆心到连线线段的最短距离，替代旧的矩形包围盒检测
-                    // [修复] 排除端点钉子区域：_t 必须落在连线内部（排除两端钉子半径范围），
-                    //        防止球仅碰撞端点钉子时错误触发特殊槽。
-                    const _sx = slot.x2 - slot.x, _sy = slot.y2 - slot.y;
-                    const _segLenSq = _sx * _sx + _sy * _sy;
-                    let _t = 0;
-                    let _onSegmentInterior = false;
-                    if (_segLenSq > 0) {
-                        _t = ((this.pos.x - slot.x) * _sx + (this.pos.y - slot.y) * _sy) / _segLenSq;
-                        // 钉子半径 / 线段长度 = 端点排除区间宽度
-                        const _pegR = 6; // Peg.radius
-                        const _segLen = Math.sqrt(_segLenSq);
-                        const _tMargin = _pegR / _segLen;
-                        // 只有投影落在两端钉子之间的内部区间时才触发
-                        _onSegmentInterior = (_t > _tMargin && _t < 1 - _tMargin);
-                        _t = Math.max(0, Math.min(1, _t));
-                    }
-                    const _closestX = slot.x + _t * _sx;
-                    const _closestY = slot.y + _t * _sy;
-                    const _distToLine = Math.hypot(this.pos.x - _closestX, this.pos.y - _closestY);
-                    const _triggerThreshold = this.radius + slot.height; // slot.height = 12 为触发带宽
-                    if (_onSegmentInterior && _distToLine < _triggerThreshold) {
+                    let dx = Math.abs(this.pos.x - slot.x);
+                    let dy = Math.abs(this.pos.y - slot.y);
+                    if (dy < 12 && dx < slot.width / 2) {
                         slot.hit = true;
                         this.portalCooldown = 40; 
                         if (slot.type === 'recall') {
@@ -2407,87 +1450,24 @@ class DropBall {
                 }
             }
 
-            // --- [物理增强] Galton Board 钉子碰撞检测（增强版）---
-            // 在原有法向反弹基础上，增加：
-            //   1. 速度依赖弹性系数（高速碰撞更弹，低速碰撞更粘）
-            //   2. 切向摩擦力（减小切向速度，产生角动量）
-            //   3. 微观噪声（模拟钉子表面不规则）
+            // ... (钉子碰撞检测逻辑保持不变，注意 rainbow_split 返回前停止声音) ...
             for (let peg of pegs) {
                 let dist = this.pos.dist(peg.pos); let minDist = this.radius + peg.radius;
                 if (dist < minDist) {
+                    // ... (反弹逻辑不变) ...
                     let n = this.pos.sub(peg.pos).norm();
                     this.pos = peg.pos.add(n.mult(minDist + 0.1));
                     const impactVel = new Vec2(this.vel.x, this.vel.y);
 
                     let d = this.vel.dot(n);
                     if (d < 0) {
-                        // [增强版碰撞解算]
-                        // 籁钉（pink）保持原有特殊弹性倍率逻辑
-                        if (peg.type === 'pink') {
-                            const elasticity = CONFIG.physics.elasticity * CONFIG.physics.pinkpegElasticityMuti;
-                            this.vel = this.vel.sub(n.mult(2 * d)).mult(elasticity);
-                            this.vel.x += (Math.random() - 0.5) * 0.5;
-                        } else {
-                            // 普通钉子：使用增强版物理碰撞（速度依赖弹性 + 切向摩擦 + 角动量）
-                            const params = this.layoutParams || getLayoutParams('default');
-                            const collResult = resolveEnhancedCollision(
-                                { pos: this.pos, vel: this.vel, spin: this.spin },
-                                peg,
-                                params
-                            );
-                            this.vel.x = collResult.newVel.x;
-                            this.vel.y = collResult.newVel.y;
-                            this.spin  = collResult.newSpin;
-                        }
+                        let elasticity = CONFIG.physics.elasticity; 
+                        if (peg.type === 'pink') elasticity *= CONFIG.physics.pinkpegElasticityMuti; 
+                        this.vel = this.vel.sub(n.mult(2 * d)).mult(elasticity);
+                        this.vel.x += (Math.random() - 0.5) * 0.5;
                     }
 
-                    // ==================== [布局位置物理修正] ====================
-                    // 根据 peg.layoutRole 在碰撞解算完成后施加额外物理修正
-                    // 这是真实的力学差异，不只是视觉效果
-                    if (peg.layoutRole && d < 0) {
-                        const role = peg.layoutRole;
-                        const boardCenterX = width / 2;
-
-                        if (role === 'wide_edge') {
-                            // 宽行边缘钉子：施加朝向内侧的横向冲量
-                            // 模拟「括号」将偏移弹珠弹回中央的物理效果
-                            // 冲量方向：从边缘指向中轴线
-                            const toCenter = boardCenterX - this.pos.x;
-                            const pushStrength = 0.55 + Math.abs(d) * 0.08; // 撞得越猛，回弹越强
-                            this.vel.x += Math.sign(toCenter) * pushStrength;
-
-                        } else if (role === 'sparse_narrow') {
-                            // 窄行钉子：弹性增强 +18%，弹珠穿越窄行时速度损失更少
-                            // 模拟「通道加速」效果：窄行间距大，弹珠在此加速蓄能
-                            const speedBoost = 1.18;
-                            this.vel.x *= speedBoost;
-                            this.vel.y *= speedBoost;
-                            // 同时轻微增加向下速度，保持下落动能
-                            this.vel.y += 0.3;
-
-                        } else if (role === 'diamond_mid') {
-                            // 菱形中段钉子：施加轻微向下的额外冲量
-                            // 模拟「中段密集区」将弹珠沉入菱形核心的物理效果
-                            this.vel.y += 0.45;
-                            // 同时轻微收拢横向速度，让弹珠在中段更集中
-                            this.vel.x *= 0.88;
-
-                        } else if (role === 'triangle_funnel') {
-                            // 漏斗区钉子：施加朝向中轴线的横向收拢力
-                            // 越往下（row 越大）收拢力越强，模拟漏斗物理
-                            const toCenter = boardCenterX - this.pos.x;
-                            // 收拢力随行号增大而增强（漏斗越窄越聚）
-                            const funnelStrength = 0.35 + (peg.row / 20) * 0.25;
-                            this.vel.x += Math.sign(toCenter) * funnelStrength;
-
-                        } else if (role === 'mirror_center') {
-                            // 镜像轴边缘钉子：横向速度取反（镜像反射）
-                            // 强化对称感：弹珠碰到对称轴边缘后被「镜像」弹回
-                            this.vel.x *= -0.85; // 镜像反转 + 轻微衰减
-                        }
-                    }
-
-                    if (peg.cooldownTimer <= 0 && peg.frozenTurns <= 0) {
+                    if (peg.cooldownTimer <= 0) {
                         // --- [关键修改：传递速度参数] ---
                         const impactSpeedVal = impactVel.mag(); 
                         peg.hit(impactSpeedVal);
@@ -2521,90 +1501,6 @@ class DropBall {
 
                         if (peg.type !== 'pink') {
                             this.handlePegInteraction(peg, game); // 传入 game
-                        }
-
-                        // ==================== [布局补偿] 布局专属特殊效果 ====================
-                        const boardLayout = game.boardLayout || 'default';
-
-                        // --- [triangle] 漏斗共鸣 ---
-                        // 弹珠碰撞任意钉子时，20% 概率额外再收集一次该钉子的属性
-                        // 模拟弹珠在收窄通道中被多次反弹的物理效果
-                        if (boardLayout === 'triangle' && peg.type !== 'normal' && peg.type !== 'pink') {
-                            if (Math.random() < 0.20) {
-                                const bonusItem = { type: peg.type, level: peg.level || 1 };
-                                this.session.collected.push(bonusItem);
-                                this.def.collected.push(peg.type);
-                                game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 24, '漏斗共鸣!', '#f59e0b');
-                            }
-                        }
-
-                        // --- [diamond] 中段爆发 ---
-                        // 弹珠碰撞菱形中段（行号在 rows/4 ~ 3*rows/4 范围内）的钉子时
-                        // 充能计数额外 +1，加速多播积累
-                        if (boardLayout === 'diamond') {
-                            const totalRows = game.currentRows || CONFIG.gameplay.rows;
-                            const rowQ1 = Math.floor(totalRows * 0.25);
-                            const rowQ3 = Math.floor(totalRows * 0.75);
-                            if (peg.row !== undefined && peg.row >= rowQ1 && peg.row <= rowQ3) {
-                                this.session.currentHits++;
-                                if (this.session.currentHits >= this.session.nextTriggerThreshold) {
-                                    this.session.currentHits = 0;
-                                    this.session.multicast++;
-                                    this.session.nextTriggerThreshold += CONFIG.gameplay.nextTriggerThresholdIncrease;
-                                    game.persistentThreshold = this.session.nextTriggerThreshold;
-                                    game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 24, '中段爆发!', '#a78bfa');
-                                    audio.playPowerup();
-                                }
-
-                                // ==================== [菱形裂变回响] 生成虚影钉子 ====================
-                                // 中段属性钉子被碰撞时，30% 概率在对角方向裂变出虚影钉子
-                                if (peg.type !== 'normal' && peg.type !== 'pink' && Math.random() < 0.30) {
-                                    if (game.ghostPegs && game.ghostPegs.length < 8) { // 最多 8 个虚影，防止堆积
-                                        // 随机选择对角方向：左上/右上/左下/右下
-                                        const diagDirs = [[-1,-1],[1,-1],[-1,1],[1,1]];
-                                        const dir = diagDirs[Math.floor(Math.random() * 4)];
-                                        const spacing = (CONFIG.gameplay.spacingX || 35); // 钉子间距
-                                        const gx = peg.pos.x + dir[0] * spacing * 0.8;
-                                        const gy = peg.pos.y + dir[1] * spacing * 0.6;
-                                        // 边界检查：虚影钉子不能超出钉盘范围
-                                        if (gx > 20 && gx < (game.width - 20) && gy > 40 && gy < (game.boardBottomY + 20)) {
-                                            const ghost = new GhostPeg(gx, gy, peg.type, peg.level || 1);
-                                            game.ghostPegs.push(ghost);
-                                            game.spawn_createFloatingText(gx, gy - 20, '裂变!', '#c084fc');
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // --- [sparse] 通道蓄力 ---
-                        // [sparse] 通道蓄力：穿越窄行（奇数行）未碰任何钉子后，激活蓄力状态
-                        // 触发时机：本次碰撞到属性钉子，且 channelCharged=true
-                        // 效果：本次收集的属性等级 +1（蓄力后爆发，最高 Lv.3）
-                        // 注意：蓄力状态在收集完成后消耗，不影响 normal/pink 钉子
-                        if (boardLayout === 'sparse' && this.channelCharged && peg.type !== 'normal' && peg.type !== 'pink') {
-                            // 标记本次碰撞需要等级加成，在下方收集逻辑执行后提升
-                            this._pendingChannelBoost = true;
-                            this.channelCharged = false;
-                        }
-
-                        // --- [wide_narrow] 边缘共振 ---
-                        // 弹珠碰撞偶数行（宽行）的边缘钉子（列号 0/1 或倒数 0/1）时
-                        // 65% 概率额外收集一次该钉子属性
-                        if (boardLayout === 'wide_narrow' && peg.type !== 'normal' && peg.type !== 'pink') {
-                            const isWideRow = (peg.row !== undefined && peg.row % 2 === 0);
-                            if (isWideRow) {
-                                const rowPegs = pegs.filter(p => p.row === peg.row);
-                                const isEdge = rowPegs.length > 0 && (
-                                    peg.col <= 1 || peg.col >= rowPegs.length - 2
-                                );
-                                if (isEdge && Math.random() < 0.65) {
-                                    const bonusItem = { type: peg.type, level: peg.level || 1 };
-                                    this.session.collected.push(bonusItem);
-                                    this.def.collected.push(peg.type);
-                                    game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 24, '边缘共振!', '#fb923c');
-                                }
-                            }
                         }
 
                         if (peg.type !== 'normal' && peg.type !== 'pink') { 
@@ -2662,20 +1558,9 @@ class DropBall {
                             }
 
                             // 将最终结果加入收集列表
-                            // [sparse 通道蓄力] 如果有待处理的等级加成，提升本次收集的属性等级
-                            const baseLevel = peg.level || 1;
-                            const boostedLevel = (this._pendingChannelBoost) 
-                                ? Math.min(baseLevel + 1, 3) 
-                                : baseLevel;
-                            const collectedItem = { type: finalType, level: boostedLevel };
+                            const collectedItem = { type: finalType, level: peg.level || 1 };
                             this.session.collected.push(collectedItem); 
                             this.def.collected.push(finalType); 
-
-                            // [sparse 通道蓄力] 消耗蓄力并显示反馈
-                            if (this._pendingChannelBoost) {
-                                this._pendingChannelBoost = false;
-                                game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 24, '通道蓄力! +Lv', '#34d399');
-                            }
 
                             // ---  合成反馈 ---
                             if (isSynthesized) {
@@ -2693,58 +1578,7 @@ class DropBall {
                         }
                     }
                 }
-
-            // ==================== [布局补偿] sparse 通道蓄力检测 ====================
-            // 检测弹珠是否穿越了奇数行（窄行）而没有碰到任何钉子
-            // 原理：记录弹珠当前 Y 坐标对应的行号，如果跨越了奇数行且该行没有碰撞，则激活蓄力
-            if ((game.boardLayout || 'default') === 'sparse') {
-                const spacingY = CONFIG.gameplay.spacingY || 32;
-                const offsetY = Math.min(120, (this.pos.y > 0 ? this.pos.y : 0) * 0.2);
-                // 估算当前行号（粗略）
-                const estimatedRow = Math.floor((this.pos.y - offsetY) / spacingY);
-                if (estimatedRow !== this._lastRowPassed && estimatedRow >= 0) {
-                    // 如果刚经过的行是奇数行（窄行），且本帧没有碰到钉子，则激活蓄力
-                    const isOddRow = (this._lastRowPassed % 2 !== 0);
-                    if (isOddRow && this._lastRowPassed >= 0) {
-                        // 检查上一行是否有碰撞（通过检查该行钉子的 litTimer）
-                        const lastRowPegs = pegs.filter(p => p.row === this._lastRowPassed);
-                        const hadCollision = lastRowPegs.some(p => p.litTimer > 0);
-                        if (!hadCollision && lastRowPegs.length > 0) {
-                            this.channelCharged = true;
-                        }
-                    }
-                    this._lastRowPassed = estimatedRow;
-                }
             }
-            }
-
-            // ==================== [diamond 布局专属] 虚影钉子碰撞检测 ====================
-            // 弹珠碰撞虚影钉子时，额外收集一次属性并消除虚影
-            if (_game && _game.ghostPegs && _game.ghostPegs.length > 0) {
-                for (const ghost of _game.ghostPegs) {
-                    if (!ghost.active || ghost.triggered) continue;
-                    const gdx = this.pos.x - ghost.pos.x;
-                    const gdy = this.pos.y - ghost.pos.y;
-                    const gdist = Math.sqrt(gdx * gdx + gdy * gdy);
-                    if (gdist < this.radius + ghost.radius) {
-                        ghost.triggered = true;
-                        ghost.active = false;
-                        // 额外收集一次虚影钉子的属性
-                        if (this.session && ghost.type !== 'normal') {
-                            const ghostItem = { type: ghost.type, level: ghost.level || 1 };
-                            this.session.collected.push(ghostItem);
-                            this.def.collected.push(ghost.type);
-                            _game.spawn_createFloatingText(
-                                ghost.pos.x, ghost.pos.y - 20,
-                                '回响!', '#c084fc'
-                            );
-                            _game.spawn_createExplosion(ghost.pos.x, ghost.pos.y, '#a855f7');
-                            _game.ui_renderRecipeHUD();
-                        }
-                    }
-                }
-            }
-
             return null;
         }
         stopSound() {
@@ -4369,169 +3203,52 @@ class RuneLoot {
         this._animTimer = 0;         // 动画计时器（用于悬浮/发光效果）
         this._glowRadius = 18;       // 发光圈半径
         this._floatOffset = 0;       // 悬浮偏移量
-        // [spawn 入场动画] 新增字段
-        this._spawnTimer = 0;        // spawn 入场计时（单位：0~1）
-        this._spawnDuration = 0.35;  // 入场动画持续时间（单位：秒）——用 _animTimer 递增模拟
-        this._spawnBurst = 1.0;      // 入场爆发光效生命周期
     }
 
     /**
      * 在画布上绘制发光的符文图标
-     * 包含 spawn 入场动画：旋转放大 + 爆发光效
      * @param {CanvasRenderingContext2D} ctx - 绘图上下文
      */
     draw(ctx) {
         if (!this.active) return;
 
         this._animTimer += 0.05;
+        this._floatOffset = Math.sin(this._animTimer) * 4; // 上下悬浮 ±4px
 
-        // ============================================================
-        // [spawn 入场动画] 入场进度（用 _animTimer 模拟，前 7 帧为入场阶段）
-        // _animTimer 每帧 +0.05，约 0.35（即 7 帧）内完成入场
-        // ============================================================
-        const SPAWN_END = 0.35; // 入场动画结束时间
-        const spawnProgress = Math.min(1, this._animTimer / SPAWN_END); // 0~1
-        const isSpawning = this._animTimer < SPAWN_END;
-
-        // 入场缩放：从 0 到 1.15 再回弹到 1.0（弹算曲线）
-        let spawnScale;
-        if (spawnProgress < 0.7) {
-            // 快速放大：0 → 1.15
-            spawnScale = (spawnProgress / 0.7) * 1.15;
-        } else {
-            // 回弹到 1.0
-            spawnScale = 1.15 - ((spawnProgress - 0.7) / 0.3) * 0.15;
-        }
-        // 入场旋转角度：从 -π/2 旋转到 0
-        const spawnRotation = isSpawning ? (1 - spawnProgress) * (-Math.PI * 0.5) : 0;
-        // 入场爆发光效强度：入场开始时强，快速消退
-        const burstAlpha = isSpawning ? Math.max(0, 1 - spawnProgress * 2.5) : 0;
-
-        // 悬浮偏移（入场完成后才开始悬浮）
-        this._floatOffset = isSpawning ? 0 : Math.sin(this._animTimer) * 4;
         const drawY = this.y + this._floatOffset;
-
-        // 从 RUNE_DB 获取符文定义（图标和稀有度）
-        const runeDef = RUNE_DB ? RUNE_DB.find(r => r.id === this.runeId) : null;
-        const icon    = (runeDef && runeDef.icon) ? runeDef.icon : '❆';
-        const rarity  = (runeDef && runeDef.rarity) ? runeDef.rarity : 'common';
-        const level   = this.level || 1;
-
-        // 稀有度对应发光颜色
-        const RARITY_GLOW = {
-            common:    { r: 160, g: 160, b: 160 },
-            rare:      { r: 74,  g: 144, b: 217 },
-            epic:      { r: 155, g: 89,  b: 182 },
-            legendary: { r: 243, g: 156, b: 18  },
-        };
-        const glow = RARITY_GLOW[rarity] || RARITY_GLOW.common;
 
         ctx.save();
 
-        // ============================================================
-        // [spawn 入场爆发光效]（入场开始时的外圈光晕）
-        // ============================================================
-        if (burstAlpha > 0) {
-            ctx.globalCompositeOperation = 'lighter';
-            const burstR = this._glowRadius * 2.5 * (1 - burstAlpha * 0.5 + 0.5);
-            const burstGrad = ctx.createRadialGradient(this.x, drawY, 0, this.x, drawY, burstR);
-            burstGrad.addColorStop(0, `rgba(255,255,255,${burstAlpha * 0.8})`);
-            burstGrad.addColorStop(0.3, `rgba(${glow.r},${glow.g},${glow.b},${burstAlpha * 0.6})`);
-            burstGrad.addColorStop(1, `rgba(${glow.r},${glow.g},${glow.b},0)`);
-            ctx.fillStyle = burstGrad;
-            ctx.beginPath();
-            ctx.arc(this.x, drawY, burstR, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.globalCompositeOperation = 'source-over';
-        }
-
-        // ============================================================
-        // 应用入场缩放和旋转变换
-        // ============================================================
-        ctx.translate(this.x, drawY);
-        ctx.rotate(spawnRotation);
-        ctx.scale(spawnScale, spawnScale);
-        ctx.translate(-this.x, -drawY);
-
-        // 外圈发光效果（稀有度颜色 + 呼吸脉冲）
+        // 外圈发光效果
         const glowPulse = 0.5 + 0.5 * Math.sin(this._animTimer * 1.5);
-        const glowR = this._glowRadius + glowPulse * 6;
-        const gradient = ctx.createRadialGradient(this.x, drawY, 0, this.x, drawY, glowR);
-        gradient.addColorStop(0, `rgba(${glow.r}, ${glow.g}, ${glow.b}, ${0.55 + glowPulse * 0.3})`);
-        gradient.addColorStop(0.5, `rgba(${glow.r}, ${glow.g}, ${glow.b}, ${0.25 + glowPulse * 0.15})`);
-        gradient.addColorStop(1, `rgba(${glow.r}, ${glow.g}, ${glow.b}, 0)`);
+        const gradient = ctx.createRadialGradient(
+            this.x, drawY, 0,
+            this.x, drawY, this._glowRadius + glowPulse * 6
+        );
+        gradient.addColorStop(0, `rgba(255, 220, 80, ${0.5 + glowPulse * 0.3})`);
+        gradient.addColorStop(0.5, `rgba(255, 160, 30, ${0.3 + glowPulse * 0.2})`);
+        gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+
         ctx.beginPath();
-        ctx.arc(this.x, drawY, glowR, 0, Math.PI * 2);
+        ctx.arc(this.x, drawY, this._glowRadius + glowPulse * 6, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
         ctx.fill();
 
-        // 稀有度旋转光环（入场完成后展示）
-        if (!isSpawning) {
-            const ringAngle = this._animTimer * 0.8;
-            const ringCount = rarity === 'legendary' ? 6 : (rarity === 'epic' ? 4 : (rarity === 'rare' ? 3 : 0));
-            if (ringCount > 0) {
-                ctx.save();
-                ctx.translate(this.x, drawY);
-                for (let i = 0; i < ringCount; i++) {
-                    const a = ringAngle + (i / ringCount) * Math.PI * 2;
-                    const rx = Math.cos(a) * (this._glowRadius - 2);
-                    const ry = Math.sin(a) * (this._glowRadius - 2) * 0.5; // 源圆压扁
-                    const dotAlpha = 0.3 + 0.4 * Math.sin(this._animTimer * 2 + i);
-                    ctx.beginPath();
-                    ctx.arc(rx, ry, 2, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(${glow.r},${glow.g},${glow.b},${dotAlpha})`;
-                    ctx.fill();
-                }
-                ctx.restore();
-            }
-        }
-
-        // 内圈黑底（黑底隔离 emoji）
+        // 内圈背景
         ctx.beginPath();
         ctx.arc(this.x, drawY, 14, 0, Math.PI * 2);
-        ctx.fillStyle = '#000';
+        ctx.fillStyle = 'rgba(30, 20, 10, 0.75)';
         ctx.fill();
-        // 稀有度边框
-        ctx.strokeStyle = `rgba(${glow.r}, ${glow.g}, ${glow.b}, ${0.75 + glowPulse * 0.25})`;
+        ctx.strokeStyle = `rgba(255, 200, 60, ${0.7 + glowPulse * 0.3})`;
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Lv2/Lv3 内圈双线效果
-        if (level >= 2) {
-            ctx.beginPath();
-            ctx.arc(this.x, drawY, 11, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(255,255,255,${level >= 3 ? 0.25 : 0.12})`;
-            ctx.lineWidth = 1;
-            ctx.stroke();
-        }
-        // Lv3 外圈光晕
-        if (level >= 3) {
-            ctx.beginPath();
-            ctx.arc(this.x, drawY, 17, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(255,255,255,0.08)`;
-            ctx.lineWidth = 1;
-            ctx.stroke();
-        }
-
-        // 绘制符文图标（真实 emoji）
+        // 绘制符文图标（emoji 字符）
         ctx.font = '14px serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(icon, this.x, drawY);
-
-        // 等级角标（右下角小文字）
-        if (level >= 1) {
-            const LV_COLORS = ['', '#94a3b8', '#60a5fa', '#fbbf24'];
-            const lvColor = LV_COLORS[Math.min(level, 3)] || '#94a3b8';
-            ctx.font = 'bold 7px sans-serif';
-            ctx.textAlign = 'right';
-            ctx.textBaseline = 'bottom';
-            ctx.fillStyle = '#000';
-            ctx.fillText(`L${level}`, this.x + 14.5, drawY + 14.5);
-            ctx.fillStyle = lvColor;
-            ctx.fillText(`L${level}`, this.x + 14, drawY + 14);
-        }
+        ctx.fillText('✦', this.x, drawY); // 默认符文占位符，实际应从 RUNE_DB 获取 icon
 
         ctx.restore();
     }
@@ -4558,8 +3275,6 @@ export {
     MarbleDefinition,
     SpecialSlot,
     FortuneWheel,
-    TriangleSideWheel,
-    GhostPeg,
     Peg,
     DropBall,
     Enemy,
@@ -4577,9 +3292,6 @@ export {
     EnergyOrb,
     LightningBolt,
     FireWave,
-    IceWave,
-    DeathExplosion,
-    HealWave,
     Player,
     RuneLoot,
     showToast,
