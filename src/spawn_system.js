@@ -930,13 +930,15 @@ export const spawn_system = {
                 const scatterCount = recipe.scatter;
                 const fullInheritCount = Math.floor(scatterCount / 2);
                 const halfInheritCount = scatterCount % 2;
+                // [符文词条 Hook] 散射矩阵 (scatter_matrix) - 激光散射夹角缩小
+                const laserScatterAngleMult = recipe._scatterAngleMultiplier !== undefined ? recipe._scatterAngleMultiplier : 1.0;
                 
                 let currentScatterIdx = 1;
                 // 生成 100% 继承的副子弹
                 for (let i = 0; i < fullInheritCount; i++) {
                     const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
                     const multiplier = Math.ceil(currentScatterIdx / 2);
-                    const angleOffset = 0.2 * multiplier * sign;
+                    const angleOffset = 0.2 * multiplier * sign * laserScatterAngleMult;
                     const newVel = vel.rotate(angleOffset);
                     const copyRecipe = { ...recipe, scatter: 0 };
                     this.combat_laser_fire(x, y, newVel, copyRecipe, shotId);
@@ -946,7 +948,7 @@ export const spawn_system = {
                 for (let i = 0; i < halfInheritCount; i++) {
                     const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
                     const multiplier = Math.ceil(currentScatterIdx / 2);
-                    const angleOffset = 0.2 * multiplier * sign;
+                    const angleOffset = 0.2 * multiplier * sign * laserScatterAngleMult;
                     const newVel = vel.rotate(angleOffset);
                     const copyRecipe = { ...recipe, scatter: 0, damage: Math.max(1, Math.floor(recipe.damage * 0.5)) };
                     this.combat_laser_fire(x, y, newVel, copyRecipe, shotId);
@@ -1007,12 +1009,15 @@ export const spawn_system = {
             };
             
             let currentScatterIdx = 1;
+            // [符文词条 Hook] 散射矩阵 (scatter_matrix) - 散射夹角缩小
+            // 读取配方中由任务 A 写入的 _scatterAngleMultiplier 字段，默认为 1.0（不缩小）
+            const scatterAngleMult = recipe._scatterAngleMultiplier !== undefined ? recipe._scatterAngleMultiplier : 1.0;
 
             // 1. 生成 100% 继承的副子弹
             for (let i = 0; i < fullInheritCount; i++) {
                 const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
                 const multiplier = Math.ceil(currentScatterIdx / 2);
-                const angleOffset = 0.2 * multiplier * sign;
+                const angleOffset = 0.2 * multiplier * sign * scatterAngleMult;
                 const newVel = vel.rotate(angleOffset);           
                 // 全继承：因子为 1.0
                 const copyRecipe = createScatterRecipe(recipe, 1.0);
@@ -1026,7 +1031,7 @@ export const spawn_system = {
             for (let i = 0; i < halfInheritCount; i++) {
                 const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
                 const multiplier = Math.ceil(currentScatterIdx /2);
-				const angleOffset = 0.2 * multiplier * sign;
+                const angleOffset = 0.2 * multiplier * sign * scatterAngleMult;
                 const newVel = vel.rotate(angleOffset);                
                 // 半继承：因子为 0.5
                 const copyRecipe = createScatterRecipe(recipe, 0.5);

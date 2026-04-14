@@ -1625,6 +1625,15 @@ export const combat_system = {
 		             
 		             projectile.chainHistory.push(enemy); 
 		        }
+        // --- [符文词条 Hook] 专注射击 (focused_fire) - 暴击判定 ---
+        // 读取配方中由任务 A 写入的 _critChance 和 _critDamage 字段
+        let isCrit = false;
+        const critChance = config._critChance || 0;
+        const critDamage = config._critDamage || 1.0;
+        if (critChance > 0 && Math.random() < critChance) {
+            isCrit = true;
+            dmg = dmg * critDamage;
+        }
         // [修改] 调用 takeDamage 时传入 projectile 作为源，用于方向判定
         const damageResult = enemy.takeDamage(dmg, projectile);
         const killed = damageResult.killed;
@@ -1823,7 +1832,24 @@ export const combat_system = {
         
         // [新增] 统一显示伤害数字 (使用实际造成的伤害)
         if (this.showDamageNumbers && actualDmg > 0) {
-            this.spawn_createFloatingText(hitX, hitY, `-${Math.ceil(actualDmg)}`, damageColor);
+            if (isCrit) {
+                // 暴击时：显示金色 CRIT 文字，不再重复显示普通伤害数字
+                this.spawn_createFloatingText(hitX, hitY - 10, `CRIT! -${Math.ceil(actualDmg)}`, '#FFD700');
+            } else {
+                this.spawn_createFloatingText(hitX, hitY, `-${Math.ceil(actualDmg)}`, damageColor);
+            }
+        }
+        // --- [符文词条 Hook] 专注射击 (focused_fire) - 暴击视觉特效 ---
+        if (isCrit) {
+            // 1. 红金相间的 spark 粒子爆发（金色和红色交替）
+            for (let i = 0; i < 12; i++) {
+                const sparkColor = i % 2 === 0 ? '#FFD700' : '#FF4444';
+                this.spawn_createParticle(hitX, hitY, sparkColor, 'spark');
+            }
+            // 2. 小范围金色冲击波（maxRadius 覆写为 60）
+            const critSw = new Shockwave(hitX, hitY, '#FFD700');
+            critSw.maxRadius = 60;
+            this.shockwaves.push(critSw);
         }
         audio.playEnemyHit(hitType);
 

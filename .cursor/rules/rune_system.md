@@ -298,3 +298,51 @@ peg.level = game.activeRunewordEffects['flying_sword_unlock'].params.level || 1;
 ```
 
 这使高等级词条（如词条等级 3）能直接生成 Lv.3 的特殊钉子，解锁更强的视觉效果和战斗行为。
+
+## 10. 符文词条-C：暴击机制与散射夹角缩小
+
+### 10.1 专注射击（focused_fire）— 暴击判定与视觉特效
+
+**实现位置：** `src/combat_system.js` → `combat_damageEnemy` 函数，`takeDamage` 调用前。
+
+**配方字段（由任务 A 写入 finalRecipe）：**
+- `_critChance`：暴击概率（0.0 ~ 1.0），默认 0（不暴击）
+- `_critDamage`：暴击伤害倍率（如 2.0 = 200%），默认 1.0
+
+**暴击判定逻辑：**
+```js
+// 在 combat_damageEnemy 中，takeDamage 调用前
+let isCrit = false;
+const critChance = config._critChance || 0;
+const critDamage = config._critDamage || 1.0;
+if (critChance > 0 && Math.random() < critChance) {
+    isCrit = true;
+    dmg = dmg * critDamage;
+}
+```
+
+**暴击视觉特效（isCrit === true 时触发）：**
+1. 浮动文字：`spawn_createFloatingText(hitX, hitY - 10, 'CRIT! -XXX', '#FFD700')`（金色，替代普通伤害数字）
+2. 粒子爆发：12 个 spark 粒子，金色（`#FFD700`）和红色（`#FF4444`）交替
+3. 金色冲击波：`new Shockwave(hitX, hitY, '#FFD700')`，`maxRadius` 覆写为 60，直接 push 到 `this.shockwaves`
+
+**注意：** 暴击时不再显示普通白色伤害数字，避免重复。
+
+### 10.2 散射矩阵（scatter_matrix）— 散射夹角缩小
+
+**实现位置：** `src/spawn_system.js` → `spawn_spawnBullet` 函数中的散射子弹生成逻辑（实体子弹和激光散射两处）。
+
+**配方字段（由任务 A 写入 finalRecipe）：**
+- `_scatterAngleMultiplier`：散射夹角乘数（0.0 ~ 1.0），默认 1.0（不缩小）
+
+**散射角度修改逻辑：**
+```js
+// 实体子弹散射（recipe.scatter > 0 && !recipe.wind 分支）
+const scatterAngleMult = recipe._scatterAngleMultiplier !== undefined ? recipe._scatterAngleMultiplier : 1.0;
+// 在 angleOffset 计算时乘以 scatterAngleMult
+const angleOffset = 0.2 * multiplier * sign * scatterAngleMult;
+```
+
+同样适用于激光散射分支（`recipe.isLaser && !recipe.wind` 内的散射处理）。
+
+**效果：** `_scatterAngleMultiplier = 0.3` 时，散射子弹夹角缩小 70%，形成更集中的弹幕。
