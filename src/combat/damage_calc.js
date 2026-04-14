@@ -146,7 +146,7 @@ export const DamageCalc = {
      * @param {number|null} shotId - 子弹ID
      * @returns {boolean} 是否成功触发了闪电链
      */
-    combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = null) {
+    combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = null, chainChanceBonus = 0) {
         // [修复1] 安全检查
         if (!sourceEnemy || !sourceEnemy.pos) return false;
         // [修复2] 容错处理
@@ -189,8 +189,9 @@ export const DamageCalc = {
         if (!selected) selected = targets[0];
         // 判定连锁概率
         const lightCfg = CONFIG.mechanics.lightning;
-        let p = lightCfg.baseChainChance; // 基础连锁概率
-        if (selected.temp < 0) p = Math.min(lightCfg.maxChainChance, lightCfg.baseChainChance + Math.abs(selected.temp) * lightCfg.tempChainMult);
+        // [属性共鸣] 应用共鸣概率加成
+        let p = lightCfg.baseChainChance + chainChanceBonus; // 基础连锁概率 + 共鸣加成
+        if (selected.temp < 0) p = Math.min(lightCfg.maxChainChance, p + Math.abs(selected.temp) * lightCfg.tempChainMult);
 
         if (Math.random() < p) {
             // [优化] 增加基础延迟，放慢连锁节奏，提升视觉快感

@@ -294,10 +294,19 @@ export const CollisionSystem = {
         // 【普通模式】：穿透衰减 + 概率折射（原有逻辑）
         // ═════════════════════════════════════════════════════════════════════
 
+        // --- [属性共鸣] 激光共鸣：读取共鸣参数，增强激光命中额外升温和伤害倍率 ---
+        const laserResonance = this.activeElementResonances && this.activeElementResonances['laser'];
+        const laserResParams = laserResonance ? laserResonance.params : null;
+        // 共鸣提供的激光命中额外升温：+3/+8/+15°
+        const laserTempBonus = laserResParams ? (laserResParams.laserTempBonus || 0) : 0;
+        // 共鸣整体激光伤害倍率：1.0/1.2/1.5
+        const laserMultiplier = laserResParams ? (laserResParams.laserMultiplier || 1.0) : 1.0;
+
         // 按穿透顺序施加衰减伤害：第 n 个目标（0-indexed）受到 原始伤害 × 0.5^n
         hits.forEach((hit, index) => {
             const damageMultiplier = Math.pow(0.5, index);
-            const attenuatedDamage = recipe.damage * damageMultiplier;
+            // [属性共鸣] 应用激光共鸣伤害倍率
+            const attenuatedDamage = recipe.damage * damageMultiplier * laserMultiplier;
             // 构造衰减后的配方，仅覆盖 damage 字段，其余属性保持不变
             const attenuatedRecipe = { ...recipe, damage: attenuatedDamage };
             this.combat_damageEnemy(hit.enemy, { config: attenuatedRecipe, pos: new Vec2(hit.projX, hit.projY), isCopy: false });
@@ -305,6 +314,14 @@ export const CollisionSystem = {
             hitEnemiesSet.add(hit.enemy);
             // 视觉：受击点特效
             if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#fff', 'spark');
+
+            // [属性共鸣] 激光共鸣：命中后额外升温
+            if (laserTempBonus > 0) {
+                hit.enemy.applyTemp(laserTempBonus);
+                if (laserTempBonus >= 8 && Math.random() < 0.4) {
+                    this.spawn_createParticle(hit.projX, hit.projY, '#fde68a', 'spark');
+                }
+            }
 
             // [Agent D] 笼热光线词条 Hook：激光命中敌人时额外升温
             const blazingBeamFx = this.activeRunewordEffects && this.activeRunewordEffects['blazing_beam'];

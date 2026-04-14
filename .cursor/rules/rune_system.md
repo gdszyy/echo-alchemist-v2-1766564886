@@ -412,38 +412,67 @@ this.activeElementResonances = newResonances;
 - 从高阶到低阶逐一检查，取满足阈值的**最高阶**共鸣。
 - 共鸣等级变化时自动弹出 Toast 提示（如 `✨ 🔥 炎焰共鸣·一阶已激活！`）。
 
-### 11.4 战斗层消费规范 (`src/combat_system.js`)
+### 11.4 战斗层消费规范
 
-在 `combat_damageEnemy` 的火焰伤害段，通过 `this.activeElementResonances['pyro']` 读取共鸣参数：
+各属性共鸣在战斗代码中的消费位置和参数如下：
 
-| 共鸣参数 | 类型 | 作用 |
-|---|---|---|
-| `burnTempThreshold` | number | 火焰额外伤害触发温度（Tier1: 30°，Tier2/3: 0°，默认: 34°） |
-| `basePyroBonus` | number | 叠加到 `config.pyro` 上的基础属性加成（影响 `baseFireDmg` 计算） |
-| `pyroMultiplier` | number | 整体火焰伤害倍率（Tier1: 1.0，Tier2: 1.2，Tier3: 1.5） |
-| `explodeThreshold` | number\|null | 爆燃触发温度阈值（Tier3: 100，其余: null → 使用全局默认值 200） |
+#### 11.4.1 Pyro (炎焰)
+- **位置**：`src/combat_system.js` (`combat_damageEnemy` 火焰伤害段)
+- **参数**：
+  - `burnTempThreshold`: 降低触发温度 (默认 34° -> 30°/0°)
+  - `basePyroBonus`: 基础属性加成 (+5/+10/+25)
+  - `pyroMultiplier`: 整体伤害倍率 (1.0/1.2/1.5)
+  - `explodeThreshold`: 爆燃阈值 (默认 200° -> 100°)
 
-**关键公式变化：**
-```js
-const effectivePyro = config.pyro + pyroBonus;           // 基础属性叠加共鸣加成
-const baseFireDmg = (effectivePyro * enemy.temp) / 200;  // 使用增强后的 pyro
-const finalFireDmg = baseFireDmg * meltdownMult * pyroResMult;  // 叠加熔毁词条 × 共鸣倍率
-```
+#### 11.4.2 Cryo (冰霜)
+- **位置**：`src/combat_system.js` (`combat_damageEnemy` 冰霜伤害段)
+- **参数**：
+  - `freezeTempThreshold`: 提升触发温度 (默认 -34° -> -25°/-15°/-5°)
+  - `baseCryoBonus`: 基础属性加成 (+5/+10/+25)
+  - `cryoMultiplier`: 整体伤害倍率 (1.0/1.2/1.5)
+  - `frozenPhysDmgBonus`: 冻结状态下物理伤害加深 (三阶 +30%)
 
-### 11.5 火焰共鸣效果速查
+#### 11.4.3 Lightning (雷霆)
+- **位置**：`src/combat_system.js` (`combat_damageEnemy` 闪电链触发前) & `src/combat/damage_calc.js` (`combat_lightning_triggerChain`)
+- **参数**：
+  - `chainChanceBonus`: 闪电链触发概率加成 (+15%/+30%/+50%)
+  - `baseLightningBonus`: 基础属性加成 (+5/+10/+25)
+  - `lightningMultiplier`: 整体伤害倍率 (1.0/1.2/1.5)
+  - `allowDoubleChain`: 允许对同一目标二次触发 (三阶 true)
 
-| 共鸣等级 | 触发层数 | 燃烧触发温度 | 基础火焰属性 | 整体火焰伤害 | 爆燃阈值 |
-|---|---|---|---|---|---|
-| 无共鸣 | < 3 | ≥ 34° | +0 | ×1.0 | 200° |
-| 炎焰共鸣·一阶 | ≥ 3 | ≥ 30° | +5 | ×1.0 | 200° |
-| 炎焰共鸣·二阶 | ≥ 6 | ≥ 0° | +10 | ×1.2 | 200° |
-| 炎焰共鸣·三阶 | ≥ 9 | ≥ 0° | +25 | ×1.5 | 100° |
+#### 11.4.4 Bounce (弹跳)
+- **位置**：`src/combat_system.js` (`combat_damageEnemy` 弹跳判定处) & `src/entities/projectile.js`
+- **参数**：
+  - `bounceDmgBonus`: 弹跳伤害加成 (+15%/+30%/+50%)
+  - `baseBounceBonus`: 基础属性加成 (+5/+10/+25)
+  - `noBounceDecay`: 每次弹跳后伤害不衰减 (二阶/三阶 true)
+  - `extraBounces`: 额外弹跳次数 (+2)
 
-### 11.6 重置规范
+#### 11.4.5 Pierce (穿透)
+- **位置**：`src/combat_system.js` (`combat_damageEnemy` 穿透判定处)
+- **参数**：
+  - `pierceDmgBonus`: 穿透伤害加成 (+15%/+30%/+50%)
+  - `basePierceBonus`: 基础属性加成 (+5/+10/+25)
+  - `pierceApplyTemp`: 命中后额外施加火焰温度 (+5°/+15°)
+  - `extraPierces`: 额外穿透次数 (+1)
+
+#### 11.4.6 Scatter (散射)
+- **位置**：`src/spawn_system.js` (`spawn_spawnBullet` 散射发射逻辑)
+- **参数**：
+  - `extraScatterShots`: 额外散射子弹数 (+1/+2/+3)
+  - `baseScatterBonus`: 基础属性加成 (+5/+10/+25)
+  - `scatterMultiplier`: 整体伤害倍率 (1.0/1.2/1.5)
+  - `scatterAngleReduction`: 散射角度收窄 (三阶 20%)
+
+#### 11.4.7 Laser (激光)
+- **位置**：`src/combat/collision.js` (`combat_laser_processPenetration`)
+- **参数**：
+  - `laserTempBonus`: 命中额外升温 (+3°/+8°/+15°)
+  - `baseLaserBonus`: 基础属性加成 (+5/+10/+25)
+  - `laserMultiplier`: 整体伤害倍率 (1.0/1.2/1.5)
+  - `extraLaserPierces`: 额外穿透次数 (+1)
+
+### 11.5 重置规范
 
 - `sys_resetGame` 中已添加 `this.activeElementResonances = {}` 重置。
 - 存档恢复时通过 `ui_updateRuneGrid()` 自动重建共鸣状态，无需额外处理。
-
-### 11.7 扩展指引
-
-其余属性（cryo、lightning、bounce、pierce、scatter、laser）的共鸣参数已在 `ELEMENT_RESONANCE_DB` 中定义，战斗层集成留待后续迭代。集成时仿照 `pyro` 的模式，在对应伤害段读取 `this.activeElementResonances['<element>']` 即可。

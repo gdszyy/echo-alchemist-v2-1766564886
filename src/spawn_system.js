@@ -960,7 +960,29 @@ export const spawn_system = {
             // === [修改重点] 散射 (Scatter) 实体子弹优化 ===
         // 风属性子弹强制单发，不受 scatter 影响
         if (recipe.scatter > 0 && !recipe.wind) { 
-            const scatterCount = recipe.scatter;
+            // --- [属性共鸣] 散射共鸣：读取共鸣参数，增加额外散射子弹数和伤害倍率 ---
+            const scatterResonance = this.activeElementResonances && this.activeElementResonances['scatter'];
+            const scatterResParams = scatterResonance ? scatterResonance.params : null;
+            // 共鸣提供的额外散射子弹数：+1/+2/+3
+            const extraScatterShots = scatterResParams ? (scatterResParams.extraScatterShots || 0) : 0;
+            // 共鸣整体散射伤害倍率：1.0/1.2/1.5
+            const scatterMultiplier = scatterResParams ? (scatterResParams.scatterMultiplier || 1.0) : 1.0;
+            // 三阶共鸣：散射角度收窄 20%
+            const scatterAngleReduction = scatterResParams ? (scatterResParams.scatterAngleReduction || 0) : 0;
+            // 将共鸣伤害倍率应用到配方中（影响所有散射子弹伤害）
+            const resonanceRecipe = scatterMultiplier !== 1.0 ? { ...recipe, damage: Math.max(1, Math.floor(recipe.damage * scatterMultiplier)) } : recipe;
+            // 将共鸣角度收窄应用到 _scatterAngleMultiplier（与现有的 scatter_matrix 词条叠加）
+            if (scatterAngleReduction > 0) {
+                const existingMult = resonanceRecipe._scatterAngleMultiplier !== undefined ? resonanceRecipe._scatterAngleMultiplier : 1.0;
+                if (resonanceRecipe === recipe) {
+                    recipe = { ...recipe, _scatterAngleMultiplier: existingMult * (1 - scatterAngleReduction) };
+                } else {
+                    resonanceRecipe._scatterAngleMultiplier = existingMult * (1 - scatterAngleReduction);
+                }
+            }
+            // 应用共鸣配方（包含伤害倍率和角度收窄）
+            const effectiveRecipe = scatterAngleReduction > 0 && resonanceRecipe === recipe ? recipe : resonanceRecipe;
+            const scatterCount = effectiveRecipe.scatter + extraScatterShots;
             const fullInheritCount = Math.floor(scatterCount / 2);
             const halfInheritCount = scatterCount % 2;
             
@@ -1010,31 +1032,30 @@ export const spawn_system = {
             
             let currentScatterIdx = 1;
             // [符文词条 Hook] 散射矩阵 (scatter_matrix) - 散射夹角缩小
-            // 读取配方中由任务 A 写入的 _scatterAngleMultiplier 字段，默认为 1.0（不缩小）
-            const scatterAngleMult = recipe._scatterAngleMultiplier !== undefined ? recipe._scatterAngleMultiplier : 1.0;
-
+            // [属性共鸣] 将共鸣角度收窄与现有词条叠加
+            // 读取 effectiveRecipe 中的 _scatterAngleMultiplier，默认为 1.0（不缩小）
+            const scatterAngleMult = effectiveRecipe._scatterAngleMultiplier !== undefined ? effectiveRecipe._scatterAngleMultiplier : 1.0;
             // 1. 生成 100% 继承的副子弹
             for (let i = 0; i < fullInheritCount; i++) {
                 const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
                 const multiplier = Math.ceil(currentScatterIdx / 2);
                 const angleOffset = 0.2 * multiplier * sign * scatterAngleMult;
                 const newVel = vel.rotate(angleOffset);           
-                // 全继承：因子为 1.0
-                const copyRecipe = createScatterRecipe(recipe, 1.0);
+                // 全继承：因子为 1.0（使用 effectiveRecipe 包含共鸣伤害加成）
+                const copyRecipe = createScatterRecipe(effectiveRecipe, 1.0);
                 
                 this.projectiles.push(new Projectile(x, y, newVel, copyRecipe, true, shotId));
                 shotStats.projectileCount++;
                 currentScatterIdx++;
             }
-
             // 2. 生成 50% 继承的副子弹 (属性层数也减半)
             for (let i = 0; i < halfInheritCount; i++) {
                 const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
                 const multiplier = Math.ceil(currentScatterIdx /2);
                 const angleOffset = 0.2 * multiplier * sign * scatterAngleMult;
                 const newVel = vel.rotate(angleOffset);                
-                // 半继承：因子为 0.5
-                const copyRecipe = createScatterRecipe(recipe, 0.5);
+                // 半继承：因子为 0.5（使用 effectiveRecipe 包含共鸣伤害加成）
+                const copyRecipe = createScatterRecipe(effectiveRecipe, 0.5);
                 this.projectiles.push(new Projectile(x, y, newVel, copyRecipe, true, shotId));
                 shotStats.projectileCount++;
                 currentScatterIdx++;
@@ -1042,6 +1063,8 @@ export const spawn_system = {
         }
         
         // 生成主子弹
+        // 注意：散射共鸣的 effectiveRecipe 定义在 if(recipe.scatter > 0) 块内，此处不可访问。
+        // 主子弹直接使用原始 recipe，属性共鸣伤害加成已在副子弹中应用。
         shotStats.projectileCount++;
         const mainRecipe = { ...recipe, isScatterChild: false };
         this.projectiles.push(new Projectile(x, y, vel, mainRecipe, false, shotId, isLast)); 

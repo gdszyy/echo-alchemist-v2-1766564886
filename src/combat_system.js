@@ -1611,20 +1611,106 @@ export const combat_system = {
         else if (config.pierce > 0) hitType = 'pierce';
         else if (config.wind > 0) hitType = 'wind';
         // --- 2. 伤害与状态逻辑 (保持原有逻辑) ---
-        if (config.cryo > 0) enemy.applyTemp(-CONFIG.balance.cryoAmount * config.cryo); 
+        // --- [属性共鸣] 冰霜共鸣：读取共鸣参数，增强降温效果、基础属性加成和伤害倍率 ---
+        const cryoResonance = this.activeElementResonances && this.activeElementResonances['cryo'];
+        const cryoResParams = cryoResonance ? cryoResonance.params : null;
+        // 冰冻触发温度：共鸣可提升至 -25/-15/-5，默认 -34（越高越容易触发冰冻）
+        const freezeTempThreshold = cryoResParams ? (cryoResParams.freezeTempThreshold || -34) : -34;
+        // 共鸣提供的基础冰霜属性加成（叠加到实际 cryo 层数上）
+        const cryoBonus = cryoResParams ? (cryoResParams.baseCryoBonus || 0) : 0;
+        const effectiveCryo = config.cryo + cryoBonus;
+        // 共鸣整体冰霜伤害倍率：1.0/1.2/1.5
+        const cryoResMult = cryoResParams ? (cryoResParams.cryoMultiplier || 1.0) : 1.0;
+        // 三阶共鸣：冻结状态下物理伤害加深
+        const frozenPhysDmgBonus = cryoResParams ? (cryoResParams.frozenPhysDmgBonus || 0) : 0;
+        if (config.cryo > 0) {
+            // 使用 effectiveCryo（含共鸣加成）计算降温量，并应用共鸣倍率
+            enemy.applyTemp(-CONFIG.balance.cryoAmount * effectiveCryo * cryoResMult);
+            // 标记本回合被冰属性命中（供元素聚变使用）
+            enemy._cryoHitThisRound = true;
+            // 三阶共鸣：冻结状态下物理伤害加深（在 takeDamage 前修改 dmg）
+            if (frozenPhysDmgBonus > 0 && enemy.temp <= freezeTempThreshold) {
+                dmg = dmg * (1 + frozenPhysDmgBonus);
+            }
+        }
         if (config.pyro > 0) enemy.applyTemp(CONFIG.balance.pyroAmount * config.pyro); 
         if (config.lightning > 0) {
-		             // 1. 尝试触发闪电链，并获取结果
-		             // [修改] 传入当前闪电等级 (config.lightning)
-		             const isChainTriggered = this.combat_lightning_triggerChain(enemy, dmg, projectile.chainHistory, config.lightning, shotId);
-		             // 2. 只有在成功触发闪电链时，才提升当前敌人的温度 (公式：闪电层数 + 连锁次数/3)
-		             if (isChainTriggered) {
-                         const chainCount = projectile.chainHistory.length;
-		                 enemy.applyTemp(config.lightning + chainCount / 3); 
-		             }
-		             
-		             projectile.chainHistory.push(enemy); 
-		        }
+            // --- [属性共鸣] 雷霖共鸣：读取共鸣参数，增强闪电链触发概率和伤害倍率 ---
+            const lightningResonance = this.activeElementResonances && this.activeElementResonances['lightning'];
+            const lightningResParams = lightningResonance ? lightningResonance.params : null;
+            // 共鸣提供的基础闪电属性加成（叠加到实际 lightning 层数上）
+            const lightningBonus = lightningResParams ? (lightningResParams.baseLightningBonus || 0) : 0;
+            const effectiveLightning = config.lightning + lightningBonus;
+            // 共鸣闪电链触发概率加成：0.15/0.30/0.50
+            const chainChanceBonus = lightningResParams ? (lightningResParams.chainChanceBonus || 0) : 0;
+            // 共鸣整体闪电伤害倍率：1.0/1.2/1.5
+            const lightningResMult = lightningResParams ? (lightningResParams.lightningMultiplier || 1.0) : 1.0;
+            // 三阶共鸣：闪电链可对同一目标二次触发
+            const allowDoubleChain = lightningResParams ? (lightningResParams.allowDoubleChain || false) : false;
+            // 将共鸣参数写入配方，供 combat_lightning_triggerChain 使用
+            const lightningDmgWithMult = dmg * lightningResMult;
+            // 1. 尝试触发闪电链，并获取结果
+            // [修改] 传入当前闪电等级 (effectiveLightning)，传入共鸣加成的概率加成
+            const isChainTriggered = this.combat_lightning_triggerChain(enemy, lightningDmgWithMult, projectile.chainHistory, effectiveLightning, shotId, chainChanceBonus);
+            // 2. 只有在成功触发闪电链时，才提升当前敌人的温度 (公式：闪电层数 + 连锁次数/3)
+            if (isChainTriggered) {
+                const chainCount = projectile.chainHistory.length;
+                enemy.applyTemp(effectiveLightning + chainCount / 3);
+                // 三阶共鸣：闪电链可对同一目标二次触发
+                if (allowDoubleChain && Math.random() < 0.5) {
+                    this.combat_lightning_triggerChain(enemy, lightningDmgWithMult, [...projectile.chainHistory], effectiveLightning, shotId, chainChanceBonus);
+                }
+            }
+            // 标记本回合被闪电命中（供元素聚变使用）
+            enemy._lightningHitThisRound = true;
+            projectile.chainHistory.push(enemy);
+        }
+        // --- [属性共鸣] 弹跳共鸣：读取共鸣参数，增强弹跳伤害加成 ---
+        if (config.bounce > 0) {
+            const bounceResonance = this.activeElementResonances && this.activeElementResonances['bounce'];
+            const bounceResParams = bounceResonance ? bounceResonance.params : null;
+            // 共鸣提供的弹跳伤害加成：+15%/+30%/+50%
+            const bounceDmgBonus = bounceResParams ? (bounceResParams.bounceDmgBonus || 0) : 0;
+            // 二/三阶共鸣：每次弹跳后伤害不衰减
+            const noBounceDecay = bounceResParams ? (bounceResParams.noBounceDecay || false) : false;
+            if (bounceDmgBonus > 0) {
+                // 弹跳命中时应用共鸣伤害加成
+                const isBounceHitNow = (projectile.bouncesLeft !== undefined && projectile.bouncesLeft < config.bounce);
+                if (isBounceHitNow) {
+                    dmg = dmg * (1 + bounceDmgBonus);
+                }
+            }
+            // 二/三阶共鸣：弹跳伤害不衰减（将弹跳次数标记到配方中，供 projectile.js 使用）
+            if (noBounceDecay) {
+                config._noBounceDecay = true;
+            }
+        }
+        // --- [属性共鸣] 穿透共鸣：读取共鸣参数，增强穿透伤害加成和额外升温 ---
+        if (config.pierce > 0) {
+            const pierceResonance = this.activeElementResonances && this.activeElementResonances['pierce'];
+            const pierceResParams = pierceResonance ? pierceResonance.params : null;
+            // 共鸣提供的穿透伤害加成：+15%/+30%/+50%
+            const pierceDmgBonus = pierceResParams ? (pierceResParams.pierceDmgBonus || 0) : 0;
+            // 二/三阶共鸣：穿透命中后额外施加火焰温度
+            const pierceApplyTemp = pierceResParams ? (pierceResParams.pierceApplyTemp || 0) : 0;
+            if (pierceDmgBonus > 0) {
+                // 穿透命中时应用共鸣伤害加成
+                const isPierceHitNow = (projectile.piercesLeft !== undefined && projectile.piercesLeft < config.pierce);
+                if (isPierceHitNow) {
+                    dmg = dmg * (1 + pierceDmgBonus);
+                }
+            }
+            if (pierceApplyTemp > 0) {
+                // 穿透命中后额外施加火焰温度（升温）
+                const isPierceHitNow = (projectile.piercesLeft !== undefined && projectile.piercesLeft < config.pierce);
+                if (isPierceHitNow) {
+                    enemy.applyTemp(pierceApplyTemp);
+                    if (pierceApplyTemp >= 10) {
+                        this.spawn_createFloatingText(hitX, hitY - 20, `火焰穿透 +${pierceApplyTemp}°`, '#f97316');
+                    }
+                }
+            }
+        }
         // --- [符文词条 Hook] 专注射击 (focused_fire) - 暴击判定 ---
         // 读取配方中由任务 A 写入的 _critChance 和 _critDamage 字段
         let isCrit = false;
