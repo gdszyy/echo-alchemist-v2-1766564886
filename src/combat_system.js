@@ -1764,7 +1764,8 @@ export const combat_system = {
                         cryo: 0, lightning: 0, wind: 0,
                         multicast: 0
                     };
-                    this.combat_flyingSword_addSon(hitX, hitY, null, lvl, swordConfig, 0);
+                    const flameSwordLvl = this.variantLevels ? (this.variantLevels.flying_sword || 1) : 1;
+                    this.combat_flyingSword_addSon(hitX, hitY, null, flameSwordLvl, swordConfig, 0);
                     this.combat_flyingSword_assignTarget(enemy);
                     this.spawn_createParticle(hitX, hitY, '#f97316', 'spark');
                     this.spawn_createFloatingText(hitX, hitY - 20, '剑光!', '#f97316');
