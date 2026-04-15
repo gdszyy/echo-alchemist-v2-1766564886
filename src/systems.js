@@ -1213,10 +1213,10 @@ const TRAINING_SCENARIOS = {
             desc: '[成長系] 每次擊殺敵人，本局全局基礎傷害永久 +1。但冰霜與火焰屬性層數降低 30%。建護先擊殺小怪累積傷害加成再汋試精英怪。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
-                // 大量低血量小怪
+                // 低血量小怪：第一排 15 血，第二排 31 血
                 for (let c = 0; c < 5; c++) {
-                    game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + 0 * h + h/2, 60, 60, 80));
-                    game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + 1 * h + h/2, 60, 60, 80));
+                    game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + 0 * h + h/2, 60, 60, 15));
+                    game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + 1 * h + h/2, 60, 60, 31));
                 }
                 // 一個高血量精英怪
                 game.enemies.push(new Enemy(2.5 * w + w/2, top + 2 * h + h/2, 60, 60, 2000, 2000, 'normal', ['shield']));
