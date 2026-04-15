@@ -398,22 +398,49 @@ export const DamageCalc = {
         const trueDamageRatio = effect.params.trueDamageRatio || 0.10;
         const fusionDmg = Math.max(1, Math.floor(enemy.maxHp * trueDamageRatio));
 
-        // 视觉特效：三色混合爆炸（橙 + 青 + 紫）
-        this.spawn_createShockwave(enemy.pos.x, enemy.pos.y, '#f0abfc'); // 紫粉色冲击波
-        for (let i = 0; i < 6; i++) this.spawn_createParticle(enemy.pos.x, enemy.pos.y, '#f97316', 'spark'); // 火
-        for (let i = 0; i < 6; i++) this.spawn_createParticle(enemy.pos.x, enemy.pos.y, '#06b6d4', 'shard'); // 冰
-        for (let i = 0; i < 6; i++) this.spawn_createParticle(enemy.pos.x, enemy.pos.y, '#c084fc', 'spark'); // 雷
+        // ═══════════════════════════════════════════════════════
+        // 视觉特效：三色元素聚变爆炸（大幅加强版）
+        // ═══════════════════════════════════════════════════════
+        const ex = enemy.pos.x, ey = enemy.pos.y;
+
+        // 1. 三重冲击波（火/冰/雷 三色，半径递增）
+        this.spawn_createShockwave(ex, ey, '#f97316'); // 橙色火焰冲击波（最内层）
+        this.spawn_createShockwave(ex, ey, '#06b6d4'); // 青色冰霜冲击波（中层）
+        this.spawn_createShockwave(ex, ey, '#f0abfc'); // 紫粉色聚变冲击波（最外层）
+
+        // 2. 三属性粒子爆发（大幅增量：每色 16 颗，共 48 颗）
+        for (let i = 0; i < 16; i++) this.spawn_createParticle(ex, ey, '#f97316', 'spark');  // 火焰火花
+        for (let i = 0; i < 16; i++) this.spawn_createParticle(ex, ey, '#06b6d4', 'shard');  // 冰晶碎片
+        for (let i = 0; i < 16; i++) this.spawn_createParticle(ex, ey, '#c084fc', 'spark');  // 雷电火花
+
+        // 3. 额外的白色核心爆发（聚变核心闪光）
+        for (let i = 0; i < 10; i++) this.spawn_createParticle(ex, ey, '#ffffff', 'spark');
+
+        // 4. 烟雾残留（三色混合，增加厚重感）
+        for (let i = 0; i < 6; i++) this.spawn_createParticle(ex, ey, '#fde68a', 'mist');  // 暖色烟雾
+        for (let i = 0; i < 6; i++) this.spawn_createParticle(ex, ey, '#a5f3fc', 'mist');  // 冷色烟雾
+
+        // 5. 敌人超强震动（hitTimer=40，震动幅度 20px，远超普通暴击的 14px）
+        enemy.hitTimer = Math.max(enemy.hitTimer, 40);
+
+        // 6. 全局屏幕震动
+        if (typeof this.triggerScreenShake === 'function') this.triggerScreenShake(18);
+
+        // 7. 全屏紫色闪光（通过 EventBus 触发 UI 层）
+        if (typeof eventBus !== 'undefined' && typeof EVENT_TYPES !== 'undefined') {
+            eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: '#f0abfc', alpha: 0.25, duration: 350 });
+            eventBus.emit(EVENT_TYPES.UI_CHROMATIC_ABERRATION, { effectClass: 'chromatic-heavy', duration: 600 });
+        }
+
         audio.playExplosion && audio.playExplosion();
 
         // 造成真实伤害（直接调用 takeDamage，不经过护盾）
         const fusionResult = enemy.takeDamage(fusionDmg, null, true);
         this.combat_recordDamage(fusionResult.actualDamage, 'lightning', 'main', shotId);
-        this.spawn_createFloatingText(
-            enemy.pos.x,
-            enemy.pos.y - 40,
-            `⚡🔥❄️ FUSION! ${Math.ceil(fusionResult.actualDamage)}`,
-            '#f0abfc'
-        );
+
+        // 8. 超大浮动文字（字号 28px，三行：标题 + 伤害数值）
+        this.spawn_createFloatingText(ex, ey - 60, `⚗️ ELEMENTAL FUSION!`, '#f0abfc', 22);
+        this.spawn_createFloatingText(ex, ey - 30, `${Math.ceil(fusionResult.actualDamage)}`, '#ffffff', 28);
 
         if (fusionResult.killed) this.spawn_addScore(enemy.maxHp);
 
