@@ -1365,12 +1365,25 @@ phase_gathering_getRandomPegType() {
                 const time = Date.now() / 50; 
                 this.ctx.beginPath();
                 this.ctx.strokeStyle = '#ffffff'; 
-                this.ctx.lineWidth = 3;
+                this.ctx.lineWidth = 4;
                 this.ctx.shadowColor = '#fef08a'; 
-                this.ctx.shadowBlur = 15;
+                this.ctx.shadowBlur = 20;
                 for (let x = 0; x <= this.width; x += 10) {
                     const offset = Math.sin(x * 0.1 + time) * 2 + (Math.random() - 0.5) * 6;
                     const y = this.enemyWaveY + offset;
+                    if (x === 0) this.ctx.moveTo(x, y);
+                    else this.ctx.lineTo(x, y);
+                }
+                this.ctx.stroke();
+
+                // [T4-B] 余晖线：在前沿线下方 20px 处绘制一条淡金色余晖
+                this.ctx.beginPath();
+                this.ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+                this.ctx.lineWidth = 1.5;
+                this.ctx.shadowBlur = 0;
+                for (let x = 0; x <= this.width; x += 10) {
+                    const offset = Math.sin(x * 0.1 + time) * 2 + (Math.random() - 0.5) * 6;
+                    const y = this.enemyWaveY + offset + 20;
                     if (x === 0) this.ctx.moveTo(x, y);
                     else this.ctx.lineTo(x, y);
                 }
@@ -1398,6 +1411,23 @@ phase_gathering_getRandomPegType() {
                     this.enemyTurnTimer = 0;
                 }
             }
+
+        // [T4-A] 底部能量粉尘：基于时间的伪随机上升光点，增加场地空气感
+        this.ctx.save();
+        const dustTime = Date.now() / 60;
+        for (let i = 0; i < 25; i++) {
+            const baseX = (Math.sin(i * 137.508) * 0.5 + 0.5) * this.width;
+            const speed = 0.6 + (i % 3) * 0.4;
+            const dustY = this.defeatLineY - ((dustTime * speed + i * 91.3) % (this.defeatLineY * 0.8));
+            const alpha = 0.08 + Math.sin(dustTime * 0.5 + i) * 0.04;
+            const size = 1 + (i % 2) * 0.5;
+            this.ctx.globalAlpha = Math.max(0, alpha);
+            this.ctx.fillStyle = i % 3 === 0 ? '#38bdf8' : '#94a3b8';
+            this.ctx.fillRect(baseX, dustY, size, size);
+        }
+        this.ctx.globalAlpha = 1;
+        this.ctx.restore();
+
         this.ctx.restore(); 
 
 
