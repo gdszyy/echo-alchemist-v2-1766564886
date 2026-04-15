@@ -68,6 +68,13 @@
 *   **UI 系统规范**：[`.cursor/rules/ui_system.md`](.cursor/rules/ui_system.md) - UI 子模块架构（hud.js、shop.js、rune_launcher.js）、函数命名约定、耦合点标记规范。
 *   **游戏系统与试炼场规范**：[`.cursor/rules/systems.md`](.cursor/rules/systems.md) - 包含试炼场（TrainingGround）场景化配置契约、真理之书（TruthBook）图鉴配置及 UI 渲染机制。
 
+### 数据索引文档（快速速查，无需读取源码）
+
+*   **符文索引**：[`.cursor/rules/rune_index.md`](.cursor/rules/rune_index.md) - 所有 13 个符文的 ID、名称、稀有度、属性、掉落权重及亲和标签速查表。
+*   **词条索引**：[`.cursor/rules/runeword_index.md`](.cursor/rules/runeword_index.md) - 所有 22 个词条的 ID、名称、符文组合、effectId、实现位置及与技能的解锁关系速查表。
+*   **属性索引**：[`.cursor/rules/attribute_index.md`](.cursor/rules/attribute_index.md) - 7 种弹药属性的显示名称、克制关系（COUNTER_MAP）、共鸣效果（ELEMENT_RESONANCE_DB）及图鉴说明速查表。
+*   **敌人词缀与 Boss 索引**：[`.cursor/rules/enemy_index.md`](.cursor/rules/enemy_index.md) - 8 种敌人词缀和 8 个 Boss 的行为机制、出现回合、克制属性、狂暴行为及关键代码位置速查表。
+
 > **架构状态（Task 3.3 更新）**：`core.js` 已完全移除 `Object.assign(Game.prototype, ...)` Mixin 模式。全部 10 个子系统均已迁移至组合模式（Composition via bind）。新增子系统必须遵循 [`.cursor/rules/global.md`](.cursor/rules/global.md) 第 5 节「子系统扩展规范」。
 
 > **注意**：随着项目的拆分和重构，本索引应持续更新。每个子模块的负责 Agent 在完成初步重构后，需创建并维护对应的规则文档。
