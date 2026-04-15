@@ -508,10 +508,11 @@ class Projectile {
         let baseDmg = this.isCopy ? this.config.damage * 0.5 : this.config.damage;
         
         // [词条 Hook] 动能衰变 (kinetic_decay)
-        // 伤害值乘以 (1 + _kineticDecayCurrentBonus)，然后衰减
+        // 伤害值乘以 (1 + _kineticDecayCurrentBonus)，然后按乘法衰减
+        // 衰减公式: bonus *= (1 - decayRate)，确保加成平滑递减而非线性递减
         if (this._kineticDecayCurrentBonus > 0) {
             baseDmg = baseDmg * (1 + this._kineticDecayCurrentBonus);
-            this._kineticDecayCurrentBonus -= (this.config._kineticDecayRate || 0);
+            this._kineticDecayCurrentBonus *= (1 - (this.config._kineticDecayRate || 0));
             if (this._kineticDecayCurrentBonus < 0) this._kineticDecayCurrentBonus = 0;
             damageOverride = baseDmg;
         }

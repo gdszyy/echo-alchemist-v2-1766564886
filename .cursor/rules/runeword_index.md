@@ -43,7 +43,7 @@
 | `runeword_scatter_matrix` | 散射矩阵 | `rune_bounce_1` × 2 + `rune_lightning_1` × 1 | 连射次数全部转化为散射层数；基础伤害降低 25%，散射夹角缩小 70% |
 | `runeword_focused_fire` | 专注射击 | `rune_laser_1` × 2 + `rune_pierce_1` × 1 | 将所有弹跳和连射层数转化为基础伤害；伤害有 20% 概率暴击造成 200% 伤害 |
 | `runeword_mass_collapse` | 质量坍缩 | `rune_bounce_1` × 2 + `rune_pyro_1` × 1 | 强制获得爆炸属性（范围减半）；每清空 1 层连射/散射，爆炸范围 +10% |
-| `runeword_kinetic_decay` | 动能衰变 | `rune_bounce_1` × 2 + `rune_pierce_1` × 1 | 子弹初始获得 25% 伤害加成；每次命中后加成衰减 7% |
+| `runeword_kinetic_decay` | 动能衰变 | `rune_bounce_1` × 2 + `rune_pierce_1` × 1 | 子弹初始获得 25% 伤害加成；每次命中后加成乘以 (1 - 7%) 衰减（最低衰减至 0%） |
 | `runeword_echo_shot` | 回响射击 | `rune_scatter_1` × 2 + `rune_bounce_1` × 1 | 子弹首次击中敌人时，有 25% 概率按原角度额外发射一颗单发子弹 |
 
 ## 2. 词条 effectId 与实现位置速查
