@@ -1110,4 +1110,4 @@ function createCombatContext(mainGame, canvas) {
     return context;
 }
 
-export { UIManager, TrainingGround, TruthBook };
+export { UIManager, TrainingGround, TruthBook, TRUTH_BOOK_DATA };
