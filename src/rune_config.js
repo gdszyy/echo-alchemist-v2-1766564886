@@ -321,8 +321,8 @@ const RUNEWORD_DB = [
         effectId: 'blade_storm',
         pattern: ['rune_pierce_1', 'rune_pierce_2', 'rune_scatter_1'],
         effect_desc: '【复合系】首个子弹定期对范围内所有敌人生成一次剑光斩击。',
-        baseParams: { radius: 120, damageRatio: 0.60, interval: 0.5 },
-        perLevelParams: { radius: 0, damageRatio: 0.20, interval: -0.1 }
+        baseParams: { radius: 120, damageRatio: 0.15, interval: 0.1 },
+        perLevelParams: { radius: 0, damageRatio: 0.05, interval: -0.01 }
     },
     {
         id: 'runeword_elemental_fusion',
