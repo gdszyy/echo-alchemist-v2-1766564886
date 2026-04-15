@@ -371,7 +371,7 @@ export const shop_system = {
                 
                 const desc = document.createElement('div');
                 desc.className = 'text-xs text-slate-400 leading-relaxed min-h-[3em]';
-                desc.innerText = upgrade.description;
+                desc.innerText = upgrade.desc;
                 
                 const bottomRow = document.createElement('div');
                 bottomRow.className = 'flex items-center justify-between mt-auto pt-2 border-t border-slate-800/50';
