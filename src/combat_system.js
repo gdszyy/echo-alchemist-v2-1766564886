@@ -1633,7 +1633,11 @@ export const combat_system = {
                 dmg = dmg * (1 + frozenPhysDmgBonus);
             }
         }
-        if (config.pyro > 0) enemy.applyTemp(CONFIG.balance.pyroAmount * config.pyro); 
+        if (config.pyro > 0) {
+            enemy.applyTemp(CONFIG.balance.pyroAmount * config.pyro);
+            // 标记本回合被火属性命中（供元素聚变使用）
+            enemy._pyroHitThisRound = true;
+        }
         if (config.lightning > 0) {
             // --- [属性共鸣] 雷霖共鸣：读取共鸣参数，增强闪电链触发概率和伤害倍率 ---
             const lightningResonance = this.activeElementResonances && this.activeElementResonances['lightning'];
@@ -1722,6 +1726,12 @@ export const combat_system = {
         }
         // [修改] 调用 takeDamage 时传入 projectile 作为源，用于方向判定
         const damageResult = enemy.takeDamage(dmg, projectile);
+        
+        // [词条 Hook] 元素聚变（elemental_fusion）
+        // 在实际造成伤害后，检查三元素状态，触发聚变爆炸
+        if (typeof this.combat_runeword_elementalFusion_check === 'function') {
+            this.combat_runeword_elementalFusion_check(enemy, dmg, shotId);
+        }
         const killed = damageResult.killed;
         const actualDmg = damageResult.actualDamage; // --- [新增] 确定基础伤害类型 (用于统计图表行) ---
         // 需求2a: 火属性子弹的弹射/穿透伤害分别统计，只有额外火伤才算火属性

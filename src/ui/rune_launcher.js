@@ -1212,7 +1212,7 @@ export const rune_launcher_system = {
             }
             case 'elemental_fusion': {
                 const ratio = Math.round(calc('trueDamageRatio') * 100);
-                return `元素聚变爆炸，真实伤害 = 敌人当前血量 × ${ratio}%`;
+                return `元素聚变爆炸，真实伤害 = 敌人最大血量 × ${ratio}%`;
             }
             default:
                 return '';

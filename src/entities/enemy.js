@@ -2499,11 +2499,11 @@ class Enemy {
      * @param {number} amount - 伤害数值
      * @param {object|null} source - 伤害来源 (通常是 projectile 或带有 pos 的对象)
      */
-    takeDamage(amount, source = null) {
+    takeDamage(amount, source = null, bypassShield = false) {
         let actualDamage = amount;
         
         // 1. 计算护盾逻辑 (优化版)
-        if (this.affixes.includes('shield')) {
+        if (this.affixes.includes('shield') && !bypassShield) {
             // A. 方向判定：检查是否从后方 (上方) 攻击
             // 敌人坐标是中心点，如果子弹在敌人上方 (y < pos.y)，则视为绕后
             let isBackAttack = false;

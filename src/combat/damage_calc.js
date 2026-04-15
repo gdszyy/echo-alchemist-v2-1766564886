@@ -403,7 +403,7 @@ export const DamageCalc = {
         audio.playExplosion && audio.playExplosion();
 
         // 造成真实伤害（直接调用 takeDamage，不经过护盾）
-        const fusionResult = enemy.takeDamage(fusionDmg);
+        const fusionResult = enemy.takeDamage(fusionDmg, null, true);
         this.combat_recordDamage(fusionResult.actualDamage, 'lightning', 'main', shotId);
         this.spawn_createFloatingText(
             enemy.pos.x,
