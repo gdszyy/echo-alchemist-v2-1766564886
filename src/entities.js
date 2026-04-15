@@ -1033,6 +1033,15 @@ class Peg {
         const isLit = this.lit;
         const color = this.getColor();
 
+        // --- [T3] 软阴影：在钉子正下方绘制压扁的椭圆阴影，模拟物体「浮」在场地上的感觉 ---
+        ctx.save();
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.beginPath();
+        ctx.ellipse(this.pos.x, this.pos.y + currentRadius + 3, currentRadius * 0.85, currentRadius * 0.22, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
         // --- [物理增强] 被击中旋转变换 ---
         // 弹珠碰击鑉子时，鑉子会轻微旋转（切向摩擦力的视觉表现）
         if (this.impactAngle !== 0) {
@@ -1065,6 +1074,26 @@ class Peg {
             ctx.shadowBlur = 0; 
         }
         ctx.fill();
+
+        // --- [T3] Peg 发光底部光晕（全局光照模拟）：为特殊/发光钉子绘制彩色地面光晕 ---
+        if (isSpecial || isLit) {
+            ctx.save();
+            const glowColor = this.getColor();
+            const glowAlpha = hexToRgba(glowColor, 0.18);
+            const glowGrad = ctx.createRadialGradient(
+                this.pos.x, this.pos.y, 0,
+                this.pos.x, this.pos.y, currentRadius * 3.5
+            );
+            glowGrad.addColorStop(0, glowAlpha);
+            glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.fillStyle = glowGrad;
+            ctx.beginPath();
+            ctx.arc(this.pos.x, this.pos.y, currentRadius * 3.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.restore();
+        }
 
         // 恢复 Context 状态
         ctx.shadowBlur = 0;
