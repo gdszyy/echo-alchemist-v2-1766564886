@@ -109,7 +109,7 @@ P(折射) = baseChance × laserRefractionDepthDecay ^ depth
 | 变量 | 类型 | 说明 |
 |---|---|---|
 | `_continuousLaserFiring` | `boolean` | 是否处于持续照射状态 |
-| `_continuousLaserState` | `Object\|null` | 持续照射状态机数据（startX/Y、vel、recipe、tickFrames、elapsedFrames 等） |
+| `_continuousLaserState` | `Object\|null` | 持续照射状态机数据（startX/Y、vel、recipe、tickFrames、elapsedFrames、**lastHitEnemy** 等） |
 
 **生命周期**：
 1. 玩家发射激光弹药时，若照射词条激活且 `_continuousLaserFiring === false`，则启动状态机。
@@ -117,6 +117,7 @@ P(折射) = baseChance × laserRefractionDepthDecay ^ depth
 3. 每 30 帧（0.5s）重新执行一次 `combat_laser_fire`，刷新伤害计算和视觉。
 4. 持续 180 帧（3s）后自动结束，重置所有敌人的 `_irradiationStacks`，延迟 600ms 释放 `isVisualEffectActive`。
 5. 每回合开始时（`phase_switchPhase` 进入 combat 阶段）强制清理状态。
+6. 敌人回合开始时（`phase_enemy_startLogic`）清零所有敌人的 `_irradiationStacks`，防止持续照射被中断时层数残留。
 
 ### 5.2 照射模式下的碰撞行为（`collision.js`）
 
@@ -129,6 +130,7 @@ P(折射) = baseChance × laserRefractionDepthDecay ^ depth
 | 折射 | 概率触发，消耗 bounce 层数 | **强制随机折射**：命中后必定在半径内随机选取目标折射，不消耗 bounce |
 | 折射颜色 | 偏绿（bounce 属性色） | 金色（`#fbbf24`，照射词条色） |
 | 累积伤害叠加 | 无 | 每次照射同一敌人 `_irradiationStacks++`，额外伤害 = 层数 × damageAmp × 基础伤害 |
+| 目标切换重置 | 无 | 命中敌人与 `lastHitEnemy` 不同时，自动重置旧敌人的 `_irradiationStacks = 0`，并更新 `lastHitEnemy` |
 
 ## 6. 雷霆散射词条防循环修复（2026-04-15）
 

@@ -235,6 +235,12 @@ export const CollisionSystem = {
             if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#fff', 'spark');
 
             // 照射词条 Hook：累积照射同一敌人伤害加深
+            // [切换目标检测] 若命中的敌人与上次不同，重置旧敌人的 _irradiationStacks
+            const laserState = this._continuousLaserState;
+            if (laserState && laserState.lastHitEnemy && laserState.lastHitEnemy !== hit.enemy) {
+                laserState.lastHitEnemy._irradiationStacks = 0;
+            }
+            if (laserState) laserState.lastHitEnemy = hit.enemy;
             if (!hit.enemy._irradiationStacks) hit.enemy._irradiationStacks = 0;
             hit.enemy._irradiationStacks++;
             const stackDmg = hit.enemy._irradiationStacks * amp * finalDamage;

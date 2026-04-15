@@ -910,6 +910,8 @@ phase_gathering_getRandomPegType() {
         this.enemies.forEach(e => {
             e.hasActedThisTurn = false;
             e.isFrozenCurrentTurn = false; // 重置上一轮的冰冻状态
+            // [照射词条] 回合结束时清零照射叠加层数，防止残留到下一回合
+            if (e._irradiationStacks) e._irradiationStacks = 0;
 
             // [Boss 移动提示预计算]
             // 在回合开始时预计算 Boss 本回合是否会移动，以便 UI 标签能在回合开始时就显示正确提示

@@ -2498,7 +2498,8 @@ export const combat_system = {
                 tickInterval: Math.round(0.5 * 60), // 0.5s = 30帧
                 totalDuration: Math.round(3.0 * 60), // 持续 3s = 180帧
                 elapsedFrames: 0,
-                shotId
+                shotId,
+                lastHitEnemy: null  // [照射词条] 记录上一次命中的敌人，用于检测目标切换时重置 _irradiationStacks
             };
             // isVisualEffectActive 由持续照射状态机维持，不再用 setTimeout 清除
         }
