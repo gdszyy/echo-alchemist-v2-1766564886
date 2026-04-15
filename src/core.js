@@ -121,6 +121,7 @@ class Game {
         this.isVisualEffectActive = false;
         this._continuousLaserFiring = false;  // [照射词条] 持续照射状态标志
         this._continuousLaserState = null;    // [照射词条] 持续照射状态机数据
+        this._laserFadeOutFrames = 0;         // [修复] 激光淡出等待帧计数（替代 setTimeout）
         this._roundFirstShotId = null;        // [剑刃风暴] 回合首发子弹ID
         this._bladeStormProjectile = null;    // [剑刃风暴] 绑定的首发子弹
         this._bladeStormTimer = 0;            // [剑刃风暴] 触发计时器

@@ -2688,26 +2688,34 @@ export const combat_system = {
         // [持续照射] 持续模式下创建 isContinuous=true 的 LaserBeam，不自动衰减，
         // 由状态机在 tick 切换或结束时统一调用 startFadeOut()，确保动画与伤害同步。
         const isContinuousMode = !!this._continuousLaserFiring;
+        // [修复] 只有首次发射（elapsedFrames=0 且非 isTickFire）或 tick 触发时，才更新 activeBeams
+        // burstQueue 额外连射（delay=20/40/60）时 _continuousLaserFiring=true 但不应覆盖 activeBeams，
+        // 否则旧 beams 永远不会被 startFadeOut，导致激光动画残留不消失。
+        const shouldUpdateActiveBeams = isContinuousMode && (
+            isTickFire ||
+            !this._continuousLaserState ||
+            this._continuousLaserState.elapsedFrames === 0
+        );
         const newBeams = [];
         for (const beam of beamsToRender) {
             // 折射光线颜色略微偏绿（混入 bounce 属性的绿色），主射线保持原色
             const beamColor = beam.isMain ? color : this._laser_blendRefractionColor(color);
             const laserBeam = new LaserBeam(beam.points, beam.width, beamColor, isContinuousMode);
-            this.spawn_pushParticleWithLimit(laserBeam);
-            if (isContinuousMode) newBeams.push(laserBeam);
+            const pushed = this.spawn_pushParticleWithLimit(laserBeam);
+            // [修复] 只有成功加入粒子池的 beam 才注册到 newBeams，避免粒子池满时注册无效引用
+            if (isContinuousMode && pushed) newBeams.push(laserBeam);
         }
         // [持续照射] 将新建的 beams 注册到状态机，替换旧引用
-        if (isContinuousMode && this._continuousLaserState) {
+        if (shouldUpdateActiveBeams && this._continuousLaserState) {
             this._continuousLaserState.activeBeams = newBeams;
         }
 
         // 音效：越粗越低沉
         audio.playTone(Math.max(100, 800 - mainWidth * 20), 'sawtooth', 0.15, 0.2 + mainWidth * 0.01);
         // [照射词条] 持续照射模式下，isVisualEffectActive 由状态机维持，不在此清除
+        // [修复] 非持续模式改用帧计数淡出，避免 setTimeout 在回合切换后仍然执行
         if (!this._continuousLaserFiring) {
-            setTimeout(() => {
-                this.isVisualEffectActive = false;
-            }, 600);
+            this._laserFadeOutFrames = 36; // 600ms ≈ 36帧
         }
 
         // [统计] 激光发射完成，增加销毁计数以触发统计保存
@@ -2795,6 +2803,14 @@ export const combat_system = {
     },
 
     combat_continuousLaser_update(timeScale = 1) {
+        // [修复] 处理激光淡出等待帧计数（替代 setTimeout，避免回合切换后异步清理失效）
+        if (this._laserFadeOutFrames > 0) {
+            this._laserFadeOutFrames -= timeScale;
+            if (this._laserFadeOutFrames <= 0) {
+                this._laserFadeOutFrames = 0;
+                this.isVisualEffectActive = false;
+            }
+        }
         if (!this._continuousLaserFiring || !this._continuousLaserState) return;
 
         const state = this._continuousLaserState;
@@ -2820,10 +2836,9 @@ export const combat_system = {
             this._continuousLaserState = null;
             // 重置所有敌人的照射叠加层数
             this.enemies.forEach(e => { if (e._irradiationStacks) e._irradiationStacks = 0; });
-            // 延迟 600ms 释放 isVisualEffectActive（等待激光视觉淡出完毕）
-            setTimeout(() => {
-                this.isVisualEffectActive = false;
-            }, 600);
+            // [修复] 使用帧计数淡出等待，避免 setTimeout 在回合切换后仍然执行导致 isVisualEffectActive 永远不清除
+            // 600ms ≈ 36帧（60fps），用 _laserFadeOutFrames 倒计时代替 setTimeout
+            this._laserFadeOutFrames = 36;
             return;
         }
 

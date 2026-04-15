@@ -605,6 +605,10 @@ phase_gathering_getRandomPegType() {
         // [照射词条] 每回合开始时重置持续照射状态
         this._continuousLaserFiring = false;
         this._continuousLaserState = null;
+        // [修复] 每回合开始时清除激光相关的视觉效果锁和淡出计时器，
+        // 防止上一回合的 setTimeout/帧计数残留导致本回合 isVisualEffectActive 永远为 true
+        this.isVisualEffectActive = false;
+        this._laserFadeOutFrames = 0;
         
         // [剑刃风暴] 重置回合首发子弹标记与更新定时器
         this._roundFirstShotId = null;
@@ -1590,7 +1594,8 @@ phase_gathering_getRandomPegType() {
             // 活跃风道更新（基于 Tick 的同步切割伤害）
             this.combat_wind_updateActiveTunnels(timeScale);
             // [照射词条] 持续照射状态机驱动（每 0.5s 重算一次激光）
-            if (this._continuousLaserFiring) {
+            // [修复] 当 _laserFadeOutFrames > 0 时也需要驱动，以处理淡出等待帧计数
+            if (this._continuousLaserFiring || this._laserFadeOutFrames > 0) {
                 this.combat_continuousLaser_update(timeScale);
             }
             
