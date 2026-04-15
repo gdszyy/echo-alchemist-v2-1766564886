@@ -1270,18 +1270,22 @@ phase_gathering_getRandomPegType() {
         //  LAYER 0: 固定 UI 层 (防线)
         // ==========================================
         this.ctx.save();
-        this.ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+        const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
+        this.ctx.shadowColor = 'rgba(239, 68, 68, 1)';
+        this.ctx.shadowBlur = 8 + pulse * 12;
+        this.ctx.strokeStyle = `rgba(239, 68, 68, ${0.45 + pulse * 0.35})`;
         this.ctx.lineWidth = 2;
         this.ctx.setLineDash([10, 10]);
         this.ctx.beginPath();
         this.ctx.moveTo(0, this.defeatLineY);
         this.ctx.lineTo(this.width, this.defeatLineY);
         this.ctx.stroke();
+        this.ctx.shadowBlur = 0;
         this.ctx.fillStyle = 'rgba(239, 68, 68, 0.7)';
         this.ctx.font = 'bold 10px monospace';
         this.ctx.fillText("⚠️ DEFENSE LINE", 10, this.defeatLineY - 6);
         const dangerGrad = this.ctx.createLinearGradient(0, this.defeatLineY, 0, this.height);
-        dangerGrad.addColorStop(0, 'rgba(239, 68, 68, 0.1)');
+        dangerGrad.addColorStop(0, `rgba(239, 68, 68, ${0.08 + pulse * 0.08})`);
         dangerGrad.addColorStop(1, 'rgba(239, 68, 68, 0.3)');
         this.ctx.fillStyle = dangerGrad;
         this.ctx.fillRect(0, this.defeatLineY, this.width, this.height - this.defeatLineY);
@@ -1294,20 +1298,36 @@ phase_gathering_getRandomPegType() {
         this.ctx.save();
         this.ctx.translate(bgShiftX, bgShiftY); 
 
-            // A. 绘制背景网格
+            // A. 绘制背景网格 (双层刻线效果)
             this.ctx.save();
-            this.ctx.strokeStyle = 'rgba(71, 85, 105, 0.15)';
-            this.ctx.lineWidth = 1;
-            this.ctx.beginPath();
             const gridOffsetX = bgShiftX * 1.5;
             const gridOffsetY = bgShiftY * 1.5;
+            this.ctx.beginPath();
             for (let x = -50; x < this.width + 50; x += 40) {
                 this.ctx.moveTo(x, -50); this.ctx.lineTo(x, this.height + 50);
             }
             for (let y = -50; y < this.height + 50; y += 40) {
                 this.ctx.moveTo(-50, y); this.ctx.lineTo(this.width + 50, y);
             }
+            // 第一遍：沟槽阴影
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
             this.ctx.stroke();
+            // 第二遍：发光刻线
+            this.ctx.lineWidth = 1;
+            this.ctx.strokeStyle = 'rgba(94, 163, 184, 0.18)';
+            this.ctx.stroke();
+            // 网格交叉点微小发光点
+            this.ctx.globalAlpha = 0.08;
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+            for (let x = -50; x < this.width + 50; x += 40) {
+                for (let y = -50; y < this.height + 50; y += 40) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+            }
+            this.ctx.globalAlpha = 1;
             this.ctx.restore();
 
             // B. 绘制扫描波
@@ -1387,35 +1407,43 @@ phase_gathering_getRandomPegType() {
         this.ctx.save();
         this.ctx.translate(entityShiftX, entityShiftY); 
 
-            // --- [修复]：绘制可视化的边界墙壁（从顶部栏下边界开始，不遮挡顶部栏内容）---
+            // --- [修复]：绘制可视化的边界墙壁（从顶部栏下边界开始，不遥挡顶部栏内容）---
             this.ctx.save();
             // 顶部栏下边界 Y（combatGridTopY - enemyHeight/2 即第一行敌人上边界，也是顶部栏底部）
             const wallTopY = this.combatGridTopY - this.enemyHeight / 2;
-            // 左墙 (半透明渐变)
+            // 左墙 (玻璃质感渐变)
             const wallGradLeft = this.ctx.createLinearGradient(0, 0, 20, 0);
-            wallGradLeft.addColorStop(0, 'rgba(148, 163, 184, 0.2)');
+            wallGradLeft.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
+            wallGradLeft.addColorStop(0.3, 'rgba(148, 163, 184, 0.1)');
             wallGradLeft.addColorStop(1, 'rgba(148, 163, 184, 0)');
             this.ctx.fillStyle = wallGradLeft;
             this.ctx.fillRect(0, wallTopY, 20, this.height - wallTopY);
+            // 左墙反光线
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            this.ctx.fillRect(0, wallTopY, 1, this.height - wallTopY);
             
-            // 右墙 (半透明渐变)
+            // 右墙 (玻璃质感渐变)
             const wallGradRight = this.ctx.createLinearGradient(this.width, 0, this.width - 20, 0);
-            wallGradRight.addColorStop(0, 'rgba(148, 163, 184, 0.2)');
+            wallGradRight.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
+            wallGradRight.addColorStop(0.3, 'rgba(148, 163, 184, 0.1)');
             wallGradRight.addColorStop(1, 'rgba(148, 163, 184, 0)');
             this.ctx.fillStyle = wallGradRight;
             this.ctx.fillRect(this.width - 20, wallTopY, 20, this.height - wallTopY);
+            // 右墙反光线
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            this.ctx.fillRect(this.width - 1, wallTopY, 1, this.height - wallTopY);
 
             // 墙壁发光边框 (明确反弹线)
             this.ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)'; // Slate-400
             this.ctx.lineWidth = 2;
-            this.ctx.shadowColor = '#94a3b8';
-            this.ctx.shadowBlur = 10;
+            this.ctx.shadowColor = '#38bdf8';
+            this.ctx.shadowBlur = 15;
             this.ctx.beginPath();
             // 左边线（从顶部栏下边界开始）
             this.ctx.moveTo(1, wallTopY); this.ctx.lineTo(1, this.height);
             // 右边线（从顶部栏下边界开始）
             this.ctx.moveTo(this.width - 1, wallTopY); this.ctx.lineTo(this.width - 1, this.height);
-            // 顶部线 (顶部栏下边界，不遮挡顶部栏)
+            // 顶部线 (顶部栏下边界，不遥挡顶部栏)
             this.ctx.moveTo(0, wallTopY); this.ctx.lineTo(this.width, wallTopY);
             this.ctx.stroke();
             this.ctx.restore();
