@@ -27,7 +27,10 @@ const TRUTH_BOOK_DATA = {
             tags: ['基礎', '測試對象'],
             desc: '標準的煉金生物。沒有特殊能力，是測試傷害的理想對象。',
             setup: (game) => {
-                game.enemies.push(new Enemy(game.width/2, 150, 60, 60, 200, 200));
+                // 统一尺寸 60x60，对齐网格 (col: 2, row: 1)
+                const x = 2 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                game.enemies.push(new Enemy(x, y, 60, 60, 200, 200));
             },
             loop: [
                 { type: 'log', text: '生成測試彈幕...' },
@@ -43,10 +46,16 @@ const TRUTH_BOOK_DATA = {
             tags: ['減傷', '激光反射'],
             desc: '擁有能量護盾，每層護盾可將受到的傷害減少 50%，護盾層數為 1 + 當前回合數。護盾表面光滑，可以反射激光束。護盾層數消耗完畢後，詞條自動移除。',
             setup: (game) => {
-                game.enemies.push(new Enemy(game.width/2, 150, 60, 60, 200, 200, 'normal', ['shield']));
+                // 统一尺寸 60x60，对齐网格 (col: 2, row: 1)
+                const x = 2 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                const e = new Enemy(x, y, 60, 60, 200, 200, 'normal', ['shield']);
+                // [修复] 核心字段是 shieldCharges 而不是 shieldLayers
+                e.shieldCharges = 3;
+                game.enemies.push(e);
             },
             loop: [
-                { type: 'log', text: '護盾減傷測試' },
+                { type: 'log', text: '普通子彈打擊 (演示減傷)' },
                 { type: 'spawn_projectile', config: { damage: 20 } },
                 { type: 'wait', frames: 60 },
                 { type: 'log', text: '激光反射測試' },
@@ -62,7 +71,10 @@ const TRUTH_BOOK_DATA = {
             tags: ['回血', '持久戰'],
             desc: '體內植入了生命水晶，每回合行動時會恢復最大生命値的 20%（如果已滿血則不觸發）。在冰凍狀態下無法行動，因此也無法觸發再生。',
             setup: (game) => {
-                const e = new Enemy(game.width/2, 150, 60, 60, 200, 200, 'normal', ['regen']);
+                // 统一尺寸 60x60，对齐网格 (col: 2, row: 1)
+                const x = 2 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                const e = new Enemy(x, y, 60, 60, 200, 200, 'normal', ['regen']);
                 e.hp = 100; 
                 game.enemies.push(e);
             },
@@ -82,12 +94,16 @@ const TRUTH_BOOK_DATA = {
             tags: ['受擊分裂', '人海戰術'],
             desc: '每回合開始時，有 50% 概率分裂出一個複製體；受到攻擊時，有 20% 概率額外觸發分裂。複製體繼承本體的詞條，可迅速填滿戰場。',
             setup: (game) => {
-                game.enemies.push(new Enemy(game.width/2, 150, 60, 60, 300, 300, 'normal', ['clone']));
+                // 统一尺寸 60x60，对齐网格 (col: 2, row: 1)
+                const x = 2 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                game.enemies.push(new Enemy(x, y, 60, 60, 300, 300, 'normal', ['clone']));
             },
             loop: [
-                { type: 'log', text: '攻擊觸發分裂' },
-                { type: 'spawn_projectile', config: { damage: 10 } },
-                { type: 'wait', frames: 30 },
+                { type: 'log', text: '回合開始：嘗試分裂' },
+                { type: 'enemy_turn' },
+                { type: 'wait', frames: 60 },
+                { type: 'log', text: '受擊觸發分裂' },
                 { type: 'spawn_projectile', config: { damage: 10 } },
                 { type: 'wait', frames: 150 },
                 { type: 'reset' }
@@ -100,7 +116,10 @@ const TRUTH_BOOK_DATA = {
             tags: ['高速', '急速衝刺'],
             desc: '腿部裝有加速裝置，每回合在正常移動後額外追加一次衝刺移動。注意：加速僅作用於移動，不會重複結算其他詞條。',
             setup: (game) => {
-                game.enemies.push(new Enemy(game.width/2, 150, 60, 60, 200, 200, 'normal', ['haste']));
+                // 统一尺寸 60x60，对齐网格 (col: 2, row: 1)
+                const x = 2 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                game.enemies.push(new Enemy(x, y, 60, 60, 200, 200, 'normal', ['haste']));
             },
             loop: [
                 { type: 'log', text: '極速行動 (2x)' },
@@ -116,9 +135,15 @@ const TRUTH_BOOK_DATA = {
             tags: ['熱能轉化', '雙重結算'],
             desc: '每回合結束時自動升溫 +20°C，且溫度結算執行兩次。當處於過熱狀態時，有概率觸發狂暴，使本回合的非移動行動（如治癒、吞噬、增殖）額外結算一次。觸發概率隨溫度升高而增加。',
             setup: (game) => {
-                const e = new Enemy(game.width/2, 150, 60, 60, 300, 300, 'normal', ['berserk']);
+                // 统一尺寸 60x60，对齐网格 (col: 2, row: 1)
+                const x = 2 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                // 添加 healer 词条以演示狂暴下的双重行动
+                const e = new Enemy(x, y, 60, 60, 300, 300, 'normal', ['berserk', 'healer']);
                 e.temp = 150; 
-                game.enemies.push(e);
+                // 添加一个受伤的队友
+                const ally = new Enemy(x - game.enemyWidth, y, 60, 60, 50, 200);
+                game.enemies.push(e, ally);
             },
             loop: [
                 { type: 'log', text: '當前溫度：150°C (過熱)' },
@@ -136,9 +161,11 @@ const TRUTH_BOOK_DATA = {
             tags: ['群體治療', '輔助'],
             desc: '戰場上的醫療兵。回合行動時會治療周圍的友軍單位。',
             setup: (game) => {
-                const e1 = new Enemy(game.width/2 - 70, 150, 60, 60, 100, 200); 
-                const healer = new Enemy(game.width/2, 150, 60, 60, 200, 200, 'normal', ['healer']);
-                const e2 = new Enemy(game.width/2 + 70, 150, 60, 60, 100, 200); 
+                // 统一尺寸 60x60，对齐网格 (col: 1, 2, 3, row: 1)
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                const e1 = new Enemy(1 * game.enemyWidth + game.enemyWidth / 2, y, 60, 60, 100, 200); 
+                const healer = new Enemy(2 * game.enemyWidth + game.enemyWidth / 2, y, 60, 60, 200, 200, 'normal', ['healer']);
+                const e2 = new Enemy(3 * game.enemyWidth + game.enemyWidth / 2, y, 60, 60, 100, 200); 
                 game.enemies.push(e1, healer, e2);
             },
             loop: [
@@ -157,14 +184,22 @@ const TRUTH_BOOK_DATA = {
             tags: ['吞噬友軍', '成長'],
             desc: '殘忍的同類相食者。每回合行動時，有概率吞噬相鄰的一個友軍單位，繼承其全部血量與所有詞條，被吞噬的單位立即死亡。',
             setup: (game) => {
-                const food = new Enemy(game.width/2 - 60, 150, 50, 50, 100, 100, 'normal', ['haste']); 
-                const eater = new Enemy(game.width/2, 150, 70, 70, 200, 500, 'normal', ['devour']);
+                // 统一尺寸 60x60，对齐网格 (col: 1, 2, row: 1)
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                // 将食物改为分身魔像，增强视觉效果
+                const food = new Enemy(1 * game.enemyWidth + game.enemyWidth / 2, y, 60, 60, 100, 100, 'normal', ['clone']); 
+                const eater = new Enemy(2 * game.enemyWidth + game.enemyWidth / 2, y, 60, 60, 200, 500, 'normal', ['devour']);
+                // [演示补丁] 确保吞噬概率为 100% 且范围足够
+                game.CONFIG.balance.affixes.devourChance = 1.0;
+                game.CONFIG.balance.affixes.devourRange = 2.0;
                 game.enemies.push(food, eater);
             },
             loop: [
-                { type: 'log', text: '發現獵物 (極速魔像)' },
+                { type: 'log', text: '發現獵物 (分身魔像)' },
                 { type: 'wait', frames: 60 },
                 { type: 'log', text: '吞噬！(繼承血量與詞條)' },
+                // 吞噬是概率触发，且受距离影响 (dist < width * afx.devourRange)
+                // 在 setup 中我们将它们放在相邻格子 (1*w, 2*w)，距离刚好是 1.0w，默认 devourRange 是 1.2
                 { type: 'enemy_turn', targetIdx: 1 },
                 { type: 'wait', frames: 120 },
                 { type: 'reset' }
@@ -177,8 +212,13 @@ const TRUTH_BOOK_DATA = {
             tags: ['越過障礙', '突進'],
             desc: '腿部裝有彈簧裝置。當前方被阻擋時，可以直接跳過障礙物繼續前進。',
             setup: (game) => {
-                const blocker = new Enemy(game.width/2, 210, 60, 60, 100, 100); 
-                const jumper = new Enemy(game.width/2, 150, 60, 60, 200, 200, 'normal', ['jump']);
+                // 统一尺寸 60x60，对齐网格 (col: 2, row: 1, 0)
+                // 注意：在实际游戏中，敌人是向下移动的。为了演示跳跃，我们将 jumper 放在 blocker 上方 (row 0)，blocker 放在 row 1。
+                const x = 2 * game.enemyWidth + game.enemyWidth / 2;
+                const blocker = new Enemy(x, game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2, 60, 60, 100, 100); 
+                const jumper = new Enemy(x, game.combatGridTopY + 0 * game.enemyHeight + game.enemyHeight / 2, 60, 60, 200, 200, 'normal', ['jump']);
+                // [演示补丁] 确保跳跃行数足够跨过一个敌人 (1行移动 + 1行阻挡 = 2行)
+                game.CONFIG.balance.affixes.jumpRows = 2;
                 game.enemies.push(blocker, jumper);
             },
             loop: [
@@ -196,13 +236,16 @@ const TRUTH_BOOK_DATA = {
             id: 'bounce', name: '彈性', icon: '⤴️', tags: ['物理', '連擊'],
             desc: '增加彈珠在敵人之間彈射的次數，適合在密集怪群中製造混亂。',
             setup: (game) => {
-                // 佈置一個三角形陣列，展示多次彈射
+                // 统一尺寸 60x60，对齐网格 (col: 1, 3, 2, 0, 4, row: 2, 2, 1, 0, 0)
+                const w = game.enemyWidth;
+                const h = game.enemyHeight;
+                const top = game.combatGridTopY;
                 game.enemies.push(
-                    new Enemy(game.width/2 - 60, 220, 50, 50, 500),
-                    new Enemy(game.width/2 + 60, 220, 50, 50, 500),
-                    new Enemy(game.width/2, 140, 50, 50, 500),
-                    new Enemy(game.width/2 - 100, 100, 40, 40, 300),
-                    new Enemy(game.width/2 + 100, 100, 40, 40, 300)
+                    new Enemy(1 * w + w/2, top + 2 * h + h/2, 60, 60, 500),
+                    new Enemy(3 * w + w/2, top + 2 * h + h/2, 60, 60, 500),
+                    new Enemy(2 * w + w/2, top + 1 * h + h/2, 60, 60, 500),
+                    new Enemy(0 * w + w/2, top + 0 * h + h/2, 60, 60, 300),
+                    new Enemy(4 * w + w/2, top + 0 * h + h/2, 60, 60, 300)
                 );
             },
             loop: [
@@ -215,9 +258,10 @@ const TRUTH_BOOK_DATA = {
             id: 'pierce', name: '穿透', icon: '↗️', tags: ['物理', '貫穿'],
             desc: '使彈珠能夠穿透敵人的身體，直接打擊後排目標。',
             setup: (game) => {
-                // 佈置一條直線上的敵人，展示一箭穿心
+                // 统一尺寸 60x60，对齐网格 (col: 2, row: 0-4)
+                const x = 2 * game.enemyWidth + game.enemyWidth / 2;
                 for(let i=0; i<5; i++) {
-                    game.enemies.push(new Enemy(game.width/2, 250 - i*50, 50, 40, 200));
+                    game.enemies.push(new Enemy(x, game.combatGridTopY + i * game.enemyHeight + game.enemyHeight / 2, 60, 60, 200));
                 }
             },
             loop: [
@@ -230,16 +274,21 @@ const TRUTH_BOOK_DATA = {
             id: 'scatter', name: '散射', icon: '🔱', tags: ['物理', '分裂'],
             desc: '彈珠飛行時會向兩側分裂出小型子彈，擴大打擊覆蓋面。',
             setup: (game) => {
-                // 佈置一個大目標和周圍的小目標，展示分裂彈的覆蓋力
-                game.enemies.push(new Enemy(game.width/2, 120, 80, 80, 1000));
-                for(let i=0; i<6; i++) {
-                    const angle = (i / 6) * Math.PI * 2;
-                    game.enemies.push(new Enemy(
-                        game.width/2 + Math.cos(angle) * 120,
-                        120 + Math.sin(angle) * 120,
-                        30, 30, 100
-                    ));
-                }
+                // 统一尺寸 60x60，对齐网格 (中心 col: 2, row: 2; 周围 col: 0, 1, 3, 4, row: 1, 3)
+                const w = game.enemyWidth;
+                const h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                // 中心大目标（演示中保持统一尺寸以符合要求）
+                game.enemies.push(new Enemy(2 * w + w/2, top + 2 * h + h/2, 60, 60, 1000));
+                // 周围小目标对齐网格
+                const positions = [
+                    {c: 1, r: 1}, {c: 3, r: 1},
+                    {c: 0, r: 2}, {c: 4, r: 2},
+                    {c: 1, r: 3}, {c: 3, r: 3}
+                ];
+                positions.forEach(p => {
+                    game.enemies.push(new Enemy(p.c * w + w/2, top + p.r * h + h/2, 60, 60, 100));
+                });
             },
             loop: [
                 { type: 'log', text: '發射分裂散射彈' },
@@ -251,7 +300,10 @@ const TRUTH_BOOK_DATA = {
             id: 'cryo', name: '冰霜', icon: '❄️', tags: ['元素', '控制'],
             desc: '降低敵人溫度。溫度 < 0°C 時觸發【易傷】，每降低 1°C 增加 0.5% 受到的傷害。達到 -100°C 時觸發【凍結】，敵人將無法行動。',
             setup: (game) => { 
-                const e = new Enemy(game.width/2, 180, 90, 90, 2000);
+                // 统一尺寸 60x60，对齐网格 (col: 2, row: 1)
+                const x = 2 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                const e = new Enemy(x, y, 60, 60, 2000);
                 e.temp = -100; // 預設凍結
                 game.enemies.push(e); 
             },
@@ -267,16 +319,21 @@ const TRUTH_BOOK_DATA = {
             id: 'pyro', name: '火焰', icon: '🔥', tags: ['元素', '範圍爆炸'],
             desc: '升高敵人溫度。溫度 ≥ 34°C 時觸發「燃燒」，造成額外傷害（公式：火屬性層數 × 溫度 / 200）。溫度 > 200°C 時有概率觸發「過熱爆炸」，對自身及半徑 120 內的敵人造成 AOE 傷害，並消耗 27% 熱量。爆炸概率從 200°C 的 15% 線性增至 800°C 的 90%（不是 600°C 必爆）。',
             setup: (game) => { 
-                const boss = new Enemy(game.width/2, 180, 80, 80, 1500);
-                game.enemies.push(boss); 
-                for(let i=0; i<8; i++) {
-                    const angle = (i / 8) * Math.PI * 2;
-                    game.enemies.push(new Enemy(
-                        game.width/2 + Math.cos(angle) * 90,
-                        180 + Math.sin(angle) * 90,
-                        40, 40, 300
-                    ));
-                }
+                // 统一尺寸 60x60，对齐网格
+                const w = game.enemyWidth;
+                const h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                // 中心目标 (col: 2, row: 1)
+                game.enemies.push(new Enemy(2 * w + w/2, top + 1 * h + h/2, 60, 60, 1500)); 
+                // 周围目标 (col: 1, 3, row: 0, 1, 2)
+                const positions = [
+                    {c: 1, r: 0}, {c: 2, r: 0}, {c: 3, r: 0},
+                    {c: 1, r: 1},              {c: 3, r: 1},
+                    {c: 1, r: 2}, {c: 2, r: 2}, {c: 3, r: 2}
+                ];
+                positions.forEach(p => {
+                    game.enemies.push(new Enemy(p.c * w + w/2, top + p.r * h + h/2, 60, 60, 300));
+                });
             },
             loop: [
                 { type: 'log', text: '第一步：施加火屬性使其【燃燒】' },
@@ -291,13 +348,16 @@ const TRUTH_BOOK_DATA = {
             id: 'lightning', name: '閃電', icon: '⚡', tags: ['元素', '連鎖'],
             desc: '命中時觸發連鎖閃電。閃電鏈可對重複敵人造成傷害，並對目標施加溫度（公式：閃電層數 + 連鎖次數/3）。閃電鏈隨機在範圍內索敵，距離越近概率越高。基礎連鎖概率 15%，目標溫度越低（冰凍狀態）概率越高（最高 100%）。連鎖傷害隨次數遞減，最多連鎖 100 次。',
             setup: (game) => {
-                // 佈置密集的敵群，展示 100 次連鎖的壯觀效果
-                for(let i=0; i<12; i++) {
-                    const x = game.width/2 + (Math.random()-0.5) * 200;
-                    const y = 150 + (Math.random()-0.5) * 150;
-                    const e = new Enemy(x, y, 40, 40, 500);
-                    e.temp = -100; // [修復] 讓所有敵人都冰凍，確保瘋狂連鎖
-                    game.enemies.push(e);
+                // 统一尺寸 60x60，对齐网格 (col: 1-3, row: 0-3)
+                const w = game.enemyWidth;
+                const h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                for(let r=0; r<4; r++) {
+                    for(let c=1; c<4; c++) {
+                        const e = new Enemy(c * w + w/2, top + r * h + h/2, 60, 60, 500);
+                        e.temp = -100; // 确保疯狂连锁
+                        game.enemies.push(e);
+                    }
                 }
             },
             loop: [
@@ -310,12 +370,14 @@ const TRUTH_BOOK_DATA = {
             id: 'laser', name: '光球', icon: '🔦', tags: ['特殊', '瞬時'],
             desc: '直接發射激光束，瞬間對路徑上的敵人造成傷害。激光可被護盾反射。',
             setup: (game) => {
+                // 统一尺寸 60x60，对齐网格 (col: 1, 3, row: 0-2)
+                const w = game.enemyWidth;
+                const h = game.enemyHeight;
+                const top = game.combatGridTopY;
                 for(let i=0; i<6; i++) {
-                    game.enemies.push(new Enemy(
-                        game.width/2 + (i%2 === 0 ? -80 : 80),
-                        250 - i*40,
-                        50, 50, 300
-                    ));
+                    const col = i % 2 === 0 ? 1 : 3;
+                    const row = Math.floor(i / 2);
+                    game.enemies.push(new Enemy(col * w + w/2, top + row * h + h/2, 60, 60, 300));
                 }
             },
             loop: [
@@ -327,7 +389,12 @@ const TRUTH_BOOK_DATA = {
         {
             id: 'wind', name: '風', icon: '🌪️', tags: ['特殊', '法陣'],
             desc: '在命中點生成風暴法陣，持續發射風刃攻擊附近的敵人。',
-            setup: (game) => { game.enemies.push(new Enemy(game.width/2, 200, 80, 80, 1000)); },
+            setup: (game) => { 
+                // 统一尺寸 60x60，对齐网格 (col: 2, row: 1)
+                const x = 2 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                game.enemies.push(new Enemy(x, y, 60, 60, 1000)); 
+            },
             loop: [
                 { type: 'spawn_projectile', config: { damage: 5, wind: 1, bounce: 4 }, vel: {x: 5, y: -15} },
                 { type: 'wait', frames: 60 },
@@ -339,7 +406,12 @@ const TRUTH_BOOK_DATA = {
             id: 'explosive', name: '爆破', icon: '🧨', tags: ['特殊', 'AOE'],
             desc: '接觸敵人時引發劇烈爆炸，造成大範圍傷害。',
             setup: (game) => {
-                for(let i=0; i<5; i++) game.enemies.push(new Enemy(game.width/2 - 100 + i*50, 200, 40, 40, 100));
+                // 统一尺寸 60x60，对齐网格 (col: 0-4, row: 1)
+                const w = game.enemyWidth;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                for(let c=0; c<5; c++) {
+                    game.enemies.push(new Enemy(c * w + w/2, y, 60, 60, 100));
+                }
             },
             loop: [
                 { type: 'spawn_projectile', config: { damage: 30, explosive: true }, vel: {x: 0, y: -15} },
@@ -350,9 +422,13 @@ const TRUTH_BOOK_DATA = {
             id: 'matryoshka', name: '套娃', icon: '🪆', tags: ['特殊', '連鎖'],
             desc: '子彈消失時會分裂出下一顆子彈。演示：散射子彈分裂出散射火屬性子彈。',
             setup: (game) => { 
-                game.enemies.push(new Enemy(game.width/2, 120, 80, 80, 1500)); 
-                for(let i=0; i<4; i++) {
-                    game.enemies.push(new Enemy(game.width/2 + (i-1.5)*80, 220, 40, 40, 300));
+                // 统一尺寸 60x60，对齐网格 (col: 2, row: 0; col: 0-3, row: 2)
+                const w = game.enemyWidth;
+                const h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2 * w + w/2, top + 0 * h + h/2, 60, 60, 1500)); 
+                for(let c=0; c<4; c++) {
+                    game.enemies.push(new Enemy(c * w + w/2, top + 2 * h + h/2, 60, 60, 300));
                 }
             },
             loop: [
@@ -1273,7 +1349,10 @@ class TruthBook {
                 }
             }
             const ts = 1.0;
-            this.demoGame.enemies.forEach(e => e.update(ts, this.demoGame));
+            this.demoGame.enemies.forEach(e => {
+                // Enemy.update 内部已经处理了 telegraphing -> executeTurnAction 的转换
+                e.update(ts, this.demoGame);
+            });
             this.demoGame.projectiles.forEach(p => {
                 // [修復] 模擬器牆壁反彈邏輯：完全同步主遊戲
                 const margin = 20;
@@ -1297,13 +1376,17 @@ class TruthBook {
                 if (f instanceof FloatingText && f.life <= 0) f.active = false;
                 else if (f.life !== undefined) { f.pos.y -= 0.5; f.life--; }
             });
-            this.demoGame.shockwaves.forEach(s => s.update(ts));
-            this.demoGame.lightningBolts.forEach(l => l.update(ts));
-            this.demoGame.projectiles = this.demoGame.projectiles.filter(p => p.active);
-            this.demoGame.particles = this.demoGame.particles.filter(p => p.active);
-            this.demoGame.floatingTexts = this.demoGame.floatingTexts.filter(f => f.life > 0);
-            this.demoGame.shockwaves = this.demoGame.shockwaves.filter(s => s.alpha > 0);
-            this.demoGame.lightningBolts = this.demoGame.lightningBolts.filter(l => l.life > 0);
+        this.demoGame.shockwaves.forEach(s => s.update(ts));
+        this.demoGame.lightningBolts.forEach(l => l.update(ts));
+        this.demoGame.fireWaves.forEach(f => f.update(ts));
+        this.demoGame.healWaves.forEach(h => h.update(ts, this.demoGame));
+        this.demoGame.projectiles = this.demoGame.projectiles.filter(p => p.active);
+        this.demoGame.particles = this.demoGame.particles.filter(p => p.active);
+        this.demoGame.floatingTexts = this.demoGame.floatingTexts.filter(f => f.life > 0);
+        this.demoGame.shockwaves = this.demoGame.shockwaves.filter(s => s.alpha > 0);
+        this.demoGame.lightningBolts = this.demoGame.lightningBolts.filter(l => l.life > 0);
+        this.demoGame.fireWaves = this.demoGame.fireWaves.filter(f => f.active);
+        this.demoGame.healWaves = this.demoGame.healWaves.filter(h => h.active);
             this.draw();
         } finally {
             window.game = _realGame;
@@ -1317,7 +1400,11 @@ class TruthBook {
             case 'wait': this.waitTimer = inst.frames; break;
             case 'enemy_turn': 
                 const actor = this.demoGame.enemies[inst.targetIdx || 0];
-                if (actor) this.mainGame.phase_enemy_processTurn.call(this.demoGame, actor);
+                if (actor) {
+                    // 重置行动状态以允许在演示中多次触发
+                    actor.hasActedThisTurn = false;
+                    this.mainGame.phase_enemy_processTurn.call(this.demoGame, actor);
+                }
                 break;
             case 'spawn_projectile':
                 const px = inst.x || this.demoGame.width / 2;
@@ -1352,12 +1439,14 @@ class TruthBook {
         const gameW = this.demoGame.width;
         const gameH = this.demoGame.height;
         ctx.clearRect(0, 0, w, h);
-        this.gridOffset = (this.gridOffset + 0.5) % 40;
-        ctx.strokeStyle = 'rgba(6, 182, 212, 0.1)';
+        // 背景网格对齐敌人尺寸 (60x60)
+        const gridSize = 60;
+        this.gridOffset = (this.gridOffset + 0.5) % gridSize;
+        ctx.strokeStyle = 'rgba(6, 182, 212, 0.08)';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        for (let x = 0; x <= w; x += 40) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
-        for (let y = this.gridOffset; y <= h; y += 40) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+        for (let x = 0; x <= w; x += gridSize) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+        for (let y = this.gridOffset; y <= h; y += gridSize) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
         ctx.stroke();
         ctx.save();
         const padding = 20;
@@ -1372,6 +1461,8 @@ class TruthBook {
         this.demoGame.particles.forEach(p => p.draw ? p.draw(ctx) : null);
         this.demoGame.shockwaves.forEach(s => s.draw(ctx));
         this.demoGame.lightningBolts.forEach(l => l.draw(ctx));
+        this.demoGame.fireWaves.forEach(f => f.draw(ctx));
+        this.demoGame.healWaves.forEach(h => h.draw(ctx));
         this.demoGame.floatingTexts.forEach(f => f.draw(ctx));
         this.scanLineY = (this.scanLineY + 2) % gameH;
         ctx.fillStyle = `rgba(6, 182, 212, 0.1)`;
@@ -1413,6 +1504,7 @@ function createCombatContext(mainGame, canvas) {
         lightningBolts: [],
         spores: [],
         fireWaves: [],
+        healWaves: [],
         sonSwords: [],
         sonSwordQueue: [],
         swordQis: [],
@@ -1493,6 +1585,12 @@ function createCombatContext(mainGame, canvas) {
         },
         spawn_smallWhirlwind(...args) {
             return mainGame.spawn_smallWhirlwind.call(this, ...args);
+        },
+        spawn_createHealWave(...args) {
+            return mainGame.spawn_createHealWave.call(this, ...args);
+        },
+        spawn_createFireWave(...args) {
+            return mainGame.spawn_createFireWave.call(this, ...args);
         },
         // uiCache 在演示环境中不可用，直接跳过
         spawn_createHitFeedback() {},
