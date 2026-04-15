@@ -15,7 +15,7 @@
 import { CONFIG } from './config.js';
 import { Enemy, Projectile, Particle, FloatingText, CloneSpore } from './entities.js';
 import { eventBus } from './event_bus.js';
-import { Vec2 } from './utils/math_utils.js';
+import { Vec2, adjustColorBrightness } from './utils/math_utils.js';
 import { RUNEWORD_DB } from './rune_config.js';
 
 // ==================== 真理之书数据 ====================
