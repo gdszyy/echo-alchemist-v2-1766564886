@@ -338,7 +338,7 @@ peg.level = game.activeRunewordEffects['flying_sword_unlock'].params.level || 1;
 - `finalRecipe.bounce = 0`，`finalRecipe.multicast = 0`。
 - `finalRecipe._critChance = critChance`，`finalRecipe._critDamage = critDamage`（由 `combat_system.js` 的 `combat_damageEnemy` 函数读取，在 `takeDamage` 调用前执行暴击判定）。
 
-**质量崩塌 (`mass_collapse`)**:
+**质量坍缩 (`mass_collapse`)**:
 - `layersCleared = (finalRecipe.multicast || 0) + (finalRecipe.scatter || 0)`。
 - `finalRecipe.multicast = 0`，`finalRecipe.scatter = 0`。
 - `finalRecipe.explosive = true`。
