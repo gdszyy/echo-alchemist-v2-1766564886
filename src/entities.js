@@ -34,7 +34,8 @@ import {
 import { 
     Particle, SlashEffect, CollectionBeam, Shockwave, LaserBeam, 
     FloatingText, EnergyOrb, LightningBolt, FireWave,
-    IceWave, DeathExplosion, HealWave
+    IceWave, DeathExplosion, HealWave,
+    BladeStormRing, SwordScar
 } from './effects/particles.js';
 import { Enemy, setEnemyAudioProvider } from './entities/enemy.js';
 import { Projectile, setProjectileAudioProvider } from './entities/projectile.js';
@@ -4656,6 +4657,8 @@ export {
     IceWave,
     DeathExplosion,
     HealWave,
+    BladeStormRing,
+    SwordScar,
     Player,
     RuneLoot,
     showToast,

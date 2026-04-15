@@ -1229,6 +1229,129 @@ class HealWave {
     }
 }
 
+// ==================== [剑刃风暴] 专属特效类 ====================
+
+/**
+ * BladeStormRing - 剑刃风暴范围扩散圆环特效
+ * 以子弹为圆心，快速扩散到 radius 后消失，绿色风刃感
+ */
+class BladeStormRing {
+    constructor(x, y, radius) {
+        this.x = x;
+        this.y = y;
+        this.maxRadius = radius;
+        this.radius = radius * 0.3; // 从 30% 半径开始扩散
+        this.life = 1.0;
+        this.active = true;
+    }
+
+    update(timeScale) {
+        if (!this.active) return;
+        // 快速扩散到 maxRadius
+        const expandSpeed = (this.maxRadius - this.radius) * 0.25;
+        this.radius += expandSpeed * timeScale;
+        this.life -= 0.12 * timeScale;
+        if (this.life <= 0) {
+            this.life = 0;
+            this.active = false;
+        }
+    }
+
+    draw(ctx) {
+        if (!this.active || this.life <= 0) return;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = this.life * 0.7;
+
+        // 外圈：宽而淡的绿色光晕
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = '#34d399';
+        ctx.lineWidth = 8 * this.life;
+        ctx.shadowBlur = 16;
+        ctx.shadowColor = '#34d399';
+        ctx.stroke();
+
+        // 内圈：细而亮的白色核心
+        ctx.globalAlpha = this.life * 0.5;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius * 0.85, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2 * this.life;
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = '#ffffff';
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
+/**
+ * SwordScar - 剑痕残留特效
+ * 在敌人位置绘制一道短暂的斜线剑痕，模拟被斩击后的刀痕
+ */
+class SwordScar {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        // 随机斜向角度（偏向斜线感）
+        this.angle = (Math.random() - 0.5) * Math.PI * 0.5 + Math.PI * 0.25;
+        this.length = 20 + Math.random() * 20;
+        this.life = 1.0;
+        this.active = true;
+        // 随机偏移，避免所有剑痕重叠
+        this.offsetX = (Math.random() - 0.5) * 20;
+        this.offsetY = (Math.random() - 0.5) * 20;
+    }
+
+    update(timeScale) {
+        if (!this.active) return;
+        this.life -= 0.04 * timeScale; // 慢慢消逝，约 25 帧
+        if (this.life <= 0) {
+            this.life = 0;
+            this.active = false;
+        }
+    }
+
+    draw(ctx) {
+        if (!this.active || this.life <= 0) return;
+        ctx.save();
+        ctx.translate(this.x + this.offsetX, this.y + this.offsetY);
+        ctx.rotate(this.angle);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = this.life * 0.8;
+
+        const halfL = this.length / 2;
+        // 主剑痕线
+        const grad = ctx.createLinearGradient(-halfL, 0, halfL, 0);
+        grad.addColorStop(0, 'rgba(255,255,255,0)');
+        grad.addColorStop(0.3, 'rgba(52, 211, 153, 0.9)');
+        grad.addColorStop(0.5, 'rgba(255, 255, 255, 1)');
+        grad.addColorStop(0.7, 'rgba(52, 211, 153, 0.9)');
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 2.5 * this.life;
+        ctx.lineCap = 'round';
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#34d399';
+        ctx.beginPath();
+        ctx.moveTo(-halfL, 0);
+        ctx.lineTo(halfL, 0);
+        ctx.stroke();
+
+        // 副剑痕（平行细线，增加层次感）
+        ctx.lineWidth = 1 * this.life;
+        ctx.globalAlpha = this.life * 0.4;
+        ctx.beginPath();
+        ctx.moveTo(-halfL * 0.6, -4);
+        ctx.lineTo(halfL * 0.6, -4);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
 // ==================== 导出 ====================
 export {
     Particle,
@@ -1242,5 +1365,7 @@ export {
     FireWave,
     IceWave,
     DeathExplosion,
-    HealWave
+    HealWave,
+    BladeStormRing,
+    SwordScar
 };

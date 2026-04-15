@@ -5,7 +5,7 @@ import {
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
     Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave,
-    IceWave, DeathExplosion, showToast, 
+    IceWave, DeathExplosion, showToast, BladeStormRing, SwordScar,
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba, RuneLoot
 } from './entities.js';
 import { loot_calcRuneDrop } from './loot_system.js';
@@ -2748,23 +2748,33 @@ export const combat_system = {
             const baseDmg = targetProj.config ? targetProj.config.damage : 2;
             const slashDmg = Math.ceil(baseDmg * damageRatio);
 
+                // === 特效 1：范围扩散圆环（以子弹为圆心） ===
+            this.spawn_pushParticleWithLimit(new BladeStormRing(targetProj.pos.x, targetProj.pos.y, radius));
+
             let hitAny = false;
             this.enemies.forEach(e => {
                 if (!e.active) return;
                 if (targetProj.pos.dist(e.pos) < radius) {
                     const slashResult = e.takeDamage(slashDmg);
                     this.combat_recordDamage(slashResult.actualDamage, 'wind', 'main', targetProj.shotId);
-                    this.spawn_createFloatingText(e.pos.x, e.pos.y - 20, `风斩+${Math.ceil(slashResult.actualDamage)}`, '#34d399');
+                    // [修复] 去掉伤害跳字，改为纯视觉特效
+
+                    // === 特效 2：敌人受击斩击光效（SlashEffect 梭形光束） ===
+                    const slashAngle = Math.random() * Math.PI * 2;
+                    const slashLen = 40 + Math.random() * 20;
+                    this.spawn_pushParticleWithLimit(new SlashEffect(e.pos.x, e.pos.y, slashAngle, slashLen, '#34d399'));
+
+                    // === 特效 3：剑痕残留（短暂消逝的斜线刀痕） ===
+                    this.spawn_pushParticleWithLimit(new SwordScar(e.pos.x, e.pos.y));
+
                     hitAny = true;
                 }
             });
 
-            // 视觉特效：如果有敌人被斩击，或者只要触发就显示
+            // 触发时在子弹位置额外加一道斩击光效（无论是否命中敌人）
             if (hitAny) {
                 const angle = Math.random() * Math.PI * 2;
-                if (typeof SlashAnim !== 'undefined') {
-                    this.spawn_pushParticleWithLimit(new SlashAnim(targetProj.pos.x, targetProj.pos.y, angle, 0.35, '#34d399'));
-                }
+                this.spawn_pushParticleWithLimit(new SlashAnim(targetProj.pos.x, targetProj.pos.y, angle, 0.4, '#34d399'));
             }
         }
     },
