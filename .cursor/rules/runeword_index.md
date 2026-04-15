@@ -13,7 +13,7 @@
 | `runeword_absolute_zero` | 绝对零度 | `rune_cryo_1` × 2 + `rune_cryo_2` | 冰冻状态下每次物理伤害令该敌人本回合受到的所有伤害加深 | 冰牢封印 |
 | `runeword_frost_nova` | 冰霜新星 | `rune_cryo_1` × 1 + `rune_bounce_1` × 1 + `rune_cryo_2` × 1 | 弹珠每弹跳数次释放冰霜新星，造成冰属性伤害并降温 | — |
 | `runeword_thunderstorm` | 雷暴之语 | `rune_lightning_1` × 2 + `rune_lightning_2` | 闪电链的伤害衰减系数提升 | 雷神降临 |
-| `runeword_thunder_scatter` | 雷霆散射 | `rune_lightning_1` × 1 + `rune_scatter_1` × 1 + `rune_lightning_2` × 1 | 每次触发闪电链时，有概率额外释放一条同属性闪电链 | — |
+| `runeword_thunder_scatter` | 雷霆散射 | `rune_lightning_1` × 1 + `rune_scatter_1` × 1 + `rune_lightning_2` × 1 | 每次成功触发闪电链时，有概率额外释放一条同属性闪电链 | — |
 | `runeword_kinetic_surge` | 动能激增 | `rune_bounce_1` × 2 + `rune_bounce_2` | 本次发射的弹珠，后续每次弹射伤害固定增加 | 动能爆发 |
 | `runeword_irradiation` | 照射 | `rune_laser_1` × 2 + `rune_laser_2` | 激光变为持续照射，累积照射同一敌人伤害加深 | — |
 
