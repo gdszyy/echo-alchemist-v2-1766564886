@@ -143,8 +143,10 @@ const TRUTH_BOOK_DATA = {
                 const food = new Enemy(2 * game.enemyWidth + game.enemyWidth / 2, y, 60, 60, 100, 100, 'normal', ['clone']); 
                 const eater = new Enemy(3 * game.enemyWidth + game.enemyWidth / 2, y, 60, 60, 200, 500, 'normal', ['devour']);
                 // [演示补丁] 确保吞噬概率为 100% 且范围足够
-                game.CONFIG.balance.affixes.devourChance = 1.0;
-                game.CONFIG.balance.affixes.devourRange = 2.0;
+                if (game.CONFIG && game.CONFIG.balance && game.CONFIG.balance.affixes) {
+                    game.CONFIG.balance.affixes.devourChance = 1.0;
+                    game.CONFIG.balance.affixes.devourRange = 2.0;
+                }
                 game.enemies.push(food, eater);
             },
             loop: [
@@ -168,7 +170,9 @@ const TRUTH_BOOK_DATA = {
                 const blocker = new Enemy(x, game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2, 60, 60, 100, 100); 
                 const jumper = new Enemy(x, game.combatGridTopY + 0 * game.enemyHeight + game.enemyHeight / 2, 60, 60, 200, 200, 'normal', ['jump']);
                 // [演示补丁] 确保跳跃行数足够跨过一个敌人 (1行移动 + 1行阻挡 = 2行)
-                game.CONFIG.balance.affixes.jumpRows = 2;
+                if (game.CONFIG && game.CONFIG.balance && game.CONFIG.balance.affixes) {
+                    game.CONFIG.balance.affixes.jumpRows = 2;
+                }
                 game.enemies.push(blocker, jumper);
             },
             loop: [
@@ -940,6 +944,10 @@ class TruthBook {
  */
 function createCombatContext(mainGame, canvas) {
     const context = {
+        // ── 全局配置引用（演示环境需要访问 CONFIG）────────────────────────────
+        CONFIG: CONFIG,
+        
+        // ── 画布与尺寸 ────────────────────────────────────────────────────────
         canvas: canvas,
         ctx: canvas ? canvas.getContext('2d') : null,
         width: canvas ? (canvas.width || 600) : 600,
