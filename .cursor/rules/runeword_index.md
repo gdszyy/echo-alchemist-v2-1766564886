@@ -102,8 +102,8 @@
 | 字段 | 类型 | 来源词条 | 消费方 |
 |---|---|---|---|
 | `_scatterAngleMultiplier` | number | `multicast_to_scatter` | 散射发射逻辑 |
-| `_critChance` | number (0~1) | `focused_fire` | Projectile 命中 |
-| `_critDamage` | number (倍率) | `focused_fire` | Projectile 命中 |
+| `_critChance` | number (0~1) | `focused_fire` | `combat_damageEnemy`（约第 1714 行）|
+| `_critDamage` | number (倍率) | `focused_fire` | `combat_damageEnemy`（约第 1714 行）|
 | `_explosionRadiusMult` | number | `mass_collapse` | 爆炸 AOE 判定 |
 | `_kineticDecayBonus` | number (0~1) | `kinetic_decay` | Projectile 命中 |
 | `_kineticDecayRate` | number (0~1) | `kinetic_decay` | Projectile 命中 |

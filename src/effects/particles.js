@@ -370,7 +370,9 @@ class Shockwave {
     }
 
     update(timeScale) { 
-        this.radius += 4 * timeScale; // 扩散速度
+        if (this.radius < this.maxRadius) {
+            this.radius += 4 * timeScale; // 扩散速度
+        }
         this.alpha -= 0.04 * timeScale; // 消失速度
     }
 
