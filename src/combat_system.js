@@ -2476,6 +2476,11 @@ export const combat_system = {
         // 基础射击
         // 如果没有多重射击，那么这第一发就是最后一发
         // [修改] 风属性子弹也强制单发，不受 multicast 影响
+        // [照射词条] 在词条消耗 multicast 之前，保存原始连射次数到 recipe._originalMulticast
+        // 为什么：照射状态机需要知道原始连射次数来计算 totalDuration，
+        // 但 focused_fire/mass_collapse/multicast_to_scatter 等词条会将 multicast 清零，
+        // 导致 recipe.multicast=0 传入状态机时 totalDuration 计算错误。
+        finalRecipe._originalMulticast = this.currentSession ? (this.currentSession.multicast || 0) : (finalRecipe.multicast || 0);
         const isOnlyOne = !(finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword' && !finalRecipe.wind);
         this.burstQueue.push({ delay: 0, vel: vel, recipe: finalRecipe, shotId: shotId, isLast: isOnlyOne }); 
         
@@ -2528,10 +2533,11 @@ export const combat_system = {
         if ((irradiationFx || blazingBeamFxForLaser) && !this._continuousLaserFiring) {
             this._continuousLaserFiring = true;
             // [照射持续时长] 基于连射次数：连射 N 次就持续 N×0.5s。
-            // recipe.multicast 就是连射次数（不含首发），最少保证 0.5s。
-            const multicastCount = (recipe.multicast || 0);
+            // 使用 recipe._originalMulticast 而非 recipe.multicast，
+            // 因为 focused_fire/mass_collapse/multicast_to_scatter 等词条会将 recipe.multicast 清零。
+            const multicastCount = (recipe._originalMulticast !== undefined ? recipe._originalMulticast : (recipe.multicast || 0));
             const totalDuration = Math.max(Math.round(0.5 * 60), multicastCount * Math.round(0.5 * 60));
-            console.log(`[LASER_FIRE] 状态机启动: multicastCount=${multicastCount} totalDuration=${totalDuration}帧(${(totalDuration/60).toFixed(2)}s)`);
+            console.log(`[LASER_FIRE] 状态机启动: multicastCount=${multicastCount}(_originalMulticast=${recipe._originalMulticast}) totalDuration=${totalDuration}帧(${(totalDuration/60).toFixed(2)}s)`);
             this._continuousLaserState = {
                 startX, startY, vel, recipe,
                 tickFrames: 0,
