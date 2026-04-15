@@ -2048,9 +2048,9 @@ export const combat_system = {
             this.spawn_addScore(enemy.maxHp);
             
             // [词条 Hook] 嗜血初锋 (bloodthirst_growth)
+            // runewordKillCount 跨回合持久，仅在 sys_resetGame 中重置（每局一次）
             if (this.activeRunewordEffects && this.activeRunewordEffects['bloodthirst_growth']) {
-                if (typeof this.runewordKillCount === 'undefined') this.runewordKillCount = 0;
-                this.runewordKillCount++;
+                this.runewordKillCount = (this.runewordKillCount || 0) + 1;
             }
             
             // 事件总线广播敌人死亡

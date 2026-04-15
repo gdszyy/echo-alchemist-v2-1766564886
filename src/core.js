@@ -221,6 +221,7 @@ class Game {
         this.runKillCount = 0;          // 本局击杀数
         this.runRuneFragmentsGained = 0; // 本局获得的符文碎片数
         this.bossDefeatedLog = [];       // 本局击败的 Boss 记录 [{bossId, bossName, round, isBigBoss}]
+        this.runewordKillCount = 0;      // [词条 Hook] 嗜血初锋: 本局击杀累计数，跨回合持久
 
         // ==================== 符文词条系统状态变量 ====================
         // Task 1: 数据结构升级 - runeInventory 和 runeGrid 存储对象格式 { id: string, level: number }

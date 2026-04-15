@@ -297,6 +297,8 @@ export const game_system = {
         this.runKillCount = 0;
         this.runRuneFragmentsGained = 0;
         this.bossDefeatedLog = [];
+        // [词条 Hook] 嗜血初锋 (bloodthirst_growth) - 每局重置击杀计数（跨回合持久）
+        this.runewordKillCount = 0;
     },
 
     /**

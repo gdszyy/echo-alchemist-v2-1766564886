@@ -65,7 +65,7 @@
 | `elemental_fusion` | 元素聚变 | `src/combat_system.js` 元素状态判定 | `activeRunewordEffects['elemental_fusion']` |
 | `flying_sword_unlock` | 剑意共鸣 | `src/spawn_system.js` 钉子变异逻辑 | `activeRunewordEffects['flying_sword_unlock']` |
 | `wind_unlock` | 风暴共鸣 | `src/spawn_system.js` 钉子变异逻辑 | `activeRunewordEffects['wind_unlock']` |
-| `bloodthirst_growth` | 嗜血初锋 | `src/combat_system.js` 约第 2037 行、2320 行 | `activeRunewordEffects['bloodthirst_growth']`, `game.runewordKillCount` |
+| `bloodthirst_growth` | 嗜血初锋 | `src/combat_system.js` 约第 2037 行、2320 行 | `activeRunewordEffects['bloodthirst_growth']`, `game.runewordKillCount`（跨回合持久，仅在 `sys_resetGame` 中重置） |
 | `multicast_to_scatter` | 散射矩阵 | `src/combat_system.js` 约第 2340 行（配方应用） | `activeRunewordEffects['multicast_to_scatter']` |
 | `focused_fire` | 专注射击 | `src/combat_system.js` 约第 1714 行（暴击判定）、2358 行（配方应用） | `activeRunewordEffects['focused_fire']`, `finalRecipe._critChance`, `finalRecipe._critDamage` |
 | `mass_collapse` | 质量坍缩 | `src/combat_system.js` 约第 2375 行（配方应用） | `activeRunewordEffects['mass_collapse']`, `finalRecipe._explosionRadiusMult` |
