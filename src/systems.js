@@ -43,8 +43,8 @@ const TRUTH_BOOK_DATA = {
             id: 'shield',
             name: '護盾魔像',
             icon: '🛡️',
-            tags: ['減傷', '激光反射'],
-            desc: '擁有能量護盾，每層護盾可將受到的傷害減少 50%，護盾層數為 1 + 當前回合數。護盾表面光滑，可以反射激光束。護盾層數消耗完畢後，詞條自動移除。',
+            tags: ['減傷', '背刺', '激光反射'],
+            desc: '擁有能量護盾，每層護盾可將受到的傷害減少 50%，護盾層數為 1 + 當前回合數。護盾表面光滑，可以反射激光束。背後攻擊可直接穿透護盾。護盾層數消耗完畢後，詞條自動移除。',
             setup: (game) => {
                 // 统一尺寸 60x60，对齐网格 (col: 2, row: 1)
                 const x = 2 * game.enemyWidth + game.enemyWidth / 2;
@@ -55,12 +55,27 @@ const TRUTH_BOOK_DATA = {
                 game.enemies.push(e);
             },
             loop: [
-                { type: 'log', text: '普通子彈打擊 (演示減傷)' },
-                { type: 'spawn_projectile', config: { damage: 20 } },
+                { type: 'log', text: '【第1阶段】护盾减伤 (50% 伤害减免)' },
+                { type: 'log', text: '发射普通子弹...' },
+                { type: 'spawn_projectile', config: { damage: 20 }, vel: {x: 0, y: -18} },
+                { type: 'wait', frames: 80 },
+                { type: 'log', text: '护盾生效！伤害减半' },
                 { type: 'wait', frames: 60 },
-                { type: 'log', text: '激光反射測試' },
-                { type: 'spawn_projectile', config: { damage: 10, isLaser: true, laser: 5 } },
-                { type: 'wait', frames: 120 },
+                
+                { type: 'log', text: '【第2阶段】背刺穿透 (绕过护盾)' },
+                { type: 'log', text: '从后方发射子弹...' },
+                { type: 'spawn_projectile', config: { damage: 20 }, vel: {x: 0, y: 18} },
+                { type: 'wait', frames: 80 },
+                { type: 'log', text: '背刺成功！全额伤害' },
+                { type: 'wait', frames: 60 },
+                
+                { type: 'log', text: '【第3阶段】激光折射 (90度反弹)' },
+                { type: 'log', text: '发射激光束...' },
+                { type: 'spawn_projectile', config: { damage: 15, laser: 8, isLaser: true }, vel: {x: 0, y: -18} },
+                { type: 'wait', frames: 100 },
+                { type: 'log', text: '激光被反射！' },
+                { type: 'wait', frames: 60 },
+                
                 { type: 'reset' }
             ]
         },
@@ -1411,7 +1426,15 @@ class TruthBook {
                 const py = inst.y || this.demoGame.height - 150;
                 const angle = -Math.PI/2 + (Math.random()-0.5) * 0.1;
                 const pvel = inst.vel ? new Vec2(inst.vel.x, inst.vel.y) : new Vec2(Math.cos(angle)*15, Math.sin(angle)*15);
-                this.demoGame.spawn_spawnBullet(px, py, pvel, inst.config || {});
+                const config = inst.config || {};
+                if (config.isLaser && config.laser > 0) {
+                    const bullet = this.demoGame.spawn_spawnBullet(px, py, pvel, config);
+                    if (this.demoGame.combat_laser_fire) {
+                        this.demoGame.combat_laser_fire(bullet, config.laser);
+                    }
+                } else {
+                    this.demoGame.spawn_spawnBullet(px, py, pvel, config);
+                }
                 break;
             case 'reset':
                 this.waitTimer = inst.delay || 60;
