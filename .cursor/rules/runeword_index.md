@@ -57,8 +57,8 @@
 | `thunder_scatter` | 雷霆散射 | `src/combat/damage_calc.js` 闪电链触发后 | `activeRunewordEffects['thunder_scatter']` |
 | `kinetic_surge` | 动能激增 | `src/combat_system.js` 弹跳伤害段 | `activeRunewordEffects['kinetic_surge']` |
 | `irradiation` | 照射 | `src/combat_system.js` 约第 2466 行 | `activeRunewordEffects['irradiation']`, `e._irradiationStacks` |
-| `flame_sword` | 炎光剑影 | `src/combat_system.js` 约第 1757 行 | `activeRunewordEffects['flame_sword']`；注意：当 `armor_piercing_meteor` 激活时，散射子弹（`isScatterChild=true`）也可触发 |
-| `armor_piercing_meteor` | 穿甲流星 | `src/spawn_system.js` 约第 1000 行（散射子弹生成）；`src/combat_system.js` 约第 1757 行（炎光剑影联动） | `activeRunewordEffects['armor_piercing_meteor']`；联动：`config.isScatterChild && armorPiercingActive` 放开炎光剑影触发限制 |
+| `flame_sword` | 炎光剑影 | `src/combat_system.js` 约第 1762 行 | `activeRunewordEffects['flame_sword']`，参数：`triggerChance`, `damageRatio`, `tempDamageRatio`；注意：当 `armor_piercing_meteor` 激活时，散射子弹（`isScatterChild=true`）也可触发 |
+| `armor_piercing_meteor` | 穿甲流星 | `src/spawn_system.js` 约第 1000 行（散射子弹生成）；`src/combat_system.js` 约第 1762 行（炎光剑影联动） | `activeRunewordEffects['armor_piercing_meteor']`；联动：`config.isScatterChild && armorPiercingActive` 放开炎光剑影触发限制 |
 | `blazing_beam` | 炽热光线 | `src/combat_system.js` 激光照射循环 | `activeRunewordEffects['blazing_beam']` |
 | `lightning_shield` | 雷电护盾 | `src/combat_system.js` 约第 1778 行 | `activeRunewordEffects['lightning_shield']` |
 | `blade_storm` | 剑刃风暴 | `src/combat_system.js` 约第 359 行 | `activeRunewordEffects['blade_storm']` |

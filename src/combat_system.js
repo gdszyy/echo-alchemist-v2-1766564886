@@ -1769,6 +1769,8 @@ export const combat_system = {
             if (flameSwordFx) {
                 const triggerChance = (flameSwordFx.params && flameSwordFx.params.triggerChance) || 0;
                 const damageRatio = (flameSwordFx.params && flameSwordFx.params.damageRatio) || 0.5;
+                // [修复 检查点3] 读取 tempDamageRatio，用于穿透命中时对敌人额外升温
+                const tempDamageRatio = (flameSwordFx.params && flameSwordFx.params.tempDamageRatio) || 0;
                 if (Math.random() < triggerChance) {
                     // 生成一把火系飞剑，目标为当前被穿透的敌人
                     const swordConfig = {
@@ -1780,6 +1782,14 @@ export const combat_system = {
                     const flameSwordLvl = this.variantLevels ? (this.variantLevels.flying_sword || 1) : 1;
                     this.combat_flyingSword_addSon(hitX, hitY, null, flameSwordLvl, swordConfig, 0);
                     this.combat_flyingSword_assignTarget(enemy);
+                    // [修复 检查点3] 额外升温：baseDamage * tempDamageRatio
+                    if (tempDamageRatio > 0) {
+                        const tempAmount = config.damage * tempDamageRatio;
+                        enemy.applyTemp(tempAmount);
+                    }
+                    // [修复 检查点4] 添加 SlashAnim 视觉特效（火焰橙色），与其他飞剑命中特效保持一致
+                    const slashAngle = Math.random() * Math.PI * 2;
+                    this.spawn_pushParticleWithLimit(new SlashAnim(hitX, hitY, slashAngle, 0.5, '#f97316'));
                     this.spawn_createParticle(hitX, hitY, '#f97316', 'spark');
                     this.spawn_createFloatingText(hitX, hitY - 20, '剑光!', '#f97316');
                 }
