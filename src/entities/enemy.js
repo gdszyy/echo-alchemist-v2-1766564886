@@ -486,6 +486,23 @@ class Enemy {
                 game.spawn_pushParticleWithLimit(shard);
             }
         }
+
+        // === [B3] 濒死状态持续粒子增强 ===
+        // 血量低于 20% 时，从敢人顶部随机位置冒出深色烟雾，模拟濒死时的焦灸/损毁状态
+        if (this.hp > 0 && this.maxHp > 0 && (this.hp / this.maxHp) < 0.2) {
+            if (Math.random() < 0.03 * timeScale) {
+                const nearDeathSmoke = new Particle(
+                    this.pos.x + (Math.random() - 0.5) * this.width * 0.8,
+                    this.pos.y - this.height * 0.45, // 从敢人顶部冰出
+                    'rgba(0,0,0,0.5)', 'smoke'
+                );
+                nearDeathSmoke.vel.y = -0.8 - Math.random() * 0.6; // 向上飘出
+                nearDeathSmoke.vel.x = (Math.random() - 0.5) * 0.4;
+                nearDeathSmoke.size = this.width * 0.18 + Math.random() * 3;
+                game.spawn_pushParticleWithLimit(nearDeathSmoke);
+            }
+        }
+        // === [B3 END] ===
     }
 
     advance(amount) { this.dropTargetY += amount; }
@@ -2674,10 +2691,152 @@ class Enemy {
                 }
             }
             // ----------------------------------------
+
+            // --- [B1] 词缀差异化受击粒子 ---
+            // 根据主导词缀（affixes[0] 或优先级最高）选择不同粒子组合，增强打击感
+            if (this.affixes && this.affixes.length > 0) {
+                // 优先级：berserk > shield/haste > regen/clone/devour > jump
+                const dominantAffix = (() => {
+                    const priority = ['berserk', 'shield', 'haste', 'regen', 'clone', 'devour', 'jump'];
+                    for (const a of priority) {
+                        if (this.affixes.includes(a)) return a;
+                    }
+                    return this.affixes[0];
+                })();
+
+                if (dominantAffix === 'shield' || dominantAffix === 'haste') {
+                    // 机械类：深色 smoke + 亮白 spark，模拟金属装甲破裂
+                    const smokeCount = 2 + Math.floor(Math.random() * 2); // 2~3
+                    for (let i = 0; i < smokeCount; i++) {
+                        const sp = new Particle(
+                            this.pos.x + (Math.random() - 0.5) * this.width * 0.8,
+                            this.pos.y + (Math.random() - 0.5) * this.height * 0.5,
+                            'rgba(30,30,30,0.7)', 'smoke'
+                        );
+                        sp.vel.y = -1.2 - Math.random() * 0.8;
+                        sp.size = this.width * 0.2 + Math.random() * 4;
+                        game.spawn_pushParticleWithLimit(sp);
+                    }
+                    const sparkCount = 3 + Math.floor(Math.random() * 2); // 3~4
+                    for (let i = 0; i < sparkCount; i++) {
+                        game.spawn_createParticle(
+                            this.pos.x + (Math.random() - 0.5) * this.width * 0.6,
+                            this.pos.y + (Math.random() - 0.5) * this.height * 0.5,
+                            '#f8fafc', 'spark'
+                        );
+                    }
+                } else if (dominantAffix === 'regen' || dominantAffix === 'clone' || dominantAffix === 'devour') {
+                    // 生物类：暗红/紫色 mist，带向下重力感
+                    const mistCount = 2 + Math.floor(Math.random() * 2); // 2~3
+                    const bioColors = { regen: '#dc2626', clone: '#c084fc', devour: '#dc2626' };
+                    const mistColor = bioColors[dominantAffix] || '#dc2626';
+                    for (let i = 0; i < mistCount; i++) {
+                        const bm = new Particle(
+                            this.pos.x + (Math.random() - 0.5) * this.width * 0.7,
+                            this.pos.y + (Math.random() - 0.5) * this.height * 0.4,
+                            mistColor, 'mist'
+                        );
+                        bm.vel.y = 0.8 + Math.random() * 0.8; // 向下重力感
+                        bm.vel.x = (Math.random() - 0.5) * 0.6;
+                        bm.size = this.width * 0.25 + Math.random() * 4;
+                        game.spawn_pushParticleWithLimit(bm);
+                    }
+                } else if (dominantAffix === 'jump' || this.bossType === 'glacies') {
+                    // 冰系/跳跃：#a5f3fc shard，向四周散射
+                    const shardCount = 4 + Math.floor(Math.random() * 3); // 4~6
+                    for (let i = 0; i < shardCount; i++) {
+                        const angle = (i / shardCount) * Math.PI * 2 + Math.random() * 0.5;
+                        const speed = 2.5 + Math.random() * 2.5;
+                        const sh = new Particle(
+                            this.pos.x + (Math.random() - 0.5) * this.width * 0.5,
+                            this.pos.y + (Math.random() - 0.5) * this.height * 0.4,
+                            '#a5f3fc', 'shard'
+                        );
+                        sh.vel.x = Math.cos(angle) * speed;
+                        sh.vel.y = Math.sin(angle) * speed;
+                        game.spawn_pushParticleWithLimit(sh);
+                    }
+                } else if (dominantAffix === 'berserk') {
+                    // 狂暴：橙红 ember + 小型 smoke
+                    const emberCount = 3 + Math.floor(Math.random() * 2); // 3~4
+                    for (let i = 0; i < emberCount; i++) {
+                        game.spawn_createParticle(
+                            this.pos.x + (Math.random() - 0.5) * this.width * 0.7,
+                            this.pos.y + (Math.random() - 0.5) * this.height * 0.5,
+                            '#f97316', 'ember'
+                        );
+                    }
+                    // 1 个小型 smoke
+                    const bs = new Particle(
+                        this.pos.x + (Math.random() - 0.5) * this.width * 0.4,
+                        this.pos.y - this.height * 0.3,
+                        'rgba(40,20,0,0.6)', 'smoke'
+                    );
+                    bs.size = this.width * 0.15 + 2;
+                    game.spawn_pushParticleWithLimit(bs);
+                }
+            }
+            // --- [B1 END] ---
         }
         // 5. 返回详细结果
         const killed = this.hp <= 0;
-        if (killed) this.active = false;
+        if (killed) {
+            this.active = false;
+
+            // --- [B2] Boss 专属死亡爆炸粒子 ---
+            if (this.type === 'boss' && this.bossType && typeof game !== 'undefined') {
+                // Boss 颜色映射（与 spawn_system.js 保持一致）
+                const BOSS_DEATH_COLORS = {
+                    ignis:    '#f97316',
+                    glacies:  '#06b6d4',
+                    mikro:    '#c084fc',
+                    devourer: '#22c55e',
+                    viridis:  '#34d399',
+                    tesla:    '#60a5fa',
+                    chimera:  '#ef4444',
+                    ouroboros:'#facc15',
+                };
+                const deathColor = BOSS_DEATH_COLORS[this.bossType] || '#ffffff';
+
+                // 15~20 个随机方向 spark
+                const sparkCount = 15 + Math.floor(Math.random() * 6);
+                for (let i = 0; i < sparkCount; i++) {
+                    game.spawn_createParticle(
+                        this.pos.x + (Math.random() - 0.5) * this.width,
+                        this.pos.y + (Math.random() - 0.5) * this.height,
+                        deathColor, 'spark'
+                    );
+                }
+
+                // 3~5 个大型 mist（size = width * 0.8）
+                const mistCount = 3 + Math.floor(Math.random() * 3);
+                for (let i = 0; i < mistCount; i++) {
+                    const dm = new Particle(
+                        this.pos.x + (Math.random() - 0.5) * this.width * 0.6,
+                        this.pos.y + (Math.random() - 0.5) * this.height * 0.5,
+                        deathColor, 'mist'
+                    );
+                    dm.size = this.width * 0.8;
+                    dm.vel.x = (Math.random() - 0.5) * 1.5;
+                    dm.vel.y = (Math.random() - 0.5) * 1.5;
+                    game.spawn_pushParticleWithLimit(dm);
+                }
+
+                // 第一次冲击波（立即）
+                game.spawn_createShockwave(this.pos.x, this.pos.y, deathColor);
+
+                // 第二次冲击波（延迟约 8 帧 ≈ 133ms）
+                const _bossX = this.pos.x;
+                const _bossY = this.pos.y;
+                const _deathColor = deathColor;
+                setTimeout(() => {
+                    if (typeof game !== 'undefined' && typeof game.spawn_createShockwave === 'function') {
+                        game.spawn_createShockwave(_bossX, _bossY, _deathColor);
+                    }
+                }, 133);
+            }
+            // --- [B2 END] ---
+        }
 
         return { 
             killed: killed, 
