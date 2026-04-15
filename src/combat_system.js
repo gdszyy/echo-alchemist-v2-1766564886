@@ -1808,6 +1808,35 @@ export const combat_system = {
             }
         }
 
+        // [词条 Hook] 召剑之语（son_sword_summon）：弹珠命中时有概率召唤三级子飞剑
+        // 触发条件：非子飞剑伤害（避免无限递归）、非 isCopy（避免散射子弹重复触发）
+        if (!projectile.isCopy && config.type !== 'flying_sword' && !config.wind) {
+            const sonSwordSummonFx = this.activeRunewordEffects && this.activeRunewordEffects['son_sword_summon'];
+            if (sonSwordSummonFx) {
+                const triggerChance = (sonSwordSummonFx.params && sonSwordSummonFx.params.triggerChance) || 0.30;
+                const swordLevel = (sonSwordSummonFx.params && sonSwordSummonFx.params.swordLevel) || 3;
+                if (Math.random() < triggerChance) {
+                    // 子飞剑继承弹珠属性（火/冰/雷），遵循原有规则
+                    const swordConfig = {
+                        damage: config.damage,
+                        pyro: config.pyro || 0,
+                        cryo: config.cryo || 0,
+                        lightning: config.lightning || 0,
+                        wind: 0,
+                        multicast: 0,
+                        type: 'flying_sword'
+                    };
+                    this.combat_flyingSword_addSon(hitX, hitY, null, swordLevel, swordConfig, 0);
+                    this.combat_flyingSword_assignTarget(enemy);
+                    // 视觉特效：蓝色剑光 + 浮动文字
+                    const slashAngle = Math.random() * Math.PI * 2;
+                    this.spawn_pushParticleWithLimit(new SlashAnim(hitX, hitY, slashAngle, 0.5, '#0ea5e9'));
+                    this.spawn_createParticle(hitX, hitY, '#0ea5e9', 'spark');
+                    this.spawn_createFloatingText(hitX, hitY - 20, '⚔召剑!', '#0ea5e9');
+                }
+            }
+        }
+
         this.combat_recordDamage(actualDmg, damageType, sourceType, shotId);
 
         // [新增] Boss 狂暴阶段即时掉落：HP 首次降至 50% 时生成 1 个 Lv1 符文并立即自动拾取

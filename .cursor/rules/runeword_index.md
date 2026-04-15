@@ -3,7 +3,7 @@
 > **数据来源**：`src/rune_config.js` → `RUNEWORD_DB`
 > **用途**：Agent 快速查询所有词条的 ID、名称、符文组合、效果描述及实现位置，无需全量读取 `rune_config.js`。
 
-## 1. 词条总览（22 个）
+## 1. 词条总览（23 个）
 
 ### 1.1 元素专属词条（7 个）
 
@@ -32,10 +32,16 @@
 
 | ID | 名称 | 符文组合 | 效果摘要 |
 |---|---|---|---|
-| `runeword_sword_resonance` | 剑意共鸣 | `rune_pierce_1` × 3 | 解锁飞剑变异；穿透弹珠碰撞穿透钉子时有 70% 概率变异为飞剑钉子 |
-| `runeword_storm_resonance` | 风暴共鸣 | `rune_bounce_1` × 3 | 解锁风属性变异；反弹弹珠碰撞反弹钉子时有 70% 概率变异为风属性钉子 |
+| `runeword_sword_resonance` | 剑意共鸣 | `rune_pierce_1` × 3 | 解锁飞剑变异；穿透弹珠碰撞穿透钉子时有70% 概率变异为飞剑钉子 |
+| `runeword_storm_resonance` | 风暴共鸣 | `rune_bounce_1` × 3 | 解锁风属性变异；反弹弹珠碰撞反弹钉子时有70% 概率变异为风属性钉子 |
 
-### 1.4 成长型低级词条（6 个，Task A 新增）
+### 1.4 特殊召唤词条（1 个，Task: 召剑之语）
+
+| ID | 名称 | 符文组合 | 效果摘要 |
+|---|---|---|---|
+| `runeword_son_sword_summon` | 召剑之语 | `rune_pierce_2` × 1 + `rune_pierce_1` × 1 + `rune_bounce_1` × 1 | 弹珠每次命中敌人时，有 30% 概率在命中位置召唤一把三级子飞剑；子飞剑继承弹珠属性，遵循原有规则（自动索敌、100% 伤害共鸣、完整属性效果）；词条等级提升时召唤概率额外 +15% |
+
+### 1.5 成长型低级词条（6 个，Task A 新增）
 
 | ID | 名称 | 符文组合 | 效果摘要 |
 |---|---|---|---|
@@ -71,6 +77,7 @@
 | `mass_collapse` | 质量坍缩 | `src/combat_system.js` 约第 2375 行（配方应用） | `activeRunewordEffects['mass_collapse']`, `finalRecipe._explosionRadiusMult` |
 | `kinetic_decay` | 动能衰变 | `src/entities/projectile.js` 命中逻辑 | `activeRunewordEffects['kinetic_decay']`, `finalRecipe._kineticDecayBonus`, `finalRecipe._kineticDecayRate` |
 | `echo_shot` | 回响射击 | `src/entities/projectile.js` 首次命中逻辑 | `activeRunewordEffects['echo_shot']`, `finalRecipe._echoShotChance`, `projectile._echoShotFired` |
+| `son_sword_summon` | 召剑之语 | `src/combat_system.js` `combat_damageEnemy` 命中后处理段 | `activeRunewordEffects['son_sword_summon']`；触发时调用 `combat_flyingSword_addSon(hitX, hitY, null, 3, swordConfig, 0)` + `combat_flyingSword_assignTarget(enemy)` |
 
 ## 3. 词条激活机制
 

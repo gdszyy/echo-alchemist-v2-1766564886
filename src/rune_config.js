@@ -406,6 +406,17 @@ const RUNEWORD_DB = [
         effect_desc: '子弹首次击中敌人时，有 25% 概率按原角度额外发射一颗单发子弹。',
         baseParams: { triggerChance: 0.25 },
         perLevelParams: { triggerChance: 0.07 }
+    },
+
+    // ---- 特殊召唤词条 (Task: 召剑之语) ----
+    {
+        id: 'runeword_son_sword_summon',
+        name: '召剑之语',
+        effectId: 'son_sword_summon',
+        pattern: ['rune_pierce_2', 'rune_pierce_1', 'rune_bounce_1'],
+        effect_desc: '【特殊系】弹珠每次命中敌人时，有 30% 概率在命中位置召唤一把三级子飞剑。子飞剑遵循原有规则：自动索敌、全伤害共鸣（100%）、完整属性效果（火/冰/雷）。词条等级提升时，召唤概率额外 +15%。',
+        baseParams: { triggerChance: 0.30, swordLevel: 3 },
+        perLevelParams: { triggerChance: 0.15, swordLevel: 0 }
     }
 ];
 
