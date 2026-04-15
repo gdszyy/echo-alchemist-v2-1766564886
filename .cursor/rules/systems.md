@@ -82,6 +82,65 @@
 }
 ```
 
+## 3.3 符文词条场景分类 (`categoryId: 'runeword'`)
+
+试炼场新增第四个场景分类：**符文词条**，用于展示和测试所有 `RUNEWORD_DB` 中定义的词条效果。
+
+### 3.3.1 场景数据结构扩展
+
+符文词条场景在标准场景对象基础上新增两个字段：
+
+```javascript
+{
+    id: 'rw_<name>',              // [必填] 场景唯一标识符，建议以 'rw_' 为前缀
+    categoryId: 'runeword',       // [必填] 分类标识
+    runewordId: 'runeword_xxx',   // [runeword 分类必填] 对应 RUNEWORD_DB 中的词条 id
+    runewordLevel: 1,             // [runeword 分类可选] 模拟的词条等级，默认为 1
+    name: '词条名称',
+    icon: '🔮',
+    desc: '词条效果说明与测试建议',
+    setup: (game) => { /* 布置测试敵人 */ },
+    bulletConfig: { /* 预设子弹属性 */ },
+    demoAction: (game, tg) => { /* 触发演示 */ }
+}
+```
+
+### 3.3.2 词条效果注入机制
+
+`loadScenario` 方法中新增了对 `runeword` 分类的特殊处理逻辑：
+
+1. **清空旧效果**：每次切换场景时，将 `game.activeRunewordEffects` 和 `game.activeRunewordStats` 重置为空对象，防止不同场景间的词条效果互相干扰。
+2. **动态注入**：根据 `scenario.runewordId` 在 `RUNEWORD_DB` 中查找词条定义，按照 `runewordLevel` 计算最终参数（`baseParams + (level-1) * perLevelParams`），并将结果写入 `game.activeRunewordEffects[effectId]`。
+3. **全局透明**：注入后，战斗系统中所有读取 `activeRunewordEffects` 的逻辑均可正常生效，无需任何额外适配。
+
+### 3.3.3 已实现场景列表
+
+目前已实现 **21 个**符文词条场景，覆盖 `RUNEWORD_DB` 中全部 21 个词条：
+
+| 场景 ID | 词条 | 分类 | 核心验证点 |
+|---|---|---|---|
+| `rw_meltdown` | 燔毀 | 火焰系 | 燃烧/爆炸伤害提升 |
+| `rw_absolute_zero` | 绝对零度 | 冰霜系 | 冻结状态下伤害加深累加 |
+| `rw_frost_nova` | 冰霜新星 | 冰霜系 | 每 5 次弹跳释放冰霜新星 |
+| `rw_thunderstorm` | 雷暴之语 | 闪电系 | 闪电链衰减系数提升 |
+| `rw_thunder_scatter` | 雷霖散射 | 闪电系 | 闪电链触发时额外释放一条链 |
+| `rw_kinetic_surge` | 动能激増 | 弹射系 | 每次弹射伤害固定增加 |
+| `rw_irradiation` | 照射 | 激光系 | 激光持续照射伤害累加 |
+| `rw_flame_sword` | 炎光剑影 | 穿透系 | 穿透时概率召唤火焰剑光 |
+| `rw_armor_piercing_meteor` | 穿甲流星 | 穿透系 | 散射子弹继承穿透层数 |
+| `rw_blazing_beam` | 炖热光线 | 复合系 | 激光照射额外升温 |
+| `rw_lightning_shield` | 雷电护盾 | 复合系 | 弹射时概率生成静电场 |
+| `rw_blade_storm` | 剑刃风暴 | 复合系 | 子弹存活期间周期性剑光斩击 |
+| `rw_elemental_fusion` | 元素聚变 | 元素系 | 火冰雷三属性共存引发聚变爆炸 |
+| `rw_focused_fire` | 专注射击 | 专注系 | 弹跳/连射转化为基础伤害+暴击 |
+| `rw_mass_collapse` | 质量崩塔 | 爆炸系 | 强制爆炸，连射/散射转爆炸范围 |
+| `rw_kinetic_decay` | 动能衰变 | 衰变系 | 初始伤害加成逐次衰减 |
+| `rw_echo_shot` | 回响射击 | 回响系 | 首次命中概率额外发射一颗 |
+| `rw_bloodthirst_edge` | 嗜血初锋 | 成长系 | 击杀累计伤害加成 |
+| `rw_scatter_matrix` | 散射矩阵 | 转化系 | 连射转化为散射层数 |
+| `rw_sword_resonance` | 剑意共鸣 | 特殊系 | 展示飞剑变异词条激活状态 |
+| `rw_storm_resonance` | 风暴共鸣 | 特殊系 | 展示风属性变异词条激活状态 |
+
 ## 4. 全局禁止行为
 
 *   **禁止修改 DOM 结构**：若需调整试炼场布局，必须修改 `initUI()` 或 `initSidebar()` 中生成的 HTML 字符串，严禁尝试去 `index.html` 中寻找这些元素。

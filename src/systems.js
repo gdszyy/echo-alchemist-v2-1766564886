@@ -16,6 +16,7 @@ import { CONFIG } from './config.js';
 import { Enemy, Projectile, Particle, FloatingText, CloneSpore } from './entities.js';
 import { eventBus } from './event_bus.js';
 import { Vec2 } from './utils/math_utils.js';
+import { RUNEWORD_DB } from './rune_config.js';
 
 // ==================== 真理之书数据 ====================
 
@@ -495,7 +496,8 @@ const TRAINING_SCENARIOS = {
     categories: [
         { id: 'enemy', name: '敵人詞條' },
         { id: 'attribute', name: '屬性效果' },
-        { id: 'boss', name: 'Boss 機制' }
+        { id: 'boss', name: 'Boss 機制' },
+        { id: 'runeword', name: '符文詞條' }
     ],
     scenarios: [
         // ── 敵人詞條 ──────────────────────────────────────────────────
@@ -824,6 +826,473 @@ const TRAINING_SCENARIOS = {
             desc: '詞條每 3 回合輪轉（護盾/極速 → 再生/治療 → 分身/跳躍）。狂暴後每回合輪轉。',
             setup: (game) => { game.spawn_spawnBoss('ouroboros', true); },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
+        // ── 符文詞條 ──────────────────────────────────────────────────────────────────
+        {
+            id: 'rw_meltdown',
+            categoryId: 'runeword',
+            runewordId: 'runeword_meltdown',
+            runewordLevel: 1,
+            name: '燔毀',
+            icon: '🌋',
+            desc: '[炸毒系] 火焰燃燒傷害與過熱爆炸最終傷害提升 50%。建議將敵人溫度提升至爆燃閾値再觸發演示。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                // 中心一个高血量敌人，初始温度设为 160°C（接近爆燃閾値 200°C）
+                const e = new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 3000, 3000);
+                e.temp = 160;
+                game.enemies.push(e);
+                // 周围小怪用于演示爆炸 AOE
+                [{c:1.5,r:0},{c:3.5,r:0},{c:1.5,r:2},{c:3.5,r:2}].forEach(p => {
+                    game.enemies.push(new Enemy(p.c * w + w/2, top + p.r * h + h/2, 60, 60, 500));
+                });
+            },
+            bulletConfig: { damage: 20, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 800, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_absolute_zero',
+            categoryId: 'runeword',
+            runewordId: 'runeword_absolute_zero',
+            runewordLevel: 1,
+            name: '絕對零度',
+            icon: '❄️',
+            desc: '[冰霜系] 散人處於凍結狀態時，每次受到物理傷害都會令該散人本回合受到的所有傷害加深。建議先用冰霜將敵人凍結再改用穿透子彈測試。',
+            setup: (game) => {
+                const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                const e = new Enemy(x, y, 60, 60, 5000, 5000);
+                e.temp = -120; // 已凍結
+                game.enemies.push(e);
+            },
+            bulletConfig: { damage: 50, bounce: 0, pierce: 5, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_frost_nova',
+            categoryId: 'runeword',
+            runewordId: 'runeword_frost_nova',
+            runewordLevel: 1,
+            name: '冰霜新星',
+            icon: '💠',
+            desc: '[冰霜系] 彈珠每彈跳 5 次，釋放一次冰霜新星，造成冰屬性傷害並降溫。建議使用高彈跳屬性子彈測試。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 1; c < 5; c++) {
+                        game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + r * h + h/2, 60, 60, 800));
+                    }
+                }
+            },
+            bulletConfig: { damage: 15, bounce: 10, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 200, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(3, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_thunderstorm',
+            categoryId: 'runeword',
+            runewordId: 'runeword_thunderstorm',
+            runewordLevel: 1,
+            name: '雷暴之語',
+            icon: '🌩️',
+            desc: '[閃電系] 閃電鏈的傷害衰減係數提升 50%，連鎖傷害更高。建護將敵人先凍結再用閃電以激發更高連鎖機率。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 1; c < 5; c++) {
+                        const e = new Enemy((c + 0.5) * w + w/2, top + r * h + h/2, 60, 60, 600);
+                        e.temp = -100; // 凍結狀態，提高閃電連鎖機率
+                        game.enemies.push(e);
+                    }
+                }
+            },
+            bulletConfig: { damage: 10, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 15, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_kinetic_surge',
+            categoryId: 'runeword',
+            runewordId: 'runeword_kinetic_surge',
+            runewordLevel: 1,
+            name: '動能激増',
+            icon: '💥',
+            desc: '[彈射系] 本次發射的彈珠，後續的每一次彈射傷害固定增加 +1。彈跳次數越多，總傷害越高。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                game.enemies.push(
+                    new Enemy(1.5 * w + w/2, top + 2 * h + h/2, 60, 60, 1000),
+                    new Enemy(3.5 * w + w/2, top + 2 * h + h/2, 60, 60, 1000),
+                    new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 1000),
+                    new Enemy(0.5 * w + w/2, top + 0 * h + h/2, 60, 60, 600),
+                    new Enemy(4.5 * w + w/2, top + 0 * h + h/2, 60, 60, 600)
+                );
+            },
+            bulletConfig: { damage: 10, bounce: 12, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(3, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_focused_fire',
+            categoryId: 'runeword',
+            runewordId: 'runeword_focused_fire',
+            runewordLevel: 1,
+            name: '專注射擊',
+            icon: '🎯',
+            desc: '[專注系] 將所有彈跳和連射層數轉化為基礎傷害。傷害有 20% 機率暴擊，造成 200% 傷害。建護配合高彈跳屬性測試。',
+            setup: (game) => {
+                const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                game.enemies.push(new Enemy(x, y, 60, 60, 3000, 3000));
+            },
+            bulletConfig: { damage: 10, bounce: 8, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_mass_collapse',
+            categoryId: 'runeword',
+            runewordId: 'runeword_mass_collapse',
+            runewordLevel: 1,
+            name: '質量崩塌',
+            icon: '💣',
+            desc: '[爆炸系] 強制獲得爆炸屬性（範圍減半）。清空連射與散射，每清空 1 層，爆炸範圍 +10%。建護配合高連射/散射屬性測試。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 1; c < 5; c++) {
+                        game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + r * h + h/2, 60, 60, 500));
+                    }
+                }
+            },
+            bulletConfig: { damage: 15, bounce: 0, pierce: 0, scatter: 6, multicast: 4, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_kinetic_decay',
+            categoryId: 'runeword',
+            runewordId: 'runeword_kinetic_decay',
+            runewordLevel: 1,
+            name: '動能衰變',
+            icon: '📉',
+            desc: '[衰變系] 子彈初始獲得 25% 傷害加成。但每次命中敵人後，此加成會衰減 7%。建護配合高穿透屬性測試傷害逐次降低。',
+            setup: (game) => {
+                const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
+                for (let i = 0; i < 5; i++) {
+                    game.enemies.push(new Enemy(x, game.combatGridTopY + i * game.enemyHeight + game.enemyHeight / 2, 60, 60, 500));
+                }
+            },
+            bulletConfig: { damage: 30, bounce: 0, pierce: 6, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_echo_shot',
+            categoryId: 'runeword',
+            runewordId: 'runeword_echo_shot',
+            runewordLevel: 1,
+            name: '回響射擊',
+            icon: '🔄',
+            desc: '[回響系] 子彈首次擊中敵人時，有 25% 機率按原角度額外發射一顆單發子彈。建護用多次發射測試回響觸發機率。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                game.enemies.push(
+                    new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 2000),
+                    new Enemy(1.5 * w + w/2, top + 0 * h + h/2, 60, 60, 500),
+                    new Enemy(3.5 * w + w/2, top + 0 * h + h/2, 60, 60, 500)
+                );
+            },
+            bulletConfig: { damage: 25, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                for (let i = 0; i < 5; i++) {
+                    setTimeout(() => {
+                        const vel = new Vec2(0, -15);
+                        game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+                    }, i * 300);
+                }
+            }
+        },
+        {
+            id: 'rw_bloodthirst_edge',
+            categoryId: 'runeword',
+            runewordId: 'runeword_bloodthirst_edge',
+            runewordLevel: 1,
+            name: '嗜血初锋',
+            icon: '🗡️',
+            desc: '[成長系] 每次擊殺敵人，本局全局基礎傷害永久 +1。但冰霜與火焰屬性層數降低 30%。建護先擊殺小怪累積傷害加成再汋試精英怪。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                // 大量低血量小怪
+                for (let c = 0; c < 5; c++) {
+                    game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + 0 * h + h/2, 60, 60, 80));
+                    game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + 1 * h + h/2, 60, 60, 80));
+                }
+                // 一個高血量精英怪
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 2 * h + h/2, 60, 60, 2000, 2000, 'normal', ['shield']));
+            },
+            bulletConfig: { damage: 15, bounce: 0, pierce: 2, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_scatter_matrix',
+            categoryId: 'runeword',
+            runewordId: 'runeword_scatter_matrix',
+            runewordLevel: 1,
+            name: '散射矩陣',
+            icon: '🔱',
+            desc: '[轉化系] 連射次數全部轉化為散射層數。基礎傷害降低 25%，散射子彈的發射夾角縮小 70%。建護配合高連射屬性測試。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 1; c < 5; c++) {
+                        game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + r * h + h/2, 60, 60, 400));
+                    }
+                }
+            },
+            bulletConfig: { damage: 20, bounce: 0, pierce: 0, scatter: 0, multicast: 8, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_flame_sword',
+            categoryId: 'runeword',
+            runewordId: 'runeword_flame_sword',
+            runewordLevel: 1,
+            name: '炎光劍影',
+            icon: '🔥',
+            desc: '[穿透系] 穿透敵人時，有 30% 機率召喚一道火焰劍光。建護配合高穿透屬性測試。',
+            setup: (game) => {
+                const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
+                for (let i = 0; i < 4; i++) {
+                    game.enemies.push(new Enemy(x, game.combatGridTopY + i * game.enemyHeight + game.enemyHeight / 2, 60, 60, 600));
+                }
+            },
+            bulletConfig: { damage: 25, bounce: 0, pierce: 5, scatter: 0, multicast: 0, pyro: 200, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_elemental_fusion',
+            categoryId: 'runeword',
+            runewordId: 'runeword_elemental_fusion',
+            runewordLevel: 1,
+            name: '元素聚變',
+            icon: '⚗️',
+            desc: '[元素系] 當敵人同時承受火、冰、雷三種狀態時，引發元素聚變爆炸。建護先用冰霜+閃電將敵人凍結，再用火焰觸發聚變。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                // 中心目標敵人，初始狀態設為冰电共存
+                const e = new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 4000, 4000);
+                e.temp = -100; // 凍結
+                game.enemies.push(e);
+                // 周围小怪用于演示爆炸 AOE
+                [{c:1.5,r:0},{c:3.5,r:0},{c:1.5,r:2},{c:3.5,r:2}].forEach(p => {
+                    game.enemies.push(new Enemy(p.c * w + w/2, top + p.r * h + h/2, 60, 60, 300));
+                });
+            },
+            bulletConfig: { damage: 20, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 400, cryo: 0, lightning: 8, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_thunder_scatter',
+            categoryId: 'runeword',
+            runewordId: 'runeword_thunder_scatter',
+            runewordLevel: 1,
+            name: '雷霖散射',
+            icon: '⚡',
+            desc: '[閃電系] 每次成功觸發閃電鏈時，額外釋放一條同屬性閃電鏈。建護配合凍結狀態的密集敵人測試連鎖暴發。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 1; c < 5; c++) {
+                        const e = new Enemy((c + 0.5) * w + w/2, top + r * h + h/2, 60, 60, 600);
+                        e.temp = -100;
+                        game.enemies.push(e);
+                    }
+                }
+            },
+            bulletConfig: { damage: 10, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 12, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_irradiation',
+            categoryId: 'runeword',
+            runewordId: 'runeword_irradiation',
+            runewordLevel: 1,
+            name: '照射',
+            icon: '☀️',
+            desc: '[激光系] 激光變為持續照射。累積照射同一個敵人，受到的傷害加深 15%。建護對單一敵人持續照射測試傷害累加效果。',
+            setup: (game) => {
+                const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                game.enemies.push(new Enemy(x, y, 60, 60, 8000, 8000));
+            },
+            bulletConfig: { damage: 30, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: true, isMatryoshka: false, type: 'normal', laser: 10 },
+            demoAction: (game, tg) => {
+                const recipe = { ...tg.bulletConfig };
+                if (recipe.laser > 0) recipe.isLaser = true;
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, recipe, null, true);
+            }
+        },
+        {
+            id: 'rw_armor_piercing_meteor',
+            categoryId: 'runeword',
+            runewordId: 'runeword_armor_piercing_meteor',
+            runewordLevel: 1,
+            name: '穿甲流星',
+            icon: '💨',
+            desc: '[穿透系] 散射出的子彈丸繼承 100% 的穿透層數。建護配合高穿透+高散射屬性測試。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                for (let r = 0; r < 4; r++) {
+                    for (let c = 1; c < 5; c++) {
+                        game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + r * h + h/2, 60, 60, 400));
+                    }
+                }
+            },
+            bulletConfig: { damage: 15, bounce: 0, pierce: 4, scatter: 5, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(2, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_blazing_beam',
+            categoryId: 'runeword',
+            runewordId: 'runeword_blazing_beam',
+            runewordLevel: 1,
+            name: '燾熱光線',
+            icon: '🔥',
+            desc: '[復合系] 激光照射敵人時，除了造成傷害，每 0.5 秒還會額外提升敵人溫度 +5°C。建護對高血量敵人持續照射測試燃燒觸發效果。',
+            setup: (game) => {
+                const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                game.enemies.push(new Enemy(x, y, 60, 60, 6000, 6000));
+            },
+            bulletConfig: { damage: 20, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: true, isMatryoshka: false, type: 'normal', laser: 8 },
+            demoAction: (game, tg) => {
+                const recipe = { ...tg.bulletConfig };
+                if (recipe.laser > 0) recipe.isLaser = true;
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, recipe, null, true);
+            }
+        },
+        {
+            id: 'rw_lightning_shield',
+            categoryId: 'runeword',
+            runewordId: 'runeword_lightning_shield',
+            runewordLevel: 1,
+            name: '雷電護盾',
+            icon: '🛡️',
+            desc: '[復合系] 彈珠彈射時有 15% 機率在自身周圍生成靜電場。建護配合高彈跳屬性測試。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                game.enemies.push(
+                    new Enemy(1.5 * w + w/2, top + 2 * h + h/2, 60, 60, 800),
+                    new Enemy(3.5 * w + w/2, top + 2 * h + h/2, 60, 60, 800),
+                    new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 800),
+                    new Enemy(0.5 * w + w/2, top + 0 * h + h/2, 60, 60, 500),
+                    new Enemy(4.5 * w + w/2, top + 0 * h + h/2, 60, 60, 500)
+                );
+            },
+            bulletConfig: { damage: 15, bounce: 10, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 5, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(3, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_blade_storm',
+            categoryId: 'runeword',
+            runewordId: 'runeword_blade_storm',
+            runewordLevel: 1,
+            name: '劍刃風暴',
+            icon: '🌀',
+            desc: '[復合系] 首個子彈定期對範圍內所有敵人生成一次劍光斬擊。建護將子彈射入敵人堆中測試周期性傷害。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 1; c < 5; c++) {
+                        game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + r * h + h/2, 60, 60, 1000));
+                    }
+                }
+            },
+            bulletConfig: { damage: 20, bounce: 0, pierce: 3, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_sword_resonance',
+            categoryId: 'runeword',
+            runewordId: 'runeword_sword_resonance',
+            runewordLevel: 1,
+            name: '劍意共鳴',
+            icon: '⚔️',
+            desc: '[特殊系] 解鎖飛劍變異。穿透彈珠碰撞穿透鉤釘時，有 70% 機率使其變異為飛劍鉤釘。該場景需在收集階段測試，此處僅展示詞條激活狀態。',
+            setup: (game) => {
+                const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                game.enemies.push(new Enemy(x, y, 60, 60, 2000, 2000));
+            },
+            bulletConfig: { damage: 30, bounce: 0, pierce: 5, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_storm_resonance',
+            categoryId: 'runeword',
+            runewordId: 'runeword_storm_resonance',
+            runewordLevel: 1,
+            name: '風暴共鳴',
+            icon: '🌪️',
+            desc: '[特殊系] 解鎖風屬性變異。反彈彈珠碰撞反彈鉤釘時，有 70% 機率使其變異為風屬性鉤釘。該場景需在收集階段測試，此處僅展示詞條激活狀態。',
+            setup: (game) => {
+                const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                game.enemies.push(new Enemy(x, y, 60, 60, 2000, 2000));
+            },
+            bulletConfig: { damage: 20, bounce: 8, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(3, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
         }
     ]
 };
@@ -1207,6 +1676,7 @@ class TrainingGround {
                 <button onclick="game.trainingGround.switchCategory('enemy')" id="scat-btn-enemy" class="train-scat-btn active">敵人</button>
                 <button onclick="game.trainingGround.switchCategory('attribute')" id="scat-btn-attribute" class="train-scat-btn">屬性</button>
                 <button onclick="game.trainingGround.switchCategory('boss')" id="scat-btn-boss" class="train-scat-btn">Boss</button>
+                <button onclick="game.trainingGround.switchCategory('runeword')" id="scat-btn-runeword" class="train-scat-btn">符文</button>
             </div>
             <!-- 场景列表 -->
             <div id="train-scenario-list" class="train-scenario-list"></div>
@@ -1264,6 +1734,25 @@ class TrainingGround {
 
         // 清理战场
         this._clearBattlefield();
+
+        // 0. 重置符文词条效果（切换场景时清空旧词条）
+        this.game.activeRunewordEffects = {};
+        this.game.activeRunewordStats = {};
+
+        // 0a. 符文词条场景特殊处理：模拟词条激活状态
+        if (scenario.categoryId === 'runeword' && scenario.runewordId) {
+            const rwDef = RUNEWORD_DB.find(rw => rw.id === scenario.runewordId);
+            if (rwDef && rwDef.effectId) {
+                const level = scenario.runewordLevel || 1;
+                const baseParams = rwDef.baseParams || {};
+                const perLevelParams = rwDef.perLevelParams || {};
+                const params = {};
+                for (const key of Object.keys(baseParams)) {
+                    params[key] = (baseParams[key] || 0) + (level - 1) * (perLevelParams[key] || 0);
+                }
+                this.game.activeRunewordEffects[rwDef.effectId] = { level, params };
+            }
+        }
 
         // 1. 应用子弹配置（如果场景有预设）
         if (scenario.bulletConfig) {
