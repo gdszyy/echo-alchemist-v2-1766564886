@@ -1128,8 +1128,10 @@ const TRAINING_SCENARIOS = {
             },
             bulletConfig: { damage: 10, bounce: 8, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game, tg) => {
-                const vel = new Vec2(0, -15);
-                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+                // [修复] 使用 fireBulletWithEffects 而非直接 spawn_spawnBullet，
+                // 确保经由 combat_fireNextShot 应用 focused_fire 词条效果：
+                // bounce=8 会被转化为 +8 基础伤害，子弹不再弹跳，并获得 20% 暴击概率
+                tg.fireBulletWithEffects(tg.bulletConfig);
             }
         },
         {
@@ -1150,8 +1152,9 @@ const TRAINING_SCENARIOS = {
             },
             bulletConfig: { damage: 15, bounce: 0, pierce: 0, scatter: 6, multicast: 4, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game, tg) => {
-                const vel = new Vec2(0, -15);
-                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+                // [修复] 使用 fireBulletWithEffects 确保 mass_collapse 词条效果被应用：
+                // scatter=6 + multicast=4 将被清空，子弹获得爆炸属性，爆炸范围 = 0.5 + 10 * 0.10 = 1.5倍
+                tg.fireBulletWithEffects(tg.bulletConfig);
             }
         },
         {
@@ -1170,8 +1173,9 @@ const TRAINING_SCENARIOS = {
             },
             bulletConfig: { damage: 30, bounce: 0, pierce: 6, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game, tg) => {
-                const vel = new Vec2(0, -15);
-                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+                // [修复] 使用 fireBulletWithEffects 确保 kinetic_decay 词条效果被应用：
+                // _kineticDecayBonus=0.25 和 _kineticDecayRate=0.07 将被写入配方
+                tg.fireBulletWithEffects(tg.bulletConfig);
             }
         },
         {
@@ -1192,11 +1196,10 @@ const TRAINING_SCENARIOS = {
             },
             bulletConfig: { damage: 25, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game, tg) => {
+                // [修复] 使用 fireBulletWithEffects 确保 echo_shot 词条效果被应用：
+                // _echoShotChance=0.25 将被写入配方，子弹命中时有 25% 概率额外发射
                 for (let i = 0; i < 5; i++) {
-                    setTimeout(() => {
-                        const vel = new Vec2(0, -15);
-                        game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
-                    }, i * 300);
+                    setTimeout(() => { tg.fireBulletWithEffects(tg.bulletConfig); }, i * 300);
                 }
             }
         },
@@ -1220,8 +1223,9 @@ const TRAINING_SCENARIOS = {
             },
             bulletConfig: { damage: 15, bounce: 0, pierce: 2, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game, tg) => {
-                const vel = new Vec2(0, -15);
-                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+                // [修复] 使用 fireBulletWithEffects 确保 bloodthirst_growth 词条效果被应用：
+                // 击杀累计加伤和属性惩罚将被应用到配方
+                tg.fireBulletWithEffects(tg.bulletConfig);
             }
         },
         {
@@ -1242,8 +1246,9 @@ const TRAINING_SCENARIOS = {
             },
             bulletConfig: { damage: 20, bounce: 0, pierce: 0, scatter: 0, multicast: 8, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game, tg) => {
-                const vel = new Vec2(0, -15);
-                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+                // [修复] 使用 fireBulletWithEffects 确保 scatter_matrix 词条效果被应用：
+                // multicast=8 将被转化为 scatter=8，子弹以收紧夹角散射而非连射
+                tg.fireBulletWithEffects(tg.bulletConfig);
             }
         },
         {
@@ -2193,6 +2198,25 @@ class TrainingGround {
     fireBullet() {
         const angle = -Math.PI/2;
         const vel = new Vec2(Math.cos(angle)*15, Math.sin(angle)*15);
+        // [修复] 将 bulletConfig 推入 ammoQueue，确保 combat_fireNextShot 中的词条效果能被正确应用
+        const recipe = { ...this.bulletConfig };
+        this.game.ammoQueue = [recipe];
+        this.game.pendingFireVelocity = vel;
+        this.game.isChargingShot = true;
+        this.game.chargeProgress = 0;
+
+        if (this.stats.startTime === 0) this.stats.startTime = Date.now();
+    }
+
+    /**
+     * 通过完整的词条应用流程发射一颗子弹（供词条场景 demoAction 使用）
+     * 将 recipe 推入 ammoQueue，经由 combat_fireNextShot 应用所有激活的词条效果后发射
+     * @param {Object} recipe - 子弹配方（通常为 tg.bulletConfig 的浅拷贝）
+     */
+    fireBulletWithEffects(recipe) {
+        const angle = -Math.PI/2;
+        const vel = new Vec2(Math.cos(angle)*15, Math.sin(angle)*15);
+        this.game.ammoQueue = [{ ...recipe }];
         this.game.pendingFireVelocity = vel;
         this.game.isChargingShot = true;
         this.game.chargeProgress = 0;

@@ -141,7 +141,31 @@
 | `rw_sword_resonance` | 剑意共鸣 | 特殊系 | 展示飞剑变异词条激活状态 |
 | `rw_storm_resonance` | 风暴共鸣 | 特殊系 | 展示风属性变异词条激活状态 |
 
-## 4. 全局禁止行为
+## 4. 词条场景 demoAction 发射规范
+
+词条场景的 `demoAction` 需要根据词条效果的应用时机，选择正确的发射方式：
+
+| 发射方式 | 适用场景 | 说明 |
+|---|---|---|
+| `tg.fireBulletWithEffects(tg.bulletConfig)` | 词条效果在 `combat_fireNextShot` 中预处理的词条 | 将 recipe 推入 `ammoQueue`，经由完整词条应用流程后发射 |
+| `game.spawn_spawnBullet(...)` | 词条效果在命中时通过 `activeRunewordEffects` 动态读取的词条 | 直接发射，命中时自动应用效果 |
+
+**需要使用 `fireBulletWithEffects` 的词条**（在 `combat_fireNextShot` 中预处理）：
+- `focused_fire`（bounce/multicast → damage 转化 + critChance/critDamage 写入）
+- `mass_collapse`（multicast/scatter 清零 + 爆炸属性注入）
+- `scatter_matrix`（multicast → scatter 转化）
+- `kinetic_decay`（_kineticDecayBonus/_kineticDecayRate 写入）
+- `echo_shot`（_echoShotChance 写入）
+- `bloodthirst_growth`（击杀累计伤害加成 + 属性惩罚应用）
+
+**可以直接使用 `spawn_spawnBullet` 的词条**（命中时动态读取）：
+- `meltdown`、`absolute_zero`、`frost_nova`、`thunderstorm`、`kinetic_surge`
+- `irradiation`、`blazing_beam`、`lightning_shield`、`blade_storm`
+- `flame_sword`、`elemental_fusion`、`thunder_scatter`、`armor_piercing_meteor`
+- `sword_resonance`、`storm_resonance`
+
+## 5. 全局禁止行为
 
 *   **禁止修改 DOM 结构**：若需调整试炼场布局，必须修改 `initUI()` 或 `initSidebar()` 中生成的 HTML 字符串，严禁尝试去 `index.html` 中寻找这些元素。
 *   **禁止绕过场景系统硬编码测试**：测试新机制时，必须通过在 `TRAINING_SCENARIOS` 中添加临时场景来进行，严禁直接修改 `TrainingGround.enter()` 的初始逻辑。
+*   **禁止在词条场景 demoAction 中直接调用 `spawn_spawnBullet`**：对于需要 `combat_fireNextShot` 预处理的词条，必须使用 `fireBulletWithEffects` 以确保词条效果被正确应用。
