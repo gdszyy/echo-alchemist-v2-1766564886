@@ -454,10 +454,10 @@ const CONFIG = {
         mirrorAxisCloneChance: 0.35,
         // 敌人血量 = (baseHp + 当前回合数 * hpPerRound) * 指数因子 * 难度系数
         // [修改] 提高基础血量，降低线性斜率，依靠指数在后期发力
-        enemyBaseHp: 10,       // 原 5 -> 稍微提高基础，防止第1回合太脆
-        enemyHpPerRound: 8,    // 原 12 -> 降低线性斜率，依靠指数在 15 回合后发力
+        enemyBaseHp: 6,        // [难度调低] 原 10 -> 降低基础血量，让前三关敌人更脆
+        enemyHpPerRound: 5,    // [难度调低] 原 8 -> 进一步降低线性斜率，前三关血量更低
         // [新增] 指数膨胀系数，1.12 表示每回合血量额外膨胀 12%
-        hpExponent: 1.12,
+        hpExponent: 1.10,      // [难度调低] 原 1.12 -> 降低指数膨胀，前期曲线更平缓
         
         // 特殊敌人血量倍率
         eliteHpMult: 7,     // 精英怪是普通怪的多少倍
@@ -662,8 +662,8 @@ const CONFIG = {
         rows: 5,           // 钉子行数
         spacingX: 35,      // 钉子水平间距
         spacingY: 32,      // 钉子垂直间距
-        startRows: 4,       // 初始生成的敌人行数
-        spawnMin: 3,        // 每波最少生成的敌人数量
+        startRows: 3,       // [难度调低] 原 4 -> 初始生成3行敌人，减少第1关压力
+        spawnMin: 2,        // [难度调低] 原 3 -> 每波最少生成2个，降低前期压力
         selectionCount: 6,  // 选卡阶段提供多少张卡
         selectionReq: 3,     // 需要选择多少张卡
         hitCooldowns: 17,    // 默认基础冷却时间

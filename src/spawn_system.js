@@ -100,7 +100,7 @@ export const spawn_system = {
         // 1个: 20% (r=1) -> 60% (r=20)
         // 2个: 0%  (r=1) -> 15% (r=20)
         let count = 0;
-        const chance1 = Math.min(0.6, 0.1 + r * 0.025);
+        const chance1 = Math.min(0.6, 0.05 + r * 0.025); // [难度调低] 初始概率 0.1 -> 0.05，前三关词缀触发概率降低约 5%
         const chance2 = r > 10 ? Math.min(0.15, (r - 10) * 0.01) : 0;
         
         // [难度平衡] Boss 战后，双词缀精英怪概率临时提升 25%

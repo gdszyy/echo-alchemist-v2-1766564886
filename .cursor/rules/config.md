@@ -89,6 +89,8 @@ globs: ["src/config.js"]
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
+| 2026-04-16 | `src/config.js`, `src/spawn_system.js` | **前三关难度降低**：`enemyBaseHp` 10→6；`enemyHpPerRound` 8→5；`hpExponent` 1.12→1.10；`startRows` 4→3；`spawnMin` 3→2；`spawn_system.js` 中词缀初始概率 0.1→0.05。整体效果：第1关敌人血量降低约 45%，前三关词缀概率降低约 5%，初始敌人行数减少 1 行。 |
+|------|------|----------|
 | 2026-04-13 | `src/game_phase.js`, `src/ui/shop.js`, `src/game_system.js`, `src/config.js`, `index.html` | **新手体验优化：遗物时机调整 + 推荐系统 + 视觉增强**：将遗物触发逻辑改为「初始回合给予一次，第 3 回合起每 5 回合给予一次」；在 `RELIC_DB` 中为强力遗物添加 `recommended`、`tags`、`recommendTip` 字段；`shop.js` 前三次遗物选择时提升推荐遗物权重并展示推荐标签/Tip；`index.html` 增强 rare/legendary/cursed 遗物卡片的动画光效。 |
 | 2026-04-13 | `src/config.js`, `src/entities.js` | **全局调低弹珠同化概率**：将所有弹珠的基础同化概率及涌潮遗物加成均降低为当前值的 0.65 倍（如 0.2->0.13, 0.3->0.195），以平衡游戏后期同化过快的问题。 |
 | 2026-04-13 | `src/config.js`, `src/ui/shop.js` | **钉盘结构遗物单局互斥限制**：新增 `BOARD_STRUCTURE_RELICS` 集合（包含 `dimension_shard`、`triangle_formation`、`diamond_formation`、`sparse_interval`、`mirror_sync`、`wide_narrow`）并导出。`shop.js` 的 `ui_showRelicSelection` 在遗物池过滤时增加互斥判断：若玩家本局已选过任意一个钉盘结构遗物，则所有其他钉盘结构遗物从候选池中排除。同时将 `dimension_shard` 的 `maxStacks` 从 `3` 改为 `1` |
