@@ -128,7 +128,7 @@
 | `rw_irradiation` | 照射 | 激光系 | 激光持续照射伤害累加 |
 | `rw_flame_sword` | 炎光剑影 | 穿透系 | 穿透时概率召唤火焰剑光 |
 | `rw_armor_piercing_meteor` | 穿甲流星 | 穿透系 | 散射子弹继承穿透层数 |
-| `rw_blazing_beam` | 炖热光线 | 复合系 | 激光照射额外升温 |
+| `rw_blazing_beam` | 炽热光线 | 复合系 | 激光照射额外升温 |
 | `rw_lightning_shield` | 雷电护盾 | 复合系 | 弹射时概率生成静电场 |
 | `rw_blade_storm` | 剑刃风暴 | 复合系 | 子弹存活期间周期性剑光斩击 |
 | `rw_elemental_fusion` | 元素聚变 | 元素系 | 火冰雷三属性共存引发聚变爆炸 |

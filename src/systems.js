@@ -1368,15 +1368,15 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_blazing_beam',
             runewordLevel: 1,
-            name: '燾熱光線',
+            name: '炽熱光線',
             icon: '🔥',
-            desc: '[復合系] 激光照射敵人時，除了造成傷害，每 0.5 秒還會額外提升敵人溫度 +5°C。建護對高血量敵人持續照射測試燃燒觸發效果。',
+            desc: '[復合系] 激光照射敵人時，除了造成傷害，每 0.5 秒還會額外提升敵人溫度 +5°C。建議配合火焰屬性持續照射高血量敵人，觀察升溫→燃燒觸發的完整鏈路。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
                 game.enemies.push(new Enemy(x, y, 60, 60, 6000, 6000));
             },
-            bulletConfig: { damage: 20, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: true, isMatryoshka: false, type: 'normal', laser: 8 },
+            bulletConfig: { damage: 20, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 3, cryo: 0, lightning: 0, wind: 0, isLaser: true, isMatryoshka: false, type: 'normal', laser: 8 },
             demoAction: (game, tg) => {
                 const recipe = { ...tg.bulletConfig };
                 if (recipe.laser > 0) recipe.isLaser = true;
