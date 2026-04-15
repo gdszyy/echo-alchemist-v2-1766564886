@@ -1,0 +1,145 @@
+# 实体系统规范 (entities.md)
+
+本文档是 Echo Alchemist V2 项目中实体系统（`entities.js` 及相关拆分文件）的开发规范。
+
+## 1. 模块职责
+实体系统负责游戏中所有"会动的东西"的定义和更新，包括：
+*   **核心实体**：弹珠（MarbleDefinition）、敌人（Enemy）、玩家（Player）、特殊槽位（SpecialSlot）、命运轮盘（FortuneWheel）、钉子（Peg）等。
+*   **战斗实体**：子弹（Projectile）、飞剑系统（SwordQi, SlashAnim, SonSword）、分身孢子（CloneSpore）。
+*   **视觉特效**：粒子（Particle）、光束（LaserBeam）、冲击波（Shockwave）等。
+*   **掉落物**：符文掉落（RuneLoot）。
+
+## 2. 架构拆分状态
+
+随着 Task 2.1 和 Task 2.2 的完成，巨型的 `entities.js` 已完成主要拆分：
+
+| 文件 | 职责 | 主要内容 |
+|------|------|----------|
+| `src/entities.js` | 入口聚合文件（约 3245 行） | 保留 DropBall、SwordQi、SlashAnim、SonSword、CloneSpore、Player、RuneLoot 等；通过 import/export 聚合所有拆分模块 |
+| `src/entities/enemy.js` | 敌人实体（约 1322 行） | Enemy 类（含所有词缀逻辑、AI 行为、温度系统、视觉渲染） |
+| `src/entities/projectile.js` | 子弹实体（约 737 行） | Projectile 类（含碰撞检测、伤害计算、视觉效果） |
+| `src/utils/math_utils.js` | 纯数学工具函数 | Vec2、lerp、lerpColor、rotateTowards 等 |
+| `src/effects/particles.js` | 纯视觉特效类 | Particle、SlashEffect、FireWave、LaserBeam 等 |
+
+**拆分进度统计：**
+- Task 2.1 前：entities.js 约 5249 行
+- Task 2.1 后：entities.js 约 5249 行（提取了 math_utils.js 和 particles.js）
+- Task 2.2 后：entities.js 约 3245 行（提取了 enemy.js 和 projectile.js，减少约 2004 行）
+
+## 3. 音频注入机制
+
+由于 `enemy.js` 和 `projectile.js` 是独立模块，它们各自维护独立的音频代理：
+
+- `entities/enemy.js` 导出 `setEnemyAudioProvider(provider)` 函数
+- `entities/projectile.js` 导出 `setProjectileAudioProvider(provider)` 函数
+- `entities.js` 的 `setAudioProvider(provider)` 会同时调用上述两个函数，确保音频注入传播到所有子模块
+- `core.js` 只需调用 `setAudioProvider`，无需感知子模块的存在
+
+## 4. 温度系统与冰冻衰减机制 (Temperature & Freeze Decay)
+*   **核心属性**：`temp` (当前温度), `frozenCount` (累计冰冻次数), `isFrozenCurrentTurn` (当前回合是否被冰冻)。
+*   **降温衰减 (Freeze Decay)**：每次敌人被冰冻时（`temp <= -100` 或概率触发），`frozenCount` 会增加 1（逻辑在 `game_phase.js` 第 424 行）。后续该敌人受到的所有降温效果（`amount < 0`）都会乘以 `0.9 ^ frozenCount` 的衰减系数。即：被冰冻 1 次后降温效果为 90%，2 次为 81%，依此类推。
+*   **统一入口**：所有温度修改必须通过 `applyTemp(amount)` 方法，衰减逻辑已在该方法内集中处理（`entities/enemy.js` 第 1698 行）。
+*   **实现状态**：✅ 已完整实现（Task B1 确认，2026-04-11）。
+
+## 5. 参数调整记录
+
+| 日期 | 文件 | 修改内容 |
+|------|------|----------|
+| 2026-04-15 | `src/entities.js` | **T3 实体投影与环境光照（Peg 光晕 + 软阴影）**：在 `Peg.draw` 方法中新增两处纯视觉增强：(1) **软阴影**（第1036行）：在 `currentRadius` 计算后、旋转变换前，绘制压扁的黑色半透明椭圆（`globalAlpha=0.22`，`fillStyle='rgba(0,0,0,0.7)'`，椭圆 Y 偏移 `currentRadius+3`，半轴比 `0.85:0.22`），模拟钉子「浮」在场地上的感觉。(2) **发光底部光晕**（第1078行）：在基础圆形 `ctx.fill()` 之后，对 `isSpecial || isLit` 的钉子使用 `hexToRgba(glowColor, 0.18)` 创建径向渐变（半径 `currentRadius*3.5`），以 `lighter` 混合模式绘制彩色地面光晕，模拟全局光照映射效果。两处修改均不影响碰撞检测、属性触发和 UI 逻辑。 |
+| 2026-04-15 | `src/spawn_system.js`, `src/entities/enemy.js` | **生成编排增强（Boss入场压迫感 + 随从阵型协同）**：(1) **Boss入场冲击波增强**：在 `spawn_triggerBossEntranceShockwave` 中新增气浪推力，根据距离对全场非 Boss 敌人施加垂直向上的 `bumpOffsetY`（最大 -20），形成波浪式避让弹跳效果。(2) **随从阵型呼吸协同**：在 `spawn_spawnEnemyRowAt` 中为每个敌人记录行内列索引 `_spawnColIndex`，并在 `enemy.js` 的 `shield` 词缀蜂巢格纹绘制中引入相位偏移 `+ (this._spawnColIndex || 0) * 0.4`，使同行护盾敌人的脉冲形成从左到右的波浪闪烁。(3) **精英敌人出场强调**：在 `spawn_spawnEnemyRowAt` 中生成 `elite` 敌人时，立即触发小型金色冲击波（`#facc15`）并生成 4~6 个金色 `spark` 粒子，增强精英敌人的存在感。 |
+| 2026-04-15 | `src/entities/enemy.js`, `src/config.js` | **Task A 渲染管线增强：材质光泽 + 战损裂纹 + 受击形变**：三项增强均通过 `CONFIG.enemyRender` 配置节管理魔法数字。**A1 材质光泽**：在 `_initTexture()` 的 OffscreenCanvas 预计算阶段，完成基础纹理绘制后叠加顶→底 LinearGradient（顶部 `rgba(255,255,255,0.08)` → 底部 `rgba(0,0,0,0.12)`），使方块/多边形产生 3D 凸起物理厚度感。**A2 战损裂纹**：在 `draw()` 的 Layer 4 区域末尾（现有温度裂纹之后）新增血量联动战损裂纹：当 `hp/maxHp < 0.3` 时，使用已有 `this.fissures` 路径绘制深灰色 `rgba(15,23,42,alpha)` 裂纹，强度随血量比例线性变化，不影响现有温度裂纹逻辑。**A3 受击形变**：新增 `_hitImpact` 字段：`takeDamage()` 中记录受击强度（单次伤害/maxHp，clamp 至 0~0.15）；`update()` 中每帧对 `_hitImpact` 乘以 0.85 进行弹性衰减（已处理所有早期返回分支）；`draw()` 的 `ctx.save()` 后根据 `_hitImpact` 应用 `ctx.scale(1 + _hitImpact * 0.5, 1 - _hitImpact * 0.5)`，使受击瞬间变扁变宽，随后弹性恢复。 |
+| 2026-04-14 | `src/entities/enemy.js` | **Layer 6 温度状态 UI 修复（异形敌人形状适配）**：修复异形敌人（polygon 随从 / arc Boss）在过热（Stage 4 炙热发光边框）和过冷（Stage 4 冰封外壳）状态下始终显示为方形的 Bug。过热边框：移除了对 `this.type === 'boss'` 的限制，使所有 `collisionShape === 'polygon'` 的敌人（包括普通/elite 异形随从）均沿多边形轮廓绘制炙热光圈。冰封外壳：新增 `polygon` 分支（沿多边形轮廓绘制冰壳 + 第一条边方向反光）和 `arc` 分支（沿外圆绘制环形冰壳 + 圆弧反光），AABB 分支保持原有切角矩形冰块逻辑不变。 |
+| 2026-04-14 | `src/entities.js`, `src/game_phase.js`, `src/config.js` | **镜像裂分（Mirror Clone）**：为镜像同步钉盘布局添加中轴线特殊钉子及弹珠复制机制。具体内容：① `game_phase.js` 的 `mirror_sync` 布局 layoutRole 标记阶段新增 `mirror_axis` 角色，每行取最靠近中轴的钉子（`midCol = Math.floor((rowLen-1)/2)`）标记为中轴裂分钉。② `entities.js` 的 `drawLayoutRoleStyle` 新增 `mirror_axis` 绘制逻辑：金色四芒星（✦）+ 外圈脉冲光晕，设计语言与镜像裂分的神秘力量对应。③ `DropBall` 构造函数新增 `_mirrorAxisCooldown = 0` 字段，`update` 方法新增冷却递减逻辑。④ `DropBall.update` 的 layoutRole 物理修正块新增 `mirror_axis` 分支：满足冷却为 0 且 `Math.random() < CONFIG.balance.mirrorAxisCloneChance`（默认 0.35）时，返回 `{action: 'mirror_clone', mirrorX, vel, originalBall}` 指令并设置 20 帧冷却。⑤ `game_phase.js` 的 `gathering_update` 新增 `mirror_clone` 结果处理：创建分身 `DropBall`，使用原弹珠的 `def` 和共享的 `currentSession`（实现属性归入原弹珠），分身弹珠设置 60 帧冷却、`isMirrorClone = true`、`canTriggerSplitSlot = false`。⑥ `DropBall.draw` 新增 LAYER 6：分身弹珠绘制金色虚线外圈脉冲标记。⑦ `config.js` 新增 `CONFIG.balance.mirrorAxisCloneChance = 0.35` 配置项及革新遗物描述。 |
+| 2026-04-13 | `src/effects/particles.js`, `src/entities.js`, `src/spawn_system.js`, `src/core.js`, `src/game_phase.js`, `src/entities/enemy.js` | **范围治疗扩散波动画（HealWave）**：新增 `HealWave` 视觉特效类（`particles.js`），专为 `healer` 词缀的范围治疗行动设计。特效包含：中心柔光晕（粉绿渐变，先膨胀后消退）、主扩散环（粉色描边 + 淡填充，扩散速度约为 Shockwave 的一半，持续时间约两倍）、内圈绿色环（层次感）、十字脉冲光线（4 方向，随主环延伸）。`spawn_system.js` 新增 `spawn_createHealWave(x, y, range)` 方法，以治疗范围为参数确保波的大小与实际覆盖区域匹配。`core.js` 初始化 `this.healWaves = []` 数组。`game_phase.js` 在 IceWaves 之后新增 HealWaves 的 update/draw 循环。`enemy.js` 的两处 healer 治疗触发（Boss 行动 + 普通敌人行动）均改为调用 `spawn_createHealWave` + `spawn_createShockwave`（双层视觉），被治疗目标改为生成 4 个粉绿火花粒子 + `❤️+N` 浮动文字，普通敌人治疗同步补充 `greenHp` 修复。 |
+| 2026-04-13 | `src/calc_utils.js`, `src/spawn_system.js`, `src/config.js` | **血量算法优化①：峰値伤害改为近3回合滑动平均**：在 `calc_utils.js` 中新增 `calc_getRecentAverageDamage(window=3)` 方法，取 `roundDamageHistory` 最近 N 条记录（加上 `prevRoundDamage`）的算术平均作为玩家战力基准。原 `calc_getPeakAverageDamage`（取历史最高3轮均值）保留为废弃层别名，内部委托给新函数。`spawn_spawnEnemyRowAt` 中的调用点从 `calc_getPeakAverageDamage()` 更新为 `calc_getRecentAverageDamage(3)`。改动背景：旧算法会将早期一次超强输出长期压制后续敌人血量，滑动平均能更及时反映玩家当前实力。 |
+| 2026-04-13 | `src/spawn_system.js`, `src/config.js` | **血量算法优化②：Boss血量倍率前期梯度调整**：在 `spawn_calculateBossHP` 中新增「倍率梯度调整（Mult Gradient）」模块。前期区间（`round` 在 `[earlyRound, lateRound]` 内，`t < 1`）根据玩家实时战力与模板预期的比値动态缩放 `bossMult`：`multRatio = clamp(playerImpliedMult / rawBossMult, gradientMin, 1.0)`，`effectiveBossMult = rawBossMult * (multRatio + (1.0 - multRatio) * t)`。后期（`t = 1`）完全使用原始 `rawBossMult`。同时将 Boss 战力评估由 `calc_getPeakAverageDamage` 改为 `calc_getRecentAverageDamage(3)`。`config.js` 的 `bossHpFormula` 新增 `bossMultGradientMin: 0.5`（梯度下限，即 bossMult 最少为原始的 50%）。 |
+| 2026-04-13 | `src/spawn_system.js`, `src/config.js` | **减少异型敌人数量**：两处修改减少异型敌人的数量。① `config.js` 的 `bossEntranceShockwave.minionChance` 从 `0.15` 降至 `0.05`，大幅降低 Boss 进场冲击波将普通敌人转化为异型随从的概率（包括大 Boss 加成后上限为 0.15，原为 0.25）。② `spawn_system.js` 的 `spawn_applyMinionShape` 头部新增 50% 概率控制：当无 Boss 历史或随机判断不通过时，直接返回默认 AABB，使普通行生成时异型敌人数量减少约 50%。 |
+| 2026-04-13 | `src/entities/projectile.js` | **子弹碰撞反弹逻辑作用域修复**：修复战斗阶段偶发的 `halfW is not defined` 报错。该错误源于 `_handleCollision` 中 AABB 碰撞的局部变量 `halfW/halfH` 在 `if (dist === 0)` 深度穿透处理逻辑中被跨作用域引用。修复方案：重构反弹逻辑，优先使用多态碰撞检测（Polygon/Arc）返回的 `shapeNormal`；若为 AABB 且触发 `dist === 0`，则在当前作用域重新计算 `halfW/halfH`，确保变量定义完备且逻辑正确。 |
+| 2026-04-13 | `src/entities/enemy.js`, `src/entities/projectile.js`, `src/spawn_system.js` | **Boss 移动后碰撞框偏移修复**：修复 Boss 移动（如入场或后续移动）后其多边形碰撞框留在原地导致子弹穿透的 Bug。修复方案：(1) 在 `Enemy` 类中新增 `getAbsoluteVertices()` 方法，将相对顶点偏移动态转换为基于当前 `pos` 的绝对坐标；(2) 在 `spawn_system.js` 中将 Boss 多边形顶点定义改为相对于中心点的偏移量；(3) 在 `projectile.js` 的 `_handleCollision` 中调用 `getAbsoluteVertices()` 进行实时碰撞检测。解决碰撞框脱离 Boss 身体及误伤 Boss 的问题。 |
+| 2026-04-13 | `src/entities.js` | **SpecialSlot 端点钉子误触发修复**：修复特殊槽仅碰撞连线端点钉子就触发的 Bug。在 `DropBall.update` 的连线碰撞检测中，新增 `_onSegmentInterior` 判断：计算球在线段上的投影参数 `_t` 后，要求 `_t` 必须落在 `(_tMargin, 1 - _tMargin)` 的内部区间（`_tMargin = pegRadius / segLen = 6 / segLen`），排除两端钉子半径范围。只有当 `_onSegmentInterior === true` 且 `_distToLine < _triggerThreshold` 时才触发，确保球必须真正穿越两钉之间的连线区域。 |
+| 2026-04-13 | `src/entities/projectile.js`, `src/systems.js` | **顶部反弹墙碰撞检测修复**：修复顶部反弹墙绘制位置与实际碰撞检测位置不一致的 Bug。绘制层（`game_phase.js`）使用 `wallTopY = combatGridTopY - enemyHeight/2` 作为顶部墙位置，而碰撞检测层（`projectile.js`）原使用 `this.pos.y < this.radius`（即 y≈0，画面顶部）。修复方案：在 `_applyMove` 中新增 `topBound` 计算，读取 `game.combatGridTopY - game.enemyHeight / 2 + this.radius`，若 `game` 未就绪则回退到 `this.radius`（y=0）。同时在 `systems.js` 的 `createCombatContext` 中补充 `combatGridTopY: 90` 字段，确保 Demo 模式下碰撞检测正常工作。 |
+| 2026-04-12 | `src/entities/enemy.js` | **Mikro 分身减伤机制**：在 `takeDamage` 中新增逻辑，当当前敌人为 Mikro 母体时，根据场上存活的 clone 分身数量（通过 `e.isClone` 标记过滤）计算减伤。每个分身提供 10% 减伤，上限 50%，并显示 `🧬-XX%` 视觉反馈。同时在 `spawn_system.js` 和 `combat_system.js` 的 clone 生成逻辑中补充 `clone.isClone = true` 标记。 |
+| 2026-04-12 | `src/entities.js` | **变异需要词条解锁**：`DropBall.handlePegInteraction` 中的突变（Mutation）分支新增前置条件检查 `hasActiveRunewords`（即 `game.activeRunewordEffects` 不为空）。没有激活词条时禁止变异，变异属于高级机制需要词条解锁。升级（Upgrade）分支不受影响。 |
+| 2026-04-12 | `src/entities.js`, `src/game_phase.js` | **SpecialSlot 双钉子连线模式重设计**：`SpecialSlot` 类构造函数参数从 `(x, y, width, type)` 改为 `(x, y, x2, y2, type)`，代表两个钉子的坐标而非单个钉子的圆心+宽度。`draw()` 方法改为在两钉子间绘制流动虚线发光连线，并在中点显示符号背景圆。`DropBall.update` 中的碰撞检测从矩形包围盒改为圆心到线段的最短距离检测（阈值 = `ball.radius + slot.height`）。`game_phase.js` 的生成逻辑改为选取一对相邻钉子（距离 ≤ `spacingX * 1.6`）并存储 `slot.pegIndex2`。 |
+| 2026-04-12 | `src/entities/enemy.js`, `src/game_phase.js` | **极速/狂暴词条重设计**：`haste` 不再增加行动次数，改为仅在移动阶段额外触发一次移动（显示 `⚡DASH!`）；`berserk` 改为触发时对非移动行动结算两次（不包含移动），并在温度结算阶段每回合 +20℃ 且温度结算执行两次。 |
+| 2026-04-12 | `src/entities/enemy.js`, `src/combat_system.js`, `src/config.js` | **Chimera 狂暴阶段受击全场爆炸**：`config.js` 的 `bossConfigs.chimera` 中新增 `berserkedBlastOnHitChance: 0.25`（受击爆炸概率）。`combat_triggerBossEnrage` 的 chimera case 中新增 `boss._berserkedBlastOnHitChance` 标志。`enemy.js` 的 `takeDamage` 中，检测 Chimera 狂暴标志：若触发概率，调用 `game.spawn_createShockwave` 生成橙色冲击波，生成 20 个红橙色 ember 粒子，显示 `💥CHAOS BLAST!` 浮动文字，并随机禁用 3 个钉子（设置高额 cooldownTimer=1000）持续 1 回合。 |
+| 2026-04-12 | `src/entities/enemy.js`, `src/combat_system.js`, `src/config.js` | **Viridis 狂暴逻辑修正**：狂暴后 Viridis 不再治疗其他敌人，改为集中治疗自身并加速再生。具体：（1）`config.js` 中 `bossConfigs.viridis.berserkedHealerRange` 从 `999` 改为 `0`，新增 `berserkedSelfRegenMult: 3.0`；（2）`combat_system.js` 的 `combat_triggerBossEnrage` viridis case 中设置 `boss._berserkedHealerRange = 0` 并新增 `boss._berserkedSelfRegenMult = bossCfg.berserkedSelfRegenMult || 3.0`；（3）`enemy.js` 的 regen affix 处理中，检测 Viridis 狂暴时应用 `_berserkedSelfRegenMult` 倍率加速自身回血；（4）Layer 6 新增 Viridis 狂暴绿色脉冲光晕视觉反馈（双层脉冲：外层 `#22c55e` 慢脉冲 + 内层 `#4ade80` 快脉冲）。 |
+| 2026-04-12 | `src/spawn_system.js` | `spawn_spawnBoss`：修复 Boss 大小、位置与网格不对齐问题。`bossH` 从 `enemyHeight * 1.5`（非整数行）改为 `enemyHeight * 2`（占 2 整行）；`spawnY` 从硬编码 `80` 改为动态计算 `80 + enemyHeight / 2`，确保 Boss 上下边界与行网格边界完全对齐；`centerX` 从 `(enemyCols/2) * enemyWidth` 改为 `this.width / 2`（更健壮，不依赖 enemyCols 为偶数） |
+| 2026-04-12 | `src/spawn_system.js` | **激光机制修复**：`spawn_spawnBullet` 中激光分支（`recipe.isLaser && !recipe.wind`）末尾新增 `return` 语句。修复前，激光分支在执行 `combat_laser_fire` 后缺少 `return`，导致代码继续向下执行实体子弹生成逻辑，额外创建了 `Projectile` 实体。修复后，所有激光属性（`isLaser=true`）仅发射激光束，不再生成实体子弹。 |
+| 2026-04-12 | `src/systems.js` | **图鉴文案同步**：更新 `laser` 属性图鉴条目的描述文案，将旧文案"發射弹珠，命中时触发折射激光"改为"直接发射激光束"；同时为训练场激光演示的 `spawn_projectile` 配置添加 `isLaser: true` 标志位，确保训练场行为与主游戏逻辑一致。 |
+| 2026-04-11 | `src/entities/enemy.js` | **B1 冰冻衰减确认**：确认 `applyTemp(amount)` 方法（第 1698 行）已正确实现冰冻衰减公式 `Math.pow(0.9, this.frozenCount)`。`frozenCount` 自增逻辑 in `game_phase.js` 第 424 行，每次冰冻触发时自增 1。无需修改。 |
+| 2026-04-11 | `src/entities.js` | `DropBall.update`：当 `this.radius > CONFIG.physics.marbleRadius`（即处于倍化状态）时，使用 `friction + 0.005`（上限 0.998）替代默认摩擦力，减少卡墙概率 |
+| 2026-04-11 | `src/ui/shop.js` | `permanent_size_up` 效果：`marbleSizeBonus` 从 `4.2` 调整为 `2.5`，防止倍化球在钉盘左右墙面间就少尺寸内将球夹住 |
+
+## 6. 开发规范
+*   **依赖管理**：
+    *   `math_utils.js` 和 `particles.js` 作为底层模块，**严禁**引入 `entities.js`、`config.js` 或 `audio.js` 等高层业务模块，以避免循环依赖。
+    *   `entities.js` 通过 ES Modules (`import`) 引入拆分出的工具和特效类，并对外重新导出 (`export`) 以保持对其他子系统（如 `combat_system.js`）的向后兼容性。
+    *   新增实体类时，应在 `src/entities/` 目录下创建独立文件，并在 `entities.js` 中 import + re-export。
+*   **性能要求**：实体类的 `update` 和 `draw` 方法会在每一帧高频调用，严禁在这些方法中执行高开销操作（如复杂的 DOM 操作或大规模对象创建）。
+*   **音频注入**：`entities.js` 不再直接依赖 `window.audio`，而是通过 `setAudioProvider` 接收来自 `core.js` 的音频实例注入。子模块（`enemy.js`、`projectile.js`）各自维护独立的音频代理，由 `entities.js` 的 `setAudioProvider` 统一分发。
+*   **状态同步**：实体状态的改变（如敌人死亡、玩家受伤）应通过事件总线 (`event_bus.js`) 广播，而不是直接修改全局状态。
+*   **向后兼容**：`entities.js` 的 export 列表必须保持完整，确保 `core.js` 等上层模块无需修改即可使用。
+
+## 7. 敌人视觉重设计 (Layer 结构)
+
+根据 Task 敌人视觉重设计，`Enemy` 类的 `draw` 方法已更新，采用全新的 Layer 分层结构以支持复杂的词缀特效和底层纹理。新的 Layer 结构如下：
+
+| Layer 层级 | 绘制内容说明 | 备注 |
+| :--- | :--- | :--- |
+| **Layer 1** | 圆角矩形容器裁剪（`#0f172a` 深色背景） | 基础裁剪层 |
+| **Layer 1.5** | 静态底层纹理（OffscreenCanvas）+ 材质光泽渐变 | **新增**，基于 `visualSeed` 预计算（金属拉丝/矿石斑点/能量流线）；**Task A 增强**：底部叠加顶→底 LinearGradient（白色高光 → 黑色阴影），模拟 3D 凸起物理厚度感 |
+| **Layer 2** | 液体血条（含延迟白条、绿色回血条） | 真实血量与动画血量 |
+| **Layer 3** | 内部覆盖层（过热橙色发光 / 过冷蓝色雾化） | 状态反馈 |
+| **Layer 3.5** | 内部词缀特效（**所有词缀**，严格裁剪在方块内） | **重设计**，各词缀采用内部填充纹理，与实际效果强关联 |
+| **Layer 4** | 裂纹绘制（过热岩浆裂纹 / 过冷冰晶裂纹 / **战损裂纹**） | 状态反馈；**Task A 增强**：血量 < 30% 时显示深灰色战损裂纹，强度随血量线性变化 |
+| **Layer 5** | 内部边框（普通 / elite / boss） | 包含预警闪烁 |
+| **Layer 5.5** | 插在身上的子剑（Stuck Swords） | 包含母剑剑穗 |
+| **Layer 6** | 外部特效（过热炙热光圈 / 过冷冰封外壳）—— **已适配 polygon/arc/AABB 三种形状** | 状态反馈 |
+| **Layer 7** | 扫描反馈（准星动画） | 状态反馈 |
+| **文字层** | 血量数字 | Layer 8 外部光环层已删除 |
+
+**Layer 3.5 词缀特效设计语言（重设计后）**：
+
+| 词缀 | 视觉语言 | 颜色 | 关联逻辑 |
+| :--- | :--- | :--- | :--- |
+| `shield` | 内壁蜂巢六边形格纹，呼吸脉冲 | 浅蓝 `#93c5fd` | 护盾=防御格栅 |
+| `regen` | 从底部向上涌动的液体波纹 | 绿 `#4ade80` | 回血=液体涌动 |
+| `haste` | 横向扫过的速度残影线 | 金黄 `#facc15` | 极速=运动模糊（仅加速移动） |
+| `devour` | 从四周向中心收缩的漩涡弧线 | 暗红 `#dc2626` | 吞噬=向心力 |
+| `healer` | 十字形脉冲扩散波，从中心向外 | 粉 `#f472b6` | 治疗=医疗脉冲 |
+| `jump` | 底部弹力压缩水平线组 | 青 `#2dd4bf` | 跳跃=弹簧压缩 |
+| `clone` | 内部游离细胞斑点，带外层光晕 | 紫 `#c084fc` | 分身=细胞分裂 |
+| `berserk` | 底部火焰形燃烧纹路 | 橙红 `#ef4444` | 狂拜=火焰（每回合+20℃，温度结算两次） |
+
+**性能优化说明**：
+*   **Layer 1.5**：使用 `OffscreenCanvas` 在 `Enemy` 构造函数中进行预计算，每帧仅执行一次 `drawImage`，性能开销极低。
+*   **动态特效**：所有动态效果（如呼吸脉冲、微位移）均使用基于 `Date.now()` 的数学函数（如 `Math.sin`）计算，无需引入复杂的粒子系统。
+*   **多词缀叠加**：当词缀数量 > 3 时透明度乘以 0.65，> 1 时乘以 0.8，防止视觉过曝。
+*   **严格边界**：所有词缀特效均在 `ctx.clip()` 裁剪区内绘制（Layer 3.5 在 Layer 1 `clip()` 之后、`ctx.restore()` 裁剪结束之前），不会渗出方块边界。
+*   **混合模式**：`regen`/`haste`/`healer`/`clone`/`berserk` 使用 `screen` 模式增强亮度而不遮盖血条；`devour` 使用 `multiply` 模式增强暗色漩涡感。
+
+## 8. 随从异型几何化 (Minion Polygon Shapes)
+
+根据 Task tsk-bbd1ce26-997，`spawn_system.js` 新增 `spawn_applyMinionShape(e)` 方法，在 `spawn_spawnEnemyRowAt` 中为每个普通随从分配与当前 Boss 历史对应的几何形状。
+
+### 形状分配规则
+
+| 最后一个 Boss | 随从形状 | 顶点数 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `ignis` | 等腰三角形 | 3 | 顶点居中，底边对称 |
+| `glacies` | 菱形 | 4 | 4顶点菱形冰晶 |
+| `mikro` | 正六边形 | 6 | 6顶点小六边形 |
+| `devourer` | 残缺矩形 | 5 | 右上角被切掉 |
+| `viridis` | 水滴形 | 7 | 多边形近似水滴（顶尖+圆底） |
+| `tesla` | 平行四边形 | 4 | 倒斜刀片形 |
+| `chimera` | 不规则五边形 | 5 | 不对称碎片 |
+| `ouroboros` | 八角形 | 8 | 标准八角形 |
+| 无历史 | 默认 AABB | - | `collisionShape='aabb'`, `collisionData=null` |
+
+### 实现细节
+
+*   **`spawn_system.js`**：`spawn_applyMinionShape(e)` 读取 `this.bossHistory` 最后一个元素，使用 `e.width`/`e.height` 计算相对坐标顶点（范围 `[-w/2, w/2]` × `[-h/2, h/2]`），写入 `e.collisionShape = 'polygon'` 和 `e.collisionData.vertices`（`Vec2` 数组）。
+*   **`entities/enemy.js`**：`draw()` 方法的 **Layer 1 裁剪** 和 **Layer 5 边框** 均已升级：当 `type` 为 `'normal'` 或 `'elite'` 且 `collisionShape === 'polygon'` 时，使用 `moveTo/lineTo/closePath` 多边形路径替代 `roundRect`/`strokeRect`。
+*   **碰撞检测**：`projectile.js` 的 `_handleCollision` 已有 `polygon` 分支（调用 `calc_getCirclePolygonCollision`），无需修改。
+*   **顶点坐标约定**：均为相对中心点 `(0,0)` 的偏移量，由 `Enemy.getAbsoluteVertices()` 转换为绝对坐标供碰撞检测使用。
