@@ -2709,7 +2709,7 @@ export const combat_system = {
                 }
             }
         }
-    }
+    },
 
     combat_continuousLaser_update(timeScale = 1) {
         if (!this._continuousLaserFiring || !this._continuousLaserState) return;
