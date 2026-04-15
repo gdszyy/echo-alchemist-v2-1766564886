@@ -1426,8 +1426,9 @@ const TRAINING_SCENARIOS = {
             },
             bulletConfig: { damage: 20, bounce: 0, pierce: 3, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game, tg) => {
-                const vel = new Vec2(0, -15);
-                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+                // [修复] 使用 fireBulletWithEffects 走正规的 ammoQueue + combat_fireNextShot 流程，
+                // 确保 _roundFirstShotId 被正确注册，blade_storm 词条效果才能触发。
+                tg.fireBulletWithEffects(tg.bulletConfig);
             }
         },
         {
@@ -2181,6 +2182,10 @@ class TrainingGround {
         this.stats.totalDamage = 0;
         this.stats.startTime = 0;
         this.stats.dps = 0;
+        // [修复] 清理 blade_storm 状态，避免切换场景时残留首发子弹绑定
+        this.game._roundFirstShotId = null;
+        this.game._bladeStormProjectile = null;
+        this.game._bladeStormTimer = 0;
     }
 
     // ── 原有方法（保持不变）────────────────────────────────────────
@@ -2201,6 +2206,10 @@ class TrainingGround {
         // [修复] 将 bulletConfig 推入 ammoQueue，确保 combat_fireNextShot 中的词条效果能被正确应用
         const recipe = { ...this.bulletConfig };
         this.game.ammoQueue = [recipe];
+        // [修复] 每次手动发射在试炼场中都视为新回合的首发，重置 blade_storm 绑定状态
+        this.game._roundFirstShotId = null;
+        this.game._bladeStormProjectile = null;
+        this.game._bladeStormTimer = 0;
         this.game.pendingFireVelocity = vel;
         this.game.isChargingShot = true;
         this.game.chargeProgress = 0;
@@ -2217,6 +2226,10 @@ class TrainingGround {
         const angle = -Math.PI/2;
         const vel = new Vec2(Math.cos(angle)*15, Math.sin(angle)*15);
         this.game.ammoQueue = [{ ...recipe }];
+        // [修复] 每次通过词条流程发射也重置 blade_storm 绑定状态（视为新回合首发）
+        this.game._roundFirstShotId = null;
+        this.game._bladeStormProjectile = null;
+        this.game._bladeStormTimer = 0;
         this.game.pendingFireVelocity = vel;
         this.game.isChargingShot = true;
         this.game.chargeProgress = 0;
