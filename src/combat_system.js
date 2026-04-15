@@ -1769,17 +1769,41 @@ export const combat_system = {
         }
 
         // [Agent D] 雷电护盾词条 Hook：弹跳命中时有概率在命中位置生成静电场
-        if (isBounceHit && config.lightning > 0 && !projectile.isCopy) {
+        // 检查点：1) 弹射时触发（isBounceHit）；2) 按 damageRatio 对周围敌人造成 AOE 伤害；
+        //         3) 施加 shockStacks 层感电状态（applyTemp）；4) LightningBolt 视觉特效
+        if (isBounceHit && !projectile.isCopy) {
             const lightningShieldFx = this.activeRunewordEffects && this.activeRunewordEffects['lightning_shield'];
             if (lightningShieldFx) {
                 const triggerChance = (lightningShieldFx.params && lightningShieldFx.params.triggerChance) || 0;
-                const damageRatio = (lightningShieldFx.params && lightningShieldFx.params.damageRatio) || 0.5;
+                const damageRatio = (lightningShieldFx.params && lightningShieldFx.params.damageRatio) || 0.20;
+                const shockStacks = (lightningShieldFx.params && lightningShieldFx.params.shockStacks) || 1;
                 if (Math.random() < triggerChance) {
-                    // 在命中位置生成静电场（复用 combat_wind_addAnchor，传入闪电属性）
+                    // 静电场 AOE 伤害：直接对范围内所有敌人造成伤害，不依赖风系锚点机制
                     const staticDmg = Math.ceil(config.damage * damageRatio);
-                    const staticConfig = { lightning: Math.max(1, config.lightning), damage: staticDmg, wind: 0 };
-                    this.combat_wind_addAnchor(hitX, hitY, staticDmg, staticConfig);
-                    this.spawn_createFloatingText(hitX, hitY - 20, '静电场!', '#c084fc');
+                    const STATIC_FIELD_RADIUS = 100; // 静电场 AOE 范围（像素）
+                    // 视觉特效：紫色冲击波 + 闪电粒子
+                    this.spawn_createShockwave(hitX, hitY, '#c084fc');
+                    for (let i = 0; i < 6; i++) {
+                        this.spawn_createParticle(hitX, hitY, '#c084fc', 'spark');
+                    }
+                    // 对范围内所有敌人造成 AOE 伤害并施加感电状态
+                    this.enemies.forEach(ne => {
+                        if (ne.active && ne.pos.dist(new Vec2(hitX, hitY)) < STATIC_FIELD_RADIUS) {
+                            // 造成静电场伤害
+                            if (staticDmg > 0) {
+                                const staticResult = ne.takeDamage(staticDmg);
+                                this.combat_recordDamage(staticResult.actualDamage, 'lightning', 'main', shotId);
+                                if (staticResult.killed) this.spawn_addScore(ne.maxHp);
+                            }
+                            // 施加 shockStacks 层感电状态（升温）
+                            ne.applyTemp(CONFIG.balance.lightningTempIncrease * shockStacks);
+                            ne._lightningHitThisRound = true; // 标记雷属性命中（供元素聚变使用）
+                            // LightningBolt 视觉特效：从命中点到每个受影响敌人
+                            this.lightningBolts.push(new LightningBolt(hitX, hitY, ne.pos.x, ne.pos.y));
+                        }
+                    });
+                    this.spawn_createFloatingText(hitX, hitY - 20, '⚡静电场!', '#c084fc');
+                    try { audio.playLightning(); } catch(e2) {}
                 }
             }
         }
