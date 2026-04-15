@@ -70,7 +70,7 @@
 | `focused_fire` | 专注射击 | `src/combat_system.js` 约第 1714 行（暴击判定）、2358 行（配方应用） | `activeRunewordEffects['focused_fire']`, `finalRecipe._critChance`, `finalRecipe._critDamage` |
 | `mass_collapse` | 质量坍缩 | `src/combat_system.js` 约第 2375 行（配方应用） | `activeRunewordEffects['mass_collapse']`, `finalRecipe._explosionRadiusMult` |
 | `kinetic_decay` | 动能衰变 | `src/entities/projectile.js` 命中逻辑 | `activeRunewordEffects['kinetic_decay']`, `finalRecipe._kineticDecayBonus`, `finalRecipe._kineticDecayRate` |
-| `echo_shot` | 回响射击 | `src/entities/projectile.js` 首次命中逻辑 | `activeRunewordEffects['echo_shot']`, `finalRecipe._echoShotChance` |
+| `echo_shot` | 回响射击 | `src/entities/projectile.js` 首次命中逻辑 | `activeRunewordEffects['echo_shot']`, `finalRecipe._echoShotChance`, `projectile._echoShotFired` |
 
 ## 3. 词条激活机制
 
@@ -107,4 +107,5 @@
 | `_explosionRadiusMult` | number | `mass_collapse` | 爆炸 AOE 判定 |
 | `_kineticDecayBonus` | number (0~1) | `kinetic_decay` | Projectile 命中 |
 | `_kineticDecayRate` | number (0~1) | `kinetic_decay` | Projectile 命中 |
-| `_echoShotChance` | number (0~1) | `echo_shot` | Projectile 首次命中 |
+| `_echoShotChance` | number (0~1) | `echo_shot` | Projectile 首次命中（回响子弹中此字段强制为 0，防止无限循环） |
+| `_echoShotFired` | boolean | `echo_shot` | Projectile 实例内部标记（非 recipe 字段），防止同一子弹重复触发 |

@@ -251,12 +251,14 @@ class Projectile {
                 this._echoShotFired = true; // 标记已触发，防止重复触发
                 if (typeof game !== 'undefined' && game.burstQueue) {
                     // 创建新的配方，继承原配方，但清空分裂属性并标记已回响
+                    // [修复] 明确清除 _echoShotChance，防止潜在的无限循环（防御性编程）
                     const echoRecipe = {
                         ...this.config,
                         multicast: 0,
                         scatter: 0,
                         bounce: 0,
-                        _echoShotFired: true // 传递标记给新子弹
+                        _echoShotFired: true,   // 传递标记给新子弹
+                        _echoShotChance: 0      // 明确清除触发概率，防止无限循环
                     };
                     
                     // 速度方向：当前速度方向
