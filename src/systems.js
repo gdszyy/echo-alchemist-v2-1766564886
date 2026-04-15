@@ -1505,6 +1505,8 @@ class TrainingGround {
                 inset: 0;
                 display: flex;
                 flex-direction: row;
+                padding-top: 0 !important; /* 覆盖 .ui-overlay 的 70px padding-top */
+                padding-bottom: 0 !important;
             }
             /* 主战斗区域（占据左侧剩余空间） */
             #train-main-area {
@@ -1699,9 +1701,11 @@ class TrainingGround {
             }
             /* 符文词条效果横幅 */
             #train-runeword-banner {
-                position: relative;
+                position: absolute;
+                top: 40px; /* 顶部状态栏高度 */
+                left: 0;
+                right: 0;
                 z-index: 30;
-                flex-shrink: 0;
                 background: linear-gradient(135deg, rgba(15,23,42,0.97) 0%, rgba(30,27,75,0.97) 100%);
                 border-bottom: 1px solid rgba(139,92,246,0.4);
                 padding: 8px 16px;
@@ -1771,7 +1775,7 @@ class TrainingGround {
                 <!-- 左侧主战斗区域 -->
             <div id="train-main-area">
                 <!-- 顶部状态栏 -->
-                <div class="flex-shrink-0 h-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 z-20" style="position:relative;">
+                <div class="absolute top-0 left-0 right-0 h-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 z-20">
                     <div class="text-slate-400 text-[10px] uppercase tracking-wider flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
                         Combat Simulation
