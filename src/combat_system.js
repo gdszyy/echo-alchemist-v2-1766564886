@@ -1761,7 +1761,10 @@ export const combat_system = {
         const damageColor = colorMap[damageType] || '#ffffff';
 
         // [Agent D] 炎光剑影词条 Hook：穿透命中时有概率召唤飞剑
-        if (isPierceHit && !projectile.isCopy) {
+        // [穿甲流星联动] 当穿甲流星激活时，散射子弹（isScatterChild=true）继承了穿透层数，
+        // 因此也应该能触发炎光剑影效果，故此处放开 isCopy 限制（仅针对散射子弹）
+        const armorPiercingActive = this.activeRunewordEffects && this.activeRunewordEffects['armor_piercing_meteor'];
+        if (isPierceHit && (!projectile.isCopy || (config.isScatterChild && armorPiercingActive))) {
             const flameSwordFx = this.activeRunewordEffects && this.activeRunewordEffects['flame_sword'];
             if (flameSwordFx) {
                 const triggerChance = (flameSwordFx.params && flameSwordFx.params.triggerChance) || 0;

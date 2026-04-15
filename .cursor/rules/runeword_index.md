@@ -22,7 +22,7 @@
 | ID | 名称 | 符文组合 | 效果摘要 |
 |---|---|---|---|
 | `runeword_flame_sword` | 炎光剑影 | `rune_pyro_1` × 1 + `rune_pierce_1` × 1 + `rune_pyro_2` × 1 | 穿透敌人时，有概率召唤一道火焰剑光 |
-| `runeword_armor_piercing_meteor` | 穿甲流星 | `rune_pierce_2` × 1 + `rune_scatter_1` × 1 + `rune_pierce_1` × 1 | 散射出的子弹丸继承 100% 的穿透层数 |
+| `runeword_armor_piercing_meteor` | 穿甲流星 | `rune_pierce_2` × 1 + `rune_scatter_1` × 1 + `rune_pierce_1` × 1 | 散射出的子弹丸继承 100% 的穿透层数；每级散射子弹伤害额外 +15%；与炎光剑影联动时散射子弹也可触发剑光 |
 | `runeword_blazing_beam` | 炽热光线 | `rune_pyro_1` × 1 + `rune_laser_1` × 1 + `rune_laser_2` × 1 | 激光照射敌人时，每 0.5 秒额外提升敌人温度 |
 | `runeword_lightning_shield` | 雷电护盾 | `rune_lightning_2` × 1 + `rune_bounce_2` × 1 + `rune_bounce_1` × 1 | 弹珠弹射时有概率在自身周围生成静电场 |
 | `runeword_blade_storm` | 剑刃风暴 | `rune_pierce_1` × 1 + `rune_pierce_2` × 1 + `rune_scatter_1` × 1 | 首个子弹定期对范围内所有敌人生成一次剑光斩击 | 
@@ -57,8 +57,8 @@
 | `thunder_scatter` | 雷霆散射 | `src/combat/damage_calc.js` 闪电链触发后 | `activeRunewordEffects['thunder_scatter']` |
 | `kinetic_surge` | 动能激增 | `src/combat_system.js` 弹跳伤害段 | `activeRunewordEffects['kinetic_surge']` |
 | `irradiation` | 照射 | `src/combat_system.js` 约第 2466 行 | `activeRunewordEffects['irradiation']`, `e._irradiationStacks` |
-| `flame_sword` | 炎光剑影 | `src/combat_system.js` 约第 1755 行 | `activeRunewordEffects['flame_sword']` |
-| `armor_piercing_meteor` | 穿甲流星 | `src/combat_system.js` 穿透判定处 | `activeRunewordEffects['armor_piercing_meteor']` |
+| `flame_sword` | 炎光剑影 | `src/combat_system.js` 约第 1757 行 | `activeRunewordEffects['flame_sword']`；注意：当 `armor_piercing_meteor` 激活时，散射子弹（`isScatterChild=true`）也可触发 |
+| `armor_piercing_meteor` | 穿甲流星 | `src/spawn_system.js` 约第 1000 行（散射子弹生成）；`src/combat_system.js` 约第 1757 行（炎光剑影联动） | `activeRunewordEffects['armor_piercing_meteor']`；联动：`config.isScatterChild && armorPiercingActive` 放开炎光剑影触发限制 |
 | `blazing_beam` | 炽热光线 | `src/combat_system.js` 激光照射循环 | `activeRunewordEffects['blazing_beam']` |
 | `lightning_shield` | 雷电护盾 | `src/combat_system.js` 约第 1778 行 | `activeRunewordEffects['lightning_shield']` |
 | `blade_storm` | 剑刃风暴 | `src/combat_system.js` 约第 359 行 | `activeRunewordEffects['blade_storm']` |

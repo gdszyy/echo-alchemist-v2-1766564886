@@ -294,7 +294,7 @@ const RUNEWORD_DB = [
         effectId: 'armor_piercing_meteor',
         pattern: ['rune_pierce_2', 'rune_scatter_1', 'rune_pierce_1'],
         effect_desc: '【穿透系】散射出的子弹丸继承 100% 的穿透层数。',
-        baseParams: { damageBonus: 0 },
+        baseParams: { damageBonus: 0.15 },
         perLevelParams: { damageBonus: 0.15 }
     },
     {
