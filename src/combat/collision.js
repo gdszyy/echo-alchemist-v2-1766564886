@@ -230,6 +230,7 @@ export const CollisionSystem = {
             if (!skipDamage) {
                 // [动画与伤害同步] 只有由状态机 tick 触发或首次发射时才计算伤害。
                 // burstQueue 额外连射发射时 skipDamage=true，仅更新视觉。
+                console.log(`[COLLISION] 照射伤害触发! 敌人=${hit.enemy.type||'?'} damage=${finalDamage.toFixed(1)} irradiationStacks=${hit.enemy._irradiationStacks||0}`);
 
                 // 对第一个敌人造成伤害
                 this.combat_damageEnemy(hit.enemy, { config: finalRecipe, pos: new Vec2(hit.projX, hit.projY), isCopy: false });
@@ -263,6 +264,7 @@ export const CollisionSystem = {
                 }
             } else {
                 // skipDamage=true：仅更新 hitEnemiesSet，不计算伤害
+                console.log(`[COLLISION] skipDamage=true 跳过伤害 敌人=${hit.enemy.type||'?'}`);
                 hitEnemiesSet.add(hit.enemy);
             }
 
