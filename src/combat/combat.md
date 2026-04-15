@@ -129,3 +129,30 @@ P(折射) = baseChance × laserRefractionDepthDecay ^ depth
 | 折射 | 概率触发，消耗 bounce 层数 | **强制随机折射**：命中后必定在半径内随机选取目标折射，不消耗 bounce |
 | 折射颜色 | 偏绿（bounce 属性色） | 金色（`#fbbf24`，照射词条色） |
 | 累积伤害叠加 | 无 | 每次照射同一敌人 `_irradiationStacks++`，额外伤害 = 层数 × damageAmp × 基础伤害 |
+
+## 6. 雷霆散射词条防循环修复（2026-04-15）
+
+### 6.1 问题描述
+
+`thunder_scatter`（雷霆散射）词条在 `combat_lightning_triggerChain` 中的实现存在无限循环风险：
+
+- 原实现：额外链调用 `combat_lightning_triggerChain(selected, nextDmg, extraHistory, level, shotId)` 时，该函数内部也会读取 `thunderScatterEffect` 并再次触发额外链。
+- 虽然每次有 50% 概率，但理论上可以无限递归，导致性能问题。
+
+### 6.2 修复方案
+
+为 `combat_lightning_triggerChain` 函数新增 `isExtraChain` 参数（默认值 `false`）：
+
+```javascript
+combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = null, chainChanceBonus = 0, isExtraChain = false)
+```
+
+- 主链调用（递归）：`isExtraChain = false`（默认），正常触发 thunder_scatter。
+- 额外链调用：传入 `isExtraChain = true`，跳过 thunder_scatter 触发逻辑。
+
+### 6.3 关键约束
+
+- 额外链继承原链的 `level`（闪电属性层数）和目标选择逻辑（距离加权随机）。
+- 额外链使用独立的 `[...history]` 副本，不影响主链的历史记录。
+- 额外链触发概率保持 50%（`Math.random() < 0.5`），在合理范围内。
+- `isExtraChain` 参数仅影响 thunder_scatter 的触发，不影响其他词条（thunderstorm、elemental_fusion）。

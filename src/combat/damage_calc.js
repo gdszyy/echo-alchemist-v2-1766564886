@@ -9,7 +9,7 @@
  *  - 色差特效触发（通过 EventBus 事件驱动，Task 3.2 已完成）
  *  - [词条 Hook] 7 个词条效果 Hook（Agent C 实现）
  *    - thunderstorm（雷暴之语）：提升闪电链伤害衰减系数
- *    - thunder_scatter（雷霆散射）：成功触发闪电链后额外触发一次
+ *    - thunder_scatter（雷霆散射）：成功触发闪电链后额外触发一次（isExtraChain 防循环保护）
  *    - absolute_zero（绝对零度）：冰冻状态下伤害加深
  *    - elemental_fusion（元素聚变）：三元素共存时触发爆炸
  *
@@ -136,17 +136,18 @@ export const DamageCalc = {
      *
      *   [词条 Hook] 已注入以下词条效果：
      *   - thunderstorm（雷暴之语）：提升 decayFactor，减少伤害衰减
-     *   - thunder_scatter（雷霆散射）：成功触发后，按概率额外触发一次闪电链
-     *   - elemental_fusion（元素聚变）：命中后检查三元素状态，触发聚变爆炸
+     *   - thunder_scatter（雷霆散射）：成功触发后，按概率额外触发一次闪电链（isExtraChain=false 时才触发，防止无限循环）
      *
      * @param {Enemy} sourceEnemy - 闪电来源敌人
      * @param {number} dmg - 当前段伤害
      * @param {Array} history - 已命中敌人历史（防止来回跳）
      * @param {number} level - 闪电属性层数（影响衰减和概率）
      * @param {number|null} shotId - 子弹ID
+     * @param {number} chainChanceBonus - 共鸣概率加成
+     * @param {boolean} isExtraChain - 是否为 thunder_scatter 触发的额外链（额外链不再触发 thunder_scatter，防止无限循环）
      * @returns {boolean} 是否成功触发了闪电链
      */
-    combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = null, chainChanceBonus = 0) {
+    combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = null, chainChanceBonus = 0, isExtraChain = false) {
         // [修复1] 安全检查
         if (!sourceEnemy || !sourceEnemy.pos) return false;
         // [修复2] 容错处理
@@ -268,16 +269,18 @@ export const DamageCalc = {
                 // [词条 Hook] 雷霆散射（thunder_scatter）
                 // 效果：每次成功触发闪电链时，有概率额外释放一条同属性闪电链
                 // 概率：extraChains 次额外触发（每次独立判定 50% 概率）
+                // 防循环：isExtraChain=true 时跳过，确保额外链不会再次触发 thunder_scatter
                 // ─────────────────────────────────────────────────────────────
                 const thunderScatterEffect = this.activeRunewordEffects && this.activeRunewordEffects['thunder_scatter'];
-                if (thunderScatterEffect && selected.active) {
+                if (thunderScatterEffect && selected.active && !isExtraChain) {
                     const extraChains = Math.floor(thunderScatterEffect.params.extraChains || 0);
                     for (let i = 0; i < extraChains; i++) {
                         // 每次额外触发有 50% 概率实际触发，防止过于强力
                         if (Math.random() < 0.5) {
-                            // 额外闪电链使用相同的 dmg 和 level，但独立的 history
+                            // 额外闪电链使用相同的 level，但独立的 history
+                            // isExtraChain=true：额外链不会再次触发 thunder_scatter，防止无限循环
                             const extraHistory = [...history];
-                            this.combat_lightning_triggerChain(selected, nextDmg, extraHistory, level, shotId);
+                            this.combat_lightning_triggerChain(selected, nextDmg, extraHistory, level, shotId, 0, true);
                         }
                     }
                 }
