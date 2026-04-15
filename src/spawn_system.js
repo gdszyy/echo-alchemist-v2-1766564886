@@ -82,8 +82,8 @@ export const spawn_system = {
      * @param {string} text - 文字內容
      * @param {string} [color] - 文字顏色 (可選)
      */
-    spawn_createFloatingText(x, y, text, color) { 
-        this.floatingTexts.push(new FloatingText(x, y, text, color)); 
+    spawn_createFloatingText(x, y, text, color, fontSize) { 
+        this.floatingTexts.push(new FloatingText(x, y, text, color, fontSize)); 
     },
 
 // --- 敌人生成与词缀系统 ---

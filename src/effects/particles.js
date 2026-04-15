@@ -474,12 +474,13 @@ class FloatingText {
      * @param {string} text - 文本
      * @param {string} [color='#fbbf24'] - 颜色 (默认为金色)
      */
-    constructor(x, y, text, color = '#fbbf24') { 
+    constructor(x, y, text, color = '#fbbf24', fontSize = 16) { 
         this.pos = new Vec2(x, y); 
         this.vel = new Vec2(0, -1); // 向上飄
         this.life = 1.0; 
         this.text = text; 
-        this.color = color; 
+        this.color = color;
+        this.fontSize = fontSize;
     }
 
     update(timeScale) { 
@@ -491,12 +492,12 @@ class FloatingText {
         if (this.life <= 0) return;
         ctx.save();
         ctx.globalAlpha = Math.max(0, this.life); 
-        ctx.font = 'bold 16px sans-serif'; 
+        ctx.font = `bold ${this.fontSize}px sans-serif`; 
         ctx.textAlign = 'center';
         
         // 繪製描邊讓文字更清楚
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = Math.max(3, this.fontSize / 5);
         ctx.strokeText(this.text, this.pos.x, this.pos.y);
         
         // 繪製填充

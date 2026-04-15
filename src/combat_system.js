@@ -1953,8 +1953,8 @@ export const combat_system = {
         // [新增] 统一显示伤害数字 (使用实际造成的伤害)
         if (this.showDamageNumbers && actualDmg > 0) {
             if (isCrit) {
-                // 暴击时：显示金色 CRIT 文字，不再重复显示普通伤害数字
-                this.spawn_createFloatingText(hitX, hitY - 10, `CRIT! -${Math.ceil(actualDmg)}`, '#FFD700');
+                // [修复] 暴击时：显示更大的红色暴击伤害数字（24px），不再显示 CRIT! 前缀文字
+                this.spawn_createFloatingText(hitX, hitY - 10, `-${Math.ceil(actualDmg)}`, '#FF3333', 24);
             } else {
                 this.spawn_createFloatingText(hitX, hitY, `-${Math.ceil(actualDmg)}`, damageColor);
             }
@@ -1966,10 +1966,8 @@ export const combat_system = {
                 const sparkColor = i % 2 === 0 ? '#FFD700' : '#FF4444';
                 this.spawn_createParticle(hitX, hitY, sparkColor, 'spark');
             }
-            // 2. 小范围金色冲击波（maxRadius 覆写为 60）
-            const critSw = new Shockwave(hitX, hitY, '#FFD700');
-            critSw.maxRadius = 60;
-            this.shockwaves.push(critSw);
+            // 2. [修复] 移除黄色光圈冲击波，改为对敌人施加更大幅度的震动
+            enemy.hitTimer = Math.max(enemy.hitTimer, 28); // 暴击震动：hitTimer=28，震动幅度最大 14px（普通为 5px）
         }
         audio.playEnemyHit(hitType);
 
