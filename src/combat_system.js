@@ -2475,7 +2475,12 @@ export const combat_system = {
      * @param {Object} recipe - 子弹配方
      * @param {string|null} shotId - 本次发射的统计 ID
      */
-    combat_laser_fire(startX, startY, vel, recipe, shotId = null) {
+    /**
+     * @param {boolean} [isTickFire=false] - 是否是由持续照射状态机的 tick 触发。
+     *   true：状态机 tick，执行完整伤害计算。
+     *   false：首次发射或 burstQueue 额外连射。在照射持续模式下，首次发射执行伤害，额外连射跳过伤害。
+     */
+    combat_laser_fire(startX, startY, vel, recipe, shotId = null, isTickFire = false) {
         // [统计] 激光是即时的，手动增加计数并在完成后减少
         if (shotId !== null && this.shotDamageMap.has(shotId)) {
             this.shotDamageMap.get(shotId).projectileCount++;
@@ -2564,10 +2569,14 @@ export const combat_system = {
                 const nextPos = currPos.add(currDir.mult(segmentLen));
 
                 // C. 伤害路径上的普通敌人，并尝试触发折射
+                // [动画与伤害同步] 照射持续模式下，只有首次发射和 tick 触发时才计算伤害。
+                // burstQueue 额外连射（delay=20/40/60）时 _continuousLaserFiring=true 且 isTickFire=false，跳过伤害。
+                const skipDmg = this._continuousLaserFiring && !isTickFire
+                    && this._continuousLaserState && this._continuousLaserState.elapsedFrames > 0;
                 if (refractionCount < maxRefractionTotal) {
                     const penetrationResult = this.combat_laser_processPenetration(
                         currPos, nextPos, taskRecipe,
-                        remainLen, bouncesLeft, hitEnemiesSet, width, refractionDepth
+                        remainLen, bouncesLeft, hitEnemiesSet, width, refractionDepth, skipDmg
                     );
                     // 接收折射任务并加入队列
                     if (penetrationResult.refractionTasks && penetrationResult.refractionTasks.length > 0) {
@@ -2584,7 +2593,7 @@ export const combat_system = {
                     // 已达折射上限，仅处理穿透伤害，不再生成折射
                     this.combat_laser_processPenetration(
                         currPos, nextPos, taskRecipe,
-                        0, 0, hitEnemiesSet, width, refractionDepth
+                        0, 0, hitEnemiesSet, width, refractionDepth, skipDmg
                     );
                 }
 
@@ -2760,7 +2769,8 @@ export const combat_system = {
                 state.activeBeams.forEach(b => b.startFadeOut());
             }
             // 重新执行激光射线计算（_continuousLaserFiring 已为 true，不会再次启动状态机）
-            this.combat_laser_fire(state.startX, state.startY, state.vel, state.recipe, state.shotId);
+            // isTickFire=true 确保伤害计算正常执行，不会被 skipDmg 逻辑跳过。
+            this.combat_laser_fire(state.startX, state.startY, state.vel, state.recipe, state.shotId, true);
         }
     },
 

@@ -152,7 +152,7 @@ export const CollisionSystem = {
      *   refractionTasks: 折射任务列表，每项为 { startPos, dir, remainLen, recipe, bouncesLeft, hitEnemiesSet, width, refractionDepth }
      *   bouncesLeft: 处理后剩余的反弹次数（已被折射消耗）
      */
-    combat_laser_processPenetration(p1, p2, recipe, remainLen = 0, bouncesLeft = 0, hitEnemiesSet = null, currentWidth = null, refractionDepth = 0) {
+    combat_laser_processPenetration(p1, p2, recipe, remainLen = 0, bouncesLeft = 0, hitEnemiesSet = null, currentWidth = null, refractionDepth = 0, skipDamage = false) {
         const laserVisualWidth = currentWidth !== null
             ? currentWidth
             : 3 + (recipe.laser * 4) + (recipe.explosive ? 10 : 0);
@@ -227,35 +227,43 @@ export const CollisionSystem = {
             const finalDamage = recipe.damage * pierceBonus;
             const finalRecipe = { ...recipe, damage: finalDamage };
 
-            // 对第一个敌人造成伤害
-            this.combat_damageEnemy(hit.enemy, { config: finalRecipe, pos: new Vec2(hit.projX, hit.projY), isCopy: false });
-            hitEnemiesSet.add(hit.enemy);
+            if (!skipDamage) {
+                // [动画与伤害同步] 只有由状态机 tick 触发或首次发射时才计算伤害。
+                // burstQueue 额外连射发射时 skipDamage=true，仅更新视觉。
 
-            // 视觉：受击点特效
-            if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#fff', 'spark');
+                // 对第一个敌人造成伤害
+                this.combat_damageEnemy(hit.enemy, { config: finalRecipe, pos: new Vec2(hit.projX, hit.projY), isCopy: false });
+                hitEnemiesSet.add(hit.enemy);
 
-            // 照射词条 Hook：累积照射同一敌人伤害加深
-            // [切换目标检测] 若命中的敌人与上次不同，重置旧敌人的 _irradiationStacks
-            const laserState = this._continuousLaserState;
-            if (laserState && laserState.lastHitEnemy && laserState.lastHitEnemy !== hit.enemy) {
-                laserState.lastHitEnemy._irradiationStacks = 0;
-            }
-            if (laserState) laserState.lastHitEnemy = hit.enemy;
-            if (!hit.enemy._irradiationStacks) hit.enemy._irradiationStacks = 0;
-            hit.enemy._irradiationStacks++;
-            const stackDmg = hit.enemy._irradiationStacks * amp * finalDamage;
-            if (stackDmg >= 1) {
-                const stackResult = hit.enemy.takeDamage(stackDmg);
-                this.combat_recordDamage(stackResult.actualDamage, 'pyro', 'main', null);
-                this.spawn_createFloatingText(hit.enemy.pos.x, hit.enemy.pos.y - 35, `照射+${Math.ceil(stackResult.actualDamage)}`, '#fbbf24');
-            }
+                // 视觉：受击点特效
+                if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#fff', 'spark');
 
-            // 炽热光线词条 Hook：激光命中敌人时额外升温
-            const blazingBeamFx = this.activeRunewordEffects && this.activeRunewordEffects['blazing_beam'];
-            if (blazingBeamFx) {
-                const tempIncrease = (blazingBeamFx.params && blazingBeamFx.params.tempIncrease) || 0;
-                hit.enemy.applyTemp(tempIncrease);
-                if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#f97316', 'spark');
+                // 照射词条 Hook：累积照射同一敌人伤害加深
+                // [切换目标检测] 若命中的敌人与上次不同，重置旧敌人的 _irradiationStacks
+                const laserState = this._continuousLaserState;
+                if (laserState && laserState.lastHitEnemy && laserState.lastHitEnemy !== hit.enemy) {
+                    laserState.lastHitEnemy._irradiationStacks = 0;
+                }
+                if (laserState) laserState.lastHitEnemy = hit.enemy;
+                if (!hit.enemy._irradiationStacks) hit.enemy._irradiationStacks = 0;
+                hit.enemy._irradiationStacks++;
+                const stackDmg = hit.enemy._irradiationStacks * amp * finalDamage;
+                if (stackDmg >= 1) {
+                    const stackResult = hit.enemy.takeDamage(stackDmg);
+                    this.combat_recordDamage(stackResult.actualDamage, 'pyro', 'main', null);
+                    this.spawn_createFloatingText(hit.enemy.pos.x, hit.enemy.pos.y - 35, `照射+${Math.ceil(stackResult.actualDamage)}`, '#fbbf24');
+                }
+
+                // 炙热光线词条 Hook：激光命中敌人时额外升温
+                const blazingBeamFx = this.activeRunewordEffects && this.activeRunewordEffects['blazing_beam'];
+                if (blazingBeamFx) {
+                    const tempIncrease = (blazingBeamFx.params && blazingBeamFx.params.tempIncrease) || 0;
+                    hit.enemy.applyTemp(tempIncrease);
+                    if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#f97316', 'spark');
+                }
+            } else {
+                // skipDamage=true：仅更新 hitEnemiesSet，不计算伤害
+                hitEnemiesSet.add(hit.enemy);
             }
 
             // 强制随机折射：在折射半径内随机选取一个未被命中的敌人
@@ -280,7 +288,7 @@ export const CollisionSystem = {
                 this.spawn_createParticle(hit.projX, hit.projY, '#fbbf24', 'spark');
                 this.spawn_createParticle(hit.projX, hit.projY, '#fde68a', 'spark');
 
-                // 折射任务加入队列（不消耗 bounce，bouncesLeft 保持不变）
+                // 折射任务加入队列（不消耗 bounce， bouncesLeft 保持不变）
                 refractionTasks.push({
                     startPos: new Vec2(hit.projX, hit.projY),
                     dir: rfDir,
