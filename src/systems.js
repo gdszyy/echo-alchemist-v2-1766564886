@@ -1281,19 +1281,25 @@ const TRAINING_SCENARIOS = {
             desc: '[元素系] 當敵人同時承受火、冰、雷三種狀態時，引發元素聚變爆炸。建護先用冰霜+閃電將敵人凍結，再用火焰觸發聚變。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
-                // 中心目標敵人，初始狀態設為冰电共存
+                // 中心目標敵人，初始狀態設為冰電共存
+                // [修复] 同时设置 temp=-100 和 _cryoHitThisRound=true，确保冰状态标记有效
                 const e = new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 4000, 4000);
                 e.temp = -100; // 凍結
+                e._cryoHitThisRound = true;      // [修复] 预设冰元素标记，供聚变触发条件使用
+                e._lightningHitThisRound = true; // [修复] 预设雷元素标记，模拟已被闪电命中状态
                 game.enemies.push(e);
                 // 周围小怪用于演示爆炸 AOE
                 [{c:1.5,r:0},{c:3.5,r:0},{c:1.5,r:2},{c:3.5,r:2}].forEach(p => {
                     game.enemies.push(new Enemy(p.c * w + w/2, top + p.r * h + h/2, 60, 60, 300));
                 });
             },
-            bulletConfig: { damage: 20, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 400, cryo: 0, lightning: 8, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            // [修复] bulletConfig 加入 cryo 和 lightning 属性，确保每次发射都能重新积累三元素状态
+            // pyro=5 触发火状态，cryo=5 触发冰状态，lightning=5 触发雷状态，三者共存即引爆聚变
+            bulletConfig: { damage: 20, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 5, cryo: 5, lightning: 5, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game, tg) => {
-                const vel = new Vec2(0, -15);
-                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+                // [修复] 改用 fireBulletWithEffects，确保子弹经由 combat_fireNextShot 完整走词条流程
+                // 子弹携带 pyro+cryo+lightning 三属性，命中后自动设置三元素标记并触发聚变
+                tg.fireBulletWithEffects(tg.bulletConfig);
             }
         },
         {
