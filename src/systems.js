@@ -1530,11 +1530,9 @@ class TrainingGround {
             }
             /* 符文词条效果横幅 */
             #train-runeword-banner {
-                position: absolute;
-                top: 40px; /* 顶部状态栏高度 */
-                left: 0;
-                right: 0;
+                position: relative;
                 z-index: 30;
+                flex-shrink: 0;
                 background: linear-gradient(135deg, rgba(15,23,42,0.97) 0%, rgba(30,27,75,0.97) 100%);
                 border-bottom: 1px solid rgba(139,92,246,0.4);
                 padding: 8px 16px;
@@ -1601,10 +1599,10 @@ class TrainingGround {
         document.head.appendChild(style);
 
         ui.innerHTML = `
-            <!-- 左侧主战斗区域 -->
+                <!-- 左侧主战斗区域 -->
             <div id="train-main-area">
                 <!-- 顶部状态栏 -->
-                <div class="absolute top-0 left-0 right-0 h-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 z-20">
+                <div class="flex-shrink-0 h-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 z-20" style="position:relative;">
                     <div class="text-slate-400 text-[10px] uppercase tracking-wider flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
                         Combat Simulation
@@ -1812,6 +1810,18 @@ class TrainingGround {
         // 0. 重置符文词条效果（切换场景时清空旧词条）
         this.game.activeRunewordEffects = {};
         this.game.activeRunewordStats = {};
+
+        // 0b. 根据分类动态调整 combatGridTopY
+        // 符文词条分类有顶部横幅（约70px），需要让敵人在横幅下方居中偏上放置
+        const trainTopBarH = 40;
+        if (scenario.categoryId === 'runeword') {
+            // 横幅高度约70px，在其下方保留 8px 间距
+            const bannerH = 70;
+            this.game.combatGridTopY = trainTopBarH + bannerH + 8 + this.game.enemyHeight / 2;
+        } else {
+            // 其他分类恢复标准高度
+            this.game.combatGridTopY = trainTopBarH + 8 + this.game.enemyHeight / 2;
+        }
 
         // 0a. 符文词条场景特殊处理：模拟词条激活状态
         if (scenario.categoryId === 'runeword' && scenario.runewordId) {
@@ -2049,6 +2059,10 @@ class TrainingGround {
         this.active = true;
         this.game.hasCombatWall = true; 
         this.game.phase_switchPhase('training');
+        // 试炼场顶部栏高度为 40px（h-10），重新计算 combatGridTopY
+        // 避免使用 unified-top-bar（52px）导致的顶部空档
+        const trainTopBarH = 40;
+        this.game.combatGridTopY = trainTopBarH + 8 + this.game.enemyHeight / 2;
         document.getElementById('phase-training').style.display = 'flex';
         document.getElementById('phase-training').classList.remove('hidden-phase');
         document.getElementById('phase-training').classList.add('active-phase');
