@@ -293,6 +293,12 @@ export const game_system = {
         this.postBossSurgeRoundsLeft = 0;
         // [清屏奖励] 重置清屏标志位
         this._prevRoundCleared = false;
+        
+        // [剑刃风暴] 重置首发子弹相关状态
+        this._roundFirstShotId = null;
+        this._bladeStormProjectile = null;
+        this._bladeStormTimer = 0;
+        
         // [本局统计] 重置本局统计字段
         this.runKillCount = 0;
         this.runRuneFragmentsGained = 0;

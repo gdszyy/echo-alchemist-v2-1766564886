@@ -606,6 +606,11 @@ phase_gathering_getRandomPegType() {
         this._continuousLaserFiring = false;
         this._continuousLaserState = null;
         
+        // [剑刃风暴] 重置回合首发子弹标记与更新定时器
+        this._roundFirstShotId = null;
+        this._bladeStormProjectile = null;
+        this._bladeStormTimer = 0;
+        
         // 初始化当前回合伤害记录
         this.shotDamageHistory = [];
         this.currentViewingRound = 0; 
@@ -1529,6 +1534,11 @@ phase_gathering_getRandomPegType() {
             // [照射词条] 持续照射状态机驱动（每 0.5s 重算一次激光）
             if (this._continuousLaserFiring) {
                 this.combat_continuousLaser_update(timeScale);
+            }
+            
+            // [剑刃风暴词条] 绑定首个子弹的周期性风斩更新
+            if (this.combat_bladeStorm_update) {
+                this.combat_bladeStorm_update(timeScale);
             }
             // 拖拽瞄准线
             if (this.isDragging && this.projectiles.length === 0 && this.ammoQueue.length > 0 && this.burstQueue.length === 0) {

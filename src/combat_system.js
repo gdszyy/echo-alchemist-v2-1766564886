@@ -355,35 +355,7 @@ export const combat_system = {
                 sword.addTarget(enemy);
             }
         });
-        // [Agent D] 剑刃风暴词条 Hook：为飞剑添加周期性范围斩击逻辑
-        const bladeStormFx = this.activeRunewordEffects && this.activeRunewordEffects['blade_storm'];
-        if (bladeStormFx) {
-            const radius = (bladeStormFx.params && bladeStormFx.params.radius) || 120;
-            const damageRatio = (bladeStormFx.params && bladeStormFx.params.damageRatio) || 0.6;
-            const interval = Math.max(0.1, (bladeStormFx.params && bladeStormFx.params.interval) || 0.5);
-            const now = Date.now();
-            // 使用节流器避免每帧触发
-            if (!this._bladeStormLastTick || (now - this._bladeStormLastTick) >= interval * 1000) {
-                this._bladeStormLastTick = now;
-                // 对飞剑周围 radius px 内的所有敌人造成风属性伤害
-                this.sonSwords.forEach(sword => {
-                    if (!sword.active || sword.isMotherBlade) return;
-                    const baseDmg = sword.config ? sword.config.damage : 2;
-                    const slashDmg = Math.ceil(baseDmg * damageRatio);
-                    this.enemies.forEach(e => {
-                        if (!e.active) return;
-                        if (sword.pos.dist(e.pos) < radius) {
-                            const slashResult = e.takeDamage(slashDmg);
-                            this.combat_recordDamage(slashResult.actualDamage, 'wind', 'flying_sword', null);
-                            this.spawn_createFloatingText(e.pos.x, e.pos.y - 20, `风斩+${Math.ceil(slashResult.actualDamage)}`, '#34d399');
-                        }
-                    });
-                    // 视觉特效
-                    const angle = Math.random() * Math.PI * 2;
-                    this.spawn_pushParticleWithLimit(new SlashAnim(sword.pos.x, sword.pos.y, angle, 0.35, '#34d399'));
-                });
-            }
-        }
+        // [修复] 剑刃风暴词条逻辑已移至 combat_bladeStorm_update，因为该效果应绑定在首个子弹存活期间周期性触发，而不是在飞剑索敌时触发。
     },
 
 // --- 新增方法：添加子剑 ---
@@ -2269,6 +2241,11 @@ export const combat_system = {
      */
     combat_fireNextShot(vel) {
         if (this.ammoQueue.length === 0) return;
+        
+        // 标记首发子弹
+        if (this._roundFirstShotId === null) {
+            this._roundFirstShotId = this.shotIdCounter;
+        }
 
         // [修复] 递归提取套娃配方，并确保使用深拷贝防止后续逻辑修改原始配方
         const pullNext = () => {
@@ -2661,6 +2638,55 @@ export const combat_system = {
      *   触发条件：irradiation 词条（持续照射累积伤害）或 blazing_beam 词条（持续升温）激活时启动。
      * @param {number} timeScale - 当前帧时间缩放（通常为 1）
      */
+    // --- [修复] 剑刃风暴定期更新逻辑 ---
+    combat_bladeStorm_update(timeScale) {
+        const bladeStormFx = this.activeRunewordEffects && this.activeRunewordEffects['blade_storm'];
+        if (!bladeStormFx) return;
+
+        // 寻找首个子弹：在 projectiles 中查找 shotId 等于 _roundFirstShotId 且不是分裂副子弹的主子弹
+        let targetProj = this._bladeStormProjectile;
+        if (!targetProj || !targetProj.active || targetProj.destroyed) {
+            targetProj = this.projectiles.find(p => p.shotId === this._roundFirstShotId && !p.isCopy);
+            if (targetProj) {
+                this._bladeStormProjectile = targetProj;
+            } else {
+                return; // 首个子弹已消失或未生成
+            }
+        }
+
+        const radius = (bladeStormFx.params && bladeStormFx.params.radius) || 120;
+        const damageRatio = (bladeStormFx.params && bladeStormFx.params.damageRatio) || 0.6;
+        const interval = Math.max(0.1, (bladeStormFx.params && bladeStormFx.params.interval) || 0.5);
+
+        this._bladeStormTimer = (this._bladeStormTimer || 0) + timeScale;
+        // 60帧 = 1秒
+        if (this._bladeStormTimer >= interval * 60) {
+            this._bladeStormTimer = 0;
+
+            const baseDmg = targetProj.config ? targetProj.config.damage : 2;
+            const slashDmg = Math.ceil(baseDmg * damageRatio);
+
+            let hitAny = false;
+            this.enemies.forEach(e => {
+                if (!e.active) return;
+                if (targetProj.pos.dist(e.pos) < radius) {
+                    const slashResult = e.takeDamage(slashDmg);
+                    this.combat_recordDamage(slashResult.actualDamage, 'wind', 'main', targetProj.shotId);
+                    this.spawn_createFloatingText(e.pos.x, e.pos.y - 20, `风斩+${Math.ceil(slashResult.actualDamage)}`, '#34d399');
+                    hitAny = true;
+                }
+            });
+
+            // 视觉特效：如果有敌人被斩击，或者只要触发就显示
+            if (hitAny) {
+                const angle = Math.random() * Math.PI * 2;
+                if (typeof SlashAnim !== 'undefined') {
+                    this.spawn_pushParticleWithLimit(new SlashAnim(targetProj.pos.x, targetProj.pos.y, angle, 0.35, '#34d399'));
+                }
+            }
+        }
+    }
+
     combat_continuousLaser_update(timeScale = 1) {
         if (!this._continuousLaserFiring || !this._continuousLaserState) return;
 
