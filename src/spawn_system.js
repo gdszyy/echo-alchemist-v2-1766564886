@@ -786,19 +786,20 @@ export const spawn_system = {
      */
     spawn_createParticle(x, y, color, mode = 'normal') {
         // ============================================================
-        // [粒子数量限制系统] v2 - 风属性有限供给 + 动态压制
+        // [粒子数量限制系统] v3 - 自适应性能等级驱动
+        // 预算数值来自 CONFIG.performance[this.perfQualityLevel]，
+        // 随帧率变化自动调整，无需手动修改魔法数字。
         // ============================================================
-        const MAX_PARTICLES = 800; // 全局粒子总上限
+        const _budget = CONFIG.performance[this.perfQualityLevel || 'high'];
 
         // --- 1. 全局上限检查 ---
-        if (this.particles.length > MAX_PARTICLES) return null;
+        if (this.particles.length >= _budget.maxParticles) return null;
 
         // --- 2. 风属性粒子：有限供给 ---
         // wind_slash（风刃）和 line（风道气流）为风属性专属粒子，设置独立配额
-        const WIND_PARTICLE_LIMIT = 120; // 风属性粒子最大存量
         if (mode === 'wind_slash' || mode === 'line') {
             const currentWind = this.particles.filter(p => p.mode === 'wind_slash' || p.mode === 'line').length;
-            if (currentWind >= WIND_PARTICLE_LIMIT) return null;
+            if (currentWind >= _budget.windLimit) return null;
         }
 
         // --- 3. 检测场上是否存在活跃的风属性粒子 ---
@@ -807,28 +808,20 @@ export const spawn_system = {
         const windIsActive = activeWindCount > 0;
 
         // --- 4. 火焰粒子（ember）限制 ---
-        // 基础上限较严格；风属性激活时进一步压缩
-        const EMBER_LIMIT_BASE = 80;  // 基础火焰粒子上限（比原 150 更严格）
-        const EMBER_LIMIT_WIND = 30;  // 风属性激活时的火焰粒子上限
         if (mode === 'ember') {
-            const limit = windIsActive ? EMBER_LIMIT_WIND : EMBER_LIMIT_BASE;
+            const limit = windIsActive ? _budget.emberLimitWind : _budget.emberLimit;
             const currentEmbers = this.particles.filter(p => p.mode === 'ember').length;
             if (currentEmbers >= limit) return null;
         }
 
         // --- 5. 冰霜粒子（mist / shard）限制 ---
-        // 基础上限较严格；风属性激活时进一步压缩
-        const MIST_LIMIT_BASE = 80;   // 基础冰雾粒子上限
-        const MIST_LIMIT_WIND = 30;   // 风属性激活时的冰雾粒子上限
-        const SHARD_LIMIT_BASE = 60;  // 基础冰渣粒子上限
-        const SHARD_LIMIT_WIND = 20;  // 风属性激活时的冰渣粒子上限
         if (mode === 'mist') {
-            const limit = windIsActive ? MIST_LIMIT_WIND : MIST_LIMIT_BASE;
+            const limit = windIsActive ? _budget.mistLimitWind : _budget.mistLimit;
             const currentMist = this.particles.filter(p => p.mode === 'mist').length;
             if (currentMist >= limit) return null;
         }
         if (mode === 'shard') {
-            const limit = windIsActive ? SHARD_LIMIT_WIND : SHARD_LIMIT_BASE;
+            const limit = windIsActive ? _budget.shardLimitWind : _budget.shardLimit;
             const currentShard = this.particles.filter(p => p.mode === 'shard').length;
             if (currentShard >= limit) return null;
         }
@@ -845,25 +838,26 @@ export const spawn_system = {
      * @param {Particle} p - 已构造好的粒子实例
      */
     spawn_pushParticleWithLimit(p) {
-        const MAX_PARTICLES = 800;
-        if (this.particles.length > MAX_PARTICLES) return false;
+        // [粒子数量限制系统] v3 - 自适应性能等级驱动（与 spawn_createParticle 保持同步）
+        const _budget = CONFIG.performance[this.perfQualityLevel || 'high'];
+        if (this.particles.length >= _budget.maxParticles) return false;
 
         const mode = p.mode;
         const activeWindCount = this.particles.filter(q => q.mode === 'wind_slash' || q.mode === 'line').length;
         const windIsActive = activeWindCount > 0;
 
         if (mode === 'ember') {
-            const limit = windIsActive ? 30 : 80;
+            const limit = windIsActive ? _budget.emberLimitWind : _budget.emberLimit;
             const current = this.particles.filter(q => q.mode === 'ember').length;
             if (current >= limit) return false;
         }
         if (mode === 'mist') {
-            const limit = windIsActive ? 30 : 80;
+            const limit = windIsActive ? _budget.mistLimitWind : _budget.mistLimit;
             const current = this.particles.filter(q => q.mode === 'mist').length;
             if (current >= limit) return false;
         }
         if (mode === 'shard') {
-            const limit = windIsActive ? 20 : 60;
+            const limit = windIsActive ? _budget.shardLimitWind : _budget.shardLimit;
             const current = this.particles.filter(q => q.mode === 'shard').length;
             if (current >= limit) return false;
         }
@@ -1140,7 +1134,10 @@ export const spawn_system = {
      * @param {number} x - **重要参数** 位置 X。
      * @param {number} y - **重要参数** 位置 Y。
      */
-    spawn_createShockwave(x, y, color = null) { 
+    spawn_createShockwave(x, y, color = null) {
+        // [自适应性能] 冲击波数量上限
+        const _budget = CONFIG.performance[this.perfQualityLevel || 'high'];
+        if (this.shockwaves.length >= _budget.shockwaveLimit) return;
         this.shockwaves.push(new Shockwave(x, y, color)); 
     },
 
@@ -1153,6 +1150,9 @@ export const spawn_system = {
      */
     spawn_createHealWave(x, y, range = 120) {
         if (!this.healWaves) this.healWaves = [];
+        // [自适应性能] 治疗波数量上限
+        const _budget = CONFIG.performance[this.perfQualityLevel || 'high'];
+        if (this.healWaves.length >= _budget.waveLimit) return;
         this.healWaves.push(new HealWave(x, y, range));
     },
 

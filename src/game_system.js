@@ -27,6 +27,56 @@ export const game_system = {
      * @description 游戏主循环，由 requestAnimationFrame 驱动。
      */
     sys_loop() {
+        // ==================== [自适应性能] FPS 采样与等级调整 ====================
+        const _now = performance.now();
+        if (this._lastFrameTime > 0) {
+            const _dt = _now - this._lastFrameTime;
+            // 只记录合理范围内的帧时间（5ms ~ 200ms），过滤标签页切换等异常
+            if (_dt > 5 && _dt < 200) {
+                const _perfCfg = CONFIG.performance;
+                const _samples = this._fpsSamples;
+                _samples.push(_dt);
+                if (_samples.length > _perfCfg.fpsSampleWindow) _samples.shift();
+                // 计算滑动平均 FPS
+                const _avgDt = _samples.reduce((a, b) => a + b, 0) / _samples.length;
+                this.avgFps = Math.round(1000 / _avgDt);
+
+                // 仅在采样窗口满后才开始评估等级（避免启动时误判）
+                if (_samples.length >= _perfCfg.fpsSampleWindow) {
+                    const _dtSec = _dt / 1000; // 本帧时长（秒），用于计时器累加
+                    const _level = this.perfQualityLevel;
+
+                    if (this.avgFps < _perfCfg.fpsThresholdDown && _level !== 'low') {
+                        // 连续低帧：累加降级计时器
+                        this._perfDownTimer += _dtSec;
+                        this._perfUpTimer = 0;
+                        if (this._perfDownTimer >= _perfCfg.downgradeHoldSec) {
+                            this._perfDownTimer = 0;
+                            const _prev = _level;
+                            this.perfQualityLevel = _level === 'high' ? 'medium' : 'low';
+                            console.info(`[Perf] 特效等级降级: ${_prev} → ${this.perfQualityLevel}（平均 FPS: ${this.avgFps}）`);
+                        }
+                    } else if (this.avgFps > _perfCfg.fpsThresholdUp && _level !== 'high') {
+                        // 连续高帧：累加升级计时器
+                        this._perfUpTimer += _dtSec;
+                        this._perfDownTimer = 0;
+                        if (this._perfUpTimer >= _perfCfg.upgradeHoldSec) {
+                            this._perfUpTimer = 0;
+                            const _prev = _level;
+                            this.perfQualityLevel = _level === 'low' ? 'medium' : 'high';
+                            console.info(`[Perf] 特效等级升级: ${_prev} → ${this.perfQualityLevel}（平均 FPS: ${this.avgFps}）`);
+                        }
+                    } else {
+                        // FPS 处于正常区间，重置两个计时器
+                        this._perfDownTimer = 0;
+                        this._perfUpTimer = 0;
+                    }
+                }
+            }
+        }
+        this._lastFrameTime = _now;
+        // ==================== [自适应性能] END ====================
+
         // 暂停时跳过物理更新，但继续请求下一帧以保持 rAF 循环活跃
         if (this.isPaused) {
             requestAnimationFrame(() => this.sys_loop());
@@ -100,7 +150,10 @@ export const game_system = {
             }
         }
 
-        // 8. 下一帧请求
+        // 8. [自适应性能] FPS 和性能等级指示层
+        this.render_perfOverlay();
+
+        // 9. 下一帧请求
         this.ctx.restore();
         requestAnimationFrame(() => this.sys_loop());
     },

@@ -141,7 +141,10 @@ export const combat_system = {
                 if (e.active) {
                     // 1. 视觉：天雷 (从屏幕顶端打到敌人头顶)
                     const startX = e.pos.x + (Math.random() - 0.5) * 50;
-                    this.lightningBolts.push(new LightningBolt(startX, 0, e.pos.x, e.pos.y));
+                    // [自适应性能] 闪电特效数量上限
+                    if (this.lightningBolts.length < CONFIG.performance[this.perfQualityLevel || 'high'].lightningLimit) {
+                        this.lightningBolts.push(new LightningBolt(startX, 0, e.pos.x, e.pos.y));
+                    }
                     
                     // 2. 造成主伤害
                     const killed = e.takeDamage(dmg);
@@ -238,7 +241,10 @@ export const combat_system = {
                 const e = this.enemies[i];
                 if (e.active) {
                     const startX = e.pos.x + (Math.random() - 0.5) * 50;
-                    this.lightningBolts.push(new LightningBolt(startX, 0, e.pos.x, e.pos.y));
+                    // [自适应性能] 闪电特效数量上限
+                    if (this.lightningBolts.length < CONFIG.performance[this.perfQualityLevel || 'high'].lightningLimit) {
+                        this.lightningBolts.push(new LightningBolt(startX, 0, e.pos.x, e.pos.y));
+                    }
                     const killed = e.takeDamage(dmg);
                     this.combat_recordDamage(dmg, 'lightning', 'main', this._currentDamageShotId);
                     this.spawn_createFloatingText(e.pos.x, e.pos.y, `-${dmg}`, p.boltColor);
@@ -1799,7 +1805,10 @@ export const combat_system = {
                             ne.applyTemp(CONFIG.balance.lightningTempIncrease * shockStacks);
                             ne._lightningHitThisRound = true; // 标记雷属性命中（供元素聚变使用）
                             // LightningBolt 视觉特效：从命中点到每个受影响敌人
-                            this.lightningBolts.push(new LightningBolt(hitX, hitY, ne.pos.x, ne.pos.y));
+                            // [自适应性能] 闪电特效数量上限
+                            if (this.lightningBolts.length < CONFIG.performance[this.perfQualityLevel || 'high'].lightningLimit) {
+                                this.lightningBolts.push(new LightningBolt(hitX, hitY, ne.pos.x, ne.pos.y));
+                            }
                         }
                     });
                     this.spawn_createFloatingText(hitX, hitY - 20, '⚡静电场!', '#c084fc');
@@ -3180,7 +3189,11 @@ export const combat_system = {
 
         // --- 2. 燃烧状态死亡：火焰爆炸扩散 ---
         if (isBurning) {
-            this.fireWaves.push(new FireWave(x, y));
+            // [自适应性能] FireWave 数量上限
+            const _fwBudget = CONFIG.performance[this.perfQualityLevel || 'high'];
+            if (this.fireWaves.length < _fwBudget.waveLimit) {
+                this.fireWaves.push(new FireWave(x, y));
+            }
             // 火焰燃烧爆炸粒子
             const emberCount = tier === 'boss' ? 25 : (tier === 'elite' ? 15 : 8);
             for (let i = 0; i < emberCount; i++) {

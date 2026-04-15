@@ -202,7 +202,10 @@ export const DamageCalc = {
             setTimeout(() => {
                 if (!selected.active) return;
                 // 视觉效果：闪电链
-                this.lightningBolts.push(new LightningBolt(sourceEnemy.pos.x, sourceEnemy.pos.y, selected.pos.x, selected.pos.y));
+                // [自适应性能] 闪电特效数量上限
+                if (this.lightningBolts.length < CONFIG.performance[this.perfQualityLevel || 'high'].lightningLimit) {
+                    this.lightningBolts.push(new LightningBolt(sourceEnemy.pos.x, sourceEnemy.pos.y, selected.pos.x, selected.pos.y));
+                }
                 audio.playLightning();
 
                 for (let i = 0; i < 5; i++) {

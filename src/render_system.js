@@ -610,8 +610,34 @@ render_singleWindMatrix(matrix) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
         ctx.beginPath();
         ctx.arc(cursorX - 2, cursorY - 2, cursorRadius * 0.4, 0, Math.PI * 2);
-        ctx.fill();
+         ctx.fill();
+        ctx.restore();
+    },
 
+    /**
+     * [自适应性能] 在 Canvas 左上角绘制 FPS 和性能等级指示层。
+     * 仅在调试模式或性能降级时显示，不影响游戏玩法。
+     */
+    render_perfOverlay() {
+        // 仅在非 HIGH 等级时显示（提示玩家性能已降级）
+        if (this.perfQualityLevel === 'high') return;
+        const ctx = this.ctx;
+        const level = this.perfQualityLevel;
+        const fps = this.avgFps;
+        const levelColor = level === 'medium' ? '#facc15' : '#f87171'; // 黄色=均衡，红色=省电
+        const label = level === 'medium' ? '均衡模式' : '省电模式';
+        ctx.save();
+        ctx.globalAlpha = 0.75;
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.beginPath();
+        ctx.roundRect(6, 6, 108, 36, 6);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.font = 'bold 11px monospace';
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(`FPS: ${fps}`, 14, 22);
+        ctx.fillStyle = levelColor;
+        ctx.fillText(label, 14, 36);
         ctx.restore();
     },
 };

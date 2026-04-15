@@ -1034,13 +1034,19 @@ class Peg {
         const color = this.getColor();
 
         // --- [T3] 软阴影：在钉子正下方绘制压扁的椭圆阴影，模拟物体「浮」在场地上的感觉 ---
-        ctx.save();
-        ctx.globalAlpha = 0.22;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.beginPath();
-        ctx.ellipse(this.pos.x, this.pos.y + currentRadius + 3, currentRadius * 0.85, currentRadius * 0.22, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        // [自适应性能] pegSoftShadow 开关：低端模式下跳过此段绘制
+        const _perfBudgetPeg = typeof game !== 'undefined' && game.perfQualityLevel
+            ? CONFIG.performance[game.perfQualityLevel]
+            : CONFIG.performance.high;
+        if (_perfBudgetPeg.pegSoftShadow) {
+            ctx.save();
+            ctx.globalAlpha = 0.22;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.beginPath();
+            ctx.ellipse(this.pos.x, this.pos.y + currentRadius + 3, currentRadius * 0.85, currentRadius * 0.22, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
 
         // --- [物理增强] 被击中旋转变换 ---
         // 弹珠碰击鑉子时，鑉子会轻微旋转（切向摩擦力的视觉表现）
@@ -1076,7 +1082,8 @@ class Peg {
         ctx.fill();
 
         // --- [T3] Peg 发光底部光晕（全局光照模拟）：为特殊/发光钉子绘制彩色地面光晕 ---
-        if (isSpecial || isLit) {
+        // [自适应性能] pegGlowHalo 开关：中端及以下关闭（每帧径向渐变 + lighter 叠加）
+        if ((isSpecial || isLit) && _perfBudgetPeg.pegGlowHalo) {
             ctx.save();
             const glowColor = this.getColor();
             const glowAlpha = hexToRgba(glowColor, 0.18);

@@ -276,6 +276,20 @@ class Game {
         // 最后切换到 meta 阶段
         this.phase_switchPhase('meta');
 
+        // ==================== 自适应性能监控状态 ====================
+        // 当前特效等级：'high' | 'medium' | 'low'
+        this.perfQualityLevel = 'high';
+        // FPS 滑动平均采样缓冲区（存储最近 N 帧的帧时间，单位 ms）
+        this._fpsSamples = [];
+        // 上一帧的时间戳（由 sys_loop 更新）
+        this._lastFrameTime = 0;
+        // 当前滑动平均 FPS（只读，由 sys_loop 计算）
+        this.avgFps = 60;
+        // 降级计时器（秒）：连续低帧时累加，达到阈值才真正降级
+        this._perfDownTimer = 0;
+        // 升级计时器（秒）：连续高帧时累加，达到阈值才真正升级
+        this._perfUpTimer = 0;
+
         // 启动游戏主循环
         this.sys_loop();
     }

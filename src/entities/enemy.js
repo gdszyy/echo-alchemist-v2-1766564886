@@ -226,11 +226,19 @@ class Enemy {
         }
         // === A1: 材质光泽叠加（Layer 1.5 增强）===
         // 在基础纹理之上叠加顶→底 LinearGradient，模拟 3D 凸起物理厚度感
-        const glossGrad = oc.createLinearGradient(0, 0, 0, h);
-        glossGrad.addColorStop(0, `rgba(255,255,255,${CONFIG.enemyRender.glossTopAlpha})`);
-        glossGrad.addColorStop(1, `rgba(0,0,0,${CONFIG.enemyRender.glossBottomAlpha})`);
-        oc.fillStyle = glossGrad;
-        oc.fillRect(0, 0, w, h);
+        // [自适应性能] enemyGloss 开关：低端模式跳过此段，省去 OffscreenCanvas 渐变叠加
+        // 注意：_initTexture 在构造时调用，此时 game 实例可能尚未初始化，
+        //        所以尝试读取 window.game ，若不存在则默认开启光泽。
+        const _glossEnabled = (typeof window !== 'undefined' && window.game && window.game.perfQualityLevel)
+            ? CONFIG.performance[window.game.perfQualityLevel].enemyGloss
+            : true;
+        if (_glossEnabled) {
+            const glossGrad = oc.createLinearGradient(0, 0, 0, h);
+            glossGrad.addColorStop(0, `rgba(255,255,255,${CONFIG.enemyRender.glossTopAlpha})`);
+            glossGrad.addColorStop(1, `rgba(0,0,0,${CONFIG.enemyRender.glossBottomAlpha})`);
+            oc.fillStyle = glossGrad;
+            oc.fillRect(0, 0, w, h);
+        }
 
         this._textureCanvas = offscreen;
     }

@@ -766,6 +766,79 @@ const CONFIG = {
         hitImpactScaleX: 0.5,
         // Y 轴压缩系数（高度缩小倍率）
         hitImpactScaleY: 0.5
+    },
+
+    // ==================== 自适应性能配置 (Adaptive Performance) ====================
+    // 根据设备实时帧率动态调整特效等级，保障手机端流畅运行。
+    // 等级共 3 档：HIGH（高画质）/ MEDIUM（均衡）/ LOW（省电/低端机）
+    performance: {
+        // --- FPS 采样参数 ---
+        // 滑动平均窗口大小（帧数），用于平滑瞬时帧率波动
+        fpsSampleWindow: 60,
+        // 降级触发阈值：平均 FPS 低于此值持续 downgradeHoldSec 秒后降一档
+        fpsThresholdDown: 45,
+        // 升级触发阈值：平均 FPS 高于此值持续 upgradeHoldSec 秒后升一档
+        fpsThresholdUp: 55,
+        // 降级保护时间（秒）：连续低帧多久才真正降级，防止瞬时卡顿误触发
+        downgradeHoldSec: 3,
+        // 升级保护时间（秒）：连续高帧多久才真正升级，防止频繁抖动
+        upgradeHoldSec: 10,
+
+        // --- 各等级粒子预算 ---
+        // HIGH：全效果，适合高端手机 / 桌面
+        high: {
+            maxParticles:    800,  // 全局粒子总上限
+            windLimit:       120,  // wind_slash / line 风属性粒子上限
+            emberLimit:       80,  // ember 火焰粒子上限（无风时）
+            emberLimitWind:   30,  // ember 火焰粒子上限（风属性激活时）
+            mistLimit:        80,  // mist 冰雾粒子上限（无风时）
+            mistLimitWind:    30,  // mist 冰雾粒子上限（风属性激活时）
+            shardLimit:       60,  // shard 冰渣粒子上限（无风时）
+            shardLimitWind:   20,  // shard 冰渣粒子上限（风属性激活时）
+            // 特效对象上限（Shockwave / FireWave / HealWave / LightningBolt）
+            shockwaveLimit:   20,
+            waveLimit:        10,
+            lightningLimit:   15,
+            // Peg 软阴影与底部光晕开关（true = 开启）
+            pegSoftShadow:    true,
+            pegGlowHalo:      true,
+            // 敌人材质光泽渐变开关
+            enemyGloss:       true,
+        },
+        // MEDIUM：均衡模式，适合中端手机
+        medium: {
+            maxParticles:    400,
+            windLimit:        60,
+            emberLimit:       40,
+            emberLimitWind:   15,
+            mistLimit:        30,
+            mistLimitWind:    12,
+            shardLimit:       30,
+            shardLimitWind:   10,
+            shockwaveLimit:   12,
+            waveLimit:         6,
+            lightningLimit:    8,
+            pegSoftShadow:    true,
+            pegGlowHalo:      false,  // 关闭 Peg 底部光晕（每帧径向渐变）
+            enemyGloss:       true,
+        },
+        // LOW：省电模式，适合低端手机 / 发热严重时
+        low: {
+            maxParticles:    150,
+            windLimit:        30,
+            emberLimit:       15,
+            emberLimitWind:    6,
+            mistLimit:        10,
+            mistLimitWind:     4,
+            shardLimit:       12,
+            shardLimitWind:    4,
+            shockwaveLimit:    6,
+            waveLimit:         3,
+            lightningLimit:    4,
+            pegSoftShadow:    false,  // 关闭 Peg 软阴影
+            pegGlowHalo:      false,
+            enemyGloss:       false,  // 关闭敌人材质光泽（省去 OffscreenCanvas 渐变叠加）
+        }
     }
 };
 
