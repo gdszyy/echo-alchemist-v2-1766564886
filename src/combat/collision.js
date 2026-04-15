@@ -329,7 +329,7 @@ export const CollisionSystem = {
                 }
             }
 
-            // [Agent D] 笼热光线词条 Hook：激光命中敌人时额外升温
+            // [炽热光线词条] Hook：激光命中敌人时额外升温（每 0.5s 触发一次，由持续照射状态机驱动）
             const blazingBeamFx = this.activeRunewordEffects && this.activeRunewordEffects['blazing_beam'];
             if (blazingBeamFx) {
                 const tempIncrease = (blazingBeamFx.params && blazingBeamFx.params.tempIncrease) || 0;

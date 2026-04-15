@@ -632,7 +632,7 @@ export const rune_launcher_system = {
                 dynamicDesc = `激光累积伤害加深 +${amp}%/次`;
             } else if (rw.effectId === 'blazing_beam') {
                 const temp = calcParam('tempIncrease');
-                dynamicDesc = `激光每次命中升温 +${temp}`;
+                dynamicDesc = `持续升温模式：每 0.5s 升温 +${temp}`;
             } else if (rw.effectId === 'flame_sword') {
                 const chance = Math.round(calcParam('triggerChance') * 100);
                 const ratio = Math.round(calcParam('damageRatio') * 100);
@@ -1196,7 +1196,7 @@ export const rune_launcher_system = {
             }
             case 'blazing_beam': {
                 const temp = calc('tempIncrease');
-                return `激光命中时每 0.5s 额外升温 +${temp}`;
+                return `激光变为持续升温模式：每 0.5s 额外提升敌人温度 +${temp}`;
             }
             case 'lightning_shield': {
                 const chance = Math.round(calc('triggerChance') * 100);

@@ -2473,11 +2473,14 @@ export const combat_system = {
         }
 
         // ─────────────────────────────────────────────────────────────────
-        // [照射词条] 持续照射模式：启动状态机，每 0.5s 重新计算一次激光
+        // [照射词条 / 炽热光线词条] 持续照射模式：启动状态机，每 0.5s 重新计算一次激光
         // 只在「首次发射」时启动（非持续照射内部的重算调用）
+        // irradiation：激光变为持续照射，累积伤害加深
+        // blazing_beam：激光变为持续升温模式，每 0.5s 额外提升敌人温度
         // ─────────────────────────────────────────────────────────────────
         const irradiationFx = this.activeRunewordEffects && this.activeRunewordEffects['irradiation'];
-        if (irradiationFx && !this._continuousLaserFiring) {
+        const blazingBeamFxForLaser = this.activeRunewordEffects && this.activeRunewordEffects['blazing_beam'];
+        if ((irradiationFx || blazingBeamFxForLaser) && !this._continuousLaserFiring) {
             this._continuousLaserFiring = true;
             this._continuousLaserState = {
                 startX, startY, vel, recipe,
@@ -2644,6 +2647,7 @@ export const combat_system = {
      *   由 game_phase.js 的 combat update 循环调用。
      *   每 0.5s（30帧）重新执行一次 combat_laser_fire 进行伤害计算和视觉刷新。
      *   持续 3s 后自动结束，清理状态并释放 isVisualEffectActive。
+     *   触发条件：irradiation 词条（持续照射累积伤害）或 blazing_beam 词条（持续升温）激活时启动。
      * @param {number} timeScale - 当前帧时间缩放（通常为 1）
      */
     combat_continuousLaser_update(timeScale = 1) {
