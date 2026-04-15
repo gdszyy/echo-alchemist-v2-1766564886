@@ -149,6 +149,10 @@ class Enemy {
         // 阶段 3 (30→0):  Boss 名称文字放大淡出
         this.entranceTimer = 0;
 
+        // === A3: 受击 Squash & Stretch 形变 ===
+        // _hitImpact: 受击形变强度（单次伤害 / maxHp，clamp 到 0~hitImpactMax）
+        this._hitImpact = 0;
+
         // === Layer 1.5: 预计算底层纹理 (OffscreenCanvas) ===
         // 基于 visualSeed 一次性生成静态纹理，每帧仅执行一次 drawImage
         this._textureCanvas = null;
@@ -220,6 +224,14 @@ class Enemy {
                 oc.stroke();
             }
         }
+        // === A1: 材质光泽叠加（Layer 1.5 增强）===
+        // 在基础纹理之上叠加顶→底 LinearGradient，模拟 3D 凸起物理厚度感
+        const glossGrad = oc.createLinearGradient(0, 0, 0, h);
+        glossGrad.addColorStop(0, `rgba(255,255,255,${CONFIG.enemyRender.glossTopAlpha})`);
+        glossGrad.addColorStop(1, `rgba(0,0,0,${CONFIG.enemyRender.glossBottomAlpha})`);
+        oc.fillStyle = glossGrad;
+        oc.fillRect(0, 0, w, h);
+
         this._textureCanvas = offscreen;
     }
 
@@ -247,6 +259,7 @@ class Enemy {
             this.pos.y = this._entranceStartY;
             if (this.hitTimer > 0) this.hitTimer -= timeScale;
             if (this.shieldHitTimer > 0) this.shieldHitTimer -= timeScale;
+            if (this._hitImpact > 0) this._hitImpact *= Math.pow(CONFIG.enemyRender.hitImpactDecay, timeScale);
             return;
         }
 
@@ -274,6 +287,7 @@ class Enemy {
             // 入场动画期间不进行其他移动逻辑
             if (this.hitTimer > 0) this.hitTimer -= timeScale;
             if (this.shieldHitTimer > 0) this.shieldHitTimer -= timeScale;
+            if (this._hitImpact > 0) this._hitImpact *= Math.pow(CONFIG.enemyRender.hitImpactDecay, timeScale);
             return;
         }
 
@@ -285,6 +299,8 @@ class Enemy {
         
         if (this.hitTimer > 0) this.hitTimer -= timeScale;
         if (this.shieldHitTimer > 0) this.shieldHitTimer -= timeScale;
+        // === A3: 受击形变弹性衰减 ===
+        if (this._hitImpact > 0) this._hitImpact *= Math.pow(CONFIG.enemyRender.hitImpactDecay, timeScale);
         if (this.justSpawned) { this.justSpawned = false; }
         
         // 弹跳恢复
@@ -1099,6 +1115,14 @@ class Enemy {
         if (!this.active) return;
         ctx.save(); 
         ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+
+        // === A3: 受击 Squash & Stretch 形变 ===
+        // 受击瞬间变扁变宽，随后弹性恢复
+        if (this._hitImpact > 0.001) {
+            const sx = CONFIG.enemyRender.hitImpactScaleX;
+            const sy = CONFIG.enemyRender.hitImpactScaleY;
+            ctx.scale(1 + this._hitImpact * sx, 1 - this._hitImpact * sy);
+        }
         
         // 预警震动
         if (this.actionPhase === 'telegraphing') {
@@ -1503,6 +1527,29 @@ class Enemy {
             });
             ctx.restore();
         }
+        // === A2: 战损裂纹（血量联动，Layer 4 新增）===
+        // 血量低于 battleDamageFissureThreshold(30%) 时显示深灰色战损裂纹
+        // 强度随血量比例线性变化（血量越低，裂纹越明显）
+        {
+            const hpRatio = this.maxHp > 0 ? this.hp / this.maxHp : 1;
+            const threshold = CONFIG.enemyRender.battleDamageFissureThreshold;
+            if (hpRatio < threshold && this.fissures.length > 0) {
+                // 线性插值：hp 从 threshold 降至 0，alpha 从 0 升至 battleDamageFissureMaxAlpha
+                const intensity = (threshold - hpRatio) / threshold;
+                const alpha = intensity * CONFIG.enemyRender.battleDamageFissureMaxAlpha;
+                ctx.save();
+                ctx.strokeStyle = `rgba(15, 23, 42, ${alpha})`;
+                ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                this.fissures.forEach(path => {
+                    if (path.length < 2) return;
+                    ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y);
+                    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+                    ctx.stroke();
+                });
+                ctx.restore();
+            }
+        }
+
         // 检查是否有任何子剑将该敌人作为当前目标 或 在队列中
         const isMarked = typeof game !== 'undefined' && game.sonSwords.some(s => 
             s.active && (s.currentTarget === this || s.targetQueue.includes(this))
@@ -2589,7 +2636,13 @@ class Enemy {
           // 4. 执行扣血
         this.hp -= actualDamage; 
         this.hitTimer = 10; 
-        this.whiteBarTimer = 45; 
+        this.whiteBarTimer = 45;
+        // === A3: 记录受击形变强度 ===
+        if (this.maxHp > 0) {
+            const impact = actualDamage / this.maxHp;
+            this._hitImpact = Math.min(CONFIG.enemyRender.hitImpactMax,
+                (this._hitImpact || 0) + impact);
+        } 
         if (typeof game !== 'undefined') {
             game.combat_reportDamage(actualDamage);
             

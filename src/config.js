@@ -741,6 +741,31 @@ const CONFIG = {
         glowBase: 10,           // 基础光晕模糊度
         glowPerDamage: 1.5,     // 每点伤害增加的光晕
         maxGlow: 30             // 最大光晕限制
+    },
+
+    // ==================== 敌人渲染管线增强参数 (Task A) ====================
+    enemyRender: {
+        // A1: Layer 1.5 材质光泽渐变
+        // 顶部白色叠加 alpha（模拟凸起高光）
+        glossTopAlpha: 0.08,
+        // 底部黑色叠加 alpha（模拟底部阴影）
+        glossBottomAlpha: 0.12,
+
+        // A2: Layer 4 战损裂纹（血量联动）
+        // 血量比例低于此阈値时显示战损裂纹
+        battleDamageFissureThreshold: 0.3,
+        // 裂纹最大 alpha（血量为 0 时达到）
+        battleDamageFissureMaxAlpha: 0.6,
+
+        // A3: 受击 Squash & Stretch 形变
+        // 单次伤害占最大血量比例的上限（防止一次性大伤害导致过度形变）
+        hitImpactMax: 0.15,
+        // 每帧衰减系数（每帧 × hitImpactDecay）
+        hitImpactDecay: 0.85,
+        // X 轴拉伸系数（宽度放大倍率）
+        hitImpactScaleX: 0.5,
+        // Y 轴压缩系数（高度缩小倍率）
+        hitImpactScaleY: 0.5
     }
 };
 
