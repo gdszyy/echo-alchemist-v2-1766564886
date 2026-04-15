@@ -413,13 +413,28 @@ class Shockwave {
 
 // --- 新增：激光光束特效 ---
 class LaserBeam {
-    constructor(segments, width, color) {
+    /**
+     * @param {Vec2[]} segments - 路径点数组
+     * @param {number} width - 光束宽度
+     * @param {string} color - 光束颜色
+     * @param {boolean} [isContinuous=false] - 持续模式：decay=0，由外部调用 startFadeOut() 触发淡出
+     */
+    constructor(segments, width, color, isContinuous = false) {
         this.segments = segments; // Array of Vec2 points [start, p1, p2, end]
         this.width = width;
         this.initialWidth = width;
         this.color = color;
-        this.life = 1.0; 
-        this.decay = 0.04; // 消失速度
+        this.isContinuous = isContinuous;
+        this.life = 1.0;
+        this.decay = isContinuous ? 0 : 0.04; // 持续模式下不自动衰减
+    }
+
+    /**
+     * 触发淡出：将 decay 恢复为正常值，激光开始消退。
+     * 由持续照射状态机在 tick 切换或结束时主动调用，确保动画与伤害同步消退。
+     */
+    startFadeOut() {
+        this.decay = 0.04;
     }
 
     update(timeScale) {

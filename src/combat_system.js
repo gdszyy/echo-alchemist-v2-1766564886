@@ -2491,14 +2491,19 @@ export const combat_system = {
         const blazingBeamFxForLaser = this.activeRunewordEffects && this.activeRunewordEffects['blazing_beam'];
         if ((irradiationFx || blazingBeamFxForLaser) && !this._continuousLaserFiring) {
             this._continuousLaserFiring = true;
+            // [照射持续时长] 基于连射次数：连射 N 次就持续 N×0.5s。
+            // recipe.multicast 就是连射次数（不含首发），最少保证 0.5s。
+            const multicastCount = (recipe.multicast || 0);
+            const totalDuration = Math.max(Math.round(0.5 * 60), multicastCount * Math.round(0.5 * 60));
             this._continuousLaserState = {
                 startX, startY, vel, recipe,
                 tickFrames: 0,
                 tickInterval: Math.round(0.5 * 60), // 0.5s = 30帧
-                totalDuration: Math.round(3.0 * 60), // 持续 3s = 180帧
+                totalDuration,                       // 连射 N 次 => N×30帧（最少 30帧）
                 elapsedFrames: 0,
                 shotId,
-                lastHitEnemy: null  // [照射词条] 记录上一次命中的敌人，用于检测目标切换时重置 _irradiationStacks
+                lastHitEnemy: null,  // [照射词条] 记录上一次命中的敌人，用于检测目标切换时重置 _irradiationStacks
+                activeBeams: []      // [持续照射] 当前帧活跃的 LaserBeam 引用列表，用于 tick 切换时主动触发淡出
             };
             // isVisualEffectActive 由持续照射状态机维持，不再用 setTimeout 清除
         }
@@ -2620,10 +2625,20 @@ export const combat_system = {
 
         // --- 3. 生成视觉与音效 ---
         // 绘制所有射线（主射线 + 折射链）
+        // [持续照射] 持续模式下创建 isContinuous=true 的 LaserBeam，不自动衰减，
+        // 由状态机在 tick 切换或结束时统一调用 startFadeOut()，确保动画与伤害同步。
+        const isContinuousMode = !!this._continuousLaserFiring;
+        const newBeams = [];
         for (const beam of beamsToRender) {
             // 折射光线颜色略微偏绿（混入 bounce 属性的绿色），主射线保持原色
             const beamColor = beam.isMain ? color : this._laser_blendRefractionColor(color);
-            this.spawn_pushParticleWithLimit(new LaserBeam(beam.points, beam.width, beamColor));
+            const laserBeam = new LaserBeam(beam.points, beam.width, beamColor, isContinuousMode);
+            this.spawn_pushParticleWithLimit(laserBeam);
+            if (isContinuousMode) newBeams.push(laserBeam);
+        }
+        // [持续照射] 将新建的 beams 注册到状态机，替换旧引用
+        if (isContinuousMode && this._continuousLaserState) {
+            this._continuousLaserState.activeBeams = newBeams;
         }
 
         // 音效：越粗越低沉
@@ -2719,23 +2734,33 @@ export const combat_system = {
         // 维持 isVisualEffectActive 为 true（阻止回合结束判定）
         this.isVisualEffectActive = true;
 
-        // 每 tickInterval 帧重新计算一次激光（伤害 + 视觉）
-        if (state.tickFrames >= state.tickInterval) {
-            state.tickFrames = 0;
-            // 重新执行激光射线计算（_continuousLaserFiring 已为 true，不会再次启动状态机）
-            this.combat_laser_fire(state.startX, state.startY, state.vel, state.recipe, state.shotId);
-        }
-
         // 持续时间结束，清理状态
         if (state.elapsedFrames >= state.totalDuration) {
+            // [动画同步] 先触发当前所有持续激光淡出，再清理状态
+            if (state.activeBeams) {
+                state.activeBeams.forEach(b => b.startFadeOut());
+            }
             this._continuousLaserFiring = false;
             this._continuousLaserState = null;
             // 重置所有敌人的照射叠加层数
             this.enemies.forEach(e => { if (e._irradiationStacks) e._irradiationStacks = 0; });
-            // 延迟 600ms 释放 isVisualEffectActive（等待最后一帧激光视觉消失）
+            // 延迟 600ms 释放 isVisualEffectActive（等待激光视觉淡出完毕）
             setTimeout(() => {
                 this.isVisualEffectActive = false;
             }, 600);
+            return;
+        }
+
+        // 每 tickInterval 帧重新计算一次激光（伤害 + 视觉）
+        if (state.tickFrames >= state.tickInterval) {
+            state.tickFrames = 0;
+            // [动画同步] tick 切换前，先触发旧 beams 淡出，再创建新 beams
+            // 新一轮激光的视觉与伤害同时产生，旧一轮开始淡出——动画与伤害严格同步。
+            if (state.activeBeams) {
+                state.activeBeams.forEach(b => b.startFadeOut());
+            }
+            // 重新执行激光射线计算（_continuousLaserFiring 已为 true，不会再次启动状态机）
+            this.combat_laser_fire(state.startX, state.startY, state.vel, state.recipe, state.shotId);
         }
     },
 
