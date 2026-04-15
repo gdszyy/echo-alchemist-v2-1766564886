@@ -358,6 +358,8 @@ export const spawn_system = {
                     hp = weakHP;
                 }
                 const e = new Enemy(centerX, yPos, w, this.enemyHeight, hp);               
+                // [新增 C2] 记录列索引，供 shield 词缀蜂巢脉冲相位偏移使用
+                e._spawnColIndex = c;
                 // 生成词条 (如果是弱点怪，不带词条)
                 if (c === weakSpotCol) {
                     e.affixes = [];
@@ -373,7 +375,15 @@ export const spawn_system = {
                 // [新增] 根据 Boss 历史分配随从异型几何形状
                 this.spawn_applyMinionShape(e);
 
-                if (e.affixes.length > 0) e.type = 'elite';
+                if (e.affixes.length > 0) {
+                    e.type = 'elite';
+                    // [C3] 精英敌人出场强调：金色冲击波 + spark 粒子
+                    this.spawn_createShockwave(e.pos.x, e.pos.y, '#facc15');
+                    const sparkCount = 4 + Math.floor(Math.random() * 3); // 4~6 个
+                    for (let s = 0; s < sparkCount; s++) {
+                        this.spawn_createParticle(e.pos.x, e.pos.y, '#facc15', 'spark');
+                    }
+                }
                 
                 this.enemies.push(e);
                 currentCount++;
@@ -387,6 +397,8 @@ export const spawn_system = {
             // 二次检查碰撞，虽然 occupiedCols 应该保证了位置
             if (!this.calc_isAreaOccupied(centerX, yPos, w * 0.8, this.enemyHeight * 0.8)) {
                 const e = new Enemy(centerX, yPos, w, this.enemyHeight, cfg.hp);
+                // [新增 C2] 记录列索引，供 shield 词缀蜂巢脉冲相位偏移使用
+                e._spawnColIndex = cfg.col;
                 e.affixes = cfg.affixes || [];
                 
                 // [新增] 初始化护盾层数
@@ -397,7 +409,15 @@ export const spawn_system = {
                 // [新增] 根据 Boss 历史分配随从异型几何形状
                 this.spawn_applyMinionShape(e);
 
-                if (e.affixes.length > 0) e.type = 'elite';
+                if (e.affixes.length > 0) {
+                    e.type = 'elite';
+                    // [C3] 精英敌人出场强调：金色冲击波 + spark 粒子
+                    this.spawn_createShockwave(e.pos.x, e.pos.y, '#facc15');
+                    const sparkCount = 4 + Math.floor(Math.random() * 3); // 4~6 个
+                    for (let s = 0; s < sparkCount; s++) {
+                        this.spawn_createParticle(e.pos.x, e.pos.y, '#facc15', 'spark');
+                    }
+                }
                 this.enemies.push(e);
             }
         }
@@ -1940,5 +1960,22 @@ export const spawn_system = {
                 }
             });
         }, cfg.waveDelay * 1.5); // 在第一圈冲击波扩散到中场后处理
+
+        // === [C1] Boss 入场气浪推力：周围小怪被震开 ===
+        // 延迟与冲击波第一圈同步，让视觉与物理反馈对齐
+        setTimeout(() => {
+            const MAX_BUMP = 20;        // 最大垂直推力（像素）
+            const BUMP_RADIUS = cfg.shockwaveMaxRadius; // 推力有效半径（与冲击波一致）
+            this.enemies.forEach(e => {
+                if (!e.active || e.type === 'boss') return;
+                const dx = e.pos.x - bossX;
+                const dy = e.pos.y - bossY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist >= BUMP_RADIUS) return;
+                // 距离越近推力越大，线性衰减
+                const ratio = 1 - dist / BUMP_RADIUS;
+                e.bumpOffsetY = -(MAX_BUMP * ratio);
+            });
+        }, cfg.waveDelay * 0.5); // 冲击波刚开始扩散时同步触发推力
     },
 };
