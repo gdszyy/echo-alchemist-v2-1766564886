@@ -1528,6 +1528,70 @@ class TrainingGround {
                 transform: translateX(-50%);
                 cursor: pointer;
             }
+            /* 符文词条效果横幅 */
+            #train-runeword-banner {
+                position: absolute;
+                top: 40px; /* 顶部状态栏高度 */
+                left: 0;
+                right: 0;
+                z-index: 30;
+                background: linear-gradient(135deg, rgba(15,23,42,0.97) 0%, rgba(30,27,75,0.97) 100%);
+                border-bottom: 1px solid rgba(139,92,246,0.4);
+                padding: 8px 16px;
+                display: none;
+                flex-direction: column;
+                gap: 4px;
+                backdrop-filter: blur(8px);
+                box-shadow: 0 4px 24px rgba(139,92,246,0.15);
+            }
+            #train-runeword-banner.visible {
+                display: flex;
+            }
+            .rw-banner-header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .rw-banner-icon {
+                font-size: 18px;
+                line-height: 1;
+            }
+            .rw-banner-name {
+                font-size: 13px;
+                font-weight: 800;
+                color: #c4b5fd;
+                letter-spacing: 0.05em;
+            }
+            .rw-banner-level {
+                font-size: 10px;
+                color: #7c3aed;
+                background: rgba(139,92,246,0.15);
+                border: 1px solid rgba(139,92,246,0.3);
+                border-radius: 4px;
+                padding: 1px 6px;
+                font-weight: bold;
+            }
+            .rw-banner-desc {
+                font-size: 11px;
+                color: #a5b4fc;
+                line-height: 1.6;
+                padding-left: 26px;
+            }
+            .rw-banner-params {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                padding-left: 26px;
+            }
+            .rw-banner-param-tag {
+                font-size: 10px;
+                color: #818cf8;
+                background: rgba(99,102,241,0.12);
+                border: 1px solid rgba(99,102,241,0.25);
+                border-radius: 4px;
+                padding: 1px 7px;
+                font-family: monospace;
+            }
             @media (max-width: 767px) {
                 .train-panel-content { max-height: 50vh; }
                 #train-attr-grid { grid-template-columns: repeat(2, 1fr) !important; }
@@ -1548,7 +1612,17 @@ class TrainingGround {
                     <div id="train-stats" class="text-amber-400 font-mono text-xs">DPS: 0 | TOTAL: 0</div>
                     <button onclick="game.trainingGround.exit()" class="text-slate-400 hover:text-white text-sm">退出</button>
                 </div>
-                <!-- 快捷操作按钮 (仅在面板收起时显示) -->
+                <!-- 符文词条效果横幅 -->
+                <div id="train-runeword-banner">
+                    <div class="rw-banner-header">
+                        <span class="rw-banner-icon" id="rw-banner-icon"></span>
+                        <span class="rw-banner-name" id="rw-banner-name"></span>
+                        <span class="rw-banner-level" id="rw-banner-level"></span>
+                    </div>
+                    <div class="rw-banner-desc" id="rw-banner-desc"></div>
+                    <div class="rw-banner-params" id="rw-banner-params"></div>
+                </div>
+                <!-- 快捷操作按鈕 (仅在面板收起时显示) -->
                 <div id="train-quick-actions" class="absolute bottom-12 left-1/2 -translate-x-1/2 flex gap-4 z-[450] transition-opacity duration-300">
                     <button onclick="game.trainingGround.fireBullet()" class="w-12 h-12 rounded-full bg-indigo-600/80 backdrop-blur-md border border-indigo-400/50 text-white shadow-lg shadow-indigo-500/20 flex items-center justify-center active:scale-90 transition-transform">
                         <span class="text-xl">🔥</span>
@@ -1783,6 +1857,62 @@ class TrainingGround {
         const descEl = document.getElementById('train-scenario-desc');
         if (descEl) descEl.textContent = scenario.desc || '';
 
+        // 3b. 符文词条横幅：显示/隐藏并填充词条效果信息
+        const banner = document.getElementById('train-runeword-banner');
+        if (banner) {
+            if (scenario.categoryId === 'runeword' && scenario.runewordId) {
+                const rwDef = RUNEWORD_DB.find(rw => rw.id === scenario.runewordId);
+                if (rwDef) {
+                    const level = scenario.runewordLevel || 1;
+                    const iconEl = document.getElementById('rw-banner-icon');
+                    const nameEl = document.getElementById('rw-banner-name');
+                    const levelEl = document.getElementById('rw-banner-level');
+                    const descBannerEl = document.getElementById('rw-banner-desc');
+                    const paramsEl = document.getElementById('rw-banner-params');
+
+                    if (iconEl) iconEl.textContent = scenario.icon || '🔮';
+                    if (nameEl) nameEl.textContent = rwDef.name;
+                    if (levelEl) levelEl.textContent = 'Lv.' + level;
+                    if (descBannerEl) descBannerEl.textContent = rwDef.effect_desc || '';
+
+                    // 生成参数标签
+                    if (paramsEl) {
+                        const baseParams = rwDef.baseParams || {};
+                        const perLevelParams = rwDef.perLevelParams || {};
+                        const paramLabels = {
+                            damageBonus: '伤害加成', damageAmp: '伤害加深/次',
+                            decayBonus: '衰减系数加成', flatDamage: '每弹跳固定加伤',
+                            triggerChance: '触发概率', critChance: '暴击概率',
+                            critDamage: '暴击倍率', initialBonus: '初始加成',
+                            decayPerHit: '每次命中衰减', requiredBounces: '触发弹跳次数',
+                            radius: '范围', tempDrop: '降温', tempIncrease: '升温/次',
+                            damagePenalty: '伤害惩罚', angleMultiplier: '夹角倍率',
+                            baseRadiusRatio: '爆炸范围基础倍率', radiusBonusPerLayer: '每层范围加成',
+                            extraChains: '额外闪电链', mutationChance: '变异概率',
+                            damagePerKill: '每次击杀加伤', elementPenalty: '属性惩罚',
+                            damageRatio: '伤害倍率', interval: '触发间隔(s)',
+                            trueDamageRatio: '真实伤害比例'
+                        };
+                        paramsEl.innerHTML = Object.entries(baseParams).map(([key, val]) => {
+                            const perLv = perLevelParams[key];
+                            const computedVal = val + (level - 1) * (perLv || 0);
+                            const label = paramLabels[key] || key;
+                            const displayVal = typeof computedVal === 'number'
+                                ? (computedVal % 1 !== 0 ? (computedVal * 100).toFixed(0) + '%' : computedVal)
+                                : computedVal;
+                            return `<span class="rw-banner-param-tag">${label}: ${displayVal}</span>`;
+                        }).join('');
+                    }
+
+                    banner.classList.add('visible');
+                } else {
+                    banner.classList.remove('visible');
+                }
+            } else {
+                banner.classList.remove('visible');
+            }
+        }
+
         // 4. 启用操作按钮
         const demoBtn = document.getElementById('train-demo-btn');
         const resetBtn = document.getElementById('train-reset-btn');
@@ -1801,6 +1931,8 @@ class TrainingGround {
      */
     triggerScenarioAction() {
         if (!this.currentScenario) return;
+        // 触发演示时自动收起侧边栏，让战斗区域全屏展示
+        this.collapseSidebar();
         if (this.currentScenario.demoAction) {
             try {
                 this.currentScenario.demoAction(this.game, this);
@@ -1833,6 +1965,17 @@ class TrainingGround {
         if (!sidebar) return;
         const isCollapsed = sidebar.classList.toggle('collapsed');
         if (toggleBtn) toggleBtn.textContent = isCollapsed ? '▶' : '◀';
+    }
+
+    /**
+     * 将侧边栏收起（仅收起，不切换）
+     */
+    collapseSidebar() {
+        const sidebar = document.getElementById('train-sidebar');
+        const toggleBtn = document.getElementById('train-sidebar-toggle');
+        if (!sidebar) return;
+        sidebar.classList.add('collapsed');
+        if (toggleBtn) toggleBtn.textContent = '▶';
     }
 
     /**
