@@ -10,7 +10,7 @@
 
 ## 活跃洞察 (Active Insights)
 
-当前共有 **4** 条活跃洞察。
+当前共有 **5** 条活跃洞察。
 
 | ID | 标题 | 版本 | 关联模块 | 最后更新 | 文档链接 |
 |----|------|------|---------|---------|---------|
@@ -18,6 +18,7 @@
 | PI-002 | 符文词条 Hook 注入流程 | v1.0 | rune_system, combat_system, ui_system, rune_launcher | 2026-04-16 | [PI-002_runeword_hook_injection.md](PI-002_runeword_hook_injection.md) |
 | PI-003 | 子系统扩展与组合模式注入流程 | v1.0 | core, game_system, combat_system, ui_system | 2026-04-16 | [PI-003_subsystem_composition_pattern.md](PI-003_subsystem_composition_pattern.md) |
 | PI-004 | 性能预算扩展与新特效接入流程 | v1.0 | performance, spawn_system, combat_system, entities | 2026-04-16 | [PI-004_performance_budget_extension.md](PI-004_performance_budget_extension.md) |
+| PI-005 | 性能自适应影响评估流程 | v1.0 | performance, combat_system, effects, entities, render_system, spawn_system | 2026-04-16 | [PI-005_perf_impact_assessment.md](PI-005_perf_impact_assessment.md) |
 
 ### 按模块快速检索
 
@@ -32,7 +33,8 @@
 | `core.js` | PI-003（_subsystems 数组、组合模式） |
 | `config.js` | PI-004（CONFIG.performance 三档配置） |
 | `spawn_system.js` | PI-004（EnergyOrb 聚合优化） |
-| `effects/particles.js` | PI-004（未接入预算的高风险特效清单） |
+| `effects/particles.js` | PI-004（未接入预算的高风险特效清单）、PI-005（性能自适应影响评估） |
+| `render_system.js` | PI-005（性能自适应影响评估） |
 
 ---
 

@@ -218,3 +218,49 @@ if avgFps > fpsThresholdUp (55):
 | 2026-04-16 | 初始实现：FPS 采样器、三档等级预算、粒子/特效/Peg/敌人全面接入、FPS 指示层 |
 | 2026-04-16 | 新增 `sparkLimit`（high:100/medium:50/low:20）和 `smokeLimit`（high:60/medium:25/low:8）两个预算字段；在 `spawn_createParticle` 和 `spawn_pushParticleWithLimit` 中同步接入 spark/smoke 上限检查，防止能量泄漏、机械类受击等高频 spark 场景占用全局粒子预算 |
 | 2026-04-16 | **Arc Boss VFX 性能门控（Task T3 补丁）**：在三档预算表中新增 4 个字段：`arcBossVfxTriCount`（Ouroboros 狂暴三角形数量，high:6/medium:3/low:0）、`arcBossVfxLineCount`（Devourer 引力线数量，high:6/medium:6/low:3）、`arcBossVfxWhiteGrad`（Devourer 深渊核心 lighter 白化叠加开关，high/medium:true/low:false）、`arcBossVfxSuckProb`（Devourer 吸入粒子生成概率，high:0.7/medium:0.5/low:0.3）。在 `enemy.js` Devourer/Ouroboros Layer 6.5 中通过 `game.perfQualityLevel` 动态读取对应字段实施门控。同步更新消费端关联索引（第 5.6 节）。 |
+
+## 9. 性能影响标记规范
+
+为了在持续迭代中保护自适应性能系统，所有 AI Agent 在修改或新增可能影响渲染性能的代码时，**必须**执行以下标记与评估流程：
+
+### 9.1 触发条件
+
+当你的代码修改涉及以下任何一项时，即触发本规范：
+- 新增或修改 `Particle`、`Shockwave`、`LightningBolt` 等特效类的实例创建逻辑
+- 在 Canvas 渲染上下文中使用或修改高开销 API：
+  - `createRadialGradient` / `createLinearGradient`
+  - `shadowBlur` / `shadowColor`
+  - `globalCompositeOperation`（特别是 `lighter`、`screen` 等加法混合模式）
+- 在主循环（`update` / `draw`）中新增复杂的遍历逻辑（如 `Array.filter`）
+
+### 9.2 标记格式
+
+1. **代码注释标记**：在受影响的代码块（如函数定义、循环体）上方添加标准注释标记：
+   ```javascript
+   // @perf-impact: [影响简述] - [处理方式]
+   // 例如：
+   // @perf-impact: 新增高频渐变创建 - 已通过 perfQualityLevel 降级处理
+   ```
+
+2. **Commit Message 标记**：在 Git 提交信息的末尾添加 `[perf-impact]` 标签：
+   ```text
+   feat(effects): 新增冰霜爆裂特效 [perf-impact]
+   ```
+
+### 9.3 强制评估模板
+
+在任务总结或 PR 描述中，必须包含以下“性能自适应影响评估”说明：
+
+```markdown
+### 性能自适应影响评估
+
+- **修改内容**：简述新增或修改了什么视觉效果。
+- **高开销 API**：列出使用的 `shadowBlur`、`createRadialGradient` 等。
+- **预算接入情况**：
+  - [x] 已在 `CONFIG.performance` 中添加对应上限字段（如 `newEffectLimit`）
+  - [x] 已在特效创建入口处添加 `CONFIG.performance[game.perfQualityLevel]` 检查
+- **三档表现说明**：
+  - `high` 档：完整效果表现
+  - `medium` 档：降级策略说明（如减少粒子数量、关闭某些渐变）
+  - `low` 档：极致降级策略说明（如关闭所有发光和混合模式）
+```
