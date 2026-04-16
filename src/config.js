@@ -799,8 +799,20 @@ const CONFIG = {
         // 浮动周期（毫秒），与呼吸错开节奏
         idleFloatPeriod: 2600,
 
+        // D1/D3 升级：呼吸缓动曲线升级（Breathe Curve Upgrade）
+        // 呼吸缓动指数（1.0=线性正弦，越大停留感越强）
+        breatheEasingPower: 1.5,
+        // 边框脉冲过曝叠加层最大透明度（lighter 模式高光描边）
+        borderPulseOverglowAlpha: 0.25,
+        // elite 边框光晕强度倍率（体现精英感）
+        borderPulseEliteMultiplier: 1.8,
+        // boss 边框光晕强度倍率（体现威压感）
+        borderPulseBossMultiplier: 2.5,
+        // boss 边框脉冲周期倍率（越小越快）
+        borderPulseBossPeriodMult: 0.75,
+
         // D3: 边框脉冲光晕（Border Pulse Glow）
-        // 光晕最大 shadowBlur 值
+        // 光晕最大 shadowBlur 値
         borderPulseBlurMax: 8,
         // 脉冲周期（毫秒）
         borderPulsePeriod: 2800,

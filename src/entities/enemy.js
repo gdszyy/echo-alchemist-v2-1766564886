@@ -1227,8 +1227,10 @@ class Enemy {
         if (this.actionPhase === 'idle' && this._hitImpact <= 0.001 && this.hitTimer <= 0) {
             const now = Date.now();
             // D1: 呼吸缩放 — 使用 visualSeed * 2π 作为相位偏移，确保多敌人节奏各异
+            // 升级：使用 Math.pow 非线性缓动曲线，增强极值停留感（breatheEasingPower 越大停留感越强）
             const breathePhase = (now / CONFIG.enemyRender.breathePeriod + this.visualSeed) * Math.PI * 2;
-            const breatheScale = 1 + Math.sin(breathePhase) * CONFIG.enemyRender.breatheAmplitude;
+            const breatheIntensity = Math.pow((Math.sin(breathePhase) + 1) * 0.5, CONFIG.enemyRender.breatheEasingPower);
+            const breatheScale = 1 + (breatheIntensity * 2 - 1) * CONFIG.enemyRender.breatheAmplitude;
             ctx.scale(breatheScale, breatheScale);
             // D2: 待机微浮动 — 周期与呼吸错开，叠加额外相位偏移避免同步
             const floatPhase = (now / CONFIG.enemyRender.idleFloatPeriod + this.visualSeed * 1.3) * Math.PI * 2;
@@ -1909,12 +1911,21 @@ class Enemy {
         }
         // === D3: 边框脉冲光晕（Border Pulse Glow）===
         // 仅在 idle 状态下生效，为边框叠加一层缓慢脉冲的 shadowBlur 光晕
+        // 升级：使用非线性缓动曲线 + elite/boss 差异化强度 + 峰値过曝高光叠加
         if (this.actionPhase === 'idle') {
             const now = Date.now();
-            const pulsePhase = (now / CONFIG.enemyRender.borderPulsePeriod + this.visualSeed * 0.7) * Math.PI * 2;
-            // 使用 (sin+1)/2 将范围映射到 [0, 1]，再乘以最大光晕强度
-            const pulseIntensity = (Math.sin(pulsePhase) + 1) * 0.5;
-            const pulseBlur = pulseIntensity * CONFIG.enemyRender.borderPulseBlurMax;
+            // boss 脉冲周期缩短（乘以 borderPulseBossPeriodMult），体现威压感
+            const pulsePeriod = this.type === 'boss'
+                ? CONFIG.enemyRender.borderPulsePeriod * CONFIG.enemyRender.borderPulseBossPeriodMult
+                : CONFIG.enemyRender.borderPulsePeriod;
+            const pulsePhase = (now / pulsePeriod + this.visualSeed * 0.7) * Math.PI * 2;
+            // 升级：使用 Math.pow 非线性缓动曲线，增强极大値停留感
+            const pulseIntensity = Math.pow((Math.sin(pulsePhase) + 1) * 0.5, CONFIG.enemyRender.breatheEasingPower);
+            // 根据敌人类型应用差异化应用光晕强度倍率
+            let blurMultiplier = 1.0;
+            if (this.type === 'elite') blurMultiplier = CONFIG.enemyRender.borderPulseEliteMultiplier;
+            if (this.type === 'boss') blurMultiplier = CONFIG.enemyRender.borderPulseBossMultiplier;
+            const pulseBlur = pulseIntensity * CONFIG.enemyRender.borderPulseBlurMax * blurMultiplier;
             let pulseColor = CONFIG.enemyRender.borderPulseColorNormal;
             if (this.type === 'elite') pulseColor = CONFIG.enemyRender.borderPulseColorElite;
             if (this.type === 'boss') pulseColor = CONFIG.enemyRender.borderPulseColorBoss;
@@ -1937,6 +1948,38 @@ class Enemy {
                 ctx.stroke();
             } else {
                 ctx.strokeRect(-w/2, -h/2, w, h);
+            }
+            // 在 pulseBlur 达到峰値时额外叠加一层 lighter 模式的高光描边，模拟 brightness 过曝效果
+            const overglowAlpha = pulseIntensity * CONFIG.enemyRender.borderPulseOverglowAlpha;
+            if (overglowAlpha > 0.01) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.shadowBlur = 0; // 过曝层不需要额外 shadowBlur
+                ctx.strokeStyle = pulseColor.replace('#', 'rgba(').replace(/([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i,
+                    (m, r, g, b) => `${parseInt(r,16)}, ${parseInt(g,16)}, ${parseInt(b,16)}, ${overglowAlpha.toFixed(3)})`);
+                if (ctx.strokeStyle === pulseColor) {
+                    // 如果替换失败，直接使用固定色并设置透明度
+                    ctx.globalAlpha = overglowAlpha;
+                    ctx.strokeStyle = pulseColor;
+                }
+                if (this.collisionShape === 'polygon' &&
+                    this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                    ctx.beginPath();
+                    const verts = this.collisionData.vertices;
+                    ctx.moveTo(verts[0].x, verts[0].y);
+                    for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x, verts[i].y);
+                    ctx.closePath();
+                    ctx.stroke();
+                } else if (this.type === 'boss' && this.collisionShape === 'arc' && this.collisionData) {
+                    const cd = this.collisionData;
+                    const outerR = cd.radius + cd.thickness * 0.5;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, outerR, 0, Math.PI * 2, false);
+                    ctx.stroke();
+                } else {
+                    ctx.strokeRect(-w/2, -h/2, w, h);
+                }
+                ctx.restore();
             }
         }
         ctx.shadowBlur = 0; // 重置
