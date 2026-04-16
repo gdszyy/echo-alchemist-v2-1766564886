@@ -1,5 +1,7 @@
 # 游戏系统与试炼场规范 (systems.js)
 
+> 最后更新：修复 `systems.js` 遗漏导入 `EVENT_TYPES` 导致 TrainingGround.enter() 抛出 ReferenceError 的 Bug。已将第 17 行的 `import { eventBus }` 补全为 `import { eventBus, EVENT_TYPES }`。
+
 本文档定义了 `src/systems.js` 中包含的核心子系统规范，重点涵盖 **试炼场 (TrainingGround)** 和 **真理之书 (TruthBook)** 的架构约定与场景化配置扩展方法。
 
 ## 1. 模块职责边界

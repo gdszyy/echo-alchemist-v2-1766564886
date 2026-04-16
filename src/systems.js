@@ -9,12 +9,12 @@
  * 依赖：
  * - CONFIG（来自 config.js）
  * - Enemy, Projectile（来自 entities.js）
- * - eventBus（来自 event_bus.js）
+ * - eventBus, EVENT_TYPES（来自 event_bus.js）
  */
 
 import { CONFIG } from './config.js';
 import { Enemy, Projectile, Particle, FloatingText, CloneSpore } from './entities.js';
-import { eventBus } from './event_bus.js';
+import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { Vec2, adjustColorBrightness } from './utils/math_utils.js';
 import { RUNEWORD_DB } from './rune_config.js';
 
