@@ -8,6 +8,7 @@
 *   **架构与防坑指南**：[`.cursor/rules/global.md`](.cursor/rules/global.md)（必读，包含子系统扩展规范与全局状态流转）。
 *   **待办与进度大盘**：[`TODO.md`](TODO.md)（包含各阶段的完成状态与重构指标）。
 *   **自适应性能规范**：[`.cursor/rules/performance.md`](.cursor/rules/performance.md)（凡修改粒子/特效/Peg/敌人渲染相关代码，必读）。
+*   **流程洞察索引**：[`.cursor/rules/process_insights/index.md`](.cursor/rules/process_insights/index.md)（在涉及复杂跨模块流程、修复历史 Bug 区域或新增特效时必读；包含历次任务沉淀的防坑经验与版本化洞察文档）。
 
 所有专门针对本项目的技能 (如 `echo-developer`) 仅需指引 Agent 阅读上述入口，无需在技能文件内硬编码具体的架构细节或行数统计。
 
@@ -80,3 +81,23 @@
 > **架构状态（Task 3.3 更新）**：`core.js` 已完全移除 `Object.assign(Game.prototype, ...)` Mixin 模式。全部 10 个子系统均已迁移至组合模式（Composition via bind）。新增子系统必须遵循 [`.cursor/rules/global.md`](.cursor/rules/global.md) 第 5 节「子系统扩展规范」。
 
 > **注意**：随着项目的拆分和重构，本索引应持续更新。每个子模块的负责 Agent 在完成初步重构后，需创建并维护对应的规则文档。
+
+## 5. 流程洞察体系 (Process Insights)
+
+流程洞察是 Agent 在完成任务后沉淀的经验文档，记录非直观的隐蔽逻辑、跨模块耦合陷阱和关键操作流程。与静态模块规范不同，流程洞察随任务持续积累，并通过独立版本号管理演进。
+
+*   **洞察注册表**：[`.cursor/rules/process_insights/index.md`](.cursor/rules/process_insights/index.md) - 所有活跃与废弃洞察的版本索引。
+
+**当前活跃洞察清单（快速预览）**：
+
+| ID | 标题 | 适用场景 |
+|----|------|----------|
+| PI-001 | 核心 Bug 修复流程与高频陷阱 | 修改 `game_phase.js`、`ui_system.js`、`game_system.js` 时 |
+| PI-002 | 符文词条 Hook 注入流程 | 新增或修改符文词条效果时 |
+| PI-003 | 子系统扩展与组合模式注入流程 | 新增子系统或修改 `core.js` 时 |
+| PI-004 | 性能预算扩展与新特效接入流程 | 新增粒子特效或高开销视觉效果时 |
+
+**Agent 维护规范**：
+- 当任务中发现隐蔽逻辑或耦合陷阱时，**必须**在任务完成后在此目录创建或更新对应洞察文档。
+- 新增洞察的 Git Commit 必须包含对 `index.md` 的更新。
+- 因代码重构导致洞察失效时，必须将其标记为 `[DEPRECATED]` 并在索引中归档。
