@@ -817,7 +817,11 @@ const CONFIG = {
         // 照射抖动最大幅度（像素）
         laserHitShakeAmplitude: 3.5,
         // 照射抖动衰减系数（每帧乘以该值）
-        laserHitShakeDecay: 0.88
+        laserHitShakeDecay: 0.88,
+
+        // Layer 3.5 Breathe: 词缀核心过曝叠加层最大透明度
+        // 比 Boss 弱（Boss 约 0.4），避免普通/精英敌人词缀特效喧宾夺主
+        affixCoreOverglowAlpha: 0.2
     },
 
     // ==================== 自适应性能配置 (Adaptive Performance) ====================

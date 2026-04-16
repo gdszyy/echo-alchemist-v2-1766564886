@@ -1452,6 +1452,21 @@ class Enemy {
                     }
                 }
                 ctx.restore();
+                // --- shield 词缀核心过曝叠加（相位与格纹脉冲错开 π/2）---
+                {
+                    const coreX = 0, coreY = 0;
+                    const coreR = Math.min(w, h) * 0.2;
+                    const shieldOverglowPhase = (Date.now() / CONFIG.enemyRender.breathePeriod + this.visualSeed * 2 + 0.25) * Math.PI * 2;
+                    const shieldOverglowIntensity = Math.pow((Math.sin(shieldOverglowPhase) + 1) * 0.5, CONFIG.enemyRender.breatheEasingPower || 1.5);
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const shieldCoreGrad = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, coreR);
+                    shieldCoreGrad.addColorStop(0, `rgba(255, 255, 255, ${shieldOverglowIntensity * CONFIG.enemyRender.affixCoreOverglowAlpha})`);
+                    shieldCoreGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.fillStyle = shieldCoreGrad;
+                    ctx.beginPath(); ctx.arc(coreX, coreY, coreR, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                }
             }
 
             // --- regen: 从底部向上涌动的绿色液体波纹（回血=液体涌动）---
@@ -1472,6 +1487,21 @@ class Enemy {
                     ctx.fillRect(-w / 2, waveY - 8, w, 16);
                 }
                 ctx.restore();
+                // --- regen 词缀核心过曝叠加 ---
+                {
+                    const coreX = 0, coreY = h * 0.3;
+                    const coreR = w * 0.15;
+                    const affixPulsePhase = (Date.now() / CONFIG.enemyRender.breathePeriod + this.visualSeed * 2) * Math.PI * 2;
+                    const affixPulseIntensity = Math.pow((Math.sin(affixPulsePhase) + 1) * 0.5, CONFIG.enemyRender.breatheEasingPower || 1.5);
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const coreGrad = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, coreR);
+                    coreGrad.addColorStop(0, `rgba(255, 255, 255, ${affixPulseIntensity * CONFIG.enemyRender.affixCoreOverglowAlpha})`);
+                    coreGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.fillStyle = coreGrad;
+                    ctx.beginPath(); ctx.arc(coreX, coreY, coreR, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                }
             }
 
             // --- haste: 横向扫过的速度残影线（极速=运动模糊）金黄色 ---
@@ -1494,6 +1524,21 @@ class Enemy {
                 ctx.globalAlpha = Math.sin(phase2 * Math.PI) * 0.3 * affixAlpha35;
                 ctx.fillRect(-w / 2, lineY2 - 1, w, 2);
                 ctx.restore();
+                // --- haste 词缀核心过曝叠加 ---
+                {
+                    const coreX = w * 0.1, coreY = 0;
+                    const coreR = w * 0.15;
+                    const affixPulsePhase = (Date.now() / CONFIG.enemyRender.breathePeriod + this.visualSeed * 2) * Math.PI * 2;
+                    const affixPulseIntensity = Math.pow((Math.sin(affixPulsePhase) + 1) * 0.5, CONFIG.enemyRender.breatheEasingPower || 1.5);
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const coreGrad = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, coreR);
+                    coreGrad.addColorStop(0, `rgba(255, 255, 255, ${affixPulseIntensity * CONFIG.enemyRender.affixCoreOverglowAlpha})`);
+                    coreGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.fillStyle = coreGrad;
+                    ctx.beginPath(); ctx.arc(coreX, coreY, coreR, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                }
             }
 
             // --- devour: 从四周向中心收缩的暗红色漩涡（吞噬=向心力）---
@@ -1522,6 +1567,21 @@ class Enemy {
                     ctx.stroke();
                 }
                 ctx.restore();
+                // --- devour 词缀核心过曝叠加 ---
+                {
+                    const coreX = 0, coreY = 0;
+                    const coreR = Math.min(w, h) * 0.18;
+                    const affixPulsePhase = (Date.now() / CONFIG.enemyRender.breathePeriod + this.visualSeed * 2) * Math.PI * 2;
+                    const affixPulseIntensity = Math.pow((Math.sin(affixPulsePhase) + 1) * 0.5, CONFIG.enemyRender.breatheEasingPower || 1.5);
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const coreGrad = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, coreR);
+                    coreGrad.addColorStop(0, `rgba(255, 255, 255, ${affixPulseIntensity * CONFIG.enemyRender.affixCoreOverglowAlpha})`);
+                    coreGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.fillStyle = coreGrad;
+                    ctx.beginPath(); ctx.arc(coreX, coreY, coreR, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                }
             }
 
             // --- healer: 十字形脉冲扩散波（治疗=医疗脉冲）粉色，从中心向外 ---
@@ -1539,6 +1599,21 @@ class Enemy {
                 ctx.fillRect(-crossW / 2, -h / 2, crossW, h);
                 ctx.fillRect(-w / 2, -crossW / 2, w, crossW);
                 ctx.restore();
+                // --- healer 词缀核心过曝叠加 ---
+                {
+                    const coreX = 0, coreY = 0;
+                    const coreR = Math.min(w, h) * 0.15;
+                    const affixPulsePhase = (Date.now() / CONFIG.enemyRender.breathePeriod + this.visualSeed * 2) * Math.PI * 2;
+                    const affixPulseIntensity = Math.pow((Math.sin(affixPulsePhase) + 1) * 0.5, CONFIG.enemyRender.breatheEasingPower || 1.5);
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const coreGrad = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, coreR);
+                    coreGrad.addColorStop(0, `rgba(255, 255, 255, ${affixPulseIntensity * CONFIG.enemyRender.affixCoreOverglowAlpha})`);
+                    coreGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.fillStyle = coreGrad;
+                    ctx.beginPath(); ctx.arc(coreX, coreY, coreR, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                }
             }
 
             // --- jump: 底部弹力压缩线（跳跃=弹簧压缩）青色，底部区域 ---
@@ -1561,6 +1636,21 @@ class Enemy {
                     ctx.stroke();
                 }
                 ctx.restore();
+                // --- jump 词缀核心过曝叠加 ---
+                {
+                    const coreX = 0, coreY = h * 0.35;
+                    const coreR = w * 0.12;
+                    const affixPulsePhase = (Date.now() / CONFIG.enemyRender.breathePeriod + this.visualSeed * 2) * Math.PI * 2;
+                    const affixPulseIntensity = Math.pow((Math.sin(affixPulsePhase) + 1) * 0.5, CONFIG.enemyRender.breatheEasingPower || 1.5);
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const coreGrad = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, coreR);
+                    coreGrad.addColorStop(0, `rgba(255, 255, 255, ${affixPulseIntensity * CONFIG.enemyRender.affixCoreOverglowAlpha})`);
+                    coreGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.fillStyle = coreGrad;
+                    ctx.beginPath(); ctx.arc(coreX, coreY, coreR, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                }
             }
 
             // --- clone: 细胞斑点（分身=细胞分裂），增强质感 ---
@@ -1592,6 +1682,21 @@ class Enemy {
                     ctx.fill();
                 });
                 ctx.restore();
+                // --- clone 词缀核心过曝叠加（淡紫色，与细胞颜色语言一致）---
+                {
+                    const coreX = 0, coreY = 0;
+                    const coreR = Math.min(w, h) * 0.2;
+                    const affixPulsePhase = (Date.now() / CONFIG.enemyRender.breathePeriod + this.visualSeed * 2) * Math.PI * 2;
+                    const affixPulseIntensity = Math.pow((Math.sin(affixPulsePhase) + 1) * 0.5, CONFIG.enemyRender.breatheEasingPower || 1.5);
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const coreGrad = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, coreR);
+                    coreGrad.addColorStop(0, `rgba(192, 132, 252, ${affixPulseIntensity * CONFIG.enemyRender.affixCoreOverglowAlpha})`);
+                    coreGrad.addColorStop(1, 'rgba(192, 132, 252, 0)');
+                    ctx.fillStyle = coreGrad;
+                    ctx.beginPath(); ctx.arc(coreX, coreY, coreR, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                }
             }
 
             // --- berserk: 橙红色燃烧纹路（狂暴=火焰），从底部蔓延 ---
@@ -1618,6 +1723,36 @@ class Enemy {
                 ctx.closePath();
                 ctx.fill();
                 ctx.restore();
+                // --- berserk 词缀核心过曝叠加 + 橙色火花点 ---
+                if (this.temp > 0) {
+                    const berserkIntensityOvg = Math.min(1, this.temp / 100);
+                    const coreX = 0, coreY = h * 0.4;
+                    const coreR = w * 0.2;
+                    const affixPulsePhase = (Date.now() / CONFIG.enemyRender.breathePeriod + this.visualSeed * 2) * Math.PI * 2;
+                    const affixPulseIntensity = Math.pow((Math.sin(affixPulsePhase) + 1) * 0.5, CONFIG.enemyRender.breatheEasingPower || 1.5);
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const coreGrad = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, coreR);
+                    coreGrad.addColorStop(0, `rgba(255, 255, 255, ${affixPulseIntensity * berserkIntensityOvg * CONFIG.enemyRender.affixCoreOverglowAlpha})`);
+                    coreGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.fillStyle = coreGrad;
+                    ctx.beginPath(); ctx.arc(coreX, coreY, coreR, 0, Math.PI * 2); ctx.fill();
+                    // 额外绘制 3-4 个橙色火花点，模拟火焰跳动
+                    const sparkCount = 3 + Math.floor(this.visualSeed * 2) % 2;
+                    for (let si = 0; si < sparkCount; si++) {
+                        const sparkSeed = this.visualSeed * 7 + si * 3.7;
+                        const sparkX = (Math.sin(sparkSeed + Date.now() / 400) * 0.4) * w;
+                        const sparkY = h * 0.2 + Math.abs(Math.sin(sparkSeed * 1.3 + Date.now() / 300)) * h * 0.3;
+                        const sparkR = 2 + Math.abs(Math.sin(sparkSeed * 2.1 + Date.now() / 250)) * 2;
+                        const sparkAlpha = (0.5 + Math.abs(Math.sin(sparkSeed + Date.now() / 350)) * 0.5) * berserkIntensityOvg;
+                        const sparkGrad = ctx.createRadialGradient(sparkX, sparkY, 0, sparkX, sparkY, sparkR);
+                        sparkGrad.addColorStop(0, `rgba(255, 200, 50, ${sparkAlpha})`);
+                        sparkGrad.addColorStop(1, 'rgba(255, 100, 0, 0)');
+                        ctx.fillStyle = sparkGrad;
+                        ctx.beginPath(); ctx.arc(sparkX, sparkY, sparkR, 0, Math.PI * 2); ctx.fill();
+                    }
+                    ctx.restore();
+                }
             }
         }
 
