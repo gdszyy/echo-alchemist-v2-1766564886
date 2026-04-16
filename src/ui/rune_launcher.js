@@ -2,7 +2,6 @@
  * src/ui/rune_launcher.js - 符文发射器界面渲染模块
  * 
  * 职责：符文发射器面板的完整 UI 交互
- * - 符文背包面板（只读查看）
  * - 符文发射器面板（网格管理）
  * - 符文选择弹出层（从库存选择符文放入网格）
  * - 符文网格更新（词条解析、高亮激活格子）
@@ -49,71 +48,6 @@ export const rune_launcher_system = {
     // ==================== 符文发射器 UI ====================
 
     /**
-     * 打开符文背包面板（只读查看，不支持合成/重铸）
-     */
-    ui_openRuneBackpack() {
-        const panel = document.getElementById('rune-backpack-panel');
-        if (!panel) return;
-        panel.style.removeProperty('display');
-        panel.style.display = 'flex';
-        this._ui_renderRuneBackpackList();
-    },
-
-
-    /**
-     * 关闭符文背包面板
-     */
-    ui_closeRuneBackpack() {
-        const panel = document.getElementById('rune-backpack-panel');
-        if (panel) panel.style.display = 'none';
-    },
-
-
-    /**
-     * 渲染符文背包内容（只读）
-     * @private
-     */
-    _ui_renderRuneBackpackList() {
-        const list = document.getElementById('rune-backpack-list');
-        const countEl = document.getElementById('rune-backpack-count');
-        if (!list) return;
-
-        const inventory = this.runeInventory || [];  // [Mixin 正常用法：读取 Game 实例状态]
-        if (countEl) countEl.textContent = inventory.length;
-
-        list.innerHTML = '';
-
-        if (inventory.length === 0) {
-            list.innerHTML = `<p class="text-center text-slate-500 text-xs py-4 italic">背包中没有符文</p>`;
-            return;
-        }
-
-        inventory.forEach((runeEntry, idx) => {
-            const runeId = typeof runeEntry === 'object' ? runeEntry.id : runeEntry;
-            if (!runeId) return;
-            const runeDef = RUNE_DB ? RUNE_DB.find(r => r.id === runeId) : null;
-            if (!runeDef) return;
-            const runeLevel = (typeof runeEntry === 'object' && runeEntry.level) ? runeEntry.level : 1;
-
-            const item = document.createElement('div');
-            item.className = 'flex items-center gap-3 bg-slate-800/60 border border-slate-700/40 rounded-xl p-2';
-            item.innerHTML = `
-                <div class="w-10 h-10 flex items-center justify-center shrink-0" style="font-size:22px;">
-                    ${_ui_buildRuneIconHTML(runeDef, runeLevel)}
-                </div>
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm font-bold text-purple-200">${runeDef.name}</span>
-                    </div>
-                    <p class="text-[10px] text-slate-400 leading-tight mt-0.5 truncate">${runeDef.desc || ''}</p>
-                </div>
-            `;
-            list.appendChild(item);
-        });
-    },
-
-
-    /**
      * 打开符文发射器面板
      */
     ui_openRuneLauncher() {
@@ -125,6 +59,12 @@ export const rune_launcher_system = {
         this._ui_updateLauncherShardCount();
         this.ui_initRuneGrid();
         this.ui_updateRuneGrid();
+        // 关闭气泡提示（玩家已进入发射器）
+        this._ui_hideRunewordBubble();
+        // 首次打开时显示内部引导教学
+        if (this.saveData && !this.saveData.runeLauncherTourDone) {
+            setTimeout(() => this.ui_showRuneLauncherTour(), 400);
+        }
     },
 
 
@@ -1217,6 +1157,375 @@ export const rune_launcher_system = {
             default:
                 return '';
         }
+    },
+
+
+    // ==================== 气泡提示：可以组成词条时弹出 ====================
+
+    /**
+     * 检测当前库存中是否可以组成任意词条，如可以则展示气泡提示
+     * 应在每次获得新符文后调用（如 phase_claimPendingRunes 后）
+     */
+    _ui_checkRunewordBubble() {
+        if (!this.runeInventory || this.runeInventory.length === 0) return;
+
+        // 检测库存中是否有任意词条可以组成
+        const emptyGrid = new Array(9).fill(null);
+        let formableRunewords = [];
+
+        // 对每个网格位置，尝试每个库存符文
+        for (let cellIdx = 0; cellIdx < 9; cellIdx++) {
+            for (const runeEntry of this.runeInventory) {
+                const newWords = getNewRunewordsOnPlacement(emptyGrid, cellIdx, runeEntry, RUNEWORD_DB);
+                newWords.forEach(rw => {
+                    if (!formableRunewords.find(r => r.id === rw.id)) {
+                        formableRunewords.push(rw);
+                    }
+                });
+            }
+        }
+
+        if (formableRunewords.length === 0) {
+            this._ui_hideRunewordBubble();
+            return;
+        }
+
+        // 如果气泡已被手动关闭则不再展示
+        if (this._runewordBubbleDismissed) return;
+
+        this._ui_showRunewordBubble(formableRunewords);
+    },
+
+    /**
+     * 展示词条气泡提示
+     * @param {Array} formableRunewords - 可组成的词条列表
+     * @private
+     */
+    _ui_showRunewordBubble(formableRunewords) {
+        // 寻找所有符文发射器按鈕（可能在多个阶段）
+        const launcherBtns = document.querySelectorAll('[onclick="game.ui_openRuneLauncher()"]');
+        if (launcherBtns.length === 0) return;
+
+        // 找到当前可见的按鈕
+        let targetBtn = null;
+        for (const btn of launcherBtns) {
+            const rect = btn.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                targetBtn = btn;
+                break;
+            }
+        }
+        if (!targetBtn) return;
+
+        // 移除旧气泡
+        const existingBubble = document.getElementById('runeword-formable-bubble');
+        if (existingBubble) existingBubble.remove();
+
+        // 创建气泡元素
+        const bubble = document.createElement('div');
+        bubble.id = 'runeword-formable-bubble';
+        const names = formableRunewords.slice(0, 2).map(rw => rw.name).join('、');
+        const moreText = formableRunewords.length > 2 ? ` 等${formableRunewords.length}个` : '';
+        bubble.innerHTML = `
+            <div class="flex items-center gap-1.5">
+                <span class="text-amber-300 text-sm animate-pulse">✨</span>
+                <span class="text-xs font-bold text-amber-100">可组成词条！</span>
+                <span class="text-[10px] text-amber-300/80">${names}${moreText}</span>
+                <button id="runeword-bubble-close" class="ml-1 text-slate-400 hover:text-white text-xs leading-none">×</button>
+            </div>
+        `;
+        bubble.style.cssText = [
+            'position: fixed;',
+            'z-index: 9000;',
+            'background: linear-gradient(135deg, rgba(120,53,15,0.95), rgba(92,38,10,0.95));',
+            'border: 1px solid rgba(245,158,11,0.6);',
+            'border-radius: 20px;',
+            'padding: 6px 12px;',
+            'box-shadow: 0 0 16px rgba(245,158,11,0.4), 0 2px 8px rgba(0,0,0,0.6);',
+            'pointer-events: auto;',
+            'cursor: pointer;',
+            'animation: runeword-bubble-in 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;',
+        ].join(' ');
+
+        // 定位到按鈕附近
+        document.body.appendChild(bubble);
+        const btnRect = targetBtn.getBoundingClientRect();
+        bubble.style.bottom = (window.innerHeight - btnRect.top + 8) + 'px';
+        bubble.style.right = (window.innerWidth - btnRect.right - 4) + 'px';
+
+        // 点击气泡主体→打开发射器
+        bubble.addEventListener('click', (e) => {
+            if (e.target.id === 'runeword-bubble-close') return;
+            this.ui_openRuneLauncher();
+        });
+
+        // 关闭按鈕
+        const closeBtn = document.getElementById('runeword-bubble-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._runewordBubbleDismissed = true;
+                bubble.style.animation = 'runeword-bubble-out 0.25s ease forwards';
+                setTimeout(() => bubble.remove(), 260);
+            });
+        }
+
+        // 注入动画 CSS（只注入一次）
+        if (!document.getElementById('runeword-bubble-style')) {
+            const style = document.createElement('style');
+            style.id = 'runeword-bubble-style';
+            style.textContent = `
+                @keyframes runeword-bubble-in {
+                    from { opacity: 0; transform: scale(0.7) translateY(10px); }
+                    to   { opacity: 1; transform: scale(1) translateY(0); }
+                }
+                @keyframes runeword-bubble-out {
+                    from { opacity: 1; transform: scale(1); }
+                    to   { opacity: 0; transform: scale(0.7) translateY(6px); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    },
+
+    /**
+     * 隐藏词条气泡提示
+     * @private
+     */
+    _ui_hideRunewordBubble() {
+        const bubble = document.getElementById('runeword-formable-bubble');
+        if (bubble) {
+            bubble.style.animation = 'runeword-bubble-out 0.2s ease forwards';
+            setTimeout(() => bubble.remove(), 220);
+        }
+    },
+
+
+    // ==================== 一键快速排布 ====================
+
+    /**
+     * 一键快速排布：自动将库存中符文填入网格以触发最多词条
+     * 算法：贪心策略 — 优先放置能触发新词条的符文
+     */
+    ui_autoArrangeRunes() {
+        if (!this.runeInventory || this.runeInventory.length === 0) {
+            showToast('库存中没有符文');
+            return;
+        }
+
+        // 将当前网格中的符文全部放回库存
+        for (let i = 0; i < 9; i++) {
+            if (this.runeGrid[i]) {
+                this.runeInventory.push(this.runeGrid[i]);
+                this.runeGrid[i] = null;
+            }
+        }
+
+        // 贪心排布：每次选择能触发最多新词条的（符文，格子）组合
+        const MAX_CELLS = 9;
+        let placed = 0;
+
+        while (placed < MAX_CELLS && this.runeInventory.length > 0) {
+            let bestScore = -1;
+            let bestRuneIdx = -1;
+            let bestCellIdx = -1;
+
+            for (let cellIdx = 0; cellIdx < MAX_CELLS; cellIdx++) {
+                if (this.runeGrid[cellIdx]) continue; // 已占用
+                for (let runeIdx = 0; runeIdx < this.runeInventory.length; runeIdx++) {
+                    const newWords = getNewRunewordsOnPlacement(
+                        this.runeGrid, cellIdx, this.runeInventory[runeIdx], RUNEWORD_DB
+                    );
+                    const score = newWords.length;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestRuneIdx = runeIdx;
+                        bestCellIdx = cellIdx;
+                    }
+                }
+            }
+
+            if (bestRuneIdx === -1) break; // 没有可放置的格子
+
+            // 如果没有任何词条可触发，就只填入第一个符文到第一个空格
+            if (bestScore === 0) {
+                // 找第一个空格和第一个符文
+                const firstEmpty = this.runeGrid.findIndex(c => !c);
+                if (firstEmpty === -1) break;
+                this.runeGrid[firstEmpty] = this.runeInventory.splice(0, 1)[0];
+            } else {
+                this.runeGrid[bestCellIdx] = this.runeInventory.splice(bestRuneIdx, 1)[0];
+            }
+            placed++;
+        }
+
+        this.ui_updateRuneGrid();
+        showToast('✨ 已自动排布符文');
+        audio.playTone(660, 'sine', 0.1, 0.3);
+    },
+
+
+    // ==================== 引导式教学 ====================
+
+    /**
+     * 展示符文发射器内部引导教学
+     * 首次打开发射器时自动调用，也可通过帮助按鈕手动触发
+     */
+    ui_showRuneLauncherTour() {
+        // 如果发射器面板不在显示状态则不展示
+        const panel = document.getElementById('phase-rune-launcher');
+        if (!panel || panel.style.display === 'none') return;
+
+        // 移除旧教学层
+        const existingTour = document.getElementById('rune-launcher-tour-overlay');
+        if (existingTour) existingTour.remove();
+
+        const tourSteps = [
+            {
+                targetId: 'rune-grid-container',
+                title: '① 符文网格',
+                desc: '将库存中的符文拖入这里。特定符文组合可触发强力「词条」！',
+                position: 'bottom',
+            },
+            {
+                targetId: 'rune-inventory-container',
+                title: '② 符文库存',
+                desc: '你拥有的所有符文在这里。点击符文可选中，选中 3 个可进行合成或重铸。',
+                position: 'top',
+            },
+            {
+                targetId: 'rune-merge-btn',
+                title: '③ 合成炉',
+                desc: '选中 3 个相同 ID 且相同等级的符文，合成为更高等级的同类符文。',
+                position: 'top',
+            },
+            {
+                targetId: 'rune-reforge-btn',
+                title: '④ 重铸炉',
+                desc: '选中任意 3 个符文消耗，随机获得一个全新符文。当库存符文不理想时可用。',
+                position: 'top',
+            },
+            {
+                targetId: 'rune-active-runewords',
+                title: '⑤ 已激活词条',
+                desc: '当网格中符文组合匹配词条时，词条将在这里展示并生效。',
+                position: 'top',
+            },
+        ];
+
+        // 创建教学层容器（不阔读背景，只展示高亮提示）
+        const overlay = document.createElement('div');
+        overlay.id = 'rune-launcher-tour-overlay';
+        overlay.style.cssText = [
+            'position: absolute;',
+            'inset: 0;',
+            'z-index: 500;',
+            'pointer-events: none;',
+        ].join(' ');
+        panel.style.position = 'relative';
+        panel.appendChild(overlay);
+
+        let currentStep = 0;
+
+        const showStep = (stepIdx) => {
+            // 清除当前提示卡
+            overlay.innerHTML = '';
+
+            if (stepIdx >= tourSteps.length) {
+                // 教学完成
+                overlay.remove();
+                if (this.saveData) this.saveData.runeLauncherTourDone = true;
+                if (this.saveGame) this.saveGame();
+                return;
+            }
+
+            const step = tourSteps[stepIdx];
+            const targetEl = document.getElementById(step.targetId);
+            if (!targetEl) {
+                // 目标元素不存在，跳过
+                showStep(stepIdx + 1);
+                return;
+            }
+
+            // 计算目标元素相对于 panel 的位置
+            const panelRect = panel.getBoundingClientRect();
+            const targetRect = targetEl.getBoundingClientRect();
+            const relTop = targetRect.top - panelRect.top;
+            const relLeft = targetRect.left - panelRect.left;
+
+            // 创建高亮边框
+            const highlight = document.createElement('div');
+            highlight.style.cssText = [
+                'position: absolute;',
+                `top: ${relTop - 4}px;`,
+                `left: ${relLeft - 4}px;`,
+                `width: ${targetRect.width + 8}px;`,
+                `height: ${targetRect.height + 8}px;`,
+                'border: 2px solid rgba(245,158,11,0.8);',
+                'border-radius: 12px;',
+                'box-shadow: 0 0 0 2000px rgba(0,0,0,0.45);',
+                'pointer-events: none;',
+                'animation: tour-highlight-pulse 1.5s ease-in-out infinite;',
+            ].join(' ');
+            overlay.appendChild(highlight);
+
+            // 创建提示卡
+            const card = document.createElement('div');
+            card.style.cssText = [
+                'position: absolute;',
+                'pointer-events: auto;',
+                'background: linear-gradient(135deg, rgba(15,23,42,0.97), rgba(30,27,75,0.97));',
+                'border: 1px solid rgba(245,158,11,0.5);',
+                'border-radius: 14px;',
+                'padding: 12px 14px;',
+                'width: 220px;',
+                'box-shadow: 0 4px 20px rgba(0,0,0,0.6), 0 0 12px rgba(245,158,11,0.2);',
+                'z-index: 10;',
+            ].join(' ');
+
+            // 卡片定位
+            const cardTop = step.position === 'bottom'
+                ? relTop + targetRect.height + 12
+                : relTop - 120;
+            const cardLeft = Math.max(4, Math.min(relLeft, panelRect.width - 230));
+            card.style.top = `${cardTop}px`;
+            card.style.left = `${cardLeft}px`;
+
+            card.innerHTML = `
+                <div class="text-xs font-bold text-amber-300 mb-1">${step.title}</div>
+                <div class="text-[11px] text-slate-300 leading-relaxed mb-3">${step.desc}</div>
+                <div class="flex items-center justify-between">
+                    <span class="text-[10px] text-slate-500">${stepIdx + 1} / ${tourSteps.length}</span>
+                    <div class="flex gap-2">
+                        ${stepIdx > 0 ? `<button id="tour-skip-btn" style="font-size:10px;color:#94a3b8;background:none;border:none;cursor:pointer;">跳过</button>` : ''}
+                        <button id="tour-next-btn" style="font-size:11px;font-weight:bold;color:#fef3c7;background:rgba(120,53,15,0.8);border:1px solid rgba(245,158,11,0.5);border-radius:8px;padding:4px 10px;cursor:pointer;">${stepIdx < tourSteps.length - 1 ? '下一步 →' : '知道了 ✓'}</button>
+                    </div>
+                </div>
+            `;
+            overlay.appendChild(card);
+
+            // 事件绑定
+            const nextBtn = document.getElementById('tour-next-btn');
+            if (nextBtn) nextBtn.addEventListener('click', () => showStep(stepIdx + 1));
+
+            const skipBtn = document.getElementById('tour-skip-btn');
+            if (skipBtn) skipBtn.addEventListener('click', () => showStep(tourSteps.length));
+        };
+
+        // 注入动画 CSS
+        if (!document.getElementById('rune-tour-style')) {
+            const style = document.createElement('style');
+            style.id = 'rune-tour-style';
+            style.textContent = `
+                @keyframes tour-highlight-pulse {
+                    0%, 100% { box-shadow: 0 0 0 2000px rgba(0,0,0,0.45), 0 0 8px rgba(245,158,11,0.4); }
+                    50%       { box-shadow: 0 0 0 2000px rgba(0,0,0,0.55), 0 0 16px rgba(245,158,11,0.8); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        showStep(0);
     },
 
 

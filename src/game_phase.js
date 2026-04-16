@@ -902,6 +902,15 @@ phase_gathering_getRandomPegType() {
         // 3. 如果有待领取符文，触发飞入背包动画事件
         if (pendingRunes.length > 0) {
             eventBus.emit(EVENT_TYPES.UI_RUNE_CLAIM_AFTER_ENEMY, { runes: pendingRunes });
+            // 4. 延迟检测是否可以组成词条，如可以则展示气泡提示
+            //    延迟 800ms 以等待符文飞入动画播放完毕
+            setTimeout(() => {
+                if (this._ui_checkRunewordBubble) {
+                    // 重置气泡关闭标记（新符文入库应重新提示）
+                    this._runewordBubbleDismissed = false;
+                    this._ui_checkRunewordBubble();
+                }
+            }, 800);
         }
     },
 
