@@ -820,8 +820,14 @@ const CONFIG = {
         laserHitShakeDecay: 0.88,
 
         // Layer 3.5 Breathe: 词缀核心过曝叠加层最大透明度
-        // 比 Boss 弱（Boss 约 0.4），避免普通/精英敌人词缀特效喧宾夺主
-        affixCoreOverglowAlpha: 0.2
+        // 比 Boss 弱（Boss 约 0.4），避免普通/精英敌人词缀特效喜宾夺主
+        affixCoreOverglowAlpha: 0.2,
+
+        // T2: Boss 核心过曝模拟（Boss Core Overglow）
+        // Boss 过曝叠加层最大透明度（0=关闭，1=最强），随呼吸周期动态变化
+        bossOverglowAlpha: 0.35,
+        // 狂暴状态下过曝强度倍率（叠加在 bossOverglowAlpha 上）
+        bossOverglowBerserkMult: 1.5
     },
 
     // ==================== 自适应性能配置 (Adaptive Performance) ====================

@@ -3177,6 +3177,29 @@ class Enemy {
                 ctx.shadowBlur = 15;
                 ctx.fill();
                 ctx.restore();
+                // [T2] 过曝白化叠加层（模拟 CSS brightness(1.4)）
+                {
+                    const pulseIntensity = (Math.sin(t * (isBerserk ? 5 : 2.5)) + 1) * 0.5;
+                    const berserkMult = isBerserk ? CONFIG.enemyRender.bossOverglowBerserkMult : 1.0;
+                    const overglowAlpha = pulseIntensity * CONFIG.enemyRender.bossOverglowAlpha * berserkMult;
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const overGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, heartR * 1.2);
+                    overGrad.addColorStop(0, `rgba(255, 255, 255, ${Math.min(overglowAlpha, 1)})`);
+                    overGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.fillStyle = overGrad;
+                    ctx.beginPath(); ctx.arc(0, 0, heartR * 1.2, 0, Math.PI * 2); ctx.fill();
+                    // 狂暴时额外增加向外扩散的脉冲波纹
+                    if (isBerserk) {
+                        const ripplePhase = (t * 1.5) % 1;
+                        const rippleR = heartR * (1.2 + ripplePhase * 1.5);
+                        const rippleAlpha = (1 - ripplePhase) * 0.5 * CONFIG.enemyRender.bossOverglowAlpha;
+                        ctx.strokeStyle = `rgba(255, 200, 100, ${rippleAlpha})`;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath(); ctx.arc(0, 0, rippleR, 0, Math.PI * 2); ctx.stroke();
+                    }
+                    ctx.restore();
+                }
                 // 火星喷射（狂暴时加强）
                 if (isBerserk) {
                     ctx.save();
@@ -3233,11 +3256,10 @@ class Enemy {
                 // === Mikro: 孢子囊 + 六边形细胞网格 ===
                 ctx.save();
                 ctx.globalCompositeOperation = 'screen';
-                // 六边形细胞网格
+                // 六边形细胞网格（[T2] 能量液位效果：网格线 alpha 从底部向顶部线性增强）
                 const hexR2 = Math.min(w, h) * 0.18;
                 const hexW2 = hexR2 * Math.sqrt(3);
                 const hexH2 = hexR2 * 2;
-                ctx.strokeStyle = `rgba(192, 132, 252, ${0.4 + Math.sin(t * 1.2) * 0.15})`;
                 ctx.lineWidth = 1;
                 ctx.shadowColor = '#a855f7';
                 ctx.shadowBlur = 5;
@@ -3246,6 +3268,10 @@ class Enemy {
                         const hx = col * hexW2 + (row % 2 === 0 ? 0 : hexW2 / 2);
                         const hy = row * hexH2 * 0.75;
                         if (Math.abs(hx) > w * 0.45 || Math.abs(hy) > h * 0.45) continue;
+                        // [T2] 能量液位：从底部(hy=h/2)到顶部(hy=-h/2)线性增强
+                        const liquidLevel = 1.0 - (hy + h * 0.5) / h; // 0(底部) ~ 1(顶部)
+                        const hexBaseAlpha = 0.25 + liquidLevel * 0.35 + Math.sin(t * 1.2) * 0.1;
+                        ctx.strokeStyle = `rgba(192, 132, 252, ${hexBaseAlpha})`;
                         ctx.beginPath();
                         for (let k = 0; k < 6; k++) {
                             const ang = Math.PI / 180 * (60 * k - 30);
@@ -3275,6 +3301,11 @@ class Enemy {
                     ctx.beginPath();
                     ctx.arc(sp.x, sp.y, spR * 2, 0, Math.PI * 2);
                     ctx.fill();
+                    // [T2] 孢子过曝白色高光点（lighter 模式）
+                    ctx.globalCompositeOperation = 'lighter';
+                    ctx.fillStyle = `rgba(255, 255, 255, ${pulse * CONFIG.enemyRender.bossOverglowAlpha * 0.8})`;
+                    ctx.beginPath(); ctx.arc(sp.x, sp.y, spR * 0.4, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalCompositeOperation = 'screen';
                 }
                 ctx.restore();
                 break;
@@ -3325,15 +3356,33 @@ class Enemy {
                 // === Viridis: 能量藤蔓 + 生命光晕 ===
                 ctx.save();
                 ctx.globalCompositeOperation = 'screen';
-                // 中心生命光晕
+                // 中心生命光晕（[T2] 呼吸峰値时内圈颜色向白色过渡）
+                const viridisBreath = (Math.sin(t * 2) + 1) * 0.5; // 0~1 呼吸周期
+                // 内圈颜色：呼吸峰値时向白色过渡
+                const viridisInnerR = Math.floor(74 + viridisBreath * (255 - 74));
+                const viridisInnerG = Math.floor(222 + viridisBreath * (255 - 222));
+                const viridisInnerB = Math.floor(128 + viridisBreath * (255 - 128));
+                const viridisInnerAlpha = 0.4 + viridisBreath * 0.2;
                 const viridisGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.min(w, h) * 0.4);
-                viridisGrad.addColorStop(0, `rgba(74, 222, 128, ${0.4 + Math.sin(t * 2) * 0.15})`);
+                viridisGrad.addColorStop(0, `rgba(${viridisInnerR}, ${viridisInnerG}, ${viridisInnerB}, ${viridisInnerAlpha})`);
                 viridisGrad.addColorStop(0.6, `rgba(34, 197, 94, 0.2)`);
                 viridisGrad.addColorStop(1, 'rgba(21, 128, 61, 0)');
                 ctx.fillStyle = viridisGrad;
                 ctx.beginPath();
                 ctx.arc(0, 0, Math.min(w, h) * 0.4, 0, Math.PI * 2);
                 ctx.fill();
+                // [T2] 中心过曝叠加层
+                {
+                    const berserkMult = isBerserk ? CONFIG.enemyRender.bossOverglowBerserkMult : 1.0;
+                    const overglowAlpha = viridisBreath * CONFIG.enemyRender.bossOverglowAlpha * berserkMult;
+                    ctx.globalCompositeOperation = 'lighter';
+                    const overGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.min(w, h) * 0.25);
+                    overGrad.addColorStop(0, `rgba(255, 255, 255, ${Math.min(overglowAlpha, 1)})`);
+                    overGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.fillStyle = overGrad;
+                    ctx.beginPath(); ctx.arc(0, 0, Math.min(w, h) * 0.25, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalCompositeOperation = 'screen';
+                }
                 // 能量藤蔓
                 const vineCount = isBerserk ? 5 : 3;
                 ctx.strokeStyle = `rgba(74, 222, 128, ${0.6 + Math.sin(t * 1.5) * 0.2})`;
@@ -3351,6 +3400,15 @@ class Enemy {
                     const endY = Math.sin(vineAngle) * vineLen;
                     ctx.quadraticCurveTo(cp1x, cp1y, endX, endY);
                     ctx.stroke();
+                    // [T2] 狂暴时藤蔓末端增加白色发光点（lighter 模式）
+                    if (isBerserk) {
+                        ctx.save();
+                        ctx.globalCompositeOperation = 'lighter';
+                        const glowAlpha = (Math.sin(t * 2 + i) * 0.3 + 0.5) * CONFIG.enemyRender.bossOverglowAlpha;
+                        ctx.fillStyle = `rgba(255, 255, 255, ${glowAlpha})`;
+                        ctx.beginPath(); ctx.arc(endX, endY, 3, 0, Math.PI * 2); ctx.fill();
+                        ctx.restore();
+                    }
                 }
                 ctx.restore();
                 break;
@@ -3363,30 +3421,48 @@ class Enemy {
                 // 闪烁电光核心
                 const teslaFlash = Math.random() < 0.3 ? 1 : (Math.sin(t * 8) * 0.5 + 0.5);
                 const teslaGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.min(w, h) * 0.35);
-                teslaGrad.addColorStop(0, `rgba(250, 204, 21, ${0.8 * teslaFlash})`);
+                // [T2] teslaFlash 峰値时中心颜色叠加白色高光
+                const teslaCenterR = Math.floor(250 + teslaFlash * (255 - 250));
+                const teslaCenterG = Math.floor(204 + teslaFlash * (255 - 204));
+                const teslaCenterB = Math.floor(21 + teslaFlash * (255 - 21));
+                teslaGrad.addColorStop(0, `rgba(${teslaCenterR}, ${teslaCenterG}, ${teslaCenterB}, ${0.8 * teslaFlash})`);
                 teslaGrad.addColorStop(0.3, `rgba(99, 102, 241, ${0.5 * teslaFlash})`);
                 teslaGrad.addColorStop(1, 'rgba(99, 102, 241, 0)');
                 ctx.fillStyle = teslaGrad;
                 ctx.beginPath();
                 ctx.arc(0, 0, Math.min(w, h) * 0.35, 0, Math.PI * 2);
                 ctx.fill();
-                // 电弧达到顶点
+                // [T2] 电光核心过曝叠加层
+                {
+                    const berserkMult = isBerserk ? CONFIG.enemyRender.bossOverglowBerserkMult : 1.0;
+                    const overglowAlpha = teslaFlash * CONFIG.enemyRender.bossOverglowAlpha * berserkMult;
+                    ctx.globalCompositeOperation = 'lighter';
+                    const tOverGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.min(w, h) * 0.2);
+                    tOverGrad.addColorStop(0, `rgba(255, 255, 255, ${Math.min(overglowAlpha, 1)})`);
+                    tOverGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.fillStyle = tOverGrad;
+                    ctx.beginPath(); ctx.arc(0, 0, Math.min(w, h) * 0.2, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalCompositeOperation = 'screen';
+                }
+                // 电弧达到顶点（[T2] 靠近中心时颜色强制向白色过渡）
                 const verts = this.collisionData && this.collisionData.vertices;
                 if (verts && verts.length > 0) {
-                    ctx.strokeStyle = `rgba(250, 204, 21, ${0.6 * teslaFlash})`;
-                    ctx.lineWidth = 1;
                     ctx.shadowColor = '#fbbf24';
                     ctx.shadowBlur = 8;
                     verts.forEach(v => {
                         if (Math.random() < 0.4) {
-                            ctx.beginPath();
-                            ctx.moveTo(0, 0);
-                            // 折线闪电
+                            ctx.lineWidth = 1;
                             const midX = v.x * 0.5 + (Math.random() - 0.5) * w * 0.2;
                             const midY = v.y * 0.5 + (Math.random() - 0.5) * h * 0.2;
-                            ctx.lineTo(midX, midY);
-                            ctx.lineTo(v.x, v.y);
-                            ctx.stroke();
+                            // 中心段（起点到中点）：白色过渡（模拟极端能量密度）
+                            const arcGrad1 = ctx.createLinearGradient(0, 0, midX, midY);
+                            arcGrad1.addColorStop(0, `rgba(255, 255, 255, ${0.9 * teslaFlash})`);
+                            arcGrad1.addColorStop(1, `rgba(250, 204, 21, ${0.6 * teslaFlash})`);
+                            ctx.strokeStyle = arcGrad1;
+                            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(midX, midY); ctx.stroke();
+                            // 外段（中点到顶点）：正常黄色
+                            ctx.strokeStyle = `rgba(250, 204, 21, ${0.6 * teslaFlash})`;
+                            ctx.beginPath(); ctx.moveTo(midX, midY); ctx.lineTo(v.x, v.y); ctx.stroke();
                         }
                     });
                 }
@@ -3398,12 +3474,15 @@ class Enemy {
                 // === Chimera: 缝合线 + 双色能量渗出 ===
                 ctx.save();
                 ctx.globalCompositeOperation = 'screen';
-                // 缝合线（垂直分割线）
+                // 缝合线（垂直分割线）（[T2] 中间段白色高光强度随呼吸周期动态变化）
                 const chimeraShift = Math.sin(t * 0.8) * 3;
+                const chimeraBreath = (Math.sin(t * 2) + 1) * 0.5; // 0~1 呼吸周期
+                const berserkMult2 = isBerserk ? CONFIG.enemyRender.bossOverglowBerserkMult : 1.0;
+                const chimeraWhiteAlpha = (0.5 + chimeraBreath * CONFIG.enemyRender.bossOverglowAlpha * berserkMult2);
                 const lineGrad = ctx.createLinearGradient(chimeraShift, -h/2, chimeraShift, h/2);
                 lineGrad.addColorStop(0, 'rgba(239, 68, 68, 0)');
                 lineGrad.addColorStop(0.3, `rgba(239, 68, 68, ${0.5 + Math.sin(t * 2) * 0.2})`);
-                lineGrad.addColorStop(0.5, `rgba(255, 255, 255, ${0.7 + Math.sin(t * 3) * 0.2})`);
+                lineGrad.addColorStop(0.5, `rgba(255, 255, 255, ${Math.min(chimeraWhiteAlpha, 1)})`);
                 lineGrad.addColorStop(0.7, `rgba(99, 102, 241, ${0.5 + Math.sin(t * 2) * 0.2})`);
                 lineGrad.addColorStop(1, 'rgba(99, 102, 241, 0)');
                 ctx.strokeStyle = lineGrad;
@@ -3420,12 +3499,28 @@ class Enemy {
                 leftGrad.addColorStop(1, 'rgba(59, 130, 246, 0)');
                 ctx.fillStyle = leftGrad;
                 ctx.fillRect(-w/2, -h/2, w/2, h);
+                // [T2] 左侧蓝色能量核心 lighter 过曝叠加
+                ctx.globalCompositeOperation = 'lighter';
+                const leftOverGrad = ctx.createRadialGradient(-w * 0.2, 0, 0, -w * 0.2, 0, w * 0.2);
+                leftOverGrad.addColorStop(0, `rgba(255, 255, 255, ${chimeraBreath * CONFIG.enemyRender.bossOverglowAlpha * berserkMult2 * 0.8})`);
+                leftOverGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                ctx.fillStyle = leftOverGrad;
+                ctx.fillRect(-w/2, -h/2, w/2, h);
+                ctx.globalCompositeOperation = 'screen';
                 // 右侧生物能量（红色）
                 const rightGrad = ctx.createRadialGradient(w * 0.2, 0, 0, w * 0.2, 0, w * 0.3);
                 rightGrad.addColorStop(0, `rgba(239, 68, 68, ${0.3 + Math.sin(t * 1.8) * 0.1})`);
                 rightGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
                 ctx.fillStyle = rightGrad;
                 ctx.fillRect(0, -h/2, w/2, h);
+                // [T2] 右侧红色能量核心 lighter 过曝叠加
+                ctx.globalCompositeOperation = 'lighter';
+                const rightOverGrad = ctx.createRadialGradient(w * 0.2, 0, 0, w * 0.2, 0, w * 0.2);
+                rightOverGrad.addColorStop(0, `rgba(255, 255, 255, ${chimeraBreath * CONFIG.enemyRender.bossOverglowAlpha * berserkMult2 * 0.8})`);
+                rightOverGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                ctx.fillStyle = rightOverGrad;
+                ctx.fillRect(0, -h/2, w/2, h);
+                ctx.globalCompositeOperation = 'screen';
                 ctx.restore();
                 break;
             }
