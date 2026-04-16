@@ -139,7 +139,12 @@ export const rune_launcher_system = {
         const pickerOverlay = document.getElementById('rune-picker-overlay');
         if (pickerOverlay) pickerOverlay.classList.add('hidden');
         const tourOverlay = document.getElementById('rune-launcher-tour-overlay');
-        if (tourOverlay) tourOverlay.remove();
+        if (tourOverlay) {
+            tourOverlay.remove();
+            // [BUGFIX] 教学期间临时将 panel.overflow 设为 hidden，关闭时需恢复，防止用户未完成教学直接关闭面板时溢出效果残留
+            const panel2 = document.getElementById('phase-rune-launcher');
+            if (panel2) panel2.style.overflow = '';
+        }
         this._pendingRuneGridIndex = null;
 
         const panel = document.getElementById('phase-rune-launcher');
@@ -1486,6 +1491,9 @@ export const rune_launcher_system = {
             'pointer-events: none;',
         ].join(' ');
         panel.style.position = 'relative';
+        // [BUGFIX] 防止 highlight 的超大 box-shadow (2000px) 溢出 panel 边界，在屏幕外形成常驻黑色蒙版
+        const _prevOverflow = panel.style.overflow;
+        panel.style.overflow = 'hidden';
         panel.appendChild(overlay);
 
         let currentStep = 0;
@@ -1497,8 +1505,10 @@ export const rune_launcher_system = {
             if (stepIdx >= tourSteps.length) {
                 // 教学完成
                 overlay.remove();
+                // [BUGFIX] 恢复 panel 的 overflow 属性（教学期间临时设为 hidden 防止 box-shadow 溢出）
+                panel.style.overflow = _prevOverflow;
                 if (this.saveData) this.saveData.runeLauncherTourDone = true;
-                if (this.saveGame) this.saveGame();
+                this.sys_saveData(); // [BUGFIX] 原为 this.saveGame()，该方法不存在，导致存档从未持久化，教学每次都重复触发
                 return;
             }
 
