@@ -888,6 +888,11 @@ const CONFIG = {
             pegGlowHalo:      true,
             // 敌人材质光泽渐变开关
             enemyGloss:       true,
+            // Arc Boss VFX 特效密度控制（high: 完整效果）
+            arcBossVfxTriCount:  6,   // Ouroboros 狂暴共鸣三角形数量（0=关闭）
+            arcBossVfxLineCount: 6,   // Devourer 旋转引力线数量
+            arcBossVfxWhiteGrad: true, // Devourer 深渊核心 lighter 白化叠加开关
+            arcBossVfxSuckProb:  0.7, // Devourer 吸入粒子每帧生成概率
         },
         // MEDIUM：均衡模式，适合中端手机
         medium: {
@@ -907,6 +912,11 @@ const CONFIG = {
             pegSoftShadow:    true,
             pegGlowHalo:      false,  // 关闭 Peg 底部光晕（每帧径向渐变）
             enemyGloss:       true,
+            // Arc Boss VFX 特效密度控制（medium: 减半）
+            arcBossVfxTriCount:  3,   // 三角形减半，降低 shadowBlur 调用次数
+            arcBossVfxLineCount: 6,   // 引力线保持，但 shadowBlur 已随脉冲降低
+            arcBossVfxWhiteGrad: true, // 保留白化叠加
+            arcBossVfxSuckProb:  0.5, // 吸入粒子概率降至 50%
         },
         // LOW：省电模式，适合低端手机 / 发热严重时
         low: {
@@ -926,6 +936,11 @@ const CONFIG = {
             pegSoftShadow:    false,  // 关闭 Peg 软阴影
             pegGlowHalo:      false,
             enemyGloss:       false,  // 关闭敌人材质光泽（省去 OffscreenCanvas 渐变叠加）
+            // Arc Boss VFX 特效密度控制（low: 大幅削减）
+            arcBossVfxTriCount:  0,   // 关闭三角形符文（6 次 shadowBlur/帧 → 0）
+            arcBossVfxLineCount: 3,   // 引力线减半（6 次 createLinearGradient → 3）
+            arcBossVfxWhiteGrad: false, // 关闭 lighter 白化叠加（createRadialGradient）
+            arcBossVfxSuckProb:  0.3, // 吸入粒子概率降至 30%
         }
     }
 };

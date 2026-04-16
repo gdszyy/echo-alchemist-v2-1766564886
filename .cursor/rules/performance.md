@@ -149,9 +149,20 @@ if avgFps > fpsThresholdUp (55):
 |------|---------|------|
 | 材质光泽叠加（约第 229 行） | `enemyGloss` | `false` 时跳过 OffscreenCanvas 光泽渐变 |
 
+### 5.6 Arc Boss VFX（`src/entities/enemy.js` → Devourer Layer 6.5 & Ouroboros Layer 6.5）
+
+| 位置 | 读取字段 | 行为 |
+|------|---------|------|
+| Devourer 深渊核心 lighter 白化叠加（DEVOURING 状态） | `arcBossVfxWhiteGrad` | `false` 时跳过 `createRadialGradient` + `lighter` 叠加（省电模式关闭） |
+| Devourer 旋转引力线数量（DEVOURING 状态） | `arcBossVfxLineCount` | 控制 `createLinearGradient` 调用次数（high:6 / medium:6 / low:3） |
+| Devourer 吸入粒子每帧生成概率（DEVOURING 状态） | `arcBossVfxSuckProb` | 控制每帧 spark 粒子生成概率（high:0.7 / medium:0.5 / low:0.3） |
+| Ouroboros 狂暴共鸣三角形符文数量（狂暴状态） | `arcBossVfxTriCount` | 控制外圈旋转三角形数量（high:6 / medium:3 / low:0），0 时完全跳过循环 |
+
+> **注意**：Arc Boss VFX 通过 `game.perfQualityLevel` 动态读取等级，默认回退到 `'high'`。吸入粒子已通过 `spawn_pushParticleWithLimit` 接入全局 sparkLimit 预算检查。
+
 > **注意**：`_initTexture` 在构造时调用，通过 `window.game` 读取等级（若 `window.game` 尚未初始化则默认开启光泽）。
 
-### 5.6 渲染系统（`src/render_system.js`）
+### 5.7 渲染系统（`src/render_system.js`）
 
 | 函数 | 行为 |
 |------|------|
@@ -206,3 +217,4 @@ if avgFps > fpsThresholdUp (55):
 |------|------|
 | 2026-04-16 | 初始实现：FPS 采样器、三档等级预算、粒子/特效/Peg/敌人全面接入、FPS 指示层 |
 | 2026-04-16 | 新增 `sparkLimit`（high:100/medium:50/low:20）和 `smokeLimit`（high:60/medium:25/low:8）两个预算字段；在 `spawn_createParticle` 和 `spawn_pushParticleWithLimit` 中同步接入 spark/smoke 上限检查，防止能量泄漏、机械类受击等高频 spark 场景占用全局粒子预算 |
+| 2026-04-16 | **Arc Boss VFX 性能门控（Task T3 补丁）**：在三档预算表中新增 4 个字段：`arcBossVfxTriCount`（Ouroboros 狂暴三角形数量，high:6/medium:3/low:0）、`arcBossVfxLineCount`（Devourer 引力线数量，high:6/medium:6/low:3）、`arcBossVfxWhiteGrad`（Devourer 深渊核心 lighter 白化叠加开关，high/medium:true/low:false）、`arcBossVfxSuckProb`（Devourer 吸入粒子生成概率，high:0.7/medium:0.5/low:0.3）。在 `enemy.js` Devourer/Ouroboros Layer 6.5 中通过 `game.perfQualityLevel` 动态读取对应字段实施门控。同步更新消费端关联索引（第 5.6 节）。 |

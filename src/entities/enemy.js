@@ -2437,8 +2437,12 @@ class Enemy {
                 ctx.arc(shakeX, shakeY, devRadius * 0.5, 0, Math.PI * 2);
                 ctx.fill();
                 // 震颤时内圈向纯白过渡（lighter 模式叠加，模拟能量满溢白化）
+                // 性能门控：low 档关闭（省去 createRadialGradient + lighter 叠加）
+                const _arcPerfA = (typeof game !== 'undefined' && game.perfQualityLevel)
+                    ? CONFIG.performance[game.perfQualityLevel] : CONFIG.performance.high;
+                const _whiteGradEnabled = _arcPerfA.arcBossVfxWhiteGrad !== false;
                 const whiteIntensity = devourPulse * 0.35;
-                if (whiteIntensity > 0.05) {
+                if (_whiteGradEnabled && whiteIntensity > 0.05) {
                     ctx.save();
                     ctx.globalCompositeOperation = 'lighter';
                     const whiteGrad = ctx.createRadialGradient(shakeX, shakeY, 0, shakeX, shakeY, devRadius * 0.35);
@@ -2461,7 +2465,10 @@ class Enemy {
                 ctx.stroke();
 
                 // 旋转能量线（靠近中心时过曝白化）
-                const lineCount = 6;
+                // 性能门控：_arcPerfB 在此块内复用（吸入粒子块已定义 _arcPerf，此处单独定义以防上下文不共享）
+                const _arcPerfB = (typeof game !== 'undefined' && game.perfQualityLevel)
+                    ? CONFIG.performance[game.perfQualityLevel] : CONFIG.performance.high;
+                const lineCount = _arcPerfB.arcBossVfxLineCount !== undefined ? _arcPerfB.arcBossVfxLineCount : 6;
                 for (let li = 0; li < lineCount; li++) {
                     const lineAngle = devTime * 3 + (li / lineCount) * Math.PI * 2;
                     const outerX = Math.cos(lineAngle) * devRadius * 1.2;
@@ -2483,7 +2490,11 @@ class Enemy {
                 ctx.restore();
 
                 // 吸入粒子特效（高密度，靠近中心加速 + 尺寸抖动）
-                if (typeof game !== 'undefined' && Math.random() < 0.7) {
+                // 性能门控：根据 performanceLevel 动态读取概率（high:0.7 / medium:0.5 / low:0.3）
+                const _arcPerf = (typeof game !== 'undefined' && game.perfQualityLevel)
+                    ? CONFIG.performance[game.perfQualityLevel] : CONFIG.performance.high;
+                const _suckProb = _arcPerf.arcBossVfxSuckProb !== undefined ? _arcPerf.arcBossVfxSuckProb : 0.7;
+                if (typeof game !== 'undefined' && Math.random() < _suckProb) {
                     const angle = Math.random() * Math.PI * 2;
                     const dist = devRadius * (1.5 + Math.random() * 1.0);
                     const px = this.pos.x + Math.cos(angle) * dist;
@@ -2674,10 +2685,16 @@ class Enemy {
 
             // --- 5. 狂暴共鸣法阵（狂暴触发后）---
             if (this.berserked) {
-                const resonanceCount = CONFIG.enemyRender.ouroborosBerserkResonanceCount || 6;
+                // 性能门控：读取 performanceLevel 对应的 arcBossVfxTriCount
+                // high:6 / medium:3 / low:0（0=完全跳过三角形循环）
+                const _ouroPerf = (typeof game !== 'undefined' && game.perfQualityLevel)
+                    ? CONFIG.performance[game.perfQualityLevel] : CONFIG.performance.high;
+                const resonanceCount = _ouroPerf.arcBossVfxTriCount !== undefined
+                    ? _ouroPerf.arcBossVfxTriCount
+                    : (CONFIG.enemyRender.ouroborosBerserkResonanceCount || 6);
                 const resonanceRadius = ouroRadius + ouroThickness * 1.2;
 
-                // 5a. 外圈旋转三角形符文标记
+                // 5a. 外圈旋转三角形符文标记（low 档 resonanceCount=0 时跳过）
                 ctx.save();
                 ctx.globalCompositeOperation = 'lighter';
                 for (let ri = 0; ri < resonanceCount; ri++) {
