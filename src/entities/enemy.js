@@ -1474,6 +1474,70 @@ class Enemy {
                     ctx.beginPath(); ctx.arc(coreX, coreY, coreR, 0, Math.PI * 2); ctx.fill();
                     ctx.restore();
                 }
+                // --- [ELITE+] shield 精英增强：六边形交点节点高光 + 网格颜色偏紫蓝融合 ---
+                if (this.type === 'elite' || this.type === 'boss') {
+                    const eliteSCfg = CONFIG.enemyRender;
+                    const nodeR = eliteSCfg.eliteShieldNodeRadius;
+                    const nodeAlpha = eliteSCfg.eliteShieldNodeAlpha * shieldPulse * affixAlpha35;
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    // 重绘六边形网格，在每个交点绘制高光节点
+                    const hexR2 = 8;
+                    const hexW2 = hexR2 * Math.sqrt(3);
+                    const hexH2 = hexR2 * 2;
+                    for (let row = -2; row <= 3; row++) {
+                        for (let col = -3; col <= 3; col++) {
+                            const hx = col * hexW2 + (row % 2 === 0 ? 0 : hexW2 / 2);
+                            const hy = row * hexH2 * 0.75;
+                            if (Math.abs(hx) > w / 2 + hexR2 || Math.abs(hy) > h / 2 + hexR2) continue;
+                            // 在六边形的 6 个顶点绘制高光节点
+                            for (let k = 0; k < 6; k++) {
+                                const angle = Math.PI / 180 * (60 * k - 30);
+                                const nx = hx + hexR2 * Math.cos(angle);
+                                const ny = hy + hexR2 * Math.sin(angle);
+                                if (Math.abs(nx) > w / 2 || Math.abs(ny) > h / 2) continue;
+                                // 精英用紫蓝节点，Boss 用红色节点
+                                const nodeColor = this.type === 'boss' ? '239, 68, 68' : '147, 197, 253';
+                                const nodeGrad = ctx.createRadialGradient(nx, ny, 0, nx, ny, nodeR * 2);
+                                nodeGrad.addColorStop(0, `rgba(255, 255, 255, ${nodeAlpha})`);
+                                nodeGrad.addColorStop(0.5, `rgba(${nodeColor}, ${nodeAlpha * 0.6})`);
+                                nodeGrad.addColorStop(1, `rgba(${nodeColor}, 0)`);
+                                ctx.fillStyle = nodeGrad;
+                                ctx.beginPath();
+                                ctx.arc(nx, ny, nodeR * 2, 0, Math.PI * 2);
+                                ctx.fill();
+                            }
+                        }
+                    }
+                    ctx.restore();
+                }
+                // --- [BOSS+] shield Boss 增强：实体化能量装甲片（带透明度的多边形填充）---
+                if (this.type === 'boss') {
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
+                    const armorAlpha = shieldPulse * 0.18 * affixAlpha35;
+                    // 绘制 4 个不规则装甲片，使用 visualSeed 确定位置
+                    for (let ai = 0; ai < 4; ai++) {
+                        const aSeed = this.visualSeed * 4 + ai * 1.5;
+                        const ax1 = (Math.sin(aSeed) * 0.45) * w;
+                        const ay1 = (Math.cos(aSeed * 1.2) * 0.45) * h;
+                        const ax2 = (Math.sin(aSeed + 1.0) * 0.45) * w;
+                        const ay2 = (Math.cos(aSeed * 0.8 + 0.7) * 0.45) * h;
+                        const ax3 = (Math.sin(aSeed + 2.0) * 0.45) * w;
+                        const ay3 = (Math.cos(aSeed * 1.1 + 1.4) * 0.45) * h;
+                        ctx.beginPath();
+                        ctx.moveTo(ax1, ay1);
+                        ctx.lineTo(ax2, ay2);
+                        ctx.lineTo(ax3, ay3);
+                        ctx.closePath();
+                        ctx.fillStyle = `rgba(147, 197, 253, ${armorAlpha})`;
+                        ctx.fill();
+                        ctx.strokeStyle = `rgba(255, 255, 255, ${armorAlpha * 1.5})`;
+                        ctx.lineWidth = 0.8;
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                }
             }
 
             // --- regen: 从底部向上涌动的绿色液体波纹（回血=液体涌动）---
@@ -1507,6 +1571,59 @@ class Enemy {
                     coreGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
                     ctx.fillStyle = coreGrad;
                     ctx.beginPath(); ctx.arc(coreX, coreY, coreR, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                }
+                // --- [ELITE+] regen 精英增强：波纹中夹杂上升气泡 + 波纹边缘高光描边 ---
+                if (this.type === 'elite' || this.type === 'boss') {
+                    const regenEliteCfg = CONFIG.enemyRender;
+                    const bubbleCount = regenEliteCfg.eliteRegenBubbleCount;
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
+                    for (let bi = 0; bi < bubbleCount; bi++) {
+                        const bSeed = this.visualSeed * 3 + bi * 1.4;
+                        // 气泡水平位置基于 seed，垂直位置基于时间循环
+                        const bubbleX = (Math.sin(bSeed) * 0.4) * w;
+                        const bubbleRise = ((t35 * (0.3 + bi * 0.07) + bSeed) % 1);
+                        const bubbleY = h / 2 - bubbleRise * h * 1.1;
+                        if (bubbleY < -h / 2 - 5) continue;
+                        const bubbleR = 2 + Math.sin(bSeed * 2) * 1.5;
+                        const bubbleAlpha = (1 - Math.abs(bubbleRise - 0.5) * 1.8) * 0.6 * affixAlpha35;
+                        if (bubbleAlpha <= 0) continue;
+                        ctx.strokeStyle = `rgba(74, 222, 128, ${bubbleAlpha})`;
+                        ctx.lineWidth = 1;
+                        ctx.shadowColor = '#4ade80';
+                        ctx.shadowBlur = 3;
+                        ctx.beginPath();
+                        ctx.arc(bubbleX, bubbleY, Math.max(1, bubbleR), 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+                // --- [BOSS+] regen Boss 增强：生物脉络缠绕（脉络有节奏地搞动）---
+                if (this.type === 'boss') {
+                    const regenBossCfg = CONFIG.enemyRender;
+                    const veinCount = regenBossCfg.bossRegenVeinCount;
+                    const veinPulse = (Math.sin(t35 * 1.2 + this.visualSeed * 4) + 1) * 0.5;
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
+                    for (let vi = 0; vi < veinCount; vi++) {
+                        const vSeed = this.visualSeed * 6 + vi * 1.05;
+                        const vAngle = (vi / veinCount) * Math.PI * 2 + t35 * 0.15;
+                        const vR = Math.min(w, h) * (0.3 + Math.sin(vSeed) * 0.15);
+                        const vx = Math.cos(vAngle) * vR;
+                        const vy = Math.sin(vAngle) * vR;
+                        const veinAlpha = (0.15 + veinPulse * 0.2) * affixAlpha35;
+                        ctx.strokeStyle = `rgba(74, 222, 128, ${veinAlpha})`;
+                        ctx.lineWidth = 1 + veinPulse * 0.8;
+                        ctx.shadowColor = '#4ade80';
+                        ctx.shadowBlur = 3 + veinPulse * 3;
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        const midX = vx * 0.5 + Math.sin(vSeed * 2) * w * 0.12;
+                        const midY = vy * 0.5 + Math.cos(vSeed * 1.5) * h * 0.12;
+                        ctx.quadraticCurveTo(midX, midY, vx, vy);
+                        ctx.stroke();
+                    }
                     ctx.restore();
                 }
             }
@@ -1544,6 +1661,36 @@ class Enemy {
                     coreGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
                     ctx.fillStyle = coreGrad;
                     ctx.beginPath(); ctx.arc(coreX, coreY, coreR, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                }
+                // --- [ELITE+] haste 精英增强：残影线带电弧（折线），颜色变为金紫色交织 ---
+                if (this.type === 'elite' || this.type === 'boss') {
+                    const hasteCfg = CONFIG.enemyRender;
+                    const arcSegs = hasteCfg.eliteHasteArcSegments;
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
+                    // 绘制 2 条电弧折线，跟随残影线的相位
+                    for (let ai = 0; ai < 2; ai++) {
+                        const arcPhase = (hastePhase + ai * 0.5) % 1;
+                        const arcY = -h / 2 + arcPhase * h;
+                        const arcAlpha = Math.sin(arcPhase * Math.PI) * 0.55 * affixAlpha35;
+                        if (arcAlpha <= 0.01) continue;
+                        // 电弧颜色：精英金紫交织，Boss 红金交织
+                        const arcColor = this.type === 'boss' ? '239, 68, 68' : '192, 132, 252';
+                        ctx.strokeStyle = `rgba(${arcColor}, ${arcAlpha})`;
+                        ctx.lineWidth = 1.5;
+                        ctx.shadowColor = this.type === 'boss' ? '#ef4444' : '#c084fc';
+                        ctx.shadowBlur = 4;
+                        // 绘制折线电弧
+                        ctx.beginPath();
+                        ctx.moveTo(-w / 2, arcY);
+                        for (let si = 0; si <= arcSegs; si++) {
+                            const sx = -w / 2 + (si / arcSegs) * w;
+                            const jitter = (Math.sin(this.visualSeed * 10 + si * 3.7 + arcPhase * 5) * 0.5) * (h * 0.08);
+                            ctx.lineTo(sx, arcY + jitter);
+                        }
+                        ctx.stroke();
+                    }
                     ctx.restore();
                 }
             }
@@ -1704,6 +1851,67 @@ class Enemy {
                     ctx.beginPath(); ctx.arc(coreX, coreY, coreR, 0, Math.PI * 2); ctx.fill();
                     ctx.restore();
                 }
+                // --- [ELITE+] clone 精英增强：身体内部出现重影（小型偶尔偶尔的山山山山）---
+                if (this.type === 'elite' || this.type === 'boss') {
+                    const cloneEliteCfg = CONFIG.enemyRender;
+                    const ghostOffset = cloneEliteCfg.eliteCloneGhostOffset;
+                    const ghostAlpha = 0.22 * affixAlpha35;
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
+                    // 在小小偏移处绘制一个缩小版本的本体轮廓（重影）
+                    const ghostColor = this.type === 'boss' ? '239, 68, 68' : '192, 132, 252';
+                    const ghostDriftX = Math.sin(t35 * 0.4 + this.visualSeed * 3) * ghostOffset;
+                    const ghostDriftY = Math.cos(t35 * 0.3 + this.visualSeed * 2) * ghostOffset * 0.6;
+                    ctx.strokeStyle = `rgba(${ghostColor}, ${ghostAlpha})`;
+                    ctx.lineWidth = 1.5;
+                    ctx.shadowColor = `rgba(${ghostColor}, 0.5)`;
+                    ctx.shadowBlur = 5;
+                    // 重影轮廓：缩小到 0.85 倍
+                    ctx.save();
+                    ctx.translate(ghostDriftX, ghostDriftY);
+                    ctx.scale(0.85, 0.85);
+                    if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                        const verts = this.collisionData.vertices;
+                        ctx.beginPath();
+                        ctx.moveTo(verts[0].x, verts[0].y);
+                        for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x, verts[i].y);
+                        ctx.closePath();
+                        ctx.stroke();
+                    } else {
+                        ctx.strokeRect(-w/2, -h/2, w, h);
+                    }
+                    ctx.restore();
+                    ctx.restore();
+                }
+                // --- [BOSS+] clone Boss 增强：周围环绕轨道卫星（小圆点按轨道旋转）---
+                if (this.type === 'boss') {
+                    const cloneBossCfg = CONFIG.enemyRender;
+                    const satCount = cloneBossCfg.bossCloneSatelliteCount;
+                    const satOrbitR = Math.max(w, h) * 0.55;
+                    const satR = 3.5;
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
+                    for (let si = 0; si < satCount; si++) {
+                        const satAngle = (si / satCount) * Math.PI * 2 + t35 * 0.7 + this.visualSeed * Math.PI;
+                        const sx = Math.cos(satAngle) * satOrbitR;
+                        const sy = Math.sin(satAngle) * satOrbitR;
+                        const satAlpha = 0.6 * affixAlpha35;
+                        const satGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, satR * 2.5);
+                        satGrad.addColorStop(0, `rgba(255, 255, 255, ${satAlpha})`);
+                        satGrad.addColorStop(0.5, `rgba(192, 132, 252, ${satAlpha * 0.7})`);
+                        satGrad.addColorStop(1, 'rgba(192, 132, 252, 0)');
+                        ctx.fillStyle = satGrad;
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, satR * 2.5, 0, Math.PI * 2);
+                        ctx.fill();
+                        // 小圆点本体
+                        ctx.fillStyle = `rgba(216, 180, 254, ${satAlpha})`;
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, satR, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.restore();
+                }
             }
 
             // --- berserk: 橙红色燃烧纹路（狂暴=火焰），从底部蔓延 ---
@@ -1766,6 +1974,10 @@ class Enemy {
         // === Layer 3.8: Boss 专属装饰 ===
         if (this.type === 'boss' && this.bossType) {
             this._drawBossDecoration(ctx, w, h);
+        }
+        // === Layer 3.9: 精英专属装饰（晶化变异）===
+        if (this.type === 'elite') {
+            this._drawEliteDecoration(ctx, w, h);
         }
 
         // === Layer 4: 裂纹绘制 (Fissures) - [保持不变] ===
@@ -2123,6 +2335,94 @@ class Enemy {
         ctx.restore(); // <--- 裁剪结束
 
         // === Layer 6: 外部特效 (光环/冰壳) ===
+
+        // **Boss 深渊黑晕（Abyssal Aura）——吸光压迫感**
+        if (this.type === 'boss') {
+            const abyssalCfg = CONFIG.enemyRender;
+            ctx.save();
+            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            ctx.shadowColor = abyssalCfg.bossAbyssalAuraColor;
+            ctx.shadowBlur = abyssalCfg.bossAbyssalAuraBlur;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0)'; // 透明描边，仅依靠 shadowBlur 投射阴影
+            ctx.lineWidth = 6;
+            if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                const verts = this.collisionData.vertices;
+                ctx.beginPath();
+                ctx.moveTo(verts[0].x, verts[0].y);
+                for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x, verts[i].y);
+                ctx.closePath();
+                ctx.stroke();
+            } else if (this.collisionShape === 'arc' && this.collisionData) {
+                const cd = this.collisionData;
+                ctx.beginPath();
+                ctx.arc(0, 0, cd.radius + cd.thickness * 0.5, 0, Math.PI * 2);
+                ctx.stroke();
+            } else {
+                ctx.strokeRect(-w/2 - 3, -h/2 - 3, w + 6, h + 6);
+            }
+            ctx.restore();
+        }
+
+        // **Boss 熔岩脉络（Magma Veins）——动态熔岩纹路呼吸**
+        if (this.type === 'boss' && this.actionPhase === 'idle') {
+            const magmaCfg = CONFIG.enemyRender;
+            const magmaT = Date.now() / 1000;
+            const magmaPhase = (magmaT / (magmaCfg.bossMagmaVeinPeriod / 1000) + this.visualSeed * 2) * Math.PI * 2;
+            const magmaIntensity = Math.pow((Math.sin(magmaPhase) + 1) * 0.5, 1.5);
+            ctx.save();
+            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            ctx.globalCompositeOperation = 'screen';
+            // 绘制 3 条熔岩纹路，使用 visualSeed 确定起点和方向
+            const veinCount = 3;
+            for (let vi = 0; vi < veinCount; vi++) {
+                const vSeed = this.visualSeed * 5 + vi * 1.7;
+                const startX = (Math.sin(vSeed) * 0.45) * w;
+                const startY = (Math.cos(vSeed * 1.3) * 0.45) * h;
+                const endX = (Math.sin(vSeed + Math.PI * 0.7) * 0.45) * w;
+                const endY = (Math.cos(vSeed * 0.8 + 1.2) * 0.45) * h;
+                const veinAlpha = magmaCfg.bossMagmaVeinAlpha * magmaIntensity * (0.5 + vi * 0.25);
+                const veinGrad = ctx.createLinearGradient(startX, startY, endX, endY);
+                veinGrad.addColorStop(0, `rgba(239, 68, 68, 0)`);
+                veinGrad.addColorStop(0.3, `rgba(249, 115, 22, ${veinAlpha})`);
+                veinGrad.addColorStop(0.7, `rgba(239, 68, 68, ${veinAlpha * 0.8})`);
+                veinGrad.addColorStop(1, `rgba(239, 68, 68, 0)`);
+                ctx.strokeStyle = veinGrad;
+                ctx.lineWidth = 1.5 + magmaIntensity;
+                ctx.shadowColor = '#ef4444';
+                ctx.shadowBlur = 4 + magmaIntensity * 4;
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                // 中间加一个微小弯曲点
+                const midX = (startX + endX) / 2 + (Math.sin(vSeed * 3) * 0.2) * w;
+                const midY = (startY + endY) / 2 + (Math.cos(vSeed * 2.5) * 0.2) * h;
+                ctx.quadraticCurveTo(midX, midY, endX, endY);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // **Boss 狂暴闪烁（Berserk Flicker）——狂暴后外壳层层剥落暴露白核**
+        if (this.type === 'boss' && this.berserked) {
+            const flickerCfg = CONFIG.enemyRender;
+            const flickerT = Date.now() / 1000;
+            // 高频闪烁：使用 sin 高频振荡模拟闪烁
+            const flickerRaw = Math.sin(flickerT * flickerCfg.bossBerserkFlickerHz * Math.PI * 2 + this.visualSeed * 10);
+            const flickerIntensity = Math.pow(Math.max(0, flickerRaw), 3); // 仅保留峰値阶段
+            if (flickerIntensity > 0.05) {
+                ctx.save();
+                ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+                ctx.globalCompositeOperation = 'lighter';
+                const flickerGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(w, h) * 0.6);
+                flickerGrad.addColorStop(0, `rgba(255, 255, 255, ${flickerCfg.bossBerserkCoreAlpha * flickerIntensity})`);
+                flickerGrad.addColorStop(0.4, `rgba(239, 68, 68, ${flickerCfg.bossBerserkCoreAlpha * flickerIntensity * 0.5})`);
+                flickerGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+                ctx.fillStyle = flickerGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, Math.max(w, h) * 0.6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
 
         // **Viridis 狂暴状态: 绿色脉冲光晕**
         if (this.type === 'boss' && this.bossType === 'viridis' && this.berserked) {
@@ -3287,6 +3587,136 @@ class Enemy {
         }
     }
     getBounds() { return { left: this.pos.x - this.width/2, right: this.pos.x + this.width/2, top: this.pos.y - this.height/2, bottom: this.pos.y + this.height/2 }; }
+
+    /**
+     * 绘制精英专属装饰（Layer 3.9）——晶化变异设计
+     * 通过虚空晶核、晶化切面和流光金边强化精英輨达度
+     * @param {CanvasRenderingContext2D} ctx - 画布上下文（已 translate 到精英中心）
+     * @param {number} w - 精英宽度（已减去边距）
+     * @param {number} h - 精英高度（已减去边距）
+     */
+    _drawEliteDecoration(ctx, w, h) {
+        const t = Date.now() / 1000;
+        const cfg = CONFIG.enemyRender;
+        const breathePhase = (t / (cfg.breathePeriod / 1000) + this.visualSeed * 2) * Math.PI * 2;
+        const breatheIntensity = Math.pow((Math.sin(breathePhase) + 1) * 0.5, cfg.breatheEasingPower);
+
+        // --- E1: 晶化切面（不规则多边形几何切面，模拟紫水晶折射）---
+        // 使用 visualSeed 预计算 3 个切面多边形，叠加半透明紫色层
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        const facetAlpha = cfg.eliteCrystalFacetAlpha * (0.7 + breatheIntensity * 0.3);
+        const facetColors = ['rgba(124, 58, 237, ', 'rgba(167, 139, 250, ', 'rgba(196, 132, 252, '];
+        for (let fi = 0; fi < 3; fi++) {
+            const fSeed = this.visualSeed * 7 + fi * 2.3;
+            const fx1 = (Math.sin(fSeed) * 0.5) * w;
+            const fy1 = (Math.cos(fSeed * 1.3) * 0.5) * h;
+            const fx2 = (Math.sin(fSeed + 1.2) * 0.5) * w;
+            const fy2 = (Math.cos(fSeed * 0.9 + 0.8) * 0.5) * h;
+            const fx3 = (Math.sin(fSeed + 2.4) * 0.5) * w;
+            const fy3 = (Math.cos(fSeed * 1.1 + 1.6) * 0.5) * h;
+            ctx.beginPath();
+            ctx.moveTo(fx1, fy1);
+            ctx.lineTo(fx2, fy2);
+            ctx.lineTo(fx3, fy3);
+            ctx.closePath();
+            ctx.fillStyle = `${facetColors[fi % facetColors.length]}${(facetAlpha * (0.6 + fi * 0.2)).toFixed(3)})`;
+            ctx.fill();
+        }
+        ctx.restore();
+
+        // --- E2: 虚空晶核（缓慢旋转的菱形晶体，代表精英能量源泉）---
+        const coreR = Math.min(w, h) * cfg.eliteCoreRadiusRatio;
+        const coreAngle = t * cfg.eliteCoreRotateSpeed + this.visualSeed * Math.PI;
+        ctx.save();
+        ctx.rotate(coreAngle);
+        // 菱形晶体：4 个顶点的菱形（上下左右各一个）
+        const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR);
+        coreGrad.addColorStop(0, `rgba(216, 180, 254, ${0.9 * (0.6 + breatheIntensity * 0.4)})`);
+        coreGrad.addColorStop(0.5, `rgba(167, 139, 250, ${0.6 * (0.5 + breatheIntensity * 0.5)})`);
+        coreGrad.addColorStop(1, 'rgba(124, 58, 237, 0)');
+        ctx.fillStyle = coreGrad;
+        ctx.shadowColor = '#a855f7';
+        ctx.shadowBlur = 8 + breatheIntensity * 6;
+        // 菱形路径
+        ctx.beginPath();
+        ctx.moveTo(0, -coreR);
+        ctx.lineTo(coreR * 0.55, 0);
+        ctx.lineTo(0, coreR);
+        ctx.lineTo(-coreR * 0.55, 0);
+        ctx.closePath();
+        ctx.fill();
+        // 菱形描边（金色）
+        ctx.strokeStyle = `rgba(250, 204, 21, ${0.5 + breatheIntensity * 0.4})`;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.restore();
+
+        // --- E3: 晶核过曝叠加（lighter 模式，展现能量溢出）---
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const overglowR = coreR * 1.8;
+        const overglowGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, overglowR);
+        overglowGrad.addColorStop(0, `rgba(192, 132, 252, ${cfg.eliteCoreOverglowAlpha * breatheIntensity})`);
+        overglowGrad.addColorStop(1, 'rgba(192, 132, 252, 0)');
+        ctx.fillStyle = overglowGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, overglowR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // --- E4: 流光金边（高光点沿边框流动，模拟能量在装甲边缘流淤）---
+        // 计算边框总周长，确定高光点当前位置
+        const perimeter = 2 * (w + h);
+        const flowPos = ((t * cfg.eliteBorderFlowSpeed) % 1) * perimeter;
+        const flowHalfWidth = perimeter * cfg.eliteBorderFlowWidth * 0.5;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        // 在边框路径上绘制流光点（使用 4 段边框线段分别判断）
+        const segments = [
+            { x1: -w/2, y1: -h/2, x2: w/2, y2: -h/2 },  // 上边
+            { x1: w/2,  y1: -h/2, x2: w/2, y2: h/2  },  // 右边
+            { x1: w/2,  y1: h/2,  x2: -w/2, y2: h/2 },  // 下边
+            { x1: -w/2, y1: h/2,  x2: -w/2, y2: -h/2 }  // 左边
+        ];
+        const segLens = [w, h, w, h];
+        let cumLen = 0;
+        for (let si = 0; si < 4; si++) {
+            const seg = segments[si];
+            const segLen = segLens[si];
+            const segStart = cumLen;
+            const segEnd = cumLen + segLen;
+            // 判断流光点是否在这一段
+            const centerInSeg = flowPos;
+            const lo = centerInSeg - flowHalfWidth;
+            const hi = centerInSeg + flowHalfWidth;
+            if (hi > segStart && lo < segEnd) {
+                // 计算在这段内的局部范围
+                const localLo = Math.max(lo, segStart) - segStart;
+                const localHi = Math.min(hi, segEnd) - segStart;
+                const t0 = localLo / segLen;
+                const t1 = localHi / segLen;
+                const px0 = seg.x1 + (seg.x2 - seg.x1) * t0;
+                const py0 = seg.y1 + (seg.y2 - seg.y1) * t0;
+                const px1 = seg.x1 + (seg.x2 - seg.x1) * t1;
+                const py1 = seg.y1 + (seg.y2 - seg.y1) * t1;
+                const flowGrad = ctx.createLinearGradient(px0, py0, px1, py1);
+                flowGrad.addColorStop(0, 'rgba(250, 204, 21, 0)');
+                flowGrad.addColorStop(0.5, `rgba(255, 255, 200, 0.8)`);
+                flowGrad.addColorStop(1, 'rgba(250, 204, 21, 0)');
+                ctx.strokeStyle = flowGrad;
+                ctx.lineWidth = 3;
+                ctx.shadowColor = '#facc15';
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.moveTo(px0, py0);
+                ctx.lineTo(px1, py1);
+                ctx.stroke();
+            }
+            cumLen += segLen;
+        }
+        ctx.restore();
+    }
 
     /**
      * 绘制 Boss 专属装饰（Layer 3.8）

@@ -847,7 +847,51 @@ const CONFIG = {
         // Ouroboros 符文呼吸缓动指数，控制 Math.pow 的幂次，值越大呼吸越有停留感
         ouroborosRuneBreathePower: 1.5,
         // Ouroboros 狂暴共鸣光环三角形数量（均匀分布在环形外侧）
-        ouroborosBerserkResonanceCount: 6
+        ouroborosBerserkResonanceCount: 6,
+
+        // ===== 精英（Elite）晶化变异装饰参数 =====
+        // 虚空晶核旋转速度（弧度/秒）
+        eliteCoreRotateSpeed: 0.8,
+        // 虚空晶核半径（相对于 min(w,h) 的比例）
+        eliteCoreRadiusRatio: 0.22,
+        // 虚空晶核过曝叠加最大透明度（lighter 模式）
+        eliteCoreOverglowAlpha: 0.45,
+        // 流光金边：高光点沿边框移动的速度（0~1 循环，值越大越快）
+        eliteBorderFlowSpeed: 0.4,
+        // 流光金边：高光点宽度（0~1，相对于边框总周长）
+        eliteBorderFlowWidth: 0.18,
+        // 晶化切面：叠加层最大透明度
+        eliteCrystalFacetAlpha: 0.12,
+
+        // ===== Boss（Boss）深渊熔炉装饰参数 =====
+        // 深渊黑晕：紧贴身体的阴影 shadowBlur 值
+        bossAbyssalAuraBlur: 28,
+        // 深渊黑晕：阴影颜色（深红近黑）
+        bossAbyssalAuraColor: '#450a0a',
+        // 熔岩脉络：脉络呼吸周期（毫秒）
+        bossMagmaVeinPeriod: 1800,
+        // 熔岩脉络：脉络最大透明度（screen 模式）
+        bossMagmaVeinAlpha: 0.22,
+        // 狂暴闪烁：闪烁频率（Hz），值越大闪烁越快
+        bossBerserkFlickerHz: 8,
+        // 狂暴闪烁：过曝白核最大透明度（lighter 模式）
+        bossBerserkCoreAlpha: 0.55,
+
+        // ===== 词缀阶梯式渲染参数 =====
+        // shield 精英：交点节点高光半径（像素）
+        eliteShieldNodeRadius: 3.5,
+        // shield 精英：交点节点高光最大透明度
+        eliteShieldNodeAlpha: 0.7,
+        // regen 精英：上升气泡数量
+        eliteRegenBubbleCount: 5,
+        // regen Boss：生物脉络数量
+        bossRegenVeinCount: 6,
+        // haste 精英：电弧折线分段数
+        eliteHasteArcSegments: 4,
+        // clone 精英：重影偏移量（像素）
+        eliteCloneGhostOffset: 4,
+        // clone Boss：轨道卫星数量
+        bossCloneSatelliteCount: 3
     },
 
     // ==================== 自适应性能配置 (Adaptive Performance) ====================
