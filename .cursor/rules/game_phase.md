@@ -118,38 +118,12 @@ globs: ["src/game_phase.js"]
 | `chimera` | 奇美拉 | 大 Boss | 初始高温，狂暴后温度直接达到阈值 |
 | `ouroboros` | 奥罗波罗斯 | 大 Boss | 每 N 回合切换词缀组，狂暴后切换加速 |
 
-## 6. Boss 遗物与固定回合遗物事件的冲突处理
+## 6. Boss 遗物与固定回合遗物事件的处理
 
-### 6.1 问题描述
+**当前设计（已移除 Boss 遗物）**：Boss 被击杀后不再触发遗物选择阶段。固定回合遗物事件（第 3 回合起每 5 回合）仅由 `phase_finalizeRound` 中的 `isRelicRound` 检测独立触发，与 Boss 击杀无关。
 
-**遗物触发时机（已更新）**：遗物触发逻辑已改为「初始回合给予一次，第 3 回合起每 5 回合给予一次」，以改善新手玩家早期体验。
-
-当 Boss 被击杀的回合数恰好是遗物触发条件时（例如：第 5 回合击杀 Boss，`phase_finalizeRound` 后 `round++` 变为 6，而 `(round - 3) % 5 == 0`），会同时触发两个遗物弹窗：
-
-1. `combat_system.js` 中 Boss 击杀后的 `setTimeout(() => this.ui_showRelicSelection(), 500)`；
-2. `phase_finalizeRound` 中固定回合遗物事件的 `setTimeout(() => this.ui_showRelicSelection(), 500)`。
-
-第二个 `ui_showRelicSelection` 会覆盖 `stateBeforeRelic` 为 `'relic_event'`，导致玩家选择或跳过遗物后，`ui_closeRelicSelection` 走入 `else` 分支直接调用 `sys_initSelectionPhase()`，玩家看起来就像“还没来得及领取遗物就跳到下一个阶段”。
-
-### 6.2 处理方案：串行触发（两个都给）
-
-**设计决策**：Boss 遗物和固定回合遗物事件均不丢弃，改为串行弹出：玩家领完 Boss 遗物后，再接着弹出固定遗物事件。
-
-**涉及标志位**：
-
-| 标志位 | 设置时机 | 清除时机 |
-|---|---|---|
-| `_pendingBossRelic` | `combat_system.js` Boss 击杀时 | `shop.js` `ui_closeRelicSelection` 关闭时 |
-| `_pendingRelicEvent` | `game_phase.js` `phase_finalizeRound` 检测到冲突时 | `shop.js` `ui_closeRelicSelection` 串行弹出时 |
-
-**执行流程**：
-1. Boss 击杀 → `_pendingBossRelic = true` + `setTimeout(ui_showRelicSelection, 500)`
-2. `phase_finalizeRound` 检测到 `round % 3 == 0` 且 `_pendingBossRelic` 为真 → `_pendingRelicEvent = true`（不立即弹窗）
-3. Boss 遗物弹窗弹出，玩家选择/跳过
-4. `ui_closeRelicSelection` 检测到 `hadPendingBossRelic && _pendingRelicEvent` → 串行弹出固定遗物事件
-5. 玩家再次选择/跳过 → `ui_closeRelicSelection` 走入正常 `else` 分支 → `sys_initSelectionPhase()`
-
-**初始化**：`sys_resetGame` 中同时重置两个标志位为 `false`。
+- `_pendingBossRelic` 和 `_pendingRelicEvent` 标志位不再使用（保留在 `sys_resetGame` 和存档/恢复逻辑中以居向兼容）。
+- `ui_closeRelicSelection` 中的串行遗物分支已移除，关闭遗物界面后直接进入 `sys_initSelectionPhase()`。
 
 ## 7. 清屏奖励规则 (Full-Clear Bonus)
 

@@ -277,16 +277,8 @@ export const shop_system = {
             overlay.classList.add('hidden-phase');
         }
         
-        const hadPendingBossRelic = this._pendingBossRelic;
-        this._pendingBossRelic = false;
-        
         if (this.stateBeforeRelic === 'gathering') {
             if (typeof this.phase_gathering_attemptComplete === 'function') this.phase_gathering_attemptComplete();
-        } else if (hadPendingBossRelic && this._pendingRelicEvent) {
-            this._pendingRelicEvent = false;
-            if (window.showToast) showToast("✨ 命魔的馈赠 ✨");
-            this.phase = 'relic_event';
-            setTimeout(() => { this.ui_showRelicSelection(); }, 300);
         } else {
             if (typeof this.sys_initSelectionPhase === 'function') this.sys_initSelectionPhase(); 
         }

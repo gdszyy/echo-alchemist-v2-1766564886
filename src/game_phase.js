@@ -1101,17 +1101,10 @@ phase_gathering_getRandomPegType() {
         // 初始回合的遗物选择由 sys_initGameStart 直接调用 ui_showRelicSelection 处理
         const isRelicRound = this.round >= 3 && (this.round - 3) % 5 === 0;
         if (isRelicRound) {
-            if (this._pendingBossRelic) {
-                // [串行遗物] Boss 遗物待领取，将固定遗物事件存入标志位。
-                // ui_closeRelicSelection 关闭 Boss 遗物后会检测此标志并自动串行弹出固定遗物事件。
-                this._pendingRelicEvent = true;
-                console.log('[RelicEvent] 本回合 Boss 遗物优先，固定遗物事件将在 Boss 遗物关闭后串行弹出。');
-            } else {
-                showToast("✨ 命魔的馈赠 ✨");
-                this.phase = 'relic_event';
-                setTimeout(() => { this.ui_showRelicSelection(); }, 500);
-                return;
-            }
+            showToast("✨ 命魔的馈赠 ✨");
+            this.phase = 'relic_event';
+            setTimeout(() => { this.ui_showRelicSelection(); }, 500);
+            return;
         }
         
         

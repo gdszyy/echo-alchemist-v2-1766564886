@@ -2141,14 +2141,6 @@ export const combat_system = {
                     bossName: enemy.bossName,
                     round: this.round
                 });
-                // [BUGFIX] 设置标志位：通知 phase_finalizeRound 本回合已有 Boss 遗物待领取，
-                // 避免固定回合遗物事件同时触发导致双重弹窗。
-                this._pendingBossRelic = true;
-                setTimeout(() => {
-                    // [fix] 修复命名不一致：openRelicSelection -> ui_showRelicSelection
-                    // ui_showRelicSelection 内部已经会设置 stateBeforeRelic，无需在此重复设置
-                    this.ui_showRelicSelection();
-                }, 500);
 
                 // [新增] Boss 死亡丰厚掉落：必定掉落 3 个符文
                 // 读取当前 Boss 的主题权重配置（如果有）
