@@ -117,6 +117,25 @@
             height: auto !important;
             flex-wrap: nowrap;
         }
+        /* PC 左侧边栏内的 info-drawer：去除绝对定位和滑入动画，改为静态展开 */
+        #pc-left-drawer-mount #info-drawer {
+            position: static !important;
+            transform: none !important;
+            width: 100% !important;
+            height: 100% !important;
+            border-top: none !important;
+            background: transparent !important;
+            backdrop-filter: none !important;
+            z-index: auto !important;
+        }
+        /* PC 模式下隐藏 info-drawer 的关闭按鈕 */
+        body.pc-mode #pc-left-drawer-mount #info-drawer > button:first-child {
+            display: none !important;
+        }
+        /* PC 模式下隐藏战斗阶段的伤害统计浮动按鈕（drawer 已常驻在左侧边栏） */
+        body.pc-mode #damage-stats-btn {
+            display: none !important;
+        }
 
         canvas {
             display: block;
@@ -2509,13 +2528,18 @@
 
 <!-- ===== PC 左侧边栏：收集队列 + 配方 HUD ===== -->
 <aside id="pc-left-sidebar">
-    <div class="text-xs font-bold text-amber-400/60 tracking-widest uppercase mb-4 font-[Cinzel]" id="pc-left-phase-title">
-        收集阶段
+    <!-- 收集阶段内容区域 -->
+    <div id="pc-left-gathering" style="display:none; flex-direction:column; height:100%;">
+        <div class="text-xs font-bold text-amber-400/60 tracking-widest uppercase mb-4 font-[Cinzel]">收集阶段</div>
+        <!-- 收集队列挂载点（PC 模式下由 JS 将 #gathering-queue 迁移至此） -->
+        <div id="pc-left-queue-mount" class="mb-3 flex flex-wrap gap-2"></div>
+        <!-- 配方 HUD 挂载点（PC 模式下由 JS 将 #gathering-hud-mount 内容迁移至此） -->
+        <div id="pc-left-recipe-mount" class="flex-1 overflow-y-auto"></div>
     </div>
-    <!-- 收集队列挂载点（PC 模式下由 JS 将 #gathering-queue 迁移至此） -->
-    <div id="pc-left-queue-mount" class="mb-3 flex flex-wrap gap-2"></div>
-    <!-- 配方 HUD 挂载点（PC 模式下由 JS 将 #gathering-hud-mount 内容迁移至此） -->
-    <div id="pc-left-recipe-mount" class="flex-1 overflow-y-auto"></div>
+    <!-- 战斗阶段内容区域：info-drawer 挂载点 -->
+    <div id="pc-left-combat" style="display:none; flex-direction:column; height:100%; overflow:hidden;">
+        <div id="pc-left-drawer-mount" style="flex:1; overflow:hidden;"></div>
+    </div>
 </aside>
 
 <div id="game-container">

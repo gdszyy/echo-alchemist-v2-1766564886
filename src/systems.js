@@ -572,7 +572,10 @@ class UIManager {
         }
         this.hoveredEnemy = enemy;
         this.isOpen = true;
-        this.drawer.classList.remove('translate-y-full');
+        // PC 模式下 drawer 已迁移到左侧边栏常驻展开，无需操作 translate
+        if (!this.drawer.dataset.pcDrawerMigrated) {
+            this.drawer.classList.remove('translate-y-full');
+        }
         const typeName = enemy.type === 'boss' ? '💀 BOSS' : (enemy.type === 'elite' ? '⚠️ 精英魔像' : '普通魔像');
         document.getElementById('info-enemy-type').innerText = typeName;
         document.getElementById('info-enemy-type').className = enemy.type === 'boss' ? 'text-xl font-bold text-red-500' : (enemy.type === 'elite' ? 'text-lg font-bold text-yellow-400' : 'text-lg font-bold text-slate-200');
@@ -651,7 +654,10 @@ class UIManager {
     closeDrawer() {
         this.isOpen = false;
         this.hoveredEnemy = null;
-        this.drawer.classList.add('translate-y-full');
+        // PC 模式下 drawer 常驻展开，不隐藏
+        if (!this.drawer.dataset.pcDrawerMigrated) {
+            this.drawer.classList.add('translate-y-full');
+        }
     }
 }
 // ==================== 试炼场系统 =====================

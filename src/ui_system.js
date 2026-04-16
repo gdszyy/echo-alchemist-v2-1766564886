@@ -344,7 +344,8 @@ ui_closeTruthBook() {
      * @method ui_updatePCLayout
      * @description 检测当前视口是否为 PC 横屏模式，并切换三栏布局。
      * PC 模式条件：宽度 > 高度（横屏）且两侧剩余空间各 >= 240px。
-     * 在 resize 事件和初始化时调用。
+     * 在 resize 事件、初始化和阶段切换时调用。
+     * 侧边栏仅在 gathering / combat 阶段显示，其他阶段（meta/shop/gameover 等）隐藏。
      */
     ui_updatePCLayout() {
         const vw = window.innerWidth;
@@ -359,6 +360,11 @@ ui_closeTruthBook() {
         // PC 模式阈值：横屏 + 单侧 >= 240px（能容纳左右侧边栏）
         const shouldBePC = isLandscape && sideW >= 240;
 
+        // 侧边栏仅在游戏进行中（gathering / combat）显示
+        const gamePhases = ['gathering', 'combat'];
+        const currentPhase = this.phase || 'meta'; // [Mixin 正常用法：读取 Game 实例状态]
+        const shouldShowSidebars = shouldBePC && gamePhases.includes(currentPhase);
+
         const body = document.body;
         const leftSidebar = document.getElementById('pc-left-sidebar');
         const rightSidebar = document.getElementById('pc-right-sidebar');
@@ -367,20 +373,82 @@ ui_closeTruthBook() {
 
         if (shouldBePC) {
             body.classList.add('pc-mode');
+        } else {
+            body.classList.remove('pc-mode');
+        }
+
+        if (shouldShowSidebars) {
             if (leftSidebar) leftSidebar.style.display = 'flex';
             if (rightSidebar) rightSidebar.style.display = 'flex';
             // 将符文发射器面板迁移到右侧边栏（如果尚未迁移）
             this._ui_migrateRuneLauncherToSidebar(true);
-            // 将收集队列和配方 HUD 迁移到左侧边栏
-            if (!wasPC) this._ui_migrateHUDToLeftSidebar(true);
+            // 根据当前阶段切换左侧边栏内容
+            this._ui_updateLeftSidebarContent(currentPhase, wasPC);
         } else {
-            body.classList.remove('pc-mode');
             if (leftSidebar) leftSidebar.style.display = 'none';
             if (rightSidebar) rightSidebar.style.display = 'none';
-            // 将符文发射器面板迁移回 game-container（如果已在侧边栏）
-            this._ui_migrateRuneLauncherToSidebar(false);
-            // 将收集队列和配方 HUD 迁移回底部面板
-            if (wasPC) this._ui_migrateHUDToLeftSidebar(false);
+            if (!shouldBePC) {
+                // 完全退出 PC 模式：迁移回原位
+                this._ui_migrateRuneLauncherToSidebar(false);
+                if (wasPC) this._ui_migrateHUDToLeftSidebar(false);
+                if (wasPC) this._ui_migrateDrawerToLeftSidebar(false);
+            }
+        }
+    },
+
+    /**
+     * @method _ui_updateLeftSidebarContent
+     * @description 根据当前阶段切换左侧边栏内容区域。
+     * - gathering：显示收集队列 + 配方 HUD
+     * - combat：显示 info-drawer（敌人状态/特殊词条/配方图鉴/伤害统计）
+     * @param {string} phase - 当前阶段
+     * @param {boolean} wasPC - 上一帧是否为 PC 模式
+     */
+    _ui_updateLeftSidebarContent(phase, wasPC) {
+        const gatheringPanel = document.getElementById('pc-left-gathering');
+        const combatPanel = document.getElementById('pc-left-combat');
+
+        if (phase === 'gathering') {
+            if (gatheringPanel) gatheringPanel.style.display = 'flex';
+            if (combatPanel) combatPanel.style.display = 'none';
+            // 迁移收集队列和配方 HUD 到左侧边栏
+            this._ui_migrateHUDToLeftSidebar(true);
+            // 将 info-drawer 迁移回 game-container
+            this._ui_migrateDrawerToLeftSidebar(false);
+        } else if (phase === 'combat') {
+            if (gatheringPanel) gatheringPanel.style.display = 'none';
+            if (combatPanel) combatPanel.style.display = 'flex';
+            // 将收集队列和配方 HUD 迁移回底部面板（战斗阶段底部面板隐藏，但节点需在原位）
+            this._ui_migrateHUDToLeftSidebar(false);
+            // 迁移 info-drawer 到左侧边栏
+            this._ui_migrateDrawerToLeftSidebar(true);
+        }
+    },
+
+    /**
+     * @method _ui_migrateDrawerToLeftSidebar
+     * @description 将 #info-drawer 在 game-container 和 pc-left-drawer-mount 之间迁移。
+     * PC 战斗模式下 info-drawer 常驻展开在左侧边栏，不再滑入滑出。
+     * @param {boolean} toSidebar - true: 迁移到左侧边栏; false: 迁移回 game-container
+     */
+    _ui_migrateDrawerToLeftSidebar(toSidebar) {
+        const drawerEl = document.getElementById('info-drawer');
+        const leftMount = document.getElementById('pc-left-drawer-mount');
+        const gameContainer = document.getElementById('game-container');
+        if (!drawerEl || !leftMount || !gameContainer) return;
+
+        const isInSidebar = leftMount.contains(drawerEl);
+
+        if (toSidebar && !isInSidebar) {
+            leftMount.appendChild(drawerEl);
+            // PC 模式下 info-drawer 始终展开，不受 translate-y-full 控制
+            drawerEl.classList.remove('translate-y-full');
+            drawerEl.dataset.pcDrawerMigrated = 'true';
+        } else if (!toSidebar && isInSidebar) {
+            gameContainer.appendChild(drawerEl);
+            // 回到移动端：默认关闭状态
+            drawerEl.classList.add('translate-y-full');
+            delete drawerEl.dataset.pcDrawerMigrated;
         }
     },
 
@@ -658,6 +726,10 @@ ui_closeTruthBook() {
         if (runeChargeUi) {
             runeChargeUi.style.display = (newPhase === 'combat') ? 'flex' : 'none';
         }
+
+        // ===== D. PC 三栏布局同步：阶段切换时更新侧边栏内容和显隐 =====
+        // 延迟一帧执行，确保 this.phase 已更新为 newPhase
+        setTimeout(() => this.ui_updatePCLayout(), 0);
     },
 
     /**

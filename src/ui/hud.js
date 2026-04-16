@@ -353,6 +353,12 @@ export const hud_system = {
         const drawer = document.getElementById('info-drawer');
         if (!drawer) return;
         
+        // PC 模式下 drawer 常驻展开，直接切换到伤害统计 tab
+        if (drawer.dataset.pcDrawerMigrated) {
+            this.ui.switchTab('damage');
+            return;
+        }
+        
         const isOpen = !drawer.classList.contains('translate-y-full');
         
         if (isOpen) {
