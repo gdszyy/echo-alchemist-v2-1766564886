@@ -478,6 +478,7 @@ class UIManager {
                 ${cfg.pyro > 0 ? `<span class="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 text-[10px] border border-orange-500/30">🔥 PYRO ${cfg.pyro}</span>` : ''}
                 ${cfg.cryo > 0 ? `<span class="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 text-[10px] border border-cyan-500/30">❄️ CRYO ${cfg.cryo}</span>` : ''}
                 ${cfg.lightning > 0 ? `<span class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px] border border-blue-500/30">⚡ LGT ${cfg.lightning}</span>` : ''}
+                ${cfg.multicast > 0 ? `<span class="px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-300 text-[10px] border border-slate-500/30">🔗 MULTI ${cfg.multicast}</span>` : ''}
                 ${cfg.isLaser ? `<span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] border border-emerald-500/30">🔦 LASER</span>` : ''}
             </div>
         `;
@@ -1339,7 +1340,7 @@ const TRAINING_SCENARIOS = {
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
                 game.enemies.push(new Enemy(x, y, 60, 60, 8000, 8000));
             },
-            bulletConfig: { damage: 30, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: true, isMatryoshka: false, type: 'normal', laser: 10 },
+            bulletConfig: { damage: 30, bounce: 0, pierce: 0, scatter: 0, multicast: 4, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: true, isMatryoshka: false, type: 'normal', laser: 10 },
             demoAction: (game, tg) => {
                 const recipe = { ...tg.bulletConfig };
                 if (recipe.laser > 0) recipe.isLaser = true;
@@ -1382,7 +1383,7 @@ const TRAINING_SCENARIOS = {
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
                 game.enemies.push(new Enemy(x, y, 60, 60, 6000, 6000));
             },
-            bulletConfig: { damage: 20, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 3, cryo: 0, lightning: 0, wind: 0, isLaser: true, isMatryoshka: false, type: 'normal', laser: 8 },
+            bulletConfig: { damage: 20, bounce: 0, pierce: 0, scatter: 0, multicast: 4, pyro: 3, cryo: 0, lightning: 0, wind: 0, isLaser: true, isMatryoshka: false, type: 'normal', laser: 8 },
             demoAction: (game, tg) => {
                 const recipe = { ...tg.bulletConfig };
                 if (recipe.laser > 0) recipe.isLaser = true;
@@ -1868,6 +1869,10 @@ class TrainingGround {
         }
         this.renderAttributeControls();
         this.updateBulletPreview();
+        // [修复] 如果修改了连射，同步更新 HUD
+        if (key === 'multicast') {
+            eventBus.emit(EVENT_TYPES.UI_MULTICAST_UPDATE, { total: 1 + (this.bulletConfig.multicast || 0), bonusAmount: delta > 0 ? 1 : 0 });
+        }
     }
 
     renderAttributeControls() {
@@ -1909,6 +1914,7 @@ class TrainingGround {
                 ${cfg.pyro > 0 ? `<span class="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 text-[10px] border border-orange-500/30">🔥 PYRO ${cfg.pyro}</span>` : ''}
                 ${cfg.cryo > 0 ? `<span class="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 text-[10px] border border-cyan-500/30">❄️ CRYO ${cfg.cryo}</span>` : ''}
                 ${cfg.lightning > 0 ? `<span class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px] border border-blue-500/30">⚡ LGT ${cfg.lightning}</span>` : ''}
+                ${cfg.multicast > 0 ? `<span class="px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-300 text-[10px] border border-slate-500/30">🔗 MULTI ${cfg.multicast}</span>` : ''}
                 ${cfg.isLaser ? `<span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] border border-emerald-500/30">🔦 LASER</span>` : ''}
             </div>
         `;
@@ -2114,6 +2120,9 @@ class TrainingGround {
         if (demoBtn) demoBtn.disabled = false;
         if (resetBtn) resetBtn.disabled = false;
 
+        // 4. 同步连射倍率 UI（试炼场环境下强制使用 bulletConfig.multicast）
+        eventBus.emit(EVENT_TYPES.UI_MULTICAST_UPDATE, { total: 1 + (this.bulletConfig.multicast || 0), bonusAmount: 0 });
+
         // 5. 重置伤害统计
         this.game.roundDamage = 0;
         this.stats.totalDamage = 0;
@@ -2298,11 +2307,12 @@ class TrainingGround {
         this.game.burstQueue = [];
         this.game.isChargingShot = false;
         this.game.chargeProgress = 0;
-        this.game.pendingFireVelocity = null;
         this.game.isReloading = false;
         this.game.reloadProgress = 0;
         this.game.isEnemyTurn = false;
         this.game.combat_runeCharge_init();
+        // [修复] 进入试炼场时，同步初始连射倍率（默认为 1）
+        eventBus.emit(EVENT_TYPES.UI_MULTICAST_UPDATE, { total: 1 + (this.bulletConfig.multicast || 0), bonusAmount: 0 });
     }
 
     exit() {
