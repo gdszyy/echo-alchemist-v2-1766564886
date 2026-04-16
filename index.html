@@ -23,7 +23,7 @@
         #app-wrapper {
             display: flex;
             justify-content: center;
-            align-items: stretch;
+            align-items: center; /* center 而非 stretch，防止拉伸 game-container 高度覆盖 aspect-ratio */
             width: 100%;
             height: 100vh; /* 旧浏览器兜底 */
             height: 100dvh;
@@ -31,15 +31,19 @@
             overflow: hidden;
         }
 
-        /* ===== 核心游戏容器：固定宽高比 ===== */
+        /* ===== 核心游戏容器：固定 9:16 宽高比，对屏幕宽高双向等比缩放 ===== */
         #game-container {
             position: relative;
-            /* 高度优先：始终填满视口 */
-            height: 100vh; /* 旧浏览器兜底 */
-            height: 100dvh;
-            /* 宽度：按 9:16 比例计算，上限 480px，同时不超过屏幕宽度（100vw）防止手机端水平溢出 */
-            width: min(calc(100dvh * 9 / 16), 100vw, 480px);
-            min-width: min(100vw, 480px);
+            /*
+             * 等比缩放公式：宽高同时受屏幕限制，不超出任何一边
+             *   width  = min(屏幕宽, 屏幕高*9/16, 480px)
+             *   height = width * 16/9  → 由 aspect-ratio 自动计算
+             *   max-height: 100dvh    → 高度不超出屏幕
+             * 竖屏手机：width 被 100vw 限制；竖高比手机：width 被 100dvh*9/16 限制；横屏：height 被 100dvh 限制
+             */
+            width: min(100vw, calc(100dvh * 9 / 16), 480px);
+            aspect-ratio: 9 / 16;
+            max-height: 100dvh;
             flex-shrink: 0;
             background: #0f172a;
             background: 
@@ -54,9 +58,9 @@
             display: none;
             flex-direction: column;
             flex: 1;
+            align-self: stretch; /* app-wrapper 改为 center 后，需要显式 stretch 自身 */
             min-width: 240px;
             max-width: 360px;
-            height: 100vh;
             height: 100dvh;
             background: rgba(15, 23, 42, 0.98);
             border-right: 1px solid #334155;
@@ -74,9 +78,9 @@
             display: none;
             flex-direction: column;
             flex: 1;
+            align-self: stretch; /* app-wrapper 改为 center 后，需要显式 stretch 自身 */
             min-width: 280px;
             max-width: 420px;
-            height: 100vh;
             height: 100dvh;
             background: rgba(2, 6, 23, 0.98);
             border-left: 1px solid #334155;

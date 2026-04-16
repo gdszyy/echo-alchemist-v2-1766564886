@@ -162,16 +162,17 @@ export const game_system = {
      * @method sys_resize
      * @description 响应窗口大小变化，调整 Canvas 尺寸和游戏布局参数。
      */
-    sys_resize() {
+     sys_resize() {
         const container = document.getElementById('game-container');
-
-        // [PC 布局修改] 不再强制覆盖宽度，让 CSS min() 公式控制游戏区域宽度
-        // 仅在移动端（竖屏/无侧边栏）时同步高度，避免安卓浏览器兼容问题
-        container.style.height = `${window.innerHeight}px`;
-        // 注意：不再设置 container.style.width，由 CSS 的 min(calc(100dvh*9/16),480px) 控制
-
-        this.width = this.canvas.width = container.clientWidth;
-        this.height = this.canvas.height = container.clientHeight;
+        // [CSS 等比缩放] 宽高均由 CSS 控制：
+        //   width: min(100vw, calc(100dvh*9/16), 480px)
+        //   aspect-ratio: 9/16  (height 由 CSS 自动计算)
+        //   max-height: 100dvh
+        // 不再通过 JS 覆盖 height，避免与 aspect-ratio 冲突。
+        // 用 getBoundingClientRect() 读取 CSS 计算后的实际尺寸。
+        const rect = container.getBoundingClientRect();
+        this.width = this.canvas.width = Math.round(rect.width);
+        this.height = this.canvas.height = Math.round(rect.height);
 
         // 动态调整失败判定线
         // PC 模式下底部面板隐藏，可以缩小安全边距
