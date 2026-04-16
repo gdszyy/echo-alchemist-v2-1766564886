@@ -558,18 +558,28 @@ class Enemy {
         }
 
         // === [B3] 濒死状态持续粒子增强 ===
-        // 血量低于 20% 时，从敢人顶部随机位置冒出深色烟雾，模拟濒死时的焦灸/损毁状态
+        // 血量低于 20% 时，从敌人身体随机位置持续迸射极小能量粒子，模拟濒死时的能量泄漏状态
         if (this.hp > 0 && this.maxHp > 0 && (this.hp / this.maxHp) < 0.2) {
-            if (Math.random() < 0.03 * timeScale) {
-                const nearDeathSmoke = new Particle(
-                    this.pos.x + (Math.random() - 0.5) * this.width * 0.8,
-                    this.pos.y - this.height * 0.45, // 从敢人顶部冰出
-                    'rgba(0,0,0,0.5)', 'smoke'
+            // 血量越低，触发概率越高（20%血量时约3%/帧，接近0时约8%/帧）
+            const hpRatio = this.hp / (this.maxHp * 0.2);
+            const leakChance = (0.03 + 0.05 * (1 - hpRatio)) * timeScale;
+            if (Math.random() < leakChance) {
+                // 能量泄漏粒子颜色：青白/电弧蓝/淡紫，与火属性橙红色系形成明显色相对比
+                const LEAK_COLORS = ['#e0f2fe', '#7dd3fc', '#38bdf8', '#c4b5fd'];
+                const leakColor = LEAK_COLORS[Math.floor(Math.random() * LEAK_COLORS.length)];
+                const leakParticle = new Particle(
+                    this.pos.x + (Math.random() - 0.5) * this.width * 0.9,
+                    this.pos.y + (Math.random() - 0.5) * this.height * 0.6,
+                    leakColor, 'spark'
                 );
-                nearDeathSmoke.vel.y = -0.8 - Math.random() * 0.6; // 向上飘出
-                nearDeathSmoke.vel.x = (Math.random() - 0.5) * 0.4;
-                nearDeathSmoke.size = this.width * 0.18 + Math.random() * 3;
-                game.spawn_pushParticleWithLimit(nearDeathSmoke);
+                // 向四周随机散射，轻微向上偏移，模拟能量从裂缝中迸出
+                const leakAngle = Math.random() * Math.PI * 2;
+                const leakSpeed = 0.8 + Math.random() * 1.2;
+                leakParticle.vel.x = Math.cos(leakAngle) * leakSpeed;
+                leakParticle.vel.y = Math.sin(leakAngle) * leakSpeed - 0.3;
+                leakParticle.size = 1.0 + Math.random() * 1.5; // 极小尺寸
+                leakParticle.decay = 0.04 + Math.random() * 0.03; // 快速消散
+                game.spawn_pushParticleWithLimit(leakParticle);
             }
         }
         // === [B3 END] ===
@@ -2842,25 +2852,26 @@ class Enemy {
                 })();
 
                 if (dominantAffix === 'shield' || dominantAffix === 'haste') {
-                    // 机械类：深色 smoke + 亮白 spark，模拟金属装甲破裂
-                    const smokeCount = 2 + Math.floor(Math.random() * 2); // 2~3
-                    for (let i = 0; i < smokeCount; i++) {
-                        const sp = new Particle(
+                    // 机械类：冷蓝/电弧色火星，模拟机械装甲受击时的能量放电感
+                    // 颜色范围：冷蓝(#38bdf8) / 电弧白(#bae6fd) / 电弧蓝紫(#818cf8)
+                    // 与火属性橙红(#fdba74/#f97316)在色相上形成对比，不易混淡
+                    const MECH_SPARK_COLORS = ['#38bdf8', '#bae6fd', '#818cf8', '#67e8f9'];
+                    const sparkCount = 4 + Math.floor(Math.random() * 3); // 4~6
+                    for (let i = 0; i < sparkCount; i++) {
+                        const mechColor = MECH_SPARK_COLORS[Math.floor(Math.random() * MECH_SPARK_COLORS.length)];
+                        const ms = new Particle(
                             this.pos.x + (Math.random() - 0.5) * this.width * 0.8,
                             this.pos.y + (Math.random() - 0.5) * this.height * 0.5,
-                            'rgba(30,30,30,0.7)', 'smoke'
+                            mechColor, 'spark'
                         );
-                        sp.vel.y = -1.2 - Math.random() * 0.8;
-                        sp.size = this.width * 0.2 + Math.random() * 4;
-                        game.spawn_pushParticleWithLimit(sp);
-                    }
-                    const sparkCount = 3 + Math.floor(Math.random() * 2); // 3~4
-                    for (let i = 0; i < sparkCount; i++) {
-                        game.spawn_createParticle(
-                            this.pos.x + (Math.random() - 0.5) * this.width * 0.6,
-                            this.pos.y + (Math.random() - 0.5) * this.height * 0.5,
-                            '#f8fafc', 'spark'
-                        );
+                        // 向四周爆发，轻微向上偏移，模拟放电火花散射
+                        const angle = Math.random() * Math.PI * 2;
+                        const speed = 2.0 + Math.random() * 2.5;
+                        ms.vel.x = Math.cos(angle) * speed;
+                        ms.vel.y = Math.sin(angle) * speed - 0.5;
+                        ms.size = 1.5 + Math.random() * 2.0; // 小型火星
+                        ms.decay = 0.05 + Math.random() * 0.04;
+                        game.spawn_pushParticleWithLimit(ms);
                     }
                 } else if (dominantAffix === 'regen' || dominantAffix === 'clone' || dominantAffix === 'devour') {
                     // 生物类：暗红/紫色 mist，带向下重力感
