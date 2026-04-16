@@ -85,6 +85,13 @@ export const rune_launcher_system = {
             } else {
                 // 移动端模式：弹出全屏覆盖层
                 panel.style.display = 'flex';
+                // [BUGFIX] 强制修正面板位置：移除 hidden-phase 类并确保 top:0
+                // 原因：ui_updateUI 会给所有 .ui-overlay 添加 hidden-phase 类，
+                // 在某些移动端浏览器中，hidden-phase 类叠加 flex 布局可能导致面板渲染到屏幕外（top:100%）。
+                panel.classList.remove('hidden-phase');
+                panel.classList.add('active-phase');
+                panel.style.top = '0';
+                panel.style.left = '0';
                 // [BUGFIX 第二道防线] 在面板上拦截 touchmove 事件，防止触摸滑动穿透到底层 Canvas。
                 // 使用 capture 阶段监听，确保在任何子元素处理之前先执行拦截。
                 // 仅在首次打开时绑定一次（通过 dataset 标记防止重复绑定）。
@@ -154,6 +161,11 @@ export const rune_launcher_system = {
             if (!isPCMode) {
                 // 移动端模式：隐藏全屏覆盖层
                 panel.style.display = 'none';
+                // [BUGFIX] 清理打开时添加的 active-phase 和内联定位修正
+                panel.classList.remove('active-phase');
+                panel.classList.add('hidden-phase');
+                panel.style.top = '';
+                panel.style.left = '';
             }
             // PC 模式：面板常驻在右侧边栏，不隐藏
         }
