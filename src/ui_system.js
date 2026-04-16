@@ -231,11 +231,18 @@ ui_closeTruthBook() {
             el.classList.remove('active-phase'); 
         });
         // 2. 显示当前阶段的主容器
-        // [META] 兼容 phase-meta, shop, truth_book
+        // [META] 兼容 phase-meta, shop, truth_book, rune-launcher
         const activeEl = document.getElementById(`phase-${this.phase}`);  // [Mixin 正常用法：读取 Game 实例状态]
         if(activeEl) { 
             // gameover 阶段需要滚动，使用 block 布局
             activeEl.style.display = (this.phase === 'gameover') ? 'block' : 'flex';  // [Mixin 正常用法]
+            
+            // [BUGFIX] 符文发射器可能已经通过 style.display='flex' 打开，
+            // 确保其 class 正确更新以匹配 active-phase 逻辑。
+            if (this.phase === 'rune-launcher') {
+                activeEl.style.display = 'flex';
+            }
+
             // 微小延迟以触发 CSS transition (如果有)
             setTimeout(() => { 
                 activeEl.classList.remove('hidden-phase'); 
@@ -497,6 +504,7 @@ ui_closeTruthBook() {
             'combat':     { text: '\u6230\u9b25\u968e\u6bb5', sub: '\u6297\u79a6\u9b54\u50cf' },
             'truth_book': { text: '\u771f\u7406\u4e4b\u66f8', sub: '\u6d1e\u6089\u842c\u7269\u4e4b\u7406' },
             'training':   { text: '\u8a66\u7149\u5834', sub: '\u6975\u9650\u6230\u9b25\u6e2c\u8a66' },
+            'rune-launcher': { text: '\u7b26\u6587\u767c\u5c04\u5668', sub: 'Rune Launcher' },
             'gameover':   { text: '\u9632\u7dda\u5931\u5b88', sub: 'Run Over' },
         };
         const titleData = PHASE_TITLES[newPhase] || { text: '\u547d\u904b\u6289\u62e9', sub: '\u9078\u64c7\u4f60\u7684\u547d\u904b' };
@@ -522,7 +530,8 @@ ui_closeTruthBook() {
                 'combat':     '\u6230\u9b25',
                 'truth_book': '\u5716\u9451',
                 'training':   '\u8a66\u7149',
-                'gameover':   '\u7ed3\u7b97',
+                'rune-launcher': '\u7b26\u6587',
+                'gameover':   '\u5931\u5b88',
             };
             topPhaseLabel.textContent = SHORT_LABELS[newPhase] || '';
         }
