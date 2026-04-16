@@ -179,7 +179,7 @@ for (const subsystem of _subsystems) {
 |---|---|
 | `ui_openRuneBackpack()` / `ui_closeRuneBackpack()` | 符文背包面板开关 |
 | `_ui_renderRuneBackpackList()` | 渲染符文背包列表 |
-| `ui_openRuneLauncher()` / `ui_closeRuneLauncher()` | 符文发射器面板开关 |
+| `ui_openRuneLauncher()` / `ui_closeRuneLauncher()` | 符文发射器面板开关。`ui_openRuneLauncher` 在函数入口处包含 **[DEBUG-LOG]** 块，每次调用时通过 `console.group` 输出 `#phase-rune-launcher` 面板的完整状态快照（`game.phase`、`isPCMode`、`style.display`、computed display/visibility/opacity/z-index、classList、dataset、BoundingRect、parentElement、调用栈前 3 帧） |
 | `ui_closeRunePicker()` | 关闭符文选择弹出层 |
 | `ui_initRuneGrid()` | 初始化符文网格 |
 | `ui_openRunePicker(cellIndex)` | 打开符文选择弹出层 |

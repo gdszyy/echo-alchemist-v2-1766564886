@@ -53,7 +53,30 @@ export const rune_launcher_system = {
     ui_openRuneLauncher() {
         const panel = document.getElementById('phase-rune-launcher');
         const isPCMode = document.body.classList.contains('pc-mode');
-        console.log('[ui_openRuneLauncher] 打开符文发射器，当前 phase=' + this.phase + '，PC模式=' + isPCMode);
+        // [DEBUG-LOG] 每次点击时记录 phase-rune-launcher 面板的完整状态快照
+        {
+            const _rect = panel ? panel.getBoundingClientRect() : null;
+            const _cs   = panel ? window.getComputedStyle(panel) : null;
+            console.group('[ui_openRuneLauncher] ▶ 符文发射器打开 — 状态快照');
+            console.log('  game.phase         =', this.phase);
+            console.log('  isPCMode           =', isPCMode);
+            console.log('  panel 存在         =', !!panel);
+            if (panel) {
+                console.log('  panel.style.display=', panel.style.display);
+                console.log('  computed display   =', _cs.display);
+                console.log('  computed visibility=', _cs.visibility);
+                console.log('  computed opacity   =', _cs.opacity);
+                console.log('  computed z-index   =', _cs.zIndex);
+                console.log('  classList          =', [...panel.classList].join(' '));
+                console.log('  dataset            =', JSON.stringify(panel.dataset));
+                console.log('  BoundingRect       =', _rect
+                    ? `top:${_rect.top.toFixed(1)} left:${_rect.left.toFixed(1)} width:${_rect.width.toFixed(1)} height:${_rect.height.toFixed(1)}`
+                    : 'N/A');
+                console.log('  parentElement      =', panel.parentElement ? panel.parentElement.id || panel.parentElement.tagName : 'null');
+            }
+            console.log('  调用栈             =', new Error().stack.split('\n').slice(1, 4).join(' | '));
+            console.groupEnd();
+        }
 
         if (panel) {
             if (isPCMode) {
