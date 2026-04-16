@@ -692,8 +692,10 @@ export const game_system = {
     _isRuneLauncherOpen() {
         const panel = document.getElementById('phase-rune-launcher');
         if (!panel) return false;
-        // PC 模式：面板已迁移到右侧边栏（常驻可见）
-        if (panel.dataset.pcMigrated === 'true') return true;
+        // [BUGFIX] PC 模式：面板已迁移到右侧边栏（常驻可见）。
+        // 此时面板在 canvas 之外的独立容器中，不会遮挡 canvas，应返回 false。
+        // 原错误逻辑：返回 true 导致 input_handleInputStart 永远提前 return，屏蔽所有 PC 端点击事件。
+        if (panel.dataset.pcMigrated === 'true') return false;
         // 移动端模式：面板为全屏浮层，通过 style.display 判断
         return panel.style.display !== '' && panel.style.display !== 'none';
     },

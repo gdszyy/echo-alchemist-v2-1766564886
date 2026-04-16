@@ -1,6 +1,6 @@
 ---
 id: "PI-001"
-version: "v1.1"
+version: "v1.2"
 last_updated: "2026-04-16"
 author: "tsk-b1def027-9d1"
 related_modules: ["game_phase", "ui_system", "game_system"]
@@ -83,6 +83,16 @@ status: "active"
 
 **关键位置**：`src/game_phase.js` → `phase_handleInputStart` 第 723 行（修复后）
 
+### 坑 7: `_isRuneLauncherOpen` PC 模式下永远返回 `true`，屏蔽所有 PC 端输入
+
+**现象**：移动端可以正常释放弹珠，PC 端（横屏宽屏布局）点击 canvas 完全无响应。
+
+**根因**：`_isRuneLauncherOpen()` 函数中，PC 模式下符文发射器被迁移到右侧边栏后，`panel.dataset.pcMigrated` 被设置为 `'true'`，函数直接 `return true`。这导致 `input_handleInputStart`、`input_handleInputMove`、`input_handleInputEnd` 三个函数的第一行 `if (this._isRuneLauncherOpen()) return;` 在 PC 端**永远提前 return**，所有鼠标事件被完全屏蔽。
+
+**正确做法**：PC 模式下符文发射器常驻在 `#pc-right-sidebar`（canvas 之外的独立容器），不会遮挡 canvas，不应视为"发射器打开"状态，应返回 `false`。将 `return true` 改为 `return false`。
+
+**关键位置**：`src/game_system.js` → `_isRuneLauncherOpen` 函数（修复后第 699 行）
+
 ---
 
 ## 关键耦合点
@@ -97,3 +107,4 @@ status: "active"
 |------|------|---------|------|
 | v1.0 | 2026-04-16 | 初始记录，整合 tsk-b1def027-9d1 的 5 个致命 Bug 修复经验 | repo-indexer |
 | v1.1 | 2026-04-16 | 新增坑 6：研磨阶段点击区域阈值过小（`phase_handleInputStart` `pos.y < height * 0.4` 导致弹珠无法发射） | echo-developer |
+| v1.2 | 2026-04-16 | 新增坑 7：PC 端 `_isRuneLauncherOpen` 返回 `true` 屏蔽所有 PC 端鼠标输入 | echo-developer |
