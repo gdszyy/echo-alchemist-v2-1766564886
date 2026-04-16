@@ -826,6 +826,20 @@ export const spawn_system = {
             if (currentShard >= limit) return null;
         }
 
+        // --- 6. 通用火星粒子（spark）限制 ---
+        // spark 用于机械类受击电弧、能量泄漏、属性火星等多种场景，需独立限制防止大量占用全局预算
+        if (mode === 'spark') {
+            const currentSpark = this.particles.filter(p => p.mode === 'spark').length;
+            if (currentSpark >= (_budget.sparkLimit ?? 100)) return null;
+        }
+
+        // --- 7. 烟雾粒子（smoke）限制 ---
+        // smoke 用于狂暴受击烟雾、死亡爆炸等场景
+        if (mode === 'smoke') {
+            const currentSmoke = this.particles.filter(p => p.mode === 'smoke').length;
+            if (currentSmoke >= (_budget.smokeLimit ?? 60)) return null;
+        }
+
         const p = new Particle(x, y, color, mode);
         this.particles.push(p);
         return p;
@@ -860,6 +874,16 @@ export const spawn_system = {
             const limit = windIsActive ? _budget.shardLimitWind : _budget.shardLimit;
             const current = this.particles.filter(q => q.mode === 'shard').length;
             if (current >= limit) return false;
+        }
+        // --- spark 限制（与 spawn_createParticle 保持同步）---
+        if (mode === 'spark') {
+            const current = this.particles.filter(q => q.mode === 'spark').length;
+            if (current >= (_budget.sparkLimit ?? 100)) return false;
+        }
+        // --- smoke 限制（与 spawn_createParticle 保持同步）---
+        if (mode === 'smoke') {
+            const current = this.particles.filter(q => q.mode === 'smoke').length;
+            if (current >= (_budget.smokeLimit ?? 60)) return false;
         }
 
         this.particles.push(p);

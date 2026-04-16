@@ -80,15 +80,17 @@ if avgFps > fpsThresholdUp (55):
 
 | 参数 | `high`（高画质） | `medium`（均衡） | `low`（省电） | 说明 |
 |------|---------------|----------------|-------------|------|
-| `maxParticles` | 800 | 400 | 150 | 全局粒子上限 |
+| `maxParticles` | 800 | 400 | 150 | 全局粒子总上限 |
 | `windLimit` | 120 | 60 | 30 | 风属性粒子上限 |
 | `emberLimit` | 80 | 40 | 15 | 火焰粒子上限 |
 | `mistLimit` | 80 | 30 | 10 | 冰雾粒子上限 |
 | `shardLimit` | 60 | 30 | 12 | 碎片粒子上限 |
+| `sparkLimit` | 100 | 50 | 20 | 通用火星粒子上限（机械类受击电弧、能量泄漏等） |
+| `smokeLimit` | 60 | 25 | 8 | 烟雾粒子上限（狂暴受击烟雾、死亡爆炸等） |
 | `shockwaveLimit` | 20 | 12 | 6 | Shockwave 特效上限 |
 | `waveLimit` | 10 | 6 | 3 | FireWave / HealWave 上限 |
 | `lightningLimit` | 15 | 8 | 4 | LightningBolt 特效上限 |
-| `pegSoftShadow` | `true` | `true` | `false` | Peg 椭圆软阴影开关 |
+| `pegSoftShadow` | `true` | `true` | `false` | Peg 渓圆软阴影开关 |
 | `pegGlowHalo` | `true` | `false` | `false` | Peg 底部径向光晕开关 |
 | `enemyGloss` | `true` | `true` | `false` | 敌人材质光泽渐变开关 |
 
@@ -112,8 +114,8 @@ if avgFps > fpsThresholdUp (55):
 
 | 函数 | 读取字段 | 行为 |
 |------|---------|------|
-| `spawn_createParticle(x, y, color, type)` | `maxParticles` / `windLimit` / `emberLimit` / `mistLimit` / `shardLimit` | 按粒子类型查询对应上限，超限时跳过创建 |
-| `spawn_pushParticleWithLimit(particle)` | `maxParticles` | 通用粒子推入前检查全局上限 |
+| `spawn_createParticle(x, y, color, type)` | `maxParticles` / `windLimit` / `emberLimit` / `mistLimit` / `shardLimit` / `sparkLimit` / `smokeLimit` | 按粒子类型查询对应上限，超限时跳过创建 |
+| `spawn_pushParticleWithLimit(particle)` | `maxParticles` / `sparkLimit` / `smokeLimit` | 通用粒子推入前检查全局上限及 spark/smoke 独立限制 |
 | `spawn_createShockwave(x, y, color)` | `shockwaveLimit` | 超限时跳过创建 |
 | `spawn_createHealWave(x, y, range)` | `waveLimit` | 超限时跳过创建 |
 
@@ -203,3 +205,4 @@ if avgFps > fpsThresholdUp (55):
 | 日期 | 内容 |
 |------|------|
 | 2026-04-16 | 初始实现：FPS 采样器、三档等级预算、粒子/特效/Peg/敌人全面接入、FPS 指示层 |
+| 2026-04-16 | 新增 `sparkLimit`（high:100/medium:50/low:20）和 `smokeLimit`（high:60/medium:25/low:8）两个预算字段；在 `spawn_createParticle` 和 `spawn_pushParticleWithLimit` 中同步接入 spark/smoke 上限检查，防止能量泄漏、机械类受击等高频 spark 场景占用全局粒子预算 |

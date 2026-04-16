@@ -857,6 +857,8 @@ const CONFIG = {
             mistLimitWind:    30,  // mist 冰雾粒子上限（风属性激活时）
             shardLimit:       60,  // shard 冰渣粒子上限（无风时）
             shardLimitWind:   20,  // shard 冰渣粒子上限（风属性激活时）
+            sparkLimit:      100,  // spark 通用火星粒子上限（含机械类受击电弧、能量泄漏等）
+            smokeLimit:       60,  // smoke 烟雾粒子上限（含狂暴受击烟雾等）
             // 特效对象上限（Shockwave / FireWave / HealWave / LightningBolt）
             shockwaveLimit:   20,
             waveLimit:        10,
@@ -877,6 +879,8 @@ const CONFIG = {
             mistLimitWind:    12,
             shardLimit:       30,
             shardLimitWind:   10,
+            sparkLimit:       50,  // spark 通用火星粒子上限（均衡模式）
+            smokeLimit:       25,  // smoke 烟雾粒子上限（均衡模式）
             shockwaveLimit:   12,
             waveLimit:         6,
             lightningLimit:    8,
@@ -894,6 +898,8 @@ const CONFIG = {
             mistLimitWind:     4,
             shardLimit:       12,
             shardLimitWind:    4,
+            sparkLimit:       20,  // spark 通用火星粒子上限（省电模式）
+            smokeLimit:        8,  // smoke 烟雾粒子上限（省电模式）
             shockwaveLimit:    6,
             waveLimit:         3,
             lightningLimit:    4,
