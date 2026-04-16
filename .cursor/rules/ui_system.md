@@ -88,7 +88,7 @@ for (const subsystem of _subsystems) {
 | 2026-04-12 | `src/systems.js`, `src/ui/shop.js` | 生产环境在缺失部分 UI 元素时启动崩溃或运行时报错：`UIManager`、`TruthBook`、`TrainingGround` 及 `shop_system` 在访问不存在的 DOM 节点（如 `#phase-training`、`#relic-container`）时未作空值保护，导致脚本中断。 | 为 `systems.js` 中的三个 UI 类及 `shop.js` 中的所有方法添加了全面的空值防御（null guards）；统一了 `shop.js` 的接口名为 `meta_buyUpgrade` 并修正参数传递。 |
 | 2026-04-15 | `src/systems.js` | `spawn_system.js` 导入 `TRUTH_BOOK_DATA` 时报错 `Uncaught SyntaxError: The requested module './systems.js' does not provide an export named 'TRUTH_BOOK_DATA'`，原因是 `systems.js` 定义了该常量但未导出。 | 在 `src/systems.js` 的末尾 `export` 语句中添加了 `TRUTH_BOOK_DATA`。 |
 | 2026-04-15 | `src/ui/shop.js` | 炼金工房（局外商店）所有商品描述显示为 `undefined`：`ui_renderShop` 中读取 `upgrade.description`，但 `META_SHOP_CONFIG.upgrades` 中的字段名为 `desc`，导致字段名不匹配。 | 将 `shop.js` 第 374 行的 `upgrade.description` 改为 `upgrade.desc`。 |
-| 2026-04-16 | `src/ui_system.js` | 符文发射器打开后立即消失：`#phase-rune-launcher` 带有 `ui-overlay` class，`ui_updateUI()` 每帧将所有 `.ui-overlay` 元素强制设为 `display:none`，导致发射器在打开后的下一帧就被隐藏。 | 在 `ui_updateUI` 的全局隐藏循环中加入保护：若当前 `launcherVisible === true`，则跳过对 `#phase-rune-launcher` 的隐藏操作；同时移除发射器打开期间清理内部蒙版的副作用代码。 |
+| 2026-04-16 | `src/ui_system.js` + `src/game_system.js` | 符文发射器打开后立即消失：**真正根因是 canvas 输入穿透**——符文发射器面板层叠在 canvas 上方（z-index:300），但 canvas 的 `mousedown`/`touchstart` 监听器是直接绑定在 DOM 上的，不受 z-index 限制。玩家点击发射器面板时事件穿透到 canvas，导致 gathering 阶段弹珠被自动发射，所有弹珠打完后自动进入战斗阶段，`phase_switchPhase('combat')` 调用 `ui_updateUI()` 将发射器面板强制隐藏；同时 `.ui-overlay` 的 `transition: opacity 0.3s` 导致面板在 0.3s 内淡出消失而非立即关闭。 | 两处修复：① `ui_updateUI` 全局隐藏循环中加入保护（发射器打开时跳过隐藏）；② `input_handleInputStart/Move/End` 开头加入发射器打开时的全局屏蔽，防止 canvas 事件穿透。 |
 
 ## 6. 修改规范
 

@@ -681,6 +681,11 @@ export const game_system = {
      * @description 处理输入开始（鼠标按下/触摸开始）。
      */
     input_handleInputStart(pos, e) {
+        // [BUGFIX] 符文发射器打开时，屏蔽所有 canvas 输入事件，
+        // 防止点击发射器面板穿透到底层 canvas，误触发弹珠发射并推进到战斗阶段。
+        const launcherPanel = document.getElementById('phase-rune-launcher');
+        if (launcherPanel && launcherPanel.style.display !== 'none') return;
+
         const offset = this.input_getTiltOffset();
         const logicPos = pos.sub(offset);
         this.lastMousePos = logicPos;
@@ -726,6 +731,10 @@ export const game_system = {
      * @description 处理输入移动（鼠标移动/触摸移动）。
      */
     input_handleInputMove(pos, e) {
+        // [BUGFIX] 符文发射器打开时，屏蔽 canvas 活动输入，防止鼠标移动导致倒斜或甄准逻辑干扰。
+        const _launcherPanelMove = document.getElementById('phase-rune-launcher');
+        if (_launcherPanelMove && _launcherPanelMove.style.display !== 'none') return;
+
         const offset = this.input_getTiltOffset();
         const logicPos = pos.sub(offset);
         this.lastMousePos = logicPos;
@@ -767,6 +776,10 @@ export const game_system = {
      * @description 处理输入结束（松手发射）。
      */
     input_handleInputEnd(pos, e) {
+        // [BUGFIX] 符文发射器打开时，屏蔽 canvas 输入结束事件，防止误触发射。
+        const _launcherPanelEnd = document.getElementById('phase-rune-launcher');
+        if (_launcherPanelEnd && _launcherPanelEnd.style.display !== 'none') return;
+
         if (this.isDragging) {
             this.isDragging = false;
             const cannonPos = new Vec2(this.width / 2, this.height - 80);
