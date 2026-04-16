@@ -260,7 +260,7 @@ export const tutorial_system = {
      */
     tutorial_restartFromHome() {
         // 1. 若当前有正在进行的教程，先清理
-        if (this._tutorialActive) this.tutorial_end(false);
+        this.tutorial_end(false);
         // 2. 重置「教程已完成」标志，使教程可以重新触发
         this.saveData.tutorialCompleted = false;
         this.sys_saveData();
@@ -269,7 +269,12 @@ export const tutorial_system = {
         // 4. 切换到主页（meta 阶段），确保教程从主页流程开始
         this.phase_switchPhase('meta');
         // 5. 延迟启动教程（等待 meta 阶段 DOM 渲染完成）
-        setTimeout(() => this.tutorial_start(), 400);
+        // [BUGFIX] 增加安全性检查，防止多次点击导致重复启动
+        if (this._restartTimer) clearTimeout(this._restartTimer);
+        this._restartTimer = setTimeout(() => {
+            this.tutorial_start();
+            this._restartTimer = null;
+        }, 400);
     },
 
     /**
@@ -319,7 +324,19 @@ export const tutorial_system = {
      * @private
      */
     _tutorial_createDOM() {
-        if (document.getElementById('tutorial-overlay')) return;
+        // [BUGFIX] 如果 DOM 已存在，先尝试重新绑定引用并确保可见，防止引用丢失或隐藏状态导致后续逻辑失效
+        const existingOverlay = document.getElementById('tutorial-overlay');
+        if (existingOverlay) {
+            this._tutorialOverlayEl = existingOverlay;
+            this._tutorialHighlightEl = document.getElementById('tutorial-highlight');
+            this._tutorialCardEl = document.getElementById('tutorial-card');
+            
+            // 确保元素可见
+            if (this._tutorialOverlayEl) this._tutorialOverlayEl.style.display = 'block';
+            if (this._tutorialHighlightEl) this._tutorialHighlightEl.style.display = 'block';
+            if (this._tutorialCardEl) this._tutorialCardEl.style.display = 'block';
+            return;
+        }
 
         // 1. 遮罩层
         const overlay = document.createElement('div');

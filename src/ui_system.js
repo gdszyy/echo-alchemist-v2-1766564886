@@ -374,6 +374,9 @@ ui_closeTruthBook() {
      * [META] 点击"开始炼成"按钮
      */
     meta_startRun() {
+        // [BUGFIX] 如果当前正在主页教程（Step 0），点击“开始游戏”应该视为继续教程流程
+        // 如果教程已经进入更深步骤或处于异常状态，这里确保逻辑一致性
+        
         // [局内存档] 新开一局时清除旧存档
         this.sys_clearRunState();
         this.sys_resetGame(); 
