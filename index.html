@@ -37,8 +37,8 @@
             /* 高度优先：始终填满视口 */
             height: 100vh; /* 旧浏览器兜底 */
             height: 100dvh;
-            /* 宽度：按 9:16 比例计算，上限 480px，手机端不小于屏幕宽度 */
-            width: min(calc(100dvh * 9 / 16), 480px);
+            /* 宽度：按 9:16 比例计算，上限 480px，同时不超过屏幕宽度（100vw）防止手机端水平溢出 */
+            width: min(calc(100dvh * 9 / 16), 100vw, 480px);
             min-width: min(100vw, 480px);
             flex-shrink: 0;
             background: #0f172a;
