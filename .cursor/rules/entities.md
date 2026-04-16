@@ -45,6 +45,7 @@
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
+| 2026-04-16 | `src/entities/enemy.js`, `src/config.js` | **Task D 生动感增强：呼吸缩放 + 待机微浮动 + 边框脉冲光晕**：三项增强均通过 `CONFIG.enemyRender` 配置节管理魔法数字。**D1 呼吸缩放**：在 `draw()` 的 `ctx.translate` 之后、A3 Squash & Stretch 之前插入，仅在 `actionPhase === 'idle'` 且 `_hitImpact <= 0.001` 且 `hitTimer <= 0` 时生效，使用 `visualSeed` 作相位偏移实现 ±1.8% 呼吸缩放（周期 3200ms）。**D2 待机微浮动**：在 D1 同一 if 块内追加，使用不同周期（2600ms）和额外相位偏移实现 ±1.5px 垂直浮动，与呼吸错开节奏。**D3 边框脉冲光晕**：在 Layer 5 边框绘制之后、`shadowBlur` 重置之前插入，仅在 idle 状态下使用 `ctx.shadowBlur` 实现缓慢脉冲光晕（周期 2800ms），颜色与敌人类型对应（normal: `#94a3b8` / elite: `#facc15` / boss: `#ef4444`）。所有动态效果均使用 `Date.now()` 驱动，不引入新的 update() 状态字段。 |
 | 2026-04-15 | `src/entities.js` | **T3 实体投影与环境光照（Peg 光晕 + 软阴影）**：在 `Peg.draw` 方法中新增两处纯视觉增强：(1) **软阴影**（第1036行）：在 `currentRadius` 计算后、旋转变换前，绘制压扁的黑色半透明椭圆（`globalAlpha=0.22`，`fillStyle='rgba(0,0,0,0.7)'`，椭圆 Y 偏移 `currentRadius+3`，半轴比 `0.85:0.22`），模拟钉子「浮」在场地上的感觉。(2) **发光底部光晕**（第1078行）：在基础圆形 `ctx.fill()` 之后，对 `isSpecial || isLit` 的钉子使用 `hexToRgba(glowColor, 0.18)` 创建径向渐变（半径 `currentRadius*3.5`），以 `lighter` 混合模式绘制彩色地面光晕，模拟全局光照映射效果。两处修改均不影响碰撞检测、属性触发和 UI 逻辑。 |
 | 2026-04-15 | `src/spawn_system.js`, `src/entities/enemy.js` | **生成编排增强（Boss入场压迫感 + 随从阵型协同）**：(1) **Boss入场冲击波增强**：在 `spawn_triggerBossEntranceShockwave` 中新增气浪推力，根据距离对全场非 Boss 敌人施加垂直向上的 `bumpOffsetY`（最大 -20），形成波浪式避让弹跳效果。(2) **随从阵型呼吸协同**：在 `spawn_spawnEnemyRowAt` 中为每个敌人记录行内列索引 `_spawnColIndex`，并在 `enemy.js` 的 `shield` 词缀蜂巢格纹绘制中引入相位偏移 `+ (this._spawnColIndex || 0) * 0.4`，使同行护盾敌人的脉冲形成从左到右的波浪闪烁。(3) **精英敌人出场强调**：在 `spawn_spawnEnemyRowAt` 中生成 `elite` 敌人时，立即触发小型金色冲击波（`#facc15`）并生成 4~6 个金色 `spark` 粒子，增强精英敌人的存在感。 |
 | 2026-04-15 | `src/entities/enemy.js`, `src/config.js` | **Task A 渲染管线增强：材质光泽 + 战损裂纹 + 受击形变**：三项增强均通过 `CONFIG.enemyRender` 配置节管理魔法数字。**A1 材质光泽**：在 `_initTexture()` 的 OffscreenCanvas 预计算阶段，完成基础纹理绘制后叠加顶→底 LinearGradient（顶部 `rgba(255,255,255,0.08)` → 底部 `rgba(0,0,0,0.12)`），使方块/多边形产生 3D 凸起物理厚度感。**A2 战损裂纹**：在 `draw()` 的 Layer 4 区域末尾（现有温度裂纹之后）新增血量联动战损裂纹：当 `hp/maxHp < 0.3` 时，使用已有 `this.fissures` 路径绘制深灰色 `rgba(15,23,42,alpha)` 裂纹，强度随血量比例线性变化，不影响现有温度裂纹逻辑。**A3 受击形变**：新增 `_hitImpact` 字段：`takeDamage()` 中记录受击强度（单次伤害/maxHp，clamp 至 0~0.15）；`update()` 中每帧对 `_hitImpact` 乘以 0.85 进行弹性衰减（已处理所有早期返回分支）；`draw()` 的 `ctx.save()` 后根据 `_hitImpact` 应用 `ctx.scale(1 + _hitImpact * 0.5, 1 - _hitImpact * 0.5)`，使受击瞬间变扁变宽，随后弹性恢复。 |
@@ -94,7 +95,9 @@
 | **Layer 3** | 内部覆盖层（过热橙色发光 / 过冷蓝色雾化） | 状态反馈 |
 | **Layer 3.5** | 内部词缀特效（**所有词缀**，严格裁剪在方块内） | **重设计**，各词缀采用内部填充纹理，与实际效果强关联 |
 | **Layer 4** | 裂纹绘制（过热岩浆裂纹 / 过冷冰晶裂纹 / **战损裂纹**） | 状态反馈；**Task A 增强**：血量 < 30% 时显示深灰色战损裂纹，强度随血量线性变化 |
+| **D1/D2** | 呼吸缩放（Breathing Scale）+ 待机微浮动（Idle Float） | **Task D 新增**，仅在 `actionPhase === 'idle'` 且无受击/预警时生效；D1 使用 `ctx.scale` 实现 ±1.8% 呼吸缩放（周期 3200ms）；D2 使用 `ctx.translate` 实现 ±1.5px 垂直浮动（周期 2600ms）；均使用 `this.visualSeed` 作为相位偏移，确保同屏多敌人节奏各异；位于 draw() 的 `ctx.translate` 之后、A3 Squash & Stretch 之前 |
 | **Layer 5** | 内部边框（普通 / elite / boss） | 包含预警闪烁 |
+| **D3** | 边框脉冲光晕（Border Pulse Glow） | **Task D 新增**，仅在 `actionPhase === 'idle'` 时生效；使用 `ctx.shadowBlur` 实现缓慢脉冲光晕（周期 2800ms）；颜色与敌人类型对应：normal：冷灰蓝 `#94a3b8`，elite：金色 `#facc15`，boss：红色 `#ef4444`；位于 Layer 5 边框绘制之后、`shadowBlur` 重置之前 |
 | **Layer 5.5** | 插在身上的子剑（Stuck Swords） | 包含母剑剑穗 |
 | **Layer 6** | 外部特效（过热炙热光圈 / 过冷冰封外壳）—— **已适配 polygon/arc/AABB 三种形状** | 状态反馈 |
 | **Layer 7** | 扫描反馈（准星动画） | 状态反馈 |

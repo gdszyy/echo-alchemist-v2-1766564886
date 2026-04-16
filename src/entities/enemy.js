@@ -1190,6 +1190,20 @@ class Enemy {
         ctx.save(); 
         ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
 
+        // === D1 & D2: 待机生动感（呼吸缩放 + 微浮动）===
+        // 仅在 idle 状态且无受击/预警时生效，使用 visualSeed 作为相位偏移
+        if (this.actionPhase === 'idle' && this._hitImpact <= 0.001 && this.hitTimer <= 0) {
+            const now = Date.now();
+            // D1: 呼吸缩放 — 使用 visualSeed * 2π 作为相位偏移，确保多敌人节奏各异
+            const breathePhase = (now / CONFIG.enemyRender.breathePeriod + this.visualSeed) * Math.PI * 2;
+            const breatheScale = 1 + Math.sin(breathePhase) * CONFIG.enemyRender.breatheAmplitude;
+            ctx.scale(breatheScale, breatheScale);
+            // D2: 待机微浮动 — 周期与呼吸错开，叠加额外相位偏移避免同步
+            const floatPhase = (now / CONFIG.enemyRender.idleFloatPeriod + this.visualSeed * 1.3) * Math.PI * 2;
+            const floatY = Math.sin(floatPhase) * CONFIG.enemyRender.idleFloatAmplitude;
+            ctx.translate(0, floatY);
+        }
+
         // === A3: 受击 Squash & Stretch 形变 ===
         // 受击瞬间变扁变宽，随后弹性恢复
         if (this._hitImpact > 0.001) {
@@ -1716,6 +1730,38 @@ class Enemy {
             }
         } else {
             ctx.strokeRect(-w/2, -h/2, w, h);
+        }
+        // === D3: 边框脉冲光晕（Border Pulse Glow）===
+        // 仅在 idle 状态下生效，为边框叠加一层缓慢脉冲的 shadowBlur 光晕
+        if (this.actionPhase === 'idle') {
+            const now = Date.now();
+            const pulsePhase = (now / CONFIG.enemyRender.borderPulsePeriod + this.visualSeed * 0.7) * Math.PI * 2;
+            // 使用 (sin+1)/2 将范围映射到 [0, 1]，再乘以最大光晕强度
+            const pulseIntensity = (Math.sin(pulsePhase) + 1) * 0.5;
+            const pulseBlur = pulseIntensity * CONFIG.enemyRender.borderPulseBlurMax;
+            let pulseColor = CONFIG.enemyRender.borderPulseColorNormal;
+            if (this.type === 'elite') pulseColor = CONFIG.enemyRender.borderPulseColorElite;
+            if (this.type === 'boss') pulseColor = CONFIG.enemyRender.borderPulseColorBoss;
+            ctx.shadowColor = pulseColor;
+            ctx.shadowBlur = pulseBlur;
+            // 重绘一次边框以应用光晕（不改变已有边框颜色）
+            if (this.collisionShape === 'polygon' &&
+                this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                ctx.beginPath();
+                const verts = this.collisionData.vertices;
+                ctx.moveTo(verts[0].x, verts[0].y);
+                for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x, verts[i].y);
+                ctx.closePath();
+                ctx.stroke();
+            } else if (this.type === 'boss' && this.collisionShape === 'arc' && this.collisionData) {
+                const cd = this.collisionData;
+                const outerR = cd.radius + cd.thickness * 0.5;
+                ctx.beginPath();
+                ctx.arc(0, 0, outerR, 0, Math.PI * 2, false);
+                ctx.stroke();
+            } else {
+                ctx.strokeRect(-w/2, -h/2, w, h);
+            }
         }
         ctx.shadowBlur = 0; // 重置
 

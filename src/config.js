@@ -785,7 +785,31 @@ const CONFIG = {
         // 磨损点最小透明度
         wearDotAlphaMin: 0.25,
         // 磨损点最大透明度
-        wearDotAlphaMax: 0.45
+        wearDotAlphaMax: 0.45,
+
+        // D1: 呼吸缩放（Breathing Scale）
+        // 呼吸缩放幅度（scale 偏移量，如 0.018 表示 ±1.8%）
+        breatheAmplitude: 0.018,
+        // 呼吸周期（毫秒），越小越快
+        breathePeriod: 3200,
+
+        // D2: 待机微浮动（Idle Float）
+        // 垂直浮动幅度（像素），如 1.5 表示上下各 1.5px
+        idleFloatAmplitude: 1.5,
+        // 浮动周期（毫秒），与呼吸错开节奏
+        idleFloatPeriod: 2600,
+
+        // D3: 边框脉冲光晕（Border Pulse Glow）
+        // 光晕最大 shadowBlur 值
+        borderPulseBlurMax: 8,
+        // 脉冲周期（毫秒）
+        borderPulsePeriod: 2800,
+        // normal 敌人光晕颜色（冷灰蓝，微弱存在感）
+        borderPulseColorNormal: '#94a3b8',
+        // elite 敌人光晕颜色（金色脉冲）
+        borderPulseColorElite: '#facc15',
+        // boss 敌人光晕颜色（红色脉冲）
+        borderPulseColorBoss: '#ef4444'
     },
 
     // ==================== 自适应性能配置 (Adaptive Performance) ====================
