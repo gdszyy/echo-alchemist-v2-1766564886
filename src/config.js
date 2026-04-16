@@ -833,7 +833,8 @@ const CONFIG = {
 
         // Layer 3.5 Breathe: 词缀核心过曝叠加层最大透明度
         // 比 Boss 弱（Boss 约 0.4），避免普通/精英敌人词缀特效喜宾夺主
-        affixCoreOverglowAlpha: 0.2,
+        // [降低护盾亮度] 0.2 → 0.12，减少 lighter 模式白色过曝对下层细节的遮盖
+        affixCoreOverglowAlpha: 0.12,
 
         // T2: Boss 核心过曝模拟（Boss Core Overglow）
         // Boss 过曝叠加层最大透明度（0=关闭，1=最强），随呼吸周期动态变化
@@ -881,7 +882,8 @@ const CONFIG = {
         // shield 精英：交点节点高光半径（像素）
         eliteShieldNodeRadius: 3.5,
         // shield 精英：交点节点高光最大透明度
-        eliteShieldNodeAlpha: 0.7,
+        // [降低护盾亮度] 0.7 → 0.45，减少精英/Boss 节点高光对下层细节的遮盖
+        eliteShieldNodeAlpha: 0.45,
         // regen 精英：上升气泡数量
         eliteRegenBubbleCount: 5,
         // regen Boss：生物脉络数量

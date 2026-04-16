@@ -1435,7 +1435,8 @@ class Enemy {
             // --- shield: 内壁蜂巢格纹（护盾=防御格栅）浅蓝色六边形网格 ---
             if (this.affixes.includes('shield') && this.shieldCharges > 0) {
                 ctx.save();
-                const shieldPulse = Math.sin(t35 * 1.2 + (this._spawnColIndex || 0) * 0.4) * 0.15 + 0.35;
+                // @perf-impact: 护盾格纹透明度 - [降低护盾亮度] 基础值 0.35 → 0.22，防止格纹过亮遮盖敌人主体细节
+                const shieldPulse = Math.sin(t35 * 1.2 + (this._spawnColIndex || 0) * 0.4) * 0.15 + 0.22;
                 ctx.globalAlpha = shieldPulse * affixAlpha35;
                 ctx.strokeStyle = '#93c5fd';
                 ctx.lineWidth = 1;
