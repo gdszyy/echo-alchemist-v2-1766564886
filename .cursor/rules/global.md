@@ -138,3 +138,40 @@ for (const subsystem of _subsystems) {
 *   组合模式创建的是**实例方法**（存在于实例上，而非原型链），每个 `Game` 实例拥有自己的方法副本。由于游戏只有一个实例，这不是问题。
 *   子系统中的非函数属性（如 `_flyEffectPool: []`）会被拷贝到实例上，每个实例拥有独立副本（数组会浅拷贝）。
 *   子系统方法中的 `this` 始终指向 `Game` 实例，无需修改子系统文件。
+
+---
+
+## 6. 自适应性能系统概述
+
+> 详细规范见 [`.cursor/rules/performance.md`](performance.md)
+
+### 性能瓶颈排名（Canvas 2D 渲染）
+
+| 排名 | 瓶颈源 | 每帧开销原因 |
+|------|---------|----------------|
+| 1 | **粒子系统**（`mist`/`ember`/`shard`） | `createRadialGradient` + `shadowBlur` + `lighter`/`screen` 混合；上限 800 |
+| 2 | **特效对象**（`Shockwave`/`FireWave`/`LightningBolt`） | 多层 `shadowBlur` + `lighter` 叠加，无原始数量上限 |
+| 3 | **Peg 软阴影 + 底部光晕** | 每帧对约 50 个 Peg 各执行 `createRadialGradient` + `ellipse` |
+| 4 | **敌人材质光泽** | `OffscreenCanvas` 上 `LinearGradient` 叠加，敌人构造时执行 |
+
+### 性能等级与帧率关系
+
+| 等级 | 触发条件 | 粒子上限 | 光效开关 |
+|------|---------|---------|----------|
+| `high` | 默认 / FPS > 55 连续 10s | 800 | 全开 |
+| `medium` | FPS < 45 连续 3s | 400 | Peg 光晕关闭 |
+| `low` | 在 medium 基础上 FPS < 45 连续 3s | 150 | 全关 |
+
+### 对外可观测接口
+
+```js
+game.avgFps           // 当前 60 帧滑动平均帧率（整数）
+game.perfQualityLevel // 当前性能等级：'high' | 'medium' | 'low'
+```
+
+### 修改性能相关功能的必读规则
+
+1. **新增粒子类型**：在 `CONFIG.performance` 三档中添加对应上限字段，并在 `spawn_createParticle` 中读取。
+2. **新增特效对象**：在创建处加入 `CONFIG.performance[this.perfQualityLevel || 'high'].xxxLimit` 检查。
+3. **禁止硬编码上限**：严禁在特效创建函数中写死数字（如 `>= 800`），必须通过 `CONFIG.performance` 读取。
+4. 详见 [`.cursor/rules/performance.md`](performance.md) 第 6 节「修改指南」。

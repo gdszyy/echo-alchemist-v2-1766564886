@@ -156,7 +156,7 @@
 
 ### E1. 初始化随机静态倾斜（Static Tilt）
 
-*   **字段**：`this._staticTilt`（在 `constructor` 中 `this.visualSeed` 赋值之后一次性计算）
+*   **字段**：`this._staticTilt`（在 `constructor` 中 `this.visualSeed` 赋値之后一次性计算）
 *   **逻辑**：`(this.visualSeed - 0.5) * CONFIG.enemyRender.staticTiltMax`
     *   `boss` 类型：强制为 `0`（不倾斜）
     *   `elite` 类型：乘以 `0.6`（最大 ±1.5°）
@@ -191,3 +191,21 @@
 | :--- | :--- | :--- |
 | 2026-04-16 | `src/entities/enemy.js` | **Task E**：constructor 新增 `_staticTilt` 一次性预计算；`_initTexture` 末尾追加 E2 色调偏移和 E3 磨损点；`draw()` 震动之后插入 E1 静态倾斜旋转 |
 | 2026-04-16 | `src/config.js` | **Task E**：`CONFIG.enemyRender` 新增 `staticTiltMax`、`hueShiftAlphaMin`、`hueShiftAlphaRange`、`wearDotCountMin`、`wearDotCountMax`、`wearDotAlphaMin`、`wearDotAlphaMax` 七个参数 |
+
+## 10. 性能相关渲染开关（自适应性能系统）
+
+> 详细规范见 [`.cursor/rules/performance.md`](performance.md)
+
+`entities.js`（`Peg.draw`）和 `entities/enemy.js`（`Enemy._initTexture`）均已接入自适应性能系统，通过 `game.perfQualityLevel` 动态控制高开销渲染步骤：
+
+| 文件 | 受控渲染步骤 | 控制字段 | 关闭等级 |
+|------|------------|---------|----------|
+| `entities.js` → `Peg.draw` | 椭圆软阴影（`ellipse`） | `pegSoftShadow` | `low` |
+| `entities.js` → `Peg.draw` | 底部径向光晕（`createRadialGradient` + `lighter`） | `pegGlowHalo` | `medium` / `low` |
+| `entities/enemy.js` → `Enemy._initTexture` | 材质光泽渐变（OffscreenCanvas `LinearGradient`） | `enemyGloss` | `low` |
+
+**修改注意事项：**
+
+- `Peg.draw` 通过 `typeof game !== 'undefined' && game.perfQualityLevel` 读取等级，默认回退 `'high'`。
+- `Enemy._initTexture` 在构造时调用，通过 `window.game` 读取等级（若 `window.game` 尚未挂载则默认开启光泽）。
+- 新增 Peg 或 Enemy 的高开销渲染步骤时，**必须**在 `CONFIG.performance` 中添加对应开关，并在 `performance.md` 第 5 节更新消费端关联索引。
