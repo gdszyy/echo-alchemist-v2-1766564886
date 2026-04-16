@@ -2487,11 +2487,7 @@
                         <span class="s-label">CRT 特效</span>
                         <span class="s-badge" id="crt-badge">关闭</span>
                     </div>
-                    <div class="settings-item" id="tutorial-replay-item" onclick="game.tutorial_start()" style="border-top: 1px solid rgba(245,158,11,0.15); margin-top: 4px; padding-top: 8px;">
-                        <span class="s-icon">📖</span>
-                        <span class="s-label">新手教程</span>
-                        <span class="s-badge" style="background:rgba(245,158,11,0.2);color:#fbbf24;border-color:rgba(245,158,11,0.4);">重播</span>
-                    </div>
+
                 </div>
             </div>
         </div>
@@ -2569,7 +2565,7 @@
 
         </div>
         
-        <button onclick="game.tutorial_start()" class="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[11px] font-bold tracking-wider text-amber-400/60 border border-amber-500/20 bg-slate-900/40 hover:text-amber-300 hover:border-amber-400/50 hover:bg-slate-800/60 transition-all duration-300 backdrop-blur-sm whitespace-nowrap">
+        <button onclick="game.tutorial_restartFromHome()" class="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[11px] font-bold tracking-wider text-amber-400/60 border border-amber-500/20 bg-slate-900/40 hover:text-amber-300 hover:border-amber-400/50 hover:bg-slate-800/60 transition-all duration-300 backdrop-blur-sm whitespace-nowrap">
             <span class="text-sm">📖</span> 重新开始教程
         </button>
         <div class="absolute bottom-4 w-full text-center text-slate-700 text-[10px] font-[Cinzel] tracking-widest opacity-50">
@@ -3092,11 +3088,7 @@
                         <span class="ps-badge" id="pause-crt-badge">关闭</span>
                     </div>
 
-                    <div class="pause-setting-row" style="border-top: 1px solid rgba(245,158,11,0.15); margin-top: 8px; padding-top: 10px;" onclick="game.ui_closePause(); game.tutorial_start();">
-                        <span class="ps-icon">📖</span>
-                        <span class="ps-label">新手教程</span>
-                        <span class="ps-badge" style="background:rgba(245,158,11,0.2);color:#fbbf24;border-color:rgba(245,158,11,0.4);">重播</span>
-                    </div>
+
                 </div>
 
                 <!-- 遗物区 -->

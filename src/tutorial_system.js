@@ -53,7 +53,7 @@ const TUTORIAL_STEPS = [
         content: `
             <p>这是一款融合了<strong>弹珠台</strong>与<strong>Roguelike</strong>的策略游戏。</p>
             <p class="mt-2">本教程将引导你完成第一局游戏，了解核心玩法。</p>
-            <p class="mt-2 text-amber-300/80 text-xs">💡 随时可在设置中重播教程</p>
+            <p class="mt-2 text-amber-300/80 text-xs">💡 可在主页底部「重新开始教程」按钮重播</p>
         `,
         position: 'center',
         noOverlay: false,
@@ -239,6 +239,8 @@ export const tutorial_system = {
     /**
      * @method tutorial_start
      * @description 启动新手教程（从第 0 步开始）。
+     * 仅供游戏初始化时自动触发（tutorial_checkAndStart）调用。
+     * 主页「重新开始教程」按钮请调用 tutorial_restartFromHome()。
      */
     tutorial_start() {
         if (this._tutorialActive) this.tutorial_end(false);
@@ -248,6 +250,26 @@ export const tutorial_system = {
         this._isTutorialRun = true;
         this._tutorial_createDOM();
         this._tutorial_showStep(0);
+    },
+
+    /**
+     * @method tutorial_restartFromHome
+     * @description 主页「重新开始教程」按钮的专属入口。
+     * 先重置 tutorialCompleted 标志并切换到主页（meta 阶段），
+     * 再延迟启动教程，确保整个流程从主页正确开始。
+     */
+    tutorial_restartFromHome() {
+        // 1. 若当前有正在进行的教程，先清理
+        if (this._tutorialActive) this.tutorial_end(false);
+        // 2. 重置「教程已完成」标志，使教程可以重新触发
+        this.saveData.tutorialCompleted = false;
+        this.sys_saveData();
+        // 3. 清除局内存档，避免主页展示「继续游戏」按钮干扰教程流程
+        this.sys_clearRunState();
+        // 4. 切换到主页（meta 阶段），确保教程从主页流程开始
+        this.phase_switchPhase('meta');
+        // 5. 延迟启动教程（等待 meta 阶段 DOM 渲染完成）
+        setTimeout(() => this.tutorial_start(), 400);
     },
 
     /**

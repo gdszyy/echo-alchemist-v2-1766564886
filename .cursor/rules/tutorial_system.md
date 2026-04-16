@@ -32,12 +32,15 @@
 
 ## 5. 对外接口 (API)
 - `tutorial_checkAndStart()`：在游戏初始化（`sys_loadSaveData` 后）调用，检查是否需要启动教程。
-- `tutorial_start()`：启动教程（从第一步开始），可由设置面板中的「重播」按钮调用。
+- `tutorial_start()`：启动教程（从第一步开始）。**仅供游戏初始化时自动调用**，不应直接由 UI 按钮调用。
+- `tutorial_restartFromHome()`：**主页「重新开始教程」按钮的专属入口**。先重置 `tutorialCompleted` 标志并切换到 `meta` 阶段，再延迟启动教程，确保整个流程从主页正确开始。
 - `tutorial_end(markCompleted)`：结束教程，清理 DOM 和事件监听。
 - `tutorial_nextStep()`：前进到下一步。
 - `tutorial_skipAll()`：跳过教程并标记为已完成。
 
 ## 6. 注意事项与修改规范
+- **重开教程入口唯一性**：重开教程的入口**仅在主页（`#phase-meta`）**提供，即主页底部的「重新开始教程」按钮。不在暂停菜单、设置面板或其他局内界面提供此入口，避免在局内状态下重开教程导致流程断裂。
+- **主页按钮调用规范**：主页按钮应调用 `tutorial_restartFromHome()`，而非直接调用 `tutorial_start()`。
 - **修改步骤文本**：直接修改 `tutorial_system.js` 顶部的 `TUTORIAL_STEPS` 数组即可，无需改动底层逻辑。
 - **新增高亮目标**：确保目标元素在对应阶段是可见的（`display !== 'none'` 且 `opacity > 0`），否则高亮框可能定位失败。
 - **清理监听器**：步骤切换或教程结束时，必须调用 `_tutorial_cleanupListeners()`，防止内存泄漏或多次触发。
