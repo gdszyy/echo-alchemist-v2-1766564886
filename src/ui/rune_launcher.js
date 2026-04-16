@@ -118,10 +118,9 @@ export const rune_launcher_system = {
         // 关闭气泡提示（玩家已进入发射器）
         this._ui_hideRunewordBubble();
         // 首次打开时显示内部引导教学（移动端不影响 PC 端常驻）
-        // [ARCHIVED] 教程功能暂时禁用，如需恢复请取消下方注释
-        // if (!isPCMode && this.saveData && !this.saveData.runeLauncherTourDone) {
-        //     setTimeout(() => this.ui_showRuneLauncherTour(), 400);
-        // }
+        if (!isPCMode && this.saveData && !this.saveData.runeLauncherTourDone) {
+            setTimeout(() => this.ui_showRuneLauncherTour(), 400);
+        }
     },
 
 
@@ -1445,175 +1444,178 @@ export const rune_launcher_system = {
         audio.playTone(660, 'sine', 0.1, 0.3);
     },
 
+    // ==================== 引导式教学 ====================
 
-    // ==================== 引导式教学（暂时归档，如需恢复请取消注释） ====================
-
-    /*
-     * [ARCHIVED] ui_showRuneLauncherTour
+    /**
      * 展示符文发射器内部引导教学
      * 首次打开发射器时自动调用，也可通过帮助按鈕手动触发
      */
-    // ui_showRuneLauncherTour() {
+    ui_showRuneLauncherTour() {
         // 如果发射器面板不在显示状态则不展示
-        // const panel = document.getElementById('phase-rune-launcher');
-        // if (!panel || panel.style.display === 'none') return;
+        const panel = document.getElementById('phase-rune-launcher');
+        if (!panel || panel.style.display === 'none') return;
 
-//         // 移除旧教学层
-        // const existingTour = document.getElementById('rune-launcher-tour-overlay');
-        // if (existingTour) existingTour.remove();
+        // 移除旧教学层
+        const existingTour = document.getElementById('rune-launcher-tour-overlay');
+        if (existingTour) existingTour.remove();
 
-//         // const tourSteps = [
-            // {
-                // targetId: 'rune-grid-container',
-                // title: '① 符文网格',
-                // desc: '将库存中的符文拖入这里。特定符文组合可触发强力「词条」！',
-                // position: 'bottom',
-            // },
-            // {
-                // targetId: 'rune-inventory-container',
-                // title: '② 符文库存',
-                // desc: '你拥有的所有符文在这里。点击符文可选中，选中 3 个可进行合成或重铸。',
-                // position: 'top',
-            // },
-            // {
-                // targetId: 'rune-merge-btn',
-                // title: '③ 合成炉',
-                // desc: '选中 3 个相同 ID 且相同等级的符文，合成为更高等级的同类符文。',
-                // position: 'top',
-            // },
-            // {
-                // targetId: 'rune-reforge-btn',
-                // title: '④ 重铸炉',
-                // desc: '选中任意 3 个符文消耗，随机获得一个全新符文。当库存符文不理想时可用。',
-                // position: 'top',
-            // },
-            // {
-                // targetId: 'rune-active-runewords',
-                // title: '⑤ 已激活词条',
-                // desc: '当网格中符文组合匹配词条时，词条将在这里展示并生效。',
-                // position: 'top',
-            // },
-        // ];
+        const tourSteps = [
+            {
+                targetId: 'rune-grid-container',
+                title: '① 符文网格',
+                desc: '将库存中的符文拖入这里。特定符文组合可触发强力「词条」！',
+                position: 'bottom',
+            },
+            {
+                targetId: 'rune-inventory-container',
+                title: '② 符文库存',
+                desc: '你拥有的所有符文在这里。点击符文可选中，选中 3 个可进行合成或重铸。',
+                position: 'top',
+            },
+            {
+                targetId: 'rune-merge-btn',
+                title: '③ 合成炉',
+                desc: '选中 3 个相同 ID 且相同等级的符文，合成为更高等级的同类符文。',
+                position: 'top',
+            },
+            {
+                targetId: 'rune-reforge-btn',
+                title: '④ 重铸炉',
+                desc: '选中任意 3 个符文消耗，随机获得一个全新符文。当库存符文不理想时可用。',
+                position: 'top',
+            },
+            {
+                targetId: 'rune-active-runewords',
+                title: '⑤ 已激活词条',
+                desc: '当网格中符文组合匹配词条时，词条将在这里展示并生效。',
+                position: 'top',
+            },
+        ];
 
-//         // 创建教学层容器（不阔读背景，只展示高亮提示）
-        // const overlay = document.createElement('div');
-        // overlay.id = 'rune-launcher-tour-overlay';
-        // overlay.style.cssText = [
-            // 'position: absolute;',
-            // 'inset: 0;',
-            // 'z-index: 500;',
-            // 'pointer-events: none;',
-        // ].join(' ');
-        // panel.style.position = 'relative';
+        // 创建教学层容器（不阔读背景，只展示高亮提示）
+        const overlay = document.createElement('div');
+        overlay.id = 'rune-launcher-tour-overlay';
+        overlay.style.cssText = [
+            'position: absolute;',
+            'inset: 0;',
+            'z-index: 500;',
+            'pointer-events: none;',
+        ].join(' ');
+        panel.style.position = 'relative';
         // [BUGFIX] 防止 highlight 的超大 box-shadow (2000px) 溢出 panel 边界，在屏幕外形成常驻黑色蒙版
-        // const _prevOverflow = panel.style.overflow;
-        // panel.style.overflow = 'hidden';
-        // panel.appendChild(overlay);
+        const _prevOverflow = panel.style.overflow;
+        panel.style.overflow = 'hidden';
+        panel.appendChild(overlay);
 
-//         // let currentStep = 0;
+        let currentStep = 0;
 
-//         // const showStep = (stepIdx) => {
+        const showStep = (stepIdx) => {
             // 清除当前提示卡
-            // overlay.innerHTML = '';
+            overlay.innerHTML = '';
 
-//             // if (stepIdx >= tourSteps.length) {
+            if (stepIdx >= tourSteps.length) {
                 // 教学完成
-                // overlay.remove();
+                overlay.remove();
                 // [BUGFIX] 恢复 panel 的 overflow 属性（教学期间临时设为 hidden 防止 box-shadow 溢出）
-                // panel.style.overflow = _prevOverflow;
-                // if (this.saveData) this.saveData.runeLauncherTourDone = true;
-                // this.sys_saveData(); // [BUGFIX] 原为 this.saveGame()，该方法不存在，导致存档从未持久化，教学每次都重复触发
-                // return;
-            // }
+                panel.style.overflow = _prevOverflow;
+                if (this.saveData) this.saveData.runeLauncherTourDone = true;
+                this.sys_saveData(); // [BUGFIX] 原为 this.saveGame()，该方法不存在，导致存档从未持久化，教学每次都重复触发
+                return;
+            }
 
-//             // const step = tourSteps[stepIdx];
-            // const targetEl = document.getElementById(step.targetId);
-            // if (!targetEl) {
+            const step = tourSteps[stepIdx];
+            const targetEl = document.getElementById(step.targetId);
+            if (!targetEl) {
                 // 目标元素不存在，跳过
-                // showStep(stepIdx + 1);
-                // return;
-            // }
+                showStep(stepIdx + 1);
+                return;
+            }
 
-//             // 计算目标元素相对于 panel 的位置
-            // const panelRect = panel.getBoundingClientRect();
-            // const targetRect = targetEl.getBoundingClientRect();
-            // const relTop = targetRect.top - panelRect.top;
-            // const relLeft = targetRect.left - panelRect.left;
+            // 计算目标元素相对于 panel 的位置
+            const panelRect = panel.getBoundingClientRect();
+            const targetRect = targetEl.getBoundingClientRect();
+            const relTop = targetRect.top - panelRect.top;
+            const relLeft = targetRect.left - panelRect.left;
 
-//             // 创建高亮边框
-            // const highlight = document.createElement('div');
-            // highlight.style.cssText = [
-                // 'position: absolute;',
-                // `top: ${relTop - 4}px;`,
-                // `left: ${relLeft - 4}px;`,
-                // `width: ${targetRect.width + 8}px;`,
-                // `height: ${targetRect.height + 8}px;`,
-                // 'border: 2px solid rgba(245,158,11,0.8);',
-                // 'border-radius: 12px;',
-                // 'box-shadow: 0 0 0 2000px rgba(0,0,0,0.45);',
-                // 'pointer-events: none;',
-                // 'animation: tour-highlight-pulse 1.5s ease-in-out infinite;',
-            // ].join(' ');
-            // overlay.appendChild(highlight);
+            // 创建高亮边框
+            const highlight = document.createElement('div');
+            highlight.style.cssText = [
+                'position: absolute;',
+                `top: ${relTop - 4}px;`,
+                `left: ${relLeft - 4}px;`,
+                `width: ${targetRect.width + 8}px;`,
+                `height: ${targetRect.height + 8}px;`,
+                'border: 2px solid rgba(245,158,11,0.8);',
+                'border-radius: 12px;',
+                'box-shadow: 0 0 0 2000px rgba(0,0,0,0.45);',
+                'pointer-events: none;',
+                'animation: tour-highlight-pulse 1.5s ease-in-out infinite;',
+            ].join(' ');
+            overlay.appendChild(highlight);
 
-//             // 创建提示卡
-            // const card = document.createElement('div');
-            // card.style.cssText = [
-                // 'position: absolute;',
-                // 'pointer-events: auto;',
-                // 'background: linear-gradient(135deg, rgba(15,23,42,0.97), rgba(30,27,75,0.97));',
-                // 'border: 1px solid rgba(245,158,11,0.5);',
-                // 'border-radius: 14px;',
-                // 'padding: 12px 14px;',
-                // 'width: 220px;',
-                // 'box-shadow: 0 4px 20px rgba(0,0,0,0.6), 0 0 12px rgba(245,158,11,0.2);',
-                // 'z-index: 10;',
-            // ].join(' ');
+            // 创建提示卡
+            const card = document.createElement('div');
+            card.style.cssText = [
+                'position: absolute;',
+                'pointer-events: auto;',
+                'background: linear-gradient(135deg, rgba(15,23,42,0.97), rgba(30,27,75,0.97));',
+                'border: 1px solid rgba(245,158,11,0.5);',
+                'border-radius: 14px;',
+                'padding: 12px 14px;',
+                'width: 220px;',
+                'box-shadow: 0 4px 20px rgba(0,0,0,0.6), 0 0 12px rgba(245,158,11,0.2);',
+                'z-index: 10;',
+            ].join(' ');
 
-//             // 卡片定位
-            // const cardTop = step.position === 'bottom'
-                // ? relTop + targetRect.height + 12
-                // : relTop - 120;
-            // const cardLeft = Math.max(4, Math.min(relLeft, panelRect.width - 230));
-            // card.style.top = `${cardTop}px`;
-            // card.style.left = `${cardLeft}px`;
+            // 卡片定位
+            const cardTop = step.position === 'bottom'
+                ? relTop + targetRect.height + 12
+                : relTop - 120;
+            const cardLeft = Math.max(4, Math.min(relLeft, panelRect.width - 230));
+            card.style.top = `${cardTop}px`;
+            card.style.left = `${cardLeft}px`;
 
-//             // card.innerHTML = `
-                // <div class="text-xs font-bold text-amber-300 mb-1">${step.title}</div>
-                // <div class="text-[11px] text-slate-300 leading-relaxed mb-3">${step.desc}</div>
-                // <div class="flex items-center justify-between">
-                    // <span class="text-[10px] text-slate-500">${stepIdx + 1} / ${tourSteps.length}</span>
-                    // <div class="flex gap-2">
-                        // ${stepIdx > 0 ? `<button id="tour-skip-btn" style="font-size:10px;color:#94a3b8;background:none;border:none;cursor:pointer;">跳过</button>` : ''}
-                        // <button id="tour-next-btn" style="font-size:11px;font-weight:bold;color:#fef3c7;background:rgba(120,53,15,0.8);border:1px solid rgba(245,158,11,0.5);border-radius:8px;padding:4px 10px;cursor:pointer;">${stepIdx < tourSteps.length - 1 ? '下一步 →' : '知道了 ✓'}</button>
-                    // </div>
-                // </div>
-            // `;
-            // overlay.appendChild(card);
+            card.innerHTML = `
+                <div class="text-xs font-bold text-amber-300 mb-1">${step.title}</div>
+                <div class="text-[11px] text-slate-300 leading-relaxed mb-3">${step.desc}</div>
+                <div class="flex items-center justify-between">
+                    <span class="text-[10px] text-slate-500">${stepIdx + 1} / ${tourSteps.length}</span>
+                    <div class="flex gap-2">
+                        ${stepIdx > 0 ? `<button id="tour-skip-btn" style="font-size:10px;color:#94a3b8;background:none;border:none;cursor:pointer;">跳过</button>` : ''}
+                        <button id="tour-next-btn" style="font-size:11px;font-weight:bold;color:#fef3c7;background:rgba(120,53,15,0.8);border:1px solid rgba(245,158,11,0.5);border-radius:8px;padding:4px 10px;cursor:pointer;">${stepIdx < tourSteps.length - 1 ? '下一步 →' : '知道了 ✓'}</button>
+                    </div>
+                </div>
+            `;
+            overlay.appendChild(card);
 
-//             // 事件绑定
-            // const nextBtn = document.getElementById('tour-next-btn');
-            // if (nextBtn) nextBtn.addEventListener('click', () => showStep(stepIdx + 1));
+            // 事件绑定
+            const nextBtn = document.getElementById('tour-next-btn');
+            if (nextBtn) nextBtn.addEventListener('click', () => showStep(stepIdx + 1));
 
-//             // const skipBtn = document.getElementById('tour-skip-btn');
-            // if (skipBtn) skipBtn.addEventListener('click', () => showStep(tourSteps.length));
-        // };
+            const skipBtn = document.getElementById('tour-skip-btn');
+            if (skipBtn) skipBtn.addEventListener('click', () => showStep(tourSteps.length));
+        };
 
-//         // 注入动画 CSS
-        // if (!document.getElementById('rune-tour-style')) {
-            // const style = document.createElement('style');
-            // style.id = 'rune-tour-style';
-            // style.textContent = `
-                // @keyframes tour-highlight-pulse {
-                    // 0%, 100% { box-shadow: 0 0 0 2000px rgba(0,0,0,0.45), 0 0 8px rgba(245,158,11,0.4); }
-                    // 50%       { box-shadow: 0 0 0 2000px rgba(0,0,0,0.55), 0 0 16px rgba(245,158,11,0.8); }
-                // }
-            // `;
-            // document.head.appendChild(style);
-        // }
+        // 注入动画 CSS
+        if (!document.getElementById('rune-tour-style')) {
+            const style = document.createElement('style');
+            style.id = 'rune-tour-style';
+            style.textContent = `
+                @keyframes tour-highlight-pulse {
+                    0%, 100% { box-shadow: 0 0 0 2000px rgba(0,0,0,0.45), 0 0 8px rgba(245,158,11,0.4); }
+                    50%       { box-shadow: 0 0 0 2000px rgba(0,0,0,0.55), 0 0 16px rgba(245,158,11,0.8); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
 
-//         // showStep(0);
-    // },
+        showStep(0);
+    },
+
+
+};
+
+// 暴露到全局，供向后兼容
 
 
 };
