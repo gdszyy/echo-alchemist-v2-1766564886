@@ -1,6 +1,6 @@
 # UI 系统规范文档
 
-> 最后更新：2026-04-13（局内存档与继续游戏功能）
+> 最后更新：2026-04-16（PC 横屏三栏响应式布局实施）
 
 ## 1. 模块架构概述
 
@@ -89,6 +89,7 @@ for (const subsystem of _subsystems) {
 | 2026-04-15 | `src/systems.js` | `spawn_system.js` 导入 `TRUTH_BOOK_DATA` 时报错 `Uncaught SyntaxError: The requested module './systems.js' does not provide an export named 'TRUTH_BOOK_DATA'`，原因是 `systems.js` 定义了该常量但未导出。 | 在 `src/systems.js` 的末尾 `export` 语句中添加了 `TRUTH_BOOK_DATA`。 |
 | 2026-04-15 | `src/ui/shop.js` | 炼金工房（局外商店）所有商品描述显示为 `undefined`：`ui_renderShop` 中读取 `upgrade.description`，但 `META_SHOP_CONFIG.upgrades` 中的字段名为 `desc`，导致字段名不匹配。 | 将 `shop.js` 第 374 行的 `upgrade.description` 改为 `upgrade.desc`。 |
 | 2026-04-16 | `src/ui_system.js` + `src/game_system.js` | 符文发射器打开后立即消失：**真正根因是 canvas 输入穿透**——符文发射器面板层叠在 canvas 上方（z-index:300），但 canvas 的 `mousedown`/`touchstart` 监听器是直接绑定在 DOM 上的，不受 z-index 限制。玩家点击发射器面板时事件穿透到 canvas，导致 gathering 阶段弹珠被自动发射，所有弹珠打完后自动进入战斗阶段，`phase_switchPhase('combat')` 调用 `ui_updateUI()` 将发射器面板强制隐藏；同时 `.ui-overlay` 的 `transition: opacity 0.3s` 导致面板在 0.3s 内淡出消失而非立即关闭。 | 两处修复：① `ui_updateUI` 全局隐藏循环中加入保护（发射器打开时跳过隐藏）；② `input_handleInputStart/Move/End` 开头加入发射器打开时的全局屏蔽，防止 canvas 事件穿透。 |
+| 2026-04-16 | `index.html`, `src/game_system.js`, `src/ui_system.js`, `src/ui/rune_launcher.js` | PC 横屏模式下游戏区域宽度占满全屏且无侧边栏，底部抽屉和符文发射器不能同时展示。 | 1. `index.html` 新增 `#app-wrapper`（flex 三栏容器）、`#pc-left-sidebar`、`#pc-right-sidebar` 结构和对应 CSS；2. `#game-container` 改为固定宽高比 `min(calc(100dvh*9/16), 480px)` 宽度；3. `sys_resize()` 移除强制覆盖宽度的代码，`defeatLineY` 在 PC 模式下缩小安全边距；4. `ui_system.js` 新增 `ui_updatePCLayout()`、`_ui_migrateRuneLauncherToSidebar()`、`_ui_migrateHUDToLeftSidebar()` 三个方法；5. `rune_launcher.js` 的 `ui_openRuneLauncher`/`ui_closeRuneLauncher` 在 PC 模式下不修改 display；6. `core.js` 的 resize 监听器和构造函数中调用 `ui_updatePCLayout()`。 |
 
 ## 6. 修改规范
 
@@ -140,6 +141,9 @@ for (const subsystem of _subsystems) {
 | `ui_closePause()` | 关闭暂停页面，恢复游戏运行 |
 | `ui_syncPauseSettings()` | 同步暂停页面中各设置项的开关状态（音效、伤害数字、CRT） |
 | `ui_renderPauseRelics()` | 渲染暂停页面中的遗物列表，展示当前遗物及其效果、稀有度、叠层数 |
+| `ui_updatePCLayout()` | 检测视口宽高并切换 PC 三栏布局（横屏且单侧剩余 ≥ 240px 时激活），在 resize 和初始化时调用 |
+| `_ui_migrateRuneLauncherToSidebar(toSidebar)` | 将 `#phase-rune-launcher` 在 `game-container` 和 `pc-right-sidebar` 之间迁移，PC 模式下移除 `.ui-overlay` 类 |
+| `_ui_migrateHUDToLeftSidebar(toSidebar)` | 将 `#gathering-queue` 和 `#gathering-hud-mount` DOM 节点在底部面板和 `pc-left-sidebar` 之间迁移 |
 
 ### 6.2 src/ui/hud.js（HUD 渲染）
 

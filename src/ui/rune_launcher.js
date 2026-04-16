@@ -52,12 +52,19 @@ export const rune_launcher_system = {
      */
     ui_openRuneLauncher() {
         const panel = document.getElementById('phase-rune-launcher');
-        // [DEBUG-LOG] 记录打开时的状态
-        console.log('[ui_openRuneLauncher] 打开符文发射器，当前 phase=' + this.phase + '，面板当前状态=' + (panel ? panel.style.display : 'N/A'));
+        const isPCMode = document.body.classList.contains('pc-mode');
+        console.log('[ui_openRuneLauncher] 打开符文发射器，当前 phase=' + this.phase + '，PC模式=' + isPCMode);
+
         if (panel) {
-            panel.style.display = 'flex';
+            if (isPCMode) {
+                // PC 模式：面板已常驻在右侧边栏，不需要修改 display
+                // 仅刷新内容即可
+            } else {
+                // 移动端模式：弹出全屏覆盖层
+                panel.style.display = 'flex';
+            }
         }
-        // [BUGFIX] 确保 picker 蒙版在打开时是关闭状态（防止上次残留）
+        // [BUGFIX] 确保 picker 蒙层在打开时是关闭状态（防止上次残留）
         const pickerOverlay = document.getElementById('rune-picker-overlay');
         if (pickerOverlay) pickerOverlay.classList.add('hidden');
         // 初始化发射器内符文碎片计数显示
@@ -66,8 +73,8 @@ export const rune_launcher_system = {
         this.ui_updateRuneGrid();
         // 关闭气泡提示（玩家已进入发射器）
         this._ui_hideRunewordBubble();
-        // 首次打开时显示内部引导教学
-        if (this.saveData && !this.saveData.runeLauncherTourDone) {
+        // 首次打开时显示内部引导教学（移动端不影响 PC 端常驻）
+        if (!isPCMode && this.saveData && !this.saveData.runeLauncherTourDone) {
             setTimeout(() => this.ui_showRuneLauncherTour(), 400);
         }
     },
@@ -91,7 +98,7 @@ export const rune_launcher_system = {
     ui_closeRuneLauncher() {
         // [DEBUG-LOG] 记录关闭时的调用栈
         console.log('[ui_closeRuneLauncher] 关闭符文发射器，调用栈:', new Error().stack);
-        // [BUGFIX] 关闭时先清理内部蒙版和教学层，防止残留
+        // [BUGFIX] 关闭时先清理内部蒙层和教学层，防止残留
         const pickerOverlay = document.getElementById('rune-picker-overlay');
         if (pickerOverlay) pickerOverlay.classList.add('hidden');
         const tourOverlay = document.getElementById('rune-launcher-tour-overlay');
@@ -100,7 +107,12 @@ export const rune_launcher_system = {
 
         const panel = document.getElementById('phase-rune-launcher');
         if (panel) {
-            panel.style.display = 'none';
+            const isPCMode = document.body.classList.contains('pc-mode');
+            if (!isPCMode) {
+                // 移动端模式：隐藏全屏覆盖层
+                panel.style.display = 'none';
+            }
+            // PC 模式：面板常驻在右侧边栏，不隐藏
         }
     },
 

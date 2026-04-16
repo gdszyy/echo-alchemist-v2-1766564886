@@ -165,15 +165,18 @@ export const game_system = {
     sys_resize() {
         const container = document.getElementById('game-container');
 
-        // 强制 JS 同步窗口高度，解决部分安卓浏览器兼容问题
+        // [PC 布局修改] 不再强制覆盖宽度，让 CSS min() 公式控制游戏区域宽度
+        // 仅在移动端（竖屏/无侧边栏）时同步高度，避免安卓浏览器兼容问题
         container.style.height = `${window.innerHeight}px`;
-        container.style.width = `${window.innerWidth}px`;
+        // 注意：不再设置 container.style.width，由 CSS 的 min(calc(100dvh*9/16),480px) 控制
 
         this.width = this.canvas.width = container.clientWidth;
         this.height = this.canvas.height = container.clientHeight;
 
         // 动态调整失败判定线
-        this.defeatLineY = this.height - 120;
+        // PC 模式下底部面板隐藏，可以缩小安全边距
+        const isPCMode = document.body.classList.contains('pc-mode');
+        this.defeatLineY = this.height - (isPCMode ? 20 : 120);
 
         this.enemyWidth = (this.width / CONFIG.gameplay.enemyCols);
         this.enemyHeight = this.enemyWidth;

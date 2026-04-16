@@ -240,9 +240,10 @@ ui_closeTruthBook() {
         // 1. 基础：隐藏所有阶段的主容器 (.ui-overlay)
         // [BUGFIX] 符文发射器是浮层覆盖层（不绑定任何 phase），若当前正在显示则跳过隐藏，
         //          防止每帧 ui_updateUI 调用将其强制关闭。
+        // [PC 布局] PC 模式下符文发射器已迁移到右侧边栏并移除了 .ui-overlay 类，不会被这里隐藏。
         const runeLauncherEl = document.getElementById('phase-rune-launcher');
         document.querySelectorAll('.ui-overlay').forEach(el => {
-            if (el === runeLauncherEl && launcherVisible) return; // 保护：发射器打开时不隐藏
+            if (el === runeLauncherEl && launcherVisible) return; // 保护：发射器打开时不隐藏（移动端模式）
             el.style.display = 'none'; 
             el.classList.add('hidden-phase'); 
             el.classList.remove('active-phase'); 
@@ -267,13 +268,15 @@ ui_closeTruthBook() {
             if (this.phase === 'meta') this.meta_updateContinueButton();
         }
 
-        // 1. 底部面板 (.bottom-panel) 只在收集阶段 (gathering) 显示
+        // 1. 底部面板 (.bottom-panel) 只在收集阶段 (gathering) 且非 PC 模式下显示
+        // PC 模式下收集队列和配方 HUD 已迁移到左侧边栏，底部面板始终隐藏
         const bottomPanel = document.querySelector('.bottom-panel');
         if (bottomPanel) {
-            if (this.phase === 'gathering') {  // [Mixin 正常用法：读取 Game 实例状态]
+            const isPCMode = document.body.classList.contains('pc-mode');
+            if (this.phase === 'gathering' && !isPCMode) {  // [Mixin 正常用法：读取 Game 实例状态]
                 bottomPanel.style.display = 'flex';
             } else {
-                bottomPanel.style.display = 'none'; // 战斗阶段隐藏底部面板
+                bottomPanel.style.display = 'none'; // 战斗阶段或 PC 模式隐藏底部面板
             }
         }
 
@@ -334,6 +337,109 @@ ui_closeTruthBook() {
         const runeChargeUi = document.getElementById('combat-rune-charge-ui');
         if (runeChargeUi) {
             runeChargeUi.style.display = (this.phase === 'combat') ? 'flex' : 'none';  // [Mixin 正常用法：读取 Game 实例状态]
+        }
+    },
+
+    /**
+     * @method ui_updatePCLayout
+     * @description 检测当前视口是否为 PC 横屏模式，并切换三栏布局。
+     * PC 模式条件：宽度 > 高度（横屏）且两侧剩余空间各 >= 240px。
+     * 在 resize 事件和初始化时调用。
+     */
+    ui_updatePCLayout() {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const isLandscape = vw > vh;
+
+        // 游戏区域宽度：CSS 中 min(calc(100dvh * 9/16), 480px)
+        const gameW = Math.min(Math.round(vh * 9 / 16), 480);
+        const remainW = vw - gameW; // 两侧总剩余宽度
+        const sideW = remainW / 2;  // 单侧可用宽度
+
+        // PC 模式阈值：横屏 + 单侧 >= 240px（能容纳左右侧边栏）
+        const shouldBePC = isLandscape && sideW >= 240;
+
+        const body = document.body;
+        const leftSidebar = document.getElementById('pc-left-sidebar');
+        const rightSidebar = document.getElementById('pc-right-sidebar');
+
+        const wasPC = body.classList.contains('pc-mode');
+
+        if (shouldBePC) {
+            body.classList.add('pc-mode');
+            if (leftSidebar) leftSidebar.style.display = 'flex';
+            if (rightSidebar) rightSidebar.style.display = 'flex';
+            // 将符文发射器面板迁移到右侧边栏（如果尚未迁移）
+            this._ui_migrateRuneLauncherToSidebar(true);
+            // 将收集队列和配方 HUD 迁移到左侧边栏
+            if (!wasPC) this._ui_migrateHUDToLeftSidebar(true);
+        } else {
+            body.classList.remove('pc-mode');
+            if (leftSidebar) leftSidebar.style.display = 'none';
+            if (rightSidebar) rightSidebar.style.display = 'none';
+            // 将符文发射器面板迁移回 game-container（如果已在侧边栏）
+            this._ui_migrateRuneLauncherToSidebar(false);
+            // 将收集队列和配方 HUD 迁移回底部面板
+            if (wasPC) this._ui_migrateHUDToLeftSidebar(false);
+        }
+    },
+
+    /**
+     * @method _ui_migrateHUDToLeftSidebar
+     * @description 将 #gathering-queue 和 #gathering-hud-mount 在底部面板和 PC 左侧边栏之间迁移。
+     * 迁移的是 DOM 节点本身，所有 JS 渲染逻辑不需修改。
+     * @param {boolean} toSidebar - true: 迁移到左侧边栏; false: 迁移回底部面板
+     */
+    _ui_migrateHUDToLeftSidebar(toSidebar) {
+        const queueEl = document.getElementById('gathering-queue');
+        const hudEl = document.getElementById('gathering-hud-mount');
+        const leftQueueMount = document.getElementById('pc-left-queue-mount');
+        const leftRecipeMount = document.getElementById('pc-left-recipe-mount');
+        const bottomPanel = document.querySelector('.bottom-panel');
+        if (!queueEl || !hudEl || !leftQueueMount || !leftRecipeMount || !bottomPanel) return;
+
+        const isInSidebar = leftQueueMount.contains(queueEl);
+
+        if (toSidebar && !isInSidebar) {
+            // 迁移到左侧边栏
+            leftQueueMount.appendChild(queueEl);
+            leftRecipeMount.appendChild(hudEl);
+        } else if (!toSidebar && isInSidebar) {
+            // 迁移回底部面板的原始容器
+            const queueContainer = bottomPanel.querySelector('.queue-container') || bottomPanel.firstElementChild;
+            const hudWrapper = bottomPanel.querySelector('.flex-1.min-w-0.h-full') || bottomPanel.lastElementChild;
+            if (queueContainer) queueContainer.appendChild(queueEl);
+            else bottomPanel.insertBefore(queueEl, bottomPanel.firstChild);
+            if (hudWrapper) hudWrapper.appendChild(hudEl);
+            else bottomPanel.appendChild(hudEl);
+        }
+    },
+
+    /**
+     * @method _ui_migrateRuneLauncherToSidebar
+     * @description 将 #phase-rune-launcher 在 game-container 和 pc-right-sidebar 之间迁移。
+     * @param {boolean} toSidebar - true: 迁移到右侧边栏; false: 迁移回 game-container
+     */
+    _ui_migrateRuneLauncherToSidebar(toSidebar) {
+        const launcherEl = document.getElementById('phase-rune-launcher');
+        const rightMount = document.getElementById('pc-right-rune-mount');
+        const gameContainer = document.getElementById('game-container');
+        if (!launcherEl || !rightMount || !gameContainer) return;
+
+        const isInSidebar = rightMount.contains(launcherEl);
+
+        if (toSidebar && !isInSidebar) {
+            // 迁移到右侧边栏
+            rightMount.appendChild(launcherEl);
+            // PC 模式下符文发射器始终可见，不受 ui_updateUI 的 .ui-overlay 隐藏逻辑影响
+            launcherEl.classList.remove('ui-overlay');
+            launcherEl.dataset.pcMigrated = 'true';
+        } else if (!toSidebar && isInSidebar) {
+            // 迁移回 game-container
+            gameContainer.appendChild(launcherEl);
+            launcherEl.classList.add('ui-overlay');
+            launcherEl.style.display = 'none';
+            delete launcherEl.dataset.pcMigrated;
         }
     },
 

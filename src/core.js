@@ -264,9 +264,12 @@ class Game {
         });
         
         window.addEventListener('resize', () => { 
+            this.ui_updatePCLayout();
             this.sys_resize(); 
             if (this.phase === 'gathering') this.phase_gathering_initPachinko(); 
         });
+        // 初始化时立即执行一次 PC 布局检测
+        this.ui_updatePCLayout();
         this.ui = new UIManager();
         this.truthBook = new TruthBook(this);
         this.trainingGround = new TrainingGround(this);
