@@ -993,6 +993,40 @@ phase_gathering_getRandomPegType() {
             }
         }
 
+        // 3. [补充行] 结算时存活敌人 ≤5，额外多生成一行，并给原空列的新敌人赋予极速词条
+        // 注意：此处仅在非 Boss 回合且存活敌人 ≤5 时触发（清屏时 activeEnemies.length === 0，不触发）
+        if (activeEnemies.length > 0 && activeEnemies.length <= 5) {
+            const totalCols = CONFIG.gameplay.enemyCols;
+            // 记录生成前已有敌人的列（用于对比找出原空列）
+            const colsWithEnemiesBefore = new Set(
+                activeEnemies.map(e => e._spawnColIndex).filter(c => c !== undefined)
+            );
+            // 额外生成一行（生成在战斗网格顶部）
+            this.spawn_spawnEnemyRow(1);
+            // 找出原本没有敌人的列（生成前的空列）
+            const emptyCols = [];
+            for (let c = 0; c < totalCols; c++) {
+                if (!colsWithEnemiesBefore.has(c)) {
+                    emptyCols.push(c);
+                }
+            }
+            // 给新生成的、位于原空列的敌人赋予极速词条
+            if (emptyCols.length > 0) {
+                const newEnemies = this.enemies.filter(e => e.active && !activeEnemies.includes(e));
+                let hasteCount = 0;
+                newEnemies.forEach(e => {
+                    if (emptyCols.includes(e._spawnColIndex) && !e.affixes.includes('haste')) {
+                        e.affixes.push('haste');
+                        hasteCount++;
+                        this.spawn_createParticle(e.pos.x, e.pos.y, '#facc15', 'spark');
+                    }
+                });
+                if (hasteCount > 0) {
+                    showToast("⚡ 增援部隊！空列敵人獲得極速！");
+                }
+            }
+        }
+
         // --- [符文领取] 充能符文和掉落符文的领取已提前到敌人动作后（phase_claimPendingRunes）执行
         // 仅将库存同步到存档（符文已在 phase_claimPendingRunes 中入库）
         this.saveData.runeInventory = (this.runeInventory || []).slice();
