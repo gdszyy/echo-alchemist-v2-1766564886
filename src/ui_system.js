@@ -234,19 +234,15 @@ ui_closeTruthBook() {
             console.log('[ui_updateUI] phase=' + this.phase);
         }
 
-        // [BUGFIX] 如果符文发射器面板当前正在显示，先清理其内部蒙版，
-        // 防止 ui_updateUI 全局隐藏面板后，内部的 rune-picker-overlay 残留。
-        if (launcherVisible) {
-            // 关闭符文选择器蒙版
-            const pickerOverlay = document.getElementById('rune-picker-overlay');
-            if (pickerOverlay) pickerOverlay.classList.add('hidden');
-            // 关闭教学层
-            const tourOverlay = document.getElementById('rune-launcher-tour-overlay');
-            if (tourOverlay) tourOverlay.remove();
-        }
+        // [BUGFIX] 符文发射器打开期间 ui_updateUI 被调用时，不再强制清理内部蒙版；
+        // 发射器面板将被保留，内部状态由发射器自身管理。
 
         // 1. 基础：隐藏所有阶段的主容器 (.ui-overlay)
-        document.querySelectorAll('.ui-overlay').forEach(el => { 
+        // [BUGFIX] 符文发射器是浮层覆盖层（不绑定任何 phase），若当前正在显示则跳过隐藏，
+        //          防止每帧 ui_updateUI 调用将其强制关闭。
+        const runeLauncherEl = document.getElementById('phase-rune-launcher');
+        document.querySelectorAll('.ui-overlay').forEach(el => {
+            if (el === runeLauncherEl && launcherVisible) return; // 保护：发射器打开时不隐藏
             el.style.display = 'none'; 
             el.classList.add('hidden-phase'); 
             el.classList.remove('active-phase'); 
