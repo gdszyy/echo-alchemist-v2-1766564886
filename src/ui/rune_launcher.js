@@ -1490,7 +1490,8 @@ export const rune_launcher_system = {
             'z-index: 500;',
             'pointer-events: none;',
         ].join(' ');
-        panel.style.position = 'relative';
+        // [BUGFIX] panel 保持 position:absolute（来自 .ui-overlay），不需要改为 relative
+        // position:absolute 本身即可作为 containing block，改为 relative 会导致 panel 回到文档流被 canvas 遮挡
         // [BUGFIX] 防止 highlight 的超大 box-shadow (2000px) 溢出 panel 边界，在屏幕外形成常驻黑色蒙版
         const _prevOverflow = panel.style.overflow;
         panel.style.overflow = 'hidden';

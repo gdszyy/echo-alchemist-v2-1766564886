@@ -479,6 +479,7 @@
             padding-top: max(70px, env(safe-area-inset-top)); 
             padding-bottom: env(safe-area-inset-bottom);
             transition: opacity 0.3s;
+            z-index: 1; /* [BUGFIX] 确保所有面板在 canvas（position:static）上方；各面板通过 inline style 的 z-index 进一步区分层级 */
         }
 
         /* ===== 统一顶部信息栏 ===== */
