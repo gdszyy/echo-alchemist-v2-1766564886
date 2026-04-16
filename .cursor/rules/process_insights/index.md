@@ -14,7 +14,7 @@
 
 | ID | 标题 | 版本 | 关联模块 | 最后更新 | 文档链接 |
 |----|------|------|---------|---------|---------|
-| PI-001 | 核心 Bug 修复流程与高频陷阱 | v1.0 | game_phase, ui_system, game_system | 2026-04-16 | [PI-001_critical_bugfix_flow.md](PI-001_critical_bugfix_flow.md) |
+| PI-001 | 核心 Bug 修复流程与高频陷阱 | v1.1 | game_phase, ui_system, game_system | 2026-04-16 | [PI-001_critical_bugfix_flow.md](PI-001_critical_bugfix_flow.md) |
 | PI-002 | 符文词条 Hook 注入流程 | v1.0 | rune_system, combat_system, ui_system, rune_launcher | 2026-04-16 | [PI-002_runeword_hook_injection.md](PI-002_runeword_hook_injection.md) |
 | PI-003 | 子系统扩展与组合模式注入流程 | v1.0 | core, game_system, combat_system, ui_system | 2026-04-16 | [PI-003_subsystem_composition_pattern.md](PI-003_subsystem_composition_pattern.md) |
 | PI-004 | 性能预算扩展与新特效接入流程 | v1.0 | performance, spawn_system, combat_system, entities | 2026-04-16 | [PI-004_performance_budget_extension.md](PI-004_performance_budget_extension.md) |

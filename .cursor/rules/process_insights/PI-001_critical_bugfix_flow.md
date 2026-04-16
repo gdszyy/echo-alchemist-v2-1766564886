@@ -1,6 +1,6 @@
 ---
 id: "PI-001"
-version: "v1.0"
+version: "v1.1"
 last_updated: "2026-04-16"
 author: "tsk-b1def027-9d1"
 related_modules: ["game_phase", "ui_system", "game_system"]
@@ -73,6 +73,18 @@ status: "active"
 
 **关键位置**：`src/game_system.js` → `sys_resetGame` 约第 253 行
 
+### 坑 6: `phase_handleInputStart` 研磨阶段点击区域阈值过小
+
+**现象**：研磨阶段点击钉盘中下部区域时，没有弹珠发射出来。
+
+**根因**：`phase_handleInputStart` 中的点击区域判断为 `pos.y < this.height * 0.4`，仅覆盖屏幕上方 40%。钉盘分布在屏幕 20%~70% 高度，点击钉盘中下部区域时 `pos.y >= this.height * 0.4`，被错误路由到"倾斜模式"（`isTiltingGrip = true`）而非发射弹珠。
+
+**正确做法**：将阈值改为 `pos.y < this.height * 0.85`，覆盖屏幕上方 85% 的区域。底部手柄区域已在 `game_system.js` 的 `input_handleInputStart` 中提前拦截，无需在 `phase_handleInputStart` 中重复判断。
+
+**关键位置**：`src/game_phase.js` → `phase_handleInputStart` 第 723 行（修复后）
+
+---
+
 ## 关键耦合点
 
 - `phase_advanceWave` 和 `phase_finalizeRound` 共同维护 `this.round`，修改任一函数时必须检查另一个。
@@ -84,3 +96,4 @@ status: "active"
 | 版本 | 日期 | 变更内容 | 作者 |
 |------|------|---------|------|
 | v1.0 | 2026-04-16 | 初始记录，整合 tsk-b1def027-9d1 的 5 个致命 Bug 修复经验 | repo-indexer |
+| v1.1 | 2026-04-16 | 新增坑 6：研磨阶段点击区域阈值过小（`phase_handleInputStart` `pos.y < height * 0.4` 导致弹珠无法发射） | echo-developer |

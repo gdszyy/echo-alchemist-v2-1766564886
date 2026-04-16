@@ -717,7 +717,10 @@ phase_gathering_getRandomPegType() {
             }
             
             // ---  判断点击区域 ---
-            if (pos.y < this.height * 0.4) {
+            // [BUGFIX] 将阈值从 0.4 提升至 0.85，使玩家点击钉盘绝大部分区域都能触发发射。
+            // 原阈值 0.4 仅覆盖屏幕上方 40%，导致点击钉盘中下部区域时被错误路由到倾斜模式。
+            // 底部手柄区域（height - 40 ± 40px）已在 input_handleInputStart 中提前拦截，无需在此重复判断。
+            if (pos.y < this.height * 0.85) {
                 // 上方区域：发射弹珠
                 if (this.activeMarbleIndex >= this.marbleQueue.length) return;
                 const marbleDef = this.marbleQueue[this.activeMarbleIndex];
