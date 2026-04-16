@@ -78,6 +78,12 @@ class Enemy {
 
         // 视觉种子
         this.visualSeed = Math.random(); 
+
+        // === E1: 静态倾斜角度（一次性预计算，不在 update/draw 中重算）===
+        // 普通敌人：最大 ±2.5°（弧度约 ±0.044），elite ±1.5°，boss 不倾斜
+        this._staticTilt = (this.visualSeed - 0.5) * CONFIG.enemyRender.staticTiltMax;
+        if (this.type === 'boss') this._staticTilt = 0;
+        else if (this.type === 'elite') this._staticTilt *= 0.6;
         
         this.hasActedThisTurn = false;
         this.actionPhase = 'idle'; // 'idle', 'telegraphing', 'acting'
@@ -238,6 +244,49 @@ class Enemy {
             glossGrad.addColorStop(1, `rgba(0,0,0,${CONFIG.enemyRender.glossBottomAlpha})`);
             oc.fillStyle = glossGrad;
             oc.fillRect(0, 0, w, h);
+        }
+
+        // === E2: 纹理色调随机偏移（Hue Shift Overlay）===
+        // 基于 visualSeed 叠加一层极淡的彩色覆盖，使每个敌人颜色略有不同
+        {
+            const hueAlpha = CONFIG.enemyRender.hueShiftAlphaMin + seed * CONFIG.enemyRender.hueShiftAlphaRange;
+            const hue = Math.floor(seed * 60) - 15; // -15° ~ +45° 色相偏移
+            if (hue >= 0) {
+                oc.fillStyle = `rgba(255, 180, 50, ${hueAlpha})`;
+            } else {
+                oc.fillStyle = `rgba(100, 150, 255, ${hueAlpha})`;
+            }
+            oc.globalCompositeOperation = 'overlay';
+            oc.fillRect(0, 0, w, h);
+            oc.globalCompositeOperation = 'source-over'; // 重置混合模式
+        }
+
+        // === E3: 边角随机磨损点（Corner Wear Dots）===
+        // 在四个角落附近放置 2~4 个极小的深色磨损点，模拟金属/石材的边角磨损
+        {
+            // seeded 伪随机函数，保证每次重建纹理结果一致
+            const seededRand = (s) => { let x = Math.sin(s * 9301 + 49297) * 233280; return x - Math.floor(x); };
+            const dotCount = CONFIG.enemyRender.wearDotCountMin + Math.floor(seed * (CONFIG.enemyRender.wearDotCountMax - CONFIG.enemyRender.wearDotCountMin + 1));
+            // 四个角落的基准坐标
+            const corners = [
+                [w * 0.15, h * 0.15],
+                [w * 0.85, h * 0.15],
+                [w * 0.15, h * 0.85],
+                [w * 0.85, h * 0.85]
+            ];
+            for (let i = 0; i < dotCount; i++) {
+                const cornerIdx = i % 4;
+                const [cx, cy] = corners[cornerIdx];
+                // 在角落附近随机偶动
+                const dx = (seededRand(seed * 10 + i * 3.7) - 0.5) * w * 0.15;
+                const dy = (seededRand(seed * 20 + i * 5.3) - 0.5) * h * 0.15;
+                const radius = 1.5 + seededRand(seed * 30 + i * 7.1) * 1.5; // 1.5 ~ 3px
+                const alpha = CONFIG.enemyRender.wearDotAlphaMin + seededRand(seed * 40 + i * 11.3) * (CONFIG.enemyRender.wearDotAlphaMax - CONFIG.enemyRender.wearDotAlphaMin);
+                oc.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+                oc.beginPath();
+                oc.arc(cx + dx, cy + dy, radius, 0, Math.PI * 2);
+                oc.fill();
+            }
         }
 
         this._textureCanvas = offscreen;
@@ -1160,6 +1209,9 @@ class Enemy {
             const shake = this.hitTimer * 0.5; 
             ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake); 
         }
+
+        // === E1: 静态倾斜（一次性预计算的 _staticTilt）===
+        if (this._staticTilt !== 0) ctx.rotate(this._staticTilt);
         
         const w = this.width - 4; 
         const h = this.height - 4; 

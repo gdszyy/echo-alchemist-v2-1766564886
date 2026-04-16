@@ -144,3 +144,45 @@
 *   **`entities/enemy.js`**：`draw()` 方法的 **Layer 1 裁剪** 和 **Layer 5 边框** 均已升级：当 `type` 为 `'normal'` 或 `'elite'` 且 `collisionShape === 'polygon'` 时，使用 `moveTo/lineTo/closePath` 多边形路径替代 `roundRect`/`strokeRect`。
 *   **碰撞检测**：`projectile.js` 的 `_handleCollision` 已有 `polygon` 分支（调用 `calc_getCirclePolygonCollision`），无需修改。
 *   **顶点坐标约定**：均为相对中心点 `(0,0)` 的偏移量，由 `Enemy.getAbsoluteVertices()` 转换为绝对坐标供碰撞检测使用。
+
+## 9. 随机微差异细节 (Task E: Random Micro-Variation Details)
+
+根据 Task tsk-c4db9f72-873，`enemy.js` 新增三项基于 `visualSeed` 的静态微差异细节，使同类型敌人之间产生个体辨识度，避免「复制粘贴感」。所有计算均在构造时一次性完成，不影响每帧性能。
+
+### E1. 初始化随机静态倾斜（Static Tilt）
+
+*   **字段**：`this._staticTilt`（在 `constructor` 中 `this.visualSeed` 赋值之后一次性计算）
+*   **逻辑**：`(this.visualSeed - 0.5) * CONFIG.enemyRender.staticTiltMax`
+    *   `boss` 类型：强制为 `0`（不倾斜）
+    *   `elite` 类型：乘以 `0.6`（最大 ±1.5°）
+    *   `normal` 类型：最大 ±2.5°（弧度约 ±0.044）
+*   **渲染**：在 `draw()` 方法的震动 `ctx.translate` 之后、Layer 1 容器裁剪之前插入 `if (this._staticTilt !== 0) ctx.rotate(this._staticTilt);`
+*   **配置**：`CONFIG.enemyRender.staticTiltMax = 0.044`
+
+### E2. 纹理色调随机偏移（Hue Shift Overlay）
+
+*   **位置**：`_initTexture()` 的 A1 光泽渐变之后追加
+*   **逻辑**：基于 `visualSeed` 叠加一层极淡的彩色 `overlay` 覆盖
+    *   `hueAlpha = hueShiftAlphaMin + seed * hueShiftAlphaRange`（0.04 ~ 0.08）
+    *   `hue = Math.floor(seed * 60) - 15`（-15° ~ +45°）
+    *   `hue >= 0`：暖色调 `rgba(255, 180, 50, hueAlpha)`；`hue < 0`：冷色调 `rgba(100, 150, 255, hueAlpha)`
+    *   使用 `globalCompositeOperation = 'overlay'`，完成后重置为 `'source-over'`
+*   **配置**：`CONFIG.enemyRender.hueShiftAlphaMin = 0.04`，`hueShiftAlphaRange = 0.04`
+
+### E3. 边角随机磨损点（Corner Wear Dots）
+
+*   **位置**：`_initTexture()` 的 E2 之后追加
+*   **逻辑**：在四个角落附近放置 2~4 个极小的深色磨损点
+    *   数量：`wearDotCountMin + Math.floor(seed * (wearDotCountMax - wearDotCountMin + 1))`（2~4 个）
+    *   角落基准坐标：`[w*0.15, h*0.15]`、`[w*0.85, h*0.15]`、`[w*0.15, h*0.85]`、`[w*0.85, h*0.85]`
+    *   每个点在角落附近随机偏移 `±w*0.15 / ±h*0.15`
+    *   半径：1.5 ~ 3px；颜色：`rgba(0, 0, 0, 0.25 ~ 0.45)`
+    *   使用 `seededRand(s)` 伪随机函数（`Math.sin` 哈希）保证纹理重建结果一致
+*   **配置**：`CONFIG.enemyRender.wearDotCountMin = 2`，`wearDotCountMax = 4`，`wearDotAlphaMin = 0.25`，`wearDotAlphaMax = 0.45`
+
+### 变更日志（Task E）
+
+| 日期 | 文件 | 变更说明 |
+| :--- | :--- | :--- |
+| 2026-04-16 | `src/entities/enemy.js` | **Task E**：constructor 新增 `_staticTilt` 一次性预计算；`_initTexture` 末尾追加 E2 色调偏移和 E3 磨损点；`draw()` 震动之后插入 E1 静态倾斜旋转 |
+| 2026-04-16 | `src/config.js` | **Task E**：`CONFIG.enemyRender` 新增 `staticTiltMax`、`hueShiftAlphaMin`、`hueShiftAlphaRange`、`wearDotCountMin`、`wearDotCountMax`、`wearDotAlphaMin`、`wearDotAlphaMax` 七个参数 |

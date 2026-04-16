@@ -765,7 +765,27 @@ const CONFIG = {
         // X 轴拉伸系数（宽度放大倍率）
         hitImpactScaleX: 0.5,
         // Y 轴压缩系数（高度缩小倍率）
-        hitImpactScaleY: 0.5
+        hitImpactScaleY: 0.5,
+
+        // E1: 随机静态倾斜（Static Tilt）
+        // 最大静态倾斜弧度（约 ±2.5°），普通敌人使用，elite 乘 0.6，boss 为 0
+        staticTiltMax: 0.044,
+
+        // E2: 纹理色调随机偏移（Hue Shift Overlay）
+        // 色调偏移最小透明度
+        hueShiftAlphaMin: 0.04,
+        // 色调偏移透明度随机范围
+        hueShiftAlphaRange: 0.04,
+
+        // E3: 边角随机磨损点（Corner Wear Dots）
+        // 磨损点最少数量
+        wearDotCountMin: 2,
+        // 磨损点最多数量
+        wearDotCountMax: 4,
+        // 磨损点最小透明度
+        wearDotAlphaMin: 0.25,
+        // 磨损点最大透明度
+        wearDotAlphaMax: 0.45
     },
 
     // ==================== 自适应性能配置 (Adaptive Performance) ====================
