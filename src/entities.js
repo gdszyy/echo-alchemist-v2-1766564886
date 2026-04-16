@@ -2042,6 +2042,8 @@ class DropBall {
             // 3. 原有的普通同化逻辑 (Fallback)
             else if (peg.type === 'normal' && ballType) {
                 // 这里保留原有的逻辑：普通弹珠同化普通钉子
+                // [设计约束] 激光弹珠不能将普通钉子同化为激光钉子，激光属性仅能由弹珠本身或符文提供。
+                if (ballType === 'laser') return;
                 let assimilationChance = CONFIG.gameplay.assimilationChance[ballType] || 0;
                 // [新增] 同化涌潮遗物加成：仅对该弹珠类型生效
                 if (game.assimilationBoostRounds && game.assimilationBoostRounds[ballType] > 0) {
@@ -2748,6 +2750,12 @@ class DropBall {
                                 if (alreadyInCurrent || alreadyInQueue) {
                                     finalType = originalBaseType;
                                 }
+                            }
+
+                            // [设计约束] 激光属性仅能通过弹珠本身或符文提供，不能由钉子给予。
+                            // 即使场上存在激光钉子（如通过历史存档或其他途径产生），碰撞也不会给弹珠提供激光属性。
+                            if (finalType === 'laser') {
+                                return null;
                             }
 
                             // [修复] 确保 finalType 在 attributeDisplay 中有定义，否则不加入收集列表
