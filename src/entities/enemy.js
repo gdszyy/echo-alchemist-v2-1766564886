@@ -1130,6 +1130,11 @@ class Enemy {
             game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, 'ROTATION!', '#a855f7');
             game.spawn_createShockwave(this.pos.x, this.pos.y, '#a855f7');
 
+            // 狂暴词缀轮转时，触发全屏白色闪光计时器（_berserkedRotation 已开启）
+            if (this._berserkedRotation) {
+                this._rotationFlashTimer = 8; // 8 帧内快速衰减到 0
+            }
+
             // 通过 EventBus 广播轮转事件
             eventBus.emit('boss:rotation', {
                 boss: this,
@@ -2418,15 +2423,33 @@ class Enemy {
                 ctx.arc(0, 0, devRadius * 1.4, 0, Math.PI * 2);
                 ctx.fill();
 
-                // 内层深渊核心
-                const voidGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, devRadius * 0.5);
+                // 内层深渊核心（高频微震颤）
+                const shakeAmp = CONFIG.enemyRender.devourerCoreShakeAmplitude || 2;
+                const shakePhase = devTime * 15;
+                const shakeX = Math.sin(shakePhase * 1.7 + 0.3) * shakeAmp * (Math.random() * 0.5 + 0.5);
+                const shakeY = Math.cos(shakePhase * 2.1 + 1.1) * shakeAmp * (Math.random() * 0.5 + 0.5);
+                const voidGrad = ctx.createRadialGradient(shakeX, shakeY, 0, shakeX, shakeY, devRadius * 0.5);
                 voidGrad.addColorStop(0, 'rgba(0, 0, 0, 1)');
                 voidGrad.addColorStop(0.5, 'rgba(20, 0, 40, 0.9)');
                 voidGrad.addColorStop(1, 'rgba(75, 0, 130, 0)');
                 ctx.fillStyle = voidGrad;
                 ctx.beginPath();
-                ctx.arc(0, 0, devRadius * 0.5, 0, Math.PI * 2);
+                ctx.arc(shakeX, shakeY, devRadius * 0.5, 0, Math.PI * 2);
                 ctx.fill();
+                // 震颤时内圈向纯白过渡（lighter 模式叠加，模拟能量满溢白化）
+                const whiteIntensity = devourPulse * 0.35;
+                if (whiteIntensity > 0.05) {
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const whiteGrad = ctx.createRadialGradient(shakeX, shakeY, 0, shakeX, shakeY, devRadius * 0.35);
+                    whiteGrad.addColorStop(0, `rgba(255, 255, 255, ${whiteIntensity})`);
+                    whiteGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.fillStyle = whiteGrad;
+                    ctx.beginPath();
+                    ctx.arc(shakeX, shakeY, devRadius * 0.35, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
 
                 // 脉冲光环
                 ctx.strokeStyle = `rgba(180, 0, 255, ${0.6 + devourPulse * 0.4})`;
@@ -2437,39 +2460,43 @@ class Enemy {
                 ctx.arc(0, 0, devRadius * (0.9 + devourPulse * 0.1), 0, Math.PI * 2);
                 ctx.stroke();
 
-                // 旋转能量线
+                // 旋转能量线（靠近中心时过曝白化）
                 const lineCount = 6;
                 for (let li = 0; li < lineCount; li++) {
                     const lineAngle = devTime * 3 + (li / lineCount) * Math.PI * 2;
-                    const lineGrad = ctx.createLinearGradient(
-                        Math.cos(lineAngle) * devRadius * 1.2, Math.sin(lineAngle) * devRadius * 1.2,
-                        0, 0
-                    );
+                    const outerX = Math.cos(lineAngle) * devRadius * 1.2;
+                    const outerY = Math.sin(lineAngle) * devRadius * 1.2;
+                    const lineGrad = ctx.createLinearGradient(outerX, outerY, 0, 0);
                     lineGrad.addColorStop(0, 'rgba(139, 0, 139, 0)');
-                    lineGrad.addColorStop(1, `rgba(200, 0, 255, ${0.5 + devourPulse * 0.3})`);
+                    // linePhase > 0.7 区尔强制向白色过渡（模拟极端能量密度下的过曝）
+                    lineGrad.addColorStop(0.7, `rgba(200, 0, 255, ${0.5 + devourPulse * 0.3})`);
+                    const overExposeAlpha = devourPulse * 0.8;
+                    lineGrad.addColorStop(1, `rgba(255, 255, 255, ${overExposeAlpha})`);
                     ctx.strokeStyle = lineGrad;
-                    ctx.lineWidth = 1.5;
-                    ctx.shadowBlur = 8;
+                    ctx.lineWidth = 1.5 + devourPulse * 0.5;
+                    ctx.shadowBlur = 8 + devourPulse * 6;
                     ctx.beginPath();
-                    ctx.moveTo(Math.cos(lineAngle) * devRadius * 1.2, Math.sin(lineAngle) * devRadius * 1.2);
+                    ctx.moveTo(outerX, outerY);
                     ctx.lineTo(0, 0);
                     ctx.stroke();
                 }
                 ctx.restore();
 
-                // 吸入粒子特效（高密度）
+                // 吸入粒子特效（高密度，靠近中心加速 + 尺寸抖动）
                 if (typeof game !== 'undefined' && Math.random() < 0.7) {
                     const angle = Math.random() * Math.PI * 2;
                     const dist = devRadius * (1.5 + Math.random() * 1.0);
                     const px = this.pos.x + Math.cos(angle) * dist;
                     const py = this.pos.y + this.bumpOffsetY + Math.sin(angle) * dist;
                     const suckP = new Particle(px, py, Math.random() < 0.5 ? '#9333ea' : '#c084fc', 'spark');
-                    suckP.vel.x = (this.pos.x - px) * 0.12;
-                    suckP.vel.y = (this.pos.y + this.bumpOffsetY - py) * 0.12;
+                    // 向心加速：将初始速度提升 1.1 倍，模拟吸入引力加速
+                    suckP.vel.x = (this.pos.x - px) * 0.12 * 1.1;
+                    suckP.vel.y = (this.pos.y + this.bumpOffsetY - py) * 0.12 * 1.1;
                     suckP.drag = 0.93;
                     suckP.gravity = 0;
                     suckP.decay = 0.035;
-                    suckP.size = Math.random() * 3 + 1;
+                    // 尺寸随机抖动：在基础尺寸上叠加随机分量
+                    suckP.size = Math.random() * 3 + 1 + Math.random() * 1.5;
                     game.spawn_pushParticleWithLimit(suckP);
                 }
                 // 额外的暗色烟雾粒子
@@ -2644,6 +2671,70 @@ class Enemy {
                 ctx.arc(ex, ey, ouroThickness * 0.8, 0, Math.PI * 2);
                 ctx.fill();
             });
+
+            // --- 5. 狂暴共鸣法阵（狂暴触发后）---
+            if (this.berserked) {
+                const resonanceCount = CONFIG.enemyRender.ouroborosBerserkResonanceCount || 6;
+                const resonanceRadius = ouroRadius + ouroThickness * 1.2;
+
+                // 5a. 外圈旋转三角形符文标记
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                for (let ri = 0; ri < resonanceCount; ri++) {
+                    const triAngle = ouroTime * 1.5 + (ri / resonanceCount) * Math.PI * 2;
+                    const tx = Math.cos(triAngle) * resonanceRadius;
+                    const ty = Math.sin(triAngle) * resonanceRadius;
+                    const triSize = ouroThickness * 0.5;
+                    const triPulse = (Math.sin(ouroTime * 3 + ri * 1.1) + 1) * 0.5;
+                    // 交替金色/紫色发光
+                    const triColor = ri % 2 === 0 ? `rgba(250, 204, 21, ${0.5 + triPulse * 0.5})` : `rgba(168, 85, 247, ${0.5 + triPulse * 0.5})`;
+                    const triGlow = ri % 2 === 0 ? '#facc15' : '#a855f7';
+                    ctx.save();
+                    ctx.translate(tx, ty);
+                    ctx.rotate(triAngle + Math.PI / 2);
+                    ctx.fillStyle = triColor;
+                    ctx.shadowColor = triGlow;
+                    ctx.shadowBlur = 8 + triPulse * 12;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -triSize);
+                    ctx.lineTo(triSize * 0.866, triSize * 0.5);
+                    ctx.lineTo(-triSize * 0.866, triSize * 0.5);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                }
+                ctx.restore();
+
+                // 5b. 核心爆发脉冲（呈现能量满溢）
+                ctx.save();
+                const burstPulse = Math.pow((Math.sin(ouroTime * 2.5) + 1) * 0.5, 1.5);
+                const burstRadius = ouroRadius * (0.3 + burstPulse * 0.25);
+                const burstGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, burstRadius);
+                burstGrad.addColorStop(0, `rgba(255, 255, 255, ${burstPulse * 0.6})`);
+                burstGrad.addColorStop(0.4, `rgba(200, 100, 255, ${burstPulse * 0.4})`);
+                burstGrad.addColorStop(0.7, `rgba(80, 0, 160, ${burstPulse * 0.2})`);
+                burstGrad.addColorStop(1, 'rgba(40, 0, 80, 0)');
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.fillStyle = burstGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, burstRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                // 5c. 词缀轮转闪光（_berserkedRotation 且 _rotationFlashTimer > 0 时）
+                if (this._rotationFlashTimer > 0) {
+                    const flashAlpha = (this._rotationFlashTimer / 8) * 0.3; // 从 0.3 快速衰减
+                    ctx.save();
+                    // 在本地坐标系中绘制全屏盖盖（使用 ctx.canvas 尺寸）
+                    const cw = ctx.canvas ? ctx.canvas.width : 400;
+                    const ch = ctx.canvas ? ctx.canvas.height : 700;
+                    ctx.globalCompositeOperation = 'lighter';
+                    ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+                    ctx.fillRect(-this.pos.x, -(this.pos.y + this.bumpOffsetY), cw, ch);
+                    ctx.restore();
+                    this._rotationFlashTimer--;
+                }
+            }
 
             ctx.restore();
         }
@@ -3575,35 +3666,47 @@ class Enemy {
                 const cd2 = this.collisionData;
                 const ouroR = cd2 ? cd2.radius : Math.min(w, h) * 0.4;
                 const gapAngle = this.gapAngle || 0;
-                // 符文光环：在环形上绘制旋转符文
+                // 符文光环：在环形上绘制旋转符文（呼吸发光）
                 const runeCount = 8;
-                ctx.fillStyle = `rgba(167, 139, 250, ${0.7 + Math.sin(t * 2) * 0.2})`;
+                const runePower = CONFIG.enemyRender.ouroborosRuneBreathePower || 1.5;
                 ctx.font = `bold ${Math.floor(ouroR * 0.3)}px monospace`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                const runeChars = ['ᚠ', 'ᚷ', 'ᛉ', 'ᛚ', 'ᛣ', 'ᛱ', 'ᚢ', 'ᚹ'];
+                const runeChars = ['\u16a0', '\u16b7', '\u16c9', '\u16da', '\u16e3', '\u16f1', '\u16a2', '\u16b9'];
                 for (let i = 0; i < runeCount; i++) {
                     const angle = (i / runeCount) * Math.PI * 2 + gapAngle + t * 0.5;
                     const rx = Math.cos(angle) * ouroR;
                     const ry = Math.sin(angle) * ouroR;
+                    // 呼吸发光：使用 Math.pow 引入缓动指数，增强停留感
+                    const runeBreath = Math.pow((Math.sin(t * 2 + i) + 1) * 0.5, runePower);
                     ctx.save();
                     ctx.translate(rx, ry);
                     ctx.rotate(angle + Math.PI / 2);
-                    ctx.globalAlpha = 0.6 + Math.sin(t * 3 + i) * 0.3;
+                    ctx.globalAlpha = 0.5 + runeBreath * 0.45;
+                    ctx.fillStyle = 'rgba(167, 139, 250, 1)';
                     ctx.shadowColor = '#7c3aed';
-                    ctx.shadowBlur = 8;
+                    ctx.shadowBlur = 8 + runeBreath * 15;
                     ctx.fillText(runeChars[i % runeChars.length], 0, 0);
                     ctx.restore();
                 }
-                // 缺口指示箭头
+                // 缺口指示箭头（动态颜色：非狂暴金色 / 狂暴后红色）
                 const gapMidAngle = gapAngle + Math.PI * 0.75; // 缺口中间角度
                 const arrowDist = ouroR * 1.15;
+                const arrowAlpha = 0.6 + Math.sin(t * 4) * 0.3;
                 ctx.save();
                 ctx.translate(Math.cos(gapMidAngle) * arrowDist, Math.sin(gapMidAngle) * arrowDist);
                 ctx.rotate(gapMidAngle);
-                ctx.fillStyle = `rgba(250, 204, 21, ${0.6 + Math.sin(t * 4) * 0.3})`;
-                ctx.shadowColor = '#fbbf24';
-                ctx.shadowBlur = 10;
+                if (isBerserk) {
+                    // 狂暴后：红色箭头 + 更强 shadowBlur
+                    ctx.fillStyle = `rgba(239, 68, 68, ${arrowAlpha})`;
+                    ctx.shadowColor = '#ef4444';
+                    ctx.shadowBlur = 35;
+                } else {
+                    // 非狂暴：金色箭头（保持现有）
+                    ctx.fillStyle = `rgba(250, 204, 21, ${arrowAlpha})`;
+                    ctx.shadowColor = '#fbbf24';
+                    ctx.shadowBlur = 20;
+                }
                 ctx.beginPath();
                 ctx.moveTo(0, -5);
                 ctx.lineTo(5, 5);

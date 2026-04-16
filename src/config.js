@@ -839,7 +839,15 @@ const CONFIG = {
         // Boss 过曝叠加层最大透明度（0=关闭，1=最强），随呼吸周期动态变化
         bossOverglowAlpha: 0.35,
         // 狂暴状态下过曝强度倍率（叠加在 bossOverglowAlpha 上）
-        bossOverglowBerserkMult: 1.5
+        bossOverglowBerserkMult: 1.5,
+
+        // Arc Boss VFX 高阶视觉特效参数（Task T3）
+        // Devourer 深渊核心震颤幅度（像素），DEVOURING 状态下核心的随机位移范围
+        devourerCoreShakeAmplitude: 2,
+        // Ouroboros 符文呼吸缓动指数，控制 Math.pow 的幂次，值越大呼吸越有停留感
+        ouroborosRuneBreathePower: 1.5,
+        // Ouroboros 狂暴共鸣光环三角形数量（均匀分布在环形外侧）
+        ouroborosBerserkResonanceCount: 6
     },
 
     // ==================== 自适应性能配置 (Adaptive Performance) ====================
