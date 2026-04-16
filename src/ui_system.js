@@ -225,8 +225,10 @@ ui_closeTruthBook() {
      */
      ui_updateUI() {
         // [DEBUG-LOG] 记录每次 ui_updateUI 调用时的 phase 和调用栈
-        const runeLauncherPanel = document.getElementById('phase-rune-launcher');
-        const launcherVisible = runeLauncherPanel && runeLauncherPanel.style.display !== 'none';
+        // [BUGFIX] 使用 _isRuneLauncherOpen() 兼容 PC 模式（dataset.pcMigrated）和移动端模式（style.display）
+        const runeLauncherEl = document.getElementById('phase-rune-launcher');
+        const launcherVisible = this._isRuneLauncherOpen ? this._isRuneLauncherOpen() 
+            : (runeLauncherEl && runeLauncherEl.style.display !== 'none'); // 兜底兼容
         if (launcherVisible) {
             // 发射器打开时被调用：打印完整调用栈，帮助定位闪退来源
             console.warn('[ui_updateUI] ⚠️ 符文发射器打开期间被调用！phase=' + this.phase + '\n调用栈:', new Error().stack);
@@ -241,7 +243,6 @@ ui_closeTruthBook() {
         // [BUGFIX] 符文发射器是浮层覆盖层（不绑定任何 phase），若当前正在显示则跳过隐藏，
         //          防止每帧 ui_updateUI 调用将其强制关闭。
         // [PC 布局] PC 模式下符文发射器已迁移到右侧边栏并移除了 .ui-overlay 类，不会被这里隐藏。
-        const runeLauncherEl = document.getElementById('phase-rune-launcher');
         document.querySelectorAll('.ui-overlay').forEach(el => {
             if (el === runeLauncherEl && launcherVisible) return; // 保护：发射器打开时不隐藏（移动端模式）
             el.style.display = 'none'; 

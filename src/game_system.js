@@ -680,14 +680,32 @@ export const game_system = {
     },
 
     /**
+     * @method _isRuneLauncherOpen
+     * @description 判断符文发射器面板当前是否处于打开状态。
+     * 兼容两种模式：
+     * - 移动端模式：面板为 .ui-overlay 全屏浮层，打开时 style.display = 'flex'，关闭时 = 'none'
+     * - PC 模式：面板已迁移到 #pc-right-sidebar，移除了 .ui-overlay 类，
+     *   由 CSS `display: flex !important` 控制，style.display 本身为空字符串。
+     *   此时通过 dataset.pcMigrated 标记来判断是否处于 PC 常驻状态。
+     * @returns {boolean} 发射器是否打开
+     */
+    _isRuneLauncherOpen() {
+        const panel = document.getElementById('phase-rune-launcher');
+        if (!panel) return false;
+        // PC 模式：面板已迁移到右侧边栏（常驻可见）
+        if (panel.dataset.pcMigrated === 'true') return true;
+        // 移动端模式：面板为全屏浮层，通过 style.display 判断
+        return panel.style.display !== '' && panel.style.display !== 'none';
+    },
+
+    /**
      * @method input_handleInputStart
      * @description 处理输入开始（鼠标按下/触摸开始）。
      */
     input_handleInputStart(pos, e) {
         // [BUGFIX] 符文发射器打开时，屏蔽所有 canvas 输入事件，
         // 防止点击发射器面板穿透到底层 canvas，误触发弹珠发射并推进到战斗阶段。
-        const launcherPanel = document.getElementById('phase-rune-launcher');
-        if (launcherPanel && launcherPanel.style.display !== 'none') return;
+        if (this._isRuneLauncherOpen()) return;
 
         const offset = this.input_getTiltOffset();
         const logicPos = pos.sub(offset);
@@ -735,8 +753,7 @@ export const game_system = {
      */
     input_handleInputMove(pos, e) {
         // [BUGFIX] 符文发射器打开时，屏蔽 canvas 活动输入，防止鼠标移动导致倒斜或甄准逻辑干扰。
-        const _launcherPanelMove = document.getElementById('phase-rune-launcher');
-        if (_launcherPanelMove && _launcherPanelMove.style.display !== 'none') return;
+        if (this._isRuneLauncherOpen()) return;
 
         const offset = this.input_getTiltOffset();
         const logicPos = pos.sub(offset);
@@ -780,8 +797,7 @@ export const game_system = {
      */
     input_handleInputEnd(pos, e) {
         // [BUGFIX] 符文发射器打开时，屏蔽 canvas 输入结束事件，防止误触发射。
-        const _launcherPanelEnd = document.getElementById('phase-rune-launcher');
-        if (_launcherPanelEnd && _launcherPanelEnd.style.display !== 'none') return;
+        if (this._isRuneLauncherOpen()) return;
 
         if (this.isDragging) {
             this.isDragging = false;

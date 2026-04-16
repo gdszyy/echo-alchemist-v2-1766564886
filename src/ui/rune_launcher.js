@@ -62,6 +62,17 @@ export const rune_launcher_system = {
             } else {
                 // 移动端模式：弹出全屏覆盖层
                 panel.style.display = 'flex';
+                // [BUGFIX 第二道防线] 在面板上拦截 touchmove 事件，防止触摸滑动穿透到底层 Canvas。
+                // 使用 capture 阶段监听，确保在任何子元素处理之前先执行拦截。
+                // 仅在首次打开时绑定一次（通过 dataset 标记防止重复绑定）。
+                if (!panel._touchMoveGuardBound) {
+                    panel.addEventListener('touchmove', (e) => {
+                        // 允许面板内部的滚动容器正常滚动（overflow-y: auto 的元素）
+                        // 但阻止事件冒泡到 window，防止被 canvas 的 touchmove 处理器捕获
+                        e.stopPropagation();
+                    }, { passive: true, capture: true });
+                    panel._touchMoveGuardBound = true;
+                }
             }
         }
         // [BUGFIX] 确保 picker 蒙层在打开时是关闭状态（防止上次残留）
