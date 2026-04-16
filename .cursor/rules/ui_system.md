@@ -1,6 +1,6 @@
 # UI 系统规范文档
 
-> 最后更新：2026-04-16（符文发射器消失 bug 完整修复：_isRuneLauncherOpen 辅助函数 + 事件拦截强化）
+> 最后更新：2026-04-16（符文发射器教程功能暂时归档）
 
 ## 1. 模块架构概述
 
@@ -90,7 +90,8 @@ for (const subsystem of _subsystems) {
 | 2026-04-15 | `src/ui/shop.js` | 炼金工房（局外商店）所有商品描述显示为 `undefined`：`ui_renderShop` 中读取 `upgrade.description`，但 `META_SHOP_CONFIG.upgrades` 中的字段名为 `desc`，导致字段名不匹配。 | 将 `shop.js` 第 374 行的 `upgrade.description` 改为 `upgrade.desc`。 |
 | 2026-04-16 | `src/ui_system.js` + `src/game_system.js` | 符文发射器打开后立即消失：**真正根因是 canvas 输入穿透**——符文发射器面板层叠在 canvas 上方（z-index:300），但 canvas 的 `mousedown`/`touchstart` 监听器是直接绑定在 DOM 上的，不受 z-index 限制。玩家点击发射器面板时事件穿透到 canvas，导致 gathering 阶段弹珠被自动发射，所有弹珠打完后自动进入战斗阶段，`phase_switchPhase('combat')` 调用 `ui_updateUI()` 将发射器面板强制隐藏；同时 `.ui-overlay` 的 `transition: opacity 0.3s` 导致面板在 0.3s 内淡出消失而非立即关闭。 | 三处修复：① `game_system.js` 新增 `_isRuneLauncherOpen()` 辅助函数，兼容移动端（`style.display`）和 PC 模式（`dataset.pcMigrated`）两种判断方式；② `input_handleInputStart/Move/End` 开头统一改用 `_isRuneLauncherOpen()` 屏蔽 canvas 事件穿透；③ `ui_updateUI` 全局隐藏循环和 `phase_switchPhase` 的 DEBUG-LOG 也改用 `_isRuneLauncherOpen()`；④ `ui/rune_launcher.js` 的 `ui_openRuneLauncher` 在移动端模式下为面板添加 `touchmove` 的 `stopPropagation` 作为第二道防线，防止触摸滑动穿透到底层 Canvas。 |
 | 2026-04-16 | `index.html`, `src/game_system.js`, `src/ui_system.js`, `src/ui/rune_launcher.js` | PC 横屏模式下游戏区域宽度占满全屏且无侧边栏，底部抽屉和符文发射器不能同时展示。 | 1. `index.html` 新增 `#app-wrapper`（flex 三栏容器）、`#pc-left-sidebar`、`#pc-right-sidebar` 结构和对应 CSS；2. `#game-container` 改为固定宽高比 `min(calc(100dvh*9/16), 480px)` 宽度；3. `sys_resize()` 移除强制覆盖宽度的代码，`defeatLineY` 在 PC 模式下缩小安全边距；4. `ui_system.js` 新增 `ui_updatePCLayout()`、`_ui_migrateRuneLauncherToSidebar()`、`_ui_migrateHUDToLeftSidebar()` 三个方法；5. `rune_launcher.js` 的 `ui_openRuneLauncher`/`ui_closeRuneLauncher` 在 PC 模式下不修改 display；6. `core.js` 的 resize 监听器和构造函数中调用 `ui_updatePCLayout()`。 |
-| 2026-04-16 | `src/ui/rune_launcher.js` | 符文发射器内部引导教学（`ui_showRuneLauncherTour`）存在两个 Bug：① 教学期间 `highlight` 元素的 `box-shadow: 0 0 0 2000px rgba(0,0,0,0.45)` 溢出 `#phase-rune-launcher` panel 边界（panel 无 `overflow: hidden`），在整个屏幕上形成常驻黑色蒙版；② 教学完成时调用 `this.saveGame()`（该方法不存在），导致 `runeLauncherTourDone = true` 仅写入内存对象，从未持久化到 localStorage，每次游戏重启后教学都重复触发。 | ① 在 `ui_showRuneLauncherTour()` 中，创建 overlay 前保存 `panel.style.overflow` 原值，并临时设为 `hidden`；教学完成时恢复原值；`ui_closeRuneLauncher()` 中移除 tour overlay 时也同步恢复 overflow（防止用户未完成教学直接关闭面板）。② 将 `if (this.saveGame) this.saveGame()` 替换为 `this.sys_saveData()`，确保完成状态正确持久化。 |
+| 2026-04-16 | `src/ui/rune_launcher.js` | 符文发射器内部引导教学（`ui_showRuneLauncherTour`）存在两个 Bug：① 教学期间 `highlight` 元素的 `box-shadow: 0 0 0 2000px rgba(0,0,0,0.45)` 溢出 `#phase-rune-launcher` panel 边界（panel 无 `overflow: hidden`），在整个屏幕上形成常驻黑色蒙版；② 教学完成时调用 `this.saveGame()`（该方法不存在），导致 `runeLauncherTourDone = true` 仅写入内存对象，从未持久化到 localStorage，每次游戏重启后教学都重复触发。 | ① 在 `ui_showRuneLauncherTour()` 中，创建 overlay 前保存 `panel.style.overflow` 原値，并临时设为 `hidden`；教学完成时恢复原値；`ui_closeRuneLauncher()` 中移除 tour overlay 时也同步恢复 overflow（防止用户未完成教学直接关闭面板）。② 将 `if (this.saveGame) this.saveGame()` 替换为 `this.sys_saveData()`，确保完成状态正确持久化。 |
+| 2026-04-16 | `src/ui/rune_launcher.js` | 符文发射器内部引导教学（`ui_showRuneLauncherTour`）暂时归档。 | 将 `ui_openRuneLauncher` 中的教程触发调用和 `ui_showRuneLauncherTour` 函数体全部注释（`[ARCHIVED]` 标记）。如需恢复，取消 `rune_launcher.js` 第 114-117 行和第 1444-1604 行的注释即可。 |
 
 ## 6. 修改规范
 
