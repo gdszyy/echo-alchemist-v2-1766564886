@@ -159,6 +159,12 @@ class Enemy {
         // _hitImpact: 受击形变强度（单次伤害 / maxHp，clamp 到 0~hitImpactMax）
         this._hitImpact = 0;
 
+        // === D4: 激光照射抖动反馈 ===
+        // 照射抖动计时器（帧数）
+        this._laserHitTimer = 0;
+        // 照射抖动当前强度（0-1）
+        this._laserHitIntensity = 0;
+
         // === Layer 1.5: 预计算底层纹理 (OffscreenCanvas) ===
         // 基于 visualSeed 一次性生成静态纹理，每帧仅执行一次 drawImage
         this._textureCanvas = null;
@@ -358,6 +364,13 @@ class Enemy {
         if (this.shieldHitTimer > 0) this.shieldHitTimer -= timeScale;
         // === A3: 受击形变弹性衰减 ===
         if (this._hitImpact > 0) this._hitImpact *= Math.pow(CONFIG.enemyRender.hitImpactDecay, timeScale);
+        // === D4: 激光照射抖动衰减 ===
+        if (this._laserHitTimer > 0) {
+            this._laserHitTimer -= timeScale;
+            this._laserHitIntensity = Math.max(0, this._laserHitTimer / CONFIG.enemyRender.laserHitShakeDuration);
+        } else {
+            this._laserHitIntensity = 0;
+        }
         if (this.justSpawned) { this.justSpawned = false; }
         
         // 弹跳恢复
@@ -1172,6 +1185,15 @@ class Enemy {
         }
     }
 
+    /**
+     * @method triggerLaserHitShake
+     * @description 激活激光照射抖动反馈
+     */
+    triggerLaserHitShake() {
+        this._laserHitTimer = CONFIG.enemyRender.laserHitShakeDuration;
+        this._laserHitIntensity = 1.0;
+    }
+
     playBurnTickEffect(game, dmg) {
         this.hitTimer = 15;
         for(let i=0; i<8; i++) game.spawn_createParticle(this.pos.x, this.pos.y, '#f97316', 'spark');
@@ -1210,6 +1232,15 @@ class Enemy {
             const sx = CONFIG.enemyRender.hitImpactScaleX;
             const sy = CONFIG.enemyRender.hitImpactScaleY;
             ctx.scale(1 + this._hitImpact * sx, 1 - this._hitImpact * sy);
+        }
+        
+        // === D4: 激光照射抖动反馈 ===
+        // 照射抖动：振幅随时间衰减
+        if (this._laserHitIntensity > 0.001) {
+            const amplitude = CONFIG.enemyRender.laserHitShakeAmplitude;
+            const shakeX = (Math.random() - 0.5) * amplitude * this._laserHitIntensity * 2;
+            const shakeY = (Math.random() - 0.5) * amplitude * this._laserHitIntensity * 2;
+            ctx.translate(shakeX, shakeY);
         }
         
         // 预警震动

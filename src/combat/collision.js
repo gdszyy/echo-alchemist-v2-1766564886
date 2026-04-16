@@ -236,7 +236,11 @@ export const CollisionSystem = {
                 this.combat_damageEnemy(hit.enemy, { config: finalRecipe, pos: new Vec2(hit.projX, hit.projY), isCopy: false });
                 hitEnemiesSet.add(hit.enemy);
 
-                // 视觉：受击点特效
+                // === D4: 激光照射抖动反馈 ===
+                // 每次照射命中都触发抖动效果
+                hit.enemy.triggerLaserHitShake();
+
+                // 视覺：受击点特效
                 if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#fff', 'spark');
 
                 // 照射词条 Hook：累积照射同一敌人伤害加深

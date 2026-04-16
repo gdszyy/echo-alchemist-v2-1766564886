@@ -809,7 +809,15 @@ const CONFIG = {
         // elite 敌人光晕颜色（金色脉冲）
         borderPulseColorElite: '#facc15',
         // boss 敌人光晕颜色（红色脉冲）
-        borderPulseColorBoss: '#ef4444'
+        borderPulseColorBoss: '#ef4444',
+
+        // D4: 激光照射抖动反馈（Laser Hit Shake）
+        // 照射抖动持续时间（帧数）
+        laserHitShakeDuration: 12,
+        // 照射抖动最大幅度（像素）
+        laserHitShakeAmplitude: 3.5,
+        // 照射抖动衰减系数（每帧乘以该值）
+        laserHitShakeDecay: 0.88
     },
 
     // ==================== 自适应性能配置 (Adaptive Performance) ====================
