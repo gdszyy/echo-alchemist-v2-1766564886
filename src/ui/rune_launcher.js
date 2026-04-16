@@ -67,6 +67,9 @@ export const rune_launcher_system = {
         // [BUGFIX] 确保 picker 蒙层在打开时是关闭状态（防止上次残留）
         const pickerOverlay = document.getElementById('rune-picker-overlay');
         if (pickerOverlay) pickerOverlay.classList.add('hidden');
+        // [BUGFIX] 每次打开发射器时重置到「发射器」Tab，防止上次切换到「词条图鉴」Tab 后
+        // #rune-launcher-content 仍带有 hidden 类，导致 3x3 Grid 不可见
+        this.ui_switchRuneTab('launcher');
         // 初始化发射器内符文碎片计数显示
         this._ui_updateLauncherShardCount();
         this.ui_initRuneGrid();
