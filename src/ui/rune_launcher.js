@@ -51,15 +51,10 @@ export const rune_launcher_system = {
      * 打开符文发射器面板
      */
     ui_openRuneLauncher() {
-        // [BUGFIX] 记录进入前的阶段，以便关闭时返回
-        if (this.phase !== 'rune-launcher') {
-            this._runeLauncherFromPhase = this.phase;
+        const panel = document.getElementById('phase-rune-launcher');
+        if (panel) {
+            panel.style.display = 'flex';
         }
-
-        // [BUGFIX] 使用 phase_switchPhase 进入符文发射器阶段
-        // 确保它被 ui_updateUI() 正确管理，不会因为 resize 或其他 UI 刷新而闪退
-        this.phase_switchPhase('rune-launcher');
-        
         // 初始化发射器内符文碎片计数显示
         this._ui_updateLauncherShardCount();
         this.ui_initRuneGrid();
@@ -89,15 +84,10 @@ export const rune_launcher_system = {
      * 关闭符文发射器面板
      */
     ui_closeRuneLauncher() {
-        // [BUGFIX] 关闭时确保清理选择器蒙版和教学层
-        this.ui_closeRunePicker();
-        const existingTour = document.getElementById('rune-launcher-tour-overlay');
-        if (existingTour) existingTour.remove();
-
-        // 返回进入前的阶段
-        const prevPhase = this._runeLauncherFromPhase || 'meta';
-        this.phase_switchPhase(prevPhase);
-        this._runeLauncherFromPhase = null;
+        const panel = document.getElementById('phase-rune-launcher');
+        if (panel) {
+            panel.style.display = 'none';
+        }
     },
 
 
@@ -453,16 +443,11 @@ export const rune_launcher_system = {
             const hasSkills = this.activeSkills && this.activeSkills.length > 0;
             const skillBar = document.getElementById('skill-bar');
             if (skillBar) {
-                // 仅在战斗阶段且有技能时显示技能杠
                 skillBar.style.display = (this.phase === 'combat' && hasSkills) ? 'flex' : 'none';
             }
             const spPanel = document.getElementById('sp-panel');
             if (spPanel) {
-                // 收集、战斗或符文发射器阶段（如果是从这两个阶段进入的）且有技能时显示 SP 面板
-                const showSP = (this.phase === 'gathering' || this.phase === 'combat' || 
-                               (this.phase === 'rune-launcher' && (this._runeLauncherFromPhase === 'gathering' || this._runeLauncherFromPhase === 'combat'))) 
-                               && hasSkills;
-                if (showSP) {
+                if ((this.phase === 'gathering' || this.phase === 'combat') && hasSkills) {
                     spPanel.style.opacity = '1';
                     spPanel.style.pointerEvents = 'auto';
                 } else {
