@@ -52,9 +52,14 @@ export const rune_launcher_system = {
      */
     ui_openRuneLauncher() {
         const panel = document.getElementById('phase-rune-launcher');
+        // [DEBUG-LOG] 记录打开时的状态
+        console.log('[ui_openRuneLauncher] 打开符文发射器，当前 phase=' + this.phase + '，面板当前状态=' + (panel ? panel.style.display : 'N/A'));
         if (panel) {
             panel.style.display = 'flex';
         }
+        // [BUGFIX] 确保 picker 蒙版在打开时是关闭状态（防止上次残留）
+        const pickerOverlay = document.getElementById('rune-picker-overlay');
+        if (pickerOverlay) pickerOverlay.classList.add('hidden');
         // 初始化发射器内符文碎片计数显示
         this._ui_updateLauncherShardCount();
         this.ui_initRuneGrid();
@@ -84,6 +89,15 @@ export const rune_launcher_system = {
      * 关闭符文发射器面板
      */
     ui_closeRuneLauncher() {
+        // [DEBUG-LOG] 记录关闭时的调用栈
+        console.log('[ui_closeRuneLauncher] 关闭符文发射器，调用栈:', new Error().stack);
+        // [BUGFIX] 关闭时先清理内部蒙版和教学层，防止残留
+        const pickerOverlay = document.getElementById('rune-picker-overlay');
+        if (pickerOverlay) pickerOverlay.classList.add('hidden');
+        const tourOverlay = document.getElementById('rune-launcher-tour-overlay');
+        if (tourOverlay) tourOverlay.remove();
+        this._pendingRuneGridIndex = null;
+
         const panel = document.getElementById('phase-rune-launcher');
         if (panel) {
             panel.style.display = 'none';

@@ -54,6 +54,15 @@ export const game_phase = {
     phase_switchPhase(newPhase) {
         const oldPhase = this.phase;
         this.phase = newPhase;
+
+        // [DEBUG-LOG] 记录每次 phase 切换的来源和调用栈
+        const runeLauncherPanel = document.getElementById('phase-rune-launcher');
+        const launcherVisible = runeLauncherPanel && runeLauncherPanel.style.display !== 'none';
+        if (launcherVisible) {
+            console.warn('[phase_switchPhase] ⚠️ 符文发射器打开期间发生 phase 切换！' + oldPhase + ' -> ' + newPhase + '\n调用栈:', new Error().stack);
+        } else {
+            console.log('[phase_switchPhase] ' + oldPhase + ' -> ' + newPhase);
+        }
         
         // 事件总线广播阶段切换
         eventBus.emit(EVENT_TYPES.PHASE_CHANGED, { from: oldPhase, to: newPhase });

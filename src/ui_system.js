@@ -224,6 +224,27 @@ ui_closeTruthBook() {
      * @description 更新 UI 界面显示，强制管理各阶段元素的显隐
      */
      ui_updateUI() {
+        // [DEBUG-LOG] 记录每次 ui_updateUI 调用时的 phase 和调用栈
+        const runeLauncherPanel = document.getElementById('phase-rune-launcher');
+        const launcherVisible = runeLauncherPanel && runeLauncherPanel.style.display !== 'none';
+        if (launcherVisible) {
+            // 发射器打开时被调用：打印完整调用栈，帮助定位闪退来源
+            console.warn('[ui_updateUI] ⚠️ 符文发射器打开期间被调用！phase=' + this.phase + '\n调用栈:', new Error().stack);
+        } else {
+            console.log('[ui_updateUI] phase=' + this.phase);
+        }
+
+        // [BUGFIX] 如果符文发射器面板当前正在显示，先清理其内部蒙版，
+        // 防止 ui_updateUI 全局隐藏面板后，内部的 rune-picker-overlay 残留。
+        if (launcherVisible) {
+            // 关闭符文选择器蒙版
+            const pickerOverlay = document.getElementById('rune-picker-overlay');
+            if (pickerOverlay) pickerOverlay.classList.add('hidden');
+            // 关闭教学层
+            const tourOverlay = document.getElementById('rune-launcher-tour-overlay');
+            if (tourOverlay) tourOverlay.remove();
+        }
+
         // 1. 基础：隐藏所有阶段的主容器 (.ui-overlay)
         document.querySelectorAll('.ui-overlay').forEach(el => { 
             el.style.display = 'none'; 
