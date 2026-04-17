@@ -1,0 +1,3320 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>回聲煉金師 (Echo Alchemist) - Ver 8.2 (Special Enemies)</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Noto+Serif+TC:wght@400;700&display=swap');
+
+        body {
+            background-color: #020617;
+            color: #e2e8f0;
+            font-family: 'Noto Serif TC', serif;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* ===== PC 响应式三栏布局 Wrapper ===== */
+        #app-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center; /* center 而非 stretch，防止拉伸 game-container 高度覆盖 aspect-ratio */
+            width: 100%;
+            height: 100vh; /* 旧浏览器兜底 */
+            height: 100dvh;
+            background-color: #020617;
+            overflow: hidden;
+        }
+
+        /* ===== 核心游戏容器：固定 9:16 宽高比，对屏幕宽高双向等比缩放 ===== */
+        #game-container {
+            position: relative;
+            /*
+             * 等比缩放公式：宽高同时受屏幕限制，不超出任何一边
+             *   width  = min(屏幕宽, 屏幕高*9/16, 480px)
+             *   height = width * 16/9  → 由 aspect-ratio 自动计算
+             *   max-height: 100dvh    → 高度不超出屏幕
+             * 竖屏手机：width 被 100vw 限制；竖高比手机：width 被 100dvh*9/16 限制；横屏：height 被 100dvh 限制
+             */
+            width: min(100vw, calc(100dvh * 9 / 16), 480px);
+            aspect-ratio: 9 / 16;
+            max-height: 100dvh;
+            flex-shrink: 0;
+            background: #0f172a;
+            background: 
+                radial-gradient(circle at 50% 30%, rgba(30, 41, 59, 0.85) 0%, rgba(2, 6, 23, 0.97) 70%),
+                radial-gradient(ellipse at 50% 100%, rgba(56, 189, 248, 0.12) 0%, transparent 50%),
+                radial-gradient(circle at center, transparent 40%, rgba(0, 0, 0, 0.75) 100%);
+            overflow: hidden;
+        }
+
+        /* ===== PC 左侧边栏：底部抽屉内容 ===== */
+        #pc-left-sidebar {
+            display: none;
+            flex-direction: column;
+            flex: 1;
+            align-self: stretch; /* app-wrapper 改为 center 后，需要显式 stretch 自身 */
+            min-width: 240px;
+            max-width: 360px;
+            height: 100dvh;
+            background: rgba(15, 23, 42, 0.98);
+            border-right: 1px solid #334155;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 16px 12px;
+            box-sizing: border-box;
+        }
+        #pc-left-sidebar::-webkit-scrollbar { width: 4px; }
+        #pc-left-sidebar::-webkit-scrollbar-track { background: transparent; }
+        #pc-left-sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+        /* ===== PC 右侧边栏：符文发射器常驻 ===== */
+        #pc-right-sidebar {
+            display: none;
+            flex-direction: column;
+            flex: 1;
+            align-self: stretch; /* app-wrapper 改为 center 后，需要显式 stretch 自身 */
+            min-width: 280px;
+            max-width: 420px;
+            height: 100dvh;
+            background: rgba(2, 6, 23, 0.98);
+            border-left: 1px solid #334155;
+            overflow-y: auto;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+        #pc-right-sidebar::-webkit-scrollbar { width: 4px; }
+        #pc-right-sidebar::-webkit-scrollbar-track { background: transparent; }
+        #pc-right-sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+        /* PC 模式下底部面板隐藏 */
+        body.pc-mode .bottom-panel { display: none !important; }
+        /* PC 模式下符文发射器浮动按钮隐藏 */
+        body.pc-mode .rune-launcher-float-btn { display: none !important; }
+        /* PC 模式下符文发射器内的返回按钮隐藏（常驻无需关闭） */
+        body.pc-mode #phase-rune-launcher .rune-launcher-close-btn { display: none !important; }
+
+        /* PC 右侧边栏内的符文发射器：去除全屏覆盖样式 */
+        #pc-right-sidebar #phase-rune-launcher {
+            position: static !important;
+            display: flex !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: transparent !important;
+            z-index: auto !important;
+            overflow-y: auto;
+        }
+        #pc-right-sidebar #phase-rune-launcher .w-full.max-w-md {
+            max-width: 100% !important;
+            padding: 16px 12px !important;
+        }
+        /* PC 左侧边栏内的配方列表：纵向排列 */
+        #pc-left-sidebar .recipe-scroll {
+            flex-direction: column !important;
+            overflow-x: hidden !important;
+            overflow-y: auto !important;
+            height: auto !important;
+            flex-wrap: nowrap;
+        }
+        /* PC 左侧边栏内的 info-drawer：去除绝对定位和滑入动画，改为静态展开 */
+        #pc-left-drawer-mount #info-drawer {
+            position: static !important;
+            transform: none !important;
+            width: 100% !important;
+            height: 100% !important;
+            border-top: none !important;
+            background: transparent !important;
+            backdrop-filter: none !important;
+            z-index: auto !important;
+        }
+        /* PC 模式下隐藏 info-drawer 的关闭按鈕 */
+        body.pc-mode #pc-left-drawer-mount #info-drawer > button:first-child {
+            display: none !important;
+        }
+        /* PC 模式下隐藏战斗阶段的伤害统计浮动按鈕（drawer 已常驻在左侧边栏） */
+        body.pc-mode #damage-stats-btn {
+            display: none !important;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        @keyframes shake-hard {
+            0% { transform: translate(0, 0); }
+            25% { transform: translate(-5px, 5px); }
+            50% { transform: translate(5px, -5px); }
+            75% { transform: translate(-5px, -5px); }
+            100% { transform: translate(0, 0); }
+        }
+        .shake-hard { animation: shake-hard 0.2s; }
+
+        /* --- [新增] 符文发光闪烁特效 --- */
+        @keyframes rune-glow-pulse {
+            0% { box-shadow: 0 0 5px rgba(168, 85, 247, 0.4); border-color: rgba(168, 85, 247, 0.4); }
+            50% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.8); border-color: rgba(168, 85, 247, 1); }
+            100% { box-shadow: 0 0 5px rgba(168, 85, 247, 0.4); border-color: rgba(168, 85, 247, 0.4); }
+        }
+        .rune-glow-active {
+            animation: rune-glow-pulse 1.5s infinite ease-in-out;
+            z-index: 10;
+        }
+
+        /* --- [新增] 技能点宝石样式 --- */
+        .sp-slot {
+            width: 12px;
+            height: 12px;
+            background: rgba(15, 23, 42, 0.6); /* 深色底槽 */
+            border: 1.5px solid #475569;       /* 边框 */
+            transform: rotate(45deg);          /* 旋转成菱形 */
+            position: relative;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+            transition: all 0.3s;
+        }
+
+        /* 宝石本体 */
+        .sp-gem {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #34d399 0%, #059669 100%); /* 翡翠绿宝石 */
+            box-shadow: 0 0 4px #10b981;
+            opacity: 0;
+            transform: scale(0);
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); /* 弹性弹出动画 */
+        }
+
+        /* 激活状态 */
+        .sp-gem.active {
+            opacity: 1;
+            transform: scale(0.8); /* 稍微留一点边框 */
+        }
+
+        /* 获得宝石时的闪光特效 */
+        @keyframes gemFlash {
+            0% { filter: brightness(2); transform: scale(1.2) rotate(45deg); }
+            100% { filter: brightness(1); transform: scale(1) rotate(45deg); }
+        }
+        .sp-slot.flash {
+            animation: gemFlash 0.3s ease-out;
+            border-color: #34d399;
+        }
+
+        /* Animated Phase Title */
+        /* 阶段标题容器：居中淡入淡出（不再缩小到左上角） */
+        #phase-title-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 100;
+            text-align: center;
+            width: 100%;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        /* --- [新增] 英雄充能条样式 --- */
+        /* --- [修改] 英雄充能条样式 --- */
+#hero-gauge-container {
+    /* 1. 位置提升：远离底部面板 (原100px -> 145px) */
+    bottom: 145px; 
+    
+    /* 2. 确保层级 */
+    z-index: 80;
+    
+    /* 3. 基础阴影 (会被 JS 动态覆盖，但作为兜底) */
+    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+    
+    /* 4. 这里的 transition 负责处理 CSS 类的变化（如受击震动），
+       而位置的移动将由 JS 每帧驱动以保证跟手 */
+    transition: filter 0.2s, opacity 0.2s;
+    
+    /* 确保它不会拦截鼠标事件，让你可以点到后面的球 */
+    pointer-events: none;
+}
+
+
+        /* 受击时的弹性震动 */
+        .gauge-shake {
+            animation: gaugeBump 0.2s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+        }
+
+        @keyframes gaugeBump {
+            0% { transform: translateX(-50%) scale(1); }
+            50% { transform: translateX(-50%) scale(1.1); filter: brightness(1.3); }
+            100% { transform: translateX(-50%) scale(1); }
+        }
+
+        /* --- 1. 修复：双向流淌的能量脉冲 (Dual Flow Border) --- */
+        #gauge-pulse-layer {
+            position: absolute;
+            inset: -2px; /* 包住边缘 */
+            border-radius: 9999px;
+            pointer-events: none;
+            z-index: 50; /* 浮在最上层 */
+            
+            /* 核心：挖空中间，只留 3px 边框用于显示光流 */
+            -webkit-mask: 
+                linear-gradient(#fff 0 0) content-box, 
+                linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            padding: 3px; /* 光流粗细 */
+            
+            opacity: 0; /* 默认隐藏 */
+            mix-blend-mode: screen; /* 滤色模式，让光更亮 */
+        }
+
+        /* 激活状态 */
+        #gauge-pulse-layer.pulse-active {
+            opacity: 1;
+            transition: opacity 0s;
+        }
+        #gauge-pulse-layer:not(.pulse-active) {
+            transition: opacity 0.5s ease-out;
+        }
+
+        /* --- 左侧流光 (逆时针) --- */
+        #gauge-pulse-layer::before {
+            content: '';
+            position: absolute;
+            inset: -50%; /* 扩大范围以覆盖旋转 */
+            
+            /* 渐变：白色头 -> 颜色 -> 透明尾巴 */
+            /* 放在 0deg (12点钟方向) */
+            background: conic-gradient(
+                from 0deg, 
+                #ffffff 0%, 
+                var(--pulse-color, #fbbf24) 10%, 
+                transparent 35%
+            );
+            
+            opacity: 0; 
+            transform: rotate(0deg); 
+        }
+
+        /* --- 右侧流光 (顺时针) --- */
+        #gauge-pulse-layer::after {
+            content: '';
+            position: absolute;
+            inset: -50%;
+            
+            /* 渐变：镜像逻辑，尾巴在前，白色头在后 (接近 360deg) */
+            background: conic-gradient(
+                from 0deg, 
+                transparent 65%, 
+                var(--pulse-color, #fbbf24) 90%, 
+                #ffffff 100%
+            );
+            
+            opacity: 0;
+            transform: rotate(0deg);
+        }
+
+        /* 激活时的动画 */
+        #gauge-pulse-layer.pulse-active::before {
+            opacity: 1;
+            /* 左边：逆时针旋转 0 -> -180度 (到达底部) */
+            animation: flowLeft 0.6s cubic-bezier(0.1, 0.5, 0.1, 1) forwards;
+        }
+
+        #gauge-pulse-layer.pulse-active::after {
+            opacity: 1;
+            /* 右边：顺时针旋转 0 -> 180度 (到达底部) */
+            animation: flowRight 0.6s cubic-bezier(0.1, 0.5, 0.1, 1) forwards;
+        }
+
+        @keyframes flowLeft {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(-180deg); }
+        }
+
+        @keyframes flowRight {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(180deg); }
+        }
+
+        /* --- 2. 修复：进度条与光泽遮罩 (解决高光跑偏问题) --- */
+        /* 进度条外壳 */
+        /* --- CSS 修改开始 --- */
+
+/* 进度条外壳 */
+#gauge-shell {
+    position: relative;
+    overflow: hidden; 
+    transform: translateZ(0);
+    background: rgba(15, 23, 42, 0.95);
+    border-radius: 9999px;
+    
+    /* [核心修复]：使用线性遮罩 */
+    /* 之前的径向遮罩(radial)在长条容器上会导致两端被"切掉"，*/
+    /* 改为线性遮罩(linear)可以完美覆盖整个长度，同时修复圆角溢出问题。 */
+    -webkit-mask-image: -webkit-linear-gradient(#fff, #fff);
+    mask-image: linear-gradient(#fff, #fff);
+}
+
+/* [新增]：全局玻璃扫光 (移到 Shell 上) */
+#gauge-shell::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; bottom: 0; right: 0;
+    
+    /* 修改：宽度设为 100% 即可，配合 transform */
+    width: 100%; 
+    
+    /* 调整渐变：增强中间的亮度，两侧透明 */
+    background: linear-gradient(
+        110deg, 
+        transparent 35%, 
+        rgba(255, 255, 255, 0.1) 40%, 
+        rgba(255, 255, 255, 0.8) 50%, 
+        rgba(255, 255, 255, 0.1) 60%, 
+        transparent 65%
+    );
+    
+    /* 动画设置 */
+    animation: glassShine 3s infinite ease-in-out;
+    
+    z-index: 10; 
+    pointer-events: none;
+    mix-blend-mode: overlay; 
+}
+
+/* 优化后的动画关键帧 */
+@keyframes glassShine {
+    0% { 
+        /* 从完全左侧外开始 (-100% 自身宽度) */
+        transform: translateX(-100%); 
+    }
+    60% { 
+        /* 扫到完全右侧外 (+100% 自身宽度) */
+        /* 增加到 60% 的时间占比，让扫光稍微慢一点点，更优雅 */
+        transform: translateX(100%); 
+    }
+    100% { 
+        /* 保持在右侧外，等待下一次循环 (留白时间) */
+        transform: translateX(100%); 
+    } 
+}
+
+/* --- CSS 修改结束 --- */
+
+
+        /* 进度条本体 */
+        #hit-bar {
+            position: relative;
+            height: 100%;
+            width: 0%;
+            /* 进度条不再负责高光，只负责颜色 */
+            background: linear-gradient(90deg, #0891b2, #22d3ee); 
+            transition: width 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 1; /* 放在底层 */
+        }
+        
+        /* 满能量时的变色 */
+        #hit-bar.bar-full {
+            background: linear-gradient(90deg, #d97706, #fbbf24, #fff);
+            box-shadow: 0 0 15px #fbbf24;
+        }
+
+        /* 内部高光 (Shimmy) - 修复位置锁定 */
+        #hit-bar::after {
+            content: none;
+        }
+        /* [新增]：全局玻璃扫光 (移到 Shell 上) */
+        /* 这样高光就会扫过整个管子，两头都是圆的 */
+        
+
+
+        @keyframes barShine {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(200%); } /* 扫得更远一点以确保完全离开 */
+        }
+        /* 进度条填充的高光流光 */
+        #hit-bar::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; bottom: 0; width: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            transform: translateX(-100%);
+            animation: shimmy 2s infinite;
+        }
+        @keyframes shimmy {
+            100% { transform: translateX(200%); }
+        }
+        .phase-text {
+            font-family: 'Cinzel', serif;
+            font-size: 3.5rem;
+            font-weight: bold;
+            color: #facc15;
+            text-shadow: 0 0 30px rgba(250, 204, 21, 0.6);
+            background: linear-gradient(to bottom, #fef08a, #ca8a04);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 2px;
+        }
+        .phase-sub {
+            font-size: 1rem;
+            color: #94a3b8;
+            margin-top: 0.5rem;
+            opacity: 1;
+            transition: opacity 0.5s;
+        }
+        .minimized .phase-sub { opacity: 0; }
+
+        /* UI Overlays */
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; 
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding-top: max(70px, env(safe-area-inset-top)); 
+            padding-bottom: env(safe-area-inset-bottom);
+            transition: opacity 0.3s;
+        }
+
+        /* ===== 统一顶部信息栏 ===== */
+        #unified-top-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: max(52px, calc(env(safe-area-inset-top) + 44px));
+            padding-top: env(safe-area-inset-top);
+            background: rgba(10, 15, 30, 0.82);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(71, 85, 105, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-left: 10px;
+            padding-right: 10px;
+            z-index: 500;
+            pointer-events: auto;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+        }
+        /* 顶部栏三个区域 */
+        .top-bar-left, .top-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+        }
+        .top-bar-center {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+        .top-bar-right {
+            justify-content: flex-end;
+        }
+        /* 回合数胶囊 */
+        .round-pill {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid #475569;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-family: 'Cinzel', serif;
+            color: #e2e8f0;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+        /* 加速按钮（保持常驻） */
+        #speed-btn {
+            width: 28px; height: 28px;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid #475569;
+            border-radius: 50%;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 0.7rem;
+            padding: 0;
+            white-space: nowrap;
+            min-width: 28px;
+        }
+        /* 设置按钮 */
+        #settings-btn {
+            width: 28px; height: 28px;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid #475569;
+            border-radius: 50%;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 0.85rem;
+            position: relative;
+        }
+        /* 设置下拉面板 */
+        #settings-panel {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            background: rgba(15, 23, 42, 0.97);
+            border: 1px solid #475569;
+            border-radius: 10px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 140px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            z-index: 600;
+            pointer-events: auto;
+            backdrop-filter: blur(8px);
+        }
+        #settings-panel.hidden { display: none; }
+        .settings-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 5px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+            font-size: 0.78rem;
+            color: #cbd5e1;
+        }
+        .settings-item:hover { background: rgba(71, 85, 105, 0.4); }
+        .settings-item .s-icon { font-size: 1rem; width: 20px; text-align: center; }
+        .settings-item .s-label { flex: 1; }
+        .settings-item .s-badge {
+            font-size: 0.65rem;
+            background: rgba(71,85,105,0.5);
+            border: 1px solid #475569;
+            border-radius: 4px;
+            padding: 1px 5px;
+            color: #94a3b8;
+        }
+        .settings-item.active .s-badge {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: #10b981;
+            color: #34d399;
+        }
+
+        .stat-pill {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid #475569;
+            padding: 0.3rem 0.8rem;
+            border-radius: 999px;
+            font-family: 'Cinzel', serif;
+            color: #e2e8f0;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            backdrop-filter: blur(4px);
+        }
+        .stat-highlight { color: #facc15; font-weight: bold; }
+
+        .btn-icon {
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid #475569;
+            border-radius: 50%;
+            color: #94a3b8;
+            cursor: pointer;
+        }
+
+        /* Bottom Panel */
+          .bottom-panel {
+            /* 原来是 90px */
+            height: 115px; 
+            
+            /* 保持其他样式不变 */
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(15, 23, 42, 0.98);
+            border-top: 1px solid #475569;
+            padding: 0 12px;
+            padding-bottom: max(0px, env(safe-area-inset-bottom));
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+            z-index: 50;
+        }
+        /* Hit Bar */
+        .hit-container {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 0.75rem; color: #94a3b8;
+        }
+        .hit-bar-bg {
+            flex: 1; height: 8px; background: #334155; border-radius: 4px; overflow: hidden;
+        }
+        .hit-bar-fill {
+            height: 100%; background: linear-gradient(90deg, #f59e0b, #fbbf24);
+            width: 0%; transition: width 0.2s;
+            box-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+        }
+
+        /* Queue & Recipe */
+        .queue-container {
+            display: flex; align-items: center; gap: 4px;
+            border-right: 1px solid #334155; padding-right: 10px;
+            margin-right: 4px;
+        }
+        .queue-dot {
+            width: 20px; height: 20px; border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.2);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        /* Recipe Cards */
+        .recipe-scroll {
+            display: flex; 
+            gap: 8px; 
+            overflow-x: auto;
+            scrollbar-width: none;
+            
+            /* 核心修改：强制不换行，且高度填满容器 */
+            flex-wrap: nowrap; 
+            height: 100%;
+            align-items: center; /* 卡片垂直居中 */
+            width: 100%;
+            padding-right: 20px; /* 防止最后一个贴边 */
+        }
+        /* --- 新增：配方锁定/完成时的特效动画 --- */
+        @keyframes recipeLockFlash {
+            0% { 
+                transform: scale(1); 
+                background: rgba(50, 60, 90, 0.9); 
+                box-shadow: 0 0 0px transparent;
+            }
+            50% { 
+                transform: scale(1.15) translateY(-5px); 
+                background: #fff; 
+                border-color: #fff;
+                box-shadow: 0 0 20px #fff; 
+                z-index: 10;
+            }
+            100% { 
+                transform: scale(1); 
+                background: rgba(50, 60, 90, 0.9); 
+                box-shadow: 0 0 0px transparent;
+            }
+        }
+        .recipe-card {
+            background: rgba(30, 41, 59, 0.6); /* 稍微增加透明度让它看起来轻盈点 */
+            border: 1px solid #475569;
+            border-radius: 6px;
+            
+            /* [优化]：减少内边距 (原 6px 10px) */
+            padding: 4px 8px; 
+            
+            width: max-content;
+            min-width: 80px; /* 稍微调小最小宽度 */
+            height: auto;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .mats-grid {
+            display: grid;
+            grid-template-rows: repeat(4, min-content); /* 保持4行 */
+            grid-auto-flow: column; /* 超过4行自动换列 */
+            
+            /* [优化]：大幅减少行间距 (原 2px)，列间距保持 12px */
+            gap: 0px 12px; 
+            
+            /* [优化]：减少顶部间距 (原 4px) */
+            margin-top: 2px;
+        }
+
+        /* --- 4. 调整行文字样式 --- */
+        .mat-row {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            
+            /* [优化]：强制行高紧凑，防止文字自带的上下留白撑高 */
+            line-height: 1.3; 
+            
+            /* [优化]：字体稍微调小一点点 (原默认可能是 0.7rem) */
+            font-size: 0.65rem; 
+        }
+        .recipe-card.locked-anim {
+            animation: recipeLockFlash 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .recipe-card.active {
+            background: rgba(50, 60, 90, 0.9);
+            border-color: #fbbf24;
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(251, 191, 36, 0.1);
+        }
+
+        /* Selection Grid */
+        .marble-grid {
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 10px;
+            padding: 10px 20px; /* 减小上下 padding */
+            pointer-events: auto;
+            width: 100%;
+            max-width: 400px; /* 限制最大宽度，防止在平板/PC上卡片太大 */
+            margin: 0 auto;   /* 居中 */
+        }
+        /* === 弹珠卡片升级样式 === */
+        .select-card {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1.5px solid rgba(71, 85, 105, 0.7);
+            border-radius: 14px;
+            height: 130px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+            gap: 4px;
+            padding: 8px 4px 6px;
+            overflow: hidden;
+        }
+        .select-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 14px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, transparent 60%);
+            pointer-events: none;
+        }
+        .select-card:hover {
+            border-color: rgba(148, 163, 184, 0.8);
+            background: rgba(30, 41, 59, 0.9);
+            transform: translateY(-3px) scale(1.03);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+        .select-card.selected {
+            border-color: #fbbf24;
+            background: rgba(45, 55, 80, 0.95);
+            box-shadow: 0 0 18px rgba(251, 191, 36, 0.35), 0 4px 16px rgba(0,0,0,0.4);
+            transform: translateY(-4px) scale(1.04);
+        }
+        /* 球体容器（扩大容纳属性特效环） */
+        .select-icon-wrap {
+            position: relative;
+            width: 64px; height: 64px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: visible;
+        }
+        .select-icon {
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            box-shadow:
+                inset -4px -4px 8px rgba(0,0,0,0.55),
+                inset 3px 3px 6px rgba(255,255,255,0.25),
+                0 4px 12px rgba(0,0,0,0.4);
+            position: relative;
+            /* overflow: visible 让属性特效的 ::before/::after 可超出球体边界 */
+            overflow: visible;
+        }
+        /* 高光层 */
+        .select-icon-shine {
+            position: absolute;
+            top: 6px; left: 8px;
+            width: 14px; height: 9px;
+            background: radial-gradient(ellipse, rgba(255,255,255,0.65) 0%, transparent 80%);
+            border-radius: 50%;
+            transform: rotate(-30deg);
+            pointer-events: none;
+        }
+        /* 属性 emoji 浮层（相对于 select-icon-wrap 定位） */
+        .select-icon-emoji {
+            position: absolute;
+            bottom: 4px; right: 4px;
+            font-size: 16px;
+            line-height: 1;
+            filter: drop-shadow(0 1px 3px rgba(0,0,0,0.7));
+            pointer-events: none;
+            z-index: 3;
+        }
+        /* 弹珠名称 */
+        .select-card-name {
+            font-size: 11px;
+            font-weight: 700;
+            color: #e2e8f0;
+            text-align: center;
+            letter-spacing: 0.03em;
+            line-height: 1.2;
+        }
+        /* 属性标签行 */
+        .select-card-tags {
+            display: flex;
+            gap: 3px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .select-card-tag {
+            font-size: 9px;
+            padding: 1px 5px;
+            border-radius: 4px;
+            background: rgba(71, 85, 105, 0.6);
+            color: #94a3b8;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        /* === 弹珠预览面板 === */
+        #marble-preview-panel {
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto 4px;
+            padding: 12px 16px 14px;
+            background: rgba(10, 15, 30, 0.92);
+            border: 1px solid rgba(71, 85, 105, 0.5);
+            border-radius: 16px;
+            pointer-events: auto;
+            transition: opacity 0.25s, transform 0.25s;
+        }
+        .marble-preview-hidden {
+            opacity: 0;
+            transform: translateY(6px);
+            pointer-events: none !important;
+        }
+        .marble-preview-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        /* 预览面板 - 顶部行 */
+        .preview-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        /* 预览球体 */
+        #preview-marble-ball {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            box-shadow:
+                inset -3px -3px 6px rgba(0,0,0,0.5),
+                inset 2px 2px 5px rgba(255,255,255,0.2),
+                0 3px 8px rgba(0,0,0,0.4);
+            position: relative;
+            overflow: hidden;
+        }
+        #preview-marble-ball::after {
+            content: '';
+            position: absolute;
+            top: 5px; left: 7px;
+            width: 10px; height: 6px;
+            background: radial-gradient(ellipse, rgba(255,255,255,0.6) 0%, transparent 80%);
+            border-radius: 50%;
+            transform: rotate(-30deg);
+        }
+        .preview-header-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .preview-name-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+        #preview-marble-icon {
+            font-size: 14px;
+            line-height: 1;
+        }
+        #preview-marble-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #f1f5f9;
+            letter-spacing: 0.04em;
+        }
+        #preview-marble-tags {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .preview-tag {
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 5px;
+            background: rgba(99, 102, 241, 0.25);
+            color: #a5b4fc;
+            font-weight: 600;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+        /* 分隔线 */
+        .preview-divider {
+            height: 1px;
+            background: rgba(71, 85, 105, 0.4);
+            margin: 8px 0;
+        }
+        /* 真理之书说明区 */
+        .preview-truth-label {
+            font-size: 9px;
+            font-weight: 700;
+            color: #f59e0b;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 3px;
+        }
+        #preview-marble-desc {
+            font-size: 11px;
+            color: #cbd5e1;
+            line-height: 1.55;
+            margin-bottom: 8px;
+        }
+        /* 同步钉子效果区 */
+        .preview-peg-label {
+            font-size: 9px;
+            font-weight: 700;
+            color: #34d399;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 3px;
+        }
+        #preview-marble-peg {
+            font-size: 10.5px;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+
+        /* ============================================================
+           弹珠属性特效动画系统
+           每种属性对应一个 .marble-fx-{type} 类
+           应用在 .select-icon 元素上
+        ============================================================ */
+
+        /* 基础属性层（所有属性共用） */
+        .select-icon {
+            transition: box-shadow 0.3s;
+        }
+
+        /* --- 冰霜 cryo --- */
+        @keyframes cryo-pulse {
+            0%, 100% { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 8px #06b6d4, 0 0 18px rgba(6,182,212,0.4); }
+            50%       { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 14px #67e8f9, 0 0 28px rgba(103,232,249,0.5); }
+        }
+        @keyframes cryo-spin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+        .marble-fx-cryo {
+            animation: cryo-pulse 2s ease-in-out infinite;
+        }
+        .marble-fx-cryo::before {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: 50%;
+            border: 1.5px solid transparent;
+            border-top-color: #a5f3fc;
+            border-right-color: rgba(165,243,252,0.4);
+            animation: cryo-spin 2.5s linear infinite;
+            pointer-events: none;
+        }
+        .marble-fx-cryo::after {
+            content: '';
+            position: absolute;
+            inset: -6px;
+            border-radius: 50%;
+            border: 1px dashed rgba(165,243,252,0.3);
+            animation: cryo-spin 4s linear infinite reverse;
+            pointer-events: none;
+        }
+
+        /* --- 火焰 pyro --- */
+        @keyframes pyro-glow {
+            0%, 100% { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 10px #f97316, 0 0 22px rgba(249,115,22,0.5); }
+            50%       { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 18px #fb923c, 0 0 35px rgba(251,146,60,0.6); }
+        }
+        @keyframes pyro-flicker {
+            0%   { opacity: 0.9; transform: scaleY(1)   scaleX(1); }
+            25%  { opacity: 1;   transform: scaleY(1.08) scaleX(0.95); }
+            50%  { opacity: 0.85;transform: scaleY(0.95) scaleX(1.05); }
+            75%  { opacity: 1;   transform: scaleY(1.05) scaleX(0.97); }
+            100% { opacity: 0.9; transform: scaleY(1)   scaleX(1); }
+        }
+        .marble-fx-pyro {
+            animation: pyro-glow 1.2s ease-in-out infinite, pyro-flicker 0.8s ease-in-out infinite;
+        }
+        .marble-fx-pyro::before {
+            content: '';
+            position: absolute;
+            bottom: -2px; left: 50%;
+            transform: translateX(-50%);
+            width: 60%; height: 55%;
+            background: radial-gradient(ellipse at bottom, rgba(251,146,60,0.7) 0%, rgba(249,115,22,0.3) 50%, transparent 80%);
+            border-radius: 50% 50% 0 0;
+            animation: pyro-flicker 0.6s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        /* --- 闪电 lightning --- */
+        @keyframes lightning-flash {
+            0%, 90%, 100% { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 8px #a855f7, 0 0 16px rgba(168,85,247,0.4); }
+            92%            { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 22px #e9d5ff, 0 0 40px rgba(233,213,255,0.8); }
+            94%            { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 8px #a855f7, 0 0 16px rgba(168,85,247,0.4); }
+            96%            { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 26px #c084fc, 0 0 45px rgba(192,132,252,0.9); }
+        }
+        @keyframes lightning-arc-spin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+        .marble-fx-lightning {
+            animation: lightning-flash 2.5s ease-in-out infinite;
+        }
+        .marble-fx-lightning::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            border-top-color: #e9d5ff;
+            border-bottom-color: rgba(192,132,252,0.5);
+            animation: lightning-arc-spin 0.8s linear infinite;
+            pointer-events: none;
+        }
+        .marble-fx-lightning::after {
+            content: '';
+            position: absolute;
+            inset: -7px;
+            border-radius: 50%;
+            border: 1px solid transparent;
+            border-left-color: rgba(233,213,255,0.4);
+            border-right-color: rgba(192,132,252,0.3);
+            animation: lightning-arc-spin 0.5s linear infinite reverse;
+            pointer-events: none;
+        }
+
+        /* --- 風 wind --- */
+        @keyframes wind-glow {
+            0%, 100% { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 8px #34d399, 0 0 18px rgba(52,211,153,0.35); }
+            50%       { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 14px #6ee7b7, 0 0 28px rgba(110,231,183,0.5); }
+        }
+        @keyframes wind-orbit {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+        @keyframes wind-orbit-rev {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(-360deg); }
+        }
+        .marble-fx-wind {
+            animation: wind-glow 1.8s ease-in-out infinite;
+        }
+        .marble-fx-wind::before {
+            content: '';
+            position: absolute;
+            inset: -5px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            border-top-color: rgba(110,231,183,0.8);
+            border-right-color: rgba(52,211,153,0.3);
+            animation: wind-orbit 1.2s linear infinite;
+            pointer-events: none;
+        }
+        .marble-fx-wind::after {
+            content: '';
+            position: absolute;
+            inset: -8px;
+            border-radius: 50%;
+            border: 1.5px solid transparent;
+            border-bottom-color: rgba(52,211,153,0.5);
+            border-left-color: rgba(110,231,183,0.2);
+            animation: wind-orbit-rev 0.9s linear infinite;
+            pointer-events: none;
+        }
+
+        /* --- 光球 laser --- */
+        @keyframes laser-pulse {
+            0%, 100% { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 10px #0ea5e9, 0 0 20px rgba(14,165,233,0.5); }
+            50%       { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 18px #38bdf8, 0 0 35px rgba(56,189,248,0.7); }
+        }
+        @keyframes laser-scan {
+            0%   { transform: rotate(-30deg) scaleX(0); opacity: 0; }
+            20%  { transform: rotate(-30deg) scaleX(1); opacity: 0.8; }
+            80%  { transform: rotate(210deg) scaleX(1); opacity: 0.8; }
+            100% { transform: rotate(210deg) scaleX(0); opacity: 0; }
+        }
+        .marble-fx-laser {
+            animation: laser-pulse 1.5s ease-in-out infinite;
+        }
+        .marble-fx-laser::before {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 200%; height: 1.5px;
+            background: linear-gradient(90deg, transparent, #38bdf8, transparent);
+            transform-origin: left center;
+            margin-top: -0.75px;
+            margin-left: -100%;
+            animation: laser-scan 3s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        /* --- 弹性 bounce --- */
+        @keyframes bounce-jump {
+            0%, 100% { transform: scaleY(1)   scaleX(1); box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 4px 12px rgba(0,0,0,0.4); }
+            30%       { transform: scaleY(1.15) scaleX(0.9); box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 8px 18px rgba(34,197,94,0.4); }
+            60%       { transform: scaleY(0.9)  scaleX(1.1); box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 2px 8px rgba(34,197,94,0.3); }
+        }
+        .marble-fx-bounce {
+            animation: bounce-jump 1.4s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+        }
+        .marble-fx-bounce::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(34,197,94,0.4);
+            animation: bounce-jump 1.4s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+            pointer-events: none;
+        }
+
+        /* --- 穿透 pierce --- */
+        @keyframes pierce-glow {
+            0%, 100% { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 8px #ef4444, 0 0 16px rgba(239,68,68,0.4); }
+            50%       { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 14px #f87171, 0 0 26px rgba(248,113,113,0.6); }
+        }
+        @keyframes pierce-arrow {
+            0%   { opacity: 0; transform: translate(-200%, -50%); }
+            40%  { opacity: 1; }
+            100% { opacity: 0; transform: translate(200%, -50%); }
+        }
+        .marble-fx-pierce {
+            animation: pierce-glow 1.6s ease-in-out infinite;
+            overflow: visible;
+        }
+        .marble-fx-pierce::before {
+            content: '';
+            position: absolute;
+            top: 50%; left: 0;
+            width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, #f87171, #ffffff, #f87171, transparent);
+            transform: translateY(-50%);
+            animation: pierce-arrow 1.6s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        /* --- 散射 scatter --- */
+        @keyframes scatter-glow {
+            0%, 100% { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 8px #facc15, 0 0 16px rgba(250,204,21,0.4); }
+            50%       { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 14px #fde047, 0 0 26px rgba(253,224,71,0.6); }
+        }
+        @keyframes scatter-dot-1 { 0%,100%{opacity:0;transform:translate(0,0) scale(0.5)} 50%{opacity:1;transform:translate(12px,-10px) scale(1)} }
+        @keyframes scatter-dot-2 { 0%,100%{opacity:0;transform:translate(0,0) scale(0.5)} 50%{opacity:1;transform:translate(-12px,-10px) scale(1)} }
+        @keyframes scatter-dot-3 { 0%,100%{opacity:0;transform:translate(0,0) scale(0.5)} 50%{opacity:1;transform:translate(0px,-14px) scale(1)} }
+        .marble-fx-scatter {
+            animation: scatter-glow 1.8s ease-in-out infinite;
+            overflow: visible;
+        }
+        .marble-fx-scatter::before,
+        .marble-fx-scatter::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            background: #fde047;
+            margin: -2.5px;
+            pointer-events: none;
+        }
+        .marble-fx-scatter::before { animation: scatter-dot-1 1.4s ease-out infinite; }
+        .marble-fx-scatter::after  { animation: scatter-dot-2 1.4s ease-out infinite 0.2s; }
+
+        /* --- 增幅 damage --- */
+        @keyframes damage-ripple {
+            0%   { transform: scale(1);   opacity: 0.7; }
+            100% { transform: scale(2.2); opacity: 0; }
+        }
+        @keyframes damage-glow {
+            0%, 100% { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 10px #a855f7, 0 0 20px rgba(168,85,247,0.5); }
+            50%       { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 18px #c084fc, 0 0 32px rgba(192,132,252,0.7); }
+        }
+        .marble-fx-damage {
+            animation: damage-glow 1.5s ease-in-out infinite;
+            overflow: visible;
+        }
+        .marble-fx-damage::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 1.5px solid rgba(168,85,247,0.7);
+            animation: damage-ripple 1.5s ease-out infinite;
+            pointer-events: none;
+        }
+        .marble-fx-damage::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 1px solid rgba(192,132,252,0.5);
+            animation: damage-ripple 1.5s ease-out infinite 0.5s;
+            pointer-events: none;
+        }
+
+        /* --- 共鳴 resonance --- */
+        @keyframes resonance-ripple {
+            0%   { transform: scale(1);   opacity: 0.6; }
+            100% { transform: scale(2.5); opacity: 0; }
+        }
+        @keyframes resonance-glow {
+            0%, 100% { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 8px #f59e0b, 0 0 18px rgba(245,158,11,0.4); }
+            50%       { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 16px #fbbf24, 0 0 30px rgba(251,191,36,0.6); }
+        }
+        .marble-fx-resonance {
+            animation: resonance-glow 2s ease-in-out infinite;
+            overflow: visible;
+        }
+        .marble-fx-resonance::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 1.5px solid rgba(245,158,11,0.8);
+            animation: resonance-ripple 2s ease-out infinite;
+            pointer-events: none;
+        }
+        .marble-fx-resonance::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 1px solid rgba(251,191,36,0.5);
+            animation: resonance-ripple 2s ease-out infinite 0.7s;
+            pointer-events: none;
+        }
+
+        /* --- 七彩 rainbow --- */
+        @keyframes rainbow-spin {
+            from { filter: hue-rotate(0deg) brightness(1.1); }
+            to   { filter: hue-rotate(360deg) brightness(1.1); }
+        }
+        @keyframes rainbow-glow {
+            0%, 100% { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.4), inset 3px 3px 6px rgba(255,255,255,0.3), 0 0 12px rgba(252,165,165,0.6), 0 0 24px rgba(96,165,250,0.4); }
+            33%       { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.4), inset 3px 3px 6px rgba(255,255,255,0.3), 0 0 12px rgba(250,204,21,0.6), 0 0 24px rgba(74,222,128,0.4); }
+            66%       { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.4), inset 3px 3px 6px rgba(255,255,255,0.3), 0 0 12px rgba(96,165,250,0.6), 0 0 24px rgba(252,165,165,0.4); }
+        }
+        .marble-fx-rainbow {
+            animation: rainbow-spin 3s linear infinite, rainbow-glow 3s ease-in-out infinite;
+        }
+
+        /* --- 爆破 explosive --- */
+        @keyframes explosive-pulse {
+            0%, 100% { transform: scale(1);    box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 8px #fca5a5, 0 0 16px rgba(252,165,165,0.4); }
+            40%       { transform: scale(1.06); box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 18px #ef4444, 0 0 32px rgba(239,68,68,0.7); }
+            80%       { transform: scale(0.97); box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 10px #fca5a5, 0 0 20px rgba(252,165,165,0.5); }
+        }
+        @keyframes explosive-ring {
+            0%   { transform: scale(1);   opacity: 0.8; }
+            100% { transform: scale(2.8); opacity: 0; }
+        }
+        .marble-fx-explosive {
+            animation: explosive-pulse 1.8s ease-in-out infinite;
+            overflow: visible;
+        }
+        .marble-fx-explosive::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 2px solid rgba(239,68,68,0.7);
+            animation: explosive-ring 1.8s ease-out infinite;
+            pointer-events: none;
+        }
+        .marble-fx-explosive::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 1px solid rgba(252,165,165,0.4);
+            animation: explosive-ring 1.8s ease-out infinite 0.6s;
+            pointer-events: none;
+        }
+
+        /* --- 套娃 matryoshka --- */
+        @keyframes matryoshka-glow {
+            0%, 100% { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 8px #d946ef, 0 0 16px rgba(217,70,239,0.4); }
+            50%       { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 14px #e879f9, 0 0 26px rgba(232,121,249,0.6); }
+        }
+        @keyframes matryoshka-pop {
+            0%, 100% { transform: scale(0.3); opacity: 0; }
+            30%       { transform: scale(1.1); opacity: 0.9; }
+            60%       { transform: scale(0.9); opacity: 0.7; }
+            80%       { transform: scale(1.5); opacity: 0; }
+        }
+        .marble-fx-matryoshka {
+            animation: matryoshka-glow 2s ease-in-out infinite;
+            overflow: visible;
+        }
+        .marble-fx-matryoshka::before {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #f5d0fe, #d946ef);
+            margin: -7px;
+            animation: matryoshka-pop 2s ease-out infinite;
+            pointer-events: none;
+        }
+        .marble-fx-matryoshka::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #fae8ff, #a21caf);
+            margin: -5px;
+            animation: matryoshka-pop 2s ease-out infinite 0.8s;
+            pointer-events: none;
+        }
+
+        /* --- 純淨 white --- */
+        @keyframes white-breathe {
+            0%, 100% { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 6px rgba(248,250,252,0.5), 0 0 14px rgba(226,232,240,0.3); }
+            50%       { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 12px rgba(255,255,255,0.7), 0 0 24px rgba(248,250,252,0.4); }
+        }
+        .marble-fx-white {
+            animation: white-breathe 2.5s ease-in-out infinite;
+        }
+
+        /* --- 增幅 damage 的小剑山效果 --- */
+        @keyframes damage-spike {
+            0%, 100% { clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); }
+            50%       { clip-path: polygon(50% 5%, 95% 38%, 80% 95%, 20% 95%, 5% 38%); }
+        }
+
+        /* --- 飞剑 flying_sword --- */
+        @keyframes sword-orbit {
+            from { transform: rotate(0deg) translateX(28px) rotate(0deg); }
+            to   { transform: rotate(360deg) translateX(28px) rotate(-360deg); }
+        }
+        @keyframes sword-glow {
+            0%, 100% { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 10px #0ea5e9, 0 0 20px rgba(14,165,233,0.5); }
+            50%       { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 18px #38bdf8, 0 0 35px rgba(56,189,248,0.7); }
+        }
+        .marble-fx-flying_sword {
+            animation: sword-glow 1.5s ease-in-out infinite;
+            overflow: visible;
+        }
+        .marble-fx-flying_sword::before {
+            content: '†';
+            position: absolute;
+            top: 50%; left: 50%;
+            font-size: 12px;
+            color: #7dd3fc;
+            text-shadow: 0 0 8px #0ea5e9;
+            animation: sword-orbit 2s linear infinite;
+            pointer-events: none;
+            line-height: 1;
+            margin: -6px;
+        }
+
+        /* Buttons */
+        .btn-main {
+            background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+            color: white; font-family: 'Cinzel', serif;
+            padding: 12px; border-radius: 8px; width: 80%;
+            text-align: center; margin: 0 auto;
+            box-shadow: 0 4px 10px rgba(79, 70, 229, 0.4);
+            pointer-events: auto;
+            transition: opacity 0.2s;
+        }
+        .btn-main:disabled { opacity: 0.5; filter: grayscale(1); }
+
+        /* Toast */
+        #toast {
+            position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8); color: #fff; padding: 8px 16px; border-radius: 20px;
+            pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 200;
+            border: 1px solid #475569;
+        }
+        .toast-visible { opacity: 1 !important; }
+        
+        /*
+        .recipe-hud-floating {
+            position: absolute;
+            bottom: max(20px, env(safe-area-inset-bottom)); 
+            right: 16px;
+            width: 160px; 
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 6px;
+            pointer-events: auto; 
+            z-index: 20;
+        }
+        .recipe-card.current {
+            background: rgba(50, 60, 90, 0.9);
+            border-color: #fbbf24;
+            box-shadow: 0 0 8px rgba(251, 191, 36, 0.2);
+            transform: scale(1.05);
+        }
+        .recipe-card.queue { opacity: 0.5; transform: scale(0.95); }
+        */
+        /* 战斗阶段 HUD 浮动容器 */
+        .recipe-hud-floating {
+            position: absolute;
+            bottom: 80px;
+            left: 10px; /* 改为固定左边距，不再使用 50% 偏移 */
+            transform: none; /* 移除 translateX */
+            width: 140px;
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 6px;
+            pointer-events: none;
+            z-index: 40;
+            align-items: flex-start; /* 改为向左对齐 */
+        }
+        /* 當前彈藥卡片 */
+        .recipe-card.current {
+            background: rgba(30, 41, 59, 0.95);
+            border: 1px solid #fbbf24;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            opacity: 1;
+        }
+
+        /* 隊列中的彈藥卡片 */
+        .recipe-card.queue {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid #475569;
+            transform: scale(0.95);
+            opacity: 0.6;
+        }
+        .mat-row { display: flex; align-items: center; margin-top: 2px; }
+        
+        /* Ammo Queue Dots */
+        .ammo-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin: 0 2px;
+            border: 1px solid #fff;
+            opacity: 0.3;
+            background: rgba(255,255,255,0.1);
+        }
+        .ammo-indicator.active { opacity: 1; box-shadow: 0 0 5px #fff; background: #fff; }
+        /* --- 遗物界面容器 --- */
+        #phase-relic {
+            /* 强制开启鼠标事件，覆盖 .ui-overlay 的 pointer-events: none */
+            pointer-events: auto !important; 
+            
+            /* 确保层级最高，不被其他 UI 遮挡 */
+            z-index: 999 !important; 
+            
+            /* 之前的样式保持不变... */
+            overflow-y: auto; 
+            padding-top: max(20px, env(safe-area-inset-top));
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
+            background: rgba(2, 6, 23, 0.95); /* 确保背景有颜色，阻挡误触下方 */
+        }
+        .ammo-stage {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+            position: relative;
+            padding: 10px 0;
+        }
+
+        .ammo-slot-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .ammo-label {
+            font-size: 0.65rem;
+            color: #94a3b8;
+            margin-bottom: 4px;
+            font-family: 'Cinzel', serif;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .ammo-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 2px solid #475569;
+            background: rgba(15, 23, 42, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: all 0.3s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+         /* 简单的 Tab 切换样式 */
+        .tab-btn.active {
+            color: #fbbf24; /* amber-400 */
+            border-bottom-color: #fbbf24;
+        }
+        .tab-btn:not(.active) {
+            border-bottom-color: transparent;
+        }
+        .safe-area-pb {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* 当前发射槽位 - 高亮 */
+        #current-slot .ammo-icon {
+            width: 64px;
+            height: 64px;
+            border-color: #fbbf24;
+            background: radial-gradient(circle, rgba(50, 60, 90, 0.9) 0%, rgba(15, 23, 42, 0.9) 100%);
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.2);
+        }
+
+        /* 下一发槽位 - 稍微暗淡 */
+        #next-slot .ammo-icon {
+            opacity: 0.7;
+            transform: scale(0.9);
+        }
+
+        /* 发射动画：当前子弹飞出 */
+        .shoot-anim {
+            animation: shootUp 0.4s forwards cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes shootUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            50% { transform: translateY(-30px) scale(1.2); opacity: 0.5; }
+            100% { transform: translateY(-60px) scale(0.5); opacity: 0; }
+        }
+
+        /* 进位动画：下一发滑动变大 */
+        .slide-in-anim {
+            animation: slideIn 0.4s forwards;
+        }
+
+        @keyframes slideIn {
+            0% { transform: translateX(40px) scale(0.8); opacity: 0; }
+            100% { transform: translateX(0) scale(1); opacity: 1; }
+        }
+
+        /* 之前旧的 queue 样式可以保留作为备用，或者隐藏 */
+        #ammo-queue { display: none; }
+        #relic-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: stretch; /* 让卡片高度一致 */
+            gap: 12px; /* 减小间距 */
+            width: 100%;
+            max-width: 900px;
+            margin-bottom: 20px;
+        }
+        .recipe-multicast-badge {
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            width: 24px;
+            height: 24px;
+            background-color: #f97316; /* Orange-500 */
+            border: 2px solid #fff;
+            border-radius: 50%;
+            color: white;
+            font-family: 'Cinzel', serif;
+            font-weight: bold;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            z-index: 10;
+            
+            /* 默認隱藏 (縮小到0) */
+            transform: scale(0); 
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .recipe-multicast-badge.visible {
+            transform: scale(1);
+        }
+        /* --- [新增] 連射倍率特效 --- */
+        .flying-badge {
+            position: fixed; /* 使用 fixed 以便跨容器定位 */
+            z-index: 9999;
+            pointer-events: none;
+            font-family: 'Cinzel', serif;
+            font-weight: bold;
+            color: #ffedd5; /* Orange-100 */
+            background: rgba(249, 115, 22, 0.9); /* Orange-500 */
+            border: 2px solid #fff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 15px #f97316;
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); /* 平滑飛行曲線 */
+        }
+        /* 激活狀態：顯示出來 */
+        .multicast-visible {
+            opacity: 1 !important;
+            transform: scale(1) !important;
+        }
+        /* 到達目標時的消失狀態 */
+        .flying-badge.arrived {
+            transform: scale(0.5);
+            opacity: 0;
+        }
+        /* 獲得加成時的強力彈跳 */
+        @keyframes multicastPopAnim {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.8) rotate(10deg); filter: brightness(1.5); }
+            80% { transform: scale(0.9); }
+            100% { transform: scale(1) rotate(0); }
+        }
+        .multicast-pop {
+            animation: multicastPopAnim 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* 數值變化時的顏色閃光 */
+        .multicast-flash {
+            color: #fff !important;
+            text-shadow: 0 0 10px #fff, 0 0 20px #fbbf24 !important;
+        }
+        /* --- 卡片样式优化 (更紧凑) --- */
+        .relic-card {
+            pointer-events: auto;
+            cursor: pointer;
+            background: linear-gradient(180deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
+            border: 1px solid #475569;
+            border-radius: 12px;
+            padding: 12px; /* 减小内边距 (原20px) */
+            
+            /* 使用相对宽度，适配移动端 */
+            width: 30%; 
+            min-width: 130px; 
+            max-width: 200px;
+            
+            min-height: 160px; /* 减小最小高度 (原240px) */
+            
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .relic-card:hover {
+            transform: translateY(-4px) scale(1.02);
+            z-index: 10;
+        }
+
+        .relic-icon {
+            font-size: 2.2rem; /* 缩小图标 (原3rem) */
+            margin-bottom: 0.5rem;
+            filter: drop-shadow(0 0 8px rgba(255,255,255,0.3));
+        }
+
+        .relic-name {
+            font-family: 'Cinzel', serif;
+            font-weight: bold;
+            color: #e2e8f0;
+            margin-bottom: 0.25rem;
+            font-size: 0.95rem; /* 缩小字体 */
+            line-height: 1.2;
+        }
+
+        .relic-desc {
+            font-size: 0.75rem; /* 缩小描述字体 */
+            color: #94a3b8;
+            line-height: 1.3;
+            
+            /* 防止描述文字太长导致溢出，超过4行显示省略号 */
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* 稀有度光效 —— 增强版 */
+
+        /* 常规遗物：蓝色边框 + 脉冲光效 */
+        @keyframes rare-pulse {
+            0%   { box-shadow: 0 0 8px 1px rgba(59, 130, 246, 0.25), 0 0 0 0 rgba(59, 130, 246, 0.15); }
+            50%  { box-shadow: 0 0 18px 4px rgba(59, 130, 246, 0.55), 0 0 0 6px rgba(59, 130, 246, 0.05); }
+            100% { box-shadow: 0 0 8px 1px rgba(59, 130, 246, 0.25), 0 0 0 0 rgba(59, 130, 246, 0.15); }
+        }
+        .relic-card.rare {
+            border-color: #3b82f6;
+            border-width: 2px;
+            animation: rare-pulse 2.8s ease-in-out infinite;
+        }
+        .relic-card.rare:hover {
+            box-shadow: 0 10px 35px -8px rgba(59, 130, 246, 0.6);
+            border-color: #60a5fa;
+            animation: none;
+        }
+
+        /* 传奇遗物：金色边框 + 强烁光效 + 光晓扫描 */
+        @keyframes legendary-glow {
+            0%   { box-shadow: 0 0 12px 2px rgba(250, 204, 21, 0.4), inset 0 0 12px rgba(250, 204, 21, 0.05); }
+            40%  { box-shadow: 0 0 28px 8px rgba(250, 204, 21, 0.75), inset 0 0 20px rgba(250, 204, 21, 0.12); }
+            100% { box-shadow: 0 0 12px 2px rgba(250, 204, 21, 0.4), inset 0 0 12px rgba(250, 204, 21, 0.05); }
+        }
+        @keyframes legendary-shimmer {
+            0%   { background-position: -200% center; }
+            100% { background-position: 200% center; }
+        }
+        .relic-card.legendary {
+            border-color: #facc15;
+            border-width: 2px;
+            animation: legendary-glow 2.2s ease-in-out infinite;
+            background: linear-gradient(180deg, rgba(40, 35, 15, 0.97) 0%, rgba(15, 12, 3, 0.99) 100%);
+        }
+        .relic-card.legendary::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 12px;
+            background: linear-gradient(105deg, transparent 40%, rgba(250, 204, 21, 0.12) 50%, transparent 60%);
+            background-size: 200% 100%;
+            animation: legendary-shimmer 3s linear infinite;
+            pointer-events: none;
+        }
+        .relic-card.legendary:hover {
+            box-shadow: 0 12px 40px -8px rgba(250, 204, 21, 0.8);
+            border-color: #fde68a;
+            animation: none;
+        }
+        .relic-card.legendary .relic-name { color: #fde68a; }
+        .relic-card.legendary .relic-icon { filter: drop-shadow(0 0 10px rgba(250, 204, 21, 0.7)); }
+
+        /* 诅咒遗物：红色边框 + 闪烁效果 */
+        @keyframes cursed-flicker {
+            0%, 100% { box-shadow: 0 0 8px 1px rgba(239, 68, 68, 0.3); }
+            30%       { box-shadow: 0 0 20px 5px rgba(239, 68, 68, 0.6); }
+            60%       { box-shadow: 0 0 10px 2px rgba(239, 68, 68, 0.4); }
+        }
+        .relic-card.cursed {
+            border-color: #ef4444;
+            border-width: 2px;
+            animation: cursed-flicker 3.5s ease-in-out infinite;
+        }
+        .relic-card.cursed:hover {
+            box-shadow: 0 10px 35px -8px rgba(239, 68, 68, 0.7);
+            animation: none;
+        }
+
+        /* ==================== 遗物推荐标签与 Tip 样式 ==================== */
+        .relic-recommend-badge {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 2px 8px;
+            background: linear-gradient(90deg, rgba(251, 191, 36, 0.2), rgba(251, 191, 36, 0.1));
+            border: 1px solid rgba(251, 191, 36, 0.6);
+            border-radius: 20px;
+            color: #fbbf24;
+            font-size: 0.65rem;
+            font-weight: bold;
+            letter-spacing: 0.05em;
+        }
+        .relic-tags {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 4px;
+            margin-top: 5px;
+        }
+        .relic-tag {
+            padding: 1px 6px;
+            background: rgba(100, 116, 139, 0.3);
+            border: 1px solid rgba(100, 116, 139, 0.5);
+            border-radius: 10px;
+            color: #94a3b8;
+            font-size: 0.6rem;
+        }
+        .relic-tip {
+            margin-top: 6px;
+            padding: 5px 8px;
+            background: rgba(30, 58, 138, 0.25);
+            border-left: 2px solid rgba(96, 165, 250, 0.6);
+            border-radius: 0 6px 6px 0;
+            color: #93c5fd;
+            font-size: 0.65rem;
+            line-height: 1.4;
+            text-align: left;
+        }
+         /* --- 针对移动端横屏/矮屏幕的终极适配 --- */
+        @media (max-height: 600px) {
+            .select-card {
+                height: 96px; /* 矮屏模式下卡片变矮 */
+            }
+            .select-icon-wrap, .select-icon {
+                width: 38px; height: 38px;
+            }
+            .select-icon {
+                width: 38px; height: 38px;
+            }
+            #phase-selection p {
+                margin-bottom: 4px; /* 压缩文字间距 */
+            }
+        }
+        .relic-icon { font-size: 1.8rem; margin-bottom: 2px; }
+        .relic-name { font-size: 0.85rem; }
+        .relic-desc { -webkit-line-clamp: 3; } /* 横屏只显示3行 */
+
+        /* 调整放弃按钮的位置 */
+       #phase-relic button {
+            pointer-events: auto;
+            cursor: pointer;
+            position: relative; /* 提升层级上下文 */
+            z-index: 1000;
+        }
+
+        /* ==================== [新增] 暂停页面样式 ==================== */
+        #phase-pause {
+            pointer-events: auto !important;
+            z-index: 1000 !important;
+            overflow-y: auto;
+            background: rgba(2, 6, 23, 0.97);
+        }
+        .pause-section-title {
+            font-family: 'Cinzel', serif;
+            font-size: 0.65rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: #475569;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+        }
+        .pause-setting-row {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.15s;
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(71, 85, 105, 0.3);
+            margin-bottom: 6px;
+        }
+        .pause-setting-row:hover { background: rgba(51, 65, 85, 0.7); }
+        .pause-setting-row .ps-icon { font-size: 1.1rem; width: 24px; text-align: center; flex-shrink: 0; }
+        .pause-setting-row .ps-label { flex: 1; margin-left: 10px; font-size: 0.82rem; color: #cbd5e1; }
+        .pause-setting-row .ps-badge {
+            font-size: 0.68rem;
+            background: rgba(71,85,105,0.5);
+            border: 1px solid #475569;
+            border-radius: 5px;
+            padding: 2px 8px;
+            color: #94a3b8;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .pause-setting-row.active .ps-badge {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: #10b981;
+            color: #34d399;
+        }
+        .pause-relic-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 12px;
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+            border: 1px solid #334155;
+            border-radius: 10px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            margin-bottom: 6px;
+        }
+        .pause-relic-card:hover { border-color: #64748b; }
+        .pause-relic-card.rare { border-color: rgba(59, 130, 246, 0.5); }
+        .pause-relic-card.rare:hover { box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15); }
+        .pause-relic-card.legendary { border-color: rgba(250, 204, 21, 0.5); }
+        .pause-relic-card.legendary:hover { box-shadow: 0 4px 16px rgba(250, 204, 21, 0.2); }
+        .pause-relic-card.cursed { border-color: rgba(239, 68, 68, 0.5); }
+        .pause-relic-card.cursed:hover { box-shadow: 0 4px 16px rgba(239, 68, 68, 0.15); }
+        .pause-relic-icon {
+            font-size: 1.6rem;
+            line-height: 1;
+            flex-shrink: 0;
+            width: 36px;
+            text-align: center;
+            filter: drop-shadow(0 0 6px rgba(255,255,255,0.2));
+        }
+        .pause-relic-info { flex: 1; min-width: 0; }
+        .pause-relic-name {
+            font-family: 'Cinzel', serif;
+            font-size: 0.82rem;
+            font-weight: bold;
+            color: #e2e8f0;
+            margin-bottom: 3px;
+        }
+        .pause-relic-desc {
+            font-size: 0.72rem;
+            color: #94a3b8;
+            line-height: 1.4;
+        }
+        .pause-relic-badge {
+            font-size: 0.6rem;
+            padding: 1px 6px;
+            border-radius: 4px;
+            border: 1px solid;
+            flex-shrink: 0;
+            align-self: flex-start;
+            margin-top: 2px;
+        }
+        .pause-relic-badge.common { background: rgba(71,85,105,0.3); border-color: #475569; color: #94a3b8; }
+        .pause-relic-badge.rare { background: rgba(59,130,246,0.15); border-color: #3b82f6; color: #93c5fd; }
+        .pause-relic-badge.legendary { background: rgba(250,204,21,0.15); border-color: #facc15; color: #fde68a; }
+        .pause-relic-badge.cursed { background: rgba(239,68,68,0.15); border-color: #ef4444; color: #fca5a5; }
+        .pause-relic-stack {
+            font-size: 0.62rem;
+            color: #f59e0b;
+            margin-top: 3px;
+        }
+        .pause-empty-relics {
+            text-align: center;
+            padding: 32px 16px;
+            color: #475569;
+            font-size: 0.8rem;
+        }
+        .pause-btn-resume {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.3) 0%, rgba(99, 102, 241, 0.2) 100%);
+            border: 1px solid rgba(99, 102, 241, 0.5);
+            border-radius: 12px;
+            color: #a5b4fc;
+            font-family: 'Cinzel', serif;
+            font-size: 1rem;
+            font-weight: bold;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .pause-btn-resume:hover {
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.5) 0%, rgba(99, 102, 241, 0.4) 100%);
+            border-color: rgba(99, 102, 241, 0.8);
+            color: #e0e7ff;
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+        }
+        .pause-btn-abandon {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background: transparent;
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            border-radius: 10px;
+            color: #ef4444;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            margin-top: 8px;
+        }
+        .pause-btn-abandon:hover {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+        /* ==================== [新增] CRT 显像管特效 ==================== */
+
+        /* 特效遮罩层 */
+        /* ===== Boss 入场遗罩动画 ===== */
+        #boss-entrance-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 9998;  /* 在 crt-overlay 之下，在所有游戏 UI 之上 */
+            background: radial-gradient(
+                ellipse at center,
+                rgba(127, 29, 29, 0.0) 0%,
+                rgba(127, 29, 29, 0.6) 60%,
+                rgba(0, 0, 0, 0.85) 100%
+            );
+            opacity: 0;
+            /* 默认不显示，通过 CSS 动画触发 */
+        }
+        /* 入场动画：淡入 0.3s -> 保持 0.9s -> 淡出 0.6s，总计 1.8s */
+        @keyframes bossEntrancePulse {
+            0%   { opacity: 0; }
+            16%  { opacity: 1; }   /* 0.3s 淡入 */
+            66%  { opacity: 0.85; } /* 0.3s~1.2s 保持（轻微呈现脉冲） */
+            100% { opacity: 0; }   /* 1.2s~1.8s 淡出 */
+        }
+        .boss-entrance-active {
+            animation: bossEntrancePulse 1.8s ease-in-out forwards;
+        }
+
+        #crt-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none; /* 关键：确保鼠标点击能穿透，不影响游戏操作 */
+            z-index: 9999;        /* 确保覆盖在所有 UI 之上 */
+            
+            /* 1. 扫描线 (Scanlines) - 使用线性渐变模拟 */
+            background: linear-gradient(
+                to bottom,
+                rgba(255, 255, 255, 0),
+                rgba(255, 255, 255, 0) 50%,
+                rgba(0, 0, 0, 0.2) 50%,
+                rgba(0, 0, 0, 0.2)
+            );
+            background-size: 100% 4px; /* 每 4px 一条线 */
+            
+            /* 2. 晕影 (Vignette) - 四周变暗，模拟老式显示器 */
+            box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.9);
+            
+            /* 3. 混合模式 (可选，增加通透感) */
+            mix-blend-mode: multiply;
+
+            /* 默认隐藏，通过 JS 激活 */
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        /* 激活状态 */
+        #crt-overlay.active {
+            opacity: 1;
+            /* 叠加微弱的闪烁动画 - 使用更慢的速度模拟电压不稳 */
+            animation: crt-flicker 3s infinite, crt-flicker-random 8s infinite;
+        }
+
+        /* 屏幕微闪动画 - 增强版：模拟电压不稳 */
+        @keyframes crt-flicker {
+            0% { opacity: 0.95; }
+            10% { opacity: 0.93; }
+            15% { opacity: 0.96; }
+            20% { opacity: 0.92; }
+            30% { opacity: 0.94; }
+            40% { opacity: 0.91; }
+            45% { opacity: 0.95; }
+            50% { opacity: 0.93; }
+            60% { opacity: 0.96; }
+            70% { opacity: 0.92; }
+            75% { opacity: 0.94; }
+            85% { opacity: 0.93; }
+            90% { opacity: 0.95; }
+            100% { opacity: 0.94; }
+        }
+        
+        /* 随机闪烁效果 - 模拟偶尔的电压波动 */
+        @keyframes crt-flicker-random {
+            0% { opacity: 0.95; filter: brightness(1); }
+            2% { opacity: 0.88; filter: brightness(0.95); }
+            4% { opacity: 0.96; filter: brightness(1.02); }
+            6% { opacity: 0.93; filter: brightness(0.98); }
+            8% { opacity: 0.95; filter: brightness(1); }
+            100% { opacity: 0.95; filter: brightness(1); }
+        }
+        
+        /* 色差效果 - 模拟RGB信号分离 */
+        @keyframes crt-chromatic-aberration-light {
+            0% { 
+                text-shadow: 0 0 0 transparent;
+                filter: none;
+            }
+            20% { 
+                text-shadow: 1px 0 0 rgba(255, 0, 0, 0.5), -1px 0 0 rgba(0, 255, 255, 0.5);
+                filter: blur(0.3px);
+            }
+            40% { 
+                text-shadow: 0.5px 0 0 rgba(255, 0, 0, 0.3), -0.5px 0 0 rgba(0, 255, 255, 0.3);
+                filter: blur(0.15px);
+            }
+            100% { 
+                text-shadow: 0 0 0 transparent;
+                filter: none;
+            }
+        }
+        
+        @keyframes crt-chromatic-aberration-medium {
+            0% { 
+                text-shadow: 0 0 0 transparent;
+                filter: none;
+            }
+            15% { 
+                text-shadow: 2px 0 0 rgba(255, 0, 0, 0.7), -2px 0 0 rgba(0, 255, 255, 0.7);
+                filter: blur(0.5px);
+            }
+            30% { 
+                text-shadow: 1px 0 0 rgba(255, 0, 0, 0.4), -1px 0 0 rgba(0, 255, 255, 0.4);
+                filter: blur(0.25px);
+            }
+            100% { 
+                text-shadow: 0 0 0 transparent;
+                filter: none;
+            }
+        }
+        
+        @keyframes crt-chromatic-aberration-heavy {
+            0% { 
+                text-shadow: 0 0 0 transparent;
+                filter: none;
+            }
+            10% { 
+                text-shadow: 3px 0 0 rgba(255, 0, 0, 0.9), -3px 0 0 rgba(0, 255, 255, 0.9), 0 2px 0 rgba(0, 255, 0, 0.5);
+                filter: blur(0.8px);
+            }
+            25% { 
+                text-shadow: 2px 0 0 rgba(255, 0, 0, 0.6), -2px 0 0 rgba(0, 255, 255, 0.6);
+                filter: blur(0.4px);
+            }
+            50% { 
+                text-shadow: 1px 0 0 rgba(255, 0, 0, 0.3), -1px 0 0 rgba(0, 255, 255, 0.3);
+                filter: blur(0.2px);
+            }
+            100% { 
+                text-shadow: 0 0 0 transparent;
+                filter: none;
+            }
+        }
+        
+        /* 色差效果应用类 */
+        #crt-overlay.chromatic-light {
+            animation: crt-flicker 3s infinite, crt-flicker-random 8s infinite, crt-chromatic-aberration-light 0.3s ease-out;
+        }
+        
+        #crt-overlay.chromatic-medium {
+            animation: crt-flicker 3s infinite, crt-flicker-random 8s infinite, crt-chromatic-aberration-medium 0.4s ease-out;
+        }
+        
+        #crt-overlay.chromatic-heavy {
+            animation: crt-flicker 3s infinite, crt-flicker-random 8s infinite, crt-chromatic-aberration-heavy 0.5s ease-out;
+        }
+
+         /* 激活时的按钮样式 */
+        #crt-btn.active {
+            color: #fbbf24; /* Amber-400 */
+            border-color: #fbbf24;
+            text-shadow: 0 0 5px #fbbf24;
+        }
+        /* =====================================================
+         * 符文图标框架系统 (Rune Icon Frame System)
+         * 统一所有符文展示位置的视觉语言：
+         *   - 黑底隔离 emoji，防止与背景融为一体
+         *   - 稀有度边框颜色：common=灰 / rare=蓝 / epic=紫 / legendary=金
+         *   - 等级装饰：Lv1=单线 / Lv2=双线发光 / Lv3=三重光晕+脉冲
+         * ===================================================== */
+
+        /* 基础框架 */
+        .rune-icon-frame {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            border-radius: 8px;
+            border: 2px solid #555;
+            box-shadow: inset 0 0 4px rgba(0,0,0,0.8);
+            overflow: visible;
+            flex-shrink: 0;
+        }
+        /* 稀有度边框颜色 */
+        .rune-icon-frame.rarity-common  { border-color: #888; }
+        .rune-icon-frame.rarity-rare    { border-color: #4a90d9; box-shadow: 0 0 6px rgba(74,144,217,0.4), inset 0 0 4px rgba(0,0,0,0.8); }
+        .rune-icon-frame.rarity-epic    { border-color: #9b59b6; box-shadow: 0 0 8px rgba(155,89,182,0.5), inset 0 0 4px rgba(0,0,0,0.8); }
+        .rune-icon-frame.rarity-legendary {
+            border-color: #f39c12;
+            box-shadow: 0 0 10px rgba(243,156,18,0.6), 0 0 20px rgba(243,156,18,0.2), inset 0 0 4px rgba(0,0,0,0.8);
+            animation: rune-legendary-pulse 2s ease-in-out infinite;
+        }
+        @keyframes rune-legendary-pulse {
+            0%, 100% { box-shadow: 0 0 10px rgba(243,156,18,0.6), 0 0 20px rgba(243,156,18,0.2), inset 0 0 4px rgba(0,0,0,0.8); }
+            50%       { box-shadow: 0 0 16px rgba(243,156,18,0.9), 0 0 30px rgba(243,156,18,0.35), inset 0 0 4px rgba(0,0,0,0.8); }
+        }
+
+        /* 等级角标 - 右下角 */
+        .rune-icon-frame .rune-lv-badge {
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            font-size: 8px;
+            font-weight: 900;
+            line-height: 1;
+            padding: 1px 3px;
+            border-radius: 3px;
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 2;
+        }
+        /* Lv1 角标：灰色低调 */
+        .rune-icon-frame.lv-1 .rune-lv-badge {
+            background: #1e293b;
+            color: #94a3b8;
+            border: 1px solid #475569;
+        }
+        /* Lv2 角标：蓝色发光 */
+        .rune-icon-frame.lv-2 .rune-lv-badge {
+            background: #1e3a5f;
+            color: #60a5fa;
+            border: 1px solid #3b82f6;
+            box-shadow: 0 0 4px rgba(59,130,246,0.6);
+        }
+        /* Lv3 角标：金色发光 */
+        .rune-icon-frame.lv-3 .rune-lv-badge {
+            background: #3d2000;
+            color: #fbbf24;
+            border: 1px solid #f59e0b;
+            box-shadow: 0 0 6px rgba(251,191,36,0.8);
+        }
+
+        /* Lv2 边框双线效果：内层伪元素 */
+        .rune-icon-frame.lv-2::before {
+            content: '';
+            position: absolute;
+            inset: 2px;
+            border-radius: 5px;
+            border: 1px solid rgba(255,255,255,0.12);
+            pointer-events: none;
+        }
+        /* Lv3 边框三重效果：内层 + 外层光晕 */
+        .rune-icon-frame.lv-3::before {
+            content: '';
+            position: absolute;
+            inset: 2px;
+            border-radius: 5px;
+            border: 1px solid rgba(255,255,255,0.2);
+            pointer-events: none;
+        }
+        .rune-icon-frame.lv-3::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 11px;
+            border: 1px solid rgba(255,255,255,0.08);
+            pointer-events: none;
+        }
+
+        /* 旧版 rune-level-badge（保留兼容，但不再主要使用） */
+        .rune-level-badge {
+            position: absolute;
+            top: 2px;
+            right: 3px;
+            font-size: 9px;
+            font-weight: 700;
+            color: #fbbf24;
+            background: rgba(15, 23, 42, 0.75);
+            border-radius: 4px;
+            padding: 0 3px;
+            line-height: 1.4;
+            pointer-events: none;
+        }
+        /* 网格格子需要 relative 定位以支持角标 */
+        .rune-grid-cell {
+            position: relative;
+        }
+
+        /* ===== 战斗阶段充能符文系统 ===== */
+        #combat-rune-charge-ui {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            pointer-events: none;
+        }
+        /* 符文槽行：左侧标签 + 右侧符文位 */
+        #combat-rune-slot-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #combat-rune-get-label {
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            color: rgba(148, 163, 184, 0.7);
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        /* 单符文槽 - 作为外层容器，内部放 .rune-icon-frame */
+        #combat-rune-single-slot {
+            width: 36px;
+            height: 36px;
+            border-radius: 9px;
+            border: 1.5px solid rgba(100, 116, 139, 0.35);
+            background: rgba(15, 23, 42, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: visible;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        /* 空状态：虚线边框 */
+        #combat-rune-single-slot.empty {
+            border-style: dashed;
+            border-color: rgba(100, 116, 139, 0.3);
+        }
+        /* 已有符文：外层容器仅保留轻微背景，视觉主体由内部 .rune-icon-frame 承担 */
+        #combat-rune-single-slot.has-rune {
+            border-style: solid;
+            border-color: rgba(100, 116, 139, 0.2);
+            background: rgba(10, 15, 30, 0.5);
+        }
+        /* 充能槽内的符文框架尺寸 */
+        #combat-rune-single-slot .rune-icon-frame {
+            width: 30px;
+            height: 30px;
+            font-size: 16px;
+            border-radius: 7px;
+        }
+        /* 充能满刷新闪光动画 */
+        #combat-rune-single-slot.rune-refresh {
+            animation: runeRefreshFlash 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes runeRefreshFlash {
+            0%   { transform: scale(0.6); filter: brightness(3) saturate(2); opacity: 0.4; }
+            40%  { transform: scale(1.25); filter: brightness(2) saturate(1.8); opacity: 1; }
+            70%  { transform: scale(0.95); filter: brightness(1.2); }
+            100% { transform: scale(1);   filter: brightness(1); }
+        }
+        /* 充能满时背景闪光（使用 .rune-slot-glow-overlay 替代 ::after，避免与 rune-icon-frame::after 冲突） */
+        .rune-slot-glow-overlay {
+            position: absolute;
+            inset: 0;
+            border-radius: 8px;
+            background: rgba(168, 85, 247, 0);
+            pointer-events: none;
+            transition: background 0.2s;
+            z-index: 1;
+        }
+        #combat-rune-single-slot.rune-refresh .rune-slot-glow-overlay {
+            animation: runeSlotGlow 0.55s ease-out forwards;
+        }
+        @keyframes runeSlotGlow {
+            0%   { background: rgba(168, 85, 247, 0.7); }
+            100% { background: rgba(168, 85, 247, 0); }
+        }
+        /* 充能条 */
+        #combat-charge-bar-shell {
+            position: relative;
+            width: 160px;
+            height: 8px;
+            background: rgba(15, 23, 42, 0.95);
+            border-radius: 9999px;
+            border: 1px solid rgba(100, 116, 139, 0.35);
+            overflow: hidden;
+        }
+        #combat-charge-bar-fill {
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 0%;
+            border-radius: 9999px;
+            background: linear-gradient(90deg, #5b21b6, #7c3aed, #a855f7);
+            transition: width 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 0 6px rgba(168, 85, 247, 0.5);
+        }
+        /* 充能满时进度条闪光脱去 */
+        #combat-charge-bar-fill.charge-burst {
+            animation: chargeBurst 0.4s ease-out forwards;
+        }
+        @keyframes chargeBurst {
+            0%   { width: 100%; filter: brightness(2.5); box-shadow: 0 0 16px rgba(168,85,247,1); }
+            60%  { width: 100%; filter: brightness(1.5); }
+            100% { width: 0%;   filter: brightness(1);   box-shadow: 0 0 6px rgba(168,85,247,0.5); }
+        }
+        /* 充能满时外壳发光 */
+        #combat-charge-bar-shell.charge-full-flash {
+            animation: chargeFull 0.45s ease-out;
+        }
+        @keyframes chargeFull {
+            0%   { box-shadow: 0 0 0 0 rgba(168,85,247,0.9); }
+            50%  { box-shadow: 0 0 0 5px rgba(168,85,247,0.35); }
+            100% { box-shadow: 0 0 0 0 rgba(168,85,247,0); }
+        }
+        /* ===== 符文入背包动画 ===== */
+        .rune-claim-fly {
+            position: fixed;
+            z-index: 9999;
+            pointer-events: none;
+            font-size: 28px;
+            filter: drop-shadow(0 0 8px rgba(168,85,247,0.9));
+            animation: runeClaimFly 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes runeClaimFly {
+            0%   { transform: scale(1.4) translateY(0);   opacity: 1; }
+            30%  { transform: scale(1.1) translateY(-12px); opacity: 1; }
+            100% { transform: scale(0.3) translateY(-80px) translateX(var(--fly-dx)); opacity: 0; }
+        }
+        /* 敌人动作后领取符文 — 飞入背包动画（支持任意 XY 方向） */
+        .rune-claim-fly--to-bag {
+            animation: runeClaimFlyToBag 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes runeClaimFlyToBag {
+            0%   { transform: translate(0, 0) scale(1.3);   opacity: 1; filter: drop-shadow(0 0 10px rgba(168,85,247,1)); }
+            20%  { transform: translate(0, -18px) scale(1.15); opacity: 1; }
+            100% { transform: translate(var(--fly-to-x), var(--fly-to-y)) scale(0.25); opacity: 0; }
+        }
+        /* 入背包时符文槽的消失动画 */
+        #combat-rune-single-slot.rune-claim-out {
+            animation: runeSlotClaimOut 0.5s ease-in forwards;
+        }
+        @keyframes runeSlotClaimOut {
+            0%   { transform: scale(1);   opacity: 1; }
+            40%  { transform: scale(1.2); opacity: 1; filter: brightness(2); }
+            100% { transform: scale(0.5); opacity: 0; }
+        }
+        /* ===== Game Over 结算页面样式 ===== */
+        #phase-gameover {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
+        }
+        #gameover-content {
+            animation: gameover-fadein 0.6s ease-out forwards;
+        }
+        @keyframes gameover-fadein {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        /* 回合节点图横向滚动容器 */
+        .gameover-timeline {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        /* Boss 节点悬停动画 */
+        .gameover-node-boss {
+            animation: boss-node-pulse 2s ease-in-out infinite;
+        }
+        @keyframes boss-node-pulse {
+            0%, 100% { box-shadow: 0 0 6px currentColor; }
+            50%       { box-shadow: 0 0 16px currentColor; }
+        }
+        /* 统计卡片动画 */
+        .gameover-stat-card {
+            animation: stat-card-in 0.5s ease-out forwards;
+        }
+        @keyframes stat-card-in {
+            from { opacity: 0; transform: scale(0.95); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+        /* 慢速闪烁动画 */
+        .animate-pulse-slow {
+            animation: pulse-slow 2.5s ease-in-out infinite;
+        }
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%       { opacity: 0.7; transform: scale(1.08); }
+        }
+    </style>
+</head>
+<body>
+<div id="app-wrapper">
+
+<!-- ===== PC 左侧边栏：收集队列 + 配方 HUD ===== -->
+<aside id="pc-left-sidebar">
+    <!-- 收集阶段内容区域 -->
+    <div id="pc-left-gathering" style="display:none; flex-direction:column; height:100%;">
+        <div class="text-xs font-bold text-amber-400/60 tracking-widest uppercase mb-4 font-[Cinzel]">收集阶段</div>
+        <!-- 收集队列挂载点（PC 模式下由 JS 将 #gathering-queue 迁移至此） -->
+        <div id="pc-left-queue-mount" class="mb-3 flex flex-wrap gap-2"></div>
+        <!-- 配方 HUD 挂载点（PC 模式下由 JS 将 #gathering-hud-mount 内容迁移至此） -->
+        <div id="pc-left-recipe-mount" class="flex-1 overflow-y-auto"></div>
+    </div>
+    <!-- 战斗阶段内容区域：info-drawer 挂载点 -->
+    <div id="pc-left-combat" style="display:none; flex-direction:column; height:100%; overflow:hidden;">
+        <div id="pc-left-drawer-mount" style="flex:1; overflow:hidden;"></div>
+    </div>
+</aside>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    <div id="crt-overlay"></div>
+
+    <!-- Boss 入场全屏遗罩（深红色暗化） -->
+    <div id="boss-entrance-overlay"></div>
+
+    <!-- Phase Title Animation (中央淡入淡出，不再缩小到左上角) -->
+    <div id="phase-title-container">
+        <div id="phase-title" class="phase-text">回聲煉金師</div>
+        <div id="phase-sub" class="phase-sub">點擊開始</div>
+    </div>
+
+    <!-- 统一顶部信息栏 -->
+    <div id="unified-top-bar">
+        <!-- 左侧：阶段标题 + SP 宝石 -->
+        <div class="top-bar-left">
+            <div id="top-phase-label" class="text-xs font-bold text-amber-400/80 font-[Cinzel] tracking-wider whitespace-nowrap"></div>
+            <div id="sp-panel" class="flex flex-wrap gap-2 pointer-events-none transition-opacity duration-300"></div>
+        </div>
+
+        <!-- 中间：战斗充能符文 UI（仅战斗阶段显示） -->
+        <div class="top-bar-center" id="top-bar-center-slot">
+            <div id="combat-rune-charge-ui" style="display:none;">
+                <!-- 充能条 -->
+                <div id="combat-charge-bar-shell">
+                    <div id="combat-charge-bar-fill"></div>
+                </div>
+                <!-- 符文槽行：左侧标签 + 右侧符文位 -->
+                <div id="combat-rune-slot-row">
+                    <span id="combat-rune-get-label">GET RUNE</span>
+                    <div id="combat-rune-single-slot" class="empty">
+                        <div class="rune-slot-glow-overlay"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：回合数 + 加速 + 设置 -->
+        <div class="top-bar-right">
+            <div class="round-pill">R <span id="round-num" class="stat-highlight">1</span></div>
+            <button id="speed-btn">⏩</button>
+            <!-- 设置按钮容器（相对定位，为下拉面板提供锁定点） -->
+            <div style="position: relative;">
+                <button id="settings-btn" title="设置">⚙️</button>
+                <div id="settings-panel" class="hidden">
+                    <div class="settings-item" id="mute-item" onclick="game.sys_toggleMute()">
+                        <span class="s-icon" id="mute-icon">🔊</span>
+                        <span class="s-label">音效</span>
+                        <span class="s-badge active" id="mute-badge">开启</span>
+                    </div>
+                    <div class="settings-item" id="damage-numbers-item" onclick="game.sys_toggleDamageNumbers()">
+                        <span class="s-icon">🔢</span>
+                        <span class="s-label">伤害数字</span>
+                        <span class="s-badge active" id="damage-numbers-badge">开启</span>
+                    </div>
+                    <div class="settings-item" id="crt-item" onclick="game.sys_toggleCrt()">
+                        <span class="s-icon">📺</span>
+                        <span class="s-label">CRT 特效</span>
+                        <span class="s-badge" id="crt-badge">关闭</span>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+
+    <!-- Phase 0: Selection -->
+    <div id="phase-meta" class="ui-overlay active-phase" style="display: flex; z-index: 200; background: #020617; pointer-events: auto;">
+        
+        <div class="absolute inset-0 overflow-hidden pointer-events-none">
+            <div class="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-indigo-900/20 rounded-full blur-[100px]"></div>
+            <div class="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-900/10 rounded-full blur-[80px]"></div>
+        </div>
+
+        <div class="absolute top-6 right-6 flex gap-4 pointer-events-auto z-10">
+             <div class="stat-pill border-purple-500/30 bg-slate-900/80 backdrop-blur-md text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.1)] px-4 py-2 rounded-full flex items-center">
+                <span class="text-lg filter drop-shadow-[0_0_5px_rgba(168,85,247,0.8)]">🔮</span>
+                <span id="meta-currency-display" class="font-bold text-xl ml-2 font-[Cinzel]">0</span>
+                <span class="text-[10px] text-purple-200/60 ml-2 tracking-widest uppercase">符文碎片</span>
+             </div>
+        </div>
+
+        <div class="flex flex-col items-center justify-center w-full h-full pb-12 relative z-10">
+            
+            <div class="text-center mb-16 relative group cursor-default">
+                <h1 class="text-6xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-400 to-amber-700 font-[Cinzel] mb-4 drop-shadow-[0_0_35px_rgba(245,158,11,0.3)] tracking-tight">
+                    Echo Alchemist
+                </h1>
+                <p class="text-slate-400 text-sm tracking-[0.8em] opacity-60 font-serif border-t border-slate-800 pt-4 mt-2 mx-auto w-2/3">
+                    回聲煉金師
+                </p>
+                <div class="absolute -left-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transparent via-amber-500/30 to-transparent"></div>
+                <div class="absolute -right-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transparent via-amber-500/30 to-transparent"></div>
+            </div>
+
+            <button onclick="game.meta_startRun()" class="btn-main w-72 py-5 mb-4 border border-indigo-400/30 shadow-[0_0_40px_rgba(79,70,229,0.2)] hover:scale-105 hover:shadow-[0_0_60px_rgba(79,70,229,0.4)] transition-all duration-300 group relative overflow-hidden bg-slate-900/80 rounded-xl">
+                <div class="absolute inset-0 bg-gradient-to-r from-indigo-600/0 via-indigo-400/10 to-indigo-600/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                <span class="text-2xl font-[Cinzel] tracking-widest relative z-10 text-indigo-50 group-hover:text-white">開始煉成</span>
+                <div class="text-[10px] text-indigo-300/70 mt-1 font-sans tracking-wider uppercase">Initialize Sequence</div>
+            </button>
+            <!-- [局内存档] 继续游戏按鈕，默认隐藏，有存档时由 JS 显示 -->
+            <button id="meta-continue-btn" onclick="game.meta_continueRun()" style="display:none" class="w-72 py-3 mb-8 flex flex-col items-center justify-center border border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.15)] hover:scale-105 hover:shadow-[0_0_50px_rgba(16,185,129,0.3)] transition-all duration-300 group relative overflow-hidden bg-slate-900/70 rounded-xl cursor-pointer">
+                <div class="absolute inset-0 bg-gradient-to-r from-emerald-600/0 via-emerald-400/8 to-emerald-600/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                <div class="flex items-center gap-2 relative z-10">
+                    <span class="text-emerald-400 text-lg">▶</span>
+                    <span class="text-base font-bold tracking-widest text-emerald-100 group-hover:text-white">繼續上次游戲</span>
+                </div>
+                <div class="continue-round text-[10px] text-emerald-400/70 mt-0.5 font-sans tracking-wider">Round ?</div>
+            </button>
+
+            <div class="grid grid-cols-3 gap-6 w-full max-w-lg px-8">
+                <button onclick="game.meta_openShop()" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-amber-500/30 transition-all duration-300 group backdrop-blur-sm">
+                    <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-amber-900/20 group-hover:text-amber-400 transition-all shadow-inner">
+                        <span class="text-2xl">⚒️</span>
+                    </div>
+                    <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-amber-100">煉金工坊</span>
+                </button>
+
+                <button onclick="game.ui_openTruthBook()" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-cyan-500/30 transition-all duration-300 group backdrop-blur-sm">
+                    <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-cyan-900/20 group-hover:text-cyan-400 transition-all shadow-inner">
+                        <span class="text-2xl">📖</span>
+                    </div>
+                    <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-cyan-100">真理之书</span>
+                </button>
+
+                <button onclick="game.trainingGround.enter()" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-red-500/30 transition-all duration-300 group backdrop-blur-sm">
+                    <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-red-900/20 group-hover:text-red-400 transition-all shadow-inner">
+                        <span class="text-2xl">⚔️</span>
+                    </div>
+                    <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-red-100">試煉場</span>
+                </button>
+            </div>
+
+        </div>
+        
+        <!-- [BUGFIX] 提升 z-index 并微调位置，确保在移动端不会被底部安全区或装饰层遮挡 -->
+        <button onclick="game.tutorial_restartFromHome()" class="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[11px] font-bold tracking-wider text-amber-400/60 border border-amber-500/20 bg-slate-900/40 hover:text-amber-300 hover:border-amber-400/50 hover:bg-slate-800/60 transition-all duration-300 backdrop-blur-sm whitespace-nowrap z-50 pointer-events-auto">
+            <span class="text-sm">📖</span> 重新开始教程
+        </button>
+        <div class="absolute bottom-4 w-full text-center text-slate-700 text-[10px] font-[Cinzel] tracking-widest opacity-50">
+            Ver 9.2 (Meta Progression)
+        </div>
+    </div>
+
+    <!-- [RUNE] 符文发射器面板 -->
+    <div id="phase-rune-launcher" class="ui-overlay" style="display: none; background: #020617; pointer-events: auto; z-index: 300;">
+        <div class="w-full max-w-md h-full flex flex-col p-6 overflow-y-auto">
+            <!-- 顶部导航 -->
+            <div class="flex justify-between items-center mb-4">
+                <button onclick="game.ui_closeRuneLauncher()" class="rune-launcher-close-btn text-slate-400 hover:text-white transition-colors">
+                    <span class="text-2xl">⬅️</span>
+                </button>
+                <h2 class="text-2xl font-[Cinzel] text-purple-100 tracking-widest">符文發射器</h2>
+                <!-- 局外符文碎片计数，合成动画的目标元素 -->
+                <div id="launcher-shard-display" class="flex items-center gap-1 bg-purple-900/40 border border-purple-500/30 rounded-full px-3 py-1 text-sm">
+                    <span class="filter drop-shadow-[0_0_4px_rgba(168,85,247,0.8)]">🔮</span>
+                    <span id="launcher-shard-count" class="font-bold text-purple-200 font-[Cinzel] text-sm">0</span>
+                </div>
+            </div>
+
+            <!-- Tab 导航 -->
+            <div class="flex gap-2 mb-5 border-b border-slate-700/50 pb-3">
+                <button id="rune-tab-launcher" onclick="game.ui_switchRuneTab('launcher')" class="flex-1 py-2 px-3 rounded-lg text-xs font-bold tracking-wider transition-all duration-200 bg-purple-700/60 text-purple-100 border border-purple-500/60">⚡ 發射器</button>
+                <button id="rune-tab-codex" onclick="game.ui_switchRuneTab('codex')" class="flex-1 py-2 px-3 rounded-lg text-xs font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">📖 詞條圖鑑</button>
+            </div>
+
+            <!-- 发射器内容区域 -->
+            <div id="rune-launcher-content">
+
+            <!-- 符文网格区域 -->
+            <div class="mb-6">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="text-xs text-purple-300/60 tracking-widest uppercase">Rune Grid — 3×3</div>
+                    <button onclick="game.ui_autoArrangeRunes()" class="flex items-center gap-1 px-2.5 py-1 bg-amber-900/30 border border-amber-600/40 rounded-lg hover:bg-amber-800/40 hover:border-amber-400/60 transition-all text-[10px] font-bold text-amber-300 hover:text-amber-100" title="自动将库存符文排布到网格以触发最多词条">
+                        <span>⚡</span>
+                        <span>一键排布</span>
+                    </button>
+                </div>
+                <div id="rune-grid-container" class="grid grid-cols-3 gap-3 mx-auto" style="max-width: 240px;">
+                    <!-- 9 个格子由 JS 动态生成 -->
+                </div>
+            </div>
+
+            <!-- 符文库存区域 -->
+            <div class="mb-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="text-xs text-slate-400/60 tracking-widest uppercase">符文庫存 <span id="rune-inventory-count" class="text-purple-300">(0)</span></div>
+                    <span id="rune-selected-count" class="text-xs text-slate-500">已选中 0/3</span>
+                </div>
+                <div id="rune-inventory-container" class="flex flex-wrap gap-2 min-h-[60px] p-3 bg-slate-900/40 border border-slate-700/30 rounded-xl">
+                    <!-- 库存符文由 JS 动态生成，支持点击选中/取消 -->
+                    <div id="rune-inventory-empty" class="w-full text-center text-slate-600 text-xs py-2">暫無符文</div>
+                </div>
+            </div>
+
+            <!-- 合成区域 -->
+            <div class="mb-4 bg-amber-900/10 border border-amber-700/30 rounded-xl p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-amber-400">⚗️</span>
+                    <div class="text-xs text-amber-300/80 tracking-widest uppercase font-bold">合成爐</div>
+                    <div class="text-[10px] text-slate-500 ml-auto">選中 3 個同 ID 同等級符文</div>
+                </div>
+                <button id="rune-merge-btn"
+                    onclick="game.ui_doRuneMerge()"
+                    disabled
+                    class="w-full py-2 px-3 rounded-xl text-sm font-bold bg-slate-800/60 text-slate-600 border border-slate-700/40 cursor-not-allowed transition-all duration-200">
+                    ⚗️ 合成（需選中 3 個同 ID 同等級）
+                </button>
+            </div>
+
+            <!-- 重铸炉区域 -->
+            <div class="mb-4 bg-purple-900/10 border border-purple-700/30 rounded-xl p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-purple-400">🔮</span>
+                    <div class="text-xs text-purple-300/80 tracking-widest uppercase font-bold">重鑄爐</div>
+                    <div class="text-[10px] text-slate-500 ml-auto">選中任意 3 個符文</div>
+                </div>
+                <button id="rune-reforge-btn"
+                    onclick="game.ui_doRuneReforge()"
+                    disabled
+                    class="w-full py-2 px-3 rounded-xl text-sm font-bold bg-slate-800/60 text-slate-600 border border-slate-700/40 cursor-not-allowed transition-all duration-200">
+                    🔮 重鑄（消耗 3 個符文，獲得全新符文）
+                </button>
+            </div>
+
+            <!-- 操作结果提示 -->
+            <div id="rune-action-result" class="hidden mb-4 text-sm font-bold text-center py-2 px-3 rounded-xl"></div>
+
+            <!-- 激活词条列表 -->
+            <div class="mb-4">
+                <div class="text-xs text-amber-300/60 tracking-widest uppercase mb-3">已激活詞條</div>
+                <div id="rune-active-runewords" class="space-y-2">
+                    <div id="rune-no-runewords" class="text-slate-600 text-xs text-center py-3">尚無激活詞條</div>
+                </div>
+            </div>
+
+            <!-- 属性共鸣状态 -->
+            <div id="rune-resonance-summary" class="hidden mb-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-yellow-400">✨</span>
+                    <div class="text-xs text-yellow-300/80 tracking-widest uppercase font-bold">屬性共鳴</div>
+                    <div class="text-[10px] text-slate-500 ml-auto">同屬性符文累積層數激活</div>
+                </div>
+                <div id="rune-resonance-list" class="space-y-2">
+                    <!-- 由 JS 动态生成 -->
+                </div>
+            </div>
+
+            <!-- 属性加成汇总 -->
+            <div id="rune-stats-summary" class="hidden bg-purple-900/20 border border-purple-700/30 rounded-xl p-4">
+                <div class="text-xs text-purple-300/60 tracking-widest uppercase mb-2">屬性加成匯總</div>
+                <div id="rune-stats-list" class="flex flex-wrap gap-2">
+                    <!-- 由 JS 动态生成：包括基础属性（蓝色标签）和词条共鸣（金色标签） -->
+                </div>
+            </div>
+
+            </div><!-- end #rune-launcher-content -->
+
+            <!-- 词条图鉴面板 -->
+            <div id="rune-codex-panel" class="hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="text-xs text-slate-400/60 tracking-widest uppercase">詞條圖鑑</div>
+                    <div class="text-xs text-purple-300/70">已發現 <span id="rune-codex-discovered-count" class="font-bold text-purple-200">0</span> / <span id="rune-codex-total-count" class="text-slate-400">0</span></div>
+                </div>
+                <div id="rune-codex-list" class="space-y-3">
+                    <!-- 由 JS 动态生成 -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 符文选择弹出层 -->
+        <div id="rune-picker-overlay" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-[400] flex items-end justify-center" onclick="game.ui_closeRunePicker()">
+            <div class="w-full max-w-md bg-slate-900 border border-purple-700/50 rounded-t-2xl p-5 relative" onclick="event.stopPropagation()">
+                <!-- [新增] 词条预览提示框 -->
+                <div id="runeword-preview-tooltip" class="hidden absolute left-1/2 -translate-x-1/2 bottom-full mb-4 w-[90%] bg-slate-800 border-2 border-amber-500/50 rounded-xl p-3 shadow-[0_0_30px_rgba(0,0,0,0.8)] z-[500] pointer-events-none">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-amber-400 text-sm">✨</span>
+                        <span class="text-amber-200 text-xs font-bold tracking-widest uppercase">預覽新觸發詞條</span>
+                    </div>
+                    <div id="runeword-preview-content" class="space-y-2">
+                        <!-- 预览内容由 JS 动态生成 -->
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center mb-4">
+                    <div class="text-sm text-purple-200 font-bold tracking-wider">選擇符文放入格子</div>
+                    <div class="text-[10px] text-slate-500 italic">長按可預覽詞条效果</div>
+                </div>
+                
+                <div id="rune-picker-list" class="flex flex-wrap gap-3 max-h-48 overflow-y-auto custom-scrollbar">
+                    <!-- 由 JS 动态生成 -->
+                </div>
+                <button onclick="game.ui_closeRunePicker()" class="mt-4 w-full py-2 text-slate-400 hover:text-white text-sm border border-slate-700 rounded-lg transition-colors">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- [META] 炼金工坊 (商店) UI -->
+    <div id="phase-shop" class="ui-overlay" style="display: none; background: #020617; pointer-events: auto; z-index: 300;">
+        <div class="w-full max-w-md h-full flex flex-col p-6">
+            <div class="flex justify-between items-center mb-6">
+                <button onclick="game.phase_switchPhase('meta')" class="text-slate-400 hover:text-white transition-colors">
+                    <span class="text-2xl">⬅️</span>
+                </button>
+                <h2 class="text-2xl font-[Cinzel] text-amber-100 tracking-widest">煉金工坊</h2>
+                <div class="flex items-center gap-2">
+                    <div class="flex items-center bg-slate-900/80 px-3 py-1 rounded-full border border-purple-500/30">
+                        <span class="text-purple-400 mr-1">🔮</span>
+                        <span id="shop-currency-display" class="font-bold text-purple-100 text-xs">0</span>
+                    </div>
+
+                </div>
+            </div>
+            
+            <div id="shop-category-tabs" class="flex gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar">
+                <!-- 动态生成分类标签 -->
+            </div>
+
+            <div id="shop-items-container" class="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+                <!-- 动态生成升级项 -->
+            </div>
+        </div>
+    </div>
+
+    <div id="phase-selection" class="ui-overlay" style="display: none;">
+    
+        <div class="flex-1 w-full min-h-0 overflow-y-auto flex flex-col items-center py-4">
+            <div id="marble-selection-grid" class="marble-grid"></div>
+            <div class="h-2 shrink-0"></div>
+            <!-- 弹珠预览面板 -->
+            <div id="marble-preview-panel" class="marble-preview-hidden" style="pointer-events: auto;">
+                <div class="preview-header">
+                    <div id="preview-marble-ball"></div>
+                    <div class="preview-header-info">
+                        <div class="preview-name-row">
+                            <span id="preview-marble-icon"></span>
+                            <span id="preview-marble-name"></span>
+                        </div>
+                        <div id="preview-marble-tags"></div>
+                    </div>
+                </div>
+                <div class="preview-divider"></div>
+                <div class="preview-truth-label">真理之書</div>
+                <div id="preview-marble-desc"></div>
+                <div class="preview-peg-label">鉤釘 / 子彈效果</div>
+                <div id="preview-marble-peg"></div>
+            </div>
+            <div class="h-2 shrink-0"></div>
+        </div>
+
+        <div class="w-full flex flex-col items-center pointer-events-auto shrink-0 z-10 bg-slate-900/80 backdrop-blur-sm border-t border-slate-700/50 pt-4 pb-6" 
+             style="padding-bottom: max(24px, env(safe-area-inset-bottom));">
+            
+            <div class="flex items-center justify-between w-full px-4 mb-3 gap-3">
+                <div>
+                    <p class="text-sm text-slate-400"><span id="selection-mode-label">命運抉擇</span>：已選擇 <span id="selected-count" class="text-white font-bold">0</span> / <span id="selected-required-count" class="text-white font-bold">3</span></p>
+                    <p id="selection-mode-subtitle" class="text-[11px] text-amber-200 mt-1 hidden" style="display:none;"></p>
+                </div>
+                <!-- 符文发射器入口（选择阶段） -->
+                <button onclick="game.ui_openRuneLauncher()" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 border border-purple-700/50 rounded-lg hover:bg-purple-900/30 hover:border-purple-400/70 transition-all duration-200 group">
+                    <span class="text-sm group-hover:scale-110 transition-transform inline-block">⚡</span>
+                    <span class="text-xs font-bold text-purple-300 tracking-wider group-hover:text-purple-100">符文發射器</span>
+                </button>
+            </div>
+            <button id="confirm-selection-btn" class="btn-main" disabled>開始煉金</button>
+        </div>
+
+    </div>
+
+    <!-- Phase 1: Gathering -->
+    <div id="phase-gathering" class="ui-overlay" style="display: none;">
+        <div class="absolute top-24 w-full text-center pointer-events-none">
+            <p class="text-xs text-cyan-100/40">點擊上方區域釋放</p>
+        </div>
+
+        <div id="hero-gauge-container" class="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center pointer-events-none transition-all duration-300">
+            <div class="text-[10px] text-cyan-200 tracking-widest mb-1 opacity-80 font-bold" style="text-shadow: 0 0 10px #06b6d4;">
+                COMBO CHARGE
+            </div>
+            <div id="multicast-ui" class="absolute left-[110%] bottom-0 flex flex-col items-center justify-center transition-all duration-300 opacity-0 scale-50">
+                <div class="text-[9px] text-orange-300 font-bold tracking-wider mb-1 whitespace-nowrap">SHOTS</div>
+                <div class="relative flex items-center justify-center w-12 h-12">
+                    <div class="absolute inset-0 bg-orange-500/20 rounded-full blur-md animate-pulse"></div>
+                    <div class="absolute inset-0 border-2 border-orange-400 rounded-full opacity-80"></div>
+                    <span id="multicast-num" class="relative text-2xl font-[Cinzel] font-bold text-orange-100 drop-shadow-[0_0_5px_#f97316]">x1</span>
+                </div>
+            </div>
+            <div id="gauge-shell" class="relative w-48 h-5 bg-slate-900/90 rounded-full border border-slate-600/50 backdrop-blur-md shadow-lg">
+                
+                <div id="gauge-pulse-layer"></div>
+
+                <div id="hit-bar"></div>
+                
+                <div class="absolute inset-0 flex items-center justify-center z-10">
+                    <span id="hit-text" class="text-[10px] font-bold text-white drop-shadow-md tracking-wider">0/5</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 研磨阶段符文发射器按钮 -->
+        <button onclick="game.ui_openRuneLauncher()" class="rune-launcher-float-btn absolute bottom-32 right-2 w-10 h-10 bg-slate-800/90 hover:bg-purple-900/80 rounded-full border-2 border-purple-600/60 hover:border-purple-300 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg" title="符文發射器">
+            <span class="text-lg">⚡</span>
+        </button>
+
+        <div class="bottom-panel">
+        <div class="flex items-center w-full h-full">
+            <div class="queue-container" id="gathering-queue"></div>
+            
+            <div class="flex-1 min-w-0 h-full">
+                <div id="gathering-hud-mount" class="recipe-scroll"></div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Phase 3: Combat -->
+    <div id="phase-combat" class="ui-overlay" style="display: none;">
+        <div id="skill-bar" class="absolute bottom-24 right-4 flex flex-col gap-3 pointer-events-auto z-50">
+        </div>
+        <div id="recipe-hud-container" class="absolute z-40 pointer-events-none"></div>
+        
+        <!-- 左下角伤害统计按鈕 -->
+        <button id="damage-stats-btn" onclick="game.ui_toggleDamagePanel()" class="absolute bottom-2 left-2 w-10 h-10 bg-slate-800/90 hover:bg-slate-700/90 rounded-full border-2 border-purple-500/50 hover:border-purple-400 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg">
+            <span class="text-lg">📊</span>
+        </button>
+        
+        <!-- 战斗阶段符文发射器按鈕 -->
+        <button onclick="game.ui_openRuneLauncher()" class="rune-launcher-float-btn absolute bottom-2 right-2 w-10 h-10 bg-slate-800/90 hover:bg-purple-900/80 rounded-full border-2 border-purple-600/60 hover:border-purple-300 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg" title="符文發射器">
+            <span class="text-lg">⚡</span>
+        </button>
+
+        <!-- combat-rune-charge-ui 已移至 #unified-top-bar 中间区域 -->
+        
+        <div class="text-center mt-4 pointer-events-none" style="margin-top: 80px;">
+            <!-- Round Damage Display -->
+            <div id="round-damage-display" class="mt-2 text-xl font-bold text-purple-400 opacity-0 transition-opacity drop-shadow-md">
+                <span id="round-damage-val">0</span>
+            </div>
+        </div>
+
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center w-full z-20 px-4" id="combat-message"></div>
+
+        
+ 
+    </div>
+
+    <!-- Phase: Truth Book (Encyclopedia) -->
+    <div id="phase-truth-book" class="ui-overlay hidden-phase" style="display: none; z-index: 300; background: rgba(2, 6, 23, 0.98); pointer-events: auto;">
+        <div class="flex flex-col w-full h-full p-6">
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-6 shrink-0">
+                <h2 class="text-3xl font-[Cinzel] text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">真理之書 <span class="text-sm text-slate-500 ml-2">Liber Veritatis</span></h2>
+                <button onclick="game.ui_closeTruthBook()" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-400 hover:bg-red-900/40 hover:text-red-400 transition-all">✕</button>
+            </div>
+
+            <div class="flex flex-1 min-h-0 gap-6">
+                <!-- Left: List -->
+                <div class="w-1/3 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar">
+                    <div class="text-xs font-bold text-slate-500 tracking-widest uppercase mb-1">敵人圖鑑</div>
+                    <div id="truth-enemy-list" class="flex flex-col gap-2"></div>
+                    <div class="text-xs font-bold text-slate-500 tracking-widest uppercase mt-4 mb-1">屬性百科</div>
+                    <div id="truth-attr-list" class="flex flex-col gap-2"></div>
+                </div>
+
+                <!-- Right: Detail & Demo -->
+                <div id="truth-detail-panel" class="flex-1 flex flex-col bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden relative shadow-2xl">
+    <div id="truth-empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-slate-700">
+        <span class="text-6xl mb-4 opacity-50">🔮</span>
+        <p class="font-[Cinzel] tracking-widest text-sm">SELECT AN ENTRY TO ANALYZE</p>
+    </div>
+    
+    <div id="truth-content" class="hidden flex flex-col h-full relative">
+        <div class="p-5 border-b border-slate-800 bg-slate-900/90 backdrop-blur-sm z-20 shadow-md">
+            <div class="flex items-center gap-4 mb-2">
+                <div class="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 shadow-inner shrink-0">
+                    <span id="truth-item-icon" class="text-3xl filter drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]"></span>
+                </div>
+                <div>
+                    <h3 id="truth-item-name" class="text-2xl font-bold text-white font-[Cinzel] tracking-wide"></h3>
+                    <div id="truth-item-tags" class="flex flex-wrap gap-2 mt-1"></div>
+                </div>
+            </div>
+            <p id="truth-item-desc" class="text-slate-400 text-xs leading-relaxed pl-1"></p>
+        </div>
+
+        <div class="flex-1 relative bg-[#020617] overflow-hidden group">
+            <div class="absolute top-4 left-4 z-10 flex flex-col gap-1 pointer-events-none">
+                <div class="bg-cyan-950/80 backdrop-blur-md px-3 py-1 rounded border-l-2 border-cyan-400 text-[10px] text-cyan-300 tracking-widest uppercase shadow-[0_0_15px_rgba(6,182,212,0.1)]">
+                    SIMULATION MATRIX
+                </div>
+                <div class="text-[9px] text-cyan-700 font-mono" id="truth-sim-time">T: 000</div>
+            </div>
+
+            <button onclick="game.truthBook.resetDemo()" class="absolute top-4 right-4 z-10 w-8 h-8 rounded bg-slate-800/50 hover:bg-cyan-600/20 border border-slate-700 hover:border-cyan-400/50 text-slate-400 hover:text-cyan-300 transition-all flex items-center justify-center" title="重置演示">
+                ⟳
+            </button>
+
+            <canvas id="truth-demo-canvas" class="w-full h-full block"></canvas>
+
+            <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent pointer-events-none">
+                <div id="truth-demo-log" class="font-mono text-[10px] space-y-1 text-slate-400 h-20 overflow-hidden flex flex-col justify-end mask-image-t">
+                    </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="phase-relic" class="ui-overlay hidden-phase" style="display: none; z-index: 200; background: rgba(2, 6, 23, 0.95);">
+        <div class="flex flex-col items-center justify-center w-full h-full p-4">
+            
+            <div class="text-center mb-8">
+                <h2 class="text-4xl font-bold text-amber-400 font-[Cinzel] mb-2 drop-shadow-lg">古代遺物</h2>
+                <p class="text-slate-400 text-sm">命運的饋贈，選擇一種力量</p>
+            </div>
+
+            <div id="relic-container" class="flex flex-wrap justify-center gap-4 w-full max-w-4xl">
+                </div>
+
+            <button onclick="game.ui_skipRelic()" class="mt-12 text-slate-500 hover:text-slate-300 text-sm underline cursor-pointer transition-colors">
+                放棄遷物並獲得局內貨幣
+            </button>
+        </div>
+    </div>
+    <!-- Phase: Game Over (每局结束结算页面) -->
+    <div id="phase-gameover" class="ui-overlay hidden-phase" style="display: none; z-index: 400; background: #020617; pointer-events: auto; overflow-y: auto;">
+        <div id="gameover-content" class="w-full max-w-md mx-auto flex flex-col">
+            <!-- 内容由 game_over.js 动态渲染 -->
+        </div>
+    </div>
+
+    <div id="info-drawer" class="absolute bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-600 text-slate-200 transform transition-transform duration-300 translate-y-full z-50 flex flex-col h-[75vh] safe-area-pb">
+    
+        <button onclick="game.ui.closeDrawer()" class="absolute top-2 right-2 text-slate-400 hover:text-white p-2">✕</button>
+
+        <div class="flex border-b border-slate-700 bg-slate-900/50">
+            <button class="flex-1 py-3 text-sm font-bold text-amber-400 border-b-2 border-amber-400 tab-btn transition-colors" onclick="game.ui.switchTab('status')">敵人狀態</button>
+            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="game.ui.switchTab('affix')">特殊詞條</button>
+            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="game.ui.switchTab('recipe')">配方圖鑑</button>
+            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="game.ui.switchTab('damage')">傷害統計</button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 relative">
+            
+            <div id="tab-status" class="tab-content h-full space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-lg font-bold" id="info-enemy-type">普通魔像</span>
+                    <span class="text-xs bg-slate-700 px-2 py-1 rounded" id="info-hp">HP: 100/100</span>
+                </div>
+                
+                <div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden relative mt-1">
+                    <div id="info-temp-bar" class="h-full bg-orange-500 absolute transition-all" style="width: 0%; left: 50%;"></div>
+                    <div class="absolute top-0 bottom-0 w-0.5 bg-white/50 left-1/2"></div> </div>
+                <p id="info-temp-text" class="text-xs text-center text-slate-400 mt-1">溫度: 0°C</p>
+
+                <div id="info-status-list" class="space-y-2 text-xs text-slate-300 mt-2">
+                    </div>
+            </div>
+
+            <div id="tab-affix" class="tab-content hidden h-full space-y-2 overflow-y-auto">
+                <div id="info-affix-list" class="space-y-2">
+                    <p class="text-slate-500 text-center italic mt-4">該敵人無特殊詞條</p>
+                </div>
+            </div>
+
+            <div id="tab-recipe" class="tab-content hidden h-full overflow-y-auto text-xs space-y-3">
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="bg-slate-800 p-2 rounded border border-slate-700">
+                        <div class="text-green-400 font-bold mb-1">⤴️ 彈性 (Bounce)</div>
+                        <div class="text-slate-400">在敵人之間彈射，增加命中次數。</div>
+                    </div>
+                    <div class="bg-slate-800 p-2 rounded border border-slate-700">
+                        <div class="text-red-400 font-bold mb-1">↗️ 穿透 (Pierce)</div>
+                        <div class="text-slate-400">穿透敵人，對後排造成傷害。</div>
+                    </div>
+                    <div class="bg-slate-800 p-2 rounded border border-slate-700">
+                        <div class="text-yellow-400 font-bold mb-1">🔱 散射 (Scatter)</div>
+                        <div class="text-slate-400">分裂出額外子彈，擴大打擊面。</div>
+                    </div>
+                    <div class="bg-slate-800 p-2 rounded border border-slate-700">
+                        <div class="text-cyan-400 font-bold mb-1">❄️ 冰霜 (Cryo)</div>
+                        <div class="text-slate-400">降低溫度。極寒可凍結敵人(無法行動)。</div>
+                    </div>
+                    <div class="bg-slate-800 p-2 rounded border border-slate-700">
+                        <div class="text-orange-400 font-bold mb-1">🔥 火焰 (Pyro)</div>
+                        <div class="text-slate-400">升高溫度。過熱造成持續傷害與燃燒擴散。</div>
+                    </div>
+                    <div class="bg-slate-800 p-2 rounded border border-slate-700">
+                        <div class="text-purple-400 font-bold mb-1">⚡ 閃電 (Lightning)</div>
+                        <div class="text-slate-400">對最近敵人造成連鎖傷害。</div>
+                    </div>
+                     <div class="bg-slate-800 p-2 rounded border border-slate-700">
+                        <div class="text-sky-400 font-bold mb-1">🔦 光球 (Laser)</div>
+                        <div class="text-slate-400">瞬時射線，根據反射面進行折射。</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="tab-damage" class="tab-content hidden h-full overflow-y-auto">
+                <div id="damage-stats-container" class="flex gap-2 h-full">
+                    <!-- 子弹伤害统计将动态生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 暂停页面 ==================== -->
+    <div id="phase-pause" class="ui-overlay hidden-phase" style="display: none;">
+        <div class="flex flex-col w-full h-full" style="padding-top: max(60px, env(safe-area-inset-top)); padding-bottom: max(20px, env(safe-area-inset-bottom));">
+            
+            <!-- 页头 -->
+            <div class="flex items-center justify-between px-5 mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-100 font-[Cinzel] tracking-wide">游戏暂停</h2>
+                    <p class="text-slate-500 text-xs mt-0.5">PAUSED</p>
+                </div>
+                <button onclick="game.ui_closePause()" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-800 border border-slate-600 text-slate-400 hover:text-white hover:bg-slate-700 transition-all text-lg">&#x2715;</button>
+            </div>
+
+            <!-- 可滚动内容区 -->
+            <div class="flex-1 overflow-y-auto px-5" style="-webkit-overflow-scrolling: touch;">
+
+                <!-- 设置区 -->
+                <div class="mb-6">
+                    <div class="pause-section-title">设置</div>
+
+                    <div class="pause-setting-row active" id="pause-mute-row" onclick="game.sys_toggleMute(); game.ui_syncPauseSettings();">
+                        <span class="ps-icon" id="pause-mute-icon">🔊</span>
+                        <span class="ps-label">音效</span>
+                        <span class="ps-badge" id="pause-mute-badge">开启</span>
+                    </div>
+
+                    <div class="pause-setting-row active" id="pause-damage-numbers-row" onclick="game.sys_toggleDamageNumbers(); game.ui_syncPauseSettings();">
+                        <span class="ps-icon">🔢</span>
+                        <span class="ps-label">伤害数字</span>
+                        <span class="ps-badge" id="pause-damage-numbers-badge">开启</span>
+                    </div>
+
+                    <div class="pause-setting-row" id="pause-crt-row" onclick="game.sys_toggleCrt(); game.ui_syncPauseSettings();">
+                        <span class="ps-icon">📺</span>
+                        <span class="ps-label">CRT 特效</span>
+                        <span class="ps-badge" id="pause-crt-badge">关闭</span>
+                    </div>
+
+
+                </div>
+
+                <!-- 遗物区 -->
+                <div class="mb-6">
+                    <div class="pause-section-title">当前遗物</div>
+                    <div id="pause-relic-list">
+                        <div class="pause-empty-relics">尚未获得任何遗物</div>
+                    </div>
+                </div>
+
+                <!-- 放弃本局按钮 -->
+                <div class="mb-4">
+                    <button onclick="if(confirm('确定放弃本局并返回主界面？')) { game.ui_closePause(); game.phase_switchPhase(\'meta\'); }" class="pause-btn-abandon">
+                        放弃本局
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- 继续游戏按钮（固定底部） -->
+            <div class="px-5 mt-3" style="padding-bottom: max(16px, env(safe-area-inset-bottom));">
+                <button onclick="game.ui_closePause()" class="pause-btn-resume">继续游戏</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== PC 右侧边栏：符文发射器常驻 ===== -->
+<aside id="pc-right-sidebar">
+    <div id="pc-right-rune-mount" class="w-full h-full"></div>
+</aside>
+
+</div><!-- /#app-wrapper -->
+
+
+<script type="module">
+// ==================== 模块化导入 (v2 - EventBus 架构) ====================
+import { Game, audio, eventBus } from './src/core.js';
+
+// ==================== 创建全局游戏实例 ====================
+// 注意：必须在 window 对象上声明，以便 HTML 中的 onclick 属性可以访问
+const game = new Game();
+window.game = game;
+// [v2 变更] 移除 window.audio 直接挂载，改用事件总线和依赖注入
+// audio 代理对象在 SoundManager 未初始化时静默失败，无需全局挂载
+window.audio = audio; // 保留兼容性，但现在是安全代理而非直接实例
+
+// 也可以通过全局变量访问（用于控制台调试）
+if (typeof globalThis !== 'undefined') {
+    globalThis.game = game;
+}
+
+// ==================== 设置面板控制逻辑 ====================
+const crtOverlay = document.getElementById('crt-overlay');
+const settingsBtn = document.getElementById('settings-btn');
+const settingsPanel = document.getElementById('settings-panel');
+
+// --- CRT 状态 ---
+let isCrtOn = localStorage.getItem('ea_crt_enabled') !== 'false';
+function updateCrtVisuals() {
+    const badge = document.getElementById('crt-badge');
+    const item = document.getElementById('crt-item');
+    if (isCrtOn) {
+        crtOverlay.classList.add('active');
+        if (badge) { badge.textContent = '开启'; badge.classList.add('active'); }
+        if (item) item.classList.add('active');
+    } else {
+        crtOverlay.classList.remove('active');
+        if (badge) { badge.textContent = '关闭'; badge.classList.remove('active'); }
+        if (item) item.classList.remove('active');
+    }
+}
+updateCrtVisuals();
+
+// 挂载到 game 对象，供 HTML onclick 调用
+game.sys_toggleCrt = () => {
+    isCrtOn = !isCrtOn;
+    localStorage.setItem('ea_crt_enabled', isCrtOn);
+    updateCrtVisuals();
+};
+
+// --- 静音切换 ---
+game.sys_toggleMute = () => {
+    audio.resume();
+    const isMuted = audio.toggleMute();
+    const icon = document.getElementById('mute-icon');
+    const badge = document.getElementById('mute-badge');
+    const item = document.getElementById('mute-item');
+    if (icon) icon.textContent = isMuted ? '🔇' : '🔊';
+    if (badge) { badge.textContent = isMuted ? '关闭' : '开启'; }
+    if (badge) isMuted ? badge.classList.remove('active') : badge.classList.add('active');
+    if (item) isMuted ? item.classList.remove('active') : item.classList.add('active');
+};
+
+// --- 伤害数字切换 ---
+game.sys_toggleDamageNumbers = () => {
+    game.showDamageNumbers = !game.showDamageNumbers;
+    const badge = document.getElementById('damage-numbers-badge');
+    const item = document.getElementById('damage-numbers-item');
+    const isOn = game.showDamageNumbers;
+    if (badge) { badge.textContent = isOn ? '开启' : '关闭'; }
+    if (badge) isOn ? badge.classList.add('active') : badge.classList.remove('active');
+    if (item) isOn ? item.classList.add('active') : item.classList.remove('active');
+    if (window.showToast) showToast(isOn ? '伤害数字：开启' : '伤害数字：关闭');
+};
+
+// --- 设置按钮改为打开暂停页面 ---
+if (settingsBtn) {
+    settingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // 如果当前有老设置面板，就先关闭它
+        if (settingsPanel) settingsPanel.classList.add('hidden');
+        game.ui_openPause();
+    });
+}
+// ==============================================================
+</script>
+</body>
+</html>
