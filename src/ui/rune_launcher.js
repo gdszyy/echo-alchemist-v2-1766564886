@@ -467,6 +467,9 @@ export const rune_launcher_system = {
         }
         this.activeElementResonances = newResonances;
 
+        // 6.6 更新属性共鸣状态显示
+        this._ui_updateResonanceDisplay();
+
         // 7. 更新属性加成汇总（展示词条加成 + 基础加成）
         this._ui_updateRuneStatsDisplay(activeStats, baseStats);
 
@@ -726,6 +729,75 @@ export const rune_launcher_system = {
                 list.appendChild(tag);
             });
         }
+    },
+
+    /**
+     * 更新属性共鸣状态显示
+     * 基于 this.activeElementResonances 渲染当前已激活的共鸣阶段卡片
+     * @private
+     */
+    _ui_updateResonanceDisplay() {
+        const summary = document.getElementById('rune-resonance-summary');
+        const list    = document.getElementById('rune-resonance-list');
+        if (!summary || !list) return;
+
+        const resonances = this.activeElementResonances || {};
+        const entries = Object.entries(resonances);
+
+        if (entries.length === 0) {
+            summary.classList.add('hidden');
+            return;
+        }
+        summary.classList.remove('hidden');
+        list.innerHTML = '';
+
+        // 属性对应的渐变色配置（背景、边框、标题、进度条颜色）
+        const ELEMENT_COLORS = {
+            pyro:      { bg: 'bg-red-900/30',    border: 'border-red-600/50',    text: 'text-red-200',    bar: 'bg-red-500',    label: 'text-red-300' },
+            cryo:      { bg: 'bg-cyan-900/30',   border: 'border-cyan-600/50',   text: 'text-cyan-200',   bar: 'bg-cyan-400',   label: 'text-cyan-300' },
+            lightning: { bg: 'bg-yellow-900/30', border: 'border-yellow-600/50', text: 'text-yellow-200', bar: 'bg-yellow-400', label: 'text-yellow-300' },
+            bounce:    { bg: 'bg-green-900/30',  border: 'border-green-600/50',  text: 'text-green-200',  bar: 'bg-green-500',  label: 'text-green-300' },
+            pierce:    { bg: 'bg-blue-900/30',   border: 'border-blue-600/50',   text: 'text-blue-200',   bar: 'bg-blue-400',   label: 'text-blue-300' },
+            scatter:   { bg: 'bg-pink-900/30',   border: 'border-pink-600/50',   text: 'text-pink-200',   bar: 'bg-pink-400',   label: 'text-pink-300' },
+            laser:     { bg: 'bg-orange-900/30', border: 'border-orange-600/50', text: 'text-orange-200', bar: 'bg-orange-400', label: 'text-orange-300' },
+        };
+
+        // 阶段对应的展示文字
+        const TIER_LABELS = { 3: '一阶', 6: '二阶', 9: '三阶' };
+
+        entries.forEach(([element, res]) => {
+            const c = ELEMENT_COLORS[element] || ELEMENT_COLORS.pyro;
+            const statInfo = STAT_DISPLAY[element] || { name: element, icon: '' };
+            const tierLabel = TIER_LABELS[res.threshold] || `${res.threshold}层`;
+
+            // 计算进度条：当前层数 / 下一阶阈値（三阶已满则显示满格）
+            const nextThreshold = res.threshold === 9 ? 9 : res.threshold + 3;
+            const progressPct = res.threshold === 9
+                ? 100
+                : Math.min(100, Math.round((res.statCount / nextThreshold) * 100));
+
+            const card = document.createElement('div');
+            card.className = [
+                'p-3 rounded-xl border',
+                c.bg, c.border,
+            ].join(' ');
+
+            card.innerHTML = `
+                <div class="flex items-center justify-between mb-1.5">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-base">${statInfo.icon}</span>
+                        <span class="text-xs font-bold ${c.text}">${statInfo.name}共鸣</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 ${c.label} font-bold">${tierLabel}</span>
+                    </div>
+                    <span class="text-[10px] ${c.label} font-bold">${res.statCount}层${res.threshold < 9 ? ` / ${nextThreshold}` : ' 满格'}</span>
+                </div>
+                <div class="text-[10px] text-slate-300/80 mb-2 leading-relaxed">${res.desc}</div>
+                <div class="w-full h-1 bg-slate-700/60 rounded-full overflow-hidden">
+                    <div class="h-full ${c.bar} rounded-full transition-all duration-500" style="width: ${progressPct}%"></div>
+                </div>
+            `;
+            list.appendChild(card);
+        });
     },
 
     /**

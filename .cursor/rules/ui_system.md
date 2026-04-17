@@ -196,3 +196,4 @@ for (const subsystem of _subsystems) {
 | `_ui_showRuneActionResult(msg, type)` | 显示操作结果提示 |
 | `_ui_playMergeShardFlyEffect(startX, startY, amount)` | 合成时符文碎片飞向局外货币显示区的动画 |
 | `_ui_updateLauncherShardCount()` | 更新发射器面板内符文碎片计数显示 |
+| `_ui_updateResonanceDisplay()` | 更新属性共鸣状态显示（基于 `this.activeElementResonances` 渲染已激活共鸣阶段卡片，包含属性图标、阶段标签、效果描述及层数进度条） |
