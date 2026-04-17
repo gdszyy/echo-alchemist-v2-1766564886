@@ -1,0 +1,47 @@
+diff --git a/.cursor/rules/process_insights/PI-006_round_start_reward_resolver.md b/.cursor/rules/process_insights/PI-006_round_start_reward_resolver.md
+index 8f744f3..7cbce6c 100644
+--- a/.cursor/rules/process_insights/PI-006_round_start_reward_resolver.md
++++ b/.cursor/rules/process_insights/PI-006_round_start_reward_resolver.md
+@@ -1,7 +1,7 @@
+ ---
+ id: "PI-006"
+-version: "v1.0"
+-last_updated: "2026-04-17"
++version: "v1.1"
++last_updated: "2026-04-18"
+ author: "tsk-33b634db-ac8"
+ related_modules: ["game_phase", "game_system", "core", "ui/shop"]
+ status: "active"
+@@ -36,6 +36,13 @@ status: "active"
+ **正确做法**：在 `sys_saveRunState()` 中持久化 `pendingRoundStartRewards`，并在 `sys_loadRunState()` 中恢复后立即再次进入 resolver。旧的 `_pendingRelicEvent` / `_pendingBossRelic` 需要迁移成 `relic` 队列项。
+ **关键位置**：`src/game_system.js` → `sys_saveRunState()` / `sys_loadRunState()`
+ 
++### 坑 4: 二次复盘时未经比对就假定“前序改动未落主仓”
++
++**现象**：任务描述或口头交接提示需要“重做”同一批掉落与状态机逻辑，但实际主仓可能已经合入该改动；如果直接回滚或重写，会制造无意义改动与新的回归风险。
++**根因**：多 Agent 协作场景下，Git 文档库交付物、主仓 `main` 与任务描述的时间点不一定一致。仅凭描述无法判断当前代码真实状态。
++**正确做法**：先读取前序任务交付物，再检查主仓关键函数和规则文档是否存在，最后对 `src/core.js`、`src/game_system.js`、`src/game_phase.js`、`src/ui/shop.js`、`src/event_bus.js` 及相关规则文档逐文件 diff。若 diff 为空，则应在现有代码上继续，不应回滚重做。
++**关键位置**：`tasks/tsk-33b634db-ac8/deliverables/*` ↔ 当前主仓对应文件
++
+ ## 关键耦合点
+ 
+ - `core.js` 的 `enemy:killed` 监听器只负责登记延迟奖励，不应直接打开 UI。
+@@ -46,4 +53,5 @@ status: "active"
+ 
+ | 版本 | 日期 | 变更内容 | 作者 |
+ |------|------|---------|------|
++| v1.1 | 2026-04-18 | 补充二次复盘防坑项：在决定回滚或续做前，先对前序交付物与主仓对应文件逐项 diff | tsk-bc433262-6fe |
+ | v1.0 | 2026-04-17 | 初始记录：固定回合遗物移除，新增 round-start resolver、延迟奖励队列与存档恢复迁移规则 | tsk-33b634db-ac8 |
+diff --git a/.cursor/rules/process_insights/index.md b/.cursor/rules/process_insights/index.md
+index c666729..6889f5b 100644
+--- a/.cursor/rules/process_insights/index.md
++++ b/.cursor/rules/process_insights/index.md
+@@ -19,7 +19,7 @@
+ | PI-003 | 子系统扩展与组合模式注入流程 | v1.0 | core, game_system, combat_system, ui_system | 2026-04-16 | [PI-003_subsystem_composition_pattern.md](PI-003_subsystem_composition_pattern.md) |
+ | PI-004 | 性能预算扩展与新特效接入流程 | v1.0 | performance, spawn_system, combat_system, entities | 2026-04-16 | [PI-004_performance_budget_extension.md](PI-004_performance_budget_extension.md) |
+ | PI-005 | 性能自适应影响评估流程 | v1.0 | performance, combat_system, effects, entities, render_system, spawn_system | 2026-04-16 | [PI-005_perf_impact_assessment.md](PI-005_perf_impact_assessment.md) |
+-| PI-006 | Round-Start 延迟奖励结算流程 | v1.0 | game_phase, game_system, core, ui/shop | 2026-04-17 | [PI-006_round_start_reward_resolver.md](PI-006_round_start_reward_resolver.md) |
++| PI-006 | Round-Start 延迟奖励结算流程 | v1.1 | game_phase, game_system, core, ui/shop | 2026-04-18 | [PI-006_round_start_reward_resolver.md](PI-006_round_start_reward_resolver.md) |
+ 
+ ### 按模块快速检索
+ 
