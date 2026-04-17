@@ -1110,8 +1110,6 @@ phase_gathering_getRandomPegType() {
                 }
             }
         }
-
-        }
         
         this.round++;
         this.prevRoundDamage = this.roundDamage;
