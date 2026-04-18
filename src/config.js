@@ -667,6 +667,17 @@ const CONFIG = {
         selectionCount: 6,  // 选卡阶段提供多少张卡
         selectionReq: 3,     // 需要选择多少张卡
         assimilationDoubleMultiplier: 2,
+        enemyDropBaseChance: 0.04,
+        enemyDropRoundBonus: 0.004,
+        enemyDropRoundBonusCap: 20,
+        enemyDropAffixBonus: 0.03,
+        enemyDropMaxChance: 0.24,
+        enemyDropRelicBaseChance: 0.12,
+        enemyDropRelicAffixBonus: 0.12,
+        enemyDropRelicHighHpThreshold: 120,
+        enemyDropRelicHighHpBonus: 0.08,
+        enemyDropRelicMaxChance: 0.45,
+        enemyDropPureEssenceChance: 0.35,
         hitCooldowns: 17,    // 默认基础冷却时间
         pegCooldownAdd: 7,   // 每次触发增加的冷却帧数
         pegCooldownDecay: 2, // 每秒减少的冷却帧数

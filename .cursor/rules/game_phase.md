@@ -20,9 +20,9 @@ globs: ["src/game_phase.js"]
 
 ### 2.1 命运抉择阶段 (Selection Phase)
 - **职责**: 玩家在回合开始前处理 round-start resolver 结算后的选择卡牌。遗物不再由固定回合直接插入，而是由延迟奖励队列在进入本阶段前统一解析。
-- **入口**: `sys_startRoundStartResolver()` 先结算 `pendingRoundStartRewards`；若没有待处理遗物，则调用 `sys_initSelectionPhase()` 呈现选择卡片。
-- **模式分支**: 标准模式要求选择 `3` 枚弹珠；若上一轮遗物写入 `pendingSelectionMode = { mode: 'pure_essence', requiredCount: 1 }`，则本次命运抉择改为只选择 `1` 枚弹珠，并在确认前完成 1 个合法符文注入。
-- **出口**: 玩家做出选择并确认，触发转场动画进入研磨阶段。纯净精华模式下，确认时必须先完成合法性校验并把注入结果写回 `MarbleDefinition.collected`。
+- **入口**: `sys_startRoundStartResolver()` 会先消费 `pendingRoundStartRewards`；若命中 `relic`，进入遗物事件；若命中 `chaos_essence` 或 `pure_essence`，则先写入 `pendingSelectionMode` 再调用 `sys_initSelectionPhase()` 呈现对应的命运时刻界面。
+- **模式分支**: 标准模式要求选择 `3` 枚弹珠；`chaos_essence` 模式沿用标准 3 选流程，但 UI 需显式标记为“混沌精华”；`pure_essence` 模式要求只选择 `1` 枚弹珠，并在确认前完成 1 个合法符文注入。
+- **出口**: 玩家做出选择并确认，触发转场动画进入研磨阶段。纯净精华模式下，确认时必须先完成合法性校验，把注入结果写回 `MarbleDefinition.collected`，并为对应 `marble.type` 写入 `doubleAssimilationBoostRounds`。
 
 ### 2.2 研磨阶段 (Gathering Phase)
 - **职责**: 核心打砖块玩法，发射弹珠收集属性，填充弹药队列。
@@ -37,8 +37,8 @@ globs: ["src/game_phase.js"]
   - 失败: 玩家防线被突破，调用 `sys_clearRunState()` 清除局内存档，游戏结束 (Game Over)。
 
 ### 2.4 局内存档与刷新恢复
-- **存档时机**: `phase_finalizeRound()` 末尾，`round++` 之后、`sys_startRoundStartResolver()` 之前。
-- **存档内容**: round、score、enemies（含 Vec2 坐标）、pegs（type/level/frozenTurns）、ownedRelics、runeInventory、runeGrid、unlockedWeights、guaranteedNextRound、`pendingRoundStartRewards`、`pendingSelectionMode`、`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`、`doubleAssimilationBoostRounds`、Boss 系统字段、难度字段、钉盘形态、技能、统计数据等。
+- **存档时机**: `phase_finalizeRound()` 末尾，`round++` 之后、`sys_startRoundStartResolver()` 之前；此外，进入命运时刻阶段、切换弹珠选择、绑定纯净精华符文时，也应即时调用 `sys_saveRunState()`，避免刷新后丢失当前选择与注入上下文。
+- **存档内容**: round、score、enemies（含 Vec2 坐标）、pegs（type/level/frozenTurns）、ownedRelics、runeInventory、runeGrid、unlockedWeights、guaranteedNextRound、`pendingRoundStartRewards`、`pendingSelectionMode`、`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`、`selectionPreviewState`、`relicOverlayReturnState`、`fateMomentContext`、`doubleAssimilationBoostRounds`、Boss 系统字段、难度字段、钉盘形态、技能、统计数据等。
 - **恢复入口**: Meta 页面「繼續上次游戲」按钮（`#meta-continue-btn`），调用 `meta_continueRun()`。
 - **恢复流程**: `sys_resetGame()` + `meta_applyUpgrades()` → 注入存档状态 → `phase_gathering_initPachinko(true)` 重建钉盘 → `sys_startRoundStartResolver()` 先结算待处理遗物/精华，再决定是否进入选牌阶段。
 - **清档时机**: 游戏结束（`_gameover_triggerPhase`）或新开一局（`meta_startRun`）时自动清除。
@@ -129,12 +129,13 @@ globs: ["src/game_phase.js"]
 
 ## 6. Boss 遗物与 round-start 延迟奖励处理
 
-**当前设计**：Boss 击杀后仍只掉落符文；固定回合遗物事件已移除。非 Boss 敌人可以在死亡时登记 `relic` 或 `essence` 到 `pendingRoundStartRewards`，并在下一回合开始由 `sys_startRoundStartResolver()` 统一结算。
+**当前设计**：Boss 击杀后仍只掉落符文；固定回合遗物事件已移除。非 Boss 敌人可以在死亡时登记 `relic`、`chaos_essence` 或 `pure_essence` 到 `pendingRoundStartRewards`，并在下一回合开始由 `sys_startRoundStartResolver()` 统一结算。
 
 - `phase_finalizeRound()` 不再计算 `isRelicRound`，只负责存档并启动 round-start resolver。
 - `sys_initGameStart()` 的首个遗物也通过 `pendingRoundStartRewards` 进入统一流程，不再直接调用 `ui_showRelicSelection()`。
 - `ui_closeRelicSelection()` 在 `resumeTarget === 'round_start_resolver'` 时必须回到 `sys_continueRoundStartResolver()`，而不是默认进入 `selection`/`gathering`。
 - 若遗物 overlay 是从 `selection` 阶段中途打开，则关闭时必须按 `relicOverlayReturnState` 恢复原有命运抉择界面，并执行 `ui_refreshSelectionModeUI()`，禁止重新跑 `sys_initSelectionPhase()` 覆盖特殊选择态。
+- 命运时刻一旦由 resolver 触发，就应写入 `fateMomentContext`，并与 `selectionPreviewState` / `relicOverlayReturnState` 一起进入存档；只有当玩家确认选择并进入研磨阶段后，才允许清空这些上下文字段。
 - `_pendingBossRelic` 和 `_pendingRelicEvent` 仅作为旧存档兼容字段保留；加载旧存档时应迁移为 `pendingRoundStartRewards` 中的 `relic` 条目。
 
 ## 7. 清屏奖励规则 (Full-Clear Bonus)
@@ -152,6 +153,7 @@ globs: ["src/game_phase.js"]
 - `phase_finalizeRound()` 结束时除了旧的 `assimilationBoostRounds` 外，还必须同步递减 `doubleAssimilationBoostRounds`。
 - 只要任一同化增益字段对某个 `marbleType` 仍大于 0，该类型在下一轮实体同化判定中都应被视为处于 `x2` 模式。
 - 纯净精华不是持续 Buff；`pendingSelectionMode` 在 `sys_initSelectionPhase()` 被消费后应立即清空，避免多回合串味。
+- 纯净精华确认后必须把 `doubleAssimilationBoostRounds[marble.type]` 至少写为 `1`（仅覆盖当前命运时刻产出的这次研磨会话；若已有更高层数则保留更高值），并由 `phase_finalizeRound()` 在回合结束时统一递减，禁止只改 UI 文案而不落实际倍率。
 
 ## 8. 难度平衡系统 (Difficulty Balance System)
 ### 8.1 战后高压因子 (Post-Boss Surge)

@@ -292,6 +292,7 @@ export const game_system = {
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
         this.relicOverlayReturnState = null;
+        this.fateMomentContext = null;
         this.ownedRelics = [];
         
         // 补充遗物相关的重置字段
@@ -512,6 +513,15 @@ export const game_system = {
         const pendingMode = this.pendingSelectionMode;
         this.selectionMode = pendingMode?.mode || 'standard';
         this.selectionRequiredCount = Math.max(1, pendingMode?.requiredCount || CONFIG.gameplay.selectionReq || 3);
+        this.fateMomentContext = this.selectionMode === 'standard'
+            ? null
+            : {
+                type: this.selectionMode,
+                source: pendingMode?.source || 'unknown',
+                round: pendingMode?.round || this.round || 1,
+                enemyType: pendingMode?.enemyType || null,
+                sourceRewardType: pendingMode?.sourceRewardType || this.selectionMode,
+            };
         this.pendingSelectionMode = null;
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
@@ -524,6 +534,7 @@ export const game_system = {
         if (confirmBtn) confirmBtn.disabled = true;
         if (recipeHud) recipeHud.classList.add('hidden');
         if (typeof this.ui_refreshSelectionModeUI === 'function') this.ui_refreshSelectionModeUI();
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
     },
 
     /**
@@ -532,18 +543,31 @@ export const game_system = {
      */
     sys_queueRoundStartReward(reward = {}) {
         if (!this.pendingRoundStartRewards) this.pendingRoundStartRewards = [];
-        const requestedType = reward.type === 'relic' ? 'relic' : 'essence';
+
+        const legacyEssenceType = reward.essenceType || reward.essenceKind || reward.mode || null;
+        const requestedType = ['relic', 'chaos_essence', 'pure_essence'].includes(reward.type)
+            ? reward.type
+            : reward.type === 'essence'
+                ? (legacyEssenceType === 'pure_essence' ? 'pure_essence' : 'chaos_essence')
+                : 'relic';
+
         if (requestedType === 'relic' && this.pendingRoundStartRewards.some(item => item && item.type === 'relic')) {
-            const fallbackAmount = Math.max(10, Math.round(reward.fallbackAmount || reward.amount || reward.enemyMaxHp || 10));
-            return this.sys_queueRoundStartReward({ ...reward, type: 'essence', amount: fallbackAmount });
+            const fallbackType = reward.fallbackRewardType === 'pure_essence'
+                ? 'pure_essence'
+                : reward.fallbackRewardType === 'chaos_essence'
+                    ? 'chaos_essence'
+                    : (Math.random() < 0.35 ? 'pure_essence' : 'chaos_essence');
+            return this.sys_queueRoundStartReward({ ...reward, type: fallbackType });
         }
+
         const normalized = {
             type: requestedType,
-            amount: requestedType === 'essence' ? Math.max(1, Math.round(reward.amount || 0)) : 0,
             source: reward.source || 'unknown',
             round: reward.round || this.round || 1,
             enemyType: reward.enemyType || null,
             enemyMaxHp: reward.enemyMaxHp || 0,
+            sourceRelicId: reward.sourceRelicId || null,
+            sourceRelicName: reward.sourceRelicName || null,
         };
         this.pendingRoundStartRewards.push(normalized);
         eventBus.emit(EVENT_TYPES.ROUND_START_REWARD_QUEUED, {
@@ -555,18 +579,29 @@ export const game_system = {
 
     /**
      * @method sys_tryQueueEnemyRoundReward
-     * @description 敌人死亡后，为下一回合开始登记遗物或精华奖励。
+     * @description 敌人死亡后，为下一回合开始登记遗物、混沌精华或纯净精华奖励。
      */
     sys_tryQueueEnemyRoundReward(enemy) {
         if (!enemy || enemy.type === 'boss' || enemy._roundStartRewardQueued) return null;
         enemy._roundStartRewardQueued = true;
 
         const affixCount = Array.isArray(enemy.affixes) ? enemy.affixes.length : 0;
-        const dropChance = Math.min(0.04 + Math.min(this.round || 1, 20) * 0.004 + affixCount * 0.03, 0.24);
+        const gameplayCfg = CONFIG.gameplay || {};
+        const dropChance = Math.min(
+            (gameplayCfg.enemyDropBaseChance || 0.04)
+                + Math.min(this.round || 1, gameplayCfg.enemyDropRoundBonusCap || 20) * (gameplayCfg.enemyDropRoundBonus || 0.004)
+                + affixCount * (gameplayCfg.enemyDropAffixBonus || 0.03),
+            gameplayCfg.enemyDropMaxChance || 0.24
+        );
         if (Math.random() >= dropChance) return null;
 
-        const essenceAmount = Math.max(10, Math.round((enemy.maxHp || 10) * (0.5 + affixCount * 0.25)));
-        const relicChance = Math.min(0.12 + affixCount * 0.12 + ((enemy.maxHp || 0) >= 120 ? 0.08 : 0), 0.45);
+        const relicChance = Math.min(
+            (gameplayCfg.enemyDropRelicBaseChance || 0.12)
+                + affixCount * (gameplayCfg.enemyDropRelicAffixBonus || 0.12)
+                + ((enemy.maxHp || 0) >= (gameplayCfg.enemyDropRelicHighHpThreshold || 120) ? (gameplayCfg.enemyDropRelicHighHpBonus || 0.08) : 0),
+            gameplayCfg.enemyDropRelicMaxChance || 0.45
+        );
+        const essenceType = Math.random() < (gameplayCfg.enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
         const queuedReward = this.sys_queueRoundStartReward(
             Math.random() < relicChance
                 ? {
@@ -575,11 +610,10 @@ export const game_system = {
                     round: this.round,
                     enemyType: enemy.type || 'normal',
                     enemyMaxHp: enemy.maxHp || 0,
-                    fallbackAmount: essenceAmount,
+                    fallbackRewardType: essenceType,
                 }
                 : {
-                    type: 'essence',
-                    amount: essenceAmount,
+                    type: essenceType,
                     source: 'enemy_drop',
                     round: this.round,
                     enemyType: enemy.type || 'normal',
@@ -588,8 +622,13 @@ export const game_system = {
         );
 
         if (!queuedReward) return null;
-        if (queuedReward.type === 'relic') showToast('✨ 敵人掉落了遺物線索，將在下回合開始結算');
-        else showToast(`🧪 敵人掉落 ${queuedReward.amount} 精華，將在下回合開始結算`);
+        if (queuedReward.type === 'relic') {
+            showToast('✨ 敵人掉落了遺物線索，將在下回合開始結算');
+        } else if (queuedReward.type === 'pure_essence') {
+            showToast('🕊️ 敵人掉落了純淨精華，將在下回合開始觸發命運時刻');
+        } else {
+            showToast('🎡 敵人掉落了混沌精華，將在下回合開始觸發命運時刻');
+        }
         return queuedReward;
     },
 
@@ -615,18 +654,41 @@ export const game_system = {
             const reward = this.pendingRoundStartRewards.shift();
             if (!reward) continue;
 
-            if (reward.type === 'essence') {
-                const amount = Math.max(1, Math.round(reward.amount || 0));
-                if (typeof this.meta_addCurrency === 'function') this.meta_addCurrency(amount);
-                showToast(`🧪 獲得 ${amount} 精華`);
-                continue;
-            }
+            const rewardType = reward.type === 'essence'
+                ? (reward.essenceType === 'pure_essence' ? 'pure_essence' : 'chaos_essence')
+                : reward.type;
 
-            if (reward.type === 'relic') {
+            if (rewardType === 'relic') {
                 this._roundStartResolverActive = false;
                 if (typeof this.ui_showRelicSelection === 'function') {
                     this.ui_showRelicSelection({ resumeTarget: 'round_start_resolver', source: reward.source || 'unknown' });
                 }
+                return;
+            }
+
+            if (rewardType === 'chaos_essence' || rewardType === 'pure_essence') {
+                this.pendingSelectionMode = {
+                    mode: rewardType,
+                    requiredCount: rewardType === 'pure_essence' ? 1 : (CONFIG.gameplay.selectionReq || 3),
+                    sourceRewardType: rewardType,
+                    source: reward.source || 'unknown',
+                    round: reward.round || this.round || 1,
+                    enemyType: reward.enemyType || null,
+                };
+                this.fateMomentContext = {
+                    type: rewardType,
+                    source: reward.source || 'unknown',
+                    round: reward.round || this.round || 1,
+                    enemyType: reward.enemyType || null,
+                    sourceRewardType: rewardType,
+                };
+                this._roundStartResolverActive = false;
+                eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
+                    round: this.round || 1,
+                    pendingCount: this.pendingRoundStartRewards.length,
+                });
+                showToast(rewardType === 'pure_essence' ? '🕊️ 命運時刻：純淨精華' : '🎡 命運時刻：混沌精華');
+                this.sys_initSelectionPhase();
                 return;
             }
         }
@@ -680,6 +742,7 @@ export const game_system = {
         if (countEl) countEl.innerText = count;
         if (typeof this.ui_refreshSelectionModeUI === 'function') this.ui_refreshSelectionModeUI();
         else if (confirmBtn) confirmBtn.disabled = count !== required;
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
         // 通知教程系统：已选中足够弹珠
         if (count === required) eventBus.emit('tutorial:marbles_ready');
     },
@@ -1168,6 +1231,9 @@ export const game_system = {
                 selectionMode: this.selectionMode || 'standard',
                 selectionRequiredCount: this.selectionRequiredCount || (CONFIG.gameplay.selectionReq || 3),
                 selectionInjectedRune: this.selectionInjectedRune ? { ...this.selectionInjectedRune } : null,
+                selectionPreviewState: this.selectionPreviewState ? { ...this.selectionPreviewState } : null,
+                relicOverlayReturnState: this.relicOverlayReturnState ? { ...this.relicOverlayReturnState } : null,
+                fateMomentContext: this.fateMomentContext ? { ...this.fateMomentContext } : null,
                 // Boss 系统
                 bossHistory: (this.bossHistory || []).slice(),
                 _pendingBossSpawn: this._pendingBossSpawn ? { ...this._pendingBossSpawn } : null,
@@ -1271,8 +1337,9 @@ export const game_system = {
             this.selectionMode = state.selectionMode || 'standard';
             this.selectionRequiredCount = state.selectionRequiredCount || (CONFIG.gameplay.selectionReq || 3);
             this.selectionInjectedRune = state.selectionInjectedRune ? { ...state.selectionInjectedRune } : null;
-            this.selectionPreviewState = null;
-            this.relicOverlayReturnState = null;
+            this.selectionPreviewState = state.selectionPreviewState ? { ...state.selectionPreviewState } : null;
+            this.relicOverlayReturnState = state.relicOverlayReturnState ? { ...state.relicOverlayReturnState } : null;
+            this.fateMomentContext = state.fateMomentContext ? { ...state.fateMomentContext } : null;
 
             // --- 恢复 Boss 系统 ---
             this.bossHistory = (state.bossHistory || []).slice();

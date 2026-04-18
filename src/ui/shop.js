@@ -39,7 +39,9 @@ export const shop_system = {
 
         // 2. 准备遗物池
         // 过滤掉玩家已经拥有的遗物 (this.ownedRelics)
+        const fateMomentRewardIds = new Set(['chaos_essence', 'pure_essence']);
         let pool = RELIC_DB.filter(r => {
+            if (fateMomentRewardIds.has(r.id)) return false;
             const count = (this.ownedRelics || []).filter(id => id === r.id).length;
             const max = r.maxStacks || 1;
             return count < max;

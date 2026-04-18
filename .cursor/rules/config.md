@@ -91,7 +91,9 @@ globs: ["src/config.js"]
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
-| 2026-04-17 | `src/config.js`, `src/core.js`, `src/game_system.js`, `src/ui/shop.js`, `src/ui_system.js`, `src/spawn_system.js`, `src/entities.js`, `src/game_phase.js`, `index.html` | **命运时刻 / 纯净精华数据契约回补**：将旧 `fortune_wheel_relic` 更名为 `chaos_essence`，新增 `pure_essence` 遗物；`CONFIG.gameplay` 新增 `assimilationDoubleMultiplier`；运行态补齐 `pendingSelectionMode`、`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`、`doubleAssimilationBoostRounds`；纯净精华改为“1 枚弹珠 + 1 个合法符文注入”，同化涌潮改为显式 `x2` 概率倍率。 |
+| 2026-04-18 | `src/config.js`, `src/game_system.js`, `.cursor/rules/config.md` | **敌人掉落参数配置化**：`CONFIG.gameplay` 新增 `enemyDropBaseChance`、`enemyDropRoundBonus`、`enemyDropAffixBonus`、`enemyDropRelicBaseChance`、`enemyDropRelicHighHpBonus`、`enemyDropPureEssenceChance` 等参数；`sys_tryQueueEnemyRoundReward()` 不再依赖硬编码常数，而是统一读取这些配置计算非 Boss 掉落。 |
+| 2026-04-18 | `src/game_system.js`, `src/ui_system.js`, `src/ui/shop.js`, `.cursor/rules/config.md`, `.cursor/rules/game_phase.md`, `.cursor/rules/ui_system.md` | **精华掉落语义闭环修复**：`pendingRoundStartRewards` 现在显式区分 `relic` / `chaos_essence` / `pure_essence`；非 Boss 敌人死亡后直接登记三类奖励，round-start resolver 在下一回合开始触发对应命运时刻；`ui_showRelicSelection()` 不再把混沌精华与纯净精华当作普通遗物候选；纯净精华确认时会把注入结果写回弹珠并写入 `doubleAssimilationBoostRounds`。 |
+| 2026-04-17 | `src/config.js`, `src/core.js`, `src/game_system.js`, `src/ui/shop.js`, `src/ui_system.js`, `src/spawn_system.js`, `src/entities.js`, `src/game_phase.js`, `index.html` | **命运时刻 / 纯净精华数据契约回补**：将旧 `fortune_wheel_relic` 更名为 `chaos_essence`，新增 `pure_essence` 数据项；`CONFIG.gameplay` 新增 `assimilationDoubleMultiplier`；运行态补齐 `pendingSelectionMode`、`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`、`doubleAssimilationBoostRounds`；纯净精华改为“1 枚弹珠 + 1 个合法符文注入”，同化涌潮改为显式 `x2` 概率倍率。 |
 | 2026-04-17 | `src/game_phase.js`, `src/game_system.js`, `src/core.js`, `src/ui/shop.js`, `src/event_bus.js`, `src/config.js` | **固定回合遗物移除 + round-start resolver**：删除 `phase_finalizeRound` 中的固定 `isRelicRound` 入口，首个遗物与非 Boss 敌人的遗物/精华掉落统一写入 `pendingRoundStartRewards`，在下一回合开始由 `sys_startRoundStartResolver()` 结算；`CONFIG.gameplay.relicRoundInterval` 配置随之移除。 |
 | 2026-04-16 | `src/config.js`, `src/game_system.js`, `src/spawn_system.js`, `src/combat_system.js`, `src/combat/damage_calc.js`, `src/entities.js`, `src/entities/enemy.js`, `src/render_system.js`, `src/core.js` | **自适应性能系统**：在 `CONFIG.performance` 新增三档特效等级（`high`/`medium`/`low`）及完整预算表；`sys_loop` 内加入 60 帧滑动平均 FPS 采样器，连续低帧 3s 降级、连续高帧 10s 升级；粒子系统（`spawn_createParticle` / `spawn_pushParticleWithLimit`）、冲击波、火焰波、治疗波、闪电特效均接入动态预算；Peg 软阴影（`pegSoftShadow`）和底部光晕（`pegGlowHalo`）接入性能开关；敌人材质光泽（`enemyGloss`）接入性能开关；降级时在 Canvas 左上角显示 FPS + 等级指示层。 |
 | 2026-04-16 | `src/game_phase.js`, `src/entities.js`, `src/spawn_system.js` | **激光属性设计调整**：移除激光属性对应的钉子生成逻辑（从 `allPegTypes` 中移除 `laser`）；在 `entities.js` 收集逻辑中当 `finalType === 'laser'` 时跳过收集；禁止激光弹珠同化普通钉子（`ballType === 'laser'` 时直接 return）。遗物 `optical_lens` 的 `unlocks: 'laser'` 保留，仅解锁激光弹珠出现。激光属性现在仅能通过弹珠本身或符文系统提供。 |
@@ -124,7 +126,10 @@ globs: ["src/config.js"]
 - **同化加成**: `entities.js` 中只要 `assimilationBoostRounds[ballType] > 0` 或 `doubleAssimilationBoostRounds[ballType] > 0`，就对基础同化概率乘以 `CONFIG.gameplay.assimilationDoubleMultiplier`（当前为 `2`），禁止继续散落 `+0.195` 等匿名常数。
 - **递减逻辑**: `game_phase.js` 的 `phase_finalizeRound` 中需要同时遍历 `assimilationBoostRounds` 与 `doubleAssimilationBoostRounds`，按回合递减并在归零时清理。
 
-## 7. 命运时刻 / 纯净精华遗物规范
-- **混沌精华 (`chaos_essence`)**：只是旧命运轮盘遗物的重命名与语义迁移，仍使用 `effect: 'unlock_slot'` 与 `slotType: 'wheel'`，禁止另起一套平行轮盘机制。
-- **纯净精华 (`pure_essence`)**：使用 `effect: 'pure_essence'`，其效果不是立刻改卡池，而是写入 `pendingSelectionMode = { mode: 'pure_essence', requiredCount: 1, ... }`，由下一次 `sys_initSelectionPhase()` 消费。
-- **运行态契约**：`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`、`pendingSelectionMode`、`doubleAssimilationBoostRounds` 必须同时出现在 `core.js` 初始化、`sys_resetGame()` 重置、`sys_saveRunState()` / `sys_loadRunState()` 持久化中。
+## 7. 命运时刻 / 纯净精华奖励规范
+- **混沌精华 (`chaos_essence`)**：语义上承接旧命运轮盘，但当前不再作为普通遗物候选出现，而是由非 Boss 敌人掉落并写入 `pendingRoundStartRewards`；resolver 处理到该奖励时，应写入 `pendingSelectionMode = { mode: 'chaos_essence', requiredCount: 3, ... }`，然后进入标准命运抉择。
+- **敌人掉落参数**：非 Boss 掉落概率与奖励构成必须通过 `CONFIG.gameplay.enemyDrop*` 参数族统一配置，至少包括基础掉率、回合成长、词缀加成、遗物权重、高血量遗物补正和纯净精华占比，禁止再把这些数值散落为匿名常数。
+- **纯净精华 (`pure_essence`)**：同样由非 Boss 敌人掉落并写入 `pendingRoundStartRewards`；resolver 处理到该奖励时，应写入 `pendingSelectionMode = { mode: 'pure_essence', requiredCount: 1, ... }`，由下一次 `sys_initSelectionPhase()` 消费。
+- **遗物池边界**：`ui_showRelicSelection()` 必须将 `chaos_essence` 与 `pure_essence` 排除在普通遗物候选池外，避免精华再次通过遗物界面重复发放。
+- **纯净精华写回要求**：确认选择时除了把注入结果写入 `MarbleDefinition.collected` 外，还必须同步写入 `source`、`infusedRuneId`、`infusedAttribute`、`assimilationMultiplier` 等局部运行态，并为对应 `marble.type` 写入 `doubleAssimilationBoostRounds`，确保“同化率 x2”真实生效。
+- **运行态契约**：`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`、`selectionPreviewState`、`relicOverlayReturnState`、`pendingSelectionMode`、`doubleAssimilationBoostRounds`、`fateMomentContext` 必须同时出现在 `core.js` 初始化、`sys_resetGame()` 重置、`sys_saveRunState()` / `sys_loadRunState()` 持久化中。

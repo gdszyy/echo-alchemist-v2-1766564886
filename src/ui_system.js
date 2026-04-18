@@ -229,6 +229,7 @@ ui_closeTruthBook() {
             baseStatPerLevel: option.runeDef.baseStatPerLevel || 1,
         };
         this.ui_refreshSelectionModeUI();
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
     },
 
     ui_renderPureEssencePanel(marbleDef, selectionIndex) {
@@ -288,6 +289,10 @@ ui_closeTruthBook() {
         });
     },
 
+    ui_isFateMomentPhase() {
+        return this.phase === 'selection' && !!this.fateMomentContext?.type;
+    },
+
     ui_refreshSelectionModeUI() {
         const countEl = document.getElementById('selected-count');
         const requiredEl = document.getElementById('selected-required-count');
@@ -298,7 +303,13 @@ ui_closeTruthBook() {
         const required = this.ui_getSelectionRequirement();
         if (countEl) countEl.innerText = String(selectedCount);
         if (requiredEl) requiredEl.innerText = String(required);
-        if (labelEl) labelEl.innerText = this.selectionMode === 'pure_essence' ? '純淨精華' : '命運抉擇';
+        if (labelEl) {
+            labelEl.innerText = this.selectionMode === 'pure_essence'
+                ? '純淨精華'
+                : this.selectionMode === 'chaos_essence'
+                    ? '混沌精華'
+                    : '命運抉擇';
+        }
         if (subtitleEl) {
             if (this.selectionMode === 'pure_essence') {
                 const injected = this.selectionInjectedRune
@@ -307,6 +318,10 @@ ui_closeTruthBook() {
                 subtitleEl.style.display = 'block';
                 subtitleEl.classList.remove('hidden');
                 subtitleEl.innerText = `選擇 1 枚彈珠並注入 1 個合法符文。${injected}`;
+            } else if (this.selectionMode === 'chaos_essence') {
+                subtitleEl.style.display = 'block';
+                subtitleEl.classList.remove('hidden');
+                subtitleEl.innerText = `命運時刻已開啟，請選擇 ${required} 枚彈珠後進入煉金。`;
             } else {
                 subtitleEl.style.display = 'none';
                 subtitleEl.classList.add('hidden');
@@ -315,7 +330,11 @@ ui_closeTruthBook() {
         }
         if (confirmBtn) {
             confirmBtn.disabled = !this.ui_isSelectionConfirmReady();
-            confirmBtn.innerText = this.selectionMode === 'pure_essence' ? '注入後開始煉金' : '開始煉金';
+            confirmBtn.innerText = this.selectionMode === 'pure_essence'
+                ? '注入後開始煉金'
+                : this.selectionMode === 'chaos_essence'
+                    ? '接受命運後開始煉金'
+                    : '開始煉金';
         }
         if (this.selectionPreviewState) {
             this.ui_renderPureEssencePanel(this.selectionPreviewState.marble, this.selectionPreviewState.selectionIndex);
@@ -482,7 +501,8 @@ ui_closeTruthBook() {
         const unifiedTopBar = document.getElementById('unified-top-bar');
         if (unifiedTopBar) {
             const hideInPhases = ['meta', 'shop', 'truth_book', 'training', 'relic', 'selection', 'gameover'];
-            unifiedTopBar.style.display = hideInPhases.includes(this.phase) ? 'none' : 'flex';  // [Mixin 正常用法：读取 Game 实例状态]
+            const shouldHideTopBar = hideInPhases.includes(this.phase) && !(typeof this.ui_isFateMomentPhase === 'function' && this.ui_isFateMomentPhase());
+            unifiedTopBar.style.display = shouldHideTopBar ? 'none' : 'flex';  // [Mixin 正常用法：读取 Game 实例状态]
         }
 
         // G. 战斗充能符文 UI 显隐同步（已在 ui_onPhaseChange 处理，此处备用兼容）
@@ -691,18 +711,25 @@ ui_closeTruthBook() {
             marble.collected = Array.isArray(marble.collected) ? marble.collected : [];
             const injectCount = Math.max(1, injected.level || 1) * Math.max(1, injected.baseStatPerLevel || 1);
             for (let i = 0; i < injectCount; i++) marble.collected.push(injected.element);
+            marble.source = 'pure_essence';
+            marble.infusedRuneId = injected.runeId;
+            marble.infusedAttribute = injected.element;
+            marble.assimilationMultiplier = Math.max(1, CONFIG.gameplay.assimilationDoubleMultiplier || 2);
+            if (!this.doubleAssimilationBoostRounds) this.doubleAssimilationBoostRounds = {};
+            this.doubleAssimilationBoostRounds[marble.type] = Math.max(this.doubleAssimilationBoostRounds[marble.type] || 0, 1);
             if (Array.isArray(this.runeInventory) && injected.inventoryIndex >= 0) {
                 this.runeInventory.splice(injected.inventoryIndex, 1);
                 if (this.saveData) this.saveData.runeInventory = (this.runeInventory || []).slice();
             }
             this.ui_updateRuneCountDisplay();
-            showToast(`已為 ${marble.getName()} 注入 ${injected.icon || '✦'} ${injected.name}。`);
+            showToast(`已為 ${marble.getName()} 注入 ${injected.icon || '✦'} ${injected.name}，本輪同化率 x${CONFIG.gameplay.assimilationDoubleMultiplier || 2}。`);
         }
 
         this.selectionMode = 'standard';
         this.selectionRequiredCount = CONFIG.gameplay.selectionReq || 3;
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
+        this.fateMomentContext = null;
         this.phase_startGatheringPhase();
     },
 
@@ -875,7 +902,13 @@ ui_closeTruthBook() {
             'training':   { text: '\u8a66\u7149\u5834', sub: '\u6975\u9650\u6230\u9b25\u6e2c\u8a66' },
             'gameover':   { text: '\u9632\u7dda\u5931\u5b88', sub: 'Run Over' },
         };
-        const titleData = PHASE_TITLES[newPhase] || { text: '\u547d\u904b\u6289\u62e9', sub: '\u9078\u64c7\u4f60\u7684\u547d\u904b' };
+        const fateMomentTitles = {
+            'chaos_essence': { text: '\u547d\u904b\u6642\u523b', sub: '\u6df7\u6c8c\u7cbe\u83ef' },
+            'pure_essence': { text: '\u547d\u904b\u6642\u523b', sub: '\u7d14\u6de8\u7cbe\u83ef' },
+        };
+        const titleData = (typeof this.ui_isFateMomentPhase === 'function' && this.ui_isFateMomentPhase())
+            ? (fateMomentTitles[this.fateMomentContext.type] || { text: '\u547d\u904b\u6642\u523b', sub: '\u9078\u64c7\u4f60\u7684\u547d\u904b' })
+            : (PHASE_TITLES[newPhase] || { text: '\u547d\u904b\u6289\u62e9', sub: '\u9078\u64c7\u4f60\u7684\u547d\u904b' });
 
         if (titleContainer && titleText && subText) {
             titleText.innerText = titleData.text;
@@ -900,7 +933,11 @@ ui_closeTruthBook() {
                 'training':   '\u8a66\u7149',
                 'gameover':   '\u7ed3\u7b97',
             };
-            topPhaseLabel.textContent = SHORT_LABELS[newPhase] || '';
+            if (typeof this.ui_isFateMomentPhase === 'function' && this.ui_isFateMomentPhase()) {
+                topPhaseLabel.textContent = '\u547d\u904b\u6642\u523b';
+            } else {
+                topPhaseLabel.textContent = SHORT_LABELS[newPhase] || '';
+            }
         }
 
         // ===== C. 战斗充能符文 UI 仅在战斗阶段显示 =====

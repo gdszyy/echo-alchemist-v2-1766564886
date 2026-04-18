@@ -193,6 +193,7 @@ class Game {
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
         this.relicOverlayReturnState = null;
+        this.fateMomentContext = null;
         this.isDragging = false; 
         this.dragStart = new Vec2(0,0); 
         this.dragCurrent = new Vec2(0,0); 

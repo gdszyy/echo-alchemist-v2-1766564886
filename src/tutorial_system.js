@@ -98,7 +98,7 @@ const TUTORIAL_STEPS = [
         position: 'bottom-fixed',   // 特殊值：固定在屏幕底部，不跟随高亮元素
         noOverlay: true,            // 不遮罩，让玩家能点击遗物
         waitForEvent: EVENT_TYPES.PHASE_CHANGED,
-        waitForEventFilter: (data) => data && data.to === 'selection',
+        waitForEventFilter: (data) => data && data.to === 'selection' && (!window.game || typeof game.ui_isFateMomentPhase !== 'function' || !game.ui_isFateMomentPhase()),
         autoAdvance: true,
         actionLabel: null,
         actionFn: null,
@@ -766,6 +766,10 @@ export const tutorial_system = {
      * @description 注册等待 EventBus 事件的监听器。
      * @private
      */
+    _tutorial_isStandardSelectionPhase() {
+        return !window.game || typeof game.ui_isFateMomentPhase !== 'function' || !game.ui_isFateMomentPhase();
+    },
+
     _tutorial_registerWaitEvent(step) {
         const unsubscribe = eventBus.on(step.waitForEvent, (data) => {
             if (step.waitForEventFilter && !step.waitForEventFilter(data)) return;

@@ -1,6 +1,6 @@
 # Echo Alchemist V2 改造工程 TODO 清单
 
-**最后更新：** 2026年4月11日 | **状态：🎉 全部完成**
+**最后更新：** 2026年4月18日 | **状态：⏳ 掉落驱动闭环修复进行中**
 
 ---
 
@@ -41,6 +41,26 @@
   - global.md 新增第 5 节「子系统扩展规范」，明确禁止 Mixin 模式
 
 ---
+
+## 阶段四：掉落驱动主流程闭环与抽象收尾 ⏳ 进行中
+
+当前仓库已经补上了 **round-start reward queue**、**非 Boss 掉落驱动**、**混沌精华 / 纯净精华命运时刻**、**纯净精华 x2 同化率**、**存档恢复上下文** 等核心闭环，但内部仍存在一层尚未彻底抽离的旧语义：特殊流程在实现层仍大量复用 `selection` 阶段和历史入口。这一抽象工作并不是“代码美化”，而是为了避免后续继续在 UI、教程、暂停、存档、overlay 返回流中到处追加 `if (selectionMode === ...)` 之类的分支，最终重新形成新的隐性耦合。
+
+| 任务 | 必要性 | 计划内容 | 当前状态 |
+| :--- | :--- | :--- | :--- |
+| Task 4.1 命运时刻阶段语义抽象 | 目前 `selection` 仍同时承载常规选择与命运时刻，阶段语义不够单一，后续维护成本高 | 统一梳理 `phase`、标题、教程、暂停、overlay 返回、顶部栏标签中的命运时刻语义，明确哪些继续复用 `selection` overlay，哪些上升为 `fate_moment` 语义层 | ⏳ 待检查后拆分 |
+| Task 4.2 选择态与命运时刻状态模型收口 | 目前 `selectionMode`、`pendingSelectionMode`、`fateMomentContext`、`selectionPreviewState` 已可用，但职责边界仍需进一步收敛 | 明确“待触发上下文”“运行中上下文”“UI 预览态”“overlay 返回态”的边界，避免后续继续散落到多个模块各自判断 | ⏳ 待检查后收口 |
+| Task 4.3 round-start resolver 与阶段切换契约固化 | 当前主流程已通，但仍需确认所有恢复入口、关闭入口、失败回退入口都不会重新跳回旧固定流程 | 系统检查 `sys_startRoundStartResolver()`、`ui_closeRelicSelection()`、继续游戏、教程等待点、暂停限制、游戏结束清档等链路 | ⏳ 正在检查 |
+| Task 4.4 TODO / 文档 / 测试清单同步 | 旧 TODO 已显示“全部完成”，不再反映当前修复与抽象工作的真实状态 | 持续把新增闭环、抽象必要性、验证范围和待办项回写到 TODO 与规则文档，并补测试检查清单 | ⏳ 进行中 |
+
+### 阶段四检查记录（持续更新）
+
+| 日期 | 检查点 | 发现 | 结论 |
+| :--- | :--- | :--- | :--- |
+| 2026-04-18 | 顶部栏与阶段语义一致性 | 已新增 `ui_isFateMomentPhase()`，并让 `ui_updateUI()`、阶段标题、顶部短标签统一通过该语义判断控制显示；命运时刻期间不再被 `selection` 的旧隐藏规则整体吞掉 | 该项已完成第一轮抽象收口，后续仅需视是否正式引入 `fate_moment` phase 再做深化 |
+| 2026-04-18 | 教程系统与命运时刻兼容性 | 教程进入弹珠选择的等待条件已补上“非命运时刻”过滤，避免 `PHASE_CHANGED -> selection` 在命运时刻期间误推进旧教程 | 主要误触发风险已收口，但 `phase: 'selection'` / `targetId: 'phase-selection'` 仍是后续深化抽象时的关注点 |
+| 2026-04-18 | 遗物 overlay 返回 resolver 链路 | `ui_closeRelicSelection()` 已能在 `returnState.phase === 'round_start_resolver'` 时回到 `sys_continueRoundStartResolver()`，在 `returnState.phase === 'selection'` 时恢复当前命运时刻界面 | 该链路当前已基本闭环，属于已验证通过项 |
+| 2026-04-18 | 继续游戏 / 新开局 / 游戏结束入口 | `sys_loadRunState()` 恢复后会重新进入 `sys_startRoundStartResolver()`；`meta_startRun()` 与 `_gameover_triggerPhase()` 也都先清除局内存档，再进入新局或结算 | 入口层没有发现重新跳回旧固定选择流程的问题，当前判断为通过 |
 
 ## 改造工程总结
 

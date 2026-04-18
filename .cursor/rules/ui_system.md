@@ -92,6 +92,8 @@ for (const subsystem of _subsystems) {
 | 2026-04-16 | `index.html`, `src/game_system.js`, `src/ui_system.js`, `src/ui/rune_launcher.js` | PC 横屏模式下游戏区域宽度占满全屏且无侧边栏，底部抽屉和符文发射器不能同时展示。 | 1. `index.html` 新增 `#app-wrapper`（flex 三栏容器）、`#pc-left-sidebar`、`#pc-right-sidebar` 结构和对应 CSS；2. `#game-container` 改为固定宽高比 `min(calc(100dvh*9/16), 480px)` 宽度；3. `sys_resize()` 移除强制覆盖宽度的代码，`defeatLineY` 在 PC 模式下缩小安全边距；4. `ui_system.js` 新增 `ui_updatePCLayout()`、`_ui_migrateRuneLauncherToSidebar()`、`_ui_migrateHUDToLeftSidebar()` 三个方法；5. `rune_launcher.js` 的 `ui_openRuneLauncher`/`ui_closeRuneLauncher` 在 PC 模式下不修改 display；6. `core.js` 的 resize 监听器和构造函数中调用 `ui_updatePCLayout()`。 |
 | 2026-04-16 | `src/ui/rune_launcher.js` | 符文发射器内部引导教学（`ui_showRuneLauncherTour`）存在两个 Bug：① 教学期间 `highlight` 元素的 `box-shadow: 0 0 0 2000px rgba(0,0,0,0.45)` 溢出 `#phase-rune-launcher` panel 边界（panel 无 `overflow: hidden`），在整个屏幕上形成常驻黑色蒙版；② 教学完成时调用 `this.saveGame()`（该方法不存在），导致 `runeLauncherTourDone = true` 仅写入内存对象，从未持久化到 localStorage，每次游戏重启后教学都重复触发。 | ① 在 `ui_showRuneLauncherTour()` 中，创建 overlay 前保存 `panel.style.overflow` 原値，并临时设为 `hidden`；教学完成时恢复原値；`ui_closeRuneLauncher()` 中移除 tour overlay 时也同步恢复 overflow（防止用户未完成教学直接关闭面板）。② 将 `if (this.saveGame) this.saveGame()` 替换为 `this.sys_saveData()`，确保完成状态正确持久化。 |
 | 2026-04-16 | `src/ui/rune_launcher.js` | 符文发射器内部引导教学（`ui_showRuneLauncherTour`）暂时归档。 | 将 `ui_openRuneLauncher` 中的教程触发调用和 `ui_showRuneLauncherTour` 函数体全部注释（`[ARCHIVED]` 标记）。如需恢复，取消 `rune_launcher.js` 第 114-117 行和第 1444-1604 行的注释即可。 |
+| 2026-04-18 | `src/ui_system.js`, `.cursor/rules/ui_system.md` | **命运时刻阶段语义显示修复**：即便内部仍复用 `selection` overlay，`ui_onPhaseChange()` 也必须根据 `fateMomentContext.type` 把大标题和顶部阶段标签渲染为“命运时刻 / 混沌精华 / 纯净精华”，避免特殊流程在视觉上继续伪装成普通命运抉择。 |
+| 2026-04-18 | `src/game_system.js`, `src/ui_system.js`, `src/ui/shop.js`, `.cursor/rules/ui_system.md` | **命运时刻 UI 语义闭环**：round-start resolver 现在会直接触发 `chaos_essence` / `pure_essence` 两种模式；`ui_refreshSelectionModeUI()` 需要显式区分“混沌精华 / 纯净精华 / 命运抉择”三种标签与按钮文案；`ui_showRelicSelection()` 不再把两种精华当作普通遗物候选；`ui_confirmSelection()` 在纯净精华模式下除了写回 `MarbleDefinition.collected` 以外，还必须写入 `doubleAssimilationBoostRounds` 以兑现同化率 x2。 |
 | 2026-04-17 | `index.html`, `src/game_system.js`, `src/ui_system.js`, `src/spawn_system.js`, `src/ui/shop.js`, `src/config.js`, `src/core.js`, `src/entities.js`, `src/game_phase.js` | **命运时刻 / 纯净精华 UI 接入**：当前主仓补落地了 `selection-mode-label`、`selected-required-count`、`selection-mode-subtitle` 三个选择阶段底栏节点；新增 `ui_getSelectionRequirement()`、`ui_isSelectionConfirmReady()`、`ui_getPureEssenceLegalElements()`、`ui_getPureEssenceRuneOptions()`、`ui_selectPureEssenceRune()`、`ui_renderPureEssencePanel()`、`ui_refreshSelectionModeUI()` 等辅助函数；`spawn_showMarblePreview()` 负责刷新纯净精华注入面板；`ui_closeRelicSelection()` 改为按 `relicOverlayReturnState` 恢复原阶段；`ui_confirmSelection()` 在纯净精华模式下会校验合法符文并把结果写回 `MarbleDefinition.collected`。 |
 | 2026-04-17 | `index.html`, `src/game_system.js` | 游戏容器宽高未同时适配屏幕宽度和高度：原 `height: 100dvh` 在竞屏手机上会超出屏幕宽度；`sys_resize` 中 `container.style.height = window.innerHeight` 会覆盖 CSS 高度计算。 | **完整等比缩放方案**：1. `#app-wrapper` 的 `align-items` 改为 `center`（防止 stretch 拉伸 game-container）；2. `#pc-left/right-sidebar` 加 `align-self: stretch`（PC 侧边栏仍填满高度）；3. `#game-container` 宽度改为 `min(100vw, calc(100dvh*9/16), 480px)`，移除 `height` 和 `min-width`，改用 `aspect-ratio: 9/16` + `max-height: 100dvh` 实现宽高双向等比缩放；4. `sys_resize()` 移除 `container.style.height` 覆盖，改用 `getBoundingClientRect()` 读取实际尺寸。 |
 
@@ -104,7 +106,13 @@ for (const subsystem of _subsystems) {
 3. 方法名遵循 `ui_` 或 `_ui_` 前缀约定
 4. 如果方法直接读取 Game 状态，添加 `// TODO[Task 3.2]: 改为监听 EventBus 事件` 注释
 5. 命运抉择相关 UI **禁止写死 `3`**；底栏计数、按钮启用条件和确认逻辑必须统一经由 `selectionMode` / `selectionRequiredCount` 与 `ui_getSelectionRequirement()` / `ui_isSelectionConfirmReady()`。
-6. 任何从选择阶段或命运时刻中途打开的 overlay，在关闭时都必须优先依据 `relicOverlayReturnState` 恢复原阶段，禁止默认重跑 `sys_initSelectionPhase()` 覆盖当前特殊选择态。
+6. `ui_refreshSelectionModeUI()` 必须显式覆盖 `standard` / `chaos_essence` / `pure_essence` 三种文案，避免命运时刻进入后仍显示旧的“命运抉择”标签。
+6.1 `ui_onPhaseChange()` 在 `selection` 阶段若检测到 `fateMomentContext.type`，必须把大标题和顶部阶段标签切换为“命运时刻”语义，而不是沿用普通选择阶段默认标题。
+6.2 `ui_updateUI()`、顶部短标签与其他阶段显隐逻辑，必须优先复用统一的命运时刻语义判断（例如 `ui_isFateMomentPhase()`）；即使底层仍复用 `selection` overlay，也不能让命运时刻继续被普通 `selection` 的隐藏规则整体吞掉。
+6.3 教程系统若通过 `PHASE_CHANGED -> selection` 作为推进条件，必须显式排除命运时刻场景，避免特殊流程误推进新手教程。
+7. 任何从选择阶段或命运时刻中途打开的 overlay，在关闭时都必须优先依据 `relicOverlayReturnState` 恢复原阶段，禁止默认重跑 `sys_initSelectionPhase()` 覆盖当前特殊选择态。
+8. `ui_confirmSelection()` 在纯净精华模式下不能只更新预览或文案，必须同时写回 `MarbleDefinition.collected`、注入元数据，并写入 `doubleAssimilationBoostRounds`，否则同化率 x2 只会停留在 UI 层。
+9. 命运时刻中途若发生刷新、继续游戏或 overlay 往返，`selectionPreviewState`、`relicOverlayReturnState`、`fateMomentContext` 必须保持同源恢复；只有确认选珠并进入研磨阶段后，才允许统一清空。
 
 ### 6.2 修改现有 UI 函数
 
@@ -129,17 +137,18 @@ for (const subsystem of _subsystems) {
 | `ui_updateSlowMotion()` | 慢动作逻辑更新（每帧调用） |
 | `ui_updateMetaCurrency()` | 更新局外货币显示 |
 | `ui_updateRuneCountDisplay()` | 更新符文数量显示 |
-| `ui_getSelectionRequirement()` | 读取当前命运抉择所需的弹珠数量（标准 3 选或纯净精华 1 选） |
+| `ui_getSelectionRequirement()` | 读取当前命运时刻所需的弹珠数量（标准 3 选、混沌精华 3 选或纯净精华 1 选） |
 | `ui_isSelectionConfirmReady()` | 统一判断当前选择阶段是否允许确认 |
 | `ui_getPureEssenceLegalElements(marbleDef)` | 计算纯净精华模式下某枚弹珠允许注入的合法属性集合 |
 | `ui_getPureEssenceRuneOptions(marbleDef)` | 从符文库存中过滤出当前弹珠可注入的合法符文 |
 | `ui_selectPureEssenceRune(selectionIndex, inventoryIndex)` | 为当前选中的弹珠绑定一个合法的注入符文 |
 | `ui_renderPureEssencePanel(marbleDef, selectionIndex)` | 在弹珠预览面板中渲染纯净精华的合法属性和符文注入按钮 |
-| `ui_refreshSelectionModeUI()` | 刷新命运抉择底栏标签、需求数量、副标题和确认按钮状态 |
+| `ui_refreshSelectionModeUI()` | 刷新命运抉择底栏标签、需求数量、副标题和确认按钮状态，并正确显示混沌精华 / 纯净精华文案 |
+| `fateMomentContext`（运行态字段） | 记录当前命运时刻来源、类型与回合信息，用于刷新恢复和 overlay 返回后的语义保持 |
 | `meta_getResourceCount(resourceId)` | 获取资源数量 |
 | `meta_spendResource(resourceId, amount)` | 消耗资源 |
 | `ui_updateUI()` | 主 UI 更新入口（每帧调用） |
-| `ui_confirmSelection()` | 确认弹珠选择 |
+| `ui_confirmSelection()` | 确认弹珠选择；在纯净精华模式下完成合法性校验、符文写回与双倍同化率状态落地 |
 | `meta_applyUpgrades()` | 应用升级效果 |
 | `meta_addCurrency(amount)` | 增加局外货币 |
 | `meta_startRun()` | 开始新一局游戏（同时清除旧存档） |
