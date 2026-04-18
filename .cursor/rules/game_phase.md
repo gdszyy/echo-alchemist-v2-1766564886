@@ -18,11 +18,15 @@ globs: ["src/game_phase.js"]
 - **禁止将此阈值降低至 0.5 以下**：钉盘分布在屏幕 20%~70% 高度，过小的阈值会导致点击钉盘中下部区域时被错误路由到"倾斜模式"，弹珠无法发射。
 - 底部手柄区域（`height - 40 ± 40px`）已在 `game_system.js` 的 `input_handleInputStart` 中提前拦截，`phase_handleInputStart` 无需重复处理。
 
-### 2.1 命运抉择阶段 (Selection Phase)
+### 2.1 命运抗择阶段 (Selection Phase)
 - **职责**: 玩家在回合开始前处理 round-start resolver 结算后的**特殊命运时刻**（混沌精华 / 纯净精华 / 遗物）。
 - **[tsk-f35c6d10] 普通命运选择已取消**：`sys_startRoundStartResolver()` 队列为空时，**不再**进入普通弹珠选择（`sys_initSelectionPhase()`），改为调用 `sys_showRoundStartBanner()` 直接进入研磨阶段。
 - **入口**: `sys_startRoundStartResolver()` 会先消费 `pendingRoundStartRewards`；若命中 `relic`，进入遗物事件；若命中 `chaos_essence` 或 `pure_essence`，则先写入 `pendingSelectionMode` 再调用 `sys_initSelectionPhase()` 呈现对应的命运时刻界面。
-- **模式分支**: `chaos_essence` 模式沿用标准 3 选流程，但 UI 需显式标记为"混沌精华"；`pure_essence` 模式要求只选择 `1` 枚弹珠，并在确认前完成 1 个合法符文注入。
+- **[tsk-668f3dba] 替换子弹阶段**：`sys_initSelectionPhase()` 在 `chaos_essence` 或 `pure_essence` 模式且 `ammoQueue` 非空时，**先**调用 `sys_initReplaceAmmoPhase()` 进入「替换当前子弹」阶段；玩家确认或跳过后再进入原有命运选择流程。`ammoQueue` 为空时自动跳过该阶段。
+  - `replaceAmmoContext`：替换阶段上下文，包含 `active`（是否处于替换阶段）、`selectedIndex`（选中的 ammoQueue 索引，-1 表示未选）、`fateMomentMode`（来源命运时刻类型）。
+  - 替换确认：`sys_confirmReplaceAmmo()` 记录替换目标，进入命运选择；`ui_confirmSelection()` 确认时将命运选择产出的第一枚弹珠替换 `ammoQueue[selectedIndex]`。
+  - 跳过：`sys_skipReplaceAmmo()` 将 `selectedIndex` 置为 -1 并进入命运选择，不执行替换。
+- **模式分支**: `chaos_essence` 模式沿用标准 3 选流程，但 UI 需显式标记为“混沌精华”；`pure_essence` 模式要求只选择 `1` 枚弹珠，并在确认前完成 1 个合法符文注入。
 - **出口**: 玩家做出选择并确认，触发转场动画进入研磨阶段。纯净精华模式下，确认时必须先完成合法性校验，把注入结果写回 `MarbleDefinition.collected`，并为对应 `marble.type` 写入 `doubleAssimilationBoostRounds`。
 
 ### 2.5 回合开始提示与充能特效 (Round Start Banner)
@@ -47,7 +51,7 @@ globs: ["src/game_phase.js"]
 
 ### 2.4 局内存档与刷新恢复
 - **存档时机**: `phase_finalizeRound()` 末尾，`round++` 之后、`sys_startRoundStartResolver()` 之前；此外，进入命运时刻阶段、切换弹珠选择、绑定纯净精华符文时，也应即时调用 `sys_saveRunState()`，避免刷新后丢失当前选择与注入上下文。
-- **存档内容**: round、score、enemies（含 Vec2 坐标）、pegs（type/level/frozenTurns）、ownedRelics、runeInventory、runeGrid、unlockedWeights、guaranteedNextRound、`pendingRoundStartRewards`、`pendingSelectionMode`、`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`、`selectionPreviewState`、`relicOverlayReturnState`、`fateMomentContext`、`doubleAssimilationBoostRounds`、Boss 系统字段、难度字段、钉盘形态、技能、统计数据等。
+- **存档内容**: round、score、enemies（含 Vec2 坐标）、pegs（type/level/frozenTurns）、ownedRelics、runeInventory、runeGrid、unlockedWeights、guaranteedNextRound、`pendingRoundStartRewards`、`pendingSelectionMode`、`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`、`selectionPreviewState`、`relicOverlayReturnState`、`fateMomentContext`、`replaceAmmoContext`（[tsk-668f3dba] 替换子弹阶段上下文）、`doubleAssimilationBoostRounds`、Boss 系统字段、难度字段、钉盘形态、技能、统计数据等。
 - **恢复入口**: Meta 页面「繼續上次游戲」按钮（`#meta-continue-btn`），调用 `meta_continueRun()`。
 - **恢复流程**: `sys_resetGame()` + `meta_applyUpgrades()` → 注入存档状态 → `phase_gathering_initPachinko(true)` 重建钉盘 → `sys_startRoundStartResolver()` 先结算待处理遗物/精华，再决定是否进入选牌阶段。
 - **清档时机**: 游戏结束（`_gameover_triggerPhase`）或新开一局（`meta_startRun`）时自动清除。

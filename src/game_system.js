@@ -293,6 +293,7 @@ export const game_system = {
         this.selectionPreviewState = null;
         this.relicOverlayReturnState = null;
         this.fateMomentContext = null;
+        this.replaceAmmoContext = null; // [tsk-668f3dba] 替换当前子弹阶段上下文
         this.ownedRelics = [];
         
         // 补充遗物相关的重置字段
@@ -507,11 +508,22 @@ export const game_system = {
     /**
      * @method sys_initSelectionPhase
      * @description 初始化弹珠选择阶段。
+     * [tsk-668f3dba] 命运时刻（chaos_essence / pure_essence）触发时，如果 ammoQueue 非空，
+     * 先进入「替换当前子弹」阶段；否则直接进入原有选择流程。
      */
     sys_initSelectionPhase() {
-        this.phase_switchPhase('selection');
         const pendingMode = this.pendingSelectionMode;
-        this.selectionMode = pendingMode?.mode || 'standard';
+        const mode = pendingMode?.mode || 'standard';
+
+        // [tsk-668f3dba] 命运时刻且 ammoQueue 非空时，先进入替换阶段
+        if ((mode === 'chaos_essence' || mode === 'pure_essence') &&
+            this.ammoQueue && this.ammoQueue.length > 0) {
+            this.sys_initReplaceAmmoPhase();
+            return;
+        }
+
+        this.phase_switchPhase('selection');
+        this.selectionMode = mode;
         this.selectionRequiredCount = Math.max(1, pendingMode?.requiredCount || CONFIG.gameplay.selectionReq || 3);
         this.fateMomentContext = this.selectionMode === 'standard'
             ? null
@@ -533,7 +545,94 @@ export const game_system = {
         if (countEl) countEl.innerText = '0';
         if (confirmBtn) confirmBtn.disabled = true;
         if (recipeHud) recipeHud.classList.add('hidden');
-         if (typeof this.ui_refreshSelectionModeUI === 'function') this.ui_refreshSelectionModeUI();
+        if (typeof this.ui_refreshSelectionModeUI === 'function') this.ui_refreshSelectionModeUI();
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+    },
+
+    /**
+     * @method sys_initReplaceAmmoPhase
+     * @description [tsk-668f3dba] 初始化「替换当前子弹」阶段。
+     * 展示当前 ammoQueue 中的所有子弹，玩家可选择替换或跳过。
+     * 完成后继续执行原有命运时刻选择流程。
+     */
+    sys_initReplaceAmmoPhase() {
+        const pendingMode = this.pendingSelectionMode;
+        const mode = pendingMode?.mode || 'chaos_essence';
+        this.replaceAmmoContext = {
+            active: true,
+            selectedIndex: -1,       // 当前选中的 ammoQueue 索引，-1 表示未选
+            fateMomentMode: mode,    // 来源命运时刻类型
+        };
+        this.phase_switchPhase('selection');
+        if (typeof this.ui_renderReplaceAmmoUI === 'function') {
+            this.ui_renderReplaceAmmoUI();
+        }
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+    },
+
+    /**
+     * @method sys_confirmReplaceAmmo
+     * @description [tsk-668f3dba] 确认替换子弹。
+     * 将 ammoQueue[selectedIndex] 替换为占位符（真实弹珠在命运选择后填入），
+     * 然后进入原有命运时刻选择流程。
+     */
+    sys_confirmReplaceAmmo() {
+        if (!this.replaceAmmoContext || !this.replaceAmmoContext.active) {
+            console.warn('[sys_confirmReplaceAmmo] replaceAmmoContext 未激活');
+            return;
+        }
+        const idx = this.replaceAmmoContext.selectedIndex;
+        if (idx < 0 || idx >= (this.ammoQueue || []).length) {
+            console.warn('[sys_confirmReplaceAmmo] 未选择有效的子弹目标');
+            return;
+        }
+        // 记录替换目标索引，在命运选择确认后由 ui_confirmSelection 执行实际替换
+        this.replaceAmmoContext.active = false;
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        // 进入原有命运时刻选择流程
+        this._proceedToFateMomentSelection();
+    },
+
+    /**
+     * @method sys_skipReplaceAmmo
+     * @description [tsk-668f3dba] 跳过替换阶段，直接进入命运时刻选择流程。
+     */
+    sys_skipReplaceAmmo() {
+        if (!this.replaceAmmoContext) return;
+        this.replaceAmmoContext.active = false;
+        this.replaceAmmoContext.selectedIndex = -1; // 跳过：不替换
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        this._proceedToFateMomentSelection();
+    },
+
+    /**
+     * @method _proceedToFateMomentSelection
+     * @description [tsk-668f3dba] 内部辅助：替换阶段完成后进入原有命运时刻选择流程。
+     */
+    _proceedToFateMomentSelection() {
+        const pendingMode = this.pendingSelectionMode;
+        const mode = pendingMode?.mode || (this.replaceAmmoContext?.fateMomentMode) || 'chaos_essence';
+        this.selectionMode = mode;
+        this.selectionRequiredCount = Math.max(1, pendingMode?.requiredCount || CONFIG.gameplay.selectionReq || 3);
+        this.fateMomentContext = {
+            type: mode,
+            source: pendingMode?.source || 'unknown',
+            round: pendingMode?.round || this.round || 1,
+            enemyType: pendingMode?.enemyType || null,
+            sourceRewardType: pendingMode?.sourceRewardType || mode,
+        };
+        this.pendingSelectionMode = null;
+        this.selectionInjectedRune = null;
+        this.selectionPreviewState = null;
+        this.spawn_generateMarbleOptions();
+        this.selectedMarbles = [];
+        const countEl = document.getElementById('selected-count');
+        const confirmBtn = document.getElementById('confirm-selection-btn');
+        const recipeHud = document.getElementById('recipe-hud-container');
+        if (countEl) countEl.innerText = '0';
+        if (confirmBtn) confirmBtn.disabled = true;
+        if (recipeHud) recipeHud.classList.add('hidden');
+        if (typeof this.ui_refreshSelectionModeUI === 'function') this.ui_refreshSelectionModeUI();
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
     },
 
@@ -578,6 +677,7 @@ export const game_system = {
         this.selectionPreviewState = null;
         this.fateMomentContext = null;
         this.pendingSelectionMode = null;
+        this.replaceAmmoContext = null; // [tsk-668f3dba] 清理替换阶段上下文
         // 存档
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
         // 直接进入战斗阶段（跳过研磨）
@@ -1349,6 +1449,7 @@ export const game_system = {
                 selectionPreviewState: this.selectionPreviewState ? { ...this.selectionPreviewState } : null,
                 relicOverlayReturnState: this.relicOverlayReturnState ? { ...this.relicOverlayReturnState } : null,
                 fateMomentContext: this.fateMomentContext ? { ...this.fateMomentContext } : null,
+                replaceAmmoContext: this.replaceAmmoContext ? { ...this.replaceAmmoContext } : null, // [tsk-668f3dba]
                 // Boss 系统
                 bossHistory: (this.bossHistory || []).slice(),
                 _pendingBossSpawn: this._pendingBossSpawn ? { ...this._pendingBossSpawn } : null,
@@ -1455,6 +1556,7 @@ export const game_system = {
             this.selectionPreviewState = state.selectionPreviewState ? { ...state.selectionPreviewState } : null;
             this.relicOverlayReturnState = state.relicOverlayReturnState ? { ...state.relicOverlayReturnState } : null;
             this.fateMomentContext = state.fateMomentContext ? { ...state.fateMomentContext } : null;
+            this.replaceAmmoContext = state.replaceAmmoContext ? { ...state.replaceAmmoContext } : null; // [tsk-668f3dba]
 
             // --- 恢复 Boss 系统 ---
             this.bossHistory = (state.bossHistory || []).slice();
@@ -1568,7 +1670,15 @@ export const game_system = {
             }, 100);
 
             // --- 下一回合开始统一结算（包括遗物/精华） ---
-            this.sys_startRoundStartResolver();
+            // [tsk-668f3dba] 如果存档时正处于替换阶段，恢复替换 UI
+            if (this.replaceAmmoContext && this.replaceAmmoContext.active) {
+                this.phase_switchPhase('selection');
+                if (typeof this.ui_renderReplaceAmmoUI === 'function') {
+                    this.ui_renderReplaceAmmoUI();
+                }
+            } else {
+                this.sys_startRoundStartResolver();
+            }
 
             showToast(`✅ 已恢復 Round ${this.round} 的進度！`);
             console.log(`[RunSave] 成功恢復回合 ${this.round} 的存档`);

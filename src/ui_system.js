@@ -293,6 +293,116 @@ ui_closeTruthBook() {
         return this.phase === 'selection' && !!this.fateMomentContext?.type;
     },
 
+    /**
+     * @method ui_renderReplaceAmmoUI
+     * @description [tsk-668f3dba] 渲染「替换当前子弹」阶段的 UI。
+     * 展示 ammoQueue 中的所有子弹卡片，玩家可选择替换或跳过。
+     * 复用 #phase-selection 内的容器，将 #marble-selection-grid 替换为子弹列表。
+     */
+    ui_renderReplaceAmmoUI() {
+        const ctx = this.replaceAmmoContext;
+        if (!ctx || !ctx.active) return;
+
+        const gridEl = document.getElementById('marble-selection-grid');
+        const labelEl = document.getElementById('selection-mode-label');
+        const subtitleEl = document.getElementById('selection-mode-subtitle');
+        const confirmBtn = document.getElementById('confirm-selection-btn');
+        const skipGrindBtn = document.getElementById('skip-grind-btn');
+        const countEl = document.getElementById('selected-count');
+        const requiredEl = document.getElementById('selected-required-count');
+        const recipeHud = document.getElementById('recipe-hud-container');
+        const previewPanel = document.getElementById('marble-preview-panel');
+
+        // 隐藏不相关元素
+        if (recipeHud) recipeHud.classList.add('hidden');
+        if (skipGrindBtn) skipGrindBtn.style.display = 'none';
+        if (previewPanel) previewPanel.className = 'marble-preview-hidden';
+
+        // 更新底栏标签
+        const modeLabel = ctx.fateMomentMode === 'pure_essence' ? '純淨精華' : '混沌精華';
+        if (labelEl) labelEl.innerText = `替換子彈（${modeLabel}）`;
+        if (subtitleEl) {
+            subtitleEl.style.display = 'block';
+            subtitleEl.classList.remove('hidden');
+            subtitleEl.innerText = '選擇一枚子彈以替換，或點擊「跳過」保留全部子彈。';
+        }
+        if (countEl) countEl.innerText = ctx.selectedIndex >= 0 ? '1' : '0';
+        if (requiredEl) requiredEl.innerText = '1';
+
+        // 渲染 ammoQueue 列表
+        if (gridEl) {
+            gridEl.style.gridTemplateColumns = '';
+            gridEl.style.maxWidth = '';
+            gridEl.innerHTML = '';
+
+            const queue = this.ammoQueue || [];
+            if (queue.length === 0) {
+                // 队列为空（理论上不应到达此分支，安全兜底）
+                gridEl.innerHTML = '<div class="text-xs text-slate-400 text-center py-4">當前沒有子彈</div>';
+            } else {
+                queue.forEach((ammo, idx) => {
+                    const isSelected = ctx.selectedIndex === idx;
+                    const typeName = ammo.type || (typeof ammo.getName === 'function' ? ammo.getName() : '彈珠');
+                    const collected = Array.isArray(ammo.collected) ? ammo.collected : [];
+                    const attrHtml = collected.length > 0
+                        ? collected.slice(0, 5).map(attr => {
+                            const display = CONFIG.ui && CONFIG.ui.attributeDisplay && CONFIG.ui.attributeDisplay[attr] ? CONFIG.ui.attributeDisplay[attr] : {};
+                            return `<span class="text-[10px] text-slate-300">${display.icon || '\u25c6'}</span>`;
+                        }).join('')
+                        : '<span class="text-[10px] text-slate-500">無屬性</span>';
+
+                    const card = document.createElement('div');
+                    card.className = `marble-card cursor-pointer transition-all duration-150 ${isSelected ? 'ring-2 ring-amber-400 bg-amber-500/10' : 'hover:ring-1 hover:ring-slate-400'}`;
+                    card.dataset.ammoIdx = idx;
+                    card.innerHTML = `
+                        <div class="marble-icon text-lg">\u{1F7E4}</div>
+                        <div class="marble-name text-xs font-bold truncate">${typeName}</div>
+                        <div class="flex flex-wrap gap-0.5 justify-center mt-1">${attrHtml}</div>
+                        ${isSelected ? '<div class="text-[10px] text-amber-300 mt-1">已選中</div>' : ''}
+                    `;
+                    card.onclick = () => this.ui_selectReplaceAmmoTarget(idx);
+                    gridEl.appendChild(card);
+                });
+            }
+        }
+
+        // 更新确认按钮
+        if (confirmBtn) {
+            confirmBtn.disabled = ctx.selectedIndex < 0;
+            confirmBtn.innerText = '確認替換';
+            confirmBtn.onclick = () => {
+                if (typeof this.sys_confirmReplaceAmmo === 'function') this.sys_confirmReplaceAmmo();
+            };
+        }
+
+        // 更新跳过按钮（复用 skip-grind-btn 或新建小按钮）
+        let skipBtn = document.getElementById('replace-ammo-skip-btn');
+        if (!skipBtn) {
+            skipBtn = document.createElement('button');
+            skipBtn.id = 'replace-ammo-skip-btn';
+            skipBtn.className = 'mt-2 flex items-center gap-1.5 px-4 py-2 bg-slate-800/80 border border-slate-600/60 rounded-lg text-xs text-slate-300 hover:bg-slate-700/80 hover:border-slate-400/80 hover:text-white transition-all duration-200';
+            skipBtn.innerHTML = '<span>\u23e9</span><span>跳過，保留全部子彈</span>';
+            if (confirmBtn && confirmBtn.parentNode) {
+                confirmBtn.parentNode.insertBefore(skipBtn, confirmBtn.nextSibling);
+            }
+        }
+        skipBtn.style.display = 'flex';
+        skipBtn.onclick = () => {
+            if (typeof this.sys_skipReplaceAmmo === 'function') this.sys_skipReplaceAmmo();
+        };
+    },
+
+    /**
+     * @method ui_selectReplaceAmmoTarget
+     * @description [tsk-668f3dba] 选中要替换的子弹目标。
+     */
+    ui_selectReplaceAmmoTarget(ammoIdx) {
+        if (!this.replaceAmmoContext || !this.replaceAmmoContext.active) return;
+        this.replaceAmmoContext.selectedIndex = ammoIdx;
+        // 重新渲染 UI 以更新选中状态
+        this.ui_renderReplaceAmmoUI();
+    },
+
     ui_refreshSelectionModeUI() {
         const countEl = document.getElementById('selected-count');
         const requiredEl = document.getElementById('selected-required-count');
@@ -312,11 +422,14 @@ ui_closeTruthBook() {
                 gridEl.style.maxWidth = '';
             }
         }
-        // [pure_essence] 控制「跳过研磨」按钮的显示/隐藏
+        // [pure_essence] 控制「跳过研磨」按鈕的显示/隐藏
         const skipGrindBtn = document.getElementById('skip-grind-btn');
         if (skipGrindBtn) {
             skipGrindBtn.style.display = (this.selectionMode === 'pure_essence') ? 'flex' : 'none';
         }
+        // [tsk-668f3dba] 进入正常选择阶段时隐藏替换跳过按鈕
+        const replaceSkipBtn = document.getElementById('replace-ammo-skip-btn');
+        if (replaceSkipBtn) replaceSkipBtn.style.display = 'none';
         if (countEl) countEl.innerText = String(selectedCount);
         if (requiredEl) requiredEl.innerText = String(required);
         if (labelEl) {
@@ -740,6 +853,21 @@ ui_closeTruthBook() {
             this.ui_updateRuneCountDisplay();
             showToast(`已為 ${marble.getName()} 注入 ${injected.icon || '✦'} ${injected.name}，本輪同化率 x${CONFIG.gameplay.assimilationDoubleMultiplier || 2}。`);
         }
+
+        // [tsk-668f3dba] 如果玩家在替换阶段选了目标，将新弹珠插入到 ammoQueue 的指定位置
+        if (this.replaceAmmoContext &&
+            !this.replaceAmmoContext.active &&
+            this.replaceAmmoContext.selectedIndex >= 0 &&
+            this.marbleQueue.length > 0) {
+            const replaceIdx = this.replaceAmmoContext.selectedIndex;
+            if (replaceIdx < this.ammoQueue.length) {
+                // 将命运选择产出的第一枚弹珠替换指定位置
+                const newMarble = this.marbleQueue[0];
+                this.ammoQueue.splice(replaceIdx, 1, newMarble);
+                console.log(`[tsk-668f3dba] 已将 ammoQueue[${replaceIdx}] 替换为 ${newMarble.type || newMarble.getName?.() || '新弹珠'}`);
+            }
+        }
+        this.replaceAmmoContext = null; // [tsk-668f3dba] 清理替换上下文
 
         this.selectionMode = 'standard';
         this.selectionRequiredCount = CONFIG.gameplay.selectionReq || 3;

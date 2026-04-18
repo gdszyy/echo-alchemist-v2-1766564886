@@ -194,6 +194,7 @@ class Game {
         this.selectionPreviewState = null;
         this.relicOverlayReturnState = null;
         this.fateMomentContext = null;
+        this.replaceAmmoContext = null; // [tsk-668f3dba] 替换当前子弹阶段上下文
         this.isDragging = false; 
         this.dragStart = new Vec2(0,0); 
         this.dragCurrent = new Vec2(0,0); 
