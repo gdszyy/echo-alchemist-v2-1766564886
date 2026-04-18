@@ -19,10 +19,19 @@ globs: ["src/game_phase.js"]
 - 底部手柄区域（`height - 40 ± 40px`）已在 `game_system.js` 的 `input_handleInputStart` 中提前拦截，`phase_handleInputStart` 无需重复处理。
 
 ### 2.1 命运抉择阶段 (Selection Phase)
-- **职责**: 玩家在回合开始前处理 round-start resolver 结算后的选择卡牌。遗物不再由固定回合直接插入，而是由延迟奖励队列在进入本阶段前统一解析。
+- **职责**: 玩家在回合开始前处理 round-start resolver 结算后的**特殊命运时刻**（混沌精华 / 纯净精华 / 遗物）。
+- **[tsk-f35c6d10] 普通命运选择已取消**：`sys_startRoundStartResolver()` 队列为空时，**不再**进入普通弹珠选择（`sys_initSelectionPhase()`），改为调用 `sys_showRoundStartBanner()` 直接进入研磨阶段。
 - **入口**: `sys_startRoundStartResolver()` 会先消费 `pendingRoundStartRewards`；若命中 `relic`，进入遗物事件；若命中 `chaos_essence` 或 `pure_essence`，则先写入 `pendingSelectionMode` 再调用 `sys_initSelectionPhase()` 呈现对应的命运时刻界面。
-- **模式分支**: 标准模式要求选择 `3` 枚弹珠；`chaos_essence` 模式沿用标准 3 选流程，但 UI 需显式标记为“混沌精华”；`pure_essence` 模式要求只选择 `1` 枚弹珠，并在确认前完成 1 个合法符文注入。
+- **模式分支**: `chaos_essence` 模式沿用标准 3 选流程，但 UI 需显式标记为"混沌精华"；`pure_essence` 模式要求只选择 `1` 枚弹珠，并在确认前完成 1 个合法符文注入。
 - **出口**: 玩家做出选择并确认，触发转场动画进入研磨阶段。纯净精华模式下，确认时必须先完成合法性校验，把注入结果写回 `MarbleDefinition.collected`，并为对应 `marble.type` 写入 `doubleAssimilationBoostRounds`。
+
+### 2.5 回合开始提示与充能特效 (Round Start Banner)
+- **触发时机**: `sys_startRoundStartResolver()` 的 `pendingRoundStartRewards` 队列为空时，调用 `sys_showRoundStartBanner()`。
+- **实现**: 先调用 `phase_switchPhase('gathering')` 切换背景，然后显示 `#round-start-banner` 全屏大字提示（「第 X 回合開始」），持续约 1.5 秒后自动调用 `phase_startGatheringPhase()` 完成研磨阶段初始化。
+- **充能特效**: 同时为 `#pc-left-sidebar` 添加 CSS 动画类 `.ammo-panel-charging`（high/medium 档：边框光流扫过）或 `.ammo-panel-charging-simple`（low 档：简单淡入淡出）。
+- **性能门控**: 特效等级由 `CONFIG.performance[perfQualityLevel].roundStartBannerGlow` 控制（high/medium: `true`，low: `false`）。
+- **DOM 元素**: `#round-start-banner`（全屏覆盖层，z-index: 9500）、`#round-start-banner-text`（大字文本）。
+- **CSS 类**: `.round-banner-hide`（隐藏）、`.round-banner-show`（显示）、`.round-banner-glow`（光晕动画，需 high/medium 档）。
 
 ### 2.2 研磨阶段 (Gathering Phase)
 - **职责**: 核心打砖块玩法，发射弹珠收集属性，填充弹药队列。

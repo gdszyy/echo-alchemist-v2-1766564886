@@ -751,7 +751,8 @@ export const game_system = {
             round: this.round || 1,
             pendingCount: 0,
         });
-        this.sys_initSelectionPhase();
+        // [tsk-f35c6d10] 队列为空时不再进入普通命运选择，改为显示回合开始提示后直接进入研磨阶段
+        this.sys_showRoundStartBanner();
     },
 
     /**
@@ -760,6 +761,67 @@ export const game_system = {
      */
     sys_continueRoundStartResolver() {
         this.sys_startRoundStartResolver();
+    },
+
+    /**
+     * @method sys_showRoundStartBanner
+     * @description 在进入研磨阶段前显示「第 X 回合开始」大字提示（约 1.5 秒），
+     * 同时触发左侧子弹属性面板充能特效。特效等级接入 CONFIG.performance 三档预算。
+     * @perf-impact: CSS keyframe 动画（无 Canvas 开销），low 档降级为简单淡入
+     */
+    sys_showRoundStartBanner() {
+        const round = this.round || 1;
+        const banner = document.getElementById('round-start-banner');
+        const bannerText = document.getElementById('round-start-banner-text');
+
+        // 先切换到 gathering 阶段（不初始化钉板），避免横幅期间背景残留 selection 界面
+        if (this.phase !== 'gathering') {
+            this.phase_switchPhase('gathering');
+        }
+
+        // 更新文本
+        if (bannerText) bannerText.textContent = `第 ${round} 回合開始`;
+
+        // 根据性能档位选择特效级别
+        const perfLevel = this.perfQualityLevel || 'high';
+        const perfBudget = CONFIG.performance[perfLevel] || CONFIG.performance.high;
+        const useGlow = perfBudget.roundStartBannerGlow !== false; // low 档为 false
+
+        // 显示横幅
+        if (banner) {
+            banner.classList.remove('round-banner-hide');
+            banner.classList.add('round-banner-show');
+            if (useGlow) {
+                banner.classList.add('round-banner-glow');
+            } else {
+                banner.classList.remove('round-banner-glow');
+            }
+        }
+
+        // 触发左侧面板充能特效
+        const leftSidebar = document.getElementById('pc-left-sidebar');
+        if (leftSidebar) {
+            leftSidebar.classList.remove('ammo-panel-charging');
+            // 强制重排以重新触发动画
+            void leftSidebar.offsetWidth;
+            if (useGlow) {
+                leftSidebar.classList.add('ammo-panel-charging');
+            } else {
+                leftSidebar.classList.add('ammo-panel-charging-simple');
+            }
+        }
+
+        // 1.5 秒后隐藏横幅并进入研磨阶段
+        setTimeout(() => {
+            if (banner) {
+                banner.classList.remove('round-banner-show', 'round-banner-glow');
+                banner.classList.add('round-banner-hide');
+            }
+            if (leftSidebar) {
+                leftSidebar.classList.remove('ammo-panel-charging', 'ammo-panel-charging-simple');
+            }
+            this.phase_startGatheringPhase();
+        }, 1500);
     },
 
     /**

@@ -12,6 +12,8 @@
 
 当前共有 **7** 条活跃洞察。
 
+> **[2026-04-18 更新]** PI-006 升版至 v1.1：新增坑 4（普通命运选择已取消，队列为空时改调用 `sys_showRoundStartBanner()`）。
+
 | ID | 标题 | 版本 | 关联模块 | 最后更新 | 文档链接 |
 |----|------|------|---------|---------|---------|
 | PI-001 | 核心 Bug 修复流程与高频陷阱 | v1.2 | game_phase, ui_system, game_system | 2026-04-16 | [PI-001_critical_bugfix_flow.md](PI-001_critical_bugfix_flow.md) |
@@ -19,7 +21,7 @@
 | PI-003 | 子系统扩展与组合模式注入流程 | v1.0 | core, game_system, combat_system, ui_system | 2026-04-16 | [PI-003_subsystem_composition_pattern.md](PI-003_subsystem_composition_pattern.md) |
 | PI-004 | 性能预算扩展与新特效接入流程 | v1.0 | performance, spawn_system, combat_system, entities | 2026-04-16 | [PI-004_performance_budget_extension.md](PI-004_performance_budget_extension.md) |
 | PI-005 | 性能自适应影响评估流程 | v1.0 | performance, combat_system, effects, entities, render_system, spawn_system | 2026-04-16 | [PI-005_perf_impact_assessment.md](PI-005_perf_impact_assessment.md) |
-| PI-006 | Round-Start 延迟奖励结算流程 | v1.0 | game_phase, game_system, core, ui/shop | 2026-04-17 | [PI-006_round_start_reward_resolver.md](PI-006_round_start_reward_resolver.md) |
+| PI-006 | Round-Start 延迟奖励结算流程 | v1.1 | game_phase, game_system, core, ui/shop | 2026-04-18 | [PI-006_round_start_reward_resolver.md](PI-006_round_start_reward_resolver.md) |
 | PI-007 | 命运时刻 Overlay 返回流与纯净精华选择模式 | v1.0 | ui/shop, game_system, ui_system, spawn_system, game_phase, entities, config, core | 2026-04-18 | [PI-007_destiny_overlay_return_and_selection_mode.md](PI-007_destiny_overlay_return_and_selection_mode.md) |
 
 ### 按模块快速检索
@@ -28,7 +30,7 @@
 |------|---------|
 | `game_phase.js` | PI-001（阶段切换双重赋值、round++ 重复执行）、PI-006（回合结束后必须进入 round-start resolver）、PI-007（纯净精华注入后的标准实体链路与同化倍率衰减） |
 | `ui_system.js` | PI-001（multicast 颜色顺序、setDeepValue 双重调用）、PI-007（命运抉择动态数量与纯净精华注入 UI） |
-| `game_system.js` | PI-001（specialSlots 初始化类型）、PI-003（sys_resetGame 新属性重置）、PI-006（pendingRoundStartRewards 存档/恢复）、PI-007（selectionMode / pendingSelectionMode / 选择态持久化） |
+| `game_system.js` | PI-001（specialSlots 初始化类型）、PI-003（sys_resetGame 新属性重置）、PI-006（pendingRoundStartRewards 存档/恢复、普通命运选择已取消、sys_showRoundStartBanner）、PI-007（selectionMode / pendingSelectionMode / 选择态持久化） |
 | `combat_system.js` | PI-002（词条 Hook 注入位置）、PI-003（组合模式）、PI-004（性能预算） |
 | `rune_config.js` | PI-002（effectId 一致性） |
 | `rune_launcher.js` | PI-002（activeRunewordEffects 数据结构） |

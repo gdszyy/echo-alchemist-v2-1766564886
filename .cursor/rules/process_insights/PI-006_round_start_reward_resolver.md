@@ -1,8 +1,8 @@
 ---
 id: "PI-006"
-version: "v1.0"
-last_updated: "2026-04-17"
-author: "tsk-33b634db-ac8"
+version: "v1.1"
+last_updated: "2026-04-18"
+author: "tsk-f35c6d10-d6f"
 related_modules: ["game_phase", "game_system", "core", "ui/shop"]
 status: "active"
 ---
@@ -36,14 +36,23 @@ status: "active"
 **正确做法**：在 `sys_saveRunState()` 中持久化 `pendingRoundStartRewards`，并在 `sys_loadRunState()` 中恢复后立即再次进入 resolver。旧的 `_pendingRelicEvent` / `_pendingBossRelic` 需要迁移成 `relic` 队列项。
 **关键位置**：`src/game_system.js` → `sys_saveRunState()` / `sys_loadRunState()`
 
+### 坑 4: `pendingRoundStartRewards` 队列为空时仍进入普通弹珠选择
+
+**现象**：每回合开始时玩家都被迫进入弹珠选择界面，即使没有任何奖励。
+**根因**：`sys_startRoundStartResolver()` 在队列为空时仍调用 `sys_initSelectionPhase()`。
+**正确做法**：队列为空时调用 `sys_showRoundStartBanner()`，显示回合开始大字提示 1.5 秒后直接进入 `phase_startGatheringPhase()`。
+**关键位置**：`src/game_system.js` → `sys_startRoundStartResolver()` 末尾、`sys_showRoundStartBanner()`
+
 ## 关键耦合点
 
 - `core.js` 的 `enemy:killed` 监听器只负责登记延迟奖励，不应直接打开 UI。
 - `game_phase.js` 负责结束战斗并触发 resolver；`game_system.js` 负责真正解析队列并决定下一阶段。
 - `ui/shop.js` 仍保留 gathering 中特殊槽位触发遗物的旧路径，因此默认恢复目标不能被全局覆盖，必须改成可参数化。
+- `sys_showRoundStartBanner()` 内部会先调用 `phase_switchPhase('gathering')` 避免横幅期间背景殊留 selection 界面，再初始化展示横幅。
 
 ## 版本变更日志
 
 | 版本 | 日期 | 变更内容 | 作者 |
 |------|------|---------|------|
 | v1.0 | 2026-04-17 | 初始记录：固定回合遗物移除，新增 round-start resolver、延迟奖励队列与存档恢复迁移规则 | tsk-33b634db-ac8 |
+| v1.1 | 2026-04-18 | 新增坑 4：普通命运选择已取消，队列为空时改调用 `sys_showRoundStartBanner()` | tsk-f35c6d10-d6f |

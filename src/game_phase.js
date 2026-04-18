@@ -1116,7 +1116,7 @@ phase_gathering_getRandomPegType() {
         this.roundDamage = 0;
         eventBus.emit(EVENT_TYPES.UI_ROUND_NUM_UPDATE, { round: this.round });
         document.getElementById("round-num").innerText = this.round;
-        showToast(`Round ${this.round}`);
+        // [tsk-f35c6d10] 移除旧的小 Toast 回合提示，改由 sys_showRoundStartBanner 提供更醒目的大字居中提示
 
         // [爽游模式] 新手教程局：第 5 回合结算后触发胜利
         if (this._isTutorialRun && this.round > 5) {

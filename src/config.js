@@ -1014,6 +1014,8 @@ const CONFIG = {
             rewardHaloEnabled: true,   // 光晕效果开关（false 时完全跳过）
             rewardRuneCount: 4,        // 混沌精华旋转符文数量
             rewardCrystalCount: 5,     // 纯净精华晶体数量
+            // 回合开始横幅充能特效（high: 完整光晕扩散动画）
+            roundStartBannerGlow: true,
         },
         // MEDIUM：均衡模式，适合中端手机
         medium: {
@@ -1042,6 +1044,8 @@ const CONFIG = {
             rewardHaloEnabled: true,   // 保留光晕效果（主要开销为 shadowBlur）
             rewardRuneCount: 2,        // 混沌精华旋转符文减半
             rewardCrystalCount: 3,     // 纯净精华晶体减少
+            // 回合开始横幅充能特效（medium: 保留光晕）
+            roundStartBannerGlow: true,
         },
         // LOW：省电模式，适合低端手机 / 发热严重时
         low: {
@@ -1070,6 +1074,8 @@ const CONFIG = {
             rewardHaloEnabled: false,  // 关闭光晕（省去 shadowBlur + createRadialGradient）
             rewardRuneCount: 0,        // 关闭旋转符文
             rewardCrystalCount: 0,     // 关闭晶体装饰
+            // 回合开始横幅充能特效（low: 降级为简单淡入，无光晕）
+            roundStartBannerGlow: false,
         }
     }
 };
