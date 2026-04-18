@@ -301,6 +301,22 @@ ui_closeTruthBook() {
         const confirmBtn = document.getElementById('confirm-selection-btn');
         const selectedCount = (this.selectedMarbles || []).length;
         const required = this.ui_getSelectionRequirement();
+        // [pure_essence 修复] 纯净精华模式下展示单卡居中布局
+        const gridEl = document.getElementById('marble-selection-grid');
+        if (gridEl) {
+            if (this.selectionMode === 'pure_essence') {
+                gridEl.style.gridTemplateColumns = '1fr';
+                gridEl.style.maxWidth = '160px';
+            } else {
+                gridEl.style.gridTemplateColumns = '';
+                gridEl.style.maxWidth = '';
+            }
+        }
+        // [pure_essence] 控制「跳过研磨」按钮的显示/隐藏
+        const skipGrindBtn = document.getElementById('skip-grind-btn');
+        if (skipGrindBtn) {
+            skipGrindBtn.style.display = (this.selectionMode === 'pure_essence') ? 'flex' : 'none';
+        }
         if (countEl) countEl.innerText = String(selectedCount);
         if (requiredEl) requiredEl.innerText = String(required);
         if (labelEl) {

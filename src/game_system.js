@@ -17,7 +17,7 @@ import { Vec2, showToast, RuneLoot, Enemy } from './entities.js';
 import { CONFIG } from './config.js';
 import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
-import { COUNTER_MAP } from './rune_config.js';
+import { COUNTER_MAP, RUNE_DB } from './rune_config.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 
 export const game_system = {
@@ -533,8 +533,59 @@ export const game_system = {
         if (countEl) countEl.innerText = '0';
         if (confirmBtn) confirmBtn.disabled = true;
         if (recipeHud) recipeHud.classList.add('hidden');
-        if (typeof this.ui_refreshSelectionModeUI === 'function') this.ui_refreshSelectionModeUI();
+         if (typeof this.ui_refreshSelectionModeUI === 'function') this.ui_refreshSelectionModeUI();
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+    },
+
+    /**
+     * @method sys_skipGrindGetRune
+     * @description 纯净精华命运时刻「跳过研磨」逻辑：随机获取一个符文并直接进入战斗阶段。
+     * 符文等级基于当前回合数：Round 1-5 → Lv1，Round 6-15 → Lv2，Round 16+ → Lv3。
+     * 跳过后不得触发 sys_initSelectionPhase() 或 phase_gathering_initPachinko()。
+     */
+    sys_skipGrindGetRune() {
+        if (this.selectionMode !== 'pure_essence') {
+            console.warn('[sys_skipGrindGetRune] 只允许在 pure_essence 模式下调用');
+            return;
+        }
+        // 根据回合数确定符文等级
+        const round = this.round || 1;
+        let forcedLevel = 1;
+        if (round >= 16) {
+            forcedLevel = 3;
+        } else if (round >= 6) {
+            forcedLevel = 2;
+        }
+        // 调用 loot_calcRuneDrop 生成随机符文
+        const drop = loot_calcRuneDrop(this, { forcedLevel });
+        if (drop && drop.runeId) {
+            const runeDef = (RUNE_DB || []).find(r => r.id === drop.runeId);
+            const runeName = runeDef ? runeDef.name : drop.runeId;
+            const runeIcon = runeDef ? (runeDef.icon || '✦') : '✦';
+            this.runeInventory.push({ id: drop.runeId, level: drop.level || forcedLevel });
+            if (this.saveData) this.saveData.runeInventory = (this.runeInventory || []).slice();
+            showToast(`跳过研磨！获得 ${runeIcon} ${runeName} Lv.${drop.level || forcedLevel}`);
+        } else {
+            showToast('跳过研磨！（未获得符文）');
+        }
+        // 清理命运时刻上下文和弹珠队列
+        this.marbleQueue = [];
+        this.activeMarbleIndex = 0;
+        this.ammoQueue = [];
+        this.selectionMode = 'standard';
+        this.selectionRequiredCount = CONFIG.gameplay.selectionReq || 3;
+        this.selectionInjectedRune = null;
+        this.selectionPreviewState = null;
+        this.fateMomentContext = null;
+        this.pendingSelectionMode = null;
+        // 存档
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        // 直接进入战斗阶段（跳过研磨）
+        if (typeof this.phase_startCombatPhase === 'function') {
+            this.phase_startCombatPhase();
+        } else {
+            this.phase_switchPhase('combat');
+        }
     },
 
     /**

@@ -599,7 +599,9 @@ export const spawn_system = {
             tutorialOnlyTypes.forEach(type => { tutorialWeights[type] = 25; });
         }
 
-        for(let i=0; i < CONFIG.gameplay.selectionCount; i++) {
+        // [pure_essence 修复] 纯净精华模式下只生成 1 个弹珠（不是从 6 个中选 1 个）
+        const generateCount = (this.selectionMode === 'pure_essence') ? 1 : CONFIG.gameplay.selectionCount;
+        for(let i=0; i < generateCount; i++) {
             let m;
             
             // 1. 保底機制
