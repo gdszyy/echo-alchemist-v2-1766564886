@@ -2587,6 +2587,189 @@ class Enemy {
             ctx.restore();
         }
 
+        // === Layer 6.8: 奖励标记敌人专属光晕 (Pending Reward Halo) ===
+        // @perf-impact: 新增 shadowBlur + createRadialGradient + 旋转符文/晶体 - 已通过 rewardHaloEnabled/rewardRuneCount/rewardCrystalCount 三档门控
+        if (this._pendingRewardType && this.actionPhase === 'idle') {
+            const _perfBudget = (typeof game !== 'undefined' && game.perfQualityLevel)
+                ? CONFIG.performance[game.perfQualityLevel]
+                : CONFIG.performance.high;
+            if (_perfBudget.rewardHaloEnabled) {
+                const _rc = CONFIG.enemyRender;
+                const _now = Date.now();
+
+                if (this._pendingRewardType === 'relic') {
+                    // --- 遗物（relic）：金色光晕 + 宝箱图标浮动 ---
+                    const _relicPhase = (_now / _rc.relicHaloPeriod + this.visualSeed * 0.5) * Math.PI * 2;
+                    const _relicIntensity = (Math.sin(_relicPhase) + 1) * 0.5;
+                    ctx.save();
+                    ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+                    ctx.shadowColor = _rc.relicHaloColor;
+                    ctx.shadowBlur = _relicIntensity * _rc.relicHaloBlurMax;
+                    ctx.strokeStyle = `rgba(250, 204, 21, ${_relicIntensity * _rc.relicHaloStrokeAlpha})`;
+                    ctx.lineWidth = 2;
+                    // 光晕轮廓跟随敌人形状
+                    if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                        const _verts = this.collisionData.vertices;
+                        ctx.beginPath();
+                        ctx.moveTo(_verts[0].x * 1.12, _verts[0].y * 1.12);
+                        for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.12, _verts[_i].y * 1.12);
+                        ctx.closePath();
+                        ctx.stroke();
+                    } else {
+                        ctx.beginPath();
+                        ctx.roundRect(-w/2 - 7, -h/2 - 7, w + 14, h + 14, r + 4);
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                    // 宝箱图标浮动
+                    const _relicFloatY = Math.sin((_now / _rc.relicIconFloatPeriod + this.visualSeed) * Math.PI * 2) * _rc.relicIconFloatAmplitude;
+                    ctx.save();
+                    ctx.font = `${_rc.relicIconFontSize}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowColor = _rc.relicHaloColor;
+                    ctx.shadowBlur = 10;
+                    ctx.fillText('🎁', this.pos.x, this.pos.y + this.bumpOffsetY - h/2 + _rc.relicIconOffsetY + _relicFloatY);
+                    ctx.restore();
+
+                } else if (this._pendingRewardType === 'chaos_essence') {
+                    // --- 混沌精华（chaos_essence）：混沌紫/红渐变光晕 + 旋转符文 ---
+                    const _chaosPhase = (_now / _rc.chaosHaloPeriod + this.visualSeed * 0.8) * Math.PI * 2;
+                    const _chaosIntensity = (Math.sin(_chaosPhase) + 1) * 0.5;
+                    ctx.save();
+                    ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+                    // 渐变光晕：内圈紫色到外圈红色
+                    ctx.shadowColor = _rc.chaosHaloColorInner;
+                    ctx.shadowBlur = _chaosIntensity * _rc.chaosHaloBlurMax;
+                    const _chaosAlpha = _chaosIntensity * _rc.chaosHaloStrokeAlpha;
+                    // 内圈紫色描边
+                    ctx.strokeStyle = `rgba(168, 85, 247, ${_chaosAlpha})`;
+                    ctx.lineWidth = 2;
+                    if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                        const _verts = this.collisionData.vertices;
+                        ctx.beginPath();
+                        ctx.moveTo(_verts[0].x * 1.10, _verts[0].y * 1.10);
+                        for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.10, _verts[_i].y * 1.10);
+                        ctx.closePath();
+                        ctx.stroke();
+                    } else {
+                        ctx.beginPath();
+                        ctx.roundRect(-w/2 - 6, -h/2 - 6, w + 12, h + 12, r + 3);
+                        ctx.stroke();
+                    }
+                    // 外圈红色描边（偏移一层）
+                    ctx.shadowColor = _rc.chaosHaloColorOuter;
+                    ctx.strokeStyle = `rgba(239, 68, 68, ${_chaosAlpha * 0.6})`;
+                    ctx.lineWidth = 1.5;
+                    if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                        const _verts = this.collisionData.vertices;
+                        ctx.beginPath();
+                        ctx.moveTo(_verts[0].x * 1.18, _verts[0].y * 1.18);
+                        for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.18, _verts[_i].y * 1.18);
+                        ctx.closePath();
+                        ctx.stroke();
+                    } else {
+                        ctx.beginPath();
+                        ctx.roundRect(-w/2 - 12, -h/2 - 12, w + 24, h + 24, r + 6);
+                        ctx.stroke();
+                    }
+                    // 旋转符文粒子
+                    const _chaosRuneCount = _perfBudget.rewardRuneCount;
+                    if (_chaosRuneCount > 0) {
+                        const _chaosRunes = ['★', '♦', '✠', '✶'];
+                        const _orbitR = Math.max(w, h) * _rc.chaosRuneOrbitRadius;
+                        const _baseAngle = _now * _rc.chaosRuneRotateSpeed;
+                        ctx.font = `${_rc.chaosRuneFontSize}px sans-serif`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        for (let _ri = 0; _ri < _chaosRuneCount; _ri++) {
+                            const _angle = _baseAngle + (_ri / _chaosRuneCount) * Math.PI * 2;
+                            const _rx = Math.cos(_angle) * _orbitR;
+                            const _ry = Math.sin(_angle) * _orbitR;
+                            const _runeAlpha = 0.5 + _chaosIntensity * 0.5;
+                            ctx.shadowColor = _ri % 2 === 0 ? _rc.chaosHaloColorInner : _rc.chaosHaloColorOuter;
+                            ctx.shadowBlur = 6;
+                            ctx.fillStyle = _ri % 2 === 0
+                                ? `rgba(168, 85, 247, ${_runeAlpha})`
+                                : `rgba(239, 68, 68, ${_runeAlpha})`;
+                            ctx.fillText(_chaosRunes[_ri % _chaosRunes.length], _rx, _ry);
+                        }
+                    }
+                    ctx.restore();
+
+                } else if (this._pendingRewardType === 'pure_essence') {
+                    // --- 纯净精华（pure_essence）：纯白/蓝白晶化光晕 ---
+                    const _purePhase = (_now / _rc.pureHaloPeriod + this.visualSeed * 0.6) * Math.PI * 2;
+                    const _pureIntensity = Math.pow((Math.sin(_purePhase) + 1) * 0.5, 1.5); // 非线性缓动
+                    ctx.save();
+                    ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+                    // 外圈蓝白光晕
+                    ctx.shadowColor = _rc.pureHaloColorOuter;
+                    ctx.shadowBlur = _pureIntensity * _rc.pureHaloBlurMax;
+                    const _pureAlpha = _pureIntensity * _rc.pureHaloStrokeAlpha;
+                    ctx.strokeStyle = `rgba(191, 219, 254, ${_pureAlpha})`;
+                    ctx.lineWidth = 2;
+                    if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                        const _verts = this.collisionData.vertices;
+                        ctx.beginPath();
+                        ctx.moveTo(_verts[0].x * 1.11, _verts[0].y * 1.11);
+                        for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.11, _verts[_i].y * 1.11);
+                        ctx.closePath();
+                        ctx.stroke();
+                    } else {
+                        ctx.beginPath();
+                        ctx.roundRect(-w/2 - 7, -h/2 - 7, w + 14, h + 14, r + 4);
+                        ctx.stroke();
+                    }
+                    // 内圈纯白光晕（lighter 模式叠加）
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    ctx.shadowColor = _rc.pureHaloColorInner;
+                    ctx.shadowBlur = _pureIntensity * _rc.pureHaloBlurMax * 0.5;
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${_pureAlpha * 0.4})`;
+                    ctx.lineWidth = 1.5;
+                    if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                        const _verts = this.collisionData.vertices;
+                        ctx.beginPath();
+                        ctx.moveTo(_verts[0].x * 1.06, _verts[0].y * 1.06);
+                        for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.06, _verts[_i].y * 1.06);
+                        ctx.closePath();
+                        ctx.stroke();
+                    } else {
+                        ctx.beginPath();
+                        ctx.roundRect(-w/2 - 3, -h/2 - 3, w + 6, h + 6, r + 2);
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                    // 晶体旋转装饰
+                    const _pureCrystalCount = _perfBudget.rewardCrystalCount;
+                    if (_pureCrystalCount > 0) {
+                        const _orbitR = Math.max(w, h) * _rc.pureCrystalOrbitRadius;
+                        const _baseAngle = _now * _rc.pureCrystalRotateSpeed;
+                        for (let _ci = 0; _ci < _pureCrystalCount; _ci++) {
+                            const _angle = _baseAngle + (_ci / _pureCrystalCount) * Math.PI * 2;
+                            const _cx = Math.cos(_angle) * _orbitR;
+                            const _cy = Math.sin(_angle) * _orbitR;
+                            const _cSize = _rc.pureCrystalSize;
+                            const _crystalAlpha = 0.4 + _pureIntensity * 0.6;
+                            ctx.shadowColor = _rc.pureHaloColorOuter;
+                            ctx.shadowBlur = 8;
+                            ctx.fillStyle = `rgba(191, 219, 254, ${_crystalAlpha})`;
+                            // 绘制菱形晶体
+                            ctx.beginPath();
+                            ctx.moveTo(_cx, _cy - _cSize);
+                            ctx.lineTo(_cx + _cSize * 0.5, _cy);
+                            ctx.lineTo(_cx, _cy + _cSize);
+                            ctx.lineTo(_cx - _cSize * 0.5, _cy);
+                            ctx.closePath();
+                            ctx.fill();
+                        }
+                    }
+                    ctx.restore();
+                }
+            }
+        }
+
         // --- [新增] 绘制预警大图标 (Pop-up Icon) ---
         if (this.actionPhase === 'telegraphing' && this.actionIcon) {
             ctx.save();

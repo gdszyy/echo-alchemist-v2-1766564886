@@ -903,7 +903,68 @@ const CONFIG = {
         // clone 精英：重影偏移量（像素）
         eliteCloneGhostOffset: 4,
         // clone Boss：轨道卫星数量
-        bossCloneSatelliteCount: 3
+        bossCloneSatelliteCount: 3,
+
+        // ===== 奖励标记敌人专属光晕参数 (Pending Reward Halo) =====
+        // 适用于 _pendingRewardType 不为空的敌人，在 idle 状态下显示专属光晕
+
+        // --- 遗物（relic）：金色光晕 + 宝箱图标浮动 ---
+        // 金色光晕：外圈 shadowBlur 最大值（像素）
+        relicHaloBlurMax: 22,
+        // 金色光晕：脉冲周期（毫秒）
+        relicHaloPeriod: 1600,
+        // 金色光晕：外圈描边颜色
+        relicHaloColor: '#facc15',
+        // 金色光晕：外圈描边最大透明度
+        relicHaloStrokeAlpha: 0.85,
+        // 宝箱图标：浮动幅度（像素）
+        relicIconFloatAmplitude: 5,
+        // 宝箱图标：浮动周期（毫秒）
+        relicIconFloatPeriod: 1800,
+        // 宝箱图标：图标字体大小（像素）
+        relicIconFontSize: 18,
+        // 宝箱图标：图标距敌人顶部的偏移（像素，负值为向上）
+        relicIconOffsetY: -14,
+
+        // --- 混沌精华（chaos_essence）：混沌紫/红渐变光晕 + 旋转粒子 ---
+        // 混沌光晕：外圈 shadowBlur 最大值（像素）
+        chaosHaloBlurMax: 20,
+        // 混沌光晕：脉冲周期（毫秒）
+        chaosHaloPeriod: 1200,
+        // 混沌光晕：内圈颜色（紫色）
+        chaosHaloColorInner: '#a855f7',
+        // 混沌光晕：外圈颜色（红色）
+        chaosHaloColorOuter: '#ef4444',
+        // 混沌光晕：外圈描边最大透明度
+        chaosHaloStrokeAlpha: 0.75,
+        // 旋转符文粒子：数量（high 档）
+        chaosRuneCount: 4,
+        // 旋转符文粒子：轨道半径（相对于敌人宽度的倍率）
+        chaosRuneOrbitRadius: 0.75,
+        // 旋转符文粒子：旋转速度（弧度/毫秒）
+        chaosRuneRotateSpeed: 0.0015,
+        // 旋转符文粒子：字体大小（像素）
+        chaosRuneFontSize: 11,
+
+        // --- 纯净精华（pure_essence）：纯白/蓝白晶化光晕 ---
+        // 纯净光晕：外圈 shadowBlur 最大值（像素）
+        pureHaloBlurMax: 18,
+        // 纯净光晕：脉冲周期（毫秒）
+        pureHaloPeriod: 2000,
+        // 纯净光晕：内圈颜色（纯白）
+        pureHaloColorInner: '#ffffff',
+        // 纯净光晕：外圈颜色（蓝白）
+        pureHaloColorOuter: '#bfdbfe',
+        // 纯净光晕：外圈描边最大透明度
+        pureHaloStrokeAlpha: 0.80,
+        // 晶化光效：晶体数量（high 档）
+        pureCrystalCount: 5,
+        // 晶化光效：晶体轨道半径（相对于敌人宽度的倍率）
+        pureCrystalOrbitRadius: 0.70,
+        // 晶化光效：旋转速度（弧度/毫秒，负值反向旋转）
+        pureCrystalRotateSpeed: -0.0008,
+        // 晶化光效：晶体大小（像素）
+        pureCrystalSize: 4
     },
 
     // ==================== 自适应性能配置 (Adaptive Performance) ====================
@@ -949,6 +1010,10 @@ const CONFIG = {
             arcBossVfxLineCount: 6,   // Devourer 旋转引力线数量
             arcBossVfxWhiteGrad: true, // Devourer 深渊核心 lighter 白化叠加开关
             arcBossVfxSuckProb:  0.7, // Devourer 吸入粒子每帧生成概率
+            // 奖励标记敌人光晕门控（high: 完整效果）
+            rewardHaloEnabled: true,   // 光晕效果开关（false 时完全跳过）
+            rewardRuneCount: 4,        // 混沌精华旋转符文数量
+            rewardCrystalCount: 5,     // 纯净精华晶体数量
         },
         // MEDIUM：均衡模式，适合中端手机
         medium: {
@@ -973,6 +1038,10 @@ const CONFIG = {
             arcBossVfxLineCount: 6,   // 引力线保持，但 shadowBlur 已随脉冲降低
             arcBossVfxWhiteGrad: true, // 保留白化叠加
             arcBossVfxSuckProb:  0.5, // 吸入粒子概率降至 50%
+            // 奖励标记敌人光晕门控（medium: 减少旋转装饰）
+            rewardHaloEnabled: true,   // 保留光晕效果（主要开销为 shadowBlur）
+            rewardRuneCount: 2,        // 混沌精华旋转符文减半
+            rewardCrystalCount: 3,     // 纯净精华晶体减少
         },
         // LOW：省电模式，适合低端手机 / 发热严重时
         low: {
@@ -997,6 +1066,10 @@ const CONFIG = {
             arcBossVfxLineCount: 3,   // 引力线减半（6 次 createLinearGradient → 3）
             arcBossVfxWhiteGrad: false, // 关闭 lighter 白化叠加（createRadialGradient）
             arcBossVfxSuckProb:  0.3, // 吸入粒子概率降至 30%
+            // 奖励标记敌人光晕门控（low: 关闭所有光晕和旋转装饰）
+            rewardHaloEnabled: false,  // 关闭光晕（省去 shadowBlur + createRadialGradient）
+            rewardRuneCount: 0,        // 关闭旋转符文
+            rewardCrystalCount: 0,     // 关闭晶体装饰
         }
     }
 };

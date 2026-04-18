@@ -622,6 +622,8 @@ export const game_system = {
         );
 
         if (!queuedReward) return null;
+        // 为敌人打上奖励类型标记，供渲染管线识别并显示专属视觉样式
+        enemy._pendingRewardType = queuedReward.type; // 'relic' | 'chaos_essence' | 'pure_essence'
         if (queuedReward.type === 'relic') {
             showToast('✨ 敵人掉落了遺物線索，將在下回合開始結算');
         } else if (queuedReward.type === 'pure_essence') {
