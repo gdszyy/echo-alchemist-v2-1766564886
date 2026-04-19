@@ -2094,9 +2094,7 @@ phase_gathering_getRandomPegType() {
         const pegRadius = Math.max(4, Math.min(8, (this.width || 400) / 60));
         
         // [防御性检查] 如果钉子数组为空，尝试自动恢复
-        // [BUGFIX tsk-gathering-phase-leak] 在回合开始横幅期间（_showingRoundBanner=true）跳过自动恢复，
-        // 防止 banner 期间 pegs 为空时触发初始化，导致研磨阶段提前显示。
-        if (this.pegs.length === 0 && !this._showingRoundBanner) {
+        if (this.pegs.length === 0) {
             console.warn("[DEBUG] 收集阶段钉子数组为空，尝试自动恢复...");
             this.phase_gathering_initPachinko();
         }

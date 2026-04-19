@@ -893,8 +893,10 @@ export const game_system = {
 
     /**
      * @method sys_showRoundStartBanner
-     * @description 在进入研磨阶段前显示「第 X 回合开始」大字提示（约 1.5 秒），
+     * @description 无精华奖励时，在直接进入战斗前显示「第 X 回合开始」大字提示（约 1.5 秒），
      * 同时触发左侧子弹属性面板充能特效。特效等级接入 CONFIG.performance 三档预算。
+     * 横幅结束后直接进入战斗阶段（跳过研磨）。
+     * 有精华奖励时由 ui_confirmSelection 直接调用 phase_startGatheringPhase。
      * @perf-impact: CSS keyframe 动画（无 Canvas 开销），low 档降级为简单淡入
      */
     sys_showRoundStartBanner() {
@@ -902,12 +904,9 @@ export const game_system = {
         const banner = document.getElementById('round-start-banner');
         const bannerText = document.getElementById('round-start-banner-text');
 
-        // [BUGFIX tsk-gathering-phase-leak] 设置标志位，防止 banner 期间 Canvas 的钉子防御性检查触发提前初始化。
-        this._showingRoundBanner = true;
-
-        // 先切换到 gathering 阶段（不初始化钉板），避免横幅期间背景残留 selection 界面
-        if (this.phase !== 'gathering') {
-            this.phase_switchPhase('gathering');
+        // 切换到 combat 阶段作为横幅背景，避免残留 selection 界面
+        if (this.phase !== 'combat') {
+            this.phase_switchPhase('combat');
         }
 
         // 更新文本
@@ -942,7 +941,7 @@ export const game_system = {
             }
         }
 
-        // 1.5 秒后隐藏横幅并进入研磨阶段
+        // 1.5 秒后隐藏横幅并直接进入战斗阶段（无精华时跳过研磨）
         setTimeout(() => {
             if (banner) {
                 banner.classList.remove('round-banner-show', 'round-banner-glow');
@@ -951,9 +950,21 @@ export const game_system = {
             if (leftSidebar) {
                 leftSidebar.classList.remove('ammo-panel-charging', 'ammo-panel-charging-simple');
             }
-            // [BUGFIX tsk-gathering-phase-leak] 横幅结束，清除标志位，再进入研磨阶段。
-            this._showingRoundBanner = false;
-            this.phase_startGatheringPhase();
+            // [充能] 无精华时，用上回合 marbleQueue 中的弹珠定义重新编译生成 ammoQueue，
+            // 保留上回研磨收集的属性（collected），实现“子弹充能”效果。
+            if (this.marbleQueue && this.marbleQueue.length > 0) {
+                this.ammoQueue = [];
+                this.marbleQueue.forEach(marbleDef => {
+                    const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
+                    const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, false);
+                    recipe.finalHits = 0;
+                    recipe.multicast = 0;
+                    this.ammoQueue.push(recipe);
+                });
+                this.ui_updateAmmoUI && this.ui_updateAmmoUI();
+                this.ui_renderRecipeHUD && this.ui_renderRecipeHUD();
+            }
+            this.phase_startCombatPhase();
         }, 1500);
     },
 
