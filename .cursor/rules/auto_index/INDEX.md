@@ -7,12 +7,12 @@
 
 | 文件 | 总行数 | 函数数 | 巨型函数 | @section 标记 | 索引文件 |
 |------|--------|--------|----------|--------------|---------|
-| `src/entities.js` | 4718 | 104 | **4** | 0 | [src_entities_js_index.md](src_entities_js_index.md) |
-| `src/entities/enemy.js` | 4399 | 26 | **3** | 0 | [src_entities_enemy_js_index.md](src_entities_enemy_js_index.md) |
-| `src/combat_system.js` | 3305 | 42 | **5** | 0 | [src_combat_system_js_index.md](src_combat_system_js_index.md) |
-| `src/systems.js` | 2800 | 85 | **2** | 0 | [src_systems_js_index.md](src_systems_js_index.md) |
-| `src/game_phase.js` | 2446 | 16 | **3** | 0 | [src_game_phase_js_index.md](src_game_phase_js_index.md) |
-| `src/spawn_system.js` | 2028 | 28 | **2** | 0 | [src_spawn_system_js_index.md](src_spawn_system_js_index.md) |
+| `src/entities.js` | 4741 | 104 | **4** | 21 | [src_entities_js_index.md](src_entities_js_index.md) |
+| `src/entities/enemy.js` | 4418 | 26 | **3** | 18 | [src_entities_enemy_js_index.md](src_entities_enemy_js_index.md) |
+| `src/combat_system.js` | 3331 | 42 | **5** | 22 | [src_combat_system_js_index.md](src_combat_system_js_index.md) |
+| `src/systems.js` | 2810 | 85 | **2** | 10 | [src_systems_js_index.md](src_systems_js_index.md) |
+| `src/game_phase.js` | 2461 | 16 | **3** | 15 | [src_game_phase_js_index.md](src_game_phase_js_index.md) |
+| `src/spawn_system.js` | 2036 | 28 | **2** | 8 | [src_spawn_system_js_index.md](src_spawn_system_js_index.md) |
 | `src/game_system.js` | 1788 | 42 | 0 | 0 | [src_game_system_js_index.md](src_game_system_js_index.md) |
 | `src/ui/rune_launcher.js` | 1682 | 25 | **1** | 0 | [src_ui_rune_launcher_js_index.md](src_ui_rune_launcher_js_index.md) |
 | `src/config.js` | 1475 | 1 | **1** | 0 | [src_config_js_index.md](src_config_js_index.md) |
@@ -25,15 +25,6 @@
 | `src/render_system.js` | 643 | 8 | 0 | 0 | [src_render_system_js_index.md](src_render_system_js_index.md) |
 | `src/plinko_physics.js` | 597 | 15 | 0 | 0 | [src_plinko_physics_js_index.md](src_plinko_physics_js_index.md) |
 | `src/audio.js` | 564 | 18 | 0 | 0 | [src_audio_js_index.md](src_audio_js_index.md) |
-
-## 警告 (6 个)
-
-- **`src/combat_system.js`** (3305行): 文件超过 2000 行但没有任何 @section 标记，建议添加内部节点标记。
-- **`src/entities/enemy.js`** (4399行): 文件超过 2000 行但没有任何 @section 标记，建议添加内部节点标记。
-- **`src/entities.js`** (4718行): 文件超过 2000 行但没有任何 @section 标记，建议添加内部节点标记。
-- **`src/game_phase.js`** (2446行): 文件超过 2000 行但没有任何 @section 标记，建议添加内部节点标记。
-- **`src/spawn_system.js`** (2028行): 文件超过 2000 行但没有任何 @section 标记，建议添加内部节点标记。
-- **`src/systems.js`** (2800行): 文件超过 2000 行但没有任何 @section 标记，建议添加内部节点标记。
 
 ## 未索引文件 (11 个)
 

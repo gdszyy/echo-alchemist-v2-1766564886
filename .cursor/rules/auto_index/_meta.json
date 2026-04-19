@@ -10,9 +10,9 @@
     },
     {
       "file": "src/combat_system.js",
-      "lines": 3305,
+      "lines": 3331,
       "funcs": 42,
-      "sections": 0,
+      "sections": 22,
       "mega_funcs": 5,
       "index_path": ".cursor/rules/auto_index/src_combat_system_js_index.md"
     },
@@ -34,9 +34,9 @@
     },
     {
       "file": "src/entities/enemy.js",
-      "lines": 4399,
+      "lines": 4418,
       "funcs": 26,
-      "sections": 0,
+      "sections": 18,
       "mega_funcs": 3,
       "index_path": ".cursor/rules/auto_index/src_entities_enemy_js_index.md"
     },
@@ -50,17 +50,17 @@
     },
     {
       "file": "src/entities.js",
-      "lines": 4718,
+      "lines": 4741,
       "funcs": 104,
-      "sections": 0,
+      "sections": 21,
       "mega_funcs": 4,
       "index_path": ".cursor/rules/auto_index/src_entities_js_index.md"
     },
     {
       "file": "src/game_phase.js",
-      "lines": 2446,
+      "lines": 2461,
       "funcs": 16,
-      "sections": 0,
+      "sections": 15,
       "mega_funcs": 3,
       "index_path": ".cursor/rules/auto_index/src_game_phase_js_index.md"
     },
@@ -98,17 +98,17 @@
     },
     {
       "file": "src/spawn_system.js",
-      "lines": 2028,
+      "lines": 2036,
       "funcs": 28,
-      "sections": 0,
+      "sections": 8,
       "mega_funcs": 2,
       "index_path": ".cursor/rules/auto_index/src_spawn_system_js_index.md"
     },
     {
       "file": "src/systems.js",
-      "lines": 2800,
+      "lines": 2810,
       "funcs": 85,
-      "sections": 0,
+      "sections": 10,
       "mega_funcs": 2,
       "index_path": ".cursor/rules/auto_index/src_systems_js_index.md"
     },
@@ -213,36 +213,5 @@
       "reason": "未达阈值 (行数=170<500, 函数数=17<20)"
     }
   ],
-  "warnings": [
-    {
-      "file": "src/combat_system.js",
-      "lines": 3305,
-      "message": "文件超过 2000 行但没有任何 @section 标记，建议添加内部节点标记。"
-    },
-    {
-      "file": "src/entities/enemy.js",
-      "lines": 4399,
-      "message": "文件超过 2000 行但没有任何 @section 标记，建议添加内部节点标记。"
-    },
-    {
-      "file": "src/entities.js",
-      "lines": 4718,
-      "message": "文件超过 2000 行但没有任何 @section 标记，建议添加内部节点标记。"
-    },
-    {
-      "file": "src/game_phase.js",
-      "lines": 2446,
-      "message": "文件超过 2000 行但没有任何 @section 标记，建议添加内部节点标记。"
-    },
-    {
-      "file": "src/spawn_system.js",
-      "lines": 2028,
-      "message": "文件超过 2000 行但没有任何 @section 标记，建议添加内部节点标记。"
-    },
-    {
-      "file": "src/systems.js",
-      "lines": 2800,
-      "message": "文件超过 2000 行但没有任何 @section 标记，建议添加内部节点标记。"
-    }
-  ]
+  "warnings": []
 }

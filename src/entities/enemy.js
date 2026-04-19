@@ -1222,6 +1222,7 @@ class Enemy {
     }
 
     // [核心修改] 绘制方法：修复冰冻视觉过大和边缘粗糙问题
+    // @section:draw_entry_and_perf_check - 绘制入口与性能等级检查
     draw(ctx) {
         if (!this.active) return;
         ctx.save(); 
@@ -1277,6 +1278,7 @@ class Enemy {
         
         const w = this.width - 4; 
         const h = this.height - 4; 
+        // @section:draw_shadow_and_base - 软阴影与敌人基础形体绘制
         const r = 6;
 
         // === Layer 1: 容器裁剪 ===
@@ -1397,6 +1399,7 @@ class Enemy {
             // --- 修改点：大幅降低不透明度 ---
             let mistOpacity = 0;
             // 即使完全冻结，透明度最高也只有 0.5 (原来是 0.9)
+            // @section:draw_status_effects - 状态效果视觉（冻结/灼烧/眩晕等）
             if (this.isFrozenCurrentTurn || this.temp <= -100) mistOpacity = 0.5;
             else mistOpacity = Math.min(0.4, (Math.abs(this.temp) - 30) / 70);
 
@@ -1597,6 +1600,7 @@ class Enemy {
                         ctx.beginPath();
                         ctx.arc(bubbleX, bubbleY, Math.max(1, bubbleR), 0, Math.PI * 2);
                         ctx.stroke();
+                    // @section:draw_boss_aura - Boss 专属光环与粒子特效
                     }
                     ctx.restore();
                 }
@@ -1897,6 +1901,7 @@ class Enemy {
                         const sx = Math.cos(satAngle) * satOrbitR;
                         const sy = Math.sin(satAngle) * satOrbitR;
                         const satAlpha = 0.6 * affixAlpha35;
+                        // @section:draw_health_bar - 血条与护盾条绘制
                         const satGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, satR * 2.5);
                         satGrad.addColorStop(0, `rgba(255, 255, 255, ${satAlpha})`);
                         satGrad.addColorStop(0.5, `rgba(192, 132, 252, ${satAlpha * 0.7})`);
@@ -2097,6 +2102,7 @@ class Enemy {
             // 多边形边框—— Boss 和随从均适用
             ctx.beginPath();
             const verts = this.collisionData.vertices;
+            // @section:draw_affix_icons - 词缀图标与状态标记
             ctx.moveTo(verts[0].x, verts[0].y);
             for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x, verts[i].y);
             ctx.closePath();
@@ -2397,6 +2403,7 @@ class Enemy {
                 const midX = (startX + endX) / 2 + (Math.sin(vSeed * 3) * 0.2) * w;
                 const midY = (startY + endY) / 2 + (Math.cos(vSeed * 2.5) * 0.2) * h;
                 ctx.quadraticCurveTo(midX, midY, endX, endY);
+                // @section:draw_boss_name_plate - Boss 名牌与阶段指示器
                 ctx.stroke();
             }
             ctx.restore();
@@ -2697,6 +2704,7 @@ class Enemy {
                     }
                     ctx.restore();
 
+                // @section:draw_attack_indicators - 攻击预警指示器绘制
                 } else if (this._pendingRewardType === 'pure_essence') {
                     // --- 纯净精华（pure_essence）：纯白/蓝白晶化光晕 ---
                     const _purePhase = (_now / _rc.pureHaloPeriod + this.visualSeed * 0.6) * Math.PI * 2;
@@ -2997,6 +3005,7 @@ class Enemy {
                 // 额外的暗色烟雾粒子
                 if (typeof game !== 'undefined' && Math.random() < 0.3) {
                     const angle = Math.random() * Math.PI * 2;
+                    // @section:draw_special_projectiles - 特殊投射物与技能特效绘制
                     const dist = devRadius * (0.6 + Math.random() * 0.4);
                     const px = this.pos.x + Math.cos(angle) * dist;
                     const py = this.pos.y + this.bumpOffsetY + Math.sin(angle) * dist;
@@ -3197,6 +3206,7 @@ class Enemy {
                     ctx.shadowColor = triGlow;
                     ctx.shadowBlur = 8 + triPulse * 12;
                     ctx.beginPath();
+                    // @section:draw_death_animation - 死亡动画与消散特效
                     ctx.moveTo(0, -triSize);
                     ctx.lineTo(triSize * 0.866, triSize * 0.5);
                     ctx.lineTo(-triSize * 0.866, triSize * 0.5);
@@ -3480,6 +3490,7 @@ class Enemy {
      * @param {number} amount - 伤害数值
      * @param {object|null} source - 伤害来源 (通常是 projectile 或带有 pos 的对象)
      */
+    // @section:damage_shield_check - 护盾吸收与穿透判断
     takeDamage(amount, source = null, bypassShield = false) {
         let actualDamage = amount;
         
@@ -3557,6 +3568,8 @@ class Enemy {
                 game.spawn_createFloatingText(this.pos.x, this.pos.y - 30, `+${Math.ceil(actualDamage - amount)}`, '#06b6d4');
             }
         }
+
+// @section:damage_element_reaction - 属性反应触发（克制/共鸣/温度系统）
 
         // 3b. [技能系统迭代] 冰牢封印技能的冻结期伤害加成
         if (this._frostPrisonAmp && this._frostPrisonAmp > 0 && (this.temp <= -100 || (this.frozenTurns && this.frozenTurns > 0))) {
@@ -3647,6 +3660,7 @@ class Enemy {
                     // 生物类：暗红/紫色 mist，带向下重力感
                     const mistCount = 2 + Math.floor(Math.random() * 2); // 2~3
                     const bioColors = { regen: '#dc2626', clone: '#c084fc', devour: '#dc2626' };
+                    // @section:damage_apply_and_feedback - 伤害应用、浮动文字与击退效果
                     const mistColor = bioColors[dominantAffix] || '#dc2626';
                     for (let i = 0; i < mistCount; i++) {
                         const bm = new Particle(
@@ -3707,6 +3721,7 @@ class Enemy {
                 const BOSS_DEATH_COLORS = {
                     ignis:    '#f97316',
                     glacies:  '#06b6d4',
+                    // @section:damage_death_trigger - 死亡判断与掉落物触发
                     mikro:    '#c084fc',
                     devourer: '#22c55e',
                     viridis:  '#34d399',
@@ -3909,6 +3924,7 @@ class Enemy {
      * @param {number} w - Boss 宽度（已减去边距）
      * @param {number} h - Boss 高度（已减去边距）
      */
+    // @section:boss_deco_phase_check - Boss 阶段检查与装饰基础参数
     _drawBossDecoration(ctx, w, h) {
         const t = Date.now() / 1000;
         const isBerserk = this.berserked || (this.hp / this.maxHp) < 0.5;
@@ -3997,6 +4013,7 @@ class Enemy {
                 glaciesGrad.addColorStop(1, 'rgba(50, 100, 200, 0)');
                 ctx.fillStyle = glaciesGrad;
                 ctx.fillRect(-w/2, -h/2, w, h);
+                // @section:boss_deco_crown_and_wings - 皇冠/翅膀/触手等 Boss 专属装饰
                 // 冰尖突出效果（在形状内部画尖刺）
                 ctx.strokeStyle = `rgba(180, 230, 255, ${0.6 + Math.sin(t * 2) * 0.2})`;
                 ctx.lineWidth = 1.5;
@@ -4147,6 +4164,7 @@ class Enemy {
                     ctx.fillStyle = overGrad;
                     ctx.beginPath(); ctx.arc(0, 0, Math.min(w, h) * 0.25, 0, Math.PI * 2); ctx.fill();
                     ctx.globalCompositeOperation = 'screen';
+                // @section:boss_deco_aura_rings - 光环圆环动画绘制
                 }
                 // 能量藤蔓
                 const vineCount = isBerserk ? 5 : 3;
@@ -4297,6 +4315,7 @@ class Enemy {
                 const cd2 = this.collisionData;
                 const ouroR = cd2 ? cd2.radius : Math.min(w, h) * 0.4;
                 const gapAngle = this.gapAngle || 0;
+                // @section:boss_deco_rune_symbols - 符文符号与能量纹路绘制
                 // 符文光环：在环形上绘制旋转符文（呼吸发光）
                 const runeCount = 8;
                 const runePower = CONFIG.enemyRender.ouroborosRuneBreathePower || 1.5;

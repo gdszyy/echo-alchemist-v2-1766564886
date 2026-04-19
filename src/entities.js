@@ -1027,6 +1027,7 @@ class Peg {
         audio.playHit(this.type, impactSpeed); 
     }
     // --- 替换 Peg 类的 draw 方法 ---
+    // @section:peg_shadow_and_transform - 软阴影与碰撞旋转变换初始化
     draw(ctx, baseRadius, tilt = {x:0, y:0}) {
         const currentRadius = baseRadius * this.scale;
         const isSpecial = this.type !== 'normal';
@@ -1060,6 +1061,8 @@ class Peg {
         // 1. 绘制基础圆形鑉子
         ctx.beginPath(); 
         ctx.arc(this.pos.x, this.pos.y, currentRadius, 0, Math.PI * 2);
+        
+// @section:peg_base_fill_and_glow - 基础圆形填充与发光效果
         
         if (this.type === 'laser') {
             ctx.shadowBlur = 10;
@@ -1097,6 +1100,7 @@ class Peg {
             ctx.fillStyle = glowGrad;
             ctx.beginPath();
             ctx.arc(this.pos.x, this.pos.y, currentRadius * 3.5, 0, Math.PI * 2);
+            // @section:peg_type_icons - 各属性钉子专属图标绘制
             ctx.fill();
             ctx.globalCompositeOperation = 'source-over';
             ctx.restore();
@@ -1137,6 +1141,8 @@ class Peg {
         if (this.type === 'wind') {
             this.drawWindPeg(ctx, currentRadius, isLit);
         }
+
+// @section:peg_border_and_level_pip - 钉子边框、等级指示器与光照反光
 
         // ==================== [特殊钉子样式标识] ====================
         // 每种属性钉子在圆形内部绘制专属几何符文，一眼可辨
@@ -2102,6 +2108,7 @@ class DropBall {
                 this.windBladeAngle += 0.1 * timeScale;
             }
 
+            // @section:particle_emission - 基于当前属性的粒子拖尾生成
             // --- 粒子生成逻辑 (基于当前拥有的属性) ---
             // 只要带有某种属性，就会掉落对应粒子
             if (Math.random() < 0.4 * timeScale) { 
@@ -2176,6 +2183,7 @@ class DropBall {
             if (this.portalCooldown > 0) this.portalCooldown -= timeScale;
             // [镜像裂分] 冷却递减
             if (this._mirrorAxisCooldown > 0) this._mirrorAxisCooldown -= timeScale;
+            // @section:gravity_and_tilt_physics - 重力计算与倾斜加速度衰减
             // 重力计算
             // 基础重力
             let gx = 0;
@@ -2309,6 +2317,7 @@ class DropBall {
             }
 
             // ... (特殊槽位检测逻辑保持不变，只需注意 active=false 时调用 this.stopSound()) ...
+            // @section:slot_detection - 底部槽位碰撞检测与属性收集触发
             for (let slot of slots) {
                 if (slot.hit) continue;
                 if (this.portalCooldown <= 0) {
@@ -2476,6 +2485,7 @@ class DropBall {
                 }
             }
 
+            // @section:peg_collision_resolution - 钉子碰撞解算（增强版物理 + 布局修正）
             // --- [物理增强] Galton Board 钉子碰撞检测（增强版）---
             // 在原有法向反弹基础上，增加：
             //   1. 速度依赖弹性系数（高速碰撞更弹，低速碰撞更粘）
@@ -2621,6 +2631,7 @@ class DropBall {
                             this.handlePegInteraction(peg, game); // 传入 game
                         }
 
+                        // @section:layout_special_effects - 布局专属特殊效果（漏斗/菱形/稀疏通道）
                         // ==================== [布局补偿] 布局专属特殊效果 ====================
                         const boardLayout = game.boardLayout || 'default';
 
@@ -2706,6 +2717,7 @@ class DropBall {
                         }
 
                         if (peg.type !== 'normal' && peg.type !== 'pink') { 
+                            // @section:attribute_collection - 属性收集逻辑与实时合成判断
                             // --- [新增/修改] 实时合成逻辑 ---
                             let finalType = peg.type;
                             let isSynthesized = false;
@@ -2798,6 +2810,7 @@ class DropBall {
                     }
                 }
 
+            // @section:sparse_channel_charge - sparse 布局通道蓄力检测
             // ==================== [布局补偿] sparse 通道蓄力检测 ====================
             // 检测弹珠是否穿越了奇数行（窄行）而没有碰到任何钉子
             // 原理：记录弹珠当前 Y 坐标对应的行号，如果跨越了奇数行且该行没有碰撞，则激活蓄力
@@ -2822,6 +2835,7 @@ class DropBall {
             }
             }
 
+            // @section:ghost_peg_collision - diamond 布局虚影钉子碰撞检测
             // ==================== [diamond 布局专属] 虚影钉子碰撞检测 ====================
             // 弹珠碰撞虚影钉子时，额外收集一次属性并消除虚影
             if (_game && _game.ghostPegs && _game.ghostPegs.length > 0) {
@@ -2873,6 +2887,7 @@ class DropBall {
             ctx.save();
             ctx.translate(x, y);
 
+            // @section:ambient_spotlight - LAYER 0：环境光晕与混沌闪烁计算
             // ==========================================
             //  🔥 混沌闪烁计算 (通用火焰与爆破)
             // ==========================================
@@ -2947,10 +2962,12 @@ class DropBall {
                 ctx.restore();
             }
 
+            // @section:laser_back_aura - LAYER 1：激光背光特效
             // ==========================================
             //  LAYER 2: Base Ball (球体本体)
             // ==========================================
             
+            // @section:base_ball_body - LAYER 2：球体本体绘制（爆破/普通分支）
             // [新增/修改]：爆破弹珠专属绘制逻辑 (RedStripe)
             // 它不再和 Pyro 共用逻辑，而是拥有独立的"不稳定核心"外观
             if (this.def.type === 'explosive') {
@@ -3005,6 +3022,7 @@ class DropBall {
                 ctx.restore(); // 结束抖动
 
             } 
+            // @section:attribute_overlay - LAYER 3-4：属性叠加特效（火/冰/雷）
             // [原有逻辑]：Pyro 火焰属性 (保持流体感)
             else if (buffs.pyro > 0) {
                  const bodyGrad = ctx.createRadialGradient(-r*0.3, -r*0.3, 0, 0, 0, r);
@@ -3080,6 +3098,7 @@ class DropBall {
             } else {
                  // ... (其他普通/彩虹/套娃弹珠逻辑保持不变) ...
                  let baseLight = '#f8fafc';
+                 // @section:wind_blades - LAYER 5：风刃环绕特效
                  let baseDark = '#334155';
                  
                  if (this.def.type === 'rainbow') {
@@ -3152,6 +3171,7 @@ class DropBall {
                 ctx.globalCompositeOperation = 'lighter'; 
                 const triggerChance = 0.2 + (buffs.lightning * 0.15);
                 if (Math.random() < triggerChance) {
+                    // @section:mirror_clone_badge - LAYER 6：镜像分身标记
                     const arcCount = 1 + Math.floor(Math.random() * (buffs.lightning * 0.6));
                     ctx.shadowBlur = 10 + buffs.lightning * 3; 
                     ctx.shadowColor = '#a855f7'; 
@@ -3437,6 +3457,7 @@ class SonSword {
         if (best) this.addTarget(best);
     }
 
+    // @section:son_sword_state_machine - 子剑状态机：冲刺/悬停/回收分支
     update(timeScale, enemies, game) {
         if (!this.active) return;
 
@@ -3506,6 +3527,7 @@ class SonSword {
         // 3. 常規狀態機
         if (this.state === 'flying' || this.state === 'recalling') {
             
+            // @section:son_sword_target_search - 节流自动寻敌与目标验证
             // [性能優化]：節流自動尋敵 (Throttling)
             // 不需要每幀都尋找目標，每 15 幀找            // [性能優化]：節流自動尋敵 (Throttling)
             // [修复] 增强索敌逻辑：如果有标记的敌人，强制锁定标记敌人，即使当前已有目标
@@ -3555,6 +3577,7 @@ class SonSword {
                 }
             }
 
+            // @section:son_sword_steering - 基于角度的转向与移动逻辑
             // --- [修改重点]：基于角度的转向逻辑 ---
             let targetPos = null;
             let currentSpeed = (CONFIG.flyingSword.sonSpeed || 12) * this.speedRandomizer;

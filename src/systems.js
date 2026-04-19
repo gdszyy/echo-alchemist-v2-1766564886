@@ -651,6 +651,7 @@ class UIManager {
         container.appendChild(div);
     }
 
+    // @section:drawer_state_save - 关闭前状态保存与动画准备
     closeDrawer() {
         this.isOpen = false;
         this.hoveredEnemy = null;
@@ -747,6 +748,7 @@ const TRAINING_SCENARIOS = {
                 const e2 = new Enemy(3.5 * game.enemyWidth + game.enemyWidth / 2, y, 60, 60, 100, 200);
                 game.enemies.push(e1, healer, e2);
             },
+            // @section:drawer_rune_grid_finalize - 符文网格最终化与合成判断
             demoAction: (game) => { game.phase_enemy_startLogic(); }
         },
         {
@@ -897,6 +899,7 @@ const TRAINING_SCENARIOS = {
             icon: '⚡',
             desc: '命中觸發連鎖閃電。目標溫度越低（冰凍狀態）連鎖概率越高，最多連鎖 100 次。',
             setup: (game) => {
+                // @section:drawer_reward_calc - 奖励计算：属性汇总与等级提升
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let r = 0; r < 4; r++) {
                     for (let c = 1; c < 4; c++) {
@@ -1047,6 +1050,7 @@ const TRAINING_SCENARIOS = {
             bulletConfig: { damage: 50, bounce: 0, pierce: 5, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game, tg) => {
                 const vel = new Vec2(0, -15);
+                // @section:drawer_session_commit - 会话数据提交与存档写入
                 game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
             }
         },
@@ -1197,6 +1201,7 @@ const TRAINING_SCENARIOS = {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(
                     new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 2000),
+                    // @section:drawer_ui_transition - UI 过渡动画与阶段切换触发
                     new Enemy(1.5 * w + w/2, top + 0 * h + h/2, 60, 60, 500),
                     new Enemy(3.5 * w + w/2, top + 0 * h + h/2, 60, 60, 500)
                 );
@@ -1347,6 +1352,7 @@ const TRAINING_SCENARIOS = {
                 game.enemies.push(new Enemy(x, y, 60, 60, 8000, 8000));
             },
             bulletConfig: { damage: 30, bounce: 0, pierce: 0, scatter: 0, multicast: 4, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: true, isMatryoshka: false, type: 'normal', laser: 10 },
+            // @section:drawer_event_emit - 事件总线通知与后续流程触发
             demoAction: (game, tg) => {
                 const recipe = { ...tg.bulletConfig };
                 if (recipe.laser > 0) recipe.isLaser = true;
@@ -1510,6 +1516,7 @@ class TrainingGround {
     /**
      * 动态创建 #phase-training DOM 结构（含底部控制面板和右侧边栏）
      */
+    // @section:ui_canvas_setup - Canvas 尺寸与 DPI 初始化
     initUI() {
         if (document.getElementById('phase-training')) return; // 防止重复初始化
         const ui = document.createElement('div');
@@ -1577,6 +1584,7 @@ class TrainingGround {
                 font-weight: bold;
                 color: #64748b;
                 border-bottom: 2px solid transparent;
+                // @section:ui_event_binding - 鼠标/触摸/键盘事件绑定
                 transition: all 0.2s;
                 background: transparent;
                 white-space: nowrap;
@@ -1677,6 +1685,7 @@ class TrainingGround {
                 transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                 z-index: 500;
                 display: flex;
+                // @section:ui_hud_components - HUD 组件初始化（血条/弹药/符文槽）
                 flex-direction: column;
             }
             #train-control-panel.collapsed {
@@ -1777,6 +1786,7 @@ class TrainingGround {
                 font-size: 10px;
                 color: #818cf8;
                 background: rgba(99,102,241,0.12);
+                // @section:ui_overlay_panels - Overlay 面板初始化（商店/命运/设置）
                 border: 1px solid rgba(99,102,241,0.25);
                 border-radius: 4px;
                 padding: 1px 7px;

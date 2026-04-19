@@ -165,6 +165,7 @@ export const spawn_system = {
      * 2. 机会生成器：概率生成布局破绽（降低难度/提供爽感）。
      * 3. 混合填充：智能填充剩余空位。
      */
+    // @section:spawn_row_config - 行配置读取：波次参数与难度缩放
     spawn_spawnEnemyRowAt(yPos) {
         const b = CONFIG.balance;
         
@@ -227,6 +228,7 @@ export const spawn_system = {
             const candidates = [];
             
             // 条件模板
+            // @section:spawn_enemy_type_select - 敌人类型选择与词缀分配
             if (playerHasPyro && this.round >= 12) candidates.push('berserk_pack');
             if (playerHasCryo && this.round >= 8) candidates.push('jumper_pack');
             // 通用战术模板
@@ -307,6 +309,7 @@ export const spawn_system = {
                 if (c % 2 === parity) {
                     // 同样，只有当这一列没被导演占用时，才强制留空
                     if (!occupiedCols[c]) {
+                        // @section:spawn_position_calc - 生成位置计算与间距分布
                         occupiedCols[c] = true; 
                     }
                 }
@@ -367,6 +370,7 @@ export const spawn_system = {
                     e.affixes = this.spawn_generateAffixes();
                 }
 
+                // @section:spawn_entity_init - 敌人实体初始化与注入游戏状态
                 // [新增] 初始化护盾层数 (1 + 回合数)
                 if (e.affixes.includes('shield')) {
                     e.shieldCharges = 1 + this.round;
@@ -923,6 +927,7 @@ export const spawn_system = {
      * @param {object} recipe - **重要参数** 弹药配方。
      * @param {number} shotId - 发射ID，用于统计伤害
      */
+    // @section:bullet_recipe_parse - 弹药配方解析与属性提取
     spawn_spawnBullet(x, y, vel, recipe, shotId = null, isLast = false) {
         if (!shotId) shotId = Date.now() + Math.random();
 
@@ -997,6 +1002,7 @@ export const spawn_system = {
                 let currentScatterIdx = 1;
                 // 生成 100% 继承的副子弹
                 for (let i = 0; i < fullInheritCount; i++) {
+                    // @section:bullet_velocity_calc - 子弹速度与方向计算
                     const sign = currentScatterIdx % 2 === 0 ? -1 : 1;
                     const multiplier = Math.ceil(currentScatterIdx / 2);
                     const angleOffset = 0.2 * multiplier * sign * laserScatterAngleMult;
@@ -1057,6 +1063,7 @@ export const spawn_system = {
                 r.chainPayload = null; // 清除普通连锁，防止无限循环 (套娃逻辑由 nestedPayload 负责)
                 r.isScatterChild = true; // 标记为散射子弹
                 
+                // @section:bullet_entity_create - 子弹实体创建与属性注入
                 // ─────────────────────────────────────────────────────────────────────
                 // [词条 Hook] 穿甲流星（armor_piercing_meteor）
                 // 效果：散射子弹继承 100% 的穿透层数（默认缩放为 0）
@@ -1117,6 +1124,7 @@ export const spawn_system = {
                 const newVel = vel.rotate(angleOffset);                
                 // 半继承：因子为 0.5（使用 effectiveRecipe 包含共鸣伤害加成）
                 const copyRecipe = createScatterRecipe(effectiveRecipe, 0.5);
+                // @section:bullet_pool_push - 子弹推入对象池与粒子预热
                 this.projectiles.push(new Projectile(x, y, newVel, copyRecipe, true, shotId));
                 shotStats.projectileCount++;
                 currentScatterIdx++;

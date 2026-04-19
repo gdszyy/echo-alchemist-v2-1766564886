@@ -115,3 +115,84 @@
 - 当任务中发现隐蔽逻辑或耦合陷阱时，**必须**在任务完成后在此目录创建或更新对应洞察文档。
 - 新增洞察的 Git Commit 必须包含对 `index.md` 的更新。
 - 因代码重构导致洞察失效时，必须将其标记为 `[DEPRECATED]` 并在索引中归档。
+
+---
+
+## 6. 自动函数索引维护规范 (Auto Index Maintenance)
+
+本项目已建立 `.cursor/rules/auto_index/` 函数级索引体系，由 `code-indexer` 脚本自动维护。所有 Agent 在修改代码后必须遵循以下规范，确保索引与源码保持同步。
+
+### 6.1 索引更新触发规则
+
+| 场景 | 操作 |
+|------|------|
+| 修改已索引大文件（>500行 或 >20个函数）中的函数 | **必须**在 Git Commit 之前更新对应文件的索引 |
+| 新增函数到已索引大文件 | **必须**更新该文件索引 |
+| 仅修改 Markdown、配置文件或静态资源 | 无需更新索引 |
+| 新文件超过阈值（500行 或 20个函数） | 运行全量扫描生成新索引 |
+
+### 6.2 索引更新命令
+
+**单文件更新（日常开发，推荐）**：
+
+```bash
+# 修改单个文件后，仅更新该文件的索引
+python3 /home/ubuntu/skills/code-indexer/scripts/generate_index.py \
+  <仓库本地路径> --file src/combat_system.js
+```
+
+**全量重建（修复索引损坏或初次建立时使用）**：
+
+```bash
+python3 /home/ubuntu/skills/code-indexer/scripts/generate_index.py \
+  <仓库本地路径> --src-dirs src
+```
+
+### 6.3 @section 标记规范
+
+当函数超过 **200 行**时，必须在函数内部按业务逻辑块添加 `@section` 标记，以便索引器提取内部节点映射：
+
+```javascript
+function combat_damageEnemy(enemy, projectile) {
+    // @section:damage_pre_calc - 伤害前置计算：基础值、暴击、穿透
+    const baseDmg = projectile.damage;
+    // ...
+
+    // @section:damage_runeword_hooks - 符文词条 Hook 注入点
+    if (hasRuneword('focused_fire')) { ... }
+
+    // @section:damage_apply_to_enemy - 伤害写入敌人并触发属性反应
+    enemy.takeDamage(finalDmg);
+}
+```
+
+**格式规范**：`// @section:{snake_case_name} - {一句话中文说明}`
+
+- `snake_case_name`：全小写下划线，描述该段的业务职责
+- 说明：一句话，不超过 20 个汉字
+- 标记必须独占一行，与上方代码之间空一行
+
+### 6.4 已索引大文件清单
+
+以下文件已建立函数级索引，修改时必须同步更新：
+
+| 文件 | 行数 | 函数数 | @section 数 | 索引文件 |
+|------|------|--------|------------|----------|
+| `src/entities.js` | ~4741 | 104 | 21 | [auto_index/src_entities_js_index.md](.cursor/rules/auto_index/src_entities_js_index.md) |
+| `src/entities/enemy.js` | ~4418 | 26 | 18 | [auto_index/src_entities_enemy_js_index.md](.cursor/rules/auto_index/src_entities_enemy_js_index.md) |
+| `src/combat_system.js` | ~3331 | 42 | 22 | [auto_index/src_combat_system_js_index.md](.cursor/rules/auto_index/src_combat_system_js_index.md) |
+| `src/systems.js` | ~2810 | 85 | 10 | [auto_index/src_systems_js_index.md](.cursor/rules/auto_index/src_systems_js_index.md) |
+| `src/game_phase.js` | ~2461 | 16 | 15 | [auto_index/src_game_phase_js_index.md](.cursor/rules/auto_index/src_game_phase_js_index.md) |
+| `src/spawn_system.js` | ~2036 | 28 | 8 | [auto_index/src_spawn_system_js_index.md](.cursor/rules/auto_index/src_spawn_system_js_index.md) |
+| `src/game_system.js` | ~1788 | 42 | 0 | [auto_index/src_game_system_js_index.md](.cursor/rules/auto_index/src_game_system_js_index.md) |
+| `src/ui/rune_launcher.js` | ~1682 | 25 | 0 | [auto_index/src_ui_rune_launcher_js_index.md](.cursor/rules/auto_index/src_ui_rune_launcher_js_index.md) |
+| `src/effects/particles.js` | ~1371 | 58 | 0 | [auto_index/src_effects_particles_js_index.md](.cursor/rules/auto_index/src_effects_particles_js_index.md) |
+| `src/ui_system.js` | ~1352 | 40 | 0 | [auto_index/src_ui_system_js_index.md](.cursor/rules/auto_index/src_ui_system_js_index.md) |
+
+> **完整索引入口**：[`.cursor/rules/auto_index/INDEX.md`](.cursor/rules/auto_index/INDEX.md)
+
+### 6.5 禁止行为
+
+- **严禁手动编辑** `.cursor/rules/auto_index/` 目录下的任何文件，该目录 100% 由脚本自动生成
+- **严禁在 Git Commit 中包含过期索引**：代码修改与索引更新必须在同一个 Commit 中
+- **严禁删除 @section 标记**：已有标记只能增加或修改，不能删除（除非对应代码段已被移除）

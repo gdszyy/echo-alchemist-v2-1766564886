@@ -92,6 +92,7 @@ export const combat_system = {
     /**
      * @param {any} skill - TODO: Describe this parameter.
      */
+    // @section:skill_type_dispatch - 技能类型分发：主动/被动/触发分支
     combat_activateSkill(skill) {
         if (this.phase !== 'combat' || this.isEnemyTurn || this.skillPoints < skill.cost) return;
 
@@ -147,6 +148,7 @@ export const combat_system = {
                     }
                     
                     // 2. 造成主伤害
+                    // @section:skill_cooldown_and_cost - 冷却时间检查与能量消耗
                     const killed = e.takeDamage(dmg);
                     this.combat_recordDamage(dmg, 'lightning', 'main', this._currentDamageShotId);
                     this.spawn_createFloatingText(e.pos.x, e.pos.y, `-${dmg}`, '#c084fc');
@@ -197,6 +199,7 @@ export const combat_system = {
                 this.spawn_createExplosion(this.width/2, this.height - 80, p.explosionColor);
                 this.ui_updateAmmoUI(); 
                 this.spawn_createFloatingText(this.width/2, this.height - 120, p.floatText, p.explosionColor);
+            // @section:skill_effect_apply - 技能效果应用（伤害/增益/召唤）
             } else {
                 // 返还 SP
                 this.skillPoints += skill.cost;
@@ -287,6 +290,7 @@ export const combat_system = {
                 if (e.active) {
                     // 只向上拉温度，不降温
                     if (e.temp < targetTemp) {
+                        // @section:skill_visual_feedback - 技能视觉反馈与音效触发
                         e.temp = targetTemp;
                     }
                     heatedCount++;
@@ -548,6 +552,7 @@ export const combat_system = {
         // if (this.soundManager) this.soundManager.playEffect('lock');
     },
 
+    // @section:wind_circle_geometry - 风圈几何计算与碰撞范围确定
     combat_wind_executeCircleEffect(x, y, w, h, size, shape, element, tunnelVector = null, bulletDamage = 2, bulletConfig = null, type = 'burst') {
         const centerX = x + w/2;
         const centerY = y + h/2;
@@ -617,6 +622,7 @@ export const combat_system = {
                     
                     // 混合属性粒子
                     let pMode = 'wind_slash';
+                    // @section:wind_circle_hit_detection - 风圈范围内敌人命中检测
                     let color = '#34d399';
                     const rand = Math.random();
                     if (bulletConfig) {
@@ -697,6 +703,7 @@ export const combat_system = {
                             shotId: this._currentDamageShotId 
                         });
                     }
+                // @section:wind_circle_damage_apply - 风圈伤害应用与属性反应
                 });
             }
         } else {
@@ -767,6 +774,7 @@ export const combat_system = {
                                 p.size = 20 + Math.random() * 20; // 主风刃
                                 p.color = '#ffffff';
                             } else {
+                                // @section:wind_circle_visual_effects - 风圈视觉特效与粒子生成
                                 p.size = 5 + Math.random() * 10; // 伴生气流
                             }
                         } else {
@@ -1502,6 +1510,7 @@ export const combat_system = {
     // [已迁移至 src/combat/collision.js] combat_tryMoveEnemy
     // 敌人移动碰撞检测 (AABB + 边界) —— 通过文件底部的 Object.assign(combat_system, CollisionSystem) 注入
 
+    // @section:damage_pre_calc - 伤害前置计算：基础值、暴击、穿透
     combat_damageEnemy(enemy, projectile, damageOverride = null) {
         if (!enemy || !enemy.active) return; 
         // --- [修復]：如果是光球/偽造子彈，補齊 chainHistory 防止報措 ---
@@ -1597,6 +1606,7 @@ export const combat_system = {
         // 共鸣提供的基础冰霜属性加成（叠加到实际 cryo 层数上）
         const cryoBonus = cryoResParams ? (cryoResParams.baseCryoBonus || 0) : 0;
         const effectiveCryo = config.cryo + cryoBonus;
+        // @section:damage_element_bonus - 属性加成与克制倍率计算
         // 共鸣整体冰霜伤害倍率：1.0/1.2/1.5
         const cryoResMult = cryoResParams ? (cryoResParams.cryoMultiplier || 1.0) : 1.0;
         // 三阶共鸣：冻结状态下物理伤害加深
@@ -1747,6 +1757,7 @@ export const combat_system = {
             if (flameSwordFx) {
                 const triggerChance = (flameSwordFx.params && flameSwordFx.params.triggerChance) || 0;
                 const damageRatio = (flameSwordFx.params && flameSwordFx.params.damageRatio) || 0.5;
+                // @section:damage_runeword_hooks - 符文词条 Hook 注入点
                 // [修复 检查点3] 读取 tempDamageRatio，用于穿透命中时对敌人额外升温
                 const tempDamageRatio = (flameSwordFx.params && flameSwordFx.params.tempDamageRatio) || 0;
                 if (Math.random() < triggerChance) {
@@ -1898,6 +1909,8 @@ export const combat_system = {
             this.combat_checkBossPhaseChange();
         }
 
+// @section:damage_apply_to_enemy - 伤害写入敌人并触发属性反应
+
         // --- 2. [火属性核心逻辑] 燃烧与过热爆炸 ---
         // [属性共鸣] 读取火焰共鸣参数，动态调整触发阈值、基础属性和伤害倍率
         const pyroResonance = this.activeElementResonances && this.activeElementResonances['pyro'];
@@ -2048,6 +2061,8 @@ export const combat_system = {
                             }
 	                    }
 
+// @section:damage_kill_check - 击杀判断与掉落物/经验触发
+
                     // 3. [修复] 视觉特效：斩击动画，使用元素属性颜色
                     const angle = Math.random() * Math.PI * 2;
                     // 根据元素属性决定斩击颜色，优先级：雷 > 火/冰
@@ -2148,6 +2163,8 @@ export const combat_system = {
                     ? enemy.bossConfig.themeWeights
                     : {};
 
+// @section:damage_dda_feedback - 动态难度调整（DDA）数据采集
+
                 // 掉落 1：必定 Lv2 + 主题权重（主题符文）
                 const drop1 = loot_calcRuneDrop(this, { forcedLevel: 2, themeWeights: bossThemeWeights });
                 if (drop1.runeId) {
@@ -2217,6 +2234,7 @@ export const combat_system = {
                 theme.particleColor = '#a5f3fc';  // 冰蓝碎片
                 theme.particleMode = 'shard';     // 冰渣飞溅
             } else if (config.lightning > 0) {
+                // @section:damage_visual_and_audio - 伤害视觉反馈与音效播放
                 theme.waveColor = '#c084fc';      // 紫色冲击波 (电磁脉冲)
                 theme.particleColor = '#d8b4fe';  // 紫色电弧
                 theme.particleMode = 'spark';     
@@ -2291,6 +2309,7 @@ export const combat_system = {
      * @description 发射下一发弹丸 (处理多重射击)。
      * @param {Vec2} vel - **重要参数** 初始速度向量。
      */
+    // @section:fire_ammo_selection - 弹药选择与配方读取
     combat_fireNextShot(vel) {
         if (this.ammoQueue.length === 0) return;
         
@@ -2357,6 +2376,7 @@ export const combat_system = {
                     } else {
                         finalRecipe[key] = (finalRecipe[key] || 0) + val;
                     }
+                // @section:fire_trajectory_calc - 弹道计算与散射角度
                 }
             }
         }
@@ -2427,6 +2447,7 @@ export const combat_system = {
             // 4. 质量坍缩 (mass_collapse)
             // 计算 layersCleared = multicast + scatter，清零两者
             // 设置 finalRecipe.explosive = true
+            // @section:fire_projectile_spawn - 子弹实体生成与属性注入
             // 将 _explosionRadiusMult = baseRadiusRatio + layersCleared * radiusBonusPerLayer 写入配方
             const massCollapseFx = this.activeRunewordEffects['mass_collapse'];
             if (massCollapseFx) {
@@ -2477,6 +2498,7 @@ export const combat_system = {
         // 基础射击
         // 如果没有多重射击，那么这第一发就是最后一发
         // [修改] 风属性子弹也强制单发，不受 multicast 影响
+        // @section:fire_post_effects - 射击后效果：后坐力/音效/HUD更新
         // [照射词条] 在词条消耗 multicast 之前，保存原始连射次数到 recipe._originalMulticast
         // 为什么：照射状态机需要知道原始连射次数来计算 totalDuration，
         // 但 focused_fire/mass_collapse/multicast_to_scatter 等词条会将 multicast 清零，
@@ -2515,6 +2537,7 @@ export const combat_system = {
      *   true：状态机 tick，执行完整伤害计算。
      *   false：首次发射或 burstQueue 额外连射。在照射持续模式下，首次发射执行伤害，额外连射跳过伤害。
      */
+    // @section:laser_ray_cast - 激光射线投射与穿透检测
     combat_laser_fire(startX, startY, vel, recipe, shotId = null, isTickFire = false) {
         // [统计] 激光是即时的，手动增加计数并在完成后减少
         if (shotId !== null && this.shotDamageMap.has(shotId)) {
@@ -2598,6 +2621,8 @@ export const combat_system = {
             let currPos = startPos;
             let currDir = dir;
 
+// @section:laser_hit_processing - 激光命中处理与连锁反应
+
             // 单条射线的射线追踪循环
             while (remainLen > 0) {
                 // A. 寻找最近的反射面（墙壁或护盾敌人）
@@ -2677,6 +2702,7 @@ export const combat_system = {
 
         // --- 3. 生成视觉与音效 ---
         // 绘制所有射线（主射线 + 折射链）
+        // @section:laser_visual_beam - 激光光束视觉渲染
         // [持续照射] 持续模式下创建 isContinuous=true 的 LaserBeam，不自动衰减，
         // 由状态机在 tick 切换或结束时统一调用 startFadeOut()，确保动画与伤害同步。
         const isContinuousMode = !!this._continuousLaserFiring;

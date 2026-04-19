@@ -115,6 +115,7 @@ export const game_phase = {
 
 /**
      */
+    // @section:pachinko_board_layout - 弹珠台布局计算与钉子生成
     phase_gathering_initPachinko(shouldInherit = false) {
         // [修复] 使用动态行数
         const rows = this.currentRows || CONFIG.gameplay.rows;
@@ -197,6 +198,7 @@ export const game_phase = {
                 const syncCols = Math.max(3, baseCols - 2);
                 rowCols = syncCols;
                 const rowWidth = (syncCols - 1) * spacingX;
+                // @section:pachinko_slot_setup - 底部槽位配置与属性分配
                 rowOffsetX = (canvasWidth - rowWidth) / 2 - offsetX;
                 rowOffsetX += isOddRow ? spacingX / 2 : 0; // 恢复标准交错
 
@@ -297,6 +299,7 @@ export const game_phase = {
                         p.layoutRole = 'triangle_funnel';
                     }
 
+                // @section:pachinko_inherit_state - 继承上局状态（符文/弹珠/加成）
                 } else if (boardLayout === 'mirror_sync') {
                     // 中轴附近钉子（列号 0 或最后一列）：镜像同步的对称轴标识
                     const rowPegs = this.pegs.filter(rp => rp.row === r);
@@ -397,6 +400,7 @@ export const game_phase = {
                         p.type = 'pink';
                         p.level = 1;
                     }
+                // @section:pachinko_special_pegs - 特殊钉子生成（布局角色分配）
                 }
             }
         }
@@ -497,6 +501,7 @@ export const game_phase = {
                 }
             }
 
+            // @section:pachinko_ui_init - 弹珠台 UI 初始化与事件绑定
             // 如果严格对不够，退化为单钉子水平短连线
             if (createdCount < effectiveSlotCount) {
                 const usedIdx = new Set(this.specialSlots.flatMap(s => [s.pegIndex, s.pegIndex2]));
@@ -1198,6 +1203,7 @@ phase_gathering_getRandomPegType() {
      * @method updateCombat
      * @description 战斗阶段的游戏逻辑更新 (含可视化墙壁与分层视差)。
      */
+    // @section:combat_update_timescale - 时间缩放与暂停状态检查
     phase_combat_update(timeScale) {
 
         // === [新增] 处理子剑动态生成队列 ===
@@ -1277,6 +1283,7 @@ phase_gathering_getRandomPegType() {
             this.combat_runeCharge_decay(timeScale);
         }
         const tilt = this.boardTilt.current;
+        // @section:combat_update_entities - 实体批量更新（敌人/子弹/特效）
         const container = document.getElementById('game-container');
         if (container) {
             container.style.perspective = "1200px";
@@ -1447,6 +1454,7 @@ phase_gathering_getRandomPegType() {
                 }
                 this.ctx.stroke();
                 
+                // @section:combat_update_collision - 碰撞检测与伤害结算调度
                 this.ctx.fillStyle = '#fef3c7'; 
                 for(let i=0; i<5; i++) {
                     const lx = Math.random() * this.width;
@@ -1597,6 +1605,7 @@ phase_gathering_getRandomPegType() {
                 fw.draw(this.ctx);
                 if (fw.life <= 0) this.fireWaves.splice(i, 1);
             }
+            // @section:combat_update_wave_logic - 波次推进与 Boss 生成判断
             // 更新和绘制 IceWaves（冰冻状态死亡特效）
             if (this.iceWaves) {
                 for (let i = this.iceWaves.length - 1; i >= 0; i--) {
@@ -1747,6 +1756,7 @@ phase_gathering_getRandomPegType() {
                     const runeDef = RUNE_DB.find(r => r.id === loot.runeId);
                     if (runeDef) {
                         // loot.level 由掉落生成时设置（Boss 掉落可能为 2+），默认为 1
+                        // @section:combat_update_ui_sync - 战斗 HUD 同步更新
                         const runeObj = { id: loot.runeId, level: loot.level || 1 };
                         this.runeInventory.push(runeObj);
                         loot.active = false;
@@ -1847,6 +1857,7 @@ phase_gathering_getRandomPegType() {
             // 回合结束：先合并相交风暴核心，再衰减能量
             this.combat_wind_mergeStormCores();
             this.combat_wind_decayStormCoresEnergy();
+            // @section:combat_update_phase_end - 战斗结束条件检查与阶段切换
             document.getElementById('combat-message').innerHTML = '<div class="bg-black/50 p-4 rounded-xl backdrop-blur-md border border-blue-500/50 pointer-events-none"><span class="text-blue-300 font-bold text-xl block mb-2">彈藥耗盡</span><span class="text-sm text-slate-300">點擊收集新彈药</span></div>'; 
         } else { 
             if (!this.gameOver) document.getElementById('combat-message').innerHTML = ''; 
@@ -1978,6 +1989,7 @@ phase_gathering_getRandomPegType() {
      * @description 收集階段的遊戲邏輯更新。
      * @param {number} [timeScale=1] - **重要參數** 時間縮放因子。
      */
+    // @section:gathering_update_balls - 弹珠物理更新与碰撞处理
     phase_gathering_update(timeScale = 1) {
         // [修复] 确保 Canvas 状态干净
         this.ctx.save();
@@ -2077,6 +2089,7 @@ phase_gathering_getRandomPegType() {
                 const p = this.pegs[i];
                 // 简单的 AABB 预判或距离平方判断
                 const dx = ball.pos.x - p.pos.x;
+                // @section:gathering_update_slots - 槽位触发检测与属性收集
                 const dy = ball.pos.y - p.pos.y;
                 
                 // 只有距离小于 LIGHT_RADIUS 时才绘制阴影
@@ -2177,6 +2190,7 @@ phase_gathering_getRandomPegType() {
                     edgeX = 0;
                     gradStart = this.ctx.createLinearGradient(ball.pos.x, ball.pos.y, edgeX, ball.pos.y);
                 } else {
+                    // @section:gathering_update_complete - 收集完成判断与结算触发
                     // 向右倾斜：牵徕线连到右边缘
                     edgeX = this.width;
                     gradStart = this.ctx.createLinearGradient(ball.pos.x, ball.pos.y, edgeX, ball.pos.y);
@@ -2277,6 +2291,7 @@ phase_gathering_getRandomPegType() {
                     newBall1.vel = new Vec2(-Math.abs(result.vel.x) - 2, result.vel.y);
                     newBall2.vel = new Vec2(Math.abs(result.vel.x) + 2, result.vel.y);
                     newBall1.canTriggerSplitSlot = false;
+                    // @section:gathering_update_ui - 收集阶段 HUD 实时更新
                     newBall2.canTriggerSplitSlot = false;
                     this.dropBalls.push(newBall1, newBall2);
                     this.currentSession.activeBalls += 1; 
