@@ -1,7 +1,7 @@
 ---
 id: "PI-006"
-version: "v1.1"
-last_updated: "2026-04-18"
+version: "v1.2"
+last_updated: "2026-04-19"
 author: "tsk-f35c6d10-d6f"
 related_modules: ["game_phase", "game_system", "core", "ui/shop"]
 status: "active"
@@ -43,6 +43,13 @@ status: "active"
 **正确做法**：队列为空时调用 `sys_showRoundStartBanner()`，显示回合开始大字提示 1.5 秒后直接进入 `phase_startGatheringPhase()`。
 **关键位置**：`src/game_system.js` → `sys_startRoundStartResolver()` 末尾、`sys_showRoundStartBanner()`
 
+### 坑 5: 开局缺少弹珠命运选择阶段
+
+**现象**：玩家开局选完遗物后，直接进入研磨阶段，没有任何弹珠配置界面。
+**根因**：`sys_initGameStart()` 只队列了一个 `relic` 奖励；遗物选完后 resolver 队列已空，直接调用 `sys_showRoundStartBanner()` 跳过了弹珠选择。
+**正确做法**：`sys_initGameStart()` 必须在队列遗物奖励之后，额外队列一个 `chaos_essence`（`source: 'run_start'`）奖励，确保开局流程为：遗物选择 → 命运选择（3 枚弹珠）→ 研磨阶段。
+**关键位置**：`src/game_system.js` → `sys_initGameStart()` 末尾的队列块
+
 ## 关键耦合点
 
 - `core.js` 的 `enemy:killed` 监听器只负责登记延迟奖励，不应直接打开 UI。
@@ -56,3 +63,4 @@ status: "active"
 |------|------|---------|------|
 | v1.0 | 2026-04-17 | 初始记录：固定回合遗物移除，新增 round-start resolver、延迟奖励队列与存档恢复迁移规则 | tsk-33b634db-ac8 |
 | v1.1 | 2026-04-18 | 新增坑 4：普通命运选择已取消，队列为空时改调用 `sys_showRoundStartBanner()` | tsk-f35c6d10-d6f |
+| v1.2 | 2026-04-19 | 新增坑 5：开局缺少弹珠命运选择阶段；`sys_initGameStart()` 必须在遗物奖励后额外队列 `chaos_essence`（`source: 'run_start'`） | 当前 Agent |

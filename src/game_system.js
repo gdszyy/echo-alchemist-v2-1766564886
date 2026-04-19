@@ -253,6 +253,9 @@ export const game_system = {
 
         // 新局首个遗物也走 round-start resolver，避免再依赖固定入口。
         this.sys_queueRoundStartReward({ type: 'relic', source: 'run_start', round: this.round });
+        // [开局命运选择] 遗物选完后，触发一次标准命运选择（3 枚弹珠），作为开局弹珠配置入口。
+        // 使用 chaos_essence 类型复用现有命运选择流程，source 标记为 'run_start' 以便区分来源。
+        this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'run_start', round: this.round });
         this.sys_startRoundStartResolver();
     },
 

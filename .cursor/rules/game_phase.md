@@ -21,6 +21,7 @@ globs: ["src/game_phase.js"]
 ### 2.1 命运抗择阶段 (Selection Phase)
 - **职责**: 玩家在回合开始前处理 round-start resolver 结算后的**特殊命运时刻**（混沌精华 / 纯净精华 / 遗物）。
 - **[tsk-f35c6d10] 普通命运选择已取消**：`sys_startRoundStartResolver()` 队列为空时，**不再**进入普通弹珠选择（`sys_initSelectionPhase()`），改为调用 `sys_showRoundStartBanner()` 直接进入研磨阶段。
+- **[开局命运选择] 已恢复**：`sys_initGameStart()` 在队列遗物奖励后，额外队列一个 `chaos_essence`（`source: 'run_start'`）奖励。遗物选完后， resolver 继续处理该奖励，触发标准 3 枚弹珠命运选择界面，作为开局弹珠配置入口。开局流程变为：遗物选择 → 命运选择（3 枚弹珠）→ 研磨阶段。
 - **入口**: `sys_startRoundStartResolver()` 会先消费 `pendingRoundStartRewards`；若命中 `relic`，进入遗物事件；若命中 `chaos_essence` 或 `pure_essence`，则先写入 `pendingSelectionMode` 再调用 `sys_initSelectionPhase()` 呈现对应的命运时刻界面。
 - **[tsk-668f3dba] 替换子弹阶段**：`sys_initSelectionPhase()` 在 `chaos_essence` 或 `pure_essence` 模式且 `ammoQueue` 非空时，**先**调用 `sys_initReplaceAmmoPhase()` 进入「替换当前子弹」阶段；玩家确认或跳过后再进入原有命运选择流程。`ammoQueue` 为空时自动跳过该阶段。
   - `replaceAmmoContext`：替换阶段上下文，包含 `active`（是否处于替换阶段）、`selectedIndex`（选中的 ammoQueue 索引，-1 表示未选）、`fateMomentMode`（来源命运时刻类型）。

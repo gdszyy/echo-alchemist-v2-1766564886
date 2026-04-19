@@ -98,7 +98,9 @@ const TUTORIAL_STEPS = [
         position: 'bottom-fixed',   // 特殊值：固定在屏幕底部，不跟随高亮元素
         noOverlay: true,            // 不遮罩，让玩家能点击遗物
         waitForEvent: EVENT_TYPES.PHASE_CHANGED,
-        waitForEventFilter: (data) => data && data.to === 'selection' && (!window.game || typeof game.ui_isFateMomentPhase !== 'function' || !game.ui_isFateMomentPhase()),
+        // [开局命运选择修复] 遗物选完后进入的是命运时刻选择阶段（chaos_essence），
+        // 此时 isFateMomentPhase() 返回 true，必须允许该条件通过才能推进到弹珠选择步骤。
+        waitForEventFilter: (data) => data && data.to === 'selection',
         autoAdvance: true,
         actionLabel: null,
         actionFn: null,

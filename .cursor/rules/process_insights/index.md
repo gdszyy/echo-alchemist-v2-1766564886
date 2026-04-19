@@ -12,7 +12,7 @@
 
 当前共有 **7** 条活跃洞察。
 
-> **[2026-04-18 更新]** PI-006 升版至 v1.1：新增坑 4（普通命运选择已取消，队列为空时改调用 `sys_showRoundStartBanner()`）。
+> **[2026-04-19 更新]** PI-006 升版至 v1.2：新增坑 5（开局缺少弹珠命运选择阶段；`sys_initGameStart()` 必须在遗物奖励后额外队列 `chaos_essence`）。
 
 | ID | 标题 | 版本 | 关联模块 | 最后更新 | 文档链接 |
 |----|------|------|---------|---------|---------|
@@ -21,7 +21,7 @@
 | PI-003 | 子系统扩展与组合模式注入流程 | v1.0 | core, game_system, combat_system, ui_system | 2026-04-16 | [PI-003_subsystem_composition_pattern.md](PI-003_subsystem_composition_pattern.md) |
 | PI-004 | 性能预算扩展与新特效接入流程 | v1.0 | performance, spawn_system, combat_system, entities | 2026-04-16 | [PI-004_performance_budget_extension.md](PI-004_performance_budget_extension.md) |
 | PI-005 | 性能自适应影响评估流程 | v1.0 | performance, combat_system, effects, entities, render_system, spawn_system | 2026-04-16 | [PI-005_perf_impact_assessment.md](PI-005_perf_impact_assessment.md) |
-| PI-006 | Round-Start 延迟奖励结算流程 | v1.1 | game_phase, game_system, core, ui/shop | 2026-04-18 | [PI-006_round_start_reward_resolver.md](PI-006_round_start_reward_resolver.md) |
+| PI-006 | Round-Start 延迟奖励结算流程 | v1.2 | game_phase, game_system, core, ui/shop | 2026-04-19 | [PI-006_round_start_reward_resolver.md](PI-006_round_start_reward_resolver.md) |
 | PI-007 | 命运时刻 Overlay 返回流与纯净精华选择模式 | v1.0 | ui/shop, game_system, ui_system, spawn_system, game_phase, entities, config, core | 2026-04-18 | [PI-007_destiny_overlay_return_and_selection_mode.md](PI-007_destiny_overlay_return_and_selection_mode.md) |
 
 ### 按模块快速检索
