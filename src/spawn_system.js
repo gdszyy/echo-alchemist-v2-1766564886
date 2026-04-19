@@ -7,6 +7,7 @@ import {
     Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, HealWave, showToast, 
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
 } from './entities.js';
+import { getThemeSegment } from './utils/math_utils.js';
 import { UIManager, TrainingGround, TruthBook, TRUTH_BOOK_DATA } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
@@ -280,28 +281,45 @@ export const spawn_system = {
             }
 
             let squadType = null;
-            const candidates = [];
-            
-            // 条件模板
-            // @section:spawn_enemy_type_select - 敌人类型选择与词缀分配
-            if (playerHasPyro && this.round >= 12) candidates.push('berserk_pack');
-            if (playerHasCryo && this.round >= 8) candidates.push('jumper_pack');
-            // 通用战术模板（使用常量中的 minRound 控制解锁回合，triggerProb 控制权重）
-            // Task B.3 将接入权重调度系统，届时 triggerProb 字段会被动态权重替换
-            // 当前实现：各 15% 基础概率随机触发（通过加入候选池后随机选择实现）
-            if (this.round >= DIRECTOR_TEMPLATE_PHALANX.minRound) candidates.push(DIRECTOR_TEMPLATE_PHALANX.id);
-            if (this.round >= DIRECTOR_TEMPLATE_BLITZ.minRound)   candidates.push(DIRECTOR_TEMPLATE_BLITZ.id);
-            // [B.2] 导演系统新增阵型：增殖核心 & 吞噬链（各 15% 随机触发）
-            if (this.round >= 12 && Math.random() < 0.15) candidates.push('swarm_core');
-            if (this.round >= 12 && Math.random() < 0.15) candidates.push('food_chain');
 
-            if (candidates.length > 0) {
-                squadType = candidates[Math.floor(Math.random() * candidates.length)];
+
+            // @section:spawn_enemy_type_select - 敌人类型选择与词缀分配
+            // [B.3] 权重调度：根据 ENEMY_CURVE_CONFIG.TEMPLATE_WEIGHTS 中当前段落的权重动态选择模板
+            const segIdx = getThemeSegment(this.round, ENEMY_CURVE_CONFIG);
+            const tplWeights = (ENEMY_CURVE_CONFIG.TEMPLATE_WEIGHTS && ENEMY_CURVE_CONFIG.TEMPLATE_WEIGHTS[segIdx])
+                ? ENEMY_CURVE_CONFIG.TEMPLATE_WEIGHTS[segIdx]
+                : { phalanx: 25, blitz: 25, berserk_pack: 25, jumper_pack: 25, thermal_bomb: 0 };
+
+            // 构建权重池：排除权重为 0 的模板，以及回合数不足的模板
+            const weightPool = [];
+            let totalTplWeight = 0;
+            if (tplWeights.phalanx > 0 && this.round >= 1)
+                weightPool.push({ id: 'phalanx', w: tplWeights.phalanx });
+            if (tplWeights.blitz > 0 && this.round >= 6)
+                weightPool.push({ id: 'blitz', w: tplWeights.blitz });
+            if (tplWeights.berserk_pack > 0 && this.round >= 12)
+                weightPool.push({ id: 'berserk_pack', w: tplWeights.berserk_pack });
+            if (tplWeights.jumper_pack > 0 && this.round >= 8)
+                weightPool.push({ id: 'jumper_pack', w: tplWeights.jumper_pack });
+            if ((tplWeights.swarm_core || 0) > 0 && this.round >= 12)
+                weightPool.push({ id: 'swarm_core', w: tplWeights.swarm_core });
+            if ((tplWeights.food_chain || 0) > 0 && this.round >= 12)
+                weightPool.push({ id: 'food_chain', w: tplWeights.food_chain });
+            if (tplWeights.thermal_bomb > 0 && this.round >= 14)
+                weightPool.push({ id: 'thermal_bomb', w: tplWeights.thermal_bomb });
+            weightPool.forEach(e => totalTplWeight += e.w);
+
+            if (weightPool.length > 0 && totalTplWeight > 0) {
+                let roll = Math.random() * totalTplWeight;
+                for (const entry of weightPool) {
+                    if (roll < entry.w) { squadType = entry.id; break; }
+                    roll -= entry.w;
+                }
             }
 
-            const addPreset = (col, hpMult, forceAffixes) => {
+            const addPreset = (col, hpMult, forceAffixes, extraInit) => {
                 if (col >= 0 && col < CONFIG.gameplay.enemyCols && !occupiedCols[col]) {
-                    pendingSpawns.push({ col, hp: Math.floor(baseHP * hpMult), affixes: forceAffixes });
+                    pendingSpawns.push({ col, hp: Math.floor(baseHP * hpMult), affixes: forceAffixes, extraInit });
                     occupiedCols[col] = true; // 导演占座
                 }
             };
@@ -346,10 +364,12 @@ export const spawn_system = {
                 }
             }
             else if (squadType === 'berserk_pack') {
+                // 狂暴包：单个高血量狂暴魔像，教学冰霜降温控制
                 const c = Math.floor(Math.random() * CONFIG.gameplay.enemyCols);
                 addPreset(c, 1.2, ['berserk']);
             }
             else if (squadType === 'jumper_pack') {
+                // 跳跃包：单个跳跃魔像，教学冰霜冻结和穿透应对
                 const c = Math.floor(Math.random() * CONFIG.gameplay.enemyCols);
                 addPreset(c, 0.8, ['jump']);
             }
@@ -390,6 +410,27 @@ export const spawn_system = {
                         frontCount++;
                         if (frontCount >= 2) break;
                     }
+                }
+            }
+            else if (squadType === 'thermal_bomb') {
+                // [B.3] 过热炸弹：1-2 个初始温度极高（接近狂暴阈值）的 berserk 词缀敌人
+                // 教学目标：训练玩家使用冰霜符文紧急降温控制
+                // berserk 狂暴触发条件： temp / 100 * berserkChanceMult（默认 0.5）
+                // 即 temp=80 时每回合狂暴概率 40%，具有明显威胁
+                // 初始温度设为 56-72（狂暴阈值区 70%-90%），第一个回合升温 +20 后就进入高概率狂暴区
+                const initTemp = Math.floor(56 + Math.random() * 16); // 56-72
+                const bombCount = this.round >= 20 ? (Math.random() < 0.5 ? 2 : 1) : 1;
+                const usedCols = [];
+                for (let b = 0; b < bombCount; b++) {
+                    let col;
+                    let attempts = 0;
+                    do {
+                        col = Math.floor(Math.random() * CONFIG.gameplay.enemyCols);
+                        attempts++;
+                    } while (usedCols.includes(col) && attempts < 10);
+                    usedCols.push(col);
+                    // extraInit.temp: 在实例化后设置初始温度（字段名为 e.temp）
+                    addPreset(col, 1.3, ['berserk'], { temp: initTemp });
                 }
             }
         }
@@ -537,6 +578,13 @@ export const spawn_system = {
                     e.shieldCharges = 1 + this.round;
                 }
 
+                // [B.3] 应用 extraInit 额外初始化参数（如 thermal_bomb 的初始温度）
+                if (cfg.extraInit) {
+                    if (cfg.extraInit.temp !== undefined) {
+                        e.temp = cfg.extraInit.temp;
+                    }
+                }
+
                 // [新增] 根据 Boss 历史分配随从异型几何形状
                 this.spawn_applyMinionShape(e);
 
@@ -547,6 +595,10 @@ export const spawn_system = {
                     const sparkCount = 4 + Math.floor(Math.random() * 3); // 4~6 个
                     for (let s = 0; s < sparkCount; s++) {
                         this.spawn_createParticle(e.pos.x, e.pos.y, '#facc15', 'spark');
+                    }
+                    // [B.3] thermal_bomb 特殊出场效果：红色冲击波表示过热警告
+                    if (cfg.extraInit && cfg.extraInit.temp !== undefined) {
+                        this.spawn_createShockwave(e.pos.x, e.pos.y, '#ef4444');
                     }
                 }
                 this.enemies.push(e);
