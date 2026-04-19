@@ -11,6 +11,60 @@ import { UIManager, TrainingGround, TruthBook, TRUTH_BOOK_DATA } from './systems
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 
+/**
+ * [导演系统] 方阵突击（Phalanx）阵型模板
+ * 教学目标：引导玩家学会穿透前排 shield 高血量敌人，优先击杀后排 healer 治愈者。
+ * 阵型结构：
+ *   - frontCount: 前排 shield 敌人数量（2-3 个），高血量（hpMult 1.5-1.8）
+ *   - backCount:  后排 healer 敌人数量（1-2 个），低血量（hpMult 0.6-0.8）
+ *   - minRound:   最早出现回合（Round 6，shield 从 Round 3 起可用，healer 从 Round 6 起可用）
+ *   - triggerProb: 在导演候选池中的基础触发概率（15%，Task B.3 接入权重调度后替换）
+ */
+export const DIRECTOR_TEMPLATE_PHALANX = {
+    id: 'phalanx',
+    minRound: 6,
+    triggerProb: 0.15,
+    front: {
+        affixes: ['shield'],
+        hpMultMin: 1.5,
+        hpMultMax: 1.8,
+        countMin: 2,
+        countMax: 3,
+    },
+    back: {
+        affixes: ['healer'],
+        hpMultMin: 0.6,
+        hpMultMax: 0.8,
+        countMin: 1,
+        countMax: 2,
+    },
+};
+
+/**
+ * [导演系统] 闪电战（Blitz）阵型模板
+ * 教学目标：训练玩家应对边路突袭，快速识别并击杀两侧 haste+jump 双词缀威胁单位。
+ * 阵型结构：
+ *   - flanks: 两侧边缘列各 1 个 haste+jump 双词缀敌人，低血量（hpMult 0.7）
+ *   - center: 中间列 1-2 个普通敌人，标准血量（hpMult 1.0），无强制词缀
+ *   - minRound: 最早出现回合（Round 10，jump 从 Round 9 起可用，haste 从 Round 8 起可用）
+ *   - triggerProb: 在导演候选池中的基础触发概率（15%，Task B.3 接入权重调度后替换）
+ */
+export const DIRECTOR_TEMPLATE_BLITZ = {
+    id: 'blitz',
+    minRound: 10,
+    triggerProb: 0.15,
+    flanks: {
+        affixes: ['haste', 'jump'],
+        hpMult: 0.7,
+    },
+    center: {
+        affixes: [],
+        hpMult: 1.0,
+        countMin: 1,
+        countMax: 2,
+    },
+};
+
 export const spawn_system = {
 /**
      * [SPAWN] 持续生成风属性技能粒子
@@ -232,9 +286,11 @@ export const spawn_system = {
             // @section:spawn_enemy_type_select - 敌人类型选择与词缀分配
             if (playerHasPyro && this.round >= 12) candidates.push('berserk_pack');
             if (playerHasCryo && this.round >= 8) candidates.push('jumper_pack');
-            // 通用战术模板
-            if (this.round >= 6) candidates.push('phalanx'); 
-            if (this.round >= 10) candidates.push('blitz'); 
+            // 通用战术模板（使用常量中的 minRound 控制解锁回合，triggerProb 控制权重）
+            // Task B.3 将接入权重调度系统，届时 triggerProb 字段会被动态权重替换
+            // 当前实现：各 15% 基础概率随机触发（通过加入候选池后随机选择实现）
+            if (this.round >= DIRECTOR_TEMPLATE_PHALANX.minRound) candidates.push(DIRECTOR_TEMPLATE_PHALANX.id);
+            if (this.round >= DIRECTOR_TEMPLATE_BLITZ.minRound)   candidates.push(DIRECTOR_TEMPLATE_BLITZ.id);
             // [B.2] 导演系统新增阵型：增殖核心 & 吞噬链（各 15% 随机触发）
             if (this.round >= 12 && Math.random() < 0.15) candidates.push('swarm_core');
             if (this.round >= 12 && Math.random() < 0.15) candidates.push('food_chain');
@@ -251,15 +307,43 @@ export const spawn_system = {
             };
 
             if (squadType === 'phalanx') {
-                const c = Math.floor(Math.random() * (CONFIG.gameplay.enemyCols - 1));
-                addPreset(c, 1.4, ['shield']);
-                addPreset(c+1, 0.8, ['healer']);
+                // [Phalanx] 方阵突击：前排 2-3 个 shield 高血量 + 后排 1-2 个 healer 低血量
+                // 教学目标：引导玩家使用穿透属性绕过前排盾牌，优先击杀后排治愈者
+                const tmpl = DIRECTOR_TEMPLATE_PHALANX;
+                const frontCount = tmpl.front.countMin + Math.floor(Math.random() * (tmpl.front.countMax - tmpl.front.countMin + 1));
+                const backCount  = tmpl.back.countMin  + Math.floor(Math.random() * (tmpl.back.countMax  - tmpl.back.countMin  + 1));
+                const cols = CONFIG.gameplay.enemyCols;
+                // 前排：左对齐，从列 0 开始据占 frontCount 列
+                for (let i = 0; i < frontCount; i++) {
+                    const hpMult = tmpl.front.hpMultMin + Math.random() * (tmpl.front.hpMultMax - tmpl.front.hpMultMin);
+                    addPreset(i, hpMult, [...tmpl.front.affixes]);
+                }
+                // 后排：右对齐，占据最后 backCount 列
+                for (let i = 0; i < backCount; i++) {
+                    const hpMult = tmpl.back.hpMultMin + Math.random() * (tmpl.back.hpMultMax - tmpl.back.hpMultMin);
+                    addPreset(cols - 1 - i, hpMult, [...tmpl.back.affixes]);
+                }
             } 
             else if (squadType === 'blitz') {
-                const c1 = Math.floor(Math.random() * CONFIG.gameplay.enemyCols);
-                let c2 = (c1 + 2) % CONFIG.gameplay.enemyCols;
-                addPreset(c1, 0.6, ['haste']);
-                addPreset(c2, 0.6, ['jump']);
+                // [Blitz] 闪电战：两侧各 1 个 haste+jump 双词缀 + 中间普通敌人
+                // 教学目标：训练玩家应对边路突袭，快速识别并击杀双词缀边路威胁
+                const tmpl = DIRECTOR_TEMPLATE_BLITZ;
+                const cols = CONFIG.gameplay.enemyCols;
+                // 两侧边缘：列 0 和列 (cols-1)，haste+jump 双词缀
+                addPreset(0,        tmpl.flanks.hpMult, [...tmpl.flanks.affixes]);
+                addPreset(cols - 1, tmpl.flanks.hpMult, [...tmpl.flanks.affixes]);
+                // 中间普通敌人：在列 1 和列 (cols-2) 之间随机选择 1-2 列
+                const centerCount = tmpl.center.countMin + Math.floor(Math.random() * (tmpl.center.countMax - tmpl.center.countMin + 1));
+                const centerCols = [];
+                for (let c = 1; c < cols - 1; c++) centerCols.push(c);
+                // 洗牌中间列
+                for (let i = centerCols.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [centerCols[i], centerCols[j]] = [centerCols[j], centerCols[i]];
+                }
+                for (let i = 0; i < Math.min(centerCount, centerCols.length); i++) {
+                    addPreset(centerCols[i], tmpl.center.hpMult, [...tmpl.center.affixes]);
+                }
             }
             else if (squadType === 'berserk_pack') {
                 const c = Math.floor(Math.random() * CONFIG.gameplay.enemyCols);

@@ -1,8 +1,12 @@
 # 生成系统规范 (Spawn System)
 
 > **数据来源**：`src/spawn_system.js` → `spawn_spawnEnemyRowAt()`
+> **文件**：`src/spawn_system.js` | **总行数**：~2163 | **函数数**：28
+> **索引**：[auto_index/src_spawn_system_js_index.md](auto_index/src_spawn_system_js_index.md)
 > **用途**：记录导演系统（The Director）所有阵型模板的设计意图、触发条件和实现细节。
-> **最后更新**：Task C.2（战后高压因子联动：BOSS_DEFEATED 事件 → postBossRoundsLeft → 双词缀精英概率提升）
+> **最后更新**：Task B.1（增强 Phalanx/Blitz 模板，新增常量定义）+ Task B.2（新增 SwarmCore/FoodChain）+ Task C.2（战后高压因子联动）
+
+---
 
 ## 1. 导演系统概述
 
@@ -12,36 +16,62 @@
 |---|---|---|
 | 触发概率 | `min(0.35, 0.15 + round × 0.01)` | 随回合数线性增长，上限 35% |
 | 选型机制 | `candidates` 数组随机选一 | 满足条件的阵型均进入候选池 |
-| 实现位置 | `spawn_spawnEnemyRowAt` → `@section:spawn_enemy_type_select` (L231) | |
+| 实现位置 | `spawn_spawnEnemyRowAt` → `@section:spawn_enemy_type_select` (L285) | |
+
+---
 
 ## 2. 阵型模板总览
 
-| 阵型 ID | 名称 | 最早回合 | 触发条件 | 教学目标 |
-|---|---|---|---|---|
-| `phalanx` | 方阵 | Round 6 | 通用 | 护盾 + 治愈协同，引导穿透/火焰 |
-| `blitz` | 闪击 | Round 10 | 通用 | 极速 + 跳跃机动，引导冰霜控制 |
-| `berserk_pack` | 狂暴群 | Round 12 | 玩家有火焰属性 | 高温狂暴，引导冰霜降温 |
-| `jumper_pack` | 跳跃群 | Round 8 | 玩家有冰霜属性 | 跳跃阻挡，引导穿透精准 |
-| `swarm_core` | 增殖核心 | Round 12 | 通用（15% 随机） | AOE 清场后集火核心 |
-| `food_chain` | 吞噬链 | Round 12 | 通用（15% 随机） | 倒计时压力，在 devour 吞噬前打破阵型 |
+| 阵型 ID | 名称 | 最早回合 | 触发条件 | 教学目标 | 常量引用 |
+|---|---|---|---|---|---|
+| `phalanx` | 方阵突击 | Round 6 | 通用 | 护盾 + 治愈协同，引导穿透/闪电 | `DIRECTOR_TEMPLATE_PHALANX` |
+| `blitz` | 闪电战 | Round 10 | 通用 | 双词缀边路突袭，引导冰霜控制 | `DIRECTOR_TEMPLATE_BLITZ` |
+| `berserk_pack` | 狂暴群 | Round 12 | 玩家有火焰属性 | 高温狂暴，引导冰霜降温 | 内联 |
+| `jumper_pack` | 跳跃群 | Round 8 | 玩家有冰霜属性 | 跳跃阻挡，引导穿透精准 | 内联 |
+| `swarm_core` | 增殖核心 | Round 12 | 通用（15% 随机） | AOE 清场后集火核心 | 内联 |
+| `food_chain` | 吞噬链 | Round 12 | 通用（15% 随机） | 倒计时压力，在 devour 吞噬前打破阵型 | 内联 |
+
+---
 
 ## 3. 阵型模板详解
 
-### 3.1 phalanx（方阵）
+### 3.1 phalanx（方阵突击）[Task B.1 增强]
+
+**常量定义**：`DIRECTOR_TEMPLATE_PHALANX`（`src/spawn_system.js` L23-L41）
+
+```
+列:  [0]   [1]   [2]   [3]   [4]   [5]
+     🛡️    🛡️   (可选🛡️)  空   💖   (可选💖)
+     前排 shield 高血量        后排 healer 低血量
+     ←── frontCount(2-3) ──→  ←── backCount(1-2) ──→
+```
 
 | 属性 | 值 |
 |---|---|
-| 组成 | 1 个 shield 高血量（1.4x）+ 1 个 healer 低血量（0.8x） |
-| 列布局 | 相邻两列（随机起始列） |
-| 克制方式 | pierce（穿透）无视护盾；pyro（火焰）熔化护盾；lightning（闪电）连锁打断治愈 |
+| 前排组成 | 2-3 个 shield 高血量（1.5x-1.8x，随机） |
+| 后排组成 | 1-2 个 healer 低血量（0.6x-0.8x，随机） |
+| 列布局 | 前排左对齐（从列 0 起），后排右对齐（从最右列起） |
+| 克制方式 | pierce（穿透）无视护盾；lightning（闪电）连锁打断治愈 |
+| 教学目标 | 引导玩家优先击杀后排 healer 治愈者，而非硬刚前排盾牌 |
 
-### 3.2 blitz（闪击）
+### 3.2 blitz（闪电战）[Task B.1 增强]
+
+**常量定义**：`DIRECTOR_TEMPLATE_BLITZ`（`src/spawn_system.js` L52-L66）
+
+```
+列:  [0]   [1]   [2]   [3]   [4]   [5]
+     ⚡🦘  (普通) (普通)  空    空   ⚡🦘
+     haste+jump 双词缀              haste+jump 双词缀
+     边缘威胁                        边缘威胁
+```
 
 | 属性 | 值 |
 |---|---|
-| 组成 | 1 个 haste 低血量（0.6x）+ 1 个 jump 低血量（0.6x） |
-| 列布局 | 间隔 2 列（随机起始列） |
-| 克制方式 | cryo（冰霜）冻结阻止行动 |
+| 边缘组成 | 列 0 和列 (cols-1) 各 1 个 **haste+jump 双词缀**低血量（0.7x） |
+| 中间组成 | 1-2 个普通敌人，标准血量（1.0x），无强制词缀 |
+| 列布局 | 边缘固定列 0 和 cols-1，中间随机选 1-2 列 |
+| 克制方式 | cryo（冰霜）同时克制 haste（冻结行动）和 jump（阻止跳跃） |
+| 教学目标 | 训练玩家识别并优先击杀两侧双词缀威胁单位，应对边路突袭 |
 
 ### 3.3 berserk_pack（狂暴群）
 
@@ -85,6 +115,8 @@
 
 **设计注意**：前排 shield 有减伤 50% 效果，regen 每回合回血 20% 最大血量。玩家需要在 devour 行动前快速击破前排，否则 devour 吞噬后会继承 shield/regen 词缀，变得极难击杀。
 
+---
+
 ## 4. addPreset 辅助函数
 
 ```javascript
@@ -96,16 +128,24 @@ const addPreset = (col, hpMult, forceAffixes) => {
 };
 ```
 
-- `col`：列索引（0-based）
-- `hpMult`：血量倍率（相对于 `baseHP`）
-- `forceAffixes`：强制词缀数组（空数组 `[]` 表示无词缀）
+- `col`：列索引（0-based，总列数 = `CONFIG.gameplay.enemyCols = 6`）
+- `hpMult`：相对于 `baseHP` 的血量倍率
+- `forceAffixes`：强制词缀数组（覆盖 `spawn_generateAffixes` 的随机结果，空数组 `[]` 表示无词缀）
+- 导演生成的敌人统一存入 `pendingSpawns`，在**第 4 步**统一实例化，确保不与填充循环冲突
 
-## 5. 修改规范
+---
 
-- 新增阵型时，必须在 `@section:spawn_enemy_type_select` 区域的 `candidates.push()` 段添加触发条件
-- 阵型实例化逻辑必须在 `if-else` 链末尾追加，不得修改现有阵型逻辑
-- 修改后必须运行 `code-indexer` 单文件更新索引
-- 必须在本文档中同步更新阵型说明
+## 5. 与其他系统的耦合点
+
+| 耦合系统 | 耦合点 | 说明 |
+|---------|-------|------|
+| `src/config.js` | `CONFIG.gameplay.enemyCols` | 总列数（当前为 6） |
+| `src/config.js` | `CONFIG.balance.affixes.*` | shield/healer/haste/jump 词缀参数 |
+| `src/entities/enemy.js` | `Enemy` 构造函数 | 敌人实体创建 |
+| `src/game_phase.js` | `phase_enemy_startLogic` | 词缀行为实现（healer 治疗、haste 行动次数、jump 跳跃） |
+| `src/combat_system.js` | `combat_damageEnemy` | shield 减伤计算 |
+
+---
 
 ## 6. 战后高压因子联动机制（Task C.2）
 
@@ -135,19 +175,7 @@ core.js: _setupEventListeners()
 |------|------|--------|------|
 | `this.postBossRoundsLeft` | `number` | `0` | 战后高压期剩余回合数，Boss 击杀时设为 3，每回合结算递减 |
 
-### 6.4 相关代码位置
-
-| 操作 | 文件 | 行号 | 说明 |
-|------|------|------|------|
-| 事件监听 & 字段设置 | `src/core.js` | ~L367 | `boss:defeated` 监听器中设置 `postBossRoundsLeft = 3` |
-| 字段重置 | `src/game_system.js` | ~L367 | `sys_resetGame` 中重置为 0 |
-| 存档/读档 | `src/game_system.js` | ~L1522, ~L1635 | `sys_saveRunState` / `sys_loadRunState` 中序列化 |
-| 回合递减 | `src/game_phase.js` | ~L1097 | `phase_finalizeRound` 末尾递减 |
-| 概率应用 | `src/spawn_system.js` | ~L108 | `spawn_generateAffixes` 中叠加到双词缀概率 |
-
-### 6.5 与现有 postBossMultiplier 的关系
-
-`postBossMultiplier`（`postBossSurgeRoundsLeft`）是另一套战后高压机制，控制敌人 HP 倍率（x1.3，每回合衰减 0.1）。`postBossRoundsLeft` 是专门控制**双词缀精英概率**的独立计数器，两者并行运作，互不干扰。
+### 6.4 与现有 postBossMultiplier 的关系
 
 | 字段 | 控制目标 | 初始值 | 衰减方式 |
 |------|---------|--------|---------|
@@ -155,31 +183,21 @@ core.js: _setupEventListeners()
 | `postBossSurgeRoundsLeft` | HP 倍率持续回合数 | 3 | 每回合 -1 |
 | `postBossRoundsLeft` | 双词缀精英概率提升 | 3 | 每回合 -1，归零后概率恢复正常 |
 
-## 7. spawn_generateAffixes 词缀生成规则
+---
 
-### 7.1 数量概率
+## 7. Task B.3 预留接口
 
-| 词缀数 | 基础概率 | 战后高压加成 |
-|--------|---------|------------|
-| 0 个 | 默认（1 - chance1 - chance2） | 无 |
-| 1 个 | `min(0.6, 0.05 + round * 0.025)` | 无 |
-| 2 个 | `r > 10 ? min(0.15, (r-10)*0.01) : 0` | `+0.25`（上限 0.40） |
+`DIRECTOR_TEMPLATE_PHALANX.triggerProb` 和 `DIRECTOR_TEMPLATE_BLITZ.triggerProb` 字段（当前均为 `0.15`）是为 Task B.3 权重调度系统预留的接口。Task B.3 实现后，应将候选池逻辑替换为基于 `triggerProb` 的加权随机选择，而非当前的等权随机。
 
-### 7.2 词缀权重池
+---
 
-| 词缀 | 解锁回合 | 权重规则 |
-|------|---------|---------|
-| `shield` | r >= 3 | r < 8: 100, r >= 8: 50 |
-| `regen` | r >= 5 | r < 12: 80, r >= 12: 40 |
-| `healer` | r >= 6 | 稳定 60 |
-| `haste` | r >= 8 | r < 15: 70, r >= 15: 50 |
-| `jump` | r >= 9 | 稳定 60 |
-| `clone` | r >= 12 | 稳定 50 |
-| `devour` | r >= 12 | 稳定 40 |
-| `berserk` | r >= 14 | `r * 3`（无上限，后期极危险） |
+## 8. 修改规范
 
-## 8. 禁止行为
-
-- **严禁**在 `spawn_system.js` 中直接操作 DOM，所有 UI 更新必须通过 `eventBus.emit` 派发事件
-- **严禁**全量读取 `spawn_system.js`（2036+ 行），必须通过 `auto_index` 精准定位后按需读取
+- 新增阵型时，必须在 `@section:spawn_enemy_type_select` 区域的 `candidates.push()` 段添加触发条件
+- 阵型实例化逻辑必须在 `if-else` 链末尾追加，不得修改现有阵型逻辑
+- 修改后必须运行 `code-indexer` 单文件更新索引
+- 必须在本文档中同步更新阵型说明
+- **严禁全量读取** `src/spawn_system.js`（2163+ 行大文件），必须通过索引精准定位
+- **严禁手动编辑** `.cursor/rules/auto_index/src_spawn_system_js_index.md`
+- **严禁删除** `@section` 标记（`spawn_enemy_type_select`、`spawn_position_calc`、`spawn_entity_init`）
 - **严禁**在 `spawn_generateAffixes` 中直接修改 `this.postBossRoundsLeft`，该字段由 `phase_finalizeRound` 统一递减
