@@ -234,6 +234,9 @@ export const spawn_system = {
             // 通用战术模板
             if (this.round >= 6) candidates.push('phalanx'); 
             if (this.round >= 10) candidates.push('blitz'); 
+            // [B.2] 导演系统新增阵型：增殖核心 & 吞噬链（各 15% 随机触发）
+            if (this.round >= 12 && Math.random() < 0.15) candidates.push('swarm_core');
+            if (this.round >= 12 && Math.random() < 0.15) candidates.push('food_chain');
 
             if (candidates.length > 0) {
                 squadType = candidates[Math.floor(Math.random() * candidates.length)];
@@ -264,6 +267,45 @@ export const spawn_system = {
             else if (squadType === 'jumper_pack') {
                 const c = Math.floor(Math.random() * CONFIG.gameplay.enemyCols);
                 addPreset(c, 0.8, ['jump']);
+            }
+            // [B.2] Swarm Core（增殖核心）：中心 1 个 clone 高血量 + 周围 3-4 个普通低血量
+            // 教学目标：引导玩家优先 AOE 清场，再集火核心
+            else if (squadType === 'swarm_core') {
+                const cols = CONFIG.gameplay.enemyCols;
+                const coreCol = Math.floor(Math.random() * cols);
+                // 核心：clone 词缀，高血量（1.8x）
+                addPreset(coreCol, 1.8, ['clone']);
+                // 周围 3 个低血量普通兵（无词缀），分布在核心两侧
+                const offsets = [-2, -1, 1, 2];
+                let surroundCount = 0;
+                for (const offset of offsets) {
+                    const col = coreCol + offset;
+                    if (col >= 0 && col < cols && !occupiedCols[col]) {
+                        addPreset(col, 0.4, []);
+                        surroundCount++;
+                        if (surroundCount >= 3) break;
+                    }
+                }
+            }
+            // [B.2] Food Chain（吞噬链）：前排 2 个 shield/regen 低血量 + 后排 1 个 devour 高血量
+            // 教学目标：倒计时压力——在 devour 吞噬前排之前打破阵型
+            else if (squadType === 'food_chain') {
+                const cols = CONFIG.gameplay.enemyCols;
+                // 后排 devour：高血量（2.0x），随机选一列
+                const devourCol = Math.floor(Math.random() * cols);
+                addPreset(devourCol, 2.0, ['devour']);
+                // 前排护盾兵：低血量（0.5x），在 devour 两侧各放一个
+                const shieldAffixes = [['shield'], ['regen']];
+                let frontCount = 0;
+                const frontOffsets = [-1, 1, -2, 2];
+                for (const offset of frontOffsets) {
+                    const col = devourCol + offset;
+                    if (col >= 0 && col < cols && !occupiedCols[col]) {
+                        addPreset(col, 0.5, shieldAffixes[frontCount % 2]);
+                        frontCount++;
+                        if (frontCount >= 2) break;
+                    }
+                }
             }
         }
 
