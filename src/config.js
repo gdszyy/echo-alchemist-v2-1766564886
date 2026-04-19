@@ -1447,8 +1447,8 @@ const BOSS_DB = [
     {
         id: 'boss_chimera',
         name: '混沌融合体·奇美拉',
-        affixes: ['devour'],
-        // 弹点：穿透 (Pierce) 与 激光 (Laser) —— 克制护盾与吞噬
+        affixes: ['berserk', 'devour'],
+        // 弹点：穿透 (Pierce) 与 激光 (Laser) —— 克制狂暴与吞噬
         themeWeights: { pierce: 3.0, laser: 3.0 }
     },
     {

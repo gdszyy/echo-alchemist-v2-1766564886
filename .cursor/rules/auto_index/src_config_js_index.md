@@ -1,6 +1,6 @@
 # src/config.js 函数索引
 
-> 自动生成于 2026-04-19 | 总行数: 1475 | 函数数: 1 | 语言: javascript
+> 自动生成于 2026-04-19 | 总行数: 1569 | 函数数: 1 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -9,4 +9,4 @@
 
 | 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
 |--------|------|--------|--------|------|------|
-| setDeepValue | function | L226 | L1476 | **1251** | `setDeepValue(obj, path, value, type)` |
+| setDeepValue | function | L226 | L1570 | **1345** | `setDeepValue(obj, path, value, type)` |

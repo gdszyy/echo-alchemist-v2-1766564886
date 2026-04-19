@@ -1,6 +1,6 @@
 # src/spawn_system.js 函数索引
 
-> 自动生成于 2026-04-19 | 总行数: 2079 | 函数数: 28 | 语言: javascript
+> 自动生成于 2026-04-19 | 总行数: 2099 | 函数数: 28 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -29,14 +29,14 @@
 | spawn_createHealWave | method | L1249 | L1263 | 15 | `spawn_createHealWave(x, y, range = 120)` |
 | spawn_createHitFeedback | method | L1264 | L1358 | 95 | `spawn_createHitFeedback(x, y, velocity, type = 'normal')` |
 | spawn_triggerLevelUpEvent | method | L1359 | L1401 | 43 | `spawn_triggerLevelUpEvent(uiX, uiY)` |
-| spawn_scheduleNextBoss | method | L1402 | L1440 | 39 | `spawn_scheduleNextBoss(extraDelay = 0)` |
-| spawn_checkBossRoundFor | method | L1441 | L1462 | 22 | `spawn_checkBossRoundFor(round)` |
-| spawn_checkBossRound | method | L1463 | L1487 | 25 | `spawn_checkBossRound()` |
-| spawn_calculateBossHP | method | L1488 | L1560 | 73 | `spawn_calculateBossHP(isBigBoss)` |
-| spawn_spawnBoss | method | L1561 | L1759 | 199 | `spawn_spawnBoss(bossId, isBigBoss)` |
-| spawn_selectBossForRound | method | L1760 | L1787 | 28 | `spawn_selectBossForRound(isBigBoss)` |
-| spawn_applyMinionShape | method | L1788 | L1937 | 150 | `spawn_applyMinionShape(e)` |
-| spawn_triggerBossEntranceShockwave | method | L1938 | L2080 | 143 | `spawn_triggerBossEntranceShockwave(boss)` |
+| spawn_scheduleNextBoss | method | L1402 | L1457 | 56 | `spawn_scheduleNextBoss(extraDelay = 0)` |
+| spawn_checkBossRoundFor | method | L1458 | L1482 | 25 | `spawn_checkBossRoundFor(round)` |
+| spawn_checkBossRound | method | L1483 | L1507 | 25 | `spawn_checkBossRound()` |
+| spawn_calculateBossHP | method | L1508 | L1580 | 73 | `spawn_calculateBossHP(isBigBoss)` |
+| spawn_spawnBoss | method | L1581 | L1779 | 199 | `spawn_spawnBoss(bossId, isBigBoss)` |
+| spawn_selectBossForRound | method | L1780 | L1807 | 28 | `spawn_selectBossForRound(isBigBoss)` |
+| spawn_applyMinionShape | method | L1808 | L1957 | 150 | `spawn_applyMinionShape(e)` |
+| spawn_triggerBossEntranceShockwave | method | L1958 | L2100 | 143 | `spawn_triggerBossEntranceShockwave(boss)` |
 
 ## 巨型函数内部节点 (@section 标记)
 

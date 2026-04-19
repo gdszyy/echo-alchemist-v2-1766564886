@@ -1,7 +1,8 @@
 # 敌人词缀与 Boss 索引 (Enemy Affix & Boss Index)
 
-> **数据来源**：`src/config.js` → `balance.affixes`, `balance.bossConfigs`, `BOSS_DB`；`src/spawn_system.js` → `spawn_generateAffixes()`；`src/systems.js` → `TRUTH_BOOK_DATA.enemies`
+> **数据来源**：`src/config.js` → `balance.affixes`, `balance.bossConfigs`, `BOSS_DB`, `ENEMY_CURVE_CONFIG`；`src/spawn_system.js` → `spawn_generateAffixes()`, `spawn_scheduleNextBoss()`；`src/systems.js` → `TRUTH_BOOK_DATA.enemies`
 > **用途**：Agent 快速查询 8 种敌人词缀和 8 个 Boss 的行为机制、出现回合、克制属性及关键代码位置。
+> **最后更新**：Task C.3 — Boss 生成顺序与主题段落对齐检查（2026-04-19）
 
 ## 1. 敌人词缀总览（8 种）
 
@@ -105,23 +106,23 @@
 
 ## 3. Boss 总览（8 个）
 
-### 3.1 Mini-Boss（出场顺序：Round 5 → 约 12 → 约 19 → 约 26）
+### 3.1 Mini-Boss（出场回合：R5 → R12 → R19 → R26，固定对齐主题段落）
 
-| ID | 名称 | 图标 | 词缀 | 弱点 | 狂暴行为 |
-|---|---|---|---|---|---|
-| `ignis` | 熔炉守卫·伊格尼斯 | 🔥 | shield + haste | pierce、pyro | 护盾层数翻倍；每回合升温 +30°C；对周围敌人火焰溅射 |
-| `glacies` | 霜晶缝合怪·格拉西斯 | ❄️ | jump + regen | cryo、pierce | 跳跃行数增加至 3 行；跳跃落地时冻结周围 Peg |
-| `mikro` | 裂变母体·米克罗 | 🦠 | clone + healer | lightning、scatter | 分身概率提升至 100%；每个存活分身提供 10% 减伤（上限 50%） |
-| `devourer` | 贪婪之渊·噬神者 | 👅 | devour + shield | bounce、laser | 全屏吞噬（吞噬范围 = 99） |
+| ID | 名称 | 出场回合 | 主题段落 | 词缀 | 弱点 | 狂暴行为 |
+|---|---|---|---|---|---|---|
+| `ignis` | 熔炉守卫·伊格尼斯 | **R5** | 基础教学段（shield+haste） | shield + haste | pierce、pyro | 护盾层数翻倍；每回合升温 +30°C；对周围敌人火焰溅射 |
+| `glacies` | 霜晶缝合怪·格拉西斯 | **R12** | 持续压力段（regen+jump） | jump + regen | cryo、pierce | 跳跃行数增加至 3 行；跳跃落地时冻结周围 Peg |
+| `mikro` | 裂变母体·米克罗 | **R19** | 群体控制段（clone+healer） | clone + healer | lightning、scatter | 分身概率提升至 100%；每个存活分身提供 10% 减伤（上限 50%） |
+| `devourer` | 贪婪之渊·噬神者 | **R26** | 机制复合段（devour+shield） | devour + shield | bounce、laser | 全屏吞噬（吞噬范围 = 99） |
 
-### 3.2 大 Boss（出场顺序：约 Round 33 → 40 → 47 → 54）
+### 3.2 大 Boss（出场回合：R33 → R40 → R47 → R54，固定对齐主题段落）
 
-| ID | 名称 | 图标 | 词缀 | 弱点 | 狂暴行为 |
-|---|---|---|---|---|---|
-| `viridis` | 翠绿共生体·维里迪斯 | 🌿 | regen + healer | laser、pyro | 放弃治疗他人；自身再生速度 × 3.0 |
-| `tesla` | 雷霆幻影·特斯拉 | ⚡ | haste + clone | cryo、bounce | 行动次数再 +1（共 4 次） |
-| `chimera` | 混沌融合体·奇美拉 | 🔴 | berserk + devour | pierce、laser | 温度直接达到阈值；受击时有 25% 概率触发全场爆炸 |
-| `ouroboros` | 永恒回声·奥罗波罗斯 | 🔄 | 轮转（见下） | 动态 | 词缀轮转加速：每回合切换（正常为每 3 回合） |
+| ID | 名称 | 出场回合 | 主题段落 | 词缀 | 弱点 | 狂暴行为 |
+|---|---|---|---|---|---|---|
+| `viridis` | 翠绿共生体·维里迪斯 | **R33** | 进阶测试段（regen+healer） | regen + healer | laser、pyro | 放弃治疗他人；自身再生速度 × 3.0 |
+| `tesla` | 雷霆幻影·特斯拉 | **R40** | 速度地狱段（haste+clone） | haste + clone | cryo、bounce | 行动次数再 +1（共 4 次） |
+| `chimera` | 混沌融合体·奇美拉 | **R47** | 混沌段（berserk+devour） | berserk + devour | pierce、laser | 温度直接达到阈值；受击时有 25% 概率触发全场爆炸 |
+| `ouroboros` | 永恒回声·奥罗波罗斯 | **R54** | 终极考验段（全词缀轮转） | 轮转（见下） | 动态 | 词缀轮转加速：每回合切换（正常为每 3 回合） |
 
 ### 3.3 奥罗波罗斯词缀轮转规则
 
@@ -133,17 +134,23 @@
 
 **轮转间隔**：正常 3 回合切换；狂暴后每回合切换（`_berserkedRotation = true`）。
 
-## 4. Boss 出场机制
+## 4. Boss 出场机制（Task C.3 修正后）
+
+> **修正说明（2026-04-19 Task C.3）**：
+> - **修正前**：`spawn_scheduleNextBoss` 使用随机间隔（7~9 回合），导致 Boss 出场回合不可预测，无法与主题段落精确对齐。
+> - **修正后**：改为直接读取 `ENEMY_CURVE_CONFIG.THEME_SEGMENTS[n].endRound` 作为固定出场回合，实现与八大主题段落的严格对齐。
+> - **isBigBoss 修正**：阈值从 `>= 3` 改为 `>= 4`，确保 Devourer（第4个）正确识别为 Mini-Boss。
+> - **BOSS_DB 修正**：chimera 的 `affixes` 补充 `berserk`，与 `bossConfigs` 保持一致。
 
 | 参数 | 值 | 说明 |
 |---|---|---|
-| 第一个 Boss 回合 | Round 5 | 固定 |
-| 后续 Boss 间隔 | 7~9 回合 | 随机 |
-| 快速击杀延期 | +2 回合 | ≤ 2 回合击杀时 |
-| 中速击杀延期 | +1 回合 | 3 回合击杀时 |
-| 延期上限 | 第 4 个 Boss 起不再延期 | `delayMaxBossIndex = 3` |
-| Mini-Boss 顺序 | ignis → glacies → mikro → devourer | 循环 |
-| 大 Boss 顺序 | viridis → tesla → chimera → ouroboros | 循环 |
+| Boss 出场回合 | **固定**：R5/R12/R19/R26/R33/R40/R47/R54 | 由 `ENEMY_CURVE_CONFIG.THEME_SEGMENTS[n].endRound` 决定 |
+| 循环延伸间隔 | 7 回合（最后两段落间隔） | 超出 8 个 Boss 时按此间隔延伸 |
+| Mini-Boss 判定 | `_bossSpawnCount < 4` | 第 1-4 个 Boss 为 Mini-Boss |
+| 大 Boss 判定 | `_bossSpawnCount >= 4` | 第 5-8 个 Boss 为大 Boss |
+| Mini-Boss 顺序 | ignis → glacies → mikro → devourer | 固定顺序 |
+| 大 Boss 顺序 | viridis → tesla → chimera → ouroboros | 固定顺序 |
+| 降级回退 | 固定回合表 `[5,12,19,26,33,40,47,54]` | `ENEMY_CURVE_CONFIG` 不可用时使用 |
 
 ## 5. Boss 血量公式
 
@@ -180,7 +187,7 @@ finalHP = max(
 **触发流程**：
 1. `src/combat_system.js` → `combat_checkBossPhaseChange()` 检测血量阈值
 2. 广播 `EVENT_TYPES.BOSS_PHASE_CHANGE` 事件（`phase: 'berserk'`）
-3. 调用 `combat_triggerBossBerserk(boss)` 根据 `bossType` 应用狂暴效果
+3. 调用 `combat_triggerBossEnrage(boss)` 根据 `bossType` 应用狂暴效果
 4. 视觉反馈：红色冲击波 + 粒子 + 浮动文字 `❗ENRAGE!` + Toast 提示
 
 **关键状态字段**：
@@ -207,10 +214,13 @@ finalHP = max(
 | 词缀生成逻辑 | `src/spawn_system.js` | `spawn_generateAffixes()` |
 | 词缀行为实现 | `src/game_phase.js` | `phase_enemy_startLogic()` 及各词缀分支 |
 | Boss 生成 | `src/spawn_system.js` | `spawn_spawnBoss(bossId, isBigBoss)` |
-| Boss 出场顺序 | `src/spawn_system.js` | `spawn_selectNextBoss()` 约第 1637 行 |
-| Boss 狂暴触发 | `src/combat_system.js` | `combat_checkBossPhaseChange()` 约第 1840 行 |
-| Boss 狂暴效果 | `src/combat_system.js` | `combat_triggerBossBerserk(boss)` 约第 2876 行 |
+| **Boss 调度（固定回合）** | `src/spawn_system.js` | `spawn_scheduleNextBoss()` — 读取 `ENEMY_CURVE_CONFIG.THEME_SEGMENTS[n].endRound` |
+| Boss 回合检测 | `src/spawn_system.js` | `spawn_checkBossRoundFor(round)` |
+| Boss 出场顺序 | `src/spawn_system.js` | `spawn_selectBossForRound(isBigBoss)` |
+| Boss 狂暴触发 | `src/combat_system.js` | `combat_checkBossPhaseChange()` 约第 3072 行 |
+| Boss 狂暴效果 | `src/combat_system.js` | `combat_triggerBossEnrage(boss)` 约第 3087 行 |
 | Boss 数据配置 | `src/config.js` | `balance.bossConfigs` 约第 545 行 |
-| Boss 数据库 | `src/config.js` | `BOSS_DB` 约第 1060 行 |
+| Boss 数据库 | `src/config.js` | `BOSS_DB` 约第 1404 行 |
+| 主题段落配置 | `src/config.js` | `ENEMY_CURVE_CONFIG.THEME_SEGMENTS` 约第 1477 行 |
 | 词缀图鉴 | `src/systems.js` | `TRUTH_BOOK_DATA.enemies` 第 24 行起 |
 | Boss 图鉴 | `src/systems.js` | `TRUTH_BOOK_DATA` → `categoryId: 'boss'` 约第 782 行 |

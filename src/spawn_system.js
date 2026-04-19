@@ -1,5 +1,5 @@
 import { 
-    META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB 
+    META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB, ENEMY_CURVE_CONFIG 
 } from './config.js';
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
@@ -1394,10 +1394,10 @@ export const spawn_system = {
     /**
      * @method spawn_scheduleNextBoss
      * @description 预计算下一个 Boss 应在哪个回合出现，并将结果存入 this._nextBossRound。
-     *   - 第一个 Boss：固定在 Round firstBoss（默认 5）
-     *   - 后续 Boss：基础间隔为 [intervalMin, intervalMax] 随机回合，加上延期回合数
-     *   - 延期规则：第三个 Boss 之后（bossSpawnCount >= delayMaxBossIndex）不再延期
-     * @param {number} [extraDelay=0] - 额外延期回合数（由 boss:defeated 事件根据击杀速度计算后传入）
+     *   - 使用 ENEMY_CURVE_CONFIG.THEME_SEGMENTS 中各段落的 endRound 作为固定 Boss 出现回合
+     *   - 每个段落的最后一回合（endRound）即为该段落 Boss 的出现回合
+     *   - 对齐表：R5(Ignis), R12(Glacies), R19(Mikro), R26(Devourer), R33(Viridis), R40(Tesla), R47(Chimera), R54(Ouroboros)
+     * @param {number} [extraDelay=0] - 额外延期回合数（保留参数兼容性，固定回合模式下忽略）
      */
     spawn_scheduleNextBoss(extraDelay = 0) {
         const cfg = CONFIG.balance.bossRounds;
@@ -1415,20 +1415,37 @@ export const spawn_system = {
             return;
         }
 
-        // 第一个 Boss 固定回合
-        if (!this._bossSpawnCount || this._bossSpawnCount === 0) {
-            this._nextBossRound = cfg.firstBoss || 5;
-            console.log(`[BossSchedule] 第一个 Boss 预定在 Round ${this._nextBossRound}`);
+        // [主题段落对齐] 使用 ENEMY_CURVE_CONFIG.THEME_SEGMENTS 的 endRound 作为固定 Boss 出现回合
+        // 每个段落的 endRound 对应该段落的 Boss：R5/R12/R19/R26/R33/R40/R47/R54
+        const segments = ENEMY_CURVE_CONFIG && ENEMY_CURVE_CONFIG.THEME_SEGMENTS;
+        if (segments && segments.length > 0) {
+            const spawnCount = this._bossSpawnCount || 0;
+            if (spawnCount < segments.length) {
+                // 下一个 Boss 对应的段落索引 = 当前已生成数量
+                this._nextBossRound = segments[spawnCount].endRound;
+                console.log(`[BossSchedule] Boss #${spawnCount + 1} 预定在 Round ${this._nextBossRound}（段落: ${segments[spawnCount].label}）`);
+            } else {
+                // 超出段落数量（循环游戏）：以最后一个段落间隔为基准继续延伸
+                const lastSegment = segments[segments.length - 1];
+                const prevSegment = segments[segments.length - 2];
+                const segInterval = lastSegment.endRound - prevSegment.endRound;
+                const lastSpawnRound = this._lastBossSpawnRound || this.round;
+                this._nextBossRound = lastSpawnRound + segInterval;
+                console.log(`[BossSchedule] Boss #${spawnCount + 1} 预定在 Round ${this._nextBossRound}（循环延伸，间隔=${segInterval}）`);
+            }
             return;
         }
 
-        // 后续 Boss：基础间隔随机，加上延期
-        const intervalMin = cfg.intervalMin || 7;
-        const intervalMax = cfg.intervalMax || 9;
-        const baseInterval = intervalMin + Math.floor(Math.random() * (intervalMax - intervalMin + 1));
-        const lastSpawnRound = this._lastBossSpawnRound || this.round;
-        this._nextBossRound = lastSpawnRound + baseInterval + extraDelay;
-        console.log(`[BossSchedule] 下一个 Boss 预定在 Round ${this._nextBossRound}（基础间隔=${baseInterval}, 延期=${extraDelay}, 上次生成回合=${lastSpawnRound}）`);
+        // 降级回退：ENEMY_CURVE_CONFIG 不可用时，使用固定回合表
+        const fallbackRounds = [5, 12, 19, 26, 33, 40, 47, 54];
+        const spawnCount = this._bossSpawnCount || 0;
+        if (spawnCount < fallbackRounds.length) {
+            this._nextBossRound = fallbackRounds[spawnCount];
+        } else {
+            const lastSpawnRound = this._lastBossSpawnRound || this.round;
+            this._nextBossRound = lastSpawnRound + 7;
+        }
+        console.log(`[BossSchedule][Fallback] Boss #${spawnCount + 1} 预定在 Round ${this._nextBossRound}`);
     },
 
     /**
@@ -1448,8 +1465,11 @@ export const spawn_system = {
             if (this._isTutorialRun) {
                 return { shouldSpawn: true, isBigBoss: true };
             }
-            // 第四个 Boss 起为大 Boss（第 1-3 个为 Mini-Boss）
-            const isBigBoss = (this._bossSpawnCount || 0) >= 3;
+            // 第五个 Boss 起为大 Boss（第 1-4 个为 Mini-Boss：Ignis/Glacies/Mikro/Devourer）
+            // _bossSpawnCount 是已生成的 Boss 数量（生成前读取）
+            // 检测第1个时 count=0, 第4个时 count=3 → 均 < 4 → mini ✓
+            // 检测第5个时 count=4 → >= 4 → big ✓
+            const isBigBoss = (this._bossSpawnCount || 0) >= 4;
             return { shouldSpawn: true, isBigBoss };
         }
         return { shouldSpawn: false, isBigBoss: false };
