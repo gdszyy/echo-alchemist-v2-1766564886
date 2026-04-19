@@ -9,6 +9,7 @@
 *   **待办与进度大盘**：[`TODO.md`](TODO.md)（包含各阶段的完成状态与重构指标）。
 *   **自适应性能规范**：[`.cursor/rules/performance.md`](.cursor/rules/performance.md)（凡修改粒子/特效/Peg/敌人渲染相关代码，必读）。
 *   **流程洞察索引**：[`.cursor/rules/process_insights/index.md`](.cursor/rules/process_insights/index.md)（在涉及复杂跨模块流程、修复历史 Bug 区域或新增特效时必读；包含历次任务沉淀的防坑经验与版本化洞察文档）。
+*   **自动函数索引**：[`.cursor/rules/auto_index/INDEX.md`](.cursor/rules/auto_index/INDEX.md)（在涉及大文件修改时必读；包含所有大文件的函数名、行号范围和 @section 内部节点映射，由 `code-indexer` 脚本自动维护，**严禁手动编辑**）。
 
 所有专门针对本项目的技能 (如 `echo-developer`) 仅需指引 Agent 阅读上述入口，无需在技能文件内硬编码具体的架构细节或行数统计。
 
