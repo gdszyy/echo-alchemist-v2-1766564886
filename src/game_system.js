@@ -904,6 +904,17 @@ export const game_system = {
         const banner = document.getElementById('round-start-banner');
         const bannerText = document.getElementById('round-start-banner-text');
 
+        // [BUGFIX] 切换到 combat 阶段前，显式重置敌人回合状态。
+        // 根因：phase_switchPhase('combat') 会让主循环 sys_loop 立即开始执行
+        // phase_combat_update()；若 isEnemyTurn/enemyWaveActive 未清零，
+        // combat_update 中的 playerTurnFinished 条件（弹药为空）在横幅期间仍然
+        // 满足，会再次调用 phase_enemy_startLogic()，导致敌人在回合开始时
+        // 重复行动（与上一回合结束时的行动重复）。
+        this.isEnemyTurn = false;
+        this.enemyWaveActive = false;
+        this.enemyTurnTimer = 0;
+        this._runeClaimPending = false;
+
         // 切换到 combat 阶段作为横幅背景，避免残留 selection 界面
         if (this.phase !== 'combat') {
             this.phase_switchPhase('combat');
