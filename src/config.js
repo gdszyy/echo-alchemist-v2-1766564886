@@ -1460,6 +1460,99 @@ const BOSS_DB = [
     }
 ];
 
+// ==================== 敌人词缀教学曲线配置 ====================
+
+/**
+
+ * ENEMY_CURVE_CONFIG - 敌人词缀教学曲线配置字典
+
+ * 
+
+ * 用于驱动 spawn_system.js 中的词缀生成概率，控制游戏节奏和难度曲线。
+
+ * 包含八大主题段落，每个段落有核心词缀权重峰值。
+
+ */
+
+const ENEMY_CURVE_CONFIG = {
+
+    // 双词缀精英基础概率
+
+    ELITE_DUAL_AFFIX_BASE: 0.15,
+
+    // Boss 战后高压提升值（持续 3 回合）
+
+    ELITE_DUAL_AFFIX_POST_BOSS_BOOST: 0.25,
+
+    
+
+    // 八大段落的回合区间定义
+
+    THEME_SEGMENTS: [
+
+        { startRound: 1, endRound: 5, label: "基础教学段", bossId: "boss_ignis" },
+
+        { startRound: 6, endRound: 12, label: "持续压力段", bossId: "boss_glacies" },
+
+        { startRound: 13, endRound: 19, label: "群体控制段", bossId: "boss_micro" },
+
+        { startRound: 20, endRound: 26, label: "机制复合段", bossId: "boss_devourer" },
+
+        { startRound: 27, endRound: 33, label: "进阶测试段", bossId: "boss_viridis" },
+
+        { startRound: 34, endRound: 40, label: "速度地狱段", bossId: "boss_tesla" },
+
+        { startRound: 41, endRound: 47, label: "混沌段", bossId: "boss_chimera" },
+
+        { startRound: 48, endRound: 54, label: "终极考验段", bossId: "boss_ouroboros" }
+
+    ],
+
+    
+
+    // 每个段落内各词缀的权重值（0-100）
+
+    // 权重设计原则：核心词缀 80-100，引入词缀 30-50，背景词缀 10-20，未引入词缀 0-5
+
+    AFFIX_WEIGHT_CURVES: [
+
+        // R1-R5 基础教学段：引入 shield (R3), regen (R5)
+
+        { shield: 80, regen: 30, healer: 0, haste: 0, jump: 0, clone: 0, devour: 0, berserk: 0 },
+
+        // R6-R12 持续压力段：引入 healer (R6), haste (R8), jump (R9)
+
+        { shield: 40, regen: 80, healer: 50, haste: 30, jump: 30, clone: 0, devour: 0, berserk: 0 },
+
+        // R13-R19 群体控制段：引入 clone (R12), devour (R12), berserk (R14)
+
+        { shield: 20, regen: 40, healer: 80, haste: 50, jump: 50, clone: 80, devour: 40, berserk: 30 },
+
+        // R20-R26 机制复合段：强化 haste, jump, devour
+
+        { shield: 20, regen: 20, healer: 40, haste: 80, jump: 80, clone: 50, devour: 80, berserk: 50 },
+
+        // R27-R33 进阶测试段：强化 regen, healer, berserk
+
+        { shield: 30, regen: 80, healer: 80, haste: 40, jump: 40, clone: 40, devour: 50, berserk: 80 },
+
+        // R34-R40 速度地狱段：极速与跳跃的极致
+
+        { shield: 20, regen: 20, healer: 20, haste: 100, jump: 100, clone: 60, devour: 40, berserk: 60 },
+
+        // R41-R47 混沌段：分身与吞噬的狂欢
+
+        { shield: 40, regen: 40, healer: 40, haste: 40, jump: 40, clone: 100, devour: 100, berserk: 80 },
+
+        // R48-R54 终极考验段：全词缀高压
+
+        { shield: 80, regen: 80, healer: 80, haste: 80, jump: 80, clone: 80, devour: 80, berserk: 100 }
+
+    ]
+
+};
+
+
 // ==================== 导出配置 ====================
 // 注意：TRUTH_BOOK_DATA 已移动到 systems.js，因为它需要使用 Enemy 类
 
@@ -1472,4 +1565,5 @@ export {
     BOARD_STRUCTURE_RELICS,
     SKILL_DB,
     BOSS_DB,
+    ENEMY_CURVE_CONFIG,
 };

@@ -133,3 +133,24 @@ globs: ["src/config.js"]
 - **遗物池边界**：`ui_showRelicSelection()` 必须将 `chaos_essence` 与 `pure_essence` 排除在普通遗物候选池外，避免精华再次通过遗物界面重复发放。
 - **纯净精华写回要求**：确认选择时除了把注入结果写入 `MarbleDefinition.collected` 外，还必须同步写入 `source`、`infusedRuneId`、`infusedAttribute`、`assimilationMultiplier` 等局部运行态，并为对应 `marble.type` 写入 `doubleAssimilationBoostRounds`，确保“同化率 x2”真实生效。
 - **运行态契约**：`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`、`selectionPreviewState`、`relicOverlayReturnState`、`pendingSelectionMode`、`doubleAssimilationBoostRounds`、`fateMomentContext` 必须同时出现在 `core.js` 初始化、`sys_resetGame()` 重置、`sys_saveRunState()` / `sys_loadRunState()` 持久化中。
+
+## 9. 教学曲线配置 (ENEMY_CURVE_CONFIG)
+
+`ENEMY_CURVE_CONFIG` 控制游戏在不同阶段（Round）的敌人词缀生成概率和难度曲线。
+
+- **`THEME_SEGMENTS`**: 定义了八大主题段落的回合区间和对应的 Boss。
+  - R1-R5 基础教学段 (boss_ignis)
+  - R6-R12 持续压力段 (boss_glacies)
+  - R13-R19 群体控制段 (boss_micro)
+  - R20-R26 机制复合段 (boss_devourer)
+  - R27-R33 进阶测试段 (boss_viridis)
+  - R34-R40 速度地狱段 (boss_tesla)
+  - R41-R47 混沌段 (boss_chimera)
+  - R48-R54 终极考验段 (boss_ouroboros)
+- **`AFFIX_WEIGHT_CURVES`**: 定义了每个段落内各词缀（shield/haste/regen/jump/healer/clone/devour/berserk）的权重值（0-100）。
+  - 核心词缀：80-100
+  - 引入词缀：30-50
+  - 背景词缀：10-20
+  - 未引入词缀：0-5
+- **`ELITE_DUAL_AFFIX_BASE`**: 双词缀精英基础概率（默认 0.15）。
+- **`ELITE_DUAL_AFFIX_POST_BOSS_BOOST`**: Boss 战后高压提升值（+0.25，持续 3 回合）。
