@@ -11,61 +11,6 @@ import { getThemeSegment } from './utils/math_utils.js';
 import { UIManager, TrainingGround, TruthBook, TRUTH_BOOK_DATA } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
-import { interpolateAffixWeights, weightedRandom, getEliteDualAffixChance } from './utils/math_utils.js';
-
-/**
- * [导演系统] 方阵突击（Phalanx）阵型模板
- * 教学目标：引导玩家学会穿透前排 shield 高血量敌人，优先击杀后排 healer 治愈者。
- * 阵型结构：
- *   - frontCount: 前排 shield 敌人数量（2-3 个），高血量（hpMult 1.5-1.8）
- *   - backCount:  后排 healer 敌人数量（1-2 个），低血量（hpMult 0.6-0.8）
- *   - minRound:   最早出现回合（Round 6，shield 从 Round 3 起可用，healer 从 Round 6 起可用）
- *   - triggerProb: 在导演候选池中的基础触发概率（15%，Task B.3 接入权重调度后替换）
- */
-export const DIRECTOR_TEMPLATE_PHALANX = {
-    id: 'phalanx',
-    minRound: 6,
-    triggerProb: 0.15,
-    front: {
-        affixes: ['shield'],
-        hpMultMin: 1.5,
-        hpMultMax: 1.8,
-        countMin: 2,
-        countMax: 3,
-    },
-    back: {
-        affixes: ['healer'],
-        hpMultMin: 0.6,
-        hpMultMax: 0.8,
-        countMin: 1,
-        countMax: 2,
-    },
-};
-
-/**
- * [导演系统] 闪电战（Blitz）阵型模板
- * 教学目标：训练玩家应对边路突袭，快速识别并击杀两侧 haste+jump 双词缀威胁单位。
- * 阵型结构：
- *   - flanks: 两侧边缘列各 1 个 haste+jump 双词缀敌人，低血量（hpMult 0.7）
- *   - center: 中间列 1-2 个普通敌人，标准血量（hpMult 1.0），无强制词缀
- *   - minRound: 最早出现回合（Round 10，jump 从 Round 9 起可用，haste 从 Round 8 起可用）
- *   - triggerProb: 在导演候选池中的基础触发概率（15%，Task B.3 接入权重调度后替换）
- */
-export const DIRECTOR_TEMPLATE_BLITZ = {
-    id: 'blitz',
-    minRound: 10,
-    triggerProb: 0.15,
-    flanks: {
-        affixes: ['haste', 'jump'],
-        hpMult: 0.7,
-    },
-    center: {
-        affixes: [],
-        hpMult: 1.0,
-        countMin: 1,
-        countMax: 2,
-    },
-};
 
 export const spawn_system = {
 /**
@@ -147,14 +92,23 @@ export const spawn_system = {
      */
     spawn_generateAffixes() {
         const affixes = [];
+        let possible = [];
         const r = this.round || 0;
 
         // 1. 决定生成多少个词条 (数量限制)
-        // 使用 getEliteDualAffixChance 基于 ENEMY_CURVE_CONFIG 动态计算双词缀概率
+        // 基础概率随回合提升，但有上限
+        // 0个: 默认
+        // 1个: 20% (r=1) -> 60% (r=20)
+        // 2个: 0%  (r=1) -> 15% (r=20)
         let count = 0;
-        const chance1 = Math.min(0.6, 0.05 + r * 0.025); // 单词缀概率
-        // [曲线接入][Task C.1] 双词缀概率改由 ENEMY_CURVE_CONFIG 驱动，包含 Boss 战后高压加成
-        const effectiveChance2 = getEliteDualAffixChance(r, this.postBossRoundsLeft || 0, ENEMY_CURVE_CONFIG);
+        const chance1 = Math.min(0.6, 0.05 + r * 0.025); // [难度调低] 初始概率 0.1 -> 0.05，前三关词缀触发概率降低约 5%
+        const chance2 = r > 10 ? Math.min(0.15, (r - 10) * 0.01) : 0;
+        
+        // [难度平衡][Task C.2] Boss 战后高压期，双词缀精英概率临时提升 25%
+        // 使用 postBossRoundsLeft 字段（由 BOSS_DEFEATED 事件设置，每回合结算递减）
+        const postBossBonus = (this.postBossRoundsLeft > 0) ? 0.25 : 0;
+        // 将 postBossBonus 叠加到 chance2（双词缀概率）
+        const effectiveChance2 = Math.min(chance2 + postBossBonus, 0.40);
 
         const roll = Math.random();
         if (roll < effectiveChance2) count = 2;
@@ -162,23 +116,45 @@ export const spawn_system = {
         
         if (count === 0) return [];
 
-        // 2. [曲线接入][Task C.1] 使用 interpolateAffixWeights 计算当前回合各词缀权重
-        // 替代原有硬编码的 poolDefinitions，权重由 ENEMY_CURVE_CONFIG.AFFIX_WEIGHT_CURVES 统一管理
-        const affixWeights = interpolateAffixWeights(r, ENEMY_CURVE_CONFIG);
+        // 2. 定义词条权重池 (Weight Pool)
+        // 格式: { id: 'affix_name', weight: function(round) }
+        const poolDefinitions = [
+            { id: 'shield',  weight: (r) => r < 3 ? 0 : (r < 8 ? 100 : 50) },  // 初期高频，后期变低
+            { id: 'regen',   weight: (r) => r < 5 ? 0 : (r < 12 ? 80 : 40) },   // 中期高频
+            { id: 'healer',  weight: (r) => r < 6 ? 0 : 60 },                   // 稳定出现
+            { id: 'haste',   weight: (r) => r < 8 ? 0 : (r < 15 ? 70 : 50) },
+            { id: 'jump',    weight: (r) => r < 9 ? 0 : 60 },
+            { id: 'clone',   weight: (r) => r < 12 ? 0 : 50 },
+            { id: 'devour',  weight: (r) => r < 12 ? 0 : 40 },
+            { id: 'berserk', weight: (r) => r < 14 ? 0 : (r * 3) }              // 后期极其危险，权重随回合无限增加
+        ];
 
-        if (Object.keys(affixWeights).length === 0) return [];
-
-        // 3. 抽取词条（使用 weightedRandom 加权随机，避免重复）
-        for (let i = 0; i < count; i++) {
-            // 构建排除已选词缀的权重字典
-            const remainingWeights = {};
-            for (const [id, w] of Object.entries(affixWeights)) {
-                if (!affixes.includes(id)) {
-                    remainingWeights[id] = w;
-                }
+        // 3. 计算当前回合的有效权重池
+        let validPool = [];
+        let totalWeight = 0;
+        
+        poolDefinitions.forEach(def => {
+            const w = def.weight(r);
+            if (w > 0) {
+                validPool.push({ id: def.id, w: w });
+                totalWeight += w;
             }
-            const chosen = weightedRandom(remainingWeights);
-            if (chosen) affixes.push(chosen);
+        });
+
+        if (totalWeight <= 0) return [];
+
+        // 4. 抽取词条
+        for (let i = 0; i < count; i++) {
+            let randomVal = Math.random() * totalWeight;
+            for (let item of validPool) {
+                if (randomVal < item.w) {
+                    if (!affixes.includes(item.id)) {
+                        affixes.push(item.id);
+                    }
+                    break;
+                }
+                randomVal -= item.w;
+            }
         }
 
         return affixes;
@@ -252,7 +228,6 @@ export const spawn_system = {
 
             let squadType = null;
 
-
             // @section:spawn_enemy_type_select - 敌人类型选择与词缀分配
             // [B.3] 权重调度：根据 ENEMY_CURVE_CONFIG.TEMPLATE_WEIGHTS 中当前段落的权重动态选择模板
             const segIdx = getThemeSegment(this.round, ENEMY_CURVE_CONFIG);
@@ -295,43 +270,17 @@ export const spawn_system = {
             };
 
             if (squadType === 'phalanx') {
-                // [Phalanx] 方阵突击：前排 2-3 个 shield 高血量 + 后排 1-2 个 healer 低血量
-                // 教学目标：引导玩家使用穿透属性绕过前排盾牌，优先击杀后排治愈者
-                const tmpl = DIRECTOR_TEMPLATE_PHALANX;
-                const frontCount = tmpl.front.countMin + Math.floor(Math.random() * (tmpl.front.countMax - tmpl.front.countMin + 1));
-                const backCount  = tmpl.back.countMin  + Math.floor(Math.random() * (tmpl.back.countMax  - tmpl.back.countMin  + 1));
-                const cols = CONFIG.gameplay.enemyCols;
-                // 前排：左对齐，从列 0 开始据占 frontCount 列
-                for (let i = 0; i < frontCount; i++) {
-                    const hpMult = tmpl.front.hpMultMin + Math.random() * (tmpl.front.hpMultMax - tmpl.front.hpMultMin);
-                    addPreset(i, hpMult, [...tmpl.front.affixes]);
-                }
-                // 后排：右对齐，占据最后 backCount 列
-                for (let i = 0; i < backCount; i++) {
-                    const hpMult = tmpl.back.hpMultMin + Math.random() * (tmpl.back.hpMultMax - tmpl.back.hpMultMin);
-                    addPreset(cols - 1 - i, hpMult, [...tmpl.back.affixes]);
-                }
+                // 战阵：护盾魔像 + 治愈魔像，教学流穿和治愈的配合应对
+                const c = Math.floor(Math.random() * (CONFIG.gameplay.enemyCols - 1));
+                addPreset(c, 1.4, ['shield']);
+                addPreset(c+1, 0.8, ['healer']);
             } 
             else if (squadType === 'blitz') {
-                // [Blitz] 闪电战：两侧各 1 个 haste+jump 双词缀 + 中间普通敌人
-                // 教学目标：训练玩家应对边路突袭，快速识别并击杀双词缀边路威胁
-                const tmpl = DIRECTOR_TEMPLATE_BLITZ;
-                const cols = CONFIG.gameplay.enemyCols;
-                // 两侧边缘：列 0 和列 (cols-1)，haste+jump 双词缀
-                addPreset(0,        tmpl.flanks.hpMult, [...tmpl.flanks.affixes]);
-                addPreset(cols - 1, tmpl.flanks.hpMult, [...tmpl.flanks.affixes]);
-                // 中间普通敌人：在列 1 和列 (cols-2) 之间随机选择 1-2 列
-                const centerCount = tmpl.center.countMin + Math.floor(Math.random() * (tmpl.center.countMax - tmpl.center.countMin + 1));
-                const centerCols = [];
-                for (let c = 1; c < cols - 1; c++) centerCols.push(c);
-                // 洗牌中间列
-                for (let i = centerCols.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [centerCols[i], centerCols[j]] = [centerCols[j], centerCols[i]];
-                }
-                for (let i = 0; i < Math.min(centerCount, centerCols.length); i++) {
-                    addPreset(centerCols[i], tmpl.center.hpMult, [...tmpl.center.affixes]);
-                }
+                // 闪击：极速 + 跳跃，教学冰霜冻结应对
+                const c1 = Math.floor(Math.random() * CONFIG.gameplay.enemyCols);
+                let c2 = (c1 + 2) % CONFIG.gameplay.enemyCols;
+                addPreset(c1, 0.6, ['haste']);
+                addPreset(c2, 0.6, ['jump']);
             }
             else if (squadType === 'berserk_pack') {
                 // 狂暴包：单个高血量狂暴魔像，教学冰霜降温控制
