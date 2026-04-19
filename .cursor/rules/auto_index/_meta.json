@@ -2,7 +2,7 @@
   "indexed": [
     {
       "file": "src/spawn_system.js",
-      "lines": 2154,
+      "lines": 2124,
       "funcs": 28,
       "sections": 8,
       "mega_funcs": 2,

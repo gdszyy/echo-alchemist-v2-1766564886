@@ -11,6 +11,7 @@ import { getThemeSegment } from './utils/math_utils.js';
 import { UIManager, TrainingGround, TruthBook, TRUTH_BOOK_DATA } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
+import { interpolateAffixWeights, weightedRandom, getEliteDualAffixChance } from './utils/math_utils.js';
 
 export const spawn_system = {
 /**
@@ -92,23 +93,14 @@ export const spawn_system = {
      */
     spawn_generateAffixes() {
         const affixes = [];
-        let possible = [];
         const r = this.round || 0;
 
         // 1. 决定生成多少个词条 (数量限制)
-        // 基础概率随回合提升，但有上限
-        // 0个: 默认
-        // 1个: 20% (r=1) -> 60% (r=20)
-        // 2个: 0%  (r=1) -> 15% (r=20)
+        // 使用 getEliteDualAffixChance 基于 ENEMY_CURVE_CONFIG 动态计算双词缀概率
         let count = 0;
-        const chance1 = Math.min(0.6, 0.05 + r * 0.025); // [难度调低] 初始概率 0.1 -> 0.05，前三关词缀触发概率降低约 5%
-        const chance2 = r > 10 ? Math.min(0.15, (r - 10) * 0.01) : 0;
-        
-        // [难度平衡][Task C.2] Boss 战后高压期，双词缀精英概率临时提升 25%
-        // 使用 postBossRoundsLeft 字段（由 BOSS_DEFEATED 事件设置，每回合结算递减）
-        const postBossBonus = (this.postBossRoundsLeft > 0) ? 0.25 : 0;
-        // 将 postBossBonus 叠加到 chance2（双词缀概率）
-        const effectiveChance2 = Math.min(chance2 + postBossBonus, 0.40);
+        const chance1 = Math.min(0.6, 0.05 + r * 0.025); // 单词缀概率
+        // [曲线接入][Task C.1] 双词缀概率改由 ENEMY_CURVE_CONFIG 驱动，包含 Boss 战后高压加成
+        const effectiveChance2 = getEliteDualAffixChance(r, this.postBossRoundsLeft || 0, ENEMY_CURVE_CONFIG);
 
         const roll = Math.random();
         if (roll < effectiveChance2) count = 2;
@@ -116,45 +108,23 @@ export const spawn_system = {
         
         if (count === 0) return [];
 
-        // 2. 定义词条权重池 (Weight Pool)
-        // 格式: { id: 'affix_name', weight: function(round) }
-        const poolDefinitions = [
-            { id: 'shield',  weight: (r) => r < 3 ? 0 : (r < 8 ? 100 : 50) },  // 初期高频，后期变低
-            { id: 'regen',   weight: (r) => r < 5 ? 0 : (r < 12 ? 80 : 40) },   // 中期高频
-            { id: 'healer',  weight: (r) => r < 6 ? 0 : 60 },                   // 稳定出现
-            { id: 'haste',   weight: (r) => r < 8 ? 0 : (r < 15 ? 70 : 50) },
-            { id: 'jump',    weight: (r) => r < 9 ? 0 : 60 },
-            { id: 'clone',   weight: (r) => r < 12 ? 0 : 50 },
-            { id: 'devour',  weight: (r) => r < 12 ? 0 : 40 },
-            { id: 'berserk', weight: (r) => r < 14 ? 0 : (r * 3) }              // 后期极其危险，权重随回合无限增加
-        ];
+        // 2. [曲线接入][Task C.1] 使用 interpolateAffixWeights 计算当前回合各词缀权重
+        // 替代原有硬编码的 poolDefinitions，权重由 ENEMY_CURVE_CONFIG.AFFIX_WEIGHT_CURVES 统一管理
+        const affixWeights = interpolateAffixWeights(r, ENEMY_CURVE_CONFIG);
 
-        // 3. 计算当前回合的有效权重池
-        let validPool = [];
-        let totalWeight = 0;
-        
-        poolDefinitions.forEach(def => {
-            const w = def.weight(r);
-            if (w > 0) {
-                validPool.push({ id: def.id, w: w });
-                totalWeight += w;
-            }
-        });
+        if (Object.keys(affixWeights).length === 0) return [];
 
-        if (totalWeight <= 0) return [];
-
-        // 4. 抽取词条
+        // 3. 抽取词条（使用 weightedRandom 加权随机，避免重复）
         for (let i = 0; i < count; i++) {
-            let randomVal = Math.random() * totalWeight;
-            for (let item of validPool) {
-                if (randomVal < item.w) {
-                    if (!affixes.includes(item.id)) {
-                        affixes.push(item.id);
-                    }
-                    break;
+            // 构建排除已选词缀的权重字典
+            const remainingWeights = {};
+            for (const [id, w] of Object.entries(affixWeights)) {
+                if (!affixes.includes(id)) {
+                    remainingWeights[id] = w;
                 }
-                randomVal -= item.w;
             }
+            const chosen = weightedRandom(remainingWeights);
+            if (chosen) affixes.push(chosen);
         }
 
         return affixes;
