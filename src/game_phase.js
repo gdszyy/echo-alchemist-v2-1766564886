@@ -1135,7 +1135,11 @@ phase_gathering_getRandomPegType() {
         }
 
         document.getElementById('combat-message').innerHTML = '';
-        this.phase_gathering_initPachinko(true);
+        // [BUGFIX tsk-gathering-phase-leak] 删除此处提前调用的 phase_gathering_initPachinko(true)。
+        // 原 Bug：钉板在战斗结算时就被初始化，随后 sys_showRoundStartBanner() 切换到 gathering 阶段，
+        //         Canvas 更新循环立即绘制已初始化的钉板，导致研磨阶段在每回合战斗结束后就提前出现。
+        // 修复：钉板初始化的唯一入口是 phase_startGatheringPhase()，由 sys_showRoundStartBanner 在
+        //       1.5 秒横幅结束后调用，确保研磨阶段只在命运抉择之后出现。
 
         // =========================================
         // 待执行 Boss 生成（round++ 后执行）
@@ -2090,7 +2094,9 @@ phase_gathering_getRandomPegType() {
         const pegRadius = Math.max(4, Math.min(8, (this.width || 400) / 60));
         
         // [防御性检查] 如果钉子数组为空，尝试自动恢复
-        if (this.pegs.length === 0) {
+        // [BUGFIX tsk-gathering-phase-leak] 在回合开始横幅期间（_showingRoundBanner=true）跳过自动恢复，
+        // 防止 banner 期间 pegs 为空时触发初始化，导致研磨阶段提前显示。
+        if (this.pegs.length === 0 && !this._showingRoundBanner) {
             console.warn("[DEBUG] 收集阶段钉子数组为空，尝试自动恢复...");
             this.phase_gathering_initPachinko();
         }

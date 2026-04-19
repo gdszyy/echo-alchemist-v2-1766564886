@@ -902,6 +902,9 @@ export const game_system = {
         const banner = document.getElementById('round-start-banner');
         const bannerText = document.getElementById('round-start-banner-text');
 
+        // [BUGFIX tsk-gathering-phase-leak] 设置标志位，防止 banner 期间 Canvas 的钉子防御性检查触发提前初始化。
+        this._showingRoundBanner = true;
+
         // 先切换到 gathering 阶段（不初始化钉板），避免横幅期间背景残留 selection 界面
         if (this.phase !== 'gathering') {
             this.phase_switchPhase('gathering');
@@ -948,6 +951,8 @@ export const game_system = {
             if (leftSidebar) {
                 leftSidebar.classList.remove('ammo-panel-charging', 'ammo-panel-charging-simple');
             }
+            // [BUGFIX tsk-gathering-phase-leak] 横幅结束，清除标志位，再进入研磨阶段。
+            this._showingRoundBanner = false;
             this.phase_startGatheringPhase();
         }, 1500);
     },
