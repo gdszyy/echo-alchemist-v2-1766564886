@@ -301,7 +301,15 @@ ui_closeTruthBook() {
      */
     ui_renderReplaceAmmoUI() {
         const ctx = this.replaceAmmoContext;
-        if (!ctx || !ctx.active) return;
+        console.log('[DEBUG][ui_renderReplaceAmmoUI] 进入', {
+            ctx: JSON.stringify(ctx),
+            ammoQueue: JSON.stringify((this.ammoQueue||[]).map(a=>({type:a.type,collected:a.collected}))),
+            phase: this.phase,
+        });
+        if (!ctx || !ctx.active) {
+            console.warn('[DEBUG][ui_renderReplaceAmmoUI] ctx不存在或未激活，提前返回');
+            return;
+        }
 
         const gridEl = document.getElementById('marble-selection-grid');
         const labelEl = document.getElementById('selection-mode-label');
@@ -404,6 +412,12 @@ ui_closeTruthBook() {
     },
 
     ui_refreshSelectionModeUI() {
+        console.log('[DEBUG][ui_refreshSelectionModeUI] 进入', {
+            selectionMode: this.selectionMode,
+            replaceAmmoContext: JSON.stringify(this.replaceAmmoContext),
+            marblesPoolLen: (this.marblesPool||[]).length,
+            phase: this.phase,
+        });
         const countEl = document.getElementById('selected-count');
         const requiredEl = document.getElementById('selected-required-count');
         const labelEl = document.getElementById('selection-mode-label');

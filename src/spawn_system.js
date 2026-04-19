@@ -555,6 +555,16 @@ export const spawn_system = {
      */
     spawn_generateMarbleOptions() { 
         const container = document.getElementById('marble-selection-grid'); 
+        console.log('[DEBUG][spawn_generateMarbleOptions] 进入', {
+            containerExists: !!container,
+            selectionMode: this.selectionMode,
+            selectionRequiredCount: this.selectionRequiredCount,
+            generateCount: (this.selectionMode === 'pure_essence') ? 1 : (typeof CONFIG !== 'undefined' ? CONFIG.gameplay.selectionCount : '?'),
+            unlockedWeights: JSON.stringify(this.unlockedWeights || {}),
+            guaranteedNextRound: JSON.stringify(this.guaranteedNextRound || []),
+            _isTutorialRun: this._isTutorialRun,
+            phase: this.phase,
+        });
         container.innerHTML = ''; 
         this.marblesPool = []; 
 
@@ -697,6 +707,11 @@ export const spawn_system = {
             container.appendChild(card);
         }
 
+        console.log('[DEBUG][spawn_generateMarbleOptions] 卡片生成完成', {
+            marblesPoolLen: this.marblesPool.length,
+            types: this.marblesPool.map(m => m.type),
+            containerChildCount: container.children.length,
+        });
         // 初始化时显示第一个弹珠的预览
         if (this.marblesPool.length > 0) {
             const firstM = this.marblesPool[0];

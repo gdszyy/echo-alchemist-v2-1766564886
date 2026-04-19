@@ -517,10 +517,18 @@ export const game_system = {
     sys_initSelectionPhase() {
         const pendingMode = this.pendingSelectionMode;
         const mode = pendingMode?.mode || 'standard';
+        console.log('[DEBUG][sys_initSelectionPhase] 进入', {
+            mode,
+            pendingMode: JSON.stringify(pendingMode),
+            ammoQueueLen: (this.ammoQueue || []).length,
+            phase: this.phase,
+            fateMomentContext: JSON.stringify(this.fateMomentContext),
+        });
 
         // [tsk-668f3dba] 命运时刻且 ammoQueue 非空时，先进入替换阶段
         if ((mode === 'chaos_essence' || mode === 'pure_essence') &&
             this.ammoQueue && this.ammoQueue.length > 0) {
+            console.log('[DEBUG][sys_initSelectionPhase] ammoQueue非空，转入替换阶段，ammoQueue:', JSON.stringify((this.ammoQueue||[]).map(a=>({type:a.type,collected:a.collected}))));
             this.sys_initReplaceAmmoPhase();
             return;
         }
@@ -561,6 +569,11 @@ export const game_system = {
     sys_initReplaceAmmoPhase() {
         const pendingMode = this.pendingSelectionMode;
         const mode = pendingMode?.mode || 'chaos_essence';
+        console.log('[DEBUG][sys_initReplaceAmmoPhase] 进入', {
+            mode,
+            ammoQueue: JSON.stringify((this.ammoQueue||[]).map(a=>({type:a.type,collected:a.collected}))),
+            phase: this.phase,
+        });
         this.replaceAmmoContext = {
             active: true,
             selectedIndex: -1,       // 当前选中的 ammoQueue 索引，-1 表示未选
@@ -615,6 +628,12 @@ export const game_system = {
     _proceedToFateMomentSelection() {
         const pendingMode = this.pendingSelectionMode;
         const mode = pendingMode?.mode || (this.replaceAmmoContext?.fateMomentMode) || 'chaos_essence';
+        console.log('[DEBUG][_proceedToFateMomentSelection] 进入', {
+            mode,
+            pendingMode: JSON.stringify(pendingMode),
+            replaceAmmoContext: JSON.stringify(this.replaceAmmoContext),
+            phase: this.phase,
+        });
         this.selectionMode = mode;
         this.selectionRequiredCount = Math.max(1, pendingMode?.requiredCount || CONFIG.gameplay.selectionReq || 3);
         this.fateMomentContext = {
@@ -793,6 +812,12 @@ export const game_system = {
      * @description 在回合开始前统一结算遗物/精华，再决定是否进入选择阶段。
      */
     sys_startRoundStartResolver() {
+        console.log('[DEBUG][sys_startRoundStartResolver] 进入', {
+            _roundStartResolverActive: this._roundStartResolverActive,
+            pendingRoundStartRewards: JSON.stringify(this.pendingRoundStartRewards || []),
+            phase: this.phase,
+            round: this.round,
+        });
         if (this._roundStartResolverActive) return;
         if (!this.pendingRoundStartRewards) this.pendingRoundStartRewards = [];
 
