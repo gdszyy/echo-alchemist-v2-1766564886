@@ -1508,6 +1508,37 @@ const ENEMY_CURVE_CONFIG = {
 
     ],
 
+    // 导演系统模板权重调度表（与 THEME_SEGMENTS 一一对应）
+    // 格式：{ phalanx, blitz, berserk_pack, jumper_pack, thermal_bomb }（权重为 0 表示不出现）
+    // 权重设计原则：各模板权重之和为 100，权重 0 表示禁用，剩余权重按比例随机选择
+    TEMPLATE_WEIGHTS: [
+
+        // R1-R5 基础教学段：引入 phalanx（教学流穿和治愈的配合）
+        { phalanx: 60, blitz: 0, berserk_pack: 0, jumper_pack: 0, thermal_bomb: 0 },
+
+        // R6-R12 持续压力段：引入 blitz（教学极速和跳跃的应对）
+        { phalanx: 40, blitz: 40, berserk_pack: 0, jumper_pack: 20, thermal_bomb: 0 },
+
+        // R13-R19 群体控制段：引入 berserk_pack（教学冰霜降温控制）
+        { phalanx: 20, blitz: 30, berserk_pack: 30, jumper_pack: 20, thermal_bomb: 0 },
+
+        // R20-R26 机制复合段：引入 thermal_bomb（教学紧急降温）
+        { phalanx: 15, blitz: 25, berserk_pack: 25, jumper_pack: 20, thermal_bomb: 15 },
+
+        // R27-R33 进阶测试段：强化 berserk 和 thermal_bomb
+        { phalanx: 10, blitz: 20, berserk_pack: 30, jumper_pack: 15, thermal_bomb: 25 },
+
+        // R34-R40 速度地狱段：极速为主， thermal_bomb 开始高频出现
+        { phalanx: 5, blitz: 35, berserk_pack: 20, jumper_pack: 20, thermal_bomb: 20 },
+
+        // R41-R47 混沌段： thermal_bomb 最高频，考验玩家全面应对能力
+        { phalanx: 5, blitz: 20, berserk_pack: 20, jumper_pack: 15, thermal_bomb: 40 },
+
+        // R48-R54 终极考验段：全模板高压，均衡分布
+        { phalanx: 10, blitz: 20, berserk_pack: 25, jumper_pack: 15, thermal_bomb: 30 }
+
+    ],
+
     
 
     // 每个段落内各词缀的权重值（0-100）

@@ -158,138 +158,25 @@ function rotateTowards(currentAngle, targetAngle, maxStep) {
     }
 
 }
-// ==================== 曲线插值与加权随机工具 ====================
-
 /**
- * 根据当前回合数返回对应的主题段落配置对象
+ * 根据当前回合数，从 ENEMY_CURVE_CONFIG.THEME_SEGMENTS 中查找对应的段落索引。
+ * 若回合数超出所有段落范围，则返回最后一个段落的索引。
+ *
  * @param {number} round - 当前回合数
- * @param {Object} curveConfig - ENEMY_CURVE_CONFIG 配置对象
- * @returns {Object} 包含 startRound, endRound, label, bossId 的段落对象
+ * @param {object} enemyCurveConfig - ENEMY_CURVE_CONFIG 配置对象
+ * @returns {number} 段落索引（0-based），对应 THEME_SEGMENTS 和 AFFIX_WEIGHT_CURVES 的下标
  */
-function getThemeSegment(round, curveConfig) {
-    const segments = curveConfig.THEME_SEGMENTS;
-    // 寻找包含当前回合的段落
+function getThemeSegment(round, enemyCurveConfig) {
+    const segments = enemyCurveConfig && enemyCurveConfig.THEME_SEGMENTS;
+    if (!segments || segments.length === 0) return 0;
     for (let i = 0; i < segments.length; i++) {
-        if (round >= segments[i].startRound && round <= segments[i].endRound) {
-            return segments[i];
+        const seg = segments[i];
+        if (round >= seg.startRound && round <= seg.endRound) {
+            return i;
         }
     }
-    // 如果超出最大回合，返回最后一个段落
-    return segments[segments.length - 1];
-}
-
-/**
- * 在相邻段落之间做线性插值，返回当前回合的各词缀权重 Map
- * @param {number} round - 当前回合数
- * @param {Object} curveConfig - ENEMY_CURVE_CONFIG 配置对象
- * @returns {Object} {affix: weight} 形式的权重对象
- */
-function interpolateAffixWeights(round, curveConfig) {
-    const segments = curveConfig.THEME_SEGMENTS;
-    const curves = curveConfig.AFFIX_WEIGHT_CURVES;
-    
-    // 寻找当前段落索引
-    let currentIndex = 0;
-    for (let i = 0; i < segments.length; i++) {
-        if (round >= segments[i].startRound && round <= segments[i].endRound) {
-            currentIndex = i;
-            break;
-        }
-        if (round > segments[i].endRound) {
-            currentIndex = i; // 记录最后一个经过的段落
-        }
-    }
-    
-    // 如果是最后一个段落或超出，直接返回该段落的权重
-    if (currentIndex >= segments.length - 1 || round >= segments[segments.length - 1].startRound) {
-        return { ...curves[segments.length - 1] };
-    }
-    
-    const currentSegment = segments[currentIndex];
-    const nextSegment = segments[currentIndex + 1];
-    
-    // 计算插值进度 t (0 到 1)
-    // 假设当前段落的中心点为权重峰值，下一个段落的中心点为下一个峰值
-    const currentCenter = (currentSegment.startRound + currentSegment.endRound) / 2;
-    const nextCenter = (nextSegment.startRound + nextSegment.endRound) / 2;
-    
-    let t = 0;
-    if (round <= currentCenter) {
-        // 在当前段落前半段，使用上一个段落到当前段落的插值
-        if (currentIndex === 0) {
-            t = 0; // 第一个段落前半段不插值
-        } else {
-            const prevSegment = segments[currentIndex - 1];
-            const prevCenter = (prevSegment.startRound + prevSegment.endRound) / 2;
-            t = (round - prevCenter) / (currentCenter - prevCenter);
-            t = Math.max(0, Math.min(1, t));
-            
-            const prevWeights = curves[currentIndex - 1];
-            const currentWeights = curves[currentIndex];
-            const result = {};
-            for (const key in currentWeights) {
-                result[key] = lerp(prevWeights[key] || 0, currentWeights[key] || 0, t);
-            }
-            return result;
-        }
-    } else {
-        // 在当前段落后半段，使用当前段落到下一个段落的插值
-        t = (round - currentCenter) / (nextCenter - currentCenter);
-        t = Math.max(0, Math.min(1, t));
-    }
-    
-    const currentWeights = curves[currentIndex];
-    const nextWeights = curves[currentIndex + 1];
-    const result = {};
-    
-    for (const key in currentWeights) {
-        result[key] = lerp(currentWeights[key] || 0, nextWeights[key] || 0, t);
-    }
-    
-    return result;
-}
-
-/**
- * 接受一个 {key: weight} 对象，按权重随机返回一个 key
- * @param {Object} weightMap - 权重对象，例如 { shield: 80, regen: 30 }
- * @returns {string|null} 随机选中的 key，如果权重总和为 0 则返回 null
- */
-function weightedRandom(weightMap) {
-    let totalWeight = 0;
-    for (const key in weightMap) {
-        totalWeight += weightMap[key];
-    }
-    
-    if (totalWeight <= 0) return null;
-    
-    let randomValue = Math.random() * totalWeight;
-    for (const key in weightMap) {
-        randomValue -= weightMap[key];
-        if (randomValue <= 0) {
-            return key;
-        }
-    }
-    
-    // 兜底返回最后一个 key
-    const keys = Object.keys(weightMap);
-    return keys.length > 0 ? keys[keys.length - 1] : null;
-}
-
-/**
- * 计算当前回合的双词缀精英出现概率（基础值 + 高压加成）
- * @param {number} round - 当前回合数
- * @param {number} postBossRoundsLeft - Boss 战后剩余的高压回合数
- * @param {Object} curveConfig - ENEMY_CURVE_CONFIG 配置对象
- * @returns {number} 双词缀精英概率 (0 到 1)
- */
-function getEliteDualAffixChance(round, postBossRoundsLeft, curveConfig) {
-    let chance = curveConfig.ELITE_DUAL_AFFIX_BASE || 0.15;
-    
-    if (postBossRoundsLeft > 0) {
-        chance += (curveConfig.ELITE_DUAL_AFFIX_POST_BOSS_BOOST || 0.25);
-    }
-    
-    return Math.min(1, Math.max(0, chance));
+    // 超出范围：返回最后一个段落
+    return segments.length - 1;
 }
 
 // ==================== 导出 ====================
@@ -301,8 +188,5 @@ export {
     Vec2,
     showToast,
     rotateTowards,
-    getThemeSegment,
-    interpolateAffixWeights,
-    weightedRandom,
-    getEliteDualAffixChance
+    getThemeSegment
 };
