@@ -911,10 +911,7 @@ export const game_system = {
             }
         }
 
-        // 1.5 秒后隐藏横幅并进入选珠阶段（选珠完成后再进入研磨阶段）
-        // [BUGFIX] 原来直接调用 phase_startGatheringPhase，导致 marbleQueue 为空，
-        // 点击钉盘无法发球。正确流程：banner -> sys_initSelectionPhase（选珠）
-        // -> ui_confirmSelection -> phase_startGatheringPhase
+        // 1.5 秒后隐藏横幅并进入研磨阶段
         setTimeout(() => {
             if (banner) {
                 banner.classList.remove('round-banner-show', 'round-banner-glow');
@@ -923,7 +920,7 @@ export const game_system = {
             if (leftSidebar) {
                 leftSidebar.classList.remove('ammo-panel-charging', 'ammo-panel-charging-simple');
             }
-            this.sys_initSelectionPhase();
+            this.phase_startGatheringPhase();
         }, 1500);
     },
 
