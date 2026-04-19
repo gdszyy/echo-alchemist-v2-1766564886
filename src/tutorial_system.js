@@ -63,7 +63,7 @@ const TUTORIAL_STEPS = [
         actionFn: null,
     },
     // ── 第 1 步：开始游戏按鈕 ─────────────────────────────────────────────────────
-    // 高亮「開始練成」按鈕，卡片提示玩家直接点击即可，教程等待事件自动前进
+    // 高亮「開始練成」按鈕，卡片固定在屏幕底部，不遮挡按钮，教程等待事件自动前进
     {
         id: 'start_run',
         phase: 'meta',
@@ -73,9 +73,9 @@ const TUTORIAL_STEPS = [
         content: `
             <p>点击高亮的「<strong>開始練成</strong>」按鈕，开始新的一局冒险。</p>
             <p class="mt-2">每一局都是独立的旅程，你需要收集弹珠、击败敌人。</p>
-            <p class="mt-2 text-amber-300/80 text-xs">↑ 直接点击上方按鈕，教程自动继续</p>
+            <p class="mt-2 text-amber-300/80 text-xs">↑ 直接点击上方高亮按鈕，教程自动继续</p>
         `,
-        position: 'top',
+        position: 'bottom-fixed',
         noOverlay: false,
         waitForEvent: 'tutorial:relic_shown',
         waitForEventFilter: null,
