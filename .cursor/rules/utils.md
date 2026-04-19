@@ -30,6 +30,10 @@ globs: ["src/utils/**/*", "src/calc_utils.js", "src/event_bus.js"]
 | `hexToRgba` | `(hex, alpha) => string` | 十六进制颜色转 `rgba()` 字符串 |
 | `rotateTowards` | `(currentAngle, targetAngle, maxStep) => number` | 平滑旋转（处理 -π 到 π 突变，走最近弧线） |
 | `showToast` | `(msg) => void` | 显示 1500ms 短暂提示（操作 `#toast` DOM 元素，内部防重复定时器） |
+| `getThemeSegment` | `(round, curveConfig) => Object` | 根据当前回合数返回对应的主题段落配置对象 |
+| `interpolateAffixWeights` | `(round, curveConfig) => Object` | 在相邻段落之间做线性插值，返回当前回合的各词缀权重 Map |
+| `weightedRandom` | `(weightMap) => string\|null` | 接受一个 `{key: weight}` 对象，按权重随机返回一个 key |
+| `getEliteDualAffixChance` | `(round, postBossRoundsLeft, curveConfig) => number` | 计算当前回合的双词缀精英出现概率（基础值 + 高压加成） |
 
 ### 2.2 Vec2 方法速查
 
