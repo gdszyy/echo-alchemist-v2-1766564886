@@ -1,9 +1,9 @@
 # src/game_phase.js 函数索引
 
-> 自动生成于 2026-04-19 | 总行数: 2461 | 函数数: 16 | 语言: javascript
+> 自动生成于 2026-04-19 | 总行数: 2468 | 函数数: 16 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 4 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -18,13 +18,13 @@
 | phase_enemy_processTurn | method | L768 | L885 | 118 | `phase_enemy_processTurn(e)` |
 | phase_claimPendingRunes | method | L886 | L937 | 52 | `phase_claimPendingRunes()` |
 | phase_enemy_startLogic | method | L938 | L976 | 39 | `phase_enemy_startLogic()` |
-| phase_finalizeRound | method | L977 | L1171 | 195 | `phase_finalizeRound()` |
-| smartScientific | method | L1172 | L1206 | 35 | `smartScientific(num, fractionDigits = 2)` |
-| phase_combat_update | method | L1207 | L1926 | **720** | `phase_combat_update(timeScale)` |
-| phase_gathering_attemptComplete | method | L1927 | L1992 | 66 | `phase_gathering_attemptComplete()` |
-| phase_gathering_update | method | L1993 | L2389 | **397** | `phase_gathering_update(timeScale = 1)` |
-| _updateDropDistribution | method | L2390 | L2418 | 29 | `_updateDropDistribution(entryX)` |
-| _drawDropHeatmap | method | L2419 | L2462 | 44 | `_drawDropHeatmap(ctx)` |
+| phase_finalizeRound | method | L977 | L1178 | **202** | `phase_finalizeRound()` |
+| smartScientific | method | L1179 | L1213 | 35 | `smartScientific(num, fractionDigits = 2)` |
+| phase_combat_update | method | L1214 | L1933 | **720** | `phase_combat_update(timeScale)` |
+| phase_gathering_attemptComplete | method | L1934 | L1999 | 66 | `phase_gathering_attemptComplete()` |
+| phase_gathering_update | method | L2000 | L2396 | **397** | `phase_gathering_update(timeScale = 1)` |
+| _updateDropDistribution | method | L2397 | L2425 | 29 | `_updateDropDistribution(entryX)` |
+| _drawDropHeatmap | method | L2426 | L2469 | 44 | `_drawDropHeatmap(ctx)` |
 
 ## 巨型函数内部节点 (@section 标记)
 
@@ -37,28 +37,32 @@
 | `@section:pachinko_special_pegs` | L403 | 特殊钉子生成（布局角色分配） |
 | `@section:pachinko_ui_init` | L504 | 弹珠台 UI 初始化与事件绑定 |
 
-### phase_combat_update (L1207-L1926, 720行)
+### phase_finalizeRound (L977-L1178, 202行)
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
+
+### phase_combat_update (L1214-L1933, 720行)
 
 | 节点标记 | 行号 | 说明 |
 |----------|------|------|
-| `@section:combat_update_entities` | L1286 | 实体批量更新（敌人/子弹/特效） |
-| `@section:combat_update_collision` | L1457 | 碰撞检测与伤害结算调度 |
-| `@section:combat_update_wave_logic` | L1608 | 波次推进与 Boss 生成判断 |
-| `@section:combat_update_ui_sync` | L1759 | 战斗 HUD 同步更新 |
-| `@section:combat_update_phase_end` | L1860 | 战斗结束条件检查与阶段切换 |
+| `@section:combat_update_entities` | L1293 | 实体批量更新（敌人/子弹/特效） |
+| `@section:combat_update_collision` | L1464 | 碰撞检测与伤害结算调度 |
+| `@section:combat_update_wave_logic` | L1615 | 波次推进与 Boss 生成判断 |
+| `@section:combat_update_ui_sync` | L1766 | 战斗 HUD 同步更新 |
+| `@section:combat_update_phase_end` | L1867 | 战斗结束条件检查与阶段切换 |
 
-### phase_gathering_update (L1993-L2389, 397行)
+### phase_gathering_update (L2000-L2396, 397行)
 
 | 节点标记 | 行号 | 说明 |
 |----------|------|------|
-| `@section:gathering_update_slots` | L2092 | 槽位触发检测与属性收集 |
-| `@section:gathering_update_complete` | L2193 | 收集完成判断与结算触发 |
-| `@section:gathering_update_ui` | L2294 | 收集阶段 HUD 实时更新 |
+| `@section:gathering_update_slots` | L2099 | 槽位触发检测与属性收集 |
+| `@section:gathering_update_complete` | L2200 | 收集完成判断与结算触发 |
+| `@section:gathering_update_ui` | L2301 | 收集阶段 HUD 实时更新 |
 
 ## 其他 @section 标记
 
 | 节点标记 | 行号 | 说明 |
 |----------|------|------|
 | `@section:pachinko_board_layout` | L118 | 弹珠台布局计算与钉子生成 |
-| `@section:combat_update_timescale` | L1206 | 时间缩放与暂停状态检查 |
-| `@section:gathering_update_balls` | L1992 | 弹珠物理更新与碰撞处理 |
+| `@section:combat_update_timescale` | L1213 | 时间缩放与暂停状态检查 |
+| `@section:gathering_update_balls` | L1999 | 弹珠物理更新与碰撞处理 |

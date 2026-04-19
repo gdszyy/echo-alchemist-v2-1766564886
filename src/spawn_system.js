@@ -103,8 +103,9 @@ export const spawn_system = {
         const chance1 = Math.min(0.6, 0.05 + r * 0.025); // [难度调低] 初始概率 0.1 -> 0.05，前三关词缀触发概率降低约 5%
         const chance2 = r > 10 ? Math.min(0.15, (r - 10) * 0.01) : 0;
         
-        // [难度平衡] Boss 战后，双词缀精英怪概率临时提升 25%
-        const postBossBonus = (this.postBossMultiplier && this.postBossMultiplier > 1.0) ? 0.25 : 0;
+        // [难度平衡][Task C.2] Boss 战后高压期，双词缀精英概率临时提升 25%
+        // 使用 postBossRoundsLeft 字段（由 BOSS_DEFEATED 事件设置，每回合结算递减）
+        const postBossBonus = (this.postBossRoundsLeft > 0) ? 0.25 : 0;
         // 将 postBossBonus 叠加到 chance2（双词缀概率）
         const effectiveChance2 = Math.min(chance2 + postBossBonus, 0.40);
 

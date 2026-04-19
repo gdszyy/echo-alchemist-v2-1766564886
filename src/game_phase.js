@@ -1093,6 +1093,13 @@ phase_gathering_getRandomPegType() {
                 console.log('[DifficultyBalance] 战后高压因子已恢复正常');
             }
         }
+        // [Task C.2] 战后高压期：双词缀精英概率提升计数器递减
+        if (this.postBossRoundsLeft > 0) {
+            this.postBossRoundsLeft--;
+            if (this.postBossRoundsLeft === 0) {
+                console.log('[DifficultyBalance] 战后高压期结束，双词缀精英概率恢复正常');
+            }
+        }
 
         // [新增] 遗物效果递减：同化涌潮系列
         if (this.assimilationBoostRounds && typeof this.assimilationBoostRounds === 'object') {

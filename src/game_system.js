@@ -363,6 +363,8 @@ export const game_system = {
         // [难度平衡] 重置战后高压因子
         this.postBossMultiplier = 1.0;
         this.postBossSurgeRoundsLeft = 0;
+        // [Task C.2] 重置战后高压期双词缀精英概率提升计数器
+        this.postBossRoundsLeft = 0;
         // [清屏奖励] 重置清屏标志位
         this._prevRoundCleared = false;
         
@@ -1517,6 +1519,7 @@ export const game_system = {
                 // 难度
                 postBossMultiplier: this.postBossMultiplier || 1.0,
                 postBossSurgeRoundsLeft: this.postBossSurgeRoundsLeft || 0,
+                postBossRoundsLeft: this.postBossRoundsLeft || 0,
                 nextRoundHpMultiplier: this.nextRoundHpMultiplier || 1,
                 difficultyGrowthFactor: this.difficultyGrowthFactor || 1.0,
                 variantLevels: { ...(this.variantLevels || {}) },
@@ -1629,6 +1632,7 @@ export const game_system = {
             // --- 恢复难度 ---
             this.postBossMultiplier = state.postBossMultiplier || 1.0;
             this.postBossSurgeRoundsLeft = state.postBossSurgeRoundsLeft || 0;
+            this.postBossRoundsLeft = state.postBossRoundsLeft || 0;
             this.nextRoundHpMultiplier = state.nextRoundHpMultiplier || 1;
             this.difficultyGrowthFactor = state.difficultyGrowthFactor || 1.0;
             this.variantLevels = { ...(state.variantLevels || { flying_sword: 1 }) };

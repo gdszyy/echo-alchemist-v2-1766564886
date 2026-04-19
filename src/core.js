@@ -363,7 +363,9 @@ class Game {
         this.eventBus.on('boss:defeated', (data) => {
             this.postBossMultiplier = 1.3;
             this.postBossSurgeRoundsLeft = 3;
-            console.log('[DifficultyBalance] Boss击杀，战后高压因子激活: x1.3，持续3回合');
+            // [Task C.2] 战后高压期：3 回合内双词缀精英概率临时提升 25%
+            this.postBossRoundsLeft = 3;
+            console.log('[DifficultyBalance] Boss击杀，战后高压因子激活: x1.3，持续3回合，双词缀精英概率提升25%');
             // [本局统计] 记录 Boss 击败日志
             if (!this.bossDefeatedLog) this.bossDefeatedLog = [];
             this.bossDefeatedLog.push({

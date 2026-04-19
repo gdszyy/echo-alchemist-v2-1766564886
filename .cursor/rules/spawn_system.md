@@ -2,6 +2,7 @@
 
 > **数据来源**：`src/spawn_system.js` → `spawn_spawnEnemyRowAt()`
 > **用途**：记录导演系统（The Director）所有阵型模板的设计意图、触发条件和实现细节。
+> **最后更新**：Task C.2（战后高压因子联动：BOSS_DEFEATED 事件 → postBossRoundsLeft → 双词缀精英概率提升）
 
 ## 1. 导演系统概述
 
@@ -105,3 +106,80 @@ const addPreset = (col, hpMult, forceAffixes) => {
 - 阵型实例化逻辑必须在 `if-else` 链末尾追加，不得修改现有阵型逻辑
 - 修改后必须运行 `code-indexer` 单文件更新索引
 - 必须在本文档中同步更新阵型说明
+
+## 6. 战后高压因子联动机制（Task C.2）
+
+### 6.1 机制概述
+
+Boss 被击杀后，游戏进入**战后高压期**，持续 3 个回合。在此期间，`spawn_generateAffixes` 中双词缀精英怪的出现概率临时提升 **25%**，增加战斗压力，形成 Boss 击杀后的紧张感。
+
+### 6.2 数据流
+
+```
+BOSS_DEFEATED 事件触发
+    ↓
+core.js: _setupEventListeners()
+    this.postBossRoundsLeft = 3
+    ↓
+每回合结算: game_phase.js: phase_finalizeRound()
+    if (this.postBossRoundsLeft > 0) this.postBossRoundsLeft--
+    ↓
+敌人生成: spawn_system.js: spawn_generateAffixes()
+    const postBossBonus = (this.postBossRoundsLeft > 0) ? 0.25 : 0;
+    const effectiveChance2 = Math.min(chance2 + postBossBonus, 0.40);
+```
+
+### 6.3 关键字段
+
+| 字段 | 类型 | 初始值 | 说明 |
+|------|------|--------|------|
+| `this.postBossRoundsLeft` | `number` | `0` | 战后高压期剩余回合数，Boss 击杀时设为 3，每回合结算递减 |
+
+### 6.4 相关代码位置
+
+| 操作 | 文件 | 行号 | 说明 |
+|------|------|------|------|
+| 事件监听 & 字段设置 | `src/core.js` | ~L367 | `boss:defeated` 监听器中设置 `postBossRoundsLeft = 3` |
+| 字段重置 | `src/game_system.js` | ~L367 | `sys_resetGame` 中重置为 0 |
+| 存档/读档 | `src/game_system.js` | ~L1522, ~L1635 | `sys_saveRunState` / `sys_loadRunState` 中序列化 |
+| 回合递减 | `src/game_phase.js` | ~L1097 | `phase_finalizeRound` 末尾递减 |
+| 概率应用 | `src/spawn_system.js` | ~L108 | `spawn_generateAffixes` 中叠加到双词缀概率 |
+
+### 6.5 与现有 postBossMultiplier 的关系
+
+`postBossMultiplier`（`postBossSurgeRoundsLeft`）是另一套战后高压机制，控制敌人 HP 倍率（x1.3，每回合衰减 0.1）。`postBossRoundsLeft` 是专门控制**双词缀精英概率**的独立计数器，两者并行运作，互不干扰。
+
+| 字段 | 控制目标 | 初始值 | 衰减方式 |
+|------|---------|--------|---------|
+| `postBossMultiplier` | 敌人 HP 倍率 | 1.3 | 每回合 -0.1，归零后恢复 1.0 |
+| `postBossSurgeRoundsLeft` | HP 倍率持续回合数 | 3 | 每回合 -1 |
+| `postBossRoundsLeft` | 双词缀精英概率提升 | 3 | 每回合 -1，归零后概率恢复正常 |
+
+## 7. spawn_generateAffixes 词缀生成规则
+
+### 7.1 数量概率
+
+| 词缀数 | 基础概率 | 战后高压加成 |
+|--------|---------|------------|
+| 0 个 | 默认（1 - chance1 - chance2） | 无 |
+| 1 个 | `min(0.6, 0.05 + round * 0.025)` | 无 |
+| 2 个 | `r > 10 ? min(0.15, (r-10)*0.01) : 0` | `+0.25`（上限 0.40） |
+
+### 7.2 词缀权重池
+
+| 词缀 | 解锁回合 | 权重规则 |
+|------|---------|---------|
+| `shield` | r >= 3 | r < 8: 100, r >= 8: 50 |
+| `regen` | r >= 5 | r < 12: 80, r >= 12: 40 |
+| `healer` | r >= 6 | 稳定 60 |
+| `haste` | r >= 8 | r < 15: 70, r >= 15: 50 |
+| `jump` | r >= 9 | 稳定 60 |
+| `clone` | r >= 12 | 稳定 50 |
+| `devour` | r >= 12 | 稳定 40 |
+| `berserk` | r >= 14 | `r * 3`（无上限，后期极危险） |
+
+## 8. 禁止行为
+
+- **严禁**在 `spawn_system.js` 中直接操作 DOM，所有 UI 更新必须通过 `eventBus.emit` 派发事件
+- **严禁**全量读取 `spawn_system.js`（2036+ 行），必须通过 `auto_index` 精准定位后按需读取
+- **严禁**在 `spawn_generateAffixes` 中直接修改 `this.postBossRoundsLeft`，该字段由 `phase_finalizeRound` 统一递减
