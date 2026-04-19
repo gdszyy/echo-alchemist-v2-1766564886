@@ -547,6 +547,8 @@ ui_closeTruthBook() {
             el.style.display = 'none'; 
             el.classList.add('hidden-phase'); 
             el.classList.remove('active-phase'); 
+            // [BUGFIX] 隐藏阶段强制关闭 pointer-events，防止透明层遮挡 Canvas
+            el.style.pointerEvents = 'none';
         });
         // 2. 显示当前阶段的主容器
         // [META] 兼容 phase-meta, shop, truth_book
@@ -554,6 +556,12 @@ ui_closeTruthBook() {
         if(activeEl) { 
             // gameover 阶段需要滚动，使用 block 布局
             activeEl.style.display = (this.phase === 'gameover') ? 'block' : 'flex';  // [Mixin 正常用法]
+            // [BUGFIX] 激活阶段恢复 pointer-events (如果 HTML 中未显式设置 pointer-events: auto，则此处恢复默认)
+            // 注意：.ui-overlay 默认是 pointer-events: none，子元素通过 pointer-events: auto 交互
+            // 但某些全屏阶段（如 meta, shop）需要整体接收事件
+            const needsAuto = ['meta', 'shop', 'truth_book', 'gameover', 'relic', 'pause'].includes(this.phase);
+            activeEl.style.pointerEvents = needsAuto ? 'auto' : 'none';
+
             // 微小延迟以触发 CSS transition (如果有)
             setTimeout(() => { 
                 activeEl.classList.remove('hidden-phase'); 
