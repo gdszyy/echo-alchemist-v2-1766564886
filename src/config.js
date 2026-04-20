@@ -907,64 +907,94 @@ const CONFIG = {
 
         // ===== 奖励标记敌人专属光晕参数 (Pending Reward Halo) =====
         // 适用于 _pendingRewardType 不为空的敌人，在 idle 状态下显示专属光晕
+        // 设计原则：借鉴精英晶化变异的视觉语言，三种类型必须一眼可辨
 
-        // --- 遗物（relic）：金色光晕 + 宝箱图标浮动 ---
+        // --- 遗物（relic）：「宝藏封印」风格 ---
+        // 借用精英 E2 虚空晶核（金色版）+ E4 流光金边 + 双层脉冲环
         // 金色光晕：外圈 shadowBlur 最大值（像素）
-        relicHaloBlurMax: 22,
+        relicHaloBlurMax: 28,
         // 金色光晕：脉冲周期（毫秒）
         relicHaloPeriod: 1600,
         // 金色光晕：外圈描边颜色
         relicHaloColor: '#facc15',
         // 金色光晕：外圈描边最大透明度
-        relicHaloStrokeAlpha: 0.85,
-        // 宝箱图标：浮动幅度（像素）
+        relicHaloStrokeAlpha: 0.9,
+        // 金色内圈光晕颜色（琥珀色）
+        relicHaloColorInner: '#f59e0b',
+        // 内圈光晕 shadowBlur 最大值（像素）
+        relicHaloInnerBlurMax: 16,
+        // 王冠图标：浮动幅度（像素）
         relicIconFloatAmplitude: 5,
-        // 宝箱图标：浮动周期（毫秒）
+        // 王冠图标：浮动周期（毫秒）
         relicIconFloatPeriod: 1800,
-        // 宝箱图标：图标字体大小（像素）
+        // 王冠图标：图标字体大小（像素）
         relicIconFontSize: 18,
-        // 宝箱图标：图标距敌人顶部的偏移（像素，负值为向上）
+        // 王冠图标：图标距敌人顶部的偏移（像素，负值为向上）
         relicIconOffsetY: -14,
+        // 金色晶核：旋转速度（弧度/秒）
+        relicCoreRotateSpeed: 0.6,
+        // 金色晶核：半径（相对于 min(w,h) 的比例）
+        relicCoreRadiusRatio: 0.20,
+        // 流光金边：高光点移动速度（0~1 循环/秒）
+        relicBorderFlowSpeed: 0.55,
+        // 流光金边：高光点宽度（0~1，相对于边框总周长）
+        relicBorderFlowWidth: 0.20,
 
-        // --- 混沌精华（chaos_essence）：混沌紫/红渐变光晕 + 旋转粒子 ---
+        // --- 混沌精华（chaos_essence）：「混沌侵蚀」风格 ---
+        // 借用精英 E1 晶化切面（紫/红混沌版）+ 快速旋转混沌晶核 + 六芒星符文
         // 混沌光晕：外圈 shadowBlur 最大值（像素）
-        chaosHaloBlurMax: 20,
-        // 混沌光晕：脉冲周期（毫秒）
-        chaosHaloPeriod: 1200,
+        chaosHaloBlurMax: 24,
+        // 混沌光晕：脉冲周期（毫秒，更快=更不稳定）
+        chaosHaloPeriod: 900,
         // 混沌光晕：内圈颜色（紫色）
         chaosHaloColorInner: '#a855f7',
         // 混沌光晕：外圈颜色（红色）
         chaosHaloColorOuter: '#ef4444',
         // 混沌光晕：外圈描边最大透明度
-        chaosHaloStrokeAlpha: 0.75,
+        chaosHaloStrokeAlpha: 0.80,
         // 旋转符文粒子：数量（high 档）
         chaosRuneCount: 4,
         // 旋转符文粒子：轨道半径（相对于敌人宽度的倍率）
-        chaosRuneOrbitRadius: 0.75,
-        // 旋转符文粒子：旋转速度（弧度/毫秒）
-        chaosRuneRotateSpeed: 0.0015,
+        chaosRuneOrbitRadius: 0.78,
+        // 旋转符文粒子：旋转速度（弧度/毫秒，更快=更混沌）
+        chaosRuneRotateSpeed: 0.0025,
         // 旋转符文粒子：字体大小（像素）
-        chaosRuneFontSize: 11,
+        chaosRuneFontSize: 12,
+        // 混沌晶核：旋转速度（弧度/秒，快速旋转体现混沌）
+        chaosCoreRotateSpeed: 2.2,
+        // 混沌晶核：半径（相对于 min(w,h) 的比例）
+        chaosCoreRadiusRatio: 0.18,
+        // 混沌切面：叠加层最大透明度（E1 同款，紫/红色系）
+        chaosCrystalFacetAlpha: 0.14,
 
-        // --- 纯净精华（pure_essence）：纯白/蓝白晶化光晕 ---
+        // --- 纯净精华（pure_essence）：「晶化净化」风格 ---
+        // 借用精英 E2 虚空晶核（冰晶版）+ E3 过曝叠加 + 六角雪花旋转
         // 纯净光晕：外圈 shadowBlur 最大值（像素）
-        pureHaloBlurMax: 18,
-        // 纯净光晕：脉冲周期（毫秒）
-        pureHaloPeriod: 2000,
+        pureHaloBlurMax: 22,
+        // 纯净光晕：脉冲周期（毫秒，缓慢=纯净稳定）
+        pureHaloPeriod: 2200,
         // 纯净光晕：内圈颜色（纯白）
         pureHaloColorInner: '#ffffff',
-        // 纯净光晕：外圈颜色（蓝白）
+        // 纯净光晕：外圈颜色（冰蓝）
         pureHaloColorOuter: '#bfdbfe',
         // 纯净光晕：外圈描边最大透明度
-        pureHaloStrokeAlpha: 0.80,
+        pureHaloStrokeAlpha: 0.85,
         // 晶化光效：晶体数量（high 档）
         pureCrystalCount: 5,
         // 晶化光效：晶体轨道半径（相对于敌人宽度的倍率）
-        pureCrystalOrbitRadius: 0.70,
+        pureCrystalOrbitRadius: 0.72,
         // 晶化光效：旋转速度（弧度/毫秒，负值反向旋转）
-        pureCrystalRotateSpeed: -0.0008,
+        pureCrystalRotateSpeed: -0.0007,
         // 晶化光效：晶体大小（像素）
-        pureCrystalSize: 4
+        pureCrystalSize: 5,
+        // 冰晶核心：旋转速度（弧度/秒，缓慢旋转体现纯净）
+        pureCoreRotateSpeed: 0.4,
+        // 冰晶核心：半径（相对于 min(w,h) 的比例）
+        pureCoreRadiusRatio: 0.22,
+        // 冰晶切面：叠加层最大透明度（E1 同款，白/蓝冰晶色系）
+        pureCrystalFacetAlpha: 0.10,
+        // 纯净过曝叠加：lighter 模式白色过曝最大透明度（E3 同款）
+        pureCoreOverglowAlpha: 0.30
     },
 
     // ==================== 自适应性能配置 (Adaptive Performance) ====================

@@ -2605,51 +2605,212 @@ class Enemy {
                 const _now = Date.now();
 
                 if (this._pendingRewardType === 'relic') {
-                    // --- 遗物（relic）：金色光晕 + 宝箱图标浮动 ---
+                    // --- 遗物（relic）：「宝藏封印」风格 ---
+                    // 借用精英 E2 虚空晶核（金色版）+ E4 流光金边 + 双层脉冲环
                     const _relicPhase = (_now / _rc.relicHaloPeriod + this.visualSeed * 0.5) * Math.PI * 2;
                     const _relicIntensity = (Math.sin(_relicPhase) + 1) * 0.5;
+                    const _relicT = _now / 1000;
                     ctx.save();
                     ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+
+                    // --- R1: 外圈金色脉冲光晕（双层描边）---
                     ctx.shadowColor = _rc.relicHaloColor;
                     ctx.shadowBlur = _relicIntensity * _rc.relicHaloBlurMax;
                     ctx.strokeStyle = `rgba(250, 204, 21, ${_relicIntensity * _rc.relicHaloStrokeAlpha})`;
-                    ctx.lineWidth = 2;
-                    // 光晕轮廓跟随敌人形状
+                    ctx.lineWidth = 2.5;
                     if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
                         const _verts = this.collisionData.vertices;
                         ctx.beginPath();
-                        ctx.moveTo(_verts[0].x * 1.12, _verts[0].y * 1.12);
-                        for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.12, _verts[_i].y * 1.12);
+                        ctx.moveTo(_verts[0].x * 1.14, _verts[0].y * 1.14);
+                        for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.14, _verts[_i].y * 1.14);
                         ctx.closePath();
                         ctx.stroke();
                     } else {
                         ctx.beginPath();
-                        ctx.roundRect(-w/2 - 7, -h/2 - 7, w + 14, h + 14, r + 4);
+                        ctx.roundRect(-w/2 - 9, -h/2 - 9, w + 18, h + 18, r + 5);
                         ctx.stroke();
                     }
+                    // 内圈琥珀色描边（偏移一层，体现双层封印）
+                    ctx.shadowColor = _rc.relicHaloColorInner;
+                    ctx.shadowBlur = _relicIntensity * _rc.relicHaloInnerBlurMax;
+                    ctx.strokeStyle = `rgba(245, 158, 11, ${_relicIntensity * _rc.relicHaloStrokeAlpha * 0.7})`;
+                    ctx.lineWidth = 1.5;
+                    if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+                        const _verts = this.collisionData.vertices;
+                        ctx.beginPath();
+                        ctx.moveTo(_verts[0].x * 1.07, _verts[0].y * 1.07);
+                        for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.07, _verts[_i].y * 1.07);
+                        ctx.closePath();
+                        ctx.stroke();
+                    } else {
+                        ctx.beginPath();
+                        ctx.roundRect(-w/2 - 4, -h/2 - 4, w + 8, h + 8, r + 2);
+                        ctx.stroke();
+                    }
+
+                    // --- R2: 金色旋转晶核（借用精英 E2 虚空晶核，金色版）---
+                    const _relicCoreR = Math.min(w, h) * _rc.relicCoreRadiusRatio;
+                    const _relicCoreAngle = _relicT * _rc.relicCoreRotateSpeed + this.visualSeed * Math.PI;
+                    ctx.save();
+                    ctx.rotate(_relicCoreAngle);
+                    const _relicCoreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, _relicCoreR);
+                    _relicCoreGrad.addColorStop(0, `rgba(255, 251, 180, ${0.95 * (0.6 + _relicIntensity * 0.4)})`);
+                    _relicCoreGrad.addColorStop(0.5, `rgba(250, 204, 21, ${0.7 * (0.5 + _relicIntensity * 0.5)})`);
+                    _relicCoreGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+                    ctx.fillStyle = _relicCoreGrad;
+                    ctx.shadowColor = '#facc15';
+                    ctx.shadowBlur = 10 + _relicIntensity * 8;
+                    // 菱形晶核路径（与精英 E2 一致）
+                    ctx.beginPath();
+                    ctx.moveTo(0, -_relicCoreR);
+                    ctx.lineTo(_relicCoreR * 0.55, 0);
+                    ctx.lineTo(0, _relicCoreR);
+                    ctx.lineTo(-_relicCoreR * 0.55, 0);
+                    ctx.closePath();
+                    ctx.fill();
+                    // 晶核描边（亮金色）
+                    ctx.strokeStyle = `rgba(255, 255, 200, ${0.6 + _relicIntensity * 0.35})`;
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
                     ctx.restore();
-                    // 宝箱图标浮动
+
+                    // --- R3: 晶核过曝叠加（lighter 模式，金色能量溢出）---
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const _relicOverglowR = _relicCoreR * 1.8;
+                    const _relicOverglowGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, _relicOverglowR);
+                    _relicOverglowGrad.addColorStop(0, `rgba(250, 204, 21, ${0.35 * _relicIntensity})`);
+                    _relicOverglowGrad.addColorStop(1, 'rgba(250, 204, 21, 0)');
+                    ctx.fillStyle = _relicOverglowGrad;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, _relicOverglowR, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+
+                    // --- R4: 流光金边（借用精英 E4，高光点沿边框流动）---
+                    const _relicPerimeter = 2 * (w + h);
+                    const _relicFlowPos = ((_relicT * _rc.relicBorderFlowSpeed) % 1) * _relicPerimeter;
+                    const _relicFlowHalfW = _relicPerimeter * _rc.relicBorderFlowWidth * 0.5;
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const _relicSegments = [
+                        { x1: -w/2, y1: -h/2, x2: w/2, y2: -h/2 },
+                        { x1: w/2,  y1: -h/2, x2: w/2, y2: h/2  },
+                        { x1: w/2,  y1: h/2,  x2: -w/2, y2: h/2 },
+                        { x1: -w/2, y1: h/2,  x2: -w/2, y2: -h/2 }
+                    ];
+                    const _relicSegLens = [w, h, w, h];
+                    let _relicCumLen = 0;
+                    for (let _si = 0; _si < 4; _si++) {
+                        const _seg = _relicSegments[_si];
+                        const _segLen = _relicSegLens[_si];
+                        const _lo = _relicFlowPos - _relicFlowHalfW;
+                        const _hi = _relicFlowPos + _relicFlowHalfW;
+                        if (_hi > _relicCumLen && _lo < _relicCumLen + _segLen) {
+                            const _localLo = Math.max(_lo, _relicCumLen) - _relicCumLen;
+                            const _localHi = Math.min(_hi, _relicCumLen + _segLen) - _relicCumLen;
+                            const _t0 = _localLo / _segLen;
+                            const _t1 = _localHi / _segLen;
+                            const _px0 = _seg.x1 + (_seg.x2 - _seg.x1) * _t0;
+                            const _py0 = _seg.y1 + (_seg.y2 - _seg.y1) * _t0;
+                            const _px1 = _seg.x1 + (_seg.x2 - _seg.x1) * _t1;
+                            const _py1 = _seg.y1 + (_seg.y2 - _seg.y1) * _t1;
+                            const _relicFlowGrad = ctx.createLinearGradient(_px0, _py0, _px1, _py1);
+                            _relicFlowGrad.addColorStop(0, 'rgba(250, 204, 21, 0)');
+                            _relicFlowGrad.addColorStop(0.5, 'rgba(255, 255, 180, 0.9)');
+                            _relicFlowGrad.addColorStop(1, 'rgba(250, 204, 21, 0)');
+                            ctx.strokeStyle = _relicFlowGrad;
+                            ctx.lineWidth = 3.5;
+                            ctx.shadowColor = '#facc15';
+                            ctx.shadowBlur = 10;
+                            ctx.beginPath();
+                            ctx.moveTo(_px0, _py0);
+                            ctx.lineTo(_px1, _py1);
+                            ctx.stroke();
+                        }
+                        _relicCumLen += _segLen;
+                    }
+                    ctx.restore();
+
+                    ctx.restore();
+                    // 王冠图标浮动（替换宝箱，更符合遗物"珍贵宝物"语义）
                     const _relicFloatY = Math.sin((_now / _rc.relicIconFloatPeriod + this.visualSeed) * Math.PI * 2) * _rc.relicIconFloatAmplitude;
                     ctx.save();
                     ctx.font = `${_rc.relicIconFontSize}px sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.shadowColor = _rc.relicHaloColor;
-                    ctx.shadowBlur = 10;
-                    ctx.fillText('🎁', this.pos.x, this.pos.y + this.bumpOffsetY - h/2 + _rc.relicIconOffsetY + _relicFloatY);
+                    ctx.shadowBlur = 12;
+                    ctx.fillText('👑', this.pos.x, this.pos.y + this.bumpOffsetY - h/2 + _rc.relicIconOffsetY + _relicFloatY);
                     ctx.restore();
 
                 } else if (this._pendingRewardType === 'chaos_essence') {
-                    // --- 混沌精华（chaos_essence）：混沌紫/红渐变光晕 + 旋转符文 ---
+                    // --- 混沌精华（chaos_essence）：「混沌侵蚀」风格 ---
+                    // 借用精英 E1 晶化切面（紫/红混沌版）+ 快速旋转混沌晶核 + 六芒星符文
                     const _chaosPhase = (_now / _rc.chaosHaloPeriod + this.visualSeed * 0.8) * Math.PI * 2;
                     const _chaosIntensity = (Math.sin(_chaosPhase) + 1) * 0.5;
+                    const _chaosT = _now / 1000;
                     ctx.save();
                     ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
-                    // 渐变光晕：内圈紫色到外圈红色
+
+                    // --- C1: 混沌晶化切面（借用精英 E1，紫/红混沌色系）---
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
+                    const _chaosFacetAlpha = _rc.chaosCrystalFacetAlpha * (0.7 + _chaosIntensity * 0.3);
+                    const _chaosFacetColors = ['rgba(168, 85, 247, ', 'rgba(239, 68, 68, ', 'rgba(196, 80, 220, '];
+                    for (let _fi = 0; _fi < 3; _fi++) {
+                        const _fSeed = this.visualSeed * 7 + _fi * 2.3;
+                        // 切面随时间缓慢变形（体现混沌不稳定性）
+                        const _fDrift = _chaosT * 0.3 + _fi * 1.1;
+                        const _fx1 = (Math.sin(_fSeed + _fDrift * 0.1) * 0.5) * w;
+                        const _fy1 = (Math.cos(_fSeed * 1.3 + _fDrift * 0.08) * 0.5) * h;
+                        const _fx2 = (Math.sin(_fSeed + 1.2 + _fDrift * 0.07) * 0.5) * w;
+                        const _fy2 = (Math.cos(_fSeed * 0.9 + 0.8 + _fDrift * 0.09) * 0.5) * h;
+                        const _fx3 = (Math.sin(_fSeed + 2.4 + _fDrift * 0.06) * 0.5) * w;
+                        const _fy3 = (Math.cos(_fSeed * 1.1 + 1.6 + _fDrift * 0.11) * 0.5) * h;
+                        ctx.beginPath();
+                        ctx.moveTo(_fx1, _fy1);
+                        ctx.lineTo(_fx2, _fy2);
+                        ctx.lineTo(_fx3, _fy3);
+                        ctx.closePath();
+                        ctx.fillStyle = `${_chaosFacetColors[_fi % _chaosFacetColors.length]}${(_chaosFacetAlpha * (0.6 + _fi * 0.2)).toFixed(3)})`;
+                        ctx.fill();
+                    }
+                    ctx.restore();
+
+                    // --- C2: 混沌晶核（快速旋转，体现混沌不稳定）---
+                    const _chaosCoreR = Math.min(w, h) * _rc.chaosCoreRadiusRatio;
+                    const _chaosCoreAngle = _chaosT * _rc.chaosCoreRotateSpeed + this.visualSeed * Math.PI;
+                    ctx.save();
+                    ctx.rotate(_chaosCoreAngle);
+                    const _chaosCoreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, _chaosCoreR);
+                    _chaosCoreGrad.addColorStop(0, `rgba(255, 200, 255, ${0.9 * (0.5 + _chaosIntensity * 0.5)})`);
+                    _chaosCoreGrad.addColorStop(0.4, `rgba(168, 85, 247, ${0.7 * (0.4 + _chaosIntensity * 0.6)})`);
+                    _chaosCoreGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+                    ctx.fillStyle = _chaosCoreGrad;
+                    ctx.shadowColor = '#a855f7';
+                    ctx.shadowBlur = 8 + _chaosIntensity * 7;
+                    // 不规则多边形晶核（5顶点，体现混沌不规则）
+                    ctx.beginPath();
+                    for (let _pi = 0; _pi < 5; _pi++) {
+                        const _pAngle = (_pi / 5) * Math.PI * 2 - Math.PI / 2;
+                        const _pR = _chaosCoreR * (0.7 + (_pi % 2) * 0.3);
+                        const _px = Math.cos(_pAngle) * _pR;
+                        const _py = Math.sin(_pAngle) * _pR;
+                        if (_pi === 0) ctx.moveTo(_px, _py); else ctx.lineTo(_px, _py);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                    // 晶核描边（紫红交替）
+                    ctx.strokeStyle = `rgba(239, 68, 68, ${0.5 + _chaosIntensity * 0.4})`;
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+                    ctx.restore();
+
+                    // --- C3: 双圈混沌光晕描边 ---
                     ctx.shadowColor = _rc.chaosHaloColorInner;
                     ctx.shadowBlur = _chaosIntensity * _rc.chaosHaloBlurMax;
                     const _chaosAlpha = _chaosIntensity * _rc.chaosHaloStrokeAlpha;
-                    // 内圈紫色描边
                     ctx.strokeStyle = `rgba(168, 85, 247, ${_chaosAlpha})`;
                     ctx.lineWidth = 2;
                     if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
@@ -2664,38 +2825,39 @@ class Enemy {
                         ctx.roundRect(-w/2 - 6, -h/2 - 6, w + 12, h + 12, r + 3);
                         ctx.stroke();
                     }
-                    // 外圈红色描边（偏移一层）
                     ctx.shadowColor = _rc.chaosHaloColorOuter;
-                    ctx.strokeStyle = `rgba(239, 68, 68, ${_chaosAlpha * 0.6})`;
+                    ctx.strokeStyle = `rgba(239, 68, 68, ${_chaosAlpha * 0.65})`;
                     ctx.lineWidth = 1.5;
                     if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
                         const _verts = this.collisionData.vertices;
                         ctx.beginPath();
-                        ctx.moveTo(_verts[0].x * 1.18, _verts[0].y * 1.18);
-                        for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.18, _verts[_i].y * 1.18);
+                        ctx.moveTo(_verts[0].x * 1.19, _verts[0].y * 1.19);
+                        for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.19, _verts[_i].y * 1.19);
                         ctx.closePath();
                         ctx.stroke();
                     } else {
                         ctx.beginPath();
-                        ctx.roundRect(-w/2 - 12, -h/2 - 12, w + 24, h + 24, r + 6);
+                        ctx.roundRect(-w/2 - 13, -h/2 - 13, w + 26, h + 26, r + 7);
                         ctx.stroke();
                     }
-                    // 旋转符文粒子
+
+                    // --- C4: 旋转六芒星符文粒子（替换原有符文，更具魔法感）---
                     const _chaosRuneCount = _perfBudget.rewardRuneCount;
                     if (_chaosRuneCount > 0) {
-                        const _chaosRunes = ['★', '♦', '✠', '✶'];
+                        // 六芒星 ✡ 和混沌符文交替，颜色紫/红交替
+                        const _chaosRunes = ['✡', '✦', '✡', '✦'];
                         const _orbitR = Math.max(w, h) * _rc.chaosRuneOrbitRadius;
                         const _baseAngle = _now * _rc.chaosRuneRotateSpeed;
-                        ctx.font = `${_rc.chaosRuneFontSize}px sans-serif`;
+                        ctx.font = `bold ${_rc.chaosRuneFontSize}px sans-serif`;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         for (let _ri = 0; _ri < _chaosRuneCount; _ri++) {
                             const _angle = _baseAngle + (_ri / _chaosRuneCount) * Math.PI * 2;
                             const _rx = Math.cos(_angle) * _orbitR;
                             const _ry = Math.sin(_angle) * _orbitR;
-                            const _runeAlpha = 0.5 + _chaosIntensity * 0.5;
+                            const _runeAlpha = 0.55 + _chaosIntensity * 0.45;
                             ctx.shadowColor = _ri % 2 === 0 ? _rc.chaosHaloColorInner : _rc.chaosHaloColorOuter;
-                            ctx.shadowBlur = 6;
+                            ctx.shadowBlur = 8;
                             ctx.fillStyle = _ri % 2 === 0
                                 ? `rgba(168, 85, 247, ${_runeAlpha})`
                                 : `rgba(239, 68, 68, ${_runeAlpha})`;
@@ -2706,12 +2868,79 @@ class Enemy {
 
                 // @section:draw_attack_indicators - 攻击预警指示器绘制
                 } else if (this._pendingRewardType === 'pure_essence') {
-                    // --- 纯净精华（pure_essence）：纯白/蓝白晶化光晕 ---
+                    // --- 纯净精华（pure_essence）：「晶化净化」风格 ---
+                    // 借用精英 E2 虚空晶核（冰晶版）+ E3 过曝叠加 + 六角雪花旋转
                     const _purePhase = (_now / _rc.pureHaloPeriod + this.visualSeed * 0.6) * Math.PI * 2;
                     const _pureIntensity = Math.pow((Math.sin(_purePhase) + 1) * 0.5, 1.5); // 非线性缓动
+                    const _pureT = _now / 1000;
                     ctx.save();
                     ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
-                    // 外圈蓝白光晕
+
+                    // --- P1: 冰晶切面（借用精英 E1，白/蓝冰晶色系）---
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
+                    const _pureFacetAlpha = _rc.pureCrystalFacetAlpha * (0.6 + _pureIntensity * 0.4);
+                    const _pureFacetColors = ['rgba(219, 234, 254, ', 'rgba(147, 197, 253, ', 'rgba(255, 255, 255, '];
+                    for (let _fi = 0; _fi < 3; _fi++) {
+                        const _fSeed = this.visualSeed * 7 + _fi * 2.3;
+                        const _fx1 = (Math.sin(_fSeed) * 0.5) * w;
+                        const _fy1 = (Math.cos(_fSeed * 1.3) * 0.5) * h;
+                        const _fx2 = (Math.sin(_fSeed + 1.2) * 0.5) * w;
+                        const _fy2 = (Math.cos(_fSeed * 0.9 + 0.8) * 0.5) * h;
+                        const _fx3 = (Math.sin(_fSeed + 2.4) * 0.5) * w;
+                        const _fy3 = (Math.cos(_fSeed * 1.1 + 1.6) * 0.5) * h;
+                        ctx.beginPath();
+                        ctx.moveTo(_fx1, _fy1);
+                        ctx.lineTo(_fx2, _fy2);
+                        ctx.lineTo(_fx3, _fy3);
+                        ctx.closePath();
+                        ctx.fillStyle = `${_pureFacetColors[_fi % _pureFacetColors.length]}${(_pureFacetAlpha * (0.5 + _fi * 0.25)).toFixed(3)})`;
+                        ctx.fill();
+                    }
+                    ctx.restore();
+
+                    // --- P2: 冰晶核心（借用精英 E2，白/蓝渐变，缓慢旋转）---
+                    const _pureCoreR = Math.min(w, h) * _rc.pureCoreRadiusRatio;
+                    const _pureCoreAngle = _pureT * _rc.pureCoreRotateSpeed + this.visualSeed * Math.PI;
+                    ctx.save();
+                    ctx.rotate(_pureCoreAngle);
+                    const _pureCoreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, _pureCoreR);
+                    _pureCoreGrad.addColorStop(0, `rgba(255, 255, 255, ${0.95 * (0.6 + _pureIntensity * 0.4)})`);
+                    _pureCoreGrad.addColorStop(0.5, `rgba(191, 219, 254, ${0.7 * (0.5 + _pureIntensity * 0.5)})`);
+                    _pureCoreGrad.addColorStop(1, 'rgba(96, 165, 250, 0)');
+                    ctx.fillStyle = _pureCoreGrad;
+                    ctx.shadowColor = '#bfdbfe';
+                    ctx.shadowBlur = 8 + _pureIntensity * 6;
+                    // 六边形晶核（体现冰晶结构）
+                    ctx.beginPath();
+                    for (let _pi = 0; _pi < 6; _pi++) {
+                        const _pAngle = (_pi / 6) * Math.PI * 2 - Math.PI / 6;
+                        const _px = Math.cos(_pAngle) * _pureCoreR;
+                        const _py = Math.sin(_pAngle) * _pureCoreR;
+                        if (_pi === 0) ctx.moveTo(_px, _py); else ctx.lineTo(_px, _py);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                    // 晶核描边（冰蓝色）
+                    ctx.strokeStyle = `rgba(147, 197, 253, ${0.5 + _pureIntensity * 0.4})`;
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+                    ctx.restore();
+
+                    // --- P3: 晶核过曝叠加（借用精英 E3，lighter 模式白色能量溢出）---
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const _pureOverglowR = _pureCoreR * 1.8;
+                    const _pureOverglowGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, _pureOverglowR);
+                    _pureOverglowGrad.addColorStop(0, `rgba(191, 219, 254, ${_rc.pureCoreOverglowAlpha * _pureIntensity})`);
+                    _pureOverglowGrad.addColorStop(1, 'rgba(191, 219, 254, 0)');
+                    ctx.fillStyle = _pureOverglowGrad;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, _pureOverglowR, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+
+                    // --- P4: 外圈蓝白光晕描边（双层）---
                     ctx.shadowColor = _rc.pureHaloColorOuter;
                     ctx.shadowBlur = _pureIntensity * _rc.pureHaloBlurMax;
                     const _pureAlpha = _pureIntensity * _rc.pureHaloStrokeAlpha;
@@ -2720,13 +2949,13 @@ class Enemy {
                     if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
                         const _verts = this.collisionData.vertices;
                         ctx.beginPath();
-                        ctx.moveTo(_verts[0].x * 1.11, _verts[0].y * 1.11);
-                        for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.11, _verts[_i].y * 1.11);
+                        ctx.moveTo(_verts[0].x * 1.12, _verts[0].y * 1.12);
+                        for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.12, _verts[_i].y * 1.12);
                         ctx.closePath();
                         ctx.stroke();
                     } else {
                         ctx.beginPath();
-                        ctx.roundRect(-w/2 - 7, -h/2 - 7, w + 14, h + 14, r + 4);
+                        ctx.roundRect(-w/2 - 8, -h/2 - 8, w + 16, h + 16, r + 4);
                         ctx.stroke();
                     }
                     // 内圈纯白光晕（lighter 模式叠加）
@@ -2734,7 +2963,7 @@ class Enemy {
                     ctx.globalCompositeOperation = 'lighter';
                     ctx.shadowColor = _rc.pureHaloColorInner;
                     ctx.shadowBlur = _pureIntensity * _rc.pureHaloBlurMax * 0.5;
-                    ctx.strokeStyle = `rgba(255, 255, 255, ${_pureAlpha * 0.4})`;
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${_pureAlpha * 0.45})`;
                     ctx.lineWidth = 1.5;
                     if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
                         const _verts = this.collisionData.vertices;
@@ -2749,7 +2978,8 @@ class Enemy {
                         ctx.stroke();
                     }
                     ctx.restore();
-                    // 晶体旋转装饰
+
+                    // --- P5: 六角雪花形旋转晶体（替换原有菱形，更符合"纯净"语义）---
                     const _pureCrystalCount = _perfBudget.rewardCrystalCount;
                     if (_pureCrystalCount > 0) {
                         const _orbitR = Math.max(w, h) * _rc.pureCrystalOrbitRadius;
@@ -2759,22 +2989,36 @@ class Enemy {
                             const _cx = Math.cos(_angle) * _orbitR;
                             const _cy = Math.sin(_angle) * _orbitR;
                             const _cSize = _rc.pureCrystalSize;
-                            const _crystalAlpha = 0.4 + _pureIntensity * 0.6;
+                            const _crystalAlpha = 0.45 + _pureIntensity * 0.55;
                             ctx.shadowColor = _rc.pureHaloColorOuter;
                             ctx.shadowBlur = 8;
-                            ctx.fillStyle = `rgba(191, 219, 254, ${_crystalAlpha})`;
-                            // 绘制菱形晶体
+                            // 绘制六角雪花形（6个顶点的星形）
                             ctx.beginPath();
-                            ctx.moveTo(_cx, _cy - _cSize);
-                            ctx.lineTo(_cx + _cSize * 0.5, _cy);
-                            ctx.lineTo(_cx, _cy + _cSize);
-                            ctx.lineTo(_cx - _cSize * 0.5, _cy);
+                            for (let _si = 0; _si < 6; _si++) {
+                                const _sAngle = (_si / 6) * Math.PI * 2 - Math.PI / 6;
+                                // 外顶点
+                                const _ox = _cx + Math.cos(_sAngle) * _cSize;
+                                const _oy = _cy + Math.sin(_sAngle) * _cSize;
+                                // 内顶点（星形凹入）
+                                const _iAngle = _sAngle + Math.PI / 6;
+                                const _ix = _cx + Math.cos(_iAngle) * _cSize * 0.4;
+                                const _iy = _cy + Math.sin(_iAngle) * _cSize * 0.4;
+                                if (_si === 0) ctx.moveTo(_ox, _oy);
+                                else ctx.lineTo(_ox, _oy);
+                                ctx.lineTo(_ix, _iy);
+                            }
                             ctx.closePath();
+                            ctx.fillStyle = `rgba(219, 234, 254, ${_crystalAlpha})`;
                             ctx.fill();
+                            // 雪花描边（纯白）
+                            ctx.strokeStyle = `rgba(255, 255, 255, ${_crystalAlpha * 0.7})`;
+                            ctx.lineWidth = 0.8;
+                            ctx.stroke();
                         }
                     }
                     ctx.restore();
                 }
+
             }
         }
 
