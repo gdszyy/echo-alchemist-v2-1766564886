@@ -13,7 +13,7 @@
  * - 弹珠选择切换 (sys_toggleMarbleSelection)
  * - 分数乘数重置 (sys_resetMultiplier)
  */
-import { Vec2, showToast, RuneLoot, Enemy } from './entities.js';
+import { Vec2, showToast, RuneLoot, Enemy, RewardDropEffect } from './entities.js';
 import { CONFIG } from './config.js';
 import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
@@ -837,7 +837,13 @@ export const game_system = {
         let rewardType = enemy._pendingRewardType || null;
 
         if (!rewardType) {
-            // 兼容路径：未经预计算的敌人（如分身克隆）在死亡时重新计算
+            // [Bug Fix] 只有分身（isClone=true）才走兼容路径重新计算。
+            // 普通敌人生成时已经由 sys_preCalcEnemyRewardType 做过掷骰，
+            // 未被标记 _pendingRewardType 说明已判定不掉落，直接返回 null，
+            // 避免死亡时二次掷骰导致普通敌人也触发掉落提示。
+            if (!enemy.isClone) return null;
+
+            // 兼容路径：分身克隆（isClone=true）生成时跳过了预计算，在死亡时重新计算
             const affixCount = Array.isArray(enemy.affixes) ? enemy.affixes.length : 0;
             const gameplayCfg = CONFIG.gameplay || {};
             const dropChance = Math.min(
@@ -881,12 +887,19 @@ export const game_system = {
         if (!queuedReward) return null;
         // 同步最终确认的奖励类型（sys_queueRoundStartReward 可能因遗物已满而降级为精华）
         enemy._pendingRewardType = queuedReward.type;
+
+        // [RewardDropEffect] 在敌人死亡位置播放对应类型的掉落特效
+        if (enemy.pos) {
+            if (!this.rewardDropEffects) this.rewardDropEffects = [];
+            this.rewardDropEffects.push(new RewardDropEffect(enemy.pos.x, enemy.pos.y, queuedReward.type));
+        }
+
         if (queuedReward.type === 'relic') {
-            showToast('✨ 敵人掉落了遺物線索，將在下回合開始結算');
+            showToast('✨ 敌人掉落了遗物線索，將在下回合開始結算');
         } else if (queuedReward.type === 'pure_essence') {
-            showToast('🕊️ 敵人掉落了純淨精華，將在下回合開始觸發命運時刻');
+            showToast('🕊️ 敌人掉落了純淨精華，將在下回合開始觸發命運時刻');
         } else {
-            showToast('🎡 敵人掉落了混沌精華，將在下回合開始觸發命運時刻');
+            showToast('🎪 敌人掉落了混沌精華，將在下回合開始觸發命運時刻');
         }
         return queuedReward;
     },

@@ -5,7 +5,7 @@ import {
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
     Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave,
-    IceWave, DeathExplosion, showToast, BladeStormRing, SwordScar,
+    IceWave, DeathExplosion, showToast, BladeStormRing, SwordScar, RewardDropEffect,
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba, RuneLoot
 } from './entities.js';
 import { loot_calcRuneDrop } from './loot_system.js';

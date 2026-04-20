@@ -1640,6 +1640,15 @@ phase_gathering_getRandomPegType() {
                     if (de.life <= 0) this.deathExplosions.splice(i, 1);
                 }
             }
+            // 更新和绘制 RewardDropEffects（遗物/精华掉落特效）
+            if (this.rewardDropEffects) {
+                for (let i = this.rewardDropEffects.length - 1; i >= 0; i--) {
+                    const rde = this.rewardDropEffects[i];
+                    rde.update(timeScale);
+                    rde.draw(this.ctx);
+                    if (rde.life <= 0) this.rewardDropEffects.splice(i, 1);
+                }
+            }
 
             // 更新和绘制特效
             for(let i=this.particles.length-1; i>=0; i--) { let p = this.particles[i]; if(p) { p.update(timeScale); p.draw(this.ctx); if(p.life <= 0) this.particles.splice(i,1); } } 

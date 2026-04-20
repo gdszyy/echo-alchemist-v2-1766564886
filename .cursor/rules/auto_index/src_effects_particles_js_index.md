@@ -1,6 +1,6 @@
 # src/effects/particles.js 函数索引
 
-> 自动生成于 2026-04-19 | 总行数: 1371 | 函数数: 58 | 语言: javascript
+> 自动生成于 2026-04-20 | 总行数: 1829 | 函数数: 62 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -64,4 +64,8 @@
 | SwordScar | class | L1293 | L1293 | 1 | `SwordScar()` |
 | constructor | method | L1294 | L1306 | 13 | `constructor(x, y)` |
 | update | method | L1307 | L1315 | 9 | `update(timeScale)` |
-| draw | method | L1316 | L1372 | 57 | `draw(ctx)` |
+| draw | method | L1316 | L1352 | 37 | `draw(ctx)` |
+| RewardDropEffect | class | L1366 | L1366 | 1 | `RewardDropEffect()` |
+| constructor | method | L1372 | L1454 | 83 | `constructor(x, y, rewardType)` |
+| update | method | L1455 | L1517 | 63 | `update(timeScale)` |
+| draw | method | L1518 | L1810 | 293 | `draw(ctx)` |

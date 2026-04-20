@@ -179,6 +179,7 @@ class Game {
         this.spinBoost = 0;             
         this.showDamageNumbers = true;  
         this.energyOrbs = []; 
+        this.rewardDropEffects = []; // 遗物/精华掉落特效数组
         this.fortuneWheel = new FortuneWheel(this);
         // [triangle 布局专属] 底部左右倍率转盘（初始为空数组，在 phase_gathering_initPachinko 中根据布局初始化）
         this.triangleSideWheels = [];

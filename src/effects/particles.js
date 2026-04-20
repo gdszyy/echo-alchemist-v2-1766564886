@@ -1352,6 +1352,463 @@ class SwordScar {
     }
 }
 
+// ==================== 奖励掉落特效 ====================
+/**
+ * RewardDropEffect - 敌人死亡掉落遗物/精华时的爆发特效
+ *
+ * 设计理念：三种类型各有独特视觉语言，均以“死亡位置向上爆发”为核心动作：
+ *   relic       → 金色光柱冲天 + 旋转金币粒子向外爆散 + 双层扩散冲击波
+ *   chaos       → 紫红双色漩涡爆炸 + 不规则碎片四散 + 快速收缩再扩张冲击波
+ *   pure        → 白蓝冰晶向上绳放 + 六角雪花粒子缓慢飘散 + 柔和扩散光环
+ *
+ * 生命周期： relic ~1.8s | chaos ~1.2s | pure ~1.5s
+ */
+class RewardDropEffect {
+    /**
+     * @param {number} x - 敌人中心 X 坐标
+     * @param {number} y - 敌人中心 Y 坐标
+     * @param {'relic'|'chaos_essence'|'pure_essence'} rewardType - 奖励类型
+     */
+    constructor(x, y, rewardType) {
+        this.x = x;
+        this.y = y;
+        this.type = rewardType;
+        this.life = 1.0;
+        this.timer = 0;
+
+        if (rewardType === 'relic') {
+            // 遗物：金色光柱冲天，持续时间最长
+            this.decay = 0.018;   // ~1.8s @ 60fps
+            // 光柱参数
+            this.beamH = 0;       // 当前光柱高度
+            this.beamMaxH = 180;  // 最大高度
+            this.beamW = 28;      // 光柱宽度
+            this.beamAlpha = 0;
+            // 冲击波：双层
+            this.rings = [
+                { r: 0, maxR: 90,  color: '#facc15', lw: 3.5, alpha: 0.9, speed: 3.5 },
+                { r: 0, maxR: 130, color: '#f59e0b', lw: 2,   alpha: 0.6, speed: 2.5 },
+            ];
+            // 金币粒子（向外爆散，带旋转）
+            this.coins = Array.from({ length: 10 }, (_, i) => ({
+                angle: (i / 10) * Math.PI * 2 + Math.random() * 0.4,
+                speed: 2.5 + Math.random() * 2.5,
+                dist: 0,
+                size: 3.5 + Math.random() * 2,
+                spin: (Math.random() - 0.5) * 0.3,
+                spinAngle: Math.random() * Math.PI * 2,
+                alpha: 0.8 + Math.random() * 0.2,
+                color: Math.random() < 0.5 ? '#facc15' : '#fde68a',
+            }));
+
+        } else if (rewardType === 'chaos_essence') {
+            // 混沌精华：紫红双色漩涡爆炸，最短暂但最强烈
+            this.decay = 0.028;   // ~1.2s @ 60fps
+            // 冲击波：先快速扩张再收缩
+            this.rings = [
+                { r: 0, maxR: 80,  color: '#a855f7', lw: 4,   alpha: 1.0, speed: 5.5, phase: 'expand' },
+                { r: 0, maxR: 110, color: '#ef4444', lw: 2.5, alpha: 0.7, speed: 4.0, phase: 'expand' },
+            ];
+            this.ringPulse = 0;   // 收缩再扩张的脑动相位
+            // 混沌碎片（不规则向外爆散）
+            this.shards = Array.from({ length: 14 }, (_, i) => ({
+                angle: (i / 14) * Math.PI * 2 + (Math.random() - 0.5) * 0.6,
+                speed: 3.0 + Math.random() * 3.5,
+                dist: 0,
+                size: 2.5 + Math.random() * 3,
+                spin: (Math.random() - 0.5) * 0.5,
+                spinAngle: Math.random() * Math.PI * 2,
+                alpha: 0.7 + Math.random() * 0.3,
+                color: Math.random() < 0.5 ? '#c084fc' : '#f87171',
+            }));
+            // 漩涡层：中心旋转漩涡
+            this.vortexAngle = 0;
+            this.vortexR = 0;
+            this.vortexMaxR = 45;
+
+        } else {
+            // 纯净精华：白蓝冰晶绳放，最柔和
+            this.decay = 0.022;   // ~1.5s @ 60fps
+            // 光环：柔和扩散
+            this.rings = [
+                { r: 0, maxR: 75,  color: '#bfdbfe', lw: 2.5, alpha: 0.8, speed: 2.0 },
+                { r: 0, maxR: 110, color: '#ffffff', lw: 1.5, alpha: 0.5, speed: 1.4 },
+            ];
+            // 冰晶光柱（细而高）
+            this.beamH = 0;
+            this.beamMaxH = 140;
+            this.beamW = 16;
+            this.beamAlpha = 0;
+            // 六角雪花粒子（缓慢飘散）
+            this.snowflakes = Array.from({ length: 8 }, (_, i) => ({
+                angle: (i / 8) * Math.PI * 2 + Math.random() * 0.3,
+                speed: 1.2 + Math.random() * 1.5,
+                dist: 0,
+                size: 4 + Math.random() * 3,
+                spinAngle: Math.random() * Math.PI * 2,
+                spinSpeed: (Math.random() - 0.5) * 0.08,
+                alpha: 0.7 + Math.random() * 0.3,
+            }));
+        }
+    }
+
+    update(timeScale) {
+        this.timer += timeScale;
+        this.life -= this.decay * timeScale;
+
+        if (this.type === 'relic') {
+            // 光柱快速冲高
+            if (this.beamH < this.beamMaxH) {
+                this.beamH = Math.min(this.beamMaxH, this.beamH + 18 * timeScale);
+                this.beamAlpha = Math.min(1, this.beamAlpha + 0.12 * timeScale);
+            } else {
+                // 光柱冲到顶后慢慢消退
+                this.beamAlpha = Math.max(0, this.beamAlpha - 0.025 * timeScale);
+            }
+            // 冲击波扩散
+            for (const ring of this.rings) {
+                if (ring.r < ring.maxR) ring.r = Math.min(ring.maxR, ring.r + ring.speed * timeScale);
+            }
+            // 金币粒子向外飞散
+            for (const c of this.coins) {
+                c.dist += c.speed * timeScale;
+                c.spinAngle += c.spin * timeScale;
+            }
+
+        } else if (this.type === 'chaos_essence') {
+            // 混沌冲击波：展开到最大后脑动收缩再扩张
+            this.ringPulse += 0.18 * timeScale;
+            for (const ring of this.rings) {
+                if (ring.phase === 'expand') {
+                    ring.r = Math.min(ring.maxR, ring.r + ring.speed * timeScale);
+                    if (ring.r >= ring.maxR) ring.phase = 'pulse';
+                } else {
+                    // 到达最大带脑动效果
+                    ring.r = ring.maxR + Math.sin(this.ringPulse * 3) * 8;
+                }
+            }
+            // 混沌碎片向外爆散
+            for (const s of this.shards) {
+                s.dist += s.speed * timeScale;
+                s.spinAngle += s.spin * timeScale;
+            }
+            // 漩涡生长
+            this.vortexAngle += 0.12 * timeScale;
+            if (this.vortexR < this.vortexMaxR) this.vortexR = Math.min(this.vortexMaxR, this.vortexR + 3 * timeScale);
+
+        } else {
+            // 纯净冰晶光柱与光环
+            if (this.beamH < this.beamMaxH) {
+                this.beamH = Math.min(this.beamMaxH, this.beamH + 12 * timeScale);
+                this.beamAlpha = Math.min(0.85, this.beamAlpha + 0.08 * timeScale);
+            } else {
+                this.beamAlpha = Math.max(0, this.beamAlpha - 0.018 * timeScale);
+            }
+            for (const ring of this.rings) {
+                if (ring.r < ring.maxR) ring.r = Math.min(ring.maxR, ring.r + ring.speed * timeScale);
+            }
+            // 雪花粒子缓慢飘散
+            for (const sf of this.snowflakes) {
+                sf.dist += sf.speed * timeScale;
+                sf.spinAngle += sf.spinSpeed * timeScale;
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+        const alpha = Math.max(0, this.life);
+        ctx.save();
+
+        if (this.type === 'relic') {
+            // ---- 遗物：金色光柱 + 金币粒子 + 双层冲击波 ----
+
+            // 1. 冲击波（先画，在光柱下方）
+            ctx.globalCompositeOperation = 'lighter';
+            for (const ring of this.rings) {
+                if (ring.r <= 0) continue;
+                const t = ring.r / ring.maxR;
+                ctx.globalAlpha = ring.alpha * (1 - t) * alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, ring.r, 0, Math.PI * 2);
+                ctx.strokeStyle = ring.color;
+                ctx.lineWidth = ring.lw * (1 - t * 0.5);
+                ctx.stroke();
+            }
+
+            // 2. 金色光柱（梯形，底部亮白向上渐变透明）
+            if (this.beamH > 0 && this.beamAlpha > 0) {
+                ctx.globalCompositeOperation = 'lighter';
+                const bx = this.x;
+                const by = this.y;
+                const bh = this.beamH;
+                const bw = this.beamW;
+                const ba = this.beamAlpha * alpha;
+                const beamGrad = ctx.createLinearGradient(bx, by, bx, by - bh);
+                beamGrad.addColorStop(0, `rgba(255, 255, 200, ${ba})`);
+                beamGrad.addColorStop(0.3, `rgba(250, 204, 21, ${ba * 0.7})`);
+                beamGrad.addColorStop(0.7, `rgba(245, 158, 11, ${ba * 0.3})`);
+                beamGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+                ctx.fillStyle = beamGrad;
+                ctx.beginPath();
+                ctx.moveTo(bx - bw * 0.25, by);
+                ctx.lineTo(bx + bw * 0.25, by);
+                ctx.lineTo(bx + bw, by - bh);
+                ctx.lineTo(bx - bw, by - bh);
+                ctx.closePath();
+                ctx.fill();
+                // 光柱中心亮线
+                ctx.strokeStyle = `rgba(255, 255, 255, ${ba * 0.8})`;
+                ctx.lineWidth = 2;
+                ctx.shadowColor = '#facc15';
+                ctx.shadowBlur = 12;
+                ctx.beginPath();
+                ctx.moveTo(bx, by);
+                ctx.lineTo(bx, by - bh);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // 3. 金币粒子（旋转菱形）
+            ctx.globalCompositeOperation = 'lighter';
+            for (const c of this.coins) {
+                const cx = this.x + Math.cos(c.angle) * c.dist;
+                const cy = this.y + Math.sin(c.angle) * c.dist - c.dist * 0.3; // 微向上偶发
+                const ca = c.alpha * alpha * Math.max(0, 1 - c.dist / 80);
+                if (ca <= 0) continue;
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(c.spinAngle);
+                ctx.globalAlpha = ca;
+                ctx.fillStyle = c.color;
+                ctx.shadowColor = '#facc15';
+                ctx.shadowBlur = 6;
+                // 菱形金币
+                ctx.beginPath();
+                ctx.moveTo(0, -c.size);
+                ctx.lineTo(c.size * 0.6, 0);
+                ctx.lineTo(0, c.size);
+                ctx.lineTo(-c.size * 0.6, 0);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 4. 中心爆发光晕（开始时的亮点）
+            if (this.timer < 8) {
+                ctx.globalCompositeOperation = 'lighter';
+                const flashAlpha = (1 - this.timer / 8) * alpha;
+                const flashGrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, 40);
+                flashGrad.addColorStop(0, `rgba(255, 255, 200, ${flashAlpha})`);
+                flashGrad.addColorStop(1, 'rgba(250, 204, 21, 0)');
+                ctx.fillStyle = flashGrad;
+                ctx.globalAlpha = 1;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 40, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+        } else if (this.type === 'chaos_essence') {
+            // ---- 混沌精华：漩涡爆炸 + 碎片四散 + 脑动冲击波 ----
+
+            // 1. 漩涡层（中心旋转的紫红渗变圆）
+            if (this.vortexR > 0) {
+                ctx.globalCompositeOperation = 'lighter';
+                const vAlpha = alpha * 0.6;
+                const vGrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.vortexR);
+                vGrad.addColorStop(0, `rgba(255, 200, 255, ${vAlpha * 0.8})`);
+                vGrad.addColorStop(0.4, `rgba(168, 85, 247, ${vAlpha * 0.5})`);
+                vGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+                ctx.fillStyle = vGrad;
+                ctx.globalAlpha = 1;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.vortexR, 0, Math.PI * 2);
+                ctx.fill();
+                // 漩涡旋转光边
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.vortexAngle);
+                for (let vi = 0; vi < 4; vi++) {
+                    const vAngle = (vi / 4) * Math.PI * 2;
+                    const vx = Math.cos(vAngle) * this.vortexR * 0.7;
+                    const vy = Math.sin(vAngle) * this.vortexR * 0.7;
+                    ctx.globalAlpha = vAlpha * 0.7;
+                    ctx.fillStyle = vi % 2 === 0 ? '#a855f7' : '#ef4444';
+                    ctx.shadowColor = vi % 2 === 0 ? '#a855f7' : '#ef4444';
+                    ctx.shadowBlur = 8;
+                    ctx.beginPath();
+                    ctx.arc(vx, vy, 3.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            // 2. 脑动冲击波
+            ctx.globalCompositeOperation = 'lighter';
+            for (const ring of this.rings) {
+                if (ring.r <= 0) continue;
+                const t = ring.r / ring.maxR;
+                const pulseAlpha = ring.phase === 'pulse'
+                    ? ring.alpha * (0.4 + Math.abs(Math.sin(this.ringPulse * 3)) * 0.6) * alpha
+                    : ring.alpha * (1 - t * 0.6) * alpha;
+                ctx.globalAlpha = pulseAlpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, ring.r, 0, Math.PI * 2);
+                ctx.strokeStyle = ring.color;
+                ctx.lineWidth = ring.lw;
+                ctx.shadowColor = ring.color;
+                ctx.shadowBlur = 10;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // 3. 混沌碎片（不规则向外爆散）
+            ctx.globalCompositeOperation = 'lighter';
+            for (const s of this.shards) {
+                const sx = this.x + Math.cos(s.angle) * s.dist;
+                const sy = this.y + Math.sin(s.angle) * s.dist;
+                const sa = s.alpha * alpha * Math.max(0, 1 - s.dist / 90);
+                if (sa <= 0) continue;
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.rotate(s.spinAngle);
+                ctx.globalAlpha = sa;
+                ctx.fillStyle = s.color;
+                ctx.shadowColor = s.color;
+                ctx.shadowBlur = 5;
+                // 不规则尖锐碎片
+                ctx.beginPath();
+                ctx.moveTo(0, -s.size);
+                ctx.lineTo(s.size * 0.45, s.size * 0.3);
+                ctx.lineTo(0, s.size * 0.7);
+                ctx.lineTo(-s.size * 0.45, s.size * 0.3);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 4. 开始时紫红双色爆闪
+            if (this.timer < 6) {
+                ctx.globalCompositeOperation = 'lighter';
+                const flashT = 1 - this.timer / 6;
+                const flashGrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, 50);
+                flashGrad.addColorStop(0, `rgba(255, 200, 255, ${flashT * alpha})`);
+                flashGrad.addColorStop(0.5, `rgba(168, 85, 247, ${flashT * alpha * 0.5})`);
+                flashGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+                ctx.fillStyle = flashGrad;
+                ctx.globalAlpha = 1;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 50, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+        } else {
+            // ---- 纯净精华：冰晶光柱 + 雪花粒子 + 柔和光环 ----
+
+            // 1. 柔和光环
+            ctx.globalCompositeOperation = 'lighter';
+            for (const ring of this.rings) {
+                if (ring.r <= 0) continue;
+                const t = ring.r / ring.maxR;
+                ctx.globalAlpha = ring.alpha * (1 - t) * alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, ring.r, 0, Math.PI * 2);
+                ctx.strokeStyle = ring.color;
+                ctx.lineWidth = ring.lw;
+                ctx.shadowColor = ring.color;
+                ctx.shadowBlur = 8;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // 2. 冰晶光柱（细而高，白蓝渐变）
+            if (this.beamH > 0 && this.beamAlpha > 0) {
+                ctx.globalCompositeOperation = 'lighter';
+                const bx = this.x;
+                const by = this.y;
+                const bh = this.beamH;
+                const bw = this.beamW;
+                const ba = this.beamAlpha * alpha;
+                const beamGrad = ctx.createLinearGradient(bx, by, bx, by - bh);
+                beamGrad.addColorStop(0, `rgba(255, 255, 255, ${ba})`);
+                beamGrad.addColorStop(0.35, `rgba(191, 219, 254, ${ba * 0.65})`);
+                beamGrad.addColorStop(0.7, `rgba(147, 197, 253, ${ba * 0.3})`);
+                beamGrad.addColorStop(1, 'rgba(96, 165, 250, 0)');
+                ctx.fillStyle = beamGrad;
+                ctx.beginPath();
+                ctx.moveTo(bx - bw * 0.2, by);
+                ctx.lineTo(bx + bw * 0.2, by);
+                ctx.lineTo(bx + bw, by - bh);
+                ctx.lineTo(bx - bw, by - bh);
+                ctx.closePath();
+                ctx.fill();
+                // 光柱中心纯白亮线
+                ctx.strokeStyle = `rgba(255, 255, 255, ${ba * 0.9})`;
+                ctx.lineWidth = 1.5;
+                ctx.shadowColor = '#bfdbfe';
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.moveTo(bx, by);
+                ctx.lineTo(bx, by - bh);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // 3. 六角雪花粒子（缓慢飘散）
+            ctx.globalCompositeOperation = 'lighter';
+            for (const sf of this.snowflakes) {
+                const sfx = this.x + Math.cos(sf.angle) * sf.dist;
+                const sfy = this.y + Math.sin(sf.angle) * sf.dist - sf.dist * 0.5; // 强向上浮动
+                const sfa = sf.alpha * alpha * Math.max(0, 1 - sf.dist / 70);
+                if (sfa <= 0) continue;
+                ctx.save();
+                ctx.translate(sfx, sfy);
+                ctx.rotate(sf.spinAngle);
+                ctx.globalAlpha = sfa;
+                ctx.fillStyle = '#dbeafe';
+                ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+                ctx.lineWidth = 0.8;
+                ctx.shadowColor = '#bfdbfe';
+                ctx.shadowBlur = 6;
+                // 六角雪花形（与敌人光晕中的雪花一致）
+                ctx.beginPath();
+                for (let si = 0; si < 6; si++) {
+                    const sAngle = (si / 6) * Math.PI * 2 - Math.PI / 6;
+                    const ox = Math.cos(sAngle) * sf.size;
+                    const oy = Math.sin(sAngle) * sf.size;
+                    const iAngle = sAngle + Math.PI / 6;
+                    const ix = Math.cos(iAngle) * sf.size * 0.4;
+                    const iy = Math.sin(iAngle) * sf.size * 0.4;
+                    if (si === 0) ctx.moveTo(ox, oy); else ctx.lineTo(ox, oy);
+                    ctx.lineTo(ix, iy);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 4. 开始时白蓝闪光
+            if (this.timer < 10) {
+                ctx.globalCompositeOperation = 'lighter';
+                const flashT = 1 - this.timer / 10;
+                const flashGrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, 35);
+                flashGrad.addColorStop(0, `rgba(255, 255, 255, ${flashT * alpha * 0.9})`);
+                flashGrad.addColorStop(1, 'rgba(191, 219, 254, 0)');
+                ctx.fillStyle = flashGrad;
+                ctx.globalAlpha = 1;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 35, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+}
+
 // ==================== 导出 ====================
 export {
     Particle,
@@ -1367,5 +1824,6 @@ export {
     DeathExplosion,
     HealWave,
     BladeStormRing,
-    SwordScar
+    SwordScar,
+    RewardDropEffect
 };

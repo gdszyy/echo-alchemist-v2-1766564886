@@ -22,8 +22,8 @@
 | sys_skipGrindGetRune | method | L702 | L751 | 50 | `sys_skipGrindGetRune()` |
 | sys_queueRoundStartReward | method | L752 | L791 | 40 | `sys_queueRoundStartReward(reward = {})` |
 | sys_preCalcEnemyRewardType | method | L803 | L825 | 23 | `sys_preCalcEnemyRewardType(enemy)` |
-| sys_tryQueueEnemyRoundReward | method | L833 | L892 | 60 | `sys_tryQueueEnemyRoundReward(enemy)` |
-| sys_startRoundStartResolver | method | L894 | L979 | 86 | `sys_startRoundStartResolver()` |
+| sys_tryQueueEnemyRoundReward | method | L833 | L905 | 73 | `sys_tryQueueEnemyRoundReward(enemy)` |
+| sys_startRoundStartResolver | method | L911 | L996 | 86 | `sys_startRoundStartResolver()` |
 | sys_continueRoundStartResolver | method | L985 | L996 | 12 | `sys_continueRoundStartResolver()` |
 | sys_showRoundStartBanner | method | L997 | L1101 | 105 | `sys_showRoundStartBanner()` |
 | sys_toggleMarbleSelection | method | L1102 | L1137 | 36 | `sys_toggleMarbleSelection(idx, cardEl)` |

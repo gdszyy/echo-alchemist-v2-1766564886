@@ -35,7 +35,7 @@ import {
     Particle, SlashEffect, CollectionBeam, Shockwave, LaserBeam, 
     FloatingText, EnergyOrb, LightningBolt, FireWave,
     IceWave, DeathExplosion, HealWave,
-    BladeStormRing, SwordScar
+    BladeStormRing, SwordScar, RewardDropEffect
 } from './effects/particles.js';
 import { Enemy, setEnemyAudioProvider } from './entities/enemy.js';
 import { Projectile, setProjectileAudioProvider } from './entities/projectile.js';
@@ -4727,6 +4727,7 @@ export {
     HealWave,
     BladeStormRing,
     SwordScar,
+    RewardDropEffect,
     Player,
     RuneLoot,
     showToast,
