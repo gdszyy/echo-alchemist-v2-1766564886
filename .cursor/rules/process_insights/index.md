@@ -13,10 +13,11 @@
 当前共有 **7** 条活跃洞察。
 
 > **[2026-04-19 更新]** PI-006 升版至 v1.2：新增坑 5（开局缺少弹珠命运选择阶段；`sys_initGameStart()` 必须在遗物奖励后额外队列 `chaos_essence`）。
+> **[2026-04-20 更新]** PI-001 升版至 v1.3：新增坑 8（纯净精华选择跳过替换子弹阶段后 `confirmBtn.onclick` 未恢复，导致无法发射子弹、直接循环敌人回合）。
 
 | ID | 标题 | 版本 | 关联模块 | 最后更新 | 文档链接 |
 |----|------|------|---------|---------|---------|
-| PI-001 | 核心 Bug 修复流程与高频陷阱 | v1.2 | game_phase, ui_system, game_system | 2026-04-16 | [PI-001_critical_bugfix_flow.md](PI-001_critical_bugfix_flow.md) |
+| PI-001 | 核心 Bug 修复流程与高频陷阱 | v1.3 | game_phase, ui_system, game_system | 2026-04-20 | [PI-001_critical_bugfix_flow.md](PI-001_critical_bugfix_flow.md) |
 | PI-002 | 符文词条 Hook 注入流程 | v1.0 | rune_system, combat_system, ui_system, rune_launcher | 2026-04-16 | [PI-002_runeword_hook_injection.md](PI-002_runeword_hook_injection.md) |
 | PI-003 | 子系统扩展与组合模式注入流程 | v1.0 | core, game_system, combat_system, ui_system | 2026-04-16 | [PI-003_subsystem_composition_pattern.md](PI-003_subsystem_composition_pattern.md) |
 | PI-004 | 性能预算扩展与新特效接入流程 | v1.0 | performance, spawn_system, combat_system, entities | 2026-04-16 | [PI-004_performance_budget_extension.md](PI-004_performance_budget_extension.md) |

@@ -1,12 +1,14 @@
 {
-  "indexed": [],
-  "skipped": [
+  "indexed": [
     {
-      "file": "src/core.js",
-      "lines": 419,
-      "funcs": 5,
-      "reason": "未达阈值 (行数=419<500, 函数数=5<20)"
+      "file": "src/game_system.js",
+      "lines": 1832,
+      "funcs": 42,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor/rules/auto_index/src_game_system_js_index.md"
     }
   ],
+  "skipped": [],
   "warnings": []
 }

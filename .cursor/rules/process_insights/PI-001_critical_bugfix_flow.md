@@ -1,7 +1,7 @@
 ---
 id: "PI-001"
-version: "v1.2"
-last_updated: "2026-04-16"
+version: "v1.3"
+last_updated: "2026-04-20"
 author: "tsk-b1def027-9d1"
 related_modules: ["game_phase", "ui_system", "game_system"]
 status: "active"
@@ -93,6 +93,16 @@ status: "active"
 
 **关键位置**：`src/game_system.js` → `_isRuneLauncherOpen` 函数（修复后第 699 行）
 
+### 坑 8: 替换子弹阶段跳过后 `confirmBtn.onclick` 未恢复，导致无法发射子弹
+
+**现象**：纯净精华（`pure_essence`）命运时刻触发且 `ammoQueue` 非空时，玩家在「替换当前子弹」阶段点击「跳過」后，进入正常的纯净精华弹珠选择界面。选好弹珠并注入符文后，点击「注入後開始煉金」按钮无响应，游戏直接以空 `ammoQueue` 进入战斗阶段，触发「彈藥耗盡」→ 敌人回合无限循环。
+
+**根因**：`ui_renderReplaceAmmoUI()` 在渲染替换阶段 UI 时，将 `confirmBtn.onclick` 覆盖为 `sys_confirmReplaceAmmo`。玩家跳过后，`sys_skipReplaceAmmo()` 调用 `_proceedToFateMomentSelection()` 进入正常选择界面，但该函数**没有恢复 `confirmBtn.onclick` 为 `ui_confirmSelection`**。`sys_confirmReplaceAmmo` 在 `replaceAmmoContext.active === false` 时直接 `return`，导致 `marbleQueue` 始终为空，`phase_startGatheringPhase()` 从未被调用。
+
+**正确做法**：在 `_proceedToFateMomentSelection()` 中，设置 `confirmBtn.disabled = true` 的同时，**必须恢复** `confirmBtn.onclick = () => this.ui_confirmSelection()`，确保后续正常选择确认流程能正确执行。
+
+**关键位置**：`src/game_system.js` → `_proceedToFateMomentSelection` → `confirmBtn` 处理块
+
 ---
 
 ## 关键耦合点
@@ -108,3 +118,4 @@ status: "active"
 | v1.0 | 2026-04-16 | 初始记录，整合 tsk-b1def027-9d1 的 5 个致命 Bug 修复经验 | repo-indexer |
 | v1.1 | 2026-04-16 | 新增坑 6：研磨阶段点击区域阈值过小（`phase_handleInputStart` `pos.y < height * 0.4` 导致弹珠无法发射） | echo-developer |
 | v1.2 | 2026-04-16 | 新增坑 7：PC 端 `_isRuneLauncherOpen` 返回 `true` 屏蔽所有 PC 端鼠标输入 | echo-developer |
+| v1.3 | 2026-04-20 | 新增坑 8：替换子弹阶段跳过后 `confirmBtn.onclick` 未恢复，导致纯净精华选择后无法发射子弹、直接循环敌人回合 | echo-developer |

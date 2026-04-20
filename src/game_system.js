@@ -655,7 +655,16 @@ export const game_system = {
         const confirmBtn = document.getElementById('confirm-selection-btn');
         const recipeHud = document.getElementById('recipe-hud-container');
         if (countEl) countEl.innerText = '0';
-        if (confirmBtn) confirmBtn.disabled = true;
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            // [tsk-668f3dba 修复] 从替换阶段跳过后，confirmBtn.onclick 被 ui_renderReplaceAmmoUI
+            // 覆盖为 sys_confirmReplaceAmmo，必须在此处恢复为 ui_confirmSelection，
+            // 否则玩家点击「注入後開始煉金」时会触发错误的处理函数，导致 marbleQueue 为空、
+            // 无法进入研磨阶段，直接循环敌人回合。
+            confirmBtn.onclick = () => {
+                if (typeof this.ui_confirmSelection === 'function') this.ui_confirmSelection();
+            };
+        }
         if (recipeHud) recipeHud.classList.add('hidden');
         if (typeof this.ui_refreshSelectionModeUI === 'function') this.ui_refreshSelectionModeUI();
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
