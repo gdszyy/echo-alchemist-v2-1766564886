@@ -161,6 +161,7 @@ class Game {
         this.relicSelectionCount = 0; // 遗物选择计数器（用于前三次推荐逻辑）
         this.pendingRoundStartRewards = []; // 下一回合开始统一结算的延迟奖励队列
         this._roundStartResolverActive = false;
+        this._roundStartBannerActive = false; // 回合开始横幅保护标志，横幅期间防止 phase_combat_update 触发敌人行动
         this.spores = []; 
         this.fireWaves = []; 
         this.healWaves = []; // 扩散治疗波特效数组

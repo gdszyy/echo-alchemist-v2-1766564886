@@ -356,6 +356,7 @@ export const game_system = {
         this.relicSelectionCount = 0;
         this.pendingRoundStartRewards = [];
         this._roundStartResolverActive = false;
+        this._roundStartBannerActive = false; // 重置横幅保护标志
         // 重置 炼金火药管平坦伤害加成
         this.flatDamageBonus = 0;
         // 重置 敌人动作后符文领取标志
@@ -912,6 +913,9 @@ export const game_system = {
         // combat_update 中的 playerTurnFinished 条件（弹药为空）在横幅期间仍然
         // 满足，会再次调用 phase_enemy_startLogic()，导致敌人在回合开始时
         // 重复行动（与上一回合结束时的行动重复）。
+        // [BUGFIX 2] 设置横幅保护标志，阻止 phase_combat_update 在横幅期间触发敌人行动。
+        // 该标志在 setTimeout 回调结束、phase_startCombatPhase() 调用前清除。
+        this._roundStartBannerActive = true;
         this.isEnemyTurn = false;
         this.enemyWaveActive = false;
         this.enemyTurnTimer = 0;
@@ -976,7 +980,23 @@ export const game_system = {
                 });
                 this.ui_updateAmmoUI && this.ui_updateAmmoUI();
                 this.ui_renderRecipeHUD && this.ui_renderRecipeHUD();
+
+                // [Bug 修复] 回合开始充能子弹时，触发充能符文系统特效。
+                // 根因：充能子弹是直接重用上回合的 marbleQueue 编译，跳过了研磨阶段，
+                // 因此 combat_runeCharge_init() 在 phase_startCombatPhase() 中才会被调用，
+                // 而充能特效需要在子弹展示时即时播放，所以在此提前触发。
+                // @perf-impact: CSS keyframe 动画（charge-burst / charge-full-flash），无 Canvas 开销
+                if (this.combat_runeCharge_levelUp) {
+                    // 使用充能升级特效：充能条闪光脱去 + 外壳发光 + 符文槽刷新
+                    // 先重置充能状态（避免与上一回合的充能状态混淆）
+                    this.runeChargeValue = 0;
+                    this.runeChargeLevel = 0;
+                    // 触发充能升级特效（会自动抽取并展示当前充能符文）
+                    this.combat_runeCharge_levelUp();
+                }
             }
+            // [BUGFIX 2] 横幅结束，清除保护标志，再进入战斗阶段
+            this._roundStartBannerActive = false;
             this.phase_startCombatPhase();
         }, 1500);
     },

@@ -1,14 +1,12 @@
 {
-  "indexed": [
+  "indexed": [],
+  "skipped": [
     {
-      "file": "src/spawn_system.js",
-      "lines": 2205,
-      "funcs": 28,
-      "sections": 8,
-      "mega_funcs": 2,
-      "index_path": ".cursor/rules/auto_index/src_spawn_system_js_index.md"
+      "file": "src/core.js",
+      "lines": 419,
+      "funcs": 5,
+      "reason": "未达阈值 (行数=419<500, 函数数=5<20)"
     }
   ],
-  "skipped": [],
   "warnings": []
 }

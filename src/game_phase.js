@@ -1807,6 +1807,8 @@ phase_gathering_getRandomPegType() {
                            !this.isVisualEffectActive;
 
         if (playerTurnFinished && !this.gameOver) {
+            // [回合开始横幅保护] 横幅期间不触发敌人行动，避免与上一回合结束时的敌人行动重复
+            if (this._roundStartBannerActive) return;
             // 试炼场模式下，不自动进入敌人回合
             if (this.phase === 'training') {
                 if (this.isEnemyTurn) {
