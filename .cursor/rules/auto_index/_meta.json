@@ -1,12 +1,12 @@
 {
   "indexed": [
     {
-      "file": "src/game_system.js",
-      "lines": 1832,
-      "funcs": 42,
+      "file": "src/ui/rune_launcher.js",
+      "lines": 1699,
+      "funcs": 25,
       "sections": 0,
-      "mega_funcs": 0,
-      "index_path": ".cursor/rules/auto_index/src_game_system_js_index.md"
+      "mega_funcs": 1,
+      "index_path": ".cursor/rules/auto_index/src_ui_rune_launcher_js_index.md"
     }
   ],
   "skipped": [],

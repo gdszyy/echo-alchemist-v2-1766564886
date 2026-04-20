@@ -98,6 +98,16 @@ export const rune_launcher_system = {
                 }
             }
         }
+        // [BUGFIX] 符文发射器面板打开时，临时隐藏教程卡片和遮罩层，防止其以 z-index:9000+ 遮挡面板内的 Tab 按钮
+        // 关闭面板时（ui_closeRuneLauncher）会恢复显示
+        if (this._tutorialActive) {
+            const tutCard = document.getElementById('tutorial-card');
+            if (tutCard) tutCard.style.display = 'none';
+            const tutOverlay = document.getElementById('tutorial-overlay');
+            if (tutOverlay) tutOverlay.style.display = 'none';
+            const tutHighlight = document.getElementById('tutorial-highlight');
+            if (tutHighlight) tutHighlight.style.display = 'none';
+        }
         // [BUGFIX] 确保 picker 蒙层在打开时是关闭状态（防止上次残留）
         const pickerOverlay = document.getElementById('rune-picker-overlay');
         if (pickerOverlay) pickerOverlay.classList.add('hidden');
@@ -146,8 +156,15 @@ export const rune_launcher_system = {
             const panel2 = document.getElementById('phase-rune-launcher');
             if (panel2) panel2.style.overflow = '';
         }
-        this._pendingRuneGridIndex = null;
-
+         this._pendingRuneGridIndex = null;
+        // [BUGFIX] 关闭符文发射器面板时，恢复教程卡片和遮罩层的显示（与 ui_openRuneLauncher 中的隐藏操作对应）
+        if (this._tutorialActive) {
+            const tutCard = document.getElementById('tutorial-card');
+            if (tutCard) tutCard.style.display = 'block';
+            const tutOverlay = document.getElementById('tutorial-overlay');
+            if (tutOverlay) tutOverlay.style.display = 'block';
+            // 高亮框的显示状态由 _tutorial_updateHighlight 控制，此处不强制恢复，避免覆盖 noOverlay 步骤的隐藏逻辑
+        }
         const panel = document.getElementById('phase-rune-launcher');
         if (panel) {
             const isPCMode = document.body.classList.contains('pc-mode');
