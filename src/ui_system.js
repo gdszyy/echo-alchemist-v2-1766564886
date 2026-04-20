@@ -430,9 +430,9 @@ ui_closeTruthBook() {
             gridEl.style.maxWidth = '';
             gridEl.innerHTML = '';
 
-            // 外层容器：两列布局
+            // 外层容器：上下两行，每行三列
             const wrapper = document.createElement('div');
-            wrapper.className = 'w-full flex flex-col gap-3';
+            wrapper.className = 'w-full flex flex-col gap-2';
 
             // ─── 辅助函数：渲染一张子弹卡片 ────────────────────────────────
             const renderCard = (recipe, globalIdx, label) => {
@@ -472,7 +472,7 @@ ui_closeTruthBook() {
                     'display:flex',
                     'flex-direction:column',
                     'align-items:center',
-                    'padding:10px 8px 8px',
+                    'padding:7px 5px 6px',
                     'border-radius:10px',
                     'cursor:pointer',
                     'user-select:none',
@@ -556,18 +556,7 @@ ui_closeTruthBook() {
                 else if (recipe.wind > 0) { iconBg = 'radial-gradient(circle at 35% 35%, #d1fae5, #34d399)'; }
                 else if (recipe.flying_sword > 0) { iconBg = 'radial-gradient(circle at 35% 35%, #bae6fd, #0ea5e9)'; iconGlow = '0 0 8px #0ea5e9'; }
 
-                const sz = ts.iconSize;
-                const iconEl = document.createElement('div');
-                iconEl.style.cssText = [
-                    'width:' + sz + 'px',
-                    'height:' + sz + 'px',
-                    'border-radius:50%',
-                    'background:' + iconBg,
-                    'box-shadow:' + iconGlow,
-                    'flex-shrink:0',
-                    'margin-top:4px',
-                ].join(';');
-                card.appendChild(iconEl);
+                // 弹珠图标已隐藏以节省空间（一行三列紧凑布局）
 
                 // 子弹名称
                 const marbleType = recipe._marbleType || recipe.type || 'normal';
@@ -575,7 +564,7 @@ ui_closeTruthBook() {
                 // 浮雕卡片的名称用属性主题色
                 const nameColor = dominant ? dominant.theme[2] : '#fef3c7';
                 const nameEl = document.createElement('div');
-                nameEl.style.cssText = 'font-size:' + ts.nameFontSize + ';font-weight:700;color:' + nameColor + ';margin-top:5px;text-align:center;line-height:1.2;';
+                nameEl.style.cssText = 'font-size:' + ts.nameFontSize + ';font-weight:700;color:' + nameColor + ';margin-top:2px;text-align:center;line-height:1.2;';
                 nameEl.innerText = typeNames[marbleType] || marbleType;
                 card.appendChild(nameEl);
 
@@ -605,7 +594,7 @@ ui_closeTruthBook() {
                 const attrKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind'];
                 const attrIcons = (CONFIG.ui && CONFIG.ui.attributeDisplay) ? CONFIG.ui.attributeDisplay : {};
                 const attrsEl = document.createElement('div');
-                attrsEl.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:5px;';
+                attrsEl.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;justify-content:center;margin-top:3px;';
                 let hasAttr = false;
                 attrKeys.forEach(function(k) {
                     if (recipe[k] && recipe[k] > 0) {
@@ -641,7 +630,7 @@ ui_closeTruthBook() {
 
                 // 来源标签（底部）
                 const srcEl = document.createElement('div');
-                srcEl.style.cssText = 'font-size:9px;font-weight:600;margin-top:5px;' +
+                srcEl.style.cssText = 'font-size:9px;font-weight:600;margin-top:3px;' +
                     (label === 'new' ? 'color:#38bdf8;' : 'color:#fbbf24;');
                 srcEl.innerText = label === 'new' ? '✦ 新研磨' : '⚡ 充能';
                 card.appendChild(srcEl);
@@ -650,35 +639,42 @@ ui_closeTruthBook() {
                 return cardWrap;
             };
 
-            // 两列布局
-            const columns = document.createElement('div');
-            columns.className = 'flex gap-3 justify-center w-full';
+            // 上行：新研磨（一行三列）
+            if (newRecipes.length > 0) {
+                const newRow = document.createElement('div');
+                newRow.className = 'flex flex-col gap-1';
+                const newHeader = document.createElement('div');
+                newHeader.className = 'text-[10px] text-sky-400 font-bold text-center border-b border-sky-400/30 pb-1';
+                newHeader.innerText = '\u2728 新研磨';
+                newRow.appendChild(newHeader);
+                const newCards = document.createElement('div');
+                newCards.className = 'grid gap-2 w-full';
+                newCards.style.gridTemplateColumns = 'repeat(' + newRecipes.length + ', 1fr)';
+                newRecipes.forEach((recipe, i) => {
+                    newCards.appendChild(renderCard(recipe, i, 'new'));
+                });
+                newRow.appendChild(newCards);
+                wrapper.appendChild(newRow);
+            }
 
-            // 左列：新研磨
-            const leftCol = document.createElement('div');
-            leftCol.className = 'flex flex-col gap-2 flex-1';
-            const leftHeader = document.createElement('div');
-            leftHeader.className = 'text-[10px] text-sky-400 font-bold text-center mb-1 border-b border-sky-400/30 pb-1';
-            leftHeader.innerText = '\u2728 新研磨';
-            leftCol.appendChild(leftHeader);
-            newRecipes.forEach((recipe, i) => {
-                leftCol.appendChild(renderCard(recipe, i, 'new'));
-            });
+            // 下行：充能子弹（一行三列）
+            if (chargedRecipes.length > 0) {
+                const chargedRow = document.createElement('div');
+                chargedRow.className = 'flex flex-col gap-1';
+                const chargedHeader = document.createElement('div');
+                chargedHeader.className = 'text-[10px] text-amber-400 font-bold text-center border-b border-amber-400/30 pb-1';
+                chargedHeader.innerText = '\u26a1 充能子弹';
+                chargedRow.appendChild(chargedHeader);
+                const chargedCards = document.createElement('div');
+                chargedCards.className = 'grid gap-2 w-full';
+                chargedCards.style.gridTemplateColumns = 'repeat(' + chargedRecipes.length + ', 1fr)';
+                chargedRecipes.forEach((recipe, i) => {
+                    chargedCards.appendChild(renderCard(recipe, newRecipes.length + i, 'charged'));
+                });
+                chargedRow.appendChild(chargedCards);
+                wrapper.appendChild(chargedRow);
+            }
 
-            // 右列：充能子弹
-            const rightCol = document.createElement('div');
-            rightCol.className = 'flex flex-col gap-2 flex-1';
-            const rightHeader = document.createElement('div');
-            rightHeader.className = 'text-[10px] text-amber-400 font-bold text-center mb-1 border-b border-amber-400/30 pb-1';
-            rightHeader.innerText = '\u26a1 充能子弹';
-            rightCol.appendChild(rightHeader);
-            chargedRecipes.forEach((recipe, i) => {
-                rightCol.appendChild(renderCard(recipe, newRecipes.length + i, 'charged'));
-            });
-
-            columns.appendChild(leftCol);
-            columns.appendChild(rightCol);
-            wrapper.appendChild(columns);
             gridEl.appendChild(wrapper);
         }
 
