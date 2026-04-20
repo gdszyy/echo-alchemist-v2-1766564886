@@ -2598,6 +2598,30 @@
             0%, 100% { opacity: 1; transform: scale(1); }
             50%       { opacity: 0.7; transform: scale(1.08); }
         }
+
+        /* ── 子弹替换卡片：扫光动画（Layer 3 闪光卡片） ── */
+        @keyframes ammo-shine-sweep {
+            0%   { transform: translateX(-120%) skewX(-20deg); opacity: 0; }
+            15%  { opacity: 1; }
+            85%  { opacity: 1; }
+            100% { transform: translateX(220%) skewX(-20deg); opacity: 0; }
+        }
+        .ammo-card-shine::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                105deg,
+                transparent 30%,
+                rgba(255,255,255,0.18) 48%,
+                rgba(255,255,255,0.32) 50%,
+                rgba(255,255,255,0.18) 52%,
+                transparent 70%
+            );
+            animation: ammo-shine-sweep 2.8s ease-in-out infinite;
+            border-radius: inherit;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>

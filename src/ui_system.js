@@ -298,6 +298,16 @@ ui_closeTruthBook() {
      * @description [ammo-replace] 渲染「研磨完成后子弹替换」阶段的 UI。
      * 展示 6 张卡片：左侧 3 张是新研磨的 recipe，右侧 3 张是充能子弹。
      * 默认选中右侧 3 张（保持充能子弹），玩家可切换选中。
+     *
+     * 卡片三层叠加视觉系统：
+     *   Layer 1 — 稀有度边框（multicast + 属性总层数综合评级 C/B/A/S）
+     *     - multicast: >=9→S, >=6→A, >=3→B, 0→C
+     *     - 属性总层数: >=15→S, >=8→A, >=3→B, <3→C
+     *     - 取两者较高等级
+     *   Layer 2 — 主属性浮雕背景（主属性 >5 且占总层数 >=50%）
+     *     - 卡片背景换为该属性的主题渐变 + 浮雕纹理感
+     *   Layer 3 — 闪光扫光（总属性层数 >12）
+     *     - 叠加 CSS 扫光动画 .ammo-card-shine
      * 卡片索引：0~(newRecipes.length-1) 为新研磨，newRecipes.length~ 为充能子弹。
      */
     ui_renderReplaceAmmoUI() {
@@ -341,6 +351,79 @@ ui_closeTruthBook() {
         if (countEl) countEl.innerText = String(selectedIndices.length);
         if (requiredEl) requiredEl.innerText = String(maxSelect);
 
+        // ─── Layer 1: 稀有度评级辅助函数 ──────────────────────────────────────
+        // 返回 0=C / 1=B / 2=A / 3=S
+        const _calcTier = (recipe) => {
+            const mc = recipe.multicast || 0;
+            const mcTier = mc >= 9 ? 3 : mc >= 6 ? 2 : mc >= 3 ? 1 : 0;
+            const statKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind'];
+            let statSum = 0;
+            statKeys.forEach(k => { if (recipe[k] > 0) statSum += recipe[k]; });
+            if (recipe.explosive) statSum += 3;
+            if (recipe.isLaser && !(recipe.laser > 0)) statSum += 3;
+            const statTier = statSum >= 15 ? 3 : statSum >= 8 ? 2 : statSum >= 3 ? 1 : 0;
+            return Math.max(mcTier, statTier);
+        };
+
+        // ─── Layer 2: 主属性浮雕识别 ──────────────────────────────────────
+        // 返回 null 或 { key, val, theme } 对象
+        const _calcDominant = (recipe) => {
+            const statKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind'];
+            let statSum = 0;
+            let maxKey = null, maxVal = 0;
+            statKeys.forEach(k => {
+                const v = recipe[k] || 0;
+                if (v > 0) { statSum += v; if (v > maxVal) { maxVal = v; maxKey = k; } }
+            });
+            // 条件：主属性 >5 且占总层数 >=50%
+            if (!maxKey || maxVal <= 5 || statSum === 0 || maxVal / statSum < 0.5) return null;
+            // 属性主题配置：[ bgGrad, accentColor, embossLight, embossDark ]
+            const ATTR_THEMES = {
+                pyro:        ['linear-gradient(160deg,#7c2d12 0%,#431407 60%,#1c0a03 100%)', '#f97316', '#fdba74', '#7c2d12'],
+                cryo:        ['linear-gradient(160deg,#0c4a6e 0%,#082f49 60%,#020f1a 100%)', '#06b6d4', '#bae6fd', '#0c4a6e'],
+                lightning:   ['linear-gradient(160deg,#3b0764 0%,#1e0536 60%,#0a0118 100%)', '#c084fc', '#e9d5ff', '#3b0764'],
+                laser:       ['linear-gradient(160deg,#0c2a4a 0%,#061525 60%,#020810 100%)', '#60a5fa', '#bfdbfe', '#0c2a4a'],
+                bounce:      ['linear-gradient(160deg,#14532d 0%,#052e16 60%,#010f07 100%)', '#22c55e', '#bbf7d0', '#14532d'],
+                pierce:      ['linear-gradient(160deg,#7f1d1d 0%,#450a0a 60%,#1a0303 100%)', '#ef4444', '#fecaca', '#7f1d1d'],
+                scatter:     ['linear-gradient(160deg,#713f12 0%,#3b1f05 60%,#150b01 100%)', '#eab308', '#fef08a', '#713f12'],
+                damage:      ['linear-gradient(160deg,#4a1d96 0%,#2e1065 60%,#0f0528 100%)', '#a855f7', '#e9d5ff', '#4a1d96'],
+                wind:        ['linear-gradient(160deg,#064e3b 0%,#022c22 60%,#010f0a 100%)', '#34d399', '#a7f3d0', '#064e3b'],
+                flying_sword:['linear-gradient(160deg,#0c4a6e 0%,#082f49 60%,#020f1a 100%)', '#0ea5e9', '#bae6fd', '#0c4a6e'],
+            };
+            const theme = ATTR_THEMES[maxKey] || null;
+            return theme ? { key: maxKey, val: maxVal, theme } : null;
+        };
+
+        // ─── Layer 3: 闪光判断 ────────────────────────────────────────────────
+        const _calcShine = (recipe) => {
+            const statKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind'];
+            let statSum = 0;
+            statKeys.forEach(k => { if (recipe[k] > 0) statSum += recipe[k]; });
+            if (recipe.explosive) statSum += 3;
+            if (recipe.isLaser && !(recipe.laser > 0)) statSum += 3;
+            return statSum > 12;
+        };
+
+        // 各 tier 的边框视觉配置
+        const TIER_STYLES = [
+            // C — 灰色基础，无光晕
+            { label: 'C', labelColor: '#94a3b8', borderIdle: '#475569', borderSelected: '#f59e0b',
+              bgIdle: 'rgba(30,41,59,0.75)', bgSelected: 'rgba(245,158,11,0.12)',
+              glow: 'none', iconSize: 26, nameFontSize: '12px' },
+            // B — 蓝绿色，轻微光晕
+            { label: 'B', labelColor: '#34d399', borderIdle: '#34d399', borderSelected: '#f59e0b',
+              bgIdle: 'rgba(6,78,59,0.35)', bgSelected: 'rgba(245,158,11,0.15)',
+              glow: '0 0 8px rgba(52,211,153,0.35)', iconSize: 30, nameFontSize: '12px' },
+            // A — 紫色精英，明显光晕
+            { label: 'A', labelColor: '#c084fc', borderIdle: '#c084fc', borderSelected: '#f59e0b',
+              bgIdle: 'rgba(88,28,135,0.35)', bgSelected: 'rgba(245,158,11,0.15)',
+              glow: '0 0 12px rgba(192,132,252,0.5)', iconSize: 34, nameFontSize: '13px' },
+            // S — 金色传说，强烈光晕 + 顶部彩条
+            { label: 'S', labelColor: '#facc15', borderIdle: '#facc15', borderSelected: '#facc15',
+              bgIdle: 'rgba(120,53,15,0.40)', bgSelected: 'rgba(245,158,11,0.22)',
+              glow: '0 0 18px rgba(250,204,21,0.65)', iconSize: 38, nameFontSize: '13px' },
+        ];
+
         // 渲染卡片列表
         if (gridEl) {
             gridEl.style.gridTemplateColumns = '';
@@ -351,78 +434,220 @@ ui_closeTruthBook() {
             const wrapper = document.createElement('div');
             wrapper.className = 'w-full flex flex-col gap-3';
 
-            // 辅助函数：渲染一张子弹卡片
+            // ─── 辅助函数：渲染一张子弹卡片 ────────────────────────────────
             const renderCard = (recipe, globalIdx, label) => {
                 const isSelected = selectedIndices.includes(globalIdx);
+                const tier = _calcTier(recipe);
+                const ts = TIER_STYLES[tier];
+                const dominant = _calcDominant(recipe);
+                const shine = _calcShine(recipe);
+
+                // ─── 卡片外层容器（overflow:hidden 用于裁剪扫光）
+                const cardWrap = document.createElement('div');
+                cardWrap.style.cssText = 'position:relative;border-radius:10px;overflow:hidden;';
+
+                // ─── Layer 1 边框 + Layer 2 浮雕背景
                 const card = document.createElement('div');
-                card.className = [
-                    'relative flex flex-col items-center p-2 rounded-lg border cursor-pointer transition-all duration-150 select-none',
+                // 背景优先级：浮雕 > tier 默认
+                let cardBg;
+                if (dominant) {
+                    const [bgGrad, accent, embossL, embossD] = dominant.theme;
+                    // 浮雕效果：在属性主题渐变上叠加对角线亮面，模拟浮雕纹理
+                    const embossOverlay = 'linear-gradient(135deg,' + embossL + '22 0%,transparent 40%,transparent 60%,' + embossD + '44 100%)';
+                    cardBg = isSelected
+                        ? bgGrad.replace('100%)', '100%), ' + embossOverlay)
+                        : bgGrad + ', ' + embossOverlay;
+                    // 实际实现：用 CSS 多背景叠加
+                    card.style.background = bgGrad;
+                    // 内嵌一层浮雕覆盖层
+                    const embossLayer = document.createElement('div');
+                    embossLayer.style.cssText = 'position:absolute;inset:0;border-radius:10px;pointer-events:none;background:' + embossOverlay + ';';
+                    cardWrap.appendChild(embossLayer);
+                } else {
+                    card.style.background = isSelected ? ts.bgSelected : ts.bgIdle;
+                }
+
+                card.style.cssText += [
+                    'position:relative',
+                    'display:flex',
+                    'flex-direction:column',
+                    'align-items:center',
+                    'padding:10px 8px 8px',
+                    'border-radius:10px',
+                    'cursor:pointer',
+                    'user-select:none',
+                    'transition:all 0.15s',
+                    'overflow:visible',
+                    'border:1.5px solid ' + (isSelected ? ts.borderSelected : (dominant ? dominant.theme[1] : ts.borderIdle)),
+                    'box-shadow:' + (isSelected
+                        ? '0 0 0 2px ' + ts.borderSelected + ', ' + (dominant ? '0 0 14px ' + dominant.theme[1] + '88' : ts.glow)
+                        : (dominant ? '0 0 10px ' + dominant.theme[1] + '55' : ts.glow)),
+                ].join(';');
+
+                cardWrap.appendChild(card);
+
+                // ─── Layer 3: 扫光覆盖层（overflow:hidden 已在 cardWrap 设置）
+                if (shine) {
+                    const shineEl = document.createElement('div');
+                    shineEl.className = 'ammo-card-shine';
+                    shineEl.style.cssText = 'position:absolute;inset:0;border-radius:10px;pointer-events:none;z-index:10;';
+                    cardWrap.appendChild(shineEl);
+                }
+
+                // S 级顶部彩条
+                if (tier === 3) {
+                    const topBar = document.createElement('div');
+                    topBar.style.cssText = 'position:absolute;top:0;left:0;right:0;height:3px;border-radius:10px 10px 0 0;background:linear-gradient(90deg,#f59e0b,#facc15,#fde68a,#facc15,#f59e0b);z-index:11;pointer-events:none;';
+                    cardWrap.appendChild(topBar);
+                }
+
+                // Tier 徽章（左上角，浮在 cardWrap 上方）
+                const tierBadge = document.createElement('div');
+                tierBadge.style.cssText = [
+                    'position:absolute',
+                    'top:-7px',
+                    'left:6px',
+                    'font-size:9px',
+                    'font-weight:900',
+                    'line-height:1',
+                    'padding:2px 5px',
+                    'border-radius:4px',
+                    'letter-spacing:0.05em',
+                    'z-index:12',
+                    'color:' + (dominant ? dominant.theme[1] : ts.labelColor),
+                    'background:rgba(15,23,42,0.92)',
+                    'border:1px solid ' + (dominant ? dominant.theme[1] : ts.labelColor),
+                    'box-shadow:0 0 6px ' + (dominant ? dominant.theme[1] : ts.labelColor) + '66',
+                ].join(';');
+                tierBadge.innerText = tier === 3 ? '✦ S' : tier === 2 ? 'A' : tier === 1 ? 'B' : 'C';
+                cardWrap.appendChild(tierBadge);
+
+                // 选中标识（右上角）
+                const checkBadge = document.createElement('div');
+                checkBadge.style.cssText = [
+                    'position:absolute',
+                    'top:-7px',
+                    'right:6px',
+                    'font-size:9px',
+                    'font-weight:700',
+                    'padding:2px 5px',
+                    'border-radius:4px',
+                    'z-index:12',
                     isSelected
-                        ? 'border-amber-400 bg-amber-500/15 ring-2 ring-amber-400/60 shadow-amber-500/20 shadow-md'
-                        : 'border-slate-600/60 bg-slate-800/60 hover:border-slate-400/80 hover:bg-slate-700/40',
-                ].join(' ');
+                        ? 'background:#f59e0b;color:#1e293b;'
+                        : 'background:rgba(30,41,59,0.9);color:#64748b;border:1px solid #334155;',
+                ].join(';');
+                checkBadge.innerText = isSelected ? '✓' : '○';
+                cardWrap.appendChild(checkBadge);
+
+                // ─── 卡片内容（均挂在 card 上）
 
                 // 子弹类型图标（纯CSS球体）
                 let iconBg = '#e2e8f0';
-                let iconShadow = 'none';
-                if (recipe.isLaser) { iconBg = '#ffffff'; iconShadow = '0 0 8px #60a5fa'; }
-                else if (recipe.explosive) { iconBg = '#fca5a5'; iconShadow = '0 0 6px #ef4444'; }
-                else if (recipe.pyro) { iconBg = '#fdba74'; iconShadow = '0 0 6px #f97316'; }
-                else if (recipe.cryo) { iconBg = '#cffafe'; iconShadow = '0 0 6px #06b6d4'; }
-                else if (recipe.lightning) { iconBg = '#e9d5ff'; iconShadow = '0 0 6px #c084fc'; }
-                else if (recipe.pierce) { iconBg = '#fecaca'; }
-                else if (recipe.bounce) { iconBg = '#bbf7d0'; }
+                let iconGlow = 'none';
+                if (recipe.isLaser) { iconBg = 'radial-gradient(circle at 35% 35%, #ffffff, #93c5fd)'; iconGlow = '0 0 10px #60a5fa, 0 0 20px #3b82f680'; }
+                else if (recipe.explosive) { iconBg = 'radial-gradient(circle at 35% 35%, #fecaca, #ef4444)'; iconGlow = '0 0 10px #ef4444, 0 0 20px #ef444460'; }
+                else if (recipe.pyro > 0) { iconBg = 'radial-gradient(circle at 35% 35%, #fed7aa, #f97316)'; iconGlow = '0 0 10px #f97316, 0 0 18px #f9731660'; }
+                else if (recipe.cryo > 0) { iconBg = 'radial-gradient(circle at 35% 35%, #e0f2fe, #06b6d4)'; iconGlow = '0 0 10px #06b6d4, 0 0 18px #06b6d460'; }
+                else if (recipe.lightning > 0) { iconBg = 'radial-gradient(circle at 35% 35%, #f3e8ff, #c084fc)'; iconGlow = '0 0 10px #c084fc, 0 0 18px #c084fc60'; }
+                else if (recipe.pierce > 0) { iconBg = 'radial-gradient(circle at 35% 35%, #fecaca, #ef4444)'; }
+                else if (recipe.bounce > 0) { iconBg = 'radial-gradient(circle at 35% 35%, #dcfce7, #22c55e)'; }
+                else if (recipe.scatter > 0) { iconBg = 'radial-gradient(circle at 35% 35%, #fef9c3, #eab308)'; }
+                else if (recipe.wind > 0) { iconBg = 'radial-gradient(circle at 35% 35%, #d1fae5, #34d399)'; }
+                else if (recipe.flying_sword > 0) { iconBg = 'radial-gradient(circle at 35% 35%, #bae6fd, #0ea5e9)'; iconGlow = '0 0 8px #0ea5e9'; }
 
+                const sz = ts.iconSize;
                 const iconEl = document.createElement('div');
-                iconEl.style.cssText = 'width:20px;height:20px;border-radius:50%;background:' + iconBg + ';box-shadow:' + iconShadow + ';flex-shrink:0;';
+                iconEl.style.cssText = [
+                    'width:' + sz + 'px',
+                    'height:' + sz + 'px',
+                    'border-radius:50%',
+                    'background:' + iconBg,
+                    'box-shadow:' + iconGlow,
+                    'flex-shrink:0',
+                    'margin-top:4px',
+                ].join(';');
+                card.appendChild(iconEl);
 
                 // 子弹名称
-                const nameEl = document.createElement('div');
                 const marbleType = recipe._marbleType || recipe.type || 'normal';
-                const typeNames = { normal: '普通', explosive: '爆炸', cryo: '冰霜', pyro: '火焰', lightning: '雷电', laser: '激光', bounce: '弹跳', pierce: '穿透', scatter: '散射', rainbow: '彩虹', matryoshka: '套娃' };
-                nameEl.className = 'text-[11px] font-bold text-amber-100 mt-1 text-center leading-tight';
+                const typeNames = { normal: '普通', explosive: '爆炸', cryo: '冰霜', pyro: '火焰', lightning: '雷电', laser: '激光', bounce: '弹跳', pierce: '穿透', scatter: '散射', rainbow: '彩虹', matryoshka: '套娃', flying_sword: '飞剑' };
+                // 浮雕卡片的名称用属性主题色
+                const nameColor = dominant ? dominant.theme[2] : '#fef3c7';
+                const nameEl = document.createElement('div');
+                nameEl.style.cssText = 'font-size:' + ts.nameFontSize + ';font-weight:700;color:' + nameColor + ';margin-top:5px;text-align:center;line-height:1.2;';
                 nameEl.innerText = typeNames[marbleType] || marbleType;
+                card.appendChild(nameEl);
 
-                // 属性行
-                const attrsEl = document.createElement('div');
-                attrsEl.className = 'flex flex-wrap gap-0.5 justify-center mt-1';
+                // 连射数（multicast）显示
+                const mc = recipe.multicast || 0;
+                if (mc > 0) {
+                    const mcEl = document.createElement('div');
+                    let mcColor = '#94a3b8';
+                    if (mc >= 9) mcColor = '#facc15';
+                    else if (mc >= 6) mcColor = '#c084fc';
+                    else if (mc >= 3) mcColor = '#34d399';
+                    mcEl.style.cssText = [
+                        'display:flex',
+                        'align-items:center',
+                        'gap:2px',
+                        'margin-top:4px',
+                        'font-size:11px',
+                        'font-weight:800',
+                        'color:' + mcColor,
+                        'text-shadow:0 0 6px ' + mcColor + '99',
+                    ].join(';');
+                    mcEl.innerHTML = '<span style="font-size:9px;opacity:0.8;">🔗</span><span>×' + (1 + mc) + '</span>';
+                    card.appendChild(mcEl);
+                }
+
+                // 属性行（带颜色图标）
                 const attrKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind'];
                 const attrIcons = (CONFIG.ui && CONFIG.ui.attributeDisplay) ? CONFIG.ui.attributeDisplay : {};
+                const attrsEl = document.createElement('div');
+                attrsEl.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:5px;';
                 let hasAttr = false;
                 attrKeys.forEach(function(k) {
                     if (recipe[k] && recipe[k] > 0) {
                         hasAttr = true;
-                        const span = document.createElement('span');
-                        span.className = 'text-[10px] text-slate-300';
-                        const icon = attrIcons[k] ? (attrIcons[k].icon || '\u25c6') : '\u25c6';
-                        span.innerText = icon + recipe[k];
-                        attrsEl.appendChild(span);
+                        const info = attrIcons[k] || {};
+                        const attrColor = info.color || '#94a3b8';
+                        const attrIcon = info.icon || '◆';
+                        const isDominantAttr = dominant && dominant.key === k;
+                        const chip = document.createElement('span');
+                        chip.style.cssText = [
+                            'display:inline-flex',
+                            'align-items:center',
+                            'gap:1px',
+                            'font-size:10px',
+                            'font-weight:' + (isDominantAttr ? '800' : '600'),
+                            'padding:1px 4px',
+                            'border-radius:4px',
+                            isDominantAttr
+                                ? 'background:' + attrColor + '33;border:1px solid ' + attrColor + ';color:' + attrColor + ';box-shadow:0 0 5px ' + attrColor + '66;'
+                                : 'background:rgba(15,23,42,0.7);border:1px solid ' + attrColor + '55;color:' + attrColor + ';',
+                        ].join(';');
+                        chip.innerHTML = '<span style="font-size:9px;">' + attrIcon + '</span><span>' + recipe[k] + '</span>';
+                        attrsEl.appendChild(chip);
                     }
                 });
                 if (!hasAttr) {
-                    const span = document.createElement('span');
-                    span.className = 'text-[10px] text-slate-500';
-                    span.innerText = '基础';
-                    attrsEl.appendChild(span);
+                    const chip = document.createElement('span');
+                    chip.style.cssText = 'font-size:10px;color:#475569;padding:1px 4px;';
+                    chip.innerText = '基础';
+                    attrsEl.appendChild(chip);
                 }
-
-                // 选中标识
-                const badgeEl = document.createElement('div');
-                badgeEl.className = 'absolute top-1 right-1 text-[9px] font-bold px-1 rounded ' + (isSelected ? 'bg-amber-400 text-slate-900' : 'bg-slate-700 text-slate-400');
-                badgeEl.innerText = isSelected ? '\u2713' : '\u25cb';
-
-                // 来源标签
-                const labelEl2 = document.createElement('div');
-                labelEl2.className = 'text-[9px] mt-1 font-semibold ' + (label === 'new' ? 'text-sky-400' : 'text-amber-400');
-                labelEl2.innerText = label === 'new' ? '新研磨' : '充能';
-
-                card.appendChild(badgeEl);
-                card.appendChild(iconEl);
-                card.appendChild(nameEl);
                 card.appendChild(attrsEl);
-                card.appendChild(labelEl2);
-                card.onclick = () => this.ui_toggleReplaceAmmoCard(globalIdx);
-                return card;
+
+                // 来源标签（底部）
+                const srcEl = document.createElement('div');
+                srcEl.style.cssText = 'font-size:9px;font-weight:600;margin-top:5px;' +
+                    (label === 'new' ? 'color:#38bdf8;' : 'color:#fbbf24;');
+                srcEl.innerText = label === 'new' ? '✦ 新研磨' : '⚡ 充能';
+                card.appendChild(srcEl);
+
+                cardWrap.onclick = () => this.ui_toggleReplaceAmmoCard(globalIdx);
+                return cardWrap;
             };
 
             // 两列布局
