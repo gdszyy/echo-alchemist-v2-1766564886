@@ -526,6 +526,12 @@ export const spawn_system = {
                         this.spawn_createParticle(e.pos.x, e.pos.y, '#facc15', 'spark');
                     }
                 }
+
+                // [奖励预计算] 生成时预先决定该敌人是否会掉落奖励及其类型，
+                // 供渲染管线在存活期间显示光晕（死亡时才真正排队奖励）
+                if (typeof this.sys_preCalcEnemyRewardType === 'function') {
+                    this.sys_preCalcEnemyRewardType(e);
+                }
                 
                 this.enemies.push(e);
                 currentCount++;
@@ -570,6 +576,10 @@ export const spawn_system = {
                     if (cfg.extraInit && cfg.extraInit.temp !== undefined) {
                         this.spawn_createShockwave(e.pos.x, e.pos.y, '#ef4444');
                     }
+                }
+                // [奖励预计算] 生成时预先决定该敌人是否会掉落奖励及其类型
+                if (typeof this.sys_preCalcEnemyRewardType === 'function') {
+                    this.sys_preCalcEnemyRewardType(e);
                 }
                 this.enemies.push(e);
             }

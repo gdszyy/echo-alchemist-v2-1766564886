@@ -795,12 +795,13 @@ export const game_system = {
     },
 
     /**
-     * @method sys_tryQueueEnemyRoundReward
-     * @description 敌人死亡后，为下一回合开始登记遗物、混沌精华或纯净精华奖励。
+     * @method sys_preCalcEnemyRewardType
+     * @description 敌人生成时预先计算掉落奖励类型并标记到 _pendingRewardType，
+     *              供渲染管线在敌人存活期间显示专属视觉光晕。
+     *              注意：此方法只做概率计算和标记，不排队奖励（排队在死亡时进行）。
      */
-    sys_tryQueueEnemyRoundReward(enemy) {
-        if (!enemy || enemy.type === 'boss' || enemy._roundStartRewardQueued) return null;
-        enemy._roundStartRewardQueued = true;
+    sys_preCalcEnemyRewardType(enemy) {
+        if (!enemy || enemy.type === 'boss') return;
 
         const affixCount = Array.isArray(enemy.affixes) ? enemy.affixes.length : 0;
         const gameplayCfg = CONFIG.gameplay || {};
@@ -810,7 +811,7 @@ export const game_system = {
                 + affixCount * (gameplayCfg.enemyDropAffixBonus || 0.03),
             gameplayCfg.enemyDropMaxChance || 0.24
         );
-        if (Math.random() >= dropChance) return null;
+        if (Math.random() >= dropChance) return; // 未命中掉落，不标记
 
         const relicChance = Math.min(
             (gameplayCfg.enemyDropRelicBaseChance || 0.12)
@@ -819,18 +820,57 @@ export const game_system = {
             gameplayCfg.enemyDropRelicMaxChance || 0.45
         );
         const essenceType = Math.random() < (gameplayCfg.enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
+        // 预先标记奖励类型，供渲染管线在存活期间显示光晕
+        enemy._pendingRewardType = Math.random() < relicChance ? 'relic' : essenceType;
+    },
+
+    /**
+     * @method sys_tryQueueEnemyRoundReward
+     * @description 敌人死亡后，为下一回合开始登记遗物、混沌精华或纯净精华奖励。
+     *              若敌人已有 _pendingRewardType（由生成时预计算），则直接使用该类型排队，
+     *              否则重新计算（兼容未经预计算的敌人，如分身）。
+     */
+    sys_tryQueueEnemyRoundReward(enemy) {
+        if (!enemy || enemy.type === 'boss' || enemy._roundStartRewardQueued) return null;
+        enemy._roundStartRewardQueued = true;
+
+        let rewardType = enemy._pendingRewardType || null;
+
+        if (!rewardType) {
+            // 兼容路径：未经预计算的敌人（如分身克隆）在死亡时重新计算
+            const affixCount = Array.isArray(enemy.affixes) ? enemy.affixes.length : 0;
+            const gameplayCfg = CONFIG.gameplay || {};
+            const dropChance = Math.min(
+                (gameplayCfg.enemyDropBaseChance || 0.04)
+                    + Math.min(this.round || 1, gameplayCfg.enemyDropRoundBonusCap || 20) * (gameplayCfg.enemyDropRoundBonus || 0.004)
+                    + affixCount * (gameplayCfg.enemyDropAffixBonus || 0.03),
+                gameplayCfg.enemyDropMaxChance || 0.24
+            );
+            if (Math.random() >= dropChance) return null;
+
+            const relicChance = Math.min(
+                (gameplayCfg.enemyDropRelicBaseChance || 0.12)
+                    + affixCount * (gameplayCfg.enemyDropRelicAffixBonus || 0.12)
+                    + ((enemy.maxHp || 0) >= (gameplayCfg.enemyDropRelicHighHpThreshold || 120) ? (gameplayCfg.enemyDropRelicHighHpBonus || 0.08) : 0),
+                gameplayCfg.enemyDropRelicMaxChance || 0.45
+            );
+            const essenceType = Math.random() < (gameplayCfg.enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
+            rewardType = Math.random() < relicChance ? 'relic' : essenceType;
+        }
+
+        const essenceTypeFallback = Math.random() < ((CONFIG.gameplay || {}).enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
         const queuedReward = this.sys_queueRoundStartReward(
-            Math.random() < relicChance
+            rewardType === 'relic'
                 ? {
                     type: 'relic',
                     source: 'enemy_drop',
                     round: this.round,
                     enemyType: enemy.type || 'normal',
                     enemyMaxHp: enemy.maxHp || 0,
-                    fallbackRewardType: essenceType,
+                    fallbackRewardType: essenceTypeFallback,
                 }
                 : {
-                    type: essenceType,
+                    type: rewardType,
                     source: 'enemy_drop',
                     round: this.round,
                     enemyType: enemy.type || 'normal',
@@ -839,8 +879,8 @@ export const game_system = {
         );
 
         if (!queuedReward) return null;
-        // 为敌人打上奖励类型标记，供渲染管线识别并显示专属视觉样式
-        enemy._pendingRewardType = queuedReward.type; // 'relic' | 'chaos_essence' | 'pure_essence'
+        // 同步最终确认的奖励类型（sys_queueRoundStartReward 可能因遗物已满而降级为精华）
+        enemy._pendingRewardType = queuedReward.type;
         if (queuedReward.type === 'relic') {
             showToast('✨ 敵人掉落了遺物線索，將在下回合開始結算');
         } else if (queuedReward.type === 'pure_essence') {

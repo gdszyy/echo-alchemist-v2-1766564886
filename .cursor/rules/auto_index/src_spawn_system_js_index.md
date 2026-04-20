@@ -1,6 +1,6 @@
 # src/spawn_system.js 函数索引
 
-> 自动生成于 2026-04-19 | 总行数: 2205 | 函数数: 28 | 语言: javascript
+> 自动生成于 2026-04-20 | 总行数: 2215 | 函数数: 28 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -12,10 +12,10 @@
 | spawn_windSkillParticles | method | L77 | L140 | 64 | `spawn_windSkillParticles(type, rect, progress)` |
 | spawn_createFloatingText | method | L141 | L147 | 7 | `spawn_createFloatingText(x, y, text, color, fontSize)` |
 | spawn_generateAffixes | method | L148 | L194 | 47 | `spawn_generateAffixes()` |
-| spawn_spawnEnemyRowAt | method | L195 | L581 | **387** | `spawn_spawnEnemyRowAt(yPos)` |
-| spawn_addSkillPoint | method | L582 | L592 | 11 | `spawn_addSkillPoint(amount = 1)` |
-| spawn_spawnEnemyRow | method | L593 | L598 | 6 | `spawn_spawnEnemyRow(count = 1)` |
-| spawn_triggerCloneSpawn | method | L599 | L631 | 33 | `spawn_triggerCloneSpawn(sourceEnemy)` |
+| spawn_spawnEnemyRowAt | method | L195 | L587 | **393** | `spawn_spawnEnemyRowAt(yPos)` |
+| spawn_addSkillPoint | method | L592 | L602 | 11 | `spawn_addSkillPoint(amount = 1)` |
+| spawn_spawnEnemyRow | method | L603 | L608 | 6 | `spawn_spawnEnemyRow(count = 1)` |
+| spawn_triggerCloneSpawn | method | L609 | L641 | 33 | `spawn_triggerCloneSpawn(sourceEnemy)` |
 | spawn_smallWhirlwind | method | L632 | L666 | 35 | `spawn_smallWhirlwind(x, y)` |
 | spawn_stormCore | method | L667 | L696 | 30 | `spawn_stormCore(x, y, radius, bulletDamage, bulletConfig)` |
 | spawn_addScore | method | L697 | L708 | 12 | `spawn_addScore(amount)` |
