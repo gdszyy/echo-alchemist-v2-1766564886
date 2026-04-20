@@ -179,6 +179,78 @@ function getThemeSegment(round, enemyCurveConfig) {
     return segments.length - 1;
 }
 
+/**
+ * 在相邻主题段落之间做线性插值，返回当前回合的各词缀权重对象。
+ * 若回合恰好在某段落内，则在该段落与下一段落的 AFFIX_WEIGHT_CURVES 之间按进度插值。
+ * 最后一个段落直接返回其权重，不再插值。
+ *
+ * @param {number} round - 当前回合数
+ * @param {object} enemyCurveConfig - ENEMY_CURVE_CONFIG 配置对象
+ * @returns {{ [affix: string]: number }} 各词缀的插值权重对象
+ */
+function interpolateAffixWeights(round, enemyCurveConfig) {
+    const segments = enemyCurveConfig && enemyCurveConfig.THEME_SEGMENTS;
+    const curves = enemyCurveConfig && enemyCurveConfig.AFFIX_WEIGHT_CURVES;
+    if (!segments || !curves || segments.length === 0) return {};
+
+    const segIdx = getThemeSegment(round, enemyCurveConfig);
+    const curCurve = curves[segIdx] || {};
+
+    // 最后一段落，直接返回
+    if (segIdx >= segments.length - 1) return Object.assign({}, curCurve);
+
+    const seg = segments[segIdx];
+    const segLen = seg.endRound - seg.startRound;
+    const progress = segLen > 0 ? (round - seg.startRound) / segLen : 0;
+    const nextCurve = curves[segIdx + 1] || {};
+
+    const result = {};
+    const affixes = new Set([...Object.keys(curCurve), ...Object.keys(nextCurve)]);
+    for (const affix of affixes) {
+        const a = curCurve[affix] || 0;
+        const b = nextCurve[affix] || 0;
+        result[affix] = a + (b - a) * progress;
+    }
+    return result;
+}
+
+/**
+ * 按权重随机从权重 Map 中返回一个 key。
+ * 权重为 0 或负数的 key 不参与抽取。
+ *
+ * @param {{ [key: string]: number }} weightMap - 键值对，值为权重（非负数）
+ * @returns {string|null} 随机选中的 key，若 weightMap 为空则返回 null
+ */
+function weightedRandom(weightMap) {
+    if (!weightMap) return null;
+    const entries = Object.entries(weightMap).filter(([, w]) => w > 0);
+    if (entries.length === 0) return null;
+    const total = entries.reduce((sum, [, w]) => sum + w, 0);
+    if (total <= 0) return null;
+    let rand = Math.random() * total;
+    for (const [key, w] of entries) {
+        rand -= w;
+        if (rand <= 0) return key;
+    }
+    return entries[entries.length - 1][0];
+}
+
+/**
+ * 计算当前回合的双词缀精英出现概率。
+ * 基础概率来自 ENEMY_CURVE_CONFIG.ELITE_DUAL_AFFIX_BASE，
+ * Boss 战后高压期（postBossRoundsLeft > 0）额外叠加 ELITE_DUAL_AFFIX_POST_BOSS_BOOST。
+ *
+ * @param {number} round - 当前回合数（暂未使用，预留扩展）
+ * @param {number} postBossRoundsLeft - Boss 战后剩余高压回合数（0 表示无高压）
+ * @param {object} enemyCurveConfig - ENEMY_CURVE_CONFIG 配置对象
+ * @returns {number} 双词缀精英出现概率（0~1）
+ */
+function getEliteDualAffixChance(round, postBossRoundsLeft, enemyCurveConfig) {
+    const base = (enemyCurveConfig && enemyCurveConfig.ELITE_DUAL_AFFIX_BASE) || 0.15;
+    const boost = (enemyCurveConfig && enemyCurveConfig.ELITE_DUAL_AFFIX_POST_BOSS_BOOST) || 0.25;
+    return postBossRoundsLeft > 0 ? base + boost : base;
+}
+
 // ==================== 导出 ====================
 export {
     adjustColorBrightness,
@@ -188,5 +260,8 @@ export {
     Vec2,
     showToast,
     rotateTowards,
-    getThemeSegment
+    getThemeSegment,
+    interpolateAffixWeights,
+    weightedRandom,
+    getEliteDualAffixChance
 };
