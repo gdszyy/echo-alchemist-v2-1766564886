@@ -471,13 +471,14 @@ ui_closeTruthBook() {
                     'position:relative',
                     'display:flex',
                     'flex-direction:column',
-                    'align-items:center',
-                    'padding:7px 5px 6px',
+                    'align-items:stretch',
+                    'padding:6px 5px 5px',
                     'border-radius:10px',
                     'cursor:pointer',
                     'user-select:none',
                     'transition:all 0.15s',
                     'overflow:visible',
+                    'min-height:0',
                     'border:1.5px solid ' + (isSelected ? ts.borderSelected : (dominant ? dominant.theme[1] : ts.borderIdle)),
                     'box-shadow:' + (isSelected
                         ? '0 0 0 2px ' + ts.borderSelected + ', ' + (dominant ? '0 0 14px ' + dominant.theme[1] + '88' : ts.glow)
@@ -556,19 +557,18 @@ ui_closeTruthBook() {
                 else if (recipe.wind > 0) { iconBg = 'radial-gradient(circle at 35% 35%, #d1fae5, #34d399)'; }
                 else if (recipe.flying_sword > 0) { iconBg = 'radial-gradient(circle at 35% 35%, #bae6fd, #0ea5e9)'; iconGlow = '0 0 8px #0ea5e9'; }
 
-                // 弹珠图标已隐藏以节省空间（一行三列紧凑布局）
-
-                // 子弹名称
+                // ─── 卡片内容：紧凑竖排（名称行 + 连射行 + 属性行）
                 const marbleType = recipe._marbleType || recipe.type || 'normal';
                 const typeNames = { normal: '普通', explosive: '爆炸', cryo: '冰霜', pyro: '火焰', lightning: '雷电', laser: '激光', bounce: '弹跳', pierce: '穿透', scatter: '散射', rainbow: '彩虹', matryoshka: '套娃', flying_sword: '飞剑' };
-                // 浮雕卡片的名称用属性主题色
                 const nameColor = dominant ? dominant.theme[2] : '#fef3c7';
+
+                // 第一行：名称（居中）
                 const nameEl = document.createElement('div');
-                nameEl.style.cssText = 'font-size:' + ts.nameFontSize + ';font-weight:700;color:' + nameColor + ';margin-top:2px;text-align:center;line-height:1.2;';
+                nameEl.style.cssText = 'font-size:11px;font-weight:700;color:' + nameColor + ';text-align:center;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
                 nameEl.innerText = typeNames[marbleType] || marbleType;
                 card.appendChild(nameEl);
 
-                // 连射数（multicast）显示
+                // 第二行：连射数（若有）
                 const mc = recipe.multicast || 0;
                 if (mc > 0) {
                     const mcEl = document.createElement('div');
@@ -576,25 +576,16 @@ ui_closeTruthBook() {
                     if (mc >= 9) mcColor = '#facc15';
                     else if (mc >= 6) mcColor = '#c084fc';
                     else if (mc >= 3) mcColor = '#34d399';
-                    mcEl.style.cssText = [
-                        'display:flex',
-                        'align-items:center',
-                        'gap:2px',
-                        'margin-top:4px',
-                        'font-size:11px',
-                        'font-weight:800',
-                        'color:' + mcColor,
-                        'text-shadow:0 0 6px ' + mcColor + '99',
-                    ].join(';');
-                    mcEl.innerHTML = '<span style="font-size:9px;opacity:0.8;">🔗</span><span>×' + (1 + mc) + '</span>';
+                    mcEl.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:1px;font-size:10px;font-weight:800;color:' + mcColor + ';text-shadow:0 0 5px ' + mcColor + '99;';
+                    mcEl.innerHTML = '<span style="font-size:8px;opacity:0.8;">🔗</span><span>×' + (1 + mc) + '</span>';
                     card.appendChild(mcEl);
                 }
 
-                // 属性行（带颜色图标）
+                // 第三行：属性 chips（换行显示）
                 const attrKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind'];
                 const attrIcons = (CONFIG.ui && CONFIG.ui.attributeDisplay) ? CONFIG.ui.attributeDisplay : {};
                 const attrsEl = document.createElement('div');
-                attrsEl.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;justify-content:center;margin-top:3px;';
+                attrsEl.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;justify-content:center;margin-top:2px;';
                 let hasAttr = false;
                 attrKeys.forEach(function(k) {
                     if (recipe[k] && recipe[k] > 0) {
@@ -610,10 +601,10 @@ ui_closeTruthBook() {
                             'gap:1px',
                             'font-size:10px',
                             'font-weight:' + (isDominantAttr ? '800' : '600'),
-                            'padding:1px 4px',
-                            'border-radius:4px',
+                            'padding:1px 3px',
+                            'border-radius:3px',
                             isDominantAttr
-                                ? 'background:' + attrColor + '33;border:1px solid ' + attrColor + ';color:' + attrColor + ';box-shadow:0 0 5px ' + attrColor + '66;'
+                                ? 'background:' + attrColor + '33;border:1px solid ' + attrColor + ';color:' + attrColor + ';box-shadow:0 0 4px ' + attrColor + '66;'
                                 : 'background:rgba(15,23,42,0.7);border:1px solid ' + attrColor + '55;color:' + attrColor + ';',
                         ].join(';');
                         chip.innerHTML = '<span style="font-size:9px;">' + attrIcon + '</span><span>' + recipe[k] + '</span>';
@@ -622,18 +613,11 @@ ui_closeTruthBook() {
                 });
                 if (!hasAttr) {
                     const chip = document.createElement('span');
-                    chip.style.cssText = 'font-size:10px;color:#475569;padding:1px 4px;';
+                    chip.style.cssText = 'font-size:10px;color:#475569;padding:1px 3px;';
                     chip.innerText = '基础';
                     attrsEl.appendChild(chip);
                 }
                 card.appendChild(attrsEl);
-
-                // 来源标签（底部）
-                const srcEl = document.createElement('div');
-                srcEl.style.cssText = 'font-size:9px;font-weight:600;margin-top:3px;' +
-                    (label === 'new' ? 'color:#38bdf8;' : 'color:#fbbf24;');
-                srcEl.innerText = label === 'new' ? '✦ 新研磨' : '⚡ 充能';
-                card.appendChild(srcEl);
 
                 cardWrap.onclick = () => this.ui_toggleReplaceAmmoCard(globalIdx);
                 return cardWrap;
