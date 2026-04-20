@@ -295,19 +295,19 @@ ui_closeTruthBook() {
 
     /**
      * @method ui_renderReplaceAmmoUI
-     * @description [tsk-668f3dba] 渲染「替换当前子弹」阶段的 UI。
-     * 展示 ammoQueue 中的所有子弹卡片，玩家可选择替换或跳过。
-     * 复用 #phase-selection 内的容器，将 #marble-selection-grid 替换为子弹列表。
+     * @description [ammo-replace] 渲染「研磨完成后子弹替换」阶段的 UI。
+     * 展示 6 张卡片：左侧 3 张是新研磨的 recipe，右侧 3 张是充能子弹。
+     * 默认选中右侧 3 张（保持充能子弹），玩家可切换选中。
+     * 卡片索引：0~(newRecipes.length-1) 为新研磨，newRecipes.length~ 为充能子弹。
      */
     ui_renderReplaceAmmoUI() {
         const ctx = this.replaceAmmoContext;
-        console.log('[DEBUG][ui_renderReplaceAmmoUI] 进入', {
-            ctx: JSON.stringify(ctx),
-            ammoQueue: JSON.stringify((this.ammoQueue||[]).map(a=>({type:a.type,collected:a.collected}))),
+        console.log('[ammo-replace][ui_renderReplaceAmmoUI] 进入', {
+            ctx: ctx ? { active: ctx.active, newCount: (ctx.newRecipes||[]).length, chargedCount: (ctx.chargedRecipes||[]).length, selectedIndices: ctx.selectedIndices } : null,
             phase: this.phase,
         });
         if (!ctx || !ctx.active) {
-            console.warn('[DEBUG][ui_renderReplaceAmmoUI] ctx不存在或未激活，提前返回');
+            console.warn('[ammo-replace][ui_renderReplaceAmmoUI] ctx不存在或未激活，提前返回');
             return;
         }
 
@@ -326,70 +326,154 @@ ui_closeTruthBook() {
         if (skipGrindBtn) skipGrindBtn.style.display = 'none';
         if (previewPanel) previewPanel.className = 'marble-preview-hidden';
 
+        const newRecipes = ctx.newRecipes || [];
+        const chargedRecipes = ctx.chargedRecipes || [];
+        const maxSelect = Math.max(newRecipes.length, chargedRecipes.length, 3);
+        const selectedIndices = ctx.selectedIndices || [];
+
         // 更新底栏标签
-        const modeLabel = ctx.fateMomentMode === 'pure_essence' ? '純淨精華' : '混沌精華';
-        if (labelEl) labelEl.innerText = `替換子彈（${modeLabel}）`;
+        if (labelEl) labelEl.innerText = '子弹替换';
         if (subtitleEl) {
             subtitleEl.style.display = 'block';
             subtitleEl.classList.remove('hidden');
-            subtitleEl.innerText = '選擇一枚子彈以替換，或點擊「跳過」保留全部子彈。';
+            subtitleEl.innerText = '选择最终进入战斗的 ' + maxSelect + ' 枚子弹（默认保留旧子弹）';
         }
-        if (countEl) countEl.innerText = ctx.selectedIndex >= 0 ? '1' : '0';
-        if (requiredEl) requiredEl.innerText = '1';
+        if (countEl) countEl.innerText = String(selectedIndices.length);
+        if (requiredEl) requiredEl.innerText = String(maxSelect);
 
-        // 渲染 ammoQueue 列表
+        // 渲染卡片列表
         if (gridEl) {
             gridEl.style.gridTemplateColumns = '';
             gridEl.style.maxWidth = '';
             gridEl.innerHTML = '';
 
-            const queue = this.ammoQueue || [];
-            if (queue.length === 0) {
-                // 队列为空（理论上不应到达此分支，安全兜底）
-                gridEl.innerHTML = '<div class="text-xs text-slate-400 text-center py-4">當前沒有子彈</div>';
-            } else {
-                queue.forEach((ammo, idx) => {
-                    const isSelected = ctx.selectedIndex === idx;
-                    const typeName = ammo.type || (typeof ammo.getName === 'function' ? ammo.getName() : '彈珠');
-                    const collected = Array.isArray(ammo.collected) ? ammo.collected : [];
-                    const attrHtml = collected.length > 0
-                        ? collected.slice(0, 5).map(attr => {
-                            const display = CONFIG.ui && CONFIG.ui.attributeDisplay && CONFIG.ui.attributeDisplay[attr] ? CONFIG.ui.attributeDisplay[attr] : {};
-                            return `<span class="text-[10px] text-slate-300">${display.icon || '\u25c6'}</span>`;
-                        }).join('')
-                        : '<span class="text-[10px] text-slate-500">無屬性</span>';
+            // 外层容器：两列布局
+            const wrapper = document.createElement('div');
+            wrapper.className = 'w-full flex flex-col gap-3';
 
-                    const card = document.createElement('div');
-                    card.className = `marble-card cursor-pointer transition-all duration-150 ${isSelected ? 'ring-2 ring-amber-400 bg-amber-500/10' : 'hover:ring-1 hover:ring-slate-400'}`;
-                    card.dataset.ammoIdx = idx;
-                    card.innerHTML = `
-                        <div class="marble-icon text-lg">\u{1F7E4}</div>
-                        <div class="marble-name text-xs font-bold truncate">${typeName}</div>
-                        <div class="flex flex-wrap gap-0.5 justify-center mt-1">${attrHtml}</div>
-                        ${isSelected ? '<div class="text-[10px] text-amber-300 mt-1">已選中</div>' : ''}
-                    `;
-                    card.onclick = () => this.ui_selectReplaceAmmoTarget(idx);
-                    gridEl.appendChild(card);
+            // 辅助函数：渲染一张子弹卡片
+            const renderCard = (recipe, globalIdx, label) => {
+                const isSelected = selectedIndices.includes(globalIdx);
+                const card = document.createElement('div');
+                card.className = [
+                    'relative flex flex-col items-center p-2 rounded-lg border cursor-pointer transition-all duration-150 select-none',
+                    isSelected
+                        ? 'border-amber-400 bg-amber-500/15 ring-2 ring-amber-400/60 shadow-amber-500/20 shadow-md'
+                        : 'border-slate-600/60 bg-slate-800/60 hover:border-slate-400/80 hover:bg-slate-700/40',
+                ].join(' ');
+
+                // 子弹类型图标（纯CSS球体）
+                let iconBg = '#e2e8f0';
+                let iconShadow = 'none';
+                if (recipe.isLaser) { iconBg = '#ffffff'; iconShadow = '0 0 8px #60a5fa'; }
+                else if (recipe.explosive) { iconBg = '#fca5a5'; iconShadow = '0 0 6px #ef4444'; }
+                else if (recipe.pyro) { iconBg = '#fdba74'; iconShadow = '0 0 6px #f97316'; }
+                else if (recipe.cryo) { iconBg = '#cffafe'; iconShadow = '0 0 6px #06b6d4'; }
+                else if (recipe.lightning) { iconBg = '#e9d5ff'; iconShadow = '0 0 6px #c084fc'; }
+                else if (recipe.pierce) { iconBg = '#fecaca'; }
+                else if (recipe.bounce) { iconBg = '#bbf7d0'; }
+
+                const iconEl = document.createElement('div');
+                iconEl.style.cssText = 'width:20px;height:20px;border-radius:50%;background:' + iconBg + ';box-shadow:' + iconShadow + ';flex-shrink:0;';
+
+                // 子弹名称
+                const nameEl = document.createElement('div');
+                const marbleType = recipe._marbleType || recipe.type || 'normal';
+                const typeNames = { normal: '普通', explosive: '爆炸', cryo: '冰霜', pyro: '火焰', lightning: '雷电', laser: '激光', bounce: '弹跳', pierce: '穿透', scatter: '散射', rainbow: '彩虹', matryoshka: '套娃' };
+                nameEl.className = 'text-[11px] font-bold text-amber-100 mt-1 text-center leading-tight';
+                nameEl.innerText = typeNames[marbleType] || marbleType;
+
+                // 属性行
+                const attrsEl = document.createElement('div');
+                attrsEl.className = 'flex flex-wrap gap-0.5 justify-center mt-1';
+                const attrKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind'];
+                const attrIcons = (CONFIG.ui && CONFIG.ui.attributeDisplay) ? CONFIG.ui.attributeDisplay : {};
+                let hasAttr = false;
+                attrKeys.forEach(function(k) {
+                    if (recipe[k] && recipe[k] > 0) {
+                        hasAttr = true;
+                        const span = document.createElement('span');
+                        span.className = 'text-[10px] text-slate-300';
+                        const icon = attrIcons[k] ? (attrIcons[k].icon || '\u25c6') : '\u25c6';
+                        span.innerText = icon + recipe[k];
+                        attrsEl.appendChild(span);
+                    }
                 });
-            }
+                if (!hasAttr) {
+                    const span = document.createElement('span');
+                    span.className = 'text-[10px] text-slate-500';
+                    span.innerText = '基础';
+                    attrsEl.appendChild(span);
+                }
+
+                // 选中标识
+                const badgeEl = document.createElement('div');
+                badgeEl.className = 'absolute top-1 right-1 text-[9px] font-bold px-1 rounded ' + (isSelected ? 'bg-amber-400 text-slate-900' : 'bg-slate-700 text-slate-400');
+                badgeEl.innerText = isSelected ? '\u2713' : '\u25cb';
+
+                // 来源标签
+                const labelEl2 = document.createElement('div');
+                labelEl2.className = 'text-[9px] mt-1 font-semibold ' + (label === 'new' ? 'text-sky-400' : 'text-amber-400');
+                labelEl2.innerText = label === 'new' ? '新研磨' : '充能';
+
+                card.appendChild(badgeEl);
+                card.appendChild(iconEl);
+                card.appendChild(nameEl);
+                card.appendChild(attrsEl);
+                card.appendChild(labelEl2);
+                card.onclick = () => this.ui_toggleReplaceAmmoCard(globalIdx);
+                return card;
+            };
+
+            // 两列布局
+            const columns = document.createElement('div');
+            columns.className = 'flex gap-3 justify-center w-full';
+
+            // 左列：新研磨
+            const leftCol = document.createElement('div');
+            leftCol.className = 'flex flex-col gap-2 flex-1';
+            const leftHeader = document.createElement('div');
+            leftHeader.className = 'text-[10px] text-sky-400 font-bold text-center mb-1 border-b border-sky-400/30 pb-1';
+            leftHeader.innerText = '\u2728 新研磨';
+            leftCol.appendChild(leftHeader);
+            newRecipes.forEach((recipe, i) => {
+                leftCol.appendChild(renderCard(recipe, i, 'new'));
+            });
+
+            // 右列：充能子弹
+            const rightCol = document.createElement('div');
+            rightCol.className = 'flex flex-col gap-2 flex-1';
+            const rightHeader = document.createElement('div');
+            rightHeader.className = 'text-[10px] text-amber-400 font-bold text-center mb-1 border-b border-amber-400/30 pb-1';
+            rightHeader.innerText = '\u26a1 充能子弹';
+            rightCol.appendChild(rightHeader);
+            chargedRecipes.forEach((recipe, i) => {
+                rightCol.appendChild(renderCard(recipe, newRecipes.length + i, 'charged'));
+            });
+
+            columns.appendChild(leftCol);
+            columns.appendChild(rightCol);
+            wrapper.appendChild(columns);
+            gridEl.appendChild(wrapper);
         }
 
         // 更新确认按钮
+        const isReady = selectedIndices.length === maxSelect;
         if (confirmBtn) {
-            confirmBtn.disabled = ctx.selectedIndex < 0;
-            confirmBtn.innerText = '確認替換';
+            confirmBtn.disabled = !isReady;
+            confirmBtn.innerText = '\u786e\u8a8d\uff08\u5df2\u9078 ' + selectedIndices.length + '/' + maxSelect + '\uff09';
             confirmBtn.onclick = () => {
                 if (typeof this.sys_confirmReplaceAmmo === 'function') this.sys_confirmReplaceAmmo();
             };
         }
 
-        // 更新跳过按钮（复用 skip-grind-btn 或新建小按钮）
+        // 跳过按钮：直接使用新研磨的子弹
         let skipBtn = document.getElementById('replace-ammo-skip-btn');
         if (!skipBtn) {
             skipBtn = document.createElement('button');
             skipBtn.id = 'replace-ammo-skip-btn';
             skipBtn.className = 'mt-2 flex items-center gap-1.5 px-4 py-2 bg-slate-800/80 border border-slate-600/60 rounded-lg text-xs text-slate-300 hover:bg-slate-700/80 hover:border-slate-400/80 hover:text-white transition-all duration-200';
-            skipBtn.innerHTML = '<span>\u23e9</span><span>跳過，保留全部子彈</span>';
+            skipBtn.innerHTML = '<span>\u23e9</span><span>\u8df3\u904e\uff0c\u4f7f\u7528\u65b0\u7814\u78e8\u5b50\u5f39</span>';
             if (confirmBtn && confirmBtn.parentNode) {
                 confirmBtn.parentNode.insertBefore(skipBtn, confirmBtn.nextSibling);
             }
@@ -401,17 +485,47 @@ ui_closeTruthBook() {
     },
 
     /**
-     * @method ui_selectReplaceAmmoTarget
-     * @description [tsk-668f3dba] 选中要替换的子弹目标。
+     * @method ui_toggleReplaceAmmoCard
+     * @description [ammo-replace] 切换子弹卡片的选中状态。
+     * 卡片索引规则：0~(newRecipes.length-1) 为新研磨，newRecipes.length~ 为充能子弹。
+     * 最多选中 maxSelect 张卡片。
      */
-    ui_selectReplaceAmmoTarget(ammoIdx) {
+    ui_toggleReplaceAmmoCard(globalIdx) {
         if (!this.replaceAmmoContext || !this.replaceAmmoContext.active) return;
-        this.replaceAmmoContext.selectedIndex = ammoIdx;
-        // 重新渲染 UI 以更新选中状态
+        const ctx = this.replaceAmmoContext;
+        const newRecipes = ctx.newRecipes || [];
+        const chargedRecipes = ctx.chargedRecipes || [];
+        const maxSelect = Math.max(newRecipes.length, chargedRecipes.length, 3);
+        let selectedIndices = ctx.selectedIndices ? [...ctx.selectedIndices] : [];
+
+        const alreadySelected = selectedIndices.includes(globalIdx);
+        if (alreadySelected) {
+            // 取消选中
+            selectedIndices = selectedIndices.filter(i => i !== globalIdx);
+        } else {
+            // 选中：如果已满则不允许
+            if (selectedIndices.length >= maxSelect) return;
+            selectedIndices.push(globalIdx);
+        }
+        ctx.selectedIndices = selectedIndices;
+        // 重新渲染 UI
         this.ui_renderReplaceAmmoUI();
     },
 
+    /**
+     * @method ui_selectReplaceAmmoTarget
+     * @description [ammo-replace] 已废弃，保留为兼容别名（调用 ui_toggleReplaceAmmoCard）。
+     */
+    ui_selectReplaceAmmoTarget(ammoIdx) {
+        this.ui_toggleReplaceAmmoCard(ammoIdx);
+    },
+
     ui_refreshSelectionModeUI() {
+        // [ammo-replace] 如果当前处于替换阶段，跳过普通选择 UI 刷新，改由 ui_renderReplaceAmmoUI 控制
+        if (this.replaceAmmoContext && this.replaceAmmoContext.active) {
+            this.ui_renderReplaceAmmoUI();
+            return;
+        }
         console.log('[DEBUG][ui_refreshSelectionModeUI] 进入', {
             selectionMode: this.selectionMode,
             replaceAmmoContext: JSON.stringify(this.replaceAmmoContext),
@@ -876,20 +990,8 @@ ui_closeTruthBook() {
             showToast(`已為 ${marble.getName()} 注入 ${injected.icon || '✦'} ${injected.name}，本輪同化率 x${CONFIG.gameplay.assimilationDoubleMultiplier || 2}。`);
         }
 
-        // [tsk-668f3dba] 如果玩家在替换阶段选了目标，将新弹珠插入到 ammoQueue 的指定位置
-        if (this.replaceAmmoContext &&
-            !this.replaceAmmoContext.active &&
-            this.replaceAmmoContext.selectedIndex >= 0 &&
-            this.marbleQueue.length > 0) {
-            const replaceIdx = this.replaceAmmoContext.selectedIndex;
-            if (replaceIdx < this.ammoQueue.length) {
-                // 将命运选择产出的第一枚弹珠替换指定位置
-                const newMarble = this.marbleQueue[0];
-                this.ammoQueue.splice(replaceIdx, 1, newMarble);
-                console.log(`[tsk-668f3dba] 已将 ammoQueue[${replaceIdx}] 替换为 ${newMarble.type || newMarble.getName?.() || '新弹珠'}`);
-            }
-        }
-        this.replaceAmmoContext = null; // [tsk-668f3dba] 清理替换上下文
+        // [ammo-replace] 替换阶段已移至研磨完成后，此处仅清理上下文
+        this.replaceAmmoContext = null;
 
         this.selectionMode = 'standard';
         this.selectionRequiredCount = CONFIG.gameplay.selectionReq || 3;

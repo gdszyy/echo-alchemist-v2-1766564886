@@ -1,6 +1,6 @@
 # src/game_phase.js 函数索引
 
-> 自动生成于 2026-04-19 | 总行数: 2470 | 函数数: 16 | 语言: javascript
+> 自动生成于 2026-04-20 | 总行数: 2482 | 函数数: 16 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 4 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -21,7 +21,7 @@
 | phase_finalizeRound | method | L977 | L1178 | **202** | `phase_finalizeRound()` |
 | smartScientific | method | L1179 | L1213 | 35 | `smartScientific(num, fractionDigits = 2)` |
 | phase_combat_update | method | L1214 | L1935 | **722** | `phase_combat_update(timeScale)` |
-| phase_gathering_attemptComplete | method | L1936 | L2001 | 66 | `phase_gathering_attemptComplete()` |
+| phase_gathering_attemptComplete | method | L1936 | L2006 | 71 | `phase_gathering_attemptComplete()` |
 | phase_gathering_update | method | L2002 | L2398 | **397** | `phase_gathering_update(timeScale = 1)` |
 | _updateDropDistribution | method | L2399 | L2427 | 29 | `_updateDropDistribution(entryX)` |
 | _drawDropHeatmap | method | L2428 | L2471 | 44 | `_drawDropHeatmap(ctx)` |

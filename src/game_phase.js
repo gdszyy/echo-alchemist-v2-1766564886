@@ -1984,8 +1984,20 @@ phase_gathering_getRandomPegType() {
         
         // 4. 状态流转
         if (this.activeMarbleIndex >= this.marbleQueue.length) {
-            // 所有弹珠都扔完了，进入战斗
-            setTimeout(() => this.phase_startCombatPhase(), 500);
+            // 所有弹珠都扔完了
+            // [ammo-replace] 如果有充能子弹（精华触发时保存的），展示替换界面
+            if (this._chargedAmmoQueue && this._chargedAmmoQueue.length > 0) {
+                setTimeout(() => {
+                    if (typeof this.sys_initReplaceAmmoPhase === 'function') {
+                        this.sys_initReplaceAmmoPhase();
+                    } else {
+                        this.phase_startCombatPhase();
+                    }
+                }, 500);
+            } else {
+                // 没有充能子弹，直接进入战斗
+                setTimeout(() => this.phase_startCombatPhase(), 500);
+            }
         } else {
              // 准备下一回合，清空当前 session，允许玩家再次点击
              this.currentSession = null; 

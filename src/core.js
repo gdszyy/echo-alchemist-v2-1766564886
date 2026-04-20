@@ -196,6 +196,7 @@ class Game {
         this.relicOverlayReturnState = null;
         this.fateMomentContext = null;
         this.replaceAmmoContext = null; // [tsk-668f3dba] 替换当前子弹阶段上下文
+        this._chargedAmmoQueue = null; // [ammo-replace] 充能子弹（上回合 marbleQueue 编译的 recipe），用于研磨后替换界面
         this.isDragging = false; 
         this.dragStart = new Vec2(0,0); 
         this.dragCurrent = new Vec2(0,0); 

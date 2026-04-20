@@ -297,6 +297,7 @@ export const game_system = {
         this.relicOverlayReturnState = null;
         this.fateMomentContext = null;
         this.replaceAmmoContext = null; // [tsk-668f3dba] 替换当前子弹阶段上下文
+        this._chargedAmmoQueue = null; // [ammo-replace] 充能子弹
         this.ownedRelics = [];
         
         // 补充遗物相关的重置字段
@@ -528,13 +529,9 @@ export const game_system = {
             fateMomentContext: JSON.stringify(this.fateMomentContext),
         });
 
-        // [tsk-668f3dba] 命运时刻且 ammoQueue 非空时，先进入替换阶段
-        if ((mode === 'chaos_essence' || mode === 'pure_essence') &&
-            this.ammoQueue && this.ammoQueue.length > 0) {
-            console.log('[DEBUG][sys_initSelectionPhase] ammoQueue非空，转入替换阶段，ammoQueue:', JSON.stringify((this.ammoQueue||[]).map(a=>({type:a.type,collected:a.collected}))));
-            this.sys_initReplaceAmmoPhase();
-            return;
-        }
+        // [ammo-replace] 已移除命运选择前的替换阶段检测。
+        // 替换阶段现在在研磨全部完成后触发（phase_gathering_attemptComplete 中），
+        // 展示新研磨的子弹 vs 充能子弹，让玩家选择。
 
         this.phase_switchPhase('selection');
         this.selectionMode = mode;
@@ -565,22 +562,28 @@ export const game_system = {
 
     /**
      * @method sys_initReplaceAmmoPhase
-     * @description [tsk-668f3dba] 初始化「替换当前子弹」阶段。
-     * 展示当前 ammoQueue 中的所有子弹，玩家可选择替换或跳过。
-     * 完成后继续执行原有命运时刻选择流程。
+     * @description [ammo-replace] 初始化「研磨完成后子弹替换」阶段。
+     * 研磨全部完成后触发，展示 6 张卡片：
+     *   - 左侧 3 张：新研磨的 recipe（ammoQueue）
+     *   - 右侧 3 张：充能子弹（_chargedAmmoQueue）
+     * 默认选中右侧 3 张（保持充能子弹），玩家可切换选中。
+     * 确认后将选中的子弹写入 ammoQueue，进入战斗。
      */
     sys_initReplaceAmmoPhase() {
-        const pendingMode = this.pendingSelectionMode;
-        const mode = pendingMode?.mode || 'chaos_essence';
-        console.log('[DEBUG][sys_initReplaceAmmoPhase] 进入', {
-            mode,
-            ammoQueue: JSON.stringify((this.ammoQueue||[]).map(a=>({type:a.type,collected:a.collected}))),
+        const newRecipes = (this.ammoQueue || []).slice();
+        const chargedRecipes = (this._chargedAmmoQueue || []).slice();
+        console.log('[ammo-replace][sys_initReplaceAmmoPhase] 进入', {
+            newRecipes: newRecipes.length,
+            chargedRecipes: chargedRecipes.length,
             phase: this.phase,
         });
+        // 默认选中右侧（充能子弹），索引 3, 4, 5
+        const defaultSelected = chargedRecipes.map((_, i) => newRecipes.length + i);
         this.replaceAmmoContext = {
             active: true,
-            selectedIndex: -1,       // 当前选中的 ammoQueue 索引，-1 表示未选
-            fateMomentMode: mode,    // 来源命运时刻类型
+            newRecipes,          // 新研磨的 recipe（左侧）
+            chargedRecipes,      // 充能子弹（右侧）
+            selectedIndices: defaultSelected, // 默认选中右侧全部
         };
         this.phase_switchPhase('selection');
         if (typeof this.ui_renderReplaceAmmoUI === 'function') {
@@ -591,37 +594,66 @@ export const game_system = {
 
     /**
      * @method sys_confirmReplaceAmmo
-     * @description [tsk-668f3dba] 确认替换子弹。
-     * 将 ammoQueue[selectedIndex] 替换为占位符（真实弹珠在命运选择后填入），
-     * 然后进入原有命运时刻选择流程。
+     * @description [ammo-replace] 确认子弹替换选择。
+     * 将 replaceAmmoContext.selectedIndices 中选中的子弹写入 ammoQueue，然后进入战斗。
+     * 卡片索引规则：0~(newRecipes.length-1) 为新研磨，newRecipes.length~ 为充能子弹。
      */
     sys_confirmReplaceAmmo() {
         if (!this.replaceAmmoContext || !this.replaceAmmoContext.active) {
             console.warn('[sys_confirmReplaceAmmo] replaceAmmoContext 未激活');
             return;
         }
-        const idx = this.replaceAmmoContext.selectedIndex;
-        if (idx < 0 || idx >= (this.ammoQueue || []).length) {
-            console.warn('[sys_confirmReplaceAmmo] 未选择有效的子弹目标');
-            return;
-        }
-        // 记录替换目标索引，在命运选择确认后由 ui_confirmSelection 执行实际替换
-        this.replaceAmmoContext.active = false;
+        const ctx = this.replaceAmmoContext;
+        const newRecipes = ctx.newRecipes || [];
+        const chargedRecipes = ctx.chargedRecipes || [];
+        const allRecipes = [...newRecipes, ...chargedRecipes];
+        const selectedIndices = ctx.selectedIndices || [];
+
+        // 按选中索引构建最终 ammoQueue
+        const finalAmmo = selectedIndices
+            .filter(i => i >= 0 && i < allRecipes.length)
+            .map(i => allRecipes[i]);
+
+        console.log('[ammo-replace][sys_confirmReplaceAmmo] 确认替换', {
+            selectedIndices,
+            finalAmmoCount: finalAmmo.length,
+        });
+
+        this.ammoQueue = finalAmmo;
+        this.replaceAmmoContext = null;
+        this._chargedAmmoQueue = null;
+        if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
+        if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
-        // 进入原有命运时刻选择流程
-        this._proceedToFateMomentSelection();
+        // 进入战斗阶段
+        if (typeof this.phase_startCombatPhase === 'function') {
+            this.phase_startCombatPhase();
+        } else {
+            this.phase_switchPhase('combat');
+        }
     },
 
     /**
      * @method sys_skipReplaceAmmo
-     * @description [tsk-668f3dba] 跳过替换阶段，直接进入命运时刻选择流程。
+     * @description [ammo-replace] 跳过替换阶段，直接使用新研磨的子弹进入战斗。
      */
     sys_skipReplaceAmmo() {
         if (!this.replaceAmmoContext) return;
-        this.replaceAmmoContext.active = false;
-        this.replaceAmmoContext.selectedIndex = -1; // 跳过：不替换
+        const ctx = this.replaceAmmoContext;
+        const newRecipes = ctx.newRecipes || [];
+        // 跳过：直接使用新研磨的子弹
+        this.ammoQueue = newRecipes.slice();
+        this.replaceAmmoContext = null;
+        this._chargedAmmoQueue = null;
+        if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
+        if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
-        this._proceedToFateMomentSelection();
+        // 进入战斗阶段
+        if (typeof this.phase_startCombatPhase === 'function') {
+            this.phase_startCombatPhase();
+        } else {
+            this.phase_switchPhase('combat');
+        }
     },
 
     /**
@@ -875,6 +907,21 @@ export const game_system = {
                     enemyType: reward.enemyType || null,
                     sourceRewardType: rewardType,
                 };
+                // [ammo-replace] 精华触发时，如果上回合有 marbleQueue，先生成充能子弹保存到 _chargedAmmoQueue
+                // 研磨全部完成后展示替换界面，让玩家选择是否替换旧子弹
+                if (this.marbleQueue && this.marbleQueue.length > 0) {
+                    this._chargedAmmoQueue = this.marbleQueue.map(marbleDef => {
+                        const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
+                        const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, false);
+                        recipe.finalHits = 0;
+                        recipe.multicast = 0;
+                        recipe._marbleType = marbleDef.type; // 保存弹珠类型用于 UI 展示
+                        return recipe;
+                    });
+                    console.log('[ammo-replace] 已生成充能子弹:', this._chargedAmmoQueue.length, '个');
+                } else {
+                    this._chargedAmmoQueue = null;
+                }
                 this._roundStartResolverActive = false;
                 eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
                     round: this.round || 1,
@@ -1535,7 +1582,8 @@ export const game_system = {
                 selectionPreviewState: this.selectionPreviewState ? { ...this.selectionPreviewState } : null,
                 relicOverlayReturnState: this.relicOverlayReturnState ? { ...this.relicOverlayReturnState } : null,
                 fateMomentContext: this.fateMomentContext ? { ...this.fateMomentContext } : null,
-                replaceAmmoContext: this.replaceAmmoContext ? { ...this.replaceAmmoContext } : null, // [tsk-668f3dba]
+                replaceAmmoContext: this.replaceAmmoContext ? JSON.parse(JSON.stringify(this.replaceAmmoContext)) : null, // [ammo-replace]
+                _chargedAmmoQueue: this._chargedAmmoQueue ? this._chargedAmmoQueue.map(r => ({ ...r })) : null, // [ammo-replace]
                 // Boss 系统
                 bossHistory: (this.bossHistory || []).slice(),
                 _pendingBossSpawn: this._pendingBossSpawn ? { ...this._pendingBossSpawn } : null,
@@ -1643,7 +1691,8 @@ export const game_system = {
             this.selectionPreviewState = state.selectionPreviewState ? { ...state.selectionPreviewState } : null;
             this.relicOverlayReturnState = state.relicOverlayReturnState ? { ...state.relicOverlayReturnState } : null;
             this.fateMomentContext = state.fateMomentContext ? { ...state.fateMomentContext } : null;
-            this.replaceAmmoContext = state.replaceAmmoContext ? { ...state.replaceAmmoContext } : null; // [tsk-668f3dba]
+            this.replaceAmmoContext = state.replaceAmmoContext ? JSON.parse(JSON.stringify(state.replaceAmmoContext)) : null; // [ammo-replace]
+            this._chargedAmmoQueue = state._chargedAmmoQueue ? state._chargedAmmoQueue.map(r => ({ ...r })) : null; // [ammo-replace]
 
             // --- 恢复 Boss 系统 ---
             this.bossHistory = (state.bossHistory || []).slice();
