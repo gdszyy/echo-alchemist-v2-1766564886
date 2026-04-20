@@ -881,6 +881,16 @@ export const spawn_system = {
             const firstTbEntry = truthBookMap[firstM.type] || supplementDesc[firstM.type] || null;
             this.spawn_showMarblePreview(firstM, firstTbEntry, supplementDesc);
         }
+
+        // [pure_essence 修复] 纯净精华模式下只有 1 枚弹珠，自动将其选中，
+        // 使 ui_renderPureEssencePanel 的 isSelected 判断为 true，
+        // 从而直接展示可选符文列表，无需玩家额外点击一次卡片。
+        if (this.selectionMode === 'pure_essence' && this.marblesPool.length === 1) {
+            const firstCard = document.querySelector('#marble-selection-grid .select-card');
+            if (typeof this.sys_toggleMarbleSelection === 'function') {
+                this.sys_toggleMarbleSelection(0, firstCard);
+            }
+        }
     },
 
     /**
