@@ -270,12 +270,9 @@ class Game {
         this._dropDistribution = null;
         this._heatmapData = null;
         
-        // [修复] 确保所有 UI 覆盖层在游戏开始时都被隐藏
-        document.querySelectorAll('.ui-overlay').forEach(el => { 
-            el.style.display = 'none'; 
-            el.classList.add('hidden-phase'); 
-            el.classList.remove('active-phase'); 
-        });
+        // [注意] 不在此处手动隐藏 .ui-overlay 元素。
+        // 面板的显示/隐藏状态由 phase_switchPhase -> ui_updateUI 统一管理。
+        // 手动隐藏会导致 phase-meta 在初始化时被隐藏后无法正确恢复（主页闪现消失 Bug）。
         
         window.addEventListener('resize', () => { 
             this.ui_updatePCLayout();

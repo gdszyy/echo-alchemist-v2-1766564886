@@ -401,14 +401,83 @@ export const ui_system = {
     },
 
     ui_updateUI() {
+        // [BUGFIX] 使用 _isRuneLauncherOpen() 兼容 PC 模式和移动端模式
+        const runeLauncherEl = document.getElementById('phase-rune-launcher');
+        const launcherVisible = this._isRuneLauncherOpen ? this._isRuneLauncherOpen()
+            : (runeLauncherEl && runeLauncherEl.style.display !== 'none');
+
+        // 1. 隐藏所有阶段的主容器 (.ui-overlay)
+        // [BUGFIX] 符文发射器打开时跳过隐藏，防止每次调用将其强制关闭
+        document.querySelectorAll('.ui-overlay').forEach(el => {
+            if (el === runeLauncherEl && launcherVisible) return;
+            el.style.display = 'none';
+            el.classList.add('hidden-phase');
+            el.classList.remove('active-phase');
+            el.style.pointerEvents = 'none';
+        });
+
+        // 2. 显示当前阶段的主容器
+        // [BUGFIX] 符文发射器打开期间，跳过底层阶段面板的重新激活，
+        // 防止 #marble-selection-grid 等子元素（pointer-events: auto）遮挡发射器 Tab 按钮
+        if (!launcherVisible) {
+            const activeEl = document.getElementById(`phase-${this.phase}`);
+            if (activeEl) {
+                activeEl.style.display = (this.phase === 'gameover') ? 'block' : 'flex';
+                const needsAuto = ['meta', 'shop', 'truth_book', 'gameover', 'relic', 'pause'].includes(this.phase);
+                activeEl.style.pointerEvents = needsAuto ? 'auto' : 'none';
+                setTimeout(() => {
+                    activeEl.classList.remove('hidden-phase');
+                    activeEl.classList.add('active-phase');
+                }, 10);
+            }
+        }
+
+        // 3. 各阶段专属 UI 更新
         this.ui_updateMetaCurrency();
         this.ui_updateRuneCountDisplay();
+        if (this.phase === 'meta') {
+            this.meta_updateContinueButton();
+        }
         if (this.phase === 'selection') {
             if (this.replaceAmmoContext && this.replaceAmmoContext.active) {
                 this.ui_renderReplaceAmmoUI();
             } else {
                 this.ui_refreshSelectionModeUI();
             }
+        }
+
+        // 4. 底部面板：仅在收集阶段且非 PC 模式下显示
+        const bottomPanel = document.querySelector('.bottom-panel');
+        if (bottomPanel) {
+            const isPCMode = document.body.classList.contains('pc-mode');
+            bottomPanel.style.display = (this.phase === 'gathering' && !isPCMode) ? 'flex' : 'none';
+        }
+
+        // 5. 技能栏：仅在战斗阶段且有已解锁技能时显示
+        const skillBar = document.getElementById('skill-bar');
+        if (skillBar) {
+            const hasSkills = this.activeSkills && this.activeSkills.length > 0;
+            skillBar.style.display = (this.phase === 'combat' && hasSkills) ? 'flex' : 'none';
+        }
+
+        // 6. 连击倍率显示
+        const multiplierEl = document.getElementById('multiplier-display');
+        if (multiplierEl) {
+            multiplierEl.style.opacity = (this.phase === 'combat') ? '1' : '0';
+        }
+
+        // 7. 统一顶部栏：在全屏阶段隐藏
+        const unifiedTopBar = document.getElementById('unified-top-bar');
+        if (unifiedTopBar) {
+            const hideInPhases = ['meta', 'shop', 'truth_book', 'training', 'relic', 'selection', 'gameover'];
+            const shouldHideTopBar = hideInPhases.includes(this.phase) && !(typeof this.ui_isFateMomentPhase === 'function' && this.ui_isFateMomentPhase());
+            unifiedTopBar.style.display = shouldHideTopBar ? 'none' : 'flex';
+        }
+
+        // 8. 战斗充能符文 UI
+        const runeChargeUi = document.getElementById('combat-rune-charge-ui');
+        if (runeChargeUi) {
+            runeChargeUi.style.display = (this.phase === 'combat') ? 'flex' : 'none';
         }
     },
 
