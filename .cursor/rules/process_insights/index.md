@@ -25,7 +25,7 @@
 | PI-005 | 性能自适应影响评估流程 | v1.0 | performance, combat_system, effects, entities, render_system, spawn_system | 2026-04-16 | [PI-005_perf_impact_assessment.md](PI-005_perf_impact_assessment.md) |
 | PI-006 | Round-Start 延迟奖励结算流程 | v1.2 | game_phase, game_system, core, ui/shop | 2026-04-19 | [PI-006_round_start_reward_resolver.md](PI-006_round_start_reward_resolver.md) |
 | PI-007 | 命运时刻 Overlay 返回流与纯净精华选择模式 | v1.0 | ui/shop, game_system, ui_system, spawn_system, game_phase, entities, config, core | 2026-04-18 | [PI-007_destiny_overlay_return_and_selection_mode.md](PI-007_destiny_overlay_return_and_selection_mode.md) |
-| PI-008 | 教程系统覆盖层遮挡符文发射器面板 Tab 的修复流程 | v1.0 | tutorial_system, ui/rune_launcher | 2026-04-21 | [PI-008_tutorial_overlay_rune_launcher_tab_block.md](PI-008_tutorial_overlay_rune_launcher_tab_block.md) |
+| PI-008 | 符文发射器面板 Tab 被底层阶段面板遮挡的修复流程 | v1.1 | tutorial_system, ui/rune_launcher, ui_system | 2026-04-21 | [PI-008_tutorial_overlay_rune_launcher_tab_block.md](PI-008_tutorial_overlay_rune_launcher_tab_block.md) |
 
 ### 按模块快速检索
 
@@ -38,6 +38,7 @@
 | `rune_config.js` | PI-002（effectId 一致性） |
 | `rune_launcher.js` | PI-002（activeRunewordEffects 数据结构）、PI-008（教程覆盖层遮挡 Tab 修复） |
 | `tutorial_system.js` | PI-008（教程 DOM z-index 竞争与临时隐藏方案） |
+| `ui_system.js` | PI-001（multicast 颜色顺序、setDeepValue 双重调用）、PI-007（命运抗决动态数量与纯净精华注入 UI）、PI-008（ui_updateUI 重新激活底层面板遮挡 Tab） |
 | `core.js` | PI-003（_subsystems 数组、组合模式）、PI-006（enemy:killed 只登记延迟奖励）、PI-007（选择态与双倍同化率运行态初始化） |
 | `config.js` | PI-004（CONFIG.performance 三档配置）、PI-007（混沌精华 / 纯净精华 / 同化倍率显式配置） |
 | `spawn_system.js` | PI-004（EnergyOrb 聚合优化）、PI-007（预览状态与纯净精华注入面板联动） |

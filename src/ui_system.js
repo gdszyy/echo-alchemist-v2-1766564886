@@ -929,21 +929,27 @@ ui_closeTruthBook() {
         });
         // 2. 显示当前阶段的主容器
         // [META] 兼容 phase-meta, shop, truth_book
-        const activeEl = document.getElementById(`phase-${this.phase}`);  // [Mixin 正常用法：读取 Game 实例状态]
-        if(activeEl) { 
-            // gameover 阶段需要滚动，使用 block 布局
-            activeEl.style.display = (this.phase === 'gameover') ? 'block' : 'flex';  // [Mixin 正常用法]
-            // [BUGFIX] 激活阶段恢复 pointer-events (如果 HTML 中未显式设置 pointer-events: auto，则此处恢复默认)
-            // 注意：.ui-overlay 默认是 pointer-events: none，子元素通过 pointer-events: auto 交互
-            // 但某些全屏阶段（如 meta, shop）需要整体接收事件
-            const needsAuto = ['meta', 'shop', 'truth_book', 'gameover', 'relic', 'pause'].includes(this.phase);
-            activeEl.style.pointerEvents = needsAuto ? 'auto' : 'none';
+        // [BUGFIX] 符文发射器打开期间，跳过底层阶段面板的重新激活。
+        // 根因：phase-selection 等底层面板被重新激活后，其子元素（如 #marble-selection-grid，
+        // pointer-events: auto）会覆盖发射器面板的 Tab 按钮，导致点击无响应。
+        // 发射器作为浮层覆盖整个游戏区域，底层面板无需显示。
+        if (!launcherVisible) {
+            const activeEl = document.getElementById(`phase-${this.phase}`);  // [Mixin 正常用法：读取 Game 实例状态]
+            if(activeEl) { 
+                // gameover 阶段需要滚动，使用 block 布局
+                activeEl.style.display = (this.phase === 'gameover') ? 'block' : 'flex';  // [Mixin 正常用法]
+                // [BUGFIX] 激活阶段恢复 pointer-events (如果 HTML 中未显式设置 pointer-events: auto，则此处恢复默认)
+                // 注意：.ui-overlay 默认是 pointer-events: none，子元素通过 pointer-events: auto 交互
+                // 但某些全屏阶段（如 meta, shop）需要整体接收事件
+                const needsAuto = ['meta', 'shop', 'truth_book', 'gameover', 'relic', 'pause'].includes(this.phase);
+                activeEl.style.pointerEvents = needsAuto ? 'auto' : 'none';
 
-            // 微小延迟以触发 CSS transition (如果有)
-            setTimeout(() => { 
-                activeEl.classList.remove('hidden-phase'); 
-                activeEl.classList.add('active-phase'); 
-            }, 10); 
+                // 微小延迟以触发 CSS transition (如果有)
+                setTimeout(() => { 
+                    activeEl.classList.remove('hidden-phase'); 
+                    activeEl.classList.add('active-phase'); 
+                }, 10); 
+            }
         }
         
         // [META] 切换到主界面或商店时更新货币显示
