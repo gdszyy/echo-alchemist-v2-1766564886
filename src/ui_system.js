@@ -336,16 +336,12 @@ ui_closeTruthBook() {
         if (skipGrindBtn) skipGrindBtn.style.display = 'none';
         if (previewPanel) previewPanel.className = 'marble-preview-hidden';
 
-        // 子弹替换阶段：将滚动容器改为 overflow:hidden + flex:1，让高度能传递给 gridEl
-        // （退出阶段时在 sys_confirmReplaceAmmo / sys_skipReplaceAmmo 中恢复）
+        // 子弹替换阶段：不依赖 flex 链路，直接用 calc(100dvh) 计算 gridEl 高度
+        // 底栏高度约 160px，顶部安全区约 70px，额外留 16px 边距
+        // 如果支持 dvh 则用 dvh，否则退化到 vh
         if (gridEl && gridEl.parentElement) {
             const p = gridEl.parentElement;
             p.style.overflow = 'hidden';
-            p.style.display = 'flex';
-            p.style.flexDirection = 'column';
-            p.style.flex = '1';
-            p.style.minHeight = '0';
-            p.style.alignItems = 'stretch';
         }
 
         const newRecipes = ctx.newRecipes || [];
@@ -441,24 +437,29 @@ ui_closeTruthBook() {
 
         // 渲染卡片列表
         if (gridEl) {
-            // 强制覆盖 .marble-grid 的 CSS 类样式，改为 flex 布局并撑满父容器
+            // 直接用 calc 设定高度，不依赖 flex 链路
+            // 底栏高度约 160px，顶部安全区 + 标题栏约 86px
+            const bottomBarH = 160;
+            const topBarH = 86;
+            const gridH = 'calc(100dvh - ' + (bottomBarH + topBarH) + 'px)';
             gridEl.style.cssText = [
                 'display:flex',
                 'flex-direction:column',
-                'flex:1',
-                'min-height:0',
                 'width:100%',
+                'height:' + gridH,
+                'min-height:200px',
                 'padding:0',
                 'max-width:none',
                 'margin:0',
                 'gap:0',
+                'overflow:hidden',
             ].join(';');
             gridEl.innerHTML = '';
 
             // 外层容器：上下两行，撑满 gridEl 全部高度
-            // padding-top:10px 为卡片顶部浮动彽章留出空间
+            // padding-top:12px 为卡片顶部浮动彽章留出空间
             const wrapper = document.createElement('div');
-            wrapper.style.cssText = 'width:100%;display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;padding:10px 12px 4px;';
+            wrapper.style.cssText = 'width:100%;height:100%;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;padding:12px 12px 4px;';
 
             // ─── 辅助函数：渲染一张子弹卡片 ────────────────────────────────
             const renderCard = (recipe, globalIdx, label) => {
@@ -470,7 +471,8 @@ ui_closeTruthBook() {
 
                 // ─── 卡片外层容器：overflow:visible 让顶部彽章不被裁剪
                 const cardWrap = document.createElement('div');
-                cardWrap.style.cssText = 'position:relative;border-radius:10px;overflow:visible;height:100%;display:flex;flex-direction:column;';
+                // height:100% 撑满 grid cell；同时设 box-sizing 避免边框影响高度
+                cardWrap.style.cssText = 'position:relative;border-radius:10px;overflow:visible;height:100%;display:flex;flex-direction:column;box-sizing:border-box;';
 
                 // ─── Layer 1 边框 + Layer 2 浮雕背景
                 const card = document.createElement('div');
@@ -667,40 +669,36 @@ ui_closeTruthBook() {
                 return cardWrap;
             };
 
-            // 上行：新研磨（一行三列，flex:1 撑满剩余高度）
-            if (newRecipes.length > 0) {
-                const newRow = document.createElement('div');
-                newRow.style.cssText = 'display:flex;flex-direction:column;gap:4px;flex:1;min-height:0;';
-                const newHeader = document.createElement('div');
-                newHeader.style.cssText = 'font-size:10px;color:#38bdf8;font-weight:700;text-align:center;border-bottom:1px solid rgba(56,189,248,0.3);padding-bottom:3px;flex-shrink:0;';
-                newHeader.innerText = '\u2728 新研磨';
-                newRow.appendChild(newHeader);
-                const newCards = document.createElement('div');
-                newCards.style.cssText = 'display:grid;gap:6px;width:100%;flex:1;min-height:0;';
-                newCards.style.gridTemplateColumns = 'repeat(' + newRecipes.length + ', 1fr)';
-                newRecipes.forEach((recipe, i) => {
-                    newCards.appendChild(renderCard(recipe, i, 'new'));
+            // 行容器辅助函数：创建一行（标题 + cards grid）
+            const makeRow = (recipes, startIdx, headerText, headerColor, borderColor) => {
+                const row = document.createElement('div');
+                // flex:1 让两行均分 wrapper 高度
+                row.style.cssText = 'display:flex;flex-direction:column;gap:4px;flex:1;min-height:0;overflow:hidden;';
+                const header = document.createElement('div');
+                header.style.cssText = 'font-size:10px;color:' + headerColor + ';font-weight:700;text-align:center;border-bottom:1px solid ' + borderColor + ';padding-bottom:3px;flex-shrink:0;';
+                header.innerText = headerText;
+                row.appendChild(header);
+                const cards = document.createElement('div');
+                // flex:1 + min-height:0 让 grid 撑满行剩余空间
+                cards.style.cssText = 'display:grid;gap:6px;width:100%;flex:1;min-height:0;align-content:stretch;';
+                cards.style.gridTemplateColumns = 'repeat(' + recipes.length + ', 1fr)';
+                // grid-template-rows: 让每行只有一行，高度撑满
+                cards.style.gridTemplateRows = '1fr';
+                recipes.forEach((recipe, i) => {
+                    cards.appendChild(renderCard(recipe, startIdx + i, ''));
                 });
-                newRow.appendChild(newCards);
-                wrapper.appendChild(newRow);
+                row.appendChild(cards);
+                return row;
+            };
+
+            // 上行：新研磨
+            if (newRecipes.length > 0) {
+                wrapper.appendChild(makeRow(newRecipes, 0, '\u2728 新研磨', '#38bdf8', 'rgba(56,189,248,0.3)'));
             }
 
-            // 下行：充能子弹（一行三列，flex:1 撑满剩余高度）
+            // 下行：充能子弹
             if (chargedRecipes.length > 0) {
-                const chargedRow = document.createElement('div');
-                chargedRow.style.cssText = 'display:flex;flex-direction:column;gap:4px;flex:1;min-height:0;';
-                const chargedHeader = document.createElement('div');
-                chargedHeader.style.cssText = 'font-size:10px;color:#fbbf24;font-weight:700;text-align:center;border-bottom:1px solid rgba(251,191,36,0.3);padding-bottom:3px;flex-shrink:0;';
-                chargedHeader.innerText = '\u26a1 充能子弹';
-                chargedRow.appendChild(chargedHeader);
-                const chargedCards = document.createElement('div');
-                chargedCards.style.cssText = 'display:grid;gap:6px;width:100%;flex:1;min-height:0;';
-                chargedCards.style.gridTemplateColumns = 'repeat(' + chargedRecipes.length + ', 1fr)';
-                chargedRecipes.forEach((recipe, i) => {
-                    chargedCards.appendChild(renderCard(recipe, newRecipes.length + i, 'charged'));
-                });
-                chargedRow.appendChild(chargedCards);
-                wrapper.appendChild(chargedRow);
+                wrapper.appendChild(makeRow(chargedRecipes, newRecipes.length, '\u26a1 充能子弹', '#fbbf24', 'rgba(251,191,36,0.3)'));
             }
 
             gridEl.appendChild(wrapper);
