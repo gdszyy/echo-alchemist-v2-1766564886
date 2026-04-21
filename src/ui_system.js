@@ -511,7 +511,11 @@ export const ui_system = {
     },
 
     meta_startRun() {
-        if (typeof this.sys_startRun === 'function') this.sys_startRun();
+        // [局内存档] 新开一局时清除旧存档
+        this.sys_clearRunState();
+        this.sys_resetGame();
+        this.sys_initGameStart();
+        // sys_initGameStart 内部已经调用了 ui_showRelicSelection
     },
 
     meta_continueRun() {
