@@ -4517,6 +4517,7 @@ class FieldLootItem {
         this.y = y;
         this.type = type;
         this.active = true;
+        this.id = Math.random().toString(36).substr(2, 9); // 唯一 ID，用于飞行动画定位
         this._animTimer = Math.random() * Math.PI * 2; // 随机初始相位，避免同步呼吸
         this._spawnTimer = 0;
         this._spawnDuration = 0.5; // 入场动画时长

@@ -13,7 +13,7 @@
  * - 弹珠选择切换 (sys_toggleMarbleSelection)
  * - 分数乘数重置 (sys_resetMultiplier)
  */
-import { Vec2, showToast, RuneLoot, Enemy, RewardDropEffect } from './entities.js';
+import { Vec2, showToast, RuneLoot, Enemy, RewardDropEffect, FieldLootItem } from './entities.js';
 import { CONFIG } from './config.js';
 import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
@@ -385,6 +385,7 @@ export const game_system = {
         this.relicSelectionCount = 0;
         this.pendingRoundStartRewards = [];
         this._roundStartResolverActive = false;
+        this.fieldLootItems = []; // 重置战场持久掉落物，防止跨局残留
         this._roundStartBannerActive = false; // 重置横幅保护标志
         // 重置 炼金火药管平坦伤害加成
         this.flatDamageBonus = 0;
@@ -1084,8 +1085,7 @@ export const game_system = {
             // 将掉落物坐标存入奖励对象，供后续飞行动画使用
             queuedReward.dropX = enemy.pos.x;
             queuedReward.dropY = enemy.pos.y;
-            queuedReward.lootItemId = lootItem.id || Math.random().toString(36).substr(2, 9);
-            lootItem.id = queuedReward.lootItemId;
+            queuedReward.lootItemId = lootItem.id; // FieldLootItem 构造时已生成唯一 id
         }
 
         if (queuedReward.type === 'relic') {
