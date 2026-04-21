@@ -105,6 +105,23 @@ status: "active"
 
 ---
 
+### 坑 9: `ui_confirmSelection` 调用不存在的 `sys_confirmSelection`，导致"开始炼金"按钮完全无响应
+
+**现象**：选中三个弹珠后，点击"开始炼金"（`#confirm-selection-btn`）按钮没有任何反应，游戏停留在弹珠选择界面，无法进入研磨阶段。
+
+**根因**：`ui_confirmSelection()` 函数体只有一行 `if (typeof this.sys_confirmSelection === 'function') this.sys_confirmSelection()`，而 `sys_confirmSelection` 在整个代码库中**从未被定义**。`typeof` 检查为 `false`，函数直接返回，`marbleQueue` 永远不会被填充，`phase_startGatheringPhase()` 永远不会被调用。
+
+**正确做法**：`ui_confirmSelection()` 必须自行完成完整的确认逻辑：
+1. 检查 `selectedMarbles.length === ui_getSelectionRequirement()`
+2. `this.marbleQueue = this.selectedMarbles.map(i => this.marblesPool[i])`
+3. 处理 `pure_essence` 分支（符文注入、`doubleAssimilationBoostRounds` 写入）
+4. 清理 `selectionMode`、`selectionInjectedRune`、`selectionPreviewState`、`fateMomentContext`、`replaceAmmoContext`
+5. 调用 `this.phase_startGatheringPhase()`
+
+**关键位置**：`src/ui_system.js` → `ui_confirmSelection`
+
+---
+
 ## 关键耦合点
 
 - `phase_advanceWave` 和 `phase_finalizeRound` 共同维护 `this.round`，修改任一函数时必须检查另一个。
@@ -119,3 +136,4 @@ status: "active"
 | v1.1 | 2026-04-16 | 新增坑 6：研磨阶段点击区域阈值过小（`phase_handleInputStart` `pos.y < height * 0.4` 导致弹珠无法发射） | echo-developer |
 | v1.2 | 2026-04-16 | 新增坑 7：PC 端 `_isRuneLauncherOpen` 返回 `true` 屏蔽所有 PC 端鼠标输入 | echo-developer |
 | v1.3 | 2026-04-20 | 新增坑 8：替换子弹阶段跳过后 `confirmBtn.onclick` 未恢复，导致纯净精华选择后无法发射子弹、直接循环敌人回合 | echo-developer |
+| v1.4 | 2026-04-21 | 新增坑 9：`ui_confirmSelection` 调用不存在的 `sys_confirmSelection`，导致"开始炼金"按钮完全无响应 | echo-developer |
