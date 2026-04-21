@@ -710,7 +710,22 @@ const CONFIG = {
         laserRefractionDamageDecay: 0.75, // 每次折射的伤害衰减系数 (75%)
         laserRefractionWidthDecay: 0.85,  // 每次折射的光线宽度衰减系数 (85%)
         laserRefractionMaxTotal: 50,      // 单次发射最大折射总次数 (防止极端情况)
-        laserRefractionDepthDecay: 0.65    // 每增加一层折射深度，概率乘以该系数 (65%)。第 1 层折射概率 × 0.65，第 2 层 × 0.65^2，以此类推
+        laserRefractionDepthDecay: 0.65,   // 每增加一层折射深度，概率乘以该系数 (65%)。第 1 层折射概率 × 0.65，第 2 层 × 0.65^2，以此类推
+        
+        // [动态掉落与保底系统]
+        dropPity: {
+            essenceMaxMiss: 5,        // 精华连续不掉落保底阈值（击杀 5 个普通怪必掉一个精华）
+            relicMaxMiss: 15,         // 遗物连续不掉落保底阈值（击杀 15 个普通怪必掉一个遗物）
+            
+            // 动态概率修正系数
+            playerPowerWeight: 0.5,   // 玩家战力对掉率的影响权重（战力越低，掉率越高）
+            enemyHpWeight: 0.3,       // 敌人血量对掉率的影响权重（血量越高，掉率越高）
+            traceHpWeight: 0.4,       // 踪迹剩余血量对掉率的影响权重（踪迹血量越低，掉率越高）
+            
+            // 概率修正范围
+            minChanceMult: 0.5,       // 最小概率倍率（运气极好/战力极强时）
+            maxChanceMult: 2.5        // 最大概率倍率（运气极差/战力极弱时）
+        }
     },
     //  初始概率配置 (現在這些是基礎權重，解鎖後會增加)
     // [DESIGN] 初始状态只提供 bounce（反弹）属性。
