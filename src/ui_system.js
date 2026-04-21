@@ -314,10 +314,18 @@ export const ui_system = {
         ];
 
         if (gridEl) {
-            const bottomBarH = 160;
-            const topBarH = 86;
-            const gridH = 'calc(100dvh - ' + (bottomBarH + topBarH) + 'px)';
-            gridEl.style.cssText = 'display:flex;flex-direction:column;width:100%;height:' + gridH + ';min-height:200px;padding:0;max-width:none;margin:0;gap:0;overflow:hidden;';
+            // [BUGFIX] 修复子弹替换卡片不可见问题：
+            // 原来用 calc(100dvh - 246px) 计算高度，但 game-container 是 9:16 等比缩放容器，
+            // 其高度 < 100dvh（如 iPhone 14 约 693px vs 844px 视口），导致 gridEl 高度超出
+            // 父容器（overflow-y-auto），卡片被滚动到视口外不可见。
+            // 修复：改用 height:100% 让 flex 布局自动分配高度，并将父容器改为 overflow:hidden。
+            const parentEl = gridEl.parentElement;
+            if (parentEl) {
+                parentEl.style.overflow = 'hidden';
+                parentEl.style.display = 'flex';
+                parentEl.style.flexDirection = 'column';
+            }
+            gridEl.style.cssText = 'display:flex;flex-direction:column;width:100%;height:100%;flex:1;min-height:0;padding:0;max-width:none;margin:0;gap:0;overflow:hidden;';
             gridEl.innerHTML = '';
 
             const wrapper = document.createElement('div');
@@ -668,6 +676,13 @@ export const ui_system = {
      * [BUGFIX] 原实现调用不存在的 sys_confirmSelection，导致点击"开始炼金"无响应。
      */
     ui_confirmSelection() {
+        // [BUGFIX] 如果当前处于子弹替换阶段，应由 sys_confirmReplaceAmmo 处理，
+        // 防止 ui_initEventListeners 绑定的 onclick 在替换阶段被误触发导致进入研磨阶段。
+        if (this.replaceAmmoContext && this.replaceAmmoContext.active) {
+            console.warn('[ui_confirmSelection] 检测到 replaceAmmoContext 激活，转发到 sys_confirmReplaceAmmo');
+            if (typeof this.sys_confirmReplaceAmmo === 'function') this.sys_confirmReplaceAmmo();
+            return;
+        }
         const required = this.ui_getSelectionRequirement();
         if ((this.selectedMarbles || []).length !== required) {
             console.warn('[DEBUG] ui_confirmSelection: 选中的弹珠数量不符合要求，当前为:', (this.selectedMarbles || []).length, '要求为:', required);
