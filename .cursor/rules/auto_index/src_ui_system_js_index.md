@@ -1,6 +1,6 @@
 # src/ui_system.js 函数索引
 
-> 自动生成于 2026-04-20 | 总行数: 1678 | 函数数: 41 | 语言: javascript
+> 自动生成于 2026-04-20 | 总行数: 1700 | 函数数: 41 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -22,31 +22,31 @@
 | ui_selectPureEssenceRune | method | L209 | L234 | 26 | `ui_selectPureEssenceRune(selectionIndex, inventoryIndex)` |
 | ui_renderPureEssencePanel | method | L235 | L291 | 57 | `ui_renderPureEssencePanel(marbleDef, selectionIndex)` |
 | ui_isFateMomentPhase | method | L292 | L312 | 21 | `ui_isFateMomentPhase()` |
-| ui_renderReplaceAmmoUI | method | L313 | L716 | **404** | `ui_renderReplaceAmmoUI()` |
-| ui_toggleReplaceAmmoCard | method | L717 | L742 | 26 | `ui_toggleReplaceAmmoCard(globalIdx)` |
-| ui_selectReplaceAmmoTarget | method | L743 | L746 | 4 | `ui_selectReplaceAmmoTarget(ammoIdx)` |
-| ui_refreshSelectionModeUI | method | L747 | L830 | 84 | `ui_refreshSelectionModeUI()` |
-| meta_getResourceCount | method | L831 | L850 | 20 | `meta_getResourceCount(resourceId)` |
-| meta_spendResource | method | L851 | L876 | 26 | `meta_spendResource(resourceId, amount)` |
-| ui_updateUI | method | L877 | L1010 | 134 | `ui_updateUI()` |
-| ui_updatePCLayout | method | L1011 | L1067 | 57 | `ui_updatePCLayout()` |
-| _ui_updateLeftSidebarContent | method | L1068 | L1094 | 27 | `_ui_updateLeftSidebarContent(phase, wasPC)` |
-| _ui_migrateDrawerToLeftSidebar | method | L1095 | L1121 | 27 | `_ui_migrateDrawerToLeftSidebar(toSidebar)` |
-| _ui_migrateHUDToLeftSidebar | method | L1122 | L1151 | 30 | `_ui_migrateHUDToLeftSidebar(toSidebar)` |
-| _ui_migrateRuneLauncherToSidebar | method | L1152 | L1178 | 27 | `_ui_migrateRuneLauncherToSidebar(toSidebar)` |
-| ui_confirmSelection | method | L1179 | L1230 | 52 | `ui_confirmSelection()` |
-| meta_applyUpgrades | method | L1231 | L1255 | 25 | `meta_applyUpgrades()` |
-| meta_addCurrency | method | L1256 | L1267 | 12 | `meta_addCurrency(amount)` |
-| meta_startRun | method | L1268 | L1281 | 14 | `meta_startRun()` |
-| meta_continueRun | method | L1282 | L1291 | 10 | `meta_continueRun()` |
-| meta_updateContinueButton | method | L1292 | L1313 | 22 | `meta_updateContinueButton()` |
-| meta_openShop | method | L1314 | L1322 | 9 | `meta_openShop()` |
-| meta_calculateUpgradeCost | method | L1323 | L1333 | 11 | `meta_calculateUpgradeCost(upgrade, level)` |
-| meta_buyUpgrade | method | L1334 | L1382 | 49 | `meta_buyUpgrade(upgradeId)` |
-| ui_onPhaseChange | method | L1383 | L1451 | 69 | `ui_onPhaseChange(newPhase)` |
-| ui_triggerScreenShake | method | L1452 | L1463 | 12 | `ui_triggerScreenShake(duration = 200)` |
-| ui_initEventListeners | method | L1464 | L1548 | 85 | `ui_initEventListeners()` |
-| ui_openPause | method | L1549 | L1581 | 33 | `ui_openPause()` |
-| ui_closePause | method | L1582 | L1596 | 15 | `ui_closePause()` |
-| ui_syncPauseSettings | method | L1597 | L1623 | 27 | `ui_syncPauseSettings()` |
-| ui_renderPauseRelics | method | L1624 | L1679 | 56 | `ui_renderPauseRelics()` |
+| ui_renderReplaceAmmoUI | method | L313 | L738 | **426** | `ui_renderReplaceAmmoUI()` |
+| ui_toggleReplaceAmmoCard | method | L739 | L764 | 26 | `ui_toggleReplaceAmmoCard(globalIdx)` |
+| ui_selectReplaceAmmoTarget | method | L765 | L768 | 4 | `ui_selectReplaceAmmoTarget(ammoIdx)` |
+| ui_refreshSelectionModeUI | method | L769 | L852 | 84 | `ui_refreshSelectionModeUI()` |
+| meta_getResourceCount | method | L853 | L872 | 20 | `meta_getResourceCount(resourceId)` |
+| meta_spendResource | method | L873 | L898 | 26 | `meta_spendResource(resourceId, amount)` |
+| ui_updateUI | method | L899 | L1032 | 134 | `ui_updateUI()` |
+| ui_updatePCLayout | method | L1033 | L1089 | 57 | `ui_updatePCLayout()` |
+| _ui_updateLeftSidebarContent | method | L1090 | L1116 | 27 | `_ui_updateLeftSidebarContent(phase, wasPC)` |
+| _ui_migrateDrawerToLeftSidebar | method | L1117 | L1143 | 27 | `_ui_migrateDrawerToLeftSidebar(toSidebar)` |
+| _ui_migrateHUDToLeftSidebar | method | L1144 | L1173 | 30 | `_ui_migrateHUDToLeftSidebar(toSidebar)` |
+| _ui_migrateRuneLauncherToSidebar | method | L1174 | L1200 | 27 | `_ui_migrateRuneLauncherToSidebar(toSidebar)` |
+| ui_confirmSelection | method | L1201 | L1252 | 52 | `ui_confirmSelection()` |
+| meta_applyUpgrades | method | L1253 | L1277 | 25 | `meta_applyUpgrades()` |
+| meta_addCurrency | method | L1278 | L1289 | 12 | `meta_addCurrency(amount)` |
+| meta_startRun | method | L1290 | L1303 | 14 | `meta_startRun()` |
+| meta_continueRun | method | L1304 | L1313 | 10 | `meta_continueRun()` |
+| meta_updateContinueButton | method | L1314 | L1335 | 22 | `meta_updateContinueButton()` |
+| meta_openShop | method | L1336 | L1344 | 9 | `meta_openShop()` |
+| meta_calculateUpgradeCost | method | L1345 | L1355 | 11 | `meta_calculateUpgradeCost(upgrade, level)` |
+| meta_buyUpgrade | method | L1356 | L1404 | 49 | `meta_buyUpgrade(upgradeId)` |
+| ui_onPhaseChange | method | L1405 | L1473 | 69 | `ui_onPhaseChange(newPhase)` |
+| ui_triggerScreenShake | method | L1474 | L1485 | 12 | `ui_triggerScreenShake(duration = 200)` |
+| ui_initEventListeners | method | L1486 | L1570 | 85 | `ui_initEventListeners()` |
+| ui_openPause | method | L1571 | L1603 | 33 | `ui_openPause()` |
+| ui_closePause | method | L1604 | L1618 | 15 | `ui_closePause()` |
+| ui_syncPauseSettings | method | L1619 | L1645 | 27 | `ui_syncPauseSettings()` |
+| ui_renderPauseRelics | method | L1646 | L1701 | 56 | `ui_renderPauseRelics()` |

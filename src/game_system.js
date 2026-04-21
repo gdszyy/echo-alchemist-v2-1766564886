@@ -622,12 +622,16 @@ export const game_system = {
         this.ammoQueue = finalAmmo;
         this.replaceAmmoContext = null;
         this._chargedAmmoQueue = null;
-        // 恢复滚动容器样式（子弹替换阶段修改过 overflow）
+        // 恢复滚动容器样式（子弹替换阶段修改过）
         const _gridEl1 = document.getElementById('marble-selection-grid');
         if (_gridEl1 && _gridEl1.parentElement) {
-            _gridEl1.parentElement.style.overflow = '';
-            _gridEl1.parentElement.style.display = '';
-            _gridEl1.parentElement.style.flexDirection = '';
+            const _p1 = _gridEl1.parentElement;
+            _p1.style.overflow = '';
+            _p1.style.display = '';
+            _p1.style.flexDirection = '';
+            _p1.style.flex = '';
+            _p1.style.minHeight = '';
+            _p1.style.alignItems = '';
         }
         if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
         if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
@@ -652,12 +656,16 @@ export const game_system = {
         this.ammoQueue = newRecipes.slice();
         this.replaceAmmoContext = null;
         this._chargedAmmoQueue = null;
-        // 恢复滚动容器样式（子弹替换阶段修改过 overflow）
+        // 恢复滚动容器样式（子弹替换阶段修改过）
         const _gridEl2 = document.getElementById('marble-selection-grid');
         if (_gridEl2 && _gridEl2.parentElement) {
-            _gridEl2.parentElement.style.overflow = '';
-            _gridEl2.parentElement.style.display = '';
-            _gridEl2.parentElement.style.flexDirection = '';
+            const _p2 = _gridEl2.parentElement;
+            _p2.style.overflow = '';
+            _p2.style.display = '';
+            _p2.style.flexDirection = '';
+            _p2.style.flex = '';
+            _p2.style.minHeight = '';
+            _p2.style.alignItems = '';
         }
         if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
         if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();

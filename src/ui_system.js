@@ -336,12 +336,16 @@ ui_closeTruthBook() {
         if (skipGrindBtn) skipGrindBtn.style.display = 'none';
         if (previewPanel) previewPanel.className = 'marble-preview-hidden';
 
-        // 子弹替换阶段：将滚动容器改为 overflow:hidden，让 flex 高度能传递给 gridEl
-        // （退出阶段时在 sys_exitReplaceAmmoPhase 中恢复）
+        // 子弹替换阶段：将滚动容器改为 overflow:hidden + flex:1，让高度能传递给 gridEl
+        // （退出阶段时在 sys_confirmReplaceAmmo / sys_skipReplaceAmmo 中恢复）
         if (gridEl && gridEl.parentElement) {
-            gridEl.parentElement.style.overflow = 'hidden';
-            gridEl.parentElement.style.display = 'flex';
-            gridEl.parentElement.style.flexDirection = 'column';
+            const p = gridEl.parentElement;
+            p.style.overflow = 'hidden';
+            p.style.display = 'flex';
+            p.style.flexDirection = 'column';
+            p.style.flex = '1';
+            p.style.minHeight = '0';
+            p.style.alignItems = 'stretch';
         }
 
         const newRecipes = ctx.newRecipes || [];
@@ -434,16 +438,24 @@ ui_closeTruthBook() {
 
         // 渲染卡片列表
         if (gridEl) {
-            gridEl.style.gridTemplateColumns = '';
-            gridEl.style.maxWidth = '';
-            gridEl.style.height = '100%';
-            gridEl.style.display = 'flex';
-            gridEl.style.flexDirection = 'column';
+            // 强制覆盖 .marble-grid 的 CSS 类样式，改为 flex 布局并撑满父容器
+            gridEl.style.cssText = [
+                'display:flex',
+                'flex-direction:column',
+                'flex:1',
+                'min-height:0',
+                'width:100%',
+                'padding:0',
+                'max-width:none',
+                'margin:0',
+                'gap:0',
+            ].join(';');
             gridEl.innerHTML = '';
 
             // 外层容器：上下两行，撑满 gridEl 全部高度
+            // padding-top:10px 为卡片顶部浮动彽章留出空间
             const wrapper = document.createElement('div');
-            wrapper.style.cssText = 'width:100%;display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;padding:0 12px;';
+            wrapper.style.cssText = 'width:100%;display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;padding:10px 12px 4px;';
 
             // ─── 辅助函数：渲染一张子弹卡片 ────────────────────────────────
             const renderCard = (recipe, globalIdx, label) => {
@@ -453,9 +465,9 @@ ui_closeTruthBook() {
                 const dominant = _calcDominant(recipe);
                 const shine = _calcShine(recipe);
 
-                // ─── 卡片外层容器（overflow:hidden 用于裁剪扫光，height:100% 撑满 grid cell）
+                // ─── 卡片外层容器：overflow:visible 让顶部彽章不被裁剪
                 const cardWrap = document.createElement('div');
-                cardWrap.style.cssText = 'position:relative;border-radius:10px;overflow:hidden;height:100%;display:flex;flex-direction:column;';
+                cardWrap.style.cssText = 'position:relative;border-radius:10px;overflow:visible;height:100%;display:flex;flex-direction:column;';
 
                 // ─── Layer 1 边框 + Layer 2 浮雕背景
                 const card = document.createElement('div');
@@ -481,6 +493,15 @@ ui_closeTruthBook() {
                 // 品质边框始终保留；选中态用 outline 叠加在外层，不覆盖品质边框
                 const qualityBorder = dominant ? dominant.theme[1] : ts.borderIdle;
                 const qualityGlow = dominant ? '0 0 10px ' + dominant.theme[1] + '55' : ts.glow;
+                // 选中态：悬浮上移 + 增强阴影，加在 cardWrap 上让彽章一起动
+                cardWrap.style.transition = 'transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s ease';
+                if (isSelected) {
+                    cardWrap.style.transform = 'translateY(-4px) scale(1.03)';
+                    cardWrap.style.boxShadow = '0 8px 24px rgba(56,189,248,0.35), 0 4px 12px rgba(0,0,0,0.5)';
+                } else {
+                    cardWrap.style.transform = '';
+                    cardWrap.style.boxShadow = '';
+                }
                 card.style.cssText += [
                     'position:relative',
                     'display:flex',
@@ -490,7 +511,7 @@ ui_closeTruthBook() {
                     'border-radius:10px',
                     'cursor:pointer',
                     'user-select:none',
-                    'transition:all 0.15s',
+                    'transition:all 0.2s cubic-bezier(0.34,1.56,0.64,1)',
                     'overflow:visible',
                     'min-height:0',
                     'flex:1',
@@ -499,18 +520,19 @@ ui_closeTruthBook() {
                     'border:1.5px solid ' + qualityBorder,
                     // 选中态：outline 在边框外层叠加，不影响品质边框
                     isSelected ? 'outline:2px solid #38bdf8;outline-offset:2px;' : 'outline:none;',
+                    // 品质内光晕（选中时增强）
                     'box-shadow:' + (isSelected
-                        ? qualityGlow + ', 0 0 0 4px #38bdf833'
+                        ? qualityGlow + ', inset 0 0 12px rgba(56,189,248,0.15)'
                         : qualityGlow),
                 ].join(';');
 
                 cardWrap.appendChild(card);
 
-                // ─── Layer 3: 扫光覆盖层（overflow:hidden 已在 cardWrap 设置）
+                // ─── Layer 3: 扫光覆盖层（用 clip-path 裁剪到卡片边界，不影响外部彽章）
                 if (shine) {
                     const shineEl = document.createElement('div');
                     shineEl.className = 'ammo-card-shine';
-                    shineEl.style.cssText = 'position:absolute;inset:0;border-radius:10px;pointer-events:none;z-index:10;';
+                    shineEl.style.cssText = 'position:absolute;inset:0;border-radius:10px;pointer-events:none;z-index:10;clip-path:inset(0 round 10px);';
                     cardWrap.appendChild(shineEl);
                 }
 
