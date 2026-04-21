@@ -159,6 +159,32 @@
         }
         .shake-hard { animation: shake-hard 0.2s; }
 
+        /* --- [新增] 子弹卡片优化动画 --- */
+        @keyframes card-float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(-4px) rotate(-1deg); }
+            75% { transform: translateY(-2px) rotate(1deg); }
+        }
+        .card-floating {
+            animation: card-float 3s ease-in-out infinite;
+        }
+
+        @keyframes rarity-pulse-s {
+            0%, 100% { box-shadow: 0 0 15px rgba(250, 204, 21, 0.4), inset 0 0 10px rgba(250, 204, 21, 0.2); border-color: #facc15; }
+            50% { box-shadow: 0 0 30px rgba(250, 204, 21, 0.8), inset 0 0 20px rgba(250, 204, 21, 0.4); border-color: #fef08a; }
+        }
+        @keyframes rarity-pulse-a {
+            0%, 100% { box-shadow: 0 0 12px rgba(192, 132, 252, 0.3), inset 0 0 8px rgba(192, 132, 252, 0.1); border-color: #c084fc; }
+            50% { box-shadow: 0 0 24px rgba(192, 132, 252, 0.6), inset 0 0 16px rgba(192, 132, 252, 0.3); border-color: #e9d5ff; }
+        }
+        @keyframes rarity-pulse-b {
+            0%, 100% { box-shadow: 0 0 8px rgba(52, 211, 153, 0.2), inset 0 0 5px rgba(52, 211, 153, 0.1); border-color: #34d399; }
+            50% { box-shadow: 0 0 16px rgba(52, 211, 153, 0.4), inset 0 0 10px rgba(52, 211, 153, 0.2); border-color: #6ee7b7; }
+        }
+        .pulse-s { animation: rarity-pulse-s 2s infinite ease-in-out; }
+        .pulse-a { animation: rarity-pulse-a 2.5s infinite ease-in-out; }
+        .pulse-b { animation: rarity-pulse-b 3s infinite ease-in-out; }
+
         /* --- [新增] 符文发光闪烁特效 --- */
         @keyframes rune-glow-pulse {
             0% { box-shadow: 0 0 5px rgba(168, 85, 247, 0.4); border-color: rgba(168, 85, 247, 0.4); }
