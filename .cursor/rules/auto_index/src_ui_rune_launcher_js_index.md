@@ -1,6 +1,6 @@
 # src/ui/rune_launcher.js 函数索引
 
-> 自动生成于 2026-04-20 | 总行数: 1699 | 函数数: 25 | 语言: javascript
+> 自动生成于 2026-04-21 | 总行数: 1703 | 函数数: 25 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -10,7 +10,7 @@
 | 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
 |--------|------|--------|--------|------|------|
 | _ui_buildRuneIconHTML | function | L31 | L52 | 22 | `_ui_buildRuneIconHTML(runeDef, runeLevel, extraClass = '')` |
-| ui_openRuneLauncher | method | L53 | L134 | 82 | `ui_openRuneLauncher()` |
+| ui_openRuneLauncher | method | L53 | L138 | 86 | `ui_openRuneLauncher()` |
 | _ui_updateLauncherShardCount | method | L135 | L145 | 11 | `_ui_updateLauncherShardCount()` |
 | ui_closeRuneLauncher | method | L146 | L182 | 37 | `ui_closeRuneLauncher()` |
 | ui_closeRunePicker | method | L183 | L195 | 13 | `ui_closeRunePicker()` |

@@ -85,6 +85,9 @@ export const rune_launcher_system = {
             } else {
                 // 移动端模式：弹出全屏覆盖层
                 panel.style.display = 'flex';
+                // [BUGFIX] ui_updateUI 在隐藏所有 .ui-overlay 时会将 pointer-events 设为 none（内联样式）。
+                // 打开面板时必须显式恢复为 auto，否则面板内所有按钮和 Tab 均无法点击。
+                panel.style.pointerEvents = 'auto';
                 // [BUGFIX 第二道防线] 在面板上拦截 touchmove 事件，防止触摸滑动穿透到底层 Canvas。
                 // 使用 capture 阶段监听，确保在任何子元素处理之前先执行拦截。
                 // 仅在首次打开时绑定一次（通过 dataset 标记防止重复绑定）。
