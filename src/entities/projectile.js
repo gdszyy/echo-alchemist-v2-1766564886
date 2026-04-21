@@ -442,9 +442,9 @@ class Projectile {
                 this.vel.y = speed * Math.cos(newAngle) * (this.vel.y > 0 ? 1 : -1);
             }
             if(this.config.bounce > 0) this.deformation = { x: 0.7, y: 1.3 };
-            // [打击感] 反弹左墙壁：低频大幅震动
+            // [打击感] 反弹左墙壁：低频大幅震动 (已降低 40%)
             if (typeof game !== 'undefined' && game.triggerScreenShake) {
-                const wallShake = 2 + Math.min(1, this.config.damage / 20) * 5; // 2~7px
+                const wallShake = (2 + Math.min(1, this.config.damage / 20) * 5) * 0.6; // 1.2~4.2px
                 game.triggerScreenShake(wallShake);
             }
             this.hitCooldowns.clear();
@@ -460,9 +460,9 @@ class Projectile {
                 this.vel.y = speed * Math.cos(newAngle) * (this.vel.y > 0 ? 1 : -1);
             }
             if(this.config.bounce > 0) this.deformation = { x: 0.7, y: 1.3 };
-            // [打击感] 反弹右墙壁：低频大幅震动
+            // [打击感] 反弹右墙壁：低频大幅震动 (已降低 40%)
             if (typeof game !== 'undefined' && game.triggerScreenShake) {
-                const wallShake = 2 + Math.min(1, this.config.damage / 20) * 5; // 2~7px
+                const wallShake = (2 + Math.min(1, this.config.damage / 20) * 5) * 0.6; // 1.2~4.2px
                 game.triggerScreenShake(wallShake);
             }
             this.hitCooldowns.clear();
@@ -477,9 +477,9 @@ class Projectile {
             this.pos.y = topBound; this.vel.y = Math.abs(this.vel.y); 
             if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
             if(this.config.bounce > 0) this.deformation = { x: 1.3, y: 0.7 };
-            // [打击感] 反弹顶墙壁：低频大幅震动
+            // [打击感] 反弹顶墙壁：低频大幅震动 (已降低 40%)
             if (typeof game !== 'undefined' && game.triggerScreenShake) {
-                const wallShake = 2 + Math.min(1, this.config.damage / 20) * 5; // 2~7px
+                const wallShake = (2 + Math.min(1, this.config.damage / 20) * 5) * 0.6; // 1.2~4.2px
                 game.triggerScreenShake(wallShake);
             }
         }
@@ -490,9 +490,9 @@ class Projectile {
                 
                 // [修复] 底部护盾反弹不消耗反弹次数
                 if(this.config.bounce > 0) this.deformation = { x: 1.3, y: 0.7 };
-                // [打击感] 反弹底墙壁：低频大幅震动
+                // [打击感] 反弹底墙壁：低频大幅震动 (已降低 40%)
                 if (typeof game !== 'undefined' && game.triggerScreenShake) {
-                    const wallShake = 2 + Math.min(1, this.config.damage / 20) * 5; // 2~7px
+                    const wallShake = (2 + Math.min(1, this.config.damage / 20) * 5) * 0.6; // 1.2~4.2px
                     game.triggerScreenShake(wallShake);
                 }
                 this.hitCooldowns.clear();

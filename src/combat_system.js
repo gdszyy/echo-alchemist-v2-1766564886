@@ -2002,12 +2002,12 @@ export const combat_system = {
         if (!killed && typeof this.triggerScreenShake === 'function') {
             const dmgRatio = Math.min(1, actualDmg / Math.max(1, enemy.maxHp));
             if (isBounceHit) {
-                // 反弹敌人：低频大幅震动，伤害越高震幅越大
-                const bounceShake = 3 + dmgRatio * 9; // 3~12px
+                // 反弹敌人：低频大幅震动，伤害越高震幅越大 (已降低 40%)
+                const bounceShake = (3 + dmgRatio * 9) * 0.6; // 1.8~7.2px
                 this.triggerScreenShake(bounceShake);
             } else if (isPierceHit && typeof this.triggerScreenShakeAdvanced === 'function') {
-                // 穿透敌人：小幅高频持续震动，幅度较小
-                const pierceAmp = 1.5 + dmgRatio * 3.5;  // 1.5~5px
+                // 穿透敌人：小幅高频持续震动，幅度较小 (已降低 40%)
+                const pierceAmp = (1.5 + dmgRatio * 3.5) * 0.6;  // 0.9~3px
                 const pierceDur = Math.round(6 + dmgRatio * 8); // 6~14帧
                 this.triggerScreenShakeAdvanced(pierceAmp, pierceDur);
             }
