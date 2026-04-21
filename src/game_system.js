@@ -850,6 +850,7 @@ export const game_system = {
 
         // --- 2. 动态概率修正 (DDA) ---
         let dynamicMult = 1.0;
+        let isPowerCrushing = false;
         
         // A. 玩家战力影响 (战力越低，掉率越高)
         if (typeof this.combat_calculatePlayerExpectedDamage === 'function') {
@@ -857,9 +858,15 @@ export const game_system = {
             const b = CONFIG.balance || {};
             const expectedEnemyHp = (b.enemyBaseHp || 30) + (this.round * (b.enemyHpPerRound || 10));
             const powerRatio = playerPower / (expectedEnemyHp || 1);
+            
             // 如果战力低于期望血量，增加掉率
             if (powerRatio < 1) {
                 dynamicMult += (1 - powerRatio) * (pityCfg.playerPowerWeight || 0.5);
+            }
+            
+            // [战力碾压判定] 如果战力远超期望血量，标记为碾压状态
+            if (powerRatio >= (pityCfg.powerCrushThreshold || 2.0)) {
+                isPowerCrushing = true;
             }
         }
 
@@ -902,16 +909,19 @@ export const game_system = {
         let forceDrop = false;
         let forcedType = null;
 
-        // 遗物保底
-        if (this.relicMissCount >= (pityCfg.relicMaxMiss || 15)) {
-            forceDrop = true;
-            forcedType = 'relic';
-        } 
-        // 精华保底 (仅在没有遗物保底时触发)
-        else if (this.essenceMissCount >= (pityCfg.essenceMaxMiss || 5)) {
-            forceDrop = true;
-            // 随机决定精华类型
-            forcedType = Math.random() < (gameplayCfg.enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
+        // [战力碾压] 只有在非碾压状态下才触发保底
+        if (!isPowerCrushing) {
+            // 遗物保底
+            if (this.relicMissCount >= (pityCfg.relicMaxMiss || 15)) {
+                forceDrop = true;
+                forcedType = 'relic';
+            } 
+            // 精华保底 (仅在没有遗物保底时触发)
+            else if (this.essenceMissCount >= (pityCfg.essenceMaxMiss || 5)) {
+                forceDrop = true;
+                // 随机决定精华类型
+                forcedType = Math.random() < (gameplayCfg.enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
+            }
         }
 
         // --- 4. 判定掉落 ---

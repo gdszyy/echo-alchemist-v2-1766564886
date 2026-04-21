@@ -728,7 +728,10 @@ const CONFIG = {
             
             // 场上奖励数量限制
             fieldRewardLimit: 3,      // 场上未拾取奖励超过此数量时开始衰减
-            fieldRewardDecay: 0.4     // 每多一个未拾取奖励，掉率乘以该系数
+            fieldRewardDecay: 0.4,    // 每多一个未拾取奖励，掉率乘以该系数
+            
+            // 战力碾压判定
+            powerCrushThreshold: 2.0  // 玩家战力超过期望血量此倍数时，禁用保底机制
         }
     },
     //  初始概率配置 (現在這些是基礎權重，解鎖後會增加)
