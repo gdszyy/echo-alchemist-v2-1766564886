@@ -1,4 +1,5 @@
 import { eventBus, EVENT_TYPES } from './event_bus.js';
+import { RUNE_DB } from './rune_config.js';
 
 export const ui_system = {
     // @section:ui_fly_effects - 飞行特效池管理
@@ -124,52 +125,114 @@ export const ui_system = {
     },
 
     ui_isSelectionConfirmReady() {
+        const required = this.ui_getSelectionRequirement();
+        if ((this.selectedMarbles || []).length !== required) return false;
         if (this.selectionMode === 'pure_essence') {
-            return this.selectionPreviewState && this.selectionPreviewState.length > 0;
+            return !!(this.selectionInjectedRune && this.selectionInjectedRune.marbleIndex === this.selectedMarbles[0]);
         }
-        // [BUGFIX] selectionPreviewState 在弹珠预览时是对象，不能用 .length 判断。
-        // 标准/混沌精华模式下，确认就绪条件是 selectedMarbles 达到要求数量。
-        return (this.selectedMarbles || []).length >= this.ui_getSelectionRequirement();
+        return true;
     },
 
     ui_getPureEssenceLegalElements(marbleDef) {
-        if (!marbleDef) return [];
-        const elements = ['pyro', 'cryo', 'lightning', 'laser', 'bounce', 'pierce', 'scatter', 'wind', 'flying_sword'];
-        return elements.filter(el => (marbleDef[el] || 0) > 0);
+        const validRuneElements = new Set((RUNE_DB || []).map(r => r.element));
+        const legal = new Set();
+        if (marbleDef?.type && validRuneElements.has(marbleDef.type)) legal.add(marbleDef.type);
+        (marbleDef?.collected || []).forEach(item => {
+            const type = typeof item === 'string' ? item : item?.type;
+            if (validRuneElements.has(type)) legal.add(type);
+        });
+        return [...legal];
     },
 
     ui_getPureEssenceRuneOptions(marbleDef) {
-        if (!marbleDef) return [];
-        const legalElements = this.ui_getPureEssenceLegalElements(marbleDef);
-        return (this.runeInventory || []).filter(rune => {
-            const runeData = RUNE_DB[rune.id];
-            return runeData && legalElements.includes(runeData.element);
-        });
+        const legalElements = new Set(this.ui_getPureEssenceLegalElements(marbleDef));
+        return (this.runeInventory || []).map((rune, inventoryIndex) => {
+            const runeDef = (RUNE_DB || []).find(item => item.id === rune.id);
+            if (!runeDef || !legalElements.has(runeDef.element)) return null;
+            return { inventoryIndex, rune, runeDef };
+        }).filter(Boolean);
     },
 
     ui_selectPureEssenceRune(selectionIndex, inventoryIndex) {
-        if (!this.selectionPreviewState) this.selectionPreviewState = [];
-        const rune = this.runeInventory[inventoryIndex];
-        this.selectionPreviewState[selectionIndex] = { inventoryIndex, rune };
+        if (this.selectionMode !== 'pure_essence') return;
+        if (!(this.selectedMarbles || []).includes(selectionIndex)) {
+            if (typeof showToast === 'function') showToast('請先選中這枚彈珠，再注入符文。');
+            return;
+        }
+        const marbleDef = this.marblesPool?.[selectionIndex];
+        const option = this.ui_getPureEssenceRuneOptions(marbleDef).find(item => item.inventoryIndex === inventoryIndex);
+        if (!option) {
+            if (typeof showToast === 'function') showToast('符文屬性不合法，無法注入。');
+            return;
+        }
+        this.selectionInjectedRune = {
+            marbleIndex: selectionIndex,
+            inventoryIndex,
+            runeId: option.rune.id,
+            level: option.rune.level || 1,
+            element: option.runeDef.element,
+            icon: option.runeDef.icon,
+            name: option.runeDef.name,
+            baseStatPerLevel: option.runeDef.baseStatPerLevel || 1,
+        };
         this.ui_refreshSelectionModeUI();
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
     },
 
     ui_renderPureEssencePanel(marbleDef, selectionIndex) {
-        const panel = document.getElementById('pure-essence-panel');
+        const panel = document.getElementById('marble-preview-panel');
         if (!panel) return;
-        panel.innerHTML = '';
-        const options = this.ui_getPureEssenceRuneOptions(marbleDef);
-        if (options.length === 0) {
-            panel.innerHTML = '<div class="text-slate-500 text-center py-8">无匹配属性的符文</div>';
+        let host = document.getElementById('selection-augment-panel');
+        if (!host) {
+            host = document.createElement('div');
+            host.id = 'selection-augment-panel';
+            host.className = 'mt-3';
+            panel.appendChild(host);
+        }
+        if (this.selectionMode !== 'pure_essence' || !marbleDef || selectionIndex < 0) {
+            host.style.display = 'none';
+            host.innerHTML = '';
             return;
         }
-        options.forEach((rune, idx) => {
-            const runeData = RUNE_DB[rune.id];
-            const el = document.createElement('div');
-            el.className = 'pure-essence-option';
-            el.innerHTML = `<span>${runeData.icon}</span><span>Lv.${rune.level}</span>`;
-            el.onclick = () => this.ui_selectPureEssenceRune(selectionIndex, idx);
-            panel.appendChild(el);
+        host.style.display = 'block';
+        const legalElements = this.ui_getPureEssenceLegalElements(marbleDef);
+        const options = this.ui_getPureEssenceRuneOptions(marbleDef);
+        const selectedIndex = (this.selectedMarbles || [])[0];
+        const isSelected = selectedIndex === selectionIndex;
+        const selectedRune = (isSelected && this.selectionInjectedRune && this.selectionInjectedRune.marbleIndex === selectionIndex)
+            ? this.selectionInjectedRune
+            : null;
+        const attrDisplay = (typeof CONFIG !== 'undefined' && CONFIG.ui?.attributeDisplay) ? CONFIG.ui.attributeDisplay : {};
+        const legalHtml = legalElements.length > 0
+            ? legalElements.map(element => {
+                const display = attrDisplay[element] || {};
+                return `<span class="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-200">${display.icon || '\u2726'} ${display.name || element}</span>`;
+            }).join('')
+            : '<span class="inline-flex items-center rounded-full border border-rose-400/40 bg-rose-500/10 px-2 py-0.5 text-[11px] text-rose-200">\u7121\u5408\u6cd5\u5c6c\u6027</span>';
+        let optionsHtml = '';
+        if (!isSelected) {
+            optionsHtml = '<div class="text-xs text-slate-400">\u5148\u9078\u4e2d\u9019\u679a\u5f48\u73e0\uff0c\u518d\u5f9e\u4e0b\u65b9\u5408\u6cd5\u7b26\u6587\u4e2d\u6ce8\u5165\u3002</div>';
+        } else if (options.length === 0) {
+            optionsHtml = '<div class="text-xs text-rose-300">\u7576\u524d\u7b26\u6587\u5eab\u4e2d\u6c92\u6709\u8207\u6b64\u5f48\u73e0\u5c6c\u6027\u5339\u914d\u7684\u5408\u6cd5\u7b26\u6587\u3002</div>';
+        } else {
+            optionsHtml = options.map(item => {
+                const active = selectedRune && selectedRune.inventoryIndex === item.inventoryIndex;
+                return `<button type="button" data-inventory-index="${item.inventoryIndex}" class="pure-essence-rune-btn px-2 py-1 rounded-lg border text-xs transition-all ${active ? 'border-amber-300 bg-amber-500/20 text-amber-100' : 'border-slate-600 bg-slate-800/80 text-slate-200 hover:border-emerald-300 hover:text-white'}">${item.runeDef.icon || '\u2726'} ${item.runeDef.name} Lv.${item.rune.level || 1}</button>`;
+            }).join('');
+        }
+        const selectedRuneText = selectedRune
+            ? `\u5df2\u9078\u4e2d\u6ce8\u5165\u7b26\u6587\uff1a${selectedRune.icon || '\u2726'} ${selectedRune.name} \u2192 ${attrDisplay[selectedRune.element]?.name || selectedRune.element}`
+            : '\u5c1a\u672a\u9078\u4e2d\u6ce8\u5165\u7b26\u6587\u3002';
+        host.innerHTML = `
+            <div class="preview-divider"></div>
+            <div class="preview-peg-label">\u7d14\u6de8\u7cbe\u83ef / \u7b26\u6587\u6ce8\u5165</div>
+            <div class="text-xs text-slate-300 mb-2">\u53ea\u5141\u8a31\u6ce8\u5165\u5f48\u73e0\u539f\u672c\u5df2\u5177\u5099\u7684\u5c6c\u6027\uff1b\u4e0d\u5408\u6cd5\u5c6c\u6027\u6703\u88ab\u6514\u622a\u3002</div>
+            <div class="flex flex-wrap gap-2 mb-2">${legalHtml}</div>
+            <div class="flex flex-wrap gap-2">${optionsHtml}</div>
+            <div class="text-xs ${selectedRune ? 'text-amber-200' : 'text-slate-500'} mt-2">${selectedRuneText}</div>
+        `;
+        host.querySelectorAll('.pure-essence-rune-btn').forEach(btn => {
+            btn.onclick = () => this.ui_selectPureEssenceRune(selectionIndex, Number(btn.dataset.inventoryIndex));
         });
     },
 
@@ -414,28 +477,77 @@ export const ui_system = {
     },
 
     ui_refreshSelectionModeUI() {
+        // [ammo-replace] \u5982\u679c\u5f53\u524d\u5904\u4e8e\u66ff\u6362\u9636\u6bb5\uff0c\u8df3\u8fc7\u666e\u901a\u9009\u62e9 UI \u5237\u65b0\uff0c\u6539\u7531 ui_renderReplaceAmmoUI \u63a7\u5236
+        if (this.replaceAmmoContext && this.replaceAmmoContext.active) {
+            this.ui_renderReplaceAmmoUI();
+            return;
+        }
+        const countEl = document.getElementById('selected-count');
+        const requiredEl = document.getElementById('selected-required-count');
         const labelEl = document.getElementById('selection-mode-label');
         const subtitleEl = document.getElementById('selection-mode-subtitle');
         const confirmBtn = document.getElementById('confirm-selection-btn');
-        const countEl = document.getElementById('selected-count');
-        const requiredEl = document.getElementById('selected-required-count');
-
-        if (this.selectionMode === 'chaos_essence') {
-            if (labelEl) labelEl.innerText = '混沌精华';
-            if (subtitleEl) subtitleEl.innerText = '选择 3 个混沌精华注入弹珠';
-        } else if (this.selectionMode === 'pure_essence') {
-            if (labelEl) labelEl.innerText = '纯净精华';
-            if (subtitleEl) subtitleEl.innerText = '选择 1 个符文进行同化';
-        } else {
-            if (labelEl) labelEl.innerText = '命运抉择';
-            if (subtitleEl) subtitleEl.innerText = '选择 3 个遗物或属性';
+        const selectedCount = (this.selectedMarbles || []).length;
+        const required = this.ui_getSelectionRequirement();
+        // [pure_essence \u4fee\u590d] \u7eaf\u51c0\u7cbe\u534e\u6a21\u5f0f\u4e0b\u5c55\u793a\u5355\u5361\u5c45\u4e2d\u5e03\u5c40
+        const gridEl = document.getElementById('marble-selection-grid');
+        if (gridEl) {
+            if (this.selectionMode === 'pure_essence') {
+                gridEl.style.gridTemplateColumns = '1fr';
+                gridEl.style.maxWidth = '160px';
+            } else {
+                gridEl.style.gridTemplateColumns = '';
+                gridEl.style.maxWidth = '';
+            }
         }
-
-        // [BUGFIX] selectionPreviewState 在弹珠预览时是对象（无 .length），
-        // 在 pure_essence 模式下是数组。已选弹珠数应读取 selectedMarbles.length。
-        if (countEl) countEl.innerText = String((this.selectedMarbles || []).length);
-        if (requiredEl) requiredEl.innerText = String(this.ui_getSelectionRequirement());
-        if (confirmBtn) confirmBtn.disabled = !this.ui_isSelectionConfirmReady();
+        // [pure_essence] \u63a7\u5236\u300c\u8df3\u8fc7\u7814\u78e8\u300d\u6309\u9215\u7684\u663e\u793a/\u9690\u85cf
+        const skipGrindBtn = document.getElementById('skip-grind-btn');
+        if (skipGrindBtn) {
+            skipGrindBtn.style.display = (this.selectionMode === 'pure_essence') ? 'flex' : 'none';
+        }
+        // [tsk-668f3dba] \u8fdb\u5165\u6b63\u5e38\u9009\u62e9\u9636\u6bb5\u65f6\u9690\u85cf\u66ff\u6362\u8df3\u8fc7\u6309\u9215
+        const replaceSkipBtn = document.getElementById('replace-ammo-skip-btn');
+        if (replaceSkipBtn) replaceSkipBtn.style.display = 'none';
+        if (countEl) countEl.innerText = String(selectedCount);
+        if (requiredEl) requiredEl.innerText = String(required);
+        if (labelEl) {
+            labelEl.innerText = this.selectionMode === 'pure_essence'
+                ? '\u7d14\u6de8\u7cbe\u83ef'
+                : this.selectionMode === 'chaos_essence'
+                    ? '\u6df7\u6c8c\u7cbe\u83ef'
+                    : '\u547d\u904b\u6289\u64c7';
+        }
+        if (subtitleEl) {
+            if (this.selectionMode === 'pure_essence') {
+                const injected = this.selectionInjectedRune
+                    ? `\u5df2\u9078\uff1a${this.selectionInjectedRune.icon || '\u2726'} ${this.selectionInjectedRune.name}`
+                    : '\u5c1a\u672a\u6ce8\u5165\u7b26\u6587';
+                subtitleEl.style.display = 'block';
+                subtitleEl.classList.remove('hidden');
+                subtitleEl.innerText = `\u9078\u64c7 1 \u679a\u5f48\u73e0\u4e26\u6ce8\u5165 1 \u500b\u5408\u6cd5\u7b26\u6587\u3002${injected}`;
+            } else if (this.selectionMode === 'chaos_essence') {
+                subtitleEl.style.display = 'block';
+                subtitleEl.classList.remove('hidden');
+                subtitleEl.innerText = `\u547d\u904b\u6642\u523b\u5df2\u958b\u555f\uff0c\u8acb\u9078\u64c7 ${required} \u679a\u5f48\u73e0\u5f8c\u9032\u5165\u7df4\u91d1\u3002`;
+            } else {
+                subtitleEl.style.display = 'none';
+                subtitleEl.classList.add('hidden');
+                subtitleEl.innerText = '';
+            }
+        }
+        if (confirmBtn) {
+            confirmBtn.disabled = !this.ui_isSelectionConfirmReady();
+            confirmBtn.innerText = this.selectionMode === 'pure_essence'
+                ? '\u6ce8\u5165\u5f8c\u958b\u59cb\u7df4\u91d1'
+                : this.selectionMode === 'chaos_essence'
+                    ? '\u63a5\u53d7\u547d\u904b\u5f8c\u958b\u59cb\u7df4\u91d1'
+                    : '\u958b\u59cb\u7df4\u91d1';
+        }
+        if (this.selectionPreviewState) {
+            this.ui_renderPureEssencePanel(this.selectionPreviewState.marble, this.selectionPreviewState.selectionIndex);
+        } else {
+            this.ui_renderPureEssencePanel(null, -1);
+        }
     },
 
     meta_getResourceCount(resourceId) {
