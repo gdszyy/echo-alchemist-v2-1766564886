@@ -140,10 +140,23 @@ export const game_system = {
                 break;
         }
 
-        // 6. 特效与文字层渲染
+        // 6. 战场掉落物更新与渲染
+        if (this.fieldLootItems) {
+            for (let i = this.fieldLootItems.length - 1; i >= 0; i--) {
+                const item = this.fieldLootItems[i];
+                if (item.active) {
+                    item.update(timeScale);
+                    item.draw(this.ctx);
+                } else {
+                    this.fieldLootItems.splice(i, 1);
+                }
+            }
+        }
+
+        // 7. 特效与文字层渲染
         this.render_floatingTexts(timeScale);
 
-        // 7. 风属性法阵渲染（仅战斗/试炼阶段）
+        // 8. 风属性法阵渲染（仅战斗/试炼阶段）
         if (this.phase === 'combat' || this.phase === 'training') {
             this.render_windAnchors();
             for (let i = this.activeWindMatrices.length - 1; i >= 0; i--) {
@@ -160,10 +173,10 @@ export const game_system = {
             }
         }
 
-        // 8. [自适应性能] FPS 和性能等级指示层
+        // 9. [自适应性能] FPS 和性能等级指示层
         this.render_perfOverlay();
 
-        // 9. 下一帧请求
+        // 10. 下一帧请求
         this.ctx.restore();
         requestAnimationFrame(() => this.sys_loop());
     },
@@ -1021,10 +1034,21 @@ export const game_system = {
         // 同步最终确认的奖励类型（sys_queueRoundStartReward 可能因遗物已满而降级为精华）
         enemy._pendingRewardType = queuedReward.type;
 
-        // [RewardDropEffect] 在敌人死亡位置播放对应类型的掉落特效
+        // [RewardDropEffect] 在敌人死亡位置播放对应类型的掉落特效，并生成持久掉落物实体
         if (enemy.pos) {
             if (!this.rewardDropEffects) this.rewardDropEffects = [];
             this.rewardDropEffects.push(new RewardDropEffect(enemy.pos.x, enemy.pos.y, queuedReward.type));
+            
+            // 生成持久掉落物实体
+            if (!this.fieldLootItems) this.fieldLootItems = [];
+            const lootItem = new FieldLootItem(enemy.pos.x, enemy.pos.y, queuedReward.type);
+            this.fieldLootItems.push(lootItem);
+            
+            // 将掉落物坐标存入奖励对象，供后续飞行动画使用
+            queuedReward.dropX = enemy.pos.x;
+            queuedReward.dropY = enemy.pos.y;
+            queuedReward.lootItemId = lootItem.id || Math.random().toString(36).substr(2, 9);
+            lootItem.id = queuedReward.lootItemId;
         }
 
         if (queuedReward.type === 'relic') {
@@ -1071,50 +1095,77 @@ export const game_system = {
 
             if (rewardType === 'relic') {
                 this._roundStartResolverActive = false;
-                if (typeof this.ui_showRelicSelection === 'function') {
-                    this.ui_showRelicSelection({ resumeTarget: 'round_start_resolver', source: reward.source || 'unknown' });
+                
+                const startSelection = () => {
+                    if (typeof this.ui_showRelicSelection === 'function') {
+                        this.ui_showRelicSelection({ resumeTarget: 'round_start_resolver', source: reward.source || 'unknown' });
+                    }
+                };
+
+                // 检查是否有掉落坐标，播放飞行动画
+                if (reward.dropX !== undefined && reward.dropY !== undefined) {
+                    // 移除场上的掉落物实体
+                    if (this.fieldLootItems) {
+                        const item = this.fieldLootItems.find(i => i.id === reward.lootItemId);
+                        if (item) item.active = false;
+                    }
+                    this.ui_playLootToCardAnimation(reward.dropX, reward.dropY, 'relic', startSelection);
+                } else {
+                    startSelection();
                 }
                 return;
             }
 
             if (rewardType === 'chaos_essence' || rewardType === 'pure_essence') {
-                this.pendingSelectionMode = {
-                    mode: rewardType,
-                    requiredCount: rewardType === 'pure_essence' ? 1 : (CONFIG.gameplay.selectionReq || 3),
-                    sourceRewardType: rewardType,
-                    source: reward.source || 'unknown',
-                    round: reward.round || this.round || 1,
-                    enemyType: reward.enemyType || null,
-                };
-                this.fateMomentContext = {
-                    type: rewardType,
-                    source: reward.source || 'unknown',
-                    round: reward.round || this.round || 1,
-                    enemyType: reward.enemyType || null,
-                    sourceRewardType: rewardType,
-                };
-                // [ammo-replace] 精华触发时，如果上回合有 marbleQueue，先生成充能子弹保存到 _chargedAmmoQueue
-                // 研磨全部完成后展示替换界面，让玩家选择是否替换旧子弹
-                if (this.marbleQueue && this.marbleQueue.length > 0) {
-                    this._chargedAmmoQueue = this.marbleQueue.map(marbleDef => {
-                        const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
-                        const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, false);
-                        recipe.finalHits = 0;
-                        recipe.multicast = 0;
-                        recipe._marbleType = marbleDef.type; // 保存弹珠类型用于 UI 展示
-                        return recipe;
+                const startSelection = () => {
+                    this.pendingSelectionMode = {
+                        mode: rewardType,
+                        requiredCount: rewardType === 'pure_essence' ? 1 : (CONFIG.gameplay.selectionReq || 3),
+                        sourceRewardType: rewardType,
+                        source: reward.source || 'unknown',
+                        round: reward.round || this.round || 1,
+                        enemyType: reward.enemyType || null,
+                    };
+                    this.fateMomentContext = {
+                        type: rewardType,
+                        source: reward.source || 'unknown',
+                        round: reward.round || this.round || 1,
+                        enemyType: reward.enemyType || null,
+                        sourceRewardType: rewardType,
+                    };
+                    // [ammo-replace] 精华触发时，如果上回合有 marbleQueue，先生成充能子弹保存到 _chargedAmmoQueue
+                    if (this.marbleQueue && this.marbleQueue.length > 0) {
+                        this._chargedAmmoQueue = this.marbleQueue.map(marbleDef => {
+                            const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
+                            const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, false);
+                            recipe.finalHits = 0;
+                            recipe.multicast = 0;
+                            recipe._marbleType = marbleDef.type;
+                            return recipe;
+                        });
+                    } else {
+                        this._chargedAmmoQueue = null;
+                    }
+                    this._roundStartResolverActive = false;
+                    eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
+                        round: this.round || 1,
+                        pendingCount: this.pendingRoundStartRewards.length,
                     });
-                    console.log('[ammo-replace] 已生成充能子弹:', this._chargedAmmoQueue.length, '个');
+                    showToast(rewardType === 'pure_essence' ? '🕊️ 命運時刻：純淨精華' : '🎡 命運時刻：混沌精华');
+                    this.sys_initSelectionPhase();
+                };
+
+                // 检查是否有掉落坐标，播放飞行动画
+                if (reward.dropX !== undefined && reward.dropY !== undefined) {
+                    // 移除场上的掉落物实体
+                    if (this.fieldLootItems) {
+                        const item = this.fieldLootItems.find(i => i.id === reward.lootItemId);
+                        if (item) item.active = false;
+                    }
+                    this.ui_playLootToCardAnimation(reward.dropX, reward.dropY, rewardType, startSelection);
                 } else {
-                    this._chargedAmmoQueue = null;
+                    startSelection();
                 }
-                this._roundStartResolverActive = false;
-                eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
-                    round: this.round || 1,
-                    pendingCount: this.pendingRoundStartRewards.length,
-                });
-                showToast(rewardType === 'pure_essence' ? '🕊️ 命運時刻：純淨精華' : '🎡 命運時刻：混沌精華');
-                this.sys_initSelectionPhase();
                 return;
             }
         }

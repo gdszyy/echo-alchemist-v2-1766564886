@@ -47,6 +47,56 @@ export const ui_system = {
         });
     },
 
+    /**
+     * @method ui_playLootToCardAnimation
+     * @description 播放掉落物飞向 UI 卡片的 3D 动画
+     */
+    ui_playLootToCardAnimation(startX, startY, type, callback) {
+        const container = document.getElementById('game-container');
+        if (!container) return callback && callback();
+
+        const node = document.createElement('div');
+        node.className = 'loot-fly-proxy';
+        
+        let icon = '🏆';
+        let glow = 'rgba(250, 204, 21, 0.8)';
+        if (type === 'chaos_essence') { icon = '🔮'; glow = 'rgba(168, 85, 247, 0.8)'; }
+        else if (type === 'pure_essence') { icon = '💎'; glow = 'rgba(56, 189, 248, 0.8)'; }
+
+        node.innerHTML = icon;
+        node.style.cssText = `
+            position: absolute;
+            left: ${startX}px;
+            top: ${startY}px;
+            font-size: 32px;
+            z-index: 2000;
+            pointer-events: none;
+            text-shadow: 0 0 20px ${glow};
+            transform: translate(-50%, -50%) scale(0.5) rotateX(0deg) rotateY(0deg);
+            transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+        `;
+        container.appendChild(node);
+
+        // 终点位置：屏幕中心偏上（卡片生成位置）
+        const targetX = this.width / 2;
+        const targetY = this.height * 0.4;
+
+        requestAnimationFrame(() => {
+            node.style.left = targetX + 'px';
+            node.style.top = targetY + 'px';
+            node.style.transform = 'translate(-50%, -50%) scale(2.5) rotateX(360deg) rotateY(720deg)';
+            
+            setTimeout(() => {
+                node.style.opacity = '0';
+                node.style.transform = 'translate(-50%, -50%) scale(4) rotateX(450deg) rotateY(900deg)';
+                setTimeout(() => {
+                    if (node.parentNode) node.parentNode.removeChild(node);
+                    if (callback) callback();
+                }, 200);
+            }, 650);
+        });
+    },
+
     ui_updateSlowMotion() {
         const overlay = document.getElementById('slow-motion-overlay');
         if (!overlay) return;

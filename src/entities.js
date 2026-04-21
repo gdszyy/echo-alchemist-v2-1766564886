@@ -4500,6 +4500,96 @@ class Player {
  * 当敌人被击杀时，可能在其位置生成一个 RuneLoot 实体。
  * 玩家进入拾取范围后自动拾取，将符文加入 runeInventory。
  */
+/**
+ * FieldLootItem - 战场持久掉落物实体
+ * 
+ * 职责：在敌人死亡后留在原地，直到回合结束进入选择阶段。
+ * 支持遗物、混沌精华、纯净精华三种类型。
+ */
+class FieldLootItem {
+    /**
+     * @param {number} x - 掉落位置 X 坐标
+     * @param {number} y - 掉落位置 Y 坐标
+     * @param {'relic'|'chaos_essence'|'pure_essence'} type - 掉落物类型
+     */
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        this.active = true;
+        this._animTimer = Math.random() * Math.PI * 2; // 随机初始相位，避免同步呼吸
+        this._spawnTimer = 0;
+        this._spawnDuration = 0.5; // 入场动画时长
+        this.scale = 0;
+        this.opacity = 0;
+    }
+
+    update(timeScale = 1) {
+        if (!this.active) return;
+        
+        // 入场动画
+        if (this._spawnTimer < this._spawnDuration) {
+            this._spawnTimer += (1/60) * timeScale;
+            const p = Math.min(1, this._spawnTimer / this._spawnDuration);
+            // 弹性入场曲线
+            this.scale = p < 0.7 
+                ? (p / 0.7) * 1.2 
+                : 1.2 - ((p - 0.7) / 0.3) * 0.2;
+            this.opacity = Math.min(1, p * 2);
+        }
+
+        this._animTimer += 0.05 * timeScale;
+    }
+
+    draw(ctx) {
+        if (!this.active || this.opacity <= 0) return;
+
+        const floatY = Math.sin(this._animTimer) * 5;
+        const pulseScale = 1 + Math.sin(this._animTimer * 0.8) * 0.05;
+        const finalScale = this.scale * pulseScale;
+        const drawY = this.y + floatY;
+
+        ctx.save();
+        ctx.translate(this.x, drawY);
+        ctx.scale(finalScale, finalScale);
+        ctx.globalAlpha = this.opacity;
+
+        // 根据类型绘制不同的视觉效果
+        let icon = '🎁';
+        let glowColor = 'rgba(250, 204, 21, 0.5)'; // 默认金色 (Relic)
+        
+        if (this.type === 'relic') {
+            icon = '🏆';
+            glowColor = 'rgba(250, 204, 21, 0.6)';
+        } else if (this.type === 'chaos_essence') {
+            icon = '🔮';
+            glowColor = 'rgba(168, 85, 247, 0.6)';
+        } else if (this.type === 'pure_essence') {
+            icon = '💎';
+            glowColor = 'rgba(56, 189, 248, 0.6)';
+        }
+
+        // 绘制底部光晕
+        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 25);
+        grad.addColorStop(0, glowColor);
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 25, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 绘制图标
+        ctx.font = '24px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = glowColor;
+        ctx.fillText(icon, 0, 0);
+
+        ctx.restore();
+    }
+}
+
 class RuneLoot {
     /**
      * @param {number} x - 掉落位置 X 坐标
@@ -4730,6 +4820,7 @@ export {
     RewardDropEffect,
     Player,
     RuneLoot,
+    FieldLootItem,
     showToast,
     rotateTowards,
     adjustColorBrightness,
