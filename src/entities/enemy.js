@@ -1985,6 +1985,57 @@ class Enemy {
         if (this.type === 'elite') {
             this._drawEliteDecoration(ctx, w, h);
         }
+        // === Layer 3.9b: 大BOSS（6+ 词条）炫彩流光边框补充 ===
+        // 大BOSS 的 E4 炫彩流光边框需要单独调用，不依赖 _drawEliteDecoration 的其他精英装饰
+        if (this.type === 'boss' && this.affixes && this.affixes.length >= 6) {
+            const _bossE4Cfg = CONFIG.enemyRender;
+            const _bossE4T = Date.now() / 1000;
+            const _bossPerimeter = 2 * (w + h);
+            const _bossFlowPos = ((_bossE4T * _bossE4Cfg.eliteBorderRainbowFlowSpeed) % 1) * _bossPerimeter;
+            const _bossFlowHW = _bossPerimeter * _bossE4Cfg.eliteBorderRainbowFlowWidth * 0.5;
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            const _bossSegs = [
+                { x1: -w/2, y1: -h/2, x2: w/2, y2: -h/2 },
+                { x1: w/2,  y1: -h/2, x2: w/2, y2: h/2  },
+                { x1: w/2,  y1: h/2,  x2: -w/2, y2: h/2 },
+                { x1: -w/2, y1: h/2,  x2: -w/2, y2: -h/2 }
+            ];
+            const _bossSegLens = [w, h, w, h];
+            let _bossCumLen = 0;
+            for (let _bsi = 0; _bsi < 4; _bsi++) {
+                const _bSeg = _bossSegs[_bsi];
+                const _bSegLen = _bossSegLens[_bsi];
+                const _bLo = _bossFlowPos - _bossFlowHW;
+                const _bHi = _bossFlowPos + _bossFlowHW;
+                if (_bHi > _bossCumLen && _bLo < _bossCumLen + _bSegLen) {
+                    const _bLocalLo = Math.max(_bLo, _bossCumLen) - _bossCumLen;
+                    const _bLocalHi = Math.min(_bHi, _bossCumLen + _bSegLen) - _bossCumLen;
+                    const _bt0 = _bLocalLo / _bSegLen;
+                    const _bt1 = _bLocalHi / _bSegLen;
+                    const _bpx0 = _bSeg.x1 + (_bSeg.x2 - _bSeg.x1) * _bt0;
+                    const _bpy0 = _bSeg.y1 + (_bSeg.y2 - _bSeg.y1) * _bt0;
+                    const _bpx1 = _bSeg.x1 + (_bSeg.x2 - _bSeg.x1) * _bt1;
+                    const _bpy1 = _bSeg.y1 + (_bSeg.y2 - _bSeg.y1) * _bt1;
+                    const _bGrad = ctx.createLinearGradient(_bpx0, _bpy0, _bpx1, _bpy1);
+                    const _bHue0 = (Date.now() / 20 + _bsi * 90) % 360;
+                    const _bHue1 = (_bHue0 + 60) % 360;
+                    _bGrad.addColorStop(0, `hsla(${_bHue0}, 100%, 70%, 0)`);
+                    _bGrad.addColorStop(0.5, `hsla(${(_bHue0 + _bHue1) / 2}, 100%, 85%, 0.95)`);
+                    _bGrad.addColorStop(1, `hsla(${_bHue1}, 100%, 70%, 0)`);
+                    ctx.strokeStyle = _bGrad;
+                    ctx.lineWidth = _bossE4Cfg.borderTierRainbowWidth + 1; // Boss 比精英稍宽
+                    ctx.shadowColor = `hsl(${_bHue0}, 100%, 65%)`;
+                    ctx.shadowBlur = _bossE4Cfg.borderTierRainbowGlowBlur + 4; // Boss 光晕更强
+                    ctx.beginPath();
+                    ctx.moveTo(_bpx0, _bpy0);
+                    ctx.lineTo(_bpx1, _bpy1);
+                    ctx.stroke();
+                }
+                _bossCumLen += _bSegLen;
+            }
+            ctx.restore();
+        }
 
         // === Layer 4: 裂纹绘制 (Fissures) - [保持不变] ===
 
@@ -2085,9 +2136,38 @@ class Enemy {
             ctx.restore();
         }
         // === Layer 5: 内部边框 ===
-        ctx.strokeStyle = '#334155'; ctx.lineWidth = 2;
-        if (this.type === 'elite') { ctx.strokeStyle = '#facc15'; ctx.lineWidth = 3; }
-        if (this.type === 'boss') { ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 4; }
+        // === 边框分级样式（Border Tier）：根据词条数量 + Boss 类型决定边框颜色/线宽 ===
+        // @perf-impact: 仅替换 strokeStyle/lineWidth，无额外 Canvas 操作，性能影响极低
+        ctx.strokeStyle = '#334155'; ctx.lineWidth = 2; // 默认：0 词条（无特殊边框）
+        if (this.type === 'boss') { ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 4; } // Boss 保持红色基础边框
+        if (this.type === 'elite' || this.type === 'boss') {
+            const affixCount = this.affixes ? this.affixes.length : 0;
+            const tierCfg = CONFIG.enemyRender;
+            // 大BOSS（6+ 词条）或 boss 类型：炫彩流光边框（颜色在 D3/E4 流光中动态计算，此处用金色占位）
+            const isLargeBoss = this.type === 'boss' && affixCount >= 6;
+            // 小BOSS（boss 类型但词条 < 6）或 4-5 词条精英：金边框
+            const isGoldTier = (this.type === 'boss' && affixCount < 6) || (this.type === 'elite' && affixCount >= 4);
+            if (isLargeBoss) {
+                // 炫彩流光：基础边框用金色，流光动态色彩由 E4 节渲染
+                ctx.strokeStyle = tierCfg.borderTierGoldColor;
+                ctx.lineWidth = tierCfg.borderTierRainbowWidth;
+            } else if (isGoldTier) {
+                ctx.strokeStyle = tierCfg.borderTierGoldColor;
+                ctx.lineWidth = tierCfg.borderTierGoldWidth;
+            } else if (affixCount === 3) {
+                ctx.strokeStyle = tierCfg.borderTierSilverColor;
+                ctx.lineWidth = tierCfg.borderTierSilverWidth;
+            } else if (affixCount === 2) {
+                ctx.strokeStyle = tierCfg.borderTierBronzeColor;
+                ctx.lineWidth = tierCfg.borderTierBronzeWidth;
+            } else if (affixCount === 1) {
+                ctx.strokeStyle = tierCfg.borderTierIronColor;
+                ctx.lineWidth = tierCfg.borderTierIronWidth;
+            } else {
+                // 0 词条精英：无特殊边框（保持默认灰色）
+                ctx.strokeStyle = '#334155'; ctx.lineWidth = 2;
+            }
+        }
 
         // [新增] 预警时边框闪烁白色
         if (this.actionPhase === 'telegraphing') {
@@ -2145,14 +2225,43 @@ class Enemy {
             const pulsePhase = (now / pulsePeriod + this.visualSeed * 0.7) * Math.PI * 2;
             // 升级：使用 Math.pow 非线性缓动曲线，增强极大値停留感
             const pulseIntensity = Math.pow((Math.sin(pulsePhase) + 1) * 0.5, CONFIG.enemyRender.breatheEasingPower);
-            // 根据敌人类型应用差异化应用光晕强度倍率
+            // 根据词条数分级应用差异化光晕强度倍率
             let blurMultiplier = 1.0;
-            if (this.type === 'elite') blurMultiplier = CONFIG.enemyRender.borderPulseEliteMultiplier;
             if (this.type === 'boss') blurMultiplier = CONFIG.enemyRender.borderPulseBossMultiplier;
+            else if (this.type === 'elite') {
+                const _ac = this.affixes ? this.affixes.length : 0;
+                // 光晕强度随词条数阶梯升高：铁(0.5) 铜(0.8) 银(1.1) 金(1.8) 炫彩(2.2)
+                if (_ac >= 6) blurMultiplier = 2.2;
+                else if (_ac >= 4) blurMultiplier = CONFIG.enemyRender.borderPulseEliteMultiplier; // 1.8
+                else if (_ac === 3) blurMultiplier = 1.1;
+                else if (_ac === 2) blurMultiplier = 0.8;
+                else if (_ac === 1) blurMultiplier = 0.5;
+                else blurMultiplier = 0.3; // 0 词条几乎无光晕
+            }
             const pulseBlur = pulseIntensity * CONFIG.enemyRender.borderPulseBlurMax * blurMultiplier;
+            // 边框分级光晕颜色：根据词条数和 Boss 类型匹配对应级别
             let pulseColor = CONFIG.enemyRender.borderPulseColorNormal;
-            if (this.type === 'elite') pulseColor = CONFIG.enemyRender.borderPulseColorElite;
-            if (this.type === 'boss') pulseColor = CONFIG.enemyRender.borderPulseColorBoss;
+            if (this.type === 'elite' || this.type === 'boss') {
+                const _affixCount = this.affixes ? this.affixes.length : 0;
+                const _isLargeBoss = this.type === 'boss' && _affixCount >= 6;
+                const _isGoldTier = (this.type === 'boss' && _affixCount < 6) || (this.type === 'elite' && _affixCount >= 4);
+                if (_isLargeBoss) {
+                    // 炫彩流光：光晕颜色随时间循环彩虹渐变
+                    const _hue = (Date.now() / 30) % 360;
+                    pulseColor = `hsl(${_hue}, 100%, 65%)`;
+                } else if (_isGoldTier) {
+                    pulseColor = CONFIG.enemyRender.borderTierGoldGlow;
+                } else if (_affixCount === 3) {
+                    pulseColor = CONFIG.enemyRender.borderTierSilverGlow;
+                } else if (_affixCount === 2) {
+                    pulseColor = CONFIG.enemyRender.borderTierBronzeGlow;
+                } else if (_affixCount === 1) {
+                    pulseColor = CONFIG.enemyRender.borderTierIronGlow;
+                } else {
+                    // 0 词条：使用默认灰色
+                    pulseColor = CONFIG.enemyRender.borderPulseColorNormal;
+                }
+            }
             ctx.shadowColor = pulseColor;
             ctx.shadowBlur = pulseBlur;
             // 重绘一次边框以应用光晕（不改变已有边框颜色）
@@ -4108,57 +4217,77 @@ class Enemy {
         ctx.fill();
         ctx.restore();
 
-        // --- E4: 流光金边（高光点沿边框流动，模拟能量在装甲边缘流淤）---
-        // 计算边框总周长，确定高光点当前位置
-        const perimeter = 2 * (w + h);
-        const flowPos = ((t * cfg.eliteBorderFlowSpeed) % 1) * perimeter;
-        const flowHalfWidth = perimeter * cfg.eliteBorderFlowWidth * 0.5;
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        // 在边框路径上绘制流光点（使用 4 段边框线段分别判断）
-        const segments = [
-            { x1: -w/2, y1: -h/2, x2: w/2, y2: -h/2 },  // 上边
-            { x1: w/2,  y1: -h/2, x2: w/2, y2: h/2  },  // 右边
-            { x1: w/2,  y1: h/2,  x2: -w/2, y2: h/2 },  // 下边
-            { x1: -w/2, y1: h/2,  x2: -w/2, y2: -h/2 }  // 左边
-        ];
-        const segLens = [w, h, w, h];
-        let cumLen = 0;
-        for (let si = 0; si < 4; si++) {
-            const seg = segments[si];
-            const segLen = segLens[si];
-            const segStart = cumLen;
-            const segEnd = cumLen + segLen;
-            // 判断流光点是否在这一段
-            const centerInSeg = flowPos;
-            const lo = centerInSeg - flowHalfWidth;
-            const hi = centerInSeg + flowHalfWidth;
-            if (hi > segStart && lo < segEnd) {
-                // 计算在这段内的局部范围
-                const localLo = Math.max(lo, segStart) - segStart;
-                const localHi = Math.min(hi, segEnd) - segStart;
-                const t0 = localLo / segLen;
-                const t1 = localHi / segLen;
-                const px0 = seg.x1 + (seg.x2 - seg.x1) * t0;
-                const py0 = seg.y1 + (seg.y2 - seg.y1) * t0;
-                const px1 = seg.x1 + (seg.x2 - seg.x1) * t1;
-                const py1 = seg.y1 + (seg.y2 - seg.y1) * t1;
-                const flowGrad = ctx.createLinearGradient(px0, py0, px1, py1);
-                flowGrad.addColorStop(0, 'rgba(250, 204, 21, 0)');
-                flowGrad.addColorStop(0.5, `rgba(255, 255, 200, 0.8)`);
-                flowGrad.addColorStop(1, 'rgba(250, 204, 21, 0)');
-                ctx.strokeStyle = flowGrad;
-                ctx.lineWidth = 3;
-                ctx.shadowColor = '#facc15';
-                ctx.shadowBlur = 8;
-                ctx.beginPath();
-                ctx.moveTo(px0, py0);
-                ctx.lineTo(px1, py1);
-                ctx.stroke();
+        // --- E4: 流光边框（根据词条数分级：金色流光 / 炫彩流光）---
+        // 仅在金边（4-5 词条）或炫彩流光（6+ 词条/大BOSS）时渲染
+        // @perf-impact: 每帧 1-2 次 createLinearGradient，已通过条件判断限制调用次数
+        {
+            const e4AffixCount = this.affixes ? this.affixes.length : 0;
+            const e4IsLargeBoss = this.type === 'boss' && e4AffixCount >= 6;
+            const e4IsGoldTier = (this.type === 'boss' && e4AffixCount < 6) || (this.type === 'elite' && e4AffixCount >= 4);
+            const e4IsRainbow = e4IsLargeBoss || (this.type === 'elite' && e4AffixCount >= 6);
+            // 仅金边或炫彩流光级才绘制流光边框
+            if (e4IsGoldTier || e4IsRainbow) {
+                const flowSpeed = e4IsRainbow ? cfg.eliteBorderRainbowFlowSpeed : cfg.eliteBorderFlowSpeed;
+                const flowWidthRatio = e4IsRainbow ? cfg.eliteBorderRainbowFlowWidth : cfg.eliteBorderFlowWidth;
+                const perimeter = 2 * (w + h);
+                const flowPos = ((t * flowSpeed) % 1) * perimeter;
+                const flowHalfWidth = perimeter * flowWidthRatio * 0.5;
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                const segments = [
+                    { x1: -w/2, y1: -h/2, x2: w/2, y2: -h/2 },  // 上边
+                    { x1: w/2,  y1: -h/2, x2: w/2, y2: h/2  },  // 右边
+                    { x1: w/2,  y1: h/2,  x2: -w/2, y2: h/2 },  // 下边
+                    { x1: -w/2, y1: h/2,  x2: -w/2, y2: -h/2 }  // 左边
+                ];
+                const segLens = [w, h, w, h];
+                let cumLen = 0;
+                for (let si = 0; si < 4; si++) {
+                    const seg = segments[si];
+                    const segLen = segLens[si];
+                    const segStart = cumLen;
+                    const segEnd = cumLen + segLen;
+                    const lo = flowPos - flowHalfWidth;
+                    const hi = flowPos + flowHalfWidth;
+                    if (hi > segStart && lo < segEnd) {
+                        const localLo = Math.max(lo, segStart) - segStart;
+                        const localHi = Math.min(hi, segEnd) - segStart;
+                        const t0 = localLo / segLen;
+                        const t1 = localHi / segLen;
+                        const px0 = seg.x1 + (seg.x2 - seg.x1) * t0;
+                        const py0 = seg.y1 + (seg.y2 - seg.y1) * t0;
+                        const px1 = seg.x1 + (seg.x2 - seg.x1) * t1;
+                        const py1 = seg.y1 + (seg.y2 - seg.y1) * t1;
+                        const flowGrad = ctx.createLinearGradient(px0, py0, px1, py1);
+                        if (e4IsRainbow) {
+                            // 炫彩流光：彩虹渐变，中心点颜色随时间循环干色相
+                            const hue0 = (Date.now() / 25 + si * 90) % 360;
+                            const hue1 = (hue0 + 60) % 360;
+                            flowGrad.addColorStop(0, `hsla(${hue0}, 100%, 70%, 0)`);
+                            flowGrad.addColorStop(0.5, `hsla(${(hue0 + hue1) / 2}, 100%, 80%, 0.9)`);
+                            flowGrad.addColorStop(1, `hsla(${hue1}, 100%, 70%, 0)`);
+                            ctx.shadowColor = `hsl(${hue0}, 100%, 65%)`;
+                            ctx.shadowBlur = cfg.borderTierRainbowGlowBlur;
+                        } else {
+                            // 金色流光
+                            flowGrad.addColorStop(0, 'rgba(250, 204, 21, 0)');
+                            flowGrad.addColorStop(0.5, 'rgba(255, 255, 200, 0.85)');
+                            flowGrad.addColorStop(1, 'rgba(250, 204, 21, 0)');
+                            ctx.shadowColor = cfg.borderTierGoldGlow;
+                            ctx.shadowBlur = cfg.borderTierGoldGlowBlur;
+                        }
+                        ctx.strokeStyle = flowGrad;
+                        ctx.lineWidth = e4IsRainbow ? cfg.borderTierRainbowWidth : 3;
+                        ctx.beginPath();
+                        ctx.moveTo(px0, py0);
+                        ctx.lineTo(px1, py1);
+                        ctx.stroke();
+                    }
+                    cumLen += segLen;
+                }
+                ctx.restore();
             }
-            cumLen += segLen;
         }
-        ctx.restore();
     }
 
     /**

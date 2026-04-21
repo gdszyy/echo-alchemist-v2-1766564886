@@ -893,6 +893,43 @@ const CONFIG = {
         eliteBorderFlowSpeed: 0.4,
         // 流光金边：高光点宽度（0~1，相对于边框总周长）
         eliteBorderFlowWidth: 0.18,
+        // 流光金边：炫彩流光速度（6+ 词条大BOSS 专用，比金边更快）
+        eliteBorderRainbowFlowSpeed: 0.6,
+        // 流光金边：炫彩流光宽度
+        eliteBorderRainbowFlowWidth: 0.22,
+
+        // ===== 精英/Boss 边框分级样式参数（Border Tier）=====
+        // 根据词条数量决定边框颜色与线宽，共 6 档：
+        //   0 词条 → 无特殊边框（normal 灰色）
+        //   1 词条 → 铁边框
+        //   2 词条 → 铜边框
+        //   3 词条 → 银边框
+        //   小BOSS / 4-5 词条 → 金边框（含流光）
+        //   大BOSS / 6+ 词条 → 炫彩流光边框
+        // 铁边框：哑光铁灰色
+        borderTierIronColor: '#6b7280',
+        borderTierIronWidth: 2.5,
+        borderTierIronGlow: '#9ca3af',
+        borderTierIronGlowBlur: 6,
+        // 铜边框：暖铜橙色
+        borderTierBronzeColor: '#b45309',
+        borderTierBronzeWidth: 3,
+        borderTierBronzeGlow: '#d97706',
+        borderTierBronzeGlowBlur: 8,
+        // 银边框：冷银白色
+        borderTierSilverColor: '#94a3b8',
+        borderTierSilverWidth: 3,
+        borderTierSilverGlow: '#e2e8f0',
+        borderTierSilverGlowBlur: 10,
+        // 金边框：流光金色（与精英装饰 E4 共用流光逻辑）
+        borderTierGoldColor: '#facc15',
+        borderTierGoldWidth: 3.5,
+        borderTierGoldGlow: '#fde68a',
+        borderTierGoldGlowBlur: 14,
+        // 炫彩流光边框：彩虹渐变循环（大BOSS / 6+ 词条）
+        borderTierRainbowWidth: 4,
+        borderTierRainbowGlowBlur: 18,
+
         // 晶化切面：叠加层最大透明度
         eliteCrystalFacetAlpha: 0.12,
 
