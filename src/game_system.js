@@ -2065,10 +2065,22 @@ export const game_system = {
             });
 
             // --- 恢复 marbleQueue（重建 MarbleDefinition 对象）---
-            // 注意：恢复后进入 selection 阶段，marbleQueue 会被重新生成
-            // 此处恢复是为了保证 UI 一致性（如果需要显示上回合队列）
-            this.marbleQueue = [];
-            this.activeMarbleIndex = 0;
+            // [ammo-replace 修复] 必须从存档恢复 marbleQueue，否则精华触发时
+            // _chargedAmmoQueue 无法从 marbleQueue 编译（因为 marbleQueue 为空），
+            // 导致研磨完成后子弹分配卡片不显示。
+            if (state.marbleQueue && state.marbleQueue.length > 0) {
+                this.marbleQueue = state.marbleQueue.map(m => ({
+                    type: m.type || 'bounce',
+                    collected: Array.isArray(m.collected) ? [...m.collected] : [],
+                    compiled: m.compiled || false,
+                    recipe: m.recipe ? { ...m.recipe } : null,
+                    multicast: m.multicast || 0,
+                    finalHits: m.finalHits || 0,
+                }));
+            } else {
+                this.marbleQueue = [];
+            }
+            this.activeMarbleIndex = state.activeMarbleIndex || 0;
 
             // --- 恢复 pegs（通过 initPachinko 重建，然后覆盖 type/level/frozenTurns）---
             // 先初始化钉盘（生成正确数量的钉子）
