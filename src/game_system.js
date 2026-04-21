@@ -876,6 +876,24 @@ export const game_system = {
             }
         }
 
+        // D. 场上已有奖励数量影响 (奖励越多，掉率越低)
+        // 统计当前场上活着的敌人中已经标记了掉落的，以及 pendingRoundStartRewards 队列中的
+        let fieldRewardCount = 0;
+        if (this.enemies) {
+            this.enemies.forEach(e => {
+                if (e.active && e._pendingRewardType) fieldRewardCount++;
+            });
+        }
+        if (this.pendingRoundStartRewards) {
+            fieldRewardCount += this.pendingRoundStartRewards.length;
+        }
+        
+        // 如果场上奖励超过限制，应用指数衰减
+        if (fieldRewardCount >= (pityCfg.fieldRewardLimit || 3)) {
+            const excess = fieldRewardCount - (pityCfg.fieldRewardLimit || 3) + 1;
+            dynamicMult *= Math.pow(pityCfg.fieldRewardDecay || 0.4, excess);
+        }
+
         // 应用倍率限制
         dynamicMult = Math.max(pityCfg.minChanceMult || 0.5, Math.min(pityCfg.maxChanceMult || 2.5, dynamicMult));
         const finalDropChance = Math.min(gameplayCfg.enemyDropMaxChance || 0.24, baseDropChance * dynamicMult);
