@@ -127,7 +127,9 @@ export const ui_system = {
         if (this.selectionMode === 'pure_essence') {
             return this.selectionPreviewState && this.selectionPreviewState.length > 0;
         }
-        return (this.selectionPreviewState || []).length >= this.ui_getSelectionRequirement();
+        // [BUGFIX] selectionPreviewState 在弹珠预览时是对象，不能用 .length 判断。
+        // 标准/混沌精华模式下，确认就绪条件是 selectedMarbles 达到要求数量。
+        return (this.selectedMarbles || []).length >= this.ui_getSelectionRequirement();
     },
 
     ui_getPureEssenceLegalElements(marbleDef) {
@@ -429,7 +431,9 @@ export const ui_system = {
             if (subtitleEl) subtitleEl.innerText = '选择 3 个遗物或属性';
         }
 
-        if (countEl) countEl.innerText = String((this.selectionPreviewState || []).length);
+        // [BUGFIX] selectionPreviewState 在弹珠预览时是对象（无 .length），
+        // 在 pure_essence 模式下是数组。已选弹珠数应读取 selectedMarbles.length。
+        if (countEl) countEl.innerText = String((this.selectedMarbles || []).length);
         if (requiredEl) requiredEl.innerText = String(this.ui_getSelectionRequirement());
         if (confirmBtn) confirmBtn.disabled = !this.ui_isSelectionConfirmReady();
     },
