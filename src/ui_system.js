@@ -362,18 +362,20 @@ ui_closeTruthBook() {
         }
         if (countEl) countEl.innerText = String(selectedIndices.length);
         if (requiredEl) requiredEl.innerText = String(maxSelect);
-
-        // ─── Layer 1: 稀有度评级辅助函数 ──────────────────────────────────────
+        // ─── Layer 1: 稀有度评级辅助函数 ──────────────────────────────────────────────
         // 返回 0=C / 1=B / 2=A / 3=S
+        // 阈值设计目标：早期 C 满地、中期偶见 B、后期才出 A、S 是真正传说
+        // statSum 阈值： C(<8) / B(8-19) / A(20-34) / S(≥35)
+        // multicast 阈值： C(0-2) / B(3-5) / A(6-11) / S(≥12)
         const _calcTier = (recipe) => {
             const mc = recipe.multicast || 0;
-            const mcTier = mc >= 9 ? 3 : mc >= 6 ? 2 : mc >= 3 ? 1 : 0;
+            const mcTier = mc >= 12 ? 3 : mc >= 6 ? 2 : mc >= 3 ? 1 : 0;
             const statKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind'];
             let statSum = 0;
             statKeys.forEach(k => { if (recipe[k] > 0) statSum += recipe[k]; });
-            if (recipe.explosive) statSum += 3;
-            if (recipe.isLaser && !(recipe.laser > 0)) statSum += 3;
-            const statTier = statSum >= 15 ? 3 : statSum >= 8 ? 2 : statSum >= 3 ? 1 : 0;
+            if (recipe.explosive) statSum += 5;
+            if (recipe.isLaser && !(recipe.laser > 0)) statSum += 5;
+            const statTier = statSum >= 35 ? 3 : statSum >= 20 ? 2 : statSum >= 8 ? 1 : 0;
             return Math.max(mcTier, statTier);
         };
 
@@ -406,14 +408,15 @@ ui_closeTruthBook() {
             return theme ? { key: maxKey, val: maxVal, theme } : null;
         };
 
-        // ─── Layer 3: 闪光判断 ────────────────────────────────────────────────
+        // ─── Layer 3: 闪光判断 ────────────────────────────────────────────────────
+        // 闪光阈值同步上调：statSum > 28（对应 A 级中段）
         const _calcShine = (recipe) => {
             const statKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind'];
             let statSum = 0;
             statKeys.forEach(k => { if (recipe[k] > 0) statSum += recipe[k]; });
-            if (recipe.explosive) statSum += 3;
-            if (recipe.isLaser && !(recipe.laser > 0)) statSum += 3;
-            return statSum > 12;
+            if (recipe.explosive) statSum += 5;
+            if (recipe.isLaser && !(recipe.laser > 0)) statSum += 5;
+            return statSum > 28;
         };
 
         // 各 tier 的边框视觉配置
