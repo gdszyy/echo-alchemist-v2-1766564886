@@ -239,6 +239,11 @@ export const CollisionSystem = {
                 // === D4: 激光照射抖动反馈 ===
                 // 每次照射命中都触发抖动效果
                 hit.enemy.triggerLaserHitShake();
+                // [打击感] 照射激光持续命中：小幅高频持续震动
+                if (typeof this.triggerScreenShakeAdvanced === 'function') {
+                    const irradAmp = 1.5 + Math.min(1, finalDamage / 20) * 3; // 1.5~4.5px
+                    this.triggerScreenShakeAdvanced(irradAmp, 10);
+                }
 
                 // 视覺：受击点特效
                 if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#fff', 'spark');
@@ -329,6 +334,12 @@ export const CollisionSystem = {
         const _laserPierceDecayReduction = _pierceResParamsForLaser ? (_pierceResParamsForLaser.pierceDecayReduction || 0) : 0;
         // 衰减底数：默认 0.5，共鸣可提升至 0.7（二阶 +0.2）或 0.9（三阶 +0.4）
         const _laserDecayBase = Math.min(0.95, 0.5 + _laserPierceDecayReduction);
+        // [打击感] 激光穿透敌人：小幅高频持续震动
+        if (hits.length > 0 && typeof this.triggerScreenShakeAdvanced === 'function') {
+            const laserAmp = 1.5 + Math.min(1, recipe.damage / 20) * 3; // 1.5~4.5px
+            const laserDur = 8 + hits.length * 2; // 命中敌人越多持续越长
+            this.triggerScreenShakeAdvanced(laserAmp, laserDur);
+        }
         hits.forEach((hit, index) => {
             const damageMultiplier = Math.pow(_laserDecayBase, index);
             // [属性共鸣] 应用激光共鸣伤害倍率

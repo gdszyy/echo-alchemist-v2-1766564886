@@ -92,6 +92,16 @@ export const game_system = {
             this.screenShake *= 0.9;
             if (this.screenShake < 0.5) this.screenShake = 0;
         }
+        // [打击感] 高频持续震动（穿透类）：幅度随剩余时间衰减
+        if (this._shakeHighFreq && this._shakeHighFreq.duration > 0) {
+            const hf = this._shakeHighFreq;
+            const ratio = hf.duration / hf.totalDuration;  // 1→0 线性衰减
+            const amp = hf.amplitude * ratio;
+            shakeX += (Math.random() - 0.5) * amp;
+            shakeY += (Math.random() - 0.5) * amp;
+            hf.duration--;
+            if (hf.duration <= 0) this._shakeHighFreq = null;
+        }
 
         this.ctx.save();
 
@@ -1221,7 +1231,21 @@ export const game_system = {
      * @param {number} amount - 震动强度。
      */
     triggerScreenShake(amount) {
-        this.screenShake = amount;
+        // 取最大值，避免小震动覆盖大震动
+        this.screenShake = Math.max(this.screenShake, amount);
+    },
+
+    /**
+     * @method triggerScreenShakeAdvanced
+     * @description 触发高频持续屏幕震动（适用于穿透类效果）。
+     *   震动幅度随持续时间线性衰减，与 screenShake 叠加。
+     * @param {number} amplitude - 初始震动幅度（像素）
+     * @param {number} duration  - 持续帧数
+     */
+    triggerScreenShakeAdvanced(amplitude, duration) {
+        if (!this._shakeHighFreq || amplitude > this._shakeHighFreq.amplitude) {
+            this._shakeHighFreq = { amplitude, duration, totalDuration: duration };
+        }
     },
 
     /**

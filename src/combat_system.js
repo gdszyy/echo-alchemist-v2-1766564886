@@ -1997,6 +1997,21 @@ export const combat_system = {
         
         // --- [CRT效果] 根据伤害大小触发色差效果 ---
         this.combat_triggerChromaticAberration(actualDmg);
+
+        // [打击感] 未击杀时的震动：反弹敌人 > 穿透敌人
+        if (!killed && typeof this.triggerScreenShake === 'function') {
+            const dmgRatio = Math.min(1, actualDmg / Math.max(1, enemy.maxHp));
+            if (isBounceHit) {
+                // 反弹敌人：低频大幅震动，伤害越高震幅越大
+                const bounceShake = 3 + dmgRatio * 9; // 3~12px
+                this.triggerScreenShake(bounceShake);
+            } else if (isPierceHit && typeof this.triggerScreenShakeAdvanced === 'function') {
+                // 穿透敌人：小幅高频持续震动，幅度较小
+                const pierceAmp = 1.5 + dmgRatio * 3.5;  // 1.5~5px
+                const pierceDur = Math.round(6 + dmgRatio * 8); // 6~14帧
+                this.triggerScreenShakeAdvanced(pierceAmp, pierceDur);
+            }
+        }
         
         // [新增] 保存当前shotId，供后续额外伤害使用
         // this._currentDamageShotId = shotId; // 移除：不再需要全局缓存 shotId
@@ -2103,6 +2118,22 @@ export const combat_system = {
 
         if (killed) { 
             this.spawn_addScore(enemy.maxHp);
+
+            // [打击感] 击杀震动：伤害越高震幅越大，按敌人类型分级加成
+            if (typeof this.triggerScreenShake === 'function') {
+                // 基础震幅 = 伤害 / maxHp 的对数映射，上限 20px
+                const dmgRatio = Math.min(1, actualDmg / Math.max(1, enemy.maxHp));
+                const baseShake = 4 + dmgRatio * 16; // 4~20px
+                let killShake;
+                if (enemy.type === 'boss') {
+                    killShake = baseShake * 3.5;   // Boss 击杀：最强
+                } else if (enemy.type === 'elite') {
+                    killShake = baseShake * 2.0;   // 精英击杀
+                } else {
+                    killShake = baseShake * 1.2;   // 普通击杀
+                }
+                this.triggerScreenShake(Math.min(killShake, 40));
+            }
             
             // [词条 Hook] 嗜血初锋 (bloodthirst_growth)
             // runewordKillCount 跨回合持久，仅在 sys_resetGame 中重置（每局一次）
