@@ -527,9 +527,12 @@ export const spawn_system = {
                     }
                 }
 
-                // [奖励预计算] 生成时预先决定该敌人是否会掉落奖励及其类型，
-                // 供渲染管线在存活期间显示光晕（死亡时才真正排队奖励）
-                if (typeof this.sys_preCalcEnemyRewardType === 'function') {
+                // [V2 奖励判定] 生成时就判定掉落类型。
+                // 每行的第一个生成的敌人为行代表，负责保底计数器累加和紧急救援判定。
+                const isRowRep = (currentCount === 0 && pendingSpawns.length === 0);
+                if (typeof this.sys_determineEnemyReward === 'function') {
+                    this.sys_determineEnemyReward(e, isRowRep);
+                } else if (typeof this.sys_preCalcEnemyRewardType === 'function') {
                     this.sys_preCalcEnemyRewardType(e);
                 }
                 
@@ -577,8 +580,10 @@ export const spawn_system = {
                         this.spawn_createShockwave(e.pos.x, e.pos.y, '#ef4444');
                     }
                 }
-                // [奖励预计算] 生成时预先决定该敌人是否会掉落奖励及其类型
-                if (typeof this.sys_preCalcEnemyRewardType === 'function') {
+                // [V2 奖励判定] 导演生成的敌人不是行代表，不累加保底计数器
+                if (typeof this.sys_determineEnemyReward === 'function') {
+                    this.sys_determineEnemyReward(e, false);
+                } else if (typeof this.sys_preCalcEnemyRewardType === 'function') {
                     this.sys_preCalcEnemyRewardType(e);
                 }
                 this.enemies.push(e);

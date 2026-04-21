@@ -362,9 +362,10 @@ export const game_system = {
         // 重置 Boss 系统状态
         this.bossHistory = [];
         
-        // [动态掉落与保底系统] 重置计数器
-        this.essenceMissCount = 0;
-        this.relicMissCount = 0;
+        // [动态掉落与保底系统 V2] 重置计数器
+        this.essenceSpawnMissCount = 0;  // 连续生成未命中精华的行数
+        this.relicSpawnMissCount = 0;    // 连续生成未命中遗物的行数
+        this.emergencyCooldown = 0;      // 紧急救援冷却回合计数器
         this._pendingBossSpawn = null;
         // [Boss 调度] 重置动态间隔调度状态
         this._nextBossRound = null;      // 下一个 Boss 预定回合
@@ -849,100 +850,130 @@ export const game_system = {
      *              供渲染管线在敌人存活期间显示专属视觉光晕。
      *              注意：此方法只做概率计算和标记，不排队奖励（排队在死亡时进行）。
      */
-    sys_preCalcEnemyRewardType(enemy) {
+    /**
+     * @method sys_determineEnemyReward
+     * @description [V2] 回合生成时判定掉落类型。
+     *   将所有概率计算、保底判定、战力碾压判定、密度控制、紧急救援全部在此完成。
+     *   命中时将 rewardType 写入 enemy.rewardType，死亡时由 sys_tryQueueEnemyRoundReward 直接读取。
+     *   保底计数器在此处统一累加和重置，不再在死亡时操作。
+     * @param {Enemy} enemy - 当前生成的敌人实体
+     * @param {boolean} [isRowRepresentative=false] - 是否为该行的代表敌人（只有代表敌人才进行保底判定）
+     */
+    sys_determineEnemyReward(enemy, isRowRepresentative = false) {
         if (!enemy || enemy.type === 'boss') return;
 
         const affixCount = Array.isArray(enemy.affixes) ? enemy.affixes.length : 0;
         const gameplayCfg = CONFIG.gameplay || {};
         const pityCfg = gameplayCfg.dropPity || {};
 
-        // --- 1. 基础概率计算 ---
-        let baseDropChance = (gameplayCfg.enemyDropBaseChance || 0.04)
-            + Math.min(this.round || 1, gameplayCfg.enemyDropRoundBonusCap || 20) * (gameplayCfg.enemyDropRoundBonus || 0.004)
-            + affixCount * (gameplayCfg.enemyDropAffixBonus || 0.03);
-
-        // --- 2. 动态概率修正 (DDA) ---
-        let dynamicMult = 1.0;
-        let isPowerCrushing = false;
-        
-        // A. 玩家战力影响 (战力越低，掉率越高)
-        if (typeof this.combat_calculatePlayerExpectedDamage === 'function') {
-            const playerPower = this.combat_calculatePlayerExpectedDamage();
-            const b = CONFIG.balance || {};
-            const expectedEnemyHp = (b.enemyBaseHp || 30) + (this.round * (b.enemyHpPerRound || 10));
-            const powerRatio = playerPower / (expectedEnemyHp || 1);
-            
-            // 如果战力低于期望血量，增加掉率
-            if (powerRatio < 1) {
-                dynamicMult += (1 - powerRatio) * (pityCfg.playerPowerWeight || 0.5);
-            }
-            
-            // [战力碾压判定] 如果战力远超期望血量，标记为碾压状态
-            if (powerRatio >= (pityCfg.powerCrushThreshold || 2.0)) {
-                isPowerCrushing = true;
-            }
-        }
-
-        // B. 敌人血量影响 (血量越高，掉率越高)
-        const hpBonus = Math.min(1.0, (enemy.maxHp || 0) / (gameplayCfg.enemyDropRelicHighHpThreshold || 120));
-        dynamicMult += hpBonus * (pityCfg.enemyHpWeight || 0.3);
-
-        // C. 踪迹剩余血量影响 (踪迹血量越低，掉率越高)
-        // 假设踪迹血量存储在 this.traceHp，如果不存在则跳过
-        if (this.traceHp !== undefined && this.traceMaxHp) {
-            const traceRatio = this.traceHp / this.traceMaxHp;
-            if (traceRatio < 0.5) {
-                dynamicMult += (0.5 - traceRatio) * 2 * (pityCfg.traceHpWeight || 0.4);
-            }
-        }
-
-        // D. 场上已有奖励数量影响 (奖励越多，掉率越低)
-        // 统计当前场上活着的敌人中已经标记了掉落的，以及 pendingRoundStartRewards 队列中的
+        // --- 1. 场上奖励密度统计 ---
         let fieldRewardCount = 0;
         if (this.enemies) {
             this.enemies.forEach(e => {
-                if (e.active && e._pendingRewardType) fieldRewardCount++;
+                if (e !== enemy && e.active && e.rewardType) fieldRewardCount++;
             });
         }
         if (this.pendingRoundStartRewards) {
             fieldRewardCount += this.pendingRoundStartRewards.length;
         }
-        
-        // 如果场上奖励超过限制，应用指数衰减
-        if (fieldRewardCount >= (pityCfg.fieldRewardLimit || 3)) {
-            const excess = fieldRewardCount - (pityCfg.fieldRewardLimit || 3) + 1;
+
+        // 硬上限：场上奖励达到硬上限时，强制归零且暂停保底累加
+        const hardCap = pityCfg.fieldRewardHardCap || 5;
+        if (fieldRewardCount >= hardCap) {
+            enemy.rewardType = null;
+            return; // 已达硬上限，不进行任何判定也不累加保底
+        }
+
+        // --- 2. 战力与生存压力评估 ---
+        let powerRatio = 1.0;
+        let isPowerCrushing = false;
+        let traceRatio = 1.0;
+
+        if (typeof this.combat_calculatePlayerExpectedDamage === 'function') {
+            const playerPower = this.combat_calculatePlayerExpectedDamage();
+            const b = CONFIG.balance || {};
+            const expectedEnemyHp = (b.enemyBaseHp || 30) + (this.round * (b.enemyHpPerRound || 10));
+            powerRatio = playerPower / (expectedEnemyHp || 1);
+            if (powerRatio >= (pityCfg.powerCrushThreshold || 2.0)) {
+                isPowerCrushing = true;
+            }
+        }
+
+        if (this.traceHp !== undefined && this.traceMaxHp) {
+            traceRatio = this.traceHp / this.traceMaxHp;
+        }
+
+        // 生存压力公式：战力越弱、踪迹越低则压力越大
+        const survivalPressure = Math.max(0, (1.0 - powerRatio) * 0.6 + (1.0 - traceRatio) * 0.4);
+
+        // --- 3. 紧急救援判定（预测性提前送出）---
+        // 只有行代表敌人才进行紧急救援判定，防止同一行多个敌人重复触发
+        if (isRowRepresentative && !isPowerCrushing && this.emergencyCooldown <= 0) {
+            const emergencyThreshold = pityCfg.emergencyReliefThreshold || 0.7;
+            if (survivalPressure >= emergencyThreshold) {
+                // 紧急救援：强制标记为精华，并启动冷却
+                const essenceType = Math.random() < (gameplayCfg.enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
+                enemy.rewardType = essenceType;
+                this.emergencyCooldown = pityCfg.emergencyReliefCooldown || 3;
+                this.essenceSpawnMissCount = 0;
+                console.log(`[DropV2] 紧急救援触发 (pressure=${survivalPressure.toFixed(2)})，标记 ${essenceType}`);
+                return;
+            }
+        }
+
+        // --- 4. 基础概率计算 ---
+        let baseDropChance = (gameplayCfg.enemyDropBaseChance || 0.04)
+            + Math.min(this.round || 1, gameplayCfg.enemyDropRoundBonusCap || 20) * (gameplayCfg.enemyDropRoundBonus || 0.004)
+            + affixCount * (gameplayCfg.enemyDropAffixBonus || 0.03);
+
+        // --- 5. 动态倍率修正 ---
+        let dynamicMult = 1.0;
+
+        // A. 玩家战力（战力越低，掉率越高）
+        if (powerRatio < 1) {
+            dynamicMult += (1 - powerRatio) * (pityCfg.playerPowerWeight || 0.5);
+        }
+
+        // B. 敌人血量（血量越高，掉率越高）
+        const hpBonus = Math.min(1.0, (enemy.maxHp || 0) / (gameplayCfg.enemyDropRelicHighHpThreshold || 120));
+        dynamicMult += hpBonus * (pityCfg.enemyHpWeight || 0.3);
+
+        // C. 踪迹血量（踪迹越低，掉率越高）
+        if (traceRatio < 0.5) {
+            dynamicMult += (0.5 - traceRatio) * 2 * (pityCfg.traceHpWeight || 0.4);
+        }
+
+        // D. 场上奖励密度衰减
+        const fieldLimit = pityCfg.fieldRewardLimit || 3;
+        if (fieldRewardCount >= fieldLimit) {
+            const excess = fieldRewardCount - fieldLimit + 1;
             dynamicMult *= Math.pow(pityCfg.fieldRewardDecay || 0.4, excess);
         }
 
-        // 应用倍率限制
         dynamicMult = Math.max(pityCfg.minChanceMult || 0.5, Math.min(pityCfg.maxChanceMult || 2.5, dynamicMult));
         const finalDropChance = Math.min(gameplayCfg.enemyDropMaxChance || 0.24, baseDropChance * dynamicMult);
 
-        // --- 3. 保底逻辑 ---
+        // --- 6. 保底判定（仅对行代表敌人生效）---
+        // 战力碾压时保底计数器暂停累加
         let forceDrop = false;
         let forcedType = null;
 
-        // [战力碾压] 只有在非碾压状态下才触发保底
-        if (!isPowerCrushing) {
-            // 遗物保底
-            if (this.relicMissCount >= (pityCfg.relicMaxMiss || 15)) {
+        if (isRowRepresentative && !isPowerCrushing) {
+            if (this.relicSpawnMissCount >= (pityCfg.relicSpawnMiss || 12)) {
                 forceDrop = true;
                 forcedType = 'relic';
-            } 
-            // 精华保底 (仅在没有遗物保底时触发)
-            else if (this.essenceMissCount >= (pityCfg.essenceMaxMiss || 5)) {
+            } else if (this.essenceSpawnMissCount >= (pityCfg.essenceSpawnMiss || 4)) {
                 forceDrop = true;
-                // 随机决定精华类型
                 forcedType = Math.random() < (gameplayCfg.enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
             }
         }
 
-        // --- 4. 判定掉落 ---
+        // --- 7. 最终判定 ---
+        let rewardType = null;
+
         if (forceDrop) {
-            enemy._pendingRewardType = forcedType;
-            // 命中保底后，在 sys_tryQueueEnemyRoundReward 中重置计数器
+            rewardType = forcedType;
         } else if (Math.random() < finalDropChance) {
-            // 正常命中掉落
             const relicChance = Math.min(
                 (gameplayCfg.enemyDropRelicBaseChance || 0.12)
                     + affixCount * (gameplayCfg.enemyDropRelicAffixBonus || 0.12)
@@ -950,11 +981,33 @@ export const game_system = {
                 gameplayCfg.enemyDropRelicMaxChance || 0.45
             );
             const essenceType = Math.random() < (gameplayCfg.enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
-            enemy._pendingRewardType = Math.random() < relicChance ? 'relic' : essenceType;
-        } else {
-            // 未命中掉落
-            enemy._pendingRewardType = null;
+            rewardType = Math.random() < relicChance ? 'relic' : essenceType;
         }
+
+        enemy.rewardType = rewardType;
+
+        // --- 8. 保底计数器更新（仅行代表敌人更新）---
+        if (isRowRepresentative) {
+            if (rewardType === 'relic') {
+                this.relicSpawnMissCount = 0;
+                this.essenceSpawnMissCount = 0;
+            } else if (rewardType === 'pure_essence' || rewardType === 'chaos_essence') {
+                this.essenceSpawnMissCount = 0;
+                // 精华不重置遗物计数，遗物保底继续累加
+                if (!isPowerCrushing) this.relicSpawnMissCount++;
+            } else {
+                // 未命中：两个计数器都累加（不在碾压和硬上限状态下）
+                if (!isPowerCrushing) {
+                    this.essenceSpawnMissCount++;
+                    this.relicSpawnMissCount++;
+                }
+            }
+        }
+    },
+
+    // 兼容别名，防止其他地方调用旧名称
+    sys_preCalcEnemyRewardType(enemy) {
+        return this.sys_determineEnemyReward(enemy, false);
     },
 
     /**
@@ -967,20 +1020,13 @@ export const game_system = {
         if (!enemy || enemy.type === 'boss' || enemy._roundStartRewardQueued) return null;
         enemy._roundStartRewardQueued = true;
 
-        let rewardType = enemy._pendingRewardType || null;
+        // [V2] 优先读取 V2 字段 rewardType，其次兼容旧字段 _pendingRewardType
+        let rewardType = enemy.rewardType !== undefined ? enemy.rewardType : (enemy._pendingRewardType || null);
 
         if (!rewardType) {
-            // [Bug Fix] 只有分身（isClone=true）才走兼容路径重新计算。
-            // 普通敌人生成时已经由 sys_preCalcEnemyRewardType 做过掷骰，
-            // 未被标记 _pendingRewardType 说明已判定不掉落。
-            if (!enemy.isClone) {
-                // [动态掉落与保底系统] 未命中掉落，增加保底计数器
-                this.essenceMissCount = (this.essenceMissCount || 0) + 1;
-                this.relicMissCount = (this.relicMissCount || 0) + 1;
-                return null;
-            }
+            // 分身克隆在生成时跳过了预计算，在死亡时走兼容路径重新计算
+            if (!enemy.isClone) return null;
 
-            // 兼容路径：分身克隆（isClone=true）生成时跳过了预计算，在死亡时重新计算
             const affixCount = Array.isArray(enemy.affixes) ? enemy.affixes.length : 0;
             const gameplayCfg = CONFIG.gameplay || {};
             const dropChance = Math.min(
@@ -999,15 +1045,6 @@ export const game_system = {
             );
             const essenceType = Math.random() < (gameplayCfg.enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
             rewardType = Math.random() < relicChance ? 'relic' : essenceType;
-        }
-
-        // [动态掉落与保底系统] 命中掉落，根据类型重置计数器
-        if (rewardType === 'relic') {
-            this.relicMissCount = 0;
-            this.essenceMissCount = 0; // 掉落遗物也重置精华计数，防止掉落过于密集
-        } else if (rewardType === 'pure_essence' || rewardType === 'chaos_essence') {
-            this.essenceMissCount = 0;
-            // 精华掉落不重置遗物计数，遗物保底继续累加
         }
 
         const essenceTypeFallback = Math.random() < ((CONFIG.gameplay || {}).enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
@@ -1865,9 +1902,10 @@ export const game_system = {
                 prevRoundDamage: this.prevRoundDamage || 0,
                 // 遗物选择计数
                 relicSelectionCount: this.relicSelectionCount || 0,
-                // [动态掉落与保底系统] 存档计数器
-                essenceMissCount: this.essenceMissCount || 0,
-                relicMissCount: this.relicMissCount || 0,
+                // [动态掉落与保底系统 V2] 存档计数器
+                essenceSpawnMissCount: this.essenceSpawnMissCount || 0,
+                relicSpawnMissCount: this.relicSpawnMissCount || 0,
+                emergencyCooldown: this.emergencyCooldown || 0,
                 // 时间戳
                 savedAt: Date.now(),
             };
@@ -1984,9 +2022,10 @@ export const game_system = {
             this.roundDamageHistory = (state.roundDamageHistory || []).slice();
             this.prevRoundDamage = state.prevRoundDamage || 0;
             this.relicSelectionCount = state.relicSelectionCount || 0;
-            // [动态掉落与保底系统] 恢复计数器
-            this.essenceMissCount = state.essenceMissCount || 0;
-            this.relicMissCount = state.relicMissCount || 0;
+            // [动态掉落与保底系统 V2] 恢复计数器
+            this.essenceSpawnMissCount = state.essenceSpawnMissCount || 0;
+            this.relicSpawnMissCount = state.relicSpawnMissCount || 0;
+            this.emergencyCooldown = state.emergencyCooldown || 0;
 
             // --- 恢复 enemies ---
             this.enemies = (state.enemies || []).map(d => {

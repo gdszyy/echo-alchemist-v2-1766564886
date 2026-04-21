@@ -2705,7 +2705,9 @@ class Enemy {
 
         // === Layer 6.8: 奖励标记敌人专属光晕 (Pending Reward Halo) ===
         // @perf-impact: 新增 shadowBlur + createRadialGradient + 旋转符文/晶体 - 已通过 rewardHaloEnabled/rewardRuneCount/rewardCrystalCount 三档门控
-        if (this._pendingRewardType && this.actionPhase === 'idle') {
+        // [V2] 兼容新字段 rewardType 和旧字段 _pendingRewardType
+        const _effectiveRewardType = this.rewardType !== undefined ? this.rewardType : this._pendingRewardType;
+        if (_effectiveRewardType && this.actionPhase === 'idle') {
             const _perfBudget = (typeof game !== 'undefined' && game.perfQualityLevel)
                 ? CONFIG.performance[game.perfQualityLevel]
                 : CONFIG.performance.high;
@@ -2713,7 +2715,7 @@ class Enemy {
                 const _rc = CONFIG.enemyRender;
                 const _now = Date.now();
 
-                if (this._pendingRewardType === 'relic') {
+                if (_effectiveRewardType === 'relic') {
                     // --- 遗物（relic）：「宝藏封印」风格 ---
                     // 借用精英 E2 虚空晶核（金色版）+ E4 流光金边 + 双层脉冲环
                     const _relicPhase = (_now / _rc.relicHaloPeriod + this.visualSeed * 0.5) * Math.PI * 2;
@@ -2853,7 +2855,7 @@ class Enemy {
                     ctx.fillText('👑', this.pos.x, this.pos.y + this.bumpOffsetY - h/2 + _rc.relicIconOffsetY + _relicFloatY);
                     ctx.restore();
 
-                } else if (this._pendingRewardType === 'chaos_essence') {
+                } else if (_effectiveRewardType === 'chaos_essence') {
                     // --- 混沌精华（chaos_essence）：「混沌侵蚀」风格 ---
                     // 借用精英 E1 晶化切面（紫/红混沌版）+ 快速旋转混沌晶核 + 六芒星符文
                     const _chaosPhase = (_now / _rc.chaosHaloPeriod + this.visualSeed * 0.8) * Math.PI * 2;
@@ -2976,7 +2978,7 @@ class Enemy {
                     ctx.restore();
 
                 // @section:draw_attack_indicators - 攻击预警指示器绘制
-                } else if (this._pendingRewardType === 'pure_essence') {
+                } else if (_effectiveRewardType === 'pure_essence') {
                     // --- 纯净精华（pure_essence）：「晶化净化」风格 ---
                     // 借用精英 E2 虚空晶核（冰晶版）+ E3 过曝叠加 + 六角雪花旋转
                     const _purePhase = (_now / _rc.pureHaloPeriod + this.visualSeed * 0.6) * Math.PI * 2;

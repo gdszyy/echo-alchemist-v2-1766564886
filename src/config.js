@@ -712,10 +712,11 @@ const CONFIG = {
         laserRefractionMaxTotal: 50,      // 单次发射最大折射总次数 (防止极端情况)
         laserRefractionDepthDecay: 0.65,   // 每增加一层折射深度，概率乘以该系数 (65%)。第 1 层折射概率 × 0.65，第 2 层 × 0.65^2，以此类推
         
-        // [动态掉落与保底系统]
+        // [动态掉落与保底系统 - V2 回合生成时判定]
         dropPity: {
-            essenceMaxMiss: 5,        // 精华连续不掉落保底阈值（击杀 5 个普通怪必掉一个精华）
-            relicMaxMiss: 15,         // 遗物连续不掉落保底阈值（击杀 15 个普通怪必掉一个遗物）
+            // 保底阈值：连续生成 N 行未命中掉落，下一行强制命中
+            essenceSpawnMiss: 4,      // 精华保底：连续 4 行未掉落，第 5 行强制出精华
+            relicSpawnMiss: 12,       // 遗物保底：连续 12 行未掉落遗物，第 13 行强制出遗物
             
             // 动态概率修正系数
             playerPowerWeight: 0.5,   // 玩家战力对掉率的影响权重（战力越低，掉率越高）
@@ -723,15 +724,20 @@ const CONFIG = {
             traceHpWeight: 0.4,       // 踪迹剩余血量对掉率的影响权重（踪迹血量越低，掉率越高）
             
             // 概率修正范围
-            minChanceMult: 0.5,       // 最小概率倍率（运气极好/战力极强时）
-            maxChanceMult: 2.5,       // 最大概率倍率（运气极差/战力极弱时）
+            minChanceMult: 0.5,       // 最小概率倍率（战力极强时）
+            maxChanceMult: 2.5,       // 最大概率倍率（战力极弱时）
             
-            // 场上奖励数量限制
-            fieldRewardLimit: 3,      // 场上未拾取奖励超过此数量时开始衰减
-            fieldRewardDecay: 0.4,    // 每多一个未拾取奖励，掉率乘以该系数
+            // 场上奖励密度控制
+            fieldRewardLimit: 3,      // 场上带奖励敌人超过此数时开始衰减
+            fieldRewardDecay: 0.4,    // 每多一个带奖励敌人，掉率乘以该系数
+            fieldRewardHardCap: 5,    // 场上带奖励敌人达到此数时，强制将掉落概率归零且暂停保底累加
             
-            // 战力碾压判定
-            powerCrushThreshold: 2.0  // 玩家战力超过期望血量此倍数时，禁用保底机制
+            // 战力碾压判定（禁用保底且暂停保底计数器累加）
+            powerCrushThreshold: 2.0, // 玩家战力超过期望血量此倍数时禁用保底
+            
+            // 紧急救援机制（预测性提前送出）
+            emergencyReliefThreshold: 0.7,  // 生存压力超过此阈值时触发紧急救援
+            emergencyReliefCooldown: 3      // 紧急救援触发后的冷却回合数
         }
     },
     //  初始概率配置 (現在這些是基礎權重，解鎖後會增加)
