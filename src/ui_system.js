@@ -336,6 +336,14 @@ ui_closeTruthBook() {
         if (skipGrindBtn) skipGrindBtn.style.display = 'none';
         if (previewPanel) previewPanel.className = 'marble-preview-hidden';
 
+        // 子弹替换阶段：将滚动容器改为 overflow:hidden，让 flex 高度能传递给 gridEl
+        // （退出阶段时在 sys_exitReplaceAmmoPhase 中恢复）
+        if (gridEl && gridEl.parentElement) {
+            gridEl.parentElement.style.overflow = 'hidden';
+            gridEl.parentElement.style.display = 'flex';
+            gridEl.parentElement.style.flexDirection = 'column';
+        }
+
         const newRecipes = ctx.newRecipes || [];
         const chargedRecipes = ctx.chargedRecipes || [];
         const maxSelect = Math.max(newRecipes.length, chargedRecipes.length, 3);
@@ -428,11 +436,14 @@ ui_closeTruthBook() {
         if (gridEl) {
             gridEl.style.gridTemplateColumns = '';
             gridEl.style.maxWidth = '';
+            gridEl.style.height = '100%';
+            gridEl.style.display = 'flex';
+            gridEl.style.flexDirection = 'column';
             gridEl.innerHTML = '';
 
-            // 外层容器：上下两行，每行三列
+            // 外层容器：上下两行，撑满 gridEl 全部高度
             const wrapper = document.createElement('div');
-            wrapper.className = 'w-full flex flex-col gap-2';
+            wrapper.style.cssText = 'width:100%;display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;padding:0 12px;';
 
             // ─── 辅助函数：渲染一张子弹卡片 ────────────────────────────────
             const renderCard = (recipe, globalIdx, label) => {
@@ -442,9 +453,9 @@ ui_closeTruthBook() {
                 const dominant = _calcDominant(recipe);
                 const shine = _calcShine(recipe);
 
-                // ─── 卡片外层容器（overflow:hidden 用于裁剪扫光）
+                // ─── 卡片外层容器（overflow:hidden 用于裁剪扫光，height:100% 撑满 grid cell）
                 const cardWrap = document.createElement('div');
-                cardWrap.style.cssText = 'position:relative;border-radius:10px;overflow:hidden;';
+                cardWrap.style.cssText = 'position:relative;border-radius:10px;overflow:hidden;height:100%;display:flex;flex-direction:column;';
 
                 // ─── Layer 1 边框 + Layer 2 浮雕背景
                 const card = document.createElement('div');
@@ -467,6 +478,9 @@ ui_closeTruthBook() {
                     card.style.background = isSelected ? ts.bgSelected : ts.bgIdle;
                 }
 
+                // 品质边框始终保留；选中态用 outline 叠加在外层，不覆盖品质边框
+                const qualityBorder = dominant ? dominant.theme[1] : ts.borderIdle;
+                const qualityGlow = dominant ? '0 0 10px ' + dominant.theme[1] + '55' : ts.glow;
                 card.style.cssText += [
                     'position:relative',
                     'display:flex',
@@ -479,10 +493,15 @@ ui_closeTruthBook() {
                     'transition:all 0.15s',
                     'overflow:visible',
                     'min-height:0',
-                    'border:1.5px solid ' + (isSelected ? ts.borderSelected : (dominant ? dominant.theme[1] : ts.borderIdle)),
+                    'flex:1',
+                    'height:100%',
+                    // 品质边框：始终使用品质色，不被选中态覆盖
+                    'border:1.5px solid ' + qualityBorder,
+                    // 选中态：outline 在边框外层叠加，不影响品质边框
+                    isSelected ? 'outline:2px solid #38bdf8;outline-offset:2px;' : 'outline:none;',
                     'box-shadow:' + (isSelected
-                        ? '0 0 0 2px ' + ts.borderSelected + ', ' + (dominant ? '0 0 14px ' + dominant.theme[1] + '88' : ts.glow)
-                        : (dominant ? '0 0 10px ' + dominant.theme[1] + '55' : ts.glow)),
+                        ? qualityGlow + ', 0 0 0 4px #38bdf833'
+                        : qualityGlow),
                 ].join(';');
 
                 cardWrap.appendChild(card);
@@ -623,16 +642,16 @@ ui_closeTruthBook() {
                 return cardWrap;
             };
 
-            // 上行：新研磨（一行三列）
+            // 上行：新研磨（一行三列，flex:1 撑满剩余高度）
             if (newRecipes.length > 0) {
                 const newRow = document.createElement('div');
-                newRow.className = 'flex flex-col gap-1';
+                newRow.style.cssText = 'display:flex;flex-direction:column;gap:4px;flex:1;min-height:0;';
                 const newHeader = document.createElement('div');
-                newHeader.className = 'text-[10px] text-sky-400 font-bold text-center border-b border-sky-400/30 pb-1';
+                newHeader.style.cssText = 'font-size:10px;color:#38bdf8;font-weight:700;text-align:center;border-bottom:1px solid rgba(56,189,248,0.3);padding-bottom:3px;flex-shrink:0;';
                 newHeader.innerText = '\u2728 新研磨';
                 newRow.appendChild(newHeader);
                 const newCards = document.createElement('div');
-                newCards.className = 'grid gap-2 w-full';
+                newCards.style.cssText = 'display:grid;gap:6px;width:100%;flex:1;min-height:0;';
                 newCards.style.gridTemplateColumns = 'repeat(' + newRecipes.length + ', 1fr)';
                 newRecipes.forEach((recipe, i) => {
                     newCards.appendChild(renderCard(recipe, i, 'new'));
@@ -641,16 +660,16 @@ ui_closeTruthBook() {
                 wrapper.appendChild(newRow);
             }
 
-            // 下行：充能子弹（一行三列）
+            // 下行：充能子弹（一行三列，flex:1 撑满剩余高度）
             if (chargedRecipes.length > 0) {
                 const chargedRow = document.createElement('div');
-                chargedRow.className = 'flex flex-col gap-1';
+                chargedRow.style.cssText = 'display:flex;flex-direction:column;gap:4px;flex:1;min-height:0;';
                 const chargedHeader = document.createElement('div');
-                chargedHeader.className = 'text-[10px] text-amber-400 font-bold text-center border-b border-amber-400/30 pb-1';
+                chargedHeader.style.cssText = 'font-size:10px;color:#fbbf24;font-weight:700;text-align:center;border-bottom:1px solid rgba(251,191,36,0.3);padding-bottom:3px;flex-shrink:0;';
                 chargedHeader.innerText = '\u26a1 充能子弹';
                 chargedRow.appendChild(chargedHeader);
                 const chargedCards = document.createElement('div');
-                chargedCards.className = 'grid gap-2 w-full';
+                chargedCards.style.cssText = 'display:grid;gap:6px;width:100%;flex:1;min-height:0;';
                 chargedCards.style.gridTemplateColumns = 'repeat(' + chargedRecipes.length + ', 1fr)';
                 chargedRecipes.forEach((recipe, i) => {
                     chargedCards.appendChild(renderCard(recipe, newRecipes.length + i, 'charged'));
