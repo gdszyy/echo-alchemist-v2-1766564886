@@ -23,10 +23,12 @@ globs: ["src/game_phase.js"]
 - **[tsk-f35c6d10] 普通命运选择已取消**：`sys_startRoundStartResolver()` 队列为空时，**不再**进入普通弹珠选择（`sys_initSelectionPhase()`），改为调用 `sys_showRoundStartBanner()` 直接进入研磨阶段。
 - **[开局命运选择] 已恢复**：`sys_initGameStart()` 在队列遗物奖励后，额外队列一个 `chaos_essence`（`source: 'run_start'`）奖励。遗物选完后， resolver 继续处理该奖励，触发标准 3 枚弹珠命运选择界面，作为开局弹珠配置入口。开局流程变为：遗物选择 → 命运选择（3 枚弹珠）→ 研磨阶段。
 - **入口**: `sys_startRoundStartResolver()` 会先消费 `pendingRoundStartRewards`；若命中 `relic`，进入遗物事件；若命中 `chaos_essence` 或 `pure_essence`，则先写入 `pendingSelectionMode` 再调用 `sys_initSelectionPhase()` 呈现对应的命运时刻界面。
-- **[tsk-668f3dba] 替换子弹阶段**：`sys_initSelectionPhase()` 在 `chaos_essence` 或 `pure_essence` 模式且 `ammoQueue` 非空时，**先**调用 `sys_initReplaceAmmoPhase()` 进入「替换当前子弹」阶段；玩家确认或跳过后再进入原有命运选择流程。`ammoQueue` 为空时自动跳过该阶段。
-  - `replaceAmmoContext`：替换阶段上下文，包含 `active`（是否处于替换阶段）、`selectedIndex`（选中的 ammoQueue 索引，-1 表示未选）、`fateMomentMode`（来源命运时刻类型）。
-  - 替换确认：`sys_confirmReplaceAmmo()` 记录替换目标，进入命运选择；`ui_confirmSelection()` 确认时将命运选择产出的第一枚弹珠替换 `ammoQueue[selectedIndex]`。
-  - 跳过：`sys_skipReplaceAmmo()` 将 `selectedIndex` 置为 -1 并进入命运选择，不执行替换。
+- **[tsk-668f3dba] 替换子弹阶段（当前实现）**：当精华触发（`chaos_essence` / `pure_essence`）且上回合 `marbleQueue` 非空时，系统在进入命运选择**前**将 `marbleQueue` 编译为**充能子弹**（`_chargedAmmoQueue`，`multicast`/`finalHits` 重置为 0）。研磨阶段全部弹珠结算完毕后，若 `_chargedAmmoQueue` 非空，自动调用 `sys_initReplaceAmmoPhase()` 进入替换阶段；否则直接进入战斗。
+  - `replaceAmmoContext`：替换阶段上下文，包含 `active`、`newRecipes`（本回合新研磨，左侧）、`chargedRecipes`（上回合充能子弹，右侧）、`selectedIndices`（多选索引数组，默认全选右侧充能子弹）。
+  - UI：`ui_renderReplaceAmmoUI()` 展示两行卡片（NEW GRIND / CHARGED），每张卡片显示属性值、Tier 徽章（C/B/A/S）和主属性主题色。玩家可逐张切换选中，最多选 `max(newRecipes.length, chargedRecipes.length, 3)` 张。
+  - 替换确认：`sys_confirmReplaceAmmo()` 按 `selectedIndices` 从 `allRecipes = [...newRecipes, ...chargedRecipes]` 中取出子弹写入 `ammoQueue`，清空 `replaceAmmoContext` 和 `_chargedAmmoQueue`，恢复 gridEl CSS 布局后进入战斗。
+  - 跳过：`sys_skipReplaceAmmo()` 直接使用 `newRecipes` 进入战斗，丢弃充能子弹。
+  - 跳过研磨（skip grind）时：优先使用 `_chargedAmmoQueue` 作为 `ammoQueue`，其次编译当前 `marbleQueue`，确保弹药不为空。
 - **模式分支**: `chaos_essence` 模式沿用标准 3 选流程，但 UI 需显式标记为“混沌精华”；`pure_essence` 模式要求只选择 `1` 枚弹珠，并在确认前完成 1 个合法符文注入。
 - **出口**: 玩家做出选择并确认，触发转场动画进入研磨阶段。纯净精华模式下，确认时必须先完成合法性校验，把注入结果写回 `MarbleDefinition.collected`，并为对应 `marble.type` 写入 `doubleAssimilationBoostRounds`。
 
