@@ -598,7 +598,10 @@ export const ui_system = {
             const activeEl = document.getElementById(`phase-${this.phase}`);
             if (activeEl) {
                 activeEl.style.display = (this.phase === 'gameover') ? 'block' : 'flex';
-                const needsAuto = ['meta', 'shop', 'truth_book', 'gameover', 'relic', 'pause'].includes(this.phase);
+                // [BUGFIX] 将 'selection' 加入 needsAuto 列表：
+                // phase-selection 的父容器 pointer-events 必须为 auto，
+                // 否则底部「開始煉金」按钮无法响应点击（父容器 none 会阻断事件传递）。
+                const needsAuto = ['meta', 'shop', 'truth_book', 'gameover', 'relic', 'pause', 'selection'].includes(this.phase);
                 activeEl.style.pointerEvents = needsAuto ? 'auto' : 'none';
                 setTimeout(() => {
                     activeEl.classList.remove('hidden-phase');

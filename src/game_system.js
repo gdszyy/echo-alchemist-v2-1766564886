@@ -577,6 +577,11 @@ export const game_system = {
         this.pendingSelectionMode = null;
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
+        // [BUGFIX] 防御性重置 gridEl inline style：
+        // 如果上一轮经过了 ui_renderReplaceAmmoUI（子弹替换阶段）且清理逻辑未运行，
+        // gridEl 上可能残留 display:flex 的 inline style，导致卡片竖排。在此强制清空。
+        const _initGridEl = document.getElementById('marble-selection-grid');
+        if (_initGridEl) _initGridEl.style.cssText = '';
         this.spawn_generateMarbleOptions();
         this.selectedMarbles = [];
         const countEl = document.getElementById('selected-count');
@@ -653,6 +658,11 @@ export const game_system = {
         this._chargedAmmoQueue = null;
         // 恢复滚动容器样式（子弹替换阶段修改过）
         const _gridEl1 = document.getElementById('marble-selection-grid');
+        if (_gridEl1) {
+            // [BUGFIX] ui_renderReplaceAmmoUI 用 cssText 覆盖了 gridEl 的 display:grid，
+            // 必须在此处清空，否则下一轮「接受命运后开始炼金」会继承 flex 布局，导致卡片竖排且高度极小。
+            _gridEl1.style.cssText = '';
+        }
         if (_gridEl1 && _gridEl1.parentElement) {
             const _p1 = _gridEl1.parentElement;
             _p1.style.overflow = '';
@@ -687,6 +697,10 @@ export const game_system = {
         this._chargedAmmoQueue = null;
         // 恢复滚动容器样式（子弹替换阶段修改过）
         const _gridEl2 = document.getElementById('marble-selection-grid');
+        if (_gridEl2) {
+            // [BUGFIX] 同 sys_confirmReplaceAmmo：清空 gridEl 的 inline cssText，恢复 CSS grid 布局。
+            _gridEl2.style.cssText = '';
+        }
         if (_gridEl2 && _gridEl2.parentElement) {
             const _p2 = _gridEl2.parentElement;
             _p2.style.overflow = '';
