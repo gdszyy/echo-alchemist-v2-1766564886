@@ -798,10 +798,28 @@ export const game_system = {
         } else {
             showToast('跳过研磨！（未获得符文）');
         }
+        // [BUGFIX] 跳过研磨时，必须先将上回合的充能子弹（_chargedAmmoQueue）或当前
+        // marbleQueue 编译为 ammoQueue，否则进入战斗阶段时 ammoQueue 为空，
+        // 导致「彈藥耗盡」→ 敌人回合无限循环。
+        // 优先使用 _chargedAmmoQueue（上回合保留的充能子弹），其次使用当前 marbleQueue。
+        if (this._chargedAmmoQueue && this._chargedAmmoQueue.length > 0) {
+            this.ammoQueue = this._chargedAmmoQueue.slice();
+        } else if (this.marbleQueue && this.marbleQueue.length > 0) {
+            this.ammoQueue = [];
+            this.marbleQueue.forEach(marbleDef => {
+                const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
+                const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, false);
+                recipe.finalHits = 0;
+                recipe.multicast = 0;
+                this.ammoQueue.push(recipe);
+            });
+        } else {
+            this.ammoQueue = [];
+        }
+        this._chargedAmmoQueue = null;
         // 清理命运时刻上下文和弹珠队列
         this.marbleQueue = [];
         this.activeMarbleIndex = 0;
-        this.ammoQueue = [];
         this.selectionMode = 'standard';
         this.selectionRequiredCount = CONFIG.gameplay.selectionReq || 3;
         this.selectionInjectedRune = null;

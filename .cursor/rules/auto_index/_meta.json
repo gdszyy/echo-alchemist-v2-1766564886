@@ -1,14 +1,20 @@
 {
   "indexed": [
     {
-      "file": "src/entities/enemy.js",
-      "lines": 4791,
-      "funcs": 26,
-      "sections": 18,
-      "mega_funcs": 3,
-      "index_path": ".cursor/rules/auto_index/src_entities_enemy_js_index.md"
+      "file": "src/game_system.js",
+      "lines": 2288,
+      "funcs": 45,
+      "sections": 0,
+      "mega_funcs": 1,
+      "index_path": ".cursor/rules/auto_index/src_game_system_js_index.md"
     }
   ],
   "skipped": [],
-  "warnings": []
+  "warnings": [
+    {
+      "file": "src/game_system.js",
+      "lines": 2288,
+      "message": "文件超过 2000 行但没有任何 @section 标记，建议添加内部节点标记。"
+    }
+  ]
 }

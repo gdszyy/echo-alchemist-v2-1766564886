@@ -14,11 +14,12 @@
 
 > **[2026-04-19 更新]** PI-006 升版至 v1.2：新增坑 5（开局缺少弹珠命运选择阶段；`sys_initGameStart()` 必须在遗物奖励后额外队列 `chaos_essence`）。
 > **[2026-04-20 更新]** PI-001 升版至 v1.3：新增坑 8（纯净精华选择跳过替换子弹阶段后 `confirmBtn.onclick` 未恢复，导致无法发射子弹、直接循环敌人回合）。
+> **[2026-04-22 更新]** PI-001 升版至 v1.5：新增坑 10（纯净精华跳过研磨后 `sys_skipGrindGetRune` 未充能 `ammoQueue`，导致子弹列表为空直接进入敌人回合）。
 > **[2026-04-21 更新]** 新增 PI-008：教程系统覆盖层（z-index: 9000+）在符文发射器面板打开时遮挡 Tab 按钮，修复方案为在 `ui_openRuneLauncher` / `ui_closeRuneLauncher` 中临时隐藏/恢复教程 DOM。
 
 | ID | 标题 | 版本 | 关联模块 | 最后更新 | 文档链接 |
 |----|------|------|---------|---------|---------|
-| PI-001 | 核心 Bug 修复流程与高频陷阱 | v1.3 | game_phase, ui_system, game_system | 2026-04-20 | [PI-001_critical_bugfix_flow.md](PI-001_critical_bugfix_flow.md) |
+| PI-001 | 核心 Bug 修复流程与高频陷阱 | v1.5 | game_phase, ui_system, game_system | 2026-04-22 | [PI-001_critical_bugfix_flow.md](PI-001_critical_bugfix_flow.md) |
 | PI-002 | 符文词条 Hook 注入流程 | v1.0 | rune_system, combat_system, ui_system, rune_launcher | 2026-04-16 | [PI-002_runeword_hook_injection.md](PI-002_runeword_hook_injection.md) |
 | PI-003 | 子系统扩展与组合模式注入流程 | v1.0 | core, game_system, combat_system, ui_system | 2026-04-16 | [PI-003_subsystem_composition_pattern.md](PI-003_subsystem_composition_pattern.md) |
 | PI-004 | 性能预算扩展与新特效接入流程 | v1.0 | performance, spawn_system, combat_system, entities | 2026-04-16 | [PI-004_performance_budget_extension.md](PI-004_performance_budget_extension.md) |

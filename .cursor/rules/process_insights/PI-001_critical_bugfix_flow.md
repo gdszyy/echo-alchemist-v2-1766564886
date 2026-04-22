@@ -1,7 +1,7 @@
 ---
 id: "PI-001"
-version: "v1.3"
-last_updated: "2026-04-20"
+version: "v1.5"
+last_updated: "2026-04-22"
 author: "tsk-b1def027-9d1"
 related_modules: ["game_phase", "ui_system", "game_system"]
 status: "active"
@@ -105,9 +105,9 @@ status: "active"
 
 ---
 
-### 坑 9: `ui_confirmSelection` 调用不存在的 `sys_confirmSelection`，导致"开始炼金"按钮完全无响应
+### 坑 9: `ui_confirmSelection` 调用不存在的 `sys_confirmSelection`，导致“开始炼金”按鈕完全无响应
 
-**现象**：选中三个弹珠后，点击"开始炼金"（`#confirm-selection-btn`）按钮没有任何反应，游戏停留在弹珠选择界面，无法进入研磨阶段。
+**现象**：选中三个弹珠后，点击“开始炼金”（`#confirm-selection-btn`）按鈕没有任何反应，游戏停留在弹珠选择界面，无法进入研磨阶段。
 
 **根因**：`ui_confirmSelection()` 函数体只有一行 `if (typeof this.sys_confirmSelection === 'function') this.sys_confirmSelection()`，而 `sys_confirmSelection` 在整个代码库中**从未被定义**。`typeof` 检查为 `false`，函数直接返回，`marbleQueue` 永远不会被填充，`phase_startGatheringPhase()` 永远不会被调用。
 
@@ -119,6 +119,21 @@ status: "active"
 5. 调用 `this.phase_startGatheringPhase()`
 
 **关键位置**：`src/ui_system.js` → `ui_confirmSelection`
+
+---
+
+### 坑 10: `sys_skipGrindGetRune` 未充能 `ammoQueue`，跳过研磨后子弹列表为空
+
+**现象**：纯净符文（`pure_essence`）命运时刻触发时，玩家在选择界面点击「跳过研磨，随机符文」后，直接进入战斗阶段。战斗阶段展示「弹藥耗尽」，玩家无法发射，游戏直接进入敌人回合循环。
+
+**根因**：`sys_skipGrindGetRune()` 在清理状态时将 `ammoQueue` 直接设为 `[]`，没有用 `_chargedAmmoQueue`（上回合保留的充能子弹）或 `marbleQueue`（当前弹珠队列）编译充能子弹。跳过后 `phase_startCombatPhase()` 被调用，但 `ammoQueue` 为空，战斗阶段立即显示「弹藥耗尽」。
+
+**正确做法**：在 `sys_skipGrindGetRune()` 中，在清空 `marbleQueue` 之前，必须先将子弹充能到 `ammoQueue`：
+1. 优先使用 `_chargedAmmoQueue`（上回合充能子弹）直接赋値给 `ammoQueue`。
+2. 如果 `_chargedAmmoQueue` 为空，则遍历 `marbleQueue`，调用 `calc_compileCollectionToRecipe` 编译并 `push` 到 `ammoQueue`。
+3. 最后才清空 `_chargedAmmoQueue`、`marbleQueue`。
+
+**关键位置**：`src/game_system.js` → `sys_skipGrindGetRune` 第 801 行左右
 
 ---
 
@@ -136,4 +151,5 @@ status: "active"
 | v1.1 | 2026-04-16 | 新增坑 6：研磨阶段点击区域阈值过小（`phase_handleInputStart` `pos.y < height * 0.4` 导致弹珠无法发射） | echo-developer |
 | v1.2 | 2026-04-16 | 新增坑 7：PC 端 `_isRuneLauncherOpen` 返回 `true` 屏蔽所有 PC 端鼠标输入 | echo-developer |
 | v1.3 | 2026-04-20 | 新增坑 8：替换子弹阶段跳过后 `confirmBtn.onclick` 未恢复，导致纯净精华选择后无法发射子弹、直接循环敌人回合 | echo-developer |
-| v1.4 | 2026-04-21 | 新增坑 9：`ui_confirmSelection` 调用不存在的 `sys_confirmSelection`，导致"开始炼金"按钮完全无响应 | echo-developer |
+| v1.4 | 2026-04-21 | 新增坑 9：`ui_confirmSelection` 调用不存在的 `sys_confirmSelection`，导致“开始炼金”按鈕完全无响应 | echo-developer |
+| v1.5 | 2026-04-22 | 新增坑 10：`sys_skipGrindGetRune` 未充能 `ammoQueue`，跳过研磨后子弹列表为空导致敌人回合循环 | echo-developer |
