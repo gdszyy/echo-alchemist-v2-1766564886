@@ -1,6 +1,6 @@
 # src/combat_system.js 函数索引
 
-> 自动生成于 2026-04-19 | 总行数: 3331 | 函数数: 42 | 语言: javascript
+> 自动生成于 2026-04-22 | 总行数: 3362 | 函数数: 42 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 5 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -34,23 +34,23 @@
 | combat_wind_drawStormCores | method | L1376 | L1438 | 63 | `combat_wind_drawStormCores(ctx)` |
 | combat_wind_mergeStormCores | method | L1439 | L1496 | 58 | `combat_wind_mergeStormCores()` |
 | combat_wind_decayStormCoresEnergy | method | L1497 | L1513 | 17 | `combat_wind_decayStormCoresEnergy()` |
-| combat_damageEnemy | method | L1514 | L2312 | **799** | `combat_damageEnemy(enemy, projectile, damageOverride = null)` |
-| combat_fireNextShot | method | L2313 | L2540 | **228** | `combat_fireNextShot(vel)` |
-| combat_laser_fire | method | L2541 | L2764 | **224** | `combat_laser_fire(startX, startY, vel, recipe, shotId = null, isTickFire = false)` |
-| combat_bladeStorm_update | method | L2765 | L2822 | 58 | `combat_bladeStorm_update(timeScale)` |
-| combat_continuousLaser_update | method | L2823 | L2884 | 62 | `combat_continuousLaser_update(timeScale = 1)` |
-| _laser_blendRefractionColor | method | L2885 | L2918 | 34 | `_laser_blendRefractionColor(baseColor)` |
-| combat_updateHitProgress | method | L2919 | L2929 | 11 | `combat_updateHitProgress(val, target)` |
-| combat_runeCharge_init | method | L2930 | L2941 | 12 | `combat_runeCharge_init()` |
-| combat_runeCharge_initUI | method | L2942 | L2956 | 15 | `combat_runeCharge_initUI()` |
-| combat_runeCharge_onHit | method | L2957 | L2992 | 36 | `combat_runeCharge_onHit(hitX, hitY, isKill = false)` |
-| combat_runeCharge_levelUp | method | L2993 | L3012 | 20 | `combat_runeCharge_levelUp()` |
-| combat_runeCharge_decay | method | L3013 | L3024 | 12 | `combat_runeCharge_decay(timeScale)` |
-| combat_runeCharge_updateUI | method | L3025 | L3037 | 13 | `combat_runeCharge_updateUI()` |
-| combat_runeCharge_claimReward | method | L3038 | L3071 | 34 | `combat_runeCharge_claimReward()` |
-| combat_checkBossPhaseChange | method | L3072 | L3086 | 15 | `combat_checkBossPhaseChange()` |
-| combat_triggerBossEnrage | method | L3087 | L3180 | 94 | `combat_triggerBossEnrage(boss)` |
-| _triggerDeathFX | method | L3181 | L3332 | 152 | `_triggerDeathFX(enemy, shotId)` |
+| combat_damageEnemy | method | L1514 | L2343 | **830** | `combat_damageEnemy(enemy, projectile, damageOverride = null)` |
+| combat_fireNextShot | method | L2344 | L2571 | **228** | `combat_fireNextShot(vel)` |
+| combat_laser_fire | method | L2572 | L2795 | **224** | `combat_laser_fire(startX, startY, vel, recipe, shotId = null, isTickFire = false)` |
+| combat_bladeStorm_update | method | L2796 | L2853 | 58 | `combat_bladeStorm_update(timeScale)` |
+| combat_continuousLaser_update | method | L2854 | L2915 | 62 | `combat_continuousLaser_update(timeScale = 1)` |
+| _laser_blendRefractionColor | method | L2916 | L2949 | 34 | `_laser_blendRefractionColor(baseColor)` |
+| combat_updateHitProgress | method | L2950 | L2960 | 11 | `combat_updateHitProgress(val, target)` |
+| combat_runeCharge_init | method | L2961 | L2972 | 12 | `combat_runeCharge_init()` |
+| combat_runeCharge_initUI | method | L2973 | L2987 | 15 | `combat_runeCharge_initUI()` |
+| combat_runeCharge_onHit | method | L2988 | L3023 | 36 | `combat_runeCharge_onHit(hitX, hitY, isKill = false)` |
+| combat_runeCharge_levelUp | method | L3024 | L3043 | 20 | `combat_runeCharge_levelUp()` |
+| combat_runeCharge_decay | method | L3044 | L3055 | 12 | `combat_runeCharge_decay(timeScale)` |
+| combat_runeCharge_updateUI | method | L3056 | L3068 | 13 | `combat_runeCharge_updateUI()` |
+| combat_runeCharge_claimReward | method | L3069 | L3102 | 34 | `combat_runeCharge_claimReward()` |
+| combat_checkBossPhaseChange | method | L3103 | L3117 | 15 | `combat_checkBossPhaseChange()` |
+| combat_triggerBossEnrage | method | L3118 | L3211 | 94 | `combat_triggerBossEnrage(boss)` |
+| _triggerDeathFX | method | L3212 | L3363 | 152 | `_triggerDeathFX(enemy, shotId)` |
 
 ## 巨型函数内部节点 (@section 标记)
 
@@ -70,33 +70,33 @@
 | `@section:wind_circle_damage_apply` | L706 | 风圈伤害应用与属性反应 |
 | `@section:wind_circle_visual_effects` | L777 | 风圈视觉特效与粒子生成 |
 
-### combat_damageEnemy (L1514-L2312, 799行)
+### combat_damageEnemy (L1514-L2343, 830行)
 
 | 节点标记 | 行号 | 说明 |
 |----------|------|------|
 | `@section:damage_element_bonus` | L1609 | 属性加成与克制倍率计算 |
 | `@section:damage_runeword_hooks` | L1760 | 符文词条 Hook 注入点 |
 | `@section:damage_apply_to_enemy` | L1912 | 伤害写入敌人并触发属性反应 |
-| `@section:damage_kill_check` | L2064 | 击杀判断与掉落物/经验触发 |
-| `@section:damage_dda_feedback` | L2166 | 动态难度调整（DDA）数据采集 |
-| `@section:damage_visual_and_audio` | L2237 | 伤害视觉反馈与音效播放 |
-| `@section:fire_ammo_selection` | L2312 | 弹药选择与配方读取 |
+| `@section:damage_kill_check` | L2079 | 击杀判断与掉落物/经验触发 |
+| `@section:damage_dda_feedback` | L2197 | 动态难度调整（DDA）数据采集 |
+| `@section:damage_visual_and_audio` | L2268 | 伤害视觉反馈与音效播放 |
+| `@section:fire_ammo_selection` | L2343 | 弹药选择与配方读取 |
 
-### combat_fireNextShot (L2313-L2540, 228行)
-
-| 节点标记 | 行号 | 说明 |
-|----------|------|------|
-| `@section:fire_trajectory_calc` | L2379 | 弹道计算与散射角度 |
-| `@section:fire_projectile_spawn` | L2450 | 子弹实体生成与属性注入 |
-| `@section:fire_post_effects` | L2501 | 射击后效果：后坐力/音效/HUD更新 |
-| `@section:laser_ray_cast` | L2540 | 激光射线投射与穿透检测 |
-
-### combat_laser_fire (L2541-L2764, 224行)
+### combat_fireNextShot (L2344-L2571, 228行)
 
 | 节点标记 | 行号 | 说明 |
 |----------|------|------|
-| `@section:laser_hit_processing` | L2624 | 激光命中处理与连锁反应 |
-| `@section:laser_visual_beam` | L2705 | 激光光束视觉渲染 |
+| `@section:fire_trajectory_calc` | L2410 | 弹道计算与散射角度 |
+| `@section:fire_projectile_spawn` | L2481 | 子弹实体生成与属性注入 |
+| `@section:fire_post_effects` | L2532 | 射击后效果：后坐力/音效/HUD更新 |
+| `@section:laser_ray_cast` | L2571 | 激光射线投射与穿透检测 |
+
+### combat_laser_fire (L2572-L2795, 224行)
+
+| 节点标记 | 行号 | 说明 |
+|----------|------|------|
+| `@section:laser_hit_processing` | L2655 | 激光命中处理与连锁反应 |
+| `@section:laser_visual_beam` | L2736 | 激光光束视觉渲染 |
 
 ## 其他 @section 标记
 

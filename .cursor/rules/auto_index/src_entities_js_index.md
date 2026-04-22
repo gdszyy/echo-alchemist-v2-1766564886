@@ -1,6 +1,6 @@
 # src/entities.js 函数索引
 
-> 自动生成于 2026-04-19 | 总行数: 4741 | 函数数: 104 | 语言: javascript
+> 自动生成于 2026-04-22 | 总行数: 4834 | 函数数: 108 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 4 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -108,11 +108,15 @@
 | drawCore | method | L4235 | L4267 | 33 | `drawCore(ctx, pos, nextAmmo)` |
 | drawOrbitals | method | L4268 | L4404 | 137 | `drawOrbitals(ctx, pos, recipe)` |
 | drawAimLine | method | L4405 | L4480 | 76 | `drawAimLine(ctx)` |
-| drawIdleCannon | method | L4481 | L4502 | 22 | `drawIdleCannon(ctx)` |
-| RuneLoot | class | L4503 | L4508 | 6 | `RuneLoot()` |
-| constructor | method | L4509 | L4527 | 19 | `constructor(x, y, runeId)` |
-| draw | method | L4528 | L4689 | 162 | `draw(ctx)` |
-| checkPickup | method | L4690 | L4742 | 53 | `checkPickup(playerPos, radius = 30)` |
+| drawIdleCannon | method | L4481 | L4508 | 28 | `drawIdleCannon(ctx)` |
+| FieldLootItem | class | L4509 | L4514 | 6 | `FieldLootItem()` |
+| constructor | method | L4515 | L4527 | 13 | `constructor(x, y, type)` |
+| update | method | L4528 | L4544 | 17 | `update(timeScale = 1)` |
+| draw | method | L4545 | L4593 | 49 | `draw(ctx)` |
+| RuneLoot | class | L4594 | L4599 | 6 | `RuneLoot()` |
+| constructor | method | L4600 | L4618 | 19 | `constructor(x, y, runeId)` |
+| draw | method | L4619 | L4780 | 162 | `draw(ctx)` |
+| checkPickup | method | L4781 | L4835 | 55 | `checkPickup(playerPos, radius = 30)` |
 
 ## 巨型函数内部节点 (@section 标记)
 

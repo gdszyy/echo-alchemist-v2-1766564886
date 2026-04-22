@@ -1,6 +1,6 @@
 # src/ui_system.js 函数索引
 
-> 自动生成于 2026-04-22 | 总行数: 810 | 函数数: 42 | 语言: javascript
+> 自动生成于 2026-04-22 | 总行数: 813 | 函数数: 42 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -29,28 +29,28 @@
 | ui_refreshSelectionModeUI | method | L488 | L561 | 74 | `ui_refreshSelectionModeUI()` |
 | meta_getResourceCount | method | L562 | L565 | 4 | `meta_getResourceCount(resourceId)` |
 | meta_spendResource | method | L566 | L577 | 12 | `meta_spendResource(resourceId, amount)` |
-| ui_updateUI | method | L578 | L658 | 81 | `ui_updateUI()` |
-| ui_updatePCLayout | method | L659 | L667 | 9 | `ui_updatePCLayout()` |
-| _ui_updateLeftSidebarContent | method | L668 | L668 | 1 | `_ui_updateLeftSidebarContent(phase, wasPC)` |
-| _ui_migrateDrawerToLeftSidebar | method | L669 | L669 | 1 | `_ui_migrateDrawerToLeftSidebar(toSidebar)` |
-| _ui_migrateHUDToLeftSidebar | method | L670 | L670 | 1 | `_ui_migrateHUDToLeftSidebar(toSidebar)` |
-| _ui_migrateRuneLauncherToSidebar | method | L671 | L678 | 8 | `_ui_migrateRuneLauncherToSidebar(toSidebar)` |
-| ui_confirmSelection | method | L679 | L735 | 57 | `ui_confirmSelection()` |
-| meta_applyUpgrades | method | L736 | L739 | 4 | `meta_applyUpgrades()` |
-| meta_addCurrency | method | L740 | L745 | 6 | `meta_addCurrency(amount)` |
-| meta_startRun | method | L746 | L753 | 8 | `meta_startRun()` |
-| meta_continueRun | method | L754 | L757 | 4 | `meta_continueRun()` |
-| meta_updateContinueButton | method | L758 | L762 | 5 | `meta_updateContinueButton()` |
-| meta_openShop | method | L763 | L767 | 5 | `meta_openShop()` |
-| meta_calculateUpgradeCost | method | L768 | L772 | 5 | `meta_calculateUpgradeCost(upgrade, level)` |
-| meta_buyUpgrade | method | L773 | L777 | 5 | `meta_buyUpgrade(upgradeId)` |
-| ui_onPhaseChange | method | L778 | L784 | 7 | `ui_onPhaseChange(newPhase)` |
-| ui_triggerScreenShake | method | L785 | L791 | 7 | `ui_triggerScreenShake(duration = 200)` |
-| ui_initEventListeners | method | L792 | L797 | 6 | `ui_initEventListeners()` |
-| ui_openPause | method | L798 | L802 | 5 | `ui_openPause()` |
-| ui_closePause | method | L803 | L807 | 5 | `ui_closePause()` |
-| ui_syncPauseSettings | method | L808 | L808 | 1 | `ui_syncPauseSettings()` |
-| ui_renderPauseRelics | method | L809 | L811 | 3 | `ui_renderPauseRelics()` |
+| ui_updateUI | method | L578 | L661 | 84 | `ui_updateUI()` |
+| ui_updatePCLayout | method | L662 | L670 | 9 | `ui_updatePCLayout()` |
+| _ui_updateLeftSidebarContent | method | L671 | L671 | 1 | `_ui_updateLeftSidebarContent(phase, wasPC)` |
+| _ui_migrateDrawerToLeftSidebar | method | L672 | L672 | 1 | `_ui_migrateDrawerToLeftSidebar(toSidebar)` |
+| _ui_migrateHUDToLeftSidebar | method | L673 | L673 | 1 | `_ui_migrateHUDToLeftSidebar(toSidebar)` |
+| _ui_migrateRuneLauncherToSidebar | method | L674 | L681 | 8 | `_ui_migrateRuneLauncherToSidebar(toSidebar)` |
+| ui_confirmSelection | method | L682 | L738 | 57 | `ui_confirmSelection()` |
+| meta_applyUpgrades | method | L739 | L742 | 4 | `meta_applyUpgrades()` |
+| meta_addCurrency | method | L743 | L748 | 6 | `meta_addCurrency(amount)` |
+| meta_startRun | method | L749 | L756 | 8 | `meta_startRun()` |
+| meta_continueRun | method | L757 | L760 | 4 | `meta_continueRun()` |
+| meta_updateContinueButton | method | L761 | L765 | 5 | `meta_updateContinueButton()` |
+| meta_openShop | method | L766 | L770 | 5 | `meta_openShop()` |
+| meta_calculateUpgradeCost | method | L771 | L775 | 5 | `meta_calculateUpgradeCost(upgrade, level)` |
+| meta_buyUpgrade | method | L776 | L780 | 5 | `meta_buyUpgrade(upgradeId)` |
+| ui_onPhaseChange | method | L781 | L787 | 7 | `ui_onPhaseChange(newPhase)` |
+| ui_triggerScreenShake | method | L788 | L794 | 7 | `ui_triggerScreenShake(duration = 200)` |
+| ui_initEventListeners | method | L795 | L800 | 6 | `ui_initEventListeners()` |
+| ui_openPause | method | L801 | L805 | 5 | `ui_openPause()` |
+| ui_closePause | method | L806 | L810 | 5 | `ui_closePause()` |
+| ui_syncPauseSettings | method | L811 | L811 | 1 | `ui_syncPauseSettings()` |
+| ui_renderPauseRelics | method | L812 | L814 | 3 | `ui_renderPauseRelics()` |
 
 ## 巨型函数内部节点 (@section 标记)
 

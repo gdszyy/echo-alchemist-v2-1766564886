@@ -1,6 +1,6 @@
 # src/entities/enemy.js 函数索引
 
-> 自动生成于 2026-04-21 | 总行数: 4791 | 函数数: 26 | 语言: javascript
+> 自动生成于 2026-04-22 | 总行数: 4793 | 函数数: 26 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -27,18 +27,18 @@
 | triggerLaserHitShake | method | L1207 | L1211 | 5 | `triggerLaserHitShake()` |
 | playBurnTickEffect | method | L1212 | L1219 | 8 | `playBurnTickEffect(game, dmg)` |
 | playScanFeedback | method | L1220 | L1225 | 6 | `playScanFeedback()` |
-| draw | method | L1226 | L3837 | **2612** | `draw(ctx)` |
-| addSwordMark | method | L3838 | L3846 | 9 | `addSwordMark(amount = 1)` |
-| takeDamage | method | L3847 | L4131 | **285** | `takeDamage(amount, source = null, bypassShield = false)` |
-| applyTemp | method | L4132 | L4140 | 9 | `applyTemp(amount)` |
-| getBounds | method | L4141 | L4149 | 9 | `getBounds()` |
-| _drawEliteDecoration | method | L4150 | L4300 | 151 | `_drawEliteDecoration(ctx, w, h)` |
-| _drawBossDecoration | method | L4301 | L4778 | **478** | `_drawBossDecoration(ctx, w, h)` |
-| getAbsoluteVertices | method | L4779 | L4792 | 14 | `getAbsoluteVertices()` |
+| draw | method | L1226 | L3839 | **2614** | `draw(ctx)` |
+| addSwordMark | method | L3840 | L3848 | 9 | `addSwordMark(amount = 1)` |
+| takeDamage | method | L3849 | L4133 | **285** | `takeDamage(amount, source = null, bypassShield = false)` |
+| applyTemp | method | L4134 | L4142 | 9 | `applyTemp(amount)` |
+| getBounds | method | L4143 | L4151 | 9 | `getBounds()` |
+| _drawEliteDecoration | method | L4152 | L4302 | 151 | `_drawEliteDecoration(ctx, w, h)` |
+| _drawBossDecoration | method | L4303 | L4780 | **478** | `_drawBossDecoration(ctx, w, h)` |
+| getAbsoluteVertices | method | L4781 | L4794 | 14 | `getAbsoluteVertices()` |
 
 ## 巨型函数内部节点 (@section 标记)
 
-### draw (L1226-L3837, 2612行)
+### draw (L1226-L3839, 2614行)
 
 | 节点标记 | 行号 | 说明 |
 |----------|------|------|
@@ -48,30 +48,30 @@
 | `@section:draw_health_bar` | L1904 | 血条与护盾条绘制 |
 | `@section:draw_affix_icons` | L2185 | 词缀图标与状态标记 |
 | `@section:draw_boss_name_plate` | L2515 | Boss 名牌与阶段指示器 |
-| `@section:draw_attack_indicators` | L2978 | 攻击预警指示器绘制 |
-| `@section:draw_special_projectiles` | L3361 | 特殊投射物与技能特效绘制 |
-| `@section:draw_death_animation` | L3562 | 死亡动画与消散特效 |
+| `@section:draw_attack_indicators` | L2980 | 攻击预警指示器绘制 |
+| `@section:draw_special_projectiles` | L3363 | 特殊投射物与技能特效绘制 |
+| `@section:draw_death_animation` | L3564 | 死亡动画与消散特效 |
 
-### takeDamage (L3847-L4131, 285行)
-
-| 节点标记 | 行号 | 说明 |
-|----------|------|------|
-| `@section:damage_element_reaction` | L3925 | 属性反应触发（克制/共鸣/温度系统） |
-| `@section:damage_apply_and_feedback` | L4016 | 伤害应用、浮动文字与击退效果 |
-| `@section:damage_death_trigger` | L4077 | 死亡判断与掉落物触发 |
-
-### _drawBossDecoration (L4301-L4778, 478行)
+### takeDamage (L3849-L4133, 285行)
 
 | 节点标记 | 行号 | 说明 |
 |----------|------|------|
-| `@section:boss_deco_crown_and_wings` | L4389 | 皇冠/翅膀/触手等 Boss 专属装饰 |
-| `@section:boss_deco_aura_rings` | L4540 | 光环圆环动画绘制 |
-| `@section:boss_deco_rune_symbols` | L4691 | 符文符号与能量纹路绘制 |
+| `@section:damage_element_reaction` | L3927 | 属性反应触发（克制/共鸣/温度系统） |
+| `@section:damage_apply_and_feedback` | L4018 | 伤害应用、浮动文字与击退效果 |
+| `@section:damage_death_trigger` | L4079 | 死亡判断与掉落物触发 |
+
+### _drawBossDecoration (L4303-L4780, 478行)
+
+| 节点标记 | 行号 | 说明 |
+|----------|------|------|
+| `@section:boss_deco_crown_and_wings` | L4391 | 皇冠/翅膀/触手等 Boss 专属装饰 |
+| `@section:boss_deco_aura_rings` | L4542 | 光环圆环动画绘制 |
+| `@section:boss_deco_rune_symbols` | L4693 | 符文符号与能量纹路绘制 |
 
 ## 其他 @section 标记
 
 | 节点标记 | 行号 | 说明 |
 |----------|------|------|
 | `@section:draw_entry_and_perf_check` | L1225 | 绘制入口与性能等级检查 |
-| `@section:damage_shield_check` | L3846 | 护盾吸收与穿透判断 |
-| `@section:boss_deco_phase_check` | L4300 | Boss 阶段检查与装饰基础参数 |
+| `@section:damage_shield_check` | L3848 | 护盾吸收与穿透判断 |
+| `@section:boss_deco_phase_check` | L4302 | Boss 阶段检查与装饰基础参数 |
