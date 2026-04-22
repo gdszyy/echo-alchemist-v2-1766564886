@@ -366,6 +366,8 @@ export const game_system = {
         this.essenceSpawnMissCount = 0;  // 连续生成未命中精华的行数
         this.relicSpawnMissCount = 0;    // 连续生成未命中遗物的行数
         this.emergencyCooldown = 0;      // 紧急救援冷却回合计数器
+        // [V3 动态遗物保底] 初始化随机阈值：2~4 行（每行=每回合）
+        this.nextRelicPityThreshold = 2 + Math.floor(Math.random() * 3);
         this._pendingBossSpawn = null;
         // [Boss 调度] 重置动态间隔调度状态
         this._nextBossRound = null;      // 下一个 Boss 预定回合
@@ -1056,7 +1058,9 @@ export const game_system = {
             const isPityEligible = avgDamage3 < totalThreatHP || avgDamage3 === 0;
 
             if (isPityEligible) {
-                if (this.relicSpawnMissCount >= (pityCfg.relicSpawnMiss || 12)) {
+                // 遗物保底：使用动态随机阈值（2.5~4 回合），不存在则回退到 config 固定值
+                const relicPityThreshold = this.nextRelicPityThreshold || (pityCfg.relicSpawnMiss || 12);
+                if (this.relicSpawnMissCount >= relicPityThreshold) {
                     forceDrop = true;
                     forcedType = 'relic';
                 } else if (this.essenceSpawnMissCount >= (pityCfg.essenceSpawnMiss || 4)) {
@@ -1091,6 +1095,9 @@ export const game_system = {
             if (rewardType === 'relic') {
                 this.relicSpawnMissCount = 0;
                 this.essenceSpawnMissCount = 0;
+                // 遗物掉落后重新随机生成下一次保底阈值（2~4 行，每行=每回合）
+                this.nextRelicPityThreshold = 2 + Math.floor(Math.random() * 3);
+                console.log(`[PityV3] 遗物掉落，下一次保底阈值设为 ${this.nextRelicPityThreshold} 行`);
             } else if (rewardType === 'pure_essence' || rewardType === 'chaos_essence') {
                 this.essenceSpawnMissCount = 0;
                 // 精华不重置遗物计数，遗物保底继续累加
@@ -2005,6 +2012,8 @@ export const game_system = {
                 essenceSpawnMissCount: this.essenceSpawnMissCount || 0,
                 relicSpawnMissCount: this.relicSpawnMissCount || 0,
                 emergencyCooldown: this.emergencyCooldown || 0,
+                // [V3 动态遗物保底] 存档动态阈值
+                nextRelicPityThreshold: this.nextRelicPityThreshold || 15,
                 // 时间戳
                 savedAt: Date.now(),
             };
@@ -2125,6 +2134,8 @@ export const game_system = {
             this.essenceSpawnMissCount = state.essenceSpawnMissCount || 0;
             this.relicSpawnMissCount = state.relicSpawnMissCount || 0;
             this.emergencyCooldown = state.emergencyCooldown || 0;
+            // [V3 动态遗物保底] 恢复动态阈值，旧存档没有则随机生成一个
+            this.nextRelicPityThreshold = state.nextRelicPityThreshold || (2 + Math.floor(Math.random() * 3));
 
             // --- 恢复 enemies ---
             this.enemies = (state.enemies || []).map(d => {
