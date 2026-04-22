@@ -853,10 +853,18 @@ export const game_system = {
      */
     /**
      * @method sys_determineEnemyReward
-     * @description [V2] 回合生成时判定掉落类型。
+     * @description [V3] 回合生成时判定掉落类型。
      *   将所有概率计算、保底判定、战力碾压判定、密度控制、紧急救援全部在此完成。
      *   命中时将 rewardType 写入 enemy.rewardType，死亡时由 sys_tryQueueEnemyRoundReward 直接读取。
      *   保底计数器在此处统一累加和重置，不再在死亡时操作。
+     *
+     *   [V3 保底算法] 保底触发新增前置条件：
+     *   - 计算三回合滑动平均伤害 avgDamage3（via calc_getRecentAverageDamage(3)）
+     *   - 计算当前场上所有活跃敌人总 HP（currentTotalHP）
+     *   - 计算最近敌人距失败线的格数 x（via defeatLineY / enemyHeight）
+     *   - 估算未来 x 行敌人总 HP（futureXRowsHP，使用与 spawn_spawnEnemyRowAt 相同的 HP 公式）
+     *   - 仅当 avgDamage3 < (currentTotalHP + futureXRowsHP) 时，保底计数器才触发掉落
+     *   - 即玩家伤害不足以清场时才给予保底，战力碾压时不触发保底
      * @param {Enemy} enemy - 当前生成的敌人实体
      * @param {boolean} [isRowRepresentative=false] - 是否为该行的代表敌人（只有代表敌人才进行保底判定）
      */
@@ -955,18 +963,77 @@ export const game_system = {
         const finalDropChance = Math.min(gameplayCfg.enemyDropMaxChance || 0.24, baseDropChance * dynamicMult);
 
         // --- 6. 保底判定（仅对行代表敌人生效）---
-        // 战力碾压时保底计数器暂停累加
+        // 新算法：用三回合平均伤害与（当前敌人总HP + x行敌人总HP）比较
+        // x = 最近敌人距玩家（失败线）的格数距离
         let forceDrop = false;
         let forcedType = null;
 
         if (isRowRepresentative && !isPowerCrushing) {
-            if (this.relicSpawnMissCount >= (pityCfg.relicSpawnMiss || 12)) {
-                forceDrop = true;
-                forcedType = 'relic';
-            } else if (this.essenceSpawnMissCount >= (pityCfg.essenceSpawnMiss || 4)) {
-                forceDrop = true;
-                forcedType = Math.random() < (gameplayCfg.enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
+            // 6a. 计算三回合平均伤害
+            const avgDamage3 = typeof this.calc_getRecentAverageDamage === 'function'
+                ? this.calc_getRecentAverageDamage(3)
+                : 0;
+
+            // 6b. 计算当前场上所有活跃敌人的总 HP
+            let currentTotalHP = 0;
+            if (this.enemies) {
+                for (const e of this.enemies) {
+                    if (e.active && !e.isDead && e.hp > 0) {
+                        currentTotalHP += e.hp;
+                    }
+                }
             }
+
+            // 6c. 计算最近敌人距玩家（失败线）的格数 x
+            let nearestGridDist = 3; // 默认 3 格（无压力时的保守估算）
+            if (this.enemies && this.enemies.length > 0) {
+                const defeatY = this.defeatLineY || (this.height - 120);
+                const enemyH = this.enemyHeight || 50;
+                const viewShiftY = this.boardTilt ? this.boardTilt.current.y * -20 : 0;
+                let minPixelDist = Infinity;
+                for (const e of this.enemies) {
+                    if (!e.active) continue;
+                    const ey = e.pos.y + viewShiftY;
+                    const dist = defeatY - ey;
+                    if (dist < minPixelDist) minPixelDist = dist;
+                }
+                if (minPixelDist !== Infinity) {
+                    nearestGridDist = Math.max(0, Math.round(minPixelDist / enemyH));
+                }
+            }
+            const x = nearestGridDist;
+
+            // 6d. 估算未来 x 行的敌人总 HP
+            // 使用与 spawn_spawnEnemyRowAt 相同的公式：(baseHp + round*hpPerRound) * expFactor * diffFactor
+            // 每行敌人数量估算为 enemyCols（满列）
+            let futureXRowsHP = 0;
+            if (x > 0) {
+                const b = CONFIG.balance || {};
+                const hpExponent = b.hpExponent || 1.12;
+                const effectiveRound = this.round || 1;
+                const exponentialFactor = Math.pow(hpExponent, Math.max(0, effectiveRound - 5));
+                const linearHP = (b.enemyBaseHp || 30) + (effectiveRound * (b.enemyHpPerRound || 10));
+                const baseHpPerEnemy = linearHP * exponentialFactor * (this.difficultyGrowthFactor || 1.0);
+                const colsPerRow = CONFIG.gameplay.enemyCols || 6;
+                futureXRowsHP = baseHpPerEnemy * colsPerRow * x;
+            }
+
+            // 6e. 保底触发条件：三回合平均伤害 < (当前总HP + 未来x行总HP) 时才允许保底
+            // 即玩家伤害不足以清场，才需要给予保底奖励
+            const totalThreatHP = currentTotalHP + futureXRowsHP;
+            const isPityEligible = avgDamage3 < totalThreatHP || avgDamage3 === 0;
+
+            if (isPityEligible) {
+                if (this.relicSpawnMissCount >= (pityCfg.relicSpawnMiss || 12)) {
+                    forceDrop = true;
+                    forcedType = 'relic';
+                } else if (this.essenceSpawnMissCount >= (pityCfg.essenceSpawnMiss || 4)) {
+                    forceDrop = true;
+                    forcedType = Math.random() < (gameplayCfg.enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
+                }
+            }
+
+            console.log(`[PityV3] avgDmg3=${avgDamage3.toFixed(1)}, currentHP=${currentTotalHP}, x=${x}, futureHP=${futureXRowsHP.toFixed(1)}, totalThreat=${totalThreatHP.toFixed(1)}, eligible=${isPityEligible}, relic=${this.relicSpawnMissCount}, essence=${this.essenceSpawnMissCount}`);
         }
 
         // --- 7. 最终判定 ---
