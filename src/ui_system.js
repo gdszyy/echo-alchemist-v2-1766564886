@@ -1,5 +1,6 @@
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
+import { CONFIG } from './config.js';
 
 export const ui_system = {
     // @section:ui_fly_effects - 飞行特效池管理
@@ -379,7 +380,7 @@ export const ui_system = {
                 iconArea.style.cssText = 'position:absolute;top:-16px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:none;';
                 if (isSelected) iconArea.className = 'card-floating';
                 
-                const attrIcons = (CONFIG.ui && CONFIG.ui.attributeDisplay) ? CONFIG.ui.attributeDisplay : {};
+                const attrIcons = (typeof CONFIG !== 'undefined' && CONFIG.ui && CONFIG.ui.attributeDisplay) ? CONFIG.ui.attributeDisplay : {};
                 const mainAttrKey = dominant ? dominant.key : (recipe.pyro > 0 ? 'pyro' : recipe.cryo > 0 ? 'cryo' : recipe.lightning > 0 ? 'lightning' : 'damage');
                 const mainAttrInfo = attrIcons[mainAttrKey] || { icon: '🔮', color: '#94a3b8' };
                 
