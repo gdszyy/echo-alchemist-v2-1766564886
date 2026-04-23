@@ -1051,10 +1051,10 @@ export const game_system = {
             let futureXRowsHP = 0;
             if (x > 0) {
                 const b = CONFIG.balance || {};
-                const hpExponent = b.hpExponent || 1.12;
+                const hpExponent = b.hpExponent || 1.08;
                 const effectiveRound = this.round || 1;
                 const exponentialFactor = Math.pow(hpExponent, Math.max(0, effectiveRound - 5));
-                const linearHP = (b.enemyBaseHp || 30) + (effectiveRound * (b.enemyHpPerRound || 10));
+                const linearHP = (b.enemyBaseHp || 5) + (effectiveRound * (b.enemyHpPerRound || 4));
                 const baseHpPerEnemy = linearHP * exponentialFactor * (this.difficultyGrowthFactor || 1.0);
                 const colsPerRow = CONFIG.gameplay.enemyCols || 6;
                 futureXRowsHP = baseHpPerEnemy * colsPerRow * x;

@@ -215,8 +215,8 @@ export const spawn_system = {
         let idealHP = 0;
         if (peakAvg > 0) {
             idealHP = peakAvg / fullRowsCapacity;
-            // 混合：60% 指数线性增长 + 40% 动态调整，提高硬数値权重
-            finalBaseHP = (linearHP * 0.6) + (idealHP * 0.4);
+            // 混合：40% 指数线性增长 + 60% 动态调整，增加每回合伤害占比
+            finalBaseHP = (linearHP * 0.4) + (idealHP * 0.6);
         }
         
         // [难度平衡] 战后高压因子（Post-Boss Surge）

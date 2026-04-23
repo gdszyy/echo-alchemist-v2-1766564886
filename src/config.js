@@ -454,10 +454,10 @@ const CONFIG = {
         mirrorAxisCloneChance: 0.35,
         // 敌人血量 = (baseHp + 当前回合数 * hpPerRound) * 指数因子 * 难度系数
         // [修改] 提高基础血量，降低线性斜率，依靠指数在后期发力
-        enemyBaseHp: 6,        // [难度调低] 原 10 -> 降低基础血量，让前三关敌人更脆
-        enemyHpPerRound: 5,    // [难度调低] 原 8 -> 进一步降低线性斜率，前三关血量更低
+        enemyBaseHp: 5,        // [难度调低] 原 6 -> 进一步降低基础血量
+        enemyHpPerRound: 4,    // [难度调低] 原 5 -> 进一步降低线性斜率，减少每回合血量增加值
         // [新增] 指数膨胀系数，1.12 表示每回合血量额外膨胀 12%
-        hpExponent: 1.10,      // [难度调低] 原 1.12 -> 降低指数膨胀，前期曲线更平缓
+        hpExponent: 1.08,      // [难度调低] 原 1.10 -> 进一步降低指数膨胀，减少后期血量增速
         
         // 特殊敌人血量倍率
         eliteHpMult: 7,     // 精英怪是普通怪的多少倍
@@ -519,13 +519,13 @@ const CONFIG = {
 
         /** Boss 血量公式参数 */
         bossHpFormula: {
-            templateWeight: 0.5,         // 模板血量权重（后期稳定值）
-            dynamicWeight: 0.5,          // 动态血量权重（后期稳定值）
+            templateWeight: 0.4,         // 模板血量权重（降低算式系数）
+            dynamicWeight: 0.6,          // 动态血量权重（增加每回合伤害占比）
             miniBossKillRounds: 2.5,     // Mini-Boss 期望击杀回合数
             bigBossKillRounds: 4.0,      // 大 Boss 期望击杀回合数
             floorMultiplier: 0.7,        // 保底：模板血量的 70%（后期稳定值）
-            miniBossMult: 15,            // Mini-Boss 血量倍率
-            bigBossMult: 35,             // 大 Boss 血量倍率
+            miniBossMult: 12,            // Mini-Boss 血量倍率 (减少 Boss 血量)
+            bigBossMult: 28,             // 大 Boss 血量倍率 (减少 Boss 血量)
             // ── 前期保护参数（Early-Game Protection）──
             // 越早期的 Boss，动态权重越高（更贴近玩家实时战力），模板权重越低
             // 线性插值区间：[earlyRound, lateRound]
