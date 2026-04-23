@@ -5,14 +5,16 @@
 
 ## 函数列表
 
-| 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
-|--------|------|--------|--------|------|------|
-| getRuneId | function | L34 | L57 | 24 | `getRuneId(entry)` |
-| parseRuneGrid | function | L58 | L152 | 95 | `parseRuneGrid(grid, runewordDb)` |
-| calcRuneBaseStats | function | L153 | L200 | 48 | `calcRuneBaseStats(runeGrid, runeDb)` |
-| findPatternInSequence | function | L201 | L232 | 32 | `findPatternInSequence(runes, pattern, indices, idGrid)` |
-| sequenceMatchesPatternUnordered | function | L233 | L267 | 35 | `sequenceMatchesPatternUnordered(sliceRunes, pattern)` |
-| _removeRuneFromInventory | function | L268 | L291 | 24 | `_removeRuneFromInventory(runeInventory, runeObj)` |
-| rune_merge | function | L292 | L360 | 69 | `rune_merge(runeObjects, runeInventory)` |
-| rune_reforge | function | L361 | L422 | 62 | `rune_reforge(runeObjects, runeInventory, game)` |
-| getNewRunewordsOnPlacement | function | L423 | L445 | 23 | `getNewRunewordsOnPlacement(currentGrid, cellIndex, runeEntry, runewordDb)` |
+> 定位方式：在源文件中 `grep -n "函数名"` 即可跳转，行号不在此列出（行号随代码变化而失效）。
+
+| 函数名 | 类型 | 签名 | 备注 |
+|--------|------|------|------|
+| getRuneId | function | `getRuneId(entry)` |  |
+| parseRuneGrid | function | `parseRuneGrid(grid, runewordDb)` |  |
+| calcRuneBaseStats | function | `calcRuneBaseStats(runeGrid, runeDb)` |  |
+| findPatternInSequence | function | `findPatternInSequence(runes, pattern, indices, idGrid)` |  |
+| sequenceMatchesPatternUnordered | function | `sequenceMatchesPatternUnordered(sliceRunes, pattern)` |  |
+| _removeRuneFromInventory | function | `_removeRuneFromInventory(runeInventory, runeObj)` |  |
+| rune_merge | function | `rune_merge(runeObjects, runeInventory)` |  |
+| rune_reforge | function | `rune_reforge(runeObjects, runeInventory, game)` |  |
+| getNewRunewordsOnPlacement | function | `getNewRunewordsOnPlacement(currentGrid, cellIndex, runeEntry, runewordDb)` |  |

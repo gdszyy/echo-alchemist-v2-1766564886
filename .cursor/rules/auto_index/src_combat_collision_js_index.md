@@ -7,8 +7,10 @@
 
 ## 函数列表
 
-| 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
-|--------|------|--------|--------|------|------|
-| combat_tryMoveEnemy | method | L36 | L70 | 35 | `combat_tryMoveEnemy(enemy, delta)` |
-| combat_laser_castRay | method | L71 | L154 | 84 | `combat_laser_castRay(start, dir, maxDist)` |
-| combat_laser_processPenetration | method | L155 | L444 | **290** | `combat_laser_processPenetration(p1, p2, recipe, remainLen = 0, bouncesLeft = 0, hitEnemiesSet = null, currentWid)` |
+> 定位方式：在源文件中 `grep -n "函数名"` 即可跳转，行号不在此列出（行号随代码变化而失效）。
+
+| 函数名 | 类型 | 签名 | 备注 |
+|--------|------|------|------|
+| combat_tryMoveEnemy | method | `combat_tryMoveEnemy(enemy, delta)` |  |
+| combat_laser_castRay | method | `combat_laser_castRay(start, dir, maxDist)` |  |
+| combat_laser_processPenetration | method | `combat_laser_processPenetration(p1, p2, recipe, remainLen = 0, bouncesLeft = 0, hitEnemiesSet = null, currentWid)` | ⚠️ 巨型函数，见 @section 导航 |

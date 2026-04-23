@@ -7,19 +7,21 @@
 
 ## 函数列表
 
-| 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
-|--------|------|--------|--------|------|------|
-| _buildRuneIconEl | function | L29 | L53 | 25 | `_buildRuneIconEl(runeDef, runeLevel)` |
-| ui_updateMultiplierUI | method | L54 | L71 | 18 | `ui_updateMultiplierUI()` |
-| ui_saveShotDamage | method | L72 | L91 | 20 | `ui_saveShotDamage()` |
-| ui_updateRoundDamage | method | L92 | L140 | 49 | `ui_updateRoundDamage()` |
-| ui_updateDamageStats | method | L141 | L335 | 195 | `ui_updateDamageStats()` |
-| ui_switchDamageRound | method | L336 | L349 | 14 | `ui_switchDamageRound(direction)` |
-| ui_toggleDamagePanel | method | L350 | L382 | 33 | `ui_toggleDamagePanel()` |
-| ui_renderRecipeHUD | method | L383 | L482 | 100 | `ui_renderRecipeHUD()` |
-| ui_renderRecipeCard | method | L483 | L576 | 94 | `ui_renderRecipeCard(container, item, isActive, statusClass)` |
-| ui_updateUICache | method | L577 | L601 | 25 | `ui_updateUICache()` |
-| ui_updateGatheringQueueUI | method | L602 | L618 | 17 | `ui_updateGatheringQueueUI()` |
-| ui_updateAmmoUI | method | L619 | L665 | 47 | `ui_updateAmmoUI()` |
-| ui_renderAmmoIcon | method | L666 | L719 | 54 | `ui_renderAmmoIcon(container, recipe, isCurrent)` |
-| hud_initEventListeners | method | L720 | L1020 | **301** | `hud_initEventListeners()` |
+> 定位方式：在源文件中 `grep -n "函数名"` 即可跳转，行号不在此列出（行号随代码变化而失效）。
+
+| 函数名 | 类型 | 签名 | 备注 |
+|--------|------|------|------|
+| _buildRuneIconEl | function | `_buildRuneIconEl(runeDef, runeLevel)` |  |
+| ui_updateMultiplierUI | method | `ui_updateMultiplierUI()` |  |
+| ui_saveShotDamage | method | `ui_saveShotDamage()` |  |
+| ui_updateRoundDamage | method | `ui_updateRoundDamage()` |  |
+| ui_updateDamageStats | method | `ui_updateDamageStats()` |  |
+| ui_switchDamageRound | method | `ui_switchDamageRound(direction)` |  |
+| ui_toggleDamagePanel | method | `ui_toggleDamagePanel()` |  |
+| ui_renderRecipeHUD | method | `ui_renderRecipeHUD()` |  |
+| ui_renderRecipeCard | method | `ui_renderRecipeCard(container, item, isActive, statusClass)` |  |
+| ui_updateUICache | method | `ui_updateUICache()` |  |
+| ui_updateGatheringQueueUI | method | `ui_updateGatheringQueueUI()` |  |
+| ui_updateAmmoUI | method | `ui_updateAmmoUI()` |  |
+| ui_renderAmmoIcon | method | `ui_renderAmmoIcon(container, recipe, isCurrent)` |  |
+| hud_initEventListeners | method | `hud_initEventListeners()` | ⚠️ 巨型函数，见 @section 导航 |

@@ -1,56 +1,74 @@
 # src/game_system.js 函数索引
 
-> 自动生成于 2026-04-22 | 总行数: 2270 | 函数数: 45 | 语言: javascript
+> 自动生成于 2026-04-22 | 总行数: 2306 | 函数数: 45 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
-| 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
-|--------|------|--------|--------|------|------|
-| sys_loop | method | L29 | L187 | 159 | `sys_loop()` |
-| sys_resize | method | L188 | L226 | 39 | `sys_resize()` |
-| sys_initGameStart | method | L227 | L288 | 62 | `sys_initGameStart()` |
-| sys_resetGame | method | L289 | L418 | 130 | `sys_resetGame()` |
-| sys_loadSaveData | method | L419 | L445 | 27 | `sys_loadSaveData()` |
-| sys_saveData | method | L446 | L457 | 12 | `sys_saveData()` |
-| sys_setupInputs | method | L458 | L549 | 92 | `sys_setupInputs()` |
-| sys_initSelectionPhase | method | L550 | L605 | 56 | `sys_initSelectionPhase()` |
-| sys_initReplaceAmmoPhase | method | L606 | L634 | 29 | `sys_initReplaceAmmoPhase()` |
-| sys_confirmReplaceAmmo | method | L635 | L689 | 55 | `sys_confirmReplaceAmmo()` |
-| sys_skipReplaceAmmo | method | L690 | L727 | 38 | `sys_skipReplaceAmmo()` |
-| _proceedToFateMomentSelection | method | L728 | L775 | 48 | `_proceedToFateMomentSelection()` |
-| sys_skipGrindGetRune | method | L776 | L825 | 50 | `sys_skipGrindGetRune()` |
-| sys_queueRoundStartReward | method | L826 | L884 | 59 | `sys_queueRoundStartReward(reward = {})` |
-| sys_determineEnemyReward | method | L885 | L1090 | **206** | `sys_determineEnemyReward(enemy, isRowRepresentative = false)` |
-| sys_preCalcEnemyRewardType | method | L1091 | L1100 | 10 | `sys_preCalcEnemyRewardType(enemy)` |
-| sys_tryQueueEnemyRoundReward | method | L1101 | L1185 | 85 | `sys_tryQueueEnemyRoundReward(enemy)` |
-| sys_startRoundStartResolver | method | L1186 | L1303 | 118 | `sys_startRoundStartResolver()` |
-| sys_continueRoundStartResolver | method | L1304 | L1315 | 12 | `sys_continueRoundStartResolver()` |
-| sys_showRoundStartBanner | method | L1316 | L1420 | 105 | `sys_showRoundStartBanner()` |
-| sys_toggleMarbleSelection | method | L1421 | L1456 | 36 | `sys_toggleMarbleSelection(idx, cardEl)` |
-| sys_resetMultiplier | method | L1457 | L1470 | 14 | `sys_resetMultiplier()` |
-| sys_initRecipeHUD | method | L1471 | L1480 | 10 | `sys_initRecipeHUD()` |
-| sys_toggleHud | method | L1481 | L1489 | 9 | `sys_toggleHud()` |
-| data_clearProjectiles | method | L1490 | L1502 | 13 | `data_clearProjectiles()` |
-| triggerScreenShake | method | L1503 | L1514 | 12 | `triggerScreenShake(amount)` |
-| triggerScreenShakeAdvanced | method | L1515 | L1524 | 10 | `triggerScreenShakeAdvanced(amplitude, duration)` |
-| drawWindTunnelFlow | method | L1525 | L1553 | 29 | `drawWindTunnelFlow(rect, isHorizontal)` |
-| checkLineIntersection | method | L1554 | L1566 | 13 | `checkLineIntersection(a, b, c, d)` |
-| isBowtieShape | method | L1567 | L1577 | 11 | `isBowtieShape(anchors)` |
-| getLineIntersectionPoint | method | L1578 | L1588 | 11 | `getLineIntersectionPoint(a, b, c, d)` |
-| input_getTiltOffset | method | L1589 | L1600 | 12 | `input_getTiltOffset()` |
-| input_handleOrientation | method | L1601 | L1622 | 22 | `input_handleOrientation(e)` |
-| _isRuneLauncherOpen | method | L1623 | L1637 | 15 | `_isRuneLauncherOpen()` |
-| input_handleInputStart | method | L1638 | L1686 | 49 | `input_handleInputStart(pos, e)` |
-| input_handleInputMove | method | L1687 | L1730 | 44 | `input_handleInputMove(pos, e)` |
-| input_handleInputEnd | method | L1731 | L1761 | 31 | `input_handleInputEnd(pos, e)` |
-| input_checkDefeat | method | L1762 | L1780 | 19 | `input_checkDefeat()` |
-| _triggerPityDrop | method | L1781 | L1854 | 74 | `_triggerPityDrop(bossEnemy)` |
-| sys_saveRunState | method | L1855 | L2003 | 149 | `sys_saveRunState()` |
-| sys_clearRunState | method | L2004 | L2013 | 10 | `sys_clearRunState()` |
-| sys_hasRunState | method | L2014 | L2022 | 9 | `sys_hasRunState()` |
-| sys_loadRunState | method | L2023 | L2218 | 196 | `sys_loadRunState()` |
-| input_checkEnemyHover | method | L2219 | L2244 | 26 | `input_checkEnemyHover(pos)` |
-| _calcDesperationMult | method | L2245 | L2271 | 27 | `_calcDesperationMult()` |
+> 定位方式：在源文件中 `grep -n "函数名"` 即可跳转，行号不在此列出（行号随代码变化而失效）。
+
+| 函数名 | 类型 | 签名 | 备注 |
+|--------|------|------|------|
+| sys_loop | method | `sys_loop()` |  |
+| sys_resize | method | `sys_resize()` |  |
+| sys_initGameStart | method | `sys_initGameStart()` |  |
+| sys_resetGame | method | `sys_resetGame()` |  |
+| sys_loadSaveData | method | `sys_loadSaveData()` |  |
+| sys_saveData | method | `sys_saveData()` |  |
+| sys_setupInputs | method | `sys_setupInputs()` |  |
+| sys_initSelectionPhase | method | `sys_initSelectionPhase()` |  |
+| sys_initReplaceAmmoPhase | method | `sys_initReplaceAmmoPhase()` |  |
+| sys_confirmReplaceAmmo | method | `sys_confirmReplaceAmmo()` |  |
+| sys_skipReplaceAmmo | method | `sys_skipReplaceAmmo()` |  |
+| _proceedToFateMomentSelection | method | `_proceedToFateMomentSelection()` |  |
+| sys_skipGrindGetRune | method | `sys_skipGrindGetRune()` |  |
+| sys_queueRoundStartReward | method | `sys_queueRoundStartReward(reward = {})` |  |
+| sys_determineEnemyReward | method | `sys_determineEnemyReward(enemy, isRowRepresentative = false)` | ⚠️ 巨型函数，见 @section 导航 |
+| sys_preCalcEnemyRewardType | method | `sys_preCalcEnemyRewardType(enemy)` |  |
+| sys_tryQueueEnemyRoundReward | method | `sys_tryQueueEnemyRoundReward(enemy)` |  |
+| sys_startRoundStartResolver | method | `sys_startRoundStartResolver()` |  |
+| sys_continueRoundStartResolver | method | `sys_continueRoundStartResolver()` |  |
+| sys_showRoundStartBanner | method | `sys_showRoundStartBanner()` |  |
+| sys_toggleMarbleSelection | method | `sys_toggleMarbleSelection(idx, cardEl)` |  |
+| sys_resetMultiplier | method | `sys_resetMultiplier()` |  |
+| sys_initRecipeHUD | method | `sys_initRecipeHUD()` |  |
+| sys_toggleHud | method | `sys_toggleHud()` |  |
+| data_clearProjectiles | method | `data_clearProjectiles()` |  |
+| triggerScreenShake | method | `triggerScreenShake(amount)` |  |
+| triggerScreenShakeAdvanced | method | `triggerScreenShakeAdvanced(amplitude, duration)` |  |
+| drawWindTunnelFlow | method | `drawWindTunnelFlow(rect, isHorizontal)` |  |
+| checkLineIntersection | method | `checkLineIntersection(a, b, c, d)` |  |
+| isBowtieShape | method | `isBowtieShape(anchors)` |  |
+| getLineIntersectionPoint | method | `getLineIntersectionPoint(a, b, c, d)` |  |
+| input_getTiltOffset | method | `input_getTiltOffset()` |  |
+| input_handleOrientation | method | `input_handleOrientation(e)` |  |
+| _isRuneLauncherOpen | method | `_isRuneLauncherOpen()` |  |
+| input_handleInputStart | method | `input_handleInputStart(pos, e)` |  |
+| input_handleInputMove | method | `input_handleInputMove(pos, e)` |  |
+| input_handleInputEnd | method | `input_handleInputEnd(pos, e)` |  |
+| input_checkDefeat | method | `input_checkDefeat()` |  |
+| _triggerPityDrop | method | `_triggerPityDrop(bossEnemy)` |  |
+| sys_saveRunState | method | `sys_saveRunState()` |  |
+| sys_clearRunState | method | `sys_clearRunState()` |  |
+| sys_hasRunState | method | `sys_hasRunState()` |  |
+| sys_loadRunState | method | `sys_loadRunState()` |  |
+| input_checkEnemyHover | method | `input_checkEnemyHover(pos)` |  |
+| _calcDesperationMult | method | `_calcDesperationMult()` |  |
+
+## 巨型函数内部节点 (@section 标记)
+
+### sys_determineEnemyReward
+
+> 定位：`grep -n '@section:{}'` 跳转到对应节点
+
+| 节点标记 | 说明 |
+|----------|------|
+| `@section:field_reward_density` | 第一步：统计场上奖励数量，达硬上限时直接返回 |
+| `@section:power_pressure_eval` | 第二步：计算玩家战力比和踪迹血量，评估生存压力 |
+| `@section:emergency_relief` | 第三步：生存压力超阈时强制标记精华（紧急救援） |
+| `@section:base_drop_chance` | 第四步：基础概率 = 基础值 + 回合加成 + 词缀加成 |
+| `@section:dynamic_multiplier` | 第五步：战力/血量/密度四维动态倍率修正 |
+| `@section:pity_guarantee` | 第六步：三回合平均伤害 vs 威胁HP保底判定（V3算法） |
+| `@section:final_reward_type` | 第七步：随机抗成判定奖励类型（遗物/混沌/纯净精华） |

@@ -5,7 +5,9 @@
 
 ## 函数列表
 
-| 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
-|--------|------|--------|--------|------|------|
-| calc_getCirclePolygonCollision | function | L3 | L75 | 73 | `calc_getCirclePolygonCollision(circlePos, circleRadius, polygonVertices)` |
-| calc_getCircleArcCollision | function | L76 | L147 | 72 | `calc_getCircleArcCollision(circlePos, circleRadius, arcCenter, arcRadius, arcStartAngle, arcEndAngle, arcTh)` |
+> 定位方式：在源文件中 `grep -n "函数名"` 即可跳转，行号不在此列出（行号随代码变化而失效）。
+
+| 函数名 | 类型 | 签名 | 备注 |
+|--------|------|------|------|
+| calc_getCirclePolygonCollision | function | `calc_getCirclePolygonCollision(circlePos, circleRadius, polygonVertices)` |  |
+| calc_getCircleArcCollision | function | `calc_getCircleArcCollision(circlePos, circleRadius, arcCenter, arcRadius, arcStartAngle, arcEndAngle, arcTh)` |  |

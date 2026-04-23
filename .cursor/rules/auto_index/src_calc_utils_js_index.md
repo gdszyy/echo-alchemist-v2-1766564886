@@ -5,13 +5,15 @@
 
 ## 函数列表
 
-| 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
-|--------|------|--------|--------|------|------|
-| calc_getRecentAverageDamage | method | L22 | L44 | 23 | `calc_getRecentAverageDamage(window = 3)` |
-| calc_getPeakAverageDamage | method | L45 | L52 | 8 | `calc_getPeakAverageDamage()` |
-| calc_evaluateAndAdjustDifficulty | method | L53 | L90 | 38 | `calc_evaluateAndAdjustDifficulty()` |
-| calc_calculateDynamicThreshold | method | L91 | L137 | 47 | `calc_calculateDynamicThreshold()` |
-| calc_isAreaOccupied | method | L138 | L175 | 38 | `calc_isAreaOccupied(x, y, w, h, excludeEnemy = null)` |
-| calc_calculateWaveSpeed | method | L176 | L241 | 66 | `calc_calculateWaveSpeed()` |
-| calc_getLineRectIntersection | method | L242 | L273 | 32 | `calc_getLineRectIntersection(start, dir, rx, ry, rw, rh)` |
-| calc_compileCollectionToRecipe | method | L274 | L333 | 60 | `calc_compileCollectionToRecipe(marbleDef, collectedTypes, totalMulticast)` |
+> 定位方式：在源文件中 `grep -n "函数名"` 即可跳转，行号不在此列出（行号随代码变化而失效）。
+
+| 函数名 | 类型 | 签名 | 备注 |
+|--------|------|------|------|
+| calc_getRecentAverageDamage | method | `calc_getRecentAverageDamage(window = 3)` |  |
+| calc_getPeakAverageDamage | method | `calc_getPeakAverageDamage()` |  |
+| calc_evaluateAndAdjustDifficulty | method | `calc_evaluateAndAdjustDifficulty()` |  |
+| calc_calculateDynamicThreshold | method | `calc_calculateDynamicThreshold()` |  |
+| calc_isAreaOccupied | method | `calc_isAreaOccupied(x, y, w, h, excludeEnemy = null)` |  |
+| calc_calculateWaveSpeed | method | `calc_calculateWaveSpeed()` |  |
+| calc_getLineRectIntersection | method | `calc_getLineRectIntersection(start, dir, rx, ry, rw, rh)` |  |
+| calc_compileCollectionToRecipe | method | `calc_compileCollectionToRecipe(marbleDef, collectedTypes, totalMulticast)` |  |

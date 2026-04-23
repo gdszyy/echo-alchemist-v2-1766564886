@@ -12,7 +12,7 @@
 | `src/combat_system.js` | 3362 | 42 | **5** | 22 | [src_combat_system_js_index.md](src_combat_system_js_index.md) |
 | `src/systems.js` | 2810 | 85 | **2** | 10 | [src_systems_js_index.md](src_systems_js_index.md) |
 | `src/game_phase.js` | 2493 | 16 | **4** | 15 | [src_game_phase_js_index.md](src_game_phase_js_index.md) |
-| `src/game_system.js` | 2270 | 45 | **1** | 0 | [src_game_system_js_index.md](src_game_system_js_index.md) |
+| `src/game_system.js` | 2306 | 45 | **1** | 7 | [src_game_system_js_index.md](src_game_system_js_index.md) |
 | `src/spawn_system.js` | 2230 | 28 | **2** | 8 | [src_spawn_system_js_index.md](src_spawn_system_js_index.md) |
 | `src/effects/particles.js` | 1829 | 62 | **1** | 0 | [src_effects_particles_js_index.md](src_effects_particles_js_index.md) |
 | `src/ui/rune_launcher.js` | 1702 | 25 | **1** | 0 | [src_ui_rune_launcher_js_index.md](src_ui_rune_launcher_js_index.md) |
@@ -36,7 +36,3 @@
 | `src/utils/math_utils.js` | 267 | 21 | 0 | 0 | [src_utils_math_utils_js_index.md](src_utils_math_utils_js_index.md) |
 | `src/event_bus.js` | 258 | 13 | 0 | 0 | [src_event_bus_js_index.md](src_event_bus_js_index.md) |
 | `src/combat/collision_shapes.js` | 146 | 2 | 0 | 0 | [src_combat_collision_shapes_js_index.md](src_combat_collision_shapes_js_index.md) |
-
-## 警告 (1 个)
-
-- **`src/game_system.js`** (2270行): 文件超过 2000 行但没有任何 @section 标记，建议添加内部节点标记。

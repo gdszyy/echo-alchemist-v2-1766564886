@@ -5,13 +5,15 @@
 
 ## 函数列表
 
-| 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
-|--------|------|--------|--------|------|------|
-| render_clearCanvas | method | L17 | L25 | 9 | `render_clearCanvas()` |
-| render_background | method | L26 | L141 | 116 | `render_background()` |
-| render_butterflyPathWave | method | L142 | L325 | 184 | `render_butterflyPathWave(ctx, anchors, center, progress)` |
-| render_floatingTexts | method | L326 | L339 | 14 | `render_floatingTexts(timeScale)` |
-| render_combat_launcherOrbitals | method | L340 | L487 | 148 | `render_combat_launcherOrbitals(ctx, centerX, centerY, recipe)` |
-| drawTiltVignette | method | L488 | L528 | 41 | `drawTiltVignette(ctx, tilt)` |
-| drawTiltIndicator | method | L529 | L620 | 92 | `drawTiltIndicator(ctx, tilt)` |
-| render_perfOverlay | method | L621 | L644 | 24 | `render_perfOverlay()` |
+> 定位方式：在源文件中 `grep -n "函数名"` 即可跳转，行号不在此列出（行号随代码变化而失效）。
+
+| 函数名 | 类型 | 签名 | 备注 |
+|--------|------|------|------|
+| render_clearCanvas | method | `render_clearCanvas()` |  |
+| render_background | method | `render_background()` |  |
+| render_butterflyPathWave | method | `render_butterflyPathWave(ctx, anchors, center, progress)` |  |
+| render_floatingTexts | method | `render_floatingTexts(timeScale)` |  |
+| render_combat_launcherOrbitals | method | `render_combat_launcherOrbitals(ctx, centerX, centerY, recipe)` |  |
+| drawTiltVignette | method | `drawTiltVignette(ctx, tilt)` |  |
+| drawTiltIndicator | method | `drawTiltIndicator(ctx, tilt)` |  |
+| render_perfOverlay | method | `render_perfOverlay()` |  |

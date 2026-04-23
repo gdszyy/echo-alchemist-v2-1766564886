@@ -909,6 +909,7 @@ export const game_system = {
         const gameplayCfg = CONFIG.gameplay || {};
         const pityCfg = gameplayCfg.dropPity || {};
 
+        // @section:field_reward_density - 第一步：统计场上奖励数量，达硬上限时直接返回
         // --- 1. 场上奖励密度统计 ---
         let fieldRewardCount = 0;
         if (this.enemies) {
@@ -927,6 +928,7 @@ export const game_system = {
             return; // 已达硬上限，不进行任何判定也不累加保底
         }
 
+        // @section:power_pressure_eval - 第二步：计算玩家战力比和踪迹血量，评估生存压力
         // --- 2. 战力与生存压力评估 ---
         let powerRatio = 1.0;
         let isPowerCrushing = false;
@@ -949,6 +951,7 @@ export const game_system = {
         // 生存压力公式：战力越弱、踪迹越低则压力越大
         const survivalPressure = Math.max(0, (1.0 - powerRatio) * 0.6 + (1.0 - traceRatio) * 0.4);
 
+        // @section:emergency_relief - 第三步：生存压力超阈时强制标记精华（紧急救援）
         // --- 3. 紧急救援判定（预测性提前送出）---
         // 只有行代表敌人才进行紧急救援判定，防止同一行多个敌人重复触发
         if (isRowRepresentative && !isPowerCrushing && this.emergencyCooldown <= 0) {
@@ -964,11 +967,13 @@ export const game_system = {
             }
         }
 
+        // @section:base_drop_chance - 第四步：基础概率 = 基础值 + 回合加成 + 词缀加成
         // --- 4. 基础概率计算 ---
         let baseDropChance = (gameplayCfg.enemyDropBaseChance || 0.04)
             + Math.min(this.round || 1, gameplayCfg.enemyDropRoundBonusCap || 20) * (gameplayCfg.enemyDropRoundBonus || 0.004)
             + affixCount * (gameplayCfg.enemyDropAffixBonus || 0.03);
 
+        // @section:dynamic_multiplier - 第五步：战力/血量/密度四维动态倍率修正
         // --- 5. 动态倍率修正 ---
         let dynamicMult = 1.0;
 
@@ -996,6 +1001,7 @@ export const game_system = {
         dynamicMult = Math.max(pityCfg.minChanceMult || 0.5, Math.min(pityCfg.maxChanceMult || 2.5, dynamicMult));
         const finalDropChance = Math.min(gameplayCfg.enemyDropMaxChance || 0.24, baseDropChance * dynamicMult);
 
+        // @section:pity_guarantee - 第六步：三回合平均伤害 vs 威胁HP保底判定（V3算法）
         // --- 6. 保底判定（仅对行代表敌人生效）---
         // 新算法：用三回合平均伤害与（当前敌人总HP + x行敌人总HP）比较
         // x = 最近敌人距玩家（失败线）的格数距离
@@ -1072,6 +1078,7 @@ export const game_system = {
             console.log(`[PityV3] avgDmg3=${avgDamage3.toFixed(1)}, currentHP=${currentTotalHP}, x=${x}, futureHP=${futureXRowsHP.toFixed(1)}, totalThreat=${totalThreatHP.toFixed(1)}, eligible=${isPityEligible}, relic=${this.relicSpawnMissCount}, essence=${this.essenceSpawnMissCount}`);
         }
 
+        // @section:final_reward_type - 第七步：随机抗成判定奖励类型（遗物/混沌/纯净精华）
         // --- 7. 最终判定 ---
         let rewardType = null;
 

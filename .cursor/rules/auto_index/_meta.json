@@ -114,9 +114,9 @@
     },
     {
       "file": "src/game_system.js",
-      "lines": 2270,
+      "lines": 2306,
       "funcs": 45,
-      "sections": 0,
+      "sections": 7,
       "mega_funcs": 1,
       "index_path": ".cursor/rules/auto_index/src_game_system_js_index.md"
     },
@@ -234,11 +234,5 @@
     }
   ],
   "skipped": [],
-  "warnings": [
-    {
-      "file": "src/game_system.js",
-      "lines": 2270,
-      "message": "文件超过 2000 行但没有任何 @section 标记，建议添加内部节点标记。"
-    }
-  ]
+  "warnings": []
 }

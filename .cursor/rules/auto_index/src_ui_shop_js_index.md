@@ -5,11 +5,13 @@
 
 ## 函数列表
 
-| 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
-|--------|------|--------|--------|------|------|
-| ui_showRelicSelection | method | L30 | L169 | 140 | `ui_showRelicSelection(options = {})` |
-| ui_selectRelic | method | L170 | L275 | 106 | `ui_selectRelic(relic)` |
-| ui_skipRelic | method | L276 | L284 | 9 | `ui_skipRelic()` |
-| ui_closeRelicSelection | method | L285 | L318 | 34 | `ui_closeRelicSelection()` |
-| ui_renderShop | method | L319 | L432 | 114 | `ui_renderShop()` |
-| _grantRunesByRarity | method | L433 | L455 | 23 | `_grantRunesByRarity(rarity, count)` |
+> 定位方式：在源文件中 `grep -n "函数名"` 即可跳转，行号不在此列出（行号随代码变化而失效）。
+
+| 函数名 | 类型 | 签名 | 备注 |
+|--------|------|------|------|
+| ui_showRelicSelection | method | `ui_showRelicSelection(options = {})` |  |
+| ui_selectRelic | method | `ui_selectRelic(relic)` |  |
+| ui_skipRelic | method | `ui_skipRelic()` |  |
+| ui_closeRelicSelection | method | `ui_closeRelicSelection()` |  |
+| ui_renderShop | method | `ui_renderShop()` |  |
+| _grantRunesByRarity | method | `_grantRunesByRarity(rarity, count)` |  |

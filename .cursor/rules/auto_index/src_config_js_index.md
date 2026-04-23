@@ -7,6 +7,8 @@
 
 ## 函数列表
 
-| 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
-|--------|------|--------|--------|------|------|
-| setDeepValue | function | L226 | L1696 | **1471** | `setDeepValue(obj, path, value, type)` |
+> 定位方式：在源文件中 `grep -n "函数名"` 即可跳转，行号不在此列出（行号随代码变化而失效）。
+
+| 函数名 | 类型 | 签名 | 备注 |
+|--------|------|------|------|
+| setDeepValue | function | `setDeepValue(obj, path, value, type)` | ⚠️ 巨型函数，见 @section 导航 |

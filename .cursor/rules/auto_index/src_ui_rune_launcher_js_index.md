@@ -7,30 +7,32 @@
 
 ## 函数列表
 
-| 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
-|--------|------|--------|--------|------|------|
-| _ui_buildRuneIconHTML | function | L31 | L52 | 22 | `_ui_buildRuneIconHTML(runeDef, runeLevel, extraClass = '')` |
-| ui_openRuneLauncher | method | L53 | L137 | 85 | `ui_openRuneLauncher()` |
-| _ui_updateLauncherShardCount | method | L138 | L148 | 11 | `_ui_updateLauncherShardCount()` |
-| ui_closeRuneLauncher | method | L149 | L185 | 37 | `ui_closeRuneLauncher()` |
-| ui_closeRunePicker | method | L186 | L198 | 13 | `ui_closeRunePicker()` |
-| ui_initRuneGrid | method | L199 | L242 | 44 | `ui_initRuneGrid()` |
-| ui_openRunePicker | method | L243 | L373 | 131 | `ui_openRunePicker(cellIndex)` |
-| ui_updateRuneGrid | method | L374 | L557 | 184 | `ui_updateRuneGrid()` |
-| _ui_updateRuneInventoryDisplay | method | L558 | L631 | 74 | `_ui_updateRuneInventoryDisplay()` |
-| _ui_updateActivatedRunewordsDisplay | method | L632 | L704 | 73 | `_ui_updateActivatedRunewordsDisplay(activatedRunewords)` |
-| _ui_updateRuneStatsDisplay | method | L705 | L758 | 54 | `_ui_updateRuneStatsDisplay(activeStats, baseStats = {})` |
-| _ui_updateResonanceDisplay | method | L759 | L826 | 68 | `_ui_updateResonanceDisplay()` |
-| _ui_updateRuneActionButtons | method | L827 | L902 | 76 | `_ui_updateRuneActionButtons()` |
-| ui_doRuneMerge | method | L903 | L959 | 57 | `ui_doRuneMerge()` |
-| ui_doRuneReforge | method | L960 | L994 | 35 | `ui_doRuneReforge()` |
-| _ui_playMergeShardFlyEffect | method | L995 | L1059 | 65 | `_ui_playMergeShardFlyEffect(startX, startY, amount)` |
-| _ui_showRuneActionResult | method | L1060 | L1084 | 25 | `_ui_showRuneActionResult(message, type)` |
-| ui_switchRuneTab | method | L1085 | L1113 | 29 | `ui_switchRuneTab(tab)` |
-| ui_renderRuneCodex | method | L1114 | L1214 | 101 | `ui_renderRuneCodex()` |
-| ui_switchRunewordCodexLevel | method | L1215 | L1248 | 34 | `ui_switchRunewordCodexLevel(runewordId, level)` |
-| _ui_calcRunewordDynamicDesc | method | L1249 | L1329 | 81 | `_ui_calcRunewordDynamicDesc(rw, level)` |
-| _ui_checkRunewordBubble | method | L1330 | L1364 | 35 | `_ui_checkRunewordBubble()` |
-| _ui_showRunewordBubble | method | L1365 | L1455 | 91 | `_ui_showRunewordBubble(formableRunewords)` |
-| _ui_hideRunewordBubble | method | L1456 | L1470 | 15 | `_ui_hideRunewordBubble()` |
-| ui_autoArrangeRunes | method | L1471 | L1703 | **233** | `ui_autoArrangeRunes()` |
+> 定位方式：在源文件中 `grep -n "函数名"` 即可跳转，行号不在此列出（行号随代码变化而失效）。
+
+| 函数名 | 类型 | 签名 | 备注 |
+|--------|------|------|------|
+| _ui_buildRuneIconHTML | function | `_ui_buildRuneIconHTML(runeDef, runeLevel, extraClass = '')` |  |
+| ui_openRuneLauncher | method | `ui_openRuneLauncher()` |  |
+| _ui_updateLauncherShardCount | method | `_ui_updateLauncherShardCount()` |  |
+| ui_closeRuneLauncher | method | `ui_closeRuneLauncher()` |  |
+| ui_closeRunePicker | method | `ui_closeRunePicker()` |  |
+| ui_initRuneGrid | method | `ui_initRuneGrid()` |  |
+| ui_openRunePicker | method | `ui_openRunePicker(cellIndex)` |  |
+| ui_updateRuneGrid | method | `ui_updateRuneGrid()` |  |
+| _ui_updateRuneInventoryDisplay | method | `_ui_updateRuneInventoryDisplay()` |  |
+| _ui_updateActivatedRunewordsDisplay | method | `_ui_updateActivatedRunewordsDisplay(activatedRunewords)` |  |
+| _ui_updateRuneStatsDisplay | method | `_ui_updateRuneStatsDisplay(activeStats, baseStats = {})` |  |
+| _ui_updateResonanceDisplay | method | `_ui_updateResonanceDisplay()` |  |
+| _ui_updateRuneActionButtons | method | `_ui_updateRuneActionButtons()` |  |
+| ui_doRuneMerge | method | `ui_doRuneMerge()` |  |
+| ui_doRuneReforge | method | `ui_doRuneReforge()` |  |
+| _ui_playMergeShardFlyEffect | method | `_ui_playMergeShardFlyEffect(startX, startY, amount)` |  |
+| _ui_showRuneActionResult | method | `_ui_showRuneActionResult(message, type)` |  |
+| ui_switchRuneTab | method | `ui_switchRuneTab(tab)` |  |
+| ui_renderRuneCodex | method | `ui_renderRuneCodex()` |  |
+| ui_switchRunewordCodexLevel | method | `ui_switchRunewordCodexLevel(runewordId, level)` |  |
+| _ui_calcRunewordDynamicDesc | method | `_ui_calcRunewordDynamicDesc(rw, level)` |  |
+| _ui_checkRunewordBubble | method | `_ui_checkRunewordBubble()` |  |
+| _ui_showRunewordBubble | method | `_ui_showRunewordBubble(formableRunewords)` |  |
+| _ui_hideRunewordBubble | method | `_ui_hideRunewordBubble()` |  |
+| ui_autoArrangeRunes | method | `ui_autoArrangeRunes()` | ⚠️ 巨型函数，见 @section 导航 |

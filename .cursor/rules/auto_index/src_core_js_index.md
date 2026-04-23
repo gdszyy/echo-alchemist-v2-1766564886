@@ -7,10 +7,12 @@
 
 ## 函数列表
 
-| 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
-|--------|------|--------|--------|------|------|
-| initAudio | function | L55 | L74 | 20 | `initAudio()` |
-| setupAudioInitListener | function | L75 | L91 | 17 | `setupAudioInitListener()` |
-| Game | class | L92 | L92 | 1 | `Game()` |
-| constructor | method | L93 | L316 | **224** | `constructor()` |
-| _setupEventListeners | method | L317 | L419 | 103 | `_setupEventListeners()` |
+> 定位方式：在源文件中 `grep -n "函数名"` 即可跳转，行号不在此列出（行号随代码变化而失效）。
+
+| 函数名 | 类型 | 签名 | 备注 |
+|--------|------|------|------|
+| initAudio | function | `initAudio()` |  |
+| setupAudioInitListener | function | `setupAudioInitListener()` |  |
+| Game | class | `Game()` |  |
+| constructor | method | `constructor()` | ⚠️ 巨型函数，见 @section 导航 |
+| _setupEventListeners | method | `_setupEventListeners()` |  |

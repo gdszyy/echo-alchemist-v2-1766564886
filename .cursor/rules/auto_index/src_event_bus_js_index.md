@@ -5,18 +5,20 @@
 
 ## 函数列表
 
-| 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
-|--------|------|--------|--------|------|------|
-| EventBus | class | L75 | L75 | 1 | `EventBus()` |
-| constructor | method | L76 | L95 | 20 | `constructor(options = {})` |
-| on | method | L96 | L114 | 19 | `on(event, handler)` |
-| off | method | L115 | L130 | 16 | `off(event, handler)` |
-| once | method | L131 | L144 | 14 | `once(event, handler)` |
-| emit | method | L145 | L182 | 38 | `emit(event, data)` |
-| hasListeners | method | L183 | L192 | 10 | `hasListeners(event)` |
-| listenerCount | method | L193 | L201 | 9 | `listenerCount(event)` |
-| removeAllListeners | method | L202 | L213 | 12 | `removeAllListeners(event)` |
-| getHistory | method | L214 | L220 | 7 | `getHistory()` |
-| clearHistory | method | L221 | L228 | 8 | `clearHistory()` |
-| _recordHistory | method | L229 | L244 | 16 | `_recordHistory(event, data)` |
-| setDebug | method | L245 | L259 | 15 | `setDebug(enabled)` |
+> 定位方式：在源文件中 `grep -n "函数名"` 即可跳转，行号不在此列出（行号随代码变化而失效）。
+
+| 函数名 | 类型 | 签名 | 备注 |
+|--------|------|------|------|
+| EventBus | class | `EventBus()` |  |
+| constructor | method | `constructor(options = {})` |  |
+| on | method | `on(event, handler)` |  |
+| off | method | `off(event, handler)` |  |
+| once | method | `once(event, handler)` |  |
+| emit | method | `emit(event, data)` |  |
+| hasListeners | method | `hasListeners(event)` |  |
+| listenerCount | method | `listenerCount(event)` |  |
+| removeAllListeners | method | `removeAllListeners(event)` |  |
+| getHistory | method | `getHistory()` |  |
+| clearHistory | method | `clearHistory()` |  |
+| _recordHistory | method | `_recordHistory(event, data)` |  |
+| setDebug | method | `setDebug(enabled)` |  |

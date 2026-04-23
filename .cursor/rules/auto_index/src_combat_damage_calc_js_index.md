@@ -5,12 +5,14 @@
 
 ## 函数列表
 
-| 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
-|--------|------|--------|--------|------|------|
-| combat_calculatePlayerExpectedDamage | method | L41 | L87 | 47 | `combat_calculatePlayerExpectedDamage()` |
-| combat_reportDamage | method | L88 | L99 | 12 | `combat_reportDamage(amount)` |
-| combat_recordDamage | method | L100 | L149 | 50 | `combat_recordDamage(amount, attrType = 'damage', sourceType = 'main', shotId = null)` |
-| combat_lightning_triggerChain | method | L150 | L305 | 156 | `combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = null, chainChanceBonus = 0, isExt)` |
-| combat_triggerChromaticAberration | method | L306 | L343 | 38 | `combat_triggerChromaticAberration(damage)` |
-| combat_runeword_absoluteZero_calcAmp | method | L344 | L380 | 37 | `combat_runeword_absoluteZero_calcAmp(enemy)` |
-| combat_runeword_elementalFusion_check | method | L381 | L461 | 81 | `combat_runeword_elementalFusion_check(enemy, baseDmg, shotId)` |
+> 定位方式：在源文件中 `grep -n "函数名"` 即可跳转，行号不在此列出（行号随代码变化而失效）。
+
+| 函数名 | 类型 | 签名 | 备注 |
+|--------|------|------|------|
+| combat_calculatePlayerExpectedDamage | method | `combat_calculatePlayerExpectedDamage()` |  |
+| combat_reportDamage | method | `combat_reportDamage(amount)` |  |
+| combat_recordDamage | method | `combat_recordDamage(amount, attrType = 'damage', sourceType = 'main', shotId = null)` |  |
+| combat_lightning_triggerChain | method | `combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = null, chainChanceBonus = 0, isExt)` |  |
+| combat_triggerChromaticAberration | method | `combat_triggerChromaticAberration(damage)` |  |
+| combat_runeword_absoluteZero_calcAmp | method | `combat_runeword_absoluteZero_calcAmp(enemy)` |  |
+| combat_runeword_elementalFusion_check | method | `combat_runeword_elementalFusion_check(enemy, baseDmg, shotId)` |  |

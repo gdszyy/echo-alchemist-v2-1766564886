@@ -5,11 +5,13 @@
 
 ## 函数列表
 
-| 函数名 | 类型 | 起始行 | 结束行 | 行数 | 签名 |
-|--------|------|--------|--------|------|------|
-| _extractAttrDamage | function | L51 | L79 | 29 | `_extractAttrDamage(byAttr)` |
-| _calcBuildVector | function | L80 | L158 | 79 | `_calcBuildVector(game)` |
-| _calcTagWeights | function | L159 | L194 | 36 | `_calcTagWeights(buildVector)` |
-| _weightedRandomChoice | function | L195 | L229 | 35 | `_weightedRandomChoice(candidates)` |
-| _selectRuneByWeight | function | L230 | L280 | 51 | `_selectRuneByWeight(tagWeights, themeWeights = {})` |
-| loot_calcRuneDrop | function | L281 | L303 | 23 | `loot_calcRuneDrop(game, overrideOptions = {})` |
+> 定位方式：在源文件中 `grep -n "函数名"` 即可跳转，行号不在此列出（行号随代码变化而失效）。
+
+| 函数名 | 类型 | 签名 | 备注 |
+|--------|------|------|------|
+| _extractAttrDamage | function | `_extractAttrDamage(byAttr)` |  |
+| _calcBuildVector | function | `_calcBuildVector(game)` |  |
+| _calcTagWeights | function | `_calcTagWeights(buildVector)` |  |
+| _weightedRandomChoice | function | `_weightedRandomChoice(candidates)` |  |
+| _selectRuneByWeight | function | `_selectRuneByWeight(tagWeights, themeWeights = {})` |  |
+| loot_calcRuneDrop | function | `loot_calcRuneDrop(game, overrideOptions = {})` |  |

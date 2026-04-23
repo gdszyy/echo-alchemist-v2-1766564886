@@ -93,6 +93,10 @@
 *   **属性索引**：[`.cursor/rules/attribute_index.md`](.cursor/rules/attribute_index.md) - 7 种弹药属性的显示名称、克制关系（COUNTER_MAP）、共鸣效果（ELEMENT_RESONANCE_DB）及图鉴说明速查表。
 *   **敌人词缀与 Boss 索引**：[`.cursor/rules/enemy_index.md`](.cursor/rules/enemy_index.md) - 8 种敌人词缀和 8 个 Boss 的行为机制、出现回合、克制属性、狂暴行为及关键代码位置速查表。
 
+### 核心机制文档（深度阅读，含数值与流程说明）
+
+*   **核心机制文档**：[`docs/core_mechanics.md`](docs/core_mechanics.md) - 四大核心机制的完整数值与流程说明：“符文充能”、“子弹替换（混沌/纯净精华两条路径）”、“遗物/精华保底概率（DropPity V3）”、“符文智能掉落算法（三层加权）”。**凡修改上述任一机制时，必须先读此文档。**
+
 > **架构状态（Task 3.3 更新）**：`core.js` 已完全移除 `Object.assign(Game.prototype, ...)` Mixin 模式。全部 10 个子系统均已迁移至组合模式（Composition via bind）。新增子系统必须遵循 [`.cursor/rules/global.md`](.cursor/rules/global.md) 第 5 节「子系统扩展规范」。
 
 > **注意**：随着项目的拆分和重构，本索引应持续更新。每个子模块的负责 Agent 在完成初步重构后，需创建并维护对应的规则文档。
