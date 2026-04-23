@@ -1,12 +1,12 @@
 {
   "indexed": [
     {
-      "file": "src/game_system.js",
-      "lines": 2309,
-      "funcs": 45,
-      "sections": 7,
+      "file": "src/ui_system.js",
+      "lines": 829,
+      "funcs": 42,
+      "sections": 1,
       "mega_funcs": 1,
-      "index_path": ".cursor/rules/auto_index/src_game_system_js_index.md"
+      "index_path": ".cursor/rules/auto_index/src_ui_system_js_index.md"
     }
   ],
   "skipped": [],

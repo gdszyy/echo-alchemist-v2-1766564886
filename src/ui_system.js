@@ -764,7 +764,10 @@ export const ui_system = {
     },
 
     meta_continueRun() {
-        if (typeof this.sys_continueRun === 'function') this.sys_continueRun();
+        const ok = this.sys_loadRunState();
+        if (!ok) {
+            if (typeof showToast === 'function') showToast('⚠️ 存档读取失败，请开始新游戏');
+        }
     },
 
     meta_updateContinueButton() {
@@ -773,8 +776,12 @@ export const ui_system = {
     },
 
     meta_openShop() {
-        const shop = document.getElementById('meta-shop-overlay');
-        if (shop) shop.classList.remove('hidden');
+        this.phase_switchPhase('shop');
+        // meta_currentShopCategory 初始化由 ui_renderShop 内部处理（META_SHOP_CONFIG 在 shop_system 中导入）
+        if (!this.meta_currentShopCategory) {
+            this.meta_currentShopCategory = 'attribute';
+        }
+        this.ui_renderShop();
     },
 
     meta_calculateUpgradeCost(upgrade, level) {
