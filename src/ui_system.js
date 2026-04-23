@@ -315,18 +315,17 @@ export const ui_system = {
         ];
 
         if (gridEl) {
-            // [BUGFIX] 修复子弹替换卡片不可见问题：
-            // 原来用 calc(100dvh - 246px) 计算高度，但 game-container 是 9:16 等比缩放容器，
-            // 其高度 < 100dvh（如 iPhone 14 约 693px vs 844px 视口），导致 gridEl 高度超出
-            // 父容器（overflow-y-auto），卡片被滚动到视口外不可见。
-            // 修复：改用 height:100% 让 flex 布局自动分配高度，并将父容器改为 overflow:hidden。
+            // [BUGFIX v2] 改用绝对定位方案，彻底绕开多层 flex 高度链传递问题。
+            // 原方案依赖 flex:1 逐层传递高度（phase-selection→parentEl→gridEl→wrapper→row→cards），
+            // 任何一层的 padding/items-center/justify-content:space-between 都可能导致高度塌陷。
+            // 新方案：parentEl 设为 position:relative，gridEl 绝对定位充满 parentEl，
+            // 完全绕开 flex 高度传递，gridEl 的高度 = parentEl 的实际高度（由 flex:1 正确分配）。
             const parentEl = gridEl.parentElement;
             if (parentEl) {
+                parentEl.style.position = 'relative';
                 parentEl.style.overflow = 'hidden';
-                parentEl.style.display = 'flex';
-                parentEl.style.flexDirection = 'column';
             }
-            gridEl.style.cssText = 'display:flex;flex-direction:column;width:100%;flex:1;min-height:0;padding:0;max-width:none;margin:0;gap:0;overflow:hidden;';
+            gridEl.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;padding:0;max-width:none;margin:0;gap:0;overflow:hidden;';
             gridEl.innerHTML = '';
 
             const wrapper = document.createElement('div');

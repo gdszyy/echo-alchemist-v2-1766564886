@@ -673,6 +673,7 @@ export const game_system = {
             _p1.style.flex = '';
             _p1.style.minHeight = '';
             _p1.style.alignItems = '';
+            _p1.style.position = ''; // [BUGFIX v2] 清除绝对定位方案设置的 position:relative
         }
         if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
         if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
@@ -711,6 +712,7 @@ export const game_system = {
             _p2.style.flex = '';
             _p2.style.minHeight = '';
             _p2.style.alignItems = '';
+            _p2.style.position = ''; // [BUGFIX v2] 清除绝对定位方案设置的 position:relative
         }
         if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
         if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
