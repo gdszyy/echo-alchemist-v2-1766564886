@@ -564,12 +564,15 @@ export const game_system = {
         // 替换阶段现在在研磨全部完成后触发（phase_gathering_attemptComplete 中），
         // 展示新研磨的子弹 vs 充能子弹，让玩家选择。
 
-        this.phase_switchPhase('selection');
+        // [BUGFIX] 先设置 selectionMode / fateMomentContext，再调用 phase_switchPhase，
+        // 确保 phase_switchPhase 内部触发的 ui_updateUI 能读到正确状态，
+        // 避免渲染出旧的命运选择界面（如上一次的 chaos_essence / pure_essence 卡片）。
         this.selectionMode = mode;
         this.selectionRequiredCount = Math.max(1, pendingMode?.requiredCount || CONFIG.gameplay.selectionReq || 3);
         this.fateMomentContext = this.selectionMode === 'standard'
             ? null
             : {
+                active: true,
                 type: this.selectionMode,
                 source: pendingMode?.source || 'unknown',
                 round: pendingMode?.round || this.round || 1,
@@ -577,6 +580,7 @@ export const game_system = {
                 sourceRewardType: pendingMode?.sourceRewardType || this.selectionMode,
             };
         this.pendingSelectionMode = null;
+        this.phase_switchPhase('selection');
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
         // [BUGFIX] 防御性重置 gridEl inline style：
@@ -1227,10 +1231,14 @@ export const game_system = {
         if (this._roundStartResolverActive) return;
         if (!this.pendingRoundStartRewards) this.pendingRoundStartRewards = [];
 
+        // [BUGFIX] 切换到 selection 前先将 selectionMode 重置为 standard，
+        // 防止 phase_switchPhase 内部触发的 ui_updateUI 读取上一次的 selectionMode
+        // 渲染出旧的命运选择卡片（如 chaos_essence / pure_essence 界面）。
+        this.selectionMode = 'standard';
+        this.fateMomentContext = null;
         if (this.phase !== 'selection') {
             this.phase_switchPhase('selection');
         }
-
         this._roundStartResolverActive = true;
         eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_STARTED, {
             round: this.round || 1,
@@ -1279,6 +1287,7 @@ export const game_system = {
                         enemyType: reward.enemyType || null,
                     };
                     this.fateMomentContext = {
+                        active: true,
                         type: rewardType,
                         source: reward.source || 'unknown',
                         round: reward.round || this.round || 1,

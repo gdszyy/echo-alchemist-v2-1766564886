@@ -1,7 +1,7 @@
 ---
 id: "PI-007"
-version: "v1.0"
-last_updated: "2026-04-18"
+version: "v1.2"
+last_updated: "2026-04-24"
 author: "agt-50c9e9de-077"
 related_modules: ["ui/shop.js", "game_system.js", "ui_system.js", "spawn_system.js", "game_phase.js", "entities.js", "config.js", "core.js"]
 status: "active"
@@ -65,8 +65,34 @@ status: "active"
 2. **预览 UI 与实际写回必须共享状态源**：预览面板读的是 `spawn_showMarblePreview()` 当前上下文，而真正的合法性校验和实体写回发生在 `ui_confirmSelection()`；两者必须共享同一套 `selectionInjectedRune` / `selectionPreviewState`。
 3. **混沌精华只是旧轮盘语义迁移，不是新机制**：它必须继续沿用 `FortuneWheel` 与 `slotType='wheel'`，否则会把命运系统拆成两套并引入新的维护负担。
 
+### 坑 5: phase_switchPhase 触发 ui_updateUI 时读取旧 selectionMode，渲染出上一次的命运选择卡片
+
+**现象**：每次触发纯净精华 / 混沌精华 / 遗物选择时，界面会短暂闪出上一次的命运选择卡片（如上一轮的 chaos_essence 弹珠网格）。
+
+**根因**：`sys_startRoundStartResolver` 先调用 `phase_switchPhase('selection')`（此时 `selectionMode` 仍为上一次的值），然后才在动画回调里（800ms 后）设置新的 `selectionMode`。`phase_switchPhase` 内部立即调用 `ui_updateUI()`，后者读到旧 `selectionMode` 并渲染旧界面。同理，`sys_initSelectionPhase` 也先 `phase_switchPhase` 再设置 `selectionMode`，导致同样问题。此外 `ui_onPhaseChange` 里多余的 `ui_updateUI()` 调用进一步加剧了双重渲染。
+
+**正确做法**：
+1. 在 `sys_startRoundStartResolver` 切换到 `selection` 阶段**之前**，先将 `selectionMode = 'standard'`、`fateMomentContext = null` 重置，确保 `phase_switchPhase` 触发的 `ui_updateUI` 渲染的是空白选择界面。
+2. 在 `sys_initSelectionPhase` 中，先设置 `selectionMode`、`selectionRequiredCount`、`fateMomentContext`，再调用 `phase_switchPhase('selection')`。
+3. 去掉 `ui_onPhaseChange` 中多余的 `ui_updateUI()` 调用（`phase_switchPhase` 内部已调用过）。
+4. 去掉 `ui_closeRelicSelection` selection 分支中多余的 `ui_updateUI()` 调用。
+
+**关键位置**：`src/game_system.js` → `sys_startRoundStartResolver()` / `sys_initSelectionPhase()`；`src/ui_system.js` → `ui_onPhaseChange()`；`src/ui/shop.js` → `ui_closeRelicSelection()`
+
+### 坑 6: fateMomentContext 缺少 active 字段，导致 ui_isFateMomentPhase() 始终返回 false
+
+**现象**：进入纯净精华后界面立刻变成混沌精华选择界面，且无法点击按钮进入研磨阶段。
+
+**根因**：`ui_isFateMomentPhase()` 的判断条件是 `this.fateMomentContext && this.fateMomentContext.active`，但 `sys_startRoundStartResolver` 和 `sys_initSelectionPhase` 构建的 `fateMomentContext` 对象均缺少 `active: true` 字段，导致该函数始终返回 `false`。这影响了顶部栏显示逻辑、教程遮罩等多处依赖 `ui_isFateMomentPhase()` 的判断。
+
+**正确做法**：所有构建 `fateMomentContext` 对象的地方都必须包含 `active: true` 字段。
+
+**关键位置**：`src/game_system.js` → `sys_startRoundStartResolver()` / `sys_initSelectionPhase()`
+
 ## 版本变更日志
 
 | 版本 | 日期 | 变更内容 | 作者 |
 |------|------|---------|------|
 | v1.0 | 2026-04-18 | 初始记录命运时刻 overlay 返回流与纯净精华选择模式的防坑要点 | agt-50c9e9de-077 |
+| v1.1 | 2026-04-24 | 补充坑 5：phase_switchPhase 触发 ui_updateUI 时读取旧 selectionMode 渲染旧卡片 | agt |
+| v1.2 | 2026-04-24 | 补充坑 6：fateMomentContext 缺少 active 字段导致 ui_isFateMomentPhase() 失效 | agt |

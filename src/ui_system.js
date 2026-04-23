@@ -795,7 +795,9 @@ export const ui_system = {
     },
 
     ui_onPhaseChange(newPhase) {
-        this.ui_updateUI();
+        // [BUGFIX] 移除多余的 ui_updateUI() 调用：
+        // phase_switchPhase 已经调用过 ui_updateUI()，再在 ui_onPhaseChange 里重复调用
+        // 会导致用旧的 selectionMode 重新渲染上一次的命运选择卡片。
         if (newPhase === 'selection' && this.replaceAmmoContext && this.replaceAmmoContext.active) {
             this.ui_renderReplaceAmmoUI();
         }

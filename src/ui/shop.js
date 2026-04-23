@@ -327,8 +327,9 @@ export const shop_system = {
         }
 
         if (returnState.phase === 'selection') {
+            // [BUGFIX] 移除多余的 ui_updateUI() 调用：
+            // phase_switchPhase 内部已调用 ui_updateUI()，再重复调用会用旧 selectionMode 覆盖界面。
             if (typeof this.phase_switchPhase === 'function') this.phase_switchPhase('selection');
-            if (typeof this.ui_updateUI === 'function') this.ui_updateUI();
             if (typeof this.ui_refreshSelectionModeUI === 'function') this.ui_refreshSelectionModeUI();
             return;
         }
