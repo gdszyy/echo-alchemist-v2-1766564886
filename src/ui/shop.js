@@ -192,10 +192,18 @@ export const shop_system = {
         } else if (relic.effect === 'row_count_up') {
             this.currentRows = (this.currentRows || 0) + 2;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
+            // [钉盘遗物] 立刻触发一次混沌精华
+            if (typeof this.sys_queueRoundStartReward === 'function') {
+                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
+            }
         } else if (relic.effect === 'row_count_up_1') {
             // 维度碎片（rare）：每次只加 1 行
             this.currentRows = (this.currentRows || 0) + 1;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
+            // [钉盘遗物] 立刻触发一次混沌精华
+            if (typeof this.sys_queueRoundStartReward === 'function') {
+                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
+            }
         } else if (relic.effect === 'flat_damage_up') {
             // 炼金火药管：所有弹珠基础伤害 +N
             const val = relic.flatDamageValue || 2;
@@ -211,27 +219,47 @@ export const shop_system = {
             this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 3;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
             if (window.showToast) showToast('三角陣形啟動！釘盤 +3 行，漏斗共鳴激活。');
+            // [钉盘遗物] 立刻触发一次混沌精华
+            if (typeof this.sys_queueRoundStartReward === 'function') {
+                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
+            }
         } else if (relic.effect === 'board_layout_diamond') {
             this.boardLayout = 'diamond';
             // [补偿] 菱形顶底稀疏，+2 行让菱形更饱满
             this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 2;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
             if (window.showToast) showToast('菱形陣形啟動！釘盤 +2 行，中段爆發激活。');
+            // [钉盘遗物] 立刻触发一次混沌精华
+            if (typeof this.sys_queueRoundStartReward === 'function') {
+                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
+            }
         } else if (relic.effect === 'board_layout_sparse') {
             this.boardLayout = 'sparse';
             // [补偿] 稀疏布局钉子总数约为 default 的 75%，+4 行补偿总量
             this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 4;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
             if (window.showToast) showToast('稀疏間隔啟動！釘盤 +4 行，通道蓄力激活。');
+            // [钉盘遗物] 立刻触发一次混沌精华
+            if (typeof this.sys_queueRoundStartReward === 'function') {
+                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
+            }
         } else if (relic.effect === 'board_layout_mirror_sync') {
             this.boardLayout = 'mirror_sync';
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
+            // [钉盘遗物] 立刻触发一次混沌精华
+            if (typeof this.sys_queueRoundStartReward === 'function') {
+                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
+            }
         } else if (relic.effect === 'board_layout_wide_narrow') {
             this.boardLayout = 'wide_narrow';
             // [补偿] 宽窄交替分布不均，+2 行轻度补偿
             this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 2;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
             if (window.showToast) showToast('寬窄交替啟動！釘盤 +2 行，邊緣共振激活。');
+            // [钉盘遗物] 立刻触发一次混沌精华
+            if (typeof this.sys_queueRoundStartReward === 'function') {
+                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
+            }
         } else if (relic.effect === 'assimilation_surge') {
             const mt = relic.marbleType;
             if (!this.guaranteedNextRound) this.guaranteedNextRound = [];
