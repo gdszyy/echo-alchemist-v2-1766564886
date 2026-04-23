@@ -29,11 +29,12 @@ globs: ["src/game_phase.js"]
   - 替换确认：`sys_confirmReplaceAmmo()` 按 `selectedIndices` 从 `allRecipes = [...newRecipes, ...chargedRecipes]` 中取出子弹写入 `ammoQueue`，清空 `replaceAmmoContext` 和 `_chargedAmmoQueue`，恢复 gridEl CSS 布局后进入战斗。
   - 跳过：`sys_skipReplaceAmmo()` 直接使用 `newRecipes` 进入战斗，丢弃充能子弹。
   - **纯净精华特殊分支（跳过研磨）**：在纯净精华界面点击“跳过研磨”（`sys_skipGrindGetRune`）时，系统会随机补偿一个符文，并**优先使用 `_chargedAmmoQueue` 作为本回合弹药**（若无则编译当前 `marbleQueue`），随后清理上下文并**直接进入战斗阶段**，不再触发替换界面。
-- **模式分支**: `chaos_essence` 模式沿用标准 3 选流程，但 UI 需显式标记为“混沌精华”；`pure_essence` 模式要求只选择 `1` 枚弹珠，并在确认前完成 1 个合法符文注入。
+- **模式分支**: `chaos_essence` 模式沿用标准 3 选流程，但 UI 需显式标记为"混沌精华"；`pure_essence` 模式要求只选择 `1` 枚弹珠，**符文注入为可选项**：有注入时享受同化率加成，无注入时直接进入研磨（单弹珠，无同化加成）。
 - **出口**: 玩家做出选择并确认，触发转场动画进入研磨阶段。纯净精华模式下，确认时必须先完成合法性校验，把注入结果写回 `MarbleDefinition.collected`，并为对应 `marble.type` 写入 `doubleAssimilationBoostRounds`。
 
 ### 2.5 回合开始提示与充能特效 (Round Start Banner)
 - **触发时机**: `sys_startRoundStartResolver()` 的 `pendingRoundStartRewards` 队列为空时，调用 `sys_showRoundStartBanner()`。
+- **充能触发条件（新）**: 横幅结束后，先检查 `ammoQueue` 是否为空；**仅当 `ammoQueue` 为空时**，才从 `marbleQueue` 重新编译充能。若 `ammoQueue` 已有内容（如第一回合开局后已有子弹），则不重新充能，直接进入战斗。
 - **实现**: 先调用 `phase_switchPhase('gathering')` 切换背景，然后显示 `#round-start-banner` 全屏大字提示（「第 X 回合開始」），持续约 1.5 秒后自动调用 `phase_startGatheringPhase()` 完成研磨阶段初始化。
 - **充能特效**: 同时为 `#pc-left-sidebar` 添加 CSS 动画类 `.ammo-panel-charging`（high/medium 档：边框光流扫过）或 `.ammo-panel-charging-simple`（low 档：简单淡入淡出）。
 - **性能门控**: 特效等级由 `CONFIG.performance[perfQualityLevel].roundStartBannerGlow` 控制（high/medium: `true`，low: `false`）。

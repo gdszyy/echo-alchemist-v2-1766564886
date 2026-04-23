@@ -1412,9 +1412,10 @@ export const game_system = {
             if (leftSidebar) {
                 leftSidebar.classList.remove('ammo-panel-charging', 'ammo-panel-charging-simple');
             }
-            // [充能] 无精华时，用上回合 marbleQueue 中的弹珠定义重新编译生成 ammoQueue，
-            // 保留上回研磨收集的属性（collected），实现“子弹充能”效果。
-            if (this.marbleQueue && this.marbleQueue.length > 0) {
+            // [充能] 每回合开始检查 ammoQueue：若为空则尝试从 marbleQueue 充能，
+            // 保留上回研磨收集的属性（collected），实现"子弹充能"效果。
+            const ammoIsEmpty = !this.ammoQueue || this.ammoQueue.length === 0;
+            if (ammoIsEmpty && this.marbleQueue && this.marbleQueue.length > 0) {
                 this.ammoQueue = [];
                 this.marbleQueue.forEach(marbleDef => {
                     const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];

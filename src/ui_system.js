@@ -129,7 +129,10 @@ export const ui_system = {
         const required = this.ui_getSelectionRequirement();
         if ((this.selectedMarbles || []).length !== required) return false;
         if (this.selectionMode === 'pure_essence') {
-            return !!(this.selectionInjectedRune && this.selectionInjectedRune.marbleIndex === this.selectedMarbles[0]);
+            // [feat] 纯净精华允许不注入符文直接进入研磨（只有一个弹珠）
+            // 有符文注入时仍需校验 marbleIndex 匹配；无符文时直接放行
+            if (!this.selectionInjectedRune) return true;
+            return !!(this.selectionInjectedRune.marbleIndex === this.selectedMarbles[0]);
         }
         return true;
     },
@@ -697,31 +700,38 @@ export const ui_system = {
             const injected = this.selectionInjectedRune;
             const selectedIndex = this.selectedMarbles[0];
             const marble = this.marbleQueue[0];
-            if (!injected || injected.marbleIndex !== selectedIndex) {
-                if (typeof showToast === 'function') showToast('純淨精華尚未完成符文注入。');
-                return;
+            if (injected) {
+                // [feat] 有符文注入时走原有注入流程
+                if (injected.marbleIndex !== selectedIndex) {
+                    if (typeof showToast === 'function') showToast('純淨精華尚未完成符文注入。');
+                    return;
+                }
+                const legalElements = new Set(this.ui_getPureEssenceLegalElements(marble));
+                if (!legalElements.has(injected.element)) {
+                    if (typeof showToast === 'function') showToast('注入失敗：符文屬性與彈珠原有屬性不匹配。');
+                    return;
+                }
+                marble.collected = Array.isArray(marble.collected) ? marble.collected : [];
+                const injectCount = Math.max(1, injected.level || 1) * Math.max(1, injected.baseStatPerLevel || 1);
+                for (let i = 0; i < injectCount; i++) marble.collected.push(injected.element);
+                marble.source = 'pure_essence';
+                marble.infusedRuneId = injected.runeId;
+                marble.infusedAttribute = injected.element;
+                marble.assimilationMultiplier = Math.max(1, (typeof CONFIG !== 'undefined' && CONFIG.gameplay.assimilationDoubleMultiplier) || 2);
+                if (!this.doubleAssimilationBoostRounds) this.doubleAssimilationBoostRounds = {};
+                this.doubleAssimilationBoostRounds[marble.type] = Math.max(this.doubleAssimilationBoostRounds[marble.type] || 0, 1);
+                if (Array.isArray(this.runeInventory) && injected.inventoryIndex >= 0) {
+                    this.runeInventory.splice(injected.inventoryIndex, 1);
+                    if (this.saveData) this.saveData.runeInventory = (this.runeInventory || []).slice();
+                }
+                this.ui_updateRuneCountDisplay();
+                const multiplier = (typeof CONFIG !== 'undefined' && CONFIG.gameplay.assimilationDoubleMultiplier) || 2;
+                if (typeof showToast === 'function') showToast(`已為 ${marble.getName()} 注入 ${injected.icon || '✦'} ${injected.name}，本輪同化率 x${multiplier}。`);
+            } else {
+                // [feat] 无符文注入时直接进入研磨（纯净精华单弹珠，无同化加成）
+                marble.source = 'pure_essence';
+                if (typeof showToast === 'function') showToast(`純淨精華：未注入符文，直接進入研磨。`);
             }
-            const legalElements = new Set(this.ui_getPureEssenceLegalElements(marble));
-            if (!legalElements.has(injected.element)) {
-                if (typeof showToast === 'function') showToast('注入失敗：符文屬性與彈珠原有屬性不匹配。');
-                return;
-            }
-            marble.collected = Array.isArray(marble.collected) ? marble.collected : [];
-            const injectCount = Math.max(1, injected.level || 1) * Math.max(1, injected.baseStatPerLevel || 1);
-            for (let i = 0; i < injectCount; i++) marble.collected.push(injected.element);
-            marble.source = 'pure_essence';
-            marble.infusedRuneId = injected.runeId;
-            marble.infusedAttribute = injected.element;
-            marble.assimilationMultiplier = Math.max(1, (typeof CONFIG !== 'undefined' && CONFIG.gameplay.assimilationDoubleMultiplier) || 2);
-            if (!this.doubleAssimilationBoostRounds) this.doubleAssimilationBoostRounds = {};
-            this.doubleAssimilationBoostRounds[marble.type] = Math.max(this.doubleAssimilationBoostRounds[marble.type] || 0, 1);
-            if (Array.isArray(this.runeInventory) && injected.inventoryIndex >= 0) {
-                this.runeInventory.splice(injected.inventoryIndex, 1);
-                if (this.saveData) this.saveData.runeInventory = (this.runeInventory || []).slice();
-            }
-            this.ui_updateRuneCountDisplay();
-            const multiplier = (typeof CONFIG !== 'undefined' && CONFIG.gameplay.assimilationDoubleMultiplier) || 2;
-            if (typeof showToast === 'function') showToast(`已為 ${marble.getName()} 注入 ${injected.icon || '✦'} ${injected.name}，本輪同化率 x${multiplier}。`);
         }
 
         // 清理替换上下文（如果存在）
