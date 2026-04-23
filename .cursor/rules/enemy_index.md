@@ -2,7 +2,7 @@
 
 > **数据来源**：`src/config.js` → `balance.affixes`, `balance.bossConfigs`, `BOSS_DB`, `ENEMY_CURVE_CONFIG`；`src/spawn_system.js` → `spawn_generateAffixes()`, `spawn_scheduleNextBoss()`；`src/systems.js` → `TRUTH_BOOK_DATA.enemies`
 > **用途**：Agent 快速查询 8 种敌人词缀和 8 个 Boss 的行为机制、出现回合、克制属性及关键代码位置。
-> **最后更新**：Task C.3 — Boss 生成顺序与主题段落对齐检查（2026-04-19）
+> **最后更新**：调整敌人与 Boss 血量算法，优化数值平衡（2026-04-23）
 
 ## 1. 敌人词缀总览（8 种）
 
@@ -163,10 +163,10 @@ finalHP = max(
 
 | 参数 | 值 | 说明 |
 |---|---|---|
-| `miniBossMult` | 15 | Mini-Boss 血量倍率 |
-| `bigBossMult` | 35 | 大 Boss 血量倍率 |
-| `templateWeight` | 0.5 | 后期稳定值 |
-| `dynamicWeight` | 0.5 | 后期稳定值 |
+| `miniBossMult` | 12 | Mini-Boss 血量倍率 |
+| `bigBossMult` | 28 | 大 Boss 血量倍率 |
+| `templateWeight` | 0.4 | 后期稳定值 |
+| `dynamicWeight` | 0.6 | 后期稳定值 |
 | `earlyDynamicWeight` | 0.85 | 前期（Round ≤ 5）动态权重 |
 | `floorMultiplier` | 0.7 | 保底倍率 |
 
