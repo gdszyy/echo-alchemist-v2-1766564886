@@ -674,7 +674,8 @@ const TRAINING_SCENARIOS = {
         { id: 'enemy', name: '敵人詞條' },
         { id: 'attribute', name: '屬性效果' },
         { id: 'boss', name: 'Boss 機制' },
-        { id: 'runeword', name: '符文詞條' }
+        { id: 'runeword', name: '符文詞條' },
+        { id: 'relic', name: '遺物/精華' }
     ],
     scenarios: [
         // ── 敵人詞條 ──────────────────────────────────────────────────
@@ -1486,6 +1487,295 @@ const TRAINING_SCENARIOS = {
             demoAction: (game, tg) => {
                 const vel = new Vec2(3, -15);
                 game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+
+        // ── 遺物/精華 测试场景 ────────────────────────────────────────────────────────────────────────────────
+
+        // 場景 1：遺物保底计数器验证
+        {
+            id: 'relic_pity_essence',
+            categoryId: 'relic',
+            name: '精華保底验证',
+            icon: '✨',
+            desc: '[保底测试] 重置精華保底计数器为 0，展示当前保底进度。连续击杀 4 行普通敌人后，第 5 行应强制触发精华掌落。点击「模拟击杀」按钮逐行进行验证。',
+            setup: (game) => {
+                // 展示 5 行普通敌人，每行 1 个，共 5 个
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                for (let r = 0; r < 5; r++) {
+                    game.enemies.push(new Enemy(2.5 * w + w/2, top + r * h + h/2, 60, 60, 100, 100, 'normal', []));
+                }
+                // 重置保底计数器
+                if (game.dropPity) {
+                    game.dropPity.essence = 0;
+                    game.dropPity.relic = 0;
+                }
+                // 展示当前保底状态
+                const banner = document.getElementById('train-runeword-banner');
+                if (banner) {
+                    banner.classList.add('visible');
+                    const nameEl = document.getElementById('rw-banner-name');
+                    const descEl = document.getElementById('rw-banner-desc');
+                    if (nameEl) nameEl.textContent = '保底计数器';
+                    if (descEl) descEl.textContent = `精華保底: ${game.dropPity ? game.dropPity.essence : 'N/A'} / 4 行 | 遗物保底: ${game.dropPity ? game.dropPity.relic : 'N/A'} / 12 行`;
+                }
+            },
+            bulletConfig: { damage: 200, bounce: 0, pierce: 5, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                // 模拟击杀一行敌人，观察保底计数器变化
+                const living = game.enemies.filter(e => e.active && e.hp > 0);
+                if (living.length > 0) {
+                    const target = living[0];
+                    target.hp = 0;
+                    target.active = false;
+                    // 触发 enemy:killed 事件以更新保底计数器
+                    if (typeof game.sys_tryQueueEnemyRoundReward === 'function') {
+                        game.sys_tryQueueEnemyRoundReward(target);
+                    }
+                }
+                // 更新展示
+                const descEl = document.getElementById('rw-banner-desc');
+                if (descEl && game.dropPity) {
+                    descEl.textContent = `精華保底: ${game.dropPity.essence} / 4 行 | 遗物保底: ${game.dropPity.relic} / 12 行 | 待结算奖励: ${(game.pendingRoundStartRewards || []).length} 个`;
+                }
+            }
+        },
+
+        // 場景 2：遗物选择界面验证（保底强制触发）
+        {
+            id: 'relic_selection_ui',
+            categoryId: 'relic',
+            name: '遗物选择界面',
+            icon: '🎁',
+            desc: '[遗物 UI 验证] 直接向 pendingRoundStartRewards 压入一个遗物奖励，然后触发 resolver。验证遗物选择界面能否正常弹出，以及关闭后是否能正确返回试炼场。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 500, 500));
+            },
+            bulletConfig: { damage: 30, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                // 向队列压入遗物奖励，并记录返回目标为 training
+                if (!game.pendingRoundStartRewards) game.pendingRoundStartRewards = [];
+                game.pendingRoundStartRewards.push({ type: 'relic', source: 'test_training' });
+                // 设置返回目标：遗物界面关闭后应返回试炼场（而不是进入研磨阶段）
+                if (typeof game.ui_showRelicSelection === 'function') {
+                    game.ui_showRelicSelection({ resumeTarget: 'training' });
+                }
+            }
+        },
+
+        // 場景 3：混沌精华（Chaos Essence）命运抗决验证
+        {
+            id: 'relic_chaos_essence',
+            categoryId: 'relic',
+            name: '混沌精华命运',
+            icon: '🎡',
+            desc: '[混沌精华] 向奖励队列压入 chaos_essence，触发命运抗决界面。验证：底栏是否显示 0/3、选择 3 枚弹珠后确认按鈕是否可用。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 500, 500));
+            },
+            bulletConfig: { damage: 30, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                if (!game.pendingRoundStartRewards) game.pendingRoundStartRewards = [];
+                game.pendingRoundStartRewards.push({ type: 'chaos_essence', source: 'test_training' });
+                if (typeof game.sys_startRoundStartResolver === 'function') {
+                    game.sys_startRoundStartResolver();
+                }
+            }
+        },
+
+        // 場景 4：纯净精华（Pure Essence）全链路验证
+        {
+            id: 'relic_pure_essence',
+            categoryId: 'relic',
+            name: '纯净精华全链路',
+            icon: '🕊️',
+            desc: '[纯净精华] 向奖励队列压入 pure_essence，触发纯净精华界面。验证：底栏是否显示 0/1、符文注入面板是否展示、fateMomentContext.active 是否为 true。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 500, 500));
+                // 预先向 marbleQueue 写入一个占位弹珠，模拟上一回合已研磨的状态
+                if (!game.marbleQueue || game.marbleQueue.length === 0) {
+                    game.marbleQueue = [{ type: 'bounce', collected: [], source: 'test' }];
+                }
+            },
+            bulletConfig: { damage: 30, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                if (!game.pendingRoundStartRewards) game.pendingRoundStartRewards = [];
+                game.pendingRoundStartRewards.push({ type: 'pure_essence', source: 'test_training' });
+                if (typeof game.sys_startRoundStartResolver === 'function') {
+                    game.sys_startRoundStartResolver();
+                }
+            }
+        },
+
+        // 場景 5：纯净精华——跳过研磨分支验证
+        {
+            id: 'relic_pure_essence_skip_grind',
+            categoryId: 'relic',
+            name: '精华跳过研磨',
+            icon: '⚡',
+            desc: '[跳过研磨] 触发纯净精华后，直接点击「跳过研磨」按鈕。验证关键点：
+1. ammoQueue 是否被正确充能（优先用 _chargedAmmoQueue，其次编译 marbleQueue）
+2. 进入战斗后不会显示「弹药耗尽」
+3. 是否获得随机符文',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                for (let c = 0; c < 5; c++) {
+                    game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + 1 * h + h/2, 60, 60, 300, 300));
+                }
+                // 模拟上一回合已有充能子弹
+                game._chargedAmmoQueue = [{ type: 'bounce', damage: 20, bounce: 5, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false }];
+                game.marbleQueue = [{ type: 'bounce', collected: [], source: 'test' }];
+            },
+            bulletConfig: { damage: 30, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                if (!game.pendingRoundStartRewards) game.pendingRoundStartRewards = [];
+                game.pendingRoundStartRewards.push({ type: 'pure_essence', source: 'test_training' });
+                if (typeof game.sys_startRoundStartResolver === 'function') {
+                    game.sys_startRoundStartResolver();
+                }
+                // 提示测试人员操作步骤
+                const descEl = document.getElementById('rw-banner-desc');
+                const banner = document.getElementById('train-runeword-banner');
+                if (banner && descEl) {
+                    banner.classList.add('visible');
+                    const nameEl = document.getElementById('rw-banner-name');
+                    if (nameEl) nameEl.textContent = '操作步骤';
+                    descEl.textContent = '界面弹出后：点击「跳过研磨」→ 检查控制台 game.ammoQueue.length > 0 且 game.phase === \'combat\'';
+                }
+            }
+        },
+
+        // 場景 6：同化涌潮遗物（surge_bounce）验证
+        {
+            id: 'relic_surge_bounce',
+            categoryId: 'relic',
+            name: '弹性涌潮遗物',
+            icon: '🔵',
+            desc: '[同化涌潮] 模拟获得「弹性涌潮」遗物后的状态。验证：
+1. doubleAssimilationBoostRounds[bounce] 是否被设为 2
+2. guaranteedNextRound 是否包含 2 个 bounce 弹珠
+3. 发射 bounce 弹珠后，同化概率是否为基础值 × 2',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                // 布置带弹性钉子的敌人（模拟已同化的钉盘）
+                for (let c = 0; c < 5; c++) {
+                    game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + 1 * h + h/2, 60, 60, 500, 500));
+                }
+                // 模拟遗物效果：手动设置涌潮状态
+                if (!game.doubleAssimilationBoostRounds) game.doubleAssimilationBoostRounds = {};
+                game.doubleAssimilationBoostRounds['bounce'] = 2;
+                if (!game.assimilationBoostRounds) game.assimilationBoostRounds = {};
+                game.assimilationBoostRounds['bounce'] = 2;
+                if (!game.guaranteedNextRound) game.guaranteedNextRound = [];
+                game.guaranteedNextRound.push({ type: 'bounce' }, { type: 'bounce' });
+                // 展示状态
+                const banner = document.getElementById('train-runeword-banner');
+                if (banner) {
+                    banner.classList.add('visible');
+                    const nameEl = document.getElementById('rw-banner-name');
+                    const descEl = document.getElementById('rw-banner-desc');
+                    if (nameEl) nameEl.textContent = '涌潮状态已激活';
+                    if (descEl) descEl.textContent = `doubleAssimilationBoostRounds.bounce = ${game.doubleAssimilationBoostRounds['bounce']} | guaranteedNextRound 包含 ${game.guaranteedNextRound.length} 个弹珠`;
+                }
+            },
+            bulletConfig: { damage: 20, bounce: 8, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'bounce' },
+            demoAction: (game, tg) => {
+                // 发射弹性弹珠，观察同化概率加成是否生效
+                tg.fireBulletWithEffects({ ...tg.bulletConfig, type: 'bounce' });
+                // 更新展示
+                const descEl = document.getElementById('rw-banner-desc');
+                if (descEl && game.doubleAssimilationBoostRounds) {
+                    const bounceBoost = game.doubleAssimilationBoostRounds['bounce'] || 0;
+                    const multiplier = (typeof game.CONFIG !== 'undefined' && game.CONFIG.gameplay) ? game.CONFIG.gameplay.assimilationDoubleMultiplier : 2;
+                    descEl.textContent = `弹性弹珠已发射 | 涌潮剩余回合: ${bounceBoost} | 同化应为基础值 ×${multiplier}`;
+                }
+            }
+        },
+
+        // 場景 7：钉盘形态遗物互斥验证
+        {
+            id: 'relic_board_exclusion',
+            categoryId: 'relic',
+            name: '钉盘形态互斥',
+            icon: '🔺',
+            desc: '[鑉盘形态遗物互斥] 模拟玩家已拥有 triangle_formation，验证遗物选择界面是否正确排除其他鑉盘结构遗物。展示候选遗物列表，确认不包含 diamond_formation、sparse_interval、mirror_sync、wide_narrow、dimension_shard。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 500, 500));
+                // 模拟玩家已拥有三角鑉盘遗物
+                if (!game.ownedRelics) game.ownedRelics = [];
+                if (!game.ownedRelics.includes('triangle_formation')) {
+                    game.ownedRelics.push('triangle_formation');
+                }
+                game.boardLayout = 'triangle';
+                // 展示当前鑉盘布局
+                const banner = document.getElementById('train-runeword-banner');
+                if (banner) {
+                    banner.classList.add('visible');
+                    const nameEl = document.getElementById('rw-banner-name');
+                    const descEl = document.getElementById('rw-banner-desc');
+                    if (nameEl) nameEl.textContent = '当前鑉盘布局';
+                    if (descEl) descEl.textContent = `boardLayout = '${game.boardLayout}' | ownedRelics 包含: ${game.ownedRelics.filter(r => ['triangle_formation','diamond_formation','sparse_interval','mirror_sync','wide_narrow','dimension_shard'].includes(r)).join(', ')}`;
+                }
+            },
+            bulletConfig: { damage: 30, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                // 触发遗物选择界面，观察候选遗物列表
+                if (typeof game.ui_showRelicSelection === 'function') {
+                    game.ui_showRelicSelection({ resumeTarget: 'training' });
+                }
+                // 展示候选遗物中是否包含互斥遗物
+                const descEl = document.getElementById('rw-banner-desc');
+                if (descEl) {
+                    const BOARD_STRUCTURE = ['triangle_formation', 'diamond_formation', 'sparse_interval', 'mirror_sync', 'wide_narrow', 'dimension_shard'];
+                    const owned = game.ownedRelics || [];
+                    const hasBoard = BOARD_STRUCTURE.some(r => owned.includes(r));
+                    descEl.textContent = `已拥有鑉盘结构遗物: ${hasBoard} | 遗物界面已弹出，请确认候选列表不包含其他鑉盘形态遗物`;
+                }
+            }
+        },
+
+        // 場景 8：存档与恢复验证
+        {
+            id: 'relic_save_restore',
+            categoryId: 'relic',
+            name: '存档恢复验证',
+            icon: '💾',
+            desc: '[存档测试] 向奖励队列压入一个遗物 + 一个精华，然后触发存档。验证 localStorage 中 pendingRoundStartRewards 是否被持久化。刷新页面后验证奖励队列是否正确恢复。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 500, 500));
+            },
+            bulletConfig: { damage: 30, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                // 向奖励队列压入多个奖励
+                if (!game.pendingRoundStartRewards) game.pendingRoundStartRewards = [];
+                game.pendingRoundStartRewards.push(
+                    { type: 'relic', source: 'test_save' },
+                    { type: 'chaos_essence', source: 'test_save' }
+                );
+                // 触发存档
+                if (typeof game.sys_saveRunState === 'function') {
+                    game.sys_saveRunState();
+                }
+                // 验证存档内容
+                const saved = localStorage.getItem('echo_alchemist_run_state');
+                let parsed = null;
+                try { parsed = saved ? JSON.parse(saved) : null; } catch(e) {}
+                const banner = document.getElementById('train-runeword-banner');
+                if (banner) {
+                    banner.classList.add('visible');
+                    const nameEl = document.getElementById('rw-banner-name');
+                    const descEl = document.getElementById('rw-banner-desc');
+                    if (nameEl) nameEl.textContent = '存档验证结果';
+                    if (descEl) {
+                        const pendingInSave = parsed && parsed.pendingRoundStartRewards ? parsed.pendingRoundStartRewards.length : 0;
+                        descEl.textContent = `localStorage 中 pendingRoundStartRewards 数量: ${pendingInSave} (预期 2) | 内容: ${parsed ? JSON.stringify(parsed.pendingRoundStartRewards) : '未找到'}`;
+                    }
+                }
             }
         }
     ]
