@@ -1,6 +1,6 @@
 # Echo Alchemist V2 改造工程 TODO 清单
 
-**最后更新：** 2026年4月18日 | **状态：⏳ 掉落驱动闭环修复进行中**
+**最后更新：** 2026年4月25日 | **状态：⏳ 掉落驱动闭环修复进行中 · 位图化视觉重构规划中**
 
 ---
 
@@ -72,6 +72,62 @@
 | 模块规范文档 | 0 个 | 9 个 | +9 |
 | 标准事件类型 | 0 个 | 26 个 | +26 |
 | Game.prototype 方法来源 | Mixin（全局污染） | bind 组合（实例隔离） | 架构升级 |
+
+
+
+## 阶段五：位图化视觉重构 🎨 规划中
+
+> 将现有纯矢量/CSS 绘制的 UI 与敌人，逐步替换为自动生成的位图（9-Slice 切图 + Sprite Sheet），在不破坏现有动态特效逻辑的前提下大幅提升视觉表现力。
+> 完整设计规格见 [`design_spec_bitmap.md`](./design_spec_bitmap.md)。
+
+### Phase A：UI 静态装饰层替换（无交互风险，优先启动）
+
+> 目标：用位图替换纯色/纯 CSS 的装饰性背景，保留所有 DOM 结构与事件逻辑不变。
+
+| 任务 | 内容 | 状态 |
+| :--- | :--- | :--- |
+| **Task 5.A1** 生成 UI 基础素材集 | 使用 AI 生成顶部状态栏底板、底部弹药栏底板、通用弹窗面板底板（9-Slice 规格 128px 边距）；暗色金属 + 炼金阵纹边框风格 | ⬜ 待开始 |
+| **Task 5.A2** 接入顶部状态栏位图 | 将 `#unified-top-bar` 的 `background` 替换为 9-Slice PNG；验证在不同屏幕宽度下拉伸正常 | ⬜ 待开始 |
+| **Task 5.A3** 接入弹窗/卡片面板位图 | 将 `.rune-card`、`.relic-card`、`#phase-rune-launcher` 等面板替换为对应稀有度（铁/铜/银/金/炫彩）的 9-Slice 边框图 | ⬜ 待开始 |
+| **Task 5.A4** 接入 SP 宝石与功能按钮图标 | 替换 `.sp-gem`（空/满两态）、`#settings-btn`、`#speed-btn` 为固定尺寸 Sprite；保留 JS 状态切换逻辑 | ⬜ 待开始 |
+| **Task 5.A5** 接入弹药属性图标 | 为 laser / explosive / pyro / cryo / lightning / pierce / bounce / scatter 8 种属性各生成 32x32 炼金法球图标，替换 `hud.js → ui_renderAmmoIcon()` 中的纯色圆形 | ⬜ 待开始 |
+
+### Phase B：敌人 Sprite 框架搭建（需要美术资源，独立于 Phase A）
+
+> 目标：在 `enemy.js` 中引入 `SpriteRenderer`，接管基础形体绘制（Layer 1），保留血条（Layer 2）与词缀特效（Layer 3/4）的现有 Canvas 逻辑。
+
+| 任务 | 内容 | 状态 |
+| :--- | :--- | :--- |
+| **Task 5.B1** 生成普通魔像基础 Sprite Sheet | 生成 128x128 基准尺寸的普通魔像 Sprite Sheet：待机 6 帧 + 移动 4 帧 + 受击 2 帧；暗黑赛博炼金风格，几何体外壳包覆发光核心 | ⬜ 待开始 |
+| **Task 5.B2** 实现 `SpriteRenderer` 模块 | 新建 `src/render/sprite_renderer.js`；提供 `load(sheet, meta)`、`play(anim)`、`draw(ctx, x, y, w, h)` 接口；按 `enemy.type` 和 `actionPhase` 自动切换动画状态 | ⬜ 待开始 |
+| **Task 5.B3** 在 `enemy.js` 中接入 `SpriteRenderer` | 在 `draw()` 的 Layer 1（基础形体）处调用 `SpriteRenderer.draw()`，以 `this.type` 为 key 查找对应 Sprite；无 Sprite 时 fallback 到现有矢量绘制 | ⬜ 待开始 |
+| **Task 5.B4** 生成精英魔像 Sprite Sheet | 在普通魔像基础上增加紫色晶化变异装饰；待机 8 帧 + 移动 6 帧 + 受击 3 帧 + 施法 4 帧 | ⬜ 待开始 |
+| **Task 5.B5** 验证血条 + 词缀特效 Overlay 兼容性 | 确认 Layer 2（液体血条）、Layer 3（温度/词缀特效）、Layer 4（裂纹）在 Sprite 替换后仍能正确叠加显示 | ⬜ 待开始 |
+
+### Phase C：Boss 专属 Sprite（依赖 Phase B 完成）
+
+> 目标：为 8 种 Boss 各自生成专属的高精度 Sprite 序列，替换现有的 `_drawBossDecoration()` 矢量装饰。
+
+| 任务 | Boss | 核心视觉特征 | 状态 |
+| :--- | :--- | :--- | :--- |
+| **Task 5.C1** | 伊格尼斯 (Ignis) | 熔炉重型装甲 + 护盾格栅 + 火焰喷口 | ⬜ 待开始 |
+| **Task 5.C2** | 格拉西斯 (Glacies) | 霜晶缝合体 + 冰刺外壳 + 跳跃弹簧腿 | ⬜ 待开始 |
+| **Task 5.C3** | 米克罗 (Mikro) | 雷电核心 + 多触手分裂体 + 治疗光环 | ⬜ 待开始 |
+| **Task 5.C4** | 噬神者 (Devourer) | 深渊巨口 + 暗物质漩涡 + 吞噬触手 | ⬜ 待开始 |
+| **Task 5.C5** | 维里迪斯 (Viridis) | 剧毒植物藤蔓 + 共生体寄生外壳 | ⬜ 待开始 |
+| **Task 5.C6** | 特斯拉 (Tesla) | 机械核心 + 雷电残影 + 极速轨迹 | ⬜ 待开始 |
+| **Task 5.C7** | 奇美拉 (Chimera) | 多核心融合体 + 混沌火焰 + 狂暴裂变 | ⬜ 待开始 |
+| **Task 5.C8** | 奥罗波罗斯 (Ouroboros) | 衔尾蛇环形体 + 全属性轮转光环 | ⬜ 待开始 |
+
+### 阶段五依赖关系
+
+```
+Phase A（UI 静态层）  ─── 独立，可立即启动
+                             ↓
+Phase B（敌人框架）  ─── 需要美术资源，B1 完成后才能推进 B2/B3
+                             ↓
+Phase C（Boss 专属）─── 依赖 Phase B 框架完成
+```
 
 ---
 
