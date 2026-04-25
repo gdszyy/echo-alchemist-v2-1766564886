@@ -10,6 +10,7 @@
 *   **自适应性能规范**：[`.cursor/rules/performance.md`](.cursor/rules/performance.md)（凡修改粒子/特效/Peg/敌人渲染相关代码，必读）。
 *   **流程洞察索引**：[`.cursor/rules/process_insights/index.md`](.cursor/rules/process_insights/index.md)（在涉及复杂跨模块流程、修复历史 Bug 区域或新增特效时必读；包含历次任务沉淀的防坑经验与版本化洞察文档）。
 *   **自动函数索引**：[`.cursor/rules/auto_index/INDEX.md`](.cursor/rules/auto_index/INDEX.md)（在涉及大文件修改时必读；包含所有大文件的函数名、行号范围和 @section 内部节点映射，由 `code-indexer` 脚本自动维护，**严禁手动编辑**）。
+*   **位图化视觉重构规格**：[`design_spec_bitmap.md`](design_spec_bitmap.md)（凡涉及位图生成、Sprite 接入、图标替换的任务必读；包含 UI 切图清单、敌人 Sprite 规格、Boss 形象清单）。
 
 所有专门针对本项目的技能 (如 `echo-developer`) 仅需指引 Agent 阅读上述入口，无需在技能文件内硬编码具体的架构细节或行数统计。
 
@@ -92,6 +93,8 @@
 *   **词条索引**：[`.cursor/rules/runeword_index.md`](.cursor/rules/runeword_index.md) - 所有 22 个词条的 ID、名称、符文组合、effectId、实现位置及与技能的解锁关系速查表。
 *   **属性索引**：[`.cursor/rules/attribute_index.md`](.cursor/rules/attribute_index.md) - 7 种弹药属性的显示名称、克制关系（COUNTER_MAP）、共鸣效果（ELEMENT_RESONANCE_DB）及图鉴说明速查表。
 *   **敌人词缀与 Boss 索引**：[`.cursor/rules/enemy_index.md`](.cursor/rules/enemy_index.md) - 8 种敌人词缀和 8 个 Boss 的行为机制、出现回合、克制属性、狂暴行为及关键代码位置速查表。
+
+*   **位图化视觉重构规格**：[`design_spec_bitmap.md`](design_spec_bitmap.md) - 阶段五规划文档。包含 UI 切图清单（9-Slice 规格 + 图标尺寸）、敌人 Sprite 规格（128×128 基准、帧数要求、Overlay 分层设计）、8 种 Boss 专属形象清单。**凡涉及位图生成、Sprite 接入、图标替换的任务，必先读此文档。**
 
 ### 核心机制文档（深度阅读，含数值与流程说明）
 

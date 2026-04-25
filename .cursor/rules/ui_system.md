@@ -216,3 +216,27 @@ for (const subsystem of _subsystems) {
 | `_ui_playMergeShardFlyEffect(startX, startY, amount)` | 合成时符文碎片飞向局外货币显示区的动画 |
 | `_ui_updateLauncherShardCount()` | 更新发射器面板内符文碎片计数显示 |
 | `_ui_updateResonanceDisplay()` | 更新属性共鸣状态显示（基于 `this.activeElementResonances` 渲染已激活共鸣阶段卡片，包含属性图标、阶段标签、效果描述及层数进度条） |
+
+## 7. 阶段五：UI 位图化接入计划（待实施）
+
+> 详细规格见 [`design_spec_bitmap.md`](../../design_spec_bitmap.md)
+
+阶段五 Phase A 计划用位图替换纯色/纯 CSS 的装饰性背景与图标。**所有 DOM 结构、JS 事件逻辑、状态切换逻辑均不改动**，仅替换 CSS `background`、`background-image` 和图标内容。
+
+### 受影响的函数与 DOM 节点
+
+| 任务 | 目标 DOM / 函数 | 替换内容 |
+| :--- | :--- | :--- |
+| 5.A2 | `#unified-top-bar` CSS `background` | 纯色背景 → 9-Slice PNG |
+| 5.A3 | `.rune-card`、`.relic-card`、`#phase-rune-launcher` CSS `border` | 纯色边框 → 稀有度 9-Slice 边框图 |
+| 5.A4 | `.sp-gem` DOM 内容、`#settings-btn`/`#speed-btn` 图标 | 纯色圆点/文字 → 固定尺寸 Sprite |
+| 5.A5 | `hud.js → ui_renderAmmoIcon()` | 纯色圆形 → 32×32 炼金法球位图 |
+| 5.A6 | `rune_launcher.js → _ui_buildRuneIconHTML()` | emoji → 48×48 符文专属位图 |
+| 5.A7 | `shop.js → relic-icon` div 内容 | emoji → 64×64 遗物专属位图 |
+| 5.A8 | `rune_launcher.js → 图鉴已发现卡片图标区` | 🔒 占位 → 64×64 词条专属位图（需同步在 RUNEWORD_DB 添加 `icon` 字段） |
+
+**开发注意事项**：
+
+- 9-Slice 图片通过 CSS `border-image` 属性接入，无需修改 JS
+- 位图图标通过 `<img src="assets/icons/...">` 或 CSS `background-image` 接入，替换现有 emoji 文本节点
+- Task 5.A8 需在 `RUNEWORD_DB`（`src/config.js`）中为每个词条对象新增 `icon: 'assets/icons/runeword/xxx.png'` 字段，并在图鉴渲染函数中读取该字段

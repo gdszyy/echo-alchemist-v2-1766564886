@@ -221,3 +221,29 @@
 - `Peg.draw` 通过 `typeof game !== 'undefined' && game.perfQualityLevel` 读取等级，默认回退 `'high'`。
 - `Enemy._initTexture` 在构造时调用，通过 `window.game` 读取等级（若 `window.game` 尚未挂载则默认开启光泽）。
 - 新增 Peg 或 Enemy 的高开销渲染步骤时，**必须**在 `CONFIG.performance` 中添加对应开关，并在 `performance.md` 第 5 节更新消费端关联索引。
+
+## 11. 阶段五：敌人 Sprite 接入计划（待实施）
+
+> 详细规格见 [`design_spec_bitmap.md`](../../design_spec_bitmap.md)
+
+阶段五计划将引入 `src/render/sprite_renderer.js` 模块，接管 `enemy.js` 中的基础形体绘制（Layer 1）。**现有分层结构必须保持不变**：
+
+| 层级 | 内容 | 接入后责任方 |
+| :--- | :--- | :--- |
+| Layer 1 | 基础形体（现为矢量几何） | 阶段五替换为 Sprite Sheet |
+| Layer 2 | 液体血条（`_drawHealthBar`） | **保留，不动** |
+| Layer 3 | 温度/词缀特效（火焰、冰霜、雷电等） | **保留，不动** |
+| Layer 4 | 裂纹、受击形变、呼吸缩放 | **保留，不动** |
+| Layer 5 | 词缀图标、Boss 装饰 | **保留，不动** |
+
+**待实施任务**：
+
+- **Task 5.B2**：新建 `src/render/sprite_renderer.js`，提供 `load(sheet, meta)`、`play(anim)`、`draw(ctx, x, y, w, h)` 接口
+- **Task 5.B3**：在 `enemy.js` 的 `draw()` Layer 1 处调用 `SpriteRenderer.draw()`，无 Sprite 时 fallback 到现有矢量绘制
+- **Task 5.C1~C8**：为 8 种 Boss 各自生成专属 Sprite，替换 `_drawBossDecoration()` 矢量装饰
+
+**开发注意事项**：
+
+- `SpriteRenderer` 必须支持 fallback 模式，确保无美术资源时游戏仍可正常运行
+- Sprite 的 `drawImage` 调用必须在现有 `ctx.save()` / `ctx.restore()` 块内，不得影响 Layer 2~5 的变换状态
+- 新增 `SpriteRenderer` 的 `drawImage` 调用属于中等开销，无需接入 `CONFIG.performance` 阈値（位图绘制比矢量更快）
