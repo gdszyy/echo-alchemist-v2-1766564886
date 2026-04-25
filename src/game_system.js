@@ -655,6 +655,27 @@ export const game_system = {
         });
 
         this.ammoQueue = finalAmmo;
+
+        // [充能修复] 同步重建 marbleQueue，确保下回合「回合开始充能」能产出正确的子弹。
+        // 根因：sys_confirmReplaceAmmo 原本不更新 marbleQueue，导致下回合充能仍读取
+        //   本回合研磨的全部弹珠定义，而非玩家在替换界面实际选择的子集
+        //   （尤其是含充能子弹的情况下，充能子弹来源于上回合 marbleQueue，不在当前 marbleQueue 中）。
+        // 修复策略：
+        //   - 选中了「新研磨」子弹（idx < newRecipes.length）→ 取 this.marbleQueue[idx]
+        //   - 选中了「充能」子弹（idx >= newRecipes.length）→ 取 recipe._sourceDef（编译时快照）
+        const finalMarbleQueue = selectedIndices
+            .filter(i => i >= 0 && i < allRecipes.length)
+            .map(i => {
+                if (i < newRecipes.length) {
+                    return (this.marbleQueue || [])[i] || null;
+                } else {
+                    const recipe = allRecipes[i];
+                    return (recipe && recipe._sourceDef) || null;
+                }
+            })
+            .filter(Boolean);
+        this.marbleQueue = finalMarbleQueue;
+
         this.replaceAmmoContext = null;
         this._chargedAmmoQueue = null;
         // 恢复滚动容器样式（子弹替换阶段修改过）
@@ -1297,6 +1318,15 @@ export const game_system = {
                             recipe.finalHits = 0;
                             recipe.multicast = 0;
                             recipe._marbleType = marbleDef.type;
+                            // [充能修复] 保存来源弹珠定义快照，供 sys_confirmReplaceAmmo 重建 marbleQueue 用
+                            recipe._sourceDef = {
+                                type: marbleDef.type,
+                                collected: Array.isArray(marbleDef.collected) ? [...marbleDef.collected] : [],
+                                compiled: marbleDef.compiled || false,
+                                recipe: marbleDef.recipe ? { ...marbleDef.recipe } : null,
+                                multicast: marbleDef.multicast || 0,
+                                finalHits: marbleDef.finalHits || 0,
+                            };
                             return recipe;
                         });
                     } else {
