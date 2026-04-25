@@ -1,6 +1,6 @@
 # src/ui_system.js 函数索引
 
-> 自动生成于 2026-04-23 | 总行数: 829 | 函数数: 42 | 语言: javascript
+> 自动生成于 2026-04-24 | 总行数: 835 | 函数数: 42 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -58,7 +58,14 @@
 
 ### ui_renderReplaceAmmoUI
 
-> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
+> 定位：`grep -n '@section:{}'` 跳转到对应节点
+
+| 节点标记 | 说明 |
+|----------|------|
+| `@section:replace_ammo_init` | 初始化上下文、获取 DOM 元素并设置标题文字 |
+| `@section:replace_ammo_tier_calc` | 子弹等级与主属性计算函数（_calcTier / _calcDominant） |
+| `@section:replace_ammo_card_render` | 子弹卡片 DOM 渲染：renderCard + makeRow + 将卡片添加到网格 |
+| `@section:replace_ammo_confirm_btn` | 确认按鈕与跳过按鈕状态同步 |
 
 ## 其他 @section 标记
 

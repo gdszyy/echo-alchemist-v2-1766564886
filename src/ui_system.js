@@ -245,6 +245,7 @@ export const ui_system = {
     },
 
     ui_renderReplaceAmmoUI() {
+        // @section:replace_ammo_init - 初始化上下文、获取 DOM 元素并设置标题文字
         const ctx = this.replaceAmmoContext;
         if (!ctx || !ctx.active) return;
 
@@ -275,6 +276,7 @@ export const ui_system = {
         if (countEl) countEl.innerText = String(selectedIndices.length);
         if (requiredEl) requiredEl.innerText = String(maxSelect);
 
+        // @section:replace_ammo_tier_calc - 子弹等级与主属性计算函数（_calcTier / _calcDominant）
         const _calcTier = (recipe) => {
             const mc = recipe.multicast || 0;
             const mcTier = mc >= 12 ? 3 : mc >= 6 ? 2 : mc >= 3 ? 1 : 0;
@@ -317,6 +319,7 @@ export const ui_system = {
             { label: 'S', labelColor: '#facc15', borderIdle: '#facc15', bgIdle: 'rgba(120,53,15,0.40)', bgSelected: 'rgba(245,158,11,0.22)', pulseClass: 'pulse-s' },
         ];
 
+        // @section:replace_ammo_card_render - 子弹卡片 DOM 渲染：renderCard + makeRow + 将卡片添加到网格
         if (gridEl) {
             // [BUGFIX v2] 改用绝对定位方案，彻底绕开多层 flex 高度链传递问题。
             // 原方案依赖 flex:1 逐层传递高度（phase-selection→parentEl→gridEl→wrapper→row→cards），
@@ -450,6 +453,7 @@ export const ui_system = {
             gridEl.appendChild(wrapper);
         }
 
+        // @section:replace_ammo_confirm_btn - 确认按鈕与跳过按鈕状态同步
         if (confirmBtn) {
             confirmBtn.disabled = selectedIndices.length !== maxSelect;
             confirmBtn.innerText = '确认（已选 ' + selectedIndices.length + '/' + maxSelect + '）';

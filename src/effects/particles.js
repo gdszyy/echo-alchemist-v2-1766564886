@@ -1521,6 +1521,7 @@ class RewardDropEffect {
         ctx.save();
 
         if (this.type === 'relic') {
+            // @section:draw_relic_beam - 遗物奖励：金色光柱 + 金币粒子 + 双层冲击波
             // ---- 遗物：金色光柱 + 金币粒子 + 双层冲击波 ----
 
             // 1. 冲击波（先画，在光柱下方）
@@ -1609,6 +1610,7 @@ class RewardDropEffect {
             }
 
         } else if (this.type === 'chaos_essence') {
+            // @section:draw_chaos_essence - 混沌精华奖励：漩涡爆炸 + 碎片四散 + 冲击波
             // ---- 混沌精华：漩涡爆炸 + 碎片四散 + 脑动冲击波 ----
 
             // 1. 漩涡层（中心旋转的紫红渗变圆）
@@ -1703,6 +1705,7 @@ class RewardDropEffect {
             }
 
         } else {
+            // @section:draw_pure_essence - 纯净精华奖励：冰晶光柱 + 六角雪花粒子 + 柔和光环
             // ---- 纯净精华：冰晶光柱 + 雪花粒子 + 柔和光环 ----
 
             // 1. 柔和光环

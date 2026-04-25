@@ -41,7 +41,7 @@ export const render_system = {
         this.ctx.restore();
     },
 
-render_windAnchors() {
+    render_windAnchors() {
         if (this.windAnchors && this.windAnchors.length > 0) {
             this.ctx.save();
             
@@ -165,7 +165,8 @@ render_windAnchors() {
         ctx.restore();
     },
 
-render_singleWindMatrix(matrix) {
+    render_singleWindMatrix(matrix) {
+        // @section:wind_matrix_init - 初始化进度参数并生成风属粒子特效
         if (!matrix || !matrix.active) return;
         const { timer, maxTimer, rect, type, anchors, tunnelVector } = matrix;
         const t = 1 - (timer / maxTimer);
@@ -189,6 +190,7 @@ render_singleWindMatrix(matrix) {
         ctx.shadowBlur = 20 * progress;
         ctx.shadowColor = "#34d399";
         ctx.stroke();
+        // @section:wind_matrix_tunnel - 隧道型风阵：渐变光带 + 方向箭头动画
         if (type === "tunnel") {
             const isHorizontal = rect.w > rect.h;
             const centerX = rect.x + rect.w/2;
@@ -234,11 +236,13 @@ render_singleWindMatrix(matrix) {
                 }
                 ctx.stroke();
             }
+        // @section:wind_matrix_bowtie - 蝴蝶结形风阵：蝴蝶路径波局线动画
         } else if (this.isBowtieShape(anchors)) {
             const intersection = this.getLineIntersectionPoint(anchors[0], anchors[2], anchors[1], anchors[3]);
             if (intersection) {
                 this.render_butterflyPathWave(ctx, anchors, intersection, progress);
             }
+        // @section:wind_matrix_cyclone - 旋风型风阵：高速切割刃 + 逆向符文环动画
         } else if (type === 'cyclone') {
             // === 旋风：绞肉机法阵 (Shredder Circle) ===
             const cx = rect.x + rect.w / 2;

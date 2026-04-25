@@ -691,11 +691,13 @@ class Projectile {
     }
 
     static drawVisuals(ctx, x, y, radius, config, rotation, intensity, deformation = {x:1, y:1}, integrity = 1.0, crackSeed = [], windBladeAngle = 0) {
+        // @section:draw_entry_transform - 坐标变换入口（translate + rotate），确定绘制坐标系
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(rotation);
         // [fix] 重构为 if-else 结构，确保每条执行路径只有一个顶层 restore
         if (config.type === 'flying_sword') {
+            // @section:draw_flying_sword - 飞剑完整绘制：剑身/剑格/剑柄/剑首/剑穗（独立 restore+return）
             // 修正角度：假設畫筆是朝右(0度)畫的，如果原圖是朝上則需旋轉
             // 這裡我們直接畫朝右的劍，與 velocity 方向一致
             const scale = radius / 6; // 根據半徑動態調整大小 (基礎半徑約7~10)
@@ -765,6 +767,7 @@ class Projectile {
             return; // flying_sword 分支结束，直接返回
         } else {
         
+        // @section:draw_shape_and_color_resolve - 形状类型与颜色决策（shapeType / mainColor / glowColor）
         // 1. 确定形状
         let shapeType = 'circle';
         if (config.pierce > 0) shapeType = 'arrow';
@@ -808,6 +811,7 @@ class Projectile {
             const shakeAmount = 1.5; 
             ctx.translate((Math.random() - 0.5) * shakeAmount, (Math.random() - 0.5) * shakeAmount);
         }
+        // @section:draw_orb_special - 光球(orb)特殊渲染：脉冲光晕 + 纯白核心（独立 restore）
         // ---  光球的特殊渲染逻辑 (绑定特效) ---
         if (shapeType === 'orb') {  // [fix] 此 if 在 else 块内，与 flying_sword 互斥
             const time = Date.now() / 200;
@@ -830,6 +834,7 @@ class Projectile {
             ctx.fill();
             ctx.restore(); // [bugfix] orb 分支必须自行 restore，否则 else 块被跳过时状态栈泄漏
         } else {
+        // @section:draw_shape_fill - 形状绘制与填色：arrow/star/crystal/matryoshka/circle 分支 + 渐变/发光
         // 3. 绘制形状 (orb 的 else 分支，即正常绘制路径)
         ctx.scale(deformation.x, deformation.y);
         ctx.beginPath();
@@ -905,6 +910,7 @@ class Projectile {
             }
             ctx.fill();
         }
+        // @section:draw_damage_cracks - 耐久度低于 0.6 时绘制裂纹贝塞尔曲线
         if (integrity < 0.6 && crackSeed && crackSeed.length > 0) {
             ctx.save();
             ctx.shadowBlur = 0; 
@@ -972,6 +978,7 @@ class Projectile {
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; 
             ctx.beginPath(); ctx.arc(0, 0, radius*0.8, 0, Math.PI*2); ctx.stroke();
         }
+        // @section:draw_wind_blades - 风属性环绕风刃特效：弯月形风刃按轨道旋转
         // 风属性环绕风刃特效
         if (config.wind && config.wind > 0) {
             ctx.save();

@@ -717,8 +717,9 @@ export const hud_system = {
      * @description [Task 3.2] 注册 EventBus 监听器，响应业务层发出的 UI 更新事件。
      *   在游戏初始化时调用（sys_initGame 或 sys_resetGame 中）。
      */
-    hud_initEventListeners() {
-        // ── 连射倍率显示 ──────────────────────────────────────────────
+      hud_initEventListeners() {
+        // @section:hud_multicast_listeners - 连射倍率显示与飞行特效事件监听器
+        // ── 连射倍率显示 ────────────────────────────────────────────
         eventBus.on(EVENT_TYPES.UI_MULTICAST_UPDATE, ({ total, bonusAmount }) => {
             const ui = document.getElementById('multicast-ui');
             const num = document.getElementById('multicast-num');
@@ -787,7 +788,8 @@ export const hud_system = {
             }
         });
 
-        // ── 弹药发射动画 ──────────────────────────────────────────────
+        // @section:hud_ammo_listeners - 弹药发射动画与命中进度条事件监听器
+        // ── 弹药发射动画 ────────────────────────────────────────────
         eventBus.on(EVENT_TYPES.UI_AMMO_FIRED, () => {
             const currentSlot = document.getElementById('current-ammo-render');
             if (currentSlot) {
@@ -805,6 +807,7 @@ export const hud_system = {
             }
         });
 
+        // @section:hud_rune_charge_listeners - 充能符文初始化/升级/进度更新事件监听器
         // ── 充能符文 UI 初始化 ──────────────────────────────────────────
         eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_INIT, () => {
             const slot = document.getElementById('combat-rune-single-slot');
@@ -877,7 +880,8 @@ export const hud_system = {
             }
         });
 
-         // ── 回合结束领取符文 → 入背包动画 ────────────────────────────
+         // @section:hud_rune_claim_listeners - 符文领取飞入背包动画事件监听器（回局结束与敌人动作后）
+        // ── 回局结束领取符文 → 入背包动画 ────────────────────────────────────
         eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_CLAIM, ({ runeDef, level }) => {
             const slot = document.getElementById('combat-rune-single-slot');
             if (!slot || !runeDef) return;
