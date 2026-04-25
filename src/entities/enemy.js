@@ -1364,8 +1364,9 @@ class Enemy {
         // === [Phase 5B Task 5.B3] Layer 1.6: Sprite Sheet 覆盖层 ===
         // 在矢量纹理之上叠加 Sprite，无资源时自动 fallback 到矢量绘制
         if (this._spriteRenderer && this._spriteRenderer.ready) {
-            // Sprite 以 0.85 透明度叠盖，保留底层纹理的微弱透出感
-            this._spriteRenderer.draw(ctx, -w/2, -h/2, w, h, 0.85);
+            // Sprite 保持正方形比例（取 min(w,h) 作为边长，居中绘制），防止拉伸变形
+            const sprSize1 = Math.min(w, h);
+            this._spriteRenderer.draw(ctx, -sprSize1/2, -sprSize1/2, sprSize1, sprSize1, 0.85);
         }
         // === Layer 2: 液体血条 (含延迟白条) ===
         
@@ -4348,8 +4349,9 @@ class Enemy {
         // Sprite 不替换矢量装饰，而是与其叠加（矢量层提供动态效果，Sprite 层提供角色外观）
         // 这里的 SpriteRenderer.draw() 在 Layer 3.8 调用，已在 ctx.save()/restore() 块内
         if (this._spriteRenderer && this._spriteRenderer.ready) {
-            // Boss Sprite 以 0.7 透明度叠加，保留矢量光效透出
-            this._spriteRenderer.draw(ctx, -w/2, -h/2, w, h, 0.7);
+            // Boss Sprite 保持正方形比例（取 min(w,h) 作为边长，居中绘制），防止宽高比 3:2 导致贴图扁扁
+            const sprSize2 = Math.min(w, h);
+            this._spriteRenderer.draw(ctx, -sprSize2/2, -sprSize2/2, sprSize2, sprSize2, 0.7);
         }
 
         const t = Date.now() / 1000;

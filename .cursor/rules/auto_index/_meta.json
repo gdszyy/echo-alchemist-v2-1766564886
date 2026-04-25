@@ -1,12 +1,12 @@
 {
   "indexed": [
     {
-      "file": "src/game_system.js",
-      "lines": 2310,
-      "funcs": 45,
-      "sections": 7,
-      "mega_funcs": 1,
-      "index_path": ".cursor/rules/auto_index/src_game_system_js_index.md"
+      "file": "src/entities/enemy.js",
+      "lines": 4845,
+      "funcs": 27,
+      "sections": 18,
+      "mega_funcs": 3,
+      "index_path": ".cursor/rules/auto_index/src_entities_enemy_js_index.md"
     }
   ],
   "skipped": [],

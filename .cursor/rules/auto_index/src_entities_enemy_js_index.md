@@ -1,6 +1,6 @@
 # src/entities/enemy.js 函数索引
 
-> 自动生成于 2026-04-24 | 总行数: 4793 | 函数数: 26 | 语言: javascript
+> 自动生成于 2026-04-25 | 总行数: 4845 | 函数数: 27 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -14,6 +14,7 @@
 | setEnemyAudioProvider | function | `setEnemyAudioProvider(provider)` |  |
 | Enemy | class | `Enemy()` |  |
 | constructor | method | `constructor(x, y, width, height, hp, maxHp = hp, type = 'normal', affixes = [])` |  |
+| initSprite | method | `initSprite()` |  |
 | _initTexture | method | `_initTexture(width, height)` |  |
 | update | method | `update(timeScale, game)` |  |
 | addSwordCrack | method | `addSwordCrack(relPos, angle)` |  |

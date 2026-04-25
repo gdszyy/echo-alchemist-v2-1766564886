@@ -44,6 +44,7 @@ import { rune_launcher_system } from './ui/rune_launcher.js';
 import { calc_utils } from './calc_utils.js';
 import { tutorial_system } from './tutorial_system.js';
 import { game_over_mixin } from './ui/game_over.js';
+import { preloadAllSprites } from './render/sprite_renderer.js'; // [Phase 5B] 预加载所有 Sprite Sheet
 
 // ==================== 延迟音频初始化 ====================
 let _audioInitialized = false;
@@ -313,7 +314,8 @@ class Game {
         this._perfDownTimer = 0;
         // 升级计时器（秒）：连续高帧时累加，达到阈值才真正升级
         this._perfUpTimer = 0;
-
+        // [Phase 5B] 预加载所有 Sprite Sheet（在游戏循环开始前触发异步加载）
+        preloadAllSprites();
         // 启动游戏主循环
         this.sys_loop();
     }
