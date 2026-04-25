@@ -19,6 +19,7 @@ import { parseRuneGrid, calcRuneBaseStats, getRuneId, rune_merge, rune_reforge, 
 import { audio } from '../audio.js';
 import { showToast } from '../entities.js';
 import { SKILL_DB } from '../config.js'; // [技能系统迭代] 用于符文解锁技能派生
+import { getRuneIconSrc } from '../bitmap_icons.js'; // [Phase 5A Task 5.A6] 位图符文图标
 
 /**
  * 构建符文图标 HTML（统一的符文展示辅助函数）
@@ -35,7 +36,14 @@ function _ui_buildRuneIconHTML(runeDef, runeLevel, extraClass = '') {
     const lvClass = `lv-${Math.min(lv, 3)}`;
     const rarityClass = `rarity-${rarity}`;
     const lvLabel = `Lv.${lv}`;
-    return `<span class="rune-icon-frame ${rarityClass} ${lvClass}${extraClass ? ' ' + extraClass : ''}">${icon}<span class="rune-lv-badge">${lvLabel}</span></span>`;
+
+    // [Phase 5A Task 5.A6] 位图符文图标：优先使用 48×48 位图，fallback 到 emoji
+    const bitmapSrc = runeDef ? getRuneIconSrc(runeDef.id) : null;
+    const iconContent = bitmapSrc
+        ? `<img src="${bitmapSrc}" alt="${icon}" style="width:80%;height:80%;object-fit:contain;display:block;margin:auto;" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='inline';"><span style="display:none;">${icon}</span>`
+        : icon;
+
+    return `<span class="rune-icon-frame ${rarityClass} ${lvClass}${extraClass ? ' ' + extraClass : ''}">${iconContent}<span class="rune-lv-badge">${lvLabel}</span></span>`;
 }
 
 /**

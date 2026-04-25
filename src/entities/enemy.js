@@ -19,6 +19,7 @@ import { CONFIG } from '../config.js';
 import { Vec2, lerp, lerpColor } from '../utils/math_utils.js';
 import { Particle } from '../effects/particles.js';
 import { eventBus } from '../event_bus.js';
+import { createSpriteRenderer } from '../render/sprite_renderer.js'; // [Phase 5B Task 5.B3] Sprite 动画渲染器
 
 // audio 代理由 entities.js 注入，通过模块级变量共享
 // 注意：Enemy 类使用的 audio 对象来自 entities.js 的依赖注入机制
@@ -169,6 +170,23 @@ class Enemy {
         // 基于 visualSeed 一次性生成静态纹理，每帧仅执行一次 drawImage
         this._textureCanvas = null;
         this._initTexture(width, height);
+
+        // === [Phase 5B Task 5.B3] SpriteRenderer 初始化 ===
+        // bossType 在构造时可能尚未赋值，由 spawn_system.js 调用 initSprite() 完成
+        this._spriteRenderer = null;
+        this._spriteLastMs = 0; // 上次 update 的时间戳（ms）
+    }
+
+    /**
+     * [Phase 5B Task 5.B3] 初始化 SpriteRenderer（在 bossType 赋值后调用）
+     * spawn_system.js 在设置 e.bossType 后应调用 e.initSprite()
+     */
+    initSprite() {
+        this._spriteRenderer = createSpriteRenderer(this.type, this.bossType);
+        if (this._spriteRenderer) {
+            this._spriteRenderer.play('idle');
+            this._spriteLastMs = performance.now();
+        }
     }
     
     /**
@@ -301,7 +319,26 @@ class Enemy {
     update(timeScale, game) {
         if (!this.active) return;
 
-        // --- [新增] 预警状态更新 ---
+        // === [Phase 5B Task 5.B3] SpriteRenderer 动画状态更新 ===
+        if (this._spriteRenderer) {
+            const nowMs = performance.now();
+            const dt = Math.min((nowMs - this._spriteLastMs) / 1000, 0.1); // 限制最大帧时间差
+            this._spriteLastMs = nowMs;
+
+            // 根据 actionPhase 和 hitTimer 映射到动画名称
+            let targetAnim = 'idle';
+            if (this.hitTimer > 0 && this._spriteRenderer.hasAnim('hit')) {
+                targetAnim = 'hit';
+            } else if (this.actionPhase === 'telegraphing' && this._spriteRenderer.hasAnim('cast')) {
+                targetAnim = 'cast';
+            } else if (this.actionPhase === 'telegraphing' && this._spriteRenderer.hasAnim('move')) {
+                targetAnim = 'move';
+            }
+            this._spriteRenderer.play(targetAnim);
+            this._spriteRenderer.update(dt * timeScale);
+        }
+
+        // --- [新增] 预警状态更新 ----
         if (this.actionPhase === 'telegraphing') {
             this.telegraphTimer -= timeScale;
             // 预警阶段剧烈震动
@@ -1320,11 +1357,16 @@ class Enemy {
         ctx.fill(); 
         ctx.clip();
 
-        // === Layer 1.5: 底层纹理 (预计算 OffscreenCanvas) ===
+         // === Layer 1.5: 底层纹理 (预计算 OffscreenCanvas) ===
         if (this._textureCanvas) {
             ctx.drawImage(this._textureCanvas, -w/2, -h/2);
         }
-
+        // === [Phase 5B Task 5.B3] Layer 1.6: Sprite Sheet 覆盖层 ===
+        // 在矢量纹理之上叠加 Sprite，无资源时自动 fallback 到矢量绘制
+        if (this._spriteRenderer && this._spriteRenderer.ready) {
+            // Sprite 以 0.85 透明度叠盖，保留底层纹理的微弱透出感
+            this._spriteRenderer.draw(ctx, -w/2, -h/2, w, h, 0.85);
+        }
         // === Layer 2: 液体血条 (含延迟白条) ===
         
         // A. 计算高度比例
@@ -4300,10 +4342,18 @@ class Enemy {
      * @param {number} h - Boss 高度（已减去边距）
      */
     // @section:boss_deco_phase_check - Boss 阶段检查与装饰基础参数
-    _drawBossDecoration(ctx, w, h) {
+     _drawBossDecoration(ctx, w, h) {
+        // === [Phase C Task 5.C] Boss Sprite 优先绘制 ===
+        // 如果 SpriteRenderer 已就绪，将 Sprite 以半透明度叠盖在矢量装饰之上
+        // Sprite 不替换矢量装饰，而是与其叠加（矢量层提供动态效果，Sprite 层提供角色外观）
+        // 这里的 SpriteRenderer.draw() 在 Layer 3.8 调用，已在 ctx.save()/restore() 块内
+        if (this._spriteRenderer && this._spriteRenderer.ready) {
+            // Boss Sprite 以 0.7 透明度叠加，保留矢量光效透出
+            this._spriteRenderer.draw(ctx, -w/2, -h/2, w, h, 0.7);
+        }
+
         const t = Date.now() / 1000;
         const isBerserk = this.berserked || (this.hp / this.maxHp) < 0.5;
-
         switch (this.bossType) {
             case 'ignis': {
                 // === Ignis: 燕火之心 + 火星喷射 ===

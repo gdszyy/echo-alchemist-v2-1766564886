@@ -1,0 +1,208 @@
+/**
+ * bitmap_ui.css — Phase A 位图化 UI 样式覆盖层
+ * Task 5.A2: #unified-top-bar background → 9-Slice PNG
+ * Task 5.A3: .rune-icon-frame / .relic-card 稀有度 9-Slice 边框
+ * Task 5.A4: .sp-gem / #settings-btn / #speed-btn → 固定尺寸 Sprite
+ *
+ * 接入规则：
+ *   - 仅覆盖视觉属性（background / border-image / content）
+ *   - 不修改 layout / z-index / pointer-events 等功能属性
+ *   - 9-Slice 通过 border-image 接入，不改 JS 逻辑
+ */
+
+/* =====================================================
+   Task 5.A2 — #unified-top-bar 9-Slice 底板
+   原样式：background: rgba(10,15,30,0.82) + backdrop-filter
+   新样式：border-image 9-Slice PNG，保留 backdrop-filter
+   9-Slice 切片参数：图片 512×128，边距取 32px（25%）
+   ===================================================== */
+#unified-top-bar {
+    /* 保留原有 backdrop-filter 模糊效果 */
+    background: transparent !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+
+    /* 9-Slice 底板：fill 关键字让中间区域也被填充 */
+    border-image-source: url('../../assets/ui/panels/top_bar_9s.png');
+    border-image-slice: 32 32 32 32 fill;   /* top right bottom left */
+    border-image-width: 32px 32px 32px 32px;
+    border-image-outset: 0;
+    border-image-repeat: stretch;
+
+    /* 保持原有内边距不变，border-image 不占用 box model 空间 */
+}
+
+/* =====================================================
+   Task 5.A3 — 稀有度 9-Slice 边框
+   目标元素：.rune-icon-frame（符文）、.relic-card（遗物）
+   9-Slice 切片参数：图片 256×342，边框区域约 48px（~19%）
+   ===================================================== */
+
+/* --- 符文图标框 稀有度边框 --- */
+/* 切片参数：256×342 图片，边框宽约 48px */
+.rune-icon-frame.rarity-common {
+    border: none !important;
+    box-shadow: none !important;
+    border-image-source: url('../../assets/ui/borders/border_common_9s.png');
+    border-image-slice: 48 48 48 48 fill;
+    border-image-width: 6px;
+    border-image-outset: 2px;
+    border-image-repeat: stretch;
+}
+
+.rune-icon-frame.rarity-rare {
+    border: none !important;
+    box-shadow: none !important;
+    border-image-source: url('../../assets/ui/borders/border_rare_9s.png');
+    border-image-slice: 48 48 48 48 fill;
+    border-image-width: 6px;
+    border-image-outset: 2px;
+    border-image-repeat: stretch;
+}
+
+.rune-icon-frame.rarity-epic {
+    border: none !important;
+    box-shadow: none !important;
+    border-image-source: url('../../assets/ui/borders/border_epic_9s.png');
+    border-image-slice: 48 48 48 48 fill;
+    border-image-width: 6px;
+    border-image-outset: 2px;
+    border-image-repeat: stretch;
+    animation: none !important; /* 位图本身已有发光质感 */
+}
+
+.rune-icon-frame.rarity-legendary {
+    border: none !important;
+    border-image-source: url('../../assets/ui/borders/border_legendary_9s.png');
+    border-image-slice: 48 48 48 48 fill;
+    border-image-width: 8px;
+    border-image-outset: 3px;
+    border-image-repeat: stretch;
+    /* 保留传说脉冲动画（仅 box-shadow 部分，border-image 不受影响） */
+    animation: rune-legendary-pulse-bitmap 2s ease-in-out infinite;
+}
+
+@keyframes rune-legendary-pulse-bitmap {
+    0%, 100% { filter: brightness(1)    drop-shadow(0 0 4px rgba(243,156,18,0.5)); }
+    50%       { filter: brightness(1.15) drop-shadow(0 0 10px rgba(243,156,18,0.9)); }
+}
+
+/* --- 遗物卡片 稀有度边框 --- */
+.relic-card {
+    border: none !important;
+    box-shadow: none !important;
+    border-image-source: url('../../assets/ui/borders/border_common_9s.png');
+    border-image-slice: 48 48 48 48 fill;
+    border-image-width: 8px;
+    border-image-outset: 3px;
+    border-image-repeat: stretch;
+    background: transparent !important;
+}
+
+.relic-card.rare {
+    border-image-source: url('../../assets/ui/borders/border_rare_9s.png') !important;
+    animation: rare-pulse-bitmap 2.8s ease-in-out infinite;
+}
+
+.relic-card.epic {
+    border-image-source: url('../../assets/ui/borders/border_epic_9s.png') !important;
+}
+
+.relic-card.legendary {
+    border-image-source: url('../../assets/ui/borders/border_legendary_9s.png') !important;
+    border-image-width: 10px !important;
+    border-image-outset: 4px !important;
+    animation: legendary-glow-bitmap 2.2s ease-in-out infinite;
+}
+
+.relic-card.cursed {
+    border-image-source: url('../../assets/ui/borders/border_cursed_9s.png') !important;
+    animation: cursed-flicker-bitmap 3.5s ease-in-out infinite;
+}
+
+/* 位图边框动画：用 filter 替代 box-shadow（border-image 不支持 box-shadow） */
+@keyframes rare-pulse-bitmap {
+    0%, 100% { filter: brightness(1)    drop-shadow(0 0 3px rgba(59,130,246,0.4)); }
+    50%       { filter: brightness(1.1)  drop-shadow(0 0 8px rgba(59,130,246,0.8)); }
+}
+
+@keyframes legendary-glow-bitmap {
+    0%, 100% { filter: brightness(1)    drop-shadow(0 0 5px rgba(250,204,21,0.5)); }
+    40%       { filter: brightness(1.2)  drop-shadow(0 0 14px rgba(250,204,21,0.9)); }
+}
+
+@keyframes cursed-flicker-bitmap {
+    0%, 100% { filter: brightness(1)    drop-shadow(0 0 3px rgba(239,68,68,0.4)); }
+    30%       { filter: brightness(1.15) drop-shadow(0 0 10px rgba(239,68,68,0.8)); }
+    60%       { filter: brightness(1.05) drop-shadow(0 0 5px rgba(239,68,68,0.5)); }
+}
+
+/* #phase-rune-launcher 面板底板 */
+#phase-rune-launcher {
+    background: transparent !important;
+    border-image-source: url('../../assets/ui/panels/popup_panel_9s.png');
+    border-image-slice: 64 64 64 64 fill;
+    border-image-width: 24px;
+    border-image-outset: 0;
+    border-image-repeat: stretch;
+}
+
+/* =====================================================
+   Task 5.A4 — .sp-gem / #settings-btn / #speed-btn Sprite
+   ===================================================== */
+
+/* SP 宝石槽：用 background-image 替代纯色 */
+.sp-slot {
+    background: url('../../assets/ui/sprites/sp_gem_empty_32.png') center/contain no-repeat !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* SP 宝石（激活态）：覆盖满格宝石图 */
+.sp-gem.active {
+    background: url('../../assets/ui/sprites/sp_gem_full_32.png') center/contain no-repeat !important;
+    box-shadow: none !important;
+    /* 保留弹出动画 */
+}
+
+/* 隐藏原有纯色宝石（未激活时不显示） */
+.sp-gem:not(.active) {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* 设置按钮：替换为位图 */
+#settings-btn {
+    background: url('../../assets/ui/sprites/settings_btn_32.png') center/contain no-repeat !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: transparent !important; /* 隐藏原有 emoji */
+    font-size: 0 !important;
+    width: 32px !important;
+    height: 32px !important;
+}
+
+#settings-btn:hover {
+    filter: brightness(1.2) drop-shadow(0 0 4px rgba(100,160,255,0.6));
+}
+
+/* 速度按钮：替换为位图 */
+#speed-btn {
+    background: url('../../assets/ui/sprites/speed_btn_32.png') center/contain no-repeat !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: transparent !important;
+    font-size: 0 !important;
+    width: 32px !important;
+    height: 32px !important;
+}
+
+#speed-btn:hover {
+    filter: brightness(1.2) drop-shadow(0 0 4px rgba(100,160,255,0.6));
+}
+
+/* 速度按钮激活态（2x速时高亮） */
+#speed-btn.active,
+#speed-btn[data-speed="2"] {
+    filter: brightness(1.3) drop-shadow(0 0 6px rgba(100,200,255,0.8)) !important;
+}

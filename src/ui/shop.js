@@ -17,6 +17,7 @@ import { META_SHOP_CONFIG, CONFIG, RELIC_DB, BOARD_STRUCTURE_RELICS } from '../c
 import { RUNE_DB } from '../rune_config.js';
 import { showToast } from '../entities.js';
 import { eventBus } from '../event_bus.js';
+import { getRelicIconSrc } from '../bitmap_icons.js'; // [Phase 5A Task 5.A7] 位图遗物图标
 
 /**
  * 商店渲染方法集合
@@ -138,8 +139,13 @@ export const shop_system = {
                     `;
                 }
                 
+                // [Phase 5A Task 5.A7] 位图遗物图标：优先使用 64×64 位图，fallback 到 emoji
+                const relicBitmapSrc = getRelicIconSrc(relic.id);
+                const relicIconHtml = relicBitmapSrc
+                    ? `<img src="${relicBitmapSrc}" alt="${relic.icon}" style="width:100%;height:100%;object-fit:contain;" loading="lazy" onerror="this.style.display='none';this.insertAdjacentText('afterend','${relic.icon}');"/>`
+                    : relic.icon;
                 el.innerHTML = `
-                    <div class="relic-icon">${relic.icon}</div>
+                    <div class="relic-icon">${relicIconHtml}</div>
                     <div class="relic-name">${relic.name}</div>
                     <div class="relic-desc">${relic.desc}</div>
                     ${stackInfo}

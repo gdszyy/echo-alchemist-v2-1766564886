@@ -535,7 +535,8 @@ export const spawn_system = {
                 } else if (typeof this.sys_preCalcEnemyRewardType === 'function') {
                     this.sys_preCalcEnemyRewardType(e);
                 }
-                
+                // [Phase 5B Task 5.B3] 初始化 SpriteRenderer
+                if (typeof e.initSprite === 'function') e.initSprite();
                 this.enemies.push(e);
                 currentCount++;
 			}
@@ -586,6 +587,8 @@ export const spawn_system = {
                 } else if (typeof this.sys_preCalcEnemyRewardType === 'function') {
                     this.sys_preCalcEnemyRewardType(e);
                 }
+                // [Phase 5B Task 5.B3] 初始化 SpriteRenderer
+                if (typeof e.initSprite === 'function') e.initSprite();
                 this.enemies.push(e);
             }
         }
@@ -1888,6 +1891,8 @@ export const spawn_system = {
         boss.entranceTimer = 0;
         // 标记此 Boss 有待播放的入场演出（事件、音效、动画），等待战斗阶段开始时触发
         boss._pendingEntrance = true;
+        // [Phase 5B Task 5.B3] 初始化 SpriteRenderer（bossType 已赋值）
+        if (typeof boss.initSprite === "function") boss.initSprite();
 
         this.enemies.push(boss);
 

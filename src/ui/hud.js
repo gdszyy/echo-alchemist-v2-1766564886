@@ -18,6 +18,8 @@
 import { CONFIG } from '../config.js';
 import { eventBus, EVENT_TYPES } from '../event_bus.js';
 import { RUNE_DB, RARITY_DISPLAY } from '../rune_config.js';
+import { getAmmoIconSrc } from '../bitmap_icons.js';
+import { getAmmoIconSrc } from '../bitmap_icons.js';
 
 /**
  * 构建符文图标 DOM 元素（hud.js 内部辅助函数）
@@ -666,49 +668,55 @@ export const hud_system = {
     ui_renderAmmoIcon(container, recipe, isCurrent) {
         const size = isCurrent ? 24 : 16;
         const div = document.createElement('div');
-        
-        // 基础球体
-        div.style.width = `${size}px`;
-        div.style.height = `${size}px`;
-        div.style.borderRadius = '50%';
-        
-        // 颜色逻辑 (与 Projectile 一致)
-        let bg = '#e2e8f0';
-        let shadow = 'none';
 
-
-        //  光球的 UI 样式 (高优先级)
-        if (recipe.isLaser) { 
-            // 核心白，外发光蓝，模拟“光球”质感
-            bg = '#ffffff'; 
-            // 动态阴影：激光层数越多，阴影扩散越大
-            const glowSize = 10 + (recipe.laser || 0) * 2;
-            shadow = `0 0 ${glowSize}px ${CONFIG.colors.laser}, inset 0 0 5px ${CONFIG.colors.laser}`;
-        }else if (recipe.explosive) { bg = '#fca5a5'; shadow = '0 0 10px #ef4444'; }
-        else if (recipe.pyro) { bg = '#fdba74'; shadow = '0 0 8px #f97316'; }
-        else if (recipe.cryo) { bg = '#cffafe'; shadow = '0 0 8px #06b6d4'; }
-        else if (recipe.lightning) { bg = '#e9d5ff'; shadow = '0 0 8px #c084fc'; }
-        else if (recipe.pierce) { bg = '#fecaca'; }
-        else if (recipe.bounce) { bg = '#bbf7d0'; }
-        
-        div.style.background = bg;
-        div.style.boxShadow = shadow;
-        div.style.position = 'relative';
-
-        if (recipe.isLaser) {
-             div.style.border = '2px solid #fff'; // 加个白圈
+        // [Phase 5A Task 5.A5] 位图法球图标
+        const iconSrc = getAmmoIconSrc(recipe);
+        if (iconSrc) {
+            // 位图模式：使用 32×32 炼金法球位图
+            div.style.width = `${size}px`;
+            div.style.height = `${size}px`;
+            div.style.backgroundImage = `url('${iconSrc}')`;
+            div.style.backgroundSize = 'contain';
+            div.style.backgroundRepeat = 'no-repeat';
+            div.style.backgroundPosition = 'center';
+            div.style.position = 'relative';
+            // 激光特效：保留发光 filter
+            if (recipe.isLaser) {
+                const glowSize = 10 + (recipe.laser || 0) * 2;
+                div.style.filter = `drop-shadow(0 0 ${Math.round(glowSize/3)}px ${CONFIG.colors.laser})`;
+            }
+        } else {
+            // Fallback：原有纯色圆形（无位图时保持可用）
+            div.style.width = `${size}px`;
+            div.style.height = `${size}px`;
+            div.style.borderRadius = '50%';
+            let bg = '#e2e8f0';
+            let shadow = 'none';
+            if (recipe.isLaser) {
+                bg = '#ffffff';
+                const glowSize = 10 + (recipe.laser || 0) * 2;
+                shadow = `0 0 ${glowSize}px ${CONFIG.colors.laser}, inset 0 0 5px ${CONFIG.colors.laser}`;
+            } else if (recipe.explosive) { bg = '#fca5a5'; shadow = '0 0 10px #ef4444'; }
+            else if (recipe.pyro)       { bg = '#fdba74'; shadow = '0 0 8px #f97316'; }
+            else if (recipe.cryo)       { bg = '#cffafe'; shadow = '0 0 8px #06b6d4'; }
+            else if (recipe.lightning)  { bg = '#e9d5ff'; shadow = '0 0 8px #c084fc'; }
+            else if (recipe.pierce)     { bg = '#fecaca'; }
+            else if (recipe.bounce)     { bg = '#bbf7d0'; }
+            div.style.background = bg;
+            div.style.boxShadow = shadow;
+            div.style.position = 'relative';
+            if (recipe.isLaser)  div.style.border = '2px solid #fff';
+            if (recipe.scatter)  div.style.border = '2px solid #facc15';
         }
-        // 简单图标装饰
-        if (recipe.scatter) {
-            div.style.border = '2px solid #facc15'; // 黄框
-        }
+
+        // multicast 角标（位图/fallback 均保留）
         if (recipe.multicast) {
             const badge = document.createElement('div');
             badge.innerText = `+${recipe.multicast}`;
             badge.className = 'absolute -top-2 -right-2 text-[10px] bg-orange-500 text-white rounded-full px-1 font-bold leading-tight';
             container.appendChild(badge);
         }
-        
+
         container.appendChild(div);
     },
 
