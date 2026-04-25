@@ -2,13 +2,13 @@
   "frameSize": 128,
   "animations": {
     "idle": {
-      "row": 2,
+      "row": 0,
       "frames": 8,
       "fps": 8
     },
     "move": {
-      "row": 2,
-      "frames": 8,
+      "row": 1,
+      "frames": 6,
       "fps": 10
     },
     "hit": {
@@ -17,8 +17,8 @@
       "fps": 14
     },
     "cast": {
-      "row": 2,
-      "frames": 8,
+      "row": 3,
+      "frames": 4,
       "fps": 8
     }
   }

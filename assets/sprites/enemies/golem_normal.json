@@ -2,7 +2,7 @@
   "frameSize": 128,
   "animations": {
     "idle": {
-      "row": 1,
+      "row": 0,
       "frames": 6,
       "fps": 8
     },

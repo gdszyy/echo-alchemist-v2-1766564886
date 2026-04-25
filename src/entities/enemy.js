@@ -1362,19 +1362,25 @@ class Enemy {
             ctx.drawImage(this._textureCanvas, -w/2, -h/2);
         }
         // === Layer 2: 液体血条 (含延迟白条) ===
+        // [修改] 血量从顶部向下填充，血量满时占满顶部，血量少时从顶部缩短
+        // 顶部留少量间距（_hpTopPad），血条高度 = h * ratio
         
         // A. 计算高度比例
         const hpRatio = Math.max(0, Math.min(1, this.displayHp / this.maxHp));
         const whiteRatio = Math.max(0, Math.min(1, this.delayedHp / this.maxHp)); // 白色条比例
         const greenRatio = Math.max(0, Math.min(1, this.greenHp / this.maxHp));   // 绿色条比例
         
+        const _hpTopPad = 4; // 血条距顶部的间距（px）
+        const _hpBarTop = -h/2 + _hpTopPad; // 血条起始 Y（顶部）
+        
         const fillHeight = h * hpRatio;
         const whiteHeight = h * whiteRatio; // 白色条高度
         const greenHeight = h * greenRatio; // 绿色条高度
         
-        const fillY = (h/2) - fillHeight;
-        const whiteY = (h/2) - whiteHeight; // 白色条Y坐标
-        const greenY = (h/2) - greenHeight; // 绿色条Y坐标
+        // 从顶部向下：fillY 固定在顶部，高度随血量变化
+        const fillY = _hpBarTop;
+        const whiteY = _hpBarTop; // 白色条从顶部开始
+        const greenY = _hpBarTop; // 绿色条从顶部开始
         
         // B. 绘制白色延迟条 (在彩色条底下)
         if (whiteRatio > hpRatio) {
@@ -1409,10 +1415,10 @@ class Enemy {
         ctx.fillStyle = baseColor; 
         ctx.fillRect(-w/2, fillY, w, fillHeight);
         
-        // D. 液面亮边 (保持不变)
+        // D. 液面亮边（血条底部边缘）
         if (hpRatio > 0 && hpRatio < 1) {
             ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'; 
-            ctx.fillRect(-w/2, fillY, w, 2);
+            ctx.fillRect(-w/2, fillY + fillHeight - 2, w, 2);
         }
 
         // === Layer 3: 内部覆盖层 (Glow & Mist) - [修改：降低浓度] ===
@@ -2076,9 +2082,11 @@ class Enemy {
         // === [Phase 5B Task 5.B3] Layer 3.95: Sprite Sheet 覆盖层（在血条和内部特效之后）===
         // 在血条/词缀特效之上叠加 Sprite，无资源时自动 fallback 到矢量绘制
         if (this._spriteRenderer && this._spriteRenderer.ready) {
-            // Sprite 保持正方形比例（取 min(w,h) 作为边长，居中绘制），防止拉伸变形
+            // Sprite 保持正方形比例（取 min(w,h) 作为边长），居中偏下绘制
+            // 偏下量 = h * 0.15，让贴图在方块内偏向下方（血量显示在顶部，贴图在中下方）
             const sprSize1 = Math.min(w, h);
-            this._spriteRenderer.draw(ctx, -sprSize1/2, -sprSize1/2, sprSize1, sprSize1, 0.85);
+            const sprOffsetY1 = h * 0.15; // 向下偏移量
+            this._spriteRenderer.draw(ctx, -sprSize1/2, -sprSize1/2 + sprOffsetY1, sprSize1, sprSize1, 0.85);
         }
         // === Layer 4: 裂纹绘制 (Fissures) - [保持不变] ===
 
@@ -4349,9 +4357,11 @@ class Enemy {
         // Sprite 不替换矢量装饰，而是与其叠加（矢量层提供动态效果，Sprite 层提供角色外观）
         // 这里的 SpriteRenderer.draw() 在 Layer 3.8 调用，已在 ctx.save()/restore() 块内
         if (this._spriteRenderer && this._spriteRenderer.ready) {
-            // Boss Sprite 保持正方形比例（取 min(w,h) 作为边长，居中绘制），防止宽高比 3:2 导致贴图扁扁
+            // Boss Sprite 保持正方形比例（取 min(w,h) 作为边长），居中偏下绘制
+            // Boss 贴图同样偏下，与普通/精英敌人保持视觉一致性
             const sprSize2 = Math.min(w, h);
-            this._spriteRenderer.draw(ctx, -sprSize2/2, -sprSize2/2, sprSize2, sprSize2, 0.7);
+            const sprOffsetY2 = h * 0.15; // 向下偏移量
+            this._spriteRenderer.draw(ctx, -sprSize2/2, -sprSize2/2 + sprOffsetY2, sprSize2, sprSize2, 0.7);
         }
 
         const t = Date.now() / 1000;
