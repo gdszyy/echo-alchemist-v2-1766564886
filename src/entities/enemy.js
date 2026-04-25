@@ -1361,13 +1361,6 @@ class Enemy {
         if (this._textureCanvas) {
             ctx.drawImage(this._textureCanvas, -w/2, -h/2);
         }
-        // === [Phase 5B Task 5.B3] Layer 1.6: Sprite Sheet 覆盖层 ===
-        // 在矢量纹理之上叠加 Sprite，无资源时自动 fallback 到矢量绘制
-        if (this._spriteRenderer && this._spriteRenderer.ready) {
-            // Sprite 保持正方形比例（取 min(w,h) 作为边长，居中绘制），防止拉伸变形
-            const sprSize1 = Math.min(w, h);
-            this._spriteRenderer.draw(ctx, -sprSize1/2, -sprSize1/2, sprSize1, sprSize1, 0.85);
-        }
         // === Layer 2: 液体血条 (含延迟白条) ===
         
         // A. 计算高度比例
@@ -2080,6 +2073,13 @@ class Enemy {
             ctx.restore();
         }
 
+        // === [Phase 5B Task 5.B3] Layer 3.95: Sprite Sheet 覆盖层（在血条和内部特效之后）===
+        // 在血条/词缀特效之上叠加 Sprite，无资源时自动 fallback 到矢量绘制
+        if (this._spriteRenderer && this._spriteRenderer.ready) {
+            // Sprite 保持正方形比例（取 min(w,h) 作为边长，居中绘制），防止拉伸变形
+            const sprSize1 = Math.min(w, h);
+            this._spriteRenderer.draw(ctx, -sprSize1/2, -sprSize1/2, sprSize1, sprSize1, 0.85);
+        }
         // === Layer 4: 裂纹绘制 (Fissures) - [保持不变] ===
 
         // **过热 Stage 3**
