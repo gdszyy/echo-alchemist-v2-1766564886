@@ -610,6 +610,18 @@ phase_gathering_getRandomPegType() {
             this.ammoQueue = [];
         }
 
+        // [feat] 每回合开始检查 ammoQueue：若为空则从 marbleQueue 重新编译充能。
+        // 覆盖所有进入战斗的路径（无精华直接充能、有精华研磨后进入战斗均适用）。
+        if (this.ammoQueue.length === 0 && this.marbleQueue && this.marbleQueue.length > 0) {
+            this.ammoQueue = this.marbleQueue.map(marbleDef => {
+                const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
+                const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, false);
+                recipe.finalHits = 0;
+                recipe.multicast = 0;
+                return recipe;
+            });
+        }
+
         // --- [核心修复 2]：UI 渲染 ---
         // 修复后，上面的代码不再报错，这一行将被正确执行，HUD 会在进入战斗时立即出现
         this.ui_updateUI();
