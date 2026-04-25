@@ -279,6 +279,15 @@ class Game {
             this.sys_resize(); 
             if (this.phase === 'gathering') this.phase_gathering_initPachinko(); 
         });
+        // [BUGFIX] 用 ResizeObserver 监听 game-container 尺寸变化，
+        // 确保页面首次渲染后（CSS aspect-ratio 计算完成）canvas 尺寸能被正确设置。
+        // 这解决了构造函数中调用 sys_resize() 时 getBoundingClientRect() 返回 0 的问题。
+        const _resizeObserver = new ResizeObserver(() => {
+            if (this.canvas.width !== Math.round(document.getElementById('game-container').getBoundingClientRect().width)) {
+                this.sys_resize();
+            }
+        });
+        _resizeObserver.observe(document.getElementById('game-container'));
         // 初始化时立即执行一次 PC 布局检测
         this.ui_updatePCLayout();
         this.ui = new UIManager();

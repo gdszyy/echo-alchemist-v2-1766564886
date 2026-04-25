@@ -186,6 +186,9 @@ export const game_system = {
         // 不再通过 JS 覆盖 height，避免与 aspect-ratio 冲突。
         // 用 getBoundingClientRect() 读取 CSS 计算后的实际尺寸。
         const rect = container.getBoundingClientRect();
+        // [BUGFIX] 若 rect.width/height 为 0（CSS 布局未完成），跳过本次 resize，
+        // 等待下一帧由 ResizeObserver 或 window.resize 重新触发。
+        if (!rect.width || !rect.height) return;
         this.width = this.canvas.width = Math.round(rect.width);
         this.height = this.canvas.height = Math.round(rect.height);
 
@@ -202,7 +205,7 @@ export const game_system = {
         // 计算：顶部栏高度 + 8px 安全间距 + 半个敌人高度（中心点偏移）
         // 这样第一行上边界 = topBarH + 8，恰好在顶部栏下方，且与后续行网格完全对齐
         const topBarEl = document.getElementById('unified-top-bar');
-        const topBarH = topBarEl ? topBarEl.getBoundingClientRect().height : 52;
+        const topBarH = topBarEl ? topBarEl.getBoundingClientRect().height : 64;
         this.combatGridTopY = topBarH + 8 + this.enemyHeight / 2;
 
         this.ui_updateUICache();

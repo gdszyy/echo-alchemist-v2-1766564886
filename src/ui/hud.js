@@ -19,7 +19,6 @@ import { CONFIG } from '../config.js';
 import { eventBus, EVENT_TYPES } from '../event_bus.js';
 import { RUNE_DB, RARITY_DISPLAY } from '../rune_config.js';
 import { getAmmoIconSrc } from '../bitmap_icons.js';
-import { getAmmoIconSrc } from '../bitmap_icons.js';
 
 /**
  * 构建符文图标 DOM 元素（hud.js 内部辅助函数）

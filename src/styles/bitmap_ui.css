@@ -40,11 +40,13 @@
 
 /* --- 符文图标框 稀有度边框 --- */
 /* 切片参数：256×342 图片，边框宽约 48px */
+/* [BUGFIX] rune-icon-frame 移除 fill 关键字，避免 border-image 中心区域覆盖符文图标 */
+/* common 边框中心不透明，必须移除 fill 否则黑色中心会遮挡图标内容 */
 .rune-icon-frame.rarity-common {
     border: none !important;
     box-shadow: none !important;
     border-image-source: url('../../assets/ui/borders/border_common_9s.png');
-    border-image-slice: 48 48 48 48 fill;
+    border-image-slice: 48 48 48 48;
     border-image-width: 6px;
     border-image-outset: 2px;
     border-image-repeat: stretch;
@@ -54,7 +56,7 @@
     border: none !important;
     box-shadow: none !important;
     border-image-source: url('../../assets/ui/borders/border_rare_9s.png');
-    border-image-slice: 48 48 48 48 fill;
+    border-image-slice: 48 48 48 48;
     border-image-width: 6px;
     border-image-outset: 2px;
     border-image-repeat: stretch;
@@ -64,7 +66,7 @@
     border: none !important;
     box-shadow: none !important;
     border-image-source: url('../../assets/ui/borders/border_epic_9s.png');
-    border-image-slice: 48 48 48 48 fill;
+    border-image-slice: 48 48 48 48;
     border-image-width: 6px;
     border-image-outset: 2px;
     border-image-repeat: stretch;
@@ -74,7 +76,7 @@
 .rune-icon-frame.rarity-legendary {
     border: none !important;
     border-image-source: url('../../assets/ui/borders/border_legendary_9s.png');
-    border-image-slice: 48 48 48 48 fill;
+    border-image-slice: 48 48 48 48;
     border-image-width: 8px;
     border-image-outset: 3px;
     border-image-repeat: stretch;
@@ -96,7 +98,8 @@
     border-image-width: 8px;
     border-image-outset: 3px;
     border-image-repeat: stretch;
-    background: transparent !important;
+    /* [BUGFIX] 保留深色底色，避免 border-image fill 覆盖后背景变白 */
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%) !important;
 }
 
 .relic-card.rare {
@@ -138,8 +141,9 @@
 }
 
 /* #phase-rune-launcher 面板底板 */
+/* [BUGFIX] 保留深色底色，让 9-Slice 图片叠加在深色背景上，中心半透明纹理才能正确显示 */
 #phase-rune-launcher {
-    background: transparent !important;
+    background: rgba(2, 6, 23, 0.95) !important;
     border-image-source: url('../../assets/ui/panels/popup_panel_9s.png');
     border-image-slice: 64 64 64 64 fill;
     border-image-width: 24px;
@@ -156,6 +160,10 @@
     background: url('../../assets/ui/sprites/sp_gem_empty_32.png') center/contain no-repeat !important;
     border: none !important;
     box-shadow: none !important;
+    /* 图片本身已是菱形，取消 CSS rotate；同时放大到 20px 以匹配 32px 位图 */
+    width: 20px !important;
+    height: 20px !important;
+    transform: none !important;
 }
 
 /* SP 宝石（激活态）：覆盖满格宝石图 */
