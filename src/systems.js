@@ -1616,10 +1616,7 @@ const TRAINING_SCENARIOS = {
             categoryId: 'relic',
             name: '精华跳过研磨',
             icon: '⚡',
-            desc: '[跳过研磨] 触发纯净精华后，直接点击「跳过研磨」按鈕。验证关键点：
-1. ammoQueue 是否被正确充能（优先用 _chargedAmmoQueue，其次编译 marbleQueue）
-2. 进入战斗后不会显示「弹药耗尽」
-3. 是否获得随机符文',
+            desc: '[跳过研磨] 触发纯净精华后，直接点击「跳过研磨」按鈕。验证关键点：\n1. ammoQueue 是否被正确充能（优先用 _chargedAmmoQueue，其次编译 marbleQueue）\n2. 进入战斗后不会显示「弹药耗尽」\n3. 是否获得随机符文',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let c = 0; c < 5; c++) {
@@ -1654,10 +1651,7 @@ const TRAINING_SCENARIOS = {
             categoryId: 'relic',
             name: '弹性涌潮遗物',
             icon: '🔵',
-            desc: '[同化涌潮] 模拟获得「弹性涌潮」遗物后的状态。验证：
-1. doubleAssimilationBoostRounds[bounce] 是否被设为 2
-2. guaranteedNextRound 是否包含 2 个 bounce 弹珠
-3. 发射 bounce 弹珠后，同化概率是否为基础值 × 2',
+            desc: '[同化涌潮] 模拟获得「弹性涌潮」遗物后的状态。验证：\n1. doubleAssimilationBoostRounds[bounce] 是否被设为 2\n2. guaranteedNextRound 是否包含 2 个 bounce 弹珠\n3. 发射 bounce 弹珠后，同化概率是否为基础值 × 2',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 // 布置带弹性钉子的敌人（模拟已同化的钉盘）
