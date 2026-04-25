@@ -91,6 +91,9 @@
 | **Task 5.A3** 接入弹窗/卡片面板位图 | 将 `.rune-card`、`.relic-card`、`#phase-rune-launcher` 等面板替换为对应稀有度（铁/铜/银/金/炫彩）的 9-Slice 边框图 | ⬜ 待开始 |
 | **Task 5.A4** 接入 SP 宝石与功能按钮图标 | 替换 `.sp-gem`（空/满两态）、`#settings-btn`、`#speed-btn` 为固定尺寸 Sprite；保留 JS 状态切换逻辑 | ⬜ 待开始 |
 | **Task 5.A5** 接入弹药属性图标 | 为 laser / explosive / pyro / cryo / lightning / pierce / bounce / scatter 8 种属性各生成 32x32 炼金法球图标，替换 `hud.js → ui_renderAmmoIcon()` 中的纯色圆形 | ⬜ 待开始 |
+| **Task 5.A6** 生成符文图标集 | 为 RUNE_DB 中 14 种基础符文（rune_pyro_1/2、rune_cryo_1/2、rune_lightning_1/2、rune_bounce_1/2、rune_pierce_1/2、rune_scatter_1、rune_laser_1/2）各生成专属 48x48 位图图标，替换 `_ui_buildRuneIconHTML()` 中的 emoji；图标需体现元素属性（火/冰/雷/弹/穿/散/激光）与稀有度（common/epic/rare/legendary）的视觉差异 | ⬜ 待开始 |
+| **Task 5.A7** 生成遗物图标集 | 为 config.js 中 39 种遗物各生成 64x64 位图图标，替换 `shop.js → relic-icon` 与遗物选择界面中的 emoji；图标需体现遗物效果语义（如「力场护盾」→ 六边形护盾纹章，「时光沙漏」→ 炼金沙漏），并通过边框颜色区分稀有度（common/rare/legendary/cursed） | ⬜ 待开始 |
+| **Task 5.A8** 生成符文词条（Runeword）图标集 | 为 RUNEWORD_DB 中 22 种词条各生成 64x64 专属图标，用于图鉴已发现卡片的图标位置（当前为 🔒 占位）；图标需体现词条效果语义（如「熔毁」→ 熔岩裂纹，「绝对零度」→ 冰晶封印），并与组成该词条的符文元素色调一致 | ⬜ 待开始 |
 
 ### Phase B：敌人 Sprite 框架搭建（需要美术资源，独立于 Phase A）
 
