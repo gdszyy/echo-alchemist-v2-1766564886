@@ -1,22 +1,243 @@
 {
   "indexed": [
     {
+      "file": "src/audio.js",
+      "lines": 570,
+      "funcs": 18,
+      "sections": 6,
+      "mega_funcs": 0,
+      "index_path": ".cursor/rules/auto_index/src_audio_js_index.md"
+    },
+    {
+      "file": "src/combat_system.js",
+      "lines": 3362,
+      "funcs": 42,
+      "sections": 22,
+      "mega_funcs": 5,
+      "index_path": ".cursor/rules/auto_index/src_combat_system_js_index.md"
+    },
+    {
+      "file": "src/config.js",
+      "lines": 1695,
+      "funcs": 1,
+      "sections": 0,
+      "mega_funcs": 1,
+      "index_path": ".cursor/rules/auto_index/src_config_js_index.md"
+    },
+    {
+      "file": "src/effects/particles.js",
+      "lines": 1832,
+      "funcs": 62,
+      "sections": 3,
+      "mega_funcs": 1,
+      "index_path": ".cursor/rules/auto_index/src_effects_particles_js_index.md"
+    },
+    {
+      "file": "src/entities/enemy.js",
+      "lines": 4845,
+      "funcs": 27,
+      "sections": 18,
+      "mega_funcs": 3,
+      "index_path": ".cursor/rules/auto_index/src_entities_enemy_js_index.md"
+    },
+    {
+      "file": "src/entities/projectile.js",
+      "lines": 1028,
+      "funcs": 13,
+      "sections": 7,
+      "mega_funcs": 2,
+      "index_path": ".cursor/rules/auto_index/src_entities_projectile_js_index.md"
+    },
+    {
+      "file": "src/entities.js",
+      "lines": 4834,
+      "funcs": 108,
+      "sections": 21,
+      "mega_funcs": 4,
+      "index_path": ".cursor/rules/auto_index/src_entities_js_index.md"
+    },
+    {
+      "file": "src/game_phase.js",
+      "lines": 2521,
+      "funcs": 16,
+      "sections": 15,
+      "mega_funcs": 4,
+      "index_path": ".cursor/rules/auto_index/src_game_phase_js_index.md"
+    },
+    {
+      "file": "src/game_system.js",
+      "lines": 2313,
+      "funcs": 45,
+      "sections": 7,
+      "mega_funcs": 1,
+      "index_path": ".cursor/rules/auto_index/src_game_system_js_index.md"
+    },
+    {
+      "file": "src/plinko_physics.js",
+      "lines": 597,
+      "funcs": 15,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor/rules/auto_index/src_plinko_physics_js_index.md"
+    },
+    {
+      "file": "src/render_system.js",
+      "lines": 647,
+      "funcs": 10,
+      "sections": 4,
+      "mega_funcs": 0,
+      "index_path": ".cursor/rules/auto_index/src_render_system_js_index.md"
+    },
+    {
+      "file": "src/rune_config.js",
+      "lines": 790,
+      "funcs": 0,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor/rules/auto_index/src_rune_config_js_index.md"
+    },
+    {
+      "file": "src/spawn_system.js",
+      "lines": 2235,
+      "funcs": 28,
+      "sections": 8,
+      "mega_funcs": 3,
+      "index_path": ".cursor/rules/auto_index/src_spawn_system_js_index.md"
+    },
+    {
+      "file": "src/systems.js",
+      "lines": 3094,
+      "funcs": 85,
+      "sections": 10,
+      "mega_funcs": 2,
+      "index_path": ".cursor/rules/auto_index/src_systems_js_index.md"
+    },
+    {
+      "file": "src/tutorial_system.js",
+      "lines": 811,
+      "funcs": 16,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor/rules/auto_index/src_tutorial_system_js_index.md"
+    },
+    {
+      "file": "src/ui/hud.js",
+      "lines": 1030,
+      "funcs": 14,
+      "sections": 4,
+      "mega_funcs": 1,
+      "index_path": ".cursor/rules/auto_index/src_ui_hud_js_index.md"
+    },
+    {
+      "file": "src/ui/rune_launcher.js",
+      "lines": 1710,
+      "funcs": 25,
+      "sections": 0,
+      "mega_funcs": 1,
+      "index_path": ".cursor/rules/auto_index/src_ui_rune_launcher_js_index.md"
+    },
+    {
+      "file": "src/ui_system.js",
+      "lines": 835,
+      "funcs": 42,
+      "sections": 5,
+      "mega_funcs": 1,
+      "index_path": ".cursor/rules/auto_index/src_ui_system_js_index.md"
+    },
+    {
+      "file": "src/utils/math_utils.js",
+      "lines": 267,
+      "funcs": 21,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor/rules/auto_index/src_utils_math_utils_js_index.md"
+    }
+  ],
+  "skipped": [
+    {
+      "file": "src/bitmap_icons.js",
+      "lines": 135,
+      "funcs": 3,
+      "reason": "未达阈值 (行数=135<500, 函数数=3<20)"
+    },
+    {
+      "file": "src/calc_utils.js",
+      "lines": 332,
+      "funcs": 8,
+      "reason": "未达阈值 (行数=332<500, 函数数=8<20)"
+    },
+    {
+      "file": "src/combat/collision.js",
+      "lines": 443,
+      "funcs": 3,
+      "reason": "未达阈值 (行数=443<500, 函数数=3<20)"
+    },
+    {
+      "file": "src/combat/collision_shapes.js",
+      "lines": 146,
+      "funcs": 2,
+      "reason": "未达阈值 (行数=146<500, 函数数=2<20)"
+    },
+    {
+      "file": "src/combat/damage_calc.js",
+      "lines": 460,
+      "funcs": 7,
+      "reason": "未达阈值 (行数=460<500, 函数数=7<20)"
+    },
+    {
+      "file": "src/core.js",
+      "lines": 429,
+      "funcs": 5,
+      "reason": "未达阈值 (行数=429<500, 函数数=5<20)"
+    },
+    {
+      "file": "src/event_bus.js",
+      "lines": 258,
+      "funcs": 13,
+      "reason": "未达阈值 (行数=258<500, 函数数=13<20)"
+    },
+    {
+      "file": "src/loot_system.js",
+      "lines": 302,
+      "funcs": 6,
+      "reason": "未达阈值 (行数=302<500, 函数数=6<20)"
+    },
+    {
+      "file": "src/render/sprite_renderer.js",
+      "lines": 293,
+      "funcs": 11,
+      "reason": "未达阈值 (行数=293<500, 函数数=11<20)"
+    },
+    {
+      "file": "src/rune_system.js",
+      "lines": 444,
+      "funcs": 9,
+      "reason": "未达阈值 (行数=444<500, 函数数=9<20)"
+    },
+    {
+      "file": "src/ui/game_over.js",
+      "lines": 454,
+      "funcs": 12,
+      "reason": "未达阈值 (行数=454<500, 函数数=12<20)"
+    },
+    {
+      "file": "src/ui/shop.js",
+      "lines": 489,
+      "funcs": 6,
+      "reason": "未达阈值 (行数=489<500, 函数数=6<20)"
+    },
+    {
       "file": "tests/ai_test_runner.js",
       "lines": 435,
       "funcs": 13,
-      "sections": 0,
-      "mega_funcs": 0,
-      "index_path": ".cursor/rules/auto_index/tests_ai_test_runner_js_index.md"
+      "reason": "未达阈值 (行数=435<500, 函数数=13<20)"
     },
     {
       "file": "tests/validate_scenarios.js",
       "lines": 167,
       "funcs": 2,
-      "sections": 0,
-      "mega_funcs": 0,
-      "index_path": ".cursor/rules/auto_index/tests_validate_scenarios_js_index.md"
+      "reason": "未达阈值 (行数=167<500, 函数数=2<20)"
     }
   ],
-  "skipped": [],
   "warnings": []
 }

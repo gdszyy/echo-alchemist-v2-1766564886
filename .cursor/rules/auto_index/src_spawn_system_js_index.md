@@ -1,9 +1,9 @@
 # src/spawn_system.js 函数索引
 
-> 自动生成于 2026-04-24 | 总行数: 2230 | 函数数: 28 | 语言: javascript
+> 自动生成于 2026-04-25 | 总行数: 2235 | 函数数: 28 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -35,7 +35,7 @@
 | spawn_checkBossRoundFor | method | `spawn_checkBossRoundFor(round)` |  |
 | spawn_checkBossRound | method | `spawn_checkBossRound()` |  |
 | spawn_calculateBossHP | method | `spawn_calculateBossHP(isBigBoss)` |  |
-| spawn_spawnBoss | method | `spawn_spawnBoss(bossId, isBigBoss)` |  |
+| spawn_spawnBoss | method | `spawn_spawnBoss(bossId, isBigBoss)` | ⚠️ 巨型函数，见 @section 导航 |
 | spawn_selectBossForRound | method | `spawn_selectBossForRound(isBigBoss)` |  |
 | spawn_applyMinionShape | method | `spawn_applyMinionShape(e)` |  |
 | spawn_triggerBossEntranceShockwave | method | `spawn_triggerBossEntranceShockwave(boss)` |  |
@@ -61,6 +61,10 @@
 | `@section:bullet_velocity_calc` | 子弹速度与方向计算 |
 | `@section:bullet_entity_create` | 子弹实体创建与属性注入 |
 | `@section:bullet_pool_push` | 子弹推入对象池与粒子预热 |
+
+### spawn_spawnBoss
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
 
 ## 其他 @section 标记
 

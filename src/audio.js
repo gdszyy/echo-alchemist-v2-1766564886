@@ -359,6 +359,7 @@ class SoundManager {
         const now = this.ctx.currentTime;
         
         switch(type) {
+            // @section:effect_bump - bump：弹球碰撞钉子，sine 200→80Hz
             case 'bump': {
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
@@ -373,6 +374,7 @@ class SoundManager {
                 osc.stop(now + 0.1);
                 break;
             }
+            // @section:effect_freeze - freeze：冰冻效果触发，sine 2000→500Hz 下滑
             case 'freeze': {
                 // 冰冻效果：高频下滑
                 const osc = this.ctx.createOscillator();
@@ -388,6 +390,7 @@ class SoundManager {
                 osc.stop(now + 0.3);
                 break;
             }
+            // @section:effect_burn_tick - burn_tick：燃烧 DoT 每跳，sawtooth 150Hz 短促
             case 'burn_tick': {
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
@@ -401,6 +404,7 @@ class SoundManager {
                 osc.stop(now + 0.1);
                 break;
             }
+            // @section:effect_split - split：分裂/弹道分叉触发，triangle 600→900Hz 上扬
             case 'split': {
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
@@ -415,6 +419,7 @@ class SoundManager {
                 osc.stop(now + 0.15);
                 break;
             }
+            // @section:effect_regen - regen：敌人回血，sine 500→700Hz 上扬
             case 'regen': {
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
@@ -429,6 +434,7 @@ class SoundManager {
                 osc.stop(now + 0.25);
                 break;
             }
+            // @section:effect_shatter - shatter：破碎效果（冰冻击碎等），白噪声爆发
             case 'shatter': {
                 // 破碎效果
                 const noise = this.ctx.createBufferSource();
