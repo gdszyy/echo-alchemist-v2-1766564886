@@ -10,11 +10,12 @@
 
 ## 活跃洞察 (Active Insights)
 
-当前共有 **8** 条活跃洞察。
+当前共有 **9** 条活跃洞察。
 
 > **[2026-04-19 更新]** PI-006 升版至 v1.2：新增坑 5（开局缺少弹珠命运选择阶段；`sys_initGameStart()` 必须在遗物奖励后额外队列 `chaos_essence`）。
 > **[2026-04-20 更新]** PI-001 升版至 v1.3：新增坑 8（纯净精华选择跳过替换子弹阶段后 `confirmBtn.onclick` 未恢复，导致无法发射子弹、直接循环敌人回合）。> **[2026-04-22 更新]** PI-001 升版至 v1.5：新增坑 10（纯净精华跳过研磨后 `sys_skipGrindGetRune` 未充能 `ammoQueue`，导致子弹列表为空直接进入敌人回合循环）。
 > **[2026-04-25 更新]** PI-001 升版至 v1.6：新增坑 11（`fieldLootItems` 渲染放在 `sys_loop` 全局循环无阶段限制，导致宝石在 `selection` 阶段泄漏显示且无入场动画）。> **[2026-04-21 更新]** 新增 PI-008：教程系统覆盖层（z-index: 9000+）在符文发射器面板打开时遮挡 Tab 按钮，修复方案为在 `ui_openRuneLauncher` / `ui_closeRuneLauncher` 中临时隐藏/恢复教程 DOM。
+> **[2026-04-25 更新]** 新增 PI-009：Sprite 贴图不显示类型错误排查 SOP，涵盖预加载、JSON 映射、层级覆盖和宽高比等常见坑位。
 
 | ID | 标题 | 版本 | 关联模块 | 最后更新 | 文档链接 |
 |----|------|------|---------|---------|---------|
@@ -26,6 +27,7 @@
 | PI-006 | Round-Start 延迟奖励结算流程 | v1.2 | game_phase, game_system, core, ui/shop | 2026-04-19 | [PI-006_round_start_reward_resolver.md](PI-006_round_start_reward_resolver.md) |
 | PI-007 | 命运时刻 Overlay 返回流与纯净精华选择模式 | v1.0 | ui/shop, game_system, ui_system, spawn_system, game_phase, entities, config, core | 2026-04-18 | [PI-007_destiny_overlay_return_and_selection_mode.md](PI-007_destiny_overlay_return_and_selection_mode.md) |
 | PI-008 | 符文发射器面板 Tab 被底层阶段面板遮挡的修复流程 | v1.1 | tutorial_system, ui/rune_launcher, ui_system | 2026-04-21 | [PI-008_tutorial_overlay_rune_launcher_tab_block.md](PI-008_tutorial_overlay_rune_launcher_tab_block.md) |
+| PI-009 | Sprite 贴图不显示类型错误排查 SOP | v1.0 | entities, render_system, core | 2026-04-25 | [PI-009_sprite_not_rendering_sop.md](PI-009_sprite_not_rendering_sop.md) |
 
 ### 按模块快速检索
 
@@ -43,7 +45,8 @@
 | `config.js` | PI-004（CONFIG.performance 三档配置）、PI-007（混沌精华 / 纯净精华 / 同化倍率显式配置） |
 | `spawn_system.js` | PI-004（EnergyOrb 聚合优化）、PI-007（预览状态与纯净精华注入面板联动） |
 | `effects/particles.js` | PI-004（未接入预算的高风险特效清单）、PI-005（性能自适应影响评估） |
-| `render_system.js` | PI-005（性能自适应影响评估） |
+| `render_system.js` | PI-005（性能自适应影响评估）、PI-009（SpriteRenderer 异步加载与绘制） |
+| `entities/enemy.js` | PI-009（Sprite 绘制层级、宽高比与居中逻辑） |
 
 ---
 
