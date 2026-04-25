@@ -1,12 +1,20 @@
 {
   "indexed": [
     {
-      "file": "src/entities/enemy.js",
-      "lines": 4845,
-      "funcs": 27,
-      "sections": 18,
-      "mega_funcs": 3,
-      "index_path": ".cursor/rules/auto_index/src_entities_enemy_js_index.md"
+      "file": "tests/ai_test_runner.js",
+      "lines": 435,
+      "funcs": 13,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor/rules/auto_index/tests_ai_test_runner_js_index.md"
+    },
+    {
+      "file": "tests/validate_scenarios.js",
+      "lines": 167,
+      "funcs": 2,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor/rules/auto_index/tests_validate_scenarios_js_index.md"
     }
   ],
   "skipped": [],

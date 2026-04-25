@@ -175,3 +175,49 @@ game.perfQualityLevel // 当前性能等级：'high' | 'medium' | 'low'
 2. **新增特效对象**：在创建处加入 `CONFIG.performance[this.perfQualityLevel || 'high'].xxxLimit` 检查。
 3. **禁止硬编码上限**：严禁在特效创建函数中写死数字（如 `>= 800`），必须通过 `CONFIG.performance` 读取。
 4. 详见 [`.cursor/rules/performance.md`](performance.md) 第 6 节「修改指南」。
+
+---
+
+## 7. 测试基础设施概述
+
+> 详细规范见 [`.cursor/rules/testing.md`](testing.md)
+
+### 测试架构三层结构
+
+| 层级 | 工具 | 触发时机 | 耗时 |
+|------|------|----------|------|
+| **Layer T1：静态结构校验** | `node tests/validate_scenarios.js` | 每次代码修改后立即执行，无需浏览器 | < 30s |
+| **Layer T2：试炼场实机验证** | 浏览器内 `TrainingGround` 沙盒 | 部署到测试环境后，AI 或人工操作 | 按需 |
+| **Layer T3：Puppeteer 自动化** | `node tests/ai_test_runner.js` | 完整回归测试，需本地游戏服务 | 2~5min |
+
+### 试炼场（TrainingGround）分类
+
+试炼场场景通过 `TRAINING_SCENARIOS.categories` 分类，当前共 5 个分类：
+
+| 分类 ID | 名称 | 覆盖机制 |
+|---------|------|----------|
+| `enemy` | 敌人词条 | 护盾、分身、精英、Boss 等词条行为 |
+| `attribute` | 属性弹珠 | 元素弹珠、符文词条触发 |
+| `boss` | Boss 机制 | Boss 专属技能与阶段切换 |
+| `runeword` | 符文词条 | 符文词条组合效果验证 |
+| `relic` | 遗物/精华 | 遗物保底、精华全链路、存档持久化 |
+
+### AI 定制测试工作流
+
+```
+AI 修改代码
+    ↓
+node tests/validate_scenarios.js   ← Layer T1 静态校验，无需浏览器
+    ↓（通过后）
+npm start + 浏览器试炼场手动验证   ← Layer T2 实机验证
+    ↓（通过后）
+node tests/ai_test_runner.js --suite <目标套件>  ← Layer T3 自动化回归
+    ↓
+控制台输出通过/失败 + 断言详情 → AI 定位修复
+```
+
+### 禁止行为
+
+- **禁止在试炼场场景中修改持久化游戏状态**：`setup()` 函数只能操作战场实体（`game.enemies`）和临时测试状态，不得修改 `game.ownedRelics`、`game.dropPity` 等存档字段（除专门测试存档的场景外）。
+- **禁止跳过 Layer T1 直接运行 Layer T3**：静态校验是最低成本的防护网，必须先通过。
+- **禁止手动编辑 `tests/validate_scenarios.js` 的校验规则**：如需新增测试场景，应同步在 `requiredRelicIds`（或对应分类）中追加场景 ID。

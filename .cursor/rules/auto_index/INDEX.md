@@ -1,16 +1,16 @@
 # 自动函数索引汇总 (Auto Index)
 
-> 自动生成于 2026-04-24 | 由 code-indexer 脚本维护
+> 自动生成于 2026-04-25 | 由 code-indexer 脚本维护
 > **本文件由脚本自动生成，严禁手动编辑。**
 
-## 已索引文件 (19 个)
+## 已索引文件 (21 个)
 
 | 文件 | 总行数 | 函数数 | 巨型函数 | @section 标记 | 索引文件 |
 |------|--------|--------|----------|--------------|---------|
 | `src/entities.js` | 4834 | 108 | **4** | 21 | [src_entities_js_index.md](src_entities_js_index.md) |
 | `src/entities/enemy.js` | 4793 | 26 | **3** | 18 | [src_entities_enemy_js_index.md](src_entities_enemy_js_index.md) |
 | `src/combat_system.js` | 3362 | 42 | **5** | 22 | [src_combat_system_js_index.md](src_combat_system_js_index.md) |
-| `src/systems.js` | 2810 | 85 | **2** | 10 | [src_systems_js_index.md](src_systems_js_index.md) |
+| `src/systems.js` | 3100 | 85 | **2** | 10 | [src_systems_js_index.md](src_systems_js_index.md) |
 | `src/game_phase.js` | 2493 | 16 | **4** | 15 | [src_game_phase_js_index.md](src_game_phase_js_index.md) |
 | `src/game_system.js` | 2318 | 45 | **1** | 7 | [src_game_system_js_index.md](src_game_system_js_index.md) |
 | `src/spawn_system.js` | 2230 | 28 | **2** | 8 | [src_spawn_system_js_index.md](src_spawn_system_js_index.md) |
@@ -26,6 +26,8 @@
 | `src/plinko_physics.js` | 597 | 15 | 0 | 0 | [src_plinko_physics_js_index.md](src_plinko_physics_js_index.md) |
 | `src/audio.js` | 564 | 18 | 0 | 0 | [src_audio_js_index.md](src_audio_js_index.md) |
 | `src/utils/math_utils.js` | 267 | 21 | 0 | 0 | [src_utils_math_utils_js_index.md](src_utils_math_utils_js_index.md) |
+| `tests/ai_test_runner.js` | 435 | 13 | 0 | 0 | [tests_ai_test_runner_js_index.md](tests_ai_test_runner_js_index.md) |
+| `tests/validate_scenarios.js` | 167 | 2 | 0 | 0 | [tests_validate_scenarios_js_index.md](tests_validate_scenarios_js_index.md) |
 
 ## 未索引文件 (10 个)
 

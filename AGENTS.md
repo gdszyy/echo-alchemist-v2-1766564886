@@ -11,6 +11,7 @@
 *   **流程洞察索引**：[`.cursor/rules/process_insights/index.md`](.cursor/rules/process_insights/index.md)（在涉及复杂跨模块流程、修复历史 Bug 区域或新增特效时必读；包含历次任务沉淀的防坑经验与版本化洞察文档）。
 *   **自动函数索引**：[`.cursor/rules/auto_index/INDEX.md`](.cursor/rules/auto_index/INDEX.md)（在涉及大文件修改时必读；包含所有大文件的函数名、行号范围和 @section 内部节点映射，由 `code-indexer` 脚本自动维护，**严禁手动编辑**）。
 *   **位图化视觉重构规格**：[`design_spec_bitmap.md`](design_spec_bitmap.md)（凡涉及位图生成、Sprite 接入、图标替换的任务必读；包含 UI 切图清单、敌人 Sprite 规格、Boss 形象清单）。
+*   **测试基础设施规范**：[`.cursor/rules/testing.md`](.cursor/rules/testing.md)（凡修改涉及遗物、精华、符文词条、敌人词条等核心机制时必读；包含试炼场场景规范、Puppeteer 测试套件运行方式、测试覆盖范围与已知盲区）。
 
 所有专门针对本项目的技能 (如 `echo-developer`) 仅需指引 Agent 阅读上述入口，无需在技能文件内硬编码具体的架构细节或行数统计。
 
