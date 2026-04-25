@@ -141,17 +141,9 @@ export const game_system = {
         }
 
         // 6. 战场掉落物更新与渲染
-        if (this.fieldLootItems) {
-            for (let i = this.fieldLootItems.length - 1; i >= 0; i--) {
-                const item = this.fieldLootItems[i];
-                if (item.active) {
-                    item.update(timeScale);
-                    item.draw(this.ctx);
-                } else {
-                    this.fieldLootItems.splice(i, 1);
-                }
-            }
-        }
+        // [BUGFIX] fieldLootItems 已移入 phase_combat_update 的 LAYER 2（实体层）内渲染，
+        // 原因：此处无阶段限制，会导致宝石在 selection 等非战斗阶段泄漏显示。
+        // 现在由 phase_combat_update 负责 fieldLootItems 的 update 和 draw。
 
         // 7. 特效与文字层渲染
         this.render_floatingTexts(timeScale);

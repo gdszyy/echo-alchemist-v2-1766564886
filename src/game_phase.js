@@ -1799,6 +1799,22 @@ phase_gathering_getRandomPegType() {
             this.runeLootItems = this.runeLootItems.filter(l => l && l.active);
         }
 
+        // --- 持久掉落物渲染（遗物/精华宝石）---
+        // [BUGFIX] fieldLootItems 必须在 LAYER 2（实体层）内渲染，原因：
+        // 1. 享有与敌人相同的视差偏移（entityShiftX/Y），位置正确
+        // 2. 只在 combat/training 阶段渲染，不会泄漏到 selection 等其他阶段
+        if (this.fieldLootItems) {
+            for (let i = this.fieldLootItems.length - 1; i >= 0; i--) {
+                const item = this.fieldLootItems[i];
+                if (item.active) {
+                    item.update(timeScale);
+                    item.draw(this.ctx);
+                } else {
+                    this.fieldLootItems.splice(i, 1);
+                }
+            }
+        }
+
         this.ctx.restore(); // 结束实体层
 
 

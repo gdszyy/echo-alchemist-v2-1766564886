@@ -1,7 +1,7 @@
 ---
 id: "PI-001"
-version: "v1.5"
-last_updated: "2026-04-22"
+version: "v1.6"
+last_updated: "2026-04-25"
 author: "tsk-b1def027-9d1"
 related_modules: ["game_phase", "ui_system", "game_system"]
 status: "active"
@@ -137,11 +137,28 @@ status: "active"
 
 ---
 
+---
+
+### 坑 11: `fieldLootItems` 渲染放在 `sys_loop` 全局循环（无阶段限制），导致宝石泄漏到 `selection` 阶段且无入场动画
+
+**现象**：纯净弹珠（`pure_essence`）或混沌弹珠（`chaos_essence`）掉落后，宝石（`FieldLootItem`）在战斗阶段没有入场动画（宝石直接显示在纯黑背景上），且在命运抟择（`selection`）阶段仍然显示在屏幕上。
+
+**根因**：`sys_loop` 第6步的 `fieldLootItems` 渲染没有阶段限制，在所有阶段（包括 `selection`）都会执行 `update` 和 `draw`。同时，该渲染在 `phase_combat_update` 的 LAYER 2（实体层）的 `ctx.restore()` 之外，没有 `entityShiftX/Y` 视差偏移。当战斗阶段结束、切换到 `selection` 阶段时，`phase_combat_update` 不再被调用，战斗背景消失，宝石渲染在纯黑 canvas 上，看起来像“没有动画”。另外，`phase-selection` DOM 没有背景色（透明），宝石透过 DOM 层显示在 canvas 上，造成“一直停留在屏幕上”的视觉效果。
+
+**正确做法**：将 `fieldLootItems` 的 `update`/`draw` 循环移入 `phase_combat_update` 的 LAYER 2 内部（紧跟 `runeLootItems` 渲染块之后，在 `ctx.restore()` 之前），并从 `sys_loop` 第6步移除该渲染。这样宝石就能：
+1. 享有与敌人相同的视差偏移（`entityShiftX/Y`），位置正确
+2. 只在 `combat`/`training` 阶段渲染，不会泄漏到 `selection` 等其他阶段
+
+**关键位置**：`src/game_phase.js` → `phase_combat_update` LAYER 2 结尾（`runeLootItems` 渲染块之后，`ctx.restore()` 之前）；`src/game_system.js` → `sys_loop` 第6步（已替换为注释）
+
+---
+
 ## 关键耦合点
 
 - `phase_advanceWave` 和 `phase_finalizeRound` 共同维护 `this.round`，修改任一函数时必须检查另一个。
 - `meta_buyUpgrade` 依赖 `CONFIG` 中的升级配置结构，修改配置格式时需同步检查此函数。
 - `specialSlots` 的生命周期横跨 `game_system.js`（重置）和 `game_phase.js`（初始化），两处必须保持一致。
+- `fieldLootItems` 必须在 `phase_combat_update` 的 LAYER 2 内渲染，不能放在 `sys_loop` 的全局渲染循环中（无阶段限制）。
 
 ## 版本变更日志
 
@@ -153,3 +170,4 @@ status: "active"
 | v1.3 | 2026-04-20 | 新增坑 8：替换子弹阶段跳过后 `confirmBtn.onclick` 未恢复，导致纯净精华选择后无法发射子弹、直接循环敌人回合 | echo-developer |
 | v1.4 | 2026-04-21 | 新增坑 9：`ui_confirmSelection` 调用不存在的 `sys_confirmSelection`，导致“开始炼金”按鈕完全无响应 | echo-developer |
 | v1.5 | 2026-04-22 | 新增坑 10：`sys_skipGrindGetRune` 未充能 `ammoQueue`，跳过研磨后子弹列表为空导致敌人回合循环 | echo-developer |
+| v1.6 | 2026-04-25 | 新增坑 11：`fieldLootItems` 渲染放在 `sys_loop` 全局循环（无阶段限制），导致宝石在 `selection` 阶段泄漏显示且无入场动画 | echo-developer |
