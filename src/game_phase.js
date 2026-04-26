@@ -1036,14 +1036,15 @@ phase_gathering_getRandomPegType() {
 
         // 3. [补充行] 结算时存活敌人 ≤5，额外多生成一行，并给原空列的新敌人赋予极速词条
         // 注意：此处仅在非 Boss 回合且存活敌人 ≤5 时触发（清屏时 activeEnemies.length === 0，不触发）
+        // [issue-2] 改为画面外入场：调用 spawn_spawnEnemyRowOffScreen，新敌人从画面外滑入"队列"位置
         if (activeEnemies.length > 0 && activeEnemies.length <= 5) {
             const totalCols = CONFIG.gameplay.enemyCols;
             // 记录生成前已有敌人的列（用于对比找出原空列）
             const colsWithEnemiesBefore = new Set(
                 activeEnemies.map(e => e._spawnColIndex).filter(c => c !== undefined)
             );
-            // 额外生成一行（生成在战斗网格顶部）
-            this.spawn_spawnEnemyRow(1);
+            // 额外生成一行（画面外入场，下回合敌人行动阶段移动进入网格顶部）
+            this.spawn_spawnEnemyRowOffScreen(1);
             // 找出原本没有敌人的列（生成前的空列）
             const emptyCols = [];
             for (let c = 0; c < totalCols; c++) {
@@ -1102,7 +1103,8 @@ phase_gathering_getRandomPegType() {
             if (rowCountCurrent < 4) spawnCount = 3;
             // [清屏奖励] 上一回合完成清屏，本回合至少推进 3 行敌人
             if (this._prevRoundCleared && spawnCount < 3) spawnCount = 3;
-            this.spawn_spawnEnemyRow(spawnCount);
+            // [issue-2] 改为画面外入场：新敌人从画面外滑入网格顶部，避免凭空出现
+            this.spawn_spawnEnemyRowOffScreen(spawnCount);
         }
         // [清屏状态] 将本回合清屏结果写入标志位，供下一回合读取
         this._prevRoundCleared = clearedThisRound;
@@ -1596,7 +1598,8 @@ phase_gathering_getRandomPegType() {
                     e.draw(this.ctx);
                     // Boss 入场动画期间（pos.y 在屏幕外）也计入活跃敌人，防止误判完美清场
                     // [演出时机修复] 同时兼容 _pendingEntrance 状态（Boss 在屏幕外待机）
-                    if (e.pos.y > 0 || (e.type === 'boss' && (e.entranceTimer > 0 || e._pendingEntrance))) {
+                    // [issue-2] 普通敌人画面外入场（_spawnedThisTurn）也计入活跃，避免误判完美清场
+                    if (e.pos.y > 0 || (e.type === 'boss' && (e.entranceTimer > 0 || e._pendingEntrance)) || e._spawnedThisTurn) {
                         activeEnemies++;
                     }
                     if (Math.abs(e.pos.y - e.dropTargetY) > 1) anyEnemyMoving = true;
@@ -1869,6 +1872,14 @@ phase_gathering_getRandomPegType() {
         if (playerTurnFinished && !this.gameOver) {
             // [回合开始横幅保护] 横幅期间不触发敌人行动，避免与上一回合结束时的敌人行动重复
             if (this._roundStartBannerActive) return;
+            // [遗物/命运时刻保护] 遗物或命运时刻 overlay 显示期间，必须等待玩家选择完毕
+            // 否则会在 phase_finalizeRound 调用 sys_startRoundStartResolver 后立刻再次触发
+            // phase_enemy_startLogic（因为 isEnemyTurn 已被置 false 且 ammoQueue 为空），
+            // 表现为：遗物卡片弹出时背景中敌人继续行动、进入下一回合。
+            if (this._roundStartResolverActive) return;
+            if (this.pendingRoundStartRewards && this.pendingRoundStartRewards.length > 0) return;
+            const _relicOverlay = document.getElementById('phase-relic');
+            if (_relicOverlay && _relicOverlay.classList.contains('active-phase')) return;
             // 试炼场模式下，不自动进入敌人回合
             if (this.phase === 'training') {
                 if (this.isEnemyTurn) {

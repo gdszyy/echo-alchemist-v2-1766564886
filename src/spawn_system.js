@@ -192,7 +192,10 @@ export const spawn_system = {
      * 3. 混合填充：智能填充剩余空位。
      */
     // @section:spawn_row_config - 行配置读取：波次参数与难度缩放
-    spawn_spawnEnemyRowAt(yPos) {
+    // [issue-2] options.offScreenEntrance: 新敌人在画面外（dropTargetY 上方一行）出现，
+    // 通过 pos.y 与 dropTargetY 之差驱动 Enemy.update() 的下落动画，并设置 hasActedThisTurn=true
+    // 让本回合扫描波跳过它们，由后续回合的扫描波正常触发。
+    spawn_spawnEnemyRowAt(yPos, options = {}) {
         const b = CONFIG.balance;
         
         // --- [优化] 动态血量修正逻辑 (V2: 指数膨胀) ---
@@ -498,7 +501,15 @@ export const spawn_system = {
                     const weakHP = Math.max(1, Math.floor(baseHP * variantRatio));
                     hp = weakHP;
                 }
-                const e = new Enemy(centerX, yPos, w, this.enemyHeight, hp);               
+                const e = new Enemy(centerX, yPos, w, this.enemyHeight, hp);
+                // [issue-2] 画面外入场：将 pos.y 抬升到 dropTargetY 之上两行（确保第一行也完全在画面顶部上方），
+                // 由 Enemy.update() 自动驱动下落动画。配合 hasActedThisTurn=true，确保新敌人在出生回合
+                // 不被扫描波误触；下一回合 phase_enemy_startLogic 重置 hasActedThisTurn 后扫描波正常作用。
+                if (options.offScreenEntrance) {
+                    e.pos.y = yPos - 2 * this.enemyHeight;
+                    e.hasActedThisTurn = true;
+                    e._spawnedThisTurn = true;
+                }
                 // [新增 C2] 记录列索引，供 shield 词缀蜂巢脉冲相位偏移使用
                 e._spawnColIndex = c;
                 // 生成词条 (如果是弱点怪，不带词条)
@@ -549,6 +560,14 @@ export const spawn_system = {
             // 二次检查碰撞，虽然 occupiedCols 应该保证了位置
             if (!this.calc_isAreaOccupied(centerX, yPos, w * 0.8, this.enemyHeight * 0.8)) {
                 const e = new Enemy(centerX, yPos, w, this.enemyHeight, cfg.hp);
+                // [issue-2] 画面外入场：将 pos.y 抬升到 dropTargetY 之上两行（确保第一行也完全在画面顶部上方），
+                // 由 Enemy.update() 自动驱动下落动画。配合 hasActedThisTurn=true，确保新敌人在出生回合
+                // 不被扫描波误触；下一回合 phase_enemy_startLogic 重置 hasActedThisTurn 后扫描波正常作用。
+                if (options.offScreenEntrance) {
+                    e.pos.y = yPos - 2 * this.enemyHeight;
+                    e.hasActedThisTurn = true;
+                    e._spawnedThisTurn = true;
+                }
                 // [新增 C2] 记录列索引，供 shield 词缀蜂巢脉冲相位偏移使用
                 e._spawnColIndex = cfg.col;
                 e.affixes = cfg.affixes || [];
@@ -609,6 +628,22 @@ export const spawn_system = {
      * @param {number} [count=1] - **重要参数** 要生成的敌人行数。
      */
     spawn_spawnEnemyRow(count = 1) { for(let i=0; i<count; i++) { this.spawn_spawnEnemyRowAt(this.combatGridTopY - (i * this.enemyHeight)); } },
+
+/**
+     * @method spawn_spawnEnemyRowOffScreen
+     * @description [issue-2] 行为与 spawn_spawnEnemyRow 一致（dropTargetY 落在网格顶部及栈式向上），
+     * 但每个新敌人 pos.y 从 dropTargetY 上方两格（确保第一行也完全在画面顶部上方）开始，
+     * 由 Enemy.update() 驱动下落动画，替代旧实现中"凭空出现在画面顶部"的瞬间生成观感。
+     * 配合 hasActedThisTurn=true，避免新敌人还在画面外/未到位时被本回合扫描波误触。
+     * @param {number} [count=1] - 要生成的行数。
+     */
+    spawn_spawnEnemyRowOffScreen(count = 1) {
+        for (let i = 0; i < count; i++) {
+            // 与 spawn_spawnEnemyRow 相同的 dropTargetY 序列：第 0 行落在网格顶部，多行依次向上栈式排列
+            const yPos = this.combatGridTopY - i * this.enemyHeight;
+            this.spawn_spawnEnemyRowAt(yPos, { offScreenEntrance: true });
+        }
+    },
 
 /**
      * @method triggerCloneSpawn
