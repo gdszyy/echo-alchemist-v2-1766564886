@@ -186,6 +186,20 @@
         .pulse-a { animation: rarity-pulse-a 2.5s infinite ease-in-out; }
         .pulse-b { animation: rarity-pulse-b 3s infinite ease-in-out; }
 
+        /* [tsk-bullet-ui] 子弹替换卡片悬浮效果：未选中时鼠标悬浮上抬+发光 */
+        .replace-ammo-card { will-change: transform, box-shadow; }
+        .replace-ammo-card:hover {
+            transform: translateY(-6px) scale(1.03);
+            box-shadow: 0 10px 24px rgba(0,0,0,0.55), 0 0 16px rgba(255,255,255,0.18);
+            filter: brightness(1.08);
+        }
+        /* 顶部图标的常驻浮动（轻微，避免与 .card-floating 冲突） */
+        .card-icon-idle { animation: card-icon-bob 4.5s ease-in-out infinite; }
+        @keyframes card-icon-bob {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50%      { transform: translateX(-50%) translateY(-2px); }
+        }
+
         /* --- [新增] 符文发光闪烁特效 --- */
         @keyframes rune-glow-pulse {
             0% { box-shadow: 0 0 5px rgba(168, 85, 247, 0.4); border-color: rgba(168, 85, 247, 0.4); }

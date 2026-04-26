@@ -74,16 +74,17 @@ class Projectile {
         this.lifeTime = 60 * 30; // [修改] 加倍子弹生命时间 (从15秒增加到30秒)
         this.chainHistory = [];
         this.trail = [];
-        // [拖尾增强 #6] 根据子弹强度（属性层数）和类型决定拖尾长度，提高高强度子弹的视觉显著度。
+        // [拖尾调优] 根据子弹强度（属性层数）和类型决定拖尾长度。
+        // 用户反馈：拖尾过长且过实，需要更短更淡的视觉效果。
         const _tierStat = (config.damage || 0) + (config.bounce || 0) + (config.pierce || 0)
             + (config.scatter || 0) + (config.cryo || 0) + (config.pyro || 0)
             + (config.lightning || 0) + (config.laser || 0)
             + (config.flying_sword || 0) + (config.wind || 0);
-        let _trailMax = 6 + Math.min(28, Math.floor(_tierStat * 0.6));
-        if (config.isLaser) _trailMax += 8;
-        if (config.type === 'flying_sword') _trailMax += 6;
-        if (config.pierce > 0) _trailMax += 4;
-        if (config.explosive) _trailMax += 2;
+        let _trailMax = 4 + Math.min(14, Math.floor(_tierStat * 0.3));
+        if (config.isLaser) _trailMax += 4;
+        if (config.type === 'flying_sword') _trailMax += 3;
+        if (config.pierce > 0) _trailMax += 2;
+        if (config.explosive) _trailMax += 1;
         this.maxTrailLength = _trailMax;
         this.tierStat = _tierStat;
         this.deformation = { x: 1, y: 1 };
@@ -724,8 +725,9 @@ class Projectile {
         else if ((cfg.scatter || 0) > 0) trailColor = '#facc15';
 
         const tier = Math.min(3, Math.floor((this.tierStat || 0) / 8));
-        // 基础宽度随子弹半径与强度联动；S 级（tier 3）显著加宽
-        const baseWidth = Math.max(1.5, this.radius * (0.55 + tier * 0.18));
+        // [拖尾调优] 用户反馈：拖尾过粗过亮，整体降一档。
+        // 基础宽度随子弹半径联动；高强度子弹仅小幅加宽
+        const baseWidth = Math.max(1.0, this.radius * (0.35 + tier * 0.10));
         const len = trail.length;
 
         ctx.save();
@@ -736,15 +738,15 @@ class Projectile {
             ctx.globalCompositeOperation = 'lighter';
         }
         ctx.shadowColor = trailColor;
-        ctx.shadowBlur = 4 + tier * 4;
+        ctx.shadowBlur = 2 + tier * 2;
 
-        // 段落式渐变描边：越靠近当前位置越亮、越粗
+        // 段落式渐变描边：越靠近当前位置越亮、越粗，整体透明度更低更轻盈
         for (let i = 1; i < len; i++) {
             const a = trail[i - 1];
             const b = trail[i];
             const t = i / (len - 1);
-            const alpha = Math.max(0.04, t * (0.55 + tier * 0.12));
-            const width = Math.max(0.6, baseWidth * t);
+            const alpha = Math.max(0.02, t * (0.30 + tier * 0.08));
+            const width = Math.max(0.4, baseWidth * t);
             ctx.strokeStyle = `${trailColor}`;
             ctx.globalAlpha = alpha;
             ctx.lineWidth = width;
@@ -756,14 +758,14 @@ class Projectile {
 
         // S 级追加一层更细更亮的核心拖尾
         if (tier >= 3 || cfg.isLaser) {
-            ctx.shadowBlur = 12;
-            for (let i = Math.max(1, len - 8); i < len; i++) {
+            ctx.shadowBlur = 6;
+            for (let i = Math.max(1, len - 5); i < len; i++) {
                 const a = trail[i - 1];
                 const b = trail[i];
                 const t = i / (len - 1);
                 ctx.strokeStyle = '#ffffff';
-                ctx.globalAlpha = 0.6 * t;
-                ctx.lineWidth = Math.max(0.8, baseWidth * 0.45 * t);
+                ctx.globalAlpha = 0.35 * t;
+                ctx.lineWidth = Math.max(0.6, baseWidth * 0.30 * t);
                 ctx.beginPath();
                 ctx.moveTo(a.x, a.y);
                 ctx.lineTo(b.x, b.y);

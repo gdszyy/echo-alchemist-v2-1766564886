@@ -622,6 +622,27 @@ phase_gathering_getRandomPegType() {
             });
         }
 
+        // [tsk-bullet-ui] 兜底保护：若 ammoQueue 与 marbleQueue 同时为空（例如玩家在
+        // 纯净精华命运时刻点击「跳过研磨」获取符文，且上回合无 _chargedAmmoQueue），
+        // 此时直接进入战斗会导致「彈藥耗盡」横幅一直显示且敌人回合无法推进。
+        // 此处强制回退到研磨阶段，重新生成弹珠选择，避免无限敌人回合死循环。
+        if (this.ammoQueue.length === 0 && (!this.marbleQueue || this.marbleQueue.length === 0)) {
+            console.warn('[phase_startCombatPhase] ammoQueue 与 marbleQueue 均为空，回退到研磨阶段防止死循环');
+            // 重置可能残留的命运时刻状态，确保进入标准研磨流程
+            this.selectionMode = 'standard';
+            this.fateMomentContext = null;
+            this.pendingSelectionMode = null;
+            this.replaceAmmoContext = null;
+            this._chargedAmmoQueue = null;
+            // 进入标准选择阶段（非命运时刻），让玩家选择弹珠后再进研磨
+            if (typeof this.sys_initSelectionPhase === 'function') {
+                this.sys_initSelectionPhase();
+            } else {
+                this.phase_switchPhase('selection');
+            }
+            return;
+        }
+
         // --- [核心修复 2]：UI 渲染 ---
         // 修复后，上面的代码不再报错，这一行将被正确执行，HUD 会在进入战斗时立即出现
         this.ui_updateUI();
