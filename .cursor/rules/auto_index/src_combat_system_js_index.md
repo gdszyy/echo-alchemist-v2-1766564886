@@ -1,6 +1,6 @@
 # src/combat_system.js 函数索引
 
-> 自动生成于 2026-04-25 | 总行数: 3362 | 函数数: 42 | 语言: javascript
+> 自动生成于 2026-04-26 | 总行数: 3364 | 函数数: 42 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 5 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -109,6 +109,7 @@
 |----------|------|
 | `@section:laser_hit_processing` | 激光命中处理与连锁反应 |
 | `@section:laser_visual_beam` | 激光光束视觉渲染 |
+| `@section:laser_audio` | 激光束发射音效（sawtooth，频率随宽度反比：越粗越低沉，100~800Hz） |
 
 ## 其他 @section 标记
 
@@ -117,3 +118,5 @@
 | `@section:skill_type_dispatch` | 技能类型分发：主动/被动/触发分支 |
 | `@section:wind_circle_geometry` | 风圈几何计算与碰撞范围确定 |
 | `@section:damage_pre_calc` | 伤害前置计算：基础值、暴击、穿透 |
+| `@section:rune_charge_levelup_audio` | 符文充能条升级音效（520Hz sine，轻柔上升感） |
+| `@section:rune_charge_claim_audio` | 符文充能完成领取音效（playPowerup 确认感） |

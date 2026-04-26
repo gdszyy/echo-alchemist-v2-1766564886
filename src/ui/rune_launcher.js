@@ -230,6 +230,7 @@ export const rune_launcher_system = {
                     this.runeGrid[i] = null;  // [Mixin 正常用法：读取 Game 实例状态]
                     this.runeInventory.push(runeEntry);  // [Mixin 正常用法：读取 Game 实例状态]
                     this.ui_updateRuneGrid();
+                    // @section:rune_grid_remove_audio - 符文格移除音效（400Hz，轻柔确认）
                     audio.playTone(400, 'sine', 0.08, 0.15);
                 } else {
                     // 空格：打开符文选择器
@@ -315,6 +316,7 @@ export const rune_launcher_system = {
                 this.runeGrid[cellIndex] = runeEntry;
                 this.ui_closeRunePicker();
                 this.ui_updateRuneGrid();
+                // @section:rune_picker_place_audio - 符文从选择器放入格子的确认音效（600Hz）
                 audio.playTone(600, 'sine', 0.1, 0.2);
             };
 
@@ -327,6 +329,7 @@ export const rune_launcher_system = {
                     </div>
                 `).join('');
                 tooltip.classList.remove('hidden');
+                // @section:rune_hover_audio - 符文词条悬停预览音效（880Hz 极轻，仅提示）
                 try { if (audio?.playTone) audio.playTone(880, 'sine', 0.05, 0.1); } catch(e) {}
             };
 
@@ -954,6 +957,7 @@ export const rune_launcher_system = {
                 `⚗️ 合成成功！获得 ${runeName} Lv.${mergedLevel}，+${shardReward} 🔮 符文碎片`,
                 'success'
             );
+            // @section:rune_merge_audio - 符文合成成功音效（880Hz 较响，强调成功感）
             audio.playTone(880, 'sine', 0.15, 0.3);
             this.ui_updateRuneGrid();
         } else {
@@ -983,6 +987,7 @@ export const rune_launcher_system = {
                 `🔮 重铸完成！获得 ${runeName} Lv.${result.result.level}`,
                 'success'
             );
+            // @section:rune_reforge_audio - 符文重铸完成音效（660Hz triangle，柔和质感）
             audio.playTone(660, 'triangle', 0.12, 0.4);
             this.ui_updateRuneGrid();
         } else {
@@ -1530,6 +1535,7 @@ export const rune_launcher_system = {
 
         this.ui_updateRuneGrid();
         showToast('✨ 已自动排布符文');
+        // @section:rune_auto_arrange_audio - 符文自动排布完成音效（660Hz sine）
         audio.playTone(660, 'sine', 0.1, 0.3);
     },
 

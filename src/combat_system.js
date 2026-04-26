@@ -2759,7 +2759,7 @@ export const combat_system = {
             this._continuousLaserState.activeBeams = newBeams;
         }
 
-        // 音效：越粗越低沉
+        // @section:laser_audio - 激光束发射音效（sawtooth，频率随宽度反比：越粗越低沉，100~800Hz）
         audio.playTone(Math.max(100, 800 - mainWidth * 20), 'sawtooth', 0.15, 0.2 + mainWidth * 0.01);
         // [照射词条] 持续照射模式下，isVisualEffectActive 由状态机维持，不在此清除
         // [修复] 非持续模式改用帧计数淡出，避免 setTimeout 在回合切换后仍然执行
@@ -3032,6 +3032,7 @@ export const combat_system = {
             runeDef:   this.runeChargeCurrentRune,
             runeLevel: this.runeChargeCurrentLevel
         });
+        // @section:rune_charge_levelup_audio - 符文充能条升级音效（520Hz sine，轻柔上升感）
         // 音效反馈
         try { if (audio?.playTone) audio.playTone(520, 'sine', 0.1, 0.25); } catch(e) {}
     },
@@ -3080,6 +3081,7 @@ export const combat_system = {
             level
         });
 
+        // @section:rune_charge_claim_audio - 符文充能完成领取音效（playPowerup 确认感）
         // 音效
         try { if (audio?.playPowerup) audio.playPowerup(); } catch(e) {}
 

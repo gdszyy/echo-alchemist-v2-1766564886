@@ -771,12 +771,14 @@ class Enemy {
             this.actionPhase = 'telegraphing';
             this.telegraphTimer = 35; // 约 0.6 秒的预警时间
             // 播放一个“蓄力”音效
+            // @section:enemy_telegraph_audio - 敌人特殊动作预警蓄力音（低频 200Hz，区别于玩家蓄力 800Hz）
             audio.playTone(200, 'sine', 0.1, 0.1); 
         }
     }
 
     // --- [核心修改] 第二步：执行动作 (Execute Action) ---
     executeTurnAction(game) {
+        // @section:enemy_action_audio - 敌人行动音效分发：regen/split/freeze 按词缀类型路由
         const afx = CONFIG.balance.affixes;
         let actionCount = 1;
         
@@ -977,6 +979,7 @@ class Enemy {
     }
 
     performTurnActionAndMove(game) {
+        // @section:enemy_move_audio - 敌人移动时的状态音效（regen/split/devour 词缀）
         const afx=CONFIG.balance.affixes
         // [改动] haste 不再增加行动次数，狂暴词条也不在此处判定（由 startTurnAction 处理）
         let actionCount = 1;

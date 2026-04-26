@@ -1943,6 +1943,7 @@ class DropBall {
         // [新增] 处理钉子交互（同化、突变、升级）
 
         handlePegInteraction(peg, game) {
+            // @section:peg_audio_feedback - 钉子属性触发音效路由（mutation→playMagic, upgrade→playPowerup, attribute→playMagic）
             // 1. 获取当前弹珠的属性类型
             let ballType = this.def.type;
 
@@ -4110,7 +4111,7 @@ class Player {
             this.isChargingShot = true;
             this.chargeProgress = 0;
             
-            // 播放蓄力开始音效
+            // @section:charge_shot_audio - 玩家蓄力发射开始音效（高频 800Hz，区别于敌人预警 200Hz）
             if (audio) audio.playTone(800, 'sine', 0.1, 0.1);
             
             return true;

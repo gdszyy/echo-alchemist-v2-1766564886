@@ -1,6 +1,6 @@
 # src/ui/rune_launcher.js 函数索引
 
-> 自动生成于 2026-04-25 | 总行数: 1710 | 函数数: 25 | 语言: javascript
+> 自动生成于 2026-04-26 | 总行数: 1716 | 函数数: 25 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -36,3 +36,23 @@
 | _ui_showRunewordBubble | method | `_ui_showRunewordBubble(formableRunewords)` |  |
 | _ui_hideRunewordBubble | method | `_ui_hideRunewordBubble()` |  |
 | ui_autoArrangeRunes | method | `ui_autoArrangeRunes()` | ⚠️ 巨型函数，见 @section 导航 |
+
+## 巨型函数内部节点 (@section 标记)
+
+### ui_autoArrangeRunes
+
+> 定位：`grep -n '@section:{}'` 跳转到对应节点
+
+| 节点标记 | 说明 |
+|----------|------|
+| `@section:rune_auto_arrange_audio` | 符文自动排布完成音效（660Hz sine） |
+
+## 其他 @section 标记
+
+| 节点标记 | 说明 |
+|----------|------|
+| `@section:rune_grid_remove_audio` | 符文格移除音效（400Hz，轻柔确认） |
+| `@section:rune_picker_place_audio` | 符文从选择器放入格子的确认音效（600Hz） |
+| `@section:rune_hover_audio` | 符文词条悬停预览音效（880Hz 极轻，仅提示） |
+| `@section:rune_merge_audio` | 符文合成成功音效（880Hz 较响，强调成功感） |
+| `@section:rune_reforge_audio` | 符文重铸完成音效（660Hz triangle，柔和质感） |

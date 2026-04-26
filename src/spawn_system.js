@@ -1445,7 +1445,8 @@ export const spawn_system = {
                 // 音效
                 const progress = Math.min(1, this.currentSession.currentHits / this.currentSession.nextTriggerThreshold);
                 if (this.currentSession.currentHits < this.currentSession.nextTriggerThreshold) {
-                    if (Math.random() < 0.5) audio.playTone(500 * (1.0 + progress * 0.5), 'triangle', 0.05, 0.2); 
+                    // @section:energy_orb_collect_audio - 能量球收集进度音效（500~750Hz 随进度升调，营造蓄力感）
+                if (Math.random() < 0.5) audio.playTone(500 * (1.0 + progress * 0.5), 'triangle', 0.05, 0.2); 
                 }
 
                 // 更新 UI
@@ -1495,6 +1496,7 @@ export const spawn_system = {
     this.currentSession.multicast++; 
     this.combat_updateMulticastDisplay(1);
     
+    // @section:levelup_audio - 能量槽满触发多播升级爆发音（pitch = multicast 等级，越高越尖锐）
     // 1. 音效爆發
     audio.playPowerup(this.currentSession.multicast); 
     
