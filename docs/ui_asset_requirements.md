@@ -34,24 +34,24 @@
 |----|---------|----------|----------|---------|---------|
 | 1.1 | `#phase-title-container` | 启动标题 / 点击开始 | 🟡 | 文字 + Cinzel 字体 | 标题徽章 PNG、点击「开始按钮」金属底板 |
 | 1.2 | `#phase-meta` | 局外元商店 / 升级树 | 🟡 | 顶部栏 9-Slice、卡片 9-Slice 边框 | **元商店分类标签 Tab Sprite**、**SP 货币图标**、升级卡片占位插画 |
-| 1.3 | `#phase-rune-launcher` | 符文发射器主面板 | ❌ | — | **整面发射器底板（含装弹槽视觉）**、Tab 切换按钮 Active/Idle、装弹动画帧 |
+| 1.3 | `#phase-rune-launcher` | 符文发射器主面板 | 🟡 | `rune_launcher_9s.png`、`rune_slot_idle.png`、`rune_slot_active.png` | Tab 切换按钮 Active/Idle、装弹动画帧 |
 | 1.4 | `#phase-shop` | 局外商店（货架） | 🟡 | 卡片 9-Slice | **背景插画（炼金工房内景）**、商店物品分类图标、价格标签 |
 | 1.5 | `#phase-selection` | 弹珠选择 / 子弹替换 / 命运时刻 | 🟡 | 卡片 9-Slice、属性图标（Emoji） | **整面背景**、卡片顶部的属性图标位（目前用 Emoji，需替换为位图）、稀有度光环装饰 |
-| 1.6 | `#phase-gathering` | 研磨阶段（弹珠台） | ❌ | — | **弹珠台背景（炼金阵图）**、发射器装置（炮台底座）、底部「钉盘外框」装饰 |
-| 1.7 | `#phase-combat` | 战斗阶段（无 DOM 主面板） | ❌ | — | **战场背景（远景塔楼/熔炉/冰窟，按 Boss 类型变化）**、发射器顶部蓄力指示位图 |
-| 1.8 | `#phase-truth-book` | 真理之书 / 图鉴 | ❌ | — | **整面卷轴/书页背景**、章节侧标 Tab、属性卡片底板、Boss 头像位 |
+| 1.6 | `#phase-gathering` | 研磨阶段（弹珠台） | 🟡 | `bg_main_canvas.png`、`bg_emitter_zone.png`、`emitter_base.png` | 底部「钉盘外框」装饰 |
+| 1.7 | `#phase-combat` | 战斗阶段（无 DOM 主面板） | 🟡 | `bg_main_canvas.png`、`emitter_base.png` | 战场背景（按 Boss 类型变化的专属背景）、发射器顶部蓄力指示位图 |
+| 1.8 | `#phase-truth-book` | 真理之书 / 图鉴 | 🟡 | `truth_book_bg_9s.png` | 章节侧标 Tab、属性卡片底板、Boss 头像位 |
 | 1.9 | `#phase-relic` | 遗物选择 overlay | 🟡 | 遗物图标 PNG（已较完整）+ 卡片 9-Slice 边框 | **覆层背景纹理**（暗紫炼金阵）、稀有度光环、「跳过」按钮金属感 |
-| 1.10 | `#phase-gameover` | 游戏结束/结算 | ❌ | — | **结算背景插画（光暗双联画）**、统计数据卡片 9-Slice、奖励发放动画图层 |
+| 1.10 | `#phase-gameover` | 游戏结束/结算 | 🟡 | `gameover_bg.png` | 统计数据卡片 9-Slice、奖励发放动画图层 |
 | 1.11 | `#phase-pause` | 暂停菜单 | ❌ | — | 半透明背景、菜单按钮 9-Slice |
 | 1.12 | `#unified-top-bar` | 顶部状态栏 | ✅ | 9-Slice `top_bar_9s.png` | — |
 | 1.13 | `.bottom-panel` | 底部弹药栏 | ✅ | 9-Slice `bottom_panel_9s.png` | — |
-| 1.14 | `#settings-panel` | 设置弹窗 | ❌ | — | **整窗背景 9-Slice**、开关 Toggle Sprite、滑条 Sprite、关闭按钮 |
+| 1.14 | `#settings-panel` | 设置弹窗 | 🟡 | `settings_modal_9s.png`、`toggle_on.png`、`toggle_off.png` | 滑条 Sprite、关闭按钮 |
 | 1.15 | `#combat-rune-charge-ui` | 战斗中符文充能 UI | 🟡 | 符文 PNG | 充能槽底板（液体/能量条）、充能完成「升级」帧动画 |
-| 1.16 | `#multiplier-display` | 连击倍率显示 | ❌ | — | 倍率徽章 PNG（×2、×3、×5 三档） |
-| 1.17 | `#skill-bar` | 战斗技能栏 | 🟡 | 技能图标 PNG | 技能槽底板、冷却扫描帧 |
-| 1.18 | `#round-start-banner` | 回合开始横幅 | ❌ | — | **回合数大字横幅**（金属字 + 光晕，可循环 6 张） |
+| 1.16 | `#multiplier-display` | 连击倍率显示 | ✅ | `multiplier_x2.png`、`multiplier_x3.png`、`multiplier_x5.png` | — |
+| 1.17 | `#skill-bar` | 战斗技能栏 | 🟡 | 技能图标 PNG、`rune_slot_idle.png`、`rune_slot_active.png` | 冷却扫描帧 |
+| 1.18 | `#round-start-banner` | 回合开始横幅 | ✅ | `round_banner_1.png` ~ `round_banner_6.png`（6 帧，600×200） | — |
 | 1.19 | 数据统计页（与图鉴并入 truth-book） | 历次伤害/记录 | ❌ | — | 折线图背景、数据指标徽章、最佳记录 ribbon |
-| 1.20 | `.ammo-icon` 弹药槽位 | 战斗 / 收集阶段 | 🟡 | `assets/icons/ammo/*.png` 已覆盖基础 7 种 | **缺 explosive、matryoshka、rainbow、resonance、flying_sword、wind 的位图**（目前回退到 emoji） |
+| 1.20 | `.ammo-icon` 弹药槽位 | 战斗 / 收集阶段 | ✅ | `assets/icons/ammo/*.png` 已覆盖全部 12 种（含 matryoshka、rainbow、resonance、flying_sword、wind） | — |
 
 ---
 
@@ -61,38 +61,38 @@
 
 | 资产 | 用途 | 建议尺寸 | 备注 |
 |------|------|---------|------|
-| `assets/ui/backgrounds/bg_main_canvas.png` | 战斗 / 研磨阶段全屏背景 | 720×1280（按 1080P 等比） | 暗黑赛博炼金风，需保留中部低对比区域以承载实体绘制 |
-| `assets/ui/backgrounds/bg_emitter_zone.png` | 底部发射器装饰 | 720×220 | 包含炼金台基座、能量管路 |
-| `assets/ui/sprites/emitter_base.png` | 发射器炮台本体 | 96×96，中心 anchor (0.5, 0.7) | 静态贴图（带高光层） |
-| `assets/ui/sprites/emitter_charging_*.png` | 蓄力 6 帧动画 | 96×96 | `_0.png` ~ `_5.png` |
-| `assets/icons/ammo/ammo_explosive.png` | 爆破弹药图标 | 32×32 | 与现有 `ammo_*.png` 风格一致 |
-| `assets/icons/ammo/ammo_matryoshka.png` | 套娃弹药图标 | 32×32 | 同上 |
-| `assets/icons/ammo/ammo_rainbow.png` | 七彩弹药图标 | 32×32 | 同上（需含彩虹渐变） |
-| `assets/icons/ammo/ammo_resonance.png` | 共鸣弹药图标 | 32×32 | 同上 |
-| `assets/icons/ammo/ammo_flying_sword.png` | 飞剑弹药图标 | 32×32 | 同上 |
-| `assets/icons/ammo/ammo_wind.png` | 风弹药图标 | 32×32 | 同上 |
+| ~~`assets/ui/backgrounds/bg_main_canvas.png`~~ | ✅ **已生成** | 720×1280 | 暗黑赛博炼金风，中部低对比区域 |
+| ~~`assets/ui/backgrounds/bg_emitter_zone.png`~~ | ✅ **已生成** | 720×220 | 含炼金台基座、能量管路 |
+| ~~`assets/ui/sprites/emitter_base.png`~~ | ✅ **已生成**（透明 PNG） | 96×96 | 静态贴图（带高光层） |
+| `assets/ui/sprites/emitter_charging_*.png` | 蓄力 6 帧动画（待生成） | 96×96 | `_0.png` ~ `_5.png` |
+| ~~`assets/icons/ammo/ammo_explosive.png`~~ | ✅ 已有 | 32×32 | 爆破弹药图标 |
+| ~~`assets/icons/ammo/ammo_matryoshka.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 套娃弹药图标 |
+| ~~`assets/icons/ammo/ammo_rainbow.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 七彩弹药图标 |
+| ~~`assets/icons/ammo/ammo_resonance.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 共鸣弹药图标 |
+| ~~`assets/icons/ammo/ammo_flying_sword.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 飞剑弹药图标 |
+| ~~`assets/icons/ammo/ammo_wind.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 风弹药图标 |
 
 ### 2.2 P1 — 完整覆盖核心 UI 模块
 
 | 资产 | 用途 | 建议尺寸 | 备注 |
 |------|------|---------|------|
-| `assets/ui/panels/rune_launcher_9s.png` | 符文发射器主面板 | 512×768，`border-image-slice:48` | 含装弹槽视觉 |
-| `assets/ui/sprites/rune_slot_idle.png` / `_active.png` | 发射器装弹槽态 | 64×64 | 两态切换 |
-| `assets/ui/panels/settings_modal_9s.png` | 设置弹窗背景 | 480×640，slice 32 | 暗紫炼金阵纹理 |
-| `assets/ui/sprites/toggle_on.png` / `toggle_off.png` | 开关 | 56×28 | 24×24 滑块 |
-| `assets/ui/sprites/slider_track.png` / `slider_thumb.png` | 滑条 | 240×16 / 24×24 | 用于音量、速度 |
-| `assets/ui/panels/truth_book_bg_9s.png` | 真理之书背景 | 720×1280，slice 64 | 卷轴/书页质感 |
-| `assets/ui/sprites/truth_book_tab_*.png` | 章节侧标 | 64×120 | 每章节一张 |
-| `assets/ui/banners/round_banner_*.png` | 回合横幅 6 帧 | 600×200 | 金属字 + 光晕动画 |
+| ~~`assets/ui/panels/rune_launcher_9s.png`~~ | ✅ **已生成** | 512×768，`border-image-slice:48` | 含装弹槽视觉 |
+| ~~`assets/ui/sprites/rune_slot_idle.png` / `_active.png`~~ | ✅ **已生成**（透明 PNG） | 64×64 | 两态切换 |
+| ~~`assets/ui/panels/settings_modal_9s.png`~~ | ✅ **已生成** | 480×640，slice 32 | 暗紫炼金阵纹理 |
+| ~~`assets/ui/sprites/toggle_on.png` / `toggle_off.png`~~ | ✅ **已生成**（透明 PNG） | 56×28 | 24×24 滑块 |
+| `assets/ui/sprites/slider_track.png` / `slider_thumb.png` | 滑条（待生成） | 240×16 / 24×24 | 用于音量、速度 |
+| ~~`assets/ui/panels/truth_book_bg_9s.png`~~ | ✅ **已生成** | 720×1280，slice 64 | 卷轴/书页质感 |
+| `assets/ui/sprites/truth_book_tab_*.png` | 章节侧标（待生成） | 64×120 | 每章节一张 |
+| ~~`assets/ui/banners/round_banner_*.png`~~ | ✅ **已生成**（6 帧） | 600×200 | 金属字 + 光晕动画 |
 
 ### 2.3 P2 — 锦上添花
 
 | 资产 | 用途 | 建议尺寸 | 备注 |
 |------|------|---------|------|
-| `assets/ui/sprites/multiplier_x2.png` ~ `x5.png` | 连击倍率徽章 | 96×48 | 三档稀有度配色 |
-| `assets/ui/panels/gameover_bg.png` | 结算背景插画 | 720×1280 | 双联画构图 |
-| `assets/ui/sprites/relic_aura_*.png` | 遗物稀有度光环 | 200×200 | 4 档稀有度 |
-| `assets/ui/sprites/skill_cooldown_overlay.png` | 技能冷却扫描 | 64×64 | 遮罩/扫光层 |
+| ~~`assets/ui/sprites/multiplier_x2.png` ~ `x5.png`~~ | ✅ **已生成**（透明 PNG） | 96×48 | 三档稀有度配色 |
+| ~~`assets/ui/panels/gameover_bg.png`~~ | ✅ **已生成** | 720×1280 | 双联画构图 |
+| `assets/ui/sprites/relic_aura_*.png` | 遗物稀有度光环（待生成） | 200×200 | 4 档稀有度 |
+| `assets/ui/sprites/skill_cooldown_overlay.png` | 技能冷却扫描（待生成） | 64×64 | 遮罩/扫光层 |
 
 ---
 
