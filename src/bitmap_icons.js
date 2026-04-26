@@ -193,6 +193,10 @@ export const EMITTER_CHARGING_SRCS = [
     'assets/ui/sprites/emitter_charging_5.png',
 ];
 
+// Canvas 背景位图（战斗 / 研磨阶段共用主底图，发射区单独叠加炼金台层）
+export const BG_MAIN_CANVAS_SRC   = 'assets/ui/backgrounds/bg_main_canvas.png';
+export const BG_EMITTER_ZONE_SRC  = 'assets/ui/backgrounds/bg_emitter_zone.png';
+
 /**
  * 预热 UI 位图（在游戏启动早期调用，避免战斗首帧卡顿）。
  */
@@ -205,6 +209,8 @@ export function preloadUiBitmaps() {
         ORBITAL_LINK_CAP,
         ...ORBITAL_LINK_FLOW,
         ...ORBITAL_INTAKE,
+        BG_MAIN_CANVAS_SRC,
+        BG_EMITTER_ZONE_SRC,
     ];
     paths.forEach(p => getUiBitmap(p));
 }

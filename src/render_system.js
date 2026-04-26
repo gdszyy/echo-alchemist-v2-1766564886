@@ -18,6 +18,8 @@ import {
     ORBITAL_INTAKE,
     EMITTER_BASE_SRC,
     EMITTER_CHARGING_SRCS,
+    BG_MAIN_CANVAS_SRC,
+    BG_EMITTER_ZONE_SRC,
 } from './bitmap_icons.js';
 
 export const render_system = {
@@ -28,6 +30,25 @@ export const render_system = {
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.ctx.fillStyle = CONFIG.colors.bg;
         this.ctx.fillRect(0, 0, this.width, this.height);
+        // 主底图位图（已生成 720×1280 暗黑赛博炼金风），未加载完成时回退到纯色底
+        const bgMain = getUiBitmap(BG_MAIN_CANVAS_SRC);
+        if (bgMain) {
+            this.ctx.save();
+            this.ctx.globalAlpha = 0.85;
+            this.ctx.drawImage(bgMain, 0, 0, this.width, this.height);
+            this.ctx.restore();
+        }
+        // 发射器区域（底部 220px 高的炼金台层），仅在战斗 / 研磨阶段叠加
+        if (this.phase === 'combat' || this.phase === 'gathering') {
+            const bgEmitter = getUiBitmap(BG_EMITTER_ZONE_SRC);
+            if (bgEmitter) {
+                const zoneH = 220;
+                this.ctx.save();
+                this.ctx.globalAlpha = 0.9;
+                this.ctx.drawImage(bgEmitter, 0, this.height - zoneH, this.width, zoneH);
+                this.ctx.restore();
+            }
+        }
     },
 
 /**
