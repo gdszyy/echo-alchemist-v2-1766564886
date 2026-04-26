@@ -65,7 +65,7 @@
 | ~~`assets/ui/backgrounds/bg_main_canvas.png`~~ | ✅ **已生成** | 720×1280 | 暗黑赛博炼金风，中部低对比区域 |
 | ~~`assets/ui/backgrounds/bg_emitter_zone.png`~~ | ✅ **已生成** | 720×220 | 含炼金台基座、能量管路 |
 | ~~`assets/ui/sprites/emitter_base.png`~~ | ✅ **已生成**（透明 PNG） | 96×96 | 静态贴图（带高光层） |
-| `assets/ui/sprites/emitter_charging_*.png` | 蓄力 6 帧动画（待生成） | 96×96 | `_0.png` ~ `_5.png` |
+| ~~`assets/ui/sprites/emitter_charging_*.png`~~ | ✅ **已生成**（透明 PNG） | 96×96 | `_0.png` ~ `_5.png`，0%→100% 蓄力渐进，纯色底 + rembg 抠图 |
 | ~~`assets/icons/ammo/ammo_explosive.png`~~ | ✅ 已有 | 32×32 | 爆破弹药图标 |
 | ~~`assets/icons/ammo/ammo_matryoshka.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 套娃弹药图标 |
 | ~~`assets/icons/ammo/ammo_rainbow.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 七彩弹药图标 |
