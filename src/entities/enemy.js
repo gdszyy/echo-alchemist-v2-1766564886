@@ -1356,7 +1356,9 @@ class Enemy {
         } else {
             ctx.roundRect(-w/2, -h/2, w, h, r);
         }
-        ctx.fillStyle = '#0f172a';
+        // [透出战场背景] 容器底色由实色 `#0f172a` 改为半透明，让 game-container
+        // 的径向渐变背景能够透过敌人方块隐约可见，避免敌人形成不透明黑块。
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.38)';
         ctx.fill();
         // [增强对比 #4] 在裁剪之前先给容器外缘绘制一圈柔光描边，
         // 让敌人在与背景同色的「液态」战场上仍能识别轮廓（精英/Boss 尤其关键）。
@@ -1398,11 +1400,12 @@ class Enemy {
         const whiteY = _hpBarBottom - whiteHeight;
         const greenY = _hpBarBottom - greenHeight;
 
-        // [增强对比] 先在容器内填一层稍亮的「空槽底色」，避免扣血后的空白和外部背景同色，
-        // 让玩家清晰看到敌人的轮廓与剩余血量边界（精英/Boss 同样适用）。
-        let emptySlotColor = 'rgba(15, 23, 42, 0.65)'; // 普通敌人：偏深的板岩蓝
-        if (this.type === 'elite') emptySlotColor = 'rgba(45, 27, 78, 0.7)';   // 精英：暗紫
-        if (this.type === 'boss') emptySlotColor = 'rgba(60, 12, 20, 0.75)';   // Boss：暗血红
+        // [透出战场背景] 空槽底色保留类型色调（普通/精英/Boss），但 alpha 大幅降低，
+        // 让游戏容器背景透出。轮廓识别由外缘 shadowBlur 描边（见上方 stroke）和液体
+        // 顶部亮边共同承担，无需依赖空槽实色。
+        let emptySlotColor = 'rgba(15, 23, 42, 0.32)'; // 普通敌人：偏深的板岩蓝
+        if (this.type === 'elite') emptySlotColor = 'rgba(45, 27, 78, 0.36)';  // 精英：暗紫
+        if (this.type === 'boss') emptySlotColor = 'rgba(60, 12, 20, 0.40)';   // Boss：暗血红
         ctx.fillStyle = emptySlotColor;
         ctx.fillRect(-w/2, -h/2, w, h);
 
@@ -1437,8 +1440,12 @@ class Enemy {
             baseColor = lerpColor(baseColor, '#0891b2', t);
         }
 
+        // [透出战场背景] HP 填色采用 globalAlpha 让色相保持纯净（lerpColor 输出仍是
+        // 16 进制），同时透出背景；alpha=0.82 在保留主色调辨识度的前提下保留少量透出感。
+        ctx.globalAlpha = 0.82;
         ctx.fillStyle = baseColor;
         ctx.fillRect(-w/2, fillY, w, fillHeight);
+        ctx.globalAlpha = 1.0;
 
         // D. 液面顶部亮边（血量减少时呈现「液面下降」的高光）
         if (hpRatio > 0 && hpRatio < 1) {
