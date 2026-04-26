@@ -629,14 +629,61 @@ export const game_system = {
             chargedRecipes: chargedRecipes.length,
             phase: this.phase,
         });
-        // 默认选中右侧（充能子弹），索引 3, 4, 5
-        const defaultSelected = chargedRecipes.map((_, i) => newRecipes.length + i);
+
+        // [tsk-bullet-ui] 继承玩家上回合的选择偏好：
+        // 1. 通过 _lastReplaceAmmoSignatures 记录玩家上回合实际选中子弹的「特征签名」
+        //    （主弹珠类型 + 主属性 + multicast 等级），作为本回合 default 选中的依据。
+        // 2. 若签名匹配不到（首次进入或弹珠彻底改变），回退到原默认逻辑：选中所有充能子弹。
+        const allRecipes = newRecipes.concat(chargedRecipes);
+        const _signatureOf = (r) => {
+            if (!r) return '';
+            const main = r._marbleType || r.type || 'normal';
+            const flags = `${r.explosive ? 'E' : ''}${r.isMatryoshka ? 'M' : ''}${r.isLaser ? 'L' : ''}`;
+            const mc = (r.multicast || 0) >= 3 ? 'm' : '';
+            const stats = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind']
+                .map(k => r[k] || 0).join('-');
+            return `${main}|${flags}|${mc}|${stats}`;
+        };
+        const lastSigs = Array.isArray(this._lastReplaceAmmoSignatures) ? this._lastReplaceAmmoSignatures.slice() : [];
+        let defaultSelected;
+        if (lastSigs.length > 0) {
+            const usedIdx = new Set();
+            defaultSelected = [];
+            lastSigs.forEach(sig => {
+                for (let i = 0; i < allRecipes.length; i++) {
+                    if (usedIdx.has(i)) continue;
+                    if (_signatureOf(allRecipes[i]) === sig) {
+                        defaultSelected.push(i);
+                        usedIdx.add(i);
+                        break;
+                    }
+                }
+            });
+            // 数量不足时用充能子弹补齐
+            const maxSelect = Math.max(newRecipes.length, chargedRecipes.length, 3);
+            for (let j = 0; j < chargedRecipes.length && defaultSelected.length < maxSelect; j++) {
+                const idx = newRecipes.length + j;
+                if (!usedIdx.has(idx)) { defaultSelected.push(idx); usedIdx.add(idx); }
+            }
+        } else {
+            // 首次进入：默认选中右侧（充能子弹），索引 newRecipes.length 起
+            defaultSelected = chargedRecipes.map((_, i) => newRecipes.length + i);
+        }
+
         this.replaceAmmoContext = {
             active: true,
             newRecipes,          // 新研磨的 recipe（左侧）
             chargedRecipes,      // 充能子弹（右侧）
-            selectedIndices: defaultSelected, // 默认选中右侧全部
+            selectedIndices: defaultSelected, // 继承上回合或默认选中右侧
         };
+        // [tsk-bullet-ui] 修复闪烁：先清空 grid DOM，再切阶段，再渲染 replace UI。
+        // 之前顺序是 switch → render，导致 ui_updateUI() 用 ui_refreshSelectionModeUI
+        // 闪一帧标准命运选择内容，再被 ui_renderReplaceAmmoUI 覆盖。
+        const _gridElPre = document.getElementById('marble-selection-grid');
+        if (_gridElPre) {
+            _gridElPre.style.cssText = '';
+            _gridElPre.innerHTML = '';
+        }
         this.phase_switchPhase('selection');
         if (typeof this.ui_renderReplaceAmmoUI === 'function') {
             this.ui_renderReplaceAmmoUI();
@@ -670,6 +717,18 @@ export const game_system = {
             selectedIndices,
             finalAmmoCount: finalAmmo.length,
         });
+
+        // [tsk-bullet-ui] 记录玩家本回合实际选中子弹的特征签名，下回合用于继承默认选择。
+        const _sigOf = (r) => {
+            if (!r) return '';
+            const main = r._marbleType || r.type || 'normal';
+            const flags = `${r.explosive ? 'E' : ''}${r.isMatryoshka ? 'M' : ''}${r.isLaser ? 'L' : ''}`;
+            const mc = (r.multicast || 0) >= 3 ? 'm' : '';
+            const stats = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind']
+                .map(k => r[k] || 0).join('-');
+            return `${main}|${flags}|${mc}|${stats}`;
+        };
+        this._lastReplaceAmmoSignatures = finalAmmo.map(_sigOf);
 
         this.ammoQueue = finalAmmo;
         this.replaceAmmoContext = null;
@@ -712,6 +771,17 @@ export const game_system = {
         const newRecipes = ctx.newRecipes || [];
         // 跳过：直接使用新研磨的子弹
         this.ammoQueue = newRecipes.slice();
+        // [tsk-bullet-ui] 跳过时也记录签名（取新研磨子弹）以便下次继承
+        const _sigOf = (r) => {
+            if (!r) return '';
+            const main = r._marbleType || r.type || 'normal';
+            const flags = `${r.explosive ? 'E' : ''}${r.isMatryoshka ? 'M' : ''}${r.isLaser ? 'L' : ''}`;
+            const mc = (r.multicast || 0) >= 3 ? 'm' : '';
+            const stats = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind']
+                .map(k => r[k] || 0).join('-');
+            return `${main}|${flags}|${mc}|${stats}`;
+        };
+        this._lastReplaceAmmoSignatures = this.ammoQueue.map(_sigOf);
         this.replaceAmmoContext = null;
         this._chargedAmmoQueue = null;
         // 恢复滚动容器样式（子弹替换阶段修改过）
@@ -822,8 +892,10 @@ export const game_system = {
         // marbleQueue 编译为 ammoQueue，否则进入战斗阶段时 ammoQueue 为空，
         // 导致「彈藥耗盡」→ 敌人回合无限循环。
         // 优先使用 _chargedAmmoQueue（上回合保留的充能子弹），其次使用当前 marbleQueue。
+        let _hasFallbackAmmo = false;
         if (this._chargedAmmoQueue && this._chargedAmmoQueue.length > 0) {
             this.ammoQueue = this._chargedAmmoQueue.slice();
+            _hasFallbackAmmo = true;
         } else if (this.marbleQueue && this.marbleQueue.length > 0) {
             this.ammoQueue = [];
             this.marbleQueue.forEach(marbleDef => {
@@ -833,6 +905,7 @@ export const game_system = {
                 recipe.multicast = marbleDef.multicast || 0;
                 this.ammoQueue.push(recipe);
             });
+            _hasFallbackAmmo = this.ammoQueue.length > 0;
         } else {
             this.ammoQueue = [];
         }
@@ -1248,7 +1321,24 @@ export const game_system = {
         // 渲染出旧的命运选择卡片（如 chaos_essence / pure_essence 界面）。
         this.selectionMode = 'standard';
         this.fateMomentContext = null;
-        if (this.phase !== 'selection') {
+        // [tsk-bullet-ui] 修复闪烁：仅当下一个奖励是精华时才切到 selection 阶段。
+        // 遗物奖励使用 #phase-relic overlay（z-index:200）覆盖当前阶段，无需切到 selection；
+        // 之前无条件 phase_switchPhase('selection') 会让 phase-selection 面板先闪一帧
+        // 旧/空的弹珠选择内容，再被 phase-relic overlay 覆盖。
+        const _nextRewardType = (() => {
+            const r = (this.pendingRoundStartRewards || [])[0];
+            if (!r) return null;
+            return r.type === 'essence'
+                ? (r.essenceType === 'pure_essence' ? 'pure_essence' : 'chaos_essence')
+                : r.type;
+        })();
+        if ((_nextRewardType === 'chaos_essence' || _nextRewardType === 'pure_essence') && this.phase !== 'selection') {
+            // 同步预先清空残留的弹珠卡片，避免 ui_updateUI 渲染出旧 DOM 闪一帧
+            const _earlyGridEl = document.getElementById('marble-selection-grid');
+            if (_earlyGridEl) {
+                _earlyGridEl.style.cssText = '';
+                _earlyGridEl.innerHTML = '';
+            }
             this.phase_switchPhase('selection');
         }
         this._roundStartResolverActive = true;

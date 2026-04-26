@@ -96,6 +96,7 @@
 *   **敌人词缀与 Boss 索引**：[`.cursor/rules/enemy_index.md`](.cursor/rules/enemy_index.md) - 8 种敌人词缀和 8 个 Boss 的行为机制、出现回合、克制属性、狂暴行为及关键代码位置速查表。
 
 *   **位图化视觉重构规格**：[`design_spec_bitmap.md`](design_spec_bitmap.md) - 阶段五规划文档。包含 UI 切图清单（9-Slice 规格 + 图标尺寸）、敌人 Sprite 规格（128×128 基准、帧数要求、Overlay 分层设计）、8 种 Boss 专属形象清单。**凡涉及位图生成、Sprite 接入、图标替换的任务，必先读此文档。**
+*   **UI 页面与美术素材需求清单**：[`docs/ui_asset_requirements.md`](docs/ui_asset_requirements.md) - 所有 UI 页面（`#phase-*` + 组件）的美术状态、缺失素材清单与优先级（P0/P1/P2）、命名/尺寸/接入路径规范。**新增 UI 页面或替换素材时必先读此文档，并同步更新该表。**
 
 ### 核心机制文档（深度阅读，含数值与流程说明）
 

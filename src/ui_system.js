@@ -379,24 +379,38 @@ export const ui_system = {
         if (requiredEl) requiredEl.innerText = String(maxSelect);
 
         // @section:replace_ammo_tier_calc - 子弹等级与主属性计算函数（_calcTier / _calcDominant）
+        // [tsk-bullet-ui] 稀有度同时考虑普通属性、连射倍率以及爆破/套娃/激光/共鸣/七彩等特殊属性。
+        const _statKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind'];
+        const _calcSpecialBonus = (recipe) => {
+            let bonus = 0;
+            if (recipe.explosive) bonus += 8;            // 爆破：等同 1 张 A 级属性
+            if (recipe.isMatryoshka) bonus += 6;         // 套娃：连锁载荷
+            if (recipe.isLaser) bonus += 5;              // 激光本体
+            if (recipe.type === 'rainbow' || recipe._marbleType === 'rainbow') bonus += 6;
+            if (recipe.type === 'resonance' || recipe._marbleType === 'resonance') bonus += 4;
+            return bonus;
+        };
         const _calcTier = (recipe) => {
             const mc = recipe.multicast || 0;
             const mcTier = mc >= 12 ? 3 : mc >= 6 ? 2 : mc >= 3 ? 1 : 0;
-            const statKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind'];
             let statSum = 0;
-            statKeys.forEach(k => { if (recipe[k] > 0) statSum += recipe[k]; });
+            _statKeys.forEach(k => { if (recipe[k] > 0) statSum += recipe[k]; });
+            statSum += _calcSpecialBonus(recipe);
             const statTier = statSum >= 35 ? 3 : statSum >= 20 ? 2 : statSum >= 8 ? 1 : 0;
             return Math.max(mcTier, statTier);
         };
 
         const _calcDominant = (recipe) => {
-            const statKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind'];
             let statSum = 0;
             let maxKey = null, maxVal = 0;
-            statKeys.forEach(k => {
+            _statKeys.forEach(k => {
                 const v = recipe[k] || 0;
                 if (v > 0) { statSum += v; if (v > maxVal) { maxVal = v; maxKey = k; } }
             });
+            // [tsk-bullet-ui] 主题色优先取特殊属性（爆破/激光/飞剑/套娃），保证视觉与玩法对应
+            if (recipe.explosive && (!maxKey || maxVal < 6)) maxKey = 'pyro';
+            if (recipe.isLaser) { maxKey = 'laser'; maxVal = Math.max(maxVal, 8); }
+            if (recipe.isMatryoshka && !maxKey) maxKey = 'lightning';
             if (!maxKey || maxVal <= 5 || statSum === 0 || maxVal / statSum < 0.5) return null;
             const ATTR_THEMES = {
                 pyro:        ['linear-gradient(160deg,#7c2d12 0%,#431407 60%,#1c0a03 100%)', '#f97316', '#fdba74', '#7c2d12'],
@@ -446,7 +460,10 @@ export const ui_system = {
                 const dominant = _calcDominant(recipe);
 
                 const cardWrap = document.createElement('div');
-                cardWrap.style.cssText = 'position:relative;border-radius:12px;overflow:visible;height:100%;display:flex;flex-direction:column;box-sizing:border-box;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);';
+                // [tsk-bullet-ui] 添加 .replace-ammo-card 类用于全局 hover 样式（鼠标悬浮时上抬+加亮）
+                cardWrap.className = 'replace-ammo-card';
+                cardWrap.style.cssText = 'position:relative;border-radius:12px;overflow:visible;height:100%;display:flex;flex-direction:column;box-sizing:border-box;transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease;';
+                cardWrap.dataset.dominantColor = dominant ? dominant.theme[1] : ts.borderIdle;
                 if (isSelected) {
                     cardWrap.style.margin = '0 6px';
                     cardWrap.style.transform = 'translateY(-8px) scale(1.05)';
@@ -484,15 +501,25 @@ export const ui_system = {
                 cardWrap.appendChild(card);
 
                 const iconArea = document.createElement('div');
-                iconArea.style.cssText = 'position:absolute;top:-16px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:none;';
-                if (isSelected) iconArea.className = 'card-floating';
-                
+                // [tsk-bullet-ui] 顶部图标常驻：所有卡片都展示主属性图标（原来仅在 isSelected 时浮动）
+                iconArea.style.cssText = 'position:absolute;top:-18px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:none;';
+                iconArea.className = isSelected ? 'card-floating' : 'card-icon-idle';
+
                 const attrIcons = (typeof CONFIG !== 'undefined' && CONFIG.ui && CONFIG.ui.attributeDisplay) ? CONFIG.ui.attributeDisplay : {};
-                const mainAttrKey = dominant ? dominant.key : (recipe.pyro > 0 ? 'pyro' : recipe.cryo > 0 ? 'cryo' : recipe.lightning > 0 ? 'lightning' : 'damage');
+                // [tsk-bullet-ui] 主属性优先识别：爆破/激光/套娃/连射 等特殊属性优先显示，其次才是数值最高的元素属性
+                let mainAttrKey;
+                if (recipe.explosive) mainAttrKey = 'explosive';
+                else if (recipe.isLaser) mainAttrKey = 'laser';
+                else if (recipe.isMatryoshka) mainAttrKey = 'matryoshka';
+                else if (recipe.type === 'rainbow' || recipe._marbleType === 'rainbow') mainAttrKey = 'rainbow';
+                else if (recipe.type === 'resonance' || recipe._marbleType === 'resonance') mainAttrKey = 'resonance';
+                else if (dominant) mainAttrKey = dominant.key;
+                else mainAttrKey = recipe.pyro > 0 ? 'pyro' : recipe.cryo > 0 ? 'cryo' : recipe.lightning > 0 ? 'lightning' : 'damage';
                 const mainAttrInfo = attrIcons[mainAttrKey] || { icon: '🔮', color: '#94a3b8' };
-                
+                const _iconBorderColor = (mainAttrInfo.color && mainAttrInfo.color.indexOf('gradient') === -1) ? mainAttrInfo.color : '#facc15';
+
                 iconArea.innerHTML = `
-                    <div style="width:36px;height:36px;background:rgba(15,23,42,0.9);border:2px solid ${mainAttrInfo.color};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 12px rgba(0,0,0,0.5), 0 0 10px ${mainAttrInfo.color}88;">
+                    <div style="width:38px;height:38px;background:rgba(15,23,42,0.92);border:2px solid ${_iconBorderColor};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 12px rgba(0,0,0,0.55), 0 0 10px ${_iconBorderColor}88;">
                         ${mainAttrInfo.icon}
                     </div>
                 `;
@@ -503,26 +530,40 @@ export const ui_system = {
                 tierBadge.innerText = tier === 3 ? '✦ S' : tier === 2 ? 'A' : tier === 1 ? 'B' : 'C';
                 card.appendChild(tierBadge);
 
+                // [tsk-bullet-ui] 显示数值属性 + 特殊属性（爆破/套娃/激光/连射/七彩/共鸣）
                 const attrKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind'];
                 const sortedAttrs = attrKeys
                     .map(k => ({ key: k, val: recipe[k] || 0 }))
                     .filter(a => a.val > 0)
-                    .sort((a, b) => b.val - a.val)
-                    .slice(0, 3);
+                    .sort((a, b) => b.val - a.val);
+
+                const specialAttrs = [];
+                if (recipe.explosive) specialAttrs.push({ key: 'explosive', label: '✓' });
+                if (recipe.isMatryoshka) specialAttrs.push({ key: 'matryoshka', label: '✓' });
+                if (recipe.isLaser && (recipe.laser || 0) === 0) specialAttrs.push({ key: 'laser', label: '✓' });
+                if (recipe.type === 'rainbow' || recipe._marbleType === 'rainbow') specialAttrs.push({ key: 'rainbow', label: '✓' });
+                if (recipe.type === 'resonance' || recipe._marbleType === 'resonance') specialAttrs.push({ key: 'resonance', label: '✓' });
+                if ((recipe.multicast || 0) > 0) specialAttrs.push({ key: 'multicast', label: 'x' + recipe.multicast });
 
                 const attrsContainer = document.createElement('div');
-                attrsContainer.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-top:auto;width:100%;';
-                
-                sortedAttrs.forEach(attr => {
+                attrsContainer.style.cssText = 'display:flex;flex-direction:column;gap:3px;margin-top:auto;width:100%;';
+
+                // 特殊属性优先显示在顶部（更醒目），数值属性补足到 4 行
+                const allRows = specialAttrs.concat(sortedAttrs).slice(0, 4);
+                allRows.forEach(attr => {
                     const info = attrIcons[attr.key] || {};
+                    const isSpecial = attr.label !== undefined;
+                    const valText = isSpecial ? attr.label : String(attr.val);
+                    const borderColor = (info.color && info.color.indexOf('gradient') === -1) ? info.color : '#facc15';
+                    const labelColor = borderColor;
                     const row = document.createElement('div');
-                    row.style.cssText = `display:flex;align-items:center;justify-content:space-between;width:100%;padding:2px 6px;background:rgba(0,0,0,0.3);border-radius:4px;border-left:2px solid ${info.color || '#475569'};`;
+                    row.style.cssText = `display:flex;align-items:center;justify-content:space-between;width:100%;padding:2px 6px;background:rgba(0,0,0,${isSpecial ? '0.45' : '0.3'});border-radius:4px;border-left:2px solid ${borderColor};`;
                     row.innerHTML = `
-                        <span style="font-size:10px;color:${info.color || '#94a3b8'};display:flex;align-items:center;gap:2px;">
+                        <span style="font-size:10px;color:${labelColor};display:flex;align-items:center;gap:2px;">
                             <span style="font-size:11px;">${info.icon || '◆'}</span>
                             <span>${info.name || attr.key}</span>
                         </span>
-                        <span style="font-size:11px;font-weight:800;color:#fff;">${attr.val}</span>
+                        <span style="font-size:11px;font-weight:800;color:#fff;">${valText}</span>
                     `;
                     attrsContainer.appendChild(row);
                 });
