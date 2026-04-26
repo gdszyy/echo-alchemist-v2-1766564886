@@ -1353,8 +1353,22 @@ class Enemy {
         } else {
             ctx.roundRect(-w/2, -h/2, w, h, r);
         }
-        ctx.fillStyle = '#0f172a'; 
-        ctx.fill(); 
+        ctx.fillStyle = '#0f172a';
+        ctx.fill();
+        // [增强对比 #4] 在裁剪之前先给容器外缘绘制一圈柔光描边，
+        // 让敌人在与背景同色的「液态」战场上仍能识别轮廓（精英/Boss 尤其关键）。
+        // 由于 ctx.clip() 之后描边会被裁剪一半，这里预先绘制可保留完整外缘。
+        ctx.save();
+        ctx.shadowColor = (this.type === 'boss') ? 'rgba(239, 68, 68, 0.85)'
+                         : (this.type === 'elite') ? 'rgba(168, 85, 247, 0.75)'
+                         : 'rgba(148, 163, 184, 0.55)';
+        ctx.shadowBlur = (this.type === 'boss') ? 18 : (this.type === 'elite') ? 14 : 8;
+        ctx.strokeStyle = (this.type === 'boss') ? 'rgba(239, 68, 68, 0.9)'
+                         : (this.type === 'elite') ? 'rgba(196, 152, 255, 0.85)'
+                         : 'rgba(203, 213, 225, 0.7)';
+        ctx.lineWidth = (this.type === 'boss') ? 3 : 2;
+        ctx.stroke();
+        ctx.restore();
         ctx.clip();
 
          // === Layer 1.5: 底层纹理 (预计算 OffscreenCanvas) ===
@@ -1362,29 +1376,36 @@ class Enemy {
             ctx.drawImage(this._textureCanvas, -w/2, -h/2);
         }
         // === Layer 2: 液体血条 (含延迟白条) ===
-        // [修改] 血量从顶部向下填充，血量满时占满顶部，血量少时从顶部缩短
-        // 顶部留少量间距（_hpTopPad），血条高度 = h * ratio
-        
+        // [修改] 血量从上往下扣除：满血时占满整个容器，血量减少时从顶部开始消失，
+        // 残余血量沉在底部，类似液面下降的视觉。
+
         // A. 计算高度比例
         const hpRatio = Math.max(0, Math.min(1, this.displayHp / this.maxHp));
         const whiteRatio = Math.max(0, Math.min(1, this.delayedHp / this.maxHp)); // 白色条比例
         const greenRatio = Math.max(0, Math.min(1, this.greenHp / this.maxHp));   // 绿色条比例
-        
-        const _hpTopPad = 4; // 血条距顶部的间距（px）
-        const _hpBarTop = -h/2 + _hpTopPad; // 血条起始 Y（顶部）
-        
+
+        const _hpBarBottom = h/2; // 血条底部 Y（贴住容器底部）
+
         const fillHeight = h * hpRatio;
         const whiteHeight = h * whiteRatio; // 白色条高度
         const greenHeight = h * greenRatio; // 绿色条高度
-        
-        // 从顶部向下：fillY 固定在顶部，高度随血量变化
-        const fillY = _hpBarTop;
-        const whiteY = _hpBarTop; // 白色条从顶部开始
-        const greenY = _hpBarTop; // 绿色条从顶部开始
-        
+
+        // 锚定底部：fillY = bottom - height，血量减少时顶部下沉
+        const fillY = _hpBarBottom - fillHeight;
+        const whiteY = _hpBarBottom - whiteHeight;
+        const greenY = _hpBarBottom - greenHeight;
+
+        // [增强对比] 先在容器内填一层稍亮的「空槽底色」，避免扣血后的空白和外部背景同色，
+        // 让玩家清晰看到敌人的轮廓与剩余血量边界（精英/Boss 同样适用）。
+        let emptySlotColor = 'rgba(15, 23, 42, 0.65)'; // 普通敌人：偏深的板岩蓝
+        if (this.type === 'elite') emptySlotColor = 'rgba(45, 27, 78, 0.7)';   // 精英：暗紫
+        if (this.type === 'boss') emptySlotColor = 'rgba(60, 12, 20, 0.75)';   // Boss：暗血红
+        ctx.fillStyle = emptySlotColor;
+        ctx.fillRect(-w/2, -h/2, w, h);
+
         // B. 绘制白色延迟条 (在彩色条底下)
         if (whiteRatio > hpRatio) {
-            ctx.fillStyle = '#ffffff'; 
+            ctx.fillStyle = '#ffffff';
             ctx.globalAlpha = 0.8;
             ctx.fillRect(-w/2, whiteY, w, whiteHeight);
             ctx.globalAlpha = 1.0;
@@ -1399,26 +1420,27 @@ class Enemy {
         }
 
         // C. 绘制真实彩色条 (盖在白条上面)
-        let baseColor = '#475569'; 
-        if (this.type === 'elite') baseColor = '#581c87'; 
-        if (this.type === 'boss') baseColor = '#7f1d1d';  
-        
+        // [增强对比] 加深基础血色，并与外部背景拉开差异。
+        let baseColor = '#64748b';                  // 普通：石板蓝（更亮）
+        if (this.type === 'elite') baseColor = '#7c3aed'; // 精英：饱和紫
+        if (this.type === 'boss') baseColor = '#dc2626';  // Boss：饱和血红
+
         // 温度变色逻辑
         if (this.temp > 0) {
             const t = Math.min(1, this.temp / 34);
-            baseColor = lerpColor(baseColor, '#ea580c', t); 
+            baseColor = lerpColor(baseColor, '#ea580c', t);
         } else if (this.temp < 0) {
             const t = Math.min(1, Math.abs(this.temp) / 34);
             baseColor = lerpColor(baseColor, '#0891b2', t);
         }
 
-        ctx.fillStyle = baseColor; 
+        ctx.fillStyle = baseColor;
         ctx.fillRect(-w/2, fillY, w, fillHeight);
-        
-        // D. 液面亮边（血条底部边缘）
+
+        // D. 液面顶部亮边（血量减少时呈现「液面下降」的高光）
         if (hpRatio > 0 && hpRatio < 1) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'; 
-            ctx.fillRect(-w/2, fillY + fillHeight - 2, w, 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+            ctx.fillRect(-w/2, fillY, w, 2);
         }
 
         // === Layer 3: 内部覆盖层 (Glow & Mist) - [修改：降低浓度] ===

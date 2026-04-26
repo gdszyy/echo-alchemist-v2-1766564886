@@ -73,8 +73,20 @@ class Projectile {
         this.windBladeAngle = 0; // 风属性环绕风刃的旋转角度
         this.lifeTime = 60 * 30; // [修改] 加倍子弹生命时间 (从15秒增加到30秒)
         this.chainHistory = [];
-        this.trail = [];      
-        this.deformation = { x: 1, y: 1 }; 
+        this.trail = [];
+        // [拖尾增强 #6] 根据子弹强度（属性层数）和类型决定拖尾长度，提高高强度子弹的视觉显著度。
+        const _tierStat = (config.damage || 0) + (config.bounce || 0) + (config.pierce || 0)
+            + (config.scatter || 0) + (config.cryo || 0) + (config.pyro || 0)
+            + (config.lightning || 0) + (config.laser || 0)
+            + (config.flying_sword || 0) + (config.wind || 0);
+        let _trailMax = 6 + Math.min(28, Math.floor(_tierStat * 0.6));
+        if (config.isLaser) _trailMax += 8;
+        if (config.type === 'flying_sword') _trailMax += 6;
+        if (config.pierce > 0) _trailMax += 4;
+        if (config.explosive) _trailMax += 2;
+        this.maxTrailLength = _trailMax;
+        this.tierStat = _tierStat;
+        this.deformation = { x: 1, y: 1 };
         this.targetDeformation = { x: 1, y: 1 }; 
         this.elasticity = 0.2;
         this.crackSeed = [];
@@ -122,7 +134,7 @@ class Projectile {
         this.deformation.x += (this.targetDeformation.x - this.deformation.x) * this.elasticity * timeScale;
         this.deformation.y += (this.targetDeformation.y - this.deformation.y) * this.elasticity * timeScale;
         this.trail.push({x: this.pos.x, y: this.pos.y});
-        if (this.trail.length > 8) this.trail.shift();
+        if (this.trail.length > (this.maxTrailLength || 8)) this.trail.shift();
         for (const [enemy, timer] of this.hitCooldowns) {
             if (timer > 0) this.hitCooldowns.set(enemy, timer - timeScale);
             else this.hitCooldowns.delete(enemy);
@@ -687,7 +699,78 @@ class Projectile {
     draw(ctx) {
         if (!this.active && !this.destroyed) return;
         const integrity = (this.bouncesLeft + this.piercesLeft) / (this.maxDurability || 1);
+        // [拖尾 #6] 在主体之前先绘制拖尾，主体覆盖在最前
+        this._drawTrail(ctx);
         Projectile.drawVisuals(ctx, this.pos.x, this.pos.y, this.radius, this.config, this.rotation, this.intensity, this.deformation, integrity, this.crackSeed, this.windBladeAngle);
+    }
+
+    // @perf-impact: 子弹拖尾 - 每子弹每帧 1 条 lineTo + 渐变描边；高强度子弹 trail 长度可达 ~30 个点。
+    _drawTrail(ctx) {
+        const trail = this.trail;
+        if (!trail || trail.length < 2) return;
+        const cfg = this.config || {};
+        // 根据属性决定主拖尾色
+        let trailColor = '#94a3b8';
+        if (cfg.isLaser) trailColor = '#7dd3fc';
+        else if (cfg.type === 'flying_sword') trailColor = '#0ea5e9';
+        else if (cfg.type === 'rainbow') trailColor = '#e9d5ff';
+        else if (cfg.explosive) trailColor = '#ef4444';
+        else if ((cfg.pyro || 0) > 0) trailColor = '#f97316';
+        else if ((cfg.cryo || 0) > 0) trailColor = '#22d3ee';
+        else if ((cfg.lightning || 0) > 0) trailColor = '#c084fc';
+        else if ((cfg.wind || 0) > 0) trailColor = '#34d399';
+        else if ((cfg.pierce || 0) > 0) trailColor = '#fca5a5';
+        else if ((cfg.bounce || 0) > 0) trailColor = '#86efac';
+        else if ((cfg.scatter || 0) > 0) trailColor = '#facc15';
+
+        const tier = Math.min(3, Math.floor((this.tierStat || 0) / 8));
+        // 基础宽度随子弹半径与强度联动；S 级（tier 3）显著加宽
+        const baseWidth = Math.max(1.5, this.radius * (0.55 + tier * 0.18));
+        const len = trail.length;
+
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        // S 级（含激光/飞剑）使用 lighter 增亮拖尾
+        if (tier >= 2 || cfg.isLaser || cfg.type === 'flying_sword' || cfg.explosive) {
+            ctx.globalCompositeOperation = 'lighter';
+        }
+        ctx.shadowColor = trailColor;
+        ctx.shadowBlur = 4 + tier * 4;
+
+        // 段落式渐变描边：越靠近当前位置越亮、越粗
+        for (let i = 1; i < len; i++) {
+            const a = trail[i - 1];
+            const b = trail[i];
+            const t = i / (len - 1);
+            const alpha = Math.max(0.04, t * (0.55 + tier * 0.12));
+            const width = Math.max(0.6, baseWidth * t);
+            ctx.strokeStyle = `${trailColor}`;
+            ctx.globalAlpha = alpha;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+        }
+
+        // S 级追加一层更细更亮的核心拖尾
+        if (tier >= 3 || cfg.isLaser) {
+            ctx.shadowBlur = 12;
+            for (let i = Math.max(1, len - 8); i < len; i++) {
+                const a = trail[i - 1];
+                const b = trail[i];
+                const t = i / (len - 1);
+                ctx.strokeStyle = '#ffffff';
+                ctx.globalAlpha = 0.6 * t;
+                ctx.lineWidth = Math.max(0.8, baseWidth * 0.45 * t);
+                ctx.beginPath();
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(b.x, b.y);
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
     }
 
     static drawVisuals(ctx, x, y, radius, config, rotation, intensity, deformation = {x:1, y:1}, integrity = 1.0, crackSeed = [], windBladeAngle = 0) {
