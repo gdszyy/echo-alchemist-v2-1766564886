@@ -51,51 +51,153 @@ export const ui_system = {
 
     /**
      * @method ui_playLootToCardAnimation
-     * @description 播放掉落物飞向 UI 卡片的 3D 动画
+     * @description 播放掉落物开启 → 飞出「卡片」的 3D 动画。
+     * [BUGFIX #8] 旧版本只是把图标整体放大并翻转，没有「卡片从掉落物中飞出」的实感。
+     * 新版本分两段：
+     *   1) 掉落物原地脉冲一下并迸发出 8 道光束（开启感）
+     *   2) 一张带边框/标题/图标的「卡片」从掉落物位置弹出，缩小 → 沿弧线飞向屏幕中央
+     *      并放大成最终展示卡片，再淡出移交给后续选择 UI。
      */
     ui_playLootToCardAnimation(startX, startY, type, callback) {
         const container = document.getElementById('game-container');
         if (!container) return callback && callback();
 
-        const node = document.createElement('div');
-        node.className = 'loot-fly-proxy';
-        
         let icon = '🏆';
-        let glow = 'rgba(250, 204, 21, 0.8)';
-        if (type === 'chaos_essence') { icon = '🔮'; glow = 'rgba(168, 85, 247, 0.8)'; }
-        else if (type === 'pure_essence') { icon = '💎'; glow = 'rgba(56, 189, 248, 0.8)'; }
+        let glow = 'rgba(250, 204, 21, 0.85)';
+        let cardBg = 'linear-gradient(160deg,#78350f 0%,#3b1f05 60%,#150b01 100%)';
+        let cardBorder = '#fbbf24';
+        let title = '遺物';
+        if (type === 'chaos_essence') {
+            icon = '🔮'; glow = 'rgba(168, 85, 247, 0.85)';
+            cardBg = 'linear-gradient(160deg,#4a1d96 0%,#2e1065 60%,#0f0528 100%)';
+            cardBorder = '#c084fc';
+            title = '混沌精華';
+        } else if (type === 'pure_essence') {
+            icon = '💎'; glow = 'rgba(56, 189, 248, 0.85)';
+            cardBg = 'linear-gradient(160deg,#0c4a6e 0%,#082f49 60%,#020f1a 100%)';
+            cardBorder = '#38bdf8';
+            title = '純淨精華';
+        }
 
-        node.innerHTML = icon;
-        node.style.cssText = `
+        // ---- A. 掉落物开启脉冲 + 光束迸发（保留原图标位置感） ----
+        const burst = document.createElement('div');
+        burst.style.cssText = `
             position: absolute;
             left: ${startX}px;
             top: ${startY}px;
-            font-size: 32px;
+            width: 8px; height: 8px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 ${glow};
+            z-index: 1990;
+            pointer-events: none;
+            transition: box-shadow 0.35s ease-out, opacity 0.35s ease-out;
+            opacity: 1;
+        `;
+        container.appendChild(burst);
+
+        const ray = document.createElement('div');
+        ray.style.cssText = `
+            position: absolute;
+            left: ${startX}px;
+            top: ${startY}px;
+            width: 4px; height: 4px;
+            transform: translate(-50%, -50%);
+            z-index: 1991;
+            pointer-events: none;
+        `;
+        for (let i = 0; i < 8; i++) {
+            const beam = document.createElement('div');
+            const angle = (i / 8) * 360;
+            beam.style.cssText = `
+                position: absolute;
+                left: 0; top: 0;
+                width: 2px; height: 60px;
+                background: linear-gradient(to top, transparent, ${glow});
+                transform-origin: 1px 0;
+                transform: rotate(${angle}deg) translateY(0);
+                opacity: 0;
+                transition: transform 0.45s ease-out, opacity 0.45s ease-out;
+            `;
+            ray.appendChild(beam);
+        }
+        container.appendChild(ray);
+
+        // ---- B. 创建「飞出的卡片」节点 ----
+        const card = document.createElement('div');
+        card.className = 'loot-fly-card';
+        card.innerHTML = `
+            <div class="loot-fly-card-icon">${icon}</div>
+            <div class="loot-fly-card-title">${title}</div>
+        `;
+        card.style.cssText = `
+            position: absolute;
+            left: ${startX}px;
+            top: ${startY}px;
+            width: 84px;
+            height: 116px;
+            transform: translate(-50%, -50%) scale(0.05) rotate(-12deg);
+            opacity: 0;
+            background: ${cardBg};
+            border: 2px solid ${cardBorder};
+            border-radius: 10px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.6), 0 0 18px ${glow};
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: #f8fafc;
+            font-family: 'Cinzel', serif;
             z-index: 2000;
             pointer-events: none;
-            text-shadow: 0 0 20px ${glow};
-            transform: translate(-50%, -50%) scale(0.5) rotateX(0deg) rotateY(0deg);
-            transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: transform 0.7s cubic-bezier(0.22, 1.2, 0.36, 1), opacity 0.5s ease-out, left 0.7s cubic-bezier(0.22, 1.2, 0.36, 1), top 0.7s cubic-bezier(0.22, 1.2, 0.36, 1);
         `;
-        container.appendChild(node);
+        const iconEl = card.querySelector('.loot-fly-card-icon');
+        if (iconEl) iconEl.style.cssText = `font-size: 38px; text-shadow: 0 0 14px ${glow};`;
+        const titleEl = card.querySelector('.loot-fly-card-title');
+        if (titleEl) titleEl.style.cssText = `font-size: 12px; letter-spacing: 2px; color: ${cardBorder}; text-shadow: 0 0 6px ${glow};`;
+        container.appendChild(card);
 
-        // 终点位置：屏幕中心偏上（卡片生成位置）
         const targetX = this.width / 2;
         const targetY = this.height * 0.4;
 
+        // 触发开启脉冲
         requestAnimationFrame(() => {
-            node.style.left = targetX + 'px';
-            node.style.top = targetY + 'px';
-            node.style.transform = 'translate(-50%, -50%) scale(2.5) rotateX(360deg) rotateY(720deg)';
-            
+            burst.style.boxShadow = `0 0 0 80px rgba(255,255,255,0)`;
+            burst.style.opacity = '0';
+            ray.querySelectorAll('div').forEach((beam) => {
+                const angle = beam.style.transform.match(/rotate\(([-\d.]+)deg\)/);
+                const a = angle ? parseFloat(angle[1]) : 0;
+                beam.style.opacity = '0.9';
+                beam.style.transform = `rotate(${a}deg) translateY(-40px)`;
+            });
+
+            // 卡片从掉落物中蹦出（先稍微停留一帧再起飞，强化「打开掉落物」的感觉）
             setTimeout(() => {
-                node.style.opacity = '0';
-                node.style.transform = 'translate(-50%, -50%) scale(4) rotateX(450deg) rotateY(900deg)';
+                card.style.opacity = '1';
+                card.style.transform = 'translate(-50%, -50%) scale(0.6) rotate(-6deg)';
+            }, 80);
+
+            // 沿弧线飞向中心，并放大
+            setTimeout(() => {
+                card.style.left = targetX + 'px';
+                card.style.top = targetY + 'px';
+                card.style.transform = 'translate(-50%, -50%) scale(1.4) rotate(0deg)';
+            }, 220);
+
+            // 抵达后短暂停留 → 淡出，触发后续 UI
+            setTimeout(() => {
+                card.style.transition = 'transform 0.25s ease-in, opacity 0.25s ease-in';
+                card.style.opacity = '0';
+                card.style.transform = 'translate(-50%, -50%) scale(1.7) rotate(0deg)';
                 setTimeout(() => {
-                    if (node.parentNode) node.parentNode.removeChild(node);
+                    if (card.parentNode) card.parentNode.removeChild(card);
+                    if (burst.parentNode) burst.parentNode.removeChild(burst);
+                    if (ray.parentNode) ray.parentNode.removeChild(ray);
                     if (callback) callback();
-                }, 200);
-            }, 650);
+                }, 260);
+            }, 920);
         });
     },
 
@@ -630,6 +732,11 @@ export const ui_system = {
             }
         }
 
+        // [PC 布局 #3] 同步左侧栏「收集 / 战斗」内容显隐
+        if (typeof this._ui_updateLeftSidebarContent === 'function') {
+            this._ui_updateLeftSidebarContent(this.phase);
+        }
+
         // 4. 底部面板：仅在收集阶段且非 PC 模式下显示
         const bottomPanel = document.querySelector('.bottom-panel');
         if (bottomPanel) {
@@ -667,17 +774,91 @@ export const ui_system = {
 
     ui_updatePCLayout() {
         const isPC = window.innerWidth > 1024;
+        const wasPC = document.body.classList.contains('pc-mode');
         document.body.classList.toggle('pc-mode', isPC);
         const leftSidebar = document.getElementById('pc-left-sidebar');
         const rightSidebar = document.getElementById('pc-right-sidebar');
         if (leftSidebar) leftSidebar.style.display = isPC ? 'flex' : 'none';
         if (rightSidebar) rightSidebar.style.display = isPC ? 'flex' : 'none';
+
+        // [PC 布局恢复 #3] 实际把右侧符文发射器、左侧 info-drawer / 收集队列 / 配方 HUD
+        // 迁移到 PC 侧边栏；离开 PC 模式时再迁回原始位置。
+        this._ui_migrateRuneLauncherToSidebar(isPC);
+        this._ui_migrateDrawerToLeftSidebar(isPC);
+        this._ui_migrateHUDToLeftSidebar(isPC);
+        this._ui_updateLeftSidebarContent(this.phase, wasPC);
     },
 
-    _ui_updateLeftSidebarContent(phase, wasPC) {},
-    _ui_migrateDrawerToLeftSidebar(toSidebar) {},
-    _ui_migrateHUDToLeftSidebar(toSidebar) {},
-    _ui_migrateRuneLauncherToSidebar(toSidebar) {},
+    _ui_updateLeftSidebarContent(phase /* , wasPC */) {
+        const gatheringPane = document.getElementById('pc-left-gathering');
+        const combatPane = document.getElementById('pc-left-combat');
+        const isPC = document.body.classList.contains('pc-mode');
+        if (!gatheringPane || !combatPane) return;
+        if (!isPC) {
+            gatheringPane.style.display = 'none';
+            combatPane.style.display = 'none';
+            return;
+        }
+        if (phase === 'gathering' || phase === 'selection') {
+            gatheringPane.style.display = 'flex';
+            combatPane.style.display = 'none';
+        } else if (phase === 'combat') {
+            gatheringPane.style.display = 'none';
+            combatPane.style.display = 'flex';
+        } else {
+            gatheringPane.style.display = 'none';
+            combatPane.style.display = 'none';
+        }
+    },
+
+    /**
+     * @description 在 PC / 移动模式之间迁移指定元素。第一次调用时记录原始 parent，
+     * 之后通过 dataset 标志位把元素移入侧边栏挂载点 / 还原回原父节点。
+     */
+    _ui_movePanelTo(elId, mountId, toSidebar) {
+        const el = document.getElementById(elId);
+        const mount = document.getElementById(mountId);
+        if (!el) return;
+        if (toSidebar) {
+            if (!mount) return;
+            if (el.parentElement !== mount) {
+                if (!el.dataset.originalParentId) {
+                    const origParent = el.parentElement;
+                    if (origParent) {
+                        if (!origParent.id) origParent.id = '_orig_parent_' + elId;
+                        el.dataset.originalParentId = origParent.id;
+                    }
+                }
+                mount.appendChild(el);
+            }
+        } else {
+            const origId = el.dataset.originalParentId;
+            if (origId) {
+                const origParent = document.getElementById(origId);
+                if (origParent && el.parentElement !== origParent) {
+                    origParent.appendChild(el);
+                }
+            }
+        }
+    },
+
+    _ui_migrateDrawerToLeftSidebar(toSidebar) {
+        this._ui_movePanelTo('info-drawer', 'pc-left-drawer-mount', toSidebar);
+    },
+
+    _ui_migrateHUDToLeftSidebar(toSidebar) {
+        this._ui_movePanelTo('gathering-queue', 'pc-left-queue-mount', toSidebar);
+        this._ui_movePanelTo('gathering-hud-mount', 'pc-left-recipe-mount', toSidebar);
+    },
+
+    _ui_migrateRuneLauncherToSidebar(toSidebar) {
+        this._ui_movePanelTo('phase-rune-launcher', 'pc-right-rune-mount', toSidebar);
+        // PC 模式下符文发射器常驻显示
+        const launcher = document.getElementById('phase-rune-launcher');
+        if (launcher && toSidebar) {
+            launcher.style.display = 'flex';
+        }
+    },
 
     /**
      * @method ui_confirmSelection
@@ -821,13 +1002,26 @@ export const ui_system = {
     },
 
     ui_openPause() {
-        const pause = document.getElementById('pause-overlay');
-        if (pause) pause.classList.remove('hidden');
+        // [BUGFIX #5] 暂停/设置面板的 DOM id 是 `phase-pause`，原代码错把它当成 `pause-overlay` 处理，
+        // 导致点击「⚙️」按鈕没有任何反应。这里改为正确的 id，并补上 hidden-phase / display 切换。
+        const pause = document.getElementById('phase-pause');
+        if (!pause) return;
+        pause.classList.remove('hidden');
+        pause.classList.remove('hidden-phase');
+        pause.classList.add('active-phase');
+        pause.style.display = 'flex';
+        pause.style.zIndex = '900';
+        pause.style.pointerEvents = 'auto';
+        if (typeof this.ui_syncPauseSettings === 'function') this.ui_syncPauseSettings();
     },
 
     ui_closePause() {
-        const pause = document.getElementById('pause-overlay');
-        if (pause) pause.classList.add('hidden');
+        const pause = document.getElementById('phase-pause');
+        if (!pause) return;
+        pause.classList.add('hidden');
+        pause.classList.add('hidden-phase');
+        pause.classList.remove('active-phase');
+        pause.style.display = 'none';
     },
 
     ui_syncPauseSettings() {},

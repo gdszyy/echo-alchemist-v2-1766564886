@@ -575,21 +575,38 @@ export const game_system = {
                 sourceRewardType: pendingMode?.sourceRewardType || this.selectionMode,
             };
         this.pendingSelectionMode = null;
-        this.phase_switchPhase('selection');
+        // [BUGFIX #7] 在 phase_switchPhase 触发 ui_updateUI 前预先清空 marble grid，
+        // 否则 ui_refreshSelectionModeUI 会用新的 selectionMode 文案搭配上一轮残留的卡片
+        // DOM，造成「先闪一帧另一种精华内容」的体验问题。
+        const _initGridEl = document.getElementById('marble-selection-grid');
+        if (_initGridEl) {
+            _initGridEl.style.cssText = '';
+            _initGridEl.innerHTML = '';
+        }
+        // 同步清掉旧的 marblesPool / 已选索引，防止 ui_refreshSelectionModeUI 读取到过期数据
+        this.marblesPool = [];
+        this.selectedMarbles = [];
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
-        // [BUGFIX] 防御性重置 gridEl inline style：
-        // 如果上一轮经过了 ui_renderReplaceAmmoUI（子弹替换阶段）且清理逻辑未运行，
-        // gridEl 上可能残留 display:flex 的 inline style，导致卡片竖排。在此强制清空。
-        const _initGridEl = document.getElementById('marble-selection-grid');
-        if (_initGridEl) _initGridEl.style.cssText = '';
+
+        this.phase_switchPhase('selection');
         this.spawn_generateMarbleOptions();
         this.selectedMarbles = [];
         const countEl = document.getElementById('selected-count');
         const confirmBtn = document.getElementById('confirm-selection-btn');
         const recipeHud = document.getElementById('recipe-hud-container');
         if (countEl) countEl.innerText = '0';
-        if (confirmBtn) confirmBtn.disabled = true;
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            // [BUGFIX] 上一轮 sys_initReplaceAmmoPhase / ui_renderReplaceAmmoUI 把 confirmBtn.onclick
+            // 覆盖为 sys_confirmReplaceAmmo。如果不在新一轮命运时刻强制恢复，
+            // 第二/三次触发精华或潮涌类遗物触发的混沌精华时，
+            // 玩家点击「接受命运开始炼金」会触发 sys_confirmReplaceAmmo（输出
+            // "[sys_confirmReplaceAmmo] replaceAmmoContext 未激活"）而无任何反应。
+            confirmBtn.onclick = () => {
+                if (typeof this.ui_confirmSelection === 'function') this.ui_confirmSelection();
+            };
+        }
         if (recipeHud) recipeHud.classList.add('hidden');
         if (typeof this.ui_refreshSelectionModeUI === 'function') this.ui_refreshSelectionModeUI();
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
