@@ -449,6 +449,8 @@ export const ui_system = {
                 cardWrap.className = 'replace-ammo-card';
                 cardWrap.style.cssText = 'position:relative;border-radius:12px;overflow:visible;height:100%;display:flex;flex-direction:column;box-sizing:border-box;transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease;';
                 cardWrap.dataset.dominantColor = dominant ? dominant.theme[1] : ts.borderIdle;
+                // [bitmap-replace-ammo] 标记稀有度，CSS 用 [data-tier] 切换 9-Slice 边框
+                cardWrap.dataset.tier = ['C','B','A','S'][tier] || 'C';
                 if (isSelected) {
                     cardWrap.style.margin = '0 6px';
                     cardWrap.style.transform = 'translateY(-8px) scale(1.05)';

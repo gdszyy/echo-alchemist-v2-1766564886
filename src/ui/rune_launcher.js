@@ -213,12 +213,11 @@ export const rune_launcher_system = {
             const cell = document.createElement('div');
             cell.id = `rune-cell-${i}`;
             cell.dataset.index = i;
+            cell.dataset.state = 'idle'; // [bitmap-rune-grid] CSS 用 [data-state] 切换 idle/hover/filled 位图
             cell.className = [
                 'rune-grid-cell',
                 'w-16 h-16 flex items-center justify-center',
-                'bg-slate-900/60 border-2 border-slate-700/60 rounded-xl',
                 'cursor-pointer select-none',
-                'hover:border-purple-500/60 hover:bg-slate-800/60',
                 'transition-all duration-200',
                 'text-2xl',
             ].join(' ');
@@ -391,6 +390,7 @@ export const rune_launcher_system = {
             const runeEntry = this.runeGrid[i];  // [Mixin 正常用法：读取 Game 实例状态]
             // 兼容新旧格式：提取符文 ID
             const runeId = getRuneId(runeEntry);
+            const prevState = cell.dataset.state || 'idle';
             if (runeId) {
                 const runeDef = RUNE_DB.find(r => r.id === runeId);
                 // 获取符文等级（新格式有 level，旧格式默认为 1）
@@ -401,12 +401,18 @@ export const rune_launcher_system = {
                 } else {
                     cell.innerHTML = '?';
                 }
-                cell.classList.add('border-purple-500/60', 'bg-slate-800/60');
-                cell.classList.remove('border-slate-700/60');
+                cell.dataset.state = 'filled';
+                // [bitmap-rune-grid] 从空→填的转换触发一次性 highlight 光圈动画
+                if (prevState !== 'filled') {
+                    cell.classList.remove('rune-slot-place');
+                    // 强制 reflow 以重启动画
+                    void cell.offsetWidth;
+                    cell.classList.add('rune-slot-place');
+                }
             } else {
                 cell.innerHTML = '';
-                cell.classList.remove('border-purple-500/60', 'bg-slate-800/60');
-                cell.classList.add('border-slate-700/60');
+                cell.dataset.state = 'idle';
+                cell.classList.remove('rune-slot-place');
             }
         }
 
@@ -448,10 +454,11 @@ export const rune_launcher_system = {
         for (let i = 0; i < 9; i++) {
             const cell = document.getElementById(`rune-cell-${i}`);
             if (!cell) continue;
+            // [bitmap-rune-grid] 用 data-active 而非 Tailwind 类标记激活态，CSS 控制视觉
             if (activatedCells.has(i)) {
-                cell.classList.add('shadow-[0_0_8px_rgba(168,85,247,0.6)]', 'border-purple-400/80');
+                cell.dataset.active = '1';
             } else {
-                cell.classList.remove('shadow-[0_0_8px_rgba(168,85,247,0.6)]', 'border-purple-400/80');
+                delete cell.dataset.active;
             }
         }
 

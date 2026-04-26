@@ -1948,10 +1948,9 @@ phase_gathering_getRandomPegType() {
         this.ctx.translate(entityShiftX, entityShiftY);
 
         const startPos = new Vec2(this.width / 2, this.height - 80);
-        this.ctx.fillStyle = 'rgba(15, 23, 42, 0.8)'; // 深色半透明底 (Slate-900 80%)
-        this.ctx.beginPath();
-        this.ctx.arc(startPos.x, startPos.y, 22, 0, Math.PI * 2); // 半径比子弹稍大
-        this.ctx.fill();
+        // [bitmap-emitter] 优先使用 emitter_base.png + emitter_charging_*.png 渲染发射器底座；
+        // 位图未加载时 fallback 到原始 arc 椭圆。
+        this.render_combat_launcherEmitterBase(this.ctx, startPos.x, startPos.y, this.isChargingShot, this.chargeProgress);
         let nextAmmo = this.ammoQueue.length > 0 ? this.ammoQueue[0] : null;
 
         if (nextAmmo) {

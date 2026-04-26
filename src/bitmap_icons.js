@@ -133,3 +133,78 @@ export function getRuneIconSrc(runeId) {
 export function getRelicIconSrc(relicId) {
     return RELIC_ICON_MAP[relicId] ?? null;
 }
+
+// ============================================================
+// UI Sprite 资源（Canvas 绘制用）— 发射器 / 属性球轨道
+// 通过 getUiBitmap(path) 获取已加载的 Image，未就绪时返回 null
+// ============================================================
+
+const _uiBitmapCache = new Map();
+
+/**
+ * 获取 UI 位图（Canvas 用）。首次访问时异步加载，未就绪返回 null（调用方应 fallback）。
+ * @param {string} path
+ * @returns {HTMLImageElement|null}
+ */
+export function getUiBitmap(path) {
+    if (!path) return null;
+    let img = _uiBitmapCache.get(path);
+    if (!img) {
+        img = new Image();
+        img.src = path;
+        _uiBitmapCache.set(path, img);
+    }
+    return (img.complete && img.naturalWidth > 0) ? img : null;
+}
+
+// 属性轨道球底座（recipe 关键字 → 7 元素 socket 贴图，覆盖率不全则保持 fallback）
+export const ORBITAL_SOCKET_MAP = {
+    pyro:      'assets/ui/sprites/orbital_socket_pyro.png',
+    cryo:      'assets/ui/sprites/orbital_socket_cryo.png',
+    lightning: 'assets/ui/sprites/orbital_socket_electro.png',
+    laser:     'assets/ui/sprites/orbital_socket_hydro.png',
+    bounce:    'assets/ui/sprites/orbital_socket_dendro.png',
+    pierce:    'assets/ui/sprites/orbital_socket_anemo.png',
+    damage:    'assets/ui/sprites/orbital_socket_geo.png',
+};
+
+export const ORBITAL_LINK_STRIP   = 'assets/ui/sprites/orbital_link_strip.png';
+export const ORBITAL_LINK_CAP     = 'assets/ui/sprites/orbital_link_cap.png';
+export const ORBITAL_LINK_FLOW    = [
+    'assets/ui/sprites/orbital_link_flow_0.png',
+    'assets/ui/sprites/orbital_link_flow_1.png',
+    'assets/ui/sprites/orbital_link_flow_2.png',
+    'assets/ui/sprites/orbital_link_flow_3.png',
+];
+export const ORBITAL_INTAKE = [
+    'assets/ui/sprites/orbital_intake_0.png',
+    'assets/ui/sprites/orbital_intake_1.png',
+    'assets/ui/sprites/orbital_intake_2.png',
+    'assets/ui/sprites/orbital_intake_3.png',
+];
+
+export const EMITTER_BASE_SRC = 'assets/ui/sprites/emitter_base.png';
+export const EMITTER_CHARGING_SRCS = [
+    'assets/ui/sprites/emitter_charging_0.png',
+    'assets/ui/sprites/emitter_charging_1.png',
+    'assets/ui/sprites/emitter_charging_2.png',
+    'assets/ui/sprites/emitter_charging_3.png',
+    'assets/ui/sprites/emitter_charging_4.png',
+    'assets/ui/sprites/emitter_charging_5.png',
+];
+
+/**
+ * 预热 UI 位图（在游戏启动早期调用，避免战斗首帧卡顿）。
+ */
+export function preloadUiBitmaps() {
+    const paths = [
+        EMITTER_BASE_SRC,
+        ...EMITTER_CHARGING_SRCS,
+        ...Object.values(ORBITAL_SOCKET_MAP),
+        ORBITAL_LINK_STRIP,
+        ORBITAL_LINK_CAP,
+        ...ORBITAL_LINK_FLOW,
+        ...ORBITAL_INTAKE,
+    ];
+    paths.forEach(p => getUiBitmap(p));
+}

@@ -214,3 +214,241 @@
 #speed-btn[data-speed="2"] {
     filter: brightness(1.3) drop-shadow(0 0 6px rgba(100,200,255,0.8)) !important;
 }
+
+/* =====================================================
+   §6.2 子弹替换 / 命运抉择 UI（#phase-selection）
+   - 整面背景：replace_ammo_bg.png
+   - 卡片边框：replace_card_frame_<tier>_9s.png（C/B/A/S 四档）
+   - 顶部属性 icon 圆形底座：replace_card_attr_slot.png
+   - 跳过按钮：skip_btn_metal.png
+   ===================================================== */
+#phase-selection {
+    background-image:
+        linear-gradient(180deg, rgba(2,6,23,0.62) 0%, rgba(2,6,23,0.78) 100%),
+        url('../../assets/ui/panels/replace_ammo_bg.png');
+    background-size: cover, cover;
+    background-position: center, center;
+    background-repeat: no-repeat, no-repeat;
+}
+
+/* 4 档稀有度 9-Slice 边框，覆盖 JS 内联 border:2px solid 的视觉表达 */
+.replace-ammo-card[data-tier="C"] > div:not(.card-floating):not(.card-icon-idle) {
+    border: none !important;
+    border-image-source: url('../../assets/ui/sprites/replace_card_frame_C_9s.png');
+    border-image-slice: 24 24 24 24;
+    border-image-width: 12px;
+    border-image-outset: 0;
+    border-image-repeat: stretch;
+}
+.replace-ammo-card[data-tier="B"] > div:not(.card-floating):not(.card-icon-idle) {
+    border: none !important;
+    border-image-source: url('../../assets/ui/sprites/replace_card_frame_B_9s.png');
+    border-image-slice: 24 24 24 24;
+    border-image-width: 12px;
+    border-image-outset: 0;
+    border-image-repeat: stretch;
+}
+.replace-ammo-card[data-tier="A"] > div:not(.card-floating):not(.card-icon-idle) {
+    border: none !important;
+    border-image-source: url('../../assets/ui/sprites/replace_card_frame_A_9s.png');
+    border-image-slice: 24 24 24 24;
+    border-image-width: 14px;
+    border-image-outset: 0;
+    border-image-repeat: stretch;
+}
+.replace-ammo-card[data-tier="S"] > div:not(.card-floating):not(.card-icon-idle) {
+    border: none !important;
+    border-image-source: url('../../assets/ui/sprites/replace_card_frame_S_9s.png');
+    border-image-slice: 24 24 24 24;
+    border-image-width: 16px;
+    border-image-outset: 0;
+    border-image-repeat: stretch;
+}
+
+/* 顶部属性 icon 圆形底座 — JS 内嵌 background:rgba(15,23,42,0.92) 的内层 div 由位图替代 */
+.replace-ammo-card .card-floating > div,
+.replace-ammo-card .card-icon-idle > div {
+    background: url('../../assets/ui/sprites/replace_card_attr_slot.png') center/contain no-repeat !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* 替换页跳过按钮：金属底板 */
+#replace-ammo-skip-btn {
+    background: url('../../assets/ui/sprites/skip_btn_metal.png') center/contain no-repeat !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #fde68a !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.65);
+    min-width: 160px;
+    height: 42px;
+    padding: 0 18px !important;
+    transition: filter 0.18s ease, transform 0.18s ease;
+}
+#replace-ammo-skip-btn:hover {
+    filter: brightness(1.18) drop-shadow(0 0 4px rgba(250,204,21,0.55));
+    transform: translateY(-1px);
+}
+
+/* =====================================================
+   §6.3 古代遗物 overlay（#phase-relic）
+   - 整面背景：relic_overlay_bg.png（暗紫炼金阵）
+   - 稀有度光环：relic_aura_<tier>.png 通过 ::before 居中绘制
+   - 「跳过」按钮金属底板
+   ===================================================== */
+#phase-relic {
+    background-image:
+        linear-gradient(180deg, rgba(2,6,23,0.55) 0%, rgba(2,6,23,0.86) 100%),
+        url('../../assets/ui/panels/relic_overlay_bg.png') !important;
+    background-size: cover, cover !important;
+    background-position: center, center !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-color: #020617 !important;
+}
+
+/* 让 .relic-card 形成独立堆叠上下文，避免 ::after 的 z-index:-1 透出到 #phase-relic 背景之下 */
+.relic-card {
+    isolation: isolate;
+}
+/* 稀有度光环背板：用 ::after 与 index.html 的 .relic-card.legendary::before（shimmer）共存 */
+.relic-card::after {
+    content: '';
+    position: absolute;
+    inset: -32px;
+    background: url('../../assets/ui/sprites/relic_aura_C.png') center/contain no-repeat;
+    pointer-events: none;
+    opacity: 0.85;
+    z-index: -1;
+    animation: relic-aura-rotate 18s linear infinite;
+}
+.relic-card.rare::after {
+    background-image: url('../../assets/ui/sprites/relic_aura_B.png');
+    opacity: 0.9;
+    animation-duration: 14s;
+}
+.relic-card.epic::after {
+    background-image: url('../../assets/ui/sprites/relic_aura_A.png');
+    opacity: 0.95;
+    animation-duration: 11s;
+}
+.relic-card.legendary::after {
+    background-image: url('../../assets/ui/sprites/relic_aura_S.png');
+    opacity: 1;
+    animation-duration: 8s;
+}
+.relic-card.cursed::after {
+    background-image: url('../../assets/ui/sprites/relic_aura_S.png');
+    opacity: 0.7;
+    filter: hue-rotate(-90deg) brightness(0.8);
+    animation-duration: 10s;
+}
+
+@keyframes relic-aura-rotate {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 遗物跳过按钮：替换原生纯文字链接为金属底板按钮（按 HTML 内嵌的 button 选择器） */
+#phase-relic button {
+    background: url('../../assets/ui/sprites/skip_btn_metal.png') center/contain no-repeat !important;
+    border: none !important;
+    color: #fde68a !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    text-decoration: none !important;
+    min-width: 220px;
+    height: 44px;
+    padding: 0 24px !important;
+    transition: filter 0.18s ease, transform 0.18s ease;
+}
+#phase-relic button:hover {
+    filter: brightness(1.18) drop-shadow(0 0 4px rgba(250,204,21,0.55));
+    transform: translateY(-1px);
+}
+
+/* =====================================================
+   §6.4 符文发射器九宫格（#phase-rune-launcher / #rune-grid-container）
+   - 容器 9-Slice：rune_grid_bg_9s.png
+   - 4 态格子：rune_slot_idle / hover / filled / highlight（一次性 place 动画）
+   ===================================================== */
+#rune-grid-container {
+    border-image-source: url('../../assets/ui/panels/rune_grid_bg_9s.png');
+    border-image-slice: 32 32 32 32 fill;
+    border-image-width: 16px;
+    border-image-outset: 4px;
+    border-image-repeat: stretch;
+    padding: 8px !important;
+}
+
+.rune-grid-cell {
+    background: url('../../assets/ui/sprites/rune_slot_idle.png') center/contain no-repeat !important;
+    border: none !important;
+    border-radius: 0 !important;
+    transition: filter 0.18s ease, transform 0.18s ease;
+}
+.rune-grid-cell:hover {
+    background-image: url('../../assets/ui/sprites/rune_slot_hover.png') !important;
+    filter: drop-shadow(0 0 6px rgba(168,85,247,0.55));
+}
+.rune-grid-cell[data-state="filled"] {
+    background-image: url('../../assets/ui/sprites/rune_slot_filled.png') !important;
+}
+.rune-grid-cell[data-active="1"] {
+    filter: drop-shadow(0 0 8px rgba(168,85,247,0.85));
+}
+
+/* 一次性放置确认光圈：使用 ::after 叠加 highlight 96×96 贴图 + 弹性缩放 */
+.rune-grid-cell.rune-slot-place {
+    position: relative;
+}
+.rune-grid-cell.rune-slot-place::after {
+    content: '';
+    position: absolute;
+    inset: -16px;
+    background: url('../../assets/ui/sprites/rune_slot_highlight.png') center/contain no-repeat;
+    pointer-events: none;
+    animation: rune-slot-place-pop 0.55s cubic-bezier(0.2, 1, 0.3, 1) forwards;
+}
+@keyframes rune-slot-place-pop {
+    0%   { opacity: 0; transform: scale(0.4); }
+    35%  { opacity: 1; transform: scale(1.15); }
+    100% { opacity: 0; transform: scale(1.45); }
+}
+
+/* =====================================================
+   §1.8 真理之书 9-Slice（#phase-truth-book）
+   ===================================================== */
+#phase-truth-book {
+    background-image:
+        linear-gradient(180deg, rgba(2,6,23,0.55) 0%, rgba(2,6,23,0.85) 100%),
+        url('../../assets/ui/panels/truth_book_bg_9s.png') !important;
+    background-size: cover, cover !important;
+    background-position: center, center !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-color: #020617 !important;
+}
+
+/* =====================================================
+   §1.14 设置弹窗 9-Slice（#settings-panel）
+   ===================================================== */
+#settings-panel {
+    background: transparent !important;
+    border: none !important;
+    border-image-source: url('../../assets/ui/panels/settings_modal_9s.png');
+    border-image-slice: 32 32 32 32 fill;
+    border-image-width: 18px;
+    border-image-outset: 0;
+    border-image-repeat: stretch;
+}
+
+/* =====================================================
+   §1.10 游戏结束页（#phase-gameover）
+   ===================================================== */
+#phase-gameover {
+    background-image:
+        linear-gradient(180deg, rgba(2,6,23,0.65) 0%, rgba(2,6,23,0.92) 100%),
+        url('../../assets/ui/panels/gameover_bg.png') !important;
+    background-size: cover, cover !important;
+    background-position: center, center !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-color: #020617 !important;
+}
