@@ -828,9 +828,9 @@ export const game_system = {
             this.ammoQueue = [];
             this.marbleQueue.forEach(marbleDef => {
                 const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
-                const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, false);
+                const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, (marbleDef.multicast || 0) > 0);
                 recipe.finalHits = 0;
-                recipe.multicast = 0;
+                recipe.multicast = marbleDef.multicast || 0;
                 this.ammoQueue.push(recipe);
             });
         } else {
@@ -1310,9 +1310,9 @@ export const game_system = {
                     if (this.marbleQueue && this.marbleQueue.length > 0) {
                         this._chargedAmmoQueue = this.marbleQueue.map(marbleDef => {
                             const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
-                            const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, false);
+                            const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, (marbleDef.multicast || 0) > 0);
                             recipe.finalHits = 0;
-                            recipe.multicast = 0;
+                            recipe.multicast = marbleDef.multicast || 0;
                             recipe._marbleType = marbleDef.type;
                             return recipe;
                         });
@@ -1440,9 +1440,9 @@ export const game_system = {
                 this.ammoQueue = [];
                 this.marbleQueue.forEach(marbleDef => {
                     const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
-                    const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, false);
+                    const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, (marbleDef.multicast || 0) > 0);
                     recipe.finalHits = 0;
-                    recipe.multicast = 0;
+                    recipe.multicast = marbleDef.multicast || 0;
                     this.ammoQueue.push(recipe);
                 });
                 this.ui_updateAmmoUI && this.ui_updateAmmoUI();
