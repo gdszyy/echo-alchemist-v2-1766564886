@@ -35,7 +35,12 @@ function _loadImage(src) {
     if (_imageCache.has(src)) return Promise.resolve(_imageCache.get(src));
     return new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload  = () => { _imageCache.set(src, img); resolve(img); };
+        img.onload  = async () => {
+            // 等待解码完成，避免首次 drawImage 时同步 decode 造成的帧抖动
+            try { if (img.decode) await img.decode(); } catch (_) { /* 忽略，回退到隐式 decode */ }
+            _imageCache.set(src, img);
+            resolve(img);
+        };
         img.onerror = () => reject(new Error(`SpriteRenderer: 图片加载失败 → ${src}`));
         img.src = src;
     });
