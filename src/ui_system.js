@@ -239,22 +239,12 @@ export const ui_system = {
         return true;
     },
 
-    ui_getPureEssenceLegalElements(marbleDef) {
-        const validRuneElements = new Set((RUNE_DB || []).map(r => r.element));
-        const legal = new Set();
-        if (marbleDef?.type && validRuneElements.has(marbleDef.type)) legal.add(marbleDef.type);
-        (marbleDef?.collected || []).forEach(item => {
-            const type = typeof item === 'string' ? item : item?.type;
-            if (validRuneElements.has(type)) legal.add(type);
-        });
-        return [...legal];
-    },
-
     ui_getPureEssenceRuneOptions(marbleDef) {
-        const legalElements = new Set(this.ui_getPureEssenceLegalElements(marbleDef));
+        // [feat] 纯净精华允许注入任意自己拥有的符文（不限定与弹珠属性一致），
+        // 注入后将覆盖弹珠的元素属性。
         return (this.runeInventory || []).map((rune, inventoryIndex) => {
             const runeDef = (RUNE_DB || []).find(item => item.id === rune.id);
-            if (!runeDef || !legalElements.has(runeDef.element)) return null;
+            if (!runeDef) return null;
             return { inventoryIndex, rune, runeDef };
         }).filter(Boolean);
     },
@@ -268,7 +258,7 @@ export const ui_system = {
         const marbleDef = this.marblesPool?.[selectionIndex];
         const option = this.ui_getPureEssenceRuneOptions(marbleDef).find(item => item.inventoryIndex === inventoryIndex);
         if (!option) {
-            if (typeof showToast === 'function') showToast('符文屬性不合法，無法注入。');
+            if (typeof showToast === 'function') showToast('找不到该符文。');
             return;
         }
         this.selectionInjectedRune = {
@@ -301,7 +291,6 @@ export const ui_system = {
             return;
         }
         host.style.display = 'block';
-        const legalElements = this.ui_getPureEssenceLegalElements(marbleDef);
         const options = this.ui_getPureEssenceRuneOptions(marbleDef);
         const selectedIndex = (this.selectedMarbles || [])[0];
         const isSelected = selectedIndex === selectionIndex;
@@ -309,17 +298,13 @@ export const ui_system = {
             ? this.selectionInjectedRune
             : null;
         const attrDisplay = (typeof CONFIG !== 'undefined' && CONFIG.ui?.attributeDisplay) ? CONFIG.ui.attributeDisplay : {};
-        const legalHtml = legalElements.length > 0
-            ? legalElements.map(element => {
-                const display = attrDisplay[element] || {};
-                return `<span class="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-200">${display.icon || '\u2726'} ${display.name || element}</span>`;
-            }).join('')
-            : '<span class="inline-flex items-center rounded-full border border-rose-400/40 bg-rose-500/10 px-2 py-0.5 text-[11px] text-rose-200">\u7121\u5408\u6cd5\u5c6c\u6027</span>';
+        const currentDisplay = attrDisplay[marbleDef.type] || {};
+        const currentAttrHtml = `<span class="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-200">${currentDisplay.icon || '\u2726'} ${currentDisplay.name || marbleDef.type}</span>`;
         let optionsHtml = '';
         if (!isSelected) {
-            optionsHtml = '<div class="text-xs text-slate-400">\u5148\u9078\u4e2d\u9019\u679a\u5f48\u73e0\uff0c\u518d\u5f9e\u4e0b\u65b9\u5408\u6cd5\u7b26\u6587\u4e2d\u6ce8\u5165\u3002</div>';
+            optionsHtml = '<div class="text-xs text-slate-400">\u5148\u9078\u4e2d\u9019\u679a\u5f48\u73e0\uff0c\u518d\u5f9e\u4e0b\u65b9\u7b26\u6587\u4e2d\u6ce8\u5165\u3002</div>';
         } else if (options.length === 0) {
-            optionsHtml = '<div class="text-xs text-rose-300">\u7576\u524d\u7b26\u6587\u5eab\u4e2d\u6c92\u6709\u8207\u6b64\u5f48\u73e0\u5c6c\u6027\u5339\u914d\u7684\u5408\u6cd5\u7b26\u6587\u3002</div>';
+            optionsHtml = '<div class="text-xs text-rose-300">\u7576\u524d\u7b26\u6587\u5eab\u70ba\u7a7a\u3002\u53ef\u76f4\u63a5\u4ee5\u539f\u5c6c\u6027\u9032\u5165\u7814\u78e8\uff0c\u6216\u9ede\u300c\u8df3\u904e\u7814\u78e8\u300d\u7372\u5f97\u96a8\u6a5f\u7b26\u6587\u3002</div>';
         } else {
             optionsHtml = options.map(item => {
                 const active = selectedRune && selectedRune.inventoryIndex === item.inventoryIndex;
@@ -327,13 +312,13 @@ export const ui_system = {
             }).join('');
         }
         const selectedRuneText = selectedRune
-            ? `\u5df2\u9078\u4e2d\u6ce8\u5165\u7b26\u6587\uff1a${selectedRune.icon || '\u2726'} ${selectedRune.name} \u2192 ${attrDisplay[selectedRune.element]?.name || selectedRune.element}`
-            : '\u5c1a\u672a\u9078\u4e2d\u6ce8\u5165\u7b26\u6587\u3002';
+            ? `\u5df2\u9078\u4e2d\u6ce8\u5165\u7b26\u6587\uff1a${selectedRune.icon || '\u2726'} ${selectedRune.name} \u2192 \u5f48\u73e0\u5c6c\u6027\u5c07\u88ab\u8986\u84cb\u70ba ${attrDisplay[selectedRune.element]?.name || selectedRune.element}`
+            : '\u672a\u9078\u4e2d\u7b26\u6587\uff1a\u5c07\u4ee5\u539f\u5c6c\u6027\u9032\u5165\u7814\u78e8\u3002';
         host.innerHTML = `
             <div class="preview-divider"></div>
             <div class="preview-peg-label">\u7d14\u6de8\u7cbe\u83ef / \u7b26\u6587\u6ce8\u5165</div>
-            <div class="text-xs text-slate-300 mb-2">\u53ea\u5141\u8a31\u6ce8\u5165\u5f48\u73e0\u539f\u672c\u5df2\u5177\u5099\u7684\u5c6c\u6027\uff1b\u4e0d\u5408\u6cd5\u5c6c\u6027\u6703\u88ab\u6514\u622a\u3002</div>
-            <div class="flex flex-wrap gap-2 mb-2">${legalHtml}</div>
+            <div class="text-xs text-slate-300 mb-2">\u53ef\u9078\u64c7\u4efb\u610f\u7b26\u6587\u6ce8\u5165\uff0c\u8986\u84cb\u5f48\u73e0\u5c6c\u6027\uff1b\u4e5f\u53ef\u4e0d\u6ce8\u5165\u4ee5\u539f\u5c6c\u6027\u9032\u5165\u7814\u78e8\u3002</div>
+            <div class="flex flex-wrap gap-2 mb-2">\u5f48\u73e0\u539f\u5c6c\u6027\uff1a${currentAttrHtml}</div>
             <div class="flex flex-wrap gap-2">${optionsHtml}</div>
             <div class="text-xs ${selectedRune ? 'text-amber-200' : 'text-slate-500'} mt-2">${selectedRuneText}</div>
         `;
@@ -929,17 +914,13 @@ export const ui_system = {
             const selectedIndex = this.selectedMarbles[0];
             const marble = this.marbleQueue[0];
             if (injected) {
-                // [feat] 有符文注入时走原有注入流程
+                // [feat] 注入任意符文：覆盖弹珠的元素属性后进入研磨阶段
                 if (injected.marbleIndex !== selectedIndex) {
                     if (typeof showToast === 'function') showToast('純淨精華尚未完成符文注入。');
                     return;
                 }
-                const legalElements = new Set(this.ui_getPureEssenceLegalElements(marble));
-                if (!legalElements.has(injected.element)) {
-                    if (typeof showToast === 'function') showToast('注入失敗：符文屬性與彈珠原有屬性不匹配。');
-                    return;
-                }
-                marble.collected = Array.isArray(marble.collected) ? marble.collected : [];
+                marble.type = injected.element;
+                marble.collected = [];
                 const injectCount = Math.max(1, injected.level || 1) * Math.max(1, injected.baseStatPerLevel || 1);
                 for (let i = 0; i < injectCount; i++) marble.collected.push(injected.element);
                 marble.source = 'pure_essence';
@@ -954,7 +935,7 @@ export const ui_system = {
                 }
                 this.ui_updateRuneCountDisplay();
                 const multiplier = (typeof CONFIG !== 'undefined' && CONFIG.gameplay.assimilationDoubleMultiplier) || 2;
-                if (typeof showToast === 'function') showToast(`已為 ${marble.getName()} 注入 ${injected.icon || '✦'} ${injected.name}，本輪同化率 x${multiplier}。`);
+                if (typeof showToast === 'function') showToast(`已為 ${marble.getName()} 覆蓋屬性並注入 ${injected.icon || '✦'} ${injected.name}，本輪同化率 x${multiplier}。`);
             } else {
                 // [feat] 无符文注入时直接进入研磨（纯净精华单弹珠，无同化加成）
                 marble.source = 'pure_essence';
