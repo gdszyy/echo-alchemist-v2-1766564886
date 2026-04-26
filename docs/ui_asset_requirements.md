@@ -52,6 +52,7 @@
 | 1.18 | `#round-start-banner` | 回合开始横幅 | ✅ | `round_banner_1.png` ~ `round_banner_6.png`（6 帧，600×200） | — |
 | 1.19 | 数据统计页（与图鉴并入 truth-book） | 历次伤害/记录 | ❌ | — | 折线图背景、数据指标徽章、最佳记录 ribbon |
 | 1.20 | `.ammo-icon` 弹药槽位 | 战斗 / 收集阶段 | ✅ | `assets/icons/ammo/*.png` 已覆盖全部 12 种（含 matryoshka、rainbow、resonance、flying_sword、wind） | — |
+| 1.21 | 发射器属性球轨道（Canvas 渲染层） | 战斗 / 装填时围绕发射器旋转的属性球 + 连线 | 🟡 | 现有渐变连线（`render_system.js:464-479`，Canvas `createLinearGradient` + `screen` 合成） | **属性球底座 socket（每属性一张）**、**连线光带 strip 纹理（可平铺）**、**端点端帽 sprite**、**沿线流动光点**、**装填吸入轨迹粒子帧** |
 
 ---
 
@@ -71,6 +72,9 @@
 | ~~`assets/icons/ammo/ammo_resonance.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 共鸣弹药图标 |
 | ~~`assets/icons/ammo/ammo_flying_sword.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 飞剑弹药图标 |
 | ~~`assets/icons/ammo/ammo_wind.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 风弹药图标 |
+| `assets/ui/sprites/orbital_socket_<elem>.png` | 属性球底座（pyro/hydro/cryo/electro/anemo/dendro/geo） | 64×64，圆形对称（无朝向） | 详见 §6.1；与发射器轨道半径 55px 适配，需带高光层 |
+| `assets/ui/sprites/orbital_link_strip.png` | 属性球↔发射器连线纹理 | 24×6，水平可平铺 | UV 沿连线方向拉伸，结合 `screen` 合成；详见 §6.1 |
+| `assets/ui/sprites/orbital_link_cap.png` | 连线端帽（球侧 / 发射器侧通用） | 16×16，中心对齐 | 用于覆盖连线两端的硬边 |
 
 ### 2.2 P1 — 完整覆盖核心 UI 模块
 
@@ -84,6 +88,16 @@
 | ~~`assets/ui/panels/truth_book_bg_9s.png`~~ | ✅ **已生成** | 720×1280，slice 64 | 卷轴/书页质感 |
 | `assets/ui/sprites/truth_book_tab_*.png` | 章节侧标（待生成） | 64×120 | 每章节一张 |
 | ~~`assets/ui/banners/round_banner_*.png`~~ | ✅ **已生成**（6 帧） | 600×200 | 金属字 + 光晕动画 |
+| `assets/ui/sprites/orbital_link_flow_*.png` | 沿连线流动的光点 4 帧 | 8×8 | `_0.png` ~ `_3.png`，循环；详见 §6.1 |
+| `assets/ui/sprites/orbital_intake_*.png` | 装填吸入轨迹粒子 4 帧 | 32×32 | `_0.png` ~ `_3.png`；轨道半径从 450px 收回 55px 时使用 |
+| `assets/ui/panels/replace_ammo_bg.png` | 子弹替换 / 命运时刻整面背景 | 720×1280 | 详见 §6.2；保留中部 480×800 低对比承载卡片 |
+| `assets/ui/sprites/replace_card_frame_<tier>_9s.png` | 子弹卡片 9-Slice 边框（C/B/A/S 四档） | 192×260，slice 24 | 替代当前 `_calcDominant()` CSS gradient 描边 |
+| `assets/ui/sprites/replace_card_attr_slot.png` | 卡片顶部属性 icon 圆形底座 | 56×56 | 承载 §1.5 / §1.20 的 `attr_icon_*.png`，居中浮出卡片顶部 |
+| `assets/ui/panels/relic_overlay_bg.png` | 遗物 / 命运时刻 overlay 背景纹理 | 720×1280 | 详见 §6.3；暗紫炼金阵纹理，半透明叠加 |
+| `assets/ui/sprites/skip_btn_metal.png` | 「跳过」按钮金属底板 | 128×40 | 用于遗物 overlay / 替换页右上角 |
+| `assets/ui/panels/rune_grid_bg_9s.png` | 符文九宫格容器背景 | 320×320，slice 32 | 详见 §6.4；包含九格分隔线纹理 |
+| `assets/ui/sprites/rune_slot_hover.png` / `rune_slot_filled.png` | 槽位 hover/filled 两态（补足 idle/active 之外） | 64×64 | 与已生成的 `rune_slot_idle/_active.png` 配合，覆盖完整 4 态交互 |
+| `assets/ui/sprites/rune_slot_highlight.png` | 槽位放置确认光圈 | 96×96 | 一次性闪光，CSS `animation: 0.4s ease-out` |
 
 ### 2.3 P2 — 锦上添花
 
@@ -123,3 +137,132 @@
 - 图标映射模块：[`src/bitmap_icons.js`](../src/bitmap_icons.js)
 - UI 系统模块：[`src/ui_system.js`](../src/ui_system.js)、[`src/ui/`](../src/ui/)
 - 全局规范：[`AGENTS.md`](../AGENTS.md) §1
+
+---
+
+## 6. 深度模块拆解（高频重点 UI 的素材方案）
+
+> 本节针对 §1 表中标 🟡/❌ 且属于战斗高频可见的模块，给出更细的素材结构、动画方案与「自然衔接」的实现路径。新增素材时按 §6.x 注明的接入函数对应。
+
+### 6.1 发射器属性球轨道（对应 §1.21）
+
+**当前实现**
+- 渲染入口：[`src/render_system.js:344`](../src/render_system.js) `render_combat_launcherOrbitals(ctx, centerX, centerY, recipe)`，由 [`src/game_phase.js:1969`](../src/game_phase.js) 调用
+- 物理：[`src/entities.js:4042`](../src/entities.js) `updateOrbitalPhysics(timeScale)`，基础角速度 `0.00012` rad/帧 + `spinBoost`（0.95 衰减）
+- 轨道半径：基础 55px；蓄力时收缩；装填时从 450px 外吸入
+- 连线：`render_system.js:464-479`，单段 `createLinearGradient(中心→属性球)`，`globalCompositeOperation = 'screen'`，alpha 0.3，仅在半径 10-120px 区间绘制
+- 属性球本体：纯 `arc()` + 双层发光，无位图
+
+**问题**
+- 连线"单段渐变"在球高速旋转时视觉上像残影/抖线，缺乏方向感与"能量流动"的暗示
+- 属性球与发射器之间缺少"承接点"——球凭空悬浮于发射器侧上方
+- 装填吸入（450 → 55px）瞬间没有粒子轨迹，玩家容易"看不见"球被收回
+
+**素材清单与自然衔接方案**
+
+| 素材 | 用途 | 关键约束 |
+|------|------|----------|
+| `assets/ui/sprites/orbital_socket_<elem>.png` (64×64) | 属性球底座（pyro/hydro/cryo/electro/anemo/dendro/geo 各一） | **必须圆形对称**（球绕发射器旋转时角度持续变化，朝向性素材会穿帮）；底座绘制在轨道圆周上、球的下层 |
+| `orbital_link_strip.png` (24×6) | 连线主体平铺纹理 | 替换当前 `createLinearGradient`；UV 沿连线方向拉伸，结合 `screen` 合成保持发光感；纹理本身做出"能量丝"的横向条纹 |
+| `orbital_link_cap.png` (16×16) | 连线两端端帽 | 覆盖连线起止处的硬边切口，球侧 / 发射器侧通用，居中对齐 |
+| `orbital_link_flow_*.png` (8×8, 4 帧) | 沿连线流动的光点 | 在连线 0%~100% 上以 `time % 1.0` 取插值位置绘制；建议 2~3 个光点错开 0.33 相位，制造"能量被吸向中心"的方向感 |
+| `orbital_intake_*.png` (32×32, 4 帧) | 装填吸入轨迹粒子 | 在 `updateOrbitalPhysics` 检测到 `radius > 120` 时，每帧在球的拖尾位置 spawn 一个粒子（4 帧动画 + 渐隐） |
+
+**接入位置**
+- `render_system.js:344` 改写：在 `arc()` 绘制属性球前插入 `drawOrbitalSocket()`；在连线绘制（464-479 行）替换为 `drawOrbitalLink()`；`updateOrbitalPhysics()` 中加 `spawnIntakeParticle()`
+- 因动画完全由 rAF 物理驱动，所有素材必须是**中性朝向**（不要带方向箭头），方向感通过流动光点的运动方向表达
+
+---
+
+### 6.2 子弹替换卡片与背景（对应 §1.5）
+
+**当前实现**
+- 渲染入口：[`src/ui_system.js:349`](../src/ui_system.js) `ui_renderReplaceAmmoUI()`，卡片工厂 `renderCard()`（行 456）
+- 稀有度：`_calcTier()` 输出 C/B/A/S，对应 `TIER_STYLES` CSS gradient + border 颜色
+- 主属性配色：`_calcDominant()` 计算 dominant theme，输出 7 套 CSS gradient（pyro/hydro/cryo 等）
+- 顶部属性 icon：浮出卡片 -18px，emoji fallback（已在 PR #61 加入 idle/floating 两态动画）
+- 背景：`#phase-selection` 容器为纯 CSS gradient（`index.html:1560+`），无位图
+
+**问题**
+- 卡片描边由 8 套 `_calcDominant` gradient + 4 档 `TIER_STYLES` 拼接，热路径计算每次 reflow 重算；位图 9-Slice 边框可一次性替代
+- 顶部 icon 当前 emoji，属性辨识度低（红色辣椒 vs 红色火焰对色弱玩家几乎相同）
+- 整面无背景，与 §1.4 商店、§1.9 遗物 overlay 视觉割裂
+
+**素材清单**
+
+| 素材 | 用途 | 备注 |
+|------|------|------|
+| `assets/ui/panels/replace_ammo_bg.png` (720×1280) | 整面背景 | 中部 480×800 留低对比区承载卡片网格；建议加炼金台俯视构图 |
+| `assets/ui/sprites/replace_card_frame_<tier>_9s.png` (192×260, slice 24) | 4 档卡片边框 | 替代 `TIER_STYLES.borderIdle`；保留 hover 时 CSS `transform: scale(1.03)` |
+| `assets/ui/sprites/replace_card_attr_slot.png` (56×56) | 卡片顶部 icon 底座 | 圆形带描边；放置 `attr_icon_<elem>.png`（与 §1.20 同源） |
+| `assets/ui/sprites/attr_icon_<elem>.png` (40×40) | 7 大属性 icon | **复用** `assets/icons/ammo/ammo_<elem>.png` 即可，按需缩放 |
+
+**接入位置**
+- `src/styles/bitmap_ui.css` 新增 `.replace-ammo-card[data-tier="S"] { border-image: url(...) 24 fill; }` 等 4 条规则
+- `renderCard()` 中 emoji fallback 行（504-526）替换为 `<img>` 引用 `attr_icon_*.png`，emoji 仅作为图片加载失败的降级
+
+---
+
+### 6.3 命运选择 / 遗物选择 Overlay（对应 §1.5 / §1.9）
+
+**当前实现**
+- 容器：[`index.html:3215`](../index.html) `#phase-relic`（标题"古代遺物"），卡片容器 `#relic-container:3223`
+- 命运时刻复用 `#phase-selection` + `fateMomentContext.active` 旗标（[`src/ui_system.js:346`](../src/ui_system.js)）
+- 背景：纯 `rgba(2, 6, 23, 0.95)` 半透明深色，inline style，无位图
+- 卡片：动态生成（图标 + 标题），不复用 §6.2 的 `renderCard()`
+- 已接入：53 种遗物 PNG（`assets/icons/relic/`，[`bitmap_icons.js:53-99`](../src/bitmap_icons.js)）
+
+**问题**
+- 遗物 overlay 在战斗结算后高频弹出（每 Boss 一次），但背景无装饰，与卡片 PNG 风格脱节
+- 「跳过」按钮纯 CSS，与遗物图标的位图质感不匹配
+- 稀有度只靠遗物图标自身颜色暗示，传奇/史诗辨识度低
+
+**素材清单**
+
+| 素材 | 用途 | 备注 |
+|------|------|------|
+| `assets/ui/panels/relic_overlay_bg.png` (720×1280) | overlay 背景纹理 | 暗紫炼金阵；放在 `rgba(2,6,23,0.95)` 之上、卡片之下；可叠加 CSS `mix-blend-mode: screen` |
+| `assets/ui/sprites/relic_aura_<tier>.png` (200×200) | 遗物稀有度光环 4 档 | 在卡片背后 absolute 居中；建议 CSS `animation: relic-aura-rotate 8s linear infinite` |
+| `assets/ui/sprites/skip_btn_metal.png` (128×40) | 跳过按钮 | 复用到 §6.2 替换页右上角；hover 时 `filter: brightness(1.15)` |
+
+**接入位置**
+- `index.html:3215` 的 inline `style="background: rgba(...)"` 拆到 `bitmap_ui.css`，加 `background-image: url(relic_overlay_bg.png)`
+- 遗物卡片渲染逻辑（搜索 `#relic-container` 的 children 注入处）外包一层 `<div class="relic-card-aura" data-tier="${tier}">`
+- 命运时刻**复用** §6.2 的 `replace_ammo_bg.png`，不另起背景
+
+---
+
+### 6.4 符文发射器九宫格放置槽（对应 §1.3）
+
+**当前实现**
+- 主面板：[`src/ui/rune_launcher.js:62`](../src/ui/rune_launcher.js) `#phase-rune-launcher`
+- 九宫格容器：`#rune-grid-container:208`，9 个 `.rune-grid-cell` 子节点（`#rune-cell-0` ~ `#rune-cell-8`）
+- CSS 类：`rune-grid-cell w-16 h-16 flex items-center justify-center bg-slate-900/60 border-2 border-slate-700/60 hover:border-purple-500/60`
+- 状态视觉：仅靠 border 颜色变化，**无空/满/高亮三态**区分
+- 已接入：13 种符文 PNG（`assets/icons/rune/`，[`bitmap_icons.js:33-47`](../src/bitmap_icons.js)）
+- 交互：`cell.addEventListener('click')`（行 226-239）→ `ui_openRunePicker(cellIndex)`（行 251）
+
+**问题**
+- 整个 §1.3 模块**完全无背景**——符文发射器是核心 meta 玩法但视觉最弱
+- 九宫格是纯 Tailwind 边框，与符文 PNG 的精致质感形成强烈落差
+- 玩家放置后没有"放置确认"反馈（仅 icon 立即出现），缺乏"咔哒一下"的满足感
+
+**素材清单**
+
+| 素材 | 用途 | 备注 |
+|------|------|------|
+| `assets/ui/panels/rune_launcher_9s.png` (512×768, slice 48) | 整面发射器面板背景 | 已列入 §2.2 P1；含装弹槽视觉 |
+| `assets/ui/panels/rune_grid_bg_9s.png` (320×320, slice 32) | 九宫格容器 9-Slice | 含九格分隔线纹理；可省略 .rune-grid-cell 的 `border` |
+| `assets/ui/sprites/rune_slot_idle.png` (64×64) | 空槽位 | 凹陷感金属底；浅灰色 |
+| `assets/ui/sprites/rune_slot_hover.png` (64×64) | 鼠标悬停 | 紫色发光边 |
+| `assets/ui/sprites/rune_slot_filled.png` (64×64) | 已放置 | 替代当前 `bg-slate-900/60`；底色加微暖色 |
+| `assets/ui/sprites/rune_slot_highlight.png` (96×96) | 放置确认光圈 | 一次性，CSS `animation: 0.4s cubic-bezier(0.2,1,0.3,1)` |
+
+**接入位置**
+- `src/ui/rune_launcher.js:212-242` 的 cell 模板：移除 Tailwind `bg-slate-900/60 border-2 border-slate-700/60`，加 class `.rune-slot[data-state="idle|hover|filled"]`
+- `bitmap_ui.css` 新增 `.rune-slot[data-state="idle"] { background-image: url(rune_slot_idle.png); }` 三条
+- `ui_updateRuneGrid()` 中放置后 `cell.classList.add('rune-slot-place')`，`animationend` 移除——该 CSS 类调用 `rune_slot_highlight.png` 的一次性动画
+
+---
+
+> **维护提示**：本节列出的所有素材若已接入，**必须**把 §1 表对应行的状态从 🟡/❌ 升到 ✅，并在 §2 表中划掉对应条目，避免双向漂移。
