@@ -45,6 +45,7 @@ import { calc_utils } from './calc_utils.js';
 import { tutorial_system } from './tutorial_system.js';
 import { game_over_mixin } from './ui/game_over.js';
 import { preloadAllSprites } from './render/sprite_renderer.js'; // [Phase 5B] 预加载所有 Sprite Sheet
+import { preloadAllIcons } from './render/preload_icons.js';     // 预解码 HUD/符文/遗物图标，消除首次 decode 抖动
 
 // ==================== 延迟音频初始化 ====================
 let _audioInitialized = false;
@@ -316,6 +317,8 @@ class Game {
         this._perfUpTimer = 0;
         // [Phase 5B] 预加载所有 Sprite Sheet（在游戏循环开始前触发异步加载）
         preloadAllSprites();
+        // 并行预解码 HUD / 抽符 / 商店图标，避免首次出现时的 decode 抖动
+        preloadAllIcons();
         // 启动游戏主循环
         this.sys_loop();
     }
