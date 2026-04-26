@@ -52,7 +52,7 @@
 | 1.18 | `#round-start-banner` | 回合开始横幅 | ✅ | `round_banner_1.png` ~ `round_banner_6.png`（6 帧，600×200） | — |
 | 1.19 | 数据统计页（与图鉴并入 truth-book） | 历次伤害/记录 | ❌ | — | 折线图背景、数据指标徽章、最佳记录 ribbon |
 | 1.20 | `.ammo-icon` 弹药槽位 | 战斗 / 收集阶段 | ✅ | `assets/icons/ammo/*.png` 已覆盖全部 12 种（含 matryoshka、rainbow、resonance、flying_sword、wind） | — |
-| 1.21 | 发射器属性球轨道（Canvas 渲染层） | 战斗 / 装填时围绕发射器旋转的属性球 + 连线 | 🟡 | 现有渐变连线（`render_system.js:464-479`，Canvas `createLinearGradient` + `screen` 合成） | **属性球底座 socket（每属性一张）**、**连线光带 strip 纹理（可平铺）**、**端点端帽 sprite**、**沿线流动光点**、**装填吸入轨迹粒子帧** |
+| 1.21 | 发射器属性球轨道（Canvas 渲染层） | 战斗 / 装填时围绕发射器旋转的属性球 + 连线 | ✅ | `orbital_socket_<elem>.png`×7、`orbital_link_strip.png`、`orbital_link_cap.png`、`orbital_link_flow_0~3.png`、`orbital_intake_0~3.png` | — |
 
 ---
 
@@ -65,16 +65,16 @@
 | ~~`assets/ui/backgrounds/bg_main_canvas.png`~~ | ✅ **已生成** | 720×1280 | 暗黑赛博炼金风，中部低对比区域 |
 | ~~`assets/ui/backgrounds/bg_emitter_zone.png`~~ | ✅ **已生成** | 720×220 | 含炼金台基座、能量管路 |
 | ~~`assets/ui/sprites/emitter_base.png`~~ | ✅ **已生成**（透明 PNG） | 96×96 | 静态贴图（带高光层） |
-| `assets/ui/sprites/emitter_charging_*.png` | 蓄力 6 帧动画（待生成） | 96×96 | `_0.png` ~ `_5.png` |
+| ~~`assets/ui/sprites/emitter_charging_*.png`~~ | ✅ **已生成**（透明 PNG） | 96×96 | `_0.png` ~ `_5.png`，0%→100% 蓄力渐进，纯色底 + rembg 抠图 |
 | ~~`assets/icons/ammo/ammo_explosive.png`~~ | ✅ 已有 | 32×32 | 爆破弹药图标 |
 | ~~`assets/icons/ammo/ammo_matryoshka.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 套娃弹药图标 |
 | ~~`assets/icons/ammo/ammo_rainbow.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 七彩弹药图标 |
 | ~~`assets/icons/ammo/ammo_resonance.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 共鸣弹药图标 |
 | ~~`assets/icons/ammo/ammo_flying_sword.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 飞剑弹药图标 |
 | ~~`assets/icons/ammo/ammo_wind.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 风弹药图标 |
-| `assets/ui/sprites/orbital_socket_<elem>.png` | 属性球底座（pyro/hydro/cryo/electro/anemo/dendro/geo） | 64×64，圆形对称（无朝向） | 详见 §6.1；与发射器轨道半径 55px 适配，需带高光层 |
-| `assets/ui/sprites/orbital_link_strip.png` | 属性球↔发射器连线纹理 | 24×6，水平可平铺 | UV 沿连线方向拉伸，结合 `screen` 合成；详见 §6.1 |
-| `assets/ui/sprites/orbital_link_cap.png` | 连线端帽（球侧 / 发射器侧通用） | 16×16，中心对齐 | 用于覆盖连线两端的硬边 |
+| ~~`assets/ui/sprites/orbital_socket_<elem>.png`~~ | ✅ **已生成**（7 属性，透明 PNG） | 64×64，圆形对称 | 详见 §6.1 |
+| ~~`assets/ui/sprites/orbital_link_strip.png`~~ | ✅ **已生成**（程序生成） | 24×6，水平可平铺 | UV 沿连线方向拉伸，结合 `screen` 合成 |
+| ~~`assets/ui/sprites/orbital_link_cap.png`~~ | ✅ **已生成**（透明 PNG） | 16×16，中心对齐 | 覆盖连线两端硬边切口 |
 
 ### 2.2 P1 — 完整覆盖核心 UI 模块
 
@@ -88,16 +88,16 @@
 | ~~`assets/ui/panels/truth_book_bg_9s.png`~~ | ✅ **已生成** | 720×1280，slice 64 | 卷轴/书页质感 |
 | `assets/ui/sprites/truth_book_tab_*.png` | 章节侧标（待生成） | 64×120 | 每章节一张 |
 | ~~`assets/ui/banners/round_banner_*.png`~~ | ✅ **已生成**（6 帧） | 600×200 | 金属字 + 光晕动画 |
-| `assets/ui/sprites/orbital_link_flow_*.png` | 沿连线流动的光点 4 帧 | 8×8 | `_0.png` ~ `_3.png`，循环；详见 §6.1 |
-| `assets/ui/sprites/orbital_intake_*.png` | 装填吸入轨迹粒子 4 帧 | 32×32 | `_0.png` ~ `_3.png`；轨道半径从 450px 收回 55px 时使用 |
-| `assets/ui/panels/replace_ammo_bg.png` | 子弹替换 / 命运时刻整面背景 | 720×1280 | 详见 §6.2；保留中部 480×800 低对比承载卡片 |
-| `assets/ui/sprites/replace_card_frame_<tier>_9s.png` | 子弹卡片 9-Slice 边框（C/B/A/S 四档） | 192×260，slice 24 | 替代当前 `_calcDominant()` CSS gradient 描边 |
-| `assets/ui/sprites/replace_card_attr_slot.png` | 卡片顶部属性 icon 圆形底座 | 56×56 | 承载 §1.5 / §1.20 的 `attr_icon_*.png`，居中浮出卡片顶部 |
-| `assets/ui/panels/relic_overlay_bg.png` | 遗物 / 命运时刻 overlay 背景纹理 | 720×1280 | 详见 §6.3；暗紫炼金阵纹理，半透明叠加 |
-| `assets/ui/sprites/skip_btn_metal.png` | 「跳过」按钮金属底板 | 128×40 | 用于遗物 overlay / 替换页右上角 |
-| `assets/ui/panels/rune_grid_bg_9s.png` | 符文九宫格容器背景 | 320×320，slice 32 | 详见 §6.4；包含九格分隔线纹理 |
-| `assets/ui/sprites/rune_slot_hover.png` / `rune_slot_filled.png` | 槽位 hover/filled 两态（补足 idle/active 之外） | 64×64 | 与已生成的 `rune_slot_idle/_active.png` 配合，覆盖完整 4 态交互 |
-| `assets/ui/sprites/rune_slot_highlight.png` | 槽位放置确认光圈 | 96×96 | 一次性闪光，CSS `animation: 0.4s ease-out` |
+| ~~`assets/ui/sprites/orbital_link_flow_*.png`~~ | ✅ **已生成**（透明 PNG） | 8×8 | `_0.png` ~ `_3.png`，循环 |
+| ~~`assets/ui/sprites/orbital_intake_*.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | `_0.png` ~ `_3.png`；吸入轨迹粒子 |
+| ~~`assets/ui/panels/replace_ammo_bg.png`~~ | ✅ **已生成** | 720×1280 | 炼金工坊促視构图，中部低对比区域 |
+| ~~`assets/ui/sprites/replace_card_frame_<tier>_9s.png`~~ | ✅ **已生成**（透明 PNG） | 192×260，slice 24 | C/B/A/S 四档卡片边框 |
+| ~~`assets/ui/sprites/replace_card_attr_slot.png`~~ | ✅ **已生成**（透明 PNG） | 56×56 | 属性 icon 圆形底座 |
+| ~~`assets/ui/panels/relic_overlay_bg.png`~~ | ✅ **已生成** | 720×1280 | 暗紫炼金阵纹理 |
+| ~~`assets/ui/sprites/skip_btn_metal.png`~~ | ✅ **已生成**（透明 PNG） | 128×40 | 金属底板按钮 |
+| ~~`assets/ui/panels/rune_grid_bg_9s.png`~~ | ✅ **已生成** | 320×320，slice 32 | 九宫格容器，含九格分隔线纹理 |
+| ~~`assets/ui/sprites/rune_slot_hover.png` / `rune_slot_filled.png`~~ | ✅ **已生成**（透明 PNG） | 64×64 | 覆盖完整 4 态交互 |
+| ~~`assets/ui/sprites/rune_slot_highlight.png`~~ | ✅ **已生成**（透明 PNG） | 96×96 | 放置确认光圈 |
 
 ### 2.3 P2 — 锦上添花
 
@@ -105,7 +105,7 @@
 |------|------|---------|------|
 | ~~`assets/ui/sprites/multiplier_x2.png` ~ `x5.png`~~ | ✅ **已生成**（透明 PNG） | 96×48 | 三档稀有度配色 |
 | ~~`assets/ui/panels/gameover_bg.png`~~ | ✅ **已生成** | 720×1280 | 双联画构图 |
-| `assets/ui/sprites/relic_aura_*.png` | 遗物稀有度光环（待生成） | 200×200 | 4 档稀有度 |
+| ~~`assets/ui/sprites/relic_aura_*.png`~~ | ✅ **已生成**（透明 PNG） | 200×200 | C/B/A/S 四档稀有度光环 |
 | `assets/ui/sprites/skill_cooldown_overlay.png` | 技能冷却扫描（待生成） | 64×64 | 遮罩/扫光层 |
 
 ---
