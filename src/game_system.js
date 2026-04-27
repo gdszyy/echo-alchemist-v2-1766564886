@@ -1356,9 +1356,12 @@ export const game_system = {
                 : reward.type;
 
             if (rewardType === 'relic') {
-                this._roundStartResolverActive = false;
-                
                 const startSelection = () => {
+                    // [BUGFIX tsk-agnet-stage] 必须在 loot 飞行动画 callback 内才清除 resolver 标志，
+                    // 而不是动画播放前。否则在动画播放（300~600ms）期间 _roundStartResolverActive=false
+                    // 且遗物 overlay 尚未挂上 active-phase，phase_combat_update 在 ammoQueue 为空时
+                    // 会误触发敌人回合，表现为「打出最后一发子弹后下一个阶段不进入」。
+                    this._roundStartResolverActive = false;
                     if (typeof this.ui_showRelicSelection === 'function') {
                         this.ui_showRelicSelection({ resumeTarget: 'round_start_resolver', source: reward.source || 'unknown' });
                     }

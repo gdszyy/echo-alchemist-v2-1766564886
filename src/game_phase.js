@@ -1880,8 +1880,14 @@ phase_gathering_getRandomPegType() {
             // 否则会在 phase_finalizeRound 调用 sys_startRoundStartResolver 后立刻再次触发
             // phase_enemy_startLogic（因为 isEnemyTurn 已被置 false 且 ammoQueue 为空），
             // 表现为：遗物卡片弹出时背景中敌人继续行动、进入下一回合。
+            // [BUGFIX tsk-agnet-stage] 不再使用 `pendingRoundStartRewards.length > 0` 作为守卫——该
+            // 队列在「敌人战斗中掉落遗物/精华」时立刻被填充，但此时本回合的敌人回合尚未进行，
+            // 加该守卫会让玩家在第 2/3 回合打完所有子弹后无法进入敌人回合。
+            // 替代方案：`_roundStartResolverActive` 现已覆盖 loot 飞行动画期间（见
+            // sys_startRoundStartResolver 的 relic 分支修复），余下的 overlay 显示阶段由下面的
+            // `#phase-relic.active-phase` 检测；精华路径会切换到 selection 阶段，phase_combat_update
+            // 不会再被调用，因此无需额外守卫。
             if (this._roundStartResolverActive) return;
-            if (this.pendingRoundStartRewards && this.pendingRoundStartRewards.length > 0) return;
             const _relicOverlay = document.getElementById('phase-relic');
             if (_relicOverlay && _relicOverlay.classList.contains('active-phase')) return;
             // 试炼场模式下，不自动进入敌人回合
