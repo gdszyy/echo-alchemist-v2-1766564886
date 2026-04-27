@@ -390,6 +390,9 @@ export const render_system = {
             flying_sword: { val: recipe.flying_sword || 0 }
         };
         Object.keys(mapping).forEach(key => {
+            // [icon-fix] 必须把 key 写回条目，否则下方 ORBITAL_SOCKET_MAP[stat.key] 永远拿到 undefined，
+            // 导致 socket 位图永远走不进 if 分支，发射器环绕属性永远显示成 fallback 的彩色圆环。
+            mapping[key].key = key;
             mapping[key].color = CONFIG.ui.attributeDisplay[key].color;
             mapping[key].icon = CONFIG.ui.attributeDisplay[key].icon;
             if (mapping[key].val > 0) stats.push(mapping[key]);

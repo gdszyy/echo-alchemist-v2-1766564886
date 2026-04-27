@@ -1,6 +1,7 @@
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
 import { CONFIG } from './config.js';
+import { getAmmoIconSrcByKey } from './bitmap_icons.js';
 
 export const ui_system = {
     // @section:ui_fly_effects - 飞行特效池管理
@@ -505,9 +506,14 @@ export const ui_system = {
                 const mainAttrInfo = attrIcons[mainAttrKey] || { icon: '🔮', color: '#94a3b8' };
                 const _iconBorderColor = (mainAttrInfo.color && mainAttrInfo.color.indexOf('gradient') === -1) ? mainAttrInfo.color : '#facc15';
 
+                // [icon-fix] 替换子弹卡片：优先使用与命运选择卡片一致的 ammo 位图
+                const ammoBitmapSrc = getAmmoIconSrcByKey(mainAttrKey);
+                const iconInner = ammoBitmapSrc
+                    ? `<img src="${ammoBitmapSrc}" alt="${mainAttrInfo.icon}" style="width:24px;height:24px;object-fit:contain;display:block;" loading="lazy" onerror="this.outerHTML='${(mainAttrInfo.icon || '').replace(/'/g, '&#39;')}';" />`
+                    : (mainAttrInfo.icon || '');
                 iconArea.innerHTML = `
                     <div style="width:38px;height:38px;background:rgba(15,23,42,0.92);border:2px solid ${_iconBorderColor};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 12px rgba(0,0,0,0.55), 0 0 10px ${_iconBorderColor}88;">
-                        ${mainAttrInfo.icon}
+                        ${iconInner}
                     </div>
                 `;
                 cardWrap.appendChild(iconArea);

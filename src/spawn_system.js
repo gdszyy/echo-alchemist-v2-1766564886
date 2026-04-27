@@ -11,6 +11,7 @@ import { getThemeSegment } from './utils/math_utils.js';
 import { UIManager, TrainingGround, TruthBook, TRUTH_BOOK_DATA } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
+import { getAmmoIconSrcByKey } from './bitmap_icons.js';
 import { interpolateAffixWeights, weightedRandom, getEliteDualAffixChance } from './utils/math_utils.js';
 
 /**
@@ -871,10 +872,25 @@ export const spawn_system = {
             const shine = document.createElement('div');
             shine.className = 'select-icon-shine';
             iconEl.appendChild(shine);
-            // 属性 emoji 覆盖在球体上
+            // 属性图标（优先位图，未命中再 fallback 到 emoji）
+            // [icon-fix] 命运选择卡片使用与 RUNE_ICON_MAP / AMMO_ICON_MAP 一致的位图素材，
+            // assets/icons/ammo/ammo_<type>.png 命中即可替换 emoji。
             const emojiEl = document.createElement('div');
             emojiEl.className = 'select-icon-emoji';
-            emojiEl.textContent = marbleIcon;
+            const marbleBitmapSrc = getAmmoIconSrcByKey(m.type);
+            if (marbleBitmapSrc) {
+                const img = document.createElement('img');
+                img.src = marbleBitmapSrc;
+                img.alt = marbleIcon;
+                img.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;';
+                img.loading = 'lazy';
+                img.onerror = function() {
+                    this.replaceWith(document.createTextNode(marbleIcon));
+                };
+                emojiEl.appendChild(img);
+            } else {
+                emojiEl.textContent = marbleIcon;
+            }
             iconWrap.append(iconEl, emojiEl);
 
             // 弹珠名称
