@@ -1,45 +1,19 @@
 /**
- * audio.js - 音频引擎 (重构版 v4 - 钉盘弹珠合成 + Reverb)
+ * audio.js - 音频引擎 (重构版 v5 - 纯合成 + Reverb)
  * 
  * 变更记录：
- * - v4: 钉盘弹珠相关音效（playHit / playEffect('bump') / createRollingSound）
- *       改回 Web Audio API 合成实现，并接入卷积混响（Reverb）效果器
- *       新增 _createReverbNode()：合成 IR 脉冲响应，模拟钉盘空间感
- *       新增 pegReverbNode：专用于钉盘音效的 Reverb 发送总线
- * - v3: 优先使用 src/assets/sfx/ 目录下的 WAV 文件播放音效
- *       保留 Web Audio API 合成作为 fallback（createRollingSound 等持续型音效）
- *       新增 _loadSfx() 预加载机制，首次用户交互后批量 decode
- * - v2: 移除模块顶层的 `new SoundManager()` 实例化
- *       SoundManager 的实例化延迟到首次用户交互后（由 core.js 控制）
+ * - v5: 回归全 Web Audio API 合成音效，移除 WAV/SFX_MAP/_playSfx 逻辑
+ *       保留 v4 引入的 Reverb 卷积混响效果器（钉盘弹珠专用）
+ *       所有音效方法恢复为纯合成实现
+ * - v4: 钉盘弹珠音效改回合成 + 新增 Reverb 卷积混响
+ * - v3: WAV 文件驱动，优先使用预加载 AudioBuffer
+ * - v2: 延迟初始化，由 core.js 控制实例化时机
  */
-
-// WAV 文件路径映射表（相对于项目根目录）
-const SFX_MAP = {
-    hit_normal:       'src/assets/sfx/hit_normal.wav',
-    hit_bounce:       'src/assets/sfx/hit_bounce.wav',
-    hit_magic:        'src/assets/sfx/hit_magic.wav',
-    shoot:            'src/assets/sfx/shoot.wav',
-    charge_shot:      'src/assets/sfx/charge_shot.wav',
-    enemy_telegraph:  'src/assets/sfx/enemy_telegraph.wav',
-    enemy_regen:      'src/assets/sfx/enemy_regen.wav',
-    enemy_split:      'src/assets/sfx/enemy_split.wav',
-    enemy_freeze:     'src/assets/sfx/enemy_freeze.wav',
-    burn_tick:        'src/assets/sfx/burn_tick.wav',
-    shatter:          'src/assets/sfx/shatter.wav',
-    explosion:        'src/assets/sfx/explosion.wav',
-    lightning:        'src/assets/sfx/lightning.wav',
-    powerup:          'src/assets/sfx/powerup.wav',
-    collect:          'src/assets/sfx/collect.wav',
-    energy_orb:       'src/assets/sfx/energy_orb.wav',
-    rune_ui:          'src/assets/sfx/rune_ui.wav',
-    rune_merge:       'src/assets/sfx/rune_merge.wav',
-};
 
 class SoundManager {
     /**
-     * 声音管理器类
-     * 优先使用预加载的 WAV AudioBuffer 播放音效；
-     * createRollingSound 等持续型音效继续使用 Web Audio API 合成。
+     * 声音管理器类，使用 Web Audio API 合成所有音效
+     * 钉盘弹珠相关音效额外接入 Reverb 卷积混响效果器
      */
     constructor() {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -61,70 +35,23 @@ class SoundManager {
         this.masterGain.connect(this.compressor);
         this.compressor.connect(this.ctx.destination);
 
-        // 白噪声缓冲（rolling sound / shatter fallback 用）
+        // 白噪声缓冲（rolling sound / shatter / lightning 用）
         this.noiseBuffer = this.createNoiseBuffer();
 
         // 防抖记录表
         this.lastPlayTime = {};
 
-        // WAV AudioBuffer 缓存（key → AudioBuffer）
-        this._sfxBuffers = {};
-
         // ── Reverb 效果器（钉盘弹珠专用）──
-        // 信号链：钉盘音效节点 → pegReverbSend(干湿混合) → pegReverbNode → masterGain
-        //                                                 ↘ (dry) → masterGain
+        // 信号链：钉盘音效节点 → pegDryGain(0.6) → masterGain
+        //                      ↘ pegWetGain(0.45) → pegReverbNode → masterGain
         this.pegReverbNode = this._createReverbNode(0.8, 2.5); // decay=0.8, duration=2.5s
         this.pegReverbNode.connect(this.masterGain);
-        // 干声发送增益（钉盘音效直连 masterGain，湿声经 reverb）
         this.pegDryGain = this.ctx.createGain();
         this.pegDryGain.gain.value = 0.6;  // 干声 60%
         this.pegDryGain.connect(this.masterGain);
         this.pegWetGain = this.ctx.createGain();
         this.pegWetGain.gain.value = 0.45; // 湿声 45%
         this.pegWetGain.connect(this.pegReverbNode);
-
-        // 异步预加载所有 WAV
-        this._preloadAllSfx();
-    }
-
-    /**
-     * 预加载 SFX_MAP 中所有 WAV 文件到 AudioBuffer
-     * 失败时静默忽略，后续调用自动降级到合成音效
-     */
-    async _preloadAllSfx() {
-        const entries = Object.entries(SFX_MAP);
-        await Promise.all(entries.map(async ([key, path]) => {
-            try {
-                const resp = await fetch(path);
-                if (!resp.ok) return;
-                const arrayBuf = await resp.arrayBuffer();
-                this._sfxBuffers[key] = await this.ctx.decodeAudioData(arrayBuf);
-            } catch (e) {
-                // 静默失败，fallback 到合成音效
-            }
-        }));
-    }
-
-    /**
-     * 播放已预加载的 WAV 音效
-     * @param {string} key - SFX_MAP 中的键名
-     * @param {number} vol - 音量倍率（默认 1.0）
-     * @param {number} rate - 播放速率（默认 1.0，可用于音调微调）
-     * @returns {boolean} 是否成功播放
-     */
-    _playSfx(key, vol = 1.0, rate = 1.0) {
-        if (this.muted) return false;
-        const buf = this._sfxBuffers[key];
-        if (!buf) return false;
-        const src = this.ctx.createBufferSource();
-        src.buffer = buf;
-        src.playbackRate.value = rate;
-        const gain = this.ctx.createGain();
-        gain.gain.value = vol;
-        src.connect(gain);
-        gain.connect(this.masterGain);
-        src.start(this.ctx.currentTime);
-        return true;
     }
 
     // ─────────────────────────────────────────────
@@ -133,7 +60,7 @@ class SoundManager {
 
     /**
      * 创建卷积混响节点（合成 IR 脉冲响应）
-     * @param {number} decay  - 混响衰减系数（越大尾音越长）
+     * @param {number} decay    - 混响衰减系数（越大尾音越长）
      * @param {number} duration - IR 时长（秒）
      * @returns {ConvolverNode}
      */
@@ -154,7 +81,7 @@ class SoundManager {
     }
 
     /**
-     * 将音效节点同时接入干声和湿声（Reverb）总线
+     * 将音效增益节点同时接入干声和湿声（Reverb）总线
      * 用于钉盘弹珠相关音效
      * @param {AudioNode} node - 待连接的音效增益节点
      */
@@ -164,11 +91,11 @@ class SoundManager {
     }
 
     // ─────────────────────────────────────────────
-    //  持续型音效（保留 Web Audio API 合成）
+    //  基础工具
     // ─────────────────────────────────────────────
 
     createNoiseBuffer() {
-        const bufferSize = this.ctx.sampleRate * 2;
+        const bufferSize = this.ctx.sampleRate * 2; // 2秒缓冲
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
@@ -176,6 +103,10 @@ class SoundManager {
         }
         return buffer;
     }
+
+    // ─────────────────────────────────────────────
+    //  持续型音效（弹珠滚动）
+    // ─────────────────────────────────────────────
 
     createRollingSound() {
         if (this.muted) return null;
@@ -203,12 +134,15 @@ class SoundManager {
             gainNode: gainNode,
             filter: filter,
             ctx: this.ctx,
+            // 核心：根据速度更新声音
             update: function(speed) {
                 const clampSpeed = Math.min(Math.max(speed, 0), 25);
                 const normalizedSpeed = clampSpeed / 25;
                 const now = this.ctx.currentTime;
+                // 平方曲线让高速时声音增加得更明显，低速保持安静
                 const targetVol = Math.pow(normalizedSpeed, 1.5) * 2.5;
                 this.gainNode.gain.setTargetAtTime(targetVol, now, 0.1);
+                // 频率随速度变化，高速时更脆
                 const targetFreq = 100 + (normalizedSpeed * 800);
                 this.filter.frequency.setTargetAtTime(targetFreq, now, 0.1);
             },
@@ -247,15 +181,15 @@ class SoundManager {
     resume() { if (this.ctx.state === 'suspended') this.ctx.resume(); }
 
     // ─────────────────────────────────────────────
-    //  通用基础音调（UI 微调用，保留合成）
+    //  通用基础音调
     // ─────────────────────────────────────────────
 
     /**
-     * 播放基础音调（用于 UI 微调音效，无对应 WAV 时使用）
+     * 播放基础音调
      * @param {number} freq - 频率
      * @param {string} type - 波形类型
-     * @param {number} vol - 音量
-     * @param {number} dur - 持续时间
+     * @param {number} vol  - 音量
+     * @param {number} dur  - 持续时间
      */
     playTone(freq, type = 'sine', vol = 0.3, dur = 0.2) {
         if (this.muted) return;
@@ -273,45 +207,41 @@ class SoundManager {
     }
 
     // ─────────────────────────────────────────────
-    //  游戏音效方法（优先 WAV，fallback 合成）
+    //  游戏音效方法（全部 Web Audio API 合成）
     // ─────────────────────────────────────────────
 
     /**
      * 播放打击音效
-     * @param {string} type - 打击类型：'normal' | 'bounce' | 'cryo' | 'pyro' | 'magic'
-     * @param {number} speed - 速度（影响 fallback 合成音调）
+     * normal / bounce 接入 Reverb 总线，cryo / pyro 直连 masterGain
+     * @param {string} type  - 打击类型：'normal' | 'bounce' | 'cryo' | 'pyro' | 'magic'
+     * @param {number} speed - 速度（影响音调）
      */
     playHit(type = 'normal', speed = 5) {
         if (this.muted) return;
-
-        // 钉盘弹珠碰撞（normal / bounce）：改回合成实现 + Reverb
-        // magic / cryo / pyro 仍使用 WAV 优先
-        if (type === 'magic' && this._playSfx('hit_magic', 0.9)) return;
-
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
 
         switch(type) {
+            // @section:hit_normal - 钉盘碰撞：triangle，速度驱动频率，接入 Reverb
             case 'normal':
-                // 钉盘碰撞：triangle，速度驱动频率，接入 Reverb
                 osc.frequency.setValueAtTime(300 + speed * 20, now);
                 osc.type = 'triangle';
                 gain.gain.setValueAtTime(0.12, now);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
                 osc.connect(gain);
-                this._connectToPegBus(gain); // 干+湿 Reverb
+                this._connectToPegBus(gain);
                 osc.start(now);
                 osc.stop(now + 0.15);
                 return;
+            // @section:hit_bounce - 弹壁反弹：triangle，更高频，接入 Reverb
             case 'bounce':
-                // 弹壁反弹：triangle，更高频，接入 Reverb
                 osc.frequency.setValueAtTime(400 + speed * 30, now);
                 osc.type = 'triangle';
                 gain.gain.setValueAtTime(0.15, now);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
                 osc.connect(gain);
-                this._connectToPegBus(gain); // 干+湿 Reverb
+                this._connectToPegBus(gain);
                 osc.start(now);
                 osc.stop(now + 0.15);
                 return;
@@ -326,12 +256,18 @@ class SoundManager {
                 osc.type = 'sawtooth';
                 gain.gain.setValueAtTime(0.15, now);
                 break;
+            // @section:hit_magic - 魔法钉子：sine 上扬，直连 masterGain
+            case 'magic':
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.linearRampToValueAtTime(1200, now + 0.1);
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.1, now);
+                break;
             default:
                 osc.frequency.setValueAtTime(300 + speed * 20, now);
                 osc.type = 'triangle';
                 gain.gain.setValueAtTime(0.12, now);
         }
-        // cryo / pyro / default：直连 masterGain（无 Reverb）
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
         osc.connect(gain);
         gain.connect(this.masterGain);
@@ -344,9 +280,6 @@ class SoundManager {
      */
     playShoot() {
         if (this.muted) return;
-        if (this._playSfx('shoot', 0.9)) return;
-
-        // Fallback
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -374,20 +307,10 @@ class SoundManager {
         if (this.lastPlayTime[key] && now - this.lastPlayTime[key] < 50) return;
         this.lastPlayTime[key] = now;
 
-        // 根据 hitType 映射到对应 WAV
-        const sfxMap = {
-            cryo:      'enemy_freeze',
-            pyro:      'burn_tick',
-            lightning: 'lightning',
-            normal:    'hit_normal',
-        };
-        const sfxKey = sfxMap[hitType] || 'hit_normal';
-        if (this._playSfx(sfxKey, 0.75)) return;
-
-        // Fallback
         const audioNow = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
+
         switch(hitType) {
             case 'cryo':
                 osc.type = 'sine';
@@ -431,10 +354,9 @@ class SoundManager {
         if (this.lastPlayTime['lightning'] && perfNow - this.lastPlayTime['lightning'] < 80) return;
         this.lastPlayTime['lightning'] = perfNow;
 
-        if (this._playSfx('lightning', 0.9)) return;
-
-        // Fallback
         const now = this.ctx.currentTime;
+
+        // 噪声 + 高频扫描
         const noise = this.ctx.createBufferSource();
         noise.buffer = this.noiseBuffer;
         const noiseGain = this.ctx.createGain();
@@ -463,10 +385,9 @@ class SoundManager {
      */
     playExplosion() {
         if (this.muted) return;
-        if (this._playSfx('explosion', 0.9)) return;
-
-        // Fallback
         const now = this.ctx.currentTime;
+
+        // 噪声爆发
         const noise = this.ctx.createBufferSource();
         noise.buffer = this.noiseBuffer;
         const noiseGain = this.ctx.createGain();
@@ -482,6 +403,7 @@ class SoundManager {
         noise.start(now);
         noise.stop(now + 0.5);
 
+        // 低频冲击
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'sine';
@@ -497,15 +419,10 @@ class SoundManager {
 
     /**
      * 播放能量提升音效
-     * @param {number} pitch - 音调等级（影响 WAV 播放速率）
+     * @param {number} pitch - 音调等级
      */
     playPowerup(pitch = 1) {
         if (this.muted) return;
-        // pitch 影响播放速率，营造等级感（每级提高 5%）
-        const rate = 1.0 + (pitch - 1) * 0.05;
-        if (this._playSfx('powerup', 0.85, rate)) return;
-
-        // Fallback
         const now = this.ctx.currentTime;
         const baseFreq = 400 + pitch * 50;
         const osc = this.ctx.createOscillator();
@@ -527,21 +444,8 @@ class SoundManager {
      */
     playEffect(type) {
         if (this.muted) return;
-
-        // WAV 映射（bump 改回合成 + Reverb，不走 WAV）
-        const sfxKeyMap = {
-            freeze:    'enemy_freeze',
-            burn_tick: 'burn_tick',
-            split:     'enemy_split',
-            regen:     'enemy_regen',
-            shatter:   'shatter',
-            // bump: 不映射 WAV，走下方合成 + Reverb
-        };
-        const sfxKey = sfxKeyMap[type];
-        if (sfxKey && this._playSfx(sfxKey, 0.8)) return;
-
-        // 合成实现
         const now = this.ctx.currentTime;
+
         switch(type) {
             // @section:effect_bump - bump：弹球碰撞钉子，sine 200→80Hz + Reverb
             case 'bump': {
@@ -640,9 +544,6 @@ class SoundManager {
      */
     playMagic() {
         if (this.muted) return;
-        if (this._playSfx('hit_magic', 0.8)) return;
-
-        // Fallback
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -669,26 +570,31 @@ class SoundManager {
         if (this.lastPlayTime['slash'] && perfNow - this.lastPlayTime['slash'] < 60) return;
         this.lastPlayTime['slash'] = perfNow;
 
-        if (this._playSfx('shoot', 0.7, 0.6)) return;
-
-        // Fallback
         const now = this.ctx.currentTime;
+
+        // 主音：快速频率下滑
         const osc1 = this.ctx.createOscillator();
         const gain1 = this.ctx.createGain();
         osc1.type = 'sawtooth';
         osc1.frequency.setValueAtTime(800, now);
         osc1.frequency.exponentialRampToValueAtTime(200, now + 0.08);
+
+        // 泛音：更高频的点缀
         const osc2 = this.ctx.createOscillator();
         const gain2 = this.ctx.createGain();
         osc2.type = 'triangle';
         osc2.frequency.setValueAtTime(1200, now);
         osc2.frequency.exponentialRampToValueAtTime(400, now + 0.06);
+
+        // 主音包络
         gain1.gain.setValueAtTime(0, now);
         gain1.gain.linearRampToValueAtTime(0.2, now + 0.02);
         gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        // 泛音包络（消失得稍微快一点）
         gain2.gain.setValueAtTime(0, now);
         gain2.gain.linearRampToValueAtTime(0.1, now + 0.02);
         gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
         osc1.connect(gain1);
         gain1.connect(this.masterGain);
         osc2.connect(gain2);
@@ -702,11 +608,7 @@ class SoundManager {
     /**
      * 播放收集音效
      */
-    playCollect() {
-        if (this.muted) return;
-        if (this._playSfx('collect', 0.85)) return;
-        this.playTone(700, 'sine', 0.1, 0.4);
-    }
+    playCollect() { this.playTone(700, 'sine', 0.1, 0.4); }
 }
 
 // ==================== 变更：不再在模块顶层创建实例 ====================
