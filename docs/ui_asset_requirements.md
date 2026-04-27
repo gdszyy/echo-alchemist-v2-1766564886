@@ -32,15 +32,15 @@
 
 | ID | DOM 节点 | 模块/职责 | 美术状态 | 现有素材 | 缺失素材 |
 |----|---------|----------|----------|---------|---------|
-| 1.1 | `#phase-title-container` | 启动标题 / 点击开始 | 🟡 | 文字 + Cinzel 字体 | 标题徽章 PNG、点击「开始按钮」金属底板 |
-| 1.2 | `#phase-meta` | 局外元商店 / 升级树 | 🟡 | 顶部栏 9-Slice、卡片 9-Slice 边框 | **元商店分类标签 Tab Sprite**、**SP 货币图标**、升级卡片占位插画 |
-| 1.3 | `#phase-rune-launcher` | 符文发射器主面板 | ✅ | `rune_launcher_9s.png`、`rune_grid_bg_9s.png`、`rune_slot_idle/hover/filled/highlight.png` | — |
-| 1.4 | `#phase-shop` | 局外商店（货架） | 🟡 | 卡片 9-Slice | **背景插画（炼金工房内景）**、商店物品分类图标、价格标签 |
+| 1.1 | `#phase-title-container` | 启动标题 / 点击开始 | 🟡 | 文字 + Cinzel 字体（背景由 `#phase-meta` 承载） | 标题徽章 PNG、点击「开始按钮」金属底板 |
+| 1.2 | `#phase-meta` | 局外元商店 / 升级树 | 🟡 | 顶部栏 9-Slice、卡片 9-Slice 边框、`relic_overlay_bg.png` 复用底纹 | **元商店分类标签 Tab Sprite**、**SP 货币图标**、升级卡片占位插画 |
+| 1.3 | `#phase-rune-launcher` | 符文发射器主面板 | ✅ | `rune_launcher_9s.png`（已收缩到内层卡片宽度 384px）、`rune_grid_bg_9s.png`、`rune_slot_idle/hover/filled/highlight.png` | — |
+| 1.4 | `#phase-shop` | 局外商店（货架） | 🟡 | 卡片 9-Slice、`replace_ammo_bg.png` 复用炼金工坊底图 | 商店物品分类图标、价格标签 |
 | 1.5 | `#phase-selection` | 弹珠选择 / 子弹替换 / 命运时刻 | ✅ | `replace_ammo_bg.png`、`replace_card_frame_<C/B/A/S>_9s.png`、`replace_card_attr_slot.png`、`skip_btn_metal.png` | — |
 | 1.6 | `#phase-gathering` | 研磨阶段（弹珠台） | 🟡 | `bg_main_canvas.png`、`bg_emitter_zone.png`、`emitter_base.png` | 底部「钉盘外框」装饰 |
 | 1.7 | `#phase-combat` | 战斗阶段（无 DOM 主面板） | ✅ | `bg_main_canvas.png`、`emitter_base.png`、`emitter_charging_0~5.png`（蓄力 6 帧叠加） | — |
 | 1.8 | `#phase-truth-book` | 真理之书 / 图鉴 | 🟡 | `truth_book_bg_9s.png`（已接入背景） | 章节侧标 Tab、属性卡片底板、Boss 头像位 |
-| 1.9 | `#phase-relic` | 遗物选择 overlay | ✅ | `relic_overlay_bg.png`、`relic_aura_<C/B/A/S>.png`、`skip_btn_metal.png` + 已有遗物图标/9-Slice 边框 | — |
+| 1.9 | `#phase-relic` | 遗物选择 overlay | ✅ | `relic_overlay_bg.png`、`skip_btn_metal.png` + 已有遗物图标/9-Slice 边框（**已移除**旋转圆形稀有度光环） | — |
 | 1.10 | `#phase-gameover` | 游戏结束/结算 | 🟡 | `gameover_bg.png`（已接入） | 统计数据卡片 9-Slice、奖励发放动画图层 |
 | 1.11 | `#phase-pause` | 暂停菜单 | ❌ | — | 半透明背景、菜单按钮 9-Slice |
 | 1.12 | `#unified-top-bar` | 顶部状态栏 | ✅ | 9-Slice `top_bar_9s.png` | — |

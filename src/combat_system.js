@@ -2159,8 +2159,8 @@ export const combat_system = {
                         if (motherBladeMarker) {
                             recallTarget = motherBladeMarker.pos;
                         } else {
-                            // 母剑不存在或未插在敌人身上，回到玩家位置
-                            recallTarget = { x: this.width / 2, y: this.height - 80 };
+                            // 母剑不存在或未插在敌人身上，回到玩家位置（[emitter-port] 对齐到素材上沿发射口）
+                            recallTarget = { x: this.width / 2, y: this.height - 102 };
                         }
                         sword.triggerRecall(recallTarget);
                     }

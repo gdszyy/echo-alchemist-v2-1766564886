@@ -140,13 +140,22 @@
     60%       { filter: brightness(1.05) drop-shadow(0 0 5px rgba(239,68,68,0.5)); }
 }
 
-/* #phase-rune-launcher 面板底板 */
-/* [BUGFIX] 保留深色底色，让 9-Slice 图片叠加在深色背景上，中心半透明纹理才能正确显示 */
+/* #phase-rune-launcher 面板底板
+   - 外层 overlay 仅作半透明遮罩（避免 border-image 被拉伸到全屏导致比例失真）
+   - 实际 9-Slice 面板贴在内层 .rune-launcher-card 上，宽度根据背景图比例收缩，
+     保证装饰带与中心石板纹理在视觉上贴合内容区域 */
 #phase-rune-launcher {
-    background: rgba(2, 6, 23, 0.95) !important;
-    border-image-source: url('../../assets/ui/panels/popup_panel_9s.png');
-    border-image-slice: 64 64 64 64 fill;
-    border-image-width: 24px;
+    background: rgba(2, 6, 23, 0.92) !important;
+    align-items: center;
+}
+#phase-rune-launcher > .rune-launcher-card {
+    /* 收缩到与 rune_launcher_9s.png（512×768）比例匹配的宽度，最大 384px，避免在大屏被拉伸 */
+    max-width: min(384px, calc(100vw - 24px));
+    margin-left: auto;
+    margin-right: auto;
+    border-image-source: url('../../assets/ui/panels/rune_launcher_9s.png');
+    border-image-slice: 64 64 96 96 fill;
+    border-image-width: 32px 24px 40px 24px;
     border-image-outset: 0;
     border-image-repeat: stretch;
 }
@@ -293,8 +302,8 @@
 /* =====================================================
    §6.3 古代遗物 overlay（#phase-relic）
    - 整面背景：relic_overlay_bg.png（暗紫炼金阵）
-   - 稀有度光环：relic_aura_<tier>.png 通过 ::before 居中绘制
    - 「跳过」按钮金属底板
+   - [移除] 稀有度旋转圆形光环（relic_aura_*.png + relic-aura-rotate 动画）
    ===================================================== */
 #phase-relic {
     background-image:
@@ -304,48 +313,6 @@
     background-position: center, center !important;
     background-repeat: no-repeat, no-repeat !important;
     background-color: #020617 !important;
-}
-
-/* 让 .relic-card 形成独立堆叠上下文，避免 ::after 的 z-index:-1 透出到 #phase-relic 背景之下 */
-.relic-card {
-    isolation: isolate;
-}
-/* 稀有度光环背板：用 ::after 与 index.html 的 .relic-card.legendary::before（shimmer）共存 */
-.relic-card::after {
-    content: '';
-    position: absolute;
-    inset: -32px;
-    background: url('../../assets/ui/sprites/relic_aura_C.png') center/contain no-repeat;
-    pointer-events: none;
-    opacity: 0.85;
-    z-index: -1;
-    animation: relic-aura-rotate 18s linear infinite;
-}
-.relic-card.rare::after {
-    background-image: url('../../assets/ui/sprites/relic_aura_B.png');
-    opacity: 0.9;
-    animation-duration: 14s;
-}
-.relic-card.epic::after {
-    background-image: url('../../assets/ui/sprites/relic_aura_A.png');
-    opacity: 0.95;
-    animation-duration: 11s;
-}
-.relic-card.legendary::after {
-    background-image: url('../../assets/ui/sprites/relic_aura_S.png');
-    opacity: 1;
-    animation-duration: 8s;
-}
-.relic-card.cursed::after {
-    background-image: url('../../assets/ui/sprites/relic_aura_S.png');
-    opacity: 0.7;
-    filter: hue-rotate(-90deg) brightness(0.8);
-    animation-duration: 10s;
-}
-
-@keyframes relic-aura-rotate {
-    0%   { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
 }
 
 /* 遗物跳过按钮：替换原生纯文字链接为金属底板按钮（按 HTML 内嵌的 button 选择器） */
@@ -452,3 +419,30 @@
     background-repeat: no-repeat, no-repeat !important;
     background-color: #020617 !important;
 }
+
+/* =====================================================
+   §1.4 商店页（#phase-shop）— 复用 replace_ammo_bg.png 的炼金工坊俯视构图
+   ===================================================== */
+#phase-shop {
+    background-image:
+        linear-gradient(180deg, rgba(2,6,23,0.62) 0%, rgba(2,6,23,0.86) 100%),
+        url('../../assets/ui/panels/replace_ammo_bg.png') !important;
+    background-size: cover, cover !important;
+    background-position: center, center !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-color: #020617 !important;
+}
+
+/* =====================================================
+   §1.2 局外元商店主页（#phase-meta）— 复用 relic_overlay_bg.png 暗紫炼金阵
+   ===================================================== */
+#phase-meta {
+    background-image:
+        linear-gradient(180deg, rgba(2,6,23,0.55) 0%, rgba(2,6,23,0.85) 100%),
+        url('../../assets/ui/panels/relic_overlay_bg.png') !important;
+    background-size: cover, cover !important;
+    background-position: center, center !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-color: #020617 !important;
+}
+

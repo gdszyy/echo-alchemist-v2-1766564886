@@ -738,9 +738,10 @@ phase_gathering_getRandomPegType() {
                  return;
              }
              if (!this.isEnemyTurn && this.ammoQueue.length > 0 && this.projectiles.length === 0 && this.burstQueue.length === 0) {
-                this.isDragging = true; 
-                this.dragStart = new Vec2(this.width / 2, this.height - 80); 
-                this.dragCurrent = logicPos; 
+                this.isDragging = true;
+                // [emitter-port] 发射口位于 emitter_base.png 上沿（Y 轴上移 22px），与发射器素材的视觉发射口对齐
+                this.dragStart = new Vec2(this.width / 2, this.height - 102);
+                this.dragCurrent = logicPos;
                 this.ui.closeDrawer();
             }
         }
@@ -1364,14 +1365,15 @@ phase_gathering_getRandomPegType() {
             }
         }
         // --- 逻辑更新 ---
-        for (let i = this.burstQueue.length - 1; i >= 0; i--) { 
-            const shot = this.burstQueue[i]; 
-            shot.delay -= timeScale; 
-            if (shot.delay <= 0) { 
-                this.spawn_spawnBullet(this.width/2, this.height-80, shot.vel, shot.recipe, shot.shotId, shot.isLast); 
-                audio.playShoot(); 
-                this.burstQueue.splice(i, 1); 
-            } 
+        for (let i = this.burstQueue.length - 1; i >= 0; i--) {
+            const shot = this.burstQueue[i];
+            shot.delay -= timeScale;
+            if (shot.delay <= 0) {
+                // [emitter-port] 子弹从发射器素材的上沿发射口生成（Y 轴上移 22px）
+                this.spawn_spawnBullet(this.width/2, this.height-102, shot.vel, shot.recipe, shot.shotId, shot.isLast);
+                audio.playShoot();
+                this.burstQueue.splice(i, 1);
+            }
         }
         if (this.waveMomentumTimer > 0) this.waveMomentumTimer -= timeScale;
 
@@ -1722,7 +1724,8 @@ phase_gathering_getRandomPegType() {
             }
             // 拖拽瞄准线
             if (this.isDragging && this.projectiles.length === 0 && this.ammoQueue.length > 0 && this.burstQueue.length === 0) {
-                const start = new Vec2(this.width / 2, this.height - 80);
+                // [emitter-port] 瞄准线起点对齐到发射器素材的上沿发射口
+                const start = new Vec2(this.width / 2, this.height - 102);
                 let force = this.lastMousePos.sub(start);
                 
                 if (force.y < -20) {
@@ -1778,10 +1781,11 @@ phase_gathering_getRandomPegType() {
                     this.ctx.restore();
                 }
             } else if (this.projectiles.length === 0) {
-                const start = new Vec2(this.width / 2, this.height - 80);
+                // [emitter-port] 空仓占位炮台对齐到发射器素材的上沿发射口
+                const start = new Vec2(this.width / 2, this.height - 102);
                 this.ctx.save();
                 this.ctx.translate(start.x, start.y);
-                this.ctx.rotate(-Math.PI / 2); 
+                this.ctx.rotate(-Math.PI / 2);
                 this.ctx.fillStyle = '#475569';
                 this.ctx.beginPath();
                 this.ctx.arc(0, 0, 12, 0, Math.PI * 2);
@@ -1947,7 +1951,9 @@ phase_gathering_getRandomPegType() {
         // 应用与实体层相同的视差偏移
         this.ctx.translate(entityShiftX, entityShiftY);
 
+        // [emitter-port] startPos = 发射器底座视觉中心；portPos = 实际发射口（沿素材上沿）
         const startPos = new Vec2(this.width / 2, this.height - 80);
+        const portPos = new Vec2(startPos.x, startPos.y - 22);
         // [bitmap-emitter] 优先使用 emitter_base.png + emitter_charging_*.png 渲染发射器底座；
         // 位图未加载时 fallback 到原始 arc 椭圆。
         this.render_combat_launcherEmitterBase(this.ctx, startPos.x, startPos.y, this.isChargingShot, this.chargeProgress);
@@ -1957,35 +1963,35 @@ phase_gathering_getRandomPegType() {
             const params = Projectile.calculateVisualParams(nextAmmo, false);
             let previewRotation =  -Math.PI / 2;
             let deformation = {x: 1, y: 1};
-            
+
             if (this.isDragging) {
                 const force = this.dragStart.sub(this.dragCurrent);
                 if (force.mag() > 10) {
                     previewRotation = Math.atan2(force.y, force.x) ;
-                    deformation = {x: 1.15, y: 0.85}; 
+                    deformation = {x: 1.15, y: 0.85};
                 }
             }
             if (this.isChargingShot) {
                 const shake = Math.random() * 2; // 吸收时的剧烈抖动
-                startPos.x += (Math.random()-0.5) * shake;
-                startPos.y += (Math.random()-0.5) * shake;
+                portPos.x += (Math.random()-0.5) * shake;
+                portPos.y += (Math.random()-0.5) * shake;
                 // 核心随着能量吸收变大变亮
                 const absorbScale = 1.0 + this.chargeProgress * 0.3;
                 deformation.x *= absorbScale;
                 deformation.y *= absorbScale;
             }
 
-            //先绘制轨道 (Orbitals) -> 这样它就在炮台下面
+            // 轨道仍以发射器底座为圆心绕飞
             this.render_combat_launcherOrbitals(this.ctx, startPos.x, startPos.y, nextAmmo);
 
-            //后绘制炮台核心 (Visuals) -> 这样它就在上面
-            Projectile.drawVisuals(this.ctx, startPos.x, startPos.y, params.radius, nextAmmo, previewRotation, params.intensity, deformation);
+            // 待发射弹药贴在素材上沿的发射口
+            Projectile.drawVisuals(this.ctx, portPos.x, portPos.y, params.radius, nextAmmo, previewRotation, params.intensity, deformation);
 
         } else {
-            // 空仓状态
+            // 空仓状态：占位圈贴在发射口
             this.ctx.fillStyle = '#1e293b';
             this.ctx.beginPath();
-            this.ctx.arc(startPos.x, startPos.y, 10, 0, Math.PI * 2);
+            this.ctx.arc(portPos.x, portPos.y, 10, 0, Math.PI * 2);
             this.ctx.fill();
             this.ctx.strokeStyle = '#475569';
             this.ctx.stroke();
