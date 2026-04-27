@@ -46,6 +46,11 @@ import {
     decaySpin,
     getLayoutParams,
 } from './plinko_physics.js';
+import {
+    getRuneIconSrc,
+    getRelicIconSrc,
+    getUiBitmap,
+} from './bitmap_icons.js';
 
 // ==================== 音频依赖注入 (重构 v2) ====================
 // 移除 Proxy 方案和 window.audio 依赖
@@ -4580,13 +4585,23 @@ class FieldLootItem {
         ctx.arc(0, 0, 25, 0, Math.PI * 2);
         ctx.fill();
 
-        // 绘制图标
-        ctx.font = '24px serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = glowColor;
-        ctx.fillText(icon, 0, 0);
+        // 绘制图标 —— 优先位图，未加载则 fallback 到 emoji
+        // [icon-fix] 战场掉落的遗物 / 混沌精华 / 纯净精华统一使用 RELIC_ICON_MAP 中的位图
+        const lootBitmapPath = getRelicIconSrc(this.type);
+        const lootBitmap = lootBitmapPath ? getUiBitmap(lootBitmapPath) : null;
+        if (lootBitmap) {
+            const sz = 36;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = glowColor;
+            ctx.drawImage(lootBitmap, -sz / 2, -sz / 2, sz, sz);
+        } else {
+            ctx.font = '24px serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = glowColor;
+            ctx.fillText(icon, 0, 0);
+        }
 
         ctx.restore();
     }
@@ -4750,12 +4765,20 @@ class RuneLoot {
             ctx.stroke();
         }
 
-        // 绘制符文图标（真实 emoji）
-        ctx.font = '14px serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(icon, this.x, drawY);
+        // 绘制符文图标 —— 优先位图，未加载则 fallback 到 emoji
+        // [icon-fix] 之前所有掉落符文都只画 emoji，即使 assets/icons/rune/ 已经有完整位图
+        const runeBitmapPath = runeDef ? getRuneIconSrc(runeDef.id) : null;
+        const runeBitmap = runeBitmapPath ? getUiBitmap(runeBitmapPath) : null;
+        if (runeBitmap) {
+            const sz = 22; // 圆形内圈半径 14，留 4px 安全边
+            ctx.drawImage(runeBitmap, this.x - sz / 2, drawY - sz / 2, sz, sz);
+        } else {
+            ctx.font = '14px serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(icon, this.x, drawY);
+        }
 
         // 等级角标（右下角小文字）
         if (level >= 1) {

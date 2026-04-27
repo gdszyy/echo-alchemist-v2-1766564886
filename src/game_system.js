@@ -1761,21 +1761,25 @@ export const game_system = {
 
     /**
      * @method _isRuneLauncherOpen
-     * @description 判断符文发射器面板当前是否处于打开状态。
+     * @description 判断符文发射器面板当前是否处于「全屏遮罩」状态（即移动端打开浮层）。
      * 兼容两种模式：
      * - 移动端模式：面板为 .ui-overlay 全屏浮层，打开时 style.display = 'flex'，关闭时 = 'none'
-     * - PC 模式：面板已迁移到 #pc-right-sidebar，移除了 .ui-overlay 类，
-     *   由 CSS `display: flex !important` 控制，style.display 本身为空字符串。
-     *   此时通过 dataset.pcMigrated 标记来判断是否处于 PC 常驻状态。
-     * @returns {boolean} 发射器是否打开
+     * - PC 模式：面板已被 _ui_migrateRuneLauncherToSidebar 迁入 #pc-right-sidebar 常驻显示，
+     *   位于 canvas 之外的独立容器，不会遮挡 canvas，必须返回 false。
+     * @returns {boolean} 发射器是否处于全屏遮罩状态
      */
     _isRuneLauncherOpen() {
         const panel = document.getElementById('phase-rune-launcher');
         if (!panel) return false;
-        // [BUGFIX] PC 模式：面板已迁移到右侧边栏（常驻可见）。
-        // 此时面板在 canvas 之外的独立容器中，不会遮挡 canvas，应返回 false。
-        // 原错误逻辑：返回 true 导致 input_handleInputStart 永远提前 return，屏蔽所有 PC 端点击事件。
-        if (panel.dataset.pcMigrated === 'true') return false;
+        // [BUGFIX tsk-pc-click-block] 通过 DOM 父级直接判断 PC 迁移状态。
+        // 旧实现依赖 panel.dataset.pcMigrated === 'true'，但 _ui_movePanelTo 从未写入该标记，
+        // 导致 PC 模式下函数永远 fallback 到 style.display 检查。而 _ui_migrateRuneLauncherToSidebar
+        // 在迁入侧边栏后会把 style.display 强制设为 'flex'（让发射器常驻），
+        // 综合作用使本函数在 PC 模式下永远返回 true，连锁导致：
+        //   1) input_handleInputStart/Move/End 全部提前 return —— 主屏幕点击全部被吞；
+        //   2) ui_updateUI 中 `if (!launcherVisible)` 分支被跳过 —— 当前阶段的 .ui-overlay
+        //      永远不会被重新激活，主屏幕显示为空。
+        if (panel.closest('#pc-right-sidebar')) return false;
         // 移动端模式：面板为全屏浮层，通过 style.display 判断
         return panel.style.display !== '' && panel.style.display !== 'none';
     },
