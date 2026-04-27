@@ -622,6 +622,31 @@ phase_gathering_getRandomPegType() {
             });
         }
 
+        // [perfect-clear-upgrade] 上回合「围墙清空且仍有剩余弹药」蓄能升级保留下来的子弹，
+        // prepend 回本回合 ammoQueue 首部，让升级首先生效。
+        if (Array.isArray(this._carryOverAmmo) && this._carryOverAmmo.length > 0) {
+            this.ammoQueue = [...this._carryOverAmmo, ...this.ammoQueue];
+            this._carryOverAmmo = null;
+        }
+        // [perfect-clear-upgrade] 重置「本回合是否已触发蓄能升级」标志
+        this._chargeUpgradeApplied = false;
+
+        // [Feature 2: 围墙非空兜底] 进入战斗时若围墙内（pos.y > 0）确实没有任何活跃敌人，
+        // 且不存在待入场 Boss / 画面外刚生成敌人，强制补一行 IN-WALL 敌人，避免空场打子弹。
+        // finalizeRound 已尽量在清屏后预留一行 IN-WALL，本兜底用于其它异常路径。
+        if (this.phase !== 'training' && Array.isArray(this.enemies)) {
+            const hasInWallEnemy = this.enemies.some(e =>
+                e.active && (
+                    e.pos.y > 0 ||
+                    (e.type === 'boss' && (e.entranceTimer > 0 || e._pendingEntrance)) ||
+                    e._spawnedThisTurn
+                )
+            );
+            if (!hasInWallEnemy && typeof this.spawn_spawnEnemyRowAt === 'function') {
+                this.spawn_spawnEnemyRowAt(this.combatGridTopY);
+            }
+        }
+
         // [tsk-bullet-ui] 兜底保护：若 ammoQueue 与 marbleQueue 同时为空（例如玩家在
         // 纯净精华命运时刻点击「跳过研磨」获取符文，且上回合无 _chargedAmmoQueue），
         // 此时直接进入战斗会导致「彈藥耗盡」横幅一直显示且敌人回合无法推进。
@@ -1104,8 +1129,21 @@ phase_gathering_getRandomPegType() {
             if (rowCountCurrent < 4) spawnCount = 3;
             // [清屏奖励] 上一回合完成清屏，本回合至少推进 3 行敌人
             if (this._prevRoundCleared && spawnCount < 3) spawnCount = 3;
-            // [issue-2] 改为画面外入场：新敌人从画面外滑入网格顶部，避免凭空出现
-            this.spawn_spawnEnemyRowOffScreen(spawnCount);
+            // [Feature 2: 围墙非空保证] 本回合清屏 → 下回合若全部从画面外滑入，将出现"围墙范围内
+            // 短暂无敌人"的空窗（玩家若仍持有子弹会立刻被 perfect-clear-upgrade 再次结算）。
+            // 因此清屏后第一行直接生成在网格顶部（IN-WALL），其余行保留画面外入场演出。
+            if (clearedThisRound) {
+                this.spawn_spawnEnemyRowAt(this.combatGridTopY);
+                for (let i = 1; i < spawnCount; i++) {
+                    this.spawn_spawnEnemyRowAt(
+                        this.combatGridTopY - i * this.enemyHeight,
+                        { offScreenEntrance: true }
+                    );
+                }
+            } else {
+                // [issue-2] 非清屏回合维持画面外入场，新敌人从画面外滑入网格顶部，避免凭空出现
+                this.spawn_spawnEnemyRowOffScreen(spawnCount);
+            }
         }
         // [清屏状态] 将本回合清屏结果写入标志位，供下一回合读取
         this._prevRoundCleared = clearedThisRound;
@@ -1214,6 +1252,52 @@ phase_gathering_getRandomPegType() {
             this.sys_startRoundStartResolver();
         }
     },
+
+    /**
+     * @method phase_playChargeUpgradeFX
+     * @description [perfect-clear-upgrade] 播放剩余弹药"蓄能升级"显著特效。
+     *              围墙清空时若仍有剩余子弹，触发本特效并将每发子弹累加属性 +1。
+     * @perf-impact: 单次回合结算事件，固定上限：3 个 Shockwave + 1 个 HealWave + ~30~70 个 spark 粒子。
+     *               所有创建均经过 spawn_create* 中的 perf budget 检查。
+     */
+    phase_playChargeUpgradeFX(leftoverCount = 1) {
+        const cx = this.width / 2;
+        const cy = this.height - 80;
+        // 1. 中心三层 Shockwave（金/紫/青，错峰模拟蓄能层叠）
+        if (typeof this.spawn_createShockwave === 'function') {
+            this.spawn_createShockwave(cx, cy, '#fde047');
+            setTimeout(() => this.spawn_createShockwave && this.spawn_createShockwave(cx, cy, '#a78bfa'), 90);
+            setTimeout(() => this.spawn_createShockwave && this.spawn_createShockwave(cx, cy, '#22d3ee'), 180);
+        }
+        // 2. 大范围扩散光晕（复用 HealWave 的扩散环 + 中心光晕表达）
+        if (typeof this.spawn_createHealWave === 'function') {
+            this.spawn_createHealWave(cx, cy, 240);
+        }
+        // 3. 多方向闪电（向上向四周辐射），随剩余子弹数缩放
+        if (typeof LightningBolt !== 'undefined' && Array.isArray(this.lightningBolts)) {
+            const _budget = (CONFIG && CONFIG.performance && CONFIG.performance[this.perfQualityLevel || 'high']) || null;
+            const limit = _budget ? _budget.lightningLimit : 12;
+            const n = Math.min(8, 4 + leftoverCount);
+            for (let i = 0; i < n && this.lightningBolts.length < limit; i++) {
+                const ang = (Math.PI * 2 * i) / n - Math.PI / 2;
+                const tx = cx + Math.cos(ang) * 220;
+                const ty = cy + Math.sin(ang) * 220;
+                this.lightningBolts.push(new LightningBolt(cx, cy, tx, ty));
+            }
+        }
+        // 4. 大量金色 spark 粒子，数量随剩余子弹数线性增长
+        const sparkCount = 28 + leftoverCount * 6;
+        for (let i = 0; i < sparkCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 12 + Math.random() * 60;
+            this.spawn_createParticle(cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist, '#fde047', 'spark');
+        }
+        // 5. 居中浮动文字提示
+        if (typeof this.spawn_createFloatingText === 'function') {
+            this.spawn_createFloatingText(cx, cy - 90, `+${leftoverCount} 蓄能升級！`, '#fde047');
+        }
+    },
+
     smartScientific(num, fractionDigits = 2) {
         // 1. 处理 0 和 非数字 的情况
         if (isNaN(num)) return "NaN";
@@ -1852,16 +1936,37 @@ phase_gathering_getRandomPegType() {
             return; 
         }
 
+        // [perfect-clear-upgrade] 围墙范围内已无敌人但仍有剩余子弹：
+        // 立刻结算，并将剩余子弹的所有可累加属性 +1 后携带到下回合，附带显著的蓄能发光升级特效。
+        // _chargeUpgradeApplied 防止同一回合多次进入此分支（结算流程内仍可能继续 tick）。
         if (activeEnemies === 0) {
             const hasLeftoverAmmo = this.ammoQueue.length > 0;
-            if (hasLeftoverAmmo) {
+            if (hasLeftoverAmmo && !this._chargeUpgradeApplied) {
+                this._chargeUpgradeApplied = true;
                 const leftoverCount = this.ammoQueue.length;
+                // 1. 维持原有奖励：分数倍率 + 下回合难度
                 const scoreMult = Math.pow(CONFIG.balance.unusedAmmoScoreMult, leftoverCount);
                 this.score *= scoreMult;
                 this.nextRoundHpMultiplier = CONFIG.balance.nextRoundDifficultyMult;
-                showToast(`完美清場! 下輪難度 UP!`);
+                // 2. 对每发剩余子弹施加 +1 强化（所有可累加属性）
+                const STACKABLE_KEYS = ['damage', 'pierce', 'bounce', 'scatter', 'pyro', 'cryo', 'lightning', 'laser', 'wind'];
+                const upgradedAmmo = this.ammoQueue.map(recipe => {
+                    const enhanced = { ...recipe };
+                    STACKABLE_KEYS.forEach(k => {
+                        enhanced[k] = (enhanced[k] || 0) + 1;
+                    });
+                    if (enhanced.laser >= 1) enhanced.isLaser = true;
+                    enhanced._chargeUpgraded = true;
+                    return enhanced;
+                });
+                // 3. 携带升级子弹到下一回合（在 phase_startCombatPhase 中 prepend 回 ammoQueue）
+                this._carryOverAmmo = upgradedAmmo;
+                // 4. 清空当前队列，让 playerTurnFinished 自然成立、回合正常结算
+                this.ammoQueue = [];
+                // 5. 显著的蓄能发光升级特效
+                this.phase_playChargeUpgradeFX(leftoverCount);
+                showToast(`⚡ 完美清場！剩餘 ${leftoverCount} 發彈藥蓄能升級 +1！`);
                 audio.playPowerup();
-                this.ammoQueue = []; 
                 this.ui_updateAmmoUI();
                 this.ui_renderRecipeHUD();
                 this.data_clearProjectiles();
