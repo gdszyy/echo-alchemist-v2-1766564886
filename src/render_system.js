@@ -20,6 +20,7 @@ import {
     EMITTER_CHARGING_SRCS,
     BG_MAIN_CANVAS_SRC,
     BG_EMITTER_ZONE_SRC,
+    getAmmoIconSrcByKey,
 } from './bitmap_icons.js';
 
 export const render_system = {
@@ -496,19 +497,35 @@ export const render_system = {
             }
 
             // 绘制文字 (仅在大小合适时)
+            // [bitmap-orbital-icon] 优先使用 AMMO_ICON_MAP 位图替代 emoji；位图未加载或属性
+            // 无对应贴图（如 multicast）时回退到 emoji，保持视觉连续性。
             if (radius < 200 && currentSize > 8) {
                 ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 if (stat.isMulticast) {
                     ctx.font = `bold ${12 * orbScale}px monospace`;
                     ctx.fillText(`x${1 + stat.val}`, ox, oy);
                 } else {
-                    ctx.font = `${10 * orbScale}px sans-serif`;
+                    const iconSrc = getAmmoIconSrcByKey(stat.key);
+                    const iconImg = iconSrc ? getUiBitmap(iconSrc) : null;
+                    const iconBoxRaw = currentSize * 1.6;
                     if (stat.val > 1) {
-                        ctx.fillText(stat.icon, ox, oy - 5 * orbScale);
-                        ctx.font = `bold ${9 * orbScale}px sans-serif`; ctx.fillStyle = stat.color;
+                        const iconBox = iconBoxRaw * 0.85;
+                        if (iconImg) {
+                            ctx.drawImage(iconImg, ox - iconBox / 2, oy - 6 * orbScale - iconBox / 2, iconBox, iconBox);
+                        } else {
+                            ctx.font = `${10 * orbScale}px sans-serif`;
+                            ctx.fillText(stat.icon, ox, oy - 5 * orbScale);
+                        }
+                        ctx.font = `bold ${9 * orbScale}px sans-serif`;
+                        ctx.fillStyle = stat.color;
                         ctx.fillText(`${stat.val}`, ox, oy + 6 * orbScale);
                     } else {
-                        ctx.font = `${14 * orbScale}px sans-serif`; ctx.fillText(stat.icon, ox, oy);
+                        if (iconImg) {
+                            ctx.drawImage(iconImg, ox - iconBoxRaw / 2, oy - iconBoxRaw / 2, iconBoxRaw, iconBoxRaw);
+                        } else {
+                            ctx.font = `${14 * orbScale}px sans-serif`;
+                            ctx.fillText(stat.icon, ox, oy);
+                        }
                     }
                 }
             }
