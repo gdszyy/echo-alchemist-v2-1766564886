@@ -1356,9 +1356,14 @@ class Enemy {
         } else {
             ctx.roundRect(-w/2, -h/2, w, h, r);
         }
-        // [透出战场背景] 容器底色由实色 `#0f172a` 改为半透明，让 game-container
-        // 的径向渐变背景能够透过敌人方块隐约可见，避免敌人形成不透明黑块。
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.38)';
+        // @perf-impact: 容器背景由实色改为线性渐变（每帧 1 个 LinearGradient/敌人）
+        // [玻璃质感] 容器底色采用顶亮底深的微弱玻璃渐变，模拟环境光自上而下
+        // 衰减；总体 alpha 降低，避免大面积纯色显得廉价，让 game-container 的
+        // 径向背景充分透出，强化"半透明面板嵌在战场上"的高级质感。
+        const _bgGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
+        _bgGrad.addColorStop(0, 'rgba(30, 41, 59, 0.14)');
+        _bgGrad.addColorStop(1, 'rgba(8, 14, 26, 0.28)');
+        ctx.fillStyle = _bgGrad;
         ctx.fill();
         // [增强对比 #4] 在裁剪之前先给容器外缘绘制一圈柔光描边，
         // 让敌人在与背景同色的「液态」战场上仍能识别轮廓（精英/Boss 尤其关键）。
@@ -1400,13 +1405,24 @@ class Enemy {
         const whiteY = _hpBarBottom - whiteHeight;
         const greenY = _hpBarBottom - greenHeight;
 
-        // [透出战场背景] 空槽底色保留类型色调（普通/精英/Boss），但 alpha 大幅降低，
-        // 让游戏容器背景透出。轮廓识别由外缘 shadowBlur 描边（见上方 stroke）和液体
-        // 顶部亮边共同承担，无需依赖空槽实色。
-        let emptySlotColor = 'rgba(15, 23, 42, 0.32)'; // 普通敌人：偏深的板岩蓝
-        if (this.type === 'elite') emptySlotColor = 'rgba(45, 27, 78, 0.36)';  // 精英：暗紫
-        if (this.type === 'boss') emptySlotColor = 'rgba(60, 12, 20, 0.40)';   // Boss：暗血红
-        ctx.fillStyle = emptySlotColor;
+        // @perf-impact: 空槽改为线性渐变（每帧 1 个 LinearGradient/敌人）
+        // [玻璃质感] 空槽保留类型色调（普通/精英/Boss）但改为顶浅底深的微弱渐变，
+        // 进一步打散纯色面，提升透明感与体积感。alpha 进一步降低，让背景透出更多。
+        let _slotTop, _slotBottom;
+        if (this.type === 'elite') {
+            _slotTop = 'rgba(76, 48, 122, 0.18)';
+            _slotBottom = 'rgba(28, 14, 52, 0.30)';
+        } else if (this.type === 'boss') {
+            _slotTop = 'rgba(96, 28, 44, 0.20)';
+            _slotBottom = 'rgba(40, 8, 16, 0.32)';
+        } else {
+            _slotTop = 'rgba(40, 52, 74, 0.16)';
+            _slotBottom = 'rgba(12, 18, 30, 0.26)';
+        }
+        const _slotGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
+        _slotGrad.addColorStop(0, _slotTop);
+        _slotGrad.addColorStop(1, _slotBottom);
+        ctx.fillStyle = _slotGrad;
         ctx.fillRect(-w/2, -h/2, w, h);
 
         // B. 绘制白色延迟条 (在彩色条底下)
@@ -1440,17 +1456,32 @@ class Enemy {
             baseColor = lerpColor(baseColor, '#0891b2', t);
         }
 
-        // [透出战场背景] HP 填色采用 globalAlpha 让色相保持纯净（lerpColor 输出仍是
-        // 16 进制），同时透出背景；alpha=0.82 在保留主色调辨识度的前提下保留少量透出感。
-        ctx.globalAlpha = 0.82;
-        ctx.fillStyle = baseColor;
-        ctx.fillRect(-w/2, fillY, w, fillHeight);
-        ctx.globalAlpha = 1.0;
+        // @perf-impact: HP 填充由实色改为线性渐变（每帧 1 个 LinearGradient/敌人）
+        // [液体质感] 沿垂直方向叠加：顶部偏亮（液面高光）→ 中段为本体色 → 底部偏暗
+        // （暗示液体深度），使 HP 条不再是大面积纯色，呈现真正的"液体"层次。
+        // alpha 略降至 0.78，让背景与温度光效更自然地透出。
+        if (fillHeight > 0.5) {
+            const _hpHighlight = lerpColor(baseColor, '#ffffff', 0.22);
+            const _hpShadow = lerpColor(baseColor, '#000000', 0.32);
+            const _hpGrad = ctx.createLinearGradient(0, fillY, 0, fillY + fillHeight);
+            _hpGrad.addColorStop(0, _hpHighlight);
+            _hpGrad.addColorStop(0.18, baseColor);
+            _hpGrad.addColorStop(1, _hpShadow);
+            ctx.globalAlpha = 0.78;
+            ctx.fillStyle = _hpGrad;
+            ctx.fillRect(-w/2, fillY, w, fillHeight);
+            ctx.globalAlpha = 1.0;
+        }
 
-        // D. 液面顶部亮边（血量减少时呈现「液面下降」的高光）
+        // D. 液面顶部高光（双层 specular：上方亮线 + 下方淡渐隐，模拟液体表面张力）
         if (hpRatio > 0 && hpRatio < 1) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-            ctx.fillRect(-w/2, fillY, w, 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+            ctx.fillRect(-w/2, fillY, w, 1);
+            const _surfaceGrad = ctx.createLinearGradient(0, fillY, 0, fillY + 5);
+            _surfaceGrad.addColorStop(0, 'rgba(255, 255, 255, 0.32)');
+            _surfaceGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = _surfaceGrad;
+            ctx.fillRect(-w/2, fillY, w, 5);
         }
 
         // === Layer 3: 内部覆盖层 (Glow & Mist) - [修改：降低浓度] ===
