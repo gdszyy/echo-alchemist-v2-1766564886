@@ -604,7 +604,9 @@ export const ui_system = {
             skipBtn.innerHTML = '<span>⏩</span><span>跳过，使用新研磨子弹</span>';
             if (confirmBtn && confirmBtn.parentNode) confirmBtn.parentNode.insertBefore(skipBtn, confirmBtn.nextSibling);
         }
-        skipBtn.style.display = 'flex';
+        // [bullet-replace-fix] 纯净精华跳过研磨场景下没有「新研磨子弹」可回退，
+        // 跳过将导致 ammoQueue 为空进入战斗死循环，因此仅在有新研磨子弹时显示该按钮。
+        skipBtn.style.display = newRecipes.length > 0 ? 'flex' : 'none';
         skipBtn.onclick = () => { if (typeof this.sys_skipReplaceAmmo === 'function') this.sys_skipReplaceAmmo(); };
     },
 

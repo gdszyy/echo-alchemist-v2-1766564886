@@ -881,9 +881,11 @@ export const game_system = {
 
     /**
      * @method sys_skipGrindGetRune
-     * @description 纯净精华命运时刻「跳过研磨」逻辑：随机获取一个符文并直接进入战斗阶段。
+     * @description 纯净精华命运时刻「跳过研磨」逻辑：随机获取一个符文，然后进入「单个子弹替换」阶段。
      * 符文等级基于当前回合数：Round 1-5 → Lv1，Round 6-15 → Lv2，Round 16+ → Lv3。
      * 跳过后不得触发 sys_initSelectionPhase() 或 phase_gathering_initPachinko()。
+     * [bullet-replace-fix] 不再直接进入战斗：若存在充能子弹（_chargedAmmoQueue 或可由 marbleQueue 编译），
+     * 必须调用 sys_initReplaceAmmoPhase 进入替换阶段，让玩家选择保留哪些子弹；仅当没有任何可用子弹时才直接进战斗。
      */
     sys_skipGrindGetRune() {
         if (this.selectionMode !== 'pure_essence') {
@@ -910,28 +912,23 @@ export const game_system = {
         } else {
             showToast('跳过研磨！（未获得符文）');
         }
-        // [BUGFIX] 跳过研磨时，必须先将上回合的充能子弹（_chargedAmmoQueue）或当前
-        // marbleQueue 编译为 ammoQueue，否则进入战斗阶段时 ammoQueue 为空，
-        // 导致「彈藥耗盡」→ 敌人回合无限循环。
-        // 优先使用 _chargedAmmoQueue（上回合保留的充能子弹），其次使用当前 marbleQueue。
-        let _hasFallbackAmmo = false;
-        if (this._chargedAmmoQueue && this._chargedAmmoQueue.length > 0) {
-            this.ammoQueue = this._chargedAmmoQueue.slice();
-            _hasFallbackAmmo = true;
-        } else if (this.marbleQueue && this.marbleQueue.length > 0) {
-            this.ammoQueue = [];
-            this.marbleQueue.forEach(marbleDef => {
-                const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
-                const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, (marbleDef.multicast || 0) > 0);
-                recipe.finalHits = 0;
-                recipe.multicast = marbleDef.multicast || 0;
-                this.ammoQueue.push(recipe);
-            });
-            _hasFallbackAmmo = this.ammoQueue.length > 0;
-        } else {
-            this.ammoQueue = [];
+        // [bullet-replace-fix] 纯净精华跳过研磨时，应进入「单个子弹替换」阶段（仅展示充能子弹），
+        // 让玩家自主决定要保留哪些上回合的子弹，而不是直接拿着这些子弹去发射。
+        // 准备右侧（充能子弹）：优先使用 _chargedAmmoQueue，否则把当前 marbleQueue 编译进去。
+        if (!this._chargedAmmoQueue || this._chargedAmmoQueue.length === 0) {
+            if (this.marbleQueue && this.marbleQueue.length > 0) {
+                this._chargedAmmoQueue = this.marbleQueue.map(marbleDef => {
+                    const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
+                    const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, (marbleDef.multicast || 0) > 0);
+                    recipe.finalHits = 0;
+                    recipe.multicast = marbleDef.multicast || 0;
+                    recipe._marbleType = marbleDef.type;
+                    return recipe;
+                });
+            }
         }
-        this._chargedAmmoQueue = null;
+        // 跳过研磨没有「新研磨子弹」，左侧 ammoQueue 必须清空
+        this.ammoQueue = [];
         // 清理命运时刻上下文和弹珠队列
         this.marbleQueue = [];
         this.activeMarbleIndex = 0;
@@ -941,10 +938,17 @@ export const game_system = {
         this.selectionPreviewState = null;
         this.fateMomentContext = null;
         this.pendingSelectionMode = null;
-        this.replaceAmmoContext = null; // [tsk-668f3dba] 清理替换阶段上下文
         // 存档
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
-        // 直接进入战斗阶段（跳过研磨）
+        // [bullet-replace-fix] 有充能子弹时进入「子弹替换」阶段；否则才直接进入战斗。
+        if (this._chargedAmmoQueue && this._chargedAmmoQueue.length > 0
+            && typeof this.sys_initReplaceAmmoPhase === 'function') {
+            this.sys_initReplaceAmmoPhase();
+            return;
+        }
+        // 无充能子弹兜底：清理替换上下文并直接进入战斗
+        this._chargedAmmoQueue = null;
+        this.replaceAmmoContext = null;
         if (typeof this.phase_startCombatPhase === 'function') {
             this.phase_startCombatPhase();
         } else {
