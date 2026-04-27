@@ -82,6 +82,22 @@ export const game_system = {
             requestAnimationFrame(() => this.sys_loop());
             return;
         }
+
+        // [修复-bullet-time] 子弹时间倒计时与恢复
+        // combat_system.js 的风系技能（旋风/风道）会把 timeScale 强制设为慢动作并将 slowMotionTimer 设为 5，
+        // 但此前没有任何地方倒计时该计时器、也没有任何地方把 timeScale 恢复为 baseTimeScale，
+        // 一旦风系特效短时间内连续触发（每 3 tick 重置一次），timeScale 就会永久卡在慢动作上。
+        // 这里使用「真实帧」倒计时（不乘 timeScale），到期后强制还原为玩家选择的 baseTimeScale。
+        if (this.slowMotionTimer > 0) {
+            this.slowMotionTimer -= 1;
+            if (this.slowMotionTimer <= 0) {
+                this.slowMotionTimer = 0;
+                this.timeScale = this.baseTimeScale;
+            }
+        }
+        // 同步 UI 蒙版状态（ui_updateSlowMotion 读取此 flag 控制 #slow-motion-overlay 显隐）
+        this.isSlowMotion = this.slowMotionTimer > 0;
+
         const timeScale = this.timeScale;
 
         // 处理震动衰减
@@ -477,12 +493,18 @@ export const game_system = {
         const speedBtn = document.getElementById('speed-btn');
         if (speedBtn) {
             speedBtn.onclick = () => {
-                if (this.timeScale === 1.0) this.timeScale = 2.0;
-                else if (this.timeScale === 2.0) this.timeScale = 3.0;
-                else if (this.timeScale === 3.0) this.timeScale = 0.42;
-                else this.timeScale = 1.0;
-                this.baseTimeScale = this.timeScale;
-                speedBtn.innerText = `⏩ x${this.timeScale}`;
+                // [修复-bullet-time] 基于 baseTimeScale（玩家选择的速度）循环，
+                // 而不是基于当前 timeScale —— 否则在子弹时间生效期间点击会读到 0.2/0.02 等慢动作值，
+                // 导致循环卡到「⏩ x1.0」并把玩家原本选择的 2x/3x 设置丢失。
+                if (this.baseTimeScale === 1.0) this.baseTimeScale = 2.0;
+                else if (this.baseTimeScale === 2.0) this.baseTimeScale = 3.0;
+                else if (this.baseTimeScale === 3.0) this.baseTimeScale = 0.42;
+                else this.baseTimeScale = 1.0;
+                // 立即生效：强制结束当前的子弹时间，避免风系技能 tick 又把 timeScale 拉回慢动作。
+                this.timeScale = this.baseTimeScale;
+                this.slowMotionTimer = 0;
+                this.isSlowMotion = false;
+                speedBtn.innerText = `⏩ x${this.baseTimeScale}`;
             };
         }
 

@@ -662,7 +662,11 @@ class Projectile {
                         game.spawn_createFloatingText(s.pos.x, s.pos.y, "RESET", "#6366f1");
                     } 
                     else if (pegLevel >= 3) {
-                        s.isAutoHunting = true; 
+                        // [修复-targeting] 与 handleFlyingSwordFinish 行为一致：lv3 子剑脱离母剑独立猎杀，
+                        // 否则保留对已 destroyed 母剑的引用会让自动猎杀阶段读取到不一致的 mother 状态。
+                        s.isAutoHunting = true;
+                        s.mother = null;
+                        s.state = 'flying';
                     }
                 }
             });

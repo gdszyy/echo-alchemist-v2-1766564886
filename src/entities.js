@@ -3445,8 +3445,10 @@ class SonSword {
     }
 
     searchForTarget(enemies) {
-        // [性能優化]：快速過濾，只找屏幕內的活躍敵人
-        const candidates = enemies.filter(e => e.active && e.pos.y > 0 && e.pos.y < game.height && e !== this.passingThroughEnemy);
+        // [修复-targeting] 放宽 Y 边界，允许刚入场（y 略低于 0）或刚要出场的敌人也作为目标，
+        // 避免 lv3 自动猎杀子剑在 enemies 全部处于过渡区时误判为「无敌人」并空转盘旋。
+        const margin = (game && game.height ? game.height : 0) + 100;
+        const candidates = enemies.filter(e => e.active && e.pos.y > -100 && e.pos.y < margin && e !== this.passingThroughEnemy);
         if (candidates.length === 0) return;
         
         // 簡單距離權重算法 (尋找最近的)
@@ -3534,52 +3536,40 @@ class SonSword {
         if (this.state === 'flying' || this.state === 'recalling') {
             
             // @section:son_sword_target_search - 节流自动寻敌与目标验证
-            // [性能優化]：節流自動尋敵 (Throttling)
-            // 不需要每幀都尋找目標，每 15 幀找            // [性能優化]：節流自動尋敵 (Throttling)
-            // [修复] 增强索敌逻辑：如果有标记的敌人，强制锁定标记敌人，即使当前已有目标
+            // [修复-targeting] 调整顺序：先清理失效目标 → 再决定是否索敌，避免「队列里全是死敌人」
+            // 或「currentTarget 已死」时浪费一帧不搜索导致 lv3 自动猎杀子剑空转盘旋。
             if (this.state === 'flying') {
-                // 1. 检查是否有被标记的敌人
+                // 1. 先过滤队列中已失效的敌人
+                if (this.targetQueue.length > 0) {
+                    this.targetQueue = this.targetQueue.filter(e => e.active);
+                }
+
+                // 2. 验证当前目标是否仍然有效（活着、且未飞出屏幕过远）
+                if (this.currentTarget) {
+                    const isOffScreen = this.currentTarget.pos.y < -100 || this.currentTarget.pos.y > game.height + 100;
+                    if (!this.currentTarget.active || isOffScreen) {
+                        this.currentTarget = null;
+                    }
+                }
+
+                // 3. 检查是否有被标记的敌人，强制锁定
                 const markedEnemy = enemies.find(e => e.active && e.markTimer > 0);
-                
-                // 2. 如果有标记敌人，且当前目标不是它，则强制切换
                 if (markedEnemy && this.currentTarget !== markedEnemy) {
                     this.currentTarget = markedEnemy;
                     this.targetQueue = []; // 清空普通队列，集火标记目标
-                } 
-                // 3. 如果没有标记敌人，且当前没有目标，则进行常规搜索
-                else if (!this.currentTarget && this.targetQueue.length === 0) {
-                    if (this.isAutoHunting) {
-                        this.searchTimer -= timeScale;
-                        if (this.searchTimer <= 0) {
-                            this.searchForTarget(enemies);
-                            this.searchTimer = 15;
-                        }
+                }
+                // 4. 没目标且队列空 → 立即/节流索敌
+                else if (!this.currentTarget && this.targetQueue.length === 0 && this.isAutoHunting) {
+                    this.searchTimer -= timeScale;
+                    if (this.searchTimer <= 0) {
+                        this.searchForTarget(enemies);
+                        this.searchTimer = 15;
                     }
                 }
-            }
 
-            // [优化]：目标验证逻辑，确保队列中的敌人都是活跃的
-            if (this.targetQueue.length > 0) {
-                this.targetQueue = this.targetQueue.filter(e => e.active);
-            }
-
-            // 取目標
-            if (this.state === 'flying' && !this.currentTarget && this.targetQueue.length > 0) {
-                this.currentTarget = this.targetQueue.shift();
-            }
-
-            // [优化]：目标死亡、失效或被取消标记检测
-            if (this.currentTarget) {
-                const isOffScreen = this.currentTarget.pos.y < -100 || this.currentTarget.pos.y > game.height + 100;
-                // 如果目标不活跃、超出屏幕，或者原本是标记目标但标记已消失（且不是自动寻敌模式）
-                if (!this.currentTarget.active || isOffScreen) {
-                    this.currentTarget = null;
-                    // 目标丢失时，立即尝试从队列取下一个
-                    if (this.targetQueue.length > 0) {
-                        this.currentTarget = this.targetQueue.shift();
-                    } else {
-                        this.searchTimer = 0; // 强制下一帧进行搜索
-                    }
+                // 5. 取目标
+                if (!this.currentTarget && this.targetQueue.length > 0) {
+                    this.currentTarget = this.targetQueue.shift();
                 }
             }
 
