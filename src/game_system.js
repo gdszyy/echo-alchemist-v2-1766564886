@@ -1913,7 +1913,10 @@ export const game_system = {
 
         if (this.isDragging) {
             this.isDragging = false;
-            const cannonPos = new Vec2(this.width / 2, this.height - 80);
+            // [emitter-port] 发射方向必须以发射口为原点（Y 轴上移 22px），
+            // 与瞄准引导线（game_phase.js:1812）和子弹生成位置（game_phase.js:1457）一致，
+            // 否则瞄准线与实际发射角度会因 22px 视差产生偏差。
+            const cannonPos = new Vec2(this.width / 2, this.height - 102);
             const targetPos = this.lastMousePos;
             const aimVector = targetPos.sub(cannonPos);
             if (aimVector.y < -20) {
