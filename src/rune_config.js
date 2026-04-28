@@ -284,9 +284,9 @@ const RUNEWORD_DB = [
         name: '炎光剑影',
         effectId: 'flame_sword',
         pattern: ['rune_pyro_1', 'rune_pierce_1', 'rune_pyro_2'],
-        effect_desc: '【穿透系】穿透敌人时，有概率召唤一道火焰剑光。',
-        baseParams: { triggerChance: 0.30, damageRatio: 0.60, tempDamageRatio: 0.10 },
-        perLevelParams: { triggerChance: 0.10, damageRatio: 0, tempDamageRatio: 0.05 }
+        effect_desc: '【穿透系】子母飞剑穿透敌人时，命中点生成一道剑光 AOE 伤害（非爆炸），并对范围内敌人额外升温。',
+        baseParams: { triggerChance: 0.30, damageRatio: 0.60, tempDamageRatio: 0.10, radius: 110 },
+        perLevelParams: { triggerChance: 0.10, damageRatio: 0.10, tempDamageRatio: 0.05, radius: 15 }
     },
     {
         id: 'runeword_armor_piercing_meteor',
@@ -375,7 +375,7 @@ const RUNEWORD_DB = [
         id: 'runeword_focused_fire',
         name: '专注射击',
         effectId: 'focused_fire',
-        pattern: ['rune_laser_1', 'rune_pierce_1', 'rune_laser_1'],
+        pattern: ['rune_cryo_1', 'rune_pierce_1', 'rune_cryo_1'],
         effect_desc: '将所有弹跳和连射层数转化为基础伤害。伤害有 20% 概率暴击，造成 200% 伤害。',
         baseParams: { critChance: 0.20, critDamage: 2.0 },
         perLevelParams: { critChance: 0.10, critDamage: 0.5 }
@@ -385,7 +385,7 @@ const RUNEWORD_DB = [
         name: '质量坍缩',
         effectId: 'mass_collapse',
         pattern: ['rune_bounce_1', 'rune_pyro_1', 'rune_bounce_1'],
-        effect_desc: '强制获得爆炸属性（范围减半）。清空连射与散射，每清空 1 层，爆炸范围 +10%。',
+        effect_desc: '强制获得爆炸属性（范围减半）。清空所有散射层数，每清空 1 层散射，爆炸范围 +10%。',
         baseParams: { baseRadiusRatio: 0.5, radiusBonusPerLayer: 0.10 },
         perLevelParams: { baseRadiusRatio: 0.2, radiusBonusPerLayer: 0.05 }
     },
@@ -414,9 +414,20 @@ const RUNEWORD_DB = [
         name: '召剑之语',
         effectId: 'son_sword_summon',
         pattern: ['rune_pierce_2', 'rune_pierce_1', 'rune_bounce_1'],
-        effect_desc: '【特殊系】弹珠每次命中敌人时，有 30% 概率在命中位置召唤一把三级子飞剑。子飞剑遵循原有规则：自动索敌、全伤害共鸣（100%）、完整属性效果（火/冰/雷）。词条等级提升时，召唤概率额外 +15%。',
-        baseParams: { triggerChance: 0.30, swordLevel: 3 },
-        perLevelParams: { triggerChance: 0.15, swordLevel: 0 }
+        effect_desc: '【特殊系】弹珠每次命中敌人时，有 7% 概率在命中位置召唤一把三级子飞剑。子飞剑继承弹珠属性（火/冰/雷）。词条等级提升时，召唤概率 +3%，子飞剑伤害额外 +7%。',
+        baseParams: { triggerChance: 0.07, swordLevel: 3, damageMultiplier: 1.0 },
+        perLevelParams: { triggerChance: 0.03, swordLevel: 0, damageMultiplier: 0.07 }
+    },
+
+    // ---- 特殊变换词条 (Task: 化弹为剑) ----
+    {
+        id: 'runeword_bullet_to_sword',
+        name: '化弹为剑',
+        effectId: 'bullet_to_sword',
+        pattern: ['rune_pierce_1', 'rune_bounce_1', 'rune_pierce_1'],
+        effect_desc: '【穿透系】首轮发射的子弹被替换为子飞剑（取消连射）。原连射层数转化为子飞剑攻击次数。词条等级对应子飞剑等级（Lv1/Lv2/Lv3）。',
+        baseParams: { swordLevel: 1 },
+        perLevelParams: { swordLevel: 1 }
     }
 ];
 

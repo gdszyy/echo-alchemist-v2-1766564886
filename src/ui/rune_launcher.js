@@ -1285,7 +1285,7 @@ export const rune_launcher_system = {
                 const radius = calc('radius');
                 const ratio = Math.round(calc('damageRatio') * 100);
                 const tempDrop = calc('tempDrop');
-                return `每弹跳 ${bounces} 次释放冰霜新星，范围 ${radius}px，冒冰伤害 ${ratio}%，降温 ${tempDrop}`;
+                return `每弹跳 ${bounces} 次释放冰霜新星，范围 ${radius}px，冰伤害 ${ratio}%，降温 ${tempDrop}；被命中敌人按当前冻结概率链式触发新星（每次链式概率减半）`;
             }
             case 'thunderstorm': {
                 const decay = Math.round(calc('decayBonus') * 100);
@@ -1307,7 +1307,8 @@ export const rune_launcher_system = {
                 const chance = Math.round(calc('triggerChance') * 100);
                 const ratio = Math.round(calc('damageRatio') * 100);
                 const tempRatio = Math.round(calc('tempDamageRatio') * 100);
-                return `穿透触发率 ${chance}%，剑光伤害 ${ratio}%，附加火焰伤害 ${tempRatio}%`;
+                const radius = Math.round(calc('radius') || 110);
+                return `子母剑穿透触发率 ${chance}%，剑光 AOE 范围 ${radius}px，伤害 ${ratio}%，附加升温 ${tempRatio}%`;
             }
             case 'armor_piercing_meteor': {
                 const bonus = Math.round(calc('damageBonus') * 100);
@@ -1323,7 +1324,7 @@ export const rune_launcher_system = {
                 const chance = Math.round(calc('triggerChance') * 100);
                 const ratio = Math.round(calc('damageRatio') * 100);
                 const stacks = calc('shockStacks');
-                return `弹跳触发率 ${chance}%，静电场伤害 ${ratio}%，附加 ${stacks} 层闪电`;
+                return `弹跳触发率 ${chance}%，静电场伤害 ${ratio}%，附加 ${stacks} 层闪电；被静电场击中后必定触发闪电链`;
             }
             case 'blade_storm': {
                 const radius = calc('radius');
@@ -1334,6 +1335,27 @@ export const rune_launcher_system = {
             case 'elemental_fusion': {
                 const ratio = Math.round(calc('trueDamageRatio') * 100);
                 return `元素聚变爆炸，真实伤害 = 敌人最大血量 × ${ratio}%`;
+            }
+            case 'focused_fire': {
+                const chance = Math.round(calc('critChance') * 100);
+                const dmg = Math.round(calc('critDamage') * 100);
+                return `所有弹跳/连射层数转化为基础伤害；${chance}% 暴击率，造成 ${dmg}% 伤害`;
+            }
+            case 'mass_collapse': {
+                const baseRatio = Math.round(calc('baseRadiusRatio') * 100);
+                const perLayer = Math.round(calc('radiusBonusPerLayer') * 100);
+                return `强制爆炸（基础范围 ${baseRatio}%）；清空所有散射，每清空 1 层散射爆炸范围 +${perLayer}%`;
+            }
+            case 'son_sword_summon': {
+                const chance = Math.round(calc('triggerChance') * 100);
+                const lv = calc('swordLevel') || 3;
+                const dmgBonus = Math.round((calc('damageMultiplier') - 1) * 100);
+                return `命中触发率 ${chance}%，召唤一把 Lv${lv} 子飞剑（伤害继承 ${100 + dmgBonus}%）`;
+            }
+            case 'bullet_to_sword': {
+                const lv = calc('swordLevel') || 1;
+                const cap = Math.min(3, Math.max(1, lv));
+                return `首轮发射的子弹替换为 Lv${cap} 子飞剑（取消连射），原连射层数转为子飞剑攻击次数`;
             }
             default:
                 return '';

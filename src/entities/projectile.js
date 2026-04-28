@@ -333,41 +333,23 @@ class Projectile {
                 // ─────────────────────────────────────────────────────────────────────
                 // [词条 Hook] 冰霜新星（frost_nova）
                 // 效果：每经过 bounceInterval 次弹跳，触发一次冰霜新星（范围冰冻）
-                // 实现：维护 this._frostNovaBounceCount 计数器，每次弹跳时自增
+                // 加强：被新星命中的敌人按其当前冻结概率额外触发一次新星，链式触发概率每次减半。
+                // 链式逻辑由 combat_triggerFrostNova 实现，确保与首次触发表现一致。
                 // ─────────────────────────────────────────────────────────────────────
                 if (typeof game !== 'undefined' && game.activeRunewordEffects) {
                     const frostNovaEffect = game.activeRunewordEffects['frost_nova'];
                     if (frostNovaEffect) {
                         if (!this._frostNovaBounceCount) this._frostNovaBounceCount = 0;
                         this._frostNovaBounceCount++;
-                        // 参数字段：requiredBounces（触发所需弹跳次数）、radius（范围）、tempDrop（降温量）、damageRatio（伤害比例）
                         const requiredBounces = Math.max(1, Math.floor(frostNovaEffect.params.requiredBounces || 5));
-                        if (this._frostNovaBounceCount % requiredBounces === 0) {
-                            // 触发冰霜新星：对周围所有敌人施加冰冻状态
-                            const novaRadius = frostNovaEffect.params.radius || 80;
-                            const tempDrop = frostNovaEffect.params.tempDrop || 10;
-                            const damageRatio = frostNovaEffect.params.damageRatio || 0.30;
-                            const novaDmg = Math.max(1, Math.floor(this.config.damage * damageRatio));
-                            // 视觉特效：冰蓝冲击波
-                            game.spawn_createShockwave(this.pos.x, this.pos.y, '#06b6d4');
-                            for (let i = 0; i < 8; i++) {
-                                game.spawn_createParticle(this.pos.x, this.pos.y, '#a5f3fc', 'shard');
-                            }
-                            // 对范围内所有敌人施加冰冻和伤害
-                            game.enemies.forEach(ne => {
-                                if (ne.active && this.pos.dist(ne.pos) < novaRadius) {
-                                    ne.applyTemp(-tempDrop);
-                                    ne._cryoHitThisRound = true; // 标记冰属性命中（供元素聚变使用）
-                                    // 附加冰霜伤害
-                                    if (novaDmg > 0) {
-                                        const novaResult = ne.takeDamage(novaDmg);
-                                        game.combat_recordDamage(novaResult.actualDamage, 'cryo', 'main', null);
-                                    }
-                                }
-                            });
-                            game.spawn_createFloatingText(
-                                this.pos.x, this.pos.y - 20,
-                                `❄️ FROST NOVA!`, '#a5f3fc'
+                        if (this._frostNovaBounceCount % requiredBounces === 0
+                            && typeof game.combat_triggerFrostNova === 'function') {
+                            game.combat_triggerFrostNova(
+                                new Vec2(this.pos.x, this.pos.y),
+                                this.config,
+                                frostNovaEffect.params || {},
+                                1.0,
+                                0
                             );
                         }
                     }
@@ -564,8 +546,8 @@ class Projectile {
 
     performSlashAttack(target, enemies) {
         const angle = Math.random() * Math.PI * 2;
-        const length = 160; 
-        const width = 40;   
+        const length = 160;
+        const width = 40;
         const center = target.pos;
         const halfLen = length / 2;
         const dir = new Vec2(Math.cos(angle), Math.sin(angle));
@@ -574,7 +556,7 @@ class Projectile {
 
         if (typeof game !== 'undefined') {
             let slashColor = CONFIG.colors.flying_sword || '#0ea5e9';
-            if (this.config.lightning > 0) slashColor = '#c084fc'; 
+            if (this.config.lightning > 0) slashColor = '#c084fc';
             else if (this.config.pyro > 0) slashColor = '#f97316';
             else if (this.config.cryo > 0) slashColor = '#06b6d4';
             // [限制] SlashEffect 受全局粒子上限约束
@@ -582,29 +564,39 @@ class Projectile {
             audio.playSlash();
         }
 
+        // [平衡] 三级子飞剑的剑痕仅对非主目标触发 20% 的伤害与属性效果
+        const swordLevel = (this.config.level || 1);
+        const isLevel3 = swordLevel >= 3;
+        const markRatio = 0.20;
+
         enemies.forEach(other => {
             if (!other.active) return;
             const E = other.pos;
-            const AB = p2.sub(p1);      
-            const AE = E.sub(p1);       
+            const AB = p2.sub(p1);
+            const AE = E.sub(p1);
             const lenSq = AB.dot(AB);
             let t = (lenSq === 0) ? -1 : AE.dot(AB) / lenSq;
             t = Math.max(0, Math.min(1, t));
             const closest = p1.add(AB.mult(t));
-            const dist = E.dist(closest); 
+            const dist = E.dist(closest);
             const hitRadius = (other.width / 2) + (width / 2);
             if (dist < hitRadius) {
                 const fsCfg = CONFIG.mechanics.flying_sword;
+                const isMark = (other !== target);
+                const ratio = (isLevel3 && isMark) ? markRatio : 1.0;
                 const slashConfig = {
                     ...this.config,
-                    damage: Math.ceil(this.config.damage * fsCfg.dashDamageMult)
+                    damage: Math.max(1, Math.ceil(this.config.damage * fsCfg.dashDamageMult * ratio)),
+                    pyro: Math.floor((this.config.pyro || 0) * ratio),
+                    cryo: Math.floor((this.config.cryo || 0) * ratio),
+                    lightning: Math.floor((this.config.lightning || 0) * ratio)
                 };
                 game.combat_damageEnemy(other, {
                     config: slashConfig,
-                    pos: closest, 
+                    pos: closest,
                     isCopy: true
                 });
-                if (other !== target) {
+                if (isMark) {
                     other.addSwordMark(1);
                 }
             }
