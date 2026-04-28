@@ -745,7 +745,10 @@ export const ui_system = {
                 // [BUGFIX] 将 'selection' 加入 needsAuto 列表：
                 // phase-selection 的父容器 pointer-events 必须为 auto，
                 // 否则底部「開始煉金」按钮无法响应点击（父容器 none 会阻断事件传递）。
-                const needsAuto = ['meta', 'shop', 'truth_book', 'gameover', 'relic', 'pause', 'selection'].includes(this.phase);
+                // [BUGFIX] 将 'training' 加入 needsAuto 列表：
+                // 试炼场 #phase-training 是 DOM 驱动的（场景列表/属性 +/- 按钮/退出按钮等），
+                // 默认 pointer-events:none 会让所有按钮失效（点击穿透到底层 canvas）。
+                const needsAuto = ['meta', 'shop', 'truth_book', 'gameover', 'relic', 'pause', 'selection', 'training'].includes(this.phase);
                 activeEl.style.pointerEvents = needsAuto ? 'auto' : 'none';
                 setTimeout(() => {
                     activeEl.classList.remove('hidden-phase');
