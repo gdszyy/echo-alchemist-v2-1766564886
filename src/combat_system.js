@@ -2754,9 +2754,17 @@ export const combat_system = {
             // [修复] 只有成功加入粒子池的 beam 才注册到 newBeams，避免粒子池满时注册无效引用
             if (isContinuousMode && pushed) newBeams.push(laserBeam);
         }
-        // [持续照射] 将新建的 beams 注册到状态机，替换旧引用
-        if (shouldUpdateActiveBeams && this._continuousLaserState) {
-            this._continuousLaserState.activeBeams = newBeams;
+        // [持续照射] 将新建的 beams 注册到状态机：
+        //   - 首次发射 / tick 触发：替换 activeBeams（旧引用已在 update 中被 startFadeOut，无需保留）
+        //   - burstQueue 额外连射（delay=20/40/60）：追加到 activeBeams，
+        //     否则这些 isContinuous=true 的 beam 永远不会被 startFadeOut（decay=0），
+        //     导致照射词条 + 多重连射时激光残留在屏幕上不消失。
+        if (isContinuousMode && this._continuousLaserState) {
+            if (shouldUpdateActiveBeams) {
+                this._continuousLaserState.activeBeams = newBeams;
+            } else if (newBeams.length > 0) {
+                this._continuousLaserState.activeBeams.push(...newBeams);
+            }
         }
 
         // @section:laser_audio - 激光束发射音效（sawtooth，频率随宽度反比：越粗越低沉，100~800Hz）

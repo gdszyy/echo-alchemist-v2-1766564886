@@ -683,6 +683,15 @@ phase_gathering_getRandomPegType() {
         // 防止上一回合的 setTimeout/帧计数残留导致本回合 isVisualEffectActive 永远为 true
         this.isVisualEffectActive = false;
         this._laserFadeOutFrames = 0;
+        // [修复-照射残留] 兜底清理：将所有处于 isContinuous 模式（decay=0）的残留激光强制淡出，
+        // 防止任何路径下未追踪到 activeBeams 的连续激光在新回合永久滞留屏幕。
+        if (this.particles && this.particles.length > 0) {
+            for (const p of this.particles) {
+                if (p instanceof LaserBeam && p.isContinuous && typeof p.startFadeOut === 'function') {
+                    p.startFadeOut();
+                }
+            }
+        }
         
         // [剑刃风暴] 重置回合首发子弹标记与更新定时器
         this._roundFirstShotId = null;
