@@ -1528,6 +1528,21 @@ export const combat_system = {
             }
         }
 
+        // --- [穿透衰减] 每次穿透命中后，伤害衰减 35%（保底 15%），穿透共鸣可减小衰减率 ---
+        // 实现：以已发生的穿透次数 piercesUsed 为指数衰减；_pierceDecayReduction 由 spawn_system.js
+        // 在生成 Projectile 时根据穿透共鸣等级注入（T2: 0.2，T3: 0.4）。
+        if (config.pierce > 0 && projectile.piercesLeft !== undefined && config.type !== 'flying_sword') {
+            const piercesUsed = Math.max(0, config.pierce - projectile.piercesLeft);
+            if (piercesUsed > 0) {
+                const baseDecayRate = 0.35;
+                const decayReduction = Math.min(0.95, Math.max(0, config._pierceDecayReduction || 0));
+                const effectiveDecayRate = baseDecayRate * (1 - decayReduction);
+                const retentionPerHit = 1 - effectiveDecayRate;
+                const decayMult = Math.max(0.15, Math.pow(retentionPerHit, piercesUsed));
+                dmg = dmg * decayMult;
+            }
+        }
+
         // --- [新增] 确定伤害来源类型 (用于统计图表颜色) ---
         let sourceType = 'main';
         if (config.isScatterChild) sourceType = 'scatter';
@@ -1748,7 +1763,7 @@ export const combat_system = {
         };
         const damageColor = colorMap[damageType] || '#ffffff';
 
-        // [Agent D] 炎光剑影词条 Hook：穿透命中时有概率召唤飞剑
+        // [词条 Hook] 炎光剑影：子母飞剑或普通子弹穿透命中时，命中点生成剑光 AOE 伤害（非爆炸）
         // [穿甲流星联动] 当穿甲流星激活时，散射子弹（isScatterChild=true）继承了穿透层数，
         // 因此也应该能触发炎光剑影效果，故此处放开 isCopy 限制（仅针对散射子弹）
         const armorPiercingActive = this.activeRunewordEffects && this.activeRunewordEffects['armor_piercing_meteor'];
@@ -1758,29 +1773,30 @@ export const combat_system = {
                 const triggerChance = (flameSwordFx.params && flameSwordFx.params.triggerChance) || 0;
                 const damageRatio = (flameSwordFx.params && flameSwordFx.params.damageRatio) || 0.5;
                 // @section:damage_runeword_hooks - 符文词条 Hook 注入点
-                // [修复 检查点3] 读取 tempDamageRatio，用于穿透命中时对敌人额外升温
+                // tempDamageRatio：剑光范围内的敌人额外升温（baseDamage * tempDamageRatio）
                 const tempDamageRatio = (flameSwordFx.params && flameSwordFx.params.tempDamageRatio) || 0;
+                const slashRadius = (flameSwordFx.params && flameSwordFx.params.radius) || 110;
                 if (Math.random() < triggerChance) {
-                    // 生成一把火系飞剑，目标为当前被穿透的敌人
-                    const swordConfig = {
-                        damage: Math.ceil(config.damage * damageRatio),
-                        pyro: Math.max(1, config.pyro || 1),
-                        cryo: 0, lightning: 0, wind: 0,
-                        multicast: 0
-                    };
-                    const flameSwordLvl = this.variantLevels ? (this.variantLevels.flying_sword || 1) : 1;
-                    this.combat_flyingSword_addSon(hitX, hitY, null, flameSwordLvl, swordConfig, 0);
-                    this.combat_flyingSword_assignTarget(enemy);
-                    // [修复 检查点3] 额外升温：baseDamage * tempDamageRatio
-                    if (tempDamageRatio > 0) {
-                        const tempAmount = config.damage * tempDamageRatio;
-                        enemy.applyTemp(tempAmount);
-                    }
-                    // [修复 检查点4] 添加 SlashAnim 视觉特效（火焰橙色），与其他飞剑命中特效保持一致
+                    // 复用穿透剑光的 AOE 形态：在命中位置生成一道剑光，对范围内所有敌人造成火属性伤害
+                    const slashDmg = Math.max(1, Math.ceil(config.damage * damageRatio));
+                    const tempAmount = config.damage * tempDamageRatio;
+                    const novaCenter = new Vec2(hitX, hitY);
+                    this.enemies.forEach(other => {
+                        if (other.active && other.pos.dist(novaCenter) < slashRadius) {
+                            const slashResult = other.takeDamage(slashDmg);
+                            this.combat_recordDamage(slashResult.actualDamage, 'pyro', 'main', shotId);
+                            if (slashResult.killed) this.spawn_addScore(other.maxHp);
+                            if (tempAmount > 0) other.applyTemp(tempAmount);
+                            other._pyroHitThisRound = true;
+                        }
+                    });
+                    // 视觉表现：剑光 + 火星 + 浮动文字
                     const slashAngle = Math.random() * Math.PI * 2;
-                    this.spawn_pushParticleWithLimit(new SlashAnim(hitX, hitY, slashAngle, 0.5, '#f97316'));
-                    this.spawn_createParticle(hitX, hitY, '#f97316', 'spark');
-                    this.spawn_createFloatingText(hitX, hitY - 20, '剑光!', '#f97316');
+                    this.spawn_pushParticleWithLimit(new SlashAnim(hitX, hitY, slashAngle, 0.9, '#f97316'));
+                    for (let i = 0; i < 6; i++) {
+                        this.spawn_createParticle(hitX, hitY, '#f97316', 'spark');
+                    }
+                    this.spawn_createFloatingText(hitX, hitY - 20, '🔥剑光!', '#f97316');
                 }
             }
         }
@@ -1820,6 +1836,11 @@ export const combat_system = {
                             if (this.lightningBolts.length < CONFIG.performance[this.perfQualityLevel || 'high'].lightningLimit) {
                                 this.lightningBolts.push(new LightningBolt(hitX, hitY, ne.pos.x, ne.pos.y));
                             }
+                            // [加强] 静电场击中后 100% 触发闪电链（chainChanceBonus = 1 强制 p>=1）
+                            if (ne.active) {
+                                const chainLevel = Math.max(1, (config.lightning || 0) || 1);
+                                this.combat_lightning_triggerChain(ne, staticDmg, [], chainLevel, shotId, 1.0);
+                            }
                         }
                     });
                     this.spawn_createFloatingText(hitX, hitY - 20, '⚡静电场!', '#c084fc');
@@ -1833,12 +1854,13 @@ export const combat_system = {
         if (!projectile.isCopy && config.type !== 'flying_sword' && !config.wind) {
             const sonSwordSummonFx = this.activeRunewordEffects && this.activeRunewordEffects['son_sword_summon'];
             if (sonSwordSummonFx) {
-                const triggerChance = (sonSwordSummonFx.params && sonSwordSummonFx.params.triggerChance) || 0.30;
+                const triggerChance = (sonSwordSummonFx.params && sonSwordSummonFx.params.triggerChance) || 0.07;
                 const swordLevel = (sonSwordSummonFx.params && sonSwordSummonFx.params.swordLevel) || 3;
+                const damageMultiplier = (sonSwordSummonFx.params && sonSwordSummonFx.params.damageMultiplier) || 1.0;
                 if (Math.random() < triggerChance) {
-                    // 子飞剑继承弹珠属性（火/冰/雷），遵循原有规则
+                    // 子飞剑继承弹珠属性（火/冰/雷），遵循原有规则；伤害按词条等级倍率缩放
                     const swordConfig = {
-                        damage: config.damage,
+                        damage: Math.max(1, Math.ceil(config.damage * damageMultiplier)),
                         pyro: config.pyro || 0,
                         cryo: config.cryo || 0,
                         lightning: config.lightning || 0,
@@ -2476,15 +2498,14 @@ export const combat_system = {
             }
 
             // 4. 质量坍缩 (mass_collapse)
-            // 计算 layersCleared = multicast + scatter，清零两者
+            // 仅清零 finalRecipe.scatter（连射层数保留）
             // 设置 finalRecipe.explosive = true
             // @section:fire_projectile_spawn - 子弹实体生成与属性注入
             // 将 _explosionRadiusMult = baseRadiusRatio + layersCleared * radiusBonusPerLayer 写入配方
             const massCollapseFx = this.activeRunewordEffects['mass_collapse'];
             if (massCollapseFx) {
                 const { baseRadiusRatio, radiusBonusPerLayer } = massCollapseFx.params;
-                const layersCleared = (finalRecipe.multicast || 0) + (finalRecipe.scatter || 0);
-                finalRecipe.multicast = 0;
+                const layersCleared = (finalRecipe.scatter || 0);
                 finalRecipe.scatter = 0;
                 finalRecipe.explosive = true;
                 finalRecipe._explosionRadiusMult = baseRadiusRatio + layersCleared * radiusBonusPerLayer;
@@ -2505,6 +2526,17 @@ export const combat_system = {
             if (echoShotFx) {
                 const { triggerChance } = echoShotFx.params;
                 finalRecipe._echoShotChance = triggerChance;
+            }
+
+            // 7. 化弹为剑 (bullet_to_sword)
+            // 将子弹替换为一把子飞剑，连射次数转化为子飞剑攻击次数
+            const bulletToSwordFx = this.activeRunewordEffects['bullet_to_sword'];
+            if (bulletToSwordFx) {
+                const swordLevel = Math.max(1, Math.min(3, Math.floor(bulletToSwordFx.params.swordLevel || 1)));
+                finalRecipe._replaceWithSonSword = true;
+                finalRecipe._sonSwordLevel = swordLevel;
+                // 保留 multicast 数值供 SonSword 构造函数读取（maxAttacks = multicast + 1），
+                // 但下方的 burstQueue 多次发射会通过 _replaceWithSonSword 标记跳过。
             }
         }
         // --- [符文词条-A] 拦截逻辑结束 ---
@@ -2535,16 +2567,18 @@ export const combat_system = {
         // 但 focused_fire/mass_collapse/multicast_to_scatter 等词条会将 multicast 清零，
         // 导致 recipe.multicast=0 传入状态机时 totalDuration 计算错误。
         finalRecipe._originalMulticast = this.currentSession ? (this.currentSession.multicast || 0) : (finalRecipe.multicast || 0);
-        const isOnlyOne = !(finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword' && !finalRecipe.wind);
-        this.burstQueue.push({ delay: 0, vel: vel, recipe: finalRecipe, shotId: shotId, isLast: isOnlyOne }); 
-        
+        // [词条 Hook] 化弹为剑：取消连射，连射次数将作为子飞剑攻击次数
+        const isReplacedSword = !!finalRecipe._replaceWithSonSword;
+        const isOnlyOne = isReplacedSword || !(finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword' && !finalRecipe.wind);
+        this.burstQueue.push({ delay: 0, vel: vel, recipe: finalRecipe, shotId: shotId, isLast: isOnlyOne });
+
         // 多重射击
-        if (finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword' && !finalRecipe.wind) {
-            for(let i=1; i<=finalRecipe.multicast; i++) { 
+        if (!isReplacedSword && finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword' && !finalRecipe.wind) {
+            for(let i=1; i<=finalRecipe.multicast; i++) {
                 const isLastInBurst = (i === finalRecipe.multicast);
-                this.burstQueue.push({ delay: i * 20, vel: vel, recipe: finalRecipe, shotId: shotId, isLast: isLastInBurst }); 
-            } 
-        } 
+                this.burstQueue.push({ delay: i * 20, vel: vel, recipe: finalRecipe, shotId: shotId, isLast: isLastInBurst });
+            }
+        }
     },
 
 /**
@@ -2800,6 +2834,68 @@ export const combat_system = {
      *   触发条件：irradiation 词条（持续照射累积伤害）或 blazing_beam 词条（持续升温）激活时启动。
      * @param {number} timeScale - 当前帧时间缩放（通常为 1）
      */
+    /**
+     * @method combat_triggerFrostNova
+     * @description 在指定位置触发一次冰霜新星：对范围内敌人造成冰属性伤害与降温，
+     *   并按敌人当前冻结概率进行链式触发（每次链式触发概率减半，避免无限链）。
+     * @param {Vec2} centerPos - 新星中心位置
+     * @param {Object} sourceConfig - 触发源配方（用于计算 novaDmg = damage * damageRatio）
+     * @param {Object} novaParams - 来自 frost_nova 词条的 effectiveParams（radius/tempDrop/damageRatio）
+     * @param {number} probMult - 链式触发概率倍率（每次链式调用减半，初始 = 1.0）
+     * @param {number} chainDepth - 当前链深度，仅用于安全限制，避免极端递归
+     */
+    combat_triggerFrostNova(centerPos, sourceConfig, novaParams, probMult = 1.0, chainDepth = 0) {
+        if (!centerPos || !novaParams) return;
+        if (chainDepth > 8) return; // 安全上限，防止极端情况下无限递归
+
+        const novaRadius = novaParams.radius || 80;
+        const tempDrop = novaParams.tempDrop || 10;
+        const damageRatio = novaParams.damageRatio || 0.30;
+        const baseDmg = (sourceConfig && sourceConfig.damage) || 0;
+        const novaDmg = Math.max(1, Math.floor(baseDmg * damageRatio));
+
+        // 视觉特效：冰蓝冲击波
+        this.spawn_createShockwave(centerPos.x, centerPos.y, '#06b6d4');
+        for (let i = 0; i < 8; i++) {
+            this.spawn_createParticle(centerPos.x, centerPos.y, '#a5f3fc', 'shard');
+        }
+
+        // 收集本次将链式触发的命中点（先扫描完再触发，避免遍历期间敌人状态被反复改写）
+        const chainPositions = [];
+
+        this.enemies.forEach(ne => {
+            if (!ne.active) return;
+            if (centerPos.dist(ne.pos) >= novaRadius) return;
+
+            ne.applyTemp(-tempDrop);
+            ne._cryoHitThisRound = true;
+
+            if (novaDmg > 0) {
+                const novaResult = ne.takeDamage(novaDmg);
+                this.combat_recordDamage(novaResult.actualDamage, 'cryo', 'main', null);
+                if (novaResult.killed && typeof this.spawn_addScore === 'function') {
+                    this.spawn_addScore(ne.maxHp);
+                }
+            }
+
+            // 按敌人当前冻结概率进行链式触发；每次链式调用概率倍率减半
+            const freezeChancePct = Math.min(100, Math.abs(ne.temp || 0)) / 2; // 0~50（百分比）
+            const chainProb = (freezeChancePct / 100) * probMult;
+            if (chainProb > 0 && Math.random() < chainProb) {
+                chainPositions.push(new Vec2(ne.pos.x, ne.pos.y));
+            }
+        });
+
+        if (typeof this.spawn_createFloatingText === 'function') {
+            this.spawn_createFloatingText(centerPos.x, centerPos.y - 20, '❄️ FROST NOVA!', '#a5f3fc');
+        }
+
+        // 链式触发（每次概率减半），独立 sourceConfig，伤害基数沿用原始 baseDmg
+        chainPositions.forEach(p => {
+            this.combat_triggerFrostNova(p, sourceConfig, novaParams, probMult * 0.5, chainDepth + 1);
+        });
+    },
+
     // --- [修复] 剑刃风暴定期更新逻辑 ---
     combat_bladeStorm_update(timeScale) {
         const bladeStormFx = this.activeRunewordEffects && this.activeRunewordEffects['blade_storm'];

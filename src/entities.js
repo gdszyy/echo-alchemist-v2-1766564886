@@ -3494,6 +3494,9 @@ class SonSword {
              if (isInside) {
                  this.dashTimer = this.dashOvershoot;
                  // [修复] 冲刺中持续检查碰撞，但每个敌人只造成一次伤害
+                 // [平衡] 三级子飞剑冲刺剑痕命中（除主目标外）仅触发 20% 的伤害与属性效果
+                 const isLevel3 = this.level >= 3;
+                 const markRatio = 0.20;
                  for (let e of enemies) {
                      if (e.active && !this.hitEnemiesInDash.has(e)) {
                          const dx = this.pos.x - e.pos.x;
@@ -3502,11 +3505,22 @@ class SonSword {
                          const hitDist = (e.width/2 + 15);
                          if (distSq < hitDist * hitDist) {
                              this.hitEnemiesInDash.add(e);
-                             game.combat_damageEnemy(e, { config: this.config, pos: this.pos, isCopy: true });
+                             const isMark = (e !== this.passingThroughEnemy);
+                             let cfgForHit = this.config;
+                             if (isLevel3 && isMark) {
+                                 cfgForHit = {
+                                     ...this.config,
+                                     damage: Math.max(1, Math.ceil((this.config.damage || 0) * markRatio)),
+                                     pyro: Math.floor((this.config.pyro || 0) * markRatio),
+                                     cryo: Math.floor((this.config.cryo || 0) * markRatio),
+                                     lightning: Math.floor((this.config.lightning || 0) * markRatio)
+                                 };
+                             }
+                             game.combat_damageEnemy(e, { config: cfgForHit, pos: this.pos, isCopy: true });
                              // [限制] SlashAnim 受全局粒子上限约束
                              game.spawn_pushParticleWithLimit(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.4));
                              audio.playSlash();
-                             
+
                              // [新增] 冲刺中击中敌人也消耗攻击次数
                              this.attacksLeft--;
                              if (this.attacksLeft <= 0) {

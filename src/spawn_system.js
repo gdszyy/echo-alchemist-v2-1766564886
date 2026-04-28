@@ -1161,20 +1161,51 @@ export const spawn_system = {
 
         // 初始化伤害统计结构 (支持二维统计: 伤害类型 -> 来源类型)
         if (!this.shotDamageMap.has(shotId)) {
-            this.shotDamageMap.set(shotId, { 
-                total: 0, 
-                projectileCount: 0, 
-                destroyedCount: 0, 
+            this.shotDamageMap.set(shotId, {
+                total: 0,
+                projectileCount: 0,
+                destroyedCount: 0,
                 // 修改：byAttr 存储为二维对象 { 'pyro': { 'main': 0, 'scatter': 0 }, ... }
-                byAttr: {} 
+                byAttr: {}
             });
-            
+
             // 绑定到当前 Game 实例的临时变量，供 UI 实时显示
             this.currentShotDamage = 0;
-            this.currentShotDamageByAttr = {}; 
+            this.currentShotDamageByAttr = {};
         }
-        
+
         const shotStats = this.shotDamageMap.get(shotId);
+
+        // [词条 Hook] 化弹为剑（bullet_to_sword）
+        // 将首轮发射的子弹替换为一把子飞剑，自动索敌；连射层数→子飞剑攻击次数（maxAttacks=multicast+1）
+        if (recipe._replaceWithSonSword) {
+            const swordLevel = Math.max(1, Math.min(3, Math.floor(recipe._sonSwordLevel || 1)));
+            const swordConfig = {
+                ...recipe,
+                type: 'flying_sword',
+                wind: 0,
+                scatter: 0,
+                level: swordLevel
+            };
+            if (typeof this.combat_flyingSword_addSon === 'function') {
+                const beforeCount = this.sonSwords.length;
+                this.combat_flyingSword_addSon(x, y, null, swordLevel, swordConfig, 0);
+                // 让新生成的子飞剑自动猎杀（仅作用于刚刚追加的剑）
+                if (this.sonSwords.length > beforeCount) {
+                    const newSword = this.sonSwords[this.sonSwords.length - 1];
+                    if (newSword) {
+                        newSword.isAutoHunting = true;
+                        if (typeof newSword.searchForTarget === 'function' && this.enemies && this.enemies.length > 0) {
+                            newSword.searchForTarget(this.enemies);
+                        }
+                    }
+                }
+                if (typeof this.spawn_createFloatingText === 'function') {
+                    this.spawn_createFloatingText(x, y - 30, '⚔️化弹为剑!', '#a78bfa');
+                }
+            }
+            return;
+        }
 
         // [关键] 属性优先级：飞剑 > 激光
         // 如果是飞剑，优先处理飞剑逻辑

@@ -21,7 +21,7 @@
 
 | ID | 名称 | 符文组合 | 效果摘要 |
 |---|---|---|---|
-| `runeword_flame_sword` | 炎光剑影 | `rune_pyro_1` × 1 + `rune_pierce_1` × 1 + `rune_pyro_2` × 1 | 穿透敌人时，有概率召唤一道火焰剑光 |
+| `runeword_flame_sword` | 炎光剑影 | `rune_pyro_1` × 1 + `rune_pierce_1` × 1 + `rune_pyro_2` × 1 | 子母飞剑/普通子弹穿透时在命中点生成火焰剑光 AOE 伤害（非爆炸），并对范围内敌人额外升温 |
 | `runeword_armor_piercing_meteor` | 穿甲流星 | `rune_pierce_2` × 1 + `rune_scatter_1` × 1 + `rune_pierce_1` × 1 | 散射出的子弹丸继承 100% 的穿透层数；每级散射子弹伤害额外 +15%；与炎光剑影联动时散射子弹也可触发剑光 |
 | `runeword_blazing_beam` | 炽热光线 | `rune_pyro_1` × 1 + `rune_laser_1` × 1 + `rune_laser_2` × 1 | 激光照射敌人时，每 0.5 秒额外提升敌人温度 |
 | `runeword_lightning_shield` | 雷电护盾 | `rune_lightning_2` × 1 + `rune_bounce_2` × 1 + `rune_bounce_1` × 1 | 弹珠弹射时有概率在自身周围生成静电场 |
@@ -35,11 +35,12 @@
 | `runeword_sword_resonance` | 剑意共鸣 | `rune_pierce_1` × 3 | 解锁飞剑变异；穿透弹珠碰撞穿透钉子时有70% 概率变异为飞剑钉子 |
 | `runeword_storm_resonance` | 风暴共鸣 | `rune_bounce_1` × 3 | 解锁风属性变异；反弹弹珠碰撞反弹钉子时有70% 概率变异为风属性钉子 |
 
-### 1.4 特殊召唤词条（1 个，Task: 召剑之语）
+### 1.4 特殊召唤词条（2 个：召剑之语 / 化弹为剑）
 
 | ID | 名称 | 符文组合 | 效果摘要 |
 |---|---|---|---|
-| `runeword_son_sword_summon` | 召剑之语 | `rune_pierce_2` × 1 + `rune_pierce_1` × 1 + `rune_bounce_1` × 1 | 弹珠每次命中敌人时，有 30% 概率在命中位置召唤一把三级子飞剑；子飞剑继承弹珠属性，遵循原有规则（自动索敌、100% 伤害共鸣、完整属性效果）；词条等级提升时召唤概率额外 +15% |
+| `runeword_son_sword_summon` | 召剑之语 | `rune_pierce_2` × 1 + `rune_pierce_1` × 1 + `rune_bounce_1` × 1 | 弹珠每次命中敌人时，有 7% 概率在命中位置召唤一把三级子飞剑；子飞剑继承弹珠属性（火/冰/雷）；词条等级提升时概率额外 +3%、子飞剑伤害额外 +7% |
+| `runeword_bullet_to_sword` | 化弹为剑 | `rune_pierce_1` × 2 + `rune_bounce_1` × 1 | 首轮发射的子弹被替换为一把子飞剑（取消连射），原连射层数转化为子飞剑攻击次数（maxAttacks = multicast + 1）；词条等级 1/2/3 对应子飞剑 Lv1/Lv2/Lv3 |
 
 ### 1.5 成长型低级词条（6 个，Task A 新增）
 
@@ -47,8 +48,8 @@
 |---|---|---|---|
 | `runeword_bloodthirst_edge` | 嗜血初锋 | `rune_pierce_1` × 2 + `rune_pyro_1` × 1 | 每次击杀敌人，全局基础伤害永久 +1；冰霜与火焰属性层数降低 30% |
 | `runeword_scatter_matrix` | 散射矩阵 | `rune_bounce_1` × 2 + `rune_lightning_1` × 1 | 连射次数全部转化为散射层数；基础伤害降低 25%，散射夹角缩小 70% |
-| `runeword_focused_fire` | 专注射击 | `rune_laser_1` × 2 + `rune_pierce_1` × 1 | 将所有弹跳和连射层数转化为基础伤害；伤害有 20% 概率暴击造成 200% 伤害 |
-| `runeword_mass_collapse` | 质量坍缩 | `rune_bounce_1` × 2 + `rune_pyro_1` × 1 | 强制获得爆炸属性（范围减半）；每清空 1 层连射/散射，爆炸范围 +10% |
+| `runeword_focused_fire` | 专注射击 | `rune_cryo_1` × 2 + `rune_pierce_1` × 1 | 将所有弹跳和连射层数转化为基础伤害；伤害有 20% 概率暴击造成 200% 伤害（不再依赖激光符文） |
+| `runeword_mass_collapse` | 质量坍缩 | `rune_bounce_1` × 2 + `rune_pyro_1` × 1 | 强制获得爆炸属性（范围减半）；只清空所有散射层数（连射保留），每清空 1 层散射爆炸范围 +10% |
 | `runeword_kinetic_decay` | 动能衰变 | `rune_bounce_1` × 2 + `rune_pierce_1` × 1 | 子弹初始获得 25% 伤害加成；每次命中后加成乘以 (1 - 7%) 衰减（最低衰减至 0%） |
 | `runeword_echo_shot` | 回响射击 | `rune_scatter_1` × 2 + `rune_bounce_1` × 1 | 子弹首次击中敌人时，有 25% 概率按原角度额外发射一颗单发子弹 |
 
@@ -77,7 +78,12 @@
 | `mass_collapse` | 质量坍缩 | `src/combat_system.js` 约第 2375 行（配方应用） | `activeRunewordEffects['mass_collapse']`, `finalRecipe._explosionRadiusMult` |
 | `kinetic_decay` | 动能衰变 | `src/entities/projectile.js` 命中逻辑 | `activeRunewordEffects['kinetic_decay']`, `finalRecipe._kineticDecayBonus`, `finalRecipe._kineticDecayRate` |
 | `echo_shot` | 回响射击 | `src/entities/projectile.js` 首次命中逻辑 | `activeRunewordEffects['echo_shot']`, `finalRecipe._echoShotChance`, `projectile._echoShotFired` |
-| `son_sword_summon` | 召剑之语 | `src/combat_system.js` `combat_damageEnemy` 命中后处理段 | `activeRunewordEffects['son_sword_summon']`；触发时调用 `combat_flyingSword_addSon(hitX, hitY, null, 3, swordConfig, 0)` + `combat_flyingSword_assignTarget(enemy)` |
+| `son_sword_summon` | 召剑之语 | `src/combat_system.js` `combat_damageEnemy` 命中后处理段 | `activeRunewordEffects['son_sword_summon']`；params 包含 `triggerChance`/`swordLevel`/`damageMultiplier`，触发时调用 `combat_flyingSword_addSon(hitX, hitY, null, 3, swordConfig, 0)` + `combat_flyingSword_assignTarget(enemy)`；子飞剑伤害 = `bullet.damage × damageMultiplier` |
+| `flame_sword` | 炎光剑影 | `src/combat_system.js` 约第 1762 行（穿透命中后段） | `activeRunewordEffects['flame_sword']`；改为生成 AOE 伤害（非爆炸）：在命中点对 `radius` 范围内敌人造成 `damage × damageRatio` 火属性伤害并升温 `damage × tempDamageRatio` |
+| `mass_collapse` | 质量坍缩 | `src/combat_system.js` 约第 2483 行（配方应用） | `activeRunewordEffects['mass_collapse']`；只清空 `finalRecipe.scatter`（连射保留），`_explosionRadiusMult = baseRadiusRatio + scatter × radiusBonusPerLayer` |
+| `lightning_shield` | 雷电护盾 | `src/combat_system.js` 约第 1791 行 | `activeRunewordEffects['lightning_shield']`；静电场对范围内敌人造成 AOE 伤害并施加感电；命中后**强制以 `chainChanceBonus = 1.0` 调用 `combat_lightning_triggerChain`**，必定触发闪电链 |
+| `frost_nova` | 冰霜新星 | `src/combat_system.js` `combat_triggerFrostNova`；`src/entities/projectile.js` 弹跳 hook | `activeRunewordEffects['frost_nova']`；命中敌人按其当前 `freezeChance = min(100, abs(temp))/2` 链式触发新星，`probMult` 每次链式调用减半，`chainDepth ≤ 8` 安全上限 |
+| `bullet_to_sword` | 化弹为剑 | `src/combat_system.js` 约第 2510 行（recipe 注入）；`src/spawn_system.js` `spawn_spawnBullet` 入口处理 | `activeRunewordEffects['bullet_to_sword']`；写入 `_replaceWithSonSword=true`、`_sonSwordLevel=level`，并在 burst 调度处跳过多重射击；spawn_spawnBullet 入口检测后调用 `combat_flyingSword_addSon` + 自动猎杀 |
 
 ## 3. 词条激活机制
 
@@ -116,3 +122,6 @@
 | `_kineticDecayRate` | number (0~1) | `kinetic_decay` | Projectile 命中 |
 | `_echoShotChance` | number (0~1) | `echo_shot` | Projectile 首次命中（回响子弹中此字段强制为 0，防止无限循环） |
 | `_echoShotFired` | boolean | `echo_shot` | Projectile 实例内部标记（非 recipe 字段），防止同一子弹重复触发 |
+| `_pierceDecayReduction` | number (0~1) | 穿透共鸣 (T2/T3) | 全局穿透衰减消费段（`combat_damageEnemy` 约第 1530 行）：每次穿透命中伤害衰减 35%（最低 15%），`pierceDecayReduction` 减小衰减率 |
+| `_replaceWithSonSword` | boolean | `bullet_to_sword` | `spawn_spawnBullet` 入口判断；触发后改为生成一把 SonSword 而非常规弹丸 |
+| `_sonSwordLevel` | number (1~3) | `bullet_to_sword` | `spawn_spawnBullet` 入口；对应生成的子飞剑等级（词条等级 → 子飞剑 Lv） |
