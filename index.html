@@ -513,6 +513,78 @@
         }
         .minimized .phase-sub { opacity: 0; }
 
+        /* [chaos-skip-upgrade] 混沌精华子弹老虎机样式 */
+        .chaos-slot {
+            width: 92px;
+            height: 120px;
+            border-radius: 12px;
+            border: 2px solid rgba(192, 132, 252, 0.5);
+            background: linear-gradient(160deg, #312e81 0%, #1e1b4b 60%, #0f0d2c 100%);
+            box-shadow: 0 0 18px rgba(192, 132, 252, 0.35), inset 0 0 22px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .chaos-slot-window {
+            width: 100%;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #fef3c7;
+            text-shadow: 0 0 10px rgba(253, 224, 71, 0.7);
+            position: relative;
+            overflow: hidden;
+        }
+        .chaos-slot-window-inner {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            top: 0;
+            transition: top 0.05s linear;
+        }
+        .chaos-slot-window-inner > div {
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            white-space: nowrap;
+            padding: 0 6px;
+        }
+        .chaos-slot-spinning {
+            animation: chaos-slot-shake 0.12s infinite alternate;
+        }
+        @keyframes chaos-slot-shake {
+            0%   { transform: translateY(-1px); }
+            100% { transform: translateY(1px); }
+        }
+        .chaos-slot-label {
+            font-size: 10px;
+            color: #cbd5e1;
+            margin-top: 4px;
+            letter-spacing: 1px;
+        }
+        .chaos-slot-locked {
+            border-color: #fcd34d;
+            box-shadow: 0 0 26px rgba(252, 211, 77, 0.7), inset 0 0 18px rgba(0, 0, 0, 0.55);
+        }
+        .chaos-slot-jackpot {
+            border-color: #f97316 !important;
+            box-shadow: 0 0 32px rgba(249, 115, 22, 0.85), inset 0 0 22px rgba(0, 0, 0, 0.6) !important;
+            animation: chaos-slot-jackpot-pulse 0.6s ease-in-out infinite alternate;
+        }
+        @keyframes chaos-slot-jackpot-pulse {
+            0%   { transform: scale(1); filter: brightness(1); }
+            100% { transform: scale(1.05); filter: brightness(1.35); }
+        }
+
         /* UI Overlays */
         .ui-overlay {
             position: absolute;
@@ -3066,8 +3138,24 @@
                 <span>⏩</span>
                 <span>跳过研磨，隨機符文</span>
             </button>
+            <!-- 跳过混沌精华按鈕（混沌精华命运时刻专用：跳过 + 子弹老虎机升级） -->
+            <button id="skip-chaos-btn" onclick="game.sys_skipChaosEssenceUpgrade()" style="display:none;" class="mt-2 flex items-center gap-1.5 px-4 py-2 bg-purple-900/60 border border-purple-500/60 rounded-lg text-xs text-purple-200 hover:bg-purple-800/70 hover:border-purple-300/80 hover:text-white transition-all duration-200">
+                <span>🎰</span>
+                <span>跳过混沌，升级当前子弹</span>
+            </button>
         </div>
 
+    </div>
+
+    <!-- [chaos-skip-upgrade] 混沌精华跳过：子弹老虎机升级覆盖层 -->
+    <div id="chaos-slot-machine-overlay" style="display:none; position: fixed; inset: 0; z-index: 500; background: rgba(2, 6, 23, 0.92); backdrop-filter: blur(8px); pointer-events: auto; align-items: center; justify-content: center; flex-direction: column;">
+        <div style="text-align: center; margin-bottom: 18px;">
+            <div style="font-family: 'Cinzel', serif; font-size: 22px; color: #f0abfc; letter-spacing: 4px; text-shadow: 0 0 18px rgba(192, 132, 252, 0.7);">CHAOS UPGRADE</div>
+            <div style="font-size: 12px; color: #cbd5e1; margin-top: 4px;">混沌精华：升级当前子弹</div>
+        </div>
+        <div id="chaos-slot-machine-slots" style="display: flex; gap: 18px; justify-content: center; align-items: center;"></div>
+        <div id="chaos-slot-machine-result" style="margin-top: 22px; min-height: 28px; font-size: 14px; color: #fde68a; text-align: center; letter-spacing: 1px;"></div>
+        <button id="chaos-slot-machine-continue" style="display:none; margin-top: 20px;" class="btn-main">进入战斗</button>
     </div>
 
     <!-- Phase 1: Gathering -->

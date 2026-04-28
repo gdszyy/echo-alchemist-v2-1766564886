@@ -332,6 +332,95 @@ export const ui_system = {
         return this.phase === 'selection' && this.fateMomentContext && this.fateMomentContext.active;
     },
 
+    /**
+     * @method ui_showChaosBulletSlotMachine
+     * @description [chaos-skip-upgrade] 渲染混沌精华跳过时的子弹老虎机覆盖层并播放动画。
+     * @param {string[][]} slotAttrs 每个 slot 可用的属性列表（顺序）。
+     * @param {string[]} finalPicks 每个 slot 最终命中的属性。
+     * @param {Object<string,string>} ATTR_LABEL 属性 key -> 显示文本映射。
+     * @param {boolean} allSame 是否三连同款。
+     * @param {Function} onComplete 玩家点击「进入战斗」按钮后的回调。
+     */
+    ui_showChaosBulletSlotMachine(slotAttrs, finalPicks, ATTR_LABEL, allSame, onComplete) {
+        const overlay = document.getElementById('chaos-slot-machine-overlay');
+        const slotsEl = document.getElementById('chaos-slot-machine-slots');
+        const resultEl = document.getElementById('chaos-slot-machine-result');
+        const continueBtn = document.getElementById('chaos-slot-machine-continue');
+        if (!overlay || !slotsEl || !resultEl || !continueBtn) {
+            if (typeof onComplete === 'function') onComplete();
+            return;
+        }
+
+        slotsEl.innerHTML = '';
+        resultEl.innerText = '';
+        continueBtn.style.display = 'none';
+
+        const ITEM_HEIGHT = 64;
+        const slotElements = [];
+        slotAttrs.forEach((attrs, idx) => {
+            const slotEl = document.createElement('div');
+            slotEl.className = 'chaos-slot';
+            const win = document.createElement('div');
+            win.className = 'chaos-slot-window';
+            const inner = document.createElement('div');
+            inner.className = 'chaos-slot-window-inner chaos-slot-spinning';
+            // 构造一个滚动序列，反复循环 attrs，最后一项确保是 finalPicks[idx]
+            const cycleCount = 22 + idx * 6;
+            const sequence = [];
+            for (let i = 0; i < cycleCount; i++) sequence.push(attrs[i % attrs.length]);
+            sequence.push(finalPicks[idx]);
+            sequence.push(finalPicks[idx]);
+            sequence.forEach(attr => {
+                const div = document.createElement('div');
+                div.innerText = ATTR_LABEL[attr] || attr;
+                inner.appendChild(div);
+            });
+            win.appendChild(inner);
+            slotEl.appendChild(win);
+            const labelEl = document.createElement('div');
+            labelEl.className = 'chaos-slot-label';
+            labelEl.innerText = `子弹 ${idx + 1}`;
+            slotEl.appendChild(labelEl);
+            slotsEl.appendChild(slotEl);
+            slotElements.push({ slotEl, inner, sequenceLen: sequence.length });
+        });
+
+        overlay.style.display = 'flex';
+
+        const baseSpinDuration = 1200;
+        const stagger = 380;
+        slotElements.forEach((s, idx) => {
+            const targetIdx = s.sequenceLen - 2; // finalPicks 是倒数第二项（最后一项是缓冲）
+            const totalDistance = targetIdx * ITEM_HEIGHT;
+            s.inner.style.top = '0px';
+            s.inner.style.transition = `top ${baseSpinDuration + idx * stagger}ms cubic-bezier(0.15, 0.85, 0.25, 1)`;
+            requestAnimationFrame(() => {
+                s.inner.style.top = `-${totalDistance}px`;
+            });
+            setTimeout(() => {
+                s.inner.classList.remove('chaos-slot-spinning');
+                s.slotEl.classList.add('chaos-slot-locked');
+            }, baseSpinDuration + idx * stagger);
+        });
+
+        const totalDuration = baseSpinDuration + (slotElements.length - 1) * stagger + 250;
+        setTimeout(() => {
+            if (allSame) {
+                slotElements.forEach(s => s.slotEl.classList.add('chaos-slot-jackpot'));
+                const attr = finalPicks[0];
+                resultEl.innerText = `🎉 三连同款【${ATTR_LABEL[attr] || attr}】：每枚子弹 ${ATTR_LABEL[attr] || attr} +5`;
+            } else {
+                const summary = finalPicks.map((p, i) => `子弹${i+1} ${ATTR_LABEL[p] || p} +2`).join(' ｜ ');
+                resultEl.innerText = summary;
+            }
+            continueBtn.style.display = 'inline-flex';
+            continueBtn.onclick = () => {
+                overlay.style.display = 'none';
+                if (typeof onComplete === 'function') onComplete();
+            };
+        }, totalDuration);
+    },
+
     ui_renderReplaceAmmoUI() {
         // @section:replace_ammo_init - 初始化上下文、获取 DOM 元素并设置标题文字
         const ctx = this.replaceAmmoContext;
@@ -349,6 +438,8 @@ export const ui_system = {
 
         if (recipeHud) recipeHud.classList.add('hidden');
         if (skipGrindBtn) skipGrindBtn.style.display = 'none';
+        const _skipChaosBtnInReplace = document.getElementById('skip-chaos-btn');
+        if (_skipChaosBtnInReplace) _skipChaosBtnInReplace.style.display = 'none';
         if (previewPanel) previewPanel.className = 'marble-preview-hidden';
 
         const newRecipes = ctx.newRecipes || [];
@@ -657,6 +748,12 @@ export const ui_system = {
         const skipGrindBtn = document.getElementById('skip-grind-btn');
         if (skipGrindBtn) {
             skipGrindBtn.style.display = (this.selectionMode === 'pure_essence') ? 'flex' : 'none';
+        }
+        // [chaos-skip-upgrade] \u6df7\u6c8c\u7cbe\u534e\u8df3\u8fc7\u6309\u94ae\uff1a\u4ec5\u5728\u6df7\u6c8c\u7cbe\u534e\u6a21\u5f0f\u4e0b\uff0c\u4e14\u5b58\u5728\u53ef\u5347\u7ea7\u7684\u5145\u80fd\u5b50\u5f39\u65f6\u663e\u793a
+        const skipChaosBtn = document.getElementById('skip-chaos-btn');
+        if (skipChaosBtn) {
+            const hasChargedAmmo = Array.isArray(this._chargedAmmoQueue) && this._chargedAmmoQueue.length > 0;
+            skipChaosBtn.style.display = (this.selectionMode === 'chaos_essence' && hasChargedAmmo) ? 'flex' : 'none';
         }
         // [tsk-668f3dba] \u8fdb\u5165\u6b63\u5e38\u9009\u62e9\u9636\u6bb5\u65f6\u9690\u85cf\u66ff\u6362\u8df3\u8fc7\u6309\u9215
         const replaceSkipBtn = document.getElementById('replace-ammo-skip-btn');

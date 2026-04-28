@@ -199,6 +199,9 @@ class Game {
         this.fateMomentContext = null;
         this.replaceAmmoContext = null; // [tsk-668f3dba] 替换当前子弹阶段上下文
         this._chargedAmmoQueue = null; // [ammo-replace] 充能子弹（上回合 marbleQueue 编译的 recipe），用于研磨后替换界面
+        // [bullet-charge-fix] 上一回合战斗实际使用的子弹快照（在 phase_startCombatPhase 中拍下），
+        // 用作下回合「子弹充能」/「精华触发时充能子弹」的真实数据源，避免使用 marbleQueue 误用未发射的子弹。
+        this._lastFiredAmmoSnapshot = null;
         this.isDragging = false; 
         this.dragStart = new Vec2(0,0); 
         this.dragCurrent = new Vec2(0,0); 

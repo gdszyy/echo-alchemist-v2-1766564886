@@ -332,6 +332,7 @@ export const game_system = {
         this.fateMomentContext = null;
         this.replaceAmmoContext = null; // [tsk-668f3dba] 替换当前子弹阶段上下文
         this._chargedAmmoQueue = null; // [ammo-replace] 充能子弹
+        this._lastFiredAmmoSnapshot = null; // [bullet-charge-fix] 上回合实际发射的子弹快照
         this.ownedRelics = [];
         
         // 补充遗物相关的重置字段
@@ -957,6 +958,101 @@ export const game_system = {
     },
 
     /**
+     * @method sys_skipChaosEssenceUpgrade
+     * @description [chaos-skip-upgrade] 混沌精华命运时刻「跳过 + 子弹老虎机升级」逻辑。
+     * 玩家点击「跳过混沌，升级当前子弹」后：
+     *   - 三个 slot 对应三枚充能子弹（_chargedAmmoQueue），每个 slot 内容是该子弹「当前拥有的所有属性」（含 multicast）。
+     *   - 老虎机滚动随机选中各 slot 的属性。
+     *   - 若三个 slot 全部相同，则三枚子弹的对应属性各 +5；否则每枚子弹各自命中的属性 +2。
+     *   - 升级后跳过研磨阶段，直接以升级后的子弹进入战斗。
+     */
+    sys_skipChaosEssenceUpgrade() {
+        if (this.selectionMode !== 'chaos_essence') {
+            console.warn('[sys_skipChaosEssenceUpgrade] 仅在 chaos_essence 模式下可调用');
+            return;
+        }
+        if (this._chaosSlotMachineActive) {
+            return; // 防止动画进行中重复触发
+        }
+        const charged = Array.isArray(this._chargedAmmoQueue) ? this._chargedAmmoQueue : [];
+        if (charged.length === 0) {
+            console.warn('[sys_skipChaosEssenceUpgrade] 没有可升级的充能子弹');
+            return;
+        }
+        this._chaosSlotMachineActive = true;
+
+        const STAT_KEYS = ['damage','bounce','pierce','scatter','multicast','cryo','pyro','lightning','laser','flying_sword','wind'];
+        const ATTR_LABEL = {
+            damage: '伤害', bounce: '反弹', pierce: '穿透', scatter: '散射',
+            multicast: '连射', cryo: '冰', pyro: '火', lightning: '雷',
+            laser: '激光', flying_sword: '飞剑', wind: '风',
+        };
+
+        // 每枚子弹当前拥有（>0）的属性集合
+        const slotAttrs = charged.map(recipe => {
+            const avail = STAT_KEYS.filter(k => (recipe[k] || 0) > 0);
+            return avail.length > 0 ? avail : ['damage'];
+        });
+
+        // 预先随机选定每个 slot 的最终命中属性
+        const finalPicks = slotAttrs.map(arr => arr[Math.floor(Math.random() * arr.length)]);
+
+        const allSame = finalPicks.length >= 3 && finalPicks.every(p => p === finalPicks[0]);
+        const incVal = allSame ? 5 : 2;
+
+        const applyUpgrade = () => {
+            if (allSame) {
+                const attr = finalPicks[0];
+                charged.forEach(r => { r[attr] = (r[attr] || 0) + incVal; });
+            } else {
+                charged.forEach((r, i) => {
+                    const attr = finalPicks[i];
+                    r[attr] = (r[attr] || 0) + incVal;
+                });
+            }
+            // 重新生效衍生标记（如 laser>0 时 isLaser 必须为 true）
+            charged.forEach(r => { if ((r.laser || 0) > 0) r.isLaser = true; });
+
+            // 升级后的充能子弹直接作为本回合 ammoQueue
+            this.ammoQueue = charged.map(r => {
+                const recipe = { ...r };
+                recipe.finalHits = 0;
+                recipe.multicast = r.multicast || 0;
+                return recipe;
+            });
+
+            // 清理命运时刻 / 替换 / 选择阶段相关上下文，跳过研磨直接进战斗
+            this._chargedAmmoQueue = null;
+            this.replaceAmmoContext = null;
+            this.fateMomentContext = null;
+            this.pendingSelectionMode = null;
+            this.selectionMode = 'standard';
+            this.selectionRequiredCount = (typeof CONFIG !== 'undefined' && CONFIG.gameplay.selectionReq) || 3;
+            this.selectionInjectedRune = null;
+            this.selectionPreviewState = null;
+            this.marbleQueue = [];
+            this.activeMarbleIndex = 0;
+
+            if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
+            if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
+            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+
+            this._chaosSlotMachineActive = false;
+            if (typeof this.phase_startCombatPhase === 'function') {
+                this.phase_startCombatPhase();
+            } else {
+                this.phase_switchPhase('combat');
+            }
+        };
+
+        if (typeof this.ui_showChaosBulletSlotMachine === 'function') {
+            this.ui_showChaosBulletSlotMachine(slotAttrs, finalPicks, ATTR_LABEL, allSame, applyUpgrade);
+        } else {
+            applyUpgrade();
+        }
+    },
+
+    /**
      * @method sys_queueRoundStartReward
      * @description 将下一回合开始需要统一结算的奖励写入队列。
      */
@@ -1425,8 +1521,17 @@ export const game_system = {
                         enemyType: reward.enemyType || null,
                         sourceRewardType: rewardType,
                     };
-                    // [ammo-replace] 精华触发时，如果上回合有 marbleQueue，先生成充能子弹保存到 _chargedAmmoQueue
-                    if (this.marbleQueue && this.marbleQueue.length > 0) {
+                    // [bullet-charge-fix] 精华触发时，优先使用「上回合实际发射的子弹快照」
+                    // 作为充能子弹源（_lastFiredAmmoSnapshot），保证子弹替换后玩家保留的子弹
+                    // 在下回合精华触发时仍能正确充能；只有在快照不存在时才回退到 marbleQueue 编译。
+                    if (Array.isArray(this._lastFiredAmmoSnapshot) && this._lastFiredAmmoSnapshot.length > 0) {
+                        this._chargedAmmoQueue = this._lastFiredAmmoSnapshot.map(r => {
+                            const recipe = { ...r };
+                            recipe.finalHits = 0;
+                            recipe.multicast = r.multicast || 0;
+                            return recipe;
+                        });
+                    } else if (this.marbleQueue && this.marbleQueue.length > 0) {
                         this._chargedAmmoQueue = this.marbleQueue.map(marbleDef => {
                             const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
                             const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, (marbleDef.multicast || 0) > 0);
@@ -1552,18 +1657,32 @@ export const game_system = {
             if (leftSidebar) {
                 leftSidebar.classList.remove('ammo-panel-charging', 'ammo-panel-charging-simple');
             }
-            // [充能] 每回合开始检查 ammoQueue：若为空则尝试从 marbleQueue 充能，
-            // 保留上回研磨收集的属性（collected），实现"子弹充能"效果。
+            // [充能] 每回合开始检查 ammoQueue：若为空则尝试充能，保留上回合实际发射子弹的属性，
+            // 实现"子弹充能"效果。
+            // [bullet-charge-fix] 优先使用「上回合实际发射的子弹快照」作为充能源；
+            // 这样子弹替换阶段保留下来的上上回合充能子弹也能正确接续，
+            // 否则会用本回合 marbleQueue（玩家未选择/未发射的新研磨子弹）覆盖，导致充能混乱。
             const ammoIsEmpty = !this.ammoQueue || this.ammoQueue.length === 0;
-            if (ammoIsEmpty && this.marbleQueue && this.marbleQueue.length > 0) {
+            const hasFiredSnapshot = Array.isArray(this._lastFiredAmmoSnapshot) && this._lastFiredAmmoSnapshot.length > 0;
+            const hasMarbleQueue = this.marbleQueue && this.marbleQueue.length > 0;
+            if (ammoIsEmpty && (hasFiredSnapshot || hasMarbleQueue)) {
                 this.ammoQueue = [];
-                this.marbleQueue.forEach(marbleDef => {
-                    const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
-                    const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, (marbleDef.multicast || 0) > 0);
-                    recipe.finalHits = 0;
-                    recipe.multicast = marbleDef.multicast || 0;
-                    this.ammoQueue.push(recipe);
-                });
+                if (hasFiredSnapshot) {
+                    this._lastFiredAmmoSnapshot.forEach(r => {
+                        const recipe = { ...r };
+                        recipe.finalHits = 0;
+                        recipe.multicast = r.multicast || 0;
+                        this.ammoQueue.push(recipe);
+                    });
+                } else {
+                    this.marbleQueue.forEach(marbleDef => {
+                        const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
+                        const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, (marbleDef.multicast || 0) > 0);
+                        recipe.finalHits = 0;
+                        recipe.multicast = marbleDef.multicast || 0;
+                        this.ammoQueue.push(recipe);
+                    });
+                }
                 this.ui_updateAmmoUI && this.ui_updateAmmoUI();
                 this.ui_renderRecipeHUD && this.ui_renderRecipeHUD();
 
@@ -2135,6 +2254,7 @@ export const game_system = {
                 fateMomentContext: this.fateMomentContext ? { ...this.fateMomentContext } : null,
                 replaceAmmoContext: this.replaceAmmoContext ? JSON.parse(JSON.stringify(this.replaceAmmoContext)) : null, // [ammo-replace]
                 _chargedAmmoQueue: this._chargedAmmoQueue ? this._chargedAmmoQueue.map(r => ({ ...r })) : null, // [ammo-replace]
+                _lastFiredAmmoSnapshot: this._lastFiredAmmoSnapshot ? this._lastFiredAmmoSnapshot.map(r => ({ ...r })) : null, // [bullet-charge-fix]
                 // Boss 系统
                 bossHistory: (this.bossHistory || []).slice(),
                 _pendingBossSpawn: this._pendingBossSpawn ? { ...this._pendingBossSpawn } : null,
@@ -2250,6 +2370,7 @@ export const game_system = {
             this.fateMomentContext = state.fateMomentContext ? { ...state.fateMomentContext } : null;
             this.replaceAmmoContext = state.replaceAmmoContext ? JSON.parse(JSON.stringify(state.replaceAmmoContext)) : null; // [ammo-replace]
             this._chargedAmmoQueue = state._chargedAmmoQueue ? state._chargedAmmoQueue.map(r => ({ ...r })) : null; // [ammo-replace]
+            this._lastFiredAmmoSnapshot = state._lastFiredAmmoSnapshot ? state._lastFiredAmmoSnapshot.map(r => ({ ...r })) : null; // [bullet-charge-fix]
 
             // --- 恢复 Boss 系统 ---
             this.bossHistory = (state.bossHistory || []).slice();

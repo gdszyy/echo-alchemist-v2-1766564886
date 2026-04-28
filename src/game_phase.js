@@ -631,6 +631,15 @@ phase_gathering_getRandomPegType() {
         // [perfect-clear-upgrade] 重置「本回合是否已触发蓄能升级」标志
         this._chargeUpgradeApplied = false;
 
+        // [bullet-charge-fix] 拍摄本回合实际进入战斗的 ammoQueue 快照，作为下回合
+        // 「子弹充能 / 精华触发时的充能子弹」的真实数据源。
+        // 之前使用 marbleQueue 编译，导致玩家在子弹替换阶段保留了「上回合充能子弹」时，
+        // 下回合反而以本回合 marbleQueue（即玩家「未选择/未发射」的新研磨子弹）作为充能源，
+        // 出现「充能子弹混乱、不是上回合实际打出的子弹」的 BUG。
+        if (Array.isArray(this.ammoQueue) && this.ammoQueue.length > 0) {
+            this._lastFiredAmmoSnapshot = this.ammoQueue.map(r => ({ ...r }));
+        }
+
         // [Feature 2: 围墙非空兜底] 进入战斗时若围墙内（pos.y > 0）确实没有任何活跃敌人，
         // 且不存在待入场 Boss / 画面外刚生成敌人，强制补一行 IN-WALL 敌人，避免空场打子弹。
         // finalizeRound 已尽量在清屏后预留一行 IN-WALL，本兜底用于其它异常路径。
