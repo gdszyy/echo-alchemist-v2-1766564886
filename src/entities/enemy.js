@@ -1361,8 +1361,8 @@ class Enemy {
         // 衰减；总体 alpha 降低，避免大面积纯色显得廉价，让 game-container 的
         // 径向背景充分透出，强化"半透明面板嵌在战场上"的高级质感。
         const _bgGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
-        _bgGrad.addColorStop(0, 'rgba(30, 41, 59, 0.14)');
-        _bgGrad.addColorStop(1, 'rgba(8, 14, 26, 0.28)');
+        _bgGrad.addColorStop(0, 'rgba(30, 41, 59, 0.08)');
+        _bgGrad.addColorStop(1, 'rgba(8, 14, 26, 0.18)');
         ctx.fillStyle = _bgGrad;
         ctx.fill();
         // [增强对比 #4] 在裁剪之前先给容器外缘绘制一圈柔光描边，
@@ -1410,14 +1410,14 @@ class Enemy {
         // 进一步打散纯色面，提升透明感与体积感。alpha 进一步降低，让背景透出更多。
         let _slotTop, _slotBottom;
         if (this.type === 'elite') {
-            _slotTop = 'rgba(76, 48, 122, 0.18)';
-            _slotBottom = 'rgba(28, 14, 52, 0.30)';
+            _slotTop = 'rgba(76, 48, 122, 0.10)';
+            _slotBottom = 'rgba(28, 14, 52, 0.18)';
         } else if (this.type === 'boss') {
-            _slotTop = 'rgba(96, 28, 44, 0.20)';
-            _slotBottom = 'rgba(40, 8, 16, 0.32)';
+            _slotTop = 'rgba(96, 28, 44, 0.12)';
+            _slotBottom = 'rgba(40, 8, 16, 0.20)';
         } else {
-            _slotTop = 'rgba(40, 52, 74, 0.16)';
-            _slotBottom = 'rgba(12, 18, 30, 0.26)';
+            _slotTop = 'rgba(40, 52, 74, 0.08)';
+            _slotBottom = 'rgba(12, 18, 30, 0.16)';
         }
         const _slotGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
         _slotGrad.addColorStop(0, _slotTop);
@@ -1467,7 +1467,7 @@ class Enemy {
             _hpGrad.addColorStop(0, _hpHighlight);
             _hpGrad.addColorStop(0.18, baseColor);
             _hpGrad.addColorStop(1, _hpShadow);
-            ctx.globalAlpha = 0.78;
+            ctx.globalAlpha = 0.62;
             ctx.fillStyle = _hpGrad;
             ctx.fillRect(-w/2, fillY, w, fillHeight);
             ctx.globalAlpha = 1.0;
