@@ -9,6 +9,20 @@ import {
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
+import { sb as _sb } from './utils/perf.js';
+import {
+    getUiBitmap,
+    ORBITAL_SOCKET_MAP,
+    ORBITAL_LINK_STRIP,
+    ORBITAL_LINK_CAP,
+    ORBITAL_LINK_FLOW,
+    ORBITAL_INTAKE,
+    EMITTER_BASE_SRC,
+    EMITTER_CHARGING_SRCS,
+    BG_MAIN_CANVAS_SRC,
+    BG_EMITTER_ZONE_SRC,
+    getAmmoIconSrcByKey,
+} from './bitmap_icons.js';
 
 export const render_system = {
 /**
@@ -18,6 +32,25 @@ export const render_system = {
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.ctx.fillStyle = CONFIG.colors.bg;
         this.ctx.fillRect(0, 0, this.width, this.height);
+        // 主底图位图（已生成 720×1280 暗黑赛博炼金风），未加载完成时回退到纯色底
+        const bgMain = getUiBitmap(BG_MAIN_CANVAS_SRC);
+        if (bgMain) {
+            this.ctx.save();
+            this.ctx.globalAlpha = 0.85;
+            this.ctx.drawImage(bgMain, 0, 0, this.width, this.height);
+            this.ctx.restore();
+        }
+        // 发射器区域（底部 220px 高的炼金台层），仅在战斗 / 研磨阶段叠加
+        if (this.phase === 'combat' || this.phase === 'gathering') {
+            const bgEmitter = getUiBitmap(BG_EMITTER_ZONE_SRC);
+            if (bgEmitter) {
+                const zoneH = 220;
+                this.ctx.save();
+                this.ctx.globalAlpha = 0.9;
+                this.ctx.drawImage(bgEmitter, 0, this.height - zoneH, this.width, zoneH);
+                this.ctx.restore();
+            }
+        }
     },
 
 /**
@@ -50,7 +83,7 @@ export const render_system = {
             this.ctx.strokeStyle = 'rgba(52, 211, 153, ' + (0.5 + linePulse * 0.3) + ')';
             this.ctx.lineWidth = 3;
             this.ctx.setLineDash([8, 12]);
-            this.ctx.shadowBlur = 10 + linePulse * 5;
+            this.ctx.shadowBlur = _sb(10 + linePulse * 5);
             this.ctx.shadowColor = '#34d399';
             
             // [属性特效]：在连线上方绘制微小的风纹粒子
@@ -95,7 +128,7 @@ export const render_system = {
                 this.ctx.save();
                 this.ctx.globalAlpha = 0.3 + pulse * 0.3;
                 this.ctx.fillStyle = '#34d399';
-                this.ctx.shadowBlur = 15 + pulse * 10;
+                this.ctx.shadowBlur = _sb(15 + pulse * 10);
                 this.ctx.shadowColor = '#34d399';
                 this.ctx.beginPath();
                 this.ctx.arc(a.x, a.y, 8 + pulse * 4, 0, Math.PI * 2);
@@ -105,7 +138,7 @@ export const render_system = {
                 // 绘制主体
                 this.ctx.save();
                 this.ctx.fillStyle = '#d1fae5';
-                this.ctx.shadowBlur = 10;
+                this.ctx.shadowBlur = _sb(10);
                 this.ctx.shadowColor = '#34d399';
                 this.ctx.beginPath();
                 this.ctx.arc(a.x, a.y, 5, 0, Math.PI * 2);
@@ -122,7 +155,7 @@ export const render_system = {
                 this.ctx.save();
                 this.ctx.fillStyle = '#34d399';
                 this.ctx.font = 'bold 12px Arial';
-                this.ctx.shadowBlur = 5;
+                this.ctx.shadowBlur = _sb(5);
                 this.ctx.shadowColor = 'rgba(0,0,0,0.5)';
                 this.ctx.fillText(idx + 1, a.x + 8, a.y - 8);
                 this.ctx.restore();
@@ -187,7 +220,7 @@ export const render_system = {
         const flash = Math.sin(time / 20) > 0;
         ctx.strokeStyle = flash ? "#fff" : "#34d399";
         ctx.lineWidth = 2;
-        ctx.shadowBlur = 20 * progress;
+        ctx.shadowBlur = _sb(20 * progress);
         ctx.shadowColor = "#34d399";
         ctx.stroke();
         // @section:wind_matrix_tunnel - 隧道型风阵：渐变光带 + 方向箭头动画
@@ -256,7 +289,7 @@ export const render_system = {
             ctx.beginPath();
             ctx.arc(shake, shake, maxR * 0.2, 0, Math.PI * 2);
             ctx.fillStyle = '#fff'; // 纯白核心
-            ctx.shadowBlur = 30;
+            ctx.shadowBlur = _sb(30);
             ctx.shadowColor = '#fff';
             ctx.fill();
             
@@ -359,6 +392,9 @@ export const render_system = {
             flying_sword: { val: recipe.flying_sword || 0 }
         };
         Object.keys(mapping).forEach(key => {
+            // [icon-fix] 必须把 key 写回条目，否则下方 ORBITAL_SOCKET_MAP[stat.key] 永远拿到 undefined，
+            // 导致 socket 位图永远走不进 if 分支，发射器环绕属性永远显示成 fallback 的彩色圆环。
+            mapping[key].key = key;
             mapping[key].color = CONFIG.ui.attributeDisplay[key].color;
             mapping[key].icon = CONFIG.ui.attributeDisplay[key].icon;
             if (mapping[key].val > 0) stats.push(mapping[key]);
@@ -408,6 +444,12 @@ export const render_system = {
             ctx.stroke();
         }
 
+        // [bitmap-orbital] 预取连线相关位图（一次性 lookup）
+        const linkStripImg = getUiBitmap(ORBITAL_LINK_STRIP);
+        const linkCapImg   = getUiBitmap(ORBITAL_LINK_CAP);
+        const flowFrameIdx = Math.floor((Date.now() / 90) % ORBITAL_LINK_FLOW.length);
+        const flowImg      = getUiBitmap(ORBITAL_LINK_FLOW[flowFrameIdx]);
+
         stats.forEach((stat, index) => {
             const angle = stepAngle * index + currentRotation;
             const ox = Math.cos(angle) * radius;
@@ -418,23 +460,35 @@ export const render_system = {
             if (!isFinite(ox) || !isFinite(oy)) return;
 
             const speedGlow = Math.min(1, this.spinBoost * 2); // 撞击后的高光
-            ctx.shadowBlur = (10 + speedGlow * 20) * orbScale;
-            ctx.shadowColor = stat.color;
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-            
             const baseSize = Math.min(22, 14 + stat.val * 0.5);
             const currentSize = Math.max(0, baseSize * orbScale);
-            
-            ctx.beginPath();
-            ctx.arc(ox, oy, currentSize, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = stat.color;
-            ctx.lineWidth = (2 + speedGlow * 2) * orbScale;
-            ctx.stroke();
+
+            // [bitmap-orbital] 优先使用元素 socket 贴图作为底座，未命中或未加载时 fallback 到原 arc
+            const socketImg = getUiBitmap(ORBITAL_SOCKET_MAP[stat.key]);
+            if (socketImg && currentSize > 4) {
+                const socketSize = currentSize * 2.4; // 64×64 源图，按当前球径放大成"光环底座"
+                ctx.save();
+                ctx.shadowBlur = _sb((8 + speedGlow * 18) * orbScale);
+                ctx.shadowColor = stat.color;
+                ctx.globalCompositeOperation = 'screen';
+                ctx.drawImage(socketImg, ox - socketSize / 2, oy - socketSize / 2, socketSize, socketSize);
+                ctx.restore();
+            } else {
+                ctx.shadowBlur = _sb((10 + speedGlow * 20) * orbScale);
+                ctx.shadowColor = stat.color;
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+                ctx.beginPath();
+                ctx.arc(ox, oy, currentSize, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = stat.color;
+                ctx.lineWidth = (2 + speedGlow * 2) * orbScale;
+                ctx.stroke();
+            }
 
             // 拖尾特效 (增强撞击爆发感)
             const totalTrail = this.spinBoost * 3 + (this.isReloading ? (1-this.reloadProgress) * 0.5 : 0);
             if (totalTrail > 0.05) {
+                ctx.shadowBlur = 0;
                 ctx.beginPath();
                 ctx.strokeStyle = stat.color;
                 ctx.lineWidth = 2 * orbScale;
@@ -444,42 +498,154 @@ export const render_system = {
             }
 
             // 绘制文字 (仅在大小合适时)
+            // [bitmap-orbital-icon] 优先使用 AMMO_ICON_MAP 位图替代 emoji；位图未加载或属性
+            // 无对应贴图（如 multicast）时回退到 emoji，保持视觉连续性。
             if (radius < 200 && currentSize > 8) {
                 ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 if (stat.isMulticast) {
                     ctx.font = `bold ${12 * orbScale}px monospace`;
                     ctx.fillText(`x${1 + stat.val}`, ox, oy);
                 } else {
-                    ctx.font = `${10 * orbScale}px sans-serif`;
+                    const iconSrc = getAmmoIconSrcByKey(stat.key);
+                    const iconImg = iconSrc ? getUiBitmap(iconSrc) : null;
+                    const iconBoxRaw = currentSize * 1.6;
                     if (stat.val > 1) {
-                        ctx.fillText(stat.icon, ox, oy - 5 * orbScale);
-                        ctx.font = `bold ${9 * orbScale}px sans-serif`; ctx.fillStyle = stat.color;
+                        const iconBox = iconBoxRaw * 0.85;
+                        if (iconImg) {
+                            ctx.drawImage(iconImg, ox - iconBox / 2, oy - 6 * orbScale - iconBox / 2, iconBox, iconBox);
+                        } else {
+                            ctx.font = `${10 * orbScale}px sans-serif`;
+                            ctx.fillText(stat.icon, ox, oy - 5 * orbScale);
+                        }
+                        ctx.font = `bold ${9 * orbScale}px sans-serif`;
+                        ctx.fillStyle = stat.color;
                         ctx.fillText(`${stat.val}`, ox, oy + 6 * orbScale);
                     } else {
-                        ctx.font = `${14 * orbScale}px sans-serif`; ctx.fillText(stat.icon, ox, oy);
+                        if (iconImg) {
+                            ctx.drawImage(iconImg, ox - iconBoxRaw / 2, oy - iconBoxRaw / 2, iconBoxRaw, iconBoxRaw);
+                        } else {
+                            ctx.font = `${14 * orbScale}px sans-serif`;
+                            ctx.fillText(stat.icon, ox, oy);
+                        }
                     }
                 }
             }
-            
-            // --- 绘制连线 (修复 gradient 报错点) ---
+
+            // --- 绘制连线：优先使用 strip 平铺贴图 + 端帽 + 流光，未加载时 fallback 到原 gradient ---
             if (radius > 10 && radius < 120) {
-                ctx.save();
-                ctx.globalCompositeOperation = 'screen';
-                // 确保渐变坐标点也是有限的
-                const grad = ctx.createLinearGradient(0, 0, ox, oy);
-                grad.addColorStop(0, 'rgba(255,255,255,0)');
-                grad.addColorStop(1, stat.color);
-                ctx.strokeStyle = grad;
-                ctx.globalAlpha = 0.3 * globalAlpha;
-                ctx.beginPath();
-                ctx.moveTo(0, 0);
-                ctx.lineTo(ox, oy);
-                ctx.stroke();
-                ctx.restore();
+                const segLen = Math.hypot(ox, oy);
+                const segAngle = Math.atan2(oy, ox);
+                if (linkStripImg && segLen > 8) {
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
+                    ctx.globalAlpha = 0.55 * globalAlpha;
+                    ctx.translate(0, 0);
+                    ctx.rotate(segAngle);
+                    // strip 高度按缩放调整，避免在 orbScale<1 时显得过粗
+                    const stripH = 6 * orbScale;
+                    ctx.drawImage(linkStripImg, 0, -stripH / 2, segLen, stripH);
+                    ctx.restore();
+
+                    // 流光：3 个错相位光点沿连线移动
+                    if (flowImg) {
+                        const flowSize = 8 * orbScale;
+                        const phase = (Date.now() / 600) % 1;
+                        ctx.save();
+                        ctx.globalCompositeOperation = 'screen';
+                        ctx.globalAlpha = 0.85 * globalAlpha;
+                        for (let p = 0; p < 3; p++) {
+                            const t = (phase + p / 3) % 1;
+                            const fx = ox * t;
+                            const fy = oy * t;
+                            ctx.drawImage(flowImg, fx - flowSize / 2, fy - flowSize / 2, flowSize, flowSize);
+                        }
+                        ctx.restore();
+                    }
+
+                    // 端帽：覆盖连线两端硬切口
+                    if (linkCapImg) {
+                        const capSize = 12 * orbScale;
+                        ctx.save();
+                        ctx.globalCompositeOperation = 'screen';
+                        ctx.globalAlpha = 0.7 * globalAlpha;
+                        ctx.drawImage(linkCapImg, -capSize / 2, -capSize / 2, capSize, capSize);
+                        ctx.drawImage(linkCapImg, ox - capSize / 2, oy - capSize / 2, capSize, capSize);
+                        ctx.restore();
+                    }
+                } else {
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
+                    const grad = ctx.createLinearGradient(0, 0, ox, oy);
+                    grad.addColorStop(0, 'rgba(255,255,255,0)');
+                    grad.addColorStop(1, stat.color);
+                    ctx.strokeStyle = grad;
+                    ctx.globalAlpha = 0.3 * globalAlpha;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(ox, oy);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+
+            // [bitmap-orbital] 装填吸入轨迹粒子：球离中心还很远时，每帧在球的拖尾位置叠一帧吸入纹理
+            if (this.isReloading && radius > 120) {
+                const intakeFrame = ORBITAL_INTAKE[Math.floor((Date.now() / 90) % ORBITAL_INTAKE.length)];
+                const intakeImg = getUiBitmap(intakeFrame);
+                if (intakeImg) {
+                    const trailT = 0.25 + Math.random() * 0.5;
+                    const tx = ox * trailT;
+                    const ty = oy * trailT;
+                    const sz = 24 * orbScale;
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
+                    ctx.globalAlpha = 0.6 * globalAlpha;
+                    ctx.drawImage(intakeImg, tx - sz / 2, ty - sz / 2, sz, sz);
+                    ctx.restore();
+                }
             }
         });
 
         ctx.restore();
+    },
+
+    /**
+     * [RENDER] 绘制发射器底座 + 蓄力动画帧。
+     * 替代 game_phase 中的简单椭圆，未加载位图时退回原始绘制。
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {number} cx
+     * @param {number} cy
+     * @param {boolean} isCharging
+     * @param {number} chargeProgress  0~1
+     */
+    render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress) {
+        const baseImg = getUiBitmap(EMITTER_BASE_SRC);
+        const baseSize = 96;
+        if (baseImg) {
+            ctx.save();
+            ctx.drawImage(baseImg, cx - baseSize / 2, cy - baseSize / 2, baseSize, baseSize);
+            ctx.restore();
+        } else {
+            ctx.save();
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+            ctx.beginPath();
+            ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        if (isCharging) {
+            const t = Math.max(0, Math.min(1, chargeProgress || 0));
+            const idx = Math.min(EMITTER_CHARGING_SRCS.length - 1, Math.floor(t * EMITTER_CHARGING_SRCS.length));
+            const chargeImg = getUiBitmap(EMITTER_CHARGING_SRCS[idx]);
+            if (chargeImg) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                ctx.globalAlpha = 0.6 + t * 0.4;
+                ctx.drawImage(chargeImg, cx - baseSize / 2, cy - baseSize / 2, baseSize, baseSize);
+                ctx.restore();
+            }
+        }
     },
 
 /**
@@ -592,7 +758,7 @@ export const render_system = {
 
         // --- 绘制光标发光效果 ---
         ctx.globalAlpha = cursorAlpha * 0.4;
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = _sb(12);
         ctx.shadowColor = cursorColor;
         ctx.fillStyle = cursorColor;
         ctx.beginPath();
@@ -601,7 +767,7 @@ export const render_system = {
 
         // --- 绘制光标主体 ---
         ctx.globalAlpha = cursorAlpha;
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = _sb(8);
         ctx.shadowColor = cursorColor;
         ctx.fillStyle = cursorColor;
         ctx.beginPath();

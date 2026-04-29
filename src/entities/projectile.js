@@ -21,6 +21,7 @@
 import { CONFIG } from '../config.js';
 import { Vec2 } from '../utils/math_utils.js';
 import { Particle, SlashEffect } from '../effects/particles.js';
+import { sb as _sb } from '../utils/perf.js';
 
 // audio 代理由 entities.js 注入，通过模块级变量共享
 let _audioProvider = null;
@@ -66,6 +67,17 @@ class Projectile {
         
         // [词条 Hook] 动能衰变 (kinetic_decay)
         this._kineticDecayCurrentBonus = config._kineticDecayBonus || 0;
+
+        // [新属性] venom / overcharge / echo
+        this.venom = config.venom || 0;
+        this.overcharge = config.overcharge || 0;
+        this.echo = config.echo || 0;
+        // 超载充能计数（穿透 +3，弹跳 +1）
+        this._chargeCount = 0;
+        // scatter 副弹继承比例（默认 1.0，spawn_system 派生时按需设置 0.5）
+        this._scatterInheritRatio = (typeof config._scatterInheritRatio === 'number') ? config._scatterInheritRatio : 1.0;
+        // 防止 echo 子弹无限链式触发
+        this._isEchoChild = config._isEchoChild || false;
         
         // [词条 Hook] 回响射击 (echo_shot)
         this._echoShotFired = config._echoShotFired || false;
@@ -73,8 +85,21 @@ class Projectile {
         this.windBladeAngle = 0; // 风属性环绕风刃的旋转角度
         this.lifeTime = 60 * 30; // [修改] 加倍子弹生命时间 (从15秒增加到30秒)
         this.chainHistory = [];
-        this.trail = [];      
-        this.deformation = { x: 1, y: 1 }; 
+        this.trail = [];
+        // [拖尾调优] 根据子弹强度（属性层数）和类型决定拖尾长度。
+        // 用户反馈：拖尾过长且过实，需要更短更淡的视觉效果。
+        const _tierStat = (config.damage || 0) + (config.bounce || 0) + (config.pierce || 0)
+            + (config.scatter || 0) + (config.cryo || 0) + (config.pyro || 0)
+            + (config.lightning || 0) + (config.laser || 0)
+            + (config.flying_sword || 0) + (config.wind || 0);
+        let _trailMax = 4 + Math.min(14, Math.floor(_tierStat * 0.3));
+        if (config.isLaser) _trailMax += 4;
+        if (config.type === 'flying_sword') _trailMax += 3;
+        if (config.pierce > 0) _trailMax += 2;
+        if (config.explosive) _trailMax += 1;
+        this.maxTrailLength = _trailMax;
+        this.tierStat = _tierStat;
+        this.deformation = { x: 1, y: 1 };
         this.targetDeformation = { x: 1, y: 1 }; 
         this.elasticity = 0.2;
         this.crackSeed = [];
@@ -122,7 +147,7 @@ class Projectile {
         this.deformation.x += (this.targetDeformation.x - this.deformation.x) * this.elasticity * timeScale;
         this.deformation.y += (this.targetDeformation.y - this.deformation.y) * this.elasticity * timeScale;
         this.trail.push({x: this.pos.x, y: this.pos.y});
-        if (this.trail.length > 8) this.trail.shift();
+        if (this.trail.length > (this.maxTrailLength || 8)) this.trail.shift();
         for (const [enemy, timer] of this.hitCooldowns) {
             if (timer > 0) this.hitCooldowns.set(enemy, timer - timeScale);
             else this.hitCooldowns.delete(enemy);
@@ -296,10 +321,24 @@ class Projectile {
                     }
                 }
                 this.piercesLeft--;
+                // [新属性] 超载：穿透命中敌人 +3 充能
+                if (this.overcharge > 0) {
+                    this._chargeCount += 3;
+                }
                 return;
             }
             if (this.bouncesLeft > 0) {
                 this.bouncesLeft--;
+
+                // [新属性] 超载：弹跳（敌人）+1 充能
+                if (this.overcharge > 0) {
+                    this._chargeCount += 1;
+                }
+
+                // [新属性] 回响：弹跳点按概率生成回响子弹（向反方向镜像）
+                if (this.echo > 0 && !this._isEchoChild && typeof game !== 'undefined') {
+                    this._tryTriggerEchoBullet();
+                }
 
                 // ─────────────────────────────────────────────────────────────────────
                 // [词条 Hook] 动能激增（kinetic_surge）
@@ -320,41 +359,23 @@ class Projectile {
                 // ─────────────────────────────────────────────────────────────────────
                 // [词条 Hook] 冰霜新星（frost_nova）
                 // 效果：每经过 bounceInterval 次弹跳，触发一次冰霜新星（范围冰冻）
-                // 实现：维护 this._frostNovaBounceCount 计数器，每次弹跳时自增
+                // 加强：被新星命中的敌人按其当前冻结概率额外触发一次新星，链式触发概率每次减半。
+                // 链式逻辑由 combat_triggerFrostNova 实现，确保与首次触发表现一致。
                 // ─────────────────────────────────────────────────────────────────────
                 if (typeof game !== 'undefined' && game.activeRunewordEffects) {
                     const frostNovaEffect = game.activeRunewordEffects['frost_nova'];
                     if (frostNovaEffect) {
                         if (!this._frostNovaBounceCount) this._frostNovaBounceCount = 0;
                         this._frostNovaBounceCount++;
-                        // 参数字段：requiredBounces（触发所需弹跳次数）、radius（范围）、tempDrop（降温量）、damageRatio（伤害比例）
                         const requiredBounces = Math.max(1, Math.floor(frostNovaEffect.params.requiredBounces || 5));
-                        if (this._frostNovaBounceCount % requiredBounces === 0) {
-                            // 触发冰霜新星：对周围所有敌人施加冰冻状态
-                            const novaRadius = frostNovaEffect.params.radius || 80;
-                            const tempDrop = frostNovaEffect.params.tempDrop || 10;
-                            const damageRatio = frostNovaEffect.params.damageRatio || 0.30;
-                            const novaDmg = Math.max(1, Math.floor(this.config.damage * damageRatio));
-                            // 视觉特效：冰蓝冲击波
-                            game.spawn_createShockwave(this.pos.x, this.pos.y, '#06b6d4');
-                            for (let i = 0; i < 8; i++) {
-                                game.spawn_createParticle(this.pos.x, this.pos.y, '#a5f3fc', 'shard');
-                            }
-                            // 对范围内所有敌人施加冰冻和伤害
-                            game.enemies.forEach(ne => {
-                                if (ne.active && this.pos.dist(ne.pos) < novaRadius) {
-                                    ne.applyTemp(-tempDrop);
-                                    ne._cryoHitThisRound = true; // 标记冰属性命中（供元素聚变使用）
-                                    // 附加冰霜伤害
-                                    if (novaDmg > 0) {
-                                        const novaResult = ne.takeDamage(novaDmg);
-                                        game.combat_recordDamage(novaResult.actualDamage, 'cryo', 'main', null);
-                                    }
-                                }
-                            });
-                            game.spawn_createFloatingText(
-                                this.pos.x, this.pos.y - 20,
-                                `❄️ FROST NOVA!`, '#a5f3fc'
+                        if (this._frostNovaBounceCount % requiredBounces === 0
+                            && typeof game.combat_triggerFrostNova === 'function') {
+                            game.combat_triggerFrostNova(
+                                new Vec2(this.pos.x, this.pos.y),
+                                this.config,
+                                frostNovaEffect.params || {},
+                                1.0,
+                                0
                             );
                         }
                     }
@@ -427,12 +448,21 @@ class Projectile {
 
     _applyMove(vel, width, height, spawnCallback) {
         this.pos = this.pos.add(vel);
-        
+
         // [优化] 在 Demo 模式下强制开启底墙
         const hasBottomWall = (this.game && this.game.isDemo) ? true : game.hasCombatWall;
 
-        if (this.pos.x < this.radius) { 
-            this.pos.x = this.radius; this.vel.x = Math.abs(this.vel.x); 
+        // [新属性] 超载/回响 墙壁碰撞钩子
+        const _onWallBounce = () => {
+            if (this.overcharge > 0) this._chargeCount += 1;
+            if (this.echo > 0 && !this._isEchoChild && typeof this._tryTriggerEchoBullet === 'function') {
+                this._tryTriggerEchoBullet();
+            }
+        };
+
+        if (this.pos.x < this.radius) {
+            this.pos.x = this.radius; this.vel.x = Math.abs(this.vel.x);
+            _onWallBounce();
             if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
             const angle = Math.abs(Math.atan2(this.vel.x, this.vel.y));
             if (angle < (10 * Math.PI / 180)) {
@@ -449,8 +479,9 @@ class Projectile {
             }
             this.hitCooldowns.clear();
         }
-        if (this.pos.x > width - this.radius) { 
-            this.pos.x = width - this.radius; this.vel.x = -Math.abs(this.vel.x); 
+        if (this.pos.x > width - this.radius) {
+            this.pos.x = width - this.radius; this.vel.x = -Math.abs(this.vel.x);
+            _onWallBounce();
             if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
             const angle = Math.abs(Math.atan2(this.vel.x, this.vel.y));
             if (angle < (10 * Math.PI / 180)) {
@@ -473,8 +504,9 @@ class Projectile {
         const topBound = (typeof game !== 'undefined' && game.combatGridTopY != null && game.enemyHeight != null)
             ? (game.combatGridTopY - game.enemyHeight / 2 + this.radius)
             : this.radius;
-        if (this.pos.y < topBound) { 
-            this.pos.y = topBound; this.vel.y = Math.abs(this.vel.y); 
+        if (this.pos.y < topBound) {
+            this.pos.y = topBound; this.vel.y = Math.abs(this.vel.y);
+            _onWallBounce();
             if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
             if(this.config.bounce > 0) this.deformation = { x: 1.3, y: 0.7 };
             // [打击感] 反弹顶墙壁：低频大幅震动 (已降低 40%)
@@ -486,6 +518,7 @@ class Projectile {
         if (this.pos.y > height - this.radius) {
             if (hasBottomWall) {
                 this.pos.y = height - this.radius; this.vel.y = -Math.abs(this.vel.y);
+                _onWallBounce();
                 if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
                 
                 // [修复] 底部护盾反弹不消耗反弹次数
@@ -551,8 +584,8 @@ class Projectile {
 
     performSlashAttack(target, enemies) {
         const angle = Math.random() * Math.PI * 2;
-        const length = 160; 
-        const width = 40;   
+        const length = 160;
+        const width = 40;
         const center = target.pos;
         const halfLen = length / 2;
         const dir = new Vec2(Math.cos(angle), Math.sin(angle));
@@ -561,7 +594,7 @@ class Projectile {
 
         if (typeof game !== 'undefined') {
             let slashColor = CONFIG.colors.flying_sword || '#0ea5e9';
-            if (this.config.lightning > 0) slashColor = '#c084fc'; 
+            if (this.config.lightning > 0) slashColor = '#c084fc';
             else if (this.config.pyro > 0) slashColor = '#f97316';
             else if (this.config.cryo > 0) slashColor = '#06b6d4';
             // [限制] SlashEffect 受全局粒子上限约束
@@ -569,37 +602,153 @@ class Projectile {
             audio.playSlash();
         }
 
+        // [平衡] 三级子飞剑的剑痕仅对非主目标触发 20% 的伤害与属性效果
+        const swordLevel = (this.config.level || 1);
+        const isLevel3 = swordLevel >= 3;
+        const markRatio = 0.20;
+
         enemies.forEach(other => {
             if (!other.active) return;
             const E = other.pos;
-            const AB = p2.sub(p1);      
-            const AE = E.sub(p1);       
+            const AB = p2.sub(p1);
+            const AE = E.sub(p1);
             const lenSq = AB.dot(AB);
             let t = (lenSq === 0) ? -1 : AE.dot(AB) / lenSq;
             t = Math.max(0, Math.min(1, t));
             const closest = p1.add(AB.mult(t));
-            const dist = E.dist(closest); 
+            const dist = E.dist(closest);
             const hitRadius = (other.width / 2) + (width / 2);
             if (dist < hitRadius) {
                 const fsCfg = CONFIG.mechanics.flying_sword;
+                const isMark = (other !== target);
+                const ratio = (isLevel3 && isMark) ? markRatio : 1.0;
                 const slashConfig = {
                     ...this.config,
-                    damage: Math.ceil(this.config.damage * fsCfg.dashDamageMult)
+                    damage: Math.max(1, Math.ceil(this.config.damage * fsCfg.dashDamageMult * ratio)),
+                    pyro: Math.floor((this.config.pyro || 0) * ratio),
+                    cryo: Math.floor((this.config.cryo || 0) * ratio),
+                    lightning: Math.floor((this.config.lightning || 0) * ratio)
                 };
                 game.combat_damageEnemy(other, {
                     config: slashConfig,
-                    pos: closest, 
+                    pos: closest,
                     isCopy: true
                 });
-                if (other !== target) {
+                if (isMark) {
                     other.addSwordMark(1);
                 }
             }
         });
     }
     
+    /**
+     * [新属性] 回响：以镜像反方向生成一颗 echo 子弹（继承 50% 属性，向下取整）。
+     * 仅在非 echo 子弹上触发；带 _isEchoChild 标记防止链式无限。
+     * 二阶共鸣 allowOneRelay 时，echo 子弹也能再触发一次（通过 _echoRelayUsed 控制）。
+     */
+    _tryTriggerEchoBullet() {
+        if (typeof game === 'undefined') return;
+        const echoLevel = this.echo || 0;
+        if (echoLevel <= 0) return;
+
+        const echoRes = game.activeElementResonances && game.activeElementResonances['echo'];
+        const echoResParams = echoRes ? echoRes.params : null;
+        const baseChance = (CONFIG.mechanics && CONFIG.mechanics.echo && CONFIG.balance.echo.baseTriggerChance) || 0.25;
+        const chancePerLevel = (CONFIG.mechanics && CONFIG.mechanics.echo && CONFIG.balance.echo.chancePerLevel) || 0.05;
+        const triggerBonus = echoResParams ? (echoResParams.triggerChanceBonus || 0) : 0;
+        const inheritRatio = echoResParams ? (echoResParams.inheritRatio || 0.5) : 0.5;
+        const triggerChance = Math.min(1.0, baseChance + echoLevel * chancePerLevel + triggerBonus);
+
+        if (Math.random() >= triggerChance) return;
+
+        // 镜像方向（反方向）
+        const mirrorVel = new Vec2(-this.vel.x, -this.vel.y);
+        const _floor = (v) => Math.floor((v || 0) * inheritRatio);
+        const echoRecipe = {
+            ...this.config,
+            damage: Math.max(1, _floor(this.config.damage)),
+            cryo: _floor(this.config.cryo),
+            pyro: _floor(this.config.pyro),
+            lightning: _floor(this.config.lightning),
+            bounce: _floor(this.config.bounce),
+            pierce: _floor(this.config.pierce),
+            scatter: _floor(this.config.scatter),
+            laser: _floor(this.config.laser),
+            venom: _floor(this.config.venom),
+            overcharge: _floor(this.config.overcharge),
+            echo: _floor(this.config.echo),
+            _isEchoChild: true,
+            // 防止再触发 echo_shot 词条无限循环
+            _echoShotChance: 0,
+        };
+        if (game.burstQueue) {
+            game.burstQueue.push({
+                delay: 0,
+                vel: mirrorVel,
+                recipe: echoRecipe,
+                shotId: this.shotId,
+                isLast: false,
+            });
+        }
+        if (game.spawn_createFloatingText) {
+            game.spawn_createFloatingText(this.pos.x, this.pos.y - 16, '🔁ECHO', '#a78bfa');
+        }
+    }
+
+    /**
+     * [新属性] 超载：子弹销毁时结算一次 AoE 爆炸。
+     * explosionDmg = chargeCount × overcharge × baseDmg × baseChargeMult × scatterInheritRatio × explosionMultiplier
+     * AoE 半径 = aoeBaseRadius + chargeCount × aoeRadiusPerCharge
+     */
+    _detonateOvercharge() {
+        if (typeof game === 'undefined') return;
+        if (this.overcharge <= 0 || this._chargeCount <= 0) return;
+        const ocRes = game.activeElementResonances && game.activeElementResonances['overcharge'];
+        const ocResParams = ocRes ? ocRes.params : null;
+        const explosionMultiplier = ocResParams ? (ocResParams.explosionMultiplier || 1.0) : 1.0;
+        const aoeBonus = ocResParams ? (ocResParams.aoeBonus || false) : false;
+
+        const ocCfg = (CONFIG.mechanics && CONFIG.mechanics.overcharge) || {};
+        const baseChargeMult = ocCfg.baseChargeMult || 0.3;
+        const aoeBaseRadius = ocCfg.aoeBaseRadius || 60;
+        const aoeRadiusPerCharge = ocCfg.aoeRadiusPerCharge || 4;
+
+        const baseDmg = this.config.damage || 1;
+        const inherit = this._scatterInheritRatio || 1.0;
+        let dmg = this._chargeCount * this.overcharge * baseDmg * baseChargeMult * inherit * explosionMultiplier;
+        let radius = aoeBaseRadius + this._chargeCount * aoeRadiusPerCharge;
+        if (aoeBonus) radius *= 1.4;
+        dmg = Math.max(1, Math.ceil(dmg));
+
+        const enemies = game.enemies || [];
+        enemies.forEach(en => {
+            if (!en.active) return;
+            const dx = en.pos.x - this.pos.x;
+            const dy = en.pos.y - this.pos.y;
+            if (dx * dx + dy * dy <= radius * radius) {
+                const r = en.takeDamage(dmg);
+                if (typeof game.combat_recordDamage === 'function') {
+                    game.combat_recordDamage(r.actualDamage, 'pyro', 'main', this.shotId);
+                }
+                if (r.killed && typeof game.spawn_addScore === 'function') game.spawn_addScore(en.maxHp);
+            }
+        });
+        if (typeof game.spawn_createShockwave === 'function') {
+            game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
+        }
+        if (typeof game.spawn_createExplosion === 'function') {
+            game.spawn_createExplosion(this.pos.x, this.pos.y, '#fbbf24');
+        }
+        if (typeof game.spawn_createFloatingText === 'function') {
+            game.spawn_createFloatingText(this.pos.x, this.pos.y - 24, `💥${dmg}`, '#fbbf24');
+        }
+    }
+
     destroy(spawnCallback) {
-        this.active = false; 
+        // [新属性] 超载爆炸（在标记 destroyed 之前以便其它系统可读 chargeCount）
+        try { this._detonateOvercharge(); } catch (e) { /* 防御性：销毁路径不应抛错 */ }
+
+        this.active = false;
         this.destroyed = true;
 
         // [修改重点]：允许套娃子弹触发嵌套逻辑，即使它是 Copy (散射出来的)
@@ -649,7 +798,11 @@ class Projectile {
                         game.spawn_createFloatingText(s.pos.x, s.pos.y, "RESET", "#6366f1");
                     } 
                     else if (pegLevel >= 3) {
-                        s.isAutoHunting = true; 
+                        // [修复-targeting] 与 handleFlyingSwordFinish 行为一致：lv3 子剑脱离母剑独立猎杀，
+                        // 否则保留对已 destroyed 母剑的引用会让自动猎杀阶段读取到不一致的 mother 状态。
+                        s.isAutoHunting = true;
+                        s.mother = null;
+                        s.state = 'flying';
                     }
                 }
             });
@@ -687,7 +840,79 @@ class Projectile {
     draw(ctx) {
         if (!this.active && !this.destroyed) return;
         const integrity = (this.bouncesLeft + this.piercesLeft) / (this.maxDurability || 1);
+        // [拖尾 #6] 在主体之前先绘制拖尾，主体覆盖在最前
+        this._drawTrail(ctx);
         Projectile.drawVisuals(ctx, this.pos.x, this.pos.y, this.radius, this.config, this.rotation, this.intensity, this.deformation, integrity, this.crackSeed, this.windBladeAngle);
+    }
+
+    // @perf-impact: 子弹拖尾 - 每子弹每帧 1 条 lineTo + 渐变描边；高强度子弹 trail 长度可达 ~30 个点。
+    _drawTrail(ctx) {
+        const trail = this.trail;
+        if (!trail || trail.length < 2) return;
+        const cfg = this.config || {};
+        // 根据属性决定主拖尾色
+        let trailColor = '#94a3b8';
+        if (cfg.isLaser) trailColor = '#7dd3fc';
+        else if (cfg.type === 'flying_sword') trailColor = '#0ea5e9';
+        else if (cfg.type === 'rainbow') trailColor = '#e9d5ff';
+        else if (cfg.explosive) trailColor = '#ef4444';
+        else if ((cfg.pyro || 0) > 0) trailColor = '#f97316';
+        else if ((cfg.cryo || 0) > 0) trailColor = '#22d3ee';
+        else if ((cfg.lightning || 0) > 0) trailColor = '#c084fc';
+        else if ((cfg.wind || 0) > 0) trailColor = '#34d399';
+        else if ((cfg.pierce || 0) > 0) trailColor = '#fca5a5';
+        else if ((cfg.bounce || 0) > 0) trailColor = '#86efac';
+        else if ((cfg.scatter || 0) > 0) trailColor = '#facc15';
+
+        const tier = Math.min(3, Math.floor((this.tierStat || 0) / 8));
+        // [拖尾调优] 用户反馈：拖尾过粗过亮，整体降一档。
+        // 基础宽度随子弹半径联动；高强度子弹仅小幅加宽
+        const baseWidth = Math.max(1.0, this.radius * (0.35 + tier * 0.10));
+        const len = trail.length;
+
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        // S 级（含激光/飞剑）使用 lighter 增亮拖尾
+        if (tier >= 2 || cfg.isLaser || cfg.type === 'flying_sword' || cfg.explosive) {
+            ctx.globalCompositeOperation = 'lighter';
+        }
+        ctx.shadowColor = trailColor;
+        ctx.shadowBlur = _sb(2 + tier * 2);
+
+        // 段落式渐变描边：越靠近当前位置越亮、越粗，整体透明度更低更轻盈
+        for (let i = 1; i < len; i++) {
+            const a = trail[i - 1];
+            const b = trail[i];
+            const t = i / (len - 1);
+            const alpha = Math.max(0.02, t * (0.30 + tier * 0.08));
+            const width = Math.max(0.4, baseWidth * t);
+            ctx.strokeStyle = `${trailColor}`;
+            ctx.globalAlpha = alpha;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+        }
+
+        // S 级追加一层更细更亮的核心拖尾
+        if (tier >= 3 || cfg.isLaser) {
+            ctx.shadowBlur = _sb(6);
+            for (let i = Math.max(1, len - 5); i < len; i++) {
+                const a = trail[i - 1];
+                const b = trail[i];
+                const t = i / (len - 1);
+                ctx.strokeStyle = '#ffffff';
+                ctx.globalAlpha = 0.35 * t;
+                ctx.lineWidth = Math.max(0.6, baseWidth * 0.30 * t);
+                ctx.beginPath();
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(b.x, b.y);
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
     }
 
     static drawVisuals(ctx, x, y, radius, config, rotation, intensity, deformation = {x:1, y:1}, integrity = 1.0, crackSeed = [], windBladeAngle = 0) {
@@ -702,7 +927,7 @@ class Projectile {
             // 這裡我們直接畫朝右的劍，與 velocity 方向一致
             const scale = radius / 6; // 根據半徑動態調整大小 (基礎半徑約7~10)
             // 1. 劍身發光 (Spirit Aura) - 隨耐久度減弱
-            ctx.shadowBlur = 15 * intensity * integrity;
+            ctx.shadowBlur = _sb(15 * intensity * integrity);
             ctx.shadowColor = '#0ea5e9'; // 青色光暈
             // 2. 劍身 (Blade) - 雙刃劍，指向右側
             ctx.beginPath();
@@ -727,7 +952,7 @@ class Projectile {
             ctx.lineWidth = 1.5;
             ctx.stroke();
             // 3. 劍格 (Guard) - 祥雲/蝙蝠紋飾
-            ctx.shadowBlur = 5;
+            ctx.shadowBlur = _sb(5);
             ctx.shadowColor = '#f59e0b';
             ctx.fillStyle = '#fbbf24'; // 金色
             ctx.beginPath();
@@ -758,7 +983,7 @@ class Projectile {
                 -50 * scale, swing * 0.5      // 終點
             );
             ctx.shadowColor = '#ef4444';
-            ctx.shadowBlur = 5;
+            ctx.shadowBlur = _sb(5);
             ctx.strokeStyle = '#ef4444'; // 紅色
             ctx.lineWidth = 2;
             ctx.lineCap = 'round';
@@ -818,14 +1043,14 @@ class Projectile {
             const pulse = Math.sin(time) * 0.1 + 1.0; 
             const laserPower = config.laser || 0;
             const sizeMod = 1 + (laserPower * 0.1); 
-            ctx.shadowBlur = 20 * intensity * sizeMod;
+            ctx.shadowBlur = _sb(20 * intensity * sizeMod);
             ctx.shadowColor = glowColor;
             ctx.fillStyle = glowColor;
             ctx.globalAlpha = 0.4;
             ctx.beginPath();
             ctx.arc(0, 0, radius * 1.2 * pulse * sizeMod, 0, Math.PI * 2);
             ctx.fill();
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = _sb(10);
             ctx.shadowColor = '#fff';
             ctx.fillStyle = '#ffffff';
             ctx.globalAlpha = 1.0;
@@ -872,7 +1097,7 @@ class Projectile {
             }
         }
         ctx.closePath();
-        ctx.shadowBlur = CONFIG.visuals.glowBase * intensity * integrity; 
+        ctx.shadowBlur = _sb(CONFIG.visuals.glowBase * intensity * integrity); 
         ctx.shadowColor = glowColor;
         if (mainColor === 'rainbow') {
             const grad = ctx.createLinearGradient(-radius, -radius, radius, radius);
@@ -942,7 +1167,7 @@ class Projectile {
             ctx.lineJoin = 'round';
             ctx.globalCompositeOperation = 'lighter'; 
             const arcCount = 1 + Math.floor(config.lightning / 2);
-            ctx.shadowBlur = 8 + config.lightning;
+            ctx.shadowBlur = _sb(8 + config.lightning);
             ctx.shadowColor = '#a855f7'; 
             ctx.strokeStyle = '#e9d5ff'; 
             for (let k = 0; k < arcCount; k++) {
@@ -982,7 +1207,7 @@ class Projectile {
         // 风属性环绕风刃特效
         if (config.wind && config.wind > 0) {
             ctx.save();
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = _sb(10);
             ctx.shadowColor = '#34d399';
             const bladeCount = Math.min(3 + config.wind, 6); // 根据风属性等级决定风刃数量
             const orbitRadius = radius * 1.8; // 环绕轨道半径

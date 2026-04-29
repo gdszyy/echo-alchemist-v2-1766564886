@@ -46,6 +46,12 @@ import {
     decaySpin,
     getLayoutParams,
 } from './plinko_physics.js';
+import {
+    getRuneIconSrc,
+    getRelicIconSrc,
+    getUiBitmap,
+} from './bitmap_icons.js';
+import { sb as _sb } from './utils/perf.js';
 
 // ==================== 音频依赖注入 (重构 v2) ====================
 // 移除 Proxy 方案和 window.audio 依赖
@@ -161,7 +167,7 @@ class SpecialSlot {
 
         // ===== 第一层：实线底层（保证连线始终可见） =====
         ctx.globalAlpha = pulse * 0.5;
-        ctx.shadowBlur  = glow * 0.8;
+        ctx.shadowBlur = _sb(glow * 0.8);
         ctx.shadowColor = color;
         ctx.strokeStyle = color;
         ctx.lineWidth   = 1.5;
@@ -173,7 +179,7 @@ class SpecialSlot {
 
         // ===== 第二层：流动虚线叠层（魔法流动感） =====
         ctx.globalAlpha = pulse;
-        ctx.shadowBlur  = glow;
+        ctx.shadowBlur = _sb(glow);
         ctx.lineWidth   = 2.5;
         ctx.setLineDash([5, 5]);
         // 流动速度：每帧向前移动，使用 animTimer 驱动而非 Date.now()
@@ -188,7 +194,7 @@ class SpecialSlot {
         // ===== 第三层：两端钉子锚点圆 =====
         ctx.globalAlpha = pulse;
         ctx.fillStyle   = color;
-        ctx.shadowBlur  = glow * 0.6;
+        ctx.shadowBlur = _sb(glow * 0.6);
         [[this.x, this.y], [this.x2, this.y2]].forEach(([ax, ay]) => {
             ctx.beginPath();
             ctx.arc(ax, ay, 5, 0, Math.PI * 2);
@@ -197,7 +203,7 @@ class SpecialSlot {
 
         // ===== 第四层：中点符号文字（无背景圆）=====
         ctx.globalAlpha  = 1.0;
-        ctx.shadowBlur   = glow;
+        ctx.shadowBlur = _sb(glow);
         ctx.shadowColor  = color;
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
@@ -355,7 +361,7 @@ class FortuneWheel {
         ctx.translate(this.pos.x, this.pos.y);
         
         // --- 0. 繪製外發光 ---
-        ctx.shadowBlur = 30;
+        ctx.shadowBlur = _sb(30);
         ctx.shadowColor = '#fbbf24'; // 金色光暈
 
         // --- 1. 繪製豪華外框 (Rim) ---
@@ -390,7 +396,7 @@ class FortuneWheel {
             ctx.arc(lx, ly, 3, 0, Math.PI * 2);
             ctx.fillStyle = isOn ? '#ffffff' : '#78350f';
             if (isOn) {
-                ctx.shadowBlur = 5; ctx.shadowColor = '#fff';
+                ctx.shadowBlur = _sb(5); ctx.shadowColor = '#fff';
             } else {
                 ctx.shadowBlur = 0;
             }
@@ -439,7 +445,7 @@ class FortuneWheel {
             
             ctx.fillStyle = '#fff';
             ctx.shadowColor = 'rgba(0,0,0,0.8)';
-            ctx.shadowBlur = 4;
+            ctx.shadowBlur = _sb(4);
             
             ctx.font = '24px Arial';
             ctx.textAlign = 'center';
@@ -484,7 +490,7 @@ class FortuneWheel {
         
         // 指針陰影
         ctx.shadowColor = 'rgba(0,0,0,0.5)';
-        ctx.shadowBlur = 5;
+        ctx.shadowBlur = _sb(5);
         
         ctx.beginPath();
         ctx.moveTo(-10, -5);
@@ -547,7 +553,7 @@ class GhostPeg {
         ctx.globalAlpha = alpha * 0.7;
         ctx.strokeStyle = '#c084fc'; // 紫色
         ctx.lineWidth = 1.5;
-        ctx.shadowBlur = 8 + pulse * 6;
+        ctx.shadowBlur = _sb(8 + pulse * 6);
         ctx.shadowColor = '#a855f7';
         ctx.setLineDash([3, 3]);
         ctx.lineDashOffset = -(this.angle * 10) % 6;
@@ -565,7 +571,7 @@ class GhostPeg {
         grad.addColorStop(0.6, 'rgba(168, 85, 247, 0.6)'); // 中间紫色
         grad.addColorStop(1, 'rgba(168, 85, 247, 0.1)');   // 边缘渐隐
         ctx.fillStyle = grad;
-        ctx.shadowBlur = 10 + pulse * 8;
+        ctx.shadowBlur = _sb(10 + pulse * 8);
         ctx.shadowColor = '#f97316';
         ctx.fill();
 
@@ -574,7 +580,7 @@ class GhostPeg {
         ctx.beginPath();
         ctx.arc(x, y, r * 0.35, 0, Math.PI * 2);
         ctx.fillStyle = '#fff';
-        ctx.shadowBlur = 4;
+        ctx.shadowBlur = _sb(4);
         ctx.fill();
 
         // 旋转小光点（两个对称小圆）
@@ -588,7 +594,7 @@ class GhostPeg {
             ctx.beginPath();
             ctx.arc(x + dx, y + dy, dotR, 0, Math.PI * 2);
             ctx.fillStyle = '#fbbf24';
-            ctx.shadowBlur = 5;
+            ctx.shadowBlur = _sb(5);
             ctx.shadowColor = '#fbbf24';
             ctx.fill();
         }
@@ -698,7 +704,7 @@ class TriangleSideWheel {
         ctx.save();
 
         // 外发光
-        ctx.shadowBlur = 10 + pulse * 8;
+        ctx.shadowBlur = _sb(10 + pulse * 8);
         ctx.shadowColor = this.spinning ? '#fbbf24' : 'rgba(100,150,255,0.5)';
 
         // 外框
@@ -744,7 +750,7 @@ class TriangleSideWheel {
             ctx.font = `bold ${sl.arc > 0.5 ? 11 : 9}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.shadowBlur = 3;
+            ctx.shadowBlur = _sb(3);
             ctx.shadowColor = 'rgba(0,0,0,0.8)';
             ctx.fillText(sl.label, 0, 0);
             ctx.restore();
@@ -770,7 +776,7 @@ class TriangleSideWheel {
         ctx.lineTo(0, 8);
         ctx.closePath();
         ctx.fillStyle = '#ef4444';
-        ctx.shadowBlur = 4;
+        ctx.shadowBlur = _sb(4);
         ctx.shadowColor = '#ef4444';
         ctx.fill();
         ctx.restore();
@@ -784,7 +790,7 @@ class TriangleSideWheel {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = '#fff';
-            ctx.shadowBlur = 12;
+            ctx.shadowBlur = _sb(12);
             ctx.shadowColor = '#fbbf24';
             const label = this.resultMultiplier === 0 ? '空' : `${this.resultMultiplier}x!`;
             ctx.fillText(label, x, y - r - 20);
@@ -1065,18 +1071,18 @@ class Peg {
 // @section:peg_base_fill_and_glow - 基础圆形填充与发光效果
         
         if (this.type === 'laser') {
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = _sb(10);
             ctx.shadowColor = CONFIG.colors.laser;
             ctx.fillStyle = isLit ? '#ffffff' : color;
         } else if (this.type === 'wind') {
             // 风属性钉子使用特殊的脉冲发光
             const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
-            ctx.shadowBlur = 12 + pulse * 8;
+            ctx.shadowBlur = _sb(12 + pulse * 8);
             ctx.shadowColor = CONFIG.colors.matWind;
             ctx.fillStyle = isLit ? '#ffffff' : color;
         } else if (isLit) {
             ctx.fillStyle = '#ffffff';
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = _sb(15);
             ctx.shadowColor = '#ffffff';
         } else {
             ctx.fillStyle = color;
@@ -1164,7 +1170,7 @@ class Peg {
             ctx.arc(this.pos.x, this.pos.y, currentRadius + 3 + pulse * 2, 0, Math.PI * 2);
             ctx.strokeStyle = `rgba(56, 189, 248, ${0.6 + pulse * 0.4})`; // 冰蓝色
             ctx.lineWidth = 2;
-            ctx.shadowBlur = 10 + pulse * 8;
+            ctx.shadowBlur = _sb(10 + pulse * 8);
             ctx.shadowColor = '#38bdf8';
             ctx.stroke();
             // 绘制冻结回合数角标
@@ -1236,7 +1242,7 @@ class Peg {
                 ctx.stroke();
                 
                 // 添加金色外发光
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = _sb(8);
                 ctx.shadowColor = goldColor;
                 ctx.stroke();
                 ctx.restore();
@@ -1268,7 +1274,7 @@ class Peg {
         // 高等级（等级≥ 2）时增加金色外发光效果
         if (this.level >= 2) {
             const pulse = (Math.sin(time * 3) + 1) / 2;
-            ctx.shadowBlur = 12 + pulse * 10;
+            ctx.shadowBlur = _sb(12 + pulse * 10);
             ctx.shadowColor = '#fbbf24';
         }
 
@@ -1330,7 +1336,7 @@ class Peg {
         
         const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
         // 高等级时增强光晓
-        ctx.shadowBlur = (this.level >= 2 ? 16 : 8) + pulse * 10;
+        ctx.shadowBlur = _sb((this.level >= 2 ? 16 : 8) + pulse * 10);
         ctx.shadowColor = this.level >= 2 ? '#a7f3d0' : '#34d399';
         
         ctx.strokeStyle = isLit ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.8)';
@@ -1660,7 +1666,7 @@ class Peg {
             const alpha = 0.45 + pulse * 0.35;
             ctx.strokeStyle = `rgba(251, 146, 60, ${alpha})`; // 橙色
             ctx.lineWidth = 1.4;
-            ctx.shadowBlur = 4 + pulse * 6;
+            ctx.shadowBlur = _sb(4 + pulse * 6);
             ctx.shadowColor = 'rgba(251, 146, 60, 0.7)';
             ctx.beginPath();
             ctx.moveTo(x,     y - d); // 顶
@@ -1678,7 +1684,7 @@ class Peg {
             ctx.lineWidth = 1.5;
             ctx.setLineDash([3, 3]);
             ctx.lineDashOffset = (Date.now() / 80) % 6; // 虚线流动动画
-            ctx.shadowBlur = 3 + pulse * 5;
+            ctx.shadowBlur = _sb(3 + pulse * 5);
             ctx.shadowColor = 'rgba(52, 211, 153, 0.6)';
             ctx.beginPath();
             ctx.arc(x, y, r * 1.55, 0, Math.PI * 2);
@@ -1692,7 +1698,7 @@ class Peg {
             ctx.strokeStyle = `rgba(251, 113, 133, ${alpha})`; // 玫瑰红
             ctx.lineWidth = 2.0;
             ctx.lineCap = 'round';
-            ctx.shadowBlur = 4 + pulse * 7;
+            ctx.shadowBlur = _sb(4 + pulse * 7);
             ctx.shadowColor = 'rgba(251, 113, 133, 0.7)';
             const arcR = r * 1.6;
             const arcSpan = Math.PI * 0.55; // 弧长约 99°
@@ -1710,7 +1716,7 @@ class Peg {
             // 钉子下方绘制小三角箭头，表示「漏斗收窄，向下聚焦」
             const alpha = 0.50 + pulse * 0.35;
             ctx.fillStyle = `rgba(245, 158, 11, ${alpha})`; // 琥珀色
-            ctx.shadowBlur = 3 + pulse * 5;
+            ctx.shadowBlur = _sb(3 + pulse * 5);
             ctx.shadowColor = 'rgba(245, 158, 11, 0.6)';
             const ty = y + r * 1.55; // 三角形顶点 Y（钉子正下方）
             const tw = r * 0.55;     // 三角形半宽
@@ -1735,7 +1741,7 @@ class Peg {
             ctx.strokeStyle = `rgba(192, 132, 252, ${alpha})`; // 紫色
             ctx.lineWidth = 1.5;
             ctx.lineCap = 'round';
-            ctx.shadowBlur = 4 + pulse * 6;
+            ctx.shadowBlur = _sb(4 + pulse * 6);
             ctx.shadowColor = 'rgba(192, 132, 252, 0.6)';
             const lx = r * 1.55;
             const lh = r * 0.8;
@@ -1767,12 +1773,12 @@ class Peg {
             ctx.arc(x, y, r * 1.7 + pulse * r * 0.3, 0, Math.PI * 2);
             ctx.strokeStyle = `rgba(251, 191, 36, ${axisAlpha * 0.5})`;
             ctx.lineWidth = 1.5;
-            ctx.shadowBlur = 8 + pulse * 10;
+            ctx.shadowBlur = _sb(8 + pulse * 10);
             ctx.shadowColor = 'rgba(251, 191, 36, 0.8)';
             ctx.stroke();
 
             // 四芒星形（✦）路径
-            ctx.shadowBlur = 6 + pulse * 8;
+            ctx.shadowBlur = _sb(6 + pulse * 8);
             ctx.shadowColor = 'rgba(251, 191, 36, 0.9)';
             ctx.fillStyle = `rgba(251, 191, 36, ${axisAlpha})`;
             ctx.beginPath();
@@ -1792,7 +1798,7 @@ class Peg {
             ctx.beginPath();
             ctx.arc(x, y, r * 0.35, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(255, 255, 255, ${axisAlpha})`;
-            ctx.shadowBlur = 4;
+            ctx.shadowBlur = _sb(4);
             ctx.shadowColor = '#ffffff';
             ctx.fill();
         }
@@ -1943,6 +1949,7 @@ class DropBall {
         // [新增] 处理钉子交互（同化、突变、升级）
 
         handlePegInteraction(peg, game) {
+            // @section:peg_audio_feedback - 钉子属性触发音效路由（mutation→playMagic, upgrade→playPowerup, attribute→playMagic）
             // 1. 获取当前弹珠的属性类型
             let ballType = this.def.type;
 
@@ -2631,6 +2638,50 @@ class DropBall {
                             this.handlePegInteraction(peg, game); // 传入 game
                         }
 
+                        // ==================== [新属性] 回响虚影 Peg ====================
+                        // 弹珠碰 Peg 时，按 (30% + echoLevel × 5% + 共鸣 triggerChanceBonus) 概率生成虚影 Peg。
+                        // 虚影 Peg 复用 GhostPeg 实现，life ≈ 60 帧（约 1 秒）。
+                        // 虚影的虚影固定 25% 概率再生（_isEchoChild=true，防止递归）。
+                        if (peg.type !== 'normal' && peg.type !== 'pink' && game.ghostPegs && game.runeGrid) {
+                            // 累加 grid 中所有 echo 符文等级
+                            let echoLevel = 0;
+                            for (const item of game.runeGrid) {
+                                if (item && typeof item === 'object' && item.id && item.id.indexOf('rune_echo') === 0) {
+                                    echoLevel += (item.level || 1);
+                                }
+                            }
+                            if (echoLevel > 0) {
+                                const echoCfg = (CONFIG.mechanics && CONFIG.mechanics.echo) || {};
+                                const baseChance = echoCfg.phantomChance || 0.30;
+                                const perLvl = echoCfg.phantomChancePerLevel || 0.05;
+                                const echoRes = game.activeElementResonances && game.activeElementResonances['echo'];
+                                const triggerBonus = (echoRes && echoRes.params) ? (echoRes.params.triggerChanceBonus || 0) : 0;
+                                const isEchoChildPeg = !!peg._isEchoChild;
+                                const finalChance = isEchoChildPeg
+                                    ? (echoCfg.phantomChildChance || 0.25)
+                                    : Math.min(1.0, baseChance + echoLevel * perLvl + triggerBonus);
+                                if (Math.random() < finalChance && game.ghostPegs.length < 16) {
+                                    // 虚影位置：略偏移于源 peg
+                                    const offsetX = (Math.random() - 0.5) * 28;
+                                    const offsetY = (Math.random() - 0.5) * 18;
+                                    const gx = peg.pos.x + offsetX;
+                                    const gy = peg.pos.y + offsetY;
+                                    if (gx > 20 && gx < (game.width - 20) && gy > 40 && gy < (game.boardBottomY + 20)) {
+                                        const ghost = new GhostPeg(gx, gy, peg.type, peg.level || 1);
+                                        // 标记虚影来源：若已是 echo child，则不再继续传播
+                                        ghost._isEchoChild = true;
+                                        // 缩短生命：1000ms ≈ 60 帧
+                                        ghost.life = 60;
+                                        ghost.maxLife = 60;
+                                        game.ghostPegs.push(ghost);
+                                        if (game.spawn_createFloatingText) {
+                                            game.spawn_createFloatingText(gx, gy - 18, '🔁回响', '#a78bfa');
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // @section:layout_special_effects - 布局专属特殊效果（漏斗/菱形/稀疏通道）
                         // ==================== [布局补偿] 布局专属特殊效果 ====================
                         const boardLayout = game.boardLayout || 'default';
@@ -2951,7 +3002,7 @@ class DropBall {
                 const sizeMod = 1 + (buffs.laser * 0.15); 
                 ctx.save();
                 ctx.globalCompositeOperation = 'lighter'; 
-                ctx.shadowBlur = (15 + pulse * 10) * sizeMod;
+                ctx.shadowBlur = _sb((15 + pulse * 10) * sizeMod);
                 ctx.shadowColor = laserColor;
                 ctx.fillStyle = laserColor;
                 ctx.globalAlpha = 0.5 + (pulse * 0.2); 
@@ -3002,7 +3053,7 @@ class DropBall {
                 ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.fill();
 
                 // 4. 绘制不稳定核心 (Unstable Core)
-                ctx.shadowBlur = glowIntensity;
+                ctx.shadowBlur = _sb(glowIntensity);
                 ctx.shadowColor = '#ef4444';
                 ctx.fillStyle = coreColor;
                 
@@ -3173,7 +3224,7 @@ class DropBall {
                 if (Math.random() < triggerChance) {
                     // @section:mirror_clone_badge - LAYER 6：镜像分身标记
                     const arcCount = 1 + Math.floor(Math.random() * (buffs.lightning * 0.6));
-                    ctx.shadowBlur = 10 + buffs.lightning * 3; 
+                    ctx.shadowBlur = _sb(10 + buffs.lightning * 3); 
                     ctx.shadowColor = '#a855f7'; 
                     ctx.strokeStyle = '#e9d5ff'; 
                     for (let k = 0; k < arcCount; k++) {
@@ -3213,7 +3264,7 @@ class DropBall {
             
             if (hasWind) {
                 ctx.save();
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = _sb(8);
                 ctx.shadowColor = '#34d399';
                 
                 // 计算wind属性的数量
@@ -3268,7 +3319,7 @@ class DropBall {
                 ctx.strokeStyle = `rgba(251, 191, 36, ${0.5 + pulse * 0.5})`;
                 ctx.lineWidth = 1.5;
                 ctx.setLineDash([3, 3]);
-                ctx.shadowBlur = 6 + pulse * 8;
+                ctx.shadowBlur = _sb(6 + pulse * 8);
                 ctx.shadowColor = 'rgba(251, 191, 36, 0.8)';
                 ctx.beginPath();
                 ctx.arc(0, 0, r + 3 + pulse * 1.5, 0, Math.PI * 2);
@@ -3344,7 +3395,7 @@ class SwordQi {
         ctx.arc(0, 0, this.width/2, Math.PI * 0.5, Math.PI * 1.5);
         ctx.bezierCurveTo(this.width/4, -this.width/2, this.width/4, this.width/2, 0, this.width/2);
         ctx.fillStyle = 'rgba(14, 165, 233, 0.8)';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = _sb(10);
         ctx.shadowColor = '#0ea5e9';
         ctx.fill();
         ctx.restore();
@@ -3439,8 +3490,10 @@ class SonSword {
     }
 
     searchForTarget(enemies) {
-        // [性能優化]：快速過濾，只找屏幕內的活躍敵人
-        const candidates = enemies.filter(e => e.active && e.pos.y > 0 && e.pos.y < game.height && e !== this.passingThroughEnemy);
+        // [修复-targeting] 放宽 Y 边界，允许刚入场（y 略低于 0）或刚要出场的敌人也作为目标，
+        // 避免 lv3 自动猎杀子剑在 enemies 全部处于过渡区时误判为「无敌人」并空转盘旋。
+        const margin = (game && game.height ? game.height : 0) + 100;
+        const candidates = enemies.filter(e => e.active && e.pos.y > -100 && e.pos.y < margin && e !== this.passingThroughEnemy);
         if (candidates.length === 0) return;
         
         // 簡單距離權重算法 (尋找最近的)
@@ -3486,6 +3539,9 @@ class SonSword {
              if (isInside) {
                  this.dashTimer = this.dashOvershoot;
                  // [修复] 冲刺中持续检查碰撞，但每个敌人只造成一次伤害
+                 // [平衡] 三级子飞剑冲刺剑痕命中（除主目标外）仅触发 20% 的伤害与属性效果
+                 const isLevel3 = this.level >= 3;
+                 const markRatio = 0.20;
                  for (let e of enemies) {
                      if (e.active && !this.hitEnemiesInDash.has(e)) {
                          const dx = this.pos.x - e.pos.x;
@@ -3494,11 +3550,22 @@ class SonSword {
                          const hitDist = (e.width/2 + 15);
                          if (distSq < hitDist * hitDist) {
                              this.hitEnemiesInDash.add(e);
-                             game.combat_damageEnemy(e, { config: this.config, pos: this.pos, isCopy: true });
+                             const isMark = (e !== this.passingThroughEnemy);
+                             let cfgForHit = this.config;
+                             if (isLevel3 && isMark) {
+                                 cfgForHit = {
+                                     ...this.config,
+                                     damage: Math.max(1, Math.ceil((this.config.damage || 0) * markRatio)),
+                                     pyro: Math.floor((this.config.pyro || 0) * markRatio),
+                                     cryo: Math.floor((this.config.cryo || 0) * markRatio),
+                                     lightning: Math.floor((this.config.lightning || 0) * markRatio)
+                                 };
+                             }
+                             game.combat_damageEnemy(e, { config: cfgForHit, pos: this.pos, isCopy: true });
                              // [限制] SlashAnim 受全局粒子上限约束
                              game.spawn_pushParticleWithLimit(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.4));
                              audio.playSlash();
-                             
+
                              // [新增] 冲刺中击中敌人也消耗攻击次数
                              this.attacksLeft--;
                              if (this.attacksLeft <= 0) {
@@ -3528,52 +3595,40 @@ class SonSword {
         if (this.state === 'flying' || this.state === 'recalling') {
             
             // @section:son_sword_target_search - 节流自动寻敌与目标验证
-            // [性能優化]：節流自動尋敵 (Throttling)
-            // 不需要每幀都尋找目標，每 15 幀找            // [性能優化]：節流自動尋敵 (Throttling)
-            // [修复] 增强索敌逻辑：如果有标记的敌人，强制锁定标记敌人，即使当前已有目标
+            // [修复-targeting] 调整顺序：先清理失效目标 → 再决定是否索敌，避免「队列里全是死敌人」
+            // 或「currentTarget 已死」时浪费一帧不搜索导致 lv3 自动猎杀子剑空转盘旋。
             if (this.state === 'flying') {
-                // 1. 检查是否有被标记的敌人
+                // 1. 先过滤队列中已失效的敌人
+                if (this.targetQueue.length > 0) {
+                    this.targetQueue = this.targetQueue.filter(e => e.active);
+                }
+
+                // 2. 验证当前目标是否仍然有效（活着、且未飞出屏幕过远）
+                if (this.currentTarget) {
+                    const isOffScreen = this.currentTarget.pos.y < -100 || this.currentTarget.pos.y > game.height + 100;
+                    if (!this.currentTarget.active || isOffScreen) {
+                        this.currentTarget = null;
+                    }
+                }
+
+                // 3. 检查是否有被标记的敌人，强制锁定
                 const markedEnemy = enemies.find(e => e.active && e.markTimer > 0);
-                
-                // 2. 如果有标记敌人，且当前目标不是它，则强制切换
                 if (markedEnemy && this.currentTarget !== markedEnemy) {
                     this.currentTarget = markedEnemy;
                     this.targetQueue = []; // 清空普通队列，集火标记目标
-                } 
-                // 3. 如果没有标记敌人，且当前没有目标，则进行常规搜索
-                else if (!this.currentTarget && this.targetQueue.length === 0) {
-                    if (this.isAutoHunting) {
-                        this.searchTimer -= timeScale;
-                        if (this.searchTimer <= 0) {
-                            this.searchForTarget(enemies);
-                            this.searchTimer = 15;
-                        }
+                }
+                // 4. 没目标且队列空 → 立即/节流索敌
+                else if (!this.currentTarget && this.targetQueue.length === 0 && this.isAutoHunting) {
+                    this.searchTimer -= timeScale;
+                    if (this.searchTimer <= 0) {
+                        this.searchForTarget(enemies);
+                        this.searchTimer = 15;
                     }
                 }
-            }
 
-            // [优化]：目标验证逻辑，确保队列中的敌人都是活跃的
-            if (this.targetQueue.length > 0) {
-                this.targetQueue = this.targetQueue.filter(e => e.active);
-            }
-
-            // 取目標
-            if (this.state === 'flying' && !this.currentTarget && this.targetQueue.length > 0) {
-                this.currentTarget = this.targetQueue.shift();
-            }
-
-            // [优化]：目标死亡、失效或被取消标记检测
-            if (this.currentTarget) {
-                const isOffScreen = this.currentTarget.pos.y < -100 || this.currentTarget.pos.y > game.height + 100;
-                // 如果目标不活跃、超出屏幕，或者原本是标记目标但标记已消失（且不是自动寻敌模式）
-                if (!this.currentTarget.active || isOffScreen) {
-                    this.currentTarget = null;
-                    // 目标丢失时，立即尝试从队列取下一个
-                    if (this.targetQueue.length > 0) {
-                        this.currentTarget = this.targetQueue.shift();
-                    } else {
-                        this.searchTimer = 0; // 强制下一帧进行搜索
-                    }
+                // 5. 取目标
+                if (!this.currentTarget && this.targetQueue.length > 0) {
+                    this.currentTarget = this.targetQueue.shift();
                 }
             }
 
@@ -3772,7 +3827,7 @@ class SonSword {
         const glowIntensity = 5 + attackRatio * 15;
         
         if (game.sonSwords.length < 40 || this.passingThroughEnemy) {
-            ctx.shadowBlur = this.passingThroughEnemy ? 20 : glowIntensity;
+            ctx.shadowBlur = _sb(this.passingThroughEnemy ? 20 : glowIntensity);
             ctx.shadowColor = color; 
         }
 
@@ -3892,7 +3947,7 @@ class CloneSpore {
         // 繪製孢子
         ctx.fillStyle = '#d8b4fe';
         ctx.shadowColor = '#a855f7';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = _sb(10);
         ctx.beginPath();
         ctx.arc(0, 0, 6, 0, Math.PI * 2);
         ctx.fill();
@@ -4110,7 +4165,7 @@ class Player {
             this.isChargingShot = true;
             this.chargeProgress = 0;
             
-            // 播放蓄力开始音效
+            // @section:charge_shot_audio - 玩家蓄力发射开始音效（高频 800Hz，区别于敌人预警 200Hz）
             if (audio) audio.playTone(800, 'sine', 0.1, 0.1);
             
             return true;
@@ -4344,7 +4399,7 @@ class Player {
             if (!isFinite(ox) || !isFinite(oy)) return;
             
             const speedGlow = Math.min(1, this.spinBoost * 2); // 撞击后的高光
-            ctx.shadowBlur = (10 + speedGlow * 20) * orbScale;
+            ctx.shadowBlur = _sb((10 + speedGlow * 20) * orbScale);
             ctx.shadowColor = stat.color;
             ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
             
@@ -4579,13 +4634,23 @@ class FieldLootItem {
         ctx.arc(0, 0, 25, 0, Math.PI * 2);
         ctx.fill();
 
-        // 绘制图标
-        ctx.font = '24px serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = glowColor;
-        ctx.fillText(icon, 0, 0);
+        // 绘制图标 —— 优先位图，未加载则 fallback 到 emoji
+        // [icon-fix] 战场掉落的遗物 / 混沌精华 / 纯净精华统一使用 RELIC_ICON_MAP 中的位图
+        const lootBitmapPath = getRelicIconSrc(this.type);
+        const lootBitmap = lootBitmapPath ? getUiBitmap(lootBitmapPath) : null;
+        if (lootBitmap) {
+            const sz = 36;
+            ctx.shadowBlur = _sb(10);
+            ctx.shadowColor = glowColor;
+            ctx.drawImage(lootBitmap, -sz / 2, -sz / 2, sz, sz);
+        } else {
+            ctx.font = '24px serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowBlur = _sb(10);
+            ctx.shadowColor = glowColor;
+            ctx.fillText(icon, 0, 0);
+        }
 
         ctx.restore();
     }
@@ -4749,12 +4814,20 @@ class RuneLoot {
             ctx.stroke();
         }
 
-        // 绘制符文图标（真实 emoji）
-        ctx.font = '14px serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(icon, this.x, drawY);
+        // 绘制符文图标 —— 优先位图，未加载则 fallback 到 emoji
+        // [icon-fix] 之前所有掉落符文都只画 emoji，即使 assets/icons/rune/ 已经有完整位图
+        const runeBitmapPath = runeDef ? getRuneIconSrc(runeDef.id) : null;
+        const runeBitmap = runeBitmapPath ? getUiBitmap(runeBitmapPath) : null;
+        if (runeBitmap) {
+            const sz = 22; // 圆形内圈半径 14，留 4px 安全边
+            ctx.drawImage(runeBitmap, this.x - sz / 2, drawY - sz / 2, sz, sz);
+        } else {
+            ctx.font = '14px serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(icon, this.x, drawY);
+        }
 
         // 等级角标（右下角小文字）
         if (level >= 1) {

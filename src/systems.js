@@ -338,6 +338,55 @@ const TRUTH_BOOK_DATA = {
             ]
         },
         {
+            id: 'venom', name: '毒素', icon: '☠️', tags: ['元素', 'DoT'],
+            desc: '命中敵人時疊加毒素層數。每次敵人行動開始前結算一次毒素傷害（每層 0.8 傷害 × 共鳴倍率）。冰凍狀態下毒素暫停發作但保留層數，解凍當回合一次性結算；過熱（≥100°C）時每回合結算 2 次。毒素 DoT 不受護盾減傷影響。',
+            setup: (game) => {
+                const w = game.enemyWidth;
+                const h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 1500));
+            },
+            loop: [
+                { type: 'log', text: '疊加毒素層數' },
+                { type: 'spawn_projectile', config: { damage: 5, venom: 6 }, vel: {x: 0, y: -15} },
+                { type: 'wait', frames: 120 }, { type: 'reset' }
+            ]
+        },
+        {
+            id: 'overcharge', name: '超載', icon: '💥', tags: ['特殊', 'AOE'],
+            desc: '子彈飛行中積累充能（彈跳 +1，穿透命中 +3）。代價：發射前 bounce/pierce 減半（共鳴可降低削減）。子彈銷毀時觸發 AoE 爆炸：傷害 = 充能數 × 超載層數 × 基礎傷害 × 0.3，半徑 = 60 + 充能數 × 4。',
+            setup: (game) => {
+                const w = game.enemyWidth;
+                const h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 1; c < 4; c++) {
+                        game.enemies.push(new Enemy((c+0.5) * w + w/2, top + r * h + h/2, 60, 60, 300));
+                    }
+                }
+            },
+            loop: [
+                { type: 'log', text: '發射超載子彈（積累充能後爆炸）' },
+                { type: 'spawn_projectile', config: { damage: 10, overcharge: 3, bounce: 4, pierce: 2 }, vel: {x: 2, y: -15} },
+                { type: 'wait', frames: 240 }, { type: 'reset' }
+            ]
+        },
+        {
+            id: 'echo', name: '回響', icon: '🔁', tags: ['特殊', '分裂'],
+            desc: '雙階段：研磨階段，弹珠碰撞 Peg 時按概率生成虛影 Peg（持續約 1 秒）。戰鬥階段，子弹弹跳時按 25% + echo×5% 概率向反方向鏡像生成回響子彈，繼承 50% 屬性（向下取整）。',
+            setup: (game) => {
+                const w = game.enemyWidth;
+                const h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 2 * h + h/2, 60, 60, 1000));
+            },
+            loop: [
+                { type: 'log', text: '發射帶回響的彈跳子彈' },
+                { type: 'spawn_projectile', config: { damage: 15, echo: 3, bounce: 6 }, vel: {x: 4, y: -15} },
+                { type: 'wait', frames: 240 }, { type: 'reset' }
+            ]
+        },
+        {
             id: 'wind', name: '風', icon: '🌪️', tags: ['特殊', '法陣'],
             desc: '在命中點生成風暴法陣，持續發射風刃攻擊附近的敵人。',
             setup: (game) => { 
@@ -1062,7 +1111,7 @@ const TRAINING_SCENARIOS = {
             runewordLevel: 1,
             name: '冰霜新星',
             icon: '💠',
-            desc: '[冰霜系] 彈珠每彈跳 5 次，釋放一次冰霜新星，造成冰屬性傷害並降溫。建議使用高彈跳屬性子彈測試。',
+            desc: '[冰霜系] 彈珠每彈跳 5 次，釋放一次冰霜新星，造成冰屬性傷害並降溫；被冰霜新星击中的敌人按当前冻结概率链式触发新一轮新星，每次链式概率减半。建議配合高彈跳与低温敵人測試链式触发。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let r = 0; r < 3; r++) {
@@ -1132,7 +1181,7 @@ const TRAINING_SCENARIOS = {
             runewordLevel: 1,
             name: '專注射擊',
             icon: '🎯',
-            desc: '[專注系] 將所有彈跳和連射層數轉化為基礎傷害。傷害有 20% 機率暴擊，造成 200% 傷害。建護配合高彈跳屬性測試。',
+            desc: '[專注系] 符文配方已改为「寒冰 + 穿刺」（不再依赖激光）。將所有彈跳和連射層數轉化為基礎傷害；傷害有 20% 機率暴擊，造成 200% 傷害。建議配合高彈跳屬性測試。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -1153,7 +1202,7 @@ const TRAINING_SCENARIOS = {
             runewordLevel: 1,
             name: '質量崩塌',
             icon: '💣',
-            desc: '[爆炸系] 強制獲得爆炸屬性（範圍減半）。清空連射與散射，每清空 1 層，爆炸範圍 +10%。建護配合高連射/散射屬性測試。',
+            desc: '[爆炸系] 強制獲得爆炸屬性（範圍減半）。仅清空所有散射層數（連射保留），每清空 1 層散射爆炸範圍 +10%。建議配合高散射屬性測試。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let r = 0; r < 3; r++) {
@@ -1271,7 +1320,7 @@ const TRAINING_SCENARIOS = {
             runewordLevel: 1,
             name: '炎光劍影',
             icon: '🔥',
-            desc: '[穿透系] 穿透敵人時，有 30% 機率召喚一道火焰劍光。建護配合高穿透屬性測試。',
+            desc: '[穿透系] 子母飞剑/普通子彈穿透敵人時，有 30% 機率在命中位置生成一道剑光 AOE 伤害（非爆炸），并对范围内敌人额外升温。建議配合高穿透與高伤害子彈測試。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 for (let i = 0; i < 4; i++) {
@@ -1411,7 +1460,7 @@ const TRAINING_SCENARIOS = {
             runewordLevel: 1,
             name: '雷電護盾',
             icon: '🛡️',
-            desc: '[復合系] 彈珠彈射時有 15% 機率在自身周圍生成靜電場。建護配合高彈跳屬性測試。',
+            desc: '[復合系] 彈珠彈射時有 15% 機率在自身周圍生成靜電場；被靜電場击中的敌人 100% 觸發闪电链。建議配合高彈跳/低层闪电属性測試。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(
@@ -1486,6 +1535,47 @@ const TRAINING_SCENARIOS = {
             bulletConfig: { damage: 20, bounce: 8, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game, tg) => {
                 const vel = new Vec2(3, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_bullet_to_sword',
+            categoryId: 'runeword',
+            runewordId: 'runeword_bullet_to_sword',
+            runewordLevel: 1,
+            name: '化彈為劍',
+            icon: '⚔️',
+            desc: '[穿透系] 首輪發射的子彈被替換為一把子飛劍（取消連射），原連射層數轉為子飛劍攻擊次數；詞條等級對應子飛劍等級（Lv1/Lv2/Lv3）。建議搭配高連射屬性測試攻擊次數。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 1; c < 5; c++) {
+                        game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + r * h + h/2, 60, 60, 600));
+                    }
+                }
+            },
+            bulletConfig: { damage: 20, bounce: 0, pierce: 1, scatter: 0, multicast: 4, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                // 通过 fireBulletWithEffects 走正规流程，确保 bullet_to_sword 词条 hook 被应用：
+                // 子弹被替换为一把子飞剑，maxAttacks = multicast + 1 = 5
+                tg.fireBulletWithEffects(tg.bulletConfig);
+            }
+        },
+        {
+            id: 'rw_pierce_decay',
+            categoryId: 'attribute',
+            name: '穿透衰減',
+            icon: '📉',
+            desc: '[平衡] 穿透子弹每次穿透命中后伤害衰减 35%（最低保留 15% 基础伤害）；穿透共鸣 T2/T3 可降低衰减率（T2 -20%，T3 -40%）。建议配合高穿透层数子弹测试逐次衰减。',
+            setup: (game) => {
+                const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
+                for (let i = 0; i < 6; i++) {
+                    game.enemies.push(new Enemy(x, game.combatGridTopY + i * game.enemyHeight + game.enemyHeight / 2, 60, 60, 800));
+                }
+            },
+            bulletConfig: { damage: 100, bounce: 0, pierce: 8, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
                 game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
             }
         },
@@ -2159,6 +2249,7 @@ class TrainingGround {
         this.game.enemies = [];
         this.game.projectiles = [];
         this.game.particles = [];
+        if (this.game.particleCounts) { for (const k in this.game.particleCounts) this.game.particleCounts[k] = 0; }
     }
 
     adjustBullet(key, delta) {
@@ -2489,6 +2580,7 @@ class TrainingGround {
         this.game.enemies = [];
         this.game.projectiles = [];
         this.game.particles = [];
+        if (this.game.particleCounts) { for (const k in this.game.particleCounts) this.game.particleCounts[k] = 0; }
         this.game.sonSwordQueue = [];
         this.game.swordQis = [];
         this.game.windAnchors = [];
@@ -2594,6 +2686,7 @@ class TrainingGround {
         this.game.enemies = [];
         this.game.projectiles = [];
         this.game.particles = [];
+        if (this.game.particleCounts) { for (const k in this.game.particleCounts) this.game.particleCounts[k] = 0; }
         this.game.sonSwordQueue = [];
         this.game.swordQis = [];
         this.game.windAnchors = []; 
@@ -2939,6 +3032,9 @@ function createCombatContext(mainGame, canvas) {
         enemies: [],
         projectiles: [],
         particles: [],
+        // [Perf] 与主 game 实例保持字段一致，避免 spawn_createParticle 访问 undefined
+        particleCounts: { wind_slash: 0, line: 0, ember: 0, mist: 0, shard: 0, spark: 0, smoke: 0 },
+        _particlePool: [],
         floatingTexts: [],
         shockwaves: [],
         lightningBolts: [],

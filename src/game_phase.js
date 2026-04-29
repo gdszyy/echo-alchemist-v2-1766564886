@@ -11,6 +11,7 @@ import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
+import { sb as _sb } from './utils/perf.js';
 import {
     calcDropDistribution,
     generateHeatmapData,
@@ -87,7 +88,7 @@ export const game_phase = {
         if (this.shotDamageHistory.length > 0) {
             this.roundDamageHistory.push({
                 round: this.round,
-                shots: JSON.parse(JSON.stringify(this.shotDamageHistory))
+                shots: this.shotDamageHistory.map(s => ({ total: s.total, byAttr: { ...s.byAttr } }))
             });
         }
         
@@ -411,7 +412,7 @@ export const game_phase = {
             effectiveSlots = effectiveSlots.filter(t => t !== 'skill_point');
         }
         const effectiveSlotCount = Math.min(this.slotCount, effectiveSlots.length > 0 ? this.slotCount : 0);
-        console.log(`[DEBUG] Starting special slot creation: effectiveSlots=${JSON.stringify(effectiveSlots)}, slotCount=${effectiveSlotCount}`);
+        if (CONFIG.debug) console.log(`[DEBUG] Starting special slot creation: effectiveSlots=${JSON.stringify(effectiveSlots)}, slotCount=${effectiveSlotCount}`);
         if (effectiveSlots.length > 0 && effectiveSlotCount > 0) {
             const slotTypes = effectiveSlots;
             
@@ -622,6 +623,64 @@ phase_gathering_getRandomPegType() {
             });
         }
 
+        // [perfect-clear-upgrade] 上回合「围墙清空且仍有剩余弹药」蓄能升级保留下来的子弹，
+        // prepend 回本回合 ammoQueue 首部，让升级首先生效。
+        if (Array.isArray(this._carryOverAmmo) && this._carryOverAmmo.length > 0) {
+            this.ammoQueue = [...this._carryOverAmmo, ...this.ammoQueue];
+            this._carryOverAmmo = null;
+        }
+        // [perfect-clear-upgrade] 重置「本回合是否已触发蓄能升级」标志
+        this._chargeUpgradeApplied = false;
+        // [in-wall-clear-lottery] 重置「本回合是否已触发围墙清空抽奖」标志
+        this._inWallClearTriggered = false;
+        this._inWallClearLotteryActive = false;
+
+        // [bullet-charge-fix] 拍摄本回合实际进入战斗的 ammoQueue 快照，作为下回合
+        // 「子弹充能 / 精华触发时的充能子弹」的真实数据源。
+        // 之前使用 marbleQueue 编译，导致玩家在子弹替换阶段保留了「上回合充能子弹」时，
+        // 下回合反而以本回合 marbleQueue（即玩家「未选择/未发射」的新研磨子弹）作为充能源，
+        // 出现「充能子弹混乱、不是上回合实际打出的子弹」的 BUG。
+        if (Array.isArray(this.ammoQueue) && this.ammoQueue.length > 0) {
+            this._lastFiredAmmoSnapshot = this.ammoQueue.map(r => ({ ...r }));
+        }
+
+        // [Feature 2: 围墙非空兜底] 进入战斗时若围墙内（pos.y > 0）确实没有任何活跃敌人，
+        // 且不存在待入场 Boss / 画面外刚生成敌人，强制补一行 IN-WALL 敌人，避免空场打子弹。
+        // finalizeRound 已尽量在清屏后预留一行 IN-WALL，本兜底用于其它异常路径。
+        if (this.phase !== 'training' && Array.isArray(this.enemies)) {
+            const hasInWallEnemy = this.enemies.some(e =>
+                e.active && (
+                    e.pos.y > 0 ||
+                    (e.type === 'boss' && (e.entranceTimer > 0 || e._pendingEntrance)) ||
+                    e._spawnedThisTurn
+                )
+            );
+            if (!hasInWallEnemy && typeof this.spawn_spawnEnemyRowAt === 'function') {
+                this.spawn_spawnEnemyRowAt(this.combatGridTopY);
+            }
+        }
+
+        // [tsk-bullet-ui] 兜底保护：若 ammoQueue 与 marbleQueue 同时为空（例如玩家在
+        // 纯净精华命运时刻点击「跳过研磨」获取符文，且上回合无 _chargedAmmoQueue），
+        // 此时直接进入战斗会导致「彈藥耗盡」横幅一直显示且敌人回合无法推进。
+        // 此处强制回退到研磨阶段，重新生成弹珠选择，避免无限敌人回合死循环。
+        if (this.ammoQueue.length === 0 && (!this.marbleQueue || this.marbleQueue.length === 0)) {
+            console.warn('[phase_startCombatPhase] ammoQueue 与 marbleQueue 均为空，回退到研磨阶段防止死循环');
+            // 重置可能残留的命运时刻状态，确保进入标准研磨流程
+            this.selectionMode = 'standard';
+            this.fateMomentContext = null;
+            this.pendingSelectionMode = null;
+            this.replaceAmmoContext = null;
+            this._chargedAmmoQueue = null;
+            // 进入标准选择阶段（非命运时刻），让玩家选择弹珠后再进研磨
+            if (typeof this.sys_initSelectionPhase === 'function') {
+                this.sys_initSelectionPhase();
+            } else {
+                this.phase_switchPhase('selection');
+            }
+            return;
+        }
+
         // --- [核心修复 2]：UI 渲染 ---
         // 修复后，上面的代码不再报错，这一行将被正确执行，HUD 会在进入战斗时立即出现
         this.ui_updateUI();
@@ -637,6 +696,15 @@ phase_gathering_getRandomPegType() {
         // 防止上一回合的 setTimeout/帧计数残留导致本回合 isVisualEffectActive 永远为 true
         this.isVisualEffectActive = false;
         this._laserFadeOutFrames = 0;
+        // [修复-照射残留] 兜底清理：将所有处于 isContinuous 模式（decay=0）的残留激光强制淡出，
+        // 防止任何路径下未追踪到 activeBeams 的连续激光在新回合永久滞留屏幕。
+        if (this.particles && this.particles.length > 0) {
+            for (const p of this.particles) {
+                if (p instanceof LaserBeam && p.isContinuous && typeof p.startFadeOut === 'function') {
+                    p.startFadeOut();
+                }
+            }
+        }
         
         // [剑刃风暴] 重置回合首发子弹标记与更新定时器
         this._roundFirstShotId = null;
@@ -717,9 +785,10 @@ phase_gathering_getRandomPegType() {
                  return;
              }
              if (!this.isEnemyTurn && this.ammoQueue.length > 0 && this.projectiles.length === 0 && this.burstQueue.length === 0) {
-                this.isDragging = true; 
-                this.dragStart = new Vec2(this.width / 2, this.height - 80); 
-                this.dragCurrent = logicPos; 
+                this.isDragging = true;
+                // [emitter-port] 发射口位于 emitter_base.png 上沿（Y 轴上移 22px），与发射器素材的视觉发射口对齐
+                this.dragStart = new Vec2(this.width / 2, this.height - 102);
+                this.dragCurrent = logicPos;
                 this.ui.closeDrawer();
             }
         }
@@ -779,8 +848,55 @@ phase_gathering_getRandomPegType() {
      */
     phase_enemy_processTurn(e) {
         if (!e.active || e.hasActedThisTurn) return;
-        
-        e.hasActedThisTurn = true; 
+
+        e.hasActedThisTurn = true;
+
+        // --- [新属性] 毒素 DoT 结算 ---
+        // 公式：dmg = venomStacks × dotPerStack × dotMultiplier(共鸣)
+        // 冻结（temp <= -80）时跳过本回合，但层数保留；解冻当回合一次性结算（按当前层数 ×1）。
+        // 过热（temp >= 100）时每回合结算 2 次。
+        // ignoreShield=true 共鸣下：对 shield 敌人 DoT 双倍（毒素本身 bypass 护盾减伤）。
+        if ((e.venomStacks || 0) > 0) {
+            const venomCfg = (CONFIG.mechanics && CONFIG.mechanics.venom) || {};
+            const dotPerStack = venomCfg.dotPerStack || 0.8;
+            const venomRes = this.activeElementResonances && this.activeElementResonances['venom'];
+            const venomResParams = venomRes ? venomRes.params : null;
+            const dotMultiplier = venomResParams ? (venomResParams.dotMultiplier || 1.0) : 1.0;
+            const ignoreShield = venomResParams ? (venomResParams.ignoreShield || false) : false;
+
+            const isFrozen = (e.temp <= -80);
+            // 解冻当回合一次性结算：上回合冻结但本回合未冻 -> _venomFrozenAccum
+            // 这里以 e._wasFrozenLastTurn 简易检测：若本帧冻结，标记 true，次回合解除时一次性结算。
+            if (isFrozen) {
+                // 冻结当回合不发作，仅标记
+                e._wasFrozenLastTurn = true;
+            } else {
+                let ticks = 1;
+                if (e.temp >= 100) ticks = 2;
+                let oneShotMult = 1;
+                if (e._wasFrozenLastTurn) {
+                    // 解冻当回合一次性结算（按当前 stacks ×1）
+                    oneShotMult = 1; // 维持公式一致：×当前 stacks 一次
+                    e._wasFrozenLastTurn = false;
+                }
+                let dotDmg = (e.venomStacks * dotPerStack * dotMultiplier) * ticks * oneShotMult;
+                // 对 shield 敌人 DoT 双倍（共鸣 Tier3）
+                if (ignoreShield && e.affixes && e.affixes.includes('shield')) {
+                    dotDmg *= 2;
+                }
+                if (dotDmg > 0) {
+                    const dmg = Math.max(1, Math.ceil(dotDmg));
+                    // bypassShield=true 让毒素 DoT 不受护盾减伤
+                    const r = e.takeDamage(dmg, null, true);
+                    if (r && this.combat_recordDamage) this.combat_recordDamage(r.actualDamage, 'pyro', 'main');
+                    if (this.spawn_createFloatingText) this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, `☠️${dmg}`, '#84cc16');
+                    if (this.spawn_createParticle) {
+                        for (let i = 0; i < 3; i++) this.spawn_createParticle(e.pos.x, e.pos.y, '#84cc16', 'mist');
+                    }
+                }
+            }
+        }
+
         
         //  只要觸發了結算，強迫掃描波在接下來的 45 幀內保持慢速
         // 這樣即使敵人被燒死消失了，波浪也會慢慢掃過屍體位置，展現"擊殺確認"的感覺
@@ -944,6 +1060,64 @@ phase_gathering_getRandomPegType() {
     },
 
 /**
+     * @method phase_inWallClearTrigger
+     * @description [in-wall-clear-lottery] 当围墙内（pos.y > 0）的敌人全部死亡时触发：
+     *   1. 清空场上所有子弹（projectiles / sonSwords / burstQueue 等）。
+     *   2. 拍摄当前 ammoQueue 快照作为老虎机抽奖输入，剩余子弹数量作为额外加成。
+     *   3. 弹出「与跳过混沌精华一致」的子弹老虎机，按 (base + 剩余子弹数) 提升属性。
+     *   4. 抽奖期间设置 `_inWallClearLotteryActive` 暂停标志，阻止 `phase_enemy_startLogic` 自动启动。
+     *   5. 抽奖结束后立刻刷出至少 3 排画面外精英援军（强制 jump+haste 词条），随后解除暂停。
+     * 整个流程每回合最多触发一次，由 `_inWallClearTriggered` 守卫。
+     */
+    phase_inWallClearTrigger() {
+        if (this._inWallClearTriggered) return;
+        if (this.gameOver) return;
+        if (this.phase !== 'combat') return;
+        // 已经处于敌人回合（例如手动调试触发），不再覆盖流程
+        if (this.isEnemyTurn) return;
+        this._inWallClearTriggered = true;
+        // 与 perfect-clear-upgrade 互斥：避免后者在同一帧再次升级 ammoQueue
+        this._chargeUpgradeApplied = true;
+
+        const remaining = Array.isArray(this.ammoQueue) ? this.ammoQueue.length : 0;
+        // 抽奖输入：优先使用当前剩余 ammoQueue；若为空（极少数发完才清场），退化到上一回合实际发射的快照
+        let snapshot = (Array.isArray(this.ammoQueue) && this.ammoQueue.length > 0)
+            ? this.ammoQueue.map(r => ({ ...r }))
+            : (Array.isArray(this._lastFiredAmmoSnapshot) ? this._lastFiredAmmoSnapshot.map(r => ({ ...r })) : []);
+
+        // 1. 清空场上所有飞行子弹（projectiles / sonSwords / burstQueue 等）
+        if (typeof this.data_clearProjectiles === 'function') {
+            this.data_clearProjectiles();
+        }
+        // 2. 清空 ammoQueue：让 playerTurnFinished 自然成立，但抽奖标志会阻断敌人回合启动
+        this.ammoQueue = [];
+        if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
+        if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
+
+        // 3. 标记抽奖暂停，开始老虎机
+        this._inWallClearLotteryActive = true;
+        showToast(`🎰 围墙清空！剩余 ${remaining} 发弹药 → 抽奖加成 +${remaining}`);
+
+        const finishLottery = () => {
+            // 4. 抽奖结束 → 刷新至少 3 排带 jump+haste 的精英援军
+            if (typeof this.spawn_spawnEliteJumperRows === 'function') {
+                this.spawn_spawnEliteJumperRows(3);
+                showToast("⚡ 精英援军入场：跳跃 + 极速！");
+                if (audio && typeof audio.playPowerup === 'function') audio.playPowerup();
+            }
+            // 5. 解除暂停，下一帧 phase_combat_update 会自动进入敌人回合
+            this._inWallClearLotteryActive = false;
+        };
+
+        if (typeof this.sys_runInWallClearLottery === 'function' && snapshot.length > 0) {
+            this.sys_runInWallClearLottery(snapshot, remaining, finishLottery);
+        } else {
+            // 无可抽奖子弹：跳过抽奖动画，直接刷援军并解除暂停
+            finishLottery();
+        }
+    },
+
+/**
      * @method startEnemyTurnLogic
      * @description 启动敌人回合：锁定状态、显示UI提示、并计算所有敌人的移动与技能
      */
@@ -1015,14 +1189,15 @@ phase_gathering_getRandomPegType() {
 
         // 3. [补充行] 结算时存活敌人 ≤5，额外多生成一行，并给原空列的新敌人赋予极速词条
         // 注意：此处仅在非 Boss 回合且存活敌人 ≤5 时触发（清屏时 activeEnemies.length === 0，不触发）
+        // [issue-2] 改为画面外入场：调用 spawn_spawnEnemyRowOffScreen，新敌人从画面外滑入"队列"位置
         if (activeEnemies.length > 0 && activeEnemies.length <= 5) {
             const totalCols = CONFIG.gameplay.enemyCols;
             // 记录生成前已有敌人的列（用于对比找出原空列）
             const colsWithEnemiesBefore = new Set(
                 activeEnemies.map(e => e._spawnColIndex).filter(c => c !== undefined)
             );
-            // 额外生成一行（生成在战斗网格顶部）
-            this.spawn_spawnEnemyRow(1);
+            // 额外生成一行（画面外入场，下回合敌人行动阶段移动进入网格顶部）
+            this.spawn_spawnEnemyRowOffScreen(1);
             // 找出原本没有敌人的列（生成前的空列）
             const emptyCols = [];
             for (let c = 0; c < totalCols; c++) {
@@ -1081,7 +1256,21 @@ phase_gathering_getRandomPegType() {
             if (rowCountCurrent < 4) spawnCount = 3;
             // [清屏奖励] 上一回合完成清屏，本回合至少推进 3 行敌人
             if (this._prevRoundCleared && spawnCount < 3) spawnCount = 3;
-            this.spawn_spawnEnemyRow(spawnCount);
+            // [Feature 2: 围墙非空保证] 本回合清屏 → 下回合若全部从画面外滑入，将出现"围墙范围内
+            // 短暂无敌人"的空窗（玩家若仍持有子弹会立刻被 perfect-clear-upgrade 再次结算）。
+            // 因此清屏后第一行直接生成在网格顶部（IN-WALL），其余行保留画面外入场演出。
+            if (clearedThisRound) {
+                this.spawn_spawnEnemyRowAt(this.combatGridTopY);
+                for (let i = 1; i < spawnCount; i++) {
+                    this.spawn_spawnEnemyRowAt(
+                        this.combatGridTopY - i * this.enemyHeight,
+                        { offScreenEntrance: true }
+                    );
+                }
+            } else {
+                // [issue-2] 非清屏回合维持画面外入场，新敌人从画面外滑入网格顶部，避免凭空出现
+                this.spawn_spawnEnemyRowOffScreen(spawnCount);
+            }
         }
         // [清屏状态] 将本回合清屏结果写入标志位，供下一回合读取
         this._prevRoundCleared = clearedThisRound;
@@ -1190,6 +1379,52 @@ phase_gathering_getRandomPegType() {
             this.sys_startRoundStartResolver();
         }
     },
+
+    /**
+     * @method phase_playChargeUpgradeFX
+     * @description [perfect-clear-upgrade] 播放剩余弹药"蓄能升级"显著特效。
+     *              围墙清空时若仍有剩余子弹，触发本特效并将每发子弹累加属性 +1。
+     * @perf-impact: 单次回合结算事件，固定上限：3 个 Shockwave + 1 个 HealWave + ~30~70 个 spark 粒子。
+     *               所有创建均经过 spawn_create* 中的 perf budget 检查。
+     */
+    phase_playChargeUpgradeFX(leftoverCount = 1) {
+        const cx = this.width / 2;
+        const cy = this.height - 80;
+        // 1. 中心三层 Shockwave（金/紫/青，错峰模拟蓄能层叠）
+        if (typeof this.spawn_createShockwave === 'function') {
+            this.spawn_createShockwave(cx, cy, '#fde047');
+            setTimeout(() => this.spawn_createShockwave && this.spawn_createShockwave(cx, cy, '#a78bfa'), 90);
+            setTimeout(() => this.spawn_createShockwave && this.spawn_createShockwave(cx, cy, '#22d3ee'), 180);
+        }
+        // 2. 大范围扩散光晕（复用 HealWave 的扩散环 + 中心光晕表达）
+        if (typeof this.spawn_createHealWave === 'function') {
+            this.spawn_createHealWave(cx, cy, 240);
+        }
+        // 3. 多方向闪电（向上向四周辐射），随剩余子弹数缩放
+        if (typeof LightningBolt !== 'undefined' && Array.isArray(this.lightningBolts)) {
+            const _budget = (CONFIG && CONFIG.performance && CONFIG.performance[this.perfQualityLevel || 'high']) || null;
+            const limit = _budget ? _budget.lightningLimit : 12;
+            const n = Math.min(8, 4 + leftoverCount);
+            for (let i = 0; i < n && this.lightningBolts.length < limit; i++) {
+                const ang = (Math.PI * 2 * i) / n - Math.PI / 2;
+                const tx = cx + Math.cos(ang) * 220;
+                const ty = cy + Math.sin(ang) * 220;
+                this.lightningBolts.push(new LightningBolt(cx, cy, tx, ty));
+            }
+        }
+        // 4. 大量金色 spark 粒子，数量随剩余子弹数线性增长
+        const sparkCount = 28 + leftoverCount * 6;
+        for (let i = 0; i < sparkCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 12 + Math.random() * 60;
+            this.spawn_createParticle(cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist, '#fde047', 'spark');
+        }
+        // 5. 居中浮动文字提示
+        if (typeof this.spawn_createFloatingText === 'function') {
+            this.spawn_createFloatingText(cx, cy - 90, `+${leftoverCount} 蓄能升級！`, '#fde047');
+        }
+    },
+
     smartScientific(num, fractionDigits = 2) {
         // 1. 处理 0 和 非数字 的情况
         if (isNaN(num)) return "NaN";
@@ -1341,14 +1576,15 @@ phase_gathering_getRandomPegType() {
             }
         }
         // --- 逻辑更新 ---
-        for (let i = this.burstQueue.length - 1; i >= 0; i--) { 
-            const shot = this.burstQueue[i]; 
-            shot.delay -= timeScale; 
-            if (shot.delay <= 0) { 
-                this.spawn_spawnBullet(this.width/2, this.height-80, shot.vel, shot.recipe, shot.shotId, shot.isLast); 
-                audio.playShoot(); 
-                this.burstQueue.splice(i, 1); 
-            } 
+        for (let i = this.burstQueue.length - 1; i >= 0; i--) {
+            const shot = this.burstQueue[i];
+            shot.delay -= timeScale;
+            if (shot.delay <= 0) {
+                // [emitter-port] 子弹从发射器素材的上沿发射口生成（Y 轴上移 22px）
+                this.spawn_spawnBullet(this.width/2, this.height-102, shot.vel, shot.recipe, shot.shotId, shot.isLast);
+                audio.playShoot();
+                this.burstQueue.splice(i, 1);
+            }
         }
         if (this.waveMomentumTimer > 0) this.waveMomentumTimer -= timeScale;
 
@@ -1358,7 +1594,7 @@ phase_gathering_getRandomPegType() {
         this.ctx.save();
         const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
         this.ctx.shadowColor = 'rgba(239, 68, 68, 1)';
-        this.ctx.shadowBlur = 8 + pulse * 12;
+        this.ctx.shadowBlur = _sb(8 + pulse * 12);
         this.ctx.strokeStyle = `rgba(239, 68, 68, ${0.45 + pulse * 0.35})`;
         this.ctx.lineWidth = 2;
         this.ctx.setLineDash([10, 10]);
@@ -1453,7 +1689,7 @@ phase_gathering_getRandomPegType() {
                 this.ctx.strokeStyle = '#ffffff'; 
                 this.ctx.lineWidth = 4;
                 this.ctx.shadowColor = '#fef08a'; 
-                this.ctx.shadowBlur = 20;
+                this.ctx.shadowBlur = _sb(20);
                 for (let x = 0; x <= this.width; x += 10) {
                     const offset = Math.sin(x * 0.1 + time) * 2 + (Math.random() - 0.5) * 6;
                     const y = this.enemyWaveY + offset;
@@ -1554,7 +1790,7 @@ phase_gathering_getRandomPegType() {
             this.ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)'; // Slate-400
             this.ctx.lineWidth = 2;
             this.ctx.shadowColor = '#38bdf8';
-            this.ctx.shadowBlur = 15;
+            this.ctx.shadowBlur = _sb(15);
             this.ctx.beginPath();
             // 左边线（从顶部栏下边界开始）
             this.ctx.moveTo(1, wallTopY); this.ctx.lineTo(1, this.height);
@@ -1575,7 +1811,8 @@ phase_gathering_getRandomPegType() {
                     e.draw(this.ctx);
                     // Boss 入场动画期间（pos.y 在屏幕外）也计入活跃敌人，防止误判完美清场
                     // [演出时机修复] 同时兼容 _pendingEntrance 状态（Boss 在屏幕外待机）
-                    if (e.pos.y > 0 || (e.type === 'boss' && (e.entranceTimer > 0 || e._pendingEntrance))) {
+                    // [issue-2] 普通敌人画面外入场（_spawnedThisTurn）也计入活跃，避免误判完美清场
+                    if (e.pos.y > 0 || (e.type === 'boss' && (e.entranceTimer > 0 || e._pendingEntrance)) || e._spawnedThisTurn) {
                         activeEnemies++;
                     }
                     if (Math.abs(e.pos.y - e.dropTargetY) > 1) anyEnemyMoving = true;
@@ -1604,7 +1841,7 @@ phase_gathering_getRandomPegType() {
                             if (shotStats.destroyedCount >= shotStats.projectileCount && shotStats.total > 0) {
                                 this.shotDamageHistory.push({
                                     total: shotStats.total,
-                                    byAttr: JSON.parse(JSON.stringify(shotStats.byAttr))
+                                    byAttr: { ...shotStats.byAttr }
                                 });
                                 // 增加容量到 10 发子弹，方便查看
                                 if (this.shotDamageHistory.length > 10) {
@@ -1664,8 +1901,27 @@ phase_gathering_getRandomPegType() {
                 }
             }
 
-            // 更新和绘制特效
-            for(let i=this.particles.length-1; i>=0; i--) { let p = this.particles[i]; if(p) { p.update(timeScale); p.draw(this.ctx); if(p.life <= 0) this.particles.splice(i,1); } } 
+            // 更新和绘制特效（两指针原地压缩，避免 splice O(N²) 与临时数组分配；死亡粒子归还对象池）
+            {
+                const arr = this.particles;
+                const counts = this.particleCounts;
+                const pool = this._particlePool;
+                let w = 0;
+                for (let r = 0; r < arr.length; r++) {
+                    const p = arr[r];
+                    if (!p) continue;
+                    p.update(timeScale);
+                    p.draw(this.ctx);
+                    if (p.life > 0) {
+                        if (w !== r) arr[w] = p;
+                        w++;
+                    } else {
+                        if (counts[p.mode] !== undefined && counts[p.mode] > 0) counts[p.mode]--;
+                        if (pool.length < 200 && typeof p.reset === 'function') pool.push(p);
+                    }
+                }
+                arr.length = w;
+            }
             for(let i=this.shockwaves.length-1; i>=0; i--) { let s = this.shockwaves[i]; if(s) { s.update(timeScale); s.draw(this.ctx); if(s.alpha <= 0) this.shockwaves.splice(i,1); } } 
             for(let i=this.lightningBolts.length-1; i>=0; i--) { let b = this.lightningBolts[i]; b.update(timeScale); b.draw(this.ctx); if(b.life <= 0) this.lightningBolts.splice(i,1); } 
             for(let i=this.spores.length-1; i>=0; i--) { let s = this.spores[i]; if(s) { s.update(timeScale); s.draw(this.ctx); if(!s.active) this.spores.splice(i,1); } }
@@ -1698,7 +1954,8 @@ phase_gathering_getRandomPegType() {
             }
             // 拖拽瞄准线
             if (this.isDragging && this.projectiles.length === 0 && this.ammoQueue.length > 0 && this.burstQueue.length === 0) {
-                const start = new Vec2(this.width / 2, this.height - 80);
+                // [emitter-port] 瞄准线起点对齐到发射器素材的上沿发射口
+                const start = new Vec2(this.width / 2, this.height - 102);
                 let force = this.lastMousePos.sub(start);
                 
                 if (force.y < -20) {
@@ -1754,10 +2011,11 @@ phase_gathering_getRandomPegType() {
                     this.ctx.restore();
                 }
             } else if (this.projectiles.length === 0) {
-                const start = new Vec2(this.width / 2, this.height - 80);
+                // [emitter-port] 空仓占位炮台对齐到发射器素材的上沿发射口
+                const start = new Vec2(this.width / 2, this.height - 102);
                 this.ctx.save();
                 this.ctx.translate(start.x, start.y);
-                this.ctx.rotate(-Math.PI / 2); 
+                this.ctx.rotate(-Math.PI / 2);
                 this.ctx.fillStyle = '#475569';
                 this.ctx.beginPath();
                 this.ctx.arc(0, 0, 12, 0, Math.PI * 2);
@@ -1824,16 +2082,44 @@ phase_gathering_getRandomPegType() {
             return; 
         }
 
+        // [in-wall-clear-lottery] 围墙范围内（pos.y > 0）已无敌人时优先触发抽奖 + 精英援军流程。
+        // 该触发会内部置 `_chargeUpgradeApplied = true`，覆盖原 perfect-clear-upgrade 路径。
+        if (activeEnemies === 0 && this.phase === 'combat' && !this.gameOver
+            && !this._inWallClearTriggered && !this.isEnemyTurn
+            && typeof this.phase_inWallClearTrigger === 'function') {
+            this.phase_inWallClearTrigger();
+        }
+
+        // [perfect-clear-upgrade] 兜底分支：若新机制未启用（如试炼场或抽奖跳过），
+        // 仍然走原蓄能升级流程，将剩余子弹 +1 携带到下回合。
         if (activeEnemies === 0) {
             const hasLeftoverAmmo = this.ammoQueue.length > 0;
-            if (hasLeftoverAmmo) {
+            if (hasLeftoverAmmo && !this._chargeUpgradeApplied) {
+                this._chargeUpgradeApplied = true;
                 const leftoverCount = this.ammoQueue.length;
+                // 1. 维持原有奖励：分数倍率 + 下回合难度
                 const scoreMult = Math.pow(CONFIG.balance.unusedAmmoScoreMult, leftoverCount);
                 this.score *= scoreMult;
                 this.nextRoundHpMultiplier = CONFIG.balance.nextRoundDifficultyMult;
-                showToast(`完美清場! 下輪難度 UP!`);
+                // 2. 对每发剩余子弹施加 +1 强化（所有可累加属性）
+                const STACKABLE_KEYS = ['damage', 'pierce', 'bounce', 'scatter', 'pyro', 'cryo', 'lightning', 'laser', 'wind'];
+                const upgradedAmmo = this.ammoQueue.map(recipe => {
+                    const enhanced = { ...recipe };
+                    STACKABLE_KEYS.forEach(k => {
+                        enhanced[k] = (enhanced[k] || 0) + 1;
+                    });
+                    if (enhanced.laser >= 1) enhanced.isLaser = true;
+                    enhanced._chargeUpgraded = true;
+                    return enhanced;
+                });
+                // 3. 携带升级子弹到下一回合（在 phase_startCombatPhase 中 prepend 回 ammoQueue）
+                this._carryOverAmmo = upgradedAmmo;
+                // 4. 清空当前队列，让 playerTurnFinished 自然成立、回合正常结算
+                this.ammoQueue = [];
+                // 5. 显著的蓄能发光升级特效
+                this.phase_playChargeUpgradeFX(leftoverCount);
+                showToast(`⚡ 完美清場！剩餘 ${leftoverCount} 發彈藥蓄能升級 +1！`);
                 audio.playPowerup();
-                this.ammoQueue = []; 
                 this.ui_updateAmmoUI();
                 this.ui_renderRecipeHUD();
                 this.data_clearProjectiles();
@@ -1846,8 +2132,24 @@ phase_gathering_getRandomPegType() {
                            !this.isVisualEffectActive;
 
         if (playerTurnFinished && !this.gameOver) {
+            // [in-wall-clear-lottery] 抽奖暂停期间禁止启动敌人回合，等待玩家关闭老虎机覆盖层
+            if (this._inWallClearLotteryActive) return;
             // [回合开始横幅保护] 横幅期间不触发敌人行动，避免与上一回合结束时的敌人行动重复
             if (this._roundStartBannerActive) return;
+            // [遗物/命运时刻保护] 遗物或命运时刻 overlay 显示期间，必须等待玩家选择完毕
+            // 否则会在 phase_finalizeRound 调用 sys_startRoundStartResolver 后立刻再次触发
+            // phase_enemy_startLogic（因为 isEnemyTurn 已被置 false 且 ammoQueue 为空），
+            // 表现为：遗物卡片弹出时背景中敌人继续行动、进入下一回合。
+            // [BUGFIX tsk-agnet-stage] 不再使用 `pendingRoundStartRewards.length > 0` 作为守卫——该
+            // 队列在「敌人战斗中掉落遗物/精华」时立刻被填充，但此时本回合的敌人回合尚未进行，
+            // 加该守卫会让玩家在第 2/3 回合打完所有子弹后无法进入敌人回合。
+            // 替代方案：`_roundStartResolverActive` 现已覆盖 loot 飞行动画期间（见
+            // sys_startRoundStartResolver 的 relic 分支修复），余下的 overlay 显示阶段由下面的
+            // `#phase-relic.active-phase` 检测；精华路径会切换到 selection 阶段，phase_combat_update
+            // 不会再被调用，因此无需额外守卫。
+            if (this._roundStartResolverActive) return;
+            const _relicOverlay = document.getElementById('phase-relic');
+            if (_relicOverlay && _relicOverlay.classList.contains('active-phase')) return;
             // 试炼场模式下，不自动进入敌人回合
             if (this.phase === 'training') {
                 if (this.isEnemyTurn) {
@@ -1915,46 +2217,47 @@ phase_gathering_getRandomPegType() {
         // 应用与实体层相同的视差偏移
         this.ctx.translate(entityShiftX, entityShiftY);
 
+        // [emitter-port] startPos = 发射器底座视觉中心；portPos = 实际发射口（沿素材上沿）
         const startPos = new Vec2(this.width / 2, this.height - 80);
-        this.ctx.fillStyle = 'rgba(15, 23, 42, 0.8)'; // 深色半透明底 (Slate-900 80%)
-        this.ctx.beginPath();
-        this.ctx.arc(startPos.x, startPos.y, 22, 0, Math.PI * 2); // 半径比子弹稍大
-        this.ctx.fill();
+        const portPos = new Vec2(startPos.x, startPos.y - 22);
+        // [bitmap-emitter] 优先使用 emitter_base.png + emitter_charging_*.png 渲染发射器底座；
+        // 位图未加载时 fallback 到原始 arc 椭圆。
+        this.render_combat_launcherEmitterBase(this.ctx, startPos.x, startPos.y, this.isChargingShot, this.chargeProgress);
         let nextAmmo = this.ammoQueue.length > 0 ? this.ammoQueue[0] : null;
 
         if (nextAmmo) {
             const params = Projectile.calculateVisualParams(nextAmmo, false);
             let previewRotation =  -Math.PI / 2;
             let deformation = {x: 1, y: 1};
-            
+
             if (this.isDragging) {
                 const force = this.dragStart.sub(this.dragCurrent);
                 if (force.mag() > 10) {
                     previewRotation = Math.atan2(force.y, force.x) ;
-                    deformation = {x: 1.15, y: 0.85}; 
+                    deformation = {x: 1.15, y: 0.85};
                 }
             }
             if (this.isChargingShot) {
                 const shake = Math.random() * 2; // 吸收时的剧烈抖动
-                startPos.x += (Math.random()-0.5) * shake;
-                startPos.y += (Math.random()-0.5) * shake;
+                portPos.x += (Math.random()-0.5) * shake;
+                portPos.y += (Math.random()-0.5) * shake;
                 // 核心随着能量吸收变大变亮
                 const absorbScale = 1.0 + this.chargeProgress * 0.3;
                 deformation.x *= absorbScale;
                 deformation.y *= absorbScale;
             }
 
-            //先绘制轨道 (Orbitals) -> 这样它就在炮台下面
+            // 轨道仍以发射器底座为圆心绕飞
             this.render_combat_launcherOrbitals(this.ctx, startPos.x, startPos.y, nextAmmo);
 
-            //后绘制炮台核心 (Visuals) -> 这样它就在上面
-            Projectile.drawVisuals(this.ctx, startPos.x, startPos.y, params.radius, nextAmmo, previewRotation, params.intensity, deformation);
+            // 待发射弹药贴在素材上沿的发射口
+            Projectile.drawVisuals(this.ctx, portPos.x, portPos.y, params.radius, nextAmmo, previewRotation, params.intensity, deformation);
 
         } else {
-            // 空仓状态
+            // 空仓状态：占位圈贴在发射口
             this.ctx.fillStyle = '#1e293b';
             this.ctx.beginPath();
-            this.ctx.arc(startPos.x, startPos.y, 10, 0, Math.PI * 2);
+            this.ctx.arc(portPos.x, portPos.y, 10, 0, Math.PI * 2);
             this.ctx.fill();
             this.ctx.strokeStyle = '#475569';
             this.ctx.stroke();
@@ -2262,7 +2565,7 @@ phase_gathering_getRandomPegType() {
                 gradStart.addColorStop(1, 'rgba(99, 102, 241, 0)');
                 
                 this.ctx.strokeStyle = gradStart;
-                this.ctx.shadowBlur = 4 + tiltStrength * 6;
+                this.ctx.shadowBlur = _sb(4 + tiltStrength * 6);
                 this.ctx.shadowColor = 'rgba(139, 92, 246, 0.5)';
                 
                 this.ctx.beginPath();
@@ -2411,12 +2714,26 @@ phase_gathering_getRandomPegType() {
             orb.draw(this.ctx);
             if (!orb.active) this.energyOrbs.splice(i, 1);
         }
-        // 繪製粒子
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-            const p = this.particles[i];
-            p.update(this.timeScale);
-            p.draw(this.ctx);
-            if (p.life <= 0) this.particles.splice(i, 1);
+        // 繪製粒子（两指针原地压缩，归还对象池；同步 particleCounts）
+        {
+            const arr = this.particles;
+            const counts = this.particleCounts;
+            const pool = this._particlePool;
+            let w = 0;
+            for (let r = 0; r < arr.length; r++) {
+                const p = arr[r];
+                if (!p) continue;
+                p.update(this.timeScale);
+                p.draw(this.ctx);
+                if (p.life > 0) {
+                    if (w !== r) arr[w] = p;
+                    w++;
+                } else {
+                    if (counts[p.mode] !== undefined && counts[p.mode] > 0) counts[p.mode]--;
+                    if (pool.length < 200 && typeof p.reset === 'function') pool.push(p);
+                }
+            }
+            arr.length = w;
         }
         // 更新和繪製 Shockwaves
         for (let i = this.shockwaves.length - 1; i >= 0; i--) {
@@ -2500,7 +2817,7 @@ phase_gathering_getRandomPegType() {
 
             // 高概率槽位添加光晕效果
             if (bar.alpha > 0.5) {
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = _sb(8);
                 ctx.shadowColor = hint.color;
                 ctx.fillStyle = `${hint.color}${Math.round(bar.alpha * 0.3 * 255).toString(16).padStart(2, '0')}`;
                 ctx.fillRect(bar.x, bar.y, bar.width, 2);

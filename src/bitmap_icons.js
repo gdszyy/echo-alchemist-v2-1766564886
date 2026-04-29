@@ -10,20 +10,27 @@
  */
 
 // ============================================================
-// Task 5.A5 — 弹药法球图标映射（8 种属性 32×32）
-// key 对应 recipe 中的属性名
+// Task 5.A5 — 弹药法球图标映射（属性 32×32）
+// key 对应 recipe 中的属性名 / MarbleDefinition.type
 // ============================================================
 export const AMMO_ICON_MAP = {
-    default:   'assets/icons/ammo/ammo_normal.png',
-    normal:    'assets/icons/ammo/ammo_normal.png',
-    pyro:      'assets/icons/ammo/ammo_pyro.png',
-    cryo:      'assets/icons/ammo/ammo_cryo.png',
-    lightning: 'assets/icons/ammo/ammo_lightning.png',
-    laser:     'assets/icons/ammo/ammo_laser.png',
-    pierce:    'assets/icons/ammo/ammo_pierce.png',
-    bounce:    'assets/icons/ammo/ammo_bounce.png',
-    scatter:   'assets/icons/ammo/ammo_scatter.png',
-    explosive: 'assets/icons/ammo/ammo_explosive.png',
+    default:      'assets/icons/ammo/ammo_normal.png',
+    normal:       'assets/icons/ammo/ammo_normal.png',
+    white:        'assets/icons/ammo/ammo_normal.png',
+    pyro:         'assets/icons/ammo/ammo_pyro.png',
+    cryo:         'assets/icons/ammo/ammo_cryo.png',
+    lightning:    'assets/icons/ammo/ammo_lightning.png',
+    laser:        'assets/icons/ammo/ammo_laser.png',
+    pierce:       'assets/icons/ammo/ammo_pierce.png',
+    bounce:       'assets/icons/ammo/ammo_bounce.png',
+    scatter:      'assets/icons/ammo/ammo_scatter.png',
+    explosive:    'assets/icons/ammo/ammo_explosive.png',
+    wind:         'assets/icons/ammo/ammo_wind.png',
+    flying_sword: 'assets/icons/ammo/ammo_flying_sword.png',
+    matryoshka:   'assets/icons/ammo/ammo_matryoshka.png',
+    rainbow:      'assets/icons/ammo/ammo_rainbow.png',
+    resonance:    'assets/icons/ammo/ammo_resonance.png',
+    damage:       'assets/icons/ammo/ammo_normal.png',
 };
 
 // ============================================================
@@ -66,7 +73,7 @@ export const RELIC_ICON_MAP = {
     slot_expander:             'assets/icons/relic/slot_expander.png',
     cryo_stone:                'assets/icons/relic/cryo_stone.png',
     pyro_stone:                'assets/icons/relic/pyro_stone.png',
-    lightning_stone:           'assets/icons/relic/cryo_stone.png',   // fallback 到 cryo_stone
+    // lightning_stone 暂未生成位图：移除指向 cryo_stone 的错误 fallback，让 UI 走 emoji
     tactical_kit_pierce:       'assets/icons/relic/tactical_kit_pierce.png',
     tactical_kit_scatter:      'assets/icons/relic/tactical_kit_scatter.png',
     tactical_kit_damage:       'assets/icons/relic/tactical_kit_damage.png',
@@ -105,6 +112,13 @@ export const RELIC_ICON_MAP = {
  */
 export function getAmmoIconSrc(recipe) {
     if (!recipe) return AMMO_ICON_MAP.default;
+    // [icon-fix] 优先识别特殊弹种（套娃 / 七彩 / 共鸣 / 飞剑 / 风），
+    // 然后是 isLaser / explosive，最后才是元素/伤害属性。
+    if (recipe.isMatryoshka)                                       return AMMO_ICON_MAP.matryoshka;
+    if (recipe.type === 'rainbow' || recipe._marbleType === 'rainbow')     return AMMO_ICON_MAP.rainbow;
+    if (recipe.type === 'resonance' || recipe._marbleType === 'resonance') return AMMO_ICON_MAP.resonance;
+    if (recipe.type === 'flying_sword' || recipe.flying_sword)     return AMMO_ICON_MAP.flying_sword;
+    if (recipe.wind)                                               return AMMO_ICON_MAP.wind;
     if (recipe.isLaser)    return AMMO_ICON_MAP.laser;
     if (recipe.explosive)  return AMMO_ICON_MAP.explosive;
     if (recipe.pyro)       return AMMO_ICON_MAP.pyro;
@@ -114,6 +128,17 @@ export function getAmmoIconSrc(recipe) {
     if (recipe.bounce)     return AMMO_ICON_MAP.bounce;
     if (recipe.scatter)    return AMMO_ICON_MAP.scatter;
     return AMMO_ICON_MAP.default;
+}
+
+/**
+ * 通过单个属性 key（marble.type 或 recipe 属性名）直接获取弹药图标路径。
+ * 用于命运选择卡片、替换子弹卡片等需要按"主属性"展示图标的场景。
+ * @param {string} key
+ * @returns {string|null}
+ */
+export function getAmmoIconSrcByKey(key) {
+    if (!key) return null;
+    return AMMO_ICON_MAP[key] ?? null;
 }
 
 /**
@@ -132,4 +157,85 @@ export function getRuneIconSrc(runeId) {
  */
 export function getRelicIconSrc(relicId) {
     return RELIC_ICON_MAP[relicId] ?? null;
+}
+
+// ============================================================
+// UI Sprite 资源（Canvas 绘制用）— 发射器 / 属性球轨道
+// 通过 getUiBitmap(path) 获取已加载的 Image，未就绪时返回 null
+// ============================================================
+
+const _uiBitmapCache = new Map();
+
+/**
+ * 获取 UI 位图（Canvas 用）。首次访问时异步加载，未就绪返回 null（调用方应 fallback）。
+ * @param {string} path
+ * @returns {HTMLImageElement|null}
+ */
+export function getUiBitmap(path) {
+    if (!path) return null;
+    let img = _uiBitmapCache.get(path);
+    if (!img) {
+        img = new Image();
+        img.src = path;
+        _uiBitmapCache.set(path, img);
+    }
+    return (img.complete && img.naturalWidth > 0) ? img : null;
+}
+
+// 属性轨道球底座（recipe 关键字 → 7 元素 socket 贴图，覆盖率不全则保持 fallback）
+export const ORBITAL_SOCKET_MAP = {
+    pyro:      'assets/ui/sprites/orbital_socket_pyro.png',
+    cryo:      'assets/ui/sprites/orbital_socket_cryo.png',
+    lightning: 'assets/ui/sprites/orbital_socket_electro.png',
+    laser:     'assets/ui/sprites/orbital_socket_hydro.png',
+    bounce:    'assets/ui/sprites/orbital_socket_dendro.png',
+    pierce:    'assets/ui/sprites/orbital_socket_anemo.png',
+    damage:    'assets/ui/sprites/orbital_socket_geo.png',
+};
+
+export const ORBITAL_LINK_STRIP   = 'assets/ui/sprites/orbital_link_strip.png';
+export const ORBITAL_LINK_CAP     = 'assets/ui/sprites/orbital_link_cap.png';
+export const ORBITAL_LINK_FLOW    = [
+    'assets/ui/sprites/orbital_link_flow_0.png',
+    'assets/ui/sprites/orbital_link_flow_1.png',
+    'assets/ui/sprites/orbital_link_flow_2.png',
+    'assets/ui/sprites/orbital_link_flow_3.png',
+];
+export const ORBITAL_INTAKE = [
+    'assets/ui/sprites/orbital_intake_0.png',
+    'assets/ui/sprites/orbital_intake_1.png',
+    'assets/ui/sprites/orbital_intake_2.png',
+    'assets/ui/sprites/orbital_intake_3.png',
+];
+
+export const EMITTER_BASE_SRC = 'assets/ui/sprites/emitter_base.png';
+export const EMITTER_CHARGING_SRCS = [
+    'assets/ui/sprites/emitter_charging_0.png',
+    'assets/ui/sprites/emitter_charging_1.png',
+    'assets/ui/sprites/emitter_charging_2.png',
+    'assets/ui/sprites/emitter_charging_3.png',
+    'assets/ui/sprites/emitter_charging_4.png',
+    'assets/ui/sprites/emitter_charging_5.png',
+];
+
+// Canvas 背景位图（战斗 / 研磨阶段共用主底图，发射区单独叠加炼金台层）
+export const BG_MAIN_CANVAS_SRC   = 'assets/ui/backgrounds/bg_main_canvas.png';
+export const BG_EMITTER_ZONE_SRC  = 'assets/ui/backgrounds/bg_emitter_zone.png';
+
+/**
+ * 预热 UI 位图（在游戏启动早期调用，避免战斗首帧卡顿）。
+ */
+export function preloadUiBitmaps() {
+    const paths = [
+        EMITTER_BASE_SRC,
+        ...EMITTER_CHARGING_SRCS,
+        ...Object.values(ORBITAL_SOCKET_MAP),
+        ORBITAL_LINK_STRIP,
+        ORBITAL_LINK_CAP,
+        ...ORBITAL_LINK_FLOW,
+        ...ORBITAL_INTAKE,
+        BG_MAIN_CANVAS_SRC,
+        BG_EMITTER_ZONE_SRC,
+    ];
+    paths.forEach(p => getUiBitmap(p));
 }

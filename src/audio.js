@@ -1,16 +1,19 @@
 /**
- * audio.js - 音频引擎 (重构版 v2)
+ * audio.js - 音频引擎 (重构版 v5 - 纯合成 + Reverb)
  * 
  * 变更记录：
- * - 移除模块顶层的 `new SoundManager()` 实例化
- * - SoundManager 的实例化延迟到首次用户交互后（由 core.js 控制）
- * - 只导出 SoundManager 类，不再导出预创建的实例
- * - 解决浏览器 AudioContext 策略警告
+ * - v5: 回归全 Web Audio API 合成音效，移除 WAV/SFX_MAP/_playSfx 逻辑
+ *       保留 v4 引入的 Reverb 卷积混响效果器（钉盘弹珠专用）
+ *       所有音效方法恢复为纯合成实现
+ * - v4: 钉盘弹珠音效改回合成 + 新增 Reverb 卷积混响
+ * - v3: WAV 文件驱动，优先使用预加载 AudioBuffer
+ * - v2: 延迟初始化，由 core.js 控制实例化时机
  */
 
 class SoundManager {
     /**
-     * 声音管理器类，使用 Web Audio API 播放音效
+     * 声音管理器类，使用 Web Audio API 合成所有音效
+     * 钉盘弹珠相关音效额外接入 Reverb 卷积混响效果器
      */
     constructor() {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -18,28 +21,81 @@ class SoundManager {
 
         // 1. 创建主音量节点
         this.masterGain = this.ctx.createGain();
-        this.masterGain.gain.value = 0.3; 
+        this.masterGain.gain.value = 0.3;
 
-        // 2.  创建动态压缩器 (防止爆音的核心)
+        // 2. 创建动态压缩器（防止爆音）
         this.compressor = this.ctx.createDynamicsCompressor();
-        // 压缩器参数调优 (适合快节奏游戏)
-        this.compressor.threshold.setValueAtTime(-24, this.ctx.currentTime); // 超过-24dB开始压缩
-        this.compressor.knee.setValueAtTime(30, this.ctx.currentTime);       // 平滑过渡
-        this.compressor.ratio.setValueAtTime(12, this.ctx.currentTime);      // 压缩比率 (高一点防止极响)
-        this.compressor.attack.setValueAtTime(0.003, this.ctx.currentTime);  // 快速响应
-        this.compressor.release.setValueAtTime(0.25, this.ctx.currentTime);  // 快速释放
+        this.compressor.threshold.setValueAtTime(-24, this.ctx.currentTime);
+        this.compressor.knee.setValueAtTime(30, this.ctx.currentTime);
+        this.compressor.ratio.setValueAtTime(12, this.ctx.currentTime);
+        this.compressor.attack.setValueAtTime(0.003, this.ctx.currentTime);
+        this.compressor.release.setValueAtTime(0.25, this.ctx.currentTime);
 
-        // 3.  连接链路： 节点 -> Master -> Compressor -> 扬声器
+        // 3. 连接链路：节点 -> Master -> Compressor -> 扬声器
         this.masterGain.connect(this.compressor);
         this.compressor.connect(this.ctx.destination);
 
+        // 白噪声缓冲（rolling sound / shatter / lightning 用）
         this.noiseBuffer = this.createNoiseBuffer();
-        
-        //  用于防抖动的记录表 (方法二用到)
-        this.lastPlayTime = {}; 
+
+        // 防抖记录表
+        this.lastPlayTime = {};
+
+        // ── Reverb 效果器（钉盘弹珠专用）──
+        // 信号链：钉盘音效节点 → pegDryGain(0.6) → masterGain
+        //                      ↘ pegWetGain(0.45) → pegReverbNode → masterGain
+        this.pegReverbNode = this._createReverbNode(0.8, 2.5); // decay=0.8, duration=2.5s
+        this.pegReverbNode.connect(this.masterGain);
+        this.pegDryGain = this.ctx.createGain();
+        this.pegDryGain.gain.value = 0.6;  // 干声 60%
+        this.pegDryGain.connect(this.masterGain);
+        this.pegWetGain = this.ctx.createGain();
+        this.pegWetGain.gain.value = 0.45; // 湿声 45%
+        this.pegWetGain.connect(this.pegReverbNode);
     }
+
+    // ─────────────────────────────────────────────
+    //  Reverb 效果器（钉盘弹珠专用）
+    // ─────────────────────────────────────────────
+
+    /**
+     * 创建卷积混响节点（合成 IR 脉冲响应）
+     * @param {number} decay    - 混响衰减系数（越大尾音越长）
+     * @param {number} duration - IR 时长（秒）
+     * @returns {ConvolverNode}
+     */
+    _createReverbNode(decay = 0.8, duration = 2.0) {
+        const sampleRate = this.ctx.sampleRate;
+        const length = Math.floor(sampleRate * duration);
+        const impulse = this.ctx.createBuffer(2, length, sampleRate);
+        for (let ch = 0; ch < 2; ch++) {
+            const data = impulse.getChannelData(ch);
+            for (let i = 0; i < length; i++) {
+                // 指数衰减白噪声 IR
+                data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay * 10);
+            }
+        }
+        const convolver = this.ctx.createConvolver();
+        convolver.buffer = impulse;
+        return convolver;
+    }
+
+    /**
+     * 将音效增益节点同时接入干声和湿声（Reverb）总线
+     * 用于钉盘弹珠相关音效
+     * @param {AudioNode} node - 待连接的音效增益节点
+     */
+    _connectToPegBus(node) {
+        node.connect(this.pegDryGain);
+        node.connect(this.pegWetGain);
+    }
+
+    // ─────────────────────────────────────────────
+    //  基础工具
+    // ─────────────────────────────────────────────
+
     createNoiseBuffer() {
-        const bufferSize = this.ctx.sampleRate * 2; // 2秒緩衝
+        const bufferSize = this.ctx.sampleRate * 2; // 2秒缓冲
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
@@ -47,6 +103,11 @@ class SoundManager {
         }
         return buffer;
     }
+
+    // ─────────────────────────────────────────────
+    //  持续型音效（弹珠滚动）
+    // ─────────────────────────────────────────────
+
     createRollingSound() {
         if (this.muted) return null;
 
@@ -56,15 +117,16 @@ class SoundManager {
 
         const filter = this.ctx.createBiquadFilter();
         filter.type = 'lowpass';
-        filter.Q.value = 1.0; 
+        filter.Q.value = 1.0;
 
         const gainNode = this.ctx.createGain();
-        gainNode.gain.value = 0; 
+        gainNode.gain.value = 0;
 
+        // 滚动音接入钉盘 Reverb 总线（干+湿）
         source.connect(filter);
         filter.connect(gainNode);
-        gainNode.connect(this.masterGain);
-
+        gainNode.connect(this.pegDryGain);
+        gainNode.connect(this.pegWetGain);
         source.start();
 
         return {
@@ -72,26 +134,18 @@ class SoundManager {
             gainNode: gainNode,
             filter: filter,
             ctx: this.ctx,
-            
             // 核心：根据速度更新声音
             update: function(speed) {
-                // 限制最大速度影响
                 const clampSpeed = Math.min(Math.max(speed, 0), 25);
-                const normalizedSpeed = clampSpeed / 25; 
-
+                const normalizedSpeed = clampSpeed / 25;
                 const now = this.ctx.currentTime;
-
-                // --- ：大幅提升滚动音量 ---
-                // 原来是 0.4，现在提升到 2.5，保证能听得清
-                // 使用平方曲线 (normalizedSpeed^2) 让高速时声音增加得更明显，低速保持安静
-                const targetVol = Math.pow(normalizedSpeed, 1.5) * 2.5; 
+                // 平方曲线让高速时声音增加得更明显，低速保持安静
+                const targetVol = Math.pow(normalizedSpeed, 1.5) * 2.5;
                 this.gainNode.gain.setTargetAtTime(targetVol, now, 0.1);
-
                 // 频率随速度变化，高速时更脆
                 const targetFreq = 100 + (normalizedSpeed * 800);
                 this.filter.frequency.setTargetAtTime(targetFreq, now, 0.1);
             },
-
             stop: function() {
                 const now = this.ctx.currentTime;
                 this.gainNode.gain.setTargetAtTime(0, now, 0.2);
@@ -101,6 +155,11 @@ class SoundManager {
             }
         };
     }
+
+    // ─────────────────────────────────────────────
+    //  控制方法
+    // ─────────────────────────────────────────────
+
     /**
      * 切换静音状态
      * @returns {boolean} 当前静音状态
@@ -121,15 +180,24 @@ class SoundManager {
      */
     resume() { if (this.ctx.state === 'suspended') this.ctx.resume(); }
 
+    // ─────────────────────────────────────────────
+    //  通用基础音调
+    // ─────────────────────────────────────────────
+
     /**
      * 播放基础音调
      * @param {number} freq - 频率
      * @param {string} type - 波形类型
-     * @param {number} vol - 音量
-     * @param {number} dur - 持续时间
+     * @param {number} vol  - 音量
+     * @param {number} dur  - 持续时间
      */
     playTone(freq, type = 'sine', vol = 0.3, dur = 0.2) {
         if (this.muted) return;
+        // [Perf] 30ms 内同 freq+type 只播一次，避免战斗高峰每帧创建数十个 AudioNode
+        const _key = `tone:${type}:${freq | 0}`;
+        const _nowMs = performance.now();
+        if (this.lastPlayTime[_key] && _nowMs - this.lastPlayTime[_key] < 30) return;
+        this.lastPlayTime[_key] = _nowMs;
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -143,24 +211,50 @@ class SoundManager {
         osc.stop(now + dur);
     }
 
+    // ─────────────────────────────────────────────
+    //  游戏音效方法（全部 Web Audio API 合成）
+    // ─────────────────────────────────────────────
+
     /**
      * 播放打击音效
-     * @param {string} type - 打击类型
+     * normal / bounce 接入 Reverb 总线，cryo / pyro 直连 masterGain
+     * @param {string} type  - 打击类型：'normal' | 'bounce' | 'cryo' | 'pyro' | 'magic'
      * @param {number} speed - 速度（影响音调）
      */
     playHit(type = 'normal', speed = 5) {
         if (this.muted) return;
+        // [Perf] 30ms 内同 type 只播一次，平滑撞击高峰的 AudioNode 创建
+        const _key = `hit:${type}`;
+        const _nowMs = performance.now();
+        if (this.lastPlayTime[_key] && _nowMs - this.lastPlayTime[_key] < 30) return;
+        this.lastPlayTime[_key] = _nowMs;
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        
-        // 根据类型调整音效
+
         switch(type) {
+            // @section:hit_normal - 钉盘碰撞：triangle，速度驱动频率，接入 Reverb
+            case 'normal':
+                osc.frequency.setValueAtTime(300 + speed * 20, now);
+                osc.type = 'triangle';
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                osc.connect(gain);
+                this._connectToPegBus(gain);
+                osc.start(now);
+                osc.stop(now + 0.15);
+                return;
+            // @section:hit_bounce - 弹壁反弹：triangle，更高频，接入 Reverb
             case 'bounce':
                 osc.frequency.setValueAtTime(400 + speed * 30, now);
                 osc.type = 'triangle';
                 gain.gain.setValueAtTime(0.15, now);
-                break;
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                osc.connect(gain);
+                this._connectToPegBus(gain);
+                osc.start(now);
+                osc.stop(now + 0.15);
+                return;
             case 'cryo':
                 osc.frequency.setValueAtTime(800, now);
                 osc.frequency.linearRampToValueAtTime(1200, now + 0.05);
@@ -172,12 +266,18 @@ class SoundManager {
                 osc.type = 'sawtooth';
                 gain.gain.setValueAtTime(0.15, now);
                 break;
+            // @section:hit_magic - 魔法钉子：sine 上扬，直连 masterGain
+            case 'magic':
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.linearRampToValueAtTime(1200, now + 0.1);
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.1, now);
+                break;
             default:
                 osc.frequency.setValueAtTime(300 + speed * 20, now);
                 osc.type = 'triangle';
                 gain.gain.setValueAtTime(0.12, now);
         }
-        
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
         osc.connect(gain);
         gain.connect(this.masterGain);
@@ -210,17 +310,17 @@ class SoundManager {
      */
     playEnemyHit(hitType = 'normal') {
         if (this.muted) return;
-        
+
         // 防抖：同类型音效间隔至少 50ms
         const now = performance.now();
         const key = `enemyHit_${hitType}`;
         if (this.lastPlayTime[key] && now - this.lastPlayTime[key] < 50) return;
         this.lastPlayTime[key] = now;
-        
+
         const audioNow = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        
+
         switch(hitType) {
             case 'cryo':
                 osc.type = 'sine';
@@ -246,7 +346,6 @@ class SoundManager {
                 osc.frequency.linearRampToValueAtTime(200, audioNow + 0.1);
                 gain.gain.setValueAtTime(0.08, audioNow);
         }
-        
         gain.gain.exponentialRampToValueAtTime(0.001, audioNow + 0.15);
         osc.connect(gain);
         gain.connect(this.masterGain);
@@ -259,13 +358,14 @@ class SoundManager {
      */
     playLightning() {
         if (this.muted) return;
-        const now = this.ctx.currentTime;
-        
+
         // 防抖
         const perfNow = performance.now();
         if (this.lastPlayTime['lightning'] && perfNow - this.lastPlayTime['lightning'] < 80) return;
         this.lastPlayTime['lightning'] = perfNow;
-        
+
+        const now = this.ctx.currentTime;
+
         // 噪声 + 高频扫描
         const noise = this.ctx.createBufferSource();
         noise.buffer = this.noiseBuffer;
@@ -276,7 +376,7 @@ class SoundManager {
         noiseGain.connect(this.masterGain);
         noise.start(now);
         noise.stop(now + 0.25);
-        
+
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'square';
@@ -296,25 +396,23 @@ class SoundManager {
     playExplosion() {
         if (this.muted) return;
         const now = this.ctx.currentTime;
-        
+
         // 噪声爆发
         const noise = this.ctx.createBufferSource();
         noise.buffer = this.noiseBuffer;
         const noiseGain = this.ctx.createGain();
         noiseGain.gain.setValueAtTime(0.3, now);
         noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-        
         const filter = this.ctx.createBiquadFilter();
         filter.type = 'lowpass';
         filter.frequency.setValueAtTime(2000, now);
         filter.frequency.exponentialRampToValueAtTime(100, now + 0.3);
-        
         noise.connect(filter);
         filter.connect(noiseGain);
         noiseGain.connect(this.masterGain);
         noise.start(now);
         noise.stop(now + 0.5);
-        
+
         // 低频冲击
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -357,9 +455,9 @@ class SoundManager {
     playEffect(type) {
         if (this.muted) return;
         const now = this.ctx.currentTime;
-        
+
         switch(type) {
-            // @section:effect_bump - bump：弹球碰撞钉子，sine 200→80Hz
+            // @section:effect_bump - bump：弹球碰撞钉子，sine 200→80Hz + Reverb
             case 'bump': {
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
@@ -369,14 +467,13 @@ class SoundManager {
                 gain.gain.setValueAtTime(0.1, now);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
                 osc.connect(gain);
-                gain.connect(this.masterGain);
+                this._connectToPegBus(gain); // 干+湿 Reverb
                 osc.start(now);
                 osc.stop(now + 0.1);
                 break;
             }
             // @section:effect_freeze - freeze：冰冻效果触发，sine 2000→500Hz 下滑
             case 'freeze': {
-                // 冰冻效果：高频下滑
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
                 osc.type = 'sine';
@@ -436,7 +533,6 @@ class SoundManager {
             }
             // @section:effect_shatter - shatter：破碎效果（冰冻击碎等），白噪声爆发
             case 'shatter': {
-                // 破碎效果
                 const noise = this.ctx.createBufferSource();
                 noise.buffer = this.noiseBuffer;
                 const noiseGain = this.ctx.createGain();
@@ -478,46 +574,47 @@ class SoundManager {
      */
     playSlash() {
         if (this.muted) return;
-        const now = this.ctx.currentTime;
-        
+
         // 防抖
         const perfNow = performance.now();
         if (this.lastPlayTime['slash'] && perfNow - this.lastPlayTime['slash'] < 60) return;
         this.lastPlayTime['slash'] = perfNow;
-        
+
+        const now = this.ctx.currentTime;
+
         // 主音：快速频率下滑
         const osc1 = this.ctx.createOscillator();
         const gain1 = this.ctx.createGain();
         osc1.type = 'sawtooth';
         osc1.frequency.setValueAtTime(800, now);
         osc1.frequency.exponentialRampToValueAtTime(200, now + 0.08);
-        
+
         // 泛音：更高频的点缀
         const osc2 = this.ctx.createOscillator();
         const gain2 = this.ctx.createGain();
         osc2.type = 'triangle';
         osc2.frequency.setValueAtTime(1200, now);
         osc2.frequency.exponentialRampToValueAtTime(400, now + 0.06);
-        
+
         // 主音包络
         gain1.gain.setValueAtTime(0, now);
         gain1.gain.linearRampToValueAtTime(0.2, now + 0.02);
         gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-        // 泛音包络 (消失得稍微快一点)
+        // 泛音包络（消失得稍微快一点）
         gain2.gain.setValueAtTime(0, now);
         gain2.gain.linearRampToValueAtTime(0.1, now + 0.02);
         gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-        // 连接
+
         osc1.connect(gain1);
         gain1.connect(this.masterGain);
         osc2.connect(gain2);
         gain2.connect(this.masterGain);
-        // 播放
         osc1.start(now);
         osc1.stop(now + 0.55);
         osc2.start(now);
         osc2.stop(now + 0.55);
     }
+
     /**
      * 播放收集音效
      */
