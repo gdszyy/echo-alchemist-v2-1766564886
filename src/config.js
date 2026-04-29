@@ -253,6 +253,8 @@ function setDeepValue(obj, path, value, type) {
 // ==================== 游戏核心配置 ====================
 
 const CONFIG = {
+    /** 调试日志总开关：玩家设备应保持 false，避免 console.* 在热路径产生开销 */
+    debug: false,
     /** 颜色配置 (保持不变) */
     ui: {
         damageStats: {
@@ -1111,6 +1113,8 @@ const CONFIG = {
             rewardCrystalCount: 5,     // 纯净精华晶体数量
             // 回合开始横幅充能特效（high: 完整光晕扩散动画）
             roundStartBannerGlow: true,
+            // shadowBlur 全局开关（移动端 GPU 上 shadowBlur 是单帧最贵的 Canvas2D 操作）
+            shadowBlurEnabled: true,
         },
         // MEDIUM：均衡模式，适合中端手机
         medium: {
@@ -1141,6 +1145,7 @@ const CONFIG = {
             rewardCrystalCount: 3,     // 纯净精华晶体减少
             // 回合开始横幅充能特效（medium: 保留光晕）
             roundStartBannerGlow: true,
+            shadowBlurEnabled: true,
         },
         // LOW：省电模式，适合低端手机 / 发热严重时
         low: {
@@ -1171,6 +1176,8 @@ const CONFIG = {
             rewardCrystalCount: 0,     // 关闭晶体装饰
             // 回合开始横幅充能特效（low: 降级为简单淡入，无光晕）
             roundStartBannerGlow: false,
+            // shadowBlur 在 low 等级一律关闭，是降温的关键开关
+            shadowBlurEnabled: false,
         }
     }
 };

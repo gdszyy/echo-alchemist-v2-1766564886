@@ -193,6 +193,11 @@ class SoundManager {
      */
     playTone(freq, type = 'sine', vol = 0.3, dur = 0.2) {
         if (this.muted) return;
+        // [Perf] 30ms 内同 freq+type 只播一次，避免战斗高峰每帧创建数十个 AudioNode
+        const _key = `tone:${type}:${freq | 0}`;
+        const _nowMs = performance.now();
+        if (this.lastPlayTime[_key] && _nowMs - this.lastPlayTime[_key] < 30) return;
+        this.lastPlayTime[_key] = _nowMs;
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -218,6 +223,11 @@ class SoundManager {
      */
     playHit(type = 'normal', speed = 5) {
         if (this.muted) return;
+        // [Perf] 30ms 内同 type 只播一次，平滑撞击高峰的 AudioNode 创建
+        const _key = `hit:${type}`;
+        const _nowMs = performance.now();
+        if (this.lastPlayTime[_key] && _nowMs - this.lastPlayTime[_key] < 30) return;
+        this.lastPlayTime[_key] = _nowMs;
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();

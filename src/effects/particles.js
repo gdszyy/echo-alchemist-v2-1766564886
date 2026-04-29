@@ -16,76 +16,89 @@
  * 提取时间：Task 2.1
  */
 import { Vec2, lerp } from '../utils/math_utils.js';
+import { sb as _sb } from '../utils/perf.js';
 
 class Particle {
     constructor(x, y, color, mode = 'normal') {
         this.pos = new Vec2(x, y);
+        this.vel = new Vec2(0, 0);
+        this._init(x, y, color, mode);
+    }
+
+    /**
+     * 从对象池复用时调用 - 复用现有 Vec2 实例避免分配
+     */
+    reset(x, y, color, mode = 'normal') {
+        this.pos.x = x; this.pos.y = y;
+        this.vel.x = 0; this.vel.y = 0;
+        this._init(x, y, color, mode);
+    }
+
+    _init(x, y, color, mode = 'normal') {
+        this.pos.x = x; this.pos.y = y;
         this.color = color;
         this.mode = mode;
         this.life = 1.0;
-        this.maxLife = 1.0; 
-        this.turbulence = 0; // 湍流强度
-        this.wobble = Math.random() * Math.PI * 2; // 随机相位
-        
+        this.maxLife = 1.0;
+        this.turbulence = 0;
+        this.wobble = Math.random() * Math.PI * 2;
+        // 复用上次设置的字段缺省值（避免读到陈旧值）
+        this.scale = null;
+        this.scaleX = 1;
+        this.scaleY = 1;
+        this.spin = 0;
+        this.angle = 0;
+
         const angle = Math.random() * Math.PI * 2;
-        
-        // --- 初始化物理参数 ---
+        const vel = this.vel;
+
         if (mode === 'spark') {
             const speed = Math.random() * 5 + 2;
-            this.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
-            this.drag = 0.85; this.gravity = 0.1; 
-            this.decay = 0.05 + Math.random() * 0.05; 
-            this.size = Math.random() * 2 + 1; 
-
+            vel.x = Math.cos(angle) * speed; vel.y = Math.sin(angle) * speed;
+            this.drag = 0.85; this.gravity = 0.1;
+            this.decay = 0.05 + Math.random() * 0.05;
+            this.size = Math.random() * 2 + 1;
         } else if (mode === 'ember') {
-            // [优化] 火焰余烬：更小的体积，更强的向上漂浮感
-            this.vel = new Vec2((Math.random() - 0.5) * 1.0, -Math.random() * 2.0 - 0.5);
-            this.drag = 0.98; this.gravity = -0.08; 
-            this.decay = 0.015 + Math.random() * 0.02; 
-            this.size = Math.random() * 1.5 + 0.5; // 粒子变小
-            this.wobble = Math.random() * 10; 
-
+            vel.x = (Math.random() - 0.5) * 1.0; vel.y = -Math.random() * 2.0 - 0.5;
+            this.drag = 0.98; this.gravity = -0.08;
+            this.decay = 0.015 + Math.random() * 0.02;
+            this.size = Math.random() * 1.5 + 0.5;
+            this.wobble = Math.random() * 10;
         } else if (mode === 'mist') {
-            this.vel = new Vec2((Math.random() - 0.5) * 0.8, Math.random() * 0.5 + 0.5); 
-            this.drag = 0.96; this.gravity = 0.02; 
-            this.decay = 0.015 + Math.random() * 0.01; 
-            this.size = Math.random() * 8 + 6; 
-            this.angle = Math.random() * Math.PI * 2; 
-
-        } else if (mode === 'shard') {
-            // [优化] 冰渣：爆发速度
-            const speed = Math.random() * 4 + 2; 
-            // 移除向上偏移，使其向四周爆发并受重力下坠
-            this.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed); 
-            this.drag = 0.96; // 稍微减小阻力，让轨迹更平滑
-            this.gravity = 0.4; // 适中的重力，表现下坠感 (Canvas Y轴向下为正)
-            this.decay = 0.02 + Math.random() * 0.02; // 寿命稍长一点点
-            
-            //  形状随机化：有的长有的短
-            this.size = Math.random() * 4 + 2;
-            this.scaleX = Math.random() * 0.5 + 0.5; // 宽度变异
-            this.scaleY = Math.random() * 1.5 + 1.0; // 长度拉伸 (做成冰刺)
-            
+            vel.x = (Math.random() - 0.5) * 0.8; vel.y = Math.random() * 0.5 + 0.5;
+            this.drag = 0.96; this.gravity = 0.02;
+            this.decay = 0.015 + Math.random() * 0.01;
+            this.size = Math.random() * 8 + 6;
             this.angle = Math.random() * Math.PI * 2;
-            this.spin = (Math.random() - 0.5) * 0.5; // 旋转
+        } else if (mode === 'shard') {
+            const speed = Math.random() * 4 + 2;
+            vel.x = Math.cos(angle) * speed; vel.y = Math.sin(angle) * speed;
+            this.drag = 0.96;
+            this.gravity = 0.4;
+            this.decay = 0.02 + Math.random() * 0.02;
+            this.size = Math.random() * 4 + 2;
+            this.scaleX = Math.random() * 0.5 + 0.5;
+            this.scaleY = Math.random() * 1.5 + 1.0;
+            this.angle = Math.random() * Math.PI * 2;
+            this.spin = (Math.random() - 0.5) * 0.5;
         } else if (mode === 'smoke') {
-            this.vel = new Vec2((Math.random() - 0.5) * 0.5, -Math.random() * 1.5 - 0.5);
+            vel.x = (Math.random() - 0.5) * 0.5; vel.y = -Math.random() * 1.5 - 0.5;
             this.drag = 0.98; this.gravity = -0.02; this.decay = 0.015;
-            this.size = Math.random() * 6 + 4; this.life = 1.2; 
+            this.size = Math.random() * 6 + 4; this.life = 1.2;
         } else if (mode === 'line') {
-            this.vel = new Vec2(0, 0);
+            vel.x = 0; vel.y = 0;
             this.drag = 0.98; this.gravity = 0; this.decay = 0.02;
             this.size = 2; this.life = 1.0;
             this.scale = { x: 1, y: 1 };
         } else if (mode === 'wind_slash') {
-            // === 🌪️ 新增：风刃粒子的物理初始化 ===
-            this.vel = new Vec2(0, 0); // 外部会设置 vel
-            this.drag = 1.0; // 默认无阻力
+            vel.x = 0; vel.y = 0;
+            this.drag = 1.0;
             this.gravity = 0;
             this.decay = 0.05;
             this.size = 10;
             this.life = 1.0;
-        } else {          this.vel = new Vec2((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4);
+        } else {
+            vel.x = (Math.random() - 0.5) * 4; vel.y = (Math.random() - 0.5) * 4;
             this.drag = 0.92; this.gravity = 0; this.decay = 0.05; this.size = Math.random() * 2 + 1;
         }
         this.maxLife = this.life;
@@ -153,7 +166,7 @@ class Particle {
             grad.addColorStop(1, `rgba(249, 115, 22, 0)`);
             
             ctx.fillStyle = grad;
-            ctx.shadowBlur = 10 * this.life;
+            ctx.shadowBlur = _sb(10 * this.life);
             ctx.shadowColor = '#f97316';
             ctx.beginPath(); ctx.arc(0, 0, this.size * 2.5, 0, Math.PI * 2); ctx.fill();
 
@@ -270,7 +283,7 @@ class SlashEffect {
         ctx.quadraticCurveTo(0, currentW, -halfL, 0); // 下弧
 
         ctx.fillStyle = '#ffffff';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = _sb(10);
         ctx.shadowColor = this.color;
         ctx.fill();
 
@@ -284,7 +297,7 @@ class SlashEffect {
 
         ctx.fillStyle = this.color;
         ctx.globalAlpha = Math.max(0, this.life * 0.6); // 光晕稍微淡一点
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = _sb(20);
         ctx.fill();
 
         // --- 3. 横向闪光 (Impact Cross) ---
@@ -461,7 +474,7 @@ class LaserBeam {
         ctx.strokeStyle = this.color;
         ctx.lineWidth = currentWidth * 2.5;
         ctx.globalAlpha = opacity * 0.3;
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = _sb(20);
         ctx.shadowColor = this.color;
         ctx.stroke();
 
@@ -474,7 +487,7 @@ class LaserBeam {
         ctx.strokeStyle = '#ffffff'; // 核心总是白色
         ctx.lineWidth = currentWidth;
         ctx.globalAlpha = opacity;
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = _sb(10);
         ctx.stroke();
 
         ctx.restore();
@@ -727,7 +740,7 @@ class LightningBolt {
             // 1. 繪製紫色光暈 (寬線條)
             ctx.strokeStyle = `rgba(192, 132, 252, ${opacity * seg.alpha * 0.5})`; // Purple-400
             ctx.lineWidth = seg.width * 4;
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = _sb(15);
             ctx.shadowColor = '#c084fc';
             ctx.stroke();
 
@@ -742,7 +755,7 @@ class LightningBolt {
         if (this.progress > 0.8) {
             ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
             ctx.shadowColor = '#fff';
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = _sb(10);
             ctx.beginPath(); ctx.arc(this.start.x, this.start.y, 3, 0, Math.PI*2); ctx.fill();
             ctx.beginPath(); ctx.arc(this.end.x, this.end.y, 4, 0, Math.PI*2); ctx.fill();
         }
@@ -1178,7 +1191,7 @@ class HealWave {
             ctx.globalAlpha = rAlpha * 0.9;
             ctx.strokeStyle = `rgba(244, 114, 182, ${rAlpha})`;
             ctx.lineWidth = 3.5;
-            ctx.shadowBlur = 12;
+            ctx.shadowBlur = _sb(12);
             ctx.shadowColor = '#f472b6';
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
@@ -1192,7 +1205,7 @@ class HealWave {
             ctx.globalAlpha = iAlpha;
             ctx.strokeStyle = `rgba(134, 239, 172, ${iAlpha})`;
             ctx.lineWidth = 2;
-            ctx.shadowBlur = 8;
+            ctx.shadowBlur = _sb(8);
             ctx.shadowColor = '#86efac';
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.innerRadius, 0, Math.PI * 2);
@@ -1268,7 +1281,7 @@ class BladeStormRing {
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.strokeStyle = '#34d399';
         ctx.lineWidth = 8 * this.life;
-        ctx.shadowBlur = 16;
+        ctx.shadowBlur = _sb(16);
         ctx.shadowColor = '#34d399';
         ctx.stroke();
 
@@ -1278,7 +1291,7 @@ class BladeStormRing {
         ctx.arc(this.x, this.y, this.radius * 0.85, 0, Math.PI * 2);
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 2 * this.life;
-        ctx.shadowBlur = 6;
+        ctx.shadowBlur = _sb(6);
         ctx.shadowColor = '#ffffff';
         ctx.stroke();
 
@@ -1333,7 +1346,7 @@ class SwordScar {
         ctx.strokeStyle = grad;
         ctx.lineWidth = 2.5 * this.life;
         ctx.lineCap = 'round';
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = _sb(8);
         ctx.shadowColor = '#34d399';
         ctx.beginPath();
         ctx.moveTo(-halfL, 0);
@@ -1562,7 +1575,7 @@ class RewardDropEffect {
                 ctx.strokeStyle = `rgba(255, 255, 255, ${ba * 0.8})`;
                 ctx.lineWidth = 2;
                 ctx.shadowColor = '#facc15';
-                ctx.shadowBlur = 12;
+                ctx.shadowBlur = _sb(12);
                 ctx.beginPath();
                 ctx.moveTo(bx, by);
                 ctx.lineTo(bx, by - bh);
@@ -1583,7 +1596,7 @@ class RewardDropEffect {
                 ctx.globalAlpha = ca;
                 ctx.fillStyle = c.color;
                 ctx.shadowColor = '#facc15';
-                ctx.shadowBlur = 6;
+                ctx.shadowBlur = _sb(6);
                 // 菱形金币
                 ctx.beginPath();
                 ctx.moveTo(0, -c.size);
@@ -1637,7 +1650,7 @@ class RewardDropEffect {
                     ctx.globalAlpha = vAlpha * 0.7;
                     ctx.fillStyle = vi % 2 === 0 ? '#a855f7' : '#ef4444';
                     ctx.shadowColor = vi % 2 === 0 ? '#a855f7' : '#ef4444';
-                    ctx.shadowBlur = 8;
+                    ctx.shadowBlur = _sb(8);
                     ctx.beginPath();
                     ctx.arc(vx, vy, 3.5, 0, Math.PI * 2);
                     ctx.fill();
@@ -1659,7 +1672,7 @@ class RewardDropEffect {
                 ctx.strokeStyle = ring.color;
                 ctx.lineWidth = ring.lw;
                 ctx.shadowColor = ring.color;
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = _sb(10);
                 ctx.stroke();
                 ctx.shadowBlur = 0;
             }
@@ -1677,7 +1690,7 @@ class RewardDropEffect {
                 ctx.globalAlpha = sa;
                 ctx.fillStyle = s.color;
                 ctx.shadowColor = s.color;
-                ctx.shadowBlur = 5;
+                ctx.shadowBlur = _sb(5);
                 // 不规则尖锐碎片
                 ctx.beginPath();
                 ctx.moveTo(0, -s.size);
@@ -1719,7 +1732,7 @@ class RewardDropEffect {
                 ctx.strokeStyle = ring.color;
                 ctx.lineWidth = ring.lw;
                 ctx.shadowColor = ring.color;
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = _sb(8);
                 ctx.stroke();
                 ctx.shadowBlur = 0;
             }
@@ -1749,7 +1762,7 @@ class RewardDropEffect {
                 ctx.strokeStyle = `rgba(255, 255, 255, ${ba * 0.9})`;
                 ctx.lineWidth = 1.5;
                 ctx.shadowColor = '#bfdbfe';
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = _sb(10);
                 ctx.beginPath();
                 ctx.moveTo(bx, by);
                 ctx.lineTo(bx, by - bh);
@@ -1772,7 +1785,7 @@ class RewardDropEffect {
                 ctx.strokeStyle = 'rgba(255,255,255,0.8)';
                 ctx.lineWidth = 0.8;
                 ctx.shadowColor = '#bfdbfe';
-                ctx.shadowBlur = 6;
+                ctx.shadowBlur = _sb(6);
                 // 六角雪花形（与敌人光晕中的雪花一致）
                 ctx.beginPath();
                 for (let si = 0; si < 6; si++) {

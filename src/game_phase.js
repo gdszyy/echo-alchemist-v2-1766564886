@@ -11,6 +11,7 @@ import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
+import { sb as _sb } from './utils/perf.js';
 import {
     calcDropDistribution,
     generateHeatmapData,
@@ -87,7 +88,7 @@ export const game_phase = {
         if (this.shotDamageHistory.length > 0) {
             this.roundDamageHistory.push({
                 round: this.round,
-                shots: JSON.parse(JSON.stringify(this.shotDamageHistory))
+                shots: this.shotDamageHistory.map(s => ({ total: s.total, byAttr: { ...s.byAttr } }))
             });
         }
         
@@ -411,7 +412,7 @@ export const game_phase = {
             effectiveSlots = effectiveSlots.filter(t => t !== 'skill_point');
         }
         const effectiveSlotCount = Math.min(this.slotCount, effectiveSlots.length > 0 ? this.slotCount : 0);
-        console.log(`[DEBUG] Starting special slot creation: effectiveSlots=${JSON.stringify(effectiveSlots)}, slotCount=${effectiveSlotCount}`);
+        if (CONFIG.debug) console.log(`[DEBUG] Starting special slot creation: effectiveSlots=${JSON.stringify(effectiveSlots)}, slotCount=${effectiveSlotCount}`);
         if (effectiveSlots.length > 0 && effectiveSlotCount > 0) {
             const slotTypes = effectiveSlots;
             
@@ -1485,7 +1486,7 @@ phase_gathering_getRandomPegType() {
         this.ctx.save();
         const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
         this.ctx.shadowColor = 'rgba(239, 68, 68, 1)';
-        this.ctx.shadowBlur = 8 + pulse * 12;
+        this.ctx.shadowBlur = _sb(8 + pulse * 12);
         this.ctx.strokeStyle = `rgba(239, 68, 68, ${0.45 + pulse * 0.35})`;
         this.ctx.lineWidth = 2;
         this.ctx.setLineDash([10, 10]);
@@ -1580,7 +1581,7 @@ phase_gathering_getRandomPegType() {
                 this.ctx.strokeStyle = '#ffffff'; 
                 this.ctx.lineWidth = 4;
                 this.ctx.shadowColor = '#fef08a'; 
-                this.ctx.shadowBlur = 20;
+                this.ctx.shadowBlur = _sb(20);
                 for (let x = 0; x <= this.width; x += 10) {
                     const offset = Math.sin(x * 0.1 + time) * 2 + (Math.random() - 0.5) * 6;
                     const y = this.enemyWaveY + offset;
@@ -1681,7 +1682,7 @@ phase_gathering_getRandomPegType() {
             this.ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)'; // Slate-400
             this.ctx.lineWidth = 2;
             this.ctx.shadowColor = '#38bdf8';
-            this.ctx.shadowBlur = 15;
+            this.ctx.shadowBlur = _sb(15);
             this.ctx.beginPath();
             // 左边线（从顶部栏下边界开始）
             this.ctx.moveTo(1, wallTopY); this.ctx.lineTo(1, this.height);
@@ -1732,7 +1733,7 @@ phase_gathering_getRandomPegType() {
                             if (shotStats.destroyedCount >= shotStats.projectileCount && shotStats.total > 0) {
                                 this.shotDamageHistory.push({
                                     total: shotStats.total,
-                                    byAttr: JSON.parse(JSON.stringify(shotStats.byAttr))
+                                    byAttr: { ...shotStats.byAttr }
                                 });
                                 // 增加容量到 10 发子弹，方便查看
                                 if (this.shotDamageHistory.length > 10) {
@@ -1792,8 +1793,27 @@ phase_gathering_getRandomPegType() {
                 }
             }
 
-            // 更新和绘制特效
-            for(let i=this.particles.length-1; i>=0; i--) { let p = this.particles[i]; if(p) { p.update(timeScale); p.draw(this.ctx); if(p.life <= 0) this.particles.splice(i,1); } } 
+            // 更新和绘制特效（两指针原地压缩，避免 splice O(N²) 与临时数组分配；死亡粒子归还对象池）
+            {
+                const arr = this.particles;
+                const counts = this.particleCounts;
+                const pool = this._particlePool;
+                let w = 0;
+                for (let r = 0; r < arr.length; r++) {
+                    const p = arr[r];
+                    if (!p) continue;
+                    p.update(timeScale);
+                    p.draw(this.ctx);
+                    if (p.life > 0) {
+                        if (w !== r) arr[w] = p;
+                        w++;
+                    } else {
+                        if (counts[p.mode] !== undefined && counts[p.mode] > 0) counts[p.mode]--;
+                        if (pool.length < 200) pool.push(p);
+                    }
+                }
+                arr.length = w;
+            }
             for(let i=this.shockwaves.length-1; i>=0; i--) { let s = this.shockwaves[i]; if(s) { s.update(timeScale); s.draw(this.ctx); if(s.alpha <= 0) this.shockwaves.splice(i,1); } } 
             for(let i=this.lightningBolts.length-1; i>=0; i--) { let b = this.lightningBolts[i]; b.update(timeScale); b.draw(this.ctx); if(b.life <= 0) this.lightningBolts.splice(i,1); } 
             for(let i=this.spores.length-1; i>=0; i--) { let s = this.spores[i]; if(s) { s.update(timeScale); s.draw(this.ctx); if(!s.active) this.spores.splice(i,1); } }
@@ -2428,7 +2448,7 @@ phase_gathering_getRandomPegType() {
                 gradStart.addColorStop(1, 'rgba(99, 102, 241, 0)');
                 
                 this.ctx.strokeStyle = gradStart;
-                this.ctx.shadowBlur = 4 + tiltStrength * 6;
+                this.ctx.shadowBlur = _sb(4 + tiltStrength * 6);
                 this.ctx.shadowColor = 'rgba(139, 92, 246, 0.5)';
                 
                 this.ctx.beginPath();
@@ -2577,12 +2597,26 @@ phase_gathering_getRandomPegType() {
             orb.draw(this.ctx);
             if (!orb.active) this.energyOrbs.splice(i, 1);
         }
-        // 繪製粒子
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-            const p = this.particles[i];
-            p.update(this.timeScale);
-            p.draw(this.ctx);
-            if (p.life <= 0) this.particles.splice(i, 1);
+        // 繪製粒子（两指针原地压缩，归还对象池；同步 particleCounts）
+        {
+            const arr = this.particles;
+            const counts = this.particleCounts;
+            const pool = this._particlePool;
+            let w = 0;
+            for (let r = 0; r < arr.length; r++) {
+                const p = arr[r];
+                if (!p) continue;
+                p.update(this.timeScale);
+                p.draw(this.ctx);
+                if (p.life > 0) {
+                    if (w !== r) arr[w] = p;
+                    w++;
+                } else {
+                    if (counts[p.mode] !== undefined && counts[p.mode] > 0) counts[p.mode]--;
+                    if (pool.length < 200) pool.push(p);
+                }
+            }
+            arr.length = w;
         }
         // 更新和繪製 Shockwaves
         for (let i = this.shockwaves.length - 1; i >= 0; i--) {
@@ -2666,7 +2700,7 @@ phase_gathering_getRandomPegType() {
 
             // 高概率槽位添加光晕效果
             if (bar.alpha > 0.5) {
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = _sb(8);
                 ctx.shadowColor = hint.color;
                 ctx.fillStyle = `${hint.color}${Math.round(bar.alpha * 0.3 * 255).toString(16).padStart(2, '0')}`;
                 ctx.fillRect(bar.x, bar.y, bar.width, 2);

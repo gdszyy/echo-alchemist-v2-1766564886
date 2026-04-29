@@ -9,6 +9,7 @@ import {
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
+import { sb as _sb } from './utils/perf.js';
 import {
     getUiBitmap,
     ORBITAL_SOCKET_MAP,
@@ -82,7 +83,7 @@ export const render_system = {
             this.ctx.strokeStyle = 'rgba(52, 211, 153, ' + (0.5 + linePulse * 0.3) + ')';
             this.ctx.lineWidth = 3;
             this.ctx.setLineDash([8, 12]);
-            this.ctx.shadowBlur = 10 + linePulse * 5;
+            this.ctx.shadowBlur = _sb(10 + linePulse * 5);
             this.ctx.shadowColor = '#34d399';
             
             // [属性特效]：在连线上方绘制微小的风纹粒子
@@ -127,7 +128,7 @@ export const render_system = {
                 this.ctx.save();
                 this.ctx.globalAlpha = 0.3 + pulse * 0.3;
                 this.ctx.fillStyle = '#34d399';
-                this.ctx.shadowBlur = 15 + pulse * 10;
+                this.ctx.shadowBlur = _sb(15 + pulse * 10);
                 this.ctx.shadowColor = '#34d399';
                 this.ctx.beginPath();
                 this.ctx.arc(a.x, a.y, 8 + pulse * 4, 0, Math.PI * 2);
@@ -137,7 +138,7 @@ export const render_system = {
                 // 绘制主体
                 this.ctx.save();
                 this.ctx.fillStyle = '#d1fae5';
-                this.ctx.shadowBlur = 10;
+                this.ctx.shadowBlur = _sb(10);
                 this.ctx.shadowColor = '#34d399';
                 this.ctx.beginPath();
                 this.ctx.arc(a.x, a.y, 5, 0, Math.PI * 2);
@@ -154,7 +155,7 @@ export const render_system = {
                 this.ctx.save();
                 this.ctx.fillStyle = '#34d399';
                 this.ctx.font = 'bold 12px Arial';
-                this.ctx.shadowBlur = 5;
+                this.ctx.shadowBlur = _sb(5);
                 this.ctx.shadowColor = 'rgba(0,0,0,0.5)';
                 this.ctx.fillText(idx + 1, a.x + 8, a.y - 8);
                 this.ctx.restore();
@@ -219,7 +220,7 @@ export const render_system = {
         const flash = Math.sin(time / 20) > 0;
         ctx.strokeStyle = flash ? "#fff" : "#34d399";
         ctx.lineWidth = 2;
-        ctx.shadowBlur = 20 * progress;
+        ctx.shadowBlur = _sb(20 * progress);
         ctx.shadowColor = "#34d399";
         ctx.stroke();
         // @section:wind_matrix_tunnel - 隧道型风阵：渐变光带 + 方向箭头动画
@@ -288,7 +289,7 @@ export const render_system = {
             ctx.beginPath();
             ctx.arc(shake, shake, maxR * 0.2, 0, Math.PI * 2);
             ctx.fillStyle = '#fff'; // 纯白核心
-            ctx.shadowBlur = 30;
+            ctx.shadowBlur = _sb(30);
             ctx.shadowColor = '#fff';
             ctx.fill();
             
@@ -467,13 +468,13 @@ export const render_system = {
             if (socketImg && currentSize > 4) {
                 const socketSize = currentSize * 2.4; // 64×64 源图，按当前球径放大成"光环底座"
                 ctx.save();
-                ctx.shadowBlur = (8 + speedGlow * 18) * orbScale;
+                ctx.shadowBlur = _sb((8 + speedGlow * 18) * orbScale);
                 ctx.shadowColor = stat.color;
                 ctx.globalCompositeOperation = 'screen';
                 ctx.drawImage(socketImg, ox - socketSize / 2, oy - socketSize / 2, socketSize, socketSize);
                 ctx.restore();
             } else {
-                ctx.shadowBlur = (10 + speedGlow * 20) * orbScale;
+                ctx.shadowBlur = _sb((10 + speedGlow * 20) * orbScale);
                 ctx.shadowColor = stat.color;
                 ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
                 ctx.beginPath();
@@ -757,7 +758,7 @@ export const render_system = {
 
         // --- 绘制光标发光效果 ---
         ctx.globalAlpha = cursorAlpha * 0.4;
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = _sb(12);
         ctx.shadowColor = cursorColor;
         ctx.fillStyle = cursorColor;
         ctx.beginPath();
@@ -766,7 +767,7 @@ export const render_system = {
 
         // --- 绘制光标主体 ---
         ctx.globalAlpha = cursorAlpha;
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = _sb(8);
         ctx.shadowColor = cursorColor;
         ctx.fillStyle = cursorColor;
         ctx.beginPath();

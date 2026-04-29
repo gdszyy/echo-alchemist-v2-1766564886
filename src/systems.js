@@ -2200,6 +2200,7 @@ class TrainingGround {
         this.game.enemies = [];
         this.game.projectiles = [];
         this.game.particles = [];
+        if (this.game.particleCounts) { for (const k in this.game.particleCounts) this.game.particleCounts[k] = 0; }
     }
 
     adjustBullet(key, delta) {
@@ -2530,6 +2531,7 @@ class TrainingGround {
         this.game.enemies = [];
         this.game.projectiles = [];
         this.game.particles = [];
+        if (this.game.particleCounts) { for (const k in this.game.particleCounts) this.game.particleCounts[k] = 0; }
         this.game.sonSwordQueue = [];
         this.game.swordQis = [];
         this.game.windAnchors = [];
@@ -2635,6 +2637,7 @@ class TrainingGround {
         this.game.enemies = [];
         this.game.projectiles = [];
         this.game.particles = [];
+        if (this.game.particleCounts) { for (const k in this.game.particleCounts) this.game.particleCounts[k] = 0; }
         this.game.sonSwordQueue = [];
         this.game.swordQis = [];
         this.game.windAnchors = []; 
@@ -2980,6 +2983,9 @@ function createCombatContext(mainGame, canvas) {
         enemies: [],
         projectiles: [],
         particles: [],
+        // [Perf] 与主 game 实例保持字段一致，避免 spawn_createParticle 访问 undefined
+        particleCounts: { wind_slash: 0, line: 0, ember: 0, mist: 0, shard: 0, spark: 0, smoke: 0 },
+        _particlePool: [],
         floatingTexts: [],
         shockwaves: [],
         lightningBolts: [],

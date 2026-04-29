@@ -14,6 +14,7 @@ import { RUNE_DB } from './rune_config.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
+import { sb as _sb } from './utils/perf.js';
 import { DamageCalc } from './combat/damage_calc.js';
 import { CollisionSystem } from './combat/collision.js';
 
@@ -1138,7 +1139,7 @@ export const combat_system = {
             grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
             
             ctx.fillStyle = grad;
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = _sb(15);
             ctx.shadowColor = color;
             
             ctx.beginPath();
@@ -1421,7 +1422,7 @@ export const combat_system = {
 
             ctx.font = 'bold 16px monospace';
             ctx.fillStyle = '#10b981';
-            ctx.shadowBlur = 5;
+            ctx.shadowBlur = _sb(5);
             ctx.shadowColor = '#000000';
             ctx.fillText(`${core.energy}/${core.energyRequired}`, 0, core.radius + 25);
             
@@ -2375,8 +2376,10 @@ export const combat_system = {
         const pullNext = () => {
             if (this.ammoQueue.length === 0) return null;
             let r = this.ammoQueue.shift();
-            // 深拷贝配方对象，防止引用污染
-            const recipeCopy = JSON.parse(JSON.stringify(r));
+            // 深拷贝配方对象，防止引用污染（structuredClone 比 JSON 字符串往返快 2-5 倍且无字符串中间产物）
+            const recipeCopy = (typeof structuredClone === 'function')
+                ? structuredClone(r)
+                : JSON.parse(JSON.stringify(r));
             if (recipeCopy.isMatryoshka) {
                 const nextR = pullNext();
                 if (nextR) recipeCopy.nestedPayload = nextR;
@@ -2618,7 +2621,7 @@ export const combat_system = {
         const irradiationFx = this.activeRunewordEffects && this.activeRunewordEffects['irradiation'];
         const blazingBeamFxForLaser = this.activeRunewordEffects && this.activeRunewordEffects['blazing_beam'];
         // [DEBUG-LASER] 每次调用打印入口状态
-        console.log(`[LASER_FIRE] 调用 isTickFire=${isTickFire} _continuousLaserFiring=${this._continuousLaserFiring} irradiationFx=${!!irradiationFx} recipe.multicast=${recipe.multicast} elapsedFrames=${this._continuousLaserState ? this._continuousLaserState.elapsedFrames : 'N/A'}`);
+        if (CONFIG.debug) console.log(`[LASER_FIRE] 调用 isTickFire=${isTickFire} _continuousLaserFiring=${this._continuousLaserFiring} irradiationFx=${!!irradiationFx} recipe.multicast=${recipe.multicast} elapsedFrames=${this._continuousLaserState ? this._continuousLaserState.elapsedFrames : 'N/A'}`);
         if ((irradiationFx || blazingBeamFxForLaser) && !this._continuousLaserFiring) {
             this._continuousLaserFiring = true;
             // [照射持续时长] 基于连射次数：连射 N 次就持续 N×0.5s。
@@ -2626,7 +2629,7 @@ export const combat_system = {
             // 因为 focused_fire/mass_collapse/multicast_to_scatter 等词条会将 recipe.multicast 清零。
             const multicastCount = (recipe._originalMulticast !== undefined ? recipe._originalMulticast : (recipe.multicast || 0));
             const totalDuration = Math.max(Math.round(0.5 * 60), multicastCount * Math.round(0.5 * 60));
-            console.log(`[LASER_FIRE] 状态机启动: multicastCount=${multicastCount}(_originalMulticast=${recipe._originalMulticast}) totalDuration=${totalDuration}帧(${(totalDuration/60).toFixed(2)}s)`);
+            if (CONFIG.debug) console.log(`[LASER_FIRE] 状态机启动: multicastCount=${multicastCount}(_originalMulticast=${recipe._originalMulticast}) totalDuration=${totalDuration}帧(${(totalDuration/60).toFixed(2)}s)`);
             this._continuousLaserState = {
                 startX, startY, vel, recipe,
                 tickFrames: 0,
@@ -2704,7 +2707,7 @@ export const combat_system = {
                     && this._continuousLaserState && this._continuousLaserState.elapsedFrames > 0;
                 // [DEBUG-LASER] 照射模式下每次射线段打印 skipDmg
                 if (this._continuousLaserFiring) {
-                    console.log(`[LASER_FIRE] 射线段 skipDmg=${skipDmg} isTickFire=${isTickFire} elapsedFrames=${this._continuousLaserState ? this._continuousLaserState.elapsedFrames : 'N/A'}`);
+                    if (CONFIG.debug) console.log(`[LASER_FIRE] 射线段 skipDmg=${skipDmg} isTickFire=${isTickFire} elapsedFrames=${this._continuousLaserState ? this._continuousLaserState.elapsedFrames : 'N/A'}`);
                 }
                 if (refractionCount < maxRefractionTotal) {
                     const penetrationResult = this.combat_laser_processPenetration(
@@ -2816,7 +2819,7 @@ export const combat_system = {
             if (shotStats.destroyedCount >= shotStats.projectileCount && shotStats.total > 0) {
                 this.shotDamageHistory.push({
                     total: shotStats.total,
-                    byAttr: JSON.parse(JSON.stringify(shotStats.byAttr))
+                    byAttr: { ...shotStats.byAttr }
                 });
                 if (this.shotDamageHistory.length > 10) this.shotDamageHistory.shift();
                 this.ui_updateDamageStats();
@@ -2975,12 +2978,12 @@ export const combat_system = {
 
         // [DEBUG-LASER] 每5帧打印一次状态机状态
         if (Math.round(state.elapsedFrames) % 5 === 0) {
-            console.log(`[LASER_UPDATE] elapsedFrames=${state.elapsedFrames.toFixed(1)} tickFrames=${state.tickFrames.toFixed(1)} totalDuration=${state.totalDuration} tickInterval=${state.tickInterval}`);
+            if (CONFIG.debug) console.log(`[LASER_UPDATE] elapsedFrames=${state.elapsedFrames.toFixed(1)} tickFrames=${state.tickFrames.toFixed(1)} totalDuration=${state.totalDuration} tickInterval=${state.tickInterval}`);
         }
 
         // 持续时间结束，清理状态
         if (state.elapsedFrames >= state.totalDuration) {
-            console.log(`[LASER_UPDATE] 状态机结束: elapsedFrames=${state.elapsedFrames.toFixed(1)} >= totalDuration=${state.totalDuration}`);
+            if (CONFIG.debug) console.log(`[LASER_UPDATE] 状态机结束: elapsedFrames=${state.elapsedFrames.toFixed(1)} >= totalDuration=${state.totalDuration}`);
             // [动画同步] 先触发当前所有持续激光淡出，再清理状态
             if (state.activeBeams) {
                 state.activeBeams.forEach(b => b.startFadeOut());
@@ -2997,7 +3000,7 @@ export const combat_system = {
 
         // 每 tickInterval 帧重新计算一次激光（伤害 + 视觉）
         if (state.tickFrames >= state.tickInterval) {
-            console.log(`[LASER_UPDATE] tick触发! elapsedFrames=${state.elapsedFrames.toFixed(1)} tickFrames=${state.tickFrames.toFixed(1)}`);
+            if (CONFIG.debug) console.log(`[LASER_UPDATE] tick触发! elapsedFrames=${state.elapsedFrames.toFixed(1)} tickFrames=${state.tickFrames.toFixed(1)}`);
             state.tickFrames = 0;
             // [动画同步] tick 切换前，先触发旧 beams 淡出，再创建新 beams
             // 新一轮激光的视觉与伤害同时产生，旧一轮开始淡出——动画与伤害严格同步。

@@ -21,6 +21,7 @@
 import { CONFIG } from '../config.js';
 import { Vec2 } from '../utils/math_utils.js';
 import { Particle, SlashEffect } from '../effects/particles.js';
+import { sb as _sb } from '../utils/perf.js';
 
 // audio 代理由 entities.js 注入，通过模块级变量共享
 let _audioProvider = null;
@@ -734,7 +735,7 @@ class Projectile {
             ctx.globalCompositeOperation = 'lighter';
         }
         ctx.shadowColor = trailColor;
-        ctx.shadowBlur = 2 + tier * 2;
+        ctx.shadowBlur = _sb(2 + tier * 2);
 
         // 段落式渐变描边：越靠近当前位置越亮、越粗，整体透明度更低更轻盈
         for (let i = 1; i < len; i++) {
@@ -754,7 +755,7 @@ class Projectile {
 
         // S 级追加一层更细更亮的核心拖尾
         if (tier >= 3 || cfg.isLaser) {
-            ctx.shadowBlur = 6;
+            ctx.shadowBlur = _sb(6);
             for (let i = Math.max(1, len - 5); i < len; i++) {
                 const a = trail[i - 1];
                 const b = trail[i];
@@ -783,7 +784,7 @@ class Projectile {
             // 這裡我們直接畫朝右的劍，與 velocity 方向一致
             const scale = radius / 6; // 根據半徑動態調整大小 (基礎半徑約7~10)
             // 1. 劍身發光 (Spirit Aura) - 隨耐久度減弱
-            ctx.shadowBlur = 15 * intensity * integrity;
+            ctx.shadowBlur = _sb(15 * intensity * integrity);
             ctx.shadowColor = '#0ea5e9'; // 青色光暈
             // 2. 劍身 (Blade) - 雙刃劍，指向右側
             ctx.beginPath();
@@ -808,7 +809,7 @@ class Projectile {
             ctx.lineWidth = 1.5;
             ctx.stroke();
             // 3. 劍格 (Guard) - 祥雲/蝙蝠紋飾
-            ctx.shadowBlur = 5;
+            ctx.shadowBlur = _sb(5);
             ctx.shadowColor = '#f59e0b';
             ctx.fillStyle = '#fbbf24'; // 金色
             ctx.beginPath();
@@ -839,7 +840,7 @@ class Projectile {
                 -50 * scale, swing * 0.5      // 終點
             );
             ctx.shadowColor = '#ef4444';
-            ctx.shadowBlur = 5;
+            ctx.shadowBlur = _sb(5);
             ctx.strokeStyle = '#ef4444'; // 紅色
             ctx.lineWidth = 2;
             ctx.lineCap = 'round';
@@ -899,14 +900,14 @@ class Projectile {
             const pulse = Math.sin(time) * 0.1 + 1.0; 
             const laserPower = config.laser || 0;
             const sizeMod = 1 + (laserPower * 0.1); 
-            ctx.shadowBlur = 20 * intensity * sizeMod;
+            ctx.shadowBlur = _sb(20 * intensity * sizeMod);
             ctx.shadowColor = glowColor;
             ctx.fillStyle = glowColor;
             ctx.globalAlpha = 0.4;
             ctx.beginPath();
             ctx.arc(0, 0, radius * 1.2 * pulse * sizeMod, 0, Math.PI * 2);
             ctx.fill();
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = _sb(10);
             ctx.shadowColor = '#fff';
             ctx.fillStyle = '#ffffff';
             ctx.globalAlpha = 1.0;
@@ -953,7 +954,7 @@ class Projectile {
             }
         }
         ctx.closePath();
-        ctx.shadowBlur = CONFIG.visuals.glowBase * intensity * integrity; 
+        ctx.shadowBlur = _sb(CONFIG.visuals.glowBase * intensity * integrity); 
         ctx.shadowColor = glowColor;
         if (mainColor === 'rainbow') {
             const grad = ctx.createLinearGradient(-radius, -radius, radius, radius);
@@ -1023,7 +1024,7 @@ class Projectile {
             ctx.lineJoin = 'round';
             ctx.globalCompositeOperation = 'lighter'; 
             const arcCount = 1 + Math.floor(config.lightning / 2);
-            ctx.shadowBlur = 8 + config.lightning;
+            ctx.shadowBlur = _sb(8 + config.lightning);
             ctx.shadowColor = '#a855f7'; 
             ctx.strokeStyle = '#e9d5ff'; 
             for (let k = 0; k < arcCount; k++) {
@@ -1063,7 +1064,7 @@ class Projectile {
         // 风属性环绕风刃特效
         if (config.wind && config.wind > 0) {
             ctx.save();
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = _sb(10);
             ctx.shadowColor = '#34d399';
             const bladeCount = Math.min(3 + config.wind, 6); // 根据风属性等级决定风刃数量
             const orbitRadius = radius * 1.8; // 环绕轨道半径

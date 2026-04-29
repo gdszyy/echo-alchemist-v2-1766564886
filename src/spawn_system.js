@@ -1041,62 +1041,46 @@ export const spawn_system = {
      */
     spawn_createParticle(x, y, color, mode = 'normal') {
         // ============================================================
-        // [粒子数量限制系统] v3 - 自适应性能等级驱动
-        // 预算数值来自 CONFIG.performance[this.perfQualityLevel]，
-        // 随帧率变化自动调整，无需手动修改魔法数字。
+        // [粒子数量限制系统] v4 - O(1) 计数 + 对象池
+        // - 各 mode 数量从 this.particleCounts 读取，避免每次创建做全量 filter
+        // - 复用 this._particlePool 内的实例，避免 new Particle() 触发 GC
         // ============================================================
         const _budget = CONFIG.performance[this.perfQualityLevel || 'high'];
+        const counts = this.particleCounts;
 
-        // --- 1. 全局上限检查 ---
         if (this.particles.length >= _budget.maxParticles) return null;
 
-        // --- 2. 风属性粒子：有限供给 ---
-        // wind_slash（风刃）和 line（风道气流）为风属性专属粒子，设置独立配额
+        const windActiveCount = counts.wind_slash + counts.line;
         if (mode === 'wind_slash' || mode === 'line') {
-            const currentWind = this.particles.filter(p => p.mode === 'wind_slash' || p.mode === 'line').length;
-            if (currentWind >= _budget.windLimit) return null;
+            if (windActiveCount >= _budget.windLimit) return null;
         }
+        const windIsActive = windActiveCount > 0;
 
-        // --- 3. 检测场上是否存在活跃的风属性粒子 ---
-        // 当风属性粒子存在时，动态压缩火/冰粒子的可用配额
-        const activeWindCount = this.particles.filter(p => p.mode === 'wind_slash' || p.mode === 'line').length;
-        const windIsActive = activeWindCount > 0;
-
-        // --- 4. 火焰粒子（ember）限制 ---
         if (mode === 'ember') {
             const limit = windIsActive ? _budget.emberLimitWind : _budget.emberLimit;
-            const currentEmbers = this.particles.filter(p => p.mode === 'ember').length;
-            if (currentEmbers >= limit) return null;
+            if (counts.ember >= limit) return null;
         }
-
-        // --- 5. 冰霜粒子（mist / shard）限制 ---
         if (mode === 'mist') {
             const limit = windIsActive ? _budget.mistLimitWind : _budget.mistLimit;
-            const currentMist = this.particles.filter(p => p.mode === 'mist').length;
-            if (currentMist >= limit) return null;
+            if (counts.mist >= limit) return null;
         }
         if (mode === 'shard') {
             const limit = windIsActive ? _budget.shardLimitWind : _budget.shardLimit;
-            const currentShard = this.particles.filter(p => p.mode === 'shard').length;
-            if (currentShard >= limit) return null;
+            if (counts.shard >= limit) return null;
         }
+        if (mode === 'spark' && counts.spark >= (_budget.sparkLimit ?? 100)) return null;
+        if (mode === 'smoke' && counts.smoke >= (_budget.smokeLimit ?? 60)) return null;
 
-        // --- 6. 通用火星粒子（spark）限制 ---
-        // spark 用于机械类受击电弧、能量泄漏、属性火星等多种场景，需独立限制防止大量占用全局预算
-        if (mode === 'spark') {
-            const currentSpark = this.particles.filter(p => p.mode === 'spark').length;
-            if (currentSpark >= (_budget.sparkLimit ?? 100)) return null;
+        const pool = this._particlePool;
+        let p;
+        if (pool.length > 0) {
+            p = pool.pop();
+            p.reset(x, y, color, mode);
+        } else {
+            p = new Particle(x, y, color, mode);
         }
-
-        // --- 7. 烟雾粒子（smoke）限制 ---
-        // smoke 用于狂暴受击烟雾、死亡爆炸等场景
-        if (mode === 'smoke') {
-            const currentSmoke = this.particles.filter(p => p.mode === 'smoke').length;
-            if (currentSmoke >= (_budget.smokeLimit ?? 60)) return null;
-        }
-
-        const p = new Particle(x, y, color, mode);
         this.particles.push(p);
+        if (counts[mode] !== undefined) counts[mode]++;
         return p;
     },
 
@@ -1107,41 +1091,31 @@ export const spawn_system = {
      * @param {Particle} p - 已构造好的粒子实例
      */
     spawn_pushParticleWithLimit(p) {
-        // [粒子数量限制系统] v3 - 自适应性能等级驱动（与 spawn_createParticle 保持同步）
+        // [粒子数量限制系统] v4 - 复用 particleCounts，与 spawn_createParticle 同步
         const _budget = CONFIG.performance[this.perfQualityLevel || 'high'];
+        const counts = this.particleCounts;
         if (this.particles.length >= _budget.maxParticles) return false;
 
         const mode = p.mode;
-        const activeWindCount = this.particles.filter(q => q.mode === 'wind_slash' || q.mode === 'line').length;
-        const windIsActive = activeWindCount > 0;
+        const windIsActive = (counts.wind_slash + counts.line) > 0;
 
         if (mode === 'ember') {
             const limit = windIsActive ? _budget.emberLimitWind : _budget.emberLimit;
-            const current = this.particles.filter(q => q.mode === 'ember').length;
-            if (current >= limit) return false;
+            if (counts.ember >= limit) return false;
         }
         if (mode === 'mist') {
             const limit = windIsActive ? _budget.mistLimitWind : _budget.mistLimit;
-            const current = this.particles.filter(q => q.mode === 'mist').length;
-            if (current >= limit) return false;
+            if (counts.mist >= limit) return false;
         }
         if (mode === 'shard') {
             const limit = windIsActive ? _budget.shardLimitWind : _budget.shardLimit;
-            const current = this.particles.filter(q => q.mode === 'shard').length;
-            if (current >= limit) return false;
+            if (counts.shard >= limit) return false;
         }
-        // --- spark 限制（与 spawn_createParticle 保持同步）---
-        if (mode === 'spark') {
-            const current = this.particles.filter(q => q.mode === 'spark').length;
-            if (current >= (_budget.sparkLimit ?? 100)) return false;
-        }
-        // --- smoke 限制（与 spawn_createParticle 保持同步）---
-        if (mode === 'smoke') {
-            const current = this.particles.filter(q => q.mode === 'smoke').length;
-            if (current >= (_budget.smokeLimit ?? 60)) return false;
-        }
+        if (mode === 'spark' && counts.spark >= (_budget.sparkLimit ?? 100)) return false;
+        if (mode === 'smoke' && counts.smoke >= (_budget.smokeLimit ?? 60)) return false;
 
         this.particles.push(p);
+        if (counts[mode] !== undefined) counts[mode]++;
         return true;
     },
 

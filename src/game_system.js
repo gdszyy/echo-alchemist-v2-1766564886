@@ -54,7 +54,8 @@ export const game_system = {
                             this._perfDownTimer = 0;
                             const _prev = _level;
                             this.perfQualityLevel = _level === 'high' ? 'medium' : 'low';
-                            console.info(`[Perf] 特效等级降级: ${_prev} → ${this.perfQualityLevel}（平均 FPS: ${this.avgFps}）`);
+                            this.shadowBlurEnabled = _perfCfg[this.perfQualityLevel].shadowBlurEnabled !== false;
+                            if (CONFIG.debug) console.info(`[Perf] 特效等级降级: ${_prev} → ${this.perfQualityLevel}（平均 FPS: ${this.avgFps}）`);
                         }
                     } else if (this.avgFps > _perfCfg.fpsThresholdUp && _level !== 'high') {
                         // 连续高帧：累加升级计时器
@@ -64,7 +65,8 @@ export const game_system = {
                             this._perfUpTimer = 0;
                             const _prev = _level;
                             this.perfQualityLevel = _level === 'low' ? 'medium' : 'high';
-                            console.info(`[Perf] 特效等级升级: ${_prev} → ${this.perfQualityLevel}（平均 FPS: ${this.avgFps}）`);
+                            this.shadowBlurEnabled = _perfCfg[this.perfQualityLevel].shadowBlurEnabled !== false;
+                            if (CONFIG.debug) console.info(`[Perf] 特效等级升级: ${_prev} → ${this.perfQualityLevel}（平均 FPS: ${this.avgFps}）`);
                         }
                     } else {
                         // FPS 处于正常区间，重置两个计时器
@@ -570,7 +572,7 @@ export const game_system = {
     sys_initSelectionPhase() {
         const pendingMode = this.pendingSelectionMode;
         const mode = pendingMode?.mode || 'standard';
-        console.log('[DEBUG][sys_initSelectionPhase] 进入', {
+        if (CONFIG.debug) console.log('[DEBUG][sys_initSelectionPhase] 进入', {
             mode,
             pendingMode: JSON.stringify(pendingMode),
             ammoQueueLen: (this.ammoQueue || []).length,
@@ -647,7 +649,7 @@ export const game_system = {
     sys_initReplaceAmmoPhase() {
         const newRecipes = (this.ammoQueue || []).slice();
         const chargedRecipes = (this._chargedAmmoQueue || []).slice();
-        console.log('[ammo-replace][sys_initReplaceAmmoPhase] 进入', {
+        if (CONFIG.debug) console.log('[ammo-replace][sys_initReplaceAmmoPhase] 进入', {
             newRecipes: newRecipes.length,
             chargedRecipes: chargedRecipes.length,
             phase: this.phase,
@@ -736,7 +738,7 @@ export const game_system = {
             .filter(i => i >= 0 && i < allRecipes.length)
             .map(i => allRecipes[i]);
 
-        console.log('[ammo-replace][sys_confirmReplaceAmmo] 确认替换', {
+        if (CONFIG.debug) console.log('[ammo-replace][sys_confirmReplaceAmmo] 确认替换', {
             selectedIndices,
             finalAmmoCount: finalAmmo.length,
         });
@@ -841,7 +843,7 @@ export const game_system = {
     _proceedToFateMomentSelection() {
         const pendingMode = this.pendingSelectionMode;
         const mode = pendingMode?.mode || (this.replaceAmmoContext?.fateMomentMode) || 'chaos_essence';
-        console.log('[DEBUG][_proceedToFateMomentSelection] 进入', {
+        if (CONFIG.debug) console.log('[DEBUG][_proceedToFateMomentSelection] 进入', {
             mode,
             pendingMode: JSON.stringify(pendingMode),
             replaceAmmoContext: JSON.stringify(this.replaceAmmoContext),
@@ -1429,7 +1431,7 @@ export const game_system = {
      * @description 在回合开始前统一结算遗物/精华，再决定是否进入选择阶段。
      */
     sys_startRoundStartResolver() {
-        console.log('[DEBUG][sys_startRoundStartResolver] 进入', {
+        if (CONFIG.debug) console.log('[DEBUG][sys_startRoundStartResolver] 进入', {
             _roundStartResolverActive: this._roundStartResolverActive,
             pendingRoundStartRewards: JSON.stringify(this.pendingRoundStartRewards || []),
             phase: this.phase,

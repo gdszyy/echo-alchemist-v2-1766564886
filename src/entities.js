@@ -51,6 +51,7 @@ import {
     getRelicIconSrc,
     getUiBitmap,
 } from './bitmap_icons.js';
+import { sb as _sb } from './utils/perf.js';
 
 // ==================== 音频依赖注入 (重构 v2) ====================
 // 移除 Proxy 方案和 window.audio 依赖
@@ -166,7 +167,7 @@ class SpecialSlot {
 
         // ===== 第一层：实线底层（保证连线始终可见） =====
         ctx.globalAlpha = pulse * 0.5;
-        ctx.shadowBlur  = glow * 0.8;
+        ctx.shadowBlur = _sb(glow * 0.8);
         ctx.shadowColor = color;
         ctx.strokeStyle = color;
         ctx.lineWidth   = 1.5;
@@ -178,7 +179,7 @@ class SpecialSlot {
 
         // ===== 第二层：流动虚线叠层（魔法流动感） =====
         ctx.globalAlpha = pulse;
-        ctx.shadowBlur  = glow;
+        ctx.shadowBlur = _sb(glow);
         ctx.lineWidth   = 2.5;
         ctx.setLineDash([5, 5]);
         // 流动速度：每帧向前移动，使用 animTimer 驱动而非 Date.now()
@@ -193,7 +194,7 @@ class SpecialSlot {
         // ===== 第三层：两端钉子锚点圆 =====
         ctx.globalAlpha = pulse;
         ctx.fillStyle   = color;
-        ctx.shadowBlur  = glow * 0.6;
+        ctx.shadowBlur = _sb(glow * 0.6);
         [[this.x, this.y], [this.x2, this.y2]].forEach(([ax, ay]) => {
             ctx.beginPath();
             ctx.arc(ax, ay, 5, 0, Math.PI * 2);
@@ -202,7 +203,7 @@ class SpecialSlot {
 
         // ===== 第四层：中点符号文字（无背景圆）=====
         ctx.globalAlpha  = 1.0;
-        ctx.shadowBlur   = glow;
+        ctx.shadowBlur = _sb(glow);
         ctx.shadowColor  = color;
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
@@ -360,7 +361,7 @@ class FortuneWheel {
         ctx.translate(this.pos.x, this.pos.y);
         
         // --- 0. 繪製外發光 ---
-        ctx.shadowBlur = 30;
+        ctx.shadowBlur = _sb(30);
         ctx.shadowColor = '#fbbf24'; // 金色光暈
 
         // --- 1. 繪製豪華外框 (Rim) ---
@@ -395,7 +396,7 @@ class FortuneWheel {
             ctx.arc(lx, ly, 3, 0, Math.PI * 2);
             ctx.fillStyle = isOn ? '#ffffff' : '#78350f';
             if (isOn) {
-                ctx.shadowBlur = 5; ctx.shadowColor = '#fff';
+                ctx.shadowBlur = _sb(5); ctx.shadowColor = '#fff';
             } else {
                 ctx.shadowBlur = 0;
             }
@@ -444,7 +445,7 @@ class FortuneWheel {
             
             ctx.fillStyle = '#fff';
             ctx.shadowColor = 'rgba(0,0,0,0.8)';
-            ctx.shadowBlur = 4;
+            ctx.shadowBlur = _sb(4);
             
             ctx.font = '24px Arial';
             ctx.textAlign = 'center';
@@ -489,7 +490,7 @@ class FortuneWheel {
         
         // 指針陰影
         ctx.shadowColor = 'rgba(0,0,0,0.5)';
-        ctx.shadowBlur = 5;
+        ctx.shadowBlur = _sb(5);
         
         ctx.beginPath();
         ctx.moveTo(-10, -5);
@@ -552,7 +553,7 @@ class GhostPeg {
         ctx.globalAlpha = alpha * 0.7;
         ctx.strokeStyle = '#c084fc'; // 紫色
         ctx.lineWidth = 1.5;
-        ctx.shadowBlur = 8 + pulse * 6;
+        ctx.shadowBlur = _sb(8 + pulse * 6);
         ctx.shadowColor = '#a855f7';
         ctx.setLineDash([3, 3]);
         ctx.lineDashOffset = -(this.angle * 10) % 6;
@@ -570,7 +571,7 @@ class GhostPeg {
         grad.addColorStop(0.6, 'rgba(168, 85, 247, 0.6)'); // 中间紫色
         grad.addColorStop(1, 'rgba(168, 85, 247, 0.1)');   // 边缘渐隐
         ctx.fillStyle = grad;
-        ctx.shadowBlur = 10 + pulse * 8;
+        ctx.shadowBlur = _sb(10 + pulse * 8);
         ctx.shadowColor = '#f97316';
         ctx.fill();
 
@@ -579,7 +580,7 @@ class GhostPeg {
         ctx.beginPath();
         ctx.arc(x, y, r * 0.35, 0, Math.PI * 2);
         ctx.fillStyle = '#fff';
-        ctx.shadowBlur = 4;
+        ctx.shadowBlur = _sb(4);
         ctx.fill();
 
         // 旋转小光点（两个对称小圆）
@@ -593,7 +594,7 @@ class GhostPeg {
             ctx.beginPath();
             ctx.arc(x + dx, y + dy, dotR, 0, Math.PI * 2);
             ctx.fillStyle = '#fbbf24';
-            ctx.shadowBlur = 5;
+            ctx.shadowBlur = _sb(5);
             ctx.shadowColor = '#fbbf24';
             ctx.fill();
         }
@@ -703,7 +704,7 @@ class TriangleSideWheel {
         ctx.save();
 
         // 外发光
-        ctx.shadowBlur = 10 + pulse * 8;
+        ctx.shadowBlur = _sb(10 + pulse * 8);
         ctx.shadowColor = this.spinning ? '#fbbf24' : 'rgba(100,150,255,0.5)';
 
         // 外框
@@ -749,7 +750,7 @@ class TriangleSideWheel {
             ctx.font = `bold ${sl.arc > 0.5 ? 11 : 9}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.shadowBlur = 3;
+            ctx.shadowBlur = _sb(3);
             ctx.shadowColor = 'rgba(0,0,0,0.8)';
             ctx.fillText(sl.label, 0, 0);
             ctx.restore();
@@ -775,7 +776,7 @@ class TriangleSideWheel {
         ctx.lineTo(0, 8);
         ctx.closePath();
         ctx.fillStyle = '#ef4444';
-        ctx.shadowBlur = 4;
+        ctx.shadowBlur = _sb(4);
         ctx.shadowColor = '#ef4444';
         ctx.fill();
         ctx.restore();
@@ -789,7 +790,7 @@ class TriangleSideWheel {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = '#fff';
-            ctx.shadowBlur = 12;
+            ctx.shadowBlur = _sb(12);
             ctx.shadowColor = '#fbbf24';
             const label = this.resultMultiplier === 0 ? '空' : `${this.resultMultiplier}x!`;
             ctx.fillText(label, x, y - r - 20);
@@ -1070,18 +1071,18 @@ class Peg {
 // @section:peg_base_fill_and_glow - 基础圆形填充与发光效果
         
         if (this.type === 'laser') {
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = _sb(10);
             ctx.shadowColor = CONFIG.colors.laser;
             ctx.fillStyle = isLit ? '#ffffff' : color;
         } else if (this.type === 'wind') {
             // 风属性钉子使用特殊的脉冲发光
             const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
-            ctx.shadowBlur = 12 + pulse * 8;
+            ctx.shadowBlur = _sb(12 + pulse * 8);
             ctx.shadowColor = CONFIG.colors.matWind;
             ctx.fillStyle = isLit ? '#ffffff' : color;
         } else if (isLit) {
             ctx.fillStyle = '#ffffff';
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = _sb(15);
             ctx.shadowColor = '#ffffff';
         } else {
             ctx.fillStyle = color;
@@ -1169,7 +1170,7 @@ class Peg {
             ctx.arc(this.pos.x, this.pos.y, currentRadius + 3 + pulse * 2, 0, Math.PI * 2);
             ctx.strokeStyle = `rgba(56, 189, 248, ${0.6 + pulse * 0.4})`; // 冰蓝色
             ctx.lineWidth = 2;
-            ctx.shadowBlur = 10 + pulse * 8;
+            ctx.shadowBlur = _sb(10 + pulse * 8);
             ctx.shadowColor = '#38bdf8';
             ctx.stroke();
             // 绘制冻结回合数角标
@@ -1241,7 +1242,7 @@ class Peg {
                 ctx.stroke();
                 
                 // 添加金色外发光
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = _sb(8);
                 ctx.shadowColor = goldColor;
                 ctx.stroke();
                 ctx.restore();
@@ -1273,7 +1274,7 @@ class Peg {
         // 高等级（等级≥ 2）时增加金色外发光效果
         if (this.level >= 2) {
             const pulse = (Math.sin(time * 3) + 1) / 2;
-            ctx.shadowBlur = 12 + pulse * 10;
+            ctx.shadowBlur = _sb(12 + pulse * 10);
             ctx.shadowColor = '#fbbf24';
         }
 
@@ -1335,7 +1336,7 @@ class Peg {
         
         const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
         // 高等级时增强光晓
-        ctx.shadowBlur = (this.level >= 2 ? 16 : 8) + pulse * 10;
+        ctx.shadowBlur = _sb((this.level >= 2 ? 16 : 8) + pulse * 10);
         ctx.shadowColor = this.level >= 2 ? '#a7f3d0' : '#34d399';
         
         ctx.strokeStyle = isLit ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.8)';
@@ -1665,7 +1666,7 @@ class Peg {
             const alpha = 0.45 + pulse * 0.35;
             ctx.strokeStyle = `rgba(251, 146, 60, ${alpha})`; // 橙色
             ctx.lineWidth = 1.4;
-            ctx.shadowBlur = 4 + pulse * 6;
+            ctx.shadowBlur = _sb(4 + pulse * 6);
             ctx.shadowColor = 'rgba(251, 146, 60, 0.7)';
             ctx.beginPath();
             ctx.moveTo(x,     y - d); // 顶
@@ -1683,7 +1684,7 @@ class Peg {
             ctx.lineWidth = 1.5;
             ctx.setLineDash([3, 3]);
             ctx.lineDashOffset = (Date.now() / 80) % 6; // 虚线流动动画
-            ctx.shadowBlur = 3 + pulse * 5;
+            ctx.shadowBlur = _sb(3 + pulse * 5);
             ctx.shadowColor = 'rgba(52, 211, 153, 0.6)';
             ctx.beginPath();
             ctx.arc(x, y, r * 1.55, 0, Math.PI * 2);
@@ -1697,7 +1698,7 @@ class Peg {
             ctx.strokeStyle = `rgba(251, 113, 133, ${alpha})`; // 玫瑰红
             ctx.lineWidth = 2.0;
             ctx.lineCap = 'round';
-            ctx.shadowBlur = 4 + pulse * 7;
+            ctx.shadowBlur = _sb(4 + pulse * 7);
             ctx.shadowColor = 'rgba(251, 113, 133, 0.7)';
             const arcR = r * 1.6;
             const arcSpan = Math.PI * 0.55; // 弧长约 99°
@@ -1715,7 +1716,7 @@ class Peg {
             // 钉子下方绘制小三角箭头，表示「漏斗收窄，向下聚焦」
             const alpha = 0.50 + pulse * 0.35;
             ctx.fillStyle = `rgba(245, 158, 11, ${alpha})`; // 琥珀色
-            ctx.shadowBlur = 3 + pulse * 5;
+            ctx.shadowBlur = _sb(3 + pulse * 5);
             ctx.shadowColor = 'rgba(245, 158, 11, 0.6)';
             const ty = y + r * 1.55; // 三角形顶点 Y（钉子正下方）
             const tw = r * 0.55;     // 三角形半宽
@@ -1740,7 +1741,7 @@ class Peg {
             ctx.strokeStyle = `rgba(192, 132, 252, ${alpha})`; // 紫色
             ctx.lineWidth = 1.5;
             ctx.lineCap = 'round';
-            ctx.shadowBlur = 4 + pulse * 6;
+            ctx.shadowBlur = _sb(4 + pulse * 6);
             ctx.shadowColor = 'rgba(192, 132, 252, 0.6)';
             const lx = r * 1.55;
             const lh = r * 0.8;
@@ -1772,12 +1773,12 @@ class Peg {
             ctx.arc(x, y, r * 1.7 + pulse * r * 0.3, 0, Math.PI * 2);
             ctx.strokeStyle = `rgba(251, 191, 36, ${axisAlpha * 0.5})`;
             ctx.lineWidth = 1.5;
-            ctx.shadowBlur = 8 + pulse * 10;
+            ctx.shadowBlur = _sb(8 + pulse * 10);
             ctx.shadowColor = 'rgba(251, 191, 36, 0.8)';
             ctx.stroke();
 
             // 四芒星形（✦）路径
-            ctx.shadowBlur = 6 + pulse * 8;
+            ctx.shadowBlur = _sb(6 + pulse * 8);
             ctx.shadowColor = 'rgba(251, 191, 36, 0.9)';
             ctx.fillStyle = `rgba(251, 191, 36, ${axisAlpha})`;
             ctx.beginPath();
@@ -1797,7 +1798,7 @@ class Peg {
             ctx.beginPath();
             ctx.arc(x, y, r * 0.35, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(255, 255, 255, ${axisAlpha})`;
-            ctx.shadowBlur = 4;
+            ctx.shadowBlur = _sb(4);
             ctx.shadowColor = '#ffffff';
             ctx.fill();
         }
@@ -2957,7 +2958,7 @@ class DropBall {
                 const sizeMod = 1 + (buffs.laser * 0.15); 
                 ctx.save();
                 ctx.globalCompositeOperation = 'lighter'; 
-                ctx.shadowBlur = (15 + pulse * 10) * sizeMod;
+                ctx.shadowBlur = _sb((15 + pulse * 10) * sizeMod);
                 ctx.shadowColor = laserColor;
                 ctx.fillStyle = laserColor;
                 ctx.globalAlpha = 0.5 + (pulse * 0.2); 
@@ -3008,7 +3009,7 @@ class DropBall {
                 ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.fill();
 
                 // 4. 绘制不稳定核心 (Unstable Core)
-                ctx.shadowBlur = glowIntensity;
+                ctx.shadowBlur = _sb(glowIntensity);
                 ctx.shadowColor = '#ef4444';
                 ctx.fillStyle = coreColor;
                 
@@ -3179,7 +3180,7 @@ class DropBall {
                 if (Math.random() < triggerChance) {
                     // @section:mirror_clone_badge - LAYER 6：镜像分身标记
                     const arcCount = 1 + Math.floor(Math.random() * (buffs.lightning * 0.6));
-                    ctx.shadowBlur = 10 + buffs.lightning * 3; 
+                    ctx.shadowBlur = _sb(10 + buffs.lightning * 3); 
                     ctx.shadowColor = '#a855f7'; 
                     ctx.strokeStyle = '#e9d5ff'; 
                     for (let k = 0; k < arcCount; k++) {
@@ -3219,7 +3220,7 @@ class DropBall {
             
             if (hasWind) {
                 ctx.save();
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = _sb(8);
                 ctx.shadowColor = '#34d399';
                 
                 // 计算wind属性的数量
@@ -3274,7 +3275,7 @@ class DropBall {
                 ctx.strokeStyle = `rgba(251, 191, 36, ${0.5 + pulse * 0.5})`;
                 ctx.lineWidth = 1.5;
                 ctx.setLineDash([3, 3]);
-                ctx.shadowBlur = 6 + pulse * 8;
+                ctx.shadowBlur = _sb(6 + pulse * 8);
                 ctx.shadowColor = 'rgba(251, 191, 36, 0.8)';
                 ctx.beginPath();
                 ctx.arc(0, 0, r + 3 + pulse * 1.5, 0, Math.PI * 2);
@@ -3350,7 +3351,7 @@ class SwordQi {
         ctx.arc(0, 0, this.width/2, Math.PI * 0.5, Math.PI * 1.5);
         ctx.bezierCurveTo(this.width/4, -this.width/2, this.width/4, this.width/2, 0, this.width/2);
         ctx.fillStyle = 'rgba(14, 165, 233, 0.8)';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = _sb(10);
         ctx.shadowColor = '#0ea5e9';
         ctx.fill();
         ctx.restore();
@@ -3782,7 +3783,7 @@ class SonSword {
         const glowIntensity = 5 + attackRatio * 15;
         
         if (game.sonSwords.length < 40 || this.passingThroughEnemy) {
-            ctx.shadowBlur = this.passingThroughEnemy ? 20 : glowIntensity;
+            ctx.shadowBlur = _sb(this.passingThroughEnemy ? 20 : glowIntensity);
             ctx.shadowColor = color; 
         }
 
@@ -3902,7 +3903,7 @@ class CloneSpore {
         // 繪製孢子
         ctx.fillStyle = '#d8b4fe';
         ctx.shadowColor = '#a855f7';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = _sb(10);
         ctx.beginPath();
         ctx.arc(0, 0, 6, 0, Math.PI * 2);
         ctx.fill();
@@ -4354,7 +4355,7 @@ class Player {
             if (!isFinite(ox) || !isFinite(oy)) return;
             
             const speedGlow = Math.min(1, this.spinBoost * 2); // 撞击后的高光
-            ctx.shadowBlur = (10 + speedGlow * 20) * orbScale;
+            ctx.shadowBlur = _sb((10 + speedGlow * 20) * orbScale);
             ctx.shadowColor = stat.color;
             ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
             
@@ -4595,14 +4596,14 @@ class FieldLootItem {
         const lootBitmap = lootBitmapPath ? getUiBitmap(lootBitmapPath) : null;
         if (lootBitmap) {
             const sz = 36;
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = _sb(10);
             ctx.shadowColor = glowColor;
             ctx.drawImage(lootBitmap, -sz / 2, -sz / 2, sz, sz);
         } else {
             ctx.font = '24px serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = _sb(10);
             ctx.shadowColor = glowColor;
             ctx.fillText(icon, 0, 0);
         }
