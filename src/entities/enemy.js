@@ -78,6 +78,9 @@ class Enemy {
         this.isFrozenCurrentTurn = false; 
         this.frozenCount = 0; // [温度衰减] 该敌人累计被冰冻的次数，每次被冰冻后温度降低效果乘以 0.9^frozenCount
 
+        // [新属性] 毒素层数（venom stacks）：每次行动结算 DoT
+        this.venomStacks = 0;
+
         // 视觉种子
         this.visualSeed = Math.random(); 
 
@@ -4246,6 +4249,16 @@ class Enemy {
             actualDamage: actualDamage 
         };
     }
+    /**
+     * [新属性] 累加毒素层数。
+     * @param {number} stacks - 要累加的毒层数（向下取整）
+     */
+    applyVenom(stacks) {
+        const s = Math.max(0, Math.floor(stacks || 0));
+        if (s <= 0) return;
+        this.venomStacks = (this.venomStacks || 0) + s;
+    }
+
     applyTemp(amount) {
         if (amount < 0) {
             // [温度衰减机制] 每被冰冻一次，降温效果额外乘以 0.9，叠加计算（冰冻 n 次后系数为 0.9^n）

@@ -338,6 +338,55 @@ const TRUTH_BOOK_DATA = {
             ]
         },
         {
+            id: 'venom', name: '毒素', icon: '☠️', tags: ['元素', 'DoT'],
+            desc: '命中敵人時疊加毒素層數。每次敵人行動開始前結算一次毒素傷害（每層 0.8 傷害 × 共鳴倍率）。冰凍狀態下毒素暫停發作但保留層數，解凍當回合一次性結算；過熱（≥100°C）時每回合結算 2 次。毒素 DoT 不受護盾減傷影響。',
+            setup: (game) => {
+                const w = game.enemyWidth;
+                const h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 1500));
+            },
+            loop: [
+                { type: 'log', text: '疊加毒素層數' },
+                { type: 'spawn_projectile', config: { damage: 5, venom: 6 }, vel: {x: 0, y: -15} },
+                { type: 'wait', frames: 120 }, { type: 'reset' }
+            ]
+        },
+        {
+            id: 'overcharge', name: '超載', icon: '💥', tags: ['特殊', 'AOE'],
+            desc: '子彈飛行中積累充能（彈跳 +1，穿透命中 +3）。代價：發射前 bounce/pierce 減半（共鳴可降低削減）。子彈銷毀時觸發 AoE 爆炸：傷害 = 充能數 × 超載層數 × 基礎傷害 × 0.3，半徑 = 60 + 充能數 × 4。',
+            setup: (game) => {
+                const w = game.enemyWidth;
+                const h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 1; c < 4; c++) {
+                        game.enemies.push(new Enemy((c+0.5) * w + w/2, top + r * h + h/2, 60, 60, 300));
+                    }
+                }
+            },
+            loop: [
+                { type: 'log', text: '發射超載子彈（積累充能後爆炸）' },
+                { type: 'spawn_projectile', config: { damage: 10, overcharge: 3, bounce: 4, pierce: 2 }, vel: {x: 2, y: -15} },
+                { type: 'wait', frames: 240 }, { type: 'reset' }
+            ]
+        },
+        {
+            id: 'echo', name: '回響', icon: '🔁', tags: ['特殊', '分裂'],
+            desc: '雙階段：研磨階段，弹珠碰撞 Peg 時按概率生成虛影 Peg（持續約 1 秒）。戰鬥階段，子弹弹跳時按 25% + echo×5% 概率向反方向鏡像生成回響子彈，繼承 50% 屬性（向下取整）。',
+            setup: (game) => {
+                const w = game.enemyWidth;
+                const h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 2 * h + h/2, 60, 60, 1000));
+            },
+            loop: [
+                { type: 'log', text: '發射帶回響的彈跳子彈' },
+                { type: 'spawn_projectile', config: { damage: 15, echo: 3, bounce: 6 }, vel: {x: 4, y: -15} },
+                { type: 'wait', frames: 240 }, { type: 'reset' }
+            ]
+        },
+        {
             id: 'wind', name: '風', icon: '🌪️', tags: ['特殊', '法陣'],
             desc: '在命中點生成風暴法陣，持續發射風刃攻擊附近的敵人。',
             setup: (game) => { 

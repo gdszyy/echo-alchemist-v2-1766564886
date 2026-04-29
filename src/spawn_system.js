@@ -1317,7 +1317,7 @@ export const spawn_system = {
             const halfInheritCount = scatterCount % 2;
             
             // 定义需要缩放的属性列表
-            const scalableAttrs = ['damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind', 'pierce', 'bounce'];
+            const scalableAttrs = ['damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind', 'pierce', 'bounce', 'venom', 'overcharge', 'echo'];
 
             // 辅助函数：创建散射副本配方
             const createScatterRecipe = (base, factor) => {
@@ -1325,6 +1325,8 @@ export const spawn_system = {
                 r.scatter = 0;         // 清除散射，防止无限递归
                 r.chainPayload = null; // 清除普通连锁，防止无限循环 (套娃逻辑由 nestedPayload 负责)
                 r.isScatterChild = true; // 标记为散射子弹
+                // [新属性] 散射副弹继承比例（供 venom/overcharge/echo 等按比例缩放）
+                r._scatterInheritRatio = factor;
                 
                 // @section:bullet_entity_create - 子弹实体创建与属性注入
                 // ─────────────────────────────────────────────────────────────────────

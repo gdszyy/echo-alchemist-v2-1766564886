@@ -67,6 +67,17 @@ class Projectile {
         
         // [词条 Hook] 动能衰变 (kinetic_decay)
         this._kineticDecayCurrentBonus = config._kineticDecayBonus || 0;
+
+        // [新属性] venom / overcharge / echo
+        this.venom = config.venom || 0;
+        this.overcharge = config.overcharge || 0;
+        this.echo = config.echo || 0;
+        // 超载充能计数（穿透 +3，弹跳 +1）
+        this._chargeCount = 0;
+        // scatter 副弹继承比例（默认 1.0，spawn_system 派生时按需设置 0.5）
+        this._scatterInheritRatio = (typeof config._scatterInheritRatio === 'number') ? config._scatterInheritRatio : 1.0;
+        // 防止 echo 子弹无限链式触发
+        this._isEchoChild = config._isEchoChild || false;
         
         // [词条 Hook] 回响射击 (echo_shot)
         this._echoShotFired = config._echoShotFired || false;
@@ -310,10 +321,24 @@ class Projectile {
                     }
                 }
                 this.piercesLeft--;
+                // [新属性] 超载：穿透命中敌人 +3 充能
+                if (this.overcharge > 0) {
+                    this._chargeCount += 3;
+                }
                 return;
             }
             if (this.bouncesLeft > 0) {
                 this.bouncesLeft--;
+
+                // [新属性] 超载：弹跳（敌人）+1 充能
+                if (this.overcharge > 0) {
+                    this._chargeCount += 1;
+                }
+
+                // [新属性] 回响：弹跳点按概率生成回响子弹（向反方向镜像）
+                if (this.echo > 0 && !this._isEchoChild && typeof game !== 'undefined') {
+                    this._tryTriggerEchoBullet();
+                }
 
                 // ─────────────────────────────────────────────────────────────────────
                 // [词条 Hook] 动能激增（kinetic_surge）
@@ -427,6 +452,14 @@ class Projectile {
         // [优化] 在 Demo 模式下强制开启底墙
         const hasBottomWall = (this.game && this.game.isDemo) ? true : game.hasCombatWall;
 
+        // [新属性] 超载/回响 墙壁碰撞钩子
+        const _onWallBounce = () => {
+            if (this.overcharge > 0) this._chargeCount += 1;
+            if (this.echo > 0 && !this._isEchoChild && typeof this._tryTriggerEchoBullet === 'function') {
+                this._tryTriggerEchoBullet();
+            }
+        };
+
         // --- [v2 即时感重塑] 遗物墙壁联动统一处理函数 ---
         // 1. 回廊电弧 (corridor_arc)：撞击左/右墙壁时 +1 层闪电属性（写入 this.config.lightning）
         // 2. 力场护盾诅咒 (energy_shield)：所有墙壁都消耗 1 次反弹或穿透；耗尽则销毁子弹
@@ -452,6 +485,7 @@ class Projectile {
 
         if (this.pos.x < this.radius) {
             this.pos.x = this.radius; this.vel.x = Math.abs(this.vel.x);
+            _onWallBounce();
             if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
             const angle = Math.abs(Math.atan2(this.vel.x, this.vel.y));
             if (angle < (10 * Math.PI / 180)) {
@@ -471,6 +505,7 @@ class Projectile {
         }
         if (this.pos.x > width - this.radius) {
             this.pos.x = width - this.radius; this.vel.x = -Math.abs(this.vel.x);
+            _onWallBounce();
             if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
             const angle = Math.abs(Math.atan2(this.vel.x, this.vel.y));
             if (angle < (10 * Math.PI / 180)) {
@@ -496,6 +531,7 @@ class Projectile {
             : this.radius;
         if (this.pos.y < topBound) {
             this.pos.y = topBound; this.vel.y = Math.abs(this.vel.y);
+            _onWallBounce();
             if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
             if(this.config.bounce > 0) this.deformation = { x: 1.3, y: 0.7 };
             // [打击感] 反弹顶墙壁：低频大幅震动 (已降低 40%)
@@ -508,6 +544,7 @@ class Projectile {
         if (this.pos.y > height - this.radius) {
             if (hasBottomWall) {
                 this.pos.y = height - this.radius; this.vel.y = -Math.abs(this.vel.y);
+                _onWallBounce();
                 if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
 
                 // [修复] 底部护盾反弹不消耗反弹次数（旧逻辑）；
@@ -632,8 +669,114 @@ class Projectile {
         });
     }
     
+    /**
+     * [新属性] 回响：以镜像反方向生成一颗 echo 子弹（继承 50% 属性，向下取整）。
+     * 仅在非 echo 子弹上触发；带 _isEchoChild 标记防止链式无限。
+     * 二阶共鸣 allowOneRelay 时，echo 子弹也能再触发一次（通过 _echoRelayUsed 控制）。
+     */
+    _tryTriggerEchoBullet() {
+        if (typeof game === 'undefined') return;
+        const echoLevel = this.echo || 0;
+        if (echoLevel <= 0) return;
+
+        const echoRes = game.activeElementResonances && game.activeElementResonances['echo'];
+        const echoResParams = echoRes ? echoRes.params : null;
+        const baseChance = (CONFIG.mechanics && CONFIG.mechanics.echo && CONFIG.balance.echo.baseTriggerChance) || 0.25;
+        const chancePerLevel = (CONFIG.mechanics && CONFIG.mechanics.echo && CONFIG.balance.echo.chancePerLevel) || 0.05;
+        const triggerBonus = echoResParams ? (echoResParams.triggerChanceBonus || 0) : 0;
+        const inheritRatio = echoResParams ? (echoResParams.inheritRatio || 0.5) : 0.5;
+        const triggerChance = Math.min(1.0, baseChance + echoLevel * chancePerLevel + triggerBonus);
+
+        if (Math.random() >= triggerChance) return;
+
+        // 镜像方向（反方向）
+        const mirrorVel = new Vec2(-this.vel.x, -this.vel.y);
+        const _floor = (v) => Math.floor((v || 0) * inheritRatio);
+        const echoRecipe = {
+            ...this.config,
+            damage: Math.max(1, _floor(this.config.damage)),
+            cryo: _floor(this.config.cryo),
+            pyro: _floor(this.config.pyro),
+            lightning: _floor(this.config.lightning),
+            bounce: _floor(this.config.bounce),
+            pierce: _floor(this.config.pierce),
+            scatter: _floor(this.config.scatter),
+            laser: _floor(this.config.laser),
+            venom: _floor(this.config.venom),
+            overcharge: _floor(this.config.overcharge),
+            echo: _floor(this.config.echo),
+            _isEchoChild: true,
+            // 防止再触发 echo_shot 词条无限循环
+            _echoShotChance: 0,
+        };
+        if (game.burstQueue) {
+            game.burstQueue.push({
+                delay: 0,
+                vel: mirrorVel,
+                recipe: echoRecipe,
+                shotId: this.shotId,
+                isLast: false,
+            });
+        }
+        if (game.spawn_createFloatingText) {
+            game.spawn_createFloatingText(this.pos.x, this.pos.y - 16, '🔁ECHO', '#a78bfa');
+        }
+    }
+
+    /**
+     * [新属性] 超载：子弹销毁时结算一次 AoE 爆炸。
+     * explosionDmg = chargeCount × overcharge × baseDmg × baseChargeMult × scatterInheritRatio × explosionMultiplier
+     * AoE 半径 = aoeBaseRadius + chargeCount × aoeRadiusPerCharge
+     */
+    _detonateOvercharge() {
+        if (typeof game === 'undefined') return;
+        if (this.overcharge <= 0 || this._chargeCount <= 0) return;
+        const ocRes = game.activeElementResonances && game.activeElementResonances['overcharge'];
+        const ocResParams = ocRes ? ocRes.params : null;
+        const explosionMultiplier = ocResParams ? (ocResParams.explosionMultiplier || 1.0) : 1.0;
+        const aoeBonus = ocResParams ? (ocResParams.aoeBonus || false) : false;
+
+        const ocCfg = (CONFIG.mechanics && CONFIG.mechanics.overcharge) || {};
+        const baseChargeMult = ocCfg.baseChargeMult || 0.3;
+        const aoeBaseRadius = ocCfg.aoeBaseRadius || 60;
+        const aoeRadiusPerCharge = ocCfg.aoeRadiusPerCharge || 4;
+
+        const baseDmg = this.config.damage || 1;
+        const inherit = this._scatterInheritRatio || 1.0;
+        let dmg = this._chargeCount * this.overcharge * baseDmg * baseChargeMult * inherit * explosionMultiplier;
+        let radius = aoeBaseRadius + this._chargeCount * aoeRadiusPerCharge;
+        if (aoeBonus) radius *= 1.4;
+        dmg = Math.max(1, Math.ceil(dmg));
+
+        const enemies = game.enemies || [];
+        enemies.forEach(en => {
+            if (!en.active) return;
+            const dx = en.pos.x - this.pos.x;
+            const dy = en.pos.y - this.pos.y;
+            if (dx * dx + dy * dy <= radius * radius) {
+                const r = en.takeDamage(dmg);
+                if (typeof game.combat_recordDamage === 'function') {
+                    game.combat_recordDamage(r.actualDamage, 'pyro', 'main', this.shotId);
+                }
+                if (r.killed && typeof game.spawn_addScore === 'function') game.spawn_addScore(en.maxHp);
+            }
+        });
+        if (typeof game.spawn_createShockwave === 'function') {
+            game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
+        }
+        if (typeof game.spawn_createExplosion === 'function') {
+            game.spawn_createExplosion(this.pos.x, this.pos.y, '#fbbf24');
+        }
+        if (typeof game.spawn_createFloatingText === 'function') {
+            game.spawn_createFloatingText(this.pos.x, this.pos.y - 24, `💥${dmg}`, '#fbbf24');
+        }
+    }
+
     destroy(spawnCallback) {
-        this.active = false; 
+        // [新属性] 超载爆炸（在标记 destroyed 之前以便其它系统可读 chargeCount）
+        try { this._detonateOvercharge(); } catch (e) { /* 防御性：销毁路径不应抛错 */ }
+
+        this.active = false;
         this.destroyed = true;
 
         // [修改重点]：允许套娃子弹触发嵌套逻辑，即使它是 Copy (散射出来的)

@@ -177,6 +177,56 @@ const RUNE_DB = [
         affinity_tags: ['clone', 'healer']
     },
 
+    // ---- 毒素系 (Venom) ----
+    {
+        id: 'rune_venom_1',
+        name: '毒蚀符文',
+        rarity: 'rare',
+        element: 'venom',
+        baseStat: 'venom',
+        baseStatPerLevel: 1,
+        icon: '☠️',
+        baseDropWeight: 6,
+        affinity_tags: ['regen', 'shield']
+    },
+    {
+        id: 'rune_venom_2',
+        name: '剧毒符文',
+        rarity: 'epic',
+        element: 'venom',
+        baseStat: 'venom',
+        baseStatPerLevel: 2,
+        icon: '🧪',
+        baseDropWeight: 2,
+        affinity_tags: ['regen', 'shield']
+    },
+
+    // ---- 超载系 (Overcharge) ----
+    {
+        id: 'rune_overcharge_1',
+        name: '超载符文',
+        rarity: 'epic',
+        element: 'overcharge',
+        baseStat: 'overcharge',
+        baseStatPerLevel: 1,
+        icon: '💥',
+        baseDropWeight: 2,
+        affinity_tags: ['shield', 'devour']
+    },
+
+    // ---- 回响系 (Echo) ----
+    {
+        id: 'rune_echo_1',
+        name: '回声符文',
+        rarity: 'rare',
+        element: 'echo',
+        baseStat: 'echo',
+        baseStatPerLevel: 1,
+        icon: '🔁',
+        baseDropWeight: 6,
+        affinity_tags: ['clone', 'jump']
+    },
+
     // ---- 激光系 (Laser) ----
     {
         id: 'rune_laser_1',
@@ -491,6 +541,24 @@ const COUNTER_MAP = {
         devour: 0.8,   // 激光克制吞噬（精准击杀）
         shield: 0.5,   // 激光对护盾有一定效果
         healer: 0.3    // 激光对治疗者效果较弱
+    },
+    venom: {
+        regen: 1.0,    // 毒素强克再生（持续伤害对抗回血）
+        shield: 0.8,   // 毒素穿透护盾结算 DoT
+        healer: 0.4,
+        haste: 0.2
+    },
+    overcharge: {
+        shield: 1.0,   // 超载爆炸克制护盾
+        devour: 0.8,   // 大范围爆炸对吞噬有效
+        clone: 0.4,
+        regen: 0.2
+    },
+    echo: {
+        clone: 1.0,    // 回响克制分身（回响子弹形成多目标）
+        jump: 0.8,     // 回响子弹镜像反向克制跳跃绕后
+        haste: 0.3,
+        healer: 0.2
     }
 };
 
@@ -508,6 +576,9 @@ const STAT_DISPLAY = {
     scatter:   { name: '散射', icon: '🌟' },
     laser:     { name: '激光', icon: '🔦' },
     damage:    { name: '伤害', icon: '⚔️' },
+    venom:     { name: '毒素', icon: '☠️' },
+    overcharge:{ name: '超载', icon: '💥' },
+    echo:      { name: '回响', icon: '🔁' },
 };
 
 // ==================== 稀有度显示映射 ====================
@@ -754,6 +825,123 @@ const ELEMENT_RESONANCE_DB = {
                     baseScatterBonus: 25,         // 基础散射属性层数 +25
                     scatterMultiplier: 1.5,       // 散射伤害 +50%
                     scatterAngleReduction: 0.3,   // 散射角度收窄 30%（即 _scatterAngleMultiplier = 0.7，供 Step3 在 spawn_system.js 中读取）
+                }
+            },
+        ]
+    },
+    venom: {
+        name: '毒素共鸣',
+        icon: '☠️',
+        tiers: [
+            {
+                threshold: 3,
+                label: '毒素共鸣·一阶',
+                desc: '毒素 DoT 倍率 ×1.2，基础毒素属性 +5',
+                params: {
+                    dotMultiplier: 1.2,
+                    baseVenomBonus: 5,
+                    applyOnHitBonus: 0,
+                    ignoreShield: false,
+                }
+            },
+            {
+                threshold: 6,
+                label: '毒素共鸣·二阶',
+                desc: '毒素 DoT 倍率 ×1.4，基础毒素属性 +10，每次命中额外 +1 毒层',
+                params: {
+                    dotMultiplier: 1.4,
+                    baseVenomBonus: 10,
+                    applyOnHitBonus: 1,
+                    ignoreShield: false,
+                }
+            },
+            {
+                threshold: 9,
+                label: '毒素共鸣·三阶',
+                desc: '毒素 DoT 倍率 ×1.7，基础毒素属性 +25，对护盾敌人造成双倍 DoT',
+                params: {
+                    dotMultiplier: 1.7,
+                    baseVenomBonus: 25,
+                    applyOnHitBonus: 1,
+                    ignoreShield: true,   // 对护盾敌人 DoT 双倍
+                }
+            },
+        ]
+    },
+    overcharge: {
+        name: '超载共鸣',
+        icon: '💥',
+        tiers: [
+            {
+                threshold: 3,
+                label: '超载共鸣·一阶',
+                desc: '爆炸伤害倍率 ×1.2，基础超载属性 +5，bounce/pierce 削减改为 30%',
+                params: {
+                    explosionMultiplier: 1.2,
+                    baseOverchargeBonus: 5,
+                    costReduction: 0.3,
+                    pierceChargeBonus: 0,
+                    aoeBonus: false,
+                }
+            },
+            {
+                threshold: 6,
+                label: '超载共鸣·二阶',
+                desc: '爆炸伤害倍率 ×1.5，基础超载属性 +10，穿透每次充能 +5',
+                params: {
+                    explosionMultiplier: 1.5,
+                    baseOverchargeBonus: 10,
+                    costReduction: 0.3,
+                    pierceChargeBonus: 2,
+                    aoeBonus: false,
+                }
+            },
+            {
+                threshold: 9,
+                label: '超载共鸣·三阶',
+                desc: '爆炸伤害倍率 ×2.0，基础超载属性 +25，不再削减 bounce/pierce，AoE 半径加成',
+                params: {
+                    explosionMultiplier: 2.0,
+                    baseOverchargeBonus: 25,
+                    costReduction: 1.0,    // 1.0 = 完全免除削减
+                    pierceChargeBonus: 2,
+                    aoeBonus: true,
+                }
+            },
+        ]
+    },
+    echo: {
+        name: '回响共鸣',
+        icon: '🔁',
+        tiers: [
+            {
+                threshold: 3,
+                label: '回响共鸣·一阶',
+                desc: '回响触发概率 +10%，回响子弹继承 55%',
+                params: {
+                    triggerChanceBonus: 0.10,
+                    inheritRatio: 0.55,
+                    allowOneRelay: false,
+                }
+            },
+            {
+                threshold: 6,
+                label: '回响共鸣·二阶',
+                desc: '回响触发概率 +20%，回响子弹继承 60%，回响子弹可再触发一次回响',
+                params: {
+                    triggerChanceBonus: 0.20,
+                    inheritRatio: 0.60,
+                    allowOneRelay: true,
+                }
+            },
+            {
+                threshold: 9,
+                label: '回响共鸣·三阶',
+                desc: '回响必触发，回响子弹继承 75%',
+                params: {
+                    triggerChanceBonus: 1.0,    // 必触发
+                    inheritRatio: 0.75,
+                    allowOneRelay: true,
                 }
             },
         ]

@@ -870,8 +870,55 @@ phase_gathering_getRandomPegType() {
      */
     phase_enemy_processTurn(e) {
         if (!e.active || e.hasActedThisTurn) return;
-        
-        e.hasActedThisTurn = true; 
+
+        e.hasActedThisTurn = true;
+
+        // --- [新属性] 毒素 DoT 结算 ---
+        // 公式：dmg = venomStacks × dotPerStack × dotMultiplier(共鸣)
+        // 冻结（temp <= -80）时跳过本回合，但层数保留；解冻当回合一次性结算（按当前层数 ×1）。
+        // 过热（temp >= 100）时每回合结算 2 次。
+        // ignoreShield=true 共鸣下：对 shield 敌人 DoT 双倍（毒素本身 bypass 护盾减伤）。
+        if ((e.venomStacks || 0) > 0) {
+            const venomCfg = (CONFIG.mechanics && CONFIG.mechanics.venom) || {};
+            const dotPerStack = venomCfg.dotPerStack || 0.8;
+            const venomRes = this.activeElementResonances && this.activeElementResonances['venom'];
+            const venomResParams = venomRes ? venomRes.params : null;
+            const dotMultiplier = venomResParams ? (venomResParams.dotMultiplier || 1.0) : 1.0;
+            const ignoreShield = venomResParams ? (venomResParams.ignoreShield || false) : false;
+
+            const isFrozen = (e.temp <= -80);
+            // 解冻当回合一次性结算：上回合冻结但本回合未冻 -> _venomFrozenAccum
+            // 这里以 e._wasFrozenLastTurn 简易检测：若本帧冻结，标记 true，次回合解除时一次性结算。
+            if (isFrozen) {
+                // 冻结当回合不发作，仅标记
+                e._wasFrozenLastTurn = true;
+            } else {
+                let ticks = 1;
+                if (e.temp >= 100) ticks = 2;
+                let oneShotMult = 1;
+                if (e._wasFrozenLastTurn) {
+                    // 解冻当回合一次性结算（按当前 stacks ×1）
+                    oneShotMult = 1; // 维持公式一致：×当前 stacks 一次
+                    e._wasFrozenLastTurn = false;
+                }
+                let dotDmg = (e.venomStacks * dotPerStack * dotMultiplier) * ticks * oneShotMult;
+                // 对 shield 敌人 DoT 双倍（共鸣 Tier3）
+                if (ignoreShield && e.affixes && e.affixes.includes('shield')) {
+                    dotDmg *= 2;
+                }
+                if (dotDmg > 0) {
+                    const dmg = Math.max(1, Math.ceil(dotDmg));
+                    // bypassShield=true 让毒素 DoT 不受护盾减伤
+                    const r = e.takeDamage(dmg, null, true);
+                    if (r && this.combat_recordDamage) this.combat_recordDamage(r.actualDamage, 'pyro', 'main');
+                    if (this.spawn_createFloatingText) this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, `☠️${dmg}`, '#84cc16');
+                    if (this.spawn_createParticle) {
+                        for (let i = 0; i < 3; i++) this.spawn_createParticle(e.pos.x, e.pos.y, '#84cc16', 'mist');
+                    }
+                }
+            }
+        }
+
         
         //  只要觸發了結算，強迫掃描波在接下來的 45 幀內保持慢速
         // 這樣即使敵人被燒死消失了，波浪也會慢慢掃過屍體位置，展現"擊殺確認"的感覺
