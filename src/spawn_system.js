@@ -647,6 +647,36 @@ export const spawn_system = {
     },
 
 /**
+     * @method spawn_spawnEliteJumperRows
+     * @description [in-wall-clear-lottery] 围墙清空抽奖结算后的强援增援：在画面外栈式生成
+     * 多排敌人，每个新敌人强制带上 ['jump', 'haste'] 双词缀并标记为精英。
+     * 用于「围墙内敌人全灭 → 抽奖 → 敌人回合开局立刻刷新精英援军」的流程。
+     * @param {number} [count=3] - 要生成的精英行数（至少 3）。
+     */
+    spawn_spawnEliteJumperRows(count = 3) {
+        const safeCount = Math.max(3, count | 0);
+        // 生成前记录现有敌人，便于事后筛选新生成的实例并赋予强制词条
+        const before = new Set(this.enemies);
+        for (let i = 0; i < safeCount; i++) {
+            const yPos = this.combatGridTopY - i * this.enemyHeight;
+            this.spawn_spawnEnemyRowAt(yPos, { offScreenEntrance: true });
+        }
+        const newcomers = this.enemies.filter(e => e.active && !before.has(e));
+        newcomers.forEach(e => {
+            // 强制覆盖词条为 jump+haste，并标记精英（含视觉强调）
+            e.affixes = ['jump', 'haste'];
+            e.type = 'elite';
+            // 取消护盾层数残留（spawn_spawnEnemyRowAt 不会给 jump+haste 配护盾，这里只是兜底）
+            if (typeof e.shieldCharges === 'number') e.shieldCharges = 0;
+            this.spawn_createShockwave(e.pos.x, e.pos.y, '#facc15');
+            for (let s = 0; s < 5; s++) {
+                this.spawn_createParticle(e.pos.x, e.pos.y, '#facc15', 'spark');
+            }
+        });
+        return newcomers.length;
+    },
+
+/**
      * @method triggerCloneSpawn
      * @description 触发分身生成的通用逻辑
      */
