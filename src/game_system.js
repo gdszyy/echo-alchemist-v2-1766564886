@@ -405,6 +405,8 @@ export const game_system = {
         this._roundStartBannerActive = false; // 重置横幅保护标志
         // 重置 炼金火药管平坦伤害加成
         this.flatDamageBonus = 0;
+        // [v2 即时感重塑] 重置 混沌契约伤害倍率
+        this.chaosPactDamageMult = 1;
         // 重置 敌人动作后符文领取标志
         this._runeClaimPending = false;
         // [难度平衡] 重置战后高压因子
@@ -1490,6 +1492,22 @@ export const game_system = {
         } else {
             showToast('🎪 敌人掉落了混沌精華，將在下回合開始觸發命運時刻');
         }
+
+        // --- [遗物 Hook] 混沌爆发 (chaos_burst) ---
+        // 当掉落物为混沌精华时，对全场所有敌人造成 (回合数 × 2) 的固定真实伤害
+        if (queuedReward.type === 'chaos_essence' && this.ownedRelics && this.ownedRelics.includes('chaos_burst')) {
+            const burstDmg = (this.round || 1) * 2;
+            for (const e of (this.enemies || [])) {
+                if (!e || !e.active || e === enemy) continue;
+                const r = e.takeDamage(burstDmg);
+                if (typeof this.spawn_createFloatingText === 'function') {
+                    this.spawn_createFloatingText(e.pos.x, e.pos.y - 18, `混沌爆发 ${burstDmg}`, '#a855f7');
+                }
+                if (r && r.killed && typeof this.spawn_addScore === 'function') this.spawn_addScore(e.maxHp);
+            }
+            if (typeof this.triggerScreenShake === 'function') this.triggerScreenShake(8);
+        }
+
         return queuedReward;
     },
 
@@ -2306,6 +2324,8 @@ export const game_system = {
                 slotCount: this.slotCount || 1,
                 marbleSizeBonus: this.marbleSizeBonus || 0,
                 flatDamageBonus: this.flatDamageBonus || 0,
+                // [v2 即时感重塑] 混沌契约伤害倍率（持久化避免存档读档后丢失）
+                chaosPactDamageMult: this.chaosPactDamageMult || 1,
                 // 符文
                 runeInventory: (this.runeInventory || []).slice(),
                 runeGrid: (this.runeGrid || Array(9).fill(null)).slice(),
@@ -2420,6 +2440,7 @@ export const game_system = {
             this.slotCount = state.slotCount || 1;
             this.marbleSizeBonus = state.marbleSizeBonus || 0;
             this.flatDamageBonus = state.flatDamageBonus || 0;
+            this.chaosPactDamageMult = state.chaosPactDamageMult || 1;
 
             // --- 恢复符文 ---
             this.runeInventory = (state.runeInventory || []).slice();

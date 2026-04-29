@@ -423,12 +423,35 @@ class Projectile {
 
     _applyMove(vel, width, height, spawnCallback) {
         this.pos = this.pos.add(vel);
-        
+
         // [优化] 在 Demo 模式下强制开启底墙
         const hasBottomWall = (this.game && this.game.isDemo) ? true : game.hasCombatWall;
 
-        if (this.pos.x < this.radius) { 
-            this.pos.x = this.radius; this.vel.x = Math.abs(this.vel.x); 
+        // --- [v2 即时感重塑] 遗物墙壁联动统一处理函数 ---
+        // 1. 回廊电弧 (corridor_arc)：撞击左/右墙壁时 +1 层闪电属性（写入 this.config.lightning）
+        // 2. 力场护盾诅咒 (energy_shield)：所有墙壁都消耗 1 次反弹或穿透；耗尽则销毁子弹
+        // 返回 true 表示子弹被销毁（调用方应直接 return）
+        const handleRelicWallHit = (side) => {
+            const g = (typeof game !== 'undefined') ? game : null;
+            if (!g || !g.ownedRelics) return false;
+            if ((side === 'left' || side === 'right') && g.ownedRelics.includes('corridor_arc')) {
+                this.config.lightning = (this.config.lightning || 0) + 1;
+            }
+            if (g.ownedRelics.includes('energy_shield')) {
+                if ((this.bouncesLeft || 0) > 0) {
+                    this.bouncesLeft--;
+                } else if ((this.piercesLeft || 0) > 0) {
+                    this.piercesLeft--;
+                } else {
+                    this.destroy(spawnCallback);
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        if (this.pos.x < this.radius) {
+            this.pos.x = this.radius; this.vel.x = Math.abs(this.vel.x);
             if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
             const angle = Math.abs(Math.atan2(this.vel.x, this.vel.y));
             if (angle < (10 * Math.PI / 180)) {
@@ -444,9 +467,10 @@ class Projectile {
                 game.triggerScreenShake(wallShake);
             }
             this.hitCooldowns.clear();
+            if (handleRelicWallHit('left')) return;
         }
-        if (this.pos.x > width - this.radius) { 
-            this.pos.x = width - this.radius; this.vel.x = -Math.abs(this.vel.x); 
+        if (this.pos.x > width - this.radius) {
+            this.pos.x = width - this.radius; this.vel.x = -Math.abs(this.vel.x);
             if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
             const angle = Math.abs(Math.atan2(this.vel.x, this.vel.y));
             if (angle < (10 * Math.PI / 180)) {
@@ -462,6 +486,7 @@ class Projectile {
                 game.triggerScreenShake(wallShake);
             }
             this.hitCooldowns.clear();
+            if (handleRelicWallHit('right')) return;
         }
         // [修复] 顶部边界使用 combatGridTopY 计算真实反弹墙位置，与绘制位置保持一致
         // 绘制层：wallTopY = combatGridTopY - enemyHeight/2（见 game_phase.js）
@@ -469,8 +494,8 @@ class Projectile {
         const topBound = (typeof game !== 'undefined' && game.combatGridTopY != null && game.enemyHeight != null)
             ? (game.combatGridTopY - game.enemyHeight / 2 + this.radius)
             : this.radius;
-        if (this.pos.y < topBound) { 
-            this.pos.y = topBound; this.vel.y = Math.abs(this.vel.y); 
+        if (this.pos.y < topBound) {
+            this.pos.y = topBound; this.vel.y = Math.abs(this.vel.y);
             if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
             if(this.config.bounce > 0) this.deformation = { x: 1.3, y: 0.7 };
             // [打击感] 反弹顶墙壁：低频大幅震动 (已降低 40%)
@@ -478,13 +503,15 @@ class Projectile {
                 const wallShake = (2 + Math.min(1, this.config.damage / 20) * 5) * 0.6; // 1.2~4.2px
                 game.triggerScreenShake(wallShake);
             }
+            if (handleRelicWallHit('top')) return;
         }
         if (this.pos.y > height - this.radius) {
             if (hasBottomWall) {
                 this.pos.y = height - this.radius; this.vel.y = -Math.abs(this.vel.y);
                 if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
-                
-                // [修复] 底部护盾反弹不消耗反弹次数
+
+                // [修复] 底部护盾反弹不消耗反弹次数（旧逻辑）；
+                // [v2 力场护盾诅咒] 现在所有墙壁都会消耗 bounce/pierce，由 handleRelicWallHit 统一处理
                 if(this.config.bounce > 0) this.deformation = { x: 1.3, y: 0.7 };
                 // [打击感] 反弹底墙壁：低频大幅震动 (已降低 40%)
                 if (typeof game !== 'undefined' && game.triggerScreenShake) {
@@ -492,6 +519,7 @@ class Projectile {
                     game.triggerScreenShake(wallShake);
                 }
                 this.hitCooldowns.clear();
+                if (handleRelicWallHit('bottom')) return;
             } else {
                 this.destroy(spawnCallback);
             }

@@ -1254,8 +1254,8 @@ const RELIC_DB = [
     //  1. 粉色钉子遗物
     { id: 'pink_slime', name: '粉紅凝膠', icon: '💗', desc: '收集階段：出現 3 個高彈性粉色釘子 (可疊加)。立刻觸發一次混沌精華。', rarity: 'common', effect: 'pink_peg_up', maxStacks: 5},
 
-    //  2. 战斗底部反弹墙
-    { id: 'energy_shield', name: '力場護盾', icon: '🛡️', desc: '戰鬥階段：底部邊界可消耗彈性/穿透次數來反彈子彈。', rarity: 'cursed', effect: 'combat_wall' ,maxStacks: 1},
+    //  2. 战斗底部反弹墙（诅咒：所有墙体都消耗反弹/穿透）
+    { id: 'energy_shield', name: '力場護盾', icon: '🛡️', desc: '戰鬥階段：底部邊界可反彈子彈。但子彈觸碰任何墻體（左/右/頂/底）都會額外消耗一次反彈或穿透次數。', rarity: 'cursed', effect: 'combat_wall' ,maxStacks: 1},
 
     //  3. 特殊槽解锁 (三种槽位)
     { id: 'unlock_recall', name: '時光沙漏', icon: '⏳', desc: '收集階段：解鎖 [回溯槽] 的出現 (若無槽位則+1)。立刻觸發一次混沌精華。', rarity: 'rare', effect: 'unlock_slot', slotType: 'recall' ,maxStacks: 1},
@@ -1373,6 +1373,145 @@ const RELIC_DB = [
         desc: '战斗阶段：距离失败线越近，所有子弹伤害加成越高。距离 0 格 +50%，1 格 +25%，2 格 +12.5%，3 格以上无加成。',
         rarity: 'cursed',
         effect: 'desperation_damage',
+        maxStacks: 1
+    },
+
+    // ==================== 即时战斗强化遗物（v2 即时感重塑）====================
+    // 设计目标：摆脱"立刻触发混沌精华"的钉板依赖，将"拿到=立刻强"的体感转移到战斗/弹药/掉落维度。
+
+    // 猎人本能：血量最低的敌人始终被标记为"狩猎目标"，命中时伤害 +25%
+    {
+        id: 'hunter_instinct',
+        name: '猎人本能',
+        icon: '🎯',
+        desc: '战斗阶段：场上血量最低的敌人始终被标记为「狩猎目标」，子弹命中该目标时伤害 +25%。',
+        rarity: 'rare',
+        effect: 'hunter_instinct',
+        maxStacks: 1,
+        recommended: true,
+        tags: ['伤害提升', '集火'],
+        recommendTip: '聚焦残血敌人，单点击杀效率大幅提升！'
+    },
+    // 符文共鸣核：每次击杀，符文充能条额外 +8%
+    {
+        id: 'rune_resonance_core',
+        name: '符文共鸣核',
+        icon: '💠',
+        desc: '战斗阶段：子弹每次击杀敌人，符文充能条额外 +8%。',
+        rarity: 'rare',
+        effect: 'rune_resonance_core',
+        maxStacks: 1,
+        recommended: true,
+        tags: ['符文加速', '击杀奖励'],
+        recommendTip: '击杀越多，符文充能越快，构筑成型速度暴增！'
+    },
+    // 镜像弹夹：获得后立即将当前 ammoQueue 中伤害最高的子弹复制一份加入队列末尾
+    {
+        id: 'mirror_magazine',
+        name: '镜像弹夹',
+        icon: '🪞',
+        desc: '获得后立刻将本回合弹药队列中伤害最高的子弹复制一份，加入队列末尾。',
+        rarity: 'rare',
+        effect: 'mirror_magazine',
+        maxStacks: 2
+    },
+    // 末日计时器：每回合开始时，场上随机一个敌人受到 round×5 的固定伤害
+    {
+        id: 'doomsday_timer',
+        name: '末日计时器',
+        icon: '⏱️',
+        desc: '每回合开始时，对场上随机一个敌人造成 (回合数 × 5) 的固定真实伤害。',
+        rarity: 'rare',
+        effect: 'doomsday_timer',
+        maxStacks: 1,
+        recommended: true,
+        tags: ['持续伤害', '回合奖励'],
+        recommendTip: '每回合自动削血，越打到后面伤害越夸张！'
+    },
+    // 余韵回响：触发钉板时，单一属性收集到 10 层以上时，额外再收集 1 层
+    {
+        id: 'echo_reverberation',
+        name: '余韵回响',
+        icon: '🔔',
+        desc: '触发钉板时，若单一属性收集到 10 层以上，自动额外再收集 1 层（每种属性每次钉板仅触发一次）。',
+        rarity: 'rare',
+        effect: 'echo_reverberation',
+        maxStacks: 1
+    },
+    // 元素注入器：获得后立即删除当前 ammoQueue 中最强和最弱的子弹，剩下那颗属性翻倍
+    {
+        id: 'element_injector',
+        name: '元素注入器',
+        icon: '💉',
+        desc: '获得后立刻删除本回合弹药队列中最强和最弱的两颗子弹，剩下那颗子弹的所有属性层数翻倍。',
+        rarity: 'epic',
+        effect: 'element_injector',
+        maxStacks: 1
+    },
+    // 混沌爆发：掉落混沌精华时，立刻全屏伤害 round×2
+    {
+        id: 'chaos_burst',
+        name: '混沌爆发',
+        icon: '💥',
+        desc: '战斗阶段：每次敌人掉落混沌精华时，立刻对全场所有敌人造成 (回合数 × 2) 的固定真实伤害。',
+        rarity: 'cursed',
+        effect: 'chaos_burst',
+        maxStacks: 1
+    },
+    // 属性协议：弹药配方含 4 种以上不同属性时，所有子弹基础伤害 +{该子弹携带属性种类数}
+    {
+        id: 'attribute_protocol',
+        name: '属性协议',
+        icon: '🧬',
+        desc: '若本回合弹药配方包含 4 种以上不同属性，每颗子弹的基础伤害 + 该子弹自身携带的属性种类数。',
+        rarity: 'rare',
+        effect: 'attribute_protocol',
+        maxStacks: 1,
+        recommended: true,
+        tags: ['多元素', '伤害提升'],
+        recommendTip: '属性越杂越强，鼓励混搭流派！'
+    },
+    // 殒命爆裂：击杀敌人时，对附近敌人造成被杀敌人最大血量 10%（最小 2）的固定伤害
+    {
+        id: 'mortal_burst',
+        name: '殒命爆裂',
+        icon: '🎆',
+        desc: '战斗阶段：每当敌人被击杀，在死亡位置爆炸，对附近敌人造成该敌人最大血量 10%（最小 2）的固定真实伤害。',
+        rarity: 'rare',
+        effect: 'mortal_burst',
+        maxStacks: 1,
+        recommended: true,
+        tags: ['连锁清场', '群伤'],
+        recommendTip: '击杀越凶，连锁爆炸越强！高血量精英死亡时清场尤为爽快。'
+    },
+    // 回廊电弧：撞击左右墙壁获得闪电属性；每回合开始对靠墙敌人发动闪电链
+    {
+        id: 'corridor_arc',
+        name: '回廊电弧',
+        icon: '⚡',
+        desc: '子弹每次撞击左/右墙壁，获得 +1 层闪电属性。每回合开始时，紧贴左右墙壁的敌人各有 50% 概率被闪电链击中（层数 = 回合数，伤害 = 当前弹药中三颗子弹的最高基础伤害）。',
+        rarity: 'epic',
+        effect: 'corridor_arc',
+        maxStacks: 1
+    },
+    // 混沌契约（诅咒）：无法研磨弹珠（精华只能跳过），但所有子弹伤害 ×2，立即获得 3 个稀有符文
+    {
+        id: 'chaos_pact',
+        name: '混沌契约',
+        icon: '🩸',
+        desc: '【诅咒】无法进行研磨阶段，获得精华只能选择跳过。【收益】立刻获得 3 个随机稀有符文，所有子弹伤害永久 ×2。',
+        rarity: 'cursed',
+        effect: 'chaos_pact',
+        maxStacks: 1
+    },
+    // 贪婪轮盘（诅咒）：发射时 multicast 折算为伤害（每层 +damage×0.5），每发 75% 概率再发射一次
+    {
+        id: 'greedy_wheel',
+        name: '贪婪轮盘',
+        icon: '🎲',
+        desc: '【诅咒】子弹发射时，所有连射 (multicast) 层数清零并按每层 +(基础伤害 × 0.5) 折算为固定伤害。【收益】每次发射后有 75% 概率自动再发射一次（再发射不会再触发本效果）。',
+        rarity: 'cursed',
+        effect: 'greedy_wheel',
         maxStacks: 1
     },
 ];
