@@ -631,6 +631,9 @@ phase_gathering_getRandomPegType() {
         }
         // [perfect-clear-upgrade] 重置「本回合是否已触发蓄能升级」标志
         this._chargeUpgradeApplied = false;
+        // [in-wall-clear-lottery] 重置「本回合是否已触发围墙清空抽奖」标志
+        this._inWallClearTriggered = false;
+        this._inWallClearLotteryActive = false;
 
         // [bullet-charge-fix] 拍摄本回合实际进入战斗的 ammoQueue 快照，作为下回合
         // 「子弹充能 / 精华触发时的充能子弹」的真实数据源。
@@ -1006,6 +1009,64 @@ phase_gathering_getRandomPegType() {
                     this._ui_checkRunewordBubble();
                 }
             }, 800);
+        }
+    },
+
+/**
+     * @method phase_inWallClearTrigger
+     * @description [in-wall-clear-lottery] 当围墙内（pos.y > 0）的敌人全部死亡时触发：
+     *   1. 清空场上所有子弹（projectiles / sonSwords / burstQueue 等）。
+     *   2. 拍摄当前 ammoQueue 快照作为老虎机抽奖输入，剩余子弹数量作为额外加成。
+     *   3. 弹出「与跳过混沌精华一致」的子弹老虎机，按 (base + 剩余子弹数) 提升属性。
+     *   4. 抽奖期间设置 `_inWallClearLotteryActive` 暂停标志，阻止 `phase_enemy_startLogic` 自动启动。
+     *   5. 抽奖结束后立刻刷出至少 3 排画面外精英援军（强制 jump+haste 词条），随后解除暂停。
+     * 整个流程每回合最多触发一次，由 `_inWallClearTriggered` 守卫。
+     */
+    phase_inWallClearTrigger() {
+        if (this._inWallClearTriggered) return;
+        if (this.gameOver) return;
+        if (this.phase !== 'combat') return;
+        // 已经处于敌人回合（例如手动调试触发），不再覆盖流程
+        if (this.isEnemyTurn) return;
+        this._inWallClearTriggered = true;
+        // 与 perfect-clear-upgrade 互斥：避免后者在同一帧再次升级 ammoQueue
+        this._chargeUpgradeApplied = true;
+
+        const remaining = Array.isArray(this.ammoQueue) ? this.ammoQueue.length : 0;
+        // 抽奖输入：优先使用当前剩余 ammoQueue；若为空（极少数发完才清场），退化到上一回合实际发射的快照
+        let snapshot = (Array.isArray(this.ammoQueue) && this.ammoQueue.length > 0)
+            ? this.ammoQueue.map(r => ({ ...r }))
+            : (Array.isArray(this._lastFiredAmmoSnapshot) ? this._lastFiredAmmoSnapshot.map(r => ({ ...r })) : []);
+
+        // 1. 清空场上所有飞行子弹（projectiles / sonSwords / burstQueue 等）
+        if (typeof this.data_clearProjectiles === 'function') {
+            this.data_clearProjectiles();
+        }
+        // 2. 清空 ammoQueue：让 playerTurnFinished 自然成立，但抽奖标志会阻断敌人回合启动
+        this.ammoQueue = [];
+        if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
+        if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
+
+        // 3. 标记抽奖暂停，开始老虎机
+        this._inWallClearLotteryActive = true;
+        showToast(`🎰 围墙清空！剩余 ${remaining} 发弹药 → 抽奖加成 +${remaining}`);
+
+        const finishLottery = () => {
+            // 4. 抽奖结束 → 刷新至少 3 排带 jump+haste 的精英援军
+            if (typeof this.spawn_spawnEliteJumperRows === 'function') {
+                this.spawn_spawnEliteJumperRows(3);
+                showToast("⚡ 精英援军入场：跳跃 + 极速！");
+                if (audio && typeof audio.playPowerup === 'function') audio.playPowerup();
+            }
+            // 5. 解除暂停，下一帧 phase_combat_update 会自动进入敌人回合
+            this._inWallClearLotteryActive = false;
+        };
+
+        if (typeof this.sys_runInWallClearLottery === 'function' && snapshot.length > 0) {
+            this.sys_runInWallClearLottery(snapshot, remaining, finishLottery);
+        } else {
+            // 无可抽奖子弹：跳过抽奖动画，直接刷援军并解除暂停
+            finishLottery();
         }
     },
 
@@ -1974,9 +2035,16 @@ phase_gathering_getRandomPegType() {
             return; 
         }
 
-        // [perfect-clear-upgrade] 围墙范围内已无敌人但仍有剩余子弹：
-        // 立刻结算，并将剩余子弹的所有可累加属性 +1 后携带到下回合，附带显著的蓄能发光升级特效。
-        // _chargeUpgradeApplied 防止同一回合多次进入此分支（结算流程内仍可能继续 tick）。
+        // [in-wall-clear-lottery] 围墙范围内（pos.y > 0）已无敌人时优先触发抽奖 + 精英援军流程。
+        // 该触发会内部置 `_chargeUpgradeApplied = true`，覆盖原 perfect-clear-upgrade 路径。
+        if (activeEnemies === 0 && this.phase === 'combat' && !this.gameOver
+            && !this._inWallClearTriggered && !this.isEnemyTurn
+            && typeof this.phase_inWallClearTrigger === 'function') {
+            this.phase_inWallClearTrigger();
+        }
+
+        // [perfect-clear-upgrade] 兜底分支：若新机制未启用（如试炼场或抽奖跳过），
+        // 仍然走原蓄能升级流程，将剩余子弹 +1 携带到下回合。
         if (activeEnemies === 0) {
             const hasLeftoverAmmo = this.ammoQueue.length > 0;
             if (hasLeftoverAmmo && !this._chargeUpgradeApplied) {
@@ -2017,6 +2085,8 @@ phase_gathering_getRandomPegType() {
                            !this.isVisualEffectActive;
 
         if (playerTurnFinished && !this.gameOver) {
+            // [in-wall-clear-lottery] 抽奖暂停期间禁止启动敌人回合，等待玩家关闭老虎机覆盖层
+            if (this._inWallClearLotteryActive) return;
             // [回合开始横幅保护] 横幅期间不触发敌人行动，避免与上一回合结束时的敌人行动重复
             if (this._roundStartBannerActive) return;
             // [遗物/命运时刻保护] 遗物或命运时刻 overlay 显示期间，必须等待玩家选择完毕

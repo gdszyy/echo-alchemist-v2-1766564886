@@ -1055,6 +1055,73 @@ export const game_system = {
     },
 
     /**
+     * @method sys_runInWallClearLottery
+     * @description [in-wall-clear-lottery] 围墙内敌人全灭时触发的子弹老虎机抽奖。
+     * 复用 `ui_showChaosBulletSlotMachine` 的视觉与命中规则（与跳过混沌精华的抽奖一致），
+     * 但额外按「剩余子弹数量」放大每个 slot 的提升幅度（incVal = base + bonusCount）。
+     * 抽奖结束后将升级后的子弹携带到下回合（_carryOverAmmo），解除暂停标志，并触发精英援军刷新。
+     * @param {Array<Object>} chargedSnapshot 用于抽奖的子弹快照（每个元素是 recipe 副本）。
+     * @param {number} [bonusCount=0] 抽奖结算时叠加到 incVal 的剩余子弹数量。
+     * @param {Function} [onComplete] 抽奖动画 + 升级应用全部完成后触发的回调。
+     */
+    sys_runInWallClearLottery(chargedSnapshot, bonusCount = 0, onComplete) {
+        const STAT_KEYS = ['damage','bounce','pierce','scatter','multicast','cryo','pyro','lightning','laser','flying_sword','wind'];
+        const ATTR_LABEL = {
+            damage: '伤害', bounce: '反弹', pierce: '穿透', scatter: '散射',
+            multicast: '连射', cryo: '冰', pyro: '火', lightning: '雷',
+            laser: '激光', flying_sword: '飞剑', wind: '风',
+        };
+
+        const charged = Array.isArray(chargedSnapshot) ? chargedSnapshot.map(r => ({ ...r })) : [];
+        if (charged.length === 0) {
+            if (typeof onComplete === 'function') onComplete();
+            return;
+        }
+
+        const slotAttrs = charged.map(recipe => {
+            const avail = STAT_KEYS.filter(k => (recipe[k] || 0) > 0);
+            return avail.length > 0 ? avail : ['damage'];
+        });
+        const finalPicks = slotAttrs.map(arr => arr[Math.floor(Math.random() * arr.length)]);
+        const allSame = finalPicks.length >= 3 && finalPicks.every(p => p === finalPicks[0]);
+        const baseInc = allSame ? 5 : 2;
+        const incVal = baseInc + Math.max(0, bonusCount | 0);
+
+        const applyUpgrade = () => {
+            if (allSame) {
+                const attr = finalPicks[0];
+                charged.forEach(r => { r[attr] = (r[attr] || 0) + incVal; });
+            } else {
+                charged.forEach((r, i) => {
+                    const attr = finalPicks[i];
+                    r[attr] = (r[attr] || 0) + incVal;
+                });
+            }
+            charged.forEach(r => { if ((r.laser || 0) > 0) r.isLaser = true; });
+
+            // 把升级后的子弹携带到下一回合（与 perfect-clear-upgrade 同一通道）
+            this._carryOverAmmo = charged.map(r => {
+                const recipe = { ...r };
+                recipe.finalHits = 0;
+                recipe.multicast = r.multicast || 0;
+                return recipe;
+            });
+
+            if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
+            if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
+            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+
+            if (typeof onComplete === 'function') onComplete();
+        };
+
+        if (typeof this.ui_showChaosBulletSlotMachine === 'function') {
+            this.ui_showChaosBulletSlotMachine(slotAttrs, finalPicks, ATTR_LABEL, allSame, applyUpgrade);
+        } else {
+            applyUpgrade();
+        }
+    },
+
+    /**
      * @method sys_queueRoundStartReward
      * @description 将下一回合开始需要统一结算的奖励写入队列。
      */
