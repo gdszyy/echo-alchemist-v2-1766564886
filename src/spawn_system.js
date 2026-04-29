@@ -11,6 +11,7 @@ import { getThemeSegment } from './utils/math_utils.js';
 import { UIManager, TrainingGround, TruthBook, TRUTH_BOOK_DATA } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
+import { getAmmoIconSrcByKey } from './bitmap_icons.js';
 import { interpolateAffixWeights, weightedRandom, getEliteDualAffixChance } from './utils/math_utils.js';
 
 /**
@@ -192,7 +193,10 @@ export const spawn_system = {
      * 3. 混合填充：智能填充剩余空位。
      */
     // @section:spawn_row_config - 行配置读取：波次参数与难度缩放
-    spawn_spawnEnemyRowAt(yPos) {
+    // [issue-2] options.offScreenEntrance: 新敌人在画面外（dropTargetY 上方一行）出现，
+    // 通过 pos.y 与 dropTargetY 之差驱动 Enemy.update() 的下落动画，并设置 hasActedThisTurn=true
+    // 让本回合扫描波跳过它们，由后续回合的扫描波正常触发。
+    spawn_spawnEnemyRowAt(yPos, options = {}) {
         const b = CONFIG.balance;
         
         // --- [优化] 动态血量修正逻辑 (V2: 指数膨胀) ---
@@ -498,7 +502,15 @@ export const spawn_system = {
                     const weakHP = Math.max(1, Math.floor(baseHP * variantRatio));
                     hp = weakHP;
                 }
-                const e = new Enemy(centerX, yPos, w, this.enemyHeight, hp);               
+                const e = new Enemy(centerX, yPos, w, this.enemyHeight, hp);
+                // [issue-2] 画面外入场：将 pos.y 抬升到 dropTargetY 之上两行（确保第一行也完全在画面顶部上方），
+                // 由 Enemy.update() 自动驱动下落动画。配合 hasActedThisTurn=true，确保新敌人在出生回合
+                // 不被扫描波误触；下一回合 phase_enemy_startLogic 重置 hasActedThisTurn 后扫描波正常作用。
+                if (options.offScreenEntrance) {
+                    e.pos.y = yPos - 2 * this.enemyHeight;
+                    e.hasActedThisTurn = true;
+                    e._spawnedThisTurn = true;
+                }
                 // [新增 C2] 记录列索引，供 shield 词缀蜂巢脉冲相位偏移使用
                 e._spawnColIndex = c;
                 // 生成词条 (如果是弱点怪，不带词条)
@@ -549,6 +561,14 @@ export const spawn_system = {
             // 二次检查碰撞，虽然 occupiedCols 应该保证了位置
             if (!this.calc_isAreaOccupied(centerX, yPos, w * 0.8, this.enemyHeight * 0.8)) {
                 const e = new Enemy(centerX, yPos, w, this.enemyHeight, cfg.hp);
+                // [issue-2] 画面外入场：将 pos.y 抬升到 dropTargetY 之上两行（确保第一行也完全在画面顶部上方），
+                // 由 Enemy.update() 自动驱动下落动画。配合 hasActedThisTurn=true，确保新敌人在出生回合
+                // 不被扫描波误触；下一回合 phase_enemy_startLogic 重置 hasActedThisTurn 后扫描波正常作用。
+                if (options.offScreenEntrance) {
+                    e.pos.y = yPos - 2 * this.enemyHeight;
+                    e.hasActedThisTurn = true;
+                    e._spawnedThisTurn = true;
+                }
                 // [新增 C2] 记录列索引，供 shield 词缀蜂巢脉冲相位偏移使用
                 e._spawnColIndex = cfg.col;
                 e.affixes = cfg.affixes || [];
@@ -609,6 +629,22 @@ export const spawn_system = {
      * @param {number} [count=1] - **重要参数** 要生成的敌人行数。
      */
     spawn_spawnEnemyRow(count = 1) { for(let i=0; i<count; i++) { this.spawn_spawnEnemyRowAt(this.combatGridTopY - (i * this.enemyHeight)); } },
+
+/**
+     * @method spawn_spawnEnemyRowOffScreen
+     * @description [issue-2] 行为与 spawn_spawnEnemyRow 一致（dropTargetY 落在网格顶部及栈式向上），
+     * 但每个新敌人 pos.y 从 dropTargetY 上方两格（确保第一行也完全在画面顶部上方）开始，
+     * 由 Enemy.update() 驱动下落动画，替代旧实现中"凭空出现在画面顶部"的瞬间生成观感。
+     * 配合 hasActedThisTurn=true，避免新敌人还在画面外/未到位时被本回合扫描波误触。
+     * @param {number} [count=1] - 要生成的行数。
+     */
+    spawn_spawnEnemyRowOffScreen(count = 1) {
+        for (let i = 0; i < count; i++) {
+            // 与 spawn_spawnEnemyRow 相同的 dropTargetY 序列：第 0 行落在网格顶部，多行依次向上栈式排列
+            const yPos = this.combatGridTopY - i * this.enemyHeight;
+            this.spawn_spawnEnemyRowAt(yPos, { offScreenEntrance: true });
+        }
+    },
 
 /**
      * @method triggerCloneSpawn
@@ -836,10 +872,25 @@ export const spawn_system = {
             const shine = document.createElement('div');
             shine.className = 'select-icon-shine';
             iconEl.appendChild(shine);
-            // 属性 emoji 覆盖在球体上
+            // 属性图标（优先位图，未命中再 fallback 到 emoji）
+            // [icon-fix] 命运选择卡片使用与 RUNE_ICON_MAP / AMMO_ICON_MAP 一致的位图素材，
+            // assets/icons/ammo/ammo_<type>.png 命中即可替换 emoji。
             const emojiEl = document.createElement('div');
             emojiEl.className = 'select-icon-emoji';
-            emojiEl.textContent = marbleIcon;
+            const marbleBitmapSrc = getAmmoIconSrcByKey(m.type);
+            if (marbleBitmapSrc) {
+                const img = document.createElement('img');
+                img.src = marbleBitmapSrc;
+                img.alt = marbleIcon;
+                img.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;';
+                img.loading = 'lazy';
+                img.onerror = function() {
+                    this.replaceWith(document.createTextNode(marbleIcon));
+                };
+                emojiEl.appendChild(img);
+            } else {
+                emojiEl.textContent = marbleIcon;
+            }
             iconWrap.append(iconEl, emojiEl);
 
             // 弹珠名称
@@ -990,62 +1041,46 @@ export const spawn_system = {
      */
     spawn_createParticle(x, y, color, mode = 'normal') {
         // ============================================================
-        // [粒子数量限制系统] v3 - 自适应性能等级驱动
-        // 预算数值来自 CONFIG.performance[this.perfQualityLevel]，
-        // 随帧率变化自动调整，无需手动修改魔法数字。
+        // [粒子数量限制系统] v4 - O(1) 计数 + 对象池
+        // - 各 mode 数量从 this.particleCounts 读取，避免每次创建做全量 filter
+        // - 复用 this._particlePool 内的实例，避免 new Particle() 触发 GC
         // ============================================================
         const _budget = CONFIG.performance[this.perfQualityLevel || 'high'];
+        const counts = this.particleCounts;
 
-        // --- 1. 全局上限检查 ---
         if (this.particles.length >= _budget.maxParticles) return null;
 
-        // --- 2. 风属性粒子：有限供给 ---
-        // wind_slash（风刃）和 line（风道气流）为风属性专属粒子，设置独立配额
+        const windActiveCount = counts.wind_slash + counts.line;
         if (mode === 'wind_slash' || mode === 'line') {
-            const currentWind = this.particles.filter(p => p.mode === 'wind_slash' || p.mode === 'line').length;
-            if (currentWind >= _budget.windLimit) return null;
+            if (windActiveCount >= _budget.windLimit) return null;
         }
+        const windIsActive = windActiveCount > 0;
 
-        // --- 3. 检测场上是否存在活跃的风属性粒子 ---
-        // 当风属性粒子存在时，动态压缩火/冰粒子的可用配额
-        const activeWindCount = this.particles.filter(p => p.mode === 'wind_slash' || p.mode === 'line').length;
-        const windIsActive = activeWindCount > 0;
-
-        // --- 4. 火焰粒子（ember）限制 ---
         if (mode === 'ember') {
             const limit = windIsActive ? _budget.emberLimitWind : _budget.emberLimit;
-            const currentEmbers = this.particles.filter(p => p.mode === 'ember').length;
-            if (currentEmbers >= limit) return null;
+            if (counts.ember >= limit) return null;
         }
-
-        // --- 5. 冰霜粒子（mist / shard）限制 ---
         if (mode === 'mist') {
             const limit = windIsActive ? _budget.mistLimitWind : _budget.mistLimit;
-            const currentMist = this.particles.filter(p => p.mode === 'mist').length;
-            if (currentMist >= limit) return null;
+            if (counts.mist >= limit) return null;
         }
         if (mode === 'shard') {
             const limit = windIsActive ? _budget.shardLimitWind : _budget.shardLimit;
-            const currentShard = this.particles.filter(p => p.mode === 'shard').length;
-            if (currentShard >= limit) return null;
+            if (counts.shard >= limit) return null;
         }
+        if (mode === 'spark' && counts.spark >= (_budget.sparkLimit ?? 100)) return null;
+        if (mode === 'smoke' && counts.smoke >= (_budget.smokeLimit ?? 60)) return null;
 
-        // --- 6. 通用火星粒子（spark）限制 ---
-        // spark 用于机械类受击电弧、能量泄漏、属性火星等多种场景，需独立限制防止大量占用全局预算
-        if (mode === 'spark') {
-            const currentSpark = this.particles.filter(p => p.mode === 'spark').length;
-            if (currentSpark >= (_budget.sparkLimit ?? 100)) return null;
+        const pool = this._particlePool;
+        let p;
+        if (pool.length > 0) {
+            p = pool.pop();
+            p.reset(x, y, color, mode);
+        } else {
+            p = new Particle(x, y, color, mode);
         }
-
-        // --- 7. 烟雾粒子（smoke）限制 ---
-        // smoke 用于狂暴受击烟雾、死亡爆炸等场景
-        if (mode === 'smoke') {
-            const currentSmoke = this.particles.filter(p => p.mode === 'smoke').length;
-            if (currentSmoke >= (_budget.smokeLimit ?? 60)) return null;
-        }
-
-        const p = new Particle(x, y, color, mode);
         this.particles.push(p);
+        if (counts[mode] !== undefined) counts[mode]++;
         return p;
     },
 
@@ -1056,41 +1091,31 @@ export const spawn_system = {
      * @param {Particle} p - 已构造好的粒子实例
      */
     spawn_pushParticleWithLimit(p) {
-        // [粒子数量限制系统] v3 - 自适应性能等级驱动（与 spawn_createParticle 保持同步）
+        // [粒子数量限制系统] v4 - 复用 particleCounts，与 spawn_createParticle 同步
         const _budget = CONFIG.performance[this.perfQualityLevel || 'high'];
+        const counts = this.particleCounts;
         if (this.particles.length >= _budget.maxParticles) return false;
 
         const mode = p.mode;
-        const activeWindCount = this.particles.filter(q => q.mode === 'wind_slash' || q.mode === 'line').length;
-        const windIsActive = activeWindCount > 0;
+        const windIsActive = (counts.wind_slash + counts.line) > 0;
 
         if (mode === 'ember') {
             const limit = windIsActive ? _budget.emberLimitWind : _budget.emberLimit;
-            const current = this.particles.filter(q => q.mode === 'ember').length;
-            if (current >= limit) return false;
+            if (counts.ember >= limit) return false;
         }
         if (mode === 'mist') {
             const limit = windIsActive ? _budget.mistLimitWind : _budget.mistLimit;
-            const current = this.particles.filter(q => q.mode === 'mist').length;
-            if (current >= limit) return false;
+            if (counts.mist >= limit) return false;
         }
         if (mode === 'shard') {
             const limit = windIsActive ? _budget.shardLimitWind : _budget.shardLimit;
-            const current = this.particles.filter(q => q.mode === 'shard').length;
-            if (current >= limit) return false;
+            if (counts.shard >= limit) return false;
         }
-        // --- spark 限制（与 spawn_createParticle 保持同步）---
-        if (mode === 'spark') {
-            const current = this.particles.filter(q => q.mode === 'spark').length;
-            if (current >= (_budget.sparkLimit ?? 100)) return false;
-        }
-        // --- smoke 限制（与 spawn_createParticle 保持同步）---
-        if (mode === 'smoke') {
-            const current = this.particles.filter(q => q.mode === 'smoke').length;
-            if (current >= (_budget.smokeLimit ?? 60)) return false;
-        }
+        if (mode === 'spark' && counts.spark >= (_budget.sparkLimit ?? 100)) return false;
+        if (mode === 'smoke' && counts.smoke >= (_budget.smokeLimit ?? 60)) return false;
 
         this.particles.push(p);
+        if (counts[mode] !== undefined) counts[mode]++;
         return true;
     },
 
@@ -1110,20 +1135,51 @@ export const spawn_system = {
 
         // 初始化伤害统计结构 (支持二维统计: 伤害类型 -> 来源类型)
         if (!this.shotDamageMap.has(shotId)) {
-            this.shotDamageMap.set(shotId, { 
-                total: 0, 
-                projectileCount: 0, 
-                destroyedCount: 0, 
+            this.shotDamageMap.set(shotId, {
+                total: 0,
+                projectileCount: 0,
+                destroyedCount: 0,
                 // 修改：byAttr 存储为二维对象 { 'pyro': { 'main': 0, 'scatter': 0 }, ... }
-                byAttr: {} 
+                byAttr: {}
             });
-            
+
             // 绑定到当前 Game 实例的临时变量，供 UI 实时显示
             this.currentShotDamage = 0;
-            this.currentShotDamageByAttr = {}; 
+            this.currentShotDamageByAttr = {};
         }
-        
+
         const shotStats = this.shotDamageMap.get(shotId);
+
+        // [词条 Hook] 化弹为剑（bullet_to_sword）
+        // 将首轮发射的子弹替换为一把子飞剑，自动索敌；连射层数→子飞剑攻击次数（maxAttacks=multicast+1）
+        if (recipe._replaceWithSonSword) {
+            const swordLevel = Math.max(1, Math.min(3, Math.floor(recipe._sonSwordLevel || 1)));
+            const swordConfig = {
+                ...recipe,
+                type: 'flying_sword',
+                wind: 0,
+                scatter: 0,
+                level: swordLevel
+            };
+            if (typeof this.combat_flyingSword_addSon === 'function') {
+                const beforeCount = this.sonSwords.length;
+                this.combat_flyingSword_addSon(x, y, null, swordLevel, swordConfig, 0);
+                // 让新生成的子飞剑自动猎杀（仅作用于刚刚追加的剑）
+                if (this.sonSwords.length > beforeCount) {
+                    const newSword = this.sonSwords[this.sonSwords.length - 1];
+                    if (newSword) {
+                        newSword.isAutoHunting = true;
+                        if (typeof newSword.searchForTarget === 'function' && this.enemies && this.enemies.length > 0) {
+                            newSword.searchForTarget(this.enemies);
+                        }
+                    }
+                }
+                if (typeof this.spawn_createFloatingText === 'function') {
+                    this.spawn_createFloatingText(x, y - 30, '⚔️化弹为剑!', '#a78bfa');
+                }
+            }
+            return;
+        }
 
         // [关键] 属性优先级：飞剑 > 激光
         // 如果是飞剑，优先处理飞剑逻辑
@@ -1445,7 +1501,8 @@ export const spawn_system = {
                 // 音效
                 const progress = Math.min(1, this.currentSession.currentHits / this.currentSession.nextTriggerThreshold);
                 if (this.currentSession.currentHits < this.currentSession.nextTriggerThreshold) {
-                    if (Math.random() < 0.5) audio.playTone(500 * (1.0 + progress * 0.5), 'triangle', 0.05, 0.2); 
+                    // @section:energy_orb_collect_audio - 能量球收集进度音效（500~750Hz 随进度升调，营造蓄力感）
+                if (Math.random() < 0.5) audio.playTone(500 * (1.0 + progress * 0.5), 'triangle', 0.05, 0.2); 
                 }
 
                 // 更新 UI
@@ -1495,6 +1552,7 @@ export const spawn_system = {
     this.currentSession.multicast++; 
     this.combat_updateMulticastDisplay(1);
     
+    // @section:levelup_audio - 能量槽满触发多播升级爆发音（pitch = multicast 等级，越高越尖锐）
     // 1. 音效爆發
     audio.playPowerup(this.currentSession.multicast); 
     

@@ -1,21 +1,21 @@
 # 自动函数索引汇总 (Auto Index)
 
-> 自动生成于 2026-04-25 | 由 code-indexer 脚本维护
+> 自动生成于 2026-04-26 | 由 code-indexer 脚本维护
 > **本文件由脚本自动生成，严禁手动编辑。**
 
 ## 已索引文件 (19 个)
 
 | 文件 | 总行数 | 函数数 | 巨型函数 | @section 标记 | 索引文件 |
 |------|--------|--------|----------|--------------|---------|
-| `src/entities/enemy.js` | 4845 | 27 | **3** | 18 | [src_entities_enemy_js_index.md](src_entities_enemy_js_index.md) |
-| `src/entities.js` | 4834 | 108 | **4** | 21 | [src_entities_js_index.md](src_entities_js_index.md) |
-| `src/combat_system.js` | 3362 | 42 | **5** | 22 | [src_combat_system_js_index.md](src_combat_system_js_index.md) |
+| `src/entities/enemy.js` | 4848 | 27 | **4** | 21 | [src_entities_enemy_js_index.md](src_entities_enemy_js_index.md) |
+| `src/entities.js` | 4835 | 108 | **4** | 23 | [src_entities_js_index.md](src_entities_js_index.md) |
+| `src/combat_system.js` | 3364 | 42 | **5** | 25 | [src_combat_system_js_index.md](src_combat_system_js_index.md) |
 | `src/systems.js` | 3094 | 85 | **2** | 10 | [src_systems_js_index.md](src_systems_js_index.md) |
 | `src/game_phase.js` | 2521 | 16 | **4** | 15 | [src_game_phase_js_index.md](src_game_phase_js_index.md) |
 | `src/game_system.js` | 2313 | 45 | **1** | 7 | [src_game_system_js_index.md](src_game_system_js_index.md) |
-| `src/spawn_system.js` | 2235 | 28 | **3** | 8 | [src_spawn_system_js_index.md](src_spawn_system_js_index.md) |
+| `src/spawn_system.js` | 2237 | 28 | **3** | 10 | [src_spawn_system_js_index.md](src_spawn_system_js_index.md) |
 | `src/effects/particles.js` | 1832 | 62 | **1** | 3 | [src_effects_particles_js_index.md](src_effects_particles_js_index.md) |
-| `src/ui/rune_launcher.js` | 1710 | 25 | **1** | 0 | [src_ui_rune_launcher_js_index.md](src_ui_rune_launcher_js_index.md) |
+| `src/ui/rune_launcher.js` | 1716 | 25 | **1** | 6 | [src_ui_rune_launcher_js_index.md](src_ui_rune_launcher_js_index.md) |
 | `src/config.js` | 1695 | 1 | **1** | 0 | [src_config_js_index.md](src_config_js_index.md) |
 | `src/ui/hud.js` | 1030 | 14 | **1** | 4 | [src_ui_hud_js_index.md](src_ui_hud_js_index.md) |
 | `src/entities/projectile.js` | 1028 | 13 | **2** | 7 | [src_entities_projectile_js_index.md](src_entities_projectile_js_index.md) |

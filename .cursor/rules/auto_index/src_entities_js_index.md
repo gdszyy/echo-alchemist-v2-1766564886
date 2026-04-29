@@ -1,6 +1,6 @@
 # src/entities.js 函数索引
 
-> 自动生成于 2026-04-25 | 总行数: 4834 | 函数数: 108 | 语言: javascript
+> 自动生成于 2026-04-26 | 总行数: 4835 | 函数数: 108 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 4 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -174,4 +174,6 @@
 | 节点标记 | 说明 |
 |----------|------|
 | `@section:peg_shadow_and_transform` | 软阴影与碰撞旋转变换初始化 |
+| `@section:peg_audio_feedback` | 钉子属性触发音效路由（mutation→playMagic, upgrade→playPowerup, attribute→playMagic） |
 | `@section:son_sword_state_machine` | 子剑状态机：冲刺/悬停/回收分支 |
+| `@section:charge_shot_audio` | 玩家蓄力发射开始音效（高频 800Hz，区别于敌人预警 200Hz） |

@@ -2,10 +2,10 @@
   "indexed": [
     {
       "file": "src/entities/enemy.js",
-      "lines": 4855,
+      "lines": 4880,
       "funcs": 27,
-      "sections": 18,
-      "mega_funcs": 3,
+      "sections": 21,
+      "mega_funcs": 4,
       "index_path": ".cursor/rules/auto_index/src_entities_enemy_js_index.md"
     }
   ],

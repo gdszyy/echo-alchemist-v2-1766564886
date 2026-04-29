@@ -181,6 +181,10 @@ export const shop_system = {
         // 处理遗物效果
         if (relic.effect === 'pink_peg_up') {
             this.pinkPegCount = (this.pinkPegCount || 0) + 3;
+            // [钉盘遗物] 立刻触发一次混沌精华
+            if (typeof this.sys_queueRoundStartReward === 'function') {
+                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
+            }
         } 
         else if (relic.effect === 'combat_wall') {
             this.hasCombatWall = true;
@@ -192,9 +196,17 @@ export const shop_system = {
                 this.unlockedSlots.push(relic.slotType);
             }
             if (this.slotCount === 0) this.slotCount = 1;
+            // [钉盘遗物] 立刻触发一次混沌精华
+            if (typeof this.sys_queueRoundStartReward === 'function') {
+                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
+            }
         }
         else if (relic.effect === 'slot_count_up') {
             this.slotCount = (this.slotCount || 0) + 1;
+            // [钉盘遗物] 立刻触发一次混沌精华
+            if (typeof this.sys_queueRoundStartReward === 'function') {
+                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
+            }
         } else if (relic.effect === 'row_count_up') {
             this.currentRows = (this.currentRows || 0) + 2;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
@@ -277,6 +289,10 @@ export const shop_system = {
             this.doubleAssimilationBoostRounds[mt] = 2;
             const display = CONFIG.ui?.attributeDisplay?.[mt]?.name || mt;
             if (window.showToast) showToast(`${relic.name}已啟動！${display} 同化率 x${CONFIG.gameplay.assimilationDoubleMultiplier || 2}（持續 2 回合）。`);
+            // [钉盘遗物] 立刻触发一次混沌精华
+            if (typeof this.sys_queueRoundStartReward === 'function') {
+                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
+            }
         } else if (relic.effect === 'pure_essence') {
             this.pendingSelectionMode = {
                 mode: 'pure_essence',
@@ -299,6 +315,10 @@ export const shop_system = {
                 this.guaranteedNextRound.push(key);
             });
             if (window.showToast) showToast(`已解鎖相關屬性!`);
+            // [钉盘遗物] 立刻触发一次混沌精华
+            if (typeof this.sys_queueRoundStartReward === 'function') {
+                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
+            }
         }
 
         this.ui_closeRelicSelection();

@@ -213,12 +213,11 @@ export const rune_launcher_system = {
             const cell = document.createElement('div');
             cell.id = `rune-cell-${i}`;
             cell.dataset.index = i;
+            cell.dataset.state = 'idle'; // [bitmap-rune-grid] CSS 用 [data-state] 切换 idle/hover/filled 位图
             cell.className = [
                 'rune-grid-cell',
                 'w-16 h-16 flex items-center justify-center',
-                'bg-slate-900/60 border-2 border-slate-700/60 rounded-xl',
                 'cursor-pointer select-none',
-                'hover:border-purple-500/60 hover:bg-slate-800/60',
                 'transition-all duration-200',
                 'text-2xl',
             ].join(' ');
@@ -230,6 +229,7 @@ export const rune_launcher_system = {
                     this.runeGrid[i] = null;  // [Mixin 正常用法：读取 Game 实例状态]
                     this.runeInventory.push(runeEntry);  // [Mixin 正常用法：读取 Game 实例状态]
                     this.ui_updateRuneGrid();
+                    // @section:rune_grid_remove_audio - 符文格移除音效（400Hz，轻柔确认）
                     audio.playTone(400, 'sine', 0.08, 0.15);
                 } else {
                     // 空格：打开符文选择器
@@ -315,6 +315,7 @@ export const rune_launcher_system = {
                 this.runeGrid[cellIndex] = runeEntry;
                 this.ui_closeRunePicker();
                 this.ui_updateRuneGrid();
+                // @section:rune_picker_place_audio - 符文从选择器放入格子的确认音效（600Hz）
                 audio.playTone(600, 'sine', 0.1, 0.2);
             };
 
@@ -327,6 +328,7 @@ export const rune_launcher_system = {
                     </div>
                 `).join('');
                 tooltip.classList.remove('hidden');
+                // @section:rune_hover_audio - 符文词条悬停预览音效（880Hz 极轻，仅提示）
                 try { if (audio?.playTone) audio.playTone(880, 'sine', 0.05, 0.1); } catch(e) {}
             };
 
@@ -388,6 +390,7 @@ export const rune_launcher_system = {
             const runeEntry = this.runeGrid[i];  // [Mixin 正常用法：读取 Game 实例状态]
             // 兼容新旧格式：提取符文 ID
             const runeId = getRuneId(runeEntry);
+            const prevState = cell.dataset.state || 'idle';
             if (runeId) {
                 const runeDef = RUNE_DB.find(r => r.id === runeId);
                 // 获取符文等级（新格式有 level，旧格式默认为 1）
@@ -398,12 +401,18 @@ export const rune_launcher_system = {
                 } else {
                     cell.innerHTML = '?';
                 }
-                cell.classList.add('border-purple-500/60', 'bg-slate-800/60');
-                cell.classList.remove('border-slate-700/60');
+                cell.dataset.state = 'filled';
+                // [bitmap-rune-grid] 从空→填的转换触发一次性 highlight 光圈动画
+                if (prevState !== 'filled') {
+                    cell.classList.remove('rune-slot-place');
+                    // 强制 reflow 以重启动画
+                    void cell.offsetWidth;
+                    cell.classList.add('rune-slot-place');
+                }
             } else {
                 cell.innerHTML = '';
-                cell.classList.remove('border-purple-500/60', 'bg-slate-800/60');
-                cell.classList.add('border-slate-700/60');
+                cell.dataset.state = 'idle';
+                cell.classList.remove('rune-slot-place');
             }
         }
 
@@ -445,10 +454,11 @@ export const rune_launcher_system = {
         for (let i = 0; i < 9; i++) {
             const cell = document.getElementById(`rune-cell-${i}`);
             if (!cell) continue;
+            // [bitmap-rune-grid] 用 data-active 而非 Tailwind 类标记激活态，CSS 控制视觉
             if (activatedCells.has(i)) {
-                cell.classList.add('shadow-[0_0_8px_rgba(168,85,247,0.6)]', 'border-purple-400/80');
+                cell.dataset.active = '1';
             } else {
-                cell.classList.remove('shadow-[0_0_8px_rgba(168,85,247,0.6)]', 'border-purple-400/80');
+                delete cell.dataset.active;
             }
         }
 
@@ -954,6 +964,7 @@ export const rune_launcher_system = {
                 `⚗️ 合成成功！获得 ${runeName} Lv.${mergedLevel}，+${shardReward} 🔮 符文碎片`,
                 'success'
             );
+            // @section:rune_merge_audio - 符文合成成功音效（880Hz 较响，强调成功感）
             audio.playTone(880, 'sine', 0.15, 0.3);
             this.ui_updateRuneGrid();
         } else {
@@ -983,6 +994,7 @@ export const rune_launcher_system = {
                 `🔮 重铸完成！获得 ${runeName} Lv.${result.result.level}`,
                 'success'
             );
+            // @section:rune_reforge_audio - 符文重铸完成音效（660Hz triangle，柔和质感）
             audio.playTone(660, 'triangle', 0.12, 0.4);
             this.ui_updateRuneGrid();
         } else {
@@ -1273,7 +1285,7 @@ export const rune_launcher_system = {
                 const radius = calc('radius');
                 const ratio = Math.round(calc('damageRatio') * 100);
                 const tempDrop = calc('tempDrop');
-                return `每弹跳 ${bounces} 次释放冰霜新星，范围 ${radius}px，冒冰伤害 ${ratio}%，降温 ${tempDrop}`;
+                return `每弹跳 ${bounces} 次释放冰霜新星，范围 ${radius}px，冰伤害 ${ratio}%，降温 ${tempDrop}；被命中敌人按当前冻结概率链式触发新星（每次链式概率减半）`;
             }
             case 'thunderstorm': {
                 const decay = Math.round(calc('decayBonus') * 100);
@@ -1295,7 +1307,8 @@ export const rune_launcher_system = {
                 const chance = Math.round(calc('triggerChance') * 100);
                 const ratio = Math.round(calc('damageRatio') * 100);
                 const tempRatio = Math.round(calc('tempDamageRatio') * 100);
-                return `穿透触发率 ${chance}%，剑光伤害 ${ratio}%，附加火焰伤害 ${tempRatio}%`;
+                const radius = Math.round(calc('radius') || 110);
+                return `子母剑穿透触发率 ${chance}%，剑光 AOE 范围 ${radius}px，伤害 ${ratio}%，附加升温 ${tempRatio}%`;
             }
             case 'armor_piercing_meteor': {
                 const bonus = Math.round(calc('damageBonus') * 100);
@@ -1311,7 +1324,7 @@ export const rune_launcher_system = {
                 const chance = Math.round(calc('triggerChance') * 100);
                 const ratio = Math.round(calc('damageRatio') * 100);
                 const stacks = calc('shockStacks');
-                return `弹跳触发率 ${chance}%，静电场伤害 ${ratio}%，附加 ${stacks} 层闪电`;
+                return `弹跳触发率 ${chance}%，静电场伤害 ${ratio}%，附加 ${stacks} 层闪电；被静电场击中后必定触发闪电链`;
             }
             case 'blade_storm': {
                 const radius = calc('radius');
@@ -1322,6 +1335,27 @@ export const rune_launcher_system = {
             case 'elemental_fusion': {
                 const ratio = Math.round(calc('trueDamageRatio') * 100);
                 return `元素聚变爆炸，真实伤害 = 敌人最大血量 × ${ratio}%`;
+            }
+            case 'focused_fire': {
+                const chance = Math.round(calc('critChance') * 100);
+                const dmg = Math.round(calc('critDamage') * 100);
+                return `所有弹跳/连射层数转化为基础伤害；${chance}% 暴击率，造成 ${dmg}% 伤害`;
+            }
+            case 'mass_collapse': {
+                const baseRatio = Math.round(calc('baseRadiusRatio') * 100);
+                const perLayer = Math.round(calc('radiusBonusPerLayer') * 100);
+                return `强制爆炸（基础范围 ${baseRatio}%）；清空所有散射，每清空 1 层散射爆炸范围 +${perLayer}%`;
+            }
+            case 'son_sword_summon': {
+                const chance = Math.round(calc('triggerChance') * 100);
+                const lv = calc('swordLevel') || 3;
+                const dmgBonus = Math.round((calc('damageMultiplier') - 1) * 100);
+                return `命中触发率 ${chance}%，召唤一把 Lv${lv} 子飞剑（伤害继承 ${100 + dmgBonus}%）`;
+            }
+            case 'bullet_to_sword': {
+                const lv = calc('swordLevel') || 1;
+                const cap = Math.min(3, Math.max(1, lv));
+                return `首轮发射的子弹替换为 Lv${cap} 子飞剑（取消连射），原连射层数转为子飞剑攻击次数`;
             }
             default:
                 return '';
@@ -1530,6 +1564,7 @@ export const rune_launcher_system = {
 
         this.ui_updateRuneGrid();
         showToast('✨ 已自动排布符文');
+        // @section:rune_auto_arrange_audio - 符文自动排布完成音效（660Hz sine）
         audio.playTone(660, 'sine', 0.1, 0.3);
     },
 

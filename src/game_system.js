@@ -54,7 +54,8 @@ export const game_system = {
                             this._perfDownTimer = 0;
                             const _prev = _level;
                             this.perfQualityLevel = _level === 'high' ? 'medium' : 'low';
-                            console.info(`[Perf] 特效等级降级: ${_prev} → ${this.perfQualityLevel}（平均 FPS: ${this.avgFps}）`);
+                            this.shadowBlurEnabled = _perfCfg[this.perfQualityLevel].shadowBlurEnabled !== false;
+                            if (CONFIG.debug) console.info(`[Perf] 特效等级降级: ${_prev} → ${this.perfQualityLevel}（平均 FPS: ${this.avgFps}）`);
                         }
                     } else if (this.avgFps > _perfCfg.fpsThresholdUp && _level !== 'high') {
                         // 连续高帧：累加升级计时器
@@ -64,7 +65,8 @@ export const game_system = {
                             this._perfUpTimer = 0;
                             const _prev = _level;
                             this.perfQualityLevel = _level === 'low' ? 'medium' : 'high';
-                            console.info(`[Perf] 特效等级升级: ${_prev} → ${this.perfQualityLevel}（平均 FPS: ${this.avgFps}）`);
+                            this.shadowBlurEnabled = _perfCfg[this.perfQualityLevel].shadowBlurEnabled !== false;
+                            if (CONFIG.debug) console.info(`[Perf] 特效等级升级: ${_prev} → ${this.perfQualityLevel}（平均 FPS: ${this.avgFps}）`);
                         }
                     } else {
                         // FPS 处于正常区间，重置两个计时器
@@ -82,6 +84,22 @@ export const game_system = {
             requestAnimationFrame(() => this.sys_loop());
             return;
         }
+
+        // [修复-bullet-time] 子弹时间倒计时与恢复
+        // combat_system.js 的风系技能（旋风/风道）会把 timeScale 强制设为慢动作并将 slowMotionTimer 设为 5，
+        // 但此前没有任何地方倒计时该计时器、也没有任何地方把 timeScale 恢复为 baseTimeScale，
+        // 一旦风系特效短时间内连续触发（每 3 tick 重置一次），timeScale 就会永久卡在慢动作上。
+        // 这里使用「真实帧」倒计时（不乘 timeScale），到期后强制还原为玩家选择的 baseTimeScale。
+        if (this.slowMotionTimer > 0) {
+            this.slowMotionTimer -= 1;
+            if (this.slowMotionTimer <= 0) {
+                this.slowMotionTimer = 0;
+                this.timeScale = this.baseTimeScale;
+            }
+        }
+        // 同步 UI 蒙版状态（ui_updateSlowMotion 读取此 flag 控制 #slow-motion-overlay 显隐）
+        this.isSlowMotion = this.slowMotionTimer > 0;
+
         const timeScale = this.timeScale;
 
         // 处理震动衰减
@@ -316,6 +334,7 @@ export const game_system = {
         this.fateMomentContext = null;
         this.replaceAmmoContext = null; // [tsk-668f3dba] 替换当前子弹阶段上下文
         this._chargedAmmoQueue = null; // [ammo-replace] 充能子弹
+        this._lastFiredAmmoSnapshot = null; // [bullet-charge-fix] 上回合实际发射的子弹快照
         this.ownedRelics = [];
         
         // 补充遗物相关的重置字段
@@ -477,12 +496,18 @@ export const game_system = {
         const speedBtn = document.getElementById('speed-btn');
         if (speedBtn) {
             speedBtn.onclick = () => {
-                if (this.timeScale === 1.0) this.timeScale = 2.0;
-                else if (this.timeScale === 2.0) this.timeScale = 3.0;
-                else if (this.timeScale === 3.0) this.timeScale = 0.42;
-                else this.timeScale = 1.0;
-                this.baseTimeScale = this.timeScale;
-                speedBtn.innerText = `⏩ x${this.timeScale}`;
+                // [修复-bullet-time] 基于 baseTimeScale（玩家选择的速度）循环，
+                // 而不是基于当前 timeScale —— 否则在子弹时间生效期间点击会读到 0.2/0.02 等慢动作值，
+                // 导致循环卡到「⏩ x1.0」并把玩家原本选择的 2x/3x 设置丢失。
+                if (this.baseTimeScale === 1.0) this.baseTimeScale = 2.0;
+                else if (this.baseTimeScale === 2.0) this.baseTimeScale = 3.0;
+                else if (this.baseTimeScale === 3.0) this.baseTimeScale = 0.42;
+                else this.baseTimeScale = 1.0;
+                // 立即生效：强制结束当前的子弹时间，避免风系技能 tick 又把 timeScale 拉回慢动作。
+                this.timeScale = this.baseTimeScale;
+                this.slowMotionTimer = 0;
+                this.isSlowMotion = false;
+                speedBtn.innerText = `⏩ x${this.baseTimeScale}`;
             };
         }
 
@@ -547,7 +572,7 @@ export const game_system = {
     sys_initSelectionPhase() {
         const pendingMode = this.pendingSelectionMode;
         const mode = pendingMode?.mode || 'standard';
-        console.log('[DEBUG][sys_initSelectionPhase] 进入', {
+        if (CONFIG.debug) console.log('[DEBUG][sys_initSelectionPhase] 进入', {
             mode,
             pendingMode: JSON.stringify(pendingMode),
             ammoQueueLen: (this.ammoQueue || []).length,
@@ -575,21 +600,38 @@ export const game_system = {
                 sourceRewardType: pendingMode?.sourceRewardType || this.selectionMode,
             };
         this.pendingSelectionMode = null;
-        this.phase_switchPhase('selection');
+        // [BUGFIX #7] 在 phase_switchPhase 触发 ui_updateUI 前预先清空 marble grid，
+        // 否则 ui_refreshSelectionModeUI 会用新的 selectionMode 文案搭配上一轮残留的卡片
+        // DOM，造成「先闪一帧另一种精华内容」的体验问题。
+        const _initGridEl = document.getElementById('marble-selection-grid');
+        if (_initGridEl) {
+            _initGridEl.style.cssText = '';
+            _initGridEl.innerHTML = '';
+        }
+        // 同步清掉旧的 marblesPool / 已选索引，防止 ui_refreshSelectionModeUI 读取到过期数据
+        this.marblesPool = [];
+        this.selectedMarbles = [];
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
-        // [BUGFIX] 防御性重置 gridEl inline style：
-        // 如果上一轮经过了 ui_renderReplaceAmmoUI（子弹替换阶段）且清理逻辑未运行，
-        // gridEl 上可能残留 display:flex 的 inline style，导致卡片竖排。在此强制清空。
-        const _initGridEl = document.getElementById('marble-selection-grid');
-        if (_initGridEl) _initGridEl.style.cssText = '';
+
+        this.phase_switchPhase('selection');
         this.spawn_generateMarbleOptions();
         this.selectedMarbles = [];
         const countEl = document.getElementById('selected-count');
         const confirmBtn = document.getElementById('confirm-selection-btn');
         const recipeHud = document.getElementById('recipe-hud-container');
         if (countEl) countEl.innerText = '0';
-        if (confirmBtn) confirmBtn.disabled = true;
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            // [BUGFIX] 上一轮 sys_initReplaceAmmoPhase / ui_renderReplaceAmmoUI 把 confirmBtn.onclick
+            // 覆盖为 sys_confirmReplaceAmmo。如果不在新一轮命运时刻强制恢复，
+            // 第二/三次触发精华或潮涌类遗物触发的混沌精华时，
+            // 玩家点击「接受命运开始炼金」会触发 sys_confirmReplaceAmmo（输出
+            // "[sys_confirmReplaceAmmo] replaceAmmoContext 未激活"）而无任何反应。
+            confirmBtn.onclick = () => {
+                if (typeof this.ui_confirmSelection === 'function') this.ui_confirmSelection();
+            };
+        }
         if (recipeHud) recipeHud.classList.add('hidden');
         if (typeof this.ui_refreshSelectionModeUI === 'function') this.ui_refreshSelectionModeUI();
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
@@ -607,19 +649,66 @@ export const game_system = {
     sys_initReplaceAmmoPhase() {
         const newRecipes = (this.ammoQueue || []).slice();
         const chargedRecipes = (this._chargedAmmoQueue || []).slice();
-        console.log('[ammo-replace][sys_initReplaceAmmoPhase] 进入', {
+        if (CONFIG.debug) console.log('[ammo-replace][sys_initReplaceAmmoPhase] 进入', {
             newRecipes: newRecipes.length,
             chargedRecipes: chargedRecipes.length,
             phase: this.phase,
         });
-        // 默认选中右侧（充能子弹），索引 3, 4, 5
-        const defaultSelected = chargedRecipes.map((_, i) => newRecipes.length + i);
+
+        // [tsk-bullet-ui] 继承玩家上回合的选择偏好：
+        // 1. 通过 _lastReplaceAmmoSignatures 记录玩家上回合实际选中子弹的「特征签名」
+        //    （主弹珠类型 + 主属性 + multicast 等级），作为本回合 default 选中的依据。
+        // 2. 若签名匹配不到（首次进入或弹珠彻底改变），回退到原默认逻辑：选中所有充能子弹。
+        const allRecipes = newRecipes.concat(chargedRecipes);
+        const _signatureOf = (r) => {
+            if (!r) return '';
+            const main = r._marbleType || r.type || 'normal';
+            const flags = `${r.explosive ? 'E' : ''}${r.isMatryoshka ? 'M' : ''}${r.isLaser ? 'L' : ''}`;
+            const mc = (r.multicast || 0) >= 3 ? 'm' : '';
+            const stats = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind']
+                .map(k => r[k] || 0).join('-');
+            return `${main}|${flags}|${mc}|${stats}`;
+        };
+        const lastSigs = Array.isArray(this._lastReplaceAmmoSignatures) ? this._lastReplaceAmmoSignatures.slice() : [];
+        let defaultSelected;
+        if (lastSigs.length > 0) {
+            const usedIdx = new Set();
+            defaultSelected = [];
+            lastSigs.forEach(sig => {
+                for (let i = 0; i < allRecipes.length; i++) {
+                    if (usedIdx.has(i)) continue;
+                    if (_signatureOf(allRecipes[i]) === sig) {
+                        defaultSelected.push(i);
+                        usedIdx.add(i);
+                        break;
+                    }
+                }
+            });
+            // 数量不足时用充能子弹补齐
+            const maxSelect = Math.max(newRecipes.length, chargedRecipes.length, 3);
+            for (let j = 0; j < chargedRecipes.length && defaultSelected.length < maxSelect; j++) {
+                const idx = newRecipes.length + j;
+                if (!usedIdx.has(idx)) { defaultSelected.push(idx); usedIdx.add(idx); }
+            }
+        } else {
+            // 首次进入：默认选中右侧（充能子弹），索引 newRecipes.length 起
+            defaultSelected = chargedRecipes.map((_, i) => newRecipes.length + i);
+        }
+
         this.replaceAmmoContext = {
             active: true,
             newRecipes,          // 新研磨的 recipe（左侧）
             chargedRecipes,      // 充能子弹（右侧）
-            selectedIndices: defaultSelected, // 默认选中右侧全部
+            selectedIndices: defaultSelected, // 继承上回合或默认选中右侧
         };
+        // [tsk-bullet-ui] 修复闪烁：先清空 grid DOM，再切阶段，再渲染 replace UI。
+        // 之前顺序是 switch → render，导致 ui_updateUI() 用 ui_refreshSelectionModeUI
+        // 闪一帧标准命运选择内容，再被 ui_renderReplaceAmmoUI 覆盖。
+        const _gridElPre = document.getElementById('marble-selection-grid');
+        if (_gridElPre) {
+            _gridElPre.style.cssText = '';
+            _gridElPre.innerHTML = '';
+        }
         this.phase_switchPhase('selection');
         if (typeof this.ui_renderReplaceAmmoUI === 'function') {
             this.ui_renderReplaceAmmoUI();
@@ -649,10 +738,22 @@ export const game_system = {
             .filter(i => i >= 0 && i < allRecipes.length)
             .map(i => allRecipes[i]);
 
-        console.log('[ammo-replace][sys_confirmReplaceAmmo] 确认替换', {
+        if (CONFIG.debug) console.log('[ammo-replace][sys_confirmReplaceAmmo] 确认替换', {
             selectedIndices,
             finalAmmoCount: finalAmmo.length,
         });
+
+        // [tsk-bullet-ui] 记录玩家本回合实际选中子弹的特征签名，下回合用于继承默认选择。
+        const _sigOf = (r) => {
+            if (!r) return '';
+            const main = r._marbleType || r.type || 'normal';
+            const flags = `${r.explosive ? 'E' : ''}${r.isMatryoshka ? 'M' : ''}${r.isLaser ? 'L' : ''}`;
+            const mc = (r.multicast || 0) >= 3 ? 'm' : '';
+            const stats = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind']
+                .map(k => r[k] || 0).join('-');
+            return `${main}|${flags}|${mc}|${stats}`;
+        };
+        this._lastReplaceAmmoSignatures = finalAmmo.map(_sigOf);
 
         this.ammoQueue = finalAmmo;
         this.replaceAmmoContext = null;
@@ -695,6 +796,17 @@ export const game_system = {
         const newRecipes = ctx.newRecipes || [];
         // 跳过：直接使用新研磨的子弹
         this.ammoQueue = newRecipes.slice();
+        // [tsk-bullet-ui] 跳过时也记录签名（取新研磨子弹）以便下次继承
+        const _sigOf = (r) => {
+            if (!r) return '';
+            const main = r._marbleType || r.type || 'normal';
+            const flags = `${r.explosive ? 'E' : ''}${r.isMatryoshka ? 'M' : ''}${r.isLaser ? 'L' : ''}`;
+            const mc = (r.multicast || 0) >= 3 ? 'm' : '';
+            const stats = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind']
+                .map(k => r[k] || 0).join('-');
+            return `${main}|${flags}|${mc}|${stats}`;
+        };
+        this._lastReplaceAmmoSignatures = this.ammoQueue.map(_sigOf);
         this.replaceAmmoContext = null;
         this._chargedAmmoQueue = null;
         // 恢复滚动容器样式（子弹替换阶段修改过）
@@ -731,7 +843,7 @@ export const game_system = {
     _proceedToFateMomentSelection() {
         const pendingMode = this.pendingSelectionMode;
         const mode = pendingMode?.mode || (this.replaceAmmoContext?.fateMomentMode) || 'chaos_essence';
-        console.log('[DEBUG][_proceedToFateMomentSelection] 进入', {
+        if (CONFIG.debug) console.log('[DEBUG][_proceedToFateMomentSelection] 进入', {
             mode,
             pendingMode: JSON.stringify(pendingMode),
             replaceAmmoContext: JSON.stringify(this.replaceAmmoContext),
@@ -772,9 +884,11 @@ export const game_system = {
 
     /**
      * @method sys_skipGrindGetRune
-     * @description 纯净精华命运时刻「跳过研磨」逻辑：随机获取一个符文并直接进入战斗阶段。
+     * @description 纯净精华命运时刻「跳过研磨」逻辑：随机获取一个符文，然后进入「单个子弹替换」阶段。
      * 符文等级基于当前回合数：Round 1-5 → Lv1，Round 6-15 → Lv2，Round 16+ → Lv3。
      * 跳过后不得触发 sys_initSelectionPhase() 或 phase_gathering_initPachinko()。
+     * [bullet-replace-fix] 不再直接进入战斗：若存在充能子弹（_chargedAmmoQueue 或可由 marbleQueue 编译），
+     * 必须调用 sys_initReplaceAmmoPhase 进入替换阶段，让玩家选择保留哪些子弹；仅当没有任何可用子弹时才直接进战斗。
      */
     sys_skipGrindGetRune() {
         if (this.selectionMode !== 'pure_essence') {
@@ -801,25 +915,23 @@ export const game_system = {
         } else {
             showToast('跳过研磨！（未获得符文）');
         }
-        // [BUGFIX] 跳过研磨时，必须先将上回合的充能子弹（_chargedAmmoQueue）或当前
-        // marbleQueue 编译为 ammoQueue，否则进入战斗阶段时 ammoQueue 为空，
-        // 导致「彈藥耗盡」→ 敌人回合无限循环。
-        // 优先使用 _chargedAmmoQueue（上回合保留的充能子弹），其次使用当前 marbleQueue。
-        if (this._chargedAmmoQueue && this._chargedAmmoQueue.length > 0) {
-            this.ammoQueue = this._chargedAmmoQueue.slice();
-        } else if (this.marbleQueue && this.marbleQueue.length > 0) {
-            this.ammoQueue = [];
-            this.marbleQueue.forEach(marbleDef => {
-                const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
-                const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, false);
-                recipe.finalHits = 0;
-                recipe.multicast = 0;
-                this.ammoQueue.push(recipe);
-            });
-        } else {
-            this.ammoQueue = [];
+        // [bullet-replace-fix] 纯净精华跳过研磨时，应进入「单个子弹替换」阶段（仅展示充能子弹），
+        // 让玩家自主决定要保留哪些上回合的子弹，而不是直接拿着这些子弹去发射。
+        // 准备右侧（充能子弹）：优先使用 _chargedAmmoQueue，否则把当前 marbleQueue 编译进去。
+        if (!this._chargedAmmoQueue || this._chargedAmmoQueue.length === 0) {
+            if (this.marbleQueue && this.marbleQueue.length > 0) {
+                this._chargedAmmoQueue = this.marbleQueue.map(marbleDef => {
+                    const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
+                    const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, (marbleDef.multicast || 0) > 0);
+                    recipe.finalHits = 0;
+                    recipe.multicast = marbleDef.multicast || 0;
+                    recipe._marbleType = marbleDef.type;
+                    return recipe;
+                });
+            }
         }
-        this._chargedAmmoQueue = null;
+        // 跳过研磨没有「新研磨子弹」，左侧 ammoQueue 必须清空
+        this.ammoQueue = [];
         // 清理命运时刻上下文和弹珠队列
         this.marbleQueue = [];
         this.activeMarbleIndex = 0;
@@ -829,14 +941,116 @@ export const game_system = {
         this.selectionPreviewState = null;
         this.fateMomentContext = null;
         this.pendingSelectionMode = null;
-        this.replaceAmmoContext = null; // [tsk-668f3dba] 清理替换阶段上下文
         // 存档
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
-        // 直接进入战斗阶段（跳过研磨）
+        // [bullet-replace-fix] 有充能子弹时进入「子弹替换」阶段；否则才直接进入战斗。
+        if (this._chargedAmmoQueue && this._chargedAmmoQueue.length > 0
+            && typeof this.sys_initReplaceAmmoPhase === 'function') {
+            this.sys_initReplaceAmmoPhase();
+            return;
+        }
+        // 无充能子弹兜底：清理替换上下文并直接进入战斗
+        this._chargedAmmoQueue = null;
+        this.replaceAmmoContext = null;
         if (typeof this.phase_startCombatPhase === 'function') {
             this.phase_startCombatPhase();
         } else {
             this.phase_switchPhase('combat');
+        }
+    },
+
+    /**
+     * @method sys_skipChaosEssenceUpgrade
+     * @description [chaos-skip-upgrade] 混沌精华命运时刻「跳过 + 子弹老虎机升级」逻辑。
+     * 玩家点击「跳过混沌，升级当前子弹」后：
+     *   - 三个 slot 对应三枚充能子弹（_chargedAmmoQueue），每个 slot 内容是该子弹「当前拥有的所有属性」（含 multicast）。
+     *   - 老虎机滚动随机选中各 slot 的属性。
+     *   - 若三个 slot 全部相同，则三枚子弹的对应属性各 +5；否则每枚子弹各自命中的属性 +2。
+     *   - 升级后跳过研磨阶段，直接以升级后的子弹进入战斗。
+     */
+    sys_skipChaosEssenceUpgrade() {
+        if (this.selectionMode !== 'chaos_essence') {
+            console.warn('[sys_skipChaosEssenceUpgrade] 仅在 chaos_essence 模式下可调用');
+            return;
+        }
+        if (this._chaosSlotMachineActive) {
+            return; // 防止动画进行中重复触发
+        }
+        const charged = Array.isArray(this._chargedAmmoQueue) ? this._chargedAmmoQueue : [];
+        if (charged.length === 0) {
+            console.warn('[sys_skipChaosEssenceUpgrade] 没有可升级的充能子弹');
+            return;
+        }
+        this._chaosSlotMachineActive = true;
+
+        const STAT_KEYS = ['damage','bounce','pierce','scatter','multicast','cryo','pyro','lightning','laser','flying_sword','wind'];
+        const ATTR_LABEL = {
+            damage: '伤害', bounce: '反弹', pierce: '穿透', scatter: '散射',
+            multicast: '连射', cryo: '冰', pyro: '火', lightning: '雷',
+            laser: '激光', flying_sword: '飞剑', wind: '风',
+        };
+
+        // 每枚子弹当前拥有（>0）的属性集合
+        const slotAttrs = charged.map(recipe => {
+            const avail = STAT_KEYS.filter(k => (recipe[k] || 0) > 0);
+            return avail.length > 0 ? avail : ['damage'];
+        });
+
+        // 预先随机选定每个 slot 的最终命中属性
+        const finalPicks = slotAttrs.map(arr => arr[Math.floor(Math.random() * arr.length)]);
+
+        const allSame = finalPicks.length >= 3 && finalPicks.every(p => p === finalPicks[0]);
+        const incVal = allSame ? 5 : 2;
+
+        const applyUpgrade = () => {
+            if (allSame) {
+                const attr = finalPicks[0];
+                charged.forEach(r => { r[attr] = (r[attr] || 0) + incVal; });
+            } else {
+                charged.forEach((r, i) => {
+                    const attr = finalPicks[i];
+                    r[attr] = (r[attr] || 0) + incVal;
+                });
+            }
+            // 重新生效衍生标记（如 laser>0 时 isLaser 必须为 true）
+            charged.forEach(r => { if ((r.laser || 0) > 0) r.isLaser = true; });
+
+            // 升级后的充能子弹直接作为本回合 ammoQueue
+            this.ammoQueue = charged.map(r => {
+                const recipe = { ...r };
+                recipe.finalHits = 0;
+                recipe.multicast = r.multicast || 0;
+                return recipe;
+            });
+
+            // 清理命运时刻 / 替换 / 选择阶段相关上下文，跳过研磨直接进战斗
+            this._chargedAmmoQueue = null;
+            this.replaceAmmoContext = null;
+            this.fateMomentContext = null;
+            this.pendingSelectionMode = null;
+            this.selectionMode = 'standard';
+            this.selectionRequiredCount = (typeof CONFIG !== 'undefined' && CONFIG.gameplay.selectionReq) || 3;
+            this.selectionInjectedRune = null;
+            this.selectionPreviewState = null;
+            this.marbleQueue = [];
+            this.activeMarbleIndex = 0;
+
+            if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
+            if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
+            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+
+            this._chaosSlotMachineActive = false;
+            if (typeof this.phase_startCombatPhase === 'function') {
+                this.phase_startCombatPhase();
+            } else {
+                this.phase_switchPhase('combat');
+            }
+        };
+
+        if (typeof this.ui_showChaosBulletSlotMachine === 'function') {
+            this.ui_showChaosBulletSlotMachine(slotAttrs, finalPicks, ATTR_LABEL, allSame, applyUpgrade);
+        } else {
+            applyUpgrade();
         }
     },
 
@@ -1217,7 +1431,7 @@ export const game_system = {
      * @description 在回合开始前统一结算遗物/精华，再决定是否进入选择阶段。
      */
     sys_startRoundStartResolver() {
-        console.log('[DEBUG][sys_startRoundStartResolver] 进入', {
+        if (CONFIG.debug) console.log('[DEBUG][sys_startRoundStartResolver] 进入', {
             _roundStartResolverActive: this._roundStartResolverActive,
             pendingRoundStartRewards: JSON.stringify(this.pendingRoundStartRewards || []),
             phase: this.phase,
@@ -1231,7 +1445,24 @@ export const game_system = {
         // 渲染出旧的命运选择卡片（如 chaos_essence / pure_essence 界面）。
         this.selectionMode = 'standard';
         this.fateMomentContext = null;
-        if (this.phase !== 'selection') {
+        // [tsk-bullet-ui] 修复闪烁：仅当下一个奖励是精华时才切到 selection 阶段。
+        // 遗物奖励使用 #phase-relic overlay（z-index:200）覆盖当前阶段，无需切到 selection；
+        // 之前无条件 phase_switchPhase('selection') 会让 phase-selection 面板先闪一帧
+        // 旧/空的弹珠选择内容，再被 phase-relic overlay 覆盖。
+        const _nextRewardType = (() => {
+            const r = (this.pendingRoundStartRewards || [])[0];
+            if (!r) return null;
+            return r.type === 'essence'
+                ? (r.essenceType === 'pure_essence' ? 'pure_essence' : 'chaos_essence')
+                : r.type;
+        })();
+        if ((_nextRewardType === 'chaos_essence' || _nextRewardType === 'pure_essence') && this.phase !== 'selection') {
+            // 同步预先清空残留的弹珠卡片，避免 ui_updateUI 渲染出旧 DOM 闪一帧
+            const _earlyGridEl = document.getElementById('marble-selection-grid');
+            if (_earlyGridEl) {
+                _earlyGridEl.style.cssText = '';
+                _earlyGridEl.innerHTML = '';
+            }
             this.phase_switchPhase('selection');
         }
         this._roundStartResolverActive = true;
@@ -1249,9 +1480,12 @@ export const game_system = {
                 : reward.type;
 
             if (rewardType === 'relic') {
-                this._roundStartResolverActive = false;
-                
                 const startSelection = () => {
+                    // [BUGFIX tsk-agnet-stage] 必须在 loot 飞行动画 callback 内才清除 resolver 标志，
+                    // 而不是动画播放前。否则在动画播放（300~600ms）期间 _roundStartResolverActive=false
+                    // 且遗物 overlay 尚未挂上 active-phase，phase_combat_update 在 ammoQueue 为空时
+                    // 会误触发敌人回合，表现为「打出最后一发子弹后下一个阶段不进入」。
+                    this._roundStartResolverActive = false;
                     if (typeof this.ui_showRelicSelection === 'function') {
                         this.ui_showRelicSelection({ resumeTarget: 'round_start_resolver', source: reward.source || 'unknown' });
                     }
@@ -1289,13 +1523,22 @@ export const game_system = {
                         enemyType: reward.enemyType || null,
                         sourceRewardType: rewardType,
                     };
-                    // [ammo-replace] 精华触发时，如果上回合有 marbleQueue，先生成充能子弹保存到 _chargedAmmoQueue
-                    if (this.marbleQueue && this.marbleQueue.length > 0) {
+                    // [bullet-charge-fix] 精华触发时，优先使用「上回合实际发射的子弹快照」
+                    // 作为充能子弹源（_lastFiredAmmoSnapshot），保证子弹替换后玩家保留的子弹
+                    // 在下回合精华触发时仍能正确充能；只有在快照不存在时才回退到 marbleQueue 编译。
+                    if (Array.isArray(this._lastFiredAmmoSnapshot) && this._lastFiredAmmoSnapshot.length > 0) {
+                        this._chargedAmmoQueue = this._lastFiredAmmoSnapshot.map(r => {
+                            const recipe = { ...r };
+                            recipe.finalHits = 0;
+                            recipe.multicast = r.multicast || 0;
+                            return recipe;
+                        });
+                    } else if (this.marbleQueue && this.marbleQueue.length > 0) {
                         this._chargedAmmoQueue = this.marbleQueue.map(marbleDef => {
                             const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
-                            const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, false);
+                            const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, (marbleDef.multicast || 0) > 0);
                             recipe.finalHits = 0;
-                            recipe.multicast = 0;
+                            recipe.multicast = marbleDef.multicast || 0;
                             recipe._marbleType = marbleDef.type;
                             return recipe;
                         });
@@ -1416,18 +1659,32 @@ export const game_system = {
             if (leftSidebar) {
                 leftSidebar.classList.remove('ammo-panel-charging', 'ammo-panel-charging-simple');
             }
-            // [充能] 每回合开始检查 ammoQueue：若为空则尝试从 marbleQueue 充能，
-            // 保留上回研磨收集的属性（collected），实现"子弹充能"效果。
+            // [充能] 每回合开始检查 ammoQueue：若为空则尝试充能，保留上回合实际发射子弹的属性，
+            // 实现"子弹充能"效果。
+            // [bullet-charge-fix] 优先使用「上回合实际发射的子弹快照」作为充能源；
+            // 这样子弹替换阶段保留下来的上上回合充能子弹也能正确接续，
+            // 否则会用本回合 marbleQueue（玩家未选择/未发射的新研磨子弹）覆盖，导致充能混乱。
             const ammoIsEmpty = !this.ammoQueue || this.ammoQueue.length === 0;
-            if (ammoIsEmpty && this.marbleQueue && this.marbleQueue.length > 0) {
+            const hasFiredSnapshot = Array.isArray(this._lastFiredAmmoSnapshot) && this._lastFiredAmmoSnapshot.length > 0;
+            const hasMarbleQueue = this.marbleQueue && this.marbleQueue.length > 0;
+            if (ammoIsEmpty && (hasFiredSnapshot || hasMarbleQueue)) {
                 this.ammoQueue = [];
-                this.marbleQueue.forEach(marbleDef => {
-                    const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
-                    const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, false);
-                    recipe.finalHits = 0;
-                    recipe.multicast = 0;
-                    this.ammoQueue.push(recipe);
-                });
+                if (hasFiredSnapshot) {
+                    this._lastFiredAmmoSnapshot.forEach(r => {
+                        const recipe = { ...r };
+                        recipe.finalHits = 0;
+                        recipe.multicast = r.multicast || 0;
+                        this.ammoQueue.push(recipe);
+                    });
+                } else {
+                    this.marbleQueue.forEach(marbleDef => {
+                        const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
+                        const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, (marbleDef.multicast || 0) > 0);
+                        recipe.finalHits = 0;
+                        recipe.multicast = marbleDef.multicast || 0;
+                        this.ammoQueue.push(recipe);
+                    });
+                }
                 this.ui_updateAmmoUI && this.ui_updateAmmoUI();
                 this.ui_renderRecipeHUD && this.ui_renderRecipeHUD();
 
@@ -1651,21 +1908,25 @@ export const game_system = {
 
     /**
      * @method _isRuneLauncherOpen
-     * @description 判断符文发射器面板当前是否处于打开状态。
+     * @description 判断符文发射器面板当前是否处于「全屏遮罩」状态（即移动端打开浮层）。
      * 兼容两种模式：
      * - 移动端模式：面板为 .ui-overlay 全屏浮层，打开时 style.display = 'flex'，关闭时 = 'none'
-     * - PC 模式：面板已迁移到 #pc-right-sidebar，移除了 .ui-overlay 类，
-     *   由 CSS `display: flex !important` 控制，style.display 本身为空字符串。
-     *   此时通过 dataset.pcMigrated 标记来判断是否处于 PC 常驻状态。
-     * @returns {boolean} 发射器是否打开
+     * - PC 模式：面板已被 _ui_migrateRuneLauncherToSidebar 迁入 #pc-right-sidebar 常驻显示，
+     *   位于 canvas 之外的独立容器，不会遮挡 canvas，必须返回 false。
+     * @returns {boolean} 发射器是否处于全屏遮罩状态
      */
     _isRuneLauncherOpen() {
         const panel = document.getElementById('phase-rune-launcher');
         if (!panel) return false;
-        // [BUGFIX] PC 模式：面板已迁移到右侧边栏（常驻可见）。
-        // 此时面板在 canvas 之外的独立容器中，不会遮挡 canvas，应返回 false。
-        // 原错误逻辑：返回 true 导致 input_handleInputStart 永远提前 return，屏蔽所有 PC 端点击事件。
-        if (panel.dataset.pcMigrated === 'true') return false;
+        // [BUGFIX tsk-pc-click-block] 通过 DOM 父级直接判断 PC 迁移状态。
+        // 旧实现依赖 panel.dataset.pcMigrated === 'true'，但 _ui_movePanelTo 从未写入该标记，
+        // 导致 PC 模式下函数永远 fallback 到 style.display 检查。而 _ui_migrateRuneLauncherToSidebar
+        // 在迁入侧边栏后会把 style.display 强制设为 'flex'（让发射器常驻），
+        // 综合作用使本函数在 PC 模式下永远返回 true，连锁导致：
+        //   1) input_handleInputStart/Move/End 全部提前 return —— 主屏幕点击全部被吞；
+        //   2) ui_updateUI 中 `if (!launcherVisible)` 分支被跳过 —— 当前阶段的 .ui-overlay
+        //      永远不会被重新激活，主屏幕显示为空。
+        if (panel.closest('#pc-right-sidebar')) return false;
         // 移动端模式：面板为全屏浮层，通过 style.display 判断
         return panel.style.display !== '' && panel.style.display !== 'none';
     },
@@ -1773,7 +2034,10 @@ export const game_system = {
 
         if (this.isDragging) {
             this.isDragging = false;
-            const cannonPos = new Vec2(this.width / 2, this.height - 80);
+            // [emitter-port] 发射方向必须以发射口为原点（Y 轴上移 22px），
+            // 与瞄准引导线（game_phase.js:1812）和子弹生成位置（game_phase.js:1457）一致，
+            // 否则瞄准线与实际发射角度会因 22px 视差产生偏差。
+            const cannonPos = new Vec2(this.width / 2, this.height - 102);
             const targetPos = this.lastMousePos;
             const aimVector = targetPos.sub(cannonPos);
             if (aimVector.y < -20) {
@@ -1992,6 +2256,7 @@ export const game_system = {
                 fateMomentContext: this.fateMomentContext ? { ...this.fateMomentContext } : null,
                 replaceAmmoContext: this.replaceAmmoContext ? JSON.parse(JSON.stringify(this.replaceAmmoContext)) : null, // [ammo-replace]
                 _chargedAmmoQueue: this._chargedAmmoQueue ? this._chargedAmmoQueue.map(r => ({ ...r })) : null, // [ammo-replace]
+                _lastFiredAmmoSnapshot: this._lastFiredAmmoSnapshot ? this._lastFiredAmmoSnapshot.map(r => ({ ...r })) : null, // [bullet-charge-fix]
                 // Boss 系统
                 bossHistory: (this.bossHistory || []).slice(),
                 _pendingBossSpawn: this._pendingBossSpawn ? { ...this._pendingBossSpawn } : null,
@@ -2107,6 +2372,7 @@ export const game_system = {
             this.fateMomentContext = state.fateMomentContext ? { ...state.fateMomentContext } : null;
             this.replaceAmmoContext = state.replaceAmmoContext ? JSON.parse(JSON.stringify(state.replaceAmmoContext)) : null; // [ammo-replace]
             this._chargedAmmoQueue = state._chargedAmmoQueue ? state._chargedAmmoQueue.map(r => ({ ...r })) : null; // [ammo-replace]
+            this._lastFiredAmmoSnapshot = state._lastFiredAmmoSnapshot ? state._lastFiredAmmoSnapshot.map(r => ({ ...r })) : null; // [bullet-charge-fix]
 
             // --- 恢复 Boss 系统 ---
             this.bossHistory = (state.bossHistory || []).slice();

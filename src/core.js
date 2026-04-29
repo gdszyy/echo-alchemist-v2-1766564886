@@ -149,8 +149,14 @@ class Game {
         this.specialSlots = []; 
         this.dropBalls = []; 
         this.projectiles = []; 
-        this.particles = []; 
-        this.shockwaves = []; 
+        this.particles = [];
+        // [Perf] 粒子分模式计数表 - 替代 this.particles.filter(p=>p.mode==='X').length 的 O(N) 扫描
+        // 维护契约：所有 push 必走 spawn_createParticle / spawn_pushParticleWithLimit；
+        // 所有删除必走 game_phase.js 的两指针压缩循环（同步 -- 计数）。
+        this.particleCounts = { wind_slash: 0, line: 0, ember: 0, mist: 0, shard: 0, spark: 0, smoke: 0 };
+        // [Perf] 粒子对象池 - 复用 Particle 实例，规避每帧 50-100 次 new 触发的 GC 停顿
+        this._particlePool = [];
+        this.shockwaves = [];
         this.floatingTexts = []; 
         this.rainbowBuffer = []; 
         this.lightningBolts = []; 
@@ -199,6 +205,9 @@ class Game {
         this.fateMomentContext = null;
         this.replaceAmmoContext = null; // [tsk-668f3dba] 替换当前子弹阶段上下文
         this._chargedAmmoQueue = null; // [ammo-replace] 充能子弹（上回合 marbleQueue 编译的 recipe），用于研磨后替换界面
+        // [bullet-charge-fix] 上一回合战斗实际使用的子弹快照（在 phase_startCombatPhase 中拍下），
+        // 用作下回合「子弹充能」/「精华触发时充能子弹」的真实数据源，避免使用 marbleQueue 误用未发射的子弹。
+        this._lastFiredAmmoSnapshot = null;
         this.isDragging = false; 
         this.dragStart = new Vec2(0,0); 
         this.dragCurrent = new Vec2(0,0); 
@@ -275,20 +284,27 @@ class Game {
         // 面板的显示/隐藏状态由 phase_switchPhase -> ui_updateUI 统一管理。
         // 手动隐藏会导致 phase-meta 在初始化时被隐藏后无法正确恢复（主页闪现消失 Bug）。
         
-        window.addEventListener('resize', () => { 
-            this.ui_updatePCLayout();
-            this.sys_resize(); 
-            if (this.phase === 'gathering') this.phase_gathering_initPachinko(); 
-        });
+        // [Perf] 监听器具名化 + 重复注册保护
+        // 之前匿名箭头闭包持有 game 实例，无法 GC；重启 / hot-reload 时也会重复注册。
+        // 现在保存到实例字段，destroy() 时可以彻底清除。
+        if (!this._onWindowResize) {
+            this._onWindowResize = () => {
+                this.ui_updatePCLayout();
+                this.sys_resize();
+                if (this.phase === 'gathering') this.phase_gathering_initPachinko();
+            };
+            window.addEventListener('resize', this._onWindowResize);
+        }
         // [BUGFIX] 用 ResizeObserver 监听 game-container 尺寸变化，
         // 确保页面首次渲染后（CSS aspect-ratio 计算完成）canvas 尺寸能被正确设置。
-        // 这解决了构造函数中调用 sys_resize() 时 getBoundingClientRect() 返回 0 的问题。
-        const _resizeObserver = new ResizeObserver(() => {
-            if (this.canvas.width !== Math.round(document.getElementById('game-container').getBoundingClientRect().width)) {
-                this.sys_resize();
-            }
-        });
-        _resizeObserver.observe(document.getElementById('game-container'));
+        if (!this._resizeObserver) {
+            this._resizeObserver = new ResizeObserver(() => {
+                if (this.canvas.width !== Math.round(document.getElementById('game-container').getBoundingClientRect().width)) {
+                    this.sys_resize();
+                }
+            });
+            this._resizeObserver.observe(document.getElementById('game-container'));
+        }
         // 初始化时立即执行一次 PC 布局检测
         this.ui_updatePCLayout();
         this.ui = new UIManager();
@@ -304,6 +320,8 @@ class Game {
         // ==================== 自适应性能监控状态 ====================
         // 当前特效等级：'high' | 'medium' | 'low'
         this.perfQualityLevel = 'high';
+        // [Perf] shadowBlur 全局开关 - 由 perfQualityLevel 同步驱动；particles.js / entities.js 引用此布尔
+        this.shadowBlurEnabled = CONFIG.performance.high.shadowBlurEnabled !== false;
         // FPS 滑动平均采样缓冲区（存储最近 N 帧的帧时间，单位 ms）
         this._fpsSamples = [];
         // 上一帧的时间戳（由 sys_loop 更新）
@@ -419,6 +437,21 @@ class Game {
         this.hud_initEventListeners();
         // [新手教程] 检测是否为首次游玩，触发教程
         this.tutorial_checkAndStart();
+    }
+
+    /**
+     * [Perf] 释放全局监听器，避免重启 / hot-reload 时旧 game 实例无法 GC。
+     * 当前未在显式重启入口调用，但提供给开发者工具与未来重构使用。
+     */
+    destroy() {
+        if (this._onWindowResize) {
+            window.removeEventListener('resize', this._onWindowResize);
+            this._onWindowResize = null;
+        }
+        if (this._resizeObserver) {
+            try { this._resizeObserver.disconnect(); } catch (e) {}
+            this._resizeObserver = null;
+        }
     }
 }
 

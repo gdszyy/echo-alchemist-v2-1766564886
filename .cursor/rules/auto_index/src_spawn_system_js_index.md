@@ -1,6 +1,6 @@
 # src/spawn_system.js 函数索引
 
-> 自动生成于 2026-04-25 | 总行数: 2235 | 函数数: 28 | 语言: javascript
+> 自动生成于 2026-04-26 | 总行数: 2237 | 函数数: 28 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -72,3 +72,5 @@
 |----------|------|
 | `@section:spawn_row_config` | 行配置读取：波次参数与难度缩放 |
 | `@section:bullet_recipe_parse` | 弹药配方解析与属性提取 |
+| `@section:energy_orb_collect_audio` | 能量球收集进度音效（500~750Hz 随进度升调，营造蓄力感） |
+| `@section:levelup_audio` | 能量槽满触发多播升级爆发音（pitch = multicast 等级，越高越尖锐） |

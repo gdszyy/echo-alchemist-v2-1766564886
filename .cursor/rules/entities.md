@@ -50,6 +50,7 @@
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
+| 2026-04-26 | `src/entities/enemy.js` | **敌人血条透明化（Transparent Enemy Health Bar）**：随着 `bg_main_canvas.png` / `#game-container` 径向渐变背景接入战斗阶段，敌人方块原先三处不透明填充会形成「黑色色块」遮挡背景。三处调整：(1) Layer 1 容器底色由实色 `#0f172a` 改为 `rgba(15, 23, 42, 0.38)`（line 1359~1362），让背景透出；(2) Layer 2 「空槽底色」三档 alpha 同步降低（普通 `0.65→0.32` / 精英 `0.7→0.36` / Boss `0.75→0.40`），保留类型色调但显著弱化遮挡（line 1403~1410）；(3) Layer 2 HP 真实彩色条改用 `ctx.globalAlpha = 0.82` 包裹 fill，再复位为 1.0，使温度变色后的 `lerpColor` 输出仍可继承半透明效果（line 1443~1448）。轮廓识别由原有 `shadowBlur` 描边（Layer 1 stroke）和液面顶部亮边继续承担，对比度无明显损失。**性能自适应影响评估**：仅修改既有 `fillStyle` 的 alpha 通道，未新增 shadowBlur/createRadialGradient/lighter 混合，three fill 操作的 GPU 开销基本不变，high/medium/low 三档表现一致。 |
 | 2026-04-18 | `src/entities/enemy.js`, `src/game_system.js`, `src/config.js` | **奖励标记敌人专属光晕（Pending Reward Halo）**：为 PI-006 round-start 延迟奖励流程中登记的非 Boss 敌人添加战斗阶段可识别的视觉标识。**game_system.js** 的 `sys_tryQueueEnemyRoundReward()` 在登记 `pendingRoundStartRewards` 队列时，同步为敌人打上 `enemy._pendingRewardType = 'relic' | 'chaos_essence' | 'pure_essence'` 标记。**enemy.js** 在 Layer 6.8（Layer 6 之后、Layer 7 之前）新增三种奖励类型的专属光晕：(1) relic = 金色脉冲光晕（shadowBlur 最大 22px，周期 1600ms）+ 宝箱图标（🎁）浮动（幅度 5px，周期 1800ms）；(2) chaos_essence = 混沌紫/红渐变光晕（内圈 #a855f7 + 外圈 #ef4444，周期 1200ms）+ 旋转符文粒子（high 档 4 个）；(3) pure_essence = 纯白/蓝白晶化光晕（内圈白色 lighter 叠加 + 外圈蓝白，周期 2000ms）+ 菱形晶体旋转（high 档 5 个）。**config.js** 的 `CONFIG.enemyRender` 新增 22 个奖励光晕参数（分 relic/chaos/pure 三组）；`CONFIG.performance` 三档各新增 `rewardHaloEnabled`、`rewardRuneCount`、`rewardCrystalCount` 门控字段（high: 完整效果，medium: 减少旋转装饰，low: 关闭所有光晕）。所有新增特效均仅在 `actionPhase === 'idle'` 且 `_pendingRewardType` 不为空时生效，不影响战斗行为。代码已添加 `// @perf-impact` 标记。 |
 | 2026-04-18 | `src/entities.js`, `src/config.js`, `src/ui_system.js`, `src/game_phase.js`, `src/game_system.js`, `src/core.js` | **命运时刻实体链路回补**：纯净精华确认时必须把合法注入结果写回 `MarbleDefinition.collected`，后续发射阶段继续消费标准 collected 链路；同化涌潮改为由 `CONFIG.gameplay.assimilationDoubleMultiplier` 与 `doubleAssimilationBoostRounds` 驱动，实体同化判定不再依赖 `+0.195` 魔法常数。 |
 | 2026-04-17 | `src/entities/enemy.js`, `src/config.js` | **降低护盾亮度（Shield Brightness Reduction）**：护盾词缀特效整体过亮，`lighter` 混合模式叠加导致下层敌人主体细节被遮盖。三处调整：(1) `config.js` 的 `affixCoreOverglowAlpha` 从 `0.2` 降至 `0.12`，减少护盾核心 `lighter` 模式白色过曝强度；(2) `config.js` 的 `eliteShieldNodeAlpha` 从 `0.7` 降至 `0.45`，减少精英/Boss 护盾六边形交点节点高光透明度；(3) `enemy.js` Layer 3.5 shield 格纹绘制中，`shieldPulse` 基础值从 `0.35` 降至 `0.22`（幅度 `±0.15` 不变），使格纹透明度范围从 `0.20~0.50` 降至 `0.07~0.37`，防止格纹过亮遮盖敌人主体细节。 |
@@ -103,7 +104,7 @@
 
 | Layer 层级 | 绘制内容说明 | 备注 |
 | :--- | :--- | :--- |
-| **Layer 1** | 圆角矩形容器裁剪（`#0f172a` 深色背景） | 基础裁剪层 |
+| **Layer 1** | 圆角矩形容器裁剪（`rgba(15, 23, 42, 0.38)` 半透明深色背景） | 基础裁剪层；**2026-04-26 调整**：底色由实色 `#0f172a` 改为半透明，让 `#game-container` 径向渐变 / `bg_main_canvas.png` 战场背景透出 |
 | **Layer 1.5** | 静态底层纹理（OffscreenCanvas）+ 材质光泽渐变 | **新增**，基于 `visualSeed` 预计算（金属拉丝/矿石斑点/能量流线）；**Task A 增强**：底部叠加顶→底 LinearGradient（白色高光 → 黑色阴影），模拟 3D 凸起物理厚度感 |
 | **Layer 2** | 液体血条（含延迟白条、绿色回血条） | 真实血量与动画血量 |
 | **Layer 3** | 内部覆盖层（过热橙色发光 / 过冷蓝色雾化） | 状态反馈 |

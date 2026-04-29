@@ -18,6 +18,7 @@
 import { CONFIG } from '../config.js';
 import { Vec2, lerp, lerpColor } from '../utils/math_utils.js';
 import { Particle } from '../effects/particles.js';
+import { sb as _sb } from '../utils/perf.js';
 import { eventBus } from '../event_bus.js';
 import { createSpriteRenderer } from '../render/sprite_renderer.js'; // [Phase 5B Task 5.B3] Sprite 动画渲染器
 
@@ -771,12 +772,14 @@ class Enemy {
             this.actionPhase = 'telegraphing';
             this.telegraphTimer = 35; // 约 0.6 秒的预警时间
             // 播放一个“蓄力”音效
+            // @section:enemy_telegraph_audio - 敌人特殊动作预警蓄力音（低频 200Hz，区别于玩家蓄力 800Hz）
             audio.playTone(200, 'sine', 0.1, 0.1); 
         }
     }
 
     // --- [核心修改] 第二步：执行动作 (Execute Action) ---
     executeTurnAction(game) {
+        // @section:enemy_action_audio - 敌人行动音效分发：regen/split/freeze 按词缀类型路由
         const afx = CONFIG.balance.affixes;
         let actionCount = 1;
         
@@ -977,6 +980,7 @@ class Enemy {
     }
 
     performTurnActionAndMove(game) {
+        // @section:enemy_move_audio - 敌人移动时的状态音效（regen/split/devour 词缀）
         const afx=CONFIG.balance.affixes
         // [改动] haste 不再增加行动次数，狂暴词条也不在此处判定（由 startTurnAction 处理）
         let actionCount = 1;
@@ -1353,8 +1357,29 @@ class Enemy {
         } else {
             ctx.roundRect(-w/2, -h/2, w, h, r);
         }
-        ctx.fillStyle = '#0f172a'; 
-        ctx.fill(); 
+        // @perf-impact: 容器背景由实色改为线性渐变（每帧 1 个 LinearGradient/敌人）
+        // [玻璃质感] 容器底色采用顶亮底深的微弱玻璃渐变，模拟环境光自上而下
+        // 衰减；总体 alpha 降低，避免大面积纯色显得廉价，让 game-container 的
+        // 径向背景充分透出，强化"半透明面板嵌在战场上"的高级质感。
+        const _bgGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
+        _bgGrad.addColorStop(0, 'rgba(30, 41, 59, 0.04)');
+        _bgGrad.addColorStop(1, 'rgba(8, 14, 26, 0.12)');
+        ctx.fillStyle = _bgGrad;
+        ctx.fill();
+        // [增强对比 #4] 在裁剪之前先给容器外缘绘制一圈柔光描边，
+        // 让敌人在与背景同色的「液态」战场上仍能识别轮廓（精英/Boss 尤其关键）。
+        // 由于 ctx.clip() 之后描边会被裁剪一半，这里预先绘制可保留完整外缘。
+        ctx.save();
+        ctx.shadowColor = (this.type === 'boss') ? 'rgba(239, 68, 68, 0.85)'
+                         : (this.type === 'elite') ? 'rgba(168, 85, 247, 0.75)'
+                         : 'rgba(148, 163, 184, 0.55)';
+        ctx.shadowBlur = _sb((this.type === 'boss') ? 18 : (this.type === 'elite') ? 14 : 8);
+        ctx.strokeStyle = (this.type === 'boss') ? 'rgba(239, 68, 68, 0.9)'
+                         : (this.type === 'elite') ? 'rgba(196, 152, 255, 0.85)'
+                         : 'rgba(203, 213, 225, 0.7)';
+        ctx.lineWidth = (this.type === 'boss') ? 3 : 2;
+        ctx.stroke();
+        ctx.restore();
         ctx.clip();
 
          // === Layer 1.5: 底层纹理 (预计算 OffscreenCanvas) ===
@@ -1362,29 +1387,48 @@ class Enemy {
             ctx.drawImage(this._textureCanvas, -w/2, -h/2);
         }
         // === Layer 2: 液体血条 (含延迟白条) ===
-        // [修改] 血量从顶部向下填充，血量满时占满顶部，血量少时从顶部缩短
-        // 顶部留少量间距（_hpTopPad），血条高度 = h * ratio
-        
+        // [修改] 血量从上往下扣除：满血时占满整个容器，血量减少时从顶部开始消失，
+        // 残余血量沉在底部，类似液面下降的视觉。
+
         // A. 计算高度比例
         const hpRatio = Math.max(0, Math.min(1, this.displayHp / this.maxHp));
         const whiteRatio = Math.max(0, Math.min(1, this.delayedHp / this.maxHp)); // 白色条比例
         const greenRatio = Math.max(0, Math.min(1, this.greenHp / this.maxHp));   // 绿色条比例
-        
-        const _hpTopPad = 4; // 血条距顶部的间距（px）
-        const _hpBarTop = -h/2 + _hpTopPad; // 血条起始 Y（顶部）
-        
+
+        const _hpBarBottom = h/2; // 血条底部 Y（贴住容器底部）
+
         const fillHeight = h * hpRatio;
         const whiteHeight = h * whiteRatio; // 白色条高度
         const greenHeight = h * greenRatio; // 绿色条高度
-        
-        // 从顶部向下：fillY 固定在顶部，高度随血量变化
-        const fillY = _hpBarTop;
-        const whiteY = _hpBarTop; // 白色条从顶部开始
-        const greenY = _hpBarTop; // 绿色条从顶部开始
-        
+
+        // 锚定底部：fillY = bottom - height，血量减少时顶部下沉
+        const fillY = _hpBarBottom - fillHeight;
+        const whiteY = _hpBarBottom - whiteHeight;
+        const greenY = _hpBarBottom - greenHeight;
+
+        // @perf-impact: 空槽改为线性渐变（每帧 1 个 LinearGradient/敌人）
+        // [玻璃质感] 空槽保留类型色调（普通/精英/Boss）但改为顶浅底深的微弱渐变，
+        // 进一步打散纯色面，提升透明感与体积感。alpha 进一步降低，让背景透出更多。
+        let _slotTop, _slotBottom;
+        if (this.type === 'elite') {
+            _slotTop = 'rgba(76, 48, 122, 0.05)';
+            _slotBottom = 'rgba(28, 14, 52, 0.12)';
+        } else if (this.type === 'boss') {
+            _slotTop = 'rgba(96, 28, 44, 0.06)';
+            _slotBottom = 'rgba(40, 8, 16, 0.14)';
+        } else {
+            _slotTop = 'rgba(40, 52, 74, 0.04)';
+            _slotBottom = 'rgba(12, 18, 30, 0.10)';
+        }
+        const _slotGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
+        _slotGrad.addColorStop(0, _slotTop);
+        _slotGrad.addColorStop(1, _slotBottom);
+        ctx.fillStyle = _slotGrad;
+        ctx.fillRect(-w/2, -h/2, w, h);
+
         // B. 绘制白色延迟条 (在彩色条底下)
         if (whiteRatio > hpRatio) {
-            ctx.fillStyle = '#ffffff'; 
+            ctx.fillStyle = '#ffffff';
             ctx.globalAlpha = 0.8;
             ctx.fillRect(-w/2, whiteY, w, whiteHeight);
             ctx.globalAlpha = 1.0;
@@ -1399,26 +1443,46 @@ class Enemy {
         }
 
         // C. 绘制真实彩色条 (盖在白条上面)
-        let baseColor = '#475569'; 
-        if (this.type === 'elite') baseColor = '#581c87'; 
-        if (this.type === 'boss') baseColor = '#7f1d1d';  
-        
+        // [增强对比] 加深基础血色，并与外部背景拉开差异。
+        let baseColor = '#64748b';                  // 普通：石板蓝（更亮）
+        if (this.type === 'elite') baseColor = '#7c3aed'; // 精英：饱和紫
+        if (this.type === 'boss') baseColor = '#dc2626';  // Boss：饱和血红
+
         // 温度变色逻辑
         if (this.temp > 0) {
             const t = Math.min(1, this.temp / 34);
-            baseColor = lerpColor(baseColor, '#ea580c', t); 
+            baseColor = lerpColor(baseColor, '#ea580c', t);
         } else if (this.temp < 0) {
             const t = Math.min(1, Math.abs(this.temp) / 34);
             baseColor = lerpColor(baseColor, '#0891b2', t);
         }
 
-        ctx.fillStyle = baseColor; 
-        ctx.fillRect(-w/2, fillY, w, fillHeight);
-        
-        // D. 液面亮边（血条底部边缘）
+        // @perf-impact: HP 填充由实色改为线性渐变（每帧 1 个 LinearGradient/敌人）
+        // [液体质感] 沿垂直方向叠加：顶部偏亮（液面高光）→ 中段为本体色 → 底部偏暗
+        // （暗示液体深度），使 HP 条不再是大面积纯色，呈现真正的"液体"层次。
+        // alpha 略降至 0.78，让背景与温度光效更自然地透出。
+        if (fillHeight > 0.5) {
+            const _hpHighlight = lerpColor(baseColor, '#ffffff', 0.22);
+            const _hpShadow = lerpColor(baseColor, '#000000', 0.32);
+            const _hpGrad = ctx.createLinearGradient(0, fillY, 0, fillY + fillHeight);
+            _hpGrad.addColorStop(0, _hpHighlight);
+            _hpGrad.addColorStop(0.18, baseColor);
+            _hpGrad.addColorStop(1, _hpShadow);
+            ctx.globalAlpha = 0.48;
+            ctx.fillStyle = _hpGrad;
+            ctx.fillRect(-w/2, fillY, w, fillHeight);
+            ctx.globalAlpha = 1.0;
+        }
+
+        // D. 液面顶部高光（双层 specular：上方亮线 + 下方淡渐隐，模拟液体表面张力）
         if (hpRatio > 0 && hpRatio < 1) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'; 
-            ctx.fillRect(-w/2, fillY + fillHeight - 2, w, 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+            ctx.fillRect(-w/2, fillY, w, 1);
+            const _surfaceGrad = ctx.createLinearGradient(0, fillY, 0, fillY + 5);
+            _surfaceGrad.addColorStop(0, 'rgba(255, 255, 255, 0.32)');
+            _surfaceGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = _surfaceGrad;
+            ctx.fillRect(-w/2, fillY, w, 5);
         }
 
         // === Layer 3: 内部覆盖层 (Glow & Mist) - [修改：降低浓度] ===
@@ -1638,7 +1702,7 @@ class Enemy {
                         ctx.strokeStyle = `rgba(74, 222, 128, ${bubbleAlpha})`;
                         ctx.lineWidth = 1;
                         ctx.shadowColor = '#4ade80';
-                        ctx.shadowBlur = 3;
+                        ctx.shadowBlur = _sb(3);
                         ctx.beginPath();
                         ctx.arc(bubbleX, bubbleY, Math.max(1, bubbleR), 0, Math.PI * 2);
                         ctx.stroke();
@@ -1663,7 +1727,7 @@ class Enemy {
                         ctx.strokeStyle = `rgba(74, 222, 128, ${veinAlpha})`;
                         ctx.lineWidth = 1 + veinPulse * 0.8;
                         ctx.shadowColor = '#4ade80';
-                        ctx.shadowBlur = 3 + veinPulse * 3;
+                        ctx.shadowBlur = _sb(3 + veinPulse * 3);
                         ctx.beginPath();
                         ctx.moveTo(0, 0);
                         const midX = vx * 0.5 + Math.sin(vSeed * 2) * w * 0.12;
@@ -1727,7 +1791,7 @@ class Enemy {
                         ctx.strokeStyle = `rgba(${arcColor}, ${arcAlpha})`;
                         ctx.lineWidth = 1.5;
                         ctx.shadowColor = this.type === 'boss' ? '#ef4444' : '#c084fc';
-                        ctx.shadowBlur = 4;
+                        ctx.shadowBlur = _sb(4);
                         // 绘制折线电弧
                         ctx.beginPath();
                         ctx.moveTo(-w / 2, arcY);
@@ -1912,7 +1976,7 @@ class Enemy {
                     ctx.strokeStyle = `rgba(${ghostColor}, ${ghostAlpha})`;
                     ctx.lineWidth = 1.5;
                     ctx.shadowColor = `rgba(${ghostColor}, 0.5)`;
-                    ctx.shadowBlur = 5;
+                    ctx.shadowBlur = _sb(5);
                     // 重影轮廓：缩小到 0.85 倍
                     ctx.save();
                     ctx.translate(ghostDriftX, ghostDriftY);
@@ -2068,7 +2132,7 @@ class Enemy {
                     ctx.strokeStyle = _bGrad;
                     ctx.lineWidth = _bossE4Cfg.borderTierRainbowWidth + 1; // Boss 比精英稍宽
                     ctx.shadowColor = `hsl(${_bHue0}, 100%, 65%)`;
-                    ctx.shadowBlur = _bossE4Cfg.borderTierRainbowGlowBlur + 4; // Boss 光晕更强
+                    ctx.shadowBlur = _sb(_bossE4Cfg.borderTierRainbowGlowBlur + 4); // Boss 光晕更强
                     ctx.beginPath();
                     ctx.moveTo(_bpx0, _bpy0);
                     ctx.lineTo(_bpx1, _bpy1);
@@ -2096,7 +2160,7 @@ class Enemy {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter'; 
             ctx.strokeStyle = `rgba(255, 255, 255, ${crackAlpha * 0.9})`;
-            ctx.shadowColor = '#f97316'; ctx.shadowBlur = 10; ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            ctx.shadowColor = '#f97316'; ctx.shadowBlur = _sb(10); ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
             this.fissures.forEach(path => {
                 if (path.length < 2) return;
                 ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y);
@@ -2157,7 +2221,7 @@ class Enemy {
             ctx.save();
             ctx.translate(0, -this.height/2 - 30 - Math.sin(time * 5) * 5);
             ctx.fillStyle = '#0ea5e9';
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = _sb(10);
             ctx.shadowColor = '#0ea5e9';
             ctx.font = 'bold 20px sans-serif';
             ctx.textAlign = 'center';
@@ -2224,7 +2288,7 @@ class Enemy {
         if (this.actionPhase === 'telegraphing') {
             ctx.strokeStyle = '#ffffff';
             ctx.shadowColor = '#fff';
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = _sb(15);
         }
 
         // 根据形状类型选择边框绘制方式：polygon 用多边形，arc 用圆弧，其余用 strokeRect
@@ -2314,7 +2378,7 @@ class Enemy {
                 }
             }
             ctx.shadowColor = pulseColor;
-            ctx.shadowBlur = pulseBlur;
+            ctx.shadowBlur = _sb(pulseBlur);
             // 重绘一次边框以应用光晕（不改变已有边框颜色）
             if (this.collisionShape === 'polygon' &&
                 this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
@@ -2373,7 +2437,7 @@ class Enemy {
             ctx.strokeStyle = '#0ea5e9'; // 飞剑的青色
             ctx.lineWidth = 2;
             ctx.lineCap = 'round';
-            ctx.shadowBlur = 5;
+            ctx.shadowBlur = _sb(5);
             ctx.shadowColor = '#0ea5e9';
             
             this.swordCracks.forEach(crack => {
@@ -2421,7 +2485,7 @@ class Enemy {
             // 绘制一个圆角矩形虚化护盾
             ctx.strokeStyle = `rgba(147, 197, 253, ${alpha})`; // 浅蓝色
             ctx.lineWidth = 4;
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = _sb(15);
             ctx.shadowColor = '#60a5fa';
             
             ctx.beginPath();
@@ -2509,7 +2573,7 @@ class Enemy {
             ctx.save();
             ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
             ctx.shadowColor = abyssalCfg.bossAbyssalAuraColor;
-            ctx.shadowBlur = abyssalCfg.bossAbyssalAuraBlur;
+            ctx.shadowBlur = _sb(abyssalCfg.bossAbyssalAuraBlur);
             ctx.strokeStyle = 'rgba(0, 0, 0, 0)'; // 透明描边，仅依靠 shadowBlur 投射阴影
             ctx.lineWidth = 6;
             if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
@@ -2556,7 +2620,7 @@ class Enemy {
                 ctx.strokeStyle = veinGrad;
                 ctx.lineWidth = 1.5 + magmaIntensity;
                 ctx.shadowColor = '#ef4444';
-                ctx.shadowBlur = 4 + magmaIntensity * 4;
+                ctx.shadowBlur = _sb(4 + magmaIntensity * 4);
                 ctx.beginPath();
                 ctx.moveTo(startX, startY);
                 // 中间加一个微小弯曲点
@@ -2602,7 +2666,7 @@ class Enemy {
             const innerPulse = (Math.sin(viridisTime * 3.5 + 1.2) + 1) * 0.5; // 快脉冲
             // 外层光晕（大圆，半透明）
             ctx.shadowColor = '#22c55e';
-            ctx.shadowBlur = 20 + outerPulse * 15;
+            ctx.shadowBlur = _sb(20 + outerPulse * 15);
             ctx.strokeStyle = `rgba(34, 197, 94, ${0.4 + outerPulse * 0.35})`;
             ctx.lineWidth = 3;
             // 外层光晕：跟随 Boss 形状
@@ -2617,7 +2681,7 @@ class Enemy {
                 ctx.beginPath(); ctx.roundRect(-w/2 - 5, -h/2 - 5, w + 10, h + 10, r + 3); ctx.stroke();
             }
             // 内层光晕（小圆，较亮）
-            ctx.shadowBlur = 10 + innerPulse * 8;
+            ctx.shadowBlur = _sb(10 + innerPulse * 8);
             ctx.strokeStyle = `rgba(74, 222, 128, ${0.3 + innerPulse * 0.4})`;
             ctx.lineWidth = 1.5;
             if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
@@ -2639,7 +2703,7 @@ class Enemy {
             ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
             const pulse = (Math.sin(Date.now() / 200) + 1) * 0.5;
             ctx.shadowColor = '#f97316';
-            ctx.shadowBlur = 15 + pulse * 10;
+            ctx.shadowBlur = _sb(15 + pulse * 10);
             ctx.strokeStyle = `rgba(251, 146, 60, ${0.6 + pulse * 0.4})`;
             ctx.lineWidth = 3;
             if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
@@ -2673,7 +2737,7 @@ class Enemy {
             ctx.strokeStyle = 'rgba(207, 250, 254, 0.9)'; // 亮青白
             ctx.fillStyle = 'rgba(165, 243, 252, 0.25)';  // 内部淡淡的冻结感
             ctx.shadowColor = '#06b6d4';
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = _sb(10);
             ctx.lineJoin = 'bevel';
             ctx.lineWidth = 2;
 
@@ -2777,7 +2841,7 @@ class Enemy {
 
                     // --- R1: 外圈金色脉冲光晕（双层描边）---
                     ctx.shadowColor = _rc.relicHaloColor;
-                    ctx.shadowBlur = _relicIntensity * _rc.relicHaloBlurMax;
+                    ctx.shadowBlur = _sb(_relicIntensity * _rc.relicHaloBlurMax);
                     ctx.strokeStyle = `rgba(250, 204, 21, ${_relicIntensity * _rc.relicHaloStrokeAlpha})`;
                     ctx.lineWidth = 2.5;
                     if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
@@ -2794,7 +2858,7 @@ class Enemy {
                     }
                     // 内圈琥珀色描边（偏移一层，体现双层封印）
                     ctx.shadowColor = _rc.relicHaloColorInner;
-                    ctx.shadowBlur = _relicIntensity * _rc.relicHaloInnerBlurMax;
+                    ctx.shadowBlur = _sb(_relicIntensity * _rc.relicHaloInnerBlurMax);
                     ctx.strokeStyle = `rgba(245, 158, 11, ${_relicIntensity * _rc.relicHaloStrokeAlpha * 0.7})`;
                     ctx.lineWidth = 1.5;
                     if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
@@ -2821,7 +2885,7 @@ class Enemy {
                     _relicCoreGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
                     ctx.fillStyle = _relicCoreGrad;
                     ctx.shadowColor = '#facc15';
-                    ctx.shadowBlur = 10 + _relicIntensity * 8;
+                    ctx.shadowBlur = _sb(10 + _relicIntensity * 8);
                     // 菱形晶核路径（与精英 E2 一致）
                     ctx.beginPath();
                     ctx.moveTo(0, -_relicCoreR);
@@ -2884,7 +2948,7 @@ class Enemy {
                             ctx.strokeStyle = _relicFlowGrad;
                             ctx.lineWidth = 3.5;
                             ctx.shadowColor = '#facc15';
-                            ctx.shadowBlur = 10;
+                            ctx.shadowBlur = _sb(10);
                             ctx.beginPath();
                             ctx.moveTo(_px0, _py0);
                             ctx.lineTo(_px1, _py1);
@@ -2902,7 +2966,7 @@ class Enemy {
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.shadowColor = _rc.relicHaloColor;
-                    ctx.shadowBlur = 12;
+                    ctx.shadowBlur = _sb(12);
                     ctx.fillText('👑', this.pos.x, this.pos.y + this.bumpOffsetY - h/2 + _rc.relicIconOffsetY + _relicFloatY);
                     ctx.restore();
 
@@ -2951,7 +3015,7 @@ class Enemy {
                     _chaosCoreGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
                     ctx.fillStyle = _chaosCoreGrad;
                     ctx.shadowColor = '#a855f7';
-                    ctx.shadowBlur = 8 + _chaosIntensity * 7;
+                    ctx.shadowBlur = _sb(8 + _chaosIntensity * 7);
                     // 不规则多边形晶核（5顶点，体现混沌不规则）
                     ctx.beginPath();
                     for (let _pi = 0; _pi < 5; _pi++) {
@@ -2971,7 +3035,7 @@ class Enemy {
 
                     // --- C3: 双圈混沌光晕描边 ---
                     ctx.shadowColor = _rc.chaosHaloColorInner;
-                    ctx.shadowBlur = _chaosIntensity * _rc.chaosHaloBlurMax;
+                    ctx.shadowBlur = _sb(_chaosIntensity * _rc.chaosHaloBlurMax);
                     const _chaosAlpha = _chaosIntensity * _rc.chaosHaloStrokeAlpha;
                     ctx.strokeStyle = `rgba(168, 85, 247, ${_chaosAlpha})`;
                     ctx.lineWidth = 2;
@@ -3019,7 +3083,7 @@ class Enemy {
                             const _ry = Math.sin(_angle) * _orbitR;
                             const _runeAlpha = 0.55 + _chaosIntensity * 0.45;
                             ctx.shadowColor = _ri % 2 === 0 ? _rc.chaosHaloColorInner : _rc.chaosHaloColorOuter;
-                            ctx.shadowBlur = 8;
+                            ctx.shadowBlur = _sb(8);
                             ctx.fillStyle = _ri % 2 === 0
                                 ? `rgba(168, 85, 247, ${_runeAlpha})`
                                 : `rgba(239, 68, 68, ${_runeAlpha})`;
@@ -3072,7 +3136,7 @@ class Enemy {
                     _pureCoreGrad.addColorStop(1, 'rgba(96, 165, 250, 0)');
                     ctx.fillStyle = _pureCoreGrad;
                     ctx.shadowColor = '#bfdbfe';
-                    ctx.shadowBlur = 8 + _pureIntensity * 6;
+                    ctx.shadowBlur = _sb(8 + _pureIntensity * 6);
                     // 六边形晶核（体现冰晶结构）
                     ctx.beginPath();
                     for (let _pi = 0; _pi < 6; _pi++) {
@@ -3104,7 +3168,7 @@ class Enemy {
 
                     // --- P4: 外圈蓝白光晕描边（双层）---
                     ctx.shadowColor = _rc.pureHaloColorOuter;
-                    ctx.shadowBlur = _pureIntensity * _rc.pureHaloBlurMax;
+                    ctx.shadowBlur = _sb(_pureIntensity * _rc.pureHaloBlurMax);
                     const _pureAlpha = _pureIntensity * _rc.pureHaloStrokeAlpha;
                     ctx.strokeStyle = `rgba(191, 219, 254, ${_pureAlpha})`;
                     ctx.lineWidth = 2;
@@ -3124,7 +3188,7 @@ class Enemy {
                     ctx.save();
                     ctx.globalCompositeOperation = 'lighter';
                     ctx.shadowColor = _rc.pureHaloColorInner;
-                    ctx.shadowBlur = _pureIntensity * _rc.pureHaloBlurMax * 0.5;
+                    ctx.shadowBlur = _sb(_pureIntensity * _rc.pureHaloBlurMax * 0.5);
                     ctx.strokeStyle = `rgba(255, 255, 255, ${_pureAlpha * 0.45})`;
                     ctx.lineWidth = 1.5;
                     if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
@@ -3153,7 +3217,7 @@ class Enemy {
                             const _cSize = _rc.pureCrystalSize;
                             const _crystalAlpha = 0.45 + _pureIntensity * 0.55;
                             ctx.shadowColor = _rc.pureHaloColorOuter;
-                            ctx.shadowBlur = 8;
+                            ctx.shadowBlur = _sb(8);
                             // 绘制六角雪花形（6个顶点的星形）
                             ctx.beginPath();
                             for (let _si = 0; _si < 6; _si++) {
@@ -3200,7 +3264,7 @@ class Enemy {
             
             // 绘制发光底板
             ctx.shadowColor = '#fff';
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = _sb(10);
             ctx.fillText(this.actionIcon, 0, 0);
             
             ctx.restore();
@@ -3216,7 +3280,7 @@ class Enemy {
             const hh = this.height / 2 + 4 + expand;
             ctx.save();
             ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
-            ctx.shadowColor = '#fff'; ctx.shadowBlur = 10;
+            ctx.shadowColor = '#fff'; ctx.shadowBlur = _sb(10);
             ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`; ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(-hw, -hh + bracketSize); ctx.lineTo(-hw, -hh); ctx.lineTo(-hw + bracketSize, -hh);
@@ -3255,7 +3319,7 @@ class Enemy {
                 ctx.strokeStyle = 'rgba(80, 20, 120, 0.6)';
                 ctx.lineWidth = 3;
                 ctx.shadowColor = '#4b0082';
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = _sb(8);
                 ctx.beginPath();
                 ctx.moveTo(-devRadius * 0.3, -devRadius * 0.1);
                 ctx.lineTo(0, devRadius * 0.15);
@@ -3274,7 +3338,7 @@ class Enemy {
                 ctx.strokeStyle = `rgba(138, 43, 226, ${0.5 + openPulse * 0.4})`;
                 ctx.lineWidth = devThickness * 0.6;
                 ctx.shadowColor = '#8b00ff';
-                ctx.shadowBlur = 15 + openPulse * 10;
+                ctx.shadowBlur = _sb(15 + openPulse * 10);
                 ctx.lineCap = 'round';
                 ctx.beginPath();
                 ctx.arc(0, 0, devRadius, openAngle, Math.PI * 2 - openAngle);
@@ -3357,7 +3421,7 @@ class Enemy {
                 ctx.strokeStyle = `rgba(180, 0, 255, ${0.6 + devourPulse * 0.4})`;
                 ctx.lineWidth = 3 + devourPulse * 3;
                 ctx.shadowColor = '#9400d3';
-                ctx.shadowBlur = 25 + devourPulse * 20;
+                ctx.shadowBlur = _sb(25 + devourPulse * 20);
                 ctx.beginPath();
                 ctx.arc(0, 0, devRadius * (0.9 + devourPulse * 0.1), 0, Math.PI * 2);
                 ctx.stroke();
@@ -3379,7 +3443,7 @@ class Enemy {
                     lineGrad.addColorStop(1, `rgba(255, 255, 255, ${overExposeAlpha})`);
                     ctx.strokeStyle = lineGrad;
                     ctx.lineWidth = 1.5 + devourPulse * 0.5;
-                    ctx.shadowBlur = 8 + devourPulse * 6;
+                    ctx.shadowBlur = _sb(8 + devourPulse * 6);
                     ctx.beginPath();
                     ctx.moveTo(outerX, outerY);
                     ctx.lineTo(0, 0);
@@ -3444,7 +3508,7 @@ class Enemy {
                 ctx.strokeStyle = `rgba(255, 50, 50, ${0.5 + coolPulse * 0.5})`;
                 ctx.lineWidth = 2 + coolPulse * 2;
                 ctx.shadowColor = '#ff1a1a';
-                ctx.shadowBlur = 12 + coolPulse * 15;
+                ctx.shadowBlur = _sb(12 + coolPulse * 15);
                 ctx.beginPath();
                 ctx.arc(0, 0, devRadius * (0.85 + coolPulse * 0.1), 0, Math.PI * 2);
                 ctx.stroke();
@@ -3453,7 +3517,7 @@ class Enemy {
                 ctx.strokeStyle = `rgba(255, 100, 100, ${0.4 + coolPulse * 0.3})`;
                 ctx.lineWidth = devThickness * 0.5;
                 ctx.lineCap = 'round';
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = _sb(8);
                 ctx.beginPath();
                 ctx.arc(0, 0, devRadius, Math.PI * 0.15, Math.PI * 1.85);
                 ctx.stroke();
@@ -3492,7 +3556,7 @@ class Enemy {
                     ctx.lineWidth = ouroThickness * 0.7;
                     ctx.lineCap = 'butt';
                     ctx.shadowColor = '#7c3aed';
-                    ctx.shadowBlur = 8;
+                    ctx.shadowBlur = _sb(8);
                     ctx.beginPath();
                     ctx.arc(0, 0, ouroRadius, trailStart, trailEnd);
                     ctx.stroke();
@@ -3509,7 +3573,7 @@ class Enemy {
             ctx.lineWidth = ouroThickness;
             ctx.lineCap = 'butt';
             ctx.shadowColor = ringGlowColor;
-            ctx.shadowBlur = 12 + ringPulse * 10;
+            ctx.shadowBlur = _sb(12 + ringPulse * 10);
             ctx.globalAlpha = 0.85 + ringPulse * 0.15;
             ctx.beginPath();
             ctx.arc(0, 0, ouroRadius, arcStart, arcEnd);
@@ -3518,7 +3582,7 @@ class Enemy {
             // 内层高光
             ctx.strokeStyle = isBerserk ? 'rgba(233, 213, 255, 0.5)' : 'rgba(199, 210, 254, 0.35)';
             ctx.lineWidth = ouroThickness * 0.3;
-            ctx.shadowBlur = 5;
+            ctx.shadowBlur = _sb(5);
             ctx.beginPath();
             ctx.arc(0, 0, ouroRadius - ouroThickness * 0.15, arcStart, arcEnd);
             ctx.stroke();
@@ -3540,14 +3604,14 @@ class Enemy {
             coreGrad.addColorStop(1, 'rgba(100, 50, 200, 0)');
             ctx.fillStyle = coreGrad;
             ctx.shadowColor = isBerserk ? '#ff00ff' : '#818cf8';
-            ctx.shadowBlur = 15 + corePulse * 15;
+            ctx.shadowBlur = _sb(15 + corePulse * 15);
             ctx.beginPath();
             ctx.arc(coreX, coreY, coreRadius * 2, 0, Math.PI * 2);
             ctx.fill();
 
             // 核心闪烁光点
             ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-            ctx.shadowBlur = 8;
+            ctx.shadowBlur = _sb(8);
             ctx.beginPath();
             ctx.arc(coreX, coreY, coreRadius * 0.4, 0, Math.PI * 2);
             ctx.fill();
@@ -3557,7 +3621,7 @@ class Enemy {
                 ctx.strokeStyle = `rgba(255, 100, 255, ${0.4 + corePulse * 0.5})`;
                 ctx.lineWidth = 1.5;
                 ctx.shadowColor = '#ff00ff';
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = _sb(10);
                 ctx.setLineDash([4, 4]);
                 ctx.beginPath();
                 ctx.arc(coreX, coreY, coreRadius * 2.5, ouroTime * 3, ouroTime * 3 + Math.PI * 1.5);
@@ -3576,7 +3640,7 @@ class Enemy {
                 endGrad.addColorStop(1, 'rgba(100, 50, 200, 0)');
                 ctx.fillStyle = endGrad;
                 ctx.shadowColor = isBerserk ? '#cc00cc' : '#6366f1';
-                ctx.shadowBlur = 10 + ringPulse * 8;
+                ctx.shadowBlur = _sb(10 + ringPulse * 8);
                 ctx.beginPath();
                 ctx.arc(ex, ey, ouroThickness * 0.8, 0, Math.PI * 2);
                 ctx.fill();
@@ -3610,7 +3674,7 @@ class Enemy {
                     ctx.rotate(triAngle + Math.PI / 2);
                     ctx.fillStyle = triColor;
                     ctx.shadowColor = triGlow;
-                    ctx.shadowBlur = 8 + triPulse * 12;
+                    ctx.shadowBlur = _sb(8 + triPulse * 12);
                     ctx.beginPath();
                     // @section:draw_death_animation - 死亡动画与消散特效
                     ctx.moveTo(0, -triSize);
@@ -3675,7 +3739,7 @@ class Enemy {
                 ctx.strokeStyle = `rgba(239, 68, 68, ${waveAlpha})`;
                 ctx.lineWidth = 4 * (1 - progress);
                 ctx.shadowColor = '#ef4444';
-                ctx.shadowBlur = 20;
+                ctx.shadowBlur = _sb(20);
                 ctx.stroke();
 
                 // 2. 第二圈（延迟半圈）
@@ -3688,7 +3752,7 @@ class Enemy {
                     ctx.strokeStyle = `rgba(251, 191, 36, ${wave2Alpha})`;
                     ctx.lineWidth = 3 * (1 - wave2Progress);
                     ctx.shadowColor = '#fbbf24';
-                    ctx.shadowBlur = 15;
+                    ctx.shadowBlur = _sb(15);
                     ctx.stroke();
                 }
 
@@ -3699,7 +3763,7 @@ class Enemy {
                 ctx.strokeStyle = '#ef4444';
                 ctx.lineWidth = 2;
                 ctx.shadowColor = '#ef4444';
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = _sb(8);
                 for (let i = 0; i < crackCount; i++) {
                     const angle = (i / crackCount) * Math.PI * 2 + this.visualSeed * Math.PI;
                     const crackLen = (this.width * 0.8 + waveRadius * 0.4) * (0.6 + this.visualSeed * 0.4);
@@ -3730,7 +3794,7 @@ class Enemy {
 
                 // 文字外发光
                 ctx.shadowColor = '#ef4444';
-                ctx.shadowBlur = 20 * textAlpha;
+                ctx.shadowBlur = _sb(20 * textAlpha);
 
                 // 大字标题
                 ctx.font = `bold ${Math.floor(this.width * 0.22)}px 'Cinzel', serif`;
@@ -3757,7 +3821,7 @@ class Enemy {
             ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
             const flashPulse = Math.sin(Date.now() / 60) * 0.3 + 0.7;
             ctx.shadowColor = '#ef4444';
-            ctx.shadowBlur = 30 * pulseAlpha * flashPulse;
+            ctx.shadowBlur = _sb(30 * pulseAlpha * flashPulse);
             ctx.strokeStyle = `rgba(239, 68, 68, ${pulseAlpha * flashPulse})`;
             ctx.lineWidth = 5;
             // 入场动画边框跟随 Boss 形状
@@ -3814,13 +3878,13 @@ class Enemy {
                 const labelH = 18;
                 ctx.fillStyle = bgColor;
                 ctx.shadowColor = glowColor;
-                ctx.shadowBlur = 8 + pulse * 6;
+                ctx.shadowBlur = _sb(8 + pulse * 6);
                 ctx.beginPath();
                 ctx.roundRect(labelX - labelW / 2, labelY - labelH / 2, labelW, labelH, 4);
                 ctx.fill();
 
                 // 文字
-                ctx.shadowBlur = 6 + pulse * 4;
+                ctx.shadowBlur = _sb(6 + pulse * 4);
                 ctx.shadowColor = glowColor;
                 ctx.font = 'bold 11px monospace';
                 ctx.textAlign = 'center';
@@ -3839,12 +3903,12 @@ class Enemy {
                 const labelH = 18;
                 ctx.fillStyle = bgColor;
                 ctx.shadowColor = glowColor;
-                ctx.shadowBlur = 10 + pulse * 8;
+                ctx.shadowBlur = _sb(10 + pulse * 8);
                 ctx.beginPath();
                 ctx.roundRect(labelX - labelW / 2, labelY - labelH / 2, labelW, labelH, 4);
                 ctx.fill();
 
-                ctx.shadowBlur = 8 + pulse * 6;
+                ctx.shadowBlur = _sb(8 + pulse * 6);
                 ctx.shadowColor = glowColor;
                 ctx.font = 'bold 11px monospace';
                 ctx.textAlign = 'center';
@@ -3869,12 +3933,12 @@ class Enemy {
 
                 ctx.fillStyle = bgColor;
                 ctx.shadowColor = glowColor;
-                ctx.shadowBlur = 5 + pulse * 3;
+                ctx.shadowBlur = _sb(5 + pulse * 3);
                 ctx.beginPath();
                 ctx.roundRect(labelX - labelW / 2, labelY - labelH / 2, labelW, labelH, 4);
                 ctx.fill();
 
-                ctx.shadowBlur = 4 + pulse * 2;
+                ctx.shadowBlur = _sb(4 + pulse * 2);
                 ctx.shadowColor = glowColor;
                 ctx.font = '11px monospace';
                 ctx.textAlign = 'center';
@@ -4242,7 +4306,7 @@ class Enemy {
         coreGrad.addColorStop(1, 'rgba(124, 58, 237, 0)');
         ctx.fillStyle = coreGrad;
         ctx.shadowColor = '#a855f7';
-        ctx.shadowBlur = 8 + breatheIntensity * 6;
+        ctx.shadowBlur = _sb(8 + breatheIntensity * 6);
         // 菱形路径
         ctx.beginPath();
         ctx.moveTo(0, -coreR);
@@ -4320,14 +4384,14 @@ class Enemy {
                             flowGrad.addColorStop(0.5, `hsla(${(hue0 + hue1) / 2}, 100%, 80%, 0.9)`);
                             flowGrad.addColorStop(1, `hsla(${hue1}, 100%, 70%, 0)`);
                             ctx.shadowColor = `hsl(${hue0}, 100%, 65%)`;
-                            ctx.shadowBlur = cfg.borderTierRainbowGlowBlur;
+                            ctx.shadowBlur = _sb(cfg.borderTierRainbowGlowBlur);
                         } else {
                             // 金色流光
                             flowGrad.addColorStop(0, 'rgba(250, 204, 21, 0)');
                             flowGrad.addColorStop(0.5, 'rgba(255, 255, 200, 0.85)');
                             flowGrad.addColorStop(1, 'rgba(250, 204, 21, 0)');
                             ctx.shadowColor = cfg.borderTierGoldGlow;
-                            ctx.shadowBlur = cfg.borderTierGoldGlowBlur;
+                            ctx.shadowBlur = _sb(cfg.borderTierGoldGlowBlur);
                         }
                         ctx.strokeStyle = flowGrad;
                         ctx.lineWidth = e4IsRainbow ? cfg.borderTierRainbowWidth : 3;
@@ -4392,7 +4456,7 @@ class Enemy {
                 coreGrad.addColorStop(1, '#e65100');
                 ctx.fillStyle = coreGrad;
                 ctx.shadowColor = '#ff6d00';
-                ctx.shadowBlur = 15;
+                ctx.shadowBlur = _sb(15);
                 ctx.fill();
                 ctx.restore();
                 // [T2] 过曝白化叠加层（模拟 CSS brightness(1.4)）
@@ -4455,7 +4519,7 @@ class Enemy {
                 ctx.strokeStyle = `rgba(180, 230, 255, ${0.6 + Math.sin(t * 2) * 0.2})`;
                 ctx.lineWidth = 1.5;
                 ctx.shadowColor = '#a5f3fc';
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = _sb(8);
                 const spikePositions = [
                     { x: 0, y: -h * 0.35, angle: -Math.PI / 2, len: h * 0.25 },
                     { x: w * 0.3, y: -h * 0.2, angle: -Math.PI / 4, len: h * 0.18 },
@@ -4481,7 +4545,7 @@ class Enemy {
                 const hexH2 = hexR2 * 2;
                 ctx.lineWidth = 1;
                 ctx.shadowColor = '#a855f7';
-                ctx.shadowBlur = 5;
+                ctx.shadowBlur = _sb(5);
                 for (let row = -2; row <= 2; row++) {
                     for (let col = -2; col <= 2; col++) {
                         const hx = col * hexW2 + (row % 2 === 0 ? 0 : hexW2 / 2);
@@ -4608,7 +4672,7 @@ class Enemy {
                 ctx.strokeStyle = `rgba(74, 222, 128, ${0.6 + Math.sin(t * 1.5) * 0.2})`;
                 ctx.lineWidth = 1.5;
                 ctx.shadowColor = '#22c55e';
-                ctx.shadowBlur = 6;
+                ctx.shadowBlur = _sb(6);
                 for (let i = 0; i < vineCount; i++) {
                     const vineAngle = (i / vineCount) * Math.PI * 2 + t * 0.3;
                     const vineLen = Math.min(w, h) * (0.3 + Math.sin(t * 1.2 + i) * 0.1);
@@ -4668,7 +4732,7 @@ class Enemy {
                 const verts = this.collisionData && this.collisionData.vertices;
                 if (verts && verts.length > 0) {
                     ctx.shadowColor = '#fbbf24';
-                    ctx.shadowBlur = 8;
+                    ctx.shadowBlur = _sb(8);
                     verts.forEach(v => {
                         if (Math.random() < 0.4) {
                             ctx.lineWidth = 1;
@@ -4708,7 +4772,7 @@ class Enemy {
                 ctx.strokeStyle = lineGrad;
                 ctx.lineWidth = 2;
                 ctx.shadowColor = '#a855f7';
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = _sb(10);
                 ctx.beginPath();
                 ctx.moveTo(chimeraShift, -h/2);
                 ctx.lineTo(chimeraShift, h/2);
@@ -4772,7 +4836,7 @@ class Enemy {
                     ctx.globalAlpha = 0.5 + runeBreath * 0.45;
                     ctx.fillStyle = 'rgba(167, 139, 250, 1)';
                     ctx.shadowColor = '#7c3aed';
-                    ctx.shadowBlur = 8 + runeBreath * 15;
+                    ctx.shadowBlur = _sb(8 + runeBreath * 15);
                     ctx.fillText(runeChars[i % runeChars.length], 0, 0);
                     ctx.restore();
                 }
@@ -4787,12 +4851,12 @@ class Enemy {
                     // 狂暴后：红色箭头 + 更强 shadowBlur
                     ctx.fillStyle = `rgba(239, 68, 68, ${arrowAlpha})`;
                     ctx.shadowColor = '#ef4444';
-                    ctx.shadowBlur = 35;
+                    ctx.shadowBlur = _sb(35);
                 } else {
                     // 非狂暴：金色箭头（保持现有）
                     ctx.fillStyle = `rgba(250, 204, 21, ${arrowAlpha})`;
                     ctx.shadowColor = '#fbbf24';
-                    ctx.shadowBlur = 20;
+                    ctx.shadowBlur = _sb(20);
                 }
                 ctx.beginPath();
                 ctx.moveTo(0, -5);
