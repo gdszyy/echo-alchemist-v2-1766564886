@@ -1809,7 +1809,7 @@ phase_gathering_getRandomPegType() {
                         w++;
                     } else {
                         if (counts[p.mode] !== undefined && counts[p.mode] > 0) counts[p.mode]--;
-                        if (pool.length < 200) pool.push(p);
+                        if (pool.length < 200 && typeof p.reset === 'function') pool.push(p);
                     }
                 }
                 arr.length = w;
@@ -2613,7 +2613,7 @@ phase_gathering_getRandomPegType() {
                     w++;
                 } else {
                     if (counts[p.mode] !== undefined && counts[p.mode] > 0) counts[p.mode]--;
-                    if (pool.length < 200) pool.push(p);
+                    if (pool.length < 200 && typeof p.reset === 'function') pool.push(p);
                 }
             }
             arr.length = w;
