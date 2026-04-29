@@ -51,7 +51,7 @@
 | 1.17 | `#skill-bar` | 战斗技能栏 | 🟡 | 技能图标 PNG、`rune_slot_idle.png`、`rune_slot_active.png` | 冷却扫描帧 |
 | 1.18 | `#round-start-banner` | 回合开始横幅 | ✅ | `round_banner_1.png` ~ `round_banner_6.png`（6 帧，600×200） | — |
 | 1.19 | 数据统计页（与图鉴并入 truth-book） | 历次伤害/记录 | ❌ | — | 折线图背景、数据指标徽章、最佳记录 ribbon |
-| 1.20 | `.ammo-icon` 弹药槽位 | 战斗 / 收集阶段 | ✅ | `assets/icons/ammo/*.png` 已覆盖全部 12 种（含 matryoshka、rainbow、resonance、flying_sword、wind） | — |
+| 1.20 | `.ammo-icon` 弹药槽位 | 战斗 / 收集阶段 | 🟡 | `assets/icons/ammo/*.png` 已覆盖原有 12 种（含 matryoshka、rainbow、resonance、flying_sword、wind） | `ammo_venom.png`、`ammo_overcharge.png`、`ammo_echo.png`（新属性，待生成） |
 | 1.21 | 发射器属性球轨道（Canvas 渲染层） | 战斗 / 装填时围绕发射器旋转的属性球 + 连线 | ✅ | `orbital_socket_<elem>.png`×7、`orbital_link_strip.png`、`orbital_link_cap.png`、`orbital_link_flow_0~3.png`、`orbital_intake_0~3.png` | — |
 
 ---
@@ -98,6 +98,13 @@
 | ~~`assets/ui/panels/rune_grid_bg_9s.png`~~ | ✅ **已生成** | 320×320，slice 32 | 九宫格容器，含九格分隔线纹理 |
 | ~~`assets/ui/sprites/rune_slot_hover.png` / `rune_slot_filled.png`~~ | ✅ **已生成**（透明 PNG） | 64×64 | 覆盖完整 4 态交互 |
 | ~~`assets/ui/sprites/rune_slot_highlight.png`~~ | ✅ **已生成**（透明 PNG） | 96×96 | 放置确认光圈 |
+| `assets/icons/ammo/ammo_venom.png` | 毒素弹药图标（待生成） | 32×32 | 毒绿色液滴 + 骷髅纹，对应 `AMMO_ICON_MAP.venom`；参考 `ammo_cryo.png` 风格 |
+| `assets/icons/ammo/ammo_overcharge.png` | 超载弹药图标（待生成） | 32×32 | 金橙色能量弹 + 充能电弧纹，对应 `AMMO_ICON_MAP.overcharge` |
+| `assets/icons/ammo/ammo_echo.png` | 回响弹药图标（待生成） | 32×32 | 蓝紫色残影环绕弹，对应 `AMMO_ICON_MAP.echo` |
+| `assets/icons/rune/rune_venom_1.png` | 毒素符文 Lv1（待生成） | 48×48 | 毒液纹路，common 灰色外框 |
+| `assets/icons/rune/rune_venom_2.png` | 毒素符文 Lv2（待生成） | 48×48 | 毒液纹路加强，epic 紫色外框 |
+| `assets/icons/rune/rune_overcharge_1.png` | 超载符文 Lv1（待生成） | 48×48 | 充能纹路，epic 紫色外框 |
+| `assets/icons/rune/rune_echo_1.png` | 回响符文 Lv1（待生成） | 48×48 | 残影环绕纹路，rare 蓝色外框 |
 
 ### 2.3 P2 — 锦上添花
 

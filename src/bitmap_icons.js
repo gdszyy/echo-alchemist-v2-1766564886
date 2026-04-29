@@ -31,6 +31,9 @@ export const AMMO_ICON_MAP = {
     rainbow:      'assets/icons/ammo/ammo_rainbow.png',
     resonance:    'assets/icons/ammo/ammo_resonance.png',
     damage:       'assets/icons/ammo/ammo_normal.png',
+    venom:        'assets/icons/ammo/ammo_venom.png',
+    overcharge:   'assets/icons/ammo/ammo_overcharge.png',
+    echo:         'assets/icons/ammo/ammo_echo.png',
 };
 
 // ============================================================
@@ -51,6 +54,10 @@ export const RUNE_ICON_MAP = {
     rune_scatter_1:   'assets/icons/rune/rune_scatter_1.png',
     rune_laser_1:     'assets/icons/rune/rune_laser_1.png',
     rune_laser_2:     'assets/icons/rune/rune_laser_2.png',
+    rune_venom_1:     'assets/icons/rune/rune_venom_1.png',
+    rune_venom_2:     'assets/icons/rune/rune_venom_2.png',
+    rune_overcharge_1:'assets/icons/rune/rune_overcharge_1.png',
+    rune_echo_1:      'assets/icons/rune/rune_echo_1.png',
 };
 
 // ============================================================
@@ -127,6 +134,9 @@ export function getAmmoIconSrc(recipe) {
     if (recipe.pierce)     return AMMO_ICON_MAP.pierce;
     if (recipe.bounce)     return AMMO_ICON_MAP.bounce;
     if (recipe.scatter)    return AMMO_ICON_MAP.scatter;
+    if (recipe.venom)      return AMMO_ICON_MAP.venom;
+    if (recipe.overcharge) return AMMO_ICON_MAP.overcharge;
+    if (recipe.echo)       return AMMO_ICON_MAP.echo;
     return AMMO_ICON_MAP.default;
 }
 
