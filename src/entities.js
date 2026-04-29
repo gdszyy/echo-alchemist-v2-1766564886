@@ -2638,6 +2638,50 @@ class DropBall {
                             this.handlePegInteraction(peg, game); // 传入 game
                         }
 
+                        // ==================== [新属性] 回响虚影 Peg ====================
+                        // 弹珠碰 Peg 时，按 (30% + echoLevel × 5% + 共鸣 triggerChanceBonus) 概率生成虚影 Peg。
+                        // 虚影 Peg 复用 GhostPeg 实现，life ≈ 60 帧（约 1 秒）。
+                        // 虚影的虚影固定 25% 概率再生（_isEchoChild=true，防止递归）。
+                        if (peg.type !== 'normal' && peg.type !== 'pink' && game.ghostPegs && game.runeGrid) {
+                            // 累加 grid 中所有 echo 符文等级
+                            let echoLevel = 0;
+                            for (const item of game.runeGrid) {
+                                if (item && typeof item === 'object' && item.id && item.id.indexOf('rune_echo') === 0) {
+                                    echoLevel += (item.level || 1);
+                                }
+                            }
+                            if (echoLevel > 0) {
+                                const echoCfg = (CONFIG.mechanics && CONFIG.mechanics.echo) || {};
+                                const baseChance = echoCfg.phantomChance || 0.30;
+                                const perLvl = echoCfg.phantomChancePerLevel || 0.05;
+                                const echoRes = game.activeElementResonances && game.activeElementResonances['echo'];
+                                const triggerBonus = (echoRes && echoRes.params) ? (echoRes.params.triggerChanceBonus || 0) : 0;
+                                const isEchoChildPeg = !!peg._isEchoChild;
+                                const finalChance = isEchoChildPeg
+                                    ? (echoCfg.phantomChildChance || 0.25)
+                                    : Math.min(1.0, baseChance + echoLevel * perLvl + triggerBonus);
+                                if (Math.random() < finalChance && game.ghostPegs.length < 16) {
+                                    // 虚影位置：略偏移于源 peg
+                                    const offsetX = (Math.random() - 0.5) * 28;
+                                    const offsetY = (Math.random() - 0.5) * 18;
+                                    const gx = peg.pos.x + offsetX;
+                                    const gy = peg.pos.y + offsetY;
+                                    if (gx > 20 && gx < (game.width - 20) && gy > 40 && gy < (game.boardBottomY + 20)) {
+                                        const ghost = new GhostPeg(gx, gy, peg.type, peg.level || 1);
+                                        // 标记虚影来源：若已是 echo child，则不再继续传播
+                                        ghost._isEchoChild = true;
+                                        // 缩短生命：1000ms ≈ 60 帧
+                                        ghost.life = 60;
+                                        ghost.maxLife = 60;
+                                        game.ghostPegs.push(ghost);
+                                        if (game.spawn_createFloatingText) {
+                                            game.spawn_createFloatingText(gx, gy - 18, '🔁回响', '#a78bfa');
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // @section:layout_special_effects - 布局专属特殊效果（漏斗/菱形/稀疏通道）
                         // ==================== [布局补偿] 布局专属特殊效果 ====================
                         const boardLayout = game.boardLayout || 'default';

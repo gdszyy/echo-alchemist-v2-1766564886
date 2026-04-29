@@ -447,6 +447,26 @@ const CONFIG = {
             dashDamageMult: 0.6,      // 穿透伤害倍率
             sonSwordDelayBase: 20,    // 子剑生成基础延迟
             sonSwordDelayMin: 2       // 子剑生成最小延迟
+        },
+        // 毒素属性 (Venom)
+        venom: {
+            dotPerStack: 0.8,         // 每层毒素每次结算的基础伤害系数
+        },
+        // 超载属性 (Overcharge)
+        overcharge: {
+            baseChargeMult: 0.3,      // 爆炸伤害基础系数: chargeCount × overcharge × baseDmg × baseChargeMult
+            aoeBaseRadius: 60,        // AoE 基础半径
+            aoeRadiusPerCharge: 4,    // 每点充能增加的 AoE 半径
+        },
+        // 回响属性 (Echo)
+        echo: {
+            baseTriggerChance: 0.25,  // 战斗阶段子弹弹跳触发回响的基础概率
+            chancePerLevel: 0.05,     // 每层 echo 增加的触发概率
+            inheritRatio: 0.5,        // 回响子弹继承属性比例
+            phantomChance: 0.30,      // 弹珠碰 Peg 时生成虚影 Peg 的基础概率
+            phantomChancePerLevel: 0.05, // 每层 echo 增加虚影概率
+            phantomLifetimeMs: 1000,  // 虚影 Peg 存活时间 (ms)
+            phantomChildChance: 0.25, // 虚影 Peg 被碰撞时再生成虚影的概率
         }
     },
     /** 游戏平衡性：敌人与数值 */

@@ -1728,6 +1728,21 @@ export const combat_system = {
             isCrit = true;
             dmg = dmg * critDamage;
         }
+        // [新属性] 毒素：命中时叠加毒层（散射副弹按继承比例）。共鸣 Tier2/3 每次命中额外 +1。
+        if ((config.venom || 0) > 0) {
+            const venomRes = this.activeElementResonances && this.activeElementResonances['venom'];
+            const venomResParams = venomRes ? venomRes.params : null;
+            const onHitBonus = venomResParams ? (venomResParams.applyOnHitBonus || 0) : 0;
+            const inheritRatio = (projectile && typeof projectile._scatterInheritRatio === 'number') ? projectile._scatterInheritRatio : 1.0;
+            const stacks = Math.floor((config.venom || 0) * inheritRatio) + onHitBonus;
+            if (stacks > 0 && typeof enemy.applyVenom === 'function') {
+                enemy.applyVenom(stacks);
+                if (this.spawn_createFloatingText) {
+                    this.spawn_createFloatingText(hitX, hitY - 14, `☠️+${stacks}`, '#84cc16');
+                }
+            }
+        }
+
         // [修改] 调用 takeDamage 时传入 projectile 作为源，用于方向判定
         const damageResult = enemy.takeDamage(dmg, projectile);
         
@@ -2543,6 +2558,34 @@ export const combat_system = {
             }
         }
         // --- [符文词条-A] 拦截逻辑结束 ---
+
+        // --- [属性共鸣] 超载共鸣：注入 baseOverchargeBonus，并按 costReduction 削减 bounce/pierce ---
+        if ((finalRecipe.overcharge || 0) > 0) {
+            const ocRes = this.activeElementResonances && this.activeElementResonances['overcharge'];
+            const ocResParams = ocRes ? ocRes.params : null;
+            if (ocResParams) {
+                finalRecipe.overcharge = (finalRecipe.overcharge || 0) + (ocResParams.baseOverchargeBonus || 0);
+            }
+            // costReduction: 0 = 完全削减50%, 1.0 = 不削减
+            const costReduction = ocResParams ? Math.min(1.0, Math.max(0, ocResParams.costReduction || 0)) : 0;
+            // 削减系数 = 0.5 + 0.5 * costReduction（默认无共鸣时削减一半，共鸣后逐步还原）
+            const keepRatio = 0.5 + 0.5 * costReduction;
+            if ((finalRecipe.bounce || 0) > 0) {
+                finalRecipe.bounce = Math.floor((finalRecipe.bounce || 0) * keepRatio);
+            }
+            if ((finalRecipe.pierce || 0) > 0) {
+                finalRecipe.pierce = Math.floor((finalRecipe.pierce || 0) * keepRatio);
+            }
+        }
+
+        // --- [属性共鸣] 毒素共鸣：注入 baseVenomBonus（基础毒素属性加成） ---
+        if ((finalRecipe.venom || 0) > 0) {
+            const venomRes = this.activeElementResonances && this.activeElementResonances['venom'];
+            const venomResParams = venomRes ? venomRes.params : null;
+            if (venomResParams) {
+                finalRecipe.venom = (finalRecipe.venom || 0) + (venomResParams.baseVenomBonus || 0);
+            }
+        }
 
         // --- [绝境之刃] 距离失败线越近，伤害加成越高 ---
         if (this.ownedRelics && this.ownedRelics.includes('desperation_blade')) {
