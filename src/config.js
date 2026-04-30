@@ -519,7 +519,11 @@ const CONFIG = {
             healerRange: 2,       // 治疗范围 (自身宽度的倍数)
             devourChance: 1,      // 吞噬触发概率
             devourRange: 2,       // 吞噬范围
-            jumpRows: 2             // 跳跃距离 (行数)
+            jumpRows: 2,            // 跳跃距离 (行数)
+            // [重装] 重装词条：血量翻倍，每2回合才移动一次
+            heavyArmorHpMult: 2.0,      // 重装：血量倍率
+            heavyArmorMoveInterval: 2,  // 重装：移动间隔（回合数）
+            heavyArmorWideGridCols: 3,  // 重装变种：占3列宽
         },
 
         // =========================================

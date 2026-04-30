@@ -1105,12 +1105,30 @@ class Enemy {
                 }
             }
         };
-        if (!this.isFrozenCurrentTurn) {
+        // [重装词条] 移动冷却：每 N 回合才移动一次，但其他行动照常执行
+        let _heavyArmorCanMove = true;
+        if (this.affixes.includes('heavyArmor') && this.type !== 'boss') {
+            if (this._moveInterval === undefined) {
+                this._moveInterval = (CONFIG.balance.affixes && CONFIG.balance.affixes.heavyArmorMoveInterval) || 2;
+                this._moveCooldown = 0;
+            }
+            if (this._moveCooldown > 0) {
+                _heavyArmorCanMove = false;
+                this._moveCooldown--;
+            } else {
+                this._moveCooldown = this._moveInterval - 1;
+            }
+        }
+
+        if (!this.isFrozenCurrentTurn && _heavyArmorCanMove) {
             _doMoveP();
             if (this.affixes.includes('haste')) {
                 game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡DASH!", "#facc15");
                 _doMoveP();
             }
+        } else if (!this.isFrozenCurrentTurn && !_heavyArmorCanMove) {
+            // 重装等待动画（短暂上下抖动）
+            this.bumpOffsetY = Math.sin(Date.now() / 200) * 2;
         }
     }
 
@@ -1389,6 +1407,23 @@ class Enemy {
         if (this._textureCanvas) {
             ctx.drawImage(this._textureCanvas, -w/2, -h/2);
         }
+
+        // === Layer 1.6: 词缀组合身份色调叠加 ===
+        // 每种词缀组合有唯一的微弱色调，让玩家能通过视觉氛围感知词缀类型
+        if (this.affixes && this.affixes.length > 0 && this.type !== 'boss') {
+            const _tintColor = this._getAffixTintColor();
+            if (_tintColor) {
+                ctx.save();
+                ctx.globalAlpha = 0.16;
+                const _tintGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
+                _tintGrad.addColorStop(0, _tintColor);
+                _tintGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = _tintGrad;
+                ctx.fillRect(-w/2, -h/2, w, h);
+                ctx.restore();
+            }
+        }
+
         // === Layer 2: 液体血条 (含延迟白条) ===
         // [修改] 血量从上往下扣除：满血时占满整个容器，血量减少时从顶部开始消失，
         // 残余血量沉在底部，类似液面下降的视觉。
@@ -2146,6 +2181,56 @@ class Enemy {
                     ctx.restore();
                 }
             }
+
+            // --- heavyArmor: 重装钢板纹路 + 铆钉（体积感厚重装甲）---
+            if (this.affixes.includes('heavyArmor')) {
+                ctx.save();
+                const _haBreath = (Math.sin(t35 * 0.6 + this.visualSeed * Math.PI) + 1) * 0.5;
+                const _haAlpha = (0.20 + _haBreath * 0.08) * affixAlpha35;
+                // 水平装甲板分割线
+                ctx.strokeStyle = `rgba(148, 163, 184, ${_haAlpha * 1.4})`;
+                ctx.lineWidth = 2;
+                const _haPlates = Math.max(2, Math.floor(h / 18));
+                for (let pi = 1; pi < _haPlates; pi++) {
+                    const _py = -h / 2 + pi * (h / _haPlates);
+                    ctx.beginPath();
+                    ctx.moveTo(-w / 2 + 3, _py);
+                    ctx.lineTo(w / 2 - 3, _py);
+                    ctx.stroke();
+                }
+                // 铆钉（四角 + 板中央）
+                const _rivetColor = `rgba(203, 213, 225, ${_haAlpha * 1.8})`;
+                ctx.fillStyle = _rivetColor;
+                const _rivetR = Math.max(2, w * 0.045);
+                const _rx = w / 2 - _rivetR - 3, _ry = h / 2 - _rivetR - 3;
+                for (const [rx, ry] of [[-_rx, -_ry], [_rx, -_ry], [-_rx, _ry], [_rx, _ry]]) {
+                    ctx.beginPath(); ctx.arc(rx, ry, _rivetR, 0, Math.PI * 2); ctx.fill();
+                }
+                // 中央钢印纹路（X形加强筋）
+                ctx.strokeStyle = `rgba(100, 116, 139, ${_haAlpha * 0.9})`;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(-w * 0.3, -h * 0.25); ctx.lineTo(w * 0.3, h * 0.25);
+                ctx.moveTo(w * 0.3, -h * 0.25); ctx.lineTo(-w * 0.3, h * 0.25);
+                ctx.stroke();
+                // 重装词条：若有_moveCooldown则显示等待回合数
+                if (this._moveCooldown > 0 && this.type !== 'boss') {
+                    ctx.font = `bold ${Math.floor(Math.min(w, h) * 0.28)}px monospace`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = `rgba(148, 163, 184, ${0.55 + _haBreath * 0.35})`;
+                    ctx.shadowColor = '#475569';
+                    ctx.shadowBlur = 4;
+                    ctx.fillText(`⏳${this._moveCooldown}`, 0, h * 0.15);
+                }
+                ctx.restore();
+            }
+        }
+
+        // === Layer 3.6: 词缀组合标识章（印章图标）===
+        // 顶部绘制每个词缀对应的几何印章，让玩家能直观识别词缀组合
+        if (this.affixes && this.affixes.length > 0 && this.type !== 'boss') {
+            this._drawAffixSigil(ctx, w, h);
         }
 
         // === Layer 3.8: Boss 专属装饰 ===
@@ -2209,8 +2294,10 @@ class Enemy {
         }
 
         // === [Phase 5B Task 5.B3] Layer 3.95: Sprite Sheet 覆盖层（在血条和内部特效之后）===
-        // 在血条/词缀特效之上叠加 Sprite，无资源时自动 fallback 到矢量绘制
-        if (this._spriteRenderer && this._spriteRenderer.ready) {
+        // Arc Boss 的 sprite 需在 clip 区域外绘制（否则被圆环裁剪），此处跳过它们
+        // 非 arc boss 的 sprite 在 clip 内正常绘制
+        if (this._spriteRenderer && this._spriteRenderer.ready &&
+            !(this.type === 'boss' && this.collisionShape === 'arc')) {
             // Sprite 保持正方形比例（取 min(w,h) 作为边长），居中偏下绘制
             // 偏下量 = h * 0.15，让贴图在方块内偏向下方（血量显示在顶部，贴图在中下方）
             const sprSize1 = Math.min(w, h);
@@ -2629,6 +2716,21 @@ class Enemy {
         }
 
         ctx.restore(); // <--- 裁剪结束
+
+        // === Layer 3.95b: Arc Boss Sprite（裁剪区域外绘制，完整呈现美术资产）===
+        // Arc boss 的圆环裁剪区域会遮挡中央 sprite，因此在 clip 恢复后单独绘制，
+        // 使 sprite 完整显示在圆环内部及周围区域。
+        if (this.type === 'boss' && this.collisionShape === 'arc' &&
+            this._spriteRenderer && this._spriteRenderer.ready) {
+            ctx.save();
+            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            // 对 arc boss 使用较大的 sprite 尺寸（直径约等于圆环直径），居中不偏移
+            const _arcSprW = this.width - 4;
+            const _arcSprH = this.height - 4;
+            const _arcSprSize = Math.min(_arcSprW, _arcSprH) * 0.9;
+            this._spriteRenderer.draw(ctx, -_arcSprSize / 2, -_arcSprSize / 2, _arcSprSize, _arcSprSize, 0.90);
+            ctx.restore();
+        }
 
         // === Layer 6: 外部特效 (光环/冰壳) ===
 
@@ -4973,6 +5075,189 @@ class Enemy {
             default:
                 break;
         }
+    }
+
+    /**
+     * 根据词缀组合返回对应的身份色（用于 Layer 1.6 色调叠加）
+     * 使得玩家能通过颜色氛围快速识别词缀组合。
+     */
+    _getAffixTintColor() {
+        if (!this.affixes || this.affixes.length === 0) return null;
+        const sorted = [...this.affixes].sort().join('+');
+        const TINTS = {
+            // 单词缀
+            'shield':     '#3b82f6',
+            'haste':      '#eab308',
+            'regen':      '#22c55e',
+            'clone':      '#a855f7',
+            'healer':     '#ec4899',
+            'devour':     '#7c3aed',
+            'jump':       '#06b6d4',
+            'berserk':    '#f97316',
+            'heavyArmor': '#78716c',
+            // 双词缀组合
+            'haste+shield':    '#60a5fa',  // 蓝黄 → 亮蓝
+            'regen+shield':    '#34d399',  // 蓝绿 → 青绿
+            'clone+shield':    '#818cf8',  // 蓝紫 → 靛蓝
+            'healer+shield':   '#f472b6',  // 蓝粉 → 粉紫
+            'devour+shield':   '#8b5cf6',  // 蓝靛 → 紫电
+            'jump+shield':     '#22d3ee',  // 蓝青 → 天蓝
+            'haste+regen':     '#a3e635',  // 黄绿 → 黄绿
+            'clone+haste':     '#c084fc',  // 黄紫 → 浅紫
+            'haste+healer':    '#fb7185',  // 黄粉 → 橙粉
+            'clone+regen':     '#4ade80',  // 绿紫 → 翠绿
+            'healer+regen':    '#86efac',  // 绿粉 → 薄荷
+            'jump+regen':      '#2dd4bf',  // 绿青 → 宝青
+            'berserk+regen':   '#fb923c',  // 绿橙 → 暖橙
+            'clone+healer':    '#e879f9',  // 粉紫 → 洋红
+            'berserk+clone':   '#f43f5e',  // 紫红 → 玫红
+            'berserk+devour':  '#dc2626',  // 紫橙 → 血红
+            'devour+jump':     '#0891b2',  // 靛青 → 深青
+            'berserk+jump':    '#ea580c',  // 青橙 → 烈橙
+            'heavyArmor+shield': '#64748b',
+            'heavyArmor+regen':  '#4b7a5c',
+            'heavyArmor+haste':  '#a16207',
+            'heavyArmor+berserk':'#b91c1c',
+        };
+        return TINTS[sorted] || TINTS[this.affixes[0]] || null;
+    }
+
+    /**
+     * 绘制词缀组合标识章（Layer 1.6）
+     * 在敌人体内顶部偏左绘制一个小型几何印章，每种词缀都有独特图形。
+     */
+    _drawAffixSigil(ctx, w, h) {
+        if (!this.affixes || this.affixes.length === 0) return;
+        const r = Math.min(w, h) * 0.12; // 印章半径
+        const spacing = r * 2.6;
+        const count = Math.min(this.affixes.length, 3);
+        const startX = -((count - 1) * spacing) / 2;
+        const sigilY = -h / 2 + r + 4;
+
+        const SIGIL_COLORS = {
+            shield:     '#93c5fd',
+            haste:      '#fde047',
+            regen:      '#86efac',
+            clone:      '#d8b4fe',
+            healer:     '#f9a8d4',
+            devour:     '#a78bfa',
+            jump:       '#67e8f9',
+            berserk:    '#fb923c',
+            heavyArmor: '#94a3b8',
+        };
+
+        ctx.save();
+        for (let i = 0; i < count; i++) {
+            const affix = this.affixes[i];
+            const cx = startX + i * spacing;
+            const cy = sigilY;
+            const color = SIGIL_COLORS[affix] || '#ffffff';
+            const pulse = (Math.sin(Date.now() / 900 + i * 1.3 + this.visualSeed * 4) + 1) * 0.5;
+            ctx.globalAlpha = 0.7 + pulse * 0.25;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 4 + pulse * 4;
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+
+            switch (affix) {
+                case 'shield': {
+                    // 六边形
+                    for (let k = 0; k < 6; k++) {
+                        const a = (k / 6) * Math.PI * 2 - Math.PI / 6;
+                        const px = cx + r * Math.cos(a), py = cy + r * Math.sin(a);
+                        k === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+                    break;
+                }
+                case 'haste': {
+                    // 闪电折线
+                    ctx.moveTo(cx - r * 0.3, cy - r);
+                    ctx.lineTo(cx + r * 0.1, cy - r * 0.1);
+                    ctx.lineTo(cx - r * 0.1, cy + r * 0.1);
+                    ctx.lineTo(cx + r * 0.3, cy + r);
+                    ctx.stroke();
+                    break;
+                }
+                case 'regen': {
+                    // 向上箭头（生长）
+                    ctx.moveTo(cx, cy - r);
+                    ctx.lineTo(cx + r * 0.5, cy - r * 0.2);
+                    ctx.moveTo(cx, cy - r);
+                    ctx.lineTo(cx - r * 0.5, cy - r * 0.2);
+                    ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r * 0.6);
+                    ctx.stroke();
+                    // 底部小圆点
+                    ctx.beginPath(); ctx.arc(cx, cy + r * 0.6, r * 0.22, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                }
+                case 'clone': {
+                    // 两个重叠小圆
+                    ctx.arc(cx - r * 0.3, cy, r * 0.55, 0, Math.PI * 2);
+                    ctx.moveTo(cx + r * 0.3 + r * 0.55, cy);
+                    ctx.arc(cx + r * 0.3, cy, r * 0.55, 0, Math.PI * 2);
+                    ctx.stroke();
+                    break;
+                }
+                case 'healer': {
+                    // 十字
+                    ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
+                    ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
+                    ctx.stroke();
+                    break;
+                }
+                case 'devour': {
+                    // 螺旋（用圆弧近似）
+                    ctx.arc(cx, cy, r * 0.7, 0, Math.PI * 1.6);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, r * 0.35, 0, Math.PI);
+                    ctx.stroke();
+                    break;
+                }
+                case 'jump': {
+                    // 向上双箭头
+                    const dy = r * 0.4;
+                    ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r * 0.5, cy - r + dy);
+                    ctx.moveTo(cx, cy - r); ctx.lineTo(cx - r * 0.5, cy - r + dy);
+                    ctx.moveTo(cx, cy - r * 0.2); ctx.lineTo(cx + r * 0.5, cy - r * 0.2 + dy);
+                    ctx.moveTo(cx, cy - r * 0.2); ctx.lineTo(cx - r * 0.5, cy - r * 0.2 + dy);
+                    ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r * 0.5);
+                    ctx.stroke();
+                    break;
+                }
+                case 'berserk': {
+                    // 火焰（三角形锯齿）
+                    ctx.moveTo(cx, cy - r);
+                    ctx.lineTo(cx + r * 0.45, cy + r * 0.5);
+                    ctx.lineTo(cx, cy + r * 0.1);
+                    ctx.lineTo(cx - r * 0.45, cy + r * 0.5);
+                    ctx.closePath();
+                    ctx.stroke();
+                    break;
+                }
+                case 'heavyArmor': {
+                    // 装甲盾牌（宽矩形 + 底部弧）
+                    ctx.rect(cx - r, cy - r * 0.7, r * 2, r * 1.1);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(cx, cy + r * 0.4, r * 0.5, 0, Math.PI);
+                    ctx.stroke();
+                    break;
+                }
+                default: {
+                    // 默认：小菱形
+                    ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r * 0.7, cy);
+                    ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r * 0.7, cy);
+                    ctx.closePath(); ctx.stroke();
+                }
+            }
+        }
+        ctx.restore();
     }
 
     /**

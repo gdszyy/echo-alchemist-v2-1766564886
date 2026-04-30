@@ -459,13 +459,67 @@ export const spawn_system = {
         }
 
         // =========================================
+        // 2.5 重装变种（3x1 宽型敌人）预生成
+        // =========================================
+        // 从第5回合起，有一定概率在当前行生成一个占3列宽的重装变种。
+        // 重装变种具有 heavyArmor 词条：血量翻倍，每2回合才能移动一次。
+        const _haAfxCfg = CONFIG.balance.affixes;
+        const _haMinRound = 5;
+        const _haSpawnChance = Math.min(0.22, 0.06 + this.round * 0.008); // 随回合数增加，最高22%
+        const _haCols = (_haAfxCfg && _haAfxCfg.heavyArmorWideGridCols) || 3;
+        if (this.round >= _haMinRound && Math.random() < _haSpawnChance) {
+            // 查找连续空闲的 _haCols 列
+            const _totalCols = CONFIG.gameplay.enemyCols;
+            for (let _sc = 0; _sc <= _totalCols - _haCols; _sc++) {
+                let _colsFree = true;
+                for (let _dc = 0; _dc < _haCols; _dc++) {
+                    if (occupiedCols[_sc + _dc]) { _colsFree = false; break; }
+                }
+                if (!_colsFree) continue;
+                // 宽敌人中心 X = 起始列 + (cols/2) 个单元格宽度的中心
+                const _wideCenterX = (_sc + (_haCols - 1) / 2) * w + w / 2;
+                const _wideW = w * _haCols;
+                if (this.calc_isAreaOccupied(_wideCenterX, yPos, _wideW * 0.85, this.enemyHeight * 0.85)) continue;
+                // 血量：应用重装词条翻倍系数
+                const _haMult = (_haAfxCfg && _haAfxCfg.heavyArmorHpMult) || 2.0;
+                const _haHp = Math.floor(baseHP * _haMult * (0.9 + Math.random() * 0.2));
+                const _haEnemy = new Enemy(_wideCenterX, yPos, _wideW, this.enemyHeight, _haHp);
+                _haEnemy.affixes = ['heavyArmor'];
+                _haEnemy.type = 'elite';
+                _haEnemy.isWideEnemy = true;
+                _haEnemy.gridCols = _haCols;
+                // 初始化重装移动冷却
+                _haEnemy._moveInterval = (_haAfxCfg && _haAfxCfg.heavyArmorMoveInterval) || 2;
+                _haEnemy._moveCooldown = 0;
+                if (options.offScreenEntrance) {
+                    _haEnemy.pos.y = yPos - 2 * this.enemyHeight;
+                    _haEnemy.hasActedThisTurn = true;
+                    _haEnemy._spawnedThisTurn = true;
+                }
+                _haEnemy._spawnColIndex = _sc + Math.floor(_haCols / 2);
+                // 标记占用的所有列
+                for (let _dc = 0; _dc < _haCols; _dc++) occupiedCols[_sc + _dc] = true;
+                // 掉落判定
+                if (typeof this.sys_determineEnemyReward === 'function') {
+                    this.sys_determineEnemyReward(_haEnemy, false);
+                }
+                // Sprite 初始化
+                if (typeof _haEnemy.initSprite === 'function') _haEnemy.initSprite();
+                this.enemies.push(_haEnemy);
+                // 入场特效：蓝灰色冲击波突出重型单位
+                this.spawn_createShockwave(_haEnemy.pos.x, _haEnemy.pos.y, '#94a3b8');
+                break; // 每行最多一个重装变种
+            }
+        }
+
+        // =========================================
         // 3. 填充剩余空位 (Fill Loop)
         // =========================================
         const minEnemies = Math.min(CONFIG.gameplay.enemyCols, CONFIG.gameplay.spawnMin + Math.floor(this.round / 4));
-        
+
         // 计算当前已确定的敌人数量 (导演生成的)
-        let currentCount = pendingSpawns.length; 
-        
+        let currentCount = pendingSpawns.length;
+
         // 获取所有未占用的列
         let freeCols = [];
         for(let c=0; c<CONFIG.gameplay.enemyCols; c++) {
@@ -1957,6 +2011,19 @@ export const spawn_system = {
         const defaultMoveInterval = bossCfg.moveInterval || 2;
         boss._moveInterval = defaultMoveInterval;
         boss._moveCooldown = 0; // 首回合直接可以移动
+
+        // [重装词条 Boss 支持] 若 bossCfg.heavyArmor === true，则为 Boss 添加重装词条
+        // 效果：血量翻倍 + 强制移动间隔 = 2（所有 Boss 可选接入此机制）
+        if (bossCfg.heavyArmor === true) {
+            if (!boss.affixes.includes('heavyArmor')) boss.affixes.push('heavyArmor');
+            const _haMult = (CONFIG.balance.affixes && CONFIG.balance.affixes.heavyArmorHpMult) || 2.0;
+            boss.hp = Math.round(boss.hp * _haMult);
+            boss.maxHp = boss.hp;
+            boss.displayHp = boss.hp;
+            boss.delayedHp = boss.hp;
+            boss.greenHp = boss.hp;
+            boss._moveInterval = (CONFIG.balance.affixes && CONFIG.balance.affixes.heavyArmorMoveInterval) || 2;
+        }
 
         // 设置入场动画状态
         boss.dropTargetY = spawnY;       // 目标位置：网格对齐的顶部
