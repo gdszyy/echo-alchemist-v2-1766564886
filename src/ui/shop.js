@@ -72,8 +72,12 @@ export const shop_system = {
         // 2. 准备遗物池
         // 过滤掉玩家已经拥有的遗物 (this.ownedRelics)
         const fateMomentRewardIds = new Set(['chaos_essence', 'pure_essence']);
+        // 开局义务选择（run_start）时排除需要现有弹药序列才能生效的遗物
+        const isRunStart = options.source === 'run_start';
+        const ammoRequiredRelics = new Set(['mirror_magazine', 'element_injector']);
         let pool = RELIC_DB.filter(r => {
             if (fateMomentRewardIds.has(r.id)) return false;
+            if (isRunStart && ammoRequiredRelics.has(r.id)) return false;
             const count = (this.ownedRelics || []).filter(id => id === r.id).length;
             const max = r.maxStacks || 1;
             return count < max;
@@ -357,9 +361,12 @@ export const shop_system = {
         // 只需要 ownedRelics 标记，运行时由 combat_system / projectile / round_start 钩子读取。
         // 这里仅处理需要"立即修改局内状态"的几个：mirror_magazine / element_injector / chaos_pact。
         if (relic.effect === 'mirror_magazine') {
-            // 立即将 ammoQueue 中"最强"那颗子弹（按 _scoreRecipeStrength 评分）复制一份加入末尾
-            const queue = this.ammoQueue || [];
-            if (queue.length > 0) {
+            // 立即将当前子弹序列中"最强"那颗子弹复制一份加入末尾。
+            // 优先操作 ammoQueue（战斗中已发射序列），回退到 _chargedAmmoQueue（命运选择后充能序列）。
+            const liveQueue = (this.ammoQueue && this.ammoQueue.length > 0) ? this.ammoQueue : null;
+            const chargedQueue = (this._chargedAmmoQueue && this._chargedAmmoQueue.length > 0) ? this._chargedAmmoQueue : null;
+            const queue = liveQueue || chargedQueue;
+            if (queue) {
                 let bestIdx = 0;
                 let bestScore = -Infinity;
                 for (let i = 0; i < queue.length; i++) {
@@ -370,11 +377,15 @@ export const shop_system = {
                 queue.push(cloned);
                 if (window.showToast) showToast(`镜像弹夹：复制了一颗强力子弹！`);
             } else {
-                if (window.showToast) showToast(`镜像弹夹：当前无弹药可复制，下回合自动失效。`);
+                if (window.showToast) showToast(`镜像弹夹：当前无弹药可复制。`);
             }
         } else if (relic.effect === 'element_injector') {
-            // 删除 ammoQueue 中最强和最弱的子弹，剩下那颗的所有属性层数翻倍
-            const queue = this.ammoQueue || [];
+            // 删除当前子弹序列中最强和最弱的子弹，剩下那颗的所有属性层数翻倍。
+            // 优先操作 ammoQueue，回退到 _chargedAmmoQueue。
+            const liveQueue = (this.ammoQueue && this.ammoQueue.length > 0) ? this.ammoQueue : null;
+            const chargedQueue = (this._chargedAmmoQueue && this._chargedAmmoQueue.length > 0) ? this._chargedAmmoQueue : null;
+            const usingCharged = !liveQueue && !!chargedQueue;
+            const queue = liveQueue || chargedQueue || [];
             if (queue.length >= 3) {
                 const scored = queue.map((r, i) => ({ i, score: _scoreRecipeStrength(r) }));
                 scored.sort((a, b) => a.score - b.score);
@@ -386,7 +397,8 @@ export const shop_system = {
                     if (!removeSet.has(i)) remaining.push(queue[i]);
                 }
                 remaining.forEach(_doubleRecipeAttrs);
-                this.ammoQueue = remaining;
+                if (usingCharged) { this._chargedAmmoQueue = remaining; }
+                else { this.ammoQueue = remaining; }
                 if (window.showToast) showToast(`元素注入器：剩余子弹属性层数翻倍！`);
             } else if (queue.length === 2) {
                 // 边界：仅 2 颗，删除最弱，保留最强并翻倍
@@ -394,11 +406,14 @@ export const shop_system = {
                 const s1 = _scoreRecipeStrength(queue[1]);
                 const survivor = s0 >= s1 ? queue[0] : queue[1];
                 _doubleRecipeAttrs(survivor);
-                this.ammoQueue = [survivor];
+                if (usingCharged) { this._chargedAmmoQueue = [survivor]; }
+                else { this.ammoQueue = [survivor]; }
                 if (window.showToast) showToast(`元素注入器：仅 2 颗子弹，强者属性翻倍！`);
             } else if (queue.length === 1) {
                 _doubleRecipeAttrs(queue[0]);
                 if (window.showToast) showToast(`元素注入器：唯一子弹属性翻倍！`);
+            } else {
+                if (window.showToast) showToast(`元素注入器：当前无弹药可注入。`);
             }
         } else if (relic.effect === 'chaos_pact') {
             // 立即获得 3 个随机稀有符文 + 设置永久伤害倍率

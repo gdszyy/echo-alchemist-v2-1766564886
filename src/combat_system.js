@@ -2217,13 +2217,35 @@ export const combat_system = {
                 const burstRadius = Math.max(60, (enemy.width || 40) * 2);
                 const cx = enemy.pos.x;
                 const cy = enemy.pos.y;
-                // 爆炸视觉粒子
-                for (let i = 0; i < 8; i++) {
-                    this.spawn_createParticle(cx, cy, '#fb923c', 'spark');
+
+                // 殒命爆裂特效：橙红爆炸主题，体现尸体爆炸的暴烈感
+                // 1. 中心火焰波扩散（FireWave 橙红）
+                if (this.fireWaves) {
+                    this.fireWaves.push(new FireWave(cx, cy));
                 }
+                // 2. 双层冲击波（橙 → 深红，表现爆炸冲击与火焰余波）
+                if (typeof this.spawn_createShockwave === 'function') {
+                    this.spawn_createShockwave(cx, cy, '#fb923c');
+                    setTimeout(() => { if (this.spawn_createShockwave) this.spawn_createShockwave(cx, cy, '#b91c1c'); }, 100);
+                }
+                // 3. 大量橙红 ember 余烬粒子（焦碎感）
+                for (let i = 0; i < 14; i++) {
+                    if (typeof this.spawn_createParticle === 'function') {
+                        const p = this.spawn_createParticle(cx + (Math.random() - 0.5) * 20, cy + (Math.random() - 0.5) * 15, i % 3 === 0 ? '#fbbf24' : '#fb923c', 'ember');
+                        if (p) { p.vel.x = (Math.random() - 0.5) * 3; p.vel.y = -(Math.random() * 3.5 + 0.5); }
+                    }
+                }
+                // 4. spark 碎片（爆炸飞溅）
+                for (let i = 0; i < 10; i++) {
+                    if (typeof this.spawn_createParticle === 'function') {
+                        this.spawn_createParticle(cx, cy, i % 2 === 0 ? '#f97316' : '#fcd34d', 'spark');
+                    }
+                }
+                // 5. 浮动文字：骷髅 + 伤害（体现"殒命"主题）
                 if (typeof this.spawn_createFloatingText === 'function') {
-                    this.spawn_createFloatingText(cx, cy - 20, `殒命爆裂 ${burstDmg}`, '#fb923c');
+                    this.spawn_createFloatingText(cx, cy - 28, `💀 爆裂 ${burstDmg}`, '#fb923c');
                 }
+
                 for (const other of this.enemies) {
                     if (!other || !other.active || other === enemy) continue;
                     const dx = (other.pos.x - cx);
@@ -3217,10 +3239,35 @@ export const combat_system = {
             if (candidates.length > 0) {
                 const target = candidates[Math.floor(Math.random() * candidates.length)];
                 const dmg = (this.round || 1) * 5;
+                const cx = target.pos.x;
+                const cy = target.pos.y;
                 const result = target.takeDamage(dmg);
-                if (typeof this.spawn_createFloatingText === 'function') {
-                    this.spawn_createFloatingText(target.pos.x, target.pos.y - 24, `末日 ${dmg}`, '#fbbf24');
+
+                // 末日时钟特效：深红/黑金主题，模拟末日倒计时敲响
+                // 1. 三层扩散冲击波（血红 → 暗金 → 黑紫，错峰营造"钟声震颤"感）
+                if (typeof this.spawn_createShockwave === 'function') {
+                    this.spawn_createShockwave(cx, cy, '#dc2626');
+                    setTimeout(() => { if (this.spawn_createShockwave) this.spawn_createShockwave(cx, cy, '#854d0e'); }, 80);
+                    setTimeout(() => { if (this.spawn_createShockwave) this.spawn_createShockwave(cx, cy, '#4c1d95'); }, 160);
                 }
+                // 2. 向上漂浮的血红 ember 余烬粒子（模拟爆炸灰烬飞散）
+                for (let i = 0; i < 10; i++) {
+                    if (typeof this.spawn_createParticle === 'function') {
+                        const p = this.spawn_createParticle(cx + (Math.random() - 0.5) * 30, cy + (Math.random() - 0.5) * 20, '#dc2626', 'ember');
+                        if (p) { p.vel.x = (Math.random() - 0.5) * 2.5; p.vel.y = -(Math.random() * 3 + 1); }
+                    }
+                }
+                // 3. 黑金 spark 碎片四溅（钟面碎裂感）
+                for (let i = 0; i < 8; i++) {
+                    if (typeof this.spawn_createParticle === 'function') {
+                        this.spawn_createParticle(cx, cy, i % 2 === 0 ? '#fbbf24' : '#1c1917', 'spark');
+                    }
+                }
+                // 4. 浮动文字：骷髅图标 + 伤害数值，暗红色强调末日感
+                if (typeof this.spawn_createFloatingText === 'function') {
+                    this.spawn_createFloatingText(cx, cy - 36, `☠️ 末日 -${dmg}`, '#dc2626');
+                }
+
                 if (result && result.killed && typeof this.spawn_addScore === 'function') {
                     this.spawn_addScore(target.maxHp);
                 }
