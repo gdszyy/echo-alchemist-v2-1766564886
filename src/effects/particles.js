@@ -85,6 +85,13 @@ class Particle {
             vel.x = (Math.random() - 0.5) * 0.5; vel.y = -Math.random() * 1.5 - 0.5;
             this.drag = 0.98; this.gravity = -0.02; this.decay = 0.015;
             this.size = Math.random() * 6 + 4; this.life = 1.2;
+        } else if (mode === 'venom') {
+            // 毒液滴：缓慢上浮，轻微横向摆动，半透明绿色液滴
+            vel.x = (Math.random() - 0.5) * 0.6;
+            vel.y = -(Math.random() * 1.2 + 0.4);
+            this.drag = 0.97; this.gravity = -0.04; this.decay = 0.012 + Math.random() * 0.008;
+            this.size = Math.random() * 2.5 + 1.5;
+            this.wobble = Math.random() * Math.PI * 2;
         } else if (mode === 'line') {
             vel.x = 0; vel.y = 0;
             this.drag = 0.98; this.gravity = 0; this.decay = 0.02;
@@ -107,6 +114,10 @@ class Particle {
     update(timeScale) {
         if (this.mode === 'ember') {
             this.pos.x += Math.sin(this.life * 10 + this.wobble) * 0.5 * timeScale;
+        }
+        if (this.mode === 'venom') {
+            // 毒液滴横向正弦摆动，模拟液体漂浮
+            this.pos.x += Math.sin(this.life * 6 + this.wobble) * 0.4 * timeScale;
         }
         // 湍流逻辑：在垂直于速度的方向上产生正弦波动
         if (this.turbulence > 0) {
@@ -222,6 +233,16 @@ class Particle {
             ctx.moveTo(-1, 0);
             ctx.lineTo(1, 0);
             ctx.stroke();
+
+        } else if (this.mode === 'venom') {
+            // @perf-impact: 毒液粒子渐变绘制 - 已通过 venomLimit 预算门控
+            ctx.globalCompositeOperation = 'screen';
+            const vg = ctx.createRadialGradient(0, 0, 0, 0, 0, this.size * 2.2);
+            vg.addColorStop(0, `rgba(200, 255, 180, ${this.life * 0.9})`);
+            vg.addColorStop(0.4, `rgba(74, 222, 128, ${this.life * 0.7})`);
+            vg.addColorStop(1, `rgba(22, 101, 52, 0)`);
+            ctx.fillStyle = vg;
+            ctx.beginPath(); ctx.arc(0, 0, this.size * 2.2, 0, Math.PI * 2); ctx.fill();
 
         } else {
             // 普通粒子 (spark/normal) 直接画圆，不用渐变

@@ -1740,6 +1740,17 @@ export const combat_system = {
                 if (this.spawn_createFloatingText) {
                     this.spawn_createFloatingText(hitX, hitY - 14, `☠️+${stacks}`, '#84cc16');
                 }
+                // @perf-impact: 命中毒素粒子爆发 - 已通过 venomLimit 预算门控
+                if (typeof this.spawn_createParticle === 'function') {
+                    const _vBurst = Math.min(4, 1 + stacks);
+                    for (let _vi = 0; _vi < _vBurst; _vi++) {
+                        this.spawn_createParticle(
+                            hitX + (Math.random() - 0.5) * 8,
+                            hitY + (Math.random() - 0.5) * 8,
+                            '#4ade80', 'venom'
+                        );
+                    }
+                }
             }
         }
 

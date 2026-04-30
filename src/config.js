@@ -1113,6 +1113,7 @@ const CONFIG = {
             shardLimitWind:   20,  // shard 冰渣粒子上限（风属性激活时）
             sparkLimit:      100,  // spark 通用火星粒子上限（含机械类受击电弧、能量泄漏等）
             smokeLimit:       60,  // smoke 烟雾粒子上限（含狂暴受击烟雾等）
+            venomLimit:       60,  // venom 毒液粒子上限（中毒敌人漂浮毒液滴）
             // 特效对象上限（Shockwave / FireWave / HealWave / LightningBolt）
             shockwaveLimit:   20,
             waveLimit:        10,
@@ -1148,6 +1149,7 @@ const CONFIG = {
             shardLimitWind:   10,
             sparkLimit:       50,  // spark 通用火星粒子上限（均衡模式）
             smokeLimit:       25,  // smoke 烟雾粒子上限（均衡模式）
+            venomLimit:       30,  // venom 毒液粒子上限（均衡模式）
             shockwaveLimit:   12,
             waveLimit:         6,
             lightningLimit:    8,
@@ -1179,6 +1181,7 @@ const CONFIG = {
             shardLimitWind:    4,
             sparkLimit:       20,  // spark 通用火星粒子上限（省电模式）
             smokeLimit:        8,  // smoke 烟雾粒子上限（省电模式）
+            venomLimit:        0,  // venom 毒液粒子上限（省电模式：完全关闭，仅保留敌人叠加层）
             shockwaveLimit:    6,
             waveLimit:         3,
             lightningLimit:    4,
