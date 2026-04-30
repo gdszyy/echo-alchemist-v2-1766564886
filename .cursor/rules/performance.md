@@ -87,6 +87,7 @@ if avgFps > fpsThresholdUp (55):
 | `shardLimit` | 60 | 30 | 12 | 碎片粒子上限 |
 | `sparkLimit` | 100 | 50 | 20 | 通用火星粒子上限（机械类受击电弧、能量泄漏等） |
 | `smokeLimit` | 60 | 25 | 8 | 烟雾粒子上限（狂暴受击烟雾、死亡爆炸等） |
+| `venomLimit` | 60 | 30 | 0 | 毒液粒子上限（中毒敌人漂浮液滴 + 命中爆发；省电模式完全关闭） |
 | `shockwaveLimit` | 20 | 12 | 6 | Shockwave 特效上限 |
 | `waveLimit` | 10 | 6 | 3 | FireWave / HealWave 上限 |
 | `lightningLimit` | 15 | 8 | 4 | LightningBolt 特效上限 |
@@ -114,8 +115,8 @@ if avgFps > fpsThresholdUp (55):
 
 | 函数 | 读取字段 | 行为 |
 |------|---------|------|
-| `spawn_createParticle(x, y, color, type)` | `maxParticles` / `windLimit` / `emberLimit` / `mistLimit` / `shardLimit` / `sparkLimit` / `smokeLimit` | 按粒子类型查询对应上限，超限时跳过创建 |
-| `spawn_pushParticleWithLimit(particle)` | `maxParticles` / `sparkLimit` / `smokeLimit` | 通用粒子推入前检查全局上限及 spark/smoke 独立限制 |
+| `spawn_createParticle(x, y, color, type)` | `maxParticles` / `windLimit` / `emberLimit` / `mistLimit` / `shardLimit` / `sparkLimit` / `smokeLimit` / `venomLimit` | 按粒子类型查询对应上限，超限时跳过创建 |
+| `spawn_pushParticleWithLimit(particle)` | `maxParticles` / `sparkLimit` / `smokeLimit` / `venomLimit` | 通用粒子推入前检查全局上限及 spark/smoke/venom 独立限制 |
 | `spawn_createShockwave(x, y, color)` | `shockwaveLimit` | 超限时跳过创建 |
 | `spawn_createHealWave(x, y, range)` | `waveLimit` | 超限时跳过创建 |
 
@@ -127,6 +128,7 @@ if avgFps > fpsThresholdUp (55):
 | 闪电技能循环（约第 241 行） | `lightningLimit` | 同上 |
 | 燃烧死亡爆炸（约第 3183 行） | `waveLimit` | 超限时跳过 FireWave 创建 |
 | 静电场词条（约第 1802 行） | `lightningLimit` | 超限时跳过 LightningBolt 创建 |
+| 毒素命中粒子爆发（约第 1739 行） | `venomLimit`（经 spawn_createParticle 间接读取） | 叠加毒层时在命中点发射 1~4 颗毒液粒子 |
 
 ### 5.3 伤害计算（`src/combat/damage_calc.js`）
 
@@ -167,6 +169,15 @@ if avgFps > fpsThresholdUp (55):
 | 函数 | 行为 |
 |------|------|
 | `render_perfOverlay()` | 当 `perfQualityLevel !== 'high'` 时，在 Canvas 左上角绘制半透明 FPS 数值和等级标签（均衡/省电） |
+
+### 5.8 毒素状态视觉（`src/entities/enemy.js` → `Enemy.draw` Layer 3.4）
+
+| 位置 | 读取字段 | 行为 |
+|------|---------|------|
+| 毒素叠加层（Layer 3.4，`venomStacks > 0`） | `perfQualityLevel` | `high`：screen 混合径向渐变 + 液滴动画；`medium`：只渐变无液滴；`low`：简单色块无渐变 |
+| 毒液粒子发射（Layer 3.4 末尾） | `venomLimit`（经 `spawn_createParticle` 间接读取） | `high` 档 8% 概率/帧发射漂浮毒液粒子，`medium` 4%，`low` 0%（venomLimit=0 兜底截止） |
+
+> **注意**：Layer 3.4 在 `ctx.clip()` 之后执行，叠加层自动被裁剪到敌人形体内部，无需额外剪切。粒子发射使用世界坐标（`this.pos.x / this.pos.y`），与局部 ctx 变换无关。
 
 ---
 
@@ -218,6 +229,7 @@ if avgFps > fpsThresholdUp (55):
 | 2026-04-16 | 初始实现：FPS 采样器、三档等级预算、粒子/特效/Peg/敌人全面接入、FPS 指示层 |
 | 2026-04-16 | 新增 `sparkLimit`（high:100/medium:50/low:20）和 `smokeLimit`（high:60/medium:25/low:8）两个预算字段；在 `spawn_createParticle` 和 `spawn_pushParticleWithLimit` 中同步接入 spark/smoke 上限检查，防止能量泄漏、机械类受击等高频 spark 场景占用全局粒子预算 |
 | 2026-04-16 | **Arc Boss VFX 性能门控（Task T3 补丁）**：在三档预算表中新增 4 个字段：`arcBossVfxTriCount`（Ouroboros 狂暴三角形数量，high:6/medium:3/low:0）、`arcBossVfxLineCount`（Devourer 引力线数量，high:6/medium:6/low:3）、`arcBossVfxWhiteGrad`（Devourer 深渊核心 lighter 白化叠加开关，high/medium:true/low:false）、`arcBossVfxSuckProb`（Devourer 吸入粒子生成概率，high:0.7/medium:0.5/low:0.3）。在 `enemy.js` Devourer/Ouroboros Layer 6.5 中通过 `game.perfQualityLevel` 动态读取对应字段实施门控。同步更新消费端关联索引（第 5.6 节）。 |
+| 2026-04-30 | **毒素敌人专属特效**：新增 `venomLimit`（high:60/medium:30/low:0）预算字段；新增 `venom` 粒子模式（上浮液滴 + screen 渐变绘制）；在 `enemy.js` Layer 3.4 新增毒素状态视觉（径向渐变叠加 + 液滴流淌动画，三档门控）；在 `combat_system.js` 命中毒素时发射 1~4 颗毒液粒子。消费端关联索引见第 5.1/5.2/5.8 节。 |
 
 ## 9. 性能影响标记规范
 

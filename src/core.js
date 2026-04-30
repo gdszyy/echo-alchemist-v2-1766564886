@@ -153,7 +153,7 @@ class Game {
         // [Perf] 粒子分模式计数表 - 替代 this.particles.filter(p=>p.mode==='X').length 的 O(N) 扫描
         // 维护契约：所有 push 必走 spawn_createParticle / spawn_pushParticleWithLimit；
         // 所有删除必走 game_phase.js 的两指针压缩循环（同步 -- 计数）。
-        this.particleCounts = { wind_slash: 0, line: 0, ember: 0, mist: 0, shard: 0, spark: 0, smoke: 0 };
+        this.particleCounts = { wind_slash: 0, line: 0, ember: 0, mist: 0, shard: 0, spark: 0, smoke: 0, venom: 0 };
         // [Perf] 粒子对象池 - 复用 Particle 实例，规避每帧 50-100 次 new 触发的 GC 停顿
         this._particlePool = [];
         this.shockwaves = [];

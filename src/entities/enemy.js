@@ -1538,6 +1538,68 @@ class Enemy {
             ctx.restore();
         }
 
+        // === Layer 3.4: 毒素状态视觉（venomStacks > 0 时显示）===
+        // @perf-impact: 新增毒素叠加层 - high/medium 档用 screen 混合+渐变，low 档仅简单色块
+        if ((this.venomStacks || 0) > 0) {
+            const _vPerfLevel = (typeof game !== 'undefined' && game.perfQualityLevel) || 'high';
+            const _vStacks = this.venomStacks;
+            const _vIntensity = Math.min(1, _vStacks / 10); // 10 层满溢
+            const _vTime = Date.now() / 1000;
+            // 毒素层数越多，脉冲越快
+            const _vPulse = (Math.sin(_vTime * (1.0 + _vIntensity * 1.5) + this.visualSeed * 4) + 1) * 0.5;
+            const _vBaseAlpha = 0.15 + _vIntensity * 0.3;
+            const _vPulseAlpha = _vBaseAlpha * (0.7 + _vPulse * 0.3);
+
+            ctx.save();
+            if (_vPerfLevel !== 'low') {
+                // high / medium: screen 混合 + 径向渐变，模拟内部毒液发光
+                ctx.globalCompositeOperation = 'screen';
+                const _vGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(w, h) * 0.7);
+                _vGrad.addColorStop(0, `rgba(134, 239, 172, ${_vPulseAlpha * 0.8})`);
+                _vGrad.addColorStop(0.5, `rgba(74, 222, 128, ${_vPulseAlpha * 0.5})`);
+                _vGrad.addColorStop(1, `rgba(22, 101, 52, 0)`);
+                ctx.fillStyle = _vGrad;
+                ctx.beginPath(); ctx.arc(0, 0, Math.max(w, h) * 0.7, 0, Math.PI * 2); ctx.fill();
+
+                // 毒液滴动画：沿边缘流淌的绿色液滴点（高性能档额外绘制）
+                if (_vPerfLevel === 'high') {
+                    const _dropCount = Math.min(5, 2 + Math.floor(_vStacks / 3));
+                    ctx.globalCompositeOperation = 'screen';
+                    for (let _di = 0; _di < _dropCount; _di++) {
+                        const _dSeed = this.visualSeed * 7 + _di * 1.618;
+                        // 液滴沿敌人下边缘滴落
+                        const _dX = (Math.sin(_dSeed) * 0.4) * w;
+                        const _dRise = ((_vTime * 0.4 + _dSeed) % 1);
+                        const _dY = h * 0.5 - _dRise * h * 1.2;
+                        if (_dY < -h * 0.5 - 6) continue;
+                        const _dAlpha = Math.sin(_dRise * Math.PI) * 0.7 * _vIntensity;
+                        if (_dAlpha <= 0) continue;
+                        ctx.globalAlpha = _dAlpha;
+                        ctx.fillStyle = '#4ade80';
+                        ctx.beginPath();
+                        ctx.ellipse(_dX, _dY, 2.5, 3.5, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            } else {
+                // low: 简单半透明色块，无渐变
+                ctx.globalAlpha = _vPulseAlpha * 0.4;
+                ctx.fillStyle = '#4ade80';
+                ctx.fillRect(-w/2, -h/2, w, h);
+            }
+            ctx.restore();
+
+            // 粒子发射：低概率从敌人顶部漂出毒液粒子（省电模式 venomLimit=0 会自然截止）
+            if (typeof game !== 'undefined' && typeof game.spawn_createParticle === 'function') {
+                const _emitProb = _vPerfLevel === 'high' ? 0.08 : (_vPerfLevel === 'medium' ? 0.04 : 0);
+                if (Math.random() < _emitProb * _vIntensity) {
+                    const _px = this.pos.x + (Math.random() - 0.5) * w;
+                    const _py = this.pos.y + this.bumpOffsetY - h * 0.3;
+                    game.spawn_createParticle(_px, _py, '#4ade80', 'venom');
+                }
+            }
+        }
+
         // === Layer 3.5: 内部词缀特效（严格裁剪在方块内，所有词缀统一处理）===
         if (this.affixes.length > 0) {
             const t35 = Date.now() / 1000;

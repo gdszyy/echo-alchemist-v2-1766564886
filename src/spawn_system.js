@@ -1100,6 +1100,7 @@ export const spawn_system = {
         }
         if (mode === 'spark' && counts.spark >= (_budget.sparkLimit ?? 100)) return null;
         if (mode === 'smoke' && counts.smoke >= (_budget.smokeLimit ?? 60)) return null;
+        if (mode === 'venom' && counts.venom >= (_budget.venomLimit ?? 30)) return null;
 
         const pool = this._particlePool;
         let p;
@@ -1143,6 +1144,7 @@ export const spawn_system = {
         }
         if (mode === 'spark' && counts.spark >= (_budget.sparkLimit ?? 100)) return false;
         if (mode === 'smoke' && counts.smoke >= (_budget.smokeLimit ?? 60)) return false;
+        if (mode === 'venom' && counts.venom >= (_budget.venomLimit ?? 30)) return false;
 
         this.particles.push(p);
         if (counts[mode] !== undefined) counts[mode]++;
