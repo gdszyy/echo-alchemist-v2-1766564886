@@ -2717,21 +2717,11 @@ export const combat_system = {
         // 如果没有多重射击，那么这第一发就是最后一发
         // [修改] 风属性子弹也强制单发，不受 multicast 影响
         // @section:fire_post_effects - 射击后效果：后坐力/音效/HUD更新
-
-        // [激光多重施法] 激光模式：穿透层+反弹层全部转化为多重施法，由状态机驱动（每 0.1s 一次伤害）
-        if (finalRecipe.isLaser || finalRecipe.laser > 0) {
-            finalRecipe.multicast = (finalRecipe.multicast || 0) + (finalRecipe.pierce || 0) + (finalRecipe.bounce || 0);
-            finalRecipe.pierce = 0;
-            finalRecipe.bounce = 0;
-            finalRecipe._originalMulticast = finalRecipe.multicast;
-            finalRecipe.multicast = 0; // 清零：由状态机控制重复伤害，不走 burstQueue 多发
-        } else {
-            // [照射词条] 在词条消耗 multicast 之前，保存原始连射次数到 recipe._originalMulticast
-            // 为什么：照射状态机需要知道原始连射次数来计算 totalDuration，
-            // 但 focused_fire/mass_collapse/multicast_to_scatter 等词条会将 multicast 清零，
-            // 导致 recipe.multicast=0 传入状态机时 totalDuration 计算错误。
-            finalRecipe._originalMulticast = this.currentSession ? (this.currentSession.multicast || 0) : (finalRecipe.multicast || 0);
-        }
+        // [照射词条] 在词条消耗 multicast 之前，保存原始连射次数到 recipe._originalMulticast
+        // 为什么：照射状态机需要知道原始连射次数来计算 totalDuration，
+        // 但 focused_fire/mass_collapse/multicast_to_scatter 等词条会将 multicast 清零，
+        // 导致 recipe.multicast=0 传入状态机时 totalDuration 计算错误。
+        finalRecipe._originalMulticast = this.currentSession ? (this.currentSession.multicast || 0) : (finalRecipe.multicast || 0);
         // [词条 Hook] 化弹为剑：取消连射，连射次数将作为子飞剑攻击次数
         const isReplacedSword = !!finalRecipe._replaceWithSonSword;
         const isOnlyOne = isReplacedSword || !(finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword' && !finalRecipe.wind);
@@ -2793,26 +2783,25 @@ export const combat_system = {
         const blazingBeamFxForLaser = this.activeRunewordEffects && this.activeRunewordEffects['blazing_beam'];
         // [DEBUG-LASER] 每次调用打印入口状态
         if (CONFIG.debug) console.log(`[LASER_FIRE] 调用 isTickFire=${isTickFire} _continuousLaserFiring=${this._continuousLaserFiring} irradiationFx=${!!irradiationFx} recipe.multicast=${recipe.multicast} elapsedFrames=${this._continuousLaserState ? this._continuousLaserState.elapsedFrames : 'N/A'}`);
-        // [激光持续模式] 所有激光均启动状态机：普通激光每 0.1s 触发一次伤害，照射词条保留 0.5s 间隔
-        if (!this._continuousLaserFiring) {
+        if ((irradiationFx || blazingBeamFxForLaser) && !this._continuousLaserFiring) {
             this._continuousLaserFiring = true;
+            // [照射持续时长] 基于连射次数：连射 N 次就持续 N×0.5s。
+            // 使用 recipe._originalMulticast 而非 recipe.multicast，
+            // 因为 focused_fire/mass_collapse/multicast_to_scatter 等词条会将 recipe.multicast 清零。
             const multicastCount = (recipe._originalMulticast !== undefined ? recipe._originalMulticast : (recipe.multicast || 0));
-            // irradiation/blazing_beam 保留 0.5s 间隔；普通激光使用 0.1s 间隔（6帧）
-            const tickInterval = (irradiationFx || blazingBeamFxForLaser)
-                ? Math.round(0.5 * 60)
-                : Math.round(0.1 * 60); // 6帧 ≈ 0.1s
-            const totalDuration = Math.max(tickInterval, multicastCount * tickInterval);
-            if (CONFIG.debug) console.log(`[LASER_FIRE] 状态机启动: multicastCount=${multicastCount} tickInterval=${tickInterval} totalDuration=${totalDuration}帧(${(totalDuration/60).toFixed(2)}s)`);
+            const totalDuration = Math.max(Math.round(0.5 * 60), multicastCount * Math.round(0.5 * 60));
+            if (CONFIG.debug) console.log(`[LASER_FIRE] 状态机启动: multicastCount=${multicastCount}(_originalMulticast=${recipe._originalMulticast}) totalDuration=${totalDuration}帧(${(totalDuration/60).toFixed(2)}s)`);
             this._continuousLaserState = {
                 startX, startY, vel, recipe,
                 tickFrames: 0,
-                tickInterval,
-                totalDuration,
+                tickInterval: Math.round(0.5 * 60), // 0.5s = 30帧
+                totalDuration,                       // 连射 N 次 => N×30帧（最少 30帧）
                 elapsedFrames: 0,
                 shotId,
-                lastHitEnemy: null,
-                activeBeams: []
+                lastHitEnemy: null,  // [照射词条] 记录上一次命中的敌人，用于检测目标切换时重置 _irradiationStacks
+                activeBeams: []      // [持续照射] 当前帧活跃的 LaserBeam 引用列表，用于 tick 切换时主动触发淡出
             };
+            // isVisualEffectActive 由持续照射状态机维持，不再用 setTimeout 清除
         }
 
         // --- 1. 参数计算 ---
