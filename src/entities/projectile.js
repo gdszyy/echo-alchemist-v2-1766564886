@@ -681,8 +681,8 @@ class Projectile {
 
         const echoRes = game.activeElementResonances && game.activeElementResonances['echo'];
         const echoResParams = echoRes ? echoRes.params : null;
-        const baseChance = (CONFIG.mechanics && CONFIG.mechanics.echo && CONFIG.balance.echo.baseTriggerChance) || 0.25;
-        const chancePerLevel = (CONFIG.mechanics && CONFIG.mechanics.echo && CONFIG.balance.echo.chancePerLevel) || 0.05;
+        const baseChance = (CONFIG.balance && CONFIG.balance.echo && CONFIG.balance.echo.baseTriggerChance) || 0.25;
+        const chancePerLevel = (CONFIG.balance && CONFIG.balance.echo && CONFIG.balance.echo.chancePerLevel) || 0.05;
         const triggerBonus = echoResParams ? (echoResParams.triggerChanceBonus || 0) : 0;
         const inheritRatio = echoResParams ? (echoResParams.inheritRatio || 0.5) : 0.5;
         const triggerChance = Math.min(1.0, baseChance + echoLevel * chancePerLevel + triggerBonus);
