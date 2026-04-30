@@ -1743,6 +1743,18 @@ export const combat_system = {
             }
         }
 
+        // --- [遗物 Hook] 猎人本能 (hunter_instinct)：场上血量最低的敌人受伤害 +25% ---
+        if (this.ownedRelics && this.ownedRelics.includes('hunter_instinct')) {
+            let lowestHpEnemy = null;
+            let lowestHp = Infinity;
+            for (const e of this.enemies) {
+                if (!e || !e.active) continue;
+                if (e.hp < lowestHp) { lowestHp = e.hp; lowestHpEnemy = e; }
+            }
+            if (lowestHpEnemy === enemy) {
+                dmg = dmg * 1.25;
+            }
+        }
         // [修改] 调用 takeDamage 时传入 projectile 作为源，用于方向判定
         const damageResult = enemy.takeDamage(dmg, projectile);
         
@@ -2186,6 +2198,32 @@ export const combat_system = {
                 shotId: shotId
             });
 
+            // --- [遗物 Hook] 殒命爆裂 (mortal_burst) ---
+            // 击杀时在敌人位置爆炸，对附近敌人造成 max(2, maxHp*10%) 的固定真实伤害
+            if (this.ownedRelics && this.ownedRelics.includes('mortal_burst') && !enemy._mortalBurstTriggered) {
+                enemy._mortalBurstTriggered = true; // 防止穿透/AOE 链反应触发死循环
+                const burstDmg = Math.max(2, Math.floor((enemy.maxHp || 0) * 0.10));
+                const burstRadius = Math.max(60, (enemy.width || 40) * 2);
+                const cx = enemy.pos.x;
+                const cy = enemy.pos.y;
+                // 爆炸视觉粒子
+                for (let i = 0; i < 8; i++) {
+                    this.spawn_createParticle(cx, cy, '#fb923c', 'spark');
+                }
+                if (typeof this.spawn_createFloatingText === 'function') {
+                    this.spawn_createFloatingText(cx, cy - 20, `殒命爆裂 ${burstDmg}`, '#fb923c');
+                }
+                for (const other of this.enemies) {
+                    if (!other || !other.active || other === enemy) continue;
+                    const dx = (other.pos.x - cx);
+                    const dy = (other.pos.y - cy);
+                    if (dx * dx + dy * dy <= burstRadius * burstRadius) {
+                        const aoeResult = other.takeDamage(burstDmg);
+                        if (aoeResult && aoeResult.killed) this.spawn_addScore(other.maxHp);
+                    }
+                }
+            }
+
             // [新增] 子剑回收逻辑：如果敌人被杀，插在上面的子剑需要回收
             if (enemy.stuckSwords && enemy.stuckSwords.length > 0) {
                 enemy.stuckSwords.forEach(sword => {
@@ -2596,6 +2634,44 @@ export const combat_system = {
             }
         }
 
+        // --- [遗物 Hook] 属性协议 (attribute_protocol) ---
+        // 弹药配方含 4 种以上不同属性时，每颗子弹基础伤害 + 该子弹自身属性种类数
+        if (this.ownedRelics && this.ownedRelics.includes('attribute_protocol')) {
+            // 统计 ammoQueue 中所有属性种类合集
+            const queueKinds = new Set();
+            const ATTR_KEYS = ['cryo','pyro','lightning','laser','wind','bounce','pierce','scatter','flying_sword'];
+            for (const r of (this.ammoQueue || [])) {
+                for (const k of ATTR_KEYS) if (r && r[k] && r[k] > 0) queueKinds.add(k);
+            }
+            if (queueKinds.size >= 4) {
+                let selfKinds = 0;
+                for (const k of ATTR_KEYS) if (finalRecipe[k] && finalRecipe[k] > 0) selfKinds++;
+                if (selfKinds > 0) {
+                    finalRecipe.damage = (finalRecipe.damage || 0) + selfKinds;
+                    finalRecipe._attributeProtocolBonus = selfKinds;
+                }
+            }
+        }
+
+        // --- [遗物 Hook] 贪婪轮盘 (greedy_wheel) ---
+        // 1. multicast 折算为伤害（每层 +damage * 0.5），随后清零
+        // 2. 设置 _greedyWheelReFireChance = 0.75，由 burstQueue 末端的逻辑读取
+        if (this.ownedRelics && this.ownedRelics.includes('greedy_wheel') && !finalRecipe._isGreedyReFire) {
+            const layers = finalRecipe.multicast || 0;
+            if (layers > 0) {
+                const baseDmg = finalRecipe.damage || 1;
+                finalRecipe.damage = Math.ceil(baseDmg + baseDmg * 0.5 * layers);
+                finalRecipe.multicast = 0;
+            }
+            finalRecipe._greedyWheelReFire = true;
+        }
+
+        // --- [遗物 Hook] 混沌契约 (chaos_pact) ---
+        // 永久子弹伤害 ×2（chaosPactDamageMult 由 ui_selectRelic 在拾取时设置）
+        if (this.chaosPactDamageMult && this.chaosPactDamageMult > 1) {
+            finalRecipe.damage = Math.ceil((finalRecipe.damage || 1) * this.chaosPactDamageMult);
+        }
+
         // --- [Task 3.2] 触发UI动画 - 改为 EventBus 事件，由 hud.js 监听 ---
         eventBus.emit(EVENT_TYPES.UI_AMMO_FIRED, {});
         this.ui_renderRecipeHUD();
@@ -2623,6 +2699,15 @@ export const combat_system = {
             for(let i=1; i<=finalRecipe.multicast; i++) {
                 const isLastInBurst = (i === finalRecipe.multicast);
                 this.burstQueue.push({ delay: i * 20, vel: vel, recipe: finalRecipe, shotId: shotId, isLast: isLastInBurst });
+            }
+        }
+
+        // [遗物 Hook] 贪婪轮盘 (greedy_wheel)：每次发射后 75% 概率追加一次相同 recipe 的发射
+        // 通过 burstQueue 直接追加，spawn_spawnBullet 不会再回到 combat_fireNextShot，因此天然不会再次触发本效果
+        if (this.ownedRelics && this.ownedRelics.includes('greedy_wheel') && !finalRecipe._isGreedyReFire) {
+            if (Math.random() < 0.75) {
+                const reFireRecipe = { ...finalRecipe, _isGreedyReFire: true };
+                this.burstQueue.push({ delay: 30, vel: vel, recipe: reFireRecipe, shotId: shotId, isLast: true });
             }
         }
     },
@@ -3102,6 +3187,73 @@ export const combat_system = {
         eventBus.emit(EVENT_TYPES.UI_HIT_PROGRESS, { val, target });
     },
 
+    // ==================== [v2 即时感重塑] 遗物回合开始钩子 ====================
+
+    /**
+     * @method relic_runRoundStartHooks
+     * @description 由 phase_finalizeRound 在 round++ 之后调用。
+     *   - 末日计时器 (doomsday_timer)：对场上随机一个敌人造成 (round × 5) 固定真实伤害
+     *   - 回廊电弧 (corridor_arc)：对紧贴左右墙壁的敌人各 50% 概率触发闪电链
+     *     · 链层数 = 当前回合数
+     *     · 链伤害 = 当前 ammoQueue 前三颗子弹中最大基础伤害
+     */
+    relic_runRoundStartHooks() {
+        if (!this.ownedRelics) return;
+
+        // --- 末日计时器 ---
+        if (this.ownedRelics.includes('doomsday_timer')) {
+            const candidates = (this.enemies || []).filter(e => e && e.active && e.hp > 0);
+            if (candidates.length > 0) {
+                const target = candidates[Math.floor(Math.random() * candidates.length)];
+                const dmg = (this.round || 1) * 5;
+                const result = target.takeDamage(dmg);
+                if (typeof this.spawn_createFloatingText === 'function') {
+                    this.spawn_createFloatingText(target.pos.x, target.pos.y - 24, `末日 ${dmg}`, '#fbbf24');
+                }
+                if (result && result.killed && typeof this.spawn_addScore === 'function') {
+                    this.spawn_addScore(target.maxHp);
+                }
+            }
+        }
+
+        // --- 回廊电弧（回合开始边界电弧） ---
+        if (this.ownedRelics.includes('corridor_arc')) {
+            const wallThreshold = 40; // 紧贴墙壁的像素阈值
+            const ammo = this.ammoQueue || [];
+            // 取前三颗子弹中基础伤害最高的值
+            let maxDmg = 0;
+            for (let i = 0; i < Math.min(3, ammo.length); i++) {
+                if (ammo[i] && (ammo[i].damage || 0) > maxDmg) maxDmg = ammo[i].damage;
+            }
+            if (maxDmg <= 0) maxDmg = (this.round || 1); // 兜底：用回合数作为伤害
+            const stacks = this.round || 1;
+            const w = this.width || 720;
+            for (const e of (this.enemies || [])) {
+                if (!e || !e.active || e.hp <= 0) continue;
+                const nearLeft = e.pos.x <= wallThreshold;
+                const nearRight = e.pos.x >= (w - wallThreshold);
+                if (!nearLeft && !nearRight) continue;
+                if (Math.random() < 0.5) {
+                    // 直接对该敌人造成层数加成的固定伤害；为避免重写完整闪电链，
+                    // 这里以 stacks × maxDmg / 3 作为合理近似的链伤害。
+                    const arcDmg = Math.max(1, Math.floor(stacks * maxDmg * 0.33));
+                    const result = e.takeDamage(arcDmg);
+                    if (typeof this.spawn_createFloatingText === 'function') {
+                        this.spawn_createFloatingText(e.pos.x, e.pos.y - 18, `电弧 ${arcDmg}`, '#a78bfa');
+                    }
+                    for (let i = 0; i < 6; i++) {
+                        if (typeof this.spawn_createParticle === 'function') {
+                            this.spawn_createParticle(e.pos.x, e.pos.y, '#d8b4fe', 'spark');
+                        }
+                    }
+                    if (result && result.killed && typeof this.spawn_addScore === 'function') {
+                        this.spawn_addScore(e.maxHp);
+                    }
+                }
+            }
+        }
+    },
+
     // ==================== 充能符文系统 ====================
 
     /**
@@ -3152,7 +3304,12 @@ export const combat_system = {
             multiplier = 2;
         }
 
-        const chargeAmount = BASE_CHARGE * multiplier;
+        let chargeAmount = BASE_CHARGE * multiplier;
+
+        // [遗物 Hook] 符文共鸣核：每次击杀额外 +8% 充能
+        if (isKill && this.ownedRelics && this.ownedRelics.includes('rune_resonance_core')) {
+            chargeAmount += 0.08;
+        }
 
         // 累加充能值
         this.runeChargeValue = Math.min(1.0, (this.runeChargeValue || 0) + chargeAmount);

@@ -273,3 +273,57 @@
 ---
 
 > **维护提示**：本节列出的所有素材若已接入，**必须**把 §1 表对应行的状态从 🟡/❌ 升到 ✅，并在 §2 表中划掉对应条目，避免双向漂移。
+
+---
+
+## 7. v2 即时感重塑遗物 UI 需求清单（2026-04-29）
+
+> 设计来源：[`docs/relic_system_design.md`](relic_system_design.md) §5。本节列出 13 个新增/修改遗物对应的 UI 与美术资产需求，按 P0/P1/P2 优先级分级。
+>
+> **接入路径**：所有遗物图标统一放至 `assets/icons/relic/<id>.png`，并在 [`src/bitmap_icons.js`](../src/bitmap_icons.js) 的 `RELIC_ICON_MAP` 中注册映射，命中后自动取代 `RELIC_DB[i].icon` 的 emoji fallback。
+
+### 7.1 P0 — 遗物图标位图（必须完成）
+
+| 遗物 ID | 名称 | 占位 emoji | 图标尺寸 | 视觉建议 |
+|---|---|---|---|---|
+| `hunter_instinct` | 猎人本能 | 🎯 | 64×64 | 红色十字准星叠加血滴；冷色金属外框 |
+| `rune_resonance_core` | 符文共鸣核 | 💠 | 64×64 | 紫色结晶核心 + 共鸣波纹环（与 `relic_aura_<tier>.png` 协调） |
+| `mirror_magazine` | 镜像弹夹 | 🪞 | 64×64 | 双子弹折射镜面，左右对称构图 |
+| `doomsday_timer` | 末日计时器 | ⏱️ | 64×64 | 黑金沙漏 + 红色秒针；刻度盘隐约可见骷髅 |
+| `echo_reverberation` | 余韵回响 | 🔔 | 64×64 | 钟形 + 多重声波同心圆，淡金色 |
+| `element_injector` | 元素注入器 | 💉 | 64×64 | 玻璃试管中三色液体（火/冰/雷）旋绕，**epic 紫边** |
+| `chaos_burst` | 混沌爆发 | 💥 | 64×64 | 紫色裂纹球 + 边缘湍流，**cursed 红黑边** |
+| `attribute_protocol` | 属性协议 | 🧬 | 64×64 | DNA 双螺旋，每节点带不同元素颜色 |
+| `mortal_burst` | 殒命爆裂 | 🎆 | 64×64 | 橙色辐射状爆破图案，中心骷髅剪影 |
+| `corridor_arc` | 回廊电弧 | ⚡ | 64×64 | 紫色雷电从左右两侧向中心汇聚，**epic 紫边** |
+| `chaos_pact` | 混沌契约 | 🩸 | 64×64 | 血色羊皮纸卷轴 + 红色封蜡，**cursed 红黑边** |
+| `greedy_wheel` | 贪婪轮盘 | 🎲 | 64×64 | 金色赌轮 + 暗黑齿轮镂空，**cursed 红黑边** |
+
+### 7.2 P1 — 战斗内即时反馈（提升打击感）
+
+这些资产用于让 v2 遗物的"即时生效"在战斗画面中可见，玩家能直接感知"刚拿到=立刻强"。
+
+| 资产 | 用途 | 建议尺寸 | 接入位置 |
+|---|---|---|---|
+| `assets/ui/sprites/hunter_target_marker.png` | 猎人本能：场上 hp 最低敌人头顶的"狩猎目标"红色十字标记 | 32×32（透明 PNG） | `render_system.js` 敌人渲染层；逐帧由 `combat_damageEnemy` 中查到的 lowestHpEnemy 决定 |
+| `assets/ui/sprites/doomsday_target_pulse.png` | 末日计时器：被命中的敌人头顶 1.0s 红色脉冲圈 | 96×96 | `relic_runRoundStartHooks` 触发后通过粒子系统播放 |
+| `assets/ui/sprites/chaos_burst_shockwave.png` | 混沌爆发：全屏冲击波贴图（紫色环） | 720×720 | `sys_dropFieldLoot` 触发时全屏 0.4s 闪烁 |
+| `assets/ui/sprites/corridor_arc_chain.png` | 回廊电弧：左右墙到敌人的电弧贴图（4 帧动画） | 64×128 | `relic_runRoundStartHooks` 触发时绘制 |
+| `assets/ui/sprites/mortal_burst_aoe.png` | 殒命爆裂：击杀位置的橙色 AOE 圈（一次性扩散） | 128×128 | killed 块内调用 |
+| `assets/ui/sprites/wall_lightning_charge.png` | 力場護盾 / 回廊电弧：墙撞瞬间火花 | 64×64 | `_applyMove` 内 `handleRelicWallHit` 触发 |
+| `assets/ui/sprites/echo_reverb_ring.png` | 余韵回响：编译时单属性 ≥10 层的环形提示（3 帧扩散） | 96×96 | 在 `phase_finalizeRound` 编译完成后由 hud 层短暂显示 |
+
+### 7.3 P2 — 提示与教程
+
+| 资产 | 用途 | 备注 |
+|---|---|---|
+| `index.html` 内新增遗物的 `recommendTip` 文案 | 已写入 `RELIC_DB`，仅前 3 次遗物选择显示 | 已完成（hunter_instinct / rune_resonance_core / doomsday_timer / attribute_protocol / mortal_burst） |
+| 真理之书新条目（13 个 v2 遗物） | 图鉴覆盖；自动从 `RELIC_DB` 读取 | 需检查 `truth-book` 是否自动同步 |
+| `assets/ui/banners/relic_v2_intro_banner.png` | v2 遗物首次出现时的引导横幅（可选） | 600×200，与 `round_banner_*.png` 同风格 |
+
+### 7.4 已知 UI 联动改造点
+
+1. **稀有度光环**：`mirror_magazine`、`element_injector`、`corridor_arc` 三档稀有度（rare / epic / epic）需要确保 `relic_aura_<tier>.png` 已正确按 rarity 字段分配。
+2. **诅咒系遗物边框**：`chaos_burst` / `chaos_pact` / `greedy_wheel` 的 `rarity: 'cursed'` 需要走 `relic_aura_cursed.png`；如果当前 RELIC_AURA 仅有 C/B/A/S 四档，需补充 cursed 配色（建议黑红血纹）。
+3. **存档兼容**：`chaosPactDamageMult` 已加入 `sys_saveRunState` / `sys_loadRunState`；旧存档读档时默认为 `1`，无破坏性。
+4. **图标 emoji fallback**：所有 v2 遗物的 emoji 均已在 `RELIC_DB` 内定义，位图缺失时不会阻塞 UI。

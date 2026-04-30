@@ -91,7 +91,29 @@ export const game_phase = {
                 shots: this.shotDamageHistory.map(s => ({ total: s.total, byAttr: { ...s.byAttr } }))
             });
         }
-        
+
+        // --- [遗物 Hook] 混沌契约 (chaos_pact)：跳过研磨阶段，直接进入战斗 ---
+        // 规则：契约持有者无法进行研磨；ammoQueue 复用上一回合的子弹快照，没有则用默认基础子弹兜底。
+        if (this.ownedRelics && this.ownedRelics.includes('chaos_pact')) {
+            const baseDmg = (CONFIG && CONFIG.gameplay && CONFIG.gameplay.baseDamage) || 1;
+            const defaultRecipe = () => ({
+                damage: baseDmg, bounce: 0, pierce: 0, scatter: 0, explosive: false,
+                isMatryoshka: false, isLaser: false, nestedPayload: null, chainPayload: null,
+                multicast: 0, flying_sword: 0, cryo: 0, pyro: 0, lightning: 0, laser: 0,
+                wind: 0, level: 1, type: 'normal'
+            });
+            const snapshot = this._lastFiredAmmoSnapshot;
+            if (snapshot && snapshot.length > 0) {
+                this.ammoQueue = snapshot.map(r => ({ ...r }));
+            } else {
+                this.ammoQueue = [defaultRecipe(), defaultRecipe(), defaultRecipe()];
+            }
+            if (typeof showToast === 'function') showToast('混沌契约：跳过研磨，直接进入战斗！');
+            if (typeof this.phase_startCombatPhase === 'function') this.phase_startCombatPhase();
+            else this.phase_switchPhase('combat');
+            return;
+        }
+
         this.phase_switchPhase('gathering');
         requestAnimationFrame(() => {
             this.ui_updateUICache();
@@ -1329,6 +1351,12 @@ phase_gathering_getRandomPegType() {
         this.roundDamage = 0;
         eventBus.emit(EVENT_TYPES.UI_ROUND_NUM_UPDATE, { round: this.round });
         document.getElementById("round-num").innerText = this.round;
+
+        // --- [遗物 Hook] 末日计时器 (doomsday_timer) & 回廊电弧 (corridor_arc) 回合开始触发 ---
+        // 在 round++ 之后立即结算，使用新回合数作为伤害基数。
+        if (typeof this.relic_runRoundStartHooks === 'function') {
+            this.relic_runRoundStartHooks();
+        }
         // [DropV2] 紧急救援冷却计数器逐回合递减
         if (this.emergencyCooldown > 0) this.emergencyCooldown--;
         // [tsk-f35c6d10] 移除旧的小 Toast 回合提示，改由 sys_showRoundStartBanner 提供更醒目的大字居中提示

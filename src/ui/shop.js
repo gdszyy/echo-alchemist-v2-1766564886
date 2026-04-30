@@ -19,6 +19,37 @@ import { showToast } from '../entities.js';
 import { eventBus } from '../event_bus.js';
 import { getRelicIconSrc } from '../bitmap_icons.js'; // [Phase 5A Task 5.A7] 位图遗物图标
 
+// ==================== [v2 即时感重塑] 子弹评分与属性操作辅助函数 ====================
+// 这些工具函数被 mirror_magazine / element_injector 调用以判定"最强/最弱"子弹与属性翻倍。
+// 评分采用：基础伤害 + 各属性层数加权 + multicast 加成的简单线性叠加，足以稳定排序。
+
+const _ATTR_KEYS = ['cryo', 'pyro', 'lightning', 'laser', 'wind', 'bounce', 'pierce', 'scatter', 'flying_sword'];
+
+function _scoreRecipeStrength(r) {
+    if (!r) return -Infinity;
+    let s = (r.damage || 0);
+    for (const k of _ATTR_KEYS) s += (r[k] || 0);
+    s += (r.multicast || 0) * 2;
+    if (r.explosive) s += 3;
+    if (r.isLaser) s += 2;
+    return s;
+}
+
+function _doubleRecipeAttrs(r) {
+    if (!r) return;
+    for (const k of _ATTR_KEYS) {
+        if (typeof r[k] === 'number' && r[k] > 0) r[k] *= 2;
+    }
+}
+
+// 工具函数：统计 recipe 中实际持有的"属性种类数"（attribute_protocol 使用）
+export function recipe_countAttributeKinds(r) {
+    if (!r) return 0;
+    let n = 0;
+    for (const k of _ATTR_KEYS) if (r[k] && r[k] > 0) n++;
+    return n;
+}
+
 /**
  * 商店渲染方法集合
  * 通过 bind(this) 组合模式作为实例方法注入到 Game 实例
@@ -308,7 +339,7 @@ export const shop_system = {
             const boost = relic.boost || 10;
             if (!this.unlockedWeights) this.unlockedWeights = {};
             if (!this.guaranteedNextRound) this.guaranteedNextRound = [];
-            
+
             keys.forEach(key => {
                 const current = this.unlockedWeights[key] || 0;
                 this.unlockedWeights[key] = current === 0 ? boost : current + Math.floor(boost * 1.5);
@@ -320,6 +351,62 @@ export const shop_system = {
                 this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
             }
         }
+
+        // ==================== [v2 即时感重塑] 新遗物即时效果分支 ====================
+        // 大部分被动遗物（猎人本能/符文共鸣核/末日计时器/余韵回响/混沌爆发/属性协议/殒命爆裂/回廊电弧/贪婪轮盘）
+        // 只需要 ownedRelics 标记，运行时由 combat_system / projectile / round_start 钩子读取。
+        // 这里仅处理需要"立即修改局内状态"的几个：mirror_magazine / element_injector / chaos_pact。
+        if (relic.effect === 'mirror_magazine') {
+            // 立即将 ammoQueue 中"最强"那颗子弹（按 _scoreRecipeStrength 评分）复制一份加入末尾
+            const queue = this.ammoQueue || [];
+            if (queue.length > 0) {
+                let bestIdx = 0;
+                let bestScore = -Infinity;
+                for (let i = 0; i < queue.length; i++) {
+                    const s = _scoreRecipeStrength(queue[i]);
+                    if (s > bestScore) { bestScore = s; bestIdx = i; }
+                }
+                const cloned = JSON.parse(JSON.stringify(queue[bestIdx]));
+                queue.push(cloned);
+                if (window.showToast) showToast(`镜像弹夹：复制了一颗强力子弹！`);
+            } else {
+                if (window.showToast) showToast(`镜像弹夹：当前无弹药可复制，下回合自动失效。`);
+            }
+        } else if (relic.effect === 'element_injector') {
+            // 删除 ammoQueue 中最强和最弱的子弹，剩下那颗的所有属性层数翻倍
+            const queue = this.ammoQueue || [];
+            if (queue.length >= 3) {
+                const scored = queue.map((r, i) => ({ i, score: _scoreRecipeStrength(r) }));
+                scored.sort((a, b) => a.score - b.score);
+                const minIdx = scored[0].i;
+                const maxIdx = scored[scored.length - 1].i;
+                const removeSet = new Set([minIdx, maxIdx]);
+                const remaining = [];
+                for (let i = 0; i < queue.length; i++) {
+                    if (!removeSet.has(i)) remaining.push(queue[i]);
+                }
+                remaining.forEach(_doubleRecipeAttrs);
+                this.ammoQueue = remaining;
+                if (window.showToast) showToast(`元素注入器：剩余子弹属性层数翻倍！`);
+            } else if (queue.length === 2) {
+                // 边界：仅 2 颗，删除最弱，保留最强并翻倍
+                const s0 = _scoreRecipeStrength(queue[0]);
+                const s1 = _scoreRecipeStrength(queue[1]);
+                const survivor = s0 >= s1 ? queue[0] : queue[1];
+                _doubleRecipeAttrs(survivor);
+                this.ammoQueue = [survivor];
+                if (window.showToast) showToast(`元素注入器：仅 2 颗子弹，强者属性翻倍！`);
+            } else if (queue.length === 1) {
+                _doubleRecipeAttrs(queue[0]);
+                if (window.showToast) showToast(`元素注入器：唯一子弹属性翻倍！`);
+            }
+        } else if (relic.effect === 'chaos_pact') {
+            // 立即获得 3 个随机稀有符文 + 设置永久伤害倍率
+            this._grantRunesByRarity('rare', 3);
+            this.chaosPactDamageMult = (this.chaosPactDamageMult || 1) * 2.0;
+            if (window.showToast) showToast(`混沌契约已签订！子弹伤害 ×2，但研磨阶段被禁用。`);
+        }
+        // ============================================================================
 
         this.ui_closeRelicSelection();
     },

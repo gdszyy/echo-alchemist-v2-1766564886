@@ -42,3 +42,78 @@
 2. **Phase 5**: 修改 `src/config.js` 标记强力遗物；修改 `src/core.js` 添加计数器；修改 `src/ui/shop.js` 实现推荐逻辑和 UI 渲染。
 3. **Phase 6**: 修改 `index.html` 添加标签、Tip 和稀有遗物的动画样式。
 4. **Phase 7**: 提交代码并更新规范文档。
+
+---
+
+## 5. v2 即时感重塑（2026-04-29）
+
+### 5.1 背景与问题
+
+旧版大量遗物机制都是在选中后通过 `sys_queueRoundStartReward({ type: 'chaos_essence' })` "立刻触发一次混沌精华"，依赖钉板的固定流程把"获得=立刻强"的反馈具象化。当钉板从「每回合固定流程」改为「掉落物触发」后：
+
+- 钉板触发时机和频率不可预测，遗物的副作用反馈变得"不及时"。
+- 玩家选完遗物后的体感弱化为"等下一次掉落才生效"。
+- 大部分钉板遗物（维度碎片、空间凿子、涌潮系列、阵形系列）都受影响。
+
+### 5.2 v2 新增/修改遗物清单
+
+> 数据源：`src/config.js` `RELIC_DB` 末尾的「即时战斗强化遗物（v2 即时感重塑）」分组。
+
+| ID | 名称 | 稀有度 | 类型 | 关键钩子位置 |
+|---|---|---|---|---|
+| `hunter_instinct` | 猎人本能 | rare | 战斗被动 | `combat_system.js` `combat_damageEnemy`：在 `enemy.takeDamage` 之前对场上 hp 最低敌人 ×1.25 |
+| `rune_resonance_core` | 符文共鸣核 | rare | 击杀奖励 | `combat_system.js` `combat_runeCharge_onHit`：击杀 +0.08 充能 |
+| `mirror_magazine` | 镜像弹夹 | rare | 一次性 | `ui/shop.js` `ui_selectRelic`：复制 `ammoQueue` 中评分最高的子弹至队尾 |
+| `doomsday_timer` | 末日计时器 | rare | 回合开始 | `game_phase.js` `phase_finalizeRound`（round++ 之后）→ `combat_system.js` `relic_runRoundStartHooks` |
+| `echo_reverberation` | 余韵回响 | rare | 钉板编译 | `calc_utils.js` `calc_compileCollectionToRecipe`：单属性 ≥10 层时 +1 |
+| `element_injector` | 元素注入器 | epic | 一次性 | `ui/shop.js` `ui_selectRelic`：删除 `ammoQueue` 最强/最弱，幸存者属性翻倍 |
+| `chaos_burst` | 混沌爆发 | cursed | 掉落联动 | `game_system.js` `sys_dropFieldLoot`：混沌精华掉落时全场固定真实伤害 round×2 |
+| `attribute_protocol` | 属性协议 | rare | 发射时 | `combat_system.js` `combat_fireNextShot`：4 种以上属性时按子弹自身属性数 +damage |
+| `mortal_burst` | 殒命爆裂 | rare | 击杀联动 | `combat_system.js` killed 块：max(2, maxHp×10%) AOE 真实伤害 |
+| `corridor_arc` | 回廊电弧 | epic | 墙撞 + 回合开始 | `entities/projectile.js` `_applyMove`（左右墙壁 +1 闪电层）+ `relic_runRoundStartHooks`（紧贴墙壁 50% 触发电弧） |
+| `chaos_pact` | 混沌契约 | cursed | 永久 + 流程 | `ui/shop.js`（拾取时给 3 稀有符文 + 设置 `chaosPactDamageMult=2`）+ `game_phase.js` `phase_startGatheringPhase`（直接跳过研磨）+ `combat_fireNextShot`（伤害倍率应用） |
+| `greedy_wheel` | 贪婪轮盘 | cursed | 发射时 | `combat_system.js` `combat_fireNextShot`：multicast 折算为 +damage×0.5/层；末尾按 75% 概率向 `burstQueue` 追加一次重发射 |
+| `energy_shield`（修改） | 力場護盾 | cursed | 墙壁联动 | `entities/projectile.js` `_applyMove`：所有墙体（左/右/顶/底）都消耗 1 次反弹或穿透 |
+
+### 5.3 状态字段
+
+新增的 game 实例字段（`sys_resetGame` / `sys_saveRunState` / `sys_loadRunState` 三处都已对齐）：
+
+| 字段 | 默认值 | 说明 |
+|---|---|---|
+| `chaosPactDamageMult` | `1` | 混沌契约的永久伤害倍率，发射时应用到 `finalRecipe.damage` |
+| 子弹 recipe `_isGreedyReFire` | `false` | 贪婪轮盘 75% 重发射时标记，避免在 `combat_fireNextShot` 内重复折算 multicast |
+| 子弹 recipe `_attributeProtocolBonus` | `undefined` | 调试用，记录属性协议本次发射叠加的伤害值 |
+| 敌人 `_mortalBurstTriggered` | `false` | 殒命爆裂连锁防递归 |
+
+### 5.4 评分算法（_scoreRecipeStrength）
+
+镜像弹夹 / 元素注入器使用同一评分公式：
+
+```
+score(r) = r.damage
+        + (r.cryo + r.pyro + r.lightning + r.laser + r.wind + r.bounce + r.pierce + r.scatter + r.flying_sword)
+        + r.multicast × 2
+        + (r.explosive ? 3 : 0)
+        + (r.isLaser ? 2 : 0)
+```
+
+定义在 `src/ui/shop.js` 文件顶部。`recipe_countAttributeKinds` 同文件导出，供属性协议跨模块复用。
+
+### 5.5 边界情况记录
+
+- **元素注入器**：ammoQueue 长度为 2 时仅删除最弱、保留最强并翻倍；长度为 1 时直接对其翻倍。
+- **混沌契约**：第一回合 `_lastFiredAmmoSnapshot` 不存在，自动用 `CONFIG.gameplay.baseDamage` 兜底生成 3 颗基础子弹。
+- **回廊电弧**：`ammoQueue` 为空时使用回合数兜底；闪电链伤害近似为 `stacks × maxDmg × 0.33`，避免重写完整闪电链算法。
+- **力場護盾诅咒**：bounce/pierce 都耗尽后，墙壁碰撞直接销毁子弹。这意味着无 bounce/pierce 子弹现在贴墙就消失（设计预期内的诅咒代价）。
+- **殒命爆裂**：通过 `enemy._mortalBurstTriggered` 防止 AOE 互相触发的链反应循环。AOE 范围取 `max(60, enemy.width × 2)`。
+- **混沌爆发**：仅在 `queuedReward.type === 'chaos_essence'` 时触发，`pure_essence` / `relic` 不触发。
+
+### 5.6 设计目标对照
+
+| 旧问题 | v2 解决方式 |
+|---|---|
+| 选完遗物要等钉板触发才有反馈 | mirror_magazine / element_injector / chaos_pact 在 `ui_selectRelic` 内立即修改 `ammoQueue` 或 `chaosPactDamageMult`，下次发射就能看到变化 |
+| 遗物效果跟回合频率脱钩 | doomsday_timer / corridor_arc 直接挂在 `phase_finalizeRound` 的 round++ 钩子，**强制每回合开始有反馈** |
+| 击杀效率与遗物无关 | hunter_instinct / rune_resonance_core / mortal_burst 都直接走击杀通路，杀得越快越爽 |
+| 钉板触发的副作用价值不可控 | chaos_burst 把"掉落混沌精华"本身变成全屏伤害事件，与新的掉落驱动正向耦合 |

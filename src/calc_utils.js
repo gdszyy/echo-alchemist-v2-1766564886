@@ -327,6 +327,17 @@ export const calc_utils = {
         if (recipe.laser > 0) {
             recipe.isLaser = true;
         }
+
+        // --- [遗物 Hook] 余韵回响 (echo_reverberation) ---
+        // 触发钉板时，单一属性收集到 10 层及以上，自动额外再 +1 层（每属性每次只触发一次）
+        if (this.ownedRelics && this.ownedRelics.includes('echo_reverberation')) {
+            const echoKeys = ['cryo', 'pyro', 'lightning', 'laser', 'wind', 'damage'];
+            for (const k of echoKeys) {
+                if ((recipe[k] || 0) >= 10) {
+                    recipe[k] = (recipe[k] || 0) + 1;
+                }
+            }
+        }
         return recipe;
     },
 };
