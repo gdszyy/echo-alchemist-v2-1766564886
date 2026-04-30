@@ -256,7 +256,7 @@ export const game_system = {
 
             // 2. 解锁所有弹珠类型（向 unlockedWeights 注入全部权重）
             const allMarbleTypes = ['explosive', 'rainbow', 'resonance', 'matryoshka',
-                                    'laser', 'bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro'];
+                                    'laser', 'bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'echo', 'venom'];
             allMarbleTypes.forEach(type => {
                 if (!this.unlockedWeights[type] || this.unlockedWeights[type] === 0) {
                     this.unlockedWeights[type] = 10;

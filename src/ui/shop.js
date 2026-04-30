@@ -313,7 +313,30 @@ export const shop_system = {
             if (typeof this.sys_queueRoundStartReward === 'function') {
                 this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
             }
+        } else if (relic.effect === 'unlock_marble') {
+            const mt = relic.marbleType;
+            const boost = relic.boost || 10;
+            // 1. 解锁属性弹珠
+            if (!this.unlockedWeights) this.unlockedWeights = {};
+            const current = this.unlockedWeights[mt] || 0;
+            this.unlockedWeights[mt] = current === 0 ? boost : current + Math.floor(boost * 1.5);
+            // 2. 保证下次命运抉择带有 2 颗该属性弹珠
+            if (!this.guaranteedNextRound) this.guaranteedNextRound = [];
+            this.guaranteedNextRound.push(mt);
+            this.guaranteedNextRound.push(mt);
+            // 3. 永久翻倍同化概率
+            if (!this.assimilationBoostRounds) this.assimilationBoostRounds = {};
+            if (!this.doubleAssimilationBoostRounds) this.doubleAssimilationBoostRounds = {};
+            this.assimilationBoostRounds[mt] = Infinity;
+            this.doubleAssimilationBoostRounds[mt] = Infinity;
+            // 4. 提示 + 触发混沌精华
+            const display = CONFIG.ui?.attributeDisplay?.[mt]?.name || mt;
+            if (window.showToast) showToast(`已解鎖 [${display}彈珠]！下次命運抉擇保證含 2 顆${display}彈珠，同化概率永久翻倍。`);
+            if (typeof this.sys_queueRoundStartReward === 'function') {
+                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
+            }
         } else if (relic.effect === 'assimilation_surge') {
+            // [兼容旧存档] 保留旧效果处理
             const mt = relic.marbleType;
             if (!this.guaranteedNextRound) this.guaranteedNextRound = [];
             this.guaranteedNextRound.push(mt);
@@ -324,7 +347,6 @@ export const shop_system = {
             this.doubleAssimilationBoostRounds[mt] = 2;
             const display = CONFIG.ui?.attributeDisplay?.[mt]?.name || mt;
             if (window.showToast) showToast(`${relic.name}已啟動！${display} 同化率 x${CONFIG.gameplay.assimilationDoubleMultiplier || 2}（持續 2 回合）。`);
-            // [钉盘遗物] 立刻触发一次混沌精华
             if (typeof this.sys_queueRoundStartReward === 'function') {
                 this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
             }

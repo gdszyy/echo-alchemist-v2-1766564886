@@ -890,7 +890,9 @@ export const spawn_system = {
             scatter: () => new MarbleDefinition('scatter'),
             damage: () => new MarbleDefinition('damage'),
             cryo: () => new MarbleDefinition('cryo'),
-            pyro: () => new MarbleDefinition('pyro')
+            pyro: () => new MarbleDefinition('pyro'),
+            echo: () => new MarbleDefinition('echo'),
+            venom: () => new MarbleDefinition('venom'),
         };
 
         // [爽游模式] 新手教程局：只展示爆炸/激光/彩虹/回响弹珠

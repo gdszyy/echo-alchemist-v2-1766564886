@@ -321,6 +321,10 @@ export const calc_utils = {
                 recipe.wind = (recipe.wind || 0) + itemLevel;
                 recipe.level = Math.max(recipe.level, itemLevel); // [迁移] 记录最高等级
             }
+
+            // [新增] 处理回响/剧毒属性
+            if (itemType === 'echo') recipe.echo = (recipe.echo || 0) + itemLevel;
+            if (itemType === 'venom') recipe.venom = (recipe.venom || 0) + itemLevel;
             
             // [已移除] 彩虹属性不再同步增加元素层数，仅保留分裂机制逻辑
         });
