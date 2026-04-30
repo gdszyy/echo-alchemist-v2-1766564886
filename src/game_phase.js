@@ -908,7 +908,9 @@ phase_gathering_getRandomPegType() {
         const _cryoRes = this.activeElementResonances && this.activeElementResonances['cryo'];
         const _cryoResParams = _cryoRes ? _cryoRes.params : null;
         // 一阶: -60, 二阶: -40, 三阶: -20（默认: -100 必冻 / -50~-100 概率冻）
-        const _freezeHardThreshold = _cryoResParams ? (_cryoResParams.freezeTempThreshold || -100) : -100;
+        // 冻结后 _freezeThresholdMult 翻倍，行动后重置，使连续冰冻变难
+        const _freezeThresholdMult = e._freezeThresholdMult || 1;
+        const _freezeHardThreshold = (_cryoResParams ? (_cryoResParams.freezeTempThreshold || -100) : -100) * _freezeThresholdMult;
         const _freezeSoftThreshold = _freezeHardThreshold + 50; // 概率触发起始点（比必冻阈值高50度）
         const _processTempOnce = () => {
             if (e.temp < 0) {
@@ -922,6 +924,7 @@ phase_gathering_getRandomPegType() {
                 if (shouldFreeze) {
                     e.isFrozenCurrentTurn = true;
                     e.frozenCount = (e.frozenCount || 0) + 1;
+                    e._freezeThresholdMult = (e._freezeThresholdMult || 1) * 2; // 下回合冻结温度要求翻倍
                     this.spawn_createExplosion(e.pos.x, e.pos.y, '#06b6d4');
                     audio.playEffect('freeze');
                 } else {
@@ -999,6 +1002,7 @@ phase_gathering_getRandomPegType() {
             if (e.type === 'boss' && e.bossType === 'ouroboros' && typeof e._performOuroborosRotation === 'function') {
                 e._performOuroborosRotation(this);
             }
+            e._freezeThresholdMult = 1; // 行动后重置冻结温度要求
             e.startTurnAction(this);
         }
     },

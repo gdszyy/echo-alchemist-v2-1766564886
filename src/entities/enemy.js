@@ -75,8 +75,9 @@ class Enemy {
         this.justSpawned = true; 
         this.temp = 0; 
         this.bumpOffsetY = 0; 
-        this.isFrozenCurrentTurn = false; 
+        this.isFrozenCurrentTurn = false;
         this.frozenCount = 0; // [温度衰减] 该敌人累计被冰冻的次数，每次被冰冻后温度降低效果乘以 0.9^frozenCount
+        this._freezeThresholdMult = 1; // 冻结后下回合冰冻温度要求翻倍；行动后重置为1
 
         // [新属性] 毒素层数（venom stacks）：每次行动结算 DoT
         this.venomStacks = 0;
