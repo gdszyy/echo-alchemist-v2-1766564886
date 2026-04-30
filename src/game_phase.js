@@ -1831,7 +1831,7 @@ phase_gathering_getRandomPegType() {
             // ------------------------------------
 
             // C. 绘制游戏实体
-            let activeEnemies = 0; 
+            let activeEnemies = 0;
             let anyEnemyMoving = false;
             this.enemies.forEach(e => {
                 if (e.active) {
@@ -1846,6 +1846,76 @@ phase_gathering_getRandomPegType() {
                     if (Math.abs(e.pos.y - e.dropTargetY) > 1) anyEnemyMoving = true;
                 }
             });
+
+            // [猎人本能] 绘制持续标记特效：找到血量最低的活跃敌人并渲染动态瞄准十字准星
+            if (this.ownedRelics && this.ownedRelics.includes('hunter_instinct')) {
+                let hunterTarget = null;
+                let lowestHp = Infinity;
+                for (const e of this.enemies) {
+                    if (e && e.active && e.hp > 0 && e.pos.y > 0) {
+                        if (e.hp < lowestHp) { lowestHp = e.hp; hunterTarget = e; }
+                    }
+                }
+                if (hunterTarget) {
+                    const tx = hunterTarget.pos.x;
+                    const ty = hunterTarget.pos.y;
+                    const ew = (hunterTarget.width || 40) * 0.5;
+                    const eh = (hunterTarget.height || 40) * 0.5;
+                    // 动画参数：基于时间的脉动/旋转
+                    const now = Date.now();
+                    const pulse = (Math.sin(now / 200) + 1) / 2;       // 0→1 脉动
+                    const spin = (now / 800) % (Math.PI * 2);           // 慢速旋转
+                    const innerR = (ew + 4) + pulse * 4;                // 动态内径
+                    const outerR = innerR + 10 + pulse * 3;
+                    const alpha = 0.65 + pulse * 0.35;
+
+                    this.ctx.save();
+                    this.ctx.translate(tx, ty);
+                    this.ctx.rotate(spin);
+                    this.ctx.globalCompositeOperation = 'lighter';
+
+                    // 外圈 — 橙红渐变光环
+                    const grad = this.ctx.createRadialGradient(0, 0, innerR * 0.7, 0, 0, outerR);
+                    grad.addColorStop(0, `rgba(239,68,68,0)`);
+                    grad.addColorStop(0.5, `rgba(239,68,68,${alpha * 0.4})`);
+                    grad.addColorStop(1, `rgba(239,68,68,0)`);
+                    this.ctx.fillStyle = grad;
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 0, outerR, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    // 主光环边线
+                    this.ctx.strokeStyle = `rgba(239,68,68,${alpha})`;
+                    this.ctx.lineWidth = 2;
+                    this.ctx.shadowColor = '#ef4444';
+                    this.ctx.shadowBlur = _sb(8 + pulse * 6);
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 0, innerR, 0, Math.PI * 2);
+                    this.ctx.stroke();
+
+                    // 四条角缺口准星线（每条 120° 间隔断口，形成 4 段弧）
+                    const segAngles = [0, Math.PI * 0.5, Math.PI, Math.PI * 1.5];
+                    const segSpan = Math.PI * 0.32;
+                    this.ctx.lineWidth = 2.5;
+                    this.ctx.strokeStyle = `rgba(251,113,133,${alpha})`;
+                    for (const sa of segAngles) {
+                        this.ctx.beginPath();
+                        this.ctx.arc(0, 0, innerR + 6, sa - segSpan / 2, sa + segSpan / 2);
+                        this.ctx.stroke();
+                    }
+
+                    // 中心十字（短划线）
+                    const crossLen = 5 + pulse * 2;
+                    this.ctx.lineWidth = 1.5;
+                    this.ctx.strokeStyle = `rgba(239,68,68,${alpha * 0.9})`;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(-crossLen, 0); this.ctx.lineTo(crossLen, 0);
+                    this.ctx.moveTo(0, -crossLen); this.ctx.lineTo(0, crossLen);
+                    this.ctx.stroke();
+
+                    this.ctx.restore();
+                }
+            }
 
             if (this.input_checkDefeat()) {
                 this.gameOver = true;
