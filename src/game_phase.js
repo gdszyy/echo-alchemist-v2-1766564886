@@ -1185,8 +1185,8 @@ phase_gathering_getRandomPegType() {
     phase_finalizeRound() {
         // 1. 统计当前存活敌人数据
         const activeEnemies = this.enemies.filter(e => e.active);
-        // [清屏检测] 记录本回合是否完成了清屏，供下一回合生成逻辑使用
-        const clearedThisRound = activeEnemies.length === 0;
+        // [清屏检测] 仅统计围墙内（pos.y > 0）的敌人：墙外敌人无法被子弹击中，不应计入清场判定
+        const clearedThisRound = !activeEnemies.some(e => e.pos.y > 0);
         // 使用 Set 统计有多少个不同的 Y 坐标（即有多少行）
         // Math.round 处理浮点误差，/50 是行高，确保归类准确
         const uniqueRows = new Set(activeEnemies.map(e => Math.round(e.pos.y / this.enemyHeight)));
