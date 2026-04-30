@@ -1846,6 +1846,447 @@ class RewardDropEffect {
     }
 }
 
+// ==================== 毒素死亡特效 ====================
+/**
+ * VenomDeathExplosion - 因剧毒死亡时的独立死亡特效
+ * 主题：酸绿 / 剧毒，三阶段：毒液膨胀 → 毒孢爆裂 → 酸雾消散
+ * tier: 'normal' | 'elite' | 'boss'
+ */
+// @perf-impact: VenomDeathExplosion - lighter 混合+径向渐变，已通过 tier 档控制粒子数量
+class VenomDeathExplosion {
+    constructor(x, y, tier = 'normal') {
+        this.x = x;
+        this.y = y;
+        this.tier = tier;
+        this.life = 1.0;
+        this.timer = 0;
+
+        const isBoss  = tier === 'boss';
+        const isElite = tier === 'elite';
+        this.decay = isBoss ? 0.008 : isElite ? 0.014 : 0.028;
+
+        // 毒液膨胀气泡
+        this.bubbleR = 0;
+        this.bubbleMax  = isBoss ? 70 : isElite ? 48 : 28;
+        this.bubbleSpeed = isBoss ? 4.5 : isElite ? 3.5 : 2.5;
+        this.burstDone = false;
+
+        // 毒孢粒子（爆裂后飞出）
+        const sporeCount = isBoss ? 18 : isElite ? 10 : 6;
+        this.spores = Array.from({ length: sporeCount }, (_, i) => ({
+            angle: (i / sporeCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.6,
+            speed: (isBoss ? 3.5 : isElite ? 2.8 : 2.0) + Math.random() * 2,
+            dist: 0,
+            size: 2 + Math.random() * (isBoss ? 4 : isElite ? 3 : 2),
+            alpha: 0.9,
+            color: Math.random() < 0.5 ? '#4ade80' : '#84cc16',
+        }));
+
+        // 内缩毒雾环
+        this.mistRings = isBoss
+            ? [{ r: 72, color: '#166534', lw: 3, alpha: 0.8 }, { r: 50, color: '#4ade80', lw: 2, alpha: 0.6 }]
+            : isElite
+            ? [{ r: 50, color: '#166534', lw: 2.5, alpha: 0.75 }]
+            : [{ r: 26, color: '#4ade80', lw: 2, alpha: 0.6 }];
+        this.ringCollapseSpeed = isBoss ? 4 : isElite ? 3.2 : 2.5;
+        this.ringsActive = false;
+    }
+
+    update(timeScale) {
+        this.timer += timeScale;
+        this.life -= this.decay * timeScale;
+
+        // 膨胀阶段
+        if (!this.burstDone) {
+            this.bubbleR += this.bubbleSpeed * timeScale;
+            if (this.bubbleR >= this.bubbleMax) {
+                this.burstDone = true;
+                this.ringsActive = true;
+                // 孢子开始飞散
+            }
+        }
+
+        // 孢子飞散
+        if (this.burstDone) {
+            for (const s of this.spores) {
+                s.dist += s.speed * timeScale;
+                s.alpha = Math.max(0, s.alpha - 0.015 * timeScale);
+            }
+        }
+
+        // 毒雾环内缩
+        if (this.ringsActive) {
+            for (const r of this.mistRings) {
+                r.r -= this.ringCollapseSpeed * timeScale;
+                if (r.r < 0) r.r = 0;
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+        ctx.save();
+        const lifeA = Math.max(0, this.life);
+
+        // ---- 1. 毒液膨胀气泡（爆裂前） ----
+        if (!this.burstDone && this.bubbleR > 0) {
+            const t = this.bubbleR / this.bubbleMax;
+            ctx.globalCompositeOperation = 'lighter';
+            const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.bubbleR);
+            grad.addColorStop(0, `rgba(74,222,128,${0.55 * (1 - t * 0.5) * lifeA})`);
+            grad.addColorStop(0.5, `rgba(34,197,94,${0.35 * lifeA})`);
+            grad.addColorStop(1, 'rgba(22,101,52,0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.bubbleR, 0, Math.PI * 2);
+            ctx.fill();
+            // 气泡边缘发光圈
+            ctx.globalAlpha = (1 - t) * 0.85 * lifeA;
+            ctx.strokeStyle = '#4ade80';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.bubbleR, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1;
+        }
+
+        // ---- 2. 毒孢飞散 ----
+        if (this.burstDone) {
+            ctx.globalCompositeOperation = 'lighter';
+            for (const s of this.spores) {
+                if (s.dist <= 0 || s.alpha <= 0) continue;
+                const sx = this.x + Math.cos(s.angle) * s.dist;
+                const sy = this.y + Math.sin(s.angle) * s.dist;
+                ctx.globalAlpha = s.alpha * lifeA;
+                ctx.fillStyle = s.color;
+                ctx.beginPath();
+                ctx.arc(sx, sy, s.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1;
+        }
+
+        // ---- 3. 毒雾环内缩 ----
+        if (this.ringsActive) {
+            ctx.globalCompositeOperation = 'lighter';
+            for (const ring of this.mistRings) {
+                if (ring.r <= 0) continue;
+                const maxR = this.tier === 'boss' ? 72 : this.tier === 'elite' ? 50 : 26;
+                const progress = 1 - ring.r / maxR;
+                ctx.globalAlpha = ring.alpha * Math.min(1, progress * 2 + 0.3) * lifeA;
+                ctx.strokeStyle = ring.color;
+                ctx.lineWidth = ring.lw;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, ring.r, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1;
+        }
+
+        // ---- 4. 中心酸液光晕（持续整个生命周期） ----
+        if (this.burstDone && lifeA > 0.2) {
+            const pulse = Math.sin(this.timer * 0.3) * 0.15 + 0.35;
+            ctx.globalCompositeOperation = 'lighter';
+            const cGrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, 14);
+            cGrad.addColorStop(0, `rgba(163,230,53,${pulse * lifeA})`);
+            cGrad.addColorStop(1, 'rgba(22,101,52,0)');
+            ctx.fillStyle = cGrad;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 14, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+}
+
+// ==================== 末日时钟特效 ====================
+/**
+ * DoomClockEffect - 末日计时器遗物的回合开始视觉特效
+ * 三阶段：半透明时钟淡入 → 指针旋转一圈 → 钟面炸裂 + 红光闪现
+ * 整体时长约 2.4s (144帧@60fps)
+ */
+// @perf-impact: DoomClockEffect - lighter 混合+shadowBlur（仅爆炸阶段），单实例，已通过 perfQualityLevel 门控 shadowBlur
+class DoomClockEffect {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.life = 1.0;
+        this.timer = 0;
+        this.FADE_IN   = 18;  // 帧
+        this.SPIN      = 90;  // 帧：指针旋转360°
+        this.EXPLODE   = 36;  // 帧：爆炸消散
+        this.TOTAL     = this.FADE_IN + this.SPIN + this.EXPLODE;
+
+        this.clockR = 34;  // 钟面半径
+
+        // 爆炸碎片：模拟钟面碎裂的扇形片段
+        this.shards = Array.from({ length: 12 }, (_, i) => ({
+            angle: (i / 12) * Math.PI * 2,
+            speed: 2.2 + Math.random() * 2.8,
+            dist: 0,
+            rot: (Math.random() - 0.5) * 0.3,
+            size: 6 + Math.random() * 8,
+            alpha: 1.0,
+        }));
+        this.exploding = false;
+    }
+
+    update(timeScale) {
+        this.timer += timeScale;
+        this.life = Math.max(0, 1 - this.timer / this.TOTAL);
+
+        if (!this.exploding && this.timer >= this.FADE_IN + this.SPIN) {
+            this.exploding = true;
+        }
+
+        if (this.exploding) {
+            const ep = (this.timer - this.FADE_IN - this.SPIN) / this.EXPLODE;
+            for (const s of this.shards) {
+                s.dist += s.speed * timeScale;
+                s.angle += s.rot * timeScale;
+                s.alpha = Math.max(0, 1 - ep * 1.4);
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+        ctx.save();
+
+        const t = this.timer;
+        const cx = this.x, cy = this.y;
+        const R = this.clockR;
+
+        if (!this.exploding) {
+            // ------ 淡入阶段 & 旋转阶段 ------
+            const fadeAlpha = Math.min(1, t / this.FADE_IN);
+            // 旋转进度 (0→1 对应 FADE_IN→FADE_IN+SPIN)
+            const spinProgress = Math.max(0, Math.min(1, (t - this.FADE_IN) / this.SPIN));
+            const handAngle = spinProgress * Math.PI * 2 - Math.PI / 2; // 从12点开始转一圈
+
+            ctx.globalAlpha = fadeAlpha * 0.82;
+
+            // 钟面背景（半透明深色）
+            ctx.fillStyle = 'rgba(20,5,5,0.70)';
+            ctx.strokeStyle = '#dc2626';
+            ctx.lineWidth = 2.5;
+            ctx.shadowColor = '#dc2626';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(cx, cy, R, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 12 个刻度线
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(220,38,38,0.75)';
+            ctx.lineWidth = 1.5;
+            for (let i = 0; i < 12; i++) {
+                const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+                const inner = i % 3 === 0 ? R * 0.72 : R * 0.82;
+                ctx.beginPath();
+                ctx.moveTo(cx + Math.cos(a) * inner, cy + Math.sin(a) * inner);
+                ctx.lineTo(cx + Math.cos(a) * (R - 3), cy + Math.sin(a) * (R - 3));
+                ctx.stroke();
+            }
+
+            // 分针（跟随旋转）
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.shadowColor = '#fbbf24';
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(handAngle) * (R * 0.82), cy + Math.sin(handAngle) * (R * 0.82));
+            ctx.stroke();
+
+            // 时针（旋转速度较慢：1/12）
+            const hourAngle = handAngle / 12 - Math.PI / 2;
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 3.5;
+            ctx.shadowColor = '#ef4444';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(hourAngle) * (R * 0.55), cy + Math.sin(hourAngle) * (R * 0.55));
+            ctx.stroke();
+
+            // 中心圆点
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+        } else {
+            // ------ 爆炸阶段 ------
+            const ep = Math.min(1, (t - this.FADE_IN - this.SPIN) / this.EXPLODE);
+
+            // 红色闪光晕（lighter 混合，向外扩散后消退）
+            ctx.globalCompositeOperation = 'lighter';
+            const flashA = Math.max(0, (1 - ep) * 0.7);
+            const flashR = R * (1 + ep * 2.5);
+            const flash = ctx.createRadialGradient(cx, cy, 0, cx, cy, flashR);
+            flash.addColorStop(0,   `rgba(255,80,80,${flashA * 0.9})`);
+            flash.addColorStop(0.35,`rgba(220,38,38,${flashA * 0.55})`);
+            flash.addColorStop(1,   'rgba(80,0,0,0)');
+            ctx.fillStyle = flash;
+            ctx.globalAlpha = 1;
+            ctx.beginPath();
+            ctx.arc(cx, cy, flashR, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 钟面碎片飞散
+            ctx.globalCompositeOperation = 'source-over';
+            for (const s of this.shards) {
+                if (s.alpha <= 0) continue;
+                const sx = cx + Math.cos(s.angle) * s.dist;
+                const sy = cy + Math.sin(s.angle) * s.dist;
+                ctx.globalAlpha = s.alpha;
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.rotate(s.angle + s.dist * 0.05);
+                ctx.fillStyle = ep < 0.3 ? '#fbbf24' : '#dc2626';
+                ctx.fillRect(-s.size / 2, -s.size / 4, s.size, s.size / 2);
+                ctx.restore();
+            }
+
+            // 扩张消退的红色环
+            const ringR = R * (1 + ep * 1.8);
+            const ringA = Math.max(0, 0.9 - ep * 1.2);
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = ringA;
+            ctx.strokeStyle = '#dc2626';
+            ctx.lineWidth = 3 * (1 - ep * 0.7);
+            ctx.shadowColor = '#ef4444';
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+}
+
+// ==================== 回廊电弧特效 ====================
+/**
+ * ElectricWallArcEffect - 回廊电弧遗物回合开始时的电击视觉
+ * 从墙壁到敌人的锯齿闪电 + 墙面短暂电弧闪光
+ * wallSide: 'left' | 'right'
+ */
+// @perf-impact: ElectricWallArcEffect - lighter 混合+shadowBlur（短时单实例），已通过 perfQualityLevel 门控
+class ElectricWallArcEffect {
+    constructor(enemyX, enemyY, wallSide, canvasWidth, canvasHeight) {
+        this.ex = enemyX;
+        this.ey = enemyY;
+        this.wallSide = wallSide;
+        this.wallX = wallSide === 'left' ? 1 : canvasWidth - 1;
+        this.canvasHeight = canvasHeight;
+        this.life = 1.0;
+        this.timer = 0;
+        this.DURATION = 40;  // ~0.67s
+
+        this.mainArc  = this._genArc();  // 主电弧
+        this.branchArc = this._genArc(true); // 分支电弧
+        this.regenTimer = 0;
+    }
+
+    _genArc(branch = false) {
+        const startX = this.wallX;
+        const startY = this.ey + (Math.random() - 0.5) * (branch ? 50 : 20);
+        const endX = this.ex + (branch ? (Math.random() - 0.5) * 20 : 0);
+        const endY = this.ey + (branch ? (Math.random() - 0.5) * 20 : 0);
+        const segments = 8 + Math.floor(Math.random() * 5);
+        const pts = [];
+        for (let i = 0; i <= segments; i++) {
+            const t = i / segments;
+            const jitter = (1 - Math.abs(t - 0.5) * 2) * (branch ? 18 : 25);
+            pts.push({
+                x: startX + (endX - startX) * t + (Math.random() - 0.5) * jitter,
+                y: startY + (endY - startY) * t + (Math.random() - 0.5) * jitter,
+            });
+        }
+        return pts;
+    }
+
+    update(timeScale) {
+        this.timer += timeScale;
+        this.life = Math.max(0, 1 - this.timer / this.DURATION);
+        this.regenTimer += timeScale;
+        if (this.regenTimer >= 3) {
+            this.mainArc  = this._genArc();
+            this.branchArc = this._genArc(true);
+            this.regenTimer = 0;
+        }
+    }
+
+    _drawArc(ctx, pts, color, lw, alpha) {
+        if (pts.length < 2) return;
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lw;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+            ctx.lineTo(pts[i].x, pts[i].y);
+        }
+        ctx.stroke();
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const a = this.life;
+
+        // 主电弧（亮白/蓝紫）
+        this._drawArc(ctx, this.mainArc,  '#e0d7ff', 2.5, a * 0.9);
+        this._drawArc(ctx, this.mainArc,  '#a78bfa', 5,   a * 0.4);
+        // 分支电弧（更细、更透明）
+        this._drawArc(ctx, this.branchArc,'#c4b5fd', 1.5, a * 0.6);
+
+        // 墙面命中点的短闪光
+        const hitX = this.wallX;
+        const hitY = this.mainArc[0] ? this.mainArc[0].y : this.ey;
+        const wallGrad = ctx.createRadialGradient(hitX, hitY, 0, hitX, hitY, 20);
+        wallGrad.addColorStop(0, `rgba(200,180,255,${a * 0.85})`);
+        wallGrad.addColorStop(1, 'rgba(100,50,200,0)');
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = wallGrad;
+        ctx.beginPath();
+        ctx.arc(hitX, hitY, 20, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 敌人命中点的电弧光晕
+        const eGrad = ctx.createRadialGradient(this.ex, this.ey, 0, this.ex, this.ey, 18);
+        eGrad.addColorStop(0, `rgba(167,139,250,${a * 0.75})`);
+        eGrad.addColorStop(1, 'rgba(109,40,217,0)');
+        ctx.fillStyle = eGrad;
+        ctx.beginPath();
+        ctx.arc(this.ex, this.ey, 18, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+}
+
 // ==================== 导出 ====================
 export {
     Particle,
@@ -1862,5 +2303,8 @@ export {
     HealWave,
     BladeStormRing,
     SwordScar,
-    RewardDropEffect
+    RewardDropEffect,
+    VenomDeathExplosion,
+    DoomClockEffect,
+    ElectricWallArcEffect
 };

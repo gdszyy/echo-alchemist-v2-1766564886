@@ -2,10 +2,11 @@ import {
     META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB 
 } from './config.js';
 import { 
-    Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
-    SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
+    Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi,
+    SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam,
     Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave,
     IceWave, DeathExplosion, showToast, BladeStormRing, SwordScar, RewardDropEffect,
+    VenomDeathExplosion, DoomClockEffect, ElectricWallArcEffect,
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba, RuneLoot
 } from './entities.js';
 import { loot_calcRuneDrop } from './loot_system.js';
@@ -3245,6 +3246,7 @@ export const combat_system = {
         if (!this.ownedRelics) return;
 
         // --- 末日计时器 ---
+        // 伤害立即结算；视觉特效在回合横幅消失后延迟触发（1800ms 后）
         if (this.ownedRelics.includes('doomsday_timer')) {
             const candidates = (this.enemies || []).filter(e => e && e.active && e.hp > 0);
             if (candidates.length > 0) {
@@ -3254,71 +3256,96 @@ export const combat_system = {
                 const cy = target.pos.y;
                 const result = target.takeDamage(dmg);
 
-                // 末日时钟特效：深红/黑金主题，模拟末日倒计时敲响
-                // 1. 三层扩散冲击波（血红 → 暗金 → 黑紫，错峰营造"钟声震颤"感）
-                if (typeof this.spawn_createShockwave === 'function') {
-                    this.spawn_createShockwave(cx, cy, '#dc2626');
-                    setTimeout(() => { if (this.spawn_createShockwave) this.spawn_createShockwave(cx, cy, '#854d0e'); }, 80);
-                    setTimeout(() => { if (this.spawn_createShockwave) this.spawn_createShockwave(cx, cy, '#4c1d95'); }, 160);
-                }
-                // 2. 向上漂浮的血红 ember 余烬粒子（模拟爆炸灰烬飞散）
-                for (let i = 0; i < 10; i++) {
-                    if (typeof this.spawn_createParticle === 'function') {
-                        const p = this.spawn_createParticle(cx + (Math.random() - 0.5) * 30, cy + (Math.random() - 0.5) * 20, '#dc2626', 'ember');
-                        if (p) { p.vel.x = (Math.random() - 0.5) * 2.5; p.vel.y = -(Math.random() * 3 + 1); }
-                    }
-                }
-                // 3. 黑金 spark 碎片四溅（钟面碎裂感）
-                for (let i = 0; i < 8; i++) {
-                    if (typeof this.spawn_createParticle === 'function') {
-                        this.spawn_createParticle(cx, cy, i % 2 === 0 ? '#fbbf24' : '#1c1917', 'spark');
-                    }
-                }
-                // 4. 浮动文字：骷髅图标 + 伤害数值，暗红色强调末日感
-                if (typeof this.spawn_createFloatingText === 'function') {
-                    this.spawn_createFloatingText(cx, cy - 36, `☠️ 末日 -${dmg}`, '#dc2626');
-                }
-
                 if (result && result.killed && typeof this.spawn_addScore === 'function') {
                     this.spawn_addScore(target.maxHp);
                 }
+
+                // 延迟触发：回合横幅消失后（约1.5s）再播放视觉特效
+                setTimeout(() => {
+                    if (!this.enemies) return; // 游戏可能已结束
+                    if (!this.deathExplosions) this.deathExplosions = [];
+
+                    // 末日时钟动画：半透明时钟在目标位置旋转一圈后炸裂
+                    this.deathExplosions.push(new DoomClockEffect(cx, cy));
+
+                    // 时钟炸裂后（约2.4s）：三层扩散冲击波 + 余烬粒子 + 浮动文字
+                    const clockExplodeDelay = 1500; // DoomClockEffect 爆炸阶段在 ~1.8s 后
+                    setTimeout(() => {
+                        if (!this.enemies) return;
+                        if (typeof this.spawn_createShockwave === 'function') {
+                            this.spawn_createShockwave(cx, cy, '#dc2626');
+                            setTimeout(() => this.spawn_createShockwave && this.spawn_createShockwave(cx, cy, '#854d0e'), 80);
+                            setTimeout(() => this.spawn_createShockwave && this.spawn_createShockwave(cx, cy, '#4c1d95'), 160);
+                        }
+                        for (let i = 0; i < 10; i++) {
+                            if (typeof this.spawn_createParticle === 'function') {
+                                const p = this.spawn_createParticle(cx + (Math.random() - 0.5) * 30, cy + (Math.random() - 0.5) * 20, '#dc2626', 'ember');
+                                if (p) { p.vel.x = (Math.random() - 0.5) * 2.5; p.vel.y = -(Math.random() * 3 + 1); }
+                            }
+                        }
+                        for (let i = 0; i < 8; i++) {
+                            if (typeof this.spawn_createParticle === 'function') {
+                                this.spawn_createParticle(cx, cy, i % 2 === 0 ? '#fbbf24' : '#1c1917', 'spark');
+                            }
+                        }
+                        if (typeof this.spawn_createFloatingText === 'function') {
+                            this.spawn_createFloatingText(cx, cy - 36, `☠️ 末日 -${dmg}`, '#dc2626');
+                        }
+                    }, clockExplodeDelay);
+                }, 1800);
             }
         }
 
         // --- 回廊电弧（回合开始边界电弧） ---
+        // 伤害立即结算；电弧视觉特效在回合横幅消失后延迟触发（1800ms 后）
         if (this.ownedRelics.includes('corridor_arc')) {
-            const wallThreshold = 40; // 紧贴墙壁的像素阈值
+            const wallThreshold = 40;
             const ammo = this.ammoQueue || [];
-            // 取前三颗子弹中基础伤害最高的值
             let maxDmg = 0;
             for (let i = 0; i < Math.min(3, ammo.length); i++) {
                 if (ammo[i] && (ammo[i].damage || 0) > maxDmg) maxDmg = ammo[i].damage;
             }
-            if (maxDmg <= 0) maxDmg = (this.round || 1); // 兜底：用回合数作为伤害
+            if (maxDmg <= 0) maxDmg = (this.round || 1);
             const stacks = this.round || 1;
             const w = this.width || 720;
+            const h = this.height || 900;
+
+            // 收集所有命中结果，延迟播放视觉
+            const arcHits = [];
             for (const e of (this.enemies || [])) {
                 if (!e || !e.active || e.hp <= 0) continue;
-                const nearLeft = e.pos.x <= wallThreshold;
+                const nearLeft  = e.pos.x <= wallThreshold;
                 const nearRight = e.pos.x >= (w - wallThreshold);
                 if (!nearLeft && !nearRight) continue;
                 if (Math.random() < 0.5) {
-                    // 直接对该敌人造成层数加成的固定伤害；为避免重写完整闪电链，
-                    // 这里以 stacks × maxDmg / 3 作为合理近似的链伤害。
                     const arcDmg = Math.max(1, Math.floor(stacks * maxDmg * 0.33));
                     const result = e.takeDamage(arcDmg);
-                    if (typeof this.spawn_createFloatingText === 'function') {
-                        this.spawn_createFloatingText(e.pos.x, e.pos.y - 18, `电弧 ${arcDmg}`, '#a78bfa');
-                    }
-                    for (let i = 0; i < 6; i++) {
-                        if (typeof this.spawn_createParticle === 'function') {
-                            this.spawn_createParticle(e.pos.x, e.pos.y, '#d8b4fe', 'spark');
-                        }
-                    }
+                    arcHits.push({ ex: e.pos.x, ey: e.pos.y, dmg: arcDmg, side: nearLeft ? 'left' : 'right' });
                     if (result && result.killed && typeof this.spawn_addScore === 'function') {
                         this.spawn_addScore(e.maxHp);
                     }
                 }
+            }
+
+            // 延迟播放电弧视觉特效
+            if (arcHits.length > 0) {
+                setTimeout(() => {
+                    if (!this.enemies) return;
+                    if (!this.electricWallArcs) this.electricWallArcs = [];
+                    for (const hit of arcHits) {
+                        // ElectricWallArcEffect 负责墙面→敌人的闪电视觉
+                        this.electricWallArcs.push(new ElectricWallArcEffect(hit.ex, hit.ey, hit.side, w, h));
+                        if (typeof this.spawn_createFloatingText === 'function') {
+                            this.spawn_createFloatingText(hit.ex, hit.ey - 18, `⚡ ${hit.dmg}`, '#a78bfa');
+                        }
+                        // 命中点 spark 粒子
+                        for (let i = 0; i < 8; i++) {
+                            if (typeof this.spawn_createParticle === 'function') {
+                                this.spawn_createParticle(hit.ex, hit.ey, '#d8b4fe', 'spark');
+                            }
+                        }
+                    }
+                }, 1800);
             }
         }
     },
@@ -3669,6 +3696,28 @@ export const combat_system = {
 
         // --- 3. 分级死亡爆炸特效（在冰冻/燃烧特效之外叠加）---
         if (!this.deathExplosions) this.deathExplosions = [];
+
+        // 剧毒死亡：单独的毒素消散特效，不使用通用 DeathExplosion
+        const hasVenom = (enemy.venomStacks || 0) > 0;
+        if (hasVenom) {
+            this.deathExplosions.push(new VenomDeathExplosion(x, y, tier));
+            const sporeCount = tier === 'boss' ? 10 : tier === 'elite' ? 6 : 4;
+            for (let i = 0; i < sporeCount; i++) {
+                const p = this.spawn_createParticle(
+                    x + (Math.random() - 0.5) * 20,
+                    y + (Math.random() - 0.5) * 20,
+                    'rgba(74,222,128,0.5)', 'mist'
+                );
+                if (p) {
+                    const angle = Math.random() * Math.PI * 2;
+                    p.vel = new Vec2(Math.cos(angle) * 0.5, Math.sin(angle) * 0.5 - 0.4);
+                    p.decay = 0.016;
+                    p.size = 7 + Math.random() * 6;
+                }
+            }
+            this.spawn_createFloatingText(x, y - 24, '☠️VENOM!', '#4ade80');
+            return;
+        }
 
         if (tier === 'boss') {
             // Boss：内爆消散，先膨胀挥扎再塑陷

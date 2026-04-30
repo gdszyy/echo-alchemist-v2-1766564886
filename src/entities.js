@@ -31,11 +31,12 @@ import {
     adjustColorBrightness, lerpColor, lerp, hexToRgba, 
     Vec2, showToast, rotateTowards 
 } from './utils/math_utils.js';
-import { 
-    Particle, SlashEffect, CollectionBeam, Shockwave, LaserBeam, 
+import {
+    Particle, SlashEffect, CollectionBeam, Shockwave, LaserBeam,
     FloatingText, EnergyOrb, LightningBolt, FireWave,
     IceWave, DeathExplosion, HealWave,
-    BladeStormRing, SwordScar, RewardDropEffect
+    BladeStormRing, SwordScar, RewardDropEffect,
+    VenomDeathExplosion, DoomClockEffect, ElectricWallArcEffect
 } from './effects/particles.js';
 import { Enemy, setEnemyAudioProvider } from './entities/enemy.js';
 import { Projectile, setProjectileAudioProvider } from './entities/projectile.js';
@@ -4892,6 +4893,9 @@ export {
     BladeStormRing,
     SwordScar,
     RewardDropEffect,
+    VenomDeathExplosion,
+    DoomClockEffect,
+    ElectricWallArcEffect,
     Player,
     RuneLoot,
     FieldLootItem,

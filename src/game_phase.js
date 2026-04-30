@@ -2,10 +2,11 @@ import {
     META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB 
 } from './config.js';
 import { 
-    Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, TriangleSideWheel, GhostPeg, Peg, DropBall, Enemy, SwordQi, 
-    SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
-    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, showToast, 
-    rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
+    Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, TriangleSideWheel, GhostPeg, Peg, DropBall, Enemy, SwordQi,
+    SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam,
+    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, showToast,
+    rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba,
+    VenomDeathExplosion, ElectricWallArcEffect
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
@@ -914,6 +915,12 @@ phase_gathering_getRandomPegType() {
                     if (this.spawn_createFloatingText) this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, `☠️${dmg}`, '#84cc16');
                     if (this.spawn_createParticle) {
                         for (let i = 0; i < 3; i++) this.spawn_createParticle(e.pos.x, e.pos.y, '#84cc16', 'mist');
+                    }
+                    // 剧毒致死：触发独立的毒素死亡特效
+                    if (r && r.killed) {
+                        if (!this.deathExplosions) this.deathExplosions = [];
+                        this.deathExplosions.push(new VenomDeathExplosion(e.pos.x, e.pos.y, e.type || 'normal'));
+                        if (typeof this.spawn_addScore === 'function') this.spawn_addScore(e.maxHp);
                     }
                 }
             }
@@ -1827,6 +1834,50 @@ phase_gathering_getRandomPegType() {
             // 顶部线 (顶部栏下边界，不遥挡顶部栏)
             this.ctx.moveTo(0, wallTopY); this.ctx.lineTo(this.width, wallTopY);
             this.ctx.stroke();
+
+            // [回廊电弧] 持有 corridor_arc 遗物时：墙面带电视觉（脉冲紫色电弧光晕）
+            // @perf-impact: corridor_arc 电墙光晕 - lighter 混合+线性渐变，已通过 perfQualityLevel 门控 shadowBlur
+            if (this.ownedRelics && this.ownedRelics.includes('corridor_arc')) {
+                const _perfLvl = this.perfQualityLevel || 'high';
+                const _wallTime = (Date.now() / 1000);
+                const _wallPulse = Math.sin(_wallTime * 3.5) * 0.5 + 0.5; // 0~1 脉冲
+                const _wallAlpha = 0.25 + _wallPulse * 0.35;
+                const _wallGlowW = 14;
+
+                this.ctx.globalCompositeOperation = 'lighter';
+
+                // 左墙电弧光晕
+                const _wgL = this.ctx.createLinearGradient(0, 0, _wallGlowW, 0);
+                _wgL.addColorStop(0, `rgba(139,92,246,${_wallAlpha})`);
+                _wgL.addColorStop(0.5, `rgba(167,139,250,${_wallAlpha * 0.5})`);
+                _wgL.addColorStop(1, 'rgba(109,40,217,0)');
+                this.ctx.fillStyle = _wgL;
+                this.ctx.fillRect(0, wallTopY, _wallGlowW, this.height - wallTopY);
+
+                // 右墙电弧光晕
+                const _wgR = this.ctx.createLinearGradient(this.width, 0, this.width - _wallGlowW, 0);
+                _wgR.addColorStop(0, `rgba(139,92,246,${_wallAlpha})`);
+                _wgR.addColorStop(0.5, `rgba(167,139,250,${_wallAlpha * 0.5})`);
+                _wgR.addColorStop(1, 'rgba(109,40,217,0)');
+                this.ctx.fillStyle = _wgR;
+                this.ctx.fillRect(this.width - _wallGlowW, wallTopY, _wallGlowW, this.height - wallTopY);
+
+                // 偶发电弧火花（仅 high/medium 档）
+                if (_perfLvl !== 'low' && Math.random() < 0.08) {
+                    const _sparkSide = Math.random() < 0.5 ? 0 : this.width;
+                    const _sparkY = wallTopY + Math.random() * (this.height - wallTopY);
+                    const _sg = this.ctx.createRadialGradient(_sparkSide, _sparkY, 0, _sparkSide, _sparkY, 12);
+                    _sg.addColorStop(0, `rgba(220,210,255,${0.7 + _wallPulse * 0.3})`);
+                    _sg.addColorStop(1, 'rgba(139,92,246,0)');
+                    this.ctx.fillStyle = _sg;
+                    this.ctx.beginPath();
+                    this.ctx.arc(_sparkSide, _sparkY, 12, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                this.ctx.globalCompositeOperation = 'source-over';
+            }
+
             this.ctx.restore();
             // ------------------------------------
 
@@ -1987,6 +2038,15 @@ phase_gathering_getRandomPegType() {
                     de.update(timeScale);
                     de.draw(this.ctx);
                     if (de.life <= 0) this.deathExplosions.splice(i, 1);
+                }
+            }
+            // 更新和绘制 ElectricWallArcs（回廊电弧遗物：墙面→敌人电弧特效）
+            if (this.electricWallArcs) {
+                for (let i = this.electricWallArcs.length - 1; i >= 0; i--) {
+                    const ea = this.electricWallArcs[i];
+                    ea.update(timeScale);
+                    ea.draw(this.ctx);
+                    if (ea.life <= 0) this.electricWallArcs.splice(i, 1);
                 }
             }
             // 更新和绘制 RewardDropEffects（遗物/精华掉落特效）
