@@ -334,13 +334,12 @@ export const CollisionSystem = {
         const _laserPierceDecayReduction = _pierceResParamsForLaser ? (_pierceResParamsForLaser.pierceDecayReduction || 0) : 0;
         // 衰减底数：默认 0.5，共鸣可提升至 0.7（二阶 +0.2）或 0.9（三阶 +0.4）
         const _laserDecayBase = Math.min(0.95, 0.5 + _laserPierceDecayReduction);
-        // [打击感] 激光穿透敌人：小幅高频持续震动 (已降低 40%)
+        // [不穿透] 激光只命中路径上第一个敌人，pierce+bounce 已转化为 multicast
         if (hits.length > 0 && typeof this.triggerScreenShakeAdvanced === 'function') {
             const laserAmp = (1.5 + Math.min(1, recipe.damage / 20) * 3) * 0.6; // 0.9~2.7px
-            const laserDur = 8 + hits.length * 2; // 命中敌人越多持续越长
-            this.triggerScreenShakeAdvanced(laserAmp, laserDur);
+            this.triggerScreenShakeAdvanced(laserAmp, 10);
         }
-        hits.forEach((hit, index) => {
+        hits.slice(0, 1).forEach((hit, index) => {
             const damageMultiplier = Math.pow(_laserDecayBase, index);
             // [属性共鸣] 应用激光共鸣伤害倍率
             const attenuatedDamage = recipe.damage * damageMultiplier * laserMultiplier;
