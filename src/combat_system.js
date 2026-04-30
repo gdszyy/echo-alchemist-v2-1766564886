@@ -2718,20 +2718,17 @@ export const combat_system = {
         // [修改] 风属性子弹也强制单发，不受 multicast 影响
         // @section:fire_post_effects - 射击后效果：后坐力/音效/HUD更新
 
-        // [激光多重施法] 激光模式：穿透层+反弹层全部转化为多重施法，由状态机驱动（每 0.1s 一次伤害）
-        if (finalRecipe.isLaser || finalRecipe.laser > 0) {
+        // [照射词条] 穿透/反弹层数仅在照射词条激活时转化为多重施法
+        if ((finalRecipe.isLaser || finalRecipe.laser > 0) && this.activeRunewordEffects && this.activeRunewordEffects['irradiation']) {
             finalRecipe.multicast = (finalRecipe.multicast || 0) + (finalRecipe.pierce || 0) + (finalRecipe.bounce || 0);
             finalRecipe.pierce = 0;
             finalRecipe.bounce = 0;
-            finalRecipe._originalMulticast = finalRecipe.multicast;
-            finalRecipe.multicast = 0; // 清零：由状态机控制重复伤害，不走 burstQueue 多发
-        } else {
-            // [照射词条] 在词条消耗 multicast 之前，保存原始连射次数到 recipe._originalMulticast
-            // 为什么：照射状态机需要知道原始连射次数来计算 totalDuration，
-            // 但 focused_fire/mass_collapse/multicast_to_scatter 等词条会将 multicast 清零，
-            // 导致 recipe.multicast=0 传入状态机时 totalDuration 计算错误。
-            finalRecipe._originalMulticast = this.currentSession ? (this.currentSession.multicast || 0) : (finalRecipe.multicast || 0);
         }
+        // [照射词条] 在词条消耗 multicast 之前，保存原始连射次数到 recipe._originalMulticast
+        // 为什么：照射状态机需要知道原始连射次数来计算 totalDuration，
+        // 但 focused_fire/mass_collapse/multicast_to_scatter 等词条会将 multicast 清零，
+        // 导致 recipe.multicast=0 传入状态机时 totalDuration 计算错误。
+        finalRecipe._originalMulticast = this.currentSession ? (this.currentSession.multicast || 0) : (finalRecipe.multicast || 0);
         // [词条 Hook] 化弹为剑：取消连射，连射次数将作为子飞剑攻击次数
         const isReplacedSword = !!finalRecipe._replaceWithSonSword;
         const isOnlyOne = isReplacedSword || !(finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword' && !finalRecipe.wind);
@@ -2793,14 +2790,10 @@ export const combat_system = {
         const blazingBeamFxForLaser = this.activeRunewordEffects && this.activeRunewordEffects['blazing_beam'];
         // [DEBUG-LASER] 每次调用打印入口状态
         if (CONFIG.debug) console.log(`[LASER_FIRE] 调用 isTickFire=${isTickFire} _continuousLaserFiring=${this._continuousLaserFiring} irradiationFx=${!!irradiationFx} recipe.multicast=${recipe.multicast} elapsedFrames=${this._continuousLaserState ? this._continuousLaserState.elapsedFrames : 'N/A'}`);
-        // [激光持续模式] 所有激光均启动状态机：普通激光每 0.1s 触发一次伤害，照射词条保留 0.5s 间隔
-        if (!this._continuousLaserFiring) {
+        if ((irradiationFx || blazingBeamFxForLaser) && !this._continuousLaserFiring) {
             this._continuousLaserFiring = true;
             const multicastCount = (recipe._originalMulticast !== undefined ? recipe._originalMulticast : (recipe.multicast || 0));
-            // irradiation/blazing_beam 保留 0.5s 间隔；普通激光使用 0.1s 间隔（6帧）
-            const tickInterval = (irradiationFx || blazingBeamFxForLaser)
-                ? Math.round(0.5 * 60)
-                : Math.round(0.1 * 60); // 6帧 ≈ 0.1s
+            const tickInterval = Math.round(0.1 * 60); // 0.1s = 6帧
             const totalDuration = Math.max(tickInterval, multicastCount * tickInterval);
             if (CONFIG.debug) console.log(`[LASER_FIRE] 状态机启动: multicastCount=${multicastCount} tickInterval=${tickInterval} totalDuration=${totalDuration}帧(${(totalDuration/60).toFixed(2)}s)`);
             this._continuousLaserState = {

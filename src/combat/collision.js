@@ -245,8 +245,13 @@ export const CollisionSystem = {
                     this.triggerScreenShakeAdvanced(irradAmp, 10);
                 }
 
-                // 视覺：受击点特效
-                if (Math.random() < 0.3) this.spawn_createParticle(hit.projX, hit.projY, '#fff', 'spark');
+                // 视觉：照射激光命中表面高能光效 - 光束停止于敌人表面的密集粒子爆发
+                for (let _i = 0; _i < 5; _i++) this.spawn_createParticle(hit.projX, hit.projY, '#fff', 'spark');
+                for (let _i = 0; _i < 4; _i++) this.spawn_createParticle(hit.projX, hit.projY, '#fbbf24', 'spark');
+                for (let _i = 0; _i < 2; _i++) this.spawn_createParticle(hit.projX, hit.projY, '#f97316', 'spark');
+                if (typeof this.spawn_createShockwave === 'function') {
+                    this.spawn_createShockwave(hit.projX, hit.projY, '#fde68a');
+                }
 
                 // 照射词条 Hook：累积照射同一敌人伤害加深
                 // [切换目标检测] 若命中的敌人与上次不同，重置旧敌人的 _irradiationStacks
@@ -334,12 +339,13 @@ export const CollisionSystem = {
         const _laserPierceDecayReduction = _pierceResParamsForLaser ? (_pierceResParamsForLaser.pierceDecayReduction || 0) : 0;
         // 衰减底数：默认 0.5，共鸣可提升至 0.7（二阶 +0.2）或 0.9（三阶 +0.4）
         const _laserDecayBase = Math.min(0.95, 0.5 + _laserPierceDecayReduction);
-        // [不穿透] 激光只命中路径上第一个敌人，pierce+bounce 已转化为 multicast
+        // [打击感] 激光穿透敌人：小幅高频持续震动 (已降低 40%)
         if (hits.length > 0 && typeof this.triggerScreenShakeAdvanced === 'function') {
             const laserAmp = (1.5 + Math.min(1, recipe.damage / 20) * 3) * 0.6; // 0.9~2.7px
-            this.triggerScreenShakeAdvanced(laserAmp, 10);
+            const laserDur = 8 + hits.length * 2; // 命中敌人越多持续越长
+            this.triggerScreenShakeAdvanced(laserAmp, laserDur);
         }
-        hits.slice(0, 1).forEach((hit, index) => {
+        hits.forEach((hit, index) => {
             const damageMultiplier = Math.pow(_laserDecayBase, index);
             // [属性共鸣] 应用激光共鸣伤害倍率
             const attenuatedDamage = recipe.damage * damageMultiplier * laserMultiplier;
