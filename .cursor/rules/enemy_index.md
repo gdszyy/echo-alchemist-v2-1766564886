@@ -3,6 +3,7 @@
 > **数据来源**：`src/config.js` → `balance.affixes`, `balance.bossConfigs`, `BOSS_DB`, `ENEMY_CURVE_CONFIG`；`src/spawn_system.js` → `spawn_generateAffixes()`, `spawn_trySpawnArchetypes()`, `spawn_scheduleNextBoss()`；`src/systems.js` → `TRUTH_BOOK_DATA.enemies`
 > **用途**：Agent 快速查询 8 种通用词缀、7 种 V2 基底专属词缀和 8 个 Boss 的行为机制、出现回合、克制属性及关键代码位置。
 > **最后更新**：V2 敌人视觉重设计——尺寸基底 + 专属词条体系（2026-05-02）
+> **美术规格**：V2 基底 Sprite 与 Overlay 资产清单见 [`design_spec_bitmap.md`](../../design_spec_bitmap.md) §3.5 / §3.6 与 [`docs/ui_asset_requirements.md`](../../docs/ui_asset_requirements.md) §8。
 
 ## 0. V2 基底专属词条总览（7 种，仅通过基底敌人附带，不进入随机词条池）
 

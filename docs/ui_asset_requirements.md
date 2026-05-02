@@ -327,3 +327,83 @@
 2. **诅咒系遗物边框**：`chaos_burst` / `chaos_pact` / `greedy_wheel` 的 `rarity: 'cursed'` 需要走 `relic_aura_cursed.png`；如果当前 RELIC_AURA 仅有 C/B/A/S 四档，需补充 cursed 配色（建议黑红血纹）。
 3. **存档兼容**：`chaosPactDamageMult` 已加入 `sys_saveRunState` / `sys_loadRunState`；旧存档读档时默认为 `1`，无破坏性。
 4. **图标 emoji fallback**：所有 v2 遗物的 emoji 均已在 `RELIC_DB` 内定义，位图缺失时不会阻塞 UI。
+
+---
+
+## 8. V2 敌人基底 + 专属词条美术清单（2026-05-02）
+
+> **来源**：[`design_spec_bitmap.md`](../design_spec_bitmap.md) §3.5 / §3.6、[`.cursor/rules/enemy_index.md`](../.cursor/rules/enemy_index.md) §0、敌人视觉设计 V2 文档。
+>
+> **范围**：本节集中**战斗内即时反馈**与**词条 UI Overlay**，敌人基底本体的 Sprite 帧规格请见 [`design_spec_bitmap.md`](../design_spec_bitmap.md) §3.5。
+>
+> **接入约定**：
+> - V2 战斗反馈素材统一放至 `assets/ui/sprites/v2/`，命名 `kebab-case`，与 §7.2 风格一致。
+> - 透明 PNG，`screen` / `lighter` 合成模式由调用方决定。
+> - 落地时同步更新本表与 `design_spec_bitmap.md` §3.6。
+
+### 8.1 P0 — 必备战斗反馈（影响词条可读性）
+
+| 资产 | 用途 | 建议尺寸 | 接入位置 | 优先级原因 |
+|---|---|---|---|---|
+| `assets/ui/sprites/v2/ward_barrier_idle.png` | `deflectionWard` 屏障静态薄膜 | 256×128 | `Enemy.draw()` 屏障 alpha = `wardBarrier / wardBarrierMax × 0.85 + 0.1` | 玩家必须能看到屏障是否还在 |
+| `assets/ui/sprites/v2/ward_barrier_break_0.png` ~ `_3.png` | 屏障击碎 4 帧 | 256×128 | `takeDamage` deflectionWard 分支击破时一次性播放 | 屏障被打破是关键打击反馈 |
+| `assets/ui/sprites/v2/prism_refract_burst_0.png` ~ `_3.png` | 折光棱柱七色折射爆发 4 帧 | 128×128 | `combat_system.js` `hitType === 'prism'` 分支 | 表达激光被折射 |
+| `assets/ui/sprites/v2/echo_relay_ring_0.png` ~ `_3.png` | 共振尖塔双重环形波 4 帧 | 160×160 | `Enemy._echoRelayRetrigger` 命中 ≥1 个目标时替代 `spawn_createShockwave` | 玩家需要识别哪个尖塔触发了 echo |
+| `assets/ui/sprites/v2/gravity_field_0.png` ~ `_5.png` | 引力炉心扭曲场 6 帧 | 440×440 | 持续渲染于 sprite 下层，按 `gravityWellPullRadius/220` 缩放 alpha | 玩家必须看到引力影响范围才能预判弹道 |
+
+### 8.2 P1 — 强化词条辨识与即时感
+
+| 资产 | 用途 | 建议尺寸 | 接入位置 | 备注 |
+|---|---|---|---|---|
+| `assets/ui/sprites/v2/ward_barrier_label.png` | 屏障数字浮字"🔷-N"底板 | 64×24 | `spawn_createFloatingText` 屏障吸收数字时叠加 | 与 shield 浮字风格区分 |
+| `assets/ui/sprites/v2/echo_relay_link.png` | 尖塔→被触发敌人脉冲连线 | 8×4，水平可平铺 | 对每个 echo 命中目标绘制 1 段，`screen` 合成 | 让玩家直观看到中继传导路径 |
+| `assets/ui/sprites/v2/hive_larva_hatch_0.png` ~ `_5.png` | 孵化破壳光环 6 帧 | 96×96 | `Enemy._hiveSpawnLarva` 末尾、幼体生成位置 | 当前是简单粒子，升级为光环更直观 |
+| `assets/ui/sprites/v2/siege_warning_strip.png` | 攻城重压前的黄黑警戒条 | 384×16，可平铺 | `_siegeCooldown <= 1` 时持续显示在履带前侧 | 给玩家"还有 1 回合就推进"的预警 |
+| `assets/ui/sprites/v2/siege_push_dust_0.png` ~ `_2.png` | 攻城推进尘暴 3 帧 | 384×64 | `siege_push` 触发瞬间于履带底部 | 强调重压的物理冲击感 |
+| `assets/ui/sprites/v2/gravity_bullet_pulled.png` | 子弹被引力捕获时的拖尾 | 16×16，4 帧 | `projectile.js` 引力分支检测到 `dist < pullR` 时按帧 spawn | 让玩家直观感受弹道偏折 |
+
+### 8.3 P2 — 入场仪式感与图鉴美化
+
+| 资产 | 用途 | 建议尺寸 | 接入位置 | 备注 |
+|---|---|---|---|---|
+| `assets/ui/sprites/v2/archetype_spawn_shockwave_blue.png` | 棱盾兽 / 重装入场冲击波（蓝灰系） | 256×256 | `spawn_trySpawnArchetypes` 末尾替代 `spawn_createShockwave('#94a3b8' / '#38bdf8')` | 颜色按 `chosen.color` 选 |
+| `assets/ui/sprites/v2/archetype_spawn_shockwave_red.png` | 深渊胃囊入场（暗红系） | 256×256 | 同上，色 `#7f1d1d` | |
+| `assets/ui/sprites/v2/archetype_spawn_shockwave_pink.png` | 共振尖塔入场（粉紫系） | 256×256 | 同上，色 `#f0abfc` | |
+| `assets/ui/sprites/v2/archetype_spawn_shockwave_cyan.png` | 折光棱柱入场（青蓝系） | 256×256 | 同上，色 `#67e8f9` | |
+| `assets/ui/sprites/v2/archetype_spawn_shockwave_lime.png` | 孵化巢入场（黄绿系） | 256×256 | 同上，色 `#a3e635` | |
+| `assets/ui/sprites/v2/archetype_spawn_shockwave_gold.png` | 攻城履带入场（金黄系） | 256×256 | 同上，色 `#facc15` | |
+| `assets/ui/sprites/v2/archetype_spawn_shockwave_purple.png` | 引力炉心入场（暗紫系） | 256×256 | 同上，色 `#7c3aed` | |
+| `assets/ui/sprites/v2/codex_<archetype>_portrait.png` | 真理之书 V2 基底图鉴肖像（8 张） | 256×256 | 真理之书 enemies 分类，新增条目 | 与 §1.8 truth-book 联动 |
+
+### 8.4 V2 基底 Sprite 本体（汇总，不在 P0/P1/P2 中重复）
+
+> 本节给出快速汇总，**详细规格见 [`design_spec_bitmap.md`](../design_spec_bitmap.md) §3.5.1 / §3.5.2**。每个基底的 Sprite 必须按 `cols×128 × rows×128` 出图，**禁止等比缩放 1×1 sprite**。
+
+| 基底 ID | 词条 | 占格 | Sprite 尺寸 | 文件命名前缀 | 状态 |
+|---|---|---|---|---|---|
+| `bastion`     | `heavyArmor`     | 3×1 | 384×128 | `enemy_bastion_*`     | 🟡 已有矢量、未出位图 |
+| `deflector`   | `deflectionWard` | 2×1 | 256×128 | `enemy_deflector_*`   | ❌ 待生成 |
+| `echoSpire`   | `echoRelay`      | 1×2 | 128×256 | `enemy_echo_spire_*`  | ❌ 待生成 |
+| `maw`         | `devour`         | 2×2 | 256×256 | `enemy_maw_*`         | ❌ 待生成（既有 1×1 devour 矢量需重做） |
+| `prism`       | `prism`          | 1×3 | 128×384 | `enemy_prism_*`       | ❌ 待生成 |
+| `hive`        | `hive`           | 2×3 | 256×384 | `enemy_hive_*`        | ❌ 待生成 |
+| `siege`       | `siege`          | 3×2 | 384×256 | `enemy_siege_*`       | ❌ 待生成 |
+| `gravityWell` | `gravityWell`    | 3×3 | 384×384 | `enemy_gravity_well_*`| ❌ 待生成（稀有，可暂用矢量） |
+
+### 8.5 与既有特效系统的复用关系
+
+| 既有素材 | 在 V2 中的复用方式 | 备注 |
+|---|---|---|
+| `shield` 六边形护盾网格 | 在 `maw + shield` 组合下**禁用**，改用 `enemy_maw_membrane_overlay.png` | 避免胃囊外层出现冷色蜂窝感破坏有机质 |
+| 现有 `regen` 绿色波纹 | 在多格基底上**按 cols×rows 缩放半径**，不能等比放大 | 防止视觉噪声扎堆 |
+| 现有 `clone` 紫色分裂粒子 | `gravityWell` / `maw` / `hive` 不允许同时挂 `clone` | 已在 `spawn_trySpawnArchetypes` 候选表中限制；视觉无需特殊处理 |
+| 现有 `haste` 残影 | 多格基底原则上不挂 `haste`，若被 `echoRelay` 触发，残影长度按基底尺寸 0.5× 缩短 | 避免大型敌人快速冲刺的不公平观感 |
+| `assets/ui/sprites/wall_lightning_charge.png`（§7.2） | 引力炉心被远程子弹切入时可复用 | `gravityWell` 半径与墙撞击同色系 |
+
+### 8.6 接入流程
+
+1. **P0 优先**：先生成 §8.1 的 5 类反馈 PNG，**无需等基底 sprite 完成**——这些反馈即使叠在矢量基底上也能补足玩家可读性。
+2. **P1 推进**：生成 §8.2，配合 [`src/render_system.js`](../src/render_system.js) 接入；同步勾掉本表对应行。
+3. **P2 收尾**：基底入场冲击波 + 图鉴肖像。
+4. **V2 基底 Sprite**：按 §8.4 优先级顺序出图，每完成一项，把行的 ❌ → 🟡 → ✅，并同步更新 [`design_spec_bitmap.md`](../design_spec_bitmap.md) §3.5.1 的对应行。
+5. **维护责任**：本节由「敌人 / 战斗 Agent」与「美术 Agent」共同维护；**新增 V2 基底或词条时必须先在此处登记，再开始美术生产**，避免素材命名漂移。
