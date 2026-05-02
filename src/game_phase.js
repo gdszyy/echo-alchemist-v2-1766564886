@@ -1158,6 +1158,21 @@ phase_gathering_getRandomPegType() {
             // [照射词条] 回合结束时清零照射叠加层数，防止残留到下一回合
             if (e._irradiationStacks) e._irradiationStacks = 0;
 
+            // [V2 echoRelay] 重置回合内的 echo 触发标记
+            e._echoedThisTurn = false;
+
+            // [V2 deflectionWard] 偏折屏障：若上一回合未被击破，则本回合开始恢复至满屏障值
+            if (e.affixes && e.affixes.includes('deflectionWard')) {
+                if (e.wardBarrierMax === undefined) {
+                    const pct = (CONFIG.balance.affixes && CONFIG.balance.affixes.deflectionWardBarrierPct) || 0.10;
+                    e.wardBarrierMax = Math.max(1, Math.floor(e.maxHp * pct));
+                }
+                if (!e.wardBrokenThisTurn) {
+                    e.wardBarrier = e.wardBarrierMax;
+                }
+                e.wardBrokenThisTurn = false;
+            }
+
             // [Boss 移动提示预计算]
             // 在回合开始时预计算 Boss 本回合是否会移动，以便 UI 标签能在回合开始时就显示正确提示
             if (e.type === 'boss' && e.bossType && typeof e._moveCooldown !== 'undefined') {

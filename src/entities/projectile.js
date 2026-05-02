@@ -157,6 +157,28 @@ class Projectile {
         // [优化 1] 增加空气阻力，防止无限加速导致的隧穿 (可选，这里设为 1.0 表示无阻力)
         this.vel = this.vel.mult(1.0);
 
+        // [V2 gravityWell] 引力炉心：对附近的子弹施加微弱回拉，造成可预测的弹道偏折
+        // 仅对带速度的常规子弹生效；激光/风刀等无 vel 主体不在此处理。
+        if (this.vel && this.vel.mag() > 0.1) {
+            const cfgAfx = (typeof CONFIG !== 'undefined' && CONFIG.balance) ? CONFIG.balance.affixes : null;
+            if (cfgAfx) {
+                const pullR = cfgAfx.gravityWellPullRadius || 220;
+                const pullS = cfgAfx.gravityWellPullStrength || 0.18;
+                for (const e of enemies) {
+                    if (!e || !e.active || !e.affixes || !e.affixes.includes('gravityWell')) continue;
+                    const dx = e.pos.x - this.pos.x;
+                    const dy = e.pos.y - this.pos.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > 1 && dist < pullR) {
+                        const falloff = 1 - dist / pullR;
+                        const accel = pullS * falloff * timeScale;
+                        this.vel.x += (dx / dist) * accel;
+                        this.vel.y += (dy / dist) * accel;
+                    }
+                }
+            }
+        }
+
         // [优化 2] 动态子步进计算
         // 确保每一步移动距离不超过半径的 50%，大幅提升高速碰撞的稳定性
         const speed = this.vel.mag();

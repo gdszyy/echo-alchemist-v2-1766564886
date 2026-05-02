@@ -484,9 +484,38 @@ class UIManager {
                 name: '👅 吞噬', 
                 desc: `有概率吞噬相鄰友軍，繼承其全部生命與詞條。` 
             },
-            'jump': { 
-                name: '🦘 跳躍', 
-                desc: `前方被阻擋時，可直接跳過最多 ${afx.jumpRows} 行障礙。` 
+            'jump': {
+                name: '🦘 跳躍',
+                desc: `前方被阻擋時，可直接跳過最多 ${afx.jumpRows} 行障礙。`
+            },
+            // [V2 基底专属词条]
+            'heavyArmor': {
+                name: '🛡️ 重裝',
+                desc: `占 3 列橫向裝甲：血量 ×${afx.heavyArmorHpMult || 2.0}，每 ${afx.heavyArmorMoveInterval || 2} 回合才能移動一次。`
+            },
+            'deflectionWard': {
+                name: '🔷 偏折屏障',
+                desc: `2×1 棱盾獸：擁有相當於最大生命值 ${(afx.deflectionWardBarrierPct || 0.10) * 100}% 的屏障，僅吸收反彈/穿透類傷害，未被打破則每回合恢復至滿值。`
+            },
+            'echoRelay': {
+                name: '🔮 回響中繼',
+                desc: `1×2 共振尖塔：每回合額外觸發一次周圍敵人的詞條效果（再生/治療/分身/極速）；自身最大生命值僅為標準精英的 ${(afx.echoRelayHpPct || 0.5) * 100}%。`
+            },
+            'prism': {
+                name: '🌈 折光',
+                desc: `1×3 折光棱柱：作為激光偏折面參與反射，命中後傷害衰減為原伤害的 ${(afx.prismLaserDeflect || 0.5) * 100}%，產生七色折射粒子。`
+            },
+            'hive': {
+                name: '🥚 孵化',
+                desc: `2×3 孵化巢：每 ${afx.hiveSpawnInterval || 2} 回合在周圍生成一隻血量為自身 ${(afx.hiveSpawnHpPct || 0.15) * 100}% 的低血量幼體。`
+            },
+            'siege': {
+                name: '🚜 攻城',
+                desc: `3×2 攻城履帶：每 ${afx.siegePushInterval || 3} 回合執行一次 +${afx.siegePushRows || 2} 行的重壓推進，壓縮戰場空間。`
+            },
+            'gravityWell': {
+                name: '🌀 引力井',
+                desc: `3×3 引力炉心：在 ${afx.gravityWellPullRadius || 220}px 半徑內對所有子彈施加微弱回拉，造成可預測的彈道偏折。`
             }
         };
     }

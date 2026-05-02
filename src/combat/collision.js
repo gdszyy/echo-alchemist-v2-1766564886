@@ -92,8 +92,10 @@ export const CollisionSystem = {
             if (d > 0 && d < closest.dist) closest = { dist: d, hitType: 'wall', normal: 'y' };
         }
         // 2. 检测带盾敌人 (视为反射面)
+        //    [V2 prism] 折光棱柱（prism 词条）也作为激光偏折面参与处理。
         this.enemies.forEach(e => {
-            if (!e.active || !e.affixes.includes('shield')) return;
+            if (!e.active) return;
+            if (!(e.affixes.includes('shield') || e.affixes.includes('prism'))) return;
 
             // 使用线段与矩形相交检测（Slab method 简化版）
             const halfW = e.width / 2 + 5;
@@ -113,7 +115,7 @@ export const CollisionSystem = {
 
                 closest = {
                     dist: t,
-                    hitType: 'shield',
+                    hitType: e.affixes.includes('prism') ? 'prism' : 'shield',
                     normal: nx > ny ? 'x' : 'y',
                     enemy: e
                 };

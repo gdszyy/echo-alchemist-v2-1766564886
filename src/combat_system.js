@@ -2921,6 +2921,17 @@ export const combat_system = {
                         this.combat_damageEnemy(hitResult.enemy, { config: taskRecipe, pos: nextPos, isCopy: false });
                         audio.playHit('bounce');
                         this.spawn_createParticle(nextPos.x, nextPos.y, '#3b82f6', 'spark');
+                    } else if (hitResult.hitType === 'prism') {
+                        // [V2 prism] 折光棱柱：分束折射，命中伤害按 prismLaserDeflect 衰减
+                        const deflect = (CONFIG.balance.affixes && CONFIG.balance.affixes.prismLaserDeflect) || 0.5;
+                        const reducedRecipe = Object.assign({}, taskRecipe, { damage: (taskRecipe.damage || 0) * deflect });
+                        this.combat_damageEnemy(hitResult.enemy, { config: reducedRecipe, pos: nextPos, isCopy: false });
+                        audio.playHit('bounce');
+                        // 折光七色粒子
+                        const prismCols = ['#ef4444', '#22c55e', '#3b82f6', '#a855f7', '#facc15'];
+                        for (let i = 0; i < 4; i++) {
+                            this.spawn_createParticle(nextPos.x, nextPos.y, prismCols[Math.floor(Math.random() * prismCols.length)], 'spark');
+                        }
                     }
 
                     // 镜面反射方向

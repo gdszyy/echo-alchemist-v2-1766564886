@@ -526,6 +526,42 @@ const CONFIG = {
             heavyArmorHpMult: 2.0,      // 重装：血量倍率
             heavyArmorMoveInterval: 2,  // 重装：移动间隔（回合数）
             heavyArmorWideGridCols: 3,  // 重装变种：占3列宽
+
+            // ============================================
+            // [V2 基底专属词条] 详见 design_spec_bitmap.md / 敌人视觉重设计 V2 文档
+            // 这些词条只通过 spawn_trySpawnArchetype 生成的大型基底敌人附带，
+            // 不进入 ENEMY_CURVE_CONFIG.AFFIX_WEIGHT_CURVES 的随机词条池。
+            // ============================================
+
+            // [deflectionWard] 棱盾兽 2x1 偏折屏障
+            deflectionWardBarrierPct: 0.10,   // 屏障值 = maxHp × 10%
+            deflectionWardHpMult: 1.0,        // 棱盾兽血量倍率（基底 hp 系数）
+
+            // [echoRelay] 共振尖塔 1x2 回响中继
+            echoRelayHpPct: 0.5,              // 自身最大生命值为同回合标准精英的 50%
+            echoRelayRange: 1.5,              // 触发周围敌人词条的范围（自身宽度倍数）
+            echoRelayHpMult: 0.5,             // 与基底 hp 联动的最终倍率（与 echoRelayHpPct 等效）
+
+            // [prism] 折光棱柱 1x3 折光（基础减伤 + 激光分束）
+            prismLaserDeflect: 0.5,           // 激光命中时分束伤害衰减比
+            prismHpMult: 1.4,                 // 折光棱柱血量倍率（高于普通敌人）
+
+            // [hive] 孵化巢 2x3 周期生成弱小单位
+            hiveSpawnInterval: 2,             // 每隔几回合孵化一次
+            hiveSpawnHpPct: 0.15,             // 幼体血量为基底 baseHP 的比例
+            hiveHpMult: 2.5,                  // 孵化巢自身血量倍率
+
+            // [siege] 攻城履带 3x2 低频重压
+            siegePushInterval: 3,             // 每隔几回合执行一次重压推进
+            siegePushRows: 2,                 // 重压推进的行数
+            siegeHpMult: 3.5,                 // 攻城履带血量倍率
+            siegeMoveInterval: 2,             // 普通回合移动间隔（迟缓）
+
+            // [gravityWell] 引力炉心 3x3 大型场控
+            gravityWellPullStrength: 0.18,    // 弹道回拉强度（0~1，乘以方向矢量）
+            gravityWellPullRadius: 220,       // 引力影响半径（像素）
+            gravityWellHpMult: 6.0,           // 引力炉心血量倍率
+            gravityWellMoveInterval: 3,       // 移动间隔（极慢）
         },
 
         // =========================================
