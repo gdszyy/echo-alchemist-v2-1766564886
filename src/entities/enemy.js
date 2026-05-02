@@ -766,6 +766,26 @@ class Enemy {
              this.actionIcon = '🦠'; this.actionName = '增殖';
         }
 
+        // [V2 基底专属词条] 预警图标
+        if (!this.actionIcon && this.affixes.includes('hive')) {
+            const cd = (this._hiveCooldown === undefined) ? 0 : this._hiveCooldown;
+            if (cd <= 1) { this.actionIcon = '🥚'; this.actionName = '孵化'; }
+        }
+        if (!this.actionIcon && this.affixes.includes('siege')) {
+            const cd = (this._siegeCooldown === undefined) ? 0 : this._siegeCooldown;
+            if (cd <= 1) { this.actionIcon = '🚜'; this.actionName = '攻城'; }
+        }
+        if (!this.actionIcon && this.affixes.includes('echoRelay')) {
+            // 共振尖塔附近若有可触发词条的目标，则提前预警
+            const range = this.width * (afx.echoRelayRange || 1.5) + this.height * 0.5;
+            const triggerable = (game.enemies || []).some(o =>
+                o !== this && o.active && this.pos.dist(o.pos) <= range &&
+                o.affixes && (o.affixes.includes('regen') || o.affixes.includes('healer')
+                    || o.affixes.includes('clone') || o.affixes.includes('haste'))
+            );
+            if (triggerable) { this.actionIcon = '🔮'; this.actionName = '回響'; }
+        }
+
         // 如果没有任何特殊动作，就是普通移动，不需要强调预警，或者给一个箭头
         if (!this.actionIcon) {
             // 普通移动不需要太长的延迟，直接行动
@@ -907,6 +927,39 @@ class Enemy {
             }
         }
 
+        // --- [V2 基底专属词条：每回合仅触发一次，不随 actionCount/狂暴重复结算] ---
+        // hive：周期性孵化幼体
+        if (this.affixes.includes('hive')) {
+            if (this._hiveCooldown === undefined) this._hiveCooldown = afx.hiveSpawnInterval || 2;
+            this._hiveCooldown--;
+            if (this._hiveCooldown <= 0) {
+                this._hiveCooldown = afx.hiveSpawnInterval || 2;
+                Enemy._hiveSpawnLarva(this, game, afx);
+            }
+        }
+        // siege：周期性额外推进
+        if (this.affixes.includes('siege')) {
+            if (this._siegeCooldown === undefined) this._siegeCooldown = afx.siegePushInterval || 3;
+            this._siegeCooldown--;
+            if (this._siegeCooldown <= 0) {
+                this._siegeCooldown = afx.siegePushInterval || 3;
+                const pushRows = afx.siegePushRows || 2;
+                const pushAmount = game.enemyHeight * pushRows;
+                const targetY = this.dropTargetY + pushAmount;
+                const isBlocked = game.calc_isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
+                if (!isBlocked) {
+                    this.advance(pushAmount);
+                    this.bumpOffsetY = -8;
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, `🚜SIEGE +${pushRows}`, '#facc15');
+                    game.spawn_createShockwave(this.pos.x, this.pos.y, '#facc15');
+                }
+            }
+        }
+        // echoRelay：额外触发一次周围敌人的词条效果
+        if (this.affixes.includes('echoRelay')) {
+            Enemy._echoRelayRetrigger(this, game, afx);
+        }
+
         // --- [改动] 移动与跳跃：移出循环，始终只执行一次 ---
         // [Boss 移动冷却逻辑]
         // 狂暴模式下：每回合必定移动（_moveCooldown 始终为 0）
@@ -926,6 +979,15 @@ class Enemy {
                     const interval = this._moveInterval || 2;
                     this._moveCooldown = interval - 1; // 下次移动需要等待的回合数
                 }
+            }
+        } else if (this._moveInterval && this._moveInterval > 1) {
+            // [V2] 非 Boss 大型基底（heavyArmor / siege / gravityWell 等）的迟缓移动节奏
+            if (this._moveCooldown === undefined) this._moveCooldown = 0;
+            if (this._moveCooldown > 0) {
+                _shouldMove = false;
+                this._moveCooldown--;
+            } else {
+                this._moveCooldown = this._moveInterval - 1;
             }
         }
         // haste 词条：额外触发一次移动（速度加快，不重复结算其他词条）
@@ -1069,35 +1131,6 @@ class Enemy {
                 game.spawn_triggerCloneSpawn(this);
             }
 
-            // --- 5. [V2 hive] 孵化巢：周期性孵化弱小幼体 ---
-            if (this.affixes.includes('hive')) {
-                if (this._hiveCooldown === undefined) this._hiveCooldown = afx.hiveSpawnInterval || 2;
-                this._hiveCooldown--;
-                if (this._hiveCooldown <= 0) {
-                    this._hiveCooldown = afx.hiveSpawnInterval || 2;
-                    Enemy._hiveSpawnLarva(this, game, afx);
-                }
-            }
-
-            // --- 6. [V2 siege] 攻城履带：周期性重压推进（额外推进数行） ---
-            if (this.affixes.includes('siege')) {
-                if (this._siegeCooldown === undefined) this._siegeCooldown = afx.siegePushInterval || 3;
-                this._siegeCooldown--;
-                if (this._siegeCooldown <= 0) {
-                    this._siegeCooldown = afx.siegePushInterval || 3;
-                    const pushRows = afx.siegePushRows || 2;
-                    const pushAmount = game.enemyHeight * pushRows;
-                    this.advance(pushAmount);
-                    this.bumpOffsetY = -8;
-                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, `🚜SIEGE +${pushRows}`, '#facc15');
-                    game.spawn_createShockwave(this.pos.x, this.pos.y, '#facc15');
-                }
-            }
-
-            // --- 7. [V2 echoRelay] 回响中继：额外触发一次周围敌人的词条效果 ---
-            if (this.affixes.includes('echoRelay')) {
-                Enemy._echoRelayRetrigger(this, game, afx);
-            }
         }
 
         // --- [改动] 移动与跳跃：移出循环，始终只执行一次 ---
