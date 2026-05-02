@@ -2257,6 +2257,11 @@ class Enemy {
             }
         }
 
+        // === Layer 3.55: V2 基底敌人轮廓美术（尺寸 × 基底 × 词条）===
+        // 在通用词缀特效之后、词缀印章之前绘制，让大型敌人的基底身份先于小图标被识别。
+        if (this.baseArchetype && this.type !== 'boss') {
+            this._drawArchetypeBody(ctx, w, h);
+        }
         // === Layer 3.6: 词缀组合标识章（印章图标）===
         // 顶部绘制每个词缀对应的几何印章，让玩家能直观识别词缀组合
         if (this.affixes && this.affixes.length > 0 && this.type !== 'boss') {
@@ -5137,6 +5142,189 @@ class Enemy {
     }
 
     /**
+     * 绘制 V2 基底敌人的轮廓美术。
+     * 这里不依赖外部 Sprite Sheet，而是使用低成本 Canvas 几何图元表达「尺寸 × 基底 × 词条」身份，
+     * 以便在最终像素资产完成前先把 gameplay-readable 的敌人样式落地。
+     */
+    _drawArchetypeBody(ctx, w, h) {
+        const archetype = this.baseArchetype;
+        if (!archetype) return;
+        const t = Date.now() / 1000;
+        const pulse = (Math.sin(t * 2.1 + this.visualSeed * 6.283) + 1) * 0.5;
+        const minSide = Math.min(w, h);
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalCompositeOperation = 'screen';
+
+        switch (archetype) {
+            case 'bastion': {
+                const alpha = 0.34 + pulse * 0.08;
+                ctx.strokeStyle = `rgba(203, 213, 225, ${alpha})`;
+                ctx.fillStyle = `rgba(71, 85, 105, ${alpha * 0.35})`;
+                ctx.lineWidth = Math.max(2, minSide * 0.035);
+                for (let i = 0; i < 3; i++) {
+                    const x = -w * 0.32 + i * w * 0.32;
+                    ctx.beginPath();
+                    ctx.roundRect(x - w * 0.11, -h * 0.28, w * 0.22, h * 0.56, 5);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+                ctx.strokeStyle = `rgba(148, 163, 184, ${alpha * 1.25})`;
+                ctx.beginPath();
+                ctx.moveTo(-w * 0.44, 0); ctx.lineTo(w * 0.44, 0);
+                ctx.moveTo(-w * 0.18, -h * 0.24); ctx.lineTo(w * 0.18, h * 0.24);
+                ctx.moveTo(w * 0.18, -h * 0.24); ctx.lineTo(-w * 0.18, h * 0.24);
+                ctx.stroke();
+                break;
+            }
+            case 'maw': {
+                const glow = 0.28 + pulse * 0.18;
+                const mawGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, minSide * 0.48);
+                mawGrad.addColorStop(0, `rgba(15, 23, 42, ${0.65 + pulse * 0.12})`);
+                mawGrad.addColorStop(0.55, `rgba(88, 28, 135, ${glow})`);
+                mawGrad.addColorStop(1, 'rgba(124, 58, 237, 0)');
+                ctx.fillStyle = mawGrad;
+                ctx.beginPath(); ctx.ellipse(0, 0, w * 0.23, h * 0.36, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = `rgba(216, 180, 254, ${0.55 + pulse * 0.25})`;
+                ctx.lineWidth = Math.max(1.5, minSide * 0.025);
+                for (let i = 0; i < 10; i++) {
+                    const a = (i / 10) * Math.PI * 2 + pulse * 0.15;
+                    const x1 = Math.cos(a) * w * 0.18, y1 = Math.sin(a) * h * 0.31;
+                    const x2 = Math.cos(a) * w * 0.24, y2 = Math.sin(a) * h * 0.40;
+                    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+                }
+                ctx.strokeStyle = `rgba(167, 139, 250, ${0.42 + pulse * 0.22})`;
+                ctx.beginPath(); ctx.arc(0, 0, minSide * 0.22, t % (Math.PI * 2), t % (Math.PI * 2) + Math.PI * 1.45); ctx.stroke();
+                break;
+            }
+            case 'deflector': {
+                const wardPct = Math.max(0, Math.min(1, (this.wardBarrier || 0) / Math.max(1, this.maxHp * 0.1)));
+                const alpha = 0.30 + wardPct * 0.28 + pulse * 0.06;
+                ctx.strokeStyle = `rgba(125, 211, 252, ${alpha})`;
+                ctx.fillStyle = `rgba(14, 165, 233, ${alpha * 0.28})`;
+                ctx.lineWidth = Math.max(2, minSide * 0.04);
+                ctx.beginPath();
+                ctx.moveTo(-w * 0.42, h * 0.18);
+                ctx.lineTo(-w * 0.22, -h * 0.26);
+                ctx.lineTo(w * 0.36, -h * 0.14);
+                ctx.lineTo(w * 0.44, h * 0.22);
+                ctx.closePath();
+                ctx.fill(); ctx.stroke();
+                ctx.strokeStyle = `rgba(224, 242, 254, ${alpha * 0.9})`;
+                ctx.beginPath();
+                ctx.moveTo(-w * 0.14, -h * 0.22); ctx.lineTo(w * 0.10, h * 0.20);
+                ctx.moveTo(w * 0.12, -h * 0.18); ctx.lineTo(w * 0.32, h * 0.18);
+                ctx.stroke();
+                ctx.globalAlpha = 0.45 + wardPct * 0.45;
+                ctx.fillStyle = '#38bdf8';
+                ctx.fillRect(-w * 0.38, h * 0.32, w * 0.76 * wardPct, Math.max(2, h * 0.045));
+                break;
+            }
+            case 'echoSpire': {
+                const alpha = 0.32 + pulse * 0.18;
+                ctx.strokeStyle = `rgba(240, 171, 252, ${alpha})`;
+                ctx.fillStyle = `rgba(168, 85, 247, ${alpha * 0.22})`;
+                ctx.lineWidth = Math.max(1.5, minSide * 0.035);
+                ctx.beginPath();
+                ctx.moveTo(0, -h * 0.42);
+                ctx.lineTo(w * 0.30, h * 0.25);
+                ctx.lineTo(0, h * 0.42);
+                ctx.lineTo(-w * 0.30, h * 0.25);
+                ctx.closePath();
+                ctx.fill(); ctx.stroke();
+                ctx.strokeStyle = `rgba(250, 232, 255, ${alpha * 0.85})`;
+                for (let i = 0; i < 3; i++) {
+                    const rr = minSide * (0.20 + i * 0.14 + pulse * 0.03);
+                    ctx.globalAlpha = (0.55 - i * 0.13) * alpha * 2;
+                    ctx.beginPath(); ctx.ellipse(0, 0, rr * 0.65, rr, 0, 0, Math.PI * 2); ctx.stroke();
+                }
+                break;
+            }
+            case 'prism': {
+                const colors = ['#ef4444', '#f59e0b', '#22c55e', '#06b6d4', '#8b5cf6'];
+                ctx.lineWidth = Math.max(1.5, minSide * 0.025);
+                for (let i = 0; i < colors.length; i++) {
+                    ctx.strokeStyle = `${colors[i]}AA`;
+                    const y = -h * 0.34 + i * h * 0.17;
+                    ctx.beginPath(); ctx.moveTo(-w * 0.28, y); ctx.lineTo(w * 0.28, -y * 0.45); ctx.stroke();
+                }
+                ctx.strokeStyle = `rgba(224, 242, 254, ${0.55 + pulse * 0.25})`;
+                ctx.beginPath();
+                ctx.moveTo(0, -h * 0.44); ctx.lineTo(w * 0.30, -h * 0.12); ctx.lineTo(w * 0.18, h * 0.40);
+                ctx.lineTo(-w * 0.18, h * 0.40); ctx.lineTo(-w * 0.30, -h * 0.12); ctx.closePath();
+                ctx.stroke();
+                break;
+            }
+            case 'hive': {
+                const alpha = 0.30 + pulse * 0.14;
+                ctx.strokeStyle = `rgba(190, 242, 100, ${alpha})`;
+                ctx.fillStyle = `rgba(132, 204, 22, ${alpha * 0.25})`;
+                ctx.lineWidth = Math.max(1.2, minSide * 0.022);
+                const cols = 2, rows = 4;
+                for (let iy = 0; iy < rows; iy++) {
+                    for (let ix = 0; ix < cols; ix++) {
+                        const cx = (ix - 0.5) * w * 0.26 + (iy % 2 ? w * 0.07 : -w * 0.07);
+                        const cy = (iy - 1.5) * h * 0.18;
+                        const rr = minSide * 0.095;
+                        ctx.beginPath();
+                        for (let k = 0; k < 6; k++) {
+                            const a = Math.PI / 6 + k * Math.PI / 3;
+                            const px = cx + Math.cos(a) * rr, py = cy + Math.sin(a) * rr;
+                            k === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+                        }
+                        ctx.closePath(); ctx.fill(); ctx.stroke();
+                    }
+                }
+                ctx.fillStyle = `rgba(217, 249, 157, ${0.42 + pulse * 0.35})`;
+                ctx.beginPath(); ctx.arc(w * 0.18, h * 0.28, minSide * 0.055, 0, Math.PI * 2); ctx.fill();
+                break;
+            }
+            case 'siege': {
+                const alpha = 0.32 + pulse * 0.10;
+                ctx.strokeStyle = `rgba(250, 204, 21, ${alpha})`;
+                ctx.fillStyle = `rgba(120, 53, 15, ${alpha * 0.32})`;
+                ctx.lineWidth = Math.max(2, minSide * 0.032);
+                for (const y of [-h * 0.22, h * 0.22]) {
+                    ctx.beginPath(); ctx.roundRect(-w * 0.40, y - h * 0.09, w * 0.72, h * 0.18, 6); ctx.fill(); ctx.stroke();
+                    for (let i = 0; i < 5; i++) {
+                        const x = -w * 0.31 + i * w * 0.15;
+                        ctx.beginPath(); ctx.moveTo(x, y - h * 0.08); ctx.lineTo(x + w * 0.05, y + h * 0.08); ctx.stroke();
+                    }
+                }
+                ctx.fillStyle = `rgba(251, 191, 36, ${alpha * 0.9})`;
+                ctx.beginPath();
+                ctx.moveTo(w * 0.20, -h * 0.32); ctx.lineTo(w * 0.46, 0); ctx.lineTo(w * 0.20, h * 0.32); ctx.closePath(); ctx.fill();
+                break;
+            }
+            case 'gravityWell': {
+                const alpha = 0.36 + pulse * 0.18;
+                const r0 = minSide * 0.18;
+                const g = ctx.createRadialGradient(0, 0, 0, 0, 0, minSide * 0.45);
+                g.addColorStop(0, 'rgba(2, 6, 23, 0.85)');
+                g.addColorStop(0.45, `rgba(124, 58, 237, ${alpha})`);
+                g.addColorStop(1, 'rgba(59, 7, 100, 0)');
+                ctx.fillStyle = g;
+                ctx.beginPath(); ctx.arc(0, 0, minSide * 0.45, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = `rgba(196, 181, 253, ${alpha})`;
+                ctx.lineWidth = Math.max(1.5, minSide * 0.025);
+                for (let i = 0; i < 3; i++) {
+                    const a = t * 0.55 + i * Math.PI * 2 / 3;
+                    ctx.beginPath();
+                    ctx.ellipse(Math.cos(a) * r0 * 0.35, Math.sin(a) * r0 * 0.35, minSide * 0.34, minSide * 0.11, a, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+                ctx.beginPath(); ctx.arc(0, 0, r0, 0, Math.PI * 2); ctx.fill();
+                break;
+            }
+            default:
+                break;
+        }
+        ctx.restore();
+    }
+
+    /**
      * 根据词缀组合返回对应的身份色（用于 Layer 1.6 色调叠加）
      * 使得玩家能通过颜色氛围快速识别词缀组合。
      */
@@ -5154,6 +5342,12 @@ class Enemy {
             'jump':       '#06b6d4',
             'berserk':    '#f97316',
             'heavyArmor': '#78716c',
+            'deflectionWard': '#38bdf8',
+            'echoRelay': '#f0abfc',
+            'prism': '#67e8f9',
+            'hive': '#a3e635',
+            'siege': '#facc15',
+            'gravityWell': '#7c3aed',
             // 双词缀组合
             'haste+shield':    '#60a5fa',  // 蓝黄 → 亮蓝
             'regen+shield':    '#34d399',  // 蓝绿 → 青绿
@@ -5203,6 +5397,12 @@ class Enemy {
             jump:       '#67e8f9',
             berserk:    '#fb923c',
             heavyArmor: '#94a3b8',
+            deflectionWard: '#7dd3fc',
+            echoRelay: '#f0abfc',
+            prism: '#67e8f9',
+            hive: '#bef264',
+            siege: '#fde047',
+            gravityWell: '#c4b5fd',
         };
 
         ctx.save();

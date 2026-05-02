@@ -101,6 +101,7 @@
 ### 核心机制文档（深度阅读，含数值与流程说明）
 
 *   **核心机制文档**：[`docs/core_mechanics.md`](docs/core_mechanics.md) - 四大核心机制的完整数值与流程说明：“符文充能”、“子弹替换（混沌/纯净精华两条路径）”、“遗物/精华保底概率（DropPity V3）”、“符文智能掉落算法（三层加权）”。**凡修改上述任一机制时，必须先读此文档。**
+*   **敌人视觉设计 V2**：[`docs/enemy_visual_design_v2.md`](docs/enemy_visual_design_v2.md) - 敌人尺寸足迹、基底类型、专属词条与 3×3 范围内大型敌人的视觉/机制规范。**凡修改敌人尺寸、基底形体、敌人词条归属或大型敌人生成逻辑时，必须先读此文档。**
 
 > **架构状态（Task 3.3 更新）**：`core.js` 已完全移除 `Object.assign(Game.prototype, ...)` Mixin 模式。全部 10 个子系统均已迁移至组合模式（Composition via bind）。新增子系统必须遵循 [`.cursor/rules/global.md`](.cursor/rules/global.md) 第 5 节「子系统扩展规范」。
 
