@@ -772,8 +772,17 @@ class Enemy {
             if (cd <= 1) { this.actionIcon = '🥚'; this.actionName = '孵化'; }
         }
         if (!this.actionIcon && this.affixes.includes('siege')) {
-            const cd = (this._siegeCooldown === undefined) ? 0 : this._siegeCooldown;
-            if (cd <= 1) { this.actionIcon = '🚜'; this.actionName = '攻城'; }
+            // siege 攻城履带：检查正前方是否有可被推动的非 Boss 敌人，有则预警
+            const halfW = this.width / 2;
+            const siegeBottom = this.pos.y + this.height / 2;
+            const yLo = siegeBottom - 4;
+            const yHi = siegeBottom + game.enemyHeight + 4;
+            const willPush = (game.enemies || []).some(o =>
+                o !== this && o.active && o.type !== 'boss' &&
+                Math.abs(o.pos.x - this.pos.x) < (this.width + o.width) / 2 - 4 &&
+                (o.pos.y - o.height / 2) > yLo && (o.pos.y - o.height / 2) < yHi
+            );
+            if (willPush) { this.actionIcon = '🚜'; this.actionName = '推進'; }
         }
         if (!this.actionIcon && this.affixes.includes('echoRelay')) {
             // 共振尖塔附近若有可触发词条的目标，则提前预警
@@ -937,24 +946,9 @@ class Enemy {
                 Enemy._hiveSpawnLarva(this, game, afx);
             }
         }
-        // siege：周期性额外推进
-        if (this.affixes.includes('siege')) {
-            if (this._siegeCooldown === undefined) this._siegeCooldown = afx.siegePushInterval || 3;
-            this._siegeCooldown--;
-            if (this._siegeCooldown <= 0) {
-                this._siegeCooldown = afx.siegePushInterval || 3;
-                const pushRows = afx.siegePushRows || 2;
-                const pushAmount = game.enemyHeight * pushRows;
-                const targetY = this.dropTargetY + pushAmount;
-                const isBlocked = game.calc_isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
-                if (!isBlocked) {
-                    this.advance(pushAmount);
-                    this.bumpOffsetY = -8;
-                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, `🚜SIEGE +${pushRows}`, '#facc15');
-                    game.spawn_createShockwave(this.pos.x, this.pos.y, '#facc15');
-                }
-            }
-        }
+        // siege：移动时推开前方敌人 + 冰冻免疫（实际推动逻辑在下方 _doMove 中处理；
+        // 此处仅做"被动状态显示"——若上一回合存在被推动的敌人，触发轻微 bump 动画）
+        // 注：siege 不再有独立的"周期重压"机制，推进效率完全由推动连锁决定。
         // echoRelay：额外触发一次周围敌人的词条效果
         if (this.affixes.includes('echoRelay')) {
             Enemy._echoRelayRetrigger(this, game, afx);
@@ -997,6 +991,21 @@ class Enemy {
             const isBlocked = game.calc_isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
             if (!isBlocked) {
                 this.advance(moveAmount);
+            } else if (this.affixes.includes('siege')) {
+                // [V2 siege] 攻城履带：被前方敌人阻挡时，把前方所有重叠的非 Boss 敌人一起向下推
+                const pushed = Enemy._siegePushBlockers(this, game, moveAmount);
+                if (pushed > 0) {
+                    // 被推之后再次确认不会与 Boss/墙体冲突；即便仍占用，攻城履带也强行推进
+                    this.advance(moveAmount);
+                    this.bumpOffsetY = -10;
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, `🚜PUSH ×${pushed}`, '#facc15');
+                    game.spawn_createShockwave(this.pos.x, this.pos.y, '#facc15');
+                    audio.playEffect('split');
+                } else {
+                    // 没有可推动目标却仍被阻挡（例如前方是 Boss）——按普通阻挡处理
+                    this.bumpOffsetY = -10;
+                    if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
+                }
             } else {
                 if (this.affixes.includes('jump')) {
                     // Boss 格拉西斯特殊：狂暴后跳跃行数增加
@@ -5404,6 +5413,90 @@ class Enemy {
             game.spawn_createFloatingText(host.pos.x, host.pos.y - 50, '🥚HATCH', '#a3e635');
             return;
         }
+    }
+
+    /**
+     * @static
+     * @method _siegePushBlockers
+     * @description [siege] 把前方所有与攻城履带横向重叠的非 Boss 敌人向下推 moveAmount。
+     *              推动时不消耗冷却、不结算其他词条；返回成功推动的敌人数量。
+     *
+     *   规则：
+     *     1. 仅推动 active 且 type !== 'boss' 的敌人（避免把 Boss 顶进玩家区）。
+     *     2. x 轴重叠判定：|other.pos.x - siege.pos.x| < (siege.width + other.width) / 2 - 4 px。
+     *     3. y 轴判定：other 的中心位于 siege 当前底边到 (底边 + moveAmount) 的区间内。
+     *     4. 若开启 siegePushAllowCascade（默认 true），递归推动被推目标前方的敌人。
+     *     5. 推动通过 advance() 修改 dropTargetY，由 update() 平滑驱动；不立即写 pos.y，
+     *        保证视觉上能看到"被一并向下挤压"的过程。
+     *
+     * @param {Enemy} siege - 攻城履带本体
+     * @param {object} game - 游戏实例
+     * @param {number} moveAmount - 推动距离（通常 = enemyHeight）
+     * @returns {number} 实际被推动的敌人数量
+     */
+    static _siegePushBlockers(siege, game, moveAmount) {
+        if (!siege || !game || !game.enemies) return 0;
+        const cfg = (CONFIG.balance && CONFIG.balance.affixes) || {};
+        const allowCascade = cfg.siegePushAllowCascade !== false;
+        const visited = new Set();
+        let totalPushed = 0;
+
+        const _pushOne = (target) => {
+            if (!target || visited.has(target)) return false;
+            if (!target.active || target.type === 'boss') return false;
+            visited.add(target);
+
+            // 先检查 target 推到目标位置之后是否还会与新一波"前方敌人"重叠，需要级联推动
+            const newTargetY = target.dropTargetY + moveAmount;
+            const halfWT = target.width / 2 - 4;
+            const halfHT = target.height / 2 - 4;
+
+            if (allowCascade) {
+                for (const other of game.enemies) {
+                    if (other === target || other === siege) continue;
+                    if (!other.active || other.type === 'boss') continue;
+                    if (visited.has(other)) continue;
+
+                    const xDist = Math.abs(other.pos.x - target.pos.x);
+                    if (xDist > (target.width + other.width) / 2 - 4) continue;
+
+                    // other 中心位于 target 推后底边附近 → 视为级联阻挡
+                    const yLo = newTargetY - halfHT;
+                    const yHi = newTargetY + target.height / 2 + other.height / 2;
+                    if (other.pos.y > yLo && other.pos.y < yHi) {
+                        _pushOne(other);
+                    }
+                }
+            }
+
+            target.advance(moveAmount);
+            target.bumpOffsetY = -6;
+            target._lastPushedBySiege = siege;
+            game.spawn_createParticle(target.pos.x, target.pos.y, '#facc15', 'spark');
+            totalPushed++;
+            return true;
+        };
+
+        // 找到 siege 正前方一行内、x 轴与 siege 重叠的所有敌人
+        const siegeBottom = siege.pos.y + siege.height / 2;
+        const targetBandTop = siegeBottom - 4;
+        const targetBandBottom = siegeBottom + moveAmount + 4;
+
+        for (const other of game.enemies) {
+            if (other === siege) continue;
+            if (!other.active || other.type === 'boss') continue;
+
+            const xDist = Math.abs(other.pos.x - siege.pos.x);
+            if (xDist > (siege.width + other.width) / 2 - 4) continue;
+
+            const yTop = other.pos.y - other.height / 2;
+            // other 顶边落在 siege 推动区间内 → 视为正前方
+            if (yTop > targetBandTop && yTop < targetBandBottom) {
+                _pushOne(other);
+            }
+        }
+
+        return totalPushed;
     }
 
     /**

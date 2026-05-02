@@ -358,8 +358,10 @@
 | `assets/ui/sprites/v2/ward_barrier_label.png` | 屏障数字浮字"🔷-N"底板 | 64×24 | `spawn_createFloatingText` 屏障吸收数字时叠加 | 与 shield 浮字风格区分 |
 | `assets/ui/sprites/v2/echo_relay_link.png` | 尖塔→被触发敌人脉冲连线 | 8×4，水平可平铺 | 对每个 echo 命中目标绘制 1 段，`screen` 合成 | 让玩家直观看到中继传导路径 |
 | `assets/ui/sprites/v2/hive_larva_hatch_0.png` ~ `_5.png` | 孵化破壳光环 6 帧 | 96×96 | `Enemy._hiveSpawnLarva` 末尾、幼体生成位置 | 当前是简单粒子，升级为光环更直观 |
-| `assets/ui/sprites/v2/siege_warning_strip.png` | 攻城重压前的黄黑警戒条 | 384×16，可平铺 | `_siegeCooldown <= 1` 时持续显示在履带前侧 | 给玩家"还有 1 回合就推进"的预警 |
-| `assets/ui/sprites/v2/siege_push_dust_0.png` ~ `_2.png` | 攻城推进尘暴 3 帧 | 384×64 | `siege_push` 触发瞬间于履带底部 | 强调重压的物理冲击感 |
+| `assets/ui/sprites/v2/siege_warning_strip.png` | 攻城推进前的黄黑警戒条 | 384×16，可平铺 | `_siegePushBlockers` 检测到将推动 ≥1 个敌人、且处于 telegraphing 阶段时闪烁 | 给玩家"下一回合会被推一起向前"的预警 |
+| `assets/ui/sprites/v2/siege_push_dust_0.png` ~ `_2.png` | 攻城推进尘暴 3 帧 | 384×64 | `_doMove` siege 分支推进瞬间于履带底部连续喷溅 | 强调推进的物理冲击感 |
+| `assets/ui/sprites/v2/siege_push_chain.png` | 攻城履带与被推敌人之间的力传递痕（金属碰撞光） | 128×64 | `Enemy._siegePushBlockers` 中每个被推目标与 siege 之间绘制 1 段 | 让玩家看到"推动方向链路" |
+| `assets/ui/sprites/v2/siege_frost_immune_flash.png` | 攻城履带被冰属性命中时的灰蓝盾光（一次性） | 384×256 | `_processTempOnce` siege 免冻分支触发时 | 视觉化"FROST IMMUNE"反馈 |
 | `assets/ui/sprites/v2/gravity_bullet_pulled.png` | 子弹被引力捕获时的拖尾 | 16×16，4 帧 | `projectile.js` 引力分支检测到 `dist < pullR` 时按帧 spawn | 让玩家直观感受弹道偏折 |
 
 ### 8.3 P2 — 入场仪式感与图鉴美化

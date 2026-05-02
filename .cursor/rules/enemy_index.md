@@ -28,7 +28,7 @@
 | `echoRelay` | 每回合额外触发一次周围（半径 ≈ 1.5×width + 0.5×height）敌人的 regen/healer/clone/haste；自身 HP 倍率为 0.5；同回合每个目标只被 echo 一次（`_echoedThisTurn`） | `Enemy._echoRelayRetrigger` 静态方法；`executeTurnAction` 末尾分支 |
 | `prism` | 与 shield 共用激光偏折面入口；命中伤害按 `prismLaserDeflect (=0.5)` 衰减；产生七色折射粒子 | `combat/collision.js` 激光检测；`combat_system.js` `hitType === 'prism'` 分支 |
 | `hive` | 每 `hiveSpawnInterval (=2)` 回合在巢周围生成血量为自身 `hiveSpawnHpPct (=15%)` 的低血量幼体（无词条，标记 `_isHiveLarva`） | `Enemy._hiveSpawnLarva` 静态方法 |
-| `siege` | 每 `siegePushInterval (=3)` 回合执行一次 `+siegePushRows (=2)` 行的额外推进 | `executeTurnAction` siege 分支 |
+| `siege` | **免疫冰冻**（`isFrozenCurrentTurn` 永远为 false，温度 < 0 时直接抹平到 0）；移动时若前方被敌人阻挡，则把横向重叠的所有非 Boss 敌人一起向下推（`siegePushAllowCascade=true` 时支持级联推动），自身不再被"BLOCKED"卡住 | `_processTempOnce` siege 分支 + `Enemy._siegePushBlockers` + `_doMove` 的 `else if (siege)` 分支 |
 | `gravityWell` | 在 `gravityWellPullRadius (=220px)` 半径内对所有带速度的子弹按 `gravityWellPullStrength (=0.18)` 施加回拉力 | `projectile.js#update` 顶部块 |
 
 ### V2 基底生成流程

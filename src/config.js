@@ -551,11 +551,11 @@ const CONFIG = {
             hiveSpawnHpPct: 0.15,             // 幼体血量为基底 baseHP 的比例
             hiveHpMult: 2.5,                  // 孵化巢自身血量倍率
 
-            // [siege] 攻城履带 3x2 低频重压
-            siegePushInterval: 3,             // 每隔几回合执行一次重压推进
-            siegePushRows: 2,                 // 重压推进的行数
+            // [siege] 攻城履带 3x2：冰冻免疫 + 移动时推开前方敌人
+            siegeFreezeImmune: true,          // 攻城履带无法被冰冻（不会进入 isFrozenCurrentTurn 状态）
+            siegePushAllowCascade: true,      // 推动前方敌人时是否允许连锁（A 推 B，B 再推 C）
             siegeHpMult: 3.5,                 // 攻城履带血量倍率
-            siegeMoveInterval: 2,             // 普通回合移动间隔（迟缓）
+            siegeMoveInterval: 1,             // 攻城履带每回合都尝试移动（迟缓由推动效率决定）
 
             // [gravityWell] 引力炉心 3x3 大型场控
             gravityWellPullStrength: 0.18,    // 弹道回拉强度（0~1，乘以方向矢量）

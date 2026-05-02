@@ -932,9 +932,24 @@ phase_gathering_getRandomPegType() {
         // 一阶: -60, 二阶: -40, 三阶: -20（默认: -100 必冻 / -50~-100 概率冻）
         const _freezeHardThreshold = _cryoResParams ? (_cryoResParams.freezeTempThreshold || -100) : -100;
         const _freezeSoftThreshold = _freezeHardThreshold + 50; // 概率触发起始点（比必冻阈值高50度）
+        // [V2 siege] 攻城履带：冰冻免疫
+        // 仅免疫"冻结状态"，仍允许 cryo 减速类效果通过 temp 起作用，但不会进入 isFrozenCurrentTurn。
+        const _siegeFreezeImmune = e.affixes && e.affixes.includes('siege')
+            && (CONFIG.balance.affixes ? CONFIG.balance.affixes.siegeFreezeImmune !== false : true);
+
         const _processTempOnce = () => {
             if (e.temp < 0) {
                 let shouldFreeze = false;
+                if (_siegeFreezeImmune) {
+                    // 攻城履带忽略冻结判定，并把负温度直接抹平到 0，避免持续触发其他寒系效果
+                    shouldFreeze = false;
+                    e.isFrozenCurrentTurn = false;
+                    e.temp = 0;
+                    if (this.spawn_createFloatingText && Math.random() < 0.25) {
+                        this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, '🚜FROST IMMUNE', '#94a3b8');
+                    }
+                    return;
+                }
                 if (e.temp <= _freezeHardThreshold) {
                     shouldFreeze = true;
                 } else if (e.temp <= _freezeSoftThreshold) {

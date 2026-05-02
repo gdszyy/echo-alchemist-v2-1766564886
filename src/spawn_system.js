@@ -2329,10 +2329,7 @@ export const spawn_system = {
             if (chosen.affix === 'hive') {
                 e._hiveCooldown = afx.hiveSpawnInterval || 2;
             }
-            // [siege] 重压倒计时
-            if (chosen.affix === 'siege') {
-                e._siegeCooldown = afx.siegePushInterval || 3;
-            }
+            // [V2 siege] 攻城履带：冰冻免疫 + 移动时推开前方敌人，无独立冷却字段
 
             // 入场动画与状态
             if (options.offScreenEntrance) {

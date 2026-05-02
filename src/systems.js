@@ -511,7 +511,7 @@ class UIManager {
             },
             'siege': {
                 name: '🚜 攻城',
-                desc: `3×2 攻城履帶：每 ${afx.siegePushInterval || 3} 回合執行一次 +${afx.siegePushRows || 2} 行的重壓推進，壓縮戰場空間。`
+                desc: '3×2 攻城履帶：免疫冰凍；移動時若前方被敵人阻擋，會把橫向重疊的所有非 Boss 敵人一起向下推（可級聯），形成不可阻擋的壓制陣線。'
             },
             'gravityWell': {
                 name: '🌀 引力井',
