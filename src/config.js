@@ -551,11 +551,9 @@ const CONFIG = {
             hiveSpawnHpPct: 0.15,             // 幼体血量为基底 baseHP 的比例
             hiveHpMult: 2.5,                  // 孵化巢自身血量倍率
 
-            // [siege] 攻城履带 3x2 低频重压
-            siegePushInterval: 3,             // 每隔几回合执行一次重压推进
-            siegePushRows: 2,                 // 重压推进的行数
+            // [siege] 攻城履带 3x2 破阵推挤
             siegeHpMult: 3.5,                 // 攻城履带血量倍率
-            siegeMoveInterval: 2,             // 普通回合移动间隔（迟缓）
+            siegeMoveInterval: 2,             // 普通回合移动间隔（迟缓）；移动被前方敌人阻挡时尝试将阻挡链条整体向前推 1 行
 
             // [gravityWell] 引力炉心 3x3 大型场控
             gravityWellPullStrength: 0.18,    // 弹道回拉强度（0~1，乘以方向矢量）

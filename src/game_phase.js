@@ -941,13 +941,16 @@ phase_gathering_getRandomPegType() {
                     const chance = (Math.abs(e.temp) - Math.abs(_freezeSoftThreshold)) / 50;
                     if (Math.random() < chance) shouldFreeze = true;
                 }
-                if (shouldFreeze) {
+                if (shouldFreeze && !(e.affixes && e.affixes.includes('siege'))) {
                     e.isFrozenCurrentTurn = true;
                     e.frozenCount = (e.frozenCount || 0) + 1;
                     this.spawn_createExplosion(e.pos.x, e.pos.y, '#06b6d4');
                     audio.playEffect('freeze');
                 } else {
                     e.isFrozenCurrentTurn = false;
+                    if (shouldFreeze && e.affixes && e.affixes.includes('siege')) {
+                        this.spawn_createFloatingText(e.pos.x, e.pos.y - 35, 'FREEZE IMMUNE', '#facc15');
+                    }
                 }
                 e.temp = Math.ceil(e.temp / 2);
             }

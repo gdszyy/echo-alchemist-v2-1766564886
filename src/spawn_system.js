@@ -2207,7 +2207,7 @@ export const spawn_system = {
      *   - 3x1 装甲横梁  heavyArmor      (R5+)
      *   - 1x3 折光棱柱  prism           (R16+)
      *   - 2x3 孵化巢    hive            (R18+)
-     *   - 3x2 攻城履带  siege           (R22+)
+     *   - 3x2 攻城履带  siege           (R22+)  冰冻免疫 / 阻挡推挤
      *   - 3x3 引力炉心  gravityWell     (R30+)
      *
      * 同屏限流（避免大型机制单位扎堆）：
@@ -2329,11 +2329,6 @@ export const spawn_system = {
             if (chosen.affix === 'hive') {
                 e._hiveCooldown = afx.hiveSpawnInterval || 2;
             }
-            // [siege] 重压倒计时
-            if (chosen.affix === 'siege') {
-                e._siegeCooldown = afx.siegePushInterval || 3;
-            }
-
             // 入场动画与状态
             if (options.offScreenEntrance) {
                 e.pos.y = centerY - 2 * this.enemyHeight;

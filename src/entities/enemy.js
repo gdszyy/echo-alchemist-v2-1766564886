@@ -1079,22 +1079,9 @@ class Enemy {
                 }
             }
 
-            // --- 6. [V2 siege] 攻城履带：周期性重压推进（额外推进数行） ---
-            if (this.affixes.includes('siege')) {
-                if (this._siegeCooldown === undefined) this._siegeCooldown = afx.siegePushInterval || 3;
-                this._siegeCooldown--;
-                if (this._siegeCooldown <= 0) {
-                    this._siegeCooldown = afx.siegePushInterval || 3;
-                    const pushRows = afx.siegePushRows || 2;
-                    const pushAmount = game.enemyHeight * pushRows;
-                    this.advance(pushAmount);
-                    this.bumpOffsetY = -8;
-                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, `🚜SIEGE +${pushRows}`, '#facc15');
-                    game.spawn_createShockwave(this.pos.x, this.pos.y, '#facc15');
-                }
-            }
-
-            // --- 7. [V2 echoRelay] 回响中继：额外触发一次周围敌人的词条效果 ---
+            // --- 6. [V2 siege] 攻城履带：免疫冰冻；普通移动被前方敌人阻挡时改为推挤链条 ---
+            // 具体推挤行为在下方 _doMoveP() 中处理，避免额外行动与普通移动节奏叠加。
+            // --- 7. [V2 echoRelay] 共振尖塔：额外触发周围敌人的词条效果 ---
             if (this.affixes.includes('echoRelay')) {
                 Enemy._echoRelayRetrigger(this, game, afx);
             }
@@ -1106,8 +1093,52 @@ class Enemy {
             const moveAmount = game.enemyHeight;
             const targetY = this.dropTargetY + moveAmount;
             const isBlocked = game.calc_isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
+            const _overlapsProjected = (ax, ay, aw, ah, other, otherY = null) => {
+                const bx = other.pos.x;
+                const by = otherY !== null ? otherY : other.dropTargetY;
+                const bw = other.width * 0.8;
+                const bh = other.height * 0.8;
+                return Math.abs(ax - bx) < (aw + bw) * 0.5 && Math.abs(ay - by) < (ah + bh) * 0.5;
+            };
+            const _findProjectedBlockers = (mover, moverTargetY, pushedSet) => {
+                const aw = mover.width * 0.8;
+                const ah = mover.height * 0.8;
+                return game.enemies.filter(other => {
+                    if (!other || !other.active || other === mover || pushedSet.has(other)) return false;
+                    return _overlapsProjected(mover.pos.x, moverTargetY, aw, ah, other);
+                });
+            };
+            const _trySiegePushChain = () => {
+                if (!this.affixes.includes('siege')) return false;
+                const pushedSet = new Set([this]);
+                const pushOrder = [];
+                const canPush = (mover) => {
+                    const nextY = mover.dropTargetY + moveAmount;
+                    if (nextY + mover.height * 0.5 > game.height) return false;
+                    const blockers = _findProjectedBlockers(mover, nextY, pushedSet);
+                    for (const blocker of blockers) {
+                        pushedSet.add(blocker);
+                        if (!canPush(blocker)) return false;
+                        pushOrder.push(blocker);
+                    }
+                    return true;
+                };
+                if (!canPush(this) || pushOrder.length === 0) return false;
+                for (const pushed of pushOrder) {
+                    pushed.advance(moveAmount);
+                    pushed.bumpOffsetY = -6;
+                    game.spawn_createParticle(pushed.pos.x, pushed.pos.y, '#facc15', 'spark');
+                }
+                this.advance(moveAmount);
+                this.bumpOffsetY = -12;
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - 45, `PUSH x${pushOrder.length}`, '#facc15');
+                game.spawn_createShockwave(this.pos.x, this.pos.y, '#facc15');
+                return true;
+            };
             if (!isBlocked) {
                 this.advance(moveAmount);
+            } else if (_trySiegePushChain()) {
+                // siege 推挤成功后不再执行 jump / blocked 分支。
             } else {
                 if (this.affixes.includes('jump')) {
                     let effectiveJumpRows = afx.jumpRows;

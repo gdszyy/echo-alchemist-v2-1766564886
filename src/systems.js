@@ -510,8 +510,8 @@ class UIManager {
                 desc: `2×3 孵化巢：每 ${afx.hiveSpawnInterval || 2} 回合在周圍生成一隻血量為自身 ${(afx.hiveSpawnHpPct || 0.15) * 100}% 的低血量幼體。`
             },
             'siege': {
-                name: '🚜 攻城',
-                desc: `3×2 攻城履帶：每 ${afx.siegePushInterval || 3} 回合執行一次 +${afx.siegePushRows || 2} 行的重壓推進，壓縮戰場空間。`
+                name: '🚜 破陣',
+                desc: `3×2 攻城履帶：無法被冰凍；移動時若被前方敵人阻擋，會嘗試將阻擋鏈條一起向前推進 1 行。`
             },
             'gravityWell': {
                 name: '🌀 引力井',
