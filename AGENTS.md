@@ -104,6 +104,7 @@
 *   **敌人视觉设计 V2**：[`docs/enemy_visual_design_v2.md`](docs/enemy_visual_design_v2.md) - 敌人尺寸足迹、基底类型、专属词条与 3×3 范围内大型敌人的视觉/机制规范。**凡修改敌人尺寸、基底形体、敌人词条归属或大型敌人生成逻辑时，必须先读此文档。**
 *   **敌人美术与词条特效影响范围评估**：[`docs/enemy_art_implementation_impact.md`](docs/enemy_art_implementation_impact.md) - 记录敌人组合资产、非 1×1 词条特效、新词条特效和预设波次系统的影响范围、优先级与推荐落地路径。
 *   **敌人组合预设波次设计**：[`docs/enemy_wave_preset_design.md`](docs/enemy_wave_preset_design.md) - 定义大型敌人首批预设波次、出场节奏、放置规则、资产键联动和后续代码修改方案。
+*   **敌人 V2 分阶段 Agent 提示词**：[`docs/enemy_agent_phase_prompts.md`](docs/enemy_agent_phase_prompts.md) - 将敌人美术资产、非 1×1 词条特效、新专属词条特效、预设波次与最终联调拆分为可顺序交给后续 Agent 执行的提示词。
 
 > **架构状态（Task 3.3 更新）**：`core.js` 已完全移除 `Object.assign(Game.prototype, ...)` Mixin 模式。全部 10 个子系统均已迁移至组合模式（Composition via bind）。新增子系统必须遵循 [`.cursor/rules/global.md`](.cursor/rules/global.md) 第 5 节「子系统扩展规范」。
 
