@@ -459,58 +459,12 @@ export const spawn_system = {
         }
 
         // =========================================
-        // 2.5 重装变种（3x1 宽型敌人）预生成
+        // 2.5 V2 基底敌人（尺寸+专属词条）预生成
         // =========================================
-        // 从第5回合起，有一定概率在当前行生成一个占3列宽的重装变种。
-        // 重装变种具有 heavyArmor 词条：血量翻倍，每2回合才能移动一次。
-        const _haAfxCfg = CONFIG.balance.affixes;
-        const _haMinRound = 5;
-        const _haSpawnChance = Math.min(0.22, 0.06 + this.round * 0.008); // 随回合数增加，最高22%
-        const _haCols = (_haAfxCfg && _haAfxCfg.heavyArmorWideGridCols) || 3;
-        if (this.round >= _haMinRound && Math.random() < _haSpawnChance) {
-            // 查找连续空闲的 _haCols 列
-            const _totalCols = CONFIG.gameplay.enemyCols;
-            for (let _sc = 0; _sc <= _totalCols - _haCols; _sc++) {
-                let _colsFree = true;
-                for (let _dc = 0; _dc < _haCols; _dc++) {
-                    if (occupiedCols[_sc + _dc]) { _colsFree = false; break; }
-                }
-                if (!_colsFree) continue;
-                // 宽敌人中心 X = 起始列 + (cols/2) 个单元格宽度的中心
-                const _wideCenterX = (_sc + (_haCols - 1) / 2) * w + w / 2;
-                const _wideW = w * _haCols;
-                if (this.calc_isAreaOccupied(_wideCenterX, yPos, _wideW * 0.85, this.enemyHeight * 0.85)) continue;
-                // 血量：应用重装词条翻倍系数
-                const _haMult = (_haAfxCfg && _haAfxCfg.heavyArmorHpMult) || 2.0;
-                const _haHp = Math.floor(baseHP * _haMult * (0.9 + Math.random() * 0.2));
-                const _haEnemy = new Enemy(_wideCenterX, yPos, _wideW, this.enemyHeight, _haHp);
-                _haEnemy.affixes = ['heavyArmor'];
-                _haEnemy.type = 'elite';
-                _haEnemy.isWideEnemy = true;
-                _haEnemy.gridCols = _haCols;
-                // 初始化重装移动冷却
-                _haEnemy._moveInterval = (_haAfxCfg && _haAfxCfg.heavyArmorMoveInterval) || 2;
-                _haEnemy._moveCooldown = 0;
-                if (options.offScreenEntrance) {
-                    _haEnemy.pos.y = yPos - 2 * this.enemyHeight;
-                    _haEnemy.hasActedThisTurn = true;
-                    _haEnemy._spawnedThisTurn = true;
-                }
-                _haEnemy._spawnColIndex = _sc + Math.floor(_haCols / 2);
-                // 标记占用的所有列
-                for (let _dc = 0; _dc < _haCols; _dc++) occupiedCols[_sc + _dc] = true;
-                // 掉落判定
-                if (typeof this.sys_determineEnemyReward === 'function') {
-                    this.sys_determineEnemyReward(_haEnemy, false);
-                }
-                // Sprite 初始化
-                if (typeof _haEnemy.initSprite === 'function') _haEnemy.initSprite();
-                this.enemies.push(_haEnemy);
-                // 入场特效：蓝灰色冲击波突出重型单位
-                this.spawn_createShockwave(_haEnemy.pos.x, _haEnemy.pos.y, '#94a3b8');
-                break; // 每行最多一个重装变种
-            }
-        }
+        // 详见 design_spec_bitmap.md / "敌人视觉设计 V2" 文档：
+        // 不同尺寸（1x1、2x1、1x2、2x2、3x1、1x3、2x3、3x2、3x3）对应不同基底，
+        // 每个基底绑定一个专属词条；专属词条不进入随机词条池。
+        this.spawn_trySpawnArchetypes(yPos, baseHP, occupiedCols, w, options);
 
         // =========================================
         // 3. 填充剩余空位 (Fill Loop)
@@ -2236,6 +2190,250 @@ export const spawn_system = {
 
             default:
                 // 无 Boss 历史或未知 Boss：默认 AABB
+                e.collisionShape = 'aabb';
+                e.collisionData = null;
+                break;
+        }
+    },
+
+    /**
+     * @method spawn_trySpawnArchetypes
+     * @description [V2 敌人视觉] 尝试在指定行生成大型基底敌人（尺寸 + 专属词条）。
+     *
+     * 基底列表（cols × rows，专属词条）：
+     *   - 2x1 棱盾兽    deflectionWard  (R9+)
+     *   - 1x2 共振尖塔  echoRelay       (R10+)
+     *   - 2x2 深渊胃囊  devour          (R12+)
+     *   - 3x1 装甲横梁  heavyArmor      (R5+)
+     *   - 1x3 折光棱柱  prism           (R16+)
+     *   - 2x3 孵化巢    hive            (R18+)
+     *   - 3x2 攻城履带  siege           (R22+)
+     *   - 3x3 引力炉心  gravityWell     (R30+)
+     *
+     * 同屏限流（避免大型机制单位扎堆）：
+     *   - 2x2 同屏 ≤ 2，2x3/3x2 ≤ 1，3x3 ≤ 1，3x3 出现时跳过其他大型基底
+     *   - 1x1 标准敌人在主填充循环中生成，不在此处理
+     */
+    spawn_trySpawnArchetypes(yPos, baseHP, occupiedCols, w, options) {
+        const r = this.round || 0;
+        const totalCols = CONFIG.gameplay.enemyCols;
+        const afx = CONFIG.balance.affixes;
+
+        // 当前同屏大型基底统计（用于限流）
+        let countMaw = 0, countHive = 0, countSiege = 0, countWell = 0;
+        for (const e of this.enemies) {
+            if (!e || !e.active) continue;
+            const a = e.baseArchetype;
+            if (a === 'maw') countMaw++;
+            else if (a === 'hive') countHive++;
+            else if (a === 'siege') countSiege++;
+            else if (a === 'gravityWell') countWell++;
+        }
+
+        // 候选基底列表（按从大到小尝试，3x3 出现时跳过其他大型）
+        const candidates = [
+            { id: 'gravityWell',   cols: 3, rows: 3, affix: 'gravityWell',   minRound: 30, weight: 0.025, hpMult: afx.gravityWellHpMult || 6.0,  color: '#7c3aed', skip: countWell >= 1 },
+            { id: 'siege',         cols: 3, rows: 2, affix: 'siege',         minRound: 22, weight: 0.05,  hpMult: afx.siegeHpMult || 3.5,        color: '#facc15', skip: countSiege >= 1 || countWell >= 1 },
+            { id: 'hive',          cols: 2, rows: 3, affix: 'hive',          minRound: 18, weight: 0.06,  hpMult: afx.hiveHpMult || 2.5,         color: '#a3e635', skip: countHive >= 1 || countWell >= 1 },
+            { id: 'prism',         cols: 1, rows: 3, affix: 'prism',         minRound: 16, weight: 0.08,  hpMult: afx.prismHpMult || 1.4,        color: '#67e8f9', skip: countWell >= 1 },
+            { id: 'maw',           cols: 2, rows: 2, affix: 'devour',        minRound: 12, weight: 0.10,  hpMult: 2.0,                            color: '#7f1d1d', skip: countMaw >= 2 || countWell >= 1 },
+            { id: 'echoSpire',     cols: 1, rows: 2, affix: 'echoRelay',     minRound: 10, weight: 0.10,  hpMult: afx.echoRelayHpMult || 0.5,    color: '#f0abfc', skip: countWell >= 1 },
+            { id: 'deflector',     cols: 2, rows: 1, affix: 'deflectionWard',minRound: 9,  weight: 0.12,  hpMult: afx.deflectionWardHpMult || 1.0,color: '#38bdf8', skip: false },
+            { id: 'bastion',       cols: 3, rows: 1, affix: 'heavyArmor',    minRound: 5,  weight: 0.18,  hpMult: afx.heavyArmorHpMult || 2.0,   color: '#94a3b8', skip: false },
+        ];
+
+        // 构建权重池
+        const pool = [];
+        let totalW = 0;
+        for (const c of candidates) {
+            if (r < c.minRound || c.skip) continue;
+            // 大型基底的总体出现概率随回合数缓慢增加，但单种概率仍由 weight 决定
+            pool.push(c);
+            totalW += c.weight;
+        }
+        if (pool.length === 0) return;
+
+        // 总体生成概率：保留与原 heavyArmor 相近的曲线（最高 40%）
+        const overallChance = Math.min(0.40, 0.10 + r * 0.012);
+        if (Math.random() >= overallChance) return;
+
+        // 加权抽签
+        let roll = Math.random() * totalW;
+        let chosen = pool[0];
+        for (const c of pool) {
+            if (roll < c.weight) { chosen = c; break; }
+            roll -= c.weight;
+        }
+
+        // 寻找连续 chosen.cols 列的空闲位置
+        const startCols = [];
+        for (let sc = 0; sc <= totalCols - chosen.cols; sc++) startCols.push(sc);
+        // 洗牌起始列，避免总出现在最左
+        for (let i = startCols.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [startCols[i], startCols[j]] = [startCols[j], startCols[i]];
+        }
+
+        for (const sc of startCols) {
+            let free = true;
+            for (let dc = 0; dc < chosen.cols; dc++) {
+                if (occupiedCols[sc + dc]) { free = false; break; }
+            }
+            if (!free) continue;
+
+            const wPx = w * chosen.cols;
+            const hPx = this.enemyHeight * chosen.rows;
+            // 中心 X
+            const centerX = (sc + (chosen.cols - 1) / 2) * w + w / 2;
+            // 中心 Y：多行基底向下扩展，中心 = yPos + (rows-1)*enemyHeight/2
+            const centerY = yPos + (chosen.rows - 1) * this.enemyHeight / 2;
+
+            // 区域占用检查（适当缩小以避免边角误判）
+            if (this.calc_isAreaOccupied(centerX, centerY, wPx * 0.85, hPx * 0.85)) continue;
+
+            // 血量计算
+            const hp = Math.floor(baseHP * chosen.hpMult * (0.9 + Math.random() * 0.2));
+
+            const e = new Enemy(centerX, centerY, wPx, hPx, hp);
+            e.affixes = [chosen.affix];
+            e.type = 'elite';
+            e.baseArchetype = chosen.id;
+            e.gridCols = chosen.cols;
+            e.gridRows = chosen.rows;
+            if (chosen.cols >= 2) e.isWideEnemy = true;
+
+            // 移动间隔：依据基底类型分配，体现"越大越慢"
+            if (chosen.affix === 'heavyArmor') {
+                e._moveInterval = afx.heavyArmorMoveInterval || 2;
+            } else if (chosen.affix === 'siege') {
+                e._moveInterval = afx.siegeMoveInterval || 2;
+            } else if (chosen.affix === 'gravityWell') {
+                e._moveInterval = afx.gravityWellMoveInterval || 3;
+            } else if (chosen.rows >= 2 || chosen.cols >= 3) {
+                e._moveInterval = 2;
+            } else {
+                e._moveInterval = 1;
+            }
+            e._moveCooldown = 0;
+
+            // [deflectionWard] 屏障初始化：满屏障值
+            if (chosen.affix === 'deflectionWard') {
+                const pct = afx.deflectionWardBarrierPct || 0.10;
+                e.wardBarrierMax = Math.max(1, Math.floor(hp * pct));
+                e.wardBarrier = e.wardBarrierMax;
+                e.wardBrokenThisTurn = false;
+            }
+            // [echoRelay] 自身血量减半（覆盖 hp 计算的 echoRelayHpMult，再保险）
+            // 这里不再二次乘以 0.5，保持 hpMult 已经设为 0.5
+            // [hive] 孵化倒计时
+            if (chosen.affix === 'hive') {
+                e._hiveCooldown = afx.hiveSpawnInterval || 2;
+            }
+            // [siege] 重压倒计时
+            if (chosen.affix === 'siege') {
+                e._siegeCooldown = afx.siegePushInterval || 3;
+            }
+
+            // 入场动画与状态
+            if (options.offScreenEntrance) {
+                e.pos.y = centerY - 2 * this.enemyHeight;
+                e.dropTargetY = centerY;
+                e.hasActedThisTurn = true;
+                e._spawnedThisTurn = true;
+            }
+            e._spawnColIndex = sc + Math.floor(chosen.cols / 2);
+
+            // 标记占用列
+            for (let dc = 0; dc < chosen.cols; dc++) occupiedCols[sc + dc] = true;
+
+            // 异型形状（部分基底有专属轮廓）
+            this.spawn_applyArchetypeShape(e, chosen.id);
+
+            // 掉落判定与 sprite 初始化
+            if (typeof this.sys_determineEnemyReward === 'function') {
+                this.sys_determineEnemyReward(e, false);
+            }
+            if (typeof e.initSprite === 'function') e.initSprite();
+            this.enemies.push(e);
+
+            // 入场冲击波（按基底主色）
+            this.spawn_createShockwave(e.pos.x, e.pos.y, chosen.color);
+            return; // 每行只生成一个大型基底
+        }
+    },
+
+    /**
+     * @method spawn_applyArchetypeShape
+     * @description [V2] 为基底敌人分配轮廓形状。覆盖 spawn_applyMinionShape 的 Boss 形状映射，
+     *              因为基底敌人有自己的语义形体（胃囊、棱柱、卵囊等）。
+     */
+    spawn_applyArchetypeShape(e, archetypeId) {
+        const w = e.width, h = e.height;
+        switch (archetypeId) {
+            case 'maw': // 2x2 缺口圆角矩形（深渊胃囊）
+                e.collisionShape = 'polygon';
+                e.collisionData = { vertices: [
+                    new Vec2(-w * 0.45, -h * 0.45),
+                    new Vec2( w * 0.45, -h * 0.45),
+                    new Vec2( w * 0.50,  h * 0.10),
+                    new Vec2( w * 0.20,  h * 0.50),
+                    new Vec2(-w * 0.20,  h * 0.50),
+                    new Vec2(-w * 0.50,  h * 0.10),
+                ]};
+                break;
+            case 'deflector': // 2x1 倾斜棱面盾壳
+                e.collisionShape = 'polygon';
+                e.collisionData = { vertices: [
+                    new Vec2(-w * 0.50,  h * 0.30),
+                    new Vec2(-w * 0.30, -h * 0.45),
+                    new Vec2( w * 0.30, -h * 0.45),
+                    new Vec2( w * 0.50,  h * 0.30),
+                    new Vec2( w * 0.30,  h * 0.50),
+                    new Vec2(-w * 0.30,  h * 0.50),
+                ]};
+                break;
+            case 'echoSpire': // 1x2 细长尖塔
+                e.collisionShape = 'polygon';
+                e.collisionData = { vertices: [
+                    new Vec2(0,         -h * 0.50),
+                    new Vec2( w * 0.30, -h * 0.30),
+                    new Vec2( w * 0.40,  h * 0.45),
+                    new Vec2(-w * 0.40,  h * 0.45),
+                    new Vec2(-w * 0.30, -h * 0.30),
+                ]};
+                break;
+            case 'prism': // 1x3 棱镜（菱形拉长）
+                e.collisionShape = 'polygon';
+                e.collisionData = { vertices: [
+                    new Vec2(0,         -h * 0.50),
+                    new Vec2( w * 0.45,  0),
+                    new Vec2(0,          h * 0.50),
+                    new Vec2(-w * 0.45,  0),
+                ]};
+                break;
+            case 'hive': // 2x3 孵化巢（圆角胶囊）
+                e.collisionShape = 'aabb';
+                e.collisionData = null;
+                break;
+            case 'siege': // 3x2 履带（六边形横向）
+                e.collisionShape = 'polygon';
+                e.collisionData = { vertices: [
+                    new Vec2(-w * 0.50, -h * 0.20),
+                    new Vec2(-w * 0.30, -h * 0.50),
+                    new Vec2( w * 0.30, -h * 0.50),
+                    new Vec2( w * 0.50, -h * 0.20),
+                    new Vec2( w * 0.50,  h * 0.20),
+                    new Vec2( w * 0.30,  h * 0.50),
+                    new Vec2(-w * 0.30,  h * 0.50),
+                    new Vec2(-w * 0.50,  h * 0.20),
+                ]};
+                break;
+            case 'gravityWell': // 3x3 引力炉心：圆形
+                e.collisionShape = 'arc';
+                e.collisionData = { radius: Math.min(w, h) * 0.45 };
+                break;
+            case 'bastion': // 3x1 重装：保持矩形
+            default:
                 e.collisionShape = 'aabb';
                 e.collisionData = null;
                 break;

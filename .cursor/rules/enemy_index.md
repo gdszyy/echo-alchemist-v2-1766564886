@@ -1,8 +1,46 @@
 # 敌人词缀与 Boss 索引 (Enemy Affix & Boss Index)
 
-> **数据来源**：`src/config.js` → `balance.affixes`, `balance.bossConfigs`, `BOSS_DB`, `ENEMY_CURVE_CONFIG`；`src/spawn_system.js` → `spawn_generateAffixes()`, `spawn_scheduleNextBoss()`；`src/systems.js` → `TRUTH_BOOK_DATA.enemies`
-> **用途**：Agent 快速查询 8 种敌人词缀和 8 个 Boss 的行为机制、出现回合、克制属性及关键代码位置。
-> **最后更新**：调整敌人与 Boss 血量算法，优化数值平衡（2026-04-23）
+> **数据来源**：`src/config.js` → `balance.affixes`, `balance.bossConfigs`, `BOSS_DB`, `ENEMY_CURVE_CONFIG`；`src/spawn_system.js` → `spawn_generateAffixes()`, `spawn_trySpawnArchetypes()`, `spawn_scheduleNextBoss()`；`src/systems.js` → `TRUTH_BOOK_DATA.enemies`
+> **用途**：Agent 快速查询 8 种通用词缀、7 种 V2 基底专属词缀和 8 个 Boss 的行为机制、出现回合、克制属性及关键代码位置。
+> **最后更新**：V2 敌人视觉重设计——尺寸基底 + 专属词条体系（2026-05-02）
+
+## 0. V2 基底专属词条总览（7 种，仅通过基底敌人附带，不进入随机词条池）
+
+> 详见敌人视觉设计 V2 文档。所有基底专属词条均由 `spawn_trySpawnArchetypes()` 在生成大型基底敌人时一次性注入，**不会**通过 `spawn_generateAffixes()` 随机分配。
+
+| 词条 ID | 中文名 | 绑定基底 | 默认尺寸 (cols×rows) | 最早出现回合 | 同屏上限 |
+|---|---|---|---|---|---|
+| `heavyArmor` | 装甲横梁 | bastion | 3×1 | R5 | 不限（每行最多 1 个大型基底） |
+| `deflectionWard` | 棱盾兽 | deflector | 2×1 | R9 | 不限 |
+| `echoRelay` | 共振尖塔 | echoSpire | 1×2 | R10 | 不限 |
+| `devour` | 深渊胃囊 | maw | 2×2 | R12 | ≤ 2 |
+| `prism` | 折光棱柱 | prism | 1×3 | R16 | 不限 |
+| `hive` | 孵化巢 | hive | 2×3 | R18 | ≤ 1 |
+| `siege` | 攻城履带 | siege | 3×2 | R22 | ≤ 1 |
+| `gravityWell` | 引力炉心 | gravityWell | 3×3 | R30 | ≤ 1（出现时跳过其他大型基底） |
+
+### V2 词条行为速查
+
+| 词条 | 行为概要 | 关键代码 |
+|---|---|---|
+| `deflectionWard` | 屏障 = `maxHp × deflectionWardBarrierPct (=10%)`；只吸收 pierce/bounce 类伤害；普通直击、火焰 DoT、毒素 DoT 绕过；未被打破则每回合开始回满 | `enemy.js#takeDamage` 顶部分支；`game_phase.js#phase_enemy_startLogic` 重置块 |
+| `echoRelay` | 每回合额外触发一次周围（半径 ≈ 1.5×width + 0.5×height）敌人的 regen/healer/clone/haste；自身 HP 倍率为 0.5；同回合每个目标只被 echo 一次（`_echoedThisTurn`） | `Enemy._echoRelayRetrigger` 静态方法；`executeTurnAction` 末尾分支 |
+| `prism` | 与 shield 共用激光偏折面入口；命中伤害按 `prismLaserDeflect (=0.5)` 衰减；产生七色折射粒子 | `combat/collision.js` 激光检测；`combat_system.js` `hitType === 'prism'` 分支 |
+| `hive` | 每 `hiveSpawnInterval (=2)` 回合在巢周围生成血量为自身 `hiveSpawnHpPct (=15%)` 的低血量幼体（无词条，标记 `_isHiveLarva`） | `Enemy._hiveSpawnLarva` 静态方法 |
+| `siege` | 每 `siegePushInterval (=3)` 回合执行一次 `+siegePushRows (=2)` 行的额外推进 | `executeTurnAction` siege 分支 |
+| `gravityWell` | 在 `gravityWellPullRadius (=220px)` 半径内对所有带速度的子弹按 `gravityWellPullStrength (=0.18)` 施加回拉力 | `projectile.js#update` 顶部块 |
+
+### V2 基底生成流程
+
+| 步骤 | 描述 |
+|---|---|
+| 1. 入口 | `spawn_spawnEnemyRowAt` 在普通敌人填充前调用 `spawn_trySpawnArchetypes` |
+| 2. 总体概率 | `Math.min(0.40, 0.10 + round × 0.012)` |
+| 3. 候选筛选 | 排除回合数不足、同屏数量超限、`gravityWell` 在场时跳过其他大型 |
+| 4. 加权抽签 | 按 `weight` 字段（`gravityWell=0.025` … `bastion=0.18`）随机一个基底 |
+| 5. 位置寻找 | 洗牌列起点，逐个尝试连续 cols 列的空闲位置；失败则放弃本行 |
+| 6. 实例化 | 设置 `width = cols × enemyWidth`、`height = rows × enemyHeight`、`baseArchetype`、`gridCols`、`gridRows`、专属词条、移动间隔、特效 |
+| 7. 形状 | 调用 `spawn_applyArchetypeShape(e, archetypeId)` 注入语义轮廓（胃囊缺口、棱镜菱形、引力圆等） |
 
 ## 1. 敌人词缀总览（8 种）
 

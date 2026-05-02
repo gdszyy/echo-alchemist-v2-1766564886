@@ -1068,6 +1068,36 @@ class Enemy {
             if(this.affixes.includes('clone') && Math.random() < afx.cloneChanceTurn) {
                 game.spawn_triggerCloneSpawn(this);
             }
+
+            // --- 5. [V2 hive] 孵化巢：周期性孵化弱小幼体 ---
+            if (this.affixes.includes('hive')) {
+                if (this._hiveCooldown === undefined) this._hiveCooldown = afx.hiveSpawnInterval || 2;
+                this._hiveCooldown--;
+                if (this._hiveCooldown <= 0) {
+                    this._hiveCooldown = afx.hiveSpawnInterval || 2;
+                    Enemy._hiveSpawnLarva(this, game, afx);
+                }
+            }
+
+            // --- 6. [V2 siege] 攻城履带：周期性重压推进（额外推进数行） ---
+            if (this.affixes.includes('siege')) {
+                if (this._siegeCooldown === undefined) this._siegeCooldown = afx.siegePushInterval || 3;
+                this._siegeCooldown--;
+                if (this._siegeCooldown <= 0) {
+                    this._siegeCooldown = afx.siegePushInterval || 3;
+                    const pushRows = afx.siegePushRows || 2;
+                    const pushAmount = game.enemyHeight * pushRows;
+                    this.advance(pushAmount);
+                    this.bumpOffsetY = -8;
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, `🚜SIEGE +${pushRows}`, '#facc15');
+                    game.spawn_createShockwave(this.pos.x, this.pos.y, '#facc15');
+                }
+            }
+
+            // --- 7. [V2 echoRelay] 回响中继：额外触发一次周围敌人的词条效果 ---
+            if (this.affixes.includes('echoRelay')) {
+                Enemy._echoRelayRetrigger(this, game, afx);
+            }
         }
 
         // --- [改动] 移动与跳跃：移出循环，始终只执行一次 ---
@@ -4130,7 +4160,36 @@ class Enemy {
     // @section:damage_shield_check - 护盾吸收与穿透判断
     takeDamage(amount, source = null, bypassShield = false) {
         let actualDamage = amount;
-        
+
+        // 0. [V2 deflectionWard] 偏折屏障：仅吸收"反弹"和"穿透"类伤害
+        //    - 直击伤害（无 pierce/bounce）、火焰持续伤害（bypassShield=true）、毒素 DoT 不受屏障影响
+        //    - 屏障值 = maxHp × deflectionWardBarrierPct，每回合开始若未破则回满
+        if (this.affixes && this.affixes.includes('deflectionWard') && (this.wardBarrier || 0) > 0 && !bypassShield) {
+            const cfg = source && source.config;
+            const isPierce = !!(cfg && cfg.pierce > 0);
+            const isBounceHit = !!(cfg && cfg.bounce > 0
+                && source.bouncesLeft !== undefined && source.bouncesLeft < cfg.bounce);
+            // 即使是首次命中（未弹跳），bounce 配置仍代表"反弹流派"，按规范也应被屏障吸收
+            const isBounceConfig = !!(cfg && cfg.bounce > 0);
+            if (isPierce || isBounceHit || isBounceConfig) {
+                const before = this.wardBarrier;
+                const absorbed = Math.min(this.wardBarrier, actualDamage);
+                this.wardBarrier -= absorbed;
+                actualDamage -= absorbed;
+                if (typeof game !== 'undefined') {
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 18, `🔷-${Math.ceil(absorbed)}`, '#67e8f9');
+                }
+                if (this.wardBarrier <= 0) {
+                    this.wardBrokenThisTurn = true;
+                    if (typeof game !== 'undefined') {
+                        game.spawn_createParticle(this.pos.x, this.pos.y, '#67e8f9', 'shard');
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 36, '🔷BREAK', '#22d3ee');
+                    }
+                }
+                if (actualDamage <= 0) return { actualDamage: Math.ceil(absorbed), killed: false, deflected: true };
+            }
+        }
+
         // 1. 计算护盾逻辑 (优化版)
         if (this.affixes.includes('shield') && !bypassShield) {
             // A. 方向判定：检查是否从后方 (上方) 攻击
@@ -5272,6 +5331,116 @@ class Enemy {
             // 我们约定新逻辑下 vertices 存储的是相对中心点的偏移
             return new Vec2(this.pos.x + v.x, this.pos.y + v.y);
         });
+    }
+
+    // ==================== [V2 基底专属词条] 静态辅助 ====================
+
+    /**
+     * @static
+     * @method _hiveSpawnLarva
+     * @description [hive] 在孵化巢下方/侧方寻找空位生成一个低血量幼体（无词条）。
+     *              幼体血量为 baseHP（按巢血量近似）的 hiveSpawnHpPct 比例。
+     */
+    static _hiveSpawnLarva(host, game, afx) {
+        if (!game || !host || !host.active) return;
+        const w = game.enemyWidth, h = game.enemyHeight;
+        const candidatePositions = [
+            new Vec2(host.pos.x,           host.pos.y + host.height / 2 + h / 2),
+            new Vec2(host.pos.x - w,       host.pos.y + host.height / 2 + h / 2),
+            new Vec2(host.pos.x + w,       host.pos.y + host.height / 2 + h / 2),
+            new Vec2(host.pos.x - host.width / 2 - w / 2, host.pos.y),
+            new Vec2(host.pos.x + host.width / 2 + w / 2, host.pos.y),
+        ];
+        for (const p of candidatePositions) {
+            if (p.x < w / 2 || p.x > game.width - w / 2) continue;
+            if (game.calc_isAreaOccupied(p.x, p.y, w * 0.8, h * 0.8)) continue;
+            const pct = (afx && afx.hiveSpawnHpPct) || 0.15;
+            const larvaHp = Math.max(1, Math.floor(host.maxHp * pct));
+            const larva = new Enemy(p.x, p.y, w, h, larvaHp);
+            larva.affixes = [];
+            larva.type = 'normal';
+            larva._isHiveLarva = true;
+            larva.dropTargetY = p.y;
+            larva.hasActedThisTurn = true;
+            if (typeof game.sys_determineEnemyReward === 'function') {
+                game.sys_determineEnemyReward(larva, false);
+            }
+            if (typeof larva.initSprite === 'function') larva.initSprite();
+            game.enemies.push(larva);
+            game.spawn_createParticle(p.x, p.y, '#a3e635', 'mist');
+            game.spawn_createFloatingText(host.pos.x, host.pos.y - 50, '🥚HATCH', '#a3e635');
+            return;
+        }
+    }
+
+    /**
+     * @static
+     * @method _echoRelayRetrigger
+     * @description [echoRelay] 额外触发一次周围敌人的词条效果。
+     *              "周围"按尖塔占格外缘一圈计算（用 1.5 倍尖塔宽度作为半径）。
+     *              触发的词条限制为 regen / healer / clone / devour / haste（位置相关词条不重复触发）。
+     *              每个被触发的目标本回合最多被 echo 一次（_echoedThisTurn 标记），避免多塔叠加失控。
+     */
+    static _echoRelayRetrigger(spire, game, afx) {
+        if (!game || !spire || !spire.active) return;
+        const range = spire.width * (afx && afx.echoRelayRange ? afx.echoRelayRange : 1.5)
+            + (spire.height * 0.5);
+        let triggered = 0;
+        for (const other of game.enemies) {
+            if (!other || !other.active || other === spire) continue;
+            if (other._echoedThisTurn) continue;
+            if (spire.pos.dist(other.pos) > range) continue;
+            const list = other.affixes || [];
+            let didEcho = false;
+
+            // regen：再生一次
+            if (list.includes('regen') && other.hp < other.maxHp) {
+                const heal = Math.floor(other.maxHp * (afx.regenPercent || 0.2)) || 1;
+                other.hp = Math.min(other.maxHp, other.hp + heal);
+                game.spawn_createFloatingText(other.pos.x, other.pos.y - 30, `+${heal}`, '#4ade80');
+                didEcho = true;
+            }
+            // healer：对邻居再治疗一次（治疗本人不结算，仅周围）
+            if (list.includes('healer')) {
+                const range2 = other.width * (afx.healerRange || 2);
+                game.enemies.forEach(t => {
+                    if (t !== other && t.active && t.hp < t.maxHp && other.pos.dist(t.pos) < range2) {
+                        const healAmt = Math.ceil(t.maxHp * (afx.healerPercent || 0.12));
+                        if (t.hp > t.greenHp) t.greenHp = t.hp;
+                        t.hp = Math.min(t.maxHp, t.hp + healAmt);
+                        didEcho = true;
+                    }
+                });
+            }
+            // clone：额外触发一次分身（按 cloneChanceTurn 概率）
+            if (list.includes('clone') && Math.random() < (afx.cloneChanceTurn || 0.5)) {
+                if (typeof game.spawn_triggerCloneSpawn === 'function') {
+                    game.spawn_triggerCloneSpawn(other);
+                    didEcho = true;
+                }
+            }
+            // haste：额外触发一次冲刺移动
+            if (list.includes('haste')) {
+                const moveAmount = game.enemyHeight;
+                const targetY = other.dropTargetY + moveAmount;
+                const isBlocked = game.calc_isAreaOccupied(other.pos.x, targetY, other.width * 0.8, other.height * 0.8, other);
+                if (!isBlocked) {
+                    other.advance(moveAmount);
+                    game.spawn_createFloatingText(other.pos.x, other.pos.y - 50, '⚡ECHO!', '#f0abfc');
+                    didEcho = true;
+                }
+            }
+
+            if (didEcho) {
+                other._echoedThisTurn = true;
+                triggered++;
+            }
+        }
+
+        if (triggered > 0) {
+            game.spawn_createShockwave(spire.pos.x, spire.pos.y, '#f0abfc');
+            game.spawn_createFloatingText(spire.pos.x, spire.pos.y - 30, `🔮ECHO ×${triggered}`, '#f0abfc');
+        }
     }
 }
 
