@@ -231,6 +231,7 @@ export class SpriteRenderer {
 // 游戏启动时预加载所有已知 Sprite Sheet，避免运行时卡顿
 
 import { ENEMY_V2_METADATA, ENEMY_V2_BY_ARCHETYPE } from '../data/enemy_v2_metadata.js';
+import { resolveEnemyVisualAsset, loadEnemyVisualAssetManifest } from '../data/enemy_visual_assets.js';
 
 const SPRITE_REGISTRY = {
     'golem_normal': 'assets/sprites/enemies/golem_normal.png',
@@ -269,6 +270,7 @@ export function preloadAllSprites() {
  * 为指定实体创建 SpriteRenderer 实例
  *
  * 选择优先级（V2 资源协议）：
+ *   0) 若可解析到 composite 资源（baseArchetype + footprint + affixSet）→ 使用组合 Sprite
  *   1) 若 enemy 提供了 baseArchetype 且匹配 V2 基底 → 使用 V2 专属 Sprite
  *   2) Boss → boss_<bossType>
  *   3) elite → golem_elite（V2 基底未命中时的安全回退）
@@ -276,22 +278,53 @@ export function preloadAllSprites() {
  * 任意一步资源未加载完成时，SpriteRenderer 内部会进入 failed 状态，
  * 由 Enemy.draw 回退到程序化矢量绘制，不会让敌人消失。
  *
- * @param {string} enemyType         - 'normal' | 'elite' | 'boss'
- * @param {string} [bossType]        - Boss 类型（仅 type==='boss' 时需要）
- * @param {string} [baseArchetype]   - V2 基底 ID（如 'bastion' / 'maw' …）
+ * 兼容两种调用约定：
+ *   createSpriteRenderer('elite', null, 'bastion')                     // 旧式
+ *   createSpriteRenderer({ type, bossType, baseArchetype, gridCols, gridRows, affixes }) // 新式：传入完整 enemy 信息
+ *
  * @returns {SpriteRenderer|null}
  */
-export function createSpriteRenderer(enemyType, bossType, baseArchetype) {
+export function createSpriteRenderer(enemyTypeOrEnemy, bossType, baseArchetype) {
+    // 归一化参数
+    let enemyInfo;
+    if (enemyTypeOrEnemy && typeof enemyTypeOrEnemy === 'object') {
+        enemyInfo = {
+            type: enemyTypeOrEnemy.type,
+            bossType: enemyTypeOrEnemy.bossType,
+            baseArchetype: enemyTypeOrEnemy.baseArchetype,
+            gridCols: enemyTypeOrEnemy.gridCols,
+            gridRows: enemyTypeOrEnemy.gridRows,
+            affixes: enemyTypeOrEnemy.affixes,
+        };
+    } else {
+        enemyInfo = {
+            type: enemyTypeOrEnemy,
+            bossType,
+            baseArchetype,
+            gridCols: 1,
+            gridRows: 1,
+            affixes: [],
+        };
+    }
+
+    // 0) 资源协议解析（baseArchetype + footprint + affixSet → composite 资源）
+    if (enemyInfo.baseArchetype || (enemyInfo.gridCols > 1 || enemyInfo.gridRows > 1)) {
+        const resolved = resolveEnemyVisualAsset(enemyInfo);
+        if (resolved && resolved.spritePath && (resolved.fallbackLevel === 'composite' || resolved.fallbackLevel === 'archetype')) {
+            return new SpriteRenderer(resolved.spritePath, resolved.manifestPath || undefined);
+        }
+    }
+
     let key = null;
 
     // 1) V2 基底优先（普通/精英共用同一组资源）
-    if (baseArchetype && ENEMY_V2_BY_ARCHETYPE[baseArchetype]) {
-        key = ENEMY_V2_BY_ARCHETYPE[baseArchetype].resourceId;
-    } else if (enemyType === 'boss' && bossType) {
-        key = `boss_${bossType}`;
-    } else if (enemyType === 'elite') {
+    if (enemyInfo.baseArchetype && ENEMY_V2_BY_ARCHETYPE[enemyInfo.baseArchetype]) {
+        key = ENEMY_V2_BY_ARCHETYPE[enemyInfo.baseArchetype].resourceId;
+    } else if (enemyInfo.type === 'boss' && enemyInfo.bossType) {
+        key = `boss_${enemyInfo.bossType}`;
+    } else if (enemyInfo.type === 'elite') {
         key = 'golem_elite';
-    } else if (enemyType === 'normal') {
+    } else if (enemyInfo.type === 'normal') {
         key = 'golem_normal';
     }
 
@@ -300,7 +333,7 @@ export function createSpriteRenderer(enemyType, bossType, baseArchetype) {
     const path = SPRITE_REGISTRY[key];
     if (!path) {
         // V2 基底配置但资源缺失 → 安全回退到 golem_elite，保证敌人可见
-        if (enemyType === 'elite' || baseArchetype) {
+        if (enemyInfo.type === 'elite' || enemyInfo.baseArchetype) {
             return new SpriteRenderer(SPRITE_REGISTRY['golem_elite']);
         }
         return new SpriteRenderer(SPRITE_REGISTRY['golem_normal']);
@@ -313,3 +346,6 @@ export function createSpriteRenderer(enemyType, bossType, baseArchetype) {
     }
     return new SpriteRenderer(path);
 }
+
+// manifest 启动时尝试预加载（异步、不阻塞）
+loadEnemyVisualAssetManifest();

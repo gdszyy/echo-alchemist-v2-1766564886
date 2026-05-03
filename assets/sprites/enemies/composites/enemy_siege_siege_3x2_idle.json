@@ -1,0 +1,9 @@
+{
+  "frameSize": 128,
+  "placeholder": true,
+  "single": true,
+  "animations": {
+    "idle": { "row": 0, "frames": 1, "fps": 1 }
+  },
+  "_note": "Single-frame composite placeholder. Real artwork should follow the standard sprite-sheet manifest: idle row + optional hit/move/cast rows."
+}

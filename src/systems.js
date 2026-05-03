@@ -19,6 +19,7 @@ import { Vec2, adjustColorBrightness } from './utils/math_utils.js';
 import { RUNEWORD_DB } from './rune_config.js';
 import { ENEMY_V2_METADATA, ENEMY_V2_BY_ID } from './data/enemy_v2_metadata.js';
 import { getEnemyV2IconSrc } from './bitmap_icons.js';
+import { resolveEnemyVisualAsset, describeAssetHitStatus, buildEnemyAssetKey } from './data/enemy_visual_assets.js';
 
 // ==================== 真理之书数据 ====================
 
@@ -2133,25 +2134,44 @@ function buildV2MatrixScenarios() {
  * desc 字符串包含：尺寸 footprint / 基底 / 词条 / 行为摘要 / 资源状态。
  */
 function buildEnemyV2Scenarios() {
-    // 资源状态：读取 ENEMY_V2_BY_ID 的 placeholder 字段
-    const resStatus = (id) => {
-        const meta = ENEMY_V2_BY_ID[id];
-        if (!meta) return '⚙️ 程序化矢量绘制（无 V2 资源键）';
-        return meta.placeholder
-            ? '🟡 占位资源 — sprite/icon 待正式美术替换（placeholder=true）'
-            : '✅ 已接入正式美术资源';
+    // [资源命中状态] 直接从 enemy_sprite_manifest.json 解析，避免重复硬编码命名。
+    // 同时保留 ENEMY_V2_BY_ID.placeholder 作为占位资源标记。
+    const resourceStatusFor = ({ archetype, cols, rows, affixes, archetypeIdForPlaceholder }) => {
+        const probe = {
+            baseArchetype: archetype || null,
+            gridCols: cols || 1,
+            gridRows: rows || 1,
+            affixes: (affixes || []).slice(),
+        };
+        const resolved = resolveEnemyVisualAsset(probe);
+        const tagInfo = describeAssetHitStatus(resolved);
+        const key = resolved.assetKey;
+        // 占位资源标记（V2 metadata 内部为 placeholder=true 时附加 PH 标识）
+        let placeholderNote = '';
+        if (archetypeIdForPlaceholder) {
+            const meta = ENEMY_V2_BY_ID[archetypeIdForPlaceholder];
+            if (meta && meta.placeholder) placeholderNote = '（PH 占位 / placeholder=true）';
+        }
+        return {
+            tag: tagInfo.tag,
+            line: `[${tagInfo.tag}] ${tagInfo.detail}${placeholderNote}　key=${key}`,
+            resolved,
+        };
     };
 
     // 构造场景说明区域的标准文本
-    const mkDesc = (footprint, archetype, affixList, behavior, resourceNote) => {
+    const mkDesc = (footprint, archetype, affixList, behavior, resourceLine) => {
         const afxStr = affixList.length > 0 ? affixList.join(' + ') : '无';
         const archStr = archetype || '无';
         return [
             `📐 footprint：${footprint}　基底：${archStr}　词条：${afxStr}`,
             `⚙️ 行为：${behavior}`,
-            `📦 资源：${resourceNote}`
+            `📦 资源：${resourceLine}`
         ].join('\n');
     };
+
+    const lineFor = (opts) => resourceStatusFor(opts).line;
+    const tagFor  = (opts) => resourceStatusFor(opts).tag;
 
     return [
         // ── 场景 1：普通 1×1 对照 ─────────────────────────────────────
@@ -2160,9 +2180,10 @@ function buildEnemyV2Scenarios() {
             categoryId: 'enemy_v2',
             name: '1×1 基准对照',
             icon: '⬜',
+            assetHitTag: tagFor({ archetype: null, cols: 1, rows: 1, affixes: [] }),
             desc: mkDesc('1×1', '无', [],
                 '标准单格炼金残渣，无专属基底、无词条。用作视觉对比基线，验证 1×1 占格单位的尺寸与渲染。',
-                '⚙️ 程序化矢量绘制（基线单位，不属于 V2 专属资源）'),
+                lineFor({ archetype: null, cols: 1, rows: 1, affixes: [] })),
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight;
                 const top = game.combatGridTopY;
@@ -2196,9 +2217,10 @@ function buildEnemyV2Scenarios() {
             categoryId: 'enemy_v2',
             name: '2×2 深渊胃囊',
             icon: '👁️',
+            assetHitTag: tagFor({ archetype: 'maw', cols: 2, rows: 2, affixes: ['devour'], archetypeIdForPlaceholder: 'maw' }),
             desc: mkDesc('2×2', 'maw', ['devour'],
                 'devour：每回合有概率吞噬相邻友军并继承其血量与词条。旁边放有 1×1 目标供吞噬触发测试。点「触发演示」执行一回合行动。',
-                resStatus('maw')),
+                lineFor({ archetype: 'maw', cols: 2, rows: 2, affixes: ['devour'], archetypeIdForPlaceholder: 'maw' })),
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight;
                 const top = game.combatGridTopY;
@@ -2231,9 +2253,10 @@ function buildEnemyV2Scenarios() {
             categoryId: 'enemy_v2',
             name: '3×1 装甲横梁',
             icon: '🧱',
+            assetHitTag: tagFor({ archetype: 'bastion', cols: 3, rows: 1, affixes: ['heavyArmor'], archetypeIdForPlaceholder: 'bastion' }),
             desc: mkDesc('3×1', 'bastion', ['heavyArmor'],
                 'heavyArmor：血量 ×2.0，每 2 回合才移动一次，横向占满 3 列封锁通道。点「触发演示」观察迟缓移动节奏。',
-                resStatus('bastion')),
+                lineFor({ archetype: 'bastion', cols: 3, rows: 1, affixes: ['heavyArmor'], archetypeIdForPlaceholder: 'bastion' })),
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight;
                 const top = game.combatGridTopY;
@@ -2261,9 +2284,10 @@ function buildEnemyV2Scenarios() {
             categoryId: 'enemy_v2',
             name: '3×2 攻城履带',
             icon: '🚛',
+            assetHitTag: tagFor({ archetype: 'siege', cols: 3, rows: 2, affixes: ['siege'], archetypeIdForPlaceholder: 'siege' }),
             desc: mkDesc('3×2', 'siege', ['siege'],
                 'siege：免疫冰冻（热管闪烁反馈），血量 ×3.5，每 2 回合移动一次，前排无阻挡时正常推进。冻结词条对其无效。',
-                resStatus('siege')),
+                lineFor({ archetype: 'siege', cols: 3, rows: 2, affixes: ['siege'], archetypeIdForPlaceholder: 'siege' })),
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight;
                 const top = game.combatGridTopY;
@@ -2290,9 +2314,10 @@ function buildEnemyV2Scenarios() {
             categoryId: 'enemy_v2',
             name: 'Siege 阻挡推挤',
             icon: '🏗️',
+            assetHitTag: tagFor({ archetype: 'siege', cols: 3, rows: 2, affixes: ['siege'], archetypeIdForPlaceholder: 'siege' }),
             desc: mkDesc('3×2 + 1×1×3 阻挡链', 'siege', ['siege'],
                 '前排 3 个 1×1 阻挡兵（col 1-3）+ 后排 3×2 siege（row 1-2）。点「触发演示」触发敌人行动：siege 移动被前排阻挡时会尝试将整条阻挡链向前推 1 行，验证链推挤逻辑与失败线判定。',
-                resStatus('siege')),
+                lineFor({ archetype: 'siege', cols: 3, rows: 2, affixes: ['siege'], archetypeIdForPlaceholder: 'siege' })),
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight;
                 const top = game.combatGridTopY;
@@ -2332,9 +2357,10 @@ function buildEnemyV2Scenarios() {
             categoryId: 'enemy_v2',
             name: '大型 + 通用词条',
             icon: '🧬',
+            assetHitTag: tagFor({ archetype: 'maw', cols: 2, rows: 2, affixes: ['devour', 'shield'], archetypeIdForPlaceholder: 'maw' }),
             desc: mkDesc('2×2', 'maw', ['devour', 'shield'],
                 '2×2 深渊胃囊叠加通用词条 shield：验证护盾特效能否覆盖完整 2×2 轮廓（而非只包住中心）。右侧 1×1 regen 精英用于对比同一通用词条在不同尺寸下的视觉缩放。',
-                resStatus('maw')),
+                lineFor({ archetype: 'maw', cols: 2, rows: 2, affixes: ['devour', 'shield'], archetypeIdForPlaceholder: 'maw' })),
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight;
                 const top = game.combatGridTopY;
@@ -2369,9 +2395,10 @@ function buildEnemyV2Scenarios() {
             categoryId: 'enemy_v2',
             name: '资源 Fallback（3×3）',
             icon: '🔧',
+            assetHitTag: tagFor({ archetype: 'gravityWell', cols: 3, rows: 3, affixes: ['gravityWell'], archetypeIdForPlaceholder: 'gravityCore' }),
             desc: mkDesc('3×3', 'gravityWell', ['gravityWell'],
                 '引力炉心 —— 验证当正式美术资源未接入时，是否正确回退到程序化矢量绘制（黑核 + 环形炉壁 + 向心网格）。同时验证 3×3 大体型的碰撞轮廓（arc 圆形）。',
-                resStatus('gravityCore')),
+                lineFor({ archetype: 'gravityWell', cols: 3, rows: 3, affixes: ['gravityWell'], archetypeIdForPlaceholder: 'gravityCore' })),
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight;
                 const top = game.combatGridTopY;
@@ -2895,14 +2922,27 @@ class TrainingGround {
         const listEl = document.getElementById('train-scenario-list');
         if (!listEl) return;
         const scenarios = TRAINING_SCENARIOS.scenarios.filter(s => s.categoryId === this.currentCategory);
-        listEl.innerHTML = scenarios.map(s => `
+        // [V2 资源协议] 资源命中状态徽标颜色映射（与 describeAssetHitStatus.tag 对齐）
+        const assetTagColor = (tag) => {
+            if (!tag) return '#475569';
+            if (tag.startsWith('Composite')) return '#10b981';
+            if (tag.startsWith('Sprite'))    return '#3b82f6';
+            if (tag.startsWith('Vector'))    return '#f59e0b';
+            return '#ef4444';
+        };
+        listEl.innerHTML = scenarios.map(s => {
+            const tagBadge = s.assetHitTag
+                ? `<span class="train-scenario-asset-tag" style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:8px;font-size:10px;font-family:monospace;background:${assetTagColor(s.assetHitTag)};color:#fff;vertical-align:middle;">${s.assetHitTag}</span>`
+                : '';
+            return `
             <button onclick="game.trainingGround.loadScenario('${s.id}')"
                 id="scenario-btn-${s.id}"
                 class="train-scenario-btn ${this.currentScenario?.id === s.id ? 'active' : ''}">
                 <span class="train-scenario-icon">${s.icon}</span>
-                <span class="train-scenario-name">${s.name}</span>
+                <span class="train-scenario-name">${s.name}</span>${tagBadge}
             </button>
-        `).join('');
+        `;
+        }).join('');
     }
 
     /**
