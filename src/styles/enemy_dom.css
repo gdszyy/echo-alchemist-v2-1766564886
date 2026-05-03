@@ -470,10 +470,222 @@
 }
 
 /* ============================================================
- * Tier 配色微调（精英 / Boss 占位 - PoC 默认仅 normal）
+ * Tier — 精英（Elite）：紫色石眼 + 紫色描边 + 更强 outer glow
  * ============================================================ */
-.enemy[data-tier="elite"] { --eye-color: 196, 181, 253; }   /* purple */
-.enemy[data-tier="boss"]  { --eye-color: 248, 113, 113; }   /* red */
+.enemy[data-tier="elite"] {
+    --eye-color: 196, 181, 253;     /* violet-300 */
+    --eye-glow: 1.15;
+}
+.enemy[data-tier="elite"] .enemy__body {
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.18) 0%,
+            rgba(255, 255, 255, 0.04) 14%,
+            transparent 30%),
+        linear-gradient(180deg,
+            transparent 60%,
+            rgba(0, 0, 0, 0.4) 100%),
+        repeating-linear-gradient(
+            12deg,
+            rgba(196, 181, 253, 0.04) 0px,
+            rgba(196, 181, 253, 0.04) 1px,
+            transparent 1px,
+            transparent 7px),
+        linear-gradient(180deg,
+            hsl(265deg, 30%, 38%) 0%,
+            hsl(265deg, 32%, 22%) 60%,
+            hsl(265deg, 35%, 12%) 100%);
+    box-shadow:
+        inset 0 -3px 6px rgba(0, 0, 0, 0.6),
+        inset 0 2px 3px rgba(196, 181, 253, 0.32),
+        0 0 14px rgba(168, 85, 247, 0.55),
+        0 4px 10px rgba(0, 0, 0, 0.55);
+}
+
+/* ============================================================
+ * Tier — Boss：基础底色（红橙）+ 8 种 boss 类型主题
+ * 形状由 collisionShape 决定（aabb / polygon），CSS 这层只管表面
+ * ============================================================ */
+.enemy[data-tier="boss"] {
+    --eye-color: 248, 113, 113;     /* red-400 */
+    --eye-glow: 1.4;
+}
+.enemy[data-tier="boss"] .enemy__body {
+    box-shadow:
+        inset 0 -4px 8px rgba(0, 0, 0, 0.7),
+        inset 0 3px 4px rgba(255, 255, 255, 0.2),
+        0 0 22px rgba(239, 68, 68, 0.55),
+        0 6px 14px rgba(0, 0, 0, 0.7);
+}
+
+/* --- Ignis（火焰）：橙红 + 余烬流动 --- */
+.enemy[data-boss-type="ignis"] {
+    --eye-color: 251, 146, 60;      /* orange-400 */
+    --eye-glow: 1.5;
+}
+.enemy[data-boss-type="ignis"] .enemy__body {
+    background:
+        radial-gradient(ellipse at 50% 100%,
+            rgba(251, 146, 60, 0.55) 0%,
+            transparent 55%),
+        repeating-linear-gradient(
+            18deg,
+            rgba(254, 215, 170, 0.04) 0px,
+            rgba(254, 215, 170, 0.04) 1px,
+            transparent 1px,
+            transparent 9px),
+        linear-gradient(180deg,
+            hsl(18deg, 70%, 38%) 0%,
+            hsl(8deg, 75%, 22%) 60%,
+            hsl(0deg, 80%, 10%) 100%);
+}
+
+/* --- Glacies（寒霜）：冰蓝 + 结晶 --- */
+.enemy[data-boss-type="glacies"] {
+    --eye-color: 186, 230, 253;     /* sky-200 */
+    --eye-glow: 1.2;
+}
+.enemy[data-boss-type="glacies"] .enemy__body {
+    background:
+        linear-gradient(40deg, transparent 45%, rgba(255, 255, 255, 0.42) 47%, transparent 50%),
+        linear-gradient(-22deg, transparent 60%, rgba(186, 230, 253, 0.32) 62%, transparent 65%),
+        radial-gradient(ellipse at 50% 0%,
+            rgba(186, 230, 253, 0.4) 0%,
+            transparent 55%),
+        linear-gradient(180deg,
+            hsl(195deg, 60%, 42%) 0%,
+            hsl(202deg, 70%, 22%) 60%,
+            hsl(210deg, 80%, 12%) 100%);
+}
+
+/* --- Tesla（雷电）：黄紫 + 电网 --- */
+.enemy[data-boss-type="tesla"] {
+    --eye-color: 253, 224, 71;      /* yellow-300 */
+    --eye-glow: 1.6;
+}
+.enemy[data-boss-type="tesla"] .enemy__body {
+    background:
+        repeating-linear-gradient(
+            76deg,
+            transparent 0px,
+            transparent 8px,
+            rgba(253, 224, 71, 0.06) 8px,
+            rgba(253, 224, 71, 0.06) 9px),
+        repeating-linear-gradient(
+            -14deg,
+            transparent 0px,
+            transparent 12px,
+            rgba(253, 224, 71, 0.04) 12px,
+            rgba(253, 224, 71, 0.04) 13px),
+        linear-gradient(180deg,
+            hsl(252deg, 35%, 35%) 0%,
+            hsl(258deg, 40%, 20%) 60%,
+            hsl(264deg, 45%, 10%) 100%);
+}
+
+/* --- Viridis（剧毒/丛林）：墨绿 + 苔藓斑 --- */
+.enemy[data-boss-type="viridis"] {
+    --eye-color: 134, 239, 172;     /* green-300 */
+    --eye-glow: 1.25;
+}
+.enemy[data-boss-type="viridis"] .enemy__body {
+    background:
+        radial-gradient(ellipse at 30% 70%,
+            rgba(134, 239, 172, 0.18) 0%,
+            transparent 30%),
+        radial-gradient(ellipse at 70% 30%,
+            rgba(74, 222, 128, 0.12) 0%,
+            transparent 25%),
+        linear-gradient(180deg,
+            hsl(140deg, 40%, 30%) 0%,
+            hsl(150deg, 45%, 18%) 60%,
+            hsl(160deg, 50%, 9%) 100%);
+}
+
+/* --- Devourer（吞噬深渊）：暗红紫 + 内陷扭曲 --- */
+.enemy[data-boss-type="devourer"] {
+    --eye-color: 217, 70, 239;      /* fuchsia-500 */
+    --eye-glow: 1.4;
+}
+.enemy[data-boss-type="devourer"] .enemy__body {
+    background:
+        radial-gradient(circle at 50% 50%,
+            rgba(0, 0, 0, 0.85) 0%,
+            rgba(0, 0, 0, 0.4) 25%,
+            transparent 50%),
+        radial-gradient(circle at 50% 50%,
+            transparent 30%,
+            rgba(217, 70, 239, 0.15) 45%,
+            transparent 70%),
+        linear-gradient(180deg,
+            hsl(310deg, 35%, 22%) 0%,
+            hsl(305deg, 40%, 12%) 60%,
+            hsl(300deg, 45%, 6%) 100%);
+}
+
+/* --- Mikro（机械微缩）：钢蓝 + 网格 --- */
+.enemy[data-boss-type="mikro"] {
+    --eye-color: 125, 211, 252;     /* sky-300 */
+    --eye-glow: 1.3;
+}
+.enemy[data-boss-type="mikro"] .enemy__body {
+    background:
+        repeating-linear-gradient(
+            0deg,
+            transparent 0px,
+            transparent 6px,
+            rgba(125, 211, 252, 0.05) 6px,
+            rgba(125, 211, 252, 0.05) 7px),
+        repeating-linear-gradient(
+            90deg,
+            transparent 0px,
+            transparent 6px,
+            rgba(125, 211, 252, 0.05) 6px,
+            rgba(125, 211, 252, 0.05) 7px),
+        linear-gradient(180deg,
+            hsl(210deg, 25%, 38%) 0%,
+            hsl(215deg, 30%, 22%) 60%,
+            hsl(220deg, 35%, 12%) 100%);
+}
+
+/* --- Chimera（异种合成）：多色斑驳 --- */
+.enemy[data-boss-type="chimera"] {
+    --eye-color: 244, 114, 182;     /* pink-400 */
+    --eye-glow: 1.35;
+}
+.enemy[data-boss-type="chimera"] .enemy__body {
+    background:
+        radial-gradient(ellipse at 25% 30%,
+            rgba(251, 146, 60, 0.25) 0%, transparent 28%),
+        radial-gradient(ellipse at 75% 65%,
+            rgba(74, 222, 128, 0.22) 0%, transparent 28%),
+        radial-gradient(ellipse at 50% 100%,
+            rgba(244, 114, 182, 0.30) 0%, transparent 35%),
+        linear-gradient(180deg,
+            hsl(330deg, 25%, 30%) 0%,
+            hsl(335deg, 30%, 18%) 60%,
+            hsl(340deg, 35%, 10%) 100%);
+}
+
+/* --- Ouroboros（轮回长蛇）：金紫 + 旋转刻纹 --- */
+.enemy[data-boss-type="ouroboros"] {
+    --eye-color: 250, 204, 21;      /* yellow-400 */
+    --eye-glow: 1.5;
+}
+.enemy[data-boss-type="ouroboros"] .enemy__body {
+    background:
+        repeating-conic-gradient(
+            from 0deg at 50% 50%,
+            transparent 0deg 14deg,
+            rgba(250, 204, 21, 0.04) 14deg 16deg),
+        radial-gradient(circle at 50% 50%,
+            rgba(250, 204, 21, 0.10) 0%,
+            transparent 60%),
+        linear-gradient(180deg,
+            hsl(45deg, 35%, 32%) 0%,
+            hsl(40deg, 40%, 18%) 60%,
+            hsl(35deg, 45%, 9%) 100%);
+}
 
 /* ============================================================
  * Affix 装饰（PoC 简化指示）

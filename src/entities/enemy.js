@@ -1349,13 +1349,16 @@ class Enemy {
     draw(ctx) {
         if (!this.active) return;
 
-        // [PoC] DOM/CSS 敌人图层接管：普通敌人的本体（容器/纹理/HP/状态层）由 DOM 渲染，
-        // 跳过 canvas 上的本体绘制。子弹、词缀光环、boss 等仍走原 canvas 路径。
+        // [PoC] DOM/CSS 敌人图层接管：本体（容器/纹理/HP/状态层）由 DOM 渲染。
+        // Boss 入场动画期间例外：仍由 canvas 接管入场（drop / shockwave / 名牌淡出），
+        // 入场结束后才移交给 DOM。
         const _domCfg = CONFIG.enemyRender;
         if (_domCfg && _domCfg.domRendererEnabled
             && Array.isArray(_domCfg.domRendererTypes)
             && _domCfg.domRendererTypes.includes(this.type)) {
-            return;
+            const inBossEntrance = (this.type === 'boss')
+                && (this.entranceTimer > 0 || this._pendingEntrance);
+            if (!inBossEntrance) return;
         }
 
         ctx.save();
