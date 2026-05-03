@@ -106,6 +106,36 @@ V2 专属词条已经具备基础绘制识别，但还需要补齐“常驻、�
 | P3 | 预设波次系统。 | 至少 5 类 preset 可按回合权重出现，并能安全回退随机生成。 |
 | P4 | 组合资产扩展。 | 通过脚本生成资产清单，逐步填充高频组合。 |
 
+## 8. 试炼场验收说明（enemy_v2 分类）
+
+在 `src/systems.js` 的 `TRAINING_SCENARIOS` 中新增了 `enemy_v2`（显示名「敌人 V2 / 美术验收」）分类，入口为右侧边栏「驗收」Tab。该分类提供 7 个可点击场景，专门用于对每种 V2 基底进行独立的视觉验收，与 V2 矩陣（一次展示全部 9 种）互为补充。
+
+### 8.1 场景列表
+
+| 场景 ID | 名称 | 尺寸 | baseArchetype | affixes | 验收重点 |
+|---|---|---|---|---|---|
+| `ev2_ref_1x1` | 1×1 基准对照 | 1×1 | 无 | 无 / shield | 单格基线尺寸与精英变体对比 |
+| `ev2_maw_2x2` | 2×2 深渊胃囊 | 2×2 | maw | devour | maw 胃囊形体 + devour 吞噬行为；旁边有 1×1 供吞噬测试 |
+| `ev2_bastion_3x1` | 3×1 装甲横梁 | 3×1 | bastion | heavyArmor | 横向 3 格轮廓 + 迟缓移动节奏（2 回合/次） |
+| `ev2_siege_3x2` | 3×2 攻城履带 | 3×2 | siege | siege | 冰冻免疫 + 静态展示履带形体 |
+| `ev2_siege_push` | Siege 阻挡推挤 | 3×2 + 1×1×3 | siege | siege | 前排 3 个阻挡兵 + 后排 siege 推挤链；触发演示验证链推挤逻辑 |
+| `ev2_large_generic_affix` | 大型 + 通用词条 | 2×2 + 1×1 | maw | devour+shield / regen | 通用词条（shield/regen）在大型基底上的视觉覆盖范围验收 |
+| `ev2_fallback_large` | 资源 Fallback（3×3） | 3×3 | gravityWell | gravityWell | 验证未接入正式资源时程序化矢量回退是否正常渲染 |
+
+### 8.2 实现约定
+
+- 每个场景 `setup(game)` 显式创建 `Enemy` 实例并赋值：`baseArchetype`、`gridCols`、`gridRows`、`isWideEnemy`（cols≥2）、`affixes`、`width`、`height`、`maxHp/hp`，与 `spawn_trySpawnArchetypes` 字段命名一致。
+- 调用 `game.spawn_applyArchetypeShape(e, archetypeId)` 为大型基底设置碰撞轮廓（polygon / arc / aabb）。
+- 场景 `desc` 固定显示：`📐 footprint` / `基底` / `词条` / `⚙️ 行为摘要` / `📦 资源状态`。资源状态从 `ENEMY_V2_BY_ID[id].placeholder` 读取：`🟡 占位资源` 或 `✅ 已接入正式美术资源`。
+- 不改变正式战斗默认刷怪概率、战斗平衡或存档逻辑；场景中敌人 `_moveInterval` 设置均为试炼场内部控制，不影响 `spawn_trySpawnArchetypes` 的生成逻辑。
+
+### 8.3 后续验收流程
+
+1. 打开试炼场 → 右侧边栏切换到「驗收」Tab。
+2. 逐一点击 7 个场景，观察敌人形体与词条特效是否符合 `docs/enemy_visual_design_v2.md` 规范。
+3. 对 `placeholder=true` 的基底，确认回退矢量绘制正常显示；有正式资源后，替换 `assets/sprites/enemies/v2/<resourceId>.png` 并将 `ENEMY_V2_METADATA` 中对应条目的 `placeholder` 改为 `false`，无需修改试炼场代码。
+4. 点击「触发演示」按钮，验证各基底的行为（吞噬、迟缓移动、推挤链、冰冻免疫）在试炼场环境中正常触发。
+
 ## References
 
 [1]: ../src/entities/enemy.js "敌人实体绘制、行动与词条视觉实现"
