@@ -808,7 +808,8 @@ const TRAINING_SCENARIOS = {
         { id: 'boss', name: 'Boss 機制' },
         { id: 'runeword', name: '符文詞條' },
         { id: 'relic', name: '遺物/精華' },
-        { id: 'v2matrix', name: '敵人 V2 矩陣' }
+        { id: 'v2matrix', name: '敵人 V2 矩陣' },
+        { id: 'enemy_v2', name: '敵人 V2 / 美術驗收' }
     ],
     scenarios: [
         // ── 敵人詞條 ──────────────────────────────────────────────────
@@ -1947,6 +1948,11 @@ const TRAINING_SCENARIOS = {
             }
         },
 
+        // ── 敵人 V2 美術驗收（逐場景单独验证基底 + 词条视觉）─────────────
+        // 对应 docs/enemy_art_implementation_impact.md §试炼场验收说明。
+        // 每个场景显式创建 Enemy 实例，字段与 spawn_trySpawnArchetypes 保持一致。
+        ...buildEnemyV2Scenarios(),
+
         // ── 敵人 V2 矩陣（尺寸基底 + 專屬詞條可見性驗收）─────────────
         // 對應文檔 docs/enemy_visual_design_v2.md：
         // 9 種 V2 基底（1×1 / 2×1 / 1×2 / 2×2 / 3×1 / 1×3 / 2×3 / 3×2 / 3×3）
@@ -2107,6 +2113,285 @@ function buildV2MatrixScenarios() {
     }));
 
     return [all, ...singles];
+}
+
+/**
+ * [敌人 V2 美术验收] 构建 enemy_v2 分类下的验收场景列表。
+ * 共 7 个场景（6 必选 + 1 可选 fallback），覆盖：
+ *   1. 1×1 基准对照
+ *   2. 2×2 maw/devour
+ *   3. 3×1 bastion/heavyArmor
+ *   4. 3×2 siege（静态展示）
+ *   5. siege 前排阻挡链推挤
+ *   6. 大型敌人 + 通用词条适配（maw + shield）
+ *   7. 资源 fallback 展示（3×3 gravityWell）
+ *
+ * 每个场景的 setup(game) 显式创建 Enemy 实例并赋值：
+ *   baseArchetype, gridCols, gridRows, affixes, width, height, maxHp/hp
+ * 这些字段与 spawn_trySpawnArchetypes 的命名保持一致。
+ *
+ * desc 字符串包含：尺寸 footprint / 基底 / 词条 / 行为摘要 / 资源状态。
+ */
+function buildEnemyV2Scenarios() {
+    // 资源状态：读取 ENEMY_V2_BY_ID 的 placeholder 字段
+    const resStatus = (id) => {
+        const meta = ENEMY_V2_BY_ID[id];
+        if (!meta) return '⚙️ 程序化矢量绘制（无 V2 资源键）';
+        return meta.placeholder
+            ? '🟡 占位资源 — sprite/icon 待正式美术替换（placeholder=true）'
+            : '✅ 已接入正式美术资源';
+    };
+
+    // 构造场景说明区域的标准文本
+    const mkDesc = (footprint, archetype, affixList, behavior, resourceNote) => {
+        const afxStr = affixList.length > 0 ? affixList.join(' + ') : '无';
+        const archStr = archetype || '无';
+        return [
+            `📐 footprint：${footprint}　基底：${archStr}　词条：${afxStr}`,
+            `⚙️ 行为：${behavior}`,
+            `📦 资源：${resourceNote}`
+        ].join('\n');
+    };
+
+    return [
+        // ── 场景 1：普通 1×1 对照 ─────────────────────────────────────
+        {
+            id: 'ev2_ref_1x1',
+            categoryId: 'enemy_v2',
+            name: '1×1 基准对照',
+            icon: '⬜',
+            desc: mkDesc('1×1', '无', [],
+                '标准单格炼金残渣，无专属基底、无词条。用作视觉对比基线，验证 1×1 占格单位的尺寸与渲染。',
+                '⚙️ 程序化矢量绘制（基线单位，不属于 V2 专属资源）'),
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                const e = new Enemy(2 * w + w / 2, top + h / 2, w, h, 200, 200, 'normal', []);
+                e.baseArchetype = null;
+                e.gridCols = 1;
+                e.gridRows = 1;
+                e._moveInterval = 9999;
+                e._moveCooldown = 9999;
+                e.hasActedThisTurn = true;
+                if (typeof e.initSprite === 'function') e.initSprite();
+                game.enemies.push(e);
+                // 精英变体对比
+                const elite = new Enemy(3 * w + w / 2, top + h / 2, w, h, 200, 200, 'elite', ['shield']);
+                elite.baseArchetype = null;
+                elite.gridCols = 1;
+                elite.gridRows = 1;
+                elite._moveInterval = 9999;
+                elite._moveCooldown = 9999;
+                elite.hasActedThisTurn = true;
+                if (typeof elite.initSprite === 'function') elite.initSprite();
+                game.enemies.push(elite);
+            },
+            bulletConfig: { damage: 20, bounce: 2, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
+
+        // ── 场景 2：2×2 深渊胃囊 / devour ────────────────────────────
+        {
+            id: 'ev2_maw_2x2',
+            categoryId: 'enemy_v2',
+            name: '2×2 深渊胃囊',
+            icon: '👁️',
+            desc: mkDesc('2×2', 'maw', ['devour'],
+                'devour：每回合有概率吞噬相邻友军并继承其血量与词条。旁边放有 1×1 目标供吞噬触发测试。点「触发演示」执行一回合行动。',
+                resStatus('maw')),
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                const afx = (CONFIG && CONFIG.balance && CONFIG.balance.affixes) || {};
+                const hp = Math.floor(200 * 2.0);
+                const maw = new Enemy(w * 1 + w, top + h, w * 2, h * 2, hp, hp, 'elite', ['devour']);
+                maw.baseArchetype = 'maw';
+                maw.gridCols = 2;
+                maw.gridRows = 2;
+                maw.isWideEnemy = true;
+                maw._moveInterval = 9999;
+                maw._moveCooldown = 9999;
+                maw.hasActedThisTurn = true;
+                if (typeof game.spawn_applyArchetypeShape === 'function') game.spawn_applyArchetypeShape(maw, 'maw');
+                if (typeof maw.initSprite === 'function') maw.initSprite();
+                game.enemies.push(maw);
+                // 1×1 相邻目标供吞噬
+                const food = new Enemy(w * 3 + w / 2, top + h / 2, w, h, 100, 100, 'normal', []);
+                food._moveInterval = 9999;
+                food.hasActedThisTurn = true;
+                if (typeof food.initSprite === 'function') food.initSprite();
+                game.enemies.push(food);
+            },
+            demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
+
+        // ── 场景 3：3×1 装甲横梁 / heavyArmor ────────────────────────
+        {
+            id: 'ev2_bastion_3x1',
+            categoryId: 'enemy_v2',
+            name: '3×1 装甲横梁',
+            icon: '🧱',
+            desc: mkDesc('3×1', 'bastion', ['heavyArmor'],
+                'heavyArmor：血量 ×2.0，每 2 回合才移动一次，横向占满 3 列封锁通道。点「触发演示」观察迟缓移动节奏。',
+                resStatus('bastion')),
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                const afx = (CONFIG && CONFIG.balance && CONFIG.balance.affixes) || {};
+                const hpMult = afx.heavyArmorHpMult || 2.0;
+                const hp = Math.floor(200 * hpMult);
+                const e = new Enemy(w * 1.5 + w / 2, top + h / 2, w * 3, h, hp, hp, 'elite', ['heavyArmor']);
+                e.baseArchetype = 'bastion';
+                e.gridCols = 3;
+                e.gridRows = 1;
+                e.isWideEnemy = true;
+                e._moveInterval = afx.heavyArmorMoveInterval || 2;
+                e._moveCooldown = 0;
+                e.hasActedThisTurn = true;
+                if (typeof game.spawn_applyArchetypeShape === 'function') game.spawn_applyArchetypeShape(e, 'bastion');
+                if (typeof e.initSprite === 'function') e.initSprite();
+                game.enemies.push(e);
+            },
+            demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
+
+        // ── 场景 4：3×2 攻城履带 / siege（静态展示）─────────────────
+        {
+            id: 'ev2_siege_3x2',
+            categoryId: 'enemy_v2',
+            name: '3×2 攻城履带',
+            icon: '🚛',
+            desc: mkDesc('3×2', 'siege', ['siege'],
+                'siege：免疫冰冻（热管闪烁反馈），血量 ×3.5，每 2 回合移动一次，前排无阻挡时正常推进。冻结词条对其无效。',
+                resStatus('siege')),
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                const afx = (CONFIG && CONFIG.balance && CONFIG.balance.affixes) || {};
+                const hp = Math.floor(200 * (afx.siegeHpMult || 3.5));
+                const e = new Enemy(w * 1.5 + w / 2, top + h, w * 3, h * 2, hp, hp, 'elite', ['siege']);
+                e.baseArchetype = 'siege';
+                e.gridCols = 3;
+                e.gridRows = 2;
+                e.isWideEnemy = true;
+                e._moveInterval = afx.siegeMoveInterval || 2;
+                e._moveCooldown = 9999;
+                e.hasActedThisTurn = true;
+                if (typeof game.spawn_applyArchetypeShape === 'function') game.spawn_applyArchetypeShape(e, 'siege');
+                if (typeof e.initSprite === 'function') e.initSprite();
+                game.enemies.push(e);
+            },
+            demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
+
+        // ── 场景 5：siege 前排阻挡链推挤 ─────────────────────────────
+        {
+            id: 'ev2_siege_push',
+            categoryId: 'enemy_v2',
+            name: 'Siege 阻挡推挤',
+            icon: '🏗️',
+            desc: mkDesc('3×2 + 1×1×3 阻挡链', 'siege', ['siege'],
+                '前排 3 个 1×1 阻挡兵（col 1-3）+ 后排 3×2 siege（row 1-2）。点「触发演示」触发敌人行动：siege 移动被前排阻挡时会尝试将整条阻挡链向前推 1 行，验证链推挤逻辑与失败线判定。',
+                resStatus('siege')),
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                const afx = (CONFIG && CONFIG.balance && CONFIG.balance.affixes) || {};
+                const hp = Math.floor(200 * (afx.siegeHpMult || 3.5));
+                // 3×2 siege 放置在 row 1-2（center at row=1, rows=2）
+                const siege = new Enemy(w * 1.5 + w / 2, top + h + h, w * 3, h * 2, hp, hp, 'elite', ['siege']);
+                siege.baseArchetype = 'siege';
+                siege.gridCols = 3;
+                siege.gridRows = 2;
+                siege.isWideEnemy = true;
+                siege._moveInterval = afx.siegeMoveInterval || 2;
+                siege._moveCooldown = 0;
+                siege.hasActedThisTurn = false;
+                if (typeof game.spawn_applyArchetypeShape === 'function') game.spawn_applyArchetypeShape(siege, 'siege');
+                if (typeof siege.initSprite === 'function') siege.initSprite();
+                game.enemies.push(siege);
+                // 前排 3 个 1×1 阻挡兵 col 1, 2, 3（row 0）
+                for (let c = 1; c <= 3; c++) {
+                    const bx = c * w + w / 2;
+                    const by = top + h / 2;
+                    const blocker = new Enemy(bx, by, w, h, 150, 150, 'normal', []);
+                    blocker.gridCols = 1;
+                    blocker.gridRows = 1;
+                    blocker._moveInterval = 9999;
+                    blocker.hasActedThisTurn = false;
+                    if (typeof blocker.initSprite === 'function') blocker.initSprite();
+                    game.enemies.push(blocker);
+                }
+            },
+            demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
+
+        // ── 场景 6：大型敌人 + 通用词条适配（maw + shield / regen）──
+        {
+            id: 'ev2_large_generic_affix',
+            categoryId: 'enemy_v2',
+            name: '大型 + 通用词条',
+            icon: '🧬',
+            desc: mkDesc('2×2', 'maw', ['devour', 'shield'],
+                '2×2 深渊胃囊叠加通用词条 shield：验证护盾特效能否覆盖完整 2×2 轮廓（而非只包住中心）。右侧 1×1 regen 精英用于对比同一通用词条在不同尺寸下的视觉缩放。',
+                resStatus('maw')),
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                const hp = Math.floor(200 * 2.0);
+                // 2×2 maw + devour + shield（左侧）
+                const maw = new Enemy(w * 0 + w, top + h, w * 2, h * 2, hp, hp, 'elite', ['devour', 'shield']);
+                maw.baseArchetype = 'maw';
+                maw.gridCols = 2;
+                maw.gridRows = 2;
+                maw.isWideEnemy = true;
+                maw._moveInterval = 9999;
+                maw._moveCooldown = 9999;
+                maw.hasActedThisTurn = true;
+                if (typeof game.spawn_applyArchetypeShape === 'function') game.spawn_applyArchetypeShape(maw, 'maw');
+                if (typeof maw.initSprite === 'function') maw.initSprite();
+                game.enemies.push(maw);
+                // 1×1 regen 精英（右侧对比）
+                const ref = new Enemy(w * 3 + w / 2, top + h / 2, w, h, 200, 200, 'elite', ['regen']);
+                ref.gridCols = 1;
+                ref.gridRows = 1;
+                ref._moveInterval = 9999;
+                ref.hasActedThisTurn = true;
+                if (typeof ref.initSprite === 'function') ref.initSprite();
+                game.enemies.push(ref);
+            },
+            demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
+
+        // ── 场景 7（可选 fallback）：3×3 引力炉心资源降级渲染 ────────
+        {
+            id: 'ev2_fallback_large',
+            categoryId: 'enemy_v2',
+            name: '资源 Fallback（3×3）',
+            icon: '🔧',
+            desc: mkDesc('3×3', 'gravityWell', ['gravityWell'],
+                '引力炉心 —— 验证当正式美术资源未接入时，是否正确回退到程序化矢量绘制（黑核 + 环形炉壁 + 向心网格）。同时验证 3×3 大体型的碰撞轮廓（arc 圆形）。',
+                resStatus('gravityCore')),
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                const afx = (CONFIG && CONFIG.balance && CONFIG.balance.affixes) || {};
+                const hp = Math.floor(200 * (afx.gravityWellHpMult || 6.0));
+                const e = new Enemy(w * 1.5 + w / 2, top + h * 1.5, w * 3, h * 3, hp, hp, 'elite', ['gravityWell']);
+                e.baseArchetype = 'gravityWell';
+                e.gridCols = 3;
+                e.gridRows = 3;
+                e.isWideEnemy = true;
+                e._moveInterval = afx.gravityWellMoveInterval || 3;
+                e._moveCooldown = 9999;
+                e.hasActedThisTurn = true;
+                if (typeof game.spawn_applyArchetypeShape === 'function') game.spawn_applyArchetypeShape(e, 'gravityWell');
+                if (typeof e.initSprite === 'function') e.initSprite();
+                game.enemies.push(e);
+            },
+            demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
+    ];
 }
 
 class TrainingGround {
@@ -2576,6 +2861,7 @@ class TrainingGround {
                 <button onclick="game.trainingGround.switchCategory('boss')" id="scat-btn-boss" class="train-scat-btn">Boss</button>
                 <button onclick="game.trainingGround.switchCategory('runeword')" id="scat-btn-runeword" class="train-scat-btn">符文</button>
                 <button onclick="game.trainingGround.switchCategory('v2matrix')" id="scat-btn-v2matrix" class="train-scat-btn" title="敵人視覺 V2 基底矩陣">V2</button>
+                <button onclick="game.trainingGround.switchCategory('enemy_v2')" id="scat-btn-enemy_v2" class="train-scat-btn" title="敵人 V2 美術驗收場景">驗收</button>
             </div>
             <!-- 场景列表 -->
             <div id="train-scenario-list" class="train-scenario-list"></div>
