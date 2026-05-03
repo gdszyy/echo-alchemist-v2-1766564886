@@ -58,12 +58,7 @@ export class DomEnemyLayer {
     shouldRender(enemy) {
         if (!this.enabled) return false;
         if (!enemy || enemy.active === false) return false;
-        if (!this.allowedTypes.has(enemy.type)) return false;
-        // Boss 入场动画期间不接管，让 canvas 画 entrance（与 enemy.draw 早退条件对偶）
-        if (enemy.type === 'boss' && (enemy.entranceTimer > 0 || enemy._pendingEntrance)) {
-            return false;
-        }
-        return true;
+        return this.allowedTypes.has(enemy.type);
     }
 
     /**
@@ -175,12 +170,6 @@ export class DomEnemyLayer {
         node.style.setProperty('--tilt', `${tiltDeg.toFixed(2)}deg`);
 
         node.dataset.tier = enemy.type || 'normal';
-        // Boss 类型主题（ignis / glacies / mikro / devourer / viridis / tesla / chimera / ouroboros）
-        if (enemy.type === 'boss' && enemy.bossType) {
-            node.dataset.bossType = enemy.bossType;
-        } else {
-            delete node.dataset.bossType;
-        }
 
         // idle 变体 0 / 1 / 2，基于 seed 稳定分配（同一敌人始终同一变体）
         node.dataset.idleVariant = String(Math.floor(seed * 3) % 3);

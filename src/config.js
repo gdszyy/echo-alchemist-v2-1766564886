@@ -855,8 +855,8 @@ const CONFIG = {
         // 跳过 canvas 上对应的 Layer 1（裁剪/材质/affix 色调/HP 槽/状态层）。
         // 子弹、粒子、词缀光环等仍然由 canvas 绘制；HP 与状态由 DOM 层呈现。
         domRendererEnabled: true,
-        // 哪些敌人类型走 DOM 渲染。Boss 入场动画期间仍由 canvas 接管（见 enemy.draw 早退条件）
-        domRendererTypes: ['normal', 'elite', 'boss'],
+        // 哪些敌人类型走 DOM 渲染（PoC 阶段仅普通敌人）
+        domRendererTypes: ['normal'],
 
         // A1: Layer 1.5 材质光泽渐变
         // 顶部白色叠加 alpha（模拟凸起高光）
