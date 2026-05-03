@@ -851,6 +851,14 @@ const CONFIG = {
 
     // ==================== 敌人渲染管线增强参数 (Task A) ====================
     enemyRender: {
+        // ─── DOM/CSS 渲染器（PoC: 可爱风纯 CSS 敌人）───────────────────────
+        // 为 true 时，符合 domRendererTypes 的敌人会用 DOM 元素 + CSS 渲染本体，
+        // 跳过 canvas 上对应的 Layer 1（裁剪/材质/affix 色调/HP 槽/状态层）。
+        // 子弹、粒子、词缀光环等仍然由 canvas 绘制；HP 与状态由 DOM 层呈现。
+        domRendererEnabled: true,
+        // 哪些敌人类型走 DOM 渲染（PoC 阶段仅普通敌人）
+        domRendererTypes: ['normal'],
+
         // A1: Layer 1.5 材质光泽渐变
         // 顶部白色叠加 alpha（模拟凸起高光）
         glossTopAlpha: 0.08,

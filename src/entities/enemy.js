@@ -1317,7 +1317,17 @@ class Enemy {
     // @section:draw_entry_and_perf_check - 绘制入口与性能等级检查
     draw(ctx) {
         if (!this.active) return;
-        ctx.save(); 
+
+        // [PoC] DOM/CSS 敌人图层接管：普通敌人的本体（容器/纹理/HP/状态层）由 DOM 渲染，
+        // 跳过 canvas 上的本体绘制。子弹、词缀光环、boss 等仍走原 canvas 路径。
+        const _domCfg = CONFIG.enemyRender;
+        if (_domCfg && _domCfg.domRendererEnabled
+            && Array.isArray(_domCfg.domRendererTypes)
+            && _domCfg.domRendererTypes.includes(this.type)) {
+            return;
+        }
+
+        ctx.save();
         ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
 
         // === D1 & D2: 待机生动感（呼吸缩放 + 微浮动）===
