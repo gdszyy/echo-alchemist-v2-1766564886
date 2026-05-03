@@ -45,7 +45,6 @@ import { calc_utils } from './calc_utils.js';
 import { tutorial_system } from './tutorial_system.js';
 import { game_over_mixin } from './ui/game_over.js';
 import { preloadAllSprites } from './render/sprite_renderer.js'; // [Phase 5B] 预加载所有 Sprite Sheet
-import { DomEnemyLayer } from './render/dom_enemy_layer.js'; // [PoC] DOM/CSS 敌人图层
 
 // ==================== 延迟音频初始化 ====================
 let _audioInitialized = false;
@@ -335,8 +334,6 @@ class Game {
         this._perfUpTimer = 0;
         // [Phase 5B] 预加载所有 Sprite Sheet（在游戏循环开始前触发异步加载）
         preloadAllSprites();
-        // [PoC] DOM/CSS 敌人图层（普通敌人本体由 DOM 渲染，神态由 CSS 驱动）
-        this.domEnemyLayer = new DomEnemyLayer();
         // 启动游戏主循环
         this.sys_loop();
     }
