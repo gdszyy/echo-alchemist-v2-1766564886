@@ -1,448 +1,610 @@
 /**
- * bitmap_ui.css — Phase A 位图化 UI 样式覆盖层
- * Task 5.A2: #unified-top-bar background → 9-Slice PNG
- * Task 5.A3: .rune-icon-frame / .relic-card 稀有度 9-Slice 边框
- * Task 5.A4: .sp-gem / #settings-btn / #speed-btn → 固定尺寸 Sprite
+ * bitmap_ui.css → CSS-themed UI 覆盖层（文件名保留以减少接入面）
  *
- * 接入规则：
- *   - 仅覆盖视觉属性（background / border-image / content）
- *   - 不修改 layout / z-index / pointer-events 等功能属性
- *   - 9-Slice 通过 border-image 接入，不改 JS 逻辑
+ * 设计系统：与敌人 DOM 层（石像 golem）一致——深色板岩 + 金属边光 +
+ *   按稀有度切换的 hue，避免使用 PNG 位图，纯 CSS gradient / border / shadow。
+ *   对应的位图素材（assets/ui/panels/*, borders/*, sprites/*）暂保留不动，
+ *   后续可单独清理。
+ *
+ * 配色基底：
+ *   --ui-base       板岩底面（panel surface）
+ *   --ui-edge       金属边光顶色 / 底色
+ *   --ui-glow-blue  / amber / purple / red  发光色（rarity / state）
+ *
+ * 形状基底：
+ *   - 切角统一 6px（与敌人 border-radius: 6px 协同）
+ *   - inset shadow 提供"嵌入感"，outer shadow 提供"漂浮感"
  */
 
+:root {
+    --ui-base-1:        rgba(15, 23, 42, 0.92);   /* slate-900 */
+    --ui-base-2:        rgba(2, 6, 23, 0.96);     /* slate-950 */
+    --ui-base-3:        rgba(30, 41, 59, 0.85);   /* slate-800 */
+    --ui-edge-top:      rgba(148, 163, 184, 0.55); /* slate-400 */
+    --ui-edge-bot:      rgba(51, 65, 85, 0.85);   /* slate-700 */
+    --ui-edge-glow:     rgba(56, 189, 248, 0.18); /* sky-400 微光 */
+    --ui-glow-cyan:     56, 189, 248;             /* sky-400 */
+    --ui-glow-blue:     59, 130, 246;             /* blue-500 */
+    --ui-glow-purple:   168, 85, 247;             /* purple-500 */
+    --ui-glow-amber:    250, 204, 21;             /* yellow-400 */
+    --ui-glow-red:      239, 68, 68;              /* red-500 */
+    --ui-glow-emerald:  74, 222, 128;             /* green-400 */
+    --ui-radius:        6px;
+    --ui-radius-lg:     10px;
+}
+
 /* =====================================================
-   Task 5.A2 — #unified-top-bar 9-Slice 底板
-   原样式：background: rgba(10,15,30,0.82) + backdrop-filter
-   新样式：border-image 9-Slice PNG，保留 backdrop-filter
-   9-Slice 切片参数：图片 512×128，边距取 32px（25%）
+   #unified-top-bar — 顶部状态栏
+   原本是 9-slice 位图，改为深色板岩 + 顶部金属高光 + 底部分隔线
    ===================================================== */
 #unified-top-bar {
-    /* 保留原有 backdrop-filter 模糊效果 */
-    background: transparent !important;
-    border-bottom: none !important;
-    box-shadow: none !important;
-
-    /* 9-Slice 底板：fill 关键字让中间区域也被填充 */
-    border-image-source: url('../../assets/ui/panels/top_bar_9s.png');
-    border-image-slice: 32 32 32 32 fill;   /* top right bottom left */
-    border-image-width: 32px 32px 32px 32px;
-    border-image-outset: 0;
-    border-image-repeat: stretch;
-
-    /* 保持原有内边距不变，border-image 不占用 box model 空间 */
+    background:
+        linear-gradient(180deg,
+            rgba(30, 41, 59, 0.78) 0%,
+            rgba(15, 23, 42, 0.92) 60%,
+            rgba(2, 6, 23, 0.96) 100%) !important;
+    border: 1px solid var(--ui-edge-bot) !important;
+    border-top: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.25) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(148, 163, 184, 0.35),
+        inset 0 -1px 0 rgba(2, 6, 23, 0.85),
+        0 2px 8px rgba(0, 0, 0, 0.5) !important;
+    /* 移除 border-image 历史 */
+    border-image: none !important;
 }
 
 /* =====================================================
-   Task 5.A3 — 稀有度 9-Slice 边框
-   目标元素：.rune-icon-frame（符文）、.relic-card（遗物）
-   9-Slice 切片参数：图片 256×342，边框区域约 48px（~19%）
+   稀有度边框：rune-icon-frame / relic-card / replace-ammo-card
    ===================================================== */
 
-/* --- 符文图标框 稀有度边框 --- */
-/* 切片参数：256×342 图片，边框宽约 48px */
-/* [BUGFIX] rune-icon-frame 移除 fill 关键字，避免 border-image 中心区域覆盖符文图标 */
-/* common 边框中心不透明，必须移除 fill 否则黑色中心会遮挡图标内容 */
+/* 通用：抹平 border-image，统一 border-radius */
+.rune-icon-frame,
+.relic-card,
+.replace-ammo-card > div:not(.card-floating):not(.card-icon-idle) {
+    border-image: none !important;
+}
+
+/* --- 符文图标框 --- */
+.rune-icon-frame {
+    border-radius: var(--ui-radius) !important;
+    background: linear-gradient(180deg,
+        rgba(30, 41, 59, 0.85) 0%,
+        rgba(15, 23, 42, 0.95) 100%) !important;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
 .rune-icon-frame.rarity-common {
-    border: none !important;
-    box-shadow: none !important;
-    border-image-source: url('../../assets/ui/borders/border_common_9s.png');
-    border-image-slice: 48 48 48 48;
-    border-image-width: 6px;
-    border-image-outset: 2px;
-    border-image-repeat: stretch;
+    border: 1.5px solid rgba(148, 163, 184, 0.5) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 2px 4px rgba(0, 0, 0, 0.5) !important;
 }
-
 .rune-icon-frame.rarity-rare {
-    border: none !important;
-    box-shadow: none !important;
-    border-image-source: url('../../assets/ui/borders/border_rare_9s.png');
-    border-image-slice: 48 48 48 48;
-    border-image-width: 6px;
-    border-image-outset: 2px;
-    border-image-repeat: stretch;
+    border: 1.5px solid rgba(var(--ui-glow-blue), 0.85) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 0 8px rgba(var(--ui-glow-blue), 0.5),
+        0 2px 4px rgba(0, 0, 0, 0.5) !important;
 }
-
 .rune-icon-frame.rarity-epic {
-    border: none !important;
-    box-shadow: none !important;
-    border-image-source: url('../../assets/ui/borders/border_epic_9s.png');
-    border-image-slice: 48 48 48 48;
-    border-image-width: 6px;
-    border-image-outset: 2px;
-    border-image-repeat: stretch;
-    animation: none !important; /* 位图本身已有发光质感 */
+    border: 1.5px solid rgba(var(--ui-glow-purple), 0.9) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.14),
+        0 0 10px rgba(var(--ui-glow-purple), 0.55),
+        0 2px 6px rgba(0, 0, 0, 0.5) !important;
+    animation: rarity-epic-pulse 2.4s ease-in-out infinite;
 }
-
 .rune-icon-frame.rarity-legendary {
-    border: none !important;
-    border-image-source: url('../../assets/ui/borders/border_legendary_9s.png');
-    border-image-slice: 48 48 48 48;
-    border-image-width: 8px;
-    border-image-outset: 3px;
-    border-image-repeat: stretch;
-    /* 保留传说脉冲动画（仅 box-shadow 部分，border-image 不受影响） */
-    animation: rune-legendary-pulse-bitmap 2s ease-in-out infinite;
+    border: 2px solid rgba(var(--ui-glow-amber), 0.95) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.18),
+        0 0 14px rgba(var(--ui-glow-amber), 0.7),
+        0 0 28px rgba(var(--ui-glow-amber), 0.4),
+        0 2px 8px rgba(0, 0, 0, 0.6) !important;
+    animation: rarity-legendary-pulse 2s ease-in-out infinite;
+}
+@keyframes rarity-epic-pulse {
+    0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.14),
+                            0 0 8px rgba(var(--ui-glow-purple), 0.45),
+                            0 2px 6px rgba(0,0,0,0.5); }
+    50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.16),
+                            0 0 18px rgba(var(--ui-glow-purple), 0.85),
+                            0 2px 8px rgba(0,0,0,0.5); }
+}
+@keyframes rarity-legendary-pulse {
+    0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.18),
+                            0 0 12px rgba(var(--ui-glow-amber), 0.55),
+                            0 0 22px rgba(var(--ui-glow-amber), 0.3),
+                            0 2px 8px rgba(0,0,0,0.6); }
+    50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.22),
+                            0 0 22px rgba(var(--ui-glow-amber), 1),
+                            0 0 42px rgba(var(--ui-glow-amber), 0.6),
+                            0 2px 10px rgba(0,0,0,0.7); }
 }
 
-@keyframes rune-legendary-pulse-bitmap {
-    0%, 100% { filter: brightness(1)    drop-shadow(0 0 4px rgba(243,156,18,0.5)); }
-    50%       { filter: brightness(1.15) drop-shadow(0 0 10px rgba(243,156,18,0.9)); }
-}
-
-/* --- 遗物卡片 稀有度边框 --- */
+/* --- 遗物卡片 --- */
 .relic-card {
-    border: none !important;
-    box-shadow: none !important;
-    border-image-source: url('../../assets/ui/borders/border_common_9s.png');
-    border-image-slice: 48 48 48 48 fill;
-    border-image-width: 8px;
-    border-image-outset: 3px;
-    border-image-repeat: stretch;
-    /* [BUGFIX] 保留深色底色，避免 border-image fill 覆盖后背景变白 */
-    background: linear-gradient(180deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%) !important;
+    border-radius: var(--ui-radius-lg) !important;
+    background: linear-gradient(180deg,
+        rgba(30, 41, 59, 0.95) 0%,
+        rgba(15, 23, 42, 0.98) 100%) !important;
+    border: 1.5px solid rgba(148, 163, 184, 0.45) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 4px 10px rgba(0, 0, 0, 0.6) !important;
 }
-
 .relic-card.rare {
-    border-image-source: url('../../assets/ui/borders/border_rare_9s.png') !important;
-    animation: rare-pulse-bitmap 2.8s ease-in-out infinite;
+    border-color: rgba(var(--ui-glow-blue), 0.85) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 0 10px rgba(var(--ui-glow-blue), 0.5),
+        0 4px 10px rgba(0, 0, 0, 0.6) !important;
+    animation: rarity-rare-breathe 2.8s ease-in-out infinite;
 }
-
 .relic-card.epic {
-    border-image-source: url('../../assets/ui/borders/border_epic_9s.png') !important;
+    border-color: rgba(var(--ui-glow-purple), 0.9) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.14),
+        0 0 12px rgba(var(--ui-glow-purple), 0.55),
+        0 4px 12px rgba(0, 0, 0, 0.6) !important;
 }
-
 .relic-card.legendary {
-    border-image-source: url('../../assets/ui/borders/border_legendary_9s.png') !important;
-    border-image-width: 10px !important;
-    border-image-outset: 4px !important;
-    animation: legendary-glow-bitmap 2.2s ease-in-out infinite;
+    border: 2px solid rgba(var(--ui-glow-amber), 0.95) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        0 0 18px rgba(var(--ui-glow-amber), 0.7),
+        0 0 36px rgba(var(--ui-glow-amber), 0.35),
+        0 4px 14px rgba(0, 0, 0, 0.7) !important;
+    animation: rarity-legendary-pulse 2.2s ease-in-out infinite;
 }
-
 .relic-card.cursed {
-    border-image-source: url('../../assets/ui/borders/border_cursed_9s.png') !important;
-    animation: cursed-flicker-bitmap 3.5s ease-in-out infinite;
+    border: 1.5px solid rgba(var(--ui-glow-red), 0.85) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 0 12px rgba(var(--ui-glow-red), 0.6),
+        0 4px 10px rgba(0, 0, 0, 0.65) !important;
+    animation: rarity-cursed-flicker 3.5s ease-in-out infinite;
+}
+@keyframes rarity-rare-breathe {
+    0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.12),
+                            0 0 8px rgba(var(--ui-glow-blue), 0.42),
+                            0 4px 10px rgba(0,0,0,0.6); }
+    50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.14),
+                            0 0 16px rgba(var(--ui-glow-blue), 0.85),
+                            0 4px 12px rgba(0,0,0,0.6); }
+}
+@keyframes rarity-cursed-flicker {
+    0%, 100% { filter: brightness(1); }
+    32%      { filter: brightness(1.18) hue-rotate(-6deg); }
+    34%      { filter: brightness(0.85); }
+    62%      { filter: brightness(1.1); }
 }
 
-/* 位图边框动画：用 filter 替代 box-shadow（border-image 不支持 box-shadow） */
-@keyframes rare-pulse-bitmap {
-    0%, 100% { filter: brightness(1)    drop-shadow(0 0 3px rgba(59,130,246,0.4)); }
-    50%       { filter: brightness(1.1)  drop-shadow(0 0 8px rgba(59,130,246,0.8)); }
-}
-
-@keyframes legendary-glow-bitmap {
-    0%, 100% { filter: brightness(1)    drop-shadow(0 0 5px rgba(250,204,21,0.5)); }
-    40%       { filter: brightness(1.2)  drop-shadow(0 0 14px rgba(250,204,21,0.9)); }
-}
-
-@keyframes cursed-flicker-bitmap {
-    0%, 100% { filter: brightness(1)    drop-shadow(0 0 3px rgba(239,68,68,0.4)); }
-    30%       { filter: brightness(1.15) drop-shadow(0 0 10px rgba(239,68,68,0.8)); }
-    60%       { filter: brightness(1.05) drop-shadow(0 0 5px rgba(239,68,68,0.5)); }
-}
-
-/* #phase-rune-launcher 面板底板
-   - 外层 overlay 仅作半透明遮罩（避免 border-image 被拉伸到全屏导致比例失真）
-   - 实际 9-Slice 面板贴在内层 .rune-launcher-card 上，宽度根据背景图比例收缩，
-     保证装饰带与中心石板纹理在视觉上贴合内容区域 */
+/* =====================================================
+   #phase-rune-launcher — 符文发射器面板
+   ===================================================== */
 #phase-rune-launcher {
     background: rgba(2, 6, 23, 0.92) !important;
     align-items: center;
 }
 #phase-rune-launcher > .rune-launcher-card {
-    /* 收缩到与 rune_launcher_9s.png（512×768）比例匹配的宽度，最大 384px，避免在大屏被拉伸 */
     max-width: min(384px, calc(100vw - 24px));
     margin-left: auto;
     margin-right: auto;
-    border-image-source: url('../../assets/ui/panels/rune_launcher_9s.png');
-    border-image-slice: 64 64 96 96 fill;
-    border-image-width: 32px 24px 40px 24px;
-    border-image-outset: 0;
-    border-image-repeat: stretch;
+    border-image: none !important;
+    background:
+        radial-gradient(ellipse at 50% 0%,
+            rgba(56, 189, 248, 0.12) 0%,
+            transparent 50%),
+        linear-gradient(180deg,
+            rgba(30, 41, 59, 0.95) 0%,
+            rgba(15, 23, 42, 0.98) 100%) !important;
+    border: 1.5px solid rgba(148, 163, 184, 0.45) !important;
+    border-radius: var(--ui-radius-lg) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 -2px 12px rgba(0, 0, 0, 0.45),
+        0 8px 24px rgba(0, 0, 0, 0.55),
+        0 0 14px rgba(56, 189, 248, 0.2) !important;
+    padding: 16px !important;
 }
 
 /* =====================================================
-   Task 5.A4 — .sp-gem / #settings-btn / #speed-btn Sprite
+   SP 宝石 / 设置 / 速度按钮 — 用 CSS 几何图形替代位图
    ===================================================== */
 
-/* SP 宝石槽：用 background-image 替代纯色 */
+/* 空 SP 槽：菱形空框 */
 .sp-slot {
-    background: url('../../assets/ui/sprites/sp_gem_empty_32.png') center/contain no-repeat !important;
-    border: none !important;
-    box-shadow: none !important;
-    /* 图片本身已是菱形，取消 CSS rotate；同时放大到 20px 以匹配 32px 位图 */
-    width: 20px !important;
-    height: 20px !important;
-    transform: none !important;
+    background: transparent !important;
+    border: 1.5px solid rgba(148, 163, 184, 0.55) !important;
+    box-shadow:
+        inset 0 0 4px rgba(0, 0, 0, 0.6),
+        0 0 2px rgba(56, 189, 248, 0.25) !important;
+    width: 16px !important;
+    height: 16px !important;
+    transform: rotate(45deg) !important;
+    border-radius: 2px !important;
+    border-image: none !important;
 }
 
-/* SP 宝石（激活态）：覆盖满格宝石图 */
+/* 满 SP 宝石：菱形发光 */
 .sp-gem.active {
-    background: url('../../assets/ui/sprites/sp_gem_full_32.png') center/contain no-repeat !important;
-    box-shadow: none !important;
-    /* 保留弹出动画 */
+    background: linear-gradient(135deg,
+        rgba(125, 211, 252, 1) 0%,
+        rgba(56, 189, 248, 1) 50%,
+        rgba(14, 165, 233, 1) 100%) !important;
+    border: 1.5px solid rgba(186, 230, 253, 0.95) !important;
+    box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.65),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.45),
+        0 0 8px rgba(56, 189, 248, 0.85),
+        0 0 14px rgba(56, 189, 248, 0.5) !important;
+    border-radius: 2px !important;
+    border-image: none !important;
 }
-
-/* 隐藏原有纯色宝石（未激活时不显示） */
 .sp-gem:not(.active) {
     background: transparent !important;
     box-shadow: none !important;
 }
 
-/* 设置按钮：替换为位图 */
+/* 设置按钮：金属圆形 + 齿轮文字 */
 #settings-btn {
-    background: url('../../assets/ui/sprites/settings_btn_32.png') center/contain no-repeat !important;
-    border: none !important;
-    box-shadow: none !important;
-    color: transparent !important; /* 隐藏原有 emoji */
-    font-size: 0 !important;
+    background:
+        radial-gradient(circle at 35% 30%,
+            rgba(148, 163, 184, 0.6) 0%,
+            rgba(71, 85, 105, 0.95) 50%,
+            rgba(30, 41, 59, 1) 100%) !important;
+    border: 1.5px solid rgba(148, 163, 184, 0.65) !important;
+    border-radius: 50% !important;
+    color: #cbd5e1 !important;
+    font-size: 16px !important;
     width: 32px !important;
     height: 32px !important;
+    box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.35),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.55),
+        0 2px 4px rgba(0, 0, 0, 0.5) !important;
+    border-image: none !important;
+    transition: filter 0.2s ease, transform 0.2s ease;
 }
-
 #settings-btn:hover {
-    filter: brightness(1.2) drop-shadow(0 0 4px rgba(100,160,255,0.6));
+    filter: brightness(1.2) drop-shadow(0 0 4px rgba(100, 160, 255, 0.6));
+    transform: rotate(20deg);
 }
 
-/* 速度按钮：替换为位图 */
+/* 速度按钮：同样金属圆形 */
 #speed-btn {
-    background: url('../../assets/ui/sprites/speed_btn_32.png') center/contain no-repeat !important;
-    border: none !important;
-    box-shadow: none !important;
-    color: transparent !important;
-    font-size: 0 !important;
+    background:
+        radial-gradient(circle at 35% 30%,
+            rgba(148, 163, 184, 0.6) 0%,
+            rgba(71, 85, 105, 0.95) 50%,
+            rgba(30, 41, 59, 1) 100%) !important;
+    border: 1.5px solid rgba(148, 163, 184, 0.65) !important;
+    border-radius: 50% !important;
+    color: #cbd5e1 !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
     width: 32px !important;
     height: 32px !important;
+    box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.35),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.55),
+        0 2px 4px rgba(0, 0, 0, 0.5) !important;
+    border-image: none !important;
+    transition: filter 0.2s ease;
 }
-
 #speed-btn:hover {
-    filter: brightness(1.2) drop-shadow(0 0 4px rgba(100,160,255,0.6));
+    filter: brightness(1.2) drop-shadow(0 0 4px rgba(100, 160, 255, 0.6));
 }
-
-/* 速度按钮激活态（2x速时高亮） */
 #speed-btn.active,
 #speed-btn[data-speed="2"] {
-    filter: brightness(1.3) drop-shadow(0 0 6px rgba(100,200,255,0.8)) !important;
+    background:
+        radial-gradient(circle at 35% 30%,
+            rgba(186, 230, 253, 0.85) 0%,
+            rgba(56, 189, 248, 0.95) 50%,
+            rgba(14, 165, 233, 1) 100%) !important;
+    border-color: rgba(186, 230, 253, 0.95) !important;
+    color: #f0f9ff !important;
+    box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.55),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.45),
+        0 0 10px rgba(56, 189, 248, 0.8),
+        0 2px 4px rgba(0, 0, 0, 0.5) !important;
 }
 
 /* =====================================================
-   §6.2 子弹替换 / 命运抉择 UI（#phase-selection）
-   - 整面背景：replace_ammo_bg.png
-   - 卡片边框：replace_card_frame_<tier>_9s.png（C/B/A/S 四档）
-   - 顶部属性 icon 圆形底座：replace_card_attr_slot.png
-   - 跳过按钮：skip_btn_metal.png
+   #phase-selection — 子弹替换 / 命运抉择
    ===================================================== */
 #phase-selection {
-    background-image:
-        linear-gradient(180deg, rgba(2,6,23,0.62) 0%, rgba(2,6,23,0.78) 100%),
-        url('../../assets/ui/panels/replace_ammo_bg.png');
-    background-size: cover, cover;
-    background-position: center, center;
-    background-repeat: no-repeat, no-repeat;
-}
-
-/* 4 档稀有度 9-Slice 边框，覆盖 JS 内联 border:2px solid 的视觉表达 */
-.replace-ammo-card[data-tier="C"] > div:not(.card-floating):not(.card-icon-idle) {
-    border: none !important;
-    border-image-source: url('../../assets/ui/sprites/replace_card_frame_C_9s.png');
-    border-image-slice: 24 24 24 24;
-    border-image-width: 12px;
-    border-image-outset: 0;
-    border-image-repeat: stretch;
-}
-.replace-ammo-card[data-tier="B"] > div:not(.card-floating):not(.card-icon-idle) {
-    border: none !important;
-    border-image-source: url('../../assets/ui/sprites/replace_card_frame_B_9s.png');
-    border-image-slice: 24 24 24 24;
-    border-image-width: 12px;
-    border-image-outset: 0;
-    border-image-repeat: stretch;
-}
-.replace-ammo-card[data-tier="A"] > div:not(.card-floating):not(.card-icon-idle) {
-    border: none !important;
-    border-image-source: url('../../assets/ui/sprites/replace_card_frame_A_9s.png');
-    border-image-slice: 24 24 24 24;
-    border-image-width: 14px;
-    border-image-outset: 0;
-    border-image-repeat: stretch;
-}
-.replace-ammo-card[data-tier="S"] > div:not(.card-floating):not(.card-icon-idle) {
-    border: none !important;
-    border-image-source: url('../../assets/ui/sprites/replace_card_frame_S_9s.png');
-    border-image-slice: 24 24 24 24;
-    border-image-width: 16px;
-    border-image-outset: 0;
-    border-image-repeat: stretch;
-}
-
-/* 顶部属性 icon 圆形底座 — JS 内嵌 background:rgba(15,23,42,0.92) 的内层 div 由位图替代 */
-.replace-ammo-card .card-floating > div,
-.replace-ammo-card .card-icon-idle > div {
-    background: url('../../assets/ui/sprites/replace_card_attr_slot.png') center/contain no-repeat !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-/* 替换页跳过按钮：金属底板 */
-#replace-ammo-skip-btn {
-    background: url('../../assets/ui/sprites/skip_btn_metal.png') center/contain no-repeat !important;
-    border: none !important;
-    box-shadow: none !important;
-    color: #fde68a !important;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.65);
-    min-width: 160px;
-    height: 42px;
-    padding: 0 18px !important;
-    transition: filter 0.18s ease, transform 0.18s ease;
-}
-#replace-ammo-skip-btn:hover {
-    filter: brightness(1.18) drop-shadow(0 0 4px rgba(250,204,21,0.55));
-    transform: translateY(-1px);
-}
-
-/* =====================================================
-   §6.3 古代遗物 overlay（#phase-relic）
-   - 整面背景：relic_overlay_bg.png（暗紫炼金阵）
-   - 「跳过」按钮金属底板
-   - [移除] 稀有度旋转圆形光环（relic_aura_*.png + relic-aura-rotate 动画）
-   ===================================================== */
-#phase-relic {
-    background-image:
-        linear-gradient(180deg, rgba(2,6,23,0.55) 0%, rgba(2,6,23,0.86) 100%),
-        url('../../assets/ui/panels/relic_overlay_bg.png') !important;
-    background-size: cover, cover !important;
-    background-position: center, center !important;
-    background-repeat: no-repeat, no-repeat !important;
+    background:
+        radial-gradient(ellipse at 50% 30%,
+            rgba(56, 189, 248, 0.10) 0%,
+            transparent 50%),
+        radial-gradient(ellipse at 50% 100%,
+            rgba(168, 85, 247, 0.12) 0%,
+            transparent 60%),
+        linear-gradient(180deg,
+            rgba(2, 6, 23, 0.85) 0%,
+            rgba(2, 6, 23, 0.97) 100%) !important;
     background-color: #020617 !important;
 }
 
-/* 遗物跳过按钮：替换原生纯文字链接为金属底板按钮（按 HTML 内嵌的 button 选择器） */
-#phase-relic button {
-    background: url('../../assets/ui/sprites/skip_btn_metal.png') center/contain no-repeat !important;
-    border: none !important;
-    color: #fde68a !important;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
-    text-decoration: none !important;
-    min-width: 220px;
-    height: 44px;
-    padding: 0 24px !important;
-    transition: filter 0.18s ease, transform 0.18s ease;
+/* 4 档稀有度卡片边框（C/B/A/S） */
+.replace-ammo-card[data-tier="C"] > div:not(.card-floating):not(.card-icon-idle) {
+    border: 1.5px solid rgba(148, 163, 184, 0.55) !important;
+    border-radius: var(--ui-radius) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 2px 4px rgba(0, 0, 0, 0.5) !important;
 }
+.replace-ammo-card[data-tier="B"] > div:not(.card-floating):not(.card-icon-idle) {
+    border: 1.5px solid rgba(var(--ui-glow-emerald), 0.75) !important;
+    border-radius: var(--ui-radius) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 0 8px rgba(var(--ui-glow-emerald), 0.45),
+        0 2px 4px rgba(0, 0, 0, 0.5) !important;
+}
+.replace-ammo-card[data-tier="A"] > div:not(.card-floating):not(.card-icon-idle) {
+    border: 1.5px solid rgba(var(--ui-glow-purple), 0.85) !important;
+    border-radius: var(--ui-radius) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 0 12px rgba(var(--ui-glow-purple), 0.6),
+        0 2px 6px rgba(0, 0, 0, 0.5) !important;
+    animation: rarity-epic-pulse 2.4s ease-in-out infinite;
+}
+.replace-ammo-card[data-tier="S"] > div:not(.card-floating):not(.card-icon-idle) {
+    border: 2px solid rgba(var(--ui-glow-amber), 0.95) !important;
+    border-radius: var(--ui-radius) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.18),
+        0 0 16px rgba(var(--ui-glow-amber), 0.7),
+        0 0 32px rgba(var(--ui-glow-amber), 0.35),
+        0 2px 8px rgba(0, 0, 0, 0.6) !important;
+    animation: rarity-legendary-pulse 2s ease-in-out infinite;
+}
+
+/* 顶部属性 icon 圆形底座 */
+.replace-ammo-card .card-floating > div,
+.replace-ammo-card .card-icon-idle > div {
+    background:
+        radial-gradient(circle at 50% 40%,
+            rgba(71, 85, 105, 0.95) 0%,
+            rgba(15, 23, 42, 0.98) 100%) !important;
+    border: 1.5px solid rgba(148, 163, 184, 0.55) !important;
+    border-radius: 50% !important;
+    box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.18),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.6),
+        0 2px 4px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 通用「金属底板」按钮（替换 skip_btn_metal.png 的所有引用） */
+#replace-ammo-skip-btn,
+#phase-relic button {
+    background:
+        linear-gradient(180deg,
+            rgba(71, 85, 105, 0.95) 0%,
+            rgba(30, 41, 59, 1) 50%,
+            rgba(15, 23, 42, 1) 100%) !important;
+    border: 1.5px solid rgba(148, 163, 184, 0.55) !important;
+    border-radius: var(--ui-radius) !important;
+    color: #fde68a !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+    text-decoration: none !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.18),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.55),
+        0 2px 6px rgba(0, 0, 0, 0.5) !important;
+    height: 42px;
+    padding: 0 18px !important;
+    transition: filter 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+#replace-ammo-skip-btn { min-width: 160px; }
+#phase-relic button   { min-width: 220px; height: 44px; padding: 0 24px !important; }
+
+#replace-ammo-skip-btn:hover,
 #phase-relic button:hover {
-    filter: brightness(1.18) drop-shadow(0 0 4px rgba(250,204,21,0.55));
+    filter: brightness(1.18);
+    border-color: rgba(250, 204, 21, 0.65) !important;
     transform: translateY(-1px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.55),
+        0 0 8px rgba(250, 204, 21, 0.45),
+        0 4px 8px rgba(0, 0, 0, 0.55) !important;
 }
 
 /* =====================================================
-   §6.4 符文发射器九宫格（#phase-rune-launcher / #rune-grid-container）
-   - 容器 9-Slice：rune_grid_bg_9s.png
-   - 4 态格子：rune_slot_idle / hover / filled / highlight（一次性 place 动画）
+   #phase-relic — 古代遗物 overlay
+   ===================================================== */
+#phase-relic {
+    background:
+        radial-gradient(circle at 50% 35%,
+            rgba(168, 85, 247, 0.18) 0%,
+            transparent 45%),
+        radial-gradient(circle at 50% 100%,
+            rgba(56, 189, 248, 0.10) 0%,
+            transparent 55%),
+        repeating-conic-gradient(
+            from 0deg at 50% 50%,
+            rgba(168, 85, 247, 0.025) 0deg 6deg,
+            transparent 6deg 12deg),
+        linear-gradient(180deg,
+            rgba(2, 6, 23, 0.85) 0%,
+            rgba(2, 6, 23, 0.96) 100%) !important;
+    background-color: #020617 !important;
+}
+
+/* =====================================================
+   #rune-grid-container — 符文发射器九宫格
    ===================================================== */
 #rune-grid-container {
-    border-image-source: url('../../assets/ui/panels/rune_grid_bg_9s.png');
-    border-image-slice: 32 32 32 32 fill;
-    border-image-width: 16px;
-    border-image-outset: 4px;
-    border-image-repeat: stretch;
-    padding: 8px !important;
+    border-image: none !important;
+    background:
+        radial-gradient(ellipse at 50% 0%,
+            rgba(168, 85, 247, 0.10) 0%,
+            transparent 60%),
+        linear-gradient(180deg,
+            rgba(15, 23, 42, 0.92) 0%,
+            rgba(2, 6, 23, 0.97) 100%) !important;
+    border: 1.5px solid rgba(148, 163, 184, 0.4) !important;
+    border-radius: var(--ui-radius-lg) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        inset 0 -2px 8px rgba(0, 0, 0, 0.4),
+        0 4px 12px rgba(0, 0, 0, 0.5) !important;
+    padding: 12px !important;
 }
 
+/* 4 状态符文格子：纯 CSS */
 .rune-grid-cell {
-    background: url('../../assets/ui/sprites/rune_slot_idle.png') center/contain no-repeat !important;
-    border: none !important;
-    border-radius: 0 !important;
-    transition: filter 0.18s ease, transform 0.18s ease;
+    background:
+        radial-gradient(ellipse at 50% 30%,
+            rgba(71, 85, 105, 0.55) 0%,
+            rgba(15, 23, 42, 0.85) 100%) !important;
+    border: 1.5px solid rgba(100, 116, 139, 0.45) !important;
+    border-radius: var(--ui-radius) !important;
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.55),
+        inset 0 -1px 1px rgba(255, 255, 255, 0.06) !important;
+    transition: filter 0.18s ease, transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 .rune-grid-cell:hover {
-    background-image: url('../../assets/ui/sprites/rune_slot_hover.png') !important;
-    filter: drop-shadow(0 0 6px rgba(168,85,247,0.55));
+    border-color: rgba(var(--ui-glow-purple), 0.75) !important;
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.55),
+        inset 0 -1px 1px rgba(255, 255, 255, 0.08),
+        0 0 8px rgba(var(--ui-glow-purple), 0.55) !important;
 }
 .rune-grid-cell[data-state="filled"] {
-    background-image: url('../../assets/ui/sprites/rune_slot_filled.png') !important;
+    background:
+        radial-gradient(ellipse at 50% 30%,
+            rgba(168, 85, 247, 0.35) 0%,
+            rgba(15, 23, 42, 0.9) 100%) !important;
+    border-color: rgba(var(--ui-glow-purple), 0.85) !important;
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.45),
+        inset 0 0 8px rgba(var(--ui-glow-purple), 0.35),
+        0 0 6px rgba(var(--ui-glow-purple), 0.45) !important;
 }
 .rune-grid-cell[data-active="1"] {
-    filter: drop-shadow(0 0 8px rgba(168,85,247,0.85));
+    box-shadow:
+        inset 0 0 12px rgba(var(--ui-glow-purple), 0.55),
+        0 0 12px rgba(var(--ui-glow-purple), 0.85) !important;
 }
 
-/* 一次性放置确认光圈：使用 ::after 叠加 highlight 96×96 贴图 + 弹性缩放 */
+/* 一次性放置确认光圈：纯 CSS 扩散环 */
 .rune-grid-cell.rune-slot-place {
     position: relative;
 }
 .rune-grid-cell.rune-slot-place::after {
     content: '';
     position: absolute;
-    inset: -16px;
-    background: url('../../assets/ui/sprites/rune_slot_highlight.png') center/contain no-repeat;
+    inset: -8px;
+    border-radius: var(--ui-radius);
+    border: 2px solid rgba(var(--ui-glow-purple), 0.95);
+    box-shadow:
+        0 0 14px rgba(var(--ui-glow-purple), 0.85),
+        inset 0 0 14px rgba(var(--ui-glow-purple), 0.45);
     pointer-events: none;
     animation: rune-slot-place-pop 0.55s cubic-bezier(0.2, 1, 0.3, 1) forwards;
 }
 @keyframes rune-slot-place-pop {
-    0%   { opacity: 0; transform: scale(0.4); }
+    0%   { opacity: 0; transform: scale(0.6); }
     35%  { opacity: 1; transform: scale(1.15); }
-    100% { opacity: 0; transform: scale(1.45); }
+    100% { opacity: 0; transform: scale(1.55); }
 }
 
 /* =====================================================
-   §1.8 真理之书 9-Slice（#phase-truth-book）
+   #phase-truth-book — 真理之书
    ===================================================== */
 #phase-truth-book {
-    background-image:
-        linear-gradient(180deg, rgba(2,6,23,0.55) 0%, rgba(2,6,23,0.85) 100%),
-        url('../../assets/ui/panels/truth_book_bg_9s.png') !important;
-    background-size: cover, cover !important;
-    background-position: center, center !important;
-    background-repeat: no-repeat, no-repeat !important;
+    background:
+        radial-gradient(ellipse at 50% 35%,
+            rgba(217, 119, 6, 0.10) 0%,
+            transparent 55%),
+        radial-gradient(ellipse at 50% 100%,
+            rgba(2, 6, 23, 0.4) 0%,
+            transparent 50%),
+        linear-gradient(180deg,
+            rgba(2, 6, 23, 0.9) 0%,
+            rgba(2, 6, 23, 0.97) 100%) !important;
     background-color: #020617 !important;
 }
 
 /* =====================================================
-   §1.14 设置弹窗 9-Slice（#settings-panel）
+   #settings-panel — 设置弹窗
    ===================================================== */
 #settings-panel {
-    background: transparent !important;
-    border: none !important;
-    border-image-source: url('../../assets/ui/panels/settings_modal_9s.png');
-    border-image-slice: 32 32 32 32 fill;
-    border-image-width: 18px;
-    border-image-outset: 0;
-    border-image-repeat: stretch;
+    background:
+        linear-gradient(180deg,
+            rgba(30, 41, 59, 0.96) 0%,
+            rgba(15, 23, 42, 0.98) 100%) !important;
+    border: 1.5px solid rgba(148, 163, 184, 0.5) !important;
+    border-radius: var(--ui-radius-lg) !important;
+    border-image: none !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 -2px 12px rgba(0, 0, 0, 0.4),
+        0 8px 28px rgba(0, 0, 0, 0.7),
+        0 0 14px rgba(56, 189, 248, 0.18) !important;
 }
 
 /* =====================================================
-   §1.10 游戏结束页（#phase-gameover）
+   #phase-gameover — 失败 / 胜利结算
    ===================================================== */
 #phase-gameover {
-    background-image:
-        linear-gradient(180deg, rgba(2,6,23,0.65) 0%, rgba(2,6,23,0.92) 100%),
-        url('../../assets/ui/panels/gameover_bg.png') !important;
-    background-size: cover, cover !important;
-    background-position: center, center !important;
-    background-repeat: no-repeat, no-repeat !important;
+    background:
+        radial-gradient(circle at 50% 30%,
+            rgba(239, 68, 68, 0.18) 0%,
+            transparent 50%),
+        radial-gradient(circle at 50% 100%,
+            rgba(2, 6, 23, 0.6) 0%,
+            transparent 70%),
+        linear-gradient(180deg,
+            rgba(2, 6, 23, 0.9) 0%,
+            rgba(0, 0, 0, 0.97) 100%) !important;
     background-color: #020617 !important;
 }
 
 /* =====================================================
-   §1.4 商店页（#phase-shop）— 复用 replace_ammo_bg.png 的炼金工坊俯视构图
+   #phase-shop — 商店
    ===================================================== */
 #phase-shop {
-    background-image:
-        linear-gradient(180deg, rgba(2,6,23,0.62) 0%, rgba(2,6,23,0.86) 100%),
-        url('../../assets/ui/panels/replace_ammo_bg.png') !important;
-    background-size: cover, cover !important;
-    background-position: center, center !important;
-    background-repeat: no-repeat, no-repeat !important;
+    background:
+        radial-gradient(ellipse at 50% 30%,
+            rgba(217, 119, 6, 0.10) 0%,
+            transparent 50%),
+        radial-gradient(ellipse at 50% 100%,
+            rgba(168, 85, 247, 0.10) 0%,
+            transparent 60%),
+        linear-gradient(180deg,
+            rgba(2, 6, 23, 0.85) 0%,
+            rgba(2, 6, 23, 0.96) 100%) !important;
     background-color: #020617 !important;
 }
 
 /* =====================================================
-   §1.2 局外元商店主页（#phase-meta）— 复用 relic_overlay_bg.png 暗紫炼金阵
+   #phase-meta — 局外元商店
    ===================================================== */
 #phase-meta {
-    background-image:
-        linear-gradient(180deg, rgba(2,6,23,0.55) 0%, rgba(2,6,23,0.85) 100%),
-        url('../../assets/ui/panels/relic_overlay_bg.png') !important;
-    background-size: cover, cover !important;
-    background-position: center, center !important;
-    background-repeat: no-repeat, no-repeat !important;
+    background:
+        radial-gradient(circle at 50% 35%,
+            rgba(168, 85, 247, 0.18) 0%,
+            transparent 50%),
+        radial-gradient(circle at 50% 100%,
+            rgba(56, 189, 248, 0.10) 0%,
+            transparent 60%),
+        repeating-conic-gradient(
+            from 0deg at 50% 50%,
+            rgba(168, 85, 247, 0.02) 0deg 4deg,
+            transparent 4deg 8deg),
+        linear-gradient(180deg,
+            rgba(2, 6, 23, 0.88) 0%,
+            rgba(2, 6, 23, 0.97) 100%) !important;
     background-color: #020617 !important;
 }
-
