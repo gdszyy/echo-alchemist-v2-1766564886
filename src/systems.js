@@ -17,8 +17,59 @@ import { Enemy, Projectile, Particle, FloatingText, CloneSpore } from './entitie
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { Vec2, adjustColorBrightness } from './utils/math_utils.js';
 import { RUNEWORD_DB } from './rune_config.js';
+import { ENEMY_V2_METADATA, ENEMY_V2_BY_ID } from './data/enemy_v2_metadata.js';
+import { getEnemyV2IconSrc } from './bitmap_icons.js';
 
 // ==================== 真理之书数据 ====================
+
+/**
+ * [V2 资源协议] 由 ENEMY_V2_METADATA 构建图鉴条目，
+ * 與試煉場 V2 矩陣共用同一份 metadata。
+ */
+function buildV2BestiaryEntries() {
+    // V2 基底的視覺標識（圖鑒列表使用 emoji；正式美術上線後可改用 iconSrc）
+    const ICON_GLYPH = {
+        bastion: '🧱', maw: '🕳️', deflector: '🔷', echoSpire: '🔮',
+        prism: '🌈', hive: '🥚', siege: '🚜', gravityCore: '🌀',
+    };
+    return ENEMY_V2_METADATA.map(meta => ({
+        id: 'v2_' + meta.id,
+        name: meta.name,
+        icon: ICON_GLYPH[meta.id] || meta.footprint,
+        iconSrc: meta.iconPath,                 // 後續可由 TruthBook 渲染為 <img>
+        tags: [meta.footprint, meta.priority, ...meta.affixes],
+        desc: `【${meta.name}・${meta.footprint}】基底=${meta.baseArchetype}，专属词条=${meta.affixes.join('/') || '无'}\n` +
+              `登场阶段：${meta.stage}\n战术职责：${meta.role}\n克制提示：${meta.counter}\n` +
+              (meta.placeholder ? '※ 当前为占位资源，待正式美术替换。' : ''),
+        // 圖鑒演示直接調用 V2 矩陣的單體場景
+        setup: (game) => {
+            const cx = 2.5 * game.enemyWidth + game.enemyWidth / 2;
+            const cy = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+            const wPx = game.enemyWidth * meta.cols;
+            const hPx = game.enemyHeight * meta.rows;
+            const hp = Math.floor(200 * meta.hpMult);
+            const e = new Enemy(cx, cy, wPx, hPx, hp, hp,
+                meta.affixes.length > 0 ? 'elite' : 'normal', meta.affixes.slice());
+            e.baseArchetype = meta.baseArchetype;
+            e.gridCols = meta.cols;
+            e.gridRows = meta.rows;
+            if (meta.cols >= 2) e.isWideEnemy = true;
+            e._moveInterval = 9999;
+            e._moveCooldown = 9999;
+            e.hasActedThisTurn = true;
+            if (typeof game.spawn_applyArchetypeShape === 'function') {
+                game.spawn_applyArchetypeShape(e, meta.baseArchetype);
+            }
+            if (typeof e.initSprite === 'function') e.initSprite();
+            game.enemies.push(e);
+        },
+        loop: [
+            { type: 'log', text: `${meta.name}（${meta.footprint}）登場` },
+            { type: 'wait', frames: 180 },
+            { type: 'reset' }
+        ]
+    }));
+}
 
 const TRUTH_BOOK_DATA = {
     enemies: [
@@ -184,7 +235,10 @@ const TRUTH_BOOK_DATA = {
                 { type: 'wait', frames: 120 },
                 { type: 'reset' }
             ]
-        }
+        },
+        // ── 敵人視覺 V2 基底圖鑒條目（來源：src/data/enemy_v2_metadata.js）──
+        // 與試煉場 V2 矩陣共用同一份 metadata，避免重複維護。
+        ...buildV2BestiaryEntries()
     ],
     attributes: [
         {
@@ -1911,18 +1965,20 @@ const TRAINING_SCENARIOS = {
  * 為避免大改 Enemy 構造函數，採用「先 new 後賦值」的兼容寫法。
  */
 function buildV2MatrixScenarios() {
-    // 矩陣定義：[基底 id, 中文名, footprint, cols, rows, baseArchetype, affixes, hpMult]
-    const V2_BASES = [
-        { id: 'sludge',      name: '炼金残渣', footprint: '1×1', cols: 1, rows: 1, baseArchetype: 'sludge',      affixes: [],                  hpMult: 1.0 },
-        { id: 'deflector',   name: '棱盾兽',   footprint: '2×1', cols: 2, rows: 1, baseArchetype: 'deflector',   affixes: ['deflectionWard'],  hpMult: 1.0 },
-        { id: 'echoSpire',   name: '共振尖塔', footprint: '1×2', cols: 1, rows: 2, baseArchetype: 'echoSpire',   affixes: ['echoRelay'],       hpMult: 0.5 },
-        { id: 'maw',         name: '深渊胃囊', footprint: '2×2', cols: 2, rows: 2, baseArchetype: 'maw',         affixes: ['devour'],          hpMult: 2.0 },
-        { id: 'bastion',     name: '装甲横梁', footprint: '3×1', cols: 3, rows: 1, baseArchetype: 'bastion',     affixes: ['heavyArmor'],      hpMult: 2.0 },
-        { id: 'prism',       name: '折光棱柱', footprint: '1×3', cols: 1, rows: 3, baseArchetype: 'prism',       affixes: ['prism'],           hpMult: 1.4 },
-        { id: 'hive',        name: '孵化巢',   footprint: '2×3', cols: 2, rows: 3, baseArchetype: 'hive',        affixes: ['hive'],            hpMult: 2.5 },
-        { id: 'siege',       name: '攻城履带', footprint: '3×2', cols: 3, rows: 2, baseArchetype: 'siege',       affixes: ['siege'],           hpMult: 3.5 },
-        { id: 'gravityCore', name: '引力炉心', footprint: '3×3', cols: 3, rows: 3, baseArchetype: 'gravityWell', affixes: ['gravityWell'],     hpMult: 6.0 }
-    ];
+    // [V2 资源协议] 演示矩阵从 ENEMY_V2_METADATA 读取，避免演示页与图鉴重复维护。
+    // 1×1 sludge 是矩阵基线对照（不属于正式 V2 基底），保留在演示文件本地。
+    const SLUDGE = { id: 'sludge', name: '炼金残渣', footprint: '1×1', cols: 1, rows: 1,
+                     baseArchetype: 'sludge', affixes: [], hpMult: 1.0 };
+    const V2_BASES = [SLUDGE, ...ENEMY_V2_METADATA.map(m => ({
+        id: m.id,
+        name: m.name,
+        footprint: m.footprint,
+        cols: m.cols,
+        rows: m.rows,
+        baseArchetype: m.baseArchetype,
+        affixes: m.affixes.slice(),
+        hpMult: m.hpMult,
+    }))];
 
     // 6 列 × 6 行的緊湊矩陣布局（與 enemyCols=6 對齊）：
     //   row 0       : 1×1 sludge | 2×1 deflector | 3×1 bastion

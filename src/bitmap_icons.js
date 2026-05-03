@@ -112,6 +112,31 @@ export const RELIC_ICON_MAP = {
     skill_prismatic_shot:      'assets/icons/relic/skill_prismatic_shot.png',
 };
 
+// ============================================================
+// 敵人視覺 V2 — 基底圖標映射（圖鑒 / 試煉場 / 結算頁引用）
+// key 為 baseArchetype（與 Enemy.baseArchetype 對齊）
+// 來源 metadata：src/data/enemy_v2_metadata.js（單一資料源）
+// ============================================================
+import { ENEMY_V2_METADATA, ENEMY_V2_BY_ARCHETYPE } from './data/enemy_v2_metadata.js';
+
+export const ENEMY_V2_ICON_MAP = ENEMY_V2_METADATA.reduce((acc, m) => {
+    acc[m.baseArchetype] = m.iconPath;
+    acc[m.id] = m.iconPath;
+    acc[m.resourceId] = m.iconPath;
+    return acc;
+}, {});
+
+/**
+ * 通过 baseArchetype / id / resourceId 获取 V2 敵人圖標路徑。
+ * 找不到返回 null（UI 應 fallback 到 emoji 或文字標籤）。
+ * @param {string} key
+ * @returns {string|null}
+ */
+export function getEnemyV2IconSrc(key) {
+    if (!key) return null;
+    return ENEMY_V2_ICON_MAP[key] ?? null;
+}
+
 /**
  * 获取弹药图标路径
  * @param {object} recipe - 弹药配方对象
