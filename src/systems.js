@@ -753,7 +753,8 @@ const TRAINING_SCENARIOS = {
         { id: 'attribute', name: '屬性效果' },
         { id: 'boss', name: 'Boss 機制' },
         { id: 'runeword', name: '符文詞條' },
-        { id: 'relic', name: '遺物/精華' }
+        { id: 'relic', name: '遺物/精華' },
+        { id: 'v2matrix', name: '敵人 V2 矩陣' }
     ],
     scenarios: [
         // ── 敵人詞條 ──────────────────────────────────────────────────
@@ -1890,9 +1891,167 @@ const TRAINING_SCENARIOS = {
                     }
                 }
             }
-        }
+        },
+
+        // ── 敵人 V2 矩陣（尺寸基底 + 專屬詞條可見性驗收）─────────────
+        // 對應文檔 docs/enemy_visual_design_v2.md：
+        // 9 種 V2 基底（1×1 / 2×1 / 1×2 / 2×2 / 3×1 / 1×3 / 2×3 / 3×2 / 3×3）
+        // 字段命名與 spawn_trySpawnArchetypes 保持一致：
+        //   - baseArchetype  基底 ID
+        //   - gridCols/gridRows 占格尺寸
+        //   - isWideEnemy    cols >= 2 時為 true
+        //   - affixes        專屬詞條
+        ...buildV2MatrixScenarios()
     ]
 };
+
+/**
+ * [V2 可見性驗收] 構建敵人 V2 矩陣演示場景。
+ * 一次性放置 9 種 V2 基底，字段寫法與 spawn_trySpawnArchetypes 保持一致。
+ * 為避免大改 Enemy 構造函數，採用「先 new 後賦值」的兼容寫法。
+ */
+function buildV2MatrixScenarios() {
+    // 矩陣定義：[基底 id, 中文名, footprint, cols, rows, baseArchetype, affixes, hpMult]
+    const V2_BASES = [
+        { id: 'sludge',      name: '炼金残渣', footprint: '1×1', cols: 1, rows: 1, baseArchetype: 'sludge',      affixes: [],                  hpMult: 1.0 },
+        { id: 'deflector',   name: '棱盾兽',   footprint: '2×1', cols: 2, rows: 1, baseArchetype: 'deflector',   affixes: ['deflectionWard'],  hpMult: 1.0 },
+        { id: 'echoSpire',   name: '共振尖塔', footprint: '1×2', cols: 1, rows: 2, baseArchetype: 'echoSpire',   affixes: ['echoRelay'],       hpMult: 0.5 },
+        { id: 'maw',         name: '深渊胃囊', footprint: '2×2', cols: 2, rows: 2, baseArchetype: 'maw',         affixes: ['devour'],          hpMult: 2.0 },
+        { id: 'bastion',     name: '装甲横梁', footprint: '3×1', cols: 3, rows: 1, baseArchetype: 'bastion',     affixes: ['heavyArmor'],      hpMult: 2.0 },
+        { id: 'prism',       name: '折光棱柱', footprint: '1×3', cols: 1, rows: 3, baseArchetype: 'prism',       affixes: ['prism'],           hpMult: 1.4 },
+        { id: 'hive',        name: '孵化巢',   footprint: '2×3', cols: 2, rows: 3, baseArchetype: 'hive',        affixes: ['hive'],            hpMult: 2.5 },
+        { id: 'siege',       name: '攻城履带', footprint: '3×2', cols: 3, rows: 2, baseArchetype: 'siege',       affixes: ['siege'],           hpMult: 3.5 },
+        { id: 'gravityCore', name: '引力炉心', footprint: '3×3', cols: 3, rows: 3, baseArchetype: 'gravityWell', affixes: ['gravityWell'],     hpMult: 6.0 }
+    ];
+
+    // 6 列 × 6 行的緊湊矩陣布局（與 enemyCols=6 對齊）：
+    //   row 0       : 1×1 sludge | 2×1 deflector | 3×1 bastion
+    //   row 1-2     : 1×2 echoSpire | 2×2 maw     | 3×2 siege
+    //   row 3-5     : 1×3 prism     | 2×3 hive    | 3×3 gravityCore
+    const LAYOUT = {
+        sludge:      { col: 0, row: 0 },
+        deflector:   { col: 1, row: 0 },
+        bastion:     { col: 3, row: 0 },
+        echoSpire:   { col: 0, row: 1 },
+        maw:         { col: 1, row: 1 },
+        siege:       { col: 3, row: 1 },
+        prism:       { col: 0, row: 3 },
+        hive:        { col: 1, row: 3 },
+        gravityCore: { col: 3, row: 3 }
+    };
+
+    const setupMatrix = (game, onlyId = null) => {
+        const tg = game.trainingGround;
+        if (tg && typeof tg._clearV2MatrixOverlay === 'function') tg._clearV2MatrixOverlay();
+
+        const w = game.enemyWidth;
+        const h = game.enemyHeight;
+        const top = game.combatGridTopY;
+        const baseHP = 200;
+        const afx = (CONFIG && CONFIG.balance && CONFIG.balance.affixes) || {};
+
+        const labelData = [];
+
+        for (const def of V2_BASES) {
+            if (onlyId && def.id !== onlyId) continue;
+            const place = LAYOUT[def.id];
+            const centerX = (place.col + (def.cols - 1) / 2) * w + w / 2;
+            const centerY = top + (place.row + (def.rows - 1) / 2) * h;
+            const wPx = w * def.cols;
+            const hPx = h * def.rows;
+            const hp = Math.floor(baseHP * def.hpMult);
+
+            const e = new Enemy(centerX, centerY, wPx, hPx, hp, hp,
+                def.affixes.length > 0 ? 'elite' : 'normal',
+                def.affixes.slice());
+
+            // 與 spawn_trySpawnArchetypes 對齊的字段命名
+            e.baseArchetype = def.baseArchetype;
+            e.gridCols = def.cols;
+            e.gridRows = def.rows;
+            if (def.cols >= 2) e.isWideEnemy = true;
+
+            // 凍結移動，保持矩陣穩定可視
+            e._moveInterval = 9999;
+            e._moveCooldown = 9999;
+            e.hasActedThisTurn = true;
+
+            // 專屬詞條的初始化（與 spawn_trySpawnArchetypes 對齊）
+            if (def.affixes.includes('deflectionWard')) {
+                const pct = afx.deflectionWardBarrierPct || 0.10;
+                e.wardBarrierMax = Math.max(1, Math.floor(hp * pct));
+                e.wardBarrier = e.wardBarrierMax;
+                e.wardBrokenThisTurn = false;
+            }
+            if (def.affixes.includes('hive')) {
+                e._hiveCooldown = afx.hiveSpawnInterval || 2;
+            }
+
+            // 異形輪廓（複用 spawn_system 的形狀映射）
+            if (typeof game.spawn_applyArchetypeShape === 'function') {
+                game.spawn_applyArchetypeShape(e, def.baseArchetype);
+            }
+            if (typeof e.initSprite === 'function') e.initSprite();
+
+            game.enemies.push(e);
+            labelData.push({ enemy: e, def, centerX, centerY, hPx });
+        }
+
+        // 渲染標籤（DOM overlay）
+        if (tg && typeof tg._renderV2MatrixLabels === 'function') {
+            tg._renderV2MatrixLabels(labelData);
+        }
+    };
+
+    const triggerBehaviors = (game) => {
+        const tg = game.trainingGround;
+        // 1) deflectionWard：把屏障打掉一半，使副屏障條視覺差異可見
+        // 2) hive：直接調 spawn_spawnEnemyClone 或減少冷卻
+        // 3) gravityWell：在範圍內顯示一條引力環視覺（用 shockwave）
+        // 4) echoRelay：以 floatingText 標出範圍
+        const enemies = game.enemies;
+        for (const e of enemies) {
+            if (!e || !e.active) continue;
+            const a = (e.affixes || [])[0];
+            if (a === 'deflectionWard' && e.wardBarrier !== undefined) {
+                e.wardBarrier = Math.max(0, Math.floor(e.wardBarrierMax * 0.5));
+            } else if (a === 'hive') {
+                e._hiveCooldown = 0;
+            } else if (a === 'gravityWell') {
+                if (typeof game.spawn_createShockwave === 'function') {
+                    game.spawn_createShockwave(e.pos.x, e.pos.y, '#7c3aed');
+                }
+            } else if (a === 'echoRelay') {
+                if (typeof game.spawn_createShockwave === 'function') {
+                    game.spawn_createShockwave(e.pos.x, e.pos.y, '#f0abfc');
+                }
+            }
+        }
+        if (tg && tg.addLog) tg.addLog && tg.addLog('觸發 V2 行為演示（屏障 / 引力環 / 回響波）');
+    };
+
+    const all = {
+        id: 'v2_matrix_all',
+        categoryId: 'v2matrix',
+        name: '🧩 V2 矩陣（全部 9 種）',
+        icon: '🧩',
+        desc: '一次性展示 9 種 V2 基底敵人（1×1 ~ 3×3）。每個敵人下方標籤顯示 footprint / baseArchetype / affixes。點「觸發演示」可看到代表性詞條視覺反饋。',
+        setup: (game) => setupMatrix(game, null),
+        demoAction: (game) => triggerBehaviors(game)
+    };
+
+    const singles = V2_BASES.map(def => ({
+        id: 'v2_matrix_' + def.id,
+        categoryId: 'v2matrix',
+        name: `${def.footprint} ${def.name}`,
+        icon: def.footprint,
+        desc: `${def.name}（${def.footprint}）：baseArchetype=${def.baseArchetype}，affixes=${JSON.stringify(def.affixes)}。`,
+        setup: (game) => setupMatrix(game, def.id),
+        demoAction: (game) => triggerBehaviors(game)
+    }));
+
+    return [all, ...singles];
+}
 
 class TrainingGround {
     constructor(game) {
@@ -2360,6 +2519,7 @@ class TrainingGround {
                 <button onclick="game.trainingGround.switchCategory('attribute')" id="scat-btn-attribute" class="train-scat-btn">屬性</button>
                 <button onclick="game.trainingGround.switchCategory('boss')" id="scat-btn-boss" class="train-scat-btn">Boss</button>
                 <button onclick="game.trainingGround.switchCategory('runeword')" id="scat-btn-runeword" class="train-scat-btn">符文</button>
+                <button onclick="game.trainingGround.switchCategory('v2matrix')" id="scat-btn-v2matrix" class="train-scat-btn" title="敵人視覺 V2 基底矩陣">V2</button>
             </div>
             <!-- 场景列表 -->
             <div id="train-scenario-list" class="train-scenario-list"></div>
@@ -2603,9 +2763,65 @@ class TrainingGround {
     }
 
     /**
+     * [V2 可見性驗收] 清空 V2 矩陣的 DOM 標籤層
+     */
+    _clearV2MatrixOverlay() {
+        const layer = document.getElementById('train-v2-matrix-layer');
+        if (layer) layer.innerHTML = '';
+    }
+
+    /**
+     * [V2 可見性驗收] 在每個 V2 基底下方繪製標籤（footprint / baseArchetype / affixes）。
+     * 使用 DOM overlay 而非 canvas，避免侵入主渲染管線。
+     */
+    _renderV2MatrixLabels(labelData) {
+        const host = document.getElementById('phase-training');
+        if (!host) return;
+        let layer = document.getElementById('train-v2-matrix-layer');
+        if (!layer) {
+            layer = document.createElement('div');
+            layer.id = 'train-v2-matrix-layer';
+            layer.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:25;';
+            host.appendChild(layer);
+        }
+        layer.innerHTML = '';
+        for (const item of labelData) {
+            const { def, centerX, centerY, hPx } = item;
+            const card = document.createElement('div');
+            const top = centerY + hPx / 2 + 4;
+            card.style.cssText = [
+                'position:absolute',
+                `left:${centerX}px`,
+                `top:${top}px`,
+                'transform:translateX(-50%)',
+                'background:rgba(15,23,42,0.85)',
+                'border:1px solid rgba(99,102,241,0.45)',
+                'border-radius:6px',
+                'padding:3px 6px',
+                'font-size:10px',
+                'line-height:1.35',
+                'color:#e2e8f0',
+                'font-family:monospace',
+                'white-space:nowrap',
+                'text-align:center',
+                'box-shadow:0 2px 6px rgba(0,0,0,0.4)'
+            ].join(';');
+            const affixStr = def.affixes.length > 0 ? def.affixes.join(',') : '—';
+            card.innerHTML = `
+                <div style="color:#fbbf24;font-weight:bold;">${def.name}</div>
+                <div style="color:#94a3b8;">${def.footprint} · ${def.baseArchetype}</div>
+                <div style="color:#a5b4fc;">affix: ${affixStr}</div>
+            `;
+            layer.appendChild(card);
+        }
+    }
+
+    /**
      * 清空战场（敌人、子弹、粒子等）
      */
     _clearBattlefield() {
+        // [V2 可見性驗收] 同步清理矩陣標籤層
+        this._clearV2MatrixOverlay();
         this.game.enemies = [];
         this.game.projectiles = [];
         this.game.particles = [];
