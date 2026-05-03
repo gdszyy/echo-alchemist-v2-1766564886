@@ -2738,7 +2738,6 @@
     </style>
     <!-- Phase 5A: 位图化 UI 样式覆盖层 -->
     <link rel="stylesheet" href="src/styles/bitmap_ui.css">
-    <link rel="stylesheet" href="src/styles/enemy_dom.css">
 </head>
 <body>
 <div id="app-wrapper">
@@ -2761,8 +2760,6 @@
 
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
-    <!-- PoC: DOM/CSS 敌人图层（叠在 canvas 之上，覆盖 enemy 本体 + HP + 表情） -->
-    <div id="enemy-dom-layer" aria-hidden="true"></div>
     <div id="crt-overlay"></div>
 
     <!-- Boss 入场全屏遗罩（深红色暗化） -->
