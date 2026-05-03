@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "_doc": "Enemy art manifest for V2 archetypes / affix composites. See docs/enemy_art_implementation_impact.md §8 and docs/enemy_v2_asset_protocol.md. Resource keys are <baseArchetype>:<cols>x<rows>:<sortedAffixSet> (empty affix set => trailing colon). Replace this file or the referenced PNGs in place; resolveEnemyVisualAsset() will pick them up automatically.",
+  "directories": {
+    "archetypes": "assets/sprites/enemies/archetypes/",
+    "composites": "assets/sprites/enemies/composites/",
+    "overlays": "assets/sprites/enemies/overlays/",
+    "archetypeIcons": "assets/ui/icons/enemy_archetypes/",
+    "affixIcons": "assets/ui/icons/enemy_affixes/"
+  },
+  "archetypeIcons": {
+    "bastion": "archetype_bastion.png",
+    "maw": "archetype_maw.png",
+    "siege": "archetype_siege.png",
+    "deflector": "enemy_deflector_2x1.png",
+    "echoSpire": "enemy_echo_spire_1x2.png",
+    "prism": "enemy_prism_1x3.png",
+    "hive": "enemy_hive_2x3.png",
+    "gravityWell": "enemy_gravity_core_3x3.png"
+  },
+  "affixIcons": {
+    "devour": "affix_devour.png",
+    "heavyArmor": "affix_heavyArmor.png",
+    "siege": "affix_siege.png",
+    "shield": "affix_shield.png",
+    "regen": "affix_regen.png"
+  },
+  "overlays": {
+    "shield": "overlay_affix_shield.png",
+    "regen": "overlay_affix_regen.png",
+    "berserk": "overlay_affix_berserk.png",
+    "haste": "overlay_affix_haste.png",
+    "healer": "overlay_affix_healer.png",
+    "clone": "overlay_affix_clone.png"
+  },
+  "archetypes": {
+    "bastion": {
+      "spritePath": "assets/sprites/enemies/archetypes/enemy_bastion_3x1.png",
+      "manifestPath": "assets/sprites/enemies/archetypes/enemy_bastion_3x1.json",
+      "footprint": "3x1",
+      "placeholder": true
+    },
+    "maw": {
+      "spritePath": "assets/sprites/enemies/archetypes/enemy_maw_2x2.png",
+      "manifestPath": "assets/sprites/enemies/archetypes/enemy_maw_2x2.json",
+      "footprint": "2x2",
+      "placeholder": true
+    },
+    "deflector": {
+      "spritePath": "assets/sprites/enemies/archetypes/enemy_deflector_2x1.png",
+      "manifestPath": "assets/sprites/enemies/archetypes/enemy_deflector_2x1.json",
+      "footprint": "2x1",
+      "placeholder": true
+    },
+    "echoSpire": {
+      "spritePath": "assets/sprites/enemies/archetypes/enemy_echo_spire_1x2.png",
+      "manifestPath": "assets/sprites/enemies/archetypes/enemy_echo_spire_1x2.json",
+      "footprint": "1x2",
+      "placeholder": true
+    },
+    "prism": {
+      "spritePath": "assets/sprites/enemies/archetypes/enemy_prism_1x3.png",
+      "manifestPath": "assets/sprites/enemies/archetypes/enemy_prism_1x3.json",
+      "footprint": "1x3",
+      "placeholder": true
+    },
+    "hive": {
+      "spritePath": "assets/sprites/enemies/archetypes/enemy_hive_2x3.png",
+      "manifestPath": "assets/sprites/enemies/archetypes/enemy_hive_2x3.json",
+      "footprint": "2x3",
+      "placeholder": true
+    },
+    "siege": {
+      "spritePath": "assets/sprites/enemies/archetypes/enemy_siege_3x2.png",
+      "manifestPath": "assets/sprites/enemies/archetypes/enemy_siege_3x2.json",
+      "footprint": "3x2",
+      "placeholder": true
+    },
+    "gravityWell": {
+      "spritePath": "assets/sprites/enemies/archetypes/enemy_gravity_core_3x3.png",
+      "manifestPath": "assets/sprites/enemies/archetypes/enemy_gravity_core_3x3.json",
+      "footprint": "3x3",
+      "placeholder": true
+    }
+  },
+  "composites": {
+    "residue:1x1:": {
+      "resourceId": "enemy_residue_1x1",
+      "spritePath": "assets/sprites/enemies/composites/enemy_residue_1x1_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_residue_1x1_idle.json",
+      "baseArchetype": "residue",
+      "footprint": "1x1",
+      "affixes": [],
+      "placeholder": true
+    },
+    "bastion:3x1:heavyArmor": {
+      "resourceId": "enemy_bastion_heavyarmor_3x1",
+      "spritePath": "assets/sprites/enemies/composites/enemy_bastion_heavyarmor_3x1_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_bastion_heavyarmor_3x1_idle.json",
+      "baseArchetype": "bastion",
+      "footprint": "3x1",
+      "affixes": ["heavyArmor"],
+      "placeholder": true
+    },
+    "maw:2x2:devour": {
+      "resourceId": "enemy_maw_devour_2x2",
+      "spritePath": "assets/sprites/enemies/composites/enemy_maw_devour_2x2_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_maw_devour_2x2_idle.json",
+      "baseArchetype": "maw",
+      "footprint": "2x2",
+      "affixes": ["devour"],
+      "placeholder": true
+    },
+    "siege:3x2:siege": {
+      "resourceId": "enemy_siege_siege_3x2",
+      "spritePath": "assets/sprites/enemies/composites/enemy_siege_siege_3x2_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_siege_siege_3x2_idle.json",
+      "baseArchetype": "siege",
+      "footprint": "3x2",
+      "affixes": ["siege"],
+      "placeholder": true
+    },
+    "echoSpire:1x2:echoRelay": {
+      "resourceId": "enemy_spire_echorelay_1x2",
+      "spritePath": "assets/sprites/enemies/composites/enemy_spire_echorelay_1x2_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_spire_echorelay_1x2_idle.json",
+      "baseArchetype": "echoSpire",
+      "footprint": "1x2",
+      "affixes": ["echoRelay"],
+      "placeholder": true
+    },
+    "deflector:2x1:deflectionWard": {
+      "resourceId": "enemy_ward_deflection_2x1",
+      "spritePath": "assets/sprites/enemies/composites/enemy_ward_deflection_2x1_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_ward_deflection_2x1_idle.json",
+      "baseArchetype": "deflector",
+      "footprint": "2x1",
+      "affixes": ["deflectionWard"],
+      "placeholder": true
+    }
+  }
+}

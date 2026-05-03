@@ -106,6 +106,62 @@ V2 专属词条已经具备基础绘制识别，但还需要补齐“常驻、�
 | P3 | 预设波次系统。 | 至少 5 类 preset 可按回合权重出现，并能安全回退随机生成。 |
 | P4 | 组合资产扩展。 | 通过脚本生成资产清单，逐步填充高频组合。 |
 
+## 7.5 资源目录与 manifest（V2 美术接入）
+
+为了把外部生成的敌人美术接入运行时，仓库现在固化了以下统一目录约定。所有解析逻辑由 `resolveEnemyVisualAsset(enemy)`（位于 `src/data/enemy_visual_assets.js`）统一处理，SpriteRenderer 与试炼场 UI 共享同一组资源键，**不再允许在多处重复硬编码命名**。
+
+| 资源类型 | 目录 | 命名规范 | 当前已接入 |
+|---|---|---|---|
+| 基底 Sprite Sheet（多帧 idle/hit） | `assets/sprites/enemies/archetypes/` | `enemy_<base>_<cols>x<rows>.png` + 同名 `.json` | bastion / maw / deflector / echoSpire / prism / hive / siege / gravityCore（占位） |
+| 组合 Sprite（baseArchetype + 主词条 + 占格） | `assets/sprites/enemies/composites/` | `enemy_<base>_<affix>_<cols>x<rows>_idle.png` + 同名 `.json` | residue 1×1 / bastion+heavyArmor 3×1 / maw+devour 2×2 / siege+siege 3×2 / spire+echoRelay 1×2 / ward+deflectionWard 2×1 |
+| 通用词条覆盖层 | `assets/sprites/enemies/overlays/` | `overlay_affix_<affix>.png` | shield / regen / berserk / haste / healer / clone |
+| 基底 UI 图标 | `assets/ui/icons/enemy_archetypes/` | `archetype_<base>.png`（保留旧名 `enemy_<base>_<...>.png` 兼容） | bastion / maw / siege（专属图标） + V2 全 8 基底 64×64 头像 |
+| 词条 UI 图标 | `assets/ui/icons/enemy_affixes/` | `affix_<affix>.png` | devour / heavyArmor / siege / shield / regen |
+
+> 中央索引文件：[`assets/sprites/enemies/enemy_sprite_manifest.json`](../assets/sprites/enemies/enemy_sprite_manifest.json)。
+> 每条 composite 条目都使用 `<baseArchetype>:<cols>x<rows>:<sortedAffixSet>` 作为键，例如 `bastion:3x1:heavyArmor`、`siege:3x2:siege`、`residue:1x1:`（空 affixSet 末尾留冒号）。
+
+### 7.5.1 manifest 字段
+
+```json
+{
+  "directories":     { "archetypes": "...", "composites": "...", "overlays": "...", "archetypeIcons": "...", "affixIcons": "..." },
+  "archetypeIcons":  { "<baseArchetype>": "<archetype_xxx.png>" },
+  "affixIcons":      { "<affix>":         "<affix_xxx.png>" },
+  "overlays":        { "<affix>":         "<overlay_affix_xxx.png>" },
+  "archetypes":      { "<baseArchetype>": { "spritePath", "manifestPath", "footprint", "placeholder" } },
+  "composites":      { "<assetKey>":      { "resourceId", "spritePath", "manifestPath", "baseArchetype", "footprint", "affixes[]", "placeholder" } }
+}
+```
+
+新增组合时**只需要**：
+1. 把新 PNG 放进 `composites/`（带 idle 后缀）或 `archetypes/`；
+2. 在 `enemy_sprite_manifest.json` 的 `composites` / `archetypes` 段追加新键；
+3. 如该词条还没有 UI 图标 / Overlay，按目录约定补充对应 PNG，并在 `affixIcons` / `overlays` 段登记文件名。
+
+### 7.5.2 resolveEnemyVisualAsset(enemy) 返回值
+
+```ts
+{
+  assetKey:        string,                                  // <baseArchetype>:<cols>x<rows>:<sortedAffixSet>
+  spritePath:      string|null,                             // PNG 绝对路径（项目根相对）
+  manifestPath:    string|null,                             // Sprite Sheet manifest（含 frameSize / animations）
+  fallbackLevel:   'composite' | 'archetype' | 'vector',
+  missingReasons:  string[],                                // 缺失原因（用于 UI 调试 / 自动巡检）
+  archetypeIcon:   string|null,                             // UI 图鉴/卡片使用的基底图标
+  affixIcons:      Array<{ affix: string, path: string|null }>,
+  overlayPaths:    Array<{ affix: string, path: string }>,  // 通用词条覆盖层（可叠加在基底之上）
+}
+```
+
+解析顺序：composite 命中 → archetype 命中 → vector fallback（程序化 Canvas 绘制）。任意一步缺失都不会抛错或留白，调用方按 `fallbackLevel` 决定如何渲染；`missingReasons` 记录每一步的缺失原因，用于试炼场 UI 上的状态徽章。
+
+### 7.5.3 共享资源键：SpriteRenderer / 试炼场 / 图鉴
+
+- `src/render/sprite_renderer.js` 的 `createSpriteRenderer({ type, baseArchetype, gridCols, gridRows, affixes, ... })` 现在第一步就调用 `resolveEnemyVisualAsset`，命中 composite/archetype 时直接使用 manifest 给出的路径；命中失败再回退到既有 V2 metadata，再回退到 `golem_elite` / `golem_normal`，最后由 SpriteRenderer 自身的 failed 状态触发 Canvas 矢量绘制。
+- `src/entities/enemy.js` 的 `Enemy.initSprite()` 已传入完整 `gridCols / gridRows / affixes`，让组合 Sprite 能被命中。
+- `src/systems.js` 的 `buildEnemyV2Scenarios` 不再硬编码 `placeholder` 字段，而是调用 `resolveEnemyVisualAsset` + `describeAssetHitStatus`，把 `Sprite / Composite Sprite / Overlay / Vector fallback / Missing asset` 标签同时显示在场景卡片的徽标和说明面板中。
+
 ## 8. 试炼场验收说明（enemy_v2 分类）
 
 在 `src/systems.js` 的 `TRAINING_SCENARIOS` 中新增了 `enemy_v2`（显示名「敌人 V2 / 美术验收」）分类，入口为右侧边栏「驗收」Tab。该分类提供 7 个可点击场景，专门用于对每种 V2 基底进行独立的视觉验收，与 V2 矩陣（一次展示全部 9 种）互为补充。
@@ -131,10 +187,11 @@ V2 专属词条已经具备基础绘制识别，但还需要补齐“常驻、�
 
 ### 8.3 后续验收流程
 
-1. 打开试炼场 → 右侧边栏切换到「驗收」Tab。
-2. 逐一点击 7 个场景，观察敌人形体与词条特效是否符合 `docs/enemy_visual_design_v2.md` 规范。
-3. 对 `placeholder=true` 的基底，确认回退矢量绘制正常显示；有正式资源后，替换 `assets/sprites/enemies/v2/<resourceId>.png` 并将 `ENEMY_V2_METADATA` 中对应条目的 `placeholder` 改为 `false`，无需修改试炼场代码。
+1. 打开试炼场 → 右侧边栏切换到「驗收」Tab。每个场景按钮右侧会出现资源命中状态徽章（绿 `Composite Sprite` / 蓝 `Sprite` / 黄 `Vector fallback` / 红 `Missing asset`），徽章颜色与 `describeAssetHitStatus(resolved).tag` 对齐。
+2. 逐一点击 7 个场景，观察敌人形体与词条特效是否符合 `docs/enemy_visual_design_v2.md` 规范。说明面板的 `📦 资源` 行会展开 `[<tag>] <详细命中说明>　key=<assetKey>`，方便确认是哪一层资源被命中。
+3. 对 `placeholder=true` 的基底，确认回退矢量绘制正常显示；有正式资源后，把 PNG 放入 `assets/sprites/enemies/composites/` 或 `assets/sprites/enemies/archetypes/`（按 §7.5 命名约定），在 `enemy_sprite_manifest.json` 中把对应键的 `placeholder` 改为 `false`（也可同时改 `ENEMY_V2_METADATA` 的 `placeholder`），**无需修改试炼场或 Enemy.draw 代码**。
 4. 点击「触发演示」按钮，验证各基底的行为（吞噬、迟缓移动、推挤链、冰冻免疫）在试炼场环境中正常触发。
+5. 资源缺失或路径写错时，徽章会显示 `Vector fallback` 或 `Missing asset`，说明面板会列出 `missingReasons`，敌人不会消失或报错——这是有意的兜底，符合「不允许报错或空白，必须回退到现有 Canvas 程序化绘制」的要求。
 
 ## References
 

@@ -186,9 +186,16 @@ class Enemy {
      * spawn_system.js 在设置 e.bossType 后应调用 e.initSprite()
      */
     initSprite() {
-        // [V2 资源协议] 传入 baseArchetype 让 createSpriteRenderer 优先选择 V2 专属 Sprite，
-        // 资源缺失时由 SpriteRenderer.failed 回退到矢量绘制，敌人不会消失。
-        this._spriteRenderer = createSpriteRenderer(this.type, this.bossType, this.baseArchetype);
+        // [V2 资源协议] 传入完整 enemy 信息（footprint + affixSet）让 createSpriteRenderer
+        // 优先解析 composite 资源，缺失时回退到基底 Sprite / 矢量绘制，敌人不会消失。
+        this._spriteRenderer = createSpriteRenderer({
+            type: this.type,
+            bossType: this.bossType,
+            baseArchetype: this.baseArchetype,
+            gridCols: this.gridCols || 1,
+            gridRows: this.gridRows || 1,
+            affixes: this.affixes || [],
+        });
         if (this._spriteRenderer) {
             this._spriteRenderer.play('idle');
             this._spriteLastMs = performance.now();
