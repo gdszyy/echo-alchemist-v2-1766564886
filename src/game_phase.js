@@ -1865,6 +1865,9 @@ phase_gathering_getRandomPegType() {
                 }
             });
 
+            // [PoC] DOM/CSS 敌人图层每帧同步（普通敌人本体由 DOM 渲染）
+            if (this.domEnemyLayer) this.domEnemyLayer.sync(this.enemies, this.width, this.height);
+
             // [猎人本能] 绘制持续标记特效：找到血量最低的活跃敌人并渲染动态瞄准十字准星
             if (this.ownedRelics && this.ownedRelics.includes('hunter_instinct')) {
                 let hunterTarget = null;
