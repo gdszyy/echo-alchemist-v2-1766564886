@@ -186,7 +186,9 @@ class Enemy {
      * spawn_system.js 在设置 e.bossType 后应调用 e.initSprite()
      */
     initSprite() {
-        this._spriteRenderer = createSpriteRenderer(this.type, this.bossType);
+        // [V2 资源协议] 传入 baseArchetype 让 createSpriteRenderer 优先选择 V2 专属 Sprite，
+        // 资源缺失时由 SpriteRenderer.failed 回退到矢量绘制，敌人不会消失。
+        this._spriteRenderer = createSpriteRenderer(this.type, this.bossType, this.baseArchetype);
         if (this._spriteRenderer) {
             this._spriteRenderer.play('idle');
             this._spriteLastMs = performance.now();
@@ -2364,11 +2366,17 @@ class Enemy {
         // 非 arc boss 的 sprite 在 clip 内正常绘制
         if (this._spriteRenderer && this._spriteRenderer.ready &&
             !(this.type === 'boss' && this.collisionShape === 'arc')) {
-            // Sprite 保持正方形比例（取 min(w,h) 作为边长），居中偏下绘制
-            // 偏下量 = h * 0.15，让贴图在方块内偏向下方（血量显示在顶部，贴图在中下方）
-            const sprSize1 = Math.min(w, h);
-            const sprOffsetY1 = h * 0.15; // 向下偏移量
-            this._spriteRenderer.draw(ctx, -sprSize1/2, -sprSize1/2 + sprOffsetY1, sprSize1, sprSize1, 0.85);
+            // [V2 资源协议] 大型基底（cols 或 rows >= 2）需用整个占格作为绘制区，
+            // 避免 min(w,h) 把 3×1 装甲横梁压成中央小方块；小型敌人保留原行为。
+            const isLargeV2 = !!this.baseArchetype && ((this.gridCols || 1) > 1 || (this.gridRows || 1) > 1);
+            if (isLargeV2) {
+                const padX = 6, padY = 6;
+                this._spriteRenderer.draw(ctx, -w/2 + padX, -h/2 + padY, w - padX*2, h - padY*2, 0.92);
+            } else {
+                const sprSize1 = Math.min(w, h);
+                const sprOffsetY1 = h * 0.15;
+                this._spriteRenderer.draw(ctx, -sprSize1/2, -sprSize1/2 + sprOffsetY1, sprSize1, sprSize1, 0.85);
+            }
         }
         // === Layer 4: 裂纹绘制 (Fissures) - [保持不变] ===
 
