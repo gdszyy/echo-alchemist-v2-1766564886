@@ -79,18 +79,17 @@
 }
 
 /* ============================================================
- * 身体：方形石块（chamfered + 风化纹理）
+ * 身体：矩形石块（默认 AABB；polygon 通过 --clip-path 覆盖）
+ *   形状必须与 collisionShape 一致——bullet 反弹边界 = 视觉边界
  * ============================================================ */
 .enemy__body {
     position: absolute;
-    inset: 4%;
-    /* 切角八边形：石块感 */
-    clip-path: polygon(
-        8% 0%,  92% 0%,
-        100% 8%, 100% 92%,
-        92% 100%, 8% 100%,
-        0% 92%, 0% 8%
-    );
+    /* 与原 canvas 的 (width-4, height-4) 内缩一致：每边 ≈ 2px */
+    inset: 2px;
+    /* 默认 AABB：矩形 + 6px 微弱倒角（与 canvas roundRect r=6 对齐） */
+    border-radius: 6px;
+    /* polygon 类型敌人由 JS 写入 --clip-path 覆盖 */
+    clip-path: var(--clip-path, none);
     /* 石头基础色 + 多层渐变模拟风化 */
     background:
         /* 顶部高光（被光照面） */
@@ -130,19 +129,15 @@
 
 /* ============================================================
  * HP 液体填充层（与原 canvas Layer 2 视觉一致）
- *   高度由 var(--hp) 驱动，从底部向上填充。
- *   3 层叠加：绿色回血预览（最底） → 白色延迟（中） → 主血条（顶）
+ *   形状始终与 .enemy__body 一致（同 border-radius / clip-path）
  * ============================================================ */
 .enemy__hp-slot {
     position: absolute;
-    inset: 4%;
-    clip-path: polygon(
-        8% 0%, 92% 0%, 100% 8%, 100% 92%,
-        92% 100%, 8% 100%, 0% 92%, 0% 8%);
+    inset: 2px;
+    border-radius: 6px;
+    clip-path: var(--clip-path, none);
     overflow: hidden;
     pointer-events: none;
-    /* 半透明，让石头纹理透出 */
-    mix-blend-mode: normal;
 }
 .enemy__hp-fill,
 .enemy__hp-delayed,
@@ -192,10 +187,10 @@
  * ============================================================ */
 .enemy__cracks {
     position: absolute;
-    inset: 4%;
-    clip-path: polygon(
-        8% 0%, 92% 0%, 100% 8%, 100% 92%,
-        92% 100%, 8% 100%, 0% 92%, 0% 8%);
+    inset: 2px;
+    border-radius: 6px;
+    clip-path: var(--clip-path, none);
+    overflow: hidden;
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.3s ease;
