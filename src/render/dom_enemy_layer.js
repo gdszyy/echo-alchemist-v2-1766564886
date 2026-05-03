@@ -173,6 +173,40 @@ export class DomEnemyLayer {
 
         // idle 变体 0 / 1 / 2，基于 seed 稳定分配（同一敌人始终同一变体）
         node.dataset.idleVariant = String(Math.floor(seed * 3) % 3);
+
+        // 形状：与 collisionShape 严格对齐
+        // - aabb（默认）→ 矩形 + 6px 倒角（CSS 缺省，--clip-path 不写）
+        // - polygon     → 用碰撞顶点生成 clip-path（视觉与反弹边界一致）
+        // - arc         → 仅 boss 用，PoC 不处理
+        const clipPath = this._buildClipPathFromCollision(enemy);
+        if (clipPath) {
+            node.style.setProperty('--clip-path', clipPath);
+            node.dataset.shape = enemy.collisionShape;
+        } else {
+            node.style.removeProperty('--clip-path');
+            node.dataset.shape = enemy.collisionShape || 'aabb';
+        }
+    }
+
+    /**
+     * 把 enemy.collisionData.vertices（相对于敌人中心，单位 px）
+     * 转成 clip-path: polygon(...%) —— 比例化到敌人的 width × height。
+     * @returns {string|null} 形如 "polygon(50% 0%, 100% 100%, 0% 100%)"，无效返回 null
+     */
+    _buildClipPathFromCollision(enemy) {
+        if (enemy.collisionShape !== 'polygon') return null;
+        const cd = enemy.collisionData;
+        if (!cd || !Array.isArray(cd.vertices) || cd.vertices.length < 3) return null;
+        const w = enemy.width;
+        const h = enemy.height;
+        if (!w || !h) return null;
+        const parts = [];
+        for (const v of cd.vertices) {
+            const xPct = ((v.x + w / 2) / w) * 100;
+            const yPct = ((v.y + h / 2) / h) * 100;
+            parts.push(`${xPct.toFixed(2)}% ${yPct.toFixed(2)}%`);
+        }
+        return `polygon(${parts.join(', ')})`;
     }
 
     // ──────────────────────────────────────────────────────────────
