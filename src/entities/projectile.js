@@ -732,8 +732,12 @@ class Projectile {
             _echoShotChance: 0,
         };
         if (game.burstQueue) {
+            // [echo-origin] 回响发射点 = 触发回响的反弹点（this.pos），而非发射器
+            // 由 game_phase.js 的 burstQueue 处理器读取 x/y 字段，缺省时回退到发射器位置
             game.burstQueue.push({
                 delay: 0,
+                x: this.pos.x,
+                y: this.pos.y,
                 vel: mirrorVel,
                 recipe: echoRecipe,
                 shotId: this.shotId,

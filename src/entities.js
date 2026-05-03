@@ -2682,6 +2682,29 @@ class DropBall {
                             }
                         }
 
+                        // ==================== [新属性] 回响弹珠概率分裂 ====================
+                        // 回响弹珠（def.type === 'echo'）撞击属性钉子时，按概率原地分裂
+                        // 复用 SpecialSlot 'split' 同款分裂返回值，由 game_phase.js 创建两颗新球
+                        // 限制：每颗球至多分裂一次（_echoSplitUsed），且 canTriggerSplitSlot=true
+                        if (
+                            this.def && this.def.type === 'echo' &&
+                            !this._echoSplitUsed &&
+                            this.canTriggerSplitSlot &&
+                            peg.type !== 'normal' && peg.type !== 'pink'
+                        ) {
+                            const echoCfg2 = (CONFIG.mechanics && CONFIG.mechanics.echo) || {};
+                            const splitChance = echoCfg2.marbleSplitChance || 0.18;
+                            if (Math.random() < splitChance) {
+                                this._echoSplitUsed = true;
+                                this.active = false;
+                                this.stopSound();
+                                audio.playPowerup();
+                                game.spawn_createExplosion(peg.pos.x, peg.pos.y, '#60a5fa');
+                                game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 24, '🔁回响分裂!', '#60a5fa');
+                                return { action: 'split', pos: this.pos, vel: this.vel, def: this.def };
+                            }
+                        }
+
                         // @section:layout_special_effects - 布局专属特殊效果（漏斗/菱形/稀疏通道）
                         // ==================== [布局补偿] 布局专属特殊效果 ====================
                         const boardLayout = game.boardLayout || 'default';
@@ -3176,6 +3199,8 @@ class DropBall {
                         'cryo': ['#e0f2fe', '#0369a1'],
                         'pyro': ['#ffedd5', '#ea580c'],
                         'resonance': ['#fef3c7', '#d97706'],
+                        'echo': ['#dbeafe', '#2563eb'],
+                        'venom': ['#dcfce7', '#16a34a'],
                     };
                      if (this.def.type && map[this.def.type]) {
                          baseLight = map[this.def.type][0];

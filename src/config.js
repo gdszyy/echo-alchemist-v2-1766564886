@@ -469,6 +469,7 @@ const CONFIG = {
             phantomChancePerLevel: 0.05, // 每层 echo 增加虚影概率
             phantomLifetimeMs: 1000,  // 虚影 Peg 存活时间 (ms)
             phantomChildChance: 0.25, // 虚影 Peg 被碰撞时再生成虚影的概率
+            marbleSplitChance: 0.18,  // 钉盘阶段：回响弹珠撞击属性钉子的概率分裂（每球至多 1 次）
         }
     },
     /** 游戏平衡性：敌人与数值 */

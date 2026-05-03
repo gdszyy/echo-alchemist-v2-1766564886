@@ -1627,7 +1627,10 @@ phase_gathering_getRandomPegType() {
             shot.delay -= timeScale;
             if (shot.delay <= 0) {
                 // [emitter-port] 子弹从发射器素材的上沿发射口生成（Y 轴上移 22px）
-                this.spawn_spawnBullet(this.width/2, this.height-102, shot.vel, shot.recipe, shot.shotId, shot.isLast);
+                // [echo-origin] 若 shot 携带 x/y（如回响弹），则从该坐标发射，否则回退到发射器
+                const spawnX = (typeof shot.x === 'number') ? shot.x : this.width/2;
+                const spawnY = (typeof shot.y === 'number') ? shot.y : this.height-102;
+                this.spawn_spawnBullet(spawnX, spawnY, shot.vel, shot.recipe, shot.shotId, shot.isLast);
                 audio.playShoot();
                 this.burstQueue.splice(i, 1);
             }
