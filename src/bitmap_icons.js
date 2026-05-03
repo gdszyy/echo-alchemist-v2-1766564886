@@ -192,11 +192,60 @@ export function getUiBitmap(path) {
     return (img.complete && img.naturalWidth > 0) ? img : null;
 }
 
+// 属性轨道球底座（recipe 关键字 → 7 元素 socket 贴图，覆盖率不全则保持 fallback）
+export const ORBITAL_SOCKET_MAP = {
+    pyro:      'assets/ui/sprites/orbital_socket_pyro.png',
+    cryo:      'assets/ui/sprites/orbital_socket_cryo.png',
+    lightning: 'assets/ui/sprites/orbital_socket_electro.png',
+    laser:     'assets/ui/sprites/orbital_socket_hydro.png',
+    bounce:    'assets/ui/sprites/orbital_socket_dendro.png',
+    pierce:    'assets/ui/sprites/orbital_socket_anemo.png',
+    damage:    'assets/ui/sprites/orbital_socket_geo.png',
+};
+
+export const ORBITAL_LINK_STRIP   = 'assets/ui/sprites/orbital_link_strip.png';
+export const ORBITAL_LINK_CAP     = 'assets/ui/sprites/orbital_link_cap.png';
+export const ORBITAL_LINK_FLOW    = [
+    'assets/ui/sprites/orbital_link_flow_0.png',
+    'assets/ui/sprites/orbital_link_flow_1.png',
+    'assets/ui/sprites/orbital_link_flow_2.png',
+    'assets/ui/sprites/orbital_link_flow_3.png',
+];
+export const ORBITAL_INTAKE = [
+    'assets/ui/sprites/orbital_intake_0.png',
+    'assets/ui/sprites/orbital_intake_1.png',
+    'assets/ui/sprites/orbital_intake_2.png',
+    'assets/ui/sprites/orbital_intake_3.png',
+];
+
+export const EMITTER_BASE_SRC = 'assets/ui/sprites/emitter_base.png';
+export const EMITTER_CHARGING_SRCS = [
+    'assets/ui/sprites/emitter_charging_0.png',
+    'assets/ui/sprites/emitter_charging_1.png',
+    'assets/ui/sprites/emitter_charging_2.png',
+    'assets/ui/sprites/emitter_charging_3.png',
+    'assets/ui/sprites/emitter_charging_4.png',
+    'assets/ui/sprites/emitter_charging_5.png',
+];
+
+// Canvas 背景位图（战斗 / 研磨阶段共用主底图，发射区单独叠加炼金台层）
+export const BG_MAIN_CANVAS_SRC   = 'assets/ui/backgrounds/bg_main_canvas.png';
+export const BG_EMITTER_ZONE_SRC  = 'assets/ui/backgrounds/bg_emitter_zone.png';
+
 /**
- * 预热 UI 位图（在游戏启动早期调用）。
- * 当前 UI 已全部 CSS 化或 canvas 程序化绘制，本函数保留为空入口
- * 以兼容已有调用点（preloadUiBitmaps()），后续可以删除。
+ * 预热 UI 位图（在游戏启动早期调用，避免战斗首帧卡顿）。
  */
 export function preloadUiBitmaps() {
-    /* no-op: UI bitmap surfaces removed (CSS / 程序化 canvas) */
+    const paths = [
+        EMITTER_BASE_SRC,
+        ...EMITTER_CHARGING_SRCS,
+        ...Object.values(ORBITAL_SOCKET_MAP),
+        ORBITAL_LINK_STRIP,
+        ORBITAL_LINK_CAP,
+        ...ORBITAL_LINK_FLOW,
+        ...ORBITAL_INTAKE,
+        BG_MAIN_CANVAS_SRC,
+        BG_EMITTER_ZONE_SRC,
+    ];
+    paths.forEach(p => getUiBitmap(p));
 }
