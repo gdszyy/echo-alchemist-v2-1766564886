@@ -901,7 +901,10 @@ phase_gathering_getRandomPegType() {
                     oneShotMult = 1; // 维持公式一致：×当前 stacks 一次
                     e._wasFrozenLastTurn = false;
                 }
-                let dotDmg = (e.venomStacks * dotPerStack * dotMultiplier) * ticks * oneShotMult;
+                // 三角阈值：每累计 1, 2, 3, 4… 层才 +1 点伤害
+                // stacks=1→1dmg, stacks=3→2dmg, stacks=6→3dmg, stacks=10→4dmg ...
+                const venomTier = Math.floor((-1 + Math.sqrt(1 + 8 * e.venomStacks)) / 2);
+                let dotDmg = (venomTier * dotPerStack * dotMultiplier) * ticks * oneShotMult;
                 // 对 shield 敌人 DoT 双倍（共鸣 Tier3）
                 if (ignoreShield && e.affixes && e.affixes.includes('shield')) {
                     dotDmg *= 2;

@@ -1,6 +1,6 @@
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
-import { CONFIG } from './config.js';
+import { CONFIG, RELIC_DB } from './config.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
 
 export const ui_system = {
@@ -1156,6 +1156,32 @@ export const ui_system = {
         pause.style.display = 'none';
     },
 
-    ui_syncPauseSettings() {},
-    ui_renderPauseRelics() {}
+    ui_syncPauseSettings() {
+        if (typeof this.ui_renderPauseRelics === 'function') this.ui_renderPauseRelics();
+    },
+    ui_renderPauseRelics() {
+        const list = document.getElementById('pause-relic-list');
+        if (!list) return;
+        const owned = (this.ownedRelics || []);
+        if (owned.length === 0) {
+            list.innerHTML = '<div class="pause-empty-relics">尚未获得任何遗物</div>';
+            return;
+        }
+        // 统计每件遗物的拥有数量
+        const counts = {};
+        owned.forEach(id => { counts[id] = (counts[id] || 0) + 1; });
+        const html = Object.entries(counts).map(([id, count]) => {
+            const def = RELIC_DB.find(r => r.id === id) || { name: id, icon: '❓', desc: '' };
+            const stack = count > 1 ? ` <span style="color:#fbbf24;font-weight:bold;">×${count}</span>` : '';
+            return `
+                <div style="display:flex;align-items:flex-start;gap:8px;padding:8px;margin-bottom:6px;background:rgba(30,41,59,0.6);border:1px solid rgba(100,116,139,0.3);border-radius:8px;">
+                    <span style="font-size:20px;line-height:1;">${def.icon || '🔮'}</span>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:12px;font-weight:bold;color:#e2e8f0;">${def.name}${stack}</div>
+                        <div style="font-size:10px;color:#94a3b8;margin-top:2px;line-height:1.4;">${def.desc || ''}</div>
+                    </div>
+                </div>`;
+        }).join('');
+        list.innerHTML = html;
+    }
 };

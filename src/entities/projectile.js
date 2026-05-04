@@ -84,6 +84,8 @@ class Projectile {
         this.rotation = 0;
         this.windBladeAngle = 0; // 风属性环绕风刃的旋转角度
         this.lifeTime = 60 * 30; // [修改] 加倍子弹生命时间 (从15秒增加到30秒)
+        // 回响子弹寿命限制为 1 秒，避免镜像反方向子弹长时间留存
+        if (this._isEchoChild) this.lifeTime = 60;
         this.chainHistory = [];
         this.trail = [];
         // [拖尾调优] 根据子弹强度（属性层数）和类型决定拖尾长度。

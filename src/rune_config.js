@@ -408,7 +408,7 @@ const RUNEWORD_DB = [
         name: '嗜血初锋',
         effectId: 'bloodthirst_growth',
         pattern: ['rune_pierce_1', 'rune_pyro_1', 'rune_pierce_1'],
-        effect_desc: '每次击杀敌人，本局全局基础伤害永久 +1。但你的冰霜与火焰属性层数降低 30%。',
+        effect_desc: '每累计击杀 1, 2, 3, 4… 个敌人后，本局全局基础伤害永久再 +1（三角阈值）。但你的冰霜与火焰属性层数降低 30%。',
         baseParams: { damagePerKill: 1, elementPenalty: 0.3 },
         perLevelParams: { damagePerKill: 1, elementPenalty: -0.1 }
     },
