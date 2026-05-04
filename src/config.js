@@ -315,6 +315,7 @@ const CONFIG = {
         matWind: '#34d399',
         matWind_lv2: '#10b981', // 进阶深绿
         matWind_lv3: '#059669', // 终极墨绿
+        matVenom: '#4ade80', // 剧毒绿
         marbleWhite: '#f8fafc',
         matMatryoshka: '#d946ef',
         marbleRedStripe: '#fca5a5',

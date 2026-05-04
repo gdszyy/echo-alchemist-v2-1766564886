@@ -253,7 +253,7 @@ class FortuneWheel {
         
         // [修改] 1. 过滤不可叠加属性 (如 pierce, bounce, scatter, flying_sword 等通常不适合转盘直接翻倍)
         // 我们只允许元素属性和增幅属性进入转盘
-        const stackableTypes = ["bounce","pierce","scatter",'damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind', 'resonance', 'explosive'];
+        const stackableTypes = ["bounce","pierce","scatter",'damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind', 'resonance', 'venom', 'explosive'];
         
         // 统计当前弹珠拥有的可叠加属性
         const counts = {};
@@ -864,6 +864,8 @@ class Peg {
             case 'wind': color = CONFIG.colors.matWind; break;
             case 'pink': color = CONFIG.colors.pegPink; break;
             case 'laser': color = CONFIG.colors.laser; break;
+            case 'resonance': color = CONFIG.colors.resonance; break;
+            case 'venom': color = CONFIG.colors.matVenom; break;
         }
         return color
     }
@@ -1080,6 +1082,16 @@ class Peg {
             ctx.shadowBlur = _sb(12 + pulse * 8);
             ctx.shadowColor = CONFIG.colors.matWind;
             ctx.fillStyle = isLit ? '#ffffff' : color;
+        } else if (this.type === 'resonance') {
+            const pulse = (Math.sin(Date.now() / 400) + 1) / 2;
+            ctx.shadowBlur = _sb(10 + pulse * 8);
+            ctx.shadowColor = CONFIG.colors.resonance;
+            ctx.fillStyle = isLit ? '#ffffff' : color;
+        } else if (this.type === 'venom') {
+            const pulse = (Math.sin(Date.now() / 500) + 1) / 2;
+            ctx.shadowBlur = _sb(8 + pulse * 6);
+            ctx.shadowColor = CONFIG.colors.matVenom;
+            ctx.fillStyle = isLit ? '#ffffff' : color;
         } else if (isLit) {
             ctx.fillStyle = '#ffffff';
             ctx.shadowBlur = _sb(15);
@@ -1161,6 +1173,8 @@ class Peg {
         if (this.type === 'damage')    this.drawDamagePeg(ctx, currentRadius, isLit);
         if (this.type === 'laser')     this.drawLaserPeg(ctx, currentRadius, isLit);
         if (this.type === 'pink')      this.drawPinkPeg(ctx, currentRadius, isLit);
+        if (this.type === 'resonance') this.drawResonancePeg(ctx, currentRadius, isLit);
+        if (this.type === 'venom')     this.drawVenomPeg(ctx, currentRadius, isLit);
 
         // [Glacies 狂暴] 冻结 Peg 蓝色光晕
         if (this.frozenTurns > 0) {
@@ -1632,6 +1646,80 @@ class Peg {
         ctx.bezierCurveTo(s, -s * 0.1, s * 0.1, -s * 0.1, 0, s * 0.4);
         ctx.closePath();
         ctx.fill();
+        ctx.restore();
+    }
+
+    /**
+     * [resonance] 共鸣属性：同心弧波纹
+     * 三圈由内向外扩散的圆弧，模拟声波/共鸣振动
+     */
+    drawResonancePeg(ctx, r, isLit) {
+        const time = Date.now() / 1000;
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
+        ctx.strokeStyle = ic;
+        ctx.lineCap = 'round';
+        // 三圈弧线，左右对称，模拟声波辐射
+        const radii = [r * 0.25, r * 0.48, r * 0.70];
+        const arcSpan = Math.PI * 0.72;
+        radii.forEach((ar, i) => {
+            ctx.lineWidth = r * (0.15 - i * 0.03);
+            // 左侧弧
+            ctx.beginPath();
+            ctx.arc(0, 0, ar, Math.PI - arcSpan / 2, Math.PI + arcSpan / 2);
+            ctx.stroke();
+            // 右侧弧
+            ctx.beginPath();
+            ctx.arc(0, 0, ar, -arcSpan / 2, arcSpan / 2);
+            ctx.stroke();
+        });
+        // 中心小圆点（波源）
+        ctx.fillStyle = ic;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    /**
+     * [venom] 剧毒属性：骷髅轮廓
+     * 圆形头骨 + 两条交叉骨骼，经典毒素符号
+     */
+    drawVenomPeg(ctx, r, isLit) {
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        const ic = isLit ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)';
+        ctx.strokeStyle = ic;
+        ctx.fillStyle = ic;
+        ctx.lineWidth = r * 0.13;
+        ctx.lineCap = 'round';
+        // 头骨圆形（上半部分）
+        ctx.beginPath();
+        ctx.arc(0, -r * 0.12, r * 0.42, Math.PI * 0.15, Math.PI * 0.85, true);
+        ctx.stroke();
+        // 下颌底边
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.38, r * 0.10);
+        ctx.lineTo(r * 0.38, r * 0.10);
+        ctx.stroke();
+        // 两个眼孔（实心小圆）
+        ctx.beginPath();
+        ctx.arc(-r * 0.17, -r * 0.18, r * 0.10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(r * 0.17, -r * 0.18, r * 0.10, 0, Math.PI * 2);
+        ctx.fill();
+        // 交叉骨骼（下方）
+        ctx.lineWidth = r * 0.11;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.38, r * 0.55);
+        ctx.lineTo(r * 0.38, r * 0.20);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(r * 0.38, r * 0.55);
+        ctx.lineTo(-r * 0.38, r * 0.20);
+        ctx.stroke();
         ctx.restore();
     }
 
