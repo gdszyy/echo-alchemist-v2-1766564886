@@ -1209,8 +1209,9 @@ phase_gathering_getRandomPegType() {
     phase_finalizeRound() {
         // 1. 统计当前存活敌人数据
         const activeEnemies = this.enemies.filter(e => e.active);
-        // [清屏检测] 仅统计围墙内（pos.y > 0）的敌人：墙外敌人无法被子弹击中，不应计入清场判定
-        const clearedThisRound = !activeEnemies.some(e => e.pos.y > 0);
+        // [清屏检测] 仅统计围墙内 (pos.y > 0) 且能被子弹击中的敌人。
+        // 顶部两排（row 0 & row 1）位于顶部墙的死角内，子弹无法触及，因此不参与清场判定。
+        const clearedThisRound = !activeEnemies.some(e => e.pos.y > 0 && this.phase_isEnemyClearable(e));
         // 使用 Set 统计有多少个不同的 Y 坐标（即有多少行）
         // Math.round 处理浮点误差，/50 是行高，确保归类准确
         const uniqueRows = new Set(activeEnemies.map(e => Math.round(e.pos.y / this.enemyHeight)));
@@ -1867,7 +1868,10 @@ phase_gathering_getRandomPegType() {
                     // Boss 入场动画期间（pos.y 在屏幕外）也计入活跃敌人，防止误判完美清场
                     // [演出时机修复] 同时兼容 _pendingEntrance 状态（Boss 在屏幕外待机）
                     // [issue-2] 普通敌人画面外入场（_spawnedThisTurn）也计入活跃，避免误判完美清场
-                    if (e.pos.y > 0 || (e.type === 'boss' && (e.entranceTimer > 0 || e._pendingEntrance)) || e._spawnedThisTurn) {
+                    // 顶部两排敌人（row 0 / row 1）被顶部墙挡住，子弹无法击中，
+                    // 不计入「围墙内活跃敌人」用以触发清场抽奖判定。
+                    const inWallAndClearable = e.pos.y > 0 && this.phase_isEnemyClearable(e);
+                    if (inWallAndClearable || (e.type === 'boss' && (e.entranceTimer > 0 || e._pendingEntrance)) || e._spawnedThisTurn) {
                         activeEnemies++;
                     }
                     if (Math.abs(e.pos.y - e.dropTargetY) > 1) anyEnemyMoving = true;
@@ -2959,5 +2963,28 @@ phase_gathering_getRandomPegType() {
         ctx.fillText(hint.hint, this.width / 2, labelY);
 
         ctx.restore();
+    },
+
+    /**
+     * 判断敌人是否处于"可被子弹击中"的可清场区域。
+     * 顶部两排（row 0 / row 1）位于顶部墙的死角内，子弹无法触及，
+     * 因此不应参与「围墙清空」判定（包括完美清场、in-wall 清场抽奖等）。
+     *
+     * 多行敌人（gridRows ≥ 2）只要有任一格延伸到 row 2 及以下，即视为可清场。
+     *
+     * @param {Object} e - 敌人对象（具有 pos.y / height / gridRows 字段）
+     * @returns {boolean} 该敌人是否参与清场判定
+     */
+    phase_isEnemyClearable(e) {
+        if (!e) return false;
+        const eh = this.enemyHeight || 40;
+        const topY = (typeof this.combatGridTopY === 'number') ? this.combatGridTopY : 90;
+        // row 2 的上边界 = combatGridTopY + 1.5 × enemyHeight
+        const row2TopEdge = topY + 1.5 * eh;
+        const rows = e.gridRows || 1;
+        const heightPx = (rows > 1) ? rows * eh : (e.height || eh);
+        const bottomEdge = e.pos.y + heightPx / 2;
+        // 留 1px 容差避免浮点误差
+        return bottomEdge > row2TopEdge + 1;
     },
 };
