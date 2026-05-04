@@ -230,8 +230,13 @@ class Game {
         this.shotDamageHistory = []; 
         this.shotIdCounter = 0; 
         this.shotDamageMap = new Map(); 
-        this.roundDamageHistory = []; 
-        this.currentViewingRound = 0; 
+        this.roundDamageHistory = [];
+        this.currentViewingRound = 0;
+        // 实时伤害统计：滑窗 DPS + rAF 节流刷新
+        this._damageRecentSamples = []; // [{t, amount}] 用于计算最近窗口 DPS
+        this._dps = 0;                  // 当前瞬时 DPS（基于 _dpsWindowMs 滑窗）
+        this._dpsWindowMs = 3000;       // DPS 滑窗大小（毫秒）
+        this._damageStatsRafScheduled = false; // rAF 节流标志，避免每帧多次重建
         this.isEnemyTurn = false;      
         this.enemyTurnTimer = 0;       
         this.enemyWaveY = 0;       

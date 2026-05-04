@@ -83,6 +83,10 @@ export const hud_system = {
             }
             // 更新显示
             this.ui_updateRoundDamage();
+            // 子弹完成 → 主动刷新一次实时面板（rAF 节流）
+            if (typeof this.ui_scheduleDamageStatsRefresh === 'function') {
+                this.ui_scheduleDamageStatsRefresh();
+            }
         }
     },
 
@@ -95,15 +99,26 @@ export const hud_system = {
         const el = document.getElementById('round-damage-val');
         const container = document.getElementById('round-damage-display');
         if (!el || !container) return;
-        
+
         // 使用本回合实时累计伤害 (roundDamage)
         const targetValue = Math.floor(this.roundDamage);  // [Mixin 正常用法：读取 Game 实例状态]
-        const currentValue = parseInt(el.innerText.replace(/,/g, '')) || 0;
-        
+        const currentValue = parseInt((el.innerText || '0').replace(/,/g, '')) || 0;
+
+        // 实时 DPS 副标签：单独的 #round-damage-dps 元素，在主数字旁显示
+        let dpsEl = document.getElementById('round-damage-dps');
+        if (!dpsEl) {
+            dpsEl = document.createElement('span');
+            dpsEl.id = 'round-damage-dps';
+            dpsEl.className = 'ml-2 text-xs font-bold text-amber-300';
+            el.parentNode && el.parentNode.appendChild(dpsEl);
+        }
+        const dps = Math.floor(this._dps || 0);
+        dpsEl.innerText = dps > 0 ? `(${dps.toLocaleString()} DPS)` : '';
+
         if (targetValue > 0) {
             container.classList.remove('opacity-0');
             container.classList.add('opacity-100');
-            
+
             // 如果差值较小，直接更新，避免频繁启动定时器
             if (Math.abs(targetValue - currentValue) < 5) {
                 el.innerText = targetValue.toLocaleString();
@@ -112,17 +127,17 @@ export const hud_system = {
 
             // 滚动数字效果
             if (this._damageScrollInterval) clearInterval(this._damageScrollInterval);
-            
-            const duration = 300; 
+
+            const duration = 300;
             const steps = 10;
             const stepValue = (targetValue - currentValue) / steps;
             let currentStep = 0;
-            
+
             this._damageScrollInterval = setInterval(() => {
                 currentStep++;
                 const newValue = Math.floor(currentValue + stepValue * currentStep);
                 el.innerText = newValue.toLocaleString();
-                
+
                 if (currentStep >= steps) {
                     el.innerText = targetValue.toLocaleString();
                     clearInterval(this._damageScrollInterval);
@@ -132,6 +147,36 @@ export const hud_system = {
             container.classList.add('opacity-0');
             container.classList.remove('opacity-100');
             el.innerText = '0';
+        }
+    },
+
+    /**
+     * @method ui_scheduleDamageStatsRefresh
+     * @description 实时伤害统计面板刷新 —— rAF 节流。
+     *   每次 combat_recordDamage 调用都会请求刷新，但实际重建 DOM 的频率最高 60fps，
+     *   且仅在「伤害面板可见 + 正在查看当前回合」时执行，避免无意义工作。
+     */
+    ui_scheduleDamageStatsRefresh() {
+        if (this._damageStatsRafScheduled) return;
+        // 仅当查看当前回合（实时数据）时才需要刷新
+        if (this.currentViewingRound !== 0) return;
+        // 仅当伤害 tab 实际可见时才刷新
+        const tabEl = document.getElementById('tab-damage');
+        if (!tabEl || tabEl.classList.contains('hidden')) return;
+
+        this._damageStatsRafScheduled = true;
+        const run = () => {
+            this._damageStatsRafScheduled = false;
+            // 再次确认仍处于实时查看模式，且面板仍可见（rAF 异步期间状态可能已变）
+            if (this.currentViewingRound !== 0) return;
+            const t = document.getElementById('tab-damage');
+            if (!t || t.classList.contains('hidden')) return;
+            this.ui_updateDamageStats();
+        };
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(run);
+        } else {
+            setTimeout(run, 16);
         }
     },
 
@@ -174,8 +219,23 @@ export const hud_system = {
         prevBtn.addEventListener('click', () => this.ui_switchDamageRound(1));
 
         const roundLabel = document.createElement('span');
-        roundLabel.className = 'text-xs font-bold text-amber-400 font-[Cinzel]';
-        roundLabel.textContent = `Round ${roundNumber}`;
+        roundLabel.className = 'text-xs font-bold text-amber-400 font-[Cinzel] flex items-center gap-2';
+        const isLive = this.currentViewingRound === 0;
+        if (isLive) {
+            const dot = document.createElement('span');
+            dot.className = 'inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse';
+            dot.title = '实时';
+            roundLabel.appendChild(dot);
+            const liveText = document.createElement('span');
+            liveText.textContent = `Round ${roundNumber} · LIVE`;
+            roundLabel.appendChild(liveText);
+            const dpsBadge = document.createElement('span');
+            dpsBadge.className = 'text-[10px] font-normal text-amber-200 bg-slate-900/60 px-1.5 py-0.5 rounded';
+            dpsBadge.textContent = `${Math.floor(this._dps || 0).toLocaleString()} DPS`;
+            roundLabel.appendChild(dpsBadge);
+        } else {
+            roundLabel.textContent = `Round ${roundNumber}`;
+        }
 
         const nextBtn = document.createElement('button');
         nextBtn.className = 'text-slate-400 hover:text-white px-3 py-1';

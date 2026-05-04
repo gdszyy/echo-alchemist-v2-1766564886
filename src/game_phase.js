@@ -43,6 +43,9 @@ export const game_phase = {
         // 回合计数的唯一执行位置保留在 phase_finalizeRound 中
         this.prevRoundDamage = this.roundDamage; // 记录上一回合伤害
         this.roundDamage = 0; // 重置本回合伤害
+        // 重置实时 DPS 滑窗
+        this._damageRecentSamples = [];
+        this._dps = 0;
         // 事件总线广播波次推进（[BUGFIX #5b] 保留：不在此处更新 DOM，由 UI 监听 wave:advance 事件处理）
         eventBus.emit(EVENT_TYPES.WAVE_ADVANCED, { round: this.round });
     },

@@ -122,7 +122,25 @@ export const DamageCalc = {
             }
             shotStats.byAttr[attrType][sourceType] += amount;
         }
+        // --- 3. 滑窗 DPS 采样：记录命中时间戳，剔除过期样本，重算 DPS ---
+        const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+        const windowMs = this._dpsWindowMs || 3000;
+        if (!this._damageRecentSamples) this._damageRecentSamples = [];
+        this._damageRecentSamples.push({ t: now, amount });
+        const cutoff = now - windowMs;
+        // 由于 push 是单调递增 t，可以用 shift 高效剔除
+        while (this._damageRecentSamples.length > 0 && this._damageRecentSamples[0].t < cutoff) {
+            this._damageRecentSamples.shift();
+        }
+        let windowSum = 0;
+        for (let i = 0; i < this._damageRecentSamples.length; i++) windowSum += this._damageRecentSamples[i].amount;
+        this._dps = windowSum / (windowMs / 1000);
+
         this.ui_updateRoundDamage();
+        // 实时刷新伤害统计面板（rAF 节流，仅在面板可见且查看当前回合时实际重建 DOM）
+        if (typeof this.ui_scheduleDamageStatsRefresh === 'function') {
+            this.ui_scheduleDamageStatsRefresh();
+        }
     },
 
     // ─────────────────────────────────────────────────────────────────────────
