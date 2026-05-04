@@ -1635,24 +1635,7 @@ phase_gathering_getRandomPegType() {
             // round-start resolver 会在存档恢复时继续处理 pendingRoundStartRewards。
             this.sys_saveRunState();
 
-            // ==================== [v2 局内商店] 每 N 场战斗弹出一次 ====================
-            const cfg = CONFIG.gameplay || {};
-            const interval = cfg.runShopInterval || 2;
-            const curRound = this.round || 1;
-            const shouldOpenShop = (curRound > 0)
-                && (curRound % interval === 0)
-                && (this._runShopOpenedRound !== curRound)
-                && (typeof this.ui_showRunShop === 'function')
-                && !this._isTutorialRun
-                && !(this.ownedRelics && this.ownedRelics.includes('chaos_pact'));
-            if (shouldOpenShop) {
-                this._runShopOpenedRound = curRound;
-                this.ui_showRunShop(() => {
-                    this.sys_startRoundStartResolver();
-                });
-                return;
-            }
-
+            // [v2 局内商店] 不再每回合自动弹出；商店仅在「跳过遗物」(ui_skipRelic) 路径下打开。
             this.sys_startRoundStartResolver();
         }
     },

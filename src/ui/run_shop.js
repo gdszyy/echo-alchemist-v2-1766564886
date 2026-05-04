@@ -17,7 +17,7 @@
 
 import { CONFIG } from '../config.js';
 import { RUNE_DB } from '../rune_config.js';
-import { MODULE_DEFS } from '../pinboard_modules.js';
+import { MODULE_DEFS, ATTR_PIN_TYPES } from '../pinboard_modules.js';
 
 const RUNE_PRICE_BY_RARITY = {
     common: 18,
@@ -27,6 +27,36 @@ const RUNE_PRICE_BY_RARITY = {
 };
 
 const SLOT_EXPAND_PRICE = 100;
+
+// [v2] 旧的「特殊槽解锁/数量+1」遗物迁移到商店出售
+const SLOT_UNLOCK_PRICE = 60;
+const SLOT_COUNT_PRICE = 50;
+const SLOT_TYPE_META = {
+    recall:    { name: '解鎖回溯槽',  icon: '⏳', desc: '加入「回溯」特殊槽到鑒池。' },
+    multicast: { name: '解鎖連射槽',  icon: '♊', desc: '加入「連射」特殊槽到鑒池。' },
+    split:     { name: '解鎖分裂槽',  icon: '☢️', desc: '加入「分裂」特殊槽到鑒池。' },
+};
+
+// [v2] 属性钉板：商店随机刷新一个带某属性的钉板模块（按当前属性权重）
+const ATTR_PIN_PRICE = 70;
+const ATTR_PIN_LABEL = {
+    bounce: '彈性', pierce: '穿透', scatter: '散射',
+    damage: '增幅', cryo: '冰霜',   pyro: '火焰', wind: '疾風',
+};
+
+function rollAttributePinType(game) {
+    const weights = (game && game.unlockedWeights) || {};
+    const candidates = [];
+    let total = 0;
+    for (const t of ATTR_PIN_TYPES) {
+        const w = Math.max(0, weights[t] || 0);
+        if (w > 0) { candidates.push({ type: t, w }); total += w; }
+    }
+    if (total <= 0 || candidates.length === 0) return null;
+    let r = Math.random() * total;
+    for (const c of candidates) { if (r < c.w) return c.type; r -= c.w; }
+    return candidates[candidates.length - 1].type;
+}
 
 /**
  * 生成商品列表
@@ -38,8 +68,8 @@ function generateInventory(game, count) {
     const runeCount = Math.max(1, Math.floor(count * runesRatio));
     const moduleCount = count - runeCount;
 
-    // 模块商品：来自 MODULE_DEFS 中价格 > 0 且玩家未解锁的
-    const lockedModules = Object.values(MODULE_DEFS).filter(d => d.price > 0 && (!game.unlockedModuleTypes || !game.unlockedModuleTypes.includes(d.id)));
+    // 模块商品：来自 MODULE_DEFS 中价格 > 0 且玩家未解锁的（不含 attr_pin_*：那些由属性钉板分支独立刷新）
+    const lockedModules = Object.values(MODULE_DEFS).filter(d => d.price > 0 && !d.isAttrPin && (!game.unlockedModuleTypes || !game.unlockedModuleTypes.includes(d.id)));
     for (let i = 0; i < moduleCount && lockedModules.length > 0; i++) {
         const def = lockedModules[Math.floor(Math.random() * lockedModules.length)];
         items.push({ kind: 'module', moduleId: def.id, name: def.name, icon: def.icon, desc: def.desc, price: def.price });
@@ -49,6 +79,39 @@ function generateInventory(game, count) {
     const totalSlots = (cfg.moduleCols || 4) * (cfg.moduleRows || 3);
     if ((game.unlockedModuleSlots || cfg.moduleDefaultSlots || 3) < totalSlots) {
         items.push({ kind: 'slot_expand', name: '模块槽位 +1', icon: '⊞', desc: `当前 ${game.unlockedModuleSlots || cfg.moduleDefaultSlots || 3}/${totalSlots}`, price: SLOT_EXPAND_PRICE });
+    }
+
+    // [v2] 特殊槽解锁：未解锁的类型作为商品出售
+    const unlockedSlotSet = new Set(game.unlockedSlots || []);
+    for (const slotType of Object.keys(SLOT_TYPE_META)) {
+        if (!unlockedSlotSet.has(slotType)) {
+            const meta = SLOT_TYPE_META[slotType];
+            items.push({ kind: 'slot_unlock', slotType, name: meta.name, icon: meta.icon, desc: meta.desc, price: SLOT_UNLOCK_PRICE });
+        }
+    }
+    // [v2] 特殊槽数量 +1（最多 3）
+    if ((game.slotCount || 0) < 3) {
+        items.push({ kind: 'slot_count', name: '特殊槽數量 +1', icon: '🔨', desc: `當前 ${game.slotCount || 0}/3`, price: SLOT_COUNT_PRICE });
+    }
+
+    // [v2] 属性钉板：按当前属性权重随机刷出一个带属性的钉板模块
+    const attrPinType = rollAttributePinType(game);
+    if (attrPinType) {
+        const moduleId = `attr_pin_${attrPinType}`;
+        const def = MODULE_DEFS[moduleId];
+        const alreadyUnlocked = (game.unlockedModuleTypes || []).includes(moduleId);
+        if (def && !alreadyUnlocked) {
+            items.push({
+                kind: 'attr_pin',
+                moduleId,
+                attribute: attrPinType,
+                name: def.name,
+                icon: def.icon,
+                desc: `3×3 釘板，全部釘子為 [${ATTR_PIN_LABEL[attrPinType] || attrPinType}] 屬性。`,
+                price: ATTR_PIN_PRICE,
+                rarity: 'rare',
+            });
+        }
     }
 
     // 符文商品：从 RUNE_DB 随机抽
@@ -178,7 +241,7 @@ export const run_shop = {
             return;
         }
         const cfg = CONFIG.gameplay || {};
-        if (it.kind === 'module') {
+        if (it.kind === 'module' || it.kind === 'attr_pin') {
             if (!Array.isArray(this.unlockedModuleTypes)) this.unlockedModuleTypes = [];
             if (!this.unlockedModuleTypes.includes(it.moduleId)) {
                 this.unlockedModuleTypes.push(it.moduleId);
@@ -188,6 +251,16 @@ export const run_shop = {
             const totalSlots = (cfg.moduleCols || 4) * (cfg.moduleRows || 3);
             this.unlockedModuleSlots = Math.min(totalSlots, (this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3) + 1);
             if (window.showToast) window.showToast(`钉板槽位 +1（当前 ${this.unlockedModuleSlots}/${totalSlots}）`);
+        } else if (it.kind === 'slot_unlock') {
+            if (!Array.isArray(this.unlockedSlots)) this.unlockedSlots = [];
+            if (!this.unlockedSlots.includes(it.slotType)) {
+                this.unlockedSlots.push(it.slotType);
+            }
+            if ((this.slotCount || 0) === 0) this.slotCount = 1;
+            if (window.showToast) window.showToast(`已解锁特殊槽: ${it.name}`);
+        } else if (it.kind === 'slot_count') {
+            this.slotCount = Math.min(3, (this.slotCount || 0) + 1);
+            if (window.showToast) window.showToast(`特殊槽數量 +1（當前 ${this.slotCount}/3）`);
         } else if (it.kind === 'rune') {
             if (!Array.isArray(this.runeInventory)) this.runeInventory = [];
             this.runeInventory.push({ id: it.runeId, level: 1 });
