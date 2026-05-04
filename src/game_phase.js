@@ -162,12 +162,13 @@ export const game_phase = {
      */
     // @section:pachinko_board_layout - 弹珠台布局计算与钉子生成
     // [v2 模块化重写] 钉板由 4×3 = 12 个模块槽组成（CONFIG.gameplay.moduleCols/Rows）。
-    // 每个模块独立生成自己区域内的钉子/特殊槽。元素属性由"符文融合"在最末尾叠加。
+    // 每个模块独立生成自己区域内的钉子/特殊槽。普通钉子会按当前 unlockedWeights 随机赋予属性，随后符文融合继续补充注入。
+
     phase_gathering_initPachinko_v2(shouldInherit = false) {
         const cfg = CONFIG.gameplay;
         const canvasWidth = (this.width && this.width > 0) ? this.width : 400;
         const canvasHeight = (this.height && this.height > 0) ? this.height : 600;
-        const ctx = this.ctx || null;
+        const moduleBuildCtx = this;
         const totalSlots = (cfg.moduleCols || 4) * (cfg.moduleRows || 3);
 
         // 确保 currentModuleLayout 存在且正确长度
@@ -190,7 +191,7 @@ export const game_phase = {
             const moduleId = this.currentModuleLayout[i];
             if (!moduleId) continue;
             const rect = calcModuleSlotRect(i, canvasWidth, canvasHeight, cfg);
-            const result = buildModuleEntities(moduleId, rect.x, rect.y, rect.w, rect.h, ctx, i);
+            const result = buildModuleEntities(moduleId, rect.x, rect.y, rect.w, rect.h, moduleBuildCtx, i);
             if (result.pegs && result.pegs.length > 0) {
                 for (const p of result.pegs) {
                     p.moduleSlotIdx = i;

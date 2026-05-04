@@ -9,9 +9,9 @@
  *
  * 设计约束：
  *   - 模块内部仍然走"交错"逻辑（用户已确认）
- *   - 所有 peg 默认 type='normal'，元素属性由"符文融合"步骤后置赋予
- *     （见 rune_system.fuseRuneIntoBoard / phase_gathering_initPachinko 的末尾步骤）
- *   - 例外：cryo_pyro_pair 模块固定预置 1 cryo + 1 pyro
+ *   - 普通 peg 在模块构造完成后，会按当前钉盘属性生成权重随机获得已解锁属性
+ *     （权重来源：game.unlockedWeights / CONFIG.probabilities 的运行态副本）
+ *   - 模块自身预置的特殊钉子（如 pink、cryo、pyro）必须保留，不参与随机覆盖
  *
  * MVP 实现说明：
  *   - wheel_module 复用 SpecialSlot type='wheel'（已有的转盘触发机制）
@@ -20,6 +20,50 @@
  */
 
 import { Peg, SpecialSlot } from './entities.js';
+
+// 与 game_phase.phase_gathering_getRandomPegType 保持一致：laser / lightning 不生成钉子。
+const RANDOMIZABLE_PEG_TYPES = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'wind'];
+
+/**
+ * 按当前局内属性权重随机生成 peg 类型。
+ * white 表示普通钉子权重，返回值使用 Peg 类实际类型 normal。
+ */
+function getRandomPegTypeFromWeights(weights) {
+    const source = weights || {};
+    const normalWeight = Math.max(0, source.white || 100);
+    const weightedTypes = RANDOMIZABLE_PEG_TYPES
+        .map(type => ({ type, weight: Math.max(0, source[type] || 0) }))
+        .filter(item => item.weight > 0);
+
+    let totalWeight = normalWeight;
+    for (const item of weightedTypes) totalWeight += item.weight;
+    if (totalWeight <= 0) return 'normal';
+
+    let r = Math.random() * totalWeight;
+    if (r < normalWeight) return 'normal';
+    r -= normalWeight;
+
+    for (const item of weightedTypes) {
+        if (r < item.weight) return item.type;
+        r -= item.weight;
+    }
+    return 'normal';
+}
+
+/**
+ * 对模块生成出的普通钉子按权重随机赋予属性；模块预置特殊钉子不被覆盖。
+ */
+function applyWeightedPegTypes(pegs, ctx) {
+    const weights = ctx && ctx.unlockedWeights;
+    if (!Array.isArray(pegs) || !weights) return pegs;
+    for (const peg of pegs) {
+        if (peg && peg.type === 'normal') {
+            peg.type = getRandomPegTypeFromWeights(weights);
+            peg.level = peg.level || 1;
+        }
+    }
+    return pegs;
+}
 
 /**
  * 在指定矩形内按交错模式生成普通钉子。
@@ -244,7 +288,9 @@ export function buildModuleEntities(moduleId, originX, originY, width, height, c
     if (!def) {
         return { pegs: [], specialSlots: [] };
     }
-    return def.build(originX, originY, width, height, ctx, slotIdx);
+    const result = def.build(originX, originY, width, height, ctx, slotIdx);
+    applyWeightedPegTypes(result.pegs, ctx);
+    return result;
 }
 
 /**

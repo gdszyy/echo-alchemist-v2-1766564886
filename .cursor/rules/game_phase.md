@@ -46,6 +46,14 @@ globs: ["src/game_phase.js"]
 - **入口**: 命运抉择结束，钉板生成完毕，玩家获得发射次数。
 - **出口**: 玩家耗尽发射次数且所有弹珠结算完毕，进入战斗阶段。
 
+### 2.2.1 模块化钉盘属性生成契约
+
+- **生成入口**：模块化钉盘由 `phase_gathering_initPachinko_v2()` 调用 `buildModuleEntities()` 构造各模块实体。
+- **权重来源**：模块生成普通钉子时必须读取当前 `game.unlockedWeights`，其中 `white` 映射为普通钉子权重，`bounce`、`pierce`、`scatter`、`damage`、`cryo`、`pyro`、`wind` 按权重生成对应属性钉子。
+- **禁止类型**：与旧版 `phase_gathering_getRandomPegType()` 保持一致，`laser` 与 `lightning` 不得作为钉子类型生成。
+- **覆盖边界**：只允许随机覆盖模块生成出的 `normal` 钉子；模块预置的 `pink`、固定 `cryo` / `pyro` 等特殊钉子必须保留，以免破坏模块本身定位。
+- **后置流程**：随机属性生成完成后，`pendingFusions` 仍继续在普通钉子上进行符文注入；若上一回合继承逻辑生效，则按原规则在非粉色普通钉子上覆盖继承属性。
+
 ### 2.3 战斗阶段 (Combat Phase)
 - **职责**: 使用收集到的弹药队列攻击敌人，进行回合制结算。
 - **入口**: 研磨阶段结束，弹药队列生成，敌人刷新。
