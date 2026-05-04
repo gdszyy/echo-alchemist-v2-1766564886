@@ -6,6 +6,442 @@ import { MODULE_DEFS, listAvailableModules } from './pinboard_modules.js';
 import { fuseRuneIntoBoard, getRuneId } from './rune_system.js';
 import { showToast } from './utils/math_utils.js';
 
+// ======================================================================
+// 钉板模块编辑器样式表
+// 设计原则：
+//   - 所有布局尺寸/网格/响应都用 class，禁止 inline style 决定布局
+//   - JS 在每次 render 时根据 window.innerWidth 切换 .is-mobile / .is-tablet / .is-desktop
+//   - 移动端单列堆叠 + sticky 底部按钮，桌面双栏
+// ======================================================================
+const ME_STYLES = `
+.me-overlay {
+    position: fixed; inset: 0; z-index: 240;
+    background: rgba(8, 12, 24, 0.92);
+    display: flex; align-items: stretch; justify-content: center;
+    box-sizing: border-box;
+    font-family: 'Cinzel', 'Microsoft YaHei', sans-serif;
+    color: #e2e8f0;
+    padding: 24px;
+    overflow: hidden;
+}
+.me-overlay.is-tablet { padding: 16px; }
+.me-overlay.is-mobile { padding: 0; align-items: stretch; }
+
+.me-overlay * { box-sizing: border-box; }
+
+.me-modal {
+    width: 100%;
+    max-width: 1180px;
+    max-height: 100%;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(20, 28, 50, 0.98));
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    margin: auto;
+}
+.me-overlay.is-mobile .me-modal {
+    border-radius: 0;
+    border: none;
+    max-width: 100%;
+    height: 100%;
+    box-shadow: none;
+}
+
+/* —— Header —— */
+.me-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.25);
+    flex-shrink: 0;
+}
+.me-overlay.is-mobile .me-header {
+    padding: 12px 14px 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+}
+.me-header-titles { min-width: 0; }
+.me-title {
+    font-size: 20px; font-weight: bold; color: #7dd3fc;
+    letter-spacing: 1px; line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.me-overlay.is-mobile .me-title { font-size: 16px; letter-spacing: 0.5px; }
+.me-subtitle { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+.me-overlay.is-mobile .me-subtitle { font-size: 10px; margin-top: 2px; }
+.me-header-stats { display: flex; gap: 14px; flex-shrink: 0; }
+.me-overlay.is-mobile .me-header-stats { justify-content: space-around; gap: 8px; }
+.me-stat { text-align: center; min-width: 0; }
+.me-stat-label { font-size: 10px; color: #94a3b8; line-height: 1; }
+.me-stat-value {
+    font-size: 18px; font-weight: bold; line-height: 1.2;
+    margin-top: 2px;
+    white-space: nowrap;
+}
+.me-overlay.is-mobile .me-stat-value { font-size: 16px; }
+.me-stat-value--cap   { color: #fbbf24; }
+.me-stat-value--placed{ color: #7dd3fc; }
+.me-stat-value--full  { color: #fbbf24; }
+.me-stat-value--rune  { color: #c084fc; }
+.me-stat-suffix { font-size: 11px; color: #64748b; margin-left: 2px; font-weight: normal; }
+
+/* —— Body —— */
+.me-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 22px;
+    display: grid;
+    gap: 14px;
+    grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr);
+    grid-template-areas:
+        "grid palette"
+        "fusion fusion";
+    align-items: start;
+}
+.me-overlay.is-tablet .me-body {
+    padding: 12px 14px;
+    grid-template-columns: minmax(0, 1.4fr) minmax(220px, 1fr);
+    gap: 12px;
+}
+.me-overlay.is-mobile .me-body {
+    padding: 10px 12px 12px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "grid" "palette" "fusion";
+    gap: 12px;
+}
+
+.me-section {
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(56, 189, 248, 0.18);
+    border-radius: 10px;
+    padding: 14px;
+    min-width: 0;
+}
+.me-overlay.is-mobile .me-section { padding: 10px 12px; }
+.me-section--grid    { grid-area: grid; }
+.me-section--palette { grid-area: palette; }
+.me-section--fusion  {
+    grid-area: fusion;
+    border-color: rgba(168, 85, 247, 0.32);
+}
+
+.me-section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin-bottom: 4px;
+}
+.me-section-title {
+    font-size: 13px; font-weight: bold; color: #7dd3fc;
+    letter-spacing: 0.5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.me-section-title--fusion { color: #c084fc; }
+.me-overlay.is-mobile .me-section-title { font-size: 12px; }
+
+.me-section-tag {
+    font-size: 10px; color: #94a3b8;
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 999px;
+    padding: 2px 8px;
+    white-space: nowrap;
+}
+.me-section-tag.is-full {
+    color: #fbbf24;
+    border-color: rgba(251, 191, 36, 0.4);
+    background: rgba(251, 191, 36, 0.08);
+}
+
+.me-section-hint {
+    font-size: 11px; color: #94a3b8;
+    line-height: 1.5;
+    margin-bottom: 10px;
+}
+.me-overlay.is-mobile .me-section-hint { font-size: 10px; margin-bottom: 8px; }
+
+/* —— 钉板网格 —— */
+.me-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+.me-overlay.is-mobile .me-grid { gap: 6px; }
+
+.me-cell {
+    appearance: none;
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 10px;
+    color: inherit;
+    padding: 10px 4px;
+    min-height: 96px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    font-family: inherit;
+}
+.me-overlay.is-mobile .me-cell { min-height: 70px; padding: 6px 2px; }
+.me-cell.is-placed {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(56, 189, 248, 0.12));
+    border-color: rgba(125, 211, 252, 0.7);
+}
+.me-cell.is-preview {
+    background: rgba(56, 189, 248, 0.10);
+    border-style: dashed;
+    border-color: rgba(125, 211, 252, 0.55);
+}
+.me-cell.is-full {
+    background: rgba(30, 41, 59, 0.4);
+    border-style: dashed;
+    border-color: rgba(100, 116, 139, 0.45);
+}
+@media (hover: hover) {
+    .me-cell:hover {
+        transform: translateY(-1px);
+        border-color: rgba(125, 211, 252, 0.9);
+    }
+}
+.me-cell-icon { font-size: 24px; line-height: 1; }
+.me-overlay.is-mobile .me-cell-icon { font-size: 20px; }
+.me-cell-icon--preview { opacity: 0.55; }
+.me-cell-icon--empty   { color: #475569; }
+.me-cell-icon--full    { color: #64748b; font-size: 18px; }
+.me-cell-name {
+    font-size: 11px; font-weight: bold;
+    margin-top: 4px; color: #e2e8f0;
+    text-align: center;
+    line-height: 1.2;
+    word-break: keep-all;
+}
+.me-overlay.is-mobile .me-cell-name { font-size: 10px; margin-top: 3px; }
+.me-cell-action { font-size: 9px; margin-top: 2px; color: #64748b; letter-spacing: 0.4px; }
+.me-cell.is-placed .me-cell-action { color: #7dd3fc; }
+.me-cell-action--preview { color: #7dd3fc; opacity: 0.85; }
+.me-overlay.is-mobile .me-cell-action { font-size: 8px; }
+
+/* —— 模块库 —— */
+.me-palette {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+.me-overlay.is-mobile .me-palette { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+.me-palette-item {
+    appearance: none;
+    background: rgba(30, 41, 59, 0.65);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 8px;
+    padding: 10px 8px 12px;
+    color: inherit;
+    cursor: pointer;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    font-family: inherit;
+}
+.me-overlay.is-mobile .me-palette-item { padding: 8px 6px 10px; }
+.me-palette-item.is-selected {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.45), rgba(56, 189, 248, 0.22));
+    border-color: rgba(125, 211, 252, 0.95);
+    animation: me-pulse-cyan 1.6s ease-out infinite;
+}
+@media (hover: hover) {
+    .me-palette-item:hover {
+        transform: translateY(-1px);
+        border-color: rgba(125, 211, 252, 0.85);
+    }
+}
+.me-palette-icon { font-size: 24px; line-height: 1; }
+.me-overlay.is-mobile .me-palette-icon { font-size: 20px; }
+.me-palette-name {
+    font-size: 12px; font-weight: bold;
+    margin-top: 6px; color: #e2e8f0;
+}
+.me-overlay.is-mobile .me-palette-name { font-size: 11px; margin-top: 4px; }
+.me-palette-desc {
+    font-size: 10px; color: #94a3b8;
+    margin-top: 4px; line-height: 1.4;
+    word-break: break-word;
+}
+.me-overlay.is-mobile .me-palette-desc { font-size: 9px; margin-top: 2px; }
+
+/* —— 符文融合区 —— */
+.me-rune-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 8px;
+    max-height: 260px;
+    min-height: 80px;
+    overflow-y: auto;
+    padding: 4px 2px;
+    margin-top: 4px;
+}
+.me-overlay.is-mobile .me-rune-list {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    max-height: 200px;
+    gap: 6px;
+}
+.me-rune-list::-webkit-scrollbar { width: 6px; }
+.me-rune-list::-webkit-scrollbar-thumb {
+    background: rgba(168, 85, 247, 0.4); border-radius: 3px;
+}
+.me-rune-item {
+    appearance: none;
+    background: rgba(30, 41, 59, 0.65);
+    border: 1px solid rgba(168, 85, 247, 0.35);
+    border-radius: 8px;
+    padding: 8px 10px;
+    color: inherit;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    text-align: left;
+    font-family: inherit;
+    min-width: 0;
+}
+.me-rune-item.is-selected {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.45), rgba(168, 85, 247, 0.22));
+    border-color: rgba(216, 180, 254, 0.95);
+    animation: me-pulse-purple 1.6s ease-out infinite;
+}
+@media (hover: hover) {
+    .me-rune-item:hover {
+        transform: translateY(-1px);
+        border-color: rgba(216, 180, 254, 0.85);
+    }
+}
+.me-rune-icon {
+    font-size: 20px; flex-shrink: 0; width: 28px; text-align: center;
+}
+.me-overlay.is-mobile .me-rune-icon { font-size: 18px; width: 24px; }
+.me-rune-info { flex: 1 1 auto; min-width: 0; }
+.me-rune-name {
+    font-size: 12px; font-weight: bold; color: #e2e8f0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.me-overlay.is-mobile .me-rune-name { font-size: 11px; }
+.me-rune-lv { color: #fbbf24; margin-left: 4px; }
+.me-rune-desc {
+    font-size: 10px; color: #94a3b8; margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.me-rune-desc b { color: #d8b4fe; font-weight: bold; }
+.me-overlay.is-mobile .me-rune-desc { font-size: 9px; }
+.me-rune-empty {
+    grid-column: 1 / -1;
+    color: #64748b; font-size: 12px;
+    text-align: center; font-style: italic;
+    padding: 18px 12px;
+}
+
+.me-pending {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: linear-gradient(90deg, rgba(168, 85, 247, 0.18), rgba(168, 85, 247, 0.08));
+    border: 1px solid rgba(168, 85, 247, 0.35);
+    border-radius: 8px;
+    font-size: 11px; color: #e9d5ff;
+}
+.me-pending-label { color: #c084fc; font-weight: bold; margin-right: 4px; }
+.me-pending-item { color: #fff; font-weight: bold; margin: 0 6px 0 0; }
+
+/* —— 按钮 —— */
+.me-btn {
+    appearance: none;
+    border-radius: 10px;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    font-family: inherit;
+}
+.me-btn--fuse {
+    margin-top: 12px;
+    width: 100%;
+    padding: 14px 16px;
+    font-size: 13px;
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.7), rgba(126, 34, 206, 0.85));
+    border: 1px solid rgba(216, 180, 254, 0.85);
+    box-shadow: 0 2px 12px rgba(168, 85, 247, 0.35);
+    letter-spacing: 0.5px;
+}
+.me-btn--fuse:disabled {
+    background: rgba(71, 85, 105, 0.5);
+    border-color: rgba(216, 180, 254, 0.3);
+    box-shadow: none;
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+@media (hover: hover) {
+    .me-btn--fuse:not(:disabled):hover {
+        background: linear-gradient(135deg, rgba(168, 85, 247, 0.85), rgba(126, 34, 206, 0.95));
+        transform: translateY(-1px);
+    }
+}
+.me-btn--start {
+    padding: 12px 28px;
+    font-size: 14px;
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.7), rgba(21, 128, 61, 0.85));
+    border: 1px solid rgba(74, 222, 128, 0.85);
+    box-shadow: 0 2px 12px rgba(34, 197, 94, 0.3);
+    letter-spacing: 1px;
+    min-width: 160px;
+}
+@media (hover: hover) {
+    .me-btn--start:hover {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.85), rgba(21, 128, 61, 0.95));
+        transform: translateY(-1px);
+        box-shadow: 0 4px 14px rgba(34, 197, 94, 0.45);
+    }
+}
+.me-overlay.is-mobile .me-btn--start { width: 100%; padding: 14px 18px; }
+
+/* —— Footer —— */
+.me-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 22px 18px;
+    border-top: 1px solid rgba(56, 189, 248, 0.25);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+.me-overlay.is-mobile .me-footer {
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0));
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+}
+.me-footer-hint {
+    font-size: 11px; color: #64748b;
+    line-height: 1.5; flex: 1; min-width: 0;
+}
+.me-overlay.is-mobile .me-footer-hint { font-size: 10px; text-align: center; }
+
+/* —— 动画 —— */
+@keyframes me-pulse-cyan {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(125, 211, 252, 0.55); }
+    50%      { box-shadow: 0 0 0 7px rgba(125, 211, 252, 0); }
+}
+@keyframes me-pulse-purple {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(216, 180, 254, 0.55); }
+    50%      { box-shadow: 0 0 0 7px rgba(216, 180, 254, 0); }
+}
+`;
+
 export const ui_system = {
     // @section:ui_fly_effects - 飞行特效池管理
     _flyEffectPool: [],
@@ -1220,100 +1656,30 @@ export const ui_system = {
 
         // 每次打开重置 selection
         this._moduleEditorState = {
-            selectedModuleId: null,  // 当前选中的模块 ID（待放入网格）
-            selectedRuneIdx: null,   // 当前选中的符文 inventory 索引
+            selectedModuleId: null,
+            selectedRuneIdx: null,
             onComplete: onComplete || null,
         };
 
-        // 注入一次性 CSS（动画与 hover 效果）
-        if (!document.getElementById('module-editor-styles')) {
-            const styleEl = document.createElement('style');
-            styleEl.id = 'module-editor-styles';
-            styleEl.textContent = `
-                @keyframes module-editor-pulse {
-                    0%, 100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.45); }
-                    50% { box-shadow: 0 0 0 6px rgba(56, 189, 248, 0); }
-                }
-                @keyframes module-editor-rune-pulse {
-                    0%, 100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.55); }
-                    50% { box-shadow: 0 0 0 8px rgba(168, 85, 247, 0); }
-                }
-                .module-grid-cell.is-unlocked:hover {
-                    transform: translateY(-1px);
-                    border-color: rgba(125, 211, 252, 0.9) !important;
-                    background: rgba(56, 189, 248, 0.28) !important;
-                }
-                .module-palette-item:hover {
-                    transform: translateY(-1px);
-                    border-color: rgba(125, 211, 252, 0.9) !important;
-                }
-                .module-palette-item.is-selected {
-                    animation: module-editor-pulse 1.6s ease-out infinite;
-                }
-                .rune-fusion-item:hover {
-                    transform: translateX(2px);
-                    border-color: rgba(216, 180, 254, 0.9) !important;
-                }
-                .rune-fusion-item.is-selected {
-                    animation: module-editor-rune-pulse 1.6s ease-out infinite;
-                }
-                #module-editor-fuse-btn:not(:disabled):hover {
-                    background: rgba(168, 85, 247, 0.75) !important;
-                    transform: translateY(-1px);
-                }
-                #module-editor-fuse-btn:disabled {
-                    opacity: 0.45;
-                    cursor: not-allowed;
-                }
-                #module-editor-start-btn:hover {
-                    background: rgba(34, 197, 94, 0.85) !important;
-                    transform: translateY(-1px);
-                    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35);
-                }
-                .module-editor-section {
-                    background: rgba(15, 23, 42, 0.55);
-                    border: 1px solid rgba(56, 189, 248, 0.18);
-                    border-radius: 10px;
-                    padding: 14px 16px;
-                }
-                .module-editor-section-title {
-                    font-size: 13px;
-                    font-weight: bold;
-                    color: #7dd3fc;
-                    letter-spacing: 0.5px;
-                    margin-bottom: 4px;
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                }
-                .module-editor-section-hint {
-                    font-size: 11px;
-                    color: #94a3b8;
-                    margin-bottom: 12px;
-                    line-height: 1.5;
-                }
-                .module-editor-runes-scroll::-webkit-scrollbar { width: 6px; }
-                .module-editor-runes-scroll::-webkit-scrollbar-thumb {
-                    background: rgba(168, 85, 247, 0.4); border-radius: 3px;
-                }
-            `;
-            document.head.appendChild(styleEl);
+        // ---- 注入样式表（全部样式集中在 class 内，避免与 inline style 冲突）----
+        // 旧版本曾混用 inline grid-template-columns + @media !important，
+        // 在某些浏览器/缓存场景下被 inline 样式覆盖，导致移动端两列布局被压成 1
+        // 字符宽的「垂直文字列」。新版本零内联布局样式 + JS viewport 检测保证可靠。
+        if (document.getElementById('module-editor-styles')) {
+            document.getElementById('module-editor-styles').remove();
         }
+        const styleEl = document.createElement('style');
+        styleEl.id = 'module-editor-styles';
+        styleEl.textContent = ME_STYLES;
+        document.head.appendChild(styleEl);
 
         let overlay = document.getElementById('module-editor-overlay');
         if (!overlay) {
             overlay = document.createElement('div');
             overlay.id = 'module-editor-overlay';
-            overlay.style.cssText = `
-                position: fixed; inset: 0; z-index: 240;
-                background: rgba(8, 12, 24, 0.92);
-                display: flex; align-items: center; justify-content: center;
-                padding: 24px; box-sizing: border-box;
-                font-family: 'Cinzel', 'Microsoft YaHei', sans-serif;
-                color: #e2e8f0;
-            `;
             document.body.appendChild(overlay);
         }
+        overlay.className = 'me-overlay';
         overlay.style.display = 'flex';
         this.ui_renderModuleEditor();
     },
@@ -1339,42 +1705,47 @@ export const ui_system = {
         const selRune = state.selectedRuneIdx;
         const inventory = Array.isArray(this.runeInventory) ? this.runeInventory : [];
         const pendingFusions = Array.isArray(this.pendingFusions) ? this.pendingFusions : [];
-        const placedCount = layout.slice(0, unlockedSlots).filter(Boolean).length;
+        const placedCount = layout.filter(Boolean).length;
+        const canPlaceMore = placedCount < unlockedSlots;
 
-        // ---- 模块网格 cells ----
+        // ---- 视口检测：决定结构变体（mobile / tablet / desktop） ----
+        const vw = window.innerWidth || document.documentElement.clientWidth || 1024;
+        const isMobile = vw < 720;
+        const isTablet = vw >= 720 && vw < 1024;
+        overlay.classList.toggle('is-mobile', isMobile);
+        overlay.classList.toggle('is-tablet', isTablet);
+        overlay.classList.toggle('is-desktop', !isMobile && !isTablet);
+
+        // ---- 钉板网格 ----
         const gridCellsHtml = (() => {
             let html = '';
             for (let i = 0; i < totalSlots; i++) {
-                const isUnlocked = i < unlockedSlots;
                 const moduleId = layout[i];
                 const def = moduleId ? MODULE_DEFS[moduleId] : null;
-                const isPickPreview = isUnlocked && !def && selModule;
+                const isPickPreview = !def && selModule && canPlaceMore;
                 const previewDef = isPickPreview ? MODULE_DEFS[selModule] : null;
-                const bg = !isUnlocked
-                    ? 'rgba(15, 23, 42, 0.5)'
-                    : (def ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(56, 189, 248, 0.12))'
-                          : (isPickPreview ? 'rgba(56, 189, 248, 0.10)' : 'rgba(30, 41, 59, 0.6)'));
-                const border = !isUnlocked
-                    ? '1px dashed rgba(100, 116, 139, 0.4)'
-                    : (def ? '1px solid rgba(125, 211, 252, 0.7)'
-                          : (isPickPreview ? '1px dashed rgba(125, 211, 252, 0.55)' : '1px solid rgba(56, 189, 248, 0.35)'));
-                let labelMain;
+                let cls = 'me-cell';
+                if (def) cls += ' is-placed';
+                else if (isPickPreview) cls += ' is-preview';
+                else if (!canPlaceMore) cls += ' is-full';
+                else cls += ' is-empty';
+
+                let inner;
                 if (def) {
-                    labelMain = `<div style="font-size:26px;line-height:1;">${def.icon || '▦'}</div>
-                        <div style="font-size:11px;margin-top:6px;text-align:center;font-weight:bold;color:#e2e8f0;">${def.name}</div>
-                        <div style="font-size:9px;margin-top:2px;color:#7dd3fc;letter-spacing:0.5px;">点击移除</div>`;
+                    inner = `<div class="me-cell-icon">${def.icon || '▦'}</div>
+                        <div class="me-cell-name">${def.name}</div>
+                        <div class="me-cell-action">点击移除</div>`;
                 } else if (isPickPreview && previewDef) {
-                    labelMain = `<div style="font-size:22px;line-height:1;opacity:0.55;">${previewDef.icon || '▦'}</div>
-                        <div style="font-size:10px;margin-top:4px;color:#7dd3fc;opacity:0.85;">点击放置</div>`;
-                } else if (isUnlocked) {
-                    labelMain = `<div style="font-size:22px;line-height:1;color:#475569;">＋</div>
-                        <div style="font-size:10px;margin-top:4px;color:#64748b;">空槽</div>`;
+                    inner = `<div class="me-cell-icon me-cell-icon--preview">${previewDef.icon || '▦'}</div>
+                        <div class="me-cell-action me-cell-action--preview">点击放置</div>`;
+                } else if (canPlaceMore) {
+                    inner = `<div class="me-cell-icon me-cell-icon--empty">＋</div>
+                        <div class="me-cell-action">空槽</div>`;
                 } else {
-                    labelMain = `<div style="font-size:18px;color:#475569;">🔒</div>
-                        <div style="font-size:9px;margin-top:4px;color:#475569;">未开放</div>`;
+                    inner = `<div class="me-cell-icon me-cell-icon--full">·</div>
+                        <div class="me-cell-action">已满</div>`;
                 }
-                const cls = isUnlocked ? 'module-grid-cell is-unlocked' : 'module-grid-cell';
-                html += `<div data-slot-idx="${i}" class="${cls}" style="cursor:${isUnlocked ? 'pointer' : 'not-allowed'};background:${bg};border:${border};border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:104px;padding:10px 6px;transition:all 0.18s ease;">${labelMain}</div>`;
+                html += `<button type="button" data-slot-idx="${i}" class="${cls}">${inner}</button>`;
             }
             return html;
         })();
@@ -1384,172 +1755,139 @@ export const ui_system = {
             const def = MODULE_DEFS[id];
             if (!def) return '';
             const isSel = selModule === id;
-            const bg = isSel
-                ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.45), rgba(56, 189, 248, 0.25))'
-                : 'rgba(30, 41, 59, 0.65)';
-            const border = isSel
-                ? '1px solid rgba(125, 211, 252, 0.95)'
-                : '1px solid rgba(56, 189, 248, 0.35)';
-            const cls = isSel ? 'module-palette-item is-selected' : 'module-palette-item';
-            return `<div data-module-id="${id}" class="${cls}" style="cursor:pointer;background:${bg};border:${border};border-radius:8px;padding:10px 10px 12px;display:flex;flex-direction:column;align-items:center;text-align:center;transition:all 0.18s ease;">
-                <div style="font-size:24px;line-height:1;">${def.icon}</div>
-                <div style="font-size:12px;margin-top:6px;font-weight:bold;color:#e2e8f0;">${def.name}</div>
-                <div style="font-size:10px;color:#94a3b8;margin-top:4px;line-height:1.4;">${def.desc}</div>
-            </div>`;
+            return `<button type="button" data-module-id="${id}" class="me-palette-item${isSel ? ' is-selected' : ''}">
+                <div class="me-palette-icon">${def.icon}</div>
+                <div class="me-palette-name">${def.name}</div>
+                <div class="me-palette-desc">${def.desc}</div>
+            </button>`;
         }).join('');
 
-        // ---- 符文融合区 ----
+        // ---- 符文列表 ----
         const runeListHtml = inventory.length > 0 ? inventory.map((r, idx) => {
             const id = getRuneId(r);
             const def = (RUNE_DB || []).find(d => d.id === id);
             if (!def) return '';
             const lv = (typeof r === 'object' && typeof r.level === 'number') ? r.level : 1;
             const isSel = selRune === idx;
-            const bg = isSel
-                ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.45), rgba(168, 85, 247, 0.20))'
-                : 'rgba(30, 41, 59, 0.65)';
-            const border = isSel
-                ? '1px solid rgba(216, 180, 254, 0.95)'
-                : '1px solid rgba(168, 85, 247, 0.35)';
-            const cls = isSel ? 'rune-fusion-item is-selected' : 'rune-fusion-item';
-            return `<div data-rune-idx="${idx}" class="${cls}" style="cursor:pointer;background:${bg};border:${border};border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;transition:all 0.18s ease;">
-                <div style="font-size:22px;flex-shrink:0;width:32px;text-align:center;">${def.icon || '🔮'}</div>
-                <div style="flex:1;min-width:0;">
-                    <div style="font-size:12px;font-weight:bold;color:#e2e8f0;">${def.name || id} <span style="color:#fbbf24;margin-left:4px;">L${lv}</span></div>
-                    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">融合后赋予 <span style="color:#d8b4fe;font-weight:bold;">${lv}</span> 颗 <span style="color:#d8b4fe;">${def.element || ''}</span> 钉子</div>
+            return `<button type="button" data-rune-idx="${idx}" class="me-rune-item${isSel ? ' is-selected' : ''}">
+                <div class="me-rune-icon">${def.icon || '🔮'}</div>
+                <div class="me-rune-info">
+                    <div class="me-rune-name">${def.name || id} <span class="me-rune-lv">L${lv}</span></div>
+                    <div class="me-rune-desc">注入 <b>${lv}</b> 颗 <b>${def.element || ''}</b> 钉子</div>
                 </div>
-            </div>`;
-        }).join('') : '<div style="color:#64748b;font-size:12px;padding:18px 12px;text-align:center;font-style:italic;">背包没有符文</div>';
+            </button>`;
+        }).join('') : '<div class="me-rune-empty">背包没有符文</div>';
 
         const pendingHtml = pendingFusions.length > 0
-            ? `<div style="margin-top:10px;padding:10px 12px;background:linear-gradient(90deg, rgba(168, 85, 247, 0.18), rgba(168, 85, 247, 0.08));border:1px solid rgba(168, 85, 247, 0.35);border-radius:8px;font-size:11px;color:#e9d5ff;">
-                 <span style="color:#c084fc;font-weight:bold;">⚗ 已注入：</span>
-                 ${pendingFusions.map(f => `<span style="margin:0 6px;color:#fff;font-weight:bold;">${f.element}×${f.count}</span>`).join('|')}
-               </div>`
+            ? `<div class="me-pending"><span class="me-pending-label">⚗ 已注入：</span>${
+                pendingFusions.map(f => `<span class="me-pending-item">${f.element}×${f.count}</span>`).join('')
+              }</div>`
             : '';
 
         const fuseDisabled = (selRune === null || selRune === undefined);
-        const fuseBtnLabel = fuseDisabled ? '请先在左侧选中一枚符文' : '注入选中符文 →';
+        const fuseBtnLabel = fuseDisabled
+            ? (isMobile ? '请先选中符文' : '请先在上方选中一枚符文')
+            : '注入选中符文';
+        const placeHintLabel = canPlaceMore ? `还可放置 ${unlockedSlots - placedCount} 个` : '已达放置上限';
 
         overlay.innerHTML = `
-            <div style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(20, 28, 50, 0.98)); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 16px; padding: 22px 24px; max-width: 1180px; width: 100%; max-height: 94vh; overflow: auto; display: flex; flex-direction: column; gap: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);">
+            <div class="me-modal">
+                <header class="me-header">
+                    <div class="me-header-titles">
+                        <div class="me-title">⚙ 钉板模块编辑器</div>
+                        <div class="me-subtitle">摆放模块 + 融合符文为元素钉子</div>
+                    </div>
+                    <div class="me-header-stats">
+                        <div class="me-stat">
+                            <div class="me-stat-label">放置上限</div>
+                            <div class="me-stat-value me-stat-value--cap">${unlockedSlots}</div>
+                        </div>
+                        <div class="me-stat">
+                            <div class="me-stat-label">已摆放</div>
+                            <div class="me-stat-value ${placedCount >= unlockedSlots ? 'me-stat-value--full' : 'me-stat-value--placed'}">${placedCount}<span class="me-stat-suffix">/${unlockedSlots}</span></div>
+                        </div>
+                        <div class="me-stat">
+                            <div class="me-stat-label">符文</div>
+                            <div class="me-stat-value me-stat-value--rune">${inventory.length}</div>
+                        </div>
+                    </div>
+                </header>
 
-                <!-- Header -->
-                <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(56, 189, 248, 0.25);padding-bottom:14px;">
-                    <div>
-                        <div style="font-size:22px;font-weight:bold;color:#7dd3fc;letter-spacing:1px;">⚙ 钉板模块编辑器</div>
-                        <div style="font-size:11px;color:#94a3b8;margin-top:4px;">摆放钉板模块，并将背包中的符文融合为元素钉子</div>
-                    </div>
-                    <div style="display:flex;gap:18px;align-items:center;">
-                        <div style="text-align:right;">
-                            <div style="font-size:10px;color:#94a3b8;">已开放槽位</div>
-                            <div style="font-size:16px;color:#fbbf24;font-weight:bold;">${unlockedSlots} <span style="font-size:11px;color:#64748b;">/ ${totalSlots}</span></div>
+                <div class="me-body">
+                    <section class="me-section me-section--grid">
+                        <div class="me-section-head">
+                            <div class="me-section-title">▦ 钉板布局</div>
+                            <div class="me-section-tag ${canPlaceMore ? '' : 'is-full'}">${placeHintLabel}</div>
                         </div>
-                        <div style="text-align:right;">
-                            <div style="font-size:10px;color:#94a3b8;">已摆放</div>
-                            <div style="font-size:16px;color:#7dd3fc;font-weight:bold;">${placedCount} <span style="font-size:11px;color:#64748b;">/ ${unlockedSlots}</span></div>
+                        <div class="me-section-hint">点击空槽放置选中模块；点击已放置模块移除。</div>
+                        <div class="me-grid" data-cols="${cols}">${gridCellsHtml}</div>
+                    </section>
+
+                    <section class="me-section me-section--palette">
+                        <div class="me-section-head">
+                            <div class="me-section-title">📦 模块库</div>
                         </div>
-                    </div>
+                        <div class="me-section-hint">点击选中 → 再点空槽放置；再次点击同一模块取消选中。</div>
+                        <div class="me-palette">${paletteHtml}</div>
+                    </section>
+
+                    <section class="me-section me-section--fusion">
+                        <div class="me-section-head">
+                            <div class="me-section-title me-section-title--fusion">✨ 符文融合</div>
+                        </div>
+                        <div class="me-section-hint">选中符文 → 点击"注入"按钮，钉板上随机普通钉子获得对应元素属性。</div>
+                        <div class="me-rune-list">${runeListHtml}</div>
+                        <button id="module-editor-fuse-btn" class="me-btn me-btn--fuse" ${fuseDisabled ? 'disabled' : ''}>${fuseBtnLabel}</button>
+                        ${pendingHtml}
+                    </section>
                 </div>
 
-                <!-- Main: 网格 + 模块库 -->
-                <div style="display:grid;grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1fr);gap:18px;">
-
-                    <!-- 钉板网格 -->
-                    <div class="module-editor-section">
-                        <div class="module-editor-section-title">▦ 钉板布局</div>
-                        <div class="module-editor-section-hint">从右侧选择模块 → 点击空槽放置；点击已放置模块可移除。</div>
-                        <div id="module-editor-grid" style="display:grid;grid-template-columns:repeat(${cols}, 1fr);gap:10px;">
-                            ${gridCellsHtml}
-                        </div>
-                    </div>
-
-                    <!-- 模块库 -->
-                    <div class="module-editor-section">
-                        <div class="module-editor-section-title">📦 模块库</div>
-                        <div class="module-editor-section-hint">点击模块以选中，再点击网格中的空槽放置。再次点击同一模块可取消选中。</div>
-                        <div id="module-editor-palette" style="display:grid;grid-template-columns:repeat(2, 1fr);gap:10px;">
-                            ${paletteHtml}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 符文融合区 -->
-                <div class="module-editor-section" style="border-color: rgba(168, 85, 247, 0.3);">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
-                        <div>
-                            <div class="module-editor-section-title" style="color:#c084fc;">✨ 符文融合</div>
-                            <div class="module-editor-section-hint" style="margin-bottom:0;">选中符文 → 点击右侧"注入"按钮，符文将被消耗，钉板上随机普通钉子获得对应元素属性。</div>
-                        </div>
-                        <div style="font-size:11px;color:#94a3b8;">背包：<span style="color:#fbbf24;font-weight:bold;">${inventory.length}</span> 枚符文</div>
-                    </div>
-
-                    <div style="display:grid;grid-template-columns: minmax(0, 1.4fr) minmax(220px, 1fr);gap:14px;align-items:stretch;margin-top:10px;">
-                        <div id="module-editor-runes" class="module-editor-runes-scroll" style="display:flex;flex-direction:column;gap:8px;max-height:240px;min-height:120px;overflow-y:auto;padding-right:4px;">
-                            ${runeListHtml}
-                        </div>
-                        <div style="display:flex;flex-direction:column;justify-content:center;gap:10px;">
-                            <button id="module-editor-fuse-btn" ${fuseDisabled ? 'disabled' : ''} style="padding:14px 16px;background:${fuseDisabled ? 'rgba(71, 85, 105, 0.5)' : 'linear-gradient(135deg, rgba(168, 85, 247, 0.7), rgba(126, 34, 206, 0.85))'};color:#fff;border:1px solid rgba(216, 180, 254, ${fuseDisabled ? '0.3' : '0.85'});border-radius:10px;cursor:${fuseDisabled ? 'not-allowed' : 'pointer'};font-size:13px;font-weight:bold;letter-spacing:0.5px;transition:all 0.18s ease;box-shadow:${fuseDisabled ? 'none' : '0 2px 12px rgba(168, 85, 247, 0.35)'};">${fuseBtnLabel}</button>
-                            <div style="font-size:10px;color:#94a3b8;text-align:center;line-height:1.5;">符文等级 = 注入钉子数量<br/>越高级一次越划算</div>
-                        </div>
-                    </div>
-                    ${pendingHtml}
-                </div>
-
-                <!-- Footer -->
-                <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(56, 189, 248, 0.25);padding-top:14px;gap:14px;flex-wrap:wrap;">
-                    <div style="font-size:11px;color:#64748b;flex:1;min-width:200px;line-height:1.5;">💡 摆放完模块后，可消耗符文将元素属性"融合"到钉板的随机普通钉子上；准备就绪后点击右侧按钮开始本回合采集。</div>
-                    <button id="module-editor-start-btn" style="padding:12px 28px;background:linear-gradient(135deg, rgba(34, 197, 94, 0.7), rgba(21, 128, 61, 0.85));color:#fff;border:1px solid rgba(74, 222, 128, 0.85);border-radius:10px;cursor:pointer;font-weight:bold;font-size:14px;letter-spacing:1px;transition:all 0.18s ease;box-shadow:0 2px 12px rgba(34, 197, 94, 0.3);">▶ 开始采集</button>
-                </div>
+                <footer class="me-footer">
+                    <div class="me-footer-hint">💡 摆完模块、注入完符文后点击"开始采集"</div>
+                    <button id="module-editor-start-btn" class="me-btn me-btn--start">▶ 开始采集</button>
+                </footer>
             </div>
         `;
 
         // ---- 事件绑定 ----
-        const grid = overlay.querySelector('#module-editor-grid');
-        if (grid) {
-            grid.querySelectorAll('.module-grid-cell').forEach(cell => {
-                cell.addEventListener('click', () => {
-                    const idx = parseInt(cell.dataset.slotIdx, 10);
-                    if (idx >= unlockedSlots) {
-                        showToast('该槽位尚未开放');
+        overlay.querySelectorAll('.me-cell').forEach(cell => {
+            cell.addEventListener('click', () => {
+                const idx = parseInt(cell.dataset.slotIdx, 10);
+                const st = this._moduleEditorState || {};
+                if (this.currentModuleLayout[idx]) {
+                    this.currentModuleLayout[idx] = null;
+                } else if (st.selectedModuleId) {
+                    const currentPlaced = (this.currentModuleLayout || []).filter(Boolean).length;
+                    if (currentPlaced >= unlockedSlots) {
+                        showToast(`已达放置上限 ${unlockedSlots} 个，请先移除一个`);
                         return;
                     }
-                    const st = this._moduleEditorState || {};
-                    if (this.currentModuleLayout[idx]) {
-                        // 已有模块 → 清除
-                        this.currentModuleLayout[idx] = null;
-                    } else if (st.selectedModuleId) {
-                        this.currentModuleLayout[idx] = st.selectedModuleId;
-                    } else {
-                        showToast('请先在右侧"模块库"中选中一个模块');
-                        return;
-                    }
-                    this.ui_renderModuleEditor();
-                });
+                    this.currentModuleLayout[idx] = st.selectedModuleId;
+                } else {
+                    showToast('请先在"模块库"中选中一个模块');
+                    return;
+                }
+                this.ui_renderModuleEditor();
             });
-        }
-        const palette = overlay.querySelector('#module-editor-palette');
-        if (palette) {
-            palette.querySelectorAll('.module-palette-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    const id = item.dataset.moduleId;
-                    if (!this._moduleEditorState) return;
-                    this._moduleEditorState.selectedModuleId = (this._moduleEditorState.selectedModuleId === id) ? null : id;
-                    this.ui_renderModuleEditor();
-                });
+        });
+        overlay.querySelectorAll('.me-palette-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const id = item.dataset.moduleId;
+                if (!this._moduleEditorState) return;
+                this._moduleEditorState.selectedModuleId =
+                    (this._moduleEditorState.selectedModuleId === id) ? null : id;
+                this.ui_renderModuleEditor();
             });
-        }
-        const runeList = overlay.querySelector('#module-editor-runes');
-        if (runeList) {
-            runeList.querySelectorAll('.rune-fusion-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    const idx = parseInt(item.dataset.runeIdx, 10);
-                    if (!this._moduleEditorState) return;
-                    this._moduleEditorState.selectedRuneIdx = (this._moduleEditorState.selectedRuneIdx === idx) ? null : idx;
-                    this.ui_renderModuleEditor();
-                });
+        });
+        overlay.querySelectorAll('.me-rune-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const idx = parseInt(item.dataset.runeIdx, 10);
+                if (!this._moduleEditorState) return;
+                this._moduleEditorState.selectedRuneIdx =
+                    (this._moduleEditorState.selectedRuneIdx === idx) ? null : idx;
+                this.ui_renderModuleEditor();
             });
-        }
+        });
         const fuseBtn = overlay.querySelector('#module-editor-fuse-btn');
         if (fuseBtn) {
             fuseBtn.addEventListener('click', () => {
@@ -1577,6 +1915,14 @@ export const ui_system = {
                 const onComplete = (this._moduleEditorState || {}).onComplete;
                 this.ui_hideModuleEditor();
                 if (typeof onComplete === 'function') onComplete();
+            });
+        }
+
+        // resize 时重新渲染（让 isMobile 切换实时生效）
+        if (!this._moduleEditorResizeBound) {
+            this._moduleEditorResizeBound = true;
+            window.addEventListener('resize', () => {
+                if (this._moduleEditorState) this.ui_renderModuleEditor();
             });
         }
     }
