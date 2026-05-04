@@ -1460,15 +1460,17 @@ class Enemy {
         // [增强对比 #4] 在裁剪之前先给容器外缘绘制一圈柔光描边，
         // 让敌人在与背景同色的「液态」战场上仍能识别轮廓（精英/Boss 尤其关键）。
         // 由于 ctx.clip() 之后描边会被裁剪一半，这里预先绘制可保留完整外缘。
+        // [柔化] 外缘轮廓改为更柔的辉光：降低描边 alpha，让轮廓融入背景而不是
+        // 像贴上去的环。shadowBlur 略增以补偿亮度损失，整体感觉更"渗出"而非"切边"。
         ctx.save();
-        ctx.shadowColor = (this.type === 'boss') ? 'rgba(239, 68, 68, 0.85)'
-                         : (this.type === 'elite') ? 'rgba(168, 85, 247, 0.75)'
-                         : 'rgba(148, 163, 184, 0.55)';
-        ctx.shadowBlur = _sb((this.type === 'boss') ? 18 : (this.type === 'elite') ? 14 : 8);
-        ctx.strokeStyle = (this.type === 'boss') ? 'rgba(239, 68, 68, 0.9)'
-                         : (this.type === 'elite') ? 'rgba(196, 152, 255, 0.85)'
-                         : 'rgba(203, 213, 225, 0.7)';
-        ctx.lineWidth = (this.type === 'boss') ? 3 : 2;
+        ctx.shadowColor = (this.type === 'boss') ? 'rgba(239, 68, 68, 0.55)'
+                         : (this.type === 'elite') ? 'rgba(168, 85, 247, 0.50)'
+                         : 'rgba(148, 163, 184, 0.32)';
+        ctx.shadowBlur = _sb((this.type === 'boss') ? 22 : (this.type === 'elite') ? 16 : 9);
+        ctx.strokeStyle = (this.type === 'boss') ? 'rgba(239, 68, 68, 0.55)'
+                         : (this.type === 'elite') ? 'rgba(196, 152, 255, 0.50)'
+                         : 'rgba(203, 213, 225, 0.42)';
+        ctx.lineWidth = (this.type === 'boss') ? 2.5 : 1.6;
         ctx.stroke();
         ctx.restore();
         ctx.clip();
@@ -1565,32 +1567,45 @@ class Enemy {
             baseColor = lerpColor(baseColor, '#0891b2', t);
         }
 
-        // @perf-impact: HP 填充由实色改为线性渐变（每帧 1 个 LinearGradient/敌人）
-        // [液体质感] 沿垂直方向叠加：顶部偏亮（液面高光）→ 中段为本体色 → 底部偏暗
-        // （暗示液体深度），使 HP 条不再是大面积纯色，呈现真正的"液体"层次。
-        // alpha 略降至 0.78，让背景与温度光效更自然地透出。
+        // @perf-impact: HP 填充由实色改为线性渐变（每帧 1-2 个 LinearGradient/敌人）
+        // [液体质感] 整体降饱和让本体色不再像塑料贴片，再叠加：
+        //  - 垂直渐变（顶部高光 → 中段本体 → 底部深处）
+        //  - 横向侧边内阴影（左右两侧暗化，模拟容器曲率，避免 HP 像一张平面贴片）
         if (fillHeight > 0.5) {
-            const _hpHighlight = lerpColor(baseColor, '#ffffff', 0.22);
-            const _hpShadow = lerpColor(baseColor, '#000000', 0.32);
+            // 整体降饱和：与中性灰混合 ~18%，把饱和原色推回"染了色的液体"质感
+            const _hpBody = lerpColor(baseColor, '#3a4658', 0.18);
+            const _hpHighlight = lerpColor(_hpBody, '#ffffff', 0.16);
+            const _hpShadow = lerpColor(_hpBody, '#000000', 0.42);
             const _hpGrad = ctx.createLinearGradient(0, fillY, 0, fillY + fillHeight);
             _hpGrad.addColorStop(0, _hpHighlight);
-            _hpGrad.addColorStop(0.18, baseColor);
+            _hpGrad.addColorStop(0.18, _hpBody);
             _hpGrad.addColorStop(1, _hpShadow);
-            ctx.globalAlpha = 0.48;
+            ctx.globalAlpha = 0.46;
             ctx.fillStyle = _hpGrad;
             ctx.fillRect(-w/2, fillY, w, fillHeight);
+
+            // 横向侧边内阴影：让 HP 条像嵌在容器中的液体，而不是平面贴片
+            const _sideGrad = ctx.createLinearGradient(-w/2, 0, w/2, 0);
+            _sideGrad.addColorStop(0, 'rgba(0,0,0,0.32)');
+            _sideGrad.addColorStop(0.18, 'rgba(0,0,0,0)');
+            _sideGrad.addColorStop(0.82, 'rgba(0,0,0,0)');
+            _sideGrad.addColorStop(1, 'rgba(0,0,0,0.32)');
+            ctx.globalAlpha = 0.55;
+            ctx.fillStyle = _sideGrad;
+            ctx.fillRect(-w/2, fillY, w, fillHeight);
+
             ctx.globalAlpha = 1.0;
         }
 
-        // D. 液面顶部高光（双层 specular：上方亮线 + 下方淡渐隐，模拟液体表面张力）
+        // D. 液面顶部高光（柔化：减弱亮线 alpha + 收窄渐隐范围，避免视觉刺眼）
         if (hpRatio > 0 && hpRatio < 1) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.38)';
             ctx.fillRect(-w/2, fillY, w, 1);
-            const _surfaceGrad = ctx.createLinearGradient(0, fillY, 0, fillY + 5);
-            _surfaceGrad.addColorStop(0, 'rgba(255, 255, 255, 0.32)');
+            const _surfaceGrad = ctx.createLinearGradient(0, fillY, 0, fillY + 6);
+            _surfaceGrad.addColorStop(0, 'rgba(255, 255, 255, 0.18)');
             _surfaceGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
             ctx.fillStyle = _surfaceGrad;
-            ctx.fillRect(-w/2, fillY, w, 5);
+            ctx.fillRect(-w/2, fillY, w, 6);
         }
 
         // === Layer 3: 内部覆盖层 (Glow & Mist) - [修改：降低浓度] ===
@@ -2483,6 +2498,19 @@ class Enemy {
             
             ctx.restore();
         }
+        // === Layer 4.9: 内壁微阴影（Inner Vignette）===
+        // [立体感] 在内边框之前叠加一层从顶部高光 → 中段透明 → 底部阴影的纵向渐变，
+        // 让边框不再贴在一张平面上，而是嵌在带有体积的容器内壁。clip 仍然有效，
+        // 渐变会被自动裁剪到本体形状。每帧 1 个 LinearGradient/敌人，开销极低。
+        {
+            const _innerShadeGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
+            _innerShadeGrad.addColorStop(0, 'rgba(255,255,255,0.05)');
+            _innerShadeGrad.addColorStop(0.45, 'rgba(0,0,0,0)');
+            _innerShadeGrad.addColorStop(1, 'rgba(0,0,0,0.22)');
+            ctx.fillStyle = _innerShadeGrad;
+            ctx.fillRect(-w/2, -h/2, w, h);
+        }
+
         // === Layer 5: 内部边框 ===
         // === 边框分级样式（Border Tier）：根据词条数量 + Boss 类型决定边框颜色/线宽 ===
         // @perf-impact: 仅替换 strokeStyle/lineWidth，无额外 Canvas 操作，性能影响极低
@@ -2522,6 +2550,17 @@ class Enemy {
             ctx.strokeStyle = '#ffffff';
             ctx.shadowColor = '#fff';
             ctx.shadowBlur = _sb(15);
+        } else if (typeof ctx.strokeStyle === 'string' && ctx.strokeStyle.charAt(0) === '#') {
+            // [边缘斜面] 把纯色 strokeStyle 转换为纵向渐变：顶部偏亮 → 中段本色 → 底部偏暗。
+            // 单次创建一个 LinearGradient，避免额外 stroke pass，让边框获得方向光感受
+            // 而不是平面切边。后续 D3 脉冲光晕仍会读取一次 strokeStyle 做光圈，
+            // 此时使用基础色重置避免重复渐变开销。
+            const _flat = ctx.strokeStyle;
+            const _bevelGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
+            _bevelGrad.addColorStop(0, lerpColor(_flat, '#ffffff', 0.30));
+            _bevelGrad.addColorStop(0.45, _flat);
+            _bevelGrad.addColorStop(1, lerpColor(_flat, '#000000', 0.40));
+            ctx.strokeStyle = _bevelGrad;
         }
 
         // 根据形状类型选择边框绘制方式：polygon 用多边形，arc 用圆弧，其余用 strokeRect
