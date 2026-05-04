@@ -1296,6 +1296,74 @@ export const ui_system = {
                 .module-editor-runes-scroll::-webkit-scrollbar-thumb {
                     background: rgba(168, 85, 247, 0.4); border-radius: 3px;
                 }
+
+                /* —— 移动端 / 窄屏适配 —— */
+                @media (max-width: 960px) {
+                    #module-editor-overlay { padding: 10px !important; }
+                    .module-editor-modal {
+                        padding: 14px 14px !important;
+                        gap: 12px !important;
+                        max-height: 96vh !important;
+                        border-radius: 12px !important;
+                    }
+                    .module-editor-main-grid {
+                        grid-template-columns: 1fr !important;
+                        gap: 12px !important;
+                    }
+                    .module-editor-fusion-grid {
+                        grid-template-columns: 1fr !important;
+                        gap: 10px !important;
+                    }
+                    .module-editor-header-stats { gap: 10px !important; }
+                    .module-editor-section { padding: 10px 12px !important; }
+                    .module-editor-title-main { font-size: 18px !important; }
+                    .module-editor-section-title { font-size: 12px !important; }
+                    .module-editor-section-hint { font-size: 10px !important; margin-bottom: 8px !important; }
+                    .module-grid-cell {
+                        min-height: 84px !important;
+                        padding: 6px 4px !important;
+                    }
+                    .module-grid-cell .mge-icon { font-size: 22px !important; }
+                    .module-grid-cell .mge-name { font-size: 10px !important; margin-top: 4px !important; }
+                    .module-grid-cell .mge-action { font-size: 8px !important; }
+                    .module-palette-item { padding: 8px !important; }
+                    .module-palette-item .mge-pal-icon { font-size: 20px !important; }
+                    .module-palette-item .mge-pal-name { font-size: 11px !important; margin-top: 4px !important; }
+                    .module-palette-item .mge-pal-desc { font-size: 9px !important; margin-top: 2px !important; }
+                    .rune-fusion-item { padding: 8px 10px !important; }
+                    #module-editor-runes {
+                        max-height: 200px !important;
+                        min-height: 80px !important;
+                    }
+                    #module-editor-fuse-btn { padding: 12px 14px !important; font-size: 12px !important; }
+                    #module-editor-start-btn { padding: 12px 22px !important; font-size: 13px !important; width: 100%; }
+                    .module-editor-footer {
+                        flex-direction: column !important;
+                        align-items: stretch !important;
+                    }
+                }
+                @media (max-width: 560px) {
+                    .module-editor-grid-cells {
+                        grid-template-columns: repeat(3, 1fr) !important;
+                    }
+                    .module-editor-palette-cells {
+                        grid-template-columns: repeat(2, 1fr) !important;
+                    }
+                    .module-editor-header {
+                        flex-direction: column !important;
+                        align-items: flex-start !important;
+                        gap: 10px;
+                    }
+                    .module-editor-header-stats {
+                        align-self: stretch;
+                        justify-content: space-between;
+                    }
+                }
+                @media (max-width: 400px) {
+                    .module-editor-grid-cells {
+                        grid-template-columns: repeat(2, 1fr) !important;
+                    }
+                }
             `;
             document.head.appendChild(styleEl);
         }
@@ -1339,42 +1407,45 @@ export const ui_system = {
         const selRune = state.selectedRuneIdx;
         const inventory = Array.isArray(this.runeInventory) ? this.runeInventory : [];
         const pendingFusions = Array.isArray(this.pendingFusions) ? this.pendingFusions : [];
-        const placedCount = layout.slice(0, unlockedSlots).filter(Boolean).length;
+        const placedCount = layout.filter(Boolean).length;
 
         // ---- 模块网格 cells ----
+        // 改动：所有 12 个槽位都允许放置，不再按索引锁定；
+        // 仅以"已摆放数量 ≤ unlockedSlots"作为限制。
+        const canPlaceMore = placedCount < unlockedSlots;
         const gridCellsHtml = (() => {
             let html = '';
             for (let i = 0; i < totalSlots; i++) {
-                const isUnlocked = i < unlockedSlots;
                 const moduleId = layout[i];
                 const def = moduleId ? MODULE_DEFS[moduleId] : null;
-                const isPickPreview = isUnlocked && !def && selModule;
+                const isPickPreview = !def && selModule && canPlaceMore;
                 const previewDef = isPickPreview ? MODULE_DEFS[selModule] : null;
-                const bg = !isUnlocked
-                    ? 'rgba(15, 23, 42, 0.5)'
-                    : (def ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(56, 189, 248, 0.12))'
-                          : (isPickPreview ? 'rgba(56, 189, 248, 0.10)' : 'rgba(30, 41, 59, 0.6)'));
-                const border = !isUnlocked
-                    ? '1px dashed rgba(100, 116, 139, 0.4)'
-                    : (def ? '1px solid rgba(125, 211, 252, 0.7)'
-                          : (isPickPreview ? '1px dashed rgba(125, 211, 252, 0.55)' : '1px solid rgba(56, 189, 248, 0.35)'));
+                const bg = def
+                    ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(56, 189, 248, 0.12))'
+                    : (isPickPreview
+                        ? 'rgba(56, 189, 248, 0.10)'
+                        : (canPlaceMore ? 'rgba(30, 41, 59, 0.6)' : 'rgba(30, 41, 59, 0.4)'));
+                const border = def
+                    ? '1px solid rgba(125, 211, 252, 0.7)'
+                    : (isPickPreview
+                        ? '1px dashed rgba(125, 211, 252, 0.55)'
+                        : (canPlaceMore ? '1px solid rgba(56, 189, 248, 0.35)' : '1px dashed rgba(100, 116, 139, 0.45)'));
                 let labelMain;
                 if (def) {
-                    labelMain = `<div style="font-size:26px;line-height:1;">${def.icon || '▦'}</div>
-                        <div style="font-size:11px;margin-top:6px;text-align:center;font-weight:bold;color:#e2e8f0;">${def.name}</div>
-                        <div style="font-size:9px;margin-top:2px;color:#7dd3fc;letter-spacing:0.5px;">点击移除</div>`;
+                    labelMain = `<div class="mge-icon" style="font-size:26px;line-height:1;">${def.icon || '▦'}</div>
+                        <div class="mge-name" style="font-size:11px;margin-top:6px;text-align:center;font-weight:bold;color:#e2e8f0;">${def.name}</div>
+                        <div class="mge-action" style="font-size:9px;margin-top:2px;color:#7dd3fc;letter-spacing:0.5px;">点击移除</div>`;
                 } else if (isPickPreview && previewDef) {
-                    labelMain = `<div style="font-size:22px;line-height:1;opacity:0.55;">${previewDef.icon || '▦'}</div>
-                        <div style="font-size:10px;margin-top:4px;color:#7dd3fc;opacity:0.85;">点击放置</div>`;
-                } else if (isUnlocked) {
-                    labelMain = `<div style="font-size:22px;line-height:1;color:#475569;">＋</div>
-                        <div style="font-size:10px;margin-top:4px;color:#64748b;">空槽</div>`;
+                    labelMain = `<div class="mge-icon" style="font-size:22px;line-height:1;opacity:0.55;">${previewDef.icon || '▦'}</div>
+                        <div class="mge-action" style="font-size:10px;margin-top:4px;color:#7dd3fc;opacity:0.85;">点击放置</div>`;
+                } else if (canPlaceMore) {
+                    labelMain = `<div class="mge-icon" style="font-size:22px;line-height:1;color:#475569;">＋</div>
+                        <div class="mge-action" style="font-size:10px;margin-top:4px;color:#64748b;">空槽</div>`;
                 } else {
-                    labelMain = `<div style="font-size:18px;color:#475569;">🔒</div>
-                        <div style="font-size:9px;margin-top:4px;color:#475569;">未开放</div>`;
+                    labelMain = `<div class="mge-icon" style="font-size:18px;line-height:1;color:#64748b;">·</div>
+                        <div class="mge-action" style="font-size:9px;margin-top:4px;color:#64748b;">已达上限</div>`;
                 }
-                const cls = isUnlocked ? 'module-grid-cell is-unlocked' : 'module-grid-cell';
-                html += `<div data-slot-idx="${i}" class="${cls}" style="cursor:${isUnlocked ? 'pointer' : 'not-allowed'};background:${bg};border:${border};border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:104px;padding:10px 6px;transition:all 0.18s ease;">${labelMain}</div>`;
+                html += `<div data-slot-idx="${i}" class="module-grid-cell is-unlocked" style="cursor:pointer;background:${bg};border:${border};border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:104px;padding:10px 6px;transition:all 0.18s ease;">${labelMain}</div>`;
             }
             return html;
         })();
@@ -1392,9 +1463,9 @@ export const ui_system = {
                 : '1px solid rgba(56, 189, 248, 0.35)';
             const cls = isSel ? 'module-palette-item is-selected' : 'module-palette-item';
             return `<div data-module-id="${id}" class="${cls}" style="cursor:pointer;background:${bg};border:${border};border-radius:8px;padding:10px 10px 12px;display:flex;flex-direction:column;align-items:center;text-align:center;transition:all 0.18s ease;">
-                <div style="font-size:24px;line-height:1;">${def.icon}</div>
-                <div style="font-size:12px;margin-top:6px;font-weight:bold;color:#e2e8f0;">${def.name}</div>
-                <div style="font-size:10px;color:#94a3b8;margin-top:4px;line-height:1.4;">${def.desc}</div>
+                <div class="mge-pal-icon" style="font-size:24px;line-height:1;">${def.icon}</div>
+                <div class="mge-pal-name" style="font-size:12px;margin-top:6px;font-weight:bold;color:#e2e8f0;">${def.name}</div>
+                <div class="mge-pal-desc" style="font-size:10px;color:#94a3b8;margin-top:4px;line-height:1.4;">${def.desc}</div>
             </div>`;
         }).join('');
 
@@ -1432,34 +1503,34 @@ export const ui_system = {
         const fuseBtnLabel = fuseDisabled ? '请先在左侧选中一枚符文' : '注入选中符文 →';
 
         overlay.innerHTML = `
-            <div style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(20, 28, 50, 0.98)); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 16px; padding: 22px 24px; max-width: 1180px; width: 100%; max-height: 94vh; overflow: auto; display: flex; flex-direction: column; gap: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);">
+            <div class="module-editor-modal" style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(20, 28, 50, 0.98)); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 16px; padding: 22px 24px; max-width: 1180px; width: 100%; max-height: 94vh; overflow: auto; display: flex; flex-direction: column; gap: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);">
 
                 <!-- Header -->
-                <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(56, 189, 248, 0.25);padding-bottom:14px;">
+                <div class="module-editor-header" style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(56, 189, 248, 0.25);padding-bottom:14px;">
                     <div>
-                        <div style="font-size:22px;font-weight:bold;color:#7dd3fc;letter-spacing:1px;">⚙ 钉板模块编辑器</div>
+                        <div class="module-editor-title-main" style="font-size:22px;font-weight:bold;color:#7dd3fc;letter-spacing:1px;">⚙ 钉板模块编辑器</div>
                         <div style="font-size:11px;color:#94a3b8;margin-top:4px;">摆放钉板模块，并将背包中的符文融合为元素钉子</div>
                     </div>
-                    <div style="display:flex;gap:18px;align-items:center;">
+                    <div class="module-editor-header-stats" style="display:flex;gap:18px;align-items:center;">
                         <div style="text-align:right;">
-                            <div style="font-size:10px;color:#94a3b8;">已开放槽位</div>
-                            <div style="font-size:16px;color:#fbbf24;font-weight:bold;">${unlockedSlots} <span style="font-size:11px;color:#64748b;">/ ${totalSlots}</span></div>
+                            <div style="font-size:10px;color:#94a3b8;">可放置上限</div>
+                            <div style="font-size:16px;color:#fbbf24;font-weight:bold;">${unlockedSlots} <span style="font-size:11px;color:#64748b;">个</span></div>
                         </div>
                         <div style="text-align:right;">
                             <div style="font-size:10px;color:#94a3b8;">已摆放</div>
-                            <div style="font-size:16px;color:#7dd3fc;font-weight:bold;">${placedCount} <span style="font-size:11px;color:#64748b;">/ ${unlockedSlots}</span></div>
+                            <div style="font-size:16px;color:${placedCount >= unlockedSlots ? '#fbbf24' : '#7dd3fc'};font-weight:bold;">${placedCount} <span style="font-size:11px;color:#64748b;">/ ${unlockedSlots}</span></div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Main: 网格 + 模块库 -->
-                <div style="display:grid;grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1fr);gap:18px;">
+                <div class="module-editor-main-grid" style="display:grid;grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1fr);gap:18px;">
 
                     <!-- 钉板网格 -->
                     <div class="module-editor-section">
-                        <div class="module-editor-section-title">▦ 钉板布局</div>
-                        <div class="module-editor-section-hint">从右侧选择模块 → 点击空槽放置；点击已放置模块可移除。</div>
-                        <div id="module-editor-grid" style="display:grid;grid-template-columns:repeat(${cols}, 1fr);gap:10px;">
+                        <div class="module-editor-section-title">▦ 钉板布局 <span style="font-size:10px;font-weight:normal;color:${canPlaceMore ? '#94a3b8' : '#fbbf24'};margin-left:8px;">${canPlaceMore ? `还可放置 ${unlockedSlots - placedCount} 个` : '已达放置上限'}</span></div>
+                        <div class="module-editor-section-hint">从右侧选择模块 → 点击任意空槽放置（最多 ${unlockedSlots} 个）；点击已放置模块可移除。</div>
+                        <div id="module-editor-grid" class="module-editor-grid-cells" style="display:grid;grid-template-columns:repeat(${cols}, 1fr);gap:10px;">
                             ${gridCellsHtml}
                         </div>
                     </div>
@@ -1468,7 +1539,7 @@ export const ui_system = {
                     <div class="module-editor-section">
                         <div class="module-editor-section-title">📦 模块库</div>
                         <div class="module-editor-section-hint">点击模块以选中，再点击网格中的空槽放置。再次点击同一模块可取消选中。</div>
-                        <div id="module-editor-palette" style="display:grid;grid-template-columns:repeat(2, 1fr);gap:10px;">
+                        <div id="module-editor-palette" class="module-editor-palette-cells" style="display:grid;grid-template-columns:repeat(2, 1fr);gap:10px;">
                             ${paletteHtml}
                         </div>
                     </div>
@@ -1479,12 +1550,12 @@ export const ui_system = {
                     <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
                         <div>
                             <div class="module-editor-section-title" style="color:#c084fc;">✨ 符文融合</div>
-                            <div class="module-editor-section-hint" style="margin-bottom:0;">选中符文 → 点击右侧"注入"按钮，符文将被消耗，钉板上随机普通钉子获得对应元素属性。</div>
+                            <div class="module-editor-section-hint" style="margin-bottom:0;">选中符文 → 点击"注入"按钮，符文将被消耗，钉板上随机普通钉子获得对应元素属性。</div>
                         </div>
                         <div style="font-size:11px;color:#94a3b8;">背包：<span style="color:#fbbf24;font-weight:bold;">${inventory.length}</span> 枚符文</div>
                     </div>
 
-                    <div style="display:grid;grid-template-columns: minmax(0, 1.4fr) minmax(220px, 1fr);gap:14px;align-items:stretch;margin-top:10px;">
+                    <div class="module-editor-fusion-grid" style="display:grid;grid-template-columns: minmax(0, 1.4fr) minmax(220px, 1fr);gap:14px;align-items:stretch;margin-top:10px;">
                         <div id="module-editor-runes" class="module-editor-runes-scroll" style="display:flex;flex-direction:column;gap:8px;max-height:240px;min-height:120px;overflow-y:auto;padding-right:4px;">
                             ${runeListHtml}
                         </div>
@@ -1497,8 +1568,8 @@ export const ui_system = {
                 </div>
 
                 <!-- Footer -->
-                <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(56, 189, 248, 0.25);padding-top:14px;gap:14px;flex-wrap:wrap;">
-                    <div style="font-size:11px;color:#64748b;flex:1;min-width:200px;line-height:1.5;">💡 摆放完模块后，可消耗符文将元素属性"融合"到钉板的随机普通钉子上；准备就绪后点击右侧按钮开始本回合采集。</div>
+                <div class="module-editor-footer" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(56, 189, 248, 0.25);padding-top:14px;gap:14px;flex-wrap:wrap;">
+                    <div style="font-size:11px;color:#64748b;flex:1;min-width:200px;line-height:1.5;">💡 摆放完模块后，可消耗符文将元素属性"融合"到钉板的随机普通钉子上；准备就绪后点击下方按钮开始本回合采集。</div>
                     <button id="module-editor-start-btn" style="padding:12px 28px;background:linear-gradient(135deg, rgba(34, 197, 94, 0.7), rgba(21, 128, 61, 0.85));color:#fff;border:1px solid rgba(74, 222, 128, 0.85);border-radius:10px;cursor:pointer;font-weight:bold;font-size:14px;letter-spacing:1px;transition:all 0.18s ease;box-shadow:0 2px 12px rgba(34, 197, 94, 0.3);">▶ 开始采集</button>
                 </div>
             </div>
@@ -1510,15 +1581,17 @@ export const ui_system = {
             grid.querySelectorAll('.module-grid-cell').forEach(cell => {
                 cell.addEventListener('click', () => {
                     const idx = parseInt(cell.dataset.slotIdx, 10);
-                    if (idx >= unlockedSlots) {
-                        showToast('该槽位尚未开放');
-                        return;
-                    }
                     const st = this._moduleEditorState || {};
                     if (this.currentModuleLayout[idx]) {
-                        // 已有模块 → 清除
+                        // 已有模块 → 清除（不受数量限制影响）
                         this.currentModuleLayout[idx] = null;
                     } else if (st.selectedModuleId) {
+                        // 放置前检查总量上限
+                        const currentPlaced = (this.currentModuleLayout || []).filter(Boolean).length;
+                        if (currentPlaced >= unlockedSlots) {
+                            showToast(`已达放置上限（${unlockedSlots} 个），请先移除一个模块`);
+                            return;
+                        }
                         this.currentModuleLayout[idx] = st.selectedModuleId;
                     } else {
                         showToast('请先在右侧"模块库"中选中一个模块');
