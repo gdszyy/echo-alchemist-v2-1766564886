@@ -896,7 +896,7 @@ export const ui_system = {
 
         // @section:replace_ammo_tier_calc - 子弹等级与主属性计算函数（_calcTier / _calcDominant）
         // [tsk-bullet-ui] 稀有度同时考虑普通属性、连射倍率以及爆破/套娃/激光/共鸣/七彩等特殊属性。
-        const _statKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind'];
+        const _statKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind','resonance','venom'];
         const _calcSpecialBonus = (recipe) => {
             let bonus = 0;
             if (recipe.explosive) bonus += 8;            // 爆破：等同 1 张 A 级属性
@@ -904,6 +904,7 @@ export const ui_system = {
             if (recipe.isLaser) bonus += 5;              // 激光本体
             if (recipe.type === 'rainbow' || recipe._marbleType === 'rainbow') bonus += 6;
             if (recipe.type === 'resonance' || recipe._marbleType === 'resonance') bonus += 4;
+            if (recipe.type === 'venom' || recipe._marbleType === 'venom') bonus += 4;
             return bonus;
         };
         const _calcTier = (recipe) => {
@@ -939,6 +940,8 @@ export const ui_system = {
                 damage:      ['linear-gradient(160deg,#4a1d96 0%,#2e1065 60%,#0f0528 100%)', '#a855f7', '#e9d5ff', '#4a1d96'],
                 wind:        ['linear-gradient(160deg,#064e3b 0%,#022c22 60%,#010f0a 100%)', '#34d399', '#a7f3d0', '#064e3b'],
                 flying_sword:['linear-gradient(160deg,#0c4a6e 0%,#082f49 60%,#020f1a 100%)', '#0ea5e9', '#bae6fd', '#0c4a6e'],
+                resonance:   ['linear-gradient(160deg,#78350f 0%,#451a03 60%,#1c0a00 100%)', '#f59e0b', '#fde68a', '#78350f'],
+                venom:       ['linear-gradient(160deg,#14532d 0%,#052e16 60%,#010f07 100%)', '#4ade80', '#bbf7d0', '#14532d'],
             };
             const theme = ATTR_THEMES[maxKey] || null;
             return theme ? { key: maxKey, val: maxVal, theme } : null;
@@ -1031,6 +1034,7 @@ export const ui_system = {
                 else if (recipe.isMatryoshka) mainAttrKey = 'matryoshka';
                 else if (recipe.type === 'rainbow' || recipe._marbleType === 'rainbow') mainAttrKey = 'rainbow';
                 else if (recipe.type === 'resonance' || recipe._marbleType === 'resonance') mainAttrKey = 'resonance';
+                else if (recipe.type === 'venom' || recipe._marbleType === 'venom') mainAttrKey = 'venom';
                 else if (dominant) mainAttrKey = dominant.key;
                 else mainAttrKey = recipe.pyro > 0 ? 'pyro' : recipe.cryo > 0 ? 'cryo' : recipe.lightning > 0 ? 'lightning' : 'damage';
                 const mainAttrInfo = attrIcons[mainAttrKey] || { icon: '🔮', color: '#94a3b8' };
@@ -1054,7 +1058,7 @@ export const ui_system = {
                 card.appendChild(tierBadge);
 
                 // [tsk-bullet-ui] 显示数值属性 + 特殊属性（爆破/套娃/激光/连射/七彩/共鸣）
-                const attrKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind'];
+                const attrKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind','resonance','venom'];
                 const sortedAttrs = attrKeys
                     .map(k => ({ key: k, val: recipe[k] || 0 }))
                     .filter(a => a.val > 0)
@@ -1066,6 +1070,7 @@ export const ui_system = {
                 if (recipe.isLaser && (recipe.laser || 0) === 0) specialAttrs.push({ key: 'laser', label: '✓' });
                 if (recipe.type === 'rainbow' || recipe._marbleType === 'rainbow') specialAttrs.push({ key: 'rainbow', label: '✓' });
                 if (recipe.type === 'resonance' || recipe._marbleType === 'resonance') specialAttrs.push({ key: 'resonance', label: '✓' });
+                if (recipe.type === 'venom' || recipe._marbleType === 'venom') specialAttrs.push({ key: 'venom', label: '✓' });
                 if ((recipe.multicast || 0) > 0) specialAttrs.push({ key: 'multicast', label: 'x' + recipe.multicast });
 
                 const attrsContainer = document.createElement('div');
