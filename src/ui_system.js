@@ -2,6 +2,8 @@ import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
 import { CONFIG, RELIC_DB } from './config.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
+import { MODULE_DEFS, listAvailableModules } from './pinboard_modules.js';
+import { fuseRuneIntoBoard, getRuneId } from './rune_system.js';
 
 export const ui_system = {
     // @section:ui_fly_effects - 飞行特效池管理
@@ -1183,5 +1185,236 @@ export const ui_system = {
                 </div>`;
         }).join('');
         list.innerHTML = html;
+    },
+
+    // ======================================================================
+    // [v2 钉板模块化] 模块编辑器
+    // ======================================================================
+    // 在每场遗物阶段后、采集阶段开始前打开。玩家可以：
+    //   1) 在 4×3 网格里摆放已解锁的钉板模块（受 unlockedModuleSlots 限制）
+    //   2) 在右侧融合区把符文消耗到钉板（写入 pendingFusions，
+    //      在 phase_gathering_initPachinko 末尾随机赋予普通钉子元素属性）
+    //   3) 点击"开始采集"关闭编辑器并进入采集阶段
+    _moduleEditorState: null,
+
+    ui_showModuleEditor(onComplete) {
+        const cfg = CONFIG.gameplay || {};
+        const cols = cfg.moduleCols || 4;
+        const rows = cfg.moduleRows || 3;
+        const totalSlots = cols * rows;
+
+        // 确保 layout / unlocked 字段已初始化
+        if (!Array.isArray(this.currentModuleLayout) || this.currentModuleLayout.length !== totalSlots) {
+            this.currentModuleLayout = new Array(totalSlots).fill(null);
+            for (let i = 0; i < (cfg.moduleDefaultSlots || 3); i++) {
+                this.currentModuleLayout[i] = 'std_stagger';
+            }
+        }
+        if (!Array.isArray(this.unlockedModuleTypes)) {
+            this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'bouncer', 'funnel'];
+        }
+        if (typeof this.unlockedModuleSlots !== 'number') {
+            this.unlockedModuleSlots = cfg.moduleDefaultSlots || 3;
+        }
+
+        // 每次打开重置 selection
+        this._moduleEditorState = {
+            selectedModuleId: null,  // 当前选中的模块 ID（待放入网格）
+            selectedRuneIdx: null,   // 当前选中的符文 inventory 索引
+            onComplete: onComplete || null,
+        };
+
+        let overlay = document.getElementById('module-editor-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'module-editor-overlay';
+            overlay.style.cssText = `
+                position: fixed; inset: 0; z-index: 240;
+                background: rgba(8, 12, 24, 0.92);
+                display: flex; align-items: center; justify-content: center;
+                padding: 16px; box-sizing: border-box;
+                font-family: 'Cinzel', 'Microsoft YaHei', sans-serif;
+                color: #e2e8f0;
+            `;
+            document.body.appendChild(overlay);
+        }
+        overlay.style.display = 'flex';
+        this.ui_renderModuleEditor();
+    },
+
+    ui_hideModuleEditor() {
+        const overlay = document.getElementById('module-editor-overlay');
+        if (overlay) overlay.style.display = 'none';
+        this._moduleEditorState = null;
+    },
+
+    ui_renderModuleEditor() {
+        const overlay = document.getElementById('module-editor-overlay');
+        if (!overlay) return;
+        const cfg = CONFIG.gameplay || {};
+        const cols = cfg.moduleCols || 4;
+        const rows = cfg.moduleRows || 3;
+        const totalSlots = cols * rows;
+        const unlockedSlots = this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3;
+        const layout = this.currentModuleLayout || [];
+        const available = listAvailableModules(this.unlockedModuleTypes || []);
+        const state = this._moduleEditorState || {};
+        const selModule = state.selectedModuleId;
+        const selRune = state.selectedRuneIdx;
+        const inventory = Array.isArray(this.runeInventory) ? this.runeInventory : [];
+        const pendingFusions = Array.isArray(this.pendingFusions) ? this.pendingFusions : [];
+
+        // ---- 模块网格 cells ----
+        const gridCellsHtml = (() => {
+            let html = '';
+            for (let i = 0; i < totalSlots; i++) {
+                const isUnlocked = i < unlockedSlots;
+                const moduleId = layout[i];
+                const def = moduleId ? MODULE_DEFS[moduleId] : null;
+                const bg = !isUnlocked
+                    ? 'rgba(30, 41, 59, 0.4)'
+                    : (def ? 'rgba(56, 189, 248, 0.18)' : 'rgba(30, 41, 59, 0.7)');
+                const border = !isUnlocked
+                    ? '1px dashed rgba(100,116,139,0.5)'
+                    : '1px solid rgba(56, 189, 248, 0.55)';
+                const labelMain = def ? `<div style="font-size:18px;line-height:1;">${def.icon || '▦'}</div><div style="font-size:10px;margin-top:4px;text-align:center;">${def.name}</div>` : (isUnlocked ? '<div style="font-size:11px;color:#64748b;">空槽</div>' : '<div style="font-size:14px;color:#475569;">🔒</div>');
+                html += `<div data-slot-idx="${i}" class="module-grid-cell" style="cursor:${isUnlocked ? 'pointer' : 'not-allowed'};background:${bg};border:${border};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80px;padding:6px;transition:all 0.15s;">${labelMain}</div>`;
+            }
+            return html;
+        })();
+
+        // ---- 模块库 ----
+        const paletteHtml = available.map(id => {
+            const def = MODULE_DEFS[id];
+            if (!def) return '';
+            const selBg = (selModule === id) ? 'rgba(56, 189, 248, 0.45)' : 'rgba(30, 41, 59, 0.7)';
+            return `<div data-module-id="${id}" class="module-palette-item" style="cursor:pointer;background:${selBg};border:1px solid rgba(56, 189, 248, 0.4);border-radius:6px;padding:8px;display:flex;flex-direction:column;align-items:center;text-align:center;transition:all 0.15s;">
+                <div style="font-size:20px;">${def.icon}</div>
+                <div style="font-size:11px;margin-top:4px;font-weight:bold;">${def.name}</div>
+                <div style="font-size:9px;color:#94a3b8;margin-top:3px;line-height:1.3;">${def.desc}</div>
+            </div>`;
+        }).join('');
+
+        // ---- 符文融合区 ----
+        const runeListHtml = inventory.length > 0 ? inventory.map((r, idx) => {
+            const id = getRuneId(r);
+            const def = (RUNE_DB || []).find(d => d.id === id);
+            if (!def) return '';
+            const lv = (typeof r === 'object' && typeof r.level === 'number') ? r.level : 1;
+            const selBg = (selRune === idx) ? 'rgba(168, 85, 247, 0.45)' : 'rgba(30, 41, 59, 0.7)';
+            return `<div data-rune-idx="${idx}" class="rune-fusion-item" style="cursor:pointer;background:${selBg};border:1px solid rgba(168, 85, 247, 0.4);border-radius:6px;padding:6px;display:flex;align-items:center;gap:6px;">
+                <div style="font-size:16px;">${def.icon || '🔮'}</div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:11px;font-weight:bold;">${def.name || id} <span style="color:#fbbf24;">L${lv}</span></div>
+                    <div style="font-size:9px;color:#94a3b8;">融合后赋予 ${lv} 颗 ${def.element || ''} 钉子</div>
+                </div>
+            </div>`;
+        }).join('') : '<div style="color:#64748b;font-size:11px;padding:8px;">背包没有符文</div>';
+
+        const pendingHtml = pendingFusions.length > 0
+            ? '<div style="margin-top:8px;padding:6px;background:rgba(168, 85, 247, 0.12);border-radius:6px;font-size:10px;">待融合: ' + pendingFusions.map(f => `${f.element}×${f.count}`).join(', ') + '</div>'
+            : '';
+
+        overlay.innerHTML = `
+            <div style="background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; padding: 18px; max-width: 960px; width: 100%; max-height: 92vh; overflow: auto; display: flex; flex-direction: column; gap: 14px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(56, 189, 248, 0.25);padding-bottom:10px;">
+                    <div style="font-size:18px;font-weight:bold;color:#7dd3fc;">钉板模块编辑器</div>
+                    <div style="font-size:11px;color:#94a3b8;">已开放槽位: <span style="color:#fbbf24;font-weight:bold;">${unlockedSlots}/${totalSlots}</span></div>
+                </div>
+                <div style="display:grid;grid-template-columns: 2fr 1.2fr;gap:14px;">
+                    <div>
+                        <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">模块网格 (点击空槽放置已选模块；点击已放置模块清除)</div>
+                        <div id="module-editor-grid" style="display:grid;grid-template-columns:repeat(${cols}, 1fr);gap:6px;">
+                            ${gridCellsHtml}
+                        </div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <div>
+                            <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">模块库 (点击选中)</div>
+                            <div id="module-editor-palette" style="display:grid;grid-template-columns:repeat(2, 1fr);gap:6px;">
+                                ${paletteHtml}
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">符文融合 (点击符文 → 点击"融合"消耗到钉板)</div>
+                            <div id="module-editor-runes" style="display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto;">
+                                ${runeListHtml}
+                            </div>
+                            <button id="module-editor-fuse-btn" style="margin-top:8px;width:100%;padding:6px;background:rgba(168, 85, 247, 0.5);color:#fff;border:1px solid rgba(168, 85, 247, 0.7);border-radius:6px;cursor:pointer;font-size:12px;">融合选中符文</button>
+                            ${pendingHtml}
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(56, 189, 248, 0.25);padding-top:10px;">
+                    <div style="font-size:10px;color:#64748b;">提示：摆放完模块后，可消耗符文将元素属性"融合"到钉板的随机普通钉子上。</div>
+                    <button id="module-editor-start-btn" style="padding:8px 18px;background:rgba(34, 197, 94, 0.55);color:#fff;border:1px solid rgba(34, 197, 94, 0.8);border-radius:6px;cursor:pointer;font-weight:bold;">开始采集</button>
+                </div>
+            </div>
+        `;
+
+        // ---- 事件绑定 ----
+        const grid = overlay.querySelector('#module-editor-grid');
+        if (grid) {
+            grid.querySelectorAll('.module-grid-cell').forEach(cell => {
+                cell.addEventListener('click', () => {
+                    const idx = parseInt(cell.dataset.slotIdx, 10);
+                    if (idx >= unlockedSlots) return; // 锁定槽
+                    const st = this._moduleEditorState || {};
+                    if (this.currentModuleLayout[idx]) {
+                        // 已有模块 → 清除
+                        this.currentModuleLayout[idx] = null;
+                    } else if (st.selectedModuleId) {
+                        this.currentModuleLayout[idx] = st.selectedModuleId;
+                    }
+                    this.ui_renderModuleEditor();
+                });
+            });
+        }
+        const palette = overlay.querySelector('#module-editor-palette');
+        if (palette) {
+            palette.querySelectorAll('.module-palette-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const id = item.dataset.moduleId;
+                    if (!this._moduleEditorState) return;
+                    this._moduleEditorState.selectedModuleId = (this._moduleEditorState.selectedModuleId === id) ? null : id;
+                    this.ui_renderModuleEditor();
+                });
+            });
+        }
+        const runeList = overlay.querySelector('#module-editor-runes');
+        if (runeList) {
+            runeList.querySelectorAll('.rune-fusion-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const idx = parseInt(item.dataset.runeIdx, 10);
+                    if (!this._moduleEditorState) return;
+                    this._moduleEditorState.selectedRuneIdx = (this._moduleEditorState.selectedRuneIdx === idx) ? null : idx;
+                    this.ui_renderModuleEditor();
+                });
+            });
+        }
+        const fuseBtn = overlay.querySelector('#module-editor-fuse-btn');
+        if (fuseBtn) {
+            fuseBtn.addEventListener('click', () => {
+                const st = this._moduleEditorState;
+                if (!st || st.selectedRuneIdx === null) {
+                    if (window.showToast) window.showToast('请先选中要融合的符文');
+                    return;
+                }
+                const rune = (this.runeInventory || [])[st.selectedRuneIdx];
+                if (!rune) return;
+                const result = fuseRuneIntoBoard(this, rune, RUNE_DB);
+                if (window.showToast) window.showToast(result.message);
+                if (result.ok) st.selectedRuneIdx = null;
+                this.ui_renderModuleEditor();
+            });
+        }
+        const startBtn = overlay.querySelector('#module-editor-start-btn');
+        if (startBtn) {
+            startBtn.addEventListener('click', () => {
+                const onComplete = (this._moduleEditorState || {}).onComplete;
+                this.ui_hideModuleEditor();
+                if (typeof onComplete === 'function') onComplete();
+            });
+        }
     }
 };

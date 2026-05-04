@@ -242,6 +242,22 @@ export const shop_system = {
             if (typeof this.sys_queueRoundStartReward === 'function') {
                 this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
             }
+        }
+        // ==================== [v2 钉板模块化] 新遗物分支 ====================
+        else if (relic.effect === 'module_slot_up') {
+            const cfg = (typeof CONFIG !== 'undefined' && CONFIG.gameplay) || {};
+            const totalSlots = (cfg.moduleCols || 4) * (cfg.moduleRows || 3);
+            const amount = (typeof relic.amount === 'number' && relic.amount > 0) ? relic.amount : 1;
+            this.unlockedModuleSlots = Math.min(totalSlots, (this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3) + amount);
+            if (window.showToast) showToast(`钉板模块槽位 +${amount}（当前 ${this.unlockedModuleSlots}/${totalSlots}）`);
+        }
+        else if (relic.effect === 'unlock_module_type') {
+            if (!Array.isArray(this.unlockedModuleTypes)) this.unlockedModuleTypes = [];
+            const moduleId = relic.moduleId;
+            if (moduleId && !this.unlockedModuleTypes.includes(moduleId)) {
+                this.unlockedModuleTypes.push(moduleId);
+                if (window.showToast) showToast(`已解锁钉板模块：${relic.name || moduleId}`);
+            }
         } else if (relic.effect === 'row_count_up') {
             this.currentRows = (this.currentRows || 0) + 2;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);

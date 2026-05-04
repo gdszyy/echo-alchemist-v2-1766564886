@@ -786,13 +786,30 @@ export const spawn_system = {
      * @description 增加分数并提高分数乘数。
      * @param {number} amount - **重要参数** 基础分数。
      */
-    spawn_addScore(amount) { 
+    spawn_addScore(amount) {
         const finalScore = Math.floor(amount * this.scoreMultiplier);
         this.score += finalScore;
         const resourceGain = Math.floor(0.523 * Math.pow(finalScore, 0.63));
-        // [已移除] runCurrency 累积：符文碎片改为合成时直接获取，不再通过局内货币结算
+        // [v2 局内符文碎片] 击杀按概率掉落碎片，累计到 this.runFragments；
+        // 局结束时按 runShopEndOfRunFragmentSettle 比例转换到 saveData.runeFragments。
+        const cfg = (typeof CONFIG !== 'undefined' && CONFIG.gameplay) ? CONFIG.gameplay : {};
+        const baseChance = cfg.enemyDropFragmentChance != null ? cfg.enemyDropFragmentChance : 0.45;
+        const roundBonus = (cfg.enemyDropFragmentRoundBonus || 0) * (this.round || 1);
+        const fragChance = Math.min(0.95, baseChance + roundBonus);
+        if (Math.random() < fragChance) {
+            const baseAmount = cfg.enemyDropFragmentBaseAmount || 1;
+            const bonus = Math.floor(Math.log2(Math.max(2, finalScore)) - 4);
+            const gained = Math.max(1, baseAmount + Math.max(0, bonus));
+            if (typeof this.runFragments !== 'number') this.runFragments = 0;
+            this.runFragments += gained;
+            if (typeof this.runRuneFragmentsGained !== 'number') this.runRuneFragmentsGained = 0;
+            this.runRuneFragmentsGained += gained;
+            if (typeof this.spawn_createFloatingText === 'function') {
+                this.spawn_createFloatingText(this.width / 2, 60, `+${gained} 🔮`, '#a855f7');
+            }
+        }
         this.scoreMultiplier = parseFloat((this.scoreMultiplier + 0.2).toFixed(1)); // 乘数增加 0.2
-        this.ui_updateMultiplierUI(); 
+        this.ui_updateMultiplierUI();
     },
 
 /**

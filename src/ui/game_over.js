@@ -14,7 +14,7 @@
  */
 
 import { RUNE_DB } from '../rune_config.js';
-import { RELIC_DB } from '../config.js';
+import { RELIC_DB, CONFIG } from '../config.js';
 
 // ==================== Boss 元数据（用于节点图标注） ====================
 const BOSS_META = {
@@ -38,6 +38,19 @@ export const game_over_mixin = {
      * 使用 setTimeout 延迟一帧，确保渲染循环安全退出后再切换阶段。
      */
     _gameover_triggerPhase() {
+        // ==================== [v2 局内符文碎片结算] ====================
+        // 局结束时把未消费的 runFragments 按比例转换为 saveData.runeFragments
+        // 避免玩家屯币不花。比例由 CONFIG.gameplay.runShopEndOfRunFragmentSettle 控制。
+        const cfg = (CONFIG && CONFIG.gameplay) || {};
+        const ratio = cfg.runShopEndOfRunFragmentSettle != null ? cfg.runShopEndOfRunFragmentSettle : 0.3;
+        const leftover = Math.max(0, this.runFragments || 0);
+        const settled = Math.floor(leftover * ratio);
+        if (settled > 0) {
+            if (!this.saveData) this.saveData = { runeFragments: 0 };
+            this.saveData.runeFragments = (this.saveData.runeFragments || 0) + settled;
+        }
+        this.runFragments = 0;
+
         // [局内存档] 游戏结束时清除局内存档，防止下次进入 meta 时错误提示继续游戏
         this.sys_clearRunState();
         // 延迟一帧，确保当前渲染帧安全完成

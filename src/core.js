@@ -40,6 +40,7 @@ import { ui_system } from './ui_system.js';
 // [Task 2.4] 导入拆分后的 UI 子模块
 import { hud_system } from './ui/hud.js';
 import { shop_system } from './ui/shop.js';
+import { run_shop } from './ui/run_shop.js';
 import { rune_launcher_system } from './ui/rune_launcher.js';
 import { calc_utils } from './calc_utils.js';
 import { tutorial_system } from './tutorial_system.js';
@@ -99,7 +100,8 @@ class Game {
         const _subsystems = [
             game_system, game_phase, combat_system, render_system, spawn_system,
             ui_system, hud_system, shop_system, rune_launcher_system,
-            calc_utils, tutorial_system, game_over_mixin
+            calc_utils, tutorial_system, game_over_mixin,
+            run_shop
         ];
         for (const subsystem of _subsystems) {
             for (const [key, val] of Object.entries(subsystem)) {
@@ -249,12 +251,25 @@ class Game {
         this.slowMotionTimer = 0;        
         this.slowMotionThreshold = 100;  
         this.saveData = { currency: 0, runeFragments: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0 };
-        this.runCurrency = 0;   
+        this.runCurrency = 0;
         // ==================== 本局统计字段 ====================
         this.runKillCount = 0;          // 本局击杀数
         this.runRuneFragmentsGained = 0; // 本局获得的符文碎片数
         this.bossDefeatedLog = [];       // 本局击败的 Boss 记录 [{bossId, bossName, round, isBigBoss}]
         this.runewordKillCount = 0;      // [词条 Hook] 嗜血初锋: 本局击杀累计数，跨回合持久
+
+        // ==================== [v2 钉板模块化] 模块系统状态 ====================
+        this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'bouncer', 'funnel'];
+        this.unlockedModuleSlots = 3;
+        this.currentModuleLayout = ['std_stagger', 'std_stagger', 'std_stagger',
+            null, null, null, null, null, null, null, null, null];
+        this.pendingFusions = [];
+
+        // ==================== [v2 局内商店 + 符文碎片经济] ====================
+        this.runFragments = 0;
+        this.runShopInventory = [];
+        this.runShopRefreshes = 0;
+        this._runShopOpenedRound = -1;
 
         // ==================== 符文词条系统状态变量 ====================
         // Task 1: 数据结构升级 - runeInventory 和 runeGrid 存储对象格式 { id: string, level: number }

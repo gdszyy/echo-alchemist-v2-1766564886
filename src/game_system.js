@@ -428,6 +428,23 @@ export const game_system = {
         this.bossDefeatedLog = [];
         // [词条 Hook] 嗜血初锋 (bloodthirst_growth) - 每局重置击杀计数（跨回合持久）
         this.runewordKillCount = 0;
+
+        // ==================== [v2 钉板模块化] 模块系统状态 ====================
+        // 钉板由 4×3 = 12 个模块槽组成，按 row-major 顺序解锁
+        // 默认开放第 1 行 3 个槽，预填 std_stagger
+        this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'bouncer', 'funnel'];
+        this.unlockedModuleSlots = 3;
+        this.currentModuleLayout = ['std_stagger', 'std_stagger', 'std_stagger',
+            null, null, null, null, null, null, null, null, null];
+        // pendingFusions: 模块编辑器关闭时写入；phase_gathering_initPachinko 末尾消费
+        // 形如 [{ element: 'pyro', count: 1, runeUid: '...' }]
+        this.pendingFusions = [];
+
+        // ==================== [v2 局内商店 + 符文碎片经济] ====================
+        this.runFragments = 0;          // 局内当前持有符文碎片
+        this.runShopInventory = [];     // 当前刷新结果
+        this.runShopRefreshes = 0;      // 已刷新次数
+        this._runShopOpenedRound = -1;  // 防止同回合重复打开
     },
 
     /**
