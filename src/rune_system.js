@@ -441,4 +441,57 @@ function getNewRunewordsOnPlacement(currentGrid, cellIndex, runeEntry, runewordD
     });
 }
 
-export { parseRuneGrid, calcRuneBaseStats, getRuneId, rune_merge, rune_reforge, getNewRunewordsOnPlacement };
+/**
+ * fuseRuneIntoBoard - [v2 钉板模块化] 把符文消耗到钉板上
+ *
+ * 把一颗符文从 game.runeInventory 中移除，并把其元素属性写入 game.pendingFusions，
+ * 由 phase_gathering_initPachinko 在采集阶段开始前应用到随机普通钉子。
+ *
+ * 融合数量上限 = 符文等级（高级符文一次注入更多）。
+ *
+ * @param {Object} game - 游戏实例（含 runeInventory / pendingFusions）
+ * @param {Object} runeEntry - 要融合的符文 { id, level, uid? }
+ * @param {Array}  runeDb - RUNE_DB
+ * @returns {{ ok: boolean, message: string, element?: string, count?: number }}
+ */
+function fuseRuneIntoBoard(game, runeEntry, runeDb) {
+    if (!game || !runeEntry) {
+        return { ok: false, message: '无效的符文或游戏实例' };
+    }
+    const runeId = getRuneId(runeEntry);
+    if (!runeId) return { ok: false, message: '无法识别符文 ID' };
+
+    const runeDef = (runeDb || []).find(r => r.id === runeId);
+    if (!runeDef) return { ok: false, message: '符文定义不存在' };
+
+    const element = runeDef.element || runeDef.baseStat;
+    if (!element) return { ok: false, message: '该符文没有可融合的元素属性' };
+
+    const level = (typeof runeEntry.level === 'number' && runeEntry.level > 0) ? runeEntry.level : 1;
+
+    // 从 inventory 移除（按 uid 优先，否则按 id+level 第一个匹配）
+    if (Array.isArray(game.runeInventory) && game.runeInventory.length > 0) {
+        let removeIdx = -1;
+        if (runeEntry.uid) {
+            removeIdx = game.runeInventory.findIndex(r => r && r.uid === runeEntry.uid);
+        }
+        if (removeIdx === -1) {
+            removeIdx = game.runeInventory.findIndex(r => {
+                const id = getRuneId(r);
+                const lv = (typeof r === 'object' && typeof r.level === 'number') ? r.level : 1;
+                return id === runeId && lv === level;
+            });
+        }
+        if (removeIdx === -1) {
+            return { ok: false, message: '符文不在背包中' };
+        }
+        game.runeInventory.splice(removeIdx, 1);
+    }
+
+    if (!Array.isArray(game.pendingFusions)) game.pendingFusions = [];
+    game.pendingFusions.push({ element, count: level, runeId, sourceLevel: level });
+
+    return { ok: true, message: `已融合 ${runeDef.name || runeId} → 钉板将赋予 ${level} 颗 ${element} 钉子`, element, count: level };
+}
+
+export { parseRuneGrid, calcRuneBaseStats, getRuneId, rune_merge, rune_reforge, getNewRunewordsOnPlacement, fuseRuneIntoBoard };

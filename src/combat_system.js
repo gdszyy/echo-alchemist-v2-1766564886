@@ -2475,53 +2475,16 @@ export const combat_system = {
         const finalRecipe = pullNext();
         if (!finalRecipe) return;
 
-        // --- [符文词条系统] 将 activeRunewordStats 加成叠加到当前弹药配方 ---
-        if (this.activeRunewordStats && typeof this.activeRunewordStats === 'object') {
-            for (const [key, val] of Object.entries(this.activeRunewordStats)) {
-                if (typeof val === 'number' && val !== 0) {
-                    if (key === 'damage') {
-                        // damage 直接加到基础伤害
-                        finalRecipe.damage = (finalRecipe.damage || 0) + val;
-                    } else if (key === 'bounce') {
-                        finalRecipe.bounce = (finalRecipe.bounce || 0) + val;
-                    } else if (key === 'pierce') {
-                        finalRecipe.pierce = (finalRecipe.pierce || 0) + val;
-                    } else if (key === 'scatter') {
-                        finalRecipe.scatter = (finalRecipe.scatter || 0) + val;
-                    } else if (key === 'pyro') {
-                        finalRecipe.pyro = (finalRecipe.pyro || 0) + val;
-                    } else if (key === 'cryo') {
-                        finalRecipe.cryo = (finalRecipe.cryo || 0) + val;
-                    } else if (key === 'lightning') {
-                        finalRecipe.lightning = (finalRecipe.lightning || 0) + val;
-                    } else if (key === 'laser') {
-                        finalRecipe.laser = (finalRecipe.laser || 0) + val;
-                        if (finalRecipe.laser > 0) finalRecipe.isLaser = true;
-                    } else {
-                        // 其他数値属性通用叠加
-                        if (typeof finalRecipe[key] === 'number' || finalRecipe[key] === undefined) {
-                            finalRecipe[key] = (finalRecipe[key] || 0) + val;
-                        }
-                    }
-                }
-            }
-        }
-        
-        // --- [符文基础属性] 将 calcRuneBaseStats() 的基础属性层数叠加到当前弹药配方 ---
-        if (this.runeGrid && Array.isArray(this.runeGrid)) {
-            const baseStats = calcRuneBaseStats(this.runeGrid, RUNE_DB);
-            for (const [key, val] of Object.entries(baseStats)) {
-                if (typeof val === 'number' && val > 0) {
-                    if (key === 'laser') {
-                        finalRecipe.laser = (finalRecipe.laser || 0) + val;
-                        if (finalRecipe.laser > 0) finalRecipe.isLaser = true;
-                    } else {
-                        finalRecipe[key] = (finalRecipe[key] || 0) + val;
-                    }
-                // @section:fire_trajectory_calc - 弹道计算与散射角度
-                }
-            }
-        }
+        // ==================== [v2 重构] 符文属性附加路径已移除 ====================
+        // 旧版本：activeRunewordStats 和 calcRuneBaseStats 会把 pyro/cryo/bounce/...
+        // 直接叠加到 finalRecipe，使得"装备符文 = 子弹被动加属性"。
+        // v2 改为"符文融合钉板"机制：玩家在模块编辑器消耗符文，把对应元素
+        // 注入到钉板上的随机普通钉子，弹珠在采集阶段碰到该钉子才获得元素。
+        // 入口：rune_system.fuseRuneIntoBoard / phase_gathering_initPachinko 末尾。
+        //
+        // 保留 runeword 的非属性效果（mutation unlock / skill unlock）：这些走
+        // activeRunewordEffects，不在此处理。
+        // @section:fire_trajectory_calc - 弹道计算与散射角度
 
         // --- [炼金火药管] 平坦伤害加成 ---
         if (this.flatDamageBonus && this.flatDamageBonus > 0) {

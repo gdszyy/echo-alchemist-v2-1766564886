@@ -19,6 +19,7 @@ import {
     getLayoutParams,
     getAllLayoutHints,
 } from './plinko_physics.js';
+import { buildModuleEntities, calcModuleSlotRect, MODULE_DEFS } from './pinboard_modules.js';
 
 export const game_phase = {
 /**
@@ -95,6 +96,22 @@ export const game_phase = {
             });
         }
 
+        // ==================== [v2 钉板模块化] 进入采集前先打开模块编辑器 ====================
+        // 玩家可以在每场遗物结束后/采集开始前重新摆放模块、融合符文。
+        // 编辑器关闭后才真正进入采集阶段。混沌契约和教程局跳过编辑器。
+        const skipEditor = (this.ownedRelics && this.ownedRelics.includes('chaos_pact'))
+            || this._isTutorialRun
+            || this._moduleEditorShownThisRound;
+        if (!skipEditor && typeof this.ui_showModuleEditor === 'function') {
+            this._moduleEditorShownThisRound = true;
+            this.ui_showModuleEditor(() => {
+                this._moduleEditorShownThisRound = false;
+                this.phase_startGatheringPhase();
+            });
+            return;
+        }
+        this._moduleEditorShownThisRound = false;
+
         // --- [遗物 Hook] 混沌契约 (chaos_pact)：跳过研磨阶段，直接进入战斗 ---
         // 规则：契约持有者无法进行研磨；ammoQueue 复用上一回合的子弹快照，没有则用默认基础子弹兜底。
         if (this.ownedRelics && this.ownedRelics.includes('chaos_pact')) {
@@ -142,7 +159,192 @@ export const game_phase = {
 /**
      */
     // @section:pachinko_board_layout - 弹珠台布局计算与钉子生成
+    // [v2 模块化重写] 钉板由 4×3 = 12 个模块槽组成（CONFIG.gameplay.moduleCols/Rows）。
+    // 每个模块独立生成自己区域内的钉子/特殊槽。元素属性由"符文融合"在最末尾叠加。
+    phase_gathering_initPachinko_v2(shouldInherit = false) {
+        const cfg = CONFIG.gameplay;
+        const canvasWidth = (this.width && this.width > 0) ? this.width : 400;
+        const canvasHeight = (this.height && this.height > 0) ? this.height : 600;
+        const ctx = this.ctx || null;
+        const totalSlots = (cfg.moduleCols || 4) * (cfg.moduleRows || 3);
+
+        // 确保 currentModuleLayout 存在且正确长度
+        if (!Array.isArray(this.currentModuleLayout) || this.currentModuleLayout.length !== totalSlots) {
+            this.currentModuleLayout = new Array(totalSlots).fill(null);
+            const defaultSlots = cfg.moduleDefaultSlots || 3;
+            for (let i = 0; i < defaultSlots; i++) {
+                this.currentModuleLayout[i] = 'std_stagger';
+            }
+        }
+
+        const previousPegs = [...(this.pegs || [])];
+        this.pegs = [];
+        this.specialSlots = [];
+
+        let maxPegY = 0;
+        const slotsToBuild = Math.min(this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3, totalSlots);
+
+        for (let i = 0; i < slotsToBuild; i++) {
+            const moduleId = this.currentModuleLayout[i];
+            if (!moduleId) continue;
+            const rect = calcModuleSlotRect(i, canvasWidth, canvasHeight, cfg);
+            const result = buildModuleEntities(moduleId, rect.x, rect.y, rect.w, rect.h, ctx, i);
+            if (result.pegs && result.pegs.length > 0) {
+                for (const p of result.pegs) {
+                    p.moduleSlotIdx = i;
+                    this.pegs.push(p);
+                    if (p.pos.y > maxPegY) maxPegY = p.pos.y;
+                }
+            }
+            if (result.specialSlots && result.specialSlots.length > 0) {
+                for (const s of result.specialSlots) {
+                    s.moduleSlotIdx = i;
+                    this.specialSlots.push(s);
+                }
+            }
+        }
+
+        this.boardBottomY = maxPegY;
+
+        // [继承] 上一回合钉子按索引保留 type/level（仅当数量一致且非粉色）
+        if (shouldInherit && previousPegs.length > 0) {
+            for (let i = 0; i < this.pegs.length && i < previousPegs.length; i++) {
+                const cur = this.pegs[i];
+                const prev = previousPegs[i];
+                if (prev && prev.type !== 'pink' && cur.type === 'normal') {
+                    cur.type = prev.type;
+                    cur.level = prev.level || 1;
+                    if (prev.cooldownTimer !== undefined) cur.cooldownTimer = prev.cooldownTimer;
+                }
+            }
+        }
+
+        // [pink_slime 遗物] 额外随机粉色钉子
+        const pinkCount = this.pinkPegCount || 0;
+        for (let i = 0; i < pinkCount; i++) {
+            if (this.pegs.length > 0) {
+                const idx = Math.floor(Math.random() * this.pegs.length);
+                this.pegs[idx].type = 'pink';
+            }
+        }
+
+        // [unlock_slot 遗物 + slot_count_up] 在模块外额外创建特殊槽
+        let effectiveSlots = [...(this.unlockedSlots || [])];
+        if (!this.activeSkills || this.activeSkills.length === 0) {
+            effectiveSlots = effectiveSlots.filter(t => t !== 'skill_point');
+        }
+        const effectiveSlotCount = Math.min(this.slotCount || 0, effectiveSlots.length > 0 ? this.slotCount : 0);
+        if (effectiveSlots.length > 0 && effectiveSlotCount > 0) {
+            const validIdx = this.pegs.map((p, i) => i).filter(i => this.pegs[i].type !== 'pink');
+            const sortedByY = [...validIdx].sort((a, b) => this.pegs[b].pos.y - this.pegs[a].pos.y);
+            const used = new Set();
+            // 也排除已被模块产生的 specialSlots 占用的钉子
+            for (const s of this.specialSlots) {
+                if (s.pegIndex !== undefined) used.add(s.pegIndex);
+                if (s.pegIndex2 !== undefined) used.add(s.pegIndex2);
+            }
+            let created = 0;
+            for (let i = 0; i < sortedByY.length && created < effectiveSlotCount; i++) {
+                const idxA = sortedByY[i];
+                if (used.has(idxA)) continue;
+                let bestIdxB = -1;
+                let bestDist = Infinity;
+                for (let j = i + 1; j < sortedByY.length; j++) {
+                    const idxB = sortedByY[j];
+                    if (used.has(idxB)) continue;
+                    const dx = this.pegs[idxA].pos.x - this.pegs[idxB].pos.x;
+                    const dy = this.pegs[idxA].pos.y - this.pegs[idxB].pos.y;
+                    const d = Math.sqrt(dx * dx + dy * dy);
+                    if (d < bestDist && d < 80) { bestDist = d; bestIdxB = idxB; }
+                }
+                if (bestIdxB === -1) continue;
+                const pegA = this.pegs[idxA];
+                const pegB = this.pegs[bestIdxB];
+                const type = effectiveSlots[created % effectiveSlots.length];
+                const slot = new SpecialSlot(pegA.pos.x, pegA.pos.y, pegB.pos.x, pegB.pos.y, type);
+                slot.pegIndex = idxA;
+                slot.pegIndex2 = bestIdxB;
+                this.specialSlots.push(slot);
+                used.add(idxA); used.add(bestIdxB);
+                created++;
+            }
+        }
+
+        // [初始 wind/sword 钉子] 仅第 1 回合且非继承时
+        if (this.round === 1 && !shouldInherit) {
+            const replaceWithSpecial = (count, type) => {
+                if (!count || count <= 0) return;
+                const normalPegs = this.pegs.filter(p => p.type === 'normal');
+                for (let i = normalPegs.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [normalPegs[i], normalPegs[j]] = [normalPegs[j], normalPegs[i]];
+                }
+                for (let i = 0; i < Math.min(count, normalPegs.length); i++) {
+                    normalPegs[i].type = type;
+                    normalPegs[i].level = 1;
+                }
+            };
+            const windPegsCount = this._isTutorialRun && this._tutorialInitWindPegs
+                ? this._tutorialInitWindPegs : (cfg.initWindPegs || 0);
+            const swordPegsCount = this._isTutorialRun && this._tutorialInitSwordPegs
+                ? this._tutorialInitSwordPegs : (cfg.initSwordPegs || 0);
+            replaceWithSpecial(windPegsCount, 'wind');
+            replaceWithSpecial(swordPegsCount, 'flying_sword');
+            if (this._isTutorialRun) {
+                this.pegs.forEach(p => {
+                    if (p.type === 'wind' || p.type === 'flying_sword') p.level = 3;
+                });
+            }
+        }
+
+        // ==================== [v2 符文融合] 应用 pendingFusions ====================
+        // 将玩家在模块编辑器选择的符文随机注入到普通钉子上
+        if (Array.isArray(this.pendingFusions) && this.pendingFusions.length > 0) {
+            for (const f of this.pendingFusions) {
+                if (!f || !f.element || !f.count) continue;
+                const blanks = this.pegs.filter(p => p.type === 'normal');
+                const targetCount = Math.min(f.count, blanks.length);
+                for (let i = blanks.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [blanks[i], blanks[j]] = [blanks[j], blanks[i]];
+                }
+                for (let i = 0; i < targetCount; i++) {
+                    blanks[i].type = f.element;
+                    blanks[i].level = 1;
+                }
+            }
+            this.pendingFusions = [];
+        }
+
+        // [兼容] boardLayout='triangle' 仍然在底部生成两个倍率转盘
+        this.ghostPegs = [];
+        this.triangleSideWheels = [];
+        if ((this.boardLayout || 'default') === 'triangle') {
+            const wheelY = maxPegY + 40;
+            const wheelXLeft = canvasWidth * 0.15;
+            const wheelXRight = canvasWidth * 0.85;
+            this.triangleSideWheels = [
+                new TriangleSideWheel(wheelXLeft, wheelY, 'left', this),
+                new TriangleSideWheel(wheelXRight, wheelY, 'right', this),
+            ];
+        }
+
+        this.currentLayout = this.boardLayout || 'default';
+        this._dropDistribution = null;
+        this._heatmapData = null;
+        this.ui_updateGatheringQueueUI();
+        this.ui_renderRecipeHUD();
+        console.log(`[Plinko v2] 模块化钉板初始化完成: ${this.pegs.length} 钉, ${this.specialSlots.length} 特殊槽, ${slotsToBuild}/${totalSlots} 槽位`);
+    },
+
+    // ==================== [兼容包装] ====================
+    // 调用 v2 模块化实现；旧的 phase_gathering_initPachinko_legacy 保留作参考
     phase_gathering_initPachinko(shouldInherit = false) {
+        return this.phase_gathering_initPachinko_v2(shouldInherit);
+    },
+
+    // [legacy] 旧的 10×5 平铺钉板生成器，保留作参考但不再被默认调用
+    phase_gathering_initPachinko_legacy(shouldInherit = false) {
         // [修复] 使用动态行数
         const rows = this.currentRows || CONFIG.gameplay.rows;
         const baseCols = CONFIG.gameplay.cols || 10;
@@ -1429,6 +1631,25 @@ phase_gathering_getRandomPegType() {
             // [局内存档] 每回合结算完毕后自动存档，防止刷新丢失进度
             // round-start resolver 会在存档恢复时继续处理 pendingRoundStartRewards。
             this.sys_saveRunState();
+
+            // ==================== [v2 局内商店] 每 N 场战斗弹出一次 ====================
+            const cfg = CONFIG.gameplay || {};
+            const interval = cfg.runShopInterval || 2;
+            const curRound = this.round || 1;
+            const shouldOpenShop = (curRound > 0)
+                && (curRound % interval === 0)
+                && (this._runShopOpenedRound !== curRound)
+                && (typeof this.ui_showRunShop === 'function')
+                && !this._isTutorialRun
+                && !(this.ownedRelics && this.ownedRelics.includes('chaos_pact'));
+            if (shouldOpenShop) {
+                this._runShopOpenedRound = curRound;
+                this.ui_showRunShop(() => {
+                    this.sys_startRoundStartResolver();
+                });
+                return;
+            }
+
             this.sys_startRoundStartResolver();
         }
     },
