@@ -487,7 +487,9 @@ export const hud_system = {
                         { k: 'pyro', i: CONFIG.ui.attributeDisplay.pyro.icon },
                         { k: 'lightning', i: CONFIG.ui.attributeDisplay.lightning.icon },
                         { k: 'laser', i: CONFIG.ui.attributeDisplay.laser.icon },
-                        { k: 'wind', i: CONFIG.ui.attributeDisplay.wind.icon }
+                        { k: 'wind', i: CONFIG.ui.attributeDisplay.wind.icon },
+                        { k: 'resonance', i: CONFIG.ui.attributeDisplay.resonance.icon },
+                        { k: 'venom', i: CONFIG.ui.attributeDisplay.venom.icon }
                     ];
                     let hasStats = false;
                     stats.forEach(s => {
@@ -582,7 +584,9 @@ export const hud_system = {
             'pyro': { c: CONFIG.colors.matPyro, l: CONFIG.ui.attributeDisplay.pyro.icon, n: '熱' },
             'lightning': { c: CONFIG.colors.matLightning, l: CONFIG.ui.attributeDisplay.lightning.icon, n: '雷' },
             'laser': { c: CONFIG.colors.laser, l: CONFIG.ui.attributeDisplay.laser.icon, n: '光' },
-            'wind': { c: CONFIG.colors.matWind, l: CONFIG.ui.attributeDisplay.wind.icon, n: '風' }
+            'wind': { c: CONFIG.colors.matWind, l: CONFIG.ui.attributeDisplay.wind.icon, n: '風' },
+            'resonance': { c: CONFIG.colors.resonance, l: CONFIG.ui.attributeDisplay.resonance.icon, n: '鳴' },
+            'venom': { c: CONFIG.colors.matVenom, l: CONFIG.ui.attributeDisplay.venom.icon, n: '毒' }
         };
 
         Object.keys(counts).forEach(type => { 
