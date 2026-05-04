@@ -4,6 +4,7 @@ import { CONFIG, RELIC_DB } from './config.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
 import { MODULE_DEFS, listAvailableModules } from './pinboard_modules.js';
 import { fuseRuneIntoBoard, getRuneId } from './rune_system.js';
+import { showToast } from './utils/math_utils.js';
 
 export const ui_system = {
     // @section:ui_fly_effects - 飞行特效池管理
@@ -1224,6 +1225,81 @@ export const ui_system = {
             onComplete: onComplete || null,
         };
 
+        // 注入一次性 CSS（动画与 hover 效果）
+        if (!document.getElementById('module-editor-styles')) {
+            const styleEl = document.createElement('style');
+            styleEl.id = 'module-editor-styles';
+            styleEl.textContent = `
+                @keyframes module-editor-pulse {
+                    0%, 100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.45); }
+                    50% { box-shadow: 0 0 0 6px rgba(56, 189, 248, 0); }
+                }
+                @keyframes module-editor-rune-pulse {
+                    0%, 100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.55); }
+                    50% { box-shadow: 0 0 0 8px rgba(168, 85, 247, 0); }
+                }
+                .module-grid-cell.is-unlocked:hover {
+                    transform: translateY(-1px);
+                    border-color: rgba(125, 211, 252, 0.9) !important;
+                    background: rgba(56, 189, 248, 0.28) !important;
+                }
+                .module-palette-item:hover {
+                    transform: translateY(-1px);
+                    border-color: rgba(125, 211, 252, 0.9) !important;
+                }
+                .module-palette-item.is-selected {
+                    animation: module-editor-pulse 1.6s ease-out infinite;
+                }
+                .rune-fusion-item:hover {
+                    transform: translateX(2px);
+                    border-color: rgba(216, 180, 254, 0.9) !important;
+                }
+                .rune-fusion-item.is-selected {
+                    animation: module-editor-rune-pulse 1.6s ease-out infinite;
+                }
+                #module-editor-fuse-btn:not(:disabled):hover {
+                    background: rgba(168, 85, 247, 0.75) !important;
+                    transform: translateY(-1px);
+                }
+                #module-editor-fuse-btn:disabled {
+                    opacity: 0.45;
+                    cursor: not-allowed;
+                }
+                #module-editor-start-btn:hover {
+                    background: rgba(34, 197, 94, 0.85) !important;
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35);
+                }
+                .module-editor-section {
+                    background: rgba(15, 23, 42, 0.55);
+                    border: 1px solid rgba(56, 189, 248, 0.18);
+                    border-radius: 10px;
+                    padding: 14px 16px;
+                }
+                .module-editor-section-title {
+                    font-size: 13px;
+                    font-weight: bold;
+                    color: #7dd3fc;
+                    letter-spacing: 0.5px;
+                    margin-bottom: 4px;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+                .module-editor-section-hint {
+                    font-size: 11px;
+                    color: #94a3b8;
+                    margin-bottom: 12px;
+                    line-height: 1.5;
+                }
+                .module-editor-runes-scroll::-webkit-scrollbar { width: 6px; }
+                .module-editor-runes-scroll::-webkit-scrollbar-thumb {
+                    background: rgba(168, 85, 247, 0.4); border-radius: 3px;
+                }
+            `;
+            document.head.appendChild(styleEl);
+        }
+
         let overlay = document.getElementById('module-editor-overlay');
         if (!overlay) {
             overlay = document.createElement('div');
@@ -1232,7 +1308,7 @@ export const ui_system = {
                 position: fixed; inset: 0; z-index: 240;
                 background: rgba(8, 12, 24, 0.92);
                 display: flex; align-items: center; justify-content: center;
-                padding: 16px; box-sizing: border-box;
+                padding: 24px; box-sizing: border-box;
                 font-family: 'Cinzel', 'Microsoft YaHei', sans-serif;
                 color: #e2e8f0;
             `;
@@ -1263,6 +1339,7 @@ export const ui_system = {
         const selRune = state.selectedRuneIdx;
         const inventory = Array.isArray(this.runeInventory) ? this.runeInventory : [];
         const pendingFusions = Array.isArray(this.pendingFusions) ? this.pendingFusions : [];
+        const placedCount = layout.slice(0, unlockedSlots).filter(Boolean).length;
 
         // ---- 模块网格 cells ----
         const gridCellsHtml = (() => {
@@ -1271,14 +1348,33 @@ export const ui_system = {
                 const isUnlocked = i < unlockedSlots;
                 const moduleId = layout[i];
                 const def = moduleId ? MODULE_DEFS[moduleId] : null;
+                const isPickPreview = isUnlocked && !def && selModule;
+                const previewDef = isPickPreview ? MODULE_DEFS[selModule] : null;
                 const bg = !isUnlocked
-                    ? 'rgba(30, 41, 59, 0.4)'
-                    : (def ? 'rgba(56, 189, 248, 0.18)' : 'rgba(30, 41, 59, 0.7)');
+                    ? 'rgba(15, 23, 42, 0.5)'
+                    : (def ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(56, 189, 248, 0.12))'
+                          : (isPickPreview ? 'rgba(56, 189, 248, 0.10)' : 'rgba(30, 41, 59, 0.6)'));
                 const border = !isUnlocked
-                    ? '1px dashed rgba(100,116,139,0.5)'
-                    : '1px solid rgba(56, 189, 248, 0.55)';
-                const labelMain = def ? `<div style="font-size:18px;line-height:1;">${def.icon || '▦'}</div><div style="font-size:10px;margin-top:4px;text-align:center;">${def.name}</div>` : (isUnlocked ? '<div style="font-size:11px;color:#64748b;">空槽</div>' : '<div style="font-size:14px;color:#475569;">🔒</div>');
-                html += `<div data-slot-idx="${i}" class="module-grid-cell" style="cursor:${isUnlocked ? 'pointer' : 'not-allowed'};background:${bg};border:${border};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80px;padding:6px;transition:all 0.15s;">${labelMain}</div>`;
+                    ? '1px dashed rgba(100, 116, 139, 0.4)'
+                    : (def ? '1px solid rgba(125, 211, 252, 0.7)'
+                          : (isPickPreview ? '1px dashed rgba(125, 211, 252, 0.55)' : '1px solid rgba(56, 189, 248, 0.35)'));
+                let labelMain;
+                if (def) {
+                    labelMain = `<div style="font-size:26px;line-height:1;">${def.icon || '▦'}</div>
+                        <div style="font-size:11px;margin-top:6px;text-align:center;font-weight:bold;color:#e2e8f0;">${def.name}</div>
+                        <div style="font-size:9px;margin-top:2px;color:#7dd3fc;letter-spacing:0.5px;">点击移除</div>`;
+                } else if (isPickPreview && previewDef) {
+                    labelMain = `<div style="font-size:22px;line-height:1;opacity:0.55;">${previewDef.icon || '▦'}</div>
+                        <div style="font-size:10px;margin-top:4px;color:#7dd3fc;opacity:0.85;">点击放置</div>`;
+                } else if (isUnlocked) {
+                    labelMain = `<div style="font-size:22px;line-height:1;color:#475569;">＋</div>
+                        <div style="font-size:10px;margin-top:4px;color:#64748b;">空槽</div>`;
+                } else {
+                    labelMain = `<div style="font-size:18px;color:#475569;">🔒</div>
+                        <div style="font-size:9px;margin-top:4px;color:#475569;">未开放</div>`;
+                }
+                const cls = isUnlocked ? 'module-grid-cell is-unlocked' : 'module-grid-cell';
+                html += `<div data-slot-idx="${i}" class="${cls}" style="cursor:${isUnlocked ? 'pointer' : 'not-allowed'};background:${bg};border:${border};border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:104px;padding:10px 6px;transition:all 0.18s ease;">${labelMain}</div>`;
             }
             return html;
         })();
@@ -1287,11 +1383,18 @@ export const ui_system = {
         const paletteHtml = available.map(id => {
             const def = MODULE_DEFS[id];
             if (!def) return '';
-            const selBg = (selModule === id) ? 'rgba(56, 189, 248, 0.45)' : 'rgba(30, 41, 59, 0.7)';
-            return `<div data-module-id="${id}" class="module-palette-item" style="cursor:pointer;background:${selBg};border:1px solid rgba(56, 189, 248, 0.4);border-radius:6px;padding:8px;display:flex;flex-direction:column;align-items:center;text-align:center;transition:all 0.15s;">
-                <div style="font-size:20px;">${def.icon}</div>
-                <div style="font-size:11px;margin-top:4px;font-weight:bold;">${def.name}</div>
-                <div style="font-size:9px;color:#94a3b8;margin-top:3px;line-height:1.3;">${def.desc}</div>
+            const isSel = selModule === id;
+            const bg = isSel
+                ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.45), rgba(56, 189, 248, 0.25))'
+                : 'rgba(30, 41, 59, 0.65)';
+            const border = isSel
+                ? '1px solid rgba(125, 211, 252, 0.95)'
+                : '1px solid rgba(56, 189, 248, 0.35)';
+            const cls = isSel ? 'module-palette-item is-selected' : 'module-palette-item';
+            return `<div data-module-id="${id}" class="${cls}" style="cursor:pointer;background:${bg};border:${border};border-radius:8px;padding:10px 10px 12px;display:flex;flex-direction:column;align-items:center;text-align:center;transition:all 0.18s ease;">
+                <div style="font-size:24px;line-height:1;">${def.icon}</div>
+                <div style="font-size:12px;margin-top:6px;font-weight:bold;color:#e2e8f0;">${def.name}</div>
+                <div style="font-size:10px;color:#94a3b8;margin-top:4px;line-height:1.4;">${def.desc}</div>
             </div>`;
         }).join('');
 
@@ -1301,53 +1404,102 @@ export const ui_system = {
             const def = (RUNE_DB || []).find(d => d.id === id);
             if (!def) return '';
             const lv = (typeof r === 'object' && typeof r.level === 'number') ? r.level : 1;
-            const selBg = (selRune === idx) ? 'rgba(168, 85, 247, 0.45)' : 'rgba(30, 41, 59, 0.7)';
-            return `<div data-rune-idx="${idx}" class="rune-fusion-item" style="cursor:pointer;background:${selBg};border:1px solid rgba(168, 85, 247, 0.4);border-radius:6px;padding:6px;display:flex;align-items:center;gap:6px;">
-                <div style="font-size:16px;">${def.icon || '🔮'}</div>
+            const isSel = selRune === idx;
+            const bg = isSel
+                ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.45), rgba(168, 85, 247, 0.20))'
+                : 'rgba(30, 41, 59, 0.65)';
+            const border = isSel
+                ? '1px solid rgba(216, 180, 254, 0.95)'
+                : '1px solid rgba(168, 85, 247, 0.35)';
+            const cls = isSel ? 'rune-fusion-item is-selected' : 'rune-fusion-item';
+            return `<div data-rune-idx="${idx}" class="${cls}" style="cursor:pointer;background:${bg};border:${border};border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;transition:all 0.18s ease;">
+                <div style="font-size:22px;flex-shrink:0;width:32px;text-align:center;">${def.icon || '🔮'}</div>
                 <div style="flex:1;min-width:0;">
-                    <div style="font-size:11px;font-weight:bold;">${def.name || id} <span style="color:#fbbf24;">L${lv}</span></div>
-                    <div style="font-size:9px;color:#94a3b8;">融合后赋予 ${lv} 颗 ${def.element || ''} 钉子</div>
+                    <div style="font-size:12px;font-weight:bold;color:#e2e8f0;">${def.name || id} <span style="color:#fbbf24;margin-left:4px;">L${lv}</span></div>
+                    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">融合后赋予 <span style="color:#d8b4fe;font-weight:bold;">${lv}</span> 颗 <span style="color:#d8b4fe;">${def.element || ''}</span> 钉子</div>
                 </div>
             </div>`;
-        }).join('') : '<div style="color:#64748b;font-size:11px;padding:8px;">背包没有符文</div>';
+        }).join('') : '<div style="color:#64748b;font-size:12px;padding:18px 12px;text-align:center;font-style:italic;">背包没有符文</div>';
 
         const pendingHtml = pendingFusions.length > 0
-            ? '<div style="margin-top:8px;padding:6px;background:rgba(168, 85, 247, 0.12);border-radius:6px;font-size:10px;">待融合: ' + pendingFusions.map(f => `${f.element}×${f.count}`).join(', ') + '</div>'
+            ? `<div style="margin-top:10px;padding:10px 12px;background:linear-gradient(90deg, rgba(168, 85, 247, 0.18), rgba(168, 85, 247, 0.08));border:1px solid rgba(168, 85, 247, 0.35);border-radius:8px;font-size:11px;color:#e9d5ff;">
+                 <span style="color:#c084fc;font-weight:bold;">⚗ 已注入：</span>
+                 ${pendingFusions.map(f => `<span style="margin:0 6px;color:#fff;font-weight:bold;">${f.element}×${f.count}</span>`).join('|')}
+               </div>`
             : '';
 
+        const fuseDisabled = (selRune === null || selRune === undefined);
+        const fuseBtnLabel = fuseDisabled ? '请先在左侧选中一枚符文' : '注入选中符文 →';
+
         overlay.innerHTML = `
-            <div style="background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; padding: 18px; max-width: 960px; width: 100%; max-height: 92vh; overflow: auto; display: flex; flex-direction: column; gap: 14px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(56, 189, 248, 0.25);padding-bottom:10px;">
-                    <div style="font-size:18px;font-weight:bold;color:#7dd3fc;">钉板模块编辑器</div>
-                    <div style="font-size:11px;color:#94a3b8;">已开放槽位: <span style="color:#fbbf24;font-weight:bold;">${unlockedSlots}/${totalSlots}</span></div>
-                </div>
-                <div style="display:grid;grid-template-columns: 2fr 1.2fr;gap:14px;">
+            <div style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(20, 28, 50, 0.98)); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 16px; padding: 22px 24px; max-width: 1180px; width: 100%; max-height: 94vh; overflow: auto; display: flex; flex-direction: column; gap: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);">
+
+                <!-- Header -->
+                <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(56, 189, 248, 0.25);padding-bottom:14px;">
                     <div>
-                        <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">模块网格 (点击空槽放置已选模块；点击已放置模块清除)</div>
-                        <div id="module-editor-grid" style="display:grid;grid-template-columns:repeat(${cols}, 1fr);gap:6px;">
+                        <div style="font-size:22px;font-weight:bold;color:#7dd3fc;letter-spacing:1px;">⚙ 钉板模块编辑器</div>
+                        <div style="font-size:11px;color:#94a3b8;margin-top:4px;">摆放钉板模块，并将背包中的符文融合为元素钉子</div>
+                    </div>
+                    <div style="display:flex;gap:18px;align-items:center;">
+                        <div style="text-align:right;">
+                            <div style="font-size:10px;color:#94a3b8;">已开放槽位</div>
+                            <div style="font-size:16px;color:#fbbf24;font-weight:bold;">${unlockedSlots} <span style="font-size:11px;color:#64748b;">/ ${totalSlots}</span></div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:10px;color:#94a3b8;">已摆放</div>
+                            <div style="font-size:16px;color:#7dd3fc;font-weight:bold;">${placedCount} <span style="font-size:11px;color:#64748b;">/ ${unlockedSlots}</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main: 网格 + 模块库 -->
+                <div style="display:grid;grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1fr);gap:18px;">
+
+                    <!-- 钉板网格 -->
+                    <div class="module-editor-section">
+                        <div class="module-editor-section-title">▦ 钉板布局</div>
+                        <div class="module-editor-section-hint">从右侧选择模块 → 点击空槽放置；点击已放置模块可移除。</div>
+                        <div id="module-editor-grid" style="display:grid;grid-template-columns:repeat(${cols}, 1fr);gap:10px;">
                             ${gridCellsHtml}
                         </div>
                     </div>
-                    <div style="display:flex;flex-direction:column;gap:10px;">
-                        <div>
-                            <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">模块库 (点击选中)</div>
-                            <div id="module-editor-palette" style="display:grid;grid-template-columns:repeat(2, 1fr);gap:6px;">
-                                ${paletteHtml}
-                            </div>
-                        </div>
-                        <div>
-                            <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">符文融合 (点击符文 → 点击"融合"消耗到钉板)</div>
-                            <div id="module-editor-runes" style="display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto;">
-                                ${runeListHtml}
-                            </div>
-                            <button id="module-editor-fuse-btn" style="margin-top:8px;width:100%;padding:6px;background:rgba(168, 85, 247, 0.5);color:#fff;border:1px solid rgba(168, 85, 247, 0.7);border-radius:6px;cursor:pointer;font-size:12px;">融合选中符文</button>
-                            ${pendingHtml}
+
+                    <!-- 模块库 -->
+                    <div class="module-editor-section">
+                        <div class="module-editor-section-title">📦 模块库</div>
+                        <div class="module-editor-section-hint">点击模块以选中，再点击网格中的空槽放置。再次点击同一模块可取消选中。</div>
+                        <div id="module-editor-palette" style="display:grid;grid-template-columns:repeat(2, 1fr);gap:10px;">
+                            ${paletteHtml}
                         </div>
                     </div>
                 </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(56, 189, 248, 0.25);padding-top:10px;">
-                    <div style="font-size:10px;color:#64748b;">提示：摆放完模块后，可消耗符文将元素属性"融合"到钉板的随机普通钉子上。</div>
-                    <button id="module-editor-start-btn" style="padding:8px 18px;background:rgba(34, 197, 94, 0.55);color:#fff;border:1px solid rgba(34, 197, 94, 0.8);border-radius:6px;cursor:pointer;font-weight:bold;">开始采集</button>
+
+                <!-- 符文融合区 -->
+                <div class="module-editor-section" style="border-color: rgba(168, 85, 247, 0.3);">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+                        <div>
+                            <div class="module-editor-section-title" style="color:#c084fc;">✨ 符文融合</div>
+                            <div class="module-editor-section-hint" style="margin-bottom:0;">选中符文 → 点击右侧"注入"按钮，符文将被消耗，钉板上随机普通钉子获得对应元素属性。</div>
+                        </div>
+                        <div style="font-size:11px;color:#94a3b8;">背包：<span style="color:#fbbf24;font-weight:bold;">${inventory.length}</span> 枚符文</div>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns: minmax(0, 1.4fr) minmax(220px, 1fr);gap:14px;align-items:stretch;margin-top:10px;">
+                        <div id="module-editor-runes" class="module-editor-runes-scroll" style="display:flex;flex-direction:column;gap:8px;max-height:240px;min-height:120px;overflow-y:auto;padding-right:4px;">
+                            ${runeListHtml}
+                        </div>
+                        <div style="display:flex;flex-direction:column;justify-content:center;gap:10px;">
+                            <button id="module-editor-fuse-btn" ${fuseDisabled ? 'disabled' : ''} style="padding:14px 16px;background:${fuseDisabled ? 'rgba(71, 85, 105, 0.5)' : 'linear-gradient(135deg, rgba(168, 85, 247, 0.7), rgba(126, 34, 206, 0.85))'};color:#fff;border:1px solid rgba(216, 180, 254, ${fuseDisabled ? '0.3' : '0.85'});border-radius:10px;cursor:${fuseDisabled ? 'not-allowed' : 'pointer'};font-size:13px;font-weight:bold;letter-spacing:0.5px;transition:all 0.18s ease;box-shadow:${fuseDisabled ? 'none' : '0 2px 12px rgba(168, 85, 247, 0.35)'};">${fuseBtnLabel}</button>
+                            <div style="font-size:10px;color:#94a3b8;text-align:center;line-height:1.5;">符文等级 = 注入钉子数量<br/>越高级一次越划算</div>
+                        </div>
+                    </div>
+                    ${pendingHtml}
+                </div>
+
+                <!-- Footer -->
+                <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(56, 189, 248, 0.25);padding-top:14px;gap:14px;flex-wrap:wrap;">
+                    <div style="font-size:11px;color:#64748b;flex:1;min-width:200px;line-height:1.5;">💡 摆放完模块后，可消耗符文将元素属性"融合"到钉板的随机普通钉子上；准备就绪后点击右侧按钮开始本回合采集。</div>
+                    <button id="module-editor-start-btn" style="padding:12px 28px;background:linear-gradient(135deg, rgba(34, 197, 94, 0.7), rgba(21, 128, 61, 0.85));color:#fff;border:1px solid rgba(74, 222, 128, 0.85);border-radius:10px;cursor:pointer;font-weight:bold;font-size:14px;letter-spacing:1px;transition:all 0.18s ease;box-shadow:0 2px 12px rgba(34, 197, 94, 0.3);">▶ 开始采集</button>
                 </div>
             </div>
         `;
@@ -1358,13 +1510,19 @@ export const ui_system = {
             grid.querySelectorAll('.module-grid-cell').forEach(cell => {
                 cell.addEventListener('click', () => {
                     const idx = parseInt(cell.dataset.slotIdx, 10);
-                    if (idx >= unlockedSlots) return; // 锁定槽
+                    if (idx >= unlockedSlots) {
+                        showToast('该槽位尚未开放');
+                        return;
+                    }
                     const st = this._moduleEditorState || {};
                     if (this.currentModuleLayout[idx]) {
                         // 已有模块 → 清除
                         this.currentModuleLayout[idx] = null;
                     } else if (st.selectedModuleId) {
                         this.currentModuleLayout[idx] = st.selectedModuleId;
+                    } else {
+                        showToast('请先在右侧"模块库"中选中一个模块');
+                        return;
                     }
                     this.ui_renderModuleEditor();
                 });
@@ -1396,14 +1554,19 @@ export const ui_system = {
         if (fuseBtn) {
             fuseBtn.addEventListener('click', () => {
                 const st = this._moduleEditorState;
-                if (!st || st.selectedRuneIdx === null) {
-                    if (window.showToast) window.showToast('请先选中要融合的符文');
+                if (!st || st.selectedRuneIdx === null || st.selectedRuneIdx === undefined) {
+                    showToast('请先选中要融合的符文');
                     return;
                 }
                 const rune = (this.runeInventory || [])[st.selectedRuneIdx];
-                if (!rune) return;
+                if (!rune) {
+                    showToast('该符文不存在或已被消耗');
+                    st.selectedRuneIdx = null;
+                    this.ui_renderModuleEditor();
+                    return;
+                }
                 const result = fuseRuneIntoBoard(this, rune, RUNE_DB);
-                if (window.showToast) window.showToast(result.message);
+                showToast(result.message);
                 if (result.ok) st.selectedRuneIdx = null;
                 this.ui_renderModuleEditor();
             });

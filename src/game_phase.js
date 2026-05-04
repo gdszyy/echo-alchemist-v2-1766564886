@@ -105,7 +105,9 @@ export const game_phase = {
         if (!skipEditor && typeof this.ui_showModuleEditor === 'function') {
             this._moduleEditorShownThisRound = true;
             this.ui_showModuleEditor(() => {
-                this._moduleEditorShownThisRound = false;
+                // 注意：保持 _moduleEditorShownThisRound = true，
+                // 这样递归调用 phase_startGatheringPhase 时 skipEditor 为 true，
+                // 不会再次打开编辑器，并在下方第 113 行被重置为 false。
                 this.phase_startGatheringPhase();
             });
             return;
