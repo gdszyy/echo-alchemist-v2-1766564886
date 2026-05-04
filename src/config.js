@@ -761,10 +761,13 @@ const CONFIG = {
         runShopItemsPerOffer: 5,       // 每次刷新提供的商品数
         runShopRunesRatio: 0.6,        // 商品中符文占比
         runShopEndOfRunFragmentSettle: 0.3, // 局结束时未消费碎片转换为 saveData 的比例
-        enemyDropFragmentChance: 0.45, // 敌人击杀后掉落碎片基础概率
+        enemyDropFragmentChance: 0.30, // 普通敌人击杀掉落碎片基础概率
         enemyDropFragmentBaseAmount: 1,
-        enemyDropFragmentRoundBonus: 0.1,
-        bossFragmentDrop: 8,
+        enemyDropFragmentRoundBonus: 0.02, // 每回合 +2% 慢爬升
+        enemyDropFragmentChanceCap: 0.55,  // 普通敌人掉落概率上限
+        eliteFragmentDrop: 3,           // 精英敌人击杀掉落（80% 概率）
+        eliteFragmentDropChance: 0.80,
+        bossFragmentDrop: 8,            // Boss 击杀必掉
         maxSkillPoints: 3,  // 技能点上限
         spSlotsStartRow:3,
         spSlotsEndRow:8,
