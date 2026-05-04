@@ -667,7 +667,14 @@ export const rune_launcher_system = {
             card.className = [
                 'flex items-start gap-3 p-3',
                 'bg-purple-900/20 border border-purple-700/40 rounded-xl',
+                'cursor-pointer hover:bg-purple-900/40 hover:border-purple-500/60 transition-all duration-150',
             ].join(' ');
+            card.title = '點擊查看詞條詳細效果';
+            card.onclick = () => {
+                if (typeof this.ui_showRunewordDetail === 'function') {
+                    this.ui_showRunewordDetail(rw.id || rw.effectId, rw.level || 1);
+                }
+            };
             // [Agent D] 根据 level 动态计算效果数值描述
             const level = rw.level || 1;
             const bp = rw.baseParams || {};
@@ -853,6 +860,12 @@ export const rune_launcher_system = {
             countEl.className = selectedCount > 0
                 ? 'text-xs text-purple-300 font-bold'
                 : 'text-xs text-slate-500';
+        }
+        // 同步管理页选中计数
+        const mgCountEl = document.getElementById('rune-management-selected-count');
+        if (mgCountEl) {
+            mgCountEl.textContent = `${selectedCount} / 3`;
+            mgCountEl.style.color = selectedCount > 0 ? '#c4b5fd' : '#64748b';
         }
 
         // 获取选中符文对象
@@ -1104,26 +1117,115 @@ export const rune_launcher_system = {
      */
     ui_switchRuneTab(tab) {
         const launcherContent = document.getElementById('rune-launcher-content');
+        const managementPanel = document.getElementById('rune-management-panel');
         const codexPanel = document.getElementById('rune-codex-panel');
         const tabLauncher = document.getElementById('rune-tab-launcher');
+        const tabManagement = document.getElementById('rune-tab-management');
         const tabCodex = document.getElementById('rune-tab-codex');
         if (!launcherContent || !codexPanel) return;
 
         const activeClass = ['bg-purple-700/60', 'text-purple-100', 'border-purple-500/60'];
         const inactiveClass = ['bg-slate-800/60', 'text-slate-400', 'border-slate-700/40'];
 
+        const setActive = (btn, on) => {
+            if (!btn) return;
+            if (on) { btn.classList.add(...activeClass); btn.classList.remove(...inactiveClass); }
+            else    { btn.classList.remove(...activeClass); btn.classList.add(...inactiveClass); }
+        };
+
+        // 默认隐藏全部内容
+        launcherContent.classList.add('hidden');
+        if (managementPanel) managementPanel.classList.add('hidden');
+        codexPanel.classList.add('hidden');
+
         if (tab === 'launcher') {
             launcherContent.classList.remove('hidden');
-            codexPanel.classList.add('hidden');
-            if (tabLauncher) { tabLauncher.classList.add(...activeClass); tabLauncher.classList.remove(...inactiveClass); }
-            if (tabCodex) { tabCodex.classList.remove(...activeClass); tabCodex.classList.add(...inactiveClass); }
+            setActive(tabLauncher, true);
+            setActive(tabManagement, false);
+            setActive(tabCodex, false);
+        } else if (tab === 'management') {
+            if (managementPanel) managementPanel.classList.remove('hidden');
+            setActive(tabLauncher, false);
+            setActive(tabManagement, true);
+            setActive(tabCodex, false);
+            // 更新管理页选中计数
+            if (typeof this._ui_updateRuneActionButtons === 'function') this._ui_updateRuneActionButtons();
+            const sel = document.getElementById('rune-management-selected-count');
+            if (sel) {
+                const c = this._selectedRuneIndices ? this._selectedRuneIndices.size : 0;
+                sel.textContent = `${c} / 3`;
+            }
         } else {
-            launcherContent.classList.add('hidden');
             codexPanel.classList.remove('hidden');
-            if (tabCodex) { tabCodex.classList.add(...activeClass); tabCodex.classList.remove(...inactiveClass); }
-            if (tabLauncher) { tabLauncher.classList.remove(...activeClass); tabLauncher.classList.add(...inactiveClass); }
+            setActive(tabLauncher, false);
+            setActive(tabManagement, false);
+            setActive(tabCodex, true);
             this.ui_renderRuneCodex();
         }
+    },
+
+
+    /**
+     * ui_showRunewordDetail - 弹出词条详细效果浮层
+     * @param {string} runewordId
+     * @param {number} [level=1]
+     */
+    ui_showRunewordDetail(runewordId, level = 1) {
+        const rw = RUNEWORD_DB.find(r => r.id === runewordId);
+        if (!rw) return;
+        let overlay = document.getElementById('runeword-detail-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'runeword-detail-overlay';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:600;display:flex;align-items:center;justify-content:center;padding:16px;';
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+            document.body.appendChild(overlay);
+        } else {
+            overlay.innerHTML = '';
+            overlay.style.display = 'flex';
+        }
+
+        const patternIcons = rw.pattern.map(rid => {
+            const rd = RUNE_DB.find(r => r.id === rid);
+            return rd ? `<span title="${rd.name}">${_ui_buildRuneIconHTML(rd, 1)}</span>` : '?';
+        }).join('<span style="color:#64748b;margin:0 2px;">→</span>');
+
+        const dynamicDesc = (typeof this._ui_calcRunewordDynamicDesc === 'function')
+            ? this._ui_calcRunewordDynamicDesc(rw, level) : '';
+
+        const tabs = [1, 2, 3].map(lv => {
+            const active = lv === level;
+            return `<button data-lv="${lv}" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:bold;cursor:pointer;border:1px solid ${active ? '#fbbf24' : '#475569'};background:${active ? 'rgba(251,191,36,0.25)' : 'rgba(30,41,59,0.6)'};color:${active ? '#fde68a' : '#94a3b8'};">Lv.${lv}</button>`;
+        }).join('');
+
+        const card = document.createElement('div');
+        card.style.cssText = 'max-width:380px;width:100%;background:#0f172a;border:1px solid rgba(168,85,247,0.5);border-radius:14px;padding:18px;box-shadow:0 0 40px rgba(168,85,247,0.3);';
+        card.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:22px;">✨</span>
+                    <span style="font-size:16px;font-weight:bold;color:#e9d5ff;">${rw.name}</span>
+                    <span style="font-size:10px;color:#94a3b8;background:rgba(30,41,59,0.7);padding:2px 6px;border-radius:4px;">${rw.effect_desc.match(/【(.+?)】/)?.[1] || ''}</span>
+                </div>
+                <button id="runeword-detail-close" style="width:28px;height:28px;border-radius:50%;background:#1e293b;color:#cbd5e1;border:1px solid #334155;cursor:pointer;font-size:14px;">✕</button>
+            </div>
+            <div style="font-size:11px;color:#cbd5e1;margin-bottom:8px;">符文組合：<span style="font-size:16px;">${patternIcons}</span></div>
+            <div style="font-size:12px;color:#e2e8f0;line-height:1.6;margin-bottom:10px;">${rw.effect_desc}</div>
+            <div id="runeword-detail-dynamic" style="font-size:12px;color:#34d399;font-weight:bold;min-height:18px;margin-bottom:12px;">${dynamicDesc}</div>
+            <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:11px;color:#94a3b8;">等級：</span>
+                <div id="runeword-detail-tabs" style="display:flex;gap:6px;">${tabs}</div>
+            </div>
+        `;
+        overlay.appendChild(card);
+
+        card.querySelector('#runeword-detail-close').onclick = () => overlay.remove();
+        card.querySelectorAll('#runeword-detail-tabs button').forEach(btn => {
+            btn.onclick = () => {
+                const lv = parseInt(btn.dataset.lv, 10);
+                this.ui_showRunewordDetail(runewordId, lv);
+            };
+        });
     },
 
 

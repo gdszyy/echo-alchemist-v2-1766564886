@@ -2539,7 +2539,12 @@ export const combat_system = {
                 const { damagePerKill, elementPenalty } = bloodthirstFx.params;
                 const killCount = this.runewordKillCount || 0;
                 if (killCount > 0 && damagePerKill > 0) {
-                    finalRecipe.damage = (finalRecipe.damage || 0) + damagePerKill * killCount;
+                    // 三角阈值：每击杀 1, 2, 3, 4... 个敌人才 +damagePerKill 伤害
+                    // 累计阈值 1, 3, 6, 10, 15... bonus = floor((-1 + sqrt(1+8N))/2)
+                    const bonusTier = Math.floor((-1 + Math.sqrt(1 + 8 * killCount)) / 2);
+                    if (bonusTier > 0) {
+                        finalRecipe.damage = (finalRecipe.damage || 0) + damagePerKill * bonusTier;
+                    }
                 }
                 if (elementPenalty > 0) {
                     if (finalRecipe.cryo > 0) {

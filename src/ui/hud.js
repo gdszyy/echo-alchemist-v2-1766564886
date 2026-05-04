@@ -17,7 +17,8 @@
 
 import { CONFIG } from '../config.js';
 import { eventBus, EVENT_TYPES } from '../event_bus.js';
-import { RUNE_DB, RARITY_DISPLAY } from '../rune_config.js';
+import { RUNE_DB, RARITY_DISPLAY, STAT_DISPLAY } from '../rune_config.js';
+import { calcRuneBaseStats } from '../rune_system.js';
 import { getAmmoIconSrc } from '../bitmap_icons.js';
 
 /**
@@ -449,9 +450,13 @@ export const hud_system = {
                     }
                     combatHud.appendChild(card);
                 });
+
+                // --- [继承加成] 显示符文基础属性、词条加成与全局额外伤害/击杀加成 ---
+                const inheritCard = this._buildInheritanceCard();
+                if (inheritCard) combatHud.appendChild(inheritCard);
             }
-        } 
-        else { 
+        }
+        else {
             // --- 收集阶段 ---
             
             // 1. 隐藏战斗 HUD
@@ -1023,6 +1028,67 @@ export const hud_system = {
         });
     },
 
+    /**
+     * 构建继承加成卡片：展示当前所有附加属性、伤害继承
+     * - 全局基础伤害加成（flatDamageBonus 来自 alchemist_powder_tube 等遗物）
+     * - 嗜血初锋累计击杀加成（runewordKillCount，三角阈值）
+     * - 符文网格基础属性加成（calcRuneBaseStats）
+     * - 词条共鸣属性加成（runewordStats）
+     * @returns {HTMLElement|null}
+     * @private
+     */
+    _buildInheritanceCard() {
+        const flatDmg = this.flatDamageBonus || 0;
+        const killCount = this.runewordKillCount || 0;
+        const bloodthirstFx = this.activeRunewordEffects && this.activeRunewordEffects['bloodthirst_growth'];
+        let bloodthirstBonus = 0;
+        if (bloodthirstFx && killCount > 0) {
+            const damagePerKill = (bloodthirstFx.params && bloodthirstFx.params.damagePerKill) || 0;
+            const bonusTier = Math.floor((-1 + Math.sqrt(1 + 8 * killCount)) / 2);
+            bloodthirstBonus = damagePerKill * bonusTier;
+        }
+
+        let baseStats = {};
+        let runewordStats = {};
+        try {
+            if (this.runeGrid) baseStats = calcRuneBaseStats(this.runeGrid, RUNE_DB) || {};
+        } catch (e) { baseStats = {}; }
+        if (this.runewordStats && typeof this.runewordStats === 'object') runewordStats = this.runewordStats;
+
+        const baseEntries = Object.entries(baseStats).filter(([, v]) => v > 0);
+        const runewordEntries = Object.entries(runewordStats).filter(([, v]) => v > 0);
+
+        if (flatDmg <= 0 && bloodthirstBonus <= 0 && baseEntries.length === 0 && runewordEntries.length === 0) {
+            return null;
+        }
+
+        const card = document.createElement('div');
+        card.className = 'recipe-card mb-1';
+        card.style.cssText = 'background:rgba(15,23,42,0.85);border:1px solid rgba(168,85,247,0.4);border-radius:6px;padding:4px 6px;';
+
+        const header = document.createElement('div');
+        header.className = 'border-b border-purple-500/20 pb-0.5 mb-1';
+        header.innerHTML = '<span class="font-bold text-purple-300 text-[10px] tracking-wider">✨ 继承加成</span>';
+        card.appendChild(header);
+
+        const lines = [];
+        if (flatDmg > 0) lines.push(`<span class="text-amber-300">⚔️ 基础伤害 +${flatDmg}</span>`);
+        if (bloodthirstBonus > 0) lines.push(`<span class="text-red-300">🩸 嗜血 +${bloodthirstBonus} (${killCount}杀)</span>`);
+        baseEntries.forEach(([k, v]) => {
+            const info = STAT_DISPLAY[k] || { name: k, icon: '' };
+            lines.push(`<span class="text-blue-300">${info.icon} ${info.name} +${v}</span>`);
+        });
+        runewordEntries.forEach(([k, v]) => {
+            const info = STAT_DISPLAY[k] || { name: k, icon: '' };
+            lines.push(`<span class="text-amber-300">${info.icon} ${info.name} +${v}</span>`);
+        });
+
+        const grid = document.createElement('div');
+        grid.className = 'flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] leading-tight';
+        grid.innerHTML = lines.join('');
+        card.appendChild(grid);
+        return card;
+    },
 
 };
 

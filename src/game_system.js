@@ -1002,7 +1002,7 @@ export const game_system = {
         const finalPicks = slotAttrs.map(arr => arr[Math.floor(Math.random() * arr.length)]);
 
         const allSame = finalPicks.length >= 3 && finalPicks.every(p => p === finalPicks[0]);
-        const incVal = allSame ? 5 : 2;
+        const incVal = allSame ? 5 : 1;
 
         const applyUpgrade = () => {
             if (allSame) {
@@ -1086,7 +1086,7 @@ export const game_system = {
         });
         const finalPicks = slotAttrs.map(arr => arr[Math.floor(Math.random() * arr.length)]);
         const allSame = finalPicks.length >= 3 && finalPicks.every(p => p === finalPicks[0]);
-        const baseInc = allSame ? 5 : 2;
+        const baseInc = allSame ? 5 : 1;
         const incVal = baseInc + Math.max(0, bonusCount | 0);
 
         const applyUpgrade = () => {

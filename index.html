@@ -2929,8 +2929,9 @@
 
             <!-- Tab 导航 -->
             <div class="flex gap-2 mb-5 border-b border-slate-700/50 pb-3">
-                <button id="rune-tab-launcher" onclick="game.ui_switchRuneTab('launcher')" class="flex-1 py-2 px-3 rounded-lg text-xs font-bold tracking-wider transition-all duration-200 bg-purple-700/60 text-purple-100 border border-purple-500/60">⚡ 發射器</button>
-                <button id="rune-tab-codex" onclick="game.ui_switchRuneTab('codex')" class="flex-1 py-2 px-3 rounded-lg text-xs font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">📖 詞條圖鑑</button>
+                <button id="rune-tab-launcher" onclick="game.ui_switchRuneTab('launcher')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-purple-700/60 text-purple-100 border border-purple-500/60">⚡ 配置</button>
+                <button id="rune-tab-management" onclick="game.ui_switchRuneTab('management')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">⚗️ 管理</button>
+                <button id="rune-tab-codex" onclick="game.ui_switchRuneTab('codex')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">📖 圖鑑</button>
             </div>
 
             <!-- 发射器内容区域 -->
@@ -2962,39 +2963,6 @@
                 </div>
             </div>
 
-            <!-- 合成区域 -->
-            <div class="mb-4 bg-amber-900/10 border border-amber-700/30 rounded-xl p-4">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="text-amber-400">⚗️</span>
-                    <div class="text-xs text-amber-300/80 tracking-widest uppercase font-bold">合成爐</div>
-                    <div class="text-[10px] text-slate-500 ml-auto">選中 3 個同 ID 同等級符文</div>
-                </div>
-                <button id="rune-merge-btn"
-                    onclick="game.ui_doRuneMerge()"
-                    disabled
-                    class="w-full py-2 px-3 rounded-xl text-sm font-bold bg-slate-800/60 text-slate-600 border border-slate-700/40 cursor-not-allowed transition-all duration-200">
-                    ⚗️ 合成（需選中 3 個同 ID 同等級）
-                </button>
-            </div>
-
-            <!-- 重铸炉区域 -->
-            <div class="mb-4 bg-purple-900/10 border border-purple-700/30 rounded-xl p-4">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="text-purple-400">🔮</span>
-                    <div class="text-xs text-purple-300/80 tracking-widest uppercase font-bold">重鑄爐</div>
-                    <div class="text-[10px] text-slate-500 ml-auto">選中任意 3 個符文</div>
-                </div>
-                <button id="rune-reforge-btn"
-                    onclick="game.ui_doRuneReforge()"
-                    disabled
-                    class="w-full py-2 px-3 rounded-xl text-sm font-bold bg-slate-800/60 text-slate-600 border border-slate-700/40 cursor-not-allowed transition-all duration-200">
-                    🔮 重鑄（消耗 3 個符文，獲得全新符文）
-                </button>
-            </div>
-
-            <!-- 操作结果提示 -->
-            <div id="rune-action-result" class="hidden mb-4 text-sm font-bold text-center py-2 px-3 rounded-xl"></div>
-
             <!-- 激活词条列表 -->
             <div class="mb-4">
                 <div class="text-xs text-amber-300/60 tracking-widest uppercase mb-3">已激活詞條</div>
@@ -3024,6 +2992,52 @@
             </div>
 
             </div><!-- end #rune-launcher-content -->
+
+            <!-- 符文管理面板（熔炼 / 重铸） -->
+            <div id="rune-management-panel" class="hidden">
+                <div class="text-xs text-slate-400/70 mb-3 leading-relaxed">
+                    在此頁面熔煉或重鑄符文。請先在「配置」頁面選中 3 個符文，再返回此頁執行操作。
+                </div>
+
+                <!-- 当前选中状态 -->
+                <div class="mb-4 px-3 py-2 bg-slate-900/40 border border-slate-700/40 rounded-lg flex items-center justify-between">
+                    <span class="text-[11px] text-slate-400">當前選中</span>
+                    <span id="rune-management-selected-count" class="text-xs text-purple-300 font-bold">0 / 3</span>
+                </div>
+
+                <!-- 合成区域 -->
+                <div class="mb-4 bg-amber-900/10 border border-amber-700/30 rounded-xl p-4">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-amber-400">⚗️</span>
+                        <div class="text-xs text-amber-300/80 tracking-widest uppercase font-bold">合成爐</div>
+                        <div class="text-[10px] text-slate-500 ml-auto">選中 3 個同 ID 同等級符文</div>
+                    </div>
+                    <button id="rune-merge-btn"
+                        onclick="game.ui_doRuneMerge()"
+                        disabled
+                        class="w-full py-2 px-3 rounded-xl text-sm font-bold bg-slate-800/60 text-slate-600 border border-slate-700/40 cursor-not-allowed transition-all duration-200">
+                        ⚗️ 合成（需選中 3 個同 ID 同等級）
+                    </button>
+                </div>
+
+                <!-- 重铸炉区域 -->
+                <div class="mb-4 bg-purple-900/10 border border-purple-700/30 rounded-xl p-4">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-purple-400">🔮</span>
+                        <div class="text-xs text-purple-300/80 tracking-widest uppercase font-bold">重鑄爐</div>
+                        <div class="text-[10px] text-slate-500 ml-auto">選中任意 3 個符文</div>
+                    </div>
+                    <button id="rune-reforge-btn"
+                        onclick="game.ui_doRuneReforge()"
+                        disabled
+                        class="w-full py-2 px-3 rounded-xl text-sm font-bold bg-slate-800/60 text-slate-600 border border-slate-700/40 cursor-not-allowed transition-all duration-200">
+                        🔮 重鑄（消耗 3 個符文，獲得全新符文）
+                    </button>
+                </div>
+
+                <!-- 操作结果提示 -->
+                <div id="rune-action-result" class="hidden mb-4 text-sm font-bold text-center py-2 px-3 rounded-xl"></div>
+            </div><!-- end #rune-management-panel -->
 
             <!-- 词条图鉴面板 -->
             <div id="rune-codex-panel" class="hidden">
