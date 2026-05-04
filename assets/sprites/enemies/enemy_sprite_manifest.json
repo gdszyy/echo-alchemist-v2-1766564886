@@ -91,7 +91,7 @@
       "baseArchetype": "residue",
       "footprint": "1x1",
       "affixes": [],
-      "placeholder": true
+      "placeholder": false
     },
     "bastion:3x1:heavyArmor": {
       "resourceId": "enemy_bastion_heavyarmor_3x1",
@@ -99,8 +99,10 @@
       "manifestPath": "assets/sprites/enemies/composites/enemy_bastion_heavyarmor_3x1_idle.json",
       "baseArchetype": "bastion",
       "footprint": "3x1",
-      "affixes": ["heavyArmor"],
-      "placeholder": true
+      "affixes": [
+        "heavyArmor"
+      ],
+      "placeholder": false
     },
     "maw:2x2:devour": {
       "resourceId": "enemy_maw_devour_2x2",
@@ -108,8 +110,10 @@
       "manifestPath": "assets/sprites/enemies/composites/enemy_maw_devour_2x2_idle.json",
       "baseArchetype": "maw",
       "footprint": "2x2",
-      "affixes": ["devour"],
-      "placeholder": true
+      "affixes": [
+        "devour"
+      ],
+      "placeholder": false
     },
     "siege:3x2:siege": {
       "resourceId": "enemy_siege_siege_3x2",
@@ -117,8 +121,10 @@
       "manifestPath": "assets/sprites/enemies/composites/enemy_siege_siege_3x2_idle.json",
       "baseArchetype": "siege",
       "footprint": "3x2",
-      "affixes": ["siege"],
-      "placeholder": true
+      "affixes": [
+        "siege"
+      ],
+      "placeholder": false
     },
     "echoSpire:1x2:echoRelay": {
       "resourceId": "enemy_spire_echorelay_1x2",
@@ -126,8 +132,10 @@
       "manifestPath": "assets/sprites/enemies/composites/enemy_spire_echorelay_1x2_idle.json",
       "baseArchetype": "echoSpire",
       "footprint": "1x2",
-      "affixes": ["echoRelay"],
-      "placeholder": true
+      "affixes": [
+        "echoRelay"
+      ],
+      "placeholder": false
     },
     "deflector:2x1:deflectionWard": {
       "resourceId": "enemy_ward_deflection_2x1",
@@ -135,8 +143,10 @@
       "manifestPath": "assets/sprites/enemies/composites/enemy_ward_deflection_2x1_idle.json",
       "baseArchetype": "deflector",
       "footprint": "2x1",
-      "affixes": ["deflectionWard"],
-      "placeholder": true
+      "affixes": [
+        "deflectionWard"
+      ],
+      "placeholder": false
     }
   }
 }

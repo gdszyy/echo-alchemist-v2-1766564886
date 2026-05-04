@@ -1,9 +1,17 @@
 {
-  "frameSize": 128,
-  "placeholder": true,
+  "frameSize": 1536,
+  "frameWidth": 864,
+  "frameHeight": 1536,
+  "placeholder": false,
   "single": true,
   "animations": {
-    "idle": { "row": 0, "frames": 1, "fps": 1 }
+    "idle": {
+      "row": 0,
+      "frames": 1,
+      "fps": 1,
+      "frameWidth": 864,
+      "frameHeight": 1536
+    }
   },
-  "_note": "Single-frame composite placeholder. Real artwork should follow the standard sprite-sheet manifest: idle row + optional hit/move/cast rows."
+  "_note": "Single-frame externally-generated artwork. To upgrade to a multi-frame sprite sheet, partition the PNG into rows/columns and add hit/move/cast entries with their own frameWidth/frameHeight."
 }
