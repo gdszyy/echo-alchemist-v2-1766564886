@@ -1277,15 +1277,8 @@ const CONFIG = {
 // 所有影响钉盘结构（行数、布局形态）的遗物 ID，单局内只能选择其中一个
 // [v2 模块化] 行数/布局遗物保留作为 boardLayout 兼容入口（映射为预设模块组合），
 // 不影响新增的 module_slot_up / unlock_module_type 系列遗物（这些可叠加）。
-const BOARD_STRUCTURE_RELICS = new Set([
-    'dimension_shard',       // 行数遗物：增加钉盘行数（1行）
-    'dimension_crystal',     // 行数遗物：增加钉盘行数（2行）
-    'triangle_formation',    // 布局遗物：三角阵形
-    'diamond_formation',     // 布局遗物：菱形阵形
-    'sparse_interval',       // 布局遗物：稀疏间隔
-    'mirror_sync',           // 布局遗物：镜像同步
-    'wide_narrow',           // 布局遗物：宽窄交替
-]);
+// [v2 模块化] 钉盘结构遗物已全部迁移为 pinboard_modules.js 中的模块；保留空集合以维持导出兼容。
+const BOARD_STRUCTURE_RELICS = new Set();
 
 // ==================== 遗物数据库 ====================
 
@@ -1321,26 +1314,9 @@ const RELIC_DB = [
     effect: 'pure_essence',
     maxStacks: 1
     },
-    // 维度碎片拆分为 rare(+1行×3) 和 legendary(+2行×2)
-    { 
-        id: 'dimension_shard', 
-        name: '維度碎片', 
-        icon: '🌌', 
-        desc: '收集階段：釘板高度延伸，額外增加 1 行釘子。（最多疊加 3 次）立刻觸發一次混沌精華。', 
-        rarity: 'rare', 
-        effect: 'row_count_up_1', maxStacks: 3,
-        recommended: true,
-        tags: ['收益增幅', '新手友好'],
-        recommendTip: '更多行釘子意味着每回合可收集更多属性，弹珠伤害将大幅提升！'
-    },
-    { 
-        id: 'dimension_crystal', 
-        name: '維度結晶', 
-        icon: '💠', 
-        desc: '收集階段：釘板高度大幅延伸，額外增加 2 行釘子。（最多疊加 2 次）立刻觸發一次混沌精華。', 
-        rarity: 'legendary', 
-        effect: 'row_count_up', maxStacks: 2
-    },
+    // [v2 模块化] 旧 dimension_shard / dimension_crystal 行数遗物已移除，迁移为
+    // pinboard_modules.js 中的 dim_shard_module / dim_crystal_module（高密度釘板模块），
+    // 通过商店购买后挂载到模块槽位。
     { id: 'stars_shines', name: '群星闪烁', icon: '✨', desc: '解鎖 [回响彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆回响彈珠。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'resonance', boost: 8, maxStacks: 1 },
     { id: 'optical_lens', name: '聚焦透鏡', icon: '🔭', desc: '解鎖 [光球彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆光球彈珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'laser', boost: 10, maxStacks: 1 },
     //  1. 粉色钉子遗物
@@ -1349,13 +1325,9 @@ const RELIC_DB = [
     //  2. 战斗底部反弹墙（诅咒：所有墙体都消耗反弹/穿透）
     { id: 'energy_shield', name: '力場護盾', icon: '🛡️', desc: '戰鬥階段：底部邊界可反彈子彈。但子彈觸碰任何墻體（左/右/頂/底）都會額外消耗一次反彈或穿透次數。', rarity: 'cursed', effect: 'combat_wall' ,maxStacks: 1},
 
-    //  3. 特殊槽解锁 (三种槽位)
-    { id: 'unlock_recall', name: '時光沙漏', icon: '⏳', desc: '收集階段：解鎖 [回溯槽] 的出現 (若無槽位則+1)。立刻觸發一次混沌精華。', rarity: 'rare', effect: 'unlock_slot', slotType: 'recall' ,maxStacks: 1},
-    { id: 'unlock_multicast', name: '雙子魔鏡', icon: '♊', desc: '收集階段：解鎖 [連射槽] 的出現 (若無槽位則+1)。立刻觸發一次混沌精華。', rarity: 'rare', effect: 'unlock_slot', slotType: 'multicast' ,maxStacks: 1},
-    { id: 'unlock_split', name: '裂變核心', icon: '☢️', desc: '收集階段：解鎖 [分裂槽] 的出現 (若無槽位則+1)。立刻觸發一次混沌精華。', rarity: 'rare', effect: 'unlock_slot', slotType: 'split' ,maxStacks: 1},
-
-    //  4. 增加特殊槽数量
-    { id: 'slot_expander', name: '空間鑿子', icon: '🔨', desc: '收集階段：特殊槽出現數量 +1。立刻觸發一次混沌精華。', rarity: 'common', effect: 'slot_count_up', maxStacks: 3, recommended: true, tags: ['连击增幅', '新手友好'], recommendTip: '更多特殊槽意味着更多触发机会，是快速提升伤害的关键！'},
+    // [v2 模块化] 特殊槽解锁 (unlock_recall / unlock_multicast / unlock_split) 和
+    // 槽数 +1 (slot_expander) 已从遗物池移除，迁移到局内商店出售
+    // （详见 src/ui/run_shop.js 中 slot_unlock / slot_count 商品）。
     //  獨立元素遺物
     { id: 'cryo_stone', name: '永恆凍土', icon: '❄️', desc: '解鎖 [冰霜彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆冰霜彈珠；此 2 顆彈珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'cryo', boost: 15, maxStacks: 1 },
     { id: 'pyro_stone', name: '不滅火種', icon: '🔥', desc: '解鎖 [火焰彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆火焰彈珠；此 2 顆彈珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'pyro', boost: 15, maxStacks: 1 },
@@ -1370,18 +1342,10 @@ const RELIC_DB = [
     { id: 'prism_shard', name: '七彩稜鏡', icon: '🌈', desc: '解鎖 [彩虹彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆彩虹彈珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'rainbow', boost: 5, maxStacks: 1 },
     { id: 'russian_doll', name: '俄羅斯套娃', icon: '🪆', desc: '解鎖 [套娃彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆套娃彈珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'matryoshka', boost: 5, maxStacks: 1 },
 
-    // ==================== 钉盘形态遗物（异型布局）====================
-    // 每种只能获取一次（maxStacks: 1），均与行数遗物有联合效果
-    // 策略1：三角阵形 - 漏斗流（行越多三角越尖，弹珠越集中于底部中央）
-    { id: 'triangle_formation', name: '三角陣形', icon: '🔺', desc: '釘盤展開為三角形，頂行最寬，每行遞減 1 列。「漏斗共鳴」：弹珠碰撞屬性釘子時，20% 機率額外再收集一次該屬性。「底部倍率轉盤」：底部左右各有一個小型轉盤，弹珠落入即觸發；轉盤層次由內到外：空（高機率）→1x→2x→3x→5x（低機率），中獎後對已收集屬性翻倍。釘盤 +3 行。立刻觸發一次混沌精華。', rarity: 'rare', effect: 'board_layout_triangle', maxStacks: 1 },
-    // 策略2：菱形阵形 - 中段爆发流（行越多菱形越饱满，中段碰撞最频繁）
-    { id: 'diamond_formation', name: '菱形陣形', icon: '🔷', desc: '釘盤展開為菱形，前半段擴展、後半段收縮。「中段爆發」：弹珠碰撞菱形中段釘子時，充能計數額外 +1。「裂變回響」：中段屬性釘子被碰撞時，30% 機率在對角方向裂變出虚影釘子（半透明閃爍），弹珠碰撞虚影即額外收集一次該屬性。釘盤 +2 行。立刻觸發一次混沌精華。', rarity: 'legendary', effect: 'board_layout_diamond', maxStacks: 1 },
-    // 策略3：稀疏间隔 - 通道流（宽窄行交替，形成弹珠通道）
-    { id: 'sparse_interval', name: '稀疏間隔', icon: '〰️', desc: '偶數行正常列數，奇數行減 4 列形成寬窄通道。「通道蓄力」：弹珠穿越窄行未碰撞任何釘子時，下次碰撞收集的屬性等級 +1（加速蓄力後爆發）。「底部粉色陷阱」：最後兩行永遠交錯排列粉色釘子，弹珠落底前必經高彈性區域。釘盤 +4 行。立刻觸發一次混沌精華。', rarity: 'rare', effect: 'board_layout_sparse', maxStacks: 1 },
-    // 策略4：镜像同步 - 直线穿透流（列数减少但行对齐，弹珠更易直线下落）
-    { id: 'mirror_sync', name: '鏡像同步', icon: '🪞', desc: '收集階段：釘盤列數減少且對齊。釘子被同化/突變時，鏡像位置的釘子同步轉化；特殊槽位鏡像呈現（數量翻倍）。「鏡像裂分」：中軸線設有特殊鏡像釘（✦），弹珠撞擊後有 35% 機率在對稱位置複製出一顆相同速度的分身弹珠，分身弹珠的後續收集屬性歸入原弹珠。立刻觸發一次混沌精華。', rarity: 'legendary', effect: 'board_layout_mirror_sync', maxStacks: 1 },
-    // 策略5：宽窄交替 - 边缘捕获流（宽行捕获偏移弹珠，窄行提供通道）
-    { id: 'wide_narrow', name: '寬窄交替', icon: '📐', desc: '偶數行 +2 列，奇數行 -2 列，寬窄交替。「邊緣共振」：弹珠碰撞寬行邊緣釘子（列號 0/1 或倒數 0/1）時，65% 機率額外再收集一次該屬性。釘盤 +2 行。立刻觸發一次混沌精華。', rarity: 'common', effect: 'board_layout_wide_narrow', maxStacks: 1 },
+    // [v2 模块化] 旧的钉盘布局遗物（triangle_formation / diamond_formation /
+    // sparse_interval / mirror_sync / wide_narrow）已从遗物池移除，迁移为
+    // pinboard_modules.js 中的 triangle_module / diamond_module / sparse_module /
+    // mirror_module / wide_narrow_module，通过商店购买后挂载到模块槽位。
     // ==================== 属性弹珠解锁遗物 ====================
     // 效果：解锁该属性弹珠，立即触发一次混沌精华，并保证带有 2 颗该属性弹珠；同化概率永久翻倍
     { id: 'surge_bounce', name: '彈性潮涌', icon: '🔵', desc: '解鎖 [彈性彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆彈性彈珠；此 2 顆彈珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'bounce', boost: 10, maxStacks: 1 },

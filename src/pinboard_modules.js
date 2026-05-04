@@ -280,6 +280,174 @@ export const MODULE_DEFS = {
     },
 };
 
+// ==================== [钉板形态遗物→模块] 由旧布局遗物迁移而来的模块 ====================
+// 旧的钉板布局/行数遗物（dimension_shard / dimension_crystal / triangle_formation /
+// diamond_formation / sparse_interval / mirror_sync / wide_narrow）在 v2 模块化下不再
+// 通过 boardLayout / currentRows 整体改写钉盘，而是改造为可在单个模块槽位内放置的模块。
+MODULE_DEFS.triangle_module = {
+    id: 'triangle_module',
+    name: '三角陣形',
+    icon: '🔺',
+    desc: '頂寬底窄的三角交錯，弹珠向中心聚焦。',
+    rarity: 'rare',
+    price: 60,
+    build(ox, oy, w, h) {
+        const pegs = generateFunnelPegs(ox, oy, w, h, 4, 4);
+        return { pegs, specialSlots: [] };
+    },
+};
+MODULE_DEFS.diamond_module = {
+    id: 'diamond_module',
+    name: '菱形陣形',
+    icon: '🔷',
+    desc: '上下窄、中段寬的菱形排布，中段碰撞密集。',
+    rarity: 'epic',
+    price: 80,
+    build(ox, oy, w, h) {
+        const pegs = [];
+        const rows = 5;
+        const spacingY = h / (rows + 0.5);
+        const widths = [2, 3, 4, 3, 2];
+        for (let r = 0; r < rows; r++) {
+            const colsThisRow = widths[r];
+            const spacingX = colsThisRow > 1 ? (w * 0.85) / colsThisRow : w * 0.85;
+            const baseLeftPad = (w - (colsThisRow - 1) * spacingX) / 2;
+            for (let c = 0; c < colsThisRow; c++) {
+                const x = ox + baseLeftPad + c * spacingX;
+                const y = oy + spacingY * 0.5 + r * spacingY;
+                const p = new Peg(x, y, 'normal');
+                p.row = r; p.col = c; p.level = 1;
+                pegs.push(p);
+            }
+        }
+        return { pegs, specialSlots: [] };
+    },
+};
+MODULE_DEFS.sparse_module = {
+    id: 'sparse_module',
+    name: '稀疏間隔',
+    icon: '〰️',
+    desc: '寬窄行交替形成通道；底部一排粉色高彈性釘子。',
+    rarity: 'rare',
+    price: 60,
+    build(ox, oy, w, h) {
+        const rows = 4;
+        const spacingY = h / (rows + 0.5);
+        const pegs = [];
+        for (let r = 0; r < rows; r++) {
+            const cols = (r % 2 === 0) ? 4 : 2;
+            const spacingX = cols > 1 ? w / cols : w;
+            const pad = (w - (cols - 1) * spacingX) / 2;
+            const isLastRow = r === rows - 1;
+            for (let c = 0; c < cols; c++) {
+                const x = ox + pad + c * spacingX;
+                const y = oy + spacingY * 0.5 + r * spacingY;
+                const p = new Peg(x, y, isLastRow ? 'pink' : 'normal');
+                p.row = r; p.col = c; p.level = 1;
+                pegs.push(p);
+            }
+        }
+        return { pegs, specialSlots: [] };
+    },
+};
+MODULE_DEFS.mirror_module = {
+    id: 'mirror_module',
+    name: '鏡像同步',
+    icon: '🪞',
+    desc: '左右對稱排列。中軸高彈釘子使弹珠頻繁鏡像反彈。',
+    rarity: 'epic',
+    price: 80,
+    build(ox, oy, w, h) {
+        const pegs = generateStaggeredPegs(ox, oy, w, h, 3, 3, 'normal');
+        // 中轴（col=1）的钉子改为粉色高弹，模拟"镜像裂分"近似效果
+        for (const p of pegs) {
+            if (p.col === 1) p.type = 'pink';
+        }
+        return { pegs, specialSlots: [] };
+    },
+};
+MODULE_DEFS.wide_narrow_module = {
+    id: 'wide_narrow_module',
+    name: '寬窄交替',
+    icon: '📐',
+    desc: '偶數行寬、奇數行窄，邊緣捕獲偏離弹珠。',
+    rarity: 'common',
+    price: 40,
+    build(ox, oy, w, h) {
+        const rows = 4;
+        const spacingY = h / (rows + 0.5);
+        const pegs = [];
+        for (let r = 0; r < rows; r++) {
+            const cols = (r % 2 === 0) ? 5 : 2;
+            const spacingX = cols > 1 ? w / cols : w;
+            const pad = (w - (cols - 1) * spacingX) / 2;
+            for (let c = 0; c < cols; c++) {
+                const x = ox + pad + c * spacingX;
+                const y = oy + spacingY * 0.5 + r * spacingY;
+                const p = new Peg(x, y, 'normal');
+                p.row = r; p.col = c; p.level = 1;
+                pegs.push(p);
+            }
+        }
+        return { pegs, specialSlots: [] };
+    },
+};
+MODULE_DEFS.dim_shard_module = {
+    id: 'dim_shard_module',
+    name: '維度碎片',
+    icon: '🌌',
+    desc: '更高密度的 4×4 交錯釘子，碰撞次數倍增。',
+    rarity: 'rare',
+    price: 60,
+    build(ox, oy, w, h) {
+        const pegs = generateStaggeredPegs(ox, oy, w, h, 4, 4, 'normal');
+        return { pegs, specialSlots: [] };
+    },
+};
+MODULE_DEFS.dim_crystal_module = {
+    id: 'dim_crystal_module',
+    name: '維度結晶',
+    icon: '💠',
+    desc: '極高密度 5×5 交錯釘子，弹珠路徑充滿碰撞。',
+    rarity: 'legendary',
+    price: 120,
+    build(ox, oy, w, h) {
+        const pegs = generateStaggeredPegs(ox, oy, w, h, 5, 5, 'normal');
+        return { pegs, specialSlots: [] };
+    },
+};
+
+// ==================== [属性钉板] 商店随机属性钉板 ====================
+// 每个属性对应一个 attr_pin_<type> 模块，所有 normal 钉子被强制赋予该属性，
+// 且不参与 unlockedWeights 随机覆盖（applyWeightedPegTypes 仅替换 type === 'normal'）。
+export const ATTR_PIN_TYPES = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'wind'];
+const ATTR_PIN_META = {
+    bounce: { name: '彈性釘板', icon: '🔵' },
+    pierce: { name: '穿透釘板', icon: '↗' },
+    scatter: { name: '散射釘板', icon: '🔱' },
+    damage: { name: '增幅釘板', icon: '⚔️' },
+    cryo:   { name: '冰霜釘板', icon: '❄️' },
+    pyro:   { name: '火焰釘板', icon: '🔥' },
+    wind:   { name: '疾風釘板', icon: '💨' },
+};
+ATTR_PIN_TYPES.forEach(type => {
+    const meta = ATTR_PIN_META[type];
+    MODULE_DEFS[`attr_pin_${type}`] = {
+        id: `attr_pin_${type}`,
+        name: meta.name,
+        icon: meta.icon,
+        desc: `3×3 釘板，全部釘子強制為「${type}」屬性。`,
+        rarity: 'rare',
+        price: 0, // 由商店动态定价；不通过通用 module 列表暴露
+        attribute: type,
+        isAttrPin: true,
+        build(ox, oy, w, h) {
+            const pegs = generateStaggeredPegs(ox, oy, w, h, 3, 3, type);
+            return { pegs, specialSlots: [] };
+        },
+    };
+});
+
 /**
  * 主入口：根据模块 ID 在指定矩形内构造实体集合
  */
