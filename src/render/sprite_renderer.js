@@ -190,9 +190,13 @@ export class SpriteRenderer {
         const anim = this._meta.animations[this._currentAnim];
         if (!anim) return false;
 
+        // 支持矩形帧：优先使用 manifest 顶层 frameWidth/frameHeight，
+        // 其次使用 anim.frameWidth/frameHeight，最后回退到正方形 frameSize（默认 128）。
         const fs = this._meta.frameSize || 128;
-        const srcX = this._frameIndex * fs;
-        const srcY = anim.row * fs;
+        const fw = anim.frameWidth  || this._meta.frameWidth  || fs;
+        const fh = anim.frameHeight || this._meta.frameHeight || fs;
+        const srcX = this._frameIndex * fw;
+        const srcY = anim.row * fh;
 
         const prevAlpha = ctx.globalAlpha;
         ctx.globalAlpha = prevAlpha * alpha;
@@ -200,7 +204,7 @@ export class SpriteRenderer {
         try {
             ctx.drawImage(
                 this._image,
-                srcX, srcY, fs, fs,   // 源矩形（Sprite Sheet 上的帧）
+                srcX, srcY, fw, fh,   // 源矩形（Sprite Sheet 上的帧）
                 x,    y,   w,  h      // 目标矩形（Canvas 上的绘制区域）
             );
         } catch (e) {
@@ -308,7 +312,9 @@ export function createSpriteRenderer(enemyTypeOrEnemy, bossType, baseArchetype) 
     }
 
     // 0) 资源协议解析（baseArchetype + footprint + affixSet → composite 资源）
-    if (enemyInfo.baseArchetype || (enemyInfo.gridCols > 1 || enemyInfo.gridRows > 1)) {
+    // 对所有非 Boss 敌人（含 1×1 residue）都走 manifest 解析，命中再使用，
+    // 未命中再回到下面的 V2 metadata / golem 兜底。
+    if (enemyInfo.type !== 'boss') {
         const resolved = resolveEnemyVisualAsset(enemyInfo);
         if (resolved && resolved.spritePath && (resolved.fallbackLevel === 'composite' || resolved.fallbackLevel === 'archetype')) {
             return new SpriteRenderer(resolved.spritePath, resolved.manifestPath || undefined);
