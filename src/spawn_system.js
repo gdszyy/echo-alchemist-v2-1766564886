@@ -2292,7 +2292,10 @@ export const spawn_system = {
             if (this.calc_isAreaOccupied(centerX, centerY, wPx * 0.85, hPx * 0.85)) continue;
 
             // 血量计算
-            const hp = Math.floor(baseHP * chosen.hpMult * (0.9 + Math.random() * 0.2));
+            // [非 1x1 敌人血量按占位数量缩放] 占据 N 格的大型敌人 HP = baseHP × N（含波动）
+            const cellsCount = chosen.cols * chosen.rows;
+            const hpMultByCells = Math.max(1, cellsCount);
+            const hp = Math.floor(baseHP * hpMultByCells * (0.9 + Math.random() * 0.2));
 
             const e = new Enemy(centerX, centerY, wPx, hPx, hp);
             e.affixes = [chosen.affix];
