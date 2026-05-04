@@ -164,7 +164,7 @@ export const combat_system = {
                     const skillChainLevel = p.chainLevel || 15; 
                     this.combat_lightning_triggerChain(e, dmg, [e], skillChainLevel);
 
-                    if (killed) this.spawn_addScore(e.maxHp);
+                    if (killed) this.spawn_addScore(e.maxHp, e);
                 }
             }
             audio.playLightning();
@@ -255,7 +255,7 @@ export const combat_system = {
                     e.applyTemp(CONFIG.balance.lightningTempIncrease || 3);
                     const skillChainLevel = p.chainLevel || 10;
                     this.combat_lightning_triggerChain(e, dmg, [e], skillChainLevel);
-                    if (killed) this.spawn_addScore(e.maxHp);
+                    if (killed) this.spawn_addScore(e.maxHp, e);
                 }
             }
             try { audio.playLightning(); } catch(e2) {}
@@ -1824,7 +1824,7 @@ export const combat_system = {
                         if (other.active && other.pos.dist(novaCenter) < slashRadius) {
                             const slashResult = other.takeDamage(slashDmg);
                             this.combat_recordDamage(slashResult.actualDamage, 'pyro', 'main', shotId);
-                            if (slashResult.killed) this.spawn_addScore(other.maxHp);
+                            if (slashResult.killed) this.spawn_addScore(other.maxHp, other);
                             if (tempAmount > 0) other.applyTemp(tempAmount);
                             other._pyroHitThisRound = true;
                         }
@@ -1865,7 +1865,7 @@ export const combat_system = {
                             if (staticDmg > 0) {
                                 const staticResult = ne.takeDamage(staticDmg);
                                 this.combat_recordDamage(staticResult.actualDamage, 'lightning', 'main', shotId);
-                                if (staticResult.killed) this.spawn_addScore(ne.maxHp);
+                                if (staticResult.killed) this.spawn_addScore(ne.maxHp, ne);
                             }
                             // 施加 shockStacks 层感电状态（升温）
                             ne.applyTemp(CONFIG.balance.lightningTempIncrease * shockStacks);
@@ -2178,7 +2178,7 @@ export const combat_system = {
         }
 
         if (killed) { 
-            this.spawn_addScore(enemy.maxHp);
+            this.spawn_addScore(enemy.maxHp, enemy);
 
             // [打击感] 击杀震动：伤害越高震幅越大，按敌人类型分级加成
             if (typeof this.triggerScreenShake === 'function') {
@@ -2252,7 +2252,7 @@ export const combat_system = {
                     const dy = (other.pos.y - cy);
                     if (dx * dx + dy * dy <= burstRadius * burstRadius) {
                         const aoeResult = other.takeDamage(burstDmg);
-                        if (aoeResult && aoeResult.killed) this.spawn_addScore(other.maxHp);
+                        if (aoeResult && aoeResult.killed) this.spawn_addScore(other.maxHp, other);
                     }
                 }
             }
@@ -2413,7 +2413,7 @@ export const combat_system = {
                     const aoeDmg = dmg * 0.5;
                     const k = other.takeDamage(aoeDmg); 
                     this.combat_recordDamage(aoeDmg, 'explosive', 'main', shotId); 
-                    if (k) this.spawn_addScore(other.maxHp); 
+                    if (k) this.spawn_addScore(other.maxHp, other); 
                     
                     // --- 4. 关键：AOE 也要施加元素效果 ---
                     // 这样爆炸范围内的敌人也会被冰冻/点燃，符合直觉
@@ -3021,7 +3021,7 @@ export const combat_system = {
                 const novaResult = ne.takeDamage(novaDmg);
                 this.combat_recordDamage(novaResult.actualDamage, 'cryo', 'main', null);
                 if (novaResult.killed && typeof this.spawn_addScore === 'function') {
-                    this.spawn_addScore(ne.maxHp);
+                    this.spawn_addScore(ne.maxHp, ne);
                 }
             }
 
@@ -3252,7 +3252,7 @@ export const combat_system = {
                 }
 
                 if (result && result.killed && typeof this.spawn_addScore === 'function') {
-                    this.spawn_addScore(target.maxHp);
+                    this.spawn_addScore(target.maxHp, target);
                 }
             }
         }
@@ -3288,7 +3288,7 @@ export const combat_system = {
                         }
                     }
                     if (result && result.killed && typeof this.spawn_addScore === 'function') {
-                        this.spawn_addScore(e.maxHp);
+                        this.spawn_addScore(e.maxHp, e);
                     }
                 }
             }

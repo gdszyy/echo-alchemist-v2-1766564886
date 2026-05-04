@@ -786,30 +786,79 @@ export const spawn_system = {
      * @description 增加分数并提高分数乘数。
      * @param {number} amount - **重要参数** 基础分数。
      */
-    spawn_addScore(amount) {
+    spawn_addScore(amount, enemy) {
         const finalScore = Math.floor(amount * this.scoreMultiplier);
         this.score += finalScore;
-        const resourceGain = Math.floor(0.523 * Math.pow(finalScore, 0.63));
-        // [v2 局内符文碎片] 击杀按概率掉落碎片，累计到 this.runFragments；
+        // [v2 局内符文碎片] 击杀按敌人类型分级掉落：
+        //   normal: 概率掉落 1 (+按 maxHp 微调)
+        //   elite:  ~85% 掉落 eliteFragmentDrop
+        //   boss:   100% 掉落 bossFragmentDrop
         // 局结束时按 runShopEndOfRunFragmentSettle 比例转换到 saveData.runeFragments。
         const cfg = (typeof CONFIG !== 'undefined' && CONFIG.gameplay) ? CONFIG.gameplay : {};
-        const baseChance = cfg.enemyDropFragmentChance != null ? cfg.enemyDropFragmentChance : 0.45;
-        const roundBonus = (cfg.enemyDropFragmentRoundBonus || 0) * (this.round || 1);
-        const fragChance = Math.min(0.95, baseChance + roundBonus);
-        if (Math.random() < fragChance) {
-            const baseAmount = cfg.enemyDropFragmentBaseAmount || 1;
-            const bonus = Math.floor(Math.log2(Math.max(2, finalScore)) - 4);
-            const gained = Math.max(1, baseAmount + Math.max(0, bonus));
-            if (typeof this.runFragments !== 'number') this.runFragments = 0;
-            this.runFragments += gained;
-            if (typeof this.runRuneFragmentsGained !== 'number') this.runRuneFragmentsGained = 0;
-            this.runRuneFragmentsGained += gained;
-            if (typeof this.spawn_createFloatingText === 'function') {
-                this.spawn_createFloatingText(this.width / 2, 60, `+${gained} 🔮`, '#a855f7');
+        const tier = (enemy && enemy.type) || 'normal';
+        let dropCount = 0;
+        if (tier === 'boss') {
+            dropCount = cfg.bossFragmentDrop || 8;
+        } else if (tier === 'elite') {
+            const eliteChance = cfg.eliteFragmentDropChance != null ? cfg.eliteFragmentDropChance : 0.80;
+            if (Math.random() < eliteChance) {
+                dropCount = cfg.eliteFragmentDrop || 3;
+            }
+        } else {
+            const baseChance = cfg.enemyDropFragmentChance != null ? cfg.enemyDropFragmentChance : 0.30;
+            const roundBonus = (cfg.enemyDropFragmentRoundBonus || 0) * (this.round || 1);
+            const cap = cfg.enemyDropFragmentChanceCap != null ? cfg.enemyDropFragmentChanceCap : 0.55;
+            const fragChance = Math.min(cap, baseChance + roundBonus);
+            if (Math.random() < fragChance) {
+                dropCount = cfg.enemyDropFragmentBaseAmount || 1;
             }
         }
-        this.scoreMultiplier = parseFloat((this.scoreMultiplier + 0.2).toFixed(1)); // 乘数增加 0.2
+        if (dropCount > 0) {
+            const dropX = (enemy && enemy.pos) ? enemy.pos.x : ((this.width || 400) / 2);
+            const dropY = (enemy && enemy.pos) ? enemy.pos.y : 60;
+            this.spawn_dropRuneFragments(dropX, dropY, dropCount, tier);
+        }
+        this.scoreMultiplier = parseFloat((this.scoreMultiplier + 0.2).toFixed(1));
         this.ui_updateMultiplierUI();
+    },
+
+    /**
+     * @method spawn_dropRuneFragments
+     * @description [v2] 在指定位置掉落符文碎片，并播放掉落动画（粒子 + 冲击波 + 飘字）。
+     *   - 累加到 this.runFragments / this.runRuneFragmentsGained
+     *   - boss/elite 使用更显眼的特效（更多粒子 / 更大冲击波）
+     */
+    spawn_dropRuneFragments(x, y, count, tier) {
+        if (!count || count <= 0) return;
+        if (typeof this.runFragments !== 'number') this.runFragments = 0;
+        if (typeof this.runRuneFragmentsGained !== 'number') this.runRuneFragmentsGained = 0;
+        this.runFragments += count;
+        this.runRuneFragmentsGained += count;
+
+        const isBoss = tier === 'boss';
+        const isElite = tier === 'elite';
+        const sparkColor = isBoss ? '#facc15' : (isElite ? '#c084fc' : '#a855f7');
+        const sparkleCount = isBoss ? 14 : (isElite ? 9 : 5);
+
+        if (typeof this.spawn_createParticle === 'function') {
+            for (let i = 0; i < sparkleCount; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 4 + Math.random() * 18;
+                this.spawn_createParticle(
+                    x + Math.cos(angle) * dist,
+                    y + Math.sin(angle) * dist,
+                    sparkColor,
+                    'spark'
+                );
+            }
+        }
+        if (typeof this.spawn_createShockwave === 'function' && (isBoss || isElite)) {
+            this.spawn_createShockwave(x, y, sparkColor);
+        }
+        if (typeof this.spawn_createFloatingText === 'function') {
+            const fontSize = isBoss ? 18 : (isElite ? 15 : 13);
+            this.spawn_createFloatingText(x, y - 22, `+${count} 🔮`, sparkColor, fontSize);
+        }
     },
 
 /**

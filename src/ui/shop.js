@@ -465,12 +465,46 @@ export const shop_system = {
     },
 
     /**
-     * 跳过选择
+     * 跳过遗物选择 → 进入局内商店
+     * [v2 调整] 不再奖励 500 score；改为打开局内商店，本回合丧失遗物。
+     * 商店关闭后接续 round-start resolver，继续后续流程（精华奖励等）。
      */
     ui_skipRelic() {
-        if (typeof this.spawn_addScore === 'function') this.spawn_addScore(500);
-        if (window.showToast) showToast("放棄遗物，获得局内货币");
-        this.ui_closeRelicSelection();
+        if (window.showToast) showToast("放棄遗物，进入局内商店");
+        // 关闭遗物界面，但不进入下一阶段；改为打开商店
+        const overlay = document.getElementById('phase-relic');
+        if (overlay) {
+            overlay.style.display = 'none';
+            overlay.classList.remove('active-phase');
+            overlay.classList.add('hidden-phase');
+        }
+        const returnState = this.relicOverlayReturnState || { phase: this.stateBeforeRelic };
+        this.relicOverlayReturnState = null;
+        // 标记本回合已弃权遗物，避免回到 resolver 时再次弹出（防止重复打开）
+        this._relicSkippedThisRound = true;
+        if (typeof this.ui_showRunShop === 'function') {
+            this.ui_showRunShop(() => {
+                // 商店关闭后回到原 resolver / phase，但本次的 relic 奖励已被消费，所以
+                // sys_continueRoundStartResolver 会自然处理下一个奖励（如有）。
+                if (returnState.phase === 'gathering') {
+                    if (typeof this.phase_gathering_attemptComplete === 'function') this.phase_gathering_attemptComplete();
+                    return;
+                }
+                if (returnState.phase === 'selection') {
+                    if (typeof this.phase_switchPhase === 'function') this.phase_switchPhase('selection');
+                    if (typeof this.ui_refreshSelectionModeUI === 'function') this.ui_refreshSelectionModeUI();
+                    return;
+                }
+                if (returnState.phase === 'round_start_resolver') {
+                    if (typeof this.sys_continueRoundStartResolver === 'function') this.sys_continueRoundStartResolver();
+                    return;
+                }
+                if (typeof this.sys_initSelectionPhase === 'function') this.sys_initSelectionPhase();
+            });
+        } else {
+            // 兜底：商店未挂载时退回原行为
+            this.ui_closeRelicSelection();
+        }
     },
 
     /**

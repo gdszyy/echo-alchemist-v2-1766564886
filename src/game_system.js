@@ -1520,7 +1520,7 @@ export const game_system = {
                 if (typeof this.spawn_createFloatingText === 'function') {
                     this.spawn_createFloatingText(e.pos.x, e.pos.y - 18, `混沌爆发 ${burstDmg}`, '#a855f7');
                 }
-                if (r && r.killed && typeof this.spawn_addScore === 'function') this.spawn_addScore(e.maxHp);
+                if (r && r.killed && typeof this.spawn_addScore === 'function') this.spawn_addScore(e.maxHp, e);
             }
             if (typeof this.triggerScreenShake === 'function') this.triggerScreenShake(8);
         }
