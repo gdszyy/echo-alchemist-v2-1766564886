@@ -2052,6 +2052,35 @@
             border-color: #10b981;
             color: #34d399;
         }
+        .pause-perf-row {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            border-radius: 10px;
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(71, 85, 105, 0.3);
+            margin-bottom: 6px;
+            gap: 8px;
+        }
+        .pause-perf-row .ps-icon { font-size: 1.1rem; width: 24px; text-align: center; flex-shrink: 0; }
+        .pause-perf-row .ps-label { flex: 1; margin-left: 2px; font-size: 0.82rem; color: #cbd5e1; }
+        .pause-perf-btns { display: flex; gap: 5px; }
+        .pause-perf-btn {
+            font-size: 0.68rem;
+            background: rgba(71,85,105,0.5);
+            border: 1px solid #475569;
+            border-radius: 5px;
+            padding: 3px 9px;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .pause-perf-btn:hover { background: rgba(51, 65, 85, 0.9); color: #cbd5e1; }
+        .pause-perf-btn.active {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: #10b981;
+            color: #34d399;
+        }
         .pause-relic-card {
             display: flex;
             align-items: flex-start;
@@ -3468,6 +3497,16 @@
                         <span class="ps-badge" id="pause-crt-badge">关闭</span>
                     </div>
 
+                    <div class="pause-perf-row">
+                        <span class="ps-icon">⚡</span>
+                        <span class="ps-label">渲染品质</span>
+                        <div class="pause-perf-btns">
+                            <button class="pause-perf-btn" id="pause-perf-low"  onclick="game.sys_setPerfQuality('low')">低</button>
+                            <button class="pause-perf-btn" id="pause-perf-medium" onclick="game.sys_setPerfQuality('medium')">中</button>
+                            <button class="pause-perf-btn" id="pause-perf-high" onclick="game.sys_setPerfQuality('high')">高</button>
+                            <button class="pause-perf-btn" id="pause-perf-auto" onclick="game.sys_setPerfQuality('auto')">自动</button>
+                        </div>
+                    </div>
 
                 </div>
 

@@ -42,7 +42,8 @@ export const game_system = {
                 this.avgFps = Math.round(1000 / _avgDt);
 
                 // 仅在采样窗口满后才开始评估等级（避免启动时误判）
-                if (_samples.length >= _perfCfg.fpsSampleWindow) {
+                // 手动模式下跳过自适应调整
+                if (_samples.length >= _perfCfg.fpsSampleWindow && !this._perfManualMode) {
                     const _dtSec = _dt / 1000; // 本帧时长（秒），用于计时器累加
                     const _level = this.perfQualityLevel;
 
@@ -431,11 +432,12 @@ export const game_system = {
 
         // ==================== [v2 钉板模块化] 模块系统状态 ====================
         // 钉板由 4×3 = 12 个模块槽组成，按 row-major 顺序解锁
-        // 默认开放第 1 行 3 个槽，预填 std_stagger
+        // 默认开放全部 12 个槽，预填 std_stagger
         this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'bouncer', 'funnel'];
-        this.unlockedModuleSlots = 3;
-        this.currentModuleLayout = ['std_stagger', 'std_stagger', 'std_stagger',
-            null, null, null, null, null, null, null, null, null];
+        this.unlockedModuleSlots = CONFIG.gameplay.moduleDefaultSlots || 12;
+        this.currentModuleLayout = new Array(
+            (CONFIG.gameplay.moduleCols || 4) * (CONFIG.gameplay.moduleRows || 3)
+        ).fill('std_stagger');
         // pendingFusions: 模块编辑器关闭时写入；phase_gathering_initPachinko 末尾消费
         // 形如 [{ element: 'pyro', count: 1, runeUid: '...' }]
         this.pendingFusions = [];
@@ -484,6 +486,26 @@ export const game_system = {
         } catch (e) {
             console.error('[sys_saveData] Save failed:', e);
         }
+    },
+
+    /**
+     * 手动设置渲染性能等级
+     * @param {'low'|'medium'|'high'|'auto'} level
+     */
+    sys_setPerfQuality(level) {
+        const perfCfg = CONFIG.performance;
+        if (level === 'auto') {
+            this._perfManualMode = null;
+            this._perfDownTimer = 0;
+            this._perfUpTimer = 0;
+        } else if (perfCfg[level]) {
+            this._perfManualMode = level;
+            this.perfQualityLevel = level;
+            this.shadowBlurEnabled = perfCfg[level].shadowBlurEnabled !== false;
+            this._perfDownTimer = 0;
+            this._perfUpTimer = 0;
+        }
+        if (typeof this.ui_syncPauseSettings === 'function') this.ui_syncPauseSettings();
     },
 
     /**

@@ -1602,6 +1602,15 @@ export const ui_system = {
 
     ui_syncPauseSettings() {
         if (typeof this.ui_renderPauseRelics === 'function') this.ui_renderPauseRelics();
+        // 同步渲染品质按钮高亮
+        const activeLevel = this.perfQualityLevel;
+        const isAuto = !this._perfManualMode;
+        ['low', 'medium', 'high', 'auto'].forEach(id => {
+            const btn = document.getElementById(`pause-perf-${id}`);
+            if (!btn) return;
+            const isActive = id === 'auto' ? isAuto : (!isAuto && id === activeLevel);
+            btn.classList.toggle('active', isActive);
+        });
     },
     ui_renderPauseRelics() {
         const list = document.getElementById('pause-relic-list');
