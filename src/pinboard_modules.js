@@ -184,11 +184,12 @@ export const MODULE_DEFS = {
         id: 'funnel',
         name: '漏斗',
         icon: '▽',
-        desc: '頂寬底窄的三角形交錯，弹珠向中央匯集。',
+        desc: '頂寬底窄的三角形交錯，弹珠向中央匯集。占用 2×1 槽。',
         rarity: 'common',
         price: 0,
+        span: { cols: 2, rows: 1 },
         build(ox, oy, w, h) {
-            const pegs = generateFunnelPegs(ox, oy, w, h, 4, 3);
+            const pegs = generateFunnelPegs(ox, oy, w, h, 6, 3);
             return { pegs, specialSlots: [] };
         },
     },
@@ -196,9 +197,10 @@ export const MODULE_DEFS = {
         id: 'wheel_module',
         name: '幸運轉盤',
         icon: '🎰',
-        desc: '在底部生成一個 [輪盤槽]，弹珠穿越時觸發屬性翻倍輪盤。',
+        desc: '在底部生成一個 [輪盤槽]，弹珠穿越時觸發屬性翻倍輪盤。占用 1×2 槽。',
         rarity: 'rare',
         price: 60,
+        span: { cols: 1, rows: 2 },
         build(ox, oy, w, h) {
             // 顶部一排普通钉子 + 底部两颗钉子之间夹一个 wheel slot
             const pegs = [];
@@ -481,26 +483,61 @@ export function buildModuleEntities(moduleId, originX, originY, width, height, c
 
 /**
  * 计算单个模块槽位的矩形（基于画布尺寸和 CONFIG.gameplay）
+ * span: { cols, rows } 多格模块占位（默认 1×1）
  */
-export function calcModuleSlotRect(slotIdx, canvasWidth, canvasHeight, cfg) {
+export function calcModuleSlotRect(slotIdx, canvasWidth, canvasHeight, cfg, span) {
     const cols = cfg.moduleCols || 4;
     const rows = cfg.moduleRows || 3;
     const topY = cfg.moduleAreaTopY || 60;
     const bottomMargin = cfg.moduleAreaBottomMargin || 80;
     const spacingX = cfg.moduleSpacingX || 4;
     const spacingY = cfg.moduleSpacingY || 4;
-    const totalW = canvasWidth - 20;
+    // 左右两侧距墙 1.5 个弹珠直径，使倍化弹珠不会与墙完全贴死
+    const sideMargin = (cfg.moduleAreaSideMargin != null) ? cfg.moduleAreaSideMargin : 23;
+    const totalW = canvasWidth - 2 * sideMargin;
     const totalH = Math.max(120, canvasHeight - topY - bottomMargin);
     const cellW = (totalW - (cols - 1) * spacingX) / cols;
     const cellH = (totalH - (rows - 1) * spacingY) / rows;
     const r = Math.floor(slotIdx / cols);
     const c = slotIdx % cols;
+    const sCols = (span && span.cols) ? span.cols : 1;
+    const sRows = (span && span.rows) ? span.rows : 1;
     return {
-        x: 10 + c * (cellW + spacingX),
+        x: sideMargin + c * (cellW + spacingX),
         y: topY + r * (cellH + spacingY),
-        w: cellW,
-        h: cellH,
+        w: cellW * sCols + spacingX * (sCols - 1),
+        h: cellH * sRows + spacingY * (sRows - 1),
     };
+}
+
+/**
+ * 获取模块的占位（多格）。默认 1×1。
+ */
+export function getModuleSpan(moduleId) {
+    const def = MODULE_DEFS[moduleId];
+    if (def && def.span) {
+        return { cols: def.span.cols || 1, rows: def.span.rows || 1 };
+    }
+    return { cols: 1, rows: 1 };
+}
+
+/**
+ * 给定锚点 slotIdx 和 span，返回所有覆盖到的 slot 索引（含锚点本身）。
+ * 若超出网格边界则返回 null。
+ */
+export function getCoveredSlots(anchorIdx, span, totalCols, totalRows) {
+    const sCols = (span && span.cols) ? span.cols : 1;
+    const sRows = (span && span.rows) ? span.rows : 1;
+    const ar = Math.floor(anchorIdx / totalCols);
+    const ac = anchorIdx % totalCols;
+    if (ar + sRows > totalRows || ac + sCols > totalCols) return null;
+    const out = [];
+    for (let r = 0; r < sRows; r++) {
+        for (let c = 0; c < sCols; c++) {
+            out.push((ar + r) * totalCols + (ac + c));
+        }
+    }
+    return out;
 }
 
 /**
