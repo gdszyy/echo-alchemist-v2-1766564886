@@ -24,10 +24,11 @@ import { Peg, SpecialSlot } from './entities.js';
 // 与 game_phase.phase_gathering_getRandomPegType 保持一致：laser / lightning 不生成钉子。
 const RANDOMIZABLE_PEG_TYPES = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'wind'];
 
-// 倍化弹珠半径 = marbleRadius(7.7) + maxSizeBonus(2.5)；间距不得小于其直径，
-// 确保倍化弹珠能在相邻钉子间通过。
-const DOUBLED_MARBLE_RADIUS = 10.2;
-const MIN_PEG_SPACING = DOUBLED_MARBLE_RADIUS * 2; // 20.4 px，中心到中心最小间距
+// 倍化弹珠半径 = marbleRadius(7.7) + maxSizeBonus(2.5)
+const PEG_RADIUS = 6;               // 与 entities.js Peg.radius 一致
+const DOUBLED_MARBLE_RADIUS = 10.2; // marbleRadius(7.7) + maxSizeBonus(2.5)
+// 最小中心到中心间距 = 两侧钉子半径 + 倍化弹珠直径，确保倍化弹珠能通过
+const MIN_PEG_SPACING = 2 * PEG_RADIUS + 2 * DOUBLED_MARBLE_RADIUS; // = 32.4 px
 
 /**
  * 按当前局内属性权重随机生成 peg 类型。
@@ -80,9 +81,7 @@ function generateStaggeredPegs(originX, originY, w, h, cols, rows, type = 'norma
     const effectiveCols = cols > 1 ? Math.min(cols, Math.max(1, Math.floor(w / MIN_PEG_SPACING))) : 1;
     const effectiveRows = rows > 1 ? Math.min(rows, Math.max(1, Math.floor(h / MIN_PEG_SPACING))) : 1;
     const spacingX = effectiveCols > 1 ? (w / effectiveCols) : w;
-    // 用 h/rows（非 h/(rows+0.5)）使顶部和底部边距相等（均为 spacingY/2），
-    // 从而消除模块拼接处比模块内部多出半格的空隙。
-    const spacingY = effectiveRows > 1 ? (h / effectiveRows) : h;
+    const spacingY = effectiveRows > 1 ? (h / (effectiveRows + 0.5)) : h;
     for (let r = 0; r < effectiveRows; r++) {
         const isOdd = r % 2 !== 0;
         // 奇数行从左边缘起始（baseLeftPad=0），右边距=spacingX；
@@ -109,7 +108,7 @@ function generateStaggeredPegs(originX, originY, w, h, cols, rows, type = 'norma
 function generateFunnelPegs(originX, originY, w, h, topCols, rows) {
     const pegs = [];
     if (rows < 1) return pegs;
-    const spacingY = rows > 1 ? h / rows : h;
+    const spacingY = rows > 1 ? h / (rows + 0.5) : h;
     const maxColsForW = Math.max(1, Math.floor((w * 0.85) / MIN_PEG_SPACING));
     for (let r = 0; r < rows; r++) {
         const colsThisRow = Math.min(Math.max(1, topCols - r), maxColsForW);
@@ -322,7 +321,7 @@ MODULE_DEFS.diamond_module = {
     build(ox, oy, w, h) {
         const pegs = [];
         const rows = 5;
-        const spacingY = h / rows;
+        const spacingY = h / (rows + 0.5);
         const widths = [2, 3, 4, 3, 2];
         const maxColsForW = Math.max(1, Math.floor((w * 0.85) / MIN_PEG_SPACING));
         for (let r = 0; r < rows; r++) {
@@ -349,7 +348,7 @@ MODULE_DEFS.sparse_module = {
     price: 60,
     build(ox, oy, w, h) {
         const rows = 4;
-        const spacingY = h / rows;
+        const spacingY = h / (rows + 0.5);
         const maxCols = Math.max(1, Math.floor(w / MIN_PEG_SPACING));
         const pegs = [];
         for (let r = 0; r < rows; r++) {
@@ -393,7 +392,7 @@ MODULE_DEFS.wide_narrow_module = {
     price: 40,
     build(ox, oy, w, h) {
         const rows = 4;
-        const spacingY = h / rows;
+        const spacingY = h / (rows + 0.5);
         const maxCols = Math.max(1, Math.floor(w / MIN_PEG_SPACING));
         const pegs = [];
         for (let r = 0; r < rows; r++) {
