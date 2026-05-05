@@ -355,6 +355,8 @@ class Game {
         this._perfDownTimer = 0;
         // 升级计时器（秒）：连续高帧时累加，达到阈值才真正升级
         this._perfUpTimer = 0;
+        // 手动性能模式：null = 自动自适应；'high'|'medium'|'low' = 手动锁定
+        this._perfManualMode = null;
         // [Phase 5B] 预加载所有 Sprite Sheet（在游戏循环开始前触发异步加载）
         preloadAllSprites();
         // 启动游戏主循环

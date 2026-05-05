@@ -2384,10 +2384,9 @@ class Enemy {
         }
 
         // === [Phase 5B Task 5.B3] Layer 3.95: Sprite Sheet 覆盖层（在血条和内部特效之后）===
-        // Arc Boss 的 sprite 需在 clip 区域外绘制（否则被圆环裁剪），此处跳过它们
-        // 非 arc boss 的 sprite 在 clip 内正常绘制
-        if (this._spriteRenderer && this._spriteRenderer.ready &&
-            !(this.type === 'boss' && this.collisionShape === 'arc')) {
+        // Boss 的 sprite 统一由 _drawBossDecoration 在 Layer 3.8 绘制，此处跳过所有 boss
+        // Arc Boss 的 sprite 另在 Layer 3.95b 裁剪区域外绘制
+        if (this._spriteRenderer && this._spriteRenderer.ready && this.type !== 'boss') {
             // [V2 资源协议] 大型基底（cols 或 rows >= 2）需用整个占格作为绘制区，
             // 避免 min(w,h) 把 3×1 装甲横梁压成中央小方块；小型敌人保留原行为。
             const isLargeV2 = !!this.baseArchetype && ((this.gridCols || 1) > 1 || (this.gridRows || 1) > 1);
@@ -2396,7 +2395,7 @@ class Enemy {
                 this._spriteRenderer.draw(ctx, -w/2 + padX, -h/2 + padY, w - padX*2, h - padY*2, 0.92);
             } else {
                 const sprSize1 = Math.min(w, h);
-                const sprOffsetY1 = h * 0.15;
+                const sprOffsetY1 = h * -0.1;
                 this._spriteRenderer.draw(ctx, -sprSize1/2, -sprSize1/2 + sprOffsetY1, sprSize1, sprSize1, 0.85);
             }
         }
@@ -2735,10 +2734,10 @@ class Enemy {
         // 文字层：保留血量数字显示
         // [修复] 即使被冻结也显示生命值数字，除非生命值为 0
         if (this.displayHp > 0) {
-            ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; 
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; 
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'top';
             if (this.displayHp > this.hp + 1) ctx.fillStyle = '#fca5a5';
-            ctx.fillText(Math.ceil(this.displayHp), 0, 2);
+            ctx.fillText(Math.ceil(this.displayHp), 0, -h/2 + 3);
         }
         
         // 受击闪白
@@ -4747,11 +4746,8 @@ class Enemy {
         // Sprite 不替换矢量装饰，而是与其叠加（矢量层提供动态效果，Sprite 层提供角色外观）
         // 这里的 SpriteRenderer.draw() 在 Layer 3.8 调用，已在 ctx.save()/restore() 块内
         if (this._spriteRenderer && this._spriteRenderer.ready) {
-            // Boss Sprite 保持正方形比例（取 min(w,h) 作为边长），居中偏下绘制
-            // Boss 贴图同样偏下，与普通/精英敌人保持视觉一致性
-            const sprSize2 = Math.min(w, h);
-            const sprOffsetY2 = h * 0.15; // 向下偏移量
-            this._spriteRenderer.draw(ctx, -sprSize2/2, -sprSize2/2 + sprOffsetY2, sprSize2, sprSize2, 0.7);
+            // Boss Sprite 填充整个实体区域，确保动画帧在正确位置显示
+            this._spriteRenderer.draw(ctx, -w/2, -h/2, w, h, 0.85);
         }
 
         const t = Date.now() / 1000;
