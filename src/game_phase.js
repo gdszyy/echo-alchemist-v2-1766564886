@@ -864,6 +864,11 @@ phase_gathering_getRandomPegType() {
             this.ammoQueue = [...this._carryOverAmmo, ...this.ammoQueue];
             this._carryOverAmmo = null;
         }
+        // 子弹持有上限：基础 3 颗，特殊遗物可通过 bulletCapBonus 增加
+        const _bulletCap = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
+        if (this.ammoQueue.length > _bulletCap) {
+            this.ammoQueue = this.ammoQueue.slice(0, _bulletCap);
+        }
         // [perfect-clear-upgrade] 重置「本回合是否已触发蓄能升级」标志
         this._chargeUpgradeApplied = false;
         // [in-wall-clear-lottery] 重置「本回合是否已触发围墙清空抽奖」标志

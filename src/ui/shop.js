@@ -243,6 +243,13 @@ export const shop_system = {
                 this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
             }
         }
+        else if (relic.effect === 'bullet_cap_up') {
+            const amount = (typeof relic.amount === 'number' && relic.amount > 0) ? relic.amount : 1;
+            this.bulletCapBonus = (this.bulletCapBonus || 0) + amount;
+            const newCap = (CONFIG.gameplay.selectionReq || 3) + this.bulletCapBonus;
+            this.selectionRequiredCount = newCap;
+            if (window.showToast) showToast(`子彈持有上限 +${amount}（當前 ${newCap}）`);
+        }
         // ==================== [v2 钉板模块化] 新遗物分支 ====================
         else if (relic.effect === 'module_slot_up') {
             const cfg = (typeof CONFIG !== 'undefined' && CONFIG.gameplay) || {};

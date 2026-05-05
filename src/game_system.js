@@ -328,6 +328,7 @@ export const game_system = {
         this.doubleAssimilationBoostRounds = {};
         this.pendingSelectionMode = null;
         this.selectionMode = 'standard';
+        this.bulletCapBonus = 0;
         this.selectionRequiredCount = CONFIG.gameplay.selectionReq || 3;
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
@@ -629,7 +630,7 @@ export const game_system = {
         // 确保 phase_switchPhase 内部触发的 ui_updateUI 能读到正确状态，
         // 避免渲染出旧的命运选择界面（如上一次的 chaos_essence / pure_essence 卡片）。
         this.selectionMode = mode;
-        this.selectionRequiredCount = Math.max(1, pendingMode?.requiredCount || CONFIG.gameplay.selectionReq || 3);
+        this.selectionRequiredCount = Math.max(1, pendingMode?.requiredCount || (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0));
         this.fateMomentContext = this.selectionMode === 'standard'
             ? null
             : {
@@ -891,7 +892,7 @@ export const game_system = {
             phase: this.phase,
         });
         this.selectionMode = mode;
-        this.selectionRequiredCount = Math.max(1, pendingMode?.requiredCount || CONFIG.gameplay.selectionReq || 3);
+        this.selectionRequiredCount = Math.max(1, pendingMode?.requiredCount || (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0));
         this.fateMomentContext = {
             type: mode,
             source: pendingMode?.source || 'unknown',
@@ -977,7 +978,7 @@ export const game_system = {
         this.marbleQueue = [];
         this.activeMarbleIndex = 0;
         this.selectionMode = 'standard';
-        this.selectionRequiredCount = CONFIG.gameplay.selectionReq || 3;
+        this.selectionRequiredCount = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
         this.fateMomentContext = null;
@@ -1070,7 +1071,7 @@ export const game_system = {
             this.fateMomentContext = null;
             this.pendingSelectionMode = null;
             this.selectionMode = 'standard';
-            this.selectionRequiredCount = (typeof CONFIG !== 'undefined' && CONFIG.gameplay.selectionReq) || 3;
+            this.selectionRequiredCount = ((typeof CONFIG !== 'undefined' && CONFIG.gameplay.selectionReq) || 3) + (this.bulletCapBonus || 0);
             this.selectionInjectedRune = null;
             this.selectionPreviewState = null;
             this.marbleQueue = [];
@@ -2376,6 +2377,7 @@ export const game_system = {
                 pendingSelectionMode: this.pendingSelectionMode ? { ...this.pendingSelectionMode } : null,
                 selectionMode: this.selectionMode || 'standard',
                 selectionRequiredCount: this.selectionRequiredCount || (CONFIG.gameplay.selectionReq || 3),
+                bulletCapBonus: this.bulletCapBonus || 0,
                 selectionInjectedRune: this.selectionInjectedRune ? { ...this.selectionInjectedRune } : null,
                 selectionPreviewState: this.selectionPreviewState ? { ...this.selectionPreviewState } : null,
                 relicOverlayReturnState: this.relicOverlayReturnState ? { ...this.relicOverlayReturnState } : null,
@@ -2492,7 +2494,8 @@ export const game_system = {
             this.doubleAssimilationBoostRounds = { ...(state.doubleAssimilationBoostRounds || state.assimilationBoostRounds || {}) };
             this.pendingSelectionMode = state.pendingSelectionMode ? { ...state.pendingSelectionMode } : null;
             this.selectionMode = state.selectionMode || 'standard';
-            this.selectionRequiredCount = state.selectionRequiredCount || (CONFIG.gameplay.selectionReq || 3);
+            this.bulletCapBonus = state.bulletCapBonus || 0;
+            this.selectionRequiredCount = state.selectionRequiredCount || ((CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0));
             this.selectionInjectedRune = state.selectionInjectedRune ? { ...state.selectionInjectedRune } : null;
             this.selectionPreviewState = state.selectionPreviewState ? { ...state.selectionPreviewState } : null;
             this.relicOverlayReturnState = state.relicOverlayReturnState ? { ...state.relicOverlayReturnState } : null;
