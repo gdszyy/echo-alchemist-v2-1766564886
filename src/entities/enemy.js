@@ -2395,8 +2395,7 @@ class Enemy {
                 this._spriteRenderer.draw(ctx, -w/2 + padX, -h/2 + padY, w - padX*2, h - padY*2, 0.92);
             } else {
                 const sprSize1 = Math.min(w, h);
-                const sprOffsetY1 = h * -0.1;
-                this._spriteRenderer.draw(ctx, -sprSize1/2, -sprSize1/2 + sprOffsetY1, sprSize1, sprSize1, 0.85);
+                this._spriteRenderer.draw(ctx, -sprSize1/2, h/2 - sprSize1, sprSize1, sprSize1, 0.85);
             }
         }
         // === Layer 4: 裂纹绘制 (Fissures) - [保持不变] ===
@@ -4746,8 +4745,8 @@ class Enemy {
         // Sprite 不替换矢量装饰，而是与其叠加（矢量层提供动态效果，Sprite 层提供角色外观）
         // 这里的 SpriteRenderer.draw() 在 Layer 3.8 调用，已在 ctx.save()/restore() 块内
         if (this._spriteRenderer && this._spriteRenderer.ready) {
-            // Boss Sprite 填充整个实体区域，确保动画帧在正确位置显示
-            this._spriteRenderer.draw(ctx, -w/2, -h/2, w, h, 0.85);
+            const sprSize2 = Math.min(w, h);
+            this._spriteRenderer.draw(ctx, -sprSize2/2, h/2 - sprSize2, sprSize2, sprSize2, 0.85);
         }
 
         const t = Date.now() / 1000;
