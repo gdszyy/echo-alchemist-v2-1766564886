@@ -19,7 +19,7 @@ import {
     getLayoutParams,
     getAllLayoutHints,
 } from './plinko_physics.js';
-import { buildModuleEntities, calcModuleSlotRect, MODULE_DEFS } from './pinboard_modules.js';
+import { buildModuleEntities, calcModuleSlotRect, MODULE_DEFS, getModuleSpan } from './pinboard_modules.js';
 
 export const game_phase = {
 /**
@@ -188,9 +188,14 @@ export const game_phase = {
         const slotsToBuild = Math.min(this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3, totalSlots);
 
         for (let i = 0; i < slotsToBuild; i++) {
-            const moduleId = this.currentModuleLayout[i];
+            const entry = this.currentModuleLayout[i];
+            // 跳过空槽和被多格模块覆盖的非锚点槽（{ ref: anchorIdx }）
+            if (!entry) continue;
+            if (typeof entry === 'object' && entry.ref !== undefined) continue;
+            const moduleId = (typeof entry === 'string') ? entry : entry.id;
             if (!moduleId) continue;
-            const rect = calcModuleSlotRect(i, canvasWidth, canvasHeight, cfg);
+            const span = getModuleSpan(moduleId);
+            const rect = calcModuleSlotRect(i, canvasWidth, canvasHeight, cfg, span);
             const result = buildModuleEntities(moduleId, rect.x, rect.y, rect.w, rect.h, moduleBuildCtx, i);
             if (result.pegs && result.pegs.length > 0) {
                 for (const p of result.pegs) {

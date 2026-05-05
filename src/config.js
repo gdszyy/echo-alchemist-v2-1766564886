@@ -751,11 +751,13 @@ const CONFIG = {
         // ==================== [v2 钉板模块化] 模块网格 ====================
         moduleCols: 4,                 // 模块网格列数
         moduleRows: 3,                 // 模块网格行数（共 12 槽）
-        moduleDefaultSlots: 3,         // 默认开放的模块槽位数（顶部第 1 行）
+        moduleDefaultSlots: 12,        // 默认开放的模块槽位数（全部 4×3 = 12 槽）
         moduleAreaTopY: 60,            // 模块区域起始 Y 坐标（画布顶部留白）
         moduleAreaBottomMargin: 80,    // 模块区域底部留白
         moduleSpacingX: 4,             // 模块横向间距 px
         moduleSpacingY: 4,             // 模块纵向间距 px
+        // 钉板左右两侧到画布墙的留白（每侧 1.5 个弹珠直径 = 1.5 × 2 × 7.7 ≈ 23 px）
+        moduleAreaSideMargin: 23,
         // ==================== [v2 局内商店 + 符文碎片经济] ====================
         runShopInterval: 2,            // 每 N 场战斗弹出一次局内商店
         runShopRefreshCost: 10,        // 刷新一次商店消耗碎片

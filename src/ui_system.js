@@ -2,7 +2,7 @@ import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
 import { CONFIG, RELIC_DB } from './config.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
-import { MODULE_DEFS, listAvailableModules } from './pinboard_modules.js';
+import { MODULE_DEFS, listAvailableModules, getModuleSpan, getCoveredSlots } from './pinboard_modules.js';
 import { fuseRuneIntoBoard, getRuneId } from './rune_system.js';
 import { showToast } from './utils/math_utils.js';
 
@@ -1710,7 +1710,11 @@ export const ui_system = {
         const selRune = state.selectedRuneIdx;
         const inventory = Array.isArray(this.runeInventory) ? this.runeInventory : [];
         const pendingFusions = Array.isArray(this.pendingFusions) ? this.pendingFusions : [];
-        const placedCount = layout.filter(Boolean).length;
+        // 锚点 = 字符串条目（多格模块的 ref 占位用 {ref} 表示）
+        const isAnchor = (e) => typeof e === 'string';
+        const isRef = (e) => e && typeof e === 'object' && e.ref !== undefined;
+        // 占用格子总数（含 ref），用于上限判断
+        const placedCount = layout.filter(e => e !== null && e !== undefined).length;
         const canPlaceMore = placedCount < unlockedSlots;
 
         // ---- 视口检测：决定结构变体（mobile / tablet / desktop） ----
@@ -1722,27 +1726,45 @@ export const ui_system = {
         overlay.classList.toggle('is-desktop', !isMobile && !isTablet);
 
         // ---- 钉板网格 ----
+        // 支持多格模块（span: {cols, rows}）：锚点用 string，被覆盖的格用 {ref: anchorIdx}。
         const gridCellsHtml = (() => {
             let html = '';
             for (let i = 0; i < totalSlots; i++) {
-                const moduleId = layout[i];
+                const entry = layout[i];
+                // 被多格模块覆盖的非锚点格不渲染按钮（由锚点的 grid-span 占据视觉位置）
+                if (isRef(entry)) continue;
+
+                const moduleId = isAnchor(entry) ? entry : null;
                 const def = moduleId ? MODULE_DEFS[moduleId] : null;
+                const span = def ? getModuleSpan(moduleId) : { cols: 1, rows: 1 };
+
                 const isPickPreview = !def && selModule && canPlaceMore;
                 const previewDef = isPickPreview ? MODULE_DEFS[selModule] : null;
+                const previewSpan = previewDef ? getModuleSpan(selModule) : { cols: 1, rows: 1 };
+
                 let cls = 'me-cell';
                 if (def) cls += ' is-placed';
                 else if (isPickPreview) cls += ' is-preview';
                 else if (!canPlaceMore) cls += ' is-full';
                 else cls += ' is-empty';
 
+                // 显式 grid 定位以兼容多格模块
+                const r = Math.floor(i / cols);
+                const c = i % cols;
+                const useSpan = def ? span : { cols: 1, rows: 1 };
+                const styleAttr = `grid-column: ${c + 1} / span ${useSpan.cols}; grid-row: ${r + 1} / span ${useSpan.rows};`;
+
                 let inner;
                 if (def) {
+                    const sizeTag = (span.cols > 1 || span.rows > 1) ? `<div class="me-cell-size">${span.cols}×${span.rows}</div>` : '';
                     inner = `<div class="me-cell-icon">${def.icon || '▦'}</div>
                         <div class="me-cell-name">${def.name}</div>
+                        ${sizeTag}
                         <div class="me-cell-action">点击移除</div>`;
                 } else if (isPickPreview && previewDef) {
+                    const sizeHint = (previewSpan.cols > 1 || previewSpan.rows > 1) ? ` (${previewSpan.cols}×${previewSpan.rows})` : '';
                     inner = `<div class="me-cell-icon me-cell-icon--preview">${previewDef.icon || '▦'}</div>
-                        <div class="me-cell-action me-cell-action--preview">点击放置</div>`;
+                        <div class="me-cell-action me-cell-action--preview">点击放置${sizeHint}</div>`;
                 } else if (canPlaceMore) {
                     inner = `<div class="me-cell-icon me-cell-icon--empty">＋</div>
                         <div class="me-cell-action">空槽</div>`;
@@ -1750,7 +1772,7 @@ export const ui_system = {
                     inner = `<div class="me-cell-icon me-cell-icon--full">·</div>
                         <div class="me-cell-action">已满</div>`;
                 }
-                html += `<button type="button" data-slot-idx="${i}" class="${cls}">${inner}</button>`;
+                html += `<button type="button" data-slot-idx="${i}" class="${cls}" style="${styleAttr}">${inner}</button>`;
             }
             return html;
         })();
@@ -1859,15 +1881,37 @@ export const ui_system = {
             cell.addEventListener('click', () => {
                 const idx = parseInt(cell.dataset.slotIdx, 10);
                 const st = this._moduleEditorState || {};
-                if (this.currentModuleLayout[idx]) {
-                    this.currentModuleLayout[idx] = null;
+                const layoutArr = this.currentModuleLayout;
+                const cur = layoutArr[idx];
+
+                // 点击 anchor → 移除该多格模块（清空所有覆盖格）
+                if (typeof cur === 'string') {
+                    const span = getModuleSpan(cur);
+                    const covered = getCoveredSlots(idx, span, cols, rows) || [idx];
+                    for (const ci of covered) layoutArr[ci] = null;
                 } else if (st.selectedModuleId) {
-                    const currentPlaced = (this.currentModuleLayout || []).filter(Boolean).length;
-                    if (currentPlaced >= unlockedSlots) {
-                        showToast(`已达放置上限 ${unlockedSlots} 个，请先移除一个`);
+                    // 放置：检查跨格不溢出 + 所有覆盖格为空 + 不超过上限
+                    const span = getModuleSpan(st.selectedModuleId);
+                    const covered = getCoveredSlots(idx, span, cols, rows);
+                    if (!covered) {
+                        showToast(`该模块占用 ${span.cols}×${span.rows} 格，超出网格边界`);
                         return;
                     }
-                    this.currentModuleLayout[idx] = st.selectedModuleId;
+                    for (const ci of covered) {
+                        if (layoutArr[ci] !== null && layoutArr[ci] !== undefined) {
+                            showToast('该位置已被其他模块占用');
+                            return;
+                        }
+                    }
+                    const currentPlaced = layoutArr.filter(e => e !== null && e !== undefined).length;
+                    if (currentPlaced + covered.length > unlockedSlots) {
+                        showToast(`已达放置上限 ${unlockedSlots} 格，请先移除一个`);
+                        return;
+                    }
+                    layoutArr[idx] = st.selectedModuleId;
+                    for (const ci of covered) {
+                        if (ci !== idx) layoutArr[ci] = { ref: idx };
+                    }
                 } else {
                     showToast('请先在"模块库"中选中一个模块');
                     return;

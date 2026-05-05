@@ -260,9 +260,12 @@ class Game {
 
         // ==================== [v2 钉板模块化] 模块系统状态 ====================
         this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'bouncer', 'funnel'];
-        this.unlockedModuleSlots = 3;
-        this.currentModuleLayout = ['std_stagger', 'std_stagger', 'std_stagger',
-            null, null, null, null, null, null, null, null, null];
+        this.unlockedModuleSlots = 12;
+        this.currentModuleLayout = [
+            'std_stagger', 'std_stagger', 'std_stagger', 'std_stagger',
+            'std_stagger', 'std_stagger', 'std_stagger', 'std_stagger',
+            'std_stagger', 'std_stagger', 'std_stagger', 'std_stagger',
+        ];
         this.pendingFusions = [];
 
         // ==================== [v2 局内商店 + 符文碎片经济] ====================
