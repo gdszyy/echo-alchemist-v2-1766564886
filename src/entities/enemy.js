@@ -2395,8 +2395,7 @@ class Enemy {
                 this._spriteRenderer.draw(ctx, -w/2 + padX, -h/2 + padY, w - padX*2, h - padY*2, 0.92);
             } else {
                 const sprSize1 = Math.min(w, h);
-                const sprOffsetY1 = h * -0.1;
-                this._spriteRenderer.draw(ctx, -sprSize1/2, -sprSize1/2 + sprOffsetY1, sprSize1, sprSize1, 0.85);
+                this._spriteRenderer.draw(ctx, -sprSize1/2, h/2 - sprSize1, sprSize1, sprSize1, 0.85);
             }
         }
         // === Layer 4: 裂纹绘制 (Fissures) - [保持不变] ===
