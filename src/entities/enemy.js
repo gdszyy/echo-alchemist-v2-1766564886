@@ -70,7 +70,8 @@ class Enemy {
         this.type = type;
         this.affixes = affixes;
         // [架构] elite/boss 由 spawn_system.js 通过 e.type 直接赋值，不再从 affixes 隐式转换
-        this.hitTimer = 0; 
+        this.hitTimer = 0;
+        this._hitFlashTimer = 0;
         this.dropTargetY = y; 
         this.justSpawned = true; 
         this.temp = 0; 
@@ -371,6 +372,7 @@ class Enemy {
             // 保持在入场起始位置（屏幕外），不执行任何移动逻辑
             this.pos.y = this._entranceStartY;
             if (this.hitTimer > 0) this.hitTimer -= timeScale;
+            if (this._hitFlashTimer > 0) this._hitFlashTimer -= timeScale;
             if (this.shieldHitTimer > 0) this.shieldHitTimer -= timeScale;
             if (this._hitImpact > 0) this._hitImpact *= Math.pow(CONFIG.enemyRender.hitImpactDecay, timeScale);
             return;
@@ -399,6 +401,7 @@ class Enemy {
             if (this.entranceTimer <= 0) this.entranceTimer = 0;
             // 入场动画期间不进行其他移动逻辑
             if (this.hitTimer > 0) this.hitTimer -= timeScale;
+            if (this._hitFlashTimer > 0) this._hitFlashTimer -= timeScale;
             if (this.shieldHitTimer > 0) this.shieldHitTimer -= timeScale;
             if (this._hitImpact > 0) this._hitImpact *= Math.pow(CONFIG.enemyRender.hitImpactDecay, timeScale);
             return;
@@ -411,6 +414,7 @@ class Enemy {
         }
         
         if (this.hitTimer > 0) this.hitTimer -= timeScale;
+        if (this._hitFlashTimer > 0) this._hitFlashTimer -= timeScale;
         if (this.shieldHitTimer > 0) this.shieldHitTimer -= timeScale;
         // === A3: 受击形变弹性衰减 ===
         if (this._hitImpact > 0) this._hitImpact *= Math.pow(CONFIG.enemyRender.hitImpactDecay, timeScale);
@@ -1343,6 +1347,7 @@ class Enemy {
 
     playBurnTickEffect(game, dmg) {
         this.hitTimer = 15;
+        this._hitFlashTimer = 4;
         for(let i=0; i<8; i++) game.spawn_createParticle(this.pos.x, this.pos.y, '#f97316', 'spark');
         for(let i=0; i<3; i++) game.spawn_createParticle(this.pos.x, this.pos.y, 'rgba(0,0,0,0.6)', 'smoke');
         game.spawn_createFloatingText(this.pos.x, this.pos.y, `🔥-${dmg}`, '#fbbf24');
@@ -2739,9 +2744,9 @@ class Enemy {
             ctx.fillText(Math.ceil(this.displayHp), 0, -h/2 + 3);
         }
         
-        // 受击闪白
-        if (this.hitTimer > 0) {
-            ctx.fillStyle = `rgba(255, 255, 255, ${this.hitTimer / 10 * 0.6})`;
+        // 受击闪白 - 使用独立的短时计时器，确保只闪一下而非持续白色
+        if (this._hitFlashTimer > 0) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${(this._hitFlashTimer / 4) * 0.8})`;
             ctx.fillRect(-w/2, -h/2, w, h);
         }
 
@@ -4365,8 +4370,9 @@ class Enemy {
         }
 
           // 4. 执行扣血
-        this.hp -= actualDamage; 
-        this.hitTimer = 10; 
+        this.hp -= actualDamage;
+        this.hitTimer = 10;
+        this._hitFlashTimer = 4;
         this.whiteBarTimer = 45;
         // === A3: 记录受击形变强度 ===
         if (this.maxHp > 0) {

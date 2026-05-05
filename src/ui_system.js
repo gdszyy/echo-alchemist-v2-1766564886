@@ -1499,7 +1499,7 @@ export const ui_system = {
         this.replaceAmmoContext = null;
 
         this.selectionMode = 'standard';
-        this.selectionRequiredCount = (typeof CONFIG !== 'undefined' && CONFIG.gameplay.selectionReq) || 3;
+        this.selectionRequiredCount = ((typeof CONFIG !== 'undefined' && CONFIG.gameplay.selectionReq) || 3) + (this.bulletCapBonus || 0);
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
         this.fateMomentContext = null;
