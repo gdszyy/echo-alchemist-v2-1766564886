@@ -2955,7 +2955,7 @@
             <div class="mb-4">
                 <div class="flex items-center justify-between mb-3">
                     <div class="text-xs text-slate-400/60 tracking-widest uppercase">符文庫存 <span id="rune-inventory-count" class="text-purple-300">(0)</span></div>
-                    <span id="rune-selected-count" class="text-xs text-slate-500">已选中 0/3</span>
+                    <span id="rune-placement-hint" class="text-xs text-slate-500">點擊符文選中，再點空格放置</span>
                 </div>
                 <div id="rune-inventory-container" class="flex flex-wrap gap-2 min-h-[60px] p-3 bg-slate-900/40 border border-slate-700/30 rounded-xl">
                     <!-- 库存符文由 JS 动态生成，支持点击选中/取消 -->
@@ -2996,13 +2996,24 @@
             <!-- 符文管理面板（熔炼 / 重铸） -->
             <div id="rune-management-panel" class="hidden">
                 <div class="text-xs text-slate-400/70 mb-3 leading-relaxed">
-                    在此頁面熔煉或重鑄符文。請先在「配置」頁面選中 3 個符文，再返回此頁執行操作。
+                    在此頁面選中 3 個符文後，可進行熔煉或重鑄操作。
                 </div>
 
                 <!-- 当前选中状态 -->
                 <div class="mb-4 px-3 py-2 bg-slate-900/40 border border-slate-700/40 rounded-lg flex items-center justify-between">
                     <span class="text-[11px] text-slate-400">當前選中</span>
-                    <span id="rune-management-selected-count" class="text-xs text-purple-300 font-bold">0 / 3</span>
+                    <div class="flex items-center gap-2">
+                        <span id="rune-management-selected-count" class="text-xs text-purple-300 font-bold">0 / 3</span>
+                        <button id="rune-management-clear-btn" onclick="game._selectedRuneIndices && game._selectedRuneIndices.clear(); game._ui_updateRuneInventoryDisplay && game._ui_updateRuneInventoryDisplay();" class="text-[10px] text-slate-400 hover:text-slate-200 underline">清除</button>
+                    </div>
+                </div>
+
+                <!-- 符文仓库（管理页专属选择列表） -->
+                <div class="mb-4">
+                    <div class="text-xs text-slate-400/60 tracking-widest uppercase mb-2">符文倉庫 <span id="rune-management-inventory-count" class="text-purple-300">(0)</span></div>
+                    <div id="rune-management-inventory" class="flex flex-wrap gap-2 min-h-[60px] p-3 bg-slate-900/40 border border-slate-700/30 rounded-xl">
+                        <div id="rune-management-inventory-empty" class="w-full text-center text-slate-600 text-xs py-2">暫無符文</div>
+                    </div>
                 </div>
 
                 <!-- 合成区域 -->
@@ -3041,9 +3052,16 @@
 
             <!-- 词条图鉴面板 -->
             <div id="rune-codex-panel" class="hidden">
-                <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center justify-between mb-3">
                     <div class="text-xs text-slate-400/60 tracking-widest uppercase">詞條圖鑑</div>
                     <div class="text-xs text-purple-300/70">已發現 <span id="rune-codex-discovered-count" class="font-bold text-purple-200">0</span> / <span id="rune-codex-total-count" class="text-slate-400">0</span></div>
+                </div>
+                <!-- 按符文筛选 -->
+                <div class="mb-3">
+                    <div class="text-[10px] text-slate-500 mb-1.5">按符文篩選</div>
+                    <div id="rune-codex-filter-bar" class="flex flex-wrap gap-1.5">
+                        <!-- 由 JS 动态生成 -->
+                    </div>
                 </div>
                 <div id="rune-codex-list" class="space-y-3">
                     <!-- 由 JS 动态生成 -->
