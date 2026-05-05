@@ -289,6 +289,10 @@ class Projectile {
 
         if (hitResult) {
             const { closestX, closestY, distSq, distVecX, distVecY, normal: shapeNormal } = hitResult;
+            // [反弹算法优化] 命中冷却仅作用于"最近一次接触的同一目标"，
+            // 防止同一帧/连续子步内对同一敌人重复结算（数值稳定性）。
+            // 一旦子弹接触了任何其他敌人或墙壁（见反弹分支与 _applyMove 中的 hitCooldowns.clear），
+            // 该冷却即被清除——这样"反弹 A → 反弹 B → 回到 A"会正确再次反弹，而非穿过。
             if (this.hitCooldowns.has(e)) return;
             this.hitCooldowns.set(e, CONFIG.gameplay.hitCooldowns);
             this.lastHitEnemy = e;
@@ -436,8 +440,9 @@ class Projectile {
                     normal = new Vec2(distVecX / dist, distVecY / dist);
                 }
 
-                // 位置修正 (Push Out)：将子弹推离敌人表面
-                const pushOutDist = this.radius + 0.1;
+                // [反弹算法优化] 位置修正 (Push Out)：使用更大的安全间隙，
+                // 避免高速反弹时下一子步因浮点误差/外力（gravityWell 等）再次穿入。
+                const pushOutDist = this.radius + 1.0;
                 this.pos.x = closestX + normal.x * pushOutDist;
                 this.pos.y = closestY + normal.y * pushOutDist;
 
@@ -446,6 +451,23 @@ class Projectile {
                 if (dot < 0) {
                     this.vel = this.vel.sub(normal.mult(2 * dot));
                 }
+
+                // [反弹算法优化] 反向速度下限：保证反弹后法向分量足够大，
+                // 防止切向滑过 + 微小法向速度时被外力反向拉回造成穿模/粘连。
+                const outwardSpeed = this.vel.x * normal.x + this.vel.y * normal.y;
+                const minOutward = Math.max(0.5, this.radius * 0.15);
+                if (outwardSpeed < minOutward) {
+                    const correction = minOutward - outwardSpeed;
+                    this.vel.x += normal.x * correction;
+                    this.vel.y += normal.y * correction;
+                }
+
+                // [反弹算法优化] 反弹后清除其他敌人的命中冷却，仅保留对当前敌人 e 的冷却。
+                // 语义：子弹"接触了一个新物体"，与所有先前敌人之间的关系即被重置；
+                // 因此再次接触它们时会正常反弹/造成伤害，而不是被旧冷却误判为可穿过。
+                const _selfCd = this.hitCooldowns.get(e);
+                this.hitCooldowns.clear();
+                if (_selfCd != null) this.hitCooldowns.set(e, _selfCd);
 
                 // 视觉挤压效果
                 this.deformation = { x: 1.3, y: 0.7 };
@@ -563,6 +585,9 @@ class Projectile {
                 const wallShake = (2 + Math.min(1, this.config.damage / 20) * 5) * 0.6; // 1.2~4.2px
                 game.triggerScreenShake(wallShake);
             }
+            // [反弹算法优化] 接触墙壁视为"接触新物体"，重置敌人冷却，
+            // 保证墙弹回后再撞同一敌人能正常反弹。
+            this.hitCooldowns.clear();
             if (handleRelicWallHit('top')) return;
         }
         if (this.pos.y > height - this.radius) {
