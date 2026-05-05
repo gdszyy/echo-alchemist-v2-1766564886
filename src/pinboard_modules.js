@@ -85,8 +85,11 @@ function generateStaggeredPegs(originX, originY, w, h, cols, rows, type = 'norma
     const spacingY = effectiveRows > 1 ? (h / effectiveRows) : h;
     for (let r = 0; r < effectiveRows; r++) {
         const isOdd = r % 2 !== 0;
-        const colsThisRow = isOdd ? Math.max(1, effectiveCols - 1) : effectiveCols;
-        const baseLeftPad = (w - (colsThisRow - 1) * spacingX) / 2;
+        // 奇数行从左边缘起始（baseLeftPad=0），右边距=spacingX；
+        // 偶数行居中（baseLeftPad=spacingX/2），两侧各 spacingX/2。
+        // 两种情况下横向拼接缝隙均为 spacingX+moduleSpacingX，消除第2行空格。
+        const colsThisRow = effectiveCols;
+        const baseLeftPad = isOdd ? 0 : (w - (colsThisRow - 1) * spacingX) / 2;
         for (let c = 0; c < colsThisRow; c++) {
             const x = originX + baseLeftPad + c * spacingX;
             const y = originY + spacingY * 0.5 + r * spacingY;
@@ -259,8 +262,10 @@ export const MODULE_DEFS = {
                 const lastRow = pegs[pegs.length - 1].row;
                 const bottomRowPegs = pegs.filter(p => p.row === lastRow).sort((a, b) => a.pos.x - b.pos.x);
                 if (bottomRowPegs.length >= 2) {
-                    pegA = bottomRowPegs[0];
-                    pegB = bottomRowPegs[1];
+                    // 取中间两颗钉作为特殊槽锚点，确保槽居中显示
+                    const midIdx = Math.floor((bottomRowPegs.length - 1) / 2);
+                    pegA = bottomRowPegs[midIdx];
+                    pegB = bottomRowPegs[midIdx + 1];
                 }
             }
             const specialSlots = [];
