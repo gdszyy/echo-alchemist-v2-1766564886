@@ -200,11 +200,10 @@ export const MODULE_DEFS = {
         rarity: 'rare',
         price: 60,
         build(ox, oy, w, h) {
-            // 顶部一排普通钉子 + 底部两颗钉子之间夹一个 wheel slot
+            // 顶部 2 颗钉（原为3颗，间距w/4=21px导致弹珠卡死；改为2颗间距w/2≈43px）
             const pegs = [];
-            const sx = w / 4;
-            for (let i = 0; i < 3; i++) {
-                const p = new Peg(ox + sx + i * sx, oy + h * 0.25, 'normal');
+            for (let i = 0; i < 2; i++) {
+                const p = new Peg(ox + w * (0.25 + i * 0.5), oy + h * 0.25, 'normal');
                 p.level = 1; p.row = 0; p.col = i; pegs.push(p);
             }
             // 底部两颗钉子（用作 SpecialSlot 锚点）
