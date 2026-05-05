@@ -1541,13 +1541,7 @@ class Enemy {
         ctx.fillStyle = _slotGrad;
         ctx.fillRect(-w/2, -h/2, w, h);
 
-        // B. 绘制白色延迟条 (在彩色条底下)
-        if (whiteRatio > hpRatio) {
-            ctx.fillStyle = '#ffffff';
-            ctx.globalAlpha = 0.8;
-            ctx.fillRect(-w/2, whiteY, w, whiteHeight);
-            ctx.globalAlpha = 1.0;
-        }
+        // B. 白色延迟条已移除（受伤时血条变亮效果不需要）
 
         // [新增] B2. 绘制绿色回血条 (在彩色条底下)
         if (greenRatio > hpRatio) {
