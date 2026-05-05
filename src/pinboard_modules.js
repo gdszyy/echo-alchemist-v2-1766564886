@@ -24,6 +24,11 @@ import { Peg, SpecialSlot } from './entities.js';
 // 与 game_phase.phase_gathering_getRandomPegType 保持一致：laser / lightning 不生成钉子。
 const RANDOMIZABLE_PEG_TYPES = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'wind'];
 
+// 倍化弹珠半径 = marbleRadius(7.7) + maxSizeBonus(2.5)；间距不得小于其直径，
+// 确保倍化弹珠能在相邻钉子间通过。
+const DOUBLED_MARBLE_RADIUS = 10.2;
+const MIN_PEG_SPACING = DOUBLED_MARBLE_RADIUS * 2; // 20.4 px，中心到中心最小间距
+
 /**
  * 按当前局内属性权重随机生成 peg 类型。
  * white 表示普通钉子权重，返回值使用 Peg 类实际类型 normal。
@@ -71,11 +76,16 @@ function applyWeightedPegTypes(pegs, ctx) {
 function generateStaggeredPegs(originX, originY, w, h, cols, rows, type = 'normal') {
     const pegs = [];
     if (cols < 1 || rows < 1) return pegs;
-    const spacingX = cols > 1 ? (w / cols) : w;
-    const spacingY = rows > 1 ? (h / (rows + 0.5)) : h;
-    for (let r = 0; r < rows; r++) {
+    // 限制列数/行数，确保中心间距 >= MIN_PEG_SPACING（倍化弹珠直径）
+    const effectiveCols = cols > 1 ? Math.min(cols, Math.max(1, Math.floor(w / MIN_PEG_SPACING))) : 1;
+    const effectiveRows = rows > 1 ? Math.min(rows, Math.max(1, Math.floor(h / MIN_PEG_SPACING))) : 1;
+    const spacingX = effectiveCols > 1 ? (w / effectiveCols) : w;
+    // 用 h/rows（非 h/(rows+0.5)）使顶部和底部边距相等（均为 spacingY/2），
+    // 从而消除模块拼接处比模块内部多出半格的空隙。
+    const spacingY = effectiveRows > 1 ? (h / effectiveRows) : h;
+    for (let r = 0; r < effectiveRows; r++) {
         const isOdd = r % 2 !== 0;
-        const colsThisRow = isOdd ? Math.max(1, cols - 1) : cols;
+        const colsThisRow = isOdd ? Math.max(1, effectiveCols - 1) : effectiveCols;
         const baseLeftPad = (w - (colsThisRow - 1) * spacingX) / 2;
         for (let c = 0; c < colsThisRow; c++) {
             const x = originX + baseLeftPad + c * spacingX;
@@ -96,9 +106,10 @@ function generateStaggeredPegs(originX, originY, w, h, cols, rows, type = 'norma
 function generateFunnelPegs(originX, originY, w, h, topCols, rows) {
     const pegs = [];
     if (rows < 1) return pegs;
-    const spacingY = h / (rows + 0.5);
+    const spacingY = rows > 1 ? h / rows : h;
+    const maxColsForW = Math.max(1, Math.floor((w * 0.85) / MIN_PEG_SPACING));
     for (let r = 0; r < rows; r++) {
-        const colsThisRow = Math.max(1, topCols - r);
+        const colsThisRow = Math.min(Math.max(1, topCols - r), maxColsForW);
         const spacingX = colsThisRow > 1 ? (w * 0.85) / colsThisRow : w * 0.85;
         const baseLeftPad = (w - (colsThisRow - 1) * spacingX) / 2;
         for (let c = 0; c < colsThisRow; c++) {
@@ -306,10 +317,11 @@ MODULE_DEFS.diamond_module = {
     build(ox, oy, w, h) {
         const pegs = [];
         const rows = 5;
-        const spacingY = h / (rows + 0.5);
+        const spacingY = h / rows;
         const widths = [2, 3, 4, 3, 2];
+        const maxColsForW = Math.max(1, Math.floor((w * 0.85) / MIN_PEG_SPACING));
         for (let r = 0; r < rows; r++) {
-            const colsThisRow = widths[r];
+            const colsThisRow = Math.min(widths[r], maxColsForW);
             const spacingX = colsThisRow > 1 ? (w * 0.85) / colsThisRow : w * 0.85;
             const baseLeftPad = (w - (colsThisRow - 1) * spacingX) / 2;
             for (let c = 0; c < colsThisRow; c++) {
@@ -332,10 +344,11 @@ MODULE_DEFS.sparse_module = {
     price: 60,
     build(ox, oy, w, h) {
         const rows = 4;
-        const spacingY = h / (rows + 0.5);
+        const spacingY = h / rows;
+        const maxCols = Math.max(1, Math.floor(w / MIN_PEG_SPACING));
         const pegs = [];
         for (let r = 0; r < rows; r++) {
-            const cols = (r % 2 === 0) ? 4 : 2;
+            const cols = Math.min((r % 2 === 0) ? 4 : 2, maxCols);
             const spacingX = cols > 1 ? w / cols : w;
             const pad = (w - (cols - 1) * spacingX) / 2;
             const isLastRow = r === rows - 1;
@@ -375,10 +388,11 @@ MODULE_DEFS.wide_narrow_module = {
     price: 40,
     build(ox, oy, w, h) {
         const rows = 4;
-        const spacingY = h / (rows + 0.5);
+        const spacingY = h / rows;
+        const maxCols = Math.max(1, Math.floor(w / MIN_PEG_SPACING));
         const pegs = [];
         for (let r = 0; r < rows; r++) {
-            const cols = (r % 2 === 0) ? 5 : 2;
+            const cols = Math.min((r % 2 === 0) ? 5 : 2, maxCols);
             const spacingX = cols > 1 ? w / cols : w;
             const pad = (w - (cols - 1) * spacingX) / 2;
             for (let c = 0; c < cols; c++) {
