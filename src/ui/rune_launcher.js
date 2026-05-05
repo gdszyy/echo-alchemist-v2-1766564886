@@ -168,6 +168,7 @@ export const rune_launcher_system = {
             if (panel2) panel2.style.overflow = '';
         }
          this._pendingRuneGridIndex = null;
+         this._pendingPlacementRuneIdx = null;
         // [BUGFIX] 关闭符文发射器面板时，恢复教程卡片和遮罩层的显示（与 ui_openRuneLauncher 中的隐藏操作对应）
         if (this._tutorialActive) {
             const tutCard = document.getElementById('tutorial-card');
@@ -231,6 +232,19 @@ export const rune_launcher_system = {
                     this.ui_updateRuneGrid();
                     // @section:rune_grid_remove_audio - 符文格移除音效（400Hz，轻柔确认）
                     audio.playTone(400, 'sine', 0.08, 0.15);
+                } else if (this._pendingPlacementRuneIdx != null) {
+                    // 空格 + 已选中库存符文：直接放置
+                    const pIdx = this._pendingPlacementRuneIdx;
+                    const pEntry = this.runeInventory[pIdx];
+                    if (pEntry) {
+                        this.runeInventory.splice(pIdx, 1);
+                        this.runeGrid[i] = pEntry;
+                        this._pendingPlacementRuneIdx = null;
+                        this.ui_updateRuneGrid();
+                        audio.playTone(600, 'sine', 0.1, 0.2);
+                    } else {
+                        this._pendingPlacementRuneIdx = null;
+                    }
                 } else {
                     // 空格：打开符文选择器
                     this._pendingRuneGridIndex = i;
@@ -253,6 +267,8 @@ export const rune_launcher_system = {
             if (window.showToast) showToast('库存中没有符文');
             return;
         }
+        // 打开 picker 时取消「待放置」状态，避免索引错位
+        this._pendingPlacementRuneIdx = null;
 
         const overlay = document.getElementById('rune-picker-overlay');
         const list = document.getElementById('rune-picker-list');
@@ -574,39 +590,137 @@ export const rune_launcher_system = {
      * @private
      */
     _ui_updateRuneInventoryDisplay() {
+        // 初始化选中状态
+        if (!this._selectedRuneIndices) this._selectedRuneIndices = new Set();
+        // 校验 _selectedRuneIndices 中的索引仍在范围内
+        const len = this.runeInventory ? this.runeInventory.length : 0;
+        for (const idx of Array.from(this._selectedRuneIndices)) {
+            if (idx >= len) this._selectedRuneIndices.delete(idx);
+        }
+        // 校验 pending 放置索引
+        if (this._pendingPlacementRuneIdx != null && this._pendingPlacementRuneIdx >= len) {
+            this._pendingPlacementRuneIdx = null;
+        }
+
+        this._ui_renderLauncherInventory();
+        this._ui_renderManagementInventory();
+        this._ui_updateRuneActionButtons();
+    },
+
+
+    /**
+     * 渲染发射器（配置 Tab）的符文库存
+     * 点击行为：选中符文进入「待放置」模式，再点 3×3 空格即放置
+     * @private
+     */
+    _ui_renderLauncherInventory() {
         const container = document.getElementById('rune-inventory-container');
         const countEl = document.getElementById('rune-inventory-count');
         const emptyEl = document.getElementById('rune-inventory-empty');
+        const hintEl = document.getElementById('rune-placement-hint');
         if (!container) return;
 
-        // 初始化选中状态
-        if (!this._selectedRuneIndices) this._selectedRuneIndices = new Set();  // [Mixin 正常用法：读取 Game 实例状态]
-
-        // 移除旧的符文按鈕（保留 empty 提示）
         Array.from(container.children).forEach(child => {
             if (child.id !== 'rune-inventory-empty') child.remove();
         });
 
-        if (countEl) countEl.textContent = `(${this.runeInventory.length})`;  // [Mixin 正常用法：读取 Game 实例状态]
+        if (countEl) countEl.textContent = `(${this.runeInventory.length})`;
 
-        if (!this.runeInventory || this.runeInventory.length === 0) {  // [Mixin 正常用法：读取 Game 实例状态]
+        if (!this.runeInventory || this.runeInventory.length === 0) {
             if (emptyEl) emptyEl.classList.remove('hidden');
-            // 清空选中状态
-            this._selectedRuneIndices.clear();  // [Mixin 正常用法：读取 Game 实例状态]
-            this._ui_updateRuneActionButtons();
+            if (hintEl) {
+                hintEl.textContent = '點擊符文選中，再點空格放置';
+                hintEl.className = 'text-xs text-slate-500';
+            }
             return;
         }
         if (emptyEl) emptyEl.classList.add('hidden');
 
-        this.runeInventory.forEach((runeEntry, idx) => {  // [Mixin 正常用法：读取 Game 实例状态]
-            // 兼容新旧格式：提取符文 ID
+        // 更新提示
+        if (hintEl) {
+            if (this._pendingPlacementRuneIdx != null) {
+                const pe = this.runeInventory[this._pendingPlacementRuneIdx];
+                const pid = getRuneId(pe);
+                const pdef = RUNE_DB.find(r => r.id === pid);
+                hintEl.textContent = pdef ? `已選中 ${pdef.name}，請點擊 3×3 空格放置` : '已選中符文，請點擊 3×3 空格放置';
+                hintEl.className = 'text-xs text-amber-300 font-bold';
+            } else {
+                hintEl.textContent = '點擊符文選中，再點空格放置';
+                hintEl.className = 'text-xs text-slate-500';
+            }
+        }
+
+        this.runeInventory.forEach((runeEntry, idx) => {
             const runeId = getRuneId(runeEntry);
             if (!runeId) return;
             const runeDef = RUNE_DB.find(r => r.id === runeId);
             if (!runeDef) return;
-            // 获取符文等级（新格式有 level，旧格式默认为 1）
             const runeLevel = (typeof runeEntry === 'object' && runeEntry.level) ? runeEntry.level : 1;
-            const isSelected = this._selectedRuneIndices.has(idx);  // [Mixin 正常用法：读取 Game 实例状态]
+            const isPending = this._pendingPlacementRuneIdx === idx;
+
+            const card = document.createElement('div');
+            card.className = [
+                'flex items-center gap-2 p-2 rounded-xl cursor-pointer select-none transition-all duration-150',
+                isPending
+                    ? 'bg-amber-700/30 border-2 border-amber-400/80 shadow-[0_0_8px_rgba(251,191,36,0.5)]'
+                    : 'bg-slate-800/60 border-2 border-slate-700/40 hover:border-amber-500/50',
+            ].join(' ');
+            card.innerHTML = `
+                <div class="w-10 h-10 flex items-center justify-center shrink-0" style="font-size:22px;">
+                    ${_ui_buildRuneIconHTML(runeDef, runeLevel)}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-bold text-purple-200 truncate">${runeDef.name}</span>
+                    </div>
+                    <div class="text-[9px] text-slate-500 truncate">${runeDef.element}</div>
+                </div>
+                ${isPending ? '<span class="text-amber-300 text-sm shrink-0">→</span>' : ''}
+            `;
+            card.addEventListener('click', () => {
+                if (this._pendingPlacementRuneIdx === idx) {
+                    this._pendingPlacementRuneIdx = null;
+                } else {
+                    this._pendingPlacementRuneIdx = idx;
+                }
+                this._ui_renderLauncherInventory();
+                try { audio.playTone(700, 'sine', 0.06, 0.08); } catch(e) {}
+            });
+            container.appendChild(card);
+        });
+    },
+
+
+    /**
+     * 渲染管理 Tab 的符文仓库（带多选用于熔炼/重铸）
+     * @private
+     */
+    _ui_renderManagementInventory() {
+        const container = document.getElementById('rune-management-inventory');
+        const countEl = document.getElementById('rune-management-inventory-count');
+        const emptyEl = document.getElementById('rune-management-inventory-empty');
+        if (!container) return;
+
+        Array.from(container.children).forEach(child => {
+            if (child.id !== 'rune-management-inventory-empty') child.remove();
+        });
+
+        if (countEl) countEl.textContent = `(${this.runeInventory.length})`;
+
+        if (!this.runeInventory || this.runeInventory.length === 0) {
+            if (emptyEl) emptyEl.classList.remove('hidden');
+            this._selectedRuneIndices.clear();
+            return;
+        }
+        if (emptyEl) emptyEl.classList.add('hidden');
+
+        this.runeInventory.forEach((runeEntry, idx) => {
+            const runeId = getRuneId(runeEntry);
+            if (!runeId) return;
+            const runeDef = RUNE_DB.find(r => r.id === runeId);
+            if (!runeDef) return;
+            const runeLevel = (typeof runeEntry === 'object' && runeEntry.level) ? runeEntry.level : 1;
+            const isSelected = this._selectedRuneIndices.has(idx);
 
             const card = document.createElement('div');
             card.className = [
@@ -628,18 +742,20 @@ export const rune_launcher_system = {
                 ${isSelected ? '<span class="text-purple-300 text-sm shrink-0">✓</span>' : ''}
             `;
             card.addEventListener('click', () => {
-                if (this._selectedRuneIndices.has(idx)) {  // [Mixin 正常用法：读取 Game 实例状态]
-                    this._selectedRuneIndices.delete(idx);  // [Mixin 正常用法：读取 Game 实例状态]
+                if (this._selectedRuneIndices.has(idx)) {
+                    this._selectedRuneIndices.delete(idx);
                 } else {
-                    this._selectedRuneIndices.add(idx);  // [Mixin 正常用法：读取 Game 实例状态]
+                    if (this._selectedRuneIndices.size >= 3) {
+                        if (window.showToast) showToast('最多選中 3 個符文');
+                        return;
+                    }
+                    this._selectedRuneIndices.add(idx);
                 }
-                this._ui_updateRuneInventoryDisplay();
+                this._ui_renderManagementInventory();
+                this._ui_updateRuneActionButtons();
             });
             container.appendChild(card);
         });
-
-        // 更新按鈕状态
-        this._ui_updateRuneActionButtons();
     },
 
 
@@ -853,14 +969,6 @@ export const rune_launcher_system = {
         if (!this._selectedRuneIndices) this._selectedRuneIndices = new Set();  // [Mixin 正常用法：读取 Game 实例状态]
         const selectedCount = this._selectedRuneIndices.size;  // [Mixin 正常用法：读取 Game 实例状态]
 
-        // 更新选中计数显示
-        const countEl = document.getElementById('rune-selected-count');
-        if (countEl) {
-            countEl.textContent = `已选中 ${selectedCount}/3`;
-            countEl.className = selectedCount > 0
-                ? 'text-xs text-purple-300 font-bold'
-                : 'text-xs text-slate-500';
-        }
         // 同步管理页选中计数
         const mgCountEl = document.getElementById('rune-management-selected-count');
         if (mgCountEl) {
@@ -1246,9 +1354,26 @@ export const rune_launcher_system = {
         if (discoveredCountEl) discoveredCountEl.textContent = discoveredCount;
         if (totalCountEl) totalCountEl.textContent = total;
 
+        // 渲染按符文筛选条
+        this._ui_renderCodexFilterBar();
+
+        // 应用筛选
+        const filterRune = this._codexRuneFilter || null;
+        const filteredDB = filterRune
+            ? RUNEWORD_DB.filter(rw => rw.pattern && rw.pattern.includes(filterRune))
+            : RUNEWORD_DB;
+
         list.innerHTML = '';
 
-        RUNEWORD_DB.forEach(rw => {
+        if (filteredDB.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'text-center text-slate-500 text-xs py-6';
+            empty.textContent = '此符文暫無相關詞條';
+            list.appendChild(empty);
+            return;
+        }
+
+        filteredDB.forEach(rw => {
             const isDiscovered = discovered.includes(rw.id);
             const card = document.createElement('div');
 
@@ -1325,6 +1450,49 @@ export const rune_launcher_system = {
             }
 
             list.appendChild(card);
+        });
+    },
+
+
+    /**
+     * 渲染图鉴的「按符文筛选」条
+     * 列出 RUNEWORD_DB pattern 中出现过的所有符文，每个一个芯片可切换筛选
+     * @private
+     */
+    _ui_renderCodexFilterBar() {
+        const bar = document.getElementById('rune-codex-filter-bar');
+        if (!bar) return;
+        bar.innerHTML = '';
+
+        // 收集所有出现在词条 pattern 中的符文 id（去重，按 RUNE_DB 顺序）
+        const usedIds = new Set();
+        RUNEWORD_DB.forEach(rw => (rw.pattern || []).forEach(rid => usedIds.add(rid)));
+        const orderedIds = RUNE_DB.filter(r => usedIds.has(r.id)).map(r => r.id);
+
+        const current = this._codexRuneFilter || null;
+
+        const makeChip = (label, runeId, iconHTML) => {
+            const isActive = current === runeId;
+            const btn = document.createElement('button');
+            btn.className = [
+                'flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all duration-150 border',
+                isActive
+                    ? 'bg-amber-600/70 text-amber-100 border-amber-400/60'
+                    : 'bg-slate-800/60 text-slate-400 border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200',
+            ].join(' ');
+            btn.innerHTML = (iconHTML ? iconHTML + ' ' : '') + `<span>${label}</span>`;
+            btn.onclick = () => {
+                this._codexRuneFilter = runeId;
+                this.ui_renderRuneCodex();
+            };
+            return btn;
+        };
+
+        bar.appendChild(makeChip('全部', null, ''));
+        orderedIds.forEach(rid => {
+            const rd = RUNE_DB.find(r => r.id === rid);
+            if (!rd) return;
+            bar.appendChild(makeChip(rd.name, rid, _ui_buildRuneIconHTML(rd, 1)));
         });
     },
 
