@@ -15,6 +15,7 @@
 
 import { PROMARE_PALETTE, AFFIX_CODEX } from './promare_tokens.js';
 import { drawShape_oct2 } from './promare_shapes.js';
+import { drawPromareBoss } from './promare_boss_draw.js';
 
 // 调用契约：调用方已经 ctx.save() / translate / scale / rotate 到敌人本地坐标系。
 // 我们只画本地坐标里的几何，画完不 restore（调用方负责）。
@@ -107,7 +108,12 @@ export function drawPromareEnemyBody(enemy, ctx, w, h) {
         ctx.restore();
     }
 
-    // ===== 5. 词缀 overlay 派发 =====
+    // ===== 5. Boss 专属 glyph（在 affix 之前，让 affix 覆盖在 glyph 之上）=====
+    if (enemy.type === 'boss' && enemy.bossType) {
+        drawPromareBoss(enemy, ctx, w, h);
+    }
+
+    // ===== 6. 词缀 overlay 派发 =====
     if (Array.isArray(enemy.affixes) && enemy.affixes.length > 0) {
         const t = Date.now() / 1000;
         for (let i = 0; i < enemy.affixes.length; i++) {
