@@ -52,6 +52,8 @@ import {
     getUiBitmap,
 } from './bitmap_icons.js';
 import { sb as _sb } from './utils/perf.js';
+import { drawPromarePeg } from './render/promare_peg_draw.js';
+import { drawPromareDropBall } from './render/promare_dropball_draw.js';
 
 // ==================== 音频依赖注入 (重构 v2) ====================
 // 移除 Proxy 方案和 window.audio 依赖
@@ -162,6 +164,73 @@ class SpecialSlot {
         const pulse = 0.65 + Math.sin(this.animTimer) * 0.2;      // 透明度脉冲 0.45~0.85
         const midX  = (this.x + this.x2) / 2;
         const midY  = (this.y + this.y2) / 2;
+
+        // [Promare] 槽位连线：硬 zigzag 折线 + 端点几何 glyph
+        // @perf-impact: 单 slot ≤ 6 lineTo + 2 fill，无 shadowBlur。
+        if (CONFIG.visualMode === 'promare') {
+            const override = CONFIG.colorsPromareOverride || {};
+            // 按 type 映射到 5 色
+            let promareColor = '#FFFFFF';
+            if (this.type === 'recall')        promareColor = override.slotRecall    || '#FF0090';
+            else if (this.type === 'multicast') promareColor = override.slotMulticast || '#00E5FF';
+            else if (this.type === 'split')     promareColor = override.slotSplit     || '#00E5FF';
+            else if (this.type === 'giant')     promareColor = override.slotGiant     || '#FF0090';
+            else if (this.type === 'skill_point')promareColor = override.slotSkill    || '#FFD600';
+            else if (this.type === 'wheel')     promareColor = override.slotWheel     || '#FFD600';
+            else                                promareColor = '#FFD600';
+
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+
+            // 1) 硬 zigzag 折线（6 段，垂直方向 ±3px 抖动）
+            const dx = this.x2 - this.x;
+            const dy = this.y2 - this.y;
+            const segLen = Math.sqrt(dx * dx + dy * dy);
+            const ux = dx / segLen, uy = dy / segLen;
+            // 垂直单位向量
+            const px = -uy, py = ux;
+            const segs = 6;
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y);
+            for (let i = 1; i < segs; i++) {
+                const t = i / segs;
+                const baseX = this.x + dx * t;
+                const baseY = this.y + dy * t;
+                const offset = ((i % 2) ? 1 : -1) * 3;
+                ctx.lineTo(baseX + px * offset, baseY + py * offset);
+            }
+            ctx.lineTo(this.x2, this.y2);
+            ctx.strokeStyle = promareColor;
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = pulse;
+            ctx.stroke();
+
+            // 2) 两端钻石锚点
+            ctx.globalAlpha = 1.0;
+            [[this.x, this.y], [this.x2, this.y2]].forEach(([ax, ay]) => {
+                ctx.save();
+                ctx.translate(ax, ay);
+                ctx.beginPath();
+                ctx.moveTo(0, -5);
+                ctx.lineTo(5, 0);
+                ctx.lineTo(0, 5);
+                ctx.lineTo(-5, 0);
+                ctx.closePath();
+                ctx.fillStyle = promareColor;
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // 3) 中点文本（Inter Mono 风）
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = 'bold 13px "Inter Mono", monospace, sans-serif';
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillText(text, midX, midY);
+            ctx.restore();
+            return;
+        }
 
         ctx.save();
 
@@ -1037,6 +1106,12 @@ class Peg {
     // --- 替换 Peg 类的 draw 方法 ---
     // @section:peg_shadow_and_transform - 软阴影与碰撞旋转变换初始化
     draw(ctx, baseRadius, tilt = {x:0, y:0}) {
+        // [Promare] 几何钉子路径：菱形 + 元素 glyph，跳过 classic 渐变 + shadowBlur
+        if (CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.useGeometricPegs) {
+            drawPromarePeg(this, ctx, baseRadius);
+            return;
+        }
+
         const currentRadius = baseRadius * this.scale;
         const isSpecial = this.type !== 'normal';
         const isLit = this.lit;
@@ -3040,12 +3115,18 @@ class DropBall {
          */
         draw(ctx) {
             if (!this.active) return;
-            
+
+            // [Promare] 几何弹珠路径：六边面化 + billboard 环
+            if (CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.useGeometricPegs) {
+                drawPromareDropBall(this, ctx);
+                return;
+            }
+
             const x = this.pos.x;
             const y = this.pos.y;
             const r = this.radius;
             const buffs = this.getBuffState();
-            
+
             ctx.save();
             ctx.translate(x, y);
 
