@@ -26,6 +26,7 @@ import { UIManager, TrainingGround, TruthBook } from './systems.js';
 
 // 导入事件总线
 import { eventBus } from './event_bus.js';
+import { spawnPromareBurst, spawnRadialImpact } from './render/promare_burst.js';
 
 // 导入 SoundManager 类和音频代理
 import { SoundManager, audio, _setAudioInstance } from './audio.js';
@@ -155,7 +156,12 @@ class Game {
         // [Perf] 粒子分模式计数表 - 替代 this.particles.filter(p=>p.mode==='X').length 的 O(N) 扫描
         // 维护契约：所有 push 必走 spawn_createParticle / spawn_pushParticleWithLimit；
         // 所有删除必走 game_phase.js 的两指针压缩循环（同步 -- 计数）。
-        this.particleCounts = { wind_slash: 0, line: 0, ember: 0, mist: 0, shard: 0, spark: 0, smoke: 0, venom: 0 };
+        this.particleCounts = {
+            wind_slash: 0, line: 0, ember: 0, mist: 0, shard: 0, spark: 0, smoke: 0, venom: 0,
+            // [Promare] 新 mode 计数器
+            pyro_cone: 0, cryo_oct: 0, thunder_z: 0, pierce_lance: 0, bounce_hex: 0,
+            scatter_star: 0, damage_diamond: 0, venom_tri: 0, echo_ring: 0, radial_spoke: 0,
+        };
         // [Perf] 粒子对象池 - 复用 Particle 实例，规避每帧 50-100 次 new 触发的 GC 停顿
         this._particlePool = [];
         this.shockwaves = [];
@@ -409,9 +415,9 @@ class Game {
                 this.combat_runeCharge_onHit(hitX, hitY, false);
             }
 
-            // [Promare] Hit Feedback 三件套：停帧 + 白闪 + 抖屏
+            // [Promare] Hit Feedback 三件套：停帧 + 白闪 + 抖屏 + 几何 burst
             // 仅 visualMode==='promare' 启用，classic 模式完全跳过保持原行为。
-            // @perf-impact: 监听器内只设字段，渲染由 sys_loop 消费。
+            // @perf-impact: 监听器内只设字段 + 调 burst spawner（受 perf 档位限粒子数）。
             if (CONFIG.visualMode === 'promare') {
                 const isKill = !!data.killed;
                 const isBig  = (data.actualDamage || data.amount || 0) > 0 && (data.amount || 0) >= 30;
@@ -422,6 +428,17 @@ class Game {
                 // 屏抖：复用现有 triggerScreenShake（取 max 不叠乘）
                 const shakeAmt = isKill ? 14 : (isBig ? 9 : 5);
                 this.triggerScreenShake(shakeAmt);
+
+                // [Promare] 几何碎片爆发：方向锥沿入射反向，元素决定形状
+                const hitX = data.hitX || (data.enemy ? data.enemy.pos.x : this.width / 2);
+                const hitY = data.hitY || (data.enemy ? data.enemy.pos.y : this.height / 2);
+                const elementType = data.type || (data.enemy && data.enemy._lastHitElement) || 'damage';
+                // 入射速度向量：projectile 的 vel 已存在 enemy._lastHitVel（由 combat_system 后续填充，
+                // 当前无该字段时退化为「球从下往上」假设）
+                const hitVel = (data.enemy && data.enemy._lastHitVel) || { x: 0, y: -1 };
+                const severity = isKill ? 'kill' : (isBig ? 'big' : 'normal');
+                spawnPromareBurst(this, hitX, hitY, hitVel, elementType, severity);
+                spawnRadialImpact(this, hitX, hitY, elementType);
             }
         });
 
@@ -440,12 +457,18 @@ class Game {
                 this.combat_runeCharge_onHit(hitX, hitY, true);
             }
 
-            // [Promare] 击杀时强化反馈：更长停帧 + 更亮白闪 + 更大抖屏
-            // 后续 P3 阶段 promare_burst 落地后，此处还会调 spawnPromareBurst 产生辐射 spoke。
+            // [Promare] 击杀时强化反馈：更长停帧 + 更亮白闪 + 更大抖屏 + 额外辐射
             if (CONFIG.visualMode === 'promare') {
                 this.hitstopFrames = Math.max(this.hitstopFrames || 0, 4);
                 this.flashOverlay  = { color: '#FFFFFF', alpha: 0.55, frames: 5 };
                 this.triggerScreenShake(18);
+                // 击杀额外辐射：16 spoke + 击杀色 burst（独立于命中 burst，节奏感更强）
+                const eKill = data.enemy;
+                if (eKill && eKill.pos) {
+                    const hv = eKill._lastHitVel || { x: 0, y: -1 };
+                    spawnPromareBurst(this, eKill.pos.x, eKill.pos.y, hv, 'damage', 'kill');
+                    spawnRadialImpact(this, eKill.pos.x, eKill.pos.y, 'damage');
+                }
             }
 
             // [本局统计] 累计击杀数

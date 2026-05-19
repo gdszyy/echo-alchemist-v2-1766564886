@@ -1554,6 +1554,12 @@ export const combat_system = {
         const hitX = projectile.pos.x;
         const hitY = projectile.pos.y;
         const afx = CONFIG.balance.affixes; // 获取配置引用
+
+        // [Promare] 记录入射速度，让 hit-feedback burst 沿其反方向喷碎片。
+        // projectile 可能没有 vel（如 wind tunnel 配置直接 pos），此时退化为「球从下往上」。
+        if (enemy && projectile && projectile.vel) {
+            enemy._lastHitVel = { x: projectile.vel.x, y: projectile.vel.y };
+        }
         
         // 根据子弹属性决定打击特效
         // 根据子弹属性决定打击特效
