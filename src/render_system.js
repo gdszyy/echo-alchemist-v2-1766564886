@@ -23,6 +23,7 @@ import {
     BG_EMITTER_ZONE_SRC,
     getAmmoIconSrcByKey,
 } from './bitmap_icons.js';
+import { renderPromareBackground } from './render/promare_background.js';
 
 export const render_system = {
 /**
@@ -30,6 +31,17 @@ export const render_system = {
      */
     render_clearCanvas() {
         this.ctx.clearRect(0, 0, this.width, this.height);
+
+        // [Promare] 全屏几何背景：黑底 + 45° 扫描线 + 底部透视网格
+        // hideBackgroundBitmap=true 时彻底跳过 BG_MAIN_CANVAS_SRC 与发射器位图。
+        // @perf-impact: 一次 fillRect + 三次 drawImage（离屏 cache），<0.2ms。
+        if (CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.hideBackgroundBitmap) {
+            const tiltFactor = (CONFIG.promare.backgroundTiltFactor != null) ? CONFIG.promare.backgroundTiltFactor : 0.5;
+            renderPromareBackground(this.ctx, this.width, this.height, this.boardTilt && this.boardTilt.current, this._frameCount || 0, tiltFactor);
+            this._frameCount = (this._frameCount || 0) + 1;
+            return;
+        }
+
         this.ctx.fillStyle = CONFIG.colors.bg;
         this.ctx.fillRect(0, 0, this.width, this.height);
         // 主底图位图（已生成 720×1280 暗黑赛博炼金风），未加载完成时回退到纯色底
@@ -57,12 +69,18 @@ export const render_system = {
      * [RENDER] 绘制背景网格。
      */
     render_background() {
+        // [Promare] 非战斗阶段背景：黑底 + 45° 扫描线 + 底部透视网格
+        // 已在 render_clearCanvas 中绘制，本函数跳过避免重复 paint。
+        if (CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.hideBackgroundBitmap) {
+            return;
+        }
+
         this.ctx.save();
         const gridSpacing = 40;
-        const tiltX = -this.boardTilt.current.x * 15; 
+        const tiltX = -this.boardTilt.current.x * 15;
         const tiltY = this.boardTilt.current.y * 10;
-        
-        this.ctx.strokeStyle = 'rgba(71, 85, 105, 0.15)'; 
+
+        this.ctx.strokeStyle = 'rgba(71, 85, 105, 0.15)';
         this.ctx.lineWidth = 1;
 
         for (let x = (tiltX % gridSpacing); x < this.width; x += gridSpacing) {
