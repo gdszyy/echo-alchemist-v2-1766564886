@@ -17,6 +17,7 @@
  */
 import { Vec2, lerp } from '../utils/math_utils.js';
 import { sb as _sb } from '../utils/perf.js';
+import { CONFIG } from '../config.js'; // [Promare] visualMode gate（小幅突破原模块独立性，仅读取 visualMode）
 import { PROMARE_PALETTE } from '../render/promare_tokens.js';
 import {
     drawShape_cone3, drawShape_oct2, drawShape_zigzagZ, drawShape_lance4,
@@ -745,21 +746,52 @@ class FloatingText {
         this.life -= 0.02 * timeScale; 
     }
 
-    draw(ctx) { 
+    draw(ctx) {
         if (this.life <= 0) return;
+
+        // [Promare] 等宽 Inter Mono + 黑色 3 偏移 stamp + 白色顶层
+        // 离散 scale 阶梯 [1.5, 1.0, 0.7] snap，营造硬感
+        if (typeof CONFIG !== 'undefined' && CONFIG.visualMode === 'promare') {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, this.life);
+            // 离散 scale snap
+            const scale = this.life > 0.66 ? 1.5 : (this.life > 0.33 ? 1.0 : 0.7);
+            const fz = Math.round(this.fontSize * scale);
+            ctx.font = `bold ${fz}px 'Inter Mono', 'Roboto Mono', monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // 黑色 stamp 3 个偏移（替代 shadowBlur）
+            ctx.fillStyle = '#0a0a0a';
+            const offs = [[2, 0], [0, 2], [-2, 0], [0, -2]];
+            for (const [ox, oy] of offs) {
+                ctx.fillText(this.text, this.pos.x + ox, this.pos.y + oy);
+            }
+            // 顶层主色（pyro→PINK / cryo→CYAN / lightning→YELLOW / 其他→WHITE）
+            let mainColor = '#FFFFFF';
+            const c = (this.color || '').toLowerCase();
+            if (c.includes('f97316') || c.includes('ef4444') || c.includes('fca5a5')) mainColor = '#FF0090';
+            else if (c.includes('06b6d4') || c.includes('22d3ee') || c.includes('06b6')) mainColor = '#00E5FF';
+            else if (c.includes('facc15') || c.includes('c084fc') || c.includes('fbbf24') || c.includes('ffd600')) mainColor = '#FFD600';
+            ctx.fillStyle = mainColor;
+            ctx.fillText(this.text, this.pos.x, this.pos.y);
+            ctx.restore();
+            return;
+        }
+
         ctx.save();
-        ctx.globalAlpha = Math.max(0, this.life); 
-        ctx.font = `bold ${this.fontSize}px sans-serif`; 
+        ctx.globalAlpha = Math.max(0, this.life);
+        ctx.font = `bold ${this.fontSize}px sans-serif`;
         ctx.textAlign = 'center';
-        
+
         // 繪製描邊讓文字更清楚
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
         ctx.lineWidth = Math.max(3, this.fontSize / 5);
         ctx.strokeText(this.text, this.pos.x, this.pos.y);
-        
+
         // 繪製填充
-        ctx.fillStyle = this.color; 
-        ctx.fillText(this.text, this.pos.x, this.pos.y); 
+        ctx.fillStyle = this.color;
+        ctx.fillText(this.text, this.pos.x, this.pos.y);
         ctx.restore();
     }
 }

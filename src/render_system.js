@@ -637,6 +637,56 @@ export const render_system = {
      * @param {number} chargeProgress  0~1
      */
     render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress) {
+        // [Promare] 几何发射器：梯形切角 + zigzag 描边 + CYAN 充能内饰
+        // @perf-impact: 单次 6-vertex 多边形 fill + stroke，无 shadowBlur，<0.05ms。
+        if (CONFIG.visualMode === 'promare') {
+            const halfW = 56, halfH = 26;
+            ctx.save();
+            ctx.translate(cx, cy);
+            // 梯形切角（左 8px / 右 8px 倒角）
+            ctx.beginPath();
+            ctx.moveTo(-halfW + 8, -halfH);
+            ctx.lineTo( halfW - 8, -halfH);
+            ctx.lineTo( halfW,     halfH);
+            ctx.lineTo(-halfW,     halfH);
+            ctx.closePath();
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fill();
+            ctx.strokeStyle = '#FF0090';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            // 充能内饰：从顶部向下填 CYAN，按 chargeProgress
+            if (isCharging && chargeProgress > 0) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(-halfW + 8, -halfH);
+                ctx.lineTo( halfW - 8, -halfH);
+                ctx.lineTo( halfW,     halfH);
+                ctx.lineTo(-halfW,     halfH);
+                ctx.closePath();
+                ctx.clip();
+                const fillH = halfH * 2 * chargeProgress;
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = 0.6;
+                ctx.fillStyle = '#00E5FF';
+                ctx.fillRect(-halfW, halfH - fillH, halfW * 2, fillH);
+                ctx.restore();
+            }
+            // 顶部装饰：3 小菱形
+            ctx.fillStyle = '#FFD600';
+            for (let i = -1; i <= 1; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * 18, -halfH - 2);
+                ctx.lineTo(i * 18 + 3, -halfH - 5);
+                ctx.lineTo(i * 18, -halfH - 8);
+                ctx.lineTo(i * 18 - 3, -halfH - 5);
+                ctx.closePath();
+                ctx.fill();
+            }
+            ctx.restore();
+            return;
+        }
+
         const baseImg = getUiBitmap(EMITTER_BASE_SRC);
         const baseSize = 96;
         if (baseImg) {

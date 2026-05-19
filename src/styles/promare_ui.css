@@ -1,0 +1,182 @@
+/* promare_ui.css - 普罗米亚视觉模式 UI 样式
+ *
+ * 作用域：body.promare-mode 下的所有 UI 元素
+ * 设计原则：
+ *   - 5 色硬切板：#FF0090 / #00E5FF / #FFD600 / #FFFFFF / #0a0a0a
+ *   - 对角切边（clip-path 梯形）替代圆角
+ *   - 硬边描边 + 内描边假发光，无 box-shadow blur
+ *   - Inter Mono / monospace 字体替代 Cinzel 衬线
+ *   - 所有 ammo / icon PNG 通过 filter 调到灰阶 + 高对比
+ *
+ * @perf-impact: 纯 CSS，GPU 加速 clip-path，零 JS 开销。
+ */
+
+/* ==================== 全局基色覆盖 ==================== */
+
+body.promare-mode {
+    background-color: #0a0a0a !important;
+    color: #FFFFFF !important;
+    font-family: 'Inter Mono', 'Roboto Mono', 'Courier New', monospace !important;
+}
+
+body.promare-mode #game-container,
+body.promare-mode #game-area {
+    background-color: #0a0a0a !important;
+}
+
+/* ==================== 顶部状态栏：对角切边 + PINK 左边条 ==================== */
+
+body.promare-mode #unified-top-bar {
+    clip-path: polygon(0 0, 100% 0, 95% 100%, 0 100%);
+    border-left: 3px solid #FF0090 !important;
+    background: #0a0a0a !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+}
+
+body.promare-mode #unified-top-bar > * {
+    color: #FFFFFF !important;
+    text-shadow: 1px 1px 0 #0a0a0a !important;
+}
+
+/* ==================== 按钮：梯形切角 ==================== */
+
+body.promare-mode button,
+body.promare-mode .btn {
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+    border-radius: 0 !important;
+    background: #0a0a0a !important;
+    color: #FFFFFF !important;
+    border: 2px solid #FF0090 !important;
+    font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+    transition: transform 0.08s ease;
+}
+
+body.promare-mode button:hover,
+body.promare-mode .btn:hover {
+    background: #FF0090 !important;
+    color: #FFFFFF !important;
+    transform: translateY(-1px);
+}
+
+body.promare-mode button:active,
+body.promare-mode .btn:active {
+    transform: translateY(1px);
+}
+
+/* 工具按钮（settings / speed）保留圆形但用硬边方框 */
+body.promare-mode #settings-btn,
+body.promare-mode #speed-btn {
+    clip-path: none;
+    border: 2px solid #FFFFFF !important;
+    background: #0a0a0a !important;
+}
+
+/* ==================== 卡牌：几何边框 + 内描边 ==================== */
+
+body.promare-mode .rune-card,
+body.promare-mode .relic-card,
+body.promare-mode .selection-card,
+body.promare-mode .shop-card {
+    border-radius: 0 !important;
+    background: #0a0a0a !important;
+    border: 2px solid #FFFFFF !important;
+    box-shadow: inset 3px 3px 0 #FF0090, inset -3px -3px 0 #00E5FF !important;
+    backdrop-filter: none !important;
+    font-family: 'Inter Mono', monospace !important;
+}
+
+body.promare-mode .rune-card:hover,
+body.promare-mode .relic-card:hover,
+body.promare-mode .selection-card:hover {
+    border-color: #FFD600 !important;
+    box-shadow: inset 3px 3px 0 #FFD600, inset -3px -3px 0 #FFD600 !important;
+}
+
+/* ==================== 弹窗面板：硬切边框 ==================== */
+
+body.promare-mode #phase-rune-launcher,
+body.promare-mode #phase-shop,
+body.promare-mode #phase-relic,
+body.promare-mode .modal-panel,
+body.promare-mode .overlay-panel {
+    background: rgba(10, 10, 10, 0.92) !important;
+    border: 2px solid #FFFFFF !important;
+    border-radius: 0 !important;
+    backdrop-filter: none !important;
+    box-shadow: 0 0 0 4px #FF0090 !important;
+}
+
+/* ==================== 底部弹药/发射器面板 ==================== */
+
+body.promare-mode .bottom-panel,
+body.promare-mode #ammo-bar,
+body.promare-mode #ammo-display {
+    background: #0a0a0a !important;
+    border-top: 2px solid #00E5FF !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+/* ==================== Ammo icon：高对比灰阶 ==================== */
+
+body.promare-mode .ammo-icon,
+body.promare-mode .rune-icon,
+body.promare-mode .relic-icon {
+    filter: contrast(1.5) saturate(0.3) brightness(1.1);
+    image-rendering: pixelated;
+}
+
+/* ==================== 文本：去衬线 + 取消 backdrop-blur ==================== */
+
+body.promare-mode h1, body.promare-mode h2, body.promare-mode h3,
+body.promare-mode .title, body.promare-mode .label {
+    font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
+    font-weight: bold;
+    text-shadow: 2px 2px 0 #0a0a0a !important;
+    letter-spacing: 0.05em;
+}
+
+body.promare-mode * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* ==================== 进度条 / SP gem ==================== */
+
+body.promare-mode .sp-gem,
+body.promare-mode .progress-bar {
+    border-radius: 0 !important;
+    background: #0a0a0a !important;
+    border: 1px solid #FFFFFF !important;
+}
+
+body.promare-mode .sp-gem.active,
+body.promare-mode .sp-gem-filled {
+    background: #FFD600 !important;
+    border-color: #FFD600 !important;
+    box-shadow: none !important;
+}
+
+/* ==================== 战斗信息文本 ==================== */
+
+body.promare-mode #combat-message > div {
+    background: #0a0a0a !important;
+    border: 2px solid #FF0090 !important;
+    border-radius: 0 !important;
+    backdrop-filter: none !important;
+}
+
+/* ==================== Toast / 浮动提示 ==================== */
+
+body.promare-mode .toast,
+body.promare-mode #toast-container > * {
+    background: #0a0a0a !important;
+    color: #FFFFFF !important;
+    border: 2px solid #FFD600 !important;
+    border-radius: 0 !important;
+    font-family: 'Inter Mono', monospace !important;
+    box-shadow: none !important;
+}
