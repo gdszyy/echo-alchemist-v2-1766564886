@@ -335,8 +335,8 @@ const CONFIG = {
 
     // ==================== 普罗米亚视觉模式（Promare Visual Mode）====================
     // 设计方案见 docs/promare 系列与 src/render/promare_tokens.js
-    // 默认 'classic'，最终迁移后翻 'promare'。console: window.__promare(true/false)
-    visualMode: 'classic',
+    // [P9] 已翻为默认。console: window.__promare(false) 可临时回退到经典模式。
+    visualMode: 'promare',
     promare: {
         useGeometricEnemies:    true,  // 启用几何敌人（绕过 sprite）
         useGeometricPegs:       true,  // 启用钻石钉子
