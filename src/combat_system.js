@@ -1555,10 +1555,26 @@ export const combat_system = {
         const hitY = projectile.pos.y;
         const afx = CONFIG.balance.affixes; // 获取配置引用
 
-        // [Promare] 记录入射速度，让 hit-feedback burst 沿其反方向喷碎片。
+        // [Promare] 记录入射速度 + 元素，让 hit-feedback burst 沿其反方向喷碎片，击杀爆炸用对应色板。
         // projectile 可能没有 vel（如 wind tunnel 配置直接 pos），此时退化为「球从下往上」。
-        if (enemy && projectile && projectile.vel) {
-            enemy._lastHitVel = { x: projectile.vel.x, y: projectile.vel.y };
+        if (enemy && projectile) {
+            if (projectile.vel) {
+                enemy._lastHitVel = { x: projectile.vel.x, y: projectile.vel.y };
+            }
+            // 元素优先级（与 _drawTrail 一致）：飞剑/激光 > pyro/cryo/lightning > pierce/bounce/scatter > damage
+            const cfg = projectile.config || {};
+            let hitElem = 'damage';
+            if (cfg.isLaser) hitElem = 'laser';
+            else if (cfg.type === 'flying_sword') hitElem = 'pierce';
+            else if ((cfg.pyro || 0) > 0) hitElem = 'pyro';
+            else if ((cfg.cryo || 0) > 0) hitElem = 'cryo';
+            else if ((cfg.lightning || 0) > 0) hitElem = 'lightning';
+            else if ((cfg.wind || 0) > 0) hitElem = 'wind';
+            else if ((cfg.pierce || 0) > 0) hitElem = 'pierce';
+            else if ((cfg.bounce || 0) > 0) hitElem = 'bounce';
+            else if ((cfg.scatter || 0) > 0) hitElem = 'scatter';
+            else if ((cfg.venom || 0) > 0) hitElem = 'venom';
+            enemy._lastHitElement = hitElem;
         }
         
         // 根据子弹属性决定打击特效

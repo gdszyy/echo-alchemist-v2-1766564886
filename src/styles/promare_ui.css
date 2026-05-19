@@ -296,3 +296,20 @@ body.promare-mode .stat-pill {
     color: #FFFFFF !important;
     backdrop-filter: none !important;
 }
+
+/* ==================== 故障艺术：色差通道偏移（pyro/lightning 击杀触发）==================== */
+/* promare_explosion.js 在 enemy:killed 时给 body 加 .promare-chromatic class
+   持续 ~150ms 后移除。filter 用 drop-shadow 模拟 RGB 三通道分离。
+   闪电主体粒子本身在 draw 时不参与（粒子用 lighter 混合，filter 仅作用于画布合成层）。
+   @perf-impact: GPU filter，单次 150ms，可忽略。 */
+
+body.promare-mode #gameCanvas {
+    transition: filter 0.02s linear;
+}
+
+body.promare-mode.promare-chromatic #gameCanvas {
+    /* 红色偏右 / 蓝色偏左 的经典色差效果 */
+    filter:
+        drop-shadow(2px 0 0 rgba(255, 0, 144, 0.5))
+        drop-shadow(-2px 0 0 rgba(0, 229, 255, 0.5));
+}

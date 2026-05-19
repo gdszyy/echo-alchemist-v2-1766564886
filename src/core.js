@@ -27,6 +27,7 @@ import { UIManager, TrainingGround, TruthBook } from './systems.js';
 // 导入事件总线
 import { eventBus } from './event_bus.js';
 import { spawnPromareBurst, spawnRadialImpact } from './render/promare_burst.js';
+import { spawnPromareKillExplosion } from './render/promare_explosion.js';
 
 // 导入 SoundManager 类和音频代理
 import { SoundManager, audio, _setAudioInstance } from './audio.js';
@@ -457,17 +458,23 @@ class Game {
                 this.combat_runeCharge_onHit(hitX, hitY, true);
             }
 
-            // [Promare] 击杀时强化反馈：更长停帧 + 更亮白闪 + 更大抖屏 + 额外辐射
+            // [Promare] 击杀时强化反馈：电磁爆炸（叙事：方形→三角碎片，体制突破）
+            // 三层切片堆叠 + 三角碎片群 + 暗紫烟雾环 + 金田白光斑 + 可选色差闪烁。
             if (CONFIG.visualMode === 'promare') {
                 this.hitstopFrames = Math.max(this.hitstopFrames || 0, 4);
                 this.flashOverlay  = { color: '#FFFFFF', alpha: 0.55, frames: 5 };
                 this.triggerScreenShake(18);
-                // 击杀额外辐射：16 spoke + 击杀色 burst（独立于命中 burst，节奏感更强）
                 const eKill = data.enemy;
                 if (eKill && eKill.pos) {
                     const hv = eKill._lastHitVel || { x: 0, y: -1 };
-                    spawnPromareBurst(this, eKill.pos.x, eKill.pos.y, hv, 'damage', 'kill');
-                    spawnRadialImpact(this, eKill.pos.x, eKill.pos.y, 'damage');
+                    const elemType = (eKill._lastHitElement || data.type || 'damage');
+                    // 常规 burst（方向锥喷碎片）+ radial（8 spoke）
+                    spawnPromareBurst(this, eKill.pos.x, eKill.pos.y, hv, elemType, 'kill');
+                    spawnRadialImpact(this, eKill.pos.x, eKill.pos.y, elemType);
+                    // 击杀爆炸：电磁切片 + 三角碎片群 + 烟雾 + 金田光斑 + 色差
+                    spawnPromareKillExplosion(this, eKill.pos.x, eKill.pos.y, elemType, {
+                        w: eKill.width, h: eKill.height
+                    });
                 }
             }
 
