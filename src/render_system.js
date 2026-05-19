@@ -395,6 +395,13 @@ export const render_system = {
     render_combat_launcherOrbitals(ctx, centerX, centerY, recipe) {
         if (!recipe) return;
 
+        // [Promare] 几何轨道：六边形 socket + zigzag 连线 + 元素 glyph
+        // @perf-impact: 单 socket 1 fill + 1 stroke + 1 glyph fill；总开销与原版相当但无 shadowBlur。
+        if (CONFIG.visualMode === 'promare') {
+            this._render_promareLauncherOrbitals(ctx, centerX, centerY, recipe);
+            return;
+        }
+
         const stats = [];
         const mapping = {
             damage:    { val: recipe.damage > 2 ? recipe.damage : 0},
@@ -876,6 +883,92 @@ export const render_system = {
         ctx.fillText(`FPS: ${fps}`, 14, 22);
         ctx.fillStyle = levelColor;
         ctx.fillText(label, 14, 36);
+        ctx.restore();
+    },
+
+    /**
+     * [Promare] 几何轨道接收器：发射器周围环绕六边形 socket，每个 socket
+     * 通过 zigzag 折线连到中心，socket 内部显示元素 glyph。
+     * @perf-impact: 单 recipe 渲染 ≤9 个 socket，每个 1 fill + 1 stroke + 1 glyph fill。
+     */
+    _render_promareLauncherOrbitals(ctx, centerX, centerY, recipe) {
+        if (!recipe) return;
+
+        // 元素 type → 颜色映射
+        const PAL = { PINK: '#FF0090', CYAN: '#00E5FF', YELLOW: '#FFD600', WHITE: '#FFFFFF', BLACK: '#0a0a0a' };
+        const elemColor = {
+            pyro: PAL.PINK, bounce: PAL.PINK, pierce: PAL.WHITE, scatter: PAL.YELLOW,
+            cryo: PAL.CYAN, lightning: PAL.YELLOW, laser: PAL.CYAN, wind: PAL.CYAN,
+            multicast: PAL.CYAN, explosive: PAL.PINK, damage: PAL.WHITE, flying_sword: PAL.WHITE,
+            venom: PAL.YELLOW, echo: PAL.PINK,
+        };
+
+        // 提取活跃元素（val>0 的）
+        const active = [];
+        const keys = ['pyro', 'cryo', 'lightning', 'pierce', 'bounce', 'scatter', 'damage', 'wind', 'laser', 'multicast', 'explosive', 'flying_sword'];
+        for (const k of keys) {
+            const v = (k === 'explosive') ? (recipe[k] ? 1 : 0) : (recipe[k] || 0);
+            if (v > 0) active.push({ key: k, val: v });
+        }
+        if (active.length === 0) return;
+
+        // 环绕半径 + 角度分布
+        const orbitR = 56;
+        const hexR   = 12;
+        const total  = active.length;
+
+        ctx.save();
+
+        for (let i = 0; i < total; i++) {
+            const a = (i / total) * Math.PI * 2 - Math.PI / 2; // 顶部开始
+            const sx = centerX + Math.cos(a) * orbitR;
+            const sy = centerY + Math.sin(a) * orbitR;
+            const e = active[i];
+            const c = elemColor[e.key] || PAL.WHITE;
+
+            // 1) 中心 → socket 的 zigzag 折线（3 段，中点垂直偏移 ±3px）
+            const dx = sx - centerX, dy = sy - centerY;
+            const mx = centerX + dx * 0.5;
+            const my = centerY + dy * 0.5;
+            const px = -dy / Math.hypot(dx, dy) * 3; // 垂直偏移
+            const py =  dx / Math.hypot(dx, dy) * 3;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(mx + px, my + py);
+            ctx.lineTo(mx - px, my - py);
+            ctx.lineTo(sx, sy);
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.strokeStyle = c;
+            ctx.lineWidth = 1.5;
+            ctx.globalAlpha = 0.7;
+            ctx.stroke();
+
+            // 2) 六边形 socket
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1.0;
+            ctx.beginPath();
+            for (let k = 0; k < 6; k++) {
+                const ka = (k / 6) * Math.PI * 2 - Math.PI / 2;
+                const px = sx + Math.cos(ka) * hexR;
+                const py = sy + Math.sin(ka) * hexR;
+                if (k === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fillStyle = PAL.BLACK;
+            ctx.fill();
+            ctx.strokeStyle = c;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 3) 中心数值（白色等宽字）
+            ctx.fillStyle = PAL.WHITE;
+            ctx.font = 'bold 11px "Inter Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(e.val), sx, sy);
+        }
+
         ctx.restore();
     },
 };

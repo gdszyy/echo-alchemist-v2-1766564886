@@ -421,14 +421,21 @@ class FortuneWheel {
 
     draw(ctx) {
         if (!this.active) return;
-        
+
+        // [Promare] 几何命运轮盘：硬切扇形 + PINK 边框 + 黄色指针
+        // @perf-impact: 单次绘制 ≤8 扇形 fill + 1 圆环 stroke + N icon，无 shadowBlur。
+        if (CONFIG.visualMode === 'promare') {
+            this._drawPromare(ctx);
+            return;
+        }
+
         // 繪製半透明黑色背景遮罩，突出輪盤
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, 0, this.game.width, this.game.height);
 
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
-        
+
         // --- 0. 繪製外發光 ---
         ctx.shadowBlur = _sb(30);
         ctx.shadowColor = '#fbbf24'; // 金色光暈
@@ -574,6 +581,140 @@ class FortuneWheel {
         ctx.arc(0, -2, 4, 0, Math.PI*2);
         ctx.fillStyle = '#7f1d1d';
         ctx.fill();
+
+        ctx.restore();
+    }
+
+    /**
+     * [Promare] 几何命运轮盘绘制：硬切扇形 + 5 色硬切板
+     * @perf-impact: 单次 N 扇形 fill + 1 圆描边 + N icon，无 shadowBlur 无渐变。
+     */
+    _drawPromare(ctx) {
+        // 半透明黑遮罩
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+        ctx.fillRect(0, 0, this.game.width, this.game.height);
+
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+
+        const PAL = { PINK: '#FF0090', CYAN: '#00E5FF', YELLOW: '#FFD600', WHITE: '#FFFFFF', BLACK: '#0a0a0a' };
+        const R = this.radius;
+
+        // 外圈：BLACK 大圆 + PINK 厚边框（不旋转）
+        ctx.beginPath();
+        ctx.arc(0, 0, R + 10, 0, Math.PI * 2);
+        ctx.fillStyle = PAL.BLACK;
+        ctx.fill();
+        ctx.strokeStyle = PAL.PINK;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // 内圈：CYAN 细描边
+        ctx.beginPath();
+        ctx.arc(0, 0, R, 0, Math.PI * 2);
+        ctx.strokeStyle = PAL.CYAN;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // 跑马灯灯泡（12 个小菱形环绕，每帧滚动一个亮灯）
+        const lightCount = 12;
+        const time = Date.now();
+        const currentLight = Math.floor(time / 100) % lightCount;
+        for (let i = 0; i < lightCount; i++) {
+            const la = (i / lightCount) * Math.PI * 2;
+            const lx = Math.cos(la) * (R + 5);
+            const ly = Math.sin(la) * (R + 5);
+            const isOn = (i === currentLight);
+            ctx.beginPath();
+            ctx.moveTo(lx, ly - 3);
+            ctx.lineTo(lx + 3, ly);
+            ctx.lineTo(lx, ly + 3);
+            ctx.lineTo(lx - 3, ly);
+            ctx.closePath();
+            ctx.fillStyle = isOn ? PAL.WHITE : PAL.YELLOW;
+            ctx.globalAlpha = isOn ? 1.0 : 0.4;
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1.0;
+
+        // 旋转盘面
+        ctx.save();
+        ctx.rotate(this.angle);
+
+        const activeSlice = this.stopping ? this.getCurrentSlice() : null;
+        const palette = [PAL.PINK, PAL.CYAN, PAL.YELLOW, PAL.WHITE];
+
+        this.slices.forEach((s, idx) => {
+            const isHighlighted = (activeSlice === s);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, R, s.startAngle, s.endAngle);
+            ctx.closePath();
+
+            // 5 色硬切：按 index 循环
+            ctx.fillStyle = palette[idx % palette.length];
+            ctx.globalAlpha = isHighlighted ? 1.0 : 0.7;
+            ctx.fill();
+
+            // 黑色分隔线
+            ctx.strokeStyle = PAL.BLACK;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+
+            // 中心 icon / 数值（白色等宽字）
+            const midAngle = s.startAngle + (s.endAngle - s.startAngle) / 2;
+            const ix = Math.cos(midAngle) * R * 0.65;
+            const iy = Math.sin(midAngle) * R * 0.65;
+            ctx.save();
+            ctx.translate(ix, iy);
+            ctx.rotate(midAngle + Math.PI / 2);
+            ctx.fillStyle = PAL.BLACK;
+            ctx.font = 'bold 14px "Inter Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // 显示属性首字母
+            const label = (s.label || s.type || '?').slice(0, 1).toUpperCase();
+            ctx.fillText(label, 0, 0);
+            ctx.restore();
+        });
+
+        ctx.restore();
+
+        // 黄色三角指针（顶部）
+        ctx.beginPath();
+        ctx.moveTo(0, -(R + 16));
+        ctx.lineTo(8, -(R + 2));
+        ctx.lineTo(-8, -(R + 2));
+        ctx.closePath();
+        ctx.fillStyle = PAL.YELLOW;
+        ctx.fill();
+        ctx.strokeStyle = PAL.WHITE;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 中心轴：黄色小菱形
+        ctx.beginPath();
+        ctx.moveTo(0, -6);
+        ctx.lineTo(6, 0);
+        ctx.lineTo(0, 6);
+        ctx.lineTo(-6, 0);
+        ctx.closePath();
+        ctx.fillStyle = PAL.YELLOW;
+        ctx.fill();
+
+        // 结果展示：停转后显示文字
+        if (this.resultTimer > 0 && activeSlice) {
+            ctx.font = 'bold 22px "Inter Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // 黑色 stamp 偏移
+            ctx.fillStyle = PAL.BLACK;
+            const offs = [[2, 0], [0, 2], [-2, 0], [0, -2]];
+            for (const [ox, oy] of offs) ctx.fillText(activeSlice.label || '', ox, R + 50 + oy);
+            ctx.fillStyle = PAL.YELLOW;
+            ctx.fillText(activeSlice.label || '', 0, R + 50);
+        }
 
         ctx.restore();
     }
