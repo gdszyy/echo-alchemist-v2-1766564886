@@ -180,3 +180,119 @@ body.promare-mode #toast-container > * {
     font-family: 'Inter Mono', monospace !important;
     box-shadow: none !important;
 }
+
+/* ==================== 强力 Tailwind 覆盖 ==================== */
+/* Tailwind 类用 inline 高特异性，需要更激进的覆盖 */
+
+/* 圆角全清 */
+body.promare-mode .rounded-xl,
+body.promare-mode .rounded-2xl,
+body.promare-mode .rounded-lg,
+body.promare-mode .rounded-md,
+body.promare-mode .rounded-full,
+body.promare-mode .rounded {
+    border-radius: 0 !important;
+}
+
+/* backdrop-blur 全清 */
+body.promare-mode .backdrop-blur,
+body.promare-mode .backdrop-blur-sm,
+body.promare-mode .backdrop-blur-md,
+body.promare-mode .backdrop-blur-lg,
+body.promare-mode .backdrop-blur-xl {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* bg-slate-* / bg-black/* 全部映射到 #0a0a0a 黑底 */
+body.promare-mode [class*="bg-slate-900"],
+body.promare-mode [class*="bg-slate-800"],
+body.promare-mode [class*="bg-slate-700"],
+body.promare-mode [class*="bg-black/"],
+body.promare-mode [class*="bg-gray-9"],
+body.promare-mode [class*="bg-zinc-9"] {
+    background-color: #0a0a0a !important;
+}
+
+/* 教程 / 弹窗卡片：把所有 border-*-500 边框统一到 PINK，hover 到 YELLOW */
+body.promare-mode [class*="border-purple-"],
+body.promare-mode [class*="border-indigo-"],
+body.promare-mode [class*="border-blue-"],
+body.promare-mode [class*="border-red-"],
+body.promare-mode [class*="border-amber-"],
+body.promare-mode [class*="border-yellow-"],
+body.promare-mode [class*="border-emerald-"],
+body.promare-mode [class*="border-cyan-"],
+body.promare-mode [class*="border-pink-"],
+body.promare-mode [class*="border-rose-"] {
+    border-color: #FF0090 !important;
+    border-radius: 0 !important;
+}
+
+/* shadow-[0_0_*] 软发光全清 */
+body.promare-mode [class*="shadow-["] {
+    box-shadow: none !important;
+}
+
+/* 文字色：彩色 token 收敛到 5 色家族 */
+body.promare-mode [class*="text-purple-"],
+body.promare-mode [class*="text-violet-"],
+body.promare-mode [class*="text-pink-"],
+body.promare-mode [class*="text-rose-"],
+body.promare-mode [class*="text-red-"]   { color: #FF0090 !important; }
+body.promare-mode [class*="text-blue-"],
+body.promare-mode [class*="text-cyan-"],
+body.promare-mode [class*="text-sky-"],
+body.promare-mode [class*="text-teal-"]  { color: #00E5FF !important; }
+body.promare-mode [class*="text-amber-"],
+body.promare-mode [class*="text-yellow-"],
+body.promare-mode [class*="text-orange-"]{ color: #FFD600 !important; }
+body.promare-mode [class*="text-emerald-"],
+body.promare-mode [class*="text-green-"] { color: #00E5FF !important; }
+body.promare-mode [class*="text-slate-3"],
+body.promare-mode [class*="text-slate-4"],
+body.promare-mode [class*="text-slate-2"],
+body.promare-mode [class*="text-gray-3"]  { color: #FFFFFF !important; }
+
+/* 强制 promare-mode 下所有 `.btn-main` 主按钮使用梯形切边 */
+body.promare-mode .btn-main {
+    clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%) !important;
+    border-radius: 0 !important;
+    background: #0a0a0a !important;
+    border: 2px solid #FF0090 !important;
+    box-shadow: none !important;
+    font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
+}
+
+body.promare-mode .btn-main:hover {
+    background: #FF0090 !important;
+    color: #FFFFFF !important;
+    box-shadow: inset 0 0 0 2px #FFD600 !important;
+}
+
+/* 教程 step 块：替换 yellow border + amber title 为 promare */
+body.promare-mode #tutorial-step-overlay,
+body.promare-mode .tutorial-step,
+body.promare-mode [id^="tutorial-"] {
+    background: #0a0a0a !important;
+    border: 2px solid #00E5FF !important;
+    border-radius: 0 !important;
+    backdrop-filter: none !important;
+    box-shadow: 0 0 0 3px #FF0090 !important;
+}
+
+/* 教程进度条 / step 标签 */
+body.promare-mode .tutorial-progress,
+body.promare-mode [class*="text-amber-400"] {
+    color: #FFD600 !important;
+}
+
+/* 顶部 stat pill */
+body.promare-mode .stat-pill {
+    border-radius: 0 !important;
+    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+    background: #0a0a0a !important;
+    border: 2px solid #FFD600 !important;
+    color: #FFFFFF !important;
+    backdrop-filter: none !important;
+}
