@@ -44,6 +44,7 @@ const audio = new Proxy({}, {
 });
 
 import { calc_getCirclePolygonCollision, calc_getCircleArcCollision } from '../combat/collision_shapes.js';
+import { drawPromareProjectile } from '../render/promare_projectile_draw.js';
 
 class Projectile {
     constructor(x, y, vel, config, isCopy = false, shotId = null, isLast = false) {
@@ -945,6 +946,22 @@ class Projectile {
         else if ((cfg.bounce || 0) > 0) trailColor = '#86efac';
         else if ((cfg.scatter || 0) > 0) trailColor = '#facc15';
 
+        // [Promare] 拖尾色映射到 5 色硬切板（保留元素家族编码）
+        if (CONFIG.visualMode === 'promare') {
+            if (cfg.isLaser)                       trailColor = '#00E5FF';
+            else if (cfg.type === 'flying_sword')  trailColor = '#FFFFFF';
+            else if (cfg.type === 'rainbow')       trailColor = '#FF0090';
+            else if (cfg.explosive)                trailColor = '#FF0090';
+            else if ((cfg.pyro || 0) > 0)          trailColor = '#FF0090';
+            else if ((cfg.cryo || 0) > 0)          trailColor = '#00E5FF';
+            else if ((cfg.lightning || 0) > 0)     trailColor = '#FFD600';
+            else if ((cfg.wind || 0) > 0)          trailColor = '#00E5FF';
+            else if ((cfg.pierce || 0) > 0)        trailColor = '#FFFFFF';
+            else if ((cfg.bounce || 0) > 0)        trailColor = '#FF0090';
+            else if ((cfg.scatter || 0) > 0)       trailColor = '#FFD600';
+            else                                    trailColor = '#FFFFFF';
+        }
+
         const tier = Math.min(3, Math.floor((this.tierStat || 0) / 8));
         // [拖尾调优] 用户反馈：拖尾过粗过亮，整体降一档。
         // 基础宽度随子弹半径联动；高强度子弹仅小幅加宽
@@ -1001,6 +1018,15 @@ class Projectile {
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(rotation);
+
+        // [Promare] 几何子弹路径：彻底绕开 classic 的 shadowBlur + 渐变堆叠
+        // @perf-impact: 每子弹每帧 1-3 个 fill + 1 stroke，加法混合，<0.1ms。
+        if (CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.useGeometricProjectiles) {
+            drawPromareProjectile(ctx, radius, config, intensity, deformation, integrity);
+            ctx.restore();
+            return;
+        }
+
         // [fix] 重构为 if-else 结构，确保每条执行路径只有一个顶层 restore
         if (config.type === 'flying_sword') {
             // @section:draw_flying_sword - 飞剑完整绘制：剑身/剑格/剑柄/剑首/剑穗（独立 restore+return）
