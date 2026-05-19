@@ -247,9 +247,15 @@ class Game {
         this.waveMomentumTimer = 0;
         this.nextRoundHpMultiplier = 1; 
         this.baseTimeScale = 1.0;
-        this.frameDamageAccumulator = 0; 
-        this.slowMotionTimer = 0;        
-        this.slowMotionThreshold = 100;  
+        this.frameDamageAccumulator = 0;
+        this.slowMotionTimer = 0;
+        this.slowMotionThreshold = 100;
+
+        // ==================== [Promare] Hit Feedback 三件套字段 ====================
+        // sys_loop 每帧读取，由 EventBus 监听器（见下文 _registerPromareHitFeedback）写入。
+        // hitstopFrames > 0 时本帧 timeScale=0；flashOverlay 控制全屏白闪。
+        this.hitstopFrames = 0;
+        this.flashOverlay = null;
         this.saveData = { currency: 0, runeFragments: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0 };
         this.runCurrency = 0;
         // ==================== 本局统计字段 ====================
@@ -359,6 +365,24 @@ class Game {
         this._perfManualMode = null;
         // [Phase 5B] 预加载所有 Sprite Sheet（在游戏循环开始前触发异步加载）
         preloadAllSprites();
+
+        // ==================== [Promare] Dev Console 切换工具 ====================
+        // 在控制台输入 `window.__promare(true)` 切换到 promare 模式，`false` 切回 classic。
+        // 同时给 body 加/去 `.promare-mode` class，让 CSS 层级也响应。
+        // 初始化时按 CONFIG.visualMode 同步 body class。
+        if (typeof window !== 'undefined') {
+            const _syncBodyClass = () => {
+                document.body && document.body.classList.toggle('promare-mode', CONFIG.visualMode === 'promare');
+            };
+            _syncBodyClass();
+            window.__promare = (on) => {
+                CONFIG.visualMode = on ? 'promare' : 'classic';
+                _syncBodyClass();
+                console.log('[Promare] visualMode =', CONFIG.visualMode);
+                return CONFIG.visualMode;
+            };
+        }
+
         // 启动游戏主循环
         this.sys_loop();
     }
@@ -384,6 +408,21 @@ class Game {
                 const hitY = data.hitY || (data.enemy ? data.enemy.pos.y : this.height / 2);
                 this.combat_runeCharge_onHit(hitX, hitY, false);
             }
+
+            // [Promare] Hit Feedback 三件套：停帧 + 白闪 + 抖屏
+            // 仅 visualMode==='promare' 启用，classic 模式完全跳过保持原行为。
+            // @perf-impact: 监听器内只设字段，渲染由 sys_loop 消费。
+            if (CONFIG.visualMode === 'promare') {
+                const isKill = !!data.killed;
+                const isBig  = (data.actualDamage || data.amount || 0) > 0 && (data.amount || 0) >= 30;
+                // 移动端友好：normal 命中不停帧，仅 big/kill 触发
+                this.hitstopFrames = isKill ? 4 : (isBig ? 3 : 0);
+                // 全屏白闪：每次命中都给一个短闪，alpha 由 sys_loop 衰减
+                this.flashOverlay = { color: '#FFFFFF', alpha: isKill ? 0.5 : 0.35, frames: 4 };
+                // 屏抖：复用现有 triggerScreenShake（取 max 不叠乘）
+                const shakeAmt = isKill ? 14 : (isBig ? 9 : 5);
+                this.triggerScreenShake(shakeAmt);
+            }
         });
 
         // 波次推进事件
@@ -400,6 +439,15 @@ class Game {
                 const hitY = data.hitY || (data.enemy ? data.enemy.pos.y : this.height / 2);
                 this.combat_runeCharge_onHit(hitX, hitY, true);
             }
+
+            // [Promare] 击杀时强化反馈：更长停帧 + 更亮白闪 + 更大抖屏
+            // 后续 P3 阶段 promare_burst 落地后，此处还会调 spawnPromareBurst 产生辐射 spoke。
+            if (CONFIG.visualMode === 'promare') {
+                this.hitstopFrames = Math.max(this.hitstopFrames || 0, 4);
+                this.flashOverlay  = { color: '#FFFFFF', alpha: 0.55, frames: 5 };
+                this.triggerScreenShake(18);
+            }
+
             // [本局统计] 累计击杀数
             this.runKillCount = (this.runKillCount || 0) + 1;
             // [延迟掉落] 非 Boss 敌人的遗物/精华不再立即结算，而是登记到下一回合开始统一解析。

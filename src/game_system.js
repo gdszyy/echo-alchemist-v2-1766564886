@@ -101,7 +101,16 @@ export const game_system = {
         // 同步 UI 蒙版状态（ui_updateSlowMotion 读取此 flag 控制 #slow-motion-overlay 显隐）
         this.isSlowMotion = this.slowMotionTimer > 0;
 
-        const timeScale = this.timeScale;
+        // [promare-hitstop] Hit-feedback 三件套之停帧
+        // 由 EventBus(COMBAT_DAMAGE_DEALT/COMBAT_ENEMY_KILLED) 在 core.js 写入 this.hitstopFrames。
+        // 停帧期间将本帧 timeScale 强制为 0，让物理与动画全部冻结，仅 UI 层渲染继续。
+        // 与 slowMotionTimer 不叠乘——后者按比例缩放、前者按帧暂停，逻辑上正交。
+        let effectiveTimeScale = this.timeScale;
+        if (this.hitstopFrames && this.hitstopFrames > 0) {
+            effectiveTimeScale = 0;
+            this.hitstopFrames -= 1;
+        }
+        const timeScale = effectiveTimeScale;
 
         // 处理震动衰减
         let shakeX = 0, shakeY = 0;
@@ -186,6 +195,23 @@ export const game_system = {
 
         // 9. [自适应性能] FPS 和性能等级指示层
         this.render_perfOverlay();
+
+        // [promare-flash] Hit-feedback 三件套之全屏白闪
+        // 由 EventBus 写入 this.flashOverlay = {color, alpha, frames}。
+        // 每帧叠加 fillRect，alpha 衰减；衰减至 <0.02 时清空。
+        // @perf-impact: 单次 fillRect 全屏覆盖，<0.1ms / 帧，无 shadowBlur。
+        if (this.flashOverlay && this.flashOverlay.alpha > 0.02) {
+            const f = this.flashOverlay;
+            this.ctx.save();
+            this.ctx.globalCompositeOperation = 'lighter';
+            this.ctx.globalAlpha = f.alpha;
+            this.ctx.fillStyle = f.color || '#FFFFFF';
+            this.ctx.fillRect(0, 0, this.width, this.height);
+            this.ctx.restore();
+            f.alpha *= 0.7;
+            f.frames -= 1;
+            if (f.frames <= 0 || f.alpha < 0.02) this.flashOverlay = null;
+        }
 
         // 10. 下一帧请求
         this.ctx.restore();
