@@ -994,6 +994,97 @@ body.promare-mode .rune-launcher-float-btn span {
     color: #FFD600 !important;
 }
 
+/* ==================== 弹药 HUD（当前槽 + 下一发）==================== */
+/* #current-slot / #next-slot 是战斗顶部弹药预览。
+   原版圆形 + radial-gradient 背景 + shadowBlur 黄色光晕 → Promare 几何菱形 */
+
+body.promare-mode .ammo-icon {
+    border-radius: 0 !important;
+    /* 钻石外形 */
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    background: #0a0a0a !important;
+    border: 2px solid #FFFFFF !important;
+    box-shadow: none !important;
+}
+
+/* 当前发射槽位（高亮）— YELLOW 实心填充 + 白边 */
+body.promare-mode #current-slot .ammo-icon {
+    background: #0a0a0a !important;
+    border: 2px solid #FFD600 !important;
+    box-shadow: 0 0 0 2px #FF0090, inset 2px 2px 0 #FFD600 !important;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+/* 下一发槽位（暗淡）— CYAN 边 + 半透明 */
+body.promare-mode #next-slot .ammo-icon {
+    opacity: 0.85 !important;
+    border-color: #00E5FF !important;
+    box-shadow: inset 1px 1px 0 #00E5FF !important;
+}
+
+/* ammo-icon 内部小符号（伪元素小钻石）替代位图 */
+body.promare-mode .ammo-icon::after {
+    content: '';
+    position: absolute;
+    top: 30%; left: 30%;
+    width: 40%; height: 40%;
+    background: #FFFFFF;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    z-index: 2;
+    pointer-events: none;
+}
+
+body.promare-mode #current-slot .ammo-icon::after {
+    background: #FFD600;
+}
+
+/* 发射 / 滑入动画 — 保留原 keyframes 行为，仅去掉 opacity 渐变（硬切） */
+body.promare-mode .shoot-anim {
+    animation: shootUpPromare 0.4s forwards cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+@keyframes shootUpPromare {
+    0%   { transform: translateY(0) scale(1) skewY(0deg); opacity: 1; }
+    100% { transform: translateY(-80px) scale(0.3) skewY(-15deg); opacity: 0; }
+}
+
+body.promare-mode .slide-in-anim {
+    animation: slideInPromare 0.3s forwards !important;
+}
+
+@keyframes slideInPromare {
+    0%   { transform: translateX(60px) scale(0.7) skewX(15deg); opacity: 0; }
+    100% { transform: translateX(0) scale(1) skewX(0deg); opacity: 1; }
+}
+
+/* ==================== Marble Preview Panel（弹珠预览，研磨阶段顶部）==================== */
+
+body.promare-mode #marble-preview-panel {
+    background: rgba(10, 10, 10, 0.9) !important;
+    border: 2px solid #FFFFFF !important;
+    border-radius: 0 !important;
+    box-shadow: inset 2px 2px 0 #FF0090, inset -2px -2px 0 #00E5FF !important;
+    backdrop-filter: none !important;
+}
+
+body.promare-mode #preview-marble-ball {
+    border-radius: 0 !important;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    background: #0a0a0a !important;
+    border: 2px solid #FFFFFF !important;
+    box-shadow: none !important;
+}
+
+body.promare-mode #preview-marble-ball::after {
+    background: none !important;
+}
+
+body.promare-mode #preview-marble-icon {
+    color: #FFFFFF !important;
+    filter: grayscale(1) brightness(1.5) contrast(1.6) !important;
+    text-shadow: none !important;
+}
+
 /* ==================== 文本：去衬线 + 取消 backdrop-blur ==================== */
 
 body.promare-mode h1, body.promare-mode h2, body.promare-mode h3,
