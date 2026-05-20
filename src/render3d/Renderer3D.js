@@ -18,6 +18,7 @@ import * as THREE from 'three';
 import { BackgroundLayer } from './BackgroundLayer.js';
 import { CameraController } from './CameraController.js';
 import { CoordsMapper } from './coords.js';
+import { SceneProxy } from './SceneProxy.js';
 
 export class Renderer3D {
     /**
@@ -35,9 +36,17 @@ export class Renderer3D {
         this._initRenderer();
         this._initScene();
         this._initCamera();
+
+        // CoordsMapper：根据相机 FOV/距离自动算 scale，画布高度占视域 94%
+        const cameraDist = Math.abs(this.camera.position.z);
+        const scale = CoordsMapper.autoScaleFromFov(this.camera.fov, cameraDist, this.height, 0.94);
+        this.coords = new CoordsMapper(this.width, this.height, scale);
+
         this._initLayers();
 
-        this.coords = new CoordsMapper(this.width, this.height);
+        // SceneProxy：玩法 ↔ 3D 桥接（钉子 / 墙 / 后续敌人 / 子弹...）
+        this.proxy = new SceneProxy(this.scene, this.coords);
+
         this.cameraController = new CameraController(this.camera);
 
         // 帧计时（秒）
@@ -96,7 +105,11 @@ export class Renderer3D {
         this.renderer.setSize(W, H, false);
         this.camera.aspect = W / H;
         this.camera.updateProjectionMatrix();
-        this.coords.update(W, H);
+        // 新 H → 重算 scale
+        const cameraDist = Math.abs(this.camera.position.z);
+        const scale = CoordsMapper.autoScaleFromFov(this.camera.fov, cameraDist, H, 0.94);
+        this.coords.update(W, H, scale);
+        if (this.proxy) this.proxy.onResize();
     }
 
     /**
@@ -111,6 +124,7 @@ export class Renderer3D {
         this._tElapsed += dt;
 
         if (this.background) this.background.update(dt, this._tElapsed);
+        if (this.proxy) this.proxy.update(dt, this._tElapsed);
         if (this.cameraController) this.cameraController.update(dt);
 
         this.renderer.render(this.scene, this.camera);
@@ -120,8 +134,10 @@ export class Renderer3D {
     }
 
     dispose() {
+        try { if (this.proxy) this.proxy.dispose(); } catch (e) {}
         try { if (this.background) this.background.dispose(); } catch (e) {}
         try { this.renderer.dispose(); } catch (e) {}
+        this.proxy = null;
         this.background = null;
         this.cameraController = null;
         this.scene = null;

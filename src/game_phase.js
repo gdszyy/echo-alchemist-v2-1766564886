@@ -68,7 +68,14 @@ export const game_phase = {
         } else {
             console.log('[phase_switchPhase] ' + oldPhase + ' -> ' + newPhase);
         }
-        
+
+        // [3D-Main M2] 通知 3D 渲染层阶段变化（控制钉子/墙的可见性）
+        if (this.renderer3d && this.renderer3d.proxy) {
+            try { this.renderer3d.proxy.setPhase(newPhase); } catch (e) {
+                console.warn('[Renderer3D] proxy.setPhase error:', e);
+            }
+        }
+
         // 事件总线广播阶段切换
         eventBus.emit(EVENT_TYPES.PHASE_CHANGED, { from: oldPhase, to: newPhase });
         
@@ -2822,17 +2829,25 @@ phase_gathering_getRandomPegType() {
             this.phase_gathering_initPachinko();
         }
 
-        this.pegs.forEach((p, idx) => { 
+        this.pegs.forEach((p, idx) => {
             p.update(); // 更新冷却和动画
-            p.draw(this.ctx, pegRadius); 
+            p.draw(this.ctx, pegRadius);
             p.resetLight();
-            
+
             // 调试日志：检查是否有槽位叠加在当前钉子上
             const hasSlot = this.specialSlots.some(s => s.pegIndex === idx);
             if (hasSlot && Math.random() < 0.01) {
                 console.log(`[DEBUG] Rendering peg ${idx} with overlaid special slot at (${p.pos.x.toFixed(1)}, ${p.pos.y.toFixed(1)})`);
             }
         });
+
+        // [3D-Main M2] 把当前钉子数组同步到 3D InstancedMesh（每帧一次）
+        // 1 帧后 Renderer3D.render() 才会取到新数据，但 60fps 下不可察觉
+        if (this.renderer3d && this.renderer3d.proxy) {
+            try { this.renderer3d.proxy.syncPegs(this.pegs, pegRadius); } catch (e) {
+                console.warn('[Renderer3D] syncPegs error:', e);
+            }
+        }
 
         
         lightSources.forEach(ball => {
