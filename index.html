@@ -174,9 +174,6 @@
             opacity: 0.30;
             transition: opacity 0.2s ease;
         }
-        body.render3d-debug #gl-canvas {
-            outline: 1px solid rgba(56, 189, 248, 0.4);
-        }
 
         @keyframes shake-hard {
             0% { transform: translate(0, 0); }
@@ -2896,6 +2893,12 @@
                         <span class="s-label">CRT 特效</span>
                         <span class="s-badge" id="crt-badge">关闭</span>
                     </div>
+                    <!-- [3D-Main] 3D 视觉模式开关：默认关闭（2D 不透明覆盖），开启后 2D 降到 30% 透明，下层 3D 全息场景透出 -->
+                    <div class="settings-item" id="render3d-item" onclick="window.toggleRender3dMode && window.toggleRender3dMode()">
+                        <span class="s-icon">🌐</span>
+                        <span class="s-label">3D 视觉</span>
+                        <span class="s-badge" id="render3d-badge">关闭</span>
+                    </div>
 
                 </div>
             </div>
@@ -3539,6 +3542,12 @@
                         <span class="ps-label">CRT 特效</span>
                         <span class="ps-badge" id="pause-crt-badge">关闭</span>
                     </div>
+                    <!-- [3D-Main] 3D 视觉模式开关（暂停设置面板版） -->
+                    <div class="pause-setting-row" id="pause-render3d-row" onclick="window.toggleRender3dMode && window.toggleRender3dMode(); game.ui_syncPauseSettings && game.ui_syncPauseSettings();">
+                        <span class="ps-icon">🌐</span>
+                        <span class="ps-label">3D 视觉</span>
+                        <span class="ps-badge" id="pause-render3d-badge">关闭</span>
+                    </div>
 
                     <div class="pause-perf-row">
                         <span class="ps-icon">⚡</span>
@@ -3630,6 +3639,43 @@ game.sys_toggleCrt = () => {
     isCrtOn = !isCrtOn;
     localStorage.setItem('ea_crt_enabled', isCrtOn);
     updateCrtVisuals();
+};
+
+// --- [3D-Main] 3D 视觉模式 ---
+// 通过给 body 加 .render3d-debug 类（M1 已定义：把 2D #gameCanvas 透到 30%，
+// 让下层 WebGL 全息场景透出）。默认关闭——玩家看到的还是熟悉的 2D 表现。
+let is3DOn = localStorage.getItem('ea_render3d_enabled') === 'true';
+function updateRender3dVisuals() {
+    const badges = [
+        document.getElementById('render3d-badge'),
+        document.getElementById('pause-render3d-badge'),
+    ];
+    const items = [
+        document.getElementById('render3d-item'),
+        document.getElementById('pause-render3d-row'),
+    ];
+    if (is3DOn) {
+        document.body.classList.add('render3d-debug');
+    } else {
+        document.body.classList.remove('render3d-debug');
+    }
+    for (const badge of badges) {
+        if (!badge) continue;
+        badge.textContent = is3DOn ? '开启' : '关闭';
+        if (is3DOn) badge.classList.add('active');
+        else        badge.classList.remove('active');
+    }
+    for (const item of items) {
+        if (!item) continue;
+        if (is3DOn) item.classList.add('active');
+        else        item.classList.remove('active');
+    }
+}
+updateRender3dVisuals();
+window.toggleRender3dMode = () => {
+    is3DOn = !is3DOn;
+    localStorage.setItem('ea_render3d_enabled', is3DOn);
+    updateRender3dVisuals();
 };
 
 // --- 静音切换 ---
