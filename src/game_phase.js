@@ -2813,7 +2813,8 @@ phase_gathering_getRandomPegType() {
         });
         // 繪製釘子
         // [修复] 增加保底半径，防止 this.width 为 0 时钉子消失
-        const pegRadius = Math.max(4, Math.min(8, (this.width || 400) / 60));
+        // [3D-Main M2] 半径区间 [4,8] → [6,11]、除数 60 → 45（视觉 +33%，与 PEG_RADIUS 物理 6→8 同步）
+        const pegRadius = Math.max(6, Math.min(11, (this.width || 400) / 45));
         
         // [防御性检查] 如果钉子数组为空，尝试自动恢复
         if (this.pegs.length === 0) {
