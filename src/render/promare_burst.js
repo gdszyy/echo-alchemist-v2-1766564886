@@ -53,6 +53,27 @@ export function ensurePromareGlobals(game) {
             }
         }
     };
+    // [cryo signature] 落地结晶分裂：粒子寿命接近 0 时分裂 2 个微小晶体
+    globalThis._promareCryoSubSpawn = (x, y, color) => {
+        if (!game || typeof game.spawn_createParticle !== 'function') return;
+        for (let i = 0; i < 2; i++) {
+            const a = (i === 0 ? -1 : 1) * (0.3 + Math.random() * 0.4); // 左右分裂
+            const sp = 0.8 + Math.random() * 0.6;
+            const sub = game.spawn_createParticle(x, y, color || '#00E5FF', 'cryo_oct');
+            if (sub) {
+                if (sub.vel) {
+                    sub.vel.x = Math.cos(a) * sp;
+                    sub.vel.y = -Math.abs(Math.sin(a)) * sp - 0.3; // 微微向上飞
+                }
+                sub.size *= 0.55;
+                sub._splitFired = true; // 防止再次分裂
+                sub.life = 0.35;
+                sub.maxLife = sub.life;
+                sub.decay = 0.07;
+                sub.gravity = 0.5; // 重力稍强，落地感
+            }
+        }
+    };
 }
 
 /**
@@ -123,6 +144,75 @@ export function spawnPromareBurst(game, x, y, hitVel, elementType, severity = 'n
                 const sp = Math.pow(Math.random(), BURST.smallSpeedPow) * BURST.smallSpeedMax + BURST.smallSpeedBase;
                 _spawnOne(game, x, y, mode, a, sp, false, codex);
             }, delay);
+        }
+    }
+
+    // ===== 元素 signature 二次效果 =====
+    // 每个 elementKey 有不同的"额外仪式"，独立于通用碎片群。
+    _spawnElementSignature(game, x, y, baseA, elementKey, perf);
+}
+
+/**
+ * 元素 signature 二次喷发：在通用碎片群之上叠加每个元素独有的仪式特效。
+ * @perf-impact: 各 ≤6 额外粒子，按 elementKey 独立路径。
+ */
+function _spawnElementSignature(game, x, y, baseA, elementKey, perf) {
+    if (!game || typeof game.spawn_createParticle !== 'function') return;
+
+    if (elementKey === 'echo') {
+        // [echo signature] 多层错时同心环涟漪（0 / 80 / 160 ms 启动）
+        const ripples = perf.useStagger ? 3 : 1;
+        for (let i = 0; i < ripples; i++) {
+            const fire = () => {
+                const p = game.spawn_createParticle(x, y, '#FF0090', 'echo_ring');
+                if (p) {
+                    p.size = 4 + i * 2;
+                    p._expandRate = 0.5 + i * 0.15;
+                    p.life = 1.0 - i * 0.1;
+                    p.maxLife = p.life;
+                    p.decay = 0.04 + i * 0.005;
+                }
+            };
+            if (i === 0) fire();
+            else setTimeout(fire, i * 80);
+        }
+    } else if (elementKey === 'wind') {
+        // [wind signature] 风暴线：3-5 条更长的 line 粒子沿 baseA ±30° 喷发
+        const lineCount = perf.useStagger ? 5 : 3;
+        for (let i = 0; i < lineCount; i++) {
+            const a = baseA + (Math.random() - 0.5) * 0.6; // ±17° 锥
+            const sp = 5 + Math.random() * 3;
+            const p = game.spawn_createParticle(x, y, '#00E5FF', 'wind_slash');
+            if (p) {
+                if (p.vel) {
+                    p.vel.x = Math.cos(a) * sp;
+                    p.vel.y = Math.sin(a) * sp;
+                }
+                // 更长更细的「风暴线」
+                p.size = 14 + Math.random() * 8;
+                p.life = 0.6;
+                p.maxLife = p.life;
+                p.decay = 0.04;
+                p.angle = a;
+            }
+        }
+    } else if (elementKey === 'cryo') {
+        // [cryo signature] 不在 burst 处增加；分裂由粒子自身在 update 时触发（已加桥接）。
+        // 此分支留空，保留扩展位。
+    } else if (elementKey === 'laser') {
+        // [laser signature] 8 道激光光柱呈放射状（已有 burst 是少量主体；这里补 8 道）
+        const beams = perf.useStagger ? 8 : 4;
+        for (let i = 0; i < beams; i++) {
+            const a = (i / beams) * Math.PI * 2;
+            const p = game.spawn_createParticle(x, y, '#FFFFFF', 'laser_beam');
+            if (p) {
+                p.angle = a;
+                if (p.vel) {
+                    p.vel.x = Math.cos(a) * 3.0;
+                    p.vel.y = Math.sin(a) * 3.0;
+                }
+                p.size = 14 + Math.random() * 4;
+            }
         }
     }
 }

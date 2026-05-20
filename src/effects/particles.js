@@ -280,6 +280,13 @@ class Particle {
                 globalThis._promareScatterSubSpawn(this.pos.x, this.pos.y, this.color);
             }
         }
+        // [Promare] cryo_oct 落地结晶分裂：寿命接近 0 时生成 2 个微小晶体
+        if (this.mode === 'cryo_oct' && !this._splitFired && this.life < 0.15 && this.life > 0.05) {
+            this._splitFired = true;
+            if (typeof globalThis !== 'undefined' && globalThis._promareCryoSubSpawn) {
+                globalThis._promareCryoSubSpawn(this.pos.x, this.pos.y, this.color);
+            }
+        }
         // [Promare] venom_tri 留腐蚀印记：每 0.3 life 记录一次位置
         if (this.mode === 'venom_tri') {
             this._dripTimer -= timeScale * 0.05;

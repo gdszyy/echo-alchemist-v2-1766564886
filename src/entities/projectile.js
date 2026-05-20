@@ -924,6 +924,31 @@ class Projectile {
         const integrity = (this.bouncesLeft + this.piercesLeft) / (this.maxDurability || 1);
         // [拖尾 #6] 在主体之前先绘制拖尾，主体覆盖在最前
         this._drawTrail(ctx);
+
+        // [Promare] 飞剑残影：在 trail 中的 3-5 个采样位置上画半透明剑身
+        // @perf-impact: 单飞剑额外 3-5 次 drawVisuals 调用；trail 已存在零额外存储成本。
+        if (CONFIG.visualMode === 'promare'
+            && this.config && this.config.type === 'flying_sword'
+            && this.trail && this.trail.length >= 5) {
+            const ghostCount = 4;
+            const step = Math.floor(this.trail.length / (ghostCount + 1));
+            ctx.save();
+            for (let k = 1; k <= ghostCount; k++) {
+                const idx = this.trail.length - 1 - k * step;
+                if (idx < 0) break;
+                const ghost = this.trail[idx];
+                if (!ghost) continue;
+                // 越远的残影越淡
+                ctx.globalAlpha = (1 - k / (ghostCount + 1)) * 0.35;
+                Projectile.drawVisuals(
+                    ctx, ghost.x, ghost.y, this.radius * (1 - k * 0.08),
+                    this.config, this.rotation, this.intensity * 0.6,
+                    this.deformation, integrity, this.crackSeed, this.windBladeAngle
+                );
+            }
+            ctx.restore();
+        }
+
         Projectile.drawVisuals(ctx, this.pos.x, this.pos.y, this.radius, this.config, this.rotation, this.intensity, this.deformation, integrity, this.crackSeed, this.windBladeAngle);
     }
 
