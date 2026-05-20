@@ -170,9 +170,15 @@
              * 即可看到下层 3D 背景（同步降低 2D 不透明度到 0.3）。
              */
         }
+        /* [3D-Main] 默认 3D 模式（body.render3d-debug）：
+         *   1. render_clearCanvas 跳过 2D 背景填充 → 3D 全息场景完整可见
+         *   2. render_background 跳过 2D 网格
+         *   3. 2D canvas 整体压到 50% → 2D entities（与 3D 版本同位置）变成柔光辅助层
+         *      未来如要"纯 3D"完全去掉 2D entities，需要在 phase_*_update 里加 skip 检查
+         * 关掉 3D 模式时移除该 class，所有 2D 行为恢复原状。 */
         body.render3d-debug #gameCanvas {
-            opacity: 0.30;
-            transition: opacity 0.2s ease;
+            opacity: 0.55;
+            transition: opacity 0.25s ease;
         }
 
         @keyframes shake-hard {
@@ -2806,7 +2812,7 @@
     }
     </script>
 </head>
-<body>
+<body class="render3d-debug">
 <div id="app-wrapper">
 
 <!-- ===== PC 左侧边栏：收集队列 + 配方 HUD ===== -->
@@ -2893,11 +2899,11 @@
                         <span class="s-label">CRT 特效</span>
                         <span class="s-badge" id="crt-badge">关闭</span>
                     </div>
-                    <!-- [3D-Main] 3D 视觉模式开关：默认关闭（2D 不透明覆盖），开启后 2D 降到 30% 透明，下层 3D 全息场景透出 -->
-                    <div class="settings-item" id="render3d-item" onclick="window.toggleRender3dMode && window.toggleRender3dMode()">
+                    <!-- [3D-Main] 3D 视觉模式开关：默认开启，3D 全息场景为主，关闭则退回纯 2D（兼容/性能保底） -->
+                    <div class="settings-item active" id="render3d-item" onclick="window.toggleRender3dMode && window.toggleRender3dMode()">
                         <span class="s-icon">🌐</span>
                         <span class="s-label">3D 视觉</span>
-                        <span class="s-badge" id="render3d-badge">关闭</span>
+                        <span class="s-badge active" id="render3d-badge">开启</span>
                     </div>
 
                 </div>
@@ -3542,11 +3548,11 @@
                         <span class="ps-label">CRT 特效</span>
                         <span class="ps-badge" id="pause-crt-badge">关闭</span>
                     </div>
-                    <!-- [3D-Main] 3D 视觉模式开关（暂停设置面板版） -->
-                    <div class="pause-setting-row" id="pause-render3d-row" onclick="window.toggleRender3dMode && window.toggleRender3dMode(); game.ui_syncPauseSettings && game.ui_syncPauseSettings();">
+                    <!-- [3D-Main] 3D 视觉模式开关（暂停设置面板版）：默认开启 -->
+                    <div class="pause-setting-row active" id="pause-render3d-row" onclick="window.toggleRender3dMode && window.toggleRender3dMode(); game.ui_syncPauseSettings && game.ui_syncPauseSettings();">
                         <span class="ps-icon">🌐</span>
                         <span class="ps-label">3D 视觉</span>
-                        <span class="ps-badge" id="pause-render3d-badge">关闭</span>
+                        <span class="ps-badge active" id="pause-render3d-badge">开启</span>
                     </div>
 
                     <div class="pause-perf-row">
@@ -3642,9 +3648,11 @@ game.sys_toggleCrt = () => {
 };
 
 // --- [3D-Main] 3D 视觉模式 ---
+// 默认开启：让全套 M1–M6.5 重建的 3D 视觉真正展现给玩家。
 // 通过给 body 加 .render3d-debug 类（M1 已定义：把 2D #gameCanvas 透到 30%，
-// 让下层 WebGL 全息场景透出）。默认关闭——玩家看到的还是熟悉的 2D 表现。
-let is3DOn = localStorage.getItem('ea_render3d_enabled') === 'true';
+// 让下层 WebGL 全息场景透出）。
+// 关闭开关意味着回退到纯 2D（兼容性 / 性能保底 / 怀旧模式）。
+let is3DOn = localStorage.getItem('ea_render3d_enabled') !== 'false';
 function updateRender3dVisuals() {
     const badges = [
         document.getElementById('render3d-badge'),

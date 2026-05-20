@@ -30,6 +30,9 @@ export const render_system = {
      */
     render_clearCanvas() {
         this.ctx.clearRect(0, 0, this.width, this.height);
+        // [3D-Main] 3D 模式下跳过 2D 背景填充，让下层 WebGL 全息场景完整可见
+        const is3D = typeof document !== 'undefined' && document.body && document.body.classList.contains('render3d-debug');
+        if (is3D) return;
         this.ctx.fillStyle = CONFIG.colors.bg;
         this.ctx.fillRect(0, 0, this.width, this.height);
         // 主底图位图（已生成 720×1280 暗黑赛博炼金风），未加载完成时回退到纯色底
@@ -57,12 +60,15 @@ export const render_system = {
      * [RENDER] 绘制背景网格。
      */
     render_background() {
+        // [3D-Main] 3D 模式下跳过背景网格——下层 3D 已有星云 + 远景 + 体积光，不需要再叠 2D 网格
+        if (typeof document !== 'undefined' && document.body && document.body.classList.contains('render3d-debug')) return;
+
         this.ctx.save();
         const gridSpacing = 40;
-        const tiltX = -this.boardTilt.current.x * 15; 
+        const tiltX = -this.boardTilt.current.x * 15;
         const tiltY = this.boardTilt.current.y * 10;
-        
-        this.ctx.strokeStyle = 'rgba(71, 85, 105, 0.15)'; 
+
+        this.ctx.strokeStyle = 'rgba(71, 85, 105, 0.15)';
         this.ctx.lineWidth = 1;
 
         for (let x = (tiltX % gridSpacing); x < this.width; x += gridSpacing) {
