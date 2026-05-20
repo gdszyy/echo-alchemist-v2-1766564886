@@ -67,6 +67,9 @@ export class PegInstancedMesh {
             },
             vertexShader: /* glsl */`
                 // ShaderMaterial 不会自动 inject 实例属性；手动声明。
+                // 注意：instanceMatrix 由 Three.js 在 USE_INSTANCING 路径自动注入，
+                // 但 instanceColor (来自 setColorAt) 必须手动声明。
+                attribute vec3 instanceColor;
                 attribute float instancePhase;
                 attribute float instanceHit;
 
