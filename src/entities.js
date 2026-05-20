@@ -52,6 +52,8 @@ import {
     getUiBitmap,
 } from './bitmap_icons.js';
 import { sb as _sb } from './utils/perf.js';
+import { drawPromarePeg } from './render/promare_peg_draw.js';
+import { drawPromareDropBall } from './render/promare_dropball_draw.js';
 
 // ==================== 音频依赖注入 (重构 v2) ====================
 // 移除 Proxy 方案和 window.audio 依赖
@@ -162,6 +164,73 @@ class SpecialSlot {
         const pulse = 0.65 + Math.sin(this.animTimer) * 0.2;      // 透明度脉冲 0.45~0.85
         const midX  = (this.x + this.x2) / 2;
         const midY  = (this.y + this.y2) / 2;
+
+        // [Promare] 槽位连线：硬 zigzag 折线 + 端点几何 glyph
+        // @perf-impact: 单 slot ≤ 6 lineTo + 2 fill，无 shadowBlur。
+        if (CONFIG.visualMode === 'promare') {
+            const override = CONFIG.colorsPromareOverride || {};
+            // 按 type 映射到 5 色
+            let promareColor = '#FFFFFF';
+            if (this.type === 'recall')        promareColor = override.slotRecall    || '#FF0090';
+            else if (this.type === 'multicast') promareColor = override.slotMulticast || '#00E5FF';
+            else if (this.type === 'split')     promareColor = override.slotSplit     || '#00E5FF';
+            else if (this.type === 'giant')     promareColor = override.slotGiant     || '#FF0090';
+            else if (this.type === 'skill_point')promareColor = override.slotSkill    || '#FFD600';
+            else if (this.type === 'wheel')     promareColor = override.slotWheel     || '#FFD600';
+            else                                promareColor = '#FFD600';
+
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+
+            // 1) 硬 zigzag 折线（6 段，垂直方向 ±3px 抖动）
+            const dx = this.x2 - this.x;
+            const dy = this.y2 - this.y;
+            const segLen = Math.sqrt(dx * dx + dy * dy);
+            const ux = dx / segLen, uy = dy / segLen;
+            // 垂直单位向量
+            const px = -uy, py = ux;
+            const segs = 6;
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y);
+            for (let i = 1; i < segs; i++) {
+                const t = i / segs;
+                const baseX = this.x + dx * t;
+                const baseY = this.y + dy * t;
+                const offset = ((i % 2) ? 1 : -1) * 3;
+                ctx.lineTo(baseX + px * offset, baseY + py * offset);
+            }
+            ctx.lineTo(this.x2, this.y2);
+            ctx.strokeStyle = promareColor;
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = pulse;
+            ctx.stroke();
+
+            // 2) 两端钻石锚点
+            ctx.globalAlpha = 1.0;
+            [[this.x, this.y], [this.x2, this.y2]].forEach(([ax, ay]) => {
+                ctx.save();
+                ctx.translate(ax, ay);
+                ctx.beginPath();
+                ctx.moveTo(0, -5);
+                ctx.lineTo(5, 0);
+                ctx.lineTo(0, 5);
+                ctx.lineTo(-5, 0);
+                ctx.closePath();
+                ctx.fillStyle = promareColor;
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // 3) 中点文本（Inter Mono 风）
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = 'bold 13px "Inter Mono", monospace, sans-serif';
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillText(text, midX, midY);
+            ctx.restore();
+            return;
+        }
 
         ctx.save();
 
@@ -352,14 +421,21 @@ class FortuneWheel {
 
     draw(ctx) {
         if (!this.active) return;
-        
+
+        // [Promare] 几何命运轮盘：硬切扇形 + PINK 边框 + 黄色指针
+        // @perf-impact: 单次绘制 ≤8 扇形 fill + 1 圆环 stroke + N icon，无 shadowBlur。
+        if (CONFIG.visualMode === 'promare') {
+            this._drawPromare(ctx);
+            return;
+        }
+
         // 繪製半透明黑色背景遮罩，突出輪盤
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, 0, this.game.width, this.game.height);
 
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
-        
+
         // --- 0. 繪製外發光 ---
         ctx.shadowBlur = _sb(30);
         ctx.shadowColor = '#fbbf24'; // 金色光暈
@@ -505,6 +581,140 @@ class FortuneWheel {
         ctx.arc(0, -2, 4, 0, Math.PI*2);
         ctx.fillStyle = '#7f1d1d';
         ctx.fill();
+
+        ctx.restore();
+    }
+
+    /**
+     * [Promare] 几何命运轮盘绘制：硬切扇形 + 5 色硬切板
+     * @perf-impact: 单次 N 扇形 fill + 1 圆描边 + N icon，无 shadowBlur 无渐变。
+     */
+    _drawPromare(ctx) {
+        // 半透明黑遮罩
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+        ctx.fillRect(0, 0, this.game.width, this.game.height);
+
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+
+        const PAL = { PINK: '#FF0090', CYAN: '#00E5FF', YELLOW: '#FFD600', WHITE: '#FFFFFF', BLACK: '#0a0a0a' };
+        const R = this.radius;
+
+        // 外圈：BLACK 大圆 + PINK 厚边框（不旋转）
+        ctx.beginPath();
+        ctx.arc(0, 0, R + 10, 0, Math.PI * 2);
+        ctx.fillStyle = PAL.BLACK;
+        ctx.fill();
+        ctx.strokeStyle = PAL.PINK;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // 内圈：CYAN 细描边
+        ctx.beginPath();
+        ctx.arc(0, 0, R, 0, Math.PI * 2);
+        ctx.strokeStyle = PAL.CYAN;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // 跑马灯灯泡（12 个小菱形环绕，每帧滚动一个亮灯）
+        const lightCount = 12;
+        const time = Date.now();
+        const currentLight = Math.floor(time / 100) % lightCount;
+        for (let i = 0; i < lightCount; i++) {
+            const la = (i / lightCount) * Math.PI * 2;
+            const lx = Math.cos(la) * (R + 5);
+            const ly = Math.sin(la) * (R + 5);
+            const isOn = (i === currentLight);
+            ctx.beginPath();
+            ctx.moveTo(lx, ly - 3);
+            ctx.lineTo(lx + 3, ly);
+            ctx.lineTo(lx, ly + 3);
+            ctx.lineTo(lx - 3, ly);
+            ctx.closePath();
+            ctx.fillStyle = isOn ? PAL.WHITE : PAL.YELLOW;
+            ctx.globalAlpha = isOn ? 1.0 : 0.4;
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1.0;
+
+        // 旋转盘面
+        ctx.save();
+        ctx.rotate(this.angle);
+
+        const activeSlice = this.stopping ? this.getCurrentSlice() : null;
+        const palette = [PAL.PINK, PAL.CYAN, PAL.YELLOW, PAL.WHITE];
+
+        this.slices.forEach((s, idx) => {
+            const isHighlighted = (activeSlice === s);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, R, s.startAngle, s.endAngle);
+            ctx.closePath();
+
+            // 5 色硬切：按 index 循环
+            ctx.fillStyle = palette[idx % palette.length];
+            ctx.globalAlpha = isHighlighted ? 1.0 : 0.7;
+            ctx.fill();
+
+            // 黑色分隔线
+            ctx.strokeStyle = PAL.BLACK;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+
+            // 中心 icon / 数值（白色等宽字）
+            const midAngle = s.startAngle + (s.endAngle - s.startAngle) / 2;
+            const ix = Math.cos(midAngle) * R * 0.65;
+            const iy = Math.sin(midAngle) * R * 0.65;
+            ctx.save();
+            ctx.translate(ix, iy);
+            ctx.rotate(midAngle + Math.PI / 2);
+            ctx.fillStyle = PAL.BLACK;
+            ctx.font = 'bold 14px "Inter Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // 显示属性首字母
+            const label = (s.label || s.type || '?').slice(0, 1).toUpperCase();
+            ctx.fillText(label, 0, 0);
+            ctx.restore();
+        });
+
+        ctx.restore();
+
+        // 黄色三角指针（顶部）
+        ctx.beginPath();
+        ctx.moveTo(0, -(R + 16));
+        ctx.lineTo(8, -(R + 2));
+        ctx.lineTo(-8, -(R + 2));
+        ctx.closePath();
+        ctx.fillStyle = PAL.YELLOW;
+        ctx.fill();
+        ctx.strokeStyle = PAL.WHITE;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 中心轴：黄色小菱形
+        ctx.beginPath();
+        ctx.moveTo(0, -6);
+        ctx.lineTo(6, 0);
+        ctx.lineTo(0, 6);
+        ctx.lineTo(-6, 0);
+        ctx.closePath();
+        ctx.fillStyle = PAL.YELLOW;
+        ctx.fill();
+
+        // 结果展示：停转后显示文字
+        if (this.resultTimer > 0 && activeSlice) {
+            ctx.font = 'bold 22px "Inter Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // 黑色 stamp 偏移
+            ctx.fillStyle = PAL.BLACK;
+            const offs = [[2, 0], [0, 2], [-2, 0], [0, -2]];
+            for (const [ox, oy] of offs) ctx.fillText(activeSlice.label || '', ox, R + 50 + oy);
+            ctx.fillStyle = PAL.YELLOW;
+            ctx.fillText(activeSlice.label || '', 0, R + 50);
+        }
 
         ctx.restore();
     }
@@ -1037,6 +1247,12 @@ class Peg {
     // --- 替换 Peg 类的 draw 方法 ---
     // @section:peg_shadow_and_transform - 软阴影与碰撞旋转变换初始化
     draw(ctx, baseRadius, tilt = {x:0, y:0}) {
+        // [Promare] 几何钉子路径：菱形 + 元素 glyph，跳过 classic 渐变 + shadowBlur
+        if (CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.useGeometricPegs) {
+            drawPromarePeg(this, ctx, baseRadius);
+            return;
+        }
+
         const currentRadius = baseRadius * this.scale;
         const isSpecial = this.type !== 'normal';
         const isLit = this.lit;
@@ -3040,12 +3256,18 @@ class DropBall {
          */
         draw(ctx) {
             if (!this.active) return;
-            
+
+            // [Promare] 几何弹珠路径：六边面化 + billboard 环
+            if (CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.useGeometricPegs) {
+                drawPromareDropBall(this, ctx);
+                return;
+            }
+
             const x = this.pos.x;
             const y = this.pos.y;
             const r = this.radius;
             const buffs = this.getBuffState();
-            
+
             ctx.save();
             ctx.translate(x, y);
 
@@ -4718,6 +4940,55 @@ class FieldLootItem {
         const finalScale = this.scale * pulseScale;
         const drawY = this.y + floatY;
 
+        // [Promare] 几何掉落物：菱形容器 + 类型色硬切
+        if (CONFIG.visualMode === 'promare') {
+            ctx.save();
+            ctx.translate(this.x, drawY);
+            ctx.scale(finalScale, finalScale);
+            ctx.globalAlpha = this.opacity;
+            // 按类型选色
+            let primary = '#FFD600'; // 默认 relic 黄
+            if (this.type === 'chaos_essence') primary = '#FF0090';     // 混沌 = 粉
+            else if (this.type === 'pure_essence') primary = '#FFFFFF'; // 纯净 = 白
+            else if (this.type === 'rune_fragments') primary = '#00E5FF'; // 符文碎片 = 青
+            // 外层菱形容器（黑底白边）
+            const r = 18;
+            ctx.beginPath();
+            ctx.moveTo(0, -r);
+            ctx.lineTo(r, 0);
+            ctx.lineTo(0, r);
+            ctx.lineTo(-r, 0);
+            ctx.closePath();
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fill();
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            // 内层小菱形（类型色实心）
+            ctx.beginPath();
+            ctx.moveTo(0, -r * 0.55);
+            ctx.lineTo(r * 0.55, 0);
+            ctx.lineTo(0, r * 0.55);
+            ctx.lineTo(-r * 0.55, 0);
+            ctx.closePath();
+            ctx.fillStyle = primary;
+            ctx.fill();
+            // 4 顶点黄色装饰菱形（拼贴感）
+            ctx.fillStyle = '#FFD600';
+            const corners = [{x: 0, y: -r * 1.15}, {x: r * 1.15, y: 0}, {x: 0, y: r * 1.15}, {x: -r * 1.15, y: 0}];
+            for (const c of corners) {
+                ctx.beginPath();
+                ctx.moveTo(c.x, c.y - 2.5);
+                ctx.lineTo(c.x + 2.5, c.y);
+                ctx.lineTo(c.x, c.y + 2.5);
+                ctx.lineTo(c.x - 2.5, c.y);
+                ctx.closePath();
+                ctx.fill();
+            }
+            ctx.restore();
+            return;
+        }
+
         ctx.save();
         ctx.translate(this.x, drawY);
         ctx.scale(finalScale, finalScale);
@@ -4798,6 +5069,63 @@ class RuneLoot {
         if (!this.active) return;
 
         this._animTimer += 0.05;
+
+        // [Promare] 几何符文掉落物：六边形容器 + 元素色硬切
+        if (CONFIG.visualMode === 'promare') {
+            const runeDef = (typeof RUNE_DB !== 'undefined') ? RUNE_DB[this.runeId] : null;
+            // 元素色映射
+            const elem = runeDef && runeDef.element;
+            let primary = '#FFD600';
+            if (elem === 'pyro' || elem === 'bounce') primary = '#FF0090';
+            else if (elem === 'cryo' || elem === 'wind' || elem === 'laser') primary = '#00E5FF';
+            else if (elem === 'lightning' || elem === 'scatter' || elem === 'venom') primary = '#FFD600';
+            else if (elem === 'pierce') primary = '#FFFFFF';
+            const floatY = Math.sin(this._animTimer * 2) * 4;
+            const drawY = this.y + floatY;
+            const r = 14;
+            ctx.save();
+            ctx.translate(this.x, drawY);
+            // 六边形容器（黑底主色边）
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+                const px = Math.cos(a) * r;
+                const py = Math.sin(a) * r;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fill();
+            ctx.strokeStyle = primary;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            // 中心小钻石（主色实心）
+            ctx.beginPath();
+            ctx.moveTo(0, -r * 0.45);
+            ctx.lineTo(r * 0.45, 0);
+            ctx.lineTo(0, r * 0.45);
+            ctx.lineTo(-r * 0.45, 0);
+            ctx.closePath();
+            ctx.fillStyle = primary;
+            ctx.fill();
+            // 等级 pip（顶部小三角，level 1-3）
+            if (runeDef && runeDef.level) {
+                const lvl = Math.min(3, runeDef.level || 1);
+                for (let i = 0; i < lvl; i++) {
+                    ctx.beginPath();
+                    const px = (i - (lvl - 1) / 2) * 4;
+                    ctx.moveTo(px, -r - 4);
+                    ctx.lineTo(px + 2, -r - 1);
+                    ctx.lineTo(px - 2, -r - 1);
+                    ctx.closePath();
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+            return;
+        }
 
         // ============================================================
         // [spawn 入场动画] 入场进度（用 _animTimer 模拟，前 7 帧为入场阶段）

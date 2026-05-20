@@ -332,6 +332,67 @@ const CONFIG = {
         slotGiant: '#ef4444', // 紅色 (變大)
         slotSkill: '#10b981', // 綠色 (技能點)
     },
+
+    // ==================== 普罗米亚视觉模式（Promare Visual Mode）====================
+    // 设计方案见 docs/promare 系列与 src/render/promare_tokens.js
+    // [P9] 已翻为默认。console: window.__promare(false) 可临时回退到经典模式。
+    visualMode: 'promare',
+    promare: {
+        useGeometricEnemies:    true,  // 启用几何敌人（绕过 sprite）
+        useGeometricPegs:       true,  // 启用钻石钉子
+        useGeometricProjectiles:true,  // 启用元素形状子弹
+        hideSprites:            true,  // 隐藏所有 sprite PNG（sprite_renderer 直接 return）
+        hideBackgroundBitmap:   true,  // 跳过 BG_MAIN_CANVAS_SRC，用扫描线背景
+        backgroundTiltFactor:   0.5,   // 扫描线随板子 tilt 联动倍率（0=不联动, 1=完全联动）
+    },
+    // colors.promareOverride 由渲染器读取替换 colors.*，gameplay 逻辑不受影响
+    colorsPromareOverride: {
+        // 元素子弹/钉子映射到 5 色家族
+        matBounce:      '#FF0090',   // PINK 系
+        matPierce:      '#FFFFFF',   // WHITE 主 + PINK accent
+        matScatter:     '#FFD600',   // YELLOW
+        matDamage:      '#FFFFFF',
+        matCryo:        '#00E5FF',   // CYAN
+        matPyro:        '#FF0090',   // PINK
+        matLightning:   '#FFD600',   // YELLOW
+        matWind:        '#00E5FF',   // CYAN
+        matWind_lv2:    '#00E5FF',
+        matWind_lv3:    '#00E5FF',
+        matVenom:       '#FFD600',
+        marbleWhite:    '#FFFFFF',
+        matMatryoshka:  '#FF0090',
+        marbleRedStripe:'#FF0090',
+
+        flying_sword:   '#FFFFFF',
+        flying_sword_lv2:'#FFFFFF',
+        flying_sword_lv3:'#FF0090',
+        laser:          '#00E5FF',
+        resonance:      '#FFD600',
+        resonanceRipple:'#00E5FF',
+
+        // 背景/钉子
+        bg:             '#0a0a0a',
+        peg:            '#FFFFFF',   // 中性钉子（半透明 WHITE，由 promare_peg_draw 控）
+        pegActive:      '#FFFFFF',
+        pegPink:        '#FF0090',
+
+        // 敌人状态色 → 全收敛到 WHITE，靠加法 alpha 区分强度
+        enemy:          '#FFFFFF',
+        enemyHit:       '#FFFFFF',
+        enemyFrozen:    '#00E5FF',
+        enemyOverheat:  '#FF0090',
+        enemyShield:    '#FFFFFF',
+
+        // 槽位 glyph 颜色 → 按语义收敛
+        slotRecall:     '#FF0090',   // 撤回 = 危险
+        slotMulticast:  '#00E5FF',   // 增益
+        slotSplit:      '#00E5FF',
+        slotGiant:      '#FF0090',
+        slotSkill:      '#FFD600',
+        slotWheel:      '#FFD600',
+        wheelPointer:   '#FFD600',
+    },
+
     evolutionRules: {
         'pierce': {
             'pierce': { result: 'flying_sword', type: 'mutation' }, // 穿透球撞穿透钉 -> 突变
