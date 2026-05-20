@@ -2102,6 +2102,13 @@ phase_gathering_getRandomPegType() {
                 }
             });
 
+            // [3D-Main M3] 把当前 enemies[] 同步到 3D EnemyMeshPool（每帧一次）
+            if (this.renderer3d && this.renderer3d.proxy) {
+                try { this.renderer3d.proxy.syncEnemies(this.enemies); } catch (e) {
+                    console.warn('[Renderer3D] syncEnemies error:', e);
+                }
+            }
+
             // [猎人本能] 绘制持续标记特效：找到血量最低的活跃敌人并渲染动态瞄准十字准星
             if (this.ownedRelics && this.ownedRelics.includes('hunter_instinct')) {
                 let hunterTarget = null;

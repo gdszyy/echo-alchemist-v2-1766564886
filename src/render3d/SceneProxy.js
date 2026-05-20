@@ -14,6 +14,7 @@
 
 import { PegInstancedMesh } from './PegInstancedMesh.js';
 import { WallMesh } from './WallMesh.js';
+import { EnemyMeshPool } from './EnemyMeshPool.js';
 
 export class SceneProxy {
     /**
@@ -31,6 +32,8 @@ export class SceneProxy {
         this.walls.resize(coords);
         this.scene.add(this.walls.group);
         this.walls.setVisible(false); // 默认隐藏：阶段不是 gathering/combat/training 时不显示
+
+        this.enemies = new EnemyMeshPool(this.scene);
 
         // 当前阶段，决定可见性。null 让首次 setPhase 一定触发刷新（避免初始 'meta' early-out）
         this._phase = null;
@@ -59,6 +62,18 @@ export class SceneProxy {
     }
 
     /**
+     * 同步整个 enemies 数组到 3D 池。
+     * @param {Array} enemies game.enemies
+     */
+    syncEnemies(enemies) {
+        if (!enemies || enemies.length === 0) {
+            this.enemies.clear();
+            return;
+        }
+        this.enemies.sync(enemies, this.coords);
+    }
+
+    /**
      * 通知 proxy 当前阶段，控制墙/钉等的可见性。
      */
     setPhase(phase) {
@@ -70,6 +85,10 @@ export class SceneProxy {
         // 钉子：仅 gathering / training 显示（combat 内没有钉子，由 syncPegs([]) 自然清空）
         if (phase !== 'gathering' && phase !== 'training') {
             this.pegs.clear();
+        }
+        // 敌人：仅 combat / training 显示
+        if (phase !== 'combat' && phase !== 'training') {
+            this.enemies.clear();
         }
     }
 
@@ -86,11 +105,13 @@ export class SceneProxy {
     update(dt, t) {
         this.pegs.update(dt, t);
         this.walls.update(t);
+        this.enemies.update(dt, t);
     }
 
     dispose() {
         try { this.pegs.dispose(); } catch (e) {}
         try { this.walls.dispose(); } catch (e) {}
+        try { this.enemies.dispose(); } catch (e) {}
         if (this.scene) {
             this.scene.remove(this.pegs.mesh);
             this.scene.remove(this.walls.group);
