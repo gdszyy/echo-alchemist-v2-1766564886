@@ -297,6 +297,93 @@ body.promare-mode .stat-pill {
     backdrop-filter: none !important;
 }
 
+/* ==================== 命运抉择卡牌（select-card 系列）==================== */
+/* DOM 卡牌：硬切边框 + 钻石图标 + 五色对比 */
+
+body.promare-mode .select-card {
+    border-radius: 0 !important;
+    background: #0a0a0a !important;
+    border: 2px solid #FFFFFF !important;
+    box-shadow: inset 2px 2px 0 #FF0090, inset -2px -2px 0 #00E5FF !important;
+    transition: transform 0.08s, border-color 0.12s !important;
+    backdrop-filter: none !important;
+}
+
+body.promare-mode .select-card:hover {
+    border-color: #FFD600 !important;
+    box-shadow: inset 2px 2px 0 #FFD600, inset -2px -2px 0 #FFD600 !important;
+    transform: translateY(-2px) !important;
+}
+
+/* 选中态 */
+body.promare-mode .select-card.selected,
+body.promare-mode .select-card[data-selected="true"] {
+    border-color: #FFD600 !important;
+    box-shadow: inset 3px 3px 0 #FFD600, inset -3px -3px 0 #FF0090, 0 0 0 3px #FFD600 !important;
+}
+
+/* 弹珠球体 → 强制方形 + 硬切菱形剪裁 */
+body.promare-mode .select-icon-wrap {
+    background: transparent !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+body.promare-mode .select-icon {
+    border-radius: 0 !important;
+    /* 强制菱形外观：clip-path */
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    background: #FFFFFF !important;  /* 主色由 attribute-* class 在下面覆盖 */
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* 类型颜色映射（按 marble-fx-* class 后缀路由）— 元素 family 映射到 5 色 */
+body.promare-mode .select-icon.marble-fx-pyro      { background: #FF0090 !important; }
+body.promare-mode .select-icon.marble-fx-bounce    { background: #FF0090 !important; }
+body.promare-mode .select-icon.marble-fx-explosive { background: #FF0090 !important; }
+body.promare-mode .select-icon.marble-fx-cryo      { background: #00E5FF !important; }
+body.promare-mode .select-icon.marble-fx-wind      { background: #00E5FF !important; }
+body.promare-mode .select-icon.marble-fx-laser     { background: #00E5FF !important; }
+body.promare-mode .select-icon.marble-fx-lightning { background: #FFD600 !important; }
+body.promare-mode .select-icon.marble-fx-scatter   { background: #FFD600 !important; }
+body.promare-mode .select-icon.marble-fx-venom     { background: #FFD600 !important; }
+body.promare-mode .select-icon.marble-fx-pierce    { background: #FFFFFF !important; }
+body.promare-mode .select-icon.marble-fx-damage    { background: #FFFFFF !important; }
+body.promare-mode .select-icon.marble-fx-flying_sword { background: #FFFFFF !important; }
+body.promare-mode .select-icon.marble-fx-matryoshka { background: #FF0090 !important; }
+body.promare-mode .select-icon.marble-fx-rainbow   { background: #FFD600 !important; }
+body.promare-mode .select-icon.marble-fx-white     { background: #FFFFFF !important; }
+
+/* 高光层关闭（不要 shine） */
+body.promare-mode .select-icon-shine {
+    display: none !important;
+}
+
+/* emoji / 位图图标层 — 转灰度 + 高对比，统一视觉语言 */
+body.promare-mode .select-icon-emoji {
+    filter: grayscale(1) contrast(1.6) brightness(1.1) !important;
+}
+
+/* 卡牌文字：Inter Mono */
+body.promare-mode .select-card-name {
+    font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
+    font-weight: bold !important;
+    color: #FFFFFF !important;
+    letter-spacing: 0.05em !important;
+    text-shadow: 1px 1px 0 #0a0a0a !important;
+}
+
+/* tag 小标签：黄色硬切 */
+body.promare-mode .select-card-tag {
+    background: #0a0a0a !important;
+    color: #FFD600 !important;
+    border: 1px solid #FFD600 !important;
+    border-radius: 0 !important;
+    font-family: 'Inter Mono', monospace !important;
+    box-shadow: none !important;
+}
+
 /* ==================== 故障艺术：色差通道偏移（pyro/lightning 击杀触发）==================== */
 /* promare_explosion.js 在 enemy:killed 时给 body 加 .promare-chromatic class
    持续 ~150ms 后移除。filter 用 drop-shadow 模拟 RGB 三通道分离。
