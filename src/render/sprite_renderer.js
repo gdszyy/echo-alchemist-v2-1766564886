@@ -237,37 +237,24 @@ export class SpriteRenderer {
 import { ENEMY_V2_METADATA, ENEMY_V2_BY_ARCHETYPE } from '../data/enemy_v2_metadata.js';
 import { resolveEnemyVisualAsset, loadEnemyVisualAssetManifest } from '../data/enemy_visual_assets.js';
 
-const SPRITE_REGISTRY = {
-    'golem_normal': 'assets/sprites/enemies/golem_normal.png',
-    'golem_elite':  'assets/sprites/enemies/golem_elite.png',
-    // V2 基底敵人 Sprite（占位资源，命名/manifest 与正式资源一致）
-    ...ENEMY_V2_METADATA.reduce((acc, m) => {
-        acc[m.resourceId] = m.spritePath;
-        return acc;
-    }, {}),
-    // Boss Sprite（Phase C 完成后逐步填充）
-    'boss_ignis':     'assets/sprites/bosses/boss_ignis.png',
-    'boss_glacies':   'assets/sprites/bosses/boss_glacies.png',
-    'boss_mikro':     'assets/sprites/bosses/boss_mikro.png',
-    'boss_devourer':  'assets/sprites/bosses/boss_devourer.png',
-    'boss_viridis':   'assets/sprites/bosses/boss_viridis.png',
-    'boss_tesla':     'assets/sprites/bosses/boss_tesla.png',
-    'boss_chimera':   'assets/sprites/bosses/boss_chimera.png',
-    'boss_ouroboros': 'assets/sprites/bosses/boss_ouroboros.png',
-};
+// [3D-Main 清理] 敌人/Boss 的 PNG sprite 全部已在 M6 删除（M3 EnemyMeshPool 程序化几何接管）。
+// 注册表清空 → preloadAllSprites 不再触发加载 → 无 console 404。
+// SpriteRenderer 内部 fail 路径不变；createSpriteRenderer 直接返回 null，让所有调用方
+// 通过现有 fallback 路径走矢量绘制（2D 路径仍在跑作为安全网）。
+const SPRITE_REGISTRY = {};
 
-/** 预加载的 SpriteRenderer 实例池 */
+/** 预加载的 SpriteRenderer 实例池（保留导出形状，但永远为空） */
 const _spritePool = new Map();
 
 /**
  * 预加载所有已注册的 Sprite Sheet
- * 在游戏初始化时调用一次
+ * 在游戏初始化时调用一次（M6 后空注册表 → no-op）
  */
 export function preloadAllSprites() {
+    // 注册表已空，循环无副作用；保留方法签名向后兼容现有调用方
     for (const [key, path] of Object.entries(SPRITE_REGISTRY)) {
-        _spritePool.set(key, SpriteRenderer.preload(path));
+        if (path) _spritePool.set(key, SpriteRenderer.preload(path));
     }
-    console.log(`[SpriteRenderer] 预加载 ${_spritePool.size} 个 Sprite Sheet`);
 }
 
 /**
@@ -289,68 +276,10 @@ export function preloadAllSprites() {
  * @returns {SpriteRenderer|null}
  */
 export function createSpriteRenderer(enemyTypeOrEnemy, bossType, baseArchetype) {
-    // 归一化参数
-    let enemyInfo;
-    if (enemyTypeOrEnemy && typeof enemyTypeOrEnemy === 'object') {
-        enemyInfo = {
-            type: enemyTypeOrEnemy.type,
-            bossType: enemyTypeOrEnemy.bossType,
-            baseArchetype: enemyTypeOrEnemy.baseArchetype,
-            gridCols: enemyTypeOrEnemy.gridCols,
-            gridRows: enemyTypeOrEnemy.gridRows,
-            affixes: enemyTypeOrEnemy.affixes,
-        };
-    } else {
-        enemyInfo = {
-            type: enemyTypeOrEnemy,
-            bossType,
-            baseArchetype,
-            gridCols: 1,
-            gridRows: 1,
-            affixes: [],
-        };
-    }
-
-    // 0) 资源协议解析（baseArchetype + footprint + affixSet → composite 资源）
-    // 对所有非 Boss 敌人（含 1×1 residue）都走 manifest 解析，命中再使用，
-    // 未命中再回到下面的 V2 metadata / golem 兜底。
-    if (enemyInfo.type !== 'boss') {
-        const resolved = resolveEnemyVisualAsset(enemyInfo);
-        if (resolved && resolved.spritePath && (resolved.fallbackLevel === 'composite' || resolved.fallbackLevel === 'archetype')) {
-            return new SpriteRenderer(resolved.spritePath, resolved.manifestPath || undefined);
-        }
-    }
-
-    let key = null;
-
-    // 1) V2 基底优先（普通/精英共用同一组资源）
-    if (enemyInfo.baseArchetype && ENEMY_V2_BY_ARCHETYPE[enemyInfo.baseArchetype]) {
-        key = ENEMY_V2_BY_ARCHETYPE[enemyInfo.baseArchetype].resourceId;
-    } else if (enemyInfo.type === 'boss' && enemyInfo.bossType) {
-        key = `boss_${enemyInfo.bossType}`;
-    } else if (enemyInfo.type === 'elite') {
-        key = 'golem_elite';
-    } else if (enemyInfo.type === 'normal') {
-        key = 'golem_normal';
-    }
-
-    if (!key) return null;
-
-    const path = SPRITE_REGISTRY[key];
-    if (!path) {
-        // V2 基底配置但资源缺失 → 安全回退到 golem_elite，保证敌人可见
-        if (enemyInfo.type === 'elite' || enemyInfo.baseArchetype) {
-            return new SpriteRenderer(SPRITE_REGISTRY['golem_elite']);
-        }
-        return new SpriteRenderer(SPRITE_REGISTRY['golem_normal']);
-    }
-
-    // 如果预加载池中已有，返回共享实例的克隆（每个实体需要独立的动画状态）
-    const pooled = _spritePool.get(key);
-    if (pooled && pooled.ready) {
-        return new SpriteRenderer(path);
-    }
-    return new SpriteRenderer(path);
+    // [3D-Main 清理] 敌人 sprite 已废弃（M3 EnemyMeshPool 接管）。
+    // 直接返回 null → 调用方（entities/enemy.js）通过 _spriteRenderer.ready 检查
+    // 走矢量 fallback。零 console 404。
+    return null;
 }
 
 // manifest 启动时尝试预加载（异步、不阻塞）
