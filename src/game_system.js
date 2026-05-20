@@ -80,6 +80,20 @@ export const game_system = {
         this._lastFrameTime = _now;
         // ==================== [自适应性能] END ====================
 
+        // ==================== [3D-Main M1] 3D 背景层渲染 ====================
+        // 即便暂停（isPaused）也持续渲染 3D 背景，保持氛围"活着"的呼吸感。
+        // 失败回退已在 Renderer3D 构造阶段处理（this.renderer3d 可能为 null）。
+        if (this.renderer3d) {
+            try {
+                this.renderer3d.render(_now);
+            } catch (err) {
+                // 渲染期出错（如 shader 编译延迟失败）→ 一次性禁用，避免循环报错刷屏
+                console.error('[Renderer3D] render error, disabling:', err);
+                try { this.renderer3d.dispose(); } catch (_) {}
+                this.renderer3d = null;
+            }
+        }
+
         // 暂停时跳过物理更新，但继续请求下一帧以保持 rAF 循环活跃
         if (this.isPaused) {
             requestAnimationFrame(() => this.sys_loop());
@@ -210,6 +224,13 @@ export const game_system = {
         if (!rect.width || !rect.height) return;
         this.width = this.canvas.width = Math.round(rect.width);
         this.height = this.canvas.height = Math.round(rect.height);
+
+        // [3D-Main M1] 同步 WebGL canvas 内部分辨率（CSS 尺寸由全局 canvas 规则控制）
+        if (this.renderer3d) {
+            try { this.renderer3d.resize(this.width, this.height); } catch (e) {
+                console.warn('[Renderer3D] resize error:', e);
+            }
+        }
 
         // 动态调整失败判定线
         // PC 模式下底部面板隐藏，可以缩小安全边距

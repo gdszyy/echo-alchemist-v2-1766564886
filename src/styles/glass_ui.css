@@ -1,0 +1,171 @@
+/* ============================================================
+ * glass_ui.css - 全息玻璃风格 HUD 覆盖层（M5）
+ *
+ * 启用方式：body 添加 class `.glass-ui-enabled`，比如：
+ *     document.body.classList.add('glass-ui-enabled');
+ *
+ * 默认关闭，零影响现有 bitmap_ui.css。启用后会用 backdrop-filter
+ * + 渐变边框替换 9-slice 位图边框，把整个 HUD 升级到"全息玻璃"。
+ * ============================================================ */
+
+body.glass-ui-enabled {
+    /* 公共变量：稀有度色 */
+    --glass-common:    rgba(226, 232, 240, 0.6);
+    --glass-rare:      rgba(129, 140, 248, 0.7);
+    --glass-epic:      rgba(217, 70, 239, 0.7);
+    --glass-legendary: rgba(245, 158, 11, 0.8);
+    --glass-cursed:    rgba(159, 18, 57, 0.7);
+    --glass-cyan:      rgba(56, 189, 248, 0.6);
+
+    --glass-bg-dark:   rgba(15, 23, 42, 0.55);
+    --glass-bg-deep:   rgba(2, 6, 23, 0.7);
+}
+
+/* ===== 顶部信息栏 ===== */
+body.glass-ui-enabled #unified-top-bar {
+    background: linear-gradient(180deg, var(--glass-bg-deep) 0%, var(--glass-bg-dark) 100%);
+    backdrop-filter: blur(14px) saturate(1.4);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    border-bottom: 1px solid var(--glass-cyan);
+    box-shadow:
+        0 0 24px rgba(56, 189, 248, 0.25),
+        inset 0 -1px 0 rgba(56, 189, 248, 0.2);
+}
+
+/* ===== 通用 .ui-overlay 面板（命运抉择/商店等弹层） ===== */
+body.glass-ui-enabled .ui-overlay {
+    background: radial-gradient(ellipse at center top, var(--glass-bg-dark) 0%, var(--glass-bg-deep) 80%);
+    backdrop-filter: blur(18px) saturate(1.4);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+}
+
+/* ===== 卡片：移除 9-slice 边框，用渐变 outline 替代 ===== */
+body.glass-ui-enabled .card,
+body.glass-ui-enabled .relic-card,
+body.glass-ui-enabled .runeword-card,
+body.glass-ui-enabled .skill-card {
+    background:
+        linear-gradient(180deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.92) 100%);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-image: none;       /* 干掉 bitmap_ui.css 的 border-image */
+    box-shadow:
+        0 0 32px rgba(15, 23, 42, 0.6),
+        inset 0 0 24px rgba(148, 163, 184, 0.05);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+body.glass-ui-enabled .card[data-rarity="common"],
+body.glass-ui-enabled .relic-card[data-rarity="common"] {
+    border-color: var(--glass-common);
+    box-shadow:
+        0 0 24px rgba(226, 232, 240, 0.20),
+        inset 0 0 18px rgba(226, 232, 240, 0.05);
+}
+body.glass-ui-enabled .card[data-rarity="rare"],
+body.glass-ui-enabled .relic-card[data-rarity="rare"] {
+    border-color: var(--glass-rare);
+    box-shadow:
+        0 0 28px rgba(129, 140, 248, 0.30),
+        inset 0 0 18px rgba(129, 140, 248, 0.08);
+}
+body.glass-ui-enabled .card[data-rarity="epic"],
+body.glass-ui-enabled .relic-card[data-rarity="epic"] {
+    border-color: var(--glass-epic);
+    box-shadow:
+        0 0 36px rgba(217, 70, 239, 0.40),
+        inset 0 0 22px rgba(217, 70, 239, 0.10);
+}
+body.glass-ui-enabled .card[data-rarity="legendary"],
+body.glass-ui-enabled .relic-card[data-rarity="legendary"] {
+    border-color: var(--glass-legendary);
+    box-shadow:
+        0 0 42px rgba(245, 158, 11, 0.50),
+        inset 0 0 28px rgba(245, 158, 11, 0.12);
+}
+body.glass-ui-enabled .card[data-rarity="cursed"],
+body.glass-ui-enabled .relic-card[data-rarity="cursed"] {
+    border-color: var(--glass-cursed);
+    box-shadow:
+        0 0 28px rgba(159, 18, 57, 0.35),
+        inset 0 0 18px rgba(159, 18, 57, 0.10);
+}
+
+body.glass-ui-enabled .card:hover,
+body.glass-ui-enabled .relic-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(56, 189, 248, 0.8);
+    box-shadow:
+        0 0 36px rgba(56, 189, 248, 0.45),
+        inset 0 0 24px rgba(56, 189, 248, 0.10);
+}
+
+/* ===== 按钮：玻璃 + 渐变 hover ===== */
+body.glass-ui-enabled button,
+body.glass-ui-enabled .btn {
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.85) 100%);
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    border-image: none;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow:
+        0 0 12px rgba(148, 163, 184, 0.2),
+        inset 0 0 12px rgba(148, 163, 184, 0.04);
+    color: #e2e8f0;
+    text-shadow: 0 0 8px rgba(148, 163, 184, 0.6);
+    transition: all 0.15s ease;
+}
+
+body.glass-ui-enabled button:hover,
+body.glass-ui-enabled .btn:hover {
+    border-color: rgba(56, 189, 248, 0.7);
+    box-shadow:
+        0 0 18px rgba(56, 189, 248, 0.4),
+        inset 0 0 18px rgba(56, 189, 248, 0.10);
+    color: #f1f5f9;
+    text-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+}
+
+/* ===== PC 三栏边栏背景 ===== */
+body.glass-ui-enabled #pc-left-sidebar,
+body.glass-ui-enabled #pc-right-sidebar {
+    background: linear-gradient(180deg, var(--glass-bg-deep) 0%, var(--glass-bg-dark) 100%);
+    backdrop-filter: blur(20px) saturate(1.5);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    border-color: rgba(56, 189, 248, 0.25);
+    box-shadow: inset 0 0 60px rgba(56, 189, 248, 0.04);
+}
+
+/* ===== 移动端底部抽屉 ===== */
+body.glass-ui-enabled .bottom-panel {
+    background: linear-gradient(0deg, var(--glass-bg-deep) 0%, var(--glass-bg-dark) 100%);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    border-top: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+/* ===== Tooltip / popover ===== */
+body.glass-ui-enabled .tooltip,
+body.glass-ui-enabled .popover {
+    background: rgba(2, 6, 23, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+}
+
+/* ===== 标题文字玻璃风 ===== */
+body.glass-ui-enabled #phase-title,
+body.glass-ui-enabled .phase-text {
+    text-shadow:
+        0 0 14px rgba(56, 189, 248, 0.6),
+        0 0 28px rgba(56, 189, 248, 0.3);
+    color: #f1f5f9;
+}
+
+/* ===== 数字滚动器（金币 / 符文碎片等） ===== */
+body.glass-ui-enabled .number-display,
+body.glass-ui-enabled .currency-amount {
+    text-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+}

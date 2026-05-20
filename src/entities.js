@@ -524,7 +524,8 @@ class GhostPeg {
      */
     constructor(x, y, type, level) {
         this.pos = new Vec2(x, y);
-        this.radius = 6;
+        // [3D-Main M2] 与 Peg.radius 同步：6 → 8
+        this.radius = 8;
         this.type = type;
         this.level = level || 1;
         this.life = 180;       // 存活 180 帧（约 3 秒）
@@ -814,8 +815,9 @@ class TriangleSideWheel {
 
 class Peg {
     constructor(x, y, type = 'normal') {
-        this.pos = new Vec2(x, y); 
-        this.radius = 6; 
+        this.pos = new Vec2(x, y);
+        // [3D-Main M2] 6 → 8，配合视觉钉子变大；MIN_PEG_SPACING 同步更新
+        this.radius = 8;
         this.type = type; 
         this.lit = false; 
         this.litTimer = 0; 
@@ -2426,7 +2428,7 @@ class DropBall {
                     if (_segLenSq > 0) {
                         _t = ((this.pos.x - slot.x) * _sx + (this.pos.y - slot.y) * _sy) / _segLenSq;
                         // 钉子半径 / 线段长度 = 端点排除区间宽度
-                        const _pegR = 6; // Peg.radius
+                        const _pegR = 8; // Peg.radius (3D-Main M2: 6 → 8)
                         const _segLen = Math.sqrt(_segLenSq);
                         const _tMargin = _pegR / _segLen;
                         // 只有投影落在两端钉子之间的内部区间时才触发
