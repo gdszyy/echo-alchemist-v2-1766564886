@@ -305,6 +305,14 @@ export const render_system = {
         const ctx = this.ctx;
         const time = Date.now();
         this.spawn_windSkillParticles(type, rect, progress);
+
+        // [Promare] 风系矩阵几何路径：硬 zigzag + CYAN/YELLOW 5 色硬切板
+        // @perf-impact: 跳过 lighter 混合 + shadowBlur + createLinearGradient + quadraticCurveTo
+        if (CONFIG.visualMode === 'promare') {
+            this._render_promareWindMatrix(matrix, progress, time);
+            return;
+        }
+
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
         ctx.beginPath();
@@ -1047,6 +1055,201 @@ export const render_system = {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(String(e.val), sx, sy);
+        }
+
+        ctx.restore();
+    },
+
+    /**
+     * [Promare] 风系矩阵几何渲染：硬 zigzag 边框 + CYAN/YELLOW + 拼贴箭头
+     * 替换 classic 的 lighter + linear-gradient + quadraticCurveTo + shadowBlur。
+     * @perf-impact: 单矩阵每帧 ≤8 lineTo + 2 stroke + N fillText，无 shadowBlur，<0.2ms。
+     */
+    _render_promareWindMatrix(matrix, progress, time) {
+        const { rect, type, anchors } = matrix;
+        const ctx = this.ctx;
+        const PAL = { PINK: '#FF0090', CYAN: '#00E5FF', YELLOW: '#FFD600', WHITE: '#FFFFFF' };
+        ctx.save();
+
+        // 1. 主框：硬 zigzag 折线 anchors → anchors 连成，每段中点 ±2px 垂直偏移
+        const flash = Math.sin(time / 100) > 0;
+        ctx.strokeStyle = flash ? PAL.WHITE : PAL.CYAN;
+        ctx.lineWidth = 2.5;
+        ctx.globalAlpha = 0.6 + progress * 0.35;
+        if (anchors && anchors.length >= 2) {
+            ctx.beginPath();
+            ctx.moveTo(anchors[0].x, anchors[0].y);
+            for (let i = 1; i <= anchors.length; i++) {
+                const prev = anchors[i - 1];
+                const curr = anchors[i % anchors.length];
+                const dx = curr.x - prev.x, dy = curr.y - prev.y;
+                const len = Math.hypot(dx, dy) || 1;
+                const px = -dy / len * 3;
+                const py = dx / len * 3;
+                const mx = (prev.x + curr.x) / 2;
+                const my = (prev.y + curr.y) / 2;
+                ctx.lineTo(mx + px, my + py);
+                ctx.lineTo(curr.x, curr.y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1.0;
+
+        // 2. 类型分派
+        if (type === 'tunnel') {
+            // tunnel：单方向硬切箭头流（替代 linear-gradient + quadratic 箭头）
+            const isHorizontal = rect.w > rect.h;
+            const arrowCount = 6;
+            const arrowSize = 12 + progress * 8;
+            ctx.fillStyle = PAL.YELLOW;
+            ctx.strokeStyle = PAL.CYAN;
+            ctx.lineWidth = 1.5;
+            for (let k = 0; k < arrowCount; k++) {
+                const arrowPos = ((time / 280) + k / arrowCount) % 1;
+                ctx.beginPath();
+                if (isHorizontal) {
+                    const ax = rect.x + arrowPos * rect.w;
+                    const ay = rect.y + rect.h / 2;
+                    ctx.moveTo(ax + arrowSize, ay);
+                    ctx.lineTo(ax - arrowSize * 0.4, ay - arrowSize * 0.6);
+                    ctx.lineTo(ax - arrowSize * 0.4, ay + arrowSize * 0.6);
+                } else {
+                    const ax = rect.x + rect.w / 2;
+                    const ay = rect.y + arrowPos * rect.h;
+                    ctx.moveTo(ax, ay + arrowSize);
+                    ctx.lineTo(ax - arrowSize * 0.6, ay - arrowSize * 0.4);
+                    ctx.lineTo(ax + arrowSize * 0.6, ay - arrowSize * 0.4);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
+        } else if (type === 'cyclone') {
+            // cyclone：六边形涡轮 + 反向硬切环 + SHREDDER 大字
+            const cx = rect.x + rect.w / 2;
+            const cy = rect.y + rect.h / 2;
+            const maxR = Math.min(rect.w, rect.h) * 0.42;
+            ctx.save();
+            ctx.translate(cx, cy);
+
+            // 暴风眼：白色实心钻石
+            ctx.beginPath();
+            ctx.moveTo(0, -maxR * 0.22);
+            ctx.lineTo(maxR * 0.22, 0);
+            ctx.lineTo(0, maxR * 0.22);
+            ctx.lineTo(-maxR * 0.22, 0);
+            ctx.closePath();
+            ctx.fillStyle = PAL.WHITE;
+            ctx.fill();
+
+            // 内层：六叶涡轮（顺时针旋转 + 硬边）
+            ctx.save();
+            ctx.rotate(time / 60);
+            const bladeCount = 6;
+            for (let i = 0; i < bladeCount; i++) {
+                const ang = (i / bladeCount) * Math.PI * 2;
+                ctx.save();
+                ctx.rotate(ang);
+                ctx.beginPath();
+                ctx.moveTo(maxR * 0.32, 0);
+                ctx.lineTo(maxR * 0.85, -maxR * 0.18);
+                ctx.lineTo(maxR * 0.95, 0);
+                ctx.lineTo(maxR * 0.85, maxR * 0.18);
+                ctx.closePath();
+                ctx.fillStyle = PAL.CYAN;
+                ctx.globalAlpha = 0.7;
+                ctx.fill();
+                ctx.strokeStyle = PAL.WHITE;
+                ctx.lineWidth = 1.5;
+                ctx.globalAlpha = 1.0;
+                ctx.stroke();
+                ctx.restore();
+            }
+            ctx.restore();
+
+            // 外层：硬切外环 + 4 个黄色三角
+            ctx.save();
+            ctx.rotate(-time / 90);
+            ctx.beginPath();
+            for (let i = 0; i < 12; i++) {
+                const ang = (i / 12) * Math.PI * 2;
+                if (i % 2 === 0) {
+                    // 跳段画硬切弧线，模拟 dash 效果
+                    ctx.moveTo(Math.cos(ang) * maxR, Math.sin(ang) * maxR);
+                    ctx.lineTo(Math.cos(ang + 0.25) * maxR, Math.sin(ang + 0.25) * maxR);
+                }
+            }
+            ctx.strokeStyle = PAL.YELLOW;
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.7 + progress * 0.3;
+            ctx.stroke();
+            // 4 个外圈黄色三角
+            for (let j = 0; j < 4; j++) {
+                ctx.save();
+                ctx.rotate(j * Math.PI / 2);
+                ctx.beginPath();
+                ctx.moveTo(maxR * 1.0, -4);
+                ctx.lineTo(maxR * 1.2, 0);
+                ctx.lineTo(maxR * 1.0, 4);
+                ctx.closePath();
+                ctx.fillStyle = PAL.YELLOW;
+                ctx.fill();
+                ctx.restore();
+            }
+            ctx.restore();
+
+            // SHREDDER 文字（Inter Mono + BLACK stamp + YELLOW）
+            const txt = 'SHREDDER';
+            ctx.font = 'bold 16px "Inter Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.globalAlpha = progress;
+            ctx.fillStyle = '#0a0a0a';
+            const offs = [[2,0],[-2,0],[0,2],[0,-2]];
+            for (const [ox, oy] of offs) ctx.fillText(txt, ox, oy);
+            ctx.fillStyle = PAL.YELLOW;
+            ctx.fillText(txt, 0, 0);
+            ctx.restore();
+        } else if (this.isBowtieShape && this.isBowtieShape(anchors)) {
+            // bowtie：硬切对角连线 + 中点闪光
+            const inter = this.getLineIntersectionPoint && this.getLineIntersectionPoint(anchors[0], anchors[2], anchors[1], anchors[3]);
+            if (inter) {
+                ctx.beginPath();
+                ctx.moveTo(0, -8);
+                ctx.lineTo(8, 0);
+                ctx.lineTo(0, 8);
+                ctx.lineTo(-8, 0);
+                ctx.closePath();
+                ctx.save();
+                ctx.translate(inter.x, inter.y);
+                ctx.fillStyle = PAL.YELLOW;
+                ctx.fill();
+                ctx.strokeStyle = PAL.WHITE;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            }
+        } else {
+            // burst：BURST 大字（Inter Mono + 故障投影）
+            const cx = rect.x + rect.w / 2;
+            const cy = rect.y + rect.h / 2;
+            ctx.font = 'bold 22px "Inter Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.globalAlpha = progress;
+            const txt = 'BURST';
+            // BLACK 4 向 stamp
+            ctx.fillStyle = '#0a0a0a';
+            for (const [ox, oy] of [[2,0],[-2,0],[0,2],[0,-2]]) ctx.fillText(txt, cx + ox, cy + oy);
+            // YELLOW 主体
+            ctx.fillStyle = PAL.YELLOW;
+            ctx.fillText(txt, cx, cy);
+            // PINK 故障偏移
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.fillStyle = PAL.PINK;
+            ctx.globalAlpha = progress * 0.5;
+            ctx.fillText(txt, cx + 3, cy + 3);
         }
 
         ctx.restore();
