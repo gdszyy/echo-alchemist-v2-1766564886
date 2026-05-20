@@ -469,6 +469,162 @@ body.promare-mode .game-over-stat {
     color: #FFFFFF !important;
 }
 
+/* ==================== 真理之书 Truth Book ==================== */
+
+body.promare-mode #phase-truth-book {
+    background: rgba(10, 10, 10, 0.98) !important;
+    backdrop-filter: none !important;
+}
+
+/* 主标题 "真理之書 Liber Veritatis" */
+body.promare-mode #phase-truth-book h2 {
+    font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
+    color: #00E5FF !important;
+    letter-spacing: 6px !important;
+    text-shadow:
+        2px 0 0 #0a0a0a, -2px 0 0 #0a0a0a, 0 2px 0 #0a0a0a, 0 -2px 0 #0a0a0a,
+        3px 3px 0 #FF0090 !important;
+    filter: none !important;
+}
+
+body.promare-mode #phase-truth-book h2 span {
+    color: #FFD600 !important;
+    font-size: 0.6em !important;
+    letter-spacing: 2px !important;
+    text-shadow: 1px 1px 0 #0a0a0a !important;
+}
+
+/* 列表项 (敌人/属性 entries) */
+body.promare-mode #truth-enemy-list > div,
+body.promare-mode #truth-attr-list > div,
+body.promare-mode .truth-list-item {
+    background: #0a0a0a !important;
+    border: 1px solid #FFFFFF !important;
+    border-left: 3px solid #FF0090 !important;
+    border-radius: 0 !important;
+    color: #FFFFFF !important;
+    font-family: 'Inter Mono', monospace !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    transition: border-color 0.1s, transform 0.08s;
+}
+
+body.promare-mode #truth-enemy-list > div:hover,
+body.promare-mode #truth-attr-list > div:hover,
+body.promare-mode .truth-list-item:hover,
+body.promare-mode .truth-list-item.active {
+    border-left-color: #FFD600 !important;
+    border-color: #FFD600 !important;
+    transform: translateX(2px);
+}
+
+/* 详情面板 */
+body.promare-mode #truth-detail-panel {
+    background: #0a0a0a !important;
+    border: 2px solid #FFFFFF !important;
+    border-radius: 0 !important;
+    box-shadow: inset 3px 3px 0 #FF0090, inset -3px -3px 0 #00E5FF !important;
+    backdrop-filter: none !important;
+}
+
+body.promare-mode #truth-empty-state {
+    color: #FFD600 !important;
+    opacity: 0.5;
+}
+
+body.promare-mode #truth-empty-state span {
+    filter: grayscale(1) brightness(2);
+}
+
+body.promare-mode #truth-empty-state p {
+    font-family: 'Inter Mono', monospace !important;
+    color: #FFD600 !important;
+}
+
+/* 顶部标题区（图标 + 名字 + tags） */
+body.promare-mode #truth-content > div:first-child {
+    background: #0a0a0a !important;
+    border-bottom: 2px solid #FF0090 !important;
+    backdrop-filter: none !important;
+}
+
+body.promare-mode #truth-item-icon {
+    filter: grayscale(1) brightness(1.5) contrast(1.6) !important;
+    color: #FFFFFF !important;
+}
+
+/* 名字图标容器 — 强制菱形 */
+body.promare-mode #truth-content > div:first-child > div:first-child > div:first-child {
+    background: #0a0a0a !important;
+    border: 2px solid #00E5FF !important;
+    border-radius: 0 !important;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    box-shadow: none !important;
+}
+
+body.promare-mode #truth-item-name {
+    font-family: 'Inter Mono', monospace !important;
+    color: #FFFFFF !important;
+    letter-spacing: 3px !important;
+    text-shadow: 2px 2px 0 #FF0090 !important;
+}
+
+body.promare-mode #truth-item-tags > span {
+    background: #0a0a0a !important;
+    border: 1px solid #FFD600 !important;
+    color: #FFD600 !important;
+    border-radius: 0 !important;
+    font-family: 'Inter Mono', monospace !important;
+}
+
+body.promare-mode #truth-item-desc {
+    color: #FFFFFF !important;
+    font-family: 'Inter Mono', monospace !important;
+}
+
+/* 演示区 canvas 容器 + simulation matrix 标签 */
+body.promare-mode #truth-content .flex-1 {
+    background: #0a0a0a !important;
+}
+
+body.promare-mode #truth-content [class*="bg-cyan-950"],
+body.promare-mode #truth-content [class*="bg-slate-"] {
+    background: #0a0a0a !important;
+    border-left-color: #00E5FF !important;
+    color: #00E5FF !important;
+    border-radius: 0 !important;
+    backdrop-filter: none !important;
+}
+
+body.promare-mode #truth-sim-time {
+    color: #00E5FF !important;
+    font-family: 'Inter Mono', monospace !important;
+}
+
+body.promare-mode #truth-demo-log {
+    color: #FFFFFF !important;
+    font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
+    background: none !important;
+}
+
+/* 关闭按钮 */
+body.promare-mode #phase-truth-book button[onclick*="closeTruthBook"] {
+    background: #0a0a0a !important;
+    border: 2px solid #FF0090 !important;
+    color: #FF0090 !important;
+    border-radius: 0 !important;
+    clip-path: none !important;
+}
+
+/* 重置 demo 按钮 */
+body.promare-mode #phase-truth-book button[onclick*="resetDemo"] {
+    background: #0a0a0a !important;
+    border: 1px solid #00E5FF !important;
+    color: #00E5FF !important;
+    border-radius: 0 !important;
+    clip-path: none !important;
+}
+
 /* ==================== 文本：去衬线 + 取消 backdrop-blur ==================== */
 
 body.promare-mode h1, body.promare-mode h2, body.promare-mode h3,
