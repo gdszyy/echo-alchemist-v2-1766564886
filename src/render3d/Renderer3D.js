@@ -27,12 +27,18 @@ export class Renderer3D {
      * @param {number}            width     initial pixel width
      * @param {number}            height    initial pixel height
      */
-    constructor(canvas, width, height) {
+    constructor(canvas, width, height, opts = {}) {
         if (!canvas) throw new Error('[Renderer3D] canvas element required');
 
         this.canvas = canvas;
         this.width = Math.max(1, width | 0);
         this.height = Math.max(1, height | 0);
+        this.opts = opts;
+
+        // 后处理 baseline（与 PostFX 默认值保持一致）—— 用于合并 cameraController 瞬时增量
+        this._fxBaselineDistortion = 0.06;
+        this._fxBaselineChromatic  = 0.005;
+        this._fxBaselineBloom      = 0.85;
 
         this._initRenderer();
         this._initScene();
@@ -55,10 +61,21 @@ export class Renderer3D {
         this.postfx = null;
         try {
             this.postfx = new PostFX(this.renderer, this.scene, this.camera, this.width, this.height);
+            // 校准 baseline（避免与 PostFX 内部默认值不一致）
+            if (this.postfx.usingHDR) {
+                this._fxBaselineBloom = 0.85;
+            } else {
+                this._fxBaselineBloom = 0.70;
+            }
             console.info(`[Renderer3D] PostFX enabled (HDR=${this.postfx.usingHDR})`);
         } catch (err) {
             console.warn('[Renderer3D] PostFX init failed, falling back to direct render:', err);
             this.postfx = null;
+        }
+
+        // [3D-Main M4.5] 订阅 eventBus（若传入），把游戏事件转发到镜头
+        if (opts.eventBus && typeof opts.eventBus.on === 'function') {
+            this._bindEventBus(opts.eventBus);
         }
 
         // 帧计时（秒）
@@ -144,6 +161,18 @@ export class Renderer3D {
         if (this.proxy) this.proxy.update(dt, this._tElapsed);
         if (this.cameraController) this.cameraController.update(dt);
 
+        // [M4.5] 把镜头瞬时增量合并到后处理 uniform
+        if (this.postfx && this.cameraController) {
+            const fx = this.cameraController.getPostFXState();
+            this.postfx.setDistortion(
+                this._fxBaselineDistortion + fx.distortion,
+                this._fxBaselineChromatic  + fx.chromatic
+            );
+            this.postfx.setBloomStrength(this._fxBaselineBloom + fx.bloom);
+            // exposure 通过 renderer.toneMappingExposure 控制（OutputPass 读取）
+            this.renderer.toneMappingExposure = 1.0 + fx.exposure;
+        }
+
         if (this.postfx) {
             this.postfx.render(dt);
         } else {
@@ -154,10 +183,95 @@ export class Renderer3D {
         this.stats.lastDtMs = dt * 1000;
     }
 
+    /**
+     * [M4.5] 触发镜头事件。语义类型由 CameraController 内部处理。
+     * @param {string} type   'IMPACT' | 'KILLED' | 'HIT_PLAYER' | 'BOSS_INTRO' | 'PHASE_TRANS'
+     * @param {Object} [payload]
+     */
+    cameraEvent(type, payload = {}) {
+        if (!this.cameraController) return;
+        try {
+            switch (type) {
+                case 'IMPACT':
+                    this.cameraController.triggerImpact(
+                        payload.intensity ?? 1.0,
+                        payload.dirX ?? 0,
+                        payload.dirY ?? 0
+                    );
+                    break;
+                case 'KILLED':
+                    this.cameraController.triggerEnemyKilled(payload.intensity ?? 0.4);
+                    break;
+                case 'HIT_PLAYER':
+                    this.cameraController.triggerPlayerHit(payload.intensity ?? 1.0);
+                    break;
+                case 'BOSS_INTRO':
+                    this.cameraController.triggerBossIntro();
+                    break;
+                case 'PHASE_TRANS':
+                    this.cameraController.triggerPhaseTransition();
+                    break;
+                case 'AIM':
+                    this.cameraController.setAim(payload.x ?? 0, payload.y ?? 0);
+                    break;
+                default:
+                    // 未知类型不报错，便于上游平滑扩展
+                    break;
+            }
+        } catch (e) {
+            console.warn('[Renderer3D] cameraEvent error:', e);
+        }
+    }
+
+    /**
+     * [M4.5] 订阅 eventBus 把游戏事件转发到镜头。轻量，幂等。
+     * @private
+     */
+    _bindEventBus(bus) {
+        // 暴击 / 强击：使用 damage:dealt 事件，按 damage 量级映射强度
+        const onDamage = (data) => {
+            if (!data) return;
+            const dmg = data.damage || data.amount || 0;
+            if (dmg <= 0) return;
+            // 阈值：< 30 微震，30..120 中震，>= 120 大震
+            let intensity = 0.18;
+            if (dmg >= 120) intensity = 0.85;
+            else if (dmg >= 30) intensity = 0.42;
+            if (data.killed) intensity *= 1.4;
+            this.cameraEvent('IMPACT', { intensity });
+        };
+        const onKill = (data) => {
+            this.cameraEvent('KILLED', { intensity: 0.5 });
+        };
+        const onBossDefeated = () => {
+            this.cameraEvent('IMPACT', { intensity: 1.4 });
+        };
+        const onPhaseChange = (data) => {
+            this.cameraEvent('PHASE_TRANS', {});
+        };
+
+        bus.on('damage:dealt', onDamage);
+        bus.on('enemy:killed', onKill);
+        bus.on('boss:defeated', onBossDefeated);
+        bus.on('phase:change', onPhaseChange);
+
+        // 记录引用以便 dispose 时取消（如果 eventBus 提供 off）
+        this._busHandlers = { onDamage, onKill, onBossDefeated, onPhaseChange };
+        this._bus = bus;
+    }
+
     dispose() {
         try { if (this.postfx) this.postfx.dispose(); } catch (e) {}
         try { if (this.proxy) this.proxy.dispose(); } catch (e) {}
         try { if (this.background) this.background.dispose(); } catch (e) {}
+        try {
+            if (this._bus && this._busHandlers && typeof this._bus.off === 'function') {
+                this._bus.off('damage:dealt',  this._busHandlers.onDamage);
+                this._bus.off('enemy:killed',  this._busHandlers.onKill);
+                this._bus.off('boss:defeated', this._busHandlers.onBossDefeated);
+                this._bus.off('phase:change',  this._busHandlers.onPhaseChange);
+            }
+        } catch (e) {}
         try { this.renderer.dispose(); } catch (e) {}
         this.postfx = null;
         this.proxy = null;
@@ -166,5 +280,7 @@ export class Renderer3D {
         this.scene = null;
         this.camera = null;
         this.renderer = null;
+        this._bus = null;
+        this._busHandlers = null;
     }
 }

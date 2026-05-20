@@ -379,7 +379,11 @@ class Game {
                     console.warn('[Renderer3D] #gl-canvas not found, skipping 3D init');
                 } else {
                     // sys_resize() 已在上面跑过，this.width/this.height 已就绪
-                    this.renderer3d = new Renderer3D(glCanvas, this.width, this.height);
+                    this.renderer3d = new Renderer3D(glCanvas, this.width, this.height, {
+                        // [M4.5] 把 eventBus 注入到 3D 层，让 damage/kill/boss/phase 事件
+                        // 自动驱动相机震动 + 后处理 boost
+                        eventBus: this.eventBus,
+                    });
                     // 同步内部像素尺寸到 2D canvas
                     this.renderer3d.resize(this.canvas.width, this.canvas.height);
                     console.info(`[Renderer3D] initialized @ ${this.canvas.width}x${this.canvas.height}`);
