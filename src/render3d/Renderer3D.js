@@ -239,12 +239,60 @@ export class Renderer3D {
             else if (dmg >= 30) intensity = 0.42;
             if (data.killed) intensity *= 1.4;
             this.cameraEvent('IMPACT', { intensity });
+
+            // [M6] 击中处撒 spark 粒子；颜色按伤害属性取色（fallback 黄白）
+            const proxy = this.proxy;
+            if (proxy && proxy.spawnParticles) {
+                const hx = data.hitX ?? (data.enemy && data.enemy.pos && data.enemy.pos.x);
+                const hy = data.hitY ?? (data.enemy && data.enemy.pos && data.enemy.pos.y);
+                if (hx !== undefined && hy !== undefined) {
+                    const cnt = Math.round(6 + intensity * 28);
+                    proxy.spawnParticles({
+                        x: hx, y: hy,
+                        color: data.color || 0xfbbf24,
+                        mode: 'spark',
+                        count: cnt,
+                        size: 3 + intensity * 4,
+                        lifetime: 0.4 + intensity * 0.5,
+                        spread: 1.0 + intensity * 0.5,
+                        speed: 6 + intensity * 12,
+                    });
+                }
+            }
         };
         const onKill = (data) => {
             this.cameraEvent('KILLED', { intensity: 0.5 });
+            // [M6] 击杀位置撒 ember + shard 爆开
+            const proxy = this.proxy;
+            if (proxy && proxy.spawnParticles && data && data.enemy && data.enemy.pos) {
+                proxy.spawnParticles({
+                    x: data.enemy.pos.x, y: data.enemy.pos.y,
+                    color: 0xfb923c, mode: 'ember',
+                    count: 24, size: 5, lifetime: 0.9, spread: 1.6, speed: 14,
+                });
+                proxy.spawnParticles({
+                    x: data.enemy.pos.x, y: data.enemy.pos.y,
+                    color: 0xfde047, mode: 'shard',
+                    count: 12, size: 6, lifetime: 0.5, spread: 1.8, speed: 18,
+                });
+            }
         };
-        const onBossDefeated = () => {
+        const onBossDefeated = (data) => {
             this.cameraEvent('IMPACT', { intensity: 1.4 });
+            // [M6] Boss 击败：大规模 smoke + ember 爆开
+            const proxy = this.proxy;
+            if (proxy && proxy.spawnParticles && data && data.boss && data.boss.pos) {
+                proxy.spawnParticles({
+                    x: data.boss.pos.x, y: data.boss.pos.y,
+                    color: 0xf59e0b, mode: 'ember',
+                    count: 80, size: 7, lifetime: 1.3, spread: 2.0, speed: 22,
+                });
+                proxy.spawnParticles({
+                    x: data.boss.pos.x, y: data.boss.pos.y,
+                    color: 0x7f1d1d, mode: 'smoke',
+                    count: 40, size: 12, lifetime: 2.0, spread: 1.5, speed: 6,
+                });
+            }
         };
         const onPhaseChange = (data) => {
             this.cameraEvent('PHASE_TRANS', {});
