@@ -89,7 +89,8 @@ function _createBodyMaterial(tierHex, phase) {
 }
 
 // ============================================================
-// Affix 装饰：当前 M3 只做最常见的两种（shield / regen），其余 milestone 再补
+// Affix 装饰：每种词缀返回一个独立 Group + 自身的几何/材质引用
+// 用于 _syncAffixes 时按 set 同步增删
 // ============================================================
 function _createShieldDecor() {
     // 六边形蜂巢盾，半透明青蓝，悬浮在敌人正面
@@ -137,6 +138,124 @@ function _createRegenDecor() {
         grp.add(m);
     }
     grp.userData = { affix: 'regen', _material: mat, _geometry: geom };
+    return grp;
+}
+
+function _createHasteDecor() {
+    // 3 道向下的青色箭头/光波（脚下涌动）
+    const grp = new THREE.Group();
+    const geom = new THREE.ConeGeometry(0.18, 0.36, 4, 1);
+    const mat = new THREE.MeshBasicMaterial({
+        color: 0x22d3ee,
+        transparent: true,
+        opacity: 0.75,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+    });
+    for (let i = 0; i < 3; i++) {
+        const m = new THREE.Mesh(geom, mat);
+        // 倒置（尖端向下）+ 横向分布
+        m.rotation.z = Math.PI;
+        m.position.set(-0.30 + i * 0.30, -0.55, 0);
+        m.userData = { phase: i * 0.4 };
+        grp.add(m);
+    }
+    grp.userData = { affix: 'haste', _material: mat, _geometry: geom };
+    return grp;
+}
+
+function _createRageDecor() {
+    // 外圈红色冲突线（torus 旋转）
+    const geom = new THREE.TorusGeometry(0.62, 0.025, 6, 24);
+    const mat = new THREE.MeshBasicMaterial({
+        color: 0xef4444,
+        transparent: true,
+        opacity: 0.7,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+    });
+    const torus = new THREE.Mesh(geom, mat);
+    torus.rotation.x = Math.PI / 2.5;     // 斜挂
+    // 附加：4 个小红色"刺"（短 cone）等距分布在 torus 上
+    const spikeGeom = new THREE.ConeGeometry(0.07, 0.2, 3, 1);
+    const spikes = [];
+    for (let i = 0; i < 4; i++) {
+        const sp = new THREE.Mesh(spikeGeom, mat);
+        const a = (i / 4) * Math.PI * 2;
+        sp.position.set(Math.cos(a) * 0.62, Math.sin(a) * 0.62, 0);
+        sp.rotation.z = a - Math.PI / 2;
+        spikes.push(sp);
+    }
+    const grp = new THREE.Group();
+    grp.add(torus, ...spikes);
+    grp.userData = { affix: 'rage', _material: mat, _geometry: geom, _spikeGeom: spikeGeom };
+    return grp;
+}
+
+function _createHealDecor() {
+    // 柔和绿色 aura（在敌人正面悬浮）
+    const grp = new THREE.Group();
+    const geom = new THREE.PlaneGeometry(1.4, 1.4);
+    const mat = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        uniforms: {
+            uTime: { value: 0 },
+            uColor: { value: new THREE.Color(0x4ade80) },
+        },
+        vertexShader: `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            precision mediump float;
+            uniform float uTime;
+            uniform vec3 uColor;
+            varying vec2 vUv;
+            void main() {
+                vec2 c = vUv - 0.5;
+                float r = length(c) * 2.0;
+                // 同心环波
+                float ring = sin(r * 8.0 - uTime * 1.6);
+                float ringMask = smoothstep(0.7, 0.4, abs(ring));
+                float alpha = (1.0 - r) * (0.25 + ringMask * 0.55);
+                alpha *= smoothstep(1.0, 0.8, r);
+                gl_FragColor = vec4(uColor, alpha);
+            }
+        `,
+    });
+    const plane = new THREE.Mesh(geom, mat);
+    plane.position.set(0, 0, -0.05);   // 略向后，避免遮挡 affix shield
+    grp.add(plane);
+    grp.userData = { affix: 'heal', _material: mat, _geometry: geom };
+    return grp;
+}
+
+function _createDevourDecor() {
+    // 6 颗小紫色粒子绕外圈，update 中向内收（"吞噬"）
+    const grp = new THREE.Group();
+    const mat = new THREE.MeshBasicMaterial({
+        color: 0xc084fc,
+        transparent: true,
+        opacity: 0.85,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+    });
+    const geom = new THREE.SphereGeometry(0.06, 8, 6);
+    const COUNT = 6;
+    for (let i = 0; i < COUNT; i++) {
+        const m = new THREE.Mesh(geom, mat);
+        m.userData = {
+            angle: (i / COUNT) * Math.PI * 2,
+            phase: i * 0.5,
+        };
+        grp.add(m);
+    }
+    grp.userData = { affix: 'devour', _material: mat, _geometry: geom };
     return grp;
 }
 
@@ -249,6 +368,44 @@ export class EnemyMeshPool {
             if (entry.shieldGroup) {
                 entry.shieldGroup.rotation.z = t * 0.4;
             }
+            // haste 箭头脉动 + 向下平移循环
+            if (entry.hasteGroup) {
+                for (const arrow of entry.hasteGroup.children) {
+                    const ud = arrow.userData;
+                    const phase = (t * 1.8 + ud.phase) % 1.0;
+                    arrow.position.y = -0.55 - phase * 0.35;
+                    arrow.material.opacity = Math.max(0, 0.85 * (1.0 - phase));
+                }
+            }
+            // rage 缓慢自转 + hp 越低越亮
+            if (entry.rageGroup) {
+                entry.rageGroup.rotation.z = -t * 0.7;
+                entry.rageGroup.rotation.y = t * 0.35;
+            }
+            // heal 时间驱动 shader pulse（由 shader 内部处理 uTime）
+            if (entry.healGroup) {
+                const mat = entry.healGroup.userData._material;
+                if (mat && mat.uniforms) mat.uniforms.uTime.value = t;
+                // 整组缓慢呼吸
+                const breath = 1.0 + Math.sin(t * 1.2) * 0.04;
+                entry.healGroup.scale.set(breath, breath, 1);
+            }
+            // devour 粒子向内收缩 + 重新弹出
+            if (entry.devourGroup) {
+                for (const orb of entry.devourGroup.children) {
+                    const ud = orb.userData;
+                    ud.angle += dt * 2.2;
+                    // radius 在 [0.18, 0.55] 间脉动
+                    const cycle = (Math.sin(t * 1.5 + ud.phase) * 0.5 + 0.5);
+                    const r = 0.18 + cycle * 0.37;
+                    orb.position.set(
+                        Math.cos(ud.angle) * r,
+                        Math.sin(ud.angle) * r * 0.6,
+                        0
+                    );
+                    orb.material.opacity = 0.4 + cycle * 0.6;
+                }
+            }
         }
     }
 
@@ -287,32 +444,48 @@ export class EnemyMeshPool {
 
     _syncAffixes(entry, affixes) {
         const set = new Set(affixes);
+        // 别名映射（让游戏内多种命名都能命中同一种装饰）
+        const ALIAS = {
+            heavyArmor: 'shield',     // 重甲也用盾形
+            deflectionWard: 'shield', // 棱盾兽
+            healer: 'heal',           // 治愈类
+            clone: 'devour',          // 增殖：暂复用漩涡（M7 再做嵌套副本）
+            berserk: 'rage',          // 狂暴
+        };
+        for (const a of Array.from(set)) {
+            if (ALIAS[a]) set.add(ALIAS[a]);
+        }
+
+        // 帮助函数：开/关 affix mesh
+        const ensure = (key, currentField, createFn) => {
+            if (set.has(key)) {
+                if (!entry[currentField]) {
+                    entry[currentField] = createFn();
+                    entry.group.add(entry[currentField]);
+                }
+            } else if (entry[currentField]) {
+                entry.group.remove(entry[currentField]);
+                this._disposeAffix(entry[currentField]);
+                entry[currentField] = null;
+            }
+        };
 
         // shield
-        if (set.has('shield')) {
-            if (!entry.shieldGroup) {
-                entry.shieldGroup = _createShieldDecor();
-                // 摆在敌人正前方（+z）一点点
-                entry.shieldGroup.position.set(0, 0, 0.55);
-                entry.group.add(entry.shieldGroup);
-            }
-        } else if (entry.shieldGroup) {
-            entry.group.remove(entry.shieldGroup);
-            this._disposeShield(entry.shieldGroup);
-            entry.shieldGroup = null;
-        }
-
+        ensure('shield', 'shieldGroup', () => {
+            const g = _createShieldDecor();
+            g.position.set(0, 0, 0.55);
+            return g;
+        });
         // regen
-        if (set.has('regen')) {
-            if (!entry.regenGroup) {
-                entry.regenGroup = _createRegenDecor();
-                entry.group.add(entry.regenGroup);
-            }
-        } else if (entry.regenGroup) {
-            entry.group.remove(entry.regenGroup);
-            this._disposeRegen(entry.regenGroup);
-            entry.regenGroup = null;
-        }
+        ensure('regen', 'regenGroup', () => _createRegenDecor());
+        // haste
+        ensure('haste', 'hasteGroup', () => _createHasteDecor());
+        // rage
+        ensure('rage', 'rageGroup', () => _createRageDecor());
+        // heal
+        ensure('heal', 'healGroup', () => _createHealDecor());
+        // devour
+        ensure('devour', 'devourGroup', () => _createDevourDecor());
     }
 
     _disposeEntry(entry) {
@@ -320,22 +493,33 @@ export class EnemyMeshPool {
             entry.body.geometry.dispose();
             entry.body.material.dispose();
         } catch (e) {}
-        if (entry.shieldGroup) this._disposeShield(entry.shieldGroup);
-        if (entry.regenGroup) this._disposeRegen(entry.regenGroup);
+        const groups = [
+            entry.shieldGroup, entry.regenGroup, entry.hasteGroup,
+            entry.rageGroup, entry.healGroup, entry.devourGroup,
+        ];
+        for (const g of groups) if (g) this._disposeAffix(g);
     }
 
-    _disposeShield(grp) {
+    /**
+     * 通用 affix mesh dispose。从 userData 读取材质/几何引用。
+     */
+    _disposeAffix(grp) {
+        if (!grp) return;
         try {
-            for (const m of grp.children) m.geometry.dispose();
-            const mats = grp.userData._materials || [];
-            for (const m of mats) m.dispose();
-        } catch (e) {}
-    }
-
-    _disposeRegen(grp) {
-        try {
-            if (grp.userData._geometry) grp.userData._geometry.dispose();
-            if (grp.userData._material) grp.userData._material.dispose();
+            const ud = grp.userData || {};
+            if (ud._materials) {
+                for (const m of ud._materials) m.dispose();
+            } else if (ud._material) {
+                ud._material.dispose();
+            }
+            if (ud._geometry) ud._geometry.dispose();
+            if (ud._spikeGeom) ud._spikeGeom.dispose();
+            // 同时尝试 dispose 子 mesh 的 geometry（如果没在 userData 上）
+            for (const m of grp.children) {
+                if (m.geometry && m.geometry !== ud._geometry) {
+                    try { m.geometry.dispose(); } catch (e) {}
+                }
+            }
         } catch (e) {}
     }
 

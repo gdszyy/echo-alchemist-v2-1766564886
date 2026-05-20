@@ -20,6 +20,7 @@ import { CameraController } from './CameraController.js';
 import { CoordsMapper } from './coords.js';
 import { SceneProxy } from './SceneProxy.js';
 import { PostFX } from './PostFX.js';
+import { detectProfile, getProfileConfig } from './QualityProfile.js';
 
 export class Renderer3D {
     /**
@@ -41,6 +42,14 @@ export class Renderer3D {
         this._fxBaselineBloom      = 0.85;
 
         this._initRenderer();
+
+        // [M6.5] 自适应画质（auto / 或 localStorage 强制锁定）
+        this.profileName = detectProfile(this.renderer);
+        this.profile = getProfileConfig(this.profileName);
+        // pixelRatio cap：低端设备别用 ratio 2
+        const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+        this.renderer.setPixelRatio(Math.min(dpr, this.profile.pixelRatioCap));
+
         this._initScene();
         this._initCamera();
 
@@ -52,25 +61,39 @@ export class Renderer3D {
         this._initLayers();
 
         // SceneProxy：玩法 ↔ 3D 桥接（钉子 / 墙 / 后续敌人 / 子弹...）
-        this.proxy = new SceneProxy(this.scene, this.coords);
+        this.proxy = new SceneProxy(this.scene, this.coords, {
+            particleCapacity: this.profile.particleCapacity,
+        });
 
         this.cameraController = new CameraController(this.camera);
 
         // [3D-Main M4] 后处理管线：bloom / 畸变 / 颗粒 / 暗角 / ACES tonemap
-        // 失败时静默回退到直接 render（this.postfx = null）
+        // [M6.5] low profile 完全跳过 postFX，直接走 renderer.render
         this.postfx = null;
-        try {
-            this.postfx = new PostFX(this.renderer, this.scene, this.camera, this.width, this.height);
-            // 校准 baseline（避免与 PostFX 内部默认值不一致）
-            if (this.postfx.usingHDR) {
-                this._fxBaselineBloom = 0.85;
-            } else {
-                this._fxBaselineBloom = 0.70;
+        if (this.profile.postFX) {
+            try {
+                this.postfx = new PostFX(this.renderer, this.scene, this.camera, this.width, this.height, {
+                    hdr: this.profile.hdr,
+                });
+                // baseline bloom 跟随 profile
+                this._fxBaselineBloom = this.profile.bloomStrength;
+                // 如果 profile 关闭 lens 畸变，把基线设为 0
+                if (!this.profile.lensDistortion) {
+                    this._fxBaselineDistortion = 0;
+                    this._fxBaselineChromatic = 0;
+                    this.postfx.setDistortion(0, 0);
+                }
+                // 关 grain：把对应 uniform 强制清零
+                if (!this.profile.filmGrain && this.postfx.vignettePass) {
+                    this.postfx.vignettePass.uniforms.uGrainAmount.value = 0;
+                }
+                console.info(`[Renderer3D] PostFX enabled (profile=${this.profileName}, HDR=${this.postfx.usingHDR})`);
+            } catch (err) {
+                console.warn('[Renderer3D] PostFX init failed, falling back to direct render:', err);
+                this.postfx = null;
             }
-            console.info(`[Renderer3D] PostFX enabled (HDR=${this.postfx.usingHDR})`);
-        } catch (err) {
-            console.warn('[Renderer3D] PostFX init failed, falling back to direct render:', err);
-            this.postfx = null;
+        } else {
+            console.info(`[Renderer3D] PostFX skipped (profile=${this.profileName})`);
         }
 
         // [3D-Main M4.5] 订阅 eventBus（若传入），把游戏事件转发到镜头
