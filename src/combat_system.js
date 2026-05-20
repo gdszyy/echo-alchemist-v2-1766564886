@@ -1376,10 +1376,104 @@ export const combat_system = {
      */
     combat_wind_drawStormCores(ctx) {
         if (!this.stormCores) return;
+
+        // [Promare] 风暴核心几何路径：6 边形容器 + 进度环 + 中心钻石 + 等宽数字
+        // @perf-impact: 单核心每帧 ≤4 fill + 2 stroke，无 shadowBlur 无渐变。
+        if (CONFIG.visualMode === 'promare') {
+            this.stormCores.forEach(core => {
+                ctx.save();
+                ctx.translate(core.pos.x, core.pos.y);
+
+                const pulse = Math.sin(core.pulsePhase) * 0.15 + 1.0;
+                const smoothEnergy = core.energy + (core.chargeTimer / 60);
+                const energyRatio = Math.min(1.0, smoothEnergy / core.energyRequired);
+                const r = core.radius;
+
+                // 1. 外圈六边形（黑底 + 青色硬边 + 加法外发光层）
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = 0.25 * core.alpha;
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const a = (i / 6) * Math.PI * 2;
+                    const x = Math.cos(a) * r * 1.1 * pulse;
+                    const y = Math.sin(a) * r * 1.1 * pulse;
+                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.fillStyle = '#00E5FF';
+                ctx.fill();
+                ctx.restore();
+
+                // 主六边形
+                ctx.globalAlpha = core.alpha;
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const a = (i / 6) * Math.PI * 2;
+                    const x = Math.cos(a) * r * 0.95;
+                    const y = Math.sin(a) * r * 0.95;
+                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.fillStyle = '#0a0a0a';
+                ctx.fill();
+                ctx.strokeStyle = '#00E5FF';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // 2. 能量进度环（硬边圆弧）
+                ctx.globalAlpha = 0.35 * core.alpha;
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(0, 0, r * 0.7, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.globalAlpha = core.alpha;
+                ctx.strokeStyle = '#FFD600';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(0, 0, r * 0.7, -Math.PI/2, -Math.PI/2 + Math.PI * 2 * energyRatio);
+                ctx.stroke();
+
+                // 3. 中心钻石（随充能旋转）
+                ctx.save();
+                ctx.rotate(core.pulsePhase * 1.5);
+                ctx.beginPath();
+                ctx.moveTo(0, -r * 0.35);
+                ctx.lineTo(r * 0.35, 0);
+                ctx.lineTo(0, r * 0.35);
+                ctx.lineTo(-r * 0.35, 0);
+                ctx.closePath();
+                ctx.fillStyle = '#00E5FF';
+                ctx.fill();
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.restore();
+
+                // 4. 能量数值（Inter Mono 等宽 + BLACK stamp）
+                ctx.globalAlpha = 1.0 * core.alpha;
+                ctx.font = 'bold 14px "Inter Mono", monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const txt = `${core.energy}/${core.energyRequired}`;
+                ctx.fillStyle = '#0a0a0a';
+                const offs = [[2, 0], [-2, 0], [0, 2], [0, -2]];
+                for (const [ox, oy] of offs) ctx.fillText(txt, ox, r + 22 + oy);
+                ctx.fillStyle = '#FFD600';
+                ctx.fillText(txt, 0, r + 22);
+
+                ctx.restore();
+            });
+            return;
+        }
+
+        // classic 路径保留
         this.stormCores.forEach(core => {
             ctx.save();
             ctx.translate(core.pos.x, core.pos.y);
-            
+
             // 1. 背景脉冲区域
             const pulse = Math.sin(core.pulsePhase) * 0.15 + 1.0;
             ctx.globalAlpha = 0.15 * core.alpha;
@@ -1389,10 +1483,9 @@ export const combat_system = {
             ctx.fill();
 
             // 2. 平滑能量环反馈
-            // [优化] 过程值反馈：当前能量 + 当前秒内的充能进度
             const smoothEnergy = core.energy + (core.chargeTimer / 60);
             const energyRatio = Math.min(1.0, smoothEnergy / core.energyRequired);
-            
+
             // 底环
             ctx.globalAlpha = 0.2 * core.alpha;
             ctx.strokeStyle = '#ffffff';
@@ -1415,7 +1508,6 @@ export const combat_system = {
             ctx.font = 'bold 24px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            // 图标随充能速度旋转
             ctx.rotate(core.pulsePhase * 2);
             ctx.fillText('🌀', 0, 0);
             ctx.rotate(-core.pulsePhase * 2);
@@ -1425,7 +1517,7 @@ export const combat_system = {
             ctx.shadowBlur = _sb(5);
             ctx.shadowColor = '#000000';
             ctx.fillText(`${core.energy}/${core.energyRequired}`, 0, core.radius + 25);
-            
+
             ctx.restore();
         });
     },

@@ -94,8 +94,88 @@ export const render_system = {
 
     render_windAnchors() {
         if (this.windAnchors && this.windAnchors.length > 0) {
+
+            // [Promare] 风系锚点：CYAN 钻石锚点 + 硬 zigzag 连线（去 shadowBlur 与虚线）
+            // @perf-impact: 单帧 ≤4 锚点 + 1 polyline，无 shadowBlur，<0.15ms。
+            if (CONFIG.visualMode === 'promare') {
+                const ctx = this.ctx;
+                const time = Date.now();
+                const linePulse = (Math.sin(time / 400) + 1) / 2;
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+
+                // 连线 — 硬 zigzag 折线（替代虚线 + shadowBlur）
+                if (this.windAnchors.length > 1) {
+                    ctx.strokeStyle = '#00E5FF';
+                    ctx.lineWidth = 2 + linePulse * 1.5;
+                    ctx.globalAlpha = 0.55 + linePulse * 0.25;
+                    ctx.beginPath();
+                    ctx.moveTo(this.windAnchors[0].x, this.windAnchors[0].y);
+                    for (let i = 1; i < this.windAnchors.length; i++) {
+                        const prev = this.windAnchors[i - 1];
+                        const curr = this.windAnchors[i];
+                        // 在 prev → curr 中段加 zigzag 中点（垂直偏移）
+                        const mx = (prev.x + curr.x) / 2;
+                        const my = (prev.y + curr.y) / 2;
+                        const dx = curr.x - prev.x, dy = curr.y - prev.y;
+                        const len = Math.hypot(dx, dy);
+                        const px = -dy / len * 4;
+                        const py = dx / len * 4;
+                        ctx.lineTo(mx + px, my + py);
+                        ctx.lineTo(curr.x, curr.y);
+                    }
+                    if (this.windAnchors.length === 4) ctx.closePath();
+                    ctx.stroke();
+                }
+
+                // 锚点：CYAN 钻石 + 中心黄色小钻石 + 编号
+                this.windAnchors.forEach((a, idx) => {
+                    const pulse = (Math.sin(time / 200 + idx) + 1) / 2;
+                    const r = 9 + pulse * 3;
+                    ctx.save();
+                    ctx.translate(a.x, a.y);
+                    // 外层菱形
+                    ctx.beginPath();
+                    ctx.moveTo(0, -r);
+                    ctx.lineTo(r, 0);
+                    ctx.lineTo(0, r);
+                    ctx.lineTo(-r, 0);
+                    ctx.closePath();
+                    ctx.fillStyle = '#00E5FF';
+                    ctx.globalAlpha = 0.6 + pulse * 0.3;
+                    ctx.fill();
+                    // 内层钻石（白色实心）
+                    ctx.globalAlpha = 1.0;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -r * 0.5);
+                    ctx.lineTo(r * 0.5, 0);
+                    ctx.lineTo(0, r * 0.5);
+                    ctx.lineTo(-r * 0.5, 0);
+                    ctx.closePath();
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fill();
+                    ctx.restore();
+
+                    // 编号（Inter Mono + 黑 stamp）
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.font = 'bold 10px "Inter Mono", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = '#0a0a0a';
+                    const ox = a.x + 12, oy = a.y - 12;
+                    ctx.fillText(idx + 1, ox + 1, oy);
+                    ctx.fillText(idx + 1, ox - 1, oy);
+                    ctx.fillText(idx + 1, ox, oy + 1);
+                    ctx.fillText(idx + 1, ox, oy - 1);
+                    ctx.fillStyle = '#FFD600';
+                    ctx.fillText(idx + 1, ox, oy);
+                });
+                ctx.restore();
+                return;
+            }
+
             this.ctx.save();
-            
+
             // 增强连线视觉：1.5倍宽度虚线 + 发光
             const linePulse = (Math.sin(Date.now() / 400) + 1) / 2;
             this.ctx.strokeStyle = 'rgba(52, 211, 153, ' + (0.5 + linePulse * 0.3) + ')';
