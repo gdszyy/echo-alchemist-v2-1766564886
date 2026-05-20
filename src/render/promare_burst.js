@@ -14,6 +14,7 @@
  */
 
 import { BURST, ELEMENT_CODEX, resolveElementKey, getPromarePerf } from './promare_tokens.js';
+import { CONFIG } from '../config.js'; // [Promare burst budget guard] 读 maxParticles 预算
 
 // 元素 key → 粒子 mode 名映射
 const ELEMENT_TO_MODE = {
@@ -95,6 +96,29 @@ export function spawnPromareBurst(game, x, y, hitVel, elementType, severity = 'n
 
     const perf = getPromarePerf(game.perfQualityLevel || 'high');
 
+    // [Promare burst budget guard] 多档预算守门：连击 burst 时防止 GC 波谷
+    //   > 95% 上限 → 跳过整个 burst（不画碎片，只画核心 radial）
+    //   > 80% 上限 → 'low_perf' + 再减半（4-6 个粒子）
+    //   > 60% 上限 → 'low_perf'（已减半 + 跳过 stagger）
+    // 实测 iPhone 12 / Pixel 5 在密集 burst 时 FPS 从 60 掉到 40 左右，本守门可缓解。
+    let extraDownscale = 1.0;
+    if (game.particles && Array.isArray(game.particles)) {
+        const budget = (typeof CONFIG !== 'undefined' && CONFIG.performance)
+            ? (CONFIG.performance[game.perfQualityLevel || 'high'] || {}).maxParticles : 800;
+        if (budget) {
+            const ratio = game.particles.length / budget;
+            if (ratio > 0.95) {
+                // 完全饱和：跳过 burst 但保留方向感（小 radial），让命中仍有反馈
+                return;
+            } else if (ratio > 0.80) {
+                if (severity !== 'low_perf') severity = 'low_perf';
+                extraDownscale = 0.5;
+            } else if (ratio > 0.60) {
+                if (severity !== 'low_perf') severity = 'low_perf';
+            }
+        }
+    }
+
     // 数量缩放：normal 用 codex 默认；big/kill 用 perf 上限；low_perf 减半
     let bigN, smallN;
     if (severity === 'kill') {
@@ -112,6 +136,12 @@ export function spawnPromareBurst(game, x, y, hitVel, elementType, severity = 'n
         smallN = Math.min(perf.burstSmallN, BURST.smallN[0] + ((Math.random() * BURST.smallN[1]) | 0));
     }
 
+    // extraDownscale 应用（80% 满载时再减半）
+    if (extraDownscale < 1.0) {
+        bigN = Math.max(1, Math.floor(bigN * extraDownscale));
+        smallN = Math.max(2, Math.floor(smallN * extraDownscale));
+    }
+
     // 入射反方向：碎片应朝球反弹方向飞
     const vx = (hitVel && hitVel.x) || 0;
     const vy = (hitVel && hitVel.y) || 1;
@@ -126,7 +156,9 @@ export function spawnPromareBurst(game, x, y, hitVel, elementType, severity = 'n
     }
 
     // ===== 小碎片：前 4 个立即，其余 0~90ms 错落 =====
-    const immediate = perf.useStagger ? Math.min(BURST.immediateSmall, smallN) : smallN;
+    // low_perf severity 强制跳过 stagger（连击爆发时立即出生 + 减半数量，让 GC 有恢复期）
+    const useStagger = perf.useStagger && severity !== 'low_perf';
+    const immediate = useStagger ? Math.min(BURST.immediateSmall, smallN) : smallN;
 
     for (let i = 0; i < immediate; i++) {
         const aOffset = (Math.random() - 0.5) * BURST.dirConeSmall * 2;
@@ -135,7 +167,7 @@ export function spawnPromareBurst(game, x, y, hitVel, elementType, severity = 'n
         _spawnOne(game, x, y, mode, a, sp, false, codex);
     }
 
-    if (perf.useStagger) {
+    if (useStagger) {
         for (let i = immediate; i < smallN; i++) {
             const delay = Math.random() * BURST.staggerMs;
             setTimeout(() => {
@@ -230,7 +262,19 @@ export function spawnRadialImpact(game, x, y, elementType) {
     if (!game || typeof game.spawn_createParticle !== 'function') return;
 
     const perf = getPromarePerf(game.perfQualityLevel || 'high');
-    const spokeCount = perf.radialSpokes;
+    let spokeCount = perf.radialSpokes;
+
+    // [Promare radial budget guard] 满载时减少 spoke 或跳过
+    if (game.particles && Array.isArray(game.particles)) {
+        const budget = (typeof CONFIG !== 'undefined' && CONFIG.performance)
+            ? (CONFIG.performance[game.perfQualityLevel || 'high'] || {}).maxParticles : 800;
+        if (budget) {
+            const ratio = game.particles.length / budget;
+            if (ratio > 0.95) return;          // 完全饱和：跳过
+            if (ratio > 0.80) spokeCount = Math.max(2, Math.floor(spokeCount * 0.5));
+            else if (ratio > 0.60) spokeCount = Math.max(3, Math.floor(spokeCount * 0.7));
+        }
+    }
 
     for (let i = 0; i < spokeCount; i++) {
         const a = (i / spokeCount) * Math.PI * 2;

@@ -54,9 +54,24 @@ export function spawnPromareKillExplosion(game, x, y, elementType, enemySize) {
     // 体积自适应：默认 32px，大型敌人 1.5×（最大 80）
     const baseR = Math.min(80, Math.max(28, ((enemySize && Math.max(enemySize.w || 0, enemySize.h || 0)) || 32) * 0.7));
 
+    // [Promare kill-explosion budget guard] 满载时降级或跳过
+    let downscale = 1.0;
+    if (game.particles && Array.isArray(game.particles)) {
+        const cfg = (typeof globalThis !== 'undefined' && globalThis.CONFIG && globalThis.CONFIG.performance)
+            ? globalThis.CONFIG.performance : null;
+        const budget = cfg ? (cfg[game.perfQualityLevel || 'high'] || {}).maxParticles : 800;
+        if (budget) {
+            const ratio = game.particles.length / budget;
+            if (ratio > 0.95) return;       // 跳过整个爆炸
+            if (ratio > 0.80) downscale = 0.4;
+            else if (ratio > 0.60) downscale = 0.7;
+        }
+    }
+
     // ===== 1. 中心三层切片堆叠 =====
     // 用 echo_ring 粒子充当切片（已实现 expand + alpha decay 行为）
-    for (let layer = 0; layer < 3; layer++) {
+    const layerCount = downscale < 0.6 ? 1 : (downscale < 1.0 ? 2 : 3);
+    for (let layer = 0; layer < layerCount; layer++) {
         const p = game.spawn_createParticle(x, y, palette[layer], 'echo_ring');
         if (p) {
             p.size = baseR * (1.0 + layer * 0.45);
@@ -69,7 +84,7 @@ export function spawnPromareKillExplosion(game, x, y, elementType, enemySize) {
 
     // ===== 2. 方形破裂 → 三角碎片群（叙事核心：燃烧者突破体制）=====
     // 6-12 个 damage_diamond 粒子但配色为 palette[0]，360° 放射（不走方向锥）
-    const fragmentCount = perf.burstSmallN >= 10 ? 12 : 6;
+    const fragmentCount = Math.max(3, Math.floor((perf.burstSmallN >= 10 ? 12 : 6) * downscale));
     for (let i = 0; i < fragmentCount; i++) {
         const a = (i / fragmentCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
         const sp = 3 + Math.random() * 4;
