@@ -57,8 +57,9 @@ export class WallMesh {
 
                 void main() {
                     // 朝玩家方向的面给一个 fresnel 边缘
+                    // [3D-Main M2 fix] 指数 1.8 → 3.5，让发光更紧贴边缘，避免蔓延到画布内部覆盖钉子
                     vec3 viewDir = normalize(cameraPosition - vWorldPos);
-                    float fres = pow(1.0 - max(0.0, dot(vNormal, viewDir)), 1.8);
+                    float fres = pow(1.0 - max(0.0, dot(vNormal, viewDir)), 3.5);
 
                     // 垂直流光（沿 v 轴推动）
                     float scroll = fract(vUv.y * 2.0 - uTime * 0.18);
@@ -70,13 +71,13 @@ export class WallMesh {
                     // 基底色（很暗）
                     vec3 col = uColorBase * 0.4;
                     // 边缘 fresnel
-                    col += uColorGlow * fres * 0.85;
+                    col += uColorGlow * fres * 0.9;
                     // 流光条纹
-                    col += uColorGlow * band * 0.75;
+                    col += uColorGlow * band * 0.8;
 
-                    // 整体 alpha：边缘 + 条纹处更不透明，靠中心透
-                    float alpha = (0.18 + fres * 0.6 + band * 0.55) * edgeY;
-                    gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.95));
+                    // 整体 alpha：边缘 + 条纹处更不透明，中央更透；总体也下调让墙更"克制"
+                    float alpha = (0.12 + fres * 0.65 + band * 0.55) * edgeY;
+                    gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.92));
                 }
             `,
         });
@@ -97,24 +98,26 @@ export class WallMesh {
      * 根据当前 canvas 尺寸 + scale 重新摆放两堵墙。
      * @param {Object} coords  CoordsMapper
      * @param {Object} [opts]
-     * @param {number} [opts.thickness=2]   墙厚（world units）
-     * @param {number} [opts.depth=8]       墙深（往 -z 拉出，制造厚度立体感）
-     * @param {number} [opts.heightRatio=1] 墙高占画布高的比例（1=满高）
+     * @param {number} [opts.thickness=1.5]  墙厚（world units，沿 x 横向）
+     * @param {number} [opts.depth=3]        墙深（沿 z 前后；薄一点避免遮挡 z=0 钉子）
+     * @param {number} [opts.outset=1.0]     墙向画布外侧推出的距离（避免与 z=0 钉子视觉重叠）
+     * @param {number} [opts.heightRatio=1]  墙高占画布高的比例（1=满高）
      */
     resize(coords, opts = {}) {
-        const thickness = opts.thickness ?? 2;
-        const depth     = opts.depth     ?? 8;
+        const thickness   = opts.thickness   ?? 1.5;
+        const depth       = opts.depth       ?? 3;
+        const outset      = opts.outset      ?? 1.0;
         const heightRatio = opts.heightRatio ?? 1.0;
 
         const wWorld = coords.W * coords.scale;
         const hWorld = coords.H * coords.scale * heightRatio;
 
-        // 左墙：x = -W/2 - thickness/2（紧贴画布左缘外侧）
+        // 左墙：x = -W/2 - outset - thickness/2（推到画布外缘外侧 outset 单位）
         this.left.scale.set(thickness, hWorld, depth);
-        this.left.position.set(-wWorld * 0.5 - thickness * 0.5, 0, 0);
+        this.left.position.set(-wWorld * 0.5 - outset - thickness * 0.5, 0, 0);
 
         this.right.scale.set(thickness, hWorld, depth);
-        this.right.position.set(wWorld * 0.5 + thickness * 0.5, 0, 0);
+        this.right.position.set(wWorld * 0.5 + outset + thickness * 0.5, 0, 0);
 
         this._configured = true;
     }
