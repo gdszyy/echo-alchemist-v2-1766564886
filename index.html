@@ -170,16 +170,13 @@
              * 即可看到下层 3D 背景（同步降低 2D 不透明度到 0.3）。
              */
         }
-        /* [3D-Main] 默认 3D 模式（body.render3d-debug）：
+        /* [3D-Main] 纯 3D 模式（body.render3d-debug）：
          *   1. render_clearCanvas 跳过 2D 背景填充 → 3D 全息场景完整可见
          *   2. render_background 跳过 2D 网格
-         *   3. 2D canvas 整体压到 50% → 2D entities（与 3D 版本同位置）变成柔光辅助层
-         *      未来如要"纯 3D"完全去掉 2D entities，需要在 phase_*_update 里加 skip 检查
-         * 关掉 3D 模式时移除该 class，所有 2D 行为恢复原状。 */
-        body.render3d-debug #gameCanvas {
-            opacity: 0.55;
-            transition: opacity 0.25s ease;
-        }
+         *   3. sys_loop 在 phase update 跑完后整块 clearRect 2D canvas → entities 完全消失
+         *   4. 然后 floating texts / wind anchors / perf overlay 在干净 canvas 上重新绘制
+         * 切回 2D 模式时移除该 class，2D 行为恢复原状。
+         * 不需要降低 #gameCanvas 不透明度——透明区域天然让 3D 完整透出。 */
 
         @keyframes shake-hard {
             0% { transform: translate(0, 0); }

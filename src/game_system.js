@@ -173,6 +173,19 @@ export const game_system = {
                 break;
         }
 
+        // [3D-Main] 纯 3D 模式：phase 跑完后把 2D canvas 上的 entity 绘制全部擦掉。
+        // 物理 update 已经执行完（粒子衰减、敌人移动等），只是把它们 .draw() 留下的像素清掉。
+        // 接下来的 floating texts / wind anchors / perf overlay / UI 在干净画布上重新绘制，
+        // 下层 WebGL 全息场景成为唯一可见的"世界视觉"。
+        // 切回 2D 模式（body 没有 render3d-debug class）时跳过此清屏，entities 正常显示。
+        if (typeof document !== 'undefined' && document.body && document.body.classList.contains('render3d-debug')) {
+            // ctx 已被外层 save + translate(shake)；clear 用 setTransform 重置避免被 shake 偏移
+            this.ctx.save();
+            this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+            this.ctx.clearRect(0, 0, this.width, this.height);
+            this.ctx.restore();
+        }
+
         // 6. 战场掉落物更新与渲染
         // [BUGFIX] fieldLootItems 已移入 phase_combat_update 的 LAYER 2（实体层）内渲染，
         // 原因：此处无阶段限制，会导致宝石在 selection 等非战斗阶段泄漏显示。
