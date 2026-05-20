@@ -124,6 +124,65 @@ export function spawnPromareKillExplosion(game, x, y, elementType, enemySize) {
     }
 }
 
+// ==================== 元素拟声词字典（Promare 拟声词视觉化技法）====================
+
+const ONOMATOPOEIA = {
+    pyro:         { text: 'BURN!',    color: '#FF0090' },
+    cryo:         { text: 'FREEZE!',  color: '#00E5FF' },
+    lightning:    { text: 'ZAP!',     color: '#FFD600' },
+    pierce:       { text: 'PIERCE!',  color: '#FFFFFF' },
+    bounce:       { text: 'BOUNCE!',  color: '#FF0090' },
+    scatter:      { text: 'SPLIT!',   color: '#FFD600' },
+    damage:       { text: 'CRIT!',    color: '#FFFFFF' },
+    wind:         { text: 'SLASH!',   color: '#00E5FF' },
+    laser:        { text: 'FLASH!',   color: '#FFFFFF' },
+    venom:        { text: 'POISON!',  color: '#FFD600' },
+    echo:         { text: 'ECHO!',    color: '#FF0090' },
+    flying_sword: { text: 'STRIKE!',  color: '#FFFFFF' },
+};
+
+/**
+ * 在击杀位置弹出 Promare 风格拟声词大字。
+ * Boss / Elite 字号更大，普通敌人字号小。
+ * 字由元素决定，颜色按 5 色家族路由。
+ *
+ * @param {Game} game
+ * @param {number} x
+ * @param {number} y
+ * @param {string} elementType
+ * @param {string} enemyType - 'normal' | 'elite' | 'boss'
+ */
+export function spawnPromareOnomatopoeia(game, x, y, elementType, enemyType) {
+    if (!game || typeof game.spawn_createFloatingText !== 'function') return;
+    const elemKey = resolveElementKey(elementType);
+    const word = ONOMATOPOEIA[elemKey] || ONOMATOPOEIA.damage;
+
+    // 字号阶梯：boss 64 / elite 44 / normal 28
+    let fontSize = 28;
+    if (enemyType === 'boss') fontSize = 64;
+    else if (enemyType === 'elite') fontSize = 44;
+
+    // FloatingText 已支持 promare 模式下的 Inter Mono + 4 偏移 stamp + 离散 scale snap
+    const ft = game.floatingTexts;
+    if (!ft) return;
+    // 先用现有 spawn 创建，再修改 vel 让大字停得更久（不要一下飘上去）
+    game.spawn_createFloatingText(x, y, word.text, word.color, fontSize);
+    const created = ft[ft.length - 1];
+    if (created) {
+        // Boss 拟声词：飘升更慢、寿命更长，停在屏幕中央更久让玩家看清
+        if (enemyType === 'boss') {
+            if (created.vel) { created.vel.x = 0; created.vel.y = -0.25; }
+            // life decay 0.02/帧 → 50 帧 = ~830ms。boss 拟声词应该停 1.5s 才消散。
+            // FloatingText.update 是 this.life -= 0.02 * timeScale，无法改 decay 系数，
+            // 但可以直接抬高 life 初值（FloatingText.draw 中 globalAlpha = max(0, life)）。
+            created.life = 1.8;
+        } else if (enemyType === 'elite') {
+            if (created.vel) { created.vel.x = 0; created.vel.y = -0.5; }
+            created.life = 1.3;
+        }
+    }
+}
+
 /**
  * 全屏色差通道偏移：通过 body 添加临时 class，CSS filter 处理。
  * 闪电主体本身不偏移（粒子绘制时已写死无偏移）。

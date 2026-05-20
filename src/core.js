@@ -27,7 +27,7 @@ import { UIManager, TrainingGround, TruthBook } from './systems.js';
 // 导入事件总线
 import { eventBus } from './event_bus.js';
 import { spawnPromareBurst, spawnRadialImpact, ensurePromareGlobals } from './render/promare_burst.js';
-import { spawnPromareKillExplosion } from './render/promare_explosion.js';
+import { spawnPromareKillExplosion, spawnPromareOnomatopoeia } from './render/promare_explosion.js';
 
 // 导入 SoundManager 类和音频代理
 import { SoundManager, audio, _setAudioInstance } from './audio.js';
@@ -477,6 +477,8 @@ class Game {
                     spawnPromareKillExplosion(this, eKill.pos.x, eKill.pos.y, elemType, {
                         w: eKill.width, h: eKill.height
                     });
+                    // 拟声词视觉化（Boss 64px 大字 / Elite 44 / 普通 28）
+                    spawnPromareOnomatopoeia(this, eKill.pos.x, eKill.pos.y - 8, elemType, eKill.type);
                 }
             }
 
