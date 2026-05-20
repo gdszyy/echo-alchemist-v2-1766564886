@@ -21,8 +21,10 @@ export class SceneProxy {
     /**
      * @param {THREE.Scene} scene
      * @param {CoordsMapper} coords
+     * @param {Object} [opts]
+     * @param {number} [opts.particleCapacity=4096]
      */
-    constructor(scene, coords) {
+    constructor(scene, coords, opts = {}) {
         this.scene = scene;
         this.coords = coords;
 
@@ -36,8 +38,10 @@ export class SceneProxy {
 
         this.enemies = new EnemyMeshPool(this.scene);
 
-        // [3D-Main M6] GPU 粒子池：4096 容量，单 draw call，按 type 分形态
-        this.particles = new GPUParticleSystem(this.scene, { capacity: 4096 });
+        // [3D-Main M6] GPU 粒子池：默认 4096，M6.5 由 QualityProfile 注入
+        this.particles = new GPUParticleSystem(this.scene, {
+            capacity: opts.particleCapacity ?? 4096,
+        });
 
         // 当前阶段，决定可见性。null 让首次 setPhase 一定触发刷新（避免初始 'meta' early-out）
         this._phase = null;
