@@ -625,6 +625,108 @@ body.promare-mode #phase-truth-book button[onclick*="resetDemo"] {
     clip-path: none !important;
 }
 
+/* ==================== Run Shop（局内小商店）==================== */
+/* run_shop.js 用 inline style 动态生成 DOM，必须用强 !important 覆盖 */
+
+body.promare-mode #run-shop-overlay {
+    background: rgba(10, 10, 10, 0.95) !important;
+    font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
+    color: #FFFFFF !important;
+}
+
+/* 主面板：移除圆角和紫色渐变，用 Promare 5 色硬切 */
+body.promare-mode #run-shop-overlay > div {
+    background: #0a0a0a !important;
+    border: 2px solid #FFFFFF !important;
+    border-radius: 0 !important;
+    box-shadow: inset 3px 3px 0 #FF0090, inset -3px -3px 0 #00E5FF, 0 0 0 3px #FFD600 !important;
+}
+
+/* 标题分割线 */
+body.promare-mode #run-shop-overlay > div > div:first-child {
+    border-bottom: 2px solid #FF0090 !important;
+}
+
+body.promare-mode #run-shop-overlay > div > div:first-child > div:first-child {
+    color: #FFD600 !important;
+    text-shadow: 2px 2px 0 #FF0090 !important;
+    letter-spacing: 4px !important;
+}
+
+/* 持有碎片 + 数字 */
+body.promare-mode #run-shop-overlay span {
+    color: #FFD600 !important;
+}
+
+/* 商品卡片 .run-shop-item — 覆盖紫色 rarity 边框 */
+body.promare-mode #run-shop-overlay .run-shop-item {
+    background: #0a0a0a !important;
+    border-radius: 0 !important;
+    box-shadow: inset 1px 1px 0 currentColor !important;
+    color: #FFFFFF !important;
+}
+
+/* 稀有度边框颜色映射到 5 色 — inline border-color 用 attribute style 覆盖 */
+body.promare-mode #run-shop-overlay .run-shop-item[style*="rgb(250, 204, 21)"],
+body.promare-mode #run-shop-overlay .run-shop-item[style*="#facc15"] {
+    border-color: #FFD600 !important;
+    color: #FFD600 !important;
+}
+body.promare-mode #run-shop-overlay .run-shop-item[style*="rgb(168, 85, 247)"],
+body.promare-mode #run-shop-overlay .run-shop-item[style*="#a855f7"] {
+    border-color: #FF0090 !important;
+    color: #FF0090 !important;
+}
+body.promare-mode #run-shop-overlay .run-shop-item[style*="rgb(59, 130, 246)"],
+body.promare-mode #run-shop-overlay .run-shop-item[style*="#3b82f6"] {
+    border-color: #00E5FF !important;
+    color: #00E5FF !important;
+}
+body.promare-mode #run-shop-overlay .run-shop-item[style*="rgb(148, 163, 184)"],
+body.promare-mode #run-shop-overlay .run-shop-item[style*="#94a3b8"] {
+    border-color: #FFFFFF !important;
+    color: #FFFFFF !important;
+}
+
+/* 商品 hover 反馈 */
+body.promare-mode #run-shop-overlay .run-shop-item:hover {
+    transform: translateY(-2px);
+    box-shadow: inset 1px 1px 0 currentColor, 0 0 0 1px #FFD600 !important;
+}
+
+/* 商品内文字回到白色 */
+body.promare-mode #run-shop-overlay .run-shop-item > div:nth-child(2),
+body.promare-mode #run-shop-overlay .run-shop-item > div:nth-child(3) {
+    color: #FFFFFF !important;
+}
+
+/* 按钮（刷新 / 离开）梯形切角 */
+body.promare-mode #run-shop-refresh-btn {
+    background: #0a0a0a !important;
+    border: 2px solid #00E5FF !important;
+    color: #00E5FF !important;
+    border-radius: 0 !important;
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+    font-family: 'Inter Mono', monospace !important;
+    font-weight: bold !important;
+}
+
+body.promare-mode #run-shop-close-btn {
+    background: #0a0a0a !important;
+    border: 2px solid #FF0090 !important;
+    color: #FFD600 !important;
+    border-radius: 0 !important;
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+    font-family: 'Inter Mono', monospace !important;
+    font-weight: bold !important;
+}
+
+body.promare-mode #run-shop-refresh-btn:hover,
+body.promare-mode #run-shop-close-btn:hover {
+    background: currentColor !important;
+    color: #0a0a0a !important;
+}
+
 /* ==================== 文本：去衬线 + 取消 backdrop-blur ==================== */
 
 body.promare-mode h1, body.promare-mode h2, body.promare-mode h3,
