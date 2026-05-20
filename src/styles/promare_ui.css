@@ -341,6 +341,134 @@ body.promare-mode .skip-btn {
     clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
 }
 
+/* ==================== Round Start Banner 改造 ==================== */
+/* 原版用 Cinzel 衬线字 + 金色渐变文字 + shadowBlur 光晕。
+   Promare 版用 Inter Mono + YELLOW 主体 + BLACK 4-direction stamp 阴影
+   + PINK/CYAN 顶下硬切框。 */
+
+body.promare-mode #round-start-banner {
+    background: rgba(10, 10, 10, 0.7) !important;
+}
+
+body.promare-mode #round-start-banner-text {
+    font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
+    font-weight: 900 !important;
+    color: #FFD600 !important;
+    letter-spacing: 8px !important;
+    background: #0a0a0a !important;
+    -webkit-background-clip: initial !important;
+    -webkit-text-fill-color: #FFD600 !important;
+    /* 4-direction BLACK stamp + 外发光替代 */
+    text-shadow:
+        3px 0 0 #0a0a0a,
+        -3px 0 0 #0a0a0a,
+        0 3px 0 #0a0a0a,
+        0 -3px 0 #0a0a0a,
+        4px 4px 0 #FF0090,
+        -4px -4px 0 #00E5FF !important;
+    padding: 16px 32px !important;
+    border-top: 3px solid #FF0090;
+    border-bottom: 3px solid #00E5FF;
+}
+
+/* 关闭 blur 动画（promare 不要模糊） */
+body.promare-mode .round-banner-glow #round-start-banner-text {
+    animation: roundBannerPromare 1.5s ease-in-out forwards !important;
+}
+
+@keyframes roundBannerPromare {
+    0%   { opacity: 0; transform: scale(0.5) translateX(-100vw); }
+    20%  { opacity: 1; transform: scale(1.15) translateX(0); }
+    35%  { opacity: 1; transform: scale(1.0) translateX(0); }
+    70%  { opacity: 1; transform: scale(1.0) translateX(0); }
+    100% { opacity: 0; transform: scale(1.0) translateX(100vw); }
+}
+
+/* ==================== Boss Entrance Overlay 改造 ==================== */
+/* 原版红色径向渐变 — 替换为黑色 + PINK 顶部+底部条纹（拼贴感） */
+
+body.promare-mode #boss-entrance-overlay {
+    background: rgba(10, 10, 10, 0.85) !important;
+}
+
+body.promare-mode #boss-entrance-overlay.boss-entrance-active::before,
+body.promare-mode #boss-entrance-overlay.boss-entrance-active::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    height: 6%;
+    background: repeating-linear-gradient(
+        135deg,
+        #FF0090 0px,
+        #FF0090 14px,
+        #0a0a0a 14px,
+        #0a0a0a 28px
+    );
+}
+
+body.promare-mode #boss-entrance-overlay.boss-entrance-active::before {
+    top: 0;
+}
+
+body.promare-mode #boss-entrance-overlay.boss-entrance-active::after {
+    bottom: 0;
+}
+
+/* ==================== Combat Message（精英援军入场等）==================== */
+
+body.promare-mode #combat-message > div {
+    background: #0a0a0a !important;
+    color: #FFD600 !important;
+    border: 2px solid #FF0090 !important;
+    border-radius: 0 !important;
+    backdrop-filter: none !important;
+    box-shadow: inset 2px 2px 0 #FFD600 !important;
+    font-family: 'Inter Mono', monospace !important;
+}
+
+body.promare-mode #combat-message span {
+    color: #FFD600 !important;
+    font-family: 'Inter Mono', monospace !important;
+}
+
+/* ==================== Game Over 屏幕 ==================== */
+
+body.promare-mode #phase-game-over,
+body.promare-mode .game-over-overlay {
+    background: rgba(10, 10, 10, 0.96) !important;
+    backdrop-filter: none !important;
+}
+
+body.promare-mode .game-over-panel,
+body.promare-mode #game-over-content {
+    background: #0a0a0a !important;
+    border: 3px solid #FF0090 !important;
+    border-radius: 0 !important;
+    box-shadow: inset 4px 4px 0 #00E5FF, 0 0 0 4px #FFD600 !important;
+    backdrop-filter: none !important;
+    padding: 24px !important;
+}
+
+body.promare-mode .game-over-title,
+body.promare-mode #game-over-title {
+    font-family: 'Inter Mono', monospace !important;
+    color: #FF0090 !important;
+    text-shadow:
+        2px 0 0 #0a0a0a, -2px 0 0 #0a0a0a, 0 2px 0 #0a0a0a, 0 -2px 0 #0a0a0a,
+        3px 3px 0 #FFD600 !important;
+    letter-spacing: 6px !important;
+}
+
+body.promare-mode .stat-row,
+body.promare-mode .game-over-stat {
+    border-radius: 0 !important;
+    border: 1px solid #FFFFFF !important;
+    background: #0a0a0a !important;
+    box-shadow: inset 1px 1px 0 #FF0090 !important;
+    font-family: 'Inter Mono', monospace !important;
+    color: #FFFFFF !important;
+}
+
 /* ==================== 文本：去衬线 + 取消 backdrop-blur ==================== */
 
 body.promare-mode h1, body.promare-mode h2, body.promare-mode h3,
