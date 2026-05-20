@@ -727,6 +727,128 @@ body.promare-mode #run-shop-close-btn:hover {
     color: #0a0a0a !important;
 }
 
+/* ==================== 命运时刻 / 遗物选择 (Relic / Fate Moment) ==================== */
+/* #phase-relic 是命运抉择 + 遗物 + 混沌/纯净精华弹窗共用的容器 */
+
+body.promare-mode #phase-relic {
+    background: rgba(10, 10, 10, 0.96) !important;
+    backdrop-filter: none !important;
+}
+
+/* 主标题与说明 */
+body.promare-mode #phase-relic h1,
+body.promare-mode #phase-relic h2,
+body.promare-mode #phase-relic h3,
+body.promare-mode #phase-relic > div > div:first-child {
+    font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
+    color: #FFD600 !important;
+    text-shadow: 2px 2px 0 #FF0090, -2px -2px 0 #00E5FF !important;
+    letter-spacing: 4px !important;
+    background: none !important;
+    -webkit-background-clip: initial !important;
+    -webkit-text-fill-color: initial !important;
+}
+
+/* .relic-card 容器 — 覆盖 linear-gradient 背景 + 圆角 */
+body.promare-mode .relic-card {
+    background: #0a0a0a !important;
+    border: 2px solid #FFFFFF !important;
+    border-radius: 0 !important;
+    box-shadow: inset 2px 2px 0 #FF0090, inset -2px -2px 0 #00E5FF !important;
+    transition: transform 0.1s, border-color 0.12s !important;
+}
+
+body.promare-mode .relic-card:hover {
+    border-color: #FFD600 !important;
+    box-shadow: inset 2px 2px 0 #FFD600, inset -2px -2px 0 #FFD600 !important;
+    transform: translateY(-3px) !important;
+}
+
+/* 稀有度边框：rare / epic / legendary */
+body.promare-mode .relic-card.rare,
+body.promare-mode .relic-card.rarity-rare {
+    border-color: #00E5FF !important;
+    box-shadow: inset 2px 2px 0 #00E5FF !important;
+}
+
+body.promare-mode .relic-card.epic,
+body.promare-mode .relic-card.rarity-epic {
+    border-color: #FF0090 !important;
+    box-shadow: inset 2px 2px 0 #FF0090, inset -2px -2px 0 #00E5FF !important;
+}
+
+body.promare-mode .relic-card.legendary,
+body.promare-mode .relic-card.rarity-legendary {
+    border: 3px solid #FFD600 !important;
+    box-shadow: inset 2px 2px 0 #FFD600, 0 0 0 2px #FF0090, 0 0 0 4px #FFD600 !important;
+    animation: promareLegendaryPulse 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes promareLegendaryPulse {
+    0%   { box-shadow: inset 2px 2px 0 #FFD600, 0 0 0 2px #FF0090, 0 0 0 4px #FFD600; }
+    100% { box-shadow: inset 2px 2px 0 #FFD600, 0 0 0 3px #FF0090, 0 0 0 5px #FFD600; }
+}
+
+/* 关闭传说卡牌的 ::before pseudo (linear-gradient glow) */
+body.promare-mode .relic-card.legendary::before,
+body.promare-mode .relic-card.rarity-legendary::before {
+    display: none !important;
+}
+
+/* 遗物图标 */
+body.promare-mode .relic-icon {
+    filter: grayscale(1) brightness(1.5) contrast(1.6) !important;
+}
+
+/* 遗物名（原 Cinzel）→ Inter Mono */
+body.promare-mode .relic-name {
+    font-family: 'Inter Mono', monospace !important;
+    color: #FFFFFF !important;
+    text-shadow: 1px 1px 0 #0a0a0a !important;
+}
+
+body.promare-mode .relic-card.legendary .relic-name,
+body.promare-mode .relic-card.rarity-legendary .relic-name {
+    color: #FFD600 !important;
+    text-shadow: 1px 1px 0 #0a0a0a, 2px 2px 0 #FF0090 !important;
+}
+
+body.promare-mode .relic-card.epic .relic-name,
+body.promare-mode .relic-card.rarity-epic .relic-name {
+    color: #FF0090 !important;
+    text-shadow: 1px 1px 0 #0a0a0a !important;
+}
+
+body.promare-mode .relic-card.rare .relic-name,
+body.promare-mode .relic-card.rarity-rare .relic-name {
+    color: #00E5FF !important;
+    text-shadow: 1px 1px 0 #0a0a0a !important;
+}
+
+body.promare-mode .relic-desc {
+    color: #FFFFFF !important;
+    font-family: 'Inter Mono', monospace !important;
+    opacity: 0.85;
+}
+
+/* 跳过研磨 / 跳过混沌按钮（命运时刻专用） */
+body.promare-mode #phase-relic button {
+    background: #0a0a0a !important;
+    border: 2px solid #FF0090 !important;
+    color: #FFFFFF !important;
+    border-radius: 0 !important;
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+    font-family: 'Inter Mono', monospace !important;
+    font-weight: bold !important;
+    letter-spacing: 2px !important;
+}
+
+body.promare-mode #phase-relic button:hover {
+    background: #FF0090 !important;
+    color: #FFFFFF !important;
+    box-shadow: inset 0 0 0 2px #FFD600 !important;
+}
+
 /* ==================== 文本：去衬线 + 取消 backdrop-blur ==================== */
 
 body.promare-mode h1, body.promare-mode h2, body.promare-mode h3,
