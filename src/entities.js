@@ -4940,6 +4940,55 @@ class FieldLootItem {
         const finalScale = this.scale * pulseScale;
         const drawY = this.y + floatY;
 
+        // [Promare] 几何掉落物：菱形容器 + 类型色硬切
+        if (CONFIG.visualMode === 'promare') {
+            ctx.save();
+            ctx.translate(this.x, drawY);
+            ctx.scale(finalScale, finalScale);
+            ctx.globalAlpha = this.opacity;
+            // 按类型选色
+            let primary = '#FFD600'; // 默认 relic 黄
+            if (this.type === 'chaos_essence') primary = '#FF0090';     // 混沌 = 粉
+            else if (this.type === 'pure_essence') primary = '#FFFFFF'; // 纯净 = 白
+            else if (this.type === 'rune_fragments') primary = '#00E5FF'; // 符文碎片 = 青
+            // 外层菱形容器（黑底白边）
+            const r = 18;
+            ctx.beginPath();
+            ctx.moveTo(0, -r);
+            ctx.lineTo(r, 0);
+            ctx.lineTo(0, r);
+            ctx.lineTo(-r, 0);
+            ctx.closePath();
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fill();
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            // 内层小菱形（类型色实心）
+            ctx.beginPath();
+            ctx.moveTo(0, -r * 0.55);
+            ctx.lineTo(r * 0.55, 0);
+            ctx.lineTo(0, r * 0.55);
+            ctx.lineTo(-r * 0.55, 0);
+            ctx.closePath();
+            ctx.fillStyle = primary;
+            ctx.fill();
+            // 4 顶点黄色装饰菱形（拼贴感）
+            ctx.fillStyle = '#FFD600';
+            const corners = [{x: 0, y: -r * 1.15}, {x: r * 1.15, y: 0}, {x: 0, y: r * 1.15}, {x: -r * 1.15, y: 0}];
+            for (const c of corners) {
+                ctx.beginPath();
+                ctx.moveTo(c.x, c.y - 2.5);
+                ctx.lineTo(c.x + 2.5, c.y);
+                ctx.lineTo(c.x, c.y + 2.5);
+                ctx.lineTo(c.x - 2.5, c.y);
+                ctx.closePath();
+                ctx.fill();
+            }
+            ctx.restore();
+            return;
+        }
+
         ctx.save();
         ctx.translate(this.x, drawY);
         ctx.scale(finalScale, finalScale);
@@ -5020,6 +5069,63 @@ class RuneLoot {
         if (!this.active) return;
 
         this._animTimer += 0.05;
+
+        // [Promare] 几何符文掉落物：六边形容器 + 元素色硬切
+        if (CONFIG.visualMode === 'promare') {
+            const runeDef = (typeof RUNE_DB !== 'undefined') ? RUNE_DB[this.runeId] : null;
+            // 元素色映射
+            const elem = runeDef && runeDef.element;
+            let primary = '#FFD600';
+            if (elem === 'pyro' || elem === 'bounce') primary = '#FF0090';
+            else if (elem === 'cryo' || elem === 'wind' || elem === 'laser') primary = '#00E5FF';
+            else if (elem === 'lightning' || elem === 'scatter' || elem === 'venom') primary = '#FFD600';
+            else if (elem === 'pierce') primary = '#FFFFFF';
+            const floatY = Math.sin(this._animTimer * 2) * 4;
+            const drawY = this.y + floatY;
+            const r = 14;
+            ctx.save();
+            ctx.translate(this.x, drawY);
+            // 六边形容器（黑底主色边）
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+                const px = Math.cos(a) * r;
+                const py = Math.sin(a) * r;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fill();
+            ctx.strokeStyle = primary;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            // 中心小钻石（主色实心）
+            ctx.beginPath();
+            ctx.moveTo(0, -r * 0.45);
+            ctx.lineTo(r * 0.45, 0);
+            ctx.lineTo(0, r * 0.45);
+            ctx.lineTo(-r * 0.45, 0);
+            ctx.closePath();
+            ctx.fillStyle = primary;
+            ctx.fill();
+            // 等级 pip（顶部小三角，level 1-3）
+            if (runeDef && runeDef.level) {
+                const lvl = Math.min(3, runeDef.level || 1);
+                for (let i = 0; i < lvl; i++) {
+                    ctx.beginPath();
+                    const px = (i - (lvl - 1) / 2) * 4;
+                    ctx.moveTo(px, -r - 4);
+                    ctx.lineTo(px + 2, -r - 1);
+                    ctx.lineTo(px - 2, -r - 1);
+                    ctx.closePath();
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+            return;
+        }
 
         // ============================================================
         // [spawn 入场动画] 入场进度（用 _animTimer 模拟，前 7 帧为入场阶段）

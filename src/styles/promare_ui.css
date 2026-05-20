@@ -120,13 +120,225 @@ body.promare-mode #ammo-display {
     backdrop-filter: none !important;
 }
 
-/* ==================== Ammo icon：高对比灰阶 ==================== */
+/* ==================== Ammo / Rune / Relic 位图全部移除，用几何替代 ==================== */
+/* 所有 .ammo-icon / .rune-icon / .relic-icon 容器内的 <img> 强制隐藏；
+   容器本身用 clip-path 强制菱形 + 内部小白菱形作为几何符号。
+   这样从根本上移除所有美术位图依赖，统一为程序化几何美学。 */
 
+body.promare-mode .ammo-icon img,
+body.promare-mode .relic-icon img,
+body.promare-mode .select-icon-emoji img,
+body.promare-mode .shop-item img,
+body.promare-mode .shop-card img,
+body.promare-mode #ammo-display img,
+body.promare-mode .relic-card img,
+body.promare-mode [class*="ammo-"]:not(.rune-icon-frame) img,
+body.promare-mode [class*="relic-"] img {
+    display: none !important;
+}
+
+/* 符文图标作为身份识别（grid + inventory）保留，但强制 grayscale 高对比统一视觉 */
+body.promare-mode .rune-grid-cell img,
+body.promare-mode .rune-icon-frame img,
+body.promare-mode #combat-rune-single-slot img {
+    filter: grayscale(1) contrast(1.7) brightness(1.2) !important;
+    border-radius: 0 !important;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+/* 容器外观：黑底 + 菱形剪裁（与游戏内子弹/钉子几何一致） */
 body.promare-mode .ammo-icon,
 body.promare-mode .rune-icon,
 body.promare-mode .relic-icon {
-    filter: contrast(1.5) saturate(0.3) brightness(1.1);
-    image-rendering: pixelated;
+    position: relative !important;
+    background: #0a0a0a !important;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: hidden !important;
+}
+
+/* 内部小钻石几何符号（伪元素） */
+body.promare-mode .ammo-icon::after,
+body.promare-mode .rune-icon::after,
+body.promare-mode .relic-icon::after {
+    content: '';
+    position: absolute;
+    top: 30%; left: 30%;
+    width: 40%; height: 40%;
+    background: #FFFFFF;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* emoji 回退也压低显示（位图缺失时显示的 emoji 不要太抢眼） */
+body.promare-mode .select-icon-emoji,
+body.promare-mode .ammo-icon-emoji,
+body.promare-mode .rune-icon-emoji {
+    filter: grayscale(1) brightness(1.4) contrast(1.6) !important;
+    opacity: 0.7 !important;
+}
+
+/* ==================== border-image 9-slice 全部清除 ==================== */
+/* bitmap_ui.css 用大量 border-image PNG 9-slice 接入位图边框（顶栏 / 卡牌 /
+   符文框稀有度 / 遗物框）。promare 模式下全部归零，用纯 CSS 5 色边框替代。 */
+
+body.promare-mode #unified-top-bar,
+body.promare-mode .top-bar,
+body.promare-mode .rune-icon-frame,
+body.promare-mode .rune-icon-frame.rarity-common,
+body.promare-mode .rune-icon-frame.rarity-rare,
+body.promare-mode .rune-icon-frame.rarity-epic,
+body.promare-mode .rune-icon-frame.rarity-legendary,
+body.promare-mode .relic-card,
+body.promare-mode .relic-card.rarity-common,
+body.promare-mode .relic-card.rarity-rare,
+body.promare-mode .relic-card.rarity-epic,
+body.promare-mode .relic-card.rarity-legendary,
+body.promare-mode .bottom-panel,
+body.promare-mode [class*="rarity-"] {
+    border-image: none !important;
+    border-image-source: none !important;
+    background-image: none !important;
+}
+
+/* 稀有度用 5 色硬切板 + 实线边框区分（替代 PNG border-image） */
+body.promare-mode .rune-icon-frame.rarity-common,
+body.promare-mode .relic-card.rarity-common {
+    border: 2px solid #FFFFFF !important;
+}
+body.promare-mode .rune-icon-frame.rarity-rare,
+body.promare-mode .relic-card.rarity-rare {
+    border: 2px solid #00E5FF !important;
+    box-shadow: inset 0 0 0 1px #00E5FF !important;
+}
+body.promare-mode .rune-icon-frame.rarity-epic,
+body.promare-mode .relic-card.rarity-epic {
+    border: 2px solid #FF0090 !important;
+    box-shadow: inset 0 0 0 1px #FF0090, 0 0 0 1px #FF0090 !important;
+}
+body.promare-mode .rune-icon-frame.rarity-legendary,
+body.promare-mode .relic-card.rarity-legendary {
+    border: 2px solid #FFD600 !important;
+    box-shadow: inset 0 0 0 2px #FFD600, 0 0 0 1px #FF0090, 0 0 0 3px #FFD600 !important;
+}
+
+/* SP gauge pulse 流光（gauge-pulse-layer ::before/::after）用 conic-gradient
+   违反"硬切"原则，promare 模式下直接关闭脉冲流光，用 CSS box-shadow 闪烁替代。 */
+body.promare-mode #gauge-pulse-layer::before,
+body.promare-mode #gauge-pulse-layer::after,
+body.promare-mode #gauge-shell::after {
+    display: none !important;
+}
+
+body.promare-mode #gauge-shell {
+    background: #0a0a0a !important;
+    border: 2px solid #FFD600 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+
+body.promare-mode #gauge-shell.pulse-active,
+body.promare-mode #gauge-pulse-layer.pulse-active {
+    box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 4px #FFD600 !important;
+}
+
+/* select-card::before 渐变光晕（白色 linear-gradient）也关 */
+body.promare-mode .select-card::before {
+    display: none !important;
+}
+
+/* ==================== 全局位图清零（终极一刀切）==================== */
+/* promare 模式下：
+   - 所有 url() 注入的 background-image / border-image / mask-image / list-style-image 强制 none
+   - 这会同时清除 34+ 处 bitmap_ui.css 的 9-slice 边框、SP gem、工具按钮、符文槽态位图
+   - 关键功能态（sp 满 / 按钮 / 符文 idle/hover/filled）下面用 CSS pseudo-element 重建 */
+
+body.promare-mode #unified-top-bar,
+body.promare-mode .bottom-panel,
+body.promare-mode .top-bar,
+body.promare-mode #rune-launcher-content,
+body.promare-mode .rune-icon-frame,
+body.promare-mode .relic-card,
+body.promare-mode .sp-gem,
+body.promare-mode #settings-btn,
+body.promare-mode #speed-btn,
+body.promare-mode .rune-grid-cell,
+body.promare-mode .skip-btn,
+body.promare-mode [class*="replace-card"],
+body.promare-mode [class*="-attr-slot"] {
+    background-image: none !important;
+    border-image: none !important;
+    border-image-source: none !important;
+    -webkit-mask-image: none !important;
+    mask-image: none !important;
+}
+
+/* SP gem 替代视觉：空 = 黄色描边空菱形，满 = 黄色实心菱形 */
+body.promare-mode .sp-gem {
+    background: transparent !important;
+    position: relative;
+    width: 22px !important;
+    height: 22px !important;
+}
+body.promare-mode .sp-gem::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    background: #FFD600;
+    opacity: 0.3;
+}
+body.promare-mode .sp-gem.active::before,
+body.promare-mode .sp-gem.filled::before,
+body.promare-mode .sp-gem-filled::before {
+    opacity: 1.0;
+    box-shadow: 0 0 0 1px #FFFFFF inset;
+}
+
+/* settings / speed 按钮替代：白色 ◯/⚙ 几何 */
+body.promare-mode #settings-btn,
+body.promare-mode #speed-btn {
+    background: #0a0a0a !important;
+    border: 2px solid #FFFFFF !important;
+    clip-path: none !important;
+    font-family: 'Inter Mono', monospace !important;
+    color: #FFFFFF !important;
+    font-size: 16px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+body.promare-mode #settings-btn::before {
+    content: '⚙';
+    color: #FFFFFF;
+    font-size: 16px;
+}
+body.promare-mode #speed-btn::before {
+    content: '▶▶';
+    color: #FFD600;
+    font-size: 12px;
+    letter-spacing: -2px;
+}
+
+/* 符文槽态：idle / hover / filled — 用 border-color + inset shadow 区分 */
+body.promare-mode .rune-grid-cell {
+    /* 已在前面定义为 BLACK + WHITE 边框 + PINK/CYAN 对角阴影 */
+    background: #0a0a0a !important;
+}
+
+/* Skip 按钮：清掉位图，用梯形切边按钮 */
+body.promare-mode .skip-btn {
+    background: #0a0a0a !important;
+    border: 2px solid #FF0090 !important;
+    color: #FFD600 !important;
+    font-family: 'Inter Mono', monospace !important;
+    border-radius: 0 !important;
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
 }
 
 /* ==================== 文本：去衬线 + 取消 backdrop-blur ==================== */

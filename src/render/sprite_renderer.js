@@ -185,6 +185,10 @@ export class SpriteRenderer {
      * @returns {boolean} 是否成功绘制位图（false = 使用了 fallback）
      */
     draw(ctx, x, y, w, h, alpha = 1) {
+        // [Promare] hideSprites=true 时彻底跳过 sprite 绘制，防止透过 Enemy.draw 早退之外的路径漏出位图。
+        if (CONFIG && CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.hideSprites) {
+            return false;
+        }
         if (!this.ready || !this._image || !this._meta) return false;
 
         const anim = this._meta.animations[this._currentAnim];
@@ -236,6 +240,7 @@ export class SpriteRenderer {
 
 import { ENEMY_V2_METADATA, ENEMY_V2_BY_ARCHETYPE } from '../data/enemy_v2_metadata.js';
 import { resolveEnemyVisualAsset, loadEnemyVisualAssetManifest } from '../data/enemy_visual_assets.js';
+import { CONFIG } from '../config.js'; // [Promare] for visualMode/hideSprites gating
 
 const SPRITE_REGISTRY = {
     'golem_normal': 'assets/sprites/enemies/golem_normal.png',
@@ -264,6 +269,11 @@ const _spritePool = new Map();
  * 在游戏初始化时调用一次
  */
 export function preloadAllSprites() {
+    // [Promare] 模式下完全不预加载 sprite，避免无谓的网络请求与 manifest JSON 拉取。
+    if (CONFIG && CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.hideSprites) {
+        console.log('[SpriteRenderer] promare 模式：跳过 sprite 预加载');
+        return;
+    }
     for (const [key, path] of Object.entries(SPRITE_REGISTRY)) {
         _spritePool.set(key, SpriteRenderer.preload(path));
     }
