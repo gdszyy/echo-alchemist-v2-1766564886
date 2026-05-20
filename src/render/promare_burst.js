@@ -24,12 +24,36 @@ const ELEMENT_TO_MODE = {
     bounce:       'bounce_hex',
     scatter:      'scatter_star',
     damage:       'damage_diamond',
-    wind:         'wind_slash',   // 复用已有 wind_slash mode
-    laser:        'echo_ring',    // 激光复用 echo 环
+    wind:         'wind_slash',     // 复用已有 wind_slash mode
+    laser:        'laser_beam',     // 改用专用激光光柱模式
     venom:        'venom_tri',
     echo:         'echo_ring',
     flying_sword: 'damage_diamond',
 };
+
+// [Promare] scatter signature: 二次爆裂子粒子 spawner（粒子在 update 内通过 globalThis 桥接调用）
+// 由 ensurePromareGlobals(game) 写入，让 scatter_star 粒子能在 life 0.5 点生成 3 个子粒子。
+export function ensurePromareGlobals(game) {
+    if (typeof globalThis === 'undefined') return;
+    if (globalThis._promareScatterSubSpawn) return;
+    globalThis._promareScatterSubSpawn = (x, y, color) => {
+        if (!game || typeof game.spawn_createParticle !== 'function') return;
+        for (let i = 0; i < 3; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const sp = 1.5 + Math.random() * 1.5;
+            const sub = game.spawn_createParticle(x, y, color || '#FFD600', 'scatter_star');
+            if (sub && sub.vel) {
+                sub.vel.x = Math.cos(a) * sp;
+                sub.vel.y = Math.sin(a) * sp;
+                sub.size *= 0.5;
+                sub._splitFired = true; // 防止子粒子再次分裂（链式爆炸）
+                sub.life = 0.4;
+                sub.maxLife = sub.life;
+                sub.decay = 0.08;
+            }
+        }
+    };
+}
 
 /**
  * 在 (x, y) 处沿入射反方向喷出几何碎片群。

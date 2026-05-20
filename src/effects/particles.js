@@ -175,29 +175,31 @@ class Particle {
             this._bounced = false;
             this._bounceY = y + (Math.random() * 80 + 40); // 落地虚拟线
         } else if (mode === 'scatter_star') {
-            // 4 角星，标重 + 中 drag + 快旋
+            // 4 角星，标重 + 中 drag + 快旋；signature: 中点二次爆裂（生成子粒子）
             const a = Math.random() * Math.PI * 2;
-            const sp = Math.random() * 4 + 1.5;
+            const sp = Math.random() * 5 + 2.5;
             vel.x = Math.cos(a) * sp;
             vel.y = Math.sin(a) * sp;
-            this.drag = 0.94; this.gravity = 0.15;
-            this.decay = 0.025 + Math.random() * 0.015;
-            this.size = Math.random() * 2.5 + 1.8;
+            this.drag = 0.94; this.gravity = 0.18;
+            this.decay = 0.022 + Math.random() * 0.012;
+            this.size = Math.random() * 3 + 2.2;
             this.angle = Math.random() * Math.PI * 2;
-            this.spin = (Math.random() < 0.5 ? -1 : 1) * (0.10 + Math.random() * 0.10);
+            this.spin = (Math.random() < 0.5 ? -1 : 1) * (0.18 + Math.random() * 0.14);
+            this._splitFired = false;     // 二次爆裂 flag
+            this._sizeStart = this.size;   // 记录初始尺寸，draw 时按 life 缩放
         } else if (mode === 'damage_diamond') {
-            // 大菱形，类 spark 但更大，慢衰
+            // 大菱形，类 spark 但更大；signature: 白心 + 黄圈双层 + 快脉冲
             const a = Math.random() * Math.PI * 2;
-            const sp = Math.random() * 4 + 2;
+            const sp = Math.random() * 4.5 + 2.5;
             vel.x = Math.cos(a) * sp;
             vel.y = Math.sin(a) * sp;
-            this.drag = 0.90; this.gravity = 0.08;
-            this.decay = 0.035 + Math.random() * 0.015;
-            this.size = Math.random() * 3 + 3;
+            this.drag = 0.89; this.gravity = 0.08;
+            this.decay = 0.045 + Math.random() * 0.018;   // 寿命更短（瞬间冲击感）
+            this.size = Math.random() * 3.5 + 3.5;          // 尺寸更大
             this.angle = Math.random() * Math.PI * 2;
-            this.spin = (Math.random() - 0.5) * 0.03;
+            this.spin = (Math.random() - 0.5) * 0.04;
         } else if (mode === 'venom_tri') {
-            // 倒三角毒滴，反重力 + x-wobble（update 中实现）
+            // 倒三角毒滴，反重力 + x-wobble；signature: 留腐蚀印记（drip）
             vel.x = (Math.random() - 0.5) * 0.8;
             vel.y = -Math.random() * 1.2 - 0.4;
             this.drag = 0.97; this.gravity = -0.04;
@@ -205,14 +207,26 @@ class Particle {
             this.size = Math.random() * 2 + 1.4;
             this.angle = 0;
             this.wobble = Math.random() * Math.PI * 2;
+            this._dripTimer = 0.3;          // 每 0.3 life 留一个印记
+            this._dripPositions = [];        // 历史印记位置
         } else if (mode === 'echo_ring') {
-            // 双同心环，静止 + 半径扩张 + alpha 衰减
+            // 同心环，静止 + 半径扩张 + alpha 衰减；signature: 多层错时涟漪
             vel.x = 0; vel.y = 0;
             this.drag = 1.0; this.gravity = 0;
             this.decay = 0.035;
             this.size = Math.random() * 2 + 3;
             this.angle = 0;
             this._expandRate = 0.6 + Math.random() * 0.4;
+        } else if (mode === 'laser_beam') {
+            // [新] 激光光柱：从中心向 angle 方向飞出，长度即可见光柱长度
+            const a = (this.angle != null) ? this.angle : Math.random() * Math.PI * 2;
+            vel.x = Math.cos(a) * 3.0;          // 飞得更远
+            vel.y = Math.sin(a) * 3.0;
+            this.drag = 0.92; this.gravity = 0;
+            this.decay = 0.06;
+            this.size = 10 + Math.random() * 6; // 光柱长度 20-32px
+            this.angle = a;
+            this.spin = 0;
         } else if (mode === 'radial_spoke') {
             // 辐射 spoke：从中心向 angle 方向射出，无重力，快衰
             const a = (this.angle != null) ? this.angle : Math.random() * Math.PI * 2;
@@ -256,6 +270,26 @@ class Particle {
         // [Promare] echo_ring 半径扩张（用 size 当当前 radius）
         if (this.mode === 'echo_ring') {
             this.size += this._expandRate * timeScale * 4;
+        }
+        // [Promare] scatter_star 中点二次爆裂：当 life 跨过 0.5 时生成 3 子粒子
+        // (子粒子在 draw 时已无法 spawn 新粒子，需在 update 期间访问 global game)
+        if (this.mode === 'scatter_star' && !this._splitFired && this.life < 0.5 && this.life > 0.3) {
+            this._splitFired = true;
+            // 子粒子用同 mode 但更小、更快、向外散
+            if (typeof globalThis !== 'undefined' && globalThis._promareScatterSubSpawn) {
+                globalThis._promareScatterSubSpawn(this.pos.x, this.pos.y, this.color);
+            }
+        }
+        // [Promare] venom_tri 留腐蚀印记：每 0.3 life 记录一次位置
+        if (this.mode === 'venom_tri') {
+            this._dripTimer -= timeScale * 0.05;
+            if (this._dripTimer <= 0) {
+                this._dripTimer = 0.3;
+                this._dripPositions.push({ x: this.pos.x, y: this.pos.y, life: 0.5 });
+                if (this._dripPositions.length > 4) this._dripPositions.shift();
+            }
+            // 印记自身衰减
+            for (const d of this._dripPositions) d.life -= timeScale * 0.025;
         }
         // 湍流逻辑：在垂直于速度的方向上产生正弦波动
         if (this.turbulence > 0) {
@@ -391,40 +425,169 @@ class Particle {
         // @perf-impact: 单粒子 1 fill + 1 stroke，加法混合无 shadowBlur，<0.05ms。
 
         } else if (this.mode === 'pyro_cone') {
+            // signature: 主体外 + 内核高亮小三角（双层灼烧感）
             ctx.rotate(this.angle || 0);
             drawShape_cone3(ctx, this.size);
             fillStroke_promare(ctx, PROMARE_PALETTE.PINK, PROMARE_PALETTE.WHITE, 1, 0.55);
+            // 内核 YELLOW 0.5× cone
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.scale(0.5, 0.5);
+            drawShape_cone3(ctx, this.size);
+            ctx.fillStyle = PROMARE_PALETTE.YELLOW;
+            ctx.globalAlpha = Math.max(0, this.life) * 0.9;
+            ctx.fill();
+            ctx.restore();
         } else if (this.mode === 'cryo_oct') {
+            // signature: 主体 + 内部白色十字闪光（晶体反光）
             ctx.rotate(this.angle || 0);
             drawShape_oct2(ctx, this.size);
             fillStroke_promare(ctx, PROMARE_PALETTE.CYAN, PROMARE_PALETTE.WHITE, 1, 0.55);
+            // 白色十字内饰
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.strokeStyle = PROMARE_PALETTE.WHITE;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, -this.size * 1.6);
+            ctx.lineTo(0,  this.size * 1.6);
+            ctx.moveTo(-this.size * 0.4, 0);
+            ctx.lineTo( this.size * 0.4, 0);
+            ctx.stroke();
+            ctx.restore();
         } else if (this.mode === 'thunder_z') {
-            // 高频 opacity strobe：65% 概率正常显示，35% 概率压低到 0.25α
+            // signature: 主体 strobe + 随机分支闪电
             const strobe = (Math.random() > 0.35) ? 1.0 : 0.25;
             ctx.globalAlpha *= strobe;
             ctx.rotate(this.angle || 0);
             drawShape_zigzagZ(ctx, this.size);
             fillStroke_promare(ctx, PROMARE_PALETTE.YELLOW, PROMARE_PALETTE.WHITE, 1, 0.6);
+            // 30% 概率每帧画一条短随机分支
+            if (Math.random() < 0.3) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.strokeStyle = PROMARE_PALETTE.WHITE;
+                ctx.lineWidth = 1;
+                const bx = (Math.random() - 0.5) * this.size * 2.5;
+                const by = (Math.random() - 0.5) * this.size * 2.5;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(bx * 0.4, by * 0.4);
+                ctx.lineTo(bx * 0.6, by * 0.7);
+                ctx.lineTo(bx, by);
+                ctx.stroke();
+                ctx.restore();
+            }
         } else if (this.mode === 'pierce_lance') {
-            // 沿速度方向锁定 angle
+            // signature: 主体 + 身后白色尾迹线（穿透痕迹）
+            ctx.save();
+            // 尾迹：沿 -x 方向画一条 4× size 的渐变细线（已 rotate 到 angle）
+            ctx.rotate(this.angle || 0);
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.strokeStyle = PROMARE_PALETTE.WHITE;
+            ctx.lineWidth = 1.5;
+            ctx.globalAlpha *= 0.45;
+            ctx.beginPath();
+            ctx.moveTo(-this.size * 0.5, 0);
+            ctx.lineTo(-this.size * 4, 0);
+            ctx.stroke();
+            ctx.restore();
+            // 主体
             ctx.rotate(this.angle || 0);
             drawShape_lance4(ctx, this.size);
-            fillStroke_promare(ctx, PROMARE_PALETTE.WHITE, PROMARE_PALETTE.PINK, 1.5, 0.7);
+            fillStroke_promare(ctx, PROMARE_PALETTE.WHITE, PROMARE_PALETTE.PINK, 1.5, 0.75);
         } else if (this.mode === 'bounce_hex') {
+            // signature: 反弹瞬间 scaleY 压扁（_bounced flag 刚翻 true 时压最扁）
+            const recentBounce = this._bounced && this.vel && this.vel.y < 0 && Math.abs(this.vel.y) > 1;
+            const sy = recentBounce ? 0.4 : 1.0;
+            const sx = recentBounce ? 1.4 : 1.0;
             ctx.rotate(this.angle || 0);
+            ctx.scale(sx, sy);
             drawShape_hex6(ctx, this.size);
-            fillStroke_promare(ctx, PROMARE_PALETTE.PINK, PROMARE_PALETTE.YELLOW, 1, 0.55);
+            fillStroke_promare(ctx, PROMARE_PALETTE.PINK, PROMARE_PALETTE.YELLOW, 1, 0.6);
         } else if (this.mode === 'scatter_star') {
+            // signature: 形变缩放（life 0~0.5 增大，0.5~0 缩小）+ 快旋
+            const lifeShape = this.life > 0.5 ? (1 - this.life) * 2 : this.life * 2;
+            const scaleFactor = 0.7 + lifeShape * 0.6;
             ctx.rotate(this.angle || 0);
+            ctx.scale(scaleFactor, scaleFactor);
             drawShape_star4(ctx, this.size);
-            fillStroke_promare(ctx, PROMARE_PALETTE.YELLOW, PROMARE_PALETTE.PINK, 1, 0.55);
+            fillStroke_promare(ctx, PROMARE_PALETTE.YELLOW, PROMARE_PALETTE.PINK, 1.5, 0.6);
         } else if (this.mode === 'damage_diamond') {
+            // signature: 白心黄圈双层 + 脉冲 alpha
+            const pulse = (Math.sin(this.life * 30) + 1) * 0.5;
             ctx.rotate(this.angle || 0);
+            // 外圈 YELLOW 1.5× scale
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha *= 0.5 + pulse * 0.3;
+            ctx.scale(1.5, 1.5);
             drawShape_diamond(ctx, this.size);
-            fillStroke_promare(ctx, PROMARE_PALETTE.WHITE, PROMARE_PALETTE.YELLOW, 1, 0.6);
+            ctx.fillStyle = PROMARE_PALETTE.YELLOW;
+            ctx.fill();
+            ctx.restore();
+            // 内核 WHITE 主体
+            drawShape_diamond(ctx, this.size);
+            fillStroke_promare(ctx, PROMARE_PALETTE.WHITE, PROMARE_PALETTE.WHITE, 1.5, 0.95);
         } else if (this.mode === 'venom_tri') {
+            // signature: 留腐蚀印记（小绿圆点）
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            if (this._dripPositions && this._dripPositions.length > 0) {
+                // 印记画在世界坐标（已 translate 到 this.pos），需要相对偏移
+                for (const d of this._dripPositions) {
+                    if (d.life <= 0) continue;
+                    const dx = d.x - this.pos.x;
+                    const dy = d.y - this.pos.y;
+                    ctx.globalAlpha = Math.max(0, d.life) * 0.55;
+                    ctx.fillStyle = PROMARE_PALETTE.YELLOW;
+                    ctx.beginPath();
+                    ctx.arc(dx, dy, 2 + d.life * 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
             drawShape_triDown(ctx, this.size);
-            fillStroke_promare(ctx, PROMARE_PALETTE.YELLOW, PROMARE_PALETTE.PINK, 1, 0.5);
+            fillStroke_promare(ctx, PROMARE_PALETTE.YELLOW, PROMARE_PALETTE.PINK, 1, 0.6);
+        } else if (this.mode === 'laser_beam') {
+            // [signature] 激光光柱：从粒子位置向 +x 射出长光柱（双层 CYAN+WHITE） + 末端三角光斑
+            ctx.rotate(this.angle || 0);
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+
+            // 外发光（CYAN 厚条带）
+            ctx.strokeStyle = PROMARE_PALETTE.CYAN;
+            ctx.lineWidth = 6;
+            ctx.globalAlpha *= 0.5;
+            ctx.beginPath();
+            ctx.moveTo(-this.size * 0.5, 0);
+            ctx.lineTo(this.size * 1.5, 0);
+            ctx.stroke();
+
+            // 主光柱（白色细中线）
+            ctx.globalAlpha = Math.max(0, this.life);
+            ctx.strokeStyle = PROMARE_PALETTE.WHITE;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-this.size * 0.5, 0);
+            ctx.lineTo(this.size * 1.5, 0);
+            ctx.stroke();
+
+            // 末端爆破三角（白色尖头）
+            ctx.fillStyle = PROMARE_PALETTE.WHITE;
+            ctx.beginPath();
+            ctx.moveTo(this.size * 1.5 + 5, 0);
+            ctx.lineTo(this.size * 1.3, -3);
+            ctx.lineTo(this.size * 1.3, 3);
+            ctx.closePath();
+            ctx.fill();
+
+            // 起点小圆斑（核心）
+            ctx.beginPath();
+            ctx.arc(-this.size * 0.5, 0, 3, 0, Math.PI * 2);
+            ctx.fillStyle = PROMARE_PALETTE.YELLOW;
+            ctx.fill();
+            ctx.restore();
         } else if (this.mode === 'echo_ring') {
             // 双同心环：外环填充 PINK，内环填充 CYAN（差值制造环）
             ctx.save();

@@ -26,7 +26,7 @@ import { UIManager, TrainingGround, TruthBook } from './systems.js';
 
 // 导入事件总线
 import { eventBus } from './event_bus.js';
-import { spawnPromareBurst, spawnRadialImpact } from './render/promare_burst.js';
+import { spawnPromareBurst, spawnRadialImpact, ensurePromareGlobals } from './render/promare_burst.js';
 import { spawnPromareKillExplosion } from './render/promare_explosion.js';
 
 // 导入 SoundManager 类和音频代理
@@ -388,6 +388,8 @@ class Game {
                 console.log('[Promare] visualMode =', CONFIG.visualMode);
                 return CONFIG.visualMode;
             };
+            // [Promare] 安装 globalThis 桥接，让 scatter_star 粒子二次爆裂能调到 spawn_createParticle
+            ensurePromareGlobals(this);
         }
 
         // 启动游戏主循环
