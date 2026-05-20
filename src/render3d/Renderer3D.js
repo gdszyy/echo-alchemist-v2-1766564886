@@ -19,6 +19,7 @@ import { BackgroundLayer } from './BackgroundLayer.js';
 import { CameraController } from './CameraController.js';
 import { CoordsMapper } from './coords.js';
 import { SceneProxy } from './SceneProxy.js';
+import { PostFX } from './PostFX.js';
 
 export class Renderer3D {
     /**
@@ -48,6 +49,17 @@ export class Renderer3D {
         this.proxy = new SceneProxy(this.scene, this.coords);
 
         this.cameraController = new CameraController(this.camera);
+
+        // [3D-Main M4] 后处理管线：bloom / 畸变 / 颗粒 / 暗角 / ACES tonemap
+        // 失败时静默回退到直接 render（this.postfx = null）
+        this.postfx = null;
+        try {
+            this.postfx = new PostFX(this.renderer, this.scene, this.camera, this.width, this.height);
+            console.info(`[Renderer3D] PostFX enabled (HDR=${this.postfx.usingHDR})`);
+        } catch (err) {
+            console.warn('[Renderer3D] PostFX init failed, falling back to direct render:', err);
+            this.postfx = null;
+        }
 
         // 帧计时（秒）
         this._tElapsed = 0;
@@ -110,6 +122,11 @@ export class Renderer3D {
         const scale = CoordsMapper.autoScaleFromFov(this.camera.fov, cameraDist, H, 0.94);
         this.coords.update(W, H, scale);
         if (this.proxy) this.proxy.onResize();
+        if (this.postfx) {
+            try { this.postfx.resize(W, H); } catch (e) {
+                console.warn('[Renderer3D] PostFX resize error:', e);
+            }
+        }
     }
 
     /**
@@ -127,16 +144,22 @@ export class Renderer3D {
         if (this.proxy) this.proxy.update(dt, this._tElapsed);
         if (this.cameraController) this.cameraController.update(dt);
 
-        this.renderer.render(this.scene, this.camera);
+        if (this.postfx) {
+            this.postfx.render(dt);
+        } else {
+            this.renderer.render(this.scene, this.camera);
+        }
 
         this.stats.frames++;
         this.stats.lastDtMs = dt * 1000;
     }
 
     dispose() {
+        try { if (this.postfx) this.postfx.dispose(); } catch (e) {}
         try { if (this.proxy) this.proxy.dispose(); } catch (e) {}
         try { if (this.background) this.background.dispose(); } catch (e) {}
         try { this.renderer.dispose(); } catch (e) {}
+        this.postfx = null;
         this.proxy = null;
         this.background = null;
         this.cameraController = null;
