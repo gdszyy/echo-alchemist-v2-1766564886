@@ -849,6 +849,151 @@ body.promare-mode #phase-relic button:hover {
     box-shadow: inset 0 0 0 2px #FFD600 !important;
 }
 
+/* ==================== 试炼场 / Training Ground ==================== */
+/* 战斗模拟界面：DPS 统计 + 子弹配置 + 敌人词缀编辑 */
+
+body.promare-mode #phase-training {
+    background: rgba(10, 10, 10, 0.95) !important;
+    backdrop-filter: none !important;
+}
+
+/* 顶部状态条：Combat Simulation + DPS */
+body.promare-mode #phase-training [class*="bg-slate-900"][class*="backdrop-blur"] {
+    background: #0a0a0a !important;
+    backdrop-filter: none !important;
+    border-bottom: 2px solid #FF0090 !important;
+    border-radius: 0 !important;
+}
+
+body.promare-mode #train-stats {
+    color: #FFD600 !important;
+    font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
+    text-shadow: 1px 1px 0 #0a0a0a !important;
+    letter-spacing: 2px !important;
+}
+
+/* 红色脉冲点 → YELLOW 闪烁菱形 */
+body.promare-mode #phase-training [class*="bg-red-500"][class*="animate-pulse"] {
+    background: #FFD600 !important;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    border-radius: 0 !important;
+}
+
+/* 子弹属性控制单元 (.train-attr-grid > div) */
+body.promare-mode #train-attr-grid > div {
+    background: #0a0a0a !important;
+    border: 1px solid #FFFFFF !important;
+    border-radius: 0 !important;
+    box-shadow: inset 1px 1px 0 #FF0090 !important;
+}
+
+body.promare-mode #train-attr-grid > div span:first-child {
+    color: #FFFFFF !important;
+}
+
+body.promare-mode #train-attr-grid > div span[class*="text-cyan-"] {
+    color: #00E5FF !important;
+}
+
+body.promare-mode #train-attr-grid button {
+    background: #0a0a0a !important;
+    border: 1px solid #FFD600 !important;
+    color: #FFD600 !important;
+    border-radius: 0 !important;
+    clip-path: none !important;
+    font-family: 'Inter Mono', monospace !important;
+}
+
+body.promare-mode #train-attr-grid button:hover {
+    background: #FFD600 !important;
+    color: #0a0a0a !important;
+}
+
+/* 子弹预览 tag — 元素属性 ATK/BNC/PRC/SCT/PYRO/CRYO/LGT/MULTI/... */
+body.promare-mode #train-bullet-preview span {
+    background: #0a0a0a !important;
+    border-radius: 0 !important;
+    font-family: 'Inter Mono', monospace !important;
+}
+
+/* 按 Tailwind 颜色 family 路由到 5 色 */
+body.promare-mode #train-bullet-preview [class*="purple-"],
+body.promare-mode #train-bullet-preview [class*="orange-"] {
+    border-color: #FF0090 !important;
+    color: #FF0090 !important;
+    background: #0a0a0a !important;
+}
+body.promare-mode #train-bullet-preview [class*="cyan-"],
+body.promare-mode #train-bullet-preview [class*="green-"] {
+    border-color: #00E5FF !important;
+    color: #00E5FF !important;
+    background: #0a0a0a !important;
+}
+body.promare-mode #train-bullet-preview [class*="yellow-"],
+body.promare-mode #train-bullet-preview [class*="amber-"] {
+    border-color: #FFD600 !important;
+    color: #FFD600 !important;
+    background: #0a0a0a !important;
+}
+body.promare-mode #train-bullet-preview [class*="red-"] {
+    border-color: #FF0090 !important;
+    color: #FF0090 !important;
+    background: #0a0a0a !important;
+}
+body.promare-mode #train-bullet-preview [class*="blue-"] {
+    border-color: #00E5FF !important;
+    color: #00E5FF !important;
+    background: #0a0a0a !important;
+}
+body.promare-mode #train-bullet-preview [class*="slate-"] {
+    border-color: #FFFFFF !important;
+    color: #FFFFFF !important;
+    background: #0a0a0a !important;
+}
+
+/* 退出按钮 */
+body.promare-mode #phase-training button[onclick*="exit"] {
+    color: #FF0090 !important;
+    font-family: 'Inter Mono', monospace !important;
+    font-weight: bold !important;
+}
+
+/* ==================== Round Damage Display（回合伤害浮字）==================== */
+
+body.promare-mode #round-damage-display {
+    color: #FFD600 !important;
+    font-family: 'Inter Mono', monospace !important;
+    text-shadow:
+        2px 0 0 #0a0a0a, -2px 0 0 #0a0a0a, 0 2px 0 #0a0a0a, 0 -2px 0 #0a0a0a,
+        3px 3px 0 #FF0090 !important;
+    filter: none !important;
+    letter-spacing: 4px !important;
+}
+
+body.promare-mode #round-damage-val {
+    font-family: 'Inter Mono', monospace !important;
+    color: #FFD600 !important;
+}
+
+/* ==================== Rune Launcher Float 浮动按钮 ==================== */
+
+body.promare-mode .rune-launcher-float-btn {
+    background: #0a0a0a !important;
+    border: 2px solid #FF0090 !important;
+    border-radius: 0 !important;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    box-shadow: none !important;
+}
+
+body.promare-mode .rune-launcher-float-btn:hover {
+    background: #FF0090 !important;
+    border-color: #FFD600 !important;
+}
+
+body.promare-mode .rune-launcher-float-btn span {
+    color: #FFD600 !important;
+}
+
 /* ==================== 文本：去衬线 + 取消 backdrop-blur ==================== */
 
 body.promare-mode h1, body.promare-mode h2, body.promare-mode h3,
