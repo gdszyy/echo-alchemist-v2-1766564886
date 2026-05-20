@@ -297,6 +297,99 @@ body.promare-mode .stat-pill {
     backdrop-filter: none !important;
 }
 
+/* ==================== 符文发射器 3×3 网格 ==================== */
+/* 战斗前每次都要点开，是高频核心 UI */
+
+body.promare-mode #phase-rune-launcher {
+    background: rgba(10, 10, 10, 0.95) !important;
+    backdrop-filter: none !important;
+}
+
+body.promare-mode #rune-launcher-content {
+    background: #0a0a0a !important;
+    border: 2px solid #FFFFFF !important;
+    border-radius: 0 !important;
+    box-shadow: 0 0 0 3px #FF0090, inset 4px 4px 0 rgba(0, 229, 255, 0.15) !important;
+    backdrop-filter: none !important;
+}
+
+body.promare-mode .rune-grid-cell {
+    background: #0a0a0a !important;
+    border: 2px solid #FFFFFF !important;
+    border-radius: 0 !important;
+    box-shadow: inset 1px 1px 0 #FF0090, inset -1px -1px 0 #00E5FF !important;
+    backdrop-filter: none !important;
+    transition: border-color 0.1s, transform 0.08s !important;
+}
+
+body.promare-mode .rune-grid-cell:hover,
+body.promare-mode .rune-grid-cell[data-state="hover"] {
+    border-color: #FFD600 !important;
+    box-shadow: inset 1px 1px 0 #FFD600, inset -1px -1px 0 #FFD600 !important;
+    transform: translateY(-1px);
+}
+
+body.promare-mode .rune-grid-cell[data-state="filled"] {
+    border-color: #FFD600 !important;
+    box-shadow: inset 2px 2px 0 #FFD600 !important;
+}
+
+/* 符文图标 → 灰阶高对比，统一视觉 */
+body.promare-mode .rune-grid-cell img,
+body.promare-mode .rune-grid-cell .rune-icon-frame img {
+    filter: grayscale(1) contrast(1.5) brightness(1.15) !important;
+    border-radius: 0 !important;
+}
+
+/* 战斗中符文槽 #combat-rune-single-slot */
+body.promare-mode #combat-rune-single-slot {
+    background: #0a0a0a !important;
+    border: 2px solid #00E5FF !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+body.promare-mode .rune-slot-glow-overlay {
+    background: rgba(255, 214, 0, 0.4) !important; /* YELLOW 充能闪光 */
+    border-radius: 0 !important;
+    box-shadow: inset 0 0 0 2px #FFD600 !important;
+}
+
+/* ==================== 商店（shop）==================== */
+
+body.promare-mode #phase-shop {
+    background: rgba(10, 10, 10, 0.95) !important;
+    backdrop-filter: none !important;
+}
+
+body.promare-mode .shop-item,
+body.promare-mode .shop-card {
+    background: #0a0a0a !important;
+    border: 2px solid #FFFFFF !important;
+    border-radius: 0 !important;
+    box-shadow: inset 2px 2px 0 #FF0090, inset -2px -2px 0 #00E5FF !important;
+    transition: border-color 0.12s !important;
+    backdrop-filter: none !important;
+}
+
+body.promare-mode .shop-item:hover,
+body.promare-mode .shop-card:hover {
+    border-color: #FFD600 !important;
+    box-shadow: inset 2px 2px 0 #FFD600, inset -2px -2px 0 #FFD600 !important;
+}
+
+/* 价格标签 */
+body.promare-mode .shop-price,
+body.promare-mode .shop-cost {
+    color: #FFD600 !important;
+    background: #0a0a0a !important;
+    border: 1px solid #FFD600 !important;
+    border-radius: 0 !important;
+    font-family: 'Inter Mono', monospace !important;
+    box-shadow: none !important;
+}
+
 /* ==================== 命运抉择卡牌（select-card 系列）==================== */
 /* DOM 卡牌：硬切边框 + 钻石图标 + 五色对比 */
 
