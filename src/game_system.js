@@ -19,6 +19,7 @@ import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
 import { COUNTER_MAP, RUNE_DB } from './rune_config.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
+import { setSuppress2DEntities } from './render3d/draw_mode.js';
 
 export const game_system = {
 
@@ -117,6 +118,13 @@ export const game_system = {
 
         const timeScale = this.timeScale;
 
+        // [3D-Main] 每帧同步"是否抑制 2D 实体绘制"开关。
+        // body.render3d-debug 由 #render3d-item 设置控制；entity.draw() 内首行查询此 flag。
+        const is3DMode = typeof document !== 'undefined'
+            && document.body
+            && document.body.classList.contains('render3d-debug');
+        setSuppress2DEntities(is3DMode);
+
         // 处理震动衰减
         let shakeX = 0, shakeY = 0;
         if (this.screenShake > 0) {
@@ -173,13 +181,10 @@ export const game_system = {
                 break;
         }
 
-        // [3D-Main] 纯 3D 模式：phase 跑完后把 2D canvas 上的 entity 绘制全部擦掉。
-        // 物理 update 已经执行完（粒子衰减、敌人移动等），只是把它们 .draw() 留下的像素清掉。
-        // 接下来的 floating texts / wind anchors / perf overlay / UI 在干净画布上重新绘制，
-        // 下层 WebGL 全息场景成为唯一可见的"世界视觉"。
-        // 切回 2D 模式（body 没有 render3d-debug class）时跳过此清屏，entities 正常显示。
-        if (typeof document !== 'undefined' && document.body && document.body.classList.contains('render3d-debug')) {
-            // ctx 已被外层 save + translate(shake)；clear 用 setTransform 重置避免被 shake 偏移
+        // [3D-Main] 纯 3D 模式：所有 2D entity.draw() 已通过 setSuppress2DEntities() 在自身首行
+        // 早返回，不再写入像素。此处不再需要 clearRect 兜底——但保留作为"任何漏改 entity 的
+        // 安全网"，开销极低（一次 clearRect O(W*H) 像素清零，远小于 entity 绘制成本）。
+        if (is3DMode) {
             this.ctx.save();
             this.ctx.setTransform(1, 0, 0, 1, 0, 0);
             this.ctx.clearRect(0, 0, this.width, this.height);

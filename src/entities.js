@@ -40,6 +40,7 @@ import {
 import { Enemy, setEnemyAudioProvider } from './entities/enemy.js';
 import { Projectile, setProjectileAudioProvider } from './entities/projectile.js';
 import { RUNE_DB } from './rune_config.js';
+import { isSuppressed2DEntities } from './render3d/draw_mode.js';
 import {
     resolveEnhancedCollision,
     calcMagnusForce,
@@ -146,6 +147,7 @@ class SpecialSlot {
      * @param {CanvasRenderingContext2D} ctx
      */
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (this.hit) return;
 
         this.animTimer += 0.05;
@@ -351,6 +353,7 @@ class FortuneWheel {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         
         // 繪製半透明黑色背景遮罩，突出輪盤
@@ -542,6 +545,7 @@ class GhostPeg {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         const x = this.pos.x, y = this.pos.y, r = this.radius;
         const lifeRatio = this.life / this.maxLife;
@@ -699,6 +703,7 @@ class TriangleSideWheel {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         const x = this.x, y = this.y, r = this.radius;
         const pulse = (Math.sin(Date.now() / 500) + 1) / 2;
 
@@ -1039,6 +1044,7 @@ class Peg {
     // --- 替换 Peg 类的 draw 方法 ---
     // @section:peg_shadow_and_transform - 软阴影与碰撞旋转变换初始化
     draw(ctx, baseRadius, tilt = {x:0, y:0}) {
+        if (isSuppressed2DEntities()) return;
         const currentRadius = baseRadius * this.scale;
         const isSpecial = this.type !== 'normal';
         const isLit = this.lit;
@@ -3041,6 +3047,7 @@ class DropBall {
          * @description 分层绘制弹珠 (更新：爆破弹珠专属视觉)
          */
         draw(ctx) {
+            if (isSuppressed2DEntities()) return;
             if (!this.active) return;
             
             const x = this.pos.x;
@@ -3500,6 +3507,7 @@ class SwordQi {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
@@ -3534,6 +3542,7 @@ class SlashAnim {
         if (this.life <= 0) this.active = false;
     }
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
@@ -3914,6 +3923,7 @@ class SonSword {
     }
 
         draw(ctx) {
+            if (isSuppressed2DEntities()) return;
         if (!this.active || this.state === 'stuck') return; 
 
         const color = this.level >= 3 ? '#f43f5e' : (this.level >= 2 ? '#6366f1' : '#0ea5e9');
@@ -4054,6 +4064,7 @@ class CloneSpore {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
@@ -4306,6 +4317,7 @@ class Player {
      * @param {CanvasRenderingContext2D} ctx - 绘图上下文
      */
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         const nextAmmo = this.game.ammoQueue.length > 0 ? this.game.ammoQueue[0] : null;
         
         // 计算当前绘制位置（可能有抖动）
@@ -4713,6 +4725,7 @@ class FieldLootItem {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active || this.opacity <= 0) return;
 
         const floatY = Math.sin(this._animTimer) * 5;
@@ -4797,6 +4810,7 @@ class RuneLoot {
      * @param {CanvasRenderingContext2D} ctx - 绘图上下文
      */
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
 
         this._animTimer += 0.05;

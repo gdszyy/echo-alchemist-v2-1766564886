@@ -22,6 +22,7 @@ import { CONFIG } from '../config.js';
 import { Vec2 } from '../utils/math_utils.js';
 import { Particle, SlashEffect } from '../effects/particles.js';
 import { sb as _sb } from '../utils/perf.js';
+import { isSuppressed2DEntities } from '../render3d/draw_mode.js';
 
 // audio 代理由 entities.js 注入，通过模块级变量共享
 let _audioProvider = null;
@@ -919,6 +920,7 @@ class Projectile {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active && !this.destroyed) return;
         const integrity = (this.bouncesLeft + this.piercesLeft) / (this.maxDurability || 1);
         // [拖尾 #6] 在主体之前先绘制拖尾，主体覆盖在最前

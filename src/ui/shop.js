@@ -18,6 +18,7 @@ import { RUNE_DB } from '../rune_config.js';
 import { showToast } from '../entities.js';
 import { eventBus } from '../event_bus.js';
 import { getRelicIconSrc } from '../bitmap_icons.js'; // [Phase 5A Task 5.A7] 位图遗物图标
+import { getRelicSigilDataURL } from './relic_sigil.js'; // [3D-Main] 程序化徽记（M5 RelicCard 2D 移植）
 
 // ==================== [v2 即时感重塑] 子弹评分与属性操作辅助函数 ====================
 // 这些工具函数被 mirror_magazine / element_injector 调用以判定"最强/最弱"子弹与属性翻倍。
@@ -174,11 +175,16 @@ export const shop_system = {
                     `;
                 }
                 
-                // [Phase 5A Task 5.A7] 位图遗物图标：优先使用 64×64 位图，fallback 到 emoji
-                const relicBitmapSrc = getRelicIconSrc(relic.id);
-                const relicIconHtml = relicBitmapSrc
-                    ? `<img src="${relicBitmapSrc}" alt="${relic.icon}" style="width:100%;height:100%;object-fit:contain;" loading="lazy" onerror="this.style.display='none';this.insertAdjacentText('afterend','${relic.icon}');"/>`
-                    : relic.icon;
+                // [3D-Main] 遗物 PNG 已废弃，改用 M5 RelicCard 风格的程序化徽记 +
+                // 角落保留 emoji 作为快速识别标记。
+                // 徽记按 hash(relic.id) → 形状，按 relic.rarity → 颜色，shop 内同一遗物
+                // 永远渲染同样的图（缓存 DataURL）。
+                const sigilSrc = getRelicSigilDataURL(relic, 96);
+                el.setAttribute('data-rarity', relic.rarity || 'common');
+                const relicIconHtml = sigilSrc
+                    ? `<img src="${sigilSrc}" alt="${relic.icon}" class="relic-sigil"/>
+                       <span class="relic-emoji">${relic.icon || ''}</span>`
+                    : (relic.icon || '');
                 el.innerHTML = `
                     <div class="relic-icon">${relicIconHtml}</div>
                     <div class="relic-name">${relic.name}</div>

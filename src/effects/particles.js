@@ -17,6 +17,7 @@
  */
 import { Vec2, lerp } from '../utils/math_utils.js';
 import { sb as _sb } from '../utils/perf.js';
+import { isSuppressed2DEntities } from '../render3d/draw_mode.js';
 
 class Particle {
     constructor(x, y, color, mode = 'normal') {
@@ -139,6 +140,7 @@ class Particle {
 
     // --- Particle 类的 draw 方法 ---
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (this.life <= 0) return;
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
@@ -283,6 +285,7 @@ class SlashEffect {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         ctx.save();
         ctx.translate(this.x, this.y);
@@ -357,6 +360,7 @@ class CollectionBeam {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (this.life <= 0) return;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -411,6 +415,7 @@ class Shockwave {
     }
 
     draw(ctx) { 
+        if (isSuppressed2DEntities()) return;
         if(this.alpha <= 0) return; 
         ctx.save(); 
         
@@ -476,6 +481,7 @@ class LaserBeam {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (this.life <= 0) return;
         ctx.save();
         ctx.lineCap = 'round';
@@ -634,6 +640,7 @@ class EnergyOrb {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         ctx.save();
         
@@ -739,6 +746,7 @@ class LightningBolt {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (this.life <= 0) return;
         ctx.save();
         ctx.lineCap = 'round';
@@ -800,6 +808,7 @@ class FireWave {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (this.life <= 0) return;
         ctx.save();
         // 使用 lighter 混合模式讓火焰看起來更亮
@@ -844,6 +853,7 @@ class IceWave {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (this.life <= 0) return;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -1031,6 +1041,7 @@ class DeathExplosion {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (this.life <= 0) return;
         ctx.save();
 
@@ -1173,6 +1184,7 @@ class HealWave {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (this.life <= 0) return;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -1292,6 +1304,7 @@ class BladeStormRing {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active || this.life <= 0) return;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -1348,6 +1361,7 @@ class SwordScar {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active || this.life <= 0) return;
         ctx.save();
         ctx.translate(this.x + this.offsetX, this.y + this.offsetY);
@@ -1550,6 +1564,7 @@ class RewardDropEffect {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (this.life <= 0) return;
         const alpha = Math.max(0, this.life);
         ctx.save();

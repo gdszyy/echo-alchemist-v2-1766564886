@@ -169,3 +169,41 @@ body.glass-ui-enabled .number-display,
 body.glass-ui-enabled .currency-amount {
     text-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
 }
+
+/* ============================================================
+ * [3D-Main] 遗物图标：程序化徽记 + emoji 双层
+ * 替代旧的 64×64 PNG（M6 已删除）。徽记由 src/ui/relic_sigil.js
+ * 按 hash(relic.id) 程序化生成，存为 DataURL 内嵌 <img>。
+ * ============================================================ */
+.relic-card .relic-icon {
+    position: relative;
+    display: inline-block;
+    width: 96px;
+    height: 96px;
+    max-width: 100%;
+    max-height: 100%;
+}
+.relic-card .relic-icon .relic-sigil {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    /* 边缘柔光，让徽记融入卡牌 */
+    filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.15));
+    pointer-events: none;
+}
+.relic-card .relic-icon .relic-emoji {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    font-size: 22px;
+    line-height: 1;
+    text-shadow: 0 0 6px rgba(0, 0, 0, 0.85);
+    pointer-events: none;
+    /* 小角标：让 emoji 作为辅助识别符 */
+    padding: 2px 4px;
+    background: rgba(2, 6, 23, 0.55);
+    border-radius: 6px;
+    backdrop-filter: blur(4px);
+}
