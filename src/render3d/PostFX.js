@@ -74,17 +74,23 @@ const LENS_DISTORTION_SHADER = {
 };
 
 // ===================================================================
-// 自定义 shader：边角暗角 + 胶片颗粒（合并一个 pass 省 framebuffer）
+// 自定义 shader：边角暗角 + 胶片颗粒 + Cinematic Color Grading
+// 一个 pass 完成三件事，省 framebuffer。
 // ===================================================================
 const VIGNETTE_GRAIN_SHADER = {
     name: 'VignetteGrainShader',
     uniforms: {
         tDiffuse:          { value: null },
         uTime:             { value: 0 },
-        uVignetteOffset:   { value: 0.70 },   // 半径外开始变暗
-        uVignetteDarkness: { value: 0.65 },   // 边角最深度
-        uGrainAmount:      { value: 0.045 },  // 颗粒强度
+        uVignetteOffset:   { value: 0.68 },   // 半径外开始变暗
+        uVignetteDarkness: { value: 0.45 },   // 边角最深度（不要太黑，留出敌人可见）
+        uGrainAmount:      { value: 0.035 },  // 颗粒强度
         uResolution:       { value: new THREE.Vector2(1, 1) },
+        // [M4 调优] Color grading 参数
+        uSaturation:       { value: 1.10 },   // 全局饱和度（1.0=原色）
+        uShadowTint:       { value: new THREE.Color(0.04, 0.08, 0.18) }, // 冷蓝阴影
+        uHighlightTint:    { value: new THREE.Color(0.20, 0.12, 0.04) }, // 暖橙高光
+        uGradingStrength:  { value: 0.32 },   // grading 混入强度
     },
     vertexShader: /* glsl */`
         varying vec2 vUv;
@@ -101,6 +107,10 @@ const VIGNETTE_GRAIN_SHADER = {
         uniform float uVignetteDarkness;
         uniform float uGrainAmount;
         uniform vec2  uResolution;
+        uniform float uSaturation;
+        uniform vec3  uShadowTint;
+        uniform vec3  uHighlightTint;
+        uniform float uGradingStrength;
         varying vec2 vUv;
 
         float hash21(vec2 p) {
@@ -109,24 +119,39 @@ const VIGNETTE_GRAIN_SHADER = {
             return fract(p.x * p.y);
         }
 
+        // Rec.709 luma
+        float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+
         void main() {
             vec4 color = texture2D(tDiffuse, vUv);
+            vec3 col = color.rgb;
 
-            // Vignette：以画面中心为圆心，距离 > offset 后线性变暗
+            // === [M4] Cinematic Color Grading ===
+            // 1) 饱和度
+            float L = luma(col);
+            col = mix(vec3(L), col, uSaturation);
+            // 2) Split-tone：阴影 → cool blue，高光 → warm amber
+            //    用 luma 做 mask；shadowMask 在暗处大，highlightMask 在亮处大
+            float shadowMask    = 1.0 - smoothstep(0.0, 0.55, L);
+            float highlightMask = smoothstep(0.45, 1.0, L);
+            col += uShadowTint    * shadowMask    * uGradingStrength;
+            col += uHighlightTint * highlightMask * uGradingStrength;
+            // 3) 微微抬黑（避免阴影完全死）
+            col = mix(col, col * 0.92 + vec3(0.015), 0.5);
+
+            // === Vignette：以画面中心为圆心，距离 > offset 后线性变暗 ===
             vec2 c = vUv - 0.5;
-            // 椭圆 vignette（考虑 9:16 纵向画面）
-            c.x *= uResolution.x / max(uResolution.y, 1.0);
+            c.x *= uResolution.x / max(uResolution.y, 1.0);   // 椭圆校准
             float r = length(c) * 1.6;
             float vig = 1.0 - smoothstep(uVignetteOffset, uVignetteOffset + 0.45, r);
-            // vig=1 表示中心保留原色，vig=0 表示边角全黑
             float vAmt = mix(1.0 - uVignetteDarkness, 1.0, vig);
-            color.rgb *= vAmt;
+            col *= vAmt;
 
-            // Film grain：基于 uv * res + 时间扰动的伪随机噪点
+            // === Film grain ===
             float grain = hash21(vUv * uResolution + uTime * 137.0) - 0.5;
-            color.rgb += grain * uGrainAmount;
+            col += grain * uGrainAmount;
 
-            gl_FragColor = vec4(color.rgb, 1.0);
+            gl_FragColor = vec4(col, 1.0);
         }
     `,
 };
@@ -176,16 +201,20 @@ export class PostFX {
         this.composer.addPass(this.renderPass);
 
         // --- Pass 2: bloom ---
+        // [M4 调优] 阈值上调避免全场泛光：只让真正亮的 emissive（强 rim、击中冲量、boss 强光）
+        // 触发 bloom。基础色被 ACES tonemap 后压在 [0, 1) 区间，不会污染。
+        // [M4 调优历史] 实测：bloom 阈值过高会让 SwiftShader 等软渲染场景几乎看不见 emissive，
+        // 真实 GPU 上又会过曝。折中默认值如下，配合 color grading + tonemap 形成稳定中间观感。
         this.bloomPass = new UnrealBloomPass(
             new THREE.Vector2(this.width, this.height),
-            0.70,   // strength
+            0.78,   // strength
             0.45,   // radius
-            0.55    // threshold（LDR 模式下需要较低阈值才能触发）
+            0.55    // threshold（LDR：luma > 0.55 触发，敌人 rim 即可激活 bloom）
         );
-        // HDR 时阈值可以高一些（emissive 自然 > 1）
         if (this.usingHDR) {
-            this.bloomPass.threshold = 0.85;
-            this.bloomPass.strength = 0.85;
+            this.bloomPass.threshold = 0.78;   // 略高于 LDR sRGB 上限，但 emissive>1 仍易激活
+            this.bloomPass.strength = 0.90;
+            this.bloomPass.radius = 0.50;
         }
         this.composer.addPass(this.bloomPass);
 

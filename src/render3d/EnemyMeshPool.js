@@ -65,10 +65,12 @@ const FRAG_SRC = /* glsl */`
         // 伪光照：用 view-y 模拟从上方斜下的"舞台灯"
         float fakeLight = 0.5 + 0.5 * max(0.0, N.y * 0.6 + N.z * 0.4);
 
-        vec3 col = uBase * (0.55 + 0.55 * fakeLight);   // 提亮基底，面部可读
-        col += uTier * 0.22;                            // 全身 tier 染色（嵌入金属基）
-        col += uTier * rim * 1.7 * pulse;               // 边缘按 tier 增强 + 呼吸
-        col = mix(col, vec3(1.0), uHit * 0.85);         // 击中瞬白闪
+        // [M4 调优] 全身 tier 0.22 → 0.18（轻度弱化），rim 1.7 → 1.9（增强让 bloom 在边缘炸）。
+        // 既保留原 M3 的整体可读性，又让 PostFX bloom 在 rim 上有更明显的炸开效果。
+        vec3 col = uBase * (0.55 + 0.55 * fakeLight);
+        col += uTier * 0.18;
+        col += uTier * rim * 1.9 * pulse;
+        col = mix(col, vec3(1.0), uHit * 0.85);
 
         gl_FragColor = vec4(col, 1.0);
     }
