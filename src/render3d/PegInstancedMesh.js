@@ -60,16 +60,24 @@ export class PegInstancedMesh {
         this._hitImpulseAttr = this.geometry.attributes.instanceHit;
         this._hitImpulse = hitImpulse;
 
+        // [3D-Main 修复] 自定义 aColor 替代 instanceColor，避免 three.js 在 setColorAt 调用与否
+        // 的两种情况下 shader 报 "undeclared identifier" / "redefinition" 的双向坑。
+        const colorBuf = new Float32Array(PEG_CAPACITY * 3);
+        this.geometry.setAttribute(
+            'aColor',
+            new THREE.InstancedBufferAttribute(colorBuf, 3)
+        );
+        this._colorAttr = this.geometry.attributes.aColor;
+        this._colorBuf = colorBuf;
+
         this.material = new THREE.ShaderMaterial({
             transparent: false,
             uniforms: {
                 uTime: { value: 0 },
             },
             vertexShader: /* glsl */`
-                // ShaderMaterial 不会自动 inject 实例属性；手动声明。
-                // 注意：instanceMatrix 由 Three.js 在 USE_INSTANCING 路径自动注入，
-                // 但 instanceColor (来自 setColorAt) 必须手动声明。
-                attribute vec3 instanceColor;
+                // 自定义实例属性（避免与 three.js 内部 instanceColor 命名冲突）
+                attribute vec3 aColor;
                 attribute float instancePhase;
                 attribute float instanceHit;
 
@@ -90,7 +98,7 @@ export class PegInstancedMesh {
                     // 法线需经过 instanceMatrix 的 3x3 部分（这里只含均匀缩放，所以 normalize 后等价于纯旋转）
                     vec3 instNormal = mat3(instanceMatrix) * normal;
                     vNormal  = normalize(normalMatrix * instNormal);
-                    vColor   = instanceColor;
+                    vColor   = aColor;
                     vViewPos = mvPos.xyz;
                     vPhase   = instancePhase;
                     vHit     = instanceHit;
@@ -165,13 +173,15 @@ export class PegInstancedMesh {
             this._tmpMat.setPosition(w.x, w.y, w.z);
             this.mesh.setMatrixAt(i, this._tmpMat);
 
+            // 写入自定义 aColor buffer（不走 setColorAt 防 three.js 冲突）
             const arr = PEG_COLORS[p.type] || PEG_COLORS.normal;
-            this._tmpColor.setRGB(arr[0], arr[1], arr[2]);
-            this.mesh.setColorAt(i, this._tmpColor);
+            this._colorBuf[i * 3 + 0] = arr[0];
+            this._colorBuf[i * 3 + 1] = arr[1];
+            this._colorBuf[i * 3 + 2] = arr[2];
         }
         this.mesh.count = n;
         this.mesh.instanceMatrix.needsUpdate = true;
-        if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+        this._colorAttr.needsUpdate = true;
     }
 
     /**

@@ -65,10 +65,14 @@ const FRAG_SRC = /* glsl */`
         // 伪光照：用 view-y 模拟从上方斜下的"舞台灯"
         float fakeLight = 0.5 + 0.5 * max(0.0, N.y * 0.6 + N.z * 0.4);
 
-        // [M4 调优] 全身 tier 0.22 → 0.18（轻度弱化），rim 1.7 → 1.9（增强让 bloom 在边缘炸）。
-        // 既保留原 M3 的整体可读性，又让 PostFX bloom 在 rim 上有更明显的炸开效果。
-        vec3 col = uBase * (0.55 + 0.55 * fakeLight);
-        col += uTier * 0.18;
+        // [3D-Main 修复] 用户反馈"敌人和背景没区分开" → 大幅提亮 body：
+        //   base 0.55 → 0.95（金属面更亮，从背景里跳出来）
+        //   tier 0.18 → 0.32（全身 tier 染色更明显，elite 青/boss 金更明显）
+        //   rim 保持 1.9（已经够强）
+        //   引入一道顶光（vNormal.y 模拟 sky light）增强 3D 立体感
+        float skyLight = max(0.0, N.y * 0.6 + 0.4);  // 0.4..1.0
+        vec3 col = uBase * (0.85 + 0.50 * skyLight);
+        col += uTier * 0.32;
         col += uTier * rim * 1.9 * pulse;
         col = mix(col, vec3(1.0), uHit * 0.85);
 
