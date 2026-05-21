@@ -16,6 +16,7 @@ import { PegInstancedMesh } from './PegInstancedMesh.js';
 import { WallMesh } from './WallMesh.js';
 import { EnemyMeshPool } from './EnemyMeshPool.js';
 import { GPUParticleSystem } from './GPUParticleSystem.js';
+import { BallMesh } from './BallMesh.js';
 
 export class SceneProxy {
     /**
@@ -37,6 +38,12 @@ export class SceneProxy {
         this.walls.setVisible(false); // 默认隐藏：阶段不是 gathering/combat/training 时不显示
 
         this.enemies = new EnemyMeshPool(this.scene);
+
+        // [3D-Main 修复] 弹珠 + 子弹的 3D 球体（之前漏掉，2D 被 guard return 后玩家看不到任何弹丸）
+        this.balls       = new BallMesh({ capacity: 32, name: 'BallMesh_DropBalls' });
+        this.projectiles = new BallMesh({ capacity: 32, name: 'BallMesh_Projectiles' });
+        this.scene.add(this.balls.mesh);
+        this.scene.add(this.projectiles.mesh);
 
         // [3D-Main M6] GPU 粒子池：默认 4096，M6.5 由 QualityProfile 注入
         this.particles = new GPUParticleSystem(this.scene, {
@@ -114,13 +121,29 @@ export class SceneProxy {
     /**
      * 通知 proxy 当前阶段，控制墙/钉等的可见性。
      */
+    /**
+     * 同步 game.dropBalls 到 3D（研磨阶段下落弹珠）
+     */
+    syncDropBalls(dropBalls) {
+        if (!this.balls) return;
+        this.balls.sync(dropBalls || [], this.coords, { defaultRadiusPx: 8, colorKey: 'type' });
+    }
+
+    /**
+     * 同步 game.projectiles 到 3D（战斗阶段子弹）
+     */
+    syncProjectiles(projectiles) {
+        if (!this.projectiles) return;
+        this.projectiles.sync(projectiles || [], this.coords, { defaultRadiusPx: 6, colorKey: 'type' });
+    }
+
     setPhase(phase) {
         if (this._phase === phase) return;
         this._phase = phase;
         // 墙：研磨 + 战斗 + 试炼都显示；其他阶段隐藏
         const wallsOn = phase === 'gathering' || phase === 'combat' || phase === 'training';
         this.walls.setVisible(wallsOn);
-        // 钉子：仅 gathering / training 显示（combat 内没有钉子，由 syncPegs([]) 自然清空）
+        // 钉子：仅 gathering / training 显示
         if (phase !== 'gathering' && phase !== 'training') {
             this.pegs.clear();
         }
@@ -128,6 +151,9 @@ export class SceneProxy {
         if (phase !== 'combat' && phase !== 'training') {
             this.enemies.clear();
         }
+        // 弹珠 / 子弹：阶段切换时立即清空（避免残留）
+        if (this.balls) this.balls.clear();
+        if (this.projectiles) this.projectiles.clear();
     }
 
     /** Canvas resize 时调用（来自 Renderer3D.resize） */
@@ -144,6 +170,8 @@ export class SceneProxy {
         this.pegs.update(dt, t);
         this.walls.update(t);
         this.enemies.update(dt, t);
+        if (this.balls) this.balls.update(dt, t);
+        if (this.projectiles) this.projectiles.update(dt, t);
         if (this.particles) this.particles.update(dt);
     }
 
@@ -151,10 +179,14 @@ export class SceneProxy {
         try { this.pegs.dispose(); } catch (e) {}
         try { this.walls.dispose(); } catch (e) {}
         try { this.enemies.dispose(); } catch (e) {}
+        try { if (this.balls) this.balls.dispose(); } catch (e) {}
+        try { if (this.projectiles) this.projectiles.dispose(); } catch (e) {}
         try { if (this.particles) this.particles.dispose(); } catch (e) {}
         if (this.scene) {
             this.scene.remove(this.pegs.mesh);
             this.scene.remove(this.walls.group);
+            if (this.balls)       this.scene.remove(this.balls.mesh);
+            if (this.projectiles) this.scene.remove(this.projectiles.mesh);
         }
     }
 }

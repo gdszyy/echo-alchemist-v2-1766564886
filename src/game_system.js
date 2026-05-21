@@ -190,15 +190,11 @@ export const game_system = {
                 break;
         }
 
-        // [3D-Main] 纯 3D 模式：所有 2D entity.draw() 已通过 setSuppress2DEntities() 在自身首行
-        // 早返回，不再写入像素。此处不再需要 clearRect 兜底——但保留作为"任何漏改 entity 的
-        // 安全网"，开销极低（一次 clearRect O(W*H) 像素清零，远小于 entity 绘制成本）。
-        if (is3DMode) {
-            this.ctx.save();
-            this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-            this.ctx.clearRect(0, 0, this.width, this.height);
-            this.ctx.restore();
-        }
+        // [3D-Main 修复] 此处之前有 clearRect 兜底擦掉 2D entity 绘制——但同样会擦掉 phase
+        // update 内部直接画在 ctx 上的关键 UI（瞄准线、风系连线、HP bar 等）。
+        // 现已通过 setSuppress2DEntities() 在 entity .draw() 首行 early-return；瞄准线 / UI
+        // 等非 entity 的 ctx 调用得以保留。如果发现新 entity 漏加 guard，应该在 entity 里加，
+        // 不要回退到整块 clearRect。
 
         // 6. 战场掉落物更新与渲染
         // [BUGFIX] fieldLootItems 已移入 phase_combat_update 的 LAYER 2（实体层）内渲染，

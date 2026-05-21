@@ -2104,7 +2104,13 @@ phase_gathering_getRandomPegType() {
 
             // [3D-Main M3] 把当前 enemies[] 同步到 3D EnemyMeshPool（每帧一次）
             if (this.renderer3d && this.renderer3d.proxy) {
-                try { this.renderer3d.proxy.syncEnemies(this.enemies); } catch (e) {
+                try {
+                    this.renderer3d.proxy.syncEnemies(this.enemies);
+                    // [3D-Main 修复] 子弹也需要 3D 同步
+                    if (this.renderer3d.proxy.syncProjectiles) {
+                        this.renderer3d.proxy.syncProjectiles(this.projectiles);
+                    }
+                } catch (e) {
                     console.warn('[Renderer3D] syncEnemies error:', e);
                 }
             }
@@ -2851,7 +2857,13 @@ phase_gathering_getRandomPegType() {
         // [3D-Main M2] 把当前钉子数组同步到 3D InstancedMesh（每帧一次）
         // 1 帧后 Renderer3D.render() 才会取到新数据，但 60fps 下不可察觉
         if (this.renderer3d && this.renderer3d.proxy) {
-            try { this.renderer3d.proxy.syncPegs(this.pegs, pegRadius); } catch (e) {
+            try {
+                this.renderer3d.proxy.syncPegs(this.pegs, pegRadius);
+                // [3D-Main 修复] 弹珠也需要 3D 同步
+                if (this.renderer3d.proxy.syncDropBalls) {
+                    this.renderer3d.proxy.syncDropBalls(this.dropBalls);
+                }
+            } catch (e) {
                 console.warn('[Renderer3D] syncPegs error:', e);
             }
         }
