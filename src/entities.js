@@ -896,6 +896,9 @@ class Peg {
     // --- 在 Peg 类中替换此方法 ---
     // --- 在 Peg 类中替换此方法 ---
     drawShadow(ctx, lightPos, lightRadius) {
+        // [3D-Main 性能] 3D 模式下整个 2D 阴影渲染都被擦除/不可见，跳过 ctx 调用
+        if (isSuppressed2DEntities()) return;
+
         const dx = this.pos.x - lightPos.x;
         const dy = this.pos.y - lightPos.y;
         const distSq = dx * dx + dy * dy;
@@ -994,6 +997,10 @@ class Peg {
     }
     //  计算来自某个光源的影响
     calculateLight(sourcePos, lightRadius) {
+        // [3D-Main 性能] 3D 模式下 lightIntensity 不会被读（peg.draw 被 guard 跳过），
+        // 整个计算可以省。这是 O(N*M) 循环里调的，开销显著。
+        if (isSuppressed2DEntities()) return;
+
         const dx = sourcePos.x - this.pos.x;
         const dy = sourcePos.y - this.pos.y;
         const distSq = dx*dx + dy*dy;
