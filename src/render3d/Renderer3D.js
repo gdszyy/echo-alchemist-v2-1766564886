@@ -194,6 +194,10 @@ export class Renderer3D {
             this.postfx.setBloomStrength(this._fxBaselineBloom + fx.bloom);
             // exposure 通过 renderer.toneMappingExposure 控制（OutputPass 读取）
             this.renderer.toneMappingExposure = 1.0 + fx.exposure;
+            // [M4] 全屏白闪
+            if (typeof this.postfx.setFlash === 'function') {
+                this.postfx.setFlash(fx.flash || 0);
+            }
         }
 
         if (this.postfx) {
@@ -237,6 +241,9 @@ export class Renderer3D {
                 case 'AIM':
                     this.cameraController.setAim(payload.x ?? 0, payload.y ?? 0);
                     break;
+                case 'FLASH':
+                    this.cameraController.triggerFlash(payload.intensity ?? 0.4);
+                    break;
                 default:
                     // 未知类型不报错，便于上游平滑扩展
                     break;
@@ -262,6 +269,12 @@ export class Renderer3D {
             else if (dmg >= 30) intensity = 0.42;
             if (data.killed) intensity *= 1.4;
             this.cameraEvent('IMPACT', { intensity });
+
+            // [M4] 大伤害 / 击杀 → 全屏白闪 punch
+            if (dmg >= 150 || (data.killed && dmg >= 60)) {
+                const flashAmt = Math.min(0.6, 0.25 + dmg / 600);
+                this.cameraEvent('FLASH', { intensity: flashAmt });
+            }
 
             // [M6] 击中处撒 spark 粒子；颜色按伤害属性取色（fallback 黄白）
             const proxy = this.proxy;
@@ -302,6 +315,8 @@ export class Renderer3D {
         };
         const onBossDefeated = (data) => {
             this.cameraEvent('IMPACT', { intensity: 1.4 });
+            // [M4] Boss 倒下：强白闪
+            this.cameraEvent('FLASH', { intensity: 0.55 });
             // [M6] Boss 击败：大规模 smoke + ember 爆开
             const proxy = this.proxy;
             if (proxy && proxy.spawnParticles && data && data.boss && data.boss.pos) {
