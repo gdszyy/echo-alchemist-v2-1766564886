@@ -44,12 +44,13 @@ const FRAG_SRC = /* glsl */`
         vec3 N = normalize(vNormal);
         vec3 V = normalize(-vViewPos);
         float ndotv = max(0.0, dot(N, V));
-        float rim = pow(1.0 - ndotv, 1.8);
+        float rim = pow(1.0 - ndotv, 1.6);
 
-        // 弹珠是发光源——base emissive 高，rim 再加强
-        vec3 col = vColor * (0.6 + rim * 1.2);
-        // 中心高光（fake specular）
-        col += vec3(1.0) * pow(ndotv, 12.0) * 0.4;
+        // [视觉调优] 用户反馈"3D 太暗" → 弹珠/子弹是核心视觉焦点，提亮：
+        //   base 0.6 → 0.85，rim 系数 1.2 → 1.5，specular 0.4 → 0.55。
+        //   配合 PostFX bloom threshold 下调，弹珠会主动激活泛光。
+        vec3 col = vColor * (0.85 + rim * 1.5);
+        col += vec3(1.0) * pow(ndotv, 10.0) * 0.55;
 
         gl_FragColor = vec4(col, 1.0);
     }

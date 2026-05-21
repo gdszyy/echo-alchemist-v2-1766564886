@@ -1,14 +1,16 @@
 /* ============================================================
  * glass_ui.css - 全息玻璃风格 HUD 覆盖层（M5）
  *
- * 启用方式：body 添加 class `.glass-ui-enabled`，比如：
- *     document.body.classList.add('glass-ui-enabled');
+ * 启用方式：body 添加 class `.glass-ui-enabled`。
  *
- * 默认关闭，零影响现有 bitmap_ui.css。启用后会用 backdrop-filter
- * + 渐变边框替换 9-slice 位图边框，把整个 HUD 升级到"全息玻璃"。
+ * [重要] 自 Promare 视觉模式（CONFIG.visualMode='promare'）成为默认后，
+ * 所有规则均加 `:not(.promare-mode)` 互斥守卫——
+ * 否则 backdrop-blur / 圆角 / 灰紫 token 会把 promare 的硬切板色板压成
+ * 老 UI 残留（首页 / 卡片 / 按钮 看起来仍是「M5 玻璃 + 老色板」）。
+ * Promare 关闭时（console: window.__promare(false)）glass-ui 自动恢复。
  * ============================================================ */
 
-body.glass-ui-enabled {
+body.glass-ui-enabled:not(.promare-mode) {
     /* 公共变量：稀有度色 */
     --glass-common:    rgba(226, 232, 240, 0.6);
     --glass-rare:      rgba(129, 140, 248, 0.7);
@@ -22,7 +24,7 @@ body.glass-ui-enabled {
 }
 
 /* ===== 顶部信息栏 ===== */
-body.glass-ui-enabled #unified-top-bar {
+body.glass-ui-enabled:not(.promare-mode) #unified-top-bar {
     background: linear-gradient(180deg, var(--glass-bg-deep) 0%, var(--glass-bg-dark) 100%);
     backdrop-filter: blur(14px) saturate(1.4);
     -webkit-backdrop-filter: blur(14px) saturate(1.4);
@@ -33,17 +35,17 @@ body.glass-ui-enabled #unified-top-bar {
 }
 
 /* ===== 通用 .ui-overlay 面板（命运抉择/商店等弹层） ===== */
-body.glass-ui-enabled .ui-overlay {
+body.glass-ui-enabled:not(.promare-mode) .ui-overlay {
     background: radial-gradient(ellipse at center top, var(--glass-bg-dark) 0%, var(--glass-bg-deep) 80%);
     backdrop-filter: blur(18px) saturate(1.4);
     -webkit-backdrop-filter: blur(18px) saturate(1.4);
 }
 
 /* ===== 卡片：移除 9-slice 边框，用渐变 outline 替代 ===== */
-body.glass-ui-enabled .card,
-body.glass-ui-enabled .relic-card,
-body.glass-ui-enabled .runeword-card,
-body.glass-ui-enabled .skill-card {
+body.glass-ui-enabled:not(.promare-mode) .card,
+body.glass-ui-enabled:not(.promare-mode) .relic-card,
+body.glass-ui-enabled:not(.promare-mode) .runeword-card,
+body.glass-ui-enabled:not(.promare-mode) .skill-card {
     background:
         linear-gradient(180deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.92) 100%);
     border: 1px solid rgba(148, 163, 184, 0.35);
@@ -56,44 +58,44 @@ body.glass-ui-enabled .skill-card {
     transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
-body.glass-ui-enabled .card[data-rarity="common"],
-body.glass-ui-enabled .relic-card[data-rarity="common"] {
+body.glass-ui-enabled:not(.promare-mode) .card[data-rarity="common"],
+body.glass-ui-enabled:not(.promare-mode) .relic-card[data-rarity="common"] {
     border-color: var(--glass-common);
     box-shadow:
         0 0 24px rgba(226, 232, 240, 0.20),
         inset 0 0 18px rgba(226, 232, 240, 0.05);
 }
-body.glass-ui-enabled .card[data-rarity="rare"],
-body.glass-ui-enabled .relic-card[data-rarity="rare"] {
+body.glass-ui-enabled:not(.promare-mode) .card[data-rarity="rare"],
+body.glass-ui-enabled:not(.promare-mode) .relic-card[data-rarity="rare"] {
     border-color: var(--glass-rare);
     box-shadow:
         0 0 28px rgba(129, 140, 248, 0.30),
         inset 0 0 18px rgba(129, 140, 248, 0.08);
 }
-body.glass-ui-enabled .card[data-rarity="epic"],
-body.glass-ui-enabled .relic-card[data-rarity="epic"] {
+body.glass-ui-enabled:not(.promare-mode) .card[data-rarity="epic"],
+body.glass-ui-enabled:not(.promare-mode) .relic-card[data-rarity="epic"] {
     border-color: var(--glass-epic);
     box-shadow:
         0 0 36px rgba(217, 70, 239, 0.40),
         inset 0 0 22px rgba(217, 70, 239, 0.10);
 }
-body.glass-ui-enabled .card[data-rarity="legendary"],
-body.glass-ui-enabled .relic-card[data-rarity="legendary"] {
+body.glass-ui-enabled:not(.promare-mode) .card[data-rarity="legendary"],
+body.glass-ui-enabled:not(.promare-mode) .relic-card[data-rarity="legendary"] {
     border-color: var(--glass-legendary);
     box-shadow:
         0 0 42px rgba(245, 158, 11, 0.50),
         inset 0 0 28px rgba(245, 158, 11, 0.12);
 }
-body.glass-ui-enabled .card[data-rarity="cursed"],
-body.glass-ui-enabled .relic-card[data-rarity="cursed"] {
+body.glass-ui-enabled:not(.promare-mode) .card[data-rarity="cursed"],
+body.glass-ui-enabled:not(.promare-mode) .relic-card[data-rarity="cursed"] {
     border-color: var(--glass-cursed);
     box-shadow:
         0 0 28px rgba(159, 18, 57, 0.35),
         inset 0 0 18px rgba(159, 18, 57, 0.10);
 }
 
-body.glass-ui-enabled .card:hover,
-body.glass-ui-enabled .relic-card:hover {
+body.glass-ui-enabled:not(.promare-mode) .card:hover,
+body.glass-ui-enabled:not(.promare-mode) .relic-card:hover {
     transform: translateY(-2px);
     border-color: rgba(56, 189, 248, 0.8);
     box-shadow:
@@ -102,8 +104,8 @@ body.glass-ui-enabled .relic-card:hover {
 }
 
 /* ===== 按钮：玻璃 + 渐变 hover ===== */
-body.glass-ui-enabled button,
-body.glass-ui-enabled .btn {
+body.glass-ui-enabled:not(.promare-mode) button,
+body.glass-ui-enabled:not(.promare-mode) .btn {
     background: linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.85) 100%);
     border: 1px solid rgba(148, 163, 184, 0.4);
     border-image: none;
@@ -117,8 +119,8 @@ body.glass-ui-enabled .btn {
     transition: all 0.15s ease;
 }
 
-body.glass-ui-enabled button:hover,
-body.glass-ui-enabled .btn:hover {
+body.glass-ui-enabled:not(.promare-mode) button:hover,
+body.glass-ui-enabled:not(.promare-mode) .btn:hover {
     border-color: rgba(56, 189, 248, 0.7);
     box-shadow:
         0 0 18px rgba(56, 189, 248, 0.4),
@@ -128,8 +130,8 @@ body.glass-ui-enabled .btn:hover {
 }
 
 /* ===== PC 三栏边栏背景 ===== */
-body.glass-ui-enabled #pc-left-sidebar,
-body.glass-ui-enabled #pc-right-sidebar {
+body.glass-ui-enabled:not(.promare-mode) #pc-left-sidebar,
+body.glass-ui-enabled:not(.promare-mode) #pc-right-sidebar {
     background: linear-gradient(180deg, var(--glass-bg-deep) 0%, var(--glass-bg-dark) 100%);
     backdrop-filter: blur(20px) saturate(1.5);
     -webkit-backdrop-filter: blur(20px) saturate(1.5);
@@ -138,7 +140,7 @@ body.glass-ui-enabled #pc-right-sidebar {
 }
 
 /* ===== 移动端底部抽屉 ===== */
-body.glass-ui-enabled .bottom-panel {
+body.glass-ui-enabled:not(.promare-mode) .bottom-panel {
     background: linear-gradient(0deg, var(--glass-bg-deep) 0%, var(--glass-bg-dark) 100%);
     backdrop-filter: blur(16px) saturate(1.4);
     -webkit-backdrop-filter: blur(16px) saturate(1.4);
@@ -146,8 +148,8 @@ body.glass-ui-enabled .bottom-panel {
 }
 
 /* ===== Tooltip / popover ===== */
-body.glass-ui-enabled .tooltip,
-body.glass-ui-enabled .popover {
+body.glass-ui-enabled:not(.promare-mode) .tooltip,
+body.glass-ui-enabled:not(.promare-mode) .popover {
     background: rgba(2, 6, 23, 0.92);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -156,8 +158,8 @@ body.glass-ui-enabled .popover {
 }
 
 /* ===== 标题文字玻璃风 ===== */
-body.glass-ui-enabled #phase-title,
-body.glass-ui-enabled .phase-text {
+body.glass-ui-enabled:not(.promare-mode) #phase-title,
+body.glass-ui-enabled:not(.promare-mode) .phase-text {
     text-shadow:
         0 0 14px rgba(56, 189, 248, 0.6),
         0 0 28px rgba(56, 189, 248, 0.3);
@@ -165,8 +167,8 @@ body.glass-ui-enabled .phase-text {
 }
 
 /* ===== 数字滚动器（金币 / 符文碎片等） ===== */
-body.glass-ui-enabled .number-display,
-body.glass-ui-enabled .currency-amount {
+body.glass-ui-enabled:not(.promare-mode) .number-display,
+body.glass-ui-enabled:not(.promare-mode) .currency-amount {
     text-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
 }
 

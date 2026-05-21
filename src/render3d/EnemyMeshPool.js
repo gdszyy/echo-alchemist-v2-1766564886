@@ -65,15 +65,14 @@ const FRAG_SRC = /* glsl */`
         // 伪光照：用 view-y 模拟从上方斜下的"舞台灯"
         float fakeLight = 0.5 + 0.5 * max(0.0, N.y * 0.6 + N.z * 0.4);
 
-        // [3D-Main 修复] 用户反馈"敌人和背景没区分开" → 大幅提亮 body：
-        //   base 0.55 → 0.95（金属面更亮，从背景里跳出来）
-        //   tier 0.18 → 0.32（全身 tier 染色更明显，elite 青/boss 金更明显）
-        //   rim 保持 1.9（已经够强）
-        //   引入一道顶光（vNormal.y 模拟 sky light）增强 3D 立体感
+        // [视觉调优] 在已有提亮基础上再加色彩鲜明度：
+        //   base 0.85+0.50 → 1.10+0.55（金属面继续提亮，去掉灰阶感）
+        //   tier 0.32 → 0.50（tier 染色覆盖更明显，normal/elite/boss 一眼分辨）
+        //   rim 1.9 → 2.4（轮廓更"切边"，符合 promare 硬切板美学）
         float skyLight = max(0.0, N.y * 0.6 + 0.4);  // 0.4..1.0
-        vec3 col = uBase * (0.85 + 0.50 * skyLight);
-        col += uTier * 0.32;
-        col += uTier * rim * 1.9 * pulse;
+        vec3 col = uBase * (1.10 + 0.55 * skyLight);
+        col += uTier * 0.50;
+        col += uTier * rim * 2.4 * pulse;
         col = mix(col, vec3(1.0), uHit * 0.85);
 
         gl_FragColor = vec4(col, 1.0);

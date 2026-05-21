@@ -449,25 +449,41 @@ class Game {
             // 仅 visualMode==='promare' 启用，classic 模式完全跳过保持原行为。
             // @perf-impact: 监听器内只设字段 + 调 burst spawner（受 perf 档位限粒子数）。
             if (CONFIG.visualMode === 'promare') {
+                // [视觉调优] 用户反馈"第一回合那个小破子弹打上去闪的厉害"——
+                // 把命中反馈拆四档：tiny(<10) / normal(<30) / big(<60) / huge / kill。
+                // tiny 完全跳过停帧 + 全屏闪，只给极轻屏抖 + burst；档位越高视觉冲击越大。
                 const isKill = !!data.killed;
-                const isBig  = (data.actualDamage || data.amount || 0) > 0 && (data.amount || 0) >= 30;
-                // 移动端友好：normal 命中不停帧，仅 big/kill 触发
-                this.hitstopFrames = isKill ? 4 : (isBig ? 3 : 0);
-                // 全屏白闪：每次命中都给一个短闪，alpha 由 sys_loop 衰减
-                this.flashOverlay = { color: '#FFFFFF', alpha: isKill ? 0.5 : 0.35, frames: 4 };
-                // 屏抖：复用现有 triggerScreenShake（取 max 不叠乘）
-                const shakeAmt = isKill ? 14 : (isBig ? 9 : 5);
-                this.triggerScreenShake(shakeAmt);
+                const amt = (data.amount || 0);
+                let severity;
+                if      (isKill)    severity = 'kill';
+                else if (amt >= 60) severity = 'huge';
+                else if (amt >= 30) severity = 'big';
+                else if (amt >= 10) severity = 'normal';
+                else                severity = 'tiny';
+
+                // hitstop
+                const HITSTOP = { tiny: 0, normal: 0, big: 2, huge: 3, kill: 4 };
+                this.hitstopFrames = HITSTOP[severity];
+
+                // 全屏白闪：tiny 完全跳过，normal 极轻、big 中、huge/kill 重
+                const FLASH = { tiny: 0, normal: 0.10, big: 0.22, huge: 0.40, kill: 0.50 };
+                const flashAlpha = FLASH[severity];
+                if (flashAlpha > 0) {
+                    this.flashOverlay = { color: '#FFFFFF', alpha: flashAlpha, frames: severity === 'tiny' ? 2 : 4 };
+                }
+
+                // 屏抖：取 max，与原 triggerScreenShake 兼容
+                const SHAKE = { tiny: 2, normal: 4, big: 8, huge: 12, kill: 14 };
+                this.triggerScreenShake(SHAKE[severity]);
 
                 // [Promare] 几何碎片爆发：方向锥沿入射反向，元素决定形状
                 const hitX = data.hitX || (data.enemy ? data.enemy.pos.x : this.width / 2);
                 const hitY = data.hitY || (data.enemy ? data.enemy.pos.y : this.height / 2);
                 const elementType = data.type || (data.enemy && data.enemy._lastHitElement) || 'damage';
-                // 入射速度向量：projectile 的 vel 已存在 enemy._lastHitVel（由 combat_system 后续填充，
-                // 当前无该字段时退化为「球从下往上」假设）
                 const hitVel = (data.enemy && data.enemy._lastHitVel) || { x: 0, y: -1 };
-                const severity = isKill ? 'kill' : (isBig ? 'big' : 'normal');
-                spawnPromareBurst(this, hitX, hitY, hitVel, elementType, severity);
+                // spawnPromareBurst 只识别 normal/big/kill，把 tiny/huge 映射回去
+                const burstSeverity = severity === 'tiny' ? 'normal' : (severity === 'huge' ? 'big' : severity);
+                spawnPromareBurst(this, hitX, hitY, hitVel, elementType, burstSeverity);
                 spawnRadialImpact(this, hitX, hitY, elementType);
             }
         });

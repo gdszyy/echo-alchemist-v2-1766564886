@@ -35,46 +35,50 @@ import { FXAAShader }        from 'three/addons/shaders/FXAAShader.js';
 //   boss       深红 + 高饱和，整体压重，营造紧迫
 //   gameover   去饱和接近黑白，结束氛围
 // ===================================================================
+// [视觉调优] 用户反馈"3D 太暗 / 太透明，跟色彩鲜明的视觉要求不符"。
+// 全局降低 vignetteDarkness（边角不再吃光），提升 saturation（饱和度普涨 25-30%），
+// 削弱 split-tone 阴影/高光偏色（gradingStrength 减半），让 promare 5 色调色板
+// 不被 grading 拉灰。整体观感从"暗黑炼金"转向"高对比色块"。
 const GRADING_PRESETS = {
     meta: {
-        saturation:       0.92,
-        shadowR: 0.05, shadowG: 0.10, shadowB: 0.22,
-        highlightR: 0.10, highlightG: 0.14, highlightB: 0.22,
-        gradingStrength:  0.40,
-        vignetteDarkness: 0.50,
-        vignetteOffset:   0.62,
+        saturation:       1.30,
+        shadowR: 0.04, shadowG: 0.08, shadowB: 0.18,
+        highlightR: 0.10, highlightG: 0.10, highlightB: 0.18,
+        gradingStrength:  0.18,
+        vignetteDarkness: 0.18,
+        vignetteOffset:   0.78,
     },
     gathering: {
-        saturation:       1.05,
-        shadowR: 0.03, shadowG: 0.10, shadowB: 0.20,
-        highlightR: 0.14, highlightG: 0.18, highlightB: 0.12,
-        gradingStrength:  0.28,
-        vignetteDarkness: 0.42,
-        vignetteOffset:   0.70,
+        saturation:       1.35,
+        shadowR: 0.02, shadowG: 0.06, shadowB: 0.14,
+        highlightR: 0.12, highlightG: 0.14, highlightB: 0.10,
+        gradingStrength:  0.15,
+        vignetteDarkness: 0.18,
+        vignetteOffset:   0.82,
     },
     combat: {
-        saturation:       1.10,
-        shadowR: 0.04, shadowG: 0.08, shadowB: 0.18,
-        highlightR: 0.20, highlightG: 0.12, highlightB: 0.04,
-        gradingStrength:  0.32,
-        vignetteDarkness: 0.45,
-        vignetteOffset:   0.68,
+        saturation:       1.40,
+        shadowR: 0.03, shadowG: 0.05, shadowB: 0.12,
+        highlightR: 0.16, highlightG: 0.10, highlightB: 0.04,
+        gradingStrength:  0.16,
+        vignetteDarkness: 0.20,
+        vignetteOffset:   0.80,
     },
     boss: {
-        saturation:       1.18,
-        shadowR: 0.18, shadowG: 0.04, shadowB: 0.06,
-        highlightR: 0.28, highlightG: 0.10, highlightB: 0.02,
-        gradingStrength:  0.45,
-        vignetteDarkness: 0.55,
-        vignetteOffset:   0.60,
+        saturation:       1.50,
+        shadowR: 0.14, shadowG: 0.03, shadowB: 0.05,
+        highlightR: 0.22, highlightG: 0.08, highlightB: 0.02,
+        gradingStrength:  0.22,
+        vignetteDarkness: 0.28,
+        vignetteOffset:   0.72,
     },
     gameover: {
-        saturation:       0.35,
+        saturation:       0.45,
         shadowR: 0.05, shadowG: 0.05, shadowB: 0.10,
         highlightR: 0.10, highlightG: 0.10, highlightB: 0.10,
-        gradingStrength:  0.50,
-        vignetteDarkness: 0.65,
-        vignetteOffset:   0.50,
+        gradingStrength:  0.40,
+        vignetteDarkness: 0.50,
+        vignetteOffset:   0.55,
     },
 };
 
@@ -140,15 +144,19 @@ const VIGNETTE_GRAIN_SHADER = {
     uniforms: {
         tDiffuse:          { value: null },
         uTime:             { value: 0 },
-        uVignetteOffset:   { value: 0.68 },   // 半径外开始变暗
-        uVignetteDarkness: { value: 0.45 },   // 边角最深度（不要太黑，留出敌人可见）
-        uGrainAmount:      { value: 0.035 },  // 颗粒强度
+        // [视觉调优] 默认 baseline 从「暗黑炼金」改成「高对比硬切」：
+        // vignette 退到 0.80，darkness 0.20（仅保留极轻微的边角收口）；
+        // saturation 拉到 1.40，让 PINK/CYAN/YELLOW 鲜艳；grading 减半免拉灰；
+        // grain 减到 0.018，避免颗粒污染纯色块。
+        uVignetteOffset:   { value: 0.80 },
+        uVignetteDarkness: { value: 0.20 },
+        uGrainAmount:      { value: 0.018 },
         uResolution:       { value: new THREE.Vector2(1, 1) },
         // [M4 调优] Color grading 参数
-        uSaturation:       { value: 1.10 },   // 全局饱和度（1.0=原色）
-        uShadowTint:       { value: new THREE.Color(0.04, 0.08, 0.18) }, // 冷蓝阴影
-        uHighlightTint:    { value: new THREE.Color(0.20, 0.12, 0.04) }, // 暖橙高光
-        uGradingStrength:  { value: 0.32 },   // grading 混入强度
+        uSaturation:       { value: 1.40 },   // 全局饱和度（1.0=原色）
+        uShadowTint:       { value: new THREE.Color(0.03, 0.05, 0.12) }, // 冷蓝阴影（更轻）
+        uHighlightTint:    { value: new THREE.Color(0.16, 0.10, 0.04) }, // 暖橙高光（更轻）
+        uGradingStrength:  { value: 0.16 },   // grading 混入强度
         // [M4] 暴击/大伤害瞬时白闪强度（0..1），由 CameraController 每帧推送，自然衰减
         uFlash:            { value: 0.0 },
         uFlashColor:       { value: new THREE.Color(1.0, 0.98, 0.92) }, // 略偏暖白
@@ -272,20 +280,19 @@ export class PostFX {
         this.composer.addPass(this.renderPass);
 
         // --- Pass 2: bloom ---
-        // [M4 调优] 阈值上调避免全场泛光：只让真正亮的 emissive（强 rim、击中冲量、boss 强光）
-        // 触发 bloom。基础色被 ACES tonemap 后压在 [0, 1) 区间，不会污染。
-        // [M4 调优历史] 实测：bloom 阈值过高会让 SwiftShader 等软渲染场景几乎看不见 emissive，
-        // 真实 GPU 上又会过曝。折中默认值如下，配合 color grading + tonemap 形成稳定中间观感。
+        // [视觉调优] 用户反馈"3D 太暗"——bloom strength 上调（LDR 0.78→1.05, HDR 0.90→1.20）、
+        // threshold 下调（LDR 0.55→0.42, HDR 0.78→0.62），让弹珠/钉子/粒子的 rim 与中等亮度
+        // 区域也参与泛光，整体观感更通透。
         this.bloomPass = new UnrealBloomPass(
             new THREE.Vector2(this.width, this.height),
-            0.78,   // strength
-            0.45,   // radius
-            0.55    // threshold（LDR：luma > 0.55 触发，敌人 rim 即可激活 bloom）
+            1.05,
+            0.55,
+            0.42
         );
         if (this.usingHDR) {
-            this.bloomPass.threshold = 0.78;   // 略高于 LDR sRGB 上限，但 emissive>1 仍易激活
-            this.bloomPass.strength = 0.90;
-            this.bloomPass.radius = 0.50;
+            this.bloomPass.threshold = 0.62;
+            this.bloomPass.strength = 1.20;
+            this.bloomPass.radius = 0.55;
         }
         this.composer.addPass(this.bloomPass);
 
