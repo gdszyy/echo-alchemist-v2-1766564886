@@ -121,16 +121,17 @@ export class PegInstancedMesh {
                     vec3 V = normalize(-vViewPos);     // view dir in view space
 
                     float ndotv = max(0.0, dot(N, V));
-                    float rim   = pow(1.0 - ndotv, 2.2);
+                    float rim   = pow(1.0 - ndotv, 1.8);
 
                     // 缓慢呼吸 emission，每个钉子相位错开
                     float pulse = 0.75 + 0.25 * sin(uTime * 1.6 + vPhase);
 
-                    // 基底：颜色 * 0.30（暗调金属感）
-                    vec3 base     = vColor * 0.30;
-                    // 边缘高光：颜色 * rim
-                    vec3 rimLight = vColor * rim * 1.7 * pulse;
-                    // 击中冲量：emissive 全白瞬闪
+                    // [视觉调优] 用户反馈"3D 太暗"——base 从 0.30 提到 0.65（钉子主体颜色饱满可读），
+                    // 顶光（N.y 方向）再叠一道 0.35 让钉子从背景里"立"出来；rim 系数 1.7 不动；
+                    // 击中冲量保持白闪 0.9，与 base 拉开对比。
+                    float topLight = max(0.0, N.y * 0.6 + 0.4);
+                    vec3 base     = vColor * (0.65 + 0.35 * topLight);
+                    vec3 rimLight = vColor * rim * 1.9 * pulse;
                     vec3 hitFlash = vec3(1.0) * vHit * 0.9;
 
                     vec3 col = base + rimLight + hitFlash;

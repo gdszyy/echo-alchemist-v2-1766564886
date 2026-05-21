@@ -2923,11 +2923,56 @@ class DropBall {
 
                     if (peg.cooldownTimer <= 0 && peg.frozenTurns <= 0) {
                         // --- [关键修改：传递速度参数] ---
-                        const impactSpeedVal = impactVel.mag(); 
+                        const impactSpeedVal = impactVel.mag();
                         peg.hit(impactSpeedVal);
-                        this.hitCount++; 
+                        this.hitCount++;
                         // 如果是普通钉子 (normal)，触发两次能量球反馈
                         game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel, peg.type);
+
+                        // [视觉调优] 用户反馈"弹珠在钉盘上撞击获取属性时需要少量碰撞特效"——
+                        // 在 3D 渲染器开启时，给被撞钉子打一次 shader 击中冲量（白闪 + 微膨胀），
+                        // 并按钉子类型撒 3-5 颗元素色 spark 粒子；普通钉子撒得少（2-3 颗），
+                        // 特殊钉子（pyro/cryo/lightning/...）色彩更鲜明（PINK/CYAN/YELLOW）。
+                        const r3d = game.renderer3d;
+                        if (r3d && r3d.proxy && r3d.proxy.pulsePeg) {
+                            const pegIdx = game.pegs.indexOf(peg);
+                            if (pegIdx >= 0) {
+                                // 撞击力度 → 冲量强度（弹珠最大速度 ~12，clamp 到 0..1）
+                                const pulseIntensity = Math.min(1.0, Math.max(0.4, impactSpeedVal / 9.0));
+                                r3d.proxy.pulsePeg(pegIdx, pulseIntensity);
+                            }
+                            // 元素 → promare 5 色映射（与 Renderer3D ELEMENT_FX 同源）
+                            const PEG_SPARK_COLOR = {
+                                pyro:      0xFF0090, // PINK
+                                bounce:    0xFF0090,
+                                resonance: 0xFF0090,
+                                cryo:      0x00E5FF, // CYAN
+                                wind:      0x00E5FF,
+                                laser:     0x00E5FF,
+                                lightning: 0xFFD600, // YELLOW
+                                scatter:   0xFFD600,
+                                venom:     0xFFD600,
+                                damage:    0xFFFFFF,
+                                pierce:    0xFFFFFF,
+                                flying_sword: 0xFFFFFF,
+                                pink:      0xFF0090,
+                                normal:    0xFFFFFF,
+                            };
+                            const sparkColor = PEG_SPARK_COLOR[peg.type] || 0xFFFFFF;
+                            // 普通钉子粒子量小（避免视觉噪声），属性钉子稍多
+                            const sparkCount = (peg.type === 'normal' || peg.type === 'pink') ? 3 : 5;
+                            r3d.proxy.spawnParticles({
+                                x: peg.pos.x,
+                                y: peg.pos.y,
+                                color: sparkColor,
+                                mode: 'spark',
+                                count: sparkCount,
+                                size: 2.2,
+                                lifetime: 0.30,
+                                spread: 0.9,
+                                speed: 6 + impactSpeedVal * 0.6,
+                            });
+                        }
 
                         if (peg.type === 'normal' && Math.random() < CONFIG.balance.normalPegSecondEnergChancey) {
                             game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.65), 'normal');

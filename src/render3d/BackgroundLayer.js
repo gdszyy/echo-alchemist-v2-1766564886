@@ -89,11 +89,12 @@ export class BackgroundLayer {
         this.ringMaterial = ringMat;
 
         // 二级辉光（内圈，更小、更亮）
+        // [视觉调优] opacity 0.25→0.55，让炼金台环更"金"，作为视觉锚点。
         const innerRingGeom = new THREE.RingGeometry(26, 30, 48, 1);
         const innerRingMat = new THREE.MeshBasicMaterial({
             color: 0xfde68a,
             transparent: true,
-            opacity: 0.25,
+            opacity: 0.55,
             depthWrite: false,
             blending: THREE.AdditiveBlending,
             side: THREE.DoubleSide,
@@ -246,15 +247,16 @@ export class BackgroundLayer {
 
         // 6 根光柱全部置于远景（z < -180），靠两侧分布避开中央玩法区。
         // 不放中心柱——中心由 skydome 的炉膛暖光承担焦点引导。
-        // 透明度刻意压低，让光柱作为"帷幕灯光"而非主体。
+        // [视觉调优] 用户反馈"3D 太透明太暗"——光柱整体不透明度上调 ~2.5×，
+        // 让左右两侧的青/紫/橙/粉色帷幕真的"打进"画面，作为色板主光源。
         const config = [
             // x,    y,    z,     radius, height, colorIdx, opacity
-            [-160,  -30,  -210,   28,     300,    0, 0.12], // 远景左主光（青）
-            [ 160,  -30,  -210,   28,     300,    1, 0.12], // 远景右主光（紫）
-            [-230,  -40,  -260,   20,     260,    2, 0.09], // 更远的左侧蓝
-            [ 230,  -40,  -260,   20,     260,    3, 0.09], // 更远的右侧橙
-            [-100,  -60,  -270,   16,     240,    4, 0.07], // 中左副柱（粉）
-            [ 100,  -60,  -270,   16,     240,    4, 0.07], // 中右副柱（粉）
+            [-160,  -30,  -210,   28,     300,    0, 0.32], // 远景左主光（青）
+            [ 160,  -30,  -210,   28,     300,    1, 0.32], // 远景右主光（紫）
+            [-230,  -40,  -260,   20,     260,    2, 0.22], // 更远的左侧蓝
+            [ 230,  -40,  -260,   20,     260,    3, 0.22], // 更远的右侧橙
+            [-100,  -60,  -270,   16,     240,    4, 0.18], // 中左副柱（粉）
+            [ 100,  -60,  -270,   16,     240,    4, 0.18], // 中右副柱（粉）
         ];
 
         for (let i = 0; i < config.length; i++) {
@@ -287,9 +289,10 @@ export class BackgroundLayer {
         this.ambientPoints = [];
         this._ambientSpeeds = [];
 
+        // [视觉调优] 近层粒子 opacity 0.75→0.95（更鲜亮），远层 0.45→0.65（提示层级感）。
         const layers = [
-            { count: 180, sizeRange: [2.4, 4.2], color: PARTICLE_COL, opacity: 0.75, zRange: [-60, -10],  speedRange: [3, 8],   xRange: 320 },
-            { count: 200, sizeRange: [1.0, 2.0], color: 0xa78bfa,     opacity: 0.45, zRange: [-150, -80], speedRange: [1, 4],   xRange: 360 },
+            { count: 180, sizeRange: [2.4, 4.2], color: PARTICLE_COL, opacity: 0.95, zRange: [-60, -10],  speedRange: [3, 8],   xRange: 320 },
+            { count: 200, sizeRange: [1.0, 2.0], color: 0xa78bfa,     opacity: 0.65, zRange: [-150, -80], speedRange: [1, 4],   xRange: 360 },
         ];
 
         for (const layer of layers) {

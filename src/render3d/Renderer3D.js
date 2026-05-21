@@ -258,40 +258,73 @@ export class Renderer3D {
      * @private
      */
     _bindEventBus(bus) {
-        // 暴击 / 强击：使用 damage:dealt 事件，按 damage 量级映射强度
+        // [视觉调优] 子弹打击的「图形 + 颜色」必须按元素绑定（与 promare codex 对齐），
+        // 不能所有元素都是同一坨橙黄小爆炸。下面这张表把 damage:dealt.type 映射成：
+        //   - GPU 粒子的 color（5 色硬切板 + 几个辅色）
+        //   - 粒子的 mode（spark/ember/shard/smoke/mist，匹配元素气质）
+        //   - 数量倍率（穿透/激光偏少而尖；爆破/火焰偏多而散）
+        const ELEMENT_FX = {
+            pyro:         { color: 0xFF0090, mode: 'ember', countMul: 1.0,  sizeMul: 1.05 }, // PINK 余烬
+            cryo:         { color: 0x00E5FF, mode: 'shard', countMul: 0.9,  sizeMul: 1.0  }, // CYAN 冰碎
+            lightning:    { color: 0xFFD600, mode: 'spark', countMul: 1.15, sizeMul: 0.9  }, // YELLOW 锐花
+            bounce:       { color: 0xFF0090, mode: 'spark', countMul: 0.9,  sizeMul: 1.05 }, // PINK 弹射
+            pierce:       { color: 0xFFFFFF, mode: 'shard', countMul: 0.7,  sizeMul: 1.1  }, // WHITE 锐碎
+            wind:         { color: 0x00E5FF, mode: 'mist',  countMul: 0.85, sizeMul: 1.2  }, // CYAN 风雾
+            scatter:      { color: 0xFFD600, mode: 'spark', countMul: 1.3,  sizeMul: 0.85 }, // YELLOW 散射
+            venom:        { color: 0xFFD600, mode: 'smoke', countMul: 0.9,  sizeMul: 1.0  },
+            echo:         { color: 0xFF0090, mode: 'spark', countMul: 0.9,  sizeMul: 1.0  },
+            laser:        { color: 0x00E5FF, mode: 'spark', countMul: 0.8,  sizeMul: 0.9  },
+            flying_sword: { color: 0xFFFFFF, mode: 'shard', countMul: 0.85, sizeMul: 1.0  },
+            damage:       { color: 0xFFFFFF, mode: 'spark', countMul: 1.0,  sizeMul: 1.0  },
+        };
+
         const onDamage = (data) => {
             if (!data) return;
             const dmg = data.damage || data.amount || 0;
             if (dmg <= 0) return;
-            // 阈值：< 30 微震，30..120 中震，>= 120 大震
-            let intensity = 0.18;
-            if (dmg >= 120) intensity = 0.85;
-            else if (dmg >= 30) intensity = 0.42;
-            if (data.killed) intensity *= 1.4;
+
+            // [视觉调优] 用户反馈"第一回合那个小破子弹打上去闪的厉害"：
+            // 微伤害（< 10）单独划档，只给极弱镜头扰动 + 几颗粒子，不触发任何全屏闪。
+            // 强击（>= 60）+ 暴击（>= 150）才有 punch。
+            const isKill = !!data.killed;
+            let bucket = 'tiny';
+            if      (dmg >= 120) bucket = 'huge';
+            else if (dmg >= 60)  bucket = 'big';
+            else if (dmg >= 18)  bucket = 'normal';
+            else                 bucket = 'tiny';
+            const BUCKET_INTENSITY = { tiny: 0.07, normal: 0.20, big: 0.48, huge: 0.85 };
+            let intensity = BUCKET_INTENSITY[bucket];
+            if (isKill) intensity = Math.min(1.0, intensity * 1.35);
             this.cameraEvent('IMPACT', { intensity });
 
-            // [M4] 大伤害 / 击杀 → 全屏白闪 punch
-            if (dmg >= 150 || (data.killed && dmg >= 60)) {
+            // 全屏白闪：tiny / normal 完全不闪；big 轻闪；huge / 击杀大伤害大闪。
+            if (bucket === 'huge' || (isKill && dmg >= 60)) {
                 const flashAmt = Math.min(0.6, 0.25 + dmg / 600);
                 this.cameraEvent('FLASH', { intensity: flashAmt });
+            } else if (bucket === 'big' && isKill) {
+                this.cameraEvent('FLASH', { intensity: 0.18 });
             }
 
-            // [M6] 击中处撒 spark 粒子；颜色按伤害属性取色（fallback 黄白）
+            // [视觉调优] 击中处撒粒子：颜色 / 形状按元素绑定，数量随档位收紧。
+            // tiny 4 颗，normal 8 颗，big 16 颗，huge 28 颗，再乘元素 countMul。
             const proxy = this.proxy;
             if (proxy && proxy.spawnParticles) {
                 const hx = data.hitX ?? (data.enemy && data.enemy.pos && data.enemy.pos.x);
                 const hy = data.hitY ?? (data.enemy && data.enemy.pos && data.enemy.pos.y);
                 if (hx !== undefined && hy !== undefined) {
-                    const cnt = Math.round(6 + intensity * 28);
+                    const fx = ELEMENT_FX[data.type] || ELEMENT_FX.damage;
+                    const BASE_COUNT = { tiny: 4, normal: 8, big: 16, huge: 28 };
+                    const baseCnt = BASE_COUNT[bucket];
+                    const cnt = Math.max(2, Math.round(baseCnt * fx.countMul));
                     proxy.spawnParticles({
                         x: hx, y: hy,
-                        color: data.color || 0xfbbf24,
-                        mode: 'spark',
+                        color: fx.color,
+                        mode: fx.mode,
                         count: cnt,
-                        size: 3 + intensity * 4,
-                        lifetime: 0.4 + intensity * 0.5,
-                        spread: 1.0 + intensity * 0.5,
-                        speed: 6 + intensity * 12,
+                        size: (2.4 + intensity * 3.5) * fx.sizeMul,
+                        lifetime: 0.30 + intensity * 0.55,
+                        spread: 0.85 + intensity * 0.55,
+                        speed: 4 + intensity * 14,
                     });
                 }
             }
