@@ -149,6 +149,9 @@ const VIGNETTE_GRAIN_SHADER = {
         uShadowTint:       { value: new THREE.Color(0.04, 0.08, 0.18) }, // 冷蓝阴影
         uHighlightTint:    { value: new THREE.Color(0.20, 0.12, 0.04) }, // 暖橙高光
         uGradingStrength:  { value: 0.32 },   // grading 混入强度
+        // [M4] 暴击/大伤害瞬时白闪强度（0..1），由 CameraController 每帧推送，自然衰减
+        uFlash:            { value: 0.0 },
+        uFlashColor:       { value: new THREE.Color(1.0, 0.98, 0.92) }, // 略偏暖白
     },
     vertexShader: /* glsl */`
         varying vec2 vUv;
@@ -169,6 +172,8 @@ const VIGNETTE_GRAIN_SHADER = {
         uniform vec3  uShadowTint;
         uniform vec3  uHighlightTint;
         uniform float uGradingStrength;
+        uniform float uFlash;
+        uniform vec3  uFlashColor;
         varying vec2 vUv;
 
         float hash21(vec2 p) {
@@ -208,6 +213,14 @@ const VIGNETTE_GRAIN_SHADER = {
             // === Film grain ===
             float grain = hash21(vUv * uResolution + uTime * 137.0) - 0.5;
             col += grain * uGrainAmount;
+
+            // === [M4] Critical flash overlay ===
+            // uFlash 由 CameraController 在大伤害/暴击事件时拉高到 0.3-0.6，每帧衰减回 0。
+            // 用 mix 而非 add，避免完全过曝吃掉颜色信息；中心稍弱，边缘稍强（vignette-aware）。
+            if (uFlash > 0.001) {
+                float flashAmt = uFlash * (0.75 + (1.0 - vig) * 0.25);
+                col = mix(col, uFlashColor, clamp(flashAmt, 0.0, 1.0));
+            }
 
             gl_FragColor = vec4(col, 1.0);
         }
@@ -389,6 +402,11 @@ export class PostFX {
     /** 调节 bloom 强度（剧烈事件时短暂拉高） */
     setBloomStrength(s) {
         this.bloomPass.strength = s;
+    }
+
+    /** [M4] 设置全屏白闪强度 0..1（每帧由 CameraController 推送 + 自然衰减） */
+    setFlash(amt) {
+        this.vignettePass.uniforms.uFlash.value = Math.max(0, Math.min(1, amt));
     }
 
     dispose() {

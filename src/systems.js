@@ -2147,6 +2147,25 @@ function buildRender3DScenarios() {
                 });
             }
         },
+        // 8) 白闪测试
+        {
+            id: 'r3d_flash_test',
+            categoryId: 'render3d',
+            name: '白閃 punch 測試',
+            icon: '⚡',
+            desc: '依次觸發 0.3 / 0.5 / 0.7 三档 FLASH 強度，每隔 800ms 一次，看暴擊白閃手感。',
+            setup: (game) => {
+                if (!game.renderer3d || !game.renderer3d.cameraEvent) return;
+                [0.3, 0.5, 0.7].forEach((amt, i) => {
+                    setTimeout(() => {
+                        if (game.renderer3d) {
+                            game.renderer3d.cameraEvent('FLASH', { intensity: amt });
+                            console.log('[Training/R3D] FLASH →', amt);
+                        }
+                    }, i * 800);
+                });
+            }
+        },
     ];
     return scenarios;
 }

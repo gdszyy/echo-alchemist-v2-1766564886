@@ -55,6 +55,7 @@ export class CameraController {
         this.chromaticBoost  = 0;   // 色散增量
         this.bloomBoost      = 0;   // bloom strength 增量
         this.exposureBoost   = 0;   // tonemap exposure 增量（罕用）
+        this.flashBoost      = 0;   // [M4] 全屏白闪 0..1，每帧快速衰减
 
         // ---- 弹簧常数 ----
         this.K_SHAKE = 90;   // 越大恢复越快
@@ -67,6 +68,7 @@ export class CameraController {
         this.DECAY_CHROMATIC  = 4.5;
         this.DECAY_BLOOM      = 2.2;
         this.DECAY_EXPOSURE   = 3.0;
+        this.DECAY_FLASH      = 7.0;   // 白闪要快进快出（~140ms 触感）
 
         // ---- 状态读取（仅 debug 用） ----
         this.lastEvent = 'IDLE';
@@ -134,6 +136,7 @@ export class CameraController {
         this.distortionBoost = Math.max(0, this.distortionBoost - this.DECAY_DISTORTION * h);
         this.chromaticBoost  = Math.max(0, this.chromaticBoost  - this.DECAY_CHROMATIC  * h);
         this.bloomBoost      = Math.max(0, this.bloomBoost      - this.DECAY_BLOOM      * h);
+        this.flashBoost      = Math.max(0, this.flashBoost      - this.DECAY_FLASH     * h);
         this.exposureBoost   = Math.max(0, this.exposureBoost   - this.DECAY_EXPOSURE   * h);
     }
 
@@ -222,6 +225,16 @@ export class CameraController {
     }
 
     /**
+     * [M4] 暴击/大伤害瞬时白闪。强度 0.3 = 轻闪，0.6 = 强闪。
+     * 配合 IMPACT 一起触发能营造"punch"感。
+     * @param {number} intensity 0..1
+     */
+    triggerFlash(intensity = 0.4) {
+        this.lastEvent = 'FLASH';
+        this.flashBoost = Math.max(this.flashBoost, Math.min(1, intensity));
+    }
+
+    /**
      * 瞄准位移目标。归一化坐标 [-1, +1]。 update 内 lerp。
      */
     setAim(normX, normY) {
@@ -239,11 +252,13 @@ export class CameraController {
             chromatic:  this.chromaticBoost,
             bloom:      this.bloomBoost,
             exposure:   this.exposureBoost,
+            flash:      this.flashBoost,
         };
     }
 
     /** 完全归零（debug / 切场景用） */
     reset() {
+        this.flashBoost = 0;
         this.shakeOffset.set(0, 0, 0);
         this.shakeVel.set(0, 0, 0);
         this.fovOffset = 0;
