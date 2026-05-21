@@ -319,15 +319,47 @@ export class Renderer3D {
         };
         const onPhaseChange = (data) => {
             this.cameraEvent('PHASE_TRANS', {});
+            // [M4 阶段感知 grading] 切预设
+            if (this.postfx && typeof this.postfx.setGradingPreset === 'function') {
+                const to = (data && data.to) || 'combat';
+                // 阶段 → 预设映射
+                const preset = (
+                    to === 'meta'      ? 'meta'      :
+                    to === 'gathering' ? 'gathering' :
+                    to === 'training'  ? 'combat'    :  // 试炼场视觉同战斗
+                    to === 'combat'    ? 'combat'    :
+                    to === 'gameover'  ? 'gameover'  :
+                    to === 'selection' ? 'gathering' :  // 选择阶段沿用研磨色
+                    'combat'
+                );
+                this.postfx.setGradingPreset(preset);
+            }
+        };
+
+        // [M4 阶段感知 grading] Boss 在场时切到 boss 预设
+        const onBossSpawn = (data) => {
+            if (this.postfx && typeof this.postfx.setGradingPreset === 'function') {
+                this.postfx.setGradingPreset('boss');
+            }
+        };
+        // Boss 击败后回到普通战斗调色
+        const onBossDefeatedGrading = (data) => {
+            if (this.postfx && typeof this.postfx.setGradingPreset === 'function') {
+                // 战斗仍在继续（其他敌人）→ 回 combat；否则保持 boss 过渡
+                this.postfx.setGradingPreset('combat');
+            }
         };
 
         bus.on('damage:dealt', onDamage);
         bus.on('enemy:killed', onKill);
         bus.on('boss:defeated', onBossDefeated);
+        bus.on('boss:defeated', onBossDefeatedGrading);  // 第二个 listener，专负责 grading
         bus.on('phase:change', onPhaseChange);
+        bus.on('boss:spawned', onBossSpawn);   // 可能事件名不同，下一行也尝试
+        bus.on('boss:appear', onBossSpawn);
 
         // 记录引用以便 dispose 时取消（如果 eventBus 提供 off）
-        this._busHandlers = { onDamage, onKill, onBossDefeated, onPhaseChange };
+        this._busHandlers = { onDamage, onKill, onBossDefeated, onBossDefeatedGrading, onPhaseChange, onBossSpawn };
         this._bus = bus;
     }
 
