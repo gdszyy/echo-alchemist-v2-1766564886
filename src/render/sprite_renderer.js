@@ -185,6 +185,10 @@ export class SpriteRenderer {
      * @returns {boolean} 是否成功绘制位图（false = 使用了 fallback）
      */
     draw(ctx, x, y, w, h, alpha = 1) {
+        // [Promare] hideSprites=true 时彻底跳过 sprite 绘制，防止透过 Enemy.draw 早退之外的路径漏出位图。
+        if (CONFIG && CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.hideSprites) {
+            return false;
+        }
         if (!this.ready || !this._image || !this._meta) return false;
 
         const anim = this._meta.animations[this._currentAnim];
@@ -236,6 +240,7 @@ export class SpriteRenderer {
 
 import { ENEMY_V2_METADATA, ENEMY_V2_BY_ARCHETYPE } from '../data/enemy_v2_metadata.js';
 import { resolveEnemyVisualAsset, loadEnemyVisualAssetManifest } from '../data/enemy_visual_assets.js';
+import { CONFIG } from '../config.js'; // [Promare] for visualMode/hideSprites gating
 
 // [3D-Main 清理] 敌人/Boss 的 PNG sprite 全部已在 M6 删除（M3 EnemyMeshPool 程序化几何接管）。
 // 注册表清空 → preloadAllSprites 不再触发加载 → 无 console 404。
@@ -251,7 +256,8 @@ const _spritePool = new Map();
  * 在游戏初始化时调用一次（M6 后空注册表 → no-op）
  */
 export function preloadAllSprites() {
-    // 注册表已空，循环无副作用；保留方法签名向后兼容现有调用方
+    // [3D-Main] 注册表在 M6 已清空（PNG 资产删除）→ 循环天然 no-op。保留方法签名兼容现有调用方。
+    // [Promare] 模式下也是 sprite-free，下面循环同样 no-op。两个视觉模式共享"无 sprite"约定。
     for (const [key, path] of Object.entries(SPRITE_REGISTRY)) {
         if (path) _spritePool.set(key, SpriteRenderer.preload(path));
     }

@@ -26,6 +26,8 @@ import { UIManager, TrainingGround, TruthBook } from './systems.js';
 
 // 导入事件总线
 import { eventBus } from './event_bus.js';
+import { spawnPromareBurst, spawnRadialImpact, ensurePromareGlobals } from './render/promare_burst.js';
+import { spawnPromareKillExplosion, spawnPromareOnomatopoeia } from './render/promare_explosion.js';
 
 // 导入 SoundManager 类和音频代理
 import { SoundManager, audio, _setAudioInstance } from './audio.js';
@@ -157,7 +159,12 @@ class Game {
         // [Perf] 粒子分模式计数表 - 替代 this.particles.filter(p=>p.mode==='X').length 的 O(N) 扫描
         // 维护契约：所有 push 必走 spawn_createParticle / spawn_pushParticleWithLimit；
         // 所有删除必走 game_phase.js 的两指针压缩循环（同步 -- 计数）。
-        this.particleCounts = { wind_slash: 0, line: 0, ember: 0, mist: 0, shard: 0, spark: 0, smoke: 0, venom: 0 };
+        this.particleCounts = {
+            wind_slash: 0, line: 0, ember: 0, mist: 0, shard: 0, spark: 0, smoke: 0, venom: 0,
+            // [Promare] 新 mode 计数器
+            pyro_cone: 0, cryo_oct: 0, thunder_z: 0, pierce_lance: 0, bounce_hex: 0,
+            scatter_star: 0, damage_diamond: 0, venom_tri: 0, echo_ring: 0, radial_spoke: 0,
+        };
         // [Perf] 粒子对象池 - 复用 Particle 实例，规避每帧 50-100 次 new 触发的 GC 停顿
         this._particlePool = [];
         this.shockwaves = [];
@@ -249,9 +256,15 @@ class Game {
         this.waveMomentumTimer = 0;
         this.nextRoundHpMultiplier = 1; 
         this.baseTimeScale = 1.0;
-        this.frameDamageAccumulator = 0; 
-        this.slowMotionTimer = 0;        
-        this.slowMotionThreshold = 100;  
+        this.frameDamageAccumulator = 0;
+        this.slowMotionTimer = 0;
+        this.slowMotionThreshold = 100;
+
+        // ==================== [Promare] Hit Feedback 三件套字段 ====================
+        // sys_loop 每帧读取，由 EventBus 监听器（见下文 _registerPromareHitFeedback）写入。
+        // hitstopFrames > 0 时本帧 timeScale=0；flashOverlay 控制全屏白闪。
+        this.hitstopFrames = 0;
+        this.flashOverlay = null;
         this.saveData = { currency: 0, runeFragments: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0 };
         this.runCurrency = 0;
         // ==================== 本局统计字段 ====================
@@ -367,8 +380,6 @@ class Game {
         //   1. 任何初始化失败（Three.js CDN 拉取失败、WebGL 不支持、shader 编译错）→
         //      this.renderer3d = null，主循环 / resize 调用都用可选链跳过。
         //   2. 默认开启；可通过 localStorage.echo_3d_disabled = '1' 强制关闭。
-        //   3. 调试可见：document.body.classList.add('render3d-debug')
-        //      （把 2D #gameCanvas 透明度降到 0.3 即可看到 3D 背景）。
         this.renderer3d = null;
         try {
             if (typeof localStorage !== 'undefined' && localStorage.getItem('echo_3d_disabled') === '1') {
@@ -378,13 +389,9 @@ class Game {
                 if (!glCanvas) {
                     console.warn('[Renderer3D] #gl-canvas not found, skipping 3D init');
                 } else {
-                    // sys_resize() 已在上面跑过，this.width/this.height 已就绪
                     this.renderer3d = new Renderer3D(glCanvas, this.width, this.height, {
-                        // [M4.5] 把 eventBus 注入到 3D 层，让 damage/kill/boss/phase 事件
-                        // 自动驱动相机震动 + 后处理 boost
                         eventBus: this.eventBus,
                     });
-                    // 同步内部像素尺寸到 2D canvas
                     this.renderer3d.resize(this.canvas.width, this.canvas.height);
                     console.info(`[Renderer3D] initialized @ ${this.canvas.width}x${this.canvas.height}`);
                 }
@@ -392,6 +399,24 @@ class Game {
         } catch (err) {
             console.error('[Renderer3D] init failed, falling back to 2D-only:', err);
             this.renderer3d = null;
+        }
+
+        // ==================== [Promare] Dev Console 切换工具 ====================
+        // 与 3D 视觉并行的另一套 2D 视觉模式。控制台 `window.__promare(true/false)` 切换。
+        // 注意：3D 模式（body.render3d-debug）下 2D entities 整体被擦除，Promare 风格不可见；
+        // 若想看 Promare 效果，需先在设置里关掉"3D 视觉"。
+        if (typeof window !== 'undefined') {
+            const _syncBodyClass = () => {
+                document.body && document.body.classList.toggle('promare-mode', CONFIG.visualMode === 'promare');
+            };
+            _syncBodyClass();
+            window.__promare = (on) => {
+                CONFIG.visualMode = on ? 'promare' : 'classic';
+                _syncBodyClass();
+                console.log('[Promare] visualMode =', CONFIG.visualMode);
+                return CONFIG.visualMode;
+            };
+            ensurePromareGlobals(this);
         }
 
         // 启动游戏主循环
@@ -419,6 +444,32 @@ class Game {
                 const hitY = data.hitY || (data.enemy ? data.enemy.pos.y : this.height / 2);
                 this.combat_runeCharge_onHit(hitX, hitY, false);
             }
+
+            // [Promare] Hit Feedback 三件套：停帧 + 白闪 + 抖屏 + 几何 burst
+            // 仅 visualMode==='promare' 启用，classic 模式完全跳过保持原行为。
+            // @perf-impact: 监听器内只设字段 + 调 burst spawner（受 perf 档位限粒子数）。
+            if (CONFIG.visualMode === 'promare') {
+                const isKill = !!data.killed;
+                const isBig  = (data.actualDamage || data.amount || 0) > 0 && (data.amount || 0) >= 30;
+                // 移动端友好：normal 命中不停帧，仅 big/kill 触发
+                this.hitstopFrames = isKill ? 4 : (isBig ? 3 : 0);
+                // 全屏白闪：每次命中都给一个短闪，alpha 由 sys_loop 衰减
+                this.flashOverlay = { color: '#FFFFFF', alpha: isKill ? 0.5 : 0.35, frames: 4 };
+                // 屏抖：复用现有 triggerScreenShake（取 max 不叠乘）
+                const shakeAmt = isKill ? 14 : (isBig ? 9 : 5);
+                this.triggerScreenShake(shakeAmt);
+
+                // [Promare] 几何碎片爆发：方向锥沿入射反向，元素决定形状
+                const hitX = data.hitX || (data.enemy ? data.enemy.pos.x : this.width / 2);
+                const hitY = data.hitY || (data.enemy ? data.enemy.pos.y : this.height / 2);
+                const elementType = data.type || (data.enemy && data.enemy._lastHitElement) || 'damage';
+                // 入射速度向量：projectile 的 vel 已存在 enemy._lastHitVel（由 combat_system 后续填充，
+                // 当前无该字段时退化为「球从下往上」假设）
+                const hitVel = (data.enemy && data.enemy._lastHitVel) || { x: 0, y: -1 };
+                const severity = isKill ? 'kill' : (isBig ? 'big' : 'normal');
+                spawnPromareBurst(this, hitX, hitY, hitVel, elementType, severity);
+                spawnRadialImpact(this, hitX, hitY, elementType);
+            }
         });
 
         // 波次推进事件
@@ -435,6 +486,29 @@ class Game {
                 const hitY = data.hitY || (data.enemy ? data.enemy.pos.y : this.height / 2);
                 this.combat_runeCharge_onHit(hitX, hitY, true);
             }
+
+            // [Promare] 击杀时强化反馈：电磁爆炸（叙事：方形→三角碎片，体制突破）
+            // 三层切片堆叠 + 三角碎片群 + 暗紫烟雾环 + 金田白光斑 + 可选色差闪烁。
+            if (CONFIG.visualMode === 'promare') {
+                this.hitstopFrames = Math.max(this.hitstopFrames || 0, 4);
+                this.flashOverlay  = { color: '#FFFFFF', alpha: 0.55, frames: 5 };
+                this.triggerScreenShake(18);
+                const eKill = data.enemy;
+                if (eKill && eKill.pos) {
+                    const hv = eKill._lastHitVel || { x: 0, y: -1 };
+                    const elemType = (eKill._lastHitElement || data.type || 'damage');
+                    // 常规 burst（方向锥喷碎片）+ radial（8 spoke）
+                    spawnPromareBurst(this, eKill.pos.x, eKill.pos.y, hv, elemType, 'kill');
+                    spawnRadialImpact(this, eKill.pos.x, eKill.pos.y, elemType);
+                    // 击杀爆炸：电磁切片 + 三角碎片群 + 烟雾 + 金田光斑 + 色差
+                    spawnPromareKillExplosion(this, eKill.pos.x, eKill.pos.y, elemType, {
+                        w: eKill.width, h: eKill.height
+                    });
+                    // 拟声词视觉化（Boss 64px 大字 / Elite 44 / 普通 28）
+                    spawnPromareOnomatopoeia(this, eKill.pos.x, eKill.pos.y - 8, elemType, eKill.type);
+                }
+            }
+
             // [本局统计] 累计击杀数
             this.runKillCount = (this.runKillCount || 0) + 1;
             // [延迟掉落] 非 Boss 敌人的遗物/精华不再立即结算，而是登记到下一回合开始统一解析。
