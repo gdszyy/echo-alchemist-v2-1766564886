@@ -21,6 +21,7 @@ import { Particle } from '../effects/particles.js';
 import { sb as _sb } from '../utils/perf.js';
 import { eventBus } from '../event_bus.js';
 import { createSpriteRenderer } from '../render/sprite_renderer.js'; // [Phase 5B Task 5.B3] Sprite 动画渲染器
+import { isSuppressed2DEntities } from '../render3d/draw_mode.js';
 import { drawPromareEnemyBody } from '../render/promare_enemy_draw.js';
 
 // audio 代理由 entities.js 注入，通过模块级变量共享
@@ -1362,6 +1363,7 @@ class Enemy {
     // [核心修改] 绘制方法：修复冰冻视觉过大和边缘粗糙问题
     // @section:draw_entry_and_perf_check - 绘制入口与性能等级检查
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         ctx.save(); 
         ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);

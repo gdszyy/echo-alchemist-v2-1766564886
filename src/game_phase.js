@@ -68,7 +68,14 @@ export const game_phase = {
         } else {
             console.log('[phase_switchPhase] ' + oldPhase + ' -> ' + newPhase);
         }
-        
+
+        // [3D-Main M2] 通知 3D 渲染层阶段变化（控制钉子/墙的可见性）
+        if (this.renderer3d && this.renderer3d.proxy) {
+            try { this.renderer3d.proxy.setPhase(newPhase); } catch (e) {
+                console.warn('[Renderer3D] proxy.setPhase error:', e);
+            }
+        }
+
         // 事件总线广播阶段切换
         eventBus.emit(EVENT_TYPES.PHASE_CHANGED, { from: oldPhase, to: newPhase });
         
@@ -2095,6 +2102,13 @@ phase_gathering_getRandomPegType() {
                 }
             });
 
+            // [3D-Main M3] 把当前 enemies[] 同步到 3D EnemyMeshPool（每帧一次）
+            if (this.renderer3d && this.renderer3d.proxy) {
+                try { this.renderer3d.proxy.syncEnemies(this.enemies); } catch (e) {
+                    console.warn('[Renderer3D] syncEnemies error:', e);
+                }
+            }
+
             // [猎人本能] 绘制持续标记特效：找到血量最低的活跃敌人并渲染动态瞄准十字准星
             if (this.ownedRelics && this.ownedRelics.includes('hunter_instinct')) {
                 let hunterTarget = null;
@@ -2771,49 +2785,50 @@ phase_gathering_getRandomPegType() {
         );
         const LIGHT_RADIUS = 150;
         const LIGHT_RADIUS_SQ = LIGHT_RADIUS * LIGHT_RADIUS;// 预计算平方，避免开根号
-        // --- 绘制阴影 (传入动态光源) ---
-        // DropBalls 发出的光
-        this.dropBalls.forEach(ball => {
-            if (!ball.active) return;
-            this.pegs.forEach(p => {
-                 // 这里是原有的小球光照阴影
-                p.drawShadow(this.ctx, ball.pos, LIGHT_RADIUS);
-            });
-        });
 
-        //  全局环境光阴影 (基于倾斜)
-        // 让所有钉子都有一个基于板子倾斜的微弱基础阴影，增加立体感
-        this.pegs.forEach(p => {
-            // 我们利用 drawShadow 的逻辑，制造一个伪造的“太阳”
-            p.drawShadow(this.ctx, lightSourcePos, 9999); // 半径很大，覆盖全屏
-        });
+        // [3D-Main 性能] 整个 2D 阴影/光照系统在 3D 模式完全不可见（3D 渲染层有自己的光照
+        // 模型，且 2D canvas 被 sys_loop 整块清屏）。跳过外层 O(N*M) 循环。
+        const _is3D = typeof document !== 'undefined'
+            && document.body
+            && document.body.classList.contains('render3d-debug');
         const lightSources = [...this.dropBalls];
 
-        // --- 优化开始：只对范围内的钉子画阴影 ---
-        lightSources.forEach(ball => {
-            if (!ball.active) return;
-            
-            // 遍历所有钉子
-            for (let i = 0; i < this.pegs.length; i++) {
-                const p = this.pegs[i];
-                // 简单的 AABB 预判或距离平方判断
-                const dx = ball.pos.x - p.pos.x;
-                // @section:gathering_update_slots - 槽位触发检测与属性收集
-                const dy = ball.pos.y - p.pos.y;
-                
-                // 只有距离小于 LIGHT_RADIUS 时才绘制阴影
-                // Math.abs 检查比乘法快，先做粗略筛选
-                if (Math.abs(dx) < LIGHT_RADIUS && Math.abs(dy) < LIGHT_RADIUS) {
-                    if ((dx*dx + dy*dy) < LIGHT_RADIUS_SQ) {
-                        p.drawShadow(this.ctx, ball.pos, LIGHT_RADIUS);
-                        p.calculateLight(ball.pos, LIGHT_RADIUS); // 光照计算也放这里
+        if (!_is3D) {
+            // --- 绘制阴影 (传入动态光源) ---
+            // DropBalls 发出的光
+            this.dropBalls.forEach(ball => {
+                if (!ball.active) return;
+                this.pegs.forEach(p => {
+                    p.drawShadow(this.ctx, ball.pos, LIGHT_RADIUS);
+                });
+            });
+
+            //  全局环境光阴影 (基于倾斜)
+            this.pegs.forEach(p => {
+                p.drawShadow(this.ctx, lightSourcePos, 9999);
+            });
+
+            // --- 只对范围内的钉子画阴影 ---
+            lightSources.forEach(ball => {
+                if (!ball.active) return;
+                for (let i = 0; i < this.pegs.length; i++) {
+                    const p = this.pegs[i];
+                    const dx = ball.pos.x - p.pos.x;
+                    // @section:gathering_update_slots - 槽位触发检测与属性收集
+                    const dy = ball.pos.y - p.pos.y;
+                    if (Math.abs(dx) < LIGHT_RADIUS && Math.abs(dy) < LIGHT_RADIUS) {
+                        if ((dx*dx + dy*dy) < LIGHT_RADIUS_SQ) {
+                            p.drawShadow(this.ctx, ball.pos, LIGHT_RADIUS);
+                            p.calculateLight(ball.pos, LIGHT_RADIUS);
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
         // 繪製釘子
         // [修复] 增加保底半径，防止 this.width 为 0 时钉子消失
-        const pegRadius = Math.max(4, Math.min(8, (this.width || 400) / 60));
+        // [3D-Main M2] 半径区间 [4,8] → [6,11]、除数 60 → 45（视觉 +33%，与 PEG_RADIUS 物理 6→8 同步）
+        const pegRadius = Math.max(6, Math.min(11, (this.width || 400) / 45));
         
         // [防御性检查] 如果钉子数组为空，尝试自动恢复
         if (this.pegs.length === 0) {
@@ -2821,11 +2836,11 @@ phase_gathering_getRandomPegType() {
             this.phase_gathering_initPachinko();
         }
 
-        this.pegs.forEach((p, idx) => { 
+        this.pegs.forEach((p, idx) => {
             p.update(); // 更新冷却和动画
-            p.draw(this.ctx, pegRadius); 
+            p.draw(this.ctx, pegRadius);
             p.resetLight();
-            
+
             // 调试日志：检查是否有槽位叠加在当前钉子上
             const hasSlot = this.specialSlots.some(s => s.pegIndex === idx);
             if (hasSlot && Math.random() < 0.01) {
@@ -2833,16 +2848,24 @@ phase_gathering_getRandomPegType() {
             }
         });
 
+        // [3D-Main M2] 把当前钉子数组同步到 3D InstancedMesh（每帧一次）
+        // 1 帧后 Renderer3D.render() 才会取到新数据，但 60fps 下不可察觉
+        if (this.renderer3d && this.renderer3d.proxy) {
+            try { this.renderer3d.proxy.syncPegs(this.pegs, pegRadius); } catch (e) {
+                console.warn('[Renderer3D] syncPegs error:', e);
+            }
+        }
+
         
-        lightSources.forEach(ball => {
-            // 优化：只检查垂直距离接近的行，或者直接遍历所有 (钉子数量不多，直接遍历性能没问题)
-            this.pegs.forEach(p => {
-                // 简单的性能优化：如果Y轴距离太远就不用算平方根了
-                if (Math.abs(ball.pos.y - p.pos.y) < LIGHT_RADIUS) {
-                    p.calculateLight(ball.pos, LIGHT_RADIUS);
-                }
+        if (!_is3D) {
+            lightSources.forEach(ball => {
+                this.pegs.forEach(p => {
+                    if (Math.abs(ball.pos.y - p.pos.y) < LIGHT_RADIUS) {
+                        p.calculateLight(ball.pos, LIGHT_RADIUS);
+                    }
+                });
             });
-        });
+        }
         this.specialSlots = this.specialSlots.filter(s => !s.hit);
         // 繪製特殊槽位
         this.specialSlots.forEach(s => s.draw(this.ctx));

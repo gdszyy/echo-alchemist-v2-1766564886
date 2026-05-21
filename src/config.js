@@ -817,8 +817,10 @@ const CONFIG = {
         moduleAreaBottomMargin: 80,    // 模块区域底部留白
         moduleSpacingX: 4,             // 模块横向间距 px
         moduleSpacingY: 4,             // 模块纵向间距 px
-        // 钉板左右两侧到画布墙的留白（每侧 1.5 个弹珠直径 = 1.5 × 2 × 7.7 ≈ 23 px）
-        moduleAreaSideMargin: 23,
+        // 钉板左右两侧到画布墙的留白
+        // [3D-Main M2] 23 → 32：钉子半径增大到 11 px（视觉）后，原 23 px 留白让最左/最右钉子与
+        //   左右能量墙的发光区视觉重叠。32 = 11(peg radius) + 10(marble doubled radius) + 11(buffer)
+        moduleAreaSideMargin: 32,
         // ==================== [v2 局内商店 + 符文碎片经济] ====================
         runShopInterval: 2,            // 每 N 场战斗弹出一次局内商店
         runShopRefreshCost: 10,        // 刷新一次商店消耗碎片

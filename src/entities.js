@@ -40,6 +40,7 @@ import {
 import { Enemy, setEnemyAudioProvider } from './entities/enemy.js';
 import { Projectile, setProjectileAudioProvider } from './entities/projectile.js';
 import { RUNE_DB } from './rune_config.js';
+import { isSuppressed2DEntities } from './render3d/draw_mode.js';
 import {
     resolveEnhancedCollision,
     calcMagnusForce,
@@ -148,6 +149,7 @@ class SpecialSlot {
      * @param {CanvasRenderingContext2D} ctx
      */
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (this.hit) return;
 
         this.animTimer += 0.05;
@@ -420,6 +422,7 @@ class FortuneWheel {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
 
         // [Promare] 几何命运轮盘：硬切扇形 + PINK 边框 + 黄色指针
@@ -734,7 +737,8 @@ class GhostPeg {
      */
     constructor(x, y, type, level) {
         this.pos = new Vec2(x, y);
-        this.radius = 6;
+        // [3D-Main M2] 与 Peg.radius 同步：6 → 8
+        this.radius = 8;
         this.type = type;
         this.level = level || 1;
         this.life = 180;       // 存活 180 帧（约 3 秒）
@@ -751,6 +755,7 @@ class GhostPeg {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         const x = this.pos.x, y = this.pos.y, r = this.radius;
         const lifeRatio = this.life / this.maxLife;
@@ -908,6 +913,7 @@ class TriangleSideWheel {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         const x = this.x, y = this.y, r = this.radius;
         const pulse = (Math.sin(Date.now() / 500) + 1) / 2;
 
@@ -1024,8 +1030,9 @@ class TriangleSideWheel {
 
 class Peg {
     constructor(x, y, type = 'normal') {
-        this.pos = new Vec2(x, y); 
-        this.radius = 6; 
+        this.pos = new Vec2(x, y);
+        // [3D-Main M2] 6 → 8，配合视觉钉子变大；MIN_PEG_SPACING 同步更新
+        this.radius = 8;
         this.type = type; 
         this.lit = false; 
         this.litTimer = 0; 
@@ -1099,6 +1106,9 @@ class Peg {
     // --- 在 Peg 类中替换此方法 ---
     // --- 在 Peg 类中替换此方法 ---
     drawShadow(ctx, lightPos, lightRadius) {
+        // [3D-Main 性能] 3D 模式下整个 2D 阴影渲染都被擦除/不可见，跳过 ctx 调用
+        if (isSuppressed2DEntities()) return;
+
         const dx = this.pos.x - lightPos.x;
         const dy = this.pos.y - lightPos.y;
         const distSq = dx * dx + dy * dy;
@@ -1197,6 +1207,10 @@ class Peg {
     }
     //  计算来自某个光源的影响
     calculateLight(sourcePos, lightRadius) {
+        // [3D-Main 性能] 3D 模式下 lightIntensity 不会被读（peg.draw 被 guard 跳过），
+        // 整个计算可以省。这是 O(N*M) 循环里调的，开销显著。
+        if (isSuppressed2DEntities()) return;
+
         const dx = sourcePos.x - this.pos.x;
         const dy = sourcePos.y - this.pos.y;
         const distSq = dx*dx + dy*dy;
@@ -1247,12 +1261,13 @@ class Peg {
     // --- 替换 Peg 类的 draw 方法 ---
     // @section:peg_shadow_and_transform - 软阴影与碰撞旋转变换初始化
     draw(ctx, baseRadius, tilt = {x:0, y:0}) {
-        // [Promare] 几何钉子路径：菱形 + 元素 glyph，跳过 classic 渐变 + shadowBlur
+        // [3D-Main] 3D 模式：跳过 2D 钉子绘制
+        if (isSuppressed2DEntities()) return;
+        // [Promare] 2D 几何模式：菱形 + 元素 glyph
         if (CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.useGeometricPegs) {
             drawPromarePeg(this, ctx, baseRadius);
             return;
         }
-
         const currentRadius = baseRadius * this.scale;
         const isSpecial = this.type !== 'normal';
         const isLit = this.lit;
@@ -2642,7 +2657,7 @@ class DropBall {
                     if (_segLenSq > 0) {
                         _t = ((this.pos.x - slot.x) * _sx + (this.pos.y - slot.y) * _sy) / _segLenSq;
                         // 钉子半径 / 线段长度 = 端点排除区间宽度
-                        const _pegR = 6; // Peg.radius
+                        const _pegR = 8; // Peg.radius (3D-Main M2: 6 → 8)
                         const _segLen = Math.sqrt(_segLenSq);
                         const _tMargin = _pegR / _segLen;
                         // 只有投影落在两端钉子之间的内部区间时才触发
@@ -3255,6 +3270,7 @@ class DropBall {
          * @description 分层绘制弹珠 (更新：爆破弹珠专属视觉)
          */
         draw(ctx) {
+            if (isSuppressed2DEntities()) return;
             if (!this.active) return;
 
             // [Promare] 几何弹珠路径：六边面化 + billboard 环
@@ -3720,6 +3736,7 @@ class SwordQi {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
@@ -3754,6 +3771,7 @@ class SlashAnim {
         if (this.life <= 0) this.active = false;
     }
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
@@ -4134,6 +4152,7 @@ class SonSword {
     }
 
         draw(ctx) {
+            if (isSuppressed2DEntities()) return;
         if (!this.active || this.state === 'stuck') return; 
 
         const color = this.level >= 3 ? '#f43f5e' : (this.level >= 2 ? '#6366f1' : '#0ea5e9');
@@ -4274,6 +4293,7 @@ class CloneSpore {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
@@ -4526,6 +4546,7 @@ class Player {
      * @param {CanvasRenderingContext2D} ctx - 绘图上下文
      */
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         const nextAmmo = this.game.ammoQueue.length > 0 ? this.game.ammoQueue[0] : null;
         
         // 计算当前绘制位置（可能有抖动）
@@ -4933,6 +4954,7 @@ class FieldLootItem {
     }
 
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active || this.opacity <= 0) return;
 
         const floatY = Math.sin(this._animTimer) * 5;
@@ -5066,6 +5088,7 @@ class RuneLoot {
      * @param {CanvasRenderingContext2D} ctx - 绘图上下文
      */
     draw(ctx) {
+        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
 
         this._animTimer += 0.05;

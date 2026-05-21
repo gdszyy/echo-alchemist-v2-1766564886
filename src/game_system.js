@@ -19,6 +19,7 @@ import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
 import { COUNTER_MAP, RUNE_DB } from './rune_config.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
+import { setSuppress2DEntities } from './render3d/draw_mode.js';
 
 export const game_system = {
 
@@ -80,6 +81,20 @@ export const game_system = {
         this._lastFrameTime = _now;
         // ==================== [自适应性能] END ====================
 
+        // ==================== [3D-Main M1] 3D 背景层渲染 ====================
+        // 即便暂停（isPaused）也持续渲染 3D 背景，保持氛围"活着"的呼吸感。
+        // 失败回退已在 Renderer3D 构造阶段处理（this.renderer3d 可能为 null）。
+        if (this.renderer3d) {
+            try {
+                this.renderer3d.render(_now);
+            } catch (err) {
+                // 渲染期出错（如 shader 编译延迟失败）→ 一次性禁用，避免循环报错刷屏
+                console.error('[Renderer3D] render error, disabling:', err);
+                try { this.renderer3d.dispose(); } catch (_) {}
+                this.renderer3d = null;
+            }
+        }
+
         // 暂停时跳过物理更新，但继续请求下一帧以保持 rAF 循环活跃
         if (this.isPaused) {
             requestAnimationFrame(() => this.sys_loop());
@@ -111,6 +126,13 @@ export const game_system = {
             this.hitstopFrames -= 1;
         }
         const timeScale = effectiveTimeScale;
+
+        // [3D-Main] 每帧同步"是否抑制 2D 实体绘制"开关。
+        // body.render3d-debug 由 #render3d-item 设置控制；entity.draw() 内首行查询此 flag。
+        const is3DMode = typeof document !== 'undefined'
+            && document.body
+            && document.body.classList.contains('render3d-debug');
+        setSuppress2DEntities(is3DMode);
 
         // 处理震动衰减
         let shakeX = 0, shakeY = 0;
@@ -166,6 +188,16 @@ export const game_system = {
             case 'combat':
                 this.phase_combat_update(timeScale);
                 break;
+        }
+
+        // [3D-Main] 纯 3D 模式：所有 2D entity.draw() 已通过 setSuppress2DEntities() 在自身首行
+        // 早返回，不再写入像素。此处不再需要 clearRect 兜底——但保留作为"任何漏改 entity 的
+        // 安全网"，开销极低（一次 clearRect O(W*H) 像素清零，远小于 entity 绘制成本）。
+        if (is3DMode) {
+            this.ctx.save();
+            this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+            this.ctx.clearRect(0, 0, this.width, this.height);
+            this.ctx.restore();
         }
 
         // 6. 战场掉落物更新与渲染
@@ -236,6 +268,13 @@ export const game_system = {
         if (!rect.width || !rect.height) return;
         this.width = this.canvas.width = Math.round(rect.width);
         this.height = this.canvas.height = Math.round(rect.height);
+
+        // [3D-Main M1] 同步 WebGL canvas 内部分辨率（CSS 尺寸由全局 canvas 规则控制）
+        if (this.renderer3d) {
+            try { this.renderer3d.resize(this.width, this.height); } catch (e) {
+                console.warn('[Renderer3D] resize error:', e);
+            }
+        }
 
         // 动态调整失败判定线
         // PC 模式下底部面板隐藏，可以缩小安全边距

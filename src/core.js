@@ -48,6 +48,8 @@ import { calc_utils } from './calc_utils.js';
 import { tutorial_system } from './tutorial_system.js';
 import { game_over_mixin } from './ui/game_over.js';
 import { preloadAllSprites } from './render/sprite_renderer.js'; // [Phase 5B] 预加载所有 Sprite Sheet
+// [3D-Main M1] 引入 3D 渲染管线（仅背景层）。任何加载/初始化失败都会被静默降级到 2D-only。
+import { Renderer3D } from './render3d/Renderer3D.js';
 
 // ==================== 延迟音频初始化 ====================
 let _audioInitialized = false;
@@ -373,10 +375,36 @@ class Game {
         // [Phase 5B] 预加载所有 Sprite Sheet（在游戏循环开始前触发异步加载）
         preloadAllSprites();
 
+        // ==================== [3D-Main M1] 初始化 3D 渲染管线 ====================
+        // 设计契约：
+        //   1. 任何初始化失败（Three.js CDN 拉取失败、WebGL 不支持、shader 编译错）→
+        //      this.renderer3d = null，主循环 / resize 调用都用可选链跳过。
+        //   2. 默认开启；可通过 localStorage.echo_3d_disabled = '1' 强制关闭。
+        this.renderer3d = null;
+        try {
+            if (typeof localStorage !== 'undefined' && localStorage.getItem('echo_3d_disabled') === '1') {
+                console.info('[Renderer3D] disabled via localStorage.echo_3d_disabled');
+            } else {
+                const glCanvas = document.getElementById('gl-canvas');
+                if (!glCanvas) {
+                    console.warn('[Renderer3D] #gl-canvas not found, skipping 3D init');
+                } else {
+                    this.renderer3d = new Renderer3D(glCanvas, this.width, this.height, {
+                        eventBus: this.eventBus,
+                    });
+                    this.renderer3d.resize(this.canvas.width, this.canvas.height);
+                    console.info(`[Renderer3D] initialized @ ${this.canvas.width}x${this.canvas.height}`);
+                }
+            }
+        } catch (err) {
+            console.error('[Renderer3D] init failed, falling back to 2D-only:', err);
+            this.renderer3d = null;
+        }
+
         // ==================== [Promare] Dev Console 切换工具 ====================
-        // 在控制台输入 `window.__promare(true)` 切换到 promare 模式，`false` 切回 classic。
-        // 同时给 body 加/去 `.promare-mode` class，让 CSS 层级也响应。
-        // 初始化时按 CONFIG.visualMode 同步 body class。
+        // 与 3D 视觉并行的另一套 2D 视觉模式。控制台 `window.__promare(true/false)` 切换。
+        // 注意：3D 模式（body.render3d-debug）下 2D entities 整体被擦除，Promare 风格不可见；
+        // 若想看 Promare 效果，需先在设置里关掉"3D 视觉"。
         if (typeof window !== 'undefined') {
             const _syncBodyClass = () => {
                 document.body && document.body.classList.toggle('promare-mode', CONFIG.visualMode === 'promare');
@@ -388,7 +416,6 @@ class Game {
                 console.log('[Promare] visualMode =', CONFIG.visualMode);
                 return CONFIG.visualMode;
             };
-            // [Promare] 安装 globalThis 桥接，让 scatter_star 粒子二次爆裂能调到 spawn_createParticle
             ensurePromareGlobals(this);
         }
 
@@ -558,6 +585,11 @@ class Game {
         if (this._resizeObserver) {
             try { this._resizeObserver.disconnect(); } catch (e) {}
             this._resizeObserver = null;
+        }
+        // [3D-Main M1] 释放 WebGL 资源
+        if (this.renderer3d) {
+            try { this.renderer3d.dispose(); } catch (e) {}
+            this.renderer3d = null;
         }
     }
 }

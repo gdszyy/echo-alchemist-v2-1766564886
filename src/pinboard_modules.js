@@ -25,10 +25,11 @@ import { Peg, SpecialSlot } from './entities.js';
 const RANDOMIZABLE_PEG_TYPES = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'wind'];
 
 // 倍化弹珠半径 = marbleRadius(7.7) + maxSizeBonus(2.5)
-const PEG_RADIUS = 6;               // 与 entities.js Peg.radius 一致
+// [3D-Main M2] 钉子半径从 6 → 8（+33%），配合 3D 钉子视觉变大
+const PEG_RADIUS = 8;               // 与 entities.js Peg.radius 一致
 const DOUBLED_MARBLE_RADIUS = 10.2; // marbleRadius(7.7) + maxSizeBonus(2.5)
 // 最小中心到中心间距 = 两侧钉子半径 + 倍化弹珠直径，确保倍化弹珠能通过
-const MIN_PEG_SPACING = 2 * PEG_RADIUS + 2 * DOUBLED_MARBLE_RADIUS; // = 32.4 px
+const MIN_PEG_SPACING = 2 * PEG_RADIUS + 2 * DOUBLED_MARBLE_RADIUS; // = 36.4 px (was 32.4)
 
 /**
  * 按当前局内属性权重随机生成 peg 类型。
@@ -135,11 +136,12 @@ export const MODULE_DEFS = {
         id: 'std_stagger',
         name: '標準交錯',
         icon: '▦',
-        desc: '3×3 普通釘子，標準交錯排列。',
+        desc: '2×3 普通釘子，標準交錯排列。',
         rarity: 'common',
         price: 0,
+        // [3D-Main M2] 3×3 → 2×3：钉子总数 -33%（配合 3D 渲染钉子变大，密度降低以保证可读性）
         build(ox, oy, w, h) {
-            const pegs = generateStaggeredPegs(ox, oy, w, h, 3, 3, 'normal');
+            const pegs = generateStaggeredPegs(ox, oy, w, h, 2, 3, 'normal');
             return { pegs, specialSlots: [] };
         },
     },
@@ -147,11 +149,12 @@ export const MODULE_DEFS = {
         id: 'dense_stagger',
         name: '密集交錯',
         icon: '▩',
-        desc: '4×3 密集普通釘子，弹珠碰撞次數多。',
+        desc: '3×3 密集普通釘子，弹珠碰撞次數多。',
         rarity: 'common',
         price: 0,
+        // [3D-Main M2] 4×3 → 3×3：-25%
         build(ox, oy, w, h) {
-            const pegs = generateStaggeredPegs(ox, oy, w, h, 4, 3, 'normal');
+            const pegs = generateStaggeredPegs(ox, oy, w, h, 3, 3, 'normal');
             return { pegs, specialSlots: [] };
         },
     },
@@ -163,7 +166,8 @@ export const MODULE_DEFS = {
         rarity: 'common',
         price: 0,
         build(ox, oy, w, h) {
-            const pegs = generateStaggeredPegs(ox, oy, w, h, 3, 3, 'normal');
+            // [3D-Main M2] 3×3 → 2×3：-33%
+            const pegs = generateStaggeredPegs(ox, oy, w, h, 2, 3, 'normal');
             if (pegs.length > 0) {
                 let bestIdx = 0;
                 let bestDist = Infinity;

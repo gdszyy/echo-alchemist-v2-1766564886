@@ -31,10 +31,11 @@ export const render_system = {
      */
     render_clearCanvas() {
         this.ctx.clearRect(0, 0, this.width, this.height);
+        // [3D-Main] 3D 模式：跳过所有 2D 背景填充，让下层 WebGL 全息场景完整可见
+        const is3D = typeof document !== 'undefined' && document.body && document.body.classList.contains('render3d-debug');
+        if (is3D) return;
 
-        // [Promare] 全屏几何背景：黑底 + 45° 扫描线 + 底部透视网格
-        // hideBackgroundBitmap=true 时彻底跳过 BG_MAIN_CANVAS_SRC 与发射器位图。
-        // @perf-impact: 一次 fillRect + 三次 drawImage（离屏 cache），<0.2ms。
+        // [Promare] 全屏几何背景（仅 2D 模式下生效）：黑底 + 45° 扫描线 + 底部透视网格
         if (CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.hideBackgroundBitmap) {
             const tiltFactor = (CONFIG.promare.backgroundTiltFactor != null) ? CONFIG.promare.backgroundTiltFactor : 0.5;
             renderPromareBackground(this.ctx, this.width, this.height, this.boardTilt && this.boardTilt.current, this._frameCount || 0, tiltFactor);
@@ -69,8 +70,9 @@ export const render_system = {
      * [RENDER] 绘制背景网格。
      */
     render_background() {
-        // [Promare] 非战斗阶段背景：黑底 + 45° 扫描线 + 底部透视网格
-        // 已在 render_clearCanvas 中绘制，本函数跳过避免重复 paint。
+        // [3D-Main] 3D 模式：跳过 2D 网格（3D 层已有星云 + 远景 + 体积光）
+        if (typeof document !== 'undefined' && document.body && document.body.classList.contains('render3d-debug')) return;
+        // [Promare] 已在 render_clearCanvas 里绘制几何背景，避免重复 paint
         if (CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.hideBackgroundBitmap) {
             return;
         }

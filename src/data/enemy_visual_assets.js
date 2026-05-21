@@ -103,21 +103,11 @@ export function loadEnemyVisualAssetManifest() {
     if (_manifest) return Promise.resolve(_manifest);
     if (_manifestPromise) return _manifestPromise;
 
-    if (typeof fetch !== 'function') {
-        // Node / 测试环境：直接给出内嵌兜底，避免阻塞调用
-        _manifest = _buildDefaultManifest();
-        return Promise.resolve(_manifest);
-    }
-
-    _manifestPromise = fetch(MANIFEST_PATH)
-        .then(r => r.ok ? r.json() : Promise.reject(new Error('manifest http ' + r.status)))
-        .then(json => { _manifest = json; return _manifest; })
-        .catch(err => {
-            console.warn('[enemy_visual_assets] manifest 加载失败，使用内嵌默认值:', err.message);
-            _manifest = _buildDefaultManifest();
-            return _manifest;
-        });
-    return _manifestPromise;
+    // [3D-Main 清理] assets/sprites/enemies/ 整个目录已在 M6 删除（M3 EnemyMeshPool 程序化几何接管），
+    // 跳过注定 404 的 fetch，直接用内嵌默认 manifest。manifest 仍提供 archetype/footprint 元数据，
+    // 但其中的 spritePath 已无意义——createSpriteRenderer 总返回 null。
+    _manifest = _buildDefaultManifest();
+    return Promise.resolve(_manifest);
 }
 
 function _buildDefaultManifest() {

@@ -151,6 +151,33 @@
             pointer-events: auto;
         }
 
+        /* ===== 3D WebGL 背景层（M1 起引入） =====
+         * 位于 2D #gameCanvas 之下，铺满 #game-container。
+         * 不接收事件（pointer-events: none），不参与 layout（position: absolute）。
+         * 内部分辨率由 JS（Renderer3D）按 2D Canvas 同步设置。
+         */
+        #gl-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            /* 默认隐藏：仅当 body 带 .render3d-enabled 类或显式 opacity 调整时可见。
+             * M1 阶段我们让它始终渲染（用于性能/正确性验证），但 2D 不透明覆盖之 → 看不到。
+             * 调试时可在 console 执行：
+             *   document.body.classList.add('render3d-debug')
+             * 即可看到下层 3D 背景（同步降低 2D 不透明度到 0.3）。
+             */
+        }
+        /* [3D-Main] 纯 3D 模式（body.render3d-debug）：
+         *   1. render_clearCanvas 跳过 2D 背景填充 → 3D 全息场景完整可见
+         *   2. render_background 跳过 2D 网格
+         *   3. sys_loop 在 phase update 跑完后整块 clearRect 2D canvas → entities 完全消失
+         *   4. 然后 floating texts / wind anchors / perf overlay 在干净 canvas 上重新绘制
+         * 切回 2D 模式时移除该 class，2D 行为恢复原状。
+         * 不需要降低 #gameCanvas 不透明度——透明区域天然让 3D 完整透出。 */
+
         @keyframes shake-hard {
             0% { transform: translate(0, 0); }
             25% { transform: translate(-5px, 5px); }
@@ -2767,10 +2794,23 @@
     </style>
     <!-- Phase 5A: 位图化 UI 样式覆盖层 -->
     <link rel="stylesheet" href="src/styles/bitmap_ui.css">
+    <!-- [3D-Main M5] 全息玻璃风 HUD 覆盖（body.glass-ui-enabled） -->
+    <link rel="stylesheet" href="src/styles/glass_ui.css">
     <!-- [Promare] Visual mode CSS overrides (scoped to body.promare-mode) -->
     <link rel="stylesheet" href="src/styles/promare_ui.css">
+
+    <!-- [3D-Main M1] Three.js importmap：让 `import * as THREE from 'three'` 解析到 CDN ESM 构建。
+         版本锁定 r160。CDN 不可达时 Renderer3D 构造抛错被 core.js try/catch 静默降级到 2D-only。 -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+    </script>
 </head>
-<body>
+<body class="render3d-debug glass-ui-enabled">
 <div id="app-wrapper">
 
 <!-- ===== PC 左侧边栏：收集队列 + 配方 HUD ===== -->
@@ -2790,6 +2830,8 @@
 </aside>
 
 <div id="game-container">
+    <!-- [3D-Main M1] WebGL 背景层。位于 2D #gameCanvas 之下，由 src/render3d/Renderer3D.js 驱动 -->
+    <canvas id="gl-canvas"></canvas>
     <canvas id="gameCanvas"></canvas>
     <div id="crt-overlay"></div>
 
@@ -2854,6 +2896,12 @@
                         <span class="s-icon">📺</span>
                         <span class="s-label">CRT 特效</span>
                         <span class="s-badge" id="crt-badge">关闭</span>
+                    </div>
+                    <!-- [3D-Main] 3D 视觉模式开关：默认开启，3D 全息场景为主，关闭则退回纯 2D（兼容/性能保底） -->
+                    <div class="settings-item active" id="render3d-item" onclick="window.toggleRender3dMode && window.toggleRender3dMode()">
+                        <span class="s-icon">🌐</span>
+                        <span class="s-label">3D 视觉</span>
+                        <span class="s-badge active" id="render3d-badge">开启</span>
                     </div>
 
                 </div>
@@ -3498,6 +3546,12 @@
                         <span class="ps-label">CRT 特效</span>
                         <span class="ps-badge" id="pause-crt-badge">关闭</span>
                     </div>
+                    <!-- [3D-Main] 3D 视觉模式开关（暂停设置面板版）：默认开启 -->
+                    <div class="pause-setting-row active" id="pause-render3d-row" onclick="window.toggleRender3dMode && window.toggleRender3dMode(); game.ui_syncPauseSettings && game.ui_syncPauseSettings();">
+                        <span class="ps-icon">🌐</span>
+                        <span class="ps-label">3D 视觉</span>
+                        <span class="ps-badge active" id="pause-render3d-badge">开启</span>
+                    </div>
 
                     <div class="pause-perf-row">
                         <span class="ps-icon">⚡</span>
@@ -3589,6 +3643,45 @@ game.sys_toggleCrt = () => {
     isCrtOn = !isCrtOn;
     localStorage.setItem('ea_crt_enabled', isCrtOn);
     updateCrtVisuals();
+};
+
+// --- [3D-Main] 3D 视觉模式 ---
+// 默认开启：让全套 M1–M6.5 重建的 3D 视觉真正展现给玩家。
+// 通过给 body 加 .render3d-debug 类（M1 已定义：把 2D #gameCanvas 透到 30%，
+// 让下层 WebGL 全息场景透出）。
+// 关闭开关意味着回退到纯 2D（兼容性 / 性能保底 / 怀旧模式）。
+let is3DOn = localStorage.getItem('ea_render3d_enabled') !== 'false';
+function updateRender3dVisuals() {
+    const badges = [
+        document.getElementById('render3d-badge'),
+        document.getElementById('pause-render3d-badge'),
+    ];
+    const items = [
+        document.getElementById('render3d-item'),
+        document.getElementById('pause-render3d-row'),
+    ];
+    if (is3DOn) {
+        document.body.classList.add('render3d-debug');
+    } else {
+        document.body.classList.remove('render3d-debug');
+    }
+    for (const badge of badges) {
+        if (!badge) continue;
+        badge.textContent = is3DOn ? '开启' : '关闭';
+        if (is3DOn) badge.classList.add('active');
+        else        badge.classList.remove('active');
+    }
+    for (const item of items) {
+        if (!item) continue;
+        if (is3DOn) item.classList.add('active');
+        else        item.classList.remove('active');
+    }
+}
+updateRender3dVisuals();
+window.toggleRender3dMode = () => {
+    is3DOn = !is3DOn;
+    localStorage.setItem('ea_render3d_enabled', is3DOn);
+    updateRender3dVisuals();
 };
 
 // --- 静音切换 ---
