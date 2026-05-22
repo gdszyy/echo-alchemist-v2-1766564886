@@ -35,49 +35,53 @@ import { FXAAShader }        from 'three/addons/shaders/FXAAShader.js';
 //   boss       深红 + 高饱和，整体压重，营造紧迫
 //   gameover   去饱和接近黑白，结束氛围
 // ===================================================================
-// [视觉调优] 用户反馈"3D 太暗 / 太透明，跟色彩鲜明的视觉要求不符"。
-// 全局降低 vignetteDarkness（边角不再吃光），提升 saturation（饱和度普涨 25-30%），
-// 削弱 split-tone 阴影/高光偏色（gradingStrength 减半），让 promare 5 色调色板
-// 不被 grading 拉灰。整体观感从"暗黑炼金"转向"高对比色块"。
+// [Promare v2 — F7] 反"暗黑炼金"路线：Promare 不靠后期，靠饱和 + 硬边 + 12fps stutter。
+// 历史调优把 bloom 0.85 / chromatic 0.005 / vignette 0.18-0.50 / grading 0.15-0.22 都拉得很满，
+// 结果是粒子被 bloom 糊成光雾、色差让颜色边缘抖、vignette 把深紫底拖向黑、grading 把粉/青拉灰。
+// 本次：
+//   - bloom 减半（baseline 0.55 / HDR 0.65）+ threshold 抬高，让 bloom 只挑真高光
+//   - chromatic / distortion 全关（电影里这两个滤镜几乎不出现，是 Promare 反例）
+//   - vignetteDarkness 各预设清零或几乎清零（不再吃边角，深紫底全屏铺）
+//   - gradingStrength 减半（保留阶段情绪 split-tone，但不拉灰原色）
 const GRADING_PRESETS = {
     meta: {
         saturation:       1.30,
         shadowR: 0.04, shadowG: 0.08, shadowB: 0.18,
         highlightR: 0.10, highlightG: 0.10, highlightB: 0.18,
-        gradingStrength:  0.18,
-        vignetteDarkness: 0.18,
+        gradingStrength:  0.09,
+        vignetteDarkness: 0.0,
         vignetteOffset:   0.78,
     },
     gathering: {
         saturation:       1.35,
         shadowR: 0.02, shadowG: 0.06, shadowB: 0.14,
         highlightR: 0.12, highlightG: 0.14, highlightB: 0.10,
-        gradingStrength:  0.15,
-        vignetteDarkness: 0.18,
+        gradingStrength:  0.08,
+        vignetteDarkness: 0.0,
         vignetteOffset:   0.82,
     },
     combat: {
         saturation:       1.40,
         shadowR: 0.03, shadowG: 0.05, shadowB: 0.12,
         highlightR: 0.16, highlightG: 0.10, highlightB: 0.04,
-        gradingStrength:  0.16,
-        vignetteDarkness: 0.20,
+        gradingStrength:  0.08,
+        vignetteDarkness: 0.0,
         vignetteOffset:   0.80,
     },
     boss: {
         saturation:       1.50,
         shadowR: 0.14, shadowG: 0.03, shadowB: 0.05,
         highlightR: 0.22, highlightG: 0.08, highlightB: 0.02,
-        gradingStrength:  0.22,
-        vignetteDarkness: 0.28,
+        gradingStrength:  0.11,
+        vignetteDarkness: 0.06,  // Boss 阶段保留极轻边角收口营造紧迫
         vignetteOffset:   0.72,
     },
     gameover: {
         saturation:       0.45,
         shadowR: 0.05, shadowG: 0.05, shadowB: 0.10,
         highlightR: 0.10, highlightG: 0.10, highlightB: 0.10,
-        gradingStrength:  0.40,
-        vignetteDarkness: 0.50,
+        gradingStrength:  0.30,
+        vignetteDarkness: 0.30,  // 结束氛围保留 vignette 帮助叙事
         vignetteOffset:   0.55,
     },
 };
@@ -92,8 +96,11 @@ const LENS_DISTORTION_SHADER = {
     name: 'LensDistortionShader',
     uniforms: {
         tDiffuse:    { value: null },
-        uDistortion: { value: 0.06 },    // 桶形畸变强度
-        uChromatic:  { value: 0.005 },   // RGB 色散
+        // [Promare v2 F7] 桶形畸变 + RGB 色散全部关到 0 ——
+        // 电影几乎不用这两个滤镜；桶形是"模拟变形镜头"，色散是"模拟廉价镜头"，
+        // 都是 cinematography 语言，与 Promare 的"平涂硬切"取向相反。
+        uDistortion: { value: 0.0 },
+        uChromatic:  { value: 0.0 },
         uVignettePower: { value: 0.0 },  // 不在这里做 vignette
     },
     vertexShader: /* glsl */`
@@ -144,19 +151,17 @@ const VIGNETTE_GRAIN_SHADER = {
     uniforms: {
         tDiffuse:          { value: null },
         uTime:             { value: 0 },
-        // [视觉调优] 默认 baseline 从「暗黑炼金」改成「高对比硬切」：
-        // vignette 退到 0.80，darkness 0.20（仅保留极轻微的边角收口）；
-        // saturation 拉到 1.40，让 PINK/CYAN/YELLOW 鲜艳；grading 减半免拉灰；
-        // grain 减到 0.018，避免颗粒污染纯色块。
+        // [Promare v2 F7] vignette / grain baseline 全清零；grading 减半。
+        // setGradingPreset() 会立刻把这些 lerp 到 GRADING_PRESETS 里对应阶段值。
         uVignetteOffset:   { value: 0.80 },
-        uVignetteDarkness: { value: 0.20 },
-        uGrainAmount:      { value: 0.018 },
+        uVignetteDarkness: { value: 0.0 },   // 旧 0.20 → 0（让深紫底铺满屏）
+        uGrainAmount:      { value: 0.0 },   // 旧 0.018 → 0（颗粒污染平涂色块）
         uResolution:       { value: new THREE.Vector2(1, 1) },
         // [M4 调优] Color grading 参数
         uSaturation:       { value: 1.40 },   // 全局饱和度（1.0=原色）
         uShadowTint:       { value: new THREE.Color(0.03, 0.05, 0.12) }, // 冷蓝阴影（更轻）
         uHighlightTint:    { value: new THREE.Color(0.16, 0.10, 0.04) }, // 暖橙高光（更轻）
-        uGradingStrength:  { value: 0.16 },   // grading 混入强度
+        uGradingStrength:  { value: 0.08 },   // 旧 0.16 → 0.08（保留情绪 split-tone，但不拉灰）
         // [M4] 暴击/大伤害瞬时白闪强度（0..1），由 CameraController 每帧推送，自然衰减
         uFlash:            { value: 0.0 },
         uFlashColor:       { value: new THREE.Color(1.0, 0.98, 0.92) }, // 略偏暖白
@@ -280,19 +285,21 @@ export class PostFX {
         this.composer.addPass(this.renderPass);
 
         // --- Pass 2: bloom ---
-        // [视觉调优] 用户反馈"3D 太暗"——bloom strength 上调（LDR 0.78→1.05, HDR 0.90→1.20）、
-        // threshold 下调（LDR 0.55→0.42, HDR 0.78→0.62），让弹珠/钉子/粒子的 rim 与中等亮度
-        // 区域也参与泛光，整体观感更通透。
+        // [Promare v2 F7] Bloom 大幅收紧 ——
+        // Promare 不靠 bloom 营造亮度，靠"饱和原色 + 硬切色块"。原版 strength 0.78-1.20 让所有
+        // 中等亮度区域都参与发光 → 粒子糊成光雾、丢失硬边。
+        // 新值：strength 半截以下 + threshold 抬到 0.78（LDR）/ 0.90（HDR），只让真正过曝的
+        // 点（白核 / 闪光帧）触发 bloom，正常色块保持硬边。
         this.bloomPass = new UnrealBloomPass(
             new THREE.Vector2(this.width, this.height),
-            1.05,
-            0.55,
-            0.42
+            0.35,    // strength：旧 1.05 → 0.35
+            0.45,    // radius：旧 0.55 → 0.45（更聚焦）
+            0.78     // threshold：旧 0.42 → 0.78
         );
         if (this.usingHDR) {
-            this.bloomPass.threshold = 0.62;
-            this.bloomPass.strength = 1.20;
-            this.bloomPass.radius = 0.55;
+            this.bloomPass.threshold = 0.90;
+            this.bloomPass.strength = 0.45;
+            this.bloomPass.radius = 0.50;
         }
         this.composer.addPass(this.bloomPass);
 

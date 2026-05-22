@@ -108,7 +108,7 @@ export const render_system = {
 
                 // 连线 — 硬 zigzag 折线（替代虚线 + shadowBlur）
                 if (this.windAnchors.length > 1) {
-                    ctx.strokeStyle = '#00E5FF';
+                    ctx.strokeStyle = '#00B4FF';
                     ctx.lineWidth = 2 + linePulse * 1.5;
                     ctx.globalAlpha = 0.55 + linePulse * 0.25;
                     ctx.beginPath();
@@ -143,7 +143,7 @@ export const render_system = {
                     ctx.lineTo(0, r);
                     ctx.lineTo(-r, 0);
                     ctx.closePath();
-                    ctx.fillStyle = '#00E5FF';
+                    ctx.fillStyle = '#00B4FF';
                     ctx.globalAlpha = 0.6 + pulse * 0.3;
                     ctx.fill();
                     // 内层钻石（白色实心）
@@ -163,13 +163,13 @@ export const render_system = {
                     ctx.font = 'bold 10px "Inter Mono", monospace';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillStyle = '#0a0a0a';
+                    ctx.fillStyle = '#1B0B2E';
                     const ox = a.x + 12, oy = a.y - 12;
                     ctx.fillText(idx + 1, ox + 1, oy);
                     ctx.fillText(idx + 1, ox - 1, oy);
                     ctx.fillText(idx + 1, ox, oy + 1);
                     ctx.fillText(idx + 1, ox, oy - 1);
-                    ctx.fillStyle = '#FFD600';
+                    ctx.fillStyle = '#FFE94A';
                     ctx.fillText(idx + 1, ox, oy);
                 });
                 ctx.restore();
@@ -747,9 +747,9 @@ export const render_system = {
             ctx.lineTo( halfW,     halfH);
             ctx.lineTo(-halfW,     halfH);
             ctx.closePath();
-            ctx.fillStyle = '#0a0a0a';
+            ctx.fillStyle = '#1B0B2E';
             ctx.fill();
-            ctx.strokeStyle = '#FF0090';
+            ctx.strokeStyle = '#FF2EA6';
             ctx.lineWidth = 2;
             ctx.stroke();
             // 充能内饰：从顶部向下填 CYAN，按 chargeProgress
@@ -765,12 +765,12 @@ export const render_system = {
                 const fillH = halfH * 2 * chargeProgress;
                 ctx.globalCompositeOperation = 'lighter';
                 ctx.globalAlpha = 0.6;
-                ctx.fillStyle = '#00E5FF';
+                ctx.fillStyle = '#00B4FF';
                 ctx.fillRect(-halfW, halfH - fillH, halfW * 2, fillH);
                 ctx.restore();
             }
             // 顶部装饰：3 小菱形
-            ctx.fillStyle = '#FFD600';
+            ctx.fillStyle = '#FFE94A';
             for (let i = -1; i <= 1; i++) {
                 ctx.beginPath();
                 ctx.moveTo(i * 18, -halfH - 2);
@@ -985,7 +985,7 @@ export const render_system = {
         if (!recipe) return;
 
         // 元素 type → 颜色映射
-        const PAL = { PINK: '#FF0090', CYAN: '#00E5FF', YELLOW: '#FFD600', WHITE: '#FFFFFF', BLACK: '#0a0a0a' };
+        const PAL = { PINK: '#FF2EA6', CYAN: '#00B4FF', YELLOW: '#FFE94A', WHITE: '#FFFFFF', BLACK: '#1B0B2E' };
         const elemColor = {
             pyro: PAL.PINK, bounce: PAL.PINK, pierce: PAL.WHITE, scatter: PAL.YELLOW,
             cryo: PAL.CYAN, lightning: PAL.YELLOW, laser: PAL.CYAN, wind: PAL.CYAN,
@@ -1070,7 +1070,7 @@ export const render_system = {
     _render_promareWindMatrix(matrix, progress, time) {
         const { rect, type, anchors } = matrix;
         const ctx = this.ctx;
-        const PAL = { PINK: '#FF0090', CYAN: '#00E5FF', YELLOW: '#FFD600', WHITE: '#FFFFFF' };
+        const PAL = { PINK: '#FF2EA6', CYAN: '#00B4FF', YELLOW: '#FFE94A', WHITE: '#FFFFFF' };
         ctx.save();
 
         // 1. 主框：硬 zigzag 折线 anchors → anchors 连成，每段中点 ±2px 垂直偏移
@@ -1207,7 +1207,7 @@ export const render_system = {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.globalAlpha = progress;
-            ctx.fillStyle = '#0a0a0a';
+            ctx.fillStyle = '#1B0B2E';
             const offs = [[2,0],[-2,0],[0,2],[0,-2]];
             for (const [ox, oy] of offs) ctx.fillText(txt, ox, oy);
             ctx.fillStyle = PAL.YELLOW;
@@ -1242,7 +1242,7 @@ export const render_system = {
             ctx.globalAlpha = progress;
             const txt = 'BURST';
             // BLACK 4 向 stamp
-            ctx.fillStyle = '#0a0a0a';
+            ctx.fillStyle = '#1B0B2E';
             for (const [ox, oy] of [[2,0],[-2,0],[0,2],[0,-2]]) ctx.fillText(txt, cx + ox, cy + oy);
             // YELLOW 主体
             ctx.fillStyle = PAL.YELLOW;

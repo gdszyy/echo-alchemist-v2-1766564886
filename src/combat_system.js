@@ -1401,7 +1401,7 @@ export const combat_system = {
                     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
                 }
                 ctx.closePath();
-                ctx.fillStyle = '#00E5FF';
+                ctx.fillStyle = '#00B4FF';
                 ctx.fill();
                 ctx.restore();
 
@@ -1415,9 +1415,9 @@ export const combat_system = {
                     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
                 }
                 ctx.closePath();
-                ctx.fillStyle = '#0a0a0a';
+                ctx.fillStyle = '#1B0B2E';
                 ctx.fill();
-                ctx.strokeStyle = '#00E5FF';
+                ctx.strokeStyle = '#00B4FF';
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
@@ -1430,7 +1430,7 @@ export const combat_system = {
                 ctx.stroke();
 
                 ctx.globalAlpha = core.alpha;
-                ctx.strokeStyle = '#FFD600';
+                ctx.strokeStyle = '#FFE94A';
                 ctx.lineWidth = 4;
                 ctx.beginPath();
                 ctx.arc(0, 0, r * 0.7, -Math.PI/2, -Math.PI/2 + Math.PI * 2 * energyRatio);
@@ -1445,7 +1445,7 @@ export const combat_system = {
                 ctx.lineTo(0, r * 0.35);
                 ctx.lineTo(-r * 0.35, 0);
                 ctx.closePath();
-                ctx.fillStyle = '#00E5FF';
+                ctx.fillStyle = '#00B4FF';
                 ctx.fill();
                 ctx.strokeStyle = '#FFFFFF';
                 ctx.lineWidth = 1.5;
@@ -1458,10 +1458,10 @@ export const combat_system = {
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 const txt = `${core.energy}/${core.energyRequired}`;
-                ctx.fillStyle = '#0a0a0a';
+                ctx.fillStyle = '#1B0B2E';
                 const offs = [[2, 0], [-2, 0], [0, 2], [0, -2]];
                 for (const [ox, oy] of offs) ctx.fillText(txt, ox, r + 22 + oy);
-                ctx.fillStyle = '#FFD600';
+                ctx.fillStyle = '#FFE94A';
                 ctx.fillText(txt, 0, r + 22);
 
                 ctx.restore();

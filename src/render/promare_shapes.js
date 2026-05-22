@@ -14,7 +14,7 @@
  *   ctx.translate(p.x, p.y);
  *   ctx.rotate(p.angle);
  *   drawShape_cone3(ctx, p.size);
- *   ctx.fillStyle = '#FF0090';
+ *   ctx.fillStyle = '#FF2EA6';
  *   ctx.fill();
  *   ctx.restore();
  */
@@ -162,23 +162,70 @@ export function drawRadialImpact(ctx, r, spokeCount = 8) {
     ctx.arc(0, 0, r, 0, Math.PI * 2);
 }
 
-// ==================== Path 描边内发光辅助 ====================
-// 调用约定：path 已绘制；本函数封装「主色填充 + 白色内描边」的双 fill+stroke 组合。
+// ==================== Path 双层渲染：F2 + F4 ====================
+// 调用约定：path 已绘制；本函数完成「不透明主色填充 + 暗调描边」的双 fill+stroke 组合。
+//
+// [v2 改造] 反"加法发光"路线：
+//   - F2 改 source-over（不再 lighter）—— 多粒子重叠不再产生白雾 whitewash
+//   - F4 改暗调描边（不再统一白）—— 描边查 PROMARE_OUTLINES，没查到回退到调用方传入
+//   - fillAlpha 默认从 0.5 提到 0.95 —— Promare 是平涂色块，不是半透叠加
+//
+// 历史调用方继续传 strokeColor='#FFFFFF' 时，函数会忽略它并自动查暗调表。
+// 想强制走主色 stroke 时可以传非白色。
+//
+// @perf-impact: 单粒子 1 fill + 1 stroke + source-over；性能与原版基本持平。
 
-/**
- * 双层渲染：主色加法填充 + 白色内描边。模拟 Promare 内发光。
- * 假设 path 已 beginPath 并 closePath，调用方仅传入颜色与描边宽度。
- * @perf-impact: 单粒子 1 fill + 1 stroke + lighter composite。
- */
-export function fillStroke_promare(ctx, fillColor, strokeColor, strokeWidth = 1, fillAlpha = 0.5) {
+import { PROMARE_OUTLINES, PROMARE_PALETTE } from './promare_tokens.js';
+
+export function fillStroke_promare(ctx, fillColor, strokeColor, strokeWidth = 1, fillAlpha = 0.95) {
+    // F4: 描边色 = 主色暗调；白色描边请求被忽略
+    let outline = PROMARE_OUTLINES[fillColor];
+    if (!outline) {
+        // strokeColor 是显式覆盖（如 pierce_lance 传 PINK 描白主体），但白色描白色没意义 → 走默认
+        outline = (strokeColor && strokeColor !== PROMARE_PALETTE.WHITE) ? strokeColor : PROMARE_PALETTE.BLACK;
+    }
+
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalCompositeOperation = 'source-over';  // F2: 平涂色块，不要加法
     ctx.globalAlpha = fillAlpha;
     ctx.fillStyle = fillColor;
     ctx.fill();
     ctx.globalAlpha = 1.0;
     ctx.lineWidth = strokeWidth;
-    ctx.strokeStyle = strokeColor;
+    ctx.strokeStyle = outline;
     ctx.stroke();
+    ctx.restore();
+}
+
+// ==================== F2: posterized 多段同心填充 ====================
+// 一次 path → 主色填充 + 内核更亮色（白/黄）二段同心；模拟两段硬切色块。
+// 调用前 path 必须未 fill。调用后会 fill 两次：外圈（fillColor）+ 内圈（coreColor, 0.55× scale）。
+//
+// @perf-impact: 单粒子 2 fill + 1 stroke；比单层多 1 fill。
+//   为了控制开销，只在"主体粒子"用 posterized；signature 装饰（drip / kanada）仍可单层。
+
+export function fillPosterized_promare(ctx, shapeDrawerFn, size, fillColor, coreColor, strokeWidth = 1) {
+    const outline = PROMARE_OUTLINES[fillColor] || PROMARE_PALETTE.BLACK;
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+
+    // 外圈：主色平涂 + 暗描边
+    shapeDrawerFn(ctx, size);
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    ctx.lineWidth = strokeWidth;
+    ctx.strokeStyle = outline;
+    ctx.stroke();
+
+    // 内核：0.55× 尺寸 + 高亮色
+    if (coreColor) {
+        ctx.save();
+        ctx.scale(0.55, 0.55);
+        shapeDrawerFn(ctx, size);
+        ctx.fillStyle = coreColor;
+        ctx.fill();
+        ctx.restore();
+    }
+
     ctx.restore();
 }

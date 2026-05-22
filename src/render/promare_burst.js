@@ -42,7 +42,7 @@ export function ensurePromareGlobals(game) {
         for (let i = 0; i < 3; i++) {
             const a = Math.random() * Math.PI * 2;
             const sp = 1.5 + Math.random() * 1.5;
-            const sub = game.spawn_createParticle(x, y, color || '#FFD600', 'scatter_star');
+            const sub = game.spawn_createParticle(x, y, color || '#FFE94A', 'scatter_star');
             if (sub && sub.vel) {
                 sub.vel.x = Math.cos(a) * sp;
                 sub.vel.y = Math.sin(a) * sp;
@@ -60,7 +60,7 @@ export function ensurePromareGlobals(game) {
         for (let i = 0; i < 2; i++) {
             const a = (i === 0 ? -1 : 1) * (0.3 + Math.random() * 0.4); // 左右分裂
             const sp = 0.8 + Math.random() * 0.6;
-            const sub = game.spawn_createParticle(x, y, color || '#00E5FF', 'cryo_oct');
+            const sub = game.spawn_createParticle(x, y, color || '#00B4FF', 'cryo_oct');
             if (sub) {
                 if (sub.vel) {
                     sub.vel.x = Math.cos(a) * sp;
@@ -147,6 +147,12 @@ export function spawnPromareBurst(game, x, y, hitVel, elementType, severity = 'n
     const vy = (hitVel && hitVel.y) || 1;
     const baseA = Math.atan2(-vy, -vx);
 
+    // ===== F5: 超大剪影层 — Promare 构图骨架 =====
+    // 在所有碎片之前生成 1 个比"大碎片"还大 2× 的静止粒子，沿入射反方向锁向。
+    // 它不移动、寿命极短（~0.2s），作用是给玩家一帧"剪影定格"，碎片群从它内部炸开。
+    // _splitFired=true 防止 scatter_star 类型触发二次爆裂（避免无意义粒子链）。
+    _spawnBigSilhouette(game, x, y, baseA, mode, codex);
+
     // ===== 大碎片：立即出生 =====
     for (let i = 0; i < bigN; i++) {
         const aOffset = (Math.random() - 0.5) * BURST.dirConeBig * 2;
@@ -196,7 +202,7 @@ function _spawnElementSignature(game, x, y, baseA, elementKey, perf) {
         const ripples = perf.useStagger ? 3 : 1;
         for (let i = 0; i < ripples; i++) {
             const fire = () => {
-                const p = game.spawn_createParticle(x, y, '#FF0090', 'echo_ring');
+                const p = game.spawn_createParticle(x, y, '#FF2EA6', 'echo_ring');
                 if (p) {
                     p.size = 4 + i * 2;
                     p._expandRate = 0.5 + i * 0.15;
@@ -214,7 +220,7 @@ function _spawnElementSignature(game, x, y, baseA, elementKey, perf) {
         for (let i = 0; i < lineCount; i++) {
             const a = baseA + (Math.random() - 0.5) * 0.6; // ±17° 锥
             const sp = 5 + Math.random() * 3;
-            const p = game.spawn_createParticle(x, y, '#00E5FF', 'wind_slash');
+            const p = game.spawn_createParticle(x, y, '#00B4FF', 'wind_slash');
             if (p) {
                 if (p.vel) {
                     p.vel.x = Math.cos(a) * sp;
@@ -294,6 +300,39 @@ export function spawnRadialImpact(game, x, y, elementType) {
     if (typeof game.spawn_createShockwave === 'function') {
         game.spawn_createShockwave(x, y, '#FFFFFF');
     }
+}
+
+// ==================== 内部：F5 超大剪影粒子 ====================
+
+/**
+ * 在 (x, y) 处生成 1 个超大、静止、短寿的 silhouette 粒子。
+ * 作用：Promare 构图骨架（power-law 尺寸层级的顶端） —— 玩家先看到剪影，
+ * 然后碎片群从内部炸开，符合电影"大色块 + 内含小动作"的视觉节奏。
+ *
+ * @param {Game} game
+ * @param {number} x
+ * @param {number} y
+ * @param {number} angle - 沿入射反方向锁向（baseA）
+ * @param {string} mode  - 元素 mode（pyro_cone 等）
+ * @param {Object} codex - ELEMENT_CODEX[elementKey]
+ */
+function _spawnBigSilhouette(game, x, y, angle, mode, codex) {
+    const p = game.spawn_createParticle(x, y, codex.primary || '#FFFFFF', mode);
+    if (!p) return; // 预算超限
+    // 不移动：速度归零（_promareMode 下 drag=1 + gravity=0，没有阻力/重力消化它）
+    if (p.vel) { p.vel.x = 0; p.vel.y = 0; }
+    // 超大尺寸：~3× big 碎片 → 占冲击半径的核心位置
+    p.size = (p.size || 2) * (3.0 + Math.random() * 0.6);
+    // 锁向：沿入射反方向，pierce/wind 类的 angle 字段会被各 mode draw 用
+    p.angle = angle;
+    // 短寿：~0.2s（F1 stutter 下大约 2-3 个可见帧 → 闪现感）
+    p.life = 0.6;
+    p.maxLife = p.life;
+    p.decay = 0.05;
+    // 抑制 scatter / cryo 类的二次分裂（剪影不应该再裂）
+    p._splitFired = true;
+    // 抑制 venom_tri 的 drip（避免奇怪的尾迹）
+    if (p._dripPositions) p._dripPositions.length = 0;
 }
 
 // ==================== 内部：单粒子 spawn ====================

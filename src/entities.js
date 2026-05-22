@@ -173,13 +173,13 @@ class SpecialSlot {
             const override = CONFIG.colorsPromareOverride || {};
             // 按 type 映射到 5 色
             let promareColor = '#FFFFFF';
-            if (this.type === 'recall')        promareColor = override.slotRecall    || '#FF0090';
-            else if (this.type === 'multicast') promareColor = override.slotMulticast || '#00E5FF';
-            else if (this.type === 'split')     promareColor = override.slotSplit     || '#00E5FF';
-            else if (this.type === 'giant')     promareColor = override.slotGiant     || '#FF0090';
-            else if (this.type === 'skill_point')promareColor = override.slotSkill    || '#FFD600';
-            else if (this.type === 'wheel')     promareColor = override.slotWheel     || '#FFD600';
-            else                                promareColor = '#FFD600';
+            if (this.type === 'recall')        promareColor = override.slotRecall    || '#FF2EA6';
+            else if (this.type === 'multicast') promareColor = override.slotMulticast || '#00B4FF';
+            else if (this.type === 'split')     promareColor = override.slotSplit     || '#00B4FF';
+            else if (this.type === 'giant')     promareColor = override.slotGiant     || '#FF2EA6';
+            else if (this.type === 'skill_point')promareColor = override.slotSkill    || '#FFE94A';
+            else if (this.type === 'wheel')     promareColor = override.slotWheel     || '#FFE94A';
+            else                                promareColor = '#FFE94A';
 
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
@@ -600,7 +600,7 @@ class FortuneWheel {
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
 
-        const PAL = { PINK: '#FF0090', CYAN: '#00E5FF', YELLOW: '#FFD600', WHITE: '#FFFFFF', BLACK: '#0a0a0a' };
+        const PAL = { PINK: '#FF2EA6', CYAN: '#00B4FF', YELLOW: '#FFE94A', WHITE: '#FFFFFF', BLACK: '#1B0B2E' };
         const R = this.radius;
 
         // 外圈：BLACK 大圆 + PINK 厚边框（不旋转）
@@ -5014,10 +5014,10 @@ class FieldLootItem {
             ctx.scale(finalScale, finalScale);
             ctx.globalAlpha = this.opacity;
             // 按类型选色
-            let primary = '#FFD600'; // 默认 relic 黄
-            if (this.type === 'chaos_essence') primary = '#FF0090';     // 混沌 = 粉
+            let primary = '#FFE94A'; // 默认 relic 黄
+            if (this.type === 'chaos_essence') primary = '#FF2EA6';     // 混沌 = 粉
             else if (this.type === 'pure_essence') primary = '#FFFFFF'; // 纯净 = 白
-            else if (this.type === 'rune_fragments') primary = '#00E5FF'; // 符文碎片 = 青
+            else if (this.type === 'rune_fragments') primary = '#00B4FF'; // 符文碎片 = 青
             // 外层菱形容器（黑底白边）
             const r = 18;
             ctx.beginPath();
@@ -5026,7 +5026,7 @@ class FieldLootItem {
             ctx.lineTo(0, r);
             ctx.lineTo(-r, 0);
             ctx.closePath();
-            ctx.fillStyle = '#0a0a0a';
+            ctx.fillStyle = '#1B0B2E';
             ctx.fill();
             ctx.strokeStyle = '#FFFFFF';
             ctx.lineWidth = 2;
@@ -5041,7 +5041,7 @@ class FieldLootItem {
             ctx.fillStyle = primary;
             ctx.fill();
             // 4 顶点黄色装饰菱形（拼贴感）
-            ctx.fillStyle = '#FFD600';
+            ctx.fillStyle = '#FFE94A';
             const corners = [{x: 0, y: -r * 1.15}, {x: r * 1.15, y: 0}, {x: 0, y: r * 1.15}, {x: -r * 1.15, y: 0}];
             for (const c of corners) {
                 ctx.beginPath();
@@ -5143,10 +5143,10 @@ class RuneLoot {
             const runeDef = (typeof RUNE_DB !== 'undefined') ? RUNE_DB[this.runeId] : null;
             // 元素色映射
             const elem = runeDef && runeDef.element;
-            let primary = '#FFD600';
-            if (elem === 'pyro' || elem === 'bounce') primary = '#FF0090';
-            else if (elem === 'cryo' || elem === 'wind' || elem === 'laser') primary = '#00E5FF';
-            else if (elem === 'lightning' || elem === 'scatter' || elem === 'venom') primary = '#FFD600';
+            let primary = '#FFE94A';
+            if (elem === 'pyro' || elem === 'bounce') primary = '#FF2EA6';
+            else if (elem === 'cryo' || elem === 'wind' || elem === 'laser') primary = '#00B4FF';
+            else if (elem === 'lightning' || elem === 'scatter' || elem === 'venom') primary = '#FFE94A';
             else if (elem === 'pierce') primary = '#FFFFFF';
             const floatY = Math.sin(this._animTimer * 2) * 4;
             const drawY = this.y + floatY;
@@ -5163,7 +5163,7 @@ class RuneLoot {
                 else ctx.lineTo(px, py);
             }
             ctx.closePath();
-            ctx.fillStyle = '#0a0a0a';
+            ctx.fillStyle = '#1B0B2E';
             ctx.fill();
             ctx.strokeStyle = primary;
             ctx.lineWidth = 2;

@@ -2,7 +2,7 @@
  *
  * 作用域：body.promare-mode 下的所有 UI 元素
  * 设计原则：
- *   - 5 色硬切板：#FF0090 / #00E5FF / #FFD600 / #FFFFFF / #0a0a0a
+ *   - 5 色硬切板：#FF2EA6 / #00B4FF / #FFE94A / #FFFFFF / #1B0B2E
  *   - 对角切边（clip-path 梯形）替代圆角
  *   - 硬边描边 + 内描边假发光，无 box-shadow blur
  *   - Inter Mono / monospace 字体替代 Cinzel 衬线
@@ -14,29 +14,29 @@
 /* ==================== 全局基色覆盖 ==================== */
 
 body.promare-mode {
-    background-color: #0a0a0a !important;
+    background-color: #1B0B2E !important;
     color: #FFFFFF !important;
     font-family: 'Inter Mono', 'Roboto Mono', 'Courier New', monospace !important;
 }
 
 body.promare-mode #game-container,
 body.promare-mode #game-area {
-    background-color: #0a0a0a !important;
+    background-color: #1B0B2E !important;
 }
 
 /* ==================== 顶部状态栏：对角切边 + PINK 左边条 ==================== */
 
 body.promare-mode #unified-top-bar {
     clip-path: polygon(0 0, 100% 0, 95% 100%, 0 100%);
-    border-left: 3px solid #FF0090 !important;
-    background: #0a0a0a !important;
+    border-left: 3px solid #FF2EA6 !important;
+    background: #1B0B2E !important;
     backdrop-filter: none !important;
     box-shadow: none !important;
 }
 
 body.promare-mode #unified-top-bar > * {
     color: #FFFFFF !important;
-    text-shadow: 1px 1px 0 #0a0a0a !important;
+    text-shadow: 1px 1px 0 #1B0B2E !important;
 }
 
 /* ==================== 按钮：梯形切角 ==================== */
@@ -45,9 +45,9 @@ body.promare-mode button,
 body.promare-mode .btn {
     clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
     border-radius: 0 !important;
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     color: #FFFFFF !important;
-    border: 2px solid #FF0090 !important;
+    border: 2px solid #FF2EA6 !important;
     font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
     text-shadow: none !important;
     box-shadow: none !important;
@@ -56,7 +56,7 @@ body.promare-mode .btn {
 
 body.promare-mode button:hover,
 body.promare-mode .btn:hover {
-    background: #FF0090 !important;
+    background: #FF2EA6 !important;
     color: #FFFFFF !important;
     transform: translateY(-1px);
 }
@@ -71,7 +71,7 @@ body.promare-mode #settings-btn,
 body.promare-mode #speed-btn {
     clip-path: none;
     border: 2px solid #FFFFFF !important;
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
 }
 
 /* ==================== 卡牌：几何边框 + 内描边 ==================== */
@@ -81,9 +81,9 @@ body.promare-mode .relic-card,
 body.promare-mode .selection-card,
 body.promare-mode .shop-card {
     border-radius: 0 !important;
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border: 2px solid #FFFFFF !important;
-    box-shadow: inset 3px 3px 0 #FF0090, inset -3px -3px 0 #00E5FF !important;
+    box-shadow: inset 3px 3px 0 #FF2EA6, inset -3px -3px 0 #00B4FF !important;
     backdrop-filter: none !important;
     font-family: 'Inter Mono', monospace !important;
 }
@@ -91,8 +91,8 @@ body.promare-mode .shop-card {
 body.promare-mode .rune-card:hover,
 body.promare-mode .relic-card:hover,
 body.promare-mode .selection-card:hover {
-    border-color: #FFD600 !important;
-    box-shadow: inset 3px 3px 0 #FFD600, inset -3px -3px 0 #FFD600 !important;
+    border-color: #FFE94A !important;
+    box-shadow: inset 3px 3px 0 #FFE94A, inset -3px -3px 0 #FFE94A !important;
 }
 
 /* ==================== 弹窗面板：硬切边框 ==================== */
@@ -102,11 +102,11 @@ body.promare-mode #phase-shop,
 body.promare-mode #phase-relic,
 body.promare-mode .modal-panel,
 body.promare-mode .overlay-panel {
-    background: rgba(10, 10, 10, 0.92) !important;
+    background: rgba(27, 11, 46, 0.92) !important;
     border: 2px solid #FFFFFF !important;
     border-radius: 0 !important;
     backdrop-filter: none !important;
-    box-shadow: 0 0 0 4px #FF0090 !important;
+    box-shadow: 0 0 0 4px #FF2EA6 !important;
 }
 
 /* ==================== 底部弹药/发射器面板 ==================== */
@@ -114,8 +114,8 @@ body.promare-mode .overlay-panel {
 body.promare-mode .bottom-panel,
 body.promare-mode #ammo-bar,
 body.promare-mode #ammo-display {
-    background: #0a0a0a !important;
-    border-top: 2px solid #00E5FF !important;
+    background: #1B0B2E !important;
+    border-top: 2px solid #00B4FF !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
 }
@@ -151,7 +151,7 @@ body.promare-mode .ammo-icon,
 body.promare-mode .rune-icon,
 body.promare-mode .relic-icon {
     position: relative !important;
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
     border-radius: 0 !important;
     box-shadow: none !important;
@@ -211,18 +211,18 @@ body.promare-mode .relic-card.rarity-common {
 }
 body.promare-mode .rune-icon-frame.rarity-rare,
 body.promare-mode .relic-card.rarity-rare {
-    border: 2px solid #00E5FF !important;
-    box-shadow: inset 0 0 0 1px #00E5FF !important;
+    border: 2px solid #00B4FF !important;
+    box-shadow: inset 0 0 0 1px #00B4FF !important;
 }
 body.promare-mode .rune-icon-frame.rarity-epic,
 body.promare-mode .relic-card.rarity-epic {
-    border: 2px solid #FF0090 !important;
-    box-shadow: inset 0 0 0 1px #FF0090, 0 0 0 1px #FF0090 !important;
+    border: 2px solid #FF2EA6 !important;
+    box-shadow: inset 0 0 0 1px #FF2EA6, 0 0 0 1px #FF2EA6 !important;
 }
 body.promare-mode .rune-icon-frame.rarity-legendary,
 body.promare-mode .relic-card.rarity-legendary {
-    border: 2px solid #FFD600 !important;
-    box-shadow: inset 0 0 0 2px #FFD600, 0 0 0 1px #FF0090, 0 0 0 3px #FFD600 !important;
+    border: 2px solid #FFE94A !important;
+    box-shadow: inset 0 0 0 2px #FFE94A, 0 0 0 1px #FF2EA6, 0 0 0 3px #FFE94A !important;
 }
 
 /* SP gauge pulse 流光（gauge-pulse-layer ::before/::after）用 conic-gradient
@@ -234,8 +234,8 @@ body.promare-mode #gauge-shell::after {
 }
 
 body.promare-mode #gauge-shell {
-    background: #0a0a0a !important;
-    border: 2px solid #FFD600 !important;
+    background: #1B0B2E !important;
+    border: 2px solid #FFE94A !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     mask-image: none !important;
@@ -244,7 +244,7 @@ body.promare-mode #gauge-shell {
 
 body.promare-mode #gauge-shell.pulse-active,
 body.promare-mode #gauge-pulse-layer.pulse-active {
-    box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 4px #FFD600 !important;
+    box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 4px #FFE94A !important;
 }
 
 /* select-card::before 渐变光晕（白色 linear-gradient）也关 */
@@ -290,7 +290,7 @@ body.promare-mode .sp-gem::before {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
     clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-    background: #FFD600;
+    background: #FFE94A;
     opacity: 0.3;
 }
 body.promare-mode .sp-gem.active::before,
@@ -303,7 +303,7 @@ body.promare-mode .sp-gem-filled::before {
 /* settings / speed 按钮替代：白色 ◯/⚙ 几何 */
 body.promare-mode #settings-btn,
 body.promare-mode #speed-btn {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border: 2px solid #FFFFFF !important;
     clip-path: none !important;
     font-family: 'Inter Mono', monospace !important;
@@ -320,7 +320,7 @@ body.promare-mode #settings-btn::before {
 }
 body.promare-mode #speed-btn::before {
     content: '▶▶';
-    color: #FFD600;
+    color: #FFE94A;
     font-size: 12px;
     letter-spacing: -2px;
 }
@@ -328,14 +328,14 @@ body.promare-mode #speed-btn::before {
 /* 符文槽态：idle / hover / filled — 用 border-color + inset shadow 区分 */
 body.promare-mode .rune-grid-cell {
     /* 已在前面定义为 BLACK + WHITE 边框 + PINK/CYAN 对角阴影 */
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
 }
 
 /* Skip 按钮：清掉位图，用梯形切边按钮 */
 body.promare-mode .skip-btn {
-    background: #0a0a0a !important;
-    border: 2px solid #FF0090 !important;
-    color: #FFD600 !important;
+    background: #1B0B2E !important;
+    border: 2px solid #FF2EA6 !important;
+    color: #FFE94A !important;
     font-family: 'Inter Mono', monospace !important;
     border-radius: 0 !important;
     clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
@@ -347,28 +347,28 @@ body.promare-mode .skip-btn {
    + PINK/CYAN 顶下硬切框。 */
 
 body.promare-mode #round-start-banner {
-    background: rgba(10, 10, 10, 0.7) !important;
+    background: rgba(27, 11, 46, 0.7) !important;
 }
 
 body.promare-mode #round-start-banner-text {
     font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
     font-weight: 900 !important;
-    color: #FFD600 !important;
+    color: #FFE94A !important;
     letter-spacing: 8px !important;
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     -webkit-background-clip: initial !important;
-    -webkit-text-fill-color: #FFD600 !important;
+    -webkit-text-fill-color: #FFE94A !important;
     /* 4-direction BLACK stamp + 外发光替代 */
     text-shadow:
-        3px 0 0 #0a0a0a,
-        -3px 0 0 #0a0a0a,
-        0 3px 0 #0a0a0a,
-        0 -3px 0 #0a0a0a,
-        4px 4px 0 #FF0090,
-        -4px -4px 0 #00E5FF !important;
+        3px 0 0 #1B0B2E,
+        -3px 0 0 #1B0B2E,
+        0 3px 0 #1B0B2E,
+        0 -3px 0 #1B0B2E,
+        4px 4px 0 #FF2EA6,
+        -4px -4px 0 #00B4FF !important;
     padding: 16px 32px !important;
-    border-top: 3px solid #FF0090;
-    border-bottom: 3px solid #00E5FF;
+    border-top: 3px solid #FF2EA6;
+    border-bottom: 3px solid #00B4FF;
 }
 
 /* 关闭 blur 动画（promare 不要模糊） */
@@ -388,7 +388,7 @@ body.promare-mode .round-banner-glow #round-start-banner-text {
 /* 原版红色径向渐变 — 替换为黑色 + PINK 顶部+底部条纹（拼贴感） */
 
 body.promare-mode #boss-entrance-overlay {
-    background: rgba(10, 10, 10, 0.85) !important;
+    background: rgba(27, 11, 46, 0.85) !important;
 }
 
 body.promare-mode #boss-entrance-overlay.boss-entrance-active::before,
@@ -399,10 +399,10 @@ body.promare-mode #boss-entrance-overlay.boss-entrance-active::after {
     height: 6%;
     background: repeating-linear-gradient(
         135deg,
-        #FF0090 0px,
-        #FF0090 14px,
-        #0a0a0a 14px,
-        #0a0a0a 28px
+        #FF2EA6 0px,
+        #FF2EA6 14px,
+        #1B0B2E 14px,
+        #1B0B2E 28px
     );
 }
 
@@ -417,17 +417,17 @@ body.promare-mode #boss-entrance-overlay.boss-entrance-active::after {
 /* ==================== Combat Message（精英援军入场等）==================== */
 
 body.promare-mode #combat-message > div {
-    background: #0a0a0a !important;
-    color: #FFD600 !important;
-    border: 2px solid #FF0090 !important;
+    background: #1B0B2E !important;
+    color: #FFE94A !important;
+    border: 2px solid #FF2EA6 !important;
     border-radius: 0 !important;
     backdrop-filter: none !important;
-    box-shadow: inset 2px 2px 0 #FFD600 !important;
+    box-shadow: inset 2px 2px 0 #FFE94A !important;
     font-family: 'Inter Mono', monospace !important;
 }
 
 body.promare-mode #combat-message span {
-    color: #FFD600 !important;
+    color: #FFE94A !important;
     font-family: 'Inter Mono', monospace !important;
 }
 
@@ -435,16 +435,16 @@ body.promare-mode #combat-message span {
 
 body.promare-mode #phase-game-over,
 body.promare-mode .game-over-overlay {
-    background: rgba(10, 10, 10, 0.96) !important;
+    background: rgba(27, 11, 46, 0.96) !important;
     backdrop-filter: none !important;
 }
 
 body.promare-mode .game-over-panel,
 body.promare-mode #game-over-content {
-    background: #0a0a0a !important;
-    border: 3px solid #FF0090 !important;
+    background: #1B0B2E !important;
+    border: 3px solid #FF2EA6 !important;
     border-radius: 0 !important;
-    box-shadow: inset 4px 4px 0 #00E5FF, 0 0 0 4px #FFD600 !important;
+    box-shadow: inset 4px 4px 0 #00B4FF, 0 0 0 4px #FFE94A !important;
     backdrop-filter: none !important;
     padding: 24px !important;
 }
@@ -452,10 +452,10 @@ body.promare-mode #game-over-content {
 body.promare-mode .game-over-title,
 body.promare-mode #game-over-title {
     font-family: 'Inter Mono', monospace !important;
-    color: #FF0090 !important;
+    color: #FF2EA6 !important;
     text-shadow:
-        2px 0 0 #0a0a0a, -2px 0 0 #0a0a0a, 0 2px 0 #0a0a0a, 0 -2px 0 #0a0a0a,
-        3px 3px 0 #FFD600 !important;
+        2px 0 0 #1B0B2E, -2px 0 0 #1B0B2E, 0 2px 0 #1B0B2E, 0 -2px 0 #1B0B2E,
+        3px 3px 0 #FFE94A !important;
     letter-spacing: 6px !important;
 }
 
@@ -463,8 +463,8 @@ body.promare-mode .stat-row,
 body.promare-mode .game-over-stat {
     border-radius: 0 !important;
     border: 1px solid #FFFFFF !important;
-    background: #0a0a0a !important;
-    box-shadow: inset 1px 1px 0 #FF0090 !important;
+    background: #1B0B2E !important;
+    box-shadow: inset 1px 1px 0 #FF2EA6 !important;
     font-family: 'Inter Mono', monospace !important;
     color: #FFFFFF !important;
 }
@@ -472,35 +472,35 @@ body.promare-mode .game-over-stat {
 /* ==================== 真理之书 Truth Book ==================== */
 
 body.promare-mode #phase-truth-book {
-    background: rgba(10, 10, 10, 0.98) !important;
+    background: rgba(27, 11, 46, 0.98) !important;
     backdrop-filter: none !important;
 }
 
 /* 主标题 "真理之書 Liber Veritatis" */
 body.promare-mode #phase-truth-book h2 {
     font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
-    color: #00E5FF !important;
+    color: #00B4FF !important;
     letter-spacing: 6px !important;
     text-shadow:
-        2px 0 0 #0a0a0a, -2px 0 0 #0a0a0a, 0 2px 0 #0a0a0a, 0 -2px 0 #0a0a0a,
-        3px 3px 0 #FF0090 !important;
+        2px 0 0 #1B0B2E, -2px 0 0 #1B0B2E, 0 2px 0 #1B0B2E, 0 -2px 0 #1B0B2E,
+        3px 3px 0 #FF2EA6 !important;
     filter: none !important;
 }
 
 body.promare-mode #phase-truth-book h2 span {
-    color: #FFD600 !important;
+    color: #FFE94A !important;
     font-size: 0.6em !important;
     letter-spacing: 2px !important;
-    text-shadow: 1px 1px 0 #0a0a0a !important;
+    text-shadow: 1px 1px 0 #1B0B2E !important;
 }
 
 /* 列表项 (敌人/属性 entries) */
 body.promare-mode #truth-enemy-list > div,
 body.promare-mode #truth-attr-list > div,
 body.promare-mode .truth-list-item {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border: 1px solid #FFFFFF !important;
-    border-left: 3px solid #FF0090 !important;
+    border-left: 3px solid #FF2EA6 !important;
     border-radius: 0 !important;
     color: #FFFFFF !important;
     font-family: 'Inter Mono', monospace !important;
@@ -513,22 +513,22 @@ body.promare-mode #truth-enemy-list > div:hover,
 body.promare-mode #truth-attr-list > div:hover,
 body.promare-mode .truth-list-item:hover,
 body.promare-mode .truth-list-item.active {
-    border-left-color: #FFD600 !important;
-    border-color: #FFD600 !important;
+    border-left-color: #FFE94A !important;
+    border-color: #FFE94A !important;
     transform: translateX(2px);
 }
 
 /* 详情面板 */
 body.promare-mode #truth-detail-panel {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border: 2px solid #FFFFFF !important;
     border-radius: 0 !important;
-    box-shadow: inset 3px 3px 0 #FF0090, inset -3px -3px 0 #00E5FF !important;
+    box-shadow: inset 3px 3px 0 #FF2EA6, inset -3px -3px 0 #00B4FF !important;
     backdrop-filter: none !important;
 }
 
 body.promare-mode #truth-empty-state {
-    color: #FFD600 !important;
+    color: #FFE94A !important;
     opacity: 0.5;
 }
 
@@ -538,13 +538,13 @@ body.promare-mode #truth-empty-state span {
 
 body.promare-mode #truth-empty-state p {
     font-family: 'Inter Mono', monospace !important;
-    color: #FFD600 !important;
+    color: #FFE94A !important;
 }
 
 /* 顶部标题区（图标 + 名字 + tags） */
 body.promare-mode #truth-content > div:first-child {
-    background: #0a0a0a !important;
-    border-bottom: 2px solid #FF0090 !important;
+    background: #1B0B2E !important;
+    border-bottom: 2px solid #FF2EA6 !important;
     backdrop-filter: none !important;
 }
 
@@ -555,8 +555,8 @@ body.promare-mode #truth-item-icon {
 
 /* 名字图标容器 — 强制菱形 */
 body.promare-mode #truth-content > div:first-child > div:first-child > div:first-child {
-    background: #0a0a0a !important;
-    border: 2px solid #00E5FF !important;
+    background: #1B0B2E !important;
+    border: 2px solid #00B4FF !important;
     border-radius: 0 !important;
     clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
     box-shadow: none !important;
@@ -566,13 +566,13 @@ body.promare-mode #truth-item-name {
     font-family: 'Inter Mono', monospace !important;
     color: #FFFFFF !important;
     letter-spacing: 3px !important;
-    text-shadow: 2px 2px 0 #FF0090 !important;
+    text-shadow: 2px 2px 0 #FF2EA6 !important;
 }
 
 body.promare-mode #truth-item-tags > span {
-    background: #0a0a0a !important;
-    border: 1px solid #FFD600 !important;
-    color: #FFD600 !important;
+    background: #1B0B2E !important;
+    border: 1px solid #FFE94A !important;
+    color: #FFE94A !important;
     border-radius: 0 !important;
     font-family: 'Inter Mono', monospace !important;
 }
@@ -584,20 +584,20 @@ body.promare-mode #truth-item-desc {
 
 /* 演示区 canvas 容器 + simulation matrix 标签 */
 body.promare-mode #truth-content .flex-1 {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
 }
 
 body.promare-mode #truth-content [class*="bg-cyan-950"],
 body.promare-mode #truth-content [class*="bg-slate-"] {
-    background: #0a0a0a !important;
-    border-left-color: #00E5FF !important;
-    color: #00E5FF !important;
+    background: #1B0B2E !important;
+    border-left-color: #00B4FF !important;
+    color: #00B4FF !important;
     border-radius: 0 !important;
     backdrop-filter: none !important;
 }
 
 body.promare-mode #truth-sim-time {
-    color: #00E5FF !important;
+    color: #00B4FF !important;
     font-family: 'Inter Mono', monospace !important;
 }
 
@@ -609,18 +609,18 @@ body.promare-mode #truth-demo-log {
 
 /* 关闭按钮 */
 body.promare-mode #phase-truth-book button[onclick*="closeTruthBook"] {
-    background: #0a0a0a !important;
-    border: 2px solid #FF0090 !important;
-    color: #FF0090 !important;
+    background: #1B0B2E !important;
+    border: 2px solid #FF2EA6 !important;
+    color: #FF2EA6 !important;
     border-radius: 0 !important;
     clip-path: none !important;
 }
 
 /* 重置 demo 按钮 */
 body.promare-mode #phase-truth-book button[onclick*="resetDemo"] {
-    background: #0a0a0a !important;
-    border: 1px solid #00E5FF !important;
-    color: #00E5FF !important;
+    background: #1B0B2E !important;
+    border: 1px solid #00B4FF !important;
+    color: #00B4FF !important;
     border-radius: 0 !important;
     clip-path: none !important;
 }
@@ -629,38 +629,38 @@ body.promare-mode #phase-truth-book button[onclick*="resetDemo"] {
 /* run_shop.js 用 inline style 动态生成 DOM，必须用强 !important 覆盖 */
 
 body.promare-mode #run-shop-overlay {
-    background: rgba(10, 10, 10, 0.95) !important;
+    background: rgba(27, 11, 46, 0.95) !important;
     font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
     color: #FFFFFF !important;
 }
 
 /* 主面板：移除圆角和紫色渐变，用 Promare 5 色硬切 */
 body.promare-mode #run-shop-overlay > div {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border: 2px solid #FFFFFF !important;
     border-radius: 0 !important;
-    box-shadow: inset 3px 3px 0 #FF0090, inset -3px -3px 0 #00E5FF, 0 0 0 3px #FFD600 !important;
+    box-shadow: inset 3px 3px 0 #FF2EA6, inset -3px -3px 0 #00B4FF, 0 0 0 3px #FFE94A !important;
 }
 
 /* 标题分割线 */
 body.promare-mode #run-shop-overlay > div > div:first-child {
-    border-bottom: 2px solid #FF0090 !important;
+    border-bottom: 2px solid #FF2EA6 !important;
 }
 
 body.promare-mode #run-shop-overlay > div > div:first-child > div:first-child {
-    color: #FFD600 !important;
-    text-shadow: 2px 2px 0 #FF0090 !important;
+    color: #FFE94A !important;
+    text-shadow: 2px 2px 0 #FF2EA6 !important;
     letter-spacing: 4px !important;
 }
 
 /* 持有碎片 + 数字 */
 body.promare-mode #run-shop-overlay span {
-    color: #FFD600 !important;
+    color: #FFE94A !important;
 }
 
 /* 商品卡片 .run-shop-item — 覆盖紫色 rarity 边框 */
 body.promare-mode #run-shop-overlay .run-shop-item {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border-radius: 0 !important;
     box-shadow: inset 1px 1px 0 currentColor !important;
     color: #FFFFFF !important;
@@ -669,18 +669,18 @@ body.promare-mode #run-shop-overlay .run-shop-item {
 /* 稀有度边框颜色映射到 5 色 — inline border-color 用 attribute style 覆盖 */
 body.promare-mode #run-shop-overlay .run-shop-item[style*="rgb(250, 204, 21)"],
 body.promare-mode #run-shop-overlay .run-shop-item[style*="#facc15"] {
-    border-color: #FFD600 !important;
-    color: #FFD600 !important;
+    border-color: #FFE94A !important;
+    color: #FFE94A !important;
 }
 body.promare-mode #run-shop-overlay .run-shop-item[style*="rgb(168, 85, 247)"],
 body.promare-mode #run-shop-overlay .run-shop-item[style*="#a855f7"] {
-    border-color: #FF0090 !important;
-    color: #FF0090 !important;
+    border-color: #FF2EA6 !important;
+    color: #FF2EA6 !important;
 }
 body.promare-mode #run-shop-overlay .run-shop-item[style*="rgb(59, 130, 246)"],
 body.promare-mode #run-shop-overlay .run-shop-item[style*="#3b82f6"] {
-    border-color: #00E5FF !important;
-    color: #00E5FF !important;
+    border-color: #00B4FF !important;
+    color: #00B4FF !important;
 }
 body.promare-mode #run-shop-overlay .run-shop-item[style*="rgb(148, 163, 184)"],
 body.promare-mode #run-shop-overlay .run-shop-item[style*="#94a3b8"] {
@@ -691,7 +691,7 @@ body.promare-mode #run-shop-overlay .run-shop-item[style*="#94a3b8"] {
 /* 商品 hover 反馈 */
 body.promare-mode #run-shop-overlay .run-shop-item:hover {
     transform: translateY(-2px);
-    box-shadow: inset 1px 1px 0 currentColor, 0 0 0 1px #FFD600 !important;
+    box-shadow: inset 1px 1px 0 currentColor, 0 0 0 1px #FFE94A !important;
 }
 
 /* 商品内文字回到白色 */
@@ -702,9 +702,9 @@ body.promare-mode #run-shop-overlay .run-shop-item > div:nth-child(3) {
 
 /* 按钮（刷新 / 离开）梯形切角 */
 body.promare-mode #run-shop-refresh-btn {
-    background: #0a0a0a !important;
-    border: 2px solid #00E5FF !important;
-    color: #00E5FF !important;
+    background: #1B0B2E !important;
+    border: 2px solid #00B4FF !important;
+    color: #00B4FF !important;
     border-radius: 0 !important;
     clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
     font-family: 'Inter Mono', monospace !important;
@@ -712,9 +712,9 @@ body.promare-mode #run-shop-refresh-btn {
 }
 
 body.promare-mode #run-shop-close-btn {
-    background: #0a0a0a !important;
-    border: 2px solid #FF0090 !important;
-    color: #FFD600 !important;
+    background: #1B0B2E !important;
+    border: 2px solid #FF2EA6 !important;
+    color: #FFE94A !important;
     border-radius: 0 !important;
     clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
     font-family: 'Inter Mono', monospace !important;
@@ -724,14 +724,14 @@ body.promare-mode #run-shop-close-btn {
 body.promare-mode #run-shop-refresh-btn:hover,
 body.promare-mode #run-shop-close-btn:hover {
     background: currentColor !important;
-    color: #0a0a0a !important;
+    color: #1B0B2E !important;
 }
 
 /* ==================== 命运时刻 / 遗物选择 (Relic / Fate Moment) ==================== */
 /* #phase-relic 是命运抉择 + 遗物 + 混沌/纯净精华弹窗共用的容器 */
 
 body.promare-mode #phase-relic {
-    background: rgba(10, 10, 10, 0.96) !important;
+    background: rgba(27, 11, 46, 0.96) !important;
     backdrop-filter: none !important;
 }
 
@@ -741,8 +741,8 @@ body.promare-mode #phase-relic h2,
 body.promare-mode #phase-relic h3,
 body.promare-mode #phase-relic > div > div:first-child {
     font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
-    color: #FFD600 !important;
-    text-shadow: 2px 2px 0 #FF0090, -2px -2px 0 #00E5FF !important;
+    color: #FFE94A !important;
+    text-shadow: 2px 2px 0 #FF2EA6, -2px -2px 0 #00B4FF !important;
     letter-spacing: 4px !important;
     background: none !important;
     -webkit-background-clip: initial !important;
@@ -751,42 +751,42 @@ body.promare-mode #phase-relic > div > div:first-child {
 
 /* .relic-card 容器 — 覆盖 linear-gradient 背景 + 圆角 */
 body.promare-mode .relic-card {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border: 2px solid #FFFFFF !important;
     border-radius: 0 !important;
-    box-shadow: inset 2px 2px 0 #FF0090, inset -2px -2px 0 #00E5FF !important;
+    box-shadow: inset 2px 2px 0 #FF2EA6, inset -2px -2px 0 #00B4FF !important;
     transition: transform 0.1s, border-color 0.12s !important;
 }
 
 body.promare-mode .relic-card:hover {
-    border-color: #FFD600 !important;
-    box-shadow: inset 2px 2px 0 #FFD600, inset -2px -2px 0 #FFD600 !important;
+    border-color: #FFE94A !important;
+    box-shadow: inset 2px 2px 0 #FFE94A, inset -2px -2px 0 #FFE94A !important;
     transform: translateY(-3px) !important;
 }
 
 /* 稀有度边框：rare / epic / legendary */
 body.promare-mode .relic-card.rare,
 body.promare-mode .relic-card.rarity-rare {
-    border-color: #00E5FF !important;
-    box-shadow: inset 2px 2px 0 #00E5FF !important;
+    border-color: #00B4FF !important;
+    box-shadow: inset 2px 2px 0 #00B4FF !important;
 }
 
 body.promare-mode .relic-card.epic,
 body.promare-mode .relic-card.rarity-epic {
-    border-color: #FF0090 !important;
-    box-shadow: inset 2px 2px 0 #FF0090, inset -2px -2px 0 #00E5FF !important;
+    border-color: #FF2EA6 !important;
+    box-shadow: inset 2px 2px 0 #FF2EA6, inset -2px -2px 0 #00B4FF !important;
 }
 
 body.promare-mode .relic-card.legendary,
 body.promare-mode .relic-card.rarity-legendary {
-    border: 3px solid #FFD600 !important;
-    box-shadow: inset 2px 2px 0 #FFD600, 0 0 0 2px #FF0090, 0 0 0 4px #FFD600 !important;
+    border: 3px solid #FFE94A !important;
+    box-shadow: inset 2px 2px 0 #FFE94A, 0 0 0 2px #FF2EA6, 0 0 0 4px #FFE94A !important;
     animation: promareLegendaryPulse 1.8s ease-in-out infinite alternate;
 }
 
 @keyframes promareLegendaryPulse {
-    0%   { box-shadow: inset 2px 2px 0 #FFD600, 0 0 0 2px #FF0090, 0 0 0 4px #FFD600; }
-    100% { box-shadow: inset 2px 2px 0 #FFD600, 0 0 0 3px #FF0090, 0 0 0 5px #FFD600; }
+    0%   { box-shadow: inset 2px 2px 0 #FFE94A, 0 0 0 2px #FF2EA6, 0 0 0 4px #FFE94A; }
+    100% { box-shadow: inset 2px 2px 0 #FFE94A, 0 0 0 3px #FF2EA6, 0 0 0 5px #FFE94A; }
 }
 
 /* 关闭传说卡牌的 ::before pseudo (linear-gradient glow) */
@@ -804,25 +804,25 @@ body.promare-mode .relic-icon {
 body.promare-mode .relic-name {
     font-family: 'Inter Mono', monospace !important;
     color: #FFFFFF !important;
-    text-shadow: 1px 1px 0 #0a0a0a !important;
+    text-shadow: 1px 1px 0 #1B0B2E !important;
 }
 
 body.promare-mode .relic-card.legendary .relic-name,
 body.promare-mode .relic-card.rarity-legendary .relic-name {
-    color: #FFD600 !important;
-    text-shadow: 1px 1px 0 #0a0a0a, 2px 2px 0 #FF0090 !important;
+    color: #FFE94A !important;
+    text-shadow: 1px 1px 0 #1B0B2E, 2px 2px 0 #FF2EA6 !important;
 }
 
 body.promare-mode .relic-card.epic .relic-name,
 body.promare-mode .relic-card.rarity-epic .relic-name {
-    color: #FF0090 !important;
-    text-shadow: 1px 1px 0 #0a0a0a !important;
+    color: #FF2EA6 !important;
+    text-shadow: 1px 1px 0 #1B0B2E !important;
 }
 
 body.promare-mode .relic-card.rare .relic-name,
 body.promare-mode .relic-card.rarity-rare .relic-name {
-    color: #00E5FF !important;
-    text-shadow: 1px 1px 0 #0a0a0a !important;
+    color: #00B4FF !important;
+    text-shadow: 1px 1px 0 #1B0B2E !important;
 }
 
 body.promare-mode .relic-desc {
@@ -833,8 +833,8 @@ body.promare-mode .relic-desc {
 
 /* 跳过研磨 / 跳过混沌按钮（命运时刻专用） */
 body.promare-mode #phase-relic button {
-    background: #0a0a0a !important;
-    border: 2px solid #FF0090 !important;
+    background: #1B0B2E !important;
+    border: 2px solid #FF2EA6 !important;
     color: #FFFFFF !important;
     border-radius: 0 !important;
     clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
@@ -844,47 +844,47 @@ body.promare-mode #phase-relic button {
 }
 
 body.promare-mode #phase-relic button:hover {
-    background: #FF0090 !important;
+    background: #FF2EA6 !important;
     color: #FFFFFF !important;
-    box-shadow: inset 0 0 0 2px #FFD600 !important;
+    box-shadow: inset 0 0 0 2px #FFE94A !important;
 }
 
 /* ==================== 试炼场 / Training Ground ==================== */
 /* 战斗模拟界面：DPS 统计 + 子弹配置 + 敌人词缀编辑 */
 
 body.promare-mode #phase-training {
-    background: rgba(10, 10, 10, 0.95) !important;
+    background: rgba(27, 11, 46, 0.95) !important;
     backdrop-filter: none !important;
 }
 
 /* 顶部状态条：Combat Simulation + DPS */
 body.promare-mode #phase-training [class*="bg-slate-900"][class*="backdrop-blur"] {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     backdrop-filter: none !important;
-    border-bottom: 2px solid #FF0090 !important;
+    border-bottom: 2px solid #FF2EA6 !important;
     border-radius: 0 !important;
 }
 
 body.promare-mode #train-stats {
-    color: #FFD600 !important;
+    color: #FFE94A !important;
     font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
-    text-shadow: 1px 1px 0 #0a0a0a !important;
+    text-shadow: 1px 1px 0 #1B0B2E !important;
     letter-spacing: 2px !important;
 }
 
 /* 红色脉冲点 → YELLOW 闪烁菱形 */
 body.promare-mode #phase-training [class*="bg-red-500"][class*="animate-pulse"] {
-    background: #FFD600 !important;
+    background: #FFE94A !important;
     clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
     border-radius: 0 !important;
 }
 
 /* 子弹属性控制单元 (.train-attr-grid > div) */
 body.promare-mode #train-attr-grid > div {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border: 1px solid #FFFFFF !important;
     border-radius: 0 !important;
-    box-shadow: inset 1px 1px 0 #FF0090 !important;
+    box-shadow: inset 1px 1px 0 #FF2EA6 !important;
 }
 
 body.promare-mode #train-attr-grid > div span:first-child {
@@ -892,26 +892,26 @@ body.promare-mode #train-attr-grid > div span:first-child {
 }
 
 body.promare-mode #train-attr-grid > div span[class*="text-cyan-"] {
-    color: #00E5FF !important;
+    color: #00B4FF !important;
 }
 
 body.promare-mode #train-attr-grid button {
-    background: #0a0a0a !important;
-    border: 1px solid #FFD600 !important;
-    color: #FFD600 !important;
+    background: #1B0B2E !important;
+    border: 1px solid #FFE94A !important;
+    color: #FFE94A !important;
     border-radius: 0 !important;
     clip-path: none !important;
     font-family: 'Inter Mono', monospace !important;
 }
 
 body.promare-mode #train-attr-grid button:hover {
-    background: #FFD600 !important;
-    color: #0a0a0a !important;
+    background: #FFE94A !important;
+    color: #1B0B2E !important;
 }
 
 /* 子弹预览 tag — 元素属性 ATK/BNC/PRC/SCT/PYRO/CRYO/LGT/MULTI/... */
 body.promare-mode #train-bullet-preview span {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border-radius: 0 !important;
     font-family: 'Inter Mono', monospace !important;
 }
@@ -919,41 +919,41 @@ body.promare-mode #train-bullet-preview span {
 /* 按 Tailwind 颜色 family 路由到 5 色 */
 body.promare-mode #train-bullet-preview [class*="purple-"],
 body.promare-mode #train-bullet-preview [class*="orange-"] {
-    border-color: #FF0090 !important;
-    color: #FF0090 !important;
-    background: #0a0a0a !important;
+    border-color: #FF2EA6 !important;
+    color: #FF2EA6 !important;
+    background: #1B0B2E !important;
 }
 body.promare-mode #train-bullet-preview [class*="cyan-"],
 body.promare-mode #train-bullet-preview [class*="green-"] {
-    border-color: #00E5FF !important;
-    color: #00E5FF !important;
-    background: #0a0a0a !important;
+    border-color: #00B4FF !important;
+    color: #00B4FF !important;
+    background: #1B0B2E !important;
 }
 body.promare-mode #train-bullet-preview [class*="yellow-"],
 body.promare-mode #train-bullet-preview [class*="amber-"] {
-    border-color: #FFD600 !important;
-    color: #FFD600 !important;
-    background: #0a0a0a !important;
+    border-color: #FFE94A !important;
+    color: #FFE94A !important;
+    background: #1B0B2E !important;
 }
 body.promare-mode #train-bullet-preview [class*="red-"] {
-    border-color: #FF0090 !important;
-    color: #FF0090 !important;
-    background: #0a0a0a !important;
+    border-color: #FF2EA6 !important;
+    color: #FF2EA6 !important;
+    background: #1B0B2E !important;
 }
 body.promare-mode #train-bullet-preview [class*="blue-"] {
-    border-color: #00E5FF !important;
-    color: #00E5FF !important;
-    background: #0a0a0a !important;
+    border-color: #00B4FF !important;
+    color: #00B4FF !important;
+    background: #1B0B2E !important;
 }
 body.promare-mode #train-bullet-preview [class*="slate-"] {
     border-color: #FFFFFF !important;
     color: #FFFFFF !important;
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
 }
 
 /* 退出按钮 */
 body.promare-mode #phase-training button[onclick*="exit"] {
-    color: #FF0090 !important;
+    color: #FF2EA6 !important;
     font-family: 'Inter Mono', monospace !important;
     font-weight: bold !important;
 }
@@ -961,37 +961,37 @@ body.promare-mode #phase-training button[onclick*="exit"] {
 /* ==================== Round Damage Display（回合伤害浮字）==================== */
 
 body.promare-mode #round-damage-display {
-    color: #FFD600 !important;
+    color: #FFE94A !important;
     font-family: 'Inter Mono', monospace !important;
     text-shadow:
-        2px 0 0 #0a0a0a, -2px 0 0 #0a0a0a, 0 2px 0 #0a0a0a, 0 -2px 0 #0a0a0a,
-        3px 3px 0 #FF0090 !important;
+        2px 0 0 #1B0B2E, -2px 0 0 #1B0B2E, 0 2px 0 #1B0B2E, 0 -2px 0 #1B0B2E,
+        3px 3px 0 #FF2EA6 !important;
     filter: none !important;
     letter-spacing: 4px !important;
 }
 
 body.promare-mode #round-damage-val {
     font-family: 'Inter Mono', monospace !important;
-    color: #FFD600 !important;
+    color: #FFE94A !important;
 }
 
 /* ==================== Rune Launcher Float 浮动按钮 ==================== */
 
 body.promare-mode .rune-launcher-float-btn {
-    background: #0a0a0a !important;
-    border: 2px solid #FF0090 !important;
+    background: #1B0B2E !important;
+    border: 2px solid #FF2EA6 !important;
     border-radius: 0 !important;
     clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
     box-shadow: none !important;
 }
 
 body.promare-mode .rune-launcher-float-btn:hover {
-    background: #FF0090 !important;
-    border-color: #FFD600 !important;
+    background: #FF2EA6 !important;
+    border-color: #FFE94A !important;
 }
 
 body.promare-mode .rune-launcher-float-btn span {
-    color: #FFD600 !important;
+    color: #FFE94A !important;
 }
 
 /* ==================== 弹药 HUD（当前槽 + 下一发）==================== */
@@ -1002,24 +1002,24 @@ body.promare-mode .ammo-icon {
     border-radius: 0 !important;
     /* 钻石外形 */
     clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border: 2px solid #FFFFFF !important;
     box-shadow: none !important;
 }
 
 /* 当前发射槽位（高亮）— YELLOW 实心填充 + 白边 */
 body.promare-mode #current-slot .ammo-icon {
-    background: #0a0a0a !important;
-    border: 2px solid #FFD600 !important;
-    box-shadow: 0 0 0 2px #FF0090, inset 2px 2px 0 #FFD600 !important;
+    background: #1B0B2E !important;
+    border: 2px solid #FFE94A !important;
+    box-shadow: 0 0 0 2px #FF2EA6, inset 2px 2px 0 #FFE94A !important;
     clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
 }
 
 /* 下一发槽位（暗淡）— CYAN 边 + 半透明 */
 body.promare-mode #next-slot .ammo-icon {
     opacity: 0.85 !important;
-    border-color: #00E5FF !important;
-    box-shadow: inset 1px 1px 0 #00E5FF !important;
+    border-color: #00B4FF !important;
+    box-shadow: inset 1px 1px 0 #00B4FF !important;
 }
 
 /* ammo-icon 内部小符号（伪元素小钻石）替代位图 */
@@ -1035,7 +1035,7 @@ body.promare-mode .ammo-icon::after {
 }
 
 body.promare-mode #current-slot .ammo-icon::after {
-    background: #FFD600;
+    background: #FFE94A;
 }
 
 /* 发射 / 滑入动画 — 保留原 keyframes 行为，仅去掉 opacity 渐变（硬切） */
@@ -1060,17 +1060,17 @@ body.promare-mode .slide-in-anim {
 /* ==================== Marble Preview Panel（弹珠预览，研磨阶段顶部）==================== */
 
 body.promare-mode #marble-preview-panel {
-    background: rgba(10, 10, 10, 0.9) !important;
+    background: rgba(27, 11, 46, 0.9) !important;
     border: 2px solid #FFFFFF !important;
     border-radius: 0 !important;
-    box-shadow: inset 2px 2px 0 #FF0090, inset -2px -2px 0 #00E5FF !important;
+    box-shadow: inset 2px 2px 0 #FF2EA6, inset -2px -2px 0 #00B4FF !important;
     backdrop-filter: none !important;
 }
 
 body.promare-mode #preview-marble-ball {
     border-radius: 0 !important;
     clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border: 2px solid #FFFFFF !important;
     box-shadow: none !important;
 }
@@ -1089,7 +1089,7 @@ body.promare-mode #preview-marble-icon {
 /* 玩家进入游戏的第一个画面，承担"品牌印象" — 必须 100% Promare */
 
 body.promare-mode #phase-meta {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
 }
 
 /* 隐藏主菜单的 indigo/amber 球形 blur 装饰 */
@@ -1102,11 +1102,11 @@ body.promare-mode #phase-meta h1 {
     background: none !important;
     -webkit-background-clip: initial !important;
     -webkit-text-fill-color: initial !important;
-    color: #FFD600 !important;
+    color: #FFE94A !important;
     font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
     text-shadow:
-        2px 0 0 #0a0a0a, -2px 0 0 #0a0a0a, 0 2px 0 #0a0a0a, 0 -2px 0 #0a0a0a,
-        4px 4px 0 #FF0090, -4px -4px 0 #00E5FF !important;
+        2px 0 0 #1B0B2E, -2px 0 0 #1B0B2E, 0 2px 0 #1B0B2E, 0 -2px 0 #1B0B2E,
+        4px 4px 0 #FF2EA6, -4px -4px 0 #00B4FF !important;
     letter-spacing: 4px !important;
     filter: none !important;
 }
@@ -1115,7 +1115,7 @@ body.promare-mode #phase-meta h1 {
 body.promare-mode #phase-meta h1 + p {
     color: #FFFFFF !important;
     font-family: 'Inter Mono', monospace !important;
-    border-top-color: #FF0090 !important;
+    border-top-color: #FF2EA6 !important;
     opacity: 1 !important;
     letter-spacing: 0.5em !important;
 }
@@ -1127,26 +1127,26 @@ body.promare-mode #phase-meta h1 ~ div[class*="absolute"][class*="bg-gradient"] 
 
 /* "开始炼成" 主按钮 .btn-main */
 body.promare-mode #phase-meta .btn-main {
-    background: #0a0a0a !important;
-    border: 3px solid #FF0090 !important;
+    background: #1B0B2E !important;
+    border: 3px solid #FF2EA6 !important;
     border-radius: 0 !important;
     clip-path: polygon(16px 0, 100% 0, calc(100% - 16px) 100%, 0 100%) !important;
-    box-shadow: inset 3px 3px 0 #FFD600, 0 0 0 2px #00E5FF !important;
+    box-shadow: inset 3px 3px 0 #FFE94A, 0 0 0 2px #00B4FF !important;
     transition: transform 0.1s !important;
 }
 
 body.promare-mode #phase-meta .btn-main:hover {
-    background: #FF0090 !important;
+    background: #FF2EA6 !important;
     transform: translateY(-2px) !important;
-    box-shadow: inset 3px 3px 0 #FFD600, 0 0 0 3px #FFD600 !important;
+    box-shadow: inset 3px 3px 0 #FFE94A, 0 0 0 3px #FFE94A !important;
 }
 
 body.promare-mode #phase-meta .btn-main span {
-    color: #FFD600 !important;
+    color: #FFE94A !important;
     font-family: 'Inter Mono', monospace !important;
     background: none !important;
     -webkit-text-fill-color: initial !important;
-    text-shadow: 2px 2px 0 #0a0a0a !important;
+    text-shadow: 2px 2px 0 #1B0B2E !important;
 }
 
 body.promare-mode #phase-meta .btn-main div {
@@ -1161,46 +1161,46 @@ body.promare-mode #phase-meta .btn-main > div[class*="bg-gradient"] {
 
 /* "继续游戏" 按钮 */
 body.promare-mode #phase-meta #meta-continue-btn {
-    background: #0a0a0a !important;
-    border: 2px solid #00E5FF !important;
+    background: #1B0B2E !important;
+    border: 2px solid #00B4FF !important;
     border-radius: 0 !important;
     clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%) !important;
-    box-shadow: inset 2px 2px 0 #00E5FF !important;
+    box-shadow: inset 2px 2px 0 #00B4FF !important;
 }
 
 body.promare-mode #phase-meta #meta-continue-btn:hover {
-    background: #00E5FF !important;
+    background: #00B4FF !important;
     transform: translateY(-2px) !important;
 }
 
 body.promare-mode #phase-meta #meta-continue-btn span {
-    color: #00E5FF !important;
+    color: #00B4FF !important;
     font-family: 'Inter Mono', monospace !important;
 }
 
 body.promare-mode #phase-meta #meta-continue-btn:hover span {
-    color: #0a0a0a !important;
+    color: #1B0B2E !important;
 }
 
 /* 3 个底部入口按钮（炼金工坊 / 真理之书 / 试炼场） */
 body.promare-mode #phase-meta .grid > button {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border: 2px solid #FFFFFF !important;
     border-radius: 0 !important;
-    box-shadow: inset 2px 2px 0 #FF0090, inset -2px -2px 0 #00E5FF !important;
+    box-shadow: inset 2px 2px 0 #FF2EA6, inset -2px -2px 0 #00B4FF !important;
     backdrop-filter: none !important;
     transition: transform 0.1s, border-color 0.12s !important;
 }
 
 body.promare-mode #phase-meta .grid > button:hover {
-    border-color: #FFD600 !important;
-    box-shadow: inset 2px 2px 0 #FFD600, inset -2px -2px 0 #FFD600 !important;
+    border-color: #FFE94A !important;
+    box-shadow: inset 2px 2px 0 #FFE94A, inset -2px -2px 0 #FFE94A !important;
     transform: translateY(-2px) !important;
 }
 
 /* 圆形 icon 容器 → 菱形 */
 body.promare-mode #phase-meta .grid > button > div:first-child {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border-radius: 0 !important;
     clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
     box-shadow: none !important;
@@ -1217,14 +1217,14 @@ body.promare-mode #phase-meta .grid > button > span:last-child {
 }
 
 body.promare-mode #phase-meta .grid > button:hover > span:last-child {
-    color: #FFD600 !important;
+    color: #FFE94A !important;
 }
 
 /* "重新开始教程" 按钮 */
 body.promare-mode #phase-meta button[onclick*="tutorial_restartFromHome"] {
-    background: #0a0a0a !important;
-    border: 1px solid #FFD600 !important;
-    color: #FFD600 !important;
+    background: #1B0B2E !important;
+    border: 1px solid #FFE94A !important;
+    color: #FFE94A !important;
     border-radius: 0 !important;
     backdrop-filter: none !important;
 }
@@ -1242,7 +1242,7 @@ body.promare-mode h1, body.promare-mode h2, body.promare-mode h3,
 body.promare-mode .title, body.promare-mode .label {
     font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
     font-weight: bold;
-    text-shadow: 2px 2px 0 #0a0a0a !important;
+    text-shadow: 2px 2px 0 #1B0B2E !important;
     letter-spacing: 0.05em;
 }
 
@@ -1256,22 +1256,22 @@ body.promare-mode * {
 body.promare-mode .sp-gem,
 body.promare-mode .progress-bar {
     border-radius: 0 !important;
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border: 1px solid #FFFFFF !important;
 }
 
 body.promare-mode .sp-gem.active,
 body.promare-mode .sp-gem-filled {
-    background: #FFD600 !important;
-    border-color: #FFD600 !important;
+    background: #FFE94A !important;
+    border-color: #FFE94A !important;
     box-shadow: none !important;
 }
 
 /* ==================== 战斗信息文本 ==================== */
 
 body.promare-mode #combat-message > div {
-    background: #0a0a0a !important;
-    border: 2px solid #FF0090 !important;
+    background: #1B0B2E !important;
+    border: 2px solid #FF2EA6 !important;
     border-radius: 0 !important;
     backdrop-filter: none !important;
 }
@@ -1280,9 +1280,9 @@ body.promare-mode #combat-message > div {
 
 body.promare-mode .toast,
 body.promare-mode #toast-container > * {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     color: #FFFFFF !important;
-    border: 2px solid #FFD600 !important;
+    border: 2px solid #FFE94A !important;
     border-radius: 0 !important;
     font-family: 'Inter Mono', monospace !important;
     box-shadow: none !important;
@@ -1311,14 +1311,14 @@ body.promare-mode .backdrop-blur-xl {
     -webkit-backdrop-filter: none !important;
 }
 
-/* bg-slate-* / bg-black/* 全部映射到 #0a0a0a 黑底 */
+/* bg-slate-* / bg-black/* 全部映射到 #1B0B2E 黑底 */
 body.promare-mode [class*="bg-slate-900"],
 body.promare-mode [class*="bg-slate-800"],
 body.promare-mode [class*="bg-slate-700"],
 body.promare-mode [class*="bg-black/"],
 body.promare-mode [class*="bg-gray-9"],
 body.promare-mode [class*="bg-zinc-9"] {
-    background-color: #0a0a0a !important;
+    background-color: #1B0B2E !important;
 }
 
 /* 教程 / 弹窗卡片：把所有 border-*-500 边框统一到 PINK，hover 到 YELLOW */
@@ -1332,7 +1332,7 @@ body.promare-mode [class*="border-emerald-"],
 body.promare-mode [class*="border-cyan-"],
 body.promare-mode [class*="border-pink-"],
 body.promare-mode [class*="border-rose-"] {
-    border-color: #FF0090 !important;
+    border-color: #FF2EA6 !important;
     border-radius: 0 !important;
 }
 
@@ -1346,16 +1346,16 @@ body.promare-mode [class*="text-purple-"],
 body.promare-mode [class*="text-violet-"],
 body.promare-mode [class*="text-pink-"],
 body.promare-mode [class*="text-rose-"],
-body.promare-mode [class*="text-red-"]   { color: #FF0090 !important; }
+body.promare-mode [class*="text-red-"]   { color: #FF2EA6 !important; }
 body.promare-mode [class*="text-blue-"],
 body.promare-mode [class*="text-cyan-"],
 body.promare-mode [class*="text-sky-"],
-body.promare-mode [class*="text-teal-"]  { color: #00E5FF !important; }
+body.promare-mode [class*="text-teal-"]  { color: #00B4FF !important; }
 body.promare-mode [class*="text-amber-"],
 body.promare-mode [class*="text-yellow-"],
-body.promare-mode [class*="text-orange-"]{ color: #FFD600 !important; }
+body.promare-mode [class*="text-orange-"]{ color: #FFE94A !important; }
 body.promare-mode [class*="text-emerald-"],
-body.promare-mode [class*="text-green-"] { color: #00E5FF !important; }
+body.promare-mode [class*="text-green-"] { color: #00B4FF !important; }
 body.promare-mode [class*="text-slate-3"],
 body.promare-mode [class*="text-slate-4"],
 body.promare-mode [class*="text-slate-2"],
@@ -1365,41 +1365,41 @@ body.promare-mode [class*="text-gray-3"]  { color: #FFFFFF !important; }
 body.promare-mode .btn-main {
     clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%) !important;
     border-radius: 0 !important;
-    background: #0a0a0a !important;
-    border: 2px solid #FF0090 !important;
+    background: #1B0B2E !important;
+    border: 2px solid #FF2EA6 !important;
     box-shadow: none !important;
     font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
 }
 
 body.promare-mode .btn-main:hover {
-    background: #FF0090 !important;
+    background: #FF2EA6 !important;
     color: #FFFFFF !important;
-    box-shadow: inset 0 0 0 2px #FFD600 !important;
+    box-shadow: inset 0 0 0 2px #FFE94A !important;
 }
 
 /* 教程 step 块：替换 yellow border + amber title 为 promare */
 body.promare-mode #tutorial-step-overlay,
 body.promare-mode .tutorial-step,
 body.promare-mode [id^="tutorial-"] {
-    background: #0a0a0a !important;
-    border: 2px solid #00E5FF !important;
+    background: #1B0B2E !important;
+    border: 2px solid #00B4FF !important;
     border-radius: 0 !important;
     backdrop-filter: none !important;
-    box-shadow: 0 0 0 3px #FF0090 !important;
+    box-shadow: 0 0 0 3px #FF2EA6 !important;
 }
 
 /* 教程进度条 / step 标签 */
 body.promare-mode .tutorial-progress,
 body.promare-mode [class*="text-amber-400"] {
-    color: #FFD600 !important;
+    color: #FFE94A !important;
 }
 
 /* 顶部 stat pill */
 body.promare-mode .stat-pill {
     border-radius: 0 !important;
     clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
-    background: #0a0a0a !important;
-    border: 2px solid #FFD600 !important;
+    background: #1B0B2E !important;
+    border: 2px solid #FFE94A !important;
     color: #FFFFFF !important;
     backdrop-filter: none !important;
 }
@@ -1408,37 +1408,37 @@ body.promare-mode .stat-pill {
 /* 战斗前每次都要点开，是高频核心 UI */
 
 body.promare-mode #phase-rune-launcher {
-    background: rgba(10, 10, 10, 0.95) !important;
+    background: rgba(27, 11, 46, 0.95) !important;
     backdrop-filter: none !important;
 }
 
 body.promare-mode #rune-launcher-content {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border: 2px solid #FFFFFF !important;
     border-radius: 0 !important;
-    box-shadow: 0 0 0 3px #FF0090, inset 4px 4px 0 rgba(0, 229, 255, 0.15) !important;
+    box-shadow: 0 0 0 3px #FF2EA6, inset 4px 4px 0 rgba(0, 180, 255, 0.15) !important;
     backdrop-filter: none !important;
 }
 
 body.promare-mode .rune-grid-cell {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border: 2px solid #FFFFFF !important;
     border-radius: 0 !important;
-    box-shadow: inset 1px 1px 0 #FF0090, inset -1px -1px 0 #00E5FF !important;
+    box-shadow: inset 1px 1px 0 #FF2EA6, inset -1px -1px 0 #00B4FF !important;
     backdrop-filter: none !important;
     transition: border-color 0.1s, transform 0.08s !important;
 }
 
 body.promare-mode .rune-grid-cell:hover,
 body.promare-mode .rune-grid-cell[data-state="hover"] {
-    border-color: #FFD600 !important;
-    box-shadow: inset 1px 1px 0 #FFD600, inset -1px -1px 0 #FFD600 !important;
+    border-color: #FFE94A !important;
+    box-shadow: inset 1px 1px 0 #FFE94A, inset -1px -1px 0 #FFE94A !important;
     transform: translateY(-1px);
 }
 
 body.promare-mode .rune-grid-cell[data-state="filled"] {
-    border-color: #FFD600 !important;
-    box-shadow: inset 2px 2px 0 #FFD600 !important;
+    border-color: #FFE94A !important;
+    box-shadow: inset 2px 2px 0 #FFE94A !important;
 }
 
 /* 符文图标 → 灰阶高对比，统一视觉 */
@@ -1450,48 +1450,48 @@ body.promare-mode .rune-grid-cell .rune-icon-frame img {
 
 /* 战斗中符文槽 #combat-rune-single-slot */
 body.promare-mode #combat-rune-single-slot {
-    background: #0a0a0a !important;
-    border: 2px solid #00E5FF !important;
+    background: #1B0B2E !important;
+    border: 2px solid #00B4FF !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
 }
 
 body.promare-mode .rune-slot-glow-overlay {
-    background: rgba(255, 214, 0, 0.4) !important; /* YELLOW 充能闪光 */
+    background: rgba(255, 233, 74, 0.4) !important; /* YELLOW 充能闪光 */
     border-radius: 0 !important;
-    box-shadow: inset 0 0 0 2px #FFD600 !important;
+    box-shadow: inset 0 0 0 2px #FFE94A !important;
 }
 
 /* ==================== 商店（shop）==================== */
 
 body.promare-mode #phase-shop {
-    background: rgba(10, 10, 10, 0.95) !important;
+    background: rgba(27, 11, 46, 0.95) !important;
     backdrop-filter: none !important;
 }
 
 body.promare-mode .shop-item,
 body.promare-mode .shop-card {
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border: 2px solid #FFFFFF !important;
     border-radius: 0 !important;
-    box-shadow: inset 2px 2px 0 #FF0090, inset -2px -2px 0 #00E5FF !important;
+    box-shadow: inset 2px 2px 0 #FF2EA6, inset -2px -2px 0 #00B4FF !important;
     transition: border-color 0.12s !important;
     backdrop-filter: none !important;
 }
 
 body.promare-mode .shop-item:hover,
 body.promare-mode .shop-card:hover {
-    border-color: #FFD600 !important;
-    box-shadow: inset 2px 2px 0 #FFD600, inset -2px -2px 0 #FFD600 !important;
+    border-color: #FFE94A !important;
+    box-shadow: inset 2px 2px 0 #FFE94A, inset -2px -2px 0 #FFE94A !important;
 }
 
 /* 价格标签 */
 body.promare-mode .shop-price,
 body.promare-mode .shop-cost {
-    color: #FFD600 !important;
-    background: #0a0a0a !important;
-    border: 1px solid #FFD600 !important;
+    color: #FFE94A !important;
+    background: #1B0B2E !important;
+    border: 1px solid #FFE94A !important;
     border-radius: 0 !important;
     font-family: 'Inter Mono', monospace !important;
     box-shadow: none !important;
@@ -1502,24 +1502,24 @@ body.promare-mode .shop-cost {
 
 body.promare-mode .select-card {
     border-radius: 0 !important;
-    background: #0a0a0a !important;
+    background: #1B0B2E !important;
     border: 2px solid #FFFFFF !important;
-    box-shadow: inset 2px 2px 0 #FF0090, inset -2px -2px 0 #00E5FF !important;
+    box-shadow: inset 2px 2px 0 #FF2EA6, inset -2px -2px 0 #00B4FF !important;
     transition: transform 0.08s, border-color 0.12s !important;
     backdrop-filter: none !important;
 }
 
 body.promare-mode .select-card:hover {
-    border-color: #FFD600 !important;
-    box-shadow: inset 2px 2px 0 #FFD600, inset -2px -2px 0 #FFD600 !important;
+    border-color: #FFE94A !important;
+    box-shadow: inset 2px 2px 0 #FFE94A, inset -2px -2px 0 #FFE94A !important;
     transform: translateY(-2px) !important;
 }
 
 /* 选中态 */
 body.promare-mode .select-card.selected,
 body.promare-mode .select-card[data-selected="true"] {
-    border-color: #FFD600 !important;
-    box-shadow: inset 3px 3px 0 #FFD600, inset -3px -3px 0 #FF0090, 0 0 0 3px #FFD600 !important;
+    border-color: #FFE94A !important;
+    box-shadow: inset 3px 3px 0 #FFE94A, inset -3px -3px 0 #FF2EA6, 0 0 0 3px #FFE94A !important;
 }
 
 /* 弹珠球体 → 强制方形 + 硬切菱形剪裁 */
@@ -1539,20 +1539,20 @@ body.promare-mode .select-icon {
 }
 
 /* 类型颜色映射（按 marble-fx-* class 后缀路由）— 元素 family 映射到 5 色 */
-body.promare-mode .select-icon.marble-fx-pyro      { background: #FF0090 !important; }
-body.promare-mode .select-icon.marble-fx-bounce    { background: #FF0090 !important; }
-body.promare-mode .select-icon.marble-fx-explosive { background: #FF0090 !important; }
-body.promare-mode .select-icon.marble-fx-cryo      { background: #00E5FF !important; }
-body.promare-mode .select-icon.marble-fx-wind      { background: #00E5FF !important; }
-body.promare-mode .select-icon.marble-fx-laser     { background: #00E5FF !important; }
-body.promare-mode .select-icon.marble-fx-lightning { background: #FFD600 !important; }
-body.promare-mode .select-icon.marble-fx-scatter   { background: #FFD600 !important; }
-body.promare-mode .select-icon.marble-fx-venom     { background: #FFD600 !important; }
+body.promare-mode .select-icon.marble-fx-pyro      { background: #FF2EA6 !important; }
+body.promare-mode .select-icon.marble-fx-bounce    { background: #FF2EA6 !important; }
+body.promare-mode .select-icon.marble-fx-explosive { background: #FF2EA6 !important; }
+body.promare-mode .select-icon.marble-fx-cryo      { background: #00B4FF !important; }
+body.promare-mode .select-icon.marble-fx-wind      { background: #00B4FF !important; }
+body.promare-mode .select-icon.marble-fx-laser     { background: #00B4FF !important; }
+body.promare-mode .select-icon.marble-fx-lightning { background: #FFE94A !important; }
+body.promare-mode .select-icon.marble-fx-scatter   { background: #FFE94A !important; }
+body.promare-mode .select-icon.marble-fx-venom     { background: #FFE94A !important; }
 body.promare-mode .select-icon.marble-fx-pierce    { background: #FFFFFF !important; }
 body.promare-mode .select-icon.marble-fx-damage    { background: #FFFFFF !important; }
 body.promare-mode .select-icon.marble-fx-flying_sword { background: #FFFFFF !important; }
-body.promare-mode .select-icon.marble-fx-matryoshka { background: #FF0090 !important; }
-body.promare-mode .select-icon.marble-fx-rainbow   { background: #FFD600 !important; }
+body.promare-mode .select-icon.marble-fx-matryoshka { background: #FF2EA6 !important; }
+body.promare-mode .select-icon.marble-fx-rainbow   { background: #FFE94A !important; }
 body.promare-mode .select-icon.marble-fx-white     { background: #FFFFFF !important; }
 
 /* 高光层关闭（不要 shine） */
@@ -1571,32 +1571,26 @@ body.promare-mode .select-card-name {
     font-weight: bold !important;
     color: #FFFFFF !important;
     letter-spacing: 0.05em !important;
-    text-shadow: 1px 1px 0 #0a0a0a !important;
+    text-shadow: 1px 1px 0 #1B0B2E !important;
 }
 
 /* tag 小标签：黄色硬切 */
 body.promare-mode .select-card-tag {
-    background: #0a0a0a !important;
-    color: #FFD600 !important;
-    border: 1px solid #FFD600 !important;
+    background: #1B0B2E !important;
+    color: #FFE94A !important;
+    border: 1px solid #FFE94A !important;
     border-radius: 0 !important;
     font-family: 'Inter Mono', monospace !important;
     box-shadow: none !important;
 }
 
-/* ==================== 故障艺术：色差通道偏移（pyro/lightning 击杀触发）==================== */
-/* promare_explosion.js 在 enemy:killed 时给 body 加 .promare-chromatic class
-   持续 ~150ms 后移除。filter 用 drop-shadow 模拟 RGB 三通道分离。
-   闪电主体粒子本身在 draw 时不参与（粒子用 lighter 混合，filter 仅作用于画布合成层）。
-   @perf-impact: GPU filter，单次 150ms，可忽略。 */
+/* ==================== 色差滤镜：已废弃（F7）==================== */
+/* 原版在 pyro/lightning/scatter/bounce 击杀时给 body 加 .promare-chromatic 触发
+   RGB 三通道偏移。电影《普罗米亚》几乎完全不用色差 —— 它是"模拟廉价镜头"的
+   cinematography 语言，与 Promare 的"平涂硬切"取向相反。
+   promare_explosion.js 的 _triggerChromaticAberration 已改为 no-op，
+   这里保留空选择器只是为了不破坏可能的 transition 链路。 */
 
 body.promare-mode #gameCanvas {
-    transition: filter 0.02s linear;
-}
-
-body.promare-mode.promare-chromatic #gameCanvas {
-    /* 红色偏右 / 蓝色偏左 的经典色差效果 */
-    filter:
-        drop-shadow(2px 0 0 rgba(255, 0, 144, 0.5))
-        drop-shadow(-2px 0 0 rgba(0, 229, 255, 0.5));
+    /* no filter — 击杀冲击感由 hitstop + 粒子碎裂承担 */
 }

@@ -54,7 +54,7 @@ function _buildScanlineCanvas(w, h) {
     ctx.translate(w / 2, h / 2);
     ctx.rotate(-Math.PI / 4);
     ctx.globalCompositeOperation = 'lighter';
-    ctx.strokeStyle = 'rgba(0,229,255,0.04)';
+    ctx.strokeStyle = 'rgba(0, 180, 255,0.04)';
     ctx.lineWidth = 2;
     for (let y = -diag; y <= diag; y += 160) {
         ctx.beginPath();
@@ -83,7 +83,7 @@ function _buildGridCanvas(w, h) {
     const vanishY = h * 0.45;
 
     ctx.save();
-    ctx.strokeStyle = 'rgba(0,229,255,0.06)';
+    ctx.strokeStyle = 'rgba(0, 180, 255,0.06)';
     ctx.lineWidth = 1;
 
     // 1) 纵向「轨道」：从屏底等距分布的点连线到消失点

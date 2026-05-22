@@ -142,17 +142,17 @@ export function spawnPromareKillExplosion(game, x, y, elementType, enemySize) {
 // ==================== 元素拟声词字典（Promare 拟声词视觉化技法）====================
 
 const ONOMATOPOEIA = {
-    pyro:         { text: 'BURN!',    color: '#FF0090' },
-    cryo:         { text: 'FREEZE!',  color: '#00E5FF' },
-    lightning:    { text: 'ZAP!',     color: '#FFD600' },
+    pyro:         { text: 'BURN!',    color: '#FF2EA6' },
+    cryo:         { text: 'FREEZE!',  color: '#00B4FF' },
+    lightning:    { text: 'ZAP!',     color: '#FFE94A' },
     pierce:       { text: 'PIERCE!',  color: '#FFFFFF' },
-    bounce:       { text: 'BOUNCE!',  color: '#FF0090' },
-    scatter:      { text: 'SPLIT!',   color: '#FFD600' },
+    bounce:       { text: 'BOUNCE!',  color: '#FF2EA6' },
+    scatter:      { text: 'SPLIT!',   color: '#FFE94A' },
     damage:       { text: 'CRIT!',    color: '#FFFFFF' },
-    wind:         { text: 'SLASH!',   color: '#00E5FF' },
+    wind:         { text: 'SLASH!',   color: '#00B4FF' },
     laser:        { text: 'FLASH!',   color: '#FFFFFF' },
-    venom:        { text: 'POISON!',  color: '#FFD600' },
-    echo:         { text: 'ECHO!',    color: '#FF0090' },
+    venom:        { text: 'POISON!',  color: '#FFE94A' },
+    echo:         { text: 'ECHO!',    color: '#FF2EA6' },
     flying_sword: { text: 'STRIKE!',  color: '#FFFFFF' },
 };
 
@@ -199,24 +199,18 @@ export function spawnPromareOnomatopoeia(game, x, y, elementType, enemyType) {
 }
 
 /**
- * 全屏色差通道偏移：通过 body 添加临时 class，CSS filter 处理。
- * 闪电主体本身不偏移（粒子绘制时已写死无偏移）。
+ * [Promare v2 F7] 色差通道偏移 — 已废弃为 no-op。
  *
- * @param {Game} game
- * @param {number} durationSec - 持续时间秒
+ * 电影《普罗米亚》几乎完全不使用色差（chromatic aberration）—— 这个滤镜是"模拟廉价镜头"的
+ * cinematography 语言，与 Promare 的"平涂硬切"取向相反。原版在 pyro/lightning/scatter/bounce
+ * 击杀时触发的 0.15s 全屏 RGB 分离是反 Promare 的"故障艺术"惯例，移除以恢复硬边色块。
+ *
+ * 调用位置（_triggerChromaticAberration / CHROMATIC_ELEMENTS）保持兼容，但不再产生效果。
+ * 击杀冲击感由 hitstop + flashRect + 大三角剪影碎裂承担（Tier 2 落地）。
+ *
+ * @param {Game} _game
+ * @param {number} _durationSec
  */
-function _triggerChromaticAberration(game, durationSec = 0.15) {
-    if (typeof document === 'undefined' || !document.body) return;
-    // 用 dataset 计数防止多次触发叠加导致一直卡在 chromatic 态
-    const body = document.body;
-    body.classList.add('promare-chromatic');
-    const stamp = Date.now();
-    body.dataset.promareChromaticStamp = String(stamp);
-    setTimeout(() => {
-        // 仅在 stamp 仍是最新时移除，防止覆盖更晚触发的色差
-        if (body.dataset.promareChromaticStamp === String(stamp)) {
-            body.classList.remove('promare-chromatic');
-            delete body.dataset.promareChromaticStamp;
-        }
-    }, Math.max(50, durationSec * 1000));
+function _triggerChromaticAberration(_game, _durationSec = 0.15) {
+    // intentionally empty — see comment above
 }
