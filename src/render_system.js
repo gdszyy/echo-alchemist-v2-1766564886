@@ -35,10 +35,12 @@ export const render_system = {
         const is3D = typeof document !== 'undefined' && document.body && document.body.classList.contains('render3d-debug');
         if (is3D) return;
 
-        // [Promare] 全屏几何背景（仅 2D 模式下生效）：黑底 + 45° 扫描线 + 底部透视网格
+        // [Promare] 全屏几何背景（仅 2D 模式下生效）：深紫底 + 3 层剪影（远景 □ + 中景 △ + 气氛 △）
         if (CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.hideBackgroundBitmap) {
             const tiltFactor = (CONFIG.promare.backgroundTiltFactor != null) ? CONFIG.promare.backgroundTiltFactor : 0.5;
-            renderPromareBackground(this.ctx, this.width, this.height, this.boardTilt && this.boardTilt.current, this._frameCount || 0, tiltFactor);
+            // 把当前 phase 透给背景模块 —— 它按 phase 切换层密度 / 颜色 / 节奏
+            const bgPhase = this.phase || 'combat';
+            renderPromareBackground(this.ctx, this.width, this.height, this.boardTilt && this.boardTilt.current, this._frameCount || 0, tiltFactor, bgPhase);
             this._frameCount = (this._frameCount || 0) + 1;
             return;
         }

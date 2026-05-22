@@ -252,6 +252,45 @@ class Particle {
             this.angle = a;
             this.spin = 0;
 
+        // ========== [T2.A 击杀瞬间] 4 个新模式 ==========
+
+        } else if (mode === 'cut_line') {
+            // 切线 △：超长极细 lance，沿 angle 方向 hard-cut 显现 ~5 帧
+            vel.x = 0; vel.y = 0;
+            this.drag = 1.0; this.gravity = 0;
+            this.decay = 0.20;          // 5 frames → r 走完
+            this.size = 60;              // 长度（caller 会覆盖到 enemyDiag * 1.6）
+            this.life = 0.5;
+            this.angle = 0;
+            this.spin = 0;
+        } else if (mode === 'square_shard') {
+            // □ 方块碎片：caller 设 vel 朝外，stepped 漂出
+            vel.x = 0; vel.y = 0;
+            this.drag = 1.0; this.gravity = 0;
+            this.decay = 0.20;          // 5 frames 寿命
+            this.size = 20;
+            this.life = 0.5;
+            this.angle = 0;
+            this.spin = 0;
+        } else if (mode === 'kanada_tri') {
+            // △ 金田光斑：1-2 帧硬切白色三角
+            vel.x = 0; vel.y = 0;
+            this.drag = 1.0; this.gravity = 0;
+            this.decay = 0.25;          // 2-3 frames
+            this.size = 12;
+            this.life = 0.4;
+            this.angle = Math.random() * Math.PI * 2;
+            this.spin = 0;
+        } else if (mode === 'resolution_circle') {
+            // ○ 收束环（boss 击杀末段唯一合法 ○）：粗描边白圈，~0.3s 寿命
+            vel.x = 0; vel.y = 0;
+            this.drag = 1.0; this.gravity = 0;
+            this.decay = 0.06;          // ~16-17 frames ≈ 280ms
+            this.size = 100;             // caller 会覆盖
+            this.life = 1.0;
+            this.angle = 0;
+            this.spin = 0;
+
         } else {
             vel.x = (Math.random() - 0.5) * 4; vel.y = (Math.random() - 0.5) * 4;
             this.drag = 0.92; this.gravity = 0; this.decay = 0.05; this.size = Math.random() * 2 + 1;
@@ -678,6 +717,45 @@ class Particle {
             drawShape_radialSpoke(ctx, this.size);
             ctx.strokeStyle = PROMARE_PALETTE.WHITE;
             ctx.lineWidth = 2;
+            ctx.stroke();
+
+        // ========== [T2.A 击杀瞬间] 4 个新模式 draw ==========
+
+        } else if (this.mode === 'cut_line') {
+            // △ 切线：极细长 lance 沿 angle 方向 hard-cut 显现
+            // size = lance 长度的一半；高度比 0.04（"刀刃感"）
+            ctx.rotate(this.angle || 0);
+            const s = this.size;
+            ctx.beginPath();
+            ctx.moveTo(s, 0);                       // 锋尖
+            ctx.lineTo(-s * 0.95, s * 0.04);
+            ctx.lineTo(-s, 0);                       // 柄
+            ctx.lineTo(-s * 0.95, -s * 0.04);
+            ctx.closePath();
+            fillStroke_promare(ctx, this.color || PROMARE_PALETTE.PINK, null, 1, 1.0);
+        } else if (this.mode === 'square_shard') {
+            // □ 方块碎片：直线向外漂（vel 由 caller 设）
+            ctx.rotate(this.angle || 0);
+            const s = this.size;
+            ctx.beginPath();
+            ctx.moveTo(-s, -s);
+            ctx.lineTo( s, -s);
+            ctx.lineTo( s,  s);
+            ctx.lineTo(-s,  s);
+            ctx.closePath();
+            fillStroke_promare(ctx, this.color || '#2A0A4A', null, 1.5, 0.85);
+        } else if (this.mode === 'kanada_tri') {
+            // △ 金田光斑：硬切白色三角，1-2 帧寿命，无 angle 旋转影响（已锁向）
+            ctx.rotate(this.angle || 0);
+            drawShape_cone3(ctx, this.size);
+            fillStroke_promare(ctx, PROMARE_PALETTE.WHITE, null, 2, 1.0);
+        } else if (this.mode === 'resolution_circle') {
+            // ○ 收束环（boss 击杀末段唯一合法 ○）：粗描边白圈，不填充
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = PROMARE_PALETTE.WHITE;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size, 0, Math.PI * 2);
             ctx.stroke();
 
         } else {

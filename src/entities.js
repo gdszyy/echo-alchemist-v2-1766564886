@@ -2943,35 +2943,85 @@ class DropBall {
                             }
                             // 元素 → promare 5 色映射（与 Renderer3D ELEMENT_FX 同源）
                             const PEG_SPARK_COLOR = {
-                                pyro:      0xFF0090, // PINK
-                                bounce:    0xFF0090,
-                                resonance: 0xFF0090,
-                                cryo:      0x00E5FF, // CYAN
-                                wind:      0x00E5FF,
-                                laser:     0x00E5FF,
-                                lightning: 0xFFD600, // YELLOW
-                                scatter:   0xFFD600,
-                                venom:     0xFFD600,
+                                pyro:      0xFF2EA6, // PINK
+                                bounce:    0xFF2EA6,
+                                resonance: 0xFF2EA6,
+                                cryo:      0x00B4FF, // CYAN
+                                wind:      0x00B4FF,
+                                laser:     0x00B4FF,
+                                lightning: 0xFFE94A, // YELLOW
+                                scatter:   0xFFE94A,
+                                venom:     0xFFE94A,
                                 damage:    0xFFFFFF,
                                 pierce:    0xFFFFFF,
                                 flying_sword: 0xFFFFFF,
-                                pink:      0xFF0090,
+                                pink:      0xFF2EA6,
                                 normal:    0xFFFFFF,
                             };
                             const sparkColor = PEG_SPARK_COLOR[peg.type] || 0xFFFFFF;
                             // 普通钉子粒子量小（避免视觉噪声），属性钉子稍多
                             const sparkCount = (peg.type === 'normal' || peg.type === 'pink') ? 3 : 5;
+                            // [Promare v2] 3D GPU spark 在 Bloom 降到 0.35 后几乎不可见（加法混合 + 小尺寸）。
+                            // 把粒子放大 + 调高内核亮度，让它们在低 bloom 下也能被看到。
                             r3d.proxy.spawnParticles({
                                 x: peg.pos.x,
                                 y: peg.pos.y,
                                 color: sparkColor,
                                 mode: 'spark',
                                 count: sparkCount,
-                                size: 2.2,
-                                lifetime: 0.30,
+                                size: 5.5,                          // 旧 2.2 → 5.5（弥补 Bloom 缩水）
+                                lifetime: 0.35,
                                 spread: 0.9,
                                 speed: 6 + impactSpeedVal * 0.6,
                             });
+                        }
+
+                        // [Promare v2] 2D Promare 三角粒子补丁 —— 与 3D spark 共生，
+                        // 不依赖 Bloom，深紫底上硬色块直接可见。
+                        // peg.type → Promare mode：复用元素 codex；normal/pink/resonance 退化到 damage_diamond。
+                        if (typeof game.spawn_createParticle === 'function') {
+                            const PEG_PROMARE_MODE = {
+                                pyro:     'pyro_cone',
+                                cryo:     'cryo_oct',
+                                lightning:'thunder_z',
+                                pierce:   'pierce_lance',
+                                bounce:   'bounce_hex',
+                                scatter:  'scatter_star',
+                                venom:    'venom_tri',
+                                laser:    'laser_beam',
+                                wind:     'damage_diamond',     // wind_slash 不在 PROMARE_MODES，退化
+                                damage:   'damage_diamond',
+                                flying_sword: 'damage_diamond',
+                                resonance:'damage_diamond',
+                                normal:   'damage_diamond',
+                                pink:     'damage_diamond',
+                            };
+                            const PEG_PROMARE_COLOR = {
+                                pyro:'#FF2EA6', bounce:'#FF2EA6', resonance:'#FF2EA6', pink:'#FF2EA6',
+                                cryo:'#00B4FF', wind:'#00B4FF', laser:'#00B4FF',
+                                lightning:'#FFE94A', scatter:'#FFE94A', venom:'#FFE94A',
+                                damage:'#FFFFFF', pierce:'#FFFFFF', flying_sword:'#FFFFFF', normal:'#FFFFFF',
+                            };
+                            const pMode  = PEG_PROMARE_MODE[peg.type]  || 'damage_diamond';
+                            const pColor = PEG_PROMARE_COLOR[peg.type] || '#FFFFFF';
+                            // 2-3 个 promare 粒子（轻量；F1-F7 自动套用）
+                            const pCount = (peg.type === 'normal' || peg.type === 'pink') ? 2 : 3;
+                            // 沿入射反方向 ±60° 锥喷出，模拟"反弹溅射"
+                            const reverseA = Math.atan2(-impactVel.y, -impactVel.x);
+                            for (let k = 0; k < pCount; k++) {
+                                const a  = reverseA + (Math.random() - 0.5) * (Math.PI * 0.66);
+                                const sp = 1.5 + Math.random() * 2.0;
+                                const pp = game.spawn_createParticle(peg.pos.x, peg.pos.y, pColor, pMode);
+                                if (pp && pp.vel) {
+                                    pp.vel.x = Math.cos(a) * sp;
+                                    pp.vel.y = Math.sin(a) * sp;
+                                    pp.size = (pp.size || 2) * 0.8;   // 钉子击中比 burst 小一号
+                                    pp.life = 0.55;                    // ~30 帧寿命
+                                    pp.maxLife = pp.life;
+                                    pp.decay = 0.04;
+                                    if (pMode === 'pierce_lance' || pMode === 'wind_slash') pp.angle = a;
+                                }
+                            }
                         }
 
                         if (peg.type === 'normal' && Math.random() < CONFIG.balance.normalPegSecondEnergChancey) {

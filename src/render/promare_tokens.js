@@ -59,6 +59,11 @@ export const PROMARE_MODES = new Set([
     'echo_ring',
     'laser_beam',
     'radial_spoke',
+    // [T2.A 击杀瞬间] 4 个新模式
+    'cut_line',          // △ 切线：粉色超长极细 lance，t=83ms 硬切显现，5 帧寿命
+    'square_shard',      // □ 方块碎片：敌人方块被切线劈成的 4-6 块，stepped 向外移
+    'kanada_tri',        // △ 金田光斑：1-2 帧白色硬切三角，模拟"闪现一帧"金田风
+    'resolution_circle', // ○ 收束环：仅 boss 击杀末段，整局游戏唯一合法的圆
 ]);
 
 export function isPromareMode(mode) {

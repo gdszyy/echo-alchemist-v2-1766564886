@@ -1,21 +1,41 @@
 /**
- * promare_explosion.js - 普罗米亚击杀爆炸特效
+ * promare_explosion.js - 普罗米亚击杀爆炸特效（T2.A 时间线版）
  *
- * 把《普罗米亚》视觉体系的「电磁爆炸」概念落地：
- *   - 几何符号叙事：方形（体制）→ 三角碎片（燃烧者突破）
- *   - 拼贴式高密度：3 层同心切片 + 三角碎片群 + 暗紫烟雾环 + 白色金田光斑
- *   - 故障艺术（色差通道偏移）：仅 pyro/lightning 元素触发，且闪电主体不偏移
+ * 设计：docs/promare_visual_design_v2.md §2.4 整段是这个文件的契约。
+ *   "□（秩序）被 △（Burnish）切开 → 碎成 △（自由）" —— 整部电影的母题在这一帧上演。
  *
- * 调用契约：在 enemy:killed 事件触发，比常规 burst 更密集、更高对比。
+ * 时间线（每 5 frames = 83ms ≈ 1 个 12fps step）：
+ *   t=0       hitstop + flashOverlay（已在 core.js 处理）
+ *   t=83ms    [Frame 5]  切线 △ 沿入射反方向硬切显现，1.6× 敌人对角线长度
+ *   t=166ms   [Frame 10] 切线 snap 消失；方块切片（4-6 □）开始向外漂
+ *   t=250ms   [Frame 15] 方块切片消失；生成 16-24 △ 碎片（power-law 2 大 + 5 中 + 15 小）
+ *   t=333ms   [Frame 20] 2-3 金田光斑（白 △，1 帧硬切显现）
+ *   t=416ms+  [Frame 25+] 碎片继续 stepped 漂移，pop-hold-snap 消亡
+ *   t=~1.5s              全部清场
  *
- * @perf-impact: 单次击杀 ≤20 粒子 + 3 shockwave + 4 金田光斑 + 6 三角碎片，
- *               额外 0.15s 色差闪烁（仅高档元素）。受 perfQualityLevel 约束。
+ * Boss 击杀：所有时长 ×2、切线 ×3、碎片 ×2，末段 +1 ○ 收束环（唯一合法 ○）。
+ *
+ * @perf-impact: 单次击杀 ≤32 粒子（4 切片 + 24 △ 碎片 + 3 金田）+ boss 末段 1 ○。
+ *               受 perfQualityLevel + budget guard 约束，>95% 跳过整段。
  */
 
 import { PROMARE_PALETTE, getPromarePerf, resolveElementKey } from './promare_tokens.js';
 
-// 烟雾色（暗紫 / 灰蓝，《普罗米亚》冷色调对比前景高亮）
-const SMOKE_COLORS = ['rgba(42, 10, 48, 0.55)', 'rgba(35, 30, 70, 0.45)', 'rgba(20, 20, 40, 0.5)'];
+// 元素 key → 主碎片 mode（与 promare_burst.js ELEMENT_TO_MODE 同源）
+const ELEMENT_TO_MODE = {
+    pyro:         'pyro_cone',
+    cryo:         'cryo_oct',
+    lightning:    'thunder_z',
+    pierce:       'pierce_lance',
+    bounce:       'bounce_hex',
+    scatter:      'scatter_star',
+    damage:       'damage_diamond',
+    wind:         'damage_diamond',     // wind_slash 不在 PROMARE_MODES，退化
+    laser:        'laser_beam',
+    venom:        'venom_tri',
+    echo:         'damage_diamond',
+    flying_sword: 'damage_diamond',
+};
 
 // 元素 → 中心切片三层主配色（《普罗米亚》强对比）
 const KILL_PALETTE = {
@@ -36,25 +56,37 @@ const KILL_PALETTE = {
 const CHROMATIC_ELEMENTS = new Set(['pyro', 'lightning', 'scatter', 'bounce']);
 
 /**
- * 击杀爆炸入口。在 enemy:killed 时调用，补在常规 burst 之上。
+ * 击杀爆炸入口 — T2.A 时间线版。
+ * Hitstop / flashOverlay / screenShake 由 core.js 在调用前处理；本函数只编排视觉时间线。
  *
  * @param {Game} game
  * @param {number} x
  * @param {number} y
  * @param {string} elementType
- * @param {{w?:number,h?:number}} [enemySize] - 用于决定爆炸尺寸（大 boss → 更大）
+ * @param {{w?:number,h?:number,hitVel?:{x:number,y:number},isBoss?:boolean}} [enemyInfo]
+ *        敌人尺寸 + 入射速度（决定切线方向）+ boss 标记（决定 ×2 时长 + 结尾 ○）
  */
-export function spawnPromareKillExplosion(game, x, y, elementType, enemySize) {
+export function spawnPromareKillExplosion(game, x, y, elementType, enemyInfo) {
     if (!game || typeof game.spawn_createParticle !== 'function') return;
 
     const elemKey = resolveElementKey(elementType);
     const palette = KILL_PALETTE[elemKey] || KILL_PALETTE.damage;
-    const perf = getPromarePerf(game.perfQualityLevel || 'high');
+    const fragMode = ELEMENT_TO_MODE[elemKey] || 'damage_diamond';
 
-    // 体积自适应：默认 32px，大型敌人 1.5×（最大 80）
-    const baseR = Math.min(80, Math.max(28, ((enemySize && Math.max(enemySize.w || 0, enemySize.h || 0)) || 32) * 0.7));
+    // 敌人尺寸 + isBoss 判定
+    const enemyW = (enemyInfo && enemyInfo.w) || 64;
+    const enemyH = (enemyInfo && enemyInfo.h) || 64;
+    const enemyDiag = Math.hypot(enemyW, enemyH);
+    const baseR = Math.min(80, Math.max(28, Math.max(enemyW, enemyH) * 0.7));
+    // Boss 判定：显式 isBoss=true，或体积超过普通敌人 1.6× 阈值
+    const isBoss = !!(enemyInfo && enemyInfo.isBoss) || Math.max(enemyW, enemyH) >= 100;
+    const T = isBoss ? 2 : 1;  // 时长倍率
 
-    // [Promare kill-explosion budget guard] 满载时降级或跳过
+    // 入射反方向角（默认从下往上）
+    const hv = (enemyInfo && enemyInfo.hitVel) || { x: 0, y: -1 };
+    const cutAngle = Math.atan2(-hv.y, -hv.x);
+
+    // [budget guard] 满载时降级或跳过
     let downscale = 1.0;
     if (game.particles && Array.isArray(game.particles)) {
         const cfg = (typeof globalThis !== 'undefined' && globalThis.CONFIG && globalThis.CONFIG.performance)
@@ -62,81 +94,124 @@ export function spawnPromareKillExplosion(game, x, y, elementType, enemySize) {
         const budget = cfg ? (cfg[game.perfQualityLevel || 'high'] || {}).maxParticles : 800;
         if (budget) {
             const ratio = game.particles.length / budget;
-            if (ratio > 0.95) return;       // 跳过整个爆炸
+            if (ratio > 0.95) return;       // 跳过整段时间线
             if (ratio > 0.80) downscale = 0.4;
             else if (ratio > 0.60) downscale = 0.7;
         }
     }
 
-    // ===== 1. 中心三层切片堆叠 =====
-    // 用 echo_ring 粒子充当切片（已实现 expand + alpha decay 行为）
-    const layerCount = downscale < 0.6 ? 1 : (downscale < 1.0 ? 2 : 3);
-    for (let layer = 0; layer < layerCount; layer++) {
-        const p = game.spawn_createParticle(x, y, palette[layer], 'echo_ring');
-        if (p) {
-            p.size = baseR * (1.0 + layer * 0.45);
-            p._expandRate = 0.4 + layer * 0.3;
-            p.life = 1.0 - layer * 0.15;
-            p.maxLife = p.life;
-            p.decay = 0.05 + layer * 0.01;
+    // ===== Frame 5 (t=83ms × T): 切线 △ 硬切显现 =====
+    // boss 用 3 道切线（错开 22.5°），普通敌人 1 道
+    const cutCount = isBoss ? 3 : 1;
+    const cutLength = enemyDiag * 1.6;
+    setTimeout(() => {
+        for (let i = 0; i < cutCount; i++) {
+            const aOffset = (i - (cutCount - 1) / 2) * (Math.PI / 8);
+            _spawnCutLine(game, x, y, cutAngle + aOffset, cutLength, palette[0]);
         }
-    }
+    }, 83 * T);
 
-    // ===== 2. 方形破裂 → 三角碎片群（叙事核心：燃烧者突破体制）=====
-    // 6-12 个 damage_diamond 粒子但配色为 palette[0]，360° 放射（不走方向锥）
-    const fragmentCount = Math.max(3, Math.floor((perf.burstSmallN >= 10 ? 12 : 6) * downscale));
-    for (let i = 0; i < fragmentCount; i++) {
-        const a = (i / fragmentCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
-        const sp = 3 + Math.random() * 4;
-        const p = game.spawn_createParticle(x, y, palette[0], 'damage_diamond');
-        if (p) {
-            if (p.vel) {
-                p.vel.x = Math.cos(a) * sp;
-                p.vel.y = Math.sin(a) * sp;
-            }
-            p.size = baseR * 0.12 + Math.random() * baseR * 0.08;
-            p.life = 1.4;
-            p.maxLife = p.life;
-            p.decay = 0.025;
-            p.angle = a + Math.PI / 4; // 菱形指向飞行方向
-            p.spin = (Math.random() - 0.5) * 0.2;
+    // ===== Frame 10 (t=166ms × T): □ 方块切片向外漂 =====
+    // boss 6 块、普通 4 块；颜色用敌人暗紫描边色（保留"秩序"残影）
+    const shardCount = Math.max(2, Math.floor((isBoss ? 6 : 4) * downscale));
+    const shardSize = Math.min(enemyW, enemyH) * 0.25;
+    setTimeout(() => {
+        for (let i = 0; i < shardCount; i++) {
+            // 沿切线两侧扇形展开：±45°-±90°
+            const a = cutAngle + (i / shardCount - 0.5) * Math.PI;
+            _spawnSquareShard(game, x, y, shardSize, a, palette[2] || PROMARE_PALETTE.WHITE);
         }
-    }
+    }, 166 * T);
 
-    // ===== 3. 暗紫烟雾环 — 冷色压制反衬前景高亮 =====
-    // 用 Shockwave 类（系统已支持）但颜色改深紫
-    if (typeof game.spawn_createShockwave === 'function') {
-        for (let i = 0; i < Math.min(3, perf.radialSpokes / 3); i++) {
-            const smokeColor = SMOKE_COLORS[i % SMOKE_COLORS.length];
-            // Shockwave 类自带扩张行为；不同启动延迟造成层叠感
-            const delay = i * 40;
-            if (delay === 0) {
-                game.spawn_createShockwave(x, y, smokeColor);
-            } else if (perf.useStagger) {
-                setTimeout(() => game.spawn_createShockwave(x, y, smokeColor), delay);
-            }
+    // ===== Frame 15 (t=250ms × T): 16-24 △ 碎片（power-law）=====
+    const totalFragments = Math.floor((isBoss ? 32 : 20) * downscale);
+    const largeN = Math.max(1, Math.floor(totalFragments * 0.12));
+    const midN   = Math.max(2, Math.floor(totalFragments * 0.25));
+    const smallN = totalFragments - largeN - midN;
+    setTimeout(() => {
+        // 大碎片（沿入射反方向 ±60° 锥，颜色 palette[0]）
+        for (let i = 0; i < largeN; i++) {
+            const a  = cutAngle + (Math.random() - 0.5) * (Math.PI * 0.66);
+            const sp = 4 + Math.random() * 3;
+            _spawnShatterTri(game, x, y, palette[0], fragMode, a, sp, 1.8, 1.2);
         }
-    }
-
-    // ===== 4. 金田光斑：2-3 个白色 echo_ring，瞬时显现 =====
-    // 用极小 life 模拟「闪现一帧」的金田光斑感
-    const kanadaCount = perf.useStagger ? 3 : 1;
-    for (let i = 0; i < kanadaCount; i++) {
-        const off = (i - (kanadaCount - 1) / 2) * baseR * 0.8;
-        const p = game.spawn_createParticle(x + off, y + (Math.random() - 0.5) * baseR * 0.3, PROMARE_PALETTE.WHITE, 'echo_ring');
-        if (p) {
-            p.size = baseR * (0.35 + Math.random() * 0.2);
-            p._expandRate = 0.8;
-            p.life = 0.45;
-            p.maxLife = p.life;
-            p.decay = 0.12;
+        // 中碎片
+        for (let i = 0; i < midN; i++) {
+            const a  = cutAngle + (Math.random() - 0.5) * (Math.PI * 0.8);
+            const sp = 3 + Math.random() * 3;
+            _spawnShatterTri(game, x, y, palette[1] || palette[0], fragMode, a, sp, 1.0, 0.9);
         }
-    }
+        // 小碎片（360° 全向）
+        for (let i = 0; i < smallN; i++) {
+            const a  = Math.random() * Math.PI * 2;
+            const sp = 1.5 + Math.random() * 2.5;
+            _spawnShatterTri(game, x, y, palette[2] || palette[0], fragMode, a, sp, 0.5, 0.7);
+        }
+    }, 250 * T);
 
-    // ===== 5. 色差通道偏移（仅 pyro / lightning / scatter / bounce 触发）=====
-    if (CHROMATIC_ELEMENTS.has(elemKey)) {
-        _triggerChromaticAberration(game, 0.15);
+    // ===== Frame 20 (t=333ms × T): 2-3 金田 △ flash =====
+    const kanadaCount = Math.max(1, Math.floor((isBoss ? 5 : 3) * downscale));
+    setTimeout(() => {
+        for (let i = 0; i < kanadaCount; i++) {
+            const offX = (Math.random() - 0.5) * baseR * 1.5;
+            const offY = (Math.random() - 0.5) * baseR * 1.5;
+            _spawnKanadaFlash(game, x + offX, y + offY, baseR * (0.25 + Math.random() * 0.15));
+        }
+    }, 333 * T);
+
+    // ===== Boss 末段 (t=1500ms): ○ 收束环 — 整局游戏唯一合法 ○ =====
+    if (isBoss) {
+        setTimeout(() => {
+            _spawnResolutionCircle(game, x, y, baseR * 3.5);
+        }, 1500);
     }
+}
+
+// ==================== 内部 spawner helpers ====================
+
+function _spawnCutLine(game, x, y, angle, length, color) {
+    const p = game.spawn_createParticle(x, y, color || PROMARE_PALETTE.PINK, 'cut_line');
+    if (!p) return;
+    p.angle = angle;
+    p.size = length / 2;  // particle.size = half-length
+    if (p.vel) { p.vel.x = 0; p.vel.y = 0; }
+}
+
+function _spawnSquareShard(game, x, y, size, angle, color) {
+    const p = game.spawn_createParticle(x, y, color, 'square_shard');
+    if (!p) return;
+    p.size = size;
+    p.angle = angle;
+    if (p.vel) {
+        const sp = 1.8;  // 慢速 stepped 向外（与 5-frame 寿命匹配）
+        p.vel.x = Math.cos(angle) * sp;
+        p.vel.y = Math.sin(angle) * sp;
+    }
+}
+
+function _spawnShatterTri(game, x, y, color, mode, angle, speed, sizeMult, lifeMult) {
+    const p = game.spawn_createParticle(x, y, color, mode);
+    if (!p) return;
+    if (p.vel) {
+        p.vel.x = Math.cos(angle) * speed;
+        p.vel.y = Math.sin(angle) * speed;
+    }
+    p.size = (p.size || 2) * sizeMult;
+    p.life = (p.life || 1) * lifeMult;
+    p.maxLife = p.life;
+    if (mode === 'pierce_lance' || mode === 'wind_slash') p.angle = angle;
+}
+
+function _spawnKanadaFlash(game, x, y, size) {
+    const p = game.spawn_createParticle(x, y, PROMARE_PALETTE.WHITE, 'kanada_tri');
+    if (!p) return;
+    p.size = size;
+}
+
+function _spawnResolutionCircle(game, x, y, size) {
+    const p = game.spawn_createParticle(x, y, PROMARE_PALETTE.WHITE, 'resolution_circle');
+    if (!p) return;
+    p.size = size;
 }
 
 // ==================== 元素拟声词字典（Promare 拟声词视觉化技法）====================
