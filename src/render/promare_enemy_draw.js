@@ -298,40 +298,63 @@ function _drawVenomOverlay(ctx, w, h) {
     ctx.restore();
 }
 
-// ==================== HP 条 ====================
+// ==================== HP 条（段化 ◆）====================
+// 设计 §3.5：12 段小菱形，不是连续 bar；段减少时 1 帧 snap 消失（不 fade）。
+// 横向排列在敌人方块底部（y = h/2 - segH * 1.2），不与目光/词条 overlay 冲突。
+
+const HP_SEGMENTS = 12;
 
 function _drawHpBar(ctx, w, h, enemy) {
     const hpRatio = Math.max(0, Math.min(1, (enemy.displayHp != null ? enemy.displayHp : enemy.hp) / enemy.maxHp));
     const delayedRatio = Math.max(0, Math.min(1, (enemy.delayedHp != null ? enemy.delayedHp / enemy.maxHp : hpRatio)));
 
-    // 延迟白条（掉血动画）
-    if (delayedRatio > hpRatio + 0.01) {
-        ctx.save();
-        ctx.globalAlpha = 0.35;
-        ctx.fillStyle = PROMARE_PALETTE.WHITE;
-        const dh = h * delayedRatio;
-        ctx.fillRect(-w / 2, h / 2 - dh, w, dh);
-        ctx.restore();
-    }
-    // 主血条
-    if (hpRatio > 0) {
-        ctx.save();
-        ctx.globalAlpha = 0.45;
-        ctx.fillStyle = PROMARE_PALETTE.WHITE;
-        const hbH = h * hpRatio;
-        ctx.fillRect(-w / 2, h / 2 - hbH, w, hbH);
-        ctx.restore();
-    }
-    // 顶部 hp 分隔细线（深紫）
+    // 当前血量段数 + 延迟段数（用于"掉血动画"差额提示）
+    const aliveCount   = Math.ceil(hpRatio * HP_SEGMENTS);
+    const delayedCount = Math.ceil(delayedRatio * HP_SEGMENTS);
+
+    // 段尺寸：横向 12 段铺满方块底部，每段是小 ◆
+    const segPitch = w / HP_SEGMENTS;          // 每段中心间距
+    const segR     = segPitch * 0.35;          // 单段菱形半径
+    const segY     = h / 2 - segR * 2.0;       // 距底边稍高，避免出框
+
     ctx.save();
-    ctx.globalAlpha = 0.75;
-    ctx.strokeStyle = OUTLINE_COLOR;
     ctx.lineWidth = 1;
-    ctx.beginPath();
-    const hbY = h / 2 - h * hpRatio;
-    ctx.moveTo(-w / 2, hbY);
-    ctx.lineTo(w / 2, hbY);
-    ctx.stroke();
+    for (let i = 0; i < HP_SEGMENTS; i++) {
+        const cx = -w / 2 + (i + 0.5) * segPitch;
+        const alive   = i < aliveCount;
+        const delayed = i < delayedCount;
+
+        // 段菱形 path
+        ctx.beginPath();
+        ctx.moveTo(cx, segY - segR);
+        ctx.lineTo(cx + segR, segY);
+        ctx.lineTo(cx, segY + segR);
+        ctx.lineTo(cx - segR, segY);
+        ctx.closePath();
+
+        if (alive) {
+            // 存活段：白色实心 + 暗紫描
+            ctx.fillStyle = PROMARE_PALETTE.WHITE;
+            ctx.globalAlpha = 0.85;
+            ctx.fill();
+            ctx.strokeStyle = OUTLINE_COLOR;
+            ctx.globalAlpha = 1.0;
+            ctx.stroke();
+        } else if (delayed) {
+            // 延迟段（刚扣血但 displayHp 还没追上）：半透灰 + 暗描
+            ctx.fillStyle = '#FFFFFF';
+            ctx.globalAlpha = 0.35;
+            ctx.fill();
+            ctx.strokeStyle = OUTLINE_COLOR;
+            ctx.globalAlpha = 0.7;
+            ctx.stroke();
+        } else {
+            // 死段：只描边，不填
+            ctx.strokeStyle = OUTLINE_COLOR;
+            ctx.globalAlpha = 0.45;
+            ctx.stroke();
+        }
+    }
     ctx.restore();
 }
 
