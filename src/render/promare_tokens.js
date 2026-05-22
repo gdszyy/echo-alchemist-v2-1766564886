@@ -13,14 +13,57 @@
  */
 
 // ==================== 5 色硬切板（核心 palette）====================
+// [v2 校色] 调到电影实拍取色 + 把"黑底"改为深紫底（F7：Promare 不用纯黑）。
+// 原版 #FF0090 / #00E5FF / #FFD600 / #0a0a0a 偏霓虹电子感，本次替换为：
+//   - PINK   #FF2EA6  研究里 Burnish 攻击色（更"糖果荧光"，少电子感）
+//   - CYAN   #00B4FF  Lio / 保护性蓝（更厚重，少屏幕青）
+//   - YELLOW #FFE94A  暖核高光（少塑料感）
+//   - BLACK  #1B0B2E  深紫底（电影里所有"阴影"都是带紫调的，不是真黑）
 
 export const PROMARE_PALETTE = {
-    PINK:   '#FF0090',   // 主色 1：火焰 / 弹射 / 穿透 accent / 危险
-    CYAN:   '#00E5FF',   // 主色 2：冰霜 / 风 / 激光 / 工具
-    YELLOW: '#FFD600',   // 主色 3：闪电 / 散射 / 警示
+    PINK:   '#FF2EA6',   // 主色 1：火焰 / 弹射 / 穿透 accent / 危险
+    CYAN:   '#00B4FF',   // 主色 2：冰霜 / 风 / 激光 / 工具
+    YELLOW: '#FFE94A',   // 主色 3：闪电 / 散射 / 警示
     WHITE:  '#FFFFFF',   // 中性高亮 / 核心 / 子弹白心
-    BLACK:  '#0a0a0a',   // 背景 / 阴影 / 实体填充
+    BLACK:  '#1B0B2E',   // 深紫底（命名保留 BLACK 防止全文 import 改名；语义=深紫底）
+    PURPLE_BRIDGE: '#9B5CFF',  // 粉-蓝过渡（备用）
 };
+
+// ==================== F4: 暗调描边色 ====================
+// 每个主色配一个暗化版本作为描边色（不是白、不是黑）。
+// fillStroke_promare 会自动查这张表；调用方传 strokeColor 时仍可覆盖。
+
+export const PROMARE_OUTLINES = {
+    [PROMARE_PALETTE.PINK]:   '#660F40',   // 暗紫红
+    [PROMARE_PALETTE.CYAN]:   '#003E5C',   // 暗深蓝
+    [PROMARE_PALETTE.YELLOW]: '#5C5008',   // 暗琥珀
+    [PROMARE_PALETTE.WHITE]:  '#1B0B2E',   // 白色描深紫底
+};
+
+// ==================== F1/F3/F6: Promare 粒子 mode 集合 ====================
+// 凡是属于这个集合的 mode，Particle 引擎会自动套用：
+//   - F1 时间量化 stutter（每 5 帧才推进 pos / angle）
+//   - F3 Pop-Hold-Snap 生命周期（draw 时不线性褪色）
+//   - F6 直线运动（gravity=0、drag=1、spin=0 覆盖各 mode 自带物理）
+// 不在集合里的 mode（spark/ember/mist/shard/...）保持原行为。
+
+export const PROMARE_MODES = new Set([
+    'pyro_cone',
+    'cryo_oct',
+    'thunder_z',
+    'pierce_lance',
+    'bounce_hex',
+    'scatter_star',
+    'damage_diamond',
+    'venom_tri',
+    'echo_ring',
+    'laser_beam',
+    'radial_spoke',
+]);
+
+export function isPromareMode(mode) {
+    return PROMARE_MODES.has(mode);
+}
 
 // ==================== Element Codex（12 元素）====================
 // 每元素的 shape / motion / 颜色映射；rendering 模块按 key 查表。

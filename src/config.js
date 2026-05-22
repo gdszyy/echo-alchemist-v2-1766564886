@@ -348,49 +348,49 @@ const CONFIG = {
     // colors.promareOverride 由渲染器读取替换 colors.*，gameplay 逻辑不受影响
     colorsPromareOverride: {
         // 元素子弹/钉子映射到 5 色家族
-        matBounce:      '#FF0090',   // PINK 系
+        matBounce:      '#FF2EA6',   // PINK 系
         matPierce:      '#FFFFFF',   // WHITE 主 + PINK accent
-        matScatter:     '#FFD600',   // YELLOW
+        matScatter:     '#FFE94A',   // YELLOW
         matDamage:      '#FFFFFF',
-        matCryo:        '#00E5FF',   // CYAN
-        matPyro:        '#FF0090',   // PINK
-        matLightning:   '#FFD600',   // YELLOW
-        matWind:        '#00E5FF',   // CYAN
-        matWind_lv2:    '#00E5FF',
-        matWind_lv3:    '#00E5FF',
-        matVenom:       '#FFD600',
+        matCryo:        '#00B4FF',   // CYAN
+        matPyro:        '#FF2EA6',   // PINK
+        matLightning:   '#FFE94A',   // YELLOW
+        matWind:        '#00B4FF',   // CYAN
+        matWind_lv2:    '#00B4FF',
+        matWind_lv3:    '#00B4FF',
+        matVenom:       '#FFE94A',
         marbleWhite:    '#FFFFFF',
-        matMatryoshka:  '#FF0090',
-        marbleRedStripe:'#FF0090',
+        matMatryoshka:  '#FF2EA6',
+        marbleRedStripe:'#FF2EA6',
 
         flying_sword:   '#FFFFFF',
         flying_sword_lv2:'#FFFFFF',
-        flying_sword_lv3:'#FF0090',
-        laser:          '#00E5FF',
-        resonance:      '#FFD600',
-        resonanceRipple:'#00E5FF',
+        flying_sword_lv3:'#FF2EA6',
+        laser:          '#00B4FF',
+        resonance:      '#FFE94A',
+        resonanceRipple:'#00B4FF',
 
         // 背景/钉子
-        bg:             '#0a0a0a',
+        bg:             '#1B0B2E',
         peg:            '#FFFFFF',   // 中性钉子（半透明 WHITE，由 promare_peg_draw 控）
         pegActive:      '#FFFFFF',
-        pegPink:        '#FF0090',
+        pegPink:        '#FF2EA6',
 
         // 敌人状态色 → 全收敛到 WHITE，靠加法 alpha 区分强度
         enemy:          '#FFFFFF',
         enemyHit:       '#FFFFFF',
-        enemyFrozen:    '#00E5FF',
-        enemyOverheat:  '#FF0090',
+        enemyFrozen:    '#00B4FF',
+        enemyOverheat:  '#FF2EA6',
         enemyShield:    '#FFFFFF',
 
         // 槽位 glyph 颜色 → 按语义收敛
-        slotRecall:     '#FF0090',   // 撤回 = 危险
-        slotMulticast:  '#00E5FF',   // 增益
-        slotSplit:      '#00E5FF',
-        slotGiant:      '#FF0090',
-        slotSkill:      '#FFD600',
-        slotWheel:      '#FFD600',
-        wheelPointer:   '#FFD600',
+        slotRecall:     '#FF2EA6',   // 撤回 = 危险
+        slotMulticast:  '#00B4FF',   // 增益
+        slotSplit:      '#00B4FF',
+        slotGiant:      '#FF2EA6',
+        slotSkill:      '#FFE94A',
+        slotWheel:      '#FFE94A',
+        wheelPointer:   '#FFE94A',
     },
 
     evolutionRules: {

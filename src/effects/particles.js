@@ -19,13 +19,26 @@ import { Vec2, lerp } from '../utils/math_utils.js';
 import { sb as _sb } from '../utils/perf.js';
 import { isSuppressed2DEntities } from '../render3d/draw_mode.js';
 import { CONFIG } from '../config.js'; // [Promare] visualMode gate
-import { PROMARE_PALETTE } from '../render/promare_tokens.js';
+import { PROMARE_PALETTE, PROMARE_MODES, isPromareMode } from '../render/promare_tokens.js';
 import {
     drawShape_cone3, drawShape_oct2, drawShape_zigzagZ, drawShape_lance4,
     drawShape_hex6, drawShape_star4, drawShape_diamond, drawShape_crescent,
     drawShape_triDown, drawShape_ringOuter, drawShape_ringInner,
-    drawShape_radialSpoke, fillStroke_promare
+    drawShape_radialSpoke, fillStroke_promare, fillPosterized_promare
 } from '../render/promare_shapes.js';
+
+// ==================== F1 / F3 / F6 Promare 特征工具 ====================
+// F1: 12fps 时间量化步长（60fps 下每 5 frame 才推进 pos/angle）
+const PROMARE_STUTTER_FRAMES = 5;
+
+// F3: Pop-Hold-Snap 生命周期 — 计算视觉缩放与 alpha
+// 行为：r >= 0.15 直接全尺寸全 alpha；r < 0.15 snap 缩小同时 alpha 加速降到 0
+function _promareLifeVisual(p) {
+    const r = p.maxLife > 0 ? (p.life / p.maxLife) : 0;
+    if (r >= 0.15) return { scale: 1.0, alpha: 1.0 };
+    const snap = r / 0.15;            // 0..1 线性
+    return { scale: snap, alpha: snap * snap }; // 缩小快、alpha 平方降速
+}
 
 class Particle {
     constructor(x, y, color, mode = 'normal') {
@@ -243,6 +256,20 @@ class Particle {
             vel.x = (Math.random() - 0.5) * 4; vel.y = (Math.random() - 0.5) * 4;
             this.drag = 0.92; this.gravity = 0; this.decay = 0.05; this.size = Math.random() * 2 + 1;
         }
+
+        // ==================== F6: Promare 直线运动覆盖 ====================
+        // 所有 promare mode：去掉 gravity / drag friction / 连续 spin。
+        // 保留 mode 自己设的初始 vel 和 angle —— 那是方向，电影里直线扇形扩散的根。
+        // _promareMode 也是 F1 stutter 与 F3 pop-hold-snap 的判定 flag。
+        if (PROMARE_MODES.has(mode)) {
+            this._promareMode   = true;
+            this.gravity        = 0;
+            this.drag           = 1.0;
+            this.spin           = 0;
+            // 错峰起步：避免所有粒子同帧 stutter 出现"群体闪烁"
+            this._stutterAccum  = Math.random() * PROMARE_STUTTER_FRAMES;
+        }
+
         this.maxLife = this.life;
     }
 
@@ -254,16 +281,18 @@ class Particle {
             // 毒液滴横向正弦摆动，模拟液体漂浮
             this.pos.x += Math.sin(this.life * 6 + this.wobble) * 0.4 * timeScale;
         }
-        // [Promare] thunder_z 高频抖动（每帧 ±0.04 单位）
-        if (this.mode === 'thunder_z') {
+        // [Promare F6] thunder_z 高频抖动：Promare 模式下抑制（与 stutter 不兼容、会看起来糊）
+        //   strobe 视觉效果仍在 draw 阶段，不依赖这里的 pos 抖动。
+        if (this.mode === 'thunder_z' && !this._promareMode) {
             this.pos.x += (Math.random() - 0.5) * 0.4 * timeScale;
             this.pos.y += (Math.random() - 0.5) * 0.4 * timeScale;
         }
-        // [Promare] venom_tri x-wobble
+        // [Promare F6] venom_tri x-wobble：Promare 模式下保留信号但缩到 1/3，避免与 stutter 冲突
         if (this.mode === 'venom_tri') {
-            this.pos.x += Math.sin(this.life * 6 + this.wobble) * 0.4 * timeScale;
+            const w = this._promareMode ? 0.13 : 0.4;
+            this.pos.x += Math.sin(this.life * 6 + this.wobble) * w * timeScale;
         }
-        // [Promare] bounce_hex 落地反弹（仅一次）
+        // [Promare] bounce_hex 落地反弹（F6 下 gravity=0 → vel.y 不变 → 永不触发；保留兼容）
         if (this.mode === 'bounce_hex' && !this._bounced && this.vel.y > 0 && this.pos.y >= this._bounceY) {
             this.vel.y *= -0.55;
             this._bounced = true;
@@ -308,17 +337,31 @@ class Particle {
                 this.pos = this.pos.add(perp.mult(wave * timeScale));
             }
         }
-        this.pos = this.pos.add(this.vel.mult(timeScale));
-        this.vel = this.vel.mult(Math.pow(this.drag, timeScale));
-        this.vel.y += this.gravity * timeScale;
-        if (this.mode === 'shard' || this.mode === 'mist') {
-            this.angle += this.spin * timeScale;
+
+        // ==================== 主 pos / vel / angle 推进 ====================
+        if (this._promareMode) {
+            // [F1] 12fps 时间量化：累积 timeScale，到阈值才一次性 pop 出位移
+            // _init 已经把 gravity / drag / spin 清零，所以 vel 是常量，无需 drag/重力推进
+            this._stutterAccum += timeScale;
+            if (this._stutterAccum >= PROMARE_STUTTER_FRAMES) {
+                this.pos = this.pos.add(this.vel.mult(this._stutterAccum));
+                this._stutterAccum = 0;
+            }
+            // angle 也按 stutter 节奏（spin=0 时实际无变化，保留逻辑供未来 Tier 2 使用）
+        } else {
+            this.pos = this.pos.add(this.vel.mult(timeScale));
+            this.vel = this.vel.mult(Math.pow(this.drag, timeScale));
+            this.vel.y += this.gravity * timeScale;
+            if (this.mode === 'shard' || this.mode === 'mist') {
+                this.angle += this.spin * timeScale;
+            }
+            // 非 promare 模式的旧 promare 旋转逻辑（如其他来源也借用了这些 mode 名）
+            if (this.mode === 'pyro_cone' || this.mode === 'cryo_oct' || this.mode === 'bounce_hex'
+                || this.mode === 'scatter_star' || this.mode === 'damage_diamond') {
+                this.angle += (this.spin || 0) * timeScale;
+            }
         }
-        // [Promare] 旋转更新
-        if (this.mode === 'pyro_cone' || this.mode === 'cryo_oct' || this.mode === 'bounce_hex'
-            || this.mode === 'scatter_star' || this.mode === 'damage_diamond') {
-            this.angle += (this.spin || 0) * timeScale;
-        }
+
         this.life -= this.decay * timeScale;
     }
 
@@ -328,7 +371,7 @@ class Particle {
         if (this.life <= 0) return;
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
-        
+
         // 设置混合模式
         if (this.mode === 'mist' && this.color && this.color.includes('0,0,0')) {
              ctx.globalCompositeOperation = 'source-over'; // 黑烟
@@ -337,6 +380,18 @@ class Particle {
         }
 
         ctx.globalAlpha = Math.max(0, this.life);
+
+        // ==================== F3: Pop-Hold-Snap 生命周期 ====================
+        // Promare 模式覆盖 globalAlpha 与 scale —— 不再线性褪色
+        // - r ≥ 0.15: 全尺寸全 alpha（"持续期"）
+        // - r < 0.15: snap 缩小 + alpha 平方降速（"snap 死亡"）
+        // 同时强制 source-over 抑制粒子重叠出现的白雾（F2 外层）
+        if (this._promareMode) {
+            const viz = _promareLifeVisual(this);
+            ctx.globalAlpha = viz.alpha;
+            if (viz.scale !== 1.0) ctx.scale(viz.scale, viz.scale);
+            ctx.globalCompositeOperation = 'source-over';
+        }
 
         // --- 优化：根据模式简化绘制 ---
         if (this.mode === 'mist') {
@@ -938,7 +993,7 @@ class FloatingText {
             ctx.textBaseline = 'middle';
 
             // 黑色 stamp 3 个偏移（替代 shadowBlur）
-            ctx.fillStyle = '#0a0a0a';
+            ctx.fillStyle = '#1B0B2E';
             const offs = [[2, 0], [0, 2], [-2, 0], [0, -2]];
             for (const [ox, oy] of offs) {
                 ctx.fillText(this.text, this.pos.x + ox, this.pos.y + oy);
@@ -946,9 +1001,9 @@ class FloatingText {
             // 顶层主色（pyro→PINK / cryo→CYAN / lightning→YELLOW / 其他→WHITE）
             let mainColor = '#FFFFFF';
             const c = (this.color || '').toLowerCase();
-            if (c.includes('f97316') || c.includes('ef4444') || c.includes('fca5a5')) mainColor = '#FF0090';
-            else if (c.includes('06b6d4') || c.includes('22d3ee') || c.includes('06b6')) mainColor = '#00E5FF';
-            else if (c.includes('facc15') || c.includes('c084fc') || c.includes('fbbf24') || c.includes('ffd600')) mainColor = '#FFD600';
+            if (c.includes('f97316') || c.includes('ef4444') || c.includes('fca5a5')) mainColor = '#FF2EA6';
+            else if (c.includes('06b6d4') || c.includes('22d3ee') || c.includes('06b6')) mainColor = '#00B4FF';
+            else if (c.includes('facc15') || c.includes('c084fc') || c.includes('fbbf24') || c.includes('ffd600')) mainColor = '#FFE94A';
             ctx.fillStyle = mainColor;
             ctx.fillText(this.text, this.pos.x, this.pos.y);
             ctx.restore();

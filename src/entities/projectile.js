@@ -975,17 +975,17 @@ class Projectile {
 
         // [Promare] 拖尾色映射到 5 色硬切板（保留元素家族编码）
         if (CONFIG.visualMode === 'promare') {
-            if (cfg.isLaser)                       trailColor = '#00E5FF';
+            if (cfg.isLaser)                       trailColor = '#00B4FF';
             else if (cfg.type === 'flying_sword')  trailColor = '#FFFFFF';
-            else if (cfg.type === 'rainbow')       trailColor = '#FF0090';
-            else if (cfg.explosive)                trailColor = '#FF0090';
-            else if ((cfg.pyro || 0) > 0)          trailColor = '#FF0090';
-            else if ((cfg.cryo || 0) > 0)          trailColor = '#00E5FF';
-            else if ((cfg.lightning || 0) > 0)     trailColor = '#FFD600';
-            else if ((cfg.wind || 0) > 0)          trailColor = '#00E5FF';
+            else if (cfg.type === 'rainbow')       trailColor = '#FF2EA6';
+            else if (cfg.explosive)                trailColor = '#FF2EA6';
+            else if ((cfg.pyro || 0) > 0)          trailColor = '#FF2EA6';
+            else if ((cfg.cryo || 0) > 0)          trailColor = '#00B4FF';
+            else if ((cfg.lightning || 0) > 0)     trailColor = '#FFE94A';
+            else if ((cfg.wind || 0) > 0)          trailColor = '#00B4FF';
             else if ((cfg.pierce || 0) > 0)        trailColor = '#FFFFFF';
-            else if ((cfg.bounce || 0) > 0)        trailColor = '#FF0090';
-            else if ((cfg.scatter || 0) > 0)       trailColor = '#FFD600';
+            else if ((cfg.bounce || 0) > 0)        trailColor = '#FF2EA6';
+            else if ((cfg.scatter || 0) > 0)       trailColor = '#FFE94A';
             else                                    trailColor = '#FFFFFF';
         }
 
