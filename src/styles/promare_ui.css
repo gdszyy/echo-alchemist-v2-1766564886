@@ -1092,6 +1092,55 @@ body.promare-mode #phase-meta {
     background: #1B0B2E !important;
 }
 
+/* [Promare v2 首页素材兜底] —— 处理"原版素材"漏网鱼：
+   1. font-[Cinzel] Tailwind arbitrary class 在 phase-meta 内一律失效，统一 Inter Mono
+   2. 顶右 stat-pill 内的 🔮 emoji 替换为黄色硬切菱形几何
+   3. drop-shadow / filter / text-shadow 这些 cinematography 装饰一刀切
+   4. 防御 inline style="background:#020617" 万一被某条规则忽略 */
+
+body.promare-mode #phase-meta [class*="Cinzel"],
+body.promare-mode #phase-meta * {
+    font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
+}
+
+body.promare-mode #phase-meta .stat-pill * {
+    filter: none !important;
+    text-shadow: none !important;
+}
+
+/* 顶右"符文碎片"pill 的 🔮 emoji → 黄色菱形几何符号 */
+body.promare-mode #phase-meta .stat-pill > span:first-child {
+    color: transparent !important;
+    font-size: 0 !important;
+    width: 14px;
+    height: 14px;
+    display: inline-block;
+    background: #FFE94A;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    margin-right: 4px;
+    filter: none !important;
+    text-shadow: none !important;
+    flex-shrink: 0;
+}
+
+/* "符文碎片" label —— Tailwind text-purple-200/60 已被全局收敛规则改成白，
+   这里再保险 + 调到 YELLOW 主色保持识别性 */
+body.promare-mode #phase-meta .stat-pill > span:last-child {
+    color: #FFE94A !important;
+    opacity: 0.85;
+}
+
+/* 货币数字 #meta-currency-display：font-[Cinzel] 必须被掐死 */
+body.promare-mode #meta-currency-display {
+    font-family: 'Inter Mono', 'Roboto Mono', monospace !important;
+    color: #FFFFFF !important;
+}
+
+/* 防御 inline style="background:#020617" —— 用属性选择器锁死 */
+body.promare-mode #phase-meta[style*="background"] {
+    background: #1B0B2E !important;
+}
+
 /* 隐藏主菜单的 indigo/amber 球形 blur 装饰 */
 body.promare-mode #phase-meta > div:first-child > div {
     display: none !important;
