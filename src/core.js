@@ -503,22 +503,27 @@ class Game {
                 this.combat_runeCharge_onHit(hitX, hitY, true);
             }
 
-            // [Promare] 击杀时强化反馈：电磁爆炸（叙事：方形→三角碎片，体制突破）
-            // 三层切片堆叠 + 三角碎片群 + 暗紫烟雾环 + 金田白光斑 + 可选色差闪烁。
+            // [Promare T2.A] 击杀瞬间 — 叙事母题：□（秩序）被 △（Burnish）切开 → 碎成 △（自由）
+            // hitstop / flashOverlay / screenShake 由这里设置；视觉时间线全部由 spawnPromareKillExplosion 编排
+            //（5 帧切线 → 10 帧方块切片 → 15 帧 △ 碎片 → 20 帧金田光斑 → boss 末段 +○ 收束）。
+            // 移除原 spawnPromareBurst + spawnRadialImpact —— 它们的圆 / spoke / 三层 ring 会与时间线打架。
             if (CONFIG.visualMode === 'promare') {
-                this.hitstopFrames = Math.max(this.hitstopFrames || 0, 4);
-                this.flashOverlay  = { color: '#FFFFFF', alpha: 0.55, frames: 5 };
-                this.triggerScreenShake(18);
                 const eKill = data.enemy;
+                const isBoss = !!(eKill && eKill.type === 'boss');
+                // hitstop：boss 6 帧、普通 4 帧
+                this.hitstopFrames = Math.max(this.hitstopFrames || 0, isBoss ? 6 : 4);
+                // 白闪：boss 强度更大
+                this.flashOverlay  = { color: '#FFFFFF', alpha: isBoss ? 0.7 : 0.55, frames: isBoss ? 6 : 5 };
+                this.triggerScreenShake(isBoss ? 24 : 18);
                 if (eKill && eKill.pos) {
                     const hv = eKill._lastHitVel || { x: 0, y: -1 };
                     const elemType = (eKill._lastHitElement || data.type || 'damage');
-                    // 常规 burst（方向锥喷碎片）+ radial（8 spoke）
-                    spawnPromareBurst(this, eKill.pos.x, eKill.pos.y, hv, elemType, 'kill');
-                    spawnRadialImpact(this, eKill.pos.x, eKill.pos.y, elemType);
-                    // 击杀爆炸：电磁切片 + 三角碎片群 + 烟雾 + 金田光斑 + 色差
+                    // 击杀时间线（详见 promare_explosion.js + docs/promare_visual_design_v2.md §2.4）
                     spawnPromareKillExplosion(this, eKill.pos.x, eKill.pos.y, elemType, {
-                        w: eKill.width, h: eKill.height
+                        w: eKill.width,
+                        h: eKill.height,
+                        hitVel: hv,
+                        isBoss,
                     });
                     // 拟声词视觉化（Boss 64px 大字 / Elite 44 / 普通 28）
                     spawnPromareOnomatopoeia(this, eKill.pos.x, eKill.pos.y - 8, elemType, eKill.type);
