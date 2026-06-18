@@ -8,7 +8,7 @@
 | :--- | :--- | :--- | :--- |
 | P0 | 弹珠选择 / 命运时刻（`#phase-selection`） | 已完成首轮交互修正 | 后续只补视觉层级与极端状态校验 |
 | P0 | 钉板收集 / 模块编辑（`#phase-gathering` + `#module-editor-layer`） | 已完成首轮交互修正 | 后续补编辑态视觉、融合预览与错误提示一致性 |
-| P0 | 战斗主界面（`#phase-combat`） | 已完成态势条与命中语义反馈 | 后续继续处理技能栏层级 |
+| P0 | 战斗主界面（`#phase-combat`） | 已完成态势条、命中语义反馈与技能栏层级 | 后续检查阶段状态残留 |
 | P0 | 敌人视觉系统 | 已完成首轮足迹/状态/威胁层级与基底外形提示 | 后续继续核对生成节奏 |
 | P1 | 符文发射器（`#phase-rune-launcher`） | 待梳理 | 与钉板符文融合建立明确关系 |
 | P1 | 遗物 / 商店 / 真理之书 | 待梳理 | 统一奖励、购买、图鉴的卡片语法 |
@@ -36,8 +36,8 @@
 
 - [x] 新增战斗态势条：聚合防线危险、敌人/精英/Boss 数量、护盾层数、剩余弹药与下一发弹药。
 - [x] 固定第一轮危险反馈语法：稳定 / 压线 / 危险 / 护盾待触发，避免玩家只从敌人位置猜测失败线风险。
-- [x] 强化发射器与下一发弹药可读性：HUD 与 Canvas 共用“超NB/很强/能打/不太行”、形态、装填格、炮管数和主属性摘要。
-- [ ] 继续梳理首屏视觉层级：战场、敌人、发射器、技能栏、符文充能、伤害数字的优先级。
+- [x] 强化发射器与下一发弹药可读性：HUD 与 Canvas 共用弹药构成、伤害数字、散射弹数、连射次数和主属性摘要；Canvas 用扇形弹丸展示散射、数字徽标展示伤害、能量条展示连射。
+- [x] 继续梳理首屏视觉层级：技能栏改为紧凑工具组，顶部显示当前 SP，技能按钮以两列布局呈现图标、成本、可用状态和禁用原因，减少右侧竖排遮挡。
 - [x] 继续检查弹药与投射物反馈：命中时新增“屏障 / 护盾 / 暴击 / 克制 / 有效 / 弹射 / 穿透”短标签，复用 `COUNTER_MAP` 解释关系但不改变伤害公式。
 - [ ] 检查暂停、失败、回合结束时的状态残留，避免视觉提示跨阶段误留。
 
@@ -78,3 +78,8 @@ python scripts/generate_index.py . --file src/ui_system.js
 - 不做核心大文件全量重写；超过局部修改范围时先拆模块或补小型辅助函数。
 - 交互优化必须同步更新对应索引入口，避免 TODO 散落在聊天记录里。
 - 本地浏览器如果因安全策略无法打开 `localhost`，不绕过策略；改用静态检查、单元验证或等待用户批准。
+
+## 7. 2026-06-19 Mobile Selection Safety
+
+- [x] Relic cards, marble cards, and pinboard module picker items now use a coarse-pointer two-step flow: first tap previews/highlights details, second tap confirms the selection.
+- [x] Mouse and keyboard desktop behavior remains unchanged.

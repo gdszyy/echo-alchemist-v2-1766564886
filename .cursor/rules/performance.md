@@ -187,7 +187,7 @@ if avgFps > fpsThresholdUp (55):
 | 函数 | 行为 |
 |------|------|
 | `render_perfOverlay()` | 当 `perfQualityLevel !== 'high'` 时，在 Canvas 左上角绘制半透明 FPS 数值和等级标签（均衡/省电） |
-| `render_combat_launcherSignal()` | 绘制下一发弹药可读性信号（强度环、炮管、装填格、形态提示）。`high` 档保留最多 3 条发光强度环与形态光线，`medium` 档保留单环与发射口信号，`low` 档关闭 `shadowBlur` 和额外形态光线，仅保留平面描边/装填格/炮管，确保语义不消失。 |
+| `render_combat_launcherSignal()` | 绘制下一发弹药可读性信号（装填格、散射扇形预览、伤害数字、连射炮管与能量条）。`high/medium` 档允许发射口主弹和连射条轻量发光，`low` 档关闭 `shadowBlur`，保留平面装填格、散射弹点、伤害数字和 xN 连射条，确保语义不消失。 |
 
 ### 5.8 毒素状态视觉（`src/entities/enemy.js` → `Enemy.draw` Layer 3.4）
 

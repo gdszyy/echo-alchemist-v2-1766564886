@@ -50,6 +50,11 @@ export function recipe_countAttributeKinds(r) {
     return n;
 }
 
+function _isCoarsePointerInput() {
+    if (typeof window === 'undefined') return false;
+    return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+}
+
 /**
  * 商店渲染方法集合
  * 通过 bind(this) 组合模式作为实例方法注入到 Game 实例
@@ -74,8 +79,10 @@ export const shop_system = {
         const fateMomentRewardIds = new Set(['chaos_essence', 'pure_essence']);
         // 开局义务选择（run_start）时排除需要现有弹药序列才能生效的遗物
         const isRunStart = options.source === 'run_start';
+        const showAllRelics = options.showAllRelics === true;
         const ammoRequiredRelics = new Set(['mirror_magazine', 'element_injector']);
         let pool = RELIC_DB.filter(r => {
+            if (showAllRelics) return true;
             if (fateMomentRewardIds.has(r.id)) return false;
             if (isRunStart && ammoRequiredRelics.has(r.id)) return false;
             const count = (this.ownedRelics || []).filter(id => id === r.id).length;
@@ -93,11 +100,11 @@ export const shop_system = {
         const hasLayoutRelic = [...ownedSet].some(id => LAYOUT_RELICS.has(id));
         const ownedRowRelic = [...ownedSet].find(id => ROW_RELICS.has(id));
         // 已选布局遗物：仅排除其他布局遗物（不影响行数遗物）
-        if (hasLayoutRelic) {
+        if (!showAllRelics && hasLayoutRelic) {
             pool = pool.filter(r => !LAYOUT_RELICS.has(r.id));
         }
         // 已选行数遗物：仅排除另一种行数遗物（不影响布局遗物）
-        if (ownedRowRelic) {
+        if (!showAllRelics && ownedRowRelic) {
             pool = pool.filter(r => !(ROW_RELICS.has(r.id) && r.id !== ownedRowRelic));
         }
         
@@ -114,7 +121,8 @@ export const shop_system = {
         // 3. 抄取遗物 (加权随机 & 不放回)
         // 早期游戏：提高推荐遗物的权重，确保至少出现一个推荐遗物
         const RECOMMENDED_WEIGHT_BOOST = 3; // 推荐遗物权重倍数
-        for(let i=0; i < choiceNum; i++) {
+        const drawCount = showAllRelics ? pool.length : choiceNum;
+        for(let i=0; i < drawCount; i++) {
             if(pool.length === 0) break;
 
             // A. 计算当前临时池子的总权重
@@ -223,8 +231,17 @@ export const shop_system = {
                     ${stackInfo}
                     ${recommendHtml}
                 `;
-                el.onclick = (e) => { 
-                    e.stopPropagation(); 
+                el.onclick = (e) => {
+                    e.stopPropagation();
+                    if (_isCoarsePointerInput() && el.dataset.touchReady !== 'true') {
+                        container.querySelectorAll('.relic-card[data-touch-ready="true"]').forEach(card => {
+                            card.dataset.touchReady = 'false';
+                        });
+                        el.dataset.touchReady = 'true';
+                        renderRelicPreview(relic, el);
+                        if (window.showToast) showToast('再次點擊以選擇該遺物');
+                        return;
+                    }
                     this.ui_selectRelic(relic);
                 };
                 el.onmouseenter = () => renderRelicPreview(relic, el);
@@ -593,6 +610,12 @@ export const shop_system = {
 
         if (returnState.phase === 'round_start_resolver') {
             if (typeof this.sys_continueRoundStartResolver === 'function') this.sys_continueRoundStartResolver();
+            return;
+        }
+
+        if (returnState.phase === 'shop') {
+            if (typeof this.phase_switchPhase === 'function') this.phase_switchPhase('shop');
+            if (typeof this.ui_renderShop === 'function') this.ui_renderShop();
             return;
         }
 

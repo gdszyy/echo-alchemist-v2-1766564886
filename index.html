@@ -784,6 +784,140 @@
                 display: none;
             }
         }
+        #skill-bar.skill-bar-panel {
+            display: none;
+            flex-direction: column;
+            width: 132px;
+            padding: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.26);
+            border-radius: 10px;
+            background: rgba(2, 6, 23, 0.72);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+            backdrop-filter: blur(10px);
+        }
+        .skill-bar-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 7px;
+            color: #cbd5e1;
+            font-size: 10px;
+            line-height: 1;
+            letter-spacing: 0;
+        }
+        .skill-bar-title {
+            color: #e2e8f0;
+            font-weight: 800;
+        }
+        .skill-sp-readout {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 6px;
+            border: 1px solid rgba(16, 185, 129, 0.42);
+            border-radius: 999px;
+            background: rgba(6, 78, 59, 0.32);
+            color: #bbf7d0;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+        }
+        .skill-button-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 7px;
+        }
+        .skill-button {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 54px;
+            height: 48px;
+            border: 1.5px solid rgba(148, 163, 184, 0.36);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.92);
+            color: #f8fafc;
+            transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, opacity 0.16s ease;
+            overflow: hidden;
+        }
+        .skill-button:not(:disabled):hover {
+            transform: translateY(-1px);
+        }
+        .skill-button:not(:disabled):active {
+            transform: translateY(1px) scale(0.98);
+        }
+        .skill-button:disabled {
+            opacity: 0.48;
+            cursor: not-allowed;
+            filter: grayscale(0.85);
+        }
+        .skill-button-icon {
+            font-size: 21px;
+            line-height: 1;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.65));
+        }
+        .skill-cost-badge {
+            position: absolute;
+            right: 4px;
+            bottom: 4px;
+            min-width: 18px;
+            height: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            border-radius: 999px;
+            background: rgba(2, 6, 23, 0.86);
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
+        }
+        .skill-ready-mark {
+            position: absolute;
+            left: 5px;
+            top: 5px;
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: #22c55e;
+            box-shadow: 0 0 7px rgba(34, 197, 94, 0.75);
+        }
+        .skill-button:disabled .skill-ready-mark {
+            background: #64748b;
+            box-shadow: none;
+        }
+        .skill-disabled-reason {
+            position: absolute;
+            left: 4px;
+            right: 4px;
+            bottom: 3px;
+            display: none;
+            color: #cbd5e1;
+            font-size: 9px;
+            font-weight: 800;
+            line-height: 1;
+            text-align: center;
+        }
+        .skill-button:disabled .skill-disabled-reason {
+            display: block;
+        }
+        .skill-button:disabled .skill-cost-badge {
+            opacity: 0;
+        }
+        @media (max-width: 420px) {
+            #skill-bar.skill-bar-panel {
+                right: 8px !important;
+                bottom: 76px !important;
+                width: 118px;
+                padding: 7px;
+            }
+            .skill-button {
+                width: 48px;
+                height: 44px;
+            }
+        }
         /* 加速按钮（保持常驻） */
         #speed-btn {
             width: 28px; height: 28px;
@@ -1266,6 +1400,10 @@
         }
         #phase-selection .select-card.selected {
             transform: translateY(-3px) scale(1.03);
+        }
+        #phase-selection .select-card[data-touch-ready="true"]:not(.selected) {
+            border-color: #fbbf24;
+            box-shadow: 0 0 14px rgba(251, 191, 36, 0.24), 0 6px 18px rgba(0,0,0,0.35);
         }
         #phase-selection .select-icon-wrap {
             width: 38px;
@@ -1828,9 +1966,6 @@
             min-width: 124px;
             max-width: 150px;
         }
-        .recipe-card.ammo-tier-s.current {
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 0 18px color-mix(in srgb, var(--ammo-accent, #fbbf24) 42%, transparent);
-        }
         .ammo-readout-header {
             gap: 6px;
             min-width: 0;
@@ -1841,10 +1976,11 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        .ammo-rating {
+        .ammo-damage {
             flex: 0 0 auto;
-            color: #020617;
-            background: var(--ammo-accent, #fbbf24);
+            color: #e9d5ff;
+            background: rgba(88, 28, 135, 0.42);
+            border: 1px solid rgba(216, 180, 254, 0.28);
             border-radius: 4px;
             padding: 1px 4px;
             font-size: 9px;
@@ -1853,7 +1989,7 @@
         }
         .ammo-signal-row {
             display: grid;
-            grid-template-columns: minmax(42px, 1fr) auto auto;
+            grid-template-columns: minmax(54px, 1fr) auto auto;
             align-items: center;
             gap: 5px;
             margin-bottom: 3px;
@@ -1861,38 +1997,54 @@
             font-size: 9px;
             line-height: 1;
         }
-        .ammo-shape {
-            min-width: 0;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            color: #e2e8f0;
-            font-weight: 800;
-        }
-        .ammo-meter,
-        .ammo-barrels {
+        .ammo-load-list {
             display: inline-flex;
             align-items: center;
+            gap: 4px;
+            min-width: 0;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        .ammo-load-list b {
+            display: inline-flex;
+            align-items: center;
+            gap: 1px;
+            font-weight: 900;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+        }
+        .ammo-scatter-fan,
+        .ammo-multicast-meter {
+            display: inline-flex;
+            align-items: end;
             gap: 2px;
         }
-        .ammo-meter i {
+        .ammo-scatter-fan i {
             width: 4px;
+            height: 4px;
+            border-radius: 999px;
+            background: #e2e8f0;
+            box-shadow: 0 0 4px var(--ammo-accent, #fbbf24);
+        }
+        .ammo-scatter-fan i:nth-child(1),
+        .ammo-scatter-fan i:nth-child(7) { transform: translateY(3px); opacity: 0.55; }
+        .ammo-scatter-fan i:nth-child(2),
+        .ammo-scatter-fan i:nth-child(6) { transform: translateY(1px); opacity: 0.72; }
+        .ammo-multicast-meter i {
+            width: 3px;
             height: 12px;
             border-radius: 2px;
             background: rgba(51, 65, 85, 0.9);
             border: 1px solid rgba(148, 163, 184, 0.24);
         }
-        .ammo-meter i.is-lit {
+        .ammo-multicast-meter i.is-lit {
             background: var(--ammo-accent, #fbbf24);
             border-color: rgba(255, 255, 255, 0.55);
             box-shadow: 0 0 5px var(--ammo-accent, #fbbf24);
         }
-        .ammo-barrels i {
-            width: 3px;
-            height: 12px;
-            border-radius: 2px;
-            background: #e2e8f0;
-            box-shadow: 0 0 4px var(--ammo-accent, #fbbf24);
+        .ammo-multicast-meter b {
+            margin-left: 2px;
+            color: #e2e8f0;
+            font-weight: 800;
         }
         .mat-row { display: flex; align-items: center; margin-top: 2px; }
         
@@ -3835,7 +3987,7 @@
 
     <!-- Phase 3: Combat -->
     <div id="phase-combat" class="ui-overlay" style="display: none;">
-        <div id="skill-bar" class="absolute bottom-24 right-4 flex flex-col gap-3 pointer-events-auto z-50">
+        <div id="skill-bar" class="skill-bar-panel absolute bottom-24 right-4 pointer-events-auto z-50">
         </div>
         <div id="recipe-hud-container" class="absolute z-40 pointer-events-none"></div>
         <div id="combat-status-panel" class="combat-status-panel is-hidden" aria-live="polite">

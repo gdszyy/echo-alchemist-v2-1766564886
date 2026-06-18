@@ -469,9 +469,9 @@ export const hud_system = {
                     const isCurrent = (idx === 0);
                     const profile = getAmmoReadabilityProfile(recipe);
                     const card = document.createElement('div');
-                    card.className = `recipe-card ${isCurrent ? 'current' : 'queue'} ammo-readout ammo-tier-${profile.tier} mb-1 transition-all duration-300`;
+                    card.className = `recipe-card ${isCurrent ? 'current' : 'queue'} ammo-readout mb-1 transition-all duration-300`;
                     card.style.setProperty('--ammo-accent', profile.primary.color);
-                    card.title = `${profile.summary} · ${profile.attributeSummary}`;
+                    card.title = profile.summary;
                     
                     // --- 渲染 Header ---
                     const header = document.createElement('div');
@@ -480,17 +480,14 @@ export const hud_system = {
                     if (recipe.explosive) nameStr = '爆破魔藥';
                     else if (recipe.isLaser) nameStr = '光束魔藥';
                     else if (recipe.isMatryoshka) nameStr = '套娃魔藥';
-                    header.innerHTML = `
-                        <span class="font-bold text-amber-400 text-[11px]">${nameStr}</span>
-                        <span class="ammo-rating">${profile.tierLabel}</span>
-                    `;
+                    header.innerHTML = `<span class="font-bold text-amber-400 text-[11px]">${nameStr}</span><span class="ammo-damage" title="damage">${recipe.damage || 0}</span>`;
 
                     const signalRow = document.createElement('div');
                     signalRow.className = 'ammo-signal-row';
                     signalRow.innerHTML = `
-                        <span class="ammo-shape">${profile.shapeLabel}</span>
-                        <span class="ammo-meter" title="装填强度">${Array.from({ length: 6 }, (_, i) => `<i class="${i < profile.loadCount ? 'is-lit' : ''}"></i>`).join('')}</span>
-                        <span class="ammo-barrels" title="炮管数量">${Array.from({ length: profile.barrelCount }, () => '<i></i>').join('')}</span>
+                        <span class="ammo-load-list">${profile.entries.length > 0 ? profile.entries.slice(0, 5).map(entry => `<b style="color:${entry.color}">${entry.icon}${entry.value}</b>`).join('') : `<b>${profile.damage}</b>`}</span>
+                        <span class="ammo-scatter-fan" title="scatter">${Array.from({ length: profile.scatterPelletCount }, () => '<i></i>').join('')}</span>
+                        <span class="ammo-multicast-meter" title="multicast">${Array.from({ length: 6 }, (_, i) => `<i class="${i < profile.multicastCount ? 'is-lit' : ''}"></i>`).join('')}<b>x${profile.multicastCount}</b></span>
                     `;
                     
                     // --- 渲染 Grid ---
@@ -729,7 +726,9 @@ export const hud_system = {
             this.ui_renderAmmoIcon(currentContainer, currentRecipe, true);
             
             // 更新底部属性文本
-            let html = `<span class="text-amber-300 font-bold">${currentProfile.tierLabel}</span><span class="text-slate-400">${currentProfile.shapeLabel}</span><span style="color:${currentProfile.primary.color}">${currentProfile.attributeSummary}</span><span class="text-cyan-200">装${currentProfile.loadCount}</span><span class="text-orange-200">管${currentProfile.barrelCount}</span>`;
+            let html = `<span style="color:${currentProfile.primary.color}" class="font-bold">${currentProfile.attributeSummary}</span>`;
+            if (currentProfile.scatter > 0) html += `<span class="text-amber-200">散${currentProfile.scatterPelletCount}</span>`;
+            if (currentProfile.multicast > 0) html += `<span class="text-cyan-200">x${currentProfile.multicastCount}</span>`;
             if (currentRecipe.damage > 2) html += `<span class="text-purple-300">⚔️${currentRecipe.damage}</span>`;
             else html += `<span class="text-slate-400">⚔️${currentRecipe.damage}</span>`;
 
@@ -779,7 +778,7 @@ export const hud_system = {
             div.style.backgroundRepeat = 'no-repeat';
             div.style.backgroundPosition = 'center';
             div.style.position = 'relative';
-            div.style.filter = `${div.style.filter || ''} drop-shadow(0 0 ${Math.round(2 + profile.powerRatio * 5)}px ${profile.primary.color})`.trim();
+            div.style.filter = `${div.style.filter || ''} drop-shadow(0 0 ${Math.round(2 + profile.signalRatio * 5)}px ${profile.primary.color})`.trim();
             // 激光特效：保留发光 filter
             if (recipe.isLaser) {
                 const glowSize = 10 + (recipe.laser || 0) * 2;
@@ -818,7 +817,7 @@ export const hud_system = {
         // multicast 角标（位图/fallback 均保留）
         if (recipe.multicast) {
             const badge = document.createElement('div');
-            badge.innerText = `管${profile.barrelCount}`;
+            badge.innerText = `x${profile.multicastCount}`;
             badge.className = 'absolute -top-2 -right-2 text-[10px] bg-orange-500 text-white rounded-full px-1 font-bold leading-tight';
             container.appendChild(badge);
         }

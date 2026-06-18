@@ -643,27 +643,47 @@ class UIManager {
     updateSkillBar(currentSP, activeSkills) {
         const container = document.getElementById('skill-bar');
         if (!container) return;
+        currentSP = Math.max(0, Number(currentSP) || 0);
         container.innerHTML = '';
         // 仅渲染已解锁的技能，而非遍历全部 SKILL_DB
         const skillsToRender = activeSkills || [];
+        if (skillsToRender.length === 0) return;
+
+        const head = document.createElement('div');
+        head.className = 'skill-bar-head';
+        head.innerHTML = `
+            <span class="skill-bar-title">技能</span>
+            <span class="skill-sp-readout">SP ${currentSP}</span>
+        `;
+        container.appendChild(head);
+
+        const grid = document.createElement('div');
+        grid.className = 'skill-button-grid';
         skillsToRender.forEach(skill => {
-            const btn = document.createElement('div');
-            const isDisabled = currentSP < skill.cost;
-            btn.className = `
-                w-12 h-12 rounded-full border-2 flex items-center justify-center 
-                text-xl shadow-lg transition-all duration-200 relative group
-                ${isDisabled ? 'border-slate-600 bg-slate-800 opacity-50 cursor-not-allowed grayscale' : 'cursor-pointer hover:scale-110 active:scale-95'}
-            `;
+            const cost = Math.max(0, Number(skill.cost) || 0);
+            const btn = document.createElement('button');
+            const isDisabled = currentSP < cost;
+            const disabledReason = isDisabled ? `SP不足` : '';
+            btn.type = 'button';
+            btn.className = 'skill-button';
+            btn.disabled = isDisabled;
+            btn.title = `${skill.name} · ${skill.desc || ''}`;
+            btn.setAttribute(
+                'aria-label',
+                isDisabled
+                    ? `${skill.name}，需要 ${cost} SP，当前 ${currentSP} SP`
+                    : `${skill.name}，消耗 ${cost} SP`
+            );
             if (!isDisabled) {
                 btn.style.borderColor = skill.color;
-                btn.style.background = `radial-gradient(circle, ${adjustColorBrightness(skill.color, 0.5)} 0%, #0f172a 100%)`;
-                btn.style.boxShadow = `0 0 10px ${skill.color}`;
+                btn.style.background = `linear-gradient(145deg, ${adjustColorBrightness(skill.color, 0.4)} 0%, rgba(15, 23, 42, 0.96) 78%)`;
+                btn.style.boxShadow = `0 0 12px ${skill.color}66`;
             }
             btn.innerHTML = `
-                <span>${skill.icon}</span>
-                <div class="absolute -bottom-2 -right-2 bg-black border border-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full text-white font-bold">
-                    ${skill.cost}
-                </div>
+                <span class="skill-ready-mark" aria-hidden="true"></span>
+                <span class="skill-button-icon" aria-hidden="true">${skill.icon}</span>
+                <span class="skill-cost-badge" aria-hidden="true">${cost}</span>
+                <span class="skill-disabled-reason" aria-hidden="true">${disabledReason}</span>
             `;
             if (!isDisabled) {
                 const stopProp = (e) => { e.stopPropagation(); };
@@ -674,8 +694,9 @@ class UIManager {
                     game.combat_activateSkill(skill);
                 };
             }
-            container.appendChild(btn);
+            grid.appendChild(btn);
         });
+        container.appendChild(grid);
     }
 
     updateSkillPoints(current, max = null) {

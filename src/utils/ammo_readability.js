@@ -62,34 +62,6 @@ export function getAmmoReadabilityProfile(recipe) {
     const bounce = Math.max(0, _num(recipe && recipe.bounce));
     const totalStacks = entries.reduce((sum, entry) => sum + entry.value, 0);
     const attributeCount = entries.filter(entry => entry.key !== 'explosive').length;
-    const specialBonus = (recipe && recipe.explosive ? 3 : 0)
-        + (recipe && recipe.isLaser ? 2 : 0)
-        + (recipe && recipe.isMatryoshka ? 2 : 0);
-
-    const powerScore = damage
-        + totalStacks * 1.35
-        + multicast * 2.25
-        + scatter * 0.9
-        + pierce * 0.65
-        + bounce * 0.45
-        + specialBonus;
-
-    let tier = 'c';
-    let tierLabel = '不太行';
-    let tierName = 'C';
-    if (powerScore >= 24) {
-        tier = 's';
-        tierLabel = '超NB';
-        tierName = 'S';
-    } else if (powerScore >= 15) {
-        tier = 'a';
-        tierLabel = '很强';
-        tierName = 'A';
-    } else if (powerScore >= 8) {
-        tier = 'b';
-        tierLabel = '能打';
-        tierName = 'B';
-    }
 
     let shapeLabel = '基础弹';
     if (recipe && recipe.isLaser) shapeLabel = '光束炮';
@@ -108,27 +80,34 @@ export function getAmmoReadabilityProfile(recipe) {
         color: _displayFor('damage').color || '#a855f7',
     };
 
-    const barrelCount = _clamp(1 + multicast + Math.floor(scatter / 3), 1, 6);
+    const multicastCount = _clamp(1 + multicast, 1, 6);
+    const scatterPelletCount = _clamp(1 + scatter, 1, 7);
+    const barrelCount = multicastCount;
     const loadCount = _clamp(Math.ceil((totalStacks + Math.max(0, damage - 2)) / 4), 1, 6);
-    const powerRatio = _clamp(powerScore / 28, 0.08, 1);
+    const signalRatio = _clamp((totalStacks + Math.max(0, damage - 2)) / 24, 0.08, 1);
     const attributeSummary = entries.slice(0, 4).map(entry => `${entry.icon}${entry.value}`).join(' ');
+    const directSummary = [
+        attributeSummary || `⚔${damage}`,
+        scatter > 0 ? `散${scatterPelletCount}` : '',
+        multicast > 0 ? `x${multicastCount}` : '',
+    ].filter(Boolean).join(' ');
 
     return {
         entries,
         damage,
         totalStacks,
         attributeCount,
-        powerScore,
-        powerRatio,
-        tier,
-        tierLabel,
-        tierName,
+        signalRatio,
         shapeLabel,
         primary,
         barrelCount,
         loadCount,
         multicast,
-        summary: `${tierLabel} · ${shapeLabel} · 装填${loadCount} · ${barrelCount}管`,
-        attributeSummary: attributeSummary || `DMG ${damage}`,
+        multicastCount,
+        scatter,
+        scatterPelletCount,
+        summary: `${shapeLabel} · ${directSummary}`,
+        attributeSummary: attributeSummary || `⚔${damage}`,
+        directSummary,
     };
 }

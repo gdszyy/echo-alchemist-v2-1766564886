@@ -14,6 +14,11 @@ import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
 import { interpolateAffixWeights, weightedRandom, getEliteDualAffixChance } from './utils/math_utils.js';
 
+function _isCoarsePointerInput() {
+    if (typeof window === 'undefined') return false;
+    return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+}
+
 /**
  * [导演系统] 方阵突击（Phalanx）阵型模板
  * 教学目标：引导玩家学会穿透前排 shield 高血量敌人，优先击杀后排 healer 治愈者。
@@ -1020,8 +1025,17 @@ export const spawn_system = {
 
             // 点击：切换选中 + 锁定预览
             card.onclick = () => {
-                this.sys_toggleMarbleSelection(i, card);
                 this.spawn_showMarblePreview(m, tbEntry, supplementDesc);
+                if (_isCoarsePointerInput() && !card.classList.contains('selected') && card.dataset.touchReady !== 'true') {
+                    container.querySelectorAll('.select-card[data-touch-ready="true"]').forEach(el => {
+                        el.dataset.touchReady = 'false';
+                    });
+                    card.dataset.touchReady = 'true';
+                    if (window.showToast) showToast('再次點擊以選擇該彈珠');
+                    return;
+                }
+                this.sys_toggleMarbleSelection(i, card);
+                card.dataset.touchReady = 'false';
             };
 
             // hover：预览（不锁定）

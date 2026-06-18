@@ -180,13 +180,25 @@ const META_SHOP_CONFIG = {
             maxLevel: 3,
             cost: { resourceId: 'rune_lightning', base: 3, growth: 2.0, type: 'exponential' },
             effect: { path: 'gameplay.initTriggerThreshold', valuePerLevel: -1, type: 'add' }
+        },
+        {
+            id: 'debug_pick_any_relic',
+            category: 'debug',
+            name: '测试遗物任选',
+            desc: '测试用：立即打开全遗物列表，可从所有遗物中任选一个获得。',
+            icon: '🧪',
+            maxLevel: 999,
+            cost: { resourceId: 'rune_fragments', values: [0], type: 'fixed' },
+            effect: { type: 'debug_pick_any_relic' },
+            debugOnly: true
         }
     ],
     categories: {
         attribute: { name: '属性炼金', icon: '🧪' },
         defense: { name: '陣地防御', icon: '🏰' },
         resource: { name: '资源调度', icon: '📦' },
-        temporary: { name: '临时增强', icon: '⏳' }
+        temporary: { name: '临时增强', icon: '⏳' },
+        debug: { name: '测试工具', icon: '🧰' }
     }
 };
 

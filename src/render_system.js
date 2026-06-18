@@ -615,47 +615,27 @@ export const render_system = {
     },
 
     /**
-     * [RENDER] 绘制发射器的下一发可读性信号：强度环、炮管、装填格和弹体形态线索。
-     * @perf-impact: 发射器下一发信号 - 每帧最多 3 条描边环、6 个装填格与 6 根炮管；low 档关闭 shadowBlur 与额外形态光线。
+     * [RENDER] 绘制发射器的下一发可读性信号：装填格、散射扇形预览和连射能量条。
+     * @perf-impact: 发射器下一发信号 - 每帧最多 7 个散射预览弹、6 个装填格、6 段连射能量条；low 档关闭 shadowBlur。
      */
     render_combat_launcherSignal(ctx, cx, cy, portX, portY, recipe) {
         if (!recipe) return;
         const profile = getAmmoReadabilityProfile(recipe);
         const quality = this.perfQualityLevel || 'high';
-        const highFx = quality === 'high';
         const glowFx = quality !== 'low';
         const time = Date.now();
         const pulse = (Math.sin(time / 220) + 1) / 2;
         const accent = profile.primary.color || '#fbbf24';
-        const ringCount = highFx ? Math.min(3, 1 + Math.ceil(profile.powerRatio * 2)) : 1;
         const relPortX = portX - cx;
         const relPortY = portY - cy;
 
         ctx.save();
         ctx.translate(cx, cy);
 
-        // 强度环：越强越亮、环越多。low 档保留平面描边，不做发光。
-        ctx.lineCap = 'round';
-        for (let i = 0; i < ringCount; i++) {
-            const r = 31 + i * 7 + (highFx ? pulse * (1.2 + i) : 0);
-            ctx.beginPath();
-            ctx.arc(0, 0, r, -Math.PI * 0.78, -Math.PI * 0.22);
-            ctx.strokeStyle = accent;
-            ctx.globalAlpha = (0.24 + profile.powerRatio * 0.44) * (1 - i * 0.18);
-            ctx.lineWidth = 2 + profile.powerRatio * 2.5 - i * 0.35;
-            if (glowFx) {
-                ctx.shadowColor = accent;
-                ctx.shadowBlur = _sb(5 + profile.powerRatio * 12);
-            }
-            ctx.stroke();
-        }
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1;
-
-        // 炮管数量：连射/散射越多，发射口上方出现越多短炮管。
+        // 连射炮管：数量只表达 multicast，不混入散射判断。
         const barrelGap = profile.barrelCount >= 5 ? 5 : 6;
         const barrelStart = -((profile.barrelCount - 1) * barrelGap) / 2;
-        const barrelLen = 14 + profile.powerRatio * 12;
+        const barrelLen = 16 + profile.signalRatio * 8;
         for (let i = 0; i < profile.barrelCount; i++) {
             const off = barrelStart + i * barrelGap;
             const isCenter = Math.abs(off) < 0.5;
@@ -667,7 +647,7 @@ export const render_system = {
             ctx.globalAlpha = isCenter ? 0.95 : 0.72;
             if (glowFx && isCenter) {
                 ctx.shadowColor = accent;
-                ctx.shadowBlur = _sb(5 + profile.powerRatio * 8);
+                ctx.shadowBlur = _sb(5 + profile.signalRatio * 8);
             }
             ctx.beginPath();
             ctx.roundRect(-2.2, -barrelLen, 4.4, barrelLen + 6, 2);
@@ -678,7 +658,7 @@ export const render_system = {
             ctx.restore();
         }
 
-        // 装填格：表示本发属性/强度被压进了多少格弹仓。
+        // 装填格：直接用属性颜色显示“装了什么”。
         const loadY = 36;
         const loadGap = 7;
         const loadStart = -(6 - 1) * loadGap / 2;
@@ -696,60 +676,84 @@ export const render_system = {
             ctx.stroke();
         }
 
-        // 形态提示：不改变 Projectile 本体，只在发射口旁加线索。
-        if (glowFx) {
-            ctx.save();
-            ctx.translate(relPortX, relPortY);
-            ctx.strokeStyle = accent;
-            ctx.fillStyle = accent;
-            ctx.globalAlpha = 0.52 + profile.powerRatio * 0.28;
-            ctx.lineWidth = 1.4 + profile.powerRatio;
-            ctx.shadowColor = accent;
-            ctx.shadowBlur = _sb(5 + profile.powerRatio * 7);
-            if (profile.shapeLabel === '散射扇') {
-                for (let i = -2; i <= 2; i++) {
-                    ctx.beginPath();
-                    ctx.moveTo(0, -8);
-                    ctx.lineTo(i * 8, -28 - Math.abs(i) * 2);
-                    ctx.stroke();
-                }
-            } else if (profile.shapeLabel === '光束炮' || profile.shapeLabel === '穿甲锥') {
-                ctx.beginPath();
-                ctx.moveTo(0, -10);
-                ctx.lineTo(0, -38);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(0, -42);
-                ctx.lineTo(-5, -32);
-                ctx.lineTo(5, -32);
-                ctx.closePath();
-                ctx.fill();
-            } else if (profile.shapeLabel === '爆破弹') {
-                for (let i = 0; i < 4; i++) {
-                    const a = -Math.PI / 2 + i * Math.PI / 2;
-                    ctx.beginPath();
-                    ctx.moveTo(Math.cos(a) * 13, Math.sin(a) * 13);
-                    ctx.lineTo(Math.cos(a) * 23, Math.sin(a) * 23);
-                    ctx.stroke();
-                }
+        // 散射扇面：用预览弹丸数量和角度直接展示 scatter。
+        const pelletCount = profile.scatterPelletCount;
+        const fanSpan = profile.scatter > 0 ? Math.min(Math.PI * 0.72, Math.PI * (0.16 + profile.scatter * 0.08)) : 0;
+        const fanRadius = 34 + Math.min(18, profile.scatter * 3);
+        let mainPelletX = relPortX;
+        let mainPelletY = relPortY - fanRadius;
+        for (let i = 0; i < pelletCount; i++) {
+            const t = pelletCount === 1 ? 0.5 : i / (pelletCount - 1);
+            const a = -Math.PI / 2 - fanSpan / 2 + fanSpan * t;
+            const bx = relPortX + Math.cos(a) * fanRadius;
+            const by = relPortY + Math.sin(a) * fanRadius;
+            const isMain = Math.abs(t - 0.5) < 0.01 || pelletCount === 1;
+            if (isMain) {
+                mainPelletX = bx;
+                mainPelletY = by;
             }
+            ctx.save();
+            ctx.globalAlpha = isMain ? 0.9 : 0.56;
+            ctx.fillStyle = isMain ? accent : 'rgba(226, 232, 240, 0.78)';
+            ctx.strokeStyle = accent;
+            if (glowFx && isMain) {
+                ctx.shadowColor = accent;
+                ctx.shadowBlur = _sb(5 + profile.signalRatio * 7);
+            }
+            ctx.beginPath();
+            ctx.arc(bx, by, isMain ? 4.2 : 3.1, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.lineWidth = 1;
+            ctx.stroke();
             ctx.restore();
         }
 
-        // 小型评级牌：放在发射器旁，避免和弹体重叠。
-        ctx.globalAlpha = 0.92;
-        ctx.fillStyle = 'rgba(2, 6, 23, 0.74)';
+        // @perf-impact: Launcher damage number - one extra compact text badge per frame, tied to the existing launcher signal budget.
+        // Damage number: keep the launcher preview numeric and avoid subjective rating text.
+        ctx.save();
+        const damageText = String(profile.damage);
+        const badgeW = Math.max(16, 8 + damageText.length * 6);
+        const badgeX = mainPelletX - badgeW / 2;
+        const badgeY = mainPelletY - 21;
+        ctx.globalAlpha = 0.94;
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.78)';
         ctx.strokeStyle = accent;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.roundRect(23, -47, 24, 17, 5);
+        ctx.roundRect(badgeX, badgeY, badgeW, 14, 5);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = accent;
+        ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 10px Cinzel';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(profile.tierName, 35, -38);
+        ctx.fillText(damageText, mainPelletX, badgeY + 7);
+        ctx.restore();
+
+        // 连射能量条：每段代表一次发射，xN 只用数字标识，避免长文字。
+        if (profile.multicastCount > 1) {
+            ctx.save();
+            const barX = 27;
+            const barY = -30;
+            const segW = 5;
+            const segH = 17;
+            ctx.globalAlpha = 0.92;
+            for (let i = 0; i < 6; i++) {
+                const lit = i < profile.multicastCount;
+                ctx.beginPath();
+                ctx.roundRect(barX + i * (segW + 2), barY, segW, segH, 2);
+                ctx.fillStyle = lit ? accent : 'rgba(30, 41, 59, 0.72)';
+                ctx.fill();
+                ctx.strokeStyle = lit ? 'rgba(255,255,255,0.62)' : 'rgba(100,116,139,0.38)';
+                ctx.stroke();
+            }
+            ctx.fillStyle = accent;
+            ctx.font = 'bold 9px Cinzel';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`x${profile.multicastCount}`, barX, barY - 6);
+            ctx.restore();
+        }
 
         ctx.restore();
     },

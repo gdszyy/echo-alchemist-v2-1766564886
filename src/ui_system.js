@@ -1,6 +1,6 @@
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
-import { CONFIG, RELIC_DB } from './config.js';
+import { CONFIG, META_SHOP_CONFIG, RELIC_DB, setDeepValue } from './config.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
 import { getAmmoReadabilityProfile } from './utils/ammo_readability.js';
 import {
@@ -19,6 +19,11 @@ import {
 } from './pinboard_modules.js';
 import { fuseRuneIntoBoard, getRuneId } from './rune_system.js';
 import { showToast } from './utils/math_utils.js';
+
+function _isCoarsePointerInput() {
+    if (typeof window === 'undefined') return false;
+    return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+}
 
 // ======================================================================
 // 钉板模块编辑器样式表
@@ -154,6 +159,7 @@ const ME_STYLES = `
 .me-picker-item:hover { border-color: rgba(103,232,249,0.5); background: rgba(30,41,59,0.75); }
 .me-picker-item:active { transform: scale(0.97); }
 .me-picker-item.is-current { border-color: #14b8a6; background: rgba(20,184,166,0.18); }
+.me-picker-item.is-previewing { border-color: #fbbf24; background: rgba(251,191,36,0.14); }
 .me-picker-item.is-disabled {
     opacity: 0.48;
     cursor: not-allowed;
@@ -481,7 +487,7 @@ export const ui_system = {
         const currentAmmo = ammoCount > 0 ? this.ammoQueue[0] : null;
         const ammoProfile = currentAmmo ? getAmmoReadabilityProfile(currentAmmo) : null;
         const ammoLabel = currentAmmo
-            ? `${ammoProfile.tierLabel} ${ammoProfile.shapeLabel} · ${ammoProfile.primary.name}${ammoProfile.primary.value || ''} · 装${ammoProfile.loadCount}/管${ammoProfile.barrelCount}`
+            ? `${ammoProfile.attributeSummary}${ammoProfile.scatter > 0 ? ` · 散${ammoProfile.scatterPelletCount}` : ''}${ammoProfile.multicast > 0 ? ` · x${ammoProfile.multicastCount}` : ''}`
             : '无待发弹药';
 
         let threatClass = '';
@@ -1478,8 +1484,48 @@ export const ui_system = {
     },
 
     meta_buyUpgrade(upgradeId) {
-        if (typeof this.sys_buyUpgrade === 'function') return this.sys_buyUpgrade(upgradeId);
-        return false;
+        const upgrade = META_SHOP_CONFIG.upgrades.find(u => u.id === upgradeId);
+        if (!upgrade) return false;
+
+        if (upgrade.effect && upgrade.effect.type === 'debug_pick_any_relic') {
+            if (typeof this.ui_showRelicSelection === 'function') {
+                this.relicOverlayReturnState = { phase: 'shop' };
+                this.ui_showRelicSelection({
+                    resumeTarget: 'shop',
+                    source: 'debug_pick_any_relic',
+                    showAllRelics: true,
+                });
+                if (typeof showToast === 'function') showToast('测试模式：请选择任意遗物');
+                return true;
+            }
+            return false;
+        }
+
+        const isTemporary = upgrade.temporary || false;
+        const store = isTemporary
+            ? (this.saveData.temporaryUpgrades ||= {})
+            : (this.saveData.upgrades ||= {});
+        const level = store[upgrade.id] || 0;
+        if (level >= upgrade.maxLevel) {
+            if (typeof showToast === 'function') showToast('已达到最高等级');
+            return false;
+        }
+
+        const cost = this.meta_calculateUpgradeCost(upgrade, level);
+        const resourceId = upgrade.cost.resourceId || 'rune_fragments';
+        if (!this.meta_spendResource(resourceId, cost)) {
+            if (typeof showToast === 'function') showToast('资源不足');
+            return false;
+        }
+
+        store[upgrade.id] = level + 1;
+        if (upgrade.effect && upgrade.effect.path) {
+            setDeepValue(CONFIG, upgrade.effect.path, upgrade.effect.valuePerLevel, upgrade.effect.type);
+        }
+        this.sys_saveData();
+        if (typeof this.ui_renderShop === 'function') this.ui_renderShop();
+        if (typeof showToast === 'function') showToast(`已购买：${upgrade.name}`);
+        return true;
     },
 
     ui_onPhaseChange(newPhase) {
@@ -1889,6 +1935,16 @@ export const ui_system = {
         backdrop.querySelectorAll('[data-pick-module]').forEach(btn => {
             btn.addEventListener('click', () => {
                 if (btn.disabled) return;
+                if (_isCoarsePointerInput() && btn.dataset.touchReady !== 'true') {
+                    backdrop.querySelectorAll('[data-pick-module].is-previewing').forEach(el => {
+                        el.classList.remove('is-previewing');
+                        el.dataset.touchReady = 'false';
+                    });
+                    btn.classList.add('is-previewing');
+                    btn.dataset.touchReady = 'true';
+                    showToast('再次點擊以套用該釘盤模組');
+                    return;
+                }
                 this._moduleEditor_applyModule(slotIdx, btn.dataset.pickModule);
             });
         });

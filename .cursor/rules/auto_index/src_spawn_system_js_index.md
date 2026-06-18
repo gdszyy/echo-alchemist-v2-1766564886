@@ -1,9 +1,9 @@
 # src\spawn_system.js 函数索引
 
-> 自动生成于 2026-06-18 | 总行数: 2658 | 函数数: 34 | 语言: javascript
+> 自动生成于 2026-06-19 | 总行数: 2672 | 函数数: 35 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -11,6 +11,7 @@
 
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
+| _isCoarsePointerInput | function | `_isCoarsePointerInput()` |  |
 | spawn_windSkillParticles | method | `spawn_windSkillParticles(type, rect, progress)` |  |
 | spawn_createFloatingText | method | `spawn_createFloatingText(x, y, text, color, fontSize)` |  |
 | spawn_generateAffixes | method | `spawn_generateAffixes()` |  |
@@ -25,7 +26,7 @@
 | spawn_stormCore | method | `spawn_stormCore(x, y, radius, bulletDamage, bulletConfig)` |  |
 | spawn_addScore | method | `spawn_addScore(amount, enemy)` |  |
 | spawn_dropRuneFragments | method | `spawn_dropRuneFragments(x, y, count, tier)` |  |
-| spawn_generateMarbleOptions | method | `spawn_generateMarbleOptions()` |  |
+| spawn_generateMarbleOptions | method | `spawn_generateMarbleOptions()` | ⚠️ 巨型函数，见 @section 导航 |
 | spawn_showMarblePreview | method | `spawn_showMarblePreview(m, tbEntry, supplementDesc)` |  |
 | spawn_createParticle | method | `spawn_createParticle(x, y, color, mode = 'normal')` |  |
 | spawn_pushParticleWithLimit | method | `spawn_pushParticleWithLimit(p)` |  |
@@ -47,6 +48,10 @@
 | spawn_triggerBossEntranceShockwave | method | `spawn_triggerBossEntranceShockwave(boss)` |  |
 
 ## 巨型函数内部节点 (@section 标记)
+
+### spawn_generateMarbleOptions
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
 
 ### spawn_spawnBullet
 
