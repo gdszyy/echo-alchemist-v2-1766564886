@@ -1169,6 +1169,11 @@ const CONFIG = {
         // 升级保护时间（秒）：连续高帧多久才真正升级，防止频繁抖动
         upgradeHoldSec: 10,
 
+        // [省电] 静态阶段（非战斗/试炼/研磨的菜单阶段及暂停态）渲染节流间隔（毫秒）。
+        // 这些阶段画面基本静止，无需满帧重绘；约 66ms ≈ 15fps，大幅降低移动端 GPU 占用与发热。
+        // 活跃阶段（combat/training/gathering）不受此限制，始终满帧 rAF。
+        idleFrameInterval: 66,
+
         // --- 各等级粒子预算 ---
         // HIGH：全效果，适合高端手机 / 桌面
         high: {
@@ -1187,11 +1192,15 @@ const CONFIG = {
             shockwaveLimit:   20,
             waveLimit:        10,
             lightningLimit:   15,
+            deathExplosionLimit: 14,  // 死亡爆炸特效上限（精英/普通；Boss 不受限）
+            iceWaveLimit:        10,  // 冰冻死亡冰波环上限
             // Peg 软阴影与底部光晕开关（true = 开启）
             pegSoftShadow:    true,
             pegGlowHalo:      true,
             // 敌人材质光泽渐变开关
             enemyGloss:       true,
+            // 弹珠环境光晕（LAYER 0 大面积 ambient 径向填充）开关
+            ballAmbientGlow:  true,
             // Arc Boss VFX 特效密度控制（high: 完整效果）
             arcBossVfxTriCount:  6,   // Ouroboros 狂暴共鸣三角形数量（0=关闭）
             arcBossVfxLineCount: 6,   // Devourer 旋转引力线数量
@@ -1222,9 +1231,12 @@ const CONFIG = {
             shockwaveLimit:   12,
             waveLimit:         6,
             lightningLimit:    8,
+            deathExplosionLimit: 8,
+            iceWaveLimit:        6,
             pegSoftShadow:    true,
             pegGlowHalo:      false,  // 关闭 Peg 底部光晕（每帧径向渐变）
             enemyGloss:       true,
+            ballAmbientGlow:  true,   // 弹珠环境光晕（均衡模式保留）
             // Arc Boss VFX 特效密度控制（medium: 减半）
             arcBossVfxTriCount:  3,   // 三角形减半，降低 shadowBlur 调用次数
             arcBossVfxLineCount: 6,   // 引力线保持，但 shadowBlur 已随脉冲降低
@@ -1254,16 +1266,22 @@ const CONFIG = {
             shockwaveLimit:    6,
             waveLimit:         3,
             lightningLimit:    4,
+            deathExplosionLimit: 4,
+            iceWaveLimit:        3,
             pegSoftShadow:    false,  // 关闭 Peg 软阴影
             pegGlowHalo:      false,
             enemyGloss:       false,  // 关闭敌人材质光泽（省去 OffscreenCanvas 渐变叠加）
+            ballAmbientGlow:  false,  // 关闭弹珠环境光晕（省去每球每帧 r*30 大面积径向填充）
             // Arc Boss VFX 特效密度控制（low: 大幅削减）
             arcBossVfxTriCount:  0,   // 关闭三角形符文（6 次 shadowBlur/帧 → 0）
             arcBossVfxLineCount: 3,   // 引力线减半（6 次 createLinearGradient → 3）
             arcBossVfxWhiteGrad: false, // 关闭 lighter 白化叠加（createRadialGradient）
             arcBossVfxSuckProb:  0.3, // 吸入粒子概率降至 30%
-            // 奖励标记敌人光晕门控（low: 关闭所有光晕和旋转装饰）
-            rewardHaloEnabled: false,  // 关闭光晕（省去 shadowBlur + createRadialGradient）
+            // 奖励标记敌人光晕门控（low: 关闭完整光晕，但保留平面兜底描边）
+            // 注意：rewardHaloEnabled=false 时，enemy.js Layer 6.8 会走 else 平面兜底分支，
+            // 仍以纯色双层描边标出携带遗物/精华的敌人（无 shadowBlur/渐变/旋转），
+            // 保证省电模式下「该敌人有掉落」这一核心玩法可读性不丢失。
+            rewardHaloEnabled: false,  // 关闭完整光晕（省去 shadowBlur + createRadialGradient），降级为平面描边
             rewardRuneCount: 0,        // 关闭旋转符文
             rewardCrystalCount: 0,     // 关闭晶体装饰
             // 回合开始横幅充能特效（low: 降级为简单淡入，无光晕）

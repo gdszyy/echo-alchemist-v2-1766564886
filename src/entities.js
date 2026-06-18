@@ -3045,7 +3045,11 @@ class DropBall {
             const y = this.pos.y;
             const r = this.radius;
             const buffs = this.getBuffState();
-            
+            // @perf-impact: LAYER 0 环境光晕为每球每帧 r*30 半径大面积径向填充，移动端 fill-rate 开销大。
+            // 纯装饰性 ambient，low 档关闭以降温；球体本体（LAYER 2+）仍完整表达属性，可读性不受影响。
+            const _ballAmbientGlow = ((typeof game !== 'undefined' && game.perfQualityLevel)
+                ? CONFIG.performance[game.perfQualityLevel].ballAmbientGlow : true) !== false;
+
             ctx.save();
             ctx.translate(x, y);
 
@@ -3095,13 +3099,15 @@ class DropBall {
                 currentAlpha = baseAlpha + (breath * 0.04);
             }
 
-            const spotR = r * 30; 
-            const spot = ctx.createRadialGradient(0, 0, r, 0, 0, spotR);
-            spot.addColorStop(0, `rgba(${glowColor}, ${currentAlpha})`);
-            spot.addColorStop(1, `rgba(${glowColor}, 0)`);
+            if (_ballAmbientGlow) {
+                const spotR = r * 30;
+                const spot = ctx.createRadialGradient(0, 0, r, 0, 0, spotR);
+                spot.addColorStop(0, `rgba(${glowColor}, ${currentAlpha})`);
+                spot.addColorStop(1, `rgba(${glowColor}, 0)`);
 
-            ctx.fillStyle = spot;
-            ctx.beginPath(); ctx.arc(0, 0, spotR, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = spot;
+                ctx.beginPath(); ctx.arc(0, 0, spotR, 0, Math.PI * 2); ctx.fill();
+            }
 
             // ==========================================
             //  LAYER 1: 🔦 Laser Back Aura (激光背光)

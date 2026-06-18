@@ -357,8 +357,14 @@ class Game {
         this._perfUpTimer = 0;
         // 手动性能模式：null = 自动自适应；'high'|'medium'|'low' = 手动锁定
         this._perfManualMode = null;
+        // [省电] 主循环节流/暂停状态
+        this._lastRenderTime = 0;   // 上一渲染帧时间戳（静态阶段降帧节流用）
+        this._loopStopped = false;  // 循环是否被后台 visibilitychange 硬停
+        this._rafId = null;         // 当前 requestAnimationFrame 句柄（用于 cancel）
         // [Phase 5B] 预加载所有 Sprite Sheet（在游戏循环开始前触发异步加载）
         preloadAllSprites();
+        // [省电] 注册页面可见性监听（后台硬停循环 + 挂起音频）
+        this.sys_setupVisibilityHandling();
         // 启动游戏主循环
         this.sys_loop();
     }

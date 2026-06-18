@@ -180,6 +180,11 @@ class SoundManager {
      */
     resume() { if (this.ctx.state === 'suspended') this.ctx.resume(); }
 
+    /**
+     * 挂起音频上下文（页面切到后台时调用，停止音频处理以省电降温）
+     */
+    suspend() { if (this.ctx && this.ctx.state === 'running') this.ctx.suspend(); }
+
     // ─────────────────────────────────────────────
     //  通用基础音调
     // ─────────────────────────────────────────────

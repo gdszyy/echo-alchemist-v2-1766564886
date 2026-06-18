@@ -91,9 +91,12 @@ if avgFps > fpsThresholdUp (55):
 | `shockwaveLimit` | 20 | 12 | 6 | Shockwave 特效上限 |
 | `waveLimit` | 10 | 6 | 3 | FireWave / HealWave 上限 |
 | `lightningLimit` | 15 | 8 | 4 | LightningBolt 特效上限 |
+| `deathExplosionLimit` | 14 | 8 | 4 | DeathExplosion 上限（精英/普通受限，Boss 不受限）；防清场卡顿 |
+| `iceWaveLimit` | 10 | 6 | 3 | 冰冻死亡 IceWave 冰波环上限；防清场卡顿 |
 | `pegSoftShadow` | `true` | `true` | `false` | Peg 渓圆软阴影开关 |
 | `pegGlowHalo` | `true` | `false` | `false` | Peg 底部径向光晕开关 |
 | `enemyGloss` | `true` | `true` | `false` | 敌人材质光泽渐变开关 |
+| `ballAmbientGlow` | `true` | `true` | `false` | 弹珠 LAYER 0 环境光晕（每球每帧 r*30 大面积径向填充）开关；`low` 关闭降 fill-rate |
 
 **FPS 采样参数**（同在 `CONFIG.performance` 根节点）：
 
@@ -129,12 +132,20 @@ if avgFps > fpsThresholdUp (55):
 | 燃烧死亡爆炸（约第 3183 行） | `waveLimit` | 超限时跳过 FireWave 创建 |
 | 静电场词条（约第 1802 行） | `lightningLimit` | 超限时跳过 LightningBolt 创建 |
 | 毒素命中粒子爆发（约第 1739 行） | `venomLimit`（经 spawn_createParticle 间接读取） | 叠加毒层时在命中点发射 1~4 颗毒液粒子 |
+| 死亡特效 `_triggerDeathFX`（IceWave 创建） | `iceWaveLimit` | 冰冻死亡冰波环超限时跳过创建 |
+| 死亡特效 `_triggerDeathFX`（DeathExplosion 创建） | `deathExplosionLimit` | 精英/普通死亡爆炸超限时跳过；Boss 死亡不受限（稀有且重要） |
 
 ### 5.3 伤害计算（`src/combat/damage_calc.js`）
 
 | 位置 | 读取字段 | 行为 |
 |------|---------|------|
 | 闪电链 setTimeout 回调（约第 205 行） | `lightningLimit` | 超限时跳过 LightningBolt 创建 |
+
+### 5.3.1 弹珠渲染（`src/entities.js` → `Ball.draw` LAYER 0）
+
+| 位置 | 读取字段 | 行为 |
+|------|---------|------|
+| 环境光晕（LAYER 0 ambient spotlight，`spotR = r*30` 径向填充） | `ballAmbientGlow` | `false`（low 档）时跳过整段大面积径向填充。纯装饰性，球体本体（LAYER 2+）仍完整表达属性，可读性不受影响。 |
 
 ### 5.4 实体渲染（`src/entities.js` → `Peg.draw`）
 
@@ -178,6 +189,17 @@ if avgFps > fpsThresholdUp (55):
 | 毒液粒子发射（Layer 3.4 末尾） | `venomLimit`（经 `spawn_createParticle` 间接读取） | `high` 档 8% 概率/帧发射漂浮毒液粒子，`medium` 4%，`low` 0%（venomLimit=0 兜底截止） |
 
 > **注意**：Layer 3.4 在 `ctx.clip()` 之后执行，叠加层自动被裁剪到敌人形体内部，无需额外剪切。粒子发射使用世界坐标（`this.pos.x / this.pos.y`），与局部 ctx 变换无关。
+
+### 5.9 奖励标记光晕（`src/entities/enemy.js` → `Enemy.draw` Layer 6.8）
+
+携带遗物/精华的敌人（`rewardType` ∈ `relic` / `chaos_essence` / `pure_essence`）会绘制奖励标记。这是**玩法可读性关键特效**（告诉玩家「打这个敌人能掉落」），遵循「降级而非消失」原则。
+
+| 位置 | 读取字段 | 行为 |
+|------|---------|------|
+| 完整光晕（`rewardHaloEnabled === true`） | `rewardHaloEnabled` / `rewardRuneCount` / `rewardCrystalCount` | `high`：完整光晕 + 旋转符文(4)/晶体(5) + shadowBlur + 渐变；`medium`：光晕 + 符文(2)/晶体(3) |
+| **平面兜底（`rewardHaloEnabled === false`，即 low 档）** | `rewardHaloEnabled` | 走 `else` 分支，绘制纯色双层描边（遗物=金 / 混沌=紫红 / 纯净=蓝白），**无 shadowBlur / 无 createRadialGradient / 无旋转**，约 2 次 `stroke()`/敌，附带 1 次 `Math.sin` 廉价脉冲。**保证省电模式下标记仍可见。** |
+
+> **重要约定**：奖励标记、敌人状态（中毒/冰冻/燃烧）、Boss 预警/狂暴等**语义类**特效，在 low 档必须**降级为廉价平面版**，严禁像装饰类特效（Peg 光晕、敌人光泽）那样 `enabled:false` 彻底关闭。
 
 ---
 
@@ -229,6 +251,12 @@ if avgFps > fpsThresholdUp (55):
 | 2026-04-16 | 初始实现：FPS 采样器、三档等级预算、粒子/特效/Peg/敌人全面接入、FPS 指示层 |
 | 2026-04-16 | 新增 `sparkLimit`（high:100/medium:50/low:20）和 `smokeLimit`（high:60/medium:25/low:8）两个预算字段；在 `spawn_createParticle` 和 `spawn_pushParticleWithLimit` 中同步接入 spark/smoke 上限检查，防止能量泄漏、机械类受击等高频 spark 场景占用全局粒子预算 |
 | 2026-04-16 | **Arc Boss VFX 性能门控（Task T3 补丁）**：在三档预算表中新增 4 个字段：`arcBossVfxTriCount`（Ouroboros 狂暴三角形数量，high:6/medium:3/low:0）、`arcBossVfxLineCount`（Devourer 引力线数量，high:6/medium:6/low:3）、`arcBossVfxWhiteGrad`（Devourer 深渊核心 lighter 白化叠加开关，high/medium:true/low:false）、`arcBossVfxSuckProb`（Devourer 吸入粒子生成概率，high:0.7/medium:0.5/low:0.3）。在 `enemy.js` Devourer/Ouroboros Layer 6.5 中通过 `game.perfQualityLevel` 动态读取对应字段实施门控。同步更新消费端关联索引（第 5.6 节）。 |
+| 2026-06-18 | **Enemy.draw 静态渐变按实例缓存（P-005 相关）**：`Enemy.draw` 此前每帧每敌创建容器背景渐变（`_bgGrad`）与空槽渐变（`_slotGrad`）两个 LinearGradient，色标静态（仅依赖 `h` / `type`，敌人生命周期内恒定）。改为按实例缓存（`_cachedBgGrad`/`_cachedSlotGrad`，h/type 变化时自动重建），**零视觉变化**，消除每帧每敌 2 个渐变分配（20 敌@60fps ≈ 2400 次/秒），降低 GC 压力与 CPU。HP 条等动态渐变（随血量变化）不缓存。 |
+| 2026-06-18 | **弹珠环境光晕 low 档门控（P-003）**：`Ball.draw` LAYER 0 环境光晕此前无 `perfQualityLevel` 门控，每球每帧执行 `r*30` 半径大面积径向填充（移动端 fill-rate 高开销，且在所有档位包括 low 都运行）。该层渐变色标每帧动态（呼吸/频闪/buff 染色）不可缓存，故采用分级门控：新增 `ballAmbientGlow`(true/true/false) 预算字段，`low` 档跳过整段填充。纯装饰性，球体本体属性表达不受影响。 |
+| 2026-06-18 | **收尾：shadowBlur 门控补全**：补全 `enemy.js` 最后 2 处未走 `_sb()` 的 `shadowBlur`（移动冷却指示器、词缀印记），全 `src/` 现已无未门控 shadowBlur（除 `perf.js` 文档注释）。`low` 档 `shadowBlurEnabled:false` 现可彻底关闭所有 GPU 模糊 pass。审计 P-032（激光高频 console.log）经核查已由 `if (CONFIG.debug)` 包裹，生产环境无 I/O 开销，无需额外处理。 |
+| 2026-06-18 | **抗卡顿：特效预算上限 + 纹理缓存**：(1) 新增 `deathExplosionLimit`(14/8/4) 与 `iceWaveLimit`(10/6/3) 预算字段，在 `combat_system.js` `_triggerDeathFX` 的 IceWave/DeathExplosion 创建处接入上限检查（Boss 死亡爆炸不受限），消除清场/范围秒杀时同屏数十个多渐变特效的帧率断崖（修复 P-009~015）。(2) `enemy.js` `_initTexture` 新增模块级 OffscreenCanvas 纹理缓存（按 类型\|尺寸\|seed桶(16)\|gloss 共享只读静态纹理，FIFO 容量 160），消除批量刷怪时密集同步分配的进场卡顿（修复 P-004）。 |
+| 2026-06-18 | **主循环省电控制**：新增 (1) 静态阶段降帧节流——非 combat/training/gathering 的菜单阶段及暂停态按 `CONFIG.performance.idleFrameInterval`(66ms≈15fps) 节流渲染，活跃阶段仍满帧；FPS 采样器仅在活跃阶段运行，避免菜单降帧误触发降级。(2) `visibilitychange` 后台硬停——页面隐藏时 `cancelAnimationFrame` 中断 rAF 链并 `audio.suspend()` 挂起音频上下文，恢复时重启循环并 `audio.resume()`。涉及 `game_system.js`(sys_loop/sys_setupVisibilityHandling)、`core.js`(状态初始化+注册)、`audio.js`(新增 suspend())、`config.js`(idleFrameInterval)。详见第 10 节。 |
+| 2026-06-18 | **奖励标记低档平面兜底**：修复 `low` 档 `rewardHaloEnabled:false` 导致携带遗物/精华的敌人无任何视觉标记的玩法可读性回归。在 `enemy.js` Layer 6.8 的 `if (rewardHaloEnabled)` 增加 `else` 分支，绘制纯色双层描边平面版（遗物=金/混沌=紫红/纯净=蓝白），无 shadowBlur/渐变/旋转。新增消费端关联索引第 5.9 节并确立「语义类特效降级而非消失」约定。 |
 | 2026-04-30 | **毒素敌人专属特效**：新增 `venomLimit`（high:60/medium:30/low:0）预算字段；新增 `venom` 粒子模式（上浮液滴 + screen 渐变绘制）；在 `enemy.js` Layer 3.4 新增毒素状态视觉（径向渐变叠加 + 液滴流淌动画，三档门控）；在 `combat_system.js` 命中毒素时发射 1~4 颗毒液粒子。消费端关联索引见第 5.1/5.2/5.8 节。 |
 
 ## 9. 性能影响标记规范
@@ -276,3 +304,51 @@ if avgFps > fpsThresholdUp (55):
   - `medium` 档：降级策略说明（如减少粒子数量、关闭某些渐变）
   - `low` 档：极致降级策略说明（如关闭所有发光和混合模式）
 ```
+
+---
+
+## 10. 主循环省电控制（节流与后台暂停）
+
+> **状态**：已实现（2026-06-18）｜**涉及文件**：`src/game_system.js`、`src/core.js`、`src/audio.js`、`src/config.js`
+
+第 4 节的三档质量预算解决的是**卡顿（帧时间尖峰）**；本节解决的是**耗电（持续功耗/发热）**——即使帧率稳定，满帧重绘静止画面仍会持续占用 GPU 发热掉电。
+
+### 10.1 静态阶段降帧节流
+
+`sys_loop` 开头按阶段决定是否满帧：
+
+```
+_activePhase = !isPaused && phase ∈ { combat, training, gathering }
+若 !_activePhase 且 (now - _lastRenderTime) < idleFrameInterval:
+    仅 requestAnimationFrame 续帧，跳过本帧渲染与采样
+```
+
+- **活跃阶段**（战斗/试炼/研磨）：不受限，满帧 rAF，保证手感与动画流畅。
+- **静态阶段**（抉择/商店/图鉴/结算等菜单）及**暂停态**：节流到 `CONFIG.performance.idleFrameInterval`（默认 66ms≈15fps）。
+- **关键**：rAF 链本身仍每帧（~16ms）tick，只是**跳过渲染**；因此阶段切换（如菜单→战斗）在下一物理帧即恢复满帧，无输入延迟。DOM 菜单交互走独立事件，不受 canvas 节流影响。
+- FPS 采样器（升降级判断）**仅在 `_activePhase` 运行**，否则菜单的 15fps 会被误判为卡顿而错误降级特效等级。
+
+### 10.2 后台硬停（visibilitychange）
+
+`sys_setupVisibilityHandling()`（由 `core.js` 构造时注册一次）：
+
+| 事件 | 行为 |
+|------|------|
+| `document.hidden`（切后台/锁屏） | `this._loopStopped = true` + `cancelAnimationFrame(_rafId)` 中断 rAF 链 + `audio.suspend()` 挂起 AudioContext |
+| 恢复可见 | `audio.resume()`；若循环已停则重置采样起点并 `requestAnimationFrame` 重启 |
+
+> 浏览器虽会把隐藏标签页的 rAF 限到 ~1Hz，但音频处理与定时器仍在跑；主动 suspend + 中断 rAF 可彻底归零后台功耗。
+
+### 10.3 相关状态字段（`Game` 实例，`core.js` 初始化）
+
+| 字段 | 含义 |
+|------|------|
+| `_lastRenderTime` | 上一**渲染**帧时间戳（节流判断用，区别于采样用的 `_lastFrameTime`） |
+| `_loopStopped` | 循环是否被后台硬停；`sys_loop` 开头 `if (_loopStopped) return` |
+| `_rafId` | 当前 rAF 句柄，用于 `cancelAnimationFrame` |
+| `_visibilityBound` | 防止重复注册可见性监听 |
+
+### 10.4 修改指南
+
+- **新增动画活跃阶段**时，须将其阶段名加入 `sys_loop` 的 `_activePhase` 判断，否则会被降帧到 15fps。
+- **依赖逐帧计时的菜单逻辑**（如按帧倒计时）在静态阶段会因降帧而变慢（墙钟时间拉长约 4 倍）。此类逻辑应改用 `performance.now()` 墙钟时间差，而非帧计数。

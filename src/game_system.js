@@ -27,8 +27,27 @@ export const game_system = {
      * @description 游戏主循环，由 requestAnimationFrame 驱动。
      */
     sys_loop() {
-        // ==================== [自适应性能] FPS 采样与等级调整 ====================
+        // [省电] 循环被 visibilitychange 后台暂停时，不再继续渲染（rAF 链就此中断）
+        if (this._loopStopped) return;
+
         const _now = performance.now();
+
+        // ==================== [省电] 静态阶段降帧节流 ====================
+        // 战斗/试炼/研磨为动画活跃阶段，满帧运行；其余菜单阶段（抉择/商店/图鉴等）及暂停态
+        // 画面基本静止，按 idleFrameInterval 节流到低帧，显著降低移动端 GPU 占用与发热。
+        const _activePhase = !this.isPaused && (this.phase === 'combat' || this.phase === 'training' || this.phase === 'gathering');
+        if (!_activePhase) {
+            const _idleInterval = CONFIG.performance.idleFrameInterval || 66;
+            if (this._lastRenderTime && (_now - this._lastRenderTime) < _idleInterval) {
+                this._rafId = requestAnimationFrame(() => this.sys_loop());
+                return;
+            }
+        }
+        this._lastRenderTime = _now;
+
+        // ==================== [自适应性能] FPS 采样与等级调整 ====================
+        // 仅在活跃阶段采样，避免菜单降帧被误判为卡顿而错误降级特效等级。
+        if (_activePhase) {
         if (this._lastFrameTime > 0) {
             const _dt = _now - this._lastFrameTime;
             // 只记录合理范围内的帧时间（5ms ~ 200ms），过滤标签页切换等异常
@@ -78,11 +97,14 @@ export const game_system = {
             }
         }
         this._lastFrameTime = _now;
+        } else {
+            this._lastFrameTime = 0;  // 重置，回到活跃阶段时重新起算 dt（避免跨菜单的超大 dt）
+        }
         // ==================== [自适应性能] END ====================
 
         // 暂停时跳过物理更新，但继续请求下一帧以保持 rAF 循环活跃
         if (this.isPaused) {
-            requestAnimationFrame(() => this.sys_loop());
+            this._rafId = requestAnimationFrame(() => this.sys_loop());
             return;
         }
 
@@ -189,7 +211,35 @@ export const game_system = {
 
         // 10. 下一帧请求
         this.ctx.restore();
-        requestAnimationFrame(() => this.sys_loop());
+        this._rafId = requestAnimationFrame(() => this.sys_loop());
+    },
+
+    /**
+     * @method sys_setupVisibilityHandling
+     * @description [省电] 注册页面可见性监听。切到后台/锁屏时硬停主循环并挂起音频上下文，
+     *              回到前台时恢复。浏览器虽会把隐藏标签页的 rAF 限到 ~1Hz，但音频处理仍在进行，
+     *              主动 suspend 可彻底消除后台功耗。仅注册一次。
+     */
+    sys_setupVisibilityHandling() {
+        if (this._visibilityBound) return;
+        this._visibilityBound = true;
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // 切到后台：硬停循环 + 挂起音频
+                this._loopStopped = true;
+                if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
+                try { audio.suspend(); } catch (e) {}
+            } else {
+                // 回到前台：恢复音频，若循环已停则重启
+                try { audio.resume(); } catch (e) {}
+                if (this._loopStopped) {
+                    this._loopStopped = false;
+                    this._lastFrameTime = 0;   // 重置采样起点，避免后台期的超大 dt
+                    this._lastRenderTime = 0;
+                    this._rafId = requestAnimationFrame(() => this.sys_loop());
+                }
+            }
+        });
     },
 
     /**

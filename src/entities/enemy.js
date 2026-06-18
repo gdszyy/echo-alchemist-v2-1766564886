@@ -44,6 +44,14 @@ const audio = new Proxy({}, {
     }
 });
 
+// ==================== 敌人底层纹理缓存 ====================
+// @perf-impact: _initTexture 同步创建 OffscreenCanvas，批量刷怪时密集分配引发进场卡顿。
+// 纹理为静态只读（仅 drawImage 读取，从不修改），故按「类型|尺寸|seed桶|gloss」共享同一画布。
+// seed 量化到 _TEXTURE_SEED_BUCKETS 桶，使同类同尺寸敌人复用纹理（微观叠加层差异不可见）。
+const _enemyTextureCache = new Map();
+const _ENEMY_TEXTURE_CACHE_MAX = 160;
+const _TEXTURE_SEED_BUCKETS = 16;
+
 // ==================== Enemy 类 ====================
 class Enemy {
     constructor(x, y, width, height, hp, maxHp = hp, type = 'normal', affixes = []) {
@@ -213,6 +221,22 @@ class Enemy {
     _initTexture(width, height) {
         const w = width - 4;
         const h = height - 4;
+
+        // [自适应性能] enemyGloss 开关纳入纹理缓存键（构造时 game 可能未就绪，默认开启光泽）
+        const _glossEnabled = (typeof window !== 'undefined' && window.game && window.game.perfQualityLevel)
+            ? CONFIG.performance[window.game.perfQualityLevel].enemyGloss
+            : true;
+
+        // @perf-impact: OffscreenCanvas 纹理缓存 - 按「类型|尺寸|seed桶|gloss」共享只读静态纹理，
+        // 避免批量刷怪时同步密集分配 OffscreenCanvas 造成进场卡顿。seed 量化到固定桶以提升命中率。
+        const _seedBucket = Math.floor(this.visualSeed * _TEXTURE_SEED_BUCKETS);
+        const _texKey = `${this.type}|${w}x${h}|${_seedBucket}|${_glossEnabled ? 1 : 0}`;
+        const _cached = _enemyTextureCache.get(_texKey);
+        if (_cached) {
+            this._textureCanvas = _cached;
+            return;
+        }
+
         // 尝试使用 OffscreenCanvas，不支持时回退到普通 Canvas
         let offscreen;
         try {
@@ -223,7 +247,8 @@ class Enemy {
             offscreen = c;
         }
         const oc = offscreen.getContext('2d');
-        const seed = this.visualSeed;
+        // 使用桶中心 seed 生成，保证同桶敌人纹理完全一致（可缓存共享）
+        const seed = (_seedBucket + 0.5) / _TEXTURE_SEED_BUCKETS;
 
         if (seed < 0.3) {
             // 金属拉丝纹理：垂直线条
@@ -270,12 +295,7 @@ class Enemy {
         }
         // === A1: 材质光泽叠加（Layer 1.5 增强）===
         // 在基础纹理之上叠加顶→底 LinearGradient，模拟 3D 凸起物理厚度感
-        // [自适应性能] enemyGloss 开关：低端模式跳过此段，省去 OffscreenCanvas 渐变叠加
-        // 注意：_initTexture 在构造时调用，此时 game 实例可能尚未初始化，
-        //        所以尝试读取 window.game ，若不存在则默认开启光泽。
-        const _glossEnabled = (typeof window !== 'undefined' && window.game && window.game.perfQualityLevel)
-            ? CONFIG.performance[window.game.perfQualityLevel].enemyGloss
-            : true;
+        // [自适应性能] enemyGloss 开关：低端模式跳过此段（_glossEnabled 已在函数开头计算并纳入缓存键）
         if (_glossEnabled) {
             const glossGrad = oc.createLinearGradient(0, 0, 0, h);
             glossGrad.addColorStop(0, `rgba(255,255,255,${CONFIG.enemyRender.glossTopAlpha})`);
@@ -328,6 +348,12 @@ class Enemy {
         }
 
         this._textureCanvas = offscreen;
+        // 写入缓存（带容量上限，超限时按 FIFO 淘汰最早条目）
+        if (_enemyTextureCache.size >= _ENEMY_TEXTURE_CACHE_MAX) {
+            const _oldest = _enemyTextureCache.keys().next().value;
+            _enemyTextureCache.delete(_oldest);
+        }
+        _enemyTextureCache.set(_texKey, offscreen);
     }
 
     update(timeScale, game) {
@@ -1457,10 +1483,15 @@ class Enemy {
         // [玻璃质感] 容器底色采用顶亮底深的微弱玻璃渐变，模拟环境光自上而下
         // 衰减；总体 alpha 降低，避免大面积纯色显得廉价，让 game-container 的
         // 径向背景充分透出，强化"半透明面板嵌在战场上"的高级质感。
-        const _bgGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
-        _bgGrad.addColorStop(0, 'rgba(30, 41, 59, 0.04)');
-        _bgGrad.addColorStop(1, 'rgba(8, 14, 26, 0.12)');
-        ctx.fillStyle = _bgGrad;
+        // @perf-impact: 容器背景渐变按实例缓存（色标静态，仅依赖 h）- 消除每帧每敌 1 个 LinearGradient 分配
+        if (!this._cachedBgGrad || this._cachedBgGradH !== h) {
+            const _bg = ctx.createLinearGradient(0, -h/2, 0, h/2);
+            _bg.addColorStop(0, 'rgba(30, 41, 59, 0.04)');
+            _bg.addColorStop(1, 'rgba(8, 14, 26, 0.12)');
+            this._cachedBgGrad = _bg;
+            this._cachedBgGradH = h;
+        }
+        ctx.fillStyle = this._cachedBgGrad;
         ctx.fill();
         // [增强对比 #4] 在裁剪之前先给容器外缘绘制一圈柔光描边，
         // 让敌人在与背景同色的「液态」战场上仍能识别轮廓（精英/Boss 尤其关键）。
@@ -1535,10 +1566,16 @@ class Enemy {
             _slotTop = 'rgba(40, 52, 74, 0.04)';
             _slotBottom = 'rgba(12, 18, 30, 0.10)';
         }
-        const _slotGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
-        _slotGrad.addColorStop(0, _slotTop);
-        _slotGrad.addColorStop(1, _slotBottom);
-        ctx.fillStyle = _slotGrad;
+        // @perf-impact: 空槽渐变按实例缓存（色标仅依赖 h + type）- 消除每帧每敌 1 个 LinearGradient 分配
+        if (!this._cachedSlotGrad || this._cachedSlotGradH !== h || this._cachedSlotGradType !== this.type) {
+            const _sg = ctx.createLinearGradient(0, -h/2, 0, h/2);
+            _sg.addColorStop(0, _slotTop);
+            _sg.addColorStop(1, _slotBottom);
+            this._cachedSlotGrad = _sg;
+            this._cachedSlotGradH = h;
+            this._cachedSlotGradType = this.type;
+        }
+        ctx.fillStyle = this._cachedSlotGrad;
         ctx.fillRect(-w/2, -h/2, w, h);
 
         // B. 绘制白色延迟条 (在彩色条底下)
@@ -2310,7 +2347,7 @@ class Enemy {
                     ctx.textBaseline = 'middle';
                     ctx.fillStyle = `rgba(148, 163, 184, ${0.55 + _haBreath * 0.35})`;
                     ctx.shadowColor = '#475569';
-                    ctx.shadowBlur = 4;
+                    ctx.shadowBlur = _sb(4);
                     ctx.fillText(`⏳${this._moveCooldown}`, 0, h * 0.15);
                 }
                 ctx.restore();
@@ -3535,6 +3572,57 @@ class Enemy {
                     ctx.restore();
                 }
 
+            } else {
+                // @perf-impact: low 档奖励标记平面兜底 - 仅纯色双层描边，无 shadowBlur/渐变/旋转
+                // 省电模式下 rewardHaloEnabled=false 会跳过完整光晕，但「敌人携带遗物/精华」是
+                // 核心玩法可读性信号，必须保留。此处以约 2 次 stroke/敌的极低成本绘制平面边框，
+                // 不触发任何 GPU 模糊/混合 pass，符合 low 档降温目标。
+                let _markColor, _markColor2;
+                if (_effectiveRewardType === 'relic') {
+                    _markColor = 'rgba(250, 204, 21, 0.95)';  _markColor2 = 'rgba(245, 158, 11, 0.6)';
+                } else if (_effectiveRewardType === 'chaos_essence') {
+                    _markColor = 'rgba(168, 85, 247, 0.95)';  _markColor2 = 'rgba(239, 68, 68, 0.6)';
+                } else { // pure_essence
+                    _markColor = 'rgba(191, 219, 254, 0.95)'; _markColor2 = 'rgba(147, 197, 253, 0.6)';
+                }
+                // 极廉价脉冲（仅 1 次 Math.sin，纯 CPU、无 GPU 开销）让标记更易被注意
+                const _markPulse = 0.7 + Math.sin(Date.now() / 400 + this.visualSeed * 3) * 0.3;
+                const _markPoly = this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3;
+                ctx.save();
+                ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = _markPulse;
+                // 外圈主色描边
+                ctx.strokeStyle = _markColor;
+                ctx.lineWidth = 2.5;
+                if (_markPoly) {
+                    const _verts = this.collisionData.vertices;
+                    ctx.beginPath();
+                    ctx.moveTo(_verts[0].x * 1.12, _verts[0].y * 1.12);
+                    for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.12, _verts[_i].y * 1.12);
+                    ctx.closePath();
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.roundRect(-w/2 - 7, -h/2 - 7, w + 14, h + 14, r + 4);
+                    ctx.stroke();
+                }
+                // 内圈辅色描边（双层，强化「被封印/标记」语义）
+                ctx.strokeStyle = _markColor2;
+                ctx.lineWidth = 1.5;
+                if (_markPoly) {
+                    const _verts = this.collisionData.vertices;
+                    ctx.beginPath();
+                    ctx.moveTo(_verts[0].x * 1.05, _verts[0].y * 1.05);
+                    for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.05, _verts[_i].y * 1.05);
+                    ctx.closePath();
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.roundRect(-w/2 - 3, -h/2 - 3, w + 6, h + 6, r + 2);
+                    ctx.stroke();
+                }
+                ctx.restore();
             }
         }
 
@@ -5500,7 +5588,7 @@ class Enemy {
             const pulse = (Math.sin(Date.now() / 900 + i * 1.3 + this.visualSeed * 4) + 1) * 0.5;
             ctx.globalAlpha = 0.7 + pulse * 0.25;
             ctx.shadowColor = color;
-            ctx.shadowBlur = 4 + pulse * 4;
+            ctx.shadowBlur = _sb(4 + pulse * 4);
             ctx.strokeStyle = color;
             ctx.fillStyle = color;
             ctx.lineWidth = 1.2;

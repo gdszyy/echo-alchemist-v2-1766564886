@@ -3570,7 +3570,11 @@ export const combat_system = {
         if (isFrozen) {
             // 冰波扩散环
             if (!this.iceWaves) this.iceWaves = [];
-            this.iceWaves.push(new IceWave(x, y));
+            // @perf-impact: IceWave 数量上限 - 防清场时冰冻死亡批量炸裂卡顿，接入 iceWaveLimit 预算
+            const _iwBudget = CONFIG.performance[this.perfQualityLevel || 'high'];
+            if (this.iceWaves.length < _iwBudget.iceWaveLimit) {
+                this.iceWaves.push(new IceWave(x, y));
+            }
             // 冰晶碎片爆发
             const shardCount = tier === 'boss' ? 20 : (tier === 'elite' ? 12 : 8);
             for (let i = 0; i < shardCount; i++) {
@@ -3641,6 +3645,10 @@ export const combat_system = {
 
         // --- 3. 分级死亡爆炸特效（在冰冻/燃烧特效之外叠加）---
         if (!this.deathExplosions) this.deathExplosions = [];
+        // @perf-impact: DeathExplosion 数量上限 - 防清场/范围秒杀时同屏数十个多渐变爆炸卡顿。
+        // Boss 死亡稀有且重要，不受上限约束；精英/普通受 deathExplosionLimit 约束。
+        const _deBudget = CONFIG.performance[this.perfQualityLevel || 'high'];
+        const _deUnderLimit = this.deathExplosions.length < _deBudget.deathExplosionLimit;
 
         if (tier === 'boss') {
             // Boss：内爆消散，先膨胀挥扎再塑陷
@@ -3666,7 +3674,7 @@ export const combat_system = {
 
         } else if (tier === 'elite') {
             // 精英：能量环内缩 + 紫色灵魂烟雾
-            this.deathExplosions.push(new DeathExplosion(x, y, 'elite'));
+            if (_deUnderLimit) this.deathExplosions.push(new DeathExplosion(x, y, 'elite'));
             // 紫色灵魂烟雾（向内漂移）
             for (let i = 0; i < 5; i++) {
                 const p = this.spawn_createParticle(
@@ -3685,7 +3693,7 @@ export const combat_system = {
 
         } else {
             // 普通敌人：内缩消散，极少的烟尘
-            this.deathExplosions.push(new DeathExplosion(x, y, 'normal'));
+            if (_deUnderLimit) this.deathExplosions.push(new DeathExplosion(x, y, 'normal'));
             // 1~2 缕烟尘（不向外爆，而是小幅漂移）
             const dustCount = 1 + Math.floor(Math.random() * 2);
             for (let i = 0; i < dustCount; i++) {
