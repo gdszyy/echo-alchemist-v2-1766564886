@@ -1483,10 +1483,15 @@ class Enemy {
         // [玻璃质感] 容器底色采用顶亮底深的微弱玻璃渐变，模拟环境光自上而下
         // 衰减；总体 alpha 降低，避免大面积纯色显得廉价，让 game-container 的
         // 径向背景充分透出，强化"半透明面板嵌在战场上"的高级质感。
-        const _bgGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
-        _bgGrad.addColorStop(0, 'rgba(30, 41, 59, 0.04)');
-        _bgGrad.addColorStop(1, 'rgba(8, 14, 26, 0.12)');
-        ctx.fillStyle = _bgGrad;
+        // @perf-impact: 容器背景渐变按实例缓存（色标静态，仅依赖 h）- 消除每帧每敌 1 个 LinearGradient 分配
+        if (!this._cachedBgGrad || this._cachedBgGradH !== h) {
+            const _bg = ctx.createLinearGradient(0, -h/2, 0, h/2);
+            _bg.addColorStop(0, 'rgba(30, 41, 59, 0.04)');
+            _bg.addColorStop(1, 'rgba(8, 14, 26, 0.12)');
+            this._cachedBgGrad = _bg;
+            this._cachedBgGradH = h;
+        }
+        ctx.fillStyle = this._cachedBgGrad;
         ctx.fill();
         // [增强对比 #4] 在裁剪之前先给容器外缘绘制一圈柔光描边，
         // 让敌人在与背景同色的「液态」战场上仍能识别轮廓（精英/Boss 尤其关键）。
@@ -1561,10 +1566,16 @@ class Enemy {
             _slotTop = 'rgba(40, 52, 74, 0.04)';
             _slotBottom = 'rgba(12, 18, 30, 0.10)';
         }
-        const _slotGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
-        _slotGrad.addColorStop(0, _slotTop);
-        _slotGrad.addColorStop(1, _slotBottom);
-        ctx.fillStyle = _slotGrad;
+        // @perf-impact: 空槽渐变按实例缓存（色标仅依赖 h + type）- 消除每帧每敌 1 个 LinearGradient 分配
+        if (!this._cachedSlotGrad || this._cachedSlotGradH !== h || this._cachedSlotGradType !== this.type) {
+            const _sg = ctx.createLinearGradient(0, -h/2, 0, h/2);
+            _sg.addColorStop(0, _slotTop);
+            _sg.addColorStop(1, _slotBottom);
+            this._cachedSlotGrad = _sg;
+            this._cachedSlotGradH = h;
+            this._cachedSlotGradType = this.type;
+        }
+        ctx.fillStyle = this._cachedSlotGrad;
         ctx.fillRect(-w/2, -h/2, w, h);
 
         // B. 绘制白色延迟条 (在彩色条底下)
