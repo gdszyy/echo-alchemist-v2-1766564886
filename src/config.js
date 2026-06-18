@@ -1262,8 +1262,11 @@ const CONFIG = {
             arcBossVfxLineCount: 3,   // 引力线减半（6 次 createLinearGradient → 3）
             arcBossVfxWhiteGrad: false, // 关闭 lighter 白化叠加（createRadialGradient）
             arcBossVfxSuckProb:  0.3, // 吸入粒子概率降至 30%
-            // 奖励标记敌人光晕门控（low: 关闭所有光晕和旋转装饰）
-            rewardHaloEnabled: false,  // 关闭光晕（省去 shadowBlur + createRadialGradient）
+            // 奖励标记敌人光晕门控（low: 关闭完整光晕，但保留平面兜底描边）
+            // 注意：rewardHaloEnabled=false 时，enemy.js Layer 6.8 会走 else 平面兜底分支，
+            // 仍以纯色双层描边标出携带遗物/精华的敌人（无 shadowBlur/渐变/旋转），
+            // 保证省电模式下「该敌人有掉落」这一核心玩法可读性不丢失。
+            rewardHaloEnabled: false,  // 关闭完整光晕（省去 shadowBlur + createRadialGradient），降级为平面描边
             rewardRuneCount: 0,        // 关闭旋转符文
             rewardCrystalCount: 0,     // 关闭晶体装饰
             // 回合开始横幅充能特效（low: 降级为简单淡入，无光晕）

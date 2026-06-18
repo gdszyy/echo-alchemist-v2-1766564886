@@ -179,6 +179,17 @@ if avgFps > fpsThresholdUp (55):
 
 > **注意**：Layer 3.4 在 `ctx.clip()` 之后执行，叠加层自动被裁剪到敌人形体内部，无需额外剪切。粒子发射使用世界坐标（`this.pos.x / this.pos.y`），与局部 ctx 变换无关。
 
+### 5.9 奖励标记光晕（`src/entities/enemy.js` → `Enemy.draw` Layer 6.8）
+
+携带遗物/精华的敌人（`rewardType` ∈ `relic` / `chaos_essence` / `pure_essence`）会绘制奖励标记。这是**玩法可读性关键特效**（告诉玩家「打这个敌人能掉落」），遵循「降级而非消失」原则。
+
+| 位置 | 读取字段 | 行为 |
+|------|---------|------|
+| 完整光晕（`rewardHaloEnabled === true`） | `rewardHaloEnabled` / `rewardRuneCount` / `rewardCrystalCount` | `high`：完整光晕 + 旋转符文(4)/晶体(5) + shadowBlur + 渐变；`medium`：光晕 + 符文(2)/晶体(3) |
+| **平面兜底（`rewardHaloEnabled === false`，即 low 档）** | `rewardHaloEnabled` | 走 `else` 分支，绘制纯色双层描边（遗物=金 / 混沌=紫红 / 纯净=蓝白），**无 shadowBlur / 无 createRadialGradient / 无旋转**，约 2 次 `stroke()`/敌，附带 1 次 `Math.sin` 廉价脉冲。**保证省电模式下标记仍可见。** |
+
+> **重要约定**：奖励标记、敌人状态（中毒/冰冻/燃烧）、Boss 预警/狂暴等**语义类**特效，在 low 档必须**降级为廉价平面版**，严禁像装饰类特效（Peg 光晕、敌人光泽）那样 `enabled:false` 彻底关闭。
+
 ---
 
 ## 6. 修改指南（Agent 防坑）
@@ -229,6 +240,7 @@ if avgFps > fpsThresholdUp (55):
 | 2026-04-16 | 初始实现：FPS 采样器、三档等级预算、粒子/特效/Peg/敌人全面接入、FPS 指示层 |
 | 2026-04-16 | 新增 `sparkLimit`（high:100/medium:50/low:20）和 `smokeLimit`（high:60/medium:25/low:8）两个预算字段；在 `spawn_createParticle` 和 `spawn_pushParticleWithLimit` 中同步接入 spark/smoke 上限检查，防止能量泄漏、机械类受击等高频 spark 场景占用全局粒子预算 |
 | 2026-04-16 | **Arc Boss VFX 性能门控（Task T3 补丁）**：在三档预算表中新增 4 个字段：`arcBossVfxTriCount`（Ouroboros 狂暴三角形数量，high:6/medium:3/low:0）、`arcBossVfxLineCount`（Devourer 引力线数量，high:6/medium:6/low:3）、`arcBossVfxWhiteGrad`（Devourer 深渊核心 lighter 白化叠加开关，high/medium:true/low:false）、`arcBossVfxSuckProb`（Devourer 吸入粒子生成概率，high:0.7/medium:0.5/low:0.3）。在 `enemy.js` Devourer/Ouroboros Layer 6.5 中通过 `game.perfQualityLevel` 动态读取对应字段实施门控。同步更新消费端关联索引（第 5.6 节）。 |
+| 2026-06-18 | **奖励标记低档平面兜底**：修复 `low` 档 `rewardHaloEnabled:false` 导致携带遗物/精华的敌人无任何视觉标记的玩法可读性回归。在 `enemy.js` Layer 6.8 的 `if (rewardHaloEnabled)` 增加 `else` 分支，绘制纯色双层描边平面版（遗物=金/混沌=紫红/纯净=蓝白），无 shadowBlur/渐变/旋转。新增消费端关联索引第 5.9 节并确立「语义类特效降级而非消失」约定。 |
 | 2026-04-30 | **毒素敌人专属特效**：新增 `venomLimit`（high:60/medium:30/low:0）预算字段；新增 `venom` 粒子模式（上浮液滴 + screen 渐变绘制）；在 `enemy.js` Layer 3.4 新增毒素状态视觉（径向渐变叠加 + 液滴流淌动画，三档门控）；在 `combat_system.js` 命中毒素时发射 1~4 颗毒液粒子。消费端关联索引见第 5.1/5.2/5.8 节。 |
 
 ## 9. 性能影响标记规范

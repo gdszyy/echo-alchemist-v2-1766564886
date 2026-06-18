@@ -3535,6 +3535,57 @@ class Enemy {
                     ctx.restore();
                 }
 
+            } else {
+                // @perf-impact: low 档奖励标记平面兜底 - 仅纯色双层描边，无 shadowBlur/渐变/旋转
+                // 省电模式下 rewardHaloEnabled=false 会跳过完整光晕，但「敌人携带遗物/精华」是
+                // 核心玩法可读性信号，必须保留。此处以约 2 次 stroke/敌的极低成本绘制平面边框，
+                // 不触发任何 GPU 模糊/混合 pass，符合 low 档降温目标。
+                let _markColor, _markColor2;
+                if (_effectiveRewardType === 'relic') {
+                    _markColor = 'rgba(250, 204, 21, 0.95)';  _markColor2 = 'rgba(245, 158, 11, 0.6)';
+                } else if (_effectiveRewardType === 'chaos_essence') {
+                    _markColor = 'rgba(168, 85, 247, 0.95)';  _markColor2 = 'rgba(239, 68, 68, 0.6)';
+                } else { // pure_essence
+                    _markColor = 'rgba(191, 219, 254, 0.95)'; _markColor2 = 'rgba(147, 197, 253, 0.6)';
+                }
+                // 极廉价脉冲（仅 1 次 Math.sin，纯 CPU、无 GPU 开销）让标记更易被注意
+                const _markPulse = 0.7 + Math.sin(Date.now() / 400 + this.visualSeed * 3) * 0.3;
+                const _markPoly = this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3;
+                ctx.save();
+                ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = _markPulse;
+                // 外圈主色描边
+                ctx.strokeStyle = _markColor;
+                ctx.lineWidth = 2.5;
+                if (_markPoly) {
+                    const _verts = this.collisionData.vertices;
+                    ctx.beginPath();
+                    ctx.moveTo(_verts[0].x * 1.12, _verts[0].y * 1.12);
+                    for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.12, _verts[_i].y * 1.12);
+                    ctx.closePath();
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.roundRect(-w/2 - 7, -h/2 - 7, w + 14, h + 14, r + 4);
+                    ctx.stroke();
+                }
+                // 内圈辅色描边（双层，强化「被封印/标记」语义）
+                ctx.strokeStyle = _markColor2;
+                ctx.lineWidth = 1.5;
+                if (_markPoly) {
+                    const _verts = this.collisionData.vertices;
+                    ctx.beginPath();
+                    ctx.moveTo(_verts[0].x * 1.05, _verts[0].y * 1.05);
+                    for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.05, _verts[_i].y * 1.05);
+                    ctx.closePath();
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.roundRect(-w/2 - 3, -h/2 - 3, w + 6, h + 6, r + 2);
+                    ctx.stroke();
+                }
+                ctx.restore();
             }
         }
 
