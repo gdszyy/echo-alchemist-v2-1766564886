@@ -224,7 +224,8 @@
 - `src/entities/enemy.js` 已新增 `_drawFootprintCue()`：对大体型、特殊碰撞形状和 Boss 绘制廉价足迹描边；多格敌人额外绘制占格分隔线，帮助玩家读出实际碰撞边界。
 - `src/entities/enemy.js` 已新增 `_drawThreatTierBadge()`：Boss、精英和大型基底在左上角显示短标签（如“首领”“精英”“装甲”“吞噬”），用于第一眼识别威胁层级与基底职责。
 - `src/entities/enemy.js` 已新增 `_drawStatusBadges()`：将护盾、偏折屏障、狂暴、毒素、温度等高频状态收敛为最多 3 个短标签，避免玩家只依赖复杂纹理或粒子判断状态。
-- 性能约束：上述提示只使用 `stroke` / `fillRect` / `fillText`，不使用渐变、`shadowBlur`、混合模式或粒子；属于语义可读性层，`low` 档也应保留。
+- `src/entities/enemy.js` 已接入 `_drawArchetypeBody()`：为 `bastion`、`maw`、`deflector`、`echoSpire`、`prism`、`hive`、`siege`、`gravityWell` 绘制专属内部结构，使大型基底不再只靠尺寸和角标表达身份。`low` 画质下会关闭 `screen` 混合，并将 `maw` / `gravityWell` 的径向渐变降级为纯色线面。
+- 性能约束：足迹、角标和状态短标签只使用 `stroke` / `fillRect` / `fillText`，不使用渐变、`shadowBlur`、混合模式或粒子；属于语义可读性层，`low` 档也应保留。基底轮廓层允许在 high/medium 使用少量 `screen` 和径向渐变，但必须在 `low` 档降级为纯色线面。
 
 ## 8. 生成与难度曲线建议
 

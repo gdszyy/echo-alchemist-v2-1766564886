@@ -163,6 +163,12 @@ if avgFps > fpsThresholdUp (55):
 |------|---------|------|
 | 材质光泽叠加（约第 229 行） | `enemyGloss` | `false` 时跳过 OffscreenCanvas 光泽渐变 |
 
+### 5.5.1 V2 基底轮廓（`src/entities/enemy.js` → `Enemy._drawArchetypeBody`）
+
+| 位置 | 读取字段 | 行为 |
+|------|---------|------|
+| 基底内部结构绘制（Layer 3.55） | `perfQualityLevel` | `high/medium`：允许少量 `screen` 混合与 `maw` / `gravityWell` 径向渐变；`low`：改用 `source-over` 与纯色线面，保留基底可读性但关闭高开销层 |
+
 ### 5.6 Arc Boss VFX（`src/entities/enemy.js` → Devourer Layer 6.5 & Ouroboros Layer 6.5）
 
 | 位置 | 读取字段 | 行为 |
@@ -269,6 +275,7 @@ if avgFps > fpsThresholdUp (55):
 | 2026-06-18 | **抗卡顿：特效预算上限 + 纹理缓存**：(1) 新增 `deathExplosionLimit`(14/8/4) 与 `iceWaveLimit`(10/6/3) 预算字段，在 `combat_system.js` `_triggerDeathFX` 的 IceWave/DeathExplosion 创建处接入上限检查（Boss 死亡爆炸不受限），消除清场/范围秒杀时同屏数十个多渐变特效的帧率断崖（修复 P-009~015）。(2) `enemy.js` `_initTexture` 新增模块级 OffscreenCanvas 纹理缓存（按 类型\|尺寸\|seed桶(16)\|gloss 共享只读静态纹理，FIFO 容量 160），消除批量刷怪时密集同步分配的进场卡顿（修复 P-004）。 |
 | 2026-06-18 | **主循环省电控制**：新增 (1) 静态阶段降帧节流——非 combat/training/gathering 的菜单阶段及暂停态按 `CONFIG.performance.idleFrameInterval`(66ms≈15fps) 节流渲染，活跃阶段仍满帧；FPS 采样器仅在活跃阶段运行，避免菜单降帧误触发降级。(2) `visibilitychange` 后台硬停——页面隐藏时 `cancelAnimationFrame` 中断 rAF 链并 `audio.suspend()` 挂起音频上下文，恢复时重启循环并 `audio.resume()`。涉及 `game_system.js`(sys_loop/sys_setupVisibilityHandling)、`core.js`(状态初始化+注册)、`audio.js`(新增 suspend())、`config.js`(idleFrameInterval)。详见第 10 节。 |
 | 2026-06-18 | **敌人语义可读性提示**：`enemy.js` 新增足迹描边/占格分隔线、威胁等级角标与状态短标签（护盾、屏障、狂暴、毒素、温度）。该层只使用少量 `stroke` / `fillRect` / `fillText`，无渐变、无 `shadowBlur`、无混合模式、无粒子；语义提示在 `low` 档保留。 |
+| 2026-06-18 | **V2 基底轮廓降级**：`enemy.js` 的 `_drawArchetypeBody()` 按 `game.perfQualityLevel` 降级。high/medium 保留少量 `screen` 混合与 `maw` / `gravityWell` 径向渐变；low 关闭混合模式并改用纯色线面，保留基底身份但降低 fill-rate 与渐变开销。 |
 | 2026-06-18 | **奖励标记低档平面兜底**：修复 `low` 档 `rewardHaloEnabled:false` 导致携带遗物/精华的敌人无任何视觉标记的玩法可读性回归。在 `enemy.js` Layer 6.8 的 `if (rewardHaloEnabled)` 增加 `else` 分支，绘制纯色双层描边平面版（遗物=金/混沌=紫红/纯净=蓝白），无 shadowBlur/渐变/旋转。新增消费端关联索引第 5.9 节并确立「语义类特效降级而非消失」约定。 |
 | 2026-04-30 | **毒素敌人专属特效**：新增 `venomLimit`（high:60/medium:30/low:0）预算字段；新增 `venom` 粒子模式（上浮液滴 + screen 渐变绘制）；在 `enemy.js` Layer 3.4 新增毒素状态视觉（径向渐变叠加 + 液滴流淌动画，三档门控）；在 `combat_system.js` 命中毒素时发射 1~4 颗毒液粒子。消费端关联索引见第 5.1/5.2/5.8 节。 |
 | 2026-06-18 | **高密度钉盘尺寸调整**：收集阶段 `marbleRadius` 下调，Peg 半径改读 `CONFIG.physics.pegRadius`，模块最小钉距改读配置化基础通行半径。该调整会提高 Peg 数量，但不新增粒子、混合模式或渐变层；高开销 Peg 阴影/光晕仍由 `pegSoftShadow` / `pegGlowHalo` 分档控制。 |

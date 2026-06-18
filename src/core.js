@@ -37,6 +37,7 @@ import { combat_system } from './combat_system.js';
 import { render_system } from './render_system.js';
 import { spawn_system } from './spawn_system.js';
 import { ui_system } from './ui_system.js';
+import { createDefaultModuleLayout } from './pinboard_modules.js';
 // [Task 2.4] 导入拆分后的 UI 子模块
 import { hud_system } from './ui/hud.js';
 import { shop_system } from './ui/shop.js';
@@ -263,12 +264,11 @@ class Game {
 
         // ==================== [v2 钉板模块化] 模块系统状态 ====================
         this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'rune_lattice', 'bouncer', 'funnel'];
-        this.unlockedModuleSlots = 12;
-        this.currentModuleLayout = [
-            'dense_stagger', 'rune_lattice', 'dense_stagger', 'bouncer',
-            'std_stagger', 'dense_stagger', 'rune_lattice', 'dense_stagger',
-            'bouncer', 'std_stagger', 'dense_stagger', 'rune_lattice',
-        ];
+        this.unlockedModuleSlots = CONFIG.gameplay.moduleDefaultSlots || 3;
+        this.currentModuleLayout = createDefaultModuleLayout(
+            (CONFIG.gameplay.moduleCols || 4) * (CONFIG.gameplay.moduleRows || 3),
+            this.unlockedModuleSlots
+        );
         this.pendingFusions = [];
 
         // ==================== [v2 局内商店 + 符文碎片经济] ====================

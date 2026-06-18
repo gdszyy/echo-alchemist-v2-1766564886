@@ -109,6 +109,7 @@
 | **Layer 2** | 液体血条（含延迟白条、绿色回血条） | 真实血量与动画血量 |
 | **Layer 3** | 内部覆盖层（过热橙色发光 / 过冷蓝色雾化） | 状态反馈 |
 | **Layer 3.5** | 内部词缀特效（**所有词缀**，严格裁剪在方块内） | **重设计**，各词缀采用内部填充纹理，与实际效果强关联 |
+| **Layer 3.55** | V2 基底轮廓美术 | **2026-06-18 更新**：`_drawArchetypeBody()` 为 `bastion`、`maw`、`deflector`、`echoSpire`、`prism`、`hive`、`siege`、`gravityWell` 绘制专属内部结构；`low` 档禁用 `screen` 混合，并将 `maw` / `gravityWell` 的径向渐变降级为纯色线面。 |
 | **Layer 4** | 裂纹绘制（过热岩浆裂纹 / 过冷冰晶裂纹 / **战损裂纹**） | 状态反馈；**Task A 增强**：血量 < 30% 时显示深灰色战损裂纹，强度随血量线性变化 |
 | **D1/D2** | 呼吸缩放（Breathing Scale）+ 待机微浮动（Idle Float） | **Task D 新增**，仅在 `actionPhase === 'idle'` 且无受击/预警时生效；D1 使用 `ctx.scale` 实现 ±1.8% 呼吸缩放（周期 3200ms）；**T1 升级**：使用 `Math.pow((sin+1)*0.5, breatheEasingPower)` 非线性缓动曲线，增强极大値停留感（默认 `breatheEasingPower=1.5`）；D2 使用 `ctx.translate` 实现 ±1.5px 垂直浮动（周期 2600ms）；均使用 `this.visualSeed` 作为相位偏移，确保同屏多敌人节奏各异；位于 draw() 的 `ctx.translate` 之后、A3 Squash & Stretch 之前 |
 | **Layer 5** | 内部边框（普通 / elite / boss） | 包含预警闪烁 |

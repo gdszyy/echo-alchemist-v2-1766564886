@@ -19,7 +19,7 @@ import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
 import { COUNTER_MAP, RUNE_DB } from './rune_config.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
-import { createDefaultModuleLayout } from './pinboard_modules.js';
+import { createDefaultModuleLayout, ensureModuleLayoutInstances } from './pinboard_modules.js';
 
 export const game_system = {
 
@@ -494,9 +494,10 @@ export const game_system = {
         // 钉板由 4×3 = 12 个模块槽组成，按 row-major 顺序解锁
         // 默认开放全部 12 个槽，预填 std_stagger
         this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'rune_lattice', 'bouncer', 'funnel'];
-        this.unlockedModuleSlots = CONFIG.gameplay.moduleDefaultSlots || 12;
+        this.unlockedModuleSlots = CONFIG.gameplay.moduleDefaultSlots || 3;
         this.currentModuleLayout = createDefaultModuleLayout(
-            (CONFIG.gameplay.moduleCols || 4) * (CONFIG.gameplay.moduleRows || 3)
+            (CONFIG.gameplay.moduleCols || 4) * (CONFIG.gameplay.moduleRows || 3),
+            this.unlockedModuleSlots
         );
         // pendingFusions: 模块编辑器关闭时写入；phase_gathering_initPachinko 末尾消费
         // 形如 [{ element: 'pyro', count: 1, runeUid: '...' }]
@@ -2535,6 +2536,10 @@ export const game_system = {
                 // 钉盘形态
                 currentRows: this.currentRows || 0,
                 boardLayout: this.boardLayout || 'default',
+                unlockedModuleTypes: (this.unlockedModuleTypes || []).slice(),
+                unlockedModuleSlots: this.unlockedModuleSlots || CONFIG.gameplay.moduleDefaultSlots || 3,
+                currentModuleLayout: this.currentModuleLayout ? JSON.parse(JSON.stringify(this.currentModuleLayout)) : null,
+                pendingFusions: (this.pendingFusions || []).map(f => ({ ...f })),
                 // 技能
                 skillPoints: this.skillPoints || 0,
                 activeSkills: (this.activeSkills || []).map(sk => sk.id || sk),
@@ -2683,6 +2688,19 @@ export const game_system = {
             // --- 恢复钉盘形态 ---
             this.currentRows = state.currentRows || 0;
             this.boardLayout = state.boardLayout || 'default';
+            this.unlockedModuleTypes = Array.isArray(state.unlockedModuleTypes)
+                ? state.unlockedModuleTypes.slice()
+                : (this.unlockedModuleTypes || ['std_stagger', 'dense_stagger', 'rune_lattice', 'bouncer', 'funnel']);
+            this.unlockedModuleSlots = state.unlockedModuleSlots || this.unlockedModuleSlots || CONFIG.gameplay.moduleDefaultSlots || 3;
+            {
+                const totalSlots = (CONFIG.gameplay.moduleCols || 4) * (CONFIG.gameplay.moduleRows || 3);
+                this.currentModuleLayout = ensureModuleLayoutInstances(
+                    state.currentModuleLayout || this.currentModuleLayout,
+                    totalSlots,
+                    this.unlockedModuleSlots
+                );
+            }
+            this.pendingFusions = (state.pendingFusions || []).map(f => ({ ...f }));
 
             // --- 恢复技能 ---
             this.skillPoints = state.skillPoints || 0;

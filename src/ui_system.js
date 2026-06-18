@@ -1915,8 +1915,9 @@ export const ui_system = {
         // 清除目标锚点原有的多格占位
         const clearAnchor = (idx) => {
             const cur = layout[idx];
-            if (typeof cur === 'string') {
-                const covered = getCoveredSlots(idx, getModuleSpan(cur), cols, rows) || [idx];
+            const curId = getModuleIdFromEntry(cur);
+            if (curId) {
+                const covered = getCoveredSlots(idx, getModuleSpan(curId), cols, rows) || [idx];
                 for (const ci of covered) layout[ci] = null;
             } else {
                 layout[idx] = null;
@@ -1941,14 +1942,14 @@ export const ui_system = {
             clearAnchor(slotIdx);
             for (const ci of covered) {
                 const occ = layout[ci];
-                if (ci !== slotIdx && (typeof occ === 'string' || (occ && occ.ref !== undefined))) {
+                if (ci !== slotIdx && (getModuleIdFromEntry(occ) || isModuleRef(occ))) {
                     showToast('该位置与相邻模块重叠，请先清空相邻区域');
                     return;
                 }
             }
-            layout[slotIdx] = moduleId;
+            layout[slotIdx] = createModuleInstance(moduleId);
             for (const ci of covered) {
-                if (ci !== slotIdx) layout[ci] = { ref: slotIdx };
+                if (ci !== slotIdx) layout[ci] = createModuleRef(slotIdx);
             }
         }
 
@@ -1972,8 +1973,9 @@ export const ui_system = {
 
         const clearAnchor = (idx) => {
             const cur = layout[idx];
-            if (typeof cur === 'string') {
-                const covered = getCoveredSlots(idx, getModuleSpan(cur), cols, rows) || [idx];
+            const curId = getModuleIdFromEntry(cur);
+            if (curId) {
+                const covered = getCoveredSlots(idx, getModuleSpan(curId), cols, rows) || [idx];
                 for (const ci of covered) layout[ci] = null;
             } else {
                 layout[idx] = null;
@@ -1989,9 +1991,9 @@ export const ui_system = {
                 return;
             }
             clearAnchor(slotIdx);
-            layout[slotIdx] = moduleId;
+            layout[slotIdx] = createModuleInstance(moduleId);
             for (const ci of placement.covered) {
-                if (ci !== slotIdx) layout[ci] = { ref: slotIdx };
+                if (ci !== slotIdx) layout[ci] = createModuleRef(slotIdx);
             }
         }
 

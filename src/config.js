@@ -762,7 +762,7 @@ const CONFIG = {
         // ==================== [v2 钉板模块化] 模块网格 ====================
         moduleCols: 4,                 // 模块网格列数
         moduleRows: 3,                 // 模块网格行数（共 12 槽）
-        moduleDefaultSlots: 12,        // 默认开放的模块槽位数（全部 4×3 = 12 槽）
+        moduleDefaultSlots: 3,         // 默认开放的模块槽位数（初始 3 个组件，后续通过局内商店扩展）
         moduleAreaTopY: 60,            // 模块区域起始 Y 坐标（画布顶部留白）
         moduleAreaBottomMargin: 80,    // 模块区域底部留白
         moduleSpacingX: 4,             // 模块横向间距 px
