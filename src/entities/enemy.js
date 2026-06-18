@@ -2336,7 +2336,7 @@ class Enemy {
                     ctx.textBaseline = 'middle';
                     ctx.fillStyle = `rgba(148, 163, 184, ${0.55 + _haBreath * 0.35})`;
                     ctx.shadowColor = '#475569';
-                    ctx.shadowBlur = 4;
+                    ctx.shadowBlur = _sb(4);
                     ctx.fillText(`⏳${this._moveCooldown}`, 0, h * 0.15);
                 }
                 ctx.restore();
@@ -5577,7 +5577,7 @@ class Enemy {
             const pulse = (Math.sin(Date.now() / 900 + i * 1.3 + this.visualSeed * 4) + 1) * 0.5;
             ctx.globalAlpha = 0.7 + pulse * 0.25;
             ctx.shadowColor = color;
-            ctx.shadowBlur = 4 + pulse * 4;
+            ctx.shadowBlur = _sb(4 + pulse * 4);
             ctx.strokeStyle = color;
             ctx.fillStyle = color;
             ctx.lineWidth = 1.2;
