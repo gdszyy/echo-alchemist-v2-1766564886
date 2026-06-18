@@ -1192,6 +1192,8 @@ const CONFIG = {
             shockwaveLimit:   20,
             waveLimit:        10,
             lightningLimit:   15,
+            deathExplosionLimit: 14,  // 死亡爆炸特效上限（精英/普通；Boss 不受限）
+            iceWaveLimit:        10,  // 冰冻死亡冰波环上限
             // Peg 软阴影与底部光晕开关（true = 开启）
             pegSoftShadow:    true,
             pegGlowHalo:      true,
@@ -1227,6 +1229,8 @@ const CONFIG = {
             shockwaveLimit:   12,
             waveLimit:         6,
             lightningLimit:    8,
+            deathExplosionLimit: 8,
+            iceWaveLimit:        6,
             pegSoftShadow:    true,
             pegGlowHalo:      false,  // 关闭 Peg 底部光晕（每帧径向渐变）
             enemyGloss:       true,
@@ -1259,6 +1263,8 @@ const CONFIG = {
             shockwaveLimit:    6,
             waveLimit:         3,
             lightningLimit:    4,
+            deathExplosionLimit: 4,
+            iceWaveLimit:        3,
             pegSoftShadow:    false,  // 关闭 Peg 软阴影
             pegGlowHalo:      false,
             enemyGloss:       false,  // 关闭敌人材质光泽（省去 OffscreenCanvas 渐变叠加）

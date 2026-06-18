@@ -44,6 +44,14 @@ const audio = new Proxy({}, {
     }
 });
 
+// ==================== 敌人底层纹理缓存 ====================
+// @perf-impact: _initTexture 同步创建 OffscreenCanvas，批量刷怪时密集分配引发进场卡顿。
+// 纹理为静态只读（仅 drawImage 读取，从不修改），故按「类型|尺寸|seed桶|gloss」共享同一画布。
+// seed 量化到 _TEXTURE_SEED_BUCKETS 桶，使同类同尺寸敌人复用纹理（微观叠加层差异不可见）。
+const _enemyTextureCache = new Map();
+const _ENEMY_TEXTURE_CACHE_MAX = 160;
+const _TEXTURE_SEED_BUCKETS = 16;
+
 // ==================== Enemy 类 ====================
 class Enemy {
     constructor(x, y, width, height, hp, maxHp = hp, type = 'normal', affixes = []) {
@@ -213,6 +221,22 @@ class Enemy {
     _initTexture(width, height) {
         const w = width - 4;
         const h = height - 4;
+
+        // [自适应性能] enemyGloss 开关纳入纹理缓存键（构造时 game 可能未就绪，默认开启光泽）
+        const _glossEnabled = (typeof window !== 'undefined' && window.game && window.game.perfQualityLevel)
+            ? CONFIG.performance[window.game.perfQualityLevel].enemyGloss
+            : true;
+
+        // @perf-impact: OffscreenCanvas 纹理缓存 - 按「类型|尺寸|seed桶|gloss」共享只读静态纹理，
+        // 避免批量刷怪时同步密集分配 OffscreenCanvas 造成进场卡顿。seed 量化到固定桶以提升命中率。
+        const _seedBucket = Math.floor(this.visualSeed * _TEXTURE_SEED_BUCKETS);
+        const _texKey = `${this.type}|${w}x${h}|${_seedBucket}|${_glossEnabled ? 1 : 0}`;
+        const _cached = _enemyTextureCache.get(_texKey);
+        if (_cached) {
+            this._textureCanvas = _cached;
+            return;
+        }
+
         // 尝试使用 OffscreenCanvas，不支持时回退到普通 Canvas
         let offscreen;
         try {
@@ -223,7 +247,8 @@ class Enemy {
             offscreen = c;
         }
         const oc = offscreen.getContext('2d');
-        const seed = this.visualSeed;
+        // 使用桶中心 seed 生成，保证同桶敌人纹理完全一致（可缓存共享）
+        const seed = (_seedBucket + 0.5) / _TEXTURE_SEED_BUCKETS;
 
         if (seed < 0.3) {
             // 金属拉丝纹理：垂直线条
@@ -270,12 +295,7 @@ class Enemy {
         }
         // === A1: 材质光泽叠加（Layer 1.5 增强）===
         // 在基础纹理之上叠加顶→底 LinearGradient，模拟 3D 凸起物理厚度感
-        // [自适应性能] enemyGloss 开关：低端模式跳过此段，省去 OffscreenCanvas 渐变叠加
-        // 注意：_initTexture 在构造时调用，此时 game 实例可能尚未初始化，
-        //        所以尝试读取 window.game ，若不存在则默认开启光泽。
-        const _glossEnabled = (typeof window !== 'undefined' && window.game && window.game.perfQualityLevel)
-            ? CONFIG.performance[window.game.perfQualityLevel].enemyGloss
-            : true;
+        // [自适应性能] enemyGloss 开关：低端模式跳过此段（_glossEnabled 已在函数开头计算并纳入缓存键）
         if (_glossEnabled) {
             const glossGrad = oc.createLinearGradient(0, 0, 0, h);
             glossGrad.addColorStop(0, `rgba(255,255,255,${CONFIG.enemyRender.glossTopAlpha})`);
@@ -328,6 +348,12 @@ class Enemy {
         }
 
         this._textureCanvas = offscreen;
+        // 写入缓存（带容量上限，超限时按 FIFO 淘汰最早条目）
+        if (_enemyTextureCache.size >= _ENEMY_TEXTURE_CACHE_MAX) {
+            const _oldest = _enemyTextureCache.keys().next().value;
+            _enemyTextureCache.delete(_oldest);
+        }
+        _enemyTextureCache.set(_texKey, offscreen);
     }
 
     update(timeScale, game) {

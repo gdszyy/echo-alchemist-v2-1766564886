@@ -91,6 +91,8 @@ if avgFps > fpsThresholdUp (55):
 | `shockwaveLimit` | 20 | 12 | 6 | Shockwave 特效上限 |
 | `waveLimit` | 10 | 6 | 3 | FireWave / HealWave 上限 |
 | `lightningLimit` | 15 | 8 | 4 | LightningBolt 特效上限 |
+| `deathExplosionLimit` | 14 | 8 | 4 | DeathExplosion 上限（精英/普通受限，Boss 不受限）；防清场卡顿 |
+| `iceWaveLimit` | 10 | 6 | 3 | 冰冻死亡 IceWave 冰波环上限；防清场卡顿 |
 | `pegSoftShadow` | `true` | `true` | `false` | Peg 渓圆软阴影开关 |
 | `pegGlowHalo` | `true` | `false` | `false` | Peg 底部径向光晕开关 |
 | `enemyGloss` | `true` | `true` | `false` | 敌人材质光泽渐变开关 |
@@ -129,6 +131,8 @@ if avgFps > fpsThresholdUp (55):
 | 燃烧死亡爆炸（约第 3183 行） | `waveLimit` | 超限时跳过 FireWave 创建 |
 | 静电场词条（约第 1802 行） | `lightningLimit` | 超限时跳过 LightningBolt 创建 |
 | 毒素命中粒子爆发（约第 1739 行） | `venomLimit`（经 spawn_createParticle 间接读取） | 叠加毒层时在命中点发射 1~4 颗毒液粒子 |
+| 死亡特效 `_triggerDeathFX`（IceWave 创建） | `iceWaveLimit` | 冰冻死亡冰波环超限时跳过创建 |
+| 死亡特效 `_triggerDeathFX`（DeathExplosion 创建） | `deathExplosionLimit` | 精英/普通死亡爆炸超限时跳过；Boss 死亡不受限（稀有且重要） |
 
 ### 5.3 伤害计算（`src/combat/damage_calc.js`）
 
@@ -240,6 +244,7 @@ if avgFps > fpsThresholdUp (55):
 | 2026-04-16 | 初始实现：FPS 采样器、三档等级预算、粒子/特效/Peg/敌人全面接入、FPS 指示层 |
 | 2026-04-16 | 新增 `sparkLimit`（high:100/medium:50/low:20）和 `smokeLimit`（high:60/medium:25/low:8）两个预算字段；在 `spawn_createParticle` 和 `spawn_pushParticleWithLimit` 中同步接入 spark/smoke 上限检查，防止能量泄漏、机械类受击等高频 spark 场景占用全局粒子预算 |
 | 2026-04-16 | **Arc Boss VFX 性能门控（Task T3 补丁）**：在三档预算表中新增 4 个字段：`arcBossVfxTriCount`（Ouroboros 狂暴三角形数量，high:6/medium:3/low:0）、`arcBossVfxLineCount`（Devourer 引力线数量，high:6/medium:6/low:3）、`arcBossVfxWhiteGrad`（Devourer 深渊核心 lighter 白化叠加开关，high/medium:true/low:false）、`arcBossVfxSuckProb`（Devourer 吸入粒子生成概率，high:0.7/medium:0.5/low:0.3）。在 `enemy.js` Devourer/Ouroboros Layer 6.5 中通过 `game.perfQualityLevel` 动态读取对应字段实施门控。同步更新消费端关联索引（第 5.6 节）。 |
+| 2026-06-18 | **抗卡顿：特效预算上限 + 纹理缓存**：(1) 新增 `deathExplosionLimit`(14/8/4) 与 `iceWaveLimit`(10/6/3) 预算字段，在 `combat_system.js` `_triggerDeathFX` 的 IceWave/DeathExplosion 创建处接入上限检查（Boss 死亡爆炸不受限），消除清场/范围秒杀时同屏数十个多渐变特效的帧率断崖（修复 P-009~015）。(2) `enemy.js` `_initTexture` 新增模块级 OffscreenCanvas 纹理缓存（按 类型\|尺寸\|seed桶(16)\|gloss 共享只读静态纹理，FIFO 容量 160），消除批量刷怪时密集同步分配的进场卡顿（修复 P-004）。 |
 | 2026-06-18 | **主循环省电控制**：新增 (1) 静态阶段降帧节流——非 combat/training/gathering 的菜单阶段及暂停态按 `CONFIG.performance.idleFrameInterval`(66ms≈15fps) 节流渲染，活跃阶段仍满帧；FPS 采样器仅在活跃阶段运行，避免菜单降帧误触发降级。(2) `visibilitychange` 后台硬停——页面隐藏时 `cancelAnimationFrame` 中断 rAF 链并 `audio.suspend()` 挂起音频上下文，恢复时重启循环并 `audio.resume()`。涉及 `game_system.js`(sys_loop/sys_setupVisibilityHandling)、`core.js`(状态初始化+注册)、`audio.js`(新增 suspend())、`config.js`(idleFrameInterval)。详见第 10 节。 |
 | 2026-06-18 | **奖励标记低档平面兜底**：修复 `low` 档 `rewardHaloEnabled:false` 导致携带遗物/精华的敌人无任何视觉标记的玩法可读性回归。在 `enemy.js` Layer 6.8 的 `if (rewardHaloEnabled)` 增加 `else` 分支，绘制纯色双层描边平面版（遗物=金/混沌=紫红/纯净=蓝白），无 shadowBlur/渐变/旋转。新增消费端关联索引第 5.9 节并确立「语义类特效降级而非消失」约定。 |
 | 2026-04-30 | **毒素敌人专属特效**：新增 `venomLimit`（high:60/medium:30/low:0）预算字段；新增 `venom` 粒子模式（上浮液滴 + screen 渐变绘制）；在 `enemy.js` Layer 3.4 新增毒素状态视觉（径向渐变叠加 + 液滴流淌动画，三档门控）；在 `combat_system.js` 命中毒素时发射 1~4 颗毒液粒子。消费端关联索引见第 5.1/5.2/5.8 节。 |
