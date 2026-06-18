@@ -2,7 +2,7 @@
  * run_shop.js - [v2] 局内商店
  *
  * 玩家用局内累计的符文碎片 (game.runFragments) 购买：
- *   - 钉板模块（解锁未拥有的模块类型）
+ *   - 钉盘组件（购买单个可拆装的组件实例）
  *   - 单个符文（按稀有度定价）
  *   - 模块槽位扩张（一次性 +1）
  *
@@ -17,7 +17,7 @@
 
 import { CONFIG } from '../config.js';
 import { RUNE_DB } from '../rune_config.js';
-import { MODULE_DEFS, ATTR_PIN_TYPES } from '../pinboard_modules.js';
+import { MODULE_DEFS, ATTR_PIN_TYPES, addModuleComponentToInventory } from '../pinboard_modules.js';
 
 const RUNE_PRICE_BY_RARITY = {
     common: 18,
@@ -68,10 +68,11 @@ function generateInventory(game, count) {
     const runeCount = Math.max(1, Math.floor(count * runesRatio));
     const moduleCount = count - runeCount;
 
-    // 模块商品：来自 MODULE_DEFS 中价格 > 0 且玩家未解锁的（不含 attr_pin_*：那些由属性钉板分支独立刷新）
-    const lockedModules = Object.values(MODULE_DEFS).filter(d => d.price > 0 && !d.isAttrPin && (!game.unlockedModuleTypes || !game.unlockedModuleTypes.includes(d.id)));
-    for (let i = 0; i < moduleCount && lockedModules.length > 0; i++) {
-        const def = lockedModules[Math.floor(Math.random() * lockedModules.length)];
+    // 模块商品：购买得到的是单个组件实例，不是无限使用的模板解锁。
+    const modulePool = Object.values(MODULE_DEFS).filter(d => d.price > 0 && !d.isAttrPin);
+    for (let i = 0; i < moduleCount && modulePool.length > 0; i++) {
+        const pickIdx = Math.floor(Math.random() * modulePool.length);
+        const def = modulePool.splice(pickIdx, 1)[0];
         items.push({ kind: 'module', moduleId: def.id, name: def.name, icon: def.icon, desc: def.desc, price: def.price });
     }
 
@@ -99,8 +100,7 @@ function generateInventory(game, count) {
     if (attrPinType) {
         const moduleId = `attr_pin_${attrPinType}`;
         const def = MODULE_DEFS[moduleId];
-        const alreadyUnlocked = (game.unlockedModuleTypes || []).includes(moduleId);
-        if (def && !alreadyUnlocked) {
+        if (def) {
             items.push({
                 kind: 'attr_pin',
                 moduleId,
@@ -242,11 +242,8 @@ export const run_shop = {
         }
         const cfg = CONFIG.gameplay || {};
         if (it.kind === 'module' || it.kind === 'attr_pin') {
-            if (!Array.isArray(this.unlockedModuleTypes)) this.unlockedModuleTypes = [];
-            if (!this.unlockedModuleTypes.includes(it.moduleId)) {
-                this.unlockedModuleTypes.push(it.moduleId);
-            }
-            if (window.showToast) window.showToast(`已解锁模块: ${it.name}`);
+            this.ownedModuleComponents = addModuleComponentToInventory(this.ownedModuleComponents, it.moduleId);
+            if (window.showToast) window.showToast(`获得钉盘组件: ${it.name}`);
         } else if (it.kind === 'slot_expand') {
             const totalSlots = (cfg.moduleCols || 4) * (cfg.moduleRows || 3);
             this.unlockedModuleSlots = Math.min(totalSlots, (this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3) + 1);

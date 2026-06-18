@@ -14,12 +14,17 @@
  * - 分数乘数重置 (sys_resetMultiplier)
  */
 import { Vec2, showToast, RuneLoot, Enemy, RewardDropEffect, FieldLootItem } from './entities.js';
-import { CONFIG } from './config.js';
+import { CONFIG, RELIC_DB } from './config.js';
 import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
 import { COUNTER_MAP, RUNE_DB } from './rune_config.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
-import { createDefaultModuleLayout, ensureModuleLayoutInstances } from './pinboard_modules.js';
+import {
+    addModuleComponentToInventory,
+    createDefaultModuleLayout,
+    ensureModuleLayoutInstances,
+    normalizeModuleInventory,
+} from './pinboard_modules.js';
 
 export const game_system = {
 
@@ -337,6 +342,13 @@ export const game_system = {
         }
         // ==================== [爽游模式] 结束 ====================
 
+        const debugStartRelicId = this.saveData?.debugStartRelicId;
+        const debugStartRelic = debugStartRelicId ? RELIC_DB.find(r => r.id === debugStartRelicId) : null;
+        if (debugStartRelic && typeof this.ui_selectRelic === 'function') {
+            this.ui_selectRelic(debugStartRelic, { skipClose: true, source: 'debug_start_relic' });
+            if (window.showToast) showToast(`测试开局遗物已生效：${debugStartRelic.name}`);
+        }
+
         // 生成初始敌人（使用 combatGridTopY 确保不被顶部半透明栏遮挡）
         const startY = this.combatGridTopY;
         for (let i = 0; i < CONFIG.gameplay.startRows; i++) {
@@ -493,12 +505,13 @@ export const game_system = {
         // ==================== [v2 钉板模块化] 模块系统状态 ====================
         // 钉板由 4×3 = 12 个模块槽组成，按 row-major 顺序解锁
         // 默认开放全部 12 个槽，预填 std_stagger
-        this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'rune_lattice', 'bouncer', 'funnel'];
+        this.unlockedModuleTypes = []; // legacy save compatibility only; placement uses ownedModuleComponents.
         this.unlockedModuleSlots = CONFIG.gameplay.moduleDefaultSlots || 3;
         this.currentModuleLayout = createDefaultModuleLayout(
             (CONFIG.gameplay.moduleCols || 4) * (CONFIG.gameplay.moduleRows || 3),
             this.unlockedModuleSlots
         );
+        this.ownedModuleComponents = [];
         // pendingFusions: 模块编辑器关闭时写入；phase_gathering_initPachinko 末尾消费
         // 形如 [{ element: 'pyro', count: 1, runeUid: '...' }]
         this.pendingFusions = [];
@@ -521,7 +534,7 @@ export const game_system = {
                 const parsed = JSON.parse(saved);
                 // 合并而非覆盖，确保新字段有默认值
                 this.saveData = Object.assign(
-                    { currency: 0, runeFragments: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0, runeInventory: [], discoveredRunewords: [] },
+                    { currency: 0, runeFragments: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0, runeInventory: [], discoveredRunewords: [], debugStartRelicId: null },
                     parsed
                 );
                 // 确保 runeInventory 字段存在
@@ -2539,6 +2552,7 @@ export const game_system = {
                 unlockedModuleTypes: (this.unlockedModuleTypes || []).slice(),
                 unlockedModuleSlots: this.unlockedModuleSlots || CONFIG.gameplay.moduleDefaultSlots || 3,
                 currentModuleLayout: this.currentModuleLayout ? JSON.parse(JSON.stringify(this.currentModuleLayout)) : null,
+                ownedModuleComponents: this.ownedModuleComponents ? JSON.parse(JSON.stringify(this.ownedModuleComponents)) : [],
                 pendingFusions: (this.pendingFusions || []).map(f => ({ ...f })),
                 // 技能
                 skillPoints: this.skillPoints || 0,
@@ -2690,7 +2704,7 @@ export const game_system = {
             this.boardLayout = state.boardLayout || 'default';
             this.unlockedModuleTypes = Array.isArray(state.unlockedModuleTypes)
                 ? state.unlockedModuleTypes.slice()
-                : (this.unlockedModuleTypes || ['std_stagger', 'dense_stagger', 'rune_lattice', 'bouncer', 'funnel']);
+                : [];
             this.unlockedModuleSlots = state.unlockedModuleSlots || this.unlockedModuleSlots || CONFIG.gameplay.moduleDefaultSlots || 3;
             {
                 const totalSlots = (CONFIG.gameplay.moduleCols || 4) * (CONFIG.gameplay.moduleRows || 3);
@@ -2699,6 +2713,15 @@ export const game_system = {
                     totalSlots,
                     this.unlockedModuleSlots
                 );
+            }
+            this.ownedModuleComponents = normalizeModuleInventory(state.ownedModuleComponents || []);
+            if (!Object.prototype.hasOwnProperty.call(state, 'ownedModuleComponents') && Array.isArray(state.unlockedModuleTypes)) {
+                const starterTypes = new Set(['std_stagger', 'dense_stagger', 'rune_lattice', 'bouncer', 'funnel']);
+                for (const moduleId of state.unlockedModuleTypes) {
+                    if (!starterTypes.has(moduleId)) {
+                        this.ownedModuleComponents = addModuleComponentToInventory(this.ownedModuleComponents, moduleId);
+                    }
+                }
             }
             this.pendingFusions = (state.pendingFusions || []).map(f => ({ ...f }));
 

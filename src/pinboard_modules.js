@@ -79,6 +79,19 @@ export function normalizeModuleEntry(entry) {
     return null;
 }
 
+export function normalizeModuleInventory(inventory) {
+    if (!Array.isArray(inventory)) return [];
+    return inventory
+        .map(entry => normalizeModuleEntry(entry))
+        .filter(entry => entry && !isModuleRef(entry) && getModuleIdFromEntry(entry));
+}
+
+export function addModuleComponentToInventory(inventory, moduleId) {
+    const next = normalizeModuleInventory(inventory);
+    if (MODULE_DEFS[moduleId]) next.push(createModuleInstance(moduleId));
+    return next;
+}
+
 export function ensureModuleLayoutInstances(layout, totalSlots, defaultSlots = CONFIG.gameplay.moduleDefaultSlots || 3) {
     const count = Math.max(0, totalSlots || DEFAULT_MODULE_SEQUENCE.length);
     const source = Array.isArray(layout) ? layout : createDefaultModuleLayout(count, defaultSlots);
@@ -850,9 +863,3 @@ export function getCoveredSlots(anchorIdx, span, totalCols, totalRows) {
     return out;
 }
 
-/**
- * 列出所有可放置的模块 ID（受 unlockedModuleTypes 限制）
- */
-export function listAvailableModules(unlockedModuleTypes) {
-    return (unlockedModuleTypes || []).filter(id => MODULE_DEFS[id]);
-}

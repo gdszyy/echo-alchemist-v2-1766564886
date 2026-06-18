@@ -5,16 +5,16 @@ import { getAmmoIconSrcByKey } from './bitmap_icons.js';
 import { getAmmoReadabilityProfile } from './utils/ammo_readability.js';
 import {
     MODULE_DEFS,
-    listAvailableModules,
     getModuleSpan,
     getCoveredSlots,
     calcModuleSlotRect,
     createDefaultModuleLayout,
-    createModuleInstance,
     createModuleRef,
     ensureModuleLayoutInstances,
+    getModuleInstance,
     getModuleIdFromEntry,
     isModuleRef,
+    normalizeModuleInventory,
     selectFusionTargetPegs,
 } from './pinboard_modules.js';
 import { fuseRuneIntoBoard, getRuneId } from './rune_system.js';
@@ -1641,8 +1641,9 @@ export const ui_system = {
             totalSlots,
             cfg.moduleDefaultSlots || 3
         );
+        this.ownedModuleComponents = normalizeModuleInventory(this.ownedModuleComponents);
         if (!Array.isArray(this.unlockedModuleTypes)) {
-            this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'rune_lattice', 'bouncer', 'funnel'];
+            this.unlockedModuleTypes = [];
         }
         if (typeof this.unlockedModuleSlots !== 'number') {
             this.unlockedModuleSlots = cfg.moduleDefaultSlots || 3;
@@ -1691,6 +1692,7 @@ export const ui_system = {
             const e = layout[i];
             if (e && !isModuleRef(e) && getModuleIdFromEntry(e)) placed++;
         }
+        const componentCount = normalizeModuleInventory(this.ownedModuleComponents).length;
         const runeCount = Array.isArray(this.runeInventory) ? this.runeInventory.length : 0;
         const runeBtnHtml = runeCount > 0
             ? `<button id="me-rune-btn" class="me-btn me-btn--rune">✨ 符文融合<span class="me-rune-badge">${runeCount}</span></button>`
@@ -1699,7 +1701,7 @@ export const ui_system = {
         layer.innerHTML = `
             <div class="me-topbar">
                 <div class="me-topbar-title">⚙ 钉板编辑</div>
-                <div class="me-topbar-hint">点击虚框区域更换模块 · 已放置 ${placed}/${cap}</div>
+                <div class="me-topbar-hint">点击虚框区域更换组件 · 已放置 ${placed}/${cap} · 库存 ${componentCount}</div>
             </div>
             <div class="me-bottombar">
                 ${runeBtnHtml}
@@ -1817,63 +1819,38 @@ export const ui_system = {
         return { ok: true, reason: '', covered, span };
     },
 
-    _moduleEditor_openPicker(slotIdx) {
-        this._moduleEditor_closePicker();
-        const layout = this.currentModuleLayout || [];
-        const curId = getModuleIdFromEntry(layout[slotIdx]);
-        const available = listAvailableModules(this.unlockedModuleTypes || []);
-
-        const itemsHtml = available.map(id => {
-            const def = MODULE_DEFS[id];
-            if (!def) return '';
-            const span = getModuleSpan(id);
-            const spanTag = (span.cols > 1 || span.rows > 1) ? ` <span class="me-picker-span">${span.cols}×${span.rows}</span>` : '';
-            const cur = id === curId ? ' is-current' : '';
-            return `<button type="button" class="me-picker-item${cur}" data-pick-module="${id}">
-                <div class="me-picker-icon">${def.icon || '▦'}</div>
-                <div class="me-picker-name">${def.name}${spanTag}</div>
-                <div class="me-picker-desc">${def.desc || ''}</div>
-            </button>`;
-        }).join('');
-
-        const removeHtml = curId
-            ? `<button type="button" class="me-picker-item is-remove" data-pick-module="__remove__">🗑 清空此区域</button>`
-            : '';
-        const bodyHtml = (itemsHtml || removeHtml)
-            ? `<div class="me-picker-grid">${itemsHtml}${removeHtml}</div>`
-            : `<div class="me-picker-empty">暂无可用模块，请在商店解锁。</div>`;
-
-        const backdrop = document.createElement('div');
-        backdrop.className = 'me-picker-backdrop';
-        backdrop.id = 'me-picker-backdrop';
-        backdrop.innerHTML = `
-            <div class="me-picker">
-                <div class="me-picker-head">
-                    <div class="me-picker-title">更换钉盘模块</div>
-                    <button class="me-picker-close" id="me-picker-close">✕</button>
-                </div>
-                <div class="me-picker-body">${bodyHtml}</div>
-            </div>`;
-        document.body.appendChild(backdrop);
-
-        backdrop.addEventListener('click', (e) => {
-            if (e.target === backdrop) this._moduleEditor_closePicker();
-        });
-        const closeBtn = backdrop.querySelector('#me-picker-close');
-        if (closeBtn) closeBtn.addEventListener('click', () => this._moduleEditor_closePicker());
-        backdrop.querySelectorAll('[data-pick-module]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                this._moduleEditor_applyModule(slotIdx, btn.dataset.pickModule);
-            });
-        });
-    },
-
     _moduleEditor_closePicker() {
         const bd = document.getElementById('me-picker-backdrop');
         if (bd) bd.remove();
         const rbd = document.getElementById('me-rune-picker-backdrop');
         if (rbd) rbd.remove();
         this._moduleEditorRunePreview = null;
+    },
+
+    _moduleEditor_normalizeComponentInventory() {
+        this.ownedModuleComponents = normalizeModuleInventory(this.ownedModuleComponents);
+        return this.ownedModuleComponents;
+    },
+
+    _moduleEditor_takeInventoryComponent(componentUid) {
+        const inventory = this._moduleEditor_normalizeComponentInventory();
+        const idx = inventory.findIndex(item => item && item.uid === componentUid);
+        if (idx < 0) return null;
+        const [component] = inventory.splice(idx, 1);
+        return component || null;
+    },
+
+    _moduleEditor_detachComponent(slotIdx, layout, cols, rows) {
+        const entry = layout[slotIdx];
+        const anchorIdx = isModuleRef(entry) ? entry.ref : slotIdx;
+        const component = getModuleInstance(layout[anchorIdx]);
+        const moduleId = getModuleIdFromEntry(component);
+        const covered = moduleId ? (getCoveredSlots(anchorIdx, getModuleSpan(moduleId), cols, rows) || [anchorIdx]) : [anchorIdx];
+        for (const ci of covered) layout[ci] = null;
+        if (component) {
+            this.ownedModuleComponents = normalizeModuleInventory([...(this.ownedModuleComponents || []), component]);
+        }
+        return component;
     },
 
     /**
@@ -1883,24 +1860,24 @@ export const ui_system = {
         this._moduleEditor_closePicker();
         const layout = this.currentModuleLayout || [];
         const curId = getModuleIdFromEntry(layout[slotIdx]);
-        const available = listAvailableModules(this.unlockedModuleTypes || []);
+        const inventory = this._moduleEditor_normalizeComponentInventory();
         const escapeHtml = (value) => String(value ?? '')
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
 
-        const itemsHtml = available.map(id => {
+        const itemsHtml = inventory.map(component => {
+            const id = getModuleIdFromEntry(component);
             const def = MODULE_DEFS[id];
             if (!def) return '';
             const span = getModuleSpan(id);
             const spanTag = (span.cols > 1 || span.rows > 1) ? ` <span class="me-picker-span">${span.cols}x${span.rows}</span>` : '';
             const placement = this._moduleEditor_getModulePlacementStatus(slotIdx, id);
-            const cur = id === curId ? ' is-current' : '';
             const disabled = placement.ok ? '' : ' is-disabled';
             const disabledAttr = placement.ok ? '' : ` disabled title="${escapeHtml(placement.reason)}"`;
             const desc = placement.ok ? (def.desc || '') : `不可放置：${placement.reason}`;
-            return `<button type="button" class="me-picker-item${cur}${disabled}" data-pick-module="${id}"${disabledAttr}>
+            return `<button type="button" class="me-picker-item${disabled}" data-pick-component="${escapeHtml(component.uid)}"${disabledAttr}>
                 <div class="me-picker-icon">${def.icon || '▦'}</div>
                 <div class="me-picker-name">${escapeHtml(def.name || id)}${spanTag}</div>
                 <div class="me-picker-desc">${escapeHtml(desc)}</div>
@@ -1912,7 +1889,7 @@ export const ui_system = {
             : '';
         const bodyHtml = (itemsHtml || removeHtml)
             ? `<div class="me-picker-grid">${itemsHtml}${removeHtml}</div>`
-            : '<div class="me-picker-empty">暂无可用模块，请在商店解锁。</div>';
+            : '<div class="me-picker-empty">库存没有可安装组件，请在商店购买。</div>';
 
         const backdrop = document.createElement('div');
         backdrop.className = 'me-picker-backdrop';
@@ -1920,7 +1897,7 @@ export const ui_system = {
         backdrop.innerHTML = `
             <div class="me-picker">
                 <div class="me-picker-head">
-                    <div class="me-picker-title">更换钉盘模块</div>
+                    <div class="me-picker-title">安装钉盘组件</div>
                     <button class="me-picker-close" id="me-picker-close">x</button>
                 </div>
                 <div class="me-picker-body">${bodyHtml}</div>
@@ -1932,112 +1909,58 @@ export const ui_system = {
         });
         const closeBtn = backdrop.querySelector('#me-picker-close');
         if (closeBtn) closeBtn.addEventListener('click', () => this._moduleEditor_closePicker());
-        backdrop.querySelectorAll('[data-pick-module]').forEach(btn => {
+        backdrop.querySelectorAll('[data-pick-component], [data-pick-module]').forEach(btn => {
             btn.addEventListener('click', () => {
                 if (btn.disabled) return;
                 if (_isCoarsePointerInput() && btn.dataset.touchReady !== 'true') {
-                    backdrop.querySelectorAll('[data-pick-module].is-previewing').forEach(el => {
+                    backdrop.querySelectorAll('[data-pick-component].is-previewing, [data-pick-module].is-previewing').forEach(el => {
                         el.classList.remove('is-previewing');
                         el.dataset.touchReady = 'false';
                     });
                     btn.classList.add('is-previewing');
                     btn.dataset.touchReady = 'true';
-                    showToast('再次點擊以套用該釘盤模組');
+                    showToast('再次点击以安装该钉盘组件');
                     return;
                 }
-                this._moduleEditor_applyModule(slotIdx, btn.dataset.pickModule);
+                this._moduleEditor_applyModule(slotIdx, btn.dataset.pickComponent || btn.dataset.pickModule);
             });
         });
-    },
-
-    _moduleEditor_applyModule(slotIdx, moduleId) {
-        const cfg = CONFIG.gameplay || {};
-        const cols = cfg.moduleCols || 4;
-        const rows = cfg.moduleRows || 3;
-        const totalSlots = cols * rows;
-        const cap = Math.min(this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3, totalSlots);
-        const layout = this.currentModuleLayout;
-
-        // 清除目标锚点原有的多格占位
-        const clearAnchor = (idx) => {
-            const cur = layout[idx];
-            const curId = getModuleIdFromEntry(cur);
-            if (curId) {
-                const covered = getCoveredSlots(idx, getModuleSpan(curId), cols, rows) || [idx];
-                for (const ci of covered) layout[ci] = null;
-            } else {
-                layout[idx] = null;
-            }
-        };
-
-        if (moduleId === '__remove__') {
-            clearAnchor(slotIdx);
-        } else {
-            const span = getModuleSpan(moduleId);
-            const covered = getCoveredSlots(slotIdx, span, cols, rows);
-            if (!covered) {
-                showToast(`该模块占用 ${span.cols}×${span.rows} 格，超出网格边界`);
-                return;
-            }
-            // 所有覆盖格必须在可编辑区域内
-            if (covered.some(ci => ci >= cap)) {
-                showToast(`该模块需要更多空间（占用 ${span.cols}×${span.rows} 格）`);
-                return;
-            }
-            // 先清空目标锚点自身，再检查其余覆盖格是否被别的模块占用
-            clearAnchor(slotIdx);
-            for (const ci of covered) {
-                const occ = layout[ci];
-                if (ci !== slotIdx && (getModuleIdFromEntry(occ) || isModuleRef(occ))) {
-                    showToast('该位置与相邻模块重叠，请先清空相邻区域');
-                    return;
-                }
-            }
-            layout[slotIdx] = createModuleInstance(moduleId);
-            for (const ci of covered) {
-                if (ci !== slotIdx) layout[ci] = createModuleRef(slotIdx);
-            }
-        }
-
-        // 重建实时钉板（不继承上一回合属性，确保所见即所得）
-        if (typeof this.phase_gathering_initPachinko === 'function') {
-            this.phase_gathering_initPachinko(false);
-        }
-        this._moduleEditor_closePicker();
-        this.ui_renderModuleEditorControls();
     },
 
     /**
      * 符文融合浮层：复用 picker 外壳，选中符文即注入钉板。
      */
-    _moduleEditor_applyModule(slotIdx, moduleId) {
+    _moduleEditor_applyModule(slotIdx, componentKey) {
         const cfg = CONFIG.gameplay || {};
         const cols = cfg.moduleCols || 4;
         const rows = cfg.moduleRows || 3;
         const layout = this.currentModuleLayout;
         if (!Array.isArray(layout)) return;
 
-        const clearAnchor = (idx) => {
-            const cur = layout[idx];
-            const curId = getModuleIdFromEntry(cur);
-            if (curId) {
-                const covered = getCoveredSlots(idx, getModuleSpan(curId), cols, rows) || [idx];
-                for (const ci of covered) layout[ci] = null;
-            } else {
-                layout[idx] = null;
-            }
-        };
-
-        if (moduleId === '__remove__') {
-            clearAnchor(slotIdx);
+        if (componentKey === '__remove__') {
+            this._moduleEditor_detachComponent(slotIdx, layout, cols, rows);
         } else {
+            const candidate = this._moduleEditor_normalizeComponentInventory()
+                .find(item => item && item.uid === componentKey);
+            const moduleId = getModuleIdFromEntry(candidate);
+            if (!candidate || !moduleId) {
+                showToast('该组件已不在库存中');
+                return;
+            }
+
             const placement = this._moduleEditor_getModulePlacementStatus(slotIdx, moduleId);
             if (!placement.ok) {
                 showToast(placement.reason || '该模块无法放置在这里');
                 return;
             }
-            clearAnchor(slotIdx);
-            layout[slotIdx] = createModuleInstance(moduleId);
+
+            const component = this._moduleEditor_takeInventoryComponent(componentKey);
+            if (!component) {
+                showToast('该组件已不在库存中');
+                return;
+            }
+            this._moduleEditor_detachComponent(slotIdx, layout, cols, rows);
+            layout[slotIdx] = component;
             for (const ci of placement.covered) {
                 if (ci !== slotIdx) layout[ci] = createModuleRef(slotIdx);
             }

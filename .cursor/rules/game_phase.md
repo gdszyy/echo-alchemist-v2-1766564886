@@ -51,8 +51,9 @@ globs: ["src/game_phase.js"]
 - **生成入口**：模块化钉盘由 `phase_gathering_initPachinko_v2()` 调用 `buildModuleEntities()` 构造各模块实体。
 - **默认钉盘**：缺失或长度不匹配的 `currentModuleLayout` 必须通过 `createDefaultModuleLayout(totalSlots, CONFIG.gameplay.moduleDefaultSlots)` 初始化；初始只开放 3 个组件，后续通过局内商店扩展槽位。
 - **组件实例**：`currentModuleLayout` 的管理单位是钉盘组件实例 `{ id, uid, pegStates, pluginStates }`；多格组件的非锚点槽位使用 `{ ref: anchorIdx }`。旧版字符串布局只允许在 `ensureModuleLayoutInstances()` 中兼容升级。
-- **融合承载模块**：`rune_lattice` 是默认解锁的符文融合承载模块，`rune_focus_module` 是商店解锁的强化融合模块；二者通过 `fusionPriority` 标记影响符文注入落点。
-- **模块扩展池**：商店解锁模块可组合现有 Peg / `SpecialSlot` 能力形成新玩法，如 `split_gate_module`（分裂槽）、`recall_loop_module`（召回槽）、`cascade_bank_module`（弹钉斜坡）、`crucible_core_module`（固定属性三角）、`double_wheel_module`（双轮盘）和 `fusion_garden_module`（2x1 融合承载）。
+- **组件库存**：可替换来源必须是 `ownedModuleComponents` 中的组件实例。商店或遗物获得组件时只能向该库存加入 1 个实例，禁止通过 `unlockedModuleTypes` 形成“解锁一次即可无限替换”的模板仓库。
+- **融合承载模块**：`rune_lattice` 是初始组件序列中的符文融合承载组件，`rune_focus_module` 是商店可购买的强化融合组件；二者通过 `fusionPriority` 标记影响符文注入落点。
+- **模块扩展池**：商店可出售的组件可组合现有 Peg / `SpecialSlot` 能力形成新玩法，如 `split_gate_module`（分裂槽）、`recall_loop_module`（召回槽）、`cascade_bank_module`（弹钉斜坡）、`crucible_core_module`（固定属性三角）、`double_wheel_module`（双轮盘）和 `fusion_garden_module`（2x1 融合承载）。
 - **密度参数**：模块内部最小钉距由 `CONFIG.physics.pegRadius`、`CONFIG.physics.marbleRadius` 与 `CONFIG.physics.pinboardSpacingBuffer` 共同决定；不得在模块生成器里重新硬编码旧版大弹珠间距。
 - **权重来源**：模块生成普通钉子时必须读取当前 `game.unlockedWeights`，其中 `white` 映射为普通钉子权重，`bounce`、`pierce`、`scatter`、`damage`、`cryo`、`pyro`、`wind` 按权重生成对应属性钉子。
 - **禁止类型**：与旧版 `phase_gathering_getRandomPegType()` 保持一致，`laser` 与 `lightning` 不得作为钉子类型生成。

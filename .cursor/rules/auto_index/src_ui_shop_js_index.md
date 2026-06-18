@@ -1,9 +1,7 @@
 # src\ui\shop.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 812 | 函数数: 11 | 语言: javascript
+> 自动生成于 2026-06-19 | 总行数: 856 | 函数数: 11 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
-
-**巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -17,14 +15,8 @@
 | _isCoarsePointerInput | function | `_isCoarsePointerInput()` |  |
 | ui_showRelicSelection | method | `ui_showRelicSelection(options = {})` |  |
 | renderRelicPreview | function | `renderRelicPreview(relic, cardEl)` |  |
-| ui_selectRelic | method | `ui_selectRelic(relic)` | ⚠️ 巨型函数，见 @section 导航 |
+| ui_selectRelic | method | `ui_selectRelic(relic, options = {})` |  |
 | ui_skipRelic | method | `ui_skipRelic()` |  |
 | ui_closeRelicSelection | method | `ui_closeRelicSelection()` |  |
 | ui_renderShop | method | `ui_renderShop()` |  |
 | _grantRunesByRarity | method | `_grantRunesByRarity(rarity, count)` |  |
-
-## 巨型函数内部节点 (@section 标记)
-
-### ui_selectRelic
-
-> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。

@@ -18,6 +18,7 @@ import { RUNE_DB } from '../rune_config.js';
 import { showToast } from '../entities.js';
 import { eventBus } from '../event_bus.js';
 import { getRelicIconSrc } from '../bitmap_icons.js'; // [Phase 5A Task 5.A7] 位图遗物图标
+import { addModuleComponentToInventory } from '../pinboard_modules.js';
 
 // ==================== [v2 即时感重塑] 子弹评分与属性操作辅助函数 ====================
 // 这些工具函数被 mirror_magazine / element_injector 调用以判定"最强/最弱"子弹与属性翻倍。
@@ -80,6 +81,9 @@ export const shop_system = {
         // 开局义务选择（run_start）时排除需要现有弹药序列才能生效的遗物
         const isRunStart = options.source === 'run_start';
         const showAllRelics = options.showAllRelics === true;
+        this.relicSelectionContext = showAllRelics && options.source === 'debug_pick_any_relic'
+            ? { mode: 'debug_start_relic' }
+            : null;
         const ammoRequiredRelics = new Set(['mirror_magazine', 'element_injector']);
         let pool = RELIC_DB.filter(r => {
             if (showAllRelics) return true;
@@ -121,43 +125,51 @@ export const shop_system = {
         // 3. 抄取遗物 (加权随机 & 不放回)
         // 早期游戏：提高推荐遗物的权重，确保至少出现一个推荐遗物
         const RECOMMENDED_WEIGHT_BOOST = 3; // 推荐遗物权重倍数
-        const drawCount = showAllRelics ? pool.length : choiceNum;
-        for(let i=0; i < drawCount; i++) {
-            if(pool.length === 0) break;
+        if (showAllRelics) {
+            const rarityOrder = { common: 1, rare: 2, epic: 3, legendary: 4, cursed: 5 };
+            choices.push(...pool.slice().sort((a, b) => {
+                const byRarity = (rarityOrder[a.rarity] || 99) - (rarityOrder[b.rarity] || 99);
+                if (byRarity !== 0) return byRarity;
+                return (a.name || a.id).localeCompare(b.name || b.id, 'zh-Hans-CN');
+            }));
+        } else {
+            for(let i=0; i < choiceNum; i++) {
+                if(pool.length === 0) break;
 
-            // A. 计算当前临时池子的总权重
-            let totalWeight = 0;
-            pool.forEach(r => {
-                let w = RARITY_WEIGHTS[r.rarity] || 10;
-                // 早期游戏且该遗物标记为推荐，则提升权重
-                if (isEarlyGame && r.recommended) w *= RECOMMENDED_WEIGHT_BOOST;
-                totalWeight += w;
-            });
+                // A. 计算当前临时池子的总权重
+                let totalWeight = 0;
+                pool.forEach(r => {
+                    let w = RARITY_WEIGHTS[r.rarity] || 10;
+                    // 早期游戏且该遗物标记为推荐，则提升权重
+                    if (isEarlyGame && r.recommended) w *= RECOMMENDED_WEIGHT_BOOST;
+                    totalWeight += w;
+                });
 
-            // B. 生成随机数 [0, totalWeight)
-            let randomVal = Math.random() * totalWeight;
-            let selectedIdx = -1;
+                // B. 生成随机数 [0, totalWeight)
+                let randomVal = Math.random() * totalWeight;
+                let selectedIdx = -1;
 
-            // C. 遍历寻找命中的遗物
-            for (let j = 0; j < pool.length; j++) {
-                let w = RARITY_WEIGHTS[pool[j].rarity] || 10;
-                if (isEarlyGame && pool[j].recommended) w *= RECOMMENDED_WEIGHT_BOOST;
-                randomVal -= w;
-                if (randomVal <= 0) {
-                    selectedIdx = j;
-                    break;
+                // C. 遍历寻找命中的遗物
+                for (let j = 0; j < pool.length; j++) {
+                    let w = RARITY_WEIGHTS[pool[j].rarity] || 10;
+                    if (isEarlyGame && pool[j].recommended) w *= RECOMMENDED_WEIGHT_BOOST;
+                    randomVal -= w;
+                    if (randomVal <= 0) {
+                        selectedIdx = j;
+                        break;
+                    }
                 }
+
+                if (selectedIdx === -1) selectedIdx = 0;
+
+                choices.push(pool[selectedIdx]);
+                pool.splice(selectedIdx, 1);
             }
-
-            if (selectedIdx === -1) selectedIdx = 0;
-
-            choices.push(pool[selectedIdx]);
-            pool.splice(selectedIdx, 1);
         }
 
         // 计数器自增（每次打开遗物选择界面时计数）
-        this.relicSelectionCount = (this.relicSelectionCount || 0) + 1;
-        const showRecommendation = this.relicSelectionCount <= 3;
+        if (!showAllRelics) this.relicSelectionCount = (this.relicSelectionCount || 0) + 1;
+        const showRecommendation = !showAllRelics && this.relicSelectionCount <= 3;
         const renderRelicPreview = (relic, cardEl) => {
             const preview = document.getElementById('relic-preview-panel');
             if (!preview || !relic) return;
@@ -204,6 +216,7 @@ export const shop_system = {
                 const el = document.createElement('div');
                 el.className = `relic-card ${relic.rarity || 'common'}`; 
                 el.tabIndex = 0;
+                el.dataset.rarity = relic.rarity || 'common';
                 const count = (this.ownedRelics || []).filter(id => id === relic.id).length;
                 const max = relic.maxStacks || 1;
                 const stackInfo = max > 1 ? `<div class="relic-stack text-xs text-amber-400 mt-1">当前层数: ${count} / ${max}</div>` : '';
@@ -260,6 +273,16 @@ export const shop_system = {
         // 5. 显示界面
         const overlay = document.getElementById('phase-relic');
         if (overlay) {
+            overlay.classList.toggle('relic-debug-picker', showAllRelics);
+            const titleEl = overlay.querySelector('.relic-title-block h2');
+            const subtitleEl = overlay.querySelector('.relic-title-block p');
+            if (titleEl) titleEl.textContent = showAllRelics ? '测试遗物库' : '古代遺物';
+            if (subtitleEl) subtitleEl.textContent = showAllRelics ? '选择任意遗物用于本轮测试' : '命運的饋贈，選擇一種力量';
+            const skipBtn = document.getElementById('relic-skip-to-shop-btn');
+            if (skipBtn) {
+                skipBtn.textContent = showAllRelics ? '返回商店' : '放棄遺物 → 進入局內商店';
+                skipBtn.onclick = showAllRelics ? () => this.ui_closeRelicSelection() : () => this.ui_skipRelic();
+            }
             overlay.style.display = 'flex';
             overlay.classList.remove('hidden-phase');
             overlay.classList.add('active-phase');
@@ -271,7 +294,17 @@ export const shop_system = {
     /**
      * 玩家选择遗物
      */
-    ui_selectRelic(relic) {
+    ui_selectRelic(relic, options = {}) {
+        if (this.relicSelectionContext?.mode === 'debug_start_relic') {
+            if (!this.saveData) this.saveData = {};
+            this.saveData.debugStartRelicId = relic.id;
+            if (typeof this.sys_saveData === 'function') this.sys_saveData();
+            if (window.showToast) showToast(`已设置开局遗物：${relic.name}`);
+            this.relicSelectionContext = null;
+            this.ui_closeRelicSelection();
+            return;
+        }
+
         if (!this.ownedRelics) this.ownedRelics = [];
         this.ownedRelics.push(relic.id);
         if (window.showToast) showToast(`獲得遺物: ${relic.name}`);
@@ -322,11 +355,10 @@ export const shop_system = {
             if (window.showToast) showToast(`钉板模块槽位 +${amount}（当前 ${this.unlockedModuleSlots}/${totalSlots}）`);
         }
         else if (relic.effect === 'unlock_module_type') {
-            if (!Array.isArray(this.unlockedModuleTypes)) this.unlockedModuleTypes = [];
             const moduleId = relic.moduleId;
-            if (moduleId && !this.unlockedModuleTypes.includes(moduleId)) {
-                this.unlockedModuleTypes.push(moduleId);
-                if (window.showToast) showToast(`已解锁钉板模块：${relic.name || moduleId}`);
+            if (moduleId) {
+                this.ownedModuleComponents = addModuleComponentToInventory(this.ownedModuleComponents, moduleId);
+                if (window.showToast) showToast(`获得钉板组件：${relic.name || moduleId}`);
             }
         } else if (relic.effect === 'row_count_up') {
             this.currentRows = (this.currentRows || 0) + 2;
@@ -535,7 +567,7 @@ export const shop_system = {
         }
         // ============================================================================
 
-        this.ui_closeRelicSelection();
+        if (!options.skipClose) this.ui_closeRelicSelection();
     },
 
     /**
@@ -550,8 +582,10 @@ export const shop_system = {
         if (overlay) {
             overlay.style.display = 'none';
             overlay.classList.remove('active-phase');
+            overlay.classList.remove('relic-debug-picker');
             overlay.classList.add('hidden-phase');
         }
+        this.relicSelectionContext = null;
         const returnState = this.relicOverlayReturnState || { phase: this.stateBeforeRelic };
         this.relicOverlayReturnState = null;
         // 标记本回合已弃权遗物，避免回到 resolver 时再次弹出（防止重复打开）
@@ -589,8 +623,10 @@ export const shop_system = {
         if (overlay) {
             overlay.style.display = 'none';
             overlay.classList.remove('active-phase');
+            overlay.classList.remove('relic-debug-picker');
             overlay.classList.add('hidden-phase');
         }
+        this.relicSelectionContext = null;
 
         const returnState = this.relicOverlayReturnState || { phase: this.stateBeforeRelic };
         this.relicOverlayReturnState = null;
@@ -705,6 +741,10 @@ export const shop_system = {
                 card.className = `shop-upgrade-card bg-slate-900/60 border ${isMax ? 'border-slate-700 opacity-80' : 'border-slate-700/50'} p-4 rounded-xl flex flex-col gap-3 relative overflow-hidden group`;
                 card.tabIndex = 0;
                 const previewState = { level, isMax, cost, resDef, canAfford };
+                const isDebugRelicPicker = upgrade.effect && upgrade.effect.type === 'debug_pick_any_relic';
+                const selectedDebugRelic = isDebugRelicPicker && this.saveData?.debugStartRelicId
+                    ? RELIC_DB.find(r => r.id === this.saveData.debugStartRelicId)
+                    : null;
 
                 const topRow = document.createElement('div');
                 topRow.className = 'flex justify-between items-start';
@@ -724,14 +764,18 @@ export const shop_system = {
                 
                 const levelBadge = document.createElement('div');
                 levelBadge.className = `px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] font-mono ${isMax ? 'text-amber-500' : 'text-slate-400'}`;
-                levelBadge.innerText = isMax ? 'MAX' : `LV.${level}`;
+                levelBadge.innerText = isDebugRelicPicker
+                    ? (selectedDebugRelic ? '已选' : '未选')
+                    : (isMax ? 'MAX' : `LV.${level}`);
                 
                 topRow.appendChild(iconGroup);
                 topRow.appendChild(levelBadge);
                 
                 const desc = document.createElement('div');
                 desc.className = 'shop-upgrade-desc text-xs text-slate-400 leading-relaxed min-h-[3em]';
-                desc.innerText = upgrade.desc;
+                desc.innerText = selectedDebugRelic
+                    ? `${upgrade.desc}\n当前开局遗物：${selectedDebugRelic.name}`
+                    : upgrade.desc;
                 
                 const bottomRow = document.createElement('div');
                 bottomRow.className = 'flex items-center justify-between mt-auto pt-2 border-t border-slate-800/50';
@@ -745,7 +789,7 @@ export const shop_system = {
                     
                     const buyBtn = document.createElement('button');
                     buyBtn.className = `px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${canAfford ? 'bg-amber-500 hover:bg-amber-400 text-slate-900 shadow-lg shadow-amber-500/20' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`;
-                    buyBtn.innerText = '升级';
+                    buyBtn.innerText = isDebugRelicPicker ? '选择' : '升级';
                     buyBtn.onclick = (e) => {
                         e.stopPropagation();
                         if (typeof this.meta_buyUpgrade === 'function') this.meta_buyUpgrade(upgrade.id);

@@ -1722,46 +1722,46 @@ const RELIC_DB = [
         amount: 4,
         maxStacks: 2
     },
-    // 模块类型解锁
+    // 模块组件获取：获得的是单个可拆装组件，不是无限模板解锁。
     {
         id: 'unlock_module_wheel',
         name: '機械轉盤',
         icon: '🎰',
-        desc: '解鎖 [轉盤模塊]：可放置在釘板上，弹珠落入後觸發屬性翻倍輪盤。',
+        desc: '獲得 1 個 [轉盤組件]：可安裝到釘板槽位，弹珠落入後觸發屬性翻倍輪盤。',
         rarity: 'rare',
         effect: 'unlock_module_type',
         moduleId: 'wheel_module',
-        maxStacks: 1
+        maxStacks: 3
     },
     {
         id: 'unlock_module_baffle',
         name: '能量擋板',
         icon: '⫽',
-        desc: '解鎖 [擋板模塊]：傾斜的高彈性平面，將弹珠導向特定方向。',
+        desc: '獲得 1 個 [擋板組件]：傾斜的高彈性平面，將弹珠導向特定方向。',
         rarity: 'rare',
         effect: 'unlock_module_type',
         moduleId: 'baffle',
-        maxStacks: 1
+        maxStacks: 3
     },
     {
         id: 'unlock_module_fixed_slot',
         name: '固定機關槽',
         icon: '◈',
-        desc: '解鎖 [固定特殊槽模塊]：在固定位置生成回溯/連射/分裂槽。',
+        desc: '獲得 1 個 [固定特殊槽組件]：在固定位置生成回溯/連射/分裂槽。',
         rarity: 'epic',
         effect: 'unlock_module_type',
         moduleId: 'fixed_slot',
-        maxStacks: 1
+        maxStacks: 3
     },
     {
         id: 'unlock_module_element_pair',
         name: '冰火元素對',
         icon: '❄🔥',
-        desc: '解鎖 [元素對模塊]：固定生成 1 顆冰霜釘 + 1 顆火焰釘，無需融合。',
+        desc: '獲得 1 個 [元素對組件]：固定生成 1 顆冰霜釘 + 1 顆火焰釘，無需融合。',
         rarity: 'rare',
         effect: 'unlock_module_type',
         moduleId: 'cryo_pyro_pair',
-        maxStacks: 1
+        maxStacks: 3
     },
 ];
 

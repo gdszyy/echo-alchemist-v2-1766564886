@@ -254,7 +254,7 @@ class Game {
         this.frameDamageAccumulator = 0; 
         this.slowMotionTimer = 0;        
         this.slowMotionThreshold = 100;  
-        this.saveData = { currency: 0, runeFragments: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0 };
+        this.saveData = { currency: 0, runeFragments: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0, debugStartRelicId: null };
         this.runCurrency = 0;
         // ==================== 本局统计字段 ====================
         this.runKillCount = 0;          // 本局击杀数
@@ -263,12 +263,13 @@ class Game {
         this.runewordKillCount = 0;      // [词条 Hook] 嗜血初锋: 本局击杀累计数，跨回合持久
 
         // ==================== [v2 钉板模块化] 模块系统状态 ====================
-        this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'rune_lattice', 'bouncer', 'funnel'];
+        this.unlockedModuleTypes = []; // legacy save compatibility only; placement uses ownedModuleComponents.
         this.unlockedModuleSlots = CONFIG.gameplay.moduleDefaultSlots || 3;
         this.currentModuleLayout = createDefaultModuleLayout(
             (CONFIG.gameplay.moduleCols || 4) * (CONFIG.gameplay.moduleRows || 3),
             this.unlockedModuleSlots
         );
+        this.ownedModuleComponents = [];
         this.pendingFusions = [];
 
         // ==================== [v2 局内商店 + 符文碎片经济] ====================
