@@ -1,9 +1,9 @@
-# src/entities.js 函数索引
+# src\entities.js 函数索引
 
-> 自动生成于 2026-04-26 | 总行数: 4835 | 函数数: 108 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 5026 | 函数数: 96 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 4 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -12,31 +12,25 @@
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
 | setAudioProvider | function | `setAudioProvider(provider)` |  |
-| MarbleDefinition | class | `MarbleDefinition()` |  |
 | constructor | method | `constructor(type)` |  |
 | getName | method | `getName()` |  |
 | getColor | method | `getColor()` |  |
-| SpecialSlot | class | `SpecialSlot()` |  |
 | constructor | method | `constructor(x, y, x2, y2, type)` |  |
 | draw | method | `draw(ctx)` |  |
-| FortuneWheel | class | `FortuneWheel()` |  |
 | constructor | method | `constructor(game)` |  |
 | spin | method | `spin(x, y, collectedAttributes, callback)` |  |
 | update | method | `update(timeScale)` |  |
 | getCurrentSlice | method | `getCurrentSlice()` |  |
 | finalizeResult | method | `finalizeResult()` |  |
 | draw | method | `draw(ctx)` |  |
-| GhostPeg | class | `GhostPeg()` |  |
 | constructor | method | `constructor(x, y, type, level)` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
-| TriangleSideWheel | class | `TriangleSideWheel()` |  |
 | constructor | method | `constructor(x, y, side, game)` |  |
 | spin | method | `spin(callback)` |  |
 | getCurrentSlice | method | `getCurrentSlice()` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
-| Peg | class | `Peg()` |  |
 | constructor | method | `constructor(x, y, type = 'normal')` |  |
 | getColor | method | `getColor()` |  |
 | upgrade | method | `upgrade()` |  |
@@ -45,7 +39,7 @@
 | resetCooldown | method | `resetCooldown()` |  |
 | calculateLight | method | `calculateLight(sourcePos, lightRadius)` |  |
 | hit | method | `hit(impactSpeed = 5)` |  |
-| draw | method | `draw(ctx, baseRadius, tilt = {x:0, y:0})` | ⚠️ 巨型函数，见 @section 导航 |
+| draw | method | `draw(ctx, baseRadius, tilt = {x:0, y:0})` |  |
 | drawSwordPeg | method | `drawSwordPeg(ctx, r, isLit)` |  |
 | drawWindPeg | method | `drawWindPeg(ctx, r, isLit)` |  |
 | drawCryoPeg | method | `drawCryoPeg(ctx, r, isLit)` |  |
@@ -56,27 +50,25 @@
 | drawDamagePeg | method | `drawDamagePeg(ctx, r, isLit)` |  |
 | drawLaserPeg | method | `drawLaserPeg(ctx, r, isLit)` |  |
 | drawPinkPeg | method | `drawPinkPeg(ctx, r, isLit)` |  |
+| drawResonancePeg | method | `drawResonancePeg(ctx, r, isLit)` |  |
+| drawVenomPeg | method | `drawVenomPeg(ctx, r, isLit)` |  |
 | drawLayoutRoleStyle | method | `drawLayoutRoleStyle(ctx, r)` |  |
 | drawLevelPips | method | `drawLevelPips(ctx, r)` |  |
 | update | method | `update()` |  |
-| DropBall | class | `DropBall()` |  |
 | constructor | method | `constructor(x, y, marbleDef, session)` |  |
 | getBuffState | method | `getBuffState()` |  |
 | handlePegInteraction | method | `handlePegInteraction(peg, game)` |  |
-| update | method | `update(pegs, slots, width, height, timeScale, tilt = {x:0, y:0})` | ⚠️ 巨型函数，见 @section 导航 |
+| update | method | `update(pegs, slots, width, height, timeScale, tilt = {x:0, y:0})` |  |
 | stopSound | method | `stopSound()` |  |
 | draw | method | `draw(ctx)` | ⚠️ 巨型函数，见 @section 导航 |
 | _drawBaseBall | method | `_drawBaseBall(ctx, r, cLight, cDark)` |  |
 | _drawHighlight | method | `_drawHighlight(ctx, r)` |  |
-| SwordQi | class | `SwordQi()` |  |
 | constructor | method | `constructor(x, y, velocity, width)` |  |
 | update | method | `update(timeScale, enemies, game)` |  |
 | draw | method | `draw(ctx)` |  |
-| SlashAnim | class | `SlashAnim()` |  |
 | constructor | method | `constructor(x, y, angle, scale=1, color='#0ea5e9')` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
-| SonSword | class | `SonSword()` |  |
 | constructor | method | `constructor(x, y, mother, level, config, startDelay = 0)` |  |
 | addTarget | method | `addTarget(enemy)` |  |
 | searchForTarget | method | `searchForTarget(enemies)` |  |
@@ -85,11 +77,9 @@
 | stickToEnemy | method | `stickToEnemy(enemy, game)` |  |
 | triggerRecall | method | `triggerRecall(targetPos)` |  |
 | draw | method | `draw(ctx)` |  |
-| CloneSpore | class | `CloneSpore()` |  |
 | constructor | method | `constructor(startX, startY, targetX, targetY, onLandCallback)` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
-| Player | class | `Player()` |  |
 | constructor | method | `constructor(game)` |  |
 | getPosition | method | `getPosition()` |  |
 | updatePosition | method | `updatePosition()` |  |
@@ -111,11 +101,9 @@
 | drawOrbitals | method | `drawOrbitals(ctx, pos, recipe)` |  |
 | drawAimLine | method | `drawAimLine(ctx)` |  |
 | drawIdleCannon | method | `drawIdleCannon(ctx)` |  |
-| FieldLootItem | class | `FieldLootItem()` |  |
 | constructor | method | `constructor(x, y, type)` |  |
 | update | method | `update(timeScale = 1)` |  |
 | draw | method | `draw(ctx)` |  |
-| RuneLoot | class | `RuneLoot()` |  |
 | constructor | method | `constructor(x, y, runeId)` |  |
 | draw | method | `draw(ctx)` |  |
 | checkPickup | method | `checkPickup(playerPos, radius = 30)` |  |
@@ -124,32 +112,7 @@
 
 ### draw
 
-> 定位：`grep -n '@section:{}'` 跳转到对应节点
-
-| 节点标记 | 说明 |
-|----------|------|
-| `@section:peg_base_fill_and_glow` | 基础圆形填充与发光效果 |
-| `@section:peg_type_icons` | 各属性钉子专属图标绘制 |
-| `@section:peg_border_and_level_pip` | 钉子边框、等级指示器与光照反光 |
-
-### update
-
-> 定位：`grep -n '@section:{}'` 跳转到对应节点
-
-| 节点标记 | 说明 |
-|----------|------|
-| `@section:particle_emission` | 基于当前属性的粒子拖尾生成 |
-| `@section:gravity_and_tilt_physics` | 重力计算与倾斜加速度衰减 |
-| `@section:slot_detection` | 底部槽位碰撞检测与属性收集触发 |
-| `@section:peg_collision_resolution` | 钉子碰撞解算（增强版物理 + 布局修正） |
-| `@section:layout_special_effects` | 布局专属特殊效果（漏斗/菱形/稀疏通道） |
-| `@section:attribute_collection` | 属性收集逻辑与实时合成判断 |
-| `@section:sparse_channel_charge` | sparse 布局通道蓄力检测 |
-| `@section:ghost_peg_collision` | diamond 布局虚影钉子碰撞检测 |
-
-### draw
-
-> 定位：`grep -n '@section:{}'` 跳转到对应节点
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|
@@ -162,18 +125,30 @@
 
 ### update
 
-> 定位：`grep -n '@section:{}'` 跳转到对应节点
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|
 | `@section:son_sword_target_search` | 节流自动寻敌与目标验证 |
 | `@section:son_sword_steering` | 基于角度的转向与移动逻辑 |
 
+
 ## 其他 @section 标记
 
 | 节点标记 | 说明 |
 |----------|------|
 | `@section:peg_shadow_and_transform` | 软阴影与碰撞旋转变换初始化 |
+| `@section:peg_base_fill_and_glow` | 基础圆形填充与发光效果 |
+| `@section:peg_type_icons` | 各属性钉子专属图标绘制 |
+| `@section:peg_border_and_level_pip` | 钉子边框、等级指示器与光照反光 |
 | `@section:peg_audio_feedback` | 钉子属性触发音效路由（mutation→playMagic, upgrade→playPowerup, attribute→playMagic） |
+| `@section:particle_emission` | 基于当前属性的粒子拖尾生成 |
+| `@section:gravity_and_tilt_physics` | 重力计算与倾斜加速度衰减 |
+| `@section:slot_detection` | 底部槽位碰撞检测与属性收集触发 |
+| `@section:peg_collision_resolution` | 钉子碰撞解算（增强版物理 + 布局修正） |
+| `@section:layout_special_effects` | 布局专属特殊效果（漏斗/菱形/稀疏通道） |
+| `@section:attribute_collection` | 属性收集逻辑与实时合成判断 |
+| `@section:sparse_channel_charge` | sparse 布局通道蓄力检测 |
+| `@section:ghost_peg_collision` | diamond 布局虚影钉子碰撞检测 |
 | `@section:son_sword_state_machine` | 子剑状态机：冲刺/悬停/回收分支 |
 | `@section:charge_shot_audio` | 玩家蓄力发射开始音效（高频 800Hz，区别于敌人预警 200Hz） |

@@ -1,6 +1,6 @@
-# tests/ai_test_runner.js 函数索引
+# tests\ai_test_runner.js 函数索引
 
-> 自动生成于 2026-04-25 | 总行数: 435 | 函数数: 13 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 435 | 函数数: 14 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -9,16 +9,17 @@
 
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
+| getArg | function | `getArg(name)` |  |
 | assert | function | `assert(condition, message)` |  |
-| waitForPhase | function | `async waitForPhase(page, phase, timeout = TIMEOUT_MS)` |  |
-| waitForCondition | function | `async waitForCondition(page, condFn, timeout = TIMEOUT_MS)` |  |
-| enterTrainingGround | function | `async enterTrainingGround(page)` |  |
-| loadScenario | function | `async loadScenario(page, scenarioId)` |  |
-| triggerDemo | function | `async triggerDemo(page, scenarioId)` |  |
-| runTest | function | `async runTest(name, fn)` |  |
-| runSuite | function | `async runSuite(name, fn, page)` |  |
-| suiteSmoke | function | `async suiteSmoke(page)` |  |
-| suiteRelic | function | `async suiteRelic(page)` |  |
-| suiteEssence | function | `async suiteEssence(page)` |  |
-| suiteRuneword | function | `async suiteRuneword(page)` |  |
-| suiteEnemy | function | `async suiteEnemy(page)` |  |
+| waitForPhase | function | `waitForPhase(page, phase, timeout = TIMEOUT_MS)` |  |
+| waitForCondition | function | `waitForCondition(page, condFn, timeout = TIMEOUT_MS)` |  |
+| enterTrainingGround | function | `enterTrainingGround(page)` |  |
+| loadScenario | function | `loadScenario(page, scenarioId)` |  |
+| triggerDemo | function | `triggerDemo(page, scenarioId)` |  |
+| runTest | function | `runTest(name, fn)` |  |
+| runSuite | function | `runSuite(name, fn, page)` |  |
+| suiteSmoke | function | `suiteSmoke(page)` |  |
+| suiteRelic | function | `suiteRelic(page)` |  |
+| suiteEssence | function | `suiteEssence(page)` |  |
+| suiteRuneword | function | `suiteRuneword(page)` |  |
+| suiteEnemy | function | `suiteEnemy(page)` |  |

@@ -50,6 +50,14 @@ globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js", "src/c
   - 条件: 任意3个符文。
   - 结果: 消耗这3个符文，产出1个新符文，等级为这3个符文等级的平均値（向下取整）。新符文 ID 通过 `loot_calcRuneDrop` 获取。
 - **原子性**: 两个操作都必须有严格的预检机制，确保扣除和产出同时成功或失败。
+- **钉盘融合 (`fuseRuneIntoBoard`)**: 模块编辑器里的符文融合会从 `runeInventory` 消耗 1 枚符文，写入 `pendingFusions`，同步更新 `saveData.runeInventory` 并保存；UI 必须立即重建当前钉盘，使融合后的属性钉在开始采集前可见。
+- **融合落点**: `phase_gathering_initPachinko` 应用 `pendingFusions` 时会优先选择 `fusionPriority` 高的普通钉子；`rune_lattice` / `rune_focus_module` 负责提供这种融合承载结构。符文等级会提升注入钉子的 `level`，上限为 3。
+
+### 4.1 钉盘融合交互约定
+
+- `ui_system.js` 的模块编辑器符文融合入口必须采用“选择符文 → 画布高亮预览目标钉 → 确认融合”的两步交互，禁止点选符文行时直接消耗。
+- 预览与实际注入必须共用 `selectFusionTargetPegs()`，确保高亮位置与确认后的属性钉位置一致。
+- 关闭符文融合弹层或切换到模块选择弹层时必须清空 `_moduleEditorRunePreview`，避免残留高亮。
 
 ## 5. 数据结构 (`rune_config.js`)
 - 符文对象标准格式: `{ id: String, level: Number }`。
@@ -120,9 +128,9 @@ globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js", "src/c
 
 战斗阶段顶部 UI 的"GET RUNE"充能条系统。玩家通过击中/击杀敌人积累充能值，充能条满时刷新一次预览符文（并记录充能次数），战斗结束后领取最终预览符文进入背包。
 
-### 8.2 当前 Bug（必须修复）
+### 8.2 已修复问题
 
-`combat_runeCharge_levelUp` 中调用 `loot_calcRuneDrop` 时，未适配其新返回值格式 `{ runeId, level }`，仍按旧的字符串格式处理，导致 `runeChargeCurrentRune` 永远为 `null`，充能奖励系统完全失效。
+`combat_runeCharge_levelUp` 曾调用 `loot_calcRuneDrop` 并按旧字符串格式处理，导致 `runeChargeCurrentRune` 永远为 `null`。当前实现已改为 `_runeCharge_draw(chargeLevel)`，直接返回 `{ runeDef, runeLevel }`，并同步写入 `runeChargeCurrentRune` 与 `runeChargeCurrentLevel`。
 
 ### 8.3 状态字段
 

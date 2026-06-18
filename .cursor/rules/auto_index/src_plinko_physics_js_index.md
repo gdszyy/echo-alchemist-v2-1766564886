@@ -1,6 +1,6 @@
-# src/plinko_physics.js 函数索引
+# src\plinko_physics.js 函数索引
 
-> 自动生成于 2026-04-26 | 总行数: 597 | 函数数: 15 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 597 | 函数数: 15 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表

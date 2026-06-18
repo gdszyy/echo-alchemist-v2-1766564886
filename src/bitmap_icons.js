@@ -61,7 +61,7 @@ export const RUNE_ICON_MAP = {
 };
 
 // ============================================================
-// Task 5.A7 — 遗物图标映射（53 种遗物 64×64）
+// Task 5.A7 — 遗物图标映射（58 种遗物 64×64）
 // key 对应 RELIC_DB 中的 id 字段
 // ============================================================
 export const RELIC_ICON_MAP = {
@@ -98,6 +98,11 @@ export const RELIC_ICON_MAP = {
     surge_damage:              'assets/icons/relic/surge_damage.png',
     surge_cryo:                'assets/icons/relic/surge_cryo.png',
     surge_pyro:                'assets/icons/relic/surge_pyro.png',
+    rune_siphon:               'assets/icons/relic/rune_siphon.png',
+    ammo_bandolier:            'assets/icons/relic/ammo_bandolier.png',
+    opening_salvo:             'assets/icons/relic/opening_salvo.png',
+    thunder_coil:              'assets/icons/relic/thunder_coil.png',
+    ember_fuse:                'assets/icons/relic/ember_fuse.png',
     alchemist_powder_tube:     'assets/icons/relic/alchemist_powder_tube.png',
     smuggler_pouch_common:     'assets/icons/relic/smuggler_pouch_common.png',
     smuggler_chest_rare:       'assets/icons/relic/smuggler_chest_rare.png',
@@ -149,6 +154,9 @@ export function getAmmoIconSrc(recipe) {
     if (recipe.isMatryoshka)                                       return AMMO_ICON_MAP.matryoshka;
     if (recipe.type === 'rainbow' || recipe._marbleType === 'rainbow')     return AMMO_ICON_MAP.rainbow;
     if (recipe.type === 'resonance' || recipe._marbleType === 'resonance') return AMMO_ICON_MAP.resonance;
+    if (recipe.type === 'venom' || recipe._marbleType === 'venom') return AMMO_ICON_MAP.venom;
+    if (recipe.type === 'overcharge' || recipe._marbleType === 'overcharge') return AMMO_ICON_MAP.overcharge;
+    if (recipe.type === 'echo' || recipe._marbleType === 'echo') return AMMO_ICON_MAP.echo;
     if (recipe.type === 'flying_sword' || recipe.flying_sword)     return AMMO_ICON_MAP.flying_sword;
     if (recipe.wind)                                               return AMMO_ICON_MAP.wind;
     if (recipe.isLaser)    return AMMO_ICON_MAP.laser;

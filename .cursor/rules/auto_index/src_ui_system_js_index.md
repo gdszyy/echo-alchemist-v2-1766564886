@@ -1,9 +1,9 @@
-# src/ui_system.js 函数索引
+# src\ui_system.js 函数索引
 
-> 自动生成于 2026-04-26 | 总行数: 835 | 函数数: 42 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 1999 | 函数数: 53 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -18,13 +18,14 @@
 | ui_updateSlowMotion | method | `ui_updateSlowMotion()` |  |
 | ui_updateMetaCurrency | method | `ui_updateMetaCurrency()` |  |
 | ui_updateRuneCountDisplay | method | `ui_updateRuneCountDisplay()` |  |
+| ui_updateShieldPill | method | `ui_updateShieldPill()` |  |
 | ui_getSelectionRequirement | method | `ui_getSelectionRequirement()` |  |
 | ui_isSelectionConfirmReady | method | `ui_isSelectionConfirmReady()` |  |
-| ui_getPureEssenceLegalElements | method | `ui_getPureEssenceLegalElements(marbleDef)` |  |
 | ui_getPureEssenceRuneOptions | method | `ui_getPureEssenceRuneOptions(marbleDef)` |  |
 | ui_selectPureEssenceRune | method | `ui_selectPureEssenceRune(selectionIndex, inventoryIndex)` |  |
 | ui_renderPureEssencePanel | method | `ui_renderPureEssencePanel(marbleDef, selectionIndex)` |  |
 | ui_isFateMomentPhase | method | `ui_isFateMomentPhase()` |  |
+| ui_showChaosBulletSlotMachine | method | `ui_showChaosBulletSlotMachine(slotAttrs, finalPicks, ATTR_LABEL, allSame, onComplete)` |  |
 | ui_renderReplaceAmmoUI | method | `ui_renderReplaceAmmoUI()` | ⚠️ 巨型函数，见 @section 导航 |
 | ui_toggleReplaceAmmoCard | method | `ui_toggleReplaceAmmoCard(globalIdx)` |  |
 | ui_selectReplaceAmmoTarget | method | `ui_selectReplaceAmmoTarget(ammoIdx)` |  |
@@ -33,7 +34,8 @@
 | meta_spendResource | method | `meta_spendResource(resourceId, amount)` |  |
 | ui_updateUI | method | `ui_updateUI()` |  |
 | ui_updatePCLayout | method | `ui_updatePCLayout()` |  |
-| _ui_updateLeftSidebarContent | method | `_ui_updateLeftSidebarContent(phase, wasPC)` |  |
+| _ui_updateLeftSidebarContent | method | `_ui_updateLeftSidebarContent(phase /* , wasPC */)` |  |
+| _ui_movePanelTo | method | `_ui_movePanelTo(elId, mountId, toSidebar)` |  |
 | _ui_migrateDrawerToLeftSidebar | method | `_ui_migrateDrawerToLeftSidebar(toSidebar)` |  |
 | _ui_migrateHUDToLeftSidebar | method | `_ui_migrateHUDToLeftSidebar(toSidebar)` |  |
 | _ui_migrateRuneLauncherToSidebar | method | `_ui_migrateRuneLauncherToSidebar(toSidebar)` |  |
@@ -53,12 +55,21 @@
 | ui_closePause | method | `ui_closePause()` |  |
 | ui_syncPauseSettings | method | `ui_syncPauseSettings()` |  |
 | ui_renderPauseRelics | method | `ui_renderPauseRelics()` |  |
+| ui_showModuleEditor | method | `ui_showModuleEditor(onComplete)` |  |
+| ui_renderModuleEditorControls | method | `ui_renderModuleEditorControls()` |  |
+| ui_hideModuleEditor | method | `ui_hideModuleEditor()` |  |
+| _moduleEditor_handleClick | method | `_moduleEditor_handleClick(logicPos)` |  |
+| _moduleEditor_getSlotRects | method | `_moduleEditor_getSlotRects()` |  |
+| _moduleEditor_getModulePlacementStatus | method | `_moduleEditor_getModulePlacementStatus(slotIdx, moduleId)` |  |
+| _moduleEditor_openPicker | method | `_moduleEditor_openPicker(slotIdx)` |  |
+| _moduleEditor_closePicker | method | `_moduleEditor_closePicker()` |  |
+| _moduleEditor_openPicker | method | `_moduleEditor_openPicker(slotIdx)` | ⚠️ 巨型函数，见 @section 导航 |
 
 ## 巨型函数内部节点 (@section 标记)
 
 ### ui_renderReplaceAmmoUI
 
-> 定位：`grep -n '@section:{}'` 跳转到对应节点
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|
@@ -66,6 +77,11 @@
 | `@section:replace_ammo_tier_calc` | 子弹等级与主属性计算函数（_calcTier / _calcDominant） |
 | `@section:replace_ammo_card_render` | 子弹卡片 DOM 渲染：renderCard + makeRow + 将卡片添加到网格 |
 | `@section:replace_ammo_confirm_btn` | 确认按鈕与跳过按鈕状态同步 |
+
+### _moduleEditor_openPicker
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
+
 
 ## 其他 @section 标记
 

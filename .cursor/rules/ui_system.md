@@ -95,7 +95,12 @@ for (const subsystem of _subsystems) {
 | 2026-04-18 | `src/ui_system.js`, `.cursor/rules/ui_system.md` | **命运时刻阶段语义显示修复**：即便内部仍复用 `selection` overlay，`ui_onPhaseChange()` 也必须根据 `fateMomentContext.type` 把大标题和顶部阶段标签渲染为“命运时刻 / 混沌精华 / 纯净精华”，避免特殊流程在视觉上继续伪装成普通命运抉择。 |
 | 2026-04-18 | `src/game_system.js`, `src/ui_system.js`, `src/ui/shop.js`, `.cursor/rules/ui_system.md` | **命运时刻 UI 语义闭环**：round-start resolver 现在会直接触发 `chaos_essence` / `pure_essence` 两种模式；`ui_refreshSelectionModeUI()` 需要显式区分“混沌精华 / 纯净精华 / 命运抉择”三种标签与按钮文案；`ui_showRelicSelection()` 不再把两种精华当作普通遗物候选；`ui_confirmSelection()` 在纯净精华模式下除了写回 `MarbleDefinition.collected` 以外，还必须写入 `doubleAssimilationBoostRounds` 以兑现同化率 x2。 |
 | 2026-04-17 | `index.html`, `src/game_system.js`, `src/ui_system.js`, `src/spawn_system.js`, `src/ui/shop.js`, `src/config.js`, `src/core.js`, `src/entities.js`, `src/game_phase.js` | **命运时刻 / 纯净精华 UI 接入**：当前主仓补落地了 `selection-mode-label`、`selected-required-count`、`selection-mode-subtitle` 三个选择阶段底栏节点；新增 `ui_getSelectionRequirement()`、`ui_isSelectionConfirmReady()`、`ui_getPureEssenceLegalElements()`、`ui_getPureEssenceRuneOptions()`、`ui_selectPureEssenceRune()`、`ui_renderPureEssencePanel()`、`ui_refreshSelectionModeUI()` 等辅助函数；`spawn_showMarblePreview()` 负责刷新纯净精华注入面板；`ui_closeRelicSelection()` 改为按 `relicOverlayReturnState` 恢复原阶段；`ui_confirmSelection()` 在纯净精华模式下会校验合法符文并把结果写回 `MarbleDefinition.collected`。 |
+| 2026-06-18 | `index.html`, `src/ui_system.js` | **交互可解释性增强**：替换子弹卡片必须支持焦点态、Enter/Space 选择与 `aria-pressed`；确认按钮禁用时必须通过提示条/标题说明阻塞原因；运行态护盾等生存资源必须在顶栏可见，避免只依赖 Toast 记忆。 |
 | 2026-04-17 | `index.html`, `src/game_system.js` | 游戏容器宽高未同时适配屏幕宽度和高度：原 `height: 100dvh` 在竞屏手机上会超出屏幕宽度；`sys_resize` 中 `container.style.height = window.innerHeight` 会覆盖 CSS 高度计算。 | **完整等比缩放方案**：1. `#app-wrapper` 的 `align-items` 改为 `center`（防止 stretch 拉伸 game-container）；2. `#pc-left/right-sidebar` 加 `align-self: stretch`（PC 侧边栏仍填满高度）；3. `#game-container` 宽度改为 `min(100vw, calc(100dvh*9/16), 480px)`，移除 `height` 和 `min-width`，改用 `aspect-ratio: 9/16` + `max-height: 100dvh` 实现宽高双向等比缩放；4. `sys_resize()` 移除 `container.style.height` 覆盖，改用 `getBoundingClientRect()` 读取实际尺寸。 |
+
+### 5.x 2026-06-18 新属性 UI 显示兜底记录
+
+`venom` / `overcharge` / `echo` 必须同时进入 `CONFIG.ui.attributeDisplay`、伤害统计色板、HUD 队列属性格、配方卡材料格、当前/下一发弹药图标和替换子弹卡片属性列表。三项弹药 PNG 已落地到 `assets/icons/ammo/` 并由 `AMMO_ICON_MAP` 直接引用；UI 保留 emoji + CSS 颜色兜底，仅用于未来资产缺失或加载失败时避免空白。
 
 ## 6. 修改规范
 
@@ -194,6 +199,12 @@ for (const subsystem of _subsystems) {
 | `ui_selectRelic(relic)` | 选择并获取遗物（参数为遗物对象） |
 | `ui_skipRelic()` | 跳过遗物选择 |
 | `ui_closeRelicSelection()` | 关闭遗物选择界面 |
+
+## 7. 2026-06-18 Interaction Notes
+
+- `#module-editor-layer` 的模块选择浮层必须在渲染阶段预先调用 `_moduleEditor_getModulePlacementStatus(slotIdx, moduleId)`；不合法的模块以禁用态展示，并在卡片描述或 `title` 中说明原因。
+- `_moduleEditor_applyModule()` 必须先完成放置校验，再清空旧模块或写入 `currentModuleLayout`，避免玩家误点一个不可放置的大模块时丢失原模块。
+- 大模块校验需要同时检查：是否越过 4x3 钉盘边界、是否超出已解锁槽位、是否与其他模块锚点或 ref 覆盖格重叠。
 
 ### 6.4 src/ui/rune_launcher.js（符文发射器）
 

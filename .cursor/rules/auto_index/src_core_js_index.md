@@ -1,6 +1,6 @@
-# src/core.js 函数索引
+# src\core.js 函数索引
 
-> 自动生成于 2026-04-22 | 总行数: 418 | 函数数: 5 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 496 | 函数数: 5 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -13,6 +13,12 @@
 |--------|------|------|------|
 | initAudio | function | `initAudio()` |  |
 | setupAudioInitListener | function | `setupAudioInitListener()` |  |
-| Game | class | `Game()` |  |
 | constructor | method | `constructor()` | ⚠️ 巨型函数，见 @section 导航 |
 | _setupEventListeners | method | `_setupEventListeners()` |  |
+| destroy | method | `destroy()` |  |
+
+## 巨型函数内部节点 (@section 标记)
+
+### constructor
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。

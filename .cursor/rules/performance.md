@@ -18,6 +18,7 @@ Echo Alchemist V2 以 Canvas 2D API 渲染，在中低端手机上粒子特效�
 | 1 | **粒子系统**（`mist`/`ember`/`shard`） | `createRadialGradient` + `shadowBlur` + `lighter`/`screen` 混合；全局上限 800 | `src/effects/particles.js`、`src/spawn_system.js` |
 | 2 | **特效对象**（`Shockwave`/`FireWave`/`LightningBolt`/`HealWave`） | 多层 `shadowBlur` + `lighter` 叠加，无原始数量上限 | `src/effects/particles.js`、`src/combat_system.js`、`src/combat/damage_calc.js`、`src/spawn_system.js` |
 | 3 | **Peg 软阴影 + 底部光晕** | 每帧对约 50 个 Peg 各执行 `createRadialGradient`（光晕）+ `ellipse`（阴影） | `src/entities.js`（`Peg.draw`） |
+| 3a | **高密度模块化钉盘** | 细钉/小弹珠会提高可见 Peg 数量；必须继续依赖 `pegSoftShadow` / `pegGlowHalo` 在 medium/low 档关闭高开销层 | `src/pinboard_modules.js`、`src/game_phase.js`、`src/entities.js` |
 | 4 | **敌人材质光泽** | `OffscreenCanvas` 上 `LinearGradient` 叠加，敌人构造时执行 | `src/entities/enemy.js`（`Enemy._initTexture`） |
 
 ---
@@ -201,6 +202,17 @@ if avgFps > fpsThresholdUp (55):
 
 > **重要约定**：奖励标记、敌人状态（中毒/冰冻/燃烧）、Boss 预警/狂暴等**语义类**特效，在 low 档必须**降级为廉价平面版**，严禁像装饰类特效（Peg 光晕、敌人光泽）那样 `enabled:false` 彻底关闭。
 
+### 5.10 敌人意图预告（`src/entities/enemy.js` → `Enemy.draw`）
+
+敌人进入 `telegraphing` 状态时，会根据 `telegraphIntent` 绘制行动预告面板。这是**玩法可读性关键提示**（告诉玩家敌人即将治疗、吞噬、跳跃、增殖、再生或冲刺），遵循「降级而非消失」原则。
+
+| 位置 | 读取字段 | 行为 |
+|------|---------|------|
+| 完整预告（`enemyTelegraphGlow === true`） | `enemyTelegraphGlow` / `telegraphDuration` / `telegraphShake` | `high/medium`：显示类型色面板、图标、短标签、倒计时进度环和轻量 `shadowBlur` |
+| 平面预告（`enemyTelegraphGlow === false`，即 low 档） | `enemyTelegraphGlow` | 保留面板、图标、短标签和倒计时环，关闭 `shadowBlur`；无粒子、无渐变、无混合模式 |
+
+> **注意**：`telegraphIntent` 在 `Enemy.startTurnAction()` 中一次性计算，渲染层只读取结果，不在 `draw()` 中扫描敌人列表或重新判定行为。
+
 ---
 
 ## 6. 修改指南（Agent 防坑）
@@ -258,6 +270,20 @@ if avgFps > fpsThresholdUp (55):
 | 2026-06-18 | **主循环省电控制**：新增 (1) 静态阶段降帧节流——非 combat/training/gathering 的菜单阶段及暂停态按 `CONFIG.performance.idleFrameInterval`(66ms≈15fps) 节流渲染，活跃阶段仍满帧；FPS 采样器仅在活跃阶段运行，避免菜单降帧误触发降级。(2) `visibilitychange` 后台硬停——页面隐藏时 `cancelAnimationFrame` 中断 rAF 链并 `audio.suspend()` 挂起音频上下文，恢复时重启循环并 `audio.resume()`。涉及 `game_system.js`(sys_loop/sys_setupVisibilityHandling)、`core.js`(状态初始化+注册)、`audio.js`(新增 suspend())、`config.js`(idleFrameInterval)。详见第 10 节。 |
 | 2026-06-18 | **奖励标记低档平面兜底**：修复 `low` 档 `rewardHaloEnabled:false` 导致携带遗物/精华的敌人无任何视觉标记的玩法可读性回归。在 `enemy.js` Layer 6.8 的 `if (rewardHaloEnabled)` 增加 `else` 分支，绘制纯色双层描边平面版（遗物=金/混沌=紫红/纯净=蓝白），无 shadowBlur/渐变/旋转。新增消费端关联索引第 5.9 节并确立「语义类特效降级而非消失」约定。 |
 | 2026-04-30 | **毒素敌人专属特效**：新增 `venomLimit`（high:60/medium:30/low:0）预算字段；新增 `venom` 粒子模式（上浮液滴 + screen 渐变绘制）；在 `enemy.js` Layer 3.4 新增毒素状态视觉（径向渐变叠加 + 液滴流淌动画，三档门控）；在 `combat_system.js` 命中毒素时发射 1~4 颗毒液粒子。消费端关联索引见第 5.1/5.2/5.8 节。 |
+| 2026-06-18 | **高密度钉盘尺寸调整**：收集阶段 `marbleRadius` 下调，Peg 半径改读 `CONFIG.physics.pegRadius`，模块最小钉距改读配置化基础通行半径。该调整会提高 Peg 数量，但不新增粒子、混合模式或渐变层；高开销 Peg 阴影/光晕仍由 `pegSoftShadow` / `pegGlowHalo` 分档控制。 |
+| 2026-06-18 | **符文融合承载模块**：新增默认 `rune_lattice` 与商店 `rune_focus_module`，通过 `fusionPriority` 改变符文注入目标。该调整增加部分高密度普通 Peg，但不新增粒子、混合模式、shadowBlur 或渐变创建；继续复用 Peg 绘制的 `pegSoftShadow` / `pegGlowHalo` 分档门控。 |
+| 2026-06-18 | **钉板模块池扩展**：新增分裂门、召回环、弹钉斜坡、属性坩埚、双轮盘与融合花园模块。全部复用现有 `Peg` / `SpecialSlot` 绘制与触发逻辑，不新增粒子、渐变、混合模式或 shadowBlur；额外开销主要来自同屏 Peg/Slot 数量，继续归入高密度模块化钉盘预算。 |
+| 2026-06-18 | **敌人意图预告升级**：`Enemy.startTurnAction()` 新增 `telegraphIntent`，在行动前显示图标、短标签和倒计时环；`Enemy.draw` 中 high/medium 使用 `enemyTelegraphGlow:true` 保留轻量 `shadowBlur`，low 档以 `enemyTelegraphGlow:false` 降级为平面面板与描边。该提示属于语义类玩法信息，low 档不得完全关闭。 |
+
+### 8.1 Battle Relic Cinematic Budget (2026-06-18)
+
+新增 `relicCinematicDelayMs`、`relicCinematicSparkCount`、`relicCinematicBoltCount` 三档预算字段，用于战斗内遗物的短演出：
+
+- `doomsday_timer`: 回合开始锁定、冲击波、落雷和粒子爆发；若击杀成功会补触发，补触发上限从 1 开始，并随主触发累计每 5 次 +1。每段演出仍复用同一组预算和既有效果上限，单轮最多受当前存活敌人数约束。
+- `corridor_arc`: 回合开始墙体电弧、墙撞火花。
+- `mortal_burst`: 击杀爆裂的 FireWave、冲击波和碎片粒子。
+
+这些演出仍叠加既有 `shockwaveLimit` / `waveLimit` / `lightningLimit` / `sparkLimit` 检查。`phase_finalizeRound()` 会按遗物 Hook 返回的演出时长延后 Boss 生成、奖励解析和下一阶段横幅，避免动画被阶段切换吞掉。
 
 ## 9. 性能影响标记规范
 

@@ -91,6 +91,10 @@ globs: ["src/config.js"]
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
+| 2026-06-18 | `src/config.js`, `src/combat_system.js`, `src/bitmap_icons.js`, `.cursor/rules/config.md`, `docs/ui_asset_requirements.md` | **新增/改造 5 个战斗构筑遗物**：`rune_siphon` 命中/击杀额外推进符文充能；`ammo_bandolier` 复用 `bullet_cap_up`，命运抉择可保留弹珠 +1，改为传说且不可叠加，并让每回合首发子弹伤害 -15% 约束强度；`opening_salvo` 每回合首发子弹伤害 +25%，且可连射弹种额外连射 +2；`thunder_coil` 取代旧 `thermal_prism`，发射时将连射层数转化为闪电层数并清空连射；`ember_fuse` 将原默认火焰过热爆炸拆为遗物效果。新遗物不新增常驻粒子或 Canvas 光效，运行期分别由 `ui_selectRelic` 通用分支、`combat_fireNextShot`、`combat_damageEnemy` 与 `combat_runeCharge_onHit` 读取 `ownedRelics` 生效。 |
+| 2026-06-18 | `src/config.js`, `src/pinboard_modules.js`, `src/entities.js`, `src/game_phase.js`, `src/game_system.js`, `src/ui/shop.js` | **钉盘密度与尺寸参数化**：`CONFIG.physics` 新增 `pegRadius`、`maxMarbleSizeBonus`、`pinboardSpacingBuffer`，收集阶段 `marbleRadius` 下调到 5.8；Peg 碰撞/绘制半径统一读取 `pegRadius`。模块生成间距改为按基础弹珠/细钉通行计算，不再以旧的大号弹珠作为密度基线；高开销 Peg 阴影/光晕仍由 `CONFIG.performance` 控制。 |
+| 2026-06-18 | `src/pinboard_modules.js`, `src/game_phase.js`, `src/core.js`, `src/game_system.js`, `src/ui_system.js` | **符文融合钉盘模块**：默认布局新增 `rune_lattice`，默认解锁列表同步加入；商店模块池新增 `rune_focus_module`。模块可通过 `fusionPriority` 标记融合优先级，`pendingFusions` 应用时会优先注入这些承载钉。 |
+| 2026-06-18 | `src/pinboard_modules.js`, `.cursor/rules/game_phase.md` | **钉板模块池扩展**：新增 `split_gate_module`、`recall_loop_module`、`cascade_bank_module`、`crucible_core_module`、`double_wheel_module`、`fusion_garden_module` 六个商店模块，复用现有 Peg、`SpecialSlot` 与 `fusionPriority` 契约，不新增全局状态。 |
 | 2026-04-18 | `src/config.js`, `src/game_system.js`, `.cursor/rules/config.md` | **敌人掉落参数配置化**：`CONFIG.gameplay` 新增 `enemyDropBaseChance`、`enemyDropRoundBonus`、`enemyDropAffixBonus`、`enemyDropRelicBaseChance`、`enemyDropRelicHighHpBonus`、`enemyDropPureEssenceChance` 等参数；`sys_tryQueueEnemyRoundReward()` 不再依赖硬编码常数，而是统一读取这些配置计算非 Boss 掉落。 |
 | 2026-04-18 | `src/game_system.js`, `src/ui_system.js`, `src/ui/shop.js`, `.cursor/rules/config.md`, `.cursor/rules/game_phase.md`, `.cursor/rules/ui_system.md` | **精华掉落语义闭环修复**：`pendingRoundStartRewards` 现在显式区分 `relic` / `chaos_essence` / `pure_essence`；非 Boss 敌人死亡后直接登记三类奖励，round-start resolver 在下一回合开始触发对应命运时刻；`ui_showRelicSelection()` 不再把混沌精华与纯净精华当作普通遗物候选；纯净精华确认时会把注入结果写回弹珠并写入 `doubleAssimilationBoostRounds`。 |
 | 2026-04-17 | `src/config.js`, `src/core.js`, `src/game_system.js`, `src/ui/shop.js`, `src/ui_system.js`, `src/spawn_system.js`, `src/entities.js`, `src/game_phase.js`, `index.html` | **命运时刻 / 纯净精华数据契约回补**：将旧 `fortune_wheel_relic` 更名为 `chaos_essence`，新增 `pure_essence` 数据项；`CONFIG.gameplay` 新增 `assimilationDoubleMultiplier`；运行态补齐 `pendingSelectionMode`、`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`、`doubleAssimilationBoostRounds`；纯净精华改为“1 枚弹珠 + 1 个合法符文注入”，同化涌潮改为显式 `x2` 概率倍率。 |
@@ -115,7 +119,7 @@ globs: ["src/config.js"]
 - **数据结构**: 遗物数据字典 (`RELIC_DB`) 中使用 `maxStacks` 字段控制遗物的最大可获取次数。
 - **获取记录**: 玩家已拥有的遗物存储在 `Game.ownedRelics` 数组中。支持重复获取的遗物会在该数组中出现多次。
 - **UI 显示**: `ui_showRelicSelection` 在渲染遗物卡片时，若 `maxStacks > 1`，将显示当前层数与最大层数的进度提示。
-- **重置逻辑**: `game_system.js` 中的 `sys_resetGame` 方法除了清空 `ownedRelics` 外，还必须重置受遗物影响的状态变量（如 `pinkPegCount`、`marbleSizeBonus`、`hasCombatWall`、`slotCount`、`unlockedSlots`、`assimilationBoostRounds`、`doubleAssimilationBoostRounds`、`pendingSelectionMode`、`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`）。
+- **重置逻辑**: `game_system.js` 中的 `sys_resetGame` 方法除了清空 `ownedRelics` 外，还必须重置受遗物影响的状态变量（如 `pinkPegCount`、`marbleSizeBonus`、`hasCombatWall`、`slotCount`、`unlockedSlots`、`flatDamageBonus`、`playerShield`、`assimilationBoostRounds`、`doubleAssimilationBoostRounds`、`pendingSelectionMode`、`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`）。
 - **ID 唯一性**: 确保 `RELIC_DB` 中每个遗物的 `id` 唯一，避免因同名 ID 导致去重或计数逻辑错误（如原有的三个 `tactical_kit` 已拆分为 `tactical_kit_pierce`、`tactical_kit_scatter`、`tactical_kit_damage`）。
 
 ## 6. 同化涌潮遗物规范

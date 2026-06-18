@@ -1,0 +1,5 @@
+node_modules/
+.codex_tmp/
+.tmp-serve-*.log
+scripts/__pycache__/
+*.pyc

@@ -1,6 +1,6 @@
-# src/combat/collision_shapes.js 函数索引
+# src\combat\collision_shapes.js 函数索引
 
-> 自动生成于 2026-04-22 | 总行数: 146 | 函数数: 2 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 146 | 函数数: 2 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -10,4 +10,4 @@
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
 | calc_getCirclePolygonCollision | function | `calc_getCirclePolygonCollision(circlePos, circleRadius, polygonVertices)` |  |
-| calc_getCircleArcCollision | function | `calc_getCircleArcCollision(circlePos, circleRadius, arcCenter, arcRadius, arcStartAngle, arcEndAngle, arcTh)` |  |
+| calc_getCircleArcCollision | function | `calc_getCircleArcCollision(circlePos, circleRadius, arcCenter, arcRadius, arcStartAngle, arcEndAngle, arcThickness)` |  |

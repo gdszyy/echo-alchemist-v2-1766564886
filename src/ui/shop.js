@@ -150,6 +150,42 @@ export const shop_system = {
         // 计数器自增（每次打开遗物选择界面时计数）
         this.relicSelectionCount = (this.relicSelectionCount || 0) + 1;
         const showRecommendation = this.relicSelectionCount <= 3;
+        const renderRelicPreview = (relic, cardEl) => {
+            const preview = document.getElementById('relic-preview-panel');
+            if (!preview || !relic) return;
+            document.querySelectorAll('#relic-container .relic-card.previewing').forEach(el => el.classList.remove('previewing'));
+            if (cardEl) cardEl.classList.add('previewing');
+
+            const count = (this.ownedRelics || []).filter(id => id === relic.id).length;
+            const max = relic.maxStacks || 1;
+            const stackInfo = max > 1
+                ? `<div class="relic-preview-stack">當前層數：${count} / ${max}</div>`
+                : '';
+            const tagsHtml = (showRecommendation && relic.recommended && Array.isArray(relic.tags))
+                ? `<div class="relic-preview-tags">${relic.tags.map(tag => `<span class="relic-tag">${tag}</span>`).join('')}</div>`
+                : '';
+            const tipHtml = (showRecommendation && relic.recommended && relic.recommendTip)
+                ? `<div class="relic-preview-tip">新手推薦：${relic.recommendTip}</div>`
+                : '';
+            const relicBitmapSrc = getRelicIconSrc(relic.id);
+            const iconHtml = relicBitmapSrc
+                ? `<img src="${relicBitmapSrc}" alt="${relic.icon}" style="width:100%;height:100%;object-fit:contain;" loading="lazy" onerror="this.style.display='none';this.insertAdjacentText('afterend','${relic.icon}');"/>`
+                : relic.icon;
+
+            preview.innerHTML = `
+                <div class="relic-preview-header">
+                    <div class="relic-preview-icon">${iconHtml}</div>
+                    <div>
+                        <div class="relic-preview-name">${relic.name}</div>
+                        <div class="relic-preview-rarity">${relic.rarity || 'common'}</div>
+                    </div>
+                </div>
+                <div class="relic-preview-desc">${relic.desc}</div>
+                ${stackInfo}
+                ${tagsHtml}
+                ${tipHtml}
+            `;
+        };
 
         // 4. 生成 HTML
         const container = document.getElementById('relic-container');
@@ -159,6 +195,7 @@ export const shop_system = {
             choices.forEach(relic => {
                 const el = document.createElement('div');
                 el.className = `relic-card ${relic.rarity || 'common'}`; 
+                el.tabIndex = 0;
                 const count = (this.ownedRelics || []).filter(id => id === relic.id).length;
                 const max = relic.maxStacks || 1;
                 const stackInfo = max > 1 ? `<div class="relic-stack text-xs text-amber-400 mt-1">当前层数: ${count} / ${max}</div>` : '';
@@ -190,8 +227,17 @@ export const shop_system = {
                     e.stopPropagation(); 
                     this.ui_selectRelic(relic);
                 };
+                el.onmouseenter = () => renderRelicPreview(relic, el);
+                el.onfocus = () => renderRelicPreview(relic, el);
+                el.addEventListener('touchstart', () => renderRelicPreview(relic, el), { passive: true });
                 container.appendChild(el);
             });
+            if (choices.length > 0) {
+                renderRelicPreview(choices[0], container.querySelector('.relic-card'));
+            } else {
+                const preview = document.getElementById('relic-preview-panel');
+                if (preview) preview.innerHTML = '';
+            }
         }
 
         // 5. 显示界面
@@ -224,7 +270,7 @@ export const shop_system = {
         else if (relic.effect === 'combat_wall') {
             this.hasCombatWall = true;
         } else if (relic.effect === 'permanent_size_up') {
-            this.marbleSizeBonus = (this.marbleSizeBonus || 0) + 2.5;
+            this.marbleSizeBonus = (this.marbleSizeBonus || 0) + (CONFIG.physics.maxMarbleSizeBonus || 1.6);
         } else if (relic.effect === 'unlock_slot') {
             if (!this.unlockedSlots) this.unlockedSlots = [];
             if (!this.unlockedSlots.includes(relic.slotType)) {
@@ -285,6 +331,10 @@ export const shop_system = {
             const val = relic.flatDamageValue || 2;
             this.flatDamageBonus = (this.flatDamageBonus || 0) + val;
             if (window.showToast) showToast(`炼金火药管已装填！基础伤害 +${val}。`);
+        } else if (relic.effect === 'early_temp_shield') {
+            const val = relic.shieldValue || 5;
+            this.playerShield = (this.playerShield || 0) + val;
+            if (window.showToast) showToast(`守护者结界展开！防线护盾 +${val}。`);
         } else if (relic.effect === 'grant_runes') {
             // 走私者系列：立即给予指定稀有度的符文
             this._grantRunesByRarity(relic.grantRarity || 'common', relic.grantCount || 2);
@@ -568,6 +618,34 @@ export const shop_system = {
         }
         
         // 1. 渲染分类标签
+        const renderShopPreview = (upgrade, state, cardEl) => {
+            const preview = document.getElementById('shop-upgrade-preview');
+            if (!preview || !upgrade || !state) return;
+            document.querySelectorAll('#shop-items-container .shop-upgrade-card.previewing').forEach(el => el.classList.remove('previewing'));
+            if (cardEl) cardEl.classList.add('previewing');
+            const category = META_SHOP_CONFIG.categories[upgrade.category] || {};
+            const resDef = state.resDef || META_SHOP_CONFIG.resources.rune_fragments;
+            const levelText = state.isMax ? 'MAX' : `LV.${state.level}`;
+            const costText = state.isMax
+                ? '已達上限'
+                : `${resDef.icon} ${state.cost.toLocaleString()}`;
+            preview.innerHTML = `
+                <div class="shop-preview-header">
+                    <div class="shop-preview-icon">${upgrade.icon}</div>
+                    <div class="min-w-0">
+                        <div class="shop-preview-name">${upgrade.name}</div>
+                        <div class="shop-preview-meta">
+                            <span class="shop-preview-pill">${category.icon || ''} ${category.name || upgrade.category}</span>
+                            <span class="shop-preview-pill">${upgrade.temporary ? '臨時強化' : '永久強化'}</span>
+                            <span class="shop-preview-pill">${levelText}</span>
+                            <span class="shop-preview-pill">${costText}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="shop-preview-desc">${upgrade.desc}</div>
+            `;
+        };
+
         if (categoryContainer) {
             categoryContainer.innerHTML = '';
             for (let catId in META_SHOP_CONFIG.categories) {
@@ -601,7 +679,9 @@ export const shop_system = {
                 const canAfford = playerHas >= cost;
 
                 const card = document.createElement('div');
-                card.className = `bg-slate-900/60 border ${isMax ? 'border-slate-700 opacity-80' : 'border-slate-700/50'} p-4 rounded-xl flex flex-col gap-3 relative overflow-hidden group`;
+                card.className = `shop-upgrade-card bg-slate-900/60 border ${isMax ? 'border-slate-700 opacity-80' : 'border-slate-700/50'} p-4 rounded-xl flex flex-col gap-3 relative overflow-hidden group`;
+                card.tabIndex = 0;
+                const previewState = { level, isMax, cost, resDef, canAfford };
 
                 const topRow = document.createElement('div');
                 topRow.className = 'flex justify-between items-start';
@@ -627,7 +707,7 @@ export const shop_system = {
                 topRow.appendChild(levelBadge);
                 
                 const desc = document.createElement('div');
-                desc.className = 'text-xs text-slate-400 leading-relaxed min-h-[3em]';
+                desc.className = 'shop-upgrade-desc text-xs text-slate-400 leading-relaxed min-h-[3em]';
                 desc.innerText = upgrade.desc;
                 
                 const bottomRow = document.createElement('div');
@@ -655,9 +735,28 @@ export const shop_system = {
                 card.appendChild(topRow);
                 card.appendChild(desc);
                 card.appendChild(bottomRow);
+                card.onmouseenter = () => renderShopPreview(upgrade, previewState, card);
+                card.onfocus = () => renderShopPreview(upgrade, previewState, card);
+                card.addEventListener('touchstart', () => renderShopPreview(upgrade, previewState, card), { passive: true });
                 
                 itemsContainer.appendChild(card);
             });
+            const firstCard = itemsContainer.querySelector('.shop-upgrade-card');
+            if (upgrades.length > 0 && firstCard) {
+                const first = upgrades[0];
+                const isTemporary = first.temporary || false;
+                const currentData = isTemporary ? (this.saveData.temporaryUpgrades || {}) : (this.saveData.upgrades || {});
+                const level = currentData[first.id] || 0;
+                const isMax = level >= first.maxLevel;
+                const cost = (typeof this.meta_calculateUpgradeCost === 'function') ? this.meta_calculateUpgradeCost(first, level) : 0;
+                const resourceId = first.cost.resourceId || 'rune_fragments';
+                const resDef = META_SHOP_CONFIG.resources[resourceId] || META_SHOP_CONFIG.resources.rune_fragments;
+                const playerHas = (typeof this.meta_getResourceCount === 'function') ? this.meta_getResourceCount(resourceId) : 0;
+                renderShopPreview(first, { level, isMax, cost, resDef, canAfford: playerHas >= cost }, firstCard);
+            } else {
+                const preview = document.getElementById('shop-upgrade-preview');
+                if (preview) preview.innerHTML = '';
+            }
         }
     },
 

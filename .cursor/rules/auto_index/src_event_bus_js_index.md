@@ -1,6 +1,6 @@
-# src/event_bus.js 函数索引
+# src\event_bus.js 函数索引
 
-> 自动生成于 2026-04-22 | 总行数: 258 | 函数数: 13 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 258 | 函数数: 12 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -9,7 +9,6 @@
 
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
-| EventBus | class | `EventBus()` |  |
 | constructor | method | `constructor(options = {})` |  |
 | on | method | `on(event, handler)` |  |
 | off | method | `off(event, handler)` |  |

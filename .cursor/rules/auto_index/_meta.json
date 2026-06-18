@@ -1,14 +1,299 @@
 {
   "indexed": [
     {
-      "file": "src/entities/enemy.js",
-      "lines": 4880,
-      "funcs": 27,
+      "file": "src\\entities\\enemy.js",
+      "lines": 5822,
+      "funcs": 30,
       "sections": 21,
       "mega_funcs": 4,
-      "index_path": ".cursor/rules/auto_index/src_entities_enemy_js_index.md"
+      "index_path": ".cursor\\rules\\auto_index\\src_entities_enemy_js_index.md"
+    },
+    {
+      "file": "src\\entities.js",
+      "lines": 5026,
+      "funcs": 96,
+      "sections": 23,
+      "mega_funcs": 2,
+      "index_path": ".cursor\\rules\\auto_index\\src_entities_js_index.md"
+    },
+    {
+      "file": "src\\systems.js",
+      "lines": 3817,
+      "funcs": 50,
+      "sections": 10,
+      "mega_funcs": 2,
+      "index_path": ".cursor\\rules\\auto_index\\src_systems_js_index.md"
+    },
+    {
+      "file": "src\\combat_system.js",
+      "lines": 3811,
+      "funcs": 44,
+      "sections": 25,
+      "mega_funcs": 5,
+      "index_path": ".cursor\\rules\\auto_index\\src_combat_system_js_index.md"
+    },
+    {
+      "file": "src\\game_phase.js",
+      "lines": 3324,
+      "funcs": 24,
+      "sections": 15,
+      "mega_funcs": 3,
+      "index_path": ".cursor\\rules\\auto_index\\src_game_phase_js_index.md"
+    },
+    {
+      "file": "src\\game_system.js",
+      "lines": 2857,
+      "funcs": 49,
+      "sections": 7,
+      "mega_funcs": 2,
+      "index_path": ".cursor\\rules\\auto_index\\src_game_system_js_index.md"
+    },
+    {
+      "file": "src\\spawn_system.js",
+      "lines": 2658,
+      "funcs": 34,
+      "sections": 10,
+      "mega_funcs": 2,
+      "index_path": ".cursor\\rules\\auto_index\\src_spawn_system_js_index.md"
+    },
+    {
+      "file": "src\\ui\\rune_launcher.js",
+      "lines": 2068,
+      "funcs": 29,
+      "sections": 6,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_ui_rune_launcher_js_index.md"
+    },
+    {
+      "file": "src\\config.js",
+      "lines": 2056,
+      "funcs": 1,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_config_js_index.md"
+    },
+    {
+      "file": "src\\effects\\particles.js",
+      "lines": 1866,
+      "funcs": 49,
+      "sections": 3,
+      "mega_funcs": 1,
+      "index_path": ".cursor\\rules\\auto_index\\src_effects_particles_js_index.md"
+    },
+    {
+      "file": "src\\ui_system.js",
+      "lines": 1846,
+      "funcs": 55,
+      "sections": 5,
+      "mega_funcs": 1,
+      "index_path": ".cursor\\rules\\auto_index\\src_ui_system_js_index.md"
+    },
+    {
+      "file": "src\\entities\\projectile.js",
+      "lines": 1346,
+      "funcs": 15,
+      "sections": 7,
+      "mega_funcs": 1,
+      "index_path": ".cursor\\rules\\auto_index\\src_entities_projectile_js_index.md"
+    },
+    {
+      "file": "src\\ui\\hud.js",
+      "lines": 1176,
+      "funcs": 16,
+      "sections": 4,
+      "mega_funcs": 2,
+      "index_path": ".cursor\\rules\\auto_index\\src_ui_hud_js_index.md"
+    },
+    {
+      "file": "src\\rune_config.js",
+      "lines": 989,
+      "funcs": 0,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_rune_config_js_index.md"
+    },
+    {
+      "file": "src\\render_system.js",
+      "lines": 813,
+      "funcs": 11,
+      "sections": 4,
+      "mega_funcs": 1,
+      "index_path": ".cursor\\rules\\auto_index\\src_render_system_js_index.md"
+    },
+    {
+      "file": "src\\tutorial_system.js",
+      "lines": 811,
+      "funcs": 16,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_tutorial_system_js_index.md"
+    },
+    {
+      "file": "src\\ui\\shop.js",
+      "lines": 789,
+      "funcs": 10,
+      "sections": 0,
+      "mega_funcs": 1,
+      "index_path": ".cursor\\rules\\auto_index\\src_ui_shop_js_index.md"
+    },
+    {
+      "file": "src\\audio.js",
+      "lines": 672,
+      "funcs": 20,
+      "sections": 9,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_audio_js_index.md"
+    },
+    {
+      "file": "src\\pinboard_modules.js",
+      "lines": 625,
+      "funcs": 30,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_pinboard_modules_js_index.md"
+    },
+    {
+      "file": "src\\plinko_physics.js",
+      "lines": 597,
+      "funcs": 15,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_plinko_physics_js_index.md"
+    },
+    {
+      "file": "src\\rune_system.js",
+      "lines": 499,
+      "funcs": 10,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_rune_system_js_index.md"
+    },
+    {
+      "file": "src\\core.js",
+      "lines": 496,
+      "funcs": 5,
+      "sections": 0,
+      "mega_funcs": 1,
+      "index_path": ".cursor\\rules\\auto_index\\src_core_js_index.md"
+    },
+    {
+      "file": "src\\combat\\damage_calc.js",
+      "lines": 478,
+      "funcs": 7,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_combat_damage_calc_js_index.md"
+    },
+    {
+      "file": "src\\ui\\game_over.js",
+      "lines": 467,
+      "funcs": 12,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_ui_game_over_js_index.md"
+    },
+    {
+      "file": "src\\combat\\collision.js",
+      "lines": 450,
+      "funcs": 3,
+      "sections": 0,
+      "mega_funcs": 1,
+      "index_path": ".cursor\\rules\\auto_index\\src_combat_collision_js_index.md"
+    },
+    {
+      "file": "tests\\ai_test_runner.js",
+      "lines": 435,
+      "funcs": 14,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\tests_ai_test_runner_js_index.md"
+    },
+    {
+      "file": "src\\calc_utils.js",
+      "lines": 347,
+      "funcs": 8,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_calc_utils_js_index.md"
+    },
+    {
+      "file": "src\\loot_system.js",
+      "lines": 302,
+      "funcs": 6,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_loot_system_js_index.md"
+    },
+    {
+      "file": "src\\utils\\math_utils.js",
+      "lines": 267,
+      "funcs": 20,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_utils_math_utils_js_index.md"
+    },
+    {
+      "file": "src\\event_bus.js",
+      "lines": 258,
+      "funcs": 12,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_event_bus_js_index.md"
+    },
+    {
+      "file": "tests\\validate_scenarios.js",
+      "lines": 167,
+      "funcs": 1,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\tests_validate_scenarios_js_index.md"
+    },
+    {
+      "file": "src\\combat\\collision_shapes.js",
+      "lines": 146,
+      "funcs": 2,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_combat_collision_shapes_js_index.md"
     }
   ],
-  "skipped": [],
+  "skipped": [
+    {
+      "file": "src\\render\\sprite_renderer.js",
+      "lines": 357,
+      "funcs": 10,
+      "reason": "未达阈值(行数=357<500, 函数数=10<20)"
+    },
+    {
+      "file": "src\\data\\enemy_visual_assets.js",
+      "lines": 317,
+      "funcs": 7,
+      "reason": "未达阈值(行数=317<500, 函数数=7<20)"
+    },
+    {
+      "file": "src\\bitmap_icons.js",
+      "lines": 279,
+      "funcs": 7,
+      "reason": "未达阈值(行数=279<500, 函数数=7<20)"
+    },
+    {
+      "file": "src\\ui\\run_shop.js",
+      "lines": 274,
+      "funcs": 6,
+      "reason": "未达阈值(行数=274<500, 函数数=6<20)"
+    },
+    {
+      "file": "src\\data\\enemy_v2_metadata.js",
+      "lines": 213,
+      "funcs": 1,
+      "reason": "未达阈值(行数=213<500, 函数数=1<20)"
+    },
+    {
+      "file": "src\\utils\\perf.js",
+      "lines": 14,
+      "funcs": 1,
+      "reason": "未达阈值(行数=14<500, 函数数=1<20)"
+    }
+  ],
   "warnings": []
 }

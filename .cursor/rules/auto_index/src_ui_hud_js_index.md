@@ -1,9 +1,9 @@
-# src/ui/hud.js 函数索引
+# src\ui\hud.js 函数索引
 
-> 自动生成于 2026-04-26 | 总行数: 1030 | 函数数: 14 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 1176 | 函数数: 16 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -15,7 +15,8 @@
 | ui_updateMultiplierUI | method | `ui_updateMultiplierUI()` |  |
 | ui_saveShotDamage | method | `ui_saveShotDamage()` |  |
 | ui_updateRoundDamage | method | `ui_updateRoundDamage()` |  |
-| ui_updateDamageStats | method | `ui_updateDamageStats()` |  |
+| ui_scheduleDamageStatsRefresh | method | `ui_scheduleDamageStatsRefresh()` |  |
+| ui_updateDamageStats | method | `ui_updateDamageStats()` | ⚠️ 巨型函数，见 @section 导航 |
 | ui_switchDamageRound | method | `ui_switchDamageRound(direction)` |  |
 | ui_toggleDamagePanel | method | `ui_toggleDamagePanel()` |  |
 | ui_renderRecipeHUD | method | `ui_renderRecipeHUD()` |  |
@@ -25,12 +26,17 @@
 | ui_updateAmmoUI | method | `ui_updateAmmoUI()` |  |
 | ui_renderAmmoIcon | method | `ui_renderAmmoIcon(container, recipe, isCurrent)` |  |
 | hud_initEventListeners | method | `hud_initEventListeners()` | ⚠️ 巨型函数，见 @section 导航 |
+| _buildInheritanceCard | method | `_buildInheritanceCard()` |  |
 
 ## 巨型函数内部节点 (@section 标记)
 
+### ui_updateDamageStats
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
+
 ### hud_initEventListeners
 
-> 定位：`grep -n '@section:{}'` 跳转到对应节点
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|

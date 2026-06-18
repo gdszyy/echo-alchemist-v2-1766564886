@@ -48,7 +48,7 @@ globs: ["src/ui/**/*", "src/ui_system.js"]
 | `UI_RUNE_CHARGE_INIT` | 充能符文初始化 | 清空 `#combat-rune-single-slot`，重置进度条 |
 | `UI_RUNE_CHARGE_LEVEL_UP` | 充能等级提升 | 刷新符文预览，触发升级特效 |
 | `UI_RUNE_CHARGE_UPDATE` | 充能条进度更新 | 更新 `#combat-charge-bar-fill` 宽度 |
-| `UI_RUNE_CHARGE_CLAIM` | 回合结束领取符文 | 触发符文飞入背包动画 |
+| `UI_RUNE_CLAIM_AFTER_ENEMY` | 敌人动作后领取充能/掉落符文 | 触发多个符文飞入背包动画 |
 | `UI_ROUND_NUM_UPDATE` | 回合数变化 | 更新回合数显示 |
 | `UI_FLASH_EFFECT` | 全屏闪光 | 触发全屏颜色叠加层动画 |
 | `UI_CHROMATIC_ABERRATION` | CRT 色差特效 | 添加 CSS class 到 body |

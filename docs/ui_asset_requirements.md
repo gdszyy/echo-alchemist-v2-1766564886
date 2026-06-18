@@ -51,7 +51,7 @@
 | 1.17 | `#skill-bar` | 战斗技能栏 | 🟡 | 技能图标 PNG、`rune_slot_idle.png`、`rune_slot_active.png` | 冷却扫描帧 |
 | 1.18 | `#round-start-banner` | 回合开始横幅 | ✅ | `round_banner_1.png` ~ `round_banner_6.png`（6 帧，600×200） | — |
 | 1.19 | 数据统计页（与图鉴并入 truth-book） | 历次伤害/记录 | ❌ | — | 折线图背景、数据指标徽章、最佳记录 ribbon |
-| 1.20 | `.ammo-icon` 弹药槽位 | 战斗 / 收集阶段 | 🟡 | `assets/icons/ammo/*.png` 已覆盖原有 12 种（含 matryoshka、rainbow、resonance、flying_sword、wind） | `ammo_venom.png`、`ammo_overcharge.png`、`ammo_echo.png`（新属性，待生成） |
+| 1.20 | `.ammo-icon` 弹药槽位 | 战斗 / 收集阶段 | ✅ | `assets/icons/ammo/*.png` 已覆盖原有 12 种及 `venom` / `overcharge` / `echo`（含 matryoshka、rainbow、resonance、flying_sword、wind） | - |
 | 1.21 | 发射器属性球轨道（Canvas 渲染层） | 战斗 / 装填时围绕发射器旋转的属性球 + 连线 | ✅ | `orbital_socket_<elem>.png`×7、`orbital_link_strip.png`、`orbital_link_cap.png`、`orbital_link_flow_0~3.png`、`orbital_intake_0~3.png` | — |
 
 ---
@@ -98,9 +98,9 @@
 | ~~`assets/ui/panels/rune_grid_bg_9s.png`~~ | ✅ **已生成** | 320×320，slice 32 | 九宫格容器，含九格分隔线纹理 |
 | ~~`assets/ui/sprites/rune_slot_hover.png` / `rune_slot_filled.png`~~ | ✅ **已生成**（透明 PNG） | 64×64 | 覆盖完整 4 态交互 |
 | ~~`assets/ui/sprites/rune_slot_highlight.png`~~ | ✅ **已生成**（透明 PNG） | 96×96 | 放置确认光圈 |
-| `assets/icons/ammo/ammo_venom.png` | 毒素弹药图标（待生成） | 32×32 | 毒绿色液滴 + 骷髅纹，对应 `AMMO_ICON_MAP.venom`；参考 `ammo_cryo.png` 风格 |
-| `assets/icons/ammo/ammo_overcharge.png` | 超载弹药图标（待生成） | 32×32 | 金橙色能量弹 + 充能电弧纹，对应 `AMMO_ICON_MAP.overcharge` |
-| `assets/icons/ammo/ammo_echo.png` | 回响弹药图标（待生成） | 32×32 | 蓝紫色残影环绕弹，对应 `AMMO_ICON_MAP.echo` |
+| ~~`assets/icons/ammo/ammo_venom.png`~~ | ✅ 已生成 | 32×32 | 毒绿色液滴 + 骷髅纹，对应 `AMMO_ICON_MAP.venom` |
+| ~~`assets/icons/ammo/ammo_overcharge.png`~~ | ✅ 已生成 | 32×32 | 金橙色能量弹 + 充能电弧纹，对应 `AMMO_ICON_MAP.overcharge` |
+| ~~`assets/icons/ammo/ammo_echo.png`~~ | ✅ 已生成 | 32×32 | 蓝紫色残影环绕弹，对应 `AMMO_ICON_MAP.echo` |
 | `assets/icons/rune/rune_venom_1.png` | 毒素符文 Lv1（待生成） | 48×48 | 毒液纹路，common 灰色外框 |
 | `assets/icons/rune/rune_venom_2.png` | 毒素符文 Lv2（待生成） | 48×48 | 毒液纹路加强，epic 紫色外框 |
 | `assets/icons/rune/rune_overcharge_1.png` | 超载符文 Lv1（待生成） | 48×48 | 充能纹路，epic 紫色外框 |
@@ -143,6 +143,7 @@
 - 位图样式接入：[`src/styles/bitmap_ui.css`](../src/styles/bitmap_ui.css)
 - 图标映射模块：[`src/bitmap_icons.js`](../src/bitmap_icons.js)
 - UI 系统模块：[`src/ui_system.js`](../src/ui_system.js)、[`src/ui/`](../src/ui/)
+- P0 交互优化 TODO：[`docs/p0_interaction_optimization_todo.md`](./p0_interaction_optimization_todo.md)
 - 全局规范：[`AGENTS.md`](../AGENTS.md) §1
 
 ---
@@ -278,7 +279,7 @@
 
 ## 7. v2 即时感重塑遗物 UI 需求清单（2026-04-29）
 
-> 设计来源：[`docs/relic_system_design.md`](relic_system_design.md) §5。本节列出 13 个新增/修改遗物对应的 UI 与美术资产需求，按 P0/P1/P2 优先级分级。
+> 设计来源：[`docs/relic_system_design.md`](relic_system_design.md) §5。本节列出 v2 新增/修改遗物及后续战斗构筑遗物对应的 UI 与美术资产需求，按 P0/P1/P2 优先级分级。
 >
 > **接入路径**：所有遗物图标统一放至 `assets/icons/relic/<id>.png`，并在 [`src/bitmap_icons.js`](../src/bitmap_icons.js) 的 `RELIC_ICON_MAP` 中注册映射，命中后自动取代 `RELIC_DB[i].icon` 的 emoji fallback。
 
@@ -286,6 +287,11 @@
 
 | 遗物 ID | 名称 | 占位 emoji | 图标尺寸 | 视觉建议 |
 |---|---|---|---|---|
+| `rune_siphon` | 符文虹吸管 | 〽️ | 64×64 | 细长玻璃虹吸管抽取青蓝符文能量，底部有小型炼金阀门 |
+| `ammo_bandolier` | 炼金弹带 | 🎞️ | 64×64 | 皮革弹带挂满发光弹珠，金属扣环，legendary 金边 |
+| `opening_salvo` | 开幕齐射管 | 📯 | 64×64 | 黄铜多管发射器向外齐射，带橙金 muzzle flash |
+| `thunder_coil` | 雷暴线圈 | ⚡ | 64×64 | 铜制线圈缠绕蓝紫电弧，中心有可导流的闪电子弹 |
+| `ember_fuse` | 余烬保险丝 | 🧨 | 64×64 | 半熔断保险丝与炽热余烬核心，边缘带小型火花 |
 | `hunter_instinct` | 猎人本能 | 🎯 | 64×64 | 红色十字准星叠加血滴；冷色金属外框 |
 | `rune_resonance_core` | 符文共鸣核 | 💠 | 64×64 | 紫色结晶核心 + 共鸣波纹环（与 `relic_aura_<tier>.png` 协调） |
 | `mirror_magazine` | 镜像弹夹 | 🪞 | 64×64 | 双子弹折射镜面，左右对称构图 |

@@ -268,6 +268,11 @@ const CONFIG = {
             wind: '#34d399',
             flying_sword: '#0ea5e9',
             explosive: '#f87171',
+            laser: '#0ea5e9',
+            resonance: '#f59e0b',
+            venom: '#4ade80',
+            overcharge: '#f59e0b',
+            echo: '#60a5fa',
             default: '#cbd5e1'
         },
         attributeDisplay: {
@@ -288,6 +293,7 @@ const CONFIG = {
             'wind': { name: '風', icon: '🌪️', color: '#34d399' },
             'multicast': { name: '连射', icon: '🔗', color: '#AAAAAA' },
             'echo': { name: '回响', icon: '🔊', color: '#60a5fa' },
+            'overcharge': { name: '超载', icon: '⚡', color: '#f59e0b' },
             'venom': { name: '剧毒', icon: '☠️', color: '#4ade80' }
         }
     },
@@ -316,6 +322,8 @@ const CONFIG = {
         matWind_lv2: '#10b981', // 进阶深绿
         matWind_lv3: '#059669', // 终极墨绿
         matVenom: '#4ade80', // 剧毒绿
+        matOvercharge: '#f59e0b',
+        matEcho: '#60a5fa',
         marbleWhite: '#f8fafc',
         matMatryoshka: '#d946ef',
         marbleRedStripe: '#fca5a5',
@@ -347,7 +355,10 @@ const CONFIG = {
         gravity: 0.30,      // 重力加速度
         friction: 0.99,     // 空气阻力
         elasticity: 0.89,    // 墙壁/钉子反弹系数
-        marbleRadius: 7.7,   // 【收集阶段】弹珠半径 (原为12)
+        marbleRadius: 5.8,   // Collection marble radius; smaller balls make the pinboard feel less sparse.
+        pegRadius: 4.0,      // Collection peg collision radius; kept fine to support denser module layouts.
+        maxMarbleSizeBonus: 1.6, // Size-up relic increment; smaller than before to preserve dense-board passability.
+        pinboardSpacingBuffer: 1.0, // Extra center-spacing buffer used by pinboard module generation.
         bulletRadius: 11,   // 【战斗阶段】弹丸半径 (原为11)
         bulletCopyRadius: 8, // 【战斗阶段】复制/散射弹丸半径
         pinkpegElasticityMuti:2.2
@@ -960,6 +971,14 @@ const CONFIG = {
         // 照射抖动衰减系数（每帧乘以该值）
         laserHitShakeDecay: 0.88,
 
+        // Enemy telegraph: special-action preview shown before enemies act.
+        telegraphDuration: 48,
+        telegraphPanelRadius: 12,
+        telegraphIconSize: 24,
+        telegraphLabelSize: 12,
+        telegraphYOffset: 42,
+        telegraphShake: 2.5,
+
         // Layer 3.5 Breathe: 词缀核心过曝叠加层最大透明度
         // 比 Boss 弱（Boss 约 0.4），避免普通/精英敌人词缀特效喜宾夺主
         // [降低护盾亮度] 0.2 → 0.12，减少 lighter 模式白色过曝对下层细节的遮盖
@@ -1210,8 +1229,12 @@ const CONFIG = {
             rewardHaloEnabled: true,   // 光晕效果开关（false 时完全跳过）
             rewardRuneCount: 4,        // 混沌精华旋转符文数量
             rewardCrystalCount: 5,     // 纯净精华晶体数量
+            enemyTelegraphGlow: true,   // 敌人意图预告：完整光晕 + 进度环
             // 回合开始横幅充能特效（high: 完整光晕扩散动画）
             roundStartBannerGlow: true,
+            relicCinematicDelayMs: 900,
+            relicCinematicSparkCount: 18,
+            relicCinematicBoltCount: 8,
             // shadowBlur 全局开关（移动端 GPU 上 shadowBlur 是单帧最贵的 Canvas2D 操作）
             shadowBlurEnabled: true,
         },
@@ -1246,8 +1269,12 @@ const CONFIG = {
             rewardHaloEnabled: true,   // 保留光晕效果（主要开销为 shadowBlur）
             rewardRuneCount: 2,        // 混沌精华旋转符文减半
             rewardCrystalCount: 3,     // 纯净精华晶体减少
+            enemyTelegraphGlow: true,   // 敌人意图预告：保留光晕，减少装饰复杂度
             // 回合开始横幅充能特效（medium: 保留光晕）
             roundStartBannerGlow: true,
+            relicCinematicDelayMs: 650,
+            relicCinematicSparkCount: 10,
+            relicCinematicBoltCount: 4,
             shadowBlurEnabled: true,
         },
         // LOW：省电模式，适合低端手机 / 发热严重时
@@ -1284,8 +1311,12 @@ const CONFIG = {
             rewardHaloEnabled: false,  // 关闭完整光晕（省去 shadowBlur + createRadialGradient），降级为平面描边
             rewardRuneCount: 0,        // 关闭旋转符文
             rewardCrystalCount: 0,     // 关闭晶体装饰
+            enemyTelegraphGlow: false,  // 敌人意图预告：保留平面图标/标签，关闭光晕
             // 回合开始横幅充能特效（low: 降级为简单淡入，无光晕）
             roundStartBannerGlow: false,
+            relicCinematicDelayMs: 300,
+            relicCinematicSparkCount: 4,
+            relicCinematicBoltCount: 1,
             // shadowBlur 在 low 等级一律关闭，是降温的关键开关
             shadowBlurEnabled: false,
         }
@@ -1387,6 +1418,19 @@ const RELIC_DB = [
         tags: ['伤害提升', '新手友好'],
         recommendTip: '立即提升所有弹珠的基础伤害，前期最稳定的输出加成！'
     },
+    {
+        id: 'guardian_barrier',
+        name: '守护者结界',
+        icon: '🔰',
+        desc: '获得 5 层守护护盾。敌人越过防线时，消耗 1 层护盾并抵消这次失败。',
+        rarity: 'common',
+        effect: 'early_temp_shield',
+        shieldValue: 5,
+        maxStacks: 2,
+        recommended: true,
+        tags: ['生存保护', '新手友好'],
+        recommendTip: '漏怪时不会立刻失败，给你更多时间熟悉战斗节奏。'
+    },
 
     // 走私者系列：立即给予符文（按稀有度分为4个版本）
     {
@@ -1477,6 +1521,64 @@ const RELIC_DB = [
         tags: ['符文加速', '击杀奖励'],
         recommendTip: '击杀越多，符文充能越快，构筑成型速度暴增！'
     },
+    {
+        id: 'rune_siphon',
+        name: '符文虹吸管',
+        icon: '〽️',
+        desc: '战斗阶段：子弹每次命中都会额外获得 +2% 符文充能；若该次命中击杀敌人，改为 +4%。',
+        rarity: 'rare',
+        effect: 'rune_siphon',
+        maxStacks: 1,
+        recommended: true,
+        tags: ['符文加速', '持续命中'],
+        recommendTip: '不只奖励击杀，连刮痧命中也能稳定推进符文充能。'
+    },
+    {
+        id: 'ammo_bandolier',
+        name: '炼金弹带',
+        icon: '🎞️',
+        desc: '每次命运抉择可保留的弹珠数量 +1；但每回合第一颗子弹伤害 -15%。',
+        rarity: 'legendary',
+        effect: 'bullet_cap_up',
+        amount: 1,
+        maxStacks: 1,
+        recommended: true,
+        tags: ['弹药容量', '高阶构筑'],
+        recommendTip: '多留一颗弹珠，但开局火力会被压低，适合能用后续弹药赚回节奏的构筑。'
+    },
+    {
+        id: 'opening_salvo',
+        name: '开幕齐射管',
+        icon: '📯',
+        desc: '战斗阶段：每回合第一颗发射的子弹伤害 +25%；若该子弹可连射，则额外获得 +2 连射。',
+        rarity: 'epic',
+        effect: 'opening_salvo',
+        maxStacks: 1,
+        tags: ['首发爆发', '连射'],
+        recommendTip: '把最强弹珠排在第一位，开场就能打出一波漂亮爆发。'
+    },
+    {
+        id: 'thunder_coil',
+        name: '雷暴线圈',
+        icon: '⚡',
+        desc: '战斗阶段：发射时将子弹的连射层数转化为闪电层数，然后清空连射。',
+        rarity: 'epic',
+        effect: 'thunder_coil',
+        maxStacks: 1,
+        tags: ['连射转化', '闪电构筑'],
+        recommendTip: '把多发火力改造成闪电弹射，适合连射堆叠后的路线转换。'
+    },
+    {
+        id: 'ember_fuse',
+        name: '余烬保险丝',
+        icon: '🧨',
+        desc: '战斗阶段：火焰造成燃烧时，过热敌人有概率引发小型爆炸并波及附近敌人。',
+        rarity: 'rare',
+        effect: 'ember_fuse',
+        maxStacks: 1,
+        tags: ['火焰清场', '过热爆炸'],
+        recommendTip: '把火焰的升温优势转成清场爆炸。'
+    },
     // 镜像弹夹：获得后立即将当前 ammoQueue 中伤害最高的子弹复制一份加入队列末尾
     {
         id: 'mirror_magazine',
@@ -1487,18 +1589,18 @@ const RELIC_DB = [
         effect: 'mirror_magazine',
         maxStacks: 2
     },
-    // 末日计时器：每回合开始时，场上随机一个敌人受到 round×5 的固定伤害
+    // 末日计时器：每回合开始时，场上随机一个敌人受到 round×5 的固定伤害；若击杀则补触发，主触发每 5 次补触发上限 +1
     {
         id: 'doomsday_timer',
         name: '末日计时器',
         icon: '⏱️',
-        desc: '每回合开始时，对场上随机一个敌人造成 (回合数 × 5) 的固定真实伤害。',
+        desc: '每回合开始时，对场上随机一个敌人造成 (回合数 × 5) 的固定真实伤害；若成功击杀敌人，则补触发。末日计时器每触发 5 次，补触发次数 +1。',
         rarity: 'rare',
         effect: 'doomsday_timer',
         maxStacks: 1,
         recommended: true,
         tags: ['持续伤害', '回合奖励'],
-        recommendTip: '每回合自动削血，越打到后面伤害越夸张！'
+        recommendTip: '每回合自动削血，触发越久，击杀后的末日回响越多！'
     },
     // 余韵回响：触发钉板时，单一属性收集到 10 层以上时，额外再收集 1 层
     {

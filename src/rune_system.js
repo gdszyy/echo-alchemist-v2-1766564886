@@ -486,6 +486,8 @@ function fuseRuneIntoBoard(game, runeEntry, runeDb) {
             return { ok: false, message: '符文不在背包中' };
         }
         game.runeInventory.splice(removeIdx, 1);
+        if (game.saveData) game.saveData.runeInventory = game.runeInventory.slice();
+        if (typeof game.sys_saveData === 'function') game.sys_saveData();
     }
 
     if (!Array.isArray(game.pendingFusions)) game.pendingFusions = [];

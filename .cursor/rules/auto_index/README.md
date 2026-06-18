@@ -6,8 +6,8 @@
 
 ```bash
 # 全量生成
-python3 /home/ubuntu/skills/code-indexer/scripts/generate_index.py <repo_path> --src-dirs src
+python scripts/generate_index.py <repo_path> --src-dirs src
 
 # 单文件更新
-python3 /home/ubuntu/skills/code-indexer/scripts/generate_index.py <repo_path> --file <relative_path>
+python scripts/generate_index.py <repo_path> --file <relative_path>
 ```

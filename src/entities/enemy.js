@@ -104,6 +104,7 @@ class Enemy {
         this.telegraphTimer = 0;   // 预警倒计时
         this.actionIcon = '';      // 即将触发的动作图标
         this.actionName = '';      // 动作名称
+        this.telegraphIntent = null; // 本回合预告意图：图标、标签、颜色与强度
 
         // Boss 专属属性（普通敌人为 undefined）
         this.bossType = undefined;      // Boss 类型 ID（如 'ignis', 'glacies' 等）
@@ -667,6 +668,78 @@ class Enemy {
 
     advance(amount) { this.dropTargetY += amount; }
 
+    _getDevourTargets(game, afx) {
+        const bossDevourCfg = CONFIG.balance.bossConfigs && CONFIG.balance.bossConfigs.devourer;
+        const rangeBonus = this.type === 'boss' && this.bossType === 'devourer' && bossDevourCfg
+            ? (bossDevourCfg.devourRangeBonus || 0)
+            : 0;
+        const devourRange = this._berserkedDevourRange || ((afx && afx.devourRange) || 2) + rangeBonus;
+        const range = this.width * devourRange;
+        return game.enemies.filter(e =>
+            e !== this && e.active && e.type !== 'boss' && this.pos.dist(e.pos) < range
+        );
+    }
+
+    _isMoveBlocked(game, rows = 1) {
+        const moveAmount = game.enemyHeight;
+        const targetY = this.dropTargetY + moveAmount * rows;
+        return game.calc_isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
+    }
+
+    _selectTurnIntent(game, afx) {
+        if (this.temp > 0 && this.affixes.includes('berserk')) {
+            const chance = (this.temp / 100) * afx.berserkChanceMult;
+            if (Math.random() < chance) {
+                return { key: 'berserk', icon: '😡', name: '狂暴', label: '狂暴', color: '#ef4444', tone: 180, severity: 3 };
+            }
+        }
+
+        if (this.affixes.includes('healer')) {
+            let effectiveHealerRange = afx.healerRange;
+            if (this.type === 'boss' && this.bossType === 'viridis' && this.berserked) {
+                effectiveHealerRange = this._berserkedHealerRange !== undefined ? this._berserkedHealerRange : 0;
+            }
+            const range = this.width * effectiveHealerRange;
+            const targets = game.enemies.filter(other =>
+                other !== this && other.active && other.hp < other.maxHp && this.pos.dist(other.pos) < range
+            );
+            if (targets.length > 0) {
+                return { key: 'healer', icon: '💖', name: '治癒', label: `治疗x${targets.length}`, color: '#f472b6', tone: 240, severity: 2 };
+            }
+        }
+
+        if (this.affixes.includes('devour') && Math.random() < afx.devourChance) {
+            const targets = this._getDevourTargets(game, afx);
+            if (targets.length > 0) {
+                return { key: 'devour', icon: '👅', name: '吞噬', label: `吞噬x${targets.length}`, color: '#dc2626', tone: 160, severity: 3 };
+            }
+        }
+
+        if (this.affixes.includes('jump') && this._isMoveBlocked(game)) {
+            let effectiveJumpRows = afx.jumpRows;
+            if (this.type === 'boss' && this.bossType === 'glacies') {
+                effectiveJumpRows = this._berserkedJumpRows || effectiveJumpRows;
+            }
+            if (!this._isMoveBlocked(game, effectiveJumpRows)) {
+                return { key: 'jump', icon: '🦘', name: '跳躍', label: `跳跃${effectiveJumpRows}`, color: '#38bdf8', tone: 260, severity: 2 };
+            }
+        }
+
+        if (this.affixes.includes('clone') && Math.random() < afx.cloneChanceTurn) {
+            return { key: 'clone', icon: '🦠', name: '增殖', label: '增殖', color: '#c084fc', tone: 220, severity: 2 };
+        }
+
+        if (this.affixes.includes('regen') && this.hp < this.maxHp) {
+            return { key: 'regen', icon: '✚', name: '再生', label: '再生', color: '#4ade80', tone: 230, severity: 1 };
+        }
+
+        if (this.affixes.includes('haste')) {
+            return { key: 'haste', icon: '⚡', name: '疾行', label: '冲刺', color: '#facc15', tone: 280, severity: 1 };
+        }
+
+        return null;
+    }
+
     // --- [核心修改] 第一步：启动预警 (Trigger Telegraph) ---
     startTurnAction(game) {
         // [新增] 更新 Boss 专属物理状态机
@@ -769,40 +842,16 @@ class Enemy {
         }
 
         // 确定本回合要触发的主要动作 (用于显示图标)
-        // 优先级：狂暴 > 治疗 > 吞噬 > 跳跃 > 移动
+        // 优先级：狂暴 > 治疗 > 吞噬 > 跳跃 > 增殖 > 再生 > 疾行
         this.actionIcon = '';
         this.actionName = '';
+        this.telegraphIntent = null;
         const afx = CONFIG.balance.affixes;
-
-        if (this.temp > 0 && this.affixes.includes('berserk')) {
-             if (Math.random() < (this.temp / 100) * afx.berserkChanceMult) {
-                 this.actionIcon = '😡'; this.actionName = '狂暴';
-             }
-        }
-        
-        if (!this.actionIcon && this.affixes.includes('healer')) {
-             this.actionIcon = '💖'; this.actionName = '治癒';
-        }
-        
-        if (!this.actionIcon && this.affixes.includes('devour')) {
-             // 吞噬有概率
-             if (Math.random() < afx.devourChance) {
-                 this.actionIcon = '👅'; this.actionName = '吞噬';
-             }
-        }
-
-        // 检测是否需要跳跃 (前方受阻)
-        if (!this.actionIcon && this.affixes.includes('jump')) {
-            let moveAmount = game.enemyHeight;
-            const targetY = this.dropTargetY + moveAmount;
-            const isBlocked = game.calc_isAreaOccupied(this.pos.x, targetY, this.width * 0.8, this.height * 0.8, this);
-            if (isBlocked) {
-                this.actionIcon = '🦘'; this.actionName = '跳躍';
-            }
-        }
-
-        if (!this.actionIcon && this.affixes.includes('clone') && Math.random() < afx.cloneChanceTurn) {
-             this.actionIcon = '🦠'; this.actionName = '增殖';
+        const intent = this._selectTurnIntent(game, afx);
+        if (intent) {
+            this.telegraphIntent = intent;
+            this.actionIcon = intent.icon;
+            this.actionName = intent.name;
         }
 
         // 如果没有任何特殊动作，就是普通移动，不需要强调预警，或者给一个箭头
@@ -812,10 +861,10 @@ class Enemy {
         } else {
             // 特殊动作：进入预警状态
             this.actionPhase = 'telegraphing';
-            this.telegraphTimer = 35; // 约 0.6 秒的预警时间
+            this.telegraphTimer = CONFIG.enemyRender.telegraphDuration || 48;
             // 播放一个“蓄力”音效
             // @section:enemy_telegraph_audio - 敌人特殊动作预警蓄力音（低频 200Hz，区别于玩家蓄力 800Hz）
-            audio.playTone(200, 'sine', 0.1, 0.1); 
+            audio.playTone(intent.tone || 200, 'sine', 0.1, 0.1); 
         }
     }
 
@@ -1426,7 +1475,7 @@ class Enemy {
         
         // 预警震动
         if (this.actionPhase === 'telegraphing') {
-             const shake = 2.5; 
+             const shake = CONFIG.enemyRender.telegraphShake || 2.5;
              ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake); 
         }
 
@@ -3626,25 +3675,62 @@ class Enemy {
             }
         }
 
-        // --- [新增] 绘制预警大图标 (Pop-up Icon) ---
+        // --- Enemy intent telegraph: icon + label + countdown ring ---
+        // @perf-impact: 敌人意图预告语义提示 - high/medium 使用 shadowBlur 轻光晕，low 降级为平面面板与描边
         if (this.actionPhase === 'telegraphing' && this.actionIcon) {
             ctx.save();
-            // 在头顶上方浮现
-            const iconY = this.pos.y - this.height/2 - 30;
-            const scale = 1.0 + Math.sin(this.telegraphTimer * 0.5) * 0.2; // 弹跳缩放
-            
-            ctx.translate(this.pos.x, iconY);
-            ctx.scale(scale, scale);
-            
-            ctx.font = '30px sans-serif';
+            const _intent = this.telegraphIntent || {
+                icon: this.actionIcon,
+                label: this.actionName || '',
+                color: '#ffffff',
+                severity: 1
+            };
+            const _teleCfg = CONFIG.enemyRender;
+            const _duration = Math.max(1, _teleCfg.telegraphDuration || 48);
+            const _progress = Math.max(0, Math.min(1, this.telegraphTimer / _duration));
+            const _pulse = 0.5 + Math.sin((1 - _progress) * Math.PI * 8) * 0.5;
+            const _perfBudget = (typeof game !== 'undefined' && game.perfQualityLevel)
+                ? CONFIG.performance[game.perfQualityLevel]
+                : CONFIG.performance.high;
+            const _glowEnabled = _perfBudget.enemyTelegraphGlow !== false;
+            const _panelW = Math.max(66, Math.min(104, this.width + 24));
+            const _panelH = 44;
+            const _iconY = this.pos.y - this.height / 2 - (_teleCfg.telegraphYOffset || 42);
+            const _scale = 1 + _pulse * 0.06 + (_intent.severity || 1) * 0.015;
+
+            ctx.translate(this.pos.x, _iconY);
+            ctx.scale(_scale, _scale);
+
+            ctx.fillStyle = _glowEnabled
+                ? `rgba(15, 23, 42, ${0.78 + _pulse * 0.08})`
+                : 'rgba(15, 23, 42, 0.9)';
+            ctx.strokeStyle = _intent.color;
+            ctx.lineWidth = 1.5 + (_intent.severity || 1) * 0.35;
+            ctx.shadowColor = _intent.color;
+            ctx.shadowBlur = _glowEnabled ? _sb(8 + (_intent.severity || 1) * 5 + _pulse * 6) : 0;
+            ctx.beginPath();
+            ctx.roundRect(-_panelW / 2, -_panelH / 2, _panelW, _panelH, _teleCfg.telegraphPanelRadius || 12);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(-_panelW / 2 + 19, 0, 13, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - _progress));
+            ctx.strokeStyle = _intent.color;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            ctx.font = `bold ${_teleCfg.telegraphIconSize || 24}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            
-            // 绘制发光底板
-            ctx.shadowColor = '#fff';
-            ctx.shadowBlur = _sb(10);
-            ctx.fillText(this.actionIcon, 0, 0);
-            
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillText(_intent.icon || this.actionIcon, -_panelW / 2 + 19, 0);
+
+            ctx.font = `bold ${_teleCfg.telegraphLabelSize || 12}px sans-serif`;
+            ctx.textAlign = 'left';
+            ctx.fillStyle = _intent.color;
+            ctx.fillText(_intent.label || this.actionName || '', -_panelW / 2 + 39, -2);
+
             ctx.restore();
         }
 

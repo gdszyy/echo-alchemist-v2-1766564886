@@ -651,6 +651,23 @@
             align-items: center;
             gap: 3px;
         }
+        .shield-pill {
+            display: none;
+            align-items: center;
+            gap: 4px;
+            background: rgba(14, 116, 144, 0.22);
+            border: 1px solid rgba(103, 232, 249, 0.55);
+            color: #cffafe;
+            padding: 2px 7px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            box-shadow: 0 0 12px rgba(34, 211, 238, 0.15);
+            white-space: nowrap;
+        }
+        .shield-pill.is-visible {
+            display: flex;
+        }
         /* 加速按钮（保持常驻） */
         #speed-btn {
             width: 28px; height: 28px;
@@ -883,8 +900,8 @@
         /* Selection Grid */
         .marble-grid {
             display: grid; 
-            grid-template-columns: repeat(3, 1fr); 
-            gap: 10px;
+            grid-template-columns: repeat(auto-fit, minmax(54px, 1fr));
+            gap: 7px;
             padding: 10px 20px; /* 减小上下 padding */
             pointer-events: auto;
             width: 100%;
@@ -1108,6 +1125,59 @@
             font-size: 10.5px;
             color: #94a3b8;
             line-height: 1.5;
+        }
+
+        /* Compact choice rail: keep options small and reserve vertical space for detail text. */
+        #phase-selection > .selection-main {
+            gap: 8px;
+            padding: 10px 12px 8px;
+        }
+        #phase-selection .marble-grid {
+            grid-template-columns: repeat(auto-fit, minmax(54px, 1fr));
+            gap: 7px;
+            padding: 4px 0 0;
+            max-width: 430px;
+            flex-shrink: 0;
+        }
+        #phase-selection .select-card {
+            height: 74px;
+            border-radius: 10px;
+            gap: 3px;
+            padding: 6px 3px 5px;
+        }
+        #phase-selection .select-card:hover {
+            transform: translateY(-2px) scale(1.02);
+        }
+        #phase-selection .select-card.selected {
+            transform: translateY(-3px) scale(1.03);
+        }
+        #phase-selection .select-icon-wrap {
+            width: 38px;
+            height: 38px;
+        }
+        #phase-selection .select-icon {
+            width: 34px;
+            height: 34px;
+        }
+        #phase-selection .select-icon-emoji {
+            right: 0;
+            bottom: 0;
+            font-size: 13px;
+        }
+        #phase-selection .select-card-name {
+            font-size: 10px;
+            line-height: 1.15;
+        }
+        #phase-selection .select-card-tags {
+            display: none;
+        }
+        #phase-selection #marble-preview-panel {
+            max-width: 430px;
+            border-radius: 12px;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            margin-bottom: 0;
         }
 
         /* ============================================================
@@ -1556,6 +1626,22 @@
             transition: opacity 0.2s;
         }
         .btn-main:disabled { opacity: 0.5; filter: grayscale(1); }
+        .selection-action-hint {
+            width: 80%;
+            min-height: 18px;
+            margin: 2px auto 0;
+            text-align: center;
+            font-size: 10px;
+            line-height: 1.35;
+            color: #94a3b8;
+        }
+        .selection-action-hint.warn {
+            color: #fbbf24;
+        }
+        .replace-ammo-card:focus-visible {
+            outline: 2px solid #67e8f9;
+            outline-offset: 4px;
+        }
 
         /* Toast */
         #toast {
@@ -1978,6 +2064,290 @@
             font-size: 0.65rem;
             line-height: 1.4;
             text-align: left;
+        }
+        /* Relic choices use the same rail + detail pattern as marble choices. */
+        #phase-relic .relic-shell {
+            justify-content: flex-start;
+            padding: 18px 14px;
+            gap: 10px;
+        }
+        #phase-relic .relic-title-block {
+            margin-bottom: 4px;
+            flex-shrink: 0;
+        }
+        #phase-relic .relic-title-block h2 {
+            font-size: 1.65rem;
+            margin-bottom: 2px;
+        }
+        #phase-relic .relic-title-block p {
+            font-size: 0.75rem;
+        }
+        #phase-relic #relic-container {
+            flex-wrap: nowrap;
+            gap: 8px;
+            max-width: 430px;
+            margin-bottom: 0;
+            flex-shrink: 0;
+        }
+        #phase-relic .relic-card {
+            flex: 1 1 0;
+            min-width: 0;
+            max-width: 132px;
+            min-height: 92px;
+            border-radius: 10px;
+            padding: 8px 4px;
+        }
+        #phase-relic .relic-card:hover {
+            transform: translateY(-2px) scale(1.02);
+        }
+        #phase-relic .relic-card.previewing {
+            border-color: #fbbf24;
+            box-shadow: 0 0 16px rgba(251, 191, 36, 0.28), 0 6px 18px rgba(0,0,0,0.35);
+        }
+        #phase-relic .relic-icon {
+            width: 36px;
+            height: 36px;
+            font-size: 1.6rem;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #phase-relic .relic-name {
+            font-size: 0.78rem;
+            line-height: 1.2;
+        }
+        #phase-relic .relic-desc,
+        #phase-relic .relic-recommend-badge,
+        #phase-relic .relic-tags,
+        #phase-relic .relic-tip {
+            display: none;
+        }
+        #phase-relic .relic-stack {
+            font-size: 0.62rem;
+            margin-top: 1px;
+        }
+        #relic-preview-panel {
+            width: 100%;
+            max-width: 430px;
+            min-height: 0;
+            flex: 1;
+            overflow-y: auto;
+            background: rgba(10, 15, 30, 0.92);
+            border: 1px solid rgba(71, 85, 105, 0.55);
+            border-radius: 12px;
+            padding: 14px 16px;
+            text-align: left;
+        }
+        .relic-preview-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .relic-preview-icon {
+            width: 48px;
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            filter: drop-shadow(0 0 8px rgba(255,255,255,0.25));
+        }
+        .relic-preview-name {
+            font-family: 'Cinzel', serif;
+            font-size: 1rem;
+            font-weight: 800;
+            color: #f1f5f9;
+            line-height: 1.2;
+        }
+        .relic-preview-rarity {
+            display: inline-flex;
+            margin-top: 5px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            background: rgba(15, 23, 42, 0.75);
+            color: #94a3b8;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        .relic-preview-desc {
+            color: #cbd5e1;
+            font-size: 0.86rem;
+            line-height: 1.65;
+        }
+        .relic-preview-stack,
+        .relic-preview-tip {
+            margin-top: 10px;
+            color: #fbbf24;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+        .relic-preview-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin: 10px 0 0;
+        }
+        #rune-picker-overlay .rune-picker-sheet {
+            max-height: min(82dvh, 620px);
+            display: flex;
+            flex-direction: column;
+        }
+        #rune-picker-list {
+            flex-wrap: nowrap !important;
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-height: none !important;
+            padding-bottom: 4px;
+            scrollbar-width: none;
+        }
+        #rune-picker-list::-webkit-scrollbar {
+            display: none;
+        }
+        #rune-picker-list > button {
+            min-width: 66px !important;
+            padding: 8px 6px !important;
+            flex-shrink: 0;
+        }
+        #rune-picker-list > button.rune-picker-option-active {
+            border-color: rgba(251, 191, 36, 0.85) !important;
+            background: rgba(120, 53, 15, 0.35) !important;
+            box-shadow: 0 0 14px rgba(251, 191, 36, 0.22);
+        }
+        #rune-picker-detail {
+            margin-top: 10px;
+            margin-bottom: 10px;
+            min-height: 128px;
+            max-height: 220px;
+            overflow-y: auto;
+            background: rgba(10, 15, 30, 0.92);
+            border: 1px solid rgba(71, 85, 105, 0.55);
+            border-radius: 12px;
+            padding: 12px 14px;
+        }
+        .rune-picker-detail-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .rune-picker-detail-icon {
+            width: 42px;
+            height: 42px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .rune-picker-detail-name {
+            font-size: 0.9rem;
+            line-height: 1.2;
+            font-weight: 800;
+            color: #f1f5f9;
+        }
+        .rune-picker-detail-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        .rune-picker-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 7px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            color: #cbd5e1;
+            background: rgba(15, 23, 42, 0.7);
+            font-size: 0.65rem;
+            font-weight: 700;
+        }
+        .rune-picker-detail-desc {
+            color: #cbd5e1;
+            font-size: 0.78rem;
+            line-height: 1.55;
+        }
+        .rune-picker-trigger-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 9px;
+        }
+        #shop-upgrade-preview {
+            width: 100%;
+            min-height: 112px;
+            max-height: 190px;
+            overflow-y: auto;
+            margin-bottom: 12px;
+            background: rgba(10, 15, 30, 0.92);
+            border: 1px solid rgba(71, 85, 105, 0.55);
+            border-radius: 12px;
+            padding: 13px 15px;
+        }
+        .shop-preview-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .shop-preview-icon {
+            width: 42px;
+            height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            border-radius: 10px;
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(100, 116, 139, 0.45);
+            font-size: 1.35rem;
+        }
+        .shop-preview-name {
+            color: #f1f5f9;
+            font-size: 0.95rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+        .shop-preview-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        .shop-preview-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 7px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            background: rgba(15, 23, 42, 0.75);
+            color: #cbd5e1;
+            font-size: 0.65rem;
+            font-weight: 700;
+        }
+        .shop-preview-desc {
+            color: #cbd5e1;
+            font-size: 0.82rem;
+            line-height: 1.6;
+        }
+        #phase-shop #shop-items-container {
+            gap: 8px;
+        }
+        #phase-shop .shop-upgrade-card {
+            padding: 10px !important;
+            gap: 8px !important;
+        }
+        #phase-shop .shop-upgrade-card.previewing {
+            border-color: rgba(251, 191, 36, 0.75) !important;
+            box-shadow: 0 0 14px rgba(251, 191, 36, 0.18);
+        }
+        #phase-shop .shop-upgrade-desc {
+            display: none;
         }
          /* --- 针对移动端横屏/矮屏幕的终极适配 --- */
         @media (max-height: 600px) {
@@ -2832,6 +3202,9 @@
 
         <!-- 右侧：回合数 + 加速 + 设置 -->
         <div class="top-bar-right">
+            <div id="shield-pill" class="shield-pill" title="守护者结界：敌人越线时消耗 1 层并抵消失败">
+                <span>🔰</span><span id="shield-count">0</span>
+            </div>
             <div class="round-pill">R <span id="round-num" class="stat-highlight">1</span></div>
             <button id="speed-btn">⏩</button>
             <!-- 设置按钮容器（相对定位，为下拉面板提供锁定点） -->
@@ -3101,7 +3474,7 @@
 
         <!-- 符文选择弹出层 -->
         <div id="rune-picker-overlay" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-[400] flex items-end justify-center" onclick="game.ui_closeRunePicker()">
-            <div class="w-full max-w-md bg-slate-900 border border-purple-700/50 rounded-t-2xl p-5 relative" onclick="event.stopPropagation()">
+            <div class="rune-picker-sheet w-full max-w-md bg-slate-900 border border-purple-700/50 rounded-t-2xl p-5 relative" onclick="event.stopPropagation()">
                 <!-- [新增] 词条预览提示框 -->
                 <div id="runeword-preview-tooltip" class="hidden absolute left-1/2 -translate-x-1/2 bottom-full mb-4 w-[90%] bg-slate-800 border-2 border-amber-500/50 rounded-xl p-3 shadow-[0_0_30px_rgba(0,0,0,0.8)] z-[500] pointer-events-none">
                     <div class="flex items-center gap-2 mb-2">
@@ -3118,6 +3491,7 @@
                     <div class="text-[10px] text-slate-500 italic">長按可預覽詞条效果</div>
                 </div>
                 
+                <div id="rune-picker-detail"></div>
                 <div id="rune-picker-list" class="flex flex-wrap gap-3 max-h-48 overflow-y-auto custom-scrollbar">
                     <!-- 由 JS 动态生成 -->
                 </div>
@@ -3147,6 +3521,8 @@
                 <!-- 动态生成分类标签 -->
             </div>
 
+            <div id="shop-upgrade-preview"></div>
+
             <div id="shop-items-container" class="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
                 <!-- 动态生成升级项 -->
             </div>
@@ -3155,7 +3531,7 @@
 
     <div id="phase-selection" class="ui-overlay" style="display: none; z-index: 200;">
     
-        <div class="flex-1 w-full min-h-0 overflow-y-auto flex flex-col items-center py-4">
+        <div class="selection-main flex-1 w-full min-h-0 flex flex-col items-center">
             <div id="marble-selection-grid" class="marble-grid"></div>
             <div class="h-2 shrink-0"></div>
             <!-- 弹珠预览面板 -->
@@ -3362,9 +3738,9 @@
     </div>
 
     <div id="phase-relic" class="ui-overlay hidden-phase" style="display: none; z-index: 200; background: rgba(2, 6, 23, 0.95);">
-        <div class="flex flex-col items-center justify-center w-full h-full p-4">
+        <div class="relic-shell flex flex-col items-center justify-center w-full h-full p-4">
             
-            <div class="text-center mb-8">
+            <div class="relic-title-block text-center mb-8">
                 <h2 class="text-4xl font-bold text-amber-400 font-[Cinzel] mb-2 drop-shadow-lg">古代遺物</h2>
                 <p class="text-slate-400 text-sm">命運的饋贈，選擇一種力量</p>
             </div>
@@ -3372,7 +3748,9 @@
             <div id="relic-container" class="flex flex-wrap justify-center gap-4 w-full max-w-4xl">
                 </div>
 
-            <button onclick="game.ui_skipRelic()" id="relic-skip-to-shop-btn" class="mt-12 text-purple-400 hover:text-purple-200 text-sm underline cursor-pointer transition-colors">
+            <div id="relic-preview-panel"></div>
+
+            <button onclick="game.ui_skipRelic()" id="relic-skip-to-shop-btn" class="mt-3 text-purple-400 hover:text-purple-200 text-sm underline cursor-pointer transition-colors">
                 放棄遺物 → 進入局內商店
             </button>
         </div>

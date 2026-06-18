@@ -48,7 +48,7 @@ export const EVENT_TYPES = {
     UI_RUNE_CHARGE_INIT: 'ui:rune_charge_init',        // 初始化充能符文UI（单符文槽，空状态）
     UI_RUNE_CHARGE_LEVEL_UP: 'ui:rune_charge_level_up', // 充能满 → 刷新符文预览（带特效）
     UI_RUNE_CHARGE_UPDATE: 'ui:rune_charge_update',    // 更新充能条进度
-    UI_RUNE_CHARGE_CLAIM: 'ui:rune_charge_claim',      // 回合结束领取符文 → 入背包动画
+    UI_RUNE_CHARGE_CLAIM: 'ui:rune_charge_claim',      // deprecated：旧充能符文领取事件，改用 UI_RUNE_CLAIM_AFTER_ENEMY
     UI_RUNE_CLAIM_AFTER_ENEMY: 'ui:rune_claim_after_enemy', // 敌人动作后领取符文（充能/掉落）→ 飞入背包动画
     UI_CHROMATIC_ABERRATION: 'ui:chromatic_aberration', // CRT 色差特效
     UI_COMBAT_MESSAGE: 'ui:combat_message',            // 战斗消息文本

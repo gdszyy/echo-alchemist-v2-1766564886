@@ -216,12 +216,24 @@
 | `entities.js` → `Peg.draw` | 椭圆软阴影（`ellipse`） | `pegSoftShadow` | `low` |
 | `entities.js` → `Peg.draw` | 底部径向光晕（`createRadialGradient` + `lighter`） | `pegGlowHalo` | `medium` / `low` |
 | `entities/enemy.js` → `Enemy._initTexture` | 材质光泽渐变（OffscreenCanvas `LinearGradient`） | `enemyGloss` | `low` |
+| `entities/enemy.js` → `Enemy.draw` | 敌人意图预告光晕（`shadowBlur`） | `enemyTelegraphGlow` | `low` 降级为平面面板 |
 
 **修改注意事项：**
 
 - `Peg.draw` 通过 `typeof game !== 'undefined' && game.perfQualityLevel` 读取等级，默认回退 `'high'`。
 - `Enemy._initTexture` 在构造时调用，通过 `window.game` 读取等级（若 `window.game` 尚未挂载则默认开启光泽）。
 - 新增 Peg 或 Enemy 的高开销渲染步骤时，**必须**在 `CONFIG.performance` 中添加对应开关，并在 `performance.md` 第 5 节更新消费端关联索引。
+
+### 10.1 敌人意图预告（Enemy Telegraph）
+
+`Enemy.startTurnAction(game)` 会在敌人行动前调用 `_selectTurnIntent(game, afx)` 生成本回合意图对象，并写入 `telegraphIntent`、`actionIcon`、`actionName`。该意图对象只服务于当前真实调用链 `startTurnAction -> executeTurnAction`，不改变敌人机制结算顺序。
+
+当前预告优先级：`berserk` > `healer` > `devour` > `jump` > `clone` > `regen` > `haste`。
+
+渲染规则：
+- `high/medium`：显示带类型色的面板、图标、短标签、倒计时进度环和轻量 `shadowBlur`。
+- `low`：关闭 `shadowBlur`，保留平面面板、图标、短标签和进度环，确保语义类玩法提示不会消失。
+- 预告时长由 `CONFIG.enemyRender.telegraphDuration` 控制，震动幅度由 `CONFIG.enemyRender.telegraphShake` 控制。
 
 ## 11. 阶段五：敌人 Sprite 接入计划（待实施）
 

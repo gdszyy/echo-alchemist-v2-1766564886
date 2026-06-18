@@ -1,6 +1,6 @@
-# src/combat_system.js 函数索引
+# src\combat_system.js 函数索引
 
-> 自动生成于 2026-04-26 | 总行数: 3364 | 函数数: 42 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 3830 | 函数数: 44 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 5 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -21,7 +21,7 @@
 | combat_wind_addAnchor | method | `combat_wind_addAnchor(x, y, bulletDamage = 2, bulletConfig = { wind: 1 })` |  |
 | combat_wind_triggerSmallWhirlwindDamage | method | `combat_wind_triggerSmallWhirlwindDamage(centerX, centerY, bulletDamage = 2, bulletConfig = { wind: true })` |  |
 | combat_wind_triggerMagicCircle | method | `combat_wind_triggerMagicCircle()` |  |
-| combat_wind_executeCircleEffect | method | `combat_wind_executeCircleEffect(x, y, w, h, size, shape, element, tunnelVector = null, bulletDamage = 2, bulletC)` | ⚠️ 巨型函数，见 @section 导航 |
+| combat_wind_executeCircleEffect | method | `combat_wind_executeCircleEffect(x, y, w, h, size, shape, element, tunnelVector = null, bulletDamage = 2, bulletConfig = null, type = 'burst')` | ⚠️ 巨型函数，见 @section 导航 |
 | combat_wind_triggerButterflyCircle | method | `combat_wind_triggerButterflyCircle()` |  |
 | combat_wind_updateButterflyCircles | method | `combat_wind_updateButterflyCircles(timeScale)` |  |
 | combat_wind_fireButterflyBlades | method | `combat_wind_fireButterflyBlades(bc)` |  |
@@ -39,10 +39,12 @@
 | combat_damageEnemy | method | `combat_damageEnemy(enemy, projectile, damageOverride = null)` | ⚠️ 巨型函数，见 @section 导航 |
 | combat_fireNextShot | method | `combat_fireNextShot(vel)` | ⚠️ 巨型函数，见 @section 导航 |
 | combat_laser_fire | method | `combat_laser_fire(startX, startY, vel, recipe, shotId = null, isTickFire = false)` | ⚠️ 巨型函数，见 @section 导航 |
+| combat_triggerFrostNova | method | `combat_triggerFrostNova(centerPos, sourceConfig, novaParams, probMult = 1.0, chainDepth = 0)` |  |
 | combat_bladeStorm_update | method | `combat_bladeStorm_update(timeScale)` |  |
 | combat_continuousLaser_update | method | `combat_continuousLaser_update(timeScale = 1)` |  |
 | _laser_blendRefractionColor | method | `_laser_blendRefractionColor(baseColor)` |  |
 | combat_updateHitProgress | method | `combat_updateHitProgress(val, target)` |  |
+| relic_runRoundStartHooks | method | `relic_runRoundStartHooks()` |  |
 | combat_runeCharge_init | method | `combat_runeCharge_init()` |  |
 | combat_runeCharge_initUI | method | `combat_runeCharge_initUI()` |  |
 | combat_runeCharge_onHit | method | `combat_runeCharge_onHit(hitX, hitY, isKill = false)` |  |
@@ -58,7 +60,7 @@
 
 ### combat_activateSkill
 
-> 定位：`grep -n '@section:{}'` 跳转到对应节点
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|
@@ -68,7 +70,7 @@
 
 ### combat_wind_executeCircleEffect
 
-> 定位：`grep -n '@section:{}'` 跳转到对应节点
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|
@@ -78,7 +80,7 @@
 
 ### combat_damageEnemy
 
-> 定位：`grep -n '@section:{}'` 跳转到对应节点
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|
@@ -88,28 +90,27 @@
 | `@section:damage_kill_check` | 击杀判断与掉落物/经验触发 |
 | `@section:damage_dda_feedback` | 动态难度调整（DDA）数据采集 |
 | `@section:damage_visual_and_audio` | 伤害视觉反馈与音效播放 |
-| `@section:fire_ammo_selection` | 弹药选择与配方读取 |
 
 ### combat_fireNextShot
 
-> 定位：`grep -n '@section:{}'` 跳转到对应节点
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|
 | `@section:fire_trajectory_calc` | 弹道计算与散射角度 |
 | `@section:fire_projectile_spawn` | 子弹实体生成与属性注入 |
 | `@section:fire_post_effects` | 射击后效果：后坐力/音效/HUD更新 |
-| `@section:laser_ray_cast` | 激光射线投射与穿透检测 |
 
 ### combat_laser_fire
 
-> 定位：`grep -n '@section:{}'` 跳转到对应节点
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|
 | `@section:laser_hit_processing` | 激光命中处理与连锁反应 |
 | `@section:laser_visual_beam` | 激光光束视觉渲染 |
 | `@section:laser_audio` | 激光束发射音效（sawtooth，频率随宽度反比：越粗越低沉，100~800Hz） |
+
 
 ## 其他 @section 标记
 
@@ -118,5 +119,7 @@
 | `@section:skill_type_dispatch` | 技能类型分发：主动/被动/触发分支 |
 | `@section:wind_circle_geometry` | 风圈几何计算与碰撞范围确定 |
 | `@section:damage_pre_calc` | 伤害前置计算：基础值、暴击、穿透 |
+| `@section:fire_ammo_selection` | 弹药选择与配方读取 |
+| `@section:laser_ray_cast` | 激光射线投射与穿透检测 |
 | `@section:rune_charge_levelup_audio` | 符文充能条升级音效（520Hz sine，轻柔上升感） |
 | `@section:rune_charge_claim_audio` | 符文充能完成领取音效（playPowerup 确认感） |

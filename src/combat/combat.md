@@ -1,5 +1,17 @@
 # 战斗系统规范 (Combat System Architecture)
 
+## 0. Battle Relic Cinematic Timing (2026-06-18)
+
+`relic_runRoundStartHooks()` returns the number of milliseconds needed for round-start relic animations. `phase_finalizeRound()` calls it after `round++`; when the return value is greater than 0, Boss spawning, reward resolving, and the next round banner are delayed until `phase_continueFinalizeRoundAfterRelicHooks()` runs.
+
+Current combat relic presentations:
+
+- `doomsday_timer`: target lock, three staged shockwaves, overhead lightning, and burst particles. If a strike kills, it can retrigger on another living enemy after a short delay. The retrigger limit starts at 1 and increases by 1 for every 5 round-start main triggers; the returned animation delay must cover the potential chain.
+- `corridor_arc`: wall-to-target lightning arcs for enemies near side walls; projectile side-wall hits add purple sparks.
+- `mortal_burst`: kill explosions set `_relicCombatCinematicFrames` so the combat end check waits for the blast beat.
+
+New combat relic animations must read `CONFIG.performance.relicCinematicDelayMs`, `relicCinematicSparkCount`, and `relicCinematicBoltCount`, while still respecting the existing effect limits (`shockwaveLimit`, `waveLimit`, `lightningLimit`, and particle limits).
+
 本文档定义了 `src/combat_system.js` 拆分后的战斗系统模块结构及职责边界。
 
 ## 1. 模块拆分与职责

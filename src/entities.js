@@ -524,7 +524,7 @@ class GhostPeg {
      */
     constructor(x, y, type, level) {
         this.pos = new Vec2(x, y);
-        this.radius = 6;
+        this.radius = CONFIG.physics.pegRadius || 4;
         this.type = type;
         this.level = level || 1;
         this.life = 180;       // 存活 180 帧（约 3 秒）
@@ -815,7 +815,7 @@ class TriangleSideWheel {
 class Peg {
     constructor(x, y, type = 'normal') {
         this.pos = new Vec2(x, y); 
-        this.radius = 6; 
+        this.radius = CONFIG.physics.pegRadius || 4;
         this.type = type; 
         this.lit = false; 
         this.litTimer = 0; 

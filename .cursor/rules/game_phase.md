@@ -25,10 +25,10 @@ globs: ["src/game_phase.js"]
 - **入口**: `sys_startRoundStartResolver()` 会先消费 `pendingRoundStartRewards`；若命中 `relic`，进入遗物事件；若命中 `chaos_essence` 或 `pure_essence`，则先写入 `pendingSelectionMode` 再调用 `sys_initSelectionPhase()` 呈现对应的命运时刻界面。
 - **[tsk-668f3dba] 替换子弹阶段（当前实现）**：当精华触发（`chaos_essence` / `pure_essence`）且上回合 `marbleQueue` 非空时，系统在进入命运选择**前**将 `marbleQueue` 编译为**充能子弹**（`_chargedAmmoQueue`，`multicast`/`finalHits` 重置为 0）。研磨阶段全部弹珠结算完毕后，若 `_chargedAmmoQueue` 非空，自动调用 `sys_initReplaceAmmoPhase()` 进入替换阶段；否则直接进入战斗。
   - `replaceAmmoContext`：替换阶段上下文，包含 `active`、`newRecipes`（本回合新研磨，左侧）、`chargedRecipes`（上回合充能子弹，右侧）、`selectedIndices`（多选索引数组，默认全选右侧充能子弹）。
-  - UI：`ui_renderReplaceAmmoUI()` 展示两行卡片（NEW GRIND / CHARGED），每张卡片显示属性值、Tier 徽章（C/B/A/S）和主属性主题色。玩家可逐张切换选中，最多选 `max(newRecipes.length, chargedRecipes.length, 3)` 张。
+  - UI：`ui_renderReplaceAmmoUI()` 展示两行卡片（NEW GRIND / CHARGED），每张卡片显示属性值、Tier 徽章（C/B/A/S）和主属性主题色。玩家可逐张切换选中，必须选 `min(子弹上限, newRecipes.length + chargedRecipes.length)` 张；纯净精华跳过研磨时即使只有 1-2 枚充能子弹，也可以正常确认。
   - 替换确认：`sys_confirmReplaceAmmo()` 按 `selectedIndices` 从 `allRecipes = [...newRecipes, ...chargedRecipes]` 中取出子弹写入 `ammoQueue`，清空 `replaceAmmoContext` 和 `_chargedAmmoQueue`，恢复 gridEl CSS 布局后进入战斗。
   - 跳过：`sys_skipReplaceAmmo()` 直接使用 `newRecipes` 进入战斗，丢弃充能子弹。
-  - **纯净精华特殊分支（跳过研磨）**：在纯净精华界面点击“跳过研磨”（`sys_skipGrindGetRune`）时，系统会随机补偿一个符文，并**优先使用 `_chargedAmmoQueue` 作为本回合弹药**（若无则编译当前 `marbleQueue`），随后清理上下文并**直接进入战斗阶段**，不再触发替换界面。
+  - **纯净精华特殊分支（跳过研磨）**：在纯净精华界面点击“跳过研磨”（`sys_skipGrindGetRune`）时，系统会随机补偿一个符文，并**优先使用 `_chargedAmmoQueue` 作为可保留弹药**（若无则编译当前 `marbleQueue`），随后清空新研磨子弹并进入只展示 CHARGED 行的替换界面。若没有任何可用充能子弹，系统回到标准弹珠选择，避免空弹药进入战斗。
 - **模式分支**: `chaos_essence` 模式沿用标准 3 选流程，但 UI 需显式标记为"混沌精华"；`pure_essence` 模式要求只选择 `1` 枚弹珠，**符文注入为可选项**：有注入时享受同化率加成，无注入时直接进入研磨（单弹珠，无同化加成）。
 - **出口**: 玩家做出选择并确认，触发转场动画进入研磨阶段。纯净精华模式下，确认时必须先完成合法性校验，把注入结果写回 `MarbleDefinition.collected`，并为对应 `marble.type` 写入 `doubleAssimilationBoostRounds`。
 
@@ -49,10 +49,15 @@ globs: ["src/game_phase.js"]
 ### 2.2.1 模块化钉盘属性生成契约
 
 - **生成入口**：模块化钉盘由 `phase_gathering_initPachinko_v2()` 调用 `buildModuleEntities()` 构造各模块实体。
+- **默认钉盘**：缺失或长度不匹配的 `currentModuleLayout` 必须通过 `createDefaultModuleLayout(totalSlots)` 初始化，默认盘为 `dense_stagger` / `rune_lattice` / `std_stagger` / `bouncer` 混排，不再使用全 12 格 `std_stagger`。
+- **融合承载模块**：`rune_lattice` 是默认解锁的符文融合承载模块，`rune_focus_module` 是商店解锁的强化融合模块；二者通过 `fusionPriority` 标记影响符文注入落点。
+- **模块扩展池**：商店解锁模块可组合现有 Peg / `SpecialSlot` 能力形成新玩法，如 `split_gate_module`（分裂槽）、`recall_loop_module`（召回槽）、`cascade_bank_module`（弹钉斜坡）、`crucible_core_module`（固定属性三角）、`double_wheel_module`（双轮盘）和 `fusion_garden_module`（2x1 融合承载）。
+- **密度参数**：模块内部最小钉距由 `CONFIG.physics.pegRadius`、`CONFIG.physics.marbleRadius` 与 `CONFIG.physics.pinboardSpacingBuffer` 共同决定；不得在模块生成器里重新硬编码旧版大弹珠间距。
 - **权重来源**：模块生成普通钉子时必须读取当前 `game.unlockedWeights`，其中 `white` 映射为普通钉子权重，`bounce`、`pierce`、`scatter`、`damage`、`cryo`、`pyro`、`wind` 按权重生成对应属性钉子。
 - **禁止类型**：与旧版 `phase_gathering_getRandomPegType()` 保持一致，`laser` 与 `lightning` 不得作为钉子类型生成。
 - **覆盖边界**：只允许随机覆盖模块生成出的 `normal` 钉子；模块预置的 `pink`、固定 `cryo` / `pyro` 等特殊钉子必须保留，以免破坏模块本身定位。
-- **后置流程**：随机属性生成完成后，`pendingFusions` 仍继续在普通钉子上进行符文注入；若上一回合继承逻辑生效，则按原规则在非粉色普通钉子上覆盖继承属性。
+- **后置流程**：随机属性生成完成后，`pendingFusions` 会优先注入 `fusionPriority` 更高的普通钉子，再按中下区域价值排序；若上一回合继承逻辑生效，则按原规则在非粉色普通钉子上覆盖继承属性。模块编辑器中选择符文融合后必须立即调用 `phase_gathering_initPachinko(false)` 重建当前盘面，保证玩家在点击「开始采集」前看到真实融合结果。
+- **融合预览**：模块编辑器存在 `_moduleEditorRunePreview` 时，`render_moduleEditorOverlay()` 必须用 `selectFusionTargetPegs()` 高亮目标钉子；该高亮只做轻量描边/填充，不新增粒子或高开销阴影。
 
 ### 2.3 战斗阶段 (Combat Phase)
 - **职责**: 使用收集到的弹药队列攻击敌人，进行回合制结算。
@@ -156,6 +161,7 @@ globs: ["src/game_phase.js"]
 
 **当前设计**：Boss 击杀后仍只掉落符文；固定回合遗物事件已移除。非 Boss 敌人可以在死亡时登记 `relic`、`chaos_essence` 或 `pure_essence` 到 `pendingRoundStartRewards`，并在下一回合开始由 `sys_startRoundStartResolver()` 统一结算。
 
+- 当 `pendingRoundStartRewards` 同时存在多个奖励时，resolver 必须显示“回合奖励 X/Y：奖励类型”的进度提示；单个奖励保持原有类型提示即可，避免 Toast 噪声。
 - `phase_finalizeRound()` 不再计算 `isRelicRound`，只负责存档并启动 round-start resolver。
 - `sys_initGameStart()` 的首个遗物也通过 `pendingRoundStartRewards` 进入统一流程，不再直接调用 `ui_showRelicSelection()`。
 - `ui_closeRelicSelection()` 在 `resumeTarget === 'round_start_resolver'` 时必须回到 `sys_continueRoundStartResolver()`，而不是默认进入 `selection`/`gathering`。
@@ -172,6 +178,7 @@ globs: ["src/game_phase.js"]
   - 在 `phase_finalizeRound` 结尾将 `clearedThisRound` 写入该标志位。
   - 在 `sys_resetGame` 中初始化为 `false`。
 - **应用时机**：在 `phase_finalizeRound` 的普通敌人行生成逻辑中，若 `this._prevRoundCleared === true` 且当前计算得到的 `spawnCount < 3`，则强制将 `spawnCount` 提升至 3。
+- **反馈要求**：触发该规则时必须给出“清屏反扑”提示，避免玩家误以为清屏成功后被无提示惩罚。
 - **与 Boss 回合的关系**：该规则仅在普通回合（非 Boss 回合）下生效，Boss 回合不生成普通敌人行，不受此规则影响。
 
 ## 7.1 命运时刻相关回合衰减约束
@@ -187,6 +194,7 @@ globs: ["src/game_phase.js"]
   - Boss 击杀后，激活战后高压因子 `postBossMultiplier = 1.3`，持续 `postBossSurgeRoundsLeft = 3` 回合。
   - 在高压期间，普通敌人的基础血量 `finalBaseHP` 会乘以 `postBossMultiplier`。
   - 在高压期间，双词缀精英怪的生成概率临时提升 25%。
+- **反馈要求**: Boss 击杀时必须提示“Boss 余波 / 高压反扑”，让玩家明确接下来 3 回合的压力来自战后事件。
 - **衰减逻辑**: 
   - 在 `phase_finalizeRound` 中，每回合结束时 `postBossSurgeRoundsLeft` 减 1。
   - `postBossMultiplier` 每次减 0.1，直到恢复至 1.0。

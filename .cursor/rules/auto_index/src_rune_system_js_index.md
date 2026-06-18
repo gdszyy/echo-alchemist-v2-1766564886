@@ -1,6 +1,6 @@
-# src/rune_system.js 函数索引
+# src\rune_system.js 函数索引
 
-> 自动生成于 2026-04-22 | 总行数: 444 | 函数数: 9 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 499 | 函数数: 10 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -18,3 +18,4 @@
 | rune_merge | function | `rune_merge(runeObjects, runeInventory)` |  |
 | rune_reforge | function | `rune_reforge(runeObjects, runeInventory, game)` |  |
 | getNewRunewordsOnPlacement | function | `getNewRunewordsOnPlacement(currentGrid, cellIndex, runeEntry, runewordDb)` |  |
+| fuseRuneIntoBoard | function | `fuseRuneIntoBoard(game, runeEntry, runeDb)` |  |

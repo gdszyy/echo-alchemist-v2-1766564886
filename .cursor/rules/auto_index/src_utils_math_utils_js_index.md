@@ -1,6 +1,6 @@
-# src/utils/math_utils.js 函数索引
+# src\utils\math_utils.js 函数索引
 
-> 自动生成于 2026-04-26 | 总行数: 267 | 函数数: 21 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 267 | 函数数: 20 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -13,7 +13,6 @@
 | lerpColor | function | `lerpColor(a, b, amount)` |  |
 | lerp | function | `lerp(start, end, t)` |  |
 | hexToRgba | function | `hexToRgba(hex, alpha)` |  |
-| Vec2 | class | `Vec2()` |  |
 | constructor | method | `constructor(x, y)` |  |
 | add | method | `add(v)` |  |
 | sub | method | `sub(v)` |  |

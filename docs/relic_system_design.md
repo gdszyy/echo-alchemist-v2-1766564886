@@ -64,7 +64,7 @@
 | `hunter_instinct` | 猎人本能 | rare | 战斗被动 | `combat_system.js` `combat_damageEnemy`：在 `enemy.takeDamage` 之前对场上 hp 最低敌人 ×1.25 |
 | `rune_resonance_core` | 符文共鸣核 | rare | 击杀奖励 | `combat_system.js` `combat_runeCharge_onHit`：击杀 +0.08 充能 |
 | `mirror_magazine` | 镜像弹夹 | rare | 一次性 | `ui/shop.js` `ui_selectRelic`：复制 `ammoQueue` 中评分最高的子弹至队尾 |
-| `doomsday_timer` | 末日计时器 | rare | 回合开始 | `game_phase.js` `phase_finalizeRound`（round++ 之后）→ `combat_system.js` `relic_runRoundStartHooks` |
+| `doomsday_timer` | 末日计时器 | rare | 回合开始 | `game_phase.js` `phase_finalizeRound`（round++ 之后）→ `combat_system.js` `relic_runRoundStartHooks`；若末日击杀成功，则短延迟后补触发；主触发每累计 5 次，补触发上限 +1 |
 | `echo_reverberation` | 余韵回响 | rare | 钉板编译 | `calc_utils.js` `calc_compileCollectionToRecipe`：单属性 ≥10 层时 +1 |
 | `element_injector` | 元素注入器 | epic | 一次性 | `ui/shop.js` `ui_selectRelic`：删除 `ammoQueue` 最强/最弱，幸存者属性翻倍 |
 | `chaos_burst` | 混沌爆发 | cursed | 掉落联动 | `game_system.js` `sys_dropFieldLoot`：混沌精华掉落时全场固定真实伤害 round×2 |

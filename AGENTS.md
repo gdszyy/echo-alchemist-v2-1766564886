@@ -7,6 +7,7 @@
 *   **项目全局规范入口**：本文档 (`AGENTS.md`)，包含核心编辑策略、禁止行为与文档索引。
 *   **架构与防坑指南**：[`.cursor/rules/global.md`](.cursor/rules/global.md)（必读，包含子系统扩展规范与全局状态流转）。
 *   **待办与进度大盘**：[`TODO.md`](TODO.md)（包含各阶段的完成状态与重构指标）。
+*   **P0 交互优化 TODO**：[`docs/p0_interaction_optimization_todo.md`](docs/p0_interaction_optimization_todo.md)（当前核心页面交互优化优先级、已落地项与下一轮 P0/P1 清单）。
 *   **自适应性能规范**：[`.cursor/rules/performance.md`](.cursor/rules/performance.md)（凡修改粒子/特效/Peg/敌人渲染相关代码，必读）。
 *   **流程洞察索引**：[`.cursor/rules/process_insights/index.md`](.cursor/rules/process_insights/index.md)（在涉及复杂跨模块流程、修复历史 Bug 区域或新增特效时必读；包含历次任务沉淀的防坑经验与版本化洞察文档）。
 *   **自动函数索引**：[`.cursor/rules/auto_index/INDEX.md`](.cursor/rules/auto_index/INDEX.md)（在涉及大文件修改时必读；包含所有大文件的函数名、行号范围和 @section 内部节点映射，由 `code-indexer` 脚本自动维护，**严禁手动编辑**）。
@@ -151,15 +152,13 @@
 
 ```bash
 # 修改单个文件后，仅更新该文件的索引
-python3 /home/ubuntu/skills/code-indexer/scripts/generate_index.py \
-  <仓库本地路径> --file src/combat_system.js
+python scripts/generate_index.py <仓库本地路径> --file src/combat_system.js
 ```
 
 **全量重建（修复索引损坏或初次建立时使用）**：
 
 ```bash
-python3 /home/ubuntu/skills/code-indexer/scripts/generate_index.py \
-  <仓库本地路径> --src-dirs src
+python scripts/generate_index.py <仓库本地路径> --src-dirs src
 ```
 
 ### 6.3 @section 标记规范

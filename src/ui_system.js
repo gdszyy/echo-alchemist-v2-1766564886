@@ -2,7 +2,7 @@ import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
 import { CONFIG, RELIC_DB } from './config.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
-import { MODULE_DEFS, listAvailableModules, getModuleSpan, getCoveredSlots, calcModuleSlotRect } from './pinboard_modules.js';
+import { MODULE_DEFS, listAvailableModules, getModuleSpan, getCoveredSlots, calcModuleSlotRect, createDefaultModuleLayout, selectFusionTargetPegs } from './pinboard_modules.js';
 import { fuseRuneIntoBoard, getRuneId } from './rune_system.js';
 import { showToast } from './utils/math_utils.js';
 
@@ -140,6 +140,15 @@ const ME_STYLES = `
 .me-picker-item:hover { border-color: rgba(103,232,249,0.5); background: rgba(30,41,59,0.75); }
 .me-picker-item:active { transform: scale(0.97); }
 .me-picker-item.is-current { border-color: #14b8a6; background: rgba(20,184,166,0.18); }
+.me-picker-item.is-disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+    border-style: dashed;
+}
+.me-picker-item.is-disabled:hover {
+    border-color: rgba(148,163,184,0.2);
+    background: rgba(30,41,59,0.45);
+}
 .me-picker-item.is-remove { grid-column: 1 / -1; align-items: center; flex-direction: row; justify-content: center; gap: 8px; border-style: dashed; color: #fca5a5; border-color: rgba(248,113,113,0.4); }
 .me-picker-icon { font-size: 22px; line-height: 1; }
 .me-picker-name { font-size: 13px; font-weight: 700; color: #f1f5f9; }
@@ -157,10 +166,27 @@ const ME_STYLES = `
     color: inherit; font-family: inherit; text-align: left;
 }
 .me-rune-row:hover { border-color: rgba(167,139,250,0.6); }
+.me-rune-row.is-selected { border-color: #a78bfa; background: rgba(124,58,237,0.22); }
 .me-rune-row .me-picker-icon { font-size: 24px; }
 .me-rune-meta { flex: 1; }
 .me-rune-meta .me-picker-name { font-size: 13px; }
 .me-rune-lv { color: #a78bfa; font-size: 11px; }
+.me-rune-preview {
+    position: sticky; bottom: -12px;
+    margin: 10px -12px -12px; padding: 10px 12px;
+    border-top: 1px solid rgba(167,139,250,0.25);
+    background: rgba(15,23,42,0.96);
+}
+.me-rune-preview-text { font-size: 12px; color: #c4b5fd; line-height: 1.35; margin-bottom: 8px; }
+.me-rune-confirm {
+    width: 100%; padding: 11px 12px; border: none; border-radius: 10px;
+    background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+    color: #f5f3ff; font-family: inherit; font-size: 13px; font-weight: 800;
+    cursor: pointer;
+}
+.me-rune-confirm:disabled {
+    cursor: default; opacity: 0.45; filter: grayscale(0.4);
+}
 
 @media (max-width: 480px) {
     .me-topbar-title { font-size: 13px; }
@@ -390,6 +416,18 @@ export const ui_system = {
         if (el) el.innerText = (this.runeInventory || []).length;
     },
 
+    ui_updateShieldPill() {
+        const pill = document.getElementById('shield-pill');
+        const countEl = document.getElementById('shield-count');
+        if (!pill || !countEl) return;
+        const shield = this.playerShield || 0;
+        countEl.innerText = String(shield);
+        pill.classList.toggle('is-visible', shield > 0 && this.phase !== 'meta');
+        pill.title = shield > 0
+            ? `守护者结界：剩余 ${shield} 层。敌人越线时消耗 1 层并抵消失败。`
+            : '守护者结界：当前没有护盾';
+    },
+
     ui_getSelectionRequirement() {
         return this.selectionRequiredCount || 3;
     },
@@ -610,8 +648,10 @@ export const ui_system = {
 
         const newRecipes = ctx.newRecipes || [];
         const chargedRecipes = ctx.chargedRecipes || [];
-        const maxSelect = Math.max(newRecipes.length, chargedRecipes.length, 3);
+        const bulletCap = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
+        const maxSelect = Math.min(bulletCap, newRecipes.length + chargedRecipes.length);
         const selectedIndices = ctx.selectedIndices || [];
+        const needed = Math.max(0, maxSelect - selectedIndices.length);
 
         if (labelEl) labelEl.innerText = '子弹替换';
         if (subtitleEl) {
@@ -623,7 +663,7 @@ export const ui_system = {
 
         // @section:replace_ammo_tier_calc - 子弹等级与主属性计算函数（_calcTier / _calcDominant）
         // [tsk-bullet-ui] 稀有度同时考虑普通属性、连射倍率以及爆破/套娃/激光/共鸣/七彩等特殊属性。
-        const _statKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind','resonance','venom'];
+        const _statKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind','resonance','venom','overcharge','echo'];
         const _calcSpecialBonus = (recipe) => {
             let bonus = 0;
             if (recipe.explosive) bonus += 8;            // 爆破：等同 1 张 A 级属性
@@ -632,6 +672,8 @@ export const ui_system = {
             if (recipe.type === 'rainbow' || recipe._marbleType === 'rainbow') bonus += 6;
             if (recipe.type === 'resonance' || recipe._marbleType === 'resonance') bonus += 4;
             if (recipe.type === 'venom' || recipe._marbleType === 'venom') bonus += 4;
+            if (recipe.type === 'overcharge' || recipe._marbleType === 'overcharge') bonus += 5;
+            if (recipe.type === 'echo' || recipe._marbleType === 'echo') bonus += 4;
             return bonus;
         };
         const _calcTier = (recipe) => {
@@ -669,6 +711,8 @@ export const ui_system = {
                 flying_sword:['linear-gradient(160deg,#0c4a6e 0%,#082f49 60%,#020f1a 100%)', '#0ea5e9', '#bae6fd', '#0c4a6e'],
                 resonance:   ['linear-gradient(160deg,#78350f 0%,#451a03 60%,#1c0a00 100%)', '#f59e0b', '#fde68a', '#78350f'],
                 venom:       ['linear-gradient(160deg,#14532d 0%,#052e16 60%,#010f07 100%)', '#4ade80', '#bbf7d0', '#14532d'],
+                overcharge:  ['linear-gradient(160deg,#78350f 0%,#451a03 60%,#1c0a00 100%)', '#f59e0b', '#fde68a', '#78350f'],
+                echo:        ['linear-gradient(160deg,#0c2a4a 0%,#061525 60%,#020810 100%)', '#60a5fa', '#bfdbfe', '#0c2a4a'],
             };
             const theme = ATTR_THEMES[maxKey] || null;
             return theme ? { key: maxKey, val: maxVal, theme } : null;
@@ -709,6 +753,10 @@ export const ui_system = {
                 // [tsk-bullet-ui] 添加 .replace-ammo-card 类用于全局 hover 样式（鼠标悬浮时上抬+加亮）
                 cardWrap.className = 'replace-ammo-card';
                 cardWrap.style.cssText = 'position:relative;border-radius:12px;overflow:visible;height:100%;display:flex;flex-direction:column;box-sizing:border-box;transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease;';
+                cardWrap.tabIndex = 0;
+                cardWrap.setAttribute('role', 'button');
+                cardWrap.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+                cardWrap.title = isSelected ? '已选择，点击或按 Enter 取消' : '点击或按 Enter 选择这枚子弹';
                 cardWrap.dataset.dominantColor = dominant ? dominant.theme[1] : ts.borderIdle;
                 // [bitmap-replace-ammo] 标记稀有度，CSS 用 [data-tier] 切换 9-Slice 边框
                 cardWrap.dataset.tier = ['C','B','A','S'][tier] || 'C';
@@ -762,6 +810,8 @@ export const ui_system = {
                 else if (recipe.type === 'rainbow' || recipe._marbleType === 'rainbow') mainAttrKey = 'rainbow';
                 else if (recipe.type === 'resonance' || recipe._marbleType === 'resonance') mainAttrKey = 'resonance';
                 else if (recipe.type === 'venom' || recipe._marbleType === 'venom') mainAttrKey = 'venom';
+                else if (recipe.type === 'overcharge' || recipe._marbleType === 'overcharge') mainAttrKey = 'overcharge';
+                else if (recipe.type === 'echo' || recipe._marbleType === 'echo') mainAttrKey = 'echo';
                 else if (dominant) mainAttrKey = dominant.key;
                 else mainAttrKey = recipe.pyro > 0 ? 'pyro' : recipe.cryo > 0 ? 'cryo' : recipe.lightning > 0 ? 'lightning' : 'damage';
                 const mainAttrInfo = attrIcons[mainAttrKey] || { icon: '🔮', color: '#94a3b8' };
@@ -785,7 +835,7 @@ export const ui_system = {
                 card.appendChild(tierBadge);
 
                 // [tsk-bullet-ui] 显示数值属性 + 特殊属性（爆破/套娃/激光/连射/七彩/共鸣）
-                const attrKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind','resonance','venom'];
+                const attrKeys = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind','resonance','venom','overcharge','echo'];
                 const sortedAttrs = attrKeys
                     .map(k => ({ key: k, val: recipe[k] || 0 }))
                     .filter(a => a.val > 0)
@@ -798,6 +848,8 @@ export const ui_system = {
                 if (recipe.type === 'rainbow' || recipe._marbleType === 'rainbow') specialAttrs.push({ key: 'rainbow', label: '✓' });
                 if (recipe.type === 'resonance' || recipe._marbleType === 'resonance') specialAttrs.push({ key: 'resonance', label: '✓' });
                 if (recipe.type === 'venom' || recipe._marbleType === 'venom') specialAttrs.push({ key: 'venom', label: '✓' });
+                if (recipe.type === 'overcharge' || recipe._marbleType === 'overcharge') specialAttrs.push({ key: 'overcharge', label: '✓' });
+                if (recipe.type === 'echo' || recipe._marbleType === 'echo') specialAttrs.push({ key: 'echo', label: '✓' });
                 if ((recipe.multicast || 0) > 0) specialAttrs.push({ key: 'multicast', label: 'x' + recipe.multicast });
 
                 const attrsContainer = document.createElement('div');
@@ -825,6 +877,12 @@ export const ui_system = {
                 card.appendChild(attrsContainer);
 
                 cardWrap.onclick = () => this.ui_toggleReplaceAmmoCard(globalIdx);
+                cardWrap.onkeydown = (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        this.ui_toggleReplaceAmmoCard(globalIdx);
+                    }
+                };
                 return cardWrap;
             };
 
@@ -853,9 +911,33 @@ export const ui_system = {
 
         // @section:replace_ammo_confirm_btn - 确认按鈕与跳过按鈕状态同步
         if (confirmBtn) {
-            confirmBtn.disabled = selectedIndices.length !== maxSelect;
+            confirmBtn.disabled = maxSelect <= 0 || selectedIndices.length !== maxSelect;
             confirmBtn.innerText = '确认（已选 ' + selectedIndices.length + '/' + maxSelect + '）';
+            confirmBtn.innerText = maxSelect <= 0
+                ? '没有可用子弹'
+                : '确认（已选 ' + selectedIndices.length + '/' + maxSelect + '）';
+            confirmBtn.title = confirmBtn.disabled
+                ? (maxSelect <= 0 ? '当前没有可用子弹' : `还需要选择 ${needed} 枚子弹`)
+                : '确认这些子弹并进入战斗';
+            confirmBtn.setAttribute('aria-disabled', confirmBtn.disabled ? 'true' : 'false');
             confirmBtn.onclick = () => { if (typeof this.sys_confirmReplaceAmmo === 'function') this.sys_confirmReplaceAmmo(); };
+        }
+
+        let hintEl = document.getElementById('selection-action-hint');
+        if (!hintEl && confirmBtn && confirmBtn.parentNode) {
+            hintEl = document.createElement('div');
+            hintEl.id = 'selection-action-hint';
+            hintEl.className = 'selection-action-hint';
+            confirmBtn.parentNode.insertBefore(hintEl, confirmBtn);
+        }
+        if (hintEl) {
+            hintEl.style.display = 'block';
+            hintEl.className = 'selection-action-hint' + (needed > 0 || maxSelect <= 0 ? ' warn' : '');
+            hintEl.innerText = maxSelect <= 0
+                ? '没有可用子弹，无法进入战斗。'
+                : needed > 0
+                    ? `还需要选择 ${needed} 枚子弹。`
+                    : '选择完成，可以确认进入战斗。';
         }
 
         let skipBtn = document.getElementById('replace-ammo-skip-btn');
@@ -876,12 +958,15 @@ export const ui_system = {
         const ctx = this.replaceAmmoContext;
         if (!ctx || !ctx.active) return;
         const selectedIndices = ctx.selectedIndices || [];
-        const maxSelect = Math.max((ctx.newRecipes || []).length, (ctx.chargedRecipes || []).length, 3);
+        const bulletCap = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
+        const maxSelect = Math.min(bulletCap, ((ctx.newRecipes || []).length + (ctx.chargedRecipes || []).length));
         const idx = selectedIndices.indexOf(globalIdx);
         if (idx > -1) {
             selectedIndices.splice(idx, 1);
         } else if (selectedIndices.length < maxSelect) {
             selectedIndices.push(globalIdx);
+        } else {
+            showToast(`最多选择 ${maxSelect} 枚子弹`);
         }
         ctx.selectedIndices = selectedIndices;
         this.ui_renderReplaceAmmoUI();
@@ -929,6 +1014,11 @@ export const ui_system = {
         // [tsk-668f3dba] \u8fdb\u5165\u6b63\u5e38\u9009\u62e9\u9636\u6bb5\u65f6\u9690\u85cf\u66ff\u6362\u8df3\u8fc7\u6309\u9215
         const replaceSkipBtn = document.getElementById('replace-ammo-skip-btn');
         if (replaceSkipBtn) replaceSkipBtn.style.display = 'none';
+        const actionHint = document.getElementById('selection-action-hint');
+        if (actionHint) {
+            actionHint.innerText = '';
+            actionHint.style.display = 'none';
+        }
         if (countEl) countEl.innerText = String(selectedCount);
         if (requiredEl) requiredEl.innerText = String(required);
         if (labelEl) {
@@ -1028,6 +1118,7 @@ export const ui_system = {
         // 3. 各阶段专属 UI 更新
         this.ui_updateMetaCurrency();
         this.ui_updateRuneCountDisplay();
+        this.ui_updateShieldPill();
         if (this.phase === 'meta') {
             this.meta_updateContinueButton();
         }
@@ -1388,13 +1479,10 @@ export const ui_system = {
 
         // ---- 确保布局 / 解锁字段已初始化 ----
         if (!Array.isArray(this.currentModuleLayout) || this.currentModuleLayout.length !== totalSlots) {
-            this.currentModuleLayout = new Array(totalSlots).fill(null);
-            for (let i = 0; i < (cfg.moduleDefaultSlots || 3); i++) {
-                this.currentModuleLayout[i] = 'std_stagger';
-            }
+            this.currentModuleLayout = createDefaultModuleLayout(totalSlots);
         }
         if (!Array.isArray(this.unlockedModuleTypes)) {
-            this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'bouncer', 'funnel'];
+            this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'rune_lattice', 'bouncer', 'funnel'];
         }
         if (typeof this.unlockedModuleSlots !== 'number') {
             this.unlockedModuleSlots = cfg.moduleDefaultSlots || 3;
@@ -1523,6 +1611,50 @@ export const ui_system = {
     /**
      * 弹出「更换模块」浮层，slotIdx 为目标槽位锚点索引。
      */
+    _moduleEditor_getModulePlacementStatus(slotIdx, moduleId) {
+        const cfg = CONFIG.gameplay || {};
+        const cols = cfg.moduleCols || 4;
+        const rows = cfg.moduleRows || 3;
+        const totalSlots = cols * rows;
+        const cap = Math.min(this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3, totalSlots);
+        const layout = this.currentModuleLayout || [];
+        if (!MODULE_DEFS[moduleId]) {
+            return { ok: false, reason: '模块不存在', covered: [], span: { cols: 1, rows: 1 } };
+        }
+
+        const span = getModuleSpan(moduleId);
+        const covered = getCoveredSlots(slotIdx, span, cols, rows);
+        if (!covered) {
+            return { ok: false, reason: `${span.cols}x${span.rows} 超出钉盘边界`, covered: [], span };
+        }
+        if (covered.some(ci => ci >= cap)) {
+            return { ok: false, reason: `需要 ${span.cols}x${span.rows} 空间，超出已解锁区域`, covered, span };
+        }
+
+        const currentCovered = new Set([slotIdx]);
+        const current = layout[slotIdx];
+        if (typeof current === 'string') {
+            const oldCovered = getCoveredSlots(slotIdx, getModuleSpan(current), cols, rows) || [slotIdx];
+            oldCovered.forEach(ci => currentCovered.add(ci));
+        }
+
+        for (const ci of covered) {
+            if (currentCovered.has(ci)) continue;
+            const occ = layout[ci];
+            if (typeof occ === 'string') {
+                const name = (MODULE_DEFS[occ] && MODULE_DEFS[occ].name) || '相邻模块';
+                return { ok: false, reason: `与 ${name} 重叠`, covered, span };
+            }
+            if (occ && occ.ref !== undefined && occ.ref !== slotIdx) {
+                const anchorId = layout[occ.ref];
+                const name = (MODULE_DEFS[anchorId] && MODULE_DEFS[anchorId].name) || '相邻模块';
+                return { ok: false, reason: `与 ${name} 重叠`, covered, span };
+            }
+        }
+
+        return { ok: true, reason: '', covered, span };
+    },
+
     _moduleEditor_openPicker(slotIdx) {
         this._moduleEditor_closePicker();
         const layout = this.currentModuleLayout || [];
@@ -1579,11 +1711,73 @@ export const ui_system = {
         if (bd) bd.remove();
         const rbd = document.getElementById('me-rune-picker-backdrop');
         if (rbd) rbd.remove();
+        this._moduleEditorRunePreview = null;
     },
 
     /**
      * 应用模块选择：写入 currentModuleLayout，重建实时钉板，刷新控件。
      */
+    _moduleEditor_openPicker(slotIdx) {
+        this._moduleEditor_closePicker();
+        const layout = this.currentModuleLayout || [];
+        const curId = (typeof layout[slotIdx] === 'string') ? layout[slotIdx] : null;
+        const available = listAvailableModules(this.unlockedModuleTypes || []);
+        const escapeHtml = (value) => String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+
+        const itemsHtml = available.map(id => {
+            const def = MODULE_DEFS[id];
+            if (!def) return '';
+            const span = getModuleSpan(id);
+            const spanTag = (span.cols > 1 || span.rows > 1) ? ` <span class="me-picker-span">${span.cols}x${span.rows}</span>` : '';
+            const placement = this._moduleEditor_getModulePlacementStatus(slotIdx, id);
+            const cur = id === curId ? ' is-current' : '';
+            const disabled = placement.ok ? '' : ' is-disabled';
+            const disabledAttr = placement.ok ? '' : ` disabled title="${escapeHtml(placement.reason)}"`;
+            const desc = placement.ok ? (def.desc || '') : `不可放置：${placement.reason}`;
+            return `<button type="button" class="me-picker-item${cur}${disabled}" data-pick-module="${id}"${disabledAttr}>
+                <div class="me-picker-icon">${def.icon || '▦'}</div>
+                <div class="me-picker-name">${escapeHtml(def.name || id)}${spanTag}</div>
+                <div class="me-picker-desc">${escapeHtml(desc)}</div>
+            </button>`;
+        }).join('');
+
+        const removeHtml = curId
+            ? '<button type="button" class="me-picker-item is-remove" data-pick-module="__remove__">清空此区域</button>'
+            : '';
+        const bodyHtml = (itemsHtml || removeHtml)
+            ? `<div class="me-picker-grid">${itemsHtml}${removeHtml}</div>`
+            : '<div class="me-picker-empty">暂无可用模块，请在商店解锁。</div>';
+
+        const backdrop = document.createElement('div');
+        backdrop.className = 'me-picker-backdrop';
+        backdrop.id = 'me-picker-backdrop';
+        backdrop.innerHTML = `
+            <div class="me-picker">
+                <div class="me-picker-head">
+                    <div class="me-picker-title">更换钉盘模块</div>
+                    <button class="me-picker-close" id="me-picker-close">x</button>
+                </div>
+                <div class="me-picker-body">${bodyHtml}</div>
+            </div>`;
+        document.body.appendChild(backdrop);
+
+        backdrop.addEventListener('click', (e) => {
+            if (e.target === backdrop) this._moduleEditor_closePicker();
+        });
+        const closeBtn = backdrop.querySelector('#me-picker-close');
+        if (closeBtn) closeBtn.addEventListener('click', () => this._moduleEditor_closePicker());
+        backdrop.querySelectorAll('[data-pick-module]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (btn.disabled) return;
+                this._moduleEditor_applyModule(slotIdx, btn.dataset.pickModule);
+            });
+        });
+    },
+
     _moduleEditor_applyModule(slotIdx, moduleId) {
         const cfg = CONFIG.gameplay || {};
         const cols = cfg.moduleCols || 4;
@@ -1643,40 +1837,118 @@ export const ui_system = {
     /**
      * 符文融合浮层：复用 picker 外壳，选中符文即注入钉板。
      */
+    _moduleEditor_applyModule(slotIdx, moduleId) {
+        const cfg = CONFIG.gameplay || {};
+        const cols = cfg.moduleCols || 4;
+        const rows = cfg.moduleRows || 3;
+        const layout = this.currentModuleLayout;
+        if (!Array.isArray(layout)) return;
+
+        const clearAnchor = (idx) => {
+            const cur = layout[idx];
+            if (typeof cur === 'string') {
+                const covered = getCoveredSlots(idx, getModuleSpan(cur), cols, rows) || [idx];
+                for (const ci of covered) layout[ci] = null;
+            } else {
+                layout[idx] = null;
+            }
+        };
+
+        if (moduleId === '__remove__') {
+            clearAnchor(slotIdx);
+        } else {
+            const placement = this._moduleEditor_getModulePlacementStatus(slotIdx, moduleId);
+            if (!placement.ok) {
+                showToast(placement.reason || '该模块无法放置在这里');
+                return;
+            }
+            clearAnchor(slotIdx);
+            layout[slotIdx] = moduleId;
+            for (const ci of placement.covered) {
+                if (ci !== slotIdx) layout[ci] = { ref: slotIdx };
+            }
+        }
+
+        if (typeof this.phase_gathering_initPachinko === 'function') {
+            this.phase_gathering_initPachinko(false);
+        }
+        this._moduleEditor_closePicker();
+        this.ui_renderModuleEditorControls();
+    },
+
+    _moduleEditor_getRunePreviewTargets(preview) {
+        const fusion = preview ? {
+            element: preview.element,
+            count: preview.count,
+            runeId: preview.runeId,
+            sourceLevel: preview.level,
+        } : null;
+        return selectFusionTargetPegs(this.pegs || [], fusion, this.width || 400, this.height || 600, false);
+    },
+
+    _moduleEditor_updateRunePickerPreview() {
+        const preview = this._moduleEditorRunePreview;
+        const backdrop = document.getElementById('me-rune-picker-backdrop');
+        if (!backdrop) return;
+        backdrop.querySelectorAll('[data-rune-idx]').forEach(btn => {
+            const idx = parseInt(btn.dataset.runeIdx, 10);
+            btn.classList.toggle('is-selected', !!preview && preview.inventoryIndex === idx);
+        });
+        const text = backdrop.querySelector('#me-rune-preview-text');
+        const confirm = backdrop.querySelector('#me-rune-confirm');
+        if (!text || !confirm) return;
+        if (!preview) {
+            text.textContent = '选择一个符文预览落点。';
+            confirm.disabled = true;
+            confirm.textContent = '先选择符文';
+            return;
+        }
+        const targets = this._moduleEditor_getRunePreviewTargets(preview);
+        text.textContent = `${preview.name} L${preview.level}：将注入 ${targets.length}/${preview.count} 颗 ${preview.element} 钉。`;
+        confirm.disabled = targets.length <= 0;
+        confirm.textContent = targets.length > 0 ? '确认融合' : '没有可注入钉';
+    },
+
     _moduleEditor_openRunePicker() {
         this._moduleEditor_closePicker();
         const inventory = Array.isArray(this.runeInventory) ? this.runeInventory : [];
         const pending = Array.isArray(this.pendingFusions) ? this.pendingFusions : [];
+        this._moduleEditorRunePreview = null;
 
         const rowsHtml = inventory.length > 0 ? inventory.map((r, idx) => {
             const id = getRuneId(r);
             const def = (RUNE_DB || []).find(d => d.id === id);
             if (!def) return '';
             const lv = (typeof r === 'object' && typeof r.level === 'number') ? r.level : 1;
-            return `<button type="button" class="me-rune-row" data-rune-idx="${idx}">
-                <div class="me-picker-icon">${def.icon || '🔮'}</div>
-                <div class="me-rune-meta">
-                    <div class="me-picker-name">${def.name || id} <span class="me-rune-lv">L${lv}</span></div>
-                    <div class="me-picker-desc">注入 <b>${lv}</b> 颗 <b>${def.element || ''}</b> 钉子</div>
-                </div>
-            </button>`;
+            const element = def.element || def.baseStat || '';
+            return '<button type="button" class="me-rune-row" data-rune-idx="' + idx + '">' +
+                '<div class="me-picker-icon">' + (def.icon || 'R') + '</div>' +
+                '<div class="me-rune-meta">' +
+                    '<div class="me-picker-name">' + (def.name || id) + ' <span class="me-rune-lv">L' + lv + '</span></div>' +
+                    '<div class="me-picker-desc">预览注入 ' + lv + ' 颗 ' + element + ' 钉</div>' +
+                '</div>' +
+            '</button>';
         }).join('') : '<div class="me-picker-empty">背包没有符文</div>';
 
         const pendingHtml = pending.length > 0
-            ? `<div class="me-picker-desc" style="padding:8px 2px 0;">⚗ 已注入：${pending.map(f => `${f.element}×${f.count}`).join('， ')}</div>`
+            ? '<div class="me-picker-desc" style="padding:8px 2px 0;">已待注入：' + pending.map(f => f.element + ' x' + f.count).join(', ') + '</div>'
             : '';
 
         const backdrop = document.createElement('div');
         backdrop.className = 'me-picker-backdrop';
         backdrop.id = 'me-rune-picker-backdrop';
-        backdrop.innerHTML = `
-            <div class="me-picker">
-                <div class="me-picker-head">
-                    <div class="me-picker-title">✨ 符文融合</div>
-                    <button class="me-picker-close" id="me-rune-picker-close">✕</button>
-                </div>
-                <div class="me-picker-body">${rowsHtml}${pendingHtml}</div>
-            </div>`;
+        backdrop.innerHTML = '<div class="me-picker">' +
+            '<div class="me-picker-head">' +
+                '<div class="me-picker-title">符文融合</div>' +
+                '<button class="me-picker-close" id="me-rune-picker-close">x</button>' +
+            '</div>' +
+            '<div class="me-picker-body">' + rowsHtml + pendingHtml +
+                '<div class="me-rune-preview">' +
+                    '<div class="me-rune-preview-text" id="me-rune-preview-text">选择一个符文预览落点。</div>' +
+                    '<button class="me-rune-confirm" id="me-rune-confirm" disabled>先选择符文</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
         document.body.appendChild(backdrop);
 
         backdrop.addEventListener('click', (e) => {
@@ -1688,12 +1960,40 @@ export const ui_system = {
             btn.addEventListener('click', () => {
                 const idx = parseInt(btn.dataset.runeIdx, 10);
                 const rune = (this.runeInventory || [])[idx];
-                if (!rune) { showToast('该符文不存在或已被消耗'); return; }
-                const result = fuseRuneIntoBoard(this, rune, RUNE_DB);
-                showToast(result.message);
-                this._moduleEditor_closePicker();
-                this.ui_renderModuleEditorControls();
+                const runeId = getRuneId(rune);
+                const def = (RUNE_DB || []).find(d => d.id === runeId);
+                if (!rune || !def) { showToast('该符文不存在或已被消耗'); return; }
+                const lv = (typeof rune === 'object' && typeof rune.level === 'number') ? rune.level : 1;
+                this._moduleEditorRunePreview = {
+                    inventoryIndex: idx,
+                    runeId,
+                    element: def.element || def.baseStat,
+                    count: lv,
+                    level: lv,
+                    name: def.name || runeId,
+                };
+                this._moduleEditor_updateRunePickerPreview();
             });
         });
+        const confirmBtn = backdrop.querySelector('#me-rune-confirm');
+        if (confirmBtn) confirmBtn.addEventListener('click', () => {
+            const preview = this._moduleEditorRunePreview;
+            if (!preview) return;
+            const rune = (this.runeInventory || [])[preview.inventoryIndex];
+            if (!rune || getRuneId(rune) !== preview.runeId) {
+                showToast('该符文不存在或已被消耗');
+                this._moduleEditorRunePreview = null;
+                this._moduleEditor_updateRunePickerPreview();
+                return;
+            }
+            const result = fuseRuneIntoBoard(this, rune, RUNE_DB);
+            showToast(result.message);
+            if (result.ok && typeof this.phase_gathering_initPachinko === 'function') {
+                this.phase_gathering_initPachinko(false);
+            }
+            this._moduleEditor_closePicker();
+            this.ui_renderModuleEditorControls();
+        });
+        this._moduleEditor_updateRunePickerPreview();
     }
 };

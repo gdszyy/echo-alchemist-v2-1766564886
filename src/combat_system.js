@@ -2002,7 +2002,7 @@ export const combat_system = {
                 const burnLabel = pyroResonance ? `🔥Burn ${Math.ceil(fireResult.actualDamage)}` : `Burn ${Math.ceil(fireResult.actualDamage)}`;
                 this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 25, burnLabel, '#fb923c');
             }
-            // Step 3: [新增] 过热爆炸机制 (Small Explosion)
+            // Step 3: [遗物 Hook] 余烬保险丝 (ember_fuse) - 过热爆炸机制 (Small Explosion)
             // [属性共鸣] 三阶共鸣可将爆燃阈值从 200 降至 100
             const pyroCfg = CONFIG.mechanics.pyro;
             const EXPLODE_THRESHOLD = (pyroResParams && pyroResParams.explodeThreshold !== null && pyroResParams.explodeThreshold !== undefined)
@@ -2017,7 +2017,7 @@ export const combat_system = {
                 explodeChance = Math.min(pyroCfg.maxExplodeChance, explodeChance); // 最高限制
             }
 
-            if (explodeChance > 0 && Math.random() < explodeChance) {
+            if (explodeChance > 0 && this.ownedRelics && this.ownedRelics.includes('ember_fuse') && Math.random() < explodeChance) {
                 
                 // A. 计算消耗量
                 const consumedHeat = enemy.temp * pyroCfg.heatConsumptionRate;
@@ -2213,6 +2213,12 @@ export const combat_system = {
             // 击杀时在敌人位置爆炸，对附近敌人造成 max(2, maxHp*10%) 的固定真实伤害
             if (this.ownedRelics && this.ownedRelics.includes('mortal_burst') && !enemy._mortalBurstTriggered) {
                 enemy._mortalBurstTriggered = true; // 防止穿透/AOE 链反应触发死循环
+                const relicBudget = CONFIG.performance[this.perfQualityLevel || 'high'];
+                this._relicCombatCinematicFrames = Math.max(
+                    this._relicCombatCinematicFrames || 0,
+                    Math.ceil((relicBudget.relicCinematicDelayMs || 300) / 16.67)
+                );
+                this.isVisualEffectActive = true;
                 const burstDmg = Math.max(2, Math.floor((enemy.maxHp || 0) * 0.10));
                 const burstRadius = Math.max(60, (enemy.width || 40) * 2);
                 const cx = enemy.pos.x;
@@ -2220,7 +2226,8 @@ export const combat_system = {
 
                 // 殒命爆裂特效：橙红爆炸主题，体现尸体爆炸的暴烈感
                 // 1. 中心火焰波扩散（FireWave 橙红）
-                if (this.fireWaves) {
+                // @perf-impact: 遗物击杀动画（殒命爆裂）- FireWave/粒子经 CONFIG.performance 三档预算限流
+                if (this.fireWaves && this.fireWaves.length < (relicBudget.waveLimit || 0)) {
                     this.fireWaves.push(new FireWave(cx, cy));
                 }
                 // 2. 双层冲击波（橙 → 深红，表现爆炸冲击与火焰余波）
@@ -2229,14 +2236,16 @@ export const combat_system = {
                     setTimeout(() => { if (this.spawn_createShockwave) this.spawn_createShockwave(cx, cy, '#b91c1c'); }, 100);
                 }
                 // 3. 大量橙红 ember 余烬粒子（焦碎感）
-                for (let i = 0; i < 14; i++) {
+                const emberCount = Math.max(3, Math.floor((relicBudget.relicCinematicSparkCount || 0) * 0.8));
+                for (let i = 0; i < emberCount; i++) {
                     if (typeof this.spawn_createParticle === 'function') {
                         const p = this.spawn_createParticle(cx + (Math.random() - 0.5) * 20, cy + (Math.random() - 0.5) * 15, i % 3 === 0 ? '#fbbf24' : '#fb923c', 'ember');
                         if (p) { p.vel.x = (Math.random() - 0.5) * 3; p.vel.y = -(Math.random() * 3.5 + 0.5); }
                     }
                 }
                 // 4. spark 碎片（爆炸飞溅）
-                for (let i = 0; i < 10; i++) {
+                const shardCount = Math.max(2, Math.floor((relicBudget.relicCinematicSparkCount || 0) * 0.6));
+                for (let i = 0; i < shardCount; i++) {
                     if (typeof this.spawn_createParticle === 'function') {
                         this.spawn_createParticle(cx, cy, i % 2 === 0 ? '#f97316' : '#fcd34d', 'spark');
                     }
@@ -2474,6 +2483,7 @@ export const combat_system = {
         };
         const finalRecipe = pullNext();
         if (!finalRecipe) return;
+        const isRoundOpeningShot = this._roundFirstShotId === this.shotIdCounter;
 
         // ==================== [v2 重构] 符文属性附加路径已移除 ====================
         // 旧版本：activeRunewordStats 和 calcRuneBaseStats 会把 pyro/cryo/bounce/...
@@ -2489,6 +2499,23 @@ export const combat_system = {
         // --- [炼金火药管] 平坦伤害加成 ---
         if (this.flatDamageBonus && this.flatDamageBonus > 0) {
             finalRecipe.damage = (finalRecipe.damage || 0) + this.flatDamageBonus;
+        }
+
+        // --- [遗物 Hook] 炼金弹带 (ammo_bandolier) ---
+        // 额外弹药容量会显著提高每回合输出上限，因此用首发伤害税约束强度。
+        if (isRoundOpeningShot && this.ownedRelics && this.ownedRelics.includes('ammo_bandolier')) {
+            finalRecipe.damage = Math.max(1, Math.ceil((finalRecipe.damage || 1) * 0.85));
+            finalRecipe._ammoBandolierPenalty = true;
+        }
+
+        // --- [遗物 Hook] 开幕齐射管 (opening_salvo) ---
+        // 每回合首发子弹获得爆发加成，鼓励玩家把最强弹珠排在队首。
+        if (isRoundOpeningShot && this.ownedRelics && this.ownedRelics.includes('opening_salvo')) {
+            finalRecipe.damage = Math.ceil((finalRecipe.damage || 1) * 1.25);
+            if (finalRecipe.type !== 'flying_sword' && !finalRecipe.wind) {
+                finalRecipe.multicast = (finalRecipe.multicast || 0) + 2;
+            }
+            finalRecipe._openingSalvo = true;
         }
 
         // --- [符文词条-A] 核心战斗发射流拦截逻辑 ---
@@ -2623,6 +2650,17 @@ export const combat_system = {
             const venomResParams = venomRes ? venomRes.params : null;
             if (venomResParams) {
                 finalRecipe.venom = (finalRecipe.venom || 0) + (venomResParams.baseVenomBonus || 0);
+            }
+        }
+
+        // --- [遗物 Hook] 雷暴线圈 (thunder_coil) ---
+        // 将连射火力改造成闪电弹射；转化后清空 multicast，避免后续逻辑重复消费。
+        if (this.ownedRelics && this.ownedRelics.includes('thunder_coil')) {
+            const convertedMulticast = finalRecipe.multicast || 0;
+            if (convertedMulticast > 0) {
+                finalRecipe.lightning = (finalRecipe.lightning || 0) + convertedMulticast;
+                finalRecipe.multicast = 0;
+                finalRecipe._thunderCoilConverted = convertedMulticast;
             }
         }
 
@@ -3214,45 +3252,98 @@ export const combat_system = {
      *     · 链伤害 = 当前 ammoQueue 前三颗子弹中最大基础伤害
      */
     relic_runRoundStartHooks() {
-        if (!this.ownedRelics) return;
+        if (!this.ownedRelics) return 0;
+        const budget = CONFIG.performance[this.perfQualityLevel || 'high'];
+        let cinematicDelayMs = 0;
 
         // --- 末日计时器 ---
         if (this.ownedRelics.includes('doomsday_timer')) {
             const candidates = (this.enemies || []).filter(e => e && e.active && e.hp > 0);
             if (candidates.length > 0) {
-                const target = candidates[Math.floor(Math.random() * candidates.length)];
                 const dmg = (this.round || 1) * 5;
-                const cx = target.pos.x;
-                const cy = target.pos.y;
-                const result = target.takeDamage(dmg);
+                const baseDelayMs = budget.relicCinematicDelayMs || 0;
+                this._doomsdayTimerTriggerCount = (this._doomsdayTimerTriggerCount || 0) + 1;
+                const maxRetriggerCount = 1 + Math.floor(this._doomsdayTimerTriggerCount / 5);
+                const playDoomsdayStrike = (target, chainIndex = 0) => {
+                    if (!target || !target.active || target.hp <= 0) return null;
+                    const cx = target.pos.x;
+                    const cy = target.pos.y;
+                    const result = target.takeDamage(dmg);
+                    cinematicDelayMs = Math.max(cinematicDelayMs, baseDelayMs);
 
-                // 末日时钟特效：深红/黑金主题，模拟末日倒计时敲响
-                // 1. 三层扩散冲击波（血红 → 暗金 → 黑紫，错峰营造"钟声震颤"感）
-                if (typeof this.spawn_createShockwave === 'function') {
-                    this.spawn_createShockwave(cx, cy, '#dc2626');
-                    setTimeout(() => { if (this.spawn_createShockwave) this.spawn_createShockwave(cx, cy, '#854d0e'); }, 80);
-                    setTimeout(() => { if (this.spawn_createShockwave) this.spawn_createShockwave(cx, cy, '#4c1d95'); }, 160);
-                }
-                // 2. 向上漂浮的血红 ember 余烬粒子（模拟爆炸灰烬飞散）
-                for (let i = 0; i < 10; i++) {
-                    if (typeof this.spawn_createParticle === 'function') {
-                        const p = this.spawn_createParticle(cx + (Math.random() - 0.5) * 30, cy + (Math.random() - 0.5) * 20, '#dc2626', 'ember');
-                        if (p) { p.vel.x = (Math.random() - 0.5) * 2.5; p.vel.y = -(Math.random() * 3 + 1); }
+                    // 末日时钟特效：深红/黑金主题，模拟末日倒计时敲响
+                    // 1. 三层扩散冲击波（血红 → 暗金 → 黑紫，错峰营造"钟声震颤"感）
+                    // @perf-impact: 遗物回合开始动画（末日计时器）- 使用 relicCinematic* 预算和既有 Shockwave/Particle/Lightning 上限
+                    if (typeof this.spawn_createShockwave === 'function') {
+                        this.spawn_createShockwave(cx, cy, chainIndex > 0 ? '#f97316' : '#dc2626');
+                        setTimeout(() => { if (this.spawn_createShockwave) this.spawn_createShockwave(cx, cy, '#facc15'); }, 120);
+                        setTimeout(() => { if (this.spawn_createShockwave) this.spawn_createShockwave(cx, cy, '#4c1d95'); }, 240);
                     }
-                }
-                // 3. 黑金 spark 碎片四溅（钟面碎裂感）
-                for (let i = 0; i < 8; i++) {
-                    if (typeof this.spawn_createParticle === 'function') {
-                        this.spawn_createParticle(cx, cy, i % 2 === 0 ? '#fbbf24' : '#1c1917', 'spark');
+                    // 2. 向上漂浮的血红 ember 余烬粒子（模拟爆炸灰烬飞散）
+                    const doomSparkCount = budget.relicCinematicSparkCount || 0;
+                    for (let i = 0; i < doomSparkCount; i++) {
+                        if (typeof this.spawn_createParticle === 'function') {
+                            const color = i % 3 === 0 ? '#facc15' : '#dc2626';
+                            const p = this.spawn_createParticle(cx + (Math.random() - 0.5) * 34, cy + (Math.random() - 0.5) * 22, color, i % 2 === 0 ? 'spark' : 'ember');
+                            if (p) {
+                                const angle = (Math.PI * 2 * i) / Math.max(1, doomSparkCount);
+                                p.vel.x = Math.cos(angle) * (1.5 + Math.random() * 2.5);
+                                p.vel.y = Math.sin(angle) * (1.5 + Math.random() * 2.5) - 1.2;
+                            }
+                        }
                     }
-                }
-                // 4. 浮动文字：骷髅图标 + 伤害数值，暗红色强调末日感
-                if (typeof this.spawn_createFloatingText === 'function') {
-                    this.spawn_createFloatingText(cx, cy - 36, `☠️ 末日 -${dmg}`, '#dc2626');
-                }
+                    // 3. 黑金 spark 碎片四溅（钟面碎裂感）
+                    if (Array.isArray(this.lightningBolts)) {
+                        const boltCount = Math.min(
+                            budget.relicCinematicBoltCount || 0,
+                            Math.max(0, (budget.lightningLimit || 0) - this.lightningBolts.length)
+                        );
+                        const sourceY = Math.max(20, cy - 180);
+                        for (let i = 0; i < boltCount; i++) {
+                            const offset = (i - (boltCount - 1) / 2) * 18;
+                            this.lightningBolts.push(new LightningBolt(cx + offset, sourceY, cx, cy));
+                        }
+                    }
+                    // 4. 浮动文字：骷髅图标 + 伤害数值，暗红色强调末日感
+                    if (typeof this.spawn_createFloatingText === 'function') {
+                        const label = chainIndex > 0 ? `☠️ 末日回响 -${dmg}` : `☠️ 末日 -${dmg}`;
+                        this.spawn_createFloatingText(cx, cy - 36, label, chainIndex > 0 ? '#f97316' : '#dc2626');
+                    }
 
-                if (result && result.killed && typeof this.spawn_addScore === 'function') {
-                    this.spawn_addScore(target.maxHp, target);
+                    if (typeof this.spawn_createFloatingText === 'function') {
+                        setTimeout(() => {
+                            if (this.spawn_createFloatingText) this.spawn_createFloatingText(cx, cy - 64, chainIndex > 0 ? 'RETRIGGER' : 'LOCKED', '#facc15', 16);
+                        }, 180);
+                    }
+                    if (typeof this.triggerScreenShakeAdvanced === 'function') {
+                        this.triggerScreenShakeAdvanced(this.perfQualityLevel === 'low' ? 2 : 5, 18);
+                    }
+
+                    if (result && result.killed && typeof this.spawn_addScore === 'function') {
+                        this.spawn_addScore(target.maxHp, target);
+                    }
+                    return result;
+                };
+
+                const target = candidates[Math.floor(Math.random() * candidates.length)];
+                const result = playDoomsdayStrike(target, 0);
+                if (result && result.killed) {
+                    const retriggerDelayMs = Math.min(360, Math.max(120, Math.floor((baseDelayMs || 300) * 0.45)));
+                    const availableRetriggers = Math.min(maxRetriggerCount, Math.max(0, candidates.length - 1));
+                    cinematicDelayMs = Math.max(cinematicDelayMs, baseDelayMs + retriggerDelayMs * availableRetriggers);
+                    const scheduleDoomsdayRetrigger = (usedRetriggers) => {
+                        if (usedRetriggers >= maxRetriggerCount) return;
+                        const remaining = (this.enemies || []).filter(e => e && e.active && e.hp > 0);
+                        if (remaining.length === 0) return;
+                        const retriggerTarget = remaining[Math.floor(Math.random() * remaining.length)];
+                        setTimeout(() => {
+                            const retriggerResult = playDoomsdayStrike(retriggerTarget, usedRetriggers + 1);
+                            if (retriggerResult && retriggerResult.killed) {
+                                scheduleDoomsdayRetrigger(usedRetriggers + 1);
+                            }
+                        }, retriggerDelayMs);
+                    };
+                    scheduleDoomsdayRetrigger(0);
                 }
             }
         }
@@ -3269,12 +3360,15 @@ export const combat_system = {
             if (maxDmg <= 0) maxDmg = (this.round || 1); // 兜底：用回合数作为伤害
             const stacks = this.round || 1;
             const w = this.width || 720;
+            let arcCount = 0;
+            const maxArcCount = budget.relicCinematicBoltCount || 0;
             for (const e of (this.enemies || [])) {
                 if (!e || !e.active || e.hp <= 0) continue;
                 const nearLeft = e.pos.x <= wallThreshold;
                 const nearRight = e.pos.x >= (w - wallThreshold);
                 if (!nearLeft && !nearRight) continue;
                 if (Math.random() < 0.5) {
+                    cinematicDelayMs = Math.max(cinematicDelayMs, Math.min(700, budget.relicCinematicDelayMs || 0));
                     // 直接对该敌人造成层数加成的固定伤害；为避免重写完整闪电链，
                     // 这里以 stacks × maxDmg / 3 作为合理近似的链伤害。
                     const arcDmg = Math.max(1, Math.floor(stacks * maxDmg * 0.33));
@@ -3282,7 +3376,14 @@ export const combat_system = {
                     if (typeof this.spawn_createFloatingText === 'function') {
                         this.spawn_createFloatingText(e.pos.x, e.pos.y - 18, `电弧 ${arcDmg}`, '#a78bfa');
                     }
-                    for (let i = 0; i < 6; i++) {
+                    // @perf-impact: 遗物回合开始动画（回廊电弧）- 闪电条数受 relicCinematicBoltCount/lightningLimit 双重限制
+                    if (Array.isArray(this.lightningBolts) && arcCount < maxArcCount && this.lightningBolts.length < (budget.lightningLimit || 0)) {
+                        const sx = nearLeft ? 0 : w;
+                        this.lightningBolts.push(new LightningBolt(sx, e.pos.y, e.pos.x, e.pos.y));
+                        arcCount++;
+                    }
+                    const arcSparkCount = Math.max(2, Math.floor((budget.relicCinematicSparkCount || 0) / 3));
+                    for (let i = 0; i < arcSparkCount; i++) {
                         if (typeof this.spawn_createParticle === 'function') {
                             this.spawn_createParticle(e.pos.x, e.pos.y, '#d8b4fe', 'spark');
                         }
@@ -3292,7 +3393,11 @@ export const combat_system = {
                     }
                 }
             }
+            if (arcCount > 0 && typeof this.triggerScreenShakeAdvanced === 'function') {
+                this.triggerScreenShakeAdvanced(this.perfQualityLevel === 'low' ? 1.5 : 3.5, 14);
+            }
         }
+        return cinematicDelayMs;
     },
 
     // ==================== 充能符文系统 ====================
@@ -3350,6 +3455,11 @@ export const combat_system = {
         // [遗物 Hook] 符文共鸣核：每次击杀额外 +8% 充能
         if (isKill && this.ownedRelics && this.ownedRelics.includes('rune_resonance_core')) {
             chargeAmount += 0.08;
+        }
+
+        // [遗物 Hook] 符文虹吸管：稳定奖励命中，击杀时奖励翻倍。
+        if (this.ownedRelics && this.ownedRelics.includes('rune_siphon')) {
+            chargeAmount += isKill ? 0.04 : 0.02;
         }
 
         // 累加充能值

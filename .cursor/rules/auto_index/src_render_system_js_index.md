@@ -1,7 +1,9 @@
-# src/render_system.js 函数索引
+# src\render_system.js 函数索引
 
-> 自动生成于 2026-04-26 | 总行数: 647 | 函数数: 10 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 813 | 函数数: 11 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
+
+**巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -15,10 +17,18 @@
 | render_butterflyPathWave | method | `render_butterflyPathWave(ctx, anchors, center, progress)` |  |
 | render_singleWindMatrix | method | `render_singleWindMatrix(matrix)` |  |
 | render_floatingTexts | method | `render_floatingTexts(timeScale)` |  |
-| render_combat_launcherOrbitals | method | `render_combat_launcherOrbitals(ctx, centerX, centerY, recipe)` |  |
+| render_combat_launcherOrbitals | method | `render_combat_launcherOrbitals(ctx, centerX, centerY, recipe)` | ⚠️ 巨型函数，见 @section 导航 |
+| render_combat_launcherEmitterBase | method | `render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress)` |  |
 | drawTiltVignette | method | `drawTiltVignette(ctx, tilt)` |  |
 | drawTiltIndicator | method | `drawTiltIndicator(ctx, tilt)` |  |
 | render_perfOverlay | method | `render_perfOverlay()` |  |
+
+## 巨型函数内部节点 (@section 标记)
+
+### render_combat_launcherOrbitals
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
+
 
 ## 其他 @section 标记
 

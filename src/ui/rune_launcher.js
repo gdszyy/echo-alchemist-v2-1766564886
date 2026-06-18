@@ -272,11 +272,13 @@ export const rune_launcher_system = {
 
         const overlay = document.getElementById('rune-picker-overlay');
         const list = document.getElementById('rune-picker-list');
+        const detail = document.getElementById('rune-picker-detail');
         const tooltip = document.getElementById('runeword-preview-tooltip');
         const tooltipContent = document.getElementById('runeword-preview-content');
         if (!overlay || !list) return;
 
         list.innerHTML = '';
+        if (detail) detail.innerHTML = '';
         if (tooltip) tooltip.classList.add('hidden');
 
         // 1. 预处理库存：计算每个符文放入该格子后能触发的新词条
@@ -298,6 +300,42 @@ export const rune_launcher_system = {
         });
 
         // 3. 渲染列表
+        const renderPickerDetail = (runeEntry, runeDef, runeLevel, newRunewords, btn) => {
+            if (!detail || !runeDef) return;
+            list.querySelectorAll('.rune-picker-option-active').forEach(el => el.classList.remove('rune-picker-option-active'));
+            if (btn) btn.classList.add('rune-picker-option-active');
+            const rarity = runeDef.rarity || 'common';
+            const rarityMeta = RARITY_DISPLAY[rarity] || {};
+            const elementMeta = (typeof CONFIG !== 'undefined' && CONFIG.ui?.attributeDisplay)
+                ? (CONFIG.ui.attributeDisplay[runeDef.element] || {})
+                : {};
+            const statAmount = Math.max(1, runeLevel || 1) * Math.max(1, runeDef.baseStatPerLevel || 1);
+            const runewordHtml = (newRunewords || []).length > 0
+                ? `<div class="rune-picker-trigger-list">${newRunewords.map(rw => `
+                    <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2">
+                        <div class="text-amber-200 text-xs font-bold">${rw.name} <span class="text-amber-500/70 font-normal">Lv.${rw.level}</span></div>
+                        <div class="text-[10px] text-slate-400 mt-1 leading-relaxed">${rw.effect_desc}</div>
+                    </div>
+                `).join('')}</div>`
+                : '<div class="text-[11px] text-slate-500 mt-3">放入此格暫不會觸發新詞條。</div>';
+
+            detail.innerHTML = `
+                <div class="rune-picker-detail-header">
+                    <div class="rune-picker-detail-icon">${_ui_buildRuneIconHTML(runeDef, runeLevel)}</div>
+                    <div class="min-w-0">
+                        <div class="rune-picker-detail-name">${runeDef.name}</div>
+                        <div class="rune-picker-detail-meta">
+                            <span class="rune-picker-pill">${rarityMeta.name || rarity}</span>
+                            <span class="rune-picker-pill">${elementMeta.icon || '✦'} ${elementMeta.name || runeDef.element}</span>
+                            <span class="rune-picker-pill">Lv.${runeLevel}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="rune-picker-detail-desc">放入格子後提供 ${elementMeta.name || runeDef.baseStat || runeDef.element} +${statAmount}。</div>
+                ${runewordHtml}
+            `;
+        };
+
         analyzedInventory.forEach(({ runeEntry, newRunewords, isTrigger }) => {
             const runeId = getRuneId(runeEntry);
             if (!runeId) return;
@@ -313,6 +351,7 @@ export const rune_launcher_system = {
                 'transition-all duration-200 min-w-[72px]',
                 isTrigger ? 'rune-glow-active' : ''
             ].join(' ');
+            btn.type = 'button';
 
             btn.innerHTML = `
                 <span style="font-size:24px;">${_ui_buildRuneIconHTML(runeDef, runeLevel)}</span>
@@ -336,6 +375,7 @@ export const rune_launcher_system = {
             };
 
             const showPreview = () => {
+                renderPickerDetail(runeEntry, runeDef, runeLevel, newRunewords, btn);
                 if (!isTrigger || !tooltip || !tooltipContent) return;
                 tooltipContent.innerHTML = newRunewords.map(rw => `
                     <div class="bg-slate-900/60 p-2 rounded-lg border border-amber-500/30">
@@ -365,10 +405,13 @@ export const rune_launcher_system = {
             };
 
             btn.addEventListener('mousedown', startPress);
+            btn.addEventListener('mouseenter', () => renderPickerDetail(runeEntry, runeDef, runeLevel, newRunewords, btn));
+            btn.addEventListener('focus', () => renderPickerDetail(runeEntry, runeDef, runeLevel, newRunewords, btn));
             btn.addEventListener('mouseup', endPress);
             btn.addEventListener('mouseleave', endPress);
             btn.addEventListener('touchstart', (e) => {
                 e.preventDefault(); // 防止触发 click
+                renderPickerDetail(runeEntry, runeDef, runeLevel, newRunewords, btn);
                 startPress(e);
             }, { passive: false });
             btn.addEventListener('touchend', (e) => {
@@ -388,6 +431,16 @@ export const rune_launcher_system = {
 
             list.appendChild(btn);
         });
+        const first = analyzedInventory.find(item => {
+            const runeId = getRuneId(item.runeEntry);
+            return runeId && RUNE_DB.find(r => r.id === runeId);
+        });
+        if (first) {
+            const runeId = getRuneId(first.runeEntry);
+            const runeDef = RUNE_DB.find(r => r.id === runeId);
+            const runeLevel = (typeof first.runeEntry === 'object' && first.runeEntry.level) ? first.runeEntry.level : 1;
+            renderPickerDetail(first.runeEntry, runeDef, runeLevel, first.newRunewords, list.querySelector('button'));
+        }
 
         overlay.classList.remove('hidden');
     },

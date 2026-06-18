@@ -19,16 +19,18 @@
  *   - fixed_slot 模块复用 SpecialSlot 类（multicast/recall/split 轮换）
  */
 
+import { CONFIG } from './config.js';
 import { Peg, SpecialSlot } from './entities.js';
 
 // 与 game_phase.phase_gathering_getRandomPegType 保持一致：laser / lightning 不生成钉子。
 const RANDOMIZABLE_PEG_TYPES = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'wind'];
 
-// 倍化弹珠半径 = marbleRadius(7.7) + maxSizeBonus(2.5)
-const PEG_RADIUS = 6;               // 与 entities.js Peg.radius 一致
-const DOUBLED_MARBLE_RADIUS = 10.2; // marbleRadius(7.7) + maxSizeBonus(2.5)
-// 最小中心到中心间距 = 两侧钉子半径 + 倍化弹珠直径，确保倍化弹珠能通过
-const MIN_PEG_SPACING = 2 * PEG_RADIUS + 2 * DOUBLED_MARBLE_RADIUS; // = 32.4 px
+const PEG_RADIUS = CONFIG.physics.pegRadius || 4;
+const MARBLE_RADIUS = CONFIG.physics.marbleRadius || 5.8;
+const PINBOARD_SPACING_BUFFER = CONFIG.physics.pinboardSpacingBuffer || 1;
+// @perf-impact: Denser modules can raise Peg count; expensive Peg shadow/halo drawing remains gated by CONFIG.performance.
+// Base passability spacing. Size-up marbles are intentionally a tradeoff, not the density baseline.
+const MIN_PEG_SPACING = 2 * PEG_RADIUS + 2 * MARBLE_RADIUS + PINBOARD_SPACING_BUFFER;
 
 /**
  * 按当前局内属性权重随机生成 peg 类型。
@@ -130,6 +132,19 @@ function generateFunnelPegs(originX, originY, w, h, topCols, rows) {
 /**
  * 模块定义注册表
  */
+function markFusionFocus(pegs, originX, originY, w, h, maxPriority = 3) {
+    const cx = originX + w / 2;
+    const cy = originY + h * 0.55;
+    for (const peg of pegs) {
+        const nx = Math.abs(peg.pos.x - cx) / Math.max(1, w / 2);
+        const ny = Math.abs(peg.pos.y - cy) / Math.max(1, h / 2);
+        const distance = nx + ny;
+        peg.fusionPriority = Math.max(1, Math.round(maxPriority - distance));
+        peg.layoutRole = peg.layoutRole || 'rune_focus';
+    }
+    return pegs;
+}
+
 export const MODULE_DEFS = {
     std_stagger: {
         id: 'std_stagger',
@@ -152,6 +167,19 @@ export const MODULE_DEFS = {
         price: 0,
         build(ox, oy, w, h) {
             const pegs = generateStaggeredPegs(ox, oy, w, h, 4, 3, 'normal');
+            return { pegs, specialSlots: [] };
+        },
+    },
+    rune_lattice: {
+        id: 'rune_lattice',
+        name: 'Rune Lattice',
+        icon: 'R',
+        desc: '4x4 fusion-ready peg lattice. Rune fusion prefers its center pegs.',
+        rarity: 'common',
+        price: 0,
+        build(ox, oy, w, h) {
+            const pegs = generateStaggeredPegs(ox, oy, w, h, 4, 4, 'normal');
+            markFusionFocus(pegs, ox, oy, w, h, 3);
             return { pegs, specialSlots: [] };
         },
     },
@@ -439,6 +467,154 @@ MODULE_DEFS.dim_crystal_module = {
 // ==================== [属性钉板] 商店随机属性钉板 ====================
 // 每个属性对应一个 attr_pin_<type> 模块，所有 normal 钉子被强制赋予该属性，
 // 且不参与 unlockedWeights 随机覆盖（applyWeightedPegTypes 仅替换 type === 'normal'）。
+MODULE_DEFS.rune_focus_module = {
+    id: 'rune_focus_module',
+    name: 'Rune Focus',
+    icon: 'F',
+    desc: 'A compact fusion chamber. Consumed runes strongly prefer the inner ring.',
+    rarity: 'rare',
+    price: 70,
+    build(ox, oy, w, h) {
+        const pegs = generateStaggeredPegs(ox, oy, w, h, 5, 4, 'normal');
+        markFusionFocus(pegs, ox, oy, w, h, 4);
+        for (const peg of pegs) {
+            if (peg.fusionPriority >= 3) peg.level = 2;
+        }
+        return { pegs, specialSlots: [] };
+    },
+};
+
+MODULE_DEFS.split_gate_module = {
+    id: 'split_gate_module',
+    name: 'Split Gate',
+    icon: 'S',
+    desc: 'A narrow center split slot framed by four guide pegs.',
+    rarity: 'rare',
+    price: 75,
+    build(ox, oy, w, h) {
+        const pegs = [
+            new Peg(ox + w * 0.28, oy + h * 0.22, 'normal'),
+            new Peg(ox + w * 0.72, oy + h * 0.22, 'normal'),
+            new Peg(ox + w * 0.28, oy + h * 0.78, 'normal'),
+            new Peg(ox + w * 0.72, oy + h * 0.78, 'normal'),
+        ];
+        pegs.forEach((p, i) => { p.row = Math.floor(i / 2); p.col = i % 2; p.level = 1; });
+        const specialSlots = [new SpecialSlot(ox + w * 0.32, oy + h * 0.5, ox + w * 0.68, oy + h * 0.5, 'split')];
+        return { pegs, specialSlots };
+    },
+};
+
+MODULE_DEFS.recall_loop_module = {
+    id: 'recall_loop_module',
+    name: 'Recall Loop',
+    icon: 'U',
+    desc: 'Pink bumpers wrap a recall slot, giving lucky balls another pass.',
+    rarity: 'epic',
+    price: 90,
+    build(ox, oy, w, h) {
+        const pegs = [
+            new Peg(ox + w * 0.22, oy + h * 0.25, 'pink'),
+            new Peg(ox + w * 0.78, oy + h * 0.25, 'pink'),
+            new Peg(ox + w * 0.34, oy + h * 0.72, 'normal'),
+            new Peg(ox + w * 0.66, oy + h * 0.72, 'normal'),
+        ];
+        pegs.forEach((p, i) => { p.row = Math.floor(i / 2); p.col = i % 2; p.level = 1; });
+        const specialSlots = [new SpecialSlot(ox + w * 0.34, oy + h * 0.55, ox + w * 0.66, oy + h * 0.55, 'recall')];
+        return { pegs, specialSlots };
+    },
+};
+
+MODULE_DEFS.cascade_bank_module = {
+    id: 'cascade_bank_module',
+    name: 'Cascade Bank',
+    icon: 'K',
+    desc: 'Alternating pink rails create a stair-step ricochet path.',
+    rarity: 'rare',
+    price: 65,
+    build(ox, oy, w, h) {
+        const pegs = [];
+        for (let i = 0; i < 5; i++) {
+            const t = i / 4;
+            const p = new Peg(ox + w * (0.18 + t * 0.64), oy + h * (0.18 + t * 0.64), i % 2 === 0 ? 'pink' : 'normal');
+            p.row = i;
+            p.col = i;
+            p.level = 1;
+            pegs.push(p);
+        }
+        for (let i = 0; i < 3; i++) {
+            const p = new Peg(ox + w * (0.72 - i * 0.18), oy + h * (0.24 + i * 0.24), 'normal');
+            p.row = i;
+            p.col = 5 - i;
+            p.level = 1;
+            pegs.push(p);
+        }
+        return { pegs, specialSlots: [] };
+    },
+};
+
+MODULE_DEFS.crucible_core_module = {
+    id: 'crucible_core_module',
+    name: 'Crucible Core',
+    icon: 'C',
+    desc: 'A fixed cryo/pyro/damage triangle with fusion-friendly center pegs.',
+    rarity: 'epic',
+    price: 95,
+    build(ox, oy, w, h) {
+        const pegs = generateStaggeredPegs(ox, oy, w, h, 3, 3, 'normal');
+        const byPos = [...pegs].sort((a, b) => a.pos.y - b.pos.y || a.pos.x - b.pos.x);
+        if (byPos[1]) byPos[1].type = 'cryo';
+        if (byPos[4]) byPos[4].type = 'damage';
+        if (byPos[7]) byPos[7].type = 'pyro';
+        markFusionFocus(pegs.filter(p => p.type === 'normal'), ox, oy, w, h, 3);
+        return { pegs, specialSlots: [] };
+    },
+};
+
+MODULE_DEFS.double_wheel_module = {
+    id: 'double_wheel_module',
+    name: 'Twin Wheel',
+    icon: 'W',
+    desc: 'Two wheel slots across a 2x1 chamber for swingy reward routing.',
+    rarity: 'legendary',
+    price: 130,
+    span: { cols: 2, rows: 1 },
+    build(ox, oy, w, h) {
+        const pegs = [];
+        const anchors = [
+            [0.18, 0.78], [0.36, 0.78],
+            [0.64, 0.78], [0.82, 0.78],
+            [0.30, 0.28], [0.70, 0.28],
+        ];
+        anchors.forEach(([px, py], i) => {
+            const p = new Peg(ox + w * px, oy + h * py, i < 4 ? 'normal' : 'pink');
+            p.row = Math.floor(i / 2);
+            p.col = i % 2;
+            p.level = 1;
+            pegs.push(p);
+        });
+        const specialSlots = [
+            new SpecialSlot(ox + w * 0.18, oy + h * 0.78, ox + w * 0.36, oy + h * 0.78, 'wheel'),
+            new SpecialSlot(ox + w * 0.64, oy + h * 0.78, ox + w * 0.82, oy + h * 0.78, 'wheel'),
+        ];
+        return { pegs, specialSlots };
+    },
+};
+
+MODULE_DEFS.fusion_garden_module = {
+    id: 'fusion_garden_module',
+    name: 'Fusion Garden',
+    icon: 'G',
+    desc: 'A broad 2x1 lattice that gives rune fusion many high-value targets.',
+    rarity: 'rare',
+    price: 85,
+    span: { cols: 2, rows: 1 },
+    build(ox, oy, w, h) {
+        const pegs = generateStaggeredPegs(ox, oy, w, h, 6, 3, 'normal');
+        markFusionFocus(pegs, ox, oy, w, h, 4);
+        return { pegs, specialSlots: [] };
+    },
+};
+
 export const ATTR_PIN_TYPES = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'wind'];
 const ATTR_PIN_META = {
     bounce: { name: '彈性釘板', icon: '🔵' },
@@ -467,9 +643,42 @@ ATTR_PIN_TYPES.forEach(type => {
     };
 });
 
+const DEFAULT_MODULE_SEQUENCE = [
+    'dense_stagger', 'rune_lattice', 'dense_stagger', 'bouncer',
+    'std_stagger', 'dense_stagger', 'rune_lattice', 'dense_stagger',
+    'bouncer', 'std_stagger', 'dense_stagger', 'rune_lattice',
+];
+
+export function createDefaultModuleLayout(totalSlots) {
+    const count = Math.max(0, totalSlots || DEFAULT_MODULE_SEQUENCE.length);
+    return Array.from({ length: count }, (_, i) => DEFAULT_MODULE_SEQUENCE[i % DEFAULT_MODULE_SEQUENCE.length]);
+}
+
 /**
  * 主入口：根据模块 ID 在指定矩形内构造实体集合
  */
+export function selectFusionTargetPegs(pegs, fusion, canvasWidth, canvasHeight, randomize = false) {
+    if (!Array.isArray(pegs) || !fusion || !fusion.count) return [];
+    const blanks = pegs.filter(p => p && p.type === 'normal');
+    const targetCount = Math.min(fusion.count, blanks.length);
+    const boardCenterX = (canvasWidth || 400) / 2;
+    const width = Math.max(1, canvasWidth || 400);
+    const height = Math.max(1, canvasHeight || 600);
+    const ranked = blanks.map(peg => ({ peg, tie: randomize ? Math.random() : 0 }));
+    ranked.sort((a, b) => {
+        const priorityDiff = (b.peg.fusionPriority || 0) - (a.peg.fusionPriority || 0);
+        if (priorityDiff !== 0) return priorityDiff;
+        const ay = (a.peg.pos.y || 0) / height;
+        const by = (b.peg.pos.y || 0) / height;
+        const ax = Math.abs((a.peg.pos.x || 0) - boardCenterX) / width;
+        const bx = Math.abs((b.peg.pos.x || 0) - boardCenterX) / width;
+        const valueDiff = (by - bx * 0.35) - (ay - ax * 0.35);
+        if (valueDiff !== 0) return valueDiff;
+        return b.tie - a.tie;
+    });
+    return ranked.slice(0, targetCount).map(item => item.peg);
+}
+
 export function buildModuleEntities(moduleId, originX, originY, width, height, ctx, slotIdx) {
     const def = MODULE_DEFS[moduleId];
     if (!def) {

@@ -317,7 +317,12 @@ export const hud_system = {
                     'lightning':{ name: '⚡ 闪电', color: CONFIG.ui.damageStats.lightning },
                     'wind':     { name: '🌪️ 风暴', color: CONFIG.ui.damageStats.wind },
                     'flying_sword': { name: '🗡️ 飞剑', color: CONFIG.ui.damageStats.flying_sword },
-                    'explosive': { name: '💥 爆炸', color: CONFIG.ui.damageStats.explosive }
+                    'explosive': { name: '💥 爆炸', color: CONFIG.ui.damageStats.explosive },
+                    'laser': { name: '☄️ 光束', color: CONFIG.ui.damageStats.laser },
+                    'resonance': { name: '🔂 共鸣', color: CONFIG.ui.damageStats.resonance },
+                    'venom': { name: '☠️ 剧毒', color: CONFIG.ui.damageStats.venom },
+                    'overcharge': { name: '⚡ 超载', color: CONFIG.ui.damageStats.overcharge },
+                    'echo': { name: '🔊 回响', color: CONFIG.ui.damageStats.echo }
                 };
                 
                 const conf = typeConfig[dtype] || { name: dtype, color: CONFIG.ui.damageStats.default };
@@ -489,7 +494,9 @@ export const hud_system = {
                         { k: 'laser', i: CONFIG.ui.attributeDisplay.laser.icon },
                         { k: 'wind', i: CONFIG.ui.attributeDisplay.wind.icon },
                         { k: 'resonance', i: CONFIG.ui.attributeDisplay.resonance.icon },
-                        { k: 'venom', i: CONFIG.ui.attributeDisplay.venom.icon }
+                        { k: 'venom', i: CONFIG.ui.attributeDisplay.venom.icon },
+                        { k: 'overcharge', i: CONFIG.ui.attributeDisplay.overcharge.icon },
+                        { k: 'echo', i: CONFIG.ui.attributeDisplay.echo.icon }
                     ];
                     let hasStats = false;
                     stats.forEach(s => {
@@ -586,7 +593,9 @@ export const hud_system = {
             'laser': { c: CONFIG.colors.laser, l: CONFIG.ui.attributeDisplay.laser.icon, n: '光' },
             'wind': { c: CONFIG.colors.matWind, l: CONFIG.ui.attributeDisplay.wind.icon, n: '風' },
             'resonance': { c: CONFIG.colors.resonance, l: CONFIG.ui.attributeDisplay.resonance.icon, n: '鳴' },
-            'venom': { c: CONFIG.colors.matVenom, l: CONFIG.ui.attributeDisplay.venom.icon, n: '毒' }
+            'venom': { c: CONFIG.colors.matVenom, l: CONFIG.ui.attributeDisplay.venom.icon, n: '毒' },
+            'overcharge': { c: CONFIG.colors.matOvercharge, l: CONFIG.ui.attributeDisplay.overcharge.icon, n: '载' },
+            'echo': { c: CONFIG.colors.matEcho, l: CONFIG.ui.attributeDisplay.echo.icon, n: '响' }
         };
 
         Object.keys(counts).forEach(type => { 
@@ -739,6 +748,7 @@ export const hud_system = {
 
         // [Phase 5A Task 5.A5] 位图法球图标
         const iconSrc = getAmmoIconSrc(recipe);
+        const recipeType = recipe.type || recipe._marbleType;
         if (iconSrc) {
             // 位图模式：使用 32×32 炼金法球位图
             div.style.width = `${size}px`;
@@ -770,11 +780,17 @@ export const hud_system = {
             else if (recipe.lightning)  { bg = '#e9d5ff'; shadow = '0 0 8px #c084fc'; }
             else if (recipe.pierce)     { bg = '#fecaca'; }
             else if (recipe.bounce)     { bg = '#bbf7d0'; }
+            else if (recipe.venom || recipeType === 'venom') { bg = '#bbf7d0'; shadow = '0 0 8px #4ade80'; }
+            else if (recipe.overcharge || recipeType === 'overcharge') { bg = '#fde68a'; shadow = '0 0 8px #f59e0b'; }
+            else if (recipe.echo || recipeType === 'echo') { bg = '#bfdbfe'; shadow = '0 0 8px #60a5fa'; }
             div.style.background = bg;
             div.style.boxShadow = shadow;
             div.style.position = 'relative';
             if (recipe.isLaser)  div.style.border = '2px solid #fff';
             if (recipe.scatter)  div.style.border = '2px solid #facc15';
+            if (recipe.venom || recipeType === 'venom') div.style.border = '2px solid #4ade80';
+            if (recipe.overcharge || recipeType === 'overcharge') div.style.border = '2px solid #f59e0b';
+            if (recipe.echo || recipeType === 'echo') div.style.border = '2px solid #60a5fa';
         }
 
         // multicast 角标（位图/fallback 均保留）

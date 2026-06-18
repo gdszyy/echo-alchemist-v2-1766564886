@@ -19,6 +19,7 @@ import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
 import { COUNTER_MAP, RUNE_DB } from './rune_config.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
+import { createDefaultModuleLayout } from './pinboard_modules.js';
 
 export const game_system = {
 
@@ -318,7 +319,7 @@ export const game_system = {
             if (!this.ownedRelics.includes('gigantism_relic')) {
                 this.ownedRelics.push('gigantism_relic');
                 // 应用倍化遗物效果：弹珠体积增大（与 shop.js 中 permanent_size_up 效果保持一致）
-                this.marbleSizeBonus = (this.marbleSizeBonus || 0) + 2.5;
+                this.marbleSizeBonus = (this.marbleSizeBonus || 0) + (CONFIG.physics.maxMarbleSizeBonus || 1.6);
             }
 
             // 4. 添加三层炼金火药管（flat_damage_up，每层 +2 基础伤害）
@@ -386,6 +387,7 @@ export const game_system = {
         this.fateMomentContext = null;
         this.replaceAmmoContext = null; // [tsk-668f3dba] 替换当前子弹阶段上下文
         this._chargedAmmoQueue = null; // [ammo-replace] 充能子弹
+        this._roundStartResolverTotalCount = 0;
         this._lastFiredAmmoSnapshot = null; // [bullet-charge-fix] 上回合实际发射的子弹快照
         this.ownedRelics = [];
         
@@ -457,6 +459,9 @@ export const game_system = {
         this._roundStartBannerActive = false; // 重置横幅保护标志
         // 重置 炼金火药管平坦伤害加成
         this.flatDamageBonus = 0;
+        // 守护者结界：越线保护层数
+        this.playerShield = 0;
+        this._doomsdayTimerTriggerCount = 0;
         // [v2 即时感重塑] 重置 混沌契约伤害倍率
         this.chaosPactDamageMult = 1;
         // 重置 敌人动作后符文领取标志
@@ -484,11 +489,11 @@ export const game_system = {
         // ==================== [v2 钉板模块化] 模块系统状态 ====================
         // 钉板由 4×3 = 12 个模块槽组成，按 row-major 顺序解锁
         // 默认开放全部 12 个槽，预填 std_stagger
-        this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'bouncer', 'funnel'];
+        this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'rune_lattice', 'bouncer', 'funnel'];
         this.unlockedModuleSlots = CONFIG.gameplay.moduleDefaultSlots || 12;
-        this.currentModuleLayout = new Array(
+        this.currentModuleLayout = createDefaultModuleLayout(
             (CONFIG.gameplay.moduleCols || 4) * (CONFIG.gameplay.moduleRows || 3)
-        ).fill('std_stagger');
+        );
         // pendingFusions: 模块编辑器关闭时写入；phase_gathering_initPachinko 末尾消费
         // 形如 [{ element: 'pyro', count: 1, runeUid: '...' }]
         this.pendingFusions = [];
@@ -752,6 +757,8 @@ export const game_system = {
         //    （主弹珠类型 + 主属性 + multicast 等级），作为本回合 default 选中的依据。
         // 2. 若签名匹配不到（首次进入或弹珠彻底改变），回退到原默认逻辑：选中所有充能子弹。
         const allRecipes = newRecipes.concat(chargedRecipes);
+        const bulletCap = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
+        const maxSelect = Math.min(bulletCap, allRecipes.length);
         const _signatureOf = (r) => {
             if (!r) return '';
             const main = r._marbleType || r.type || 'normal';
@@ -777,14 +784,16 @@ export const game_system = {
                 }
             });
             // 数量不足时用充能子弹补齐
-            const maxSelect = Math.max(newRecipes.length, chargedRecipes.length, 3);
             for (let j = 0; j < chargedRecipes.length && defaultSelected.length < maxSelect; j++) {
                 const idx = newRecipes.length + j;
                 if (!usedIdx.has(idx)) { defaultSelected.push(idx); usedIdx.add(idx); }
             }
+            for (let i = 0; i < allRecipes.length && defaultSelected.length < maxSelect; i++) {
+                if (!usedIdx.has(i)) { defaultSelected.push(i); usedIdx.add(i); }
+            }
         } else {
             // 首次进入：默认选中右侧（充能子弹），索引 newRecipes.length 起
-            defaultSelected = chargedRecipes.map((_, i) => newRecipes.length + i);
+            defaultSelected = chargedRecipes.map((_, i) => newRecipes.length + i).slice(0, maxSelect);
         }
 
         this.replaceAmmoContext = {
@@ -824,6 +833,17 @@ export const game_system = {
         const chargedRecipes = ctx.chargedRecipes || [];
         const allRecipes = [...newRecipes, ...chargedRecipes];
         const selectedIndices = ctx.selectedIndices || [];
+        const bulletCap = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
+        const maxSelect = Math.min(bulletCap, allRecipes.length);
+        if (maxSelect <= 0 || selectedIndices.length !== maxSelect) {
+            console.warn('[sys_confirmReplaceAmmo] 子弹选择数量不合法', {
+                selected: selectedIndices.length,
+                required: maxSelect,
+                available: allRecipes.length,
+            });
+            showToast(maxSelect <= 0 ? '没有可用子弹' : `请选择 ${maxSelect} 枚子弹`);
+            return;
+        }
 
         // 按选中索引构建最终 ammoQueue
         const finalAmmo = selectedIndices
@@ -886,6 +906,10 @@ export const game_system = {
         if (!this.replaceAmmoContext) return;
         const ctx = this.replaceAmmoContext;
         const newRecipes = ctx.newRecipes || [];
+        if (newRecipes.length === 0) {
+            showToast('当前没有新研磨子弹可跳过');
+            return;
+        }
         // 跳过：直接使用新研磨的子弹
         this.ammoQueue = newRecipes.slice();
         // [tsk-bullet-ui] 跳过时也记录签名（取新研磨子弹）以便下次继承
@@ -1035,19 +1059,20 @@ export const game_system = {
         this.pendingSelectionMode = null;
         // 存档
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
-        // [bullet-replace-fix] 有充能子弹时进入「子弹替换」阶段；否则才直接进入战斗。
+        // [bullet-replace-fix] 有充能子弹时进入「子弹替换」阶段；否则回到标准选择，避免空弹药进入战斗。
         if (this._chargedAmmoQueue && this._chargedAmmoQueue.length > 0
             && typeof this.sys_initReplaceAmmoPhase === 'function') {
             this.sys_initReplaceAmmoPhase();
             return;
         }
-        // 无充能子弹兜底：清理替换上下文并直接进入战斗
+        // 无充能子弹兜底：清理替换上下文并回到标准选择
         this._chargedAmmoQueue = null;
         this.replaceAmmoContext = null;
-        if (typeof this.phase_startCombatPhase === 'function') {
-            this.phase_startCombatPhase();
+        showToast('没有可保留的充能子弹，请重新选择弹珠');
+        if (typeof this.sys_initSelectionPhase === 'function') {
+            this.sys_initSelectionPhase();
         } else {
-            this.phase_switchPhase('combat');
+            this.phase_switchPhase('selection');
         }
     },
 
@@ -1614,6 +1639,9 @@ export const game_system = {
         });
         if (this._roundStartResolverActive) return;
         if (!this.pendingRoundStartRewards) this.pendingRoundStartRewards = [];
+        if (!this._roundStartResolverTotalCount || this._roundStartResolverTotalCount < this.pendingRoundStartRewards.length) {
+            this._roundStartResolverTotalCount = this.pendingRoundStartRewards.length;
+        }
 
         // [BUGFIX] 切换到 selection 前先将 selectionMode 重置为 standard，
         // 防止 phase_switchPhase 内部触发的 ui_updateUI 读取上一次的 selectionMode
@@ -1644,6 +1672,7 @@ export const game_system = {
         eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_STARTED, {
             round: this.round || 1,
             pendingCount: this.pendingRoundStartRewards.length,
+            totalCount: this._roundStartResolverTotalCount || this.pendingRoundStartRewards.length,
         });
 
         while (this.pendingRoundStartRewards.length > 0) {
@@ -1653,6 +1682,16 @@ export const game_system = {
             const rewardType = reward.type === 'essence'
                 ? (reward.essenceType === 'pure_essence' ? 'pure_essence' : 'chaos_essence')
                 : reward.type;
+            const totalRewards = this._roundStartResolverTotalCount || (this.pendingRoundStartRewards.length + 1);
+            const currentRewardIndex = Math.max(1, totalRewards - this.pendingRoundStartRewards.length);
+            const rewardLabel = rewardType === 'relic'
+                ? '遗物线索'
+                : rewardType === 'pure_essence'
+                    ? '纯净精华'
+                    : '混沌精华';
+            if (totalRewards > 1) {
+                showToast(`回合奖励 ${currentRewardIndex}/${totalRewards}：${rewardLabel}`);
+            }
 
             if (rewardType === 'relic') {
                 const startSelection = () => {
@@ -1724,8 +1763,13 @@ export const game_system = {
                     eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
                         round: this.round || 1,
                         pendingCount: this.pendingRoundStartRewards.length,
+                        totalCount: totalRewards,
+                        resolvedCount: currentRewardIndex,
+                        currentRewardType: rewardType,
                     });
-                    showToast(rewardType === 'pure_essence' ? '🕊️ 命運時刻：純淨精華' : '🎡 命運時刻：混沌精华');
+                    this._roundStartResolverTotalCount = 0;
+                    const progressPrefix = totalRewards > 1 ? `(${currentRewardIndex}/${totalRewards}) ` : '';
+                    showToast(progressPrefix + (rewardType === 'pure_essence' ? '🕊️ 命運時刻：純淨精華' : '🎡 命運時刻：混沌精华'));
                     this.sys_initSelectionPhase();
                 };
 
@@ -1745,9 +1789,12 @@ export const game_system = {
         }
 
         this._roundStartResolverActive = false;
+        this._roundStartResolverTotalCount = 0;
         eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
             round: this.round || 1,
             pendingCount: 0,
+            totalCount: 0,
+            resolvedCount: 0,
         });
         // [tsk-f35c6d10] 队列为空时不再进入普通命运选择，改为显示回合开始提示后直接进入研磨阶段
         this.sys_showRoundStartBanner();
@@ -2258,6 +2305,21 @@ export const game_system = {
                 if (e.type === 'boss') {
                     this._triggerPityDrop(e);
                 }
+                if ((this.playerShield || 0) > 0) {
+                    this.playerShield = Math.max(0, this.playerShield - 1);
+                    e.active = false;
+                    if (typeof this.spawn_createFloatingText === 'function') {
+                        this.spawn_createFloatingText(e.pos.x, this.defeatLineY - 18, `护盾抵消 (${this.playerShield})`, '#93c5fd');
+                    }
+                    if (typeof this.spawn_createParticle === 'function') {
+                        for (let i = 0; i < 8; i++) {
+                            this.spawn_createParticle(e.pos.x, this.defeatLineY, '#93c5fd', 'spark');
+                        }
+                    }
+                    showToast(`🔰 守护者结界抵消越线！剩余 ${this.playerShield} 层`);
+                    if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+                    return false;
+                }
                 return true;
             }
         }
@@ -2427,6 +2489,8 @@ export const game_system = {
                 slotCount: this.slotCount || 1,
                 marbleSizeBonus: this.marbleSizeBonus || 0,
                 flatDamageBonus: this.flatDamageBonus || 0,
+                playerShield: this.playerShield || 0,
+                doomsdayTimerTriggerCount: this._doomsdayTimerTriggerCount || 0,
                 // [v2 即时感重塑] 混沌契约伤害倍率（持久化避免存档读档后丢失）
                 chaosPactDamageMult: this.chaosPactDamageMult || 1,
                 // 符文
@@ -2544,6 +2608,8 @@ export const game_system = {
             this.slotCount = state.slotCount || 1;
             this.marbleSizeBonus = state.marbleSizeBonus || 0;
             this.flatDamageBonus = state.flatDamageBonus || 0;
+            this.playerShield = state.playerShield || 0;
+            this._doomsdayTimerTriggerCount = state.doomsdayTimerTriggerCount || 0;
             this.chaosPactDamageMult = state.chaosPactDamageMult || 1;
 
             // --- 恢复符文 ---
@@ -2565,6 +2631,28 @@ export const game_system = {
             this.fateMomentContext = state.fateMomentContext ? { ...state.fateMomentContext } : null;
             this.replaceAmmoContext = state.replaceAmmoContext ? JSON.parse(JSON.stringify(state.replaceAmmoContext)) : null; // [ammo-replace]
             this._chargedAmmoQueue = state._chargedAmmoQueue ? state._chargedAmmoQueue.map(r => ({ ...r })) : null; // [ammo-replace]
+            if (this.replaceAmmoContext && this.replaceAmmoContext.active) {
+                const newRecipes = this.replaceAmmoContext.newRecipes || [];
+                const chargedRecipes = this.replaceAmmoContext.chargedRecipes || [];
+                const allRecipes = newRecipes.concat(chargedRecipes);
+                const bulletCap = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
+                const maxSelect = Math.min(bulletCap, allRecipes.length);
+                let selected = Array.isArray(this.replaceAmmoContext.selectedIndices)
+                    ? this.replaceAmmoContext.selectedIndices.slice()
+                    : [];
+                if (!selected.length && Number.isInteger(this.replaceAmmoContext.selectedIndex)) {
+                    selected = [this.replaceAmmoContext.selectedIndex];
+                }
+                selected = [...new Set(selected.filter(i => i >= 0 && i < allRecipes.length))].slice(0, maxSelect);
+                for (let i = newRecipes.length; i < allRecipes.length && selected.length < maxSelect; i++) {
+                    if (!selected.includes(i)) selected.push(i);
+                }
+                for (let i = 0; i < allRecipes.length && selected.length < maxSelect; i++) {
+                    if (!selected.includes(i)) selected.push(i);
+                }
+                this.replaceAmmoContext.selectedIndices = selected;
+                delete this.replaceAmmoContext.selectedIndex;
+            }
             this._lastFiredAmmoSnapshot = state._lastFiredAmmoSnapshot ? state._lastFiredAmmoSnapshot.map(r => ({ ...r })) : null; // [bullet-charge-fix]
 
             // --- 恢复 Boss 系统 ---

@@ -1,9 +1,9 @@
-# src/entities/projectile.js 函数索引
+# src\entities\projectile.js 函数索引
 
-> 自动生成于 2026-04-26 | 总行数: 1028 | 函数数: 13 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 1346 | 函数数: 15 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -12,7 +12,6 @@
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
 | setProjectileAudioProvider | function | `setProjectileAudioProvider(provider)` |  |
-| Projectile | class | `Projectile()` |  |
 | constructor | method | `constructor(x, y, vel, config, isCopy = false, shotId = null, isLast = false)` |  |
 | update | method | `update(width, height, enemies, spawnCallback, timeScale)` |  |
 | _handleCollision | method | `_handleCollision(e, enemies, spawnCallback)` | ⚠️ 巨型函数，见 @section 导航 |
@@ -20,10 +19,13 @@
 | _applyMove | method | `_applyMove(vel, width, height, spawnCallback)` |  |
 | onHit | method | `onHit(enemy, allEnemies)` |  |
 | performSlashAttack | method | `performSlashAttack(target, enemies)` |  |
+| _tryTriggerEchoBullet | method | `_tryTriggerEchoBullet()` |  |
+| _detonateOvercharge | method | `_detonateOvercharge()` |  |
 | destroy | method | `destroy(spawnCallback)` |  |
 | stickToEnemy | method | `stickToEnemy(enemy)` |  |
 | handleFlyingSwordFinish | method | `handleFlyingSwordFinish(host, game, isBottomExit = false)` |  |
-| draw | method | `draw(ctx)` | ⚠️ 巨型函数，见 @section 导航 |
+| draw | method | `draw(ctx)` |  |
+| _drawTrail | method | `_drawTrail(ctx)` |  |
 
 ## 巨型函数内部节点 (@section 标记)
 
@@ -31,9 +33,8 @@
 
 > **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
 
-### draw
 
-> 定位：`grep -n '@section:{}'` 跳转到对应节点
+## 其他 @section 标记
 
 | 节点标记 | 说明 |
 |----------|------|

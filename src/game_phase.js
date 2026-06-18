@@ -19,7 +19,7 @@ import {
     getLayoutParams,
     getAllLayoutHints,
 } from './plinko_physics.js';
-import { buildModuleEntities, calcModuleSlotRect, MODULE_DEFS, getModuleSpan } from './pinboard_modules.js';
+import { buildModuleEntities, calcModuleSlotRect, createDefaultModuleLayout, MODULE_DEFS, getModuleSpan, selectFusionTargetPegs } from './pinboard_modules.js';
 
 export const game_phase = {
 /**
@@ -164,11 +164,7 @@ export const game_phase = {
 
         // 确保 currentModuleLayout 存在且正确长度
         if (!Array.isArray(this.currentModuleLayout) || this.currentModuleLayout.length !== totalSlots) {
-            this.currentModuleLayout = new Array(totalSlots).fill(null);
-            const defaultSlots = cfg.moduleDefaultSlots || 3;
-            for (let i = 0; i < defaultSlots; i++) {
-                this.currentModuleLayout[i] = 'std_stagger';
-            }
+            this.currentModuleLayout = createDefaultModuleLayout(totalSlots);
         }
 
         const previousPegs = [...(this.pegs || [])];
@@ -301,15 +297,12 @@ export const game_phase = {
         if (Array.isArray(this.pendingFusions) && this.pendingFusions.length > 0) {
             for (const f of this.pendingFusions) {
                 if (!f || !f.element || !f.count) continue;
-                const blanks = this.pegs.filter(p => p.type === 'normal');
-                const targetCount = Math.min(f.count, blanks.length);
-                for (let i = blanks.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [blanks[i], blanks[j]] = [blanks[j], blanks[i]];
-                }
-                for (let i = 0; i < targetCount; i++) {
-                    blanks[i].type = f.element;
-                    blanks[i].level = 1;
+                const targets = selectFusionTargetPegs(this.pegs, f, canvasWidth, canvasHeight, false);
+                for (const peg of targets) {
+                    peg.type = f.element;
+                    peg.level = Math.min(3, Math.max(peg.level || 1, f.sourceLevel || 1));
+                    peg.infusedRuneId = f.runeId || null;
+                    peg.fusionSourceLevel = f.sourceLevel || 1;
                 }
             }
             this.pendingFusions = [];
@@ -410,6 +403,32 @@ export const game_phase = {
                 ctx.fillStyle = 'rgba(148, 197, 220, 0.9)';
                 ctx.font = '600 11px "Microsoft YaHei", sans-serif';
                 ctx.fillText('点击放置', cx, cy + 12, w - 6);
+                ctx.restore();
+            }
+        }
+
+        // @perf-impact: Rune fusion preview draws lightweight target rings only; no particles, gradients, or shadowBlur.
+        const preview = this._moduleEditorRunePreview;
+        if (preview) {
+            const targets = selectFusionTargetPegs(this.pegs || [], {
+                element: preview.element,
+                count: preview.count,
+                runeId: preview.runeId,
+                sourceLevel: preview.level,
+            }, this.width || 400, this.height || 600, false);
+            if (targets.length > 0) {
+                ctx.save();
+                ctx.setLineDash([]);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#c4b5fd';
+                ctx.fillStyle = `rgba(167, 139, 250, ${0.16 + pulse * 0.08})`;
+                for (const peg of targets) {
+                    const radius = Math.max((peg.radius || 4) + 5, 9);
+                    ctx.beginPath();
+                    ctx.arc(peg.pos.x, peg.pos.y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                }
                 ctx.restore();
             }
         }
@@ -1582,7 +1601,10 @@ phase_gathering_getRandomPegType() {
             let spawnCount = 1;
             if (rowCountCurrent < 4) spawnCount = 3;
             // [清屏奖励] 上一回合完成清屏，本回合至少推进 3 行敌人
-            if (this._prevRoundCleared && spawnCount < 3) spawnCount = 3;
+            if (this._prevRoundCleared && spawnCount < 3) {
+                spawnCount = 3;
+                showToast('⚔️ 清屏反扑：敌军至少推进 3 行');
+            }
             // [Feature 2: 围墙非空保证] 本回合清屏 → 下回合若全部从画面外滑入，将出现"围墙范围内
             // 短暂无敌人"的空窗（玩家若仍持有子弹会立刻被 perfect-clear-upgrade 再次结算）。
             // 因此清屏后第一行直接生成在网格顶部（IN-WALL），其余行保留画面外入场演出。
@@ -1659,9 +1681,23 @@ phase_gathering_getRandomPegType() {
 
         // --- [遗物 Hook] 末日计时器 (doomsday_timer) & 回廊电弧 (corridor_arc) 回合开始触发 ---
         // 在 round++ 之后立即结算，使用新回合数作为伤害基数。
+        let relicHookDelayMs = 0;
         if (typeof this.relic_runRoundStartHooks === 'function') {
-            this.relic_runRoundStartHooks();
+            relicHookDelayMs = this.relic_runRoundStartHooks() || 0;
         }
+        if (relicHookDelayMs > 0) {
+            this._roundStartRelicHookDelayActive = true;
+            setTimeout(() => {
+                this._roundStartRelicHookDelayActive = false;
+                this.phase_continueFinalizeRoundAfterRelicHooks();
+            }, relicHookDelayMs);
+            return;
+        }
+        this.phase_continueFinalizeRoundAfterRelicHooks();
+        return;
+    },
+
+    phase_continueFinalizeRoundAfterRelicHooks() {
         // [DropV2] 紧急救援冷却计数器逐回合递减
         if (this.emergencyCooldown > 0) this.emergencyCooldown--;
         // [tsk-f35c6d10] 移除旧的小 Toast 回合提示，改由 sys_showRoundStartBanner 提供更醒目的大字居中提示
@@ -1796,6 +1832,16 @@ phase_gathering_getRandomPegType() {
      */
     // @section:combat_update_timescale - 时间缩放与暂停状态检查
     phase_combat_update(timeScale) {
+        if (this._relicCombatCinematicFrames > 0) {
+            this._relicCombatCinematicFrames -= timeScale;
+            this.isVisualEffectActive = true;
+            if (this._relicCombatCinematicFrames <= 0) {
+                this._relicCombatCinematicFrames = 0;
+                if (!this._continuousLaserFiring && !(this._laserFadeOutFrames > 0)) {
+                    this.isVisualEffectActive = false;
+                }
+            }
+        }
 
         // === [新增] 处理子剑动态生成队列 ===
         if (this.sonSwordQueue.length > 0) {
@@ -2547,6 +2593,7 @@ phase_gathering_getRandomPegType() {
             if (this._inWallClearLotteryActive) return;
             // [回合开始横幅保护] 横幅期间不触发敌人行动，避免与上一回合结束时的敌人行动重复
             if (this._roundStartBannerActive) return;
+            if (this._roundStartRelicHookDelayActive) return;
             // [遗物/命运时刻保护] 遗物或命运时刻 overlay 显示期间，必须等待玩家选择完毕
             // 否则会在 phase_finalizeRound 调用 sys_startRoundStartResolver 后立刻再次触发
             // phase_enemy_startLogic（因为 isEnemyTurn 已被置 false 且 ammoQueue 为空），
@@ -2878,7 +2925,7 @@ phase_gathering_getRandomPegType() {
         });
         // 繪製釘子
         // [修复] 增加保底半径，防止 this.width 为 0 时钉子消失
-        const pegRadius = Math.max(4, Math.min(8, (this.width || 400) / 60));
+        const pegRadius = Math.max(3.2, Math.min(5.6, CONFIG.physics.pegRadius || (this.width || 400) / 85));
         
         // [防御性检查] 如果钉子数组为空，尝试自动恢复
         if (this.pegs.length === 0) {

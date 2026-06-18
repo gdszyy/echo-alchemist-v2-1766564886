@@ -515,6 +515,18 @@ class Projectile {
             if (!g || !g.ownedRelics) return false;
             if ((side === 'left' || side === 'right') && g.ownedRelics.includes('corridor_arc')) {
                 this.config.lightning = (this.config.lightning || 0) + 1;
+                // @perf-impact: 回廊电弧墙撞火花 - 使用 spawn_createParticle 的 sparkLimit 预算
+                const budget = CONFIG.performance[g.perfQualityLevel || 'high'];
+                const sparkCount = Math.max(1, Math.floor((budget.relicCinematicSparkCount || 0) / 4));
+                for (let i = 0; i < sparkCount; i++) {
+                    if (typeof g.spawn_createParticle === 'function') {
+                        const p = g.spawn_createParticle(this.pos.x, this.pos.y, '#d8b4fe', 'spark');
+                        if (p) {
+                            p.vel.x += side === 'left' ? 2 + Math.random() * 2 : -2 - Math.random() * 2;
+                            p.vel.y += (Math.random() - 0.5) * 2;
+                        }
+                    }
+                }
             }
             if (g.ownedRelics.includes('energy_shield')) {
                 if ((this.bouncesLeft || 0) > 0) {

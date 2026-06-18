@@ -1,9 +1,9 @@
-# src/spawn_system.js 函数索引
+# src\spawn_system.js 函数索引
 
-> 自动生成于 2026-04-26 | 总行数: 2237 | 函数数: 28 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 2658 | 函数数: 34 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -14,13 +14,17 @@
 | spawn_windSkillParticles | method | `spawn_windSkillParticles(type, rect, progress)` |  |
 | spawn_createFloatingText | method | `spawn_createFloatingText(x, y, text, color, fontSize)` |  |
 | spawn_generateAffixes | method | `spawn_generateAffixes()` |  |
-| spawn_spawnEnemyRowAt | method | `spawn_spawnEnemyRowAt(yPos)` | ⚠️ 巨型函数，见 @section 导航 |
+| spawn_spawnEnemyRowAt | method | `spawn_spawnEnemyRowAt(yPos, options = {})` |  |
+| addPreset | function | `addPreset(col, hpMult, forceAffixes, extraInit)` |  |
 | spawn_addSkillPoint | method | `spawn_addSkillPoint(amount = 1)` |  |
 | spawn_spawnEnemyRow | method | `spawn_spawnEnemyRow(count = 1)` |  |
+| spawn_spawnEnemyRowOffScreen | method | `spawn_spawnEnemyRowOffScreen(count = 1)` |  |
+| spawn_spawnEliteJumperRows | method | `spawn_spawnEliteJumperRows(count = 3)` |  |
 | spawn_triggerCloneSpawn | method | `spawn_triggerCloneSpawn(sourceEnemy)` |  |
 | spawn_smallWhirlwind | method | `spawn_smallWhirlwind(x, y)` |  |
 | spawn_stormCore | method | `spawn_stormCore(x, y, radius, bulletDamage, bulletConfig)` |  |
-| spawn_addScore | method | `spawn_addScore(amount)` |  |
+| spawn_addScore | method | `spawn_addScore(amount, enemy)` |  |
+| spawn_dropRuneFragments | method | `spawn_dropRuneFragments(x, y, count, tier)` |  |
 | spawn_generateMarbleOptions | method | `spawn_generateMarbleOptions()` |  |
 | spawn_showMarblePreview | method | `spawn_showMarblePreview(m, tbEntry, supplementDesc)` |  |
 | spawn_createParticle | method | `spawn_createParticle(x, y, color, mode = 'normal')` |  |
@@ -38,23 +42,15 @@
 | spawn_spawnBoss | method | `spawn_spawnBoss(bossId, isBigBoss)` | ⚠️ 巨型函数，见 @section 导航 |
 | spawn_selectBossForRound | method | `spawn_selectBossForRound(isBigBoss)` |  |
 | spawn_applyMinionShape | method | `spawn_applyMinionShape(e)` |  |
+| spawn_trySpawnArchetypes | method | `spawn_trySpawnArchetypes(yPos, baseHP, occupiedCols, w, options)` |  |
+| spawn_applyArchetypeShape | method | `spawn_applyArchetypeShape(e, archetypeId)` |  |
 | spawn_triggerBossEntranceShockwave | method | `spawn_triggerBossEntranceShockwave(boss)` |  |
 
 ## 巨型函数内部节点 (@section 标记)
 
-### spawn_spawnEnemyRowAt
-
-> 定位：`grep -n '@section:{}'` 跳转到对应节点
-
-| 节点标记 | 说明 |
-|----------|------|
-| `@section:spawn_enemy_type_select` | 敌人类型选择与词缀分配 |
-| `@section:spawn_position_calc` | 生成位置计算与间距分布 |
-| `@section:spawn_entity_init` | 敌人实体初始化与注入游戏状态 |
-
 ### spawn_spawnBullet
 
-> 定位：`grep -n '@section:{}'` 跳转到对应节点
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|
@@ -66,11 +62,15 @@
 
 > **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
 
+
 ## 其他 @section 标记
 
 | 节点标记 | 说明 |
 |----------|------|
 | `@section:spawn_row_config` | 行配置读取：波次参数与难度缩放 |
+| `@section:spawn_enemy_type_select` | 敌人类型选择与词缀分配 |
+| `@section:spawn_position_calc` | 生成位置计算与间距分布 |
+| `@section:spawn_entity_init` | 敌人实体初始化与注入游戏状态 |
 | `@section:bullet_recipe_parse` | 弹药配方解析与属性提取 |
 | `@section:energy_orb_collect_audio` | 能量球收集进度音效（500~750Hz 随进度升调，营造蓄力感） |
 | `@section:levelup_audio` | 能量槽满触发多播升级爆发音（pitch = multicast 等级，越高越尖锐） |

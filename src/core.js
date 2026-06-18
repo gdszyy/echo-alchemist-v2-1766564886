@@ -122,6 +122,9 @@ class Game {
         this.variantLevels = { flying_sword: 1 };
         this.marbleSizeBonus=0;
         this.isVisualEffectActive = false;
+        this._relicCombatCinematicFrames = 0;
+        this._roundStartRelicHookDelayActive = false;
+        this._doomsdayTimerTriggerCount = 0;
         this._continuousLaserFiring = false;  // [照射词条] 持续照射状态标志
         this._continuousLaserState = null;    // [照射词条] 持续照射状态机数据
         this._laserFadeOutFrames = 0;         // [修复] 激光淡出等待帧计数（替代 setTimeout）
@@ -259,12 +262,12 @@ class Game {
         this.runewordKillCount = 0;      // [词条 Hook] 嗜血初锋: 本局击杀累计数，跨回合持久
 
         // ==================== [v2 钉板模块化] 模块系统状态 ====================
-        this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'bouncer', 'funnel'];
+        this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'rune_lattice', 'bouncer', 'funnel'];
         this.unlockedModuleSlots = 12;
         this.currentModuleLayout = [
-            'std_stagger', 'std_stagger', 'std_stagger', 'std_stagger',
-            'std_stagger', 'std_stagger', 'std_stagger', 'std_stagger',
-            'std_stagger', 'std_stagger', 'std_stagger', 'std_stagger',
+            'dense_stagger', 'rune_lattice', 'dense_stagger', 'bouncer',
+            'std_stagger', 'dense_stagger', 'rune_lattice', 'dense_stagger',
+            'bouncer', 'std_stagger', 'dense_stagger', 'rune_lattice',
         ];
         this.pendingFusions = [];
 
@@ -425,6 +428,7 @@ class Game {
             this.postBossSurgeRoundsLeft = 3;
             // [Task C.2] 战后高压期：3 回合内双词缀精英概率临时提升 25%
             this.postBossRoundsLeft = 3;
+            showToast('⚠️ Boss 余波：接下来 3 回合敌军进入高压反扑');
             console.log('[DifficultyBalance] Boss击杀，战后高压因子激活: x1.3，持续3回合，双词缀精英概率提升25%');
             // [本局统计] 记录 Boss 击败日志
             if (!this.bossDefeatedLog) this.bossDefeatedLog = [];
