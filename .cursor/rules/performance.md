@@ -240,6 +240,7 @@ if avgFps > fpsThresholdUp (55):
 | 2026-04-16 | 初始实现：FPS 采样器、三档等级预算、粒子/特效/Peg/敌人全面接入、FPS 指示层 |
 | 2026-04-16 | 新增 `sparkLimit`（high:100/medium:50/low:20）和 `smokeLimit`（high:60/medium:25/low:8）两个预算字段；在 `spawn_createParticle` 和 `spawn_pushParticleWithLimit` 中同步接入 spark/smoke 上限检查，防止能量泄漏、机械类受击等高频 spark 场景占用全局粒子预算 |
 | 2026-04-16 | **Arc Boss VFX 性能门控（Task T3 补丁）**：在三档预算表中新增 4 个字段：`arcBossVfxTriCount`（Ouroboros 狂暴三角形数量，high:6/medium:3/low:0）、`arcBossVfxLineCount`（Devourer 引力线数量，high:6/medium:6/low:3）、`arcBossVfxWhiteGrad`（Devourer 深渊核心 lighter 白化叠加开关，high/medium:true/low:false）、`arcBossVfxSuckProb`（Devourer 吸入粒子生成概率，high:0.7/medium:0.5/low:0.3）。在 `enemy.js` Devourer/Ouroboros Layer 6.5 中通过 `game.perfQualityLevel` 动态读取对应字段实施门控。同步更新消费端关联索引（第 5.6 节）。 |
+| 2026-06-18 | **主循环省电控制**：新增 (1) 静态阶段降帧节流——非 combat/training/gathering 的菜单阶段及暂停态按 `CONFIG.performance.idleFrameInterval`(66ms≈15fps) 节流渲染，活跃阶段仍满帧；FPS 采样器仅在活跃阶段运行，避免菜单降帧误触发降级。(2) `visibilitychange` 后台硬停——页面隐藏时 `cancelAnimationFrame` 中断 rAF 链并 `audio.suspend()` 挂起音频上下文，恢复时重启循环并 `audio.resume()`。涉及 `game_system.js`(sys_loop/sys_setupVisibilityHandling)、`core.js`(状态初始化+注册)、`audio.js`(新增 suspend())、`config.js`(idleFrameInterval)。详见第 10 节。 |
 | 2026-06-18 | **奖励标记低档平面兜底**：修复 `low` 档 `rewardHaloEnabled:false` 导致携带遗物/精华的敌人无任何视觉标记的玩法可读性回归。在 `enemy.js` Layer 6.8 的 `if (rewardHaloEnabled)` 增加 `else` 分支，绘制纯色双层描边平面版（遗物=金/混沌=紫红/纯净=蓝白），无 shadowBlur/渐变/旋转。新增消费端关联索引第 5.9 节并确立「语义类特效降级而非消失」约定。 |
 | 2026-04-30 | **毒素敌人专属特效**：新增 `venomLimit`（high:60/medium:30/low:0）预算字段；新增 `venom` 粒子模式（上浮液滴 + screen 渐变绘制）；在 `enemy.js` Layer 3.4 新增毒素状态视觉（径向渐变叠加 + 液滴流淌动画，三档门控）；在 `combat_system.js` 命中毒素时发射 1~4 颗毒液粒子。消费端关联索引见第 5.1/5.2/5.8 节。 |
 
@@ -288,3 +289,51 @@ if avgFps > fpsThresholdUp (55):
   - `medium` 档：降级策略说明（如减少粒子数量、关闭某些渐变）
   - `low` 档：极致降级策略说明（如关闭所有发光和混合模式）
 ```
+
+---
+
+## 10. 主循环省电控制（节流与后台暂停）
+
+> **状态**：已实现（2026-06-18）｜**涉及文件**：`src/game_system.js`、`src/core.js`、`src/audio.js`、`src/config.js`
+
+第 4 节的三档质量预算解决的是**卡顿（帧时间尖峰）**；本节解决的是**耗电（持续功耗/发热）**——即使帧率稳定，满帧重绘静止画面仍会持续占用 GPU 发热掉电。
+
+### 10.1 静态阶段降帧节流
+
+`sys_loop` 开头按阶段决定是否满帧：
+
+```
+_activePhase = !isPaused && phase ∈ { combat, training, gathering }
+若 !_activePhase 且 (now - _lastRenderTime) < idleFrameInterval:
+    仅 requestAnimationFrame 续帧，跳过本帧渲染与采样
+```
+
+- **活跃阶段**（战斗/试炼/研磨）：不受限，满帧 rAF，保证手感与动画流畅。
+- **静态阶段**（抉择/商店/图鉴/结算等菜单）及**暂停态**：节流到 `CONFIG.performance.idleFrameInterval`（默认 66ms≈15fps）。
+- **关键**：rAF 链本身仍每帧（~16ms）tick，只是**跳过渲染**；因此阶段切换（如菜单→战斗）在下一物理帧即恢复满帧，无输入延迟。DOM 菜单交互走独立事件，不受 canvas 节流影响。
+- FPS 采样器（升降级判断）**仅在 `_activePhase` 运行**，否则菜单的 15fps 会被误判为卡顿而错误降级特效等级。
+
+### 10.2 后台硬停（visibilitychange）
+
+`sys_setupVisibilityHandling()`（由 `core.js` 构造时注册一次）：
+
+| 事件 | 行为 |
+|------|------|
+| `document.hidden`（切后台/锁屏） | `this._loopStopped = true` + `cancelAnimationFrame(_rafId)` 中断 rAF 链 + `audio.suspend()` 挂起 AudioContext |
+| 恢复可见 | `audio.resume()`；若循环已停则重置采样起点并 `requestAnimationFrame` 重启 |
+
+> 浏览器虽会把隐藏标签页的 rAF 限到 ~1Hz，但音频处理与定时器仍在跑；主动 suspend + 中断 rAF 可彻底归零后台功耗。
+
+### 10.3 相关状态字段（`Game` 实例，`core.js` 初始化）
+
+| 字段 | 含义 |
+|------|------|
+| `_lastRenderTime` | 上一**渲染**帧时间戳（节流判断用，区别于采样用的 `_lastFrameTime`） |
+| `_loopStopped` | 循环是否被后台硬停；`sys_loop` 开头 `if (_loopStopped) return` |
+| `_rafId` | 当前 rAF 句柄，用于 `cancelAnimationFrame` |
+| `_visibilityBound` | 防止重复注册可见性监听 |
+
+### 10.4 修改指南
+
+- **新增动画活跃阶段**时，须将其阶段名加入 `sys_loop` 的 `_activePhase` 判断，否则会被降帧到 15fps。
+- **依赖逐帧计时的菜单逻辑**（如按帧倒计时）在静态阶段会因降帧而变慢（墙钟时间拉长约 4 倍）。此类逻辑应改用 `performance.now()` 墙钟时间差，而非帧计数。
