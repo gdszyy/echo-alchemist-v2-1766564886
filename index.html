@@ -3543,6 +3543,21 @@
 </div><!-- /#app-wrapper -->
 
 
+<script>
+// ==================== Service Worker 注册（位图资源持久缓存） ====================
+// 首次访问后缓存 assets/ 下的位图，跨刷新/跨会话不再重复下载，并支持离线。
+// 调试美术时在 URL 加 ?nosw 可跳过缓存；详见 sw.js 注释。
+(function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    if (new URLSearchParams(location.search).has('nosw')) return;
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch((err) => {
+            console.warn('[SW] 注册失败（不影响游戏运行）:', err && err.message);
+        });
+    });
+})();
+</script>
+
 <script type="module">
 // ==================== 模块化导入 (v2 - EventBus 架构) ====================
 import { Game, audio, eventBus } from './src/core.js';

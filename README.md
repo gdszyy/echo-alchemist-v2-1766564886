@@ -69,3 +69,12 @@
 详细的改造规划和任务拆分，请参阅：
 - [架构改造规划](docs/refactoring_plan.md)
 - [TODO 任务清单](TODO.md)
+
+## 5. 位图资源缓存（Service Worker）
+
+为避免每次刷新 / 重开页面都重新下载 `assets/` 下的位图（约 283MB PNG），项目引入了两层持久缓存：
+
+- **HTTP 缓存头**（[`serve.json`](serve.json)）：`assets/**` 返回 `max-age=31536000, immutable`，HTML/JS/`sw.js` 返回 `no-cache` 以保证代码可及时更新。
+- **Service Worker**（[`sw.js`](sw.js)）：对 `assets/` 资源采用 **cache-first** 运行时缓存（首次访问后落盘，跨刷新/跨会话秒开，断网也可加载），对代码/HTML 采用 **network-first**。
+
+**调试美术时**：若希望绕过缓存看到最新图片，在 URL 后加 `?nosw`（跳过 SW 注册），或在 DevTools → Application → Service Workers 中 Unregister。**替换同名 PNG 后想让所有客户端更新**：bump `sw.js` 中的 `CACHE_VERSION`。
