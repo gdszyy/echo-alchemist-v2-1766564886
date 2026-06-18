@@ -1,0 +1,17 @@
+{
+  "frameSize": 2560,
+  "frameWidth": 2560,
+  "frameHeight": 1440,
+  "placeholder": false,
+  "single": true,
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 1,
+      "fps": 1,
+      "frameWidth": 2560,
+      "frameHeight": 1440
+    }
+  },
+  "_note": "Single-frame externally-generated artwork. To upgrade to a multi-frame sprite sheet, partition the PNG into rows/columns and add hit/move/cast entries with their own frameWidth/frameHeight."
+}

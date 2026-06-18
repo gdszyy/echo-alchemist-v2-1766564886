@@ -21,8 +21,6 @@ import { Particle } from '../effects/particles.js';
 import { sb as _sb } from '../utils/perf.js';
 import { eventBus } from '../event_bus.js';
 import { createSpriteRenderer } from '../render/sprite_renderer.js'; // [Phase 5B Task 5.B3] Sprite 动画渲染器
-import { isSuppressed2DEntities } from '../render3d/draw_mode.js';
-import { drawPromareEnemyBody } from '../render/promare_enemy_draw.js';
 
 // audio 代理由 entities.js 注入，通过模块级变量共享
 // 注意：Enemy 类使用的 audio 对象来自 entities.js 的依赖注入机制
@@ -1363,7 +1361,6 @@ class Enemy {
     // [核心修改] 绘制方法：修复冰冻视觉过大和边缘粗糙问题
     // @section:draw_entry_and_perf_check - 绘制入口与性能等级检查
     draw(ctx) {
-        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         ctx.save(); 
         ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
@@ -1416,19 +1413,10 @@ class Enemy {
         // === E1: 静态倾斜（一次性预计算的 _staticTilt）===
         if (this._staticTilt !== 0) ctx.rotate(this._staticTilt);
         
-        const w = this.width - 4;
-        const h = this.height - 4;
+        const w = this.width - 4; 
+        const h = this.height - 4; 
         // @section:draw_shadow_and_base - 软阴影与敌人基础形体绘制
         const r = 6;
-
-        // [Promare] 几何敌人路径：BLACK 体 + WHITE 边 + 词缀 overlay，
-        // 完全跳过 classic 的 _textureCanvas / 渐变堆叠 / shadowBlur。
-        // @perf-impact: 净省 — 跳过每帧 4-6 个渐变与 shadowBlur 调用。
-        if (CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.useGeometricEnemies) {
-            drawPromareEnemyBody(this, ctx, w, h);
-            ctx.restore();
-            return;
-        }
 
         // === Layer 1: 容器裁剪 ===
         // 根据 collisionShape 选择裁剪路径：polygon 用多边形，arc 用环形，其余用 roundRect

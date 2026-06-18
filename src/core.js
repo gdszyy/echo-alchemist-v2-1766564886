@@ -26,8 +26,6 @@ import { UIManager, TrainingGround, TruthBook } from './systems.js';
 
 // 导入事件总线
 import { eventBus } from './event_bus.js';
-import { spawnPromareBurst, spawnRadialImpact, ensurePromareGlobals } from './render/promare_burst.js';
-import { spawnPromareKillExplosion, spawnPromareOnomatopoeia } from './render/promare_explosion.js';
 
 // 导入 SoundManager 类和音频代理
 import { SoundManager, audio, _setAudioInstance } from './audio.js';
@@ -48,8 +46,6 @@ import { calc_utils } from './calc_utils.js';
 import { tutorial_system } from './tutorial_system.js';
 import { game_over_mixin } from './ui/game_over.js';
 import { preloadAllSprites } from './render/sprite_renderer.js'; // [Phase 5B] 预加载所有 Sprite Sheet
-// [3D-Main M1] 引入 3D 渲染管线（仅背景层）。任何加载/初始化失败都会被静默降级到 2D-only。
-import { Renderer3D } from './render3d/Renderer3D.js';
 
 // ==================== 延迟音频初始化 ====================
 let _audioInitialized = false;
@@ -159,12 +155,7 @@ class Game {
         // [Perf] 粒子分模式计数表 - 替代 this.particles.filter(p=>p.mode==='X').length 的 O(N) 扫描
         // 维护契约：所有 push 必走 spawn_createParticle / spawn_pushParticleWithLimit；
         // 所有删除必走 game_phase.js 的两指针压缩循环（同步 -- 计数）。
-        this.particleCounts = {
-            wind_slash: 0, line: 0, ember: 0, mist: 0, shard: 0, spark: 0, smoke: 0, venom: 0,
-            // [Promare] 新 mode 计数器
-            pyro_cone: 0, cryo_oct: 0, thunder_z: 0, pierce_lance: 0, bounce_hex: 0,
-            scatter_star: 0, damage_diamond: 0, venom_tri: 0, echo_ring: 0, radial_spoke: 0,
-        };
+        this.particleCounts = { wind_slash: 0, line: 0, ember: 0, mist: 0, shard: 0, spark: 0, smoke: 0, venom: 0 };
         // [Perf] 粒子对象池 - 复用 Particle 实例，规避每帧 50-100 次 new 触发的 GC 停顿
         this._particlePool = [];
         this.shockwaves = [];
@@ -256,15 +247,9 @@ class Game {
         this.waveMomentumTimer = 0;
         this.nextRoundHpMultiplier = 1; 
         this.baseTimeScale = 1.0;
-        this.frameDamageAccumulator = 0;
-        this.slowMotionTimer = 0;
-        this.slowMotionThreshold = 100;
-
-        // ==================== [Promare] Hit Feedback 三件套字段 ====================
-        // sys_loop 每帧读取，由 EventBus 监听器（见下文 _registerPromareHitFeedback）写入。
-        // hitstopFrames > 0 时本帧 timeScale=0；flashOverlay 控制全屏白闪。
-        this.hitstopFrames = 0;
-        this.flashOverlay = null;
+        this.frameDamageAccumulator = 0; 
+        this.slowMotionTimer = 0;        
+        this.slowMotionThreshold = 100;  
         this.saveData = { currency: 0, runeFragments: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0 };
         this.runCurrency = 0;
         // ==================== 本局统计字段 ====================
@@ -374,51 +359,6 @@ class Game {
         this._perfManualMode = null;
         // [Phase 5B] 预加载所有 Sprite Sheet（在游戏循环开始前触发异步加载）
         preloadAllSprites();
-
-        // ==================== [3D-Main M1] 初始化 3D 渲染管线 ====================
-        // 设计契约：
-        //   1. 任何初始化失败（Three.js CDN 拉取失败、WebGL 不支持、shader 编译错）→
-        //      this.renderer3d = null，主循环 / resize 调用都用可选链跳过。
-        //   2. 默认开启；可通过 localStorage.echo_3d_disabled = '1' 强制关闭。
-        this.renderer3d = null;
-        try {
-            if (typeof localStorage !== 'undefined' && localStorage.getItem('echo_3d_disabled') === '1') {
-                console.info('[Renderer3D] disabled via localStorage.echo_3d_disabled');
-            } else {
-                const glCanvas = document.getElementById('gl-canvas');
-                if (!glCanvas) {
-                    console.warn('[Renderer3D] #gl-canvas not found, skipping 3D init');
-                } else {
-                    this.renderer3d = new Renderer3D(glCanvas, this.width, this.height, {
-                        eventBus: this.eventBus,
-                    });
-                    this.renderer3d.resize(this.canvas.width, this.canvas.height);
-                    console.info(`[Renderer3D] initialized @ ${this.canvas.width}x${this.canvas.height}`);
-                }
-            }
-        } catch (err) {
-            console.error('[Renderer3D] init failed, falling back to 2D-only:', err);
-            this.renderer3d = null;
-        }
-
-        // ==================== [Promare] Dev Console 切换工具 ====================
-        // 与 3D 视觉并行的另一套 2D 视觉模式。控制台 `window.__promare(true/false)` 切换。
-        // 注意：3D 模式（body.render3d-debug）下 2D entities 整体被擦除，Promare 风格不可见；
-        // 若想看 Promare 效果，需先在设置里关掉"3D 视觉"。
-        if (typeof window !== 'undefined') {
-            const _syncBodyClass = () => {
-                document.body && document.body.classList.toggle('promare-mode', CONFIG.visualMode === 'promare');
-            };
-            _syncBodyClass();
-            window.__promare = (on) => {
-                CONFIG.visualMode = on ? 'promare' : 'classic';
-                _syncBodyClass();
-                console.log('[Promare] visualMode =', CONFIG.visualMode);
-                return CONFIG.visualMode;
-            };
-            ensurePromareGlobals(this);
-        }
-
         // 启动游戏主循环
         this.sys_loop();
     }
@@ -444,48 +384,6 @@ class Game {
                 const hitY = data.hitY || (data.enemy ? data.enemy.pos.y : this.height / 2);
                 this.combat_runeCharge_onHit(hitX, hitY, false);
             }
-
-            // [Promare] Hit Feedback 三件套：停帧 + 白闪 + 抖屏 + 几何 burst
-            // 仅 visualMode==='promare' 启用，classic 模式完全跳过保持原行为。
-            // @perf-impact: 监听器内只设字段 + 调 burst spawner（受 perf 档位限粒子数）。
-            if (CONFIG.visualMode === 'promare') {
-                // [视觉调优] 用户反馈"第一回合那个小破子弹打上去闪的厉害"——
-                // 把命中反馈拆四档：tiny(<10) / normal(<30) / big(<60) / huge / kill。
-                // tiny 完全跳过停帧 + 全屏闪，只给极轻屏抖 + burst；档位越高视觉冲击越大。
-                const isKill = !!data.killed;
-                const amt = (data.amount || 0);
-                let severity;
-                if      (isKill)    severity = 'kill';
-                else if (amt >= 60) severity = 'huge';
-                else if (amt >= 30) severity = 'big';
-                else if (amt >= 10) severity = 'normal';
-                else                severity = 'tiny';
-
-                // hitstop
-                const HITSTOP = { tiny: 0, normal: 0, big: 2, huge: 3, kill: 4 };
-                this.hitstopFrames = HITSTOP[severity];
-
-                // 全屏白闪：tiny 完全跳过，normal 极轻、big 中、huge/kill 重
-                const FLASH = { tiny: 0, normal: 0.10, big: 0.22, huge: 0.40, kill: 0.50 };
-                const flashAlpha = FLASH[severity];
-                if (flashAlpha > 0) {
-                    this.flashOverlay = { color: '#FFFFFF', alpha: flashAlpha, frames: severity === 'tiny' ? 2 : 4 };
-                }
-
-                // 屏抖：取 max，与原 triggerScreenShake 兼容
-                const SHAKE = { tiny: 2, normal: 4, big: 8, huge: 12, kill: 14 };
-                this.triggerScreenShake(SHAKE[severity]);
-
-                // [Promare] 几何碎片爆发：方向锥沿入射反向，元素决定形状
-                const hitX = data.hitX || (data.enemy ? data.enemy.pos.x : this.width / 2);
-                const hitY = data.hitY || (data.enemy ? data.enemy.pos.y : this.height / 2);
-                const elementType = data.type || (data.enemy && data.enemy._lastHitElement) || 'damage';
-                const hitVel = (data.enemy && data.enemy._lastHitVel) || { x: 0, y: -1 };
-                // spawnPromareBurst 只识别 normal/big/kill，把 tiny/huge 映射回去
-                const burstSeverity = severity === 'tiny' ? 'normal' : (severity === 'huge' ? 'big' : severity);
-                spawnPromareBurst(this, hitX, hitY, hitVel, elementType, burstSeverity);
-                spawnRadialImpact(this, hitX, hitY, elementType);
-            }
         });
 
         // 波次推进事件
@@ -502,34 +400,6 @@ class Game {
                 const hitY = data.hitY || (data.enemy ? data.enemy.pos.y : this.height / 2);
                 this.combat_runeCharge_onHit(hitX, hitY, true);
             }
-
-            // [Promare T2.A] 击杀瞬间 — 叙事母题：□（秩序）被 △（Burnish）切开 → 碎成 △（自由）
-            // hitstop / flashOverlay / screenShake 由这里设置；视觉时间线全部由 spawnPromareKillExplosion 编排
-            //（5 帧切线 → 10 帧方块切片 → 15 帧 △ 碎片 → 20 帧金田光斑 → boss 末段 +○ 收束）。
-            // 移除原 spawnPromareBurst + spawnRadialImpact —— 它们的圆 / spoke / 三层 ring 会与时间线打架。
-            if (CONFIG.visualMode === 'promare') {
-                const eKill = data.enemy;
-                const isBoss = !!(eKill && eKill.type === 'boss');
-                // hitstop：boss 6 帧、普通 4 帧
-                this.hitstopFrames = Math.max(this.hitstopFrames || 0, isBoss ? 6 : 4);
-                // 白闪：boss 强度更大
-                this.flashOverlay  = { color: '#FFFFFF', alpha: isBoss ? 0.7 : 0.55, frames: isBoss ? 6 : 5 };
-                this.triggerScreenShake(isBoss ? 24 : 18);
-                if (eKill && eKill.pos) {
-                    const hv = eKill._lastHitVel || { x: 0, y: -1 };
-                    const elemType = (eKill._lastHitElement || data.type || 'damage');
-                    // 击杀时间线（详见 promare_explosion.js + docs/promare_visual_design_v2.md §2.4）
-                    spawnPromareKillExplosion(this, eKill.pos.x, eKill.pos.y, elemType, {
-                        w: eKill.width,
-                        h: eKill.height,
-                        hitVel: hv,
-                        isBoss,
-                    });
-                    // 拟声词视觉化（Boss 64px 大字 / Elite 44 / 普通 28）
-                    spawnPromareOnomatopoeia(this, eKill.pos.x, eKill.pos.y - 8, elemType, eKill.type);
-                }
-            }
-
             // [本局统计] 累计击杀数
             this.runKillCount = (this.runKillCount || 0) + 1;
             // [延迟掉落] 非 Boss 敌人的遗物/精华不再立即结算，而是登记到下一回合开始统一解析。
@@ -606,11 +476,6 @@ class Game {
         if (this._resizeObserver) {
             try { this._resizeObserver.disconnect(); } catch (e) {}
             this._resizeObserver = null;
-        }
-        // [3D-Main M1] 释放 WebGL 资源
-        if (this.renderer3d) {
-            try { this.renderer3d.dispose(); } catch (e) {}
-            this.renderer3d = null;
         }
     }
 }
