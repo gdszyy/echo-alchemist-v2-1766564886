@@ -1,6 +1,6 @@
 # src\pinboard_modules.js 函数索引
 
-> 自动生成于 2026-06-18 | 总行数: 858 | 函数数: 46 | 语言: javascript
+> 自动生成于 2026-06-19 | 总行数: 865 | 函数数: 47 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -16,6 +16,8 @@
 | getModuleIdFromEntry | function | `getModuleIdFromEntry(entry)` |  |
 | getModuleInstance | function | `getModuleInstance(entry)` |  |
 | normalizeModuleEntry | function | `normalizeModuleEntry(entry)` |  |
+| normalizeModuleInventory | function | `normalizeModuleInventory(inventory)` |  |
+| addModuleComponentToInventory | function | `addModuleComponentToInventory(inventory, moduleId)` |  |
 | ensureModuleLayoutInstances | function | `ensureModuleLayoutInstances(layout, totalSlots, defaultSlots = CONFIG.gameplay.moduleDefaultSlots || 3)` |  |
 | getRandomPegTypeFromWeights | function | `getRandomPegTypeFromWeights(weights)` |  |
 | applyWeightedPegTypes | function | `applyWeightedPegTypes(pegs, ctx)` |  |
@@ -54,4 +56,3 @@
 | calcModuleSlotRect | function | `calcModuleSlotRect(slotIdx, canvasWidth, canvasHeight, cfg, span)` |  |
 | getModuleSpan | function | `getModuleSpan(moduleId)` |  |
 | getCoveredSlots | function | `getCoveredSlots(anchorIdx, span, totalCols, totalRows)` |  |
-| listAvailableModules | function | `listAvailableModules(unlockedModuleTypes)` |  |
