@@ -96,6 +96,7 @@ if avgFps > fpsThresholdUp (55):
 | `pegSoftShadow` | `true` | `true` | `false` | Peg 渓圆软阴影开关 |
 | `pegGlowHalo` | `true` | `false` | `false` | Peg 底部径向光晕开关 |
 | `enemyGloss` | `true` | `true` | `false` | 敌人材质光泽渐变开关 |
+| `ballAmbientGlow` | `true` | `true` | `false` | 弹珠 LAYER 0 环境光晕（每球每帧 r*30 大面积径向填充）开关；`low` 关闭降 fill-rate |
 
 **FPS 采样参数**（同在 `CONFIG.performance` 根节点）：
 
@@ -139,6 +140,12 @@ if avgFps > fpsThresholdUp (55):
 | 位置 | 读取字段 | 行为 |
 |------|---------|------|
 | 闪电链 setTimeout 回调（约第 205 行） | `lightningLimit` | 超限时跳过 LightningBolt 创建 |
+
+### 5.3.1 弹珠渲染（`src/entities.js` → `Ball.draw` LAYER 0）
+
+| 位置 | 读取字段 | 行为 |
+|------|---------|------|
+| 环境光晕（LAYER 0 ambient spotlight，`spotR = r*30` 径向填充） | `ballAmbientGlow` | `false`（low 档）时跳过整段大面积径向填充。纯装饰性，球体本体（LAYER 2+）仍完整表达属性，可读性不受影响。 |
 
 ### 5.4 实体渲染（`src/entities.js` → `Peg.draw`）
 
@@ -244,6 +251,7 @@ if avgFps > fpsThresholdUp (55):
 | 2026-04-16 | 初始实现：FPS 采样器、三档等级预算、粒子/特效/Peg/敌人全面接入、FPS 指示层 |
 | 2026-04-16 | 新增 `sparkLimit`（high:100/medium:50/low:20）和 `smokeLimit`（high:60/medium:25/low:8）两个预算字段；在 `spawn_createParticle` 和 `spawn_pushParticleWithLimit` 中同步接入 spark/smoke 上限检查，防止能量泄漏、机械类受击等高频 spark 场景占用全局粒子预算 |
 | 2026-04-16 | **Arc Boss VFX 性能门控（Task T3 补丁）**：在三档预算表中新增 4 个字段：`arcBossVfxTriCount`（Ouroboros 狂暴三角形数量，high:6/medium:3/low:0）、`arcBossVfxLineCount`（Devourer 引力线数量，high:6/medium:6/low:3）、`arcBossVfxWhiteGrad`（Devourer 深渊核心 lighter 白化叠加开关，high/medium:true/low:false）、`arcBossVfxSuckProb`（Devourer 吸入粒子生成概率，high:0.7/medium:0.5/low:0.3）。在 `enemy.js` Devourer/Ouroboros Layer 6.5 中通过 `game.perfQualityLevel` 动态读取对应字段实施门控。同步更新消费端关联索引（第 5.6 节）。 |
+| 2026-06-18 | **弹珠环境光晕 low 档门控（P-003）**：`Ball.draw` LAYER 0 环境光晕此前无 `perfQualityLevel` 门控，每球每帧执行 `r*30` 半径大面积径向填充（移动端 fill-rate 高开销，且在所有档位包括 low 都运行）。该层渐变色标每帧动态（呼吸/频闪/buff 染色）不可缓存，故采用分级门控：新增 `ballAmbientGlow`(true/true/false) 预算字段，`low` 档跳过整段填充。纯装饰性，球体本体属性表达不受影响。 |
 | 2026-06-18 | **收尾：shadowBlur 门控补全**：补全 `enemy.js` 最后 2 处未走 `_sb()` 的 `shadowBlur`（移动冷却指示器、词缀印记），全 `src/` 现已无未门控 shadowBlur（除 `perf.js` 文档注释）。`low` 档 `shadowBlurEnabled:false` 现可彻底关闭所有 GPU 模糊 pass。审计 P-032（激光高频 console.log）经核查已由 `if (CONFIG.debug)` 包裹，生产环境无 I/O 开销，无需额外处理。 |
 | 2026-06-18 | **抗卡顿：特效预算上限 + 纹理缓存**：(1) 新增 `deathExplosionLimit`(14/8/4) 与 `iceWaveLimit`(10/6/3) 预算字段，在 `combat_system.js` `_triggerDeathFX` 的 IceWave/DeathExplosion 创建处接入上限检查（Boss 死亡爆炸不受限），消除清场/范围秒杀时同屏数十个多渐变特效的帧率断崖（修复 P-009~015）。(2) `enemy.js` `_initTexture` 新增模块级 OffscreenCanvas 纹理缓存（按 类型\|尺寸\|seed桶(16)\|gloss 共享只读静态纹理，FIFO 容量 160），消除批量刷怪时密集同步分配的进场卡顿（修复 P-004）。 |
 | 2026-06-18 | **主循环省电控制**：新增 (1) 静态阶段降帧节流——非 combat/training/gathering 的菜单阶段及暂停态按 `CONFIG.performance.idleFrameInterval`(66ms≈15fps) 节流渲染，活跃阶段仍满帧；FPS 采样器仅在活跃阶段运行，避免菜单降帧误触发降级。(2) `visibilitychange` 后台硬停——页面隐藏时 `cancelAnimationFrame` 中断 rAF 链并 `audio.suspend()` 挂起音频上下文，恢复时重启循环并 `audio.resume()`。涉及 `game_system.js`(sys_loop/sys_setupVisibilityHandling)、`core.js`(状态初始化+注册)、`audio.js`(新增 suspend())、`config.js`(idleFrameInterval)。详见第 10 节。 |

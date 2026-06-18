@@ -1199,6 +1199,8 @@ const CONFIG = {
             pegGlowHalo:      true,
             // 敌人材质光泽渐变开关
             enemyGloss:       true,
+            // 弹珠环境光晕（LAYER 0 大面积 ambient 径向填充）开关
+            ballAmbientGlow:  true,
             // Arc Boss VFX 特效密度控制（high: 完整效果）
             arcBossVfxTriCount:  6,   // Ouroboros 狂暴共鸣三角形数量（0=关闭）
             arcBossVfxLineCount: 6,   // Devourer 旋转引力线数量
@@ -1234,6 +1236,7 @@ const CONFIG = {
             pegSoftShadow:    true,
             pegGlowHalo:      false,  // 关闭 Peg 底部光晕（每帧径向渐变）
             enemyGloss:       true,
+            ballAmbientGlow:  true,   // 弹珠环境光晕（均衡模式保留）
             // Arc Boss VFX 特效密度控制（medium: 减半）
             arcBossVfxTriCount:  3,   // 三角形减半，降低 shadowBlur 调用次数
             arcBossVfxLineCount: 6,   // 引力线保持，但 shadowBlur 已随脉冲降低
@@ -1268,6 +1271,7 @@ const CONFIG = {
             pegSoftShadow:    false,  // 关闭 Peg 软阴影
             pegGlowHalo:      false,
             enemyGloss:       false,  // 关闭敌人材质光泽（省去 OffscreenCanvas 渐变叠加）
+            ballAmbientGlow:  false,  // 关闭弹珠环境光晕（省去每球每帧 r*30 大面积径向填充）
             // Arc Boss VFX 特效密度控制（low: 大幅削减）
             arcBossVfxTriCount:  0,   // 关闭三角形符文（6 次 shadowBlur/帧 → 0）
             arcBossVfxLineCount: 3,   // 引力线减半（6 次 createLinearGradient → 3）
