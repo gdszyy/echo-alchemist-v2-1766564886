@@ -51,7 +51,7 @@ globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js", "src/c
   - 结果: 消耗这3个符文，产出1个新符文，等级为这3个符文等级的平均値（向下取整）。新符文 ID 通过 `loot_calcRuneDrop` 获取。
 - **原子性**: 两个操作都必须有严格的预检机制，确保扣除和产出同时成功或失败。
 - **钉盘融合 (`fuseRuneIntoBoard`)**: 模块编辑器里的符文融合会从 `runeInventory` 消耗 1 枚符文，写入 `pendingFusions`，同步更新 `saveData.runeInventory` 并保存；UI 必须立即重建当前钉盘，使融合后的属性钉在开始采集前可见。
-- **融合落点**: `phase_gathering_initPachinko` 应用 `pendingFusions` 时会优先选择 `fusionPriority` 高的普通钉子；`rune_lattice` / `rune_focus_module` 负责提供这种融合承载结构。符文等级会提升注入钉子的 `level`，上限为 3。
+- **融合落点**: `phase_gathering_initPachinko` 应用 `pendingFusions` 时会优先选择 `fusionPriority` 高的普通钉子；`rune_lattice` / `rune_focus_module` 负责提供这种融合承载结构。符文等级会提升注入钉子的 `level`，上限为 3，并且必须写回对应钉盘组件实例的 `pegStates`，不得只修改本次生成出来的临时 `Peg` 对象。
 
 ### 4.1 钉盘融合交互约定
 

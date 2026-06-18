@@ -205,6 +205,7 @@ for (const subsystem of _subsystems) {
 - `#module-editor-layer` 的模块选择浮层必须在渲染阶段预先调用 `_moduleEditor_getModulePlacementStatus(slotIdx, moduleId)`；不合法的模块以禁用态展示，并在卡片描述或 `title` 中说明原因。
 - `_moduleEditor_applyModule()` 必须先完成放置校验，再清空旧模块或写入 `currentModuleLayout`，避免玩家误点一个不可放置的大模块时丢失原模块。
 - 大模块校验需要同时检查：是否越过 4x3 钉盘边界、是否超出已解锁槽位、是否与其他模块锚点或 ref 覆盖格重叠。
+- 模块编辑器写入 `currentModuleLayout` 时必须创建 `{ id, uid, pegStates, pluginStates }` 组件实例；多格占位使用 `{ ref: anchorIdx }`。不得重新写入裸字符串模块 ID，否则符文融合写入的 `pegStates` 会在替换/重建时丢失。
 - `#combat-status-panel` 是战斗态势聚合入口，由 `ui_updateCombatStatusPanel()` 节流刷新；只读 `enemies`、`defeatLineY`、`playerShield`、`ammoQueue` 等现有状态，不得在该函数内改变战斗逻辑。
 - 战斗危险反馈统一使用“稳定 / 压线 / 危险 / 护盾待触发”语义，避免各处新增彼此冲突的临时文案。
 

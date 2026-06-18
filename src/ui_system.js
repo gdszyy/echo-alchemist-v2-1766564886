@@ -2,6 +2,7 @@ import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
 import { CONFIG, RELIC_DB } from './config.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
+import { getAmmoReadabilityProfile } from './utils/ammo_readability.js';
 import {
     MODULE_DEFS,
     listAvailableModules,
@@ -478,20 +479,9 @@ export const ui_system = {
         const playerShield = this.playerShield || 0;
         const ammoCount = (this.ammoQueue || []).length;
         const currentAmmo = ammoCount > 0 ? this.ammoQueue[0] : null;
-        const attrDisplay = CONFIG.ui && CONFIG.ui.attributeDisplay ? CONFIG.ui.attributeDisplay : {};
-        const attrKeys = [
-            'pyro', 'cryo', 'lightning', 'laser', 'pierce', 'bounce', 'scatter',
-            'wind', 'flying_sword', 'resonance', 'multicast', 'venom', 'overcharge', 'echo'
-        ];
-        const mainAttr = currentAmmo
-            ? attrKeys.reduce((best, key) => ((currentAmmo[key] || 0) > (currentAmmo[best] || 0) ? key : best), attrKeys[0])
-            : null;
-        const mainAttrValue = currentAmmo && mainAttr ? (currentAmmo[mainAttr] || 0) : 0;
-        const mainAttrName = mainAttrValue > 0
-            ? (attrDisplay[mainAttr]?.name || attrDisplay[mainAttr]?.label || mainAttr)
-            : '基础';
+        const ammoProfile = currentAmmo ? getAmmoReadabilityProfile(currentAmmo) : null;
         const ammoLabel = currentAmmo
-            ? `${mainAttrName} ${currentAmmo.damage || 0}`
+            ? `${ammoProfile.tierLabel} ${ammoProfile.shapeLabel} · ${ammoProfile.primary.name}${ammoProfile.primary.value || ''} · 装${ammoProfile.loadCount}/管${ammoProfile.barrelCount}`
             : '无待发弹药';
 
         let threatClass = '';

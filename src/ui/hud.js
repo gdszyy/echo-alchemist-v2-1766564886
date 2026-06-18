@@ -20,6 +20,7 @@ import { eventBus, EVENT_TYPES } from '../event_bus.js';
 import { RUNE_DB, RARITY_DISPLAY, STAT_DISPLAY } from '../rune_config.js';
 import { calcRuneBaseStats } from '../rune_system.js';
 import { getAmmoIconSrc } from '../bitmap_icons.js';
+import { getAmmoReadabilityProfile } from '../utils/ammo_readability.js';
 
 /**
  * 构建符文图标 DOM 元素（hud.js 内部辅助函数）
@@ -466,17 +467,31 @@ export const hud_system = {
                 const previewLimit = 4;
                 this.ammoQueue.slice(0, previewLimit).forEach((recipe, idx) => {  // [Mixin 正常用法：读取 Game 实例状态]
                     const isCurrent = (idx === 0);
+                    const profile = getAmmoReadabilityProfile(recipe);
                     const card = document.createElement('div');
-                    card.className = `recipe-card ${isCurrent ? 'current' : 'queue'} mb-1 transition-all duration-300`;
+                    card.className = `recipe-card ${isCurrent ? 'current' : 'queue'} ammo-readout ammo-tier-${profile.tier} mb-1 transition-all duration-300`;
+                    card.style.setProperty('--ammo-accent', profile.primary.color);
+                    card.title = `${profile.summary} · ${profile.attributeSummary}`;
                     
                     // --- 渲染 Header ---
                     const header = document.createElement('div');
-                    header.className = 'flex justify-between items-center border-b border-white/10 pb-1 mb-1';
+                    header.className = 'ammo-readout-header flex justify-between items-center border-b border-white/10 pb-1 mb-1';
                     let nameStr = '普通魔藥';
                     if (recipe.explosive) nameStr = '爆破魔藥';
                     else if (recipe.isLaser) nameStr = '光束魔藥';
                     else if (recipe.isMatryoshka) nameStr = '套娃魔藥';
-                    header.innerHTML = `<span class="font-bold text-amber-400 text-[11px]">${nameStr}</span><span class="text-[10px] text-slate-300 bg-slate-700/50 px-1 rounded">DMG ${recipe.damage || 0}</span>`;
+                    header.innerHTML = `
+                        <span class="font-bold text-amber-400 text-[11px]">${nameStr}</span>
+                        <span class="ammo-rating">${profile.tierLabel}</span>
+                    `;
+
+                    const signalRow = document.createElement('div');
+                    signalRow.className = 'ammo-signal-row';
+                    signalRow.innerHTML = `
+                        <span class="ammo-shape">${profile.shapeLabel}</span>
+                        <span class="ammo-meter" title="装填强度">${Array.from({ length: 6 }, (_, i) => `<i class="${i < profile.loadCount ? 'is-lit' : ''}"></i>`).join('')}</span>
+                        <span class="ammo-barrels" title="炮管数量">${Array.from({ length: profile.barrelCount }, () => '<i></i>').join('')}</span>
+                    `;
                     
                     // --- 渲染 Grid ---
                     const grid = document.createElement('div');
@@ -511,6 +526,7 @@ export const hud_system = {
                     if (!hasStats) grid.innerHTML = '<span class="col-span-4 text-slate-500 italic text-center">基础属性</span>';
 
                     card.appendChild(header); // 挂载标题
+                    card.appendChild(signalRow);
                     card.appendChild(grid);   // 必须添加这一行，否则图标不显示！
                     if (isCurrent) {
                         const indicator = document.createElement('div');
@@ -709,10 +725,11 @@ export const hud_system = {
         // 1. 渲染当前弹药 (Queue[0])
         if (this.ammoQueue.length > 0) {  // [Mixin 正常用法：读取 Game 实例状态]
             const currentRecipe = this.ammoQueue[0];  // [Mixin 正常用法：读取 Game 实例状态]
+            const currentProfile = getAmmoReadabilityProfile(currentRecipe);
             this.ui_renderAmmoIcon(currentContainer, currentRecipe, true);
             
             // 更新底部属性文本
-            let html = '';
+            let html = `<span class="text-amber-300 font-bold">${currentProfile.tierLabel}</span><span class="text-slate-400">${currentProfile.shapeLabel}</span><span style="color:${currentProfile.primary.color}">${currentProfile.attributeSummary}</span><span class="text-cyan-200">装${currentProfile.loadCount}</span><span class="text-orange-200">管${currentProfile.barrelCount}</span>`;
             if (currentRecipe.damage > 2) html += `<span class="text-purple-300">⚔️${currentRecipe.damage}</span>`;
             else html += `<span class="text-slate-400">⚔️${currentRecipe.damage}</span>`;
 
@@ -733,8 +750,10 @@ export const hud_system = {
         if (this.ammoQueue.length > 1) {  // [Mixin 正常用法：读取 Game 实例状态]
             const nextRecipe = this.ammoQueue[1];  // [Mixin 正常用法：读取 Game 实例状态]
             this.ui_renderAmmoIcon(nextContainer, nextRecipe, false);
+            nextContainer.title = getAmmoReadabilityProfile(nextRecipe).summary;
         } else {
             nextContainer.innerHTML = '<span class="text-slate-700 text-xs">--</span>';
+            nextContainer.removeAttribute('title');
         }
     },
 
@@ -745,6 +764,8 @@ export const hud_system = {
     ui_renderAmmoIcon(container, recipe, isCurrent) {
         const size = isCurrent ? 24 : 16;
         const div = document.createElement('div');
+        const profile = getAmmoReadabilityProfile(recipe);
+        container.title = profile.summary;
 
         // [Phase 5A Task 5.A5] 位图法球图标
         const iconSrc = getAmmoIconSrc(recipe);
@@ -758,6 +779,7 @@ export const hud_system = {
             div.style.backgroundRepeat = 'no-repeat';
             div.style.backgroundPosition = 'center';
             div.style.position = 'relative';
+            div.style.filter = `${div.style.filter || ''} drop-shadow(0 0 ${Math.round(2 + profile.powerRatio * 5)}px ${profile.primary.color})`.trim();
             // 激光特效：保留发光 filter
             if (recipe.isLaser) {
                 const glowSize = 10 + (recipe.laser || 0) * 2;
@@ -796,7 +818,7 @@ export const hud_system = {
         // multicast 角标（位图/fallback 均保留）
         if (recipe.multicast) {
             const badge = document.createElement('div');
-            badge.innerText = `+${recipe.multicast}`;
+            badge.innerText = `管${profile.barrelCount}`;
             badge.className = 'absolute -top-2 -right-2 text-[10px] bg-orange-500 text-white rounded-full px-1 font-bold leading-tight';
             container.appendChild(badge);
         }

@@ -4,7 +4,7 @@
  * 钉板由 4×3 = 12 个模块槽组成。每个模块在自己的矩形区域内独立生成
  * 一组实体（普通钉子、特殊钉子、固定特殊槽等）。
  *
- * 主入口：buildModuleEntities(moduleId, originX, originY, w, h, ctx, slotIdx)
+ * 主入口：buildModuleEntities(moduleEntry, originX, originY, w, h, ctx, slotIdx)
  *   返回 { pegs: Peg[], specialSlots: SpecialSlot[] }
  *
  * 设计约束：
