@@ -12,6 +12,17 @@ Current combat relic presentations:
 
 New combat relic animations must read `CONFIG.performance.relicCinematicDelayMs`, `relicCinematicSparkCount`, and `relicCinematicBoltCount`, while still respecting the existing effect limits (`shockwaveLimit`, `waveLimit`, `lightningLimit`, and particle limits).
 
+## 0.1 Hit Feedback Labels (2026-06-18)
+
+`combat_getHitFeedbackLabel()` is a visual-only helper used by `combat_damageEnemy()` after `Enemy.takeDamage()` returns. It adds a short floating label near the normal damage number for high-signal outcomes:
+
+- Defense outcomes: `屏障` when a deflection ward absorbs damage, `护盾` when shield charges are actually spent.
+- Damage outcomes: `暴击` for focused-fire crits.
+- Counter outcomes: `克制` / `有效` by reading `COUNTER_MAP` from `src/rune_config.js`; this is explanatory only and does not change damage math or rune drop weights.
+- Projectile outcomes: fallback labels for `弹射` and `穿透` when no higher-priority label applies.
+
+The helper must remain side-effect free. It may inspect enemy tags, archetype aliases, projectile config, and the post-hit `damageResult`, but damage formulas stay in the existing damage sections.
+
 本文档定义了 `src/combat_system.js` 拆分后的战斗系统模块结构及职责边界。
 
 ## 1. 模块拆分与职责
@@ -158,11 +169,12 @@ P(折射) = baseChance × laserRefractionDepthDecay ^ depth
 为 `combat_lightning_triggerChain` 函数新增 `isExtraChain` 参数（默认值 `false`）：
 
 ```javascript
-combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = null, chainChanceBonus = 0, isExtraChain = false)
+combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = null, chainChanceBonus = 0, isExtraChain = false, chainGuaranteeState = null)
 ```
 
 - 主链调用（递归）：`isExtraChain = false`（默认），正常触发 thunder_scatter。
 - 额外链调用：传入 `isExtraChain = true`，跳过 thunder_scatter 触发逻辑。
+- 雷暴线圈等遗物可通过 `chainGuaranteeState._guaranteedLightningChains` 传入保底次数；每次闪电链概率判定成功消耗 1 次保底，使前 N 次弹射概率视为 100%，但不增加 `lightning` 层数。
 
 ### 6.3 关键约束
 

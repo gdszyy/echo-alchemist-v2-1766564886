@@ -112,6 +112,7 @@
 | **Layer 4** | 裂纹绘制（过热岩浆裂纹 / 过冷冰晶裂纹 / **战损裂纹**） | 状态反馈；**Task A 增强**：血量 < 30% 时显示深灰色战损裂纹，强度随血量线性变化 |
 | **D1/D2** | 呼吸缩放（Breathing Scale）+ 待机微浮动（Idle Float） | **Task D 新增**，仅在 `actionPhase === 'idle'` 且无受击/预警时生效；D1 使用 `ctx.scale` 实现 ±1.8% 呼吸缩放（周期 3200ms）；**T1 升级**：使用 `Math.pow((sin+1)*0.5, breatheEasingPower)` 非线性缓动曲线，增强极大値停留感（默认 `breatheEasingPower=1.5`）；D2 使用 `ctx.translate` 实现 ±1.5px 垂直浮动（周期 2600ms）；均使用 `this.visualSeed` 作为相位偏移，确保同屏多敌人节奏各异；位于 draw() 的 `ctx.translate` 之后、A3 Squash & Stretch 之前 |
 | **Layer 5** | 内部边框（普通 / elite / boss） | 包含预警闪烁 |
+| **Layer 5.1** | 足迹描边、威胁角标与状态短标签 | **2026-06-18 新增**：`_drawFootprintCue()` 对大体型/特殊碰撞形状/Boss 绘制廉价足迹描边与占格分隔线；`_drawThreatTierBadge()` 在左上角显示 Boss/精英/大型基底短标签；`_drawStatusBadges()` 将护盾、偏折屏障、狂暴、毒素、温度聚合为最多 3 个短标签。仅使用 stroke/fillText，无渐变、无 shadowBlur、无混合模式、无粒子。 |
 | **D3** | 边框脉冲光晕（Border Pulse Glow） | **Task D 新增**，仅在 `actionPhase === 'idle'` 时生效；使用 `ctx.shadowBlur` 实现缓慢脉冲光晕（周期 2800ms）；颜色与敌人类型对应：normal：冷灰蓝 `#94a3b8`，elite：金色 `#facc15`，boss：红色 `#ef4444`；位于 Layer 5 边框绘制之后、`shadowBlur` 重置之前；**T1 升级**：同样使用 `Math.pow` 非线性缓动曲线；elite 光晕强度乘以 `borderPulseEliteMultiplier=1.8`，boss 光晕强度乘以 `borderPulseBossMultiplier=2.5` 且周期缩短至 75%；在峰値时额外叠加 `lighter` 模式高光描边（`borderPulseOverglowAlpha=0.25`），模拟 brightness 过曝效果 |
 | **Layer 5.5** | 插在身上的子剑（Stuck Swords） | 包含母剑剑穗 |
 | **Layer 6** | 外部特效（过热炙热光圈 / 过冷冰封外壳）—— **已适配 polygon/arc/AABB 三种形状** | 状态反馈 |

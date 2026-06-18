@@ -10,7 +10,7 @@ import {
 } from './entities.js';
 import { loot_calcRuneDrop } from './loot_system.js';
 import { calcRuneBaseStats } from './rune_system.js';
-import { RUNE_DB } from './rune_config.js';
+import { COUNTER_MAP, RUNE_DB } from './rune_config.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
@@ -1511,6 +1511,81 @@ export const combat_system = {
     // [已迁移至 src/combat/collision.js] combat_tryMoveEnemy
     // 敌人移动碰撞检测 (AABB + 边界) —— 通过文件底部的 Object.assign(combat_system, CollisionSystem) 注入
 
+    combat_getHitFeedbackLabel(enemy, config = {}, projectile = null, damageResult = null, context = {}) {
+        if (!enemy || !config || !damageResult) return null;
+
+        if (context.wardSpent || damageResult.deflected) {
+            return { text: '屏障', color: '#67e8f9', size: 14 };
+        }
+        if (context.shieldSpent && damageResult.actualDamage > 0) {
+            return { text: '护盾', color: '#93c5fd', size: 14 };
+        }
+        if (context.isCrit) {
+            return { text: '暴击', color: '#ff4444', size: 16 };
+        }
+
+        const affixTags = new Set(Array.isArray(enemy.affixes) ? enemy.affixes : []);
+        const aliasMap = {
+            deflectionWard: ['shield'],
+            heavyArmor: ['shield'],
+            bastion: ['shield'],
+            hive: ['clone'],
+            echoRelay: ['healer', 'clone'],
+            maw: ['devour'],
+            devourer: ['devour'],
+            splitter: ['clone']
+        };
+        const rawTags = [
+            enemy.archetype,
+            enemy.baseShape,
+            enemy.assetKey,
+            enemy.bossType,
+            enemy.v2Affix
+        ];
+        for (const tag of rawTags) {
+            if (!tag) continue;
+            affixTags.add(tag);
+            const aliases = aliasMap[tag];
+            if (aliases) aliases.forEach(alias => affixTags.add(alias));
+        }
+        for (const tag of [...affixTags]) {
+            const aliases = aliasMap[tag];
+            if (aliases) aliases.forEach(alias => affixTags.add(alias));
+        }
+
+        const attrs = [];
+        const addAttr = (attr, value = 0) => {
+            if (!COUNTER_MAP[attr]) return;
+            const strength = Number(value) || 0;
+            if (strength <= 0) return;
+            attrs.push({ attr, strength });
+        };
+        addAttr('pyro', config.pyro);
+        addAttr('cryo', config.cryo);
+        addAttr('lightning', config.lightning);
+        addAttr('venom', config.venom);
+        addAttr('overcharge', config.overcharge);
+        addAttr('echo', config.echo);
+        addAttr('scatter', (config.scatter || 0) + (config.isScatterChild ? 1 : 0));
+        addAttr('laser', (config.laser || 0) + (config.isLaser || config.type === 'laser' ? 1 : 0));
+        addAttr('bounce', context.isBounceHit ? Math.max(1, config.bounce || 0) : 0);
+        addAttr('pierce', context.isPierceHit ? Math.max(1, config.pierce || 0) : 0);
+        attrs.sort((a, b) => b.strength - a.strength);
+
+        let bestWeight = 0;
+        for (const { attr } of attrs) {
+            const counter = COUNTER_MAP[attr];
+            for (const tag of affixTags) {
+                bestWeight = Math.max(bestWeight, counter[tag] || 0);
+            }
+        }
+        if (bestWeight >= 0.8) return { text: '克制', color: '#22c55e', size: 15 };
+        if (bestWeight >= 0.4) return { text: '有效', color: '#a3e635', size: 14 };
+        if (context.isBounceHit) return { text: '弹射', color: '#fbbf24', size: 13 };
+        if (context.isPierceHit) return { text: '穿透', color: '#fca5a5', size: 13 };
+        return null;
+    },
+
     // @section:damage_pre_calc - 伤害前置计算：基础值、暴击、穿透
     combat_damageEnemy(enemy, projectile, damageOverride = null) {
         if (!enemy || !enemy.active) return; 
@@ -1642,13 +1717,14 @@ export const combat_system = {
             // 标记本回合被火属性命中（供元素聚变使用）
             enemy._pyroHitThisRound = true;
         }
-        if (config.lightning > 0) {
+        const guaranteedLightningChains = Math.max(0, Math.floor(config._guaranteedLightningChains || 0));
+        if (config.lightning > 0 || guaranteedLightningChains > 0) {
             // --- [属性共鸣] 雷霖共鸣：读取共鸣参数，增强闪电链触发概率和伤害倍率 ---
             const lightningResonance = this.activeElementResonances && this.activeElementResonances['lightning'];
             const lightningResParams = lightningResonance ? lightningResonance.params : null;
             // 共鸣提供的基础闪电属性加成（叠加到实际 lightning 层数上）
             const lightningBonus = lightningResParams ? (lightningResParams.baseLightningBonus || 0) : 0;
-            const effectiveLightning = config.lightning + lightningBonus;
+            const effectiveLightning = Math.max(guaranteedLightningChains > 0 ? 1 : 0, (config.lightning || 0) + lightningBonus);
             // 共鸣闪电链触发概率加成：0.15/0.30/0.50
             const chainChanceBonus = lightningResParams ? (lightningResParams.chainChanceBonus || 0) : 0;
             // 共鸣整体闪电伤害倍率：1.0/1.2/1.5
@@ -1659,14 +1735,14 @@ export const combat_system = {
             const lightningDmgWithMult = dmg * lightningResMult;
             // 1. 尝试触发闪电链，并获取结果
             // [修改] 传入当前闪电等级 (effectiveLightning)，传入共鸣加成的概率加成
-            const isChainTriggered = this.combat_lightning_triggerChain(enemy, lightningDmgWithMult, projectile.chainHistory, effectiveLightning, shotId, chainChanceBonus);
+            const isChainTriggered = this.combat_lightning_triggerChain(enemy, lightningDmgWithMult, projectile.chainHistory, effectiveLightning, shotId, chainChanceBonus, false, config);
             // 2. 只有在成功触发闪电链时，才提升当前敌人的温度 (公式：闪电层数 + 连锁次数/3)
             if (isChainTriggered) {
                 const chainCount = projectile.chainHistory.length;
                 enemy.applyTemp(effectiveLightning + chainCount / 3);
                 // 三阶共鸣：闪电链可对同一目标二次触发
                 if (allowDoubleChain && Math.random() < 0.5) {
-                    this.combat_lightning_triggerChain(enemy, lightningDmgWithMult, [...projectile.chainHistory], effectiveLightning, shotId, chainChanceBonus);
+                    this.combat_lightning_triggerChain(enemy, lightningDmgWithMult, [...projectile.chainHistory], effectiveLightning, shotId, chainChanceBonus, false, config);
                 }
             }
             // 标记本回合被闪电命中（供元素聚变使用）
@@ -1767,6 +1843,8 @@ export const combat_system = {
             }
         }
         // [修改] 调用 takeDamage 时传入 projectile 作为源，用于方向判定
+        const shieldChargesBefore = enemy.shieldCharges || 0;
+        const wardBarrierBefore = enemy.wardBarrier || 0;
         const damageResult = enemy.takeDamage(dmg, projectile);
         
         // [词条 Hook] 元素聚变（elemental_fusion）
@@ -1801,6 +1879,14 @@ export const combat_system = {
             'wind': '#34d399', 'flying_sword': '#0ea5e9', 'scatter': '#facc15'
         };
         const damageColor = colorMap[damageType] || '#ffffff';
+        const hitFeedback = this.combat_getHitFeedbackLabel(enemy, config, projectile, damageResult, {
+            isCrit,
+            isBounceHit,
+            isPierceHit,
+            shieldSpent: shieldChargesBefore > (enemy.shieldCharges || 0),
+            wardSpent: wardBarrierBefore > (enemy.wardBarrier || 0),
+            damageType
+        });
 
         // [词条 Hook] 炎光剑影：子母飞剑或普通子弹穿透命中时，命中点生成剑光 AOE 伤害（非爆炸）
         // [穿甲流星联动] 当穿甲流星激活时，散射子弹（isScatterChild=true）继承了穿透层数，
@@ -2084,6 +2170,10 @@ export const combat_system = {
                 this.spawn_createFloatingText(hitX, hitY - 10, `-${Math.ceil(actualDmg)}`, '#FF3333', 24);
             } else {
                 this.spawn_createFloatingText(hitX, hitY, `-${Math.ceil(actualDmg)}`, damageColor);
+            }
+            if (hitFeedback) {
+                const labelY = hitY - (isCrit ? 36 : 24);
+                this.spawn_createFloatingText(hitX, labelY, hitFeedback.text, hitFeedback.color, hitFeedback.size || 14);
             }
         }
         // --- [符文词条 Hook] 专注射击 (focused_fire) - 暴击视觉特效 ---
@@ -2654,12 +2744,12 @@ export const combat_system = {
         }
 
         // --- [遗物 Hook] 雷暴线圈 (thunder_coil) ---
-        // 将连射火力改造成闪电弹射；转化后清空 multicast，避免后续逻辑重复消费。
+        // 将连射火力改造成闪电链保底次数；不增加 lightning 层数，避免膨胀闪电伤害/温度。
         if (this.ownedRelics && this.ownedRelics.includes('thunder_coil')) {
             const convertedMulticast = finalRecipe.multicast || 0;
             if (convertedMulticast > 0) {
-                finalRecipe.lightning = (finalRecipe.lightning || 0) + convertedMulticast;
                 finalRecipe.multicast = 0;
+                finalRecipe._guaranteedLightningChains = (finalRecipe._guaranteedLightningChains || 0) + convertedMulticast;
                 finalRecipe._thunderCoilConverted = convertedMulticast;
             }
         }

@@ -32,6 +32,60 @@ const PINBOARD_SPACING_BUFFER = CONFIG.physics.pinboardSpacingBuffer || 1;
 // Base passability spacing. Size-up marbles are intentionally a tradeoff, not the density baseline.
 const MIN_PEG_SPACING = 2 * PEG_RADIUS + 2 * MARBLE_RADIUS + PINBOARD_SPACING_BUFFER;
 
+let moduleInstanceSeq = 0;
+
+function createModuleUid(moduleId) {
+    moduleInstanceSeq += 1;
+    return `${moduleId}_${Date.now().toString(36)}_${moduleInstanceSeq.toString(36)}`;
+}
+
+export function createModuleInstance(moduleId, seed = {}) {
+    return {
+        id: moduleId,
+        uid: seed.uid || createModuleUid(moduleId),
+        pegStates: { ...(seed.pegStates || {}) },
+        pluginStates: { ...(seed.pluginStates || {}) },
+    };
+}
+
+export function createModuleRef(anchorIdx) {
+    return { ref: anchorIdx };
+}
+
+export function isModuleRef(entry) {
+    return !!(entry && typeof entry === 'object' && entry.ref !== undefined);
+}
+
+export function getModuleIdFromEntry(entry) {
+    if (typeof entry === 'string') return entry;
+    if (entry && typeof entry === 'object' && entry.id) return entry.id;
+    return null;
+}
+
+export function getModuleInstance(entry) {
+    return entry && typeof entry === 'object' && entry.id ? entry : null;
+}
+
+export function normalizeModuleEntry(entry) {
+    if (!entry) return null;
+    if (isModuleRef(entry)) return entry;
+    if (typeof entry === 'string') return createModuleInstance(entry);
+    if (entry && typeof entry === 'object' && entry.id) {
+        if (!entry.uid) entry.uid = createModuleUid(entry.id);
+        if (!entry.pegStates) entry.pegStates = {};
+        if (!entry.pluginStates) entry.pluginStates = {};
+        return entry;
+    }
+    return null;
+}
+
+export function ensureModuleLayoutInstances(layout, totalSlots, defaultSlots = CONFIG.gameplay.moduleDefaultSlots || 3) {
+    const count = Math.max(0, totalSlots || DEFAULT_MODULE_SEQUENCE.length);
+    const source = Array.isArray(layout) ? layout : createDefaultModuleLayout(count, defaultSlots);
+    const next = Array.from({ length: count }, (_, i) => normalizeModuleEntry(source[i]));
+    return next;
+}
+
 /**
  * 按当前局内属性权重随机生成 peg 类型。
  * white 表示普通钉子权重，返回值使用 Peg 类实际类型 normal。
@@ -649,9 +703,13 @@ const DEFAULT_MODULE_SEQUENCE = [
     'bouncer', 'std_stagger', 'dense_stagger', 'rune_lattice',
 ];
 
-export function createDefaultModuleLayout(totalSlots) {
+export function createDefaultModuleLayout(totalSlots, activeSlots = CONFIG.gameplay.moduleDefaultSlots || 3) {
     const count = Math.max(0, totalSlots || DEFAULT_MODULE_SEQUENCE.length);
-    return Array.from({ length: count }, (_, i) => DEFAULT_MODULE_SEQUENCE[i % DEFAULT_MODULE_SEQUENCE.length]);
+    const activeCount = Math.max(0, Math.min(activeSlots || 0, count));
+    return Array.from({ length: count }, (_, i) => {
+        if (i >= activeCount) return null;
+        return createModuleInstance(DEFAULT_MODULE_SEQUENCE[i % DEFAULT_MODULE_SEQUENCE.length]);
+    });
 }
 
 /**
@@ -679,13 +737,57 @@ export function selectFusionTargetPegs(pegs, fusion, canvasWidth, canvasHeight, 
     return ranked.slice(0, targetCount).map(item => item.peg);
 }
 
-export function buildModuleEntities(moduleId, originX, originY, width, height, ctx, slotIdx) {
+function applyModulePegStates(pegs, ctx, moduleInstance) {
+    const states = moduleInstance ? (moduleInstance.pegStates || (moduleInstance.pegStates = {})) : null;
+    for (let i = 0; i < (pegs || []).length; i++) {
+        const peg = pegs[i];
+        if (!peg) continue;
+        peg.modulePegIdx = i;
+        const key = String(i);
+        const saved = states ? states[key] : null;
+        if (saved && peg.type === 'normal') {
+            peg.type = saved.type || peg.type;
+            peg.level = saved.level || peg.level || 1;
+            if (saved.infusedRuneId) peg.infusedRuneId = saved.infusedRuneId;
+            if (saved.fusionSourceLevel) peg.fusionSourceLevel = saved.fusionSourceLevel;
+            continue;
+        }
+        if (peg.type === 'normal') {
+            peg.type = getRandomPegTypeFromWeights(ctx && ctx.unlockedWeights);
+            peg.level = peg.level || 1;
+            if (states) {
+                states[key] = {
+                    type: peg.type,
+                    level: peg.level,
+                    source: 'generated',
+                };
+            }
+        } else {
+            peg.level = peg.level || 1;
+        }
+    }
+    return pegs;
+}
+
+export function setModulePegState(moduleEntry, peg, state) {
+    const instance = getModuleInstance(moduleEntry);
+    if (!instance || !peg || peg.modulePegIdx === undefined) return false;
+    if (!instance.pegStates) instance.pegStates = {};
+    instance.pegStates[String(peg.modulePegIdx)] = {
+        ...(instance.pegStates[String(peg.modulePegIdx)] || {}),
+        ...state,
+    };
+    return true;
+}
+
+export function buildModuleEntities(moduleEntry, originX, originY, width, height, ctx, slotIdx) {
+    const moduleId = getModuleIdFromEntry(moduleEntry);
     const def = MODULE_DEFS[moduleId];
     if (!def) {
         return { pegs: [], specialSlots: [] };
     }
     const result = def.build(originX, originY, width, height, ctx, slotIdx);
-    applyWeightedPegTypes(result.pegs, ctx);
+    applyModulePegStates(result.pegs, ctx, getModuleInstance(moduleEntry));
     return result;
 }
 

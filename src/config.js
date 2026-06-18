@@ -1561,12 +1561,12 @@ const RELIC_DB = [
         id: 'thunder_coil',
         name: '雷暴线圈',
         icon: '⚡',
-        desc: '战斗阶段：发射时将子弹的连射层数转化为闪电层数，然后清空连射。',
+        desc: '战斗阶段：发射时将子弹的连射层数转化为闪电链保底次数；前 X 次闪电弹射概率变为 100%，然后清空连射。',
         rarity: 'epic',
         effect: 'thunder_coil',
         maxStacks: 1,
         tags: ['连射转化', '闪电构筑'],
-        recommendTip: '把多发火力改造成闪电弹射，适合连射堆叠后的路线转换。'
+        recommendTip: '把多发火力改造成稳定的闪电弹射次数，不直接提高闪电层数。'
     },
     {
         id: 'ember_fuse',

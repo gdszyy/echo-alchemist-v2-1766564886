@@ -1,6 +1,6 @@
 # src\ui_system.js 函数索引
 
-> 自动生成于 2026-06-18 | 总行数: 1999 | 函数数: 53 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 2105 | 函数数: 54 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -19,6 +19,7 @@
 | ui_updateMetaCurrency | method | `ui_updateMetaCurrency()` |  |
 | ui_updateRuneCountDisplay | method | `ui_updateRuneCountDisplay()` |  |
 | ui_updateShieldPill | method | `ui_updateShieldPill()` |  |
+| ui_updateCombatStatusPanel | method | `ui_updateCombatStatusPanel(force = false)` |  |
 | ui_getSelectionRequirement | method | `ui_getSelectionRequirement()` |  |
 | ui_isSelectionConfirmReady | method | `ui_isSelectionConfirmReady()` |  |
 | ui_getPureEssenceRuneOptions | method | `ui_getPureEssenceRuneOptions(marbleDef)` |  |

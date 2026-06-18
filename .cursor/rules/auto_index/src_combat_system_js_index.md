@@ -1,6 +1,6 @@
 # src\combat_system.js 函数索引
 
-> 自动生成于 2026-06-18 | 总行数: 3830 | 函数数: 44 | 语言: javascript
+> 自动生成于 2026-06-18 | 总行数: 3920 | 函数数: 46 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 5 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -36,6 +36,8 @@
 | combat_wind_drawStormCores | method | `combat_wind_drawStormCores(ctx)` |  |
 | combat_wind_mergeStormCores | method | `combat_wind_mergeStormCores()` |  |
 | combat_wind_decayStormCoresEnergy | method | `combat_wind_decayStormCoresEnergy()` |  |
+| combat_getHitFeedbackLabel | method | `combat_getHitFeedbackLabel(enemy, config = {}, projectile = null, damageResult = null, context = {})` |  |
+| addAttr | function | `addAttr(attr, value = 0)` |  |
 | combat_damageEnemy | method | `combat_damageEnemy(enemy, projectile, damageOverride = null)` | ⚠️ 巨型函数，见 @section 导航 |
 | combat_fireNextShot | method | `combat_fireNextShot(vel)` | ⚠️ 巨型函数，见 @section 导航 |
 | combat_laser_fire | method | `combat_laser_fire(startX, startY, vel, recipe, shotId = null, isTickFire = false)` | ⚠️ 巨型函数，见 @section 导航 |

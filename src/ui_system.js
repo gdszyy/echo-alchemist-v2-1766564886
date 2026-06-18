@@ -2,7 +2,20 @@ import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
 import { CONFIG, RELIC_DB } from './config.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
-import { MODULE_DEFS, listAvailableModules, getModuleSpan, getCoveredSlots, calcModuleSlotRect, createDefaultModuleLayout, selectFusionTargetPegs } from './pinboard_modules.js';
+import {
+    MODULE_DEFS,
+    listAvailableModules,
+    getModuleSpan,
+    getCoveredSlots,
+    calcModuleSlotRect,
+    createDefaultModuleLayout,
+    createModuleInstance,
+    createModuleRef,
+    ensureModuleLayoutInstances,
+    getModuleIdFromEntry,
+    isModuleRef,
+    selectFusionTargetPegs,
+} from './pinboard_modules.js';
 import { fuseRuneIntoBoard, getRuneId } from './rune_system.js';
 import { showToast } from './utils/math_utils.js';
 
@@ -426,6 +439,111 @@ export const ui_system = {
         pill.title = shield > 0
             ? `守护者结界：剩余 ${shield} 层。敌人越线时消耗 1 层并抵消失败。`
             : '守护者结界：当前没有护盾';
+    },
+
+    ui_updateCombatStatusPanel(force = false) {
+        const panel = document.getElementById('combat-status-panel');
+        if (!panel) return;
+        if (this.phase !== 'combat' && this.phase !== 'training') {
+            panel.classList.add('is-hidden');
+            this._combatStatusSignature = '';
+            return;
+        }
+
+        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        if (!force && this._combatStatusUpdatedAt && now - this._combatStatusUpdatedAt < 180) return;
+        this._combatStatusUpdatedAt = now;
+
+        const activeEnemies = (this.enemies || []).filter(e => e && e.active && !e.isDead && e.hp > 0);
+        let eliteCount = 0;
+        let bossCount = 0;
+        let shieldedCount = 0;
+        let minRowsToLine = Infinity;
+        let nearestLabel = '无敌人';
+        const defeatY = this.defeatLineY || this.height || 0;
+        const rowH = Math.max(1, this.enemyHeight || 48);
+
+        activeEnemies.forEach(enemy => {
+            if (enemy.type === 'elite') eliteCount++;
+            if (enemy.type === 'boss') bossCount++;
+            if ((enemy.shieldCharges || 0) > 0 || (enemy.affixes || []).includes('shield')) shieldedCount++;
+            const bottomY = (enemy.pos ? enemy.pos.y : 0) + ((enemy.height || rowH) / 2);
+            const rowsToLine = Math.ceil((defeatY - bottomY) / rowH);
+            if (rowsToLine < minRowsToLine) {
+                minRowsToLine = rowsToLine;
+                nearestLabel = enemy.bossName || (enemy.type === 'boss' ? 'Boss' : enemy.type === 'elite' ? '精英' : '敌人');
+            }
+        });
+
+        const playerShield = this.playerShield || 0;
+        const ammoCount = (this.ammoQueue || []).length;
+        const currentAmmo = ammoCount > 0 ? this.ammoQueue[0] : null;
+        const attrDisplay = CONFIG.ui && CONFIG.ui.attributeDisplay ? CONFIG.ui.attributeDisplay : {};
+        const attrKeys = [
+            'pyro', 'cryo', 'lightning', 'laser', 'pierce', 'bounce', 'scatter',
+            'wind', 'flying_sword', 'resonance', 'multicast', 'venom', 'overcharge', 'echo'
+        ];
+        const mainAttr = currentAmmo
+            ? attrKeys.reduce((best, key) => ((currentAmmo[key] || 0) > (currentAmmo[best] || 0) ? key : best), attrKeys[0])
+            : null;
+        const mainAttrValue = currentAmmo && mainAttr ? (currentAmmo[mainAttr] || 0) : 0;
+        const mainAttrName = mainAttrValue > 0
+            ? (attrDisplay[mainAttr]?.name || attrDisplay[mainAttr]?.label || mainAttr)
+            : '基础';
+        const ammoLabel = currentAmmo
+            ? `${mainAttrName} ${currentAmmo.damage || 0}`
+            : '无待发弹药';
+
+        let threatClass = '';
+        let threatLabel = '稳定';
+        let note = activeEnemies.length > 0
+            ? `${nearestLabel} 距离防线 ${Math.max(0, minRowsToLine)} 行 · 下一发 ${ammoLabel}`
+            : `场上已清空 · 下一发 ${ammoLabel}`;
+
+        if (activeEnemies.length === 0) {
+            threatLabel = '清场';
+        } else if (minRowsToLine <= 0) {
+            threatClass = 'is-danger';
+            threatLabel = playerShield > 0 ? '护盾待触发' : '越线危险';
+            note = playerShield > 0
+                ? `${nearestLabel} 已压线，守护者结界可抵消 1 次`
+                : `${nearestLabel} 已越过防线，立即清场或击退`;
+        } else if (minRowsToLine <= 1 || bossCount > 0) {
+            threatClass = 'is-danger';
+            threatLabel = minRowsToLine <= 1 ? '危险' : 'Boss';
+        } else if (minRowsToLine <= 2 || eliteCount >= 2) {
+            threatClass = 'is-watch';
+            threatLabel = '压线';
+        }
+
+        const signature = [
+            threatClass, threatLabel, activeEnemies.length, eliteCount, bossCount,
+            shieldedCount, playerShield, ammoCount, minRowsToLine, ammoLabel, note
+        ].join('|');
+        if (!force && signature === this._combatStatusSignature) return;
+        this._combatStatusSignature = signature;
+
+        const threatPill = document.getElementById('combat-threat-pill');
+        const threatLabelEl = document.getElementById('combat-threat-label');
+        const enemyCountEl = document.getElementById('combat-enemy-count');
+        const eliteCountEl = document.getElementById('combat-elite-count');
+        const bossCountEl = document.getElementById('combat-boss-count');
+        const shieldCountEl = document.getElementById('combat-shield-count');
+        const ammoCountEl = document.getElementById('combat-ammo-count');
+        const noteEl = document.getElementById('combat-status-note');
+
+        panel.classList.remove('is-hidden');
+        if (threatPill) {
+            threatPill.classList.toggle('is-watch', threatClass === 'is-watch');
+            threatPill.classList.toggle('is-danger', threatClass === 'is-danger');
+        }
+        if (threatLabelEl) threatLabelEl.innerText = threatLabel;
+        if (enemyCountEl) enemyCountEl.innerText = String(activeEnemies.length);
+        if (eliteCountEl) eliteCountEl.innerText = String(eliteCount);
+        if (bossCountEl) bossCountEl.innerText = String(bossCount);
+        if (shieldCountEl) shieldCountEl.innerText = String(playerShield);
+        if (ammoCountEl) ammoCountEl.innerText = String(ammoCount);
+        if (noteEl) noteEl.innerText = note;
     },
 
     ui_getSelectionRequirement() {
@@ -1119,6 +1237,7 @@ export const ui_system = {
         this.ui_updateMetaCurrency();
         this.ui_updateRuneCountDisplay();
         this.ui_updateShieldPill();
+        this.ui_updateCombatStatusPanel(true);
         if (this.phase === 'meta') {
             this.meta_updateContinueButton();
         }
@@ -1479,8 +1598,13 @@ export const ui_system = {
 
         // ---- 确保布局 / 解锁字段已初始化 ----
         if (!Array.isArray(this.currentModuleLayout) || this.currentModuleLayout.length !== totalSlots) {
-            this.currentModuleLayout = createDefaultModuleLayout(totalSlots);
+            this.currentModuleLayout = createDefaultModuleLayout(totalSlots, cfg.moduleDefaultSlots || 3);
         }
+        this.currentModuleLayout = ensureModuleLayoutInstances(
+            this.currentModuleLayout,
+            totalSlots,
+            cfg.moduleDefaultSlots || 3
+        );
         if (!Array.isArray(this.unlockedModuleTypes)) {
             this.unlockedModuleTypes = ['std_stagger', 'dense_stagger', 'rune_lattice', 'bouncer', 'funnel'];
         }
@@ -1529,7 +1653,7 @@ export const ui_system = {
         let placed = 0;
         for (let i = 0; i < cap; i++) {
             const e = layout[i];
-            if (typeof e === 'string') placed++;
+            if (e && !isModuleRef(e) && getModuleIdFromEntry(e)) placed++;
         }
         const runeCount = Array.isArray(this.runeInventory) ? this.runeInventory.length : 0;
         const runeBtnHtml = runeCount > 0
@@ -1599,8 +1723,8 @@ export const ui_system = {
         const out = [];
         for (let i = 0; i < cap; i++) {
             const entry = layout[i];
-            if (entry && typeof entry === 'object' && entry.ref !== undefined) continue; // 被多格模块覆盖
-            const moduleId = (typeof entry === 'string') ? entry : null;
+            if (isModuleRef(entry)) continue; // 被多格模块覆盖
+            const moduleId = getModuleIdFromEntry(entry);
             const span = moduleId ? getModuleSpan(moduleId) : { cols: 1, rows: 1 };
             const rect = calcModuleSlotRect(i, w, h, cfg, span);
             out.push({ idx: i, rect, moduleId });
@@ -1633,20 +1757,22 @@ export const ui_system = {
 
         const currentCovered = new Set([slotIdx]);
         const current = layout[slotIdx];
-        if (typeof current === 'string') {
-            const oldCovered = getCoveredSlots(slotIdx, getModuleSpan(current), cols, rows) || [slotIdx];
+        const currentId = getModuleIdFromEntry(current);
+        if (currentId) {
+            const oldCovered = getCoveredSlots(slotIdx, getModuleSpan(currentId), cols, rows) || [slotIdx];
             oldCovered.forEach(ci => currentCovered.add(ci));
         }
 
         for (const ci of covered) {
             if (currentCovered.has(ci)) continue;
             const occ = layout[ci];
-            if (typeof occ === 'string') {
-                const name = (MODULE_DEFS[occ] && MODULE_DEFS[occ].name) || '相邻模块';
+            const occId = getModuleIdFromEntry(occ);
+            if (occId) {
+                const name = (MODULE_DEFS[occId] && MODULE_DEFS[occId].name) || '相邻模块';
                 return { ok: false, reason: `与 ${name} 重叠`, covered, span };
             }
-            if (occ && occ.ref !== undefined && occ.ref !== slotIdx) {
-                const anchorId = layout[occ.ref];
+            if (isModuleRef(occ) && occ.ref !== slotIdx) {
+                const anchorId = getModuleIdFromEntry(layout[occ.ref]);
                 const name = (MODULE_DEFS[anchorId] && MODULE_DEFS[anchorId].name) || '相邻模块';
                 return { ok: false, reason: `与 ${name} 重叠`, covered, span };
             }
@@ -1658,7 +1784,7 @@ export const ui_system = {
     _moduleEditor_openPicker(slotIdx) {
         this._moduleEditor_closePicker();
         const layout = this.currentModuleLayout || [];
-        const curId = (typeof layout[slotIdx] === 'string') ? layout[slotIdx] : null;
+        const curId = getModuleIdFromEntry(layout[slotIdx]);
         const available = listAvailableModules(this.unlockedModuleTypes || []);
 
         const itemsHtml = available.map(id => {
@@ -1720,7 +1846,7 @@ export const ui_system = {
     _moduleEditor_openPicker(slotIdx) {
         this._moduleEditor_closePicker();
         const layout = this.currentModuleLayout || [];
-        const curId = (typeof layout[slotIdx] === 'string') ? layout[slotIdx] : null;
+        const curId = getModuleIdFromEntry(layout[slotIdx]);
         const available = listAvailableModules(this.unlockedModuleTypes || []);
         const escapeHtml = (value) => String(value ?? '')
             .replace(/&/g, '&amp;')

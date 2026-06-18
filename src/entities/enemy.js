@@ -2689,6 +2689,10 @@ class Enemy {
         } else {
             ctx.strokeRect(-w/2, -h/2, w, h);
         }
+
+        this._drawFootprintCue(ctx, w, h, r);
+        this._drawThreatTierBadge(ctx, w, h);
+
         // === D3: 边框脉冲光晕（Border Pulse Glow）===
         // 仅在 idle 状态下生效，为边框叠加一层缓慢脉冲的 shadowBlur 光晕
         // 升级：使用非线性缓动曲线 + elite/boss 差异化强度 + 峰値过曝高光叠加
@@ -2829,6 +2833,8 @@ class Enemy {
             if (this.displayHp > this.hp + 1) ctx.fillStyle = '#fca5a5';
             ctx.fillText(Math.ceil(this.displayHp), 0, -h/2 + 3);
         }
+
+        this._drawStatusBadges(ctx, w, h);
         
         // 受击闪白 - 使用独立的短时计时器，确保只闪一下而非持续白色
         if (this._hitFlashTimer > 0) {
@@ -4761,6 +4767,163 @@ class Enemy {
     }
     getBounds() { return { left: this.pos.x - this.width/2, right: this.pos.x + this.width/2, top: this.pos.y - this.height/2, bottom: this.pos.y + this.height/2 }; }
 
+    _drawFootprintCue(ctx, w, h, r) {
+        const gameRef = (typeof game !== 'undefined') ? game : null;
+        const cellW = Math.max(1, gameRef?.enemyWidth || this.width || w);
+        const cellH = Math.max(1, gameRef?.enemyHeight || this.height || h);
+        const gridCols = Math.max(1, Math.round(this.width / cellW));
+        const gridRows = Math.max(1, Math.round(this.height / cellH));
+        const isLargeFootprint = gridCols > 1 || gridRows > 1 || this.isWideEnemy || this.baseArchetype;
+        const isSpecialShape = this.collisionShape === 'polygon' || (this.type === 'boss' && this.collisionShape === 'arc');
+        if (!isLargeFootprint && !isSpecialShape && this.type !== 'boss') return;
+
+        // @perf-impact: 语义足迹提示仅使用 1-3 次 stroke/敌人，无渐变、shadowBlur、混合模式或粒子。
+        ctx.save();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = this.type === 'boss' ? 0.95 : 0.78;
+        ctx.strokeStyle = this.type === 'boss' ? 'rgba(252, 165, 165, 0.95)'
+            : this.type === 'elite' ? 'rgba(216, 180, 254, 0.88)'
+            : 'rgba(125, 211, 252, 0.82)';
+        ctx.lineWidth = this.type === 'boss' ? 2 : 1.35;
+        ctx.setLineDash(isLargeFootprint ? [5, 4] : [3, 4]);
+
+        const pad = this.type === 'boss' ? 7 : 5;
+        ctx.beginPath();
+        if (this.collisionShape === 'polygon' &&
+            this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
+            const verts = this.collisionData.vertices;
+            ctx.moveTo(verts[0].x, verts[0].y);
+            for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x, verts[i].y);
+            ctx.closePath();
+        } else if (this.type === 'boss' && this.collisionShape === 'arc' && this.collisionData) {
+            const cd = this.collisionData;
+            const outerR = cd.radius + cd.thickness * 0.5 + pad;
+            const innerR = Math.max(0, cd.radius - cd.thickness * 0.5 - pad);
+            ctx.arc(0, 0, outerR, 0, Math.PI * 2, false);
+            if (innerR > 0) {
+                ctx.moveTo(innerR, 0);
+                ctx.arc(0, 0, innerR, 0, Math.PI * 2, true);
+            }
+        } else {
+            ctx.roundRect(-w / 2 - pad, -h / 2 - pad, w + pad * 2, h + pad * 2, r + 4);
+        }
+        ctx.stroke();
+
+        if (isLargeFootprint) {
+            ctx.setLineDash([2, 5]);
+            ctx.globalAlpha *= 0.55;
+            for (let col = 1; col < gridCols; col++) {
+                const x = -w / 2 + (w * col / gridCols);
+                ctx.beginPath();
+                ctx.moveTo(x, -h / 2 - 2);
+                ctx.lineTo(x, h / 2 + 2);
+                ctx.stroke();
+            }
+            for (let row = 1; row < gridRows; row++) {
+                const y = -h / 2 + (h * row / gridRows);
+                ctx.beginPath();
+                ctx.moveTo(-w / 2 - 2, y);
+                ctx.lineTo(w / 2 + 2, y);
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
+    }
+
+    _drawThreatTierBadge(ctx, w, h) {
+        const gameRef = (typeof game !== 'undefined') ? game : null;
+        const cellW = Math.max(1, gameRef?.enemyWidth || this.width || w);
+        const cellH = Math.max(1, gameRef?.enemyHeight || this.height || h);
+        const gridCols = Math.max(1, Math.round(this.width / cellW));
+        const gridRows = Math.max(1, Math.round(this.height / cellH));
+        const archetypeLabels = {
+            bastion: '装甲',
+            maw: '吞噬',
+            deflector: '棱盾',
+            echoSpire: '尖塔',
+            prism: '棱柱',
+            hive: '孵巢',
+            siege: '攻城',
+            gravityWell: '引力'
+        };
+
+        let text = '';
+        let color = '#94a3b8';
+        if (this.type === 'boss') {
+            text = '首领';
+            color = '#fca5a5';
+        } else if (this.type === 'elite') {
+            text = '精英';
+            color = '#d8b4fe';
+        }
+        if (this.baseArchetype && archetypeLabels[this.baseArchetype]) {
+            text = archetypeLabels[this.baseArchetype];
+            color = this.type === 'boss' ? color : '#7dd3fc';
+        } else if (!text && (gridCols > 1 || gridRows > 1)) {
+            text = `${gridCols}×${gridRows}`;
+            color = '#7dd3fc';
+        }
+        if (!text) return;
+
+        // @perf-impact: 威胁等级角标仅 1 个小矩形 + fillText/敌人，无渐变、shadowBlur、混合模式或粒子。
+        ctx.save();
+        ctx.shadowBlur = 0;
+        ctx.font = 'bold 10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const textW = Math.min(46, Math.max(24, ctx.measureText(text).width + 12));
+        const x = -w / 2 + 2;
+        const y = -h / 2 - 19;
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.82)';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = this.type === 'boss' ? 1.4 : 1;
+        ctx.beginPath();
+        ctx.roundRect(x, y, textW, 15, 5);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = color;
+        ctx.fillText(text, x + textW / 2, y + 8);
+        ctx.restore();
+    }
+
+    _drawStatusBadges(ctx, w, h) {
+        const badges = [];
+        if ((this.shieldCharges || 0) > 0) badges.push({ text: `盾${this.shieldCharges}`, color: '#93c5fd' });
+        if ((this.wardBarrier || 0) > 0) {
+            const pct = Math.max(1, Math.round((this.wardBarrier / Math.max(1, this.wardBarrierMax || this.maxHp * 0.1)) * 100));
+            badges.push({ text: `屏${pct}%`, color: '#67e8f9' });
+        }
+        if (this.berserked || (this.affixes || []).includes('berserk')) badges.push({ text: '狂', color: '#f87171' });
+        if ((this.venomStacks || 0) > 0) badges.push({ text: `毒${this.venomStacks}`, color: '#86efac' });
+        if (this.temp >= 24) badges.push({ text: '热', color: '#fdba74' });
+        else if (this.temp <= -24) badges.push({ text: '冻', color: '#67e8f9' });
+        if (badges.length === 0) return;
+
+        // @perf-impact: 状态短标签最多 3 个小矩形 + fillText/敌人，无渐变、shadowBlur、混合模式或粒子。
+        ctx.save();
+        ctx.shadowBlur = 0;
+        ctx.font = 'bold 10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        let x = w / 2 - 2;
+        const y = -h / 2 - 12;
+        badges.slice(0, 3).forEach((badge) => {
+            const textW = Math.min(38, Math.max(18, ctx.measureText(badge.text).width + 9));
+            x -= textW;
+            ctx.fillStyle = 'rgba(2, 6, 23, 0.78)';
+            ctx.strokeStyle = badge.color;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(x, y - 7, textW - 3, 14, 5);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = badge.color;
+            ctx.fillText(badge.text, x + (textW - 3) / 2, y + 0.5);
+            x -= 3;
+        });
+        ctx.restore();
+    }
+
     /**
      * 绘制精英专属装饰（Layer 3.9）——晶化变异设计
      * 通过虚空晶核、晶化切面和流光金边强化精英輨达度
@@ -5409,13 +5572,16 @@ class Enemy {
     _drawArchetypeBody(ctx, w, h) {
         const archetype = this.baseArchetype;
         if (!archetype) return;
+        const perfLevel = (typeof game !== 'undefined' && game.perfQualityLevel) ? game.perfQualityLevel : 'high';
+        const useRichArchetypeFx = perfLevel !== 'low';
         const t = Date.now() / 1000;
         const pulse = (Math.sin(t * 2.1 + this.visualSeed * 6.283) + 1) * 0.5;
         const minSide = Math.min(w, h);
+        // @perf-impact: V2 基底轮廓使用 Canvas 几何图元；low 档禁用 screen 混合和径向渐变，仅保留纯色线面提示。
         ctx.save();
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.globalCompositeOperation = 'screen';
+        ctx.globalCompositeOperation = useRichArchetypeFx ? 'screen' : 'source-over';
 
         switch (archetype) {
             case 'bastion': {
@@ -5440,11 +5606,15 @@ class Enemy {
             }
             case 'maw': {
                 const glow = 0.28 + pulse * 0.18;
-                const mawGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, minSide * 0.48);
-                mawGrad.addColorStop(0, `rgba(15, 23, 42, ${0.65 + pulse * 0.12})`);
-                mawGrad.addColorStop(0.55, `rgba(88, 28, 135, ${glow})`);
-                mawGrad.addColorStop(1, 'rgba(124, 58, 237, 0)');
-                ctx.fillStyle = mawGrad;
+                if (useRichArchetypeFx) {
+                    const mawGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, minSide * 0.48);
+                    mawGrad.addColorStop(0, `rgba(15, 23, 42, ${0.65 + pulse * 0.12})`);
+                    mawGrad.addColorStop(0.55, `rgba(88, 28, 135, ${glow})`);
+                    mawGrad.addColorStop(1, 'rgba(124, 58, 237, 0)');
+                    ctx.fillStyle = mawGrad;
+                } else {
+                    ctx.fillStyle = `rgba(88, 28, 135, ${glow * 0.55})`;
+                }
                 ctx.beginPath(); ctx.ellipse(0, 0, w * 0.23, h * 0.36, 0, 0, Math.PI * 2); ctx.fill();
                 ctx.strokeStyle = `rgba(216, 180, 254, ${0.55 + pulse * 0.25})`;
                 ctx.lineWidth = Math.max(1.5, minSide * 0.025);
@@ -5560,11 +5730,15 @@ class Enemy {
             case 'gravityWell': {
                 const alpha = 0.36 + pulse * 0.18;
                 const r0 = minSide * 0.18;
-                const g = ctx.createRadialGradient(0, 0, 0, 0, 0, minSide * 0.45);
-                g.addColorStop(0, 'rgba(2, 6, 23, 0.85)');
-                g.addColorStop(0.45, `rgba(124, 58, 237, ${alpha})`);
-                g.addColorStop(1, 'rgba(59, 7, 100, 0)');
-                ctx.fillStyle = g;
+                if (useRichArchetypeFx) {
+                    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, minSide * 0.45);
+                    g.addColorStop(0, 'rgba(2, 6, 23, 0.85)');
+                    g.addColorStop(0.45, `rgba(124, 58, 237, ${alpha})`);
+                    g.addColorStop(1, 'rgba(59, 7, 100, 0)');
+                    ctx.fillStyle = g;
+                } else {
+                    ctx.fillStyle = `rgba(76, 29, 149, ${alpha * 0.55})`;
+                }
                 ctx.beginPath(); ctx.arc(0, 0, minSide * 0.45, 0, Math.PI * 2); ctx.fill();
                 ctx.strokeStyle = `rgba(196, 181, 253, ${alpha})`;
                 ctx.lineWidth = Math.max(1.5, minSide * 0.025);

@@ -163,9 +163,10 @@ export const DamageCalc = {
      * @param {number|null} shotId - 子弹ID
      * @param {number} chainChanceBonus - 共鸣概率加成
      * @param {boolean} isExtraChain - 是否为 thunder_scatter 触发的额外链（额外链不再触发 thunder_scatter，防止无限循环）
+     * @param {object|null} chainGuaranteeState - 可选配方状态；_guaranteedLightningChains 会让前 N 次概率判定必定成功
      * @returns {boolean} 是否成功触发了闪电链
      */
-    combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = null, chainChanceBonus = 0, isExtraChain = false) {
+    combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = null, chainChanceBonus = 0, isExtraChain = false, chainGuaranteeState = null) {
         // [修复1] 安全检查
         if (!sourceEnemy || !sourceEnemy.pos) return false;
         // [修复2] 容错处理
@@ -211,8 +212,12 @@ export const DamageCalc = {
         // [属性共鸣] 应用共鸣概率加成
         let p = lightCfg.baseChainChance + chainChanceBonus; // 基础连锁概率 + 共鸣加成
         if (selected.temp < 0) p = Math.min(lightCfg.maxChainChance, p + Math.abs(selected.temp) * lightCfg.tempChainMult);
+        const hasGuaranteedChain = !!(chainGuaranteeState && chainGuaranteeState._guaranteedLightningChains > 0);
 
-        if (Math.random() < p) {
+        if (hasGuaranteedChain || Math.random() < p) {
+            if (hasGuaranteedChain) {
+                chainGuaranteeState._guaranteedLightningChains = Math.max(0, chainGuaranteeState._guaranteedLightningChains - 1);
+            }
             // [优化] 增加基础延迟，放慢连锁节奏，提升视觉快感
             const chainCount = history.length;
             // 基础延迟从 150ms 增加到 250ms，且减速曲线更平缓
@@ -283,7 +288,7 @@ export const DamageCalc = {
                 history.push(selected);
                 // 限制最大连锁次数防止死循环 (增加到 100 次)
                 if (history.length < 100) {
-                    this.combat_lightning_triggerChain(selected, nextDmg, history, level, shotId);
+                    this.combat_lightning_triggerChain(selected, nextDmg, history, level, shotId, 0, false, chainGuaranteeState);
                 }
 
                 // ─────────────────────────────────────────────────────────────
@@ -301,7 +306,7 @@ export const DamageCalc = {
                             // 额外闪电链使用相同的 level，但独立的 history
                             // isExtraChain=true：额外链不会再次触发 thunder_scatter，防止无限循环
                             const extraHistory = [...history];
-                            this.combat_lightning_triggerChain(selected, nextDmg, extraHistory, level, shotId, 0, true);
+                            this.combat_lightning_triggerChain(selected, nextDmg, extraHistory, level, shotId, 0, true, chainGuaranteeState);
                         }
                     }
                 }

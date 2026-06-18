@@ -182,6 +182,10 @@ export const game_system = {
                 break;
         }
 
+        if (typeof this.ui_updateCombatStatusPanel === 'function') {
+            this.ui_updateCombatStatusPanel();
+        }
+
         // 6. 战场掉落物更新与渲染
         // [BUGFIX] fieldLootItems 已移入 phase_combat_update 的 LAYER 2（实体层）内渲染，
         // 原因：此处无阶段限制，会导致宝石在 selection 等非战斗阶段泄漏显示。

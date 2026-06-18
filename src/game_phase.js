@@ -19,7 +19,18 @@ import {
     getLayoutParams,
     getAllLayoutHints,
 } from './plinko_physics.js';
-import { buildModuleEntities, calcModuleSlotRect, createDefaultModuleLayout, MODULE_DEFS, getModuleSpan, selectFusionTargetPegs } from './pinboard_modules.js';
+import {
+    buildModuleEntities,
+    calcModuleSlotRect,
+    createDefaultModuleLayout,
+    ensureModuleLayoutInstances,
+    MODULE_DEFS,
+    getModuleIdFromEntry,
+    getModuleSpan,
+    isModuleRef,
+    selectFusionTargetPegs,
+    setModulePegState,
+} from './pinboard_modules.js';
 
 export const game_phase = {
 /**
@@ -164,8 +175,13 @@ export const game_phase = {
 
         // 确保 currentModuleLayout 存在且正确长度
         if (!Array.isArray(this.currentModuleLayout) || this.currentModuleLayout.length !== totalSlots) {
-            this.currentModuleLayout = createDefaultModuleLayout(totalSlots);
+            this.currentModuleLayout = createDefaultModuleLayout(totalSlots, cfg.moduleDefaultSlots || 3);
         }
+        this.currentModuleLayout = ensureModuleLayoutInstances(
+            this.currentModuleLayout,
+            totalSlots,
+            cfg.moduleDefaultSlots || 3
+        );
 
         const previousPegs = [...(this.pegs || [])];
         this.pegs = [];
@@ -177,13 +193,12 @@ export const game_phase = {
         for (let i = 0; i < slotsToBuild; i++) {
             const entry = this.currentModuleLayout[i];
             // 跳过空槽和被多格模块覆盖的非锚点槽（{ ref: anchorIdx }）
-            if (!entry) continue;
-            if (typeof entry === 'object' && entry.ref !== undefined) continue;
-            const moduleId = (typeof entry === 'string') ? entry : entry.id;
+            if (!entry || isModuleRef(entry)) continue;
+            const moduleId = getModuleIdFromEntry(entry);
             if (!moduleId) continue;
             const span = getModuleSpan(moduleId);
             const rect = calcModuleSlotRect(i, canvasWidth, canvasHeight, cfg, span);
-            const result = buildModuleEntities(moduleId, rect.x, rect.y, rect.w, rect.h, moduleBuildCtx, i);
+            const result = buildModuleEntities(entry, rect.x, rect.y, rect.w, rect.h, moduleBuildCtx, i);
             if (result.pegs && result.pegs.length > 0) {
                 for (const p of result.pegs) {
                     p.moduleSlotIdx = i;
@@ -303,6 +318,13 @@ export const game_phase = {
                     peg.level = Math.min(3, Math.max(peg.level || 1, f.sourceLevel || 1));
                     peg.infusedRuneId = f.runeId || null;
                     peg.fusionSourceLevel = f.sourceLevel || 1;
+                    setModulePegState(this.currentModuleLayout[peg.moduleSlotIdx], peg, {
+                        type: peg.type,
+                        level: peg.level,
+                        source: 'fusion',
+                        infusedRuneId: peg.infusedRuneId,
+                        fusionSourceLevel: peg.fusionSourceLevel,
+                    });
                 }
             }
             this.pendingFusions = [];
