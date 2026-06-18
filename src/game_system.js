@@ -2069,6 +2069,15 @@ export const game_system = {
         const logicPos = pos.sub(offset);
         this.lastMousePos = logicPos;
 
+        // [v2 重构] 钉板编辑模式：点击画布命中可编辑区域则弹出更换模块浮层，
+        // 不触发弹珠发射 / 倾斜。
+        if (this._moduleEditorActive) {
+            if (typeof this._moduleEditor_handleClick === 'function') {
+                this._moduleEditor_handleClick(logicPos);
+            }
+            return;
+        }
+
         if (this.phase === 'meta') {
             // [fix] 移除幽灵调用 this.meta_handleClick(pos)
             // meta 阶段的 UI 是基于 HTML DOM 的（#phase-meta z-index:200 pointer-events:auto）
@@ -2112,6 +2121,8 @@ export const game_system = {
     input_handleInputMove(pos, e) {
         // [BUGFIX] 符文发射器打开时，屏蔽 canvas 活动输入，防止鼠标移动导致倒斜或甄准逻辑干扰。
         if (this._isRuneLauncherOpen()) return;
+        // [v2 重构] 编辑模式下冻结悬停倾斜，使虚框与指针对齐。
+        if (this._moduleEditorActive) return;
 
         const offset = this.input_getTiltOffset();
         const logicPos = pos.sub(offset);
@@ -2156,6 +2167,8 @@ export const game_system = {
     input_handleInputEnd(pos, e) {
         // [BUGFIX] 符文发射器打开时，屏蔽 canvas 输入结束事件，防止误触发射。
         if (this._isRuneLauncherOpen()) return;
+        // [v2 重构] 编辑模式下不响应发射 / 倾斜结束逻辑。
+        if (this._moduleEditorActive) return;
 
         if (this.isDragging) {
             this.isDragging = false;

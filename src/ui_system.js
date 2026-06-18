@@ -2,7 +2,7 @@ import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
 import { CONFIG, RELIC_DB } from './config.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
-import { MODULE_DEFS, listAvailableModules, getModuleSpan, getCoveredSlots } from './pinboard_modules.js';
+import { MODULE_DEFS, listAvailableModules, getModuleSpan, getCoveredSlots, calcModuleSlotRect } from './pinboard_modules.js';
 import { fuseRuneIntoBoard, getRuneId } from './rune_system.js';
 import { showToast } from './utils/math_utils.js';
 
@@ -14,431 +14,158 @@ import { showToast } from './utils/math_utils.js';
 //   - 移动端单列堆叠 + sticky 底部按钮，桌面双栏
 // ======================================================================
 const ME_STYLES = `
-.me-overlay {
-    position: fixed; inset: 0; z-index: 240;
-    background: rgba(8, 12, 24, 0.92);
-    display: flex; align-items: stretch; justify-content: center;
-    box-sizing: border-box;
+/* ============================================================
+   [v2 重构] 钉板内嵌编辑器样式
+   设计：编辑器不再是覆盖全屏的抽象网格弹窗，而是直接在实时钉板画布上
+   叠加可点击的虚框区域（由 canvas 绘制）。本样式表只负责：
+     1) 顶部标题条（不遮挡钉板主体）
+     2) 底部操作条（开始采集 / 符文融合入口）
+     3) 点击钉板区域后弹出的「更换模块」浮层
+   ============================================================ */
+
+/* 编辑器激活时挂在 #game-container 上的薄层，仅承载 DOM 控件，
+   不拦截画布点击（pointer-events 由子元素各自开启） */
+#module-editor-layer {
+    position: absolute; inset: 0; z-index: 150;
+    pointer-events: none;
     font-family: 'Cinzel', 'Microsoft YaHei', sans-serif;
     color: #e2e8f0;
-    padding: 24px;
-    overflow: hidden;
-}
-.me-overlay.is-tablet { padding: 16px; }
-.me-overlay.is-mobile { padding: 0; align-items: stretch; }
-
-.me-overlay * { box-sizing: border-box; }
-
-.me-modal {
-    width: 100%;
-    max-width: 1180px;
-    max-height: 100%;
-    background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(20, 28, 50, 0.98));
-    border: 1px solid rgba(56, 189, 248, 0.4);
-    border-radius: 16px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    margin: auto;
-}
-.me-overlay.is-mobile .me-modal {
-    border-radius: 0;
-    border: none;
-    max-width: 100%;
-    height: 100%;
-    box-shadow: none;
 }
 
-/* —— Header —— */
-.me-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 18px 22px 14px;
-    border-bottom: 1px solid rgba(56, 189, 248, 0.25);
-    flex-shrink: 0;
-}
-.me-overlay.is-mobile .me-header {
-    padding: 12px 14px 10px;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-}
-.me-header-titles { min-width: 0; }
-.me-title {
-    font-size: 20px; font-weight: bold; color: #7dd3fc;
-    letter-spacing: 1px; line-height: 1.2;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.me-overlay.is-mobile .me-title { font-size: 16px; letter-spacing: 0.5px; }
-.me-subtitle { font-size: 11px; color: #94a3b8; margin-top: 4px; }
-.me-overlay.is-mobile .me-subtitle { font-size: 10px; margin-top: 2px; }
-.me-header-stats { display: flex; gap: 14px; flex-shrink: 0; }
-.me-overlay.is-mobile .me-header-stats { justify-content: space-around; gap: 8px; }
-.me-stat { text-align: center; min-width: 0; }
-.me-stat-label { font-size: 10px; color: #94a3b8; line-height: 1; }
-.me-stat-value {
-    font-size: 18px; font-weight: bold; line-height: 1.2;
-    margin-top: 2px;
-    white-space: nowrap;
-}
-.me-overlay.is-mobile .me-stat-value { font-size: 16px; }
-.me-stat-value--cap   { color: #fbbf24; }
-.me-stat-value--placed{ color: #7dd3fc; }
-.me-stat-value--full  { color: #fbbf24; }
-.me-stat-value--rune  { color: #c084fc; }
-.me-stat-suffix { font-size: 11px; color: #64748b; margin-left: 2px; font-weight: normal; }
-
-/* —— Body —— */
-.me-body {
-    flex: 1 1 auto;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 16px 22px;
-    display: grid;
-    gap: 14px;
-    grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr);
-    grid-template-areas:
-        "grid palette"
-        "fusion fusion";
-    align-items: start;
-}
-.me-overlay.is-tablet .me-body {
-    padding: 12px 14px;
-    grid-template-columns: minmax(0, 1.4fr) minmax(220px, 1fr);
-    gap: 12px;
-}
-.me-overlay.is-mobile .me-body {
-    padding: 10px 12px 12px;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "grid" "palette" "fusion";
-    gap: 12px;
-}
-
-.me-section {
-    background: rgba(15, 23, 42, 0.55);
-    border: 1px solid rgba(56, 189, 248, 0.18);
-    border-radius: 10px;
-    padding: 14px;
-    min-width: 0;
-}
-.me-overlay.is-mobile .me-section { padding: 10px 12px; }
-.me-section--grid    { grid-area: grid; }
-.me-section--palette { grid-area: palette; }
-.me-section--fusion  {
-    grid-area: fusion;
-    border-color: rgba(168, 85, 247, 0.32);
-}
-
-.me-section-head {
+/* ---- 顶部标题条 ---- */
+.me-topbar {
+    position: absolute; top: 0; left: 0; right: 0;
+    pointer-events: auto;
     display: flex; align-items: center; justify-content: space-between;
-    gap: 10px; margin-bottom: 4px;
+    gap: 8px;
+    padding: 8px 12px;
+    background: linear-gradient(180deg, rgba(8,12,24,0.92) 0%, rgba(8,12,24,0.55) 80%, rgba(8,12,24,0) 100%);
+    box-sizing: border-box;
 }
-.me-section-title {
-    font-size: 13px; font-weight: bold; color: #7dd3fc;
-    letter-spacing: 0.5px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.me-section-title--fusion { color: #c084fc; }
-.me-overlay.is-mobile .me-section-title { font-size: 12px; }
-
-.me-section-tag {
-    font-size: 10px; color: #94a3b8;
-    background: rgba(30, 41, 59, 0.7);
-    border: 1px solid rgba(56, 189, 248, 0.25);
-    border-radius: 999px;
-    padding: 2px 8px;
+.me-topbar-title {
+    font-size: 15px; font-weight: 700; letter-spacing: 1px;
+    color: #67e8f9; text-shadow: 0 0 8px rgba(34,211,238,0.5);
     white-space: nowrap;
 }
-.me-section-tag.is-full {
-    color: #fbbf24;
-    border-color: rgba(251, 191, 36, 0.4);
-    background: rgba(251, 191, 36, 0.08);
+.me-topbar-hint {
+    font-size: 11px; color: #94a3b8; line-height: 1.3;
+    flex: 1; text-align: right;
 }
 
-.me-section-hint {
-    font-size: 11px; color: #94a3b8;
-    line-height: 1.5;
-    margin-bottom: 10px;
-}
-.me-overlay.is-mobile .me-section-hint { font-size: 10px; margin-bottom: 8px; }
-
-/* —— 钉板网格 —— */
-.me-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+/* ---- 底部操作条 ---- */
+.me-bottombar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    pointer-events: auto;
+    display: flex; align-items: center; justify-content: center;
     gap: 10px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(0deg, rgba(8,12,24,0.94) 0%, rgba(8,12,24,0.6) 75%, rgba(8,12,24,0) 100%);
+    box-sizing: border-box;
 }
-.me-overlay.is-mobile .me-grid { gap: 6px; }
-
-.me-cell {
-    appearance: none;
-    background: rgba(30, 41, 59, 0.6);
-    border: 1px solid rgba(56, 189, 248, 0.35);
-    border-radius: 10px;
-    color: inherit;
-    padding: 10px 4px;
-    min-height: 96px;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    cursor: pointer;
-    transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-    font-family: inherit;
-}
-.me-overlay.is-mobile .me-cell { min-height: 70px; padding: 6px 2px; }
-.me-cell.is-placed {
-    background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(56, 189, 248, 0.12));
-    border-color: rgba(125, 211, 252, 0.7);
-}
-.me-cell.is-preview {
-    background: rgba(56, 189, 248, 0.10);
-    border-style: dashed;
-    border-color: rgba(125, 211, 252, 0.55);
-}
-.me-cell.is-full {
-    background: rgba(30, 41, 59, 0.4);
-    border-style: dashed;
-    border-color: rgba(100, 116, 139, 0.45);
-}
-@media (hover: hover) {
-    .me-cell:hover {
-        transform: translateY(-1px);
-        border-color: rgba(125, 211, 252, 0.9);
-    }
-}
-.me-cell-icon { font-size: 24px; line-height: 1; }
-.me-overlay.is-mobile .me-cell-icon { font-size: 20px; }
-.me-cell-icon--preview { opacity: 0.55; }
-.me-cell-icon--empty   { color: #475569; }
-.me-cell-icon--full    { color: #64748b; font-size: 18px; }
-.me-cell-name {
-    font-size: 11px; font-weight: bold;
-    margin-top: 4px; color: #e2e8f0;
-    text-align: center;
-    line-height: 1.2;
-    word-break: keep-all;
-}
-.me-overlay.is-mobile .me-cell-name { font-size: 10px; margin-top: 3px; }
-.me-cell-action { font-size: 9px; margin-top: 2px; color: #64748b; letter-spacing: 0.4px; }
-.me-cell.is-placed .me-cell-action { color: #7dd3fc; }
-.me-cell-action--preview { color: #7dd3fc; opacity: 0.85; }
-.me-overlay.is-mobile .me-cell-action { font-size: 8px; }
-
-/* —— 模块库 —— */
-.me-palette {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-}
-.me-overlay.is-mobile .me-palette { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-
-.me-palette-item {
-    appearance: none;
-    background: rgba(30, 41, 59, 0.65);
-    border: 1px solid rgba(56, 189, 248, 0.35);
-    border-radius: 8px;
-    padding: 10px 8px 12px;
-    color: inherit;
-    cursor: pointer;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-    font-family: inherit;
-}
-.me-overlay.is-mobile .me-palette-item { padding: 8px 6px 10px; }
-.me-palette-item.is-selected {
-    background: linear-gradient(135deg, rgba(56, 189, 248, 0.45), rgba(56, 189, 248, 0.22));
-    border-color: rgba(125, 211, 252, 0.95);
-    animation: me-pulse-cyan 1.6s ease-out infinite;
-}
-@media (hover: hover) {
-    .me-palette-item:hover {
-        transform: translateY(-1px);
-        border-color: rgba(125, 211, 252, 0.85);
-    }
-}
-.me-palette-icon { font-size: 24px; line-height: 1; }
-.me-overlay.is-mobile .me-palette-icon { font-size: 20px; }
-.me-palette-name {
-    font-size: 12px; font-weight: bold;
-    margin-top: 6px; color: #e2e8f0;
-}
-.me-overlay.is-mobile .me-palette-name { font-size: 11px; margin-top: 4px; }
-.me-palette-desc {
-    font-size: 10px; color: #94a3b8;
-    margin-top: 4px; line-height: 1.4;
-    word-break: break-word;
-}
-.me-overlay.is-mobile .me-palette-desc { font-size: 9px; margin-top: 2px; }
-
-/* —— 符文融合区 —— */
-.me-rune-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-    gap: 8px;
-    max-height: 260px;
-    min-height: 80px;
-    overflow-y: auto;
-    padding: 4px 2px;
-    margin-top: 4px;
-}
-.me-overlay.is-mobile .me-rune-list {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    max-height: 200px;
-    gap: 6px;
-}
-.me-rune-list::-webkit-scrollbar { width: 6px; }
-.me-rune-list::-webkit-scrollbar-thumb {
-    background: rgba(168, 85, 247, 0.4); border-radius: 3px;
-}
-.me-rune-item {
-    appearance: none;
-    background: rgba(30, 41, 59, 0.65);
-    border: 1px solid rgba(168, 85, 247, 0.35);
-    border-radius: 8px;
-    padding: 8px 10px;
-    color: inherit;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-    text-align: left;
-    font-family: inherit;
-    min-width: 0;
-}
-.me-rune-item.is-selected {
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.45), rgba(168, 85, 247, 0.22));
-    border-color: rgba(216, 180, 254, 0.95);
-    animation: me-pulse-purple 1.6s ease-out infinite;
-}
-@media (hover: hover) {
-    .me-rune-item:hover {
-        transform: translateY(-1px);
-        border-color: rgba(216, 180, 254, 0.85);
-    }
-}
-.me-rune-icon {
-    font-size: 20px; flex-shrink: 0; width: 28px; text-align: center;
-}
-.me-overlay.is-mobile .me-rune-icon { font-size: 18px; width: 24px; }
-.me-rune-info { flex: 1 1 auto; min-width: 0; }
-.me-rune-name {
-    font-size: 12px; font-weight: bold; color: #e2e8f0;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.me-overlay.is-mobile .me-rune-name { font-size: 11px; }
-.me-rune-lv { color: #fbbf24; margin-left: 4px; }
-.me-rune-desc {
-    font-size: 10px; color: #94a3b8; margin-top: 2px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.me-rune-desc b { color: #d8b4fe; font-weight: bold; }
-.me-overlay.is-mobile .me-rune-desc { font-size: 9px; }
-.me-rune-empty {
-    grid-column: 1 / -1;
-    color: #64748b; font-size: 12px;
-    text-align: center; font-style: italic;
-    padding: 18px 12px;
-}
-
-.me-pending {
-    margin-top: 10px;
-    padding: 8px 12px;
-    background: linear-gradient(90deg, rgba(168, 85, 247, 0.18), rgba(168, 85, 247, 0.08));
-    border: 1px solid rgba(168, 85, 247, 0.35);
-    border-radius: 8px;
-    font-size: 11px; color: #e9d5ff;
-}
-.me-pending-label { color: #c084fc; font-weight: bold; margin-right: 4px; }
-.me-pending-item { color: #fff; font-weight: bold; margin: 0 6px 0 0; }
-
-/* —— 按钮 —— */
 .me-btn {
-    appearance: none;
+    pointer-events: auto;
+    border: none; cursor: pointer;
     border-radius: 10px;
-    color: #fff;
-    font-weight: bold;
-    cursor: pointer;
-    transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-    font-family: inherit;
+    font-family: inherit; font-weight: 700;
+    transition: transform 0.08s ease, filter 0.12s ease;
+    -webkit-tap-highlight-color: transparent;
 }
-.me-btn--fuse {
-    margin-top: 12px;
-    width: 100%;
-    padding: 14px 16px;
-    font-size: 13px;
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.7), rgba(126, 34, 206, 0.85));
-    border: 1px solid rgba(216, 180, 254, 0.85);
-    box-shadow: 0 2px 12px rgba(168, 85, 247, 0.35);
-    letter-spacing: 0.5px;
-}
-.me-btn--fuse:disabled {
-    background: rgba(71, 85, 105, 0.5);
-    border-color: rgba(216, 180, 254, 0.3);
-    box-shadow: none;
-    opacity: 0.55;
-    cursor: not-allowed;
-}
-@media (hover: hover) {
-    .me-btn--fuse:not(:disabled):hover {
-        background: linear-gradient(135deg, rgba(168, 85, 247, 0.85), rgba(126, 34, 206, 0.95));
-        transform: translateY(-1px);
-    }
-}
+.me-btn:active { transform: scale(0.96); }
 .me-btn--start {
-    padding: 12px 28px;
-    font-size: 14px;
-    background: linear-gradient(135deg, rgba(34, 197, 94, 0.7), rgba(21, 128, 61, 0.85));
-    border: 1px solid rgba(74, 222, 128, 0.85);
-    box-shadow: 0 2px 12px rgba(34, 197, 94, 0.3);
-    letter-spacing: 1px;
-    min-width: 160px;
+    flex: 1; max-width: 280px;
+    padding: 13px 18px; font-size: 16px; letter-spacing: 2px;
+    color: #042f2e;
+    background: linear-gradient(135deg, #5eead4, #14b8a6);
+    box-shadow: 0 4px 16px rgba(20,184,166,0.45);
 }
-@media (hover: hover) {
-    .me-btn--start:hover {
-        background: linear-gradient(135deg, rgba(34, 197, 94, 0.85), rgba(21, 128, 61, 0.95));
-        transform: translateY(-1px);
-        box-shadow: 0 4px 14px rgba(34, 197, 94, 0.45);
-    }
+.me-btn--start:hover { filter: brightness(1.08); }
+.me-btn--rune {
+    padding: 13px 14px; font-size: 13px;
+    color: #ede9fe;
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    box-shadow: 0 4px 14px rgba(124,58,237,0.4);
+    position: relative;
 }
-.me-overlay.is-mobile .me-btn--start { width: 100%; padding: 14px 18px; }
+.me-btn--rune .me-rune-badge {
+    position: absolute; top: -6px; right: -6px;
+    min-width: 18px; height: 18px; padding: 0 4px;
+    border-radius: 9px; background: #f43f5e; color: #fff;
+    font-size: 11px; line-height: 18px; text-align: center;
+    box-shadow: 0 0 0 2px rgba(8,12,24,0.9);
+}
 
-/* —— Footer —— */
-.me-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 14px 22px 18px;
-    border-top: 1px solid rgba(56, 189, 248, 0.25);
-    flex-shrink: 0;
-    flex-wrap: wrap;
+/* ---- 模块选择浮层（点击钉板区域后弹出）---- */
+.me-picker-backdrop {
+    position: fixed; inset: 0; z-index: 250;
+    background: rgba(4,8,18,0.78);
+    backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px; box-sizing: border-box;
+    font-family: 'Cinzel', 'Microsoft YaHei', sans-serif;
+    color: #e2e8f0;
 }
-.me-overlay.is-mobile .me-footer {
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0));
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
+.me-picker {
+    width: 100%; max-width: 460px;
+    max-height: 86vh; display: flex; flex-direction: column;
+    background: linear-gradient(160deg, #131a2e, #0b1120);
+    border: 1px solid rgba(103,232,249,0.25);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    overflow: hidden;
 }
-.me-footer-hint {
-    font-size: 11px; color: #64748b;
-    line-height: 1.5; flex: 1; min-width: 0;
+.me-picker-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-bottom: 1px solid rgba(148,163,184,0.15);
 }
-.me-overlay.is-mobile .me-footer-hint { font-size: 10px; text-align: center; }
+.me-picker-title { font-size: 15px; font-weight: 700; color: #67e8f9; }
+.me-picker-close {
+    width: 30px; height: 30px; border-radius: 8px;
+    border: 1px solid rgba(148,163,184,0.25);
+    background: rgba(30,41,59,0.6); color: #cbd5e1;
+    font-size: 16px; cursor: pointer; line-height: 1;
+}
+.me-picker-body { padding: 12px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.me-picker-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+}
+.me-picker-item {
+    text-align: left; cursor: pointer;
+    border: 1px solid rgba(148,163,184,0.2);
+    background: rgba(30,41,59,0.45);
+    border-radius: 12px; padding: 10px;
+    display: flex; flex-direction: column; gap: 4px;
+    transition: border-color 0.12s ease, background 0.12s ease, transform 0.08s ease;
+    color: inherit; font-family: inherit;
+}
+.me-picker-item:hover { border-color: rgba(103,232,249,0.5); background: rgba(30,41,59,0.75); }
+.me-picker-item:active { transform: scale(0.97); }
+.me-picker-item.is-current { border-color: #14b8a6; background: rgba(20,184,166,0.18); }
+.me-picker-item.is-remove { grid-column: 1 / -1; align-items: center; flex-direction: row; justify-content: center; gap: 8px; border-style: dashed; color: #fca5a5; border-color: rgba(248,113,113,0.4); }
+.me-picker-icon { font-size: 22px; line-height: 1; }
+.me-picker-name { font-size: 13px; font-weight: 700; color: #f1f5f9; }
+.me-picker-name .me-picker-span { font-size: 11px; color: #67e8f9; font-weight: 600; }
+.me-picker-desc { font-size: 11px; color: #94a3b8; line-height: 1.35; }
+.me-picker-empty { padding: 24px; text-align: center; color: #94a3b8; font-size: 13px; }
 
-/* —— 动画 —— */
-@keyframes me-pulse-cyan {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(125, 211, 252, 0.55); }
-    50%      { box-shadow: 0 0 0 7px rgba(125, 211, 252, 0); }
+/* ---- 符文融合列表（复用 picker 外壳）---- */
+.me-rune-row {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; cursor: pointer;
+    border: 1px solid rgba(148,163,184,0.2);
+    background: rgba(30,41,59,0.45);
+    border-radius: 12px; padding: 10px; margin-bottom: 8px;
+    color: inherit; font-family: inherit; text-align: left;
 }
-@keyframes me-pulse-purple {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(216, 180, 254, 0.55); }
-    50%      { box-shadow: 0 0 0 7px rgba(216, 180, 254, 0); }
+.me-rune-row:hover { border-color: rgba(167,139,250,0.6); }
+.me-rune-row .me-picker-icon { font-size: 24px; }
+.me-rune-meta { flex: 1; }
+.me-rune-meta .me-picker-name { font-size: 13px; }
+.me-rune-lv { color: #a78bfa; font-size: 11px; }
+
+@media (max-width: 480px) {
+    .me-topbar-title { font-size: 13px; }
+    .me-topbar-hint { display: none; }
+    .me-picker-grid { grid-template-columns: 1fr; }
 }
 `;
 
@@ -1639,22 +1366,27 @@ export const ui_system = {
     },
 
     // ======================================================================
-    // [v2 钉板模块化] 模块编辑器
+    // [v2 重构] 钉板内嵌编辑器
     // ======================================================================
-    // 在每场遗物阶段后、采集阶段开始前打开。玩家可以：
-    //   1) 在 4×3 网格里摆放已解锁的钉板模块（受 unlockedModuleSlots 限制）
-    //   2) 在右侧融合区把符文消耗到钉板（写入 pendingFusions，
-    //      在 phase_gathering_initPachinko 末尾随机赋予普通钉子元素属性）
-    //   3) 点击"开始采集"关闭编辑器并进入采集阶段
+    // 设计目标（用户需求）：
+    //   - 直接在实时钉板画布上编辑，能看到真实的钉盘区域；
+    //   - 每个「可编辑钉盘区域」（已解锁的模块槽）用虚框描边标出（由 canvas 绘制）；
+    //   - 点击某个区域 → 弹出「更换模块」浮层，可替换 / 移除该区域的模块。
+    // 画布上的虚框绘制见 game_phase.js: render_moduleEditorOverlay；
+    // 点击命中检测见 game_system.js: input_handleInputStart → _moduleEditor_handleClick。
     _moduleEditorState: null,
 
+    /**
+     * 进入钉板编辑模式。此时游戏已处于 gathering 阶段且实时钉板已构建，
+     * 本方法只负责：标记编辑态、冻结倾斜、挂载顶部 / 底部 DOM 控件。
+     */
     ui_showModuleEditor(onComplete) {
         const cfg = CONFIG.gameplay || {};
         const cols = cfg.moduleCols || 4;
         const rows = cfg.moduleRows || 3;
         const totalSlots = cols * rows;
 
-        // 确保 layout / unlocked 字段已初始化
+        // ---- 确保布局 / 解锁字段已初始化 ----
         if (!Array.isArray(this.currentModuleLayout) || this.currentModuleLayout.length !== totalSlots) {
             this.currentModuleLayout = new Array(totalSlots).fill(null);
             for (let i = 0; i < (cfg.moduleDefaultSlots || 3); i++) {
@@ -1668,320 +1400,300 @@ export const ui_system = {
             this.unlockedModuleSlots = cfg.moduleDefaultSlots || 3;
         }
 
-        // 每次打开重置 selection
-        this._moduleEditorState = {
-            selectedModuleId: null,
-            selectedRuneIdx: null,
-            onComplete: onComplete || null,
-        };
+        this._moduleEditorState = { onComplete: onComplete || null };
+        this._moduleEditorActive = true;
 
-        // ---- 注入样式表（全部样式集中在 class 内，避免与 inline style 冲突）----
-        // 旧版本曾混用 inline grid-template-columns + @media !important，
-        // 在某些浏览器/缓存场景下被 inline 样式覆盖，导致移动端两列布局被压成 1
-        // 字符宽的「垂直文字列」。新版本零内联布局样式 + JS viewport 检测保证可靠。
-        if (document.getElementById('module-editor-styles')) {
-            document.getElementById('module-editor-styles').remove();
+        // 编辑期间冻结钉板倾斜，使虚框与指针 1:1 对齐
+        if (this.boardTilt) {
+            this.boardTilt.target = { x: 0, y: 0 };
+            this.boardTilt.current = { x: 0, y: 0 };
         }
-        const styleEl = document.createElement('style');
-        styleEl.id = 'module-editor-styles';
-        styleEl.textContent = ME_STYLES;
-        document.head.appendChild(styleEl);
 
-        let overlay = document.getElementById('module-editor-overlay');
-        if (!overlay) {
-            overlay = document.createElement('div');
-            overlay.id = 'module-editor-overlay';
-            document.body.appendChild(overlay);
+        // ---- 注入样式 ----
+        if (!document.getElementById('module-editor-styles')) {
+            const styleEl = document.createElement('style');
+            styleEl.id = 'module-editor-styles';
+            styleEl.textContent = ME_STYLES;
+            document.head.appendChild(styleEl);
         }
-        overlay.className = 'me-overlay';
-        overlay.style.display = 'flex';
-        this.ui_renderModuleEditor();
+
+        this.ui_renderModuleEditorControls();
     },
 
+    /**
+     * 渲染 / 刷新编辑器的 DOM 控件（顶部标题条 + 底部操作条）。
+     * 真正的钉盘区域虚框由 canvas 在 render_moduleEditorOverlay 中绘制。
+     */
+    ui_renderModuleEditorControls() {
+        const container = document.getElementById('game-container');
+        if (!container) return;
+        let layer = document.getElementById('module-editor-layer');
+        if (!layer) {
+            layer = document.createElement('div');
+            layer.id = 'module-editor-layer';
+            container.appendChild(layer);
+        }
+
+        const cfg = CONFIG.gameplay || {};
+        const totalSlots = (cfg.moduleCols || 4) * (cfg.moduleRows || 3);
+        const cap = Math.min(this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3, totalSlots);
+        const layout = this.currentModuleLayout || [];
+        let placed = 0;
+        for (let i = 0; i < cap; i++) {
+            const e = layout[i];
+            if (typeof e === 'string') placed++;
+        }
+        const runeCount = Array.isArray(this.runeInventory) ? this.runeInventory.length : 0;
+        const runeBtnHtml = runeCount > 0
+            ? `<button id="me-rune-btn" class="me-btn me-btn--rune">✨ 符文融合<span class="me-rune-badge">${runeCount}</span></button>`
+            : '';
+
+        layer.innerHTML = `
+            <div class="me-topbar">
+                <div class="me-topbar-title">⚙ 钉板编辑</div>
+                <div class="me-topbar-hint">点击虚框区域更换模块 · 已放置 ${placed}/${cap}</div>
+            </div>
+            <div class="me-bottombar">
+                ${runeBtnHtml}
+                <button id="me-start-btn" class="me-btn me-btn--start">▶ 开始采集</button>
+            </div>
+        `;
+
+        const startBtn = layer.querySelector('#me-start-btn');
+        if (startBtn) startBtn.addEventListener('click', () => this.ui_hideModuleEditor());
+        const runeBtn = layer.querySelector('#me-rune-btn');
+        if (runeBtn) runeBtn.addEventListener('click', () => this._moduleEditor_openRunePicker());
+    },
+
+    /**
+     * 退出编辑模式：移除 DOM 控件与浮层，恢复正常采集输入。
+     */
     ui_hideModuleEditor() {
-        const overlay = document.getElementById('module-editor-overlay');
-        if (overlay) overlay.style.display = 'none';
+        this._moduleEditorActive = false;
+        const onComplete = (this._moduleEditorState || {}).onComplete;
         this._moduleEditorState = null;
+        const layer = document.getElementById('module-editor-layer');
+        if (layer) layer.remove();
+        this._moduleEditor_closePicker();
+        if (typeof onComplete === 'function') onComplete();
     },
 
-    ui_renderModuleEditor() {
-        const overlay = document.getElementById('module-editor-overlay');
-        if (!overlay) return;
+    /**
+     * [命中检测] 在编辑模式下点击画布时调用，logicPos 为画布坐标。
+     * 命中某个可编辑钉盘区域则弹出模块选择浮层。
+     */
+    _moduleEditor_handleClick(logicPos) {
+        const rects = this._moduleEditor_getSlotRects();
+        for (const r of rects) {
+            if (logicPos.x >= r.rect.x && logicPos.x <= r.rect.x + r.rect.w &&
+                logicPos.y >= r.rect.y && logicPos.y <= r.rect.y + r.rect.h) {
+                this._moduleEditor_openPicker(r.idx);
+                return;
+            }
+        }
+    },
+
+    /**
+     * 计算所有「可编辑钉盘区域」的画布矩形。
+     * 可编辑区域 = 前 cap 个槽位（与 phase_gathering_initPachinko_v2 的 slotsToBuild 一致）。
+     * 多格模块只在锚点处返回合并后的矩形；被覆盖的 ref 槽不返回独立矩形。
+     * 返回 [{ idx, rect:{x,y,w,h}, moduleId }]
+     */
+    _moduleEditor_getSlotRects() {
         const cfg = CONFIG.gameplay || {};
         const cols = cfg.moduleCols || 4;
         const rows = cfg.moduleRows || 3;
         const totalSlots = cols * rows;
-        const unlockedSlots = this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3;
+        const cap = Math.min(this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3, totalSlots);
+        const w = (this.width && this.width > 0) ? this.width : 400;
+        const h = (this.height && this.height > 0) ? this.height : 600;
         const layout = this.currentModuleLayout || [];
+        const out = [];
+        for (let i = 0; i < cap; i++) {
+            const entry = layout[i];
+            if (entry && typeof entry === 'object' && entry.ref !== undefined) continue; // 被多格模块覆盖
+            const moduleId = (typeof entry === 'string') ? entry : null;
+            const span = moduleId ? getModuleSpan(moduleId) : { cols: 1, rows: 1 };
+            const rect = calcModuleSlotRect(i, w, h, cfg, span);
+            out.push({ idx: i, rect, moduleId });
+        }
+        return out;
+    },
+
+    /**
+     * 弹出「更换模块」浮层，slotIdx 为目标槽位锚点索引。
+     */
+    _moduleEditor_openPicker(slotIdx) {
+        this._moduleEditor_closePicker();
+        const layout = this.currentModuleLayout || [];
+        const curId = (typeof layout[slotIdx] === 'string') ? layout[slotIdx] : null;
         const available = listAvailableModules(this.unlockedModuleTypes || []);
-        const state = this._moduleEditorState || {};
-        const selModule = state.selectedModuleId;
-        const selRune = state.selectedRuneIdx;
-        const inventory = Array.isArray(this.runeInventory) ? this.runeInventory : [];
-        const pendingFusions = Array.isArray(this.pendingFusions) ? this.pendingFusions : [];
-        // 锚点 = 字符串条目（多格模块的 ref 占位用 {ref} 表示）
-        const isAnchor = (e) => typeof e === 'string';
-        const isRef = (e) => e && typeof e === 'object' && e.ref !== undefined;
-        // 占用格子总数（含 ref），用于上限判断
-        const placedCount = layout.filter(e => e !== null && e !== undefined).length;
-        const canPlaceMore = placedCount < unlockedSlots;
 
-        // ---- 视口检测：决定结构变体（mobile / tablet / desktop） ----
-        const vw = window.innerWidth || document.documentElement.clientWidth || 1024;
-        const isMobile = vw < 720;
-        const isTablet = vw >= 720 && vw < 1024;
-        overlay.classList.toggle('is-mobile', isMobile);
-        overlay.classList.toggle('is-tablet', isTablet);
-        overlay.classList.toggle('is-desktop', !isMobile && !isTablet);
-
-        // ---- 钉板网格 ----
-        // 支持多格模块（span: {cols, rows}）：锚点用 string，被覆盖的格用 {ref: anchorIdx}。
-        const gridCellsHtml = (() => {
-            let html = '';
-            for (let i = 0; i < totalSlots; i++) {
-                const entry = layout[i];
-                // 被多格模块覆盖的非锚点格不渲染按钮（由锚点的 grid-span 占据视觉位置）
-                if (isRef(entry)) continue;
-
-                const moduleId = isAnchor(entry) ? entry : null;
-                const def = moduleId ? MODULE_DEFS[moduleId] : null;
-                const span = def ? getModuleSpan(moduleId) : { cols: 1, rows: 1 };
-
-                const isPickPreview = !def && selModule && canPlaceMore;
-                const previewDef = isPickPreview ? MODULE_DEFS[selModule] : null;
-                const previewSpan = previewDef ? getModuleSpan(selModule) : { cols: 1, rows: 1 };
-
-                let cls = 'me-cell';
-                if (def) cls += ' is-placed';
-                else if (isPickPreview) cls += ' is-preview';
-                else if (!canPlaceMore) cls += ' is-full';
-                else cls += ' is-empty';
-
-                // 显式 grid 定位以兼容多格模块
-                const r = Math.floor(i / cols);
-                const c = i % cols;
-                const useSpan = def ? span : { cols: 1, rows: 1 };
-                const styleAttr = `grid-column: ${c + 1} / span ${useSpan.cols}; grid-row: ${r + 1} / span ${useSpan.rows};`;
-
-                let inner;
-                if (def) {
-                    const sizeTag = (span.cols > 1 || span.rows > 1) ? `<div class="me-cell-size">${span.cols}×${span.rows}</div>` : '';
-                    inner = `<div class="me-cell-icon">${def.icon || '▦'}</div>
-                        <div class="me-cell-name">${def.name}</div>
-                        ${sizeTag}
-                        <div class="me-cell-action">点击移除</div>`;
-                } else if (isPickPreview && previewDef) {
-                    const sizeHint = (previewSpan.cols > 1 || previewSpan.rows > 1) ? ` (${previewSpan.cols}×${previewSpan.rows})` : '';
-                    inner = `<div class="me-cell-icon me-cell-icon--preview">${previewDef.icon || '▦'}</div>
-                        <div class="me-cell-action me-cell-action--preview">点击放置${sizeHint}</div>`;
-                } else if (canPlaceMore) {
-                    inner = `<div class="me-cell-icon me-cell-icon--empty">＋</div>
-                        <div class="me-cell-action">空槽</div>`;
-                } else {
-                    inner = `<div class="me-cell-icon me-cell-icon--full">·</div>
-                        <div class="me-cell-action">已满</div>`;
-                }
-                html += `<button type="button" data-slot-idx="${i}" class="${cls}" style="${styleAttr}">${inner}</button>`;
-            }
-            return html;
-        })();
-
-        // ---- 模块库 ----
-        const paletteHtml = available.map(id => {
+        const itemsHtml = available.map(id => {
             const def = MODULE_DEFS[id];
             if (!def) return '';
-            const isSel = selModule === id;
-            return `<button type="button" data-module-id="${id}" class="me-palette-item${isSel ? ' is-selected' : ''}">
-                <div class="me-palette-icon">${def.icon}</div>
-                <div class="me-palette-name">${def.name}</div>
-                <div class="me-palette-desc">${def.desc}</div>
+            const span = getModuleSpan(id);
+            const spanTag = (span.cols > 1 || span.rows > 1) ? ` <span class="me-picker-span">${span.cols}×${span.rows}</span>` : '';
+            const cur = id === curId ? ' is-current' : '';
+            return `<button type="button" class="me-picker-item${cur}" data-pick-module="${id}">
+                <div class="me-picker-icon">${def.icon || '▦'}</div>
+                <div class="me-picker-name">${def.name}${spanTag}</div>
+                <div class="me-picker-desc">${def.desc || ''}</div>
             </button>`;
         }).join('');
 
-        // ---- 符文列表 ----
-        const runeListHtml = inventory.length > 0 ? inventory.map((r, idx) => {
+        const removeHtml = curId
+            ? `<button type="button" class="me-picker-item is-remove" data-pick-module="__remove__">🗑 清空此区域</button>`
+            : '';
+        const bodyHtml = (itemsHtml || removeHtml)
+            ? `<div class="me-picker-grid">${itemsHtml}${removeHtml}</div>`
+            : `<div class="me-picker-empty">暂无可用模块，请在商店解锁。</div>`;
+
+        const backdrop = document.createElement('div');
+        backdrop.className = 'me-picker-backdrop';
+        backdrop.id = 'me-picker-backdrop';
+        backdrop.innerHTML = `
+            <div class="me-picker">
+                <div class="me-picker-head">
+                    <div class="me-picker-title">更换钉盘模块</div>
+                    <button class="me-picker-close" id="me-picker-close">✕</button>
+                </div>
+                <div class="me-picker-body">${bodyHtml}</div>
+            </div>`;
+        document.body.appendChild(backdrop);
+
+        backdrop.addEventListener('click', (e) => {
+            if (e.target === backdrop) this._moduleEditor_closePicker();
+        });
+        const closeBtn = backdrop.querySelector('#me-picker-close');
+        if (closeBtn) closeBtn.addEventListener('click', () => this._moduleEditor_closePicker());
+        backdrop.querySelectorAll('[data-pick-module]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this._moduleEditor_applyModule(slotIdx, btn.dataset.pickModule);
+            });
+        });
+    },
+
+    _moduleEditor_closePicker() {
+        const bd = document.getElementById('me-picker-backdrop');
+        if (bd) bd.remove();
+        const rbd = document.getElementById('me-rune-picker-backdrop');
+        if (rbd) rbd.remove();
+    },
+
+    /**
+     * 应用模块选择：写入 currentModuleLayout，重建实时钉板，刷新控件。
+     */
+    _moduleEditor_applyModule(slotIdx, moduleId) {
+        const cfg = CONFIG.gameplay || {};
+        const cols = cfg.moduleCols || 4;
+        const rows = cfg.moduleRows || 3;
+        const totalSlots = cols * rows;
+        const cap = Math.min(this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3, totalSlots);
+        const layout = this.currentModuleLayout;
+
+        // 清除目标锚点原有的多格占位
+        const clearAnchor = (idx) => {
+            const cur = layout[idx];
+            if (typeof cur === 'string') {
+                const covered = getCoveredSlots(idx, getModuleSpan(cur), cols, rows) || [idx];
+                for (const ci of covered) layout[ci] = null;
+            } else {
+                layout[idx] = null;
+            }
+        };
+
+        if (moduleId === '__remove__') {
+            clearAnchor(slotIdx);
+        } else {
+            const span = getModuleSpan(moduleId);
+            const covered = getCoveredSlots(slotIdx, span, cols, rows);
+            if (!covered) {
+                showToast(`该模块占用 ${span.cols}×${span.rows} 格，超出网格边界`);
+                return;
+            }
+            // 所有覆盖格必须在可编辑区域内
+            if (covered.some(ci => ci >= cap)) {
+                showToast(`该模块需要更多空间（占用 ${span.cols}×${span.rows} 格）`);
+                return;
+            }
+            // 先清空目标锚点自身，再检查其余覆盖格是否被别的模块占用
+            clearAnchor(slotIdx);
+            for (const ci of covered) {
+                const occ = layout[ci];
+                if (ci !== slotIdx && (typeof occ === 'string' || (occ && occ.ref !== undefined))) {
+                    showToast('该位置与相邻模块重叠，请先清空相邻区域');
+                    return;
+                }
+            }
+            layout[slotIdx] = moduleId;
+            for (const ci of covered) {
+                if (ci !== slotIdx) layout[ci] = { ref: slotIdx };
+            }
+        }
+
+        // 重建实时钉板（不继承上一回合属性，确保所见即所得）
+        if (typeof this.phase_gathering_initPachinko === 'function') {
+            this.phase_gathering_initPachinko(false);
+        }
+        this._moduleEditor_closePicker();
+        this.ui_renderModuleEditorControls();
+    },
+
+    /**
+     * 符文融合浮层：复用 picker 外壳，选中符文即注入钉板。
+     */
+    _moduleEditor_openRunePicker() {
+        this._moduleEditor_closePicker();
+        const inventory = Array.isArray(this.runeInventory) ? this.runeInventory : [];
+        const pending = Array.isArray(this.pendingFusions) ? this.pendingFusions : [];
+
+        const rowsHtml = inventory.length > 0 ? inventory.map((r, idx) => {
             const id = getRuneId(r);
             const def = (RUNE_DB || []).find(d => d.id === id);
             if (!def) return '';
             const lv = (typeof r === 'object' && typeof r.level === 'number') ? r.level : 1;
-            const isSel = selRune === idx;
-            return `<button type="button" data-rune-idx="${idx}" class="me-rune-item${isSel ? ' is-selected' : ''}">
-                <div class="me-rune-icon">${def.icon || '🔮'}</div>
-                <div class="me-rune-info">
-                    <div class="me-rune-name">${def.name || id} <span class="me-rune-lv">L${lv}</span></div>
-                    <div class="me-rune-desc">注入 <b>${lv}</b> 颗 <b>${def.element || ''}</b> 钉子</div>
+            return `<button type="button" class="me-rune-row" data-rune-idx="${idx}">
+                <div class="me-picker-icon">${def.icon || '🔮'}</div>
+                <div class="me-rune-meta">
+                    <div class="me-picker-name">${def.name || id} <span class="me-rune-lv">L${lv}</span></div>
+                    <div class="me-picker-desc">注入 <b>${lv}</b> 颗 <b>${def.element || ''}</b> 钉子</div>
                 </div>
             </button>`;
-        }).join('') : '<div class="me-rune-empty">背包没有符文</div>';
+        }).join('') : '<div class="me-picker-empty">背包没有符文</div>';
 
-        const pendingHtml = pendingFusions.length > 0
-            ? `<div class="me-pending"><span class="me-pending-label">⚗ 已注入：</span>${
-                pendingFusions.map(f => `<span class="me-pending-item">${f.element}×${f.count}</span>`).join('')
-              }</div>`
+        const pendingHtml = pending.length > 0
+            ? `<div class="me-picker-desc" style="padding:8px 2px 0;">⚗ 已注入：${pending.map(f => `${f.element}×${f.count}`).join('， ')}</div>`
             : '';
 
-        const fuseDisabled = (selRune === null || selRune === undefined);
-        const fuseBtnLabel = fuseDisabled
-            ? (isMobile ? '请先选中符文' : '请先在上方选中一枚符文')
-            : '注入选中符文';
-        const placeHintLabel = canPlaceMore ? `还可放置 ${unlockedSlots - placedCount} 个` : '已达放置上限';
-
-        overlay.innerHTML = `
-            <div class="me-modal">
-                <header class="me-header">
-                    <div class="me-header-titles">
-                        <div class="me-title">⚙ 钉板模块编辑器</div>
-                        <div class="me-subtitle">摆放模块 + 融合符文为元素钉子</div>
-                    </div>
-                    <div class="me-header-stats">
-                        <div class="me-stat">
-                            <div class="me-stat-label">放置上限</div>
-                            <div class="me-stat-value me-stat-value--cap">${unlockedSlots}</div>
-                        </div>
-                        <div class="me-stat">
-                            <div class="me-stat-label">已摆放</div>
-                            <div class="me-stat-value ${placedCount >= unlockedSlots ? 'me-stat-value--full' : 'me-stat-value--placed'}">${placedCount}<span class="me-stat-suffix">/${unlockedSlots}</span></div>
-                        </div>
-                        <div class="me-stat">
-                            <div class="me-stat-label">符文</div>
-                            <div class="me-stat-value me-stat-value--rune">${inventory.length}</div>
-                        </div>
-                    </div>
-                </header>
-
-                <div class="me-body">
-                    <section class="me-section me-section--grid">
-                        <div class="me-section-head">
-                            <div class="me-section-title">▦ 钉板布局</div>
-                            <div class="me-section-tag ${canPlaceMore ? '' : 'is-full'}">${placeHintLabel}</div>
-                        </div>
-                        <div class="me-section-hint">点击空槽放置选中模块；点击已放置模块移除。</div>
-                        <div class="me-grid" data-cols="${cols}">${gridCellsHtml}</div>
-                    </section>
-
-                    <section class="me-section me-section--palette">
-                        <div class="me-section-head">
-                            <div class="me-section-title">📦 模块库</div>
-                        </div>
-                        <div class="me-section-hint">点击选中 → 再点空槽放置；再次点击同一模块取消选中。</div>
-                        <div class="me-palette">${paletteHtml}</div>
-                    </section>
-
-                    <section class="me-section me-section--fusion">
-                        <div class="me-section-head">
-                            <div class="me-section-title me-section-title--fusion">✨ 符文融合</div>
-                        </div>
-                        <div class="me-section-hint">选中符文 → 点击"注入"按钮，钉板上随机普通钉子获得对应元素属性。</div>
-                        <div class="me-rune-list">${runeListHtml}</div>
-                        <button id="module-editor-fuse-btn" class="me-btn me-btn--fuse" ${fuseDisabled ? 'disabled' : ''}>${fuseBtnLabel}</button>
-                        ${pendingHtml}
-                    </section>
+        const backdrop = document.createElement('div');
+        backdrop.className = 'me-picker-backdrop';
+        backdrop.id = 'me-rune-picker-backdrop';
+        backdrop.innerHTML = `
+            <div class="me-picker">
+                <div class="me-picker-head">
+                    <div class="me-picker-title">✨ 符文融合</div>
+                    <button class="me-picker-close" id="me-rune-picker-close">✕</button>
                 </div>
+                <div class="me-picker-body">${rowsHtml}${pendingHtml}</div>
+            </div>`;
+        document.body.appendChild(backdrop);
 
-                <footer class="me-footer">
-                    <div class="me-footer-hint">💡 摆完模块、注入完符文后点击"开始采集"</div>
-                    <button id="module-editor-start-btn" class="me-btn me-btn--start">▶ 开始采集</button>
-                </footer>
-            </div>
-        `;
-
-        // ---- 事件绑定 ----
-        overlay.querySelectorAll('.me-cell').forEach(cell => {
-            cell.addEventListener('click', () => {
-                const idx = parseInt(cell.dataset.slotIdx, 10);
-                const st = this._moduleEditorState || {};
-                const layoutArr = this.currentModuleLayout;
-                const cur = layoutArr[idx];
-
-                // 点击 anchor → 移除该多格模块（清空所有覆盖格）
-                if (typeof cur === 'string') {
-                    const span = getModuleSpan(cur);
-                    const covered = getCoveredSlots(idx, span, cols, rows) || [idx];
-                    for (const ci of covered) layoutArr[ci] = null;
-                } else if (st.selectedModuleId) {
-                    // 放置：检查跨格不溢出 + 所有覆盖格为空 + 不超过上限
-                    const span = getModuleSpan(st.selectedModuleId);
-                    const covered = getCoveredSlots(idx, span, cols, rows);
-                    if (!covered) {
-                        showToast(`该模块占用 ${span.cols}×${span.rows} 格，超出网格边界`);
-                        return;
-                    }
-                    for (const ci of covered) {
-                        if (layoutArr[ci] !== null && layoutArr[ci] !== undefined) {
-                            showToast('该位置已被其他模块占用');
-                            return;
-                        }
-                    }
-                    const currentPlaced = layoutArr.filter(e => e !== null && e !== undefined).length;
-                    if (currentPlaced + covered.length > unlockedSlots) {
-                        showToast(`已达放置上限 ${unlockedSlots} 格，请先移除一个`);
-                        return;
-                    }
-                    layoutArr[idx] = st.selectedModuleId;
-                    for (const ci of covered) {
-                        if (ci !== idx) layoutArr[ci] = { ref: idx };
-                    }
-                } else {
-                    showToast('请先在"模块库"中选中一个模块');
-                    return;
-                }
-                this.ui_renderModuleEditor();
-            });
+        backdrop.addEventListener('click', (e) => {
+            if (e.target === backdrop) this._moduleEditor_closePicker();
         });
-        overlay.querySelectorAll('.me-palette-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const id = item.dataset.moduleId;
-                if (!this._moduleEditorState) return;
-                this._moduleEditorState.selectedModuleId =
-                    (this._moduleEditorState.selectedModuleId === id) ? null : id;
-                this.ui_renderModuleEditor();
-            });
-        });
-        overlay.querySelectorAll('.me-rune-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const idx = parseInt(item.dataset.runeIdx, 10);
-                if (!this._moduleEditorState) return;
-                this._moduleEditorState.selectedRuneIdx =
-                    (this._moduleEditorState.selectedRuneIdx === idx) ? null : idx;
-                this.ui_renderModuleEditor();
-            });
-        });
-        const fuseBtn = overlay.querySelector('#module-editor-fuse-btn');
-        if (fuseBtn) {
-            fuseBtn.addEventListener('click', () => {
-                const st = this._moduleEditorState;
-                if (!st || st.selectedRuneIdx === null || st.selectedRuneIdx === undefined) {
-                    showToast('请先选中要融合的符文');
-                    return;
-                }
-                const rune = (this.runeInventory || [])[st.selectedRuneIdx];
-                if (!rune) {
-                    showToast('该符文不存在或已被消耗');
-                    st.selectedRuneIdx = null;
-                    this.ui_renderModuleEditor();
-                    return;
-                }
+        const closeBtn = backdrop.querySelector('#me-rune-picker-close');
+        if (closeBtn) closeBtn.addEventListener('click', () => this._moduleEditor_closePicker());
+        backdrop.querySelectorAll('[data-rune-idx]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.runeIdx, 10);
+                const rune = (this.runeInventory || [])[idx];
+                if (!rune) { showToast('该符文不存在或已被消耗'); return; }
                 const result = fuseRuneIntoBoard(this, rune, RUNE_DB);
                 showToast(result.message);
-                if (result.ok) st.selectedRuneIdx = null;
-                this.ui_renderModuleEditor();
+                this._moduleEditor_closePicker();
+                this.ui_renderModuleEditorControls();
             });
-        }
-        const startBtn = overlay.querySelector('#module-editor-start-btn');
-        if (startBtn) {
-            startBtn.addEventListener('click', () => {
-                const onComplete = (this._moduleEditorState || {}).onComplete;
-                this.ui_hideModuleEditor();
-                if (typeof onComplete === 'function') onComplete();
-            });
-        }
-
-        // resize 时重新渲染（让 isMobile 切换实时生效）
-        if (!this._moduleEditorResizeBound) {
-            this._moduleEditorResizeBound = true;
-            window.addEventListener('resize', () => {
-                if (this._moduleEditorState) this.ui_renderModuleEditor();
-            });
-        }
+        });
     }
 };
