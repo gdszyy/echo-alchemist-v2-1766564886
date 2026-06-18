@@ -2729,6 +2729,7 @@ phase_gathering_getRandomPegType() {
 
             // 轨道仍以发射器底座为圆心绕飞
             this.render_combat_launcherOrbitals(this.ctx, startPos.x, startPos.y, nextAmmo);
+            this.render_combat_launcherSignal(this.ctx, startPos.x, startPos.y, portPos.x, portPos.y, nextAmmo);
 
             // 待发射弹药贴在素材上沿的发射口
             Projectile.drawVisuals(this.ctx, portPos.x, portPos.y, params.radius, nextAmmo, previewRotation, params.intensity, deformation);

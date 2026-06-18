@@ -96,6 +96,7 @@ for (const subsystem of _subsystems) {
 | 2026-04-18 | `src/game_system.js`, `src/ui_system.js`, `src/ui/shop.js`, `.cursor/rules/ui_system.md` | **命运时刻 UI 语义闭环**：round-start resolver 现在会直接触发 `chaos_essence` / `pure_essence` 两种模式；`ui_refreshSelectionModeUI()` 需要显式区分“混沌精华 / 纯净精华 / 命运抉择”三种标签与按钮文案；`ui_showRelicSelection()` 不再把两种精华当作普通遗物候选；`ui_confirmSelection()` 在纯净精华模式下除了写回 `MarbleDefinition.collected` 以外，还必须写入 `doubleAssimilationBoostRounds` 以兑现同化率 x2。 |
 | 2026-04-17 | `index.html`, `src/game_system.js`, `src/ui_system.js`, `src/spawn_system.js`, `src/ui/shop.js`, `src/config.js`, `src/core.js`, `src/entities.js`, `src/game_phase.js` | **命运时刻 / 纯净精华 UI 接入**：当前主仓补落地了 `selection-mode-label`、`selected-required-count`、`selection-mode-subtitle` 三个选择阶段底栏节点；新增 `ui_getSelectionRequirement()`、`ui_isSelectionConfirmReady()`、`ui_getPureEssenceLegalElements()`、`ui_getPureEssenceRuneOptions()`、`ui_selectPureEssenceRune()`、`ui_renderPureEssencePanel()`、`ui_refreshSelectionModeUI()` 等辅助函数；`spawn_showMarblePreview()` 负责刷新纯净精华注入面板；`ui_closeRelicSelection()` 改为按 `relicOverlayReturnState` 恢复原阶段；`ui_confirmSelection()` 在纯净精华模式下会校验合法符文并把结果写回 `MarbleDefinition.collected`。 |
 | 2026-06-18 | `index.html`, `src/ui_system.js` | **交互可解释性增强**：替换子弹卡片必须支持焦点态、Enter/Space 选择与 `aria-pressed`；确认按钮禁用时必须通过提示条/标题说明阻塞原因；运行态护盾等生存资源必须在顶栏可见，避免只依赖 Toast 记忆。 |
+| 2026-06-18 | `src/utils/ammo_readability.js`, `src/render_system.js`, `src/game_phase.js`, `src/ui/hud.js`, `src/ui_system.js`, `index.html` | **下一发弹药可读性增强**：新增统一弹药读数工具，战斗 HUD 与 Canvas 发射器共用“超NB/很强/能打/不太行”、形态、装填格、炮管数与主属性摘要；发射器绘制层补强强度环、炮管和装填格，不改变伤害公式。 |
 | 2026-04-17 | `index.html`, `src/game_system.js` | 游戏容器宽高未同时适配屏幕宽度和高度：原 `height: 100dvh` 在竞屏手机上会超出屏幕宽度；`sys_resize` 中 `container.style.height = window.innerHeight` 会覆盖 CSS 高度计算。 | **完整等比缩放方案**：1. `#app-wrapper` 的 `align-items` 改为 `center`（防止 stretch 拉伸 game-container）；2. `#pc-left/right-sidebar` 加 `align-self: stretch`（PC 侧边栏仍填满高度）；3. `#game-container` 宽度改为 `min(100vw, calc(100dvh*9/16), 480px)`，移除 `height` 和 `min-width`，改用 `aspect-ratio: 9/16` + `max-height: 100dvh` 实现宽高双向等比缩放；4. `sys_resize()` 移除 `container.style.height` 覆盖，改用 `getBoundingClientRect()` 读取实际尺寸。 |
 
 ### 5.x 2026-06-18 新属性 UI 显示兜底记录
@@ -208,6 +209,7 @@ for (const subsystem of _subsystems) {
 - 模块编辑器写入 `currentModuleLayout` 时必须创建 `{ id, uid, pegStates, pluginStates }` 组件实例；多格占位使用 `{ ref: anchorIdx }`。不得重新写入裸字符串模块 ID，否则符文融合写入的 `pegStates` 会在替换/重建时丢失。
 - `#combat-status-panel` 是战斗态势聚合入口，由 `ui_updateCombatStatusPanel()` 节流刷新；只读 `enemies`、`defeatLineY`、`playerShield`、`ammoQueue` 等现有状态，不得在该函数内改变战斗逻辑。
 - 战斗危险反馈统一使用“稳定 / 压线 / 危险 / 护盾待触发”语义，避免各处新增彼此冲突的临时文案。
+- 下一发弹药的强弱、形态、装填格和炮管数必须统一走 `getAmmoReadabilityProfile()`；`ui_updateCombatStatusPanel()`、战斗 HUD 卡片和 `render_combat_launcherSignal()` 不得各自重新定义评分阈值。
 
 ### 6.4 src/ui/rune_launcher.js（符文发射器）
 

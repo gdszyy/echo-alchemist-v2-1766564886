@@ -23,6 +23,7 @@ import {
     BG_EMITTER_ZONE_SRC,
     getAmmoIconSrcByKey,
 } from './bitmap_icons.js';
+import { getAmmoReadabilityProfile } from './utils/ammo_readability.js';
 
 export const render_system = {
 /**
@@ -377,6 +378,7 @@ export const render_system = {
     render_combat_launcherOrbitals(ctx, centerX, centerY, recipe) {
         if (!recipe) return;
 
+        // @section:launcher_orbital_stats - 读取下一发属性并生成轨道球列表
         const stats = [];
         const mapping = {
             damage:    { val: recipe.damage > 2 ? recipe.damage : 0},
@@ -401,6 +403,7 @@ export const render_system = {
         });
         if (stats.length === 0) return;
 
+        // @section:launcher_orbital_motion - 装填/蓄力时的半径、透明度与缩放
         // --- 动画数值计算 ---
         let currentRotation = this.orbitalAngle;
         let baseRadius = 55;
@@ -435,6 +438,7 @@ export const render_system = {
         ctx.translate(centerX, centerY);
         ctx.globalAlpha = Math.max(0, globalAlpha);
 
+        // @section:launcher_orbital_track - 绘制轨道环和位图连线资源
         // 绘制轨道线 (仅在非吸收状态画)
         if (radius > 15 && radius < 150) {
             ctx.beginPath();
@@ -450,6 +454,7 @@ export const render_system = {
         const flowFrameIdx = Math.floor((Date.now() / 90) % ORBITAL_LINK_FLOW.length);
         const flowImg      = getUiBitmap(ORBITAL_LINK_FLOW[flowFrameIdx]);
 
+        // @section:launcher_orbital_orbs - 绘制属性球、图标、连线和吸入轨迹
         stats.forEach((stat, index) => {
             const angle = stepAngle * index + currentRotation;
             const ox = Math.cos(angle) * radius;
@@ -605,6 +610,146 @@ export const render_system = {
                 }
             }
         });
+
+        ctx.restore();
+    },
+
+    /**
+     * [RENDER] 绘制发射器的下一发可读性信号：强度环、炮管、装填格和弹体形态线索。
+     * @perf-impact: 发射器下一发信号 - 每帧最多 3 条描边环、6 个装填格与 6 根炮管；low 档关闭 shadowBlur 与额外形态光线。
+     */
+    render_combat_launcherSignal(ctx, cx, cy, portX, portY, recipe) {
+        if (!recipe) return;
+        const profile = getAmmoReadabilityProfile(recipe);
+        const quality = this.perfQualityLevel || 'high';
+        const highFx = quality === 'high';
+        const glowFx = quality !== 'low';
+        const time = Date.now();
+        const pulse = (Math.sin(time / 220) + 1) / 2;
+        const accent = profile.primary.color || '#fbbf24';
+        const ringCount = highFx ? Math.min(3, 1 + Math.ceil(profile.powerRatio * 2)) : 1;
+        const relPortX = portX - cx;
+        const relPortY = portY - cy;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+
+        // 强度环：越强越亮、环越多。low 档保留平面描边，不做发光。
+        ctx.lineCap = 'round';
+        for (let i = 0; i < ringCount; i++) {
+            const r = 31 + i * 7 + (highFx ? pulse * (1.2 + i) : 0);
+            ctx.beginPath();
+            ctx.arc(0, 0, r, -Math.PI * 0.78, -Math.PI * 0.22);
+            ctx.strokeStyle = accent;
+            ctx.globalAlpha = (0.24 + profile.powerRatio * 0.44) * (1 - i * 0.18);
+            ctx.lineWidth = 2 + profile.powerRatio * 2.5 - i * 0.35;
+            if (glowFx) {
+                ctx.shadowColor = accent;
+                ctx.shadowBlur = _sb(5 + profile.powerRatio * 12);
+            }
+            ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+
+        // 炮管数量：连射/散射越多，发射口上方出现越多短炮管。
+        const barrelGap = profile.barrelCount >= 5 ? 5 : 6;
+        const barrelStart = -((profile.barrelCount - 1) * barrelGap) / 2;
+        const barrelLen = 14 + profile.powerRatio * 12;
+        for (let i = 0; i < profile.barrelCount; i++) {
+            const off = barrelStart + i * barrelGap;
+            const isCenter = Math.abs(off) < 0.5;
+            ctx.save();
+            ctx.translate(relPortX + off, relPortY + 5);
+            ctx.rotate(off * 0.012);
+            ctx.fillStyle = isCenter ? accent : 'rgba(226, 232, 240, 0.72)';
+            ctx.strokeStyle = accent;
+            ctx.globalAlpha = isCenter ? 0.95 : 0.72;
+            if (glowFx && isCenter) {
+                ctx.shadowColor = accent;
+                ctx.shadowBlur = _sb(5 + profile.powerRatio * 8);
+            }
+            ctx.beginPath();
+            ctx.roundRect(-2.2, -barrelLen, 4.4, barrelLen + 6, 2);
+            ctx.fill();
+            ctx.globalAlpha = 0.85;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 装填格：表示本发属性/强度被压进了多少格弹仓。
+        const loadY = 36;
+        const loadGap = 7;
+        const loadStart = -(6 - 1) * loadGap / 2;
+        const loadEntries = profile.entries.length > 0 ? profile.entries : [profile.primary];
+        for (let i = 0; i < 6; i++) {
+            const lit = i < profile.loadCount;
+            const entry = loadEntries[i % loadEntries.length] || profile.primary;
+            ctx.beginPath();
+            ctx.roundRect(loadStart + i * loadGap - 2.4, loadY, 4.8, 9, 2);
+            ctx.fillStyle = lit ? (entry.color || accent) : 'rgba(30, 41, 59, 0.78)';
+            ctx.globalAlpha = lit ? 0.95 : 0.55;
+            ctx.fill();
+            ctx.strokeStyle = lit ? 'rgba(255,255,255,0.65)' : 'rgba(100,116,139,0.45)';
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+        }
+
+        // 形态提示：不改变 Projectile 本体，只在发射口旁加线索。
+        if (glowFx) {
+            ctx.save();
+            ctx.translate(relPortX, relPortY);
+            ctx.strokeStyle = accent;
+            ctx.fillStyle = accent;
+            ctx.globalAlpha = 0.52 + profile.powerRatio * 0.28;
+            ctx.lineWidth = 1.4 + profile.powerRatio;
+            ctx.shadowColor = accent;
+            ctx.shadowBlur = _sb(5 + profile.powerRatio * 7);
+            if (profile.shapeLabel === '散射扇') {
+                for (let i = -2; i <= 2; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, -8);
+                    ctx.lineTo(i * 8, -28 - Math.abs(i) * 2);
+                    ctx.stroke();
+                }
+            } else if (profile.shapeLabel === '光束炮' || profile.shapeLabel === '穿甲锥') {
+                ctx.beginPath();
+                ctx.moveTo(0, -10);
+                ctx.lineTo(0, -38);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, -42);
+                ctx.lineTo(-5, -32);
+                ctx.lineTo(5, -32);
+                ctx.closePath();
+                ctx.fill();
+            } else if (profile.shapeLabel === '爆破弹') {
+                for (let i = 0; i < 4; i++) {
+                    const a = -Math.PI / 2 + i * Math.PI / 2;
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(a) * 13, Math.sin(a) * 13);
+                    ctx.lineTo(Math.cos(a) * 23, Math.sin(a) * 23);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+        }
+
+        // 小型评级牌：放在发射器旁，避免和弹体重叠。
+        ctx.globalAlpha = 0.92;
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.74)';
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(23, -47, 24, 17, 5);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = accent;
+        ctx.font = 'bold 10px Cinzel';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(profile.tierName, 35, -38);
 
         ctx.restore();
     },
