@@ -19,7 +19,6 @@ import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
 import { COUNTER_MAP, RUNE_DB } from './rune_config.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
-import { setSuppress2DEntities } from './render3d/draw_mode.js';
 
 export const game_system = {
 
@@ -81,20 +80,6 @@ export const game_system = {
         this._lastFrameTime = _now;
         // ==================== [自适应性能] END ====================
 
-        // ==================== [3D-Main M1] 3D 背景层渲染 ====================
-        // 即便暂停（isPaused）也持续渲染 3D 背景，保持氛围"活着"的呼吸感。
-        // 失败回退已在 Renderer3D 构造阶段处理（this.renderer3d 可能为 null）。
-        if (this.renderer3d) {
-            try {
-                this.renderer3d.render(_now);
-            } catch (err) {
-                // 渲染期出错（如 shader 编译延迟失败）→ 一次性禁用，避免循环报错刷屏
-                console.error('[Renderer3D] render error, disabling:', err);
-                try { this.renderer3d.dispose(); } catch (_) {}
-                this.renderer3d = null;
-            }
-        }
-
         // 暂停时跳过物理更新，但继续请求下一帧以保持 rAF 循环活跃
         if (this.isPaused) {
             requestAnimationFrame(() => this.sys_loop());
@@ -116,23 +101,7 @@ export const game_system = {
         // 同步 UI 蒙版状态（ui_updateSlowMotion 读取此 flag 控制 #slow-motion-overlay 显隐）
         this.isSlowMotion = this.slowMotionTimer > 0;
 
-        // [promare-hitstop] Hit-feedback 三件套之停帧
-        // 由 EventBus(COMBAT_DAMAGE_DEALT/COMBAT_ENEMY_KILLED) 在 core.js 写入 this.hitstopFrames。
-        // 停帧期间将本帧 timeScale 强制为 0，让物理与动画全部冻结，仅 UI 层渲染继续。
-        // 与 slowMotionTimer 不叠乘——后者按比例缩放、前者按帧暂停，逻辑上正交。
-        let effectiveTimeScale = this.timeScale;
-        if (this.hitstopFrames && this.hitstopFrames > 0) {
-            effectiveTimeScale = 0;
-            this.hitstopFrames -= 1;
-        }
-        const timeScale = effectiveTimeScale;
-
-        // [3D-Main] 每帧同步"是否抑制 2D 实体绘制"开关。
-        // body.render3d-debug 由 #render3d-item 设置控制；entity.draw() 内首行查询此 flag。
-        const is3DMode = typeof document !== 'undefined'
-            && document.body
-            && document.body.classList.contains('render3d-debug');
-        setSuppress2DEntities(is3DMode);
+        const timeScale = this.timeScale;
 
         // 处理震动衰减
         let shakeX = 0, shakeY = 0;
@@ -190,12 +159,6 @@ export const game_system = {
                 break;
         }
 
-        // [3D-Main 修复] 此处之前有 clearRect 兜底擦掉 2D entity 绘制——但同样会擦掉 phase
-        // update 内部直接画在 ctx 上的关键 UI（瞄准线、风系连线、HP bar 等）。
-        // 现已通过 setSuppress2DEntities() 在 entity .draw() 首行 early-return；瞄准线 / UI
-        // 等非 entity 的 ctx 调用得以保留。如果发现新 entity 漏加 guard，应该在 entity 里加，
-        // 不要回退到整块 clearRect。
-
         // 6. 战场掉落物更新与渲染
         // [BUGFIX] fieldLootItems 已移入 phase_combat_update 的 LAYER 2（实体层）内渲染，
         // 原因：此处无阶段限制，会导致宝石在 selection 等非战斗阶段泄漏显示。
@@ -224,23 +187,6 @@ export const game_system = {
         // 9. [自适应性能] FPS 和性能等级指示层
         this.render_perfOverlay();
 
-        // [promare-flash] Hit-feedback 三件套之全屏白闪
-        // 由 EventBus 写入 this.flashOverlay = {color, alpha, frames}。
-        // 每帧叠加 fillRect，alpha 衰减；衰减至 <0.02 时清空。
-        // @perf-impact: 单次 fillRect 全屏覆盖，<0.1ms / 帧，无 shadowBlur。
-        if (this.flashOverlay && this.flashOverlay.alpha > 0.02) {
-            const f = this.flashOverlay;
-            this.ctx.save();
-            this.ctx.globalCompositeOperation = 'lighter';
-            this.ctx.globalAlpha = f.alpha;
-            this.ctx.fillStyle = f.color || '#FFFFFF';
-            this.ctx.fillRect(0, 0, this.width, this.height);
-            this.ctx.restore();
-            f.alpha *= 0.7;
-            f.frames -= 1;
-            if (f.frames <= 0 || f.alpha < 0.02) this.flashOverlay = null;
-        }
-
         // 10. 下一帧请求
         this.ctx.restore();
         requestAnimationFrame(() => this.sys_loop());
@@ -264,13 +210,6 @@ export const game_system = {
         if (!rect.width || !rect.height) return;
         this.width = this.canvas.width = Math.round(rect.width);
         this.height = this.canvas.height = Math.round(rect.height);
-
-        // [3D-Main M1] 同步 WebGL canvas 内部分辨率（CSS 尺寸由全局 canvas 规则控制）
-        if (this.renderer3d) {
-            try { this.renderer3d.resize(this.width, this.height); } catch (e) {
-                console.warn('[Renderer3D] resize error:', e);
-            }
-        }
 
         // 动态调整失败判定线
         // PC 模式下底部面板隐藏，可以缩小安全边距

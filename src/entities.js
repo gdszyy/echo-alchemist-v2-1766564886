@@ -40,7 +40,6 @@ import {
 import { Enemy, setEnemyAudioProvider } from './entities/enemy.js';
 import { Projectile, setProjectileAudioProvider } from './entities/projectile.js';
 import { RUNE_DB } from './rune_config.js';
-import { isSuppressed2DEntities } from './render3d/draw_mode.js';
 import {
     resolveEnhancedCollision,
     calcMagnusForce,
@@ -53,8 +52,6 @@ import {
     getUiBitmap,
 } from './bitmap_icons.js';
 import { sb as _sb } from './utils/perf.js';
-import { drawPromarePeg } from './render/promare_peg_draw.js';
-import { drawPromareDropBall } from './render/promare_dropball_draw.js';
 
 // ==================== 音频依赖注入 (重构 v2) ====================
 // 移除 Proxy 方案和 window.audio 依赖
@@ -149,7 +146,6 @@ class SpecialSlot {
      * @param {CanvasRenderingContext2D} ctx
      */
     draw(ctx) {
-        if (isSuppressed2DEntities()) return;
         if (this.hit) return;
 
         this.animTimer += 0.05;
@@ -166,73 +162,6 @@ class SpecialSlot {
         const pulse = 0.65 + Math.sin(this.animTimer) * 0.2;      // 透明度脉冲 0.45~0.85
         const midX  = (this.x + this.x2) / 2;
         const midY  = (this.y + this.y2) / 2;
-
-        // [Promare] 槽位连线：硬 zigzag 折线 + 端点几何 glyph
-        // @perf-impact: 单 slot ≤ 6 lineTo + 2 fill，无 shadowBlur。
-        if (CONFIG.visualMode === 'promare') {
-            const override = CONFIG.colorsPromareOverride || {};
-            // 按 type 映射到 5 色
-            let promareColor = '#FFFFFF';
-            if (this.type === 'recall')        promareColor = override.slotRecall    || '#FF2EA6';
-            else if (this.type === 'multicast') promareColor = override.slotMulticast || '#00B4FF';
-            else if (this.type === 'split')     promareColor = override.slotSplit     || '#00B4FF';
-            else if (this.type === 'giant')     promareColor = override.slotGiant     || '#FF2EA6';
-            else if (this.type === 'skill_point')promareColor = override.slotSkill    || '#FFE94A';
-            else if (this.type === 'wheel')     promareColor = override.slotWheel     || '#FFE94A';
-            else                                promareColor = '#FFE94A';
-
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighter';
-
-            // 1) 硬 zigzag 折线（6 段，垂直方向 ±3px 抖动）
-            const dx = this.x2 - this.x;
-            const dy = this.y2 - this.y;
-            const segLen = Math.sqrt(dx * dx + dy * dy);
-            const ux = dx / segLen, uy = dy / segLen;
-            // 垂直单位向量
-            const px = -uy, py = ux;
-            const segs = 6;
-            ctx.beginPath();
-            ctx.moveTo(this.x, this.y);
-            for (let i = 1; i < segs; i++) {
-                const t = i / segs;
-                const baseX = this.x + dx * t;
-                const baseY = this.y + dy * t;
-                const offset = ((i % 2) ? 1 : -1) * 3;
-                ctx.lineTo(baseX + px * offset, baseY + py * offset);
-            }
-            ctx.lineTo(this.x2, this.y2);
-            ctx.strokeStyle = promareColor;
-            ctx.lineWidth = 2;
-            ctx.globalAlpha = pulse;
-            ctx.stroke();
-
-            // 2) 两端钻石锚点
-            ctx.globalAlpha = 1.0;
-            [[this.x, this.y], [this.x2, this.y2]].forEach(([ax, ay]) => {
-                ctx.save();
-                ctx.translate(ax, ay);
-                ctx.beginPath();
-                ctx.moveTo(0, -5);
-                ctx.lineTo(5, 0);
-                ctx.lineTo(0, 5);
-                ctx.lineTo(-5, 0);
-                ctx.closePath();
-                ctx.fillStyle = promareColor;
-                ctx.fill();
-                ctx.restore();
-            });
-
-            // 3) 中点文本（Inter Mono 风）
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.font = 'bold 13px "Inter Mono", monospace, sans-serif';
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillText(text, midX, midY);
-            ctx.restore();
-            return;
-        }
 
         ctx.save();
 
@@ -422,23 +351,15 @@ class FortuneWheel {
     }
 
     draw(ctx) {
-        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
-
-        // [Promare] 几何命运轮盘：硬切扇形 + PINK 边框 + 黄色指针
-        // @perf-impact: 单次绘制 ≤8 扇形 fill + 1 圆环 stroke + N icon，无 shadowBlur。
-        if (CONFIG.visualMode === 'promare') {
-            this._drawPromare(ctx);
-            return;
-        }
-
+        
         // 繪製半透明黑色背景遮罩，突出輪盤
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, 0, this.game.width, this.game.height);
 
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
-
+        
         // --- 0. 繪製外發光 ---
         ctx.shadowBlur = _sb(30);
         ctx.shadowColor = '#fbbf24'; // 金色光暈
@@ -587,140 +508,6 @@ class FortuneWheel {
 
         ctx.restore();
     }
-
-    /**
-     * [Promare] 几何命运轮盘绘制：硬切扇形 + 5 色硬切板
-     * @perf-impact: 单次 N 扇形 fill + 1 圆描边 + N icon，无 shadowBlur 无渐变。
-     */
-    _drawPromare(ctx) {
-        // 半透明黑遮罩
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
-        ctx.fillRect(0, 0, this.game.width, this.game.height);
-
-        ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-
-        const PAL = { PINK: '#FF2EA6', CYAN: '#00B4FF', YELLOW: '#FFE94A', WHITE: '#FFFFFF', BLACK: '#1B0B2E' };
-        const R = this.radius;
-
-        // 外圈：BLACK 大圆 + PINK 厚边框（不旋转）
-        ctx.beginPath();
-        ctx.arc(0, 0, R + 10, 0, Math.PI * 2);
-        ctx.fillStyle = PAL.BLACK;
-        ctx.fill();
-        ctx.strokeStyle = PAL.PINK;
-        ctx.lineWidth = 3;
-        ctx.stroke();
-
-        // 内圈：CYAN 细描边
-        ctx.beginPath();
-        ctx.arc(0, 0, R, 0, Math.PI * 2);
-        ctx.strokeStyle = PAL.CYAN;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // 跑马灯灯泡（12 个小菱形环绕，每帧滚动一个亮灯）
-        const lightCount = 12;
-        const time = Date.now();
-        const currentLight = Math.floor(time / 100) % lightCount;
-        for (let i = 0; i < lightCount; i++) {
-            const la = (i / lightCount) * Math.PI * 2;
-            const lx = Math.cos(la) * (R + 5);
-            const ly = Math.sin(la) * (R + 5);
-            const isOn = (i === currentLight);
-            ctx.beginPath();
-            ctx.moveTo(lx, ly - 3);
-            ctx.lineTo(lx + 3, ly);
-            ctx.lineTo(lx, ly + 3);
-            ctx.lineTo(lx - 3, ly);
-            ctx.closePath();
-            ctx.fillStyle = isOn ? PAL.WHITE : PAL.YELLOW;
-            ctx.globalAlpha = isOn ? 1.0 : 0.4;
-            ctx.fill();
-        }
-        ctx.globalAlpha = 1.0;
-
-        // 旋转盘面
-        ctx.save();
-        ctx.rotate(this.angle);
-
-        const activeSlice = this.stopping ? this.getCurrentSlice() : null;
-        const palette = [PAL.PINK, PAL.CYAN, PAL.YELLOW, PAL.WHITE];
-
-        this.slices.forEach((s, idx) => {
-            const isHighlighted = (activeSlice === s);
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.arc(0, 0, R, s.startAngle, s.endAngle);
-            ctx.closePath();
-
-            // 5 色硬切：按 index 循环
-            ctx.fillStyle = palette[idx % palette.length];
-            ctx.globalAlpha = isHighlighted ? 1.0 : 0.7;
-            ctx.fill();
-
-            // 黑色分隔线
-            ctx.strokeStyle = PAL.BLACK;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.globalAlpha = 1.0;
-
-            // 中心 icon / 数值（白色等宽字）
-            const midAngle = s.startAngle + (s.endAngle - s.startAngle) / 2;
-            const ix = Math.cos(midAngle) * R * 0.65;
-            const iy = Math.sin(midAngle) * R * 0.65;
-            ctx.save();
-            ctx.translate(ix, iy);
-            ctx.rotate(midAngle + Math.PI / 2);
-            ctx.fillStyle = PAL.BLACK;
-            ctx.font = 'bold 14px "Inter Mono", monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            // 显示属性首字母
-            const label = (s.label || s.type || '?').slice(0, 1).toUpperCase();
-            ctx.fillText(label, 0, 0);
-            ctx.restore();
-        });
-
-        ctx.restore();
-
-        // 黄色三角指针（顶部）
-        ctx.beginPath();
-        ctx.moveTo(0, -(R + 16));
-        ctx.lineTo(8, -(R + 2));
-        ctx.lineTo(-8, -(R + 2));
-        ctx.closePath();
-        ctx.fillStyle = PAL.YELLOW;
-        ctx.fill();
-        ctx.strokeStyle = PAL.WHITE;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // 中心轴：黄色小菱形
-        ctx.beginPath();
-        ctx.moveTo(0, -6);
-        ctx.lineTo(6, 0);
-        ctx.lineTo(0, 6);
-        ctx.lineTo(-6, 0);
-        ctx.closePath();
-        ctx.fillStyle = PAL.YELLOW;
-        ctx.fill();
-
-        // 结果展示：停转后显示文字
-        if (this.resultTimer > 0 && activeSlice) {
-            ctx.font = 'bold 22px "Inter Mono", monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            // 黑色 stamp 偏移
-            ctx.fillStyle = PAL.BLACK;
-            const offs = [[2, 0], [0, 2], [-2, 0], [0, -2]];
-            for (const [ox, oy] of offs) ctx.fillText(activeSlice.label || '', ox, R + 50 + oy);
-            ctx.fillStyle = PAL.YELLOW;
-            ctx.fillText(activeSlice.label || '', 0, R + 50);
-        }
-
-        ctx.restore();
-    }
 }
 
 // ==================== GhostPeg 菱形布局裂变回响虚影钉子 ====================
@@ -737,8 +524,7 @@ class GhostPeg {
      */
     constructor(x, y, type, level) {
         this.pos = new Vec2(x, y);
-        // [3D-Main M2] 与 Peg.radius 同步：6 → 8
-        this.radius = 8;
+        this.radius = 6;
         this.type = type;
         this.level = level || 1;
         this.life = 180;       // 存活 180 帧（约 3 秒）
@@ -755,7 +541,6 @@ class GhostPeg {
     }
 
     draw(ctx) {
-        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         const x = this.pos.x, y = this.pos.y, r = this.radius;
         const lifeRatio = this.life / this.maxLife;
@@ -913,7 +698,6 @@ class TriangleSideWheel {
     }
 
     draw(ctx) {
-        if (isSuppressed2DEntities()) return;
         const x = this.x, y = this.y, r = this.radius;
         const pulse = (Math.sin(Date.now() / 500) + 1) / 2;
 
@@ -1030,9 +814,8 @@ class TriangleSideWheel {
 
 class Peg {
     constructor(x, y, type = 'normal') {
-        this.pos = new Vec2(x, y);
-        // [3D-Main M2] 6 → 8，配合视觉钉子变大；MIN_PEG_SPACING 同步更新
-        this.radius = 8;
+        this.pos = new Vec2(x, y); 
+        this.radius = 6; 
         this.type = type; 
         this.lit = false; 
         this.litTimer = 0; 
@@ -1106,9 +889,6 @@ class Peg {
     // --- 在 Peg 类中替换此方法 ---
     // --- 在 Peg 类中替换此方法 ---
     drawShadow(ctx, lightPos, lightRadius) {
-        // [3D-Main 性能] 3D 模式下整个 2D 阴影渲染都被擦除/不可见，跳过 ctx 调用
-        if (isSuppressed2DEntities()) return;
-
         const dx = this.pos.x - lightPos.x;
         const dy = this.pos.y - lightPos.y;
         const distSq = dx * dx + dy * dy;
@@ -1207,10 +987,6 @@ class Peg {
     }
     //  计算来自某个光源的影响
     calculateLight(sourcePos, lightRadius) {
-        // [3D-Main 性能] 3D 模式下 lightIntensity 不会被读（peg.draw 被 guard 跳过），
-        // 整个计算可以省。这是 O(N*M) 循环里调的，开销显著。
-        if (isSuppressed2DEntities()) return;
-
         const dx = sourcePos.x - this.pos.x;
         const dy = sourcePos.y - this.pos.y;
         const distSq = dx*dx + dy*dy;
@@ -1261,13 +1037,6 @@ class Peg {
     // --- 替换 Peg 类的 draw 方法 ---
     // @section:peg_shadow_and_transform - 软阴影与碰撞旋转变换初始化
     draw(ctx, baseRadius, tilt = {x:0, y:0}) {
-        // [3D-Main] 3D 模式：跳过 2D 钉子绘制
-        if (isSuppressed2DEntities()) return;
-        // [Promare] 2D 几何模式：菱形 + 元素 glyph
-        if (CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.useGeometricPegs) {
-            drawPromarePeg(this, ctx, baseRadius);
-            return;
-        }
         const currentRadius = baseRadius * this.scale;
         const isSpecial = this.type !== 'normal';
         const isLit = this.lit;
@@ -2657,7 +2426,7 @@ class DropBall {
                     if (_segLenSq > 0) {
                         _t = ((this.pos.x - slot.x) * _sx + (this.pos.y - slot.y) * _sy) / _segLenSq;
                         // 钉子半径 / 线段长度 = 端点排除区间宽度
-                        const _pegR = 8; // Peg.radius (3D-Main M2: 6 → 8)
+                        const _pegR = 6; // Peg.radius
                         const _segLen = Math.sqrt(_segLenSq);
                         const _tMargin = _pegR / _segLen;
                         // 只有投影落在两端钉子之间的内部区间时才触发
@@ -2923,106 +2692,11 @@ class DropBall {
 
                     if (peg.cooldownTimer <= 0 && peg.frozenTurns <= 0) {
                         // --- [关键修改：传递速度参数] ---
-                        const impactSpeedVal = impactVel.mag();
+                        const impactSpeedVal = impactVel.mag(); 
                         peg.hit(impactSpeedVal);
-                        this.hitCount++;
+                        this.hitCount++; 
                         // 如果是普通钉子 (normal)，触发两次能量球反馈
                         game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel, peg.type);
-
-                        // [视觉调优] 用户反馈"弹珠在钉盘上撞击获取属性时需要少量碰撞特效"——
-                        // 在 3D 渲染器开启时，给被撞钉子打一次 shader 击中冲量（白闪 + 微膨胀），
-                        // 并按钉子类型撒 3-5 颗元素色 spark 粒子；普通钉子撒得少（2-3 颗），
-                        // 特殊钉子（pyro/cryo/lightning/...）色彩更鲜明（PINK/CYAN/YELLOW）。
-                        const r3d = game.renderer3d;
-                        if (r3d && r3d.proxy && r3d.proxy.pulsePeg) {
-                            const pegIdx = game.pegs.indexOf(peg);
-                            if (pegIdx >= 0) {
-                                // 撞击力度 → 冲量强度（弹珠最大速度 ~12，clamp 到 0..1）
-                                const pulseIntensity = Math.min(1.0, Math.max(0.4, impactSpeedVal / 9.0));
-                                r3d.proxy.pulsePeg(pegIdx, pulseIntensity);
-                            }
-                            // 元素 → promare 5 色映射（与 Renderer3D ELEMENT_FX 同源）
-                            const PEG_SPARK_COLOR = {
-                                pyro:      0xFF2EA6, // PINK
-                                bounce:    0xFF2EA6,
-                                resonance: 0xFF2EA6,
-                                cryo:      0x00B4FF, // CYAN
-                                wind:      0x00B4FF,
-                                laser:     0x00B4FF,
-                                lightning: 0xFFE94A, // YELLOW
-                                scatter:   0xFFE94A,
-                                venom:     0xFFE94A,
-                                damage:    0xFFFFFF,
-                                pierce:    0xFFFFFF,
-                                flying_sword: 0xFFFFFF,
-                                pink:      0xFF2EA6,
-                                normal:    0xFFFFFF,
-                            };
-                            const sparkColor = PEG_SPARK_COLOR[peg.type] || 0xFFFFFF;
-                            // 普通钉子粒子量小（避免视觉噪声），属性钉子稍多
-                            const sparkCount = (peg.type === 'normal' || peg.type === 'pink') ? 3 : 5;
-                            // [Promare v2] 3D GPU spark 在 Bloom 降到 0.35 后几乎不可见（加法混合 + 小尺寸）。
-                            // 把粒子放大 + 调高内核亮度，让它们在低 bloom 下也能被看到。
-                            r3d.proxy.spawnParticles({
-                                x: peg.pos.x,
-                                y: peg.pos.y,
-                                color: sparkColor,
-                                mode: 'spark',
-                                count: sparkCount,
-                                size: 5.5,                          // 旧 2.2 → 5.5（弥补 Bloom 缩水）
-                                lifetime: 0.35,
-                                spread: 0.9,
-                                speed: 6 + impactSpeedVal * 0.6,
-                            });
-                        }
-
-                        // [Promare v2] 2D Promare 三角粒子补丁 —— 与 3D spark 共生，
-                        // 不依赖 Bloom，深紫底上硬色块直接可见。
-                        // peg.type → Promare mode：复用元素 codex；normal/pink/resonance 退化到 damage_diamond。
-                        if (typeof game.spawn_createParticle === 'function') {
-                            const PEG_PROMARE_MODE = {
-                                pyro:     'pyro_cone',
-                                cryo:     'cryo_oct',
-                                lightning:'thunder_z',
-                                pierce:   'pierce_lance',
-                                bounce:   'bounce_hex',
-                                scatter:  'scatter_star',
-                                venom:    'venom_tri',
-                                laser:    'laser_beam',
-                                wind:     'damage_diamond',     // wind_slash 不在 PROMARE_MODES，退化
-                                damage:   'damage_diamond',
-                                flying_sword: 'damage_diamond',
-                                resonance:'damage_diamond',
-                                normal:   'damage_diamond',
-                                pink:     'damage_diamond',
-                            };
-                            const PEG_PROMARE_COLOR = {
-                                pyro:'#FF2EA6', bounce:'#FF2EA6', resonance:'#FF2EA6', pink:'#FF2EA6',
-                                cryo:'#00B4FF', wind:'#00B4FF', laser:'#00B4FF',
-                                lightning:'#FFE94A', scatter:'#FFE94A', venom:'#FFE94A',
-                                damage:'#FFFFFF', pierce:'#FFFFFF', flying_sword:'#FFFFFF', normal:'#FFFFFF',
-                            };
-                            const pMode  = PEG_PROMARE_MODE[peg.type]  || 'damage_diamond';
-                            const pColor = PEG_PROMARE_COLOR[peg.type] || '#FFFFFF';
-                            // 2-3 个 promare 粒子（轻量；F1-F7 自动套用）
-                            const pCount = (peg.type === 'normal' || peg.type === 'pink') ? 2 : 3;
-                            // 沿入射反方向 ±60° 锥喷出，模拟"反弹溅射"
-                            const reverseA = Math.atan2(-impactVel.y, -impactVel.x);
-                            for (let k = 0; k < pCount; k++) {
-                                const a  = reverseA + (Math.random() - 0.5) * (Math.PI * 0.66);
-                                const sp = 1.5 + Math.random() * 2.0;
-                                const pp = game.spawn_createParticle(peg.pos.x, peg.pos.y, pColor, pMode);
-                                if (pp && pp.vel) {
-                                    pp.vel.x = Math.cos(a) * sp;
-                                    pp.vel.y = Math.sin(a) * sp;
-                                    pp.size = (pp.size || 2) * 0.8;   // 钉子击中比 burst 小一号
-                                    pp.life = 0.55;                    // ~30 帧寿命
-                                    pp.maxLife = pp.life;
-                                    pp.decay = 0.04;
-                                    if (pMode === 'pierce_lance' || pMode === 'wind_slash') pp.angle = a;
-                                }
-                            }
-                        }
 
                         if (peg.type === 'normal' && Math.random() < CONFIG.balance.normalPegSecondEnergChancey) {
                             game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.65), 'normal');
@@ -3365,20 +3039,13 @@ class DropBall {
          * @description 分层绘制弹珠 (更新：爆破弹珠专属视觉)
          */
         draw(ctx) {
-            if (isSuppressed2DEntities()) return;
             if (!this.active) return;
-
-            // [Promare] 几何弹珠路径：六边面化 + billboard 环
-            if (CONFIG.visualMode === 'promare' && CONFIG.promare && CONFIG.promare.useGeometricPegs) {
-                drawPromareDropBall(this, ctx);
-                return;
-            }
-
+            
             const x = this.pos.x;
             const y = this.pos.y;
             const r = this.radius;
             const buffs = this.getBuffState();
-
+            
             ctx.save();
             ctx.translate(x, y);
 
@@ -3831,7 +3498,6 @@ class SwordQi {
     }
 
     draw(ctx) {
-        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
@@ -3866,7 +3532,6 @@ class SlashAnim {
         if (this.life <= 0) this.active = false;
     }
     draw(ctx) {
-        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
@@ -4247,7 +3912,6 @@ class SonSword {
     }
 
         draw(ctx) {
-            if (isSuppressed2DEntities()) return;
         if (!this.active || this.state === 'stuck') return; 
 
         const color = this.level >= 3 ? '#f43f5e' : (this.level >= 2 ? '#6366f1' : '#0ea5e9');
@@ -4388,7 +4052,6 @@ class CloneSpore {
     }
 
     draw(ctx) {
-        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
@@ -4641,7 +4304,6 @@ class Player {
      * @param {CanvasRenderingContext2D} ctx - 绘图上下文
      */
     draw(ctx) {
-        if (isSuppressed2DEntities()) return;
         const nextAmmo = this.game.ammoQueue.length > 0 ? this.game.ammoQueue[0] : null;
         
         // 计算当前绘制位置（可能有抖动）
@@ -5049,62 +4711,12 @@ class FieldLootItem {
     }
 
     draw(ctx) {
-        if (isSuppressed2DEntities()) return;
         if (!this.active || this.opacity <= 0) return;
 
         const floatY = Math.sin(this._animTimer) * 5;
         const pulseScale = 1 + Math.sin(this._animTimer * 0.8) * 0.05;
         const finalScale = this.scale * pulseScale;
         const drawY = this.y + floatY;
-
-        // [Promare] 几何掉落物：菱形容器 + 类型色硬切
-        if (CONFIG.visualMode === 'promare') {
-            ctx.save();
-            ctx.translate(this.x, drawY);
-            ctx.scale(finalScale, finalScale);
-            ctx.globalAlpha = this.opacity;
-            // 按类型选色
-            let primary = '#FFE94A'; // 默认 relic 黄
-            if (this.type === 'chaos_essence') primary = '#FF2EA6';     // 混沌 = 粉
-            else if (this.type === 'pure_essence') primary = '#FFFFFF'; // 纯净 = 白
-            else if (this.type === 'rune_fragments') primary = '#00B4FF'; // 符文碎片 = 青
-            // 外层菱形容器（黑底白边）
-            const r = 18;
-            ctx.beginPath();
-            ctx.moveTo(0, -r);
-            ctx.lineTo(r, 0);
-            ctx.lineTo(0, r);
-            ctx.lineTo(-r, 0);
-            ctx.closePath();
-            ctx.fillStyle = '#1B0B2E';
-            ctx.fill();
-            ctx.strokeStyle = '#FFFFFF';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            // 内层小菱形（类型色实心）
-            ctx.beginPath();
-            ctx.moveTo(0, -r * 0.55);
-            ctx.lineTo(r * 0.55, 0);
-            ctx.lineTo(0, r * 0.55);
-            ctx.lineTo(-r * 0.55, 0);
-            ctx.closePath();
-            ctx.fillStyle = primary;
-            ctx.fill();
-            // 4 顶点黄色装饰菱形（拼贴感）
-            ctx.fillStyle = '#FFE94A';
-            const corners = [{x: 0, y: -r * 1.15}, {x: r * 1.15, y: 0}, {x: 0, y: r * 1.15}, {x: -r * 1.15, y: 0}];
-            for (const c of corners) {
-                ctx.beginPath();
-                ctx.moveTo(c.x, c.y - 2.5);
-                ctx.lineTo(c.x + 2.5, c.y);
-                ctx.lineTo(c.x, c.y + 2.5);
-                ctx.lineTo(c.x - 2.5, c.y);
-                ctx.closePath();
-                ctx.fill();
-            }
-            ctx.restore();
-            return;
-        }
 
         ctx.save();
         ctx.translate(this.x, drawY);
@@ -5183,67 +4795,9 @@ class RuneLoot {
      * @param {CanvasRenderingContext2D} ctx - 绘图上下文
      */
     draw(ctx) {
-        if (isSuppressed2DEntities()) return;
         if (!this.active) return;
 
         this._animTimer += 0.05;
-
-        // [Promare] 几何符文掉落物：六边形容器 + 元素色硬切
-        if (CONFIG.visualMode === 'promare') {
-            const runeDef = (typeof RUNE_DB !== 'undefined') ? RUNE_DB[this.runeId] : null;
-            // 元素色映射
-            const elem = runeDef && runeDef.element;
-            let primary = '#FFE94A';
-            if (elem === 'pyro' || elem === 'bounce') primary = '#FF2EA6';
-            else if (elem === 'cryo' || elem === 'wind' || elem === 'laser') primary = '#00B4FF';
-            else if (elem === 'lightning' || elem === 'scatter' || elem === 'venom') primary = '#FFE94A';
-            else if (elem === 'pierce') primary = '#FFFFFF';
-            const floatY = Math.sin(this._animTimer * 2) * 4;
-            const drawY = this.y + floatY;
-            const r = 14;
-            ctx.save();
-            ctx.translate(this.x, drawY);
-            // 六边形容器（黑底主色边）
-            ctx.beginPath();
-            for (let i = 0; i < 6; i++) {
-                const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
-                const px = Math.cos(a) * r;
-                const py = Math.sin(a) * r;
-                if (i === 0) ctx.moveTo(px, py);
-                else ctx.lineTo(px, py);
-            }
-            ctx.closePath();
-            ctx.fillStyle = '#1B0B2E';
-            ctx.fill();
-            ctx.strokeStyle = primary;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            // 中心小钻石（主色实心）
-            ctx.beginPath();
-            ctx.moveTo(0, -r * 0.45);
-            ctx.lineTo(r * 0.45, 0);
-            ctx.lineTo(0, r * 0.45);
-            ctx.lineTo(-r * 0.45, 0);
-            ctx.closePath();
-            ctx.fillStyle = primary;
-            ctx.fill();
-            // 等级 pip（顶部小三角，level 1-3）
-            if (runeDef && runeDef.level) {
-                const lvl = Math.min(3, runeDef.level || 1);
-                for (let i = 0; i < lvl; i++) {
-                    ctx.beginPath();
-                    const px = (i - (lvl - 1) / 2) * 4;
-                    ctx.moveTo(px, -r - 4);
-                    ctx.lineTo(px + 2, -r - 1);
-                    ctx.lineTo(px - 2, -r - 1);
-                    ctx.closePath();
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fill();
-                }
-            }
-            ctx.restore();
-            return;
-        }
 
         // ============================================================
         // [spawn 入场动画] 入场进度（用 _animTimer 模拟，前 7 帧为入场阶段）

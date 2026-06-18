@@ -332,67 +332,6 @@ const CONFIG = {
         slotGiant: '#ef4444', // 紅色 (變大)
         slotSkill: '#10b981', // 綠色 (技能點)
     },
-
-    // ==================== 普罗米亚视觉模式（Promare Visual Mode）====================
-    // 设计方案见 docs/promare 系列与 src/render/promare_tokens.js
-    // [P9] 已翻为默认。console: window.__promare(false) 可临时回退到经典模式。
-    visualMode: 'promare',
-    promare: {
-        useGeometricEnemies:    true,  // 启用几何敌人（绕过 sprite）
-        useGeometricPegs:       true,  // 启用钻石钉子
-        useGeometricProjectiles:true,  // 启用元素形状子弹
-        hideSprites:            true,  // 隐藏所有 sprite PNG（sprite_renderer 直接 return）
-        hideBackgroundBitmap:   true,  // 跳过 BG_MAIN_CANVAS_SRC，用扫描线背景
-        backgroundTiltFactor:   0.5,   // 扫描线随板子 tilt 联动倍率（0=不联动, 1=完全联动）
-    },
-    // colors.promareOverride 由渲染器读取替换 colors.*，gameplay 逻辑不受影响
-    colorsPromareOverride: {
-        // 元素子弹/钉子映射到 5 色家族
-        matBounce:      '#FF2EA6',   // PINK 系
-        matPierce:      '#FFFFFF',   // WHITE 主 + PINK accent
-        matScatter:     '#FFE94A',   // YELLOW
-        matDamage:      '#FFFFFF',
-        matCryo:        '#00B4FF',   // CYAN
-        matPyro:        '#FF2EA6',   // PINK
-        matLightning:   '#FFE94A',   // YELLOW
-        matWind:        '#00B4FF',   // CYAN
-        matWind_lv2:    '#00B4FF',
-        matWind_lv3:    '#00B4FF',
-        matVenom:       '#FFE94A',
-        marbleWhite:    '#FFFFFF',
-        matMatryoshka:  '#FF2EA6',
-        marbleRedStripe:'#FF2EA6',
-
-        flying_sword:   '#FFFFFF',
-        flying_sword_lv2:'#FFFFFF',
-        flying_sword_lv3:'#FF2EA6',
-        laser:          '#00B4FF',
-        resonance:      '#FFE94A',
-        resonanceRipple:'#00B4FF',
-
-        // 背景/钉子
-        bg:             '#1B0B2E',
-        peg:            '#FFFFFF',   // 中性钉子（半透明 WHITE，由 promare_peg_draw 控）
-        pegActive:      '#FFFFFF',
-        pegPink:        '#FF2EA6',
-
-        // 敌人状态色 → 全收敛到 WHITE，靠加法 alpha 区分强度
-        enemy:          '#FFFFFF',
-        enemyHit:       '#FFFFFF',
-        enemyFrozen:    '#00B4FF',
-        enemyOverheat:  '#FF2EA6',
-        enemyShield:    '#FFFFFF',
-
-        // 槽位 glyph 颜色 → 按语义收敛
-        slotRecall:     '#FF2EA6',   // 撤回 = 危险
-        slotMulticast:  '#00B4FF',   // 增益
-        slotSplit:      '#00B4FF',
-        slotGiant:      '#FF2EA6',
-        slotSkill:      '#FFE94A',
-        slotWheel:      '#FFE94A',
-        wheelPointer:   '#FFE94A',
-    },
-
     evolutionRules: {
         'pierce': {
             'pierce': { result: 'flying_sword', type: 'mutation' }, // 穿透球撞穿透钉 -> 突变
@@ -817,10 +756,8 @@ const CONFIG = {
         moduleAreaBottomMargin: 80,    // 模块区域底部留白
         moduleSpacingX: 4,             // 模块横向间距 px
         moduleSpacingY: 4,             // 模块纵向间距 px
-        // 钉板左右两侧到画布墙的留白
-        // [3D-Main M2] 23 → 32：钉子半径增大到 11 px（视觉）后，原 23 px 留白让最左/最右钉子与
-        //   左右能量墙的发光区视觉重叠。32 = 11(peg radius) + 10(marble doubled radius) + 11(buffer)
-        moduleAreaSideMargin: 32,
+        // 钉板左右两侧到画布墙的留白（每侧 1.5 个弹珠直径 = 1.5 × 2 × 7.7 ≈ 23 px）
+        moduleAreaSideMargin: 23,
         // ==================== [v2 局内商店 + 符文碎片经济] ====================
         runShopInterval: 2,            // 每 N 场战斗弹出一次局内商店
         runShopRefreshCost: 10,        // 刷新一次商店消耗碎片

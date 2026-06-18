@@ -12,7 +12,6 @@
 *   **自动函数索引**：[`.cursor/rules/auto_index/INDEX.md`](.cursor/rules/auto_index/INDEX.md)（在涉及大文件修改时必读；包含所有大文件的函数名、行号范围和 @section 内部节点映射，由 `code-indexer` 脚本自动维护，**严禁手动编辑**）。
 *   **位图化视觉重构规格**：[`design_spec_bitmap.md`](design_spec_bitmap.md)（凡涉及位图生成、Sprite 接入、图标替换的任务必读；包含 UI 切图清单、敌人 Sprite 规格、Boss 形象清单）。
 *   **测试基础设施规范**：[`.cursor/rules/testing.md`](.cursor/rules/testing.md)（凡修改涉及遗物、精华、符文词条、敌人词条等核心机制时必读；包含试炼场场景规范、Puppeteer 测试套件运行方式、测试覆盖范围与已知盲区）。
-*   **普罗米亚视觉模式规范**：[`.cursor/rules/promare_design.md`](.cursor/rules/promare_design.md)（**默认视觉模式**。凡修改 `src/render/promare_*.js`、新增元素/词缀/Boss 的视觉、调整 `CONFIG.visualMode` 或 `body.promare-mode` CSS 时必读；包含 5 色硬切板契约、12 元素 codex、10 词缀 codex、8 Boss silhouette grammar、命中/击杀反馈三层、性能预算表、修改强制流程）。
 
 所有专门针对本项目的技能 (如 `echo-developer`) 仅需指引 Agent 阅读上述入口，无需在技能文件内硬编码具体的架构细节或行数统计。
 

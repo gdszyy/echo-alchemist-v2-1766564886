@@ -1,0 +1,10 @@
+{
+  "frameSize": 256,
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 6,
+      "fps": 6
+    }
+  }
+}

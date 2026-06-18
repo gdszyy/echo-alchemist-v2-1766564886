@@ -63,14 +63,54 @@ export const RUNE_ICON_MAP = {
 // ============================================================
 // Task 5.A7 — 遗物图标映射（53 种遗物 64×64）
 // key 对应 RELIC_DB 中的 id 字段
-//
-// [3D-Main 清理] 遗物 PNG 已在 M6 删除（M5 RelicCard 3D 卡片接管），
-// 此处保留导出形状但清空内容。所有 getRelicIconSrc 返回 null，
-// FieldLootItem.draw 走 emoji fallback（已实现），无 404 噪音。
-// 若后续 FieldLootItem 也接入 3D 渲染（小型 RelicCard / 程序化徽记），
-// 这个 export 可以彻底移除。
 // ============================================================
-export const RELIC_ICON_MAP = {};
+export const RELIC_ICON_MAP = {
+    gigantism_relic:           'assets/icons/relic/gigantism_relic.png',
+    chaos_essence:             'assets/icons/relic/chaos_essence.png',
+    pure_essence:              'assets/icons/relic/pure_essence.png',
+    dimension_shard:           'assets/icons/relic/dimension_shard.png',
+    dimension_crystal:         'assets/icons/relic/dimension_crystal.png',
+    stars_shines:              'assets/icons/relic/stars_shines.png',
+    optical_lens:              'assets/icons/relic/optical_lens.png',
+    pink_slime:                'assets/icons/relic/pink_slime.png',
+    energy_shield:             'assets/icons/relic/energy_shield.png',
+    unlock_recall:             'assets/icons/relic/unlock_recall.png',
+    unlock_multicast:          'assets/icons/relic/unlock_multicast.png',
+    unlock_split:              'assets/icons/relic/unlock_split.png',
+    slot_expander:             'assets/icons/relic/slot_expander.png',
+    cryo_stone:                'assets/icons/relic/cryo_stone.png',
+    pyro_stone:                'assets/icons/relic/pyro_stone.png',
+    // lightning_stone 暂未生成位图：移除指向 cryo_stone 的错误 fallback，让 UI 走 emoji
+    tactical_kit_pierce:       'assets/icons/relic/tactical_kit_pierce.png',
+    tactical_kit_scatter:      'assets/icons/relic/tactical_kit_scatter.png',
+    tactical_kit_damage:       'assets/icons/relic/tactical_kit_damage.png',
+    explosive_ammo:            'assets/icons/relic/explosive_ammo.png',
+    prism_shard:               'assets/icons/relic/prism_shard.png',
+    russian_doll:              'assets/icons/relic/russian_doll.png',
+    triangle_formation:        'assets/icons/relic/triangle_formation.png',
+    diamond_formation:         'assets/icons/relic/diamond_formation.png',
+    sparse_interval:           'assets/icons/relic/sparse_interval.png',
+    mirror_sync:               'assets/icons/relic/mirror_sync.png',
+    wide_narrow:               'assets/icons/relic/wide_narrow.png',
+    surge_bounce:              'assets/icons/relic/surge_bounce.png',
+    surge_pierce:              'assets/icons/relic/surge_pierce.png',
+    surge_scatter:             'assets/icons/relic/surge_scatter.png',
+    surge_damage:              'assets/icons/relic/surge_damage.png',
+    surge_cryo:                'assets/icons/relic/surge_cryo.png',
+    surge_pyro:                'assets/icons/relic/surge_pyro.png',
+    alchemist_powder_tube:     'assets/icons/relic/alchemist_powder_tube.png',
+    smuggler_pouch_common:     'assets/icons/relic/smuggler_pouch_common.png',
+    smuggler_chest_rare:       'assets/icons/relic/smuggler_chest_rare.png',
+    smuggler_vault_epic:       'assets/icons/relic/smuggler_vault_epic.png',
+    smuggler_sanctum_legendary:'assets/icons/relic/smuggler_sanctum_legendary.png',
+    desperation_blade:         'assets/icons/relic/desperation_blade.png',
+    skill_frost_prison:        'assets/icons/relic/skill_frost_prison.png',
+    skill_thunder_call:        'assets/icons/relic/skill_thunder_call.png',
+    skill_kinetic_burst:       'assets/icons/relic/skill_kinetic_burst.png',
+    skill_meltdown_nova:       'assets/icons/relic/skill_meltdown_nova.png',
+    skill_blade_rain:          'assets/icons/relic/skill_blade_rain.png',
+    skill_prismatic_shot:      'assets/icons/relic/skill_prismatic_shot.png',
+};
 
 // ============================================================
 // 敵人視覺 V2 — 基底圖標映射（圖鑒 / 試煉場 / 結算頁引用）
