@@ -96,26 +96,9 @@ export const game_phase = {
             });
         }
 
-        // ==================== [v2 钉板模块化] 进入采集前先打开模块编辑器 ====================
-        // 玩家可以在每场遗物结束后/采集开始前重新摆放模块、融合符文。
-        // 编辑器关闭后才真正进入采集阶段。混沌契约和教程局跳过编辑器。
-        const skipEditor = (this.ownedRelics && this.ownedRelics.includes('chaos_pact'))
-            || this._isTutorialRun
-            || this._moduleEditorShownThisRound;
-        if (!skipEditor && typeof this.ui_showModuleEditor === 'function') {
-            this._moduleEditorShownThisRound = true;
-            this.ui_showModuleEditor(() => {
-                // 注意：保持 _moduleEditorShownThisRound = true，
-                // 这样递归调用 phase_startGatheringPhase 时 skipEditor 为 true，
-                // 不会再次打开编辑器，并在下方第 113 行被重置为 false。
-                this.phase_startGatheringPhase();
-            });
-            return;
-        }
-        this._moduleEditorShownThisRound = false;
-
         // --- [遗物 Hook] 混沌契约 (chaos_pact)：跳过研磨阶段，直接进入战斗 ---
         // 规则：契约持有者无法进行研磨；ammoQueue 复用上一回合的子弹快照，没有则用默认基础子弹兜底。
+        // [v2 重构] 必须在切换到 gathering / 构建钉板之前判断并提前返回。
         if (this.ownedRelics && this.ownedRelics.includes('chaos_pact')) {
             const baseDmg = (CONFIG && CONFIG.gameplay && CONFIG.gameplay.baseDamage) || 1;
             const defaultRecipe = () => ({
@@ -151,11 +134,19 @@ export const game_phase = {
         this.ammoQueue = []; 
         this.dropBalls = []; 
         this.activeMarbleIndex = 0; 
-        this.combat_updateHitProgress(0, this.persistentThreshold); 
-        this.ui_updateGatheringQueueUI(); 
-        this.ui_renderRecipeHUD(); 
+        this.combat_updateHitProgress(0, this.persistentThreshold);
+        this.ui_updateGatheringQueueUI();
+        this.ui_renderRecipeHUD();
         this.combat_updateMulticastDisplay(0);
         this.ui_renderRecipeHUD();
+
+        // ==================== [v2 重构] 钉板内嵌编辑器 ====================
+        // 实时钉板已构建完成，直接在画布上叠加可点击的虚框区域供玩家更换模块。
+        // 玩家点击「开始采集」后退出编辑、正常发射弹珠。教程局跳过。
+        const skipEditor = this._isTutorialRun;
+        if (!skipEditor && typeof this.ui_showModuleEditor === 'function') {
+            this.ui_showModuleEditor();
+        }
     },
 
 /**
@@ -349,6 +340,80 @@ export const game_phase = {
     // 调用 v2 模块化实现；旧的 phase_gathering_initPachinko_legacy 保留作参考
     phase_gathering_initPachinko(shouldInherit = false) {
         return this.phase_gathering_initPachinko_v2(shouldInherit);
+    },
+
+    /**
+     * [v2 重构] 在实时钉板画布上绘制「可编辑钉盘区域」虚框描边。
+     * 每个已解锁的模块槽位用虚框标出；已放置模块的区域显示图标+名称，
+     * 空区域显示「＋ 点击放置」。点击命中检测见 _moduleEditor_handleClick。
+     * 仅在 this._moduleEditorActive 为真时由 phase_gathering_update 调用。
+     */
+    render_moduleEditorOverlay() {
+        const rects = (typeof this._moduleEditor_getSlotRects === 'function')
+            ? this._moduleEditor_getSlotRects() : [];
+        if (!rects.length) return;
+        const ctx = this.ctx;
+        const t = Date.now();
+        // 虚线流动 + 呼吸透明度
+        const pulse = (Math.sin(t / 500) + 1) / 2; // 0~1
+        ctx.save();
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 6]);
+        ctx.lineDashOffset = -(t / 60) % 14;
+        ctx.font = '600 12px "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        for (const { rect, moduleId } of rects) {
+            const { x, y, w, h } = rect;
+            const cx = x + w / 2;
+            const cy = y + h / 2;
+            const placed = !!moduleId;
+            const accent = placed ? '#34d399' : '#67e8f9';
+
+            // 区域淡色填充，提示可点击范围
+            ctx.fillStyle = placed
+                ? `rgba(52, 211, 153, ${0.06 + pulse * 0.05})`
+                : `rgba(103, 232, 249, ${0.08 + pulse * 0.06})`;
+            ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+
+            // 虚框描边
+            ctx.strokeStyle = accent;
+            ctx.shadowBlur = _sb(6 + pulse * 4);
+            ctx.shadowColor = accent;
+            ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+            ctx.shadowBlur = 0;
+
+            // 标签
+            const def = placed ? MODULE_DEFS[moduleId] : null;
+            if (def) {
+                ctx.save();
+                ctx.setLineDash([]);
+                // 顶部名称底条
+                ctx.fillStyle = 'rgba(2, 6, 23, 0.65)';
+                const tagH = 16;
+                ctx.fillRect(x + 1, y + 1, w - 2, tagH);
+                ctx.fillStyle = '#d1fae5';
+                ctx.font = '600 11px "Microsoft YaHei", sans-serif';
+                ctx.fillText(`${def.icon || '▦'} ${def.name}`, cx, y + 1 + tagH / 2, w - 6);
+                // 底部「点击更换」
+                ctx.fillStyle = 'rgba(52, 211, 153, 0.85)';
+                ctx.font = '600 10px "Microsoft YaHei", sans-serif';
+                ctx.fillText('点击更换', cx, y + h - 9, w - 6);
+                ctx.restore();
+            } else {
+                ctx.save();
+                ctx.setLineDash([]);
+                ctx.fillStyle = `rgba(103, 232, 249, ${0.7 + pulse * 0.3})`;
+                ctx.font = '700 22px "Microsoft YaHei", sans-serif';
+                ctx.fillText('＋', cx, cy - 6);
+                ctx.fillStyle = 'rgba(148, 197, 220, 0.9)';
+                ctx.font = '600 11px "Microsoft YaHei", sans-serif';
+                ctx.fillText('点击放置', cx, cy + 12, w - 6);
+                ctx.restore();
+            }
+        }
+        ctx.restore();
     },
 
     // [legacy] 旧的 10×5 平铺钉板生成器，保留作参考但不再被默认调用
@@ -2846,6 +2911,11 @@ phase_gathering_getRandomPegType() {
         this.specialSlots = this.specialSlots.filter(s => !s.hit);
         // 繪製特殊槽位
         this.specialSlots.forEach(s => s.draw(this.ctx));
+
+        // [v2 重构] 钉板编辑模式：在实时钉板上叠加可点击的虚框区域
+        if (this._moduleEditorActive) {
+            this.render_moduleEditorOverlay();
+        }
 
         // --- [diamond 布局专属] 绘制裂变回响虚影钉子 ---
         if (this.ghostPegs && this.ghostPegs.length > 0) {
