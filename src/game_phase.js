@@ -225,6 +225,39 @@ function drawBottomRewardZones(ctx, zones) {
     ctx.restore();
 }
 
+function buildFallbackMarbleQueue(game) {
+    const cfg = CONFIG.gameplay || {};
+    const required = Math.max(1, (cfg.selectionReq || 3) + (game.bulletCapBonus || 0));
+    const existingPool = Array.isArray(game.marblesPool) ? game.marblesPool : [];
+    const selected = Array.isArray(game.selectedMarbles) ? game.selectedMarbles : [];
+    const fromSelection = selected
+        .map(i => existingPool[i])
+        .filter(Boolean);
+    if (fromSelection.length > 0) {
+        return fromSelection.slice(0, required);
+    }
+    if (existingPool.length > 0) {
+        return existingPool.slice(0, required);
+    }
+
+    const rewardOnlyTypes = new Set(cfg.bottomRewardOnlyTypes || []);
+    const weighted = Object.entries(game.unlockedWeights || CONFIG.probabilities || {})
+        .filter(([type, weight]) => (weight || 0) > 0 && !rewardOnlyTypes.has(type) && type !== 'normal')
+        .map(([type, weight]) => ({ type, weight }));
+    const total = weighted.reduce((sum, item) => sum + item.weight, 0);
+    const pickType = () => {
+        if (total <= 0 || weighted.length === 0) return 'white';
+        let roll = Math.random() * total;
+        for (const item of weighted) {
+            roll -= item.weight;
+            if (roll <= 0) return item.type;
+        }
+        return weighted[0].type;
+    };
+
+    return Array.from({ length: required }, () => new MarbleDefinition(pickType()));
+}
+
 export const game_phase = {
 /**
      * @method advanceWave
@@ -321,6 +354,16 @@ export const game_phase = {
             if (typeof this.phase_startCombatPhase === 'function') this.phase_startCombatPhase();
             else this.phase_switchPhase('combat');
             return;
+        }
+
+        // Round-start banner switches to the gathering background before this initializer runs.
+        // If that transitional state is saved/restored or a special flow cleared marbleQueue,
+        // rebuild launchable marble definitions here instead of entering an empty grind.
+        if (!Array.isArray(this.marbleQueue) || this.marbleQueue.length === 0) {
+            this.marbleQueue = buildFallbackMarbleQueue(this);
+            this.marblesPool = this.marbleQueue.slice();
+            this.selectedMarbles = this.marbleQueue.map((_, idx) => idx);
+            if (typeof showToast === 'function') showToast('研磨弹珠已自动补齐。');
         }
 
         this.phase_switchPhase('gathering');

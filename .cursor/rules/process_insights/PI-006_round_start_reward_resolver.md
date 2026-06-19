@@ -1,6 +1,6 @@
 ---
 id: "PI-006"
-version: "v1.3"
+version: "v1.4"
 last_updated: "2026-06-19"
 author: "tsk-f35c6d10-d6f"
 related_modules: ["game_phase", "game_system", "core", "ui/shop"]
@@ -66,6 +66,7 @@ status: "active"
 | v1.2 | 2026-04-19 | 新增坑 5：开局缺少弹珠命运选择阶段；`sys_initGameStart()` 必须在遗物奖励后额外队列 `chaos_essence`（`source: 'run_start'`） | 当前 Agent |
 
 | v1.3 | 2026-06-19 | Pitfall 6: normal round-start banner must not rebuild `ammoQueue` from `_lastFiredAmmoSnapshot` or `marbleQueue`; those sources are only for explicit essence / replace-ammo charge flows. | Current Agent |
+| v1.4 | 2026-06-19 | Pitfall 7: gathering initialization must rebuild missing launchable `marbleQueue` entries without touching `ammoQueue`, preventing empty grind phases after banner/resume edge cases. | Codex |
 
 ## Pitfall 6: Normal Round-Start Banner Reuses Charge Sources
 
@@ -76,3 +77,13 @@ status: "active"
 **Correct approach**: ordinary round-start banner only shows the transition and then calls `phase_startGatheringPhase()`. It must not rebuild `ammoQueue`; any charged-ammo preservation must go through the explicit essence / replace-ammo flow.
 
 **Key location**: `src/game_system.js` -> `sys_showRoundStartBanner()`.
+
+## Pitfall 7: Gathering Background Without Launchable Marbles
+
+**Symptom**: the game sometimes shows the gathering/grind phase, but the queue has no marbles to launch.
+
+**Root cause**: `sys_showRoundStartBanner()` intentionally calls `phase_switchPhase('gathering')` before the actual `phase_startGatheringPhase()` initializer runs, so the saved/restored phase can temporarily be `gathering`. If a resume path, overlay return, or special fate flow has cleared `marbleQueue`, the later initializer can enter a visually valid gathering phase with no launchable marble definitions.
+
+**Correct approach**: `phase_startGatheringPhase()` is the final lifecycle gate for grind initialization. Before building the board/HUD, it must ensure `marbleQueue` contains launchable `MarbleDefinition` entries. If it is empty, rebuild from selected `marblesPool` entries first, then from the pool itself, and finally from current unlocked weights. This must not rebuild `ammoQueue`; combat ammo is still produced only by gathering completion or explicit charge/replace flows.
+
+**Key location**: `src/game_phase.js` -> `buildFallbackMarbleQueue()` / `phase_startGatheringPhase()`.

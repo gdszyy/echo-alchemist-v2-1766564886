@@ -39,6 +39,7 @@ console.log('===================================================\n');
 
 const uiSystem = read('src/ui_system.js');
 const gameSystem = read('src/game_system.js');
+const gamePhase = read('src/game_phase.js');
 const gameOver = read('src/ui/game_over.js');
 const indexHtml = read('index.html');
 
@@ -68,6 +69,8 @@ check(has(gameSystem, /const\s+savedPhase\s*=\s*state\.phase\s*\|\|\s*null/), 'r
 check(has(gameSystem, /this\.marblesPool\s*=\s*state\.marblesPool\.map\(m\s*=>\s*\{[\s\S]*new\s+MarbleDefinition\(m\.type\s*\|\|\s*['"]bounce['"]\)/), 'run load restores saved marble candidates as MarbleDefinition instances');
 check(has(gameSystem, /const\s+shouldRestoreSelection\s*=\s*savedPhase\s*===\s*['"]selection['"][\s\S]*this\.fateMomentContext[\s\S]*this\.selectionMode[\s\S]*!==\s*['"]standard['"]/), 'run load detects saved fate selection before running resolver');
 check(has(gameSystem, /else\s+if\s*\(shouldRestoreSelection\)\s*\{[\s\S]*phase_switchPhase\(['"]selection['"]\)[\s\S]*spawn_generateMarbleOptions\(\)[\s\S]*ui_refreshSelectionModeUI\(\)[\s\S]*spawn_showMarblePreview/), 'run load restores selection UI instead of falling through to round-start resolver');
+check(has(gamePhase, /function\s+buildFallbackMarbleQueue\s*\(game\)/), 'gathering has fallback marble queue builder');
+check(has(gamePhase, /phase_startGatheringPhase\s*\(\)\s*\{[\s\S]*this\.marbleQueue\s*=\s*buildFallbackMarbleQueue\(this\)/), 'gathering phase rebuilds missing marbleQueue before empty grind');
 
 check(has(gameOver, /ui_clearTransientOverlays\s*\(\)/), 'gameover trigger clears transient overlays');
 check(has(indexHtml, /game\.ui_abandonRunToMeta\(\)/), 'pause abandon button uses ui_abandonRunToMeta');

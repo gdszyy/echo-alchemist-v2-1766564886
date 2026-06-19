@@ -1,6 +1,6 @@
 # src\game_phase.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 3595 | 函数数: 29 | 语言: javascript
+> 自动生成于 2026-06-19 | 总行数: 3638 | 函数数: 30 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -16,6 +16,7 @@
 | makeBottomRewardBarrier | function | `makeBottomRewardBarrier(x, y1, y2, rewardType)` |  |
 | buildBottomRewardZones | function | `buildBottomRewardZones(game, maxPegY, canvasWidth, canvasHeight)` |  |
 | drawBottomRewardZones | function | `drawBottomRewardZones(ctx, zones)` |  |
+| buildFallbackMarbleQueue | function | `buildFallbackMarbleQueue(game)` |  |
 | phase_advanceWave | method | `phase_advanceWave()` |  |
 | phase_switchPhase | method | `phase_switchPhase(newPhase)` |  |
 | phase_startGatheringPhase | method | `phase_startGatheringPhase()` |  |

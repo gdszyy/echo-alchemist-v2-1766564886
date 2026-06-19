@@ -38,6 +38,7 @@ globs: ["src/game_phase.js"]
 - **充能触发条件**: 普通回合开始横幅不触发子弹充能；`_lastFiredAmmoSnapshot` / `marbleQueue` 只能在精华触发、跳过研磨、子弹替换等显式充能流程中作为弹药来源。
 - **实现**: 先调用 `phase_switchPhase('gathering')` 切换背景，然后显示 `#round-start-banner` 全屏大字提示（「第 X 回合開始」），持续约 1.5 秒后自动调用 `phase_startGatheringPhase()` 完成研磨阶段初始化。
 - **子弹队列边界（2026-06-19）**: `sys_showRoundStartBanner()` 只负责进入下一轮研磨阶段，普通回合开始时不得从 `_lastFiredAmmoSnapshot` 或 `marbleQueue` 重建 `ammoQueue`。这两个来源仅用于精华触发 / 子弹替换等显式充能流程，避免下一回合待发射子弹串成上一轮保留子弹或新生成候选弹珠。
+- **空弹珠兜底（2026-06-19）**: `phase_switchPhase('gathering')` 只是横幅背景切换，不代表研磨已初始化。`phase_startGatheringPhase()` 必须在真正初始化时确认 `marbleQueue` 非空；若存档恢复、overlay 返回或特殊流程清空了队列，应通过 `buildFallbackMarbleQueue()` 从选择池/当前权重补齐可发射弹珠，禁止进入没有弹珠的研磨阶段。
 - **充能特效**: 同时为 `#pc-left-sidebar` 添加 CSS 动画类 `.ammo-panel-charging`（high/medium 档：边框光流扫过）或 `.ammo-panel-charging-simple`（low 档：简单淡入淡出）。
 - **性能门控**: 特效等级由 `CONFIG.performance[perfQualityLevel].roundStartBannerGlow` 控制（high/medium: `true`，low: `false`）。
 - **DOM 元素**: `#round-start-banner`（全屏覆盖层，z-index: 9500）、`#round-start-banner-text`（大字文本）。
