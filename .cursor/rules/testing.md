@@ -14,6 +14,7 @@
 | **T1：阶段契约校验** | `tests/validate_phase_contracts.mjs` | Node.js，无需浏览器 | 每次修改阶段切换、暂停、gameover、命运时刻或 overlay 返回流后执行 | < 30s |
 | **T1：预设波次校验** | `tests/validate_wave_presets.mjs` | Node.js，无需浏览器 | 每次修改 `src/wave_presets.js` 或 preset 放置规则后执行 | < 30s |
 | **T1：大型基底运行期生成校验** | `tests/validate_enemy_spawn_runtime.mjs` | Node.js + 最小 Canvas/DOM stub | 每次修改大型基底生成限制、preset 回退逻辑或同屏上限后执行 | < 30s |
+| **T1：Boss 破绽契约校验** | `tests/validate_boss_vulnerability.mjs` | Node.js，无需浏览器 | 每次修改 Boss 破绽谱、Boss 伤害结算或普通波次机会布局后执行 | < 30s |
 | **T2：试炼场实机验证** | 浏览器内 `TrainingGround` 沙盒 | 游戏内置，需部署 | 部署到测试环境后，AI 或人工操作 | 按需 |
 | **T3：Puppeteer 自动化** | `tests/ai_test_runner.js` | Puppeteer，需本地游戏服务 | 完整回归测试 | 2~5min |
 
@@ -201,6 +202,20 @@ node tests/validate_enemy_spawn_runtime.mjs
 运行方式：
 ```bash
 node tests/validate_phase_contracts.mjs
+```
+
+### 4.6 Boss 破绽契约校验
+
+`tests/validate_boss_vulnerability.mjs` 静态锁定 Boss 破绽重设计：
+- `spawn_system.js` 不得重新出现旧 `weak_spot` 普通波次低血量弱点怪。
+- `config.js` 不得重新使用旧 `weakness:` Boss 字段。
+- 8 个 Boss 必须配置 `vulnerability` 破绽谱。
+- `combat_system.js` 必须保留 `combat_applyBossVulnerability()` 与 `_bossVulnerabilityExposedHits` 易伤窗口消费。
+- `ouroboros` 必须使用动态轮转破绽谱。
+
+运行方式：
+```bash
+node tests/validate_boss_vulnerability.mjs
 ```
 
 ---

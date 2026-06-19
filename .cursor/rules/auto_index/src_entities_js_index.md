@@ -1,6 +1,6 @@
 # src\entities.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 5033 | 函数数: 96 | 语言: javascript
+> 自动生成于 2026-06-19 | 总行数: 5160 | 函数数: 97 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -39,6 +39,7 @@
 | resetCooldown | method | `resetCooldown()` |  |
 | calculateLight | method | `calculateLight(sourcePos, lightRadius)` |  |
 | hit | method | `hit(impactSpeed = 5)` |  |
+| drawBarrierPeg | method | `drawBarrierPeg(ctx, color, isLit)` |  |
 | draw | method | `draw(ctx, baseRadius, tilt = {x:0, y:0})` |  |
 | drawSwordPeg | method | `drawSwordPeg(ctx, r, isLit)` |  |
 | drawWindPeg | method | `drawWindPeg(ctx, r, isLit)` |  |

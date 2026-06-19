@@ -75,11 +75,32 @@ globs: ["src/config.js"]
 - **初始状态只提供反弹属性**：`bounce: 20` 是唯一初始权重大于 0 的特殊属性，其余属性（`pierce`、`scatter`、`damage`、`cryo`、`pyro`、`explosive` 等）均为 `0`。
 - **遗物解锁机制**：玩家选择遗物时，`shop.js` 中的 `ui_selectRelic` 会通过 `this.unlockedWeights[key]` 增加对应属性的权重，从而在后续回合的钉板刷新中按概率生成对应属性钉子。
 - **闪电属性特殊性**：自 2026-04-14 起，**闪电（lightning）属性不再拥有对应的钉子**，也不再通过遗物直接解锁其生成权重。闪电属性仅能通过收集阶段中【冰霜】与【火焰】属性的抗消（合成）产生。
-- **激光属性特殊性**：自 2026-04-16 起，**激光（laser）属性不再拥有对应的钉子**，遉物 `optical_lens` 的 `unlocks: 'laser'` 仅解锁激光弹珠出现，不会产生激光钉子。激光属性仅能通过弹珠本身（`marbleDef.type === 'laser'`）或符文系统（`calcRuneBaseStats`）提供。
+- **激光属性特殊性**：自 2026-04-16 起，**激光（laser）属性不再拥有对应的钉子**，遉物 `optical_lens` 的 `unlocks: 'laser'` 仅解锁激光弹珠出现，不会产生激光钉子。激光属性仅能通过弹珠本身（`marbleDef.type === 'laser'`）、奖励区或纯净精华符文合成写入 `MarbleDefinition.collected` 提供；`calcRuneBaseStats` 不再作为战斗继承属性来源。
 - **修改警告**：严禁将除 `bounce` 和 `white` 以外的属性初始权重设置为大于 0 的数値，否则会破坏“遗物解锁属性”的游戏设计意图。严禁在 `allPegTypes` 中重新加入 `lightning` 或 `laser`。
 ## 7. Boss 配置参数说明 (bossConfigs)
 
 `CONFIG.balance.bossConfigs` 控制各个特殊 Boss 的专有参数和机制系数。
+
+Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnerability` 描述“破绽谱”：
+
+| 字段 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `vulnerability.attrs` | string[] | 固定 Boss 的破绽谱属性。命中这些属性会累积破绽进度。 |
+| `vulnerability.label` | string | 破绽满格时的浮字标签。 |
+| `vulnerability.dynamic` | boolean | `ouroboros` 专用；为 true 时按轮转组读取动态破绽谱。 |
+| `vulnerability.rotationAttrs` | string[][] | `ouroboros` 每个轮转组对应的破绽谱属性。 |
+| `vulnerability.labels` | string[] | `ouroboros` 每个轮转组的破绽标签。 |
+
+`CONFIG.balance.bossVulnerability` 控制全局 Boss 破绽机制：
+
+| 字段 | 默认值 | 说明 |
+| :--- | :--- | :--- |
+| `breakThreshold` | `3` | 破绽进度满格阈值。 |
+| `exposedHits` | `3` | 破绽触发后持续的易伤命中次数。 |
+| `exposedDamageMult` | `1.35` | 易伤窗口内的伤害倍率。 |
+| `counterHitGain` | `1` | 命中破绽谱属性时增加的进度。 |
+| `offPatternGain` | `0` | 未命中破绽谱属性时的进度变化；当前不惩罚。 |
+| `enrageDelayOnBreak` | `true` | 破绽触发后，若 Boss 尚未狂暴，则延后一次 50% 血量狂暴检测。 |
 
 **Mikro (裂变母体·米克罗) 专有参数**:
 - `cloneChanceHitBonus`: 额外受击分身概率 (默认 0.3)
@@ -91,7 +112,11 @@ globs: ["src/config.js"]
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
-| 2026-06-19 | `src/config.js`, `src/pinboard_modules.js`, `src/game_system.js`, `docs/pinboard_component_design_v2.md`, `.cursor/rules/performance.md` | **初始钉盘 2x5 铺满与异形机关化**：`moduleDefaultSlots` 调整为 10，`moduleInitialSlots` 改为前两行 `[0..9]`，`moduleSpacingX/Y` 调整为 `0`，默认盘面由首发异形组件铺满；新增 `split_lattice_bridge`、`split_gate_light`、`multicast_gate_light`、`recall_loop_light`、`wheel_cup_light`，并通过接缝钉把首发密度提升到约 157 Peg / 5 SpecialSlot。旧存档若低于当前默认槽数会自动抬到新版 `2x5`，空活动槽会补默认组件。异形组件必须具备路线物理、固定属性/融合优先级或真实 `SpecialSlot` 之一，避免弱于常规交错钉阵。 |
+| 2026-06-19 | `src/config.js`, `src/spawn_system.js`, `src/ui/shop.js`, `src/game_phase.js`, `src/entities.js`, `src/calc_utils.js` | **底部奖励分栏与奖励专属属性**：`moduleDefaultSlots` / `moduleInitialSlots` 回调为首行 5 个初始钉板；`CONFIG.gameplay` 新增 `bottomRewardZoneChance`、`bottomRewardZoneWidthMultiplier`、`bottomRewardOnlyTypes`、`bottomRewardZoneWeights` 等底部分栏参数。`explosive` / `laser` 从命运弹珠候选与保底队列中过滤，不再作为普通弹珠出现；对应遗物只校准底部奖励分栏并触发混沌精华。 |
+| 2026-06-19 | `src/config.js`, `src/ui/shop.js`, `src/ui_system.js`, `src/game_system.js`, `src/core.js`, `.cursor/rules/config.md`, `.cursor/rules/ui_system.md` | **新增选择刷新遗物**：`fate_reroll_token` 提供每次命运抉择 1 次弹珠候选刷新；`relic_reroll_seal` 提供每次遗物选择 1 次遗物候选刷新。两者为选择 UI 被动遗物，不新增粒子、Canvas 光效或性能预算消费；刷新使用状态进入局内存档，避免刷新页面重复使用。 |
+| 2026-06-19 | `src/config.js`, `src/combat_system.js`, `src/spawn_system.js`, `src/entities/enemy.js`, `src/game_system.js`, `src/systems.js`, `.cursor/rules/config.md`, `.cursor/rules/enemy_index.md`, `.cursor/rules/spawn_system.md` | **Boss 破绽机制与旧弱点移除**：删除普通波次 `weak_spot` 低血量弱点怪；Boss 配置从 `weakness` 改为 `vulnerability` 破绽谱；命中破绽谱属性会累积进度，满格后触发短暂易伤窗口并延后一次狂暴检测。破绽进度与易伤命中数进入局内存档，Boss 状态短标签显示 `隙` / `破`。 |
+| 2026-06-19 | `src/pinboard_modules.js`, `docs/pinboard_component_design_v2.md`, `.cursor/rules/performance.md` | **默认钉盘回归纯交错钉板**：默认 `2x5` 前两行全部使用 `dense_stagger`，不再放入 `starter_*`、转盘、弹力角或异形默认模块。`dense_stagger` 提升为安全上限内的 2x6 交错生成，当前默认盘审计为 120 圆钉 / 0 barrier / 0 SpecialSlot，最小圆钉中心距约 `29.49px`，高于当前倍化弹珠阈值 `23.8px`。旧多异形默认盘、临时 `caret_wheel_field` 超大默认盘与 `starter_*` 默认盘会精确迁移回新版纯交错默认盘。 |
+| 2026-06-19 | `src/config.js`, `src/pinboard_modules.js`, `src/entities.js`, `src/game_system.js`, `docs/pinboard_component_design_v2.md`, `.cursor/rules/performance.md` | **初始钉盘 2x5 铺满与异形机关化**：`moduleDefaultSlots` 调整为 10，`moduleInitialSlots` 改为前两行 `[0..9]`，`moduleSpacingX/Y` 调整为 `0`，默认盘面由首发异形组件铺满；新增 `split_lattice_bridge`、`split_gate_light`、`multicast_gate_light`、`recall_loop_light`、`wheel_cup_light`，并新增 `shape='barrier'` 异形 Peg 用于真实挡板/杯口/导流翼。圆钉间距按倍化弹珠半径强制大于约 `23.8px`，默认盘审计为约 75 圆钉 + 10 barrier / 5 SpecialSlot。旧存档若低于当前默认槽数会自动抬到新版 `2x5`，空活动槽会补默认组件。 |
 | 2026-06-19 | `src/config.js`, `src/game_system.js`, `src/ui/run_shop.js`, `src/ui/shop.js`, `src/ui_system.js`, `.cursor/rules/game_phase.md`, `.cursor/rules/ui_system.md` | **局内商店接入 round-start resolver**：新增 `runShopOfferAfterBoss`、`runShopMinFragmentsToOffer`、`runShopSkipRelicBonus` 参数；商店改为奖励队列清空后的可选构筑调整节点，跳过遗物会先补偿局内碎片；`runFragments`、货架和刷新次数进入局内存档；`debugOnly` 局外商品默认隐藏并在购买逻辑中二次校验。 |
 | 2026-06-19 | `src/pinboard_modules.js`, `src/ui/run_shop.js`, `src/ui_system.js`, `.cursor/rules/game_phase.md`, `.cursor/rules/performance.md` | **商店异形钉盘组件池扩展**：新增 `split_yoke_module`、`hourglass_gate_module`、`crescent_bank_module`、`spiral_return_module`、`prism_splitter_module`、`twin_wheel_bridge_module` 六个路线型商店组件，并为组件增加 `shape` 路线元数据。局内商店与模块安装弹层会展示占位、入口、出口和稀有度摘要，便于玩家理解组件身份。 |
 | 2026-06-19 | `src/config.js`, `src/pinboard_modules.js`, `src/game_phase.js`, `src/ui_system.js`, `.cursor/rules/game_phase.md`, `.cursor/rules/performance.md` | **钉盘居中 3+3 初始布局**：`moduleCols` 调整为 5，`moduleDefaultSlots` 调整为 6，并新增 `moduleInitialSlots` / `moduleUnlockOrder`；默认盘面改为两行居中的 `guide_fin_left`、`rune_lattice_light`、`guide_fin_right`、`bounce_chamber`、`crucible_seed`、`catcher_cup` 六个异形组件。构建与编辑器放置校验统一读取 active slot set，不再假设前 N 个 row-major 槽已解锁。 |
@@ -129,6 +154,7 @@ globs: ["src/config.js"]
 - **UI 显示**: `ui_showRelicSelection` 在渲染遗物卡片时，若 `maxStacks > 1`，将显示当前层数与最大层数的进度提示。
 - **重置逻辑**: `game_system.js` 中的 `sys_resetGame` 方法除了清空 `ownedRelics` 外，还必须重置受遗物影响的状态变量（如 `pinkPegCount`、`marbleSizeBonus`、`hasCombatWall`、`slotCount`、`unlockedSlots`、`flatDamageBonus`、`playerShield`、`assimilationBoostRounds`、`doubleAssimilationBoostRounds`、`pendingSelectionMode`、`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`）。
 - **ID 唯一性**: 确保 `RELIC_DB` 中每个遗物的 `id` 唯一，避免因同名 ID 导致去重或计数逻辑错误（如原有的三个 `tactical_kit` 已拆分为 `tactical_kit_pierce`、`tactical_kit_scatter`、`tactical_kit_damage`）。
+- **选择刷新遗物**: `selection_reroll` / `relic_reroll` 类遗物只提供 UI 层刷新入口。刷新按钮必须由 `ownedRelics` 判定显隐，并通过 `selectionRerollUsed` / `relicRerollUsed` 限制为当前选择机会一次；不得通过重复调用 `ui_showRelicSelection()` 推进 `relicSelectionCount`。
 
 ## 6. 同化涌潮遗物规范
 - **设计意图**: 每种可同化钉子的弹珠（`bounce`、`pierce`、`scatter`、`damage`、`cryo`、`pyro`）各对应一个遗物，命名格式为 `surge_{type}`。
@@ -143,7 +169,7 @@ globs: ["src/config.js"]
 - **敌人掉落参数**：非 Boss 掉落概率与奖励构成必须通过 `CONFIG.gameplay.enemyDrop*` 参数族统一配置，至少包括基础掉率、回合成长、词缀加成、遗物权重、高血量遗物补正和纯净精华占比，禁止再把这些数值散落为匿名常数。
 - **纯净精华 (`pure_essence`)**：同样由非 Boss 敌人掉落并写入 `pendingRoundStartRewards`；resolver 处理到该奖励时，应写入 `pendingSelectionMode = { mode: 'pure_essence', requiredCount: 1, ... }`，由下一次 `sys_initSelectionPhase()` 消费。
 - **遗物池边界**：`ui_showRelicSelection()` 必须将 `chaos_essence` 与 `pure_essence` 排除在普通遗物候选池外，避免精华再次通过遗物界面重复发放。
-- **纯净精华写回要求**：确认选择时除了把注入结果写入 `MarbleDefinition.collected` 外，还必须同步写入 `source`、`infusedRuneId`、`infusedAttribute`、`assimilationMultiplier` 等局部运行态，并为对应 `marble.type` 写入 `doubleAssimilationBoostRounds`，确保“同化率 x2”真实生效。
+- **纯净精华写回要求**：确认选择时必须把符文元素作为合成属性追加写入 `MarbleDefinition.collected`，不得覆盖 `marble.type` 或清空弹珠原有属性；同时同步写入 `source`、`infusedRuneId`、`infusedAttribute`、`assimilationMultiplier` 等局部运行态，并为对应 `marble.type` 写入 `doubleAssimilationBoostRounds`，确保“同化率 x2”真实生效。研磨发射时 `currentSession.collected` 必须继承该弹珠已有 `collected`，否则合成属性不会进入最终子弹 recipe。
 - **运行态契约**：`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`、`selectionPreviewState`、`relicOverlayReturnState`、`pendingSelectionMode`、`doubleAssimilationBoostRounds`、`fateMomentContext` 必须同时出现在 `core.js` 初始化、`sys_resetGame()` 重置、`sys_saveRunState()` / `sys_loadRunState()` 持久化中。
 
 ## 9. 教学曲线配置 (ENEMY_CURVE_CONFIG)

@@ -1,6 +1,6 @@
 # src\pinboard_modules.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 1492 | 函数数: 73 | 语言: javascript
+> 自动生成于 2026-06-19 | 总行数: 1583 | 函数数: 76 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -22,6 +22,7 @@
 | getActiveModuleSlots | function | `getActiveModuleSlots(unlockedSlots, totalSlots, cfg = CONFIG.gameplay || {})` |  |
 | getActiveModuleSlotSet | function | `getActiveModuleSlotSet(unlockedSlots, totalSlots, cfg = CONFIG.gameplay || {})` |  |
 | migrateModuleLayoutToCurrentGrid | function | `migrateModuleLayoutToCurrentGrid(layout, totalSlots, defaultSlots)` |  |
+| shouldResetLegacyStarterLayout | function | `shouldResetLegacyStarterLayout(layout, totalSlots, defaultSlots)` |  |
 | ensureModuleLayoutInstances | function | `ensureModuleLayoutInstances(layout, totalSlots, defaultSlots = CONFIG.gameplay.moduleDefaultSlots || 3)` |  |
 | getRandomPegTypeFromWeights | function | `getRandomPegTypeFromWeights(weights)` |  |
 | applyWeightedPegTypes | function | `applyWeightedPegTypes(pegs, ctx)` |  |
@@ -29,8 +30,10 @@
 | generateFunnelPegs | function | `generateFunnelPegs(originX, originY, w, h, topCols, rows)` |  |
 | markFusionFocus | function | `markFusionFocus(pegs, originX, originY, w, h, maxPriority = 3)` |  |
 | makePegAt | function | `makePegAt(ox, oy, w, h, px, py, type = 'normal', row = 0, col = 0)` |  |
+| makeBarrierAt | function | `makeBarrierAt(ox, oy, w, h, ax, ay, bx, by, type = 'pink', row = 0, col = 0)` |  |
 | hasNearbyPeg | function | `hasNearbyPeg(pegs, x, y, minDistance)` |  |
 | addModuleSeamPegs | function | `addModuleSeamPegs(pegs, ox, oy, w, h, moduleId)` |  |
+| enforceCirclePegSpacing | function | `enforceCirclePegSpacing(pegs, minDistance = MIN_PEG_SPACING)` |  |
 | buildGuideFin | function | `buildGuideFin(ox, oy, w, h, mirror = false)` |  |
 | build | method | `build(ox, oy, w, h)` |  |
 | build | method | `build(ox, oy, w, h)` |  |

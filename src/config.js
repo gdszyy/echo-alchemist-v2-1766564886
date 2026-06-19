@@ -643,7 +643,7 @@ const CONFIG = {
                 name: '熔炉守卫·伊格尼斯',
                 isBigBoss: false,
                 affixes: ['shield', 'haste'],
-                weakness: ['pierce', 'pyro'],
+                vulnerability: { attrs: ['pierce', 'pyro'], label: '破甲熔炉' },
                 shieldChargesBonus: 5,    // 额外护盾层数
                 berserkedShieldMult: 2,   // 狂暴后护盾层数翻倍系数
                 berserkedTempRisePerTurn: 30, // 狂暴后每回合温度上升值
@@ -656,7 +656,7 @@ const CONFIG = {
                 name: '霜晶缝合怪·格拉西斯',
                 isBigBoss: false,
                 affixes: ['jump', 'regen'],
-                weakness: ['cryo', 'pierce'],
+                vulnerability: { attrs: ['cryo', 'pierce'], label: '冻结裂隙' },
                 jumpRowsBonus: 2,         // 额外跳跃行数
                 berserkedJumpRows: 3,     // 狂暴后每回合跳跃行数
                 berserkedFreezePegRadius: 120, // 狂暴后跳跃落地冻结周围 Peg 的范围（像素）
@@ -667,7 +667,7 @@ const CONFIG = {
                 name: '裂变母体·米克罗',
                 isBigBoss: false,
                 affixes: ['clone', 'healer'],
-                weakness: ['lightning', 'scatter'],
+                vulnerability: { attrs: ['lightning', 'scatter'], label: '群体断链' },
                 cloneChanceHitBonus: 0.3, // 额外受击分身概率
                 berserkedCloneChance: 1.0, // 狂暴后分身概率 100%
                 cloneDamageReductionPerClone: 0.10, // 每个存活分身提供的减伤比例
@@ -679,7 +679,7 @@ const CONFIG = {
                 name: '贪婪之渊·噬神者',
                 isBigBoss: false,
                 affixes: ['devour', 'shield'],
-                weakness: ['bounce', 'laser'],
+                vulnerability: { attrs: ['bounce', 'laser'], label: '深渊开口' },
                 devourRangeBonus: 2,      // 额外吞噬范围
                 berserkedDevourRange: 99, // 狂暴后全屏吞噬
                 moveInterval: 2,          // 常规模式：每 2 回合移动一次（吞噬后需要靠近）
@@ -689,7 +689,7 @@ const CONFIG = {
                 name: '翠绿共生体·维里迪斯',
                 isBigBoss: true,
                 affixes: ['regen', 'healer'],
-                weakness: ['laser', 'pyro'],
+                vulnerability: { attrs: ['laser', 'pyro'], label: '再生烧蚀' },
                 regenPercentBonus: 0.2,   // 额外再生百分比
                 berserkedHealerRange: 0,   // 狂暴后停止治疗其他敌人（放弃治疗他人）
                 berserkedSelfRegenMult: 3.0, // 狂暴后自身回血速度倍率（集中治疗自身）
@@ -700,7 +700,7 @@ const CONFIG = {
                 name: '雷霆幻影·特斯拉',
                 isBigBoss: true,
                 affixes: ['haste', 'clone'],
-                weakness: ['cryo', 'bounce'],
+                vulnerability: { attrs: ['cryo', 'bounce'], label: '惯性失衡' },
                 hasteActionsBonus: 1,     // 额外行动次数（共3次）
                 berserkedActionsBonus: 1, // 狂暴后再+1次行动
                 moveInterval: 2,          // 常规模式：每 2 回合移动一次（有 haste 词缀，移动较快）
@@ -710,7 +710,7 @@ const CONFIG = {
                 name: '混沌融合体·奇美拉',
                 isBigBoss: true,
                 affixes: ['berserk', 'devour'],
-                weakness: ['pierce', 'laser'],
+                vulnerability: { attrs: ['pierce', 'laser'], label: '混沌核心' },
                 initTemp: 60,             // 初始温度（半狂暴状态）
                 berserkedTempThreshold: 100, // 狂暴后温度阈值
                 berserkedBlastOnHitChance: 0.25, // 狂暴后受击触发全场爆炸概率
@@ -721,7 +721,15 @@ const CONFIG = {
                 name: '永恒回声·奥罗波罗斯',
                 isBigBoss: true,
                 affixes: ['shield', 'haste'], // 初始词缀组（轮转起点）
-                weakness: ['dynamic'],        // 动态弱点
+                vulnerability: {
+                    dynamic: true,
+                    rotationAttrs: [
+                        ['pierce', 'cryo'],
+                        ['laser', 'pyro'],
+                        ['lightning', 'scatter']
+                    ],
+                    labels: ['鳞盾裂隙', '轮回再生核', '回声裂群']
+                },
                 rotationSets: [             // 词缀轮转组
                     ['shield', 'haste'],
                     ['regen', 'healer'],
@@ -732,6 +740,15 @@ const CONFIG = {
                 moveInterval: 3,          // 常规模式：每 3 回合移动一次（永恒回声，移动最慢）
                 themeWeights: { pierce: 1.2, cryo: 1.2, lightning: 1.2 }
             }
+        },
+        /** Boss 破绽机制：命中当前破绽谱属性会积累破绽，满格后进入短暂易伤窗口 */
+        bossVulnerability: {
+            breakThreshold: 3,
+            exposedHits: 3,
+            exposedDamageMult: 1.35,
+            counterHitGain: 1,
+            offPatternGain: 0,
+            enrageDelayOnBreak: true
         },
         /** Boss 进场冲击波效果配置 */
         bossEntranceShockwave: {
@@ -783,8 +800,8 @@ const CONFIG = {
         // ==================== [v2 钉板模块化] 模块网格 ====================
         moduleCols: 5,                 // 模块网格列数（奇数列，保证初始钉盘中轴居中）
         moduleRows: 3,                 // 模块网格行数（共 15 槽）
-        moduleDefaultSlots: 10,        // 默认开放的模块槽位数（初始 2x5 铺满，后续通过局内商店扩展第三行）
-        moduleInitialSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        moduleDefaultSlots: 5,         // 默认开放的模块槽位数（初始只开放首行 5 个钉板）
+        moduleInitialSlots: [0, 1, 2, 3, 4],
         moduleUnlockOrder: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 10, 14],
         moduleAreaTopY: 60,            // 模块区域起始 Y 坐标（画布顶部留白）
         moduleAreaBottomMargin: 80,    // 模块区域底部留白
@@ -792,6 +809,12 @@ const CONFIG = {
         moduleSpacingY: 0,             // 模块纵向间距 px；上下行边缘钉共同形成连续通道
         // 钉板左右两侧到画布墙的留白（每侧 1.5 个弹珠直径 = 1.5 × 2 × 7.7 ≈ 23 px）
         moduleAreaSideMargin: 23,
+        bottomRewardZoneChance: 0.28,  // 每次研磨阶段生成底部奖励分栏的基础概率
+        bottomRewardZoneMaxCount: 1,   // 当前仅生成一个窄奖励分栏，避免底部过度拥挤
+        bottomRewardZoneWidthMultiplier: 1.5, // 奖励分栏宽度 = 1.5 个倍化弹珠直径
+        bottomRewardZoneHeight: 48,
+        bottomRewardOnlyTypes: ['explosive', 'laser'],
+        bottomRewardZoneWeights: { explosive: 2, laser: 1 },
         // ==================== [v2 局内商店 + 符文碎片经济] ====================
         runShopInterval: 2,            // 每 N 个回合开始前出现一次可选局内商人入口（0 = 关闭周期入口）
         runShopOfferAfterBoss: true,   // Boss 击败后的下一回合开始前强制出现一次商人入口
@@ -935,6 +958,10 @@ const CONFIG = {
         // Hit flash is intentionally subtle so damage numbers stay readable.
         hitFlashDuration: 2,
         hitFlashMaxAlpha: 0.16,
+        // Delayed damage trail only marks recently lost HP; it should not whiten the current HP fill.
+        delayedDamageTrailHold: 12,
+        delayedDamageTrailAlpha: 0.18,
+        delayedDamageTrailColor: '#fca5a5',
 
         // E1: 随机静态倾斜（Static Tilt）
         // 最大静态倾斜弧度（约 ±2.5°），普通敌人使用，elite 乘 0.6，boss 为 0
@@ -1397,7 +1424,7 @@ const RELIC_DB = [
     // pinboard_modules.js 中的 dim_shard_module / dim_crystal_module（高密度釘板模块），
     // 通过商店购买后挂载到模块槽位。
     { id: 'stars_shines', name: '群星闪烁', icon: '✨', desc: '解鎖 [回响彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆回响彈珠。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'resonance', boost: 8, maxStacks: 1 },
-    { id: 'optical_lens', name: '聚焦透鏡', icon: '🔭', desc: '解鎖 [光球彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆光球彈珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'laser', boost: 10, maxStacks: 1 },
+    { id: 'optical_lens', name: '聚焦透鏡', icon: '🔭', desc: '校準底部獎勵分欄：[光] 屬性會在研磨底部分欄中出現。立刻觸發一次混沌精華。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'laser', boost: 10, maxStacks: 1 },
     //  1. 粉色钉子遗物
     { id: 'pink_slime', name: '粉紅凝膠', icon: '💗', desc: '收集階段：出現 3 個高彈性粉色釘子 (可疊加)。立刻觸發一次混沌精華。', rarity: 'common', effect: 'pink_peg_up', maxStacks: 5},
 
@@ -1417,7 +1444,7 @@ const RELIC_DB = [
     { id: 'tactical_kit_scatter', name: '散射補給', icon: '🔱', desc: '解鎖 [散射彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆散射彈珠；此 2 顆彈珠同化概率永久翻倍。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'scatter', boost: 5, maxStacks: 1 },
     { id: 'tactical_kit_damage', name: '增幅補給', icon: '⚔️', desc: '解鎖 [增幅彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆增幅彈珠；此 2 顆彈珠同化概率永久翻倍。', rarity: 'common', effect: 'unlock_marble', marbleType: 'damage', boost: 5, maxStacks: 1, recommended: true, tags: ['伤害核心', '新手友好'], recommendTip: '解锁增幅属性并立即获得2颗增幅弹珠，同化概率永久翻倍！' },
 
-    { id: 'explosive_ammo', name: '高爆火藥', icon: '🧨', desc: '解鎖 [爆破彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆爆破彈珠。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'explosive', boost: 10, maxStacks: 1 },
+    { id: 'explosive_ammo', name: '高爆火藥', icon: '🧨', desc: '校準底部獎勵分欄：[爆破] 屬性會在研磨底部分欄中出現。立刻觸發一次混沌精華。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'explosive', boost: 10, maxStacks: 1 },
     { id: 'prism_shard', name: '七彩稜鏡', icon: '🌈', desc: '解鎖 [彩虹彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆彩虹彈珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'rainbow', boost: 5, maxStacks: 1 },
     { id: 'russian_doll', name: '俄羅斯套娃', icon: '🪆', desc: '解鎖 [套娃彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆套娃彈珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'matryoshka', boost: 5, maxStacks: 1 },
 
@@ -1458,6 +1485,29 @@ const RELIC_DB = [
         recommended: true,
         tags: ['生存保护', '新手友好'],
         recommendTip: '漏怪时不会立刻失败，给你更多时间熟悉战斗节奏。'
+    },
+    {
+        id: 'fate_reroll_token',
+        name: '命运重铸币',
+        icon: '🪙',
+        desc: '每次命运抉择可刷新一次弹珠候选。刷新会清空当前已选弹珠。',
+        rarity: 'rare',
+        effect: 'selection_reroll',
+        maxStacks: 1,
+        recommended: true,
+        tags: ['选择优化', '弹珠刷新'],
+        recommendTip: '不满意当前弹珠池时可以重刷一次，帮助构筑更快成型。'
+    },
+    {
+        id: 'relic_reroll_seal',
+        name: '鉴宝重掷印',
+        icon: '🎟️',
+        desc: '每次遗物选择可刷新一次遗物候选。刷新不会额外推进遗物选择计数。',
+        rarity: 'rare',
+        effect: 'relic_reroll',
+        maxStacks: 1,
+        tags: ['选择优化', '遗物刷新'],
+        recommendTip: '遗物三选一不合心意时多看一轮，适合寻找关键构筑件。'
     },
 
     // 走私者系列：立即给予符文（按稀有度分为4个版本）
@@ -1833,7 +1883,7 @@ const SKILL_DB = [
  *     键为 RUNE_DB 中的 element 字段，值为额外权重加成量
  *     在 loot_calcRuneDrop 的第三层抽取中，与 BOSS_THEME_MULTIPLIER 相乘后叠加到符文权重
  *
- * 弹点属性来源：docs/boss_system_design.md
+ * 破绽谱来源：docs/boss_system_design.md
  * 对应 COUNTER_MAP 中的克制关系：
  *   pyro.shield=1.0, pierce.shield=1.0 → 伊格尼斯（护盾+极速）
  *   cryo.jump=0.8, pierce.jump=0.8   → 格拉西斯（跳跃+再生）
@@ -1842,63 +1892,63 @@ const SKILL_DB = [
  *   laser.regen=1.0, pyro.regen=0.8      → 维里迪斯（再生+治疗）
  *   cryo.haste=1.0, bounce.haste=0.4     → 特斯拉（极速+分身）
  *   pierce.shield=1.0, laser.shield=0.5  → 奇美拉（狂暴+吞噬）
- *   动态弹点                            → 奥罗波罗斯（全词缀轮转）
+ *   动态破绽谱                          → 奥罗波罗斯（全词缀轮转）
  */
 const BOSS_DB = [
     {
         id: 'boss_ignis',
         name: '燕炉守卫·伊格尼斯',
         affixes: ['shield', 'haste'],
-        // 弹点：穿透 (Pierce) 与 火焰 (Pyro) —— 克制护盾
+        // 破绽谱：穿透 (Pierce) 与 火焰 (Pyro) —— 克制护盾
         themeWeights: { pierce: 3.0, pyro: 3.0 }
     },
     {
         id: 'boss_glacies',
         name: '霜晶缝合怪·格拉西斯',
         affixes: ['jump', 'regen'],
-        // 弹点：冰霜 (Cryo) 与 穿透 (Pierce) —— 克制跳跃与再生
+        // 破绽谱：冰霜 (Cryo) 与 穿透 (Pierce) —— 克制跳跃与再生
         themeWeights: { cryo: 3.0, pierce: 3.0 }
     },
     {
         id: 'boss_micro',
         name: '裂变母体·米克罗',
         affixes: ['clone', 'healer'],
-        // 弹点：闪电 (Lightning) 与 散射 (Scatter) —— 克制分身与治疗
+        // 破绽谱：闪电 (Lightning) 与 散射 (Scatter) —— 克制分身与治疗
         themeWeights: { lightning: 3.0, scatter: 3.0 }
     },
     {
         id: 'boss_devourer',
         name: '贪婪之渊·噬神者',
         affixes: ['devour', 'shield'],
-        // 弹点：弹射 (Bounce) 与 激光 (Laser) —— 克制吞噬
+        // 破绽谱：弹射 (Bounce) 与 激光 (Laser) —— 克制吞噬
         themeWeights: { bounce: 3.0, laser: 3.0 }
     },
     {
         id: 'boss_viridis',
         name: '翠绳共生体·维里迪斯',
         affixes: ['regen', 'healer'],
-        // 弹点：激光 (Laser) 与 火焰 (Pyro) —— 克制再生与治疗
+        // 破绽谱：激光 (Laser) 与 火焰 (Pyro) —— 克制再生与治疗
         themeWeights: { laser: 3.0, pyro: 3.0 }
     },
     {
         id: 'boss_tesla',
         name: '雷霆幻影·特斯拉',
         affixes: ['haste', 'clone'],
-        // 弹点：冰霜 (Cryo) 与 弹射 (Bounce) —— 克制极速与分身
+        // 破绽谱：冰霜 (Cryo) 与 弹射 (Bounce) —— 克制极速与分身
         themeWeights: { cryo: 3.0, bounce: 3.0 }
     },
     {
         id: 'boss_chimera',
         name: '混沌融合体·奇美拉',
         affixes: ['berserk', 'devour'],
-        // 弹点：穿透 (Pierce) 与 激光 (Laser) —— 克制狂暴与吞噬
+        // 破绽谱：穿透 (Pierce) 与 激光 (Laser) —— 克制狂暴与吞噬
         themeWeights: { pierce: 3.0, laser: 3.0 }
     },
     {
         id: 'boss_ouroboros',
         name: '永恒回声·奥罗波罗斯',
         affixes: ['shield', 'haste'], // 初始词缀，将按回合轮转
-        // 动态弹点，暂时配置均衡权重（待导演系统实现后可根据当前词缀动态调整）
+        // 动态破绽谱，暂时配置均衡权重（待导演系统实现后可根据当前词缀动态调整）
         themeWeights: { pierce: 1.5, pyro: 1.5, cryo: 1.5, lightning: 1.5, laser: 1.5, scatter: 1.5, bounce: 1.5 }
     }
 ];

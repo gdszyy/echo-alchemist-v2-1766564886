@@ -399,6 +399,9 @@ export const game_system = {
         this.selectionRequiredCount = CONFIG.gameplay.selectionReq || 3;
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
+        this.selectionRerollUsed = false;
+        this.relicRerollUsed = false;
+        this._lastRelicSelectionOptions = null;
         this.relicOverlayReturnState = null;
         this.fateMomentContext = null;
         this.replaceAmmoContext = null; // [tsk-668f3dba] 替换当前子弹阶段上下文
@@ -732,6 +735,7 @@ export const game_system = {
         this.selectionPreviewState = null;
 
         this.phase_switchPhase('selection');
+        this.selectionRerollUsed = false;
         this.spawn_generateMarbleOptions();
         this.selectedMarbles = [];
         const countEl = document.getElementById('selected-count');
@@ -998,6 +1002,7 @@ export const game_system = {
         this.pendingSelectionMode = null;
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
+        this.selectionRerollUsed = false;
         this.spawn_generateMarbleOptions();
         this.selectedMarbles = [];
         const countEl = document.getElementById('selected-count');
@@ -2456,6 +2461,9 @@ export const game_system = {
                     gapAngle: e.gapAngle,
                     _moveInterval: e._moveInterval,
                     _moveCooldown: e._moveCooldown,
+                    _bossVulnerabilityProgress: e._bossVulnerabilityProgress || 0,
+                    _bossVulnerabilityExposedHits: e._bossVulnerabilityExposedHits || 0,
+                    _bossVulnerabilitySuppressedEnrage: e._bossVulnerabilitySuppressedEnrage || false,
                 };
                 // 序列化 collisionData（将 Vec2 转为 {x,y}）
                 if (e.collisionData) {
@@ -2541,6 +2549,8 @@ export const game_system = {
                 bulletCapBonus: this.bulletCapBonus || 0,
                 selectionInjectedRune: this.selectionInjectedRune ? { ...this.selectionInjectedRune } : null,
                 selectionPreviewState: this.selectionPreviewState ? { ...this.selectionPreviewState } : null,
+                selectionRerollUsed: this.selectionRerollUsed || false,
+                relicRerollUsed: this.relicRerollUsed || false,
                 relicOverlayReturnState: this.relicOverlayReturnState ? { ...this.relicOverlayReturnState } : null,
                 fateMomentContext: this.fateMomentContext ? { ...this.fateMomentContext } : null,
                 wavePresetUsage: this._wavePresetUsage ? JSON.parse(JSON.stringify(this._wavePresetUsage)) : {},
@@ -2675,6 +2685,8 @@ export const game_system = {
             this.selectionRequiredCount = state.selectionRequiredCount || ((CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0));
             this.selectionInjectedRune = state.selectionInjectedRune ? { ...state.selectionInjectedRune } : null;
             this.selectionPreviewState = state.selectionPreviewState ? { ...state.selectionPreviewState } : null;
+            this.selectionRerollUsed = state.selectionRerollUsed || false;
+            this.relicRerollUsed = state.relicRerollUsed || false;
             this.relicOverlayReturnState = state.relicOverlayReturnState ? { ...state.relicOverlayReturnState } : null;
             this.fateMomentContext = state.fateMomentContext ? { ...state.fateMomentContext } : null;
             this._wavePresetUsage = state.wavePresetUsage ? JSON.parse(JSON.stringify(state.wavePresetUsage)) : {};
@@ -2815,6 +2827,9 @@ export const game_system = {
                 if (d.gapAngle !== undefined) e.gapAngle = d.gapAngle;
                 if (d._moveInterval !== undefined) e._moveInterval = d._moveInterval;
                 if (d._moveCooldown !== undefined) e._moveCooldown = d._moveCooldown;
+                e._bossVulnerabilityProgress = d._bossVulnerabilityProgress || 0;
+                e._bossVulnerabilityExposedHits = d._bossVulnerabilityExposedHits || 0;
+                e._bossVulnerabilitySuppressedEnrage = d._bossVulnerabilitySuppressedEnrage || false;
                 e.justSpawned = false; // 恢复时不播放入场动画
                 return e;
             });

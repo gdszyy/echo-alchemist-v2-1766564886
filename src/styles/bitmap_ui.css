@@ -334,6 +334,44 @@
     border-image-width: 12px;
 }
 
+#phase-selection .select-card[data-attr="white"] {
+    background-image:
+        linear-gradient(180deg, rgba(239, 246, 255, 0.22), rgba(14, 165, 233, 0.10) 42%, rgba(2, 6, 23, 0.90)) !important;
+    border: 1px solid rgba(219, 234, 254, 0.66) !important;
+    box-shadow:
+        0 10px 22px rgba(0, 0, 0, 0.34),
+        inset 0 0 18px rgba(191, 219, 254, 0.16) !important;
+}
+
+#phase-selection .select-card[data-attr="white"]::before {
+    background:
+        linear-gradient(135deg, rgba(255,255,255,0.18), transparent 48%),
+        radial-gradient(circle at 50% 0%, rgba(219,234,254,0.28), transparent 60%) !important;
+}
+
+#phase-selection .select-card[data-attr="white"].selected {
+    box-shadow:
+        0 12px 28px rgba(0, 0, 0, 0.46),
+        0 0 22px rgba(191, 219, 254, 0.48),
+        inset 0 0 20px rgba(255, 255, 255, 0.18) !important;
+}
+
+#phase-selection .select-card[data-attr="white"] .select-icon-wrap {
+    background:
+        radial-gradient(circle at 50% 42%, rgba(255,255,255,0.38), rgba(125,211,252,0.18) 48%, rgba(15,23,42,0.16) 68%, transparent 72%) !important;
+    border-radius: 50%;
+}
+
+#phase-selection .select-card[data-attr="white"] .select-icon {
+    background:
+        radial-gradient(circle at 35% 28%, #ffffff 0%, #eff6ff 24%, #bae6fd 54%, #64748b 100%) !important;
+    border: 1px solid rgba(224, 242, 254, 0.88) !important;
+    box-shadow:
+        inset -4px -4px 8px rgba(15, 23, 42, 0.46),
+        inset 3px 3px 6px rgba(255,255,255,0.40),
+        0 0 14px rgba(186, 230, 253, 0.42) !important;
+}
+
 #phase-selection .select-card::before {
     background:
         linear-gradient(135deg, rgba(255,255,255,0.08), transparent 45%),

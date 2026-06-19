@@ -20,8 +20,18 @@ New combat relic animations must read `CONFIG.performance.relicCinematicDelayMs`
 - Damage outcomes: `暴击` for focused-fire crits.
 - Counter outcomes: `克制` / `有效` by reading `COUNTER_MAP` from `src/rune_config.js`; this is explanatory only and does not change damage math or rune drop weights.
 - Projectile outcomes: fallback labels for `弹射` and `穿透` when no higher-priority label applies.
+- Boss vulnerability outcomes: `破绽+` when the current hit advances the Boss vulnerability meter, `破绽` when the meter breaks, and `易伤` while the exposed-hit window is being consumed.
 
 The helper must remain side-effect free. It may inspect enemy tags, archetype aliases, projectile config, and the post-hit `damageResult`, but damage formulas stay in the existing damage sections.
+
+## 0.2 Boss Vulnerability Redesign (2026-06-19)
+
+The old static Boss `weakness` field has been replaced by `CONFIG.balance.bossConfigs[*].vulnerability` plus the global `CONFIG.balance.bossVulnerability` tuning block.
+
+- `combat_getBossVulnerabilityProfile()` resolves the active vulnerability attrs; Ouroboros uses `rotationIndex` to switch attrs with its affix set.
+- `combat_applyBossVulnerability()` runs before `Enemy.takeDamage()`: matching attrs add progress, a full meter grants `_bossVulnerabilityExposedHits`, and exposed hits multiply damage by `exposedDamageMult`.
+- Breaking the meter before enrage sets `_bossVulnerabilitySuppressedEnrage`, delaying one 50% HP enrage check.
+- The mechanic is numeric and label-only; it does not add persistent particles, new blend modes, gradients, or `shadowBlur`.
 
 本文档定义了 `src/combat_system.js` 拆分后的战斗系统模块结构及职责边界。
 

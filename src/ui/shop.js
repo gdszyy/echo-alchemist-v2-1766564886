@@ -67,6 +67,7 @@ export const shop_system = {
     ui_showRelicSelection(options = {}) {
         // 1. 记录之前的状态 (用于关闭时恢复)
         this.stateBeforeRelic = options.resumeTarget || this.phase;
+        const isReroll = options.isReroll === true;
 
         // --- 配置权重 ---
         const RARITY_WEIGHTS = CONFIG.balance.relicRarityWright;
@@ -80,6 +81,12 @@ export const shop_system = {
         // 开局义务选择（run_start）时排除需要现有弹药序列才能生效的遗物
         const isRunStart = options.source === 'run_start';
         const showAllRelics = options.showAllRelics === true;
+        this._lastRelicSelectionOptions = {
+            resumeTarget: options.resumeTarget || this.stateBeforeRelic,
+            source: options.source || null,
+            showAllRelics,
+        };
+        if (!isReroll) this.relicRerollUsed = false;
         this.relicSelectionContext = showAllRelics && options.source === 'debug_pick_any_relic'
             ? { mode: 'debug_start_relic' }
             : null;
@@ -167,7 +174,7 @@ export const shop_system = {
         }
 
         // 计数器自增（每次打开遗物选择界面时计数）
-        if (!showAllRelics) this.relicSelectionCount = (this.relicSelectionCount || 0) + 1;
+        if (!showAllRelics && !isReroll) this.relicSelectionCount = (this.relicSelectionCount || 0) + 1;
         const showRecommendation = !showAllRelics && this.relicSelectionCount <= 3;
         const renderRelicPreview = (relic, cardEl) => {
             const preview = document.getElementById('relic-preview-panel');
@@ -283,12 +290,46 @@ export const shop_system = {
                 skipBtn.textContent = showAllRelics ? '返回商店' : `放棄遺物 → +${skipBonus} 碎片并进商店`;
                 skipBtn.onclick = showAllRelics ? () => this.ui_closeRelicSelection() : () => this.ui_skipRelic();
             }
+            let rerollBtn = document.getElementById('relic-reroll-btn');
+            if (!rerollBtn && skipBtn && skipBtn.parentNode) {
+                rerollBtn = document.createElement('button');
+                rerollBtn.id = 'relic-reroll-btn';
+                rerollBtn.className = 'mt-3 text-cyan-300 hover:text-cyan-100 text-sm underline cursor-pointer transition-colors';
+                skipBtn.parentNode.insertBefore(rerollBtn, skipBtn);
+            }
+            if (rerollBtn) {
+                const hasRerollRelic = (this.ownedRelics || []).includes('relic_reroll_seal');
+                const canReroll = !showAllRelics && hasRerollRelic && !this.relicRerollUsed;
+                rerollBtn.style.display = canReroll ? 'inline-flex' : 'none';
+                rerollBtn.textContent = '刷新遗物候选';
+                rerollBtn.onclick = () => this.ui_rerollRelicSelection();
+            }
             overlay.style.display = 'flex';
             overlay.classList.remove('hidden-phase');
             overlay.classList.add('active-phase');
         }
         // 通知教程系统：遗物选择界面已打开
         eventBus.emit('tutorial:relic_shown');
+    },
+
+    /**
+     * 刷新当前遗物候选（由鉴宝重掷印提供，每次遗物选择最多一次）
+     */
+    ui_rerollRelicSelection() {
+        if (!(this.ownedRelics || []).includes('relic_reroll_seal')) {
+            if (window.showToast) showToast('需要遗物「鉴宝重掷印」才能刷新遗物候选。');
+            return;
+        }
+        if (this.relicRerollUsed) {
+            if (window.showToast) showToast('本次遗物选择已经刷新过。');
+            return;
+        }
+        const options = this._lastRelicSelectionOptions || { resumeTarget: this.stateBeforeRelic || this.phase };
+        if (options.showAllRelics) return;
+        this.relicRerollUsed = true;
+        if (window.showToast) showToast('遗物候选已刷新。');
+        this.ui_showRelicSelection({ ...options, isReroll: true });
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
     },
 
     /**
@@ -424,10 +465,22 @@ export const shop_system = {
         } else if (relic.effect === 'unlock_marble') {
             const mt = relic.marbleType;
             const boost = relic.boost || 10;
+            const rewardOnlyMarbleTypes = new Set(CONFIG.gameplay.bottomRewardOnlyTypes || []);
+            const rewardOnly = rewardOnlyMarbleTypes.has(mt);
             // 1. 解锁属性弹珠
             if (!this.unlockedWeights) this.unlockedWeights = {};
             const current = this.unlockedWeights[mt] || 0;
             this.unlockedWeights[mt] = current === 0 ? boost : current + Math.floor(boost * 1.5);
+            if (rewardOnly) {
+                const display = CONFIG.ui?.attributeDisplay?.[mt]?.name || mt;
+                if (window.showToast) showToast(`已校准底部奖励区：[${display}] 属性会在研磨底部分栏中出现。`);
+                if (typeof this.sys_queueRoundStartReward === 'function') {
+                    this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
+                }
+                if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+                if (!options.skipClose) this.ui_closeRelicSelection();
+                return;
+            }
             // 2. 保证下次命运抉择带有 2 颗该属性弹珠
             if (!this.guaranteedNextRound) this.guaranteedNextRound = [];
             this.guaranteedNextRound.push(mt);
@@ -577,6 +630,8 @@ export const shop_system = {
             overlay.classList.add('hidden-phase');
         }
         this.relicSelectionContext = null;
+        this._lastRelicSelectionOptions = null;
+        this.relicRerollUsed = false;
         const returnState = this.relicOverlayReturnState || { phase: this.stateBeforeRelic };
         this.relicOverlayReturnState = null;
         // 标记本回合已弃权遗物，避免回到 resolver 时再次弹出（防止重复打开）
@@ -618,6 +673,8 @@ export const shop_system = {
             overlay.classList.add('hidden-phase');
         }
         this.relicSelectionContext = null;
+        this._lastRelicSelectionOptions = null;
+        this.relicRerollUsed = false;
 
         const returnState = this.relicOverlayReturnState || { phase: this.stateBeforeRelic };
         this.relicOverlayReturnState = null;

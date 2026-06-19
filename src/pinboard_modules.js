@@ -15,7 +15,7 @@
  *
  * MVP 实现说明：
  *   - wheel_module 复用 SpecialSlot type='wheel'（已有的转盘触发机制）
- *   - baffle 模块用一排粉色高弹性钉子模拟"挡板反弹"，复用 pink peg 物理
+ *   - baffle 模块使用 barrier 形态的异形钉，避免用近距离圆钉拼挡板造成卡球
  *   - fixed_slot 模块复用 SpecialSlot 类（multicast/recall/split 轮换）
  */
 
@@ -27,10 +27,11 @@ const RANDOMIZABLE_PEG_TYPES = ['bounce', 'pierce', 'scatter', 'damage', 'cryo',
 
 const PEG_RADIUS = CONFIG.physics.pegRadius || 4;
 const MARBLE_RADIUS = CONFIG.physics.marbleRadius || 5.8;
+const MAX_MARBLE_RADIUS = MARBLE_RADIUS + (CONFIG.physics.maxMarbleSizeBonus || 0);
 const PINBOARD_SPACING_BUFFER = CONFIG.physics.pinboardSpacingBuffer || 1;
 // @perf-impact: Denser modules can raise Peg count; expensive Peg shadow/halo drawing remains gated by CONFIG.performance.
-// Base passability spacing. Size-up marbles are intentionally a tradeoff, not the density baseline.
-const MIN_PEG_SPACING = 2 * PEG_RADIUS + 2 * MARBLE_RADIUS + PINBOARD_SPACING_BUFFER;
+// Circle peg center spacing must pass size-up marbles; baffles should use barrier pegs, not tight circle pairs.
+const MIN_PEG_SPACING = 2 * PEG_RADIUS + 2 * MAX_MARBLE_RADIUS + PINBOARD_SPACING_BUFFER;
 
 let moduleInstanceSeq = 0;
 
@@ -150,11 +151,49 @@ function migrateModuleLayoutToCurrentGrid(layout, totalSlots, defaultSlots) {
     return next;
 }
 
+function shouldResetLegacyStarterLayout(layout, totalSlots, defaultSlots) {
+    if (!Array.isArray(layout)) return false;
+    const activeSlots = getActiveModuleSlots(defaultSlots, totalSlots);
+    const isOldWideDefault = activeSlots.every(slotIdx => {
+        const entry = normalizeModuleEntry(layout[slotIdx]);
+        if (slotIdx === 0) return getModuleIdFromEntry(entry) === 'caret_wheel_field';
+        return isModuleRef(entry) && entry.ref === 0;
+    });
+    if (isOldWideDefault) return true;
+    const isStarterStitchDefault = activeSlots.every(slotIdx => {
+        const entry = normalizeModuleEntry(layout[slotIdx]);
+        const moduleId = getModuleIdFromEntry(entry);
+        return typeof moduleId === 'string' && moduleId.startsWith('starter_');
+    });
+    if (isStarterStitchDefault) return true;
+
+    const legacyBySlot = new Map([
+        [0, 'guide_fin_left'],
+        [1, 'split_lattice_bridge'],
+        [3, 'multicast_gate_light'],
+        [4, 'guide_fin_right'],
+        [5, 'recall_loop_light'],
+        [6, 'bounce_chamber'],
+        [7, 'crucible_seed'],
+        [8, 'catcher_cup'],
+        [9, 'wheel_cup_light'],
+    ]);
+    return activeSlots.every(slotIdx => {
+        const entry = normalizeModuleEntry(layout[slotIdx]);
+        if (slotIdx === 2) return isModuleRef(entry) && entry.ref === 1;
+        if (!legacyBySlot.has(slotIdx)) return !entry;
+        return getModuleIdFromEntry(entry) === legacyBySlot.get(slotIdx);
+    });
+}
+
 export function ensureModuleLayoutInstances(layout, totalSlots, defaultSlots = CONFIG.gameplay.moduleDefaultSlots || 3) {
     const count = Math.max(0, totalSlots || DEFAULT_MODULE_SEQUENCE.length);
-    const source = Array.isArray(layout)
+    let source = Array.isArray(layout)
         ? migrateModuleLayoutToCurrentGrid(layout, count, defaultSlots)
         : createDefaultModuleLayout(count, defaultSlots);
+    if (shouldResetLegacyStarterLayout(source, count, defaultSlots)) {
+        source = createDefaultModuleLayout(count, defaultSlots);
+    }
     const next = Array.from({ length: count }, (_, i) => normalizeModuleEntry(source[i]));
     const defaultLayout = createDefaultModuleLayout(count, defaultSlots);
     for (const slotIdx of getActiveModuleSlots(defaultSlots, count)) {
@@ -286,8 +325,24 @@ function makePegAt(ox, oy, w, h, px, py, type = 'normal', row = 0, col = 0) {
     return peg;
 }
 
+function makeBarrierAt(ox, oy, w, h, ax, ay, bx, by, type = 'pink', row = 0, col = 0) {
+    const x1 = ox + w * ax;
+    const y1 = oy + h * ay;
+    const x2 = ox + w * bx;
+    const y2 = oy + h * by;
+    const peg = new Peg((x1 + x2) / 2, (y1 + y2) / 2, type);
+    peg.shape = 'barrier';
+    peg.segment = { x1, y1, x2, y2 };
+    peg.thickness = Math.max(PEG_RADIUS * 2.15, 8.5);
+    peg.radius = peg.thickness / 2;
+    peg.row = row;
+    peg.col = col;
+    peg.level = 1;
+    return peg;
+}
+
 function hasNearbyPeg(pegs, x, y, minDistance) {
-    return pegs.some(peg => peg && peg.pos && Math.hypot(peg.pos.x - x, peg.pos.y - y) < minDistance);
+    return pegs.some(peg => peg && peg.shape !== 'barrier' && peg.pos && Math.hypot(peg.pos.x - x, peg.pos.y - y) < minDistance);
 }
 
 const SEAMED_STARTER_MODULES = new Set([
@@ -310,7 +365,7 @@ function addModuleSeamPegs(pegs, ox, oy, w, h, moduleId) {
         [0.12, 0.24], [0.88, 0.36], [0.12, 0.62], [0.88, 0.74],
         [0.32, 0.08], [0.68, 0.08], [0.32, 0.94], [0.68, 0.94],
     ];
-    const minDistance = Math.max(PEG_RADIUS * 2 + MARBLE_RADIUS * 0.95, 13.5);
+    const minDistance = MIN_PEG_SPACING;
     seamPoints.forEach(([px, py], i) => {
         const x = ox + w * px;
         const y = oy + h * py;
@@ -322,11 +377,29 @@ function addModuleSeamPegs(pegs, ox, oy, w, h, moduleId) {
     return pegs;
 }
 
+function enforceCirclePegSpacing(pegs, minDistance = MIN_PEG_SPACING) {
+    const kept = [];
+    for (const peg of pegs || []) {
+        if (!peg || peg.shape === 'barrier') {
+            kept.push(peg);
+            continue;
+        }
+        if (hasNearbyPeg(kept, peg.pos.x, peg.pos.y, minDistance)) continue;
+        kept.push(peg);
+    }
+    return kept;
+}
+
 function buildGuideFin(ox, oy, w, h, mirror = false) {
     const pegs = [];
+    const barrier = mirror
+        ? makeBarrierAt(ox, oy, w, h, 0.78, 0.16, 0.20, 0.82, 'pink', 0, 0)
+        : makeBarrierAt(ox, oy, w, h, 0.22, 0.16, 0.80, 0.82, 'pink', 0, 0);
+    barrier.layoutRole = mirror ? 'guide_fin_right_barrier' : 'guide_fin_left_barrier';
+    pegs.push(barrier);
     const rail = mirror
-        ? [[0.78, 0.18], [0.64, 0.34], [0.50, 0.50], [0.36, 0.66], [0.22, 0.82]]
-        : [[0.22, 0.18], [0.36, 0.34], [0.50, 0.50], [0.64, 0.66], [0.78, 0.82]];
+        ? [[0.88, 0.24], [0.58, 0.50], [0.24, 0.78]]
+        : [[0.12, 0.24], [0.42, 0.50], [0.76, 0.78]];
     rail.forEach(([px, py], i) => {
         const peg = makePegAt(ox, oy, w, h, px, py, i === 1 || i === 3 ? 'pink' : 'normal', i, i);
         peg.layoutRole = mirror ? 'guide_fin_right' : 'guide_fin_left';
@@ -376,7 +449,7 @@ export const MODULE_DEFS = {
         rarity: 'common',
         price: 0,
         build(ox, oy, w, h) {
-            const pegs = generateStaggeredPegs(ox, oy, w, h, 4, 3, 'normal');
+            const pegs = generateStaggeredPegs(ox, oy, w, h, 4, 6, 'normal');
             return { pegs, specialSlots: [] };
         },
     },
@@ -464,20 +537,13 @@ export const MODULE_DEFS = {
         rarity: 'rare',
         price: 50,
         build(ox, oy, w, h) {
-            // 沿对角线排布 4 颗 pink 钉子模拟挡板
             const pegs = [];
-            const steps = 4;
-            for (let i = 0; i < steps; i++) {
-                const t = i / (steps - 1);
-                const x = ox + w * (0.15 + t * 0.7);
-                const y = oy + h * (0.85 - t * 0.55);
-                const p = new Peg(x, y, 'pink');
-                p.row = 0; p.col = i; p.level = 1;
-                pegs.push(p);
-            }
+            const barrier = makeBarrierAt(ox, oy, w, h, 0.16, 0.82, 0.84, 0.28, 'pink', 0, 0);
+            barrier.layoutRole = 'baffle_barrier';
+            pegs.push(barrier);
             // 顶部 2 颗普通钉子提供初始反弹
             for (let i = 0; i < 2; i++) {
-                const x = ox + w * (0.3 + i * 0.4);
+                const x = ox + w * (0.25 + i * 0.5);
                 const y = oy + h * 0.15;
                 const p = new Peg(x, y, 'normal');
                 p.row = 1; p.col = i; p.level = 1;
@@ -577,6 +643,13 @@ export const MODULE_DEFS = {
                 peg.layoutRole = 'split_lattice_bridge';
                 return peg;
             });
+            [
+                makeBarrierAt(ox, oy, w, h, 0.14, 0.34, 0.40, 0.54, 'pink', 1, 6),
+                makeBarrierAt(ox, oy, w, h, 0.58, 0.34, 0.88, 0.58, 'pink', 1, 7),
+            ].forEach(peg => {
+                peg.layoutRole = 'split_lattice_bridge_barrier';
+                pegs.push(peg);
+            });
             markFusionFocus(pegs.filter(p => p.type === 'normal'), ox, oy, w, h, 3);
             const specialSlots = [new SpecialSlot(ox + w * 0.18, oy + h * 0.50, ox + w * 0.42, oy + h * 0.50, 'split')];
             return { pegs, specialSlots };
@@ -634,6 +707,13 @@ export const MODULE_DEFS = {
                 makePegAt(ox, oy, w, h, 0.70, 0.78, 'normal', 2, 2),
                 makePegAt(ox, oy, w, h, 0.82, 0.70, 'normal', 2, 3),
             ];
+            [
+                makeBarrierAt(ox, oy, w, h, 0.22, 0.34, 0.38, 0.68, 'pink', 3, 0),
+                makeBarrierAt(ox, oy, w, h, 0.78, 0.34, 0.62, 0.68, 'pink', 3, 1),
+            ].forEach(peg => {
+                peg.layoutRole = 'bounce_chamber_barrier';
+                pegs.push(peg);
+            });
             pegs.forEach(p => { p.layoutRole = 'bounce_chamber'; });
             return { pegs, specialSlots: [] };
         },
@@ -689,6 +769,9 @@ export const MODULE_DEFS = {
                 makePegAt(ox, oy, w, h, 0.40, 0.82, 'normal', 2, 0),
                 makePegAt(ox, oy, w, h, 0.60, 0.82, 'normal', 2, 2),
             ];
+            const cupBarrier = makeBarrierAt(ox, oy, w, h, 0.18, 0.68, 0.82, 0.68, 'pink', 3, 0);
+            cupBarrier.layoutRole = 'catcher_cup_barrier';
+            pegs.push(cupBarrier);
             pegs.forEach(p => { p.layoutRole = 'catcher_cup'; });
             const specialSlots = [new SpecialSlot(ox + w * 0.30, oy + h * 0.72, ox + w * 0.70, oy + h * 0.72, 'recall')];
             return { pegs, specialSlots };
@@ -772,6 +855,13 @@ export const MODULE_DEFS = {
                 makePegAt(ox, oy, w, h, 0.36, 0.88, 'normal', 3, 0),
                 makePegAt(ox, oy, w, h, 0.64, 0.88, 'normal', 3, 2),
             ];
+            [
+                makeBarrierAt(ox, oy, w, h, 0.22, 0.24, 0.38, 0.62, 'pink', 4, 0),
+                makeBarrierAt(ox, oy, w, h, 0.78, 0.24, 0.62, 0.62, 'pink', 4, 1),
+            ].forEach(peg => {
+                peg.layoutRole = 'recall_loop_light_barrier';
+                pegs.push(peg);
+            });
             pegs.forEach(p => { p.layoutRole = 'recall_loop_light'; });
             const specialSlots = [new SpecialSlot(ox + w * 0.32, oy + h * 0.60, ox + w * 0.68, oy + h * 0.60, 'recall')];
             return { pegs, specialSlots };
@@ -798,6 +888,9 @@ export const MODULE_DEFS = {
                 makePegAt(ox, oy, w, h, 0.50, 0.84, 'normal', 2, 1),
                 makePegAt(ox, oy, w, h, 0.72, 0.76, 'normal', 2, 2),
             ];
+            const cupBarrier = makeBarrierAt(ox, oy, w, h, 0.20, 0.64, 0.80, 0.64, 'pink', 3, 0);
+            cupBarrier.layoutRole = 'wheel_cup_light_barrier';
+            pegs.push(cupBarrier);
             pegs.forEach(p => { p.layoutRole = 'wheel_cup_light'; });
             const specialSlots = [new SpecialSlot(ox + w * 0.30, oy + h * 0.70, ox + w * 0.70, oy + h * 0.70, 'wheel')];
             return { pegs, specialSlots };
@@ -1290,12 +1383,9 @@ ATTR_PIN_TYPES.forEach(type => {
     };
 });
 
-// @perf-impact: Full initial 2x5 pinboard raises default Peg/SpecialSlot count; Peg shadow/halo cost remains gated by CONFIG.performance.
+// @perf-impact: Default 2x5 starter returns to plain dense staggered modules; Peg shadow/halo cost remains gated by CONFIG.performance.
 const DEFAULT_MODULE_SEQUENCE = [
-    'guide_fin_left', 'split_lattice_bridge', 'multicast_gate_light', 'guide_fin_right',
-    'recall_loop_light', 'bounce_chamber', 'crucible_seed', 'catcher_cup', 'wheel_cup_light',
-    'split_gate_light', 'rune_lattice_light',
-    'funnel', 'cryo_pyro_pair', 'sparse_module', 'mirror_module', 'wide_narrow_module',
+    'dense_stagger',
 ];
 
 export function createDefaultModuleLayout(totalSlots, activeSlots = CONFIG.gameplay.moduleDefaultSlots || 3) {
@@ -1412,6 +1502,7 @@ export function buildModuleEntities(moduleEntry, originX, originY, width, height
     }
     const result = def.build(originX, originY, width, height, ctx, slotIdx);
     addModuleSeamPegs(result.pegs, originX, originY, width, height, moduleId);
+    result.pegs = enforceCirclePegSpacing(result.pegs);
     applyModulePegStates(result.pegs, ctx, getModuleInstance(moduleEntry));
     return result;
 }

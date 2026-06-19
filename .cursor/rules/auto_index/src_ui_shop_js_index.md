@@ -1,6 +1,6 @@
 # src\ui\shop.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 856 | 函数数: 11 | 语言: javascript
+> 自动生成于 2026-06-19 | 总行数: 913 | 函数数: 12 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -15,6 +15,7 @@
 | _isCoarsePointerInput | function | `_isCoarsePointerInput()` |  |
 | ui_showRelicSelection | method | `ui_showRelicSelection(options = {})` |  |
 | renderRelicPreview | function | `renderRelicPreview(relic, cardEl)` |  |
+| ui_rerollRelicSelection | method | `ui_rerollRelicSelection()` |  |
 | ui_selectRelic | method | `ui_selectRelic(relic, options = {})` |  |
 | ui_skipRelic | method | `ui_skipRelic()` |  |
 | ui_closeRelicSelection | method | `ui_closeRelicSelection()` |  |

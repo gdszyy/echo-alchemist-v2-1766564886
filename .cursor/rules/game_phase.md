@@ -29,8 +29,8 @@ globs: ["src/game_phase.js"]
   - 替换确认：`sys_confirmReplaceAmmo()` 按 `selectedIndices` 从 `allRecipes = [...newRecipes, ...chargedRecipes]` 中取出子弹写入 `ammoQueue`，清空 `replaceAmmoContext` 和 `_chargedAmmoQueue`，恢复 gridEl CSS 布局后进入战斗。
   - 跳过：`sys_skipReplaceAmmo()` 直接使用 `newRecipes` 进入战斗，丢弃充能子弹。
   - **纯净精华特殊分支（跳过研磨）**：在纯净精华界面点击“跳过研磨”（`sys_skipGrindGetRune`）时，系统会随机补偿一个符文，并**优先使用 `_chargedAmmoQueue` 作为可保留弹药**（若无则编译当前 `marbleQueue`），随后清空新研磨子弹并进入只展示 CHARGED 行的替换界面。若没有任何可用充能子弹，系统回到标准弹珠选择，避免空弹药进入战斗。
-- **模式分支**: `chaos_essence` 模式沿用标准 3 选流程，但 UI 需显式标记为"混沌精华"；`pure_essence` 模式要求只选择 `1` 枚弹珠，**符文注入为可选项**：有注入时享受同化率加成，无注入时直接进入研磨（单弹珠，无同化加成）。
-- **出口**: 玩家做出选择并确认，触发转场动画进入研磨阶段。纯净精华模式下，确认时必须先完成合法性校验，把注入结果写回 `MarbleDefinition.collected`，并为对应 `marble.type` 写入 `doubleAssimilationBoostRounds`。
+- **模式分支**: `chaos_essence` 模式沿用标准 3 选流程，但 UI 需显式标记为"混沌精华"；`pure_essence` 模式要求只选择 `1` 枚弹珠，**符文合成为可选项**：有合成时把符文元素追加到该弹珠的 `MarbleDefinition.collected`，并享受同化率加成；无合成时直接进入研磨（单弹珠，无同化加成）。
+- **出口**: 玩家做出选择并确认，触发转场动画进入研磨阶段。纯净精华模式下，确认时必须先完成合法性校验，把合成属性写回 `MarbleDefinition.collected`；研磨发射时必须把弹珠已有 `collected` 拷贝进本次 `currentSession.collected`，确保最终子弹 recipe 获得对应属性，并为对应 `marble.type` 写入 `doubleAssimilationBoostRounds`。
 
 ### 2.5 回合开始提示与充能特效 (Round Start Banner)
 - **触发时机**: `sys_startRoundStartResolver()` 的 `pendingRoundStartRewards` 队列为空时，调用 `sys_showRoundStartBanner()`。
@@ -51,9 +51,9 @@ globs: ["src/game_phase.js"]
 ### 2.2.1 模块化钉盘属性生成契约
 
 - **生成入口**：模块化钉盘由 `phase_gathering_initPachinko_v2()` 调用 `buildModuleEntities()` 构造各模块实体。
-- **默认钉盘**：缺失或长度不匹配的 `currentModuleLayout` 必须通过 `createDefaultModuleLayout(totalSlots, CONFIG.gameplay.moduleDefaultSlots)` 初始化；初始开放前两行 `2x5` 共 10 个组件，后续通过局内商店按 `moduleUnlockOrder` 扩展第三行槽位。
+- **默认钉盘**：缺失或长度不匹配的 `currentModuleLayout` 必须通过 `createDefaultModuleLayout(totalSlots, CONFIG.gameplay.moduleDefaultSlots)` 初始化；当前初始盘面只开放首行 5 个 `dense_stagger` 1x1 模块，全部为普通交错钉板，不包含默认转盘、弹力角或异形机关；后续通过局内商店按 `moduleUnlockOrder` 扩展剩余槽位。
 - **居中解锁顺序**：模块化钉盘使用 `CONFIG.gameplay.moduleCols = 5` 与 `moduleUnlockOrder` 控制可编辑/可构建槽位。业务层与编辑器不得再假设“前 N 个 row-major 槽已解锁”；必须通过 `getActiveModuleSlots()` / `getActiveModuleSlotSet()` 获取激活槽。
-- **模块接缝**：`moduleSpacingX/Y` 默认为 `0`，首发模块通过边缘接缝钉与相邻模块共同组成连续通道；新增默认组件时必须考虑左右/上下相邻模块的边缘钉距，不能只在单模块内部看起来成立。
+- **模块接缝**：`moduleSpacingX/Y` 默认为 `0`；默认 `dense_stagger` 依靠同一交错节奏跨模块连续铺排。新增默认组件时必须按倍化弹珠半径审计圆钉两两中心距，挡板/杯口/导流翼必须使用 barrier，不能用近距离圆钉硬拼。
 - **组件实例**：`currentModuleLayout` 的管理单位是钉盘组件实例 `{ id, uid, pegStates, pluginStates }`；多格组件的非锚点槽位使用 `{ ref: anchorIdx }`。旧版字符串布局只允许在 `ensureModuleLayoutInstances()` 中兼容升级。
 - **组件库存**：可替换来源必须是 `ownedModuleComponents` 中的组件实例。商店或遗物获得组件时只能向该库存加入 1 个实例，禁止通过 `unlockedModuleTypes` 形成“解锁一次即可无限替换”的模板仓库。
 - **融合承载模块**：初始盘使用 `rune_lattice_light` 作为轻量符文融合承载组件，`rune_lattice` / `rune_focus_module` 是后续可获得的强化融合组件；三者通过 `fusionPriority` 标记影响符文注入落点。
@@ -63,6 +63,7 @@ globs: ["src/game_phase.js"]
 - **密度参数**：模块内部最小钉距由 `CONFIG.physics.pegRadius`、`CONFIG.physics.marbleRadius` 与 `CONFIG.physics.pinboardSpacingBuffer` 共同决定；不得在模块生成器里重新硬编码旧版大弹珠间距。
 - **权重来源**：模块生成普通钉子时必须读取当前 `game.unlockedWeights`，其中 `white` 映射为普通钉子权重，`bounce`、`pierce`、`scatter`、`damage`、`cryo`、`pyro`、`wind` 按权重生成对应属性钉子。
 - **禁止类型**：与旧版 `phase_gathering_getRandomPegType()` 保持一致，`laser` 与 `lightning` 不得作为钉子类型生成。
+- **底部奖励分栏**：`phase_gathering_initPachinko_v2()` 会按 `CONFIG.gameplay.bottomRewardZoneChance` 小概率在底部生成 1 个窄奖励区，宽度由 `bottomRewardZoneWidthMultiplier` 按倍化弹珠直径换算，两侧使用 `shape='barrier'` 的竖直 Peg 挡板。弹珠进入分栏时返回 `reward_zone`，向当前收集列表写入 `{ type, level: 1, source: 'bottom_reward_zone' }`，用于提供 `explosive` / `laser` 等奖励专属属性。
 - **覆盖边界**：只允许随机覆盖模块生成出的 `normal` 钉子；模块预置的 `pink`、固定 `cryo` / `pyro` 等特殊钉子必须保留，以免破坏模块本身定位。
 - **后置流程**：随机属性生成完成后，`pendingFusions` 会优先注入 `fusionPriority` 更高的普通钉子，再按中下区域价值排序；注入结果必须通过 `setModulePegState()` 写回组件实例的 `pegStates`，保证重建、拆卸或替换其它组件后，被同化钉子的属性不丢失。模块编辑器中选择符文融合后必须立即调用 `phase_gathering_initPachinko(false)` 重建当前盘面，保证玩家在点击「开始采集」前看到真实融合结果。
 - **融合预览**：模块编辑器存在 `_moduleEditorRunePreview` 时，`render_moduleEditorOverlay()` 必须用 `selectFusionTargetPegs()` 高亮目标钉子；该高亮只做轻量描边/填充，不新增粒子或高开销阴影。

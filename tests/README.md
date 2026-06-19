@@ -9,6 +9,7 @@
 | 文件 | 类型 | 依赖 | 说明 |
 |---|---|---|---|
 | `validate_scenarios.js` | 静态校验 | Node.js（无需浏览器） | 验证 `TRAINING_SCENARIOS` 数据结构完整性 |
+| `validate_boss_vulnerability.mjs` | 静态校验 | Node.js（无需浏览器） | 验证 Boss 破绽谱重设计与旧 `weak_spot` 机制移除 |
 | `ai_test_runner.js` | 运行时测试 | Puppeteer + 本地游戏服务 | 驱动浏览器进行实机行为验证 |
 
 ---
@@ -26,6 +27,18 @@ node tests/validate_scenarios.js
 - 8 个遗物/精华专项场景是否完整
 - 每个场景的 `bulletConfig`、`name`、`desc` 字段是否齐全
 - 场景 ID 唯一性、`categoryId` 合法性
+
+### 1.1 Boss 破绽契约校验（无需启动游戏）
+
+```bash
+node tests/validate_boss_vulnerability.mjs
+```
+
+验证内容：
+- 普通波次不再包含旧 `weak_spot` 低血量弱点怪
+- Boss 配置不再使用旧 `weakness` 字段
+- 8 个 Boss 都有 `vulnerability` 破绽谱
+- 战斗管线保留 Boss 破绽进度与易伤窗口入口
 
 ### 2. 运行时自动化测试（需要本地游戏服务）
 
@@ -126,7 +139,7 @@ node tests/ai_test_runner.js --headless
 ## 与 AI 协作的测试流程
 
 1. **AI 修改代码** → 提交到仓库
-2. **静态校验**：`node tests/validate_scenarios.js`（无需浏览器，30 秒内完成）
+2. **静态校验**：`node tests/validate_scenarios.js`；若修改 Boss 机制，再运行 `node tests/validate_boss_vulnerability.mjs`
 3. **部署游戏**：`npm start` 或推送到测试环境
 4. **运行时验证**：`node tests/ai_test_runner.js --suite <目标套件>`
 5. **查看报告**：控制台输出通过/失败数量，失败项附带具体断言信息

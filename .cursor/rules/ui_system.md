@@ -121,6 +121,7 @@ for (const subsystem of _subsystems) {
 7. 任何从选择阶段或命运时刻中途打开的 overlay，在关闭时都必须优先依据 `relicOverlayReturnState` 恢复原阶段，禁止默认重跑 `sys_initSelectionPhase()` 覆盖当前特殊选择态。
 8. `ui_confirmSelection()` 在纯净精华模式下不能只更新预览或文案，必须同时写回 `MarbleDefinition.collected`、注入元数据，并写入 `doubleAssimilationBoostRounds`，否则同化率 x2 只会停留在 UI 层。
 9. 命运时刻中途若发生刷新、继续游戏或 overlay 往返，`selectionPreviewState`、`relicOverlayReturnState`、`fateMomentContext` 必须保持同源恢复；只有确认选珠并进入研磨阶段后，才允许统一清空。
+10. `fate_reroll_token` / `relic_reroll_seal` 只允许提供当前选择机会内的一次刷新：弹珠刷新由 `ui_rerollMarbleSelection()` 清空已选弹珠后重跑 `spawn_generateMarbleOptions()`；遗物刷新由 `ui_rerollRelicSelection()` 重跑 `ui_showRelicSelection({ isReroll: true })`，不得额外推进 `relicSelectionCount`，debug 全遗物库不显示刷新按钮。
 
 ### 6.2 修改现有 UI 函数
 
@@ -152,6 +153,7 @@ for (const subsystem of _subsystems) {
 | `ui_selectPureEssenceRune(selectionIndex, inventoryIndex)` | 为当前选中的弹珠绑定一个合法的注入符文 |
 | `ui_renderPureEssencePanel(marbleDef, selectionIndex)` | 在弹珠预览面板中渲染纯净精华的合法属性和符文注入按钮 |
 | `ui_refreshSelectionModeUI()` | 刷新命运抉择底栏标签、需求数量、副标题和确认按钮状态，并正确显示混沌精华 / 纯净精华文案 |
+| `ui_rerollMarbleSelection()` | 消费当前命运抉择的弹珠刷新机会，清空已选弹珠并重建候选卡片 |
 | `fateMomentContext`（运行态字段） | 记录当前命运时刻来源、类型与回合信息，用于刷新恢复和 overlay 返回后的语义保持 |
 | `meta_getResourceCount(resourceId)` | 获取资源数量 |
 | `meta_spendResource(resourceId, amount)` | 消耗资源 |
@@ -202,6 +204,7 @@ for (const subsystem of _subsystems) {
 |---|---|
 | `ui_renderShop()` | 渲染商店物品列表 |
 | `ui_showRelicSelection()` | 显示遗物选择界面（前三次自动提升推荐遗物权重并展示推荐标签/Tip） |
+| `ui_rerollRelicSelection()` | 消费当前遗物选择的刷新机会并重抽候选遗物，不额外推进遗物选择计数 |
 | `ui_selectRelic(relic)` | 选择并获取遗物（参数为遗物对象） |
 | `ui_skipRelic()` | 跳过遗物选择 |
 | `ui_closeRelicSelection()` | 关闭遗物选择界面 |

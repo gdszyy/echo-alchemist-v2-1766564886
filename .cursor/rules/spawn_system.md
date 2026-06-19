@@ -45,6 +45,17 @@
 
 ## 2. 阵型模板总览
 
+### 2.0 普通行机会布局（2026-06-19）
+
+`spawn_spawnEnemyRowAt()` 的 Opportunity Generator 只保留两类轻量读线辅助：
+
+| 布局 | 行为 | 说明 |
+|---|---|---|
+| `gap` | 随机留空一列 | 给弹道提供穿行入口。 |
+| `checkerboard` | 按奇偶列留空 | 降低密度并制造弹射/穿透路径。 |
+
+旧 `weak_spot` 低血量无词缀敌人已移除。Boss 对抗改由 `combat_system.js` 的 Boss 破绽机制承担，普通敌人行不再生成“弱点怪”。
+
 | 阵型 ID | 名称 | 最早回合 | 教学目标 | 常量引用 |
 |---|---|---|---|---|
 | `phalanx` | 方阵突击 | Round 1 | 护盾 + 治愈协同，引导穿透/闪电 | `DIRECTOR_TEMPLATE_PHALANX` |

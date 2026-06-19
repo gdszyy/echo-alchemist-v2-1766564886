@@ -1,6 +1,6 @@
 # src\ui_system.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 2672 | 函数数: 50 | 语言: javascript
+> 自动生成于 2026-06-19 | 总行数: 2711 | 函数数: 51 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -16,6 +16,7 @@
 | makeRow | function | `makeRow(recipes, startIdx, headerText, headerColor)` |  |
 | ui_toggleReplaceAmmoCard | method | `ui_toggleReplaceAmmoCard(globalIdx)` |  |
 | ui_selectReplaceAmmoTarget | method | `ui_selectReplaceAmmoTarget(ammoIdx)` |  |
+| ui_rerollMarbleSelection | method | `ui_rerollMarbleSelection()` |  |
 | ui_refreshSelectionModeUI | method | `ui_refreshSelectionModeUI()` |  |
 | meta_getResourceCount | method | `meta_getResourceCount(resourceId)` |  |
 | meta_spendResource | method | `meta_spendResource(resourceId, amount)` |  |

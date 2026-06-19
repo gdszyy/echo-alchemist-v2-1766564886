@@ -129,6 +129,102 @@ function drawModuleFootprintOutline(ctx, rect, footprint, color, pulse = 0) {
     return true;
 }
 
+function pickBottomRewardType(game) {
+    const cfg = CONFIG.gameplay || {};
+    const types = Array.isArray(cfg.bottomRewardOnlyTypes) ? cfg.bottomRewardOnlyTypes : ['explosive', 'laser'];
+    const baseWeights = cfg.bottomRewardZoneWeights || {};
+    const runtimeWeights = game && game.unlockedWeights ? game.unlockedWeights : {};
+    const weighted = types
+        .map(type => ({ type, weight: Math.max(0, runtimeWeights[type] || baseWeights[type] || 0) }))
+        .filter(item => item.weight > 0);
+    if (!weighted.length) return types[0] || 'explosive';
+    const total = weighted.reduce((sum, item) => sum + item.weight, 0);
+    let r = Math.random() * total;
+    for (const item of weighted) {
+        r -= item.weight;
+        if (r <= 0) return item.type;
+    }
+    return weighted[0].type;
+}
+
+function makeBottomRewardBarrier(x, y1, y2, rewardType) {
+    const peg = new Peg(x, (y1 + y2) / 2, 'pink');
+    peg.shape = 'barrier';
+    peg.segment = { x1: x, y1, x2: x, y2 };
+    peg.thickness = Math.max((CONFIG.physics.pegRadius || 4) * 2.15, 8.5);
+    peg.radius = peg.thickness / 2;
+    peg.level = 1;
+    peg.layoutRole = 'bottom_reward_gate';
+    peg.rewardLaneType = rewardType;
+    return peg;
+}
+
+// @perf-impact: Bottom reward lanes add at most two barrier Peg strokes and a flat HUD band; Peg shadow remains CONFIG.performance-gated.
+function buildBottomRewardZones(game, maxPegY, canvasWidth, canvasHeight) {
+    const cfg = CONFIG.gameplay || {};
+    const chance = cfg.bottomRewardZoneChance ?? 0.25;
+    if (Math.random() >= chance) return { zones: [], barriers: [] };
+
+    const maxCount = Math.max(0, cfg.bottomRewardZoneMaxCount || 1);
+    if (maxCount <= 0) return { zones: [], barriers: [] };
+
+    const maxRadius = (CONFIG.physics.marbleRadius || 5.8) + (CONFIG.physics.maxMarbleSizeBonus || 0);
+    const zoneWidth = Math.max(18, maxRadius * 2 * (cfg.bottomRewardZoneWidthMultiplier || 1.5));
+    const zoneHeight = Math.max(34, cfg.bottomRewardZoneHeight || 48);
+    const top = Math.min(
+        canvasHeight - zoneHeight - 28,
+        Math.max(maxPegY + 46, canvasHeight - 128)
+    );
+    const minX = Math.max(18, (CONFIG.physics.marbleRadius || 5.8) * 2);
+    const maxX = Math.max(minX, canvasWidth - zoneWidth - minX);
+    const lanes = [
+        canvasWidth * 0.28 - zoneWidth / 2,
+        canvasWidth * 0.50 - zoneWidth / 2,
+        canvasWidth * 0.72 - zoneWidth / 2,
+    ].map(x => Math.max(minX, Math.min(maxX, x)));
+    const x = lanes[Math.floor(Math.random() * lanes.length)];
+    const type = pickBottomRewardType(game);
+    const display = CONFIG.ui.attributeDisplay[type] || {};
+    const zone = {
+        id: `bottom_reward_${type}_${Math.round(x)}_${Math.round(top)}`,
+        x,
+        y: top,
+        w: zoneWidth,
+        h: zoneHeight,
+        type,
+        color: display.color || '#fbbf24',
+        label: display.name || type,
+    };
+    const barriers = [
+        makeBottomRewardBarrier(x, top, top + zoneHeight, type),
+        makeBottomRewardBarrier(x + zoneWidth, top, top + zoneHeight, type),
+    ];
+    return { zones: [zone], barriers };
+}
+
+function drawBottomRewardZones(ctx, zones) {
+    if (!ctx || !Array.isArray(zones) || zones.length === 0) return;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '700 10px sans-serif';
+    for (const zone of zones) {
+        if (!zone) continue;
+        const color = zone.color || '#fbbf24';
+        ctx.globalAlpha = 0.16;
+        ctx.fillStyle = color;
+        ctx.fillRect(zone.x, zone.y, zone.w, zone.h);
+        ctx.globalAlpha = 0.88;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(zone.x + 0.5, zone.y + 0.5, zone.w - 1, zone.h - 1);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillText(`+${zone.label}`, zone.x + zone.w / 2, zone.y + zone.h / 2);
+    }
+    ctx.restore();
+}
+
 export const game_phase = {
 /**
      * @method advanceWave
@@ -313,6 +409,13 @@ export const game_phase = {
                     this.specialSlots.push(s);
                 }
             }
+        }
+
+        const bottomReward = buildBottomRewardZones(this, maxPegY, canvasWidth, canvasHeight);
+        this.bottomRewardZones = bottomReward.zones;
+        for (const barrier of bottomReward.barriers) {
+            this.pegs.push(barrier);
+            if (barrier.segment && barrier.segment.y2 > maxPegY) maxPegY = barrier.segment.y2;
         }
 
         this.boardBottomY = maxPegY;
@@ -1293,9 +1396,12 @@ phase_gathering_getRandomPegType() {
                 const marbleDef = this.marbleQueue[this.activeMarbleIndex];
                 
                 // 使用之前修复过的持久化阈值逻辑
+                const inheritedCollected = Array.isArray(marbleDef.collected)
+                    ? marbleDef.collected.map(item => (typeof item === 'string' ? item : { ...item }))
+                    : [];
                 this.currentSession = {
                     game: this, // [新增] 传入 game 实例引用
-                    collected: [], multicast: 0, activeBalls: 1, currentHits: 0,
+                    collected: inheritedCollected, multicast: 0, activeBalls: 1, currentHits: 0,
                     nextTriggerThreshold: this.persistentThreshold, // 确保这里用了 persistentThreshold
                     totalHits: 0, multicastAdded: [], isFinished: false
                 };
@@ -3091,6 +3197,8 @@ phase_gathering_getRandomPegType() {
             this.phase_gathering_initPachinko();
         }
 
+        drawBottomRewardZones(this.ctx, this.bottomRewardZones);
+
         this.pegs.forEach((p, idx) => { 
             p.update(); // 更新冷却和动画
             p.draw(this.ctx, pegRadius); 
@@ -3234,6 +3342,11 @@ phase_gathering_getRandomPegType() {
                         this.marbleQueue[this.activeMarbleIndex].collected.push(result.material);
                     }
                     this.spawn_createHitFeedback(ball.pos.x, ball.pos.y, ball.vel, result.material); // 這裡也許要傳入屬性類型作為顏色依據
+                    audio.playCollect();
+                    this.ui_renderRecipeHUD();
+                    
+                } else if (result.type === 'reward_zone') {
+                    this.spawn_createHitFeedback(ball.pos.x, ball.pos.y, ball.vel, result.material);
                     audio.playCollect();
                     this.ui_renderRecipeHUD();
                     

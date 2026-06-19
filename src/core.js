@@ -207,6 +207,9 @@ class Game {
         this.selectionRequiredCount = CONFIG.gameplay.selectionReq || 3;
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
+        this.selectionRerollUsed = false;
+        this.relicRerollUsed = false;
+        this._lastRelicSelectionOptions = null;
         this.relicOverlayReturnState = null;
         this.fateMomentContext = null;
         this.replaceAmmoContext = null; // [tsk-668f3dba] 替换当前子弹阶段上下文

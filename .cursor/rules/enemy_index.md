@@ -1,7 +1,7 @@
 # 敌人词缀与 Boss 索引 (Enemy Affix & Boss Index)
 
 > **数据来源**：`src/config.js` → `balance.affixes`, `balance.bossConfigs`, `BOSS_DB`, `ENEMY_CURVE_CONFIG`；`src/spawn_system.js` → `spawn_generateAffixes()`, `spawn_trySpawnWavePreset()`, `spawn_trySpawnArchetypes()`, `spawn_scheduleNextBoss()`；`src/wave_presets.js` → `ENEMY_WAVE_PRESETS`；`src/systems.js` → `TRUTH_BOOK_DATA.enemies`
-> **用途**：Agent 快速查询 8 种通用词缀、7 种 V2 基底专属词缀和 8 个 Boss 的行为机制、出现回合、克制属性及关键代码位置。
+> **用途**：Agent 快速查询 8 种通用词缀、7 种 V2 基底专属词缀和 8 个 Boss 的行为机制、出现回合、破绽谱及关键代码位置。
 > **最后更新**：V2 敌人视觉重设计——尺寸基底 + 专属词条体系（2026-05-02）
 
 ## 0. V2 基底专属词条总览（7 种，仅通过基底敌人附带，不进入随机词条池）
@@ -159,7 +159,7 @@
 
 ### 3.1 Mini-Boss（出场回合：R5 → R12 → R19 → R26，固定对齐主题段落）
 
-| ID | 名称 | 出场回合 | 主题段落 | 词缀 | 弱点 | 狂暴行为 |
+| ID | 名称 | 出场回合 | 主题段落 | 词缀 | 破绽谱 | 狂暴行为 |
 |---|---|---|---|---|---|---|
 | `ignis` | 熔炉守卫·伊格尼斯 | **R5** | 基础教学段（shield+haste） | shield + haste | pierce、pyro | 护盾层数翻倍；每回合升温 +30°C；对周围敌人火焰溅射 |
 | `glacies` | 霜晶缝合怪·格拉西斯 | **R12** | 持续压力段（regen+jump） | jump + regen | cryo、pierce | 跳跃行数增加至 3 行；跳跃落地时冻结周围 Peg |
@@ -168,7 +168,7 @@
 
 ### 3.2 大 Boss（出场回合：R33 → R40 → R47 → R54，固定对齐主题段落）
 
-| ID | 名称 | 出场回合 | 主题段落 | 词缀 | 弱点 | 狂暴行为 |
+| ID | 名称 | 出场回合 | 主题段落 | 词缀 | 破绽谱 | 狂暴行为 |
 |---|---|---|---|---|---|---|
 | `viridis` | 翠绿共生体·维里迪斯 | **R33** | 进阶测试段（regen+healer） | regen + healer | laser、pyro | 放弃治疗他人；自身再生速度 × 3.0 |
 | `tesla` | 雷霆幻影·特斯拉 | **R40** | 速度地狱段（haste+clone） | haste + clone | cryo、bounce | 行动次数再 +1（共 4 次） |
@@ -177,13 +177,39 @@
 
 ### 3.3 奥罗波罗斯词缀轮转规则
 
-| 轮转组 | 词缀 | 对应弱点 |
+| 轮转组 | 词缀 | 对应破绽谱 |
 |---|---|---|
 | 组 0（初始） | shield + haste | pierce、cryo |
 | 组 1 | regen + healer | laser、pyro |
 | 组 2 | clone + jump | lightning、scatter |
 
 **轮转间隔**：正常 3 回合切换；狂暴后每回合切换（`_berserkedRotation = true`）。
+
+### 3.4 Boss 破绽机制（2026-06-19）
+
+旧版 Boss 配置中的 `weakness` 字段已移除，普通波次的 `weak_spot` 低血量弱点怪也已删除。当前 Boss 对抗使用 `CONFIG.balance.bossConfigs[*].vulnerability` 与 `CONFIG.balance.bossVulnerability`：
+
+| 状态 | 规则 |
+|---|---|
+| 破绽累积 | `combat_damageEnemy()` 调用 `combat_applyBossVulnerability()`；命中当前 Boss 破绽谱属性时增加 `counterHitGain` 进度。 |
+| 破绽触发 | 进度达到 `breakThreshold` 后清零，写入 `_bossVulnerabilityExposedHits = exposedHits`。 |
+| 易伤窗口 | 易伤命中数大于 0 时，本次伤害乘以 `exposedDamageMult`，随后消耗 1 次命中数。 |
+| 狂暴延后 | 若 `enrageDelayOnBreak` 为 true 且 Boss 尚未狂暴，破绽触发后会延后一次 50% 血量狂暴检测。 |
+| 可视反馈 | Boss 状态短标签显示 `隙N`（进度）或 `破N`（剩余易伤命中）；命中反馈显示 `破绽+` / `破绽` / `易伤`。 |
+| 存档 | `_bossVulnerabilityProgress`、`_bossVulnerabilityExposedHits`、`_bossVulnerabilitySuppressedEnrage` 进入 `sys_saveRunState()` / `sys_loadRunState()`。 |
+
+破绽谱速查：
+
+| Boss | 破绽谱 |
+|---|---|
+| `ignis` | pierce、pyro |
+| `glacies` | cryo、pierce |
+| `mikro` | lightning、scatter |
+| `devourer` | bounce、laser |
+| `viridis` | laser、pyro |
+| `tesla` | cryo、bounce |
+| `chimera` | pierce、laser |
+| `ouroboros` | 动态：shield+haste → pierce/cryo；regen+healer → laser/pyro；clone+jump → lightning/scatter |
 
 ## 4. Boss 出场机制（Task C.3 修正后）
 
@@ -270,7 +296,8 @@ finalHP = max(
 | Boss 出场顺序 | `src/spawn_system.js` | `spawn_selectBossForRound(isBigBoss)` |
 | Boss 狂暴触发 | `src/combat_system.js` | `combat_checkBossPhaseChange()` 约第 3072 行 |
 | Boss 狂暴效果 | `src/combat_system.js` | `combat_triggerBossEnrage(boss)` 约第 3087 行 |
-| Boss 数据配置 | `src/config.js` | `balance.bossConfigs` 约第 545 行 |
+| Boss 数据配置 | `src/config.js` | `balance.bossConfigs` / `balance.bossVulnerability` |
+| Boss 破绽结算 | `src/combat_system.js` | `combat_applyBossVulnerability()` / `combat_getBossVulnerabilityProfile()` |
 | Boss 数据库 | `src/config.js` | `BOSS_DB` 约第 1404 行 |
 | 主题段落配置 | `src/config.js` | `ENEMY_CURVE_CONFIG.THEME_SEGMENTS` 约第 1477 行 |
 | 词缀图鉴 | `src/systems.js` | `TRUTH_BOOK_DATA.enemies` 第 24 行起 |

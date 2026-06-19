@@ -1649,9 +1649,10 @@ class Enemy {
 
         // B. 绘制白色延迟条 (在彩色条底下)
         if (whiteRatio > hpRatio) {
-            ctx.fillStyle = '#ffffff';
-            ctx.globalAlpha = 0.8;
-            ctx.fillRect(-w/2, whiteY, w, whiteHeight);
+            const damageTrailHeight = Math.max(0, fillY - whiteY);
+            ctx.fillStyle = CONFIG.enemyRender.delayedDamageTrailColor || '#fca5a5';
+            ctx.globalAlpha = CONFIG.enemyRender.delayedDamageTrailAlpha ?? 0.18;
+            ctx.fillRect(-w/2, whiteY, w, damageTrailHeight);
             ctx.globalAlpha = 1.0;
         }
 
@@ -4576,7 +4577,7 @@ class Enemy {
         this.hp -= actualDamage;
         this.hitTimer = 10;
         this._hitFlashTimer = Math.max(0, CONFIG.enemyRender.hitFlashDuration || 0);
-        this.whiteBarTimer = 45;
+        this.whiteBarTimer = Math.max(0, CONFIG.enemyRender.delayedDamageTrailHold || 0);
         // === A3: 记录受击形变强度 ===
         if (this.maxHp > 0) {
             const impact = actualDamage / this.maxHp;
@@ -4917,6 +4918,13 @@ class Enemy {
             badges.push({ text: `屏${pct}%`, color: '#67e8f9' });
         }
         if (this.berserked || (this.affixes || []).includes('berserk')) badges.push({ text: '狂', color: '#f87171' });
+        if (this.type === 'boss') {
+            if ((this._bossVulnerabilityExposedHits || 0) > 0) {
+                badges.push({ text: `破${this._bossVulnerabilityExposedHits}`, color: '#facc15' });
+            } else if ((this._bossVulnerabilityProgress || 0) > 0) {
+                badges.push({ text: `隙${Math.ceil(this._bossVulnerabilityProgress)}`, color: '#fde68a' });
+            }
+        }
         if ((this.venomStacks || 0) > 0) badges.push({ text: `毒${this.venomStacks}`, color: '#86efac' });
         if (this.temp >= 24) badges.push({ text: '热', color: '#fdba74' });
         else if (this.temp <= -24) badges.push({ text: '冻', color: '#67e8f9' });

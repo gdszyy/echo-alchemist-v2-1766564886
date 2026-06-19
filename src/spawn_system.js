@@ -190,7 +190,7 @@ export const spawn_system = {
      * @method spawnEnemyRowAt
      * @description [重构V3] 导演系统 + 机会生成器
      * 1. 导演系统：概率生成强力小队（增加难度/教学）。
-     * 2. 机会生成器：概率生成布局破绽（降低难度/提供爽感）。
+     * 2. 机会生成器：概率生成缺口/棋盘布局（降低难度/提供爽感）。
      * 3. 混合填充：智能填充剩余空位。
      */
     // @section:spawn_row_config - 行配置读取：波次参数与难度缩放
@@ -419,7 +419,7 @@ export const spawn_system = {
         const helpChance = Math.max(0.42, 0.99 - (this.round * 0.02)); 
 
         if (Math.random() < helpChance) {
-            const types = ['gap', 'weak_spot', 'checkerboard'];
+            const types = ['gap', 'checkerboard'];
             layoutType = types[Math.floor(Math.random() * types.length)];
         }
 
@@ -432,20 +432,7 @@ export const spawn_system = {
             }
         }
         
-        // 策略 B: [弱点] 稍后在填充循环中生成一个 1 HP 的敌人
-        let weakSpotCol = -1;
-        if (layoutType === 'weak_spot') {
-            // 找一个没被占用的空位
-            const freeIndices = [];
-            occupiedCols.forEach((occupied, idx) => { if(!occupied) freeIndices.push(idx); });
-            
-            if (freeIndices.length > 0) {
-                weakSpotCol = freeIndices[Math.floor(Math.random() * freeIndices.length)];
-                // 注意：这里不要把 occupiedCols 设为 true，因为我们需要在那个位置生成一个弱点怪
-            }
-        }
-
-        // 策略 C: [棋盘] 强制隔一个生成一个
+        // 策略 B: [棋盘] 强制隔一个生成一个
         if (layoutType === 'checkerboard') {
             const parity = Math.random() > 0.5 ? 0 : 1;
             for (let c = 0; c < CONFIG.gameplay.enemyCols; c++) {
@@ -497,23 +484,12 @@ export const spawn_system = {
             // 基础生成判定
             let shouldSpawn = false;
             
-            // 如果是弱点位置，强制生成
-            if (c === weakSpotCol) shouldSpawn = true;
-            // 否则按概率或最小数量生成 (注意：如果是Checkerboard布局，freeCols 已经很少了，这里的逻辑会自动适应)
-            else if (currentCount < minEnemies || Math.random() < b.spawnProb) shouldSpawn = true;
+            if (currentCount < minEnemies || Math.random() < b.spawnProb) shouldSpawn = true;
 
             if (shouldSpawn && !this.calc_isAreaOccupied(centerX, yPos, w * 0.8, this.enemyHeight * 0.8)) {
                 
                 // 决定血量
                 let hp = Math.floor(baseHP * (0.8 + Math.random() * 0.4));
-                
-                // [应用弱点策略]：如果是选定的弱点列，血量强制设为极低
-                if (c === weakSpotCol) {
-                    // 弱点怪血量约为基础血量的 10% ~ 20%，或者直接为 1
-                    const variantRatio = (12 + (Math.random() * 14 - 7)) / 100;
-                    const weakHP = Math.max(1, Math.floor(baseHP * variantRatio));
-                    hp = weakHP;
-                }
                 const e = new Enemy(centerX, yPos, w, this.enemyHeight, hp);
                 // [issue-2] 画面外入场：将 pos.y 抬升到 dropTargetY 之上两行（确保第一行也完全在画面顶部上方），
                 // 由 Enemy.update() 自动驱动下落动画。配合 hasActedThisTurn=true，确保新敌人在出生回合
@@ -525,12 +501,7 @@ export const spawn_system = {
                 }
                 // [新增 C2] 记录列索引，供 shield 词缀蜂巢脉冲相位偏移使用
                 e._spawnColIndex = c;
-                // 生成词条 (如果是弱点怪，不带词条)
-                if (c === weakSpotCol) {
-                    e.affixes = [];
-                } else {
-                    e.affixes = this.spawn_generateAffixes();
-                }
+                e.affixes = this.spawn_generateAffixes();
 
                 // @section:spawn_entity_init - 敌人实体初始化与注入游戏状态
                 // [新增] 初始化护盾层数 (1 + 回合数)
@@ -919,8 +890,9 @@ export const spawn_system = {
             venom: () => new MarbleDefinition('venom'),
         };
 
-        // [爽游模式] 新手教程局：只展示爆炸/激光/彩虹/回响弹珠
-        const tutorialOnlyTypes = ['explosive', 'laser', 'rainbow', 'resonance'];
+        // [爽游模式] 新手教程局：爆炸/激光已移入底部奖励分栏，不再作为候选弹珠出现。
+        const rewardOnlyMarbleTypes = new Set(CONFIG.gameplay.bottomRewardOnlyTypes || []);
+        const tutorialOnlyTypes = ['rainbow', 'resonance', 'echo', 'venom'];
         const tutorialWeights = {};
         if (this._isTutorialRun) {
             tutorialOnlyTypes.forEach(type => { tutorialWeights[type] = 25; });
@@ -933,9 +905,14 @@ export const spawn_system = {
             
             // 1. 保底機制
             if (this.guaranteedNextRound.length > 0) {
-                const key = this.guaranteedNextRound.shift();
+                const rawKey = this.guaranteedNextRound.shift();
+                const key = (typeof rawKey === 'string') ? rawKey : (rawKey && rawKey.type);
                 // [爽游模式] 教程局中保底弹珠也限制在允许的类型内
-                if (typeMapping[key] && (!this._isTutorialRun || tutorialOnlyTypes.includes(key))) {
+                if (
+                    typeMapping[key] &&
+                    !rewardOnlyMarbleTypes.has(key) &&
+                    (!this._isTutorialRun || tutorialOnlyTypes.includes(key))
+                ) {
                     m = typeMapping[key]();
                 }
             } 
@@ -943,7 +920,12 @@ export const spawn_system = {
             // 2. 加權隨機機制
             if (!m) {
                 // [爽游模式] 教程局使用限定权重表
-                const activeWeights = this._isTutorialRun ? tutorialWeights : this.unlockedWeights;
+                const sourceWeights = this._isTutorialRun ? tutorialWeights : (this.unlockedWeights || {});
+                const activeWeights = Object.fromEntries(
+                    Object.entries(sourceWeights).filter(([key, weight]) => {
+                        return !rewardOnlyMarbleTypes.has(key) && (weight || 0) > 0;
+                    })
+                );
                 let total = 0;
                 const keys = Object.keys(activeWeights);
                 keys.forEach(k => total += activeWeights[k]);
@@ -994,10 +976,6 @@ export const spawn_system = {
             iconWrap.className = 'select-icon-wrap';
             const iconEl = document.createElement('div');
             iconEl.className = 'select-icon';
-            const marbleAccent = m.getColor();
-            const accentColor = (typeof marbleAccent === 'string' && !marbleAccent.includes('gradient'))
-                ? marbleAccent
-                : '#94a3b8';
             iconEl.style.background = 'radial-gradient(circle at 35% 28%, #f8fafc 0%, #dbe4f0 28%, #93a4b8 58%, #334155 100%)';
             iconEl.style.border = '1px solid rgba(203, 213, 225, 0.7)';
             iconEl.style.boxShadow = 'inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.24), 0 0 10px rgba(148,163,184,0.22)';
@@ -1132,9 +1110,6 @@ export const spawn_system = {
         const previewBall = panel.querySelector('#preview-marble-ball');
 
         if (previewBall) {
-            const accentColor = (typeof marbleColor === 'string' && !marbleColor.includes('gradient'))
-                ? marbleColor
-                : '#94a3b8';
             previewBall.style.background = 'radial-gradient(circle at 35% 28%, #f8fafc 0%, #dbe4f0 30%, #93a4b8 60%, #334155 100%)';
             previewBall.style.border = '1px solid rgba(203, 213, 225, 0.7)';
             previewBall.style.boxShadow = 'inset -3px -3px 6px rgba(0,0,0,0.5), inset 2px 2px 5px rgba(255,255,255,0.2), 0 0 10px rgba(148,163,184,0.22)';
@@ -1942,6 +1917,9 @@ export const spawn_system = {
         boss.bossName = bossCfg.name;
         boss.isBigBoss = isBigBoss;
         boss.berserked = false; // 狂暴阶段标志
+        boss._bossVulnerabilityProgress = 0;
+        boss._bossVulnerabilityExposedHits = 0;
+        boss._bossVulnerabilitySuppressedEnrage = false;
         
         // 分配异型碰撞形状
         switch(bossId) {

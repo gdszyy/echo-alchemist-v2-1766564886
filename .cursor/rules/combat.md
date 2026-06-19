@@ -34,7 +34,7 @@ globs: ["src/combat/**/*", "src/combat_system.js"]
   laser: number,         // 激光层数
   wind: number,          // 风属性层数
   isLaser: boolean,      // 是否为激光弹药
-  explosive: boolean,    // 是否为爆炸弹珠
+  explosive: boolean,    // 是否带爆炸效果（可由底部奖励分栏提供）
   flying_sword: number,  // 飞剑层数
   type: string,          // 弹药类型（'normal'/'flying_sword'）
   level: number,         // 弹药等级（取属性中最高等级）
@@ -73,6 +73,7 @@ const RUNE_CHARGE_MAX_LEVEL  = 3;
 combat_damageEnemy()
   ├─ 1. damage_pre_calc      基础值 × 暴击 × 穿透
   ├─ 2. damage_element_bonus 属性克制倍率（火>冰>雷>火 三角克制）
+  ├─ 2.5 boss_vulnerability  Boss 破绽谱进度与易伤窗口
   ├─ 3. damage_runeword_hooks 词条 Hook 注入（thunderstorm / absolute_zero 等）
   ├─ 4. damage_apply_to_enemy 写入 enemy.takeDamage()
   ├─ 5. damage_kill_check    击杀 → 掉落物 / 经验 / 得分
@@ -90,6 +91,16 @@ combat_damageEnemy()
 | `thunder_scatter`（雷霆散射） | `combat_runeword_thunderScatter_check` | 闪电链成功后额外触发一次（`isExtraChain` 防循环） |
 | `absolute_zero`（绝对零度） | `combat_runeword_absoluteZero_check` | 冰冻状态下伤害随命中次数加深 |
 | `elemental_fusion`（元素聚变） | `combat_runeword_elementalFusion_check` | 火+冰+雷三元素同时存在时触发爆炸（真实伤害 = `maxHp × trueDamageRatio`） |
+
+### 3.2.1 Boss 破绽机制
+
+Boss 不再使用旧 `weakness` 静态字段。`combat_damageEnemy()` 在 `enemy.takeDamage()` 前调用 `combat_applyBossVulnerability()`：
+
+- `combat_getBossVulnerabilityProfile()` 从 `CONFIG.balance.bossConfigs[bossId].vulnerability` 读取当前破绽谱；`ouroboros` 会按 `rotationIndex` 动态切换。
+- 命中破绽谱属性时累积 `_bossVulnerabilityProgress`；达到 `CONFIG.balance.bossVulnerability.breakThreshold` 后进入 `_bossVulnerabilityExposedHits` 易伤窗口。
+- 易伤窗口内伤害乘以 `exposedDamageMult`，每次命中消耗 1 次。
+- 若 Boss 尚未狂暴，破绽触发会设置 `_bossVulnerabilitySuppressedEnrage`，延后一次 50% 血量狂暴检测。
+- 命中反馈标签为 `破绽+` / `破绽` / `易伤`；该机制不新增粒子、渐变或常驻 Canvas 光效。
 
 ### 3.3 DDA（动态难度调整）规则
 

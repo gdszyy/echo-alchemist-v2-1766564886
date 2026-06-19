@@ -1119,7 +1119,7 @@ const TRAINING_SCENARIOS = {
             categoryId: 'boss',
             name: '熔爐守衛·伊格尼斯',
             icon: '🔥',
-            desc: '護盾+極速。狂暴後每回合升溫 +30°C 並對周圍敵人火焰濺射。弱點：穿透/火焰。',
+            desc: '護盾+極速。狂暴後每回合升溫 +30°C 並對周圍敵人火焰濺射。破綻譜：穿透/火焰。',
             setup: (game) => { game.spawn_spawnBoss('ignis', false); },
             bulletConfig: { damage: 50, bounce: 0, pierce: 3, scatter: 0, multicast: 0, pyro: 200, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
@@ -1129,7 +1129,7 @@ const TRAINING_SCENARIOS = {
             categoryId: 'boss',
             name: '霜晶縫合怪·格拉西斯',
             icon: '❄️',
-            desc: '跳躍+再生。狂暴後跳躍行數增加，落地冰凍周圍鋼釘。弱點：冰霜/穿透。',
+            desc: '跳躍+再生。狂暴後跳躍行數增加，落地冰凍周圍鋼釘。破綻譜：冰霜/穿透。',
             setup: (game) => { game.spawn_spawnBoss('glacies', false); },
             bulletConfig: { damage: 50, bounce: 0, pierce: 3, scatter: 0, multicast: 0, pyro: 0, cryo: 200, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
@@ -1139,7 +1139,7 @@ const TRAINING_SCENARIOS = {
             categoryId: 'boss',
             name: '裂變母體·米克羅',
             icon: '🦠',
-            desc: '分身+治療。每個存活分身提供 10% 減傷（上限 50%）。弱點：閃電/散射。',
+            desc: '分身+治療。每個存活分身提供 10% 減傷（上限 50%）。破綻譜：閃電/散射。',
             setup: (game) => { game.spawn_spawnBoss('mikro', false); },
             bulletConfig: { damage: 20, bounce: 0, pierce: 0, scatter: 5, multicast: 0, pyro: 0, cryo: 0, lightning: 8, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
@@ -1149,7 +1149,7 @@ const TRAINING_SCENARIOS = {
             categoryId: 'boss',
             name: '貪婪之淵·噬神者',
             icon: '👅',
-            desc: '吞噬+護盾。狂暴後全屏吞噬。弱點：彈跳/激光。',
+            desc: '吞噬+護盾。狂暴後全屏吞噬。破綻譜：彈跳/激光。',
             setup: (game) => { game.spawn_spawnBoss('devourer', false); },
             bulletConfig: { damage: 40, bounce: 5, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: true, isMatryoshka: false, type: 'normal', laser: 8 },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
@@ -1159,9 +1159,37 @@ const TRAINING_SCENARIOS = {
             categoryId: 'boss',
             name: '永恆回聲·奧羅波羅斯',
             icon: '🔄',
-            desc: '詞條每 3 回合輪轉（護盾/極速 → 再生/治療 → 分身/跳躍）。狂暴後每回合輪轉。',
+            desc: '詞條每 3 回合輪轉（護盾/極速 → 再生/治療 → 分身/跳躍）。破綻譜會隨輪轉組切換。',
             setup: (game) => { game.spawn_spawnBoss('ouroboros', true); },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
+        {
+            id: 'boss_vulnerability_break',
+            categoryId: 'boss',
+            name: 'Boss 破綻窗口',
+            icon: '🎯',
+            desc: '連續用破綻譜屬性命中 Boss，累積「隙」並觸發「破」易傷窗口，同時延後一次狂暴觸發。',
+            setup: (game) => {
+                const boss = game.spawn_spawnBoss('ignis', false);
+                if (boss) {
+                    boss._pendingEntrance = false;
+                    boss.entranceTimer = 1;
+                }
+            },
+            bulletConfig: { damage: 20, bounce: 0, pierce: 3, scatter: 0, multicast: 0, pyro: 3, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const boss = game.enemies.find(e => e.active && e.type === 'boss');
+                if (!boss) return;
+                const recipe = { ...tg.bulletConfig };
+                for (let i = 0; i < 4; i++) {
+                    game.combat_damageEnemy(boss, {
+                        config: recipe,
+                        pos: boss.pos,
+                        isCopy: false,
+                        chainHistory: []
+                    });
+                }
+            }
         },
         // ── 符文詞條 ──────────────────────────────────────────────────────────────────
         {

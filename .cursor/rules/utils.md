@@ -96,6 +96,7 @@ enemy.pos.add(delta);
 
 - `damage` 钉子：每个 `{type:'damage', level:N}` 将 `recipe.damage += N`（基础值为 `CONFIG.gameplay.baseDamage`）。
 - 元素属性（`cryo/pyro/lightning/laser/wind`）：**层数累加**，支持混合格式（字符串 `'cryo'` 视为 level=1，对象 `{type:'cryo', level:2}` 累加 2 层）。
+- 底部奖励分栏属性：`{type:'explosive', level:1, source:'bottom_reward_zone'}` 会设置 `recipe.explosive = true`；`{type:'laser', ...}` 会累加 `recipe.laser` 并使 `recipe.isLaser = true`。
 - `flying_sword` 属性：设置 `recipe.type = 'flying_sword'`，`recipe.level` 取所有属性中的最高等级。
 - 彩虹属性：**已移除**同步增加元素层数的逻辑，仅保留分裂机制。
 

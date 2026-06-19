@@ -291,12 +291,16 @@ class FortuneWheel {
         }
 
         let currentAngle = 0;
+        const totalCollectedCount = Math.max(1, collectedAttributes.length || 0);
         Object.keys(weights).forEach(type => {
             const arc = (weights[type] / totalWeight) * Math.PI * 2;
             const display = CONFIG.ui.attributeDisplay[type];
             
-            // [修改] 3. 动态奖励算法：中奖后获得的层数
-            const rewardCount = Math.max(1, Math.ceil(counts[type] * 0.5));
+            // Wheel rewards at least +50% of the current marble stack, so the lowest outcome is about x1.5.
+            const minWheelBonus = Math.max(1, Math.ceil(totalCollectedCount * 0.5));
+            const rewardCount = Math.max(minWheelBonus, Math.ceil((counts[type] || 0) * 0.5));
+            const multiplierValue = 1 + rewardCount / totalCollectedCount;
+            const multiplierLabel = `x${multiplierValue.toFixed(multiplierValue % 1 === 0 ? 0 : 1)}`;
 
             this.slices.push({
                 type: type,
@@ -305,7 +309,8 @@ class FortuneWheel {
                 color: display ? display.color : '#ccc',
                 icon: display ? display.icon : '❓',
                 rewardCount: rewardCount, // 存储奖励层数
-                count: rewardCount        // [修复] 修复绘制时 s.count 为 undefined 的问题
+                count: rewardCount,       // [修复] 修复绘制时 s.count 为 undefined 的问题
+                multiplierLabel
             });
             currentAngle += arc;
         });
@@ -456,7 +461,7 @@ class FortuneWheel {
             if ((s.endAngle - s.startAngle) > 0.4) {
                  ctx.font = 'bold 12px sans-serif';
                  ctx.textBaseline = 'top';
-                 ctx.fillText(`x${s.count}`, 0, 8); // 數量
+                 ctx.fillText(s.multiplierLabel || `+${s.count}`, 0, 8); // 倍率/数量
             }
             
             ctx.restore();
@@ -832,6 +837,9 @@ class Peg {
         this.col = -1;
         this.mirrorIdx = -1; // 存储镜像钉子在 game.pegs 中的索引
         this.frozenTurns = 0;  // Glacies 狂暴冻结剩余回合数（> 0 时不可触发）
+        this.shape = 'circle';
+        this.segment = null;
+        this.thickness = this.radius * 2;
         // --- [物理增强] 钉子被击中时的旋转角度（视觉反馈）---
         this.impactAngle = 0;    // 当前旋转角度（弧度）
         this.impactSpin = 0;     // 被击中时的角速度（逐帧衰减）
@@ -1034,6 +1042,54 @@ class Peg {
         // 将速度传递给音效管理器
         audio.playHit(this.type, impactSpeed); 
     }
+    // @perf-impact: Barrier pegs reuse Peg shadow gates and draw rounded strokes; no particles or new gradients.
+    drawBarrierPeg(ctx, color, isLit) {
+        if (!this.segment) return;
+        const _perfBudgetPeg = typeof game !== 'undefined' && game.perfQualityLevel
+            ? CONFIG.performance[game.perfQualityLevel]
+            : CONFIG.performance.high;
+        const width = (this.thickness || this.radius * 2) * this.scale;
+        ctx.save();
+        if (_perfBudgetPeg.pegSoftShadow) {
+            ctx.globalAlpha = 0.18;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.72)';
+            ctx.lineWidth = width * 1.05;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(this.segment.x1, this.segment.y1 + 4);
+            ctx.lineTo(this.segment.x2, this.segment.y2 + 4);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+        ctx.lineCap = 'round';
+        ctx.lineWidth = width;
+        ctx.strokeStyle = isLit ? '#ffffff' : color;
+        ctx.shadowBlur = _sb(isLit ? 14 : 4);
+        ctx.shadowColor = isLit ? '#ffffff' : color;
+        ctx.beginPath();
+        ctx.moveTo(this.segment.x1, this.segment.y1);
+        ctx.lineTo(this.segment.x2, this.segment.y2);
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = Math.max(1.5, width * 0.26);
+        ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+        ctx.beginPath();
+        ctx.moveTo(this.segment.x1, this.segment.y1 - width * 0.12);
+        ctx.lineTo(this.segment.x2, this.segment.y2 - width * 0.12);
+        ctx.stroke();
+
+        if (this.cooldownTimer > 0) {
+            ctx.globalAlpha = 0.45;
+            ctx.strokeStyle = 'rgba(15, 23, 42, 0.82)';
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(this.segment.x1, this.segment.y1);
+            ctx.lineTo(this.segment.x2, this.segment.y2);
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
     // --- 替换 Peg 类的 draw 方法 ---
     // @section:peg_shadow_and_transform - 软阴影与碰撞旋转变换初始化
     draw(ctx, baseRadius, tilt = {x:0, y:0}) {
@@ -1041,6 +1097,10 @@ class Peg {
         const isSpecial = this.type !== 'normal';
         const isLit = this.lit;
         const color = this.getColor();
+        if (this.shape === 'barrier') {
+            this.drawBarrierPeg(ctx, color, isLit);
+            return;
+        }
 
         // --- [T3] 软阴影：在钉子正下方绘制压扁的椭圆阴影，模拟物体「浮」在场地上的感觉 ---
         // [自适应性能] pegSoftShadow 开关：低端模式下跳过此段绘制
@@ -2412,6 +2472,34 @@ class DropBall {
             }
 
             // 底部退出
+            const rewardZones = _game && Array.isArray(_game.bottomRewardZones) ? _game.bottomRewardZones : [];
+            if (!this._bottomRewardZoneHits) this._bottomRewardZoneHits = new Set();
+            for (const zone of rewardZones) {
+                if (!zone) continue;
+                const zoneKey = zone.id || `${zone.type}:${Math.round(zone.x)}:${Math.round(zone.y)}`;
+                if (this._bottomRewardZoneHits.has(zoneKey)) continue;
+                const inZone = this.pos.x >= zone.x && this.pos.x <= zone.x + zone.w
+                    && this.pos.y >= zone.y && this.pos.y <= zone.y + zone.h;
+                if (!inZone) continue;
+                this._bottomRewardZoneHits.add(zoneKey);
+                const rewardType = zone.type || 'explosive';
+                const rewardItem = { type: rewardType, level: 1, source: 'bottom_reward_zone' };
+                if (this.session && this.session.collected) this.session.collected.push(rewardItem);
+                if (this.def && this.def.collected) this.def.collected.push(rewardType);
+                if (_game.spawn_createFloatingText) {
+                    const display = CONFIG.ui.attributeDisplay[rewardType];
+                    const label = display ? display.name : rewardType;
+                    _game.spawn_createFloatingText(
+                        zone.x + zone.w / 2,
+                        zone.y - 14,
+                        `${label} +1`,
+                        zone.color || '#fbbf24'
+                    );
+                }
+                audio.playPowerup();
+                return { type: 'reward_zone', material: rewardType };
+            }
+
             if (this.pos.y > height + 150) { 
                 this.active = false; 
                 this.stopSound(); 
@@ -2594,6 +2682,45 @@ class DropBall {
             //   2. 切向摩擦力（减小切向速度，产生角动量）
             //   3. 微观噪声（模拟钉子表面不规则）
             for (let peg of pegs) {
+                if (peg.shape === 'barrier' && peg.segment) {
+                    const sx = peg.segment.x2 - peg.segment.x1;
+                    const sy = peg.segment.y2 - peg.segment.y1;
+                    const segLenSq = sx * sx + sy * sy;
+                    if (segLenSq <= 0) continue;
+                    let t = ((this.pos.x - peg.segment.x1) * sx + (this.pos.y - peg.segment.y1) * sy) / segLenSq;
+                    t = Math.max(0, Math.min(1, t));
+                    const closest = new Vec2(peg.segment.x1 + sx * t, peg.segment.y1 + sy * t);
+                    let dx = this.pos.x - closest.x;
+                    let dy = this.pos.y - closest.y;
+                    let dist = Math.hypot(dx, dy);
+                    const halfThickness = (peg.thickness || peg.radius * 2) / 2;
+                    const minDist = this.radius + halfThickness;
+                    if (dist < minDist) {
+                        let n;
+                        if (dist > 0.001) {
+                            n = new Vec2(dx / dist, dy / dist);
+                        } else {
+                            const segLen = Math.sqrt(segLenSq);
+                            n = new Vec2(-sy / segLen, sx / segLen);
+                        }
+                        this.pos = closest.add(n.mult(minDist + 0.1));
+                        const impactVel = new Vec2(this.vel.x, this.vel.y);
+                        const d = this.vel.dot(n);
+                        if (d < 0) {
+                            const elasticity = Math.min(1.22, CONFIG.physics.elasticity * (CONFIG.physics.pinkpegElasticityMuti || 2.2) * 0.58);
+                            this.vel = this.vel.sub(n.mult(2 * d)).mult(elasticity);
+                            const tangent = new Vec2(-n.y, n.x);
+                            const slide = this.vel.dot(tangent);
+                            this.vel = this.vel.sub(tangent.mult(slide * 0.08));
+                        }
+                        if (peg.cooldownTimer <= 0 && peg.frozenTurns <= 0) {
+                            peg.hit(impactVel.mag());
+                            this.hitCount++;
+                            game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel, 'pink');
+                        }
+                    }
+                    continue;
+                }
                 let dist = this.pos.dist(peg.pos); let minDist = this.radius + peg.radius;
                 if (dist < minDist) {
                     let n = this.pos.sub(peg.pos).norm();

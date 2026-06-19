@@ -304,6 +304,7 @@ export const calc_utils = {
             if (itemType === 'cryo') recipe.cryo = (recipe.cryo || 0) + itemLevel; 
             if (itemType === 'pyro') recipe.pyro = (recipe.pyro || 0) + itemLevel;       
             if (itemType === 'lightning') recipe.lightning = (recipe.lightning || 0) + itemLevel;      
+            if (itemType === 'explosive') recipe.explosive = true;
             
             // 收集到激光钉子 -> 增加激光层数
             if (itemType === 'laser') {

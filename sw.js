@@ -14,7 +14,7 @@
  * 或在 DevTools → Application → Service Workers 里 Unregister。
  */
 
-const CACHE_VERSION = 'v20260619-bitmap3';
+const CACHE_VERSION = 'v20260619-bitmap4';
 const ASSET_CACHE = `echo-alchemist-assets-${CACHE_VERSION}`;
 const CORE_CACHE = `echo-alchemist-core-${CACHE_VERSION}`;
 
@@ -57,7 +57,7 @@ async function cacheFirst(request) {
     const response = await fetch(request);
     // 仅缓存成功的、可缓存的响应（含 opaque 兜底由上层 same-origin 保证）
     if (response && response.ok) {
-        cache.put(request, response.clone());
+        cache.put(request, response.clone()).catch(() => {});
     }
     return response;
 }
@@ -68,13 +68,17 @@ async function networkFirst(request) {
     try {
         const response = await fetch(request);
         if (response && response.ok) {
-            cache.put(request, response.clone());
+            cache.put(request, response.clone()).catch(() => {});
         }
         return response;
     } catch (err) {
         const cached = await cache.match(request);
         if (cached) return cached;
-        throw err;
+        return new Response('Service Worker network request failed and no cached response is available.', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        });
     }
 }
 

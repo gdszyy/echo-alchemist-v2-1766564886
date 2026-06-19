@@ -1511,9 +1511,118 @@ export const combat_system = {
     // [已迁移至 src/combat/collision.js] combat_tryMoveEnemy
     // 敌人移动碰撞检测 (AABB + 边界) —— 通过文件底部的 Object.assign(combat_system, CollisionSystem) 注入
 
+    combat_getProjectileVulnerabilityAttrs(config = {}, projectile = null) {
+        const attrs = new Set();
+        const add = (attr, value = 0) => {
+            if ((Number(value) || 0) > 0) attrs.add(attr);
+        };
+
+        add('pyro', config.pyro);
+        add('cryo', config.cryo);
+        add('lightning', config.lightning);
+        add('venom', config.venom);
+        add('overcharge', config.overcharge);
+        add('echo', config.echo);
+        add('scatter', (config.scatter || 0) + (config.isScatterChild ? 1 : 0));
+        add('laser', (config.laser || 0) + (config.isLaser || config.type === 'laser' ? 1 : 0));
+        add('bounce', config.bounce);
+        add('pierce', config.pierce);
+        return attrs;
+    },
+
+    combat_getBossVulnerabilityProfile(boss) {
+        if (!boss || boss.type !== 'boss' || !boss.bossType) return null;
+
+        const bossCfg = CONFIG.balance.bossConfigs && CONFIG.balance.bossConfigs[boss.bossType];
+        const vulnCfg = bossCfg && bossCfg.vulnerability;
+        if (!vulnCfg) return null;
+
+        const mech = CONFIG.balance.bossVulnerability || {};
+        if (vulnCfg.dynamic) {
+            const sets = vulnCfg.rotationAttrs || [];
+            if (sets.length === 0) return null;
+            const idx = Math.max(0, boss.rotationIndex || 0) % sets.length;
+            return {
+                attrs: sets[idx],
+                label: (vulnCfg.labels && vulnCfg.labels[idx]) || '动态破绽',
+                breakThreshold: vulnCfg.breakThreshold || mech.breakThreshold || 3,
+                exposedHits: vulnCfg.exposedHits || mech.exposedHits || 3,
+                exposedDamageMult: vulnCfg.exposedDamageMult || mech.exposedDamageMult || 1.35
+            };
+        }
+
+        return {
+            attrs: vulnCfg.attrs || [],
+            label: vulnCfg.label || 'Boss破绽',
+            breakThreshold: vulnCfg.breakThreshold || mech.breakThreshold || 3,
+            exposedHits: vulnCfg.exposedHits || mech.exposedHits || 3,
+            exposedDamageMult: vulnCfg.exposedDamageMult || mech.exposedDamageMult || 1.35
+        };
+    },
+
+    combat_applyBossVulnerability(enemy, config = {}, projectile = null, dmg = 0) {
+        const result = {
+            damage: dmg,
+            matchedAttr: null,
+            progressGain: 0,
+            breakTriggered: false,
+            exposedApplied: false,
+            profile: null
+        };
+        const profile = this.combat_getBossVulnerabilityProfile(enemy);
+        if (!profile || !profile.attrs || profile.attrs.length === 0) return result;
+
+        const mech = CONFIG.balance.bossVulnerability || {};
+        result.profile = profile;
+        if ((enemy._bossVulnerabilityExposedHits || 0) > 0) {
+            result.damage = result.damage * profile.exposedDamageMult;
+            enemy._bossVulnerabilityExposedHits = Math.max(0, (enemy._bossVulnerabilityExposedHits || 0) - 1);
+            result.exposedApplied = true;
+        }
+
+        const hitAttrs = this.combat_getProjectileVulnerabilityAttrs(config, projectile);
+        const matchedAttr = profile.attrs.find(attr => hitAttrs.has(attr));
+        if (!matchedAttr) {
+            const offPatternGain = mech.offPatternGain || 0;
+            if (offPatternGain > 0) {
+                enemy._bossVulnerabilityProgress = Math.max(0, (enemy._bossVulnerabilityProgress || 0) - offPatternGain);
+            }
+            return result;
+        }
+
+        result.matchedAttr = matchedAttr;
+        result.progressGain = mech.counterHitGain || 1;
+        enemy._bossVulnerabilityProgress = (enemy._bossVulnerabilityProgress || 0) + result.progressGain;
+
+        if (enemy._bossVulnerabilityProgress >= profile.breakThreshold) {
+            enemy._bossVulnerabilityProgress = 0;
+            enemy._bossVulnerabilityExposedHits = Math.max(enemy._bossVulnerabilityExposedHits || 0, profile.exposedHits);
+            if (mech.enrageDelayOnBreak && !enemy.berserked) {
+                enemy._bossVulnerabilitySuppressedEnrage = true;
+            }
+            result.breakTriggered = true;
+            if (this.spawn_createFloatingText) {
+                this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 56, `${profile.label} 破!`, '#facc15', 16);
+            }
+        }
+
+        return result;
+    },
+
     combat_getHitFeedbackLabel(enemy, config = {}, projectile = null, damageResult = null, context = {}) {
         if (!enemy || !config || !damageResult) return null;
 
+        if (context.bossVulnerability) {
+            if (context.bossVulnerability.breakTriggered) {
+                return { text: '破绽', color: '#facc15', size: 16 };
+            }
+            if (context.bossVulnerability.exposedApplied) {
+                return { text: '易伤', color: '#fbbf24', size: 15 };
+            }
+            if (context.bossVulnerability.progressGain > 0) {
+                return { text: '破绽+', color: '#fde68a', size: 14 };
+            }
+        }
         if (context.wardSpent || damageResult.deflected) {
             return { text: '屏障', color: '#67e8f9', size: 14 };
         }
@@ -1842,6 +1951,8 @@ export const combat_system = {
                 dmg = dmg * 1.25;
             }
         }
+        const bossVulnerability = this.combat_applyBossVulnerability(enemy, config, projectile, dmg);
+        dmg = bossVulnerability.damage;
         // [修改] 调用 takeDamage 时传入 projectile 作为源，用于方向判定
         const shieldChargesBefore = enemy.shieldCharges || 0;
         const wardBarrierBefore = enemy.wardBarrier || 0;
@@ -1885,7 +1996,8 @@ export const combat_system = {
             isPierceHit,
             shieldSpent: shieldChargesBefore > (enemy.shieldCharges || 0),
             wardSpent: wardBarrierBefore > (enemy.wardBarrier || 0),
-            damageType
+            damageType,
+            bossVulnerability
         });
 
         // [词条 Hook] 炎光剑影：子母飞剑或普通子弹穿透命中时，命中点生成剑光 AOE 伤害（非爆炸）
@@ -2053,7 +2165,12 @@ export const combat_system = {
 
         // Boss 阶段变化检测：伤害结算后检测是否触发狂暴
         if (!killed && enemy.type === 'boss' && !enemy.berserked) {
-            this.combat_checkBossPhaseChange();
+            if (enemy._bossVulnerabilitySuppressedEnrage && enemy.hp <= enemy.maxHp * 0.5) {
+                enemy._bossVulnerabilitySuppressedEnrage = false;
+                this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 64, '狂暴延迟', '#facc15', 14);
+            } else {
+                this.combat_checkBossPhaseChange();
+            }
         }
 
 // @section:damage_apply_to_enemy - 伤害写入敌人并触发属性反应
