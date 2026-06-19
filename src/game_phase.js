@@ -607,8 +607,8 @@ export const game_phase = {
 
     /**
      * [v2 重构] 在实时钉板画布上绘制「可编辑钉盘区域」虚框描边。
-     * 每个已解锁的模块槽位用虚框标出；已放置模块的区域显示图标+名称，
-     * 空区域显示「＋ 点击放置」。点击命中检测见 _moduleEditor_handleClick。
+     * 每个已解锁的模块槽位用虚框标出；已装备组件的区域显示图标+名称，
+     * 空区域显示「＋ 点击装备」。点击命中检测见 _moduleEditor_handleClick。
      * 仅在 this._moduleEditorActive 为真时由 phase_gathering_update 调用。
      */
     render_moduleEditorOverlay() {
@@ -661,10 +661,10 @@ export const game_phase = {
                 ctx.fillStyle = '#d1fae5';
                 ctx.font = '600 11px "Microsoft YaHei", sans-serif';
                 ctx.fillText(`${def.icon || '▦'} ${def.name}`, cx, y + 1 + tagH / 2, w - 6);
-                // 底部「点击更换」
+                // 底部「点击卸下」
                 ctx.fillStyle = 'rgba(52, 211, 153, 0.85)';
                 ctx.font = '600 10px "Microsoft YaHei", sans-serif';
-                ctx.fillText('点击更换', cx, y + h - 9, w - 6);
+                ctx.fillText('点击卸下', cx, y + h - 9, w - 6);
                 ctx.restore();
             } else {
                 ctx.save();
@@ -674,7 +674,7 @@ export const game_phase = {
                 ctx.fillText('＋', cx, cy - 6);
                 ctx.fillStyle = 'rgba(148, 197, 220, 0.9)';
                 ctx.font = '600 11px "Microsoft YaHei", sans-serif';
-                ctx.fillText('点击放置', cx, cy + 12, w - 6);
+                ctx.fillText('点击装备', cx, cy + 12, w - 6);
                 ctx.restore();
             }
         }

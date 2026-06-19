@@ -1,6 +1,6 @@
 # tests\ai_test_runner.js 函数索引
 
-> 自动生成于 2026-06-18 | 总行数: 435 | 函数数: 14 | 语言: javascript
+> 自动生成于 2026-06-19 | 总行数: 733 | 函数数: 17 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -23,3 +23,6 @@
 | suiteEssence | function | `suiteEssence(page)` |  |
 | suiteRuneword | function | `suiteRuneword(page)` |  |
 | suiteEnemy | function | `suiteEnemy(page)` |  |
+| suiteOverlay | function | `suiteOverlay(page)` |  |
+| setupPinboardEditor | function | `setupPinboardEditor(page)` |  |
+| suitePinboard | function | `suitePinboard(page)` |  |

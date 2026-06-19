@@ -61,6 +61,7 @@ globs: ["src/game_phase.js"]
 - **模块扩展池**：商店可出售的组件可组合现有 Peg / `SpecialSlot` 能力形成新玩法，如 `split_gate_module`（分裂槽）、`recall_loop_module`（召回槽）、`cascade_bank_module`（弹钉斜坡）、`crucible_core_module`（固定属性三角）、`double_wheel_module`（双轮盘）、`fusion_garden_module`（2x1 融合承载）、`split_yoke_module`（Y 字分流）、`hourglass_gate_module`（1x2 聚焦/分流）、`crescent_bank_module`（2x1 横移导流）、`spiral_return_module`（2x2 回收）、`prism_splitter_module`（固定属性分光）和 `twin_wheel_bridge_module`（3x1 双轮盘横桥）。
 - **组件路线元数据**：组件可通过 `shape` 声明 `footprint`、`entry`、`exit`。该元数据只用于商店/编辑器说明与后续轻量轮廓绘制，不参与物理结算。
 - **编辑器轮廓**：`render_moduleEditorOverlay()` 会根据 `shape.footprint` 绘制轻量组件轮廓（导流翼、菱格、杯形、沙漏、螺旋、桥形等）。轮廓仅使用平面 `stroke` / 曲线，不得新增粒子、渐变或额外 `shadowBlur`。
+- **编辑器点击语义**：钉板编辑态的 Canvas 提示和 `_moduleEditor_handleClick()` 必须使用“装备/卸下”逻辑：空槽提示并打开库存装备，已装备槽提示并执行卸下回库存；不要把主点击恢复成“更换组件”弹层。
 - **密度参数**：模块内部最小钉距由 `CONFIG.physics.pegRadius`、`CONFIG.physics.marbleRadius` 与 `CONFIG.physics.pinboardSpacingBuffer` 共同决定；不得在模块生成器里重新硬编码旧版大弹珠间距。
 - **权重来源**：模块生成普通钉子时必须读取当前 `game.unlockedWeights`，其中 `white` 映射为普通钉子权重，`bounce`、`pierce`、`scatter`、`damage`、`cryo`、`pyro`、`wind` 按权重生成对应属性钉子。
 - **禁止类型**：与旧版 `phase_gathering_getRandomPegType()` 保持一致，`laser` 与 `lightning` 不得作为钉子类型生成。

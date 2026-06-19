@@ -1,6 +1,6 @@
 # src\ui_system.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 2711 | 函数数: 51 | 语言: javascript
+> 自动生成于 2026-06-19 | 总行数: 2737 | 函数数: 52 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -61,6 +61,7 @@
 | _moduleEditor_normalizeComponentInventory | method | `_moduleEditor_normalizeComponentInventory()` |  |
 | _moduleEditor_takeInventoryComponent | method | `_moduleEditor_takeInventoryComponent(componentUid)` |  |
 | _moduleEditor_detachComponent | method | `_moduleEditor_detachComponent(slotIdx, layout, cols, rows)` |  |
+| _moduleEditor_unequipComponent | method | `_moduleEditor_unequipComponent(slotIdx)` |  |
 | _moduleEditor_openPicker | method | `_moduleEditor_openPicker(slotIdx)` | ⚠️ 巨型函数，见 @section 导航 |
 
 ## 巨型函数内部节点 (@section 标记)

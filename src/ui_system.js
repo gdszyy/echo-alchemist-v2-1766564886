@@ -1937,7 +1937,7 @@ export const ui_system = {
     // 设计目标（用户需求）：
     //   - 直接在实时钉板画布上编辑，能看到真实的钉盘区域；
     //   - 每个「可编辑钉盘区域」（已解锁的模块槽）用虚框描边标出（由 canvas 绘制）；
-    //   - 点击某个区域 → 弹出「更换模块」浮层，可替换 / 移除该区域的模块。
+    //   - 点击空槽 → 打开库存装备组件；点击已装备槽 → 卸下组件并放回库存。
     // 画布上的虚框绘制见 game_phase.js: render_moduleEditorOverlay；
     // 点击命中检测见 game_system.js: input_handleInputStart → _moduleEditor_handleClick。
     _moduleEditorState: null,
@@ -2027,7 +2027,7 @@ export const ui_system = {
         layer.innerHTML = `
             <div class="me-topbar">
                 <div class="me-topbar-title">⚙ 钉板编辑</div>
-                <div class="me-topbar-hint">点击虚框区域更换组件 · 已放置 ${placed}/${activeSlots.length} · 库存 ${componentCount}</div>
+                <div class="me-topbar-hint">空槽点击装备 · 已装备槽点击卸下 · 已装备 ${placed}/${activeSlots.length} · 库存 ${componentCount}</div>
             </div>
             ${fusionSummaryHtml}
             <div class="me-bottombar">
@@ -2179,14 +2179,18 @@ export const ui_system = {
 
     /**
      * [命中检测] 在编辑模式下点击画布时调用，logicPos 为画布坐标。
-     * 命中某个可编辑钉盘区域则弹出模块选择浮层。
+     * 命中空槽时弹出库存装备浮层；命中已装备槽时卸下组件并放回库存。
      */
     _moduleEditor_handleClick(logicPos) {
         const rects = this._moduleEditor_getSlotRects();
         for (const r of rects) {
             if (logicPos.x >= r.rect.x && logicPos.x <= r.rect.x + r.rect.w &&
                 logicPos.y >= r.rect.y && logicPos.y <= r.rect.y + r.rect.h) {
-                this._moduleEditor_openPicker(r.idx);
+                if (r.moduleId) {
+                    this._moduleEditor_unequipComponent(r.idx);
+                } else {
+                    this._moduleEditor_openPicker(r.idx);
+                }
                 return;
             }
         }
@@ -2336,6 +2340,27 @@ export const ui_system = {
         return component;
     },
 
+    _moduleEditor_unequipComponent(slotIdx) {
+        const cfg = CONFIG.gameplay || {};
+        const layout = this.currentModuleLayout;
+        if (!Array.isArray(layout)) return null;
+        const component = this._moduleEditor_detachComponent(slotIdx, layout, cfg.moduleCols || 4, cfg.moduleRows || 3);
+        if (!component) return null;
+        if (typeof this.phase_gathering_initPachinko === 'function') {
+            this.phase_gathering_initPachinko(false);
+        }
+        this._moduleEditor_closePicker();
+        this.ui_renderModuleEditorControls();
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        const def = MODULE_DEFS[getModuleIdFromEntry(component)];
+        this._moduleEditor_showNotice(`已卸下 ${def ? def.name : '钉板组件'}`, {
+            type: 'info',
+            detail: '组件已放回库存，可点击空槽重新装备。',
+            duration: 1800,
+        });
+        return component;
+    },
+
     /**
      * 应用模块选择：写入 currentModuleLayout，重建实时钉板，刷新控件。
      */
@@ -2482,6 +2507,7 @@ export const ui_system = {
         }
         this._moduleEditor_closePicker();
         this.ui_renderModuleEditorControls();
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
     },
 
     _moduleEditor_getRunePreviewTargets(preview) {

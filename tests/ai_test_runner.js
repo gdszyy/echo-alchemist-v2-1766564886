@@ -583,6 +583,36 @@ async function suitePinboard(page) {
         assert(state.reason.length > 0, 'disabled module should expose placement reason');
     });
 
+    await runTest('pinboard: slot click unequips and empty slot equips from inventory', async () => {
+        await setupPinboardEditor(page);
+        const result = await page.evaluate(() => {
+            const rects = game._moduleEditor_getSlotRects();
+            const first = rects.find(r => r.moduleId);
+            if (!first) return { error: 'missing occupied slot' };
+            const beforeInventory = (game.ownedModuleComponents || []).length;
+            game._moduleEditor_handleClick({
+                x: first.rect.x + first.rect.w / 2,
+                y: first.rect.y + first.rect.h / 2,
+            });
+            const afterUnequipInventory = (game.ownedModuleComponents || []).length;
+            const afterUnequipSlot = game.currentModuleLayout[first.idx];
+            const component = game.ownedModuleComponents && game.ownedModuleComponents[game.ownedModuleComponents.length - 1];
+            game._moduleEditor_applyModule(first.idx, component && component.uid);
+            return {
+                beforeInventory,
+                afterUnequipInventory,
+                afterEquipInventory: (game.ownedModuleComponents || []).length,
+                emptyAfterUnequip: !afterUnequipSlot,
+                equippedAfterApply: !!game.currentModuleLayout[first.idx],
+            };
+        });
+        assert(!result.error, result.error || 'unexpected setup failure');
+        assert(result.afterUnequipInventory === result.beforeInventory + 1, 'unequip should return one component to inventory');
+        assert(result.emptyAfterUnequip, 'unequip should clear the slot');
+        assert(result.afterEquipInventory === result.beforeInventory, 'equip should consume one inventory component');
+        assert(result.equippedAfterApply, 'equip should write the component back into the slot');
+    });
+
     await runTest('pinboard: rune fusion preview and confirm update summary', async () => {
         await setupPinboardEditor(page);
         await page.evaluate(() => {
