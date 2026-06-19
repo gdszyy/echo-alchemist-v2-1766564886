@@ -1,0 +1,14 @@
+{
+  "phase": "selection",
+  "tier": "C",
+  "attr": "bounce",
+  "rect": [
+    12,
+    161,
+    55,
+    74
+  ],
+  "borderImage": "none",
+  "borderTop": "8px",
+  "boxSizing": "border-box"
+}

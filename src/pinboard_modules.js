@@ -92,10 +92,76 @@ export function addModuleComponentToInventory(inventory, moduleId) {
     return next;
 }
 
+function getDefaultSlotOrder(totalSlots, cfg = CONFIG.gameplay || {}) {
+    const count = Math.max(0, totalSlots || 0);
+    const configured = Array.isArray(cfg.moduleUnlockOrder) ? cfg.moduleUnlockOrder : [];
+    const out = [];
+    const seen = new Set();
+    for (const raw of configured) {
+        const idx = Number(raw);
+        if (!Number.isInteger(idx) || idx < 0 || idx >= count || seen.has(idx)) continue;
+        seen.add(idx);
+        out.push(idx);
+    }
+    for (let i = 0; i < count; i++) {
+        if (!seen.has(i)) out.push(i);
+    }
+    return out;
+}
+
+export function getActiveModuleSlots(unlockedSlots, totalSlots, cfg = CONFIG.gameplay || {}) {
+    const count = Math.max(0, totalSlots || 0);
+    const activeCount = Math.max(0, Math.min(unlockedSlots || 0, count));
+    return getDefaultSlotOrder(count, cfg).slice(0, activeCount);
+}
+
+export function getActiveModuleSlotSet(unlockedSlots, totalSlots, cfg = CONFIG.gameplay || {}) {
+    return new Set(getActiveModuleSlots(unlockedSlots, totalSlots, cfg));
+}
+
+function migrateModuleLayoutToCurrentGrid(layout, totalSlots, defaultSlots) {
+    const count = Math.max(0, totalSlots || 0);
+    if (!Array.isArray(layout)) return createDefaultModuleLayout(count, defaultSlots);
+    const normalized = layout.map(entry => normalizeModuleEntry(entry));
+    if (normalized.length === count) return Array.from({ length: count }, (_, i) => normalized[i] || null);
+
+    const next = Array.from({ length: count }, () => null);
+    const order = getDefaultSlotOrder(count);
+    const anchors = normalized.filter(entry => entry && !isModuleRef(entry) && getModuleIdFromEntry(entry));
+    const occupied = new Set();
+    for (const component of anchors) {
+        const moduleId = getModuleIdFromEntry(component);
+        const span = getModuleSpan(moduleId);
+        let placed = false;
+        for (const slotIdx of order) {
+            const covered = getCoveredSlots(slotIdx, span, CONFIG.gameplay.moduleCols || 5, CONFIG.gameplay.moduleRows || 3);
+            if (!covered || covered.some(ci => occupied.has(ci) || ci >= count)) continue;
+            next[slotIdx] = component;
+            for (const ci of covered) {
+                occupied.add(ci);
+                if (ci !== slotIdx) next[ci] = createModuleRef(slotIdx);
+            }
+            placed = true;
+            break;
+        }
+        if (!placed) break;
+    }
+    if (anchors.length === 0) return createDefaultModuleLayout(count, defaultSlots);
+    return next;
+}
+
 export function ensureModuleLayoutInstances(layout, totalSlots, defaultSlots = CONFIG.gameplay.moduleDefaultSlots || 3) {
     const count = Math.max(0, totalSlots || DEFAULT_MODULE_SEQUENCE.length);
-    const source = Array.isArray(layout) ? layout : createDefaultModuleLayout(count, defaultSlots);
+    const source = Array.isArray(layout)
+        ? migrateModuleLayoutToCurrentGrid(layout, count, defaultSlots)
+        : createDefaultModuleLayout(count, defaultSlots);
     const next = Array.from({ length: count }, (_, i) => normalizeModuleEntry(source[i]));
+    const defaultLayout = createDefaultModuleLayout(count, defaultSlots);
+    for (const slotIdx of getActiveModuleSlots(defaultSlots, count)) {
+        if (next[slotIdx]) continue;
+        const fallback = normalizeModuleEntry(defaultLayout[slotIdx]);
+        if (fallback && !isModuleRef(fallback)) next[slotIdx] = fallback;
+    }
     return next;
 }
 
@@ -209,6 +275,83 @@ function markFusionFocus(pegs, originX, originY, w, h, maxPriority = 3) {
         peg.fusionPriority = Math.max(1, Math.round(maxPriority - distance));
         peg.layoutRole = peg.layoutRole || 'rune_focus';
     }
+    return pegs;
+}
+
+function makePegAt(ox, oy, w, h, px, py, type = 'normal', row = 0, col = 0) {
+    const peg = new Peg(ox + w * px, oy + h * py, type);
+    peg.row = row;
+    peg.col = col;
+    peg.level = 1;
+    return peg;
+}
+
+function hasNearbyPeg(pegs, x, y, minDistance) {
+    return pegs.some(peg => peg && peg.pos && Math.hypot(peg.pos.x - x, peg.pos.y - y) < minDistance);
+}
+
+const SEAMED_STARTER_MODULES = new Set([
+    'guide_fin_left',
+    'guide_fin_right',
+    'split_lattice_bridge',
+    'multicast_gate_light',
+    'recall_loop_light',
+    'bounce_chamber',
+    'crucible_seed',
+    'catcher_cup',
+    'wheel_cup_light',
+]);
+
+// @perf-impact: Seam pegs increase default Peg count to close gaps between adjacent modules; Peg shadow/halo remains CONFIG.performance gated.
+function addModuleSeamPegs(pegs, ox, oy, w, h, moduleId) {
+    if (!SEAMED_STARTER_MODULES.has(moduleId)) return pegs;
+    const role = `${moduleId}_seam`;
+    const seamPoints = [
+        [0.12, 0.24], [0.88, 0.36], [0.12, 0.62], [0.88, 0.74],
+        [0.32, 0.08], [0.68, 0.08], [0.32, 0.94], [0.68, 0.94],
+    ];
+    const minDistance = Math.max(PEG_RADIUS * 2 + MARBLE_RADIUS * 0.95, 13.5);
+    seamPoints.forEach(([px, py], i) => {
+        const x = ox + w * px;
+        const y = oy + h * py;
+        if (hasNearbyPeg(pegs, x, y, minDistance)) return;
+        const peg = makePegAt(ox, oy, w, h, px, py, 'normal', 10 + Math.floor(i / 2), 10 + i);
+        peg.layoutRole = role;
+        pegs.push(peg);
+    });
+    return pegs;
+}
+
+function buildGuideFin(ox, oy, w, h, mirror = false) {
+    const pegs = [];
+    const rail = mirror
+        ? [[0.78, 0.18], [0.64, 0.34], [0.50, 0.50], [0.36, 0.66], [0.22, 0.82]]
+        : [[0.22, 0.18], [0.36, 0.34], [0.50, 0.50], [0.64, 0.66], [0.78, 0.82]];
+    rail.forEach(([px, py], i) => {
+        const peg = makePegAt(ox, oy, w, h, px, py, i === 1 || i === 3 ? 'pink' : 'normal', i, i);
+        peg.layoutRole = mirror ? 'guide_fin_right' : 'guide_fin_left';
+        pegs.push(peg);
+    });
+    const guardX = mirror ? 0.25 : 0.75;
+    const guard = makePegAt(ox, oy, w, h, guardX, 0.32, 'wind', 0, 5);
+    guard.layoutRole = mirror ? 'guide_fin_right' : 'guide_fin_left';
+    pegs.push(guard);
+    const weave = mirror
+        ? [[0.78, 0.44], [0.58, 0.74], [0.34, 0.24]]
+        : [[0.22, 0.44], [0.42, 0.74], [0.66, 0.24]];
+    weave.forEach(([px, py], i) => {
+        const peg = makePegAt(ox, oy, w, h, px, py, 'normal', i + 1, i + 6);
+        peg.layoutRole = mirror ? 'guide_fin_right' : 'guide_fin_left';
+        pegs.push(peg);
+    });
+    const fill = mirror
+        ? [[0.86, 0.62], [0.54, 0.10], [0.18, 0.70]]
+        : [[0.14, 0.62], [0.46, 0.10], [0.82, 0.70]];
+    fill.forEach(([px, py], i) => {
+        const peg = makePegAt(ox, oy, w, h, px, py, 'normal', i + 2, i + 9);
+        peg.layoutRole = mirror ? 'guide_fin_right' : 'guide_fin_left';
+        pegs.push(peg);
+    });
     return pegs;
 }
 
@@ -387,6 +530,277 @@ export const MODULE_DEFS = {
                 midRowPegs[midRowPegs.length - 1].type = 'pyro';
             }
             return { pegs, specialSlots: [] };
+        },
+    },
+    guide_fin_left: {
+        id: 'guide_fin_left',
+        name: '左导流翼',
+        icon: '↘',
+        desc: '斜向弹钉翼，把左侧入口的弹珠导回中轴。',
+        rarity: 'common',
+        price: 0,
+        shape: { footprint: 'fin-left', entry: 'top-left', exit: 'bottom-center' },
+        build(ox, oy, w, h) {
+            return { pegs: buildGuideFin(ox, oy, w, h, false), specialSlots: [] };
+        },
+    },
+    guide_fin_right: {
+        id: 'guide_fin_right',
+        name: '右导流翼',
+        icon: '↙',
+        desc: '与左导流翼镜像，把右侧入口的弹珠导回中轴。',
+        rarity: 'common',
+        price: 0,
+        shape: { footprint: 'fin-right', entry: 'top-right', exit: 'bottom-center' },
+        build(ox, oy, w, h) {
+            return { pegs: buildGuideFin(ox, oy, w, h, true), specialSlots: [] };
+        },
+    },
+    split_lattice_bridge: {
+        id: 'split_lattice_bridge',
+        name: '分裂符文桥',
+        icon: 'R⑂',
+        desc: '2x1 宽幅异形桥，左侧分裂槽接右侧符文格，兼顾路线拆分与融合承载。',
+        rarity: 'common',
+        price: 0,
+        span: { cols: 2, rows: 1 },
+        shape: { footprint: 'bridge', entry: 'top', exit: 'split' },
+        build(ox, oy, w, h) {
+            const anchors = [
+                [0.10, 0.18, 'normal'], [0.24, 0.12, 'normal'], [0.38, 0.18, 'normal'], [0.52, 0.12, 'normal'], [0.68, 0.18, 'normal'], [0.86, 0.16, 'normal'],
+                [0.16, 0.36, 'pink'], [0.34, 0.42, 'pink'], [0.50, 0.36, 'normal'], [0.66, 0.42, 'normal'], [0.84, 0.36, 'normal'],
+                [0.12, 0.58, 'normal'], [0.28, 0.64, 'normal'], [0.44, 0.58, 'normal'], [0.60, 0.64, 'normal'], [0.78, 0.58, 'normal'], [0.92, 0.64, 'normal'],
+                [0.20, 0.84, 'normal'], [0.36, 0.90, 'normal'], [0.52, 0.84, 'normal'], [0.68, 0.90, 'normal'], [0.84, 0.84, 'normal'],
+            ];
+            const pegs = anchors.map(([px, py, type], i) => {
+                const peg = makePegAt(ox, oy, w, h, px, py, type, Math.floor(i / 6), i % 6);
+                peg.layoutRole = 'split_lattice_bridge';
+                return peg;
+            });
+            markFusionFocus(pegs.filter(p => p.type === 'normal'), ox, oy, w, h, 3);
+            const specialSlots = [new SpecialSlot(ox + w * 0.18, oy + h * 0.50, ox + w * 0.42, oy + h * 0.50, 'split')];
+            return { pegs, specialSlots };
+        },
+    },
+    rune_lattice_light: {
+        id: 'rune_lattice_light',
+        name: '轻符文格',
+        icon: 'R',
+        desc: '小菱格融合承载，中心钉优先接收符文注入。',
+        rarity: 'common',
+        price: 0,
+        shape: { footprint: 'diamond', entry: 'top', exit: 'bottom' },
+        build(ox, oy, w, h) {
+            const pegs = [
+                makePegAt(ox, oy, w, h, 0.50, 0.18, 'normal', 0, 1),
+                makePegAt(ox, oy, w, h, 0.36, 0.28, 'normal', 0, 0),
+                makePegAt(ox, oy, w, h, 0.64, 0.28, 'normal', 0, 2),
+                makePegAt(ox, oy, w, h, 0.30, 0.40, 'normal', 1, 0),
+                makePegAt(ox, oy, w, h, 0.70, 0.40, 'normal', 1, 2),
+                makePegAt(ox, oy, w, h, 0.50, 0.50, 'normal', 1, 1),
+                makePegAt(ox, oy, w, h, 0.18, 0.58, 'normal', 2, 0),
+                makePegAt(ox, oy, w, h, 0.42, 0.64, 'normal', 2, 0),
+                makePegAt(ox, oy, w, h, 0.58, 0.64, 'normal', 2, 2),
+                makePegAt(ox, oy, w, h, 0.82, 0.58, 'normal', 2, 3),
+                makePegAt(ox, oy, w, h, 0.30, 0.76, 'normal', 3, 0),
+                makePegAt(ox, oy, w, h, 0.70, 0.76, 'normal', 3, 2),
+                makePegAt(ox, oy, w, h, 0.50, 0.84, 'normal', 3, 1),
+            ];
+            markFusionFocus(pegs, ox, oy, w, h, 3);
+            return { pegs, specialSlots: [] };
+        },
+    },
+    bounce_chamber: {
+        id: 'bounce_chamber',
+        name: '弹跳室',
+        icon: '◇',
+        desc: '低密度反弹腔，中心高弹钉制造清晰的第一次改向。',
+        rarity: 'common',
+        price: 0,
+        shape: { footprint: 'chamber', entry: 'top', exit: 'split' },
+        build(ox, oy, w, h) {
+            const pegs = [
+                makePegAt(ox, oy, w, h, 0.28, 0.24, 'normal', 0, 0),
+                makePegAt(ox, oy, w, h, 0.50, 0.20, 'normal', 0, 1),
+                makePegAt(ox, oy, w, h, 0.72, 0.24, 'normal', 0, 2),
+                makePegAt(ox, oy, w, h, 0.24, 0.48, 'normal', 1, 0),
+                makePegAt(ox, oy, w, h, 0.38, 0.38, 'pink', 1, 1),
+                makePegAt(ox, oy, w, h, 0.50, 0.50, 'pink', 1, 1),
+                makePegAt(ox, oy, w, h, 0.62, 0.38, 'pink', 1, 2),
+                makePegAt(ox, oy, w, h, 0.76, 0.48, 'normal', 1, 2),
+                makePegAt(ox, oy, w, h, 0.18, 0.70, 'normal', 2, 0),
+                makePegAt(ox, oy, w, h, 0.30, 0.78, 'normal', 2, 0),
+                makePegAt(ox, oy, w, h, 0.50, 0.82, 'normal', 2, 1),
+                makePegAt(ox, oy, w, h, 0.70, 0.78, 'normal', 2, 2),
+                makePegAt(ox, oy, w, h, 0.82, 0.70, 'normal', 2, 3),
+            ];
+            pegs.forEach(p => { p.layoutRole = 'bounce_chamber'; });
+            return { pegs, specialSlots: [] };
+        },
+    },
+    crucible_seed: {
+        id: 'crucible_seed',
+        name: '炼金核',
+        icon: '△',
+        desc: '三角属性核，少量固定属性搭配中心融合落点。',
+        rarity: 'common',
+        price: 0,
+        shape: { footprint: 'triangle-core', entry: 'top', exit: 'bottom' },
+        build(ox, oy, w, h) {
+            const pegs = [
+                makePegAt(ox, oy, w, h, 0.50, 0.20, 'cryo', 0, 1),
+                makePegAt(ox, oy, w, h, 0.36, 0.34, 'normal', 0, 0),
+                makePegAt(ox, oy, w, h, 0.64, 0.34, 'normal', 0, 2),
+                makePegAt(ox, oy, w, h, 0.22, 0.46, 'normal', 1, 0),
+                makePegAt(ox, oy, w, h, 0.32, 0.56, 'normal', 1, 0),
+                makePegAt(ox, oy, w, h, 0.50, 0.52, 'damage', 1, 1),
+                makePegAt(ox, oy, w, h, 0.68, 0.56, 'normal', 1, 2),
+                makePegAt(ox, oy, w, h, 0.78, 0.46, 'normal', 1, 3),
+                makePegAt(ox, oy, w, h, 0.28, 0.76, 'normal', 2, 0),
+                makePegAt(ox, oy, w, h, 0.38, 0.92, 'normal', 2, 0),
+                makePegAt(ox, oy, w, h, 0.50, 0.72, 'normal', 2, 1),
+                makePegAt(ox, oy, w, h, 0.62, 0.94, 'pyro', 2, 2),
+                makePegAt(ox, oy, w, h, 0.72, 0.76, 'normal', 2, 3),
+            ];
+            markFusionFocus(pegs.filter(p => p.type === 'normal'), ox, oy, w, h, 3);
+            return { pegs, specialSlots: [] };
+        },
+    },
+    catcher_cup: {
+        id: 'catcher_cup',
+        name: '接球杯',
+        icon: '∪',
+        desc: 'U 型缓冲杯，减少新手局弹珠从底部直落。',
+        rarity: 'common',
+        price: 0,
+        shape: { footprint: 'cup', entry: 'top', exit: 'bottom-center' },
+        build(ox, oy, w, h) {
+            const pegs = [
+                makePegAt(ox, oy, w, h, 0.25, 0.30, 'normal', 0, 0),
+                makePegAt(ox, oy, w, h, 0.50, 0.24, 'normal', 0, 1),
+                makePegAt(ox, oy, w, h, 0.75, 0.30, 'normal', 0, 2),
+                makePegAt(ox, oy, w, h, 0.10, 0.38, 'normal', 1, 0),
+                makePegAt(ox, oy, w, h, 0.34, 0.50, 'normal', 1, 0),
+                makePegAt(ox, oy, w, h, 0.66, 0.50, 'normal', 1, 2),
+                makePegAt(ox, oy, w, h, 0.90, 0.38, 'normal', 1, 3),
+                makePegAt(ox, oy, w, h, 0.20, 0.64, 'pink', 1, 0),
+                makePegAt(ox, oy, w, h, 0.50, 0.66, 'normal', 1, 1),
+                makePegAt(ox, oy, w, h, 0.80, 0.64, 'pink', 1, 2),
+                makePegAt(ox, oy, w, h, 0.40, 0.82, 'normal', 2, 0),
+                makePegAt(ox, oy, w, h, 0.60, 0.82, 'normal', 2, 2),
+            ];
+            pegs.forEach(p => { p.layoutRole = 'catcher_cup'; });
+            const specialSlots = [new SpecialSlot(ox + w * 0.30, oy + h * 0.72, ox + w * 0.70, oy + h * 0.72, 'recall')];
+            return { pegs, specialSlots };
+        },
+    },
+    split_gate_light: {
+        id: 'split_gate_light',
+        name: '轻分裂门',
+        icon: '⑂',
+        desc: '密集护栏夹住分裂槽，弹珠穿过中线时复制路线。',
+        rarity: 'common',
+        price: 0,
+        shape: { footprint: 'split-gate', entry: 'top', exit: 'split' },
+        build(ox, oy, w, h) {
+            const pegs = [
+                makePegAt(ox, oy, w, h, 0.26, 0.18, 'normal', 0, 0),
+                makePegAt(ox, oy, w, h, 0.50, 0.18, 'normal', 0, 1),
+                makePegAt(ox, oy, w, h, 0.74, 0.18, 'normal', 0, 2),
+                makePegAt(ox, oy, w, h, 0.20, 0.38, 'normal', 1, 0),
+                makePegAt(ox, oy, w, h, 0.38, 0.42, 'pink', 1, 1),
+                makePegAt(ox, oy, w, h, 0.62, 0.42, 'pink', 1, 2),
+                makePegAt(ox, oy, w, h, 0.80, 0.38, 'normal', 1, 3),
+                makePegAt(ox, oy, w, h, 0.28, 0.64, 'normal', 2, 0),
+                makePegAt(ox, oy, w, h, 0.50, 0.66, 'normal', 2, 1),
+                makePegAt(ox, oy, w, h, 0.72, 0.64, 'normal', 2, 2),
+                makePegAt(ox, oy, w, h, 0.36, 0.84, 'normal', 3, 0),
+                makePegAt(ox, oy, w, h, 0.64, 0.84, 'normal', 3, 2),
+            ];
+            pegs.forEach(p => { p.layoutRole = 'split_gate_light'; });
+            const specialSlots = [new SpecialSlot(ox + w * 0.34, oy + h * 0.54, ox + w * 0.66, oy + h * 0.54, 'split')];
+            return { pegs, specialSlots };
+        },
+    },
+    multicast_gate_light: {
+        id: 'multicast_gate_light',
+        name: '连射门',
+        icon: '+2',
+        desc: '窄口连射槽，穿过后为当前弹珠追加连射次数。',
+        rarity: 'common',
+        price: 0,
+        shape: { footprint: 'hourglass', entry: 'top', exit: 'bottom' },
+        build(ox, oy, w, h) {
+            const pegs = [
+                makePegAt(ox, oy, w, h, 0.22, 0.18, 'normal', 0, 0),
+                makePegAt(ox, oy, w, h, 0.50, 0.16, 'normal', 0, 1),
+                makePegAt(ox, oy, w, h, 0.78, 0.18, 'normal', 0, 2),
+                makePegAt(ox, oy, w, h, 0.34, 0.36, 'pink', 1, 0),
+                makePegAt(ox, oy, w, h, 0.66, 0.36, 'pink', 1, 2),
+                makePegAt(ox, oy, w, h, 0.24, 0.58, 'normal', 2, 0),
+                makePegAt(ox, oy, w, h, 0.50, 0.58, 'normal', 2, 1),
+                makePegAt(ox, oy, w, h, 0.76, 0.58, 'normal', 2, 2),
+                makePegAt(ox, oy, w, h, 0.32, 0.78, 'normal', 3, 0),
+                makePegAt(ox, oy, w, h, 0.50, 0.86, 'normal', 3, 1),
+                makePegAt(ox, oy, w, h, 0.68, 0.78, 'normal', 3, 2),
+            ];
+            pegs.forEach(p => { p.layoutRole = 'multicast_gate_light'; });
+            const specialSlots = [new SpecialSlot(ox + w * 0.35, oy + h * 0.48, ox + w * 0.65, oy + h * 0.48, 'multicast')];
+            return { pegs, specialSlots };
+        },
+    },
+    recall_loop_light: {
+        id: 'recall_loop_light',
+        name: '轻回环',
+        icon: '↺',
+        desc: '回溯槽被高弹钉包住，漏到底前给一次重新入场机会。',
+        rarity: 'common',
+        price: 0,
+        shape: { footprint: 'cup', entry: 'top', exit: 'recall' },
+        build(ox, oy, w, h) {
+            const pegs = [
+                makePegAt(ox, oy, w, h, 0.24, 0.20, 'pink', 0, 0),
+                makePegAt(ox, oy, w, h, 0.50, 0.18, 'normal', 0, 1),
+                makePegAt(ox, oy, w, h, 0.76, 0.20, 'pink', 0, 2),
+                makePegAt(ox, oy, w, h, 0.18, 0.42, 'normal', 1, 0),
+                makePegAt(ox, oy, w, h, 0.38, 0.46, 'normal', 1, 1),
+                makePegAt(ox, oy, w, h, 0.62, 0.46, 'normal', 1, 2),
+                makePegAt(ox, oy, w, h, 0.82, 0.42, 'normal', 1, 3),
+                makePegAt(ox, oy, w, h, 0.24, 0.70, 'pink', 2, 0),
+                makePegAt(ox, oy, w, h, 0.50, 0.74, 'normal', 2, 1),
+                makePegAt(ox, oy, w, h, 0.76, 0.70, 'pink', 2, 2),
+                makePegAt(ox, oy, w, h, 0.36, 0.88, 'normal', 3, 0),
+                makePegAt(ox, oy, w, h, 0.64, 0.88, 'normal', 3, 2),
+            ];
+            pegs.forEach(p => { p.layoutRole = 'recall_loop_light'; });
+            const specialSlots = [new SpecialSlot(ox + w * 0.32, oy + h * 0.60, ox + w * 0.68, oy + h * 0.60, 'recall')];
+            return { pegs, specialSlots };
+        },
+    },
+    wheel_cup_light: {
+        id: 'wheel_cup_light',
+        name: '轻轮盘杯',
+        icon: '🎡',
+        desc: '底部轮盘槽复制已收集属性，杯形钉组提高触发机会。',
+        rarity: 'common',
+        price: 0,
+        shape: { footprint: 'cup', entry: 'top', exit: 'wheel' },
+        build(ox, oy, w, h) {
+            const pegs = [
+                makePegAt(ox, oy, w, h, 0.24, 0.22, 'normal', 0, 0),
+                makePegAt(ox, oy, w, h, 0.50, 0.18, 'normal', 0, 1),
+                makePegAt(ox, oy, w, h, 0.76, 0.22, 'normal', 0, 2),
+                makePegAt(ox, oy, w, h, 0.18, 0.44, 'normal', 1, 0),
+                makePegAt(ox, oy, w, h, 0.38, 0.50, 'pink', 1, 1),
+                makePegAt(ox, oy, w, h, 0.62, 0.50, 'pink', 1, 2),
+                makePegAt(ox, oy, w, h, 0.82, 0.44, 'normal', 1, 3),
+                makePegAt(ox, oy, w, h, 0.28, 0.76, 'normal', 2, 0),
+                makePegAt(ox, oy, w, h, 0.50, 0.84, 'normal', 2, 1),
+                makePegAt(ox, oy, w, h, 0.72, 0.76, 'normal', 2, 2),
+            ];
+            pegs.forEach(p => { p.layoutRole = 'wheel_cup_light'; });
+            const specialSlots = [new SpecialSlot(ox + w * 0.30, oy + h * 0.70, ox + w * 0.70, oy + h * 0.70, 'wheel')];
+            return { pegs, specialSlots };
         },
     },
 };
@@ -682,6 +1096,172 @@ MODULE_DEFS.fusion_garden_module = {
     },
 };
 
+MODULE_DEFS.split_yoke_module = {
+    id: 'split_yoke_module',
+    name: '分叉轭',
+    icon: 'Y',
+    desc: '2x1 Y 字分流架，中心入口分成左右两路，并内置分裂槽。',
+    rarity: 'rare',
+    price: 85,
+    span: { cols: 2, rows: 1 },
+    shape: { footprint: 'yoke', entry: 'top-center', exit: 'split' },
+    build(ox, oy, w, h) {
+        const pegs = [
+            makePegAt(ox, oy, w, h, 0.50, 0.22, 'normal', 0, 2),
+            makePegAt(ox, oy, w, h, 0.34, 0.30, 'normal', 0, 1),
+            makePegAt(ox, oy, w, h, 0.66, 0.30, 'normal', 0, 3),
+            makePegAt(ox, oy, w, h, 0.38, 0.46, 'pink', 1, 1),
+            makePegAt(ox, oy, w, h, 0.62, 0.46, 'pink', 1, 3),
+            makePegAt(ox, oy, w, h, 0.20, 0.58, 'normal', 1, 0),
+            makePegAt(ox, oy, w, h, 0.80, 0.58, 'normal', 1, 4),
+            makePegAt(ox, oy, w, h, 0.25, 0.78, 'normal', 2, 0),
+            makePegAt(ox, oy, w, h, 0.75, 0.78, 'normal', 2, 4),
+            makePegAt(ox, oy, w, h, 0.50, 0.76, 'normal', 2, 2),
+        ];
+        pegs.forEach(p => { p.layoutRole = 'split_yoke'; });
+        const specialSlots = [new SpecialSlot(ox + w * 0.38, oy + h * 0.58, ox + w * 0.62, oy + h * 0.58, 'split')];
+        return { pegs, specialSlots };
+    },
+};
+
+MODULE_DEFS.hourglass_gate_module = {
+    id: 'hourglass_gate_module',
+    name: '沙漏门',
+    icon: '⌛',
+    desc: '1x2 上宽下窄再张开，先聚焦再分流，适合接奖励槽。',
+    rarity: 'rare',
+    price: 80,
+    span: { cols: 1, rows: 2 },
+    shape: { footprint: 'hourglass', entry: 'top', exit: 'split' },
+    build(ox, oy, w, h) {
+        const pegs = [
+            makePegAt(ox, oy, w, h, 0.25, 0.12, 'normal', 0, 0),
+            makePegAt(ox, oy, w, h, 0.75, 0.12, 'normal', 0, 2),
+            makePegAt(ox, oy, w, h, 0.50, 0.24, 'normal', 1, 1),
+            makePegAt(ox, oy, w, h, 0.38, 0.32, 'pink', 1, 0),
+            makePegAt(ox, oy, w, h, 0.62, 0.32, 'pink', 1, 2),
+            makePegAt(ox, oy, w, h, 0.50, 0.50, 'normal', 2, 1),
+            makePegAt(ox, oy, w, h, 0.34, 0.70, 'pink', 3, 0),
+            makePegAt(ox, oy, w, h, 0.66, 0.70, 'pink', 3, 2),
+            makePegAt(ox, oy, w, h, 0.50, 0.76, 'normal', 3, 1),
+            makePegAt(ox, oy, w, h, 0.22, 0.88, 'normal', 4, 0),
+            makePegAt(ox, oy, w, h, 0.78, 0.88, 'normal', 4, 2),
+        ];
+        pegs.forEach(p => { p.layoutRole = 'hourglass_gate'; });
+        return { pegs, specialSlots: [] };
+    },
+};
+
+MODULE_DEFS.crescent_bank_module = {
+    id: 'crescent_bank_module',
+    name: '月牙坡',
+    icon: ')',
+    desc: '2x1 弧形弹钉坡，强制横移后回中，适合修正偏航弹珠。',
+    rarity: 'rare',
+    price: 75,
+    span: { cols: 2, rows: 1 },
+    shape: { footprint: 'crescent', entry: 'top-left', exit: 'bottom-center' },
+    build(ox, oy, w, h) {
+        const pegs = [
+            makePegAt(ox, oy, w, h, 0.18, 0.28, 'normal', 0, 0),
+            makePegAt(ox, oy, w, h, 0.32, 0.18, 'pink', 0, 1),
+            makePegAt(ox, oy, w, h, 0.50, 0.22, 'pink', 0, 2),
+            makePegAt(ox, oy, w, h, 0.66, 0.38, 'pink', 1, 3),
+            makePegAt(ox, oy, w, h, 0.24, 0.48, 'normal', 1, 1),
+            makePegAt(ox, oy, w, h, 0.50, 0.52, 'normal', 2, 2),
+            makePegAt(ox, oy, w, h, 0.76, 0.62, 'pink', 2, 4),
+            makePegAt(ox, oy, w, h, 0.72, 0.78, 'normal', 3, 4),
+            makePegAt(ox, oy, w, h, 0.62, 0.82, 'normal', 3, 3),
+            makePegAt(ox, oy, w, h, 0.40, 0.78, 'normal', 3, 2),
+        ];
+        pegs.forEach(p => { p.layoutRole = 'crescent_bank'; });
+        return { pegs, specialSlots: [] };
+    },
+};
+
+MODULE_DEFS.spiral_return_module = {
+    id: 'spiral_return_module',
+    name: '螺旋回廊',
+    icon: 'S',
+    desc: '2x2 高占位回收件，外圈弹钉包住回溯槽，给漏球第二次机会。',
+    rarity: 'epic',
+    price: 115,
+    span: { cols: 2, rows: 2 },
+    shape: { footprint: 'spiral', entry: 'top', exit: 'recall' },
+    build(ox, oy, w, h) {
+        const anchors = [
+            [0.24, 0.18, 'pink'], [0.54, 0.16, 'normal'], [0.78, 0.28, 'pink'],
+            [0.48, 0.30, 'normal'], [0.82, 0.56, 'pink'], [0.72, 0.62, 'normal'],
+            [0.62, 0.78, 'normal'], [0.48, 0.66, 'normal'], [0.34, 0.78, 'pink'],
+            [0.18, 0.58, 'pink'], [0.26, 0.48, 'normal'], [0.34, 0.40, 'normal'], [0.58, 0.44, 'normal'],
+        ];
+        const pegs = anchors.map(([px, py, type], i) => {
+            const peg = makePegAt(ox, oy, w, h, px, py, type, Math.floor(i / 3), i % 3);
+            peg.layoutRole = 'spiral_return';
+            return peg;
+        });
+        const specialSlots = [new SpecialSlot(ox + w * 0.36, oy + h * 0.56, ox + w * 0.62, oy + h * 0.56, 'recall')];
+        return { pegs, specialSlots };
+    },
+};
+
+MODULE_DEFS.prism_splitter_module = {
+    id: 'prism_splitter_module',
+    name: '棱镜分光器',
+    icon: 'P',
+    desc: '三射线固定属性组件，少量属性钉配合分流路线。',
+    rarity: 'epic',
+    price: 90,
+    shape: { footprint: 'prism', entry: 'top', exit: 'split' },
+    build(ox, oy, w, h) {
+        const pegs = [
+            makePegAt(ox, oy, w, h, 0.50, 0.18, 'scatter', 0, 1),
+            makePegAt(ox, oy, w, h, 0.28, 0.44, 'cryo', 1, 0),
+            makePegAt(ox, oy, w, h, 0.50, 0.42, 'normal', 1, 1),
+            makePegAt(ox, oy, w, h, 0.72, 0.44, 'pyro', 1, 2),
+            makePegAt(ox, oy, w, h, 0.24, 0.62, 'normal', 2, 0),
+            makePegAt(ox, oy, w, h, 0.76, 0.62, 'normal', 2, 2),
+            makePegAt(ox, oy, w, h, 0.38, 0.70, 'normal', 2, 0),
+            makePegAt(ox, oy, w, h, 0.62, 0.70, 'normal', 2, 2),
+            makePegAt(ox, oy, w, h, 0.50, 0.86, 'damage', 3, 1),
+        ];
+        markFusionFocus(pegs.filter(p => p.type === 'normal'), ox, oy, w, h, 2);
+        return { pegs, specialSlots: [] };
+    },
+};
+
+MODULE_DEFS.twin_wheel_bridge_module = {
+    id: 'twin_wheel_bridge_module',
+    name: '双轮桥',
+    icon: 'B',
+    desc: '3x1 大型横桥，两个轮盘槽夹住中央导流，峰值高但占位大。',
+    rarity: 'legendary',
+    price: 145,
+    span: { cols: 3, rows: 1 },
+    shape: { footprint: 'bridge', entry: 'top', exit: 'wheel' },
+    build(ox, oy, w, h) {
+        const pegs = [
+            makePegAt(ox, oy, w, h, 0.22, 0.46, 'normal', 1, 1),
+            makePegAt(ox, oy, w, h, 0.14, 0.76, 'normal', 2, 0),
+            makePegAt(ox, oy, w, h, 0.28, 0.76, 'normal', 2, 1),
+            makePegAt(ox, oy, w, h, 0.72, 0.76, 'normal', 2, 4),
+            makePegAt(ox, oy, w, h, 0.86, 0.76, 'normal', 2, 5),
+            makePegAt(ox, oy, w, h, 0.38, 0.30, 'pink', 0, 2),
+            makePegAt(ox, oy, w, h, 0.50, 0.24, 'normal', 0, 3),
+            makePegAt(ox, oy, w, h, 0.50, 0.50, 'normal', 1, 3),
+            makePegAt(ox, oy, w, h, 0.50, 0.74, 'normal', 2, 3),
+            makePegAt(ox, oy, w, h, 0.62, 0.30, 'pink', 0, 4),
+            makePegAt(ox, oy, w, h, 0.78, 0.46, 'normal', 1, 5),
+        ];
+        pegs.forEach(p => { p.layoutRole = 'twin_wheel_bridge'; });
+        const specialSlots = [
+            new SpecialSlot(ox + w * 0.14, oy + h * 0.76, ox + w * 0.28, oy + h * 0.76, 'wheel'),
+            new SpecialSlot(ox + w * 0.72, oy + h * 0.76, ox + w * 0.86, oy + h * 0.76, 'wheel'),
+        ];
+        return { pegs, specialSlots };
+    },
+};
+
 export const ATTR_PIN_TYPES = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'wind'];
 const ATTR_PIN_META = {
     bounce: { name: '彈性釘板', icon: '🔵' },
@@ -710,19 +1290,50 @@ ATTR_PIN_TYPES.forEach(type => {
     };
 });
 
+// @perf-impact: Full initial 2x5 pinboard raises default Peg/SpecialSlot count; Peg shadow/halo cost remains gated by CONFIG.performance.
 const DEFAULT_MODULE_SEQUENCE = [
-    'dense_stagger', 'rune_lattice', 'dense_stagger', 'bouncer',
-    'std_stagger', 'dense_stagger', 'rune_lattice', 'dense_stagger',
-    'bouncer', 'std_stagger', 'dense_stagger', 'rune_lattice',
+    'guide_fin_left', 'split_lattice_bridge', 'multicast_gate_light', 'guide_fin_right',
+    'recall_loop_light', 'bounce_chamber', 'crucible_seed', 'catcher_cup', 'wheel_cup_light',
+    'split_gate_light', 'rune_lattice_light',
+    'funnel', 'cryo_pyro_pair', 'sparse_module', 'mirror_module', 'wide_narrow_module',
 ];
 
 export function createDefaultModuleLayout(totalSlots, activeSlots = CONFIG.gameplay.moduleDefaultSlots || 3) {
     const count = Math.max(0, totalSlots || DEFAULT_MODULE_SEQUENCE.length);
     const activeCount = Math.max(0, Math.min(activeSlots || 0, count));
-    return Array.from({ length: count }, (_, i) => {
-        if (i >= activeCount) return null;
-        return createModuleInstance(DEFAULT_MODULE_SEQUENCE[i % DEFAULT_MODULE_SEQUENCE.length]);
-    });
+    const layout = Array.from({ length: count }, () => null);
+    const activeSlotIds = getActiveModuleSlots(activeCount, count);
+    const activeSet = new Set(activeSlotIds);
+    const occupied = new Set();
+    let orderIdx = 0;
+    for (const slotIdx of activeSlotIds) {
+        if (occupied.has(slotIdx)) continue;
+        let placed = false;
+        for (let attempts = 0; attempts < DEFAULT_MODULE_SEQUENCE.length; attempts++) {
+            const moduleId = DEFAULT_MODULE_SEQUENCE[orderIdx % DEFAULT_MODULE_SEQUENCE.length];
+            orderIdx++;
+            const span = getModuleSpan(moduleId);
+            const covered = getCoveredSlots(
+                slotIdx,
+                span,
+                CONFIG.gameplay.moduleCols || 5,
+                CONFIG.gameplay.moduleRows || 3
+            );
+            if (!covered || covered.some(ci => !activeSet.has(ci) || occupied.has(ci) || ci >= count)) continue;
+            layout[slotIdx] = createModuleInstance(moduleId);
+            for (const ci of covered) {
+                occupied.add(ci);
+                if (ci !== slotIdx) layout[ci] = createModuleRef(slotIdx);
+            }
+            placed = true;
+            break;
+        }
+        if (!placed) {
+            layout[slotIdx] = createModuleInstance('dense_stagger');
+            occupied.add(slotIdx);
+        }
+    }
+    return layout;
 }
 
 /**
@@ -800,6 +1411,7 @@ export function buildModuleEntities(moduleEntry, originX, originY, width, height
         return { pegs: [], specialSlots: [] };
     }
     const result = def.build(originX, originY, width, height, ctx, slotIdx);
+    addModuleSeamPegs(result.pegs, originX, originY, width, height, moduleId);
     applyModulePegStates(result.pegs, ctx, getModuleInstance(moduleEntry));
     return result;
 }
@@ -842,6 +1454,21 @@ export function getModuleSpan(moduleId) {
         return { cols: def.span.cols || 1, rows: def.span.rows || 1 };
     }
     return { cols: 1, rows: 1 };
+}
+
+export function getModuleMetaSummary(moduleId) {
+    const def = MODULE_DEFS[moduleId];
+    if (!def) return '';
+    const span = getModuleSpan(moduleId);
+    const parts = [];
+    if (span.cols > 1 || span.rows > 1) parts.push(`${span.cols}x${span.rows}`);
+    if (def.shape) {
+        const entry = def.shape.entry ? `入口:${def.shape.entry}` : '';
+        const exit = def.shape.exit ? `出口:${def.shape.exit}` : '';
+        if (entry || exit) parts.push([entry, exit].filter(Boolean).join(' / '));
+    }
+    if (def.rarity) parts.push(def.rarity);
+    return parts.join(' · ');
 }
 
 /**

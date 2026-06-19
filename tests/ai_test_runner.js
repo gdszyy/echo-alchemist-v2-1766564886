@@ -8,7 +8,7 @@
  *   - 支持 --suite 参数指定运行特定套件，默认运行全部
  *
  * 用法：
- *   node tests/ai_test_runner.js [--url http://localhost:3000] [--suite relic|essence|runeword|enemy|smoke]
+ *   node tests/ai_test_runner.js [--url http://localhost:3000] [--suite relic|essence|runeword|enemy|smoke|overlay|pinboard]
  *
  * 依赖：
  *   npm install puppeteer  （或 pnpm add puppeteer）
@@ -370,6 +370,272 @@ async function suiteEnemy(page) {
 
 // ─── 主流程 ───────────────────────────────────────────────────────────────────
 
+async function suiteOverlay(page) {
+    await enterTrainingGround(page);
+
+    await runTest('overlay: rune launcher preserves fate selection state', async () => {
+        await page.evaluate(() => {
+            game.phase_switchPhase('selection');
+            game.selectionMode = 'pure_essence';
+            game.fateMomentContext = { active: true, type: 'pure_essence', source: 'overlay_suite', round: game.round || 1 };
+            game.selectionPreviewState = null;
+            game.ui_updateUI();
+            game.ui_openRuneLauncher();
+        });
+        await page.waitForFunction(() => {
+            const panel = document.getElementById('phase-rune-launcher');
+            return panel && window.getComputedStyle(panel).display !== 'none';
+        }, { timeout: 5000 });
+        await page.evaluate(() => game.ui_closeRuneLauncher());
+        const state = await page.evaluate(() => ({
+            phase: game.currentPhase,
+            selectionMode: game.selectionMode,
+            fateActive: !!(game.fateMomentContext && game.fateMomentContext.active),
+            launcherVisible: (() => {
+                const panel = document.getElementById('phase-rune-launcher');
+                return panel && window.getComputedStyle(panel).display !== 'none' && !document.body.classList.contains('pc-mode');
+            })(),
+        }));
+        assert(state.phase === 'selection', `phase should stay selection, got ${state.phase}`);
+        assert(state.selectionMode === 'pure_essence', `selectionMode should stay pure_essence, got ${state.selectionMode}`);
+        assert(state.fateActive, 'fateMomentContext.active should stay true');
+        assert(!state.launcherVisible, 'mobile rune launcher should be hidden after close');
+    });
+
+    await runTest('overlay: relic selection returns to fate selection state', async () => {
+        await page.evaluate(() => {
+            game.phase_switchPhase('selection');
+            game.selectionMode = 'chaos_essence';
+            game.fateMomentContext = { active: true, type: 'chaos_essence', source: 'overlay_suite', round: game.round || 1 };
+            game.relicOverlayReturnState = { phase: 'selection' };
+            game.ui_showRelicSelection({ resumeTarget: 'selection', source: 'overlay_suite', showAllRelics: true });
+        });
+        await page.waitForFunction(() => {
+            const overlay = document.getElementById('phase-relic');
+            return overlay && window.getComputedStyle(overlay).display !== 'none';
+        }, { timeout: 5000 });
+        await page.evaluate(() => game.ui_closeRelicSelection());
+        const state = await page.evaluate(() => ({
+            phase: game.currentPhase,
+            selectionMode: game.selectionMode,
+            fateActive: !!(game.fateMomentContext && game.fateMomentContext.active),
+            returnState: game.relicOverlayReturnState,
+        }));
+        assert(state.phase === 'selection', `phase should return to selection, got ${state.phase}`);
+        assert(state.selectionMode === 'chaos_essence', `selectionMode should stay chaos_essence, got ${state.selectionMode}`);
+        assert(state.fateActive, 'fateMomentContext.active should stay true');
+        assert(state.returnState === null, 'relicOverlayReturnState should be cleared');
+    });
+
+    await runTest('overlay: truth book returns to fate selection state', async () => {
+        await page.evaluate(() => {
+            game.phase_switchPhase('selection');
+            game.selectionMode = 'pure_essence';
+            game.fateMomentContext = { active: true, type: 'pure_essence', source: 'overlay_suite_truth_book', round: game.round || 1 };
+            game.ui_openTruthBook();
+        });
+        await page.waitForFunction(() => {
+            const panel = document.getElementById('phase-truth-book');
+            return panel && window.getComputedStyle(panel).display !== 'none';
+        }, { timeout: 5000 });
+        await page.evaluate(() => game.ui_closeTruthBook());
+        const state = await page.evaluate(() => ({
+            phase: game.currentPhase,
+            selectionMode: game.selectionMode,
+            fateActive: !!(game.fateMomentContext && game.fateMomentContext.active),
+            fateType: game.fateMomentContext && game.fateMomentContext.type,
+            returnState: game.truthBookReturnState,
+        }));
+        assert(state.phase === 'selection', `truth book should return to selection, got ${state.phase}`);
+        assert(state.selectionMode === 'pure_essence', `selectionMode should stay pure_essence, got ${state.selectionMode}`);
+        assert(state.fateActive && state.fateType === 'pure_essence', 'fateMomentContext should be restored');
+        assert(state.returnState === null, 'truthBookReturnState should be cleared');
+    });
+
+    await runTest('overlay: shop relic picker returns to shop', async () => {
+        await page.evaluate(() => {
+            game.meta_openShop();
+            game.relicOverlayReturnState = { phase: 'shop' };
+            game.ui_showRelicSelection({ resumeTarget: 'shop', source: 'debug_pick_any_relic', showAllRelics: true });
+        });
+        await page.waitForFunction(() => {
+            const overlay = document.getElementById('phase-relic');
+            return overlay && window.getComputedStyle(overlay).display !== 'none';
+        }, { timeout: 5000 });
+        await page.evaluate(() => game.ui_closeRelicSelection());
+        const state = await page.evaluate(() => ({
+            phase: game.currentPhase,
+            shopVisible: (() => {
+                const panel = document.getElementById('phase-shop');
+                return panel && window.getComputedStyle(panel).display !== 'none';
+            })(),
+            returnState: game.relicOverlayReturnState,
+        }));
+        assert(state.phase === 'shop', `phase should return to shop, got ${state.phase}`);
+        assert(state.shopVisible, 'shop panel should remain visible');
+        assert(state.returnState === null, 'relicOverlayReturnState should be cleared');
+    });
+
+    await runTest('overlay: round-start relic picker resumes resolver', async () => {
+        await page.evaluate(() => {
+            game.__overlaySuiteResolverResumed = false;
+            game.__overlaySuiteOriginalResolver = game.sys_continueRoundStartResolver;
+            game.sys_continueRoundStartResolver = () => {
+                game.__overlaySuiteResolverResumed = true;
+            };
+            game.phase_switchPhase('gathering');
+            game.relicOverlayReturnState = { phase: 'round_start_resolver' };
+            game.ui_showRelicSelection({ resumeTarget: 'round_start_resolver', source: 'overlay_suite', showAllRelics: true });
+        });
+        await page.waitForFunction(() => {
+            const overlay = document.getElementById('phase-relic');
+            return overlay && window.getComputedStyle(overlay).display !== 'none';
+        }, { timeout: 5000 });
+        await page.evaluate(() => game.ui_closeRelicSelection());
+        const state = await page.evaluate(() => {
+            const resumed = game.__overlaySuiteResolverResumed === true;
+            game.sys_continueRoundStartResolver = game.__overlaySuiteOriginalResolver;
+            delete game.__overlaySuiteOriginalResolver;
+            delete game.__overlaySuiteResolverResumed;
+            return {
+                resumed,
+                returnState: game.relicOverlayReturnState,
+            };
+        });
+        assert(state.resumed, 'ui_closeRelicSelection should call sys_continueRoundStartResolver');
+        assert(state.returnState === null, 'relicOverlayReturnState should be cleared');
+    });
+}
+
+async function setupPinboardEditor(page) {
+    await page.evaluate(() => {
+        if (typeof game._moduleEditor_closePicker === 'function') game._moduleEditor_closePicker();
+        const oldLayer = document.getElementById('module-editor-layer');
+        if (oldLayer) oldLayer.remove();
+        game.sys_resetGame();
+        game.phase_startGatheringPhase();
+    });
+    await page.waitForFunction(() => {
+        const layer = document.getElementById('module-editor-layer');
+        return !!(game && game._moduleEditorActive && layer && window.getComputedStyle(layer).display !== 'none');
+    }, { timeout: 5000 });
+}
+
+async function suitePinboard(page) {
+    await runTest('pinboard: module editor opens with controls', async () => {
+        await setupPinboardEditor(page);
+        const state = await page.evaluate(() => ({
+            active: !!game._moduleEditorActive,
+            hasLayer: !!document.getElementById('module-editor-layer'),
+            hasStart: !!document.getElementById('me-start-btn'),
+            slotRects: typeof game._moduleEditor_getSlotRects === 'function' ? game._moduleEditor_getSlotRects().length : 0,
+        }));
+        assert(state.active, 'module editor should be active');
+        assert(state.hasLayer && state.hasStart, 'module editor controls should be mounted');
+        assert(state.slotRects > 0, 'module editor should expose editable slot rects');
+    });
+
+    await runTest('pinboard: start collection blocks invalid empty slot', async () => {
+        await setupPinboardEditor(page);
+        await page.evaluate(() => {
+            const rects = game._moduleEditor_getSlotRects();
+            const target = rects[0] && rects[0].idx;
+            if (Number.isInteger(target)) {
+                game.currentModuleLayout[target] = null;
+                game.ui_renderModuleEditorControls();
+            }
+        });
+        await page.click('#me-start-btn');
+        await page.waitForFunction(() => !!document.getElementById('me-editor-alert'), { timeout: 5000 });
+        const state = await page.evaluate(() => {
+            const alert = document.getElementById('me-editor-alert');
+            return {
+                active: !!game._moduleEditorActive,
+                alertText: alert ? alert.textContent : '',
+            };
+        });
+        assert(state.active, 'module editor should stay open after invalid start');
+        assert(state.alertText.length > 0, 'invalid start should show editor alert');
+    });
+
+    await runTest('pinboard: module picker shows disabled placement reason', async () => {
+        await setupPinboardEditor(page);
+        await page.evaluate(() => {
+            game.ownedModuleComponents = [
+                ...(game.ownedModuleComponents || []),
+                { id: 'twin_wheel_bridge_module', uid: 'pinboard_suite_wide_bridge' },
+            ];
+            const rects = game._moduleEditor_getSlotRects();
+            const target = rects[rects.length - 1] && rects[rects.length - 1].idx;
+            game._moduleEditor_openPicker(target);
+        });
+        await page.waitForSelector('#me-picker-backdrop', { timeout: 5000 });
+        const state = await page.evaluate(() => {
+            const item = document.querySelector('[data-module-id="twin_wheel_bridge_module"]');
+            return {
+                hasItem: !!item,
+                placementOk: item ? item.dataset.placementOk : null,
+                reason: item ? (item.dataset.placementReason || item.getAttribute('title') || '') : '',
+            };
+        });
+        assert(state.hasItem, 'wide module should appear in picker inventory');
+        assert(state.placementOk === 'false', 'wide module should be disabled at edge slot');
+        assert(state.reason.length > 0, 'disabled module should expose placement reason');
+    });
+
+    await runTest('pinboard: rune fusion preview and confirm update summary', async () => {
+        await setupPinboardEditor(page);
+        await page.evaluate(() => {
+            game._moduleEditor_closePicker();
+            game.runeInventory = [{ id: 'rune_pyro_1', level: 1, uid: 'pinboard_suite_pyro' }];
+            game.pendingFusions = [];
+            game.ui_renderModuleEditorControls();
+            game._moduleEditor_openRunePicker();
+        });
+        await page.waitForSelector('#me-rune-picker-backdrop', { timeout: 5000 });
+        await page.click('[data-rune-idx="0"]');
+        await page.waitForFunction(() => {
+            const confirm = document.getElementById('me-rune-confirm');
+            return confirm && !confirm.disabled && !!game._moduleEditorRunePreview;
+        }, { timeout: 5000 });
+        const preview = await page.evaluate(() => ({
+            hasPreview: !!game._moduleEditorRunePreview,
+            targetText: document.getElementById('me-rune-preview-text')?.textContent || '',
+            chainText: document.getElementById('me-rune-chain-text')?.textContent || '',
+        }));
+        assert(preview.hasPreview, 'selecting a rune should create fusion preview');
+        assert(preview.targetText.length > 0, 'fusion preview should show target count');
+        assert(preview.chainText.length > 0, 'fusion preview should show launcher/runeword hints');
+
+        await page.click('#me-rune-confirm');
+        await page.waitForFunction(() => !document.getElementById('me-rune-picker-backdrop'), { timeout: 5000 });
+        const after = await page.evaluate(() => ({
+            pendingCount: (game.pendingFusions || []).length,
+            runeCount: (game.runeInventory || []).length,
+            summaryText: document.getElementById('module-editor-layer')?.textContent || '',
+        }));
+        assert(after.pendingCount >= 1, 'confirming rune fusion should append pendingFusions');
+        assert(after.runeCount === 0, 'confirming rune fusion should consume rune inventory entry');
+        assert(after.summaryText.length > 0, 'module editor should re-render after fusion');
+    });
+
+    await runTest('pinboard: valid start closes editor', async () => {
+        await page.evaluate(() => {
+            game.sys_resetGame();
+            game.phase_startGatheringPhase();
+        });
+        await page.waitForFunction(() => !!document.getElementById('module-editor-layer'), { timeout: 5000 });
+        await page.click('#me-start-btn');
+        await page.waitForFunction(() => !document.getElementById('module-editor-layer'), { timeout: 5000 });
+        const state = await page.evaluate(() => ({
+            active: !!game._moduleEditorActive,
+            phase: game.currentPhase,
+        }));
+        assert(!state.active, 'module editor should be inactive after valid start');
+        assert(state.phase === 'gathering', `phase should stay gathering, got ${state.phase}`);
+    });
+}
+
 (async () => {
     console.log('═══════════════════════════════════════════════════');
     console.log('  Echo Alchemist v2 — AI 自动化测试');
@@ -408,6 +674,8 @@ async function suiteEnemy(page) {
         await runSuite('essence',  suiteEssence,  page);
         await runSuite('runeword', suiteRuneword, page);
         await runSuite('enemy',    suiteEnemy,    page);
+        await runSuite('overlay',  suiteOverlay,  page);
+        await runSuite('pinboard', suitePinboard, page);
 
     } catch (e) {
         console.error(`\n[致命错误] ${e.message}`);

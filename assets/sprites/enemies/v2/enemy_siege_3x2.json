@@ -1,16 +1,23 @@
 {
   "frameSize": 128,
-  "placeholder": true,
+  "frameWidth": 128,
+  "frameHeight": 128,
+  "placeholder": false,
+  "generated": "procedural_bitmap_v2_2026_06_19",
   "animations": {
     "idle": {
       "row": 0,
       "frames": 4,
-      "fps": 6
+      "fps": 6,
+      "frameWidth": 128,
+      "frameHeight": 128
     },
     "hit": {
       "row": 1,
       "frames": 2,
-      "fps": 12
+      "fps": 12,
+      "frameWidth": 128,
+      "frameHeight": 128
     }
   }
 }

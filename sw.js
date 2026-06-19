@@ -14,7 +14,7 @@
  * 或在 DevTools → Application → Service Workers 里 Unregister。
  */
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v20260619-bitmap3';
 const ASSET_CACHE = `echo-alchemist-assets-${CACHE_VERSION}`;
 const CORE_CACHE = `echo-alchemist-core-${CACHE_VERSION}`;
 

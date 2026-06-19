@@ -54,6 +54,8 @@ node tests/ai_test_runner.js --suite relic    # 遗物系统
 node tests/ai_test_runner.js --suite essence  # 精华系统
 node tests/ai_test_runner.js --suite runeword # 符文词条
 node tests/ai_test_runner.js --suite enemy    # 敌人词条
+node tests/ai_test_runner.js --suite overlay  # Overlay 返回链路
+node tests/ai_test_runner.js --suite pinboard # 钉板编辑闭环
 ```
 
 **无头模式（CI 环境）：**

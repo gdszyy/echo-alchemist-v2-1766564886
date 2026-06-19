@@ -367,6 +367,15 @@ const CONFIG = {
         gravity: 0.30,      // 重力加速度
         friction: 0.99,     // 空气阻力
         elasticity: 0.89,    // 墙壁/钉子反弹系数
+        tiltSmoothing: 0.11,
+        tiltDragSensitivity: 0.008,
+        tiltHoverInfluence: 0.45,
+        tiltGripRadius: 72,
+        tiltGravityScale: 0.105,
+        tiltVerticalGravityScale: 0.035,
+        tiltDeadzone: 0.025,
+        tiltBoostPeak: 1.35,
+        tiltBoostDecay: 0.025,
         marbleRadius: 5.8,   // Collection marble radius; smaller balls make the pinboard feel less sparse.
         pegRadius: 4.0,      // Collection peg collision radius; kept fine to support denser module layouts.
         maxMarbleSizeBonus: 1.6, // Size-up relic increment; smaller than before to preserve dense-board passability.
@@ -772,17 +781,22 @@ const CONFIG = {
         initTriggerThreshold: 15,
         nextTriggerThresholdIncrease: 8,
         // ==================== [v2 钉板模块化] 模块网格 ====================
-        moduleCols: 4,                 // 模块网格列数
-        moduleRows: 3,                 // 模块网格行数（共 12 槽）
-        moduleDefaultSlots: 3,         // 默认开放的模块槽位数（初始 3 个组件，后续通过局内商店扩展）
+        moduleCols: 5,                 // 模块网格列数（奇数列，保证初始钉盘中轴居中）
+        moduleRows: 3,                 // 模块网格行数（共 15 槽）
+        moduleDefaultSlots: 10,        // 默认开放的模块槽位数（初始 2x5 铺满，后续通过局内商店扩展第三行）
+        moduleInitialSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        moduleUnlockOrder: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 10, 14],
         moduleAreaTopY: 60,            // 模块区域起始 Y 坐标（画布顶部留白）
         moduleAreaBottomMargin: 80,    // 模块区域底部留白
-        moduleSpacingX: 4,             // 模块横向间距 px
-        moduleSpacingY: 4,             // 模块纵向间距 px
+        moduleSpacingX: 0,             // 模块横向间距 px；接缝由相邻模块边缘钉共同形成
+        moduleSpacingY: 0,             // 模块纵向间距 px；上下行边缘钉共同形成连续通道
         // 钉板左右两侧到画布墙的留白（每侧 1.5 个弹珠直径 = 1.5 × 2 × 7.7 ≈ 23 px）
         moduleAreaSideMargin: 23,
         // ==================== [v2 局内商店 + 符文碎片经济] ====================
-        runShopInterval: 2,            // 每 N 场战斗弹出一次局内商店
+        runShopInterval: 2,            // 每 N 个回合开始前出现一次可选局内商人入口（0 = 关闭周期入口）
+        runShopOfferAfterBoss: true,   // Boss 击败后的下一回合开始前强制出现一次商人入口
+        runShopMinFragmentsToOffer: 1, // 至少持有多少局内碎片才自动提示商人入口
+        runShopSkipRelicBonus: 12,     // 放弃遗物时补偿的局内碎片，避免空手进入商店
         runShopRefreshCost: 10,        // 刷新一次商店消耗碎片
         runShopItemsPerOffer: 5,       // 每次刷新提供的商品数
         runShopRunesRatio: 0.6,        // 商品中符文占比
@@ -918,6 +932,9 @@ const CONFIG = {
         hitImpactScaleX: 0.5,
         // Y 轴压缩系数（高度缩小倍率）
         hitImpactScaleY: 0.5,
+        // Hit flash is intentionally subtle so damage numbers stay readable.
+        hitFlashDuration: 2,
+        hitFlashMaxAlpha: 0.16,
 
         // E1: 随机静态倾斜（Static Tilt）
         // 最大静态倾斜弧度（约 ±2.5°），普通敌人使用，elite 乘 0.6，boss 为 0
@@ -1339,7 +1356,6 @@ const CONFIG = {
 // ==================== 钉盘结构遗物互斥集合 ====================
 // 所有影响钉盘结构（行数、布局形态）的遗物 ID，单局内只能选择其中一个
 // [v2 模块化] 行数/布局遗物保留作为 boardLayout 兼容入口（映射为预设模块组合），
-// 不影响新增的 module_slot_up / unlock_module_type 系列遗物（这些可叠加）。
 // [v2 模块化] 钉盘结构遗物已全部迁移为 pinboard_modules.js 中的模块；保留空集合以维持导出兼容。
 const BOARD_STRUCTURE_RELICS = new Set();
 
@@ -1699,69 +1715,6 @@ const RELIC_DB = [
         rarity: 'cursed',
         effect: 'greedy_wheel',
         maxStacks: 1
-    },
-    // ==================== [v2 钉板模块化] 新增遗物 ====================
-    // 模块槽位扩张
-    {
-        id: 'module_slot_expander',
-        name: '模塊擴張器',
-        icon: '⊞',
-        desc: '釘板模塊槽位 +1。槽位按 row-major 順序解鎖（從第 1 行向下展開）。',
-        rarity: 'rare',
-        effect: 'module_slot_up',
-        amount: 1,
-        maxStacks: 9
-    },
-    {
-        id: 'module_row_unlock',
-        name: '模塊整行解鎖',
-        icon: '═',
-        desc: '釘板模塊槽位一次性 +4（解鎖一整行）。',
-        rarity: 'legendary',
-        effect: 'module_slot_up',
-        amount: 4,
-        maxStacks: 2
-    },
-    // 模块组件获取：获得的是单个可拆装组件，不是无限模板解锁。
-    {
-        id: 'unlock_module_wheel',
-        name: '機械轉盤',
-        icon: '🎰',
-        desc: '獲得 1 個 [轉盤組件]：可安裝到釘板槽位，弹珠落入後觸發屬性翻倍輪盤。',
-        rarity: 'rare',
-        effect: 'unlock_module_type',
-        moduleId: 'wheel_module',
-        maxStacks: 3
-    },
-    {
-        id: 'unlock_module_baffle',
-        name: '能量擋板',
-        icon: '⫽',
-        desc: '獲得 1 個 [擋板組件]：傾斜的高彈性平面，將弹珠導向特定方向。',
-        rarity: 'rare',
-        effect: 'unlock_module_type',
-        moduleId: 'baffle',
-        maxStacks: 3
-    },
-    {
-        id: 'unlock_module_fixed_slot',
-        name: '固定機關槽',
-        icon: '◈',
-        desc: '獲得 1 個 [固定特殊槽組件]：在固定位置生成回溯/連射/分裂槽。',
-        rarity: 'epic',
-        effect: 'unlock_module_type',
-        moduleId: 'fixed_slot',
-        maxStacks: 3
-    },
-    {
-        id: 'unlock_module_element_pair',
-        name: '冰火元素對',
-        icon: '❄🔥',
-        desc: '獲得 1 個 [元素對組件]：固定生成 1 顆冰霜釘 + 1 顆火焰釘，無需融合。',
-        rarity: 'rare',
-        effect: 'unlock_module_type',
-        moduleId: 'cryo_pyro_pair',
-        maxStacks: 3
     },
 ];
 

@@ -1,8 +1,8 @@
 # Echo Alchemist V2 改造工程 TODO 清单
 
-**最后更新：** 2026年6月18日 | **状态：⏳ P0 交互优化推进中 · 掉落驱动闭环修复进行中 · 位图化视觉重构规划中**
+**最后更新：** 2026年6月19日 | **状态：⏳ P0 交互优化大盘已整理 · 阶段状态残留 / 大型基底生成节奏为下一优先级 · 位图化视觉重构规划中**
 
-> 当前 P0 交互优化拆解与验收清单见 [`docs/p0_interaction_optimization_todo.md`](docs/p0_interaction_optimization_todo.md)。该文档承接“先打磨现有机制、修 bug、再考虑减法”的最新执行优先级。
+> 当前完整优化 TODO、已完成项、下一轮 P0/P1/P2 优先级与验收清单见 [`docs/p0_interaction_optimization_todo.md`](docs/p0_interaction_optimization_todo.md)。该文档承接“先打磨现有机制、修 bug、再考虑减法”的最新执行优先级。
 
 ---
 
@@ -62,7 +62,7 @@
 | 2026-04-18 | 顶部栏与阶段语义一致性 | 已新增 `ui_isFateMomentPhase()`，并让 `ui_updateUI()`、阶段标题、顶部短标签统一通过该语义判断控制显示；命运时刻期间不再被 `selection` 的旧隐藏规则整体吞掉 | 该项已完成第一轮抽象收口，后续仅需视是否正式引入 `fate_moment` phase 再做深化 |
 | 2026-04-18 | 教程系统与命运时刻兼容性 | 教程进入弹珠选择的等待条件已补上“非命运时刻”过滤，避免 `PHASE_CHANGED -> selection` 在命运时刻期间误推进旧教程 | 主要误触发风险已收口，但 `phase: 'selection'` / `targetId: 'phase-selection'` 仍是后续深化抽象时的关注点 |
 | 2026-04-18 | 遗物 overlay 返回 resolver 链路 | `ui_closeRelicSelection()` 已能在 `returnState.phase === 'round_start_resolver'` 时回到 `sys_continueRoundStartResolver()`，在 `returnState.phase === 'selection'` 时恢复当前命运时刻界面 | 该链路当前已基本闭环，属于已验证通过项 |
-| 2026-04-18 | 继续游戏 / 新开局 / 游戏结束入口 | `sys_loadRunState()` 恢复后会重新进入 `sys_startRoundStartResolver()`；`meta_startRun()` 与 `_gameover_triggerPhase()` 也都先清除局内存档，再进入新局或结算 | 入口层没有发现重新跳回旧固定选择流程的问题，当前判断为通过 |
+| 2026-04-18 | 继续游戏 / 新开局 / 游戏结束入口 | `sys_loadRunState()` 会先判断存档是否来自 `selection` / 命运时刻；若是则恢复候选卡片、已选索引、注入符文和预览 UI，只有普通回合恢复才进入 `sys_startRoundStartResolver()`；`meta_startRun()` 与 `_gameover_triggerPhase()` 仍会先清除局内存档，再进入新局或结算 | 继续游戏不再把命运时刻误落回 resolver；静态契约已覆盖 |
 
 ## 改造工程总结
 
@@ -169,4 +169,18 @@ Phase C（Boss 专属）─── 依赖 Phase B 框架完成
 - [x] 大型基底专属外形：V2 基底轮廓美术已接入性能降级，low 档关闭 `screen` / 径向渐变但保留身份线面。
 - [x] 发射器下一发可读性：Canvas 发射器改为扇形弹丸展示散射、能量条展示连射、装填格展示属性构成；HUD/态势条同步显示主属性、散射弹数与连射次数。
 - [x] 技能栏层级：战斗技能栏改为紧凑两列工具组，显示当前 SP、技能成本、可用状态和禁用原因，减少首屏遮挡。
-- [ ] 下一步 P0：检查暂停、失败、回合结束时的视觉状态残留，并核对大型基底导演生成节奏。
+- [x] 阶段残留首轮收口：`ui_updateUI()` 离开 combat 后统一清理战斗态势外的配方 HUD、技能栏、伤害数字、符文充能和伤害统计抽屉；训练场仅保留态势面板。
+- [x] 暂停/放弃本局收口：暂停页现在真正冻结/恢复主循环；放弃本局统一清局内存档、运行态和临时 UI 后返回 meta。
+- [x] PC 侧栏残留收口：左右侧栏只在 gathering/combat/selection/training 显示，meta/shop/gameover 等阶段不保留常驻符文发射器或战斗侧栏。
+- [x] Gameover/meta 高层浮层收口：Boss 入场、混沌轮盘、遗物层、符文选择器、模块编辑器和终局 Toast 在结算/回首页/局外阶段主动清理。
+- [x] 大型基底预设波次首轮接入：新增 `src/wave_presets.js`，生成行优先尝试首批 V2 大型基底导演镜头，失败回退旧随机大型基底。
+- [x] 大型基底训练场入口：`enemy_v2` 分类新增 `ev2_wave_preset_spawn`，固定 Round 12 调用真实 preset 生成入口，便于后续调参复现。
+- [x] 大型基底 preset 静态校验：新增 `tests/validate_wave_presets.mjs`，检查 preset ID、尺寸/词条匹配、lane 放置、越界/重叠和单 preset 大型数量上限。
+- [x] 大型基底运行期生成模拟：新增 `tests/validate_enemy_spawn_runtime.mjs`，覆盖 preset 与旧随机大型基底回退路径，验证同屏上限、`gravityWell` 互斥、碰撞足迹和网格尺寸。
+- [x] 大型基底足迹契约校验：运行期脚本逐类验证 8 种 V2 基底的占格元数据、实际尺寸、专属词条、碰撞形状和关键初始化。
+- [x] 阶段/命运时刻静态契约校验：新增 `tests/validate_phase_contracts.mjs`，锁定 HUD 清理、terminal overlay 清理、暂停放弃统一入口、gameover 清浮层、命运时刻 active 标记、round-start relic 返回目标与继续游戏 selection 恢复。
+- [x] Overlay 浏览器回归套件：`tests/ai_test_runner.js` 新增 `--suite overlay`，覆盖符文发射器、遗物选择、真理之书、商店遗物选择与 round-start resolver 的真实打开/关闭返回链路。
+- [x] 真理之书返回语义收口：从命运时刻打开真理之书时记录并恢复原 `selectionMode` / `fateMomentContext`；从局外入口打开仍默认回 meta。
+- [x] 继续游戏恢复收口：`sys_saveRunState()` 已持久化 `phase`、`marblesPool`、`selectedMarbles`；`sys_loadRunState()` 对命运时刻/selection 存档优先恢复卡片 DOM、已选状态、注入符文与预览，避免落回 round-start resolver。
+- [x] 钉板编辑闭环浏览器脚本：`tests/ai_test_runner.js --suite pinboard` 覆盖编辑器打开、无效开始采集阻塞、模块禁用原因、符文融合预览/确认、有效开始采集关闭编辑器。
+- [ ] 下一步 P1：把钉板符文融合结果与发射器可用词条建立明确反馈链，并复查移动端长列表/底部安全区。

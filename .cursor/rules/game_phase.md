@@ -34,8 +34,10 @@ globs: ["src/game_phase.js"]
 
 ### 2.5 回合开始提示与充能特效 (Round Start Banner)
 - **触发时机**: `sys_startRoundStartResolver()` 的 `pendingRoundStartRewards` 队列为空时，调用 `sys_showRoundStartBanner()`。
-- **充能触发条件（新）**: 横幅结束后，先检查 `ammoQueue` 是否为空；**仅当 `ammoQueue` 为空时**，才从 `marbleQueue` 重新编译充能。若 `ammoQueue` 已有内容（如第一回合开局后已有子弹），则不重新充能，直接进入战斗。
+- **局内商店入口**: 在奖励队列清空后、`sys_showRoundStartBanner()` 之前，`sys_maybeOfferRunShopBeforeRoundStart()` 可按 `CONFIG.gameplay.runShopInterval` 或 Boss 后节奏显示一次可选局内商人入口。商店关闭或跳过后继续回合开始横幅，不能重新触发遗物/精华队列。
+- **充能触发条件**: 普通回合开始横幅不触发子弹充能；`_lastFiredAmmoSnapshot` / `marbleQueue` 只能在精华触发、跳过研磨、子弹替换等显式充能流程中作为弹药来源。
 - **实现**: 先调用 `phase_switchPhase('gathering')` 切换背景，然后显示 `#round-start-banner` 全屏大字提示（「第 X 回合開始」），持续约 1.5 秒后自动调用 `phase_startGatheringPhase()` 完成研磨阶段初始化。
+- **子弹队列边界（2026-06-19）**: `sys_showRoundStartBanner()` 只负责进入下一轮研磨阶段，普通回合开始时不得从 `_lastFiredAmmoSnapshot` 或 `marbleQueue` 重建 `ammoQueue`。这两个来源仅用于精华触发 / 子弹替换等显式充能流程，避免下一回合待发射子弹串成上一轮保留子弹或新生成候选弹珠。
 - **充能特效**: 同时为 `#pc-left-sidebar` 添加 CSS 动画类 `.ammo-panel-charging`（high/medium 档：边框光流扫过）或 `.ammo-panel-charging-simple`（low 档：简单淡入淡出）。
 - **性能门控**: 特效等级由 `CONFIG.performance[perfQualityLevel].roundStartBannerGlow` 控制（high/medium: `true`，low: `false`）。
 - **DOM 元素**: `#round-start-banner`（全屏覆盖层，z-index: 9500）、`#round-start-banner-text`（大字文本）。
@@ -49,11 +51,15 @@ globs: ["src/game_phase.js"]
 ### 2.2.1 模块化钉盘属性生成契约
 
 - **生成入口**：模块化钉盘由 `phase_gathering_initPachinko_v2()` 调用 `buildModuleEntities()` 构造各模块实体。
-- **默认钉盘**：缺失或长度不匹配的 `currentModuleLayout` 必须通过 `createDefaultModuleLayout(totalSlots, CONFIG.gameplay.moduleDefaultSlots)` 初始化；初始只开放 3 个组件，后续通过局内商店扩展槽位。
+- **默认钉盘**：缺失或长度不匹配的 `currentModuleLayout` 必须通过 `createDefaultModuleLayout(totalSlots, CONFIG.gameplay.moduleDefaultSlots)` 初始化；初始开放前两行 `2x5` 共 10 个组件，后续通过局内商店按 `moduleUnlockOrder` 扩展第三行槽位。
+- **居中解锁顺序**：模块化钉盘使用 `CONFIG.gameplay.moduleCols = 5` 与 `moduleUnlockOrder` 控制可编辑/可构建槽位。业务层与编辑器不得再假设“前 N 个 row-major 槽已解锁”；必须通过 `getActiveModuleSlots()` / `getActiveModuleSlotSet()` 获取激活槽。
+- **模块接缝**：`moduleSpacingX/Y` 默认为 `0`，首发模块通过边缘接缝钉与相邻模块共同组成连续通道；新增默认组件时必须考虑左右/上下相邻模块的边缘钉距，不能只在单模块内部看起来成立。
 - **组件实例**：`currentModuleLayout` 的管理单位是钉盘组件实例 `{ id, uid, pegStates, pluginStates }`；多格组件的非锚点槽位使用 `{ ref: anchorIdx }`。旧版字符串布局只允许在 `ensureModuleLayoutInstances()` 中兼容升级。
 - **组件库存**：可替换来源必须是 `ownedModuleComponents` 中的组件实例。商店或遗物获得组件时只能向该库存加入 1 个实例，禁止通过 `unlockedModuleTypes` 形成“解锁一次即可无限替换”的模板仓库。
-- **融合承载模块**：`rune_lattice` 是初始组件序列中的符文融合承载组件，`rune_focus_module` 是商店可购买的强化融合组件；二者通过 `fusionPriority` 标记影响符文注入落点。
-- **模块扩展池**：商店可出售的组件可组合现有 Peg / `SpecialSlot` 能力形成新玩法，如 `split_gate_module`（分裂槽）、`recall_loop_module`（召回槽）、`cascade_bank_module`（弹钉斜坡）、`crucible_core_module`（固定属性三角）、`double_wheel_module`（双轮盘）和 `fusion_garden_module`（2x1 融合承载）。
+- **融合承载模块**：初始盘使用 `rune_lattice_light` 作为轻量符文融合承载组件，`rune_lattice` / `rune_focus_module` 是后续可获得的强化融合组件；三者通过 `fusionPriority` 标记影响符文注入落点。
+- **模块扩展池**：商店可出售的组件可组合现有 Peg / `SpecialSlot` 能力形成新玩法，如 `split_gate_module`（分裂槽）、`recall_loop_module`（召回槽）、`cascade_bank_module`（弹钉斜坡）、`crucible_core_module`（固定属性三角）、`double_wheel_module`（双轮盘）、`fusion_garden_module`（2x1 融合承载）、`split_yoke_module`（Y 字分流）、`hourglass_gate_module`（1x2 聚焦/分流）、`crescent_bank_module`（2x1 横移导流）、`spiral_return_module`（2x2 回收）、`prism_splitter_module`（固定属性分光）和 `twin_wheel_bridge_module`（3x1 双轮盘横桥）。
+- **组件路线元数据**：组件可通过 `shape` 声明 `footprint`、`entry`、`exit`。该元数据只用于商店/编辑器说明与后续轻量轮廓绘制，不参与物理结算。
+- **编辑器轮廓**：`render_moduleEditorOverlay()` 会根据 `shape.footprint` 绘制轻量组件轮廓（导流翼、菱格、杯形、沙漏、螺旋、桥形等）。轮廓仅使用平面 `stroke` / 曲线，不得新增粒子、渐变或额外 `shadowBlur`。
 - **密度参数**：模块内部最小钉距由 `CONFIG.physics.pegRadius`、`CONFIG.physics.marbleRadius` 与 `CONFIG.physics.pinboardSpacingBuffer` 共同决定；不得在模块生成器里重新硬编码旧版大弹珠间距。
 - **权重来源**：模块生成普通钉子时必须读取当前 `game.unlockedWeights`，其中 `white` 映射为普通钉子权重，`bounce`、`pierce`、`scatter`、`damage`、`cryo`、`pyro`、`wind` 按权重生成对应属性钉子。
 - **禁止类型**：与旧版 `phase_gathering_getRandomPegType()` 保持一致，`laser` 与 `lightning` 不得作为钉子类型生成。
@@ -70,9 +76,9 @@ globs: ["src/game_phase.js"]
 
 ### 2.4 局内存档与刷新恢复
 - **存档时机**: `phase_finalizeRound()` 末尾，`round++` 之后、`sys_startRoundStartResolver()` 之前；此外，进入命运时刻阶段、切换弹珠选择、绑定纯净精华符文时，也应即时调用 `sys_saveRunState()`，避免刷新后丢失当前选择与注入上下文。
-- **存档内容**: round、score、enemies（含 Vec2 坐标）、pegs（type/level/frozenTurns）、ownedRelics、runeInventory、runeGrid、unlockedWeights、guaranteedNextRound、`pendingRoundStartRewards`、`pendingSelectionMode`、`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`、`selectionPreviewState`、`relicOverlayReturnState`、`fateMomentContext`、`replaceAmmoContext`（[tsk-668f3dba] 替换子弹阶段上下文）、`doubleAssimilationBoostRounds`、Boss 系统字段、难度字段、钉盘形态、技能、统计数据等。
+- **存档内容**: `phase`、round、score、enemies（含 Vec2 坐标）、pegs（type/level/frozenTurns）、ownedRelics、runeInventory、runeGrid、unlockedWeights、guaranteedNextRound、`pendingRoundStartRewards`、`pendingSelectionMode`、`selectionMode`、`selectionRequiredCount`、`marblesPool`、`selectedMarbles`、`selectionInjectedRune`、`selectionPreviewState`、`relicOverlayReturnState`、`fateMomentContext`、`replaceAmmoContext`（[tsk-668f3dba] 替换子弹阶段上下文）、`doubleAssimilationBoostRounds`、Boss 系统字段、难度字段、钉盘形态、`runFragments` / `runShopInventory` / `runShopRefreshes` / `_runShopOpenedRound`、技能、统计数据等。
 - **恢复入口**: Meta 页面「繼續上次游戲」按钮（`#meta-continue-btn`），调用 `meta_continueRun()`。
-- **恢复流程**: `sys_resetGame()` + `meta_applyUpgrades()` → 注入存档状态 → `phase_gathering_initPachinko(true)` 重建钉盘 → `sys_startRoundStartResolver()` 先结算待处理遗物/精华，再决定是否进入选牌阶段。
+- **恢复流程**: `sys_resetGame()` + `meta_applyUpgrades()` → 注入存档状态 → `phase_gathering_initPachinko(true)` 重建钉盘 → 若存档处于 `replaceAmmoContext.active`，直接恢复替换子弹 UI；若存档来自 `selection` / 命运时刻，必须重建候选卡片 DOM、恢复 `selectedMarbles` / `selectionInjectedRune` / 预览态并执行 `ui_refreshSelectionModeUI()`；只有普通回合恢复才进入 `sys_startRoundStartResolver()` 继续结算待处理遗物/精华。
 - **清档时机**: 游戏结束（`_gameover_triggerPhase`）或新开一局（`meta_startRun`）时自动清除。
 
 ## 3. 阶段转换规范
@@ -164,6 +170,7 @@ globs: ["src/game_phase.js"]
 **当前设计**：Boss 击杀后仍只掉落符文；固定回合遗物事件已移除。非 Boss 敌人可以在死亡时登记 `relic`、`chaos_essence` 或 `pure_essence` 到 `pendingRoundStartRewards`，并在下一回合开始由 `sys_startRoundStartResolver()` 统一结算。
 
 - 当 `pendingRoundStartRewards` 同时存在多个奖励时，resolver 必须显示“回合奖励 X/Y：奖励类型”的进度提示；单个奖励保持原有类型提示即可，避免 Toast 噪声。
+- 奖励队列清空后，局内商店只能作为可选构筑调整节点出现；`_runShopOpenedRound` 必须防止同一回合重复弹出。周期/Boss 后商人入口必须先确认当前货架至少有 1 件可购买商品，避免无购买力打断。放弃遗物进入商店时必须先发放 `runShopSkipRelicBonus`，避免玩家以遗物为代价进入空购买力商店。
 - `phase_finalizeRound()` 不再计算 `isRelicRound`，只负责存档并启动 round-start resolver。
 - `sys_initGameStart()` 的首个遗物也通过 `pendingRoundStartRewards` 进入统一流程，不再直接调用 `ui_showRelicSelection()`。
 - `ui_closeRelicSelection()` 在 `resumeTarget === 'round_start_resolver'` 时必须回到 `sys_continueRoundStartResolver()`，而不是默认进入 `selection`/`gathering`。

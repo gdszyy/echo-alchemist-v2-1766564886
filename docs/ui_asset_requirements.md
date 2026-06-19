@@ -101,10 +101,10 @@
 | ~~`assets/icons/ammo/ammo_venom.png`~~ | ✅ 已生成 | 32×32 | 毒绿色液滴 + 骷髅纹，对应 `AMMO_ICON_MAP.venom` |
 | ~~`assets/icons/ammo/ammo_overcharge.png`~~ | ✅ 已生成 | 32×32 | 金橙色能量弹 + 充能电弧纹，对应 `AMMO_ICON_MAP.overcharge` |
 | ~~`assets/icons/ammo/ammo_echo.png`~~ | ✅ 已生成 | 32×32 | 蓝紫色残影环绕弹，对应 `AMMO_ICON_MAP.echo` |
-| `assets/icons/rune/rune_venom_1.png` | 毒素符文 Lv1（待生成） | 48×48 | 毒液纹路，common 灰色外框 |
-| `assets/icons/rune/rune_venom_2.png` | 毒素符文 Lv2（待生成） | 48×48 | 毒液纹路加强，epic 紫色外框 |
-| `assets/icons/rune/rune_overcharge_1.png` | 超载符文 Lv1（待生成） | 48×48 | 充能纹路，epic 紫色外框 |
-| `assets/icons/rune/rune_echo_1.png` | 回响符文 Lv1（待生成） | 48×48 | 残影环绕纹路，rare 蓝色外框 |
+| ~~`assets/icons/rune/rune_venom_1.png`~~ | ✅ 已生成 | 48×48 | 毒液纹路，rare 蓝色外框 |
+| ~~`assets/icons/rune/rune_venom_2.png`~~ | ✅ 已生成 | 48×48 | 毒液纹路加强，epic 紫色外框 |
+| ~~`assets/icons/rune/rune_overcharge_1.png`~~ | ✅ 已生成 | 48×48 | 充能纹路，epic 紫色外框 |
+| ~~`assets/icons/rune/rune_echo_1.png`~~ | ✅ 已生成 | 48×48 | 残影环绕纹路，rare 蓝色外框 |
 
 ### 2.3 P2 — 锦上添花
 
@@ -333,3 +333,26 @@
 2. **诅咒系遗物边框**：`chaos_burst` / `chaos_pact` / `greedy_wheel` 的 `rarity: 'cursed'` 需要走 `relic_aura_cursed.png`；如果当前 RELIC_AURA 仅有 C/B/A/S 四档，需补充 cursed 配色（建议黑红血纹）。
 3. **存档兼容**：`chaosPactDamageMult` 已加入 `sys_saveRunState` / `sys_loadRunState`；旧存档读档时默认为 `1`，无破坏性。
 4. **图标 emoji fallback**：所有 v2 遗物的 emoji 均已在 `RELIC_DB` 内定义，位图缺失时不会阻塞 UI。
+## 7. 2026-06-19 Rune Launcher V2 Assets
+
+- `#phase-rune-launcher` now has a V2 bitmap set designed for the denser configuration / management / codex UI:
+  - `assets/ui/panels/rune_launcher_v2_raw.png`
+  - `assets/ui/panels/rune_launcher_v2_9s.png`
+  - `assets/ui/panels/rune_grid_v2_raw.png`
+  - `assets/ui/panels/rune_grid_v2_9s.png`
+  - `assets/ui/sprites/rune_info_plate_v2_raw.png`
+  - `assets/ui/sprites/rune_info_plate_v2_9s.png`
+- The V2 rules live in `src/styles/bitmap_ui.css` under `2026-06-19 Rune Launcher V2`; old rune slot sprites remain in use for the individual 3x3 cells.
+## 8. 2026-06-19 Combat Bottom Emitter V2 Assets
+
+- `#phase-combat` bottom bullet launcher now uses a V2 Canvas sprite set:
+  - `assets/ui/sprites/emitter_base_v2_raw.png`
+  - `assets/ui/sprites/emitter_base_v2_alpha_raw.png`
+  - `assets/ui/sprites/emitter_base_v2.png`
+  - `assets/ui/sprites/emitter_charge_v2_raw.png`
+  - `assets/ui/sprites/emitter_charge_v2_alpha_raw.png`
+  - `assets/ui/sprites/emitter_charge_v2.png`
+  - `assets/ui/sprites/emitter_charging_v2_0.png` through `emitter_charging_v2_5.png`
+- Runtime mapping lives in `src/bitmap_icons.js` via `EMITTER_BASE_SRC`, `EMITTER_CHARGING_SRCS`, `EMITTER_DRAW_SIZE`, and `EMITTER_PORT_OFFSET_Y`.
+- Rendering remains a bitmap-sprite replacement path in `render_combat_launcherEmitterBase()`; no new particle system or gradient loop was added.
+- 2026-06-19 V2.2 readout pass: `render_combat_launcherSignal()` now presents the next-shot preview as a centered launcher HUD: a visible bullet body with reused ammo icon core, `DMG` damage chip, scatter count (`S`) plus mini fan preview, multicast count (`xN`) plus burst columns, and colored load cells. No new bitmap asset is required; the core reuses `AMMO_ICON_MAP`.

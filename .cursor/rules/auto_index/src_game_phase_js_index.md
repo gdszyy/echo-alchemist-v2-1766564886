@@ -1,6 +1,6 @@
 # src\game_phase.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 3347 | 函数数: 24 | 语言: javascript
+> 自动生成于 2026-06-19 | 总行数: 3482 | 函数数: 25 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -11,6 +11,7 @@
 
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
+| drawModuleFootprintOutline | function | `drawModuleFootprintOutline(ctx, rect, footprint, color, pulse = 0)` |  |
 | phase_advanceWave | method | `phase_advanceWave()` |  |
 | phase_switchPhase | method | `phase_switchPhase(newPhase)` |  |
 | phase_startGatheringPhase | method | `phase_startGatheringPhase()` |  |

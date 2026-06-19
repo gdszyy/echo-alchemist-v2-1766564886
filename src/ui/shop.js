@@ -18,7 +18,6 @@ import { RUNE_DB } from '../rune_config.js';
 import { showToast } from '../entities.js';
 import { eventBus } from '../event_bus.js';
 import { getRelicIconSrc } from '../bitmap_icons.js'; // [Phase 5A Task 5.A7] 位图遗物图标
-import { addModuleComponentToInventory } from '../pinboard_modules.js';
 
 // ==================== [v2 即时感重塑] 子弹评分与属性操作辅助函数 ====================
 // 这些工具函数被 mirror_magazine / element_injector 调用以判定"最强/最弱"子弹与属性翻倍。
@@ -280,7 +279,8 @@ export const shop_system = {
             if (subtitleEl) subtitleEl.textContent = showAllRelics ? '选择任意遗物用于本轮测试' : '命運的饋贈，選擇一種力量';
             const skipBtn = document.getElementById('relic-skip-to-shop-btn');
             if (skipBtn) {
-                skipBtn.textContent = showAllRelics ? '返回商店' : '放棄遺物 → 進入局內商店';
+                const skipBonus = ((CONFIG.gameplay || {}).runShopSkipRelicBonus || 0);
+                skipBtn.textContent = showAllRelics ? '返回商店' : `放棄遺物 → +${skipBonus} 碎片并进商店`;
                 skipBtn.onclick = showAllRelics ? () => this.ui_closeRelicSelection() : () => this.ui_skipRelic();
             }
             overlay.style.display = 'flex';
@@ -346,21 +346,7 @@ export const shop_system = {
             this.selectionRequiredCount = newCap;
             if (window.showToast) showToast(`子彈持有上限 +${amount}（當前 ${newCap}）`);
         }
-        // ==================== [v2 钉板模块化] 新遗物分支 ====================
-        else if (relic.effect === 'module_slot_up') {
-            const cfg = (typeof CONFIG !== 'undefined' && CONFIG.gameplay) || {};
-            const totalSlots = (cfg.moduleCols || 4) * (cfg.moduleRows || 3);
-            const amount = (typeof relic.amount === 'number' && relic.amount > 0) ? relic.amount : 1;
-            this.unlockedModuleSlots = Math.min(totalSlots, (this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3) + amount);
-            if (window.showToast) showToast(`钉板模块槽位 +${amount}（当前 ${this.unlockedModuleSlots}/${totalSlots}）`);
-        }
-        else if (relic.effect === 'unlock_module_type') {
-            const moduleId = relic.moduleId;
-            if (moduleId) {
-                this.ownedModuleComponents = addModuleComponentToInventory(this.ownedModuleComponents, moduleId);
-                if (window.showToast) showToast(`获得钉板组件：${relic.name || moduleId}`);
-            }
-        } else if (relic.effect === 'row_count_up') {
+        else if (relic.effect === 'row_count_up') {
             this.currentRows = (this.currentRows || 0) + 2;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
             // [钉盘遗物] 立刻触发一次混沌精华
@@ -576,7 +562,12 @@ export const shop_system = {
      * 商店关闭后接续 round-start resolver，继续后续流程（精华奖励等）。
      */
     ui_skipRelic() {
-        if (window.showToast) showToast("放棄遗物，进入局内商店");
+        const skipBonus = ((CONFIG.gameplay || {}).runShopSkipRelicBonus || 0);
+        if (skipBonus > 0) {
+            this.runFragments = (this.runFragments || 0) + skipBonus;
+            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        }
+        if (window.showToast) showToast(skipBonus > 0 ? `放棄遗物，获得 ${skipBonus} 碎片` : "放棄遗物，进入局内商店");
         // 关闭遗物界面，但不进入下一阶段；改为打开商店
         const overlay = document.getElementById('phase-relic');
         if (overlay) {
@@ -608,7 +599,7 @@ export const shop_system = {
                     return;
                 }
                 if (typeof this.sys_initSelectionPhase === 'function') this.sys_initSelectionPhase();
-            });
+            }, { reason: 'skip_relic' });
         } else {
             // 兜底：商店未挂载时退回原行为
             this.ui_closeRelicSelection();
@@ -675,6 +666,12 @@ export const shop_system = {
             const total = (this.saveData && this.saveData.runeInventory ? this.saveData.runeInventory.length : 0);
             shopRuneCount.textContent = `${total}个符文`;
         }
+        const debugShopEnabled = CONFIG.debug === true
+            || this.debugMode === true
+            || (typeof localStorage !== 'undefined' && localStorage.getItem('echo_debug_shop') === '1');
+        if (this.meta_currentShopCategory === 'debug' && !debugShopEnabled) {
+            this.meta_currentShopCategory = 'attribute';
+        }
         
         // 1. 渲染分类标签
         const renderShopPreview = (upgrade, state, cardEl) => {
@@ -708,6 +705,7 @@ export const shop_system = {
         if (categoryContainer) {
             categoryContainer.innerHTML = '';
             for (let catId in META_SHOP_CONFIG.categories) {
+                if (catId === 'debug' && !debugShopEnabled) continue;
                 const cat = META_SHOP_CONFIG.categories[catId];
                 const isActive = this.meta_currentShopCategory === catId;
                 const btn = document.createElement('button');
@@ -724,7 +722,9 @@ export const shop_system = {
         // 2. 渲染升级项
         if (itemsContainer) {
             itemsContainer.innerHTML = '';
-            const upgrades = META_SHOP_CONFIG.upgrades.filter(u => u.category === this.meta_currentShopCategory);
+            const upgrades = META_SHOP_CONFIG.upgrades.filter(u =>
+                u.category === this.meta_currentShopCategory && (!u.debugOnly || debugShopEnabled)
+            );
             
             upgrades.forEach(upgrade => {
                 const isTemporary = upgrade.temporary || false;

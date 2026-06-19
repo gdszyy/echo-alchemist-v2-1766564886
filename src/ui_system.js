@@ -1,5 +1,5 @@
 import { eventBus, EVENT_TYPES } from './event_bus.js';
-import { RUNE_DB } from './rune_config.js';
+import { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY } from './rune_config.js';
 import { CONFIG, META_SHOP_CONFIG, RELIC_DB, setDeepValue } from './config.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
 import { getAmmoReadabilityProfile } from './utils/ammo_readability.js';
@@ -11,8 +11,11 @@ import {
     createDefaultModuleLayout,
     createModuleRef,
     ensureModuleLayoutInstances,
+    getActiveModuleSlots,
+    getActiveModuleSlotSet,
     getModuleInstance,
     getModuleIdFromEntry,
+    getModuleMetaSummary,
     isModuleRef,
     normalizeModuleInventory,
     selectFusionTargetPegs,
@@ -23,6 +26,25 @@ import { showToast } from './utils/math_utils.js';
 function _isCoarsePointerInput() {
     if (typeof window === 'undefined') return false;
     return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+}
+
+function _escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function _getRuneLevel(entry) {
+    return (entry && typeof entry === 'object' && typeof entry.level === 'number' && entry.level > 0)
+        ? entry.level
+        : 1;
+}
+
+function _getStatLabel(statKey) {
+    const meta = (STAT_DISPLAY || {})[statKey] || {};
+    return `${meta.icon || ''} ${meta.name || statKey}`.trim();
 }
 
 // ======================================================================
@@ -81,6 +103,51 @@ const ME_STYLES = `
     background: linear-gradient(0deg, rgba(8,12,24,0.94) 0%, rgba(8,12,24,0.6) 75%, rgba(8,12,24,0) 100%);
     box-sizing: border-box;
 }
+.me-fusion-summary {
+    position: absolute; left: 12px; right: 12px; bottom: 64px;
+    pointer-events: auto;
+    display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+    gap: 6px 8px;
+    padding: 7px 9px;
+    border: 1px solid rgba(167,139,250,0.24);
+    border-radius: 10px;
+    background: rgba(15,23,42,0.78);
+    box-shadow: 0 6px 20px rgba(2,6,23,0.26);
+}
+.me-fusion-label {
+    font-size: 10px; color: #c4b5fd; font-weight: 800; letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+.me-fusion-chip {
+    font-size: 11px; color: #e0f2fe; font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: rgba(30,41,59,0.82);
+    border: 1px solid rgba(125,211,252,0.26);
+}
+.me-fusion-note {
+    font-size: 10px; color: #94a3b8; line-height: 1.25;
+}
+.me-editor-alert {
+    position: absolute; left: 12px; right: 12px; bottom: 118px;
+    pointer-events: auto;
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 9px 10px;
+    border-radius: 10px;
+    background: rgba(127, 29, 29, 0.86);
+    border: 1px solid rgba(252, 165, 165, 0.38);
+    color: #fee2e2;
+    box-shadow: 0 8px 24px rgba(2, 6, 23, 0.32);
+}
+.me-editor-alert[data-type="info"] {
+    background: rgba(14, 116, 144, 0.84);
+    border-color: rgba(125, 211, 252, 0.38);
+    color: #e0f2fe;
+}
+.me-editor-alert__icon { font-size: 14px; line-height: 1.25; }
+.me-editor-alert__body { flex: 1; min-width: 0; }
+.me-editor-alert__title { font-size: 12px; font-weight: 800; line-height: 1.25; }
+.me-editor-alert__detail { margin-top: 2px; font-size: 10px; line-height: 1.35; color: rgba(255,255,255,0.72); }
 .me-btn {
     pointer-events: auto;
     border: none; cursor: pointer;
@@ -191,6 +258,7 @@ const ME_STYLES = `
 .me-rune-meta { flex: 1; }
 .me-rune-meta .me-picker-name { font-size: 13px; }
 .me-rune-lv { color: #a78bfa; font-size: 11px; }
+.me-rune-hints { color: #7dd3fc; }
 .me-rune-preview {
     position: sticky; bottom: -12px;
     margin: 10px -12px -12px; padding: 10px 12px;
@@ -198,6 +266,14 @@ const ME_STYLES = `
     background: rgba(15,23,42,0.96);
 }
 .me-rune-preview-text { font-size: 12px; color: #c4b5fd; line-height: 1.35; margin-bottom: 8px; }
+.me-rune-chain {
+    margin-bottom: 8px;
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: 11px; line-height: 1.35; color: #94a3b8;
+}
+.me-rune-chain strong { color: #e9d5ff; font-weight: 800; }
+.me-rune-chain .is-good { color: #86efac; }
+.me-rune-chain .is-hint { color: #7dd3fc; }
 .me-rune-confirm {
     width: 100%; padding: 11px 12px; border: none; border-radius: 10px;
     background: linear-gradient(135deg, #8b5cf6, #6d28d9);
@@ -540,6 +616,99 @@ export const ui_system = {
         if (shieldCountEl) shieldCountEl.innerText = String(playerShield);
         if (ammoCountEl) ammoCountEl.innerText = String(ammoCount);
         if (noteEl) noteEl.innerText = note;
+    },
+
+    ui_resetCombatPhaseHud(options = {}) {
+        const preserveStatusPanel = !!options.preserveStatusPanel;
+        const statusPanel = document.getElementById('combat-status-panel');
+        if (!preserveStatusPanel) {
+            if (statusPanel) statusPanel.classList.add('is-hidden');
+            this._combatStatusSignature = '';
+        }
+
+        const recipeHud = document.getElementById('recipe-hud-container');
+        if (recipeHud) {
+            recipeHud.classList.add('hidden');
+            recipeHud.classList.remove('recipe-hud-floating');
+            recipeHud.innerHTML = '';
+        }
+
+        const skillBar = document.getElementById('skill-bar');
+        if (skillBar) skillBar.style.display = 'none';
+
+        const runeChargeUi = document.getElementById('combat-rune-charge-ui');
+        if (runeChargeUi) runeChargeUi.style.display = 'none';
+
+        const damageDisplay = document.getElementById('round-damage-display');
+        const damageValue = document.getElementById('round-damage-val');
+        const damageDps = document.getElementById('round-damage-dps');
+        if (this._damageScrollInterval) {
+            clearInterval(this._damageScrollInterval);
+            this._damageScrollInterval = null;
+        }
+        if (damageDisplay) {
+            damageDisplay.classList.add('opacity-0');
+            damageDisplay.classList.remove('opacity-100');
+        }
+        if (damageValue) damageValue.innerText = '0';
+        if (damageDps) damageDps.innerText = '';
+
+        const damageTab = document.getElementById('tab-damage');
+        const drawer = document.getElementById('info-drawer');
+        const damageTabActive = damageTab && !damageTab.classList.contains('hidden');
+        if (damageTabActive && drawer && !drawer.classList.contains('translate-y-full')) {
+            if (this.ui && typeof this.ui.closeDrawer === 'function') this.ui.closeDrawer();
+            else drawer.classList.add('translate-y-full');
+        }
+    },
+
+    ui_clearTransientOverlays(options = {}) {
+        const keepRuneLauncher = !!options.keepRuneLauncher;
+        const keepRelicOverlay = !!options.keepRelicOverlay;
+
+        const bossOverlay = document.getElementById('boss-entrance-overlay');
+        if (bossOverlay) {
+            bossOverlay.style.display = 'none';
+            bossOverlay.classList.remove('active');
+            bossOverlay.innerHTML = '';
+        }
+
+        const chaosOverlay = document.getElementById('chaos-slot-machine-overlay');
+        if (chaosOverlay) chaosOverlay.style.display = 'none';
+
+        if (!keepRelicOverlay) {
+            const relicOverlay = document.getElementById('phase-relic');
+            if (relicOverlay && this.phase !== 'relic') {
+                relicOverlay.style.display = 'none';
+                relicOverlay.style.pointerEvents = 'none';
+                relicOverlay.classList.add('hidden-phase');
+                relicOverlay.classList.remove('active-phase', 'relic-debug-picker');
+            }
+            this.relicOverlayReturnState = null;
+            this.stateBeforeRelic = null;
+        }
+
+        if (!keepRuneLauncher) {
+            if (typeof this.ui_closeRunePicker === 'function') {
+                this.ui_closeRunePicker();
+            } else {
+                const runePickerOverlay = document.getElementById('rune-picker-overlay');
+                if (runePickerOverlay) runePickerOverlay.classList.add('hidden');
+                this._pendingRuneGridIndex = null;
+            }
+        }
+
+        const moduleLayer = document.getElementById('module-editor-layer');
+        if (moduleLayer) moduleLayer.remove();
+        if (typeof this._moduleEditor_closePicker === 'function') this._moduleEditor_closePicker();
+        this._moduleEditorActive = false;
+        this._moduleEditorState = null;
+
+        const toast = document.getElementById('toast');
+        if (toast && (this.phase === 'meta' || this.phase === 'gameover')) {
+            toast.classList.remove('toast-visible');
+            toast.innerText = '';
+        }
     },
 
     ui_getSelectionRequirement() {
@@ -1196,6 +1365,10 @@ export const ui_system = {
         const runeLauncherEl = document.getElementById('phase-rune-launcher');
         const launcherVisible = this._isRuneLauncherOpen ? this._isRuneLauncherOpen()
             : (runeLauncherEl && runeLauncherEl.style.display !== 'none');
+        const terminalPhase = ['meta', 'shop', 'truth_book', 'gameover'].includes(this.phase);
+        if (terminalPhase) {
+            this.ui_clearTransientOverlays({ keepRuneLauncher: launcherVisible });
+        }
 
         // 1. 隐藏所有阶段的主容器 (.ui-overlay)
         // [BUGFIX] 符文发射器打开时跳过隐藏，防止每次调用将其强制关闭
@@ -1234,6 +1407,9 @@ export const ui_system = {
         this.ui_updateRuneCountDisplay();
         this.ui_updateShieldPill();
         this.ui_updateCombatStatusPanel(true);
+        if (this.phase !== 'combat') {
+            this.ui_resetCombatPhaseHud({ preserveStatusPanel: this.phase === 'training' });
+        }
         if (this.phase === 'meta') {
             this.meta_updateContinueButton();
         }
@@ -1249,6 +1425,12 @@ export const ui_system = {
         if (typeof this._ui_updateLeftSidebarContent === 'function') {
             this._ui_updateLeftSidebarContent(this.phase);
         }
+        const pcSidebarPhaseActive = ['gathering', 'combat', 'selection', 'training'].includes(this.phase);
+        const pcSidebarVisible = document.body.classList.contains('pc-mode') && pcSidebarPhaseActive;
+        const pcLeftSidebar = document.getElementById('pc-left-sidebar');
+        const pcRightSidebar = document.getElementById('pc-right-sidebar');
+        if (pcLeftSidebar) pcLeftSidebar.style.display = pcSidebarVisible ? 'flex' : 'none';
+        if (pcRightSidebar) pcRightSidebar.style.display = pcSidebarVisible ? 'flex' : 'none';
 
         // 4. 底部面板：仅在收集阶段且非 PC 模式下显示
         const bottomPanel = document.querySelector('.bottom-panel');
@@ -1291,8 +1473,9 @@ export const ui_system = {
         document.body.classList.toggle('pc-mode', isPC);
         const leftSidebar = document.getElementById('pc-left-sidebar');
         const rightSidebar = document.getElementById('pc-right-sidebar');
-        if (leftSidebar) leftSidebar.style.display = isPC ? 'flex' : 'none';
-        if (rightSidebar) rightSidebar.style.display = isPC ? 'flex' : 'none';
+        const sidebarPhaseActive = ['gathering', 'combat', 'selection'].includes(this.phase);
+        if (leftSidebar) leftSidebar.style.display = (isPC && sidebarPhaseActive) ? 'flex' : 'none';
+        if (rightSidebar) rightSidebar.style.display = (isPC && sidebarPhaseActive) ? 'flex' : 'none';
 
         // [PC 布局恢复 #3] 实际把右侧符文发射器、左侧 info-drawer / 收集队列 / 配方 HUD
         // 迁移到 PC 侧边栏；离开 PC 模式时再迁回原始位置。
@@ -1486,6 +1669,13 @@ export const ui_system = {
     meta_buyUpgrade(upgradeId) {
         const upgrade = META_SHOP_CONFIG.upgrades.find(u => u.id === upgradeId);
         if (!upgrade) return false;
+        const debugShopEnabled = CONFIG.debug === true
+            || this.debugMode === true
+            || (typeof localStorage !== 'undefined' && localStorage.getItem('echo_debug_shop') === '1');
+        if (upgrade.debugOnly && !debugShopEnabled) {
+            if (typeof showToast === 'function') showToast('测试商品未启用');
+            return false;
+        }
 
         if (upgrade.effect && upgrade.effect.type === 'debug_pick_any_relic') {
             if (typeof this.ui_showRelicSelection === 'function') {
@@ -1550,11 +1740,89 @@ export const ui_system = {
         window.addEventListener('resize', () => this.ui_updatePCLayout());
     },
 
+    ui_openTruthBook(options = {}) {
+        const fromPhase = this.phase || 'meta';
+        const returnablePhases = new Set(['selection', 'gathering', 'combat', 'shop']);
+        const defaultReturnState = returnablePhases.has(fromPhase)
+            ? {
+                phase: fromPhase,
+                selectionMode: this.selectionMode || null,
+                fateMomentContext: this.fateMomentContext ? { ...this.fateMomentContext } : null,
+            }
+            : { phase: 'meta' };
+        this.truthBookReturnState = options.returnState || defaultReturnState;
+
+        if (this.trainingGround && this.trainingGround.active && typeof this.trainingGround.exit === 'function') {
+            this.trainingGround.exit();
+            this.truthBookReturnState = { phase: 'meta' };
+        }
+        if (typeof this.phase_switchPhase === 'function') {
+            this.phase_switchPhase('truth_book');
+        } else {
+            this.phase = 'truth_book';
+            this.ui_updateUI();
+        }
+
+        const panel = document.getElementById('phase-truth-book');
+        if (panel) {
+            panel.style.display = 'flex';
+            panel.style.pointerEvents = 'auto';
+            panel.classList.remove('hidden-phase');
+            panel.classList.add('active-phase');
+        }
+        if (this.truthBook) {
+            if (typeof this.truthBook.initUI === 'function') this.truthBook.initUI();
+            if (typeof this.truthBook.resize === 'function') this.truthBook.resize();
+        }
+    },
+
+    ui_closeTruthBook() {
+        if (this.truthBook) {
+            this.truthBook.active = false;
+            this.truthBook.currentEntry = null;
+            this.truthBook.demoGame = null;
+        }
+        const panel = document.getElementById('phase-truth-book');
+        if (panel) {
+            panel.style.display = 'none';
+            panel.style.pointerEvents = 'none';
+            panel.classList.add('hidden-phase');
+            panel.classList.remove('active-phase');
+        }
+        const returnState = this.truthBookReturnState || { phase: 'meta' };
+        this.truthBookReturnState = null;
+        const targetPhase = returnState.phase && returnState.phase !== 'truth_book'
+            ? returnState.phase
+            : 'meta';
+
+        if (targetPhase === 'selection') {
+            if (returnState.selectionMode) this.selectionMode = returnState.selectionMode;
+            if (returnState.fateMomentContext) this.fateMomentContext = { ...returnState.fateMomentContext };
+        }
+
+        if (typeof this.phase_switchPhase === 'function') {
+            this.phase_switchPhase(targetPhase);
+        } else {
+            this.phase = targetPhase;
+            this.ui_updateUI();
+        }
+
+        if (targetPhase === 'selection' && typeof this.ui_refreshSelectionModeUI === 'function') {
+            this.ui_refreshSelectionModeUI();
+        } else if (targetPhase === 'shop' && typeof this.ui_renderShop === 'function') {
+            this.ui_renderShop();
+        }
+    },
+
     ui_openPause() {
         // [BUGFIX #5] 暂停/设置面板的 DOM id 是 `phase-pause`，原代码错把它当成 `pause-overlay` 处理，
         // 导致点击「⚙️」按鈕没有任何反应。这里改为正确的 id，并补上 hidden-phase / display 切换。
         const pause = document.getElementById('phase-pause');
         if (!pause) return;
+        if (!this.isPaused) {
+            this._pausedFromPhase = this.phase;
+        }
+        this.isPaused = true;
         pause.classList.remove('hidden');
         pause.classList.remove('hidden-phase');
         pause.classList.add('active-phase');
@@ -1566,11 +1834,24 @@ export const ui_system = {
 
     ui_closePause() {
         const pause = document.getElementById('phase-pause');
+        this.isPaused = false;
+        this._pausedFromPhase = null;
         if (!pause) return;
         pause.classList.add('hidden');
         pause.classList.add('hidden-phase');
         pause.classList.remove('active-phase');
         pause.style.display = 'none';
+        pause.style.pointerEvents = 'none';
+    },
+
+    ui_abandonRunToMeta() {
+        this.ui_closePause();
+        if (typeof this.ui_clearTransientOverlays === 'function') this.ui_clearTransientOverlays();
+        if (typeof this.ui_closeRuneLauncher === 'function') this.ui_closeRuneLauncher();
+        if (typeof this.sys_clearRunState === 'function') this.sys_clearRunState();
+        if (typeof this.sys_resetGame === 'function') this.sys_resetGame();
+        if (typeof this.phase_switchPhase === 'function') this.phase_switchPhase('meta');
+        if (typeof this.meta_updateContinueButton === 'function') this.meta_updateContinueButton();
     },
 
     ui_syncPauseSettings() {
@@ -1621,6 +1902,7 @@ export const ui_system = {
     // 画布上的虚框绘制见 game_phase.js: render_moduleEditorOverlay；
     // 点击命中检测见 game_system.js: input_handleInputStart → _moduleEditor_handleClick。
     _moduleEditorState: null,
+    _moduleEditorPlacementPreview: null,
 
     /**
      * 进入钉板编辑模式。此时游戏已处于 gathering 阶段且实时钉板已构建，
@@ -1633,7 +1915,7 @@ export const ui_system = {
         const totalSlots = cols * rows;
 
         // ---- 确保布局 / 解锁字段已初始化 ----
-        if (!Array.isArray(this.currentModuleLayout) || this.currentModuleLayout.length !== totalSlots) {
+        if (!Array.isArray(this.currentModuleLayout)) {
             this.currentModuleLayout = createDefaultModuleLayout(totalSlots, cfg.moduleDefaultSlots || 3);
         }
         this.currentModuleLayout = ensureModuleLayoutInstances(
@@ -1685,10 +1967,14 @@ export const ui_system = {
 
         const cfg = CONFIG.gameplay || {};
         const totalSlots = (cfg.moduleCols || 4) * (cfg.moduleRows || 3);
-        const cap = Math.min(this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3, totalSlots);
+        const activeSlots = getActiveModuleSlots(
+            this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3,
+            totalSlots,
+            cfg
+        );
         const layout = this.currentModuleLayout || [];
         let placed = 0;
-        for (let i = 0; i < cap; i++) {
+        for (const i of activeSlots) {
             const e = layout[i];
             if (e && !isModuleRef(e) && getModuleIdFromEntry(e)) placed++;
         }
@@ -1697,12 +1983,14 @@ export const ui_system = {
         const runeBtnHtml = runeCount > 0
             ? `<button id="me-rune-btn" class="me-btn me-btn--rune">✨ 符文融合<span class="me-rune-badge">${runeCount}</span></button>`
             : '';
+        const fusionSummaryHtml = this._moduleEditor_buildFusionSummaryHtml();
 
         layer.innerHTML = `
             <div class="me-topbar">
                 <div class="me-topbar-title">⚙ 钉板编辑</div>
-                <div class="me-topbar-hint">点击虚框区域更换组件 · 已放置 ${placed}/${cap} · 库存 ${componentCount}</div>
+                <div class="me-topbar-hint">点击虚框区域更换组件 · 已放置 ${placed}/${activeSlots.length} · 库存 ${componentCount}</div>
             </div>
+            ${fusionSummaryHtml}
             <div class="me-bottombar">
                 ${runeBtnHtml}
                 <button id="me-start-btn" class="me-btn me-btn--start">▶ 开始采集</button>
@@ -1710,9 +1998,130 @@ export const ui_system = {
         `;
 
         const startBtn = layer.querySelector('#me-start-btn');
-        if (startBtn) startBtn.addEventListener('click', () => this.ui_hideModuleEditor());
+        if (startBtn) startBtn.addEventListener('click', () => this._moduleEditor_tryStartCollection());
         const runeBtn = layer.querySelector('#me-rune-btn');
         if (runeBtn) runeBtn.addEventListener('click', () => this._moduleEditor_openRunePicker());
+    },
+
+    _moduleEditor_showNotice(message, options = {}) {
+        const layer = document.getElementById('module-editor-layer');
+        const host = document.getElementById('me-picker-backdrop')
+            || document.getElementById('me-rune-picker-backdrop')
+            || layer;
+        if (!host) {
+            if (typeof showToast === 'function') showToast(message);
+            return;
+        }
+        const type = options.type || 'error';
+        const detail = options.detail || '';
+        let alert = host.querySelector('#me-editor-alert');
+        if (!alert) {
+            alert = document.createElement('div');
+            alert.id = 'me-editor-alert';
+            alert.className = 'me-editor-alert';
+            host.appendChild(alert);
+        }
+        alert.dataset.type = type;
+        alert.innerHTML = `
+            <div class="me-editor-alert__icon">${type === 'info' ? 'i' : '!'}</div>
+            <div class="me-editor-alert__body">
+                <div class="me-editor-alert__title">${_escapeHtml(message)}</div>
+                ${detail ? `<div class="me-editor-alert__detail">${_escapeHtml(detail)}</div>` : ''}
+            </div>
+        `;
+        if (this._moduleEditorNoticeTimer) clearTimeout(this._moduleEditorNoticeTimer);
+        this._moduleEditorNoticeTimer = setTimeout(() => {
+            const current = document.getElementById('me-editor-alert');
+            if (current) current.remove();
+            this._moduleEditorNoticeTimer = null;
+        }, options.duration || 3200);
+    },
+
+    _moduleEditor_clearNotice() {
+        if (this._moduleEditorNoticeTimer) {
+            clearTimeout(this._moduleEditorNoticeTimer);
+            this._moduleEditorNoticeTimer = null;
+        }
+        const alert = document.getElementById('me-editor-alert');
+        if (alert) alert.remove();
+    },
+
+    _moduleEditor_validateBeforeStart() {
+        const cfg = CONFIG.gameplay || {};
+        const cols = cfg.moduleCols || 4;
+        const rows = cfg.moduleRows || 3;
+        const totalSlots = cols * rows;
+        const layout = this.currentModuleLayout || [];
+        const unlockedCount = this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3;
+        const activeSlots = getActiveModuleSlots(unlockedCount, totalSlots, cfg);
+        const activeSet = getActiveModuleSlotSet(unlockedCount, totalSlots, cfg);
+
+        if (!Array.isArray(this.currentModuleLayout) || this.currentModuleLayout.length !== totalSlots) {
+            return { ok: false, reason: '钉板布局尚未初始化', detail: '请重新打开编辑器，或更换一个组件后再开始采集。' };
+        }
+
+        const emptySlots = activeSlots.filter(i => !layout[i]);
+        if (emptySlots.length > 0) {
+            return {
+                ok: false,
+                reason: `还有 ${emptySlots.length} 个钉板槽未放置组件`,
+                detail: '点击空槽安装组件，或先在商店购买更多钉板组件。',
+            };
+        }
+
+        const seenCovered = new Set();
+        for (const i of activeSlots) {
+            const entry = layout[i];
+            if (!entry) continue;
+            if (isModuleRef(entry)) {
+                if (!activeSet.has(entry.ref) || !getModuleIdFromEntry(layout[entry.ref])) {
+                    return { ok: false, reason: '钉板占位引用失效', detail: `槽位 ${i + 1} 指向了不存在的组件。` };
+                }
+                continue;
+            }
+
+            const moduleId = getModuleIdFromEntry(entry);
+            if (!moduleId) {
+                return { ok: false, reason: '钉板组件数据异常', detail: `槽位 ${i + 1} 没有有效组件 ID。` };
+            }
+            const span = getModuleSpan(moduleId);
+            const covered = getCoveredSlots(i, span, cols, rows);
+            if (!covered) {
+                return { ok: false, reason: `${span.cols}x${span.rows} 组件越过钉板边界`, detail: `请调整槽位 ${i + 1} 的组件。` };
+            }
+            if (covered.some(ci => !activeSet.has(ci))) {
+                return { ok: false, reason: `${span.cols}x${span.rows} 组件超出已解锁区域`, detail: `请把槽位 ${i + 1} 的组件换成更小组件，或先扩展槽位。` };
+            }
+            for (const ci of covered) {
+                if (seenCovered.has(ci)) {
+                    return { ok: false, reason: '钉板组件覆盖区域重叠', detail: `槽位 ${ci + 1} 被多个组件覆盖。` };
+                }
+                seenCovered.add(ci);
+                if (ci !== i) {
+                    const ref = layout[ci];
+                    if (!isModuleRef(ref) || ref.ref !== i) {
+                        return { ok: false, reason: '多格组件占位未同步', detail: `槽位 ${ci + 1} 应该被槽位 ${i + 1} 的组件占用。` };
+                    }
+                }
+            }
+        }
+
+        if (this._moduleEditorRunePreview) {
+            return { ok: false, reason: '还有未确认的符文融合预览', detail: '请先确认融合，或关闭符文融合弹层取消预览。' };
+        }
+
+        return { ok: true, reason: '', detail: '' };
+    },
+
+    _moduleEditor_tryStartCollection() {
+        const validation = this._moduleEditor_validateBeforeStart();
+        if (!validation.ok) {
+            this._moduleEditor_showNotice(validation.reason, { detail: validation.detail });
+            if (typeof showToast === 'function') showToast(validation.reason);
+            return;
+        }
+        this._moduleEditor_clearNotice();
+        this.ui_hideModuleEditor();
     },
 
     /**
@@ -1724,6 +2133,7 @@ export const ui_system = {
         this._moduleEditorState = null;
         const layer = document.getElementById('module-editor-layer');
         if (layer) layer.remove();
+        this._moduleEditor_clearNotice();
         this._moduleEditor_closePicker();
         if (typeof onComplete === 'function') onComplete();
     },
@@ -1745,7 +2155,7 @@ export const ui_system = {
 
     /**
      * 计算所有「可编辑钉盘区域」的画布矩形。
-     * 可编辑区域 = 前 cap 个槽位（与 phase_gathering_initPachinko_v2 的 slotsToBuild 一致）。
+     * 可编辑区域 = moduleUnlockOrder 的前 unlockedModuleSlots 个槽位（与 phase_gathering_initPachinko_v2 一致）。
      * 多格模块只在锚点处返回合并后的矩形；被覆盖的 ref 槽不返回独立矩形。
      * 返回 [{ idx, rect:{x,y,w,h}, moduleId }]
      */
@@ -1754,12 +2164,16 @@ export const ui_system = {
         const cols = cfg.moduleCols || 4;
         const rows = cfg.moduleRows || 3;
         const totalSlots = cols * rows;
-        const cap = Math.min(this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3, totalSlots);
+        const activeSlots = getActiveModuleSlots(
+            this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3,
+            totalSlots,
+            cfg
+        );
         const w = (this.width && this.width > 0) ? this.width : 400;
         const h = (this.height && this.height > 0) ? this.height : 600;
         const layout = this.currentModuleLayout || [];
         const out = [];
-        for (let i = 0; i < cap; i++) {
+        for (const i of activeSlots) {
             const entry = layout[i];
             if (isModuleRef(entry)) continue; // 被多格模块覆盖
             const moduleId = getModuleIdFromEntry(entry);
@@ -1778,7 +2192,11 @@ export const ui_system = {
         const cols = cfg.moduleCols || 4;
         const rows = cfg.moduleRows || 3;
         const totalSlots = cols * rows;
-        const cap = Math.min(this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3, totalSlots);
+        const activeSlotSet = getActiveModuleSlotSet(
+            this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3,
+            totalSlots,
+            cfg
+        );
         const layout = this.currentModuleLayout || [];
         if (!MODULE_DEFS[moduleId]) {
             return { ok: false, reason: '模块不存在', covered: [], span: { cols: 1, rows: 1 } };
@@ -1789,7 +2207,7 @@ export const ui_system = {
         if (!covered) {
             return { ok: false, reason: `${span.cols}x${span.rows} 超出钉盘边界`, covered: [], span };
         }
-        if (covered.some(ci => ci >= cap)) {
+        if (covered.some(ci => !activeSlotSet.has(ci))) {
             return { ok: false, reason: `需要 ${span.cols}x${span.rows} 空间，超出已解锁区域`, covered, span };
         }
 
@@ -1825,6 +2243,32 @@ export const ui_system = {
         const rbd = document.getElementById('me-rune-picker-backdrop');
         if (rbd) rbd.remove();
         this._moduleEditorRunePreview = null;
+        this._moduleEditorPlacementPreview = null;
+    },
+
+    _moduleEditor_setPlacementPreview(slotIdx, moduleId = null, options = {}) {
+        const mode = options.mode || 'candidate';
+        let status = {
+            ok: true,
+            reason: '',
+            covered: [slotIdx],
+            span: { cols: 1, rows: 1 },
+        };
+        if (moduleId) {
+            status = this._moduleEditor_getModulePlacementStatus(slotIdx, moduleId);
+            if (!status.covered || status.covered.length <= 0) {
+                status.covered = [slotIdx];
+            }
+        }
+        this._moduleEditorPlacementPreview = {
+            slotIdx,
+            moduleId,
+            mode,
+            ok: !!status.ok,
+            reason: status.reason || '',
+            covered: status.covered || [slotIdx],
+            span: status.span || { cols: 1, rows: 1 },
+        };
     },
 
     _moduleEditor_normalizeComponentInventory() {
@@ -1860,6 +2304,7 @@ export const ui_system = {
         this._moduleEditor_closePicker();
         const layout = this.currentModuleLayout || [];
         const curId = getModuleIdFromEntry(layout[slotIdx]);
+        this._moduleEditor_setPlacementPreview(slotIdx, curId || null, { mode: 'target' });
         const inventory = this._moduleEditor_normalizeComponentInventory();
         const escapeHtml = (value) => String(value ?? '')
             .replace(/&/g, '&amp;')
@@ -1875,11 +2320,16 @@ export const ui_system = {
             const spanTag = (span.cols > 1 || span.rows > 1) ? ` <span class="me-picker-span">${span.cols}x${span.rows}</span>` : '';
             const placement = this._moduleEditor_getModulePlacementStatus(slotIdx, id);
             const disabled = placement.ok ? '' : ' is-disabled';
-            const disabledAttr = placement.ok ? '' : ` disabled title="${escapeHtml(placement.reason)}"`;
+            const disabledAttr = placement.ok
+                ? ' data-placement-ok="true"'
+                : ` aria-disabled="true" data-placement-ok="false" data-placement-reason="${escapeHtml(placement.reason)}" title="${escapeHtml(placement.reason)}"`;
             const desc = placement.ok ? (def.desc || '') : `不可放置：${placement.reason}`;
-            return `<button type="button" class="me-picker-item${disabled}" data-pick-component="${escapeHtml(component.uid)}"${disabledAttr}>
+            const meta = getModuleMetaSummary(id);
+            const metaHtml = meta ? `<div class="me-picker-desc">${escapeHtml(meta)}</div>` : '';
+            return `<button type="button" class="me-picker-item${disabled}" data-pick-component="${escapeHtml(component.uid)}" data-module-id="${escapeHtml(id)}"${disabledAttr}>
                 <div class="me-picker-icon">${def.icon || '▦'}</div>
                 <div class="me-picker-name">${escapeHtml(def.name || id)}${spanTag}</div>
+                ${metaHtml}
                 <div class="me-picker-desc">${escapeHtml(desc)}</div>
             </button>`;
         }).join('');
@@ -1910,8 +2360,24 @@ export const ui_system = {
         const closeBtn = backdrop.querySelector('#me-picker-close');
         if (closeBtn) closeBtn.addEventListener('click', () => this._moduleEditor_closePicker());
         backdrop.querySelectorAll('[data-pick-component], [data-pick-module]').forEach(btn => {
+            const previewModule = btn.dataset.moduleId || null;
+            const previewCandidate = () => {
+                if (previewModule) this._moduleEditor_setPlacementPreview(slotIdx, previewModule, { mode: 'candidate' });
+                else this._moduleEditor_setPlacementPreview(slotIdx, curId || null, { mode: 'target' });
+            };
+            const restoreTarget = () => this._moduleEditor_setPlacementPreview(slotIdx, curId || null, { mode: 'target' });
+            btn.addEventListener('pointerenter', previewCandidate);
+            btn.addEventListener('focus', previewCandidate);
+            btn.addEventListener('pointerleave', restoreTarget);
+            btn.addEventListener('blur', restoreTarget);
             btn.addEventListener('click', () => {
-                if (btn.disabled) return;
+                previewCandidate();
+                if (btn.dataset.placementOk === 'false') {
+                    this._moduleEditor_showNotice(btn.dataset.placementReason || '该模块无法放置在这里', {
+                        detail: '红色预览槽位表示当前组件无法覆盖该区域。',
+                    });
+                    return;
+                }
                 if (_isCoarsePointerInput() && btn.dataset.touchReady !== 'true') {
                     backdrop.querySelectorAll('[data-pick-component].is-previewing, [data-pick-module].is-previewing').forEach(el => {
                         el.classList.remove('is-previewing');
@@ -1919,7 +2385,7 @@ export const ui_system = {
                     });
                     btn.classList.add('is-previewing');
                     btn.dataset.touchReady = 'true';
-                    showToast('再次点击以安装该钉盘组件');
+                    this._moduleEditor_showNotice('再次点击以安装该钉盘组件', { type: 'info', duration: 2200 });
                     return;
                 }
                 this._moduleEditor_applyModule(slotIdx, btn.dataset.pickComponent || btn.dataset.pickModule);
@@ -1944,19 +2410,25 @@ export const ui_system = {
                 .find(item => item && item.uid === componentKey);
             const moduleId = getModuleIdFromEntry(candidate);
             if (!candidate || !moduleId) {
-                showToast('该组件已不在库存中');
+                this._moduleEditor_showNotice('该组件已不在库存中', {
+                    detail: '库存可能刚刚发生变化，请重新打开组件列表。',
+                });
                 return;
             }
 
             const placement = this._moduleEditor_getModulePlacementStatus(slotIdx, moduleId);
             if (!placement.ok) {
-                showToast(placement.reason || '该模块无法放置在这里');
+                this._moduleEditor_showNotice(placement.reason || '该模块无法放置在这里', {
+                    detail: '请根据画布上的红色覆盖预览调整槽位或更换组件。',
+                });
                 return;
             }
 
             const component = this._moduleEditor_takeInventoryComponent(componentKey);
             if (!component) {
-                showToast('该组件已不在库存中');
+                this._moduleEditor_showNotice('该组件已不在库存中', {
+                    detail: '库存可能刚刚发生变化，请重新打开组件列表。',
+                });
                 return;
             }
             this._moduleEditor_detachComponent(slotIdx, layout, cols, rows);
@@ -1983,6 +2455,101 @@ export const ui_system = {
         return selectFusionTargetPegs(this.pegs || [], fusion, this.width || 400, this.height || 600, false);
     },
 
+    _moduleEditor_collectFusionSummary(extraFusion = null) {
+        const byElement = {};
+        const addFusion = (element, level = 1, runeId = null, count = 1) => {
+            if (!element || count <= 0) return;
+            if (!byElement[element]) {
+                byElement[element] = { element, count: 0, levelTotal: 0, runeIds: new Set() };
+            }
+            byElement[element].count += count;
+            byElement[element].levelTotal += Math.max(1, level || 1) * count;
+            if (runeId) byElement[element].runeIds.add(runeId);
+        };
+
+        const seenStateKeys = new Set();
+        let fusionPegCount = 0;
+        for (const peg of (this.pegs || [])) {
+            if (!peg || !peg.type || (!peg.infusedRuneId && !peg.fusionSourceLevel)) continue;
+            fusionPegCount++;
+            if (Number.isInteger(peg.moduleSlotIdx) && peg.modulePegIdx !== undefined) {
+                seenStateKeys.add(`${peg.moduleSlotIdx}:${peg.modulePegIdx}`);
+            }
+            addFusion(peg.type, peg.level || peg.fusionSourceLevel || 1, peg.infusedRuneId || null, 1);
+        }
+
+        if (fusionPegCount <= 0) {
+            (this.currentModuleLayout || []).forEach((entry, slotIdx) => {
+                const inst = getModuleInstance(entry);
+                if (!inst || !inst.pegStates) return;
+                Object.entries(inst.pegStates).forEach(([pegIdx, state]) => {
+                    if (!state || state.source !== 'fusion' || !state.type) return;
+                    if (seenStateKeys.has(`${slotIdx}:${pegIdx}`)) return;
+                    addFusion(state.type, state.level || state.fusionSourceLevel || 1, state.infusedRuneId || null, 1);
+                });
+            });
+        }
+
+        if (extraFusion && extraFusion.element) {
+            addFusion(extraFusion.element, extraFusion.level || extraFusion.sourceLevel || 1, extraFusion.runeId || null, extraFusion.count || 1);
+        }
+
+        const entries = Object.values(byElement)
+            .map(item => ({
+                ...item,
+                runeIds: Array.from(item.runeIds),
+            }))
+            .sort((a, b) => b.levelTotal - a.levelTotal || a.element.localeCompare(b.element));
+        const totalCount = entries.reduce((sum, item) => sum + item.count, 0);
+        const totalLevel = entries.reduce((sum, item) => sum + item.levelTotal, 0);
+        return { entries, totalCount, totalLevel };
+    },
+
+    _moduleEditor_getRunewordHintsForRune(runeId, limit = 3) {
+        if (!runeId) return [];
+        return (RUNEWORD_DB || [])
+            .filter(rw => Array.isArray(rw.pattern) && rw.pattern.includes(runeId))
+            .slice(0, limit)
+            .map(rw => rw.name || rw.id)
+            .filter(Boolean);
+    },
+
+    _moduleEditor_buildFusionSummaryHtml(extraFusion = null) {
+        const summary = this._moduleEditor_collectFusionSummary(extraFusion);
+        if (!summary.entries.length) return '';
+        const chips = summary.entries.slice(0, 5).map(item => {
+            const label = _getStatLabel(item.element);
+            return `<span class="me-fusion-chip">${_escapeHtml(label)} x${item.count} / Lv.${item.levelTotal}</span>`;
+        }).join('');
+        const more = summary.entries.length > 5
+            ? `<span class="me-fusion-chip">+${summary.entries.length - 5}</span>`
+            : '';
+        return `<div class="me-fusion-summary">
+            <span class="me-fusion-label">已融合</span>
+            ${chips}${more}
+            <span class="me-fusion-note">采集中改变属性钉；词条仍在发射器 3x3 排布中激活</span>
+        </div>`;
+    },
+
+    _moduleEditor_buildRunePreviewChainHtml(preview, targets) {
+        if (!preview) return '';
+        const targetCount = Array.isArray(targets) ? targets.length : 0;
+        const summary = this._moduleEditor_collectFusionSummary({ ...preview, count: targetCount });
+        const elementLabel = _getStatLabel(preview.element);
+        const hints = this._moduleEditor_getRunewordHintsForRune(preview.runeId, 3);
+        const hintHtml = hints.length
+            ? `<div class="is-hint">发射器词条线索：${hints.map(_escapeHtml).join(' / ')}</div>`
+            : '<div>该符文暂无直接词条线索，可作为属性层补强。</div>';
+        const totalHtml = summary.entries.length
+            ? `<div class="is-good">确认后钉板累计：${summary.entries.map(item => `${_escapeHtml(_getStatLabel(item.element))} x${item.count}`).join('，')}</div>`
+            : '';
+        return `<div class="me-rune-chain">
+            <div><strong>${_escapeHtml(preview.name)}</strong> 将注入 ${targetCount}/${preview.count} 颗 ${_escapeHtml(elementLabel)} 钉</div>
+            ${totalHtml}
+            ${hintHtml}
+        </div>`;
+    },
+
     _moduleEditor_updateRunePickerPreview() {
         const preview = this._moduleEditorRunePreview;
         const backdrop = document.getElementById('me-rune-picker-backdrop');
@@ -1993,15 +2560,18 @@ export const ui_system = {
         });
         const text = backdrop.querySelector('#me-rune-preview-text');
         const confirm = backdrop.querySelector('#me-rune-confirm');
+        const chain = backdrop.querySelector('#me-rune-chain-text');
         if (!text || !confirm) return;
         if (!preview) {
             text.textContent = '选择一个符文预览落点。';
+            if (chain) chain.innerHTML = '';
             confirm.disabled = true;
             confirm.textContent = '先选择符文';
             return;
         }
         const targets = this._moduleEditor_getRunePreviewTargets(preview);
         text.textContent = `${preview.name} L${preview.level}：将注入 ${targets.length}/${preview.count} 颗 ${preview.element} 钉。`;
+        if (chain) chain.innerHTML = this._moduleEditor_buildRunePreviewChainHtml(preview, targets);
         confirm.disabled = targets.length <= 0;
         confirm.textContent = targets.length > 0 ? '确认融合' : '没有可注入钉';
     },
@@ -2016,13 +2586,18 @@ export const ui_system = {
             const id = getRuneId(r);
             const def = (RUNE_DB || []).find(d => d.id === id);
             if (!def) return '';
-            const lv = (typeof r === 'object' && typeof r.level === 'number') ? r.level : 1;
+            const lv = _getRuneLevel(r);
             const element = def.element || def.baseStat || '';
+            const hints = this._moduleEditor_getRunewordHintsForRune(id, 2);
+            const hintsHtml = hints.length
+                ? '<div class="me-picker-desc me-rune-hints">发射器词条：' + hints.map(_escapeHtml).join(' / ') + '</div>'
+                : '';
             return '<button type="button" class="me-rune-row" data-rune-idx="' + idx + '">' +
                 '<div class="me-picker-icon">' + (def.icon || 'R') + '</div>' +
                 '<div class="me-rune-meta">' +
                     '<div class="me-picker-name">' + (def.name || id) + ' <span class="me-rune-lv">L' + lv + '</span></div>' +
                     '<div class="me-picker-desc">预览注入 ' + lv + ' 颗 ' + element + ' 钉</div>' +
+                    hintsHtml +
                 '</div>' +
             '</button>';
         }).join('') : '<div class="me-picker-empty">背包没有符文</div>';
@@ -2042,6 +2617,7 @@ export const ui_system = {
             '<div class="me-picker-body">' + rowsHtml + pendingHtml +
                 '<div class="me-rune-preview">' +
                     '<div class="me-rune-preview-text" id="me-rune-preview-text">选择一个符文预览落点。</div>' +
+                    '<div class="me-rune-chain" id="me-rune-chain-text"></div>' +
                     '<button class="me-rune-confirm" id="me-rune-confirm" disabled>先选择符文</button>' +
                 '</div>' +
             '</div>' +

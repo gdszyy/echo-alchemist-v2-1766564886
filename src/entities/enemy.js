@@ -21,6 +21,7 @@ import { Particle } from '../effects/particles.js';
 import { sb as _sb } from '../utils/perf.js';
 import { eventBus } from '../event_bus.js';
 import { createSpriteRenderer } from '../render/sprite_renderer.js'; // [Phase 5B Task 5.B3] Sprite 动画渲染器
+import { resolveEnemyVisualAsset } from '../data/enemy_visual_assets.js';
 
 // audio 代理由 entities.js 注入，通过模块级变量共享
 // 注意：Enemy 类使用的 audio 对象来自 entities.js 的依赖注入机制
@@ -43,6 +44,22 @@ const audio = new Proxy({}, {
         return () => {};
     }
 });
+
+const _affixOverlayImageCache = new Map();
+
+function _getAffixOverlayImage(src) {
+    if (!src || typeof Image === 'undefined') return null;
+    const cached = _affixOverlayImageCache.get(src);
+    if (cached) return cached;
+
+    const img = new Image();
+    const record = { img, ready: false, failed: false };
+    img.onload = () => { record.ready = true; };
+    img.onerror = () => { record.failed = true; };
+    img.src = src;
+    _affixOverlayImageCache.set(src, record);
+    return record;
+}
 
 // ==================== 敌人底层纹理缓存 ====================
 // @perf-impact: _initTexture 同步创建 OffscreenCanvas，批量刷怪时密集分配引发进场卡顿。
@@ -189,6 +206,8 @@ class Enemy {
         // bossType 在构造时可能尚未赋值，由 spawn_system.js 调用 initSprite() 完成
         this._spriteRenderer = null;
         this._spriteLastMs = 0; // 上次 update 的时间戳（ms）
+        this._visualAssetKey = '';
+        this._affixOverlayImages = [];
     }
 
     /**
@@ -196,6 +215,7 @@ class Enemy {
      * spawn_system.js 在设置 e.bossType 后应调用 e.initSprite()
      */
     initSprite() {
+        this._syncAffixOverlayImages();
         // [V2 资源协议] 传入完整 enemy 信息（footprint + affixSet）让 createSpriteRenderer
         // 优先解析 composite 资源，缺失时回退到基底 Sprite / 矢量绘制，敌人不会消失。
         this._spriteRenderer = createSpriteRenderer({
@@ -1422,7 +1442,7 @@ class Enemy {
 
     playBurnTickEffect(game, dmg) {
         this.hitTimer = 15;
-        this._hitFlashTimer = 4;
+        this._hitFlashTimer = Math.max(0, CONFIG.enemyRender.hitFlashDuration || 0);
         for(let i=0; i<8; i++) game.spawn_createParticle(this.pos.x, this.pos.y, '#f97316', 'spark');
         for(let i=0; i<3; i++) game.spawn_createParticle(this.pos.x, this.pos.y, 'rgba(0,0,0,0.6)', 'smoke');
         game.spawn_createFloatingText(this.pos.x, this.pos.y, `🔥-${dmg}`, '#fbbf24');
@@ -2489,6 +2509,7 @@ class Enemy {
                 this._spriteRenderer.draw(ctx, -sprSize1/2, h/2 - sprSize1, sprSize1, sprSize1, 0.85);
             }
         }
+        this._drawAffixBitmapOverlays(ctx, w, h);
         // === Layer 4: 裂纹绘制 (Fissures) - [保持不变] ===
 
         // **过热 Stage 3**
@@ -2838,7 +2859,9 @@ class Enemy {
         
         // 受击闪白 - 使用独立的短时计时器，确保只闪一下而非持续白色
         if (this._hitFlashTimer > 0) {
-            ctx.fillStyle = `rgba(255, 255, 255, ${(this._hitFlashTimer / 4) * 0.8})`;
+            const flashDuration = Math.max(1, CONFIG.enemyRender.hitFlashDuration || 1);
+            const flashMaxAlpha = CONFIG.enemyRender.hitFlashMaxAlpha ?? 0.16;
+            ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, this._hitFlashTimer / flashDuration) * flashMaxAlpha})`;
             ctx.fillRect(-w/2, -h/2, w, h);
         }
 
@@ -4549,10 +4572,10 @@ class Enemy {
             }
         }
 
-          // 4. 执行扣血
+        // 4. 执行扣血
         this.hp -= actualDamage;
         this.hitTimer = 10;
-        this._hitFlashTimer = 4;
+        this._hitFlashTimer = Math.max(0, CONFIG.enemyRender.hitFlashDuration || 0);
         this.whiteBarTimer = 45;
         // === A3: 记录受击形变强度 ===
         if (this.maxHp > 0) {
@@ -5807,6 +5830,60 @@ class Enemy {
             'heavyArmor+berserk':'#b91c1c',
         };
         return TINTS[sorted] || TINTS[this.affixes[0]] || null;
+    }
+
+    _syncAffixOverlayImages() {
+        const resolved = resolveEnemyVisualAsset({
+            type: this.type,
+            bossType: this.bossType,
+            baseArchetype: this.baseArchetype,
+            gridCols: this.gridCols || 1,
+            gridRows: this.gridRows || 1,
+            affixes: this.affixes || [],
+        });
+        if (!resolved || resolved.assetKey === this._visualAssetKey) return;
+
+        this._visualAssetKey = resolved.assetKey;
+        this._affixOverlayImages = (resolved.overlayPaths || [])
+            .map((item) => ({
+                affix: item.affix,
+                path: item.path,
+                image: _getAffixOverlayImage(item.path),
+            }))
+            .filter((item) => item.image);
+    }
+
+    _drawAffixBitmapOverlays(ctx, w, h) {
+        if (this.type === 'boss' || !this.affixes || this.affixes.length === 0) return;
+        this._syncAffixOverlayImages();
+        if (!this._affixOverlayImages || this._affixOverlayImages.length === 0) return;
+
+        const gameRef = (typeof game !== 'undefined') ? game : null;
+        const quality = gameRef?.perfQualityLevel || 'high';
+        const maxOverlays = quality === 'high' ? 2 : 1;
+        const readyOverlays = this._affixOverlayImages
+            .filter((item) => item.image && item.image.ready && !item.image.failed)
+            .slice(0, maxOverlays);
+        if (readyOverlays.length === 0) return;
+
+        // @perf-impact: 词条位图覆盖层每敌最多 2 次 drawImage；medium/low 降为 1 次，
+        // 不新增粒子、渐变、shadowBlur 或混合预算字段，语义仍由短标签和 Canvas 词条层兜底。
+        ctx.save();
+        ctx.globalCompositeOperation = quality === 'low' ? 'source-over' : 'screen';
+        const baseAlpha = quality === 'low' ? 0.30 : 0.44;
+        const t = Date.now() / 1000;
+
+        readyOverlays.forEach((item, index) => {
+            const pulse = quality === 'low' ? 0 : Math.sin(t * 1.4 + index * 1.7 + this.visualSeed * 3) * 0.04;
+            const scale = item.affix === 'shield' ? 1.10 : item.affix === 'haste' ? 1.02 : 0.94;
+            const drawSize = Math.max(w, h) * (scale + pulse);
+            const alpha = baseAlpha * (index === 0 ? 1 : 0.72);
+            const prevAlpha = ctx.globalAlpha;
+            ctx.globalAlpha = prevAlpha * alpha;
+            ctx.drawImage(item.image.img, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+            ctx.globalAlpha = prevAlpha;
+        });
+        ctx.restore();
     }
 
     /**

@@ -34,6 +34,10 @@ RUNE_DEFS = [
     ('rune_pierce_1',    '穿刺符文', 'epic',      'pierce',    'arrow'),
     ('rune_pierce_2',    '破甲符文', 'legendary', 'pierce',    'spear'),
     ('rune_scatter_1',   '散裂符文', 'legendary', 'scatter',   'scatter'),
+    ('rune_venom_1',     '毒蚀符文', 'rare',      'venom',     'venom'),
+    ('rune_venom_2',     '剧毒符文', 'epic',      'venom',     'toxin'),
+    ('rune_overcharge_1','超载符文', 'epic',      'overcharge','overcharge'),
+    ('rune_echo_1',      '回声符文', 'rare',      'echo',      'echo'),
     ('rune_laser_1',     '光束符文', 'rare',      'laser',     'beam'),
     ('rune_laser_2',     '聚焦符文', 'legendary', 'laser',     'focus'),
     # 额外：通用占位符文
@@ -47,6 +51,9 @@ ELEMENT_COLORS = {
     'bounce':    (80,  220, 120),
     'pierce':    (255, 100, 100),
     'scatter':   (255, 210, 60),
+    'venom':     (80,  240, 120),
+    'overcharge':(255, 170, 60),
+    'echo':      (120, 140, 255),
     'laser':     (120, 220, 255),
     'generic':   (160, 160, 180),
 }
@@ -164,6 +171,49 @@ def draw_rune_symbol(draw, cx, cy, symbol, color, size, rarity):
             ey = cy + math.sin(angle) * sym_r
             draw.line([(cx, cy), (ex, ey)], fill=(r, g, b, 160), width=1)
             draw.ellipse([ex - 3, ey - 3, ex + 3, ey + 3], fill=(r, g, b, 200))
+
+    elif symbol == 'venom':
+        # 毒蚀（液滴 + 腐蚀点）
+        pts = [(cx, cy - sym_r), (cx + sym_r * 0.52, cy - sym_r * 0.1),
+               (cx + sym_r * 0.38, cy + sym_r * 0.55), (cx, cy + sym_r),
+               (cx - sym_r * 0.38, cy + sym_r * 0.55), (cx - sym_r * 0.52, cy - sym_r * 0.1)]
+        draw.polygon(pts, fill=(r, g, b, 210))
+        draw.ellipse([cx - sym_r * 0.24, cy - sym_r * 0.1,
+                      cx + sym_r * 0.24, cy + sym_r * 0.38],
+                    fill=(170, 255, 150, 190))
+        for ox, oy in [(-0.42, -0.3), (0.45, 0.15), (-0.2, 0.55)]:
+            draw.ellipse([cx + sym_r * ox - 2, cy + sym_r * oy - 2,
+                          cx + sym_r * ox + 2, cy + sym_r * oy + 2],
+                        fill=(220, 255, 180, 160))
+
+    elif symbol == 'toxin':
+        # 剧毒（药瓶 + 蒸汽）
+        draw.rounded_rectangle([cx - sym_r * 0.42, cy - sym_r * 0.15,
+                                cx + sym_r * 0.42, cy + sym_r * 0.75],
+                               radius=5, fill=(r, g, b, 180),
+                               outline=(210, 255, 170, 220), width=1)
+        draw.rectangle([cx - sym_r * 0.22, cy - sym_r * 0.45,
+                        cx + sym_r * 0.22, cy - sym_r * 0.12],
+                       fill=(r, g, b, 210))
+        for i in range(3):
+            x = cx + (i - 1) * sym_r * 0.28
+            draw.arc([x - 5, cy - sym_r * 0.95, x + 5, cy - sym_r * 0.35],
+                     start=90, end=250, fill=(180, 255, 170, 150), width=1)
+
+    elif symbol == 'overcharge':
+        # 超载（核心 + 爆裂电弧）
+        draw.ellipse([cx - sym_r * 0.36, cy - sym_r * 0.36,
+                      cx + sym_r * 0.36, cy + sym_r * 0.36],
+                    fill=(255, 230, 120, 220))
+        for i in range(8):
+            angle = math.radians(i * 45)
+            inner = sym_r * 0.42
+            outer = sym_r * (0.78 if i % 2 == 0 else 0.62)
+            draw.line([(cx + math.cos(angle) * inner, cy + math.sin(angle) * inner),
+                       (cx + math.cos(angle) * outer, cy + math.sin(angle) * outer)],
+                      fill=(r, g, b, 220), width=2)
+        draw.arc([cx - sym_r, cy - sym_r, cx + sym_r, cy + sym_r],
+                 start=20, end=150, fill=(255, 255, 210, 150), width=2)
 
     elif symbol == 'beam':
         # 光束（水平线+光晕）

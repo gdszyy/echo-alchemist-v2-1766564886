@@ -31,7 +31,7 @@
  * @property {string}   counter         克制提示
  * @property {string}   spritePath      Sprite Sheet PNG 路径
  * @property {string}   iconPath        UI 图标 PNG 路径
- * @property {number}   hpMult          矩阵演示用 HP 倍率（基于 baseHP=200）
+ * @property {number}   hpMult          设计参考 HP 倍率；实战/试炼场以 spawn_system 口径为准
  * @property {boolean}  placeholder     是否仍为占位资源（true=待美术替换）
  */
 
@@ -52,7 +52,7 @@ export const ENEMY_V2_METADATA = [
         spritePath: 'assets/sprites/enemies/v2/enemy_bastion_3x1.png',
         iconPath:   'assets/icons/enemies/enemy_bastion_3x1.png',
         hpMult: 2.0,
-        placeholder: true,
+        placeholder: false,
     },
     {
         id: 'maw',
@@ -69,7 +69,7 @@ export const ENEMY_V2_METADATA = [
         spritePath: 'assets/sprites/enemies/v2/enemy_maw_2x2.png',
         iconPath:   'assets/icons/enemies/enemy_maw_2x2.png',
         hpMult: 2.0,
-        placeholder: true,
+        placeholder: false,
     },
     {
         id: 'deflector',
@@ -86,7 +86,7 @@ export const ENEMY_V2_METADATA = [
         spritePath: 'assets/sprites/enemies/v2/enemy_deflector_2x1.png',
         iconPath:   'assets/icons/enemies/enemy_deflector_2x1.png',
         hpMult: 1.0,
-        placeholder: true,
+        placeholder: false,
     },
     {
         id: 'echoSpire',
@@ -103,7 +103,7 @@ export const ENEMY_V2_METADATA = [
         spritePath: 'assets/sprites/enemies/v2/enemy_echo_spire_1x2.png',
         iconPath:   'assets/icons/enemies/enemy_echo_spire_1x2.png',
         hpMult: 0.5,
-        placeholder: true,
+        placeholder: false,
     },
     {
         id: 'prism',
@@ -120,7 +120,7 @@ export const ENEMY_V2_METADATA = [
         spritePath: 'assets/sprites/enemies/v2/enemy_prism_1x3.png',
         iconPath:   'assets/icons/enemies/enemy_prism_1x3.png',
         hpMult: 1.4,
-        placeholder: true,
+        placeholder: false,
     },
     {
         id: 'hive',
@@ -137,7 +137,7 @@ export const ENEMY_V2_METADATA = [
         spritePath: 'assets/sprites/enemies/v2/enemy_hive_2x3.png',
         iconPath:   'assets/icons/enemies/enemy_hive_2x3.png',
         hpMult: 2.5,
-        placeholder: true,
+        placeholder: false,
     },
     {
         id: 'siege',
@@ -154,7 +154,7 @@ export const ENEMY_V2_METADATA = [
         spritePath: 'assets/sprites/enemies/v2/enemy_siege_3x2.png',
         iconPath:   'assets/icons/enemies/enemy_siege_3x2.png',
         hpMult: 3.5,
-        placeholder: true,
+        placeholder: false,
     },
     {
         id: 'gravityCore',
@@ -171,7 +171,7 @@ export const ENEMY_V2_METADATA = [
         spritePath: 'assets/sprites/enemies/v2/enemy_gravity_core_3x3.png',
         iconPath:   'assets/icons/enemies/enemy_gravity_core_3x3.png',
         hpMult: 6.0,
-        placeholder: true,
+        placeholder: false,
     },
 ];
 

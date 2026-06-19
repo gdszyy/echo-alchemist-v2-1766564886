@@ -18,9 +18,11 @@ import {
     ORBITAL_LINK_FLOW,
     ORBITAL_INTAKE,
     EMITTER_BASE_SRC,
+    EMITTER_DRAW_SIZE,
     EMITTER_CHARGING_SRCS,
     BG_MAIN_CANVAS_SRC,
     BG_EMITTER_ZONE_SRC,
+    getAmmoIconSrc,
     getAmmoIconSrcByKey,
 } from './bitmap_icons.js';
 import { getAmmoReadabilityProfile } from './utils/ammo_readability.js';
@@ -623,137 +625,173 @@ export const render_system = {
         const profile = getAmmoReadabilityProfile(recipe);
         const quality = this.perfQualityLevel || 'high';
         const glowFx = quality !== 'low';
-        const time = Date.now();
-        const pulse = (Math.sin(time / 220) + 1) / 2;
         const accent = profile.primary.color || '#fbbf24';
         const relPortX = portX - cx;
         const relPortY = portY - cy;
-
+        const time = Date.now();
+        const pulse = (Math.sin(time / 260) + 1) / 2;
         ctx.save();
         ctx.translate(cx, cy);
 
-        // 连射炮管：数量只表达 multicast，不混入散射判断。
-        const barrelGap = profile.barrelCount >= 5 ? 5 : 6;
-        const barrelStart = -((profile.barrelCount - 1) * barrelGap) / 2;
-        const barrelLen = 16 + profile.signalRatio * 8;
-        for (let i = 0; i < profile.barrelCount; i++) {
-            const off = barrelStart + i * barrelGap;
-            const isCenter = Math.abs(off) < 0.5;
-            ctx.save();
-            ctx.translate(relPortX + off, relPortY + 5);
-            ctx.rotate(off * 0.012);
-            ctx.fillStyle = isCenter ? accent : 'rgba(226, 232, 240, 0.72)';
-            ctx.strokeStyle = accent;
-            ctx.globalAlpha = isCenter ? 0.95 : 0.72;
-            if (glowFx && isCenter) {
-                ctx.shadowColor = accent;
-                ctx.shadowBlur = _sb(5 + profile.signalRatio * 8);
-            }
-            ctx.beginPath();
-            ctx.roundRect(-2.2, -barrelLen, 4.4, barrelLen + 6, 2);
-            ctx.fill();
-            ctx.globalAlpha = 0.85;
-            ctx.lineWidth = 1;
-            ctx.stroke();
-            ctx.restore();
-        }
+        // @perf-impact: launcher signal V2 uses fixed-count path/text/image draws; high/medium keep lightweight glow, low disables shadowBlur.
+        const panelX = -63;
+        const panelY = relPortY - 96;
+        const panelW = 126;
+        const panelH = 78;
+        const coreX = 0;
+        const coreY = panelY + 42;
+        const pelletCount = profile.scatterPelletCount;
+        const iconImg = getUiBitmap(getAmmoIconSrc(recipe));
 
-        // 装填格：直接用属性颜色显示“装了什么”。
-        const loadY = 36;
-        const loadGap = 7;
-        const loadStart = -(6 - 1) * loadGap / 2;
+        ctx.save();
+        ctx.globalAlpha = 0.46;
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(relPortX, relPortY - 6);
+        ctx.lineTo(coreX, panelY + panelH - 7);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.globalAlpha = 0.78;
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.66)';
+        ctx.strokeStyle = 'rgba(226, 232, 240, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(panelX, panelY, panelW, panelH, 14);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = accent;
+        ctx.globalAlpha = 0.24 + pulse * 0.1;
+        ctx.beginPath();
+        ctx.roundRect(panelX + 3, panelY + 3, panelW - 6, panelH - 6, 11);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.globalAlpha = 0.96;
+        if (glowFx) {
+            ctx.shadowColor = accent;
+            ctx.shadowBlur = _sb(10 + profile.signalRatio * 10);
+        }
+        ctx.fillStyle = accent;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(coreX, coreY - 21);
+        ctx.quadraticCurveTo(coreX + 15, coreY - 11, coreX + 13, coreY + 12);
+        ctx.quadraticCurveTo(coreX, coreY + 22, coreX - 13, coreY + 12);
+        ctx.quadraticCurveTo(coreX - 15, coreY - 11, coreX, coreY - 21);
+        ctx.fill();
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
+        ctx.beginPath();
+        ctx.arc(coreX, coreY + 3, 12, 0, Math.PI * 2);
+        ctx.fill();
+        if (iconImg) {
+            ctx.drawImage(iconImg, coreX - 10, coreY - 7, 20, 20);
+        } else {
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 13px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(profile.primary.icon || '*', coreX, coreY + 3);
+        }
+        ctx.restore();
+
+        const drawBadge = (x, y, w, label, value, color) => {
+            const valueText = String(value);
+            ctx.save();
+            ctx.globalAlpha = 0.94;
+            ctx.fillStyle = 'rgba(2, 6, 23, 0.8)';
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, 18, 6);
+            ctx.fill();
+            ctx.stroke();
+            ctx.font = 'bold 7px Cinzel';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'rgba(226, 232, 240, 0.72)';
+            ctx.fillText(label, x + 5, y + 9);
+            ctx.font = 'bold 10px Cinzel';
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'right';
+            ctx.fillText(valueText, x + w - 5, y + 9);
+            ctx.restore();
+        };
+
+        const drawScatterPreview = () => {
+            const baseX = panelX + 24;
+            const baseY = panelY + 46;
+            const fanSpan = pelletCount > 1 ? Math.min(Math.PI * 0.72, Math.PI * (0.2 + profile.scatter * 0.08)) : 0;
+            const visible = Math.min(pelletCount, 7);
+            ctx.save();
+            ctx.strokeStyle = '#facc15';
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.55;
+            for (let i = 0; i < visible; i++) {
+                const t = visible === 1 ? 0.5 : i / (visible - 1);
+                const angle = -Math.PI / 2 - fanSpan / 2 + fanSpan * t;
+                const px = baseX + Math.cos(angle) * 18;
+                const py = baseY + Math.sin(angle) * 18;
+                ctx.beginPath();
+                ctx.moveTo(baseX, baseY);
+                ctx.lineTo(px, py);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(px, py, i === Math.floor(visible / 2) ? 3.4 : 2.5, 0, Math.PI * 2);
+                ctx.fillStyle = i === Math.floor(visible / 2) ? '#fef3c7' : '#facc15';
+                ctx.fill();
+            }
+            ctx.restore();
+        };
+
+        const drawBurstStack = () => {
+            const rackX = panelX + panelW - 36;
+            const rackY = panelY + 31;
+            ctx.save();
+            ctx.globalAlpha = 0.94;
+            for (let i = 0; i < 6; i++) {
+                const lit = i < profile.multicastCount;
+                const h = 5 + i * 2;
+                ctx.beginPath();
+                ctx.roundRect(rackX + i * 5, rackY + 18 - h, 3.5, h, 1.5);
+                ctx.fillStyle = lit ? '#67e8f9' : 'rgba(30, 41, 59, 0.72)';
+                ctx.fill();
+                ctx.strokeStyle = lit ? 'rgba(255,255,255,0.62)' : 'rgba(100,116,139,0.38)';
+                ctx.lineWidth = 0.7;
+                ctx.stroke();
+            }
+            ctx.restore();
+        };
+
+        drawBadge(panelX + 8, panelY + 7, 43, 'DMG', profile.damage, accent);
+        drawBadge(panelX + panelW - 49, panelY + 7, 41, 'x', profile.multicastCount, '#67e8f9');
+        drawBadge(panelX + 8, panelY + panelH - 21, 39, 'S', pelletCount, '#facc15');
+        drawScatterPreview();
+        drawBurstStack();
+
         const loadEntries = profile.entries.length > 0 ? profile.entries : [profile.primary];
+        const loadX = -22;
+        const loadY = panelY + panelH - 14;
+        ctx.save();
         for (let i = 0; i < 6; i++) {
             const lit = i < profile.loadCount;
             const entry = loadEntries[i % loadEntries.length] || profile.primary;
             ctx.beginPath();
-            ctx.roundRect(loadStart + i * loadGap - 2.4, loadY, 4.8, 9, 2);
+            ctx.roundRect(loadX + i * 9, loadY, 6, 8, 2);
             ctx.fillStyle = lit ? (entry.color || accent) : 'rgba(30, 41, 59, 0.78)';
             ctx.globalAlpha = lit ? 0.95 : 0.55;
             ctx.fill();
             ctx.strokeStyle = lit ? 'rgba(255,255,255,0.65)' : 'rgba(100,116,139,0.45)';
-            ctx.lineWidth = 0.8;
+            ctx.lineWidth = 0.75;
             ctx.stroke();
         }
-
-        // 散射扇面：用预览弹丸数量和角度直接展示 scatter。
-        const pelletCount = profile.scatterPelletCount;
-        const fanSpan = profile.scatter > 0 ? Math.min(Math.PI * 0.72, Math.PI * (0.16 + profile.scatter * 0.08)) : 0;
-        const fanRadius = 34 + Math.min(18, profile.scatter * 3);
-        let mainPelletX = relPortX;
-        let mainPelletY = relPortY - fanRadius;
-        for (let i = 0; i < pelletCount; i++) {
-            const t = pelletCount === 1 ? 0.5 : i / (pelletCount - 1);
-            const a = -Math.PI / 2 - fanSpan / 2 + fanSpan * t;
-            const bx = relPortX + Math.cos(a) * fanRadius;
-            const by = relPortY + Math.sin(a) * fanRadius;
-            const isMain = Math.abs(t - 0.5) < 0.01 || pelletCount === 1;
-            if (isMain) {
-                mainPelletX = bx;
-                mainPelletY = by;
-            }
-            ctx.save();
-            ctx.globalAlpha = isMain ? 0.9 : 0.56;
-            ctx.fillStyle = isMain ? accent : 'rgba(226, 232, 240, 0.78)';
-            ctx.strokeStyle = accent;
-            if (glowFx && isMain) {
-                ctx.shadowColor = accent;
-                ctx.shadowBlur = _sb(5 + profile.signalRatio * 7);
-            }
-            ctx.beginPath();
-            ctx.arc(bx, by, isMain ? 4.2 : 3.1, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.lineWidth = 1;
-            ctx.stroke();
-            ctx.restore();
-        }
-
-        // @perf-impact: Launcher damage number - one extra compact text badge per frame, tied to the existing launcher signal budget.
-        // Damage number: keep the launcher preview numeric and avoid subjective rating text.
-        ctx.save();
-        const damageText = String(profile.damage);
-        const badgeW = Math.max(16, 8 + damageText.length * 6);
-        const badgeX = mainPelletX - badgeW / 2;
-        const badgeY = mainPelletY - 21;
-        ctx.globalAlpha = 0.94;
-        ctx.fillStyle = 'rgba(2, 6, 23, 0.78)';
-        ctx.strokeStyle = accent;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.roundRect(badgeX, badgeY, badgeW, 14, 5);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 10px Cinzel';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(damageText, mainPelletX, badgeY + 7);
         ctx.restore();
-
-        // 连射能量条：每段代表一次发射，xN 只用数字标识，避免长文字。
-        if (profile.multicastCount > 1) {
-            ctx.save();
-            const barX = 27;
-            const barY = -30;
-            const segW = 5;
-            const segH = 17;
-            ctx.globalAlpha = 0.92;
-            for (let i = 0; i < 6; i++) {
-                const lit = i < profile.multicastCount;
-                ctx.beginPath();
-                ctx.roundRect(barX + i * (segW + 2), barY, segW, segH, 2);
-                ctx.fillStyle = lit ? accent : 'rgba(30, 41, 59, 0.72)';
-                ctx.fill();
-                ctx.strokeStyle = lit ? 'rgba(255,255,255,0.62)' : 'rgba(100,116,139,0.38)';
-                ctx.stroke();
-            }
-            ctx.fillStyle = accent;
-            ctx.font = 'bold 9px Cinzel';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(`x${profile.multicastCount}`, barX, barY - 6);
-            ctx.restore();
-        }
 
         ctx.restore();
     },
@@ -769,7 +807,8 @@ export const render_system = {
      */
     render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress) {
         const baseImg = getUiBitmap(EMITTER_BASE_SRC);
-        const baseSize = 96;
+        // @perf-impact: Combat emitter V2 swaps the old 96px sprite for one 128px bitmap draw plus the existing optional charging overlay.
+        const baseSize = EMITTER_DRAW_SIZE;
         if (baseImg) {
             ctx.save();
             ctx.drawImage(baseImg, cx - baseSize / 2, cy - baseSize / 2, baseSize, baseSize);

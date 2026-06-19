@@ -13,7 +13,7 @@
  * - 弹珠选择切换 (sys_toggleMarbleSelection)
  * - 分数乘数重置 (sys_resetMultiplier)
  */
-import { Vec2, showToast, RuneLoot, Enemy, RewardDropEffect, FieldLootItem } from './entities.js';
+import { Vec2, showToast, RuneLoot, Enemy, RewardDropEffect, FieldLootItem, MarbleDefinition } from './entities.js';
 import { CONFIG, RELIC_DB } from './config.js';
 import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
@@ -159,7 +159,7 @@ export const game_system = {
         this.render_clearCanvas();
 
         // 2. 全局状态更新（平滑倾斜插值）
-        const smoothSpeed = 0.05 * timeScale;
+        const smoothSpeed = Math.min(1, (CONFIG.physics.tiltSmoothing || 0.05) * timeScale);
         this.boardTilt.current.x += (this.boardTilt.target.x - this.boardTilt.current.x) * smoothSpeed;
         this.boardTilt.current.y += (this.boardTilt.target.y - this.boardTilt.current.y) * smoothSpeed;
 
@@ -470,6 +470,9 @@ export const game_system = {
         // 重置 遗物选择计数器（用于前三次推荐逻辑）
         this.relicSelectionCount = 0;
         this.pendingRoundStartRewards = [];
+        this._wavePresetUsage = {};
+        this._wavePresetIntroShown = {};
+        this._wavePresetRoundUsed = null;
         this._roundStartResolverActive = false;
         this.fieldLootItems = []; // 重置战场持久掉落物，防止跨局残留
         this._roundStartBannerActive = false; // 重置横幅保护标志
@@ -503,8 +506,7 @@ export const game_system = {
         this.runewordKillCount = 0;
 
         // ==================== [v2 钉板模块化] 模块系统状态 ====================
-        // 钉板由 4×3 = 12 个模块槽组成，按 row-major 顺序解锁
-        // 默认开放全部 12 个槽，预填 std_stagger
+        // 钉板由 CONFIG.gameplay.moduleCols/Rows 定义；默认开放前两行 2x5 首发异形组件。
         this.unlockedModuleTypes = []; // legacy save compatibility only; placement uses ownedModuleComponents.
         this.unlockedModuleSlots = CONFIG.gameplay.moduleDefaultSlots || 3;
         this.currentModuleLayout = createDefaultModuleLayout(
@@ -986,6 +988,7 @@ export const game_system = {
         this.selectionMode = mode;
         this.selectionRequiredCount = Math.max(1, pendingMode?.requiredCount || (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0));
         this.fateMomentContext = {
+            active: true,
             type: mode,
             source: pendingMode?.source || 'unknown',
             round: pendingMode?.round || this.round || 1,
@@ -1645,6 +1648,46 @@ export const game_system = {
     },
 
     /**
+     * @method sys_maybeOfferRunShopBeforeRoundStart
+     * @description 在 round-start resolver 清空后、回合横幅前，按节奏给出一次可选局内商店入口。
+     */
+    sys_maybeOfferRunShopBeforeRoundStart() {
+        const cfg = CONFIG.gameplay || {};
+        if (typeof this.ui_offerRunShop !== 'function' && typeof this.ui_showRunShop !== 'function') return false;
+        if ((this.round || 1) <= 1) return false;
+        if (this._runShopOpenedRound === this.round) return false;
+
+        const minFragments = cfg.runShopMinFragmentsToOffer != null ? cfg.runShopMinFragmentsToOffer : 1;
+        if ((this.runFragments || 0) < minFragments) return false;
+
+        const interval = cfg.runShopInterval || 0;
+        const intervalHit = interval > 0 && (this.round || 1) % interval === 0;
+        const bossOfferEnabled = cfg.runShopOfferAfterBoss !== false;
+        const bossJustDefeated = bossOfferEnabled && (this.bossDefeatedLog || []).some(log => {
+            const defeatedRound = Number(log && log.round) || 0;
+            return defeatedRound === (this.round - 1) || defeatedRound === this.round;
+        });
+
+        if (!intervalHit && !bossJustDefeated) return false;
+        if (typeof this.ui_hasAffordableRunShopItem === 'function' && !this.ui_hasAffordableRunShopItem()) {
+            this.runShopInventory = [];
+            return false;
+        }
+
+        const continueRound = () => {
+            this.sys_showRoundStartBanner();
+        };
+        const reason = bossJustDefeated ? 'boss' : 'interval';
+        this._runShopOpenedRound = this.round;
+        if (typeof this.ui_offerRunShop === 'function') {
+            this.ui_offerRunShop(continueRound, reason);
+        } else {
+            this.ui_showRunShop(continueRound, { reason });
+        }
+        return true;
+    },
+
+    /**
      * @method sys_startRoundStartResolver
      * @description 在回合开始前统一结算遗物/精华，再决定是否进入选择阶段。
      */
@@ -1815,6 +1858,7 @@ export const game_system = {
             resolvedCount: 0,
         });
         // [tsk-f35c6d10] 队列为空时不再进入普通命运选择，改为显示回合开始提示后直接进入研磨阶段
+        if (this.sys_maybeOfferRunShopBeforeRoundStart()) return;
         this.sys_showRoundStartBanner();
     },
 
@@ -1853,9 +1897,11 @@ export const game_system = {
         this.enemyTurnTimer = 0;
         this._runeClaimPending = false;
 
-        // 切换到 combat 阶段作为横幅背景，避免残留 selection 界面
-        if (this.phase !== 'combat') {
-            this.phase_switchPhase('combat');
+        // 切换到 gathering 阶段作为横幅背景，避免残留 selection 界面
+        // Round-start banner is only a transition into the next gathering phase.
+        // Do not rebuild ammoQueue here from stale fired snapshots or marbleQueue.
+        if (this.phase !== 'gathering') {
+            this.phase_switchPhase('gathering');
         }
 
         // 更新文本
@@ -1899,52 +1945,10 @@ export const game_system = {
             if (leftSidebar) {
                 leftSidebar.classList.remove('ammo-panel-charging', 'ammo-panel-charging-simple');
             }
-            // [充能] 每回合开始检查 ammoQueue：若为空则尝试充能，保留上回合实际发射子弹的属性，
-            // 实现"子弹充能"效果。
-            // [bullet-charge-fix] 优先使用「上回合实际发射的子弹快照」作为充能源；
-            // 这样子弹替换阶段保留下来的上上回合充能子弹也能正确接续，
-            // 否则会用本回合 marbleQueue（玩家未选择/未发射的新研磨子弹）覆盖，导致充能混乱。
-            const ammoIsEmpty = !this.ammoQueue || this.ammoQueue.length === 0;
-            const hasFiredSnapshot = Array.isArray(this._lastFiredAmmoSnapshot) && this._lastFiredAmmoSnapshot.length > 0;
-            const hasMarbleQueue = this.marbleQueue && this.marbleQueue.length > 0;
-            if (ammoIsEmpty && (hasFiredSnapshot || hasMarbleQueue)) {
-                this.ammoQueue = [];
-                if (hasFiredSnapshot) {
-                    this._lastFiredAmmoSnapshot.forEach(r => {
-                        const recipe = { ...r };
-                        recipe.finalHits = 0;
-                        recipe.multicast = r.multicast || 0;
-                        this.ammoQueue.push(recipe);
-                    });
-                } else {
-                    this.marbleQueue.forEach(marbleDef => {
-                        const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
-                        const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, (marbleDef.multicast || 0) > 0);
-                        recipe.finalHits = 0;
-                        recipe.multicast = marbleDef.multicast || 0;
-                        this.ammoQueue.push(recipe);
-                    });
-                }
-                this.ui_updateAmmoUI && this.ui_updateAmmoUI();
-                this.ui_renderRecipeHUD && this.ui_renderRecipeHUD();
-
-                // [Bug 修复] 回合开始充能子弹时，触发充能符文系统特效。
-                // 根因：充能子弹是直接重用上回合的 marbleQueue 编译，跳过了研磨阶段，
-                // 因此 combat_runeCharge_init() 在 phase_startCombatPhase() 中才会被调用，
-                // 而充能特效需要在子弹展示时即时播放，所以在此提前触发。
-                // @perf-impact: CSS keyframe 动画（charge-burst / charge-full-flash），无 Canvas 开销
-                if (this.combat_runeCharge_levelUp) {
-                    // 使用充能升级特效：充能条闪光脱去 + 外壳发光 + 符文槽刷新
-                    // 先重置充能状态（避免与上一回合的充能状态混淆）
-                    this.runeChargeValue = 0;
-                    this.runeChargeLevel = 0;
-                    // 触发充能升级特效（会自动抽取并展示当前充能符文）
-                    this.combat_runeCharge_levelUp();
-                }
-            }
-            // [BUGFIX 2] 横幅结束，清除保护标志，再进入战斗阶段
+            // Normal round start goes to gathering; essence-triggered charge is handled by replace-ammo flows.
+            // [BUGFIX 2] 横幅结束，清除保护标志，再进入研磨阶段
             this._roundStartBannerActive = false;
-            this.phase_startCombatPhase();
+            this.phase_startGatheringPhase();
         }, 1500);
     },
 
@@ -2136,6 +2140,7 @@ export const game_system = {
      */
     input_handleOrientation(e) {
         if (!this.boardTilt.enabled) return;
+        if (this.isTiltingGrip) return;
         const maxTilt = 30;
         let x = e.gamma || 0;
         let y = e.beta || 0;
@@ -2214,7 +2219,8 @@ export const game_system = {
                 return;
             }
             const gripPos = new Vec2(this.width / 2, this.height - 40);
-            if (pos.dist(gripPos) < 40) {
+            const gripRadius = CONFIG.physics.tiltGripRadius || 40;
+            if (pos.dist(gripPos) < gripRadius) {
                 this.isTiltingGrip = true;
                 this.gripStartPos = pos;
                 return;
@@ -2251,11 +2257,11 @@ export const game_system = {
         }
 
         // 收集阶段 - 手动拖拽倾斜
-        if (this.phase === 'gathering' && this.isTiltingGrip && !this.boardTilt.enabled) {
+        if (this.phase === 'gathering' && this.isTiltingGrip) {
             e.preventDefault();
             const deltaX = pos.x - this.gripStartPos.x;
             const deltaY = pos.y - this.gripStartPos.y;
-            const sensitivity = 0.005;
+            const sensitivity = CONFIG.physics.tiltDragSensitivity || 0.005;
             this.boardTilt.target.x = Math.max(-1, Math.min(1, deltaX * sensitivity));
             this.boardTilt.target.y = Math.max(-1, Math.min(1, deltaY * sensitivity));
             return;
@@ -2265,8 +2271,9 @@ export const game_system = {
         if ((this.phase === 'gathering' || this.phase === 'combat') && !this.isTiltingGrip && !this.boardTilt.enabled) {
             const centerX = this.width / 2;
             const centerY = this.height / 2;
-            this.boardTilt.target.x = ((pos.x - centerX) / centerX) * 0.3;
-            this.boardTilt.target.y = ((pos.y - centerY) / centerY) * 0.3;
+            const hoverInfluence = this.phase === 'gathering' ? (CONFIG.physics.tiltHoverInfluence || 0.3) : 0.3;
+            this.boardTilt.target.x = ((pos.x - centerX) / centerX) * hoverInfluence;
+            this.boardTilt.target.y = ((pos.y - centerY) / centerY) * hoverInfluence;
         }
 
         // 战斗阶段悬浮检测
@@ -2304,9 +2311,7 @@ export const game_system = {
 
         if (this.isTiltingGrip) {
             this.isTiltingGrip = false;
-            if (!this.boardTilt.enabled) {
-                this.boardTilt.target = { x: 0, y: 0 };
-            }
+            this.boardTilt.target = { x: 0, y: 0 };
         }
     },
 
@@ -2488,9 +2493,18 @@ export const game_system = {
                 multicast: m.multicast || 0,
                 finalHits: m.finalHits || 0,
             }));
+            const marblesPoolData = (this.marblesPool || []).map(m => ({
+                type: m.type,
+                collected: m.collected ? [...m.collected] : [],
+                compiled: m.compiled || false,
+                recipe: m.recipe ? { ...m.recipe } : null,
+                multicast: m.multicast || 0,
+                finalHits: m.finalHits || 0,
+            }));
 
             const state = {
                 // 基础
+                phase: this.phase || 'meta',
                 round: this.round,
                 score: this.score,
                 scoreMultiplier: this.scoreMultiplier || 1.0,
@@ -2498,6 +2512,8 @@ export const game_system = {
                 enemies: enemiesData,
                 pegs: pegsData,
                 marbleQueue: marbleQueueData,
+                marblesPool: marblesPoolData,
+                selectedMarbles: (this.selectedMarbles || []).slice(),
                 activeMarbleIndex: this.activeMarbleIndex || 0,
                 // 遗物
                 ownedRelics: (this.ownedRelics || []).slice(),
@@ -2527,6 +2543,9 @@ export const game_system = {
                 selectionPreviewState: this.selectionPreviewState ? { ...this.selectionPreviewState } : null,
                 relicOverlayReturnState: this.relicOverlayReturnState ? { ...this.relicOverlayReturnState } : null,
                 fateMomentContext: this.fateMomentContext ? { ...this.fateMomentContext } : null,
+                wavePresetUsage: this._wavePresetUsage ? JSON.parse(JSON.stringify(this._wavePresetUsage)) : {},
+                wavePresetIntroShown: this._wavePresetIntroShown ? { ...this._wavePresetIntroShown } : {},
+                wavePresetRoundUsed: this._wavePresetRoundUsed || null,
                 replaceAmmoContext: this.replaceAmmoContext ? JSON.parse(JSON.stringify(this.replaceAmmoContext)) : null, // [ammo-replace]
                 _chargedAmmoQueue: this._chargedAmmoQueue ? this._chargedAmmoQueue.map(r => ({ ...r })) : null, // [ammo-replace]
                 _lastFiredAmmoSnapshot: this._lastFiredAmmoSnapshot ? this._lastFiredAmmoSnapshot.map(r => ({ ...r })) : null, // [bullet-charge-fix]
@@ -2554,6 +2573,11 @@ export const game_system = {
                 currentModuleLayout: this.currentModuleLayout ? JSON.parse(JSON.stringify(this.currentModuleLayout)) : null,
                 ownedModuleComponents: this.ownedModuleComponents ? JSON.parse(JSON.stringify(this.ownedModuleComponents)) : [],
                 pendingFusions: (this.pendingFusions || []).map(f => ({ ...f })),
+                // 局内商店经济
+                runFragments: this.runFragments || 0,
+                runShopInventory: this.runShopInventory ? JSON.parse(JSON.stringify(this.runShopInventory)) : [],
+                runShopRefreshes: this.runShopRefreshes || 0,
+                _runShopOpenedRound: this._runShopOpenedRound || -1,
                 // 技能
                 skillPoints: this.skillPoints || 0,
                 activeSkills: (this.activeSkills || []).map(sk => sk.id || sk),
@@ -2612,6 +2636,7 @@ export const game_system = {
         }
         try {
             const state = JSON.parse(raw);
+            const savedPhase = state.phase || null;
 
             // --- 先重置游戏（清空实体、重置 UI）---
             this.sys_resetGame();
@@ -2652,6 +2677,9 @@ export const game_system = {
             this.selectionPreviewState = state.selectionPreviewState ? { ...state.selectionPreviewState } : null;
             this.relicOverlayReturnState = state.relicOverlayReturnState ? { ...state.relicOverlayReturnState } : null;
             this.fateMomentContext = state.fateMomentContext ? { ...state.fateMomentContext } : null;
+            this._wavePresetUsage = state.wavePresetUsage ? JSON.parse(JSON.stringify(state.wavePresetUsage)) : {};
+            this._wavePresetIntroShown = state.wavePresetIntroShown ? { ...state.wavePresetIntroShown } : {};
+            this._wavePresetRoundUsed = state.wavePresetRoundUsed || null;
             this.replaceAmmoContext = state.replaceAmmoContext ? JSON.parse(JSON.stringify(state.replaceAmmoContext)) : null; // [ammo-replace]
             this._chargedAmmoQueue = state._chargedAmmoQueue ? state._chargedAmmoQueue.map(r => ({ ...r })) : null; // [ammo-replace]
             if (this.replaceAmmoContext && this.replaceAmmoContext.active) {
@@ -2705,9 +2733,16 @@ export const game_system = {
             this.unlockedModuleTypes = Array.isArray(state.unlockedModuleTypes)
                 ? state.unlockedModuleTypes.slice()
                 : [];
-            this.unlockedModuleSlots = state.unlockedModuleSlots || this.unlockedModuleSlots || CONFIG.gameplay.moduleDefaultSlots || 3;
             {
                 const totalSlots = (CONFIG.gameplay.moduleCols || 4) * (CONFIG.gameplay.moduleRows || 3);
+                const defaultSlots = CONFIG.gameplay.moduleDefaultSlots || 3;
+                const savedSlots = Number.isFinite(state.unlockedModuleSlots) ? state.unlockedModuleSlots : 0;
+                // 旧存档可能停留在 3/6 槽初始盘；低于当前默认值时自动抬到新版 2x5。
+                this.unlockedModuleSlots = Math.min(totalSlots, Math.max(
+                    defaultSlots,
+                    savedSlots,
+                    this.unlockedModuleSlots || 0
+                ));
                 this.currentModuleLayout = ensureModuleLayoutInstances(
                     state.currentModuleLayout || this.currentModuleLayout,
                     totalSlots,
@@ -2724,6 +2759,10 @@ export const game_system = {
                 }
             }
             this.pendingFusions = (state.pendingFusions || []).map(f => ({ ...f }));
+            this.runFragments = state.runFragments || 0;
+            this.runShopInventory = state.runShopInventory ? JSON.parse(JSON.stringify(state.runShopInventory)) : [];
+            this.runShopRefreshes = state.runShopRefreshes || 0;
+            this._runShopOpenedRound = state._runShopOpenedRound || -1;
 
             // --- 恢复技能 ---
             this.skillPoints = state.skillPoints || 0;
@@ -2796,6 +2835,22 @@ export const game_system = {
             } else {
                 this.marbleQueue = [];
             }
+            if (state.marblesPool && state.marblesPool.length > 0) {
+                this.marblesPool = state.marblesPool.map(m => {
+                    const marbleDef = new MarbleDefinition(m.type || 'bounce');
+                    marbleDef.collected = Array.isArray(m.collected) ? [...m.collected] : [];
+                    marbleDef.compiled = m.compiled || false;
+                    marbleDef.recipe = m.recipe ? { ...m.recipe } : null;
+                    marbleDef.multicast = m.multicast || 0;
+                    marbleDef.finalHits = m.finalHits || 0;
+                    return marbleDef;
+                });
+            } else {
+                this.marblesPool = [];
+            }
+            this.selectedMarbles = Array.isArray(state.selectedMarbles)
+                ? state.selectedMarbles.filter(i => Number.isInteger(i) && i >= 0 && i < this.marblesPool.length)
+                : [];
             this.activeMarbleIndex = state.activeMarbleIndex || 0;
 
             // --- 恢复 pegs（通过 initPachinko 重建，然后覆盖 type/level/frozenTurns）---
@@ -2832,10 +2887,43 @@ export const game_system = {
 
             // --- 下一回合开始统一结算（包括遗物/精华） ---
             // [tsk-668f3dba] 如果存档时正处于替换阶段，恢复替换 UI
+            const restoredMarbleTypes = (this.marblesPool || []).map(m => m.type).filter(Boolean);
+            const restoredSelectedMarbles = (this.selectedMarbles || []).slice();
+            const restoredSelectionInjectedRune = this.selectionInjectedRune ? { ...this.selectionInjectedRune } : null;
+            const restoredSelectionPreviewState = this.selectionPreviewState ? { ...this.selectionPreviewState } : null;
+            const shouldRestoreSelection = savedPhase === 'selection'
+                || !!(this.fateMomentContext && this.fateMomentContext.active)
+                || (this.selectionMode && this.selectionMode !== 'standard');
             if (this.replaceAmmoContext && this.replaceAmmoContext.active) {
                 this.phase_switchPhase('selection');
                 if (typeof this.ui_renderReplaceAmmoUI === 'function') {
                     this.ui_renderReplaceAmmoUI();
+                }
+            } else if (shouldRestoreSelection) {
+                this.phase_switchPhase('selection');
+                if (restoredMarbleTypes.length > 0 && typeof this.spawn_generateMarbleOptions === 'function') {
+                    const savedGuaranteedNextRound = (this.guaranteedNextRound || []).slice();
+                    this.guaranteedNextRound = restoredMarbleTypes.slice();
+                    this.spawn_generateMarbleOptions();
+                    this.guaranteedNextRound = savedGuaranteedNextRound;
+                    this.selectedMarbles = restoredSelectedMarbles.filter(i => Number.isInteger(i) && i >= 0 && i < this.marblesPool.length);
+                    this.selectionInjectedRune = restoredSelectionInjectedRune;
+                    this.selectionPreviewState = restoredSelectionPreviewState;
+                    document.querySelectorAll('#marble-selection-grid .select-card.selected').forEach(card => card.classList.remove('selected'));
+                    this.selectedMarbles.forEach(i => {
+                        const card = document.querySelector(`#marble-selection-grid .select-card[data-marble-index="${i}"]`);
+                        if (card) card.classList.add('selected');
+                    });
+                } else if (typeof this.spawn_generateMarbleOptions === 'function') {
+                    this.spawn_generateMarbleOptions();
+                }
+                if (typeof this.ui_refreshSelectionModeUI === 'function') {
+                    this.ui_refreshSelectionModeUI();
+                }
+                const previewIndex = (this.selectedMarbles || [])[0] ?? 0;
+                const previewMarble = (this.marblesPool || [])[previewIndex] || (this.marblesPool || [])[0];
+                if (previewMarble && typeof this.spawn_showMarblePreview === 'function') {
+                    this.spawn_showMarblePreview(previewMarble, null, {});
                 }
             } else {
                 this.sys_startRoundStartResolver();

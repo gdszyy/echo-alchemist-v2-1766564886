@@ -169,6 +169,12 @@ if avgFps > fpsThresholdUp (55):
 |------|---------|------|
 | 基底内部结构绘制（Layer 3.55） | `perfQualityLevel` | `high/medium`：允许少量 `screen` 混合与 `maw` / `gravityWell` 径向渐变；`low`：改用 `source-over` 与纯色线面，保留基底可读性但关闭高开销层 |
 
+### 5.5.2 词条位图覆盖层（`src/entities/enemy.js` → `Enemy._drawAffixBitmapOverlays`）
+
+| 位置 | 读取字段 | 行为 |
+|------|---------|------|
+| 通用词条 Overlay 位图叠层（Layer 3.96） | `perfQualityLevel` | `high`：每敌最多 2 次 `drawImage`；`medium/low`：每敌最多 1 次 `drawImage`。不新增粒子、渐变、`shadowBlur` 或预算字段；缺失/未加载资源时静默跳过，语义由 Canvas 词条层与短标签兜底 |
+
 ### 5.6 Arc Boss VFX（`src/entities/enemy.js` → Devourer Layer 6.5 & Ouroboros Layer 6.5）
 
 | 位置 | 读取字段 | 行为 |
@@ -267,6 +273,14 @@ if avgFps > fpsThresholdUp (55):
 
 | 日期 | 内容 |
 |------|------|
+| 2026-06-19 | **战斗发射器信号 V2.2**：`render_combat_launcherSignal()` 改为居中的下一发 HUD，集中展示弹体轮廓、弹药位图核心、`DMG` 伤害、`S` 散射弹数、散射扇形预览、`xN` 连射数、连射柱和装填格。该层复用现有弹药位图，绘制数量固定；`shadowBlur` 继续由 `perfQualityLevel !== 'low'` 门控，不新增粒子、渐变循环或 `CONFIG.performance` 预算字段。 |
+| 2026-06-19 | **钉盘编辑器放置预览**：模块 picker 在 hover/focus 候选组件时写入 `_moduleEditorPlacementPreview`，`render_moduleEditorOverlay()` 用平面填充和描边标记当前槽、可放置覆盖槽、不可放置覆盖槽。该反馈不新增粒子、渐变、混合模式或 `shadowBlur`，无需新增 `CONFIG.performance` 预算字段。 |
+| 2026-06-19 | **钉盘编辑器异形轮廓**：`render_moduleEditorOverlay()` 根据组件 `shape.footprint` 绘制导流翼、杯形、沙漏、螺旋等平面轮廓，帮助玩家在编辑态识别组件身份。该层只使用 `stroke`、`lineTo`、`quadraticCurveTo`、`arc/ellipse` 等廉价路径绘制，不新增粒子、渐变、混合模式或额外 `shadowBlur`。 |
+| 2026-06-19 | **钉盘模块接缝加密**：`moduleSpacingX/Y` 调整为 `0`，首发模块通过接缝钉补齐左右/上下模块之间的空白通道，并将顶部中段升级为 `2x1` 分裂符文桥。默认盘约 157 Peg / 5 SpecialSlot，接缝钉带近距保护以降低卡球风险。该修改仍只复用现有 `Peg` / `SpecialSlot`，不新增粒子、`shadowBlur`、渐变、混合模式或新预算字段；Peg 阴影/光晕继续由 `pegSoftShadow` / `pegGlowHalo` 三档门控。 |
+| 2026-06-19 | **初始钉盘 2x5 铺满与异形机关化**：默认开放前两行 10 个槽，首发组件提升到约 120 Peg / 5 SpecialSlot，并新增轻分裂门、连射门、轻回环、轻轮盘杯等真实机关模块。该修改复用现有 `Peg` / `SpecialSlot`、既有 `split` / `multicast` / `recall` / `wheel` 触发逻辑，不新增粒子、`shadowBlur`、渐变、混合模式或新预算字段；高开销 Peg 阴影/光晕仍由 `pegSoftShadow` / `pegGlowHalo` 三档门控。 |
+| 2026-06-19 | **钉盘钉子密度加密**：初始 6 个异形组件从约 35 颗 Peg 提升到约 58 颗 Peg，商店路线型组件同步补齐入口、转折和出口空洞。该修改只增加普通 Peg/少量既有类型 Peg，未新增粒子、`shadowBlur`、渐变、混合模式或新预算字段；高开销 Peg 阴影/光晕仍由 `pegSoftShadow` / `pegGlowHalo` 三档门控。 |
+| 2026-06-19 | **商店异形钉盘组件池扩展**：新增 6 个路线型商店组件（Y 字分流、沙漏门、月牙坡、螺旋回廊、棱镜分光、双轮桥），全部复用现有 `Peg` 与 `SpecialSlot` 绘制和触发逻辑，不新增粒子、`shadowBlur`、渐变或混合模式。性能影响仍主要来自同屏 Peg/Slot 数量，继续归入高密度模块化钉盘预算。 |
+| 2026-06-19 | **钉盘居中 3+3 初始布局与异形组件**：`moduleCols` 调整为 5，默认激活槽从 3 个提升到居中 `3+3` 两行共 6 个组件，并新增 6 个首发异形组件（导流翼、轻符文格、弹跳室、炼金核、接球杯）。该调整会提高初始 Peg 数量，但不新增粒子、`shadowBlur`、`createRadialGradient` 或混合模式；Peg 软阴影/光晕继续由 `pegSoftShadow` / `pegGlowHalo` 三档门控。 |
 | 2026-04-16 | 初始实现：FPS 采样器、三档等级预算、粒子/特效/Peg/敌人全面接入、FPS 指示层 |
 | 2026-04-16 | 新增 `sparkLimit`（high:100/medium:50/low:20）和 `smokeLimit`（high:60/medium:25/low:8）两个预算字段；在 `spawn_createParticle` 和 `spawn_pushParticleWithLimit` 中同步接入 spark/smoke 上限检查，防止能量泄漏、机械类受击等高频 spark 场景占用全局粒子预算 |
 | 2026-04-16 | **Arc Boss VFX 性能门控（Task T3 补丁）**：在三档预算表中新增 4 个字段：`arcBossVfxTriCount`（Ouroboros 狂暴三角形数量，high:6/medium:3/low:0）、`arcBossVfxLineCount`（Devourer 引力线数量，high:6/medium:6/low:3）、`arcBossVfxWhiteGrad`（Devourer 深渊核心 lighter 白化叠加开关，high/medium:true/low:false）、`arcBossVfxSuckProb`（Devourer 吸入粒子生成概率，high:0.7/medium:0.5/low:0.3）。在 `enemy.js` Devourer/Ouroboros Layer 6.5 中通过 `game.perfQualityLevel` 动态读取对应字段实施门控。同步更新消费端关联索引（第 5.6 节）。 |
@@ -277,6 +291,7 @@ if avgFps > fpsThresholdUp (55):
 | 2026-06-18 | **主循环省电控制**：新增 (1) 静态阶段降帧节流——非 combat/training/gathering 的菜单阶段及暂停态按 `CONFIG.performance.idleFrameInterval`(66ms≈15fps) 节流渲染，活跃阶段仍满帧；FPS 采样器仅在活跃阶段运行，避免菜单降帧误触发降级。(2) `visibilitychange` 后台硬停——页面隐藏时 `cancelAnimationFrame` 中断 rAF 链并 `audio.suspend()` 挂起音频上下文，恢复时重启循环并 `audio.resume()`。涉及 `game_system.js`(sys_loop/sys_setupVisibilityHandling)、`core.js`(状态初始化+注册)、`audio.js`(新增 suspend())、`config.js`(idleFrameInterval)。详见第 10 节。 |
 | 2026-06-18 | **敌人语义可读性提示**：`enemy.js` 新增足迹描边/占格分隔线、威胁等级角标与状态短标签（护盾、屏障、狂暴、毒素、温度）。该层只使用少量 `stroke` / `fillRect` / `fillText`，无渐变、无 `shadowBlur`、无混合模式、无粒子；语义提示在 `low` 档保留。 |
 | 2026-06-18 | **V2 基底轮廓降级**：`enemy.js` 的 `_drawArchetypeBody()` 按 `game.perfQualityLevel` 降级。high/medium 保留少量 `screen` 混合与 `maw` / `gravityWell` 径向渐变；low 关闭混合模式并改用纯色线面，保留基底身份但降低 fill-rate 与渐变开销。 |
+| 2026-06-19 | **词条位图 Overlay 试点**：`enemy.js` 新增 `_drawAffixBitmapOverlays()`，从 `enemy_sprite_manifest.json` 的 `overlays` 段读取通用词条覆盖层并叠加到非 Boss 敌人。`high` 每敌最多 2 次 `drawImage`，`medium/low` 最多 1 次；不新增粒子、渐变、`shadowBlur` 或预算字段，资源未就绪时直接跳过并由既有 Canvas 词条视觉/短标签兜底。 |
 | 2026-06-18 | **奖励标记低档平面兜底**：修复 `low` 档 `rewardHaloEnabled:false` 导致携带遗物/精华的敌人无任何视觉标记的玩法可读性回归。在 `enemy.js` Layer 6.8 的 `if (rewardHaloEnabled)` 增加 `else` 分支，绘制纯色双层描边平面版（遗物=金/混沌=紫红/纯净=蓝白），无 shadowBlur/渐变/旋转。新增消费端关联索引第 5.9 节并确立「语义类特效降级而非消失」约定。 |
 | 2026-04-30 | **毒素敌人专属特效**：新增 `venomLimit`（high:60/medium:30/low:0）预算字段；新增 `venom` 粒子模式（上浮液滴 + screen 渐变绘制）；在 `enemy.js` Layer 3.4 新增毒素状态视觉（径向渐变叠加 + 液滴流淌动画，三档门控）；在 `combat_system.js` 命中毒素时发射 1~4 颗毒液粒子。消费端关联索引见第 5.1/5.2/5.8 节。 |
 | 2026-06-18 | **高密度钉盘尺寸调整**：收集阶段 `marbleRadius` 下调，Peg 半径改读 `CONFIG.physics.pegRadius`，模块最小钉距改读配置化基础通行半径。该调整会提高 Peg 数量，但不新增粒子、混合模式或渐变层；高开销 Peg 阴影/光晕仍由 `pegSoftShadow` / `pegGlowHalo` 分档控制。 |

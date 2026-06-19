@@ -1,0 +1,512 @@
+[
+  {
+    "file": "assets/sprites/enemies/v2/enemy_bastion_3x1.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 29.17,
+    "bbox": [
+      5,
+      33,
+      505,
+      218
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 1757
+  },
+  {
+    "file": "assets/sprites/enemies/v2/enemy_deflector_2x1.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 20.66,
+    "bbox": [
+      5,
+      20,
+      499,
+      237
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 3865
+  },
+  {
+    "file": "assets/sprites/enemies/v2/enemy_echo_spire_1x2.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 17.4,
+    "bbox": [
+      5,
+      8,
+      471,
+      243
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 2334
+  },
+  {
+    "file": "assets/sprites/enemies/v2/enemy_gravity_core_3x3.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 12.17,
+    "bbox": [
+      4,
+      6,
+      507,
+      253
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 3990,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 6767
+  },
+  {
+    "file": "assets/sprites/enemies/v2/enemy_hive_2x3.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 54.42,
+    "bbox": [
+      5,
+      10,
+      503,
+      247
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 3654
+  },
+  {
+    "file": "assets/sprites/enemies/v2/enemy_maw_2x2.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 42.68,
+    "bbox": [
+      5,
+      10,
+      503,
+      247
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 5217
+  },
+  {
+    "file": "assets/sprites/enemies/v2/enemy_prism_1x3.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 14.66,
+    "bbox": [
+      4,
+      10,
+      477,
+      243
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 2524
+  },
+  {
+    "file": "assets/sprites/enemies/v2/enemy_siege_3x2.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 39.83,
+    "bbox": [
+      5,
+      10,
+      507,
+      241
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 1969
+  },
+  {
+    "file": "assets/sprites/enemies/archetypes/enemy_bastion_3x1.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 29.17,
+    "bbox": [
+      5,
+      33,
+      505,
+      218
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 1757
+  },
+  {
+    "file": "assets/sprites/enemies/archetypes/enemy_deflector_2x1.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 20.66,
+    "bbox": [
+      5,
+      20,
+      499,
+      237
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 3865
+  },
+  {
+    "file": "assets/sprites/enemies/archetypes/enemy_echo_spire_1x2.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 17.4,
+    "bbox": [
+      5,
+      8,
+      471,
+      243
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 2334
+  },
+  {
+    "file": "assets/sprites/enemies/archetypes/enemy_gravity_core_3x3.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 12.17,
+    "bbox": [
+      4,
+      6,
+      507,
+      253
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 3990,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 6767
+  },
+  {
+    "file": "assets/sprites/enemies/archetypes/enemy_hive_2x3.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 54.42,
+    "bbox": [
+      5,
+      10,
+      503,
+      247
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 3654
+  },
+  {
+    "file": "assets/sprites/enemies/archetypes/enemy_maw_2x2.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 42.68,
+    "bbox": [
+      5,
+      10,
+      503,
+      247
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 5217
+  },
+  {
+    "file": "assets/sprites/enemies/archetypes/enemy_prism_1x3.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 14.66,
+    "bbox": [
+      4,
+      10,
+      477,
+      243
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 2524
+  },
+  {
+    "file": "assets/sprites/enemies/archetypes/enemy_siege_3x2.png",
+    "w": 512,
+    "h": 256,
+    "fillPct": 39.83,
+    "bbox": [
+      5,
+      10,
+      507,
+      241
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": true,
+    "frames": null,
+    "bytes": 1969
+  },
+  {
+    "file": "assets/sprites/enemies/composites/enemy_bastion_heavyarmor_3x1_idle.png",
+    "w": 1680,
+    "h": 720,
+    "fillPct": 30.37,
+    "bbox": [
+      171,
+      171,
+      1508,
+      551
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 22932,
+    "placeholder": false,
+    "frames": null,
+    "bytes": 901088
+  },
+  {
+    "file": "assets/sprites/enemies/composites/enemy_maw_devour_2x2_idle.png",
+    "w": 1248,
+    "h": 1248,
+    "fillPct": 43.83,
+    "bbox": [
+      128,
+      143,
+      1122,
+      1107
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 73034,
+    "placeholder": false,
+    "frames": null,
+    "bytes": 1705243
+  },
+  {
+    "file": "assets/sprites/enemies/composites/enemy_residue_1x1_idle.png",
+    "w": 1248,
+    "h": 1248,
+    "fillPct": 18.04,
+    "bbox": [
+      207,
+      332,
+      892,
+      895
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 32512,
+    "placeholder": false,
+    "frames": null,
+    "bytes": 662708
+  },
+  {
+    "file": "assets/sprites/enemies/composites/enemy_siege_siege_3x2_idle.png",
+    "w": 1536,
+    "h": 1024,
+    "fillPct": 43.06,
+    "bbox": [
+      227,
+      105,
+      1305,
+      920
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 72872,
+    "placeholder": false,
+    "frames": null,
+    "bytes": 1727732
+  },
+  {
+    "file": "assets/sprites/enemies/composites/enemy_spire_echorelay_1x2_idle.png",
+    "w": 864,
+    "h": 1536,
+    "fillPct": 22.15,
+    "bbox": [
+      165,
+      159,
+      534,
+      1331
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 13011,
+    "placeholder": false,
+    "frames": null,
+    "bytes": 899384
+  },
+  {
+    "file": "assets/sprites/enemies/composites/enemy_ward_deflection_2x1_idle.png",
+    "w": 2560,
+    "h": 1440,
+    "fillPct": 40.81,
+    "bbox": [
+      263,
+      211,
+      2296,
+      1230
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 66995,
+    "placeholder": false,
+    "frames": null,
+    "bytes": 3515397
+  },
+  {
+    "file": "assets/icons/enemies/enemy_bastion_3x1.png",
+    "w": 64,
+    "h": 64,
+    "fillPct": 39.82,
+    "bbox": [
+      4,
+      16,
+      61,
+      45
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": null,
+    "frames": null,
+    "bytes": 1092
+  },
+  {
+    "file": "assets/icons/enemies/enemy_deflector_2x1.png",
+    "w": 64,
+    "h": 64,
+    "fillPct": 28.81,
+    "bbox": [
+      7,
+      10,
+      58,
+      55
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": null,
+    "frames": null,
+    "bytes": 2818
+  },
+  {
+    "file": "assets/icons/enemies/enemy_echo_spire_1x2.png",
+    "w": 64,
+    "h": 64,
+    "fillPct": 24.24,
+    "bbox": [
+      21,
+      4,
+      44,
+      58
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": null,
+    "frames": null,
+    "bytes": 1791
+  },
+  {
+    "file": "assets/icons/enemies/enemy_gravity_core_3x3.png",
+    "w": 64,
+    "h": 64,
+    "fillPct": 23.61,
+    "bbox": [
+      3,
+      3,
+      62,
+      62
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 140,
+    "placeholder": null,
+    "frames": null,
+    "bytes": 6582
+  },
+  {
+    "file": "assets/icons/enemies/enemy_hive_2x3.png",
+    "w": 64,
+    "h": 64,
+    "fillPct": 73.85,
+    "bbox": [
+      5,
+      5,
+      60,
+      60
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": null,
+    "frames": null,
+    "bytes": 1642
+  },
+  {
+    "file": "assets/icons/enemies/enemy_maw_2x2.png",
+    "w": 64,
+    "h": 64,
+    "fillPct": 58.59,
+    "bbox": [
+      5,
+      5,
+      60,
+      60
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 53,
+    "placeholder": null,
+    "frames": null,
+    "bytes": 4166
+  },
+  {
+    "file": "assets/icons/enemies/enemy_prism_1x3.png",
+    "w": 64,
+    "h": 64,
+    "fillPct": 20.73,
+    "bbox": [
+      18,
+      5,
+      47,
+      58
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": null,
+    "frames": null,
+    "bytes": 2540
+  },
+  {
+    "file": "assets/icons/enemies/enemy_siege_3x2.png",
+    "w": 64,
+    "h": 64,
+    "fillPct": 54.59,
+    "bbox": [
+      4,
+      5,
+      62,
+      50
+    ],
+    "greenVisible": 0,
+    "darkOpaque": 0,
+    "placeholder": null,
+    "frames": null,
+    "bytes": 1553
+  }
+]

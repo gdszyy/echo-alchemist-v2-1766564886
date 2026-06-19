@@ -1,0 +1,2066 @@
+[
+  {
+    "label": "pc-1440x900",
+    "width": 1440,
+    "height": 900,
+    "mobile": false,
+    "meta": {
+      "vw": 1440,
+      "vh": 900,
+      "phase": "meta",
+      "body": [
+        "pc-mode"
+      ],
+      "rects": {
+        "game": [
+          480,
+          23,
+          480,
+          853,
+          960,
+          877,
+          "block"
+        ],
+        "left": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "right": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "meta": [
+          480,
+          23,
+          480,
+          853,
+          960,
+          877,
+          "flex"
+        ],
+        "selection": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "gathering": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "truth": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ]
+      },
+      "overflowCount": 2,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[8",
+          "text": "",
+          "rect": [
+            320,
+            -147,
+            800,
+            800,
+            1120,
+            653
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-am",
+          "text": "",
+          "rect": [
+            432,
+            462,
+            500,
+            500,
+            932,
+            962
+          ]
+        }
+      ],
+      "textOverflowCount": 6,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "game-container",
+          "cls": "",
+          "text": "回聲煉金師 點擊開始 🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALI",
+          "size": [
+            512,
+            480,
+            853,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "phase-meta",
+          "cls": "ui-overlay active-phase",
+          "text": "🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE",
+          "size": [
+            512,
+            480,
+            853,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute inset-0 overflow-hidden pointer-events-none",
+          "text": "",
+          "size": [
+            640,
+            480,
+            939,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col items-center justify-center w-full h-full pb-1",
+          "text": "Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 \ud83d",
+          "size": [
+            512,
+            480,
+            781,
+            781
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "text-center mb-16 relative group cursor-default",
+          "text": "Echo Alchemist 回聲煉金師",
+          "size": [
+            512,
+            480,
+            197,
+            197
+          ]
+        },
+        {
+          "tag": "H1",
+          "id": "",
+          "cls": "text-6xl md:text-7xl font-bold text-transparent bg-clip-text",
+          "text": "Echo Alchemist",
+          "size": [
+            480,
+            480,
+            156,
+            144
+          ]
+        }
+      ]
+    },
+    "training": {
+      "vw": 1440,
+      "vh": 900,
+      "phase": "training",
+      "body": [
+        "pc-mode"
+      ],
+      "rects": {
+        "game": [
+          450,
+          23,
+          480,
+          853,
+          930,
+          877,
+          "block"
+        ],
+        "left": [
+          90,
+          0,
+          360,
+          900,
+          450,
+          900,
+          "flex"
+        ],
+        "right": [
+          930,
+          0,
+          420,
+          900,
+          1350,
+          900,
+          "flex"
+        ],
+        "meta": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "selection": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "gathering": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "truth": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ]
+      },
+      "overflowCount": 84,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "crt-overlay",
+          "cls": "active",
+          "text": "",
+          "rect": [
+            450,
+            23,
+            1440,
+            900,
+            1890,
+            923
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "boss-entrance-overlay",
+          "cls": "",
+          "text": "",
+          "rect": [
+            450,
+            23,
+            1440,
+            900,
+            1890,
+            923
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "train-control-panel",
+          "cls": "collapsed",
+          "text": "▲ 展开配置 子弹编辑 敌人配置 DAMAGE 10 - + BOUNCE 0 - + PIERCE 0 - ",
+          "rect": [
+            0,
+            860,
+            1240,
+            261,
+            1240,
+            1121
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex border-b border-slate-700 bg-slate-900/50",
+          "text": "子弹编辑 敌人配置",
+          "rect": [
+            0,
+            861,
+            160,
+            260,
+            160,
+            1121
+          ]
+        },
+        {
+          "tag": "BUTTON",
+          "id": "tab-btn-bullet",
+          "cls": "train-tab-btn active",
+          "text": "子弹编辑",
+          "rect": [
+            0,
+            861,
+            80,
+            259,
+            80,
+            1120
+          ]
+        },
+        {
+          "tag": "BUTTON",
+          "id": "tab-btn-enemy",
+          "cls": "train-tab-btn",
+          "text": "敌人配置",
+          "rect": [
+            80,
+            861,
+            80,
+            259,
+            160,
+            1120
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "panel-bullet",
+          "cls": "train-panel-content active",
+          "text": "DAMAGE 10 - + BOUNCE 0 - + PIERCE 0 - + SCATTER 0 - + M",
+          "rect": [
+            160,
+            861,
+            823,
+            260,
+            983,
+            1121
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col md:flex-row gap-4",
+          "text": "DAMAGE 10 - + BOUNCE 0 - + PIERCE 0 - + SCATTER 0 - + M",
+          "rect": [
+            176,
+            877,
+            791,
+            199,
+            967,
+            1076
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex-1",
+          "text": "DAMAGE 10 - + BOUNCE 0 - + PIERCE 0 - + SCATTER 0 - + M",
+          "rect": [
+            176,
+            877,
+            647,
+            199,
+            823,
+            1076
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "train-attr-grid",
+          "cls": "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2",
+          "text": "DAMAGE 10 - + BOUNCE 0 - + PIERCE 0 - + SCATTER 0 - + M",
+          "rect": [
+            176,
+            877,
+            647,
+            199,
+            823,
+            1076
+          ]
+        }
+      ],
+      "textOverflowCount": 3,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "game-container",
+          "cls": "",
+          "text": "回聲煉金師 點擊開始",
+          "size": [
+            1440,
+            480,
+            900,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "phase-training",
+          "cls": "ui-overlay active-phase",
+          "text": "COMBAT SIMULATION DPS: 0 | TOTAL: 0 退出 🔥 👾 ▲ 展开配置 子弹编",
+          "size": [
+            1440,
+            1440,
+            1121,
+            900
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "train-main-area",
+          "cls": "",
+          "text": "COMBAT SIMULATION DPS: 0 | TOTAL: 0 退出 🔥 👾 ▲ 展开配置 子弹编",
+          "size": [
+            1240,
+            1240,
+            1121,
+            900
+          ]
+        }
+      ]
+    },
+    "truth": {
+      "vw": 1440,
+      "vh": 900,
+      "phase": "truth_book",
+      "body": [
+        "pc-mode"
+      ],
+      "rects": {
+        "game": [
+          480,
+          23,
+          480,
+          853,
+          960,
+          877,
+          "block"
+        ],
+        "left": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "right": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "meta": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "selection": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "gathering": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "truth": [
+          480,
+          23,
+          480,
+          853,
+          960,
+          877,
+          "flex"
+        ]
+      },
+      "overflowCount": 98,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "truth-enemy-list",
+          "cls": "flex flex-col gap-2",
+          "text": "🛡️ 護盾魔像 高防御 🦠 分身魔像 受擊分裂 ⚡ 極速魔像 高速 😡 狂暴魔像 熱能轉化 💖 治癒魔",
+          "rect": [
+            504,
+            219,
+            136,
+            1125,
+            640,
+            1344
+          ]
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "cls": "truth-list-btn flex items-center gap-3 p-3 w-full bg-slate-8",
+          "text": "🔷 棱盾兽 2×1",
+          "rect": [
+            504,
+            899,
+            136,
+            60,
+            640,
+            958
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-2xl group-hover:scale-110 transition-transform filter d",
+          "text": "🔷",
+          "rect": [
+            517,
+            913,
+            33,
+            32,
+            550,
+            945
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col",
+          "text": "棱盾兽 2×1",
+          "rect": [
+            562,
+            912,
+            42,
+            34,
+            604,
+            945
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-sm font-bold text-slate-300 group-hover:text-cyan-100 t",
+          "text": "棱盾兽",
+          "rect": [
+            562,
+            912,
+            42,
+            20,
+            604,
+            932
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-[9px] text-slate-500 uppercase tracking-wider group-hov",
+          "text": "2×1",
+          "rect": [
+            562,
+            932,
+            42,
+            14,
+            604,
+            945
+          ]
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "cls": "truth-list-btn flex items-center gap-3 p-3 w-full bg-slate-8",
+          "text": "🔮 共振尖塔 1×2",
+          "rect": [
+            504,
+            974,
+            136,
+            60,
+            640,
+            1034
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-2xl group-hover:scale-110 transition-transform filter d",
+          "text": "🔮",
+          "rect": [
+            517,
+            988,
+            31,
+            32,
+            548,
+            1020
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col",
+          "text": "共振尖塔 1×2",
+          "rect": [
+            560,
+            987,
+            56,
+            34,
+            616,
+            1021
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-sm font-bold text-slate-300 group-hover:text-cyan-100 t",
+          "text": "共振尖塔",
+          "rect": [
+            560,
+            987,
+            56,
+            20,
+            616,
+            1007
+          ]
+        }
+      ],
+      "textOverflowCount": 2,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "w-1/3 flex flex-col gap-4 overflow-y-auto pr-2 custom-scroll",
+          "text": "敵人圖鑑 🛡️ 護盾魔像 高防御 🦠 分身魔像 受擊分裂 ⚡ 極速魔像 高速 😡 狂暴魔像 熱能轉化 \ud83d",
+          "size": [
+            144,
+            144,
+            2202,
+            669
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-6xl mb-4 opacity-50",
+          "text": "🔮",
+          "size": [
+            77,
+            77,
+            73,
+            60
+          ]
+        }
+      ]
+    },
+    "runEntry": {
+      "vw": 1440,
+      "vh": 900,
+      "phase": "truth_book",
+      "body": [
+        "pc-mode"
+      ],
+      "rects": {
+        "game": [
+          480,
+          23,
+          480,
+          853,
+          960,
+          877,
+          "block"
+        ],
+        "left": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "right": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "meta": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "selection": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "gathering": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "truth": [
+          480,
+          23,
+          480,
+          853,
+          960,
+          877,
+          "flex"
+        ]
+      },
+      "overflowCount": 98,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "truth-enemy-list",
+          "cls": "flex flex-col gap-2",
+          "text": "🛡️ 護盾魔像 高防御 🦠 分身魔像 受擊分裂 ⚡ 極速魔像 高速 😡 狂暴魔像 熱能轉化 💖 治癒魔",
+          "rect": [
+            504,
+            219,
+            136,
+            1125,
+            640,
+            1344
+          ]
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "cls": "truth-list-btn flex items-center gap-3 p-3 w-full bg-slate-8",
+          "text": "🔷 棱盾兽 2×1",
+          "rect": [
+            504,
+            899,
+            136,
+            60,
+            640,
+            958
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-2xl group-hover:scale-110 transition-transform filter d",
+          "text": "🔷",
+          "rect": [
+            517,
+            913,
+            33,
+            32,
+            550,
+            945
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col",
+          "text": "棱盾兽 2×1",
+          "rect": [
+            562,
+            912,
+            42,
+            34,
+            604,
+            945
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-sm font-bold text-slate-300 group-hover:text-cyan-100 t",
+          "text": "棱盾兽",
+          "rect": [
+            562,
+            912,
+            42,
+            20,
+            604,
+            932
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-[9px] text-slate-500 uppercase tracking-wider group-hov",
+          "text": "2×1",
+          "rect": [
+            562,
+            932,
+            42,
+            14,
+            604,
+            945
+          ]
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "cls": "truth-list-btn flex items-center gap-3 p-3 w-full bg-slate-8",
+          "text": "🔮 共振尖塔 1×2",
+          "rect": [
+            504,
+            974,
+            136,
+            60,
+            640,
+            1034
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-2xl group-hover:scale-110 transition-transform filter d",
+          "text": "🔮",
+          "rect": [
+            517,
+            988,
+            31,
+            32,
+            548,
+            1020
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col",
+          "text": "共振尖塔 1×2",
+          "rect": [
+            560,
+            987,
+            56,
+            34,
+            616,
+            1021
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-sm font-bold text-slate-300 group-hover:text-cyan-100 t",
+          "text": "共振尖塔",
+          "rect": [
+            560,
+            987,
+            56,
+            20,
+            616,
+            1007
+          ]
+        }
+      ],
+      "textOverflowCount": 2,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "w-1/3 flex flex-col gap-4 overflow-y-auto pr-2 custom-scroll",
+          "text": "敵人圖鑑 🛡️ 護盾魔像 高防御 🦠 分身魔像 受擊分裂 ⚡ 極速魔像 高速 😡 狂暴魔像 熱能轉化 \ud83d",
+          "size": [
+            144,
+            144,
+            2202,
+            669
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-6xl mb-4 opacity-50",
+          "text": "🔮",
+          "size": [
+            77,
+            77,
+            73,
+            60
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "label": "mobile-390x844",
+    "width": 390,
+    "height": 844,
+    "mobile": true,
+    "meta": {
+      "vw": 390,
+      "vh": 844,
+      "phase": "meta",
+      "body": [],
+      "rects": {
+        "game": [
+          0,
+          75,
+          390,
+          693,
+          390,
+          769,
+          "block"
+        ],
+        "left": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "right": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "meta": [
+          0,
+          75,
+          390,
+          693,
+          390,
+          769,
+          "flex"
+        ],
+        "selection": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "gathering": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "truth": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ]
+      },
+      "overflowCount": 14,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[8",
+          "text": "",
+          "rect": [
+            -205,
+            -63,
+            800,
+            800,
+            595,
+            737
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-am",
+          "text": "",
+          "rect": [
+            -39,
+            338,
+            500,
+            500,
+            461,
+            838
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute -left-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradie",
+          "text": "",
+          "rect": [
+            -32,
+            240,
+            4,
+            96,
+            -28,
+            336
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute -right-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradi",
+          "text": "",
+          "rect": [
+            418,
+            240,
+            4,
+            96,
+            422,
+            336
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute inset-0 bg-gradient-to-r from-indigo-600/0 via-indi",
+          "text": "",
+          "rect": [
+            -234,
+            440,
+            286,
+            91,
+            52,
+            531
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "info-drawer",
+          "cls": "absolute bottom-0 left-0 w-full bg-slate-900/95 backdrop-blu",
+          "text": "✕ 敵人狀態 特殊詞條 配方圖鑑 傷害統計 普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            0,
+            769,
+            390,
+            520,
+            390,
+            1289
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex-1 overflow-y-auto p-4 relative",
+          "text": "普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            0,
+            817,
+            390,
+            472,
+            390,
+            1289
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "tab-status",
+          "cls": "tab-content h-full space-y-3",
+          "text": "普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            16,
+            833,
+            358,
+            440,
+            374,
+            1273
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex items-center justify-between",
+          "text": "普通魔像 HP: 100/100",
+          "rect": [
+            16,
+            833,
+            358,
+            28,
+            374,
+            861
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "info-enemy-type",
+          "cls": "text-lg font-bold",
+          "text": "普通魔像",
+          "rect": [
+            16,
+            833,
+            72,
+            28,
+            88,
+            861
+          ]
+        }
+      ],
+      "textOverflowCount": 6,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "game-container",
+          "cls": "",
+          "text": "回聲煉金師 點擊開始 🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALI",
+          "size": [
+            422,
+            390,
+            1213,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "phase-meta",
+          "cls": "ui-overlay active-phase",
+          "text": "🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE",
+          "size": [
+            422,
+            390,
+            693,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute inset-0 overflow-hidden pointer-events-none",
+          "text": "",
+          "size": [
+            595,
+            390,
+            763,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col items-center justify-center w-full h-full pb-1",
+          "text": "Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 \ud83d",
+          "size": [
+            422,
+            390,
+            621,
+            621
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "text-center mb-16 relative group cursor-default",
+          "text": "Echo Alchemist 回聲煉金師",
+          "size": [
+            422,
+            390,
+            173,
+            173
+          ]
+        },
+        {
+          "tag": "H1",
+          "id": "",
+          "cls": "text-6xl md:text-7xl font-bold text-transparent bg-clip-text",
+          "text": "Echo Alchemist",
+          "size": [
+            390,
+            390,
+            130,
+            120
+          ]
+        }
+      ]
+    },
+    "training": {
+      "vw": 390,
+      "vh": 844,
+      "phase": "training",
+      "body": [],
+      "rects": {
+        "game": [
+          0,
+          75,
+          390,
+          693,
+          390,
+          769,
+          "block"
+        ],
+        "left": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "right": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "meta": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "selection": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "gathering": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "truth": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ]
+      },
+      "overflowCount": 97,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "crt-overlay",
+          "cls": "active",
+          "text": "",
+          "rect": [
+            0,
+            75,
+            390,
+            844,
+            390,
+            919
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "boss-entrance-overlay",
+          "cls": "",
+          "text": "",
+          "rect": [
+            0,
+            75,
+            390,
+            844,
+            390,
+            919
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "info-drawer",
+          "cls": "absolute bottom-0 left-0 w-full bg-slate-900/95 backdrop-blu",
+          "text": "✕ 敵人狀態 特殊詞條 配方圖鑑 傷害統計 普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            0,
+            769,
+            390,
+            520,
+            390,
+            1289
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex-1 overflow-y-auto p-4 relative",
+          "text": "普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            0,
+            817,
+            390,
+            472,
+            390,
+            1289
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "tab-status",
+          "cls": "tab-content h-full space-y-3",
+          "text": "普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            16,
+            833,
+            358,
+            440,
+            374,
+            1273
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex items-center justify-between",
+          "text": "普通魔像 HP: 100/100",
+          "rect": [
+            16,
+            833,
+            358,
+            28,
+            374,
+            861
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "info-enemy-type",
+          "cls": "text-lg font-bold",
+          "text": "普通魔像",
+          "rect": [
+            16,
+            833,
+            72,
+            28,
+            88,
+            861
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "info-hp",
+          "cls": "text-xs bg-slate-700 px-2 py-1 rounded",
+          "text": "HP: 100/100",
+          "rect": [
+            291,
+            835,
+            83,
+            24,
+            374,
+            859
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "w-full bg-slate-700 h-2 rounded-full overflow-hidden relativ",
+          "text": "",
+          "rect": [
+            16,
+            873,
+            358,
+            8,
+            374,
+            881
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute top-0 bottom-0 w-0.5 bg-white/50 left-1/2",
+          "text": "",
+          "rect": [
+            195,
+            873,
+            2,
+            8,
+            197,
+            881
+          ]
+        }
+      ],
+      "textOverflowCount": 7,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "game-container",
+          "cls": "",
+          "text": "回聲煉金師 點擊開始 ✕ 敵人狀態 特殊詞條 配方圖鑑 傷害統計 普通魔像 HP: 100/100 溫度: 0",
+          "size": [
+            390,
+            390,
+            1213,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "phase-training",
+          "cls": "ui-overlay active-phase",
+          "text": "COMBAT SIMULATION DPS: 0 | TOTAL: 0 退出 🔥 👾 ▲ 展开配置 子弹编",
+          "size": [
+            390,
+            390,
+            1227,
+            844
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "train-main-area",
+          "cls": "",
+          "text": "COMBAT SIMULATION DPS: 0 | TOTAL: 0 退出 🔥 👾 ▲ 展开配置 子弹编",
+          "size": [
+            230,
+            230,
+            1227,
+            844
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "panel-bullet",
+          "cls": "train-panel-content active",
+          "text": "DAMAGE 10 - + BOUNCE 0 - + PIERCE 0 - + SCATTER 0 - + M",
+          "size": [
+            233,
+            142,
+            467,
+            422
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col md:flex-row gap-4",
+          "text": "DAMAGE 10 - + BOUNCE 0 - + PIERCE 0 - + SCATTER 0 - + M",
+          "size": [
+            217,
+            110,
+            406,
+            406
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex-1",
+          "text": "DAMAGE 10 - + BOUNCE 0 - + PIERCE 0 - + SCATTER 0 - + M",
+          "size": [
+            217,
+            110,
+            406,
+            406
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "train-attr-grid",
+          "cls": "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2",
+          "text": "DAMAGE 10 - + BOUNCE 0 - + PIERCE 0 - + SCATTER 0 - + M",
+          "size": [
+            217,
+            110,
+            406,
+            406
+          ]
+        }
+      ]
+    },
+    "truth": {
+      "vw": 390,
+      "vh": 844,
+      "phase": "truth_book",
+      "body": [],
+      "rects": {
+        "game": [
+          0,
+          75,
+          390,
+          693,
+          390,
+          769,
+          "block"
+        ],
+        "left": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "right": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "meta": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "selection": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "gathering": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "truth": [
+          0,
+          75,
+          390,
+          693,
+          390,
+          769,
+          "flex"
+        ]
+      },
+      "overflowCount": 126,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "truth-enemy-list",
+          "cls": "flex flex-col gap-2",
+          "text": "🛡️ 護盾魔像 高防御 🦠 分身魔像 受擊分裂 ⚡ 極速魔像 高速 😡 狂暴魔像 熱能轉化 💖 治癒魔",
+          "rect": [
+            24,
+            271,
+            106,
+            1492,
+            130,
+            1763
+          ]
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "cls": "truth-list-btn flex items-center gap-3 p-3 w-full bg-slate-8",
+          "text": "👅 貪食魔像 吞噬友軍",
+          "rect": [
+            24,
+            789,
+            106,
+            93,
+            130,
+            882
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-2xl group-hover:scale-110 transition-transform filter d",
+          "text": "👅",
+          "rect": [
+            37,
+            820,
+            33,
+            32,
+            70,
+            852
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col",
+          "text": "貪食魔像 吞噬友軍",
+          "rect": [
+            82,
+            802,
+            35,
+            67,
+            117,
+            869
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-[9px] text-slate-500 uppercase tracking-wider group-hov",
+          "text": "吞噬友軍",
+          "rect": [
+            82,
+            842,
+            35,
+            27,
+            117,
+            869
+          ]
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "cls": "truth-list-btn flex items-center gap-3 p-3 w-full bg-slate-8",
+          "text": "🦘 跳躍魔像 越過障礙",
+          "rect": [
+            24,
+            898,
+            106,
+            93,
+            130,
+            991
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-2xl group-hover:scale-110 transition-transform filter d",
+          "text": "🦘",
+          "rect": [
+            37,
+            929,
+            33,
+            32,
+            70,
+            961
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col",
+          "text": "跳躍魔像 越過障礙",
+          "rect": [
+            82,
+            911,
+            35,
+            67,
+            117,
+            978
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-sm font-bold text-slate-300 group-hover:text-cyan-100 t",
+          "text": "跳躍魔像",
+          "rect": [
+            82,
+            911,
+            35,
+            40,
+            117,
+            951
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-[9px] text-slate-500 uppercase tracking-wider group-hov",
+          "text": "越過障礙",
+          "rect": [
+            82,
+            951,
+            35,
+            27,
+            117,
+            978
+          ]
+        }
+      ],
+      "textOverflowCount": 3,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "game-container",
+          "cls": "",
+          "text": "回聲煉金師 點擊開始 真理之書 Liber Veritatis ✕ 敵人圖鑑 🛡️ 護盾魔像 高防御 🦠 ",
+          "size": [
+            390,
+            390,
+            1213,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "w-1/3 flex flex-col gap-4 overflow-y-auto pr-2 custom-scroll",
+          "text": "敵人圖鑑 🛡️ 護盾魔像 高防御 🦠 分身魔像 受擊分裂 ⚡ 極速魔像 高速 😡 狂暴魔像 熱能轉化 \ud83d",
+          "size": [
+            114,
+            114,
+            2570,
+            509
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-6xl mb-4 opacity-50",
+          "text": "🔮",
+          "size": [
+            77,
+            77,
+            73,
+            60
+          ]
+        }
+      ]
+    },
+    "runEntry": {
+      "vw": 390,
+      "vh": 844,
+      "phase": "truth_book",
+      "body": [],
+      "rects": {
+        "game": [
+          0,
+          75,
+          390,
+          693,
+          390,
+          769,
+          "block"
+        ],
+        "left": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "right": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "meta": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "selection": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "gathering": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          "none"
+        ],
+        "truth": [
+          0,
+          75,
+          390,
+          693,
+          390,
+          769,
+          "flex"
+        ]
+      },
+      "overflowCount": 126,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "truth-enemy-list",
+          "cls": "flex flex-col gap-2",
+          "text": "🛡️ 護盾魔像 高防御 🦠 分身魔像 受擊分裂 ⚡ 極速魔像 高速 😡 狂暴魔像 熱能轉化 💖 治癒魔",
+          "rect": [
+            24,
+            271,
+            106,
+            1492,
+            130,
+            1763
+          ]
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "cls": "truth-list-btn flex items-center gap-3 p-3 w-full bg-slate-8",
+          "text": "👅 貪食魔像 吞噬友軍",
+          "rect": [
+            24,
+            789,
+            106,
+            93,
+            130,
+            882
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-2xl group-hover:scale-110 transition-transform filter d",
+          "text": "👅",
+          "rect": [
+            37,
+            820,
+            33,
+            32,
+            70,
+            852
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col",
+          "text": "貪食魔像 吞噬友軍",
+          "rect": [
+            82,
+            802,
+            35,
+            67,
+            117,
+            869
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-[9px] text-slate-500 uppercase tracking-wider group-hov",
+          "text": "吞噬友軍",
+          "rect": [
+            82,
+            842,
+            35,
+            27,
+            117,
+            869
+          ]
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "cls": "truth-list-btn flex items-center gap-3 p-3 w-full bg-slate-8",
+          "text": "🦘 跳躍魔像 越過障礙",
+          "rect": [
+            24,
+            898,
+            106,
+            93,
+            130,
+            991
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-2xl group-hover:scale-110 transition-transform filter d",
+          "text": "🦘",
+          "rect": [
+            37,
+            929,
+            33,
+            32,
+            70,
+            961
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col",
+          "text": "跳躍魔像 越過障礙",
+          "rect": [
+            82,
+            911,
+            35,
+            67,
+            117,
+            978
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-sm font-bold text-slate-300 group-hover:text-cyan-100 t",
+          "text": "跳躍魔像",
+          "rect": [
+            82,
+            911,
+            35,
+            40,
+            117,
+            951
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-[9px] text-slate-500 uppercase tracking-wider group-hov",
+          "text": "越過障礙",
+          "rect": [
+            82,
+            951,
+            35,
+            27,
+            117,
+            978
+          ]
+        }
+      ],
+      "textOverflowCount": 6,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "game-container",
+          "cls": "",
+          "text": "回聲煉金師 點擊開始 回合奖励 1/2：遗物线索 真理之書 Liber Veritatis ✕ 敵人圖鑑 🛡",
+          "size": [
+            390,
+            390,
+            1213,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "w-1/3 flex flex-col gap-4 overflow-y-auto pr-2 custom-scroll",
+          "text": "敵人圖鑑 🛡️ 護盾魔像 高防御 🦠 分身魔像 受擊分裂 ⚡ 極速魔像 高速 😡 狂暴魔像 熱能轉化 \ud83d",
+          "size": [
+            114,
+            114,
+            2570,
+            509
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "cls": "text-6xl mb-4 opacity-50",
+          "text": "🔮",
+          "size": [
+            77,
+            77,
+            73,
+            60
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "relic-icon",
+          "text": "❄🔥",
+          "size": [
+            36,
+            36,
+            56,
+            36
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "relic-preview-header",
+          "text": "❄🔥 冰火元素對 RARE",
+          "size": [
+            328,
+            328,
+            72,
+            48
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "relic-preview-icon",
+          "text": "❄🔥",
+          "size": [
+            48,
+            48,
+            72,
+            48
+          ]
+        }
+      ]
+    }
+  }
+]

@@ -13,6 +13,13 @@
 // Task 5.A5 — 弹药法球图标映射（属性 32×32）
 // key 对应 recipe 中的属性名 / MarbleDefinition.type
 // ============================================================
+const BITMAP_ASSET_VERSION = '20260619-bitmap-v3';
+
+function versionBitmapSrc(path) {
+    if (!path) return path;
+    return path.includes('?') ? `${path}&v=${BITMAP_ASSET_VERSION}` : `${path}?v=${BITMAP_ASSET_VERSION}`;
+}
+
 export const AMMO_ICON_MAP = {
     default:      'assets/icons/ammo/ammo_normal.png',
     normal:       'assets/icons/ammo/ammo_normal.png',
@@ -147,7 +154,7 @@ export function getEnemyV2IconSrc(key) {
  * @param {object} recipe - 弹药配方对象
  * @returns {string} 图标路径
  */
-export function getAmmoIconSrc(recipe) {
+function getAmmoIconSrcRaw(recipe) {
     if (!recipe) return AMMO_ICON_MAP.default;
     // [icon-fix] 优先识别特殊弹种（套娃 / 七彩 / 共鸣 / 飞剑 / 风），
     // 然后是 isLaser / explosive，最后才是元素/伤害属性。
@@ -173,6 +180,10 @@ export function getAmmoIconSrc(recipe) {
     return AMMO_ICON_MAP.default;
 }
 
+export function getAmmoIconSrc(recipe) {
+    return versionBitmapSrc(getAmmoIconSrcRaw(recipe));
+}
+
 /**
  * 通过单个属性 key（marble.type 或 recipe 属性名）直接获取弹药图标路径。
  * 用于命运选择卡片、替换子弹卡片等需要按"主属性"展示图标的场景。
@@ -181,7 +192,7 @@ export function getAmmoIconSrc(recipe) {
  */
 export function getAmmoIconSrcByKey(key) {
     if (!key) return null;
-    return AMMO_ICON_MAP[key] ?? null;
+    return versionBitmapSrc(AMMO_ICON_MAP[key] ?? null);
 }
 
 /**
@@ -190,7 +201,7 @@ export function getAmmoIconSrcByKey(key) {
  * @returns {string|null} 图标路径，null 表示无位图（fallback 到 emoji）
  */
 export function getRuneIconSrc(runeId) {
-    return RUNE_ICON_MAP[runeId] ?? null;
+    return versionBitmapSrc(RUNE_ICON_MAP[runeId] ?? null);
 }
 
 /**
@@ -199,7 +210,7 @@ export function getRuneIconSrc(runeId) {
  * @returns {string|null} 图标路径，null 表示无位图（fallback 到 emoji）
  */
 export function getRelicIconSrc(relicId) {
-    return RELIC_ICON_MAP[relicId] ?? null;
+    return versionBitmapSrc(RELIC_ICON_MAP[relicId] ?? null);
 }
 
 // ============================================================
@@ -251,19 +262,21 @@ export const ORBITAL_INTAKE = [
     'assets/ui/sprites/orbital_intake_3.png',
 ];
 
-export const EMITTER_BASE_SRC = 'assets/ui/sprites/emitter_base.png';
+export const EMITTER_BASE_SRC = 'assets/ui/sprites/emitter_base_v2.png';
+export const EMITTER_DRAW_SIZE = 128;
+export const EMITTER_PORT_OFFSET_Y = 44;
 export const EMITTER_CHARGING_SRCS = [
-    'assets/ui/sprites/emitter_charging_0.png',
-    'assets/ui/sprites/emitter_charging_1.png',
-    'assets/ui/sprites/emitter_charging_2.png',
-    'assets/ui/sprites/emitter_charging_3.png',
-    'assets/ui/sprites/emitter_charging_4.png',
-    'assets/ui/sprites/emitter_charging_5.png',
+    'assets/ui/sprites/emitter_charging_v2_0.png',
+    'assets/ui/sprites/emitter_charging_v2_1.png',
+    'assets/ui/sprites/emitter_charging_v2_2.png',
+    'assets/ui/sprites/emitter_charging_v2_3.png',
+    'assets/ui/sprites/emitter_charging_v2_4.png',
+    'assets/ui/sprites/emitter_charging_v2_5.png',
 ];
 
 // Canvas 背景位图（战斗 / 研磨阶段共用主底图，发射区单独叠加炼金台层）
-export const BG_MAIN_CANVAS_SRC   = 'assets/ui/backgrounds/bg_main_canvas.png';
-export const BG_EMITTER_ZONE_SRC  = 'assets/ui/backgrounds/bg_emitter_zone.png';
+export const BG_MAIN_CANVAS_SRC   = versionBitmapSrc('assets/ui/backgrounds/bg_main_canvas.png');
+export const BG_EMITTER_ZONE_SRC  = versionBitmapSrc('assets/ui/backgrounds/bg_emitter_zone.png');
 
 /**
  * 预热 UI 位图（在游戏启动早期调用，避免战斗首帧卡顿）。

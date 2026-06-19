@@ -6,8 +6,10 @@
  *   - 单个符文（按稀有度定价）
  *   - 模块槽位扩张（一次性 +1）
  *
- * 出现时机：每场战斗结束后，每 N 场（CONFIG.gameplay.runShopInterval）触发一次。
- * 关闭时直接进入下一阶段（round-start resolver）。
+ * 出现时机：
+ *   - round-start resolver 结算完遗物/精华后，按 runShopInterval 或 Boss 后节奏给出可选入口
+ *   - 放弃遗物时直接进入，并获得一笔局内碎片补偿
+ * 关闭时继续回合开始流程。
  *
  * 与 meta `src/ui/shop.js` 不同：
  *   - meta shop 是局间永久商店，使用 saveData.runeFragments
@@ -17,7 +19,7 @@
 
 import { CONFIG } from '../config.js';
 import { RUNE_DB } from '../rune_config.js';
-import { MODULE_DEFS, ATTR_PIN_TYPES, addModuleComponentToInventory } from '../pinboard_modules.js';
+import { MODULE_DEFS, ATTR_PIN_TYPES, addModuleComponentToInventory, getModuleMetaSummary } from '../pinboard_modules.js';
 
 const RUNE_PRICE_BY_RARITY = {
     common: 18,
@@ -58,44 +60,54 @@ function rollAttributePinType(game) {
     return candidates[candidates.length - 1].type;
 }
 
+function takeRandom(pool) {
+    if (!pool || pool.length === 0) return null;
+    const idx = Math.floor(Math.random() * pool.length);
+    return pool.splice(idx, 1)[0];
+}
+
+function countAffordable(items, fragments) {
+    return (items || []).filter(it => it && fragments >= it.price).length;
+}
+
 /**
  * 生成商品列表
  */
 function generateInventory(game, count) {
     const cfg = CONFIG.gameplay || {};
     const items = [];
-    const runesRatio = cfg.runShopRunesRatio != null ? cfg.runShopRunesRatio : 0.6;
-    const runeCount = Math.max(1, Math.floor(count * runesRatio));
-    const moduleCount = count - runeCount;
 
-    // 模块商品：购买得到的是单个组件实例，不是无限使用的模板解锁。
+    // 1. 构筑组件：购买得到的是单个组件实例，不是无限使用的模板解锁。
     const modulePool = Object.values(MODULE_DEFS).filter(d => d.price > 0 && !d.isAttrPin);
-    for (let i = 0; i < moduleCount && modulePool.length > 0; i++) {
-        const pickIdx = Math.floor(Math.random() * modulePool.length);
-        const def = modulePool.splice(pickIdx, 1)[0];
-        items.push({ kind: 'module', moduleId: def.id, name: def.name, icon: def.icon, desc: def.desc, price: def.price });
-    }
+    const addModuleItem = () => {
+        const def = takeRandom(modulePool);
+        if (!def) return false;
+        const meta = getModuleMetaSummary(def.id);
+        items.push({ kind: 'module', moduleId: def.id, name: def.name, icon: def.icon, desc: def.desc, meta, price: def.price, rarity: def.rarity });
+        return true;
+    };
+    addModuleItem();
 
-    // 槽位扩张（每次商店至少出现一次，若槽位未满）
+    // 2. 结构扩展：槽位扩张 / 特殊槽解锁 / 特殊槽数量，三者最多出现一个。
     const totalSlots = (cfg.moduleCols || 4) * (cfg.moduleRows || 3);
+    const utilityItems = [];
     if ((game.unlockedModuleSlots || cfg.moduleDefaultSlots || 3) < totalSlots) {
-        items.push({ kind: 'slot_expand', name: '模块槽位 +1', icon: '⊞', desc: `当前 ${game.unlockedModuleSlots || cfg.moduleDefaultSlots || 3}/${totalSlots}`, price: SLOT_EXPAND_PRICE });
+        utilityItems.push({ kind: 'slot_expand', name: '模块槽位 +1', icon: '⊞', desc: `当前 ${game.unlockedModuleSlots || cfg.moduleDefaultSlots || 3}/${totalSlots}`, price: SLOT_EXPAND_PRICE });
     }
-
-    // [v2] 特殊槽解锁：未解锁的类型作为商品出售
     const unlockedSlotSet = new Set(game.unlockedSlots || []);
     for (const slotType of Object.keys(SLOT_TYPE_META)) {
         if (!unlockedSlotSet.has(slotType)) {
             const meta = SLOT_TYPE_META[slotType];
-            items.push({ kind: 'slot_unlock', slotType, name: meta.name, icon: meta.icon, desc: meta.desc, price: SLOT_UNLOCK_PRICE });
+            utilityItems.push({ kind: 'slot_unlock', slotType, name: meta.name, icon: meta.icon, desc: meta.desc, price: SLOT_UNLOCK_PRICE });
         }
     }
-    // [v2] 特殊槽数量 +1（最多 3）
     if ((game.slotCount || 0) < 3) {
-        items.push({ kind: 'slot_count', name: '特殊槽數量 +1', icon: '🔨', desc: `當前 ${game.slotCount || 0}/3`, price: SLOT_COUNT_PRICE });
+        utilityItems.push({ kind: 'slot_count', name: '特殊槽數量 +1', icon: '🔨', desc: `當前 ${game.slotCount || 0}/3`, price: SLOT_COUNT_PRICE });
     }
+    const utility = takeRandom(utilityItems);
+    if (utility) items.push(utility);
 
-    // [v2] 属性钉板：按当前属性权重随机刷出一个带属性的钉板模块
+    // 3. 属性钉板：按当前属性权重随机刷出一个带属性的钉板模块。
     const attrPinType = rollAttributePinType(game);
     if (attrPinType) {
         const moduleId = `attr_pin_${attrPinType}`;
@@ -114,13 +126,14 @@ function generateInventory(game, count) {
         }
     }
 
-    // 符文商品：从 RUNE_DB 随机抽
+    // 4. 符文商品：保底至少一个，其余按缺口补齐到目标数量。
     const allRunes = (RUNE_DB || []).filter(r => r && r.id);
-    for (let i = 0; i < runeCount && allRunes.length > 0; i++) {
+    while (items.length < count && allRunes.length > 0) {
         const r = allRunes[Math.floor(Math.random() * allRunes.length)];
         const price = RUNE_PRICE_BY_RARITY[r.rarity] || 25;
         items.push({ kind: 'rune', runeId: r.id, name: r.name || r.id, icon: r.icon || '🔮', desc: r.desc || `${r.element} 符文`, price, rarity: r.rarity });
     }
+    while (items.length < count && addModuleItem()) {}
 
     return items;
 }
@@ -130,11 +143,13 @@ export const run_shop = {
      * 打开局内商店
      * @param {Function} onClose - 关闭后的回调
      */
-    ui_showRunShop(onClose) {
+    ui_showRunShop(onClose, options = {}) {
         const cfg = CONFIG.gameplay || {};
         if (!Array.isArray(this.runShopInventory) || this.runShopInventory.length === 0) {
             this.runShopInventory = generateInventory(this, cfg.runShopItemsPerOffer || 5);
         }
+        this._runShopOpenedRound = this.round || 0;
+        this._runShopReason = options.reason || this._runShopReason || 'manual';
         this._runShopOnClose = onClose || null;
 
         let overlay = document.getElementById('run-shop-overlay');
@@ -153,6 +168,76 @@ export const run_shop = {
         }
         overlay.style.display = 'flex';
         this.ui_renderRunShop();
+    },
+
+    ui_offerRunShop(onClose, reason = 'interval') {
+        const cfg = CONFIG.gameplay || {};
+        if (!Array.isArray(this.runShopInventory) || this.runShopInventory.length === 0) {
+            this.runShopInventory = generateInventory(this, cfg.runShopItemsPerOffer || 5);
+        }
+        this._runShopOpenedRound = this.round || 0;
+        this._runShopReason = reason;
+
+        const fragments = this.runFragments || 0;
+        const affordableCount = countAffordable(this.runShopInventory, fragments);
+        let overlay = document.getElementById('run-shop-offer-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'run-shop-offer-overlay';
+            overlay.style.cssText = `
+                position: fixed; inset: 0; z-index: 244;
+                background: rgba(2, 6, 23, 0.72);
+                display: flex; align-items: center; justify-content: center;
+                padding: 18px; box-sizing: border-box;
+                font-family: 'Cinzel', 'Microsoft YaHei', sans-serif;
+                color: #e2e8f0;
+            `;
+            document.body.appendChild(overlay);
+        }
+        const reasonText = reason === 'boss' ? 'Boss 余波后，商人带来了稀有货架。' : '商人到访，可在下一轮研磨前调整构筑。';
+        const openDisabled = affordableCount <= 0;
+        overlay.innerHTML = `
+            <div style="width:min(420px, 100%);background:rgba(15,23,42,0.97);border:1px solid rgba(168,85,247,0.45);border-radius:12px;padding:18px;box-shadow:0 18px 45px rgba(0,0,0,0.35);">
+                <div style="font-size:18px;font-weight:bold;color:#c084fc;margin-bottom:6px;">局内商人</div>
+                <div style="font-size:12px;color:#94a3b8;line-height:1.6;margin-bottom:12px;">${reasonText}</div>
+                <div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;margin-bottom:14px;">
+                    <span>持有 <b style="color:#fbbf24;">${fragments} 🔮</b></span>
+                    <span>可购买 <b style="color:${affordableCount > 0 ? '#86efac' : '#f87171'};">${affordableCount}</b> 件</span>
+                </div>
+                <div style="display:flex;gap:10px;justify-content:flex-end;">
+                    <button id="run-shop-offer-skip" style="padding:8px 12px;background:rgba(30,41,59,0.9);color:#cbd5e1;border:1px solid rgba(148,163,184,0.35);border-radius:6px;cursor:pointer;">继续</button>
+                    <button id="run-shop-offer-open" ${openDisabled ? 'disabled' : ''} style="padding:8px 14px;background:${openDisabled ? 'rgba(51,65,85,0.8)' : 'rgba(168,85,247,0.68)'};color:${openDisabled ? '#64748b' : '#fff'};border:1px solid rgba(216,180,254,0.65);border-radius:6px;cursor:${openDisabled ? 'not-allowed' : 'pointer'};font-weight:bold;">进入商店</button>
+                </div>
+            </div>
+        `;
+        overlay.style.display = 'flex';
+        const closeOffer = () => {
+            overlay.style.display = 'none';
+            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        };
+        const skipBtn = overlay.querySelector('#run-shop-offer-skip');
+        if (skipBtn) {
+            skipBtn.addEventListener('click', () => {
+                this.runShopInventory = [];
+                closeOffer();
+                if (typeof onClose === 'function') onClose();
+            });
+        }
+        const openBtn = overlay.querySelector('#run-shop-offer-open');
+        if (openBtn && !openDisabled) {
+            openBtn.addEventListener('click', () => {
+                closeOffer();
+                this.ui_showRunShop(onClose, { reason });
+            });
+        }
+    },
+
+    ui_hasAffordableRunShopItem() {
+        const cfg = CONFIG.gameplay || {};
+        if (!Array.isArray(this.runShopInventory) || this.runShopInventory.length === 0) {
+            this.runShopInventory = generateInventory(this, cfg.runShopItemsPerOffer || 5);
+        }
+        return countAffordable(this.runShopInventory, this.runFragments || 0) > 0;
     },
 
     ui_hideRunShop() {
@@ -178,12 +263,14 @@ export const run_shop = {
             const rarityColor = it.rarity === 'legendary' ? '#facc15' :
                 it.rarity === 'epic' ? '#a855f7' :
                     it.rarity === 'rare' ? '#3b82f6' : '#94a3b8';
+            const metaHtml = it.meta ? `<div style="font-size:9px;color:${rarityColor};line-height:1.35;text-transform:uppercase;">${it.meta}</div>` : '';
             return `<div data-item-idx="${i}" class="run-shop-item" style="cursor:${cursor};opacity:${opacity};background:rgba(30, 41, 59, 0.7);border:1px solid ${rarityColor};border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;transition:all 0.15s;">
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                     <div style="font-size:22px;">${it.icon}</div>
                     <div style="font-size:12px;font-weight:bold;color:${rarityColor};">${it.price} 🔮</div>
                 </div>
                 <div style="font-size:13px;font-weight:bold;">${it.name}</div>
+                ${metaHtml}
                 <div style="font-size:10px;color:#94a3b8;line-height:1.4;">${it.desc}</div>
             </div>`;
         }).join('');
@@ -220,6 +307,7 @@ export const run_shop = {
                 this.runFragments -= refreshCost;
                 this.runShopInventory = generateInventory(this, cfg.runShopItemsPerOffer || 5);
                 this.runShopRefreshes = (this.runShopRefreshes || 0) + 1;
+                if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
                 this.ui_renderRunShop();
             });
         }
@@ -227,6 +315,7 @@ export const run_shop = {
         if (closeBtn) {
             closeBtn.addEventListener('click', () => {
                 this.runShopInventory = []; // 离开后清空，下次重新生成
+                if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
                 this.ui_hideRunShop();
             });
         }
@@ -266,6 +355,7 @@ export const run_shop = {
         this.runFragments -= it.price;
         // 售出后从商店列表移除
         inventory.splice(idx, 1);
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
         this.ui_renderRunShop();
     },
 };

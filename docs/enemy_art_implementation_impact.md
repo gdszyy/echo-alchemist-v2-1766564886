@@ -160,6 +160,7 @@ V2 专属词条已经具备基础绘制识别，但还需要补齐“常驻、�
 
 - `src/render/sprite_renderer.js` 的 `createSpriteRenderer({ type, baseArchetype, gridCols, gridRows, affixes, ... })` 现在第一步就调用 `resolveEnemyVisualAsset`，命中 composite/archetype 时直接使用 manifest 给出的路径；命中失败再回退到既有 V2 metadata，再回退到 `golem_elite` / `golem_normal`，最后由 SpriteRenderer 自身的 failed 状态触发 Canvas 矢量绘制。
 - `src/entities/enemy.js` 的 `Enemy.initSprite()` 已传入完整 `gridCols / gridRows / affixes`，让组合 Sprite 能被命中。
+- `src/entities/enemy.js` 的 `_drawAffixBitmapOverlays()` 会读取 `resolveEnemyVisualAsset(enemy).overlayPaths`，把通用词条覆盖层叠加在非 Boss 敌人的 Sprite/基底之上；资源缺失或未加载时静默跳过，继续保留既有 Canvas 词条视觉与短标签兜底。
 - `src/systems.js` 的 `buildEnemyV2Scenarios` 不再硬编码 `placeholder` 字段，而是调用 `resolveEnemyVisualAsset` + `describeAssetHitStatus`，把 `Sprite / Composite Sprite / Overlay / Vector fallback / Missing asset` 标签同时显示在场景卡片的徽标和说明面板中。
 
 ## 8. 试炼场验收说明（enemy_v2 分类）

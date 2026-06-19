@@ -1,6 +1,6 @@
 # src\pinboard_modules.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 865 | 函数数: 47 | 语言: javascript
+> 自动生成于 2026-06-19 | 总行数: 1492 | 函数数: 73 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -18,12 +18,20 @@
 | normalizeModuleEntry | function | `normalizeModuleEntry(entry)` |  |
 | normalizeModuleInventory | function | `normalizeModuleInventory(inventory)` |  |
 | addModuleComponentToInventory | function | `addModuleComponentToInventory(inventory, moduleId)` |  |
+| getDefaultSlotOrder | function | `getDefaultSlotOrder(totalSlots, cfg = CONFIG.gameplay || {})` |  |
+| getActiveModuleSlots | function | `getActiveModuleSlots(unlockedSlots, totalSlots, cfg = CONFIG.gameplay || {})` |  |
+| getActiveModuleSlotSet | function | `getActiveModuleSlotSet(unlockedSlots, totalSlots, cfg = CONFIG.gameplay || {})` |  |
+| migrateModuleLayoutToCurrentGrid | function | `migrateModuleLayoutToCurrentGrid(layout, totalSlots, defaultSlots)` |  |
 | ensureModuleLayoutInstances | function | `ensureModuleLayoutInstances(layout, totalSlots, defaultSlots = CONFIG.gameplay.moduleDefaultSlots || 3)` |  |
 | getRandomPegTypeFromWeights | function | `getRandomPegTypeFromWeights(weights)` |  |
 | applyWeightedPegTypes | function | `applyWeightedPegTypes(pegs, ctx)` |  |
 | generateStaggeredPegs | function | `generateStaggeredPegs(originX, originY, w, h, cols, rows, type = 'normal')` |  |
 | generateFunnelPegs | function | `generateFunnelPegs(originX, originY, w, h, topCols, rows)` |  |
 | markFusionFocus | function | `markFusionFocus(pegs, originX, originY, w, h, maxPriority = 3)` |  |
+| makePegAt | function | `makePegAt(ox, oy, w, h, px, py, type = 'normal', row = 0, col = 0)` |  |
+| hasNearbyPeg | function | `hasNearbyPeg(pegs, x, y, minDistance)` |  |
+| addModuleSeamPegs | function | `addModuleSeamPegs(pegs, ox, oy, w, h, moduleId)` |  |
+| buildGuideFin | function | `buildGuideFin(ox, oy, w, h, mirror = false)` |  |
 | build | method | `build(ox, oy, w, h)` |  |
 | build | method | `build(ox, oy, w, h)` |  |
 | build | method | `build(ox, oy, w, h)` |  |
@@ -48,6 +56,23 @@
 | build | method | `build(ox, oy, w, h)` |  |
 | build | method | `build(ox, oy, w, h)` |  |
 | build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
 | createDefaultModuleLayout | function | `createDefaultModuleLayout(totalSlots, activeSlots = CONFIG.gameplay.moduleDefaultSlots || 3)` |  |
 | selectFusionTargetPegs | function | `selectFusionTargetPegs(pegs, fusion, canvasWidth, canvasHeight, randomize = false)` |  |
 | applyModulePegStates | function | `applyModulePegStates(pegs, ctx, moduleInstance)` |  |
@@ -55,4 +80,5 @@
 | buildModuleEntities | function | `buildModuleEntities(moduleEntry, originX, originY, width, height, ctx, slotIdx)` |  |
 | calcModuleSlotRect | function | `calcModuleSlotRect(slotIdx, canvasWidth, canvasHeight, cfg, span)` |  |
 | getModuleSpan | function | `getModuleSpan(moduleId)` |  |
+| getModuleMetaSummary | function | `getModuleMetaSummary(moduleId)` |  |
 | getCoveredSlots | function | `getCoveredSlots(anchorIdx, span, totalCols, totalRows)` |  |

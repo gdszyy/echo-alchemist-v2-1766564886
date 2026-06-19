@@ -283,6 +283,99 @@
 }
 
 /* 替换页跳过按钮：金属底板 */
+/* 普通命运抉择卡：复用替换页位图框，统一选择页视觉语言。 */
+#phase-selection .select-card {
+    background:
+        linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(2, 6, 23, 0.88)) !important;
+    border: none !important;
+    border-image-slice: 24 24 24 24;
+    border-image-width: 10px;
+    border-image-outset: 0;
+    border-image-repeat: stretch;
+    box-sizing: border-box;
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.34);
+}
+
+#phase-selection .select-card[data-tier="C"] {
+    background-image:
+        url('../../assets/ui/sprites/replace_card_frame_C_9s.png'),
+        linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(2, 6, 23, 0.88)) !important;
+    background-size: 100% 100%, cover !important;
+    background-position: center, center !important;
+    background-repeat: no-repeat, no-repeat !important;
+}
+
+#phase-selection .select-card[data-tier="B"] {
+    background-image:
+        url('../../assets/ui/sprites/replace_card_frame_B_9s.png'),
+        linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(2, 6, 23, 0.88)) !important;
+    background-size: 100% 100%, cover !important;
+    background-position: center, center !important;
+    background-repeat: no-repeat, no-repeat !important;
+}
+
+#phase-selection .select-card[data-tier="A"] {
+    background-image:
+        url('../../assets/ui/sprites/replace_card_frame_A_9s.png'),
+        linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(2, 6, 23, 0.88)) !important;
+    background-size: 100% 100%, cover !important;
+    background-position: center, center !important;
+    background-repeat: no-repeat, no-repeat !important;
+    border-image-width: 11px;
+}
+
+#phase-selection .select-card[data-tier="S"] {
+    background-image:
+        url('../../assets/ui/sprites/replace_card_frame_S_9s.png'),
+        linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(2, 6, 23, 0.88)) !important;
+    background-size: 100% 100%, cover !important;
+    background-position: center, center !important;
+    background-repeat: no-repeat, no-repeat !important;
+    border-image-width: 12px;
+}
+
+#phase-selection .select-card::before {
+    background:
+        linear-gradient(135deg, rgba(255,255,255,0.08), transparent 45%),
+        radial-gradient(circle at 50% 0%, rgba(56,189,248,0.14), transparent 58%) !important;
+}
+
+#phase-selection .select-card.selected {
+    filter: brightness(1.14);
+    box-shadow:
+        0 12px 28px rgba(0, 0, 0, 0.46),
+        0 0 18px rgba(250, 204, 21, 0.34) !important;
+}
+
+#phase-selection .select-icon-wrap {
+    background: url('../../assets/ui/sprites/replace_card_attr_slot.png') center/contain no-repeat;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45));
+}
+
+#phase-selection .select-icon {
+    transform: scale(0.78);
+}
+
+#phase-selection .select-icon-emoji {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(2, 6, 23, 0.68);
+}
+
+#phase-selection .select-icon-emoji img {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+#phase-selection .select-card-name {
+    color: #f8fafc !important;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+}
+
 #replace-ammo-skip-btn {
     background: url('../../assets/ui/sprites/skip_btn_metal.png') center/contain no-repeat !important;
     border: none !important;
@@ -394,6 +487,103 @@
     background-color: #020617 !important;
 }
 
+@media (max-width: 720px) {
+    #phase-truth-book > .flex.flex-col {
+        padding: 14px !important;
+        gap: 10px;
+    }
+
+    #phase-truth-book > .flex.flex-col > .flex.justify-between {
+        margin-bottom: 10px !important;
+        align-items: flex-start !important;
+        gap: 12px;
+    }
+
+    #phase-truth-book h2 {
+        font-size: 1.45rem !important;
+        line-height: 1.1;
+    }
+
+    #phase-truth-book h2 span {
+        display: block;
+        margin-left: 0 !important;
+        margin-top: 4px;
+        font-size: 0.66rem !important;
+        letter-spacing: 0.12em;
+    }
+
+    #phase-truth-book > .flex.flex-col > .flex.flex-1 {
+        flex-direction: column !important;
+        gap: 12px !important;
+    }
+
+    #phase-truth-book .w-1\/3.custom-scrollbar {
+        width: 100% !important;
+        flex: 0 0 auto;
+        max-height: 188px;
+        overflow-y: hidden !important;
+        overflow-x: auto !important;
+        padding-right: 0 !important;
+    }
+
+    #truth-enemy-list,
+    #truth-attr-list {
+        flex-direction: row !important;
+        gap: 8px !important;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 4px;
+        scroll-snap-type: x proximity;
+    }
+
+    #phase-truth-book .truth-list-btn {
+        flex: 0 0 132px;
+        min-width: 132px;
+        min-height: 74px;
+        padding: 10px !important;
+        scroll-snap-align: start;
+    }
+
+    #phase-truth-book .truth-list-btn .text-2xl {
+        font-size: 1.45rem !important;
+    }
+
+    #phase-truth-book .truth-list-btn .text-sm {
+        font-size: 0.78rem !important;
+        line-height: 1.25;
+    }
+
+    #phase-truth-book .truth-list-btn .text-\[9px\] {
+        font-size: 0.62rem !important;
+        line-height: 1.25;
+    }
+
+    #truth-detail-panel {
+        min-height: 330px;
+        border-radius: 14px !important;
+    }
+
+    #truth-empty-state {
+        padding: 0 18px;
+        text-align: center;
+    }
+
+    #truth-empty-state p {
+        white-space: normal;
+        line-height: 1.5;
+        font-size: 0.66rem !important;
+    }
+
+    #truth-content > .p-5 {
+        padding: 12px !important;
+    }
+
+    #truth-item-name {
+        font-size: 1.2rem !important;
+        line-height: 1.15;
+    }
+}
+
 /* =====================================================
    §1.14 设置弹窗 9-Slice（#settings-panel）
    ===================================================== */
@@ -446,3 +636,298 @@
     background-color: #020617 !important;
 }
 
+/* =====================================================
+   2026-06-19 Rune Launcher V2
+   Uses new generated bitmap assets for the denser launcher UI:
+   - assets/ui/panels/rune_launcher_v2_9s.png
+   - assets/ui/panels/rune_grid_v2_9s.png
+   - assets/ui/sprites/rune_info_plate_v2_9s.png
+   ===================================================== */
+#phase-rune-launcher {
+    --launcher-bg: rgba(7, 10, 23, 0.96);
+    --launcher-panel: rgba(15, 23, 42, 0.76);
+    --launcher-line: rgba(100, 116, 139, 0.28);
+    --launcher-text: #e5edf8;
+    --launcher-muted: #8ea0b8;
+    --launcher-accent: #38bdf8;
+    --launcher-good: #34d399;
+}
+
+#phase-rune-launcher > .rune-launcher-card {
+    width: 100%;
+    max-width: min(400px, calc(100vw - 20px)) !important;
+    height: 100%;
+    margin: 0 auto;
+    padding: 18px !important;
+    gap: 12px;
+    color: var(--launcher-text);
+    background: rgba(2, 6, 23, 0.18) !important;
+    border-image-source: url('../../assets/ui/panels/rune_launcher_v2_9s.png') !important;
+    border-image-slice: 64 64 64 64 fill;
+    border-image-width: 42px 34px 42px 34px;
+    border-image-outset: 0;
+    border-image-repeat: stretch;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.65) transparent;
+}
+
+#phase-rune-launcher .rune-launcher-card::-webkit-scrollbar { width: 5px; }
+#phase-rune-launcher .rune-launcher-card::-webkit-scrollbar-track { background: transparent; }
+#phase-rune-launcher .rune-launcher-card::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.65);
+    border-radius: 999px;
+}
+
+#phase-rune-launcher .rune-launcher-card > .flex.justify-between {
+    flex: 0 0 auto;
+    min-height: 38px;
+    margin-bottom: 0 !important;
+    padding: 0 2px 10px;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.24);
+}
+
+#phase-rune-launcher .rune-launcher-card h2 {
+    color: #f8fafc !important;
+    font-size: 1.08rem !important;
+    line-height: 1.2;
+    letter-spacing: 0.08em !important;
+    text-align: center;
+    text-shadow: 0 0 12px rgba(56, 189, 248, 0.22);
+}
+
+#phase-rune-launcher .rune-launcher-close-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid var(--launcher-line);
+    background: rgba(15, 23, 42, 0.72);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#launcher-shard-display {
+    height: 30px;
+    border-radius: 8px !important;
+    background: rgba(15, 23, 42, 0.76) !important;
+    border-color: rgba(56, 189, 248, 0.32) !important;
+    color: #dbeafe;
+}
+
+#rune-tab-launcher,
+#rune-tab-management,
+#rune-tab-codex {
+    min-width: 0;
+    height: 34px;
+    border: 0 !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    color: var(--launcher-muted) !important;
+    letter-spacing: 0.06em !important;
+    box-shadow: none !important;
+    border-image-source: url('../../assets/ui/sprites/rune_info_plate_v2_9s.png') !important;
+    border-image-slice: 40 72 40 72 fill;
+    border-image-width: 14px 18px;
+    border-image-repeat: stretch;
+}
+
+#rune-tab-launcher[data-active="true"],
+#rune-tab-management[data-active="true"],
+#rune-tab-codex[data-active="true"] {
+    color: #e0f2fe !important;
+    filter: brightness(1.16) drop-shadow(0 0 8px rgba(56, 189, 248, 0.26));
+}
+
+#phase-rune-launcher .rune-launcher-card > .flex.gap-2 {
+    flex: 0 0 auto;
+    margin-bottom: 0 !important;
+    padding: 4px !important;
+    border: 1px solid rgba(56, 189, 248, 0.18) !important;
+    border-radius: 10px;
+    background: rgba(2, 6, 23, 0.46);
+}
+
+#rune-launcher-content:not(.hidden),
+#rune-management-panel:not(.hidden),
+#rune-codex-panel:not(.hidden) {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#rune-launcher-content > div,
+#rune-management-panel > div:not(#rune-action-result),
+#rune-codex-panel > div {
+    margin-bottom: 0 !important;
+}
+
+#rune-launcher-content > div,
+#rune-management-panel > div:not(#rune-action-result),
+#rune-codex-panel > div:not(:first-child) {
+    border: 0 !important;
+    border-radius: 8px;
+    background: transparent !important;
+    padding: 12px;
+    border-image-source: url('../../assets/ui/sprites/rune_info_plate_v2_9s.png') !important;
+    border-image-slice: 40 72 40 72 fill;
+    border-image-width: 14px 18px;
+    border-image-repeat: stretch;
+}
+
+#rune-codex-panel > div:first-child,
+#rune-management-panel > div:first-child {
+    color: #b6c5da;
+    border: 0;
+    background: transparent;
+    padding: 0;
+}
+
+#rune-grid-container {
+    width: min(100%, 228px);
+    max-width: 228px !important;
+    aspect-ratio: 1 / 1;
+    box-sizing: border-box;
+    gap: 10px !important;
+    padding: 14px !important;
+    border-image-source: url('../../assets/ui/panels/rune_grid_v2_9s.png') !important;
+    border-image-slice: 32 32 32 32 fill;
+    border-image-width: 24px;
+    border-image-repeat: stretch;
+}
+
+#rune-inventory-container,
+#rune-management-inventory {
+    min-height: 56px !important;
+    max-height: 188px;
+    overflow-y: auto;
+    padding: 8px !important;
+    border: 1px solid rgba(56, 189, 248, 0.14) !important;
+    border-radius: 8px !important;
+    background: rgba(2, 6, 23, 0.34) !important;
+}
+
+#rune-inventory-container,
+#rune-management-inventory,
+#rune-active-runewords,
+#rune-codex-list,
+#rune-resonance-list,
+#rune-stats-list {
+    gap: 8px !important;
+}
+
+#rune-active-runewords,
+#rune-codex-list {
+    display: flex;
+    flex-direction: column;
+}
+
+#rune-stats-summary,
+#rune-resonance-summary {
+    border: 0 !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    border-image-source: url('../../assets/ui/sprites/rune_info_plate_v2_9s.png') !important;
+    border-image-slice: 40 72 40 72 fill;
+    border-image-width: 14px 18px;
+    border-image-repeat: stretch;
+}
+
+.rune-list-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 54px;
+    padding: 8px 10px;
+    border: 0 !important;
+    border-radius: 8px;
+    background: transparent !important;
+    color: var(--launcher-text);
+    border-image-source: url('../../assets/ui/sprites/rune_info_plate_v2_9s.png') !important;
+    border-image-slice: 40 72 40 72 fill;
+    border-image-width: 13px 17px;
+    border-image-repeat: stretch;
+    transition: filter 0.16s ease, transform 0.16s ease;
+}
+
+.rune-list-card:hover {
+    filter: brightness(1.12) drop-shadow(0 0 8px rgba(56, 189, 248, 0.16));
+}
+
+.rune-list-card--pending,
+.rune-list-card--selected {
+    filter: brightness(1.18) drop-shadow(0 0 10px rgba(56, 189, 248, 0.24));
+}
+
+.rune-list-card--active {
+    align-items: flex-start;
+    filter: drop-shadow(0 0 7px rgba(52, 211, 153, 0.12));
+}
+
+.rune-list-card--locked {
+    opacity: 0.68;
+    filter: grayscale(0.2);
+}
+
+.rune-list-card__icon {
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 38px;
+}
+
+.rune-list-card__body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.rune-list-card__title {
+    font-size: 0.78rem;
+    line-height: 1.25;
+    font-weight: 800;
+    color: #f1f5f9;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rune-list-card__meta {
+    margin-top: 2px;
+    font-size: 0.66rem;
+    line-height: 1.35;
+    color: var(--launcher-muted);
+}
+
+.rune-list-card__status {
+    flex: 0 0 auto;
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #7dd3fc;
+    white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+    #phase-rune-launcher > .rune-launcher-card {
+        padding: 14px !important;
+        gap: 10px;
+    }
+
+    #phase-rune-launcher .rune-launcher-card h2 {
+        font-size: 0.96rem !important;
+    }
+
+    #rune-tab-launcher,
+    #rune-tab-management,
+    #rune-tab-codex {
+        font-size: 0.64rem !important;
+        padding-left: 4px !important;
+        padding-right: 4px !important;
+    }
+
+    #rune-grid-container {
+        max-width: 210px !important;
+    }
+}

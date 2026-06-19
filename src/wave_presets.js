@@ -1,0 +1,110 @@
+export const ENEMY_WAVE_PRESETS = [
+    {
+        id: 'teach_deflection_ward',
+        roundRange: [9, 14],
+        weight: 14,
+        maxUses: 1,
+        cooldownRounds: 99,
+        introText: '棱盾兽会挡下反弹与穿透，换用直击或元素伤害。',
+        slots: [
+            { archetype: 'deflector', affixes: ['deflectionWard'], cols: 2, rows: 1, lane: 'center', hpMult: 1.0 },
+            { archetype: 'normal', affixes: [], cols: 1, rows: 1, lane: 'side', hpMult: 0.75 },
+        ],
+    },
+    {
+        id: 'bastion_wall',
+        roundRange: [10, 20],
+        weight: 12,
+        maxUses: 2,
+        cooldownRounds: 6,
+        introText: '装甲横梁正在保护后排，穿透或连锁能更快破阵。',
+        slots: [
+            { archetype: 'bastion', affixes: ['heavyArmor'], cols: 3, rows: 1, lane: 'center', hpMult: 2.0 },
+            { archetype: 'normal', affixes: ['healer'], cols: 1, rows: 1, lane: 'right', hpMult: 0.6 },
+        ],
+    },
+    {
+        id: 'teach_echo_relay',
+        roundRange: [12, 18],
+        weight: 12,
+        maxUses: 1,
+        cooldownRounds: 99,
+        introText: '共振尖塔会额外触发周围词缀，优先拆掉核心。',
+        slots: [
+            { archetype: 'echoSpire', affixes: ['echoRelay'], cols: 1, rows: 2, lane: 'center', hpMult: 0.55 },
+            { archetype: 'normal', affixes: ['regen'], cols: 1, rows: 1, lane: 'side', hpMult: 0.8 },
+        ],
+    },
+    {
+        id: 'maw_food_chain_v2',
+        roundRange: [18, 26],
+        weight: 11,
+        maxUses: 2,
+        cooldownRounds: 7,
+        introText: '深渊胃囊会吞噬身边单位，先切断供给。',
+        slots: [
+            { archetype: 'maw', affixes: ['devour'], cols: 2, rows: 2, lane: 'center', hpMult: 2.0 },
+            { archetype: 'normal', affixes: [], cols: 1, rows: 1, lane: 'left', hpMult: 0.5 },
+            { archetype: 'normal', affixes: [], cols: 1, rows: 1, lane: 'right', hpMult: 0.5 },
+        ],
+    },
+    {
+        id: 'siege_push_line',
+        roundRange: [22, 30],
+        weight: 9,
+        maxUses: 1,
+        cooldownRounds: 99,
+        introText: '攻城履带无法被冰冻停住，会持续压缩阵线。',
+        slots: [
+            { archetype: 'siege', affixes: ['siege'], cols: 3, rows: 2, lane: 'center', hpMult: 3.5 },
+            { archetype: 'normal', affixes: ['shield'], cols: 1, rows: 1, lane: 'left', hpMult: 0.5 },
+            { archetype: 'normal', affixes: ['shield'], cols: 1, rows: 1, lane: 'right', hpMult: 0.5 },
+        ],
+    },
+    {
+        id: 'prism_refraction',
+        roundRange: [22, 30],
+        weight: 10,
+        maxUses: 1,
+        cooldownRounds: 99,
+        introText: '折光棱柱会干扰射线路径，注意调整发射角。',
+        slots: [
+            { archetype: 'prism', affixes: ['prism'], cols: 1, rows: 3, lane: 'center', hpMult: 1.4 },
+            { archetype: 'normal', affixes: [], cols: 1, rows: 1, lane: 'side', hpMult: 0.8 },
+        ],
+    },
+    {
+        id: 'hive_incubator',
+        roundRange: [24, 34],
+        weight: 8,
+        maxUses: 1,
+        cooldownRounds: 99,
+        introText: '孵化巢会持续产出幼体，拖久会淹没战场。',
+        slots: [
+            { archetype: 'hive', affixes: ['hive'], cols: 2, rows: 3, lane: 'center', hpMult: 2.5 },
+            { archetype: 'normal', affixes: [], cols: 1, rows: 1, lane: 'side', hpMult: 0.7 },
+        ],
+    },
+    {
+        id: 'gravity_blackout',
+        roundRange: [32, 42],
+        weight: 5,
+        maxUses: 1,
+        cooldownRounds: 99,
+        introText: '引力炉心会牵引弹道，是稀有的大型场控核心。',
+        slots: [
+            { archetype: 'gravityWell', affixes: ['gravityWell'], cols: 3, rows: 3, lane: 'center', hpMult: 6.0 },
+        ],
+    },
+];
+
+export const ENEMY_WAVE_PRESET_ARCHETYPES = {
+    bastion: { cols: 3, rows: 1, affix: 'heavyArmor', color: '#94a3b8' },
+    maw: { cols: 2, rows: 2, affix: 'devour', color: '#7f1d1d' },
+    deflector: { cols: 2, rows: 1, affix: 'deflectionWard', color: '#38bdf8' },
+    echoSpire: { cols: 1, rows: 2, affix: 'echoRelay', color: '#f0abfc' },
+    prism: { cols: 1, rows: 3, affix: 'prism', color: '#67e8f9' },
+    hive: { cols: 2, rows: 3, affix: 'hive', color: '#a3e635' },
+    siege: { cols: 3, rows: 2, affix: 'siege', color: '#facc15' },
+    gravityWell: { cols: 3, rows: 3, affix: 'gravityWell', color: '#7c3aed' },
+};

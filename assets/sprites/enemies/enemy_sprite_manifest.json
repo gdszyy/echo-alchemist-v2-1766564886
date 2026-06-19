@@ -21,6 +21,11 @@
   "affixIcons": {
     "devour": "affix_devour.png",
     "heavyArmor": "affix_heavyArmor.png",
+    "deflectionWard": "affix_deflectionWard.png",
+    "echoRelay": "affix_echoRelay.png",
+    "prism": "affix_prism.png",
+    "hive": "affix_hive.png",
+    "gravityWell": "affix_gravityWell.png",
     "siege": "affix_siege.png",
     "shield": "affix_shield.png",
     "regen": "affix_regen.png"
@@ -38,49 +43,49 @@
       "spritePath": "assets/sprites/enemies/archetypes/enemy_bastion_3x1.png",
       "manifestPath": "assets/sprites/enemies/archetypes/enemy_bastion_3x1.json",
       "footprint": "3x1",
-      "placeholder": true
+      "placeholder": false
     },
     "maw": {
       "spritePath": "assets/sprites/enemies/archetypes/enemy_maw_2x2.png",
       "manifestPath": "assets/sprites/enemies/archetypes/enemy_maw_2x2.json",
       "footprint": "2x2",
-      "placeholder": true
+      "placeholder": false
     },
     "deflector": {
       "spritePath": "assets/sprites/enemies/archetypes/enemy_deflector_2x1.png",
       "manifestPath": "assets/sprites/enemies/archetypes/enemy_deflector_2x1.json",
       "footprint": "2x1",
-      "placeholder": true
+      "placeholder": false
     },
     "echoSpire": {
       "spritePath": "assets/sprites/enemies/archetypes/enemy_echo_spire_1x2.png",
       "manifestPath": "assets/sprites/enemies/archetypes/enemy_echo_spire_1x2.json",
       "footprint": "1x2",
-      "placeholder": true
+      "placeholder": false
     },
     "prism": {
       "spritePath": "assets/sprites/enemies/archetypes/enemy_prism_1x3.png",
       "manifestPath": "assets/sprites/enemies/archetypes/enemy_prism_1x3.json",
       "footprint": "1x3",
-      "placeholder": true
+      "placeholder": false
     },
     "hive": {
       "spritePath": "assets/sprites/enemies/archetypes/enemy_hive_2x3.png",
       "manifestPath": "assets/sprites/enemies/archetypes/enemy_hive_2x3.json",
       "footprint": "2x3",
-      "placeholder": true
+      "placeholder": false
     },
     "siege": {
       "spritePath": "assets/sprites/enemies/archetypes/enemy_siege_3x2.png",
       "manifestPath": "assets/sprites/enemies/archetypes/enemy_siege_3x2.json",
       "footprint": "3x2",
-      "placeholder": true
+      "placeholder": false
     },
     "gravityWell": {
       "spritePath": "assets/sprites/enemies/archetypes/enemy_gravity_core_3x3.png",
       "manifestPath": "assets/sprites/enemies/archetypes/enemy_gravity_core_3x3.json",
       "footprint": "3x3",
-      "placeholder": true
+      "placeholder": false
     }
   },
   "composites": {

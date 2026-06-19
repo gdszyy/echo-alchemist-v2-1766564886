@@ -48,7 +48,7 @@ function buildV2BestiaryEntries() {
             const cy = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
             const wPx = game.enemyWidth * meta.cols;
             const hPx = game.enemyHeight * meta.rows;
-            const hp = Math.floor(200 * meta.hpMult);
+            const hp = Math.floor(200 * Math.max(1, meta.cols * meta.rows));
             const e = new Enemy(cx, cy, wPx, hPx, hp, hp,
                 meta.affixes.length > 0 ? 'elite' : 'normal', meta.affixes.slice());
             e.baseArchetype = meta.baseArchetype;
@@ -2043,7 +2043,7 @@ function buildV2MatrixScenarios() {
             const centerY = top + (place.row + (def.rows - 1) / 2) * h;
             const wPx = w * def.cols;
             const hPx = h * def.rows;
-            const hp = Math.floor(baseHP * def.hpMult);
+            const hp = Math.floor(baseHP * Math.max(1, def.cols * def.rows));
 
             const e = new Enemy(centerX, centerY, wPx, hPx, hp, hp,
                 def.affixes.length > 0 ? 'elite' : 'normal',
@@ -2439,6 +2439,46 @@ function buildEnemyV2Scenarios() {
             },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
         },
+
+        // ── 场景 8：V2 大型基底 preset 生成入口验收 ────────────────
+        {
+            id: 'ev2_wave_preset_spawn',
+            categoryId: 'enemy_v2',
+            name: '预设波次生成',
+            icon: '🎬',
+            assetHitTag: 'PRESET',
+            desc: [
+                '📐 验证入口：spawn_trySpawnWavePreset()',
+                '⚙️ 行为：临时固定 Round 12 与随机数，强制命中首个可用 preset，生成 2×1 deflector + 1×1 陪衬单位。',
+                '📦 目的：确认大型基底能通过导演 preset 进入战场，而不是只依赖随机大型基底回退。'
+            ].join('\n'),
+            setup: (game) => {
+                const oldRound = game.round;
+                const oldUsage = game._wavePresetUsage;
+                const oldIntroShown = game._wavePresetIntroShown;
+                const oldRoundUsed = game._wavePresetRoundUsed;
+                const oldRandom = Math.random;
+                try {
+                    game.round = 12;
+                    game._wavePresetUsage = {};
+                    game._wavePresetIntroShown = {};
+                    game._wavePresetRoundUsed = null;
+                    Math.random = () => 0;
+                    const occupied = Array(CONFIG.gameplay.enemyCols).fill(false);
+                    if (typeof game.spawn_trySpawnWavePreset === 'function') {
+                        game.spawn_trySpawnWavePreset(game.combatGridTopY + game.enemyHeight / 2, 200, occupied, game.enemyWidth, {});
+                    }
+                } finally {
+                    Math.random = oldRandom;
+                    game.round = oldRound;
+                    game._wavePresetUsage = oldUsage;
+                    game._wavePresetIntroShown = oldIntroShown;
+                    game._wavePresetRoundUsed = oldRoundUsed;
+                }
+            },
+            bulletConfig: { damage: 35, bounce: 0, pierce: 2, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
     ];
 }
 
@@ -2493,6 +2533,15 @@ class TrainingGround {
                 display: flex;
                 flex-direction: column;
             }
+            body.pc-mode #phase-training {
+                justify-content: center;
+                background: #020617;
+            }
+            body.pc-mode #train-main-area {
+                flex: 0 0 min(480px, calc(100dvh * 9 / 16));
+                width: min(480px, calc(100dvh * 9 / 16));
+                max-width: 480px;
+            }
             /* 右侧边栏 */
             #train-sidebar {
                 width: 200px;
@@ -2504,6 +2553,12 @@ class TrainingGround {
                 z-index: 500;
                 transition: width 0.25s cubic-bezier(0.4,0,0.2,1), min-width 0.25s;
                 overflow: hidden;
+            }
+            body.pc-mode #train-sidebar {
+                flex: 0 0 220px;
+                width: 220px;
+                min-width: 220px;
+                max-height: 100dvh;
             }
             #train-sidebar.collapsed {
                 width: 32px;
@@ -2638,6 +2693,10 @@ class TrainingGround {
                 display: flex;
                 // @section:ui_hud_components - HUD 组件初始化（血条/弹药/符文槽）
                 flex-direction: column;
+            }
+            body.pc-mode #train-control-panel {
+                max-width: 100%;
+                overflow: hidden;
             }
             #train-control-panel.collapsed {
                 transform: translateY(calc(100% - 40px));
@@ -3331,6 +3390,11 @@ class TrainingGround {
         document.getElementById('phase-training').style.display = 'flex';
         document.getElementById('phase-training').classList.remove('hidden-phase');
         document.getElementById('phase-training').classList.add('active-phase');
+        const trainSidebar = document.getElementById('train-sidebar');
+        const trainSidebarToggle = document.getElementById('train-sidebar-toggle');
+        const compactTrainingLayout = window.innerWidth <= 767;
+        if (trainSidebar) trainSidebar.classList.toggle('collapsed', compactTrainingLayout);
+        if (trainSidebarToggle) trainSidebarToggle.textContent = compactTrainingLayout ? '>' : '<';
         this.game.enemies = [];
         this.game.projectiles = [];
         this.game.particles = [];

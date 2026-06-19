@@ -1,7 +1,7 @@
 ---
 id: "PI-007"
-version: "v1.2"
-last_updated: "2026-04-24"
+version: "v1.3"
+last_updated: "2026-06-19"
 author: "agt-50c9e9de-077"
 related_modules: ["ui/shop.js", "game_system.js", "ui_system.js", "spawn_system.js", "game_phase.js", "entities.js", "config.js", "core.js"]
 status: "active"
@@ -89,6 +89,8 @@ status: "active"
 
 **关键位置**：`src/game_system.js` → `sys_startRoundStartResolver()` / `sys_initSelectionPhase()`
 
+**2026-06-19 补充**：`_proceedToFateMomentSelection()` 也是命运时刻上下文恢复入口。该函数通常在子弹替换流程完成后回到原命运时刻，如果这里缺少 `active: true`，顶部栏和教程过滤仍会把界面误判为普通 `selection`。
+
 ## 版本变更日志
 
 | 版本 | 日期 | 变更内容 | 作者 |
@@ -96,3 +98,4 @@ status: "active"
 | v1.0 | 2026-04-18 | 初始记录命运时刻 overlay 返回流与纯净精华选择模式的防坑要点 | agt-50c9e9de-077 |
 | v1.1 | 2026-04-24 | 补充坑 5：phase_switchPhase 触发 ui_updateUI 时读取旧 selectionMode 渲染旧卡片 | agt |
 | v1.2 | 2026-04-24 | 补充坑 6：fateMomentContext 缺少 active 字段导致 ui_isFateMomentPhase() 失效 | agt |
+| v1.3 | 2026-06-19 | 补充 `_proceedToFateMomentSelection()` 也必须写入 active 字段 | codex |

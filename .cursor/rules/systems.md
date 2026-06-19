@@ -58,6 +58,7 @@
 *   **DOM 动态生成**：`#phase-training` 及其内部的控制面板、右侧边栏完全由 `TrainingGround.initUI()` 动态创建，**并未硬编码在 `index.html` 中**。
 *   **右侧边栏 (Sidebar)**：包含分类 Tab 和场景列表。切换分类由 `switchCategory(id)` 处理，点击场景由 `loadScenario(id)` 处理。
 *   **Boss 入场动画特殊处理**：试炼场不走完整的战斗阶段（`phase === 'training'`），因此在 `loadScenario` 中有专门针对 `categoryId === 'boss'` 的硬编码逻辑：强制将 `e._pendingEntrance = false` 并设置 `e.entranceTimer = 1` 以激活 Boss 入场动画。
+*   **V2 预设波次验证**：`enemy_v2` 分类包含 `ev2_wave_preset_spawn` 场景，临时固定 Round 12 与随机数后调用真实 `spawn_trySpawnWavePreset()`，用于验证大型基底能通过导演 preset 入口生成。该场景结束 setup 后必须恢复 `round`、`_wavePresetUsage`、`_wavePresetIntroShown`、`_wavePresetRoundUsed` 和 `Math.random`，避免污染其它试炼场场景。
 
 ## 3. 真理之书图鉴配置 (TruthBook)
 

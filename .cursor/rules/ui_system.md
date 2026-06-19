@@ -11,6 +11,7 @@ UI 系统已按职责区域拆分为以下模块，均通过 `bind(this)` 组合
 | `src/ui_system.js` | UI 核心协调层（飞行效果、货币更新、阶段切换、商店购买逻辑） | `ui_playResourceFlyEffect`、`ui_updateUI`、`meta_*`、`ui_onPhaseChange` |
 | `src/ui/hud.js` | HUD 渲染（弹药、配方、伤害统计、收集队列） | `ui_updateAmmoUI`、`ui_renderRecipeHUD`、`ui_updateDamageStats` 等 |
 | `src/ui/shop.js` | 商店/遗物选择界面渲染 | `ui_renderShop`、`ui_showRelicSelection`、`ui_selectRelic` 等 |
+| `src/ui/run_shop.js` | 局内商店/商人到访入口 | `ui_offerRunShop`、`ui_showRunShop`、`ui_buyRunShopItem` 等 |
 | `src/ui/rune_launcher.js` | 符文发射器界面（背包、网格、选择弹出层、合成重铸） | `ui_openRuneLauncher`、`ui_updateRuneGrid`、`ui_doRuneMerge` 等 |
 
 ## 2. 模块加载方式
@@ -140,7 +141,7 @@ for (const subsystem of _subsystems) {
 | 函数 | 描述 |
 |---|---|
 | `ui_playResourceFlyEffect(x, y, amount)` | 资源飞入动画（🔮 货币飞向显示区） |
-| `ui_openTruthBook()` / `ui_closeTruthBook()` | 真理之书面板开关 |
+| `ui_openTruthBook(options)` / `ui_closeTruthBook()` | 真理之书面板开关；从 `selection` 等运行态打开时记录 `truthBookReturnState`，关闭后恢复原阶段和命运时刻语义 |
 | `ui_updateSlowMotion()` | 慢动作逻辑更新（每帧调用） |
 | `ui_updateMetaCurrency()` | 更新局外货币显示 |
 | `ui_updateRuneCountDisplay()` | 更新符文数量显示 |
@@ -155,6 +156,8 @@ for (const subsystem of _subsystems) {
 | `meta_getResourceCount(resourceId)` | 获取资源数量 |
 | `meta_spendResource(resourceId, amount)` | 消耗资源 |
 | `ui_updateUI()` | 主 UI 更新入口（每帧调用） |
+| `ui_resetCombatPhaseHud()` | 阶段切换时清理战斗专属 HUD 残留；`training` 可保留态势面板但必须清掉配方、技能、伤害数字和符文充能 UI |
+| `ui_clearTransientOverlays()` | 进入 meta/shop/truth_book/gameover 等终止或局外阶段时清理 Boss 入场、混沌轮盘、遗物层、符文选择器、模块编辑器和 Toast 等高层临时覆盖物 |
 | `ui_confirmSelection()` | 确认弹珠选择；在纯净精华模式下完成合法性校验、符文写回与双倍同化率状态落地 |
 | `meta_applyUpgrades()` | 应用升级效果 |
 | `meta_addCurrency(amount)` | 增加局外货币 |
@@ -168,6 +171,7 @@ for (const subsystem of _subsystems) {
 | `ui_triggerScreenShake(duration)` | 触发屏幕震动效果 |
 | `ui_openPause()` | 打开暂停页面（仅在 gathering/combat/training 阶段有效），设置 `isPaused=true` 冻结物理更新 |
 | `ui_closePause()` | 关闭暂停页面，恢复游戏运行 |
+| `ui_abandonRunToMeta()` | 暂停页放弃本局的统一出口：关闭暂停/符文发射器、清局内存档、重置运行态并返回 meta |
 | `ui_syncPauseSettings()` | 同步暂停页面中各设置项的开关状态（音效、伤害数字、CRT） |
 | `ui_renderPauseRelics()` | 渲染暂停页面中的遗物列表，展示当前遗物及其效果、稀有度、叠层数 |
 | `ui_updatePCLayout()` | 检测视口宽高并切换 PC 三栏布局（横屏且单侧剩余 ≥ 240px 时激活），在 resize 和初始化时调用 |
@@ -202,17 +206,36 @@ for (const subsystem of _subsystems) {
 | `ui_skipRelic()` | 跳过遗物选择 |
 | `ui_closeRelicSelection()` | 关闭遗物选择界面 |
 
+### 6.3.1 src/ui/run_shop.js（局内商店）
+
+| 函数 | 描述 |
+|---|---|
+| `ui_offerRunShop()` | 在 round-start resolver 奖励清空后显示可选商人到访入口；跳过后继续回合横幅 |
+| `ui_showRunShop()` | 打开局内商店，使用 `runFragments` 购买本局构筑资源 |
+| `ui_renderRunShop()` | 渲染当前货架、持有碎片、可购买状态与刷新/离开按钮 |
+| `ui_buyRunShopItem()` | 购买钉盘组件、符文、模块槽位或特殊槽，并写回本局状态 |
+
+局内商店不得作为永久升级入口；购买内容只影响当前 run。刷新、购买、离开时应调用 `sys_saveRunState()`，确保 `runFragments` 与货架状态可恢复。遗物跳过进入商店时必须先发放 `CONFIG.gameplay.runShopSkipRelicBonus`，避免玩家用遗物换到无购买力商店。
+
 ## 7. 2026-06-18 Interaction Notes
 
 - `#module-editor-layer` 的模块选择浮层必须在渲染阶段预先调用 `_moduleEditor_getModulePlacementStatus(slotIdx, moduleId)`；不合法的模块以禁用态展示，并在卡片描述或 `title` 中说明原因。
+- 模块选择浮层的 `.me-picker-item` 需要保留 hover/focus 事件，即使不可放置也必须写入 `_moduleEditorPlacementPreview`，让 Canvas 同步显示合法/非法覆盖槽位。不可放置项使用 `aria-disabled="true"` 与点击拦截，不使用原生 `disabled` 阻断预览事件。
+- ????????? UI ???????????????????????? `pegs` ?? `infusedRuneId` / `fusionSourceLevel`?????????? `pegStates[source="fusion"]`??????????????????????????? 3x3 ????????? `RUNEWORD_DB.pattern` ???????????????
+- ???????????????????? `_moduleEditor_validateBeforeStart()`?????? ref?????????????????????????????????????????? `_moduleEditor_showNotice()` ??????????????
 - `_moduleEditor_applyModule()` 必须先完成放置校验，再清空旧模块或写入 `currentModuleLayout`，避免玩家误点一个不可放置的大模块时丢失原模块。
-- 大模块校验需要同时检查：是否越过 4x3 钉盘边界、是否超出已解锁槽位、是否与其他模块锚点或 ref 覆盖格重叠。
+- 大模块校验需要同时检查：是否越过 `CONFIG.gameplay.moduleCols/moduleRows` 钉盘边界、是否超出 `getActiveModuleSlotSet()` 所定义的已解锁槽位、是否与其他模块锚点或 ref 覆盖格重叠。
 - 模块编辑器写入 `currentModuleLayout` 时必须创建 `{ id, uid, pegStates, pluginStates }` 组件实例；多格占位使用 `{ ref: anchorIdx }`。不得重新写入裸字符串模块 ID，否则符文融合写入的 `pegStates` 会在替换/重建时丢失。
 - 模块编辑器的 picker 必须读取 `ownedModuleComponents` 库存；安装组件时从库存移除该 `uid`，拆卸组件时放回库存。不得读取 `unlockedModuleTypes` 作为可无限使用的模板列表。
 - `#combat-status-panel` 是战斗态势聚合入口，由 `ui_updateCombatStatusPanel()` 节流刷新；只读 `enemies`、`defeatLineY`、`playerShield`、`ammoQueue` 等现有状态，不得在该函数内改变战斗逻辑。
 - 战斗危险反馈统一使用“稳定 / 压线 / 危险 / 护盾待触发”语义，避免各处新增彼此冲突的临时文案。
 - 下一发弹药的属性构成、散射弹数、连射次数和装填格必须统一走 `getAmmoReadabilityProfile()`；`ui_updateCombatStatusPanel()`、战斗 HUD 卡片和 `render_combat_launcherSignal()` 不得各自重新定义展示阈值或评价文案。
 - `UIManager.updateSkillBar()` 负责战斗技能栏工具组：顶部显示当前 SP，技能按钮使用两列网格、`button` 语义、成本徽章、可用状态点和禁用原因；只调用 `game.combat_activateSkill(skill)`，不得在 UI 层扣 SP 或改技能效果。
+- `ui_updateUI()` 必须在非 `combat` 阶段调用 `ui_resetCombatPhaseHud()`，集中隐藏/重置 `#recipe-hud-container`、`#skill-bar`、`#round-damage-display`、`#combat-rune-charge-ui` 和伤害统计抽屉；`training` 只允许保留 `#combat-status-panel`，不得继承 combat 专属浮层。
+- `ui_updateUI()` 进入 `meta` / `shop` / `truth_book` / `gameover` 等局外或终止阶段时必须调用 `ui_clearTransientOverlays()`，清掉 Boss 入场、混沌老虎机、遗物 overlay、模块编辑器、符文选择弹层和终局 Toast。`gameover` 入口也应主动调用一次，避免失败发生在高 z-index 演出期间时遮挡结算页。
+- 暂停页不得只显示 DOM overlay；`ui_openPause()` 必须设置 `isPaused=true` 和 `_pausedFromPhase`，`ui_closePause()` 必须恢复这两个字段并禁用 `#phase-pause` 的 pointer events。“放弃本局”不得直接 `phase_switchPhase('meta')`，必须走 `ui_abandonRunToMeta()` 统一清理局内存档和临时 UI。
+- PC 侧栏只允许在 `gathering` / `combat` / `selection` / `training` 运行态显示；`meta`、`shop`、`gameover`、`truth_book`、`relic` 等全屏/局外阶段必须隐藏左右侧栏，避免常驻符文发射器或战斗 HUD 残留。
+- 局外商店中的 `debugOnly` 商品默认必须隐藏，`meta_buyUpgrade()` 也必须校验 `CONFIG.debug` / `debugMode` / `localStorage.echo_debug_shop`，禁止通过普通商店或控制台直接购买测试遗物任选项。
 
 ### 6.4 src/ui/rune_launcher.js（符文发射器）
 
@@ -263,5 +286,5 @@ for (const subsystem of _subsystems) {
 ## 8. 2026-06-19 Mobile Selection Safety
 
 - On coarse-pointer devices, cards that can permanently choose or apply a reward/configuration must not confirm on the first tap.
-- Current covered surfaces: `#phase-relic .relic-card`, `#phase-selection .select-card`, and `.me-picker-item` in the pinboard module picker.
+- Current covered surfaces: `#phase-relic .relic-card` and `.me-picker-item` in the pinboard module picker. `#phase-selection .select-card` remains single-tap because players select several marbles in one flow.
 - First tap previews/highlights the item; the second tap on the same item confirms. Desktop mouse and keyboard behavior may remain direct where existing flows expect it.

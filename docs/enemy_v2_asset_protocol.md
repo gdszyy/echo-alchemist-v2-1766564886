@@ -127,6 +127,14 @@ normal              →  golem_normal
 5. 运行 `python3 scripts/gen_enemy_v2_placeholders.py`
    仅会重新生成 placeholder，不会覆盖正式美术（除非主动恢复占位）。
 
+## 6.5 2026-06-19 asset update
+
+- The 8 V2 base enemies now use procedural bitmap sprite sheets instead of the original line/block placeholders.
+- Updated folders: `assets/sprites/enemies/v2/`, `assets/sprites/enemies/archetypes/`, and `assets/icons/enemies/`.
+- Each V2 sheet keeps the 128 px frame contract with 4 idle frames and 2 hit frames.
+- Related manifests and `src/data/enemy_v2_metadata.js` now use `placeholder: false`.
+- Later hand-painted art can still replace the same file names in place.
+
 ## 7. 验收清单
 
 - [x] `assets/sprites/enemies/v2/` 包含 8 个 P0–P3 PNG + manifest

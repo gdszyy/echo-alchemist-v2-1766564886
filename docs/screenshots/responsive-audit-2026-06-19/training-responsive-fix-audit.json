@@ -1,0 +1,470 @@
+{
+  "pc": {
+    "vw": 1440,
+    "vh": 900,
+    "phase": "training",
+    "body": [
+      "pc-mode"
+    ],
+    "rects": {
+      "phase": [
+        0,
+        0,
+        1440,
+        900,
+        1440,
+        900,
+        "flex"
+      ],
+      "main": [
+        370,
+        0,
+        480,
+        900,
+        850,
+        900,
+        "flex"
+      ],
+      "trainSidebar": [
+        850,
+        0,
+        220,
+        900,
+        1070,
+        900,
+        "flex"
+      ],
+      "pcLeft": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        "none"
+      ],
+      "pcRight": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        "none"
+      ],
+      "control": [
+        370,
+        860,
+        480,
+        261,
+        850,
+        1121,
+        "flex"
+      ]
+    },
+    "overflowCount": 12,
+    "overflow": [
+      {
+        "tag": "DIV",
+        "id": "crt-overlay",
+        "cls": "active",
+        "text": "",
+        "rect": [
+          480,
+          23,
+          1440,
+          900,
+          1920,
+          923
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "boss-entrance-overlay",
+        "cls": "",
+        "text": "",
+        "rect": [
+          480,
+          23,
+          1440,
+          900,
+          1920,
+          923
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "train-control-panel",
+        "cls": "collapsed",
+        "text": "▲ 展开配置 子弹编辑 敌人配置 DAMAGE 10 - + BOUNCE 0 - + PIERCE 0 - + SCA",
+        "rect": [
+          370,
+          860,
+          480,
+          261,
+          850,
+          1121
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "flex border-b border-slate-700 bg-slate-900/50",
+        "text": "子弹编辑 敌人配置",
+        "rect": [
+          370,
+          861,
+          88,
+          260,
+          458,
+          1121
+        ]
+      },
+      {
+        "tag": "BUTTON",
+        "id": "tab-btn-bullet",
+        "cls": "train-tab-btn active",
+        "text": "子弹编辑",
+        "rect": [
+          370,
+          861,
+          44,
+          259,
+          414,
+          1120
+        ]
+      },
+      {
+        "tag": "BUTTON",
+        "id": "tab-btn-enemy",
+        "cls": "train-tab-btn",
+        "text": "敌人配置",
+        "rect": [
+          414,
+          861,
+          44,
+          259,
+          458,
+          1120
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "panel-bullet",
+        "cls": "train-panel-content active",
+        "text": "DAMAGE 10 - + BOUNCE 0 - + PIERCE 0 - + SCATTER 0 - + MULTIC",
+        "rect": [
+          458,
+          861,
+          392,
+          260,
+          850,
+          1121
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "flex flex-col md:flex-row gap-4",
+        "text": "DAMAGE 10 - + BOUNCE 0 - + PIERCE 0 - + SCATTER 0 - + MULTIC",
+        "rect": [
+          474,
+          877,
+          360,
+          199,
+          834,
+          1076
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "flex-1",
+        "text": "DAMAGE 10 - + BOUNCE 0 - + PIERCE 0 - + SCATTER 0 - + MULTIC",
+        "rect": [
+          474,
+          877,
+          216,
+          199,
+          690,
+          1076
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "train-attr-grid",
+        "cls": "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2",
+        "text": "DAMAGE 10 - + BOUNCE 0 - + PIERCE 0 - + SCATTER 0 - + MULTIC",
+        "rect": [
+          474,
+          877,
+          216,
+          199,
+          690,
+          1076
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "flex flex-col gap-1 p-2 bg-slate-800/60 border border-slate-700 rounde",
+        "text": "DAMAGE 10 - +",
+        "rect": [
+          474,
+          877,
+          37,
+          61,
+          511,
+          938
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "flex gap-1",
+        "text": "- +",
+        "rect": [
+          483,
+          906,
+          19,
+          23,
+          502,
+          929
+        ]
+      }
+    ]
+  },
+  "mobile": {
+    "vw": 390,
+    "vh": 844,
+    "phase": "training",
+    "body": [],
+    "rects": {
+      "phase": [
+        0,
+        0,
+        390,
+        844,
+        390,
+        844,
+        "flex"
+      ],
+      "main": [
+        0,
+        0,
+        230,
+        844,
+        230,
+        844,
+        "flex"
+      ],
+      "trainSidebar": [
+        230,
+        0,
+        160,
+        844,
+        390,
+        844,
+        "flex"
+      ],
+      "pcLeft": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        "none"
+      ],
+      "pcRight": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        "none"
+      ],
+      "control": [
+        0,
+        804,
+        230,
+        423,
+        230,
+        1227,
+        "flex"
+      ]
+    },
+    "overflowCount": 12,
+    "overflow": [
+      {
+        "tag": "DIV",
+        "id": "crt-overlay",
+        "cls": "active",
+        "text": "",
+        "rect": [
+          0,
+          75,
+          390,
+          844,
+          390,
+          919
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "boss-entrance-overlay",
+        "cls": "",
+        "text": "",
+        "rect": [
+          0,
+          75,
+          390,
+          844,
+          390,
+          919
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "info-drawer",
+        "cls": "absolute bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md borde",
+        "text": "✕ 敵人狀態 特殊詞條 配方圖鑑 傷害統計 普通魔像 HP: 100/100 溫度: 0°C",
+        "rect": [
+          0,
+          769,
+          390,
+          520,
+          390,
+          1289
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "flex-1 overflow-y-auto p-4 relative",
+        "text": "普通魔像 HP: 100/100 溫度: 0°C",
+        "rect": [
+          0,
+          817,
+          390,
+          472,
+          390,
+          1289
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "tab-status",
+        "cls": "tab-content h-full space-y-3",
+        "text": "普通魔像 HP: 100/100 溫度: 0°C",
+        "rect": [
+          16,
+          833,
+          358,
+          440,
+          374,
+          1273
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "flex items-center justify-between",
+        "text": "普通魔像 HP: 100/100",
+        "rect": [
+          16,
+          833,
+          358,
+          28,
+          374,
+          861
+        ]
+      },
+      {
+        "tag": "SPAN",
+        "id": "info-enemy-type",
+        "cls": "text-lg font-bold",
+        "text": "普通魔像",
+        "rect": [
+          16,
+          833,
+          72,
+          28,
+          88,
+          861
+        ]
+      },
+      {
+        "tag": "SPAN",
+        "id": "info-hp",
+        "cls": "text-xs bg-slate-700 px-2 py-1 rounded",
+        "text": "HP: 100/100",
+        "rect": [
+          291,
+          835,
+          83,
+          24,
+          374,
+          859
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "w-full bg-slate-700 h-2 rounded-full overflow-hidden relative mt-1",
+        "text": "",
+        "rect": [
+          16,
+          873,
+          358,
+          8,
+          374,
+          881
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "cls": "absolute top-0 bottom-0 w-0.5 bg-white/50 left-1/2",
+        "text": "",
+        "rect": [
+          195,
+          873,
+          2,
+          8,
+          197,
+          881
+        ]
+      },
+      {
+        "tag": "P",
+        "id": "info-temp-text",
+        "cls": "text-xs text-center text-slate-400 mt-1",
+        "text": "溫度: 0°C",
+        "rect": [
+          16,
+          893,
+          358,
+          16,
+          374,
+          909
+        ]
+      },
+      {
+        "tag": "DIV",
+        "id": "train-control-panel",
+        "cls": "collapsed",
+        "text": "▲ 展开配置 子弹编辑 敌人配置 DAMAGE 10 - + BOUNCE 0 - + PIERCE 0 - + SCA",
+        "rect": [
+          0,
+          804,
+          230,
+          423,
+          230,
+          1227
+        ]
+      }
+    ]
+  }
+}

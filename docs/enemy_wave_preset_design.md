@@ -1,7 +1,7 @@
 # 敌人组合预设波次设计与代码修改方案
 
 作者：**Manus AI**  
-状态：阶段设计稿  
+状态：首轮已接入（2026-06-19：`src/wave_presets.js` + `spawn_trySpawnWavePreset()`）
 关联文档：[`docs/enemy_visual_design_v2.md`](enemy_visual_design_v2.md)、[`docs/enemy_art_implementation_impact.md`](enemy_art_implementation_impact.md)
 
 ## 1. 设计目标
@@ -65,7 +65,7 @@ export const ENEMY_WAVE_PRESETS = [
 
 ## 4. 代码修改方案
 
-代码上建议分四步推进。第一步创建 preset 数据文件和选择器，只让系统能选中并打印调试信息。第二步接入 footprint 放置器，复用 `spawn_trySpawnArchetype()` 的宽高、血量和形状初始化规则。第三步接入首次教学提示和冷却计数。第四步再把 preset 权重接入 `ENEMY_CURVE_CONFIG.TEMPLATE_WEIGHTS` 或新增独立的 `WAVE_PRESET_WEIGHTS`。[1] [3]
+代码上建议分四步推进。2026-06-19 已完成首轮实现：新增 `src/wave_presets.js` 定义 preset 数据；`spawn_spawnEnemyRowAt()` 在随机大型基底前调用 `spawn_trySpawnWavePreset()`；放置器复用 footprint 占用检查、`Enemy` 实例化、`spawn_applyArchetypeShape()`、掉落判定和 Sprite 初始化；并接入首次教学 Toast、`maxUses`、`cooldownRounds` 与局内存档恢复。后续仍需补更系统的模拟验证、训练场入口和权重调参。[1] [3]
 
 | 步骤 | 修改文件 | 修改内容 | 风险 |
 |---|---|---|---|
@@ -104,6 +104,14 @@ Preset 放置器必须比普通随机生成更严格，因为大型敌人的 foo
 | 美术绑定 | 每个 preset 可生成稳定资产键，缺失资产能回退。 |
 | 性能预算 | 大型敌人特效在中低性能档不会显著增加粒子峰值。 |
 | 文档同步 | `spawn_system.md` 与 `enemy_art_implementation_impact.md` 均登记最新 preset。 |
+
+## 8. 2026-06-19 Training-Ground Consistency Note
+
+Training-ground V2 validation should follow live combat behavior, not the other way around.
+Random large-archetype spawns use the live baseline `baseHP * gridCols * gridRows` with
+small variance. Wave presets use their slot `hpMult` on top of that footprint scale:
+`baseHP * hpMult * gridCols * gridRows`. Training-ground matrix/bestiary previews should
+therefore document or display the live-combat baseline instead of redefining combat HP.
 
 ## References
 

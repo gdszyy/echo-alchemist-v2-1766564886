@@ -1,6 +1,6 @@
 # src\ui_system.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 2096 | 函数数: 57 | 语言: javascript
+> 自动生成于 2026-06-19 | 总行数: 2672 | 函数数: 50 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -12,23 +12,8 @@
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
 | _isCoarsePointerInput | function | `_isCoarsePointerInput()` |  |
-| _getFlyEffectNode | method | `_getFlyEffectNode()` |  |
-| _releaseFlyEffectNode | method | `_releaseFlyEffectNode(node)` |  |
-| ui_playResourceFlyEffect | method | `ui_playResourceFlyEffect(startX, startY, amount)` |  |
-| ui_playLootToCardAnimation | method | `ui_playLootToCardAnimation(startX, startY, type, callback)` |  |
-| ui_updateSlowMotion | method | `ui_updateSlowMotion()` |  |
-| ui_updateMetaCurrency | method | `ui_updateMetaCurrency()` |  |
-| ui_updateRuneCountDisplay | method | `ui_updateRuneCountDisplay()` |  |
-| ui_updateShieldPill | method | `ui_updateShieldPill()` |  |
-| ui_updateCombatStatusPanel | method | `ui_updateCombatStatusPanel(force = false)` |  |
-| ui_getSelectionRequirement | method | `ui_getSelectionRequirement()` |  |
-| ui_isSelectionConfirmReady | method | `ui_isSelectionConfirmReady()` |  |
-| ui_getPureEssenceRuneOptions | method | `ui_getPureEssenceRuneOptions(marbleDef)` |  |
-| ui_selectPureEssenceRune | method | `ui_selectPureEssenceRune(selectionIndex, inventoryIndex)` |  |
-| ui_renderPureEssencePanel | method | `ui_renderPureEssencePanel(marbleDef, selectionIndex)` |  |
-| ui_isFateMomentPhase | method | `ui_isFateMomentPhase()` |  |
-| ui_showChaosBulletSlotMachine | method | `ui_showChaosBulletSlotMachine(slotAttrs, finalPicks, ATTR_LABEL, allSame, onComplete)` |  |
-| ui_renderReplaceAmmoUI | method | `ui_renderReplaceAmmoUI()` | ⚠️ 巨型函数，见 @section 导航 |
+| _escapeHtml | function | `_escapeHtml(value)` | ⚠️ 巨型函数，见 @section 导航 |
+| makeRow | function | `makeRow(recipes, startIdx, headerText, headerColor)` |  |
 | ui_toggleReplaceAmmoCard | method | `ui_toggleReplaceAmmoCard(globalIdx)` |  |
 | ui_selectReplaceAmmoTarget | method | `ui_selectReplaceAmmoTarget(ammoIdx)` |  |
 | ui_refreshSelectionModeUI | method | `ui_refreshSelectionModeUI()` |  |
@@ -53,17 +38,25 @@
 | ui_onPhaseChange | method | `ui_onPhaseChange(newPhase)` |  |
 | ui_triggerScreenShake | method | `ui_triggerScreenShake(duration = 200)` |  |
 | ui_initEventListeners | method | `ui_initEventListeners()` |  |
+| ui_openTruthBook | method | `ui_openTruthBook(options = {})` |  |
+| ui_closeTruthBook | method | `ui_closeTruthBook()` |  |
 | ui_openPause | method | `ui_openPause()` |  |
 | ui_closePause | method | `ui_closePause()` |  |
+| ui_abandonRunToMeta | method | `ui_abandonRunToMeta()` |  |
 | ui_syncPauseSettings | method | `ui_syncPauseSettings()` |  |
 | ui_renderPauseRelics | method | `ui_renderPauseRelics()` |  |
 | ui_showModuleEditor | method | `ui_showModuleEditor(onComplete)` |  |
 | ui_renderModuleEditorControls | method | `ui_renderModuleEditorControls()` |  |
+| _moduleEditor_showNotice | method | `_moduleEditor_showNotice(message, options = {})` |  |
+| _moduleEditor_clearNotice | method | `_moduleEditor_clearNotice()` |  |
+| _moduleEditor_validateBeforeStart | method | `_moduleEditor_validateBeforeStart()` |  |
+| _moduleEditor_tryStartCollection | method | `_moduleEditor_tryStartCollection()` |  |
 | ui_hideModuleEditor | method | `ui_hideModuleEditor()` |  |
 | _moduleEditor_handleClick | method | `_moduleEditor_handleClick(logicPos)` |  |
 | _moduleEditor_getSlotRects | method | `_moduleEditor_getSlotRects()` |  |
 | _moduleEditor_getModulePlacementStatus | method | `_moduleEditor_getModulePlacementStatus(slotIdx, moduleId)` |  |
 | _moduleEditor_closePicker | method | `_moduleEditor_closePicker()` |  |
+| _moduleEditor_setPlacementPreview | method | `_moduleEditor_setPlacementPreview(slotIdx, moduleId = null, options = {})` |  |
 | _moduleEditor_normalizeComponentInventory | method | `_moduleEditor_normalizeComponentInventory()` |  |
 | _moduleEditor_takeInventoryComponent | method | `_moduleEditor_takeInventoryComponent(componentUid)` |  |
 | _moduleEditor_detachComponent | method | `_moduleEditor_detachComponent(slotIdx, layout, cols, rows)` |  |
@@ -71,16 +64,16 @@
 
 ## 巨型函数内部节点 (@section 标记)
 
-### ui_renderReplaceAmmoUI
+### _escapeHtml
 
 > 定位：`grep -n '@section:节点名'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|
+| `@section:ui_fly_effects` | 飞行特效池管理 |
 | `@section:replace_ammo_init` | 初始化上下文、获取 DOM 元素并设置标题文字 |
 | `@section:replace_ammo_tier_calc` | 子弹等级与主属性计算函数（_calcTier / _calcDominant） |
 | `@section:replace_ammo_card_render` | 子弹卡片 DOM 渲染：renderCard + makeRow + 将卡片添加到网格 |
-| `@section:replace_ammo_confirm_btn` | 确认按鈕与跳过按鈕状态同步 |
 
 ### _moduleEditor_openPicker
 
@@ -91,4 +84,4 @@
 
 | 节点标记 | 说明 |
 |----------|------|
-| `@section:ui_fly_effects` | 飞行特效池管理 |
+| `@section:replace_ammo_confirm_btn` | 确认按鈕与跳过按鈕状态同步 |

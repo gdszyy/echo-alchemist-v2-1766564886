@@ -1,0 +1,1574 @@
+[
+  {
+    "label": "pc-1440x900",
+    "width": 1440,
+    "height": 900,
+    "mobile": false,
+    "meta": {
+      "vw": 1440,
+      "vh": 900,
+      "phase": "meta",
+      "overflowCount": 2,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-indigo-900/",
+          "text": "",
+          "rect": [
+            320,
+            -147,
+            800,
+            800,
+            1120,
+            653
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-900/10 rounded-f",
+          "text": "",
+          "rect": [
+            432,
+            462,
+            500,
+            500,
+            932,
+            962
+          ]
+        }
+      ],
+      "textOverflowCount": 6,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "game-container",
+          "cls": "",
+          "text": "回聲煉金師 點擊開始 🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ ",
+          "size": [
+            512,
+            480,
+            853,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "phase-meta",
+          "cls": "ui-overlay active-phase",
+          "text": "🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之",
+          "size": [
+            512,
+            480,
+            853,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute inset-0 overflow-hidden pointer-events-none",
+          "text": "",
+          "size": [
+            640,
+            480,
+            939,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col items-center justify-center w-full h-full pb-12 relative z-10",
+          "text": "Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之书 ⚔️ 試煉場",
+          "size": [
+            512,
+            480,
+            781,
+            781
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "text-center mb-16 relative group cursor-default",
+          "text": "Echo Alchemist 回聲煉金師",
+          "size": [
+            512,
+            480,
+            197,
+            197
+          ]
+        },
+        {
+          "tag": "H1",
+          "id": "",
+          "cls": "text-6xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b fr",
+          "text": "Echo Alchemist",
+          "size": [
+            480,
+            480,
+            156,
+            144
+          ]
+        }
+      ]
+    },
+    "training": {
+      "vw": 1440,
+      "vh": 900,
+      "phase": "meta",
+      "overflowCount": 2,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-indigo-900/",
+          "text": "",
+          "rect": [
+            320,
+            -147,
+            800,
+            800,
+            1120,
+            653
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-900/10 rounded-f",
+          "text": "",
+          "rect": [
+            432,
+            462,
+            500,
+            500,
+            932,
+            962
+          ]
+        }
+      ],
+      "textOverflowCount": 6,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "game-container",
+          "cls": "",
+          "text": "回聲煉金師 點擊開始 🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ ",
+          "size": [
+            512,
+            480,
+            853,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "phase-meta",
+          "cls": "ui-overlay active-phase",
+          "text": "🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之",
+          "size": [
+            512,
+            480,
+            853,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute inset-0 overflow-hidden pointer-events-none",
+          "text": "",
+          "size": [
+            640,
+            480,
+            939,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col items-center justify-center w-full h-full pb-12 relative z-10",
+          "text": "Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之书 ⚔️ 試煉場",
+          "size": [
+            512,
+            480,
+            781,
+            781
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "text-center mb-16 relative group cursor-default",
+          "text": "Echo Alchemist 回聲煉金師",
+          "size": [
+            512,
+            480,
+            197,
+            197
+          ]
+        },
+        {
+          "tag": "H1",
+          "id": "",
+          "cls": "text-6xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b fr",
+          "text": "Echo Alchemist",
+          "size": [
+            480,
+            480,
+            156,
+            144
+          ]
+        }
+      ]
+    },
+    "truth": {
+      "vw": 1440,
+      "vh": 900,
+      "phase": "meta",
+      "overflowCount": 2,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-indigo-900/",
+          "text": "",
+          "rect": [
+            320,
+            -147,
+            800,
+            800,
+            1120,
+            653
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-900/10 rounded-f",
+          "text": "",
+          "rect": [
+            432,
+            462,
+            500,
+            500,
+            932,
+            962
+          ]
+        }
+      ],
+      "textOverflowCount": 6,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "game-container",
+          "cls": "",
+          "text": "回聲煉金師 點擊開始 🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ ",
+          "size": [
+            512,
+            480,
+            853,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "phase-meta",
+          "cls": "ui-overlay active-phase",
+          "text": "🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之",
+          "size": [
+            512,
+            480,
+            853,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute inset-0 overflow-hidden pointer-events-none",
+          "text": "",
+          "size": [
+            640,
+            480,
+            939,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col items-center justify-center w-full h-full pb-12 relative z-10",
+          "text": "Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之书 ⚔️ 試煉場",
+          "size": [
+            512,
+            480,
+            781,
+            781
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "text-center mb-16 relative group cursor-default",
+          "text": "Echo Alchemist 回聲煉金師",
+          "size": [
+            512,
+            480,
+            197,
+            197
+          ]
+        },
+        {
+          "tag": "H1",
+          "id": "",
+          "cls": "text-6xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b fr",
+          "text": "Echo Alchemist",
+          "size": [
+            480,
+            480,
+            156,
+            144
+          ]
+        }
+      ]
+    },
+    "runEntry": {
+      "vw": 1440,
+      "vh": 900,
+      "phase": "meta",
+      "overflowCount": 2,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-indigo-900/",
+          "text": "",
+          "rect": [
+            320,
+            -147,
+            800,
+            800,
+            1120,
+            653
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-900/10 rounded-f",
+          "text": "",
+          "rect": [
+            432,
+            462,
+            500,
+            500,
+            932,
+            962
+          ]
+        }
+      ],
+      "textOverflowCount": 6,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "game-container",
+          "cls": "",
+          "text": "回聲煉金師 點擊開始 🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ ",
+          "size": [
+            512,
+            480,
+            853,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "phase-meta",
+          "cls": "ui-overlay active-phase",
+          "text": "🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之",
+          "size": [
+            512,
+            480,
+            853,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute inset-0 overflow-hidden pointer-events-none",
+          "text": "",
+          "size": [
+            640,
+            480,
+            939,
+            853
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col items-center justify-center w-full h-full pb-12 relative z-10",
+          "text": "Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之书 ⚔️ 試煉場",
+          "size": [
+            512,
+            480,
+            781,
+            781
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "text-center mb-16 relative group cursor-default",
+          "text": "Echo Alchemist 回聲煉金師",
+          "size": [
+            512,
+            480,
+            197,
+            197
+          ]
+        },
+        {
+          "tag": "H1",
+          "id": "",
+          "cls": "text-6xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b fr",
+          "text": "Echo Alchemist",
+          "size": [
+            480,
+            480,
+            156,
+            144
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "label": "mobile-390x844",
+    "width": 390,
+    "height": 844,
+    "mobile": true,
+    "meta": {
+      "vw": 390,
+      "vh": 844,
+      "phase": "meta",
+      "overflowCount": 14,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-indigo-900/",
+          "text": "",
+          "rect": [
+            -205,
+            -63,
+            800,
+            800,
+            595,
+            737
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-900/10 rounded-f",
+          "text": "",
+          "rect": [
+            -39,
+            338,
+            500,
+            500,
+            461,
+            838
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute -left-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transpa",
+          "text": "",
+          "rect": [
+            -32,
+            240,
+            4,
+            96,
+            -28,
+            336
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute -right-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transp",
+          "text": "",
+          "rect": [
+            418,
+            240,
+            4,
+            96,
+            422,
+            336
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute inset-0 bg-gradient-to-r from-indigo-600/0 via-indigo-400/10 to-indigo-",
+          "text": "",
+          "rect": [
+            -234,
+            440,
+            286,
+            91,
+            52,
+            531
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "info-drawer",
+          "cls": "absolute bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t border",
+          "text": "✕ 敵人狀態 特殊詞條 配方圖鑑 傷害統計 普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            0,
+            769,
+            390,
+            520,
+            390,
+            1289
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex-1 overflow-y-auto p-4 relative",
+          "text": "普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            0,
+            817,
+            390,
+            472,
+            390,
+            1289
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "tab-status",
+          "cls": "tab-content h-full space-y-3",
+          "text": "普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            16,
+            833,
+            358,
+            440,
+            374,
+            1273
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex items-center justify-between",
+          "text": "普通魔像 HP: 100/100",
+          "rect": [
+            16,
+            833,
+            358,
+            28,
+            374,
+            861
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "info-enemy-type",
+          "cls": "text-lg font-bold",
+          "text": "普通魔像",
+          "rect": [
+            16,
+            833,
+            72,
+            28,
+            88,
+            861
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "info-hp",
+          "cls": "text-xs bg-slate-700 px-2 py-1 rounded",
+          "text": "HP: 100/100",
+          "rect": [
+            291,
+            835,
+            83,
+            24,
+            374,
+            859
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "w-full bg-slate-700 h-2 rounded-full overflow-hidden relative mt-1",
+          "text": "",
+          "rect": [
+            16,
+            873,
+            358,
+            8,
+            374,
+            881
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute top-0 bottom-0 w-0.5 bg-white/50 left-1/2",
+          "text": "",
+          "rect": [
+            195,
+            873,
+            2,
+            8,
+            197,
+            881
+          ]
+        },
+        {
+          "tag": "P",
+          "id": "info-temp-text",
+          "cls": "text-xs text-center text-slate-400 mt-1",
+          "text": "溫度: 0°C",
+          "rect": [
+            16,
+            893,
+            358,
+            16,
+            374,
+            909
+          ]
+        }
+      ],
+      "textOverflowCount": 6,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "game-container",
+          "cls": "",
+          "text": "回聲煉金師 點擊開始 🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ ",
+          "size": [
+            422,
+            390,
+            1213,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "phase-meta",
+          "cls": "ui-overlay active-phase",
+          "text": "🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之",
+          "size": [
+            422,
+            390,
+            693,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute inset-0 overflow-hidden pointer-events-none",
+          "text": "",
+          "size": [
+            595,
+            390,
+            763,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col items-center justify-center w-full h-full pb-12 relative z-10",
+          "text": "Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之书 ⚔️ 試煉場",
+          "size": [
+            422,
+            390,
+            621,
+            621
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "text-center mb-16 relative group cursor-default",
+          "text": "Echo Alchemist 回聲煉金師",
+          "size": [
+            422,
+            390,
+            173,
+            173
+          ]
+        },
+        {
+          "tag": "H1",
+          "id": "",
+          "cls": "text-6xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b fr",
+          "text": "Echo Alchemist",
+          "size": [
+            390,
+            390,
+            130,
+            120
+          ]
+        }
+      ]
+    },
+    "training": {
+      "vw": 390,
+      "vh": 844,
+      "phase": "meta",
+      "overflowCount": 14,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-indigo-900/",
+          "text": "",
+          "rect": [
+            -205,
+            -63,
+            800,
+            800,
+            595,
+            737
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-900/10 rounded-f",
+          "text": "",
+          "rect": [
+            -39,
+            338,
+            500,
+            500,
+            461,
+            838
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute -left-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transpa",
+          "text": "",
+          "rect": [
+            -32,
+            240,
+            4,
+            96,
+            -28,
+            336
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute -right-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transp",
+          "text": "",
+          "rect": [
+            418,
+            240,
+            4,
+            96,
+            422,
+            336
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute inset-0 bg-gradient-to-r from-indigo-600/0 via-indigo-400/10 to-indigo-",
+          "text": "",
+          "rect": [
+            -234,
+            440,
+            286,
+            91,
+            52,
+            531
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "info-drawer",
+          "cls": "absolute bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t border",
+          "text": "✕ 敵人狀態 特殊詞條 配方圖鑑 傷害統計 普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            0,
+            769,
+            390,
+            520,
+            390,
+            1289
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex-1 overflow-y-auto p-4 relative",
+          "text": "普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            0,
+            817,
+            390,
+            472,
+            390,
+            1289
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "tab-status",
+          "cls": "tab-content h-full space-y-3",
+          "text": "普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            16,
+            833,
+            358,
+            440,
+            374,
+            1273
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex items-center justify-between",
+          "text": "普通魔像 HP: 100/100",
+          "rect": [
+            16,
+            833,
+            358,
+            28,
+            374,
+            861
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "info-enemy-type",
+          "cls": "text-lg font-bold",
+          "text": "普通魔像",
+          "rect": [
+            16,
+            833,
+            72,
+            28,
+            88,
+            861
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "info-hp",
+          "cls": "text-xs bg-slate-700 px-2 py-1 rounded",
+          "text": "HP: 100/100",
+          "rect": [
+            291,
+            835,
+            83,
+            24,
+            374,
+            859
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "w-full bg-slate-700 h-2 rounded-full overflow-hidden relative mt-1",
+          "text": "",
+          "rect": [
+            16,
+            873,
+            358,
+            8,
+            374,
+            881
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute top-0 bottom-0 w-0.5 bg-white/50 left-1/2",
+          "text": "",
+          "rect": [
+            195,
+            873,
+            2,
+            8,
+            197,
+            881
+          ]
+        },
+        {
+          "tag": "P",
+          "id": "info-temp-text",
+          "cls": "text-xs text-center text-slate-400 mt-1",
+          "text": "溫度: 0°C",
+          "rect": [
+            16,
+            893,
+            358,
+            16,
+            374,
+            909
+          ]
+        }
+      ],
+      "textOverflowCount": 6,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "game-container",
+          "cls": "",
+          "text": "回聲煉金師 點擊開始 🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ ",
+          "size": [
+            422,
+            390,
+            1213,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "phase-meta",
+          "cls": "ui-overlay active-phase",
+          "text": "🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之",
+          "size": [
+            422,
+            390,
+            693,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute inset-0 overflow-hidden pointer-events-none",
+          "text": "",
+          "size": [
+            595,
+            390,
+            763,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col items-center justify-center w-full h-full pb-12 relative z-10",
+          "text": "Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之书 ⚔️ 試煉場",
+          "size": [
+            422,
+            390,
+            621,
+            621
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "text-center mb-16 relative group cursor-default",
+          "text": "Echo Alchemist 回聲煉金師",
+          "size": [
+            422,
+            390,
+            173,
+            173
+          ]
+        },
+        {
+          "tag": "H1",
+          "id": "",
+          "cls": "text-6xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b fr",
+          "text": "Echo Alchemist",
+          "size": [
+            390,
+            390,
+            130,
+            120
+          ]
+        }
+      ]
+    },
+    "truth": {
+      "vw": 390,
+      "vh": 844,
+      "phase": "meta",
+      "overflowCount": 14,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-indigo-900/",
+          "text": "",
+          "rect": [
+            -205,
+            -63,
+            800,
+            800,
+            595,
+            737
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-900/10 rounded-f",
+          "text": "",
+          "rect": [
+            -39,
+            338,
+            500,
+            500,
+            461,
+            838
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute -left-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transpa",
+          "text": "",
+          "rect": [
+            -32,
+            240,
+            4,
+            96,
+            -28,
+            336
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute -right-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transp",
+          "text": "",
+          "rect": [
+            418,
+            240,
+            4,
+            96,
+            422,
+            336
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute inset-0 bg-gradient-to-r from-indigo-600/0 via-indigo-400/10 to-indigo-",
+          "text": "",
+          "rect": [
+            -234,
+            440,
+            286,
+            91,
+            52,
+            531
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "info-drawer",
+          "cls": "absolute bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t border",
+          "text": "✕ 敵人狀態 特殊詞條 配方圖鑑 傷害統計 普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            0,
+            769,
+            390,
+            520,
+            390,
+            1289
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex-1 overflow-y-auto p-4 relative",
+          "text": "普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            0,
+            817,
+            390,
+            472,
+            390,
+            1289
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "tab-status",
+          "cls": "tab-content h-full space-y-3",
+          "text": "普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            16,
+            833,
+            358,
+            440,
+            374,
+            1273
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex items-center justify-between",
+          "text": "普通魔像 HP: 100/100",
+          "rect": [
+            16,
+            833,
+            358,
+            28,
+            374,
+            861
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "info-enemy-type",
+          "cls": "text-lg font-bold",
+          "text": "普通魔像",
+          "rect": [
+            16,
+            833,
+            72,
+            28,
+            88,
+            861
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "info-hp",
+          "cls": "text-xs bg-slate-700 px-2 py-1 rounded",
+          "text": "HP: 100/100",
+          "rect": [
+            291,
+            835,
+            83,
+            24,
+            374,
+            859
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "w-full bg-slate-700 h-2 rounded-full overflow-hidden relative mt-1",
+          "text": "",
+          "rect": [
+            16,
+            873,
+            358,
+            8,
+            374,
+            881
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute top-0 bottom-0 w-0.5 bg-white/50 left-1/2",
+          "text": "",
+          "rect": [
+            195,
+            873,
+            2,
+            8,
+            197,
+            881
+          ]
+        },
+        {
+          "tag": "P",
+          "id": "info-temp-text",
+          "cls": "text-xs text-center text-slate-400 mt-1",
+          "text": "溫度: 0°C",
+          "rect": [
+            16,
+            893,
+            358,
+            16,
+            374,
+            909
+          ]
+        }
+      ],
+      "textOverflowCount": 6,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "game-container",
+          "cls": "",
+          "text": "回聲煉金師 點擊開始 🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ ",
+          "size": [
+            422,
+            390,
+            1213,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "phase-meta",
+          "cls": "ui-overlay active-phase",
+          "text": "🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之",
+          "size": [
+            422,
+            390,
+            693,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute inset-0 overflow-hidden pointer-events-none",
+          "text": "",
+          "size": [
+            595,
+            390,
+            763,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col items-center justify-center w-full h-full pb-12 relative z-10",
+          "text": "Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之书 ⚔️ 試煉場",
+          "size": [
+            422,
+            390,
+            621,
+            621
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "text-center mb-16 relative group cursor-default",
+          "text": "Echo Alchemist 回聲煉金師",
+          "size": [
+            422,
+            390,
+            173,
+            173
+          ]
+        },
+        {
+          "tag": "H1",
+          "id": "",
+          "cls": "text-6xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b fr",
+          "text": "Echo Alchemist",
+          "size": [
+            390,
+            390,
+            130,
+            120
+          ]
+        }
+      ]
+    },
+    "runEntry": {
+      "vw": 390,
+      "vh": 844,
+      "phase": "meta",
+      "overflowCount": 14,
+      "overflow": [
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-indigo-900/",
+          "text": "",
+          "rect": [
+            -205,
+            -63,
+            800,
+            800,
+            595,
+            737
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-900/10 rounded-f",
+          "text": "",
+          "rect": [
+            -39,
+            338,
+            500,
+            500,
+            461,
+            838
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute -left-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transpa",
+          "text": "",
+          "rect": [
+            -32,
+            240,
+            4,
+            96,
+            -28,
+            336
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute -right-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transp",
+          "text": "",
+          "rect": [
+            418,
+            240,
+            4,
+            96,
+            422,
+            336
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute inset-0 bg-gradient-to-r from-indigo-600/0 via-indigo-400/10 to-indigo-",
+          "text": "",
+          "rect": [
+            -234,
+            440,
+            286,
+            91,
+            52,
+            531
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "info-drawer",
+          "cls": "absolute bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t border",
+          "text": "✕ 敵人狀態 特殊詞條 配方圖鑑 傷害統計 普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            0,
+            769,
+            390,
+            520,
+            390,
+            1289
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex-1 overflow-y-auto p-4 relative",
+          "text": "普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            0,
+            817,
+            390,
+            472,
+            390,
+            1289
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "tab-status",
+          "cls": "tab-content h-full space-y-3",
+          "text": "普通魔像 HP: 100/100 溫度: 0°C",
+          "rect": [
+            16,
+            833,
+            358,
+            440,
+            374,
+            1273
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex items-center justify-between",
+          "text": "普通魔像 HP: 100/100",
+          "rect": [
+            16,
+            833,
+            358,
+            28,
+            374,
+            861
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "info-enemy-type",
+          "cls": "text-lg font-bold",
+          "text": "普通魔像",
+          "rect": [
+            16,
+            833,
+            72,
+            28,
+            88,
+            861
+          ]
+        },
+        {
+          "tag": "SPAN",
+          "id": "info-hp",
+          "cls": "text-xs bg-slate-700 px-2 py-1 rounded",
+          "text": "HP: 100/100",
+          "rect": [
+            291,
+            835,
+            83,
+            24,
+            374,
+            859
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "w-full bg-slate-700 h-2 rounded-full overflow-hidden relative mt-1",
+          "text": "",
+          "rect": [
+            16,
+            873,
+            358,
+            8,
+            374,
+            881
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute top-0 bottom-0 w-0.5 bg-white/50 left-1/2",
+          "text": "",
+          "rect": [
+            195,
+            873,
+            2,
+            8,
+            197,
+            881
+          ]
+        },
+        {
+          "tag": "P",
+          "id": "info-temp-text",
+          "cls": "text-xs text-center text-slate-400 mt-1",
+          "text": "溫度: 0°C",
+          "rect": [
+            16,
+            893,
+            358,
+            16,
+            374,
+            909
+          ]
+        }
+      ],
+      "textOverflowCount": 6,
+      "textOverflow": [
+        {
+          "tag": "DIV",
+          "id": "game-container",
+          "cls": "",
+          "text": "回聲煉金師 點擊開始 🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ ",
+          "size": [
+            422,
+            390,
+            1213,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "phase-meta",
+          "cls": "ui-overlay active-phase",
+          "text": "🔮 0 符文碎片 Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之",
+          "size": [
+            422,
+            390,
+            693,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "absolute inset-0 overflow-hidden pointer-events-none",
+          "text": "",
+          "size": [
+            595,
+            390,
+            763,
+            693
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "flex flex-col items-center justify-center w-full h-full pb-12 relative z-10",
+          "text": "Echo Alchemist 回聲煉金師 開始煉成 INITIALIZE SEQUENCE ⚒️ 煉金工坊 📖 真理之书 ⚔️ 試煉場",
+          "size": [
+            422,
+            390,
+            621,
+            621
+          ]
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "cls": "text-center mb-16 relative group cursor-default",
+          "text": "Echo Alchemist 回聲煉金師",
+          "size": [
+            422,
+            390,
+            173,
+            173
+          ]
+        },
+        {
+          "tag": "H1",
+          "id": "",
+          "cls": "text-6xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-b fr",
+          "text": "Echo Alchemist",
+          "size": [
+            390,
+            390,
+            130,
+            120
+          ]
+        }
+      ]
+    }
+  }
+]

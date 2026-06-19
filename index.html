@@ -109,6 +109,250 @@
             z-index: auto !important;
             overflow-y: auto;
         }
+        /* ===== Rune launcher unified surface ===== */
+        #phase-rune-launcher {
+            --launcher-bg: rgba(7, 10, 23, 0.96);
+            --launcher-panel: rgba(15, 23, 42, 0.76);
+            --launcher-panel-strong: rgba(20, 28, 48, 0.92);
+            --launcher-line: rgba(100, 116, 139, 0.28);
+            --launcher-line-strong: rgba(148, 163, 184, 0.42);
+            --launcher-text: #e5edf8;
+            --launcher-muted: #8ea0b8;
+            --launcher-accent: #38bdf8;
+            --launcher-warm: #f59e0b;
+            --launcher-good: #34d399;
+        }
+        #phase-rune-launcher .rune-launcher-card {
+            width: 100%;
+            max-width: 480px;
+            height: 100%;
+            margin: 0 auto;
+            padding: 16px;
+            gap: 12px;
+            background:
+                linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(5, 8, 18, 0.98)),
+                radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.12), transparent 44%);
+            color: var(--launcher-text);
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(100, 116, 139, 0.65) transparent;
+        }
+        #phase-rune-launcher .rune-launcher-card::-webkit-scrollbar { width: 5px; }
+        #phase-rune-launcher .rune-launcher-card::-webkit-scrollbar-track { background: transparent; }
+        #phase-rune-launcher .rune-launcher-card::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.65);
+            border-radius: 999px;
+        }
+        #phase-rune-launcher .rune-launcher-card > .flex.justify-between {
+            flex: 0 0 auto;
+            min-height: 38px;
+            margin-bottom: 0 !important;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--launcher-line);
+        }
+        #phase-rune-launcher .rune-launcher-card h2 {
+            color: #f8fafc !important;
+            font-size: 1.08rem !important;
+            line-height: 1.2;
+            letter-spacing: 0.08em !important;
+            text-align: center;
+        }
+        #phase-rune-launcher .rune-launcher-close-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            border: 1px solid var(--launcher-line);
+            background: rgba(15, 23, 42, 0.7);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #launcher-shard-display {
+            height: 30px;
+            border-radius: 8px !important;
+            background: rgba(15, 23, 42, 0.76) !important;
+            border-color: rgba(56, 189, 248, 0.32) !important;
+            color: #dbeafe;
+        }
+        #rune-tab-launcher,
+        #rune-tab-management,
+        #rune-tab-codex {
+            min-width: 0;
+            height: 34px;
+            border-radius: 8px !important;
+            border: 1px solid var(--launcher-line) !important;
+            background: rgba(15, 23, 42, 0.66) !important;
+            color: var(--launcher-muted) !important;
+            letter-spacing: 0.06em !important;
+            box-shadow: none !important;
+        }
+        #rune-tab-launcher[data-active="true"],
+        #rune-tab-management[data-active="true"],
+        #rune-tab-codex[data-active="true"] {
+            background: rgba(14, 116, 144, 0.38) !important;
+            border-color: rgba(56, 189, 248, 0.72) !important;
+            color: #e0f2fe !important;
+            box-shadow: inset 0 0 0 1px rgba(224, 242, 254, 0.08), 0 0 16px rgba(56, 189, 248, 0.12) !important;
+        }
+        #phase-rune-launcher .rune-launcher-card > .flex.gap-2 {
+            flex: 0 0 auto;
+            margin-bottom: 0 !important;
+            padding: 4px !important;
+            border: 1px solid var(--launcher-line) !important;
+            border-radius: 10px;
+            background: rgba(2, 6, 23, 0.5);
+        }
+        #rune-launcher-content:not(.hidden),
+        #rune-management-panel:not(.hidden),
+        #rune-codex-panel:not(.hidden) {
+            display: flex !important;
+            flex-direction: column;
+            gap: 12px;
+        }
+        #rune-launcher-content > div,
+        #rune-management-panel > div:not(#rune-action-result),
+        #rune-codex-panel > div {
+            margin-bottom: 0 !important;
+        }
+        #rune-launcher-content > div,
+        #rune-management-panel > div:not(#rune-action-result),
+        #rune-codex-panel > div:not(:first-child) {
+            border: 1px solid var(--launcher-line);
+            border-radius: 8px;
+            background: var(--launcher-panel);
+            padding: 12px;
+        }
+        #rune-codex-panel > div:first-child,
+        #rune-management-panel > div:first-child {
+            color: #b6c5da;
+            border: 0;
+            background: transparent;
+            padding: 0;
+        }
+        #rune-grid-container {
+            width: min(100%, 228px);
+            max-width: 228px !important;
+            gap: 10px !important;
+        }
+        #rune-inventory-container,
+        #rune-management-inventory,
+        #rune-active-runewords,
+        #rune-codex-list,
+        #rune-resonance-list,
+        #rune-stats-list {
+            gap: 8px !important;
+        }
+        #rune-inventory-container,
+        #rune-management-inventory {
+            min-height: 56px !important;
+            max-height: 188px;
+            overflow-y: auto;
+            padding: 8px !important;
+            border-radius: 8px !important;
+            border-color: var(--launcher-line) !important;
+            background: rgba(2, 6, 23, 0.44) !important;
+        }
+        #rune-stats-summary,
+        #rune-resonance-summary {
+            border-color: var(--launcher-line) !important;
+            border-radius: 8px !important;
+            background: var(--launcher-panel) !important;
+        }
+        #rune-active-runewords,
+        #rune-codex-list {
+            display: flex;
+            flex-direction: column;
+        }
+        .rune-list-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            min-height: 54px;
+            padding: 8px 10px;
+            border: 1px solid var(--launcher-line);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.7);
+            color: var(--launcher-text);
+            transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+        }
+        .rune-list-card:hover {
+            border-color: var(--launcher-line-strong);
+            background: var(--launcher-panel-strong);
+        }
+        .rune-list-card--pending,
+        .rune-list-card--selected {
+            border-color: rgba(56, 189, 248, 0.72);
+            background: rgba(14, 116, 144, 0.28);
+            box-shadow: inset 0 0 0 1px rgba(224, 242, 254, 0.08);
+        }
+        .rune-list-card--active {
+            align-items: flex-start;
+            border-color: rgba(52, 211, 153, 0.45);
+            background: rgba(6, 78, 59, 0.2);
+        }
+        .rune-list-card--locked {
+            opacity: 0.68;
+            border-style: dashed;
+        }
+        .rune-list-card__icon {
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 38px;
+        }
+        .rune-list-card__body {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+        .rune-list-card__title {
+            font-size: 0.78rem;
+            line-height: 1.25;
+            font-weight: 800;
+            color: #f1f5f9;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .rune-list-card__meta {
+            margin-top: 2px;
+            font-size: 0.66rem;
+            line-height: 1.35;
+            color: var(--launcher-muted);
+        }
+        .rune-list-card__status {
+            flex: 0 0 auto;
+            font-size: 0.68rem;
+            font-weight: 800;
+            color: #7dd3fc;
+            white-space: nowrap;
+        }
+        .rune-action-panel {
+            border-radius: 8px !important;
+            background: rgba(15, 23, 42, 0.72) !important;
+            border-color: var(--launcher-line) !important;
+        }
+        @media (max-width: 420px) {
+            #phase-rune-launcher .rune-launcher-card {
+                padding: 12px;
+                gap: 10px;
+            }
+            #phase-rune-launcher .rune-launcher-card h2 {
+                font-size: 0.96rem !important;
+            }
+            #rune-tab-launcher,
+            #rune-tab-management,
+            #rune-tab-codex {
+                font-size: 0.64rem !important;
+                padding-left: 4px !important;
+                padding-right: 4px !important;
+            }
+            #rune-grid-container {
+                max-width: 210px !important;
+            }
+        }
         #pc-right-sidebar #phase-rune-launcher .w-full.max-w-md {
             max-width: 100% !important;
             padding: 16px 12px !important;
@@ -1400,10 +1644,6 @@
         }
         #phase-selection .select-card.selected {
             transform: translateY(-3px) scale(1.03);
-        }
-        #phase-selection .select-card[data-touch-ready="true"]:not(.selected) {
-            border-color: #fbbf24;
-            box-shadow: 0 0 14px rgba(251, 191, 36, 0.24), 0 6px 18px rgba(0,0,0,0.35);
         }
         #phase-selection .select-icon-wrap {
             width: 38px;
@@ -3804,9 +4044,9 @@
 
             <!-- Tab 导航 -->
             <div class="flex gap-2 mb-5 border-b border-slate-700/50 pb-3">
-                <button id="rune-tab-launcher" onclick="game.ui_switchRuneTab('launcher')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-purple-700/60 text-purple-100 border border-purple-500/60">⚡ 配置</button>
-                <button id="rune-tab-management" onclick="game.ui_switchRuneTab('management')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">⚗️ 管理</button>
-                <button id="rune-tab-codex" onclick="game.ui_switchRuneTab('codex')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">📖 圖鑑</button>
+                <button id="rune-tab-launcher" data-active="true" aria-selected="true" onclick="game.ui_switchRuneTab('launcher')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-purple-700/60 text-purple-100 border border-purple-500/60">⚡ 配置</button>
+                <button id="rune-tab-management" data-active="false" aria-selected="false" onclick="game.ui_switchRuneTab('management')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">⚗️ 管理</button>
+                <button id="rune-tab-codex" data-active="false" aria-selected="false" onclick="game.ui_switchRuneTab('codex')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">📖 圖鑑</button>
             </div>
 
             <!-- 发射器内容区域 -->
@@ -4386,7 +4626,7 @@
 
                 <!-- 放弃本局按钮 -->
                 <div class="mb-4">
-                    <button onclick="if(confirm('确定放弃本局并返回主界面？')) { game.ui_closePause(); game.phase_switchPhase(\'meta\'); }" class="pause-btn-abandon">
+                    <button onclick="if(confirm('确定放弃本局并返回主界面？')) { game.ui_abandonRunToMeta(); }" class="pause-btn-abandon">
                         放弃本局
                     </button>
                 </div>
@@ -4410,12 +4650,36 @@
 
 
 <script>
+const APP_ASSET_CACHE_VERSION = '20260619-bitmap-v3';
+
+async function clearStaleAssetCaches() {
+    if (!('caches' in window)) return;
+    const versionKey = 'ea_asset_cache_version';
+    if (localStorage.getItem(versionKey) === APP_ASSET_CACHE_VERSION) return;
+
+    const names = await caches.keys();
+    await Promise.all(
+        names
+            .filter((name) => name.startsWith('echo-alchemist-'))
+            .map((name) => caches.delete(name))
+    );
+    localStorage.setItem(versionKey, APP_ASSET_CACHE_VERSION);
+}
 // ==================== Service Worker 注册（位图资源持久缓存） ====================
 // 首次访问后缓存 assets/ 下的位图，跨刷新/跨会话不再重复下载，并支持离线。
 // 调试美术时在 URL 加 ?nosw 可跳过缓存；详见 sw.js 注释。
 (function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    if (new URLSearchParams(location.search).has('nosw')) return;
+    clearStaleAssetCaches().catch((err) => {
+        console.warn('[Cache] stale asset cache cleanup failed', err && err.message);
+    });
+    if (new URLSearchParams(location.search).has('nosw')) {
+        navigator.serviceWorker.getRegistrations()
+            .then((regs) => Promise.all(regs.map((reg) => reg.unregister())))
+            .then(() => clearStaleAssetCaches())
+            .catch(() => {});
+        return;
+    }
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch((err) => {
             console.warn('[SW] 注册失败（不影响游戏运行）:', err && err.message);

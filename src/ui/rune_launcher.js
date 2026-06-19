@@ -713,20 +713,18 @@ export const rune_launcher_system = {
 
             const card = document.createElement('div');
             card.className = [
-                'flex items-center gap-2 p-2 rounded-xl cursor-pointer select-none transition-all duration-150',
+                'rune-list-card cursor-pointer select-none',
                 isPending
-                    ? 'bg-amber-700/30 border-2 border-amber-400/80 shadow-[0_0_8px_rgba(251,191,36,0.5)]'
-                    : 'bg-slate-800/60 border-2 border-slate-700/40 hover:border-amber-500/50',
+                    ? 'rune-list-card--pending'
+                    : '',
             ].join(' ');
             card.innerHTML = `
-                <div class="w-10 h-10 flex items-center justify-center shrink-0" style="font-size:22px;">
+                <div class="rune-list-card__icon" style="font-size:22px;">
                     ${_ui_buildRuneIconHTML(runeDef, runeLevel)}
                 </div>
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-1.5">
-                        <span class="text-xs font-bold text-purple-200 truncate">${runeDef.name}</span>
-                    </div>
-                    <div class="text-[9px] text-slate-500 truncate">${runeDef.element}</div>
+                <div class="rune-list-card__body">
+                    <div class="rune-list-card__title">${runeDef.name}</div>
+                    <div class="rune-list-card__meta">${runeDef.element}</div>
                 </div>
                 ${isPending ? '<span class="text-amber-300 text-sm shrink-0">→</span>' : ''}
             `;
@@ -777,20 +775,18 @@ export const rune_launcher_system = {
 
             const card = document.createElement('div');
             card.className = [
-                'flex items-center gap-2 p-2 rounded-xl cursor-pointer select-none transition-all duration-150',
+                'rune-list-card cursor-pointer select-none',
                 isSelected
-                    ? 'bg-purple-700/40 border-2 border-purple-400/80 shadow-[0_0_6px_rgba(168,85,247,0.5)]'
-                    : 'bg-slate-800/60 border-2 border-slate-700/40 hover:border-purple-600/50',
+                    ? 'rune-list-card--selected'
+                    : '',
             ].join(' ');
             card.innerHTML = `
-                <div class="w-10 h-10 flex items-center justify-center shrink-0" style="font-size:22px;">
+                <div class="rune-list-card__icon" style="font-size:22px;">
                     ${_ui_buildRuneIconHTML(runeDef, runeLevel)}
                 </div>
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-1.5">
-                        <span class="text-xs font-bold text-purple-200 truncate">${runeDef.name}</span>
-                    </div>
-                    <div class="text-[9px] text-slate-500 truncate">${runeDef.element}</div>
+                <div class="rune-list-card__body">
+                    <div class="rune-list-card__title">${runeDef.name}</div>
+                    <div class="rune-list-card__meta">${runeDef.element}</div>
                 </div>
                 ${isSelected ? '<span class="text-purple-300 text-sm shrink-0">✓</span>' : ''}
             `;
@@ -834,8 +830,7 @@ export const rune_launcher_system = {
         activatedRunewords.forEach(rw => {
             const card = document.createElement('div');
             card.className = [
-                'flex items-start gap-3 p-3',
-                'bg-purple-900/20 border border-purple-700/40 rounded-xl',
+                'rune-list-card rune-list-card--active',
                 'cursor-pointer hover:bg-purple-900/40 hover:border-purple-500/60 transition-all duration-150',
             ].join(' ');
             card.title = '點擊查看詞條詳細效果';
@@ -877,9 +872,9 @@ export const rune_launcher_system = {
                 ? Object.entries(rw.stats).map(([k, v]) => `${k}+${v}`).join(', ')
                 : '';
             card.innerHTML = `
-                <div class="flex-1">
-                    <div class="text-sm font-bold text-purple-200">${rw.name} <span class="text-xs text-amber-400 font-normal">Lv.${level}</span></div>
-                    <div class="text-[10px] text-slate-400 mt-0.5">${rw.effect_desc || ''}</div>
+                <div class="rune-list-card__body">
+                    <div class="rune-list-card__title">${rw.name} <span class="text-xs text-amber-400 font-normal">Lv.${level}</span></div>
+                    <div class="rune-list-card__meta">${rw.effect_desc || ''}</div>
                     ${dynamicDesc ? `<div class="text-[10px] text-emerald-400 mt-1">${dynamicDesc}</div>` : ''}
                     ${statsText ? `<div class="text-[10px] text-amber-300 mt-1">${statsText}</div>` : ''}
                 </div>
@@ -1290,6 +1285,8 @@ export const rune_launcher_system = {
 
         const setActive = (btn, on) => {
             if (!btn) return;
+            btn.dataset.active = on ? 'true' : 'false';
+            btn.setAttribute('aria-selected', on ? 'true' : 'false');
             if (on) { btn.classList.add(...activeClass); btn.classList.remove(...inactiveClass); }
             else    { btn.classList.remove(...activeClass); btn.classList.add(...inactiveClass); }
         };
@@ -1432,7 +1429,7 @@ export const rune_launcher_system = {
 
             if (!isDiscovered) {
                 // 未发现：显示隐藏卡片
-                card.className = 'bg-slate-900/60 border border-slate-700/30 rounded-xl p-4 opacity-60';
+                card.className = 'rune-list-card rune-list-card--locked';
                 // 显示 pattern 中符文的元素类型作为提示
                 const patternHint = rw.pattern.map(runeId => {
                     const rd = RUNE_DB.find(r => r.id === runeId);
@@ -1453,7 +1450,7 @@ export const rune_launcher_system = {
             } else {
                 // 已发现：显示完整信息，默认展示 Lv.1 效果
                 const defaultLevel = 1;
-                card.className = 'bg-purple-900/20 border border-purple-700/40 rounded-xl p-4';
+                card.className = 'rune-list-card rune-list-card--active';
                 card.dataset.runewordId = rw.id;
 
                 const patternIcons = rw.pattern.map(runeId => {

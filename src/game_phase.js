@@ -12,6 +12,7 @@ import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
 import { sb as _sb } from './utils/perf.js';
+import { EMITTER_PORT_OFFSET_Y } from './bitmap_icons.js';
 import {
     calcDropDistribution,
     generateHeatmapData,
@@ -24,6 +25,7 @@ import {
     calcModuleSlotRect,
     createDefaultModuleLayout,
     ensureModuleLayoutInstances,
+    getActiveModuleSlots,
     MODULE_DEFS,
     getModuleIdFromEntry,
     getModuleSpan,
@@ -31,6 +33,101 @@ import {
     selectFusionTargetPegs,
     setModulePegState,
 } from './pinboard_modules.js';
+
+function drawModuleFootprintOutline(ctx, rect, footprint, color, pulse = 0) {
+    if (!ctx || !rect || !footprint) return false;
+    const { x, y, w, h } = rect;
+    const px = (v) => x + w * v;
+    const py = (v) => y + h * v;
+    const wobble = 1 + pulse * 0.04;
+
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = color;
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.16)';
+    ctx.beginPath();
+
+    switch (footprint) {
+        case 'fin-left':
+            ctx.moveTo(px(0.20), py(0.18));
+            ctx.lineTo(px(0.52), py(0.48));
+            ctx.lineTo(px(0.80), py(0.84));
+            break;
+        case 'fin-right':
+            ctx.moveTo(px(0.80), py(0.18));
+            ctx.lineTo(px(0.48), py(0.48));
+            ctx.lineTo(px(0.20), py(0.84));
+            break;
+        case 'diamond':
+            ctx.moveTo(px(0.50), py(0.18));
+            ctx.lineTo(px(0.76), py(0.48));
+            ctx.lineTo(px(0.50), py(0.84));
+            ctx.lineTo(px(0.24), py(0.48));
+            ctx.closePath();
+            break;
+        case 'chamber':
+            ctx.ellipse(px(0.50), py(0.52), w * 0.30 * wobble, h * 0.30, 0, 0, Math.PI * 2);
+            break;
+        case 'triangle-core':
+            ctx.moveTo(px(0.50), py(0.18));
+            ctx.lineTo(px(0.78), py(0.82));
+            ctx.lineTo(px(0.22), py(0.82));
+            ctx.closePath();
+            break;
+        case 'cup':
+            ctx.moveTo(px(0.18), py(0.30));
+            ctx.quadraticCurveTo(px(0.18), py(0.84), px(0.50), py(0.84));
+            ctx.quadraticCurveTo(px(0.82), py(0.84), px(0.82), py(0.30));
+            break;
+        case 'yoke':
+            ctx.moveTo(px(0.50), py(0.18));
+            ctx.lineTo(px(0.50), py(0.48));
+            ctx.moveTo(px(0.50), py(0.48));
+            ctx.lineTo(px(0.24), py(0.82));
+            ctx.moveTo(px(0.50), py(0.48));
+            ctx.lineTo(px(0.76), py(0.82));
+            break;
+        case 'hourglass':
+            ctx.moveTo(px(0.22), py(0.14));
+            ctx.lineTo(px(0.78), py(0.14));
+            ctx.lineTo(px(0.50), py(0.50));
+            ctx.lineTo(px(0.78), py(0.86));
+            ctx.lineTo(px(0.22), py(0.86));
+            ctx.lineTo(px(0.50), py(0.50));
+            ctx.closePath();
+            break;
+        case 'crescent':
+            ctx.moveTo(px(0.22), py(0.28));
+            ctx.quadraticCurveTo(px(0.86), py(0.10), px(0.78), py(0.62));
+            ctx.quadraticCurveTo(px(0.72), py(0.90), px(0.34), py(0.78));
+            break;
+        case 'spiral':
+            ctx.arc(px(0.50), py(0.50), Math.min(w, h) * 0.32, -0.3, Math.PI * 1.75);
+            ctx.arc(px(0.50), py(0.50), Math.min(w, h) * 0.17, Math.PI * 1.75, Math.PI * 0.45, true);
+            break;
+        case 'prism':
+            ctx.moveTo(px(0.50), py(0.18));
+            ctx.lineTo(px(0.76), py(0.74));
+            ctx.lineTo(px(0.24), py(0.74));
+            ctx.closePath();
+            ctx.moveTo(px(0.50), py(0.18));
+            ctx.lineTo(px(0.50), py(0.84));
+            break;
+        case 'bridge':
+            ctx.moveTo(px(0.12), py(0.72));
+            ctx.quadraticCurveTo(px(0.50), py(0.20), px(0.88), py(0.72));
+            ctx.moveTo(px(0.32), py(0.72));
+            ctx.lineTo(px(0.68), py(0.72));
+            break;
+        default:
+            return false;
+    }
+
+    ctx.stroke();
+    ctx.restore();
+    return true;
+}
 
 export const game_phase = {
 /**
@@ -163,7 +260,7 @@ export const game_phase = {
 /**
      */
     // @section:pachinko_board_layout - 弹珠台布局计算与钉子生成
-    // [v2 模块化重写] 钉板由 4×3 = 12 个模块槽组成（CONFIG.gameplay.moduleCols/Rows）。
+    // [v2 模块化重写] 钉板由 CONFIG.gameplay.moduleCols/Rows 定义，解锁顺序通过 moduleUnlockOrder 居中展开。
     // 每个模块独立生成自己区域内的钉子/特殊槽。普通钉子会按当前 unlockedWeights 随机赋予属性，随后符文融合继续补充注入。
 
     phase_gathering_initPachinko_v2(shouldInherit = false) {
@@ -173,8 +270,8 @@ export const game_phase = {
         const moduleBuildCtx = this;
         const totalSlots = (cfg.moduleCols || 4) * (cfg.moduleRows || 3);
 
-        // 确保 currentModuleLayout 存在且正确长度
-        if (!Array.isArray(this.currentModuleLayout) || this.currentModuleLayout.length !== totalSlots) {
+        // 确保 currentModuleLayout 存在；长度不匹配时由 ensureModuleLayoutInstances 迁移到当前网格。
+        if (!Array.isArray(this.currentModuleLayout)) {
             this.currentModuleLayout = createDefaultModuleLayout(totalSlots, cfg.moduleDefaultSlots || 3);
         }
         this.currentModuleLayout = ensureModuleLayoutInstances(
@@ -188,9 +285,13 @@ export const game_phase = {
         this.specialSlots = [];
 
         let maxPegY = 0;
-        const slotsToBuild = Math.min(this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3, totalSlots);
+        const activeSlots = getActiveModuleSlots(
+            this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3,
+            totalSlots,
+            cfg
+        );
 
-        for (let i = 0; i < slotsToBuild; i++) {
+        for (const i of activeSlots) {
             const entry = this.currentModuleLayout[i];
             // 跳过空槽和被多格模块覆盖的非锚点槽（{ ref: anchorIdx }）
             if (!entry || isModuleRef(entry)) continue;
@@ -348,7 +449,7 @@ export const game_phase = {
         this._heatmapData = null;
         this.ui_updateGatheringQueueUI();
         this.ui_renderRecipeHUD();
-        console.log(`[Plinko v2] 模块化钉板初始化完成: ${this.pegs.length} 钉, ${this.specialSlots.length} 特殊槽, ${slotsToBuild}/${totalSlots} 槽位`);
+        console.log(`[Plinko v2] 模块化钉板初始化完成: ${this.pegs.length} 钉, ${this.specialSlots.length} 特殊槽, ${activeSlots.length}/${totalSlots} 槽位`);
     },
 
     // ==================== [兼容包装] ====================
@@ -404,6 +505,8 @@ export const game_phase = {
             if (def) {
                 ctx.save();
                 ctx.setLineDash([]);
+                // @perf-impact: Module editor footprint outlines are flat strokes only; no particles, gradients, or extra shadowBlur.
+                drawModuleFootprintOutline(ctx, rect, def.shape && def.shape.footprint, 'rgba(209, 250, 229, 0.72)', pulse);
                 // 顶部名称底条
                 ctx.fillStyle = 'rgba(2, 6, 23, 0.65)';
                 const tagH = 16;
@@ -427,6 +530,38 @@ export const game_phase = {
                 ctx.fillText('点击放置', cx, cy + 12, w - 6);
                 ctx.restore();
             }
+        }
+
+        // @perf-impact: Module placement preview uses flat slot fills/strokes only; no particles, gradients, or shadowBlur.
+        const placementPreview = this._moduleEditorPlacementPreview;
+        if (placementPreview && Array.isArray(placementPreview.covered)) {
+            const cfg = CONFIG.gameplay || {};
+            const canvasWidth = (this.width && this.width > 0) ? this.width : 400;
+            const canvasHeight = (this.height && this.height > 0) ? this.height : 600;
+            const previewSlots = placementPreview.covered.length > 0
+                ? placementPreview.covered
+                : [placementPreview.slotIdx];
+            const isTarget = placementPreview.mode === 'target';
+            const ok = placementPreview.ok !== false;
+            const stroke = isTarget ? '#67e8f9' : (ok ? '#22c55e' : '#fb7185');
+            const fill = isTarget
+                ? `rgba(103, 232, 249, ${0.10 + pulse * 0.05})`
+                : (ok
+                    ? `rgba(34, 197, 94, ${0.14 + pulse * 0.06})`
+                    : `rgba(251, 113, 133, ${0.16 + pulse * 0.07})`);
+
+            ctx.save();
+            ctx.setLineDash(ok ? [] : [5, 4]);
+            ctx.lineWidth = isTarget ? 2 : 3;
+            ctx.strokeStyle = stroke;
+            ctx.fillStyle = fill;
+            for (const slotIdx of previewSlots) {
+                if (!Number.isInteger(slotIdx) || slotIdx < 0) continue;
+                const cell = calcModuleSlotRect(slotIdx, canvasWidth, canvasHeight, cfg, { cols: 1, rows: 1 });
+                ctx.fillRect(cell.x + 3, cell.y + 3, cell.w - 6, cell.h - 6);
+                ctx.strokeRect(cell.x + 3.5, cell.y + 3.5, cell.w - 7, cell.h - 7);
+            }
+            ctx.restore();
         }
 
         // @perf-impact: Rune fusion preview draws lightweight target rings only; no particles, gradients, or shadowBlur.
@@ -1132,7 +1267,7 @@ phase_gathering_getRandomPegType() {
              }
              if (!this.isEnemyTurn && this.ammoQueue.length > 0 && this.projectiles.length === 0 && this.burstQueue.length === 0) {
                 this.isDragging = true;
-                // [emitter-port] 发射口位于 emitter_base.png 上沿（Y 轴上移 22px），与发射器素材的视觉发射口对齐
+                // [emitter-port] 发射口位于 emitter_base_v2.png 上沿，偏移量统一来自 EMITTER_PORT_OFFSET_Y。
                 this.dragStart = new Vec2(this.width / 2, this.height - 102);
                 this.dragCurrent = logicPos;
                 this.ui.closeDrawer();
@@ -1983,7 +2118,7 @@ phase_gathering_getRandomPegType() {
             const shot = this.burstQueue[i];
             shot.delay -= timeScale;
             if (shot.delay <= 0) {
-                // [emitter-port] 子弹从发射器素材的上沿发射口生成（Y 轴上移 22px）
+                // [emitter-port] 子弹从发射器素材的上沿发射口生成，偏移量统一来自 EMITTER_PORT_OFFSET_Y。
                 // [echo-origin] 若 shot 携带 x/y（如回响弹），则从该坐标发射，否则回退到发射器
                 const spawnX = (typeof shot.x === 'number') ? shot.x : this.width/2;
                 const spawnY = (typeof shot.y === 'number') ? shot.y : this.height-102;
@@ -2699,7 +2834,7 @@ phase_gathering_getRandomPegType() {
 
         // [emitter-port] startPos = 发射器底座视觉中心；portPos = 实际发射口（沿素材上沿）
         const startPos = new Vec2(this.width / 2, this.height - 80);
-        const portPos = new Vec2(startPos.x, startPos.y - 22);
+        const portPos = new Vec2(startPos.x, startPos.y - EMITTER_PORT_OFFSET_Y);
         // [bitmap-emitter] 优先使用 emitter_base.png + emitter_charging_*.png 渲染发射器底座；
         // 位图未加载时 fallback 到原始 arc 椭圆。
         this.render_combat_launcherEmitterBase(this.ctx, startPos.x, startPos.y, this.isChargingShot, this.chargeProgress);

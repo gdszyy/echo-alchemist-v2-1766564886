@@ -1,7 +1,7 @@
 ---
 id: "PI-006"
-version: "v1.2"
-last_updated: "2026-04-19"
+version: "v1.3"
+last_updated: "2026-06-19"
 author: "tsk-f35c6d10-d6f"
 related_modules: ["game_phase", "game_system", "core", "ui/shop"]
 status: "active"
@@ -64,3 +64,15 @@ status: "active"
 | v1.0 | 2026-04-17 | 初始记录：固定回合遗物移除，新增 round-start resolver、延迟奖励队列与存档恢复迁移规则 | tsk-33b634db-ac8 |
 | v1.1 | 2026-04-18 | 新增坑 4：普通命运选择已取消，队列为空时改调用 `sys_showRoundStartBanner()` | tsk-f35c6d10-d6f |
 | v1.2 | 2026-04-19 | 新增坑 5：开局缺少弹珠命运选择阶段；`sys_initGameStart()` 必须在遗物奖励后额外队列 `chaos_essence`（`source: 'run_start'`） | 当前 Agent |
+
+| v1.3 | 2026-06-19 | Pitfall 6: normal round-start banner must not rebuild `ammoQueue` from `_lastFiredAmmoSnapshot` or `marbleQueue`; those sources are only for explicit essence / replace-ammo charge flows. | Current Agent |
+
+## Pitfall 6: Normal Round-Start Banner Reuses Charge Sources
+
+**Symptom**: after selecting or replacing bullets, the next round's pending shots can unexpectedly become either the previously selected charged bullets or the newly generated / newly ground marble candidates.
+
+**Root cause**: `sys_showRoundStartBanner()` ran on the ordinary empty-reward round-start path, but it also rebuilt `ammoQueue` from `_lastFiredAmmoSnapshot` or `marbleQueue`. Those sources belong to explicit charge flows such as `chaos_essence`, `pure_essence`, `sys_skipGrindGetRune()`, and `sys_initReplaceAmmoPhase()`.
+
+**Correct approach**: ordinary round-start banner only shows the transition and then calls `phase_startGatheringPhase()`. It must not rebuild `ammoQueue`; any charged-ammo preservation must go through the explicit essence / replace-ammo flow.
+
+**Key location**: `src/game_system.js` -> `sys_showRoundStartBanner()`.

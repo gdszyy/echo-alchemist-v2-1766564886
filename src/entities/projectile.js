@@ -1176,15 +1176,26 @@ class Projectile {
         } else if (shapeType === 'matryoshka') {
              ctx.arc(0, 0, radius, 0, Math.PI * 2);
         } else {
-            if (config.pyro > 0) {
-                const time = Date.now() / 50;
-                for (let i = 0; i <= 30; i++) {
-                    const angle = (i / 30) * Math.PI * 2;
-                    const wave1 = Math.sin(time + angle * 3) * (radius * 0.15);
-                    const wave2 = Math.sin(time * 1.5 + angle * 7) * (radius * 0.08);
-                    const r = radius + wave1 + wave2;
-                    ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
-                }
+            if (config.pyro > 0 && !config.explosive) {
+                const time = Date.now() / 120;
+                const tipFlicker = Math.sin(time) * radius * 0.08;
+                const sideFlicker = Math.sin(time * 1.7) * radius * 0.06;
+                ctx.moveTo(0, -radius * 1.55 - tipFlicker);
+                ctx.bezierCurveTo(
+                    radius * (0.96 + sideFlicker / radius), -radius * 0.78,
+                    radius * 0.88, radius * 0.42,
+                    radius * 0.18, radius * 1.04
+                );
+                ctx.bezierCurveTo(
+                    radius * 0.05, radius * 0.88,
+                    -radius * 0.06, radius * 0.88,
+                    -radius * 0.18, radius * 1.04
+                );
+                ctx.bezierCurveTo(
+                    -radius * 0.88, radius * 0.42,
+                    -radius * (0.96 - sideFlicker / radius), -radius * 0.78,
+                    0, -radius * 1.55 - tipFlicker
+                );
             } else {
                 ctx.arc(0, 0, radius, 0, Math.PI * 2);
             }
@@ -1206,6 +1217,20 @@ class Projectile {
         ctx.fill();
         if (integrity < 1.0) {
             ctx.fillStyle = `rgba(0, 0, 0, ${0.6 - 0.6 * integrity})`; 
+            ctx.fill();
+        }
+        // @perf-impact: Pure pyro bullet inner flame - two small bezier fills only; no extra gradient or blend mode.
+        if (config.pyro > 0 && !config.explosive) {
+            const time = Date.now() / 150;
+            const innerPulse = Math.sin(time) * radius * 0.06;
+            ctx.shadowBlur = _sb(4 * intensity * integrity);
+            ctx.shadowColor = '#facc15';
+            ctx.fillStyle = 'rgba(254, 240, 138, 0.88)';
+            ctx.beginPath();
+            ctx.moveTo(0, -radius * 0.92 - innerPulse);
+            ctx.bezierCurveTo(radius * 0.42, -radius * 0.36, radius * 0.34, radius * 0.38, 0, radius * 0.7);
+            ctx.bezierCurveTo(-radius * 0.34, radius * 0.38, -radius * 0.42, -radius * 0.36, 0, -radius * 0.92 - innerPulse);
+            ctx.closePath();
             ctx.fill();
         }
         if (config.cryo > 0) {

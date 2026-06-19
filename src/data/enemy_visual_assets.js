@@ -81,6 +81,11 @@ const _DEFAULT_ARCHETYPE_ICONS = {
 const _DEFAULT_AFFIX_ICONS = {
     devour:     'affix_devour.png',
     heavyArmor: 'affix_heavyArmor.png',
+    deflectionWard: 'affix_deflectionWard.png',
+    echoRelay:  'affix_echoRelay.png',
+    prism:      'affix_prism.png',
+    hive:       'affix_hive.png',
+    gravityWell:'affix_gravityWell.png',
     siege:      'affix_siege.png',
     shield:     'affix_shield.png',
     regen:      'affix_regen.png',
@@ -131,7 +136,7 @@ function _buildDefaultManifest() {
             baseArchetype: arch,
             footprint: foot,
             affixes: affix ? affix.split('+') : [],
-            placeholder: true,
+            placeholder: false,
         };
     }
     const archetypes = {};
@@ -139,7 +144,7 @@ function _buildDefaultManifest() {
         archetypes[arch] = {
             spritePath: _DEFAULT_DIRS.archetypes + baseName + '.png',
             manifestPath: _DEFAULT_DIRS.archetypes + baseName + '.json',
-            placeholder: true,
+            placeholder: false,
         };
     }
     return {

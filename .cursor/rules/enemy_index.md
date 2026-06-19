@@ -1,6 +1,6 @@
 # 敌人词缀与 Boss 索引 (Enemy Affix & Boss Index)
 
-> **数据来源**：`src/config.js` → `balance.affixes`, `balance.bossConfigs`, `BOSS_DB`, `ENEMY_CURVE_CONFIG`；`src/spawn_system.js` → `spawn_generateAffixes()`, `spawn_trySpawnArchetypes()`, `spawn_scheduleNextBoss()`；`src/systems.js` → `TRUTH_BOOK_DATA.enemies`
+> **数据来源**：`src/config.js` → `balance.affixes`, `balance.bossConfigs`, `BOSS_DB`, `ENEMY_CURVE_CONFIG`；`src/spawn_system.js` → `spawn_generateAffixes()`, `spawn_trySpawnWavePreset()`, `spawn_trySpawnArchetypes()`, `spawn_scheduleNextBoss()`；`src/wave_presets.js` → `ENEMY_WAVE_PRESETS`；`src/systems.js` → `TRUTH_BOOK_DATA.enemies`
 > **用途**：Agent 快速查询 8 种通用词缀、7 种 V2 基底专属词缀和 8 个 Boss 的行为机制、出现回合、克制属性及关键代码位置。
 > **最后更新**：V2 敌人视觉重设计——尺寸基底 + 专属词条体系（2026-05-02）
 
@@ -34,13 +34,26 @@
 
 | 步骤 | 描述 |
 |---|---|
-| 1. 入口 | `spawn_spawnEnemyRowAt` 在普通敌人填充前调用 `spawn_trySpawnArchetypes` |
+| 1. 入口 | `spawn_spawnEnemyRowAt` 在普通敌人填充前先调用 `spawn_trySpawnWavePreset`，未命中或放置失败时再回退 `spawn_trySpawnArchetypes` |
 | 2. 总体概率 | `Math.min(0.40, 0.10 + round × 0.012)` |
 | 3. 候选筛选 | 排除回合数不足、同屏数量超限、`gravityWell` 在场时跳过其他大型 |
 | 4. 加权抽签 | 按 `weight` 字段（`gravityWell=0.025` … `bastion=0.18`）随机一个基底 |
 | 5. 位置寻找 | 洗牌列起点，逐个尝试连续 cols 列的空闲位置；失败则放弃本行 |
 | 6. 实例化 | 设置 `width = cols × enemyWidth`、`height = rows × enemyHeight`、`baseArchetype`、`gridCols`、`gridRows`、专属词条、移动间隔、特效 |
 | 7. 形状 | 调用 `spawn_applyArchetypeShape(e, archetypeId)` 注入语义轮廓（胃囊缺口、棱镜菱形、引力圆等） |
+
+### V2 预设波次速查
+
+| Preset ID | 目标回合 | 核心基底 | 说明 |
+|---|---:|---|---|
+| `teach_deflection_ward` | R9-R14 | deflector | 偏折屏障首次教学 |
+| `bastion_wall` | R10-R20 | bastion | 横向装甲墙配后排 |
+| `teach_echo_relay` | R12-R18 | echoSpire | 共振尖塔首次教学 |
+| `maw_food_chain_v2` | R18-R26 | maw | 吞噬链 V2 |
+| `siege_push_line` | R22-R30 | siege | 破阵履带压力 |
+| `prism_refraction` | R22-R30 | prism | 折光路径干扰 |
+| `hive_incubator` | R24-R34 | hive | 孵化持续压力 |
+| `gravity_blackout` | R32-R42 | gravityWell | 稀有大型场控 |
 
 ## 1. 敌人词缀总览（8 种）
 

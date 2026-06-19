@@ -1,0 +1,7 @@
+{
+  "phase": "selection",
+  "tier": "C",
+  "attr": "white",
+  "backgroundImage": "url(\"http://127.0.0.1:4174/assets/ui/sprites/replace_card_frame_C_9s.png\"), linear-gradient(rgba(15, 23, 42, 0.82), rgba(2, 6, 23, 0.88))",
+  "borderTop": "8px"
+}

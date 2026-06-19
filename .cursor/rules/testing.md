@@ -11,6 +11,9 @@
 | 层级 | 工具 | 位置 | 触发时机 | 耗时 |
 |------|------|------|----------|------|
 | **T1：静态结构校验** | `tests/validate_scenarios.js` | Node.js，无需浏览器 | 每次修改 `systems.js` 后立即执行 | < 30s |
+| **T1：阶段契约校验** | `tests/validate_phase_contracts.mjs` | Node.js，无需浏览器 | 每次修改阶段切换、暂停、gameover、命运时刻或 overlay 返回流后执行 | < 30s |
+| **T1：预设波次校验** | `tests/validate_wave_presets.mjs` | Node.js，无需浏览器 | 每次修改 `src/wave_presets.js` 或 preset 放置规则后执行 | < 30s |
+| **T1：大型基底运行期生成校验** | `tests/validate_enemy_spawn_runtime.mjs` | Node.js + 最小 Canvas/DOM stub | 每次修改大型基底生成限制、preset 回退逻辑或同屏上限后执行 | < 30s |
 | **T2：试炼场实机验证** | 浏览器内 `TrainingGround` 沙盒 | 游戏内置，需部署 | 部署到测试环境后，AI 或人工操作 | 按需 |
 | **T3：Puppeteer 自动化** | `tests/ai_test_runner.js` | Puppeteer，需本地游戏服务 | 完整回归测试 | 2~5min |
 
@@ -75,7 +78,7 @@
 | `relic_pure_essence_skip_grind` | 精华跳过研磨 | `_chargedAmmoQueue` 继承，弹药充能不丢失 | PI-001 |
 | `relic_surge_bounce` | 弹性涌潮遗物 | `doubleAssimilationBoostRounds` + `guaranteedNextRound` 状态 | — |
 | `relic_board_exclusion` | 钉盘形态互斥 | 已拥有形态遗物时，其他形态遗物从候选池移除 | — |
-| `relic_save_restore` | 存档恢复验证 | `pendingRoundStartRewards` 持久化到 `localStorage` | PI-006 |
+| `relic_save_restore` | 存档恢复验证 | `pendingRoundStartRewards`、命运时刻 selection 候选卡片与已选状态持久化到 `localStorage` | PI-006 |
 
 ---
 
@@ -88,6 +91,8 @@
 | `smoke` | 5 | 游戏加载、试炼场进入、DOM 渲染、relic 分类存在 |
 | `relic` | 6 | 保底计数器、遗物 UI 弹出、钉盘互斥、存档持久化 |
 | `essence` | 4 | 混沌精华触发、纯净精华激活、跳过研磨、涌潮遗物 |
+| `overlay` | 5 | 符文发射器、遗物选择、真理之书、商店遗物选择、round-start resolver 的打开/关闭返回链路 |
+| `pinboard` | 5 | 钉板编辑器打开、开始采集阻塞、模块禁用原因、符文融合预览/确认、有效开始采集关闭编辑器 |
 | `runeword` | 4 | focused_fire / mass_collapse / kinetic_decay / echo_shot |
 | `enemy` | 3 | shield/clone 词条、roundDamage 增加 |
 
@@ -106,6 +111,8 @@ node tests/ai_test_runner.js --url http://localhost:3000
 # 运行指定套件
 node tests/ai_test_runner.js --suite relic
 node tests/ai_test_runner.js --suite essence
+node tests/ai_test_runner.js --suite overlay
+node tests/ai_test_runner.js --suite pinboard
 
 # CI 无头模式
 node tests/ai_test_runner.js --headless
@@ -152,6 +159,49 @@ const requiredRelicIds = [
 ```
 
 新增其他分类场景时，在对应分类的校验区块中追加。
+
+### 4.3 V2 大型基底预设波次校验
+
+`tests/validate_wave_presets.mjs` 校验 `src/wave_presets.js` 中的 `ENEMY_WAVE_PRESETS`：
+
+- preset ID 唯一，`roundRange`、`weight`、`slots` 合法。
+- 非 `normal` slot 必须注册在 `ENEMY_WAVE_PRESET_ARCHETYPES`，尺寸与专属词条匹配。
+- `center` / `left` / `right` / `side` lane 能在 `enemyCols=6` 的列网格中放下，且不越界、不重叠。
+- 单 preset 内 `maw ≤ 2`、`hive ≤ 1`、`siege ≤ 1`、`gravityWell ≤ 1`；`gravityWell` 不与其它大型基底同 preset。
+
+运行方式：
+
+```bash
+node tests/validate_wave_presets.mjs
+```
+
+### 4.4 V2 大型基底运行期生成校验
+
+`tests/validate_enemy_spawn_runtime.mjs` 将 `spawn_system` 真实方法绑定到最小 fake game，并用 Node stub Canvas/DOM 环境执行：
+- 强制 preset 路径，确认 `spawn_trySpawnWavePreset()` 可以生成大型基底。
+- 强制旧随机大型基底路径，确认 `spawn_trySpawnArchetypes()` 的 `gravityWell`、`maw`、`hive`、`siege` 同屏上限有效。
+- 60 回合 seeded 模拟同时覆盖 preset 与随机回退路径，检查活跃敌人不重叠，且 `gridCols/gridRows` 与实际 `width/height` 一致。
+- 逐类实例化 8 种 V2 基底，验证 `baseArchetype`、专属词条、`collisionShape/collisionData`、宽体标记、慢速移动间隔和专属初始化（如 deflector 屏障、hive 冷却）。
+
+运行方式：
+```bash
+node tests/validate_enemy_spawn_runtime.mjs
+```
+
+### 4.5 阶段清理与命运时刻契约校验
+
+`tests/validate_phase_contracts.mjs` 通过静态契约锁定阶段切换和命运时刻返回流的关键收口：
+- `ui_updateUI()` 离开 combat 后必须清理战斗 HUD，且 training 只保留态势面板。
+- meta / shop / truth_book / gameover 等 terminal 阶段必须清理 transient overlays。
+- 暂停“放弃本局”必须走 `ui_abandonRunToMeta()`，gameover 触发前必须清理临时浮层。
+- `_proceedToFateMomentSelection()` 必须重建 `fateMomentContext.active = true` 语义。
+- round-start reward resolver 打开遗物 overlay 时必须带 `resumeTarget: 'round_start_resolver'`。
+- 继续游戏若命中 selection / 命运时刻存档，必须恢复 `phase`、`marblesPool`、`selectedMarbles`、注入符文与预览 UI，禁止直接落回 `sys_startRoundStartResolver()`。
+
+运行方式：
+```bash
+node tests/validate_phase_contracts.mjs
+```
 
 ---
 

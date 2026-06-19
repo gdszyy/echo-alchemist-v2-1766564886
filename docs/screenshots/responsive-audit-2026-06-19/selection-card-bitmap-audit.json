@@ -1,0 +1,158 @@
+{
+  "pc": {
+    "phase": "selection",
+    "count": 6,
+    "cards": [
+      {
+        "tier": "C",
+        "attr": "white",
+        "rect": [
+          475,
+          109,
+          66,
+          74
+        ],
+        "borderImage": "none",
+        "text": "純淨彈珠"
+      },
+      {
+        "tier": "C",
+        "attr": "bounce",
+        "rect": [
+          548,
+          109,
+          66,
+          74
+        ],
+        "borderImage": "none",
+        "text": "彈性彈珠"
+      },
+      {
+        "tier": "C",
+        "attr": "bounce",
+        "rect": [
+          621,
+          109,
+          66,
+          74
+        ],
+        "borderImage": "none",
+        "text": "彈性彈珠"
+      },
+      {
+        "tier": "C",
+        "attr": "white",
+        "rect": [
+          694,
+          109,
+          66,
+          74
+        ],
+        "borderImage": "none",
+        "text": "純淨彈珠"
+      },
+      {
+        "tier": "C",
+        "attr": "white",
+        "rect": [
+          766,
+          109,
+          66,
+          74
+        ],
+        "borderImage": "none",
+        "text": "純淨彈珠"
+      },
+      {
+        "tier": "C",
+        "attr": "white",
+        "rect": [
+          839,
+          109,
+          66,
+          74
+        ],
+        "borderImage": "none",
+        "text": "純淨彈珠"
+      }
+    ]
+  },
+  "mobile": {
+    "phase": "selection",
+    "count": 6,
+    "cards": [
+      {
+        "tier": "C",
+        "attr": "white",
+        "rect": [
+          12,
+          161,
+          55,
+          74
+        ],
+        "borderImage": "none",
+        "text": "純淨彈珠"
+      },
+      {
+        "tier": "C",
+        "attr": "damage",
+        "rect": [
+          74,
+          161,
+          55,
+          74
+        ],
+        "borderImage": "none",
+        "text": "增幅彈珠"
+      },
+      {
+        "tier": "C",
+        "attr": "white",
+        "rect": [
+          136,
+          161,
+          55,
+          74
+        ],
+        "borderImage": "none",
+        "text": "純淨彈珠"
+      },
+      {
+        "tier": "C",
+        "attr": "white",
+        "rect": [
+          199,
+          161,
+          55,
+          74
+        ],
+        "borderImage": "none",
+        "text": "純淨彈珠"
+      },
+      {
+        "tier": "C",
+        "attr": "bounce",
+        "rect": [
+          261,
+          161,
+          55,
+          74
+        ],
+        "borderImage": "none",
+        "text": "彈性彈珠"
+      },
+      {
+        "tier": "C",
+        "attr": "white",
+        "rect": [
+          323,
+          161,
+          55,
+          74
+        ],
+        "borderImage": "none",
+        "text": "純淨彈珠"
+      }
+    ]
+  }
+}

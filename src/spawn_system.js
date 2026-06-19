@@ -13,11 +13,7 @@ import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
 import { interpolateAffixWeights, weightedRandom, getEliteDualAffixChance } from './utils/math_utils.js';
-
-function _isCoarsePointerInput() {
-    if (typeof window === 'undefined') return false;
-    return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-}
+import { ENEMY_WAVE_PRESETS, ENEMY_WAVE_PRESET_ARCHETYPES } from './wave_presets.js';
 
 /**
  * [导演系统] 方阵突击（Phalanx）阵型模板
@@ -469,7 +465,10 @@ export const spawn_system = {
         // 详见 design_spec_bitmap.md / "敌人视觉设计 V2" 文档：
         // 不同尺寸（1x1、2x1、1x2、2x2、3x1、1x3、2x3、3x2、3x3）对应不同基底，
         // 每个基底绑定一个专属词条；专属词条不进入随机词条池。
-        this.spawn_trySpawnArchetypes(yPos, baseHP, occupiedCols, w, options);
+        const wavePresetSpawned = this.spawn_trySpawnWavePreset(yPos, baseHP, occupiedCols, w, options);
+        if (!wavePresetSpawned) {
+            this.spawn_trySpawnArchetypes(yPos, baseHP, occupiedCols, w, options);
+        }
 
         // =========================================
         // 3. 填充剩余空位 (Fill Loop)
@@ -972,13 +971,36 @@ export const spawn_system = {
             const card = document.createElement('div');
             card.className = 'select-card';
             card.dataset.marbleIndex = i;
+            card.dataset.attr = m.type || 'normal';
+            const cardTierMap = {
+                rainbow: 'S',
+                resonance: 'S',
+                laser: 'A',
+                flying_sword: 'A',
+                overcharge: 'A',
+                echo: 'A',
+                venom: 'A',
+                pyro: 'B',
+                cryo: 'B',
+                lightning: 'B',
+                wind: 'B',
+                explosive: 'B',
+                matryoshka: 'B',
+            };
+            card.dataset.tier = cardTierMap[m.type] || 'C';
 
             // 弹珠球体（带光泽效果）
             const iconWrap = document.createElement('div');
             iconWrap.className = 'select-icon-wrap';
             const iconEl = document.createElement('div');
-            iconEl.className = `select-icon marble-fx-${m.type}`;
-            iconEl.style.background = m.getColor();
+            iconEl.className = 'select-icon';
+            const marbleAccent = m.getColor();
+            const accentColor = (typeof marbleAccent === 'string' && !marbleAccent.includes('gradient'))
+                ? marbleAccent
+                : '#94a3b8';
+            iconEl.style.background = 'radial-gradient(circle at 35% 28%, #f8fafc 0%, #dbe4f0 28%, #93a4b8 58%, #334155 100%)';
+            iconEl.style.border = '1px solid rgba(203, 213, 225, 0.7)';
+            iconEl.style.boxShadow = 'inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.24), 0 0 10px rgba(148,163,184,0.22)';
             // 光泽高光层
             const shine = document.createElement('div');
             shine.className = 'select-icon-shine';
@@ -993,7 +1015,7 @@ export const spawn_system = {
                 const img = document.createElement('img');
                 img.src = marbleBitmapSrc;
                 img.alt = marbleIcon;
-                img.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;';
+                img.style.cssText = 'width:18px;height:18px;object-fit:contain;display:block;filter:grayscale(1) brightness(1.25);opacity:0.95;';
                 img.loading = 'lazy';
                 img.onerror = function() {
                     this.replaceWith(document.createTextNode(marbleIcon));
@@ -1025,17 +1047,8 @@ export const spawn_system = {
 
             // 点击：切换选中 + 锁定预览
             card.onclick = () => {
-                this.spawn_showMarblePreview(m, tbEntry, supplementDesc);
-                if (_isCoarsePointerInput() && !card.classList.contains('selected') && card.dataset.touchReady !== 'true') {
-                    container.querySelectorAll('.select-card[data-touch-ready="true"]').forEach(el => {
-                        el.dataset.touchReady = 'false';
-                    });
-                    card.dataset.touchReady = 'true';
-                    if (window.showToast) showToast('再次點擊以選擇該彈珠');
-                    return;
-                }
                 this.sys_toggleMarbleSelection(i, card);
-                card.dataset.touchReady = 'false';
+                this.spawn_showMarblePreview(m, tbEntry, supplementDesc);
             };
 
             // hover：预览（不锁定）
@@ -1119,7 +1132,12 @@ export const spawn_system = {
         const previewBall = panel.querySelector('#preview-marble-ball');
 
         if (previewBall) {
-            previewBall.style.background = marbleColor;
+            const accentColor = (typeof marbleColor === 'string' && !marbleColor.includes('gradient'))
+                ? marbleColor
+                : '#94a3b8';
+            previewBall.style.background = 'radial-gradient(circle at 35% 28%, #f8fafc 0%, #dbe4f0 30%, #93a4b8 60%, #334155 100%)';
+            previewBall.style.border = '1px solid rgba(203, 213, 225, 0.7)';
+            previewBall.style.boxShadow = 'inset -3px -3px 6px rgba(0,0,0,0.5), inset 2px 2px 5px rgba(255,255,255,0.2), 0 0 10px rgba(148,163,184,0.22)';
         }
         if (previewIcon) previewIcon.textContent = marbleIcon;
         if (previewName) previewName.textContent = marbleName;
@@ -2276,6 +2294,202 @@ export const spawn_system = {
         }
     },
 
+    spawn_pickWavePreset() {
+        const round = this.round || 1;
+        if (this._wavePresetRoundUsed === round) return null;
+
+        const usage = this._wavePresetUsage || (this._wavePresetUsage = {});
+        const activeLargeCounts = this.spawn_countActiveArchetypes();
+        const candidates = [];
+        let totalWeight = 0;
+
+        for (const preset of ENEMY_WAVE_PRESETS) {
+            const [minRound, maxRound] = preset.roundRange || [1, 999];
+            if (round < minRound || round > maxRound) continue;
+
+            const state = usage[preset.id] || { count: 0, lastRound: -999 };
+            if (preset.maxUses != null && state.count >= preset.maxUses) continue;
+            if (round - state.lastRound < (preset.cooldownRounds || 0)) continue;
+            if (!this.spawn_canUseWavePreset(preset, activeLargeCounts)) continue;
+
+            candidates.push({ preset, weight: preset.weight || 1 });
+            totalWeight += preset.weight || 1;
+        }
+
+        if (!candidates.length || totalWeight <= 0) return null;
+
+        const chance = Math.min(0.30, 0.12 + round * 0.006);
+        if (Math.random() >= chance) return null;
+
+        let roll = Math.random() * totalWeight;
+        for (const entry of candidates) {
+            if (roll < entry.weight) return entry.preset;
+            roll -= entry.weight;
+        }
+        return candidates[candidates.length - 1].preset;
+    },
+
+    spawn_countActiveArchetypes() {
+        const counts = {};
+        for (const e of this.enemies || []) {
+            if (!e || !e.active || !e.baseArchetype) continue;
+            counts[e.baseArchetype] = (counts[e.baseArchetype] || 0) + 1;
+        }
+        return counts;
+    },
+
+    spawn_canUseWavePreset(preset, counts) {
+        const hasGravityWell = (counts.gravityWell || 0) > 0;
+        const hasOtherLarge = Object.entries(counts).some(([archetype, count]) => archetype !== 'gravityWell' && count > 0);
+        for (const slot of preset.slots || []) {
+            const archetype = slot.archetype;
+            if (!archetype || archetype === 'normal') continue;
+            if (hasGravityWell && archetype !== 'gravityWell') return false;
+            if (archetype === 'gravityWell' && hasOtherLarge) return false;
+            if (archetype === 'gravityWell' && hasGravityWell) return false;
+            if (archetype === 'maw' && (counts.maw || 0) >= 2) return false;
+            if (archetype === 'hive' && (counts.hive || 0) >= 1) return false;
+            if (archetype === 'siege' && (counts.siege || 0) >= 1) return false;
+        }
+        return true;
+    },
+
+    spawn_trySpawnWavePreset(yPos, baseHP, occupiedCols, w, options = {}) {
+        const preset = this.spawn_pickWavePreset();
+        if (!preset) return false;
+
+        const placements = [];
+        const localOccupied = occupiedCols.slice();
+        for (const slot of preset.slots || []) {
+            const placement = this.spawn_findWavePresetPlacement(slot, yPos, localOccupied, w);
+            if (!placement) return false;
+            placements.push({ slot, ...placement });
+            for (let dc = 0; dc < placement.cols; dc++) localOccupied[placement.startCol + dc] = true;
+        }
+
+        for (const placement of placements) {
+            this.spawn_spawnWavePresetSlot(placement, baseHP, w, options);
+            for (let dc = 0; dc < placement.cols; dc++) occupiedCols[placement.startCol + dc] = true;
+        }
+
+        const usage = this._wavePresetUsage || (this._wavePresetUsage = {});
+        const state = usage[preset.id] || { count: 0, lastRound: -999 };
+        usage[preset.id] = { count: state.count + 1, lastRound: this.round || 1 };
+        this._wavePresetRoundUsed = this.round || 1;
+
+        if (preset.introText && !this._wavePresetIntroShown?.[preset.id] && typeof showToast === 'function') {
+            this._wavePresetIntroShown = this._wavePresetIntroShown || {};
+            this._wavePresetIntroShown[preset.id] = true;
+            showToast(preset.introText);
+        }
+        return true;
+    },
+
+    spawn_findWavePresetPlacement(slot, yPos, occupiedCols, w) {
+        const totalCols = CONFIG.gameplay.enemyCols;
+        const archetypeMeta = ENEMY_WAVE_PRESET_ARCHETYPES[slot.archetype] || {};
+        const cols = slot.cols || archetypeMeta.cols || 1;
+        const rows = slot.rows || archetypeMeta.rows || 1;
+        if (cols > totalCols) return null;
+
+        const centerStart = Math.floor((totalCols - cols) / 2);
+        const lane = slot.lane || 'center';
+        let starts = [];
+        if (lane === 'left') {
+            starts = Array.from({ length: totalCols - cols + 1 }, (_, i) => i);
+        } else if (lane === 'right') {
+            starts = Array.from({ length: totalCols - cols + 1 }, (_, i) => totalCols - cols - i);
+        } else if (lane === 'side') {
+            starts = [0, totalCols - cols];
+            for (let i = 1; i <= totalCols - cols - 1; i++) starts.push(i);
+        } else {
+            starts = [centerStart];
+            for (let offset = 1; offset <= totalCols; offset++) {
+                if (centerStart - offset >= 0) starts.push(centerStart - offset);
+                if (centerStart + offset <= totalCols - cols) starts.push(centerStart + offset);
+            }
+        }
+        starts = [...new Set(starts.filter(sc => sc >= 0 && sc <= totalCols - cols))];
+
+        for (const startCol of starts) {
+            let free = true;
+            for (let dc = 0; dc < cols; dc++) {
+                if (occupiedCols[startCol + dc]) { free = false; break; }
+            }
+            if (!free) continue;
+
+            const widthPx = w * cols;
+            const heightPx = this.enemyHeight * rows;
+            const centerX = (startCol + (cols - 1) / 2) * w + w / 2;
+            const centerY = yPos + (rows - 1) * this.enemyHeight / 2;
+            if (this.calc_isAreaOccupied(centerX, centerY, widthPx * 0.85, heightPx * 0.85)) continue;
+            return { startCol, cols, rows, centerX, centerY, widthPx, heightPx };
+        }
+        return null;
+    },
+
+    spawn_spawnWavePresetSlot(placement, baseHP, w, options = {}) {
+        const { slot, startCol, cols, rows, centerX, centerY, widthPx, heightPx } = placement;
+        const archetypeMeta = ENEMY_WAVE_PRESET_ARCHETYPES[slot.archetype] || {};
+        const afx = CONFIG.balance.affixes || {};
+        const cellsCount = cols * rows;
+        const hpMult = slot.hpMult || 1;
+        const hpScale = slot.archetype === 'normal' ? 1 : Math.max(1, cellsCount);
+        const hp = Math.max(1, Math.floor(baseHP * hpMult * hpScale));
+        const e = new Enemy(centerX, centerY, widthPx, heightPx, hp);
+        e.affixes = Array.isArray(slot.affixes) ? slot.affixes.slice() : [];
+
+        if (slot.archetype && slot.archetype !== 'normal') {
+            e.type = 'elite';
+            e.baseArchetype = slot.archetype;
+            e.gridCols = cols;
+            e.gridRows = rows;
+            if (cols >= 2) e.isWideEnemy = true;
+            this.spawn_applyArchetypeShape(e, slot.archetype);
+        } else if (e.affixes.length > 0) {
+            e.type = 'elite';
+            this.spawn_applyMinionShape(e);
+        }
+
+        if (e.affixes.includes('shield')) {
+            e.shieldCharges = 1 + this.round;
+        }
+        if (e.affixes.includes('deflectionWard')) {
+            const pct = afx.deflectionWardBarrierPct || 0.10;
+            e.wardBarrierMax = Math.max(1, Math.floor(hp * pct));
+            e.wardBarrier = e.wardBarrierMax;
+            e.wardBrokenThisTurn = false;
+        }
+        if (e.affixes.includes('hive')) e._hiveCooldown = afx.hiveSpawnInterval || 2;
+
+        if (e.affixes.includes('heavyArmor')) e._moveInterval = afx.heavyArmorMoveInterval || 2;
+        else if (e.affixes.includes('siege')) e._moveInterval = afx.siegeMoveInterval || 2;
+        else if (e.affixes.includes('gravityWell')) e._moveInterval = afx.gravityWellMoveInterval || 3;
+        else if (rows >= 2 || cols >= 3) e._moveInterval = 2;
+        e._moveCooldown = 0;
+
+        if (options.offScreenEntrance) {
+            e.pos.y = centerY - 2 * this.enemyHeight;
+            e.dropTargetY = centerY;
+            e.hasActedThisTurn = true;
+            e._spawnedThisTurn = true;
+        }
+        e._spawnColIndex = startCol + Math.floor(cols / 2);
+
+        if (typeof this.sys_determineEnemyReward === 'function') {
+            this.sys_determineEnemyReward(e, false);
+        } else if (typeof this.sys_preCalcEnemyRewardType === 'function') {
+            this.sys_preCalcEnemyRewardType(e);
+        }
+        if (typeof e.initSprite === 'function') e.initSprite();
+        this.enemies.push(e);
+
+        // @perf-impact: preset 入场复用既有 shockwave 预算，每个成功 slot 最多 1 个低频冲击波
+        if (e.type === 'elite') {
+            this.spawn_createShockwave(e.pos.x, e.pos.y, archetypeMeta.color || '#facc15');
+        }
+    },
+
     /**
      * @method spawn_trySpawnArchetypes
      * @description [V2 敌人视觉] 尝试在指定行生成大型基底敌人（尺寸 + 专属词条）。
@@ -2300,7 +2514,7 @@ export const spawn_system = {
         const afx = CONFIG.balance.affixes;
 
         // 当前同屏大型基底统计（用于限流）
-        let countMaw = 0, countHive = 0, countSiege = 0, countWell = 0;
+        let countMaw = 0, countHive = 0, countSiege = 0, countWell = 0, countOtherLarge = 0;
         for (const e of this.enemies) {
             if (!e || !e.active) continue;
             const a = e.baseArchetype;
@@ -2308,18 +2522,19 @@ export const spawn_system = {
             else if (a === 'hive') countHive++;
             else if (a === 'siege') countSiege++;
             else if (a === 'gravityWell') countWell++;
+            else if (a) countOtherLarge++;
         }
 
         // 候选基底列表（按从大到小尝试，3x3 出现时跳过其他大型）
         const candidates = [
-            { id: 'gravityWell',   cols: 3, rows: 3, affix: 'gravityWell',   minRound: 30, weight: 0.025, hpMult: afx.gravityWellHpMult || 6.0,  color: '#7c3aed', skip: countWell >= 1 },
+            { id: 'gravityWell',   cols: 3, rows: 3, affix: 'gravityWell',   minRound: 30, weight: 0.025, hpMult: afx.gravityWellHpMult || 6.0,  color: '#7c3aed', skip: countWell >= 1 || countOtherLarge > 0 || countMaw > 0 || countHive > 0 || countSiege > 0 },
             { id: 'siege',         cols: 3, rows: 2, affix: 'siege',         minRound: 22, weight: 0.05,  hpMult: afx.siegeHpMult || 3.5,        color: '#facc15', skip: countSiege >= 1 || countWell >= 1 },
             { id: 'hive',          cols: 2, rows: 3, affix: 'hive',          minRound: 18, weight: 0.06,  hpMult: afx.hiveHpMult || 2.5,         color: '#a3e635', skip: countHive >= 1 || countWell >= 1 },
             { id: 'prism',         cols: 1, rows: 3, affix: 'prism',         minRound: 16, weight: 0.08,  hpMult: afx.prismHpMult || 1.4,        color: '#67e8f9', skip: countWell >= 1 },
             { id: 'maw',           cols: 2, rows: 2, affix: 'devour',        minRound: 12, weight: 0.10,  hpMult: 2.0,                            color: '#7f1d1d', skip: countMaw >= 2 || countWell >= 1 },
             { id: 'echoSpire',     cols: 1, rows: 2, affix: 'echoRelay',     minRound: 10, weight: 0.10,  hpMult: afx.echoRelayHpMult || 0.5,    color: '#f0abfc', skip: countWell >= 1 },
-            { id: 'deflector',     cols: 2, rows: 1, affix: 'deflectionWard',minRound: 9,  weight: 0.12,  hpMult: afx.deflectionWardHpMult || 1.0,color: '#38bdf8', skip: false },
-            { id: 'bastion',       cols: 3, rows: 1, affix: 'heavyArmor',    minRound: 5,  weight: 0.18,  hpMult: afx.heavyArmorHpMult || 2.0,   color: '#94a3b8', skip: false },
+            { id: 'deflector',     cols: 2, rows: 1, affix: 'deflectionWard',minRound: 9,  weight: 0.12,  hpMult: afx.deflectionWardHpMult || 1.0,color: '#38bdf8', skip: countWell >= 1 },
+            { id: 'bastion',       cols: 3, rows: 1, affix: 'heavyArmor',    minRound: 5,  weight: 0.18,  hpMult: afx.heavyArmorHpMult || 2.0,   color: '#94a3b8', skip: countWell >= 1 },
         ];
 
         // 构建权重池

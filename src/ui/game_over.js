@@ -53,6 +53,9 @@ export const game_over_mixin = {
 
         // [局内存档] 游戏结束时清除局内存档，防止下次进入 meta 时错误提示继续游戏
         this.sys_clearRunState();
+        if (typeof this.ui_clearTransientOverlays === 'function') {
+            this.ui_clearTransientOverlays();
+        }
         // 延迟一帧，确保当前渲染帧安全完成
         setTimeout(() => {
             this.phase_switchPhase('gameover');

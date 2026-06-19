@@ -1,6 +1,6 @@
 # src\spawn_system.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 2672 | 函数数: 35 | 语言: javascript
+> 自动生成于 2026-06-19 | 总行数: 2887 | 函数数: 40 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -11,7 +11,6 @@
 
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
-| _isCoarsePointerInput | function | `_isCoarsePointerInput()` |  |
 | spawn_windSkillParticles | method | `spawn_windSkillParticles(type, rect, progress)` |  |
 | spawn_createFloatingText | method | `spawn_createFloatingText(x, y, text, color, fontSize)` |  |
 | spawn_generateAffixes | method | `spawn_generateAffixes()` |  |
@@ -43,6 +42,12 @@
 | spawn_spawnBoss | method | `spawn_spawnBoss(bossId, isBigBoss)` | ⚠️ 巨型函数，见 @section 导航 |
 | spawn_selectBossForRound | method | `spawn_selectBossForRound(isBigBoss)` |  |
 | spawn_applyMinionShape | method | `spawn_applyMinionShape(e)` |  |
+| spawn_pickWavePreset | method | `spawn_pickWavePreset()` |  |
+| spawn_countActiveArchetypes | method | `spawn_countActiveArchetypes()` |  |
+| spawn_canUseWavePreset | method | `spawn_canUseWavePreset(preset, counts)` |  |
+| spawn_trySpawnWavePreset | method | `spawn_trySpawnWavePreset(yPos, baseHP, occupiedCols, w, options = {})` |  |
+| spawn_findWavePresetPlacement | method | `spawn_findWavePresetPlacement(slot, yPos, occupiedCols, w)` |  |
+| spawn_spawnWavePresetSlot | method | `spawn_spawnWavePresetSlot(placement, baseHP, w, options = {})` |  |
 | spawn_trySpawnArchetypes | method | `spawn_trySpawnArchetypes(yPos, baseHP, occupiedCols, w, options)` |  |
 | spawn_applyArchetypeShape | method | `spawn_applyArchetypeShape(e, archetypeId)` |  |
 | spawn_triggerBossEntranceShockwave | method | `spawn_triggerBossEntranceShockwave(boss)` |  |

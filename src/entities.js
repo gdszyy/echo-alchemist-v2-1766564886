@@ -2286,26 +2286,32 @@ class DropBall {
 
             // --- 偏移加速度加成衰减机制 (Tilt Boost) ---
             // a. 计算当前帧的倾斜方向
-            const newTiltDir = Math.sign(tilt.x);
+            const tiltDeadzone = CONFIG.physics.tiltDeadzone || 0.025;
+            const rawTiltX = Math.abs(tilt.x) < tiltDeadzone ? 0 : Math.max(-1, Math.min(1, tilt.x));
+            const rawTiltY = Math.abs(tilt.y) < tiltDeadzone ? 0 : Math.max(-1, Math.min(1, tilt.y));
+            const tiltX = rawTiltX === 0 ? 0 : Math.sign(rawTiltX) * Math.pow(Math.abs(rawTiltX), 0.85);
+            const tiltY = rawTiltY === 0 ? 0 : Math.sign(rawTiltY) * Math.pow(Math.abs(rawTiltY), 0.9);
+            const newTiltDir = Math.sign(rawTiltX);
             // b. 检测方向改变（越过平衡点）：新方向非零且与上一帧不同
             if (newTiltDir !== 0 && newTiltDir !== this.lastTiltDirection) {
                 // 方向改变，重置加成为 25%
-                this.tiltBoostMultiplier = 1.25;
+                this.tiltBoostMultiplier = CONFIG.physics.tiltBoostPeak || 1.25;
             }
             // c. 更新上一帧方向
             this.lastTiltDirection = newTiltDir;
             // d. 若加成大于 1.0，每帧衰减
             if (this.tiltBoostMultiplier > 1.0) {
-                this.tiltBoostMultiplier = Math.max(1.0, this.tiltBoostMultiplier - 0.04 * timeScale);
+                this.tiltBoostMultiplier = Math.max(1.0, this.tiltBoostMultiplier - (CONFIG.physics.tiltBoostDecay || 0.04) * timeScale);
             }
             // e. 叠加倾斜影响（含加成倍率）
             // x轴倾斜直接产生横向重力
-            gx += tilt.x * 0.05 * this.tiltBoostMultiplier; // 倾斜重力系数 * 加成倍率
+            gx += tiltX * (CONFIG.physics.tiltGravityScale || 0.05) * this.tiltBoostMultiplier; // tilt gravity scale * boost
 
             // 可选视觉反馈：当 tiltBoostMultiplier > 1.05 时，生成少量尾迹粒子
+            // @perf-impact: Tilt boost spark feedback reuses spawn_createParticle spark budget.
             if (this.tiltBoostMultiplier > 1.05 && Math.random() < 0.3 * timeScale) {
                 // 在弹珠后方（与运动方向相反）生成尾迹粒子
-                const trailColor = tilt.x > 0 ? '#fbbf24' : '#60a5fa'; // 向右黄色，向左蓝色
+                const trailColor = rawTiltX > 0 ? '#fbbf24' : '#60a5fa'; // right yellow, left blue
                 game.spawn_createParticle(
                     this.pos.x - this.vel.x * 0.5,
                     this.pos.y - this.vel.y * 0.5,
@@ -2315,7 +2321,8 @@ class DropBall {
             }
             
             // y轴倾斜微调垂直重力 (前倾加速，后倾减速)
-            // gy += tilt.y * 0.1;
+            gy += tiltY * (CONFIG.physics.tiltVerticalGravityScale || 0);
+            gy = Math.max(CONFIG.physics.gravity * 0.65, Math.min(CONFIG.physics.gravity * 1.45, gy));
 
             let gravityStep = new Vec2(gx * timeScale, gy * timeScale);
 

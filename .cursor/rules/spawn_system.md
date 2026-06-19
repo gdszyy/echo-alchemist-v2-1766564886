@@ -18,6 +18,29 @@
 | 选型机制（Task B.3 起） | `ENEMY_CURVE_CONFIG.TEMPLATE_WEIGHTS` 权重调度 | 根据当前段落的权重池随机选择模板 |
 | 实现位置 | `spawn_spawnEnemyRowAt` → `@section:spawn_enemy_type_select` (L285) | |
 
+### 1.1 V2 大型基底预设波次（2026-06-19）
+
+`src/wave_presets.js` 新增首批 `ENEMY_WAVE_PRESETS`，用于把 V2 大型基底从“纯随机大型单位”推进到“关键回合导演镜头”：
+
+- 入口：`spawn_spawnEnemyRowAt()` 在随机大型基底前先调用 `spawn_trySpawnWavePreset()`。
+- 选择：`spawn_pickWavePreset()` 根据 `roundRange`、`weight`、`maxUses`、`cooldownRounds`、同屏大型上限和每回合一次限制抽取。
+- 放置：`spawn_findWavePresetPlacement()` 按 `center` / `left` / `right` / `side` lane 找连续 footprint；失败时整个 preset 放弃并回退旧随机生成。
+- 实例化：`spawn_spawnWavePresetSlot()` 复用 `Enemy`、`spawn_applyArchetypeShape()`、掉落判定与 Sprite 初始化，不另开实体规则。
+- 局内持久化：`_wavePresetUsage`、`_wavePresetIntroShown`、`_wavePresetRoundUsed` 会随局内存档保存/恢复，新开局重置。
+
+首批 preset：
+
+| Preset ID | 回合 | 核心组合 | 目标 |
+|---|---:|---|---|
+| `teach_deflection_ward` | R9-R14 | `deflector(2×1)` + 普通敌人 | 教学偏折屏障 |
+| `bastion_wall` | R10-R20 | `bastion(3×1)` + healer | 横向装甲墙 + 后排 |
+| `teach_echo_relay` | R12-R18 | `echoSpire(1×2)` + regen | 教学共振尖塔 |
+| `maw_food_chain_v2` | R18-R26 | `maw(2×2)` + 两侧喂食单位 | 强化吞噬链 |
+| `siege_push_line` | R22-R30 | `siege(3×2)` + shield 护卫 | 破阵履带压力 |
+| `prism_refraction` | R22-R30 | `prism(1×3)` + 普通敌人 | 射线路径干扰 |
+| `hive_incubator` | R24-R34 | `hive(2×3)` + 护卫 | 持续产怪压力 |
+| `gravity_blackout` | R32-R42 | `gravityWell(3×3)` | 稀有大型场控 |
+
 ---
 
 ## 2. 阵型模板总览
