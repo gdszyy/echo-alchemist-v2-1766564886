@@ -230,14 +230,13 @@ function buildFallbackMarbleQueue(game) {
     const required = Math.max(1, (cfg.selectionReq || 3) + (game.bulletCapBonus || 0));
     const existingPool = Array.isArray(game.marblesPool) ? game.marblesPool : [];
     const selected = Array.isArray(game.selectedMarbles) ? game.selectedMarbles : [];
-    const fromSelection = selected
+    const queue = selected
         .map(i => existingPool[i])
         .filter(Boolean);
-    if (fromSelection.length > 0) {
-        return fromSelection.slice(0, required);
-    }
-    if (existingPool.length > 0) {
-        return existingPool.slice(0, required);
+
+    for (const marble of existingPool) {
+        if (queue.length >= required) break;
+        if (marble && !queue.includes(marble)) queue.push(marble);
     }
 
     const rewardOnlyTypes = new Set(cfg.bottomRewardOnlyTypes || []);
@@ -255,7 +254,10 @@ function buildFallbackMarbleQueue(game) {
         return weighted[0].type;
     };
 
-    return Array.from({ length: required }, () => new MarbleDefinition(pickType()));
+    while (queue.length < required) {
+        queue.push(new MarbleDefinition(pickType()));
+    }
+    return queue.slice(0, required);
 }
 
 export const game_phase = {
@@ -363,7 +365,6 @@ export const game_phase = {
             this.marbleQueue = buildFallbackMarbleQueue(this);
             this.marblesPool = this.marbleQueue.slice();
             this.selectedMarbles = this.marbleQueue.map((_, idx) => idx);
-            if (typeof showToast === 'function') showToast('研磨弹珠已自动补齐。');
         }
 
         this.phase_switchPhase('gathering');
