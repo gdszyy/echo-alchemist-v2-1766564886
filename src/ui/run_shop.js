@@ -7,9 +7,9 @@
  *   - 模块槽位扩张（一次性 +1）
  *
  * 出现时机：
- *   - round-start resolver 结算完遗物/精华后，按 runShopInterval 或 Boss 后节奏给出可选入口
+ *   - 第 3 回合固定首访；后续按 3..当前回合数随机等待后到访
+ *   - 每次到访停留 2 回合，由底部倒计时入口打开
  *   - 放弃遗物时直接进入，并获得一笔局内碎片补偿
- * 关闭时继续回合开始流程。
  *
  * 与 meta `src/ui/shop.js` 不同：
  *   - meta shop 是局间永久商店，使用 saveData.runeFragments
@@ -33,6 +33,7 @@ const SLOT_EXPAND_PRICE = 100;
 // [v2] 旧的「特殊槽解锁/数量+1」遗物迁移到商店出售
 const SLOT_UNLOCK_PRICE = 60;
 const SLOT_COUNT_PRICE = 50;
+const STARTER_BOOST_ID = 'starter_aid_bundle';
 const SLOT_TYPE_META = {
     recall:    { name: '解鎖回溯槽',  icon: '⏳', desc: '加入「回溯」特殊槽到鑒池。' },
     multicast: { name: '解鎖連射槽',  icon: '♊', desc: '加入「連射」特殊槽到鑒池。' },
@@ -68,6 +69,29 @@ function takeRandom(pool) {
 
 function countAffordable(items, fragments) {
     return (items || []).filter(it => it && fragments >= it.price).length;
+}
+
+function isStarterBoostVisit(game) {
+    const cfg = CONFIG.gameplay || {};
+    const firstRound = cfg.runShopFirstOfferRound || 3;
+    return !!game && !game.runShopStarterBoostClaimed && (game.runShopLastArrivalRound || 0) === firstRound;
+}
+
+function createStarterBoostItem() {
+    const cfg = CONFIG.gameplay || {};
+    const shield = cfg.runShopStarterBoostShield || 2;
+    const damage = cfg.runShopStarterBoostFlatDamage || 1;
+    const damageRounds = cfg.runShopStarterBoostDamageRounds || 2;
+    const fragments = cfg.runShopStarterBoostFragments || 12;
+    return {
+        kind: 'starter_boost',
+        boostId: STARTER_BOOST_ID,
+        name: '商人应急包',
+        icon: '✦',
+        desc: `免费：获得 ${shield} 层护盾、基础伤害 +${damage}（${damageRounds} 回合），并补给 ${fragments} 局内碎片。`,
+        price: 0,
+        rarity: 'rare',
+    };
 }
 
 /**
@@ -138,6 +162,48 @@ function generateInventory(game, count) {
     return items;
 }
 
+function generateInventoryForCurrentVisit(game, count) {
+    const items = generateInventory(game, Math.max(1, count));
+    if (isStarterBoostVisit(game) && !items.some(it => it && it.kind === 'starter_boost')) {
+        items.unshift(createStarterBoostItem());
+        return items.slice(0, Math.max(1, count));
+    }
+    return items;
+}
+
+function getRunShopVisitKey(game) {
+    if (game && typeof game.sys_isRunShopActive === 'function' && game.sys_isRunShopActive()) {
+        return game.runShopLastArrivalRound || game.round || 0;
+    }
+    return game && game.round ? game.round : 0;
+}
+
+function ensureInventoryForCurrentVisit(game, count) {
+    const visitKey = getRunShopVisitKey(game);
+    const alreadyGenerated = game._runShopInventoryGeneratedForRound === visitKey;
+    if (!Array.isArray(game.runShopInventory) || (game.runShopInventory.length === 0 && !alreadyGenerated)) {
+        game.runShopInventory = generateInventoryForCurrentVisit(game, count);
+        game._runShopInventoryGeneratedForRound = visitKey;
+    }
+}
+
+function applyStarterBoost(game) {
+    const cfg = CONFIG.gameplay || {};
+    const shield = cfg.runShopStarterBoostShield || 2;
+    const damage = cfg.runShopStarterBoostFlatDamage || 1;
+    const damageRounds = cfg.runShopStarterBoostDamageRounds || 2;
+    const fragments = cfg.runShopStarterBoostFragments || 12;
+    game.playerShield = (game.playerShield || 0) + shield;
+    game.flatDamageBonus = (game.flatDamageBonus || 0) + damage;
+    game.runShopStarterBoostDamageAmount = (game.runShopStarterBoostDamageAmount || 0) + damage;
+    game.runShopStarterBoostDamageRounds = Math.max(game.runShopStarterBoostDamageRounds || 0, damageRounds);
+    game.runFragments = (game.runFragments || 0) + fragments;
+    game.runShopStarterBoostClaimed = true;
+    if (window.showToast) {
+        window.showToast(`首访援助：护盾 +${shield} / 伤害 +${damage}（${damageRounds} 回合） / 碎片 +${fragments}`);
+    }
+}
+
 export const run_shop = {
     /**
      * 打开局内商店
@@ -145,12 +211,15 @@ export const run_shop = {
      */
     ui_showRunShop(onClose, options = {}) {
         const cfg = CONFIG.gameplay || {};
-        if (!Array.isArray(this.runShopInventory) || this.runShopInventory.length === 0) {
-            this.runShopInventory = generateInventory(this, cfg.runShopItemsPerOffer || 5);
-        }
+        ensureInventoryForCurrentVisit(this, cfg.runShopItemsPerOffer || 5);
         this._runShopOpenedRound = this.round || 0;
         this._runShopReason = options.reason || this._runShopReason || 'manual';
         this._runShopOnClose = onClose || null;
+        this._runShopPausedByOverlay = false;
+        if (!onClose && ['gathering', 'combat', 'selection'].includes(this.phase) && !this.isPaused) {
+            this.isPaused = true;
+            this._runShopPausedByOverlay = true;
+        }
 
         let overlay = document.getElementById('run-shop-overlay');
         if (!overlay) {
@@ -172,9 +241,7 @@ export const run_shop = {
 
     ui_offerRunShop(onClose, reason = 'interval') {
         const cfg = CONFIG.gameplay || {};
-        if (!Array.isArray(this.runShopInventory) || this.runShopInventory.length === 0) {
-            this.runShopInventory = generateInventory(this, cfg.runShopItemsPerOffer || 5);
-        }
+        ensureInventoryForCurrentVisit(this, cfg.runShopItemsPerOffer || 5);
         this._runShopOpenedRound = this.round || 0;
         this._runShopReason = reason;
 
@@ -219,6 +286,7 @@ export const run_shop = {
         if (skipBtn) {
             skipBtn.addEventListener('click', () => {
                 this.runShopInventory = [];
+                this._runShopInventoryGeneratedForRound = 0;
                 closeOffer();
                 if (typeof onClose === 'function') onClose();
             });
@@ -234,15 +302,17 @@ export const run_shop = {
 
     ui_hasAffordableRunShopItem() {
         const cfg = CONFIG.gameplay || {};
-        if (!Array.isArray(this.runShopInventory) || this.runShopInventory.length === 0) {
-            this.runShopInventory = generateInventory(this, cfg.runShopItemsPerOffer || 5);
-        }
+        ensureInventoryForCurrentVisit(this, cfg.runShopItemsPerOffer || 5);
         return countAffordable(this.runShopInventory, this.runFragments || 0) > 0;
     },
 
     ui_hideRunShop() {
         const overlay = document.getElementById('run-shop-overlay');
         if (overlay) overlay.style.display = 'none';
+        if (this._runShopPausedByOverlay) {
+            this.isPaused = false;
+            this._runShopPausedByOverlay = false;
+        }
         const cb = this._runShopOnClose;
         this._runShopOnClose = null;
         if (typeof cb === 'function') cb();
@@ -264,10 +334,11 @@ export const run_shop = {
                 it.rarity === 'epic' ? '#a855f7' :
                     it.rarity === 'rare' ? '#3b82f6' : '#94a3b8';
             const metaHtml = it.meta ? `<div style="font-size:9px;color:${rarityColor};line-height:1.35;text-transform:uppercase;">${it.meta}</div>` : '';
+            const priceLabel = (it.price || 0) <= 0 ? '免费' : `${it.price} 🔮`;
             return `<div data-item-idx="${i}" class="run-shop-item" style="cursor:${cursor};opacity:${opacity};background:rgba(30, 41, 59, 0.7);border:1px solid ${rarityColor};border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;transition:all 0.15s;">
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                     <div style="font-size:22px;">${it.icon}</div>
-                    <div style="font-size:12px;font-weight:bold;color:${rarityColor};">${it.price} 🔮</div>
+                    <div style="font-size:12px;font-weight:bold;color:${rarityColor};">${priceLabel}</div>
                 </div>
                 <div style="font-size:13px;font-weight:bold;">${it.name}</div>
                 ${metaHtml}
@@ -306,6 +377,7 @@ export const run_shop = {
                 }
                 this.runFragments -= refreshCost;
                 this.runShopInventory = generateInventory(this, cfg.runShopItemsPerOffer || 5);
+                this._runShopInventoryGeneratedForRound = getRunShopVisitKey(this);
                 this.runShopRefreshes = (this.runShopRefreshes || 0) + 1;
                 if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
                 this.ui_renderRunShop();
@@ -314,7 +386,10 @@ export const run_shop = {
         const closeBtn = overlay.querySelector('#run-shop-close-btn');
         if (closeBtn) {
             closeBtn.addEventListener('click', () => {
-                this.runShopInventory = []; // 离开后清空，下次重新生成
+                if (typeof this.sys_isRunShopActive !== 'function' || !this.sys_isRunShopActive()) {
+                    this.runShopInventory = []; // 非到访期的旧入口离开后清空，下次重新生成
+                    this._runShopInventoryGeneratedForRound = 0;
+                }
                 if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
                 this.ui_hideRunShop();
             });
@@ -333,6 +408,8 @@ export const run_shop = {
         if (it.kind === 'module' || it.kind === 'attr_pin') {
             this.ownedModuleComponents = addModuleComponentToInventory(this.ownedModuleComponents, it.moduleId);
             if (window.showToast) window.showToast(`获得钉盘组件: ${it.name}`);
+        } else if (it.kind === 'starter_boost') {
+            applyStarterBoost(this);
         } else if (it.kind === 'slot_expand') {
             const totalSlots = (cfg.moduleCols || 4) * (cfg.moduleRows || 3);
             this.unlockedModuleSlots = Math.min(totalSlots, (this.unlockedModuleSlots || cfg.moduleDefaultSlots || 3) + 1);
@@ -357,5 +434,55 @@ export const run_shop = {
         inventory.splice(idx, 1);
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
         this.ui_renderRunShop();
+    },
+
+    ui_updateRunShopScheduleUI() {
+        const dock = document.getElementById('run-shop-status-dock');
+        if (!dock) return;
+
+        const visiblePhase = ['gathering', 'combat'].includes(this.phase);
+        const state = typeof this.sys_getRunShopScheduleState === 'function'
+            ? this.sys_getRunShopScheduleState()
+            : null;
+        if (!visiblePhase || !state || state.hidden) {
+            dock.style.display = 'none';
+            return;
+        }
+
+        const titleEl = document.getElementById('run-shop-status-title');
+        const detailEl = document.getElementById('run-shop-status-detail');
+        const fillEl = document.getElementById('run-shop-status-fill');
+        const btn = document.getElementById('run-shop-status-open');
+        const pct = Math.max(0, Math.min(100, Math.round((state.progress || 0) * 100)));
+
+        dock.style.display = 'flex';
+        dock.classList.toggle('is-active', !!state.isActive);
+        if (fillEl) fillEl.style.width = `${pct}%`;
+
+        if (state.isActive) {
+            const remaining = state.remainingRounds || 1;
+            if (titleEl) titleEl.textContent = '商人已到访';
+            if (detailEl) detailEl.textContent = remaining <= 1 ? '下回合离开' : `${remaining} 回合后离开`;
+            if (btn) {
+                btn.style.display = 'inline-flex';
+                btn.disabled = false;
+            }
+        } else {
+            const wait = state.roundsUntilArrival || 0;
+            if (titleEl) titleEl.textContent = '商人旅程';
+            if (detailEl) detailEl.textContent = wait <= 0 ? '本回合到访' : (wait === 1 ? '下回合到访' : `${wait} 回合后到访`);
+            if (btn) {
+                btn.style.display = 'none';
+                btn.disabled = true;
+            }
+        }
+
+        if (btn && btn.dataset.runShopBound !== 'true') {
+            btn.dataset.runShopBound = 'true';
+            btn.addEventListener('click', () => {
+                if (typeof this.sys_isRunShopActive === 'function' && !this.sys_isRunShopActive()) return;
+                this.ui_showRunShop(null, { reason: 'status_dock' });
+            });
+        }
     },
 };

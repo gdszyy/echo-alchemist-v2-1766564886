@@ -19,6 +19,7 @@ import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
 import { COUNTER_MAP, RUNE_DB } from './rune_config.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
+import { EMITTER_PORT_OFFSET_Y } from './bitmap_icons.js';
 import {
     addModuleComponentToInventory,
     createDefaultModuleLayout,
@@ -285,7 +286,12 @@ export const game_system = {
         // 这样第一行上边界 = topBarH + 8，恰好在顶部栏下方，且与后续行网格完全对齐
         const topBarEl = document.getElementById('unified-top-bar');
         const topBarH = topBarEl ? topBarEl.getBoundingClientRect().height : 64;
-        this.combatGridTopY = topBarH + 8 + this.enemyHeight / 2;
+        // Combat reserves both the unified top bar and the compact status strip.
+        const statusPanelEl = document.getElementById('combat-status-panel');
+        const statusPanelRect = statusPanelEl ? statusPanelEl.getBoundingClientRect() : null;
+        const statusPanelH = statusPanelRect && statusPanelRect.height ? statusPanelRect.height : 48;
+        const combatTopUiBottom = topBarH + 6 + statusPanelH;
+        this.combatGridTopY = combatTopUiBottom + 8 + this.enemyHeight / 2;
 
         this.ui_updateUICache();
 
@@ -526,6 +532,15 @@ export const game_system = {
         this.runShopInventory = [];     // 当前刷新结果
         this.runShopRefreshes = 0;      // 已刷新次数
         this._runShopOpenedRound = -1;  // 防止同回合重复打开
+        this.runShopNextOfferRound = CONFIG.gameplay.runShopFirstOfferRound || 3;
+        this.runShopActiveUntilRound = 0;
+        this.runShopLastArrivalRound = 0;
+        this.runShopScheduleStartRound = 1;
+        this.runShopScheduleGap = Math.max(1, (this.runShopNextOfferRound || 3) - 1);
+        this.runShopStarterBoostClaimed = false;
+        this.runShopStarterBoostDamageAmount = 0;
+        this.runShopStarterBoostDamageRounds = 0;
+        this._runShopInventoryGeneratedForRound = 0;
     },
 
     /**
@@ -539,15 +554,19 @@ export const game_system = {
                 const parsed = JSON.parse(saved);
                 // 合并而非覆盖，确保新字段有默认值
                 this.saveData = Object.assign(
-                    { currency: 0, runeFragments: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0, runeInventory: [], discoveredRunewords: [], debugStartRelicId: null },
+                    { currency: 0, runeFragments: 0, resources: { rune_fragments: 0 }, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0, runeInventory: [], discoveredRunewords: [], debugStartRelicId: null },
                     parsed
                 );
+                if (!this.saveData.resources || typeof this.saveData.resources !== 'object') {
+                    this.saveData.resources = {};
+                }
                 // 确保 runeInventory 字段存在
                 if (!this.saveData.runeInventory) this.saveData.runeInventory = [];
                 // 确保 discoveredRunewords 字段存在（存档升级兼容）
                 if (!this.saveData.discoveredRunewords) this.saveData.discoveredRunewords = [];
                 // 确保 tutorialCompleted 字段存在（存档升级兼容：老存档默认视为已完成，不重复触发教程）
                 if (this.saveData.tutorialCompleted === undefined) this.saveData.tutorialCompleted = true;
+                if (typeof this._meta_ensureResourceStore === 'function') this._meta_ensureResourceStore();
             } catch (e) {
                 console.error('[sys_loadSaveData] Save load failed:', e);
             }
@@ -1652,44 +1671,117 @@ export const game_system = {
         return queuedReward;
     },
 
+    sys_initRunShopSchedule() {
+        const firstRound = (CONFIG.gameplay && CONFIG.gameplay.runShopFirstOfferRound) || 3;
+        this.runShopNextOfferRound = firstRound;
+        this.runShopActiveUntilRound = 0;
+        this.runShopLastArrivalRound = 0;
+        this.runShopScheduleStartRound = 1;
+        this.runShopScheduleGap = Math.max(1, firstRound - 1);
+        this.runShopStarterBoostClaimed = false;
+        this.runShopStarterBoostDamageAmount = 0;
+        this.runShopStarterBoostDamageRounds = 0;
+        this._runShopInventoryGeneratedForRound = 0;
+    },
+
+    sys_rollNextRunShopRound(fromRound = this.round || 1) {
+        const cfg = CONFIG.gameplay || {};
+        const minWait = Math.max(1, cfg.runShopRandomWaitMin || 3);
+        const maxWait = Math.max(minWait, Math.floor(fromRound || minWait));
+        const wait = minWait + Math.floor(Math.random() * (maxWait - minWait + 1));
+        this.runShopScheduleStartRound = fromRound;
+        this.runShopScheduleGap = wait;
+        this.runShopNextOfferRound = fromRound + wait;
+    },
+
+    sys_activateRunShopVisit(round = this.round || 1) {
+        const duration = Math.max(1, (CONFIG.gameplay || {}).runShopVisitDurationRounds || 2);
+        this.runShopLastArrivalRound = round;
+        this.runShopActiveUntilRound = round + duration - 1;
+        this.runShopNextOfferRound = null;
+        this.runShopInventory = [];
+        this._runShopInventoryGeneratedForRound = 0;
+        this.runShopRefreshes = 0;
+        this._runShopOpenedRound = -1;
+        if (window.showToast) showToast(round === ((CONFIG.gameplay || {}).runShopFirstOfferRound || 3)
+            ? '商人到访：首访援助已备好'
+            : '商人到访：货架开放两回合');
+    },
+
+    sys_updateRunShopScheduleForRound() {
+        const cfg = CONFIG.gameplay || {};
+        const round = this.round || 1;
+        const firstRound = cfg.runShopFirstOfferRound || 3;
+
+        if (!this.runShopNextOfferRound && !this.runShopActiveUntilRound && !this.runShopLastArrivalRound) {
+            if (round <= firstRound) {
+                this.runShopNextOfferRound = firstRound;
+                this.runShopScheduleStartRound = 1;
+                this.runShopScheduleGap = Math.max(1, firstRound - 1);
+            } else {
+                this.sys_activateRunShopVisit(round);
+                return;
+            }
+        }
+
+        if (this.runShopActiveUntilRound && round > this.runShopActiveUntilRound) {
+            this.runShopActiveUntilRound = 0;
+            this.runShopInventory = [];
+            this._runShopInventoryGeneratedForRound = 0;
+            if (!this.runShopNextOfferRound || this.runShopNextOfferRound <= round) {
+                this.sys_rollNextRunShopRound(round);
+            }
+        }
+
+        if (!this.runShopActiveUntilRound && this.runShopNextOfferRound && round >= this.runShopNextOfferRound) {
+            this.sys_activateRunShopVisit(round);
+        }
+    },
+
+    sys_isRunShopActive() {
+        const round = this.round || 1;
+        return !!(this.runShopActiveUntilRound && round <= this.runShopActiveUntilRound);
+    },
+
+    sys_getRunShopScheduleState() {
+        const cfg = CONFIG.gameplay || {};
+        const round = this.round || 1;
+        const duration = Math.max(1, cfg.runShopVisitDurationRounds || 2);
+        if (this.sys_isRunShopActive()) {
+            const remaining = Math.max(1, this.runShopActiveUntilRound - round + 1);
+            return {
+                hidden: false,
+                isActive: true,
+                round,
+                remainingRounds: remaining,
+                activeUntilRound: this.runShopActiveUntilRound,
+                progress: Math.max(0, Math.min(1, remaining / duration)),
+            };
+        }
+
+        const nextRound = this.runShopNextOfferRound || cfg.runShopFirstOfferRound || 3;
+        if (!nextRound) return { hidden: true };
+        const startRound = this.runShopScheduleStartRound || 1;
+        const total = Math.max(1, nextRound - startRound);
+        const elapsed = Math.max(0, round - startRound);
+        return {
+            hidden: false,
+            isActive: false,
+            round,
+            nextRound,
+            roundsUntilArrival: Math.max(0, nextRound - round),
+            progress: Math.max(0, Math.min(1, elapsed / total)),
+        };
+    },
+
     /**
      * @method sys_maybeOfferRunShopBeforeRoundStart
-     * @description 在 round-start resolver 清空后、回合横幅前，按节奏给出一次可选局内商店入口。
+     * @description Updates scheduled merchant visits before the round banner; the bottom status UI opens the shop.
      */
     sys_maybeOfferRunShopBeforeRoundStart() {
-        const cfg = CONFIG.gameplay || {};
-        if (typeof this.ui_offerRunShop !== 'function' && typeof this.ui_showRunShop !== 'function') return false;
-        if ((this.round || 1) <= 1) return false;
-        if (this._runShopOpenedRound === this.round) return false;
-
-        const minFragments = cfg.runShopMinFragmentsToOffer != null ? cfg.runShopMinFragmentsToOffer : 1;
-        if ((this.runFragments || 0) < minFragments) return false;
-
-        const interval = cfg.runShopInterval || 0;
-        const intervalHit = interval > 0 && (this.round || 1) % interval === 0;
-        const bossOfferEnabled = cfg.runShopOfferAfterBoss !== false;
-        const bossJustDefeated = bossOfferEnabled && (this.bossDefeatedLog || []).some(log => {
-            const defeatedRound = Number(log && log.round) || 0;
-            return defeatedRound === (this.round - 1) || defeatedRound === this.round;
-        });
-
-        if (!intervalHit && !bossJustDefeated) return false;
-        if (typeof this.ui_hasAffordableRunShopItem === 'function' && !this.ui_hasAffordableRunShopItem()) {
-            this.runShopInventory = [];
-            return false;
-        }
-
-        const continueRound = () => {
-            this.sys_showRoundStartBanner();
-        };
-        const reason = bossJustDefeated ? 'boss' : 'interval';
-        this._runShopOpenedRound = this.round;
-        if (typeof this.ui_offerRunShop === 'function') {
-            this.ui_offerRunShop(continueRound, reason);
-        } else {
-            this.ui_showRunShop(continueRound, { reason });
-        }
-        return true;
+        this.sys_updateRunShopScheduleForRound();
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        return false;
     },
 
     /**
@@ -1862,7 +1954,7 @@ export const game_system = {
             totalCount: 0,
             resolvedCount: 0,
         });
-        // [tsk-f35c6d10] 队列为空时不再进入普通命运选择，改为显示回合开始提示后直接进入研磨阶段
+        // [tsk-f35c6d10] 队列为空时不再进入普通命运选择，改为显示回合开始提示后直接进入战斗阶段
         if (this.sys_maybeOfferRunShopBeforeRoundStart()) return;
         this.sys_showRoundStartBanner();
     },
@@ -1902,11 +1994,11 @@ export const game_system = {
         this.enemyTurnTimer = 0;
         this._runeClaimPending = false;
 
-        // 切换到 gathering 阶段作为横幅背景，避免残留 selection 界面
-        // Round-start banner is only a transition into the next gathering phase.
+        // 切换到 combat 阶段作为横幅背景，避免残留 selection 界面。
+        // Round-start banner is only a transition into the next combat phase when no essence is active.
         // Do not rebuild ammoQueue here from stale fired snapshots or marbleQueue.
-        if (this.phase !== 'gathering') {
-            this.phase_switchPhase('gathering');
+        if (this.phase !== 'combat') {
+            this.phase_switchPhase('combat');
         }
 
         // 更新文本
@@ -1950,10 +2042,10 @@ export const game_system = {
             if (leftSidebar) {
                 leftSidebar.classList.remove('ammo-panel-charging', 'ammo-panel-charging-simple');
             }
-            // Normal round start goes to gathering; essence-triggered charge is handled by replace-ammo flows.
-            // [BUGFIX 2] 横幅结束，清除保护标志，再进入研磨阶段
+            // Normal round start goes to combat; essence-triggered grinding is handled by ui_confirmSelection.
+            // [BUGFIX 2] 横幅结束，清除保护标志，再进入战斗阶段
             this._roundStartBannerActive = false;
-            this.phase_startGatheringPhase();
+            this.phase_startCombatPhase();
         }, 1500);
     },
 
@@ -2257,6 +2349,7 @@ export const game_system = {
         // 战斗拖拽瞄准
         if (this.isDragging) {
             this.dragCurrent = logicPos;
+            this.lastMousePos = logicPos;
             e.preventDefault();
             return;
         }
@@ -2299,11 +2392,9 @@ export const game_system = {
 
         if (this.isDragging) {
             this.isDragging = false;
-            // [emitter-port] 发射方向必须以发射口为原点（Y 轴上移 22px），
-            // 与瞄准引导线（game_phase.js:1812）和子弹生成位置（game_phase.js:1457）一致，
-            // 否则瞄准线与实际发射角度会因 22px 视差产生偏差。
-            const cannonPos = new Vec2(this.width / 2, this.height - 102);
-            const targetPos = this.lastMousePos;
+            // [emitter-port] 发射方向必须和战斗引导线/子弹生成点共用同一个炮口锚点。
+            const cannonPos = new Vec2(this.width / 2, this.height - 80 - EMITTER_PORT_OFFSET_Y);
+            const targetPos = this.dragCurrent || this.lastMousePos;
             const aimVector = targetPos.sub(cannonPos);
             if (aimVector.y < -20) {
                 this.sys_resetMultiplier();
@@ -2464,6 +2555,8 @@ export const game_system = {
                     _bossVulnerabilityProgress: e._bossVulnerabilityProgress || 0,
                     _bossVulnerabilityExposedHits: e._bossVulnerabilityExposedHits || 0,
                     _bossVulnerabilitySuppressedEnrage: e._bossVulnerabilitySuppressedEnrage || false,
+                    _bossVulnerabilityMode: e._bossVulnerabilityMode,
+                    _bossVulnerabilityThreshold: e._bossVulnerabilityThreshold || 0,
                 };
                 // 序列化 collisionData（将 Vec2 转为 {x,y}）
                 if (e.collisionData) {
@@ -2588,6 +2681,15 @@ export const game_system = {
                 runShopInventory: this.runShopInventory ? JSON.parse(JSON.stringify(this.runShopInventory)) : [],
                 runShopRefreshes: this.runShopRefreshes || 0,
                 _runShopOpenedRound: this._runShopOpenedRound || -1,
+                runShopNextOfferRound: this.runShopNextOfferRound || null,
+                runShopActiveUntilRound: this.runShopActiveUntilRound || 0,
+                runShopLastArrivalRound: this.runShopLastArrivalRound || 0,
+                runShopScheduleStartRound: this.runShopScheduleStartRound || 1,
+                runShopScheduleGap: this.runShopScheduleGap || 0,
+                runShopStarterBoostClaimed: !!this.runShopStarterBoostClaimed,
+                runShopStarterBoostDamageAmount: this.runShopStarterBoostDamageAmount || 0,
+                runShopStarterBoostDamageRounds: this.runShopStarterBoostDamageRounds || 0,
+                _runShopInventoryGeneratedForRound: this._runShopInventoryGeneratedForRound || 0,
                 // 技能
                 skillPoints: this.skillPoints || 0,
                 activeSkills: (this.activeSkills || []).map(sk => sk.id || sk),
@@ -2775,6 +2877,18 @@ export const game_system = {
             this.runShopInventory = state.runShopInventory ? JSON.parse(JSON.stringify(state.runShopInventory)) : [];
             this.runShopRefreshes = state.runShopRefreshes || 0;
             this._runShopOpenedRound = state._runShopOpenedRound || -1;
+            this.runShopNextOfferRound = Object.prototype.hasOwnProperty.call(state, 'runShopNextOfferRound')
+                ? state.runShopNextOfferRound
+                : ((CONFIG.gameplay || {}).runShopFirstOfferRound || 3);
+            this.runShopActiveUntilRound = state.runShopActiveUntilRound || 0;
+            this.runShopLastArrivalRound = state.runShopLastArrivalRound || 0;
+            this.runShopScheduleStartRound = state.runShopScheduleStartRound || 1;
+            this.runShopScheduleGap = state.runShopScheduleGap || Math.max(1, ((this.runShopNextOfferRound || 3) - (this.runShopScheduleStartRound || 1)));
+            this.runShopStarterBoostClaimed = !!state.runShopStarterBoostClaimed;
+            this.runShopStarterBoostDamageAmount = state.runShopStarterBoostDamageAmount || 0;
+            this.runShopStarterBoostDamageRounds = state.runShopStarterBoostDamageRounds || 0;
+            this._runShopInventoryGeneratedForRound = state._runShopInventoryGeneratedForRound || 0;
+            if (typeof this.sys_updateRunShopScheduleForRound === 'function') this.sys_updateRunShopScheduleForRound();
 
             // --- 恢复技能 ---
             this.skillPoints = state.skillPoints || 0;
@@ -2830,6 +2944,8 @@ export const game_system = {
                 e._bossVulnerabilityProgress = d._bossVulnerabilityProgress || 0;
                 e._bossVulnerabilityExposedHits = d._bossVulnerabilityExposedHits || 0;
                 e._bossVulnerabilitySuppressedEnrage = d._bossVulnerabilitySuppressedEnrage || false;
+                e._bossVulnerabilityMode = d._bossVulnerabilityMode;
+                e._bossVulnerabilityThreshold = d._bossVulnerabilityThreshold || 0;
                 e.justSpawned = false; // 恢复时不播放入场动画
                 return e;
             });

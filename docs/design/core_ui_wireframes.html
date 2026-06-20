@@ -1,0 +1,1239 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Echo Alchemist V2 核心页面 UI 线框图</title>
+  <style>
+    :root {
+      --bg: #10131a;
+      --panel: #181d27;
+      --panel-2: #202633;
+      --line: #596173;
+      --line-strong: #9aa4b8;
+      --text: #edf1f7;
+      --muted: #aeb7c8;
+      --accent: #d8b45a;
+      --danger: #d46b6b;
+      --safe: #76c893;
+      --info: #75a7d8;
+      --violet: #b78adf;
+      --cyan: #7ccfd4;
+      --space: 16px;
+      --radius: 8px;
+      font-family: "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      padding: 18px 28px;
+      border-bottom: 1px solid #2b3240;
+      background: rgba(16, 19, 26, 0.96);
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    header p {
+      max-width: 1080px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    main {
+      width: min(1440px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 24px 0 56px;
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .legend-item {
+      min-height: 58px;
+      padding: 10px 12px;
+      border: 1px solid #343b4b;
+      border-radius: var(--radius);
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .legend-item b {
+      display: block;
+      color: var(--text);
+      font-size: 14px;
+      margin-bottom: 3px;
+    }
+
+    .page {
+      margin-top: 28px;
+      padding-top: 22px;
+      border-top: 1px solid #333a49;
+    }
+
+    .page-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .page h2 {
+      font-size: 21px;
+      font-weight: 800;
+    }
+
+    .page-head p {
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .wireframe-wrap {
+      display: grid;
+      grid-template-columns: minmax(360px, 430px) 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .phone {
+      width: min(100%, 430px);
+      aspect-ratio: 9 / 16;
+      border: 2px solid var(--line-strong);
+      border-radius: 18px;
+      background: #0d1016;
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
+    }
+
+    .block {
+      position: relative;
+      min-height: 44px;
+      padding: 8px;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    .block.strong { border-style: solid; border-color: var(--line-strong); }
+    .block.accent { border-color: var(--accent); }
+    .block.danger { border-color: var(--danger); }
+    .block.safe { border-color: var(--safe); }
+    .block.info { border-color: var(--info); }
+    .block.violet { border-color: var(--violet); }
+    .block.cyan { border-color: var(--cyan); }
+    .block.dim { opacity: 0.72; }
+
+    .block-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .block-note {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 8px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
+      padding: 2px 6px;
+      border: 1px solid #4b5363;
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .stage {
+      display: grid;
+      grid-template-rows: 46px 58px 1fr 116px 70px;
+      gap: 8px;
+    }
+
+    .combat-stage {
+      display: grid;
+      grid-template-rows: 70px minmax(0, 1fr) 122px 78px;
+      gap: 8px;
+    }
+
+    .top-combat-hud {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .hud-main {
+      min-width: 0;
+    }
+
+    .hud-capsules {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 6px;
+    }
+
+    .hud-capsule {
+      border: 1px solid #4b5363;
+      border-radius: 999px;
+      padding: 2px 6px;
+      font-size: 10px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .hud-capsule.warn {
+      color: var(--danger);
+      border-color: var(--danger);
+    }
+
+    .hud-actions {
+      width: 72px;
+      display: grid;
+      gap: 5px;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .combat-arena {
+      display: grid;
+      grid-template-columns: 52px minmax(0, 1fr) 52px;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .side-art {
+      min-height: 0;
+      border: 1px dashed #435062;
+      border-radius: var(--radius);
+      background:
+        linear-gradient(180deg, rgba(216, 180, 90, 0.12), rgba(117, 167, 216, 0.06)),
+        repeating-linear-gradient(180deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 22px);
+      color: var(--muted);
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      text-align: center;
+      padding: 8px 4px;
+    }
+
+    .safe-play-rect {
+      display: grid;
+      grid-template-rows: 48px minmax(0, 1fr) 44px;
+      min-height: 0;
+      padding: 8px;
+      border: 2px solid var(--safe);
+      border-radius: var(--radius);
+      background: #111722;
+    }
+
+    .safe-play-label {
+      color: var(--safe);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .bottom-zone {
+      display: grid;
+      grid-template-columns: 104px 1fr;
+      gap: 8px;
+      border: 2px solid var(--accent);
+      border-radius: var(--radius);
+      background: #171819;
+      padding: 8px;
+    }
+
+    .readout-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 5px;
+      margin-top: 6px;
+    }
+
+    .readout {
+      min-height: 24px;
+      border: 1px solid #444d5f;
+      border-radius: 6px;
+      padding: 3px 5px;
+      color: var(--muted);
+      font-size: 10px;
+      background: rgba(13, 16, 22, 0.55);
+    }
+
+    .floating-ui-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .floating-ui {
+      border: 1px solid #687186;
+      border-radius: var(--radius);
+      background: rgba(24, 29, 39, 0.86);
+      padding: 8px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .mini-list {
+      display: grid;
+      gap: 5px;
+      margin-top: 7px;
+      font-size: 10px;
+    }
+
+    .mini-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 3px 5px;
+      border: 1px solid #3f4758;
+      border-radius: 6px;
+      background: rgba(13, 16, 22, 0.45);
+    }
+
+    .meter {
+      height: 6px;
+      border-radius: 999px;
+      background: #293142;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .meter > span {
+      display: block;
+      height: 100%;
+      width: var(--value, 50%);
+      background: currentColor;
+    }
+
+    .field {
+      display: grid;
+      grid-template-rows: 54px 1fr 58px;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .enemy-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      grid-auto-rows: 48px;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .enemy {
+      border: 1px solid #747d91;
+      border-radius: 6px;
+      background: var(--panel-2);
+      color: var(--muted);
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .enemy.boss {
+      grid-column: span 2;
+      grid-row: span 2;
+      border-color: var(--danger);
+      color: var(--text);
+    }
+
+    .enemy.wide {
+      grid-column: span 2;
+      border-color: var(--accent);
+    }
+
+    .enemy.tall {
+      grid-row: span 2;
+      border-color: var(--violet);
+    }
+
+    .launcher {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .turret {
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .three-col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .card {
+      min-height: 178px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-2);
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .card b {
+      display: block;
+      color: var(--text);
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+
+    .overlay-screen {
+      position: relative;
+      overflow: hidden;
+      border: 2px solid var(--line-strong);
+      border-radius: 18px;
+      background: #0d1016;
+      min-height: 0;
+      padding: 12px;
+      display: grid;
+      grid-template-rows: 46px 1fr 68px;
+      gap: 8px;
+    }
+
+    .overlay-screen::before {
+      content: "";
+      position: absolute;
+      inset: 72px 12px 88px;
+      border: 1px dashed #435062;
+      border-radius: 10px;
+      background:
+        linear-gradient(180deg, rgba(20, 28, 42, 0.88), rgba(8, 10, 15, 0.88)),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 34px);
+    }
+
+    .mask {
+      position: absolute;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.68);
+      border-radius: 16px;
+    }
+
+    .overlay-content {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .overlay-title {
+      justify-self: center;
+      width: min(92%, 330px);
+      padding: 8px 10px;
+      border: 1px solid var(--violet);
+      border-radius: var(--radius);
+      background: rgba(24, 29, 39, 0.92);
+      text-align: center;
+      font-size: 12px;
+      color: var(--text);
+      font-weight: 800;
+    }
+
+    .floating-card-row {
+      align-self: center;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .floating-card {
+      min-height: 210px;
+      padding: 10px 8px;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      background: rgba(32, 38, 51, 0.96);
+      box-shadow: 0 12px 28px rgba(0,0,0,0.36);
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .floating-card b {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .card-art {
+      height: 52px;
+      border: 1px solid #596173;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 8px;
+      color: var(--accent);
+      background: rgba(216, 180, 90, 0.08);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .card-stat {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      border-top: 1px solid #343b4b;
+      padding-top: 5px;
+      margin-top: 5px;
+      font-size: 10px;
+    }
+
+    .overlay-actions {
+      justify-self: center;
+      width: min(94%, 360px);
+      padding: 8px;
+      border: 1px solid var(--safe);
+      border-radius: var(--radius);
+      background: rgba(24, 29, 39, 0.94);
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .tab-panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .small-panel {
+      min-height: 78px;
+      padding: 7px;
+      border: 1px solid #465066;
+      border-radius: var(--radius);
+      background: rgba(13, 16, 22, 0.5);
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .pinboard {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      grid-template-rows: repeat(8, 1fr);
+      gap: 5px;
+      min-height: 0;
+      margin-top: 8px;
+    }
+
+    .pin {
+      border: 1px solid #4c5568;
+      border-radius: 50%;
+      background: #1f2633;
+    }
+
+    .pin.special { border-radius: 4px; border-color: var(--accent); }
+    .pin.rune { border-color: var(--cyan); background: #18323a; }
+    .pin.locked { opacity: 0.32; }
+
+    .editor-strip {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .editor-tile {
+      min-height: 42px;
+      border: 1px solid #4b5363;
+      border-radius: 6px;
+      padding: 5px;
+      font-size: 10px;
+      color: var(--muted);
+      background: rgba(13, 16, 22, 0.48);
+    }
+
+    .rune-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      width: min(100%, 230px);
+      margin: 10px auto 0;
+    }
+
+    .slot {
+      aspect-ratio: 1;
+      border: 1px solid #5f687a;
+      border-radius: 8px;
+      background: #161c26;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .slot.filled { border-color: var(--cyan); color: var(--text); }
+    .slot.active { border-color: var(--accent); color: var(--accent); }
+
+    .notes {
+      border: 1px solid #343b4b;
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 14px;
+    }
+
+    .notes h3 {
+      font-size: 15px;
+      margin-bottom: 10px;
+    }
+
+    .notes table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .notes th, .notes td {
+      vertical-align: top;
+      padding: 8px;
+      border-top: 1px solid #303746;
+      text-align: left;
+    }
+
+    .notes th {
+      color: var(--text);
+      width: 112px;
+      font-weight: 800;
+    }
+
+    .priority {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+      height: 22px;
+      border-radius: 999px;
+      border: 1px solid currentColor;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .l0 { color: var(--accent); }
+    .l1 { color: var(--safe); }
+    .l2 { color: var(--info); }
+    .l3 { color: var(--muted); }
+
+    .layout-stack {
+      display: grid;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .shop-layout {
+      display: grid;
+      grid-template-rows: 66px 1fr 58px;
+      gap: 8px;
+    }
+
+    .book-layout {
+      display: grid;
+      grid-template-columns: 78px 1fr;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .book-tabs {
+      display: grid;
+      gap: 8px;
+    }
+
+    .book-content {
+      display: grid;
+      grid-template-rows: 72px 1fr 84px;
+      gap: 8px;
+    }
+
+    @media (max-width: 980px) {
+      .legend { grid-template-columns: 1fr 1fr; }
+      .wireframe-wrap { grid-template-columns: 1fr; }
+      .page-head { display: block; }
+      .page-head p { margin-top: 8px; }
+    }
+
+    @media (max-width: 560px) {
+      main { width: calc(100vw - 20px); }
+      header { padding: 16px; }
+      .legend { grid-template-columns: 1fr; }
+      .cards { grid-template-columns: 1fr; }
+      .three-col { grid-template-columns: 1fr; }
+      .two-col { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Echo Alchemist V2 核心页面 UI 线框图</h1>
+    <p>目标是先固定布局骨架和内容职责：哪些信息常驻、哪些信息贴近事件、哪些内容进入抽屉或图鉴。线框不代表最终美术，只表达阅读顺序、模块位置和资产装饰方向。</p>
+  </header>
+
+  <main>
+    <section class="legend" aria-label="图例">
+      <div class="legend-item"><b><span class="priority l0">L0</span> 环境态</b>阶段、场地、气氛、第一眼压迫。</div>
+      <div class="legend-item"><b><span class="priority l1">L1</span> 决策态</b>发射前必须读懂的风险、资源、行动。</div>
+      <div class="legend-item"><b><span class="priority l2">L2</span> 解释态</b>命中、克制、屏障、充能等即时反馈。</div>
+      <div class="legend-item"><b><span class="priority l3">L3</span> 复盘态</b>统计、详情、图鉴、长解释。</div>
+      <div class="legend-item"><b>竖屏优先</b>暂时忽略 PC 专项；核心先按手机/竖屏安全区设计。</div>
+    </section>
+
+    <section class="page" id="combat">
+      <div class="page-head">
+        <div>
+          <h2>1. 战斗主界面 #phase-combat</h2>
+          <p>顶部合并为一个紧凑战斗 HUD：阶段/回合/资源与少量态势胶囊共存。态势不再单独占一整条，把竖屏空间还给核心游戏矩形。</p>
+        </div>
+      </div>
+
+      <div class="wireframe-wrap">
+        <div class="phone combat-stage" aria-label="战斗主界面移动端线框">
+          <div class="block strong accent top-combat-hud">
+            <div class="hud-main">
+              <div class="block-title">顶部战斗 HUD <span class="priority l1">L1</span></div>
+              <div class="block-note">回合 / 阶段 / 护盾 / 资源 + 必要态势胶囊</div>
+              <div class="hud-capsules">
+                <span class="hud-capsule warn">防线: 压线</span>
+                <span class="hud-capsule">回合 12</span>
+                <span class="hud-capsule">护盾 2</span>
+                <span class="hud-capsule">敌 7 / Boss 1</span>
+                <span class="hud-capsule">弹药 4</span>
+              </div>
+            </div>
+            <div class="hud-actions">
+              <span class="tag">暂停</span>
+              <span class="tag">设置</span>
+            </div>
+          </div>
+          <div class="combat-arena">
+            <div class="side-art">左侧炼金管线 / 场景装饰 / 浮动小 UI</div>
+            <div class="safe-play-rect">
+              <div>
+                <div class="safe-play-label">固定游戏安全矩形：战斗判定只在这里</div>
+                <div class="block-note">敌人、弹丸、碰撞、Peg、掉落物、命中标签；两侧和底部不参与敌人展示</div>
+              </div>
+              <div class="enemy-grid">
+                <div class="enemy wide">大型<br>足迹</div>
+                <div class="enemy">普通</div>
+                <div class="enemy tall">精英</div>
+                <div class="enemy boss">Boss<br>状态</div>
+                <div class="enemy">护盾</div>
+                <div class="enemy">残血</div>
+                <div class="enemy">毒</div>
+                <div class="enemy">冰</div>
+                <div class="enemy">穿透反馈</div>
+              </div>
+              <div class="block info" style="min-height: 36px;">
+                <div class="block-title">防线 / 失败线 <span class="priority l1">L1</span></div>
+              </div>
+            </div>
+            <div class="side-art">右侧炉壁 / 机械臂 / 符文仪表 / 悬浮小 UI</div>
+          </div>
+          <div class="bottom-zone">
+            <div class="turret">底部禁区<br>发射器</div>
+            <div>
+              <div class="block-title">下一发读数</div>
+              <div class="block-note">当前子弹信息必须常驻：属性球轨道、伤害徽标、散射扇形、连射能量、装填格</div>
+              <div class="readout-grid">
+                <div class="readout">主属性<br><b>火 / 雷</b></div>
+                <div class="readout">伤害<br><b>126</b></div>
+                <div class="readout">形态<br><b>散射 x3</b></div>
+                <div class="readout">连射<br><b>2 次</b></div>
+              </div>
+            </div>
+          </div>
+          <div class="floating-ui-row">
+            <div class="floating-ui">
+              <div class="block-title">左悬浮 UI <span class="priority l1">L1</span></div>
+              <div class="block-note">符文充能 / 当前词条 / 伤害统计入口</div>
+              <div class="mini-list">
+                <div class="mini-row"><span>符文充能</span><b>72%</b></div>
+                <div class="meter cyan" style="color: var(--cyan); --value:72%;"><span></span></div>
+                <div class="mini-row"><span>已激活</span><b>熔毁</b></div>
+              </div>
+            </div>
+            <div class="floating-ui">
+              <div class="block-title">右悬浮 UI <span class="priority l1">L1</span></div>
+              <div class="block-note">技能栏 / SP / 禁用原因 / 临时加成</div>
+              <div class="mini-list">
+                <div class="mini-row"><span>SP</span><b>3 / 5</b></div>
+                <div class="mini-row"><span>冻结爆发</span><b>可用</b></div>
+                <div class="mini-row"><span>雷暴</span><b>缺 SP</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="notes">
+          <h3>内容标注</h3>
+          <table>
+            <tr><th>核心目标</th><td>确保中间长方形安全游戏区稳定可玩；两侧只做沉浸装饰和轻量悬浮信息。</td></tr>
+            <tr><th>常驻信息</th><td>顶部战斗 HUD、底部发射器子弹信息。态势摘要不独立占条，只作为顶部胶囊；技能/符文/词条作为左右悬浮 UI。</td></tr>
+            <tr><th>即时反馈</th><td>命中、克制、护盾、暴击、穿透、弹射等反馈贴近敌人或弹道出现，避免挤进顶部栏。</td></tr>
+            <tr><th>美术资产</th><td>左右侧场景装饰、中央安全区边框、底部炼金发射台、发射器 V3、属性球轨道、敌人足迹、状态短标签底板。</td></tr>
+            <tr><th>态势必要性</th><td>需要保留“防线风险”这个判断，但不需要一整条态势栏。敌人数/Boss/剩余弹药只在高压或需要决策时以胶囊显示。</td></tr>
+            <tr><th>底部禁区</th><td>底部理论上不展示敌人，可承载发射器和当前子弹信息；需要与失败线/防线语义明确分离。</td></tr>
+          </table>
+        </aside>
+      </div>
+    </section>
+
+    <section class="page" id="p0-combat-detail">
+      <div class="page-head">
+        <div>
+          <h2>P0 细化：战斗主界面组件规格</h2>
+          <p>本节是第一优先级的可执行设计：先把战斗页的固定信息、条件信息、反馈信息和美术资产边界定下来。实现时先按这张表做，不再额外扩张 UI 区域。</p>
+        </div>
+      </div>
+
+      <div class="notes">
+        <h3>组件优先级</h3>
+        <table>
+          <tr>
+            <th>顶部战斗 HUD</th>
+            <td>
+              默认字段：阶段名、回合数、护盾/生命类生存资源、局内资源、暂停/设置。
+              条件胶囊：防线风险常驻；敌人数、Boss、弹药余量只在高压、Boss 存在、弹药低于阈值时出现。
+              禁止：独立态势条、长句提示、超过一行半的胶囊堆叠。
+            </td>
+          </tr>
+          <tr>
+            <th>核心游戏矩形</th>
+            <td>
+              只承载战斗判定：敌人、弹丸、Peg、掉落物、状态短标、伤害数字、弹道反馈。
+              需要明确边界线和防线位置。背景应低对比，不出现高亮装饰图案。
+              敌人不得进入左右装饰区和底部发射器区。
+            </td>
+          </tr>
+          <tr>
+            <th>左右场景装饰</th>
+            <td>
+              左侧建议放炼金管线、液体刻度、伤害统计入口、符文充能。
+              右侧建议放炉壁、机械臂、SP/技能组、临时加成。
+              装饰必须比敌人和弹丸暗，悬浮 UI 采用半透明小面板。
+            </td>
+          </tr>
+          <tr>
+            <th>底部发射器区</th>
+            <td>
+              固定展示当前子弹：主属性、伤害、形态、连射/装填。
+              发射器本体承担瞄准、蓄力、属性球轨道和装填反馈。
+              这里是非敌人区，可以更厚重、更有仪式感，但不能遮挡发射轨迹起点。
+            </td>
+          </tr>
+          <tr>
+            <th>即时反馈</th>
+            <td>
+              命中反馈贴近事件源：伤害数字 + 最多 2 个短标签。
+              优先级：屏障/护盾 > 暴击 > 克制/有效 > 穿透/弹射 > 温度/毒素。
+              反馈消失后进入伤害统计，不常驻在战场。
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="notes" style="margin-top: 14px;">
+        <h3>状态显示规则</h3>
+        <table>
+          <tr><th>默认状态</th><td>顶部只显示防线稳定、回合、护盾、资源；底部显示下一发四项读数；左右悬浮 UI 收起到紧凑态。</td></tr>
+          <tr><th>高压状态</th><td>顶部防线胶囊变为压线/危险；敌人数/Boss 胶囊出现；左右悬浮 UI 可显示临时警示，但不进入中央游戏矩形。</td></tr>
+          <tr><th>瞄准状态</th><td>底部发射器强化显示角度、弹道预览、装填格；顶部 HUD 不扩张；左右悬浮 UI 降低透明度，避免干扰瞄准。</td></tr>
+          <tr><th>命中爆发</th><td>中央矩形内出现伤害数字和短标签；发射器可短暂脉冲；不弹出大面积遮罩。</td></tr>
+          <tr><th>回合结束</th><td>敌人行动和奖励掉落仍在中央矩形内完成；选择/遗物出现时才进入蒙版 + 悬浮卡片。</td></tr>
+        </table>
+      </div>
+
+      <div class="notes" style="margin-top: 14px;">
+        <h3>P0 资产切分</h3>
+        <table>
+          <tr><th>必须先做</th><td>顶部 HUD 底板、中央安全区边框、防线标记、底部发射器工作台、发射器本体、四项读数小格。</td></tr>
+          <tr><th>随后补强</th><td>左右场景装饰、符文充能小面板、技能/SP 小面板、状态短标签底板、伤害数字样式。</td></tr>
+          <tr><th>暂缓</th><td>复杂粒子、全屏高光、额外镜头运动、会改变战斗判定区域的装饰结构。</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <section class="page" id="gathering">
+      <div class="page-head">
+        <div>
+          <h2>2. P1 预备：研磨 / 钉板编辑 #phase-gathering</h2>
+          <p>研磨阶段是“构筑被物理验证”的页面。常态看弹珠路径和收益，编辑态看槽位、模块合法性、符文融合摘要。</p>
+        </div>
+      </div>
+
+      <div class="wireframe-wrap">
+        <div class="phone layout-stack" aria-label="研磨页面移动端线框">
+          <div class="block strong accent">
+            <div class="block-title">顶部状态栏 <span class="priority l1">L1</span></div>
+            <div class="block-note">回合 / 资源 / 当前阶段 / 进入符文发射器</div>
+          </div>
+          <div class="block safe">
+            <div class="block-title">收集目标与配方 HUD <span class="priority l1">L1</span></div>
+            <div class="block-note">本轮目标：火 2 / 雷 1；当前收集 2/5；预计产出：爆破弹 + 符文碎片</div>
+          </div>
+          <div class="block" style="min-height: 460px;">
+            <div class="block-title">钉板场地 <span class="priority l1">L1</span></div>
+            <div class="block-note">弹珠路径、Peg、特殊模块、融合钉、锁定槽位</div>
+            <div class="pinboard">
+              <div class="pin"></div><div class="pin"></div><div class="pin rune"></div><div class="pin"></div><div class="pin"></div>
+              <div class="pin"></div><div class="pin special"></div><div class="pin"></div><div class="pin special"></div><div class="pin"></div>
+              <div class="pin locked"></div><div class="pin"></div><div class="pin"></div><div class="pin"></div><div class="pin locked"></div>
+              <div class="pin"></div><div class="pin rune"></div><div class="pin"></div><div class="pin"></div><div class="pin"></div>
+              <div class="pin special"></div><div class="pin"></div><div class="pin"></div><div class="pin"></div><div class="pin special"></div>
+              <div class="pin locked"></div><div class="pin"></div><div class="pin"></div><div class="pin"></div><div class="pin locked"></div>
+              <div class="pin"></div><div class="pin"></div><div class="pin rune"></div><div class="pin"></div><div class="pin"></div>
+              <div class="pin locked"></div><div class="pin locked"></div><div class="pin"></div><div class="pin locked"></div><div class="pin locked"></div>
+            </div>
+          </div>
+          <div class="block info">
+            <div class="block-title">编辑器底栏 <span class="priority l1">L1</span></div>
+            <div class="block-note">模块库存、放置合法性、融合摘要、开始采集按钮</div>
+            <div class="editor-strip">
+              <div class="editor-tile"><b>模块</b><br>导流翼 x2<br>杯口 x1</div>
+              <div class="editor-tile"><b>融合</b><br>火钉 3<br>词条线索: 熔毁</div>
+              <div class="editor-tile"><b>开始</b><br>可采集<br>无阻塞</div>
+            </div>
+          </div>
+          <div class="block danger">
+            <div class="block-title">错误/阻塞原因 <span class="priority l2">L2</span></div>
+            <div class="block-note">越界、占用、未解锁、未确认融合预览</div>
+          </div>
+        </div>
+
+        <aside class="notes">
+          <h3>内容标注</h3>
+          <table>
+            <tr><th>常态重点</th><td>显示弹珠运行路径、收集目标、特殊钉收益和本轮产出。</td></tr>
+            <tr><th>编辑重点</th><td>模块候选、可放置覆盖格、不可放置原因、库存失效、符文融合结果。</td></tr>
+            <tr><th>资产装饰</th><td>钉盘外框、炼金工坊底纹、特殊钉轮廓、锁定槽位、模块选择浮层底板。</td></tr>
+            <tr><th>交互规则</th><td>先预校验再提交；移动端模块选择采用第一次预览、第二次确认。</td></tr>
+            <tr><th>页面气质</th><td>比战斗页更像工坊台面，色温可偏暖，但弹珠路径区域必须干净。</td></tr>
+          </table>
+        </aside>
+      </div>
+    </section>
+
+    <section class="page" id="selection">
+      <div class="page-head">
+        <div>
+          <h2>3. P1 预备：弹珠选择 / 命运时刻 #phase-selection</h2>
+          <p>所有选择类都按“底层战场/工坊被压暗 + 中央悬浮卡片”的 overlay 结构处理。玩家要感觉是在当前场景上做选择，而不是跳到另一张普通页面。</p>
+        </div>
+      </div>
+
+      <div class="wireframe-wrap">
+        <div class="phone overlay-screen" aria-label="选择页面蒙版悬浮卡片线框">
+          <div class="mask"></div>
+          <div class="overlay-content" style="grid-row: 1 / -1;">
+            <div class="overlay-title">蒙版标题：命运抉择 / 混沌精华 / 纯净精华 <span class="priority l0">L0</span></div>
+            <div class="floating-card-row">
+              <div class="floating-card">
+                <div class="card-art">弹珠图标 / 属性槽</div>
+                <b>烈焰弹珠 A</b>
+                主属性、稀有度、收益摘要、禁用原因或预览态。
+                <div class="card-stat"><span>伤害</span><b>+18%</b></div>
+                <div class="card-stat"><span>词条</span><b>过热</b></div>
+              </div>
+              <div class="floating-card">
+                <div class="card-art">预览高亮</div>
+                <b>雷鸣弹珠 B</b>
+                第一次点击预览，第二次确认；键盘焦点可见。
+                <div class="card-stat"><span>弹射</span><b>+2</b></div>
+                <div class="card-stat"><span>状态</span><b>已预览</b></div>
+              </div>
+              <div class="floating-card">
+                <div class="card-art">混沌/纯净态</div>
+                <b>冰霜弹珠 C</b>
+                顶部属性槽，显示 dominant 属性和特殊词条。
+                <div class="card-stat"><span>控制</span><b>冻结</b></div>
+                <div class="card-stat"><span>限制</span><b>可选</b></div>
+              </div>
+            </div>
+            <div class="overlay-actions">
+              <div class="block-title">悬浮确认区 <span class="priority l1">L1</span></div>
+              <div class="block-note">已选 2/3 | 确认可用 | 跳过 | 刷新 1 次 | 禁用原因直接显示；纯净精华在这里展开符文注入预览</div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="notes">
+          <h3>内容标注</h3>
+          <table>
+            <tr><th>统一结构</th><td>底层保留战场/工坊背景，压暗成蒙版；选择内容以 2-3 张悬浮卡片呈现。</td></tr>
+            <tr><th>普通选择</th><td>悬浮卡片稳定，强调三选需求、已选数量和弹珠属性。</td></tr>
+            <tr><th>混沌精华</th><td>蒙版加入紫红裂隙和不稳定边框，强调替换、随机性和风险收益。</td></tr>
+            <tr><th>纯净精华</th><td>蒙版加入蓝白净化核心，强调合法属性、符文注入、同化加成。</td></tr>
+            <tr><th>资产装饰</th><td>替换背景、卡片 9-Slice、属性槽、跳过按钮、精华模式特效底纹。</td></tr>
+            <tr><th>关键约束</th><td>选择层是 overlay，不应清空底层场景语义；刷新/继续游戏/overlay 返回后，模式标签、确认条件和卡片状态必须恢复一致。</td></tr>
+          </table>
+        </aside>
+      </div>
+    </section>
+
+    <section class="page" id="rune-launcher">
+      <div class="page-head">
+        <div>
+          <h2>4. P1 预备：符文发射器 #phase-rune-launcher</h2>
+          <p>符文发射器是长期构筑中枢。它应该像一台可插拔符文仪器：左侧说明当前配置，中心操作 3x3，底部/侧栏显示库存与词条结果。</p>
+        </div>
+      </div>
+
+      <div class="wireframe-wrap">
+        <div class="phone layout-stack" aria-label="符文发射器移动端线框">
+          <div class="block strong cyan">
+            <div class="block-title">面板标题与关闭 <span class="priority l1">L1</span></div>
+            <div class="block-note">当前配置名、碎片数量、返回原阶段</div>
+          </div>
+          <div class="three-col">
+            <div class="block accent"><div class="block-title">配置</div><div class="block-note">当前 3x3</div></div>
+            <div class="block"><div class="block-title">管理</div><div class="block-note">库存/合成</div></div>
+            <div class="block"><div class="block-title">图鉴</div><div class="block-note">词条发现</div></div>
+          </div>
+          <div class="block" style="min-height: 280px;">
+            <div class="block-title">3x3 符文槽 <span class="priority l1">L1</span></div>
+            <div class="block-note">空槽、已放置、激活高亮、可替换状态</div>
+            <div class="rune-grid">
+              <div class="slot filled">火</div><div class="slot">空</div><div class="slot filled">雷</div>
+              <div class="slot active">核心</div><div class="slot filled">冰</div><div class="slot">空</div>
+              <div class="slot">空</div><div class="slot filled">弹</div><div class="slot active">词</div>
+            </div>
+          </div>
+          <div class="block safe">
+            <div class="block-title">激活词条摘要 <span class="priority l1">L1</span></div>
+            <div class="block-note">当前生效、可激活、材料不足、与钉板融合的反馈链</div>
+            <div class="mini-list">
+              <div class="mini-row"><span>已激活</span><b>熔毁 / 回声</b></div>
+              <div class="mini-row"><span>可激活</span><b>绝对零度</b></div>
+              <div class="mini-row"><span>钉板线索</span><b>火钉 3/3</b></div>
+            </div>
+          </div>
+          <div class="block info">
+            <div class="block-title">库存 / 图鉴列表 <span class="priority l3">L3</span></div>
+            <div class="block-note">移动端长列表滚动，不遮挡底部确认区</div>
+            <div class="tab-panels">
+              <div class="small-panel"><b>库存摘要</b><br>火 Lv2 x1<br>冰 Lv1 x2<br>碎片 18</div>
+              <div class="small-panel"><b>图鉴进度</b><br>发现 12/22<br>可追踪 3<br>材料不足 5</div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="notes">
+          <h3>内容标注</h3>
+          <table>
+            <tr><th>配置 Tab</th><td>当前 3x3、空槽、已激活词条、可替换符文。</td></tr>
+            <tr><th>管理 Tab</th><td>库存、碎片、合成、重铸、可升级提示。</td></tr>
+            <tr><th>图鉴 Tab</th><td>未发现、已发现、可激活、已激活、材料不足。</td></tr>
+            <tr><th>资产装饰</th><td>发射器主面板、九宫格底板、符文槽四态、插入确认光圈、词条卡片底板。</td></tr>
+            <tr><th>移动端布局</th><td>作为独立浮层打开，关闭后返回原阶段；长列表滚动必须保留底部确认区和关闭入口。</td></tr>
+          </table>
+        </aside>
+      </div>
+    </section>
+
+    <section class="page" id="reward-shop-book">
+      <div class="page-head">
+        <div>
+          <h2>5. P1 预备：遗物 / 商店 / 真理之书共用卡片框架</h2>
+          <p>遗物选择、商店购买、图鉴条目详情都优先采用蒙版 + 悬浮卡片结构。商店/真理之书可有完整页面，但具体选择动作仍以浮层承接。</p>
+        </div>
+      </div>
+
+      <div class="wireframe-wrap">
+        <div class="phone overlay-screen" aria-label="遗物商店图鉴蒙版悬浮卡片线框">
+          <div class="mask"></div>
+          <div class="overlay-content" style="grid-row: 1 / -1;">
+            <div class="overlay-title">来源标题：遗物奖励 / 商人货架 / 图鉴详情 <span class="priority l0">L0</span></div>
+            <div class="floating-card-row">
+              <div class="floating-card">
+                <div class="card-art">遗物/商品图标</div>
+                <b>力场护盾</b>
+                稀有度、来源、收益摘要、可用状态。
+                <div class="card-stat"><span>收益</span><b>护盾 +1</b></div>
+                <div class="card-stat"><span>状态</span><b>推荐</b></div>
+              </div>
+              <div class="floating-card">
+                <div class="card-art">价格牌</div>
+                <b>临时援助包</b>
+                代价、持有资源、已拥有 / 不足 / 已满级。
+                <div class="card-stat"><span>价格</span><b>免费</b></div>
+                <div class="card-stat"><span>持续</span><b>2 回合</b></div>
+              </div>
+              <div class="floating-card">
+                <div class="card-art">图鉴章节</div>
+                <b>机制详情</b>
+                详情入口，不在卡面塞满长解释。
+                <div class="card-stat"><span>发现</span><b>已解锁</b></div>
+                <div class="card-stat"><span>验证</span><b>可进入</b></div>
+              </div>
+            </div>
+            <div class="overlay-actions">
+              <div class="block-title">悬浮操作区 <span class="priority l1">L1</span></div>
+              <div class="block-note">选择 / 购买 / 返回 / 跳过 / 刷新；禁用时显示原因，例如“碎片不足 2”“已拥有”“本局已满级”</div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="notes">
+          <h3>内容标注</h3>
+          <table>
+            <tr><th>统一结构</th><td>选择动作统一为蒙版 + 悬浮卡片；完整商店/图鉴页面只负责浏览和筛选。</td></tr>
+            <tr><th>遗物选择</th><td>奖励仪式感最强，可用背景光环和掉落飞入，但卡片信息仍保持统一。</td></tr>
+            <tr><th>商店</th><td>重点是价格、持有资源、购买限制、临时加成持续回合。</td></tr>
+            <tr><th>真理之书</th><td>重点是机制结论、发现状态、验证入口；长解释放详情页或二级浮层。</td></tr>
+            <tr><th>资产装饰</th><td>遗物 overlay 背景、商店货架、书页 9-Slice、章节侧标、价格牌、卡片稀有度边框。</td></tr>
+            <tr><th>统一语法</th><td>可用 / 不足 / 已拥有 / 已满级 / 未发现 / 可激活，跨页面保持一致。</td></tr>
+          </table>
+        </aside>
+      </div>
+    </section>
+
+    <section class="page" id="mobile-rules">
+      <div class="page-head">
+        <div>
+          <h2>6. 竖屏安全区与场景装饰规则</h2>
+          <p>暂时忽略 PC 专项，先固定手机竖屏的可玩矩形、底部非敌人区和左右沉浸装饰区。后续所有实际界面应先满足这套比例约束。</p>
+        </div>
+      </div>
+
+      <div class="wireframe-wrap">
+        <div class="phone combat-stage" aria-label="竖屏安全区规则线框">
+          <div class="block strong accent top-combat-hud">
+            <div class="hud-main">
+              <div class="block-title">合并顶部 HUD</div>
+              <div class="block-note">阶段/回合/资源 + 防线风险胶囊</div>
+              <div class="hud-capsules">
+                <span class="hud-capsule warn">防线: 危险</span>
+                <span class="hud-capsule">敌 9</span>
+                <span class="hud-capsule">弹 3</span>
+              </div>
+            </div>
+            <div class="hud-actions"><span class="tag">暂停</span><span class="tag">设置</span></div>
+          </div>
+          <div class="combat-arena">
+            <div class="side-art">沉浸装饰，不参与碰撞</div>
+            <div class="safe-play-rect">
+              <div class="safe-play-label">核心游戏矩形</div>
+              <div class="block-note">建议保持约 60%-68% 屏高；敌人、弹丸和 Peg 只在这里发生</div>
+              <div class="block" style="min-height: 260px; margin-top: 8px;">
+                <div class="block-title">玩法判定区</div>
+                <div class="block-note">碰撞、弹道、敌人移动、状态短标、掉落物</div>
+              </div>
+              <div class="block info" style="min-height: 36px;"><div class="block-title">防线</div></div>
+            </div>
+            <div class="side-art">悬浮 UI 可贴边，不遮挡矩形</div>
+          </div>
+          <div class="bottom-zone">
+            <div class="turret">非敌人区</div>
+            <div>
+              <div class="block-title">底部发射器与当前子弹信息</div>
+              <div class="block-note">这里可以更厚、更有仪式感；不要在该区域展示敌人或关键碰撞。</div>
+              <div class="readout-grid">
+                <div class="readout">子弹<br><b>火雷散射</b></div>
+                <div class="readout">装填<br><b>3 / 6</b></div>
+                <div class="readout">技能<br><b>SP 3</b></div>
+                <div class="readout">符文<br><b>72%</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="notes">
+          <h3>比例与禁区标注</h3>
+          <table>
+            <tr><th>顶部规则</th><td>顶部状态与态势摘要合并，不再拆成两条。默认只显示防线风险，敌人数/Boss/弹药余量可作为胶囊补充。</td></tr>
+            <tr><th>核心矩形</th><td>必须是一块稳定的长方形区域，承载全部敌人、弹丸、Peg、碰撞和战斗反馈。</td></tr>
+            <tr><th>左右两侧</th><td>优先做场景美术装饰：炉壁、管线、机械臂、符文仪表。可以挂轻量悬浮 UI，但不能成为敌人生成区。</td></tr>
+            <tr><th>底部禁区</th><td>理论上不展示敌人，专门放发射器、当前子弹、装填信息和少量操作反馈。</td></tr>
+            <tr><th>悬浮 UI</th><td>左右两侧可承载技能、符文充能、临时加成、伤害统计入口；默认半透明，避免抢主游戏区。</td></tr>
+            <tr><th>选择层</th><td>选择、购买、遗物、替换、详情确认都压暗当前场景后用悬浮卡片承接。</td></tr>
+          </table>
+        </aside>
+      </div>
+    </section>
+
+    <section class="page" id="summary">
+      <div class="notes">
+        <h3>落地优先级摘要</h3>
+        <table>
+          <tr><th>P0</th><td>合并顶部战斗 HUD，固定竖屏核心游戏矩形、底部非敌人发射器区、左右场景装饰与悬浮 UI 边界。</td></tr>
+          <tr><th>P1</th><td>所有选择类统一为蒙版 + 悬浮卡片：弹珠、遗物、商店购买、真理之书详情。</td></tr>
+          <tr><th>P2</th><td>沉浸资产：左右场景装饰、底部发射器工作台、奖励飞入、敌人 Sprite、Boss 专属形象。</td></tr>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

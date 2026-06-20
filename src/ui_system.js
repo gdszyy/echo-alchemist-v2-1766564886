@@ -95,24 +95,27 @@ const ME_STYLES = `
 
 /* ---- 底部操作条 ---- */
 .me-bottombar {
-    position: absolute; bottom: 0; left: 0; right: 0;
-    pointer-events: auto;
+    position: absolute; top: 52px; left: 12px; right: auto; bottom: auto;
+    pointer-events: none;
     display: flex; align-items: center; justify-content: center;
-    gap: 10px;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
-    background: linear-gradient(0deg, rgba(8,12,24,0.94) 0%, rgba(8,12,24,0.6) 75%, rgba(8,12,24,0) 100%);
+    gap: 8px;
+    padding: 0;
+    background: transparent;
     box-sizing: border-box;
 }
+.me-bottombar > * { pointer-events: auto; }
 .me-fusion-summary {
-    position: absolute; left: 12px; right: 12px; bottom: 64px;
+    position: absolute; left: 12px; right: 188px; top: 96px; bottom: auto;
     pointer-events: auto;
-    display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+    display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap;
     gap: 6px 8px;
     padding: 7px 9px;
     border: 1px solid rgba(167,139,250,0.24);
     border-radius: 10px;
     background: rgba(15,23,42,0.78);
     box-shadow: 0 6px 20px rgba(2,6,23,0.26);
+    max-height: 52px;
+    overflow: hidden;
 }
 .me-fusion-label {
     font-size: 10px; color: #c4b5fd; font-weight: 800; letter-spacing: 0.5px;
@@ -129,7 +132,7 @@ const ME_STYLES = `
     font-size: 10px; color: #94a3b8; line-height: 1.25;
 }
 .me-editor-alert {
-    position: absolute; left: 12px; right: 12px; bottom: 118px;
+    position: absolute; left: 12px; right: 188px; top: 154px; bottom: auto;
     pointer-events: auto;
     display: flex; align-items: flex-start; gap: 8px;
     padding: 9px 10px;
@@ -158,15 +161,15 @@ const ME_STYLES = `
 }
 .me-btn:active { transform: scale(0.96); }
 .me-btn--start {
-    flex: 1; max-width: 280px;
-    padding: 13px 18px; font-size: 16px; letter-spacing: 2px;
+    flex: 0 0 auto; max-width: none;
+    padding: 9px 12px; font-size: 12px; letter-spacing: 1px;
     color: #042f2e;
     background: linear-gradient(135deg, #5eead4, #14b8a6);
     box-shadow: 0 4px 16px rgba(20,184,166,0.45);
 }
 .me-btn--start:hover { filter: brightness(1.08); }
 .me-btn--rune {
-    padding: 13px 14px; font-size: 13px;
+    padding: 9px 10px; font-size: 12px;
     color: #ede9fe;
     background: linear-gradient(135deg, #7c3aed, #6d28d9);
     box-shadow: 0 4px 14px rgba(124,58,237,0.4);
@@ -181,6 +184,114 @@ const ME_STYLES = `
 }
 
 /* ---- 模块选择浮层（点击钉板区域后弹出）---- */
+.me-edit-entry {
+    position: absolute; right: 12px; top: 58px; bottom: auto; z-index: 140;
+    pointer-events: auto;
+    display: flex; justify-content: flex-end;
+}
+.me-btn--edit-entry {
+    padding: 10px 13px;
+    color: #e0f2fe;
+    background: rgba(15,23,42,0.88);
+    border: 1px solid rgba(103,232,249,0.45);
+    box-shadow: 0 6px 18px rgba(2,6,23,0.34), 0 0 16px rgba(34,211,238,0.16);
+    font-size: 12px;
+}
+.me-btn--edit-entry span { margin-left: 6px; color: #93c5fd; font-size: 11px; }
+.me-inventory-panel {
+    position: absolute; left: auto; right: 10px; top: 54px; bottom: auto;
+    width: min(168px, calc(100% - 20px));
+    max-height: calc(100% - 176px);
+    pointer-events: auto;
+    display: flex; flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid rgba(148,163,184,0.22);
+    border-radius: 10px;
+    background: rgba(15,23,42,0.82);
+    box-shadow: 0 8px 24px rgba(2,6,23,0.32);
+    overflow-y: auto;
+}
+.me-inventory-title,
+.me-slot-title {
+    font-size: 10px; color: #93c5fd; font-weight: 900;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.me-inventory-grid {
+    display: flex; flex-direction: column; gap: 6px;
+    overflow-x: hidden; overflow-y: auto;
+    max-height: 160px;
+    padding-top: 5px; padding-right: 2px;
+}
+.me-inventory-item {
+    flex: 0 0 auto;
+    width: 100%;
+    min-height: 44px;
+    border-radius: 8px;
+    border: 1px solid rgba(148,163,184,0.26);
+    background: rgba(30,41,59,0.82);
+    color: #dbeafe;
+    display: flex; flex-direction: row; align-items: center; justify-content: flex-start;
+    gap: 3px;
+    padding: 6px 8px;
+    box-sizing: border-box;
+    font-family: inherit;
+    cursor: pointer;
+}
+.me-inventory-item.is-selected {
+    border-color: #67e8f9;
+    box-shadow: 0 0 0 2px rgba(103,232,249,0.16);
+    background: rgba(8,47,73,0.9);
+}
+.me-inventory-icon { font-size: 18px; line-height: 1; }
+.me-inventory-name {
+    max-width: 74px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 10px; font-weight: 800;
+}
+.me-inventory-empty {
+    padding: 12px 8px;
+    color: #94a3b8;
+    font-size: 11px;
+}
+.me-slot-panel {
+    border-left: 0;
+    border-top: 1px solid rgba(148,163,184,0.18);
+    padding-left: 0;
+    padding-top: 8px;
+    min-width: 0;
+}
+.me-slot-body {
+    margin-top: 5px;
+    color: #e2e8f0;
+    font-size: 11px;
+    line-height: 1.35;
+}
+.me-slot-actions {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px;
+}
+.me-action-btn {
+    border: 1px solid rgba(148,163,184,0.28);
+    border-radius: 7px;
+    padding: 5px 7px;
+    color: #e2e8f0;
+    background: rgba(30,41,59,0.86);
+    font-family: inherit; font-size: 10px; font-weight: 800;
+    cursor: pointer;
+}
+.me-action-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.me-action-btn--danger {
+    border-color: rgba(251,113,133,0.42);
+    color: #fecdd3;
+}
+.me-action-btn--equip {
+    border-color: rgba(94,234,212,0.42);
+    color: #ccfbf1;
+}
+
 .me-picker-backdrop {
     position: fixed; inset: 0; z-index: 250;
     background: rgba(4,8,18,0.78);
@@ -287,7 +398,32 @@ const ME_STYLES = `
 @media (max-width: 480px) {
     .me-topbar-title { font-size: 13px; }
     .me-topbar-hint { display: none; }
+    .me-bottombar { top: 54px; left: 8px; }
+    .me-btn--start { padding: 8px 10px; font-size: 11px; }
+    .me-btn--rune { padding: 8px 9px; font-size: 11px; }
+    .me-edit-entry { top: 54px; right: 8px; }
+    .me-inventory-panel {
+        top: 54px; right: 8px;
+        width: 148px;
+        max-height: calc(100% - 188px);
+    }
+    .me-inventory-item { min-height: 42px; }
+    .me-inventory-name { max-width: 96px; }
+    .me-fusion-summary {
+        left: 8px; right: 164px; top: 96px;
+        max-height: 48px;
+    }
+    .me-editor-alert {
+        left: 8px; right: 164px; top: 150px;
+        padding: 8px 9px;
+    }
     .me-picker-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 360px) {
+    .me-inventory-panel { right: 6px; width: 136px; }
+    .me-fusion-summary,
+    .me-editor-alert { right: 148px; }
 }
 `;
 
@@ -503,8 +639,9 @@ export const ui_system = {
     },
 
     ui_updateMetaCurrency() {
-        const el = document.getElementById('meta-currency-value');
-        if (el) el.innerText = this.saveData.currency || 0;
+        const value = this.meta_getResourceCount('rune_fragments') || 0;
+        const el = document.getElementById('meta-currency-value') || document.getElementById('meta-currency-display');
+        if (el) el.innerText = value.toLocaleString();
     },
 
     ui_updateRuneCountDisplay() {
@@ -700,9 +837,13 @@ export const ui_system = {
 
         const moduleLayer = document.getElementById('module-editor-layer');
         if (moduleLayer) moduleLayer.remove();
+        const moduleEntryLayer = document.getElementById('module-editor-entry-layer');
+        if (moduleEntryLayer) moduleEntryLayer.remove();
         if (typeof this._moduleEditor_closePicker === 'function') this._moduleEditor_closePicker();
         this._moduleEditorActive = false;
         this._moduleEditorState = null;
+        this._moduleEditorSelectedComponentUid = null;
+        this._moduleEditorSelectedSlotIdx = null;
 
         const toast = document.getElementById('toast');
         if (toast && (this.phase === 'meta' || this.phase === 'gameover')) {
@@ -725,6 +866,69 @@ export const ui_system = {
             return !!(this.selectionInjectedRune.marbleIndex === this.selectedMarbles[0]);
         }
         return true;
+    },
+
+    ui_updateSelectionChoiceStrip() {
+        const stripEl = document.getElementById('selection-choice-strip');
+        const progressEl = document.getElementById('selection-progress');
+        if (!stripEl && !progressEl) return;
+
+        const attrDisplay = (typeof CONFIG !== 'undefined' && CONFIG.ui?.attributeDisplay) ? CONFIG.ui.attributeDisplay : {};
+        const isReplace = !!(this.replaceAmmoContext && this.replaceAmmoContext.active);
+        let required = this.ui_getSelectionRequirement();
+        let selectedItems = [];
+
+        if (isReplace) {
+            const ctx = this.replaceAmmoContext;
+            const allRecipes = [...(ctx.newRecipes || []), ...(ctx.chargedRecipes || [])];
+            const bulletCap = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
+            required = Math.min(bulletCap, allRecipes.length);
+            selectedItems = (ctx.selectedIndices || [])
+                .filter(idx => idx >= 0 && idx < allRecipes.length)
+                .map(idx => {
+                    const recipe = allRecipes[idx];
+                    const profile = getAmmoReadabilityProfile(recipe);
+                    const source = idx < (ctx.newRecipes || []).length ? '新' : '充';
+                    return {
+                        icon: profile.primary?.icon || '',
+                        label: `${source} ${profile.shapeLabel || '子弹'}`,
+                        detail: profile.attributeSummary || profile.directSummary || '',
+                    };
+                });
+        } else {
+            required = this.ui_getSelectionRequirement();
+            selectedItems = (this.selectedMarbles || []).map(idx => {
+                const marble = this.marblesPool?.[idx];
+                if (!marble) return null;
+                const info = attrDisplay[marble.type] || {};
+                return {
+                    icon: info.icon || '',
+                    label: marble.getName ? marble.getName() : (info.name || marble.type || '弹珠'),
+                    detail: info.name || marble.type || '',
+                };
+            }).filter(Boolean);
+        }
+
+        const filled = Math.min(selectedItems.length, required);
+        if (stripEl) {
+            const chips = [];
+            for (let i = 0; i < Math.max(required, filled); i++) {
+                const item = selectedItems[i];
+                if (item) {
+                    const title = [item.label, item.detail].filter(Boolean).join(' · ');
+                    chips.push(`<span class="selection-choice-chip is-filled" title="${_escapeHtml(title)}"><span>${i + 1}</span><strong>${item.icon ? `${_escapeHtml(item.icon)} ` : ''}${_escapeHtml(item.label)}</strong></span>`);
+                } else {
+                    chips.push(`<span class="selection-choice-chip is-empty"><span>${i + 1}</span><strong>待选择</strong></span>`);
+                }
+            }
+            stripEl.innerHTML = chips.join('');
+        }
+
+        if (progressEl) {
+            progressEl.innerHTML = Array.from({ length: Math.max(1, required) }, (_, i) => (
+                `<span class="selection-progress-dot${i < filled ? ' is-filled' : ''}"></span>`
+            )).join('');
+        }
     },
 
     ui_getPureEssenceRuneOptions(marbleDef) {
@@ -943,6 +1147,7 @@ export const ui_system = {
         }
         if (countEl) countEl.innerText = String(selectedIndices.length);
         if (requiredEl) requiredEl.innerText = String(maxSelect);
+        this.ui_updateSelectionChoiceStrip();
 
         // @section:replace_ammo_tier_calc - 子弹等级与主属性计算函数（_calcTier / _calcDominant）
         // [tsk-bullet-ui] 稀有度同时考虑普通属性、连射倍率以及爆破/套娃/激光/共鸣/七彩等特殊属性。
@@ -1330,6 +1535,7 @@ export const ui_system = {
         }
         if (countEl) countEl.innerText = String(selectedCount);
         if (requiredEl) requiredEl.innerText = String(required);
+        this.ui_updateSelectionChoiceStrip();
         if (labelEl) {
             labelEl.innerText = this.selectionMode === 'pure_essence'
                 ? '\u7d14\u6de8\u7cbe\u83ef'
@@ -1384,20 +1590,80 @@ export const ui_system = {
         }
     },
 
+    _meta_ensureResourceStore() {
+        if (!this.saveData) this.saveData = {};
+        if (!this.saveData.resources || typeof this.saveData.resources !== 'object') {
+            this.saveData.resources = {};
+        }
+
+        const resources = this.saveData.resources;
+        const storedFragments = Number(resources.rune_fragments || 0);
+        const legacyFragments = Number(this.saveData.runeFragments || 0);
+        const legacyCurrency = Number(this.saveData.currency || 0);
+        let canonicalFragments = storedFragments;
+        if (!storedFragments && (legacyFragments || legacyCurrency)) {
+            canonicalFragments = legacyFragments + legacyCurrency;
+        } else {
+            canonicalFragments = Math.max(storedFragments, legacyFragments, legacyCurrency);
+        }
+        resources.rune_fragments = Math.max(0, Math.floor(canonicalFragments || 0));
+        this.saveData.runeFragments = resources.rune_fragments;
+        this.saveData.currency = resources.rune_fragments;
+        return resources;
+    },
+
+    _meta_getRuneInventoryResourceCount(resourceId) {
+        const resource = META_SHOP_CONFIG.resources[resourceId];
+        if (!resource || !resource.element) return 0;
+        const runeById = new Map((RUNE_DB || []).map(r => [r.id, r]));
+        return (this.runeInventory || this.saveData?.runeInventory || []).reduce((count, item) => {
+            const runeId = typeof item === 'string' ? item : item?.id;
+            const rune = runeById.get(runeId);
+            return count + (rune && rune.element === resource.element ? 1 : 0);
+        }, 0);
+    },
+
     meta_getResourceCount(resourceId) {
-        return this.saveData.resources ? (this.saveData.resources[resourceId] || 0) : 0;
+        const resources = this._meta_ensureResourceStore();
+        const stored = Math.max(0, Math.floor(Number(resources[resourceId] || 0)));
+        return stored + this._meta_getRuneInventoryResourceCount(resourceId);
     },
 
     meta_spendResource(resourceId, amount) {
-        if (!this.saveData.resources) this.saveData.resources = {};
-        const current = this.saveData.resources[resourceId] || 0;
-        if (current >= amount) {
-            this.saveData.resources[resourceId] = current - amount;
-            this.sys_saveData();
-            this.ui_updateMetaCurrency();
-            return true;
+        const cost = Math.max(0, Math.floor(Number(amount || 0)));
+        const resources = this._meta_ensureResourceStore();
+        if (this.meta_getResourceCount(resourceId) < cost) return false;
+
+        if (resourceId === 'rune_fragments') {
+            resources.rune_fragments = Math.max(0, (resources.rune_fragments || 0) - cost);
+            this.saveData.runeFragments = resources.rune_fragments;
+            this.saveData.currency = resources.rune_fragments;
+        } else {
+            let remaining = cost;
+            const fromStored = Math.min(resources[resourceId] || 0, remaining);
+            resources[resourceId] = (resources[resourceId] || 0) - fromStored;
+            remaining -= fromStored;
+            if (remaining > 0) {
+                const resource = META_SHOP_CONFIG.resources[resourceId];
+                const runeById = new Map((RUNE_DB || []).map(r => [r.id, r]));
+                const inventory = (this.runeInventory || this.saveData?.runeInventory || []).slice();
+                for (let i = inventory.length - 1; i >= 0 && remaining > 0; i--) {
+                    const runeId = typeof inventory[i] === 'string' ? inventory[i] : inventory[i]?.id;
+                    const rune = runeById.get(runeId);
+                    if (rune && rune.element === resource?.element) {
+                        inventory.splice(i, 1);
+                        remaining--;
+                    }
+                }
+                this.runeInventory = inventory;
+                if (this.saveData) this.saveData.runeInventory = inventory.slice();
+                this.ui_updateRuneCountDisplay();
+            }
         }
-        return false;
+
+        this.sys_saveData();
+        this.ui_updateMetaCurrency();
+        return true;
     },
 
     ui_updateUI() {
@@ -1446,6 +1712,9 @@ export const ui_system = {
         this.ui_updateMetaCurrency();
         this.ui_updateRuneCountDisplay();
         this.ui_updateShieldPill();
+        if (typeof this.ui_updateRunShopScheduleUI === 'function') {
+            this.ui_updateRunShopScheduleUI();
+        }
         this.ui_updateCombatStatusPanel(true);
         if (this.phase !== 'combat') {
             this.ui_resetCombatPhaseHud({ preserveStatusPanel: this.phase === 'training' });
@@ -1665,8 +1934,14 @@ export const ui_system = {
         if (typeof this.sys_applyUpgrades === 'function') this.sys_applyUpgrades();
     },
 
-    meta_addCurrency(amount) {
-        this.saveData.currency = (this.saveData.currency || 0) + amount;
+    meta_addCurrency(amount, resourceId = 'rune_fragments') {
+        const resources = this._meta_ensureResourceStore();
+        const add = Math.max(0, Math.floor(Number(amount || 0)));
+        resources[resourceId] = Math.max(0, Math.floor(Number(resources[resourceId] || 0))) + add;
+        if (resourceId === 'rune_fragments') {
+            this.saveData.runeFragments = resources.rune_fragments;
+            this.saveData.currency = resources.rune_fragments;
+        }
         this.sys_saveData();
         this.ui_updateMetaCurrency();
     },
@@ -1943,6 +2218,38 @@ export const ui_system = {
     _moduleEditorState: null,
     _moduleEditorPlacementPreview: null,
 
+    _moduleEditor_ensureStyles() {
+        if (document.getElementById('module-editor-styles')) return;
+        const styleEl = document.createElement('style');
+        styleEl.id = 'module-editor-styles';
+        styleEl.textContent = ME_STYLES;
+        document.head.appendChild(styleEl);
+    },
+
+    ui_showModuleEditorEntry() {
+        const container = document.getElementById('game-container');
+        if (!container || this._moduleEditorActive) return;
+        this._moduleEditor_ensureStyles();
+        const inventory = this._moduleEditor_normalizeComponentInventory
+            ? this._moduleEditor_normalizeComponentInventory()
+            : normalizeModuleInventory(this.ownedModuleComponents);
+        let layer = document.getElementById('module-editor-entry-layer');
+        if (!layer) {
+            layer = document.createElement('div');
+            layer.id = 'module-editor-entry-layer';
+            layer.className = 'me-edit-entry';
+            container.appendChild(layer);
+        }
+        layer.innerHTML = `<button id="me-edit-entry-btn" class="me-btn me-btn--edit-entry">编辑钉板<span>库存 ${inventory.length}</span></button>`;
+        const btn = layer.querySelector('#me-edit-entry-btn');
+        if (btn) btn.addEventListener('click', () => this.ui_showModuleEditor());
+    },
+
+    ui_hideModuleEditorEntry() {
+        const layer = document.getElementById('module-editor-entry-layer');
+        if (layer) layer.remove();
+    },
+
     /**
      * 进入钉板编辑模式。此时游戏已处于 gathering 阶段且实时钉板已构建，
      * 本方法只负责：标记编辑态、冻结倾斜、挂载顶部 / 底部 DOM 控件。
@@ -1972,6 +2279,9 @@ export const ui_system = {
 
         this._moduleEditorState = { onComplete: onComplete || null };
         this._moduleEditorActive = true;
+        this._moduleEditorSelectedComponentUid = null;
+        this._moduleEditorSelectedSlotIdx = null;
+        this.ui_hideModuleEditorEntry();
 
         // 编辑期间冻结钉板倾斜，使虚框与指针 1:1 对齐
         if (this.boardTilt) {
@@ -1980,12 +2290,7 @@ export const ui_system = {
         }
 
         // ---- 注入样式 ----
-        if (!document.getElementById('module-editor-styles')) {
-            const styleEl = document.createElement('style');
-            styleEl.id = 'module-editor-styles';
-            styleEl.textContent = ME_STYLES;
-            document.head.appendChild(styleEl);
-        }
+        this._moduleEditor_ensureStyles();
 
         this.ui_renderModuleEditorControls();
     },
@@ -2017,22 +2322,76 @@ export const ui_system = {
             const e = layout[i];
             if (e && !isModuleRef(e) && getModuleIdFromEntry(e)) placed++;
         }
-        const componentCount = normalizeModuleInventory(this.ownedModuleComponents).length;
+
+        const inventory = this._moduleEditor_normalizeComponentInventory();
+        if (this._moduleEditorSelectedComponentUid && !inventory.some(item => item && item.uid === this._moduleEditorSelectedComponentUid)) {
+            this._moduleEditorSelectedComponentUid = null;
+        }
+        const componentCount = inventory.length;
         const runeCount = Array.isArray(this.runeInventory) ? this.runeInventory.length : 0;
         const runeBtnHtml = runeCount > 0
             ? `<button id="me-rune-btn" class="me-btn me-btn--rune">✨ 符文融合<span class="me-rune-badge">${runeCount}</span></button>`
             : '';
         const fusionSummaryHtml = this._moduleEditor_buildFusionSummaryHtml();
+        const selectedComponent = inventory.find(item => item && item.uid === this._moduleEditorSelectedComponentUid) || null;
+        const selectedComponentId = getModuleIdFromEntry(selectedComponent);
+        const selectedSlotIdx = Number.isInteger(this._moduleEditorSelectedSlotIdx) ? this._moduleEditorSelectedSlotIdx : null;
+        const selectedSlotEntry = selectedSlotIdx !== null ? layout[selectedSlotIdx] : null;
+        const selectedSlotId = getModuleIdFromEntry(selectedSlotEntry);
+        const selectedSlotDef = selectedSlotId ? MODULE_DEFS[selectedSlotId] : null;
+        const selectedComponentDef = selectedComponentId ? MODULE_DEFS[selectedComponentId] : null;
+        const inventoryHtml = inventory.length > 0
+            ? `<div class="me-inventory-grid">${inventory.map(component => {
+                const id = getModuleIdFromEntry(component);
+                const def = MODULE_DEFS[id];
+                if (!def) return '';
+                const selected = component.uid === this._moduleEditorSelectedComponentUid ? ' is-selected' : '';
+                return `<button type="button" class="me-inventory-item${selected}" data-inventory-uid="${_escapeHtml(component.uid)}" data-module-id="${_escapeHtml(id)}" title="${_escapeHtml(getModuleMetaSummary(id) || def.desc || '')}">
+                    <span class="me-inventory-icon">${def.icon || '▦'}</span>
+                    <span class="me-inventory-name">${_escapeHtml(def.name || id)}</span>
+                </button>`;
+            }).join('')}</div>`
+            : '<div class="me-inventory-empty">库存为空：去商店购买钉板组件后会出现在这里。</div>';
+        const slotLabel = selectedSlotIdx === null
+            ? '未选择槽位'
+            : `槽位 ${selectedSlotIdx + 1}`;
+        const slotBody = selectedSlotIdx === null
+            ? '点击钉板上的槽位查看已装备组件，或先从库存选择组件。'
+            : selectedSlotDef
+                ? `已装备：${selectedSlotDef.icon || '▦'} ${selectedSlotDef.name || selectedSlotId}`
+                : '空槽：可装备库存中的组件。';
+        const canEquipSelected = !!(selectedComponent && selectedSlotIdx !== null);
+        const canUnequipSelected = !!(selectedSlotId && selectedSlotIdx !== null);
+        const slotPanelHtml = `
+            <div class="me-slot-panel">
+                <div class="me-slot-title">${_escapeHtml(slotLabel)}</div>
+                <div class="me-slot-body">
+                    <div>${_escapeHtml(slotBody)}</div>
+                    <div>${selectedComponentDef ? `已选库存：${_escapeHtml(selectedComponentDef.name || selectedComponentId)}` : '未选库存组件'}</div>
+                </div>
+                <div class="me-slot-actions">
+                    <button id="me-equip-selected-btn" class="me-action-btn me-action-btn--equip" ${canEquipSelected ? '' : 'disabled'}>装备到槽位</button>
+                    <button id="me-unequip-selected-btn" class="me-action-btn me-action-btn--danger" ${canUnequipSelected ? '' : 'disabled'}>卸下</button>
+                    <button id="me-clear-selection-btn" class="me-action-btn">取消选择</button>
+                </div>
+            </div>`;
 
         layer.innerHTML = `
             <div class="me-topbar">
                 <div class="me-topbar-title">⚙ 钉板编辑</div>
-                <div class="me-topbar-hint">空槽点击装备 · 已装备槽点击卸下 · 已装备 ${placed}/${activeSlots.length} · 库存 ${componentCount}</div>
+                <div class="me-topbar-hint">先选库存，再选槽位装备；选中已装备槽可卸下 · 已装备 ${placed}/${activeSlots.length} · 库存 ${componentCount}</div>
             </div>
             ${fusionSummaryHtml}
+            <div class="me-inventory-panel">
+                <div>
+                    <div class="me-inventory-title">组件库存</div>
+                    ${inventoryHtml}
+                </div>
+                ${slotPanelHtml}
+            </div>
             <div class="me-bottombar">
                 ${runeBtnHtml}
-                <button id="me-start-btn" class="me-btn me-btn--start">▶ 开始采集</button>
+                <button id="me-start-btn" class="me-btn me-btn--start">完成编辑</button>
             </div>
         `;
 
@@ -2040,6 +2399,34 @@ export const ui_system = {
         if (startBtn) startBtn.addEventListener('click', () => this._moduleEditor_tryStartCollection());
         const runeBtn = layer.querySelector('#me-rune-btn');
         if (runeBtn) runeBtn.addEventListener('click', () => this._moduleEditor_openRunePicker());
+        layer.querySelectorAll('[data-inventory-uid]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this._moduleEditorSelectedComponentUid = btn.dataset.inventoryUid || null;
+                if (Number.isInteger(this._moduleEditorSelectedSlotIdx)) {
+                    this._moduleEditor_setPlacementPreview(this._moduleEditorSelectedSlotIdx, btn.dataset.moduleId || null, { mode: 'candidate' });
+                }
+                this.ui_renderModuleEditorControls();
+            });
+        });
+        const equipBtn = layer.querySelector('#me-equip-selected-btn');
+        if (equipBtn) equipBtn.addEventListener('click', () => {
+            if (Number.isInteger(this._moduleEditorSelectedSlotIdx) && this._moduleEditorSelectedComponentUid) {
+                this._moduleEditor_applyModule(this._moduleEditorSelectedSlotIdx, this._moduleEditorSelectedComponentUid);
+            }
+        });
+        const unequipBtn = layer.querySelector('#me-unequip-selected-btn');
+        if (unequipBtn) unequipBtn.addEventListener('click', () => {
+            if (Number.isInteger(this._moduleEditorSelectedSlotIdx)) {
+                this._moduleEditor_unequipComponent(this._moduleEditorSelectedSlotIdx);
+            }
+        });
+        const clearBtn = layer.querySelector('#me-clear-selection-btn');
+        if (clearBtn) clearBtn.addEventListener('click', () => {
+            this._moduleEditorSelectedComponentUid = null;
+            this._moduleEditorSelectedSlotIdx = null;
+            this._moduleEditorPlacementPreview = null;
+            this.ui_renderModuleEditorControls();
+        });
     },
 
     _moduleEditor_showNotice(message, options = {}) {
@@ -2170,27 +2557,36 @@ export const ui_system = {
         this._moduleEditorActive = false;
         const onComplete = (this._moduleEditorState || {}).onComplete;
         this._moduleEditorState = null;
+        this._moduleEditorSelectedComponentUid = null;
+        this._moduleEditorSelectedSlotIdx = null;
         const layer = document.getElementById('module-editor-layer');
         if (layer) layer.remove();
         this._moduleEditor_clearNotice();
         this._moduleEditor_closePicker();
+        if (this.phase === 'gathering' && typeof this.ui_showModuleEditorEntry === 'function') {
+            this.ui_showModuleEditorEntry();
+        }
         if (typeof onComplete === 'function') onComplete();
     },
 
     /**
      * [命中检测] 在编辑模式下点击画布时调用，logicPos 为画布坐标。
-     * 命中空槽时弹出库存装备浮层；命中已装备槽时卸下组件并放回库存。
+     * 命中槽位时只更新当前选中槽；装备/卸下由库存栏和槽位操作按钮确认。
      */
     _moduleEditor_handleClick(logicPos) {
         const rects = this._moduleEditor_getSlotRects();
         for (const r of rects) {
             if (logicPos.x >= r.rect.x && logicPos.x <= r.rect.x + r.rect.w &&
                 logicPos.y >= r.rect.y && logicPos.y <= r.rect.y + r.rect.h) {
-                if (r.moduleId) {
-                    this._moduleEditor_unequipComponent(r.idx);
+                this._moduleEditorSelectedSlotIdx = r.idx;
+                if (this._moduleEditorSelectedComponentUid) {
+                    const component = this._moduleEditor_normalizeComponentInventory()
+                        .find(item => item && item.uid === this._moduleEditorSelectedComponentUid);
+                    this._moduleEditor_setPlacementPreview(r.idx, getModuleIdFromEntry(component), { mode: 'candidate' });
                 } else {
-                    this._moduleEditor_openPicker(r.idx);
+                    this._moduleEditor_setPlacementPreview(r.idx, r.moduleId || null, { mode: 'target' });
                 }
+                this.ui_renderModuleEditorControls();
                 return;
             }
         }
@@ -2350,6 +2746,8 @@ export const ui_system = {
             this.phase_gathering_initPachinko(false);
         }
         this._moduleEditor_closePicker();
+        this._moduleEditorSelectedSlotIdx = slotIdx;
+        this._moduleEditorSelectedComponentUid = null;
         this.ui_renderModuleEditorControls();
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
         const def = MODULE_DEFS[getModuleIdFromEntry(component)];
@@ -2506,6 +2904,8 @@ export const ui_system = {
             this.phase_gathering_initPachinko(false);
         }
         this._moduleEditor_closePicker();
+        this._moduleEditorSelectedSlotIdx = slotIdx;
+        this._moduleEditorSelectedComponentUid = null;
         this.ui_renderModuleEditorControls();
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
     },

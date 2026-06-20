@@ -257,7 +257,7 @@ class Game {
         this.frameDamageAccumulator = 0; 
         this.slowMotionTimer = 0;        
         this.slowMotionThreshold = 100;  
-        this.saveData = { currency: 0, runeFragments: 0, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0, debugStartRelicId: null };
+        this.saveData = { currency: 0, runeFragments: 0, resources: { rune_fragments: 0 }, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0, debugStartRelicId: null };
         this.runCurrency = 0;
         // ==================== 本局统计字段 ====================
         this.runKillCount = 0;          // 本局击杀数
@@ -280,6 +280,15 @@ class Game {
         this.runShopInventory = [];
         this.runShopRefreshes = 0;
         this._runShopOpenedRound = -1;
+        this.runShopNextOfferRound = CONFIG.gameplay.runShopFirstOfferRound || 3;
+        this.runShopActiveUntilRound = 0;
+        this.runShopLastArrivalRound = 0;
+        this.runShopScheduleStartRound = 1;
+        this.runShopScheduleGap = Math.max(1, (this.runShopNextOfferRound || 3) - 1);
+        this.runShopStarterBoostClaimed = false;
+        this.runShopStarterBoostDamageAmount = 0;
+        this.runShopStarterBoostDamageRounds = 0;
+        this._runShopInventoryGeneratedForRound = 0;
 
         // ==================== 符文词条系统状态变量 ====================
         // Task 1: 数据结构升级 - runeInventory 和 runeGrid 存储对象格式 { id: string, level: number }

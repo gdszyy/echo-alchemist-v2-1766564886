@@ -1,5 +1,7 @@
 # Enemy V2 Dark Alchemical Fantasy Assets
 
+> 2026-06-19 风格补充：后续替换或扩展本包资源时，统一采用“几何磨石块基座 + 镶嵌核心”的敌人母题。资源应像被打磨、切削、腐蚀过的几何石块，机制核心嵌入石槽内部；不要做成纯光效、纯软体、纯机械载具或 UI 徽章。完整规范见 [`enemy_geometric_whetstone_style.md`](enemy_geometric_whetstone_style.md)。
+
 本包包含两批共 **20 个透明背景 PNG** 资源。所有资源均以纯色底生成后执行抠图处理，并在最终 PNG 中保留约 **10% 透明安全边距**；资源不含文字、数字、Logo、血条、UI 框或完整背景场景，适合 Canvas 战斗棋盘、试炼场卡片与图鉴缩略图使用。
 
 | 文件名 | baseArchetype | footprint | affixes | 推荐用途 |

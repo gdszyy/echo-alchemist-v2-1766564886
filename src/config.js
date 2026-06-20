@@ -643,7 +643,7 @@ const CONFIG = {
                 name: '熔炉守卫·伊格尼斯',
                 isBigBoss: false,
                 affixes: ['shield', 'haste'],
-                vulnerability: { attrs: ['pierce', 'pyro'], label: '破甲熔炉' },
+                vulnerability: { attrs: ['pierce', 'pyro'], label: '破甲熔炉', mode: 'hits', hitThreshold: 3 },
                 shieldChargesBonus: 5,    // 额外护盾层数
                 berserkedShieldMult: 2,   // 狂暴后护盾层数翻倍系数
                 berserkedTempRisePerTurn: 30, // 狂暴后每回合温度上升值
@@ -656,7 +656,7 @@ const CONFIG = {
                 name: '霜晶缝合怪·格拉西斯',
                 isBigBoss: false,
                 affixes: ['jump', 'regen'],
-                vulnerability: { attrs: ['cryo', 'pierce'], label: '冻结裂隙' },
+                vulnerability: { attrs: ['cryo', 'pierce'], label: '冻结裂隙', mode: 'damage', damageRatio: 0.10 },
                 jumpRowsBonus: 2,         // 额外跳跃行数
                 berserkedJumpRows: 3,     // 狂暴后每回合跳跃行数
                 berserkedFreezePegRadius: 120, // 狂暴后跳跃落地冻结周围 Peg 的范围（像素）
@@ -667,7 +667,7 @@ const CONFIG = {
                 name: '裂变母体·米克罗',
                 isBigBoss: false,
                 affixes: ['clone', 'healer'],
-                vulnerability: { attrs: ['lightning', 'scatter'], label: '群体断链' },
+                vulnerability: { attrs: ['lightning', 'scatter'], label: '群体断链', mode: 'hits', hitThreshold: 5 },
                 cloneChanceHitBonus: 0.3, // 额外受击分身概率
                 berserkedCloneChance: 1.0, // 狂暴后分身概率 100%
                 cloneDamageReductionPerClone: 0.10, // 每个存活分身提供的减伤比例
@@ -679,7 +679,7 @@ const CONFIG = {
                 name: '贪婪之渊·噬神者',
                 isBigBoss: false,
                 affixes: ['devour', 'shield'],
-                vulnerability: { attrs: ['bounce', 'laser'], label: '深渊开口' },
+                vulnerability: { attrs: ['bounce', 'laser'], label: '深渊开口', mode: 'damage', damageRatio: 0.08 },
                 devourRangeBonus: 2,      // 额外吞噬范围
                 berserkedDevourRange: 99, // 狂暴后全屏吞噬
                 moveInterval: 2,          // 常规模式：每 2 回合移动一次（吞噬后需要靠近）
@@ -689,7 +689,7 @@ const CONFIG = {
                 name: '翠绿共生体·维里迪斯',
                 isBigBoss: true,
                 affixes: ['regen', 'healer'],
-                vulnerability: { attrs: ['laser', 'pyro'], label: '再生烧蚀' },
+                vulnerability: { attrs: ['laser', 'pyro'], label: '再生烧蚀', mode: 'damage', damageRatio: 0.12 },
                 regenPercentBonus: 0.2,   // 额外再生百分比
                 berserkedHealerRange: 0,   // 狂暴后停止治疗其他敌人（放弃治疗他人）
                 berserkedSelfRegenMult: 3.0, // 狂暴后自身回血速度倍率（集中治疗自身）
@@ -700,7 +700,7 @@ const CONFIG = {
                 name: '雷霆幻影·特斯拉',
                 isBigBoss: true,
                 affixes: ['haste', 'clone'],
-                vulnerability: { attrs: ['cryo', 'bounce'], label: '惯性失衡' },
+                vulnerability: { attrs: ['cryo', 'bounce'], label: '惯性失衡', mode: 'hits', hitThreshold: 4 },
                 hasteActionsBonus: 1,     // 额外行动次数（共3次）
                 berserkedActionsBonus: 1, // 狂暴后再+1次行动
                 moveInterval: 2,          // 常规模式：每 2 回合移动一次（有 haste 词缀，移动较快）
@@ -710,7 +710,7 @@ const CONFIG = {
                 name: '混沌融合体·奇美拉',
                 isBigBoss: true,
                 affixes: ['berserk', 'devour'],
-                vulnerability: { attrs: ['pierce', 'laser'], label: '混沌核心' },
+                vulnerability: { attrs: ['pierce', 'laser'], label: '混沌核心', mode: 'damage', damageRatio: 0.09 },
                 initTemp: 60,             // 初始温度（半狂暴状态）
                 berserkedTempThreshold: 100, // 狂暴后温度阈值
                 berserkedBlastOnHitChance: 0.25, // 狂暴后受击触发全场爆炸概率
@@ -728,7 +728,10 @@ const CONFIG = {
                         ['laser', 'pyro'],
                         ['lightning', 'scatter']
                     ],
-                    labels: ['鳞盾裂隙', '轮回再生核', '回声裂群']
+                    labels: ['鳞盾裂隙', '轮回再生核', '回声裂群'],
+                    rotationModes: ['hits', 'damage', 'hits'],
+                    rotationHitThresholds: [4, null, 5],
+                    rotationDamageRatios: [null, 0.11, null]
                 },
                 rotationSets: [             // 词缀轮转组
                     ['shield', 'haste'],
@@ -741,13 +744,19 @@ const CONFIG = {
                 themeWeights: { pierce: 1.2, cryo: 1.2, lightning: 1.2 }
             }
         },
-        /** Boss 破绽机制：命中当前破绽谱属性会积累破绽，满格后进入短暂易伤窗口 */
+        /** Boss 破绽机制：不同 Boss 可按命中次数或实际伤害累积，回合越高条件越苛刻 */
         bossVulnerability: {
-            breakThreshold: 3,
+            breakThreshold: 3,        // 兼容旧默认值；未配置 hitThreshold 时使用
+            baseDamageRatio: 0.10,    // 未配置 damageRatio 时，按 Boss 最大生命百分比累积
             exposedHits: 3,
             exposedDamageMult: 1.35,
             counterHitGain: 1,
             offPatternGain: 0,
+            roundScalingStart: 5,
+            roundScalingStep: 10,
+            hitThresholdRoundBonus: 1,
+            damageRatioRoundBonus: 0.015,
+            maxRoundScaleSteps: 6,
             enrageDelayOnBreak: true
         },
         /** Boss 进场冲击波效果配置 */
@@ -816,9 +825,16 @@ const CONFIG = {
         bottomRewardOnlyTypes: ['explosive', 'laser'],
         bottomRewardZoneWeights: { explosive: 2, laser: 1 },
         // ==================== [v2 局内商店 + 符文碎片经济] ====================
-        runShopInterval: 2,            // 每 N 个回合开始前出现一次可选局内商人入口（0 = 关闭周期入口）
-        runShopOfferAfterBoss: true,   // Boss 击败后的下一回合开始前强制出现一次商人入口
-        runShopMinFragmentsToOffer: 1, // 至少持有多少局内碎片才自动提示商人入口
+        runShopFirstOfferRound: 3,     // 第一次商人固定在第 3 回合到访
+        runShopRandomWaitMin: 3,       // 后续商人离开后，等待 3..当前回合数的随机回合数
+        runShopVisitDurationRounds: 2, // 每次商人到访会停留的回合数
+        runShopStarterBoostShield: 2,  // 首访免费临时援助：本局护盾层数
+        runShopStarterBoostFlatDamage: 1, // 首访免费临时援助：临时基础伤害
+        runShopStarterBoostDamageRounds: 2, // 首访免费临时援助：基础伤害持续回合
+        runShopStarterBoostFragments: 12, // 首访免费临时援助：本局局内碎片
+        runShopInterval: 0,            // 旧版固定周期入口已停用，由随机到访日程控制
+        runShopOfferAfterBoss: false,  // 旧版 Boss 后强制入口已停用
+        runShopMinFragmentsToOffer: 0, // 随机到访不再要求玩家预先持有碎片
         runShopSkipRelicBonus: 12,     // 放弃遗物时补偿的局内碎片，避免空手进入商店
         runShopRefreshCost: 10,        // 刷新一次商店消耗碎片
         runShopItemsPerOffer: 5,       // 每次刷新提供的商品数

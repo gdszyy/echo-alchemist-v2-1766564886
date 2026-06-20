@@ -61,6 +61,10 @@ function _getAffixOverlayImage(src) {
     return record;
 }
 
+function _getEnemyFrameImage(src) {
+    return _getAffixOverlayImage(src);
+}
+
 // ==================== 敌人底层纹理缓存 ====================
 // @perf-impact: _initTexture 同步创建 OffscreenCanvas，批量刷怪时密集分配引发进场卡顿。
 // 纹理为静态只读（仅 drawImage 读取，从不修改），故按「类型|尺寸|seed桶|gloss」共享同一画布。
@@ -207,6 +211,9 @@ class Enemy {
         this._spriteRenderer = null;
         this._spriteLastMs = 0; // 上次 update 的时间戳（ms）
         this._visualAssetKey = '';
+        this._visualFrameKey = '';
+        this._visualFramePath = '';
+        this._collisionFrameImage = null;
         this._affixOverlayImages = [];
     }
 
@@ -1350,6 +1357,8 @@ class Enemy {
             const sets = bossCfg.rotationSets || [['shield', 'haste']];
             this.rotationIndex = ((this.rotationIndex || 0) + 1) % sets.length;
             this.affixes = [...sets[this.rotationIndex]];
+            this._bossVulnerabilityProgress = 0;
+            this._bossVulnerabilityThreshold = 0;
 
             // 重置护盾层数
             if (this.affixes.includes('shield')) {
@@ -2621,10 +2630,12 @@ class Enemy {
             ctx.fillStyle = _innerShadeGrad;
             ctx.fillRect(-w/2, -h/2, w, h);
         }
+        const boundaryFrameDrawn = this._drawCollisionFrameBitmap(ctx, w, h);
 
         // === Layer 5: 内部边框 ===
         // === 边框分级样式（Border Tier）：根据词条数量 + Boss 类型决定边框颜色/线宽 ===
         // @perf-impact: 仅替换 strokeStyle/lineWidth，无额外 Canvas 操作，性能影响极低
+        if (!boundaryFrameDrawn) {
         ctx.strokeStyle = '#334155'; ctx.lineWidth = 2; // 默认：0 词条（无特殊边框）
         if (this.type === 'boss') { ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 4; } // Boss 保持红色基础边框
         if (this.type === 'elite' || this.type === 'boss') {
@@ -2713,7 +2724,6 @@ class Enemy {
         }
 
         this._drawFootprintCue(ctx, w, h, r);
-        this._drawThreatTierBadge(ctx, w, h);
 
         // === D3: 边框脉冲光晕（Border Pulse Glow）===
         // 仅在 idle 状态下生效，为边框叠加一层缓慢脉冲的 shadowBlur 光晕
@@ -2817,7 +2827,9 @@ class Enemy {
                 ctx.restore();
             }
         }
+        }
         ctx.shadowBlur = 0; // 重置
+        this._drawThreatTierBadge(ctx, w, h);
 
         if (this.swordCracks.length > 0) {
             ctx.save();
@@ -2865,7 +2877,6 @@ class Enemy {
             ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, this._hitFlashTimer / flashDuration) * flashMaxAlpha})`;
             ctx.fillRect(-w/2, -h/2, w, h);
         }
-
         // --- [新增] 护盾受击视觉反馈 (放大虚化的护盾) ---
         if (this.shieldHitTimer > 0) {
             ctx.save();
@@ -4922,7 +4933,10 @@ class Enemy {
             if ((this._bossVulnerabilityExposedHits || 0) > 0) {
                 badges.push({ text: `破${this._bossVulnerabilityExposedHits}`, color: '#facc15' });
             } else if ((this._bossVulnerabilityProgress || 0) > 0) {
-                badges.push({ text: `隙${Math.ceil(this._bossVulnerabilityProgress)}`, color: '#fde68a' });
+                const progressText = this._bossVulnerabilityMode === 'damage' && (this._bossVulnerabilityThreshold || 0) > 0
+                    ? `隙${Math.min(99, Math.ceil((this._bossVulnerabilityProgress / this._bossVulnerabilityThreshold) * 100))}%`
+                    : `隙${Math.ceil(this._bossVulnerabilityProgress)}`;
+                badges.push({ text: progressText, color: '#fde68a' });
             }
         }
         if ((this.venomStacks || 0) > 0) badges.push({ text: `毒${this.venomStacks}`, color: '#86efac' });
@@ -5838,6 +5852,50 @@ class Enemy {
             'heavyArmor+berserk':'#b91c1c',
         };
         return TINTS[sorted] || TINTS[this.affixes[0]] || null;
+    }
+
+    _syncCollisionFrameImage() {
+        const resolved = resolveEnemyVisualAsset({
+            type: this.type,
+            bossType: this.bossType,
+            baseArchetype: this.baseArchetype,
+            gridCols: this.gridCols || 1,
+            gridRows: this.gridRows || 1,
+            affixes: this.affixes || [],
+        });
+        if (!resolved) return;
+        const framePath = resolved.framePath || '';
+        if (resolved.frameKey === this._visualFrameKey && framePath === this._visualFramePath) return;
+
+        this._visualFrameKey = resolved.frameKey || null;
+        this._visualFramePath = framePath;
+        this._collisionFrameImage = resolved.framePath ? {
+            key: resolved.frameKey,
+            path: resolved.framePath,
+            shape: resolved.frameShape,
+            image: _getEnemyFrameImage(resolved.framePath),
+        } : null;
+    }
+
+    _drawCollisionFrameBitmap(ctx, w, h) {
+        if (this.type === 'boss') return false;
+
+        this._syncCollisionFrameImage();
+        const frame = this._collisionFrameImage;
+        if (!frame || !frame.image || !frame.image.ready || frame.image.failed) return false;
+
+        const gameRef = (typeof game !== 'undefined') ? game : null;
+        const quality = gameRef?.perfQualityLevel || 'high';
+
+        // @perf-impact: 敌人碰撞框材质边框每个非 Boss 敌人最多增加 1 次 drawImage，
+        // 复用图片缓存与现有碰撞 clip，不新增粒子、shadowBlur、渐变或混合模式预算。
+        // frame PNG 作为顶层中空物理边界；绘制成功后 Layer 5 矢量边框会让位。
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha *= quality === 'low' ? 0.84 : 0.96;
+        ctx.drawImage(frame.image.img, -w / 2, -h / 2, w, h);
+        ctx.restore();
+        return true;
     }
 
     _syncAffixOverlayImages() {

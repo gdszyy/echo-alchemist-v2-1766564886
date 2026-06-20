@@ -93,7 +93,7 @@
 | `relic` | 6 | 保底计数器、遗物 UI 弹出、钉盘互斥、存档持久化 |
 | `essence` | 4 | 混沌精华触发、纯净精华激活、跳过研磨、涌潮遗物 |
 | `overlay` | 5 | 符文发射器、遗物选择、真理之书、商店遗物选择、round-start resolver 的打开/关闭返回链路 |
-| `pinboard` | 5 | 钉板编辑器打开、开始采集阻塞、模块禁用原因、符文融合预览/确认、有效开始采集关闭编辑器 |
+| `pinboard` | 7 | 编辑入口门控、钉板编辑器打开、开始采集阻塞、模块禁用原因、库存装备/卸下、符文融合预览/确认、有效开始采集关闭编辑器 |
 | `runeword` | 4 | focused_fire / mass_collapse / kinetic_decay / echo_shot |
 | `enemy` | 3 | shield/clone 词条、roundDamage 增加 |
 
@@ -210,7 +210,9 @@ node tests/validate_phase_contracts.mjs
 - `spawn_system.js` 不得重新出现旧 `weak_spot` 普通波次低血量弱点怪。
 - `config.js` 不得重新使用旧 `weakness:` Boss 字段。
 - 8 个 Boss 必须配置 `vulnerability` 破绽谱。
-- `combat_system.js` 必须保留 `combat_applyBossVulnerability()` 与 `_bossVulnerabilityExposedHits` 易伤窗口消费。
+- `combat_system.js` 必须保留 `combat_applyBossVulnerability()`、`combat_updateBossVulnerabilityProgress()` 与 `_bossVulnerabilityExposedHits` 易伤窗口消费。
+- 固定 Boss 必须同时覆盖 `hits` 与 `damage` 两类累积方式。
+- `CONFIG.balance.bossVulnerability` 必须保留回合缩放参数，确保回合越高破绽条件越苛刻。
 - `ouroboros` 必须使用动态轮转破绽谱。
 
 运行方式：

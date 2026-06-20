@@ -6,7 +6,7 @@
 
 Current combat relic presentations:
 
-- `doomsday_timer`: target lock, three staged shockwaves, overhead lightning, and burst particles. If a strike kills, it can retrigger on another living enemy after a short delay. The retrigger limit starts at 1 and increases by 1 for every 5 round-start main triggers; the returned animation delay must cover the potential chain.
+- `doomsday_timer`: target lock, three staged shockwaves, a red-black countdown readout, clock-face shard particles, and burst particles. It should read as doomsday/countdown rather than lightning. If a strike kills, it can retrigger on another living enemy after a short delay. The retrigger limit starts at 1 and increases by 1 for every 5 round-start main triggers; the returned animation delay must cover the potential chain.
 - `corridor_arc`: wall-to-target lightning arcs for enemies near side walls; projectile side-wall hits add purple sparks.
 - `mortal_burst`: kill explosions set `_relicCombatCinematicFrames` so the combat end check waits for the blast beat.
 
@@ -28,8 +28,9 @@ The helper must remain side-effect free. It may inspect enemy tags, archetype al
 
 The old static Boss `weakness` field has been replaced by `CONFIG.balance.bossConfigs[*].vulnerability` plus the global `CONFIG.balance.bossVulnerability` tuning block.
 
-- `combat_getBossVulnerabilityProfile()` resolves the active vulnerability attrs; Ouroboros uses `rotationIndex` to switch attrs with its affix set.
-- `combat_applyBossVulnerability()` runs before `Enemy.takeDamage()`: matching attrs add progress, a full meter grants `_bossVulnerabilityExposedHits`, and exposed hits multiply damage by `exposedDamageMult`.
+- `combat_getBossVulnerabilityProfile()` resolves the active vulnerability attrs, accumulation mode, and round-scaled threshold; Ouroboros uses `rotationIndex` to switch attrs with its affix set.
+- `combat_applyBossVulnerability()` runs before `Enemy.takeDamage()` to consume exposed hits and remember whether the hit matched the current vulnerability attrs.
+- `combat_updateBossVulnerabilityProgress()` runs after `Enemy.takeDamage()` so `hits` mode counts real damaging hits and `damage` mode uses `damageResult.actualDamage`.
 - Breaking the meter before enrage sets `_bossVulnerabilitySuppressedEnrage`, delaying one 50% HP enrage check.
 - The mechanic is numeric and label-only; it does not add persistent particles, new blend modes, gradients, or `shadowBlur`.
 

@@ -512,9 +512,17 @@ async function setupPinboardEditor(page) {
         if (typeof game._moduleEditor_closePicker === 'function') game._moduleEditor_closePicker();
         const oldLayer = document.getElementById('module-editor-layer');
         if (oldLayer) oldLayer.remove();
+        const oldEntry = document.getElementById('module-editor-entry-layer');
+        if (oldEntry) oldEntry.remove();
         game.sys_resetGame();
         game.phase_startGatheringPhase();
     });
+    await page.waitForFunction(() => {
+        const entry = document.getElementById('module-editor-entry-layer');
+        const layer = document.getElementById('module-editor-layer');
+        return !!(entry && !layer && !game._moduleEditorActive);
+    }, { timeout: 5000 });
+    await page.click('#me-edit-entry-btn');
     await page.waitForFunction(() => {
         const layer = document.getElementById('module-editor-layer');
         return !!(game && game._moduleEditorActive && layer && window.getComputedStyle(layer).display !== 'none');
@@ -522,16 +530,37 @@ async function setupPinboardEditor(page) {
 }
 
 async function suitePinboard(page) {
+    await runTest('pinboard: edit entry gates editor state', async () => {
+        await page.evaluate(() => {
+            if (typeof game._moduleEditor_closePicker === 'function') game._moduleEditor_closePicker();
+            document.getElementById('module-editor-layer')?.remove();
+            document.getElementById('module-editor-entry-layer')?.remove();
+            game.sys_resetGame();
+            game.phase_startGatheringPhase();
+        });
+        await page.waitForFunction(() => !!document.getElementById('module-editor-entry-layer'), { timeout: 5000 });
+        const before = await page.evaluate(() => ({
+            active: !!game._moduleEditorActive,
+            hasEditor: !!document.getElementById('module-editor-layer'),
+            hasEntry: !!document.getElementById('module-editor-entry-layer'),
+        }));
+        assert(before.hasEntry, 'gathering should show edit pinboard entry');
+        assert(!before.active && !before.hasEditor, 'editor should not open until edit entry is clicked');
+        await page.click('#me-edit-entry-btn');
+        await page.waitForFunction(() => !!game._moduleEditorActive && !!document.getElementById('module-editor-layer'), { timeout: 5000 });
+    });
+
     await runTest('pinboard: module editor opens with controls', async () => {
         await setupPinboardEditor(page);
         const state = await page.evaluate(() => ({
             active: !!game._moduleEditorActive,
             hasLayer: !!document.getElementById('module-editor-layer'),
             hasStart: !!document.getElementById('me-start-btn'),
+            hasInventory: !!document.querySelector('.me-inventory-panel'),
             slotRects: typeof game._moduleEditor_getSlotRects === 'function' ? game._moduleEditor_getSlotRects().length : 0,
         }));
         assert(state.active, 'module editor should be active');
-        assert(state.hasLayer && state.hasStart, 'module editor controls should be mounted');
+        assert(state.hasLayer && state.hasStart && state.hasInventory, 'module editor controls and inventory should be mounted');
         assert(state.slotRects > 0, 'module editor should expose editable slot rects');
     });
 
@@ -583,7 +612,7 @@ async function suitePinboard(page) {
         assert(state.reason.length > 0, 'disabled module should expose placement reason');
     });
 
-    await runTest('pinboard: slot click unequips and empty slot equips from inventory', async () => {
+    await runTest('pinboard: inventory actions unequip and equip selected slot', async () => {
         await setupPinboardEditor(page);
         const result = await page.evaluate(() => {
             const rects = game._moduleEditor_getSlotRects();
@@ -594,19 +623,29 @@ async function suitePinboard(page) {
                 x: first.rect.x + first.rect.w / 2,
                 y: first.rect.y + first.rect.h / 2,
             });
+            const afterClickInventory = (game.ownedModuleComponents || []).length;
+            const stillEquippedAfterClick = !!game.currentModuleLayout[first.idx];
+            document.getElementById('me-unequip-selected-btn')?.click();
             const afterUnequipInventory = (game.ownedModuleComponents || []).length;
             const afterUnequipSlot = game.currentModuleLayout[first.idx];
             const component = game.ownedModuleComponents && game.ownedModuleComponents[game.ownedModuleComponents.length - 1];
-            game._moduleEditor_applyModule(first.idx, component && component.uid);
+            game._moduleEditorSelectedComponentUid = component && component.uid;
+            game._moduleEditorSelectedSlotIdx = first.idx;
+            game.ui_renderModuleEditorControls();
+            document.getElementById('me-equip-selected-btn')?.click();
             return {
                 beforeInventory,
+                afterClickInventory,
                 afterUnequipInventory,
                 afterEquipInventory: (game.ownedModuleComponents || []).length,
+                stillEquippedAfterClick,
                 emptyAfterUnequip: !afterUnequipSlot,
                 equippedAfterApply: !!game.currentModuleLayout[first.idx],
             };
         });
         assert(!result.error, result.error || 'unexpected setup failure');
+        assert(result.afterClickInventory === result.beforeInventory, 'slot click should only select, not change inventory');
+        assert(result.stillEquippedAfterClick, 'slot click should not unequip immediately');
         assert(result.afterUnequipInventory === result.beforeInventory + 1, 'unequip should return one component to inventory');
         assert(result.emptyAfterUnequip, 'unequip should clear the slot');
         assert(result.afterEquipInventory === result.beforeInventory, 'equip should consume one inventory component');

@@ -1,0 +1,18 @@
+{
+  "name": "world-sim-lab",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "世界变迁引擎独立调参/验证前端（实时引用 echo src/world_sim 引擎，不复制源码）",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10"
+  },
+  "dependencies": {
+    "lil-gui": "^0.19.2"
+  }
+}

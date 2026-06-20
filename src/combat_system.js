@@ -1538,26 +1538,47 @@ export const combat_system = {
         if (!vulnCfg) return null;
 
         const mech = CONFIG.balance.bossVulnerability || {};
+        const stepSize = Math.max(1, mech.roundScalingStep || 10);
+        const round = Math.max(1, this.round || 1);
+        const rawSteps = Math.max(0, Math.floor((round - (mech.roundScalingStart || 5)) / stepSize));
+        const scaleSteps = Math.min(mech.maxRoundScaleSteps || 6, rawSteps);
+        const makeProfile = (attrs, label, mode, hitThreshold, damageRatio) => {
+            const resolvedMode = mode || 'hits';
+            const baseHitThreshold = Math.max(1, hitThreshold || mech.breakThreshold || 3);
+            const baseDamageRatio = Math.max(0.01, damageRatio || mech.baseDamageRatio || 0.10);
+            const breakThreshold = resolvedMode === 'damage'
+                ? Math.max(1, Math.ceil((boss.maxHp || 1) * (baseDamageRatio + scaleSteps * (mech.damageRatioRoundBonus || 0))))
+                : Math.max(1, Math.ceil(baseHitThreshold + scaleSteps * (mech.hitThresholdRoundBonus || 0)));
+            return {
+                attrs,
+                label,
+                mode: resolvedMode,
+                breakThreshold,
+                exposedHits: vulnCfg.exposedHits || mech.exposedHits || 3,
+                exposedDamageMult: vulnCfg.exposedDamageMult || mech.exposedDamageMult || 1.35
+            };
+        };
+
         if (vulnCfg.dynamic) {
             const sets = vulnCfg.rotationAttrs || [];
             if (sets.length === 0) return null;
             const idx = Math.max(0, boss.rotationIndex || 0) % sets.length;
-            return {
-                attrs: sets[idx],
-                label: (vulnCfg.labels && vulnCfg.labels[idx]) || '动态破绽',
-                breakThreshold: vulnCfg.breakThreshold || mech.breakThreshold || 3,
-                exposedHits: vulnCfg.exposedHits || mech.exposedHits || 3,
-                exposedDamageMult: vulnCfg.exposedDamageMult || mech.exposedDamageMult || 1.35
-            };
+            return makeProfile(
+                sets[idx],
+                (vulnCfg.labels && vulnCfg.labels[idx]) || '动态破绽',
+                vulnCfg.rotationModes && vulnCfg.rotationModes[idx],
+                vulnCfg.rotationHitThresholds && vulnCfg.rotationHitThresholds[idx],
+                vulnCfg.rotationDamageRatios && vulnCfg.rotationDamageRatios[idx]
+            );
         }
 
-        return {
-            attrs: vulnCfg.attrs || [],
-            label: vulnCfg.label || 'Boss破绽',
-            breakThreshold: vulnCfg.breakThreshold || mech.breakThreshold || 3,
-            exposedHits: vulnCfg.exposedHits || mech.exposedHits || 3,
-            exposedDamageMult: vulnCfg.exposedDamageMult || mech.exposedDamageMult || 1.35
-        };
+        return makeProfile(
+            vulnCfg.attrs || [],
+            vulnCfg.label || 'Boss破绽',
+            vulnCfg.mode,
+            vulnCfg.hitThreshold,
+            vulnCfg.damageRatio
+        );
     },
 
     combat_applyBossVulnerability(enemy, config = {}, projectile = null, dmg = 0) {
@@ -1565,6 +1586,7 @@ export const combat_system = {
             damage: dmg,
             matchedAttr: null,
             progressGain: 0,
+            progressMode: null,
             breakTriggered: false,
             exposedApplied: false,
             profile: null
@@ -1572,8 +1594,11 @@ export const combat_system = {
         const profile = this.combat_getBossVulnerabilityProfile(enemy);
         if (!profile || !profile.attrs || profile.attrs.length === 0) return result;
 
-        const mech = CONFIG.balance.bossVulnerability || {};
         result.profile = profile;
+        result.progressMode = profile.mode;
+        enemy._bossVulnerabilityMode = profile.mode;
+        enemy._bossVulnerabilityThreshold = profile.breakThreshold;
+        const mech = CONFIG.balance.bossVulnerability || {};
         if ((enemy._bossVulnerabilityExposedHits || 0) > 0) {
             result.damage = result.damage * profile.exposedDamageMult;
             enemy._bossVulnerabilityExposedHits = Math.max(0, (enemy._bossVulnerabilityExposedHits || 0) - 1);
@@ -1591,8 +1616,21 @@ export const combat_system = {
         }
 
         result.matchedAttr = matchedAttr;
-        result.progressGain = mech.counterHitGain || 1;
-        enemy._bossVulnerabilityProgress = (enemy._bossVulnerabilityProgress || 0) + result.progressGain;
+        return result;
+    },
+
+    combat_updateBossVulnerabilityProgress(enemy, bossVulnerability, actualDamage = 0) {
+        if (!enemy || !bossVulnerability || !bossVulnerability.matchedAttr || !bossVulnerability.profile) return bossVulnerability;
+        if ((actualDamage || 0) <= 0) return bossVulnerability;
+
+        const mech = CONFIG.balance.bossVulnerability || {};
+        const profile = bossVulnerability.profile;
+        const gain = profile.mode === 'damage'
+            ? Math.max(0, actualDamage || 0)
+            : (mech.counterHitGain || 1);
+
+        bossVulnerability.progressGain = gain;
+        enemy._bossVulnerabilityProgress = (enemy._bossVulnerabilityProgress || 0) + bossVulnerability.progressGain;
 
         if (enemy._bossVulnerabilityProgress >= profile.breakThreshold) {
             enemy._bossVulnerabilityProgress = 0;
@@ -1600,13 +1638,13 @@ export const combat_system = {
             if (mech.enrageDelayOnBreak && !enemy.berserked) {
                 enemy._bossVulnerabilitySuppressedEnrage = true;
             }
-            result.breakTriggered = true;
+            bossVulnerability.breakTriggered = true;
             if (this.spawn_createFloatingText) {
                 this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 56, `${profile.label} 破!`, '#facc15', 16);
             }
         }
 
-        return result;
+        return bossVulnerability;
     },
 
     combat_getHitFeedbackLabel(enemy, config = {}, projectile = null, damageResult = null, context = {}) {
@@ -1965,6 +2003,9 @@ export const combat_system = {
         }
         const killed = damageResult.killed;
         const actualDmg = damageResult.actualDamage; // --- [新增] 确定基础伤害类型 (用于统计图表行) ---
+        if (!killed) {
+            this.combat_updateBossVulnerabilityProgress(enemy, bossVulnerability, actualDmg);
+        }
         // 需求2a: 火属性子弹的弹射/穿透伤害分别统计，只有额外火伤才算火属性
         let damageType = 'damage'; // 默认为物理/基础
 
@@ -3478,40 +3519,41 @@ export const combat_system = {
                     const result = target.takeDamage(dmg);
                     cinematicDelayMs = Math.max(cinematicDelayMs, baseDelayMs);
 
-                    // 末日时钟特效：深红/黑金主题，模拟末日倒计时敲响
-                    // 1. 三层扩散冲击波（血红 → 暗金 → 黑紫，错峰营造"钟声震颤"感）
-                    // @perf-impact: 遗物回合开始动画（末日计时器）- 使用 relicCinematic* 预算和既有 Shockwave/Particle/Lightning 上限
+                    // 末日时钟特效：深红/黑金主题，模拟倒计时归零与钟面崩裂
+                    // 1. 三层扩散冲击波（血红 → 暗金 → 黑紫，错峰营造"终末钟声"感）
+                    // @perf-impact: 遗物回合开始动画（末日计时器）- 使用 relicCinematic* 预算和既有 Shockwave/Particle 上限
                     if (typeof this.spawn_createShockwave === 'function') {
                         this.spawn_createShockwave(cx, cy, chainIndex > 0 ? '#f97316' : '#dc2626');
                         setTimeout(() => { if (this.spawn_createShockwave) this.spawn_createShockwave(cx, cy, '#facc15'); }, 120);
                         setTimeout(() => { if (this.spawn_createShockwave) this.spawn_createShockwave(cx, cy, '#4c1d95'); }, 240);
                     }
-                    // 2. 向上漂浮的血红 ember 余烬粒子（模拟爆炸灰烬飞散）
+                    // 2. 环形血红/暗金粒子，表达钟盘刻度崩落
                     const doomSparkCount = budget.relicCinematicSparkCount || 0;
                     for (let i = 0; i < doomSparkCount; i++) {
                         if (typeof this.spawn_createParticle === 'function') {
                             const color = i % 3 === 0 ? '#facc15' : '#dc2626';
-                            const p = this.spawn_createParticle(cx + (Math.random() - 0.5) * 34, cy + (Math.random() - 0.5) * 22, color, i % 2 === 0 ? 'spark' : 'ember');
+                            const angle = (Math.PI * 2 * i) / Math.max(1, doomSparkCount);
+                            const radius = 18 + Math.random() * 18;
+                            const p = this.spawn_createParticle(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius * 0.72, color, i % 2 === 0 ? 'spark' : 'ember');
                             if (p) {
-                                const angle = (Math.PI * 2 * i) / Math.max(1, doomSparkCount);
-                                p.vel.x = Math.cos(angle) * (1.5 + Math.random() * 2.5);
-                                p.vel.y = Math.sin(angle) * (1.5 + Math.random() * 2.5) - 1.2;
+                                p.vel.x = Math.cos(angle) * (1.2 + Math.random() * 1.8);
+                                p.vel.y = Math.sin(angle) * (1.0 + Math.random() * 1.6) - 0.6;
                             }
                         }
                     }
-                    // 3. 黑金 spark 碎片四溅（钟面碎裂感）
-                    if (Array.isArray(this.lightningBolts)) {
-                        const boltCount = Math.min(
-                            budget.relicCinematicBoltCount || 0,
-                            Math.max(0, (budget.lightningLimit || 0) - this.lightningBolts.length)
-                        );
-                        const sourceY = Math.max(20, cy - 180);
-                        for (let i = 0; i < boltCount; i++) {
-                            const offset = (i - (boltCount - 1) / 2) * 18;
-                            this.lightningBolts.push(new LightningBolt(cx + offset, sourceY, cx, cy));
+                    // 3. 秒针归零碎片：短促横向飞散，避免误读为闪电打击
+                    const clockShardCount = budget.relicCinematicBoltCount || 0;
+                    for (let i = 0; i < clockShardCount; i++) {
+                        if (typeof this.spawn_createParticle === 'function') {
+                            const angle = -Math.PI / 2 + ((i - (clockShardCount - 1) / 2) * Math.PI) / Math.max(3, clockShardCount);
+                            const p = this.spawn_createParticle(cx + Math.cos(angle) * 12, cy + Math.sin(angle) * 8, i % 2 === 0 ? '#facc15' : '#7f1d1d', 'spark');
+                            if (p) {
+                                p.vel.x = Math.cos(angle) * (2.6 + Math.random() * 1.6);
+                                p.vel.y = Math.sin(angle) * (1.5 + Math.random() * 1.2);
+                            }
                         }
                     }
-                    // 4. 浮动文字：骷髅图标 + 伤害数值，暗红色强调末日感
+                    // 4. 浮动文字：计时器/骷髅语义 + 伤害数值，暗红色强调末日感
                     if (typeof this.spawn_createFloatingText === 'function') {
                         const label = chainIndex > 0 ? `☠️ 末日回响 -${dmg}` : `☠️ 末日 -${dmg}`;
                         this.spawn_createFloatingText(cx, cy - 36, label, chainIndex > 0 ? '#f97316' : '#dc2626');
@@ -3519,7 +3561,7 @@ export const combat_system = {
 
                     if (typeof this.spawn_createFloatingText === 'function') {
                         setTimeout(() => {
-                            if (this.spawn_createFloatingText) this.spawn_createFloatingText(cx, cy - 64, chainIndex > 0 ? 'RETRIGGER' : 'LOCKED', '#facc15', 16);
+                            if (this.spawn_createFloatingText) this.spawn_createFloatingText(cx, cy - 64, chainIndex > 0 ? 'ECHO T-00' : 'T-00', '#facc15', 16);
                         }, 180);
                     }
                     if (typeof this.triggerScreenShakeAdvanced === 'function') {

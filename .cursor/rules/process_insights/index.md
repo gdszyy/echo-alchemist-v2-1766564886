@@ -12,7 +12,8 @@
 
 当前共有 **9** 条活跃洞察。
 
-> **[2026-06-19 更新]** PI-006 升版至 v1.4：新增坑 7（横幅背景已切到 `gathering` 但真实研磨初始化必须补齐 `marbleQueue`，避免空弹珠研磨）。
+> **[2026-06-20 更新]** PI-006 升版至 v1.5：新增坑 8（局内商人随机到访只更新底部状态入口，不得由 resolver overlay 阻塞回合横幅）。
+> **[2026-06-19 更新]** PI-006 升版至 v1.4：新增坑 7（普通横幅不能进研磨；显式研磨入口才补齐 `marbleQueue`，避免空弹珠研磨）。
 > **[2026-06-19 更新]** PI-006 升版至 v1.3：新增坑 6（普通回合横幅不得从 `_lastFiredAmmoSnapshot` / `marbleQueue` 重建 `ammoQueue`）。
 > **[2026-06-19 更新]** PI-007 升版至 v1.3：补充 `_proceedToFateMomentSelection()` 也必须写入 `fateMomentContext.active = true`。
 > **[2026-04-20 更新]** PI-001 升版至 v1.3：新增坑 8（纯净精华选择跳过替换子弹阶段后 `confirmBtn.onclick` 未恢复，导致无法发射子弹、直接循环敌人回合）。> **[2026-04-22 更新]** PI-001 升版至 v1.5：新增坑 10（纯净精华跳过研磨后 `sys_skipGrindGetRune` 未充能 `ammoQueue`，导致子弹列表为空直接进入敌人回合循环）。
@@ -26,7 +27,7 @@
 | PI-003 | 子系统扩展与组合模式注入流程 | v1.0 | core, game_system, combat_system, ui_system | 2026-04-16 | [PI-003_subsystem_composition_pattern.md](PI-003_subsystem_composition_pattern.md) |
 | PI-004 | 性能预算扩展与新特效接入流程 | v1.0 | performance, spawn_system, combat_system, entities | 2026-04-16 | [PI-004_performance_budget_extension.md](PI-004_performance_budget_extension.md) |
 | PI-005 | 性能自适应影响评估流程 | v1.0 | performance, combat_system, effects, entities, render_system, spawn_system | 2026-04-16 | [PI-005_perf_impact_assessment.md](PI-005_perf_impact_assessment.md) |
-| PI-006 | Round-Start 延迟奖励结算流程 | v1.4 | game_phase, game_system, core, ui/shop | 2026-06-19 | [PI-006_round_start_reward_resolver.md](PI-006_round_start_reward_resolver.md) |
+| PI-006 | Round-Start 延迟奖励结算流程 | v1.5 | game_phase, game_system, core, ui/shop, ui/run_shop | 2026-06-20 | [PI-006_round_start_reward_resolver.md](PI-006_round_start_reward_resolver.md) |
 | PI-007 | 命运时刻 Overlay 返回流与纯净精华选择模式 | v1.3 | ui/shop, game_system, ui_system, spawn_system, game_phase, entities, config, core | 2026-06-19 | [PI-007_destiny_overlay_return_and_selection_mode.md](PI-007_destiny_overlay_return_and_selection_mode.md) |
 | PI-008 | 符文发射器面板 Tab 被底层阶段面板遮挡的修复流程 | v1.1 | tutorial_system, ui/rune_launcher, ui_system | 2026-04-21 | [PI-008_tutorial_overlay_rune_launcher_tab_block.md](PI-008_tutorial_overlay_rune_launcher_tab_block.md) |
 | PI-009 | Sprite 贴图不显示类型错误排查 SOP | v1.0 | entities, render_system, core | 2026-04-25 | [PI-009_sprite_not_rendering_sop.md](PI-009_sprite_not_rendering_sop.md) |
@@ -37,7 +38,7 @@
 |------|---------|
 | `game_phase.js` | PI-001（阶段切换双重赋値、round++ 重复执行、`fieldLootItems` 必须在 LAYER 2 内渲染）、PI-006（回合结束后必须进入 round-start resolver）、PI-007（纯净精华注入后的标准实体链路与同化倍率衰减） |
 | `ui_system.js` | PI-001（multicast 颜色顺序、setDeepValue 双重调用）、PI-007（命运抉择动态数量与纯净精华注入 UI） |
-| `game_system.js` | PI-001（specialSlots 初始化类型、`fieldLootItems` 渲染已从 `sys_loop` 移除）、PI-003（sys_resetGame 新属性重置）、PI-006（pendingRoundStartRewards 存档/恢复、普通命运选择已取消、sys_showRoundStartBanner 不重建 ammoQueue）、PI-007（selectionMode / pendingSelectionMode / 选择态持久化） |
+| `game_system.js` | PI-001（specialSlots 初始化类型、`fieldLootItems` 渲染已从 `sys_loop` 移除）、PI-003（sys_resetGame 新属性重置）、PI-006（pendingRoundStartRewards 存档/恢复、普通命运选择已取消、sys_showRoundStartBanner 不重建 ammoQueue、局内商人调度不得阻塞横幅）、PI-007（selectionMode / pendingSelectionMode / 选择态持久化） |
 | `combat_system.js` | PI-002（词条 Hook 注入位置）、PI-003（组合模式）、PI-004（性能预算） |
 | `rune_config.js` | PI-002（effectId 一致性） |
 | `rune_launcher.js` | PI-002（activeRunewordEffects 数据结构）、PI-008（教程覆盖层遮挡 Tab 修复） |

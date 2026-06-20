@@ -44,6 +44,9 @@
 *   **`config.js` / `rune_config.js`**
     *   **核心职责**：全局常量、属性字典、遗物、技能、商店配置及符文系统的数据字典。
     *   **依赖关系**：被几乎所有模块引用。
+*   **`src/world_sim/`（独立子系统）**
+    *   **核心职责**：世界变迁模拟器引擎——基于元胞自动机的星球演化（地幔/气候/晶石/生物四层），自 `world-morphing-simulator` 移植为原生 JS。`SimulationEngine` 内部沿用组合模式（`bind(this)` 注入四层），是**纯数据模块**（无 DOM/渲染/UI）。
+    *   **依赖关系**：自包含，仅内部互相引用（`engine` → 四层 + `bio_spawn` + `cell`/`params`；地幔 → `perlin`）。**当前未接入 `core.js`/`Game` 实例，未注册 EventBus，与打砖块玩法零耦合。** 详见 [`world_sim.md`](world_sim.md)。
 
 ## 3. 智能编辑策略决策树
 

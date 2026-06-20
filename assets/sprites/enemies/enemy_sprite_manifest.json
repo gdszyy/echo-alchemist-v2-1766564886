@@ -5,6 +5,7 @@
     "archetypes": "assets/sprites/enemies/archetypes/",
     "composites": "assets/sprites/enemies/composites/",
     "overlays": "assets/sprites/enemies/overlays/",
+    "frames": "assets/sprites/enemies/frames/",
     "archetypeIcons": "assets/ui/icons/enemy_archetypes/",
     "affixIcons": "assets/ui/icons/enemy_affixes/"
   },
@@ -37,6 +38,53 @@
     "haste": "overlay_affix_haste.png",
     "healer": "overlay_affix_healer.png",
     "clone": "overlay_affix_clone.png"
+  },
+  "frames": {
+    "residue:1x1": {
+      "spritePath": "assets/sprites/enemies/frames/frame_residue_1x1.png",
+      "shape": "aabb",
+      "footprint": "1x1"
+    },
+    "bastion:3x1": {
+      "spritePath": "assets/sprites/enemies/frames/frame_bastion_3x1.png",
+      "shape": "aabb",
+      "footprint": "3x1"
+    },
+    "maw:2x2": {
+      "spritePath": "assets/sprites/enemies/frames/frame_maw_2x2.png",
+      "shape": "polygon",
+      "footprint": "2x2"
+    },
+    "deflector:2x1": {
+      "spritePath": "assets/sprites/enemies/frames/frame_deflector_2x1.png",
+      "shape": "polygon",
+      "footprint": "2x1"
+    },
+    "echoSpire:1x2": {
+      "spritePath": "assets/sprites/enemies/frames/frame_echo_spire_1x2.png",
+      "shape": "polygon",
+      "footprint": "1x2"
+    },
+    "prism:1x3": {
+      "spritePath": "assets/sprites/enemies/frames/frame_prism_1x3.png",
+      "shape": "polygon",
+      "footprint": "1x3"
+    },
+    "hive:2x3": {
+      "spritePath": "assets/sprites/enemies/frames/frame_hive_2x3.png",
+      "shape": "polygon",
+      "footprint": "2x3"
+    },
+    "siege:3x2": {
+      "spritePath": "assets/sprites/enemies/frames/frame_siege_3x2.png",
+      "shape": "aabb",
+      "footprint": "3x2"
+    },
+    "gravityWell:3x3": {
+      "spritePath": "assets/sprites/enemies/frames/frame_gravity_core_3x3.png",
+      "shape": "polygon",
+      "footprint": "3x3"
+    }
   },
   "archetypes": {
     "bastion": {

@@ -914,16 +914,17 @@
         }
         .combat-status-panel {
             position: absolute;
-            top: 58px;
+            top: calc(max(64px, calc(env(safe-area-inset-top) + 56px)) + 6px);
             left: 50%;
             transform: translateX(-50%);
             z-index: 45;
             display: flex;
             align-items: center;
-            gap: 10px;
-            max-width: min(720px, calc(100vw - 24px));
+            gap: 8px;
+            width: min(720px, calc(100% - 16px));
+            box-sizing: border-box;
             min-height: 36px;
-            padding: 6px 10px;
+            padding: 5px 10px;
             border: 1px solid rgba(148, 163, 184, 0.24);
             border-radius: 8px;
             background: rgba(2, 6, 23, 0.72);
@@ -943,12 +944,14 @@
             align-items: center;
             gap: 8px;
             min-width: 0;
+            flex: 1 1 auto;
             white-space: nowrap;
             font-size: 0.72rem;
         }
         .combat-status-note {
             min-width: 8rem;
             max-width: 18rem;
+            flex: 0 1 14rem;
             color: #cbd5e1;
             font-size: 0.72rem;
             line-height: 1.15;
@@ -1003,9 +1006,10 @@
         }
         @media (max-width: 720px) {
             .combat-status-panel {
-                top: 54px;
+                top: calc(max(64px, calc(env(safe-area-inset-top) + 56px)) + 6px);
                 left: 8px;
                 right: 8px;
+                width: auto;
                 transform: none;
                 max-width: none;
                 padding: 6px 8px;
@@ -1251,6 +1255,92 @@
         }
         .stat-highlight { color: #facc15; font-weight: bold; }
 
+        .run-shop-status-dock {
+            position: absolute;
+            left: 12px;
+            right: 12px;
+            bottom: max(124px, calc(env(safe-area-inset-bottom) + 124px));
+            z-index: 72;
+            min-height: 44px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.9);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            pointer-events: auto;
+            backdrop-filter: blur(8px);
+        }
+        .run-shop-status-main {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .run-shop-status-copy {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 10px;
+            line-height: 1;
+            letter-spacing: 0;
+            color: #cbd5e1;
+            white-space: nowrap;
+        }
+        #run-shop-status-title {
+            color: #fbbf24;
+            font-weight: 800;
+        }
+        #run-shop-status-detail {
+            color: #94a3b8;
+        }
+        .run-shop-status-track {
+            width: 100%;
+            height: 6px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(51, 65, 85, 0.9);
+        }
+        #run-shop-status-fill {
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #38bdf8, #fbbf24);
+            transition: width 0.25s ease;
+        }
+        .run-shop-status-dock.is-active {
+            border-color: rgba(251, 191, 36, 0.7);
+            background: rgba(30, 27, 75, 0.92);
+        }
+        .run-shop-status-dock.is-active #run-shop-status-fill {
+            background: linear-gradient(90deg, #fbbf24, #22c55e);
+        }
+        #run-shop-status-open {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            min-width: 58px;
+            min-height: 28px;
+            padding: 5px 9px;
+            border: 1px solid rgba(251, 191, 36, 0.8);
+            border-radius: 6px;
+            background: rgba(180, 83, 9, 0.68);
+            color: #fff7ed;
+            font-size: 11px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        body.pc-mode .run-shop-status-dock {
+            left: 50%;
+            right: auto;
+            bottom: 12px;
+            width: min(420px, calc(100% - 24px));
+            transform: translateX(-50%);
+        }
+
         .btn-icon {
             width: 32px; height: 32px;
             display: flex; align-items: center; justify-content: center;
@@ -1434,6 +1524,25 @@
             background: rgba(45, 55, 80, 0.95);
             box-shadow: 0 0 18px rgba(251, 191, 36, 0.35), 0 4px 16px rgba(0,0,0,0.4);
             transform: translateY(-4px) scale(1.04);
+        }
+        .select-card.selected::after {
+            content: 'SELECTED';
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            z-index: 4;
+            padding: 2px 5px;
+            border-radius: 999px;
+            background: rgba(251, 191, 36, 0.95);
+            color: #1e1b4b;
+            font-size: 8px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+        }
+        .select-card:focus-visible {
+            outline: 2px solid #67e8f9;
+            outline-offset: 3px;
         }
         /* 球体容器（扩大容纳属性特效环） */
         .select-icon-wrap {
@@ -1672,6 +1781,165 @@
             min-height: 0;
             overflow-y: auto;
             margin-bottom: 0;
+        }
+        .selection-bottom-dock {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: auto;
+            flex-shrink: 0;
+            z-index: 10;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(2, 6, 23, 0.94));
+            backdrop-filter: blur(14px);
+            border-top: 1px solid rgba(148, 163, 184, 0.22);
+            box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.35);
+            padding: 12px 14px max(18px, env(safe-area-inset-bottom));
+        }
+        .selection-status-row {
+            width: 100%;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .selection-status-title {
+            display: flex;
+            align-items: baseline;
+            gap: 7px;
+            color: #94a3b8;
+            font-size: 12px;
+            line-height: 1.25;
+            min-width: 0;
+        }
+        #selection-mode-label {
+            color: #e2e8f0;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+        }
+        .selection-count-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 2px 7px;
+            border-radius: 999px;
+            background: rgba(251, 191, 36, 0.14);
+            border: 1px solid rgba(251, 191, 36, 0.34);
+            color: #fde68a;
+            font-weight: 900;
+        }
+        #selection-mode-subtitle {
+            max-width: 100%;
+            color: #fcd34d;
+            font-size: 11px;
+            line-height: 1.35;
+            margin-top: 3px;
+        }
+        .selection-choice-strip {
+            width: 100%;
+            min-height: 38px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            justify-content: center;
+            margin: 6px 0 8px;
+        }
+        .selection-choice-chip {
+            min-width: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            max-width: 132px;
+            padding: 5px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.26);
+            background: rgba(15, 23, 42, 0.78);
+            color: #cbd5e1;
+            font-size: 11px;
+            line-height: 1;
+            white-space: nowrap;
+        }
+        .selection-choice-chip strong {
+            color: #f8fafc;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .selection-choice-chip.is-filled {
+            border-color: rgba(251, 191, 36, 0.52);
+            background: rgba(251, 191, 36, 0.12);
+            color: #fde68a;
+        }
+        .selection-choice-chip.is-empty {
+            color: #64748b;
+            border-style: dashed;
+        }
+        .selection-progress {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            justify-content: center;
+            margin-bottom: 8px;
+        }
+        .selection-progress-dot {
+            width: 28px;
+            height: 4px;
+            border-radius: 999px;
+            background: rgba(71, 85, 105, 0.75);
+            transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
+        }
+        .selection-progress-dot.is-filled {
+            background: #fbbf24;
+            box-shadow: 0 0 10px rgba(251, 191, 36, 0.45);
+            transform: scaleY(1.25);
+        }
+        .selection-actions {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .selection-rune-entry {
+            min-width: 42px;
+            min-height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(168, 85, 247, 0.42);
+            background: rgba(15, 23, 42, 0.82);
+            color: #d8b4fe;
+            transition: border-color 0.18s, background 0.18s, color 0.18s;
+        }
+        .selection-rune-entry:hover {
+            border-color: rgba(216, 180, 254, 0.82);
+            background: rgba(88, 28, 135, 0.35);
+            color: #f5f3ff;
+        }
+        .selection-rune-entry .selection-rune-entry-icon {
+            width: 18px;
+            height: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            line-height: 1;
+        }
+        .selection-rune-entry .selection-rune-entry-text {
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            white-space: nowrap;
+        }
+        @media (max-width: 420px) {
+            .selection-bottom-dock { padding-left: 10px; padding-right: 10px; }
+            .selection-status-row { grid-template-columns: minmax(0, 1fr) auto; }
+            .selection-choice-chip { max-width: 108px; padding-inline: 7px; }
+            .selection-rune-entry .selection-rune-entry-text { display: none; }
         }
 
         /* ============================================================
@@ -3882,6 +4150,19 @@
         <div id="round-start-banner-text">第 1 回合開始</div>
     </div>
 
+    <div id="run-shop-status-dock" class="run-shop-status-dock" aria-live="polite">
+        <div class="run-shop-status-main">
+            <div class="run-shop-status-copy">
+                <span id="run-shop-status-title">商人旅程</span>
+                <span id="run-shop-status-detail">3 回合后到访</span>
+            </div>
+            <div class="run-shop-status-track" aria-hidden="true">
+                <div id="run-shop-status-fill"></div>
+            </div>
+        </div>
+        <button id="run-shop-status-open" type="button">商店</button>
+    </div>
+
     <!-- Phase Title Animation (中央淡入淡出，不再缩小到左上角) -->
     <div id="phase-title-container">
         <div id="phase-title" class="phase-text">回聲煉金師</div>
@@ -4230,6 +4511,8 @@
                 </div>
             </div>
             
+            <div id="shop-resource-overview" class="grid grid-cols-4 gap-2 mb-4"></div>
+
             <div id="shop-category-tabs" class="flex gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar">
                 <!-- 动态生成分类标签 -->
             </div>
@@ -4268,20 +4551,21 @@
             <div class="h-2 shrink-0"></div>
         </div>
 
-        <div class="w-full flex flex-col items-center pointer-events-auto shrink-0 z-10 bg-slate-900/80 backdrop-blur-sm border-t border-slate-700/50 pt-4 pb-6" 
-             style="padding-bottom: max(24px, env(safe-area-inset-bottom));">
+        <div class="selection-bottom-dock">
             
-            <div class="flex items-center justify-between w-full px-4 mb-3">
-                <div>
-                    <p class="text-sm text-slate-400"><span id="selection-mode-label">命運抉擇</span>：已選擇 <span id="selected-count" class="text-white font-bold">0</span> / <span id="selected-required-count" class="text-white font-bold">3</span></p>
-                    <p id="selection-mode-subtitle" class="text-[11px] text-amber-200 mt-1 hidden" style="display:none;"></p>
+            <div class="selection-status-row">
+                <div class="min-w-0">
+                    <p class="selection-status-title"><span id="selection-mode-label">命運抉擇</span><span>已選 <span class="selection-count-pill"><span id="selected-count">0</span>/<span id="selected-required-count">3</span></span></span></p>
+                    <p id="selection-mode-subtitle" class="hidden" style="display:none;"></p>
                 </div>
                 <!-- 符文发射器入口（选择阶段） -->
-                <button onclick="game.ui_openRuneLauncher()" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 border border-purple-700/50 rounded-lg hover:bg-purple-900/30 hover:border-purple-400/70 transition-all duration-200 group">
+                <button onclick="game.ui_openRuneLauncher()" class="selection-rune-entry group" title="打开符文发射器">
                     <span class="text-sm group-hover:scale-110 transition-transform inline-block">⚡</span>
                     <span class="text-xs font-bold text-purple-300 tracking-wider group-hover:text-purple-100">符文發射器</span>
                 </button>
             </div>
+            <div id="selection-choice-strip" class="selection-choice-strip" aria-live="polite"></div>
+            <div id="selection-progress" class="selection-progress" aria-hidden="true"></div>
             <button id="confirm-selection-btn" class="btn-main" disabled>開始煉金</button>
             <!-- 跳过研磨按鈕（纯净精华命运时刻专用） -->
             <button id="skip-grind-btn" onclick="game.sys_skipGrindGetRune()" style="display:none;" class="mt-2 flex items-center gap-1.5 px-4 py-2 bg-slate-800/80 border border-slate-600/60 rounded-lg text-xs text-slate-300 hover:bg-slate-700/80 hover:border-slate-400/80 hover:text-white transition-all duration-200">
@@ -4650,7 +4934,7 @@
 
 
 <script>
-const APP_ASSET_CACHE_VERSION = '20260619-bitmap-v3';
+const APP_ASSET_CACHE_VERSION = '20260620-enemy-normal-redo-v2';
 
 async function clearStaleAssetCaches() {
     if (!('caches' in window)) return;

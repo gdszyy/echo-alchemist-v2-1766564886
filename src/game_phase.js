@@ -34,6 +34,170 @@ import {
     setModulePegState,
 } from './pinboard_modules.js';
 
+function getCombatAimEnemyHit(game, start, dir, maxDist, radius) {
+    let closest = null;
+    const enemies = Array.isArray(game.enemies) ? game.enemies : [];
+
+    for (const enemy of enemies) {
+        if (!enemy || !enemy.active) continue;
+        if (typeof game.phase_isEnemyClearable === 'function' && !game.phase_isEnemyClearable(enemy)) continue;
+
+        const halfW = (enemy.width || 0) / 2 + radius;
+        const halfH = (enemy.height || 0) / 2 + radius;
+        if (halfW <= 0 || halfH <= 0) continue;
+
+        const minX = enemy.pos.x - halfW;
+        const maxX = enemy.pos.x + halfW;
+        const minY = enemy.pos.y - halfH;
+        const maxY = enemy.pos.y + halfH;
+        let tMin = -Infinity;
+        let tMax = Infinity;
+        let normal = null;
+
+        if (Math.abs(dir.x) < 0.0001) {
+            if (start.x < minX || start.x > maxX) continue;
+        } else {
+            const tx1 = (minX - start.x) / dir.x;
+            const tx2 = (maxX - start.x) / dir.x;
+            const nearX = Math.min(tx1, tx2);
+            const farX = Math.max(tx1, tx2);
+            if (nearX > tMin) normal = new Vec2(tx1 < tx2 ? -1 : 1, 0);
+            tMin = Math.max(tMin, nearX);
+            tMax = Math.min(tMax, farX);
+        }
+
+        if (Math.abs(dir.y) < 0.0001) {
+            if (start.y < minY || start.y > maxY) continue;
+        } else {
+            const ty1 = (minY - start.y) / dir.y;
+            const ty2 = (maxY - start.y) / dir.y;
+            const nearY = Math.min(ty1, ty2);
+            const farY = Math.max(ty1, ty2);
+            if (nearY > tMin) normal = new Vec2(0, ty1 < ty2 ? -1 : 1);
+            tMin = Math.max(tMin, nearY);
+            tMax = Math.min(tMax, farY);
+        }
+
+        if (tMax < Math.max(0.01, tMin)) continue;
+        const dist = tMin > 0.01 ? tMin : tMax;
+        if (dist <= 0.01 || dist >= maxDist) continue;
+        if (!closest || dist < closest.dist) {
+            closest = { dist, normal, enemy };
+        }
+    }
+
+    return closest;
+}
+
+function buildCombatAimGuide(game, start, dir, bounceCount = 3, options = {}) {
+    const radius = CONFIG.physics.bulletRadius;
+    const topBound = (game.combatGridTopY != null && game.enemyHeight != null)
+        ? (game.combatGridTopY - game.enemyHeight / 2 + radius)
+        : radius;
+    const bottomBound = game.height - radius;
+    const points = [start];
+    const bouncePoints = [];
+    const enemyBouncePoints = [];
+    let piercesLeft = Math.max(0, options.pierce || 0);
+    let current = start;
+    let currentDir = new Vec2(dir.x, dir.y);
+
+    for (let i = 0; i < bounceCount; i++) {
+        let hitDist = Infinity;
+        let normal = null;
+        let hitType = 'wall';
+
+        if (currentDir.x > 0) {
+            const dist = (game.width - radius - current.x) / currentDir.x;
+            if (dist > 0.01 && dist < hitDist) {
+                hitDist = dist;
+                normal = 'x';
+            }
+        } else if (currentDir.x < 0) {
+            const dist = (radius - current.x) / currentDir.x;
+            if (dist > 0.01 && dist < hitDist) {
+                hitDist = dist;
+                normal = 'x';
+            }
+        }
+
+        if (currentDir.y < 0) {
+            const dist = (topBound - current.y) / currentDir.y;
+            if (dist > 0.01 && dist < hitDist) {
+                hitDist = dist;
+                normal = 'y';
+            }
+        } else if (game.hasCombatWall && currentDir.y > 0) {
+            const dist = (bottomBound - current.y) / currentDir.y;
+            if (dist > 0.01 && dist < hitDist) {
+                hitDist = dist;
+                normal = 'y';
+            }
+        } else if (currentDir.y > 0) {
+            const terminalDist = (bottomBound - current.y) / currentDir.y;
+            if (terminalDist > 0.01 && terminalDist < hitDist) {
+                points.push(current.add(currentDir.mult(terminalDist)));
+                return { points, bouncePoints, enemyBouncePoints };
+            }
+        }
+
+        const enemyHit = getCombatAimEnemyHit(game, current, currentDir, hitDist, radius);
+        if (enemyHit && enemyHit.normal) {
+            hitDist = enemyHit.dist;
+            normal = enemyHit.normal;
+            hitType = 'enemy';
+        }
+
+        if (!Number.isFinite(hitDist) || !normal) break;
+
+        const hitPoint = current.add(currentDir.mult(hitDist));
+        points.push(hitPoint);
+        if (hitType === 'enemy' && piercesLeft > 0) {
+            piercesLeft--;
+            current = hitPoint.add(currentDir.mult(radius + 1));
+            continue;
+        }
+
+        if (hitType === 'enemy') enemyBouncePoints.push(hitPoint);
+        else bouncePoints.push(hitPoint);
+
+        if (typeof normal === 'string') {
+            if (normal === 'x') currentDir.x *= -1;
+            else currentDir.y *= -1;
+        } else {
+            const dot = currentDir.dot(normal);
+            currentDir = currentDir.sub(normal.mult(2 * dot)).norm();
+        }
+        current = hitPoint.add(currentDir.mult(0.5));
+    }
+
+    const tailLength = Math.min(Math.max(game.width, game.height) * 0.65, 460);
+    points.push(current.add(currentDir.mult(tailLength)));
+    return { points, bouncePoints, enemyBouncePoints };
+}
+
+function buildCombatAimGuides(game, start, dir, recipe) {
+    const scatter = recipe && !recipe.wind ? Math.max(0, Math.floor(recipe.scatter || 0)) : 0;
+    const scatterAngleMult = recipe && recipe._scatterAngleMultiplier !== undefined ? recipe._scatterAngleMultiplier : 1.0;
+    const pierce = recipe ? Math.max(0, Math.floor(recipe.pierce || 0)) : 0;
+    const guides = [{
+        kind: 'main',
+        guide: buildCombatAimGuide(game, start, dir, 3, { pierce }),
+    }];
+
+    for (let idx = 1; idx <= Math.min(scatter, 6); idx++) {
+        const sign = idx % 2 === 0 ? -1 : 1;
+        const multiplier = Math.ceil(idx / 2);
+        const angleOffset = 0.2 * multiplier * sign * scatterAngleMult;
+        guides.push({
+            kind: 'scatter',
+            guide: buildCombatAimGuide(game, start, dir.rotate(angleOffset), 3, { pierce }),
+        });
+    }
+
+    return guides;
+}
+
 function drawModuleFootprintOutline(ctx, rect, footprint, color, pulse = 0) {
     if (!ctx || !rect || !footprint) return false;
     const { x, y, w, h } = rect;
@@ -388,12 +552,12 @@ export const game_phase = {
         this.combat_updateMulticastDisplay(0);
         this.ui_renderRecipeHUD();
 
-        // ==================== [v2 重构] 钉板内嵌编辑器 ====================
-        // 实时钉板已构建完成，直接在画布上叠加可点击的虚框区域供玩家更换模块。
-        // 玩家点击「开始采集」后退出编辑、正常发射弹珠。教程局跳过。
+        // ==================== [v2 重构] 钉板编辑入口 ====================
+        // 实时钉板已构建完成后，只显示「编辑钉板」入口；玩家点击入口才进入编辑态。
+        // 常态研磨不叠加编辑虚框，避免把装备/卸下误做成直接点击画布。
         const skipEditor = this._isTutorialRun;
-        if (!skipEditor && typeof this.ui_showModuleEditor === 'function') {
-            this.ui_showModuleEditor();
+        if (!skipEditor && typeof this.ui_showModuleEditorEntry === 'function') {
+            this.ui_showModuleEditorEntry();
         }
     },
 
@@ -608,7 +772,7 @@ export const game_phase = {
     /**
      * [v2 重构] 在实时钉板画布上绘制「可编辑钉盘区域」虚框描边。
      * 每个已解锁的模块槽位用虚框标出；已装备组件的区域显示图标+名称，
-     * 空区域显示「＋ 点击装备」。点击命中检测见 _moduleEditor_handleClick。
+     * 空区域显示「＋ 空槽」。点击命中只选中槽位，装备/卸下由库存栏按钮确认。
      * 仅在 this._moduleEditorActive 为真时由 phase_gathering_update 调用。
      */
     render_moduleEditorOverlay() {
@@ -661,10 +825,10 @@ export const game_phase = {
                 ctx.fillStyle = '#d1fae5';
                 ctx.font = '600 11px "Microsoft YaHei", sans-serif';
                 ctx.fillText(`${def.icon || '▦'} ${def.name}`, cx, y + 1 + tagH / 2, w - 6);
-                // 底部「点击卸下」
+                // 底部提示：点击只选中槽位，卸下由库存栏确认
                 ctx.fillStyle = 'rgba(52, 211, 153, 0.85)';
                 ctx.font = '600 10px "Microsoft YaHei", sans-serif';
-                ctx.fillText('点击卸下', cx, y + h - 9, w - 6);
+                ctx.fillText('点击选择', cx, y + h - 9, w - 6);
                 ctx.restore();
             } else {
                 ctx.save();
@@ -674,7 +838,7 @@ export const game_phase = {
                 ctx.fillText('＋', cx, cy - 6);
                 ctx.fillStyle = 'rgba(148, 197, 220, 0.9)';
                 ctx.font = '600 11px "Microsoft YaHei", sans-serif';
-                ctx.fillText('点击装备', cx, cy + 12, w - 6);
+                ctx.fillText('空槽', cx, cy + 12, w - 6);
                 ctx.restore();
             }
         }
@@ -1414,8 +1578,8 @@ phase_gathering_getRandomPegType() {
              }
              if (!this.isEnemyTurn && this.ammoQueue.length > 0 && this.projectiles.length === 0 && this.burstQueue.length === 0) {
                 this.isDragging = true;
-                // [emitter-port] 发射口位于 emitter_base_v2.png 上沿，偏移量统一来自 EMITTER_PORT_OFFSET_Y。
-                this.dragStart = new Vec2(this.width / 2, this.height - 102);
+                // [emitter-port] 发射口位于发射器素材上沿，偏移量统一来自 EMITTER_PORT_OFFSET_Y。
+                this.dragStart = new Vec2(this.width / 2, this.height - 80 - EMITTER_PORT_OFFSET_Y);
                 this.dragCurrent = logicPos;
                 this.ui.closeDrawer();
             }
@@ -1979,6 +2143,15 @@ phase_gathering_getRandomPegType() {
                 }
             }
         }
+
+        if ((this.runShopStarterBoostDamageRounds || 0) > 0) {
+            this.runShopStarterBoostDamageRounds--;
+            if (this.runShopStarterBoostDamageRounds <= 0) {
+                const boostDamage = this.runShopStarterBoostDamageAmount || 0;
+                this.flatDamageBonus = Math.max(0, (this.flatDamageBonus || 0) - boostDamage);
+                this.runShopStarterBoostDamageAmount = 0;
+            }
+        }
         
         this.round++;
         this.prevRoundDamage = this.roundDamage;
@@ -2271,7 +2444,7 @@ phase_gathering_getRandomPegType() {
                 // [emitter-port] 子弹从发射器素材的上沿发射口生成，偏移量统一来自 EMITTER_PORT_OFFSET_Y。
                 // [echo-origin] 若 shot 携带 x/y（如回响弹），则从该坐标发射，否则回退到发射器
                 const spawnX = (typeof shot.x === 'number') ? shot.x : this.width/2;
-                const spawnY = (typeof shot.y === 'number') ? shot.y : this.height-102;
+                const spawnY = (typeof shot.y === 'number') ? shot.y : this.height - 80 - EMITTER_PORT_OFFSET_Y;
                 this.spawn_spawnBullet(spawnX, spawnY, shot.vel, shot.recipe, shot.shotId, shot.isLast);
                 audio.playShoot();
                 this.burstQueue.splice(i, 1);
@@ -2719,48 +2892,49 @@ phase_gathering_getRandomPegType() {
             // 拖拽瞄准线
             if (this.isDragging && this.projectiles.length === 0 && this.ammoQueue.length > 0 && this.burstQueue.length === 0) {
                 // [emitter-port] 瞄准线起点对齐到发射器素材的上沿发射口
-                const start = new Vec2(this.width / 2, this.height - 102);
+                const start = new Vec2(this.width / 2, this.height - 80 - EMITTER_PORT_OFFSET_Y);
                 let force = this.lastMousePos.sub(start);
                 
                 if (force.y < -20) {
-                    const maxLen = 800; 
-                    const radius = CONFIG.physics.bulletRadius;
                     let dir = force.norm(); 
+                    const aimRecipe = this.ammoQueue && this.ammoQueue.length > 0 ? this.ammoQueue[0] : null;
+                    const guides = buildCombatAimGuides(this, start, dir, aimRecipe);
                     
                     this.ctx.save();
-                    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                    this.ctx.lineWidth = 2;
-                    this.ctx.setLineDash([6, 6]);
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(start.x, start.y);
-
-                    let distToX = Infinity;
-                    let distToY = Infinity;
-                    if (dir.x > 0) distToX = (this.width - radius - start.x) / dir.x;
-                    else if (dir.x < 0) distToX = (radius - start.x) / dir.x;
-                    if (dir.y < 0) distToY = (radius - start.y) / dir.y;
-
-                    let hitDist = Math.min(distToX, distToY);
-                    if (hitDist < maxLen) {
-                        const hitPoint = start.add(dir.mult(hitDist));
-                        this.ctx.lineTo(hitPoint.x, hitPoint.y);
-                        const remainLen = maxLen - hitDist;
-                        let reflectDir = new Vec2(dir.x, dir.y);
-                        if (distToX < distToY) reflectDir.x *= -1; 
-                        else reflectDir.y *= -1; 
-                        const endPoint = hitPoint.add(reflectDir.mult(remainLen));
-                        this.ctx.lineTo(endPoint.x, endPoint.y);
-                        this.ctx.stroke();
+                    guides.forEach(({ kind, guide }, guideIndex) => {
+                        const isMainGuide = kind === 'main';
+                        this.ctx.strokeStyle = isMainGuide ? 'rgba(255, 255, 255, 0.55)' : 'rgba(250, 204, 21, 0.34)';
+                        this.ctx.lineWidth = isMainGuide ? 2 : 1.4;
+                        this.ctx.setLineDash(isMainGuide ? [6, 6] : [4, 8]);
                         this.ctx.beginPath();
+                        guide.points.forEach((point, index) => {
+                            if (index === 0) this.ctx.moveTo(point.x, point.y);
+                            else this.ctx.lineTo(point.x, point.y);
+                        });
+                        this.ctx.stroke();
+
+                        if (guideIndex > 0) return;
+
                         this.ctx.setLineDash([]);
                         this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                        this.ctx.arc(endPoint.x, endPoint.y, 3, 0, Math.PI * 2);
-                        this.ctx.fill();
-                    } else {
-                        const end = start.add(dir.mult(maxLen));
-                        this.ctx.lineTo(end.x, end.y);
-                        this.ctx.stroke();
-                    }
+                        guide.bouncePoints.forEach((point, index) => {
+                            this.ctx.beginPath();
+                            this.ctx.arc(point.x, point.y, 3 + index * 0.5, 0, Math.PI * 2);
+                            this.ctx.fill();
+                        });
+                        this.ctx.fillStyle = 'rgba(250, 204, 21, 0.92)';
+                        guide.enemyBouncePoints.forEach((point, index) => {
+                            this.ctx.beginPath();
+                            this.ctx.arc(point.x, point.y, 4 + index * 0.4, 0, Math.PI * 2);
+                            this.ctx.fill();
+                        });
+                        const endPoint = guide.points[guide.points.length - 1];
+                        if (endPoint) {
+                            this.ctx.beginPath();
+                            this.ctx.arc(endPoint.x, endPoint.y, 3, 0, Math.PI * 2);
+                            this.ctx.fill();
+                        }
+                    });
                     this.ctx.restore();
 
                     this.ctx.save();
@@ -2776,7 +2950,7 @@ phase_gathering_getRandomPegType() {
                 }
             } else if (this.projectiles.length === 0) {
                 // [emitter-port] 空仓占位炮台对齐到发射器素材的上沿发射口
-                const start = new Vec2(this.width / 2, this.height - 102);
+                const start = new Vec2(this.width / 2, this.height - 80 - EMITTER_PORT_OFFSET_Y);
                 this.ctx.save();
                 this.ctx.translate(start.x, start.y);
                 this.ctx.rotate(-Math.PI / 2);
@@ -2987,7 +3161,7 @@ phase_gathering_getRandomPegType() {
         const portPos = new Vec2(startPos.x, startPos.y - EMITTER_PORT_OFFSET_Y);
         // [bitmap-emitter] 优先使用 emitter_base.png + emitter_charging_*.png 渲染发射器底座；
         // 位图未加载时 fallback 到原始 arc 椭圆。
-        this.render_combat_launcherEmitterBase(this.ctx, startPos.x, startPos.y, this.isChargingShot, this.chargeProgress);
+        this.render_combat_launcherEmitterBase(this.ctx, startPos.x, startPos.y, this.isChargingShot, this.chargeProgress, this.isReloading ? this.reloadProgress : 0);
         let nextAmmo = this.ammoQueue.length > 0 ? this.ammoQueue[0] : null;
 
         if (nextAmmo) {
@@ -2996,9 +3170,9 @@ phase_gathering_getRandomPegType() {
             let deformation = {x: 1, y: 1};
 
             if (this.isDragging) {
-                const force = this.dragStart.sub(this.dragCurrent);
-                if (force.mag() > 10) {
-                    previewRotation = Math.atan2(force.y, force.x) ;
+                const aimVector = this.dragCurrent.sub(this.dragStart);
+                if (aimVector.mag() > 10) {
+                    previewRotation = Math.atan2(aimVector.y, aimVector.x) ;
                     deformation = {x: 1.15, y: 0.85};
                 }
             }
@@ -3014,10 +3188,15 @@ phase_gathering_getRandomPegType() {
 
             // 轨道仍以发射器底座为圆心绕飞
             this.render_combat_launcherOrbitals(this.ctx, startPos.x, startPos.y, nextAmmo);
-            this.render_combat_launcherSignal(this.ctx, startPos.x, startPos.y, portPos.x, portPos.y, nextAmmo);
-
-            // 待发射弹药贴在素材上沿的发射口
-            Projectile.drawVisuals(this.ctx, portPos.x, portPos.y, params.radius, nextAmmo, previewRotation, params.intensity, deformation);
+            this.render_combat_launcherSignal(this.ctx, startPos.x, startPos.y, portPos.x, portPos.y, nextAmmo, {
+                previewRotation,
+                deformation,
+                params,
+                chargeProgress: this.chargeProgress,
+                reloadProgress: this.isReloading ? this.reloadProgress : 0,
+                isCharging: this.isChargingShot,
+                isReloading: this.isReloading,
+            });
 
         } else {
             // 空仓状态：占位圈贴在发射口

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>世界变迁引擎 · 调参实验台</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- 顶部工具栏 -->
+      <header id="toolbar">
+        <div class="tb-group tb-title">
+          <span class="logo">◐</span>
+          <div>
+            <div class="t1">世界变迁引擎 · 调参实验台</div>
+            <div class="t2">live-referencing <code>src/world_sim</code></div>
+          </div>
+        </div>
+
+        <div class="tb-group" id="run-controls">
+          <button id="btn-play" class="btn btn-primary" title="空格">▶ 运行</button>
+          <button id="btn-step" class="btn" title="单步推进一帧">⏭ 单步</button>
+          <button id="btn-reset" class="btn" title="按当前参数重建世界">⟲ 重置</button>
+        </div>
+
+        <div class="tb-group">
+          <label class="field">
+            <span>速度 <b id="speed-val">1</b>×</span>
+            <input id="speed" type="range" min="1" max="50" step="1" value="1" />
+          </label>
+        </div>
+
+        <div class="tb-group">
+          <label class="field compact">
+            <span>宽</span><input id="grid-w" type="number" min="16" max="160" step="1" value="50" />
+          </label>
+          <label class="field compact">
+            <span>高</span><input id="grid-h" type="number" min="16" max="160" step="1" value="50" />
+          </label>
+        </div>
+
+        <div class="tb-group">
+          <label class="field check">
+            <input id="seed-on" type="checkbox" /> <span>固定种子</span>
+          </label>
+          <label class="field compact">
+            <input id="seed-val" type="number" min="0" step="1" value="12345" disabled />
+          </label>
+        </div>
+
+        <div class="tb-group" id="layer-buttons">
+          <!-- 图层按钮由 JS 注入 -->
+        </div>
+
+        <div class="tb-group" id="preset-controls">
+          <button id="btn-export" class="btn" title="导出当前参数为 JSON">⬇ 导出</button>
+          <button id="btn-import" class="btn" title="从 JSON 载入参数">⬆ 导入</button>
+          <button id="btn-defaults" class="btn" title="恢复引擎默认参数">默认</button>
+          <input id="import-file" type="file" accept="application/json,.json" hidden />
+        </div>
+
+        <div class="tb-group" id="scenario-controls">
+          <button id="btn-scenario-natural" class="btn active" title="使用默认圆形初始世界">默认演化</button>
+          <button id="btn-scenario-source" class="btn" title="生成源井、窄颈和活跃盆地">源井盆地</button>
+          <button id="btn-scenario-circle" class="btn" title="生成圆形大陆中的源井、窄颈和活跃盆地">圆形源井</button>
+          <button id="btn-stable-preset" class="btn" title="载入通过 50×50 / 600 步稳定窗口复验的可解参数">50×50参数</button>
+          <button id="btn-ring-front" class="btn" title="载入 50×50 圆形岛屿参数并推进到环形前缘">环形前缘</button>
+          <button id="btn-ring-front-key" class="btn" title="在环形前缘部署半径 9 的六点吸能阵列">六点吸能</button>
+          <button id="btn-siphon" class="btn" title="在推荐源井/关键点部署人类吸能基地">部署吸能</button>
+          <button id="btn-cut" class="btn" title="命中当前最高优先级关键割集">阻断割集</button>
+          <button id="btn-clear-bases" class="btn" title="移除所有人类吸能基地">清除基地</button>
+        </div>
+      </header>
+
+      <!-- 左：世界画布 + 实时曲线 -->
+      <main id="stage">
+        <section id="world-wrap">
+          <canvas id="world"></canvas>
+          <div id="overlay-toggles"><!-- 叠加层开关由 JS 注入 --></div>
+          <div id="world-hint">世界视图</div>
+        </section>
+        <section id="chart-wrap">
+          <div class="panel-head">
+            <span>实时指标曲线</span>
+            <div id="series-legend"><!-- 序列图例/开关由 JS 注入 --></div>
+          </div>
+          <canvas id="chart"></canvas>
+        </section>
+      </main>
+
+      <!-- 右：状态 + 参数面板 + 格子检视 -->
+      <aside id="sidebar">
+        <section class="card" id="stats-card">
+          <div class="panel-head"><span>世界状态</span><span id="run-state" class="pill">已暂停</span></div>
+          <div id="stats-grid"><!-- 指标读数由 JS 注入 --></div>
+          <div id="terrain-note" class="note"></div>
+        </section>
+
+        <section class="card" id="inspect-card">
+          <div class="panel-head"><span>格子检视</span><span id="inspect-coord" class="muted">悬停画布</span></div>
+          <pre id="inspect-body" class="muted">将鼠标移到世界画布上的某个格子查看它的全部字段。</pre>
+        </section>
+
+        <section class="card" id="params-card">
+          <div class="panel-head"><span>引擎参数（实时生效）</span></div>
+          <div id="gui-mount"><!-- lil-gui 挂载点 --></div>
+        </section>
+      </aside>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

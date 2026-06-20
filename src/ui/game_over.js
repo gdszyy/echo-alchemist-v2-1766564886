@@ -46,8 +46,15 @@ export const game_over_mixin = {
         const leftover = Math.max(0, this.runFragments || 0);
         const settled = Math.floor(leftover * ratio);
         if (settled > 0) {
-            if (!this.saveData) this.saveData = { runeFragments: 0 };
-            this.saveData.runeFragments = (this.saveData.runeFragments || 0) + settled;
+            if (typeof this.meta_addCurrency === 'function') {
+                this.meta_addCurrency(settled);
+            } else {
+                if (!this.saveData) this.saveData = { runeFragments: 0, resources: { rune_fragments: 0 } };
+                if (!this.saveData.resources) this.saveData.resources = {};
+                this.saveData.resources.rune_fragments = (this.saveData.resources.rune_fragments || 0) + settled;
+                this.saveData.runeFragments = this.saveData.resources.rune_fragments;
+                this.saveData.currency = this.saveData.resources.rune_fragments;
+            }
         }
         this.runFragments = 0;
 

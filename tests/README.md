@@ -39,6 +39,8 @@ node tests/validate_boss_vulnerability.mjs
 - Boss 配置不再使用旧 `weakness` 字段
 - 8 个 Boss 都有 `vulnerability` 破绽谱
 - 战斗管线保留 Boss 破绽进度与易伤窗口入口
+- Boss 覆盖按实际命中次数和按实际伤害量两种累积方式
+- 回合缩放参数存在，后期破绽条件更苛刻
 
 ### 2. 运行时自动化测试（需要本地游戏服务）
 

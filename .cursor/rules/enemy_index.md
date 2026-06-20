@@ -191,25 +191,26 @@
 
 | 状态 | 规则 |
 |---|---|
-| 破绽累积 | `combat_damageEnemy()` 调用 `combat_applyBossVulnerability()`；命中当前 Boss 破绽谱属性时增加 `counterHitGain` 进度。 |
+| 破绽累积 | `combat_damageEnemy()` 先调用 `combat_applyBossVulnerability()` 判断当前破绽谱与易伤窗口，再在 `Enemy.takeDamage()` 后调用 `combat_updateBossVulnerabilityProgress()` 按实际命中次数或实际伤害量推进进度。 |
 | 破绽触发 | 进度达到 `breakThreshold` 后清零，写入 `_bossVulnerabilityExposedHits = exposedHits`。 |
 | 易伤窗口 | 易伤命中数大于 0 时，本次伤害乘以 `exposedDamageMult`，随后消耗 1 次命中数。 |
+| 回合缩放 | 从 `roundScalingStart` 起，每 `roundScalingStep` 回合提高一次条件；`hits` 模式增加命中次数，`damage` 模式增加最大生命百分比阈值。 |
 | 狂暴延后 | 若 `enrageDelayOnBreak` 为 true 且 Boss 尚未狂暴，破绽触发后会延后一次 50% 血量狂暴检测。 |
 | 可视反馈 | Boss 状态短标签显示 `隙N`（进度）或 `破N`（剩余易伤命中）；命中反馈显示 `破绽+` / `破绽` / `易伤`。 |
-| 存档 | `_bossVulnerabilityProgress`、`_bossVulnerabilityExposedHits`、`_bossVulnerabilitySuppressedEnrage` 进入 `sys_saveRunState()` / `sys_loadRunState()`。 |
+| 存档 | `_bossVulnerabilityProgress`、`_bossVulnerabilityExposedHits`、`_bossVulnerabilitySuppressedEnrage`、`_bossVulnerabilityMode`、`_bossVulnerabilityThreshold` 进入 `sys_saveRunState()` / `sys_loadRunState()`。 |
 
 破绽谱速查：
 
-| Boss | 破绽谱 |
+| Boss | 破绽谱 | 累积方式 |
 |---|---|
-| `ignis` | pierce、pyro |
-| `glacies` | cryo、pierce |
-| `mikro` | lightning、scatter |
-| `devourer` | bounce、laser |
-| `viridis` | laser、pyro |
-| `tesla` | cryo、bounce |
-| `chimera` | pierce、laser |
-| `ouroboros` | 动态：shield+haste → pierce/cryo；regen+healer → laser/pyro；clone+jump → lightning/scatter |
+| `ignis` | pierce、pyro | 命中次数，基础 3 次 |
+| `glacies` | cryo、pierce | 实际伤害量，基础 10% 最大生命 |
+| `mikro` | lightning、scatter | 命中次数，基础 5 次 |
+| `devourer` | bounce、laser | 实际伤害量，基础 8% 最大生命 |
+| `viridis` | laser、pyro | 实际伤害量，基础 12% 最大生命 |
+| `tesla` | cryo、bounce | 命中次数，基础 4 次 |
+| `chimera` | pierce、laser | 实际伤害量，基础 9% 最大生命 |
+| `ouroboros` | 动态：shield+haste → pierce/cryo；regen+healer → laser/pyro；clone+jump → lightning/scatter | 动态：命中次数 / 实际伤害量 / 命中次数 |
 
 ## 4. Boss 出场机制（Task C.3 修正后）
 
@@ -297,7 +298,7 @@ finalHP = max(
 | Boss 狂暴触发 | `src/combat_system.js` | `combat_checkBossPhaseChange()` 约第 3072 行 |
 | Boss 狂暴效果 | `src/combat_system.js` | `combat_triggerBossEnrage(boss)` 约第 3087 行 |
 | Boss 数据配置 | `src/config.js` | `balance.bossConfigs` / `balance.bossVulnerability` |
-| Boss 破绽结算 | `src/combat_system.js` | `combat_applyBossVulnerability()` / `combat_getBossVulnerabilityProfile()` |
+| Boss 破绽结算 | `src/combat_system.js` | `combat_applyBossVulnerability()` / `combat_updateBossVulnerabilityProgress()` / `combat_getBossVulnerabilityProfile()` |
 | Boss 数据库 | `src/config.js` | `BOSS_DB` 约第 1404 行 |
 | 主题段落配置 | `src/config.js` | `ENEMY_CURVE_CONFIG.THEME_SEGMENTS` 约第 1477 行 |
 | 词缀图鉴 | `src/systems.js` | `TRUTH_BOOK_DATA.enemies` 第 24 行起 |

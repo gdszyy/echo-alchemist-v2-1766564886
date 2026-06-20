@@ -620,7 +620,7 @@ export const render_system = {
      * [RENDER] 绘制发射器的下一发可读性信号：装填格、散射扇形预览和连射能量条。
      * @perf-impact: 发射器下一发信号 - 每帧最多 7 个散射预览弹、6 个装填格、6 段连射能量条；low 档关闭 shadowBlur。
      */
-    render_combat_launcherSignal(ctx, cx, cy, portX, portY, recipe) {
+    render_combat_launcherSignal(ctx, cx, cy, portX, portY, recipe, visual = {}) {
         if (!recipe) return;
         const profile = getAmmoReadabilityProfile(recipe);
         const quality = this.perfQualityLevel || 'high';
@@ -633,165 +633,287 @@ export const render_system = {
         ctx.save();
         ctx.translate(cx, cy);
 
-        // @perf-impact: launcher signal V2 uses fixed-count path/text/image draws; high/medium keep lightweight glow, low disables shadowBlur.
-        const panelX = -63;
-        const panelY = relPortY - 96;
-        const panelW = 126;
-        const panelH = 78;
-        const coreX = 0;
-        const coreY = panelY + 42;
+        // @perf-impact: launcher readout UI uses fixed-count path/text/image draws; high/medium keep lightweight glow, low disables shadowBlur.
+        const bodyScale = EMITTER_DRAW_SIZE / 128;
+        const chargeProgress = Math.max(0, Math.min(1, visual.chargeProgress || 0));
+        const reloadProgress = Math.max(0, Math.min(1, visual.reloadProgress || 0));
+        const recoilY = visual.isReloading ? Math.sin(reloadProgress * Math.PI) * 4 * bodyScale : 0;
+        const muzzleX = relPortX;
+        const muzzleY = relPortY;
+        const chamberX = 0;
+        const chamberY = 7 * bodyScale + recoilY;
+        const screen = { x: -54 * bodyScale, y: -8 * bodyScale + recoilY, w: 28 * bodyScale, h: 36 * bodyScale };
+        const scatter = { x: muzzleX, y: muzzleY + recoilY };
+        const capacitor = { x: 39 * bodyScale, y: -9 * bodyScale + recoilY, w: 16 * bodyScale, h: 44 * bodyScale };
+        const magazine = {
+            y: 41 * bodyScale + recoilY,
+            centers: [-33, -20, -7, 7, 20, 33].map(x => x * bodyScale),
+        };
         const pelletCount = profile.scatterPelletCount;
         const iconImg = getUiBitmap(getAmmoIconSrc(recipe));
 
-        ctx.save();
-        ctx.globalAlpha = 0.46;
-        ctx.strokeStyle = accent;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(relPortX, relPortY - 6);
-        ctx.lineTo(coreX, panelY + panelH - 7);
-        ctx.stroke();
-        ctx.restore();
-
-        ctx.save();
-        ctx.globalAlpha = 0.78;
-        ctx.fillStyle = 'rgba(2, 6, 23, 0.66)';
-        ctx.strokeStyle = 'rgba(226, 232, 240, 0.2)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.roundRect(panelX, panelY, panelW, panelH, 14);
-        ctx.fill();
-        ctx.stroke();
-        ctx.strokeStyle = accent;
-        ctx.globalAlpha = 0.24 + pulse * 0.1;
-        ctx.beginPath();
-        ctx.roundRect(panelX + 3, panelY + 3, panelW - 6, panelH - 6, 11);
-        ctx.stroke();
-        ctx.restore();
-
-        ctx.save();
-        ctx.globalAlpha = 0.96;
-        if (glowFx) {
-            ctx.shadowColor = accent;
-            ctx.shadowBlur = _sb(10 + profile.signalRatio * 10);
-        }
-        ctx.fillStyle = accent;
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        ctx.moveTo(coreX, coreY - 21);
-        ctx.quadraticCurveTo(coreX + 15, coreY - 11, coreX + 13, coreY + 12);
-        ctx.quadraticCurveTo(coreX, coreY + 22, coreX - 13, coreY + 12);
-        ctx.quadraticCurveTo(coreX - 15, coreY - 11, coreX, coreY - 21);
-        ctx.fill();
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
-        ctx.beginPath();
-        ctx.arc(coreX, coreY + 3, 12, 0, Math.PI * 2);
-        ctx.fill();
-        if (iconImg) {
-            ctx.drawImage(iconImg, coreX - 10, coreY - 7, 20, 20);
-        } else {
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 13px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(profile.primary.icon || '*', coreX, coreY + 3);
-        }
-        ctx.restore();
-
-        const drawBadge = (x, y, w, label, value, color) => {
-            const valueText = String(value);
+        const drawInsetPanel = (x, y, w, h, color, radius = 5, alpha = 0.9) => {
             ctx.save();
-            ctx.globalAlpha = 0.94;
-            ctx.fillStyle = 'rgba(2, 6, 23, 0.8)';
-            ctx.strokeStyle = color;
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = 'rgba(2, 6, 23, 0.78)';
+            ctx.strokeStyle = 'rgba(226, 232, 240, 0.18)';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.roundRect(x, y, w, 18, 6);
+            ctx.roundRect(x, y, w, h, radius * bodyScale);
             ctx.fill();
             ctx.stroke();
-            ctx.font = 'bold 7px Cinzel';
-            ctx.textAlign = 'left';
+            if (glowFx) {
+                ctx.shadowColor = color;
+                ctx.shadowBlur = _sb(5 + pulse * 4);
+            }
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = alpha * (0.45 + pulse * 0.18);
+            ctx.beginPath();
+            ctx.roundRect(x + 2 * bodyScale, y + 2 * bodyScale, w - 4 * bodyScale, h - 4 * bodyScale, Math.max(1, radius - 2) * bodyScale);
+            ctx.stroke();
+            ctx.restore();
+        };
+
+        const drawChamberFrame = () => {
+            ctx.save();
+            ctx.globalAlpha = 0.82;
+            ctx.strokeStyle = `rgba(226, 232, 240, ${0.2 + pulse * 0.08})`;
+            ctx.lineWidth = 1.4 * bodyScale;
+            if (glowFx) {
+                ctx.shadowColor = accent;
+                ctx.shadowBlur = _sb(5 + chargeProgress * 7);
+            }
+            ctx.beginPath();
+            ctx.arc(chamberX, chamberY, 29 * bodyScale, Math.PI * 0.1, Math.PI * 0.9);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(chamberX, chamberY, 29 * bodyScale, Math.PI * 1.1, Math.PI * 1.9);
+            ctx.stroke();
+
+            const intakeAlpha = 0.25 + chargeProgress * 0.45 + pulse * 0.08;
+            ctx.shadowBlur = glowFx ? _sb(4 + chargeProgress * 6) : 0;
+            ctx.strokeStyle = `rgba(34, 211, 238, ${intakeAlpha})`;
+            ctx.lineWidth = 1 * bodyScale;
+            ctx.beginPath();
+            ctx.moveTo(0, muzzleY + 8 * bodyScale + recoilY);
+            ctx.lineTo(0, chamberY - 28 * bodyScale);
+            ctx.stroke();
+            ctx.restore();
+        };
+
+        const drawValueScreen = () => {
+            drawInsetPanel(screen.x, screen.y, screen.w, screen.h, accent, 4, 0.9);
+            ctx.save();
+            const value = String(profile.damage);
+            const maxValueWidth = screen.w - 6 * bodyScale;
+            let valueSize = 12 * bodyScale;
+            ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillStyle = 'rgba(226, 232, 240, 0.72)';
-            ctx.fillText(label, x + 5, y + 9);
-            ctx.font = 'bold 10px Cinzel';
-            ctx.fillStyle = '#fff';
-            ctx.textAlign = 'right';
-            ctx.fillText(valueText, x + w - 5, y + 9);
+            ctx.fillStyle = 'rgba(103, 232, 249, 0.82)';
+            ctx.font = `bold ${5 * bodyScale}px Cinzel`;
+            ctx.fillText('DMG', screen.x + screen.w / 2, screen.y + 7 * bodyScale);
+            ctx.fillStyle = '#f8fafc';
+            do {
+                ctx.font = `bold ${valueSize}px Cinzel`;
+                if (ctx.measureText(value).width <= maxValueWidth || valueSize <= 7 * bodyScale) break;
+                valueSize -= bodyScale;
+            } while (true);
+            if (glowFx) {
+                ctx.shadowColor = accent;
+                ctx.shadowBlur = _sb(5 + pulse * 4);
+            }
+            ctx.fillText(value, screen.x + screen.w / 2, screen.y + 21 * bodyScale);
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = `rgba(103, 232, 249, ${0.28 + pulse * 0.14})`;
+            ctx.lineWidth = 0.7 * bodyScale;
+            ctx.beginPath();
+            ctx.moveTo(screen.x + 5 * bodyScale, screen.y + 29 * bodyScale);
+            ctx.lineTo(screen.x + screen.w - 5 * bodyScale, screen.y + 29 * bodyScale);
+            ctx.stroke();
             ctx.restore();
         };
 
         const drawScatterPreview = () => {
-            const baseX = panelX + 24;
-            const baseY = panelY + 46;
             const fanSpan = pelletCount > 1 ? Math.min(Math.PI * 0.72, Math.PI * (0.2 + profile.scatter * 0.08)) : 0;
             const visible = Math.min(pelletCount, 7);
+            const fanR = 25 * bodyScale;
             ctx.save();
-            ctx.strokeStyle = '#facc15';
             ctx.lineWidth = 1;
-            ctx.globalAlpha = 0.55;
+            ctx.strokeStyle = `rgba(250, 204, 21, ${0.3 + chargeProgress * 0.22 + pulse * 0.1})`;
             for (let i = 0; i < visible; i++) {
                 const t = visible === 1 ? 0.5 : i / (visible - 1);
                 const angle = -Math.PI / 2 - fanSpan / 2 + fanSpan * t;
-                const px = baseX + Math.cos(angle) * 18;
-                const py = baseY + Math.sin(angle) * 18;
+                const px = scatter.x + Math.cos(angle) * fanR;
+                const py = scatter.y + Math.sin(angle) * fanR * 0.8;
                 ctx.beginPath();
-                ctx.moveTo(baseX, baseY);
+                ctx.moveTo(scatter.x, scatter.y);
                 ctx.lineTo(px, py);
                 ctx.stroke();
                 ctx.beginPath();
-                ctx.arc(px, py, i === Math.floor(visible / 2) ? 3.4 : 2.5, 0, Math.PI * 2);
+                ctx.arc(px, py, (i === Math.floor(visible / 2) ? 3.8 : 2.7) * bodyScale, 0, Math.PI * 2);
                 ctx.fillStyle = i === Math.floor(visible / 2) ? '#fef3c7' : '#facc15';
+                if (glowFx) {
+                    ctx.shadowColor = '#facc15';
+                    ctx.shadowBlur = _sb(5);
+                }
                 ctx.fill();
+                ctx.shadowBlur = 0;
             }
+            drawInsetPanel(-12 * bodyScale, -34 * bodyScale + recoilY, 24 * bodyScale, 13 * bodyScale, '#facc15', 4, 0.84);
+            ctx.fillStyle = '#fef3c7';
+            ctx.font = `bold ${7 * bodyScale}px Cinzel`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`S${Math.max(1, pelletCount)}`, 0, -27.5 * bodyScale + recoilY);
+            ctx.restore();
+        };
+
+        const drawMuzzlePulse = () => {
+            if (!visual.isReloading && chargeProgress <= 0.02) return;
+            const fire = visual.isReloading ? Math.sin(reloadProgress * Math.PI) : chargeProgress * 0.45;
+            if (fire <= 0.02) return;
+            ctx.save();
+            ctx.globalAlpha = Math.min(0.92, fire);
+            ctx.fillStyle = 'rgba(254, 243, 199, 0.86)';
+            ctx.strokeStyle = `rgba(34, 211, 238, ${0.24 + fire * 0.34})`;
+            if (glowFx) {
+                ctx.shadowColor = visual.isReloading ? '#facc15' : accent;
+                ctx.shadowBlur = _sb(8 + fire * 12);
+            }
+            ctx.beginPath();
+            ctx.moveTo(muzzleX, muzzleY - 13 * bodyScale);
+            ctx.lineTo(muzzleX - 7 * bodyScale * fire, muzzleY + 5 * bodyScale);
+            ctx.lineTo(muzzleX + 7 * bodyScale * fire, muzzleY + 5 * bodyScale);
+            ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(muzzleX, muzzleY, (8 + fire * 10) * bodyScale, Math.PI * 1.08, Math.PI * 1.92);
+            ctx.stroke();
             ctx.restore();
         };
 
         const drawBurstStack = () => {
-            const rackX = panelX + panelW - 36;
-            const rackY = panelY + 31;
+            drawInsetPanel(capacitor.x, capacitor.y, capacitor.w, capacitor.h, '#f59e0b', 5, 0.72);
             ctx.save();
             ctx.globalAlpha = 0.94;
-            for (let i = 0; i < 6; i++) {
-                const lit = i < profile.multicastCount;
-                const h = 5 + i * 2;
+            const maxSegments = 5;
+            const litSegments = Math.max(1, Math.min(maxSegments, profile.multicastCount));
+            for (let i = 0; i < maxSegments; i++) {
+                const lit = i < litSegments;
+                const x = capacitor.x + 3 * bodyScale;
+                const y = capacitor.y + capacitor.h - (8 + i * 7) * bodyScale;
+                const w = capacitor.w - 6 * bodyScale;
                 ctx.beginPath();
-                ctx.roundRect(rackX + i * 5, rackY + 18 - h, 3.5, h, 1.5);
-                ctx.fillStyle = lit ? '#67e8f9' : 'rgba(30, 41, 59, 0.72)';
+                ctx.roundRect(x, y, w, 4.2 * bodyScale, 2 * bodyScale);
+                ctx.fillStyle = lit ? `rgba(251, 191, 36, ${0.72 + pulse * 0.18})` : 'rgba(30, 41, 59, 0.5)';
+                if (lit && glowFx) {
+                    ctx.shadowColor = '#f59e0b';
+                    ctx.shadowBlur = _sb(4 + chargeProgress * 5);
+                }
                 ctx.fill();
-                ctx.strokeStyle = lit ? 'rgba(255,255,255,0.62)' : 'rgba(100,116,139,0.38)';
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = lit ? 'rgba(255,255,255,0.5)' : 'rgba(100,116,139,0.34)';
                 ctx.lineWidth = 0.7;
                 ctx.stroke();
+            }
+            ctx.fillStyle = '#fef3c7';
+            ctx.font = `bold ${6.5 * bodyScale}px Cinzel`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`x${profile.multicastCount}`, capacitor.x + capacitor.w / 2, capacitor.y + 6 * bodyScale);
+            ctx.restore();
+        };
+
+        const drawAttributeMagazine = () => {
+            const loadEntries = profile.entries.length > 0 ? profile.entries : [profile.primary];
+            ctx.save();
+            for (let i = 0; i < 6; i++) {
+                const lit = i < profile.loadCount;
+                const entry = loadEntries[i % loadEntries.length] || profile.primary;
+                const x = magazine.centers[i];
+                const color = entry.color || accent;
+                ctx.beginPath();
+                ctx.arc(x, magazine.y, 5.8 * bodyScale, 0, Math.PI * 2);
+                ctx.fillStyle = lit ? 'rgba(15, 23, 42, 0.86)' : 'rgba(30, 41, 59, 0.56)';
+                ctx.globalAlpha = lit ? 0.95 : 0.55;
+                ctx.fill();
+                ctx.strokeStyle = lit ? color : 'rgba(100,116,139,0.45)';
+                ctx.lineWidth = lit ? 1 * bodyScale : 0.75;
+                ctx.stroke();
+                if (lit) {
+                    const smallIcon = getUiBitmap(getAmmoIconSrcByKey(entry.key));
+                    if (glowFx) {
+                        ctx.shadowColor = color;
+                        ctx.shadowBlur = _sb(5);
+                    }
+                    if (smallIcon) {
+                        ctx.drawImage(smallIcon, x - 3.5 * bodyScale, magazine.y - 3.5 * bodyScale, 7 * bodyScale, 7 * bodyScale);
+                    } else {
+                        ctx.fillStyle = color;
+                        ctx.beginPath();
+                        ctx.arc(x, magazine.y, 2.8 * bodyScale, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.shadowBlur = 0;
+                }
+            }
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = 'rgba(226, 232, 240, 0.82)';
+            ctx.font = `bold ${6 * bodyScale}px Cinzel`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${Math.min(6, profile.loadCount)}/6`, 0, magazine.y + 12 * bodyScale);
+            ctx.restore();
+        };
+
+        const drawLoadedProjectile = () => {
+            const params = visual.params || Projectile.calculateVisualParams(recipe, false);
+            const deformation = visual.deformation || { x: 1, y: 1 };
+            const rotation = Number.isFinite(visual.previewRotation) ? visual.previewRotation : -Math.PI / 2;
+            const projectileRadius = Math.max(7, Math.min(12 * bodyScale, params.radius * 0.82 * (1 + chargeProgress * 0.16)));
+            Projectile.drawVisuals(
+                ctx,
+                chamberX,
+                chamberY,
+                projectileRadius,
+                recipe,
+                rotation,
+                params.intensity,
+                deformation
+            );
+
+            ctx.save();
+            ctx.globalAlpha = 0.95;
+            ctx.strokeStyle = `rgba(226, 232, 240, ${0.44 + pulse * 0.1})`;
+            ctx.lineWidth = 2 * bodyScale;
+            ctx.beginPath();
+            ctx.arc(chamberX, chamberY, 23 * bodyScale, Math.PI * 0.1, Math.PI * 0.9);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(chamberX, chamberY, 23 * bodyScale, Math.PI * 1.1, Math.PI * 1.9);
+            ctx.stroke();
+            if (visual.isCharging || visual.isReloading) {
+                ctx.strokeStyle = `rgba(34, 211, 238, ${0.2 + chargeProgress * 0.4 + pulse * 0.12})`;
+                ctx.lineWidth = 1 * bodyScale;
+                ctx.beginPath();
+                ctx.moveTo(chamberX, chamberY - 24 * bodyScale);
+                ctx.lineTo(muzzleX, muzzleY + recoilY);
+                ctx.stroke();
+            }
+            if (iconImg) {
+                ctx.globalAlpha = 0.86;
+                ctx.drawImage(iconImg, chamberX - 7 * bodyScale, chamberY + 25 * bodyScale, 14 * bodyScale, 14 * bodyScale);
             }
             ctx.restore();
         };
 
-        drawBadge(panelX + 8, panelY + 7, 43, 'DMG', profile.damage, accent);
-        drawBadge(panelX + panelW - 49, panelY + 7, 41, 'x', profile.multicastCount, '#67e8f9');
-        drawBadge(panelX + 8, panelY + panelH - 21, 39, 'S', pelletCount, '#facc15');
+        drawChamberFrame();
+        drawMuzzlePulse();
         drawScatterPreview();
+        drawLoadedProjectile();
+        drawValueScreen();
         drawBurstStack();
-
-        const loadEntries = profile.entries.length > 0 ? profile.entries : [profile.primary];
-        const loadX = -22;
-        const loadY = panelY + panelH - 14;
-        ctx.save();
-        for (let i = 0; i < 6; i++) {
-            const lit = i < profile.loadCount;
-            const entry = loadEntries[i % loadEntries.length] || profile.primary;
-            ctx.beginPath();
-            ctx.roundRect(loadX + i * 9, loadY, 6, 8, 2);
-            ctx.fillStyle = lit ? (entry.color || accent) : 'rgba(30, 41, 59, 0.78)';
-            ctx.globalAlpha = lit ? 0.95 : 0.55;
-            ctx.fill();
-            ctx.strokeStyle = lit ? 'rgba(255,255,255,0.65)' : 'rgba(100,116,139,0.45)';
-            ctx.lineWidth = 0.75;
-            ctx.stroke();
-        }
-        ctx.restore();
+        drawAttributeMagazine();
 
         ctx.restore();
     },
@@ -804,17 +926,21 @@ export const render_system = {
      * @param {number} cy
      * @param {boolean} isCharging
      * @param {number} chargeProgress  0~1
+     * @param {number} reloadProgress  0~1
      */
-    render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress) {
+    render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress, reloadProgress = 0) {
         const baseImg = getUiBitmap(EMITTER_BASE_SRC);
-        // @perf-impact: Combat emitter V2 swaps the old 96px sprite for one 128px bitmap draw plus the existing optional charging overlay.
+        // @perf-impact: Combat emitter V3 uses one 128px bitmap draw plus the existing optional charging overlay; recoil is a translate only.
         const baseSize = EMITTER_DRAW_SIZE;
+        const recoilY = Math.sin(Math.max(0, Math.min(1, reloadProgress || 0)) * Math.PI) * 4;
         if (baseImg) {
             ctx.save();
+            ctx.translate(0, recoilY);
             ctx.drawImage(baseImg, cx - baseSize / 2, cy - baseSize / 2, baseSize, baseSize);
             ctx.restore();
         } else {
             ctx.save();
+            ctx.translate(0, recoilY);
             ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
             ctx.beginPath();
             ctx.arc(cx, cy, 22, 0, Math.PI * 2);
@@ -828,6 +954,7 @@ export const render_system = {
             const chargeImg = getUiBitmap(EMITTER_CHARGING_SRCS[idx]);
             if (chargeImg) {
                 ctx.save();
+                ctx.translate(0, recoilY);
                 ctx.globalCompositeOperation = 'screen';
                 ctx.globalAlpha = 0.6 + t * 0.4;
                 ctx.drawImage(chargeImg, cx - baseSize / 2, cy - baseSize / 2, baseSize, baseSize);

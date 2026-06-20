@@ -262,16 +262,16 @@ export const ORBITAL_INTAKE = [
     'assets/ui/sprites/orbital_intake_3.png',
 ];
 
-export const EMITTER_BASE_SRC = 'assets/ui/sprites/emitter_base_v2.png';
+export const EMITTER_BASE_SRC = 'assets/ui/sprites/emitter_base_v3.png';
 export const EMITTER_DRAW_SIZE = 128;
 export const EMITTER_PORT_OFFSET_Y = 44;
 export const EMITTER_CHARGING_SRCS = [
-    'assets/ui/sprites/emitter_charging_v2_0.png',
-    'assets/ui/sprites/emitter_charging_v2_1.png',
-    'assets/ui/sprites/emitter_charging_v2_2.png',
-    'assets/ui/sprites/emitter_charging_v2_3.png',
-    'assets/ui/sprites/emitter_charging_v2_4.png',
-    'assets/ui/sprites/emitter_charging_v2_5.png',
+    'assets/ui/sprites/emitter_charging_v3_0.png',
+    'assets/ui/sprites/emitter_charging_v3_1.png',
+    'assets/ui/sprites/emitter_charging_v3_2.png',
+    'assets/ui/sprites/emitter_charging_v3_3.png',
+    'assets/ui/sprites/emitter_charging_v3_4.png',
+    'assets/ui/sprites/emitter_charging_v3_5.png',
 ];
 
 // Canvas 背景位图（战斗 / 研磨阶段共用主底图，发射区单独叠加炼金台层）

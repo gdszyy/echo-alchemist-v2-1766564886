@@ -87,19 +87,31 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 | :--- | :--- | :--- |
 | `vulnerability.attrs` | string[] | 固定 Boss 的破绽谱属性。命中这些属性会累积破绽进度。 |
 | `vulnerability.label` | string | 破绽满格时的浮字标签。 |
+| `vulnerability.mode` | `'hits' \| 'damage'` | 累积方式：按实际造成伤害次数，或按实际伤害量。 |
+| `vulnerability.hitThreshold` | number | `hits` 模式基础命中次数阈值。 |
+| `vulnerability.damageRatio` | number | `damage` 模式基础伤害阈值，占 Boss 最大生命百分比。 |
 | `vulnerability.dynamic` | boolean | `ouroboros` 专用；为 true 时按轮转组读取动态破绽谱。 |
 | `vulnerability.rotationAttrs` | string[][] | `ouroboros` 每个轮转组对应的破绽谱属性。 |
 | `vulnerability.labels` | string[] | `ouroboros` 每个轮转组的破绽标签。 |
+| `vulnerability.rotationModes` | string[] | `ouroboros` 每个轮转组对应的累积方式。 |
+| `vulnerability.rotationHitThresholds` | Array<number\|null> | `ouroboros` 命中次数阈值组。 |
+| `vulnerability.rotationDamageRatios` | Array<number\|null> | `ouroboros` 伤害比例阈值组。 |
 
 `CONFIG.balance.bossVulnerability` 控制全局 Boss 破绽机制：
 
 | 字段 | 默认值 | 说明 |
 | :--- | :--- | :--- |
 | `breakThreshold` | `3` | 破绽进度满格阈值。 |
+| `baseDamageRatio` | `0.10` | 未显式配置 `damageRatio` 时的基础伤害比例。 |
 | `exposedHits` | `3` | 破绽触发后持续的易伤命中次数。 |
 | `exposedDamageMult` | `1.35` | 易伤窗口内的伤害倍率。 |
 | `counterHitGain` | `1` | 命中破绽谱属性时增加的进度。 |
 | `offPatternGain` | `0` | 未命中破绽谱属性时的进度变化；当前不惩罚。 |
+| `roundScalingStart` | `5` | 从该回合后开始提高破绽条件。 |
+| `roundScalingStep` | `10` | 每隔多少回合提升一次条件。 |
+| `hitThresholdRoundBonus` | `1` | 每个缩放步给 `hits` 模式增加的命中次数。 |
+| `damageRatioRoundBonus` | `0.015` | 每个缩放步给 `damage` 模式增加的最大生命百分比。 |
+| `maxRoundScaleSteps` | `6` | 回合缩放最大步数，避免后期无限膨胀。 |
 | `enrageDelayOnBreak` | `true` | 破绽触发后，若 Boss 尚未狂暴，则延后一次 50% 血量狂暴检测。 |
 
 **Mikro (裂变母体·米克罗) 专有参数**:
@@ -112,9 +124,10 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
+| 2026-06-20 | `src/config.js`, `src/game_system.js`, `src/game_phase.js`, `src/ui/run_shop.js`, `src/ui_system.js`, `src/core.js`, `index.html`, `.cursor/rules/config.md`, `.cursor/rules/game_phase.md`, `.cursor/rules/ui_system.md` | **局内商人随机到访调度**：`CONFIG.gameplay` 新增 `runShopFirstOfferRound`、`runShopRandomWaitMin`、`runShopVisitDurationRounds`、`runShopStarterBoostShield`、`runShopStarterBoostFlatDamage`、`runShopStarterBoostDamageRounds`、`runShopStarterBoostFragments`；首访固定第 3 回合且提供免费 `starter_boost` 占位援助包，后续商人按 3..当前回合数随机等待并停留 2 回合，底部 UI 显示到访/离开倒计时。 |
 | 2026-06-19 | `src/config.js`, `src/spawn_system.js`, `src/ui/shop.js`, `src/game_phase.js`, `src/entities.js`, `src/calc_utils.js` | **底部奖励分栏与奖励专属属性**：`moduleDefaultSlots` / `moduleInitialSlots` 回调为首行 5 个初始钉板；`CONFIG.gameplay` 新增 `bottomRewardZoneChance`、`bottomRewardZoneWidthMultiplier`、`bottomRewardOnlyTypes`、`bottomRewardZoneWeights` 等底部分栏参数。`explosive` / `laser` 从命运弹珠候选与保底队列中过滤，不再作为普通弹珠出现；对应遗物只校准底部奖励分栏并触发混沌精华。 |
 | 2026-06-19 | `src/config.js`, `src/ui/shop.js`, `src/ui_system.js`, `src/game_system.js`, `src/core.js`, `.cursor/rules/config.md`, `.cursor/rules/ui_system.md` | **新增选择刷新遗物**：`fate_reroll_token` 提供每次命运抉择 1 次弹珠候选刷新；`relic_reroll_seal` 提供每次遗物选择 1 次遗物候选刷新。两者为选择 UI 被动遗物，不新增粒子、Canvas 光效或性能预算消费；刷新使用状态进入局内存档，避免刷新页面重复使用。 |
-| 2026-06-19 | `src/config.js`, `src/combat_system.js`, `src/spawn_system.js`, `src/entities/enemy.js`, `src/game_system.js`, `src/systems.js`, `.cursor/rules/config.md`, `.cursor/rules/enemy_index.md`, `.cursor/rules/spawn_system.md` | **Boss 破绽机制与旧弱点移除**：删除普通波次 `weak_spot` 低血量弱点怪；Boss 配置从 `weakness` 改为 `vulnerability` 破绽谱；命中破绽谱属性会累积进度，满格后触发短暂易伤窗口并延后一次狂暴检测。破绽进度与易伤命中数进入局内存档，Boss 状态短标签显示 `隙` / `破`。 |
+| 2026-06-19 | `src/config.js`, `src/combat_system.js`, `src/spawn_system.js`, `src/entities/enemy.js`, `src/game_system.js`, `src/systems.js`, `.cursor/rules/config.md`, `.cursor/rules/enemy_index.md`, `.cursor/rules/spawn_system.md` | **Boss 破绽机制与旧弱点移除**：删除普通波次 `weak_spot` 低血量弱点怪；Boss 配置从 `weakness` 改为 `vulnerability` 破绽谱；不同 Boss 可按实际命中次数或实际伤害量累积破绽，回合越高阈值越苛刻；满格后触发短暂易伤窗口并延后一次狂暴检测。破绽进度与易伤命中数进入局内存档，Boss 状态短标签显示 `隙` / `破`。 |
 | 2026-06-19 | `src/pinboard_modules.js`, `docs/pinboard_component_design_v2.md`, `.cursor/rules/performance.md` | **默认钉盘回归纯交错钉板**：默认 `2x5` 前两行全部使用 `dense_stagger`，不再放入 `starter_*`、转盘、弹力角或异形默认模块。`dense_stagger` 提升为安全上限内的 2x6 交错生成，当前默认盘审计为 120 圆钉 / 0 barrier / 0 SpecialSlot，最小圆钉中心距约 `29.49px`，高于当前倍化弹珠阈值 `23.8px`。旧多异形默认盘、临时 `caret_wheel_field` 超大默认盘与 `starter_*` 默认盘会精确迁移回新版纯交错默认盘。 |
 | 2026-06-19 | `src/config.js`, `src/pinboard_modules.js`, `src/entities.js`, `src/game_system.js`, `docs/pinboard_component_design_v2.md`, `.cursor/rules/performance.md` | **初始钉盘 2x5 铺满与异形机关化**：`moduleDefaultSlots` 调整为 10，`moduleInitialSlots` 改为前两行 `[0..9]`，`moduleSpacingX/Y` 调整为 `0`，默认盘面由首发异形组件铺满；新增 `split_lattice_bridge`、`split_gate_light`、`multicast_gate_light`、`recall_loop_light`、`wheel_cup_light`，并新增 `shape='barrier'` 异形 Peg 用于真实挡板/杯口/导流翼。圆钉间距按倍化弹珠半径强制大于约 `23.8px`，默认盘审计为约 75 圆钉 + 10 barrier / 5 SpecialSlot。旧存档若低于当前默认槽数会自动抬到新版 `2x5`，空活动槽会补默认组件。 |
 | 2026-06-19 | `src/config.js`, `src/game_system.js`, `src/ui/run_shop.js`, `src/ui/shop.js`, `src/ui_system.js`, `.cursor/rules/game_phase.md`, `.cursor/rules/ui_system.md` | **局内商店接入 round-start resolver**：新增 `runShopOfferAfterBoss`、`runShopMinFragmentsToOffer`、`runShopSkipRelicBonus` 参数；商店改为奖励队列清空后的可选构筑调整节点，跳过遗物会先补偿局内碎片；`runFragments`、货架和刷新次数进入局内存档；`debugOnly` 局外商品默认隐藏并在购买逻辑中二次校验。 |

@@ -38,7 +38,7 @@
 | 1.4 | `#phase-shop` | 局外商店（货架） | 🟡 | 卡片 9-Slice、`replace_ammo_bg.png` 复用炼金工坊底图 | 商店物品分类图标、价格标签 |
 | 1.5 | `#phase-selection` | 弹珠选择 / 子弹替换 / 命运时刻 | ✅ | `replace_ammo_bg.png`、`replace_card_frame_<C/B/A/S>_9s.png`、`replace_card_attr_slot.png`、`skip_btn_metal.png` | — |
 | 1.6 | `#phase-gathering` | 研磨阶段（弹珠台） | 🟡 | `bg_main_canvas.png`、`bg_emitter_zone.png`、`emitter_base.png` | 底部「钉盘外框」装饰 |
-| 1.7 | `#phase-combat` | 战斗阶段（无 DOM 主面板） | ✅ | `bg_main_canvas.png`、`emitter_base.png`、`emitter_charging_0~5.png`（蓄力 6 帧叠加） | — |
+| 1.7 | `#phase-combat` | 战斗阶段（无 DOM 主面板） | ✅ | `bg_main_canvas.png`、`emitter_base_v3.png`、`emitter_charging_v3_0~5.png`（蓄力 6 帧叠加） | — |
 | 1.8 | `#phase-truth-book` | 真理之书 / 图鉴 | 🟡 | `truth_book_bg_9s.png`（已接入背景） | 章节侧标 Tab、属性卡片底板、Boss 头像位 |
 | 1.9 | `#phase-relic` | 遗物选择 overlay | ✅ | `relic_overlay_bg.png`、`skip_btn_metal.png` + 已有遗物图标/9-Slice 边框（**已移除**旋转圆形稀有度光环） | — |
 | 1.10 | `#phase-gameover` | 游戏结束/结算 | 🟡 | `gameover_bg.png`（已接入） | 统计数据卡片 9-Slice、奖励发放动画图层 |
@@ -66,6 +66,8 @@
 | ~~`assets/ui/backgrounds/bg_emitter_zone.png`~~ | ✅ **已生成** | 720×220 | 含炼金台基座、能量管路 |
 | ~~`assets/ui/sprites/emitter_base.png`~~ | ✅ **已生成**（透明 PNG） | 96×96 | 静态贴图（带高光层） |
 | ~~`assets/ui/sprites/emitter_charging_*.png`~~ | ✅ **已生成**（透明 PNG） | 96×96 | `_0.png` ~ `_5.png`，0%→100% 蓄力渐进，纯色底 + rembg 抠图 |
+| ~~`assets/ui/sprites/emitter_base_v3.png`~~ | ✅ **已生成**（透明 PNG） | 256×256 | 战斗底部发射器 V3：内置显示屏、电容柱、中央弹丸舱、6 个弹仓 |
+| ~~`assets/ui/sprites/emitter_charging_v3_*.png`~~ | ✅ **已生成**（透明 PNG） | 256×256 | `_0.png` ~ `_5.png`，与 V3 底图对齐的透明能量叠加层 |
 | ~~`assets/icons/ammo/ammo_explosive.png`~~ | ✅ 已有 | 32×32 | 爆破弹药图标 |
 | ~~`assets/icons/ammo/ammo_matryoshka.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 套娃弹药图标 |
 | ~~`assets/icons/ammo/ammo_rainbow.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | 七彩弹药图标 |
@@ -356,3 +358,12 @@
 - Runtime mapping lives in `src/bitmap_icons.js` via `EMITTER_BASE_SRC`, `EMITTER_CHARGING_SRCS`, `EMITTER_DRAW_SIZE`, and `EMITTER_PORT_OFFSET_Y`.
 - Rendering remains a bitmap-sprite replacement path in `render_combat_launcherEmitterBase()`; no new particle system or gradient loop was added.
 - 2026-06-19 V2.2 readout pass: `render_combat_launcherSignal()` now presents the next-shot preview as a centered launcher HUD: a visible bullet body with reused ammo icon core, `DMG` damage chip, scatter count (`S`) plus mini fan preview, multicast count (`xN`) plus burst columns, and colored load cells. No new bitmap asset is required; the core reuses `AMMO_ICON_MAP`.
+
+## 9. 2026-06-19 Combat Bottom Emitter V3 Assets
+
+- `#phase-combat` bottom bullet launcher now uses a regenerated V3 art base with the UI readout spaces painted into the device:
+  - `assets/ui/sprites/emitter_base_v3_alpha_raw.png`
+  - `assets/ui/sprites/emitter_base_v3.png`
+  - `assets/ui/sprites/emitter_charging_v3_0.png` through `emitter_charging_v3_5.png`
+- V3 art reserves a central projectile chamber, left electronic display frame, right capacitor stack, and six lower ammo sockets so runtime damage/scatter/multicast/load data can read as part of the launcher body.
+- Runtime mapping remains in `src/bitmap_icons.js`; `render_combat_launcherSignal()` continues to draw fixed-count Canvas readouts over the bitmap with low-quality glow disabled.

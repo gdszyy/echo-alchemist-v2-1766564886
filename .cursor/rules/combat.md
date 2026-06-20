@@ -96,8 +96,11 @@ combat_damageEnemy()
 
 Boss 不再使用旧 `weakness` 静态字段。`combat_damageEnemy()` 在 `enemy.takeDamage()` 前调用 `combat_applyBossVulnerability()`：
 
-- `combat_getBossVulnerabilityProfile()` 从 `CONFIG.balance.bossConfigs[bossId].vulnerability` 读取当前破绽谱；`ouroboros` 会按 `rotationIndex` 动态切换。
-- 命中破绽谱属性时累积 `_bossVulnerabilityProgress`；达到 `CONFIG.balance.bossVulnerability.breakThreshold` 后进入 `_bossVulnerabilityExposedHits` 易伤窗口。
+- `combat_getBossVulnerabilityProfile()` 从 `CONFIG.balance.bossConfigs[bossId].vulnerability` 读取当前破绽谱、累积模式与阈值；`ouroboros` 会按 `rotationIndex` 动态切换。
+- `combat_applyBossVulnerability()` 在 `Enemy.takeDamage()` 前判断本次命中是否匹配破绽谱，并消费已有易伤窗口。
+- `combat_updateBossVulnerabilityProgress()` 在实际伤害产生后推进进度：`hits` 模式按实际造成伤害的命中次数累积，`damage` 模式按 `damageResult.actualDamage` 累积。
+- 回合缩放由 `CONFIG.balance.bossVulnerability.roundScaling*` 控制：回合越高，命中次数阈值或最大生命百分比阈值越高。
+- 命中破绽谱属性并达到当前阈值后进入 `_bossVulnerabilityExposedHits` 易伤窗口。
 - 易伤窗口内伤害乘以 `exposedDamageMult`，每次命中消耗 1 次。
 - 若 Boss 尚未狂暴，破绽触发会设置 `_bossVulnerabilitySuppressedEnrage`，延后一次 50% 血量狂暴检测。
 - 命中反馈标签为 `破绽+` / `破绽` / `易伤`；该机制不新增粒子、渐变或常驻 Canvas 光效。

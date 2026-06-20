@@ -43,6 +43,7 @@ const _DEFAULT_DIRS = {
     archetypes: 'assets/sprites/enemies/archetypes/',
     composites: 'assets/sprites/enemies/composites/',
     overlays: 'assets/sprites/enemies/overlays/',
+    frames: 'assets/sprites/enemies/frames/',
     archetypeIcons: 'assets/ui/icons/enemy_archetypes/',
     affixIcons: 'assets/ui/icons/enemy_affixes/',
 };
@@ -100,6 +101,18 @@ const _DEFAULT_OVERLAYS = {
     clone:   'overlay_affix_clone.png',
 };
 
+const _DEFAULT_FRAMES = {
+    'residue:1x1':   { spritePath: 'assets/sprites/enemies/frames/frame_residue_1x1.png', shape: 'aabb' },
+    'bastion:3x1':   { spritePath: 'assets/sprites/enemies/frames/frame_bastion_3x1.png', shape: 'aabb' },
+    'maw:2x2':       { spritePath: 'assets/sprites/enemies/frames/frame_maw_2x2.png', shape: 'polygon' },
+    'deflector:2x1': { spritePath: 'assets/sprites/enemies/frames/frame_deflector_2x1.png', shape: 'polygon' },
+    'echoSpire:1x2': { spritePath: 'assets/sprites/enemies/frames/frame_echo_spire_1x2.png', shape: 'polygon' },
+    'prism:1x3':     { spritePath: 'assets/sprites/enemies/frames/frame_prism_1x3.png', shape: 'polygon' },
+    'hive:2x3':      { spritePath: 'assets/sprites/enemies/frames/frame_hive_2x3.png', shape: 'polygon' },
+    'siege:3x2':     { spritePath: 'assets/sprites/enemies/frames/frame_siege_3x2.png', shape: 'aabb' },
+    'gravityWell:3x3': { spritePath: 'assets/sprites/enemies/frames/frame_gravity_core_3x3.png', shape: 'polygon' },
+};
+
 /**
  * 异步加载 manifest 文件，返回 Promise<manifest>。
  * 浏览器环境使用 fetch；Node 环境（node --check / SSR）跳过 fetch，仅返回内嵌默认值。
@@ -153,6 +166,7 @@ function _buildDefaultManifest() {
         archetypeIcons: { ..._DEFAULT_ARCHETYPE_ICONS },
         affixIcons:    { ..._DEFAULT_AFFIX_ICONS },
         overlays:      { ..._DEFAULT_OVERLAYS },
+        frames:        { ..._DEFAULT_FRAMES },
         archetypes,
         composites,
     };
@@ -205,7 +219,10 @@ export function buildEnemyAssetKey(enemy) {
  *   missingReasons: string[],
  *   archetypeIcon: string|null,
  *   affixIcons: Array<{ affix: string, path: string|null }>,
- *   overlayPaths: Array<{ affix: string, path: string }>
+ *   overlayPaths: Array<{ affix: string, path: string }>,
+ *   frameKey: string|null,
+ *   framePath: string|null,
+ *   frameShape: string|null
  * }}
  */
 export function resolveEnemyVisualAsset(enemy) {
@@ -217,6 +234,7 @@ export function resolveEnemyVisualAsset(enemy) {
     const rows = (enemy && enemy.gridRows) || 1;
     const baseArchetype = (enemy && enemy.baseArchetype) || ((cols === 1 && rows === 1) ? 'residue' : null);
     const affixes = (enemy && enemy.affixes) || [];
+    const frameKey = baseArchetype ? `${baseArchetype}:${cols}x${rows}` : null;
 
     const missingReasons = [];
 
@@ -278,6 +296,20 @@ export function resolveEnemyVisualAsset(enemy) {
         }
     }
 
+    let framePath = null;
+    let frameShape = null;
+    if (frameKey) {
+        const frameHit = (manifest.frames || {})[frameKey];
+        if (frameHit) {
+            if (typeof frameHit === 'string') {
+                framePath = (dirs.frames || _DEFAULT_DIRS.frames) + frameHit;
+            } else {
+                framePath = frameHit.spritePath || (frameHit.file ? (dirs.frames || _DEFAULT_DIRS.frames) + frameHit.file : null);
+                frameShape = frameHit.shape || null;
+            }
+        }
+    }
+
     return {
         assetKey,
         spritePath,
@@ -287,6 +319,9 @@ export function resolveEnemyVisualAsset(enemy) {
         archetypeIcon,
         affixIcons,
         overlayPaths,
+        frameKey,
+        framePath,
+        frameShape,
     };
 }
 

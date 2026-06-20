@@ -11,7 +11,7 @@ UI 系统已按职责区域拆分为以下模块，均通过 `bind(this)` 组合
 | `src/ui_system.js` | UI 核心协调层（飞行效果、货币更新、阶段切换、商店购买逻辑） | `ui_playResourceFlyEffect`、`ui_updateUI`、`meta_*`、`ui_onPhaseChange` |
 | `src/ui/hud.js` | HUD 渲染（弹药、配方、伤害统计、收集队列） | `ui_updateAmmoUI`、`ui_renderRecipeHUD`、`ui_updateDamageStats` 等 |
 | `src/ui/shop.js` | 商店/遗物选择界面渲染 | `ui_renderShop`、`ui_showRelicSelection`、`ui_selectRelic` 等 |
-| `src/ui/run_shop.js` | 局内商店/商人到访入口 | `ui_offerRunShop`、`ui_showRunShop`、`ui_buyRunShopItem` 等 |
+| `src/ui/run_shop.js` | 局内商店/商人到访入口与底部倒计时 | `ui_updateRunShopScheduleUI`、`ui_showRunShop`、`ui_buyRunShopItem` 等 |
 | `src/ui/rune_launcher.js` | 符文发射器界面（背包、网格、选择弹出层、合成重铸） | `ui_openRuneLauncher`、`ui_updateRuneGrid`、`ui_doRuneMerge` 等 |
 
 ## 2. 模块加载方式
@@ -213,12 +213,13 @@ for (const subsystem of _subsystems) {
 
 | 函数 | 描述 |
 |---|---|
-| `ui_offerRunShop()` | 在 round-start resolver 奖励清空后显示可选商人到访入口；跳过后继续回合横幅 |
-| `ui_showRunShop()` | 打开局内商店，使用 `runFragments` 购买本局构筑资源 |
+| `ui_offerRunShop()` | 兼容旧的可选商人入口与遗物跳过流程；常规随机到访不再由它阻塞横幅 |
+| `ui_showRunShop()` | 打开局内商店，使用 `runFragments` 购买本局构筑资源；从底部入口打开时临时暂停当前运行阶段 |
 | `ui_renderRunShop()` | 渲染当前货架、持有碎片、可购买状态与刷新/离开按钮 |
 | `ui_buyRunShopItem()` | 购买钉盘组件、符文、模块槽位或特殊槽，并写回本局状态 |
+| `ui_updateRunShopScheduleUI()` | 渲染底部 `#run-shop-status-dock`，展示到访/离开倒计时、进度条与可打开商店按钮 |
 
-局内商店不得作为永久升级入口；购买内容只影响当前 run。刷新、购买、离开时应调用 `sys_saveRunState()`，确保 `runFragments` 与货架状态可恢复。遗物跳过进入商店时必须先发放 `CONFIG.gameplay.runShopSkipRelicBonus`，避免玩家用遗物换到无购买力商店。
+局内商店不得作为永久升级入口；购买内容只影响当前 run。刷新、购买、离开时应调用 `sys_saveRunState()`，确保 `runFragments`、货架、商人调度与首访援助领取状态可恢复。常规到访由 `runShopNextOfferRound` / `runShopActiveUntilRound` 驱动，首访第 3 回合固定提供免费 `starter_boost` 占位援助包；该包的伤害部分必须通过 `runShopStarterBoostDamageRounds` 临时衰减，不得沉淀为永久 `flatDamageBonus`。同一次到访期内货架只生成一次，重开商店不得绕过刷新成本。遗物跳过进入商店时必须先发放 `CONFIG.gameplay.runShopSkipRelicBonus`，避免玩家用遗物换到无购买力商店。
 
 ## 7. 2026-06-18 Interaction Notes
 
@@ -226,7 +227,8 @@ for (const subsystem of _subsystems) {
 - 模块选择浮层的 `.me-picker-item` 需要保留 hover/focus 事件，即使不可放置也必须写入 `_moduleEditorPlacementPreview`，让 Canvas 同步显示合法/非法覆盖槽位。不可放置项使用 `aria-disabled="true"` 与点击拦截，不使用原生 `disabled` 阻断预览事件。
 - ????????? UI ???????????????????????? `pegs` ?? `infusedRuneId` / `fusionSourceLevel`?????????? `pegStates[source="fusion"]`??????????????????????????? 3x3 ????????? `RUNEWORD_DB.pattern` ???????????????
 - ???????????????????? `_moduleEditor_validateBeforeStart()`?????? ref?????????????????????????????????????????? `_moduleEditor_showNotice()` ??????????????
-- 钉板编辑器的画布点击语义必须保持“装备/卸下”：点击已装备槽位应直接调用卸下逻辑，把组件放回 `ownedModuleComponents`；点击空槽才打开 picker 选择库存组件装备。不要把画布主交互退回“更换/清空”语义。
+- 钉板编辑器必须由研磨常态下的「编辑钉板」入口显式进入；进入研磨阶段时不得自动打开编辑态。编辑态必须常驻显示 `ownedModuleComponents` 库存栏。
+- 钉板编辑器的画布点击只负责选中槽位和展示预览；不得直接装备或卸下。装备必须先在库存栏选中组件，再通过「装备到槽位」确认；卸下必须选中已装备槽后点击「卸下」，并把组件放回 `ownedModuleComponents`。
 - `_moduleEditor_applyModule()` 必须先完成放置校验，再清空旧模块或写入 `currentModuleLayout`，避免玩家误点一个不可放置的大模块时丢失原模块。
 - 大模块校验需要同时检查：是否越过 `CONFIG.gameplay.moduleCols/moduleRows` 钉盘边界、是否超出 `getActiveModuleSlotSet()` 所定义的已解锁槽位、是否与其他模块锚点或 ref 覆盖格重叠。
 - 模块编辑器写入 `currentModuleLayout` 时必须创建 `{ id, uid, pegStates, pluginStates }` 组件实例；多格占位使用 `{ ref: anchorIdx }`。不得重新写入裸字符串模块 ID，否则符文融合写入的 `pegStates` 会在替换/重建时丢失。
@@ -292,3 +294,17 @@ for (const subsystem of _subsystems) {
 - On coarse-pointer devices, cards that can permanently choose or apply a reward/configuration must not confirm on the first tap.
 - Current covered surfaces: `#phase-relic .relic-card` and `.me-picker-item` in the pinboard module picker. `#phase-selection .select-card` remains single-tap because players select several marbles in one flow.
 - First tap previews/highlights the item; the second tap on the same item confirms. Desktop mouse and keyboard behavior may remain direct where existing flows expect it.
+
+## 9. 2026-06-19 Meta Resource Save Contract
+
+- `saveData.resources` is the canonical store for meta-shop resources. `rune_fragments` must be mirrored to legacy `saveData.runeFragments` and `saveData.currency` for older UI and saves.
+- All rune-fragment reads in meta shop, rune launcher, and top-level currency UI must go through `meta_getResourceCount('rune_fragments')`.
+- All rune-fragment gains and spends must go through `meta_addCurrency()` / `meta_spendResource()`. Do not write `saveData.runeFragments += ...` directly.
+- `sys_loadSaveData()` must call `_meta_ensureResourceStore()` after merging legacy saves so old `currency` / `runeFragments` data is migrated into `resources.rune_fragments`.
+- The meta shop must render `#shop-resource-overview` from `META_SHOP_CONFIG.resources`, not only the headline shard counter, so players can inspect every spendable meta resource.
+
+## 10. 2026-06-19 Combat Top Safe Area
+
+- `#combat-status-panel` must sit below `#unified-top-bar`, not overlap it. Keep its CSS `top` in sync with the top bar height expression plus the 6px visual gap.
+- `sys_resize()` must calculate `combatGridTopY` from the bottom of the full combat top UI stack: unified top bar + status strip + 8px battlefield gap + half an enemy cell.
+- Do not spawn combat enemies, Bosses, training combat dummies, or draw the top wall from a hard-coded `80px` top row. Use `combatGridTopY` so the visible battlefield never sits under the top HUD.

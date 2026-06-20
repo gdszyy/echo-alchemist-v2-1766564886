@@ -1,6 +1,6 @@
 # src\render_system.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 1001 | 函数数: 12 | 语言: javascript
+> 自动生成于 2026-06-20 | 总行数: 1128 | 函数数: 20 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -18,8 +18,16 @@
 | render_singleWindMatrix | method | `render_singleWindMatrix(matrix)` |  |
 | render_floatingTexts | method | `render_floatingTexts(timeScale)` |  |
 | render_combat_launcherOrbitals | method | `render_combat_launcherOrbitals(ctx, centerX, centerY, recipe)` | ⚠️ 巨型函数，见 @section 导航 |
-| render_combat_launcherSignal | method | `render_combat_launcherSignal(ctx, cx, cy, portX, portY, recipe)` |  |
-| render_combat_launcherEmitterBase | method | `render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress)` |  |
+| render_combat_launcherSignal | method | `render_combat_launcherSignal(ctx, cx, cy, portX, portY, recipe, visual = {})` |  |
+| drawInsetPanel | function | `drawInsetPanel(x, y, w, h, color, radius = 5, alpha = 0.9)` |  |
+| drawChamberFrame | function | `drawChamberFrame()` |  |
+| drawValueScreen | function | `drawValueScreen()` |  |
+| drawScatterPreview | function | `drawScatterPreview()` |  |
+| drawMuzzlePulse | function | `drawMuzzlePulse()` |  |
+| drawBurstStack | function | `drawBurstStack()` |  |
+| drawAttributeMagazine | function | `drawAttributeMagazine()` |  |
+| drawLoadedProjectile | function | `drawLoadedProjectile()` |  |
+| render_combat_launcherEmitterBase | method | `render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress, reloadProgress = 0)` |  |
 | drawTiltVignette | method | `drawTiltVignette(ctx, tilt)` |  |
 | drawTiltIndicator | method | `drawTiltIndicator(ctx, tilt)` |  |
 | render_perfOverlay | method | `render_perfOverlay()` |  |

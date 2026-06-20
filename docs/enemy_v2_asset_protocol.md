@@ -4,6 +4,8 @@
 manifest、metadata 接入路径与回退策略。所有 V2 敌人必须遵守该协议，
 后续替换为正式美术时**只需替换文件，无需修改其他代码**。
 
+> **统一美术母题**：正式美术默认采用“几何磨石块基座 + 镶嵌核心”。PNG / Sprite Sheet / 图鉴头像都应保留磨损倒角、切削痕、石槽和嵌入式机制核心；不要求 GIF。完整风格规范见 [`docs/design/enemy_geometric_whetstone_style.md`](design/enemy_geometric_whetstone_style.md)，重生成批次见 [`docs/design/enemy_asset_regeneration_plan.md`](design/enemy_asset_regeneration_plan.md)。
+
 > 配套实现：
 > - 元数据：[`src/data/enemy_v2_metadata.js`](../src/data/enemy_v2_metadata.js)
 > - 图标映射：[`src/bitmap_icons.js`](../src/bitmap_icons.js) → `ENEMY_V2_ICON_MAP`
@@ -17,6 +19,7 @@ manifest、metadata 接入路径与回退策略。所有 V2 敌人必须遵守�
 |---|---|---|
 | Sprite Sheet PNG | `assets/sprites/enemies/v2/<resourceId>.png` | `enemy_<base>_<cols>x<rows>` |
 | Sprite manifest  | `assets/sprites/enemies/v2/<resourceId>.json` | 同 PNG，扩展名 `.json` |
+| Collision Frame PNG | `assets/sprites/enemies/frames/frame_<base>_<cols>x<rows>.png` | 与物理碰撞框同形，中心透明；作为顶层物理边界 |
 | UI 头像/图鉴图标 | `assets/icons/enemies/<resourceId>.png`        | 64×64，与 PNG 同名 |
 
 **当前已建立的 `resourceId`（P0–P3）**：
@@ -32,9 +35,7 @@ manifest、metadata 接入路径与回退策略。所有 V2 敌人必须遵守�
 | P3 | `enemy_siege_3x2`        | siege       | 3×2 |
 | P3 | `enemy_gravity_core_3x3` | gravityWell | 3×3 |
 
-> 当前所有 PNG 均为 **placeholder**（由
-> `scripts/gen_enemy_v2_placeholders.py` 生成），manifest 中带
-> `"placeholder": true`。命名/manifest/接入协议为正式版。
+> 普通 1×1 残渣使用 `residue:1x1` frame 键，V2 大型基底使用 `<baseArchetype>:<cols>x<rows>` frame 键。
 
 ## 2. Sprite Sheet manifest 规格
 
@@ -56,6 +57,28 @@ manifest、metadata 接入路径与回退策略。所有 V2 敌人必须遵守�
 - `animations.hit.row`：受击行号；可选，但建议提供。
 - `animations.move/cast`：可选；如果未提供，渲染层会自动回退到 `idle`。
 - `placeholder`：true 表示占位资源，后续美术替换时改为 false。
+
+> 资源可以只提供 `idle` + `hit` 两行，后续 `move` / `cast` 为可选增强。若美术只交付静态 PNG，应仍按同名 manifest 包装为单帧或少帧 Sprite Sheet，避免绕开现有 `SpriteRenderer` 和 manifest 回退链路。
+
+## 2.5 Collision Frame manifest 规格
+
+`assets/sprites/enemies/enemy_sprite_manifest.json` 的 `frames` 段用于登记材质化物理碰撞框。键名为 `<baseArchetype>:<cols>x<rows>`，运行时由 `resolveEnemyVisualAsset(enemy)` 返回 `frameKey/framePath/frameShape`，再由 `Enemy._drawCollisionFrameBitmap()` 绘制。
+
+```json
+{
+  "frames": {
+    "bastion:3x1": {
+      "spritePath": "assets/sprites/enemies/frames/frame_bastion_3x1.png",
+      "shape": "aabb",
+      "footprint": "3x1"
+    }
+  }
+}
+```
+
+- Frame 必须匹配 `spawn_applyArchetypeShape()` 设定的真实 `collisionShape/collisionData`，不是独立装饰容器。
+- PNG 中心保持透明或近透明，给 Layer 2 血条、HP 数字、状态短标和预警 UI 留出可读空间。
+- 绘制层在 Layer 4.9 内壁阴影之后。若 frame PNG 已加载并成功绘制，Layer 5 矢量描边/边框脉冲不再绘制，避免旧边框盖过物理边界；若 frame 资源缺失或未 ready，则继续使用 Layer 5 作为兜底。
 
 ## 3. metadata 字段（src/data/enemy_v2_metadata.js）
 
@@ -95,6 +118,12 @@ sprite_renderer / icon map / 试炼场 / 图鉴会自动同步。
    - 当 `baseArchetype` 存在且 `cols>=2 || rows>=2` 时，Sprite 占满整个占格（仅留 6px 边距）；
    - 否则回到默认 `min(w,h)` 居中偏下绘制。
 8. Layer 4+：裂纹 / 过载 / 选中高亮
+9. Layer 4.9b：**Collision Frame 材质边框**
+   - 对普通 `1×1 residue` 与所有登记 frame 的非 Boss V2 敌人生效；
+   - 读取 manifest `frames[<baseArchetype>:<cols>x<rows>]`；
+   - 绘制成功后接管物理边界表达，Layer 5 矢量描边只作为资源未 ready / 加载失败时的兜底。
+
+当前目标图层收束为：底层 Canvas 血量容器，中层中心敌人 Sprite，顶层中空 Collision Frame。状态和词条特效暂时沿用既有 Layer 3.x / overlay 管线，后续再单独拆分为可控特效层。
 
 ## 5. 回退策略（防止敌人消失）
 
@@ -127,6 +156,8 @@ normal              →  golem_normal
 5. 运行 `python3 scripts/gen_enemy_v2_placeholders.py`
    仅会重新生成 placeholder，不会覆盖正式美术（除非主动恢复占位）。
 
+正式美术验收时额外检查：主体是否仍是几何磨石块基座，专属机制是否嵌在石槽内部，通用词条是否只作为覆层存在。若资源看起来像纯发光云、纯软体器官、独立机械载具或 UI 徽章，应退回重画。
+
 ## 6.5 2026-06-19 asset update
 
 - The 8 V2 base enemies now use procedural bitmap sprite sheets instead of the original line/block placeholders.
@@ -144,3 +175,4 @@ normal              →  golem_normal
 - [x] 试炼场 V2 矩阵 / 真理之书图鉴共用 `ENEMY_V2_METADATA`
 - [x] 每个 V2 敌人具备：中文名、footprint、baseArchetype、affix、战术职责、克制提示
 - [x] 资源加载失败时回退到矢量绘制 + 元素轮廓，敌人保持可见
+- [x] Collision Frame 已覆盖普通 `residue:1x1` 与 8 个 V2 基底，成功绘制时接管顶层物理边界

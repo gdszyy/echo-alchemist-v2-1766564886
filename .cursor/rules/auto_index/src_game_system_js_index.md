@@ -1,6 +1,6 @@
 # src\game_system.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 3008 | 函数数: 50 | 语言: javascript
+> 自动生成于 2026-06-20 | 总行数: 3124 | 函数数: 56 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -32,6 +32,12 @@
 | sys_determineEnemyReward | method | `sys_determineEnemyReward(enemy, isRowRepresentative = false)` | ⚠️ 巨型函数，见 @section 导航 |
 | sys_preCalcEnemyRewardType | method | `sys_preCalcEnemyRewardType(enemy)` |  |
 | sys_tryQueueEnemyRoundReward | method | `sys_tryQueueEnemyRoundReward(enemy)` |  |
+| sys_initRunShopSchedule | method | `sys_initRunShopSchedule()` |  |
+| sys_rollNextRunShopRound | method | `sys_rollNextRunShopRound(fromRound = this.round || 1)` |  |
+| sys_activateRunShopVisit | method | `sys_activateRunShopVisit(round = this.round || 1)` |  |
+| sys_updateRunShopScheduleForRound | method | `sys_updateRunShopScheduleForRound()` |  |
+| sys_isRunShopActive | method | `sys_isRunShopActive()` |  |
+| sys_getRunShopScheduleState | method | `sys_getRunShopScheduleState()` |  |
 | sys_maybeOfferRunShopBeforeRoundStart | method | `sys_maybeOfferRunShopBeforeRoundStart()` |  |
 | sys_startRoundStartResolver | method | `sys_startRoundStartResolver()` |  |
 | sys_continueRoundStartResolver | method | `sys_continueRoundStartResolver()` |  |

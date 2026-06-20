@@ -88,6 +88,7 @@
 *   **游戏系统与试炼场规范**：[`.cursor/rules/systems.md`](.cursor/rules/systems.md) - 包含试炼场（TrainingGround）场景化配置契约、真理之书（TruthBook）图鉴配置及 UI 渲染机制。
 *   **生成系统规范**：[`.cursor/rules/spawn_system.md`](.cursor/rules/spawn_system.md) - 导演系统阵型模板完整规范（所有阵型的设计意图、触发条件和实现细节）。（Task B.1/B.2 完成）
 *   **自适应性能系统规范**：[`.cursor/rules/performance.md`](.cursor/rules/performance.md) - 基于手机平均帧率的动态特效等级系统（FPS 采样器、三档预算表、所有消费端关联索引、Agent 修改防坑指南）。**凡涉及粒子数量、特效上限、Peg 光效、敌人光泽的修改，必须先读此文档。**
+*   **世界变迁模拟器规范**：[`.cursor/rules/world_sim.md`](.cursor/rules/world_sim.md) - `src/world_sim/` 元胞自动机星球演化引擎（地幔/气候/晶石/生物四层）的移植规范。**纯数据模块，当前未接入 `Game` 主类与 EventBus**；凡修改四层演化逻辑、元胞状态模型或欲接入 gameplay 时必读。
 
 ### 数据索引文档（快速速查，无需读取源码）
 

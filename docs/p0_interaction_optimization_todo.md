@@ -124,10 +124,17 @@
 
 - [ ] 统一卡片头部：名称、稀有度、来源、代价、收益、禁用原因。
 - [ ] 商店购买、遗物选择、图鉴条目使用同一套“可用 / 不足 / 已拥有 / 已满级”状态语法。
+- [ ] 设计局内商人首访免费“临时加成类”商品池：明确每种加成的持续范围、数值、互斥规则、刷新/购买限制与 UI 文案；当前实现仅用 `starter_aid_bundle` 占位援助包承接第 3 回合新手保护（护盾/碎片即时发放，基础伤害临时持续 2 回合）。
 - [ ] 真理之书补充核心机制验证入口，优先覆盖符文充能、子弹替换、DropPity、智能掉落和 V2 大型敌人。
 
 ### 4.3 P2 位图化视觉重构
 
+- [x] 敌人美术风格母题收口：新增 `docs/design/enemy_geometric_whetstone_style.md`，将 V2 敌人统一为“几何磨石块基座 + 镶嵌核心”，并同步引用到位图规格、敌人 V2 视觉文档、资源协议和资产影响评估。
+- [x] 敌人资产重生成计划：新增 `docs/design/enemy_asset_regeneration_plan.md`，按 Batch A-E 规划 V2 基底、Composite、Overlay/Icon、Normal/Elite fallback 与 Boss 概念预研。
+- [x] Pass 1 概念预览：生成 `bastion`、`maw`、`deflector`、`echoSpire` 四张 alpha 概念稿与 contact sheet，保存到 `docs/design/concepts/enemy_pass1/`。
+- [x] Pass 1 视角/打光修正：补充正交正面轻俯视与居中前顶光规范，生成 view-fix 版本并保存到 `docs/design/concepts/enemy_pass1_viewfix/`。
+- [x] Pass 1 碰撞框材质层：修正“装饰框”误解，按 `collisionShape/collisionData` 生成 4 个 collision-aligned frame，后续建议接入 `frames` manifest 段。
+- [ ] 按 `docs/design/enemy_asset_regeneration_plan.md` 执行 Pass 1：重生成 `bastion`、`maw`、`deflector`、`echoSpire` 四个 V2 基底与对应图标。
 - [ ] 按 `docs/ui_asset_requirements.md` 和 `design_spec_bitmap.md` 逐项补 UI 9-Slice、弹药图标、符文图标、遗物图标、词条图标。
 - [ ] 在素材接入前保留现有 DOM / Canvas 逻辑，先替换静态装饰层，避免同时改交互和美术资源。
 - [ ] 接入 Sprite 或高开销 Canvas 特效时，必须先读 `.cursor/rules/performance.md` 并补 `// @perf-impact` 与三档评估。

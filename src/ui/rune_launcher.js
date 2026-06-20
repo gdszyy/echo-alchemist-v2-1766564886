@@ -146,7 +146,10 @@ export const rune_launcher_system = {
     _ui_updateLauncherShardCount() {
         const el = document.getElementById('launcher-shard-count');
         if (el) {
-            el.textContent = (this.saveData && this.saveData.runeFragments) ? this.saveData.runeFragments.toLocaleString() : '0';  // [Mixin 正常用法：读取 Game 实例状态]
+            const fragments = (typeof this.meta_getResourceCount === 'function')
+                ? this.meta_getResourceCount('rune_fragments')
+                : (this.saveData && this.saveData.runeFragments ? this.saveData.runeFragments : 0);
+            el.textContent = fragments.toLocaleString();
         }
     },
 

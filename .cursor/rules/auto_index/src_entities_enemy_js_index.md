@@ -1,6 +1,6 @@
 # src\entities\enemy.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 6167 | 函数数: 39 | 语言: javascript
+> 自动生成于 2026-06-20 | 总行数: 6225 | 函数数: 42 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 4 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -13,6 +13,7 @@
 |--------|------|------|------|
 | setEnemyAudioProvider | function | `setEnemyAudioProvider(provider)` |  |
 | _getAffixOverlayImage | function | `_getAffixOverlayImage(src)` |  |
+| _getEnemyFrameImage | function | `_getEnemyFrameImage(src)` |  |
 | constructor | method | `constructor(x, y, width, height, hp, maxHp = hp, type = 'normal', affixes = [])` |  |
 | initSprite | method | `initSprite()` |  |
 | _initTexture | method | `_initTexture(width, height)` |  |
@@ -46,6 +47,8 @@
 | _drawBossDecoration | method | `_drawBossDecoration(ctx, w, h)` | ⚠️ 巨型函数，见 @section 导航 |
 | _drawArchetypeBody | method | `_drawArchetypeBody(ctx, w, h)` |  |
 | _getAffixTintColor | method | `_getAffixTintColor()` |  |
+| _syncCollisionFrameImage | method | `_syncCollisionFrameImage()` |  |
+| _drawCollisionFrameBitmap | method | `_drawCollisionFrameBitmap(ctx, w, h)` |  |
 | _syncAffixOverlayImages | method | `_syncAffixOverlayImages()` |  |
 | _drawAffixBitmapOverlays | method | `_drawAffixBitmapOverlays(ctx, w, h)` |  |
 | _drawAffixSigil | method | `_drawAffixSigil(ctx, w, h)` |  |

@@ -1,0 +1,55 @@
+
+> world-sim-lab@0.1.0 dev
+> vite --host 127.0.0.1 --port 5175 --strictPort
+
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m290[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5175[22m/[39m
+[2m17:00:56[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mterrain-layer-dom.html[22m
+[2m17:01:13[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mterrain-layer-dom.html[22m
+[2m17:01:14[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mterrain-layer-dom.html[22m
+[2m17:01:32[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mterrain-layer-dom.html[22m
+[2m17:01:33[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mterrain-layer-dom.html[22m
+[2m17:02:05[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mterrain-layer-dom.html[22m
+[2m17:08:51[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/sim/disaster-tools.js[22m
+[2m17:09:45[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
+[2m17:13:00[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/sim/disaster-tools.js[22m
+[2m17:20:13[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/engine.js[22m
+[2m17:20:24[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/params.js[22m
+[2m17:21:16[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/climate_layer.js[22m
+[2m17:21:25[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/sim/params-schema.js[22m
+[2m17:46:03[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/params.js[22m
+[2m17:46:24[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/mantle_layer.js[22m
+[2m17:46:44[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/engine.js[22m
+[2m17:46:50[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/sim/params-schema.js[22m
+[2m18:35:50[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/engine.js[22m
+[2m18:35:58[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/params.js[22m
+[2m18:36:17[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/mantle_layer.js[22m
+[2m18:36:27[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/sim/params-schema.js[22m
+[2m19:15:10[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/cell.js[22m
+[2m19:15:30[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/params.js[22m
+[2m19:15:49[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/bio_layer.js[22m
+[2m19:15:56[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/bio_layer.js[22m
+[2m19:16:59[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/bio_spawn.js[22m
+[2m19:17:10[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/engine.js[22m
+[2m19:17:15[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/terrain_features.js[22m
+[2m19:19:04[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/bio_layer.js[22m
+[2m19:19:11[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/bio_spawn.js[22m
+[2m19:24:38[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/bio_layer.js[22m
+[2m19:24:44[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/params.js[22m
+[2m19:39:50[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/params.js[22m
+[2m19:40:07[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/engine.js[22m
+[2m19:40:21[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/bio_spawn.js[22m
+[2m19:42:40[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/bio_spawn.js[22m
+[2m19:44:01[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/params.js[22m
+[2m19:44:15[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/bio_spawn.js[22m
+[2m20:15:41[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/params.js[22m
+[2m20:16:04[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/bio_layer.js[22m
+[2m20:16:29[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/mantle_layer.js[22m
+[2m20:16:37[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/mantle_layer.js[22m
+[2m20:16:48[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/bio_layer.js[22m
+[2m20:16:58[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/bio_spawn.js[22m
+[2m20:17:19[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/bio_layer.js[22m
+[2m20:21:27[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/mantle_layer.js[22m
+[2m20:21:48[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mD:/claude/echo-alchemist-v2-1766564886/src/world_sim/crystal_layer.js[22m

@@ -175,6 +175,11 @@ if avgFps > fpsThresholdUp (55):
 |------|---------|------|
 | 通用词条 Overlay 位图叠层（Layer 3.96） | `perfQualityLevel` | `high`：每敌最多 2 次 `drawImage`；`medium/low`：每敌最多 1 次 `drawImage`。不新增粒子、渐变、`shadowBlur` 或预算字段；缺失/未加载资源时静默跳过，语义由 Canvas 词条层与短标签兜底 |
 
+### 5.5.3 碰撞框材质边框（`src/entities/enemy.js` → `Enemy._drawCollisionFrameBitmap`）
+| 位置 | 读取字段 | 行为 |
+|------|---------|------|
+| 非 Boss 敌人 Collision Frame 位图层（Layer 4.9b） | `perfQualityLevel` | `high/medium`：每个已登记 frame 的非 Boss 敌人 1 次缓存 `drawImage`，透明度 0.96；`low`：仍保留边框语义，透明度降为 0.84。不新增粒子、渐变、`shadowBlur`、混合模式或预算字段；绘制成功时接管顶层物理边界并跳过 Layer 5 矢量边框，缺失/未加载资源时由 Layer 5 矢量碰撞描边兜底 |
+
 ### 5.6 Arc Boss VFX（`src/entities/enemy.js` → Devourer Layer 6.5 & Ouroboros Layer 6.5）
 
 | 位置 | 读取字段 | 行为 |
@@ -302,15 +307,17 @@ if avgFps > fpsThresholdUp (55):
 | 2026-06-18 | **钉板模块池扩展**：新增分裂门、召回环、弹钉斜坡、属性坩埚、双轮盘与融合花园模块。全部复用现有 `Peg` / `SpecialSlot` 绘制与触发逻辑，不新增粒子、渐变、混合模式或 shadowBlur；额外开销主要来自同屏 Peg/Slot 数量，继续归入高密度模块化钉盘预算。 |
 | 2026-06-18 | **敌人意图预告升级**：`Enemy.startTurnAction()` 新增 `telegraphIntent`，在行动前显示图标、短标签和倒计时环；`Enemy.draw` 中 high/medium 使用 `enemyTelegraphGlow:true` 保留轻量 `shadowBlur`，low 档以 `enemyTelegraphGlow:false` 降级为平面面板与描边。该提示属于语义类玩法信息，low 档不得完全关闭。 |
 
+| 2026-06-19 | **碰撞框材质边框**：`enemy.js` 新增 `_drawCollisionFrameBitmap()`，从 `enemy_sprite_manifest.json` 的 `frames` 段读取大型 V2 敌人的同形材质边框，并在 Layer 4.9 后、Layer 5 矢量描边前绘制。每敌最多 1 次缓存 `drawImage`，`low` 档降低透明度但保留物理边界语义；不新增粒子、渐变、`shadowBlur`、混合模式或新预算字段，资源未就绪时由既有矢量描边兜底。 |
+
 ### 8.1 Battle Relic Cinematic Budget (2026-06-18)
 
 新增 `relicCinematicDelayMs`、`relicCinematicSparkCount`、`relicCinematicBoltCount` 三档预算字段，用于战斗内遗物的短演出：
 
-- `doomsday_timer`: 回合开始锁定、冲击波、落雷和粒子爆发；若击杀成功会补触发，补触发上限从 1 开始，并随主触发累计每 5 次 +1。每段演出仍复用同一组预算和既有效果上限，单轮最多受当前存活敌人数约束。
+- `doomsday_timer`: 回合开始锁定、冲击波、倒计时读数、钟面碎片和粒子爆发；若击杀成功会补触发，补触发上限从 1 开始，并随主触发累计每 5 次 +1。每段演出仍复用同一组预算和既有效果上限，单轮最多受当前存活敌人数约束。
 - `corridor_arc`: 回合开始墙体电弧、墙撞火花。
 - `mortal_burst`: 击杀爆裂的 FireWave、冲击波和碎片粒子。
 
-这些演出仍叠加既有 `shockwaveLimit` / `waveLimit` / `lightningLimit` / `sparkLimit` 检查。`phase_finalizeRound()` 会按遗物 Hook 返回的演出时长延后 Boss 生成、奖励解析和下一阶段横幅，避免动画被阶段切换吞掉。
+这些演出仍叠加既有 `shockwaveLimit` / `waveLimit` / `lightningLimit` / `sparkLimit` 检查；其中 `doomsday_timer` 不再创建 `LightningBolt`，但仍复用 `relicCinematicBoltCount` 作为钟面碎片数量预算。`phase_finalizeRound()` 会按遗物 Hook 返回的演出时长延后 Boss 生成、奖励解析和下一阶段横幅，避免动画被阶段切换吞掉。
 
 ## 9. 性能影响标记规范
 

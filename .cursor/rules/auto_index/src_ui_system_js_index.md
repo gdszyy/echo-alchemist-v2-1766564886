@@ -1,6 +1,6 @@
 # src\ui_system.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 2737 | 函数数: 52 | 语言: javascript
+> 自动生成于 2026-06-20 | 总行数: 3137 | 函数数: 57 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -18,6 +18,8 @@
 | ui_selectReplaceAmmoTarget | method | `ui_selectReplaceAmmoTarget(ammoIdx)` |  |
 | ui_rerollMarbleSelection | method | `ui_rerollMarbleSelection()` |  |
 | ui_refreshSelectionModeUI | method | `ui_refreshSelectionModeUI()` |  |
+| _meta_ensureResourceStore | method | `_meta_ensureResourceStore()` |  |
+| _meta_getRuneInventoryResourceCount | method | `_meta_getRuneInventoryResourceCount(resourceId)` |  |
 | meta_getResourceCount | method | `meta_getResourceCount(resourceId)` |  |
 | meta_spendResource | method | `meta_spendResource(resourceId, amount)` |  |
 | ui_updateUI | method | `ui_updateUI()` |  |
@@ -29,7 +31,7 @@
 | _ui_migrateRuneLauncherToSidebar | method | `_ui_migrateRuneLauncherToSidebar(toSidebar)` |  |
 | ui_confirmSelection | method | `ui_confirmSelection()` |  |
 | meta_applyUpgrades | method | `meta_applyUpgrades()` |  |
-| meta_addCurrency | method | `meta_addCurrency(amount)` |  |
+| meta_addCurrency | method | `meta_addCurrency(amount, resourceId = 'rune_fragments')` |  |
 | meta_startRun | method | `meta_startRun()` |  |
 | meta_continueRun | method | `meta_continueRun()` |  |
 | meta_updateContinueButton | method | `meta_updateContinueButton()` |  |
@@ -46,6 +48,9 @@
 | ui_abandonRunToMeta | method | `ui_abandonRunToMeta()` |  |
 | ui_syncPauseSettings | method | `ui_syncPauseSettings()` |  |
 | ui_renderPauseRelics | method | `ui_renderPauseRelics()` |  |
+| _moduleEditor_ensureStyles | method | `_moduleEditor_ensureStyles()` |  |
+| ui_showModuleEditorEntry | method | `ui_showModuleEditorEntry()` |  |
+| ui_hideModuleEditorEntry | method | `ui_hideModuleEditorEntry()` |  |
 | ui_showModuleEditor | method | `ui_showModuleEditor(onComplete)` |  |
 | ui_renderModuleEditorControls | method | `ui_renderModuleEditorControls()` |  |
 | _moduleEditor_showNotice | method | `_moduleEditor_showNotice(message, options = {})` |  |

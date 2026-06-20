@@ -975,10 +975,16 @@ export const spawn_system = {
             const iconWrap = document.createElement('div');
             iconWrap.className = 'select-icon-wrap';
             const iconEl = document.createElement('div');
-            iconEl.className = 'select-icon';
-            iconEl.style.background = 'radial-gradient(circle at 35% 28%, #f8fafc 0%, #dbe4f0 28%, #93a4b8 58%, #334155 100%)';
-            iconEl.style.border = '1px solid rgba(203, 213, 225, 0.7)';
-            iconEl.style.boxShadow = 'inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.24), 0 0 10px rgba(148,163,184,0.22)';
+            iconEl.className = `select-icon marble-fx-${m.type || 'white'}`;
+            const marbleColor = m.getColor();
+            const isGradientColor = marbleColor && marbleColor.includes('gradient');
+            const marbleGlowColor = isGradientColor ? '#facc15' : (marbleColor || '#f8fafc');
+            const marbleFill = isGradientColor
+                ? marbleColor
+                : `radial-gradient(circle at 35% 28%, #ffffff 0%, ${marbleGlowColor} 34%, #475569 100%)`;
+            iconEl.style.background = marbleFill;
+            iconEl.style.border = `1px solid ${marbleGlowColor}`;
+            iconEl.style.boxShadow = `inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.24), 0 0 12px ${marbleGlowColor}`;
             // 光泽高光层
             const shine = document.createElement('div');
             shine.className = 'select-icon-shine';
@@ -993,7 +999,7 @@ export const spawn_system = {
                 const img = document.createElement('img');
                 img.src = marbleBitmapSrc;
                 img.alt = marbleIcon;
-                img.style.cssText = 'width:18px;height:18px;object-fit:contain;display:block;filter:grayscale(1) brightness(1.25);opacity:0.95;';
+                img.style.cssText = 'width:18px;height:18px;object-fit:contain;display:block;filter:drop-shadow(0 0 4px rgba(255,255,255,0.28));opacity:0.98;';
                 img.loading = 'lazy';
                 img.onerror = function() {
                     this.replaceWith(document.createTextNode(marbleIcon));
@@ -1110,9 +1116,15 @@ export const spawn_system = {
         const previewBall = panel.querySelector('#preview-marble-ball');
 
         if (previewBall) {
-            previewBall.style.background = 'radial-gradient(circle at 35% 28%, #f8fafc 0%, #dbe4f0 30%, #93a4b8 60%, #334155 100%)';
-            previewBall.style.border = '1px solid rgba(203, 213, 225, 0.7)';
-            previewBall.style.boxShadow = 'inset -3px -3px 6px rgba(0,0,0,0.5), inset 2px 2px 5px rgba(255,255,255,0.2), 0 0 10px rgba(148,163,184,0.22)';
+            const isGradientColor = marbleColor && marbleColor.includes('gradient');
+            const marbleGlowColor = isGradientColor ? '#facc15' : (marbleColor || '#f8fafc');
+            const previewFill = isGradientColor
+                ? marbleColor
+                : `radial-gradient(circle at 35% 28%, #ffffff 0%, ${marbleGlowColor} 36%, #475569 100%)`;
+            previewBall.className = `marble-fx-${m.type || 'white'}`;
+            previewBall.style.background = previewFill;
+            previewBall.style.border = `1px solid ${marbleGlowColor}`;
+            previewBall.style.boxShadow = `inset -3px -3px 6px rgba(0,0,0,0.5), inset 2px 2px 5px rgba(255,255,255,0.2), 0 0 14px ${marbleGlowColor}`;
         }
         if (previewIcon) previewIcon.textContent = marbleIcon;
         if (previewName) previewName.textContent = marbleName;

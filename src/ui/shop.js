@@ -713,9 +713,33 @@ export const shop_system = {
         const categoryContainer = document.getElementById('shop-category-tabs');
         const itemsContainer = document.getElementById('shop-items-container');
         const currencyDisplay = document.getElementById('shop-currency-display');
+        const resourceOverview = document.getElementById('shop-resource-overview');
         
         if (currencyDisplay) {
-            currencyDisplay.innerText = (this.saveData && this.saveData.runeFragments ? this.saveData.runeFragments : 0).toLocaleString();
+            const fragments = (typeof this.meta_getResourceCount === 'function')
+                ? this.meta_getResourceCount('rune_fragments')
+                : (this.saveData && this.saveData.runeFragments ? this.saveData.runeFragments : 0);
+            currencyDisplay.innerText = fragments.toLocaleString();
+        }
+
+        if (resourceOverview) {
+            resourceOverview.innerHTML = '';
+            Object.values(META_SHOP_CONFIG.resources || {}).forEach(res => {
+                const amount = (typeof this.meta_getResourceCount === 'function')
+                    ? this.meta_getResourceCount(res.id)
+                    : 0;
+                const item = document.createElement('div');
+                item.className = 'rounded-lg border border-slate-700/60 bg-slate-900/70 px-2 py-2 min-w-0';
+                item.title = `${res.name}: ${amount.toLocaleString()}`;
+                item.innerHTML = `
+                    <div class="flex items-center gap-1 min-w-0">
+                        <span class="text-sm shrink-0">${res.icon}</span>
+                        <span class="text-[10px] text-slate-400 truncate">${res.name}</span>
+                    </div>
+                    <div class="mt-1 text-sm font-bold text-slate-100 tabular-nums">${amount.toLocaleString()}</div>
+                `;
+                resourceOverview.appendChild(item);
+            });
         }
         
         const shopRuneCount = document.getElementById('shop-rune-count');

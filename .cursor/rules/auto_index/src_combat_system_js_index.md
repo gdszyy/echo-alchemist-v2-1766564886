@@ -1,6 +1,6 @@
 # src\combat_system.js 函数索引
 
-> 自动生成于 2026-06-19 | 总行数: 4037 | 函数数: 50 | 语言: javascript
+> 自动生成于 2026-06-20 | 总行数: 4079 | 函数数: 51 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 5 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -40,6 +40,7 @@
 | add | function | `add(attr, value = 0)` |  |
 | combat_getBossVulnerabilityProfile | method | `combat_getBossVulnerabilityProfile(boss)` |  |
 | combat_applyBossVulnerability | method | `combat_applyBossVulnerability(enemy, config = {}, projectile = null, dmg = 0)` |  |
+| combat_updateBossVulnerabilityProgress | method | `combat_updateBossVulnerabilityProgress(enemy, bossVulnerability, actualDamage = 0)` |  |
 | combat_getHitFeedbackLabel | method | `combat_getHitFeedbackLabel(enemy, config = {}, projectile = null, damageResult = null, context = {})` |  |
 | addAttr | function | `addAttr(attr, value = 0)` |  |
 | combat_damageEnemy | method | `combat_damageEnemy(enemy, projectile, damageOverride = null)` | ⚠️ 巨型函数，见 @section 导航 |
