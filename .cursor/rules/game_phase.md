@@ -233,6 +233,7 @@ globs: ["src/game_phase.js"]
 - `phase_gathering_createSession()` creates one independent session per marble. The compatibility field `currentSession` may point to the first session, but gameplay settlement must read `gatheringSessions`.
 - `phase_gathering_attemptComplete()` waits until all drop balls, energy orbs, side wheels, and session `activeBalls` are finished, then compiles each session into one ammo recipe.
 - Result handling inside `phase_gathering_update()` must use `ball.session` for collected stats, multicast, split clones, mirror clones, and rainbow shards.
+- Normal gathering sessions must initialize `session.multicast` from `marbleDef.multicast`; otherwise the second round silently drops stored multicast layers and every bullet fires only once. Essence charged ammo may still reset multicast/finalHits by design.
 - Peg-hit energy feedback must carry the triggering marble `session` into `spawn_createHitFeedback()`. Energy-orb arrival and level-up callbacks may only fall back to `currentSession` for legacy single-marble flows.
 - When several sessions level up in one simultaneous batch, `persistentThreshold` must be written back as the max observed session threshold so late-arriving orbs cannot roll the global threshold backward.
 - Do not add new sequential-click dependencies to gathering. One player click should produce the final bullet list for the current charge batch.

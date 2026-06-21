@@ -131,6 +131,8 @@ check(has(read('src/ui/rune_launcher.js'), /meta_getResourceCount\(['"]rune_frag
 check(has(indexHtml, /game\.ui_abandonRunToMeta\(\)/), 'pause abandon button uses ui_abandonRunToMeta');
 check(has(indexHtml, /id=["']run-shop-status-dock["']/), 'run-shop countdown dock exists');
 check(has(runShop, /const\s+visiblePhase\s*=\s*this\.phase\s*===\s*['"]gathering['"]\s*\|\|\s*this\.phase\s*===\s*['"]combat['"]/), 'run shop countdown remains visible in gathering and combat');
+check(has(gamePhase, /multicast:\s*Math\.max\(0,\s*Math\.floor\(marbleDef\.multicast\s*\|\|\s*0\)\)/), 'gathering sessions inherit stored marble multicast layers');
+check(has(gamePhase, /const\s+inheritedMulticast\s*=\s*Math\.max\(0,\s*Math\.floor\(marbleDef\.multicast\s*\|\|\s*0\)\)[\s\S]{0,220}recipe\.multicast\s*=\s*inheritedMulticast/), 'combat fallback compile preserves stored marble multicast layers');
 check(has(runShop, /kind:\s*['"]starter_boost['"]/), 'first run-shop visit can generate a free starter boost item');
 check(has(runShop, /runShopStarterBoostDamageRounds/), 'starter boost item displays a temporary damage duration');
 check(has(runShop, /ensureInventoryForCurrentVisit[\s\S]*_runShopInventoryGeneratedForRound/), 'run shop inventory is generated once per active visit');

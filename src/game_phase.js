@@ -1526,9 +1526,10 @@ phase_gathering_getRandomPegType() {
         if (this.ammoQueue.length === 0 && this.marbleQueue && this.marbleQueue.length > 0) {
             this.ammoQueue = this.marbleQueue.map(marbleDef => {
                 const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
-                const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, false);
+                const inheritedMulticast = Math.max(0, Math.floor(marbleDef.multicast || 0));
+                const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, inheritedMulticast > 0);
                 recipe.finalHits = 0;
-                recipe.multicast = 0;
+                recipe.multicast = inheritedMulticast;
                 return recipe;
             });
         }
@@ -1697,7 +1698,7 @@ phase_gathering_getRandomPegType() {
             marbleIndex,
             marbleDef,
             collected: [...inheritedCollected, ...runeSlotCollected],
-            multicast: 0,
+            multicast: Math.max(0, Math.floor(marbleDef.multicast || 0)),
             activeBalls: 1,
             currentHits: 0,
             nextTriggerThreshold: this.persistentThreshold,
