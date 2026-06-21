@@ -1451,8 +1451,8 @@ const RELIC_DB = [
     //  1. 粉色钉子遗物
     { id: 'pink_slime', name: '粉紅凝膠', icon: '💗', desc: '收集階段：出現 3 個高彈性粉色釘子 (可疊加)。', rarity: 'common', effect: 'pink_peg_up', maxStacks: 5},
 
-    //  2. 战斗底部反弹墙（诅咒：所有墙体都消耗反弹/穿透）
-    { id: 'energy_shield', name: '力場護盾', icon: '🛡️', desc: '戰鬥階段：底部邊界可反彈子彈。但子彈觸碰任何墻體（左/右/頂/底）都會額外消耗一次反彈或穿透次數。', rarity: 'cursed', effect: 'combat_wall' ,maxStacks: 1},
+    //  2. 战斗底部反弹墙（诅咒：每次墙体接触最多消耗 1 层反弹/穿透，但不吞子弹）
+    { id: 'energy_shield', name: '力場護盾', icon: '🛡️', desc: '戰鬥階段：底部邊界可反彈子彈。但子彈每次觸碰墻體（左/右/頂/底）最多消耗一層反彈或穿透；若已無耐久，仍按普通墻體反彈，不會被墻吞沒。', rarity: 'cursed', effect: 'combat_wall' ,maxStacks: 1},
 
     // [v2 模块化] 特殊槽解锁 (unlock_recall / unlock_multicast / unlock_split) 和
     // 槽数 +1 (slot_expander) 已从遗物池移除，迁移到局内商店出售

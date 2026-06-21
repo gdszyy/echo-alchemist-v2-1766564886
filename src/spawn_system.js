@@ -1587,6 +1587,9 @@ export const spawn_system = {
      * @param {any} type - TODO: Describe this parameter.
      */
     spawn_createHitFeedback(x, y, velocity, type = 'normal', options = {}) {
+        const chargeSession = options.session || this.currentSession;
+        const visualOptions = { ...options };
+        delete visualOptions.session;
         // 1. 获取目标坐标
         if (!this.uiCache) this.ui_updateUICache();
         
@@ -1645,26 +1648,26 @@ export const spawn_system = {
             burstYMult: options.secondary ? 0.28 : 0.36,
             minSpeed: options.secondary ? 1.2 : 1.6,
             hoverTime: options.secondary ? 9 : 12,
-            ...options,
+            ...visualOptions,
         };
         delete orbOptions.secondary;
 
         this.energyOrbs.push(new EnergyOrb(x, y, targetX, targetY, color, initVel, () => {
-            if(this.currentSession) { 
-                this.currentSession.currentHits++;
-                this.currentSession.totalHits++; 
+            if(chargeSession) { 
+                chargeSession.currentHits++;
+                chargeSession.totalHits++; 
                 
                 // [已移除] runCurrency 累积：符文碎片改为合成时直接获取，不再通过局内货币结算
                 
                 // 音效
-                const progress = Math.min(1, this.currentSession.currentHits / this.currentSession.nextTriggerThreshold);
-                if (this.currentSession.currentHits < this.currentSession.nextTriggerThreshold) {
+                const progress = Math.min(1, chargeSession.currentHits / chargeSession.nextTriggerThreshold);
+                if (chargeSession.currentHits < chargeSession.nextTriggerThreshold) {
                     // @section:energy_orb_collect_audio - 能量球收集进度音效（500~750Hz 随进度升调，营造蓄力感）
                 if (Math.random() < 0.5) audio.playTone(500 * (1.0 + progress * 0.5), 'triangle', 0.05, 0.2); 
                 }
 
                 // 更新 UI
-                this.combat_updateHitProgress(this.currentSession.currentHits, this.currentSession.nextTriggerThreshold); 
+                this.combat_updateHitProgress(chargeSession.currentHits, chargeSession.nextTriggerThreshold); 
                 
                 const pulseLayer = this.uiCache.pulseLayer; // 使用缓存 DOM
                 if (pulseLayer) {
@@ -1693,8 +1696,8 @@ export const spawn_system = {
                     this.spawn_pushParticleWithLimit(p);
                 }
 
-                if (this.currentSession.currentHits >= this.currentSession.nextTriggerThreshold) {
-                    this.spawn_triggerLevelUpEvent(targetX, targetY); 
+                if (chargeSession.currentHits >= chargeSession.nextTriggerThreshold) {
+                    this.spawn_triggerLevelUpEvent(targetX, targetY, chargeSession); 
                 } 
             }
             this.phase_gathering_attemptComplete();
@@ -1705,37 +1708,40 @@ export const spawn_system = {
      * @param {any} uiX - TODO: Describe this parameter.
      * @param {any} uiY - TODO: Describe this parameter.
      */
-    spawn_triggerLevelUpEvent(uiX, uiY) {
-    this.currentSession.currentHits = 0;
-    this.currentSession.multicast++; 
-    this.combat_updateMulticastDisplay(1);
+    spawn_triggerLevelUpEvent(uiX, uiY, session = this.currentSession) {
+        if (!session) return;
+        session.currentHits = 0;
+        session.multicast++; 
+        session.nextTriggerThreshold += CONFIG.gameplay.nextTriggerThresholdIncrease;
+        this.persistentThreshold = Math.max(this.persistentThreshold || 0, session.nextTriggerThreshold);
+        this.combat_updateMulticastDisplay(1);
     
     // @section:levelup_audio - 能量槽满触发多播升级爆发音（pitch = multicast 等级，越高越尖锐）
     // 1. 音效爆發
-    audio.playPowerup(this.currentSession.multicast); 
+        audio.playPowerup(session.multicast); 
     
     // 2. UI 容器进入“满能量”状态动画
-    const gaugeShell = this.uiCache ? this.uiCache.gaugeShell : document.getElementById('gauge-shell');
-    if (gaugeShell) {
+        const gaugeShell = this.uiCache ? this.uiCache.gaugeShell : document.getElementById('gauge-shell');
+        if (gaugeShell) {
         // 添加针对圆角优化的发光类
-        gaugeShell.classList.add('gauge-full');
+            gaugeShell.classList.add('gauge-full');
         
         // 0.8秒后移除
-        setTimeout(() => gaugeShell.classList.remove('gauge-full'), 800);
-    }
+            setTimeout(() => gaugeShell.classList.remove('gauge-full'), 800);
+        }
     // 3. 强力冲击波
-    this.spawn_createShockwave(uiX, uiY, '#facc15');
+        this.spawn_createShockwave(uiX, uiY, '#facc15');
     
     // 4. 生成大量粒子
-    for(let i=0; i<20; i++) {
-        const px = uiX + (Math.random()-0.5) * 80;
-        const py = uiY + (Math.random()-0.5) * 30;
-        this.spawn_createParticle(px, py, '#fcd34d', 'spark');
-    }
+        for(let i=0; i<20; i++) {
+            const px = uiX + (Math.random()-0.5) * 80;
+            const py = uiY + (Math.random()-0.5) * 30;
+            this.spawn_createParticle(px, py, '#fcd34d', 'spark');
+        }
 
-    this.spawn_createFloatingText(uiX, uiY - 50, "LEVEL UP!", "#fff");
-    this.combat_updateHitProgress(0, this.currentSession.nextTriggerThreshold);
-},
+        this.spawn_createFloatingText(uiX, uiY - 50, "LEVEL UP!", "#fff");
+        this.combat_updateHitProgress(0, session.nextTriggerThreshold);
+    },
 
     // =========================================
     // Boss 生成系统

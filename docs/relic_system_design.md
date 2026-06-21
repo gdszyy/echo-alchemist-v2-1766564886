@@ -73,7 +73,7 @@
 | `corridor_arc` | 回廊电弧 | epic | 墙撞 + 回合开始 | `entities/projectile.js` `_applyMove`（左右墙壁 +1 闪电层）+ `relic_runRoundStartHooks`（紧贴墙壁 50% 触发电弧） |
 | `chaos_pact` | 混沌契约 | cursed | 永久 + 流程 | `ui/shop.js`（拾取时给 3 稀有符文 + 设置 `chaosPactDamageMult=2`）+ `game_phase.js` `phase_startGatheringPhase`（直接跳过研磨）+ `combat_fireNextShot`（伤害倍率应用） |
 | `greedy_wheel` | 贪婪轮盘 | cursed | 发射时 | `combat_system.js` `combat_fireNextShot`：multicast 折算为 +damage×0.5/层；末尾按 75% 概率向 `burstQueue` 追加一次重发射 |
-| `energy_shield`（修改） | 力場護盾 | cursed | 墙壁联动 | `entities/projectile.js` `_applyMove`：所有墙体（左/右/顶/底）都消耗 1 次反弹或穿透 |
+| `energy_shield`（修改） | 力場護盾 | cursed | 墙壁联动 | `entities/projectile.js` `_applyMove`：每次墙体接触最多消耗 1 层反弹或穿透；同帧角落碰撞也只扣 1 层；无耐久时继续正常墙体反弹 |
 
 ### 5.3 状态字段
 
@@ -105,7 +105,7 @@ score(r) = r.damage
 - **元素注入器**：ammoQueue 长度为 2 时仅删除最弱、保留最强并翻倍；长度为 1 时直接对其翻倍。
 - **混沌契约**：第一回合 `_lastFiredAmmoSnapshot` 不存在，自动用 `CONFIG.gameplay.baseDamage` 兜底生成 3 颗基础子弹。
 - **回廊电弧**：`ammoQueue` 为空时使用回合数兜底；闪电链伤害近似为 `stacks × maxDmg × 0.33`，避免重写完整闪电链算法。
-- **力場護盾诅咒**：bounce/pierce 都耗尽后，墙壁碰撞直接销毁子弹。这意味着无 bounce/pierce 子弹现在贴墙就消失（设计预期内的诅咒代价）。
+- **力場護盾诅咒**：墙壁碰撞会优先消耗现有 bounce/pierce 耐久，但每次墙体接触最多只扣 1 层；即使同帧擦到角落两面墙，也不会连续扣多层。耐久耗尽后不再销毁子弹，无 bounce/pierce 子弹应继续按普通墙体反弹，避免墙体表现成“吞子弹”。
 - **殒命爆裂**：通过 `enemy._mortalBurstTriggered` 防止 AOE 互相触发的链反应循环。AOE 范围取 `max(60, enemy.width × 2)`。
 - **混沌爆发**：仅在 `queuedReward.type === 'chaos_essence'` 时触发，`pure_essence` / `relic` 不触发。
 

@@ -2835,7 +2835,7 @@ class DropBall {
                             this.markScoredPeg(peg);
                             peg.hit(impactVel.mag());
                             this.hitCount++;
-                            game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel, 'pink', { secondary: true });
+                            game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel, 'pink', { secondary: true, session: this.session });
                         }
                     }
                     continue;
@@ -2950,18 +2950,18 @@ class DropBall {
                         peg.hit(impactSpeedVal);
                         this.hitCount++; 
                         // 如果是普通钉子 (normal)，触发两次能量球反馈
-                        game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel, peg.type);
+                        game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel, peg.type, { session: this.session });
 
                         if (peg.type === 'normal' && Math.random() < CONFIG.balance.normalPegSecondEnergChancey) {
-                            game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.65), 'normal', { secondary: true });
+                            game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.65), 'normal', { secondary: true, session: this.session });
                         }
 
                         if (this.def.type === 'resonance') {
                             if (Math.random() < CONFIG.balance.normalPegSecondEnergChancey){
-                                game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.21+0.42*Math.random()), 'resonance', { secondary: true });
+                                game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.21+0.42*Math.random()), 'resonance', { secondary: true, session: this.session });
                             }
                             if (Math.random() < CONFIG.balance.normalPegSecondEnergChancey){
-                                game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(-0.21-0.72*Math.random()), 'resonance', { secondary: true });
+                                game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(-0.21-0.72*Math.random()), 'resonance', { secondary: true, session: this.session });
                             }
                             
                         }

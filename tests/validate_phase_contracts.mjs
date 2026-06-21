@@ -96,6 +96,10 @@ check(has(spawnSystem, /bossBounds[\s\S]*bossBounds\.left\s*\+\s*bossBounds\.rig
 check(has(collisionSystem, /moveBounds[\s\S]*newPos\.x\s*-\s*halfW\s*<\s*moveBounds\.left[\s\S]*newPos\.x\s*\+\s*halfW\s*>\s*moveBounds\.right/), 'enemy movement is clamped to inset combat arena');
 check(has(collisionSystem, /leftBound\s*=\s*combatBounds\.left\s*\+\s*CONFIG\.physics\.bulletRadius[\s\S]*rightBound\s*=\s*combatBounds\.right\s*-\s*CONFIG\.physics\.bulletRadius[\s\S]*leftBound\s*-\s*start\.x[\s\S]*rightBound\s*-\s*start\.x/), 'laser wall reflection uses inset combat arena');
 check(has(projectile, /leftBound\s*=\s*combatBounds\.left\s*\+\s*this\.radius[\s\S]*rightBound\s*=\s*combatBounds\.right\s*-\s*this\.radius[\s\S]*this\.pos\.x\s*<\s*leftBound[\s\S]*this\.pos\.x\s*>\s*rightBound/), 'projectile wall bounce uses inset combat arena');
+check(!has(projectile, /ownedRelics\.includes\(['"]energy_shield['"]\)[\s\S]{0,360}destroy\s*\(/), 'energy shield wall collision does not destroy bullets after bounce/pierce are exhausted');
+check(has(projectile, /let\s+shieldWallDurabilityConsumed\s*=\s*false/), 'energy shield wall collision tracks per-step durability consumption');
+check(has(projectile, /ownedRelics\.includes\(['"]energy_shield['"]\)\s*&&\s*!\s*shieldWallDurabilityConsumed[\s\S]{0,180}this\.bouncesLeft--[\s\S]{0,120}shieldWallDurabilityConsumed\s*=\s*true[\s\S]{0,180}this\.piercesLeft--[\s\S]{0,120}shieldWallDurabilityConsumed\s*=\s*true/), 'energy shield wall collision consumes at most one durability layer per movement step');
+check(has(config, /energy_shield[\s\S]{0,280}最多消耗一層[\s\S]{0,120}不會被墻吞沒/), 'energy shield relic copy states one-layer wall durability consumption and no bullet swallowing');
 check(has(gameSystem, /runShopFirstOfferRound\)\s*\|\|\s*3|runShopFirstOfferRound\s*\|\|\s*3/), 'run shop first scheduled visit defaults to round 3');
 check(has(gameSystem, /runShopVisitDurationRounds\s*\|\|\s*2/), 'run shop visits default to a two-round stay');
 check(has(gameSystem, /sys_rollNextRunShopRound[\s\S]*runShopRandomWaitMin[\s\S]*fromRound/), 'run shop next visit rolls between configured min wait and current round');
@@ -119,7 +123,8 @@ check(has(indexHtml, /id=["']shop-resource-overview["']/), 'meta shop has a visi
 check(has(read('src/ui/shop.js'), /Object\.values\(META_SHOP_CONFIG\.resources\s*\|\|\s*\{\}\)\.forEach/), 'meta shop resource overview renders every configured resource');
 check(has(read('src/ui/rune_launcher.js'), /meta_getResourceCount\(['"]rune_fragments['"]\)/), 'rune launcher shard display reads unified rune fragment resource');
 check(has(indexHtml, /game\.ui_abandonRunToMeta\(\)/), 'pause abandon button uses ui_abandonRunToMeta');
-check(has(indexHtml, /id=["']run-shop-status-dock["']/), 'bottom run-shop countdown dock exists');
+check(has(indexHtml, /id=["']run-shop-status-dock["']/), 'run-shop countdown dock exists');
+check(has(runShop, /const\s+visiblePhase\s*=\s*this\.phase\s*===\s*['"]gathering['"]\s*\|\|\s*this\.phase\s*===\s*['"]combat['"]/), 'run shop countdown remains visible in gathering and combat');
 check(has(runShop, /kind:\s*['"]starter_boost['"]/), 'first run-shop visit can generate a free starter boost item');
 check(has(runShop, /runShopStarterBoostDamageRounds/), 'starter boost item displays a temporary damage duration');
 check(has(runShop, /ensureInventoryForCurrentVisit[\s\S]*_runShopInventoryGeneratedForRound/), 'run shop inventory is generated once per active visit');

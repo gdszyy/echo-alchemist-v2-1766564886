@@ -513,8 +513,11 @@ class Projectile {
 
         // --- [v2 即时感重塑] 遗物墙壁联动统一处理函数 ---
         // 1. 回廊电弧 (corridor_arc)：撞击左/右墙壁时 +1 层闪电属性（写入 this.config.lightning）
-        // 2. 力场护盾诅咒 (energy_shield)：所有墙壁都消耗 1 次反弹或穿透；耗尽则销毁子弹
-        // 返回 true 表示子弹被销毁（调用方应直接 return）
+        // 2. 力场护盾诅咒 (energy_shield)：一次墙体接触最多消耗 1 层反弹或穿透。
+        // 同一帧若同时擦到角落的两面墙，也只扣 1 层；耐久耗尽时只按普通墙体反弹，
+        // 不再销毁子弹，避免墙体表现成“吞子弹”。
+        // 返回值保留给旧调用点兼容；当前不会因 energy_shield 返回 true。
+        let shieldWallDurabilityConsumed = false;
         const handleRelicWallHit = (side) => {
             const g = (typeof game !== 'undefined') ? game : null;
             if (!g || !g.ownedRelics) return false;
@@ -533,14 +536,13 @@ class Projectile {
                     }
                 }
             }
-            if (g.ownedRelics.includes('energy_shield')) {
+            if (g.ownedRelics.includes('energy_shield') && !shieldWallDurabilityConsumed) {
                 if ((this.bouncesLeft || 0) > 0) {
                     this.bouncesLeft--;
+                    shieldWallDurabilityConsumed = true;
                 } else if ((this.piercesLeft || 0) > 0) {
                     this.piercesLeft--;
-                } else {
-                    this.destroy(spawnCallback);
-                    return true;
+                    shieldWallDurabilityConsumed = true;
                 }
             }
             return false;
@@ -613,8 +615,8 @@ class Projectile {
                 _onWallBounce();
                 if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
 
-                // [修复] 底部护盾反弹不消耗反弹次数（旧逻辑）；
-                // [v2 力场护盾诅咒] 现在所有墙壁都会消耗 bounce/pierce，由 handleRelicWallHit 统一处理
+                // [力场护盾] 底部护盾反弹同样参与墙体联动：
+                // 单次接触最多消耗 1 层 bounce/pierce；无耐久时继续正常反弹，不吞子弹。
                 if(this.config.bounce > 0) this.deformation = { x: 1.3, y: 0.7 };
                 // [打击感] 反弹底墙壁：低频大幅震动 (已降低 40%)
                 if (typeof game !== 'undefined' && game.triggerScreenShake) {

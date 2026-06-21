@@ -34,7 +34,7 @@ globs: ["src/game_phase.js"]
 
 ### 2.5 回合开始提示与充能特效 (Round Start Banner)
 - **触发时机**: `sys_startRoundStartResolver()` 的 `pendingRoundStartRewards` 队列为空时，调用 `sys_showRoundStartBanner()`。
-- **局内商人调度**: 在奖励队列清空后、`sys_showRoundStartBanner()` 之前，`sys_maybeOfferRunShopBeforeRoundStart()` 只负责更新商人到访调度并返回 `false`，不得阻塞回合开始横幅。首访固定第 3 回合，后续由 `sys_rollNextRunShopRound()` 按 3..当前回合数随机等待；每次到访停留 2 回合，由底部 `#run-shop-status-dock` 显示到访/离开倒计时并打开商店。
+- **局内商人调度**: 在奖励队列清空后、`sys_showRoundStartBanner()` 之前，`sys_maybeOfferRunShopBeforeRoundStart()` 只负责更新商人到访调度并返回 `false`，不得阻塞回合开始横幅。首访固定第 3 回合，后续由 `sys_rollNextRunShopRound()` 按 3..当前回合数随机等待；每次到访停留 2 回合，由右上角紧凑 `#run-shop-status-dock` 在研磨/战斗阶段显示到访/离开倒计时并打开商店。
 - **充能触发条件**: 普通回合开始横幅不触发子弹充能；`ammoQueue` 只来自当前保留的最多 3 枚弹珠或显式替换确认。三发上限来自三枚晶石核心充能位，禁止通过遗物或存档字段扩大选择数量。
 - **弹珠符文槽**: 选择阶段的弹珠预览面板允许把符文直接融合进已选弹珠；每颗弹珠最多 3 个 `runeSlots`，融合会立即消耗 `runeInventory` 中的符文。进入研磨/编译时槽位以 `source: 'rune_slot'` 临时加入属性，结算写回 `marble.collected` 时必须过滤，避免重复叠层。
 - **实现**: 先调用 `phase_switchPhase('combat')` 切换背景，然后显示 `#round-start-banner` 全屏大字提示（「第 X 回合開始」），持续约 1.5 秒后自动调用 `phase_startCombatPhase()` 进入战斗。只有精华/命运选择确认才会调用 `phase_startGatheringPhase()`。
@@ -174,7 +174,7 @@ globs: ["src/game_phase.js"]
 **当前设计**：Boss 击杀后仍只掉落符文；固定回合遗物事件已移除。非 Boss 敌人可以在死亡时登记 `relic`、`chaos_essence` 或 `pure_essence` 到 `pendingRoundStartRewards`，并在下一回合开始由 `sys_startRoundStartResolver()` 统一结算。
 
 - 当 `pendingRoundStartRewards` 同时存在多个奖励时，resolver 必须显示“回合奖励 X/Y：奖励类型”的进度提示；单个奖励保持原有类型提示即可，避免 Toast 噪声。
-- 奖励队列清空后，局内商人只能作为底部状态入口出现；`sys_maybeOfferRunShopBeforeRoundStart()` 不得打开 overlay 或打断横幅。调度状态由 `runShopNextOfferRound`、`runShopActiveUntilRound`、`runShopLastArrivalRound`、`runShopScheduleStartRound`、`runShopScheduleGap` 共同描述；首访第 3 回合固定生成免费 `starter_boost` 占位援助包（护盾/碎片即时发放，基础伤害按 `runShopStarterBoostDamageRounds` 临时衰减），后续商人按 3..当前回合数随机等待并停留 2 回合。放弃遗物进入商店时仍必须先发放 `runShopSkipRelicBonus`。
+- 奖励队列清空后，局内商人只能作为右上角状态入口出现；`sys_maybeOfferRunShopBeforeRoundStart()` 不得打开 overlay 或打断横幅。调度状态由 `runShopNextOfferRound`、`runShopActiveUntilRound`、`runShopLastArrivalRound`、`runShopScheduleStartRound`、`runShopScheduleGap` 共同描述；首访第 3 回合固定生成免费 `starter_boost` 占位援助包（护盾/碎片即时发放，基础伤害按 `runShopStarterBoostDamageRounds` 临时衰减），后续商人按 3..当前回合数随机等待并停留 2 回合。放弃遗物进入商店时仍必须先发放 `runShopSkipRelicBonus`。
 - `phase_finalizeRound()` 不再计算 `isRelicRound`，只负责存档并启动 round-start resolver。
 - `sys_initGameStart()` 的首个遗物也通过 `pendingRoundStartRewards` 进入统一流程，不再直接调用 `ui_showRelicSelection()`。
 - `ui_closeRelicSelection()` 在 `resumeTarget === 'round_start_resolver'` 时必须回到 `sys_continueRoundStartResolver()`，而不是默认进入 `selection`/`gathering`。
@@ -233,6 +233,8 @@ globs: ["src/game_phase.js"]
 - `phase_gathering_createSession()` creates one independent session per marble. The compatibility field `currentSession` may point to the first session, but gameplay settlement must read `gatheringSessions`.
 - `phase_gathering_attemptComplete()` waits until all drop balls, energy orbs, side wheels, and session `activeBalls` are finished, then compiles each session into one ammo recipe.
 - Result handling inside `phase_gathering_update()` must use `ball.session` for collected stats, multicast, split clones, mirror clones, and rainbow shards.
+- Peg-hit energy feedback must carry the triggering marble `session` into `spawn_createHitFeedback()`. Energy-orb arrival and level-up callbacks may only fall back to `currentSession` for legacy single-marble flows.
+- When several sessions level up in one simultaneous batch, `persistentThreshold` must be written back as the max observed session threshold so late-arriving orbs cannot roll the global threshold backward.
 - Do not add new sequential-click dependencies to gathering. One player click should produce the final bullet list for the current charge batch.
 
 ## 2026-06-21 Combat Aim Guide Scatter Parity

@@ -598,7 +598,7 @@ export const run_shop = {
         const dock = document.getElementById('run-shop-status-dock');
         if (!dock) return;
 
-        const visiblePhase = this.phase === 'gathering';
+        const visiblePhase = this.phase === 'gathering' || this.phase === 'combat';
         const state = typeof this.sys_getRunShopScheduleState === 'function'
             ? this.sys_getRunShopScheduleState()
             : null;

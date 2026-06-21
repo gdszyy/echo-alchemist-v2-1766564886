@@ -3708,12 +3708,12 @@ phase_gathering_getRandomPegType() {
                     if (marbleDef) {
                         marbleDef.collected.push(result.material);
                     }
-                    this.spawn_createHitFeedback(ball.pos.x, ball.pos.y, ball.vel, result.material); // 這裡也許要傳入屬性類型作為顏色依據
+                    this.spawn_createHitFeedback(ball.pos.x, ball.pos.y, ball.vel, result.material, { session }); // 這裡也許要傳入屬性類型作為顏色依據
                     audio.playCollect();
                     this.ui_renderRecipeHUD();
                     
                 } else if (result.type === 'reward_zone') {
-                    this.spawn_createHitFeedback(ball.pos.x, ball.pos.y, ball.vel, result.material);
+                    this.spawn_createHitFeedback(ball.pos.x, ball.pos.y, ball.vel, result.material, { session });
                     audio.playCollect();
                     this.ui_renderRecipeHUD();
                     

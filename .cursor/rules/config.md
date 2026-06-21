@@ -125,6 +125,7 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
+| 2026-06-22 | `src/config.js`, `src/entities/projectile.js`, `docs/relic_system_design.md` | **力场护盾墙体语义修正**：`energy_shield` 文案与实现统一为“每次墙体接触最多消耗 1 层现有反弹/穿透耐久；耐久耗尽后按普通墙体反弹，不销毁子弹”。该改动修复无耐久子弹贴墙后被墙体吞没的问题，并避免角落同帧碰撞连续扣多层；不新增配置项、粒子、Canvas 光效或性能预算消费。 |
 | 2026-06-21 | `src/config.js`, `src/ui/run_shop.js`, `src/ui/shop.js`, `src/game_system.js`, `src/game_phase.js`, `src/ui_system.js`, `src/ui/hud.js`, `index.html`, `.cursor/rules/config.md`, `.cursor/rules/game_phase.md`, `.cursor/rules/ui_system.md` | **弹珠包主循环第一批落地**：取消新精华投放，敌人奖励只登记遗物线索；所有弹珠默认进入基础概率池，遗物改为提高对应弹珠权重并立即提供倾向胚珠包；局内商人新增杂色包、去纯包、倾向包和固定穿透包，价格按概率期望动态计算；三发/三弹珠上限固定为晶石核心 3 充能位；商人状态条移至右上角小胶囊；符文获取增加中央揭示动画。 |
 | 2026-06-20 | `src/config.js`, `src/game_system.js`, `src/game_phase.js`, `src/ui/run_shop.js`, `src/ui_system.js`, `src/core.js`, `index.html`, `.cursor/rules/config.md`, `.cursor/rules/game_phase.md`, `.cursor/rules/ui_system.md` | **局内商人随机到访调度**：`CONFIG.gameplay` 新增 `runShopFirstOfferRound`、`runShopRandomWaitMin`、`runShopVisitDurationRounds`、`runShopStarterBoostShield`、`runShopStarterBoostFlatDamage`、`runShopStarterBoostDamageRounds`、`runShopStarterBoostFragments`；首访固定第 3 回合且提供免费 `starter_boost` 占位援助包，后续商人按 3..当前回合数随机等待并停留 2 回合，底部 UI 显示到访/离开倒计时。 |
 | 2026-06-21 | `src/config.js`, `src/game_phase.js`, `src/entities.js`, `src/calc_utils.js`, `src/ui/shop.js` | **底部奖励分栏收窄与超载接入**：底部奖励区可同时出现 1..3 个，中心入口按两侧实体碰撞板收窄判定；`bottomRewardOnlyTypes` 固定为 `explosive` / `laser` / `overcharge`，三者不进入普通弹珠候选池，遗物只提高奖励区权重。 |
