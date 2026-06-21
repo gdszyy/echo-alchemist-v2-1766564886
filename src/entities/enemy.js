@@ -2636,7 +2636,6 @@ class Enemy {
             // 避免 min(w,h) 把 3×1 装甲横梁压成中央小方块；小型敌人保留原行为。
             const isLargeV2 = !!this.baseArchetype && ((this.gridCols || 1) > 1 || (this.gridRows || 1) > 1);
             ctx.save();
-            this._clipSpriteForHpWindows(ctx, w, h);
             if (isLargeV2) {
                 const padX = 6, padY = 6;
                 this._spriteRenderer.draw(ctx, -w/2 + padX, -h/2 + padY, w - padX*2, h - padY*2, 0.92);
@@ -2647,7 +2646,6 @@ class Enemy {
             ctx.restore();
         }
         this._drawAffixBitmapOverlays(ctx, w, h);
-        this._drawHpReadabilityOverlay(ctx, w, h, hpRatio, whiteRatio, greenRatio, baseColor);
         // === Layer 4: 裂纹绘制 (Fissures) - [保持不变] ===
 
         // **过热 Stage 3**

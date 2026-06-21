@@ -278,7 +278,7 @@ if avgFps > fpsThresholdUp (55):
 
 | 日期 | 内容 |
 |------|------|
-| 2026-06-21 | **敌人 HP 与碰撞框可读性修正**：`Enemy.draw()` 新增前景 HP 视窗、液面亮线与侧边液位尺，确保主体 Sprite 遮挡底部液体时仍能读出掉血；非 Boss Sprite 绘制增加轻量镂空 clip，让底层运行时 HP 可透出；collision frame 位图加载后一次性测量 alpha 内容框，绘制时裁掉透明 padding 后贴合当前碰撞区域。该修改只新增少量 `fillRect` / `strokeRect` / clip 路径与既有 `drawImage` 源裁剪，不新增粒子、`shadowBlur`、渐变、混合模式或 `CONFIG.performance` 预算字段；`low` 档完整保留 HP 与物理边界语义。 |
+| 2026-06-21 | **敌人 HP 与碰撞框可读性修正**：第一轮运行时前景 HP 视窗、液面亮线、侧边液位尺与 Sprite clip 已撤销；当前由 `*_native_hollow*` 敌人素材的原生镂空结构露出 Layer 2 HP 液体，避免把血量 UI 拉到敌人左侧或在完整主体上硬切窗口。保留 collision frame alpha 内容框测量与透明 padding 裁剪，让边框贴合当前碰撞区域。该方案减少 `fillRect` / `strokeRect` / clip 路径，不新增粒子、`shadowBlur`、渐变、混合模式或 `CONFIG.performance` 预算字段；`low` 档完整保留 HP 与物理边界语义。 |
 | 2026-06-21 | **研磨视觉重心调整**：`Peg.hit()` 缩短点亮/缩放反馈，`Peg.draw()` 改为廉价菱形铆钉板轮廓、内倒角、短高光/暗部笔触和中心槽位，以区别圆形玻璃弹珠，并在 `pegGlowHalo` 预算下压低 Peg 光晕半径/透明度；`DropBall.draw()` 增加玻璃边缘高光/暗部弧线强化球体质感；`EnergyOrb` 默认改为更小的 `source-over` 低透明度短拖尾，`spawn_createHitFeedback()` 为普通/二次反馈传入更克制的视觉参数。未新增粒子、`CONFIG.performance` 字段、渐变循环或无预算高开销效果；`high` 保留 Peg halo 但更低调，`medium`/`low` 继续按既有门控关闭 Peg halo / 软阴影。 |
 | 2026-06-19 | **默认钉盘回归纯交错钉板**：默认前两行由 10 个 `dense_stagger` 1x1 模块组成，120 个普通圆钉、0 个 barrier、0 个 SpecialSlot；未新增粒子、渐变或额外 `shadowBlur`，Peg 绘制继续受 `pegSoftShadow` / `pegGlowHalo` 三档预算控制。三档影响：`high`/`medium` 维持原 Peg 视觉门控，`low` 继续关闭高开销 Peg halo。 |
 | 2026-06-19 | **底部奖励分栏与初始 5 钉板**：默认开放槽位回调为首行 5 个 `dense_stagger` 模块；研磨底部小概率生成 1 个奖励分栏，宽度按 `1.5` 个倍化弹珠直径计算，两侧新增最多 2 条 `shape='barrier'` 竖直挡板。分栏绘制只使用 `fillRect` / `strokeRect` / 文本，挡板复用 `Peg.drawBarrierPeg()`，软阴影继续由 `pegSoftShadow` 门控；不新增粒子、渐变、混合模式、额外 `shadowBlur` 或 `CONFIG.performance` 预算字段。 |
