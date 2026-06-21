@@ -485,3 +485,10 @@ this.activeElementResonances = newResonances;
 
 - `sys_resetGame` 中已添加 `this.activeElementResonances = {}` 重置。
 - 存档恢复时通过 `ui_updateRuneGrid()` 自动重建共鸣状态，无需额外处理。
+## 2026-06-21 Marble Rune Slots
+
+- `MarbleDefinition` owns `runeSlots: []` and `maxRuneSlots: 3`.
+- A fused slot stores `{ runeId, level, element, statAmount, name, icon, rarity }`.
+- Selection UI fuses runes directly into the selected marble and consumes the rune immediately from `runeInventory`.
+- `calc_compileCollectionToRecipe()` treats rune slots as temporary collected stats with `source: 'rune_slot'`; gathering write-back must filter these temporary stats out of `marble.collected` to avoid duplicate stacking on later rounds.
+- A marble with fused rune slots is locked in the current charge selection, preventing accidental deselection after the rune has been consumed.

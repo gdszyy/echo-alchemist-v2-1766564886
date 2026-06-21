@@ -308,3 +308,15 @@ for (const subsystem of _subsystems) {
 - `#combat-status-panel` must sit below `#unified-top-bar`, not overlap it. Keep its CSS `top` in sync with the top bar height expression plus the 6px visual gap.
 - `sys_resize()` must calculate `combatGridTopY` from the bottom of the full combat top UI stack: unified top bar + status strip + 8px battlefield gap + half an enemy cell.
 - Do not spawn combat enemies, Bosses, training combat dummies, or draw the top wall from a hard-coded `80px` top row. Use `combatGridTopY` so the visible battlefield never sits under the top HUD.
+
+## 11. 2026-06-21 Run Shop And Rune Claim Feedback
+
+- `#run-shop-status-dock` must remain a compact top-right status capsule in gathering/combat phases. Do not move it back to the bottom firing area, because that overlaps the launcher/crystal-core interaction space.
+- Rune acquisition must use a two-step feedback pattern: `.rune-acquire-reveal` central reveal for name/level recognition, followed by the existing `.rune-claim-fly--to-bag` travel animation.
+- The reveal animation is DOM/CSS only and should not add Canvas particles or `shadowBlur` render work.
+
+## 12. 2026-06-21 Marble Rune Slot Selection UI
+
+- The marble preview panel owns the in-run rune fusion entry. It renders three slots per marble and uses `ui_fuseRuneIntoMarble()` to consume a rune immediately.
+- Fused runes are stored on the marble as `runeSlots`; do not write them directly into `marble.collected` from UI code.
+- Once a selected marble has fused rune slots, selection toggling must keep it locked for the current charge sequence to prevent accidental rune loss.

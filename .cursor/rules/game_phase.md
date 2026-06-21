@@ -18,11 +18,11 @@ globs: ["src/game_phase.js"]
 - **禁止将此阈值降低至 0.5 以下**：钉盘分布在屏幕 20%~70% 高度，过小的阈值会导致点击钉盘中下部区域时被错误路由到"倾斜模式"，弹珠无法发射。
 - 底部手柄区域（`height - 40 ± 40px`）已在 `game_system.js` 的 `input_handleInputStart` 中提前拦截，`phase_handleInputStart` 无需重复处理。
 
-### 2.1 命运抗择阶段 (Selection Phase)
-- **职责**: 玩家在回合开始前处理 round-start resolver 结算后的**特殊命运时刻**（混沌精华 / 纯净精华 / 遗物）。
-- **[tsk-f35c6d10] 普通命运选择已取消**：`sys_startRoundStartResolver()` 队列为空时，**不再**进入普通弹珠选择（`sys_initSelectionPhase()`），改为调用 `sys_showRoundStartBanner()` 直接进入战斗阶段（跳过研磨）。
-- **[开局命运选择] 已恢复**：`sys_initGameStart()` 在队列遗物奖励后，额外队列一个 `chaos_essence`（`source: 'run_start'`）奖励。遗物选完后， resolver 继续处理该奖励，触发标准 3 枚弹珠命运选择界面，作为开局弹珠配置入口。开局流程变为：遗物选择 → 命运选择（3 枚弹珠）→ 研磨阶段。
-- **入口**: `sys_startRoundStartResolver()` 会先消费 `pendingRoundStartRewards`；若命中 `relic`，进入遗物事件；若命中 `chaos_essence` 或 `pure_essence`，则先写入 `pendingSelectionMode` 再调用 `sys_initSelectionPhase()` 呈现对应的命运时刻界面。
+### 2.1 胚珠包选择阶段 (Selection Phase)
+- **职责**: 玩家在回合开始前处理 round-start resolver 结算后的遗物线索与胚珠包。当前主循环已取消精华投放，`marble_pack` 是标准 3 弹珠选择入口。
+- **[tsk-f35c6d10] 普通选择入口**：`sys_startRoundStartResolver()` 队列为空时，**不再**进入普通弹珠选择（`sys_initSelectionPhase()`），改为调用 `sys_showRoundStartBanner()` 直接进入战斗阶段（跳过研磨）。
+- **[胚珠包开局]**：`sys_initGameStart()` 在队列遗物奖励后，额外队列一个 `marble_pack`（`source: 'run_start'`）奖励。遗物选完后，resolver 继续处理该奖励，触发标准 3 枚弹珠选择界面，作为开局弹珠配置入口。开局流程变为：遗物选择 → 胚珠包选择（3 枚弹珠）→ 研磨阶段。
+- **入口**: `sys_startRoundStartResolver()` 会先消费 `pendingRoundStartRewards`；若命中 `relic`，进入遗物事件；若命中 `marble_pack`，则先写入 `pendingSelectionMode.mode = 'standard'` 再调用 `sys_initSelectionPhase()` 呈现胚珠包选择界面。
 - **[tsk-668f3dba] 替换子弹阶段（当前实现）**：当精华触发（`chaos_essence` / `pure_essence`）且上回合 `marbleQueue` 非空时，系统在进入命运选择**前**将 `marbleQueue` 编译为**充能子弹**（`_chargedAmmoQueue`，`multicast`/`finalHits` 重置为 0）。研磨阶段全部弹珠结算完毕后，若 `_chargedAmmoQueue` 非空，自动调用 `sys_initReplaceAmmoPhase()` 进入替换阶段；否则直接进入战斗。
   - `replaceAmmoContext`：替换阶段上下文，包含 `active`、`newRecipes`（本回合新研磨，左侧）、`chargedRecipes`（上回合充能子弹，右侧）、`selectedIndices`（多选索引数组，默认全选右侧充能子弹）。
   - UI：`ui_renderReplaceAmmoUI()` 展示两行卡片（NEW GRIND / CHARGED），每张卡片显示属性值、Tier 徽章（C/B/A/S）和主属性主题色。玩家可逐张切换选中，必须选 `min(子弹上限, newRecipes.length + chargedRecipes.length)` 张；纯净精华跳过研磨时即使只有 1-2 枚充能子弹，也可以正常确认。
@@ -35,7 +35,8 @@ globs: ["src/game_phase.js"]
 ### 2.5 回合开始提示与充能特效 (Round Start Banner)
 - **触发时机**: `sys_startRoundStartResolver()` 的 `pendingRoundStartRewards` 队列为空时，调用 `sys_showRoundStartBanner()`。
 - **局内商人调度**: 在奖励队列清空后、`sys_showRoundStartBanner()` 之前，`sys_maybeOfferRunShopBeforeRoundStart()` 只负责更新商人到访调度并返回 `false`，不得阻塞回合开始横幅。首访固定第 3 回合，后续由 `sys_rollNextRunShopRound()` 按 3..当前回合数随机等待；每次到访停留 2 回合，由底部 `#run-shop-status-dock` 显示到访/离开倒计时并打开商店。
-- **充能触发条件**: 普通回合开始横幅不触发子弹充能；`_lastFiredAmmoSnapshot` / `marbleQueue` 只能在精华触发、跳过研磨、子弹替换等显式充能流程中作为弹药来源。
+- **充能触发条件**: 普通回合开始横幅不触发子弹充能；`ammoQueue` 只来自当前保留的最多 3 枚弹珠或显式替换确认。三发上限来自三枚晶石核心充能位，禁止通过遗物或存档字段扩大选择数量。
+- **弹珠符文槽**: 选择阶段的弹珠预览面板允许把符文直接融合进已选弹珠；每颗弹珠最多 3 个 `runeSlots`，融合会立即消耗 `runeInventory` 中的符文。进入研磨/编译时槽位以 `source: 'rune_slot'` 临时加入属性，结算写回 `marble.collected` 时必须过滤，避免重复叠层。
 - **实现**: 先调用 `phase_switchPhase('combat')` 切换背景，然后显示 `#round-start-banner` 全屏大字提示（「第 X 回合開始」），持续约 1.5 秒后自动调用 `phase_startCombatPhase()` 进入战斗。只有精华/命运选择确认才会调用 `phase_startGatheringPhase()`。
 - **子弹队列边界（2026-06-19）**: `sys_showRoundStartBanner()` 只负责进入下一轮战斗阶段，普通回合开始时不得从 `_lastFiredAmmoSnapshot` 或 `marbleQueue` 重建 `ammoQueue`。这两个来源仅用于精华触发 / 子弹替换等显式充能流程，避免下一回合待发射子弹串成上一轮保留子弹或新生成候选弹珠。
 - **空弹珠兜底（2026-06-19）**: `phase_startGatheringPhase()` 只允许由精华/命运选择等显式研磨入口调用，并必须在真正初始化时确认 `marbleQueue` 非空；若存档恢复、overlay 返回或特殊流程清空了队列，应通过 `buildFallbackMarbleQueue()` 从选择池/当前权重补齐可发射弹珠，禁止进入没有弹珠的研磨阶段。
@@ -226,3 +227,10 @@ globs: ["src/game_phase.js"]
   - 统计玩家近期伤害占比 `buildVector` 时，如果某一属性的伤害占比超过阈值（默认 60%），则对超出部分进行衰减。
   - 衰减系数为 0.5，即超出部分减半。
   - 衰减后重新归一化 `buildVector`，防止玩家过度依赖单一属性导致掉落过于单一。
+## 2026-06-21 Simultaneous Marble Charge
+
+- Gathering now launches the selected marble queue as one charge batch instead of one marble per click.
+- `phase_gathering_createSession()` creates one independent session per marble. The compatibility field `currentSession` may point to the first session, but gameplay settlement must read `gatheringSessions`.
+- `phase_gathering_attemptComplete()` waits until all drop balls, energy orbs, side wheels, and session `activeBalls` are finished, then compiles each session into one ammo recipe.
+- Result handling inside `phase_gathering_update()` must use `ball.session` for collected stats, multicast, split clones, mirror clones, and rainbow shards.
+- Do not add new sequential-click dependencies to gathering. One player click should produce the final bullet list for the current charge batch.

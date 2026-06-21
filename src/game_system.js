@@ -363,9 +363,8 @@ export const game_system = {
 
         // 新局首个遗物也走 round-start resolver，避免再依赖固定入口。
         this.sys_queueRoundStartReward({ type: 'relic', source: 'run_start', round: this.round });
-        // [开局命运选择] 遗物选完后，触发一次标准命运选择（3 枚弹珠），作为开局弹珠配置入口。
-        // 使用 chaos_essence 类型复用现有命运选择流程，source 标记为 'run_start' 以便区分来源。
-        this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'run_start', round: this.round });
+        // 开局遗物后提供一包基础弹珠，作为本局三枚晶石核心的初始配置入口。
+        this.sys_queueRoundStartReward({ type: 'marble_pack', source: 'run_start', round: this.round });
         this.sys_startRoundStartResolver();
     },
 
@@ -430,6 +429,7 @@ export const game_system = {
         this.dropBalls = [];
         this.ammoQueue = [];
         this.marbleQueue = [];
+        this.gatheringSessions = [];
         this.energyOrbs = [];
         this.spores = [];
         this.currentRows = CONFIG.gameplay.rows;
@@ -727,7 +727,7 @@ export const game_system = {
         // 确保 phase_switchPhase 内部触发的 ui_updateUI 能读到正确状态，
         // 避免渲染出旧的命运选择界面（如上一次的 chaos_essence / pure_essence 卡片）。
         this.selectionMode = mode;
-        this.selectionRequiredCount = Math.max(1, pendingMode?.requiredCount || (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0));
+        this.selectionRequiredCount = Math.max(1, pendingMode?.requiredCount || (CONFIG.gameplay.selectionReq || 3));
         this.fateMomentContext = this.selectionMode === 'standard'
             ? null
             : {
@@ -800,7 +800,7 @@ export const game_system = {
         //    （主弹珠类型 + 主属性 + multicast 等级），作为本回合 default 选中的依据。
         // 2. 若签名匹配不到（首次进入或弹珠彻底改变），回退到原默认逻辑：选中所有充能子弹。
         const allRecipes = newRecipes.concat(chargedRecipes);
-        const bulletCap = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
+        const bulletCap = (CONFIG.gameplay.selectionReq || 3);
         const maxSelect = Math.min(bulletCap, allRecipes.length);
         const _signatureOf = (r) => {
             if (!r) return '';
@@ -876,7 +876,7 @@ export const game_system = {
         const chargedRecipes = ctx.chargedRecipes || [];
         const allRecipes = [...newRecipes, ...chargedRecipes];
         const selectedIndices = ctx.selectedIndices || [];
-        const bulletCap = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
+        const bulletCap = (CONFIG.gameplay.selectionReq || 3);
         const maxSelect = Math.min(bulletCap, allRecipes.length);
         if (maxSelect <= 0 || selectedIndices.length !== maxSelect) {
             console.warn('[sys_confirmReplaceAmmo] 子弹选择数量不合法', {
@@ -1009,7 +1009,7 @@ export const game_system = {
             phase: this.phase,
         });
         this.selectionMode = mode;
-        this.selectionRequiredCount = Math.max(1, pendingMode?.requiredCount || (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0));
+        this.selectionRequiredCount = Math.max(1, pendingMode?.requiredCount || (CONFIG.gameplay.selectionReq || 3));
         this.fateMomentContext = {
             active: true,
             type: mode,
@@ -1095,9 +1095,11 @@ export const game_system = {
         this.ammoQueue = [];
         // 清理命运时刻上下文和弹珠队列
         this.marbleQueue = [];
+        this.gatheringSessions = [];
+        this.currentSession = null;
         this.activeMarbleIndex = 0;
         this.selectionMode = 'standard';
-        this.selectionRequiredCount = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
+        this.selectionRequiredCount = (CONFIG.gameplay.selectionReq || 3);
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
         this.fateMomentContext = null;
@@ -1191,10 +1193,12 @@ export const game_system = {
             this.fateMomentContext = null;
             this.pendingSelectionMode = null;
             this.selectionMode = 'standard';
-            this.selectionRequiredCount = ((typeof CONFIG !== 'undefined' && CONFIG.gameplay.selectionReq) || 3) + (this.bulletCapBonus || 0);
+            this.selectionRequiredCount = ((typeof CONFIG !== 'undefined' && CONFIG.gameplay.selectionReq) || 3);
             this.selectionInjectedRune = null;
             this.selectionPreviewState = null;
             this.marbleQueue = [];
+            this.gatheringSessions = [];
+            this.currentSession = null;
             this.activeMarbleIndex = 0;
 
             if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
@@ -1291,19 +1295,14 @@ export const game_system = {
         if (!this.pendingRoundStartRewards) this.pendingRoundStartRewards = [];
 
         const legacyEssenceType = reward.essenceType || reward.essenceKind || reward.mode || null;
-        const requestedType = ['relic', 'chaos_essence', 'pure_essence'].includes(reward.type)
+        const requestedType = ['relic', 'marble_pack', 'chaos_essence', 'pure_essence'].includes(reward.type)
             ? reward.type
             : reward.type === 'essence'
                 ? (legacyEssenceType === 'pure_essence' ? 'pure_essence' : 'chaos_essence')
                 : 'relic';
 
         if (requestedType === 'relic' && this.pendingRoundStartRewards.some(item => item && item.type === 'relic')) {
-            const fallbackType = reward.fallbackRewardType === 'pure_essence'
-                ? 'pure_essence'
-                : reward.fallbackRewardType === 'chaos_essence'
-                    ? 'chaos_essence'
-                    : (Math.random() < 0.35 ? 'pure_essence' : 'chaos_essence');
-            return this.sys_queueRoundStartReward({ ...reward, type: fallbackType });
+            return this.sys_queueRoundStartReward({ ...reward, type: 'marble_pack' });
         }
 
         const normalized = {
@@ -1314,6 +1313,7 @@ export const game_system = {
             enemyMaxHp: reward.enemyMaxHp || 0,
             sourceRelicId: reward.sourceRelicId || null,
             sourceRelicName: reward.sourceRelicName || null,
+            marbleTypes: Array.isArray(reward.marbleTypes) ? reward.marbleTypes.slice(0, 3) : null,
         };
         this.pendingRoundStartRewards.push(normalized);
         eventBus.emit(EVENT_TYPES.ROUND_START_REWARD_QUEUED, {
@@ -1395,18 +1395,17 @@ export const game_system = {
         // 生存压力公式：战力越弱、踪迹越低则压力越大
         const survivalPressure = Math.max(0, (1.0 - powerRatio) * 0.6 + (1.0 - traceRatio) * 0.4);
 
-        // @section:emergency_relief - 第三步：生存压力超阈时强制标记精华（紧急救援）
+        // @section:emergency_relief - 第三步：生存压力超阈时强制标记遗物线索（紧急救援）
         // --- 3. 紧急救援判定（预测性提前送出）---
         // 只有行代表敌人才进行紧急救援判定，防止同一行多个敌人重复触发
         if (isRowRepresentative && !isPowerCrushing && this.emergencyCooldown <= 0) {
             const emergencyThreshold = pityCfg.emergencyReliefThreshold || 0.7;
             if (survivalPressure >= emergencyThreshold) {
-                // 紧急救援：强制标记为精华，并启动冷却
-                const essenceType = Math.random() < (gameplayCfg.enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
-                enemy.rewardType = essenceType;
+                // 紧急救援：强制标记为遗物线索，并启动冷却
+                enemy.rewardType = 'relic';
                 this.emergencyCooldown = pityCfg.emergencyReliefCooldown || 3;
                 this.essenceSpawnMissCount = 0;
-                console.log(`[DropV2] 紧急救援触发 (pressure=${survivalPressure.toFixed(2)})，标记 ${essenceType}`);
+                console.log(`[DropV2] 紧急救援触发 (pressure=${survivalPressure.toFixed(2)})，标记 relic`);
                 return;
             }
         }
@@ -1513,16 +1512,13 @@ export const game_system = {
                 if (this.relicSpawnMissCount >= relicPityThreshold) {
                     forceDrop = true;
                     forcedType = 'relic';
-                } else if (this.essenceSpawnMissCount >= (pityCfg.essenceSpawnMiss || 4)) {
-                    forceDrop = true;
-                    forcedType = Math.random() < (gameplayCfg.enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
                 }
             }
 
             console.log(`[PityV3] avgDmg3=${avgDamage3.toFixed(1)}, currentHP=${currentTotalHP}, x=${x}, futureHP=${futureXRowsHP.toFixed(1)}, totalThreat=${totalThreatHP.toFixed(1)}, eligible=${isPityEligible}, relic=${this.relicSpawnMissCount}, essence=${this.essenceSpawnMissCount}`);
         }
 
-        // @section:final_reward_type - 第七步：随机抗成判定奖励类型（遗物/混沌/纯净精华）
+        // @section:final_reward_type - 第七步：随机判定奖励类型（遗物线索）
         // --- 7. 最终判定 ---
         let rewardType = null;
 
@@ -1535,8 +1531,7 @@ export const game_system = {
                     + ((enemy.maxHp || 0) >= (gameplayCfg.enemyDropRelicHighHpThreshold || 120) ? (gameplayCfg.enemyDropRelicHighHpBonus || 0.08) : 0),
                 gameplayCfg.enemyDropRelicMaxChance || 0.45
             );
-            const essenceType = Math.random() < (gameplayCfg.enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
-            rewardType = Math.random() < relicChance ? 'relic' : essenceType;
+            rewardType = Math.random() < relicChance ? 'relic' : null;
         }
 
         enemy.rewardType = rewardType;
@@ -1549,10 +1544,6 @@ export const game_system = {
                 // 遗物掉落后重新随机生成下一次保底阈值（2~4 行，每行=每回合）
                 this.nextRelicPityThreshold = 2 + Math.floor(Math.random() * 3);
                 console.log(`[PityV3] 遗物掉落，下一次保底阈值设为 ${this.nextRelicPityThreshold} 行`);
-            } else if (rewardType === 'pure_essence' || rewardType === 'chaos_essence') {
-                this.essenceSpawnMissCount = 0;
-                // 精华不重置遗物计数，遗物保底继续累加
-                if (!isPowerCrushing) this.relicSpawnMissCount++;
             } else {
                 // 未命中：两个计数器都累加（不在碾压和硬上限状态下）
                 if (!isPowerCrushing) {
@@ -1570,7 +1561,7 @@ export const game_system = {
 
     /**
      * @method sys_tryQueueEnemyRoundReward
-     * @description 敌人死亡后，为下一回合开始登记遗物、混沌精华或纯净精华奖励。
+     * @description 敌人死亡后，为下一回合开始登记遗物线索奖励。
      *              若敌人已有 _pendingRewardType（由生成时预计算），则直接使用该类型排队，
      *              否则重新计算（兼容未经预计算的敌人，如分身）。
      */
@@ -1601,28 +1592,19 @@ export const game_system = {
                     + ((enemy.maxHp || 0) >= (gameplayCfg.enemyDropRelicHighHpThreshold || 120) ? (gameplayCfg.enemyDropRelicHighHpBonus || 0.08) : 0),
                 gameplayCfg.enemyDropRelicMaxChance || 0.45
             );
-            const essenceType = Math.random() < (gameplayCfg.enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
-            rewardType = Math.random() < relicChance ? 'relic' : essenceType;
+            rewardType = Math.random() < relicChance ? 'relic' : null;
+            if (!rewardType) return null;
         }
 
-        const essenceTypeFallback = Math.random() < ((CONFIG.gameplay || {}).enemyDropPureEssenceChance || 0.35) ? 'pure_essence' : 'chaos_essence';
+        if (rewardType !== 'relic') return null;
         const queuedReward = this.sys_queueRoundStartReward(
-            rewardType === 'relic'
-                ? {
-                    type: 'relic',
-                    source: 'enemy_drop',
-                    round: this.round,
-                    enemyType: enemy.type || 'normal',
-                    enemyMaxHp: enemy.maxHp || 0,
-                    fallbackRewardType: essenceTypeFallback,
-                }
-                : {
-                    type: rewardType,
-                    source: 'enemy_drop',
-                    round: this.round,
-                    enemyType: enemy.type || 'normal',
-                    enemyMaxHp: enemy.maxHp || 0,
-                }
+            {
+                type: 'relic',
+                source: 'enemy_drop',
+                round: this.round,
+                enemyType: enemy.type || 'normal',
+                enemyMaxHp: enemy.maxHp || 0,
+            }
         );
 
         if (!queuedReward) return null;
@@ -1645,28 +1627,7 @@ export const game_system = {
             queuedReward.lootItemId = lootItem.id; // FieldLootItem 构造时已生成唯一 id
         }
 
-        if (queuedReward.type === 'relic') {
-            showToast('✨ 敌人掉落了遗物線索，將在下回合開始結算');
-        } else if (queuedReward.type === 'pure_essence') {
-            showToast('🕊️ 敌人掉落了純淨精華，將在下回合開始觸發命運時刻');
-        } else {
-            showToast('🎪 敌人掉落了混沌精華，將在下回合開始觸發命運時刻');
-        }
-
-        // --- [遗物 Hook] 混沌爆发 (chaos_burst) ---
-        // 当掉落物为混沌精华时，对全场所有敌人造成 (回合数 × 2) 的固定真实伤害
-        if (queuedReward.type === 'chaos_essence' && this.ownedRelics && this.ownedRelics.includes('chaos_burst')) {
-            const burstDmg = (this.round || 1) * 2;
-            for (const e of (this.enemies || [])) {
-                if (!e || !e.active || e === enemy) continue;
-                const r = e.takeDamage(burstDmg);
-                if (typeof this.spawn_createFloatingText === 'function') {
-                    this.spawn_createFloatingText(e.pos.x, e.pos.y - 18, `混沌爆发 ${burstDmg}`, '#a855f7');
-                }
-                if (r && r.killed && typeof this.spawn_addScore === 'function') this.spawn_addScore(e.maxHp, e);
-            }
-            if (typeof this.triggerScreenShake === 'function') this.triggerScreenShake(8);
-        }
+        showToast('✨ 敌人掉落了遗物線索，將在下回合開始結算');
 
         return queuedReward;
     },
@@ -1817,7 +1778,7 @@ export const game_system = {
                 ? (r.essenceType === 'pure_essence' ? 'pure_essence' : 'chaos_essence')
                 : r.type;
         })();
-        if ((_nextRewardType === 'chaos_essence' || _nextRewardType === 'pure_essence') && this.phase !== 'selection') {
+        if ((_nextRewardType === 'marble_pack' || _nextRewardType === 'chaos_essence' || _nextRewardType === 'pure_essence') && this.phase !== 'selection') {
             // 同步预先清空残留的弹珠卡片，避免 ui_updateUI 渲染出旧 DOM 闪一帧
             const _earlyGridEl = document.getElementById('marble-selection-grid');
             if (_earlyGridEl) {
@@ -1844,6 +1805,8 @@ export const game_system = {
             const currentRewardIndex = Math.max(1, totalRewards - this.pendingRoundStartRewards.length);
             const rewardLabel = rewardType === 'relic'
                 ? '遗物线索'
+                : rewardType === 'marble_pack'
+                    ? '弹珠包'
                 : rewardType === 'pure_essence'
                     ? '纯净精华'
                     : '混沌精华';
@@ -1874,6 +1837,31 @@ export const game_system = {
                 } else {
                     startSelection();
                 }
+                return;
+            }
+
+            if (rewardType === 'marble_pack') {
+                if (Array.isArray(reward.marbleTypes) && reward.marbleTypes.length > 0) {
+                    if (!Array.isArray(this.guaranteedNextRound)) this.guaranteedNextRound = [];
+                    this.guaranteedNextRound.unshift(...reward.marbleTypes.slice(0, 3));
+                }
+                this.pendingSelectionMode = {
+                    mode: 'standard',
+                    requiredCount: (CONFIG.gameplay.selectionReq || 3),
+                    sourceRewardType: 'marble_pack',
+                    source: reward.source || 'unknown',
+                    round: reward.round || this.round || 1,
+                };
+                this._roundStartResolverActive = false;
+                eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
+                    round: this.round || 1,
+                    pendingCount: this.pendingRoundStartRewards.length,
+                    totalCount: totalRewards,
+                    resolvedCount: currentRewardIndex,
+                    currentRewardType: rewardType,
+                });
+                this._roundStartResolverTotalCount = 0;
+                if (typeof this.sys_initSelectionPhase === 'function') this.sys_initSelectionPhase();
                 return;
             }
 
@@ -2058,6 +2046,11 @@ export const game_system = {
     sys_toggleMarbleSelection(idx, cardEl) {
         const required = Math.max(1, this.selectionRequiredCount || CONFIG.gameplay.selectionReq || 3);
         if (this.selectedMarbles.includes(idx)) {
+            const marble = this.marblesPool?.[idx];
+            if (marble && Array.isArray(marble.runeSlots) && marble.runeSlots.length > 0) {
+                showToast('Fused marble is locked for this charge.');
+                return;
+            }
             this.selectedMarbles = this.selectedMarbles.filter(i => i !== idx);
             if (cardEl) cardEl.classList.remove('selected');
             if (this.selectionInjectedRune && this.selectionInjectedRune.marbleIndex === idx) {
@@ -2065,6 +2058,14 @@ export const game_system = {
             }
         } else {
             if (required === 1) {
+                const lockedSelected = (this.selectedMarbles || []).find(i => {
+                    const marble = this.marblesPool?.[i];
+                    return marble && Array.isArray(marble.runeSlots) && marble.runeSlots.length > 0;
+                });
+                if (lockedSelected !== undefined && lockedSelected !== idx) {
+                    showToast('Fused marble is locked for this charge.');
+                    return;
+                }
                 document.querySelectorAll('#marble-selection-grid .select-card.selected').forEach(el => el.classList.remove('selected'));
                 this.selectedMarbles = [idx];
                 if (cardEl) cardEl.classList.add('selected');
@@ -2589,6 +2590,8 @@ export const game_system = {
             const marbleQueueData = (this.marbleQueue || []).map(m => ({
                 type: m.type,
                 collected: m.collected ? [...m.collected] : [],
+                runeSlots: Array.isArray(m.runeSlots) ? m.runeSlots.map(slot => ({ ...slot })) : [],
+                maxRuneSlots: m.maxRuneSlots || 3,
                 compiled: m.compiled || false,
                 recipe: m.recipe ? { ...m.recipe } : null,
                 multicast: m.multicast || 0,
@@ -2597,6 +2600,8 @@ export const game_system = {
             const marblesPoolData = (this.marblesPool || []).map(m => ({
                 type: m.type,
                 collected: m.collected ? [...m.collected] : [],
+                runeSlots: Array.isArray(m.runeSlots) ? m.runeSlots.map(slot => ({ ...slot })) : [],
+                maxRuneSlots: m.maxRuneSlots || 3,
                 compiled: m.compiled || false,
                 recipe: m.recipe ? { ...m.recipe } : null,
                 multicast: m.multicast || 0,
@@ -2784,7 +2789,7 @@ export const game_system = {
             this.pendingSelectionMode = state.pendingSelectionMode ? { ...state.pendingSelectionMode } : null;
             this.selectionMode = state.selectionMode || 'standard';
             this.bulletCapBonus = state.bulletCapBonus || 0;
-            this.selectionRequiredCount = state.selectionRequiredCount || ((CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0));
+            this.selectionRequiredCount = Math.min(CONFIG.gameplay.selectionReq || 3, state.selectionRequiredCount || (CONFIG.gameplay.selectionReq || 3));
             this.selectionInjectedRune = state.selectionInjectedRune ? { ...state.selectionInjectedRune } : null;
             this.selectionPreviewState = state.selectionPreviewState ? { ...state.selectionPreviewState } : null;
             this.selectionRerollUsed = state.selectionRerollUsed || false;
@@ -2800,7 +2805,7 @@ export const game_system = {
                 const newRecipes = this.replaceAmmoContext.newRecipes || [];
                 const chargedRecipes = this.replaceAmmoContext.chargedRecipes || [];
                 const allRecipes = newRecipes.concat(chargedRecipes);
-                const bulletCap = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
+                const bulletCap = (CONFIG.gameplay.selectionReq || 3);
                 const maxSelect = Math.min(bulletCap, allRecipes.length);
                 let selected = Array.isArray(this.replaceAmmoContext.selectedIndices)
                     ? this.replaceAmmoContext.selectedIndices.slice()
@@ -2958,6 +2963,8 @@ export const game_system = {
                 this.marbleQueue = state.marbleQueue.map(m => ({
                     type: m.type || 'bounce',
                     collected: Array.isArray(m.collected) ? [...m.collected] : [],
+                    runeSlots: Array.isArray(m.runeSlots) ? m.runeSlots.map(slot => ({ ...slot })) : [],
+                    maxRuneSlots: m.maxRuneSlots || 3,
                     compiled: m.compiled || false,
                     recipe: m.recipe ? { ...m.recipe } : null,
                     multicast: m.multicast || 0,
@@ -2970,6 +2977,9 @@ export const game_system = {
                 this.marblesPool = state.marblesPool.map(m => {
                     const marbleDef = new MarbleDefinition(m.type || 'bounce');
                     marbleDef.collected = Array.isArray(m.collected) ? [...m.collected] : [];
+                    marbleDef.runeSlots = Array.isArray(m.runeSlots) ? m.runeSlots.map(slot => ({ ...slot })) : [];
+                    marbleDef.maxRuneSlots = m.maxRuneSlots || 3;
+                    if (typeof marbleDef.normalizeRuneSlots === 'function') marbleDef.normalizeRuneSlots();
                     marbleDef.compiled = m.compiled || false;
                     marbleDef.recipe = m.recipe ? { ...m.recipe } : null;
                     marbleDef.multicast = m.multicast || 0;
@@ -2983,6 +2993,8 @@ export const game_system = {
                 ? state.selectedMarbles.filter(i => Number.isInteger(i) && i >= 0 && i < this.marblesPool.length)
                 : [];
             this.activeMarbleIndex = state.activeMarbleIndex || 0;
+            this.gatheringSessions = [];
+            this.currentSession = null;
 
             // --- 恢复 pegs（通过 initPachinko 重建，然后覆盖 type/level/frozenTurns）---
             // 先初始化钉盘（生成正确数量的钉子）

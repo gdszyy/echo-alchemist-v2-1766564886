@@ -222,6 +222,7 @@ class Game {
         this.dragCurrent = new Vec2(0,0); 
         this.lastMousePos = new Vec2(0,0); 
         this.currentSession = null; 
+        this.gatheringSessions = [];
         this.isTiltingGrip = false;
         this.gripStartPos = new Vec2(0, 0); 
         this.gameOver = false; 

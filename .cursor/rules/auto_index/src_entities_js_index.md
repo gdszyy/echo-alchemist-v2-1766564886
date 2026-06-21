@@ -1,6 +1,6 @@
 # src\entities.js 函数索引
 
-> 自动生成于 2026-06-20 | 总行数: 5160 | 函数数: 97 | 语言: javascript
+> 自动生成于 2026-06-21 | 总行数: 5214 | 函数数: 103 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -13,6 +13,9 @@
 |--------|------|------|------|
 | setAudioProvider | function | `setAudioProvider(provider)` |  |
 | constructor | method | `constructor(type)` |  |
+| normalizeRuneSlots | method | `normalizeRuneSlots()` |  |
+| getRuneSlotCollected | method | `getRuneSlotCollected()` |  |
+| canFuseRune | method | `canFuseRune()` |  |
 | getName | method | `getName()` |  |
 | getColor | method | `getColor()` |  |
 | constructor | method | `constructor(x, y, x2, y2, type)` |  |
@@ -58,6 +61,9 @@
 | update | method | `update()` |  |
 | constructor | method | `constructor(x, y, marbleDef, session)` |  |
 | getBuffState | method | `getBuffState()` |  |
+| _getPegTriggerKey | method | `_getPegTriggerKey(peg)` |  |
+| canScorePeg | method | `canScorePeg(peg)` |  |
+| markScoredPeg | method | `markScoredPeg(peg)` |  |
 | handlePegInteraction | method | `handlePegInteraction(peg, game)` |  |
 | update | method | `update(pegs, slots, width, height, timeScale, tilt = {x:0, y:0})` |  |
 | stopSound | method | `stopSound()` |  |

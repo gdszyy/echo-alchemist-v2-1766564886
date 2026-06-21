@@ -287,9 +287,25 @@ export const calc_utils = {
             type: 'normal'
         };
 
+        const sourceCollected = Array.isArray(collectedTypes) ? collectedTypes : [];
+        const hasRuneSlotStats = sourceCollected.some(item => item && typeof item === 'object' && item.source === 'rune_slot');
+        const runeSlotStats = (!hasRuneSlotStats && marbleDef && typeof marbleDef.getRuneSlotCollected === 'function')
+            ? marbleDef.getRuneSlotCollected()
+            : (!hasRuneSlotStats && Array.isArray(marbleDef?.runeSlots)
+                ? marbleDef.runeSlots
+                    .filter(slot => slot && slot.element)
+                    .map(slot => ({
+                        type: slot.element,
+                        level: Math.max(1, Math.floor(slot.statAmount || slot.level || 1)),
+                        source: 'rune_slot',
+                        runeId: slot.runeId,
+                    }))
+                : []);
+        const effectiveCollected = hasRuneSlotStats ? sourceCollected : [...sourceCollected, ...runeSlotStats];
+
 
         // --- 2. 收集属性 (Collected Stats) ---
-        collectedTypes.forEach(t => { 
+        effectiveCollected.forEach(t => { 
             // [修复] 支持混合格式：字符串或对象 {type, level}
             const itemType = (typeof t === 'string') ? t : t.type;
             const itemLevel = (typeof t === 'string') ? 1 : (t.level || 1);

@@ -822,7 +822,7 @@ const CONFIG = {
         bottomRewardZoneMaxCount: 1,   // 当前仅生成一个窄奖励分栏，避免底部过度拥挤
         bottomRewardZoneWidthMultiplier: 1.5, // 奖励分栏宽度 = 1.5 个倍化弹珠直径
         bottomRewardZoneHeight: 48,
-        bottomRewardOnlyTypes: ['explosive', 'laser'],
+        bottomRewardOnlyTypes: [],
         bottomRewardZoneWeights: { explosive: 2, laser: 1 },
         // ==================== [v2 局内商店 + 符文碎片经济] ====================
         runShopFirstOfferRound: 3,     // 第一次商人固定在第 3 回合到访
@@ -839,6 +839,9 @@ const CONFIG = {
         runShopRefreshCost: 10,        // 刷新一次商店消耗碎片
         runShopItemsPerOffer: 5,       // 每次刷新提供的商品数
         runShopRunesRatio: 0.6,        // 商品中符文占比
+        runShopMarblePackBasePrice: 16,
+        runShopMarblePackMarkup: 1.15,
+        runShopMarblePackRarityPower: 0.65,
         runShopEndOfRunFragmentSettle: 0.3, // 局结束时未消费碎片转换为 saveData 的比例
         enemyDropFragmentChance: 0.30, // 普通敌人击杀掉落碎片基础概率
         enemyDropFragmentBaseAmount: 1,
@@ -905,29 +908,26 @@ const CONFIG = {
             emergencyReliefCooldown: 3      // 紧急救援触发后的冷却回合数
         }
     },
-    //  初始概率配置 (現在這些是基礎權重，解鎖後會增加)
-    // [DESIGN] 初始状态只提供 bounce（反弹）属性。
-    // 其余属性权重均为 0，需通过遗物解锁后才会按概率刷新对应属性钉子。
+    //  初始概率配置。所有弹珠默认进入池；遗物只提高对应权重，不再负责解锁。
     probabilities: { 
-        white: 100,       // 基礎
-        bounce: 20,       // 初始解鎖（唯一初始可用属性）
-        laser: 0,
-        // 物理系 (初始鎖定，通過遺物解鎖)
-        pierce: 0, 
-        scatter: 0,
-        damage: 3,
+        white: 100,
+        bounce: 18,
+        laser: 3,
+        pierce: 6, 
+        scatter: 6,
+        damage: 12,
         
-        // 元素系 (初始鎖定，通過遺物獨立解鎖)
-        cryo: 0, 
-        pyro: 0, 
+        // 元素系
+        cryo: 12, 
+        pyro: 12, 
         
-        // 特殊系 (初始鎖定)
-        explosive: 0,
-        rainbow: 0,
-        matryoshka: 0,
-        resonance: 0,
-        echo: 0,
-        venom: 0,
+        // 特殊系
+        explosive: 3,
+        rainbow: 1,
+        matryoshka: 1,
+        resonance: 4,
+        echo: 4,
+        venom: 4,
     },
     /** 视觉表现配置 (新增) */
     visuals: {
@@ -1419,30 +1419,32 @@ const RELIC_DB = [
 },
     { 
     id: 'chaos_essence', 
-    name: '混沌精華', 
+    name: '旧混沌精华', 
     icon: '🎡', 
-    desc: '收集階段：沿用舊版命運輪盤入口，轉動後使選中的已擁有屬性數量翻倍。', 
+    desc: '已废弃：旧版命运轮盘入口。当前主循环不再投放精华。', 
     rarity: 'legendary', 
     effect: 'unlock_slot', 
     slotType: 'wheel',
-    maxStacks: 1
+    maxStacks: 1,
+    deprecated: true
     },
     {
     id: 'pure_essence',
-    name: '純淨精華',
+    name: '旧纯净精华',
     icon: '🕊️',
-    desc: '下一次命運抉擇改為只選 1 枚彈珠，並額外注入 1 個合法符文。',
+    desc: '已废弃：旧版单弹珠符文注入入口。当前主循环不再投放精华。',
     rarity: 'legendary',
     effect: 'pure_essence',
-    maxStacks: 1
+    maxStacks: 1,
+    deprecated: true
     },
     // [v2 模块化] 旧 dimension_shard / dimension_crystal 行数遗物已移除，迁移为
     // pinboard_modules.js 中的 dim_shard_module / dim_crystal_module（高密度釘板模块），
     // 通过商店购买后挂载到模块槽位。
-    { id: 'stars_shines', name: '群星闪烁', icon: '✨', desc: '解鎖 [回响彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆回响彈珠。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'resonance', boost: 8, maxStacks: 1 },
-    { id: 'optical_lens', name: '聚焦透鏡', icon: '🔭', desc: '校準底部獎勵分欄：[光] 屬性會在研磨底部分欄中出現。立刻觸發一次混沌精華。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'laser', boost: 10, maxStacks: 1 },
+    { id: 'stars_shines', name: '群星闪烁', icon: '✨', desc: '提高 [回响弹珠] 出现权重，并立即获得一包回响倾向胚珠。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'resonance', boost: 8, maxStacks: 1 },
+    { id: 'optical_lens', name: '聚焦透鏡', icon: '🔭', desc: '提高 [激光弹珠] 出现权重，并立即获得一包激光倾向胚珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'laser', boost: 10, maxStacks: 1 },
     //  1. 粉色钉子遗物
-    { id: 'pink_slime', name: '粉紅凝膠', icon: '💗', desc: '收集階段：出現 3 個高彈性粉色釘子 (可疊加)。立刻觸發一次混沌精華。', rarity: 'common', effect: 'pink_peg_up', maxStacks: 5},
+    { id: 'pink_slime', name: '粉紅凝膠', icon: '💗', desc: '收集階段：出現 3 個高彈性粉色釘子 (可疊加)。', rarity: 'common', effect: 'pink_peg_up', maxStacks: 5},
 
     //  2. 战斗底部反弹墙（诅咒：所有墙体都消耗反弹/穿透）
     { id: 'energy_shield', name: '力場護盾', icon: '🛡️', desc: '戰鬥階段：底部邊界可反彈子彈。但子彈觸碰任何墻體（左/右/頂/底）都會額外消耗一次反彈或穿透次數。', rarity: 'cursed', effect: 'combat_wall' ,maxStacks: 1},
@@ -1451,28 +1453,28 @@ const RELIC_DB = [
     // 槽数 +1 (slot_expander) 已从遗物池移除，迁移到局内商店出售
     // （详见 src/ui/run_shop.js 中 slot_unlock / slot_count 商品）。
     //  獨立元素遺物
-    { id: 'cryo_stone', name: '永恆凍土', icon: '❄️', desc: '解鎖 [冰霜彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆冰霜彈珠；此 2 顆彈珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'cryo', boost: 15, maxStacks: 1 },
-    { id: 'pyro_stone', name: '不滅火種', icon: '🔥', desc: '解鎖 [火焰彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆火焰彈珠；此 2 顆彈珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'pyro', boost: 15, maxStacks: 1 },
+    { id: 'cryo_stone', name: '永恆凍土', icon: '❄️', desc: '提高 [冰霜弹珠] 出现权重，并立即获得一包冰霜倾向胚珠；冰霜弹珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'cryo', boost: 15, maxStacks: 1 },
+    { id: 'pyro_stone', name: '不滅火種', icon: '🔥', desc: '提高 [火焰弹珠] 出现权重，并立即获得一包火焰倾向胚珠；火焰弹珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'pyro', boost: 15, maxStacks: 1 },
     // { id: 'lightning_stone', name: '雷霆之怒', icon: '⚡', desc: '解鎖 [閃電] 屬性 (彈珠與釘子)。', rarity: 'rare', unlocks: 'lightning', boost: 15 },
 
     //  物理套裝遺物
-    { id: 'tactical_kit_pierce', name: '穿透補給', icon: '↗', desc: '解鎖 [穿透彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆穿透彈珠；此 2 顆彈珠同化概率永久翻倍。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'pierce', boost: 5, maxStacks: 1 },
-    { id: 'tactical_kit_scatter', name: '散射補給', icon: '🔱', desc: '解鎖 [散射彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆散射彈珠；此 2 顆彈珠同化概率永久翻倍。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'scatter', boost: 5, maxStacks: 1 },
-    { id: 'tactical_kit_damage', name: '增幅補給', icon: '⚔️', desc: '解鎖 [增幅彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆增幅彈珠；此 2 顆彈珠同化概率永久翻倍。', rarity: 'common', effect: 'unlock_marble', marbleType: 'damage', boost: 5, maxStacks: 1, recommended: true, tags: ['伤害核心', '新手友好'], recommendTip: '解锁增幅属性并立即获得2颗增幅弹珠，同化概率永久翻倍！' },
+    { id: 'tactical_kit_pierce', name: '穿透補給', icon: '↗', desc: '提高 [穿透弹珠] 出现权重，并立即获得一包穿透倾向胚珠；穿透弹珠同化概率永久翻倍。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'pierce', boost: 5, maxStacks: 1 },
+    { id: 'tactical_kit_scatter', name: '散射補給', icon: '🔱', desc: '提高 [散射弹珠] 出现权重，并立即获得一包散射倾向胚珠；散射弹珠同化概率永久翻倍。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'scatter', boost: 5, maxStacks: 1 },
+    { id: 'tactical_kit_damage', name: '增幅補給', icon: '⚔️', desc: '提高 [增幅弹珠] 出现权重，并立即获得一包增幅倾向胚珠；增幅弹珠同化概率永久翻倍。', rarity: 'common', effect: 'unlock_marble', marbleType: 'damage', boost: 5, maxStacks: 1, recommended: true, tags: ['伤害核心', '新手友好'], recommendTip: '提高增幅弹珠概率并立即获得一包增幅倾向胚珠！' },
 
-    { id: 'explosive_ammo', name: '高爆火藥', icon: '🧨', desc: '校準底部獎勵分欄：[爆破] 屬性會在研磨底部分欄中出現。立刻觸發一次混沌精華。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'explosive', boost: 10, maxStacks: 1 },
-    { id: 'prism_shard', name: '七彩稜鏡', icon: '🌈', desc: '解鎖 [彩虹彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆彩虹彈珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'rainbow', boost: 5, maxStacks: 1 },
-    { id: 'russian_doll', name: '俄羅斯套娃', icon: '🪆', desc: '解鎖 [套娃彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆套娃彈珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'matryoshka', boost: 5, maxStacks: 1 },
+    { id: 'explosive_ammo', name: '高爆火藥', icon: '🧨', desc: '提高 [爆破弹珠] 出现权重，并立即获得一包爆破倾向胚珠。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'explosive', boost: 10, maxStacks: 1 },
+    { id: 'prism_shard', name: '七彩稜鏡', icon: '🌈', desc: '提高 [彩虹弹珠] 出现权重，并立即获得一包彩虹倾向胚珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'rainbow', boost: 5, maxStacks: 1 },
+    { id: 'russian_doll', name: '俄羅斯套娃', icon: '🪆', desc: '提高 [套娃弹珠] 出现权重，并立即获得一包套娃倾向胚珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'matryoshka', boost: 5, maxStacks: 1 },
 
     // [v2 模块化] 旧的钉盘布局遗物（triangle_formation / diamond_formation /
     // sparse_interval / mirror_sync / wide_narrow）已从遗物池移除，迁移为
     // pinboard_modules.js 中的 triangle_module / diamond_module / sparse_module /
     // mirror_module / wide_narrow_module，通过商店购买后挂载到模块槽位。
     // ==================== 属性弹珠解锁遗物 ====================
-    // 效果：解锁该属性弹珠，立即触发一次混沌精华，并保证带有 2 颗该属性弹珠；同化概率永久翻倍
-    { id: 'surge_bounce', name: '彈性潮涌', icon: '🔵', desc: '解鎖 [彈性彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆彈性彈珠；此 2 顆彈珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'bounce', boost: 10, maxStacks: 1 },
-    { id: 'surge_echo',   name: '回响潮涌', icon: '🔊', desc: '解鎖 [回响彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆回响彈珠；此 2 顆彈珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'echo',   boost: 10, maxStacks: 1 },
-    { id: 'surge_venom',  name: '劇毒潮涌', icon: '☠️', desc: '解鎖 [劇毒彈珠]。立刻觸發一次混沌精華，並保證帶有 2 顆劇毒彈珠；此 2 顆彈珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'venom',  boost: 10, maxStacks: 1 },
+    // 效果：提高该属性弹珠概率，立即提供一包对应倾向胚珠；同化概率永久翻倍
+    { id: 'surge_bounce', name: '彈性潮涌', icon: '🔵', desc: '提高 [弹性弹珠] 出现权重，并立即获得一包弹性倾向胚珠；弹性弹珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'bounce', boost: 10, maxStacks: 1 },
+    { id: 'surge_echo',   name: '回响潮涌', icon: '🔊', desc: '提高 [回响弹珠] 出现权重，并立即获得一包回响倾向胚珠；回响弹珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'echo',   boost: 10, maxStacks: 1 },
+    { id: 'surge_venom',  name: '劇毒潮涌', icon: '☠️', desc: '提高 [剧毒弹珠] 出现权重，并立即获得一包剧毒倾向胚珠；剧毒弹珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'venom',  boost: 10, maxStacks: 1 },
 
     // ==================== 新手前期过渡遗物 ====================
     // 炼金火药管：所有弹珠基础伤害 +2（可叠加3次），后期自然稀释
@@ -1629,14 +1631,15 @@ const RELIC_DB = [
     },
     {
         id: 'ammo_bandolier',
-        name: '炼金弹带',
+        name: '旧炼金弹带',
         icon: '🎞️',
-        desc: '每次命运抉择可保留的弹珠数量 +1；但每回合第一颗子弹伤害 -15%。',
+        desc: '已废弃：当前晶石核心默认最多保留并充能 3 颗弹珠。',
         rarity: 'legendary',
         effect: 'bullet_cap_up',
         amount: 1,
         maxStacks: 1,
-        recommended: true,
+        deprecated: true,
+        recommended: false,
         tags: ['弹药容量', '高阶构筑'],
         recommendTip: '多留一颗弹珠，但开局火力会被压低，适合能用后续弹药赚回节奏的构筑。'
     },
@@ -1716,15 +1719,16 @@ const RELIC_DB = [
         effect: 'element_injector',
         maxStacks: 1
     },
-    // 混沌爆发：掉落混沌精华时，立刻全屏伤害 round×2
+    // 旧精华体系遗物：当前主循环已停用
     {
         id: 'chaos_burst',
-        name: '混沌爆发',
+        name: '旧混沌爆发',
         icon: '💥',
-        desc: '战斗阶段：每次敌人掉落混沌精华时，立刻对全场所有敌人造成 (回合数 × 2) 的固定真实伤害。',
+        desc: '已废弃：旧版精华掉落联动遗物。',
         rarity: 'cursed',
         effect: 'chaos_burst',
-        maxStacks: 1
+        maxStacks: 1,
+        deprecated: true
     },
     // 属性协议：弹药配方含 4 种以上不同属性时，所有子弹基础伤害 +{该子弹携带属性种类数}
     {

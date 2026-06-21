@@ -72,11 +72,12 @@ globs: ["src/config.js"]
 `CONFIG.probabilities` 定义了收集阶段钉板刷新时各属性钉子的基础权重，并在每局开始时被复制到 `this.unlockedWeights`。
 
 - **设计原则**：
-- **初始状态只提供反弹属性**：`bounce: 20` 是唯一初始权重大于 0 的特殊属性，其余属性（`pierce`、`scatter`、`damage`、`cryo`、`pyro`、`explosive` 等）均为 `0`。
-- **遗物解锁机制**：玩家选择遗物时，`shop.js` 中的 `ui_selectRelic` 会通过 `this.unlockedWeights[key]` 增加对应属性的权重，从而在后续回合的钉板刷新中按概率生成对应属性钉子。
+- **所有弹珠默认进池**：`white` 权重最高，`bounce`、`damage`、`cryo`、`pyro` 等常规弹珠默认可出现，`rainbow`、`matryoshka` 等特殊弹珠使用低权重控制稀有度。
+- **遗物权重机制**：玩家选择弹珠倾向遗物时，`shop.js` 中的 `ui_selectRelic` 会提高对应 `this.unlockedWeights[key]`，并立即提供一包对应倾向胚珠；遗物不再负责“解锁弹珠”或触发精华。
+- **商人弹珠包定价**：`run_shop.js` 根据 `CONFIG.probabilities` 的归一化期望价值动态计算弹珠包价格。去纯净包、固定低概率弹珠包等必须重新计算概率分布，不允许手填固定价格绕过期望价值。
 - **闪电属性特殊性**：自 2026-04-14 起，**闪电（lightning）属性不再拥有对应的钉子**，也不再通过遗物直接解锁其生成权重。闪电属性仅能通过收集阶段中【冰霜】与【火焰】属性的抗消（合成）产生。
-- **激光属性特殊性**：自 2026-04-16 起，**激光（laser）属性不再拥有对应的钉子**，遉物 `optical_lens` 的 `unlocks: 'laser'` 仅解锁激光弹珠出现，不会产生激光钉子。激光属性仅能通过弹珠本身（`marbleDef.type === 'laser'`）、奖励区或纯净精华符文合成写入 `MarbleDefinition.collected` 提供；`calcRuneBaseStats` 不再作为战斗继承属性来源。
-- **修改警告**：严禁将除 `bounce` 和 `white` 以外的属性初始权重设置为大于 0 的数値，否则会破坏“遗物解锁属性”的游戏设计意图。严禁在 `allPegTypes` 中重新加入 `lightning` 或 `laser`。
+- **激光属性特殊性**：自 2026-04-16 起，**激光（laser）属性不再拥有对应的钉子**。激光属性仅能通过弹珠本身（`marbleDef.type === 'laser'`）或奖励区写入 `MarbleDefinition.collected` 提供；`calcRuneBaseStats` 不再作为战斗继承属性来源。
+- **修改警告**：严禁在 `allPegTypes` 中重新加入 `lightning` 或 `laser` 作为普通钉子类型。调整 `white` 权重会直接影响杂色包价格和玩家获得纯净弹珠的体感，必须同步检查商店包价格。
 ## 7. Boss 配置参数说明 (bossConfigs)
 
 `CONFIG.balance.bossConfigs` 控制各个特殊 Boss 的专有参数和机制系数。
@@ -124,6 +125,7 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
+| 2026-06-21 | `src/config.js`, `src/ui/run_shop.js`, `src/ui/shop.js`, `src/game_system.js`, `src/game_phase.js`, `src/ui_system.js`, `src/ui/hud.js`, `index.html`, `.cursor/rules/config.md`, `.cursor/rules/game_phase.md`, `.cursor/rules/ui_system.md` | **弹珠包主循环第一批落地**：取消新精华投放，敌人奖励只登记遗物线索；所有弹珠默认进入基础概率池，遗物改为提高对应弹珠权重并立即提供倾向胚珠包；局内商人新增杂色包、去纯包、倾向包和固定穿透包，价格按概率期望动态计算；三发/三弹珠上限固定为晶石核心 3 充能位；商人状态条移至右上角小胶囊；符文获取增加中央揭示动画。 |
 | 2026-06-20 | `src/config.js`, `src/game_system.js`, `src/game_phase.js`, `src/ui/run_shop.js`, `src/ui_system.js`, `src/core.js`, `index.html`, `.cursor/rules/config.md`, `.cursor/rules/game_phase.md`, `.cursor/rules/ui_system.md` | **局内商人随机到访调度**：`CONFIG.gameplay` 新增 `runShopFirstOfferRound`、`runShopRandomWaitMin`、`runShopVisitDurationRounds`、`runShopStarterBoostShield`、`runShopStarterBoostFlatDamage`、`runShopStarterBoostDamageRounds`、`runShopStarterBoostFragments`；首访固定第 3 回合且提供免费 `starter_boost` 占位援助包，后续商人按 3..当前回合数随机等待并停留 2 回合，底部 UI 显示到访/离开倒计时。 |
 | 2026-06-19 | `src/config.js`, `src/spawn_system.js`, `src/ui/shop.js`, `src/game_phase.js`, `src/entities.js`, `src/calc_utils.js` | **底部奖励分栏与奖励专属属性**：`moduleDefaultSlots` / `moduleInitialSlots` 回调为首行 5 个初始钉板；`CONFIG.gameplay` 新增 `bottomRewardZoneChance`、`bottomRewardZoneWidthMultiplier`、`bottomRewardOnlyTypes`、`bottomRewardZoneWeights` 等底部分栏参数。`explosive` / `laser` 从命运弹珠候选与保底队列中过滤，不再作为普通弹珠出现；对应遗物只校准底部奖励分栏并触发混沌精华。 |
 | 2026-06-19 | `src/config.js`, `src/ui/shop.js`, `src/ui_system.js`, `src/game_system.js`, `src/core.js`, `.cursor/rules/config.md`, `.cursor/rules/ui_system.md` | **新增选择刷新遗物**：`fate_reroll_token` 提供每次命运抉择 1 次弹珠候选刷新；`relic_reroll_seal` 提供每次遗物选择 1 次遗物候选刷新。两者为选择 UI 被动遗物，不新增粒子、Canvas 光效或性能预算消费；刷新使用状态进入局内存档，避免刷新页面重复使用。 |

@@ -1,6 +1,6 @@
 # src\game_phase.js 函数索引
 
-> 自动生成于 2026-06-20 | 总行数: 3818 | 函数数: 33 | 语言: javascript
+> 自动生成于 2026-06-21 | 总行数: 3929 | 函数数: 35 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -29,6 +29,8 @@
 | phase_gathering_initPachinko_legacy | method | `phase_gathering_initPachinko_legacy(shouldInherit = false)` | ⚠️ 巨型函数，见 @section 导航 |
 | phase_gathering_getRandomPegType | method | `phase_gathering_getRandomPegType()` |  |
 | phase_startCombatPhase | method | `phase_startCombatPhase()` |  |
+| phase_gathering_createSession | method | `phase_gathering_createSession(marbleDef, marbleIndex)` |  |
+| phase_gathering_launchMarbleBatch | method | `phase_gathering_launchMarbleBatch(pos)` |  |
 | phase_handleInputStart | method | `phase_handleInputStart(pos)` |  |
 | phase_enemy_processTurn | method | `phase_enemy_processTurn(e)` |  |
 | phase_claimPendingRunes | method | `phase_claimPendingRunes()` |  |

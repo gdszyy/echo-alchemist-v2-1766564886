@@ -250,9 +250,9 @@
     },
     {
       "file": "src\\world_sim\\bio_layer.js",
-      "lines": 477,
+      "lines": 474,
       "funcs": 9,
-      "reason": "未达阈值(行数=477<500, 函数数=9<20)"
+      "reason": "未达阈值(行数=474<500, 函数数=9<20)"
     },
     {
       "file": "src\\world_sim\\crystal_disaster.js",

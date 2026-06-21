@@ -263,3 +263,9 @@
 - `SpriteRenderer` 必须支持 fallback 模式，确保无美术资源时游戏仍可正常运行
 - Sprite 的 `drawImage` 调用必须在现有 `ctx.save()` / `ctx.restore()` 块内，不得影响 Layer 2~5 的变换状态
 - 新增 `SpriteRenderer` 的 `drawImage` 调用属于中等开销，无需接入 `CONFIG.performance` 阈値（位图绘制比矢量更快）
+## 2026-06-21 Per-Ball Peg Trigger Guard
+
+- `DropBall` owns `lastScoringPegKey`; peg trigger scoring is no longer gated by shared `Peg.cooldownTimer`.
+- A ball may physically bounce on the same peg repeatedly, but it only gains energy or attributes when the current peg key differs from its previous scoring peg key.
+- Hitting a different peg updates `lastScoringPegKey`, so returning to the first peg can score again.
+- Split, mirror, and rainbow child balls carry their own session references and should not write through `game.currentSession`.

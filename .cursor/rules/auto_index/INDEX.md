@@ -45,7 +45,7 @@
 | 文件 | 行数 | 函数数 |
 |------|------|--------|
 | `src\ui\run_shop.js` | 488 | 17 |
-| `src\world_sim\bio_layer.js` | 477 | 9 |
+| `src\world_sim\bio_layer.js` | 474 | 9 |
 | `src\world_sim\crystal_disaster.js` | 417 | 19 |
 | `src\data\enemy_visual_assets.js` | 357 | 7 |
 | `src\render\sprite_renderer.js` | 357 | 10 |

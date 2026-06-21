@@ -126,3 +126,15 @@
 当玩家在替换界面确认选择后（`sys_confirmReplaceAmmo`），系统会将选中的卡片合并为最终的 `ammoQueue`，并清空临时队列 `_chargedAmmoQueue` 和替换上下文 `replaceAmmoContext`。随后，游戏正式进入战斗阶段。
 
 这一机制赋予了玩家在获得精华奖励时“保留上回合强力子弹”的策略选择权，同时通过纯净精华的“跳过研磨”分支，为玩家提供了更灵活的节奏控制。
+## 2026-06-21 Marble Rune Slot Update
+
+- Essence rewards are no longer a new-run reward source. The standard pre-grind entry is now `marble_pack`.
+- Each `MarbleDefinition` can hold up to 3 fused rune slots through `runeSlots`.
+- Fusing a rune in the marble selection preview consumes the rune immediately and adds temporary recipe stats through `source: 'rune_slot'`.
+- Gathering settlement must not persist `source: 'rune_slot'` entries inside `marble.collected`; the durable source of truth is the marble's `runeSlots` array.
+## 2026-06-21 Charge Batch Gathering
+
+- A round charge launches up to 3 selected marbles at once. Each marble keeps an independent gathering session and becomes one ammo recipe when the board settles.
+- The final bullet list is produced only after all marbles, split clones, energy orbs, and roulette callbacks have completed.
+- Peg trigger cooldown is per ball: repeated contact with the same peg does not add energy or attributes until that ball hits a different peg.
+- Rune slots remain durable marble equipment. Their `source: 'rune_slot'` stats are injected into the session for compilation and are not copied into persistent `marble.collected`.

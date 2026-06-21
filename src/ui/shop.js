@@ -15,7 +15,7 @@
 
 import { META_SHOP_CONFIG, CONFIG, RELIC_DB, BOARD_STRUCTURE_RELICS } from '../config.js';
 import { RUNE_DB } from '../rune_config.js';
-import { showToast } from '../entities.js';
+import { showToast, MarbleDefinition } from '../entities.js';
 import { eventBus } from '../event_bus.js';
 import { getRelicIconSrc } from '../bitmap_icons.js'; // [Phase 5A Task 5.A7] 位图遗物图标
 
@@ -53,6 +53,23 @@ export function recipe_countAttributeKinds(r) {
 function _isCoarsePointerInput() {
     if (typeof window === 'undefined') return false;
     return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+}
+
+function _grantRelicMarblePack(game, marbleType, count = 3) {
+    if (!marbleType) return [];
+    const types = [marbleType, marbleType, 'white'].slice(0, Math.max(1, count));
+    if (!Array.isArray(game.guaranteedNextRound)) game.guaranteedNextRound = [];
+    game.guaranteedNextRound.unshift(...types);
+    game.lastMarblePackTypes = types.slice();
+
+    const currentQueueEmpty = !Array.isArray(game.marbleQueue) || game.marbleQueue.length === 0;
+    const canPrimeImmediately = currentQueueEmpty && !['combat', 'gathering'].includes(game.phase);
+    if (canPrimeImmediately) {
+        game.marbleQueue = types.map(type => new MarbleDefinition(type));
+        game.marblesPool = game.marbleQueue.slice();
+        game.selectedMarbles = game.marbleQueue.map((_, idx) => idx);
+    }
+    return types;
 }
 
 /**
@@ -93,6 +110,7 @@ export const shop_system = {
         const ammoRequiredRelics = new Set(['mirror_magazine', 'element_injector']);
         let pool = RELIC_DB.filter(r => {
             if (showAllRelics) return true;
+            if (r.deprecated) return false;
             if (fateMomentRewardIds.has(r.id)) return false;
             if (isRunStart && ammoRequiredRelics.has(r.id)) return false;
             const count = (this.ownedRelics || []).filter(id => id === r.id).length;
@@ -353,10 +371,6 @@ export const shop_system = {
         // 处理遗物效果
         if (relic.effect === 'pink_peg_up') {
             this.pinkPegCount = (this.pinkPegCount || 0) + 3;
-            // [钉盘遗物] 立刻触发一次混沌精华
-            if (typeof this.sys_queueRoundStartReward === 'function') {
-                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
-            }
         } 
         else if (relic.effect === 'combat_wall') {
             this.hasCombatWall = true;
@@ -368,40 +382,22 @@ export const shop_system = {
                 this.unlockedSlots.push(relic.slotType);
             }
             if (this.slotCount === 0) this.slotCount = 1;
-            // [钉盘遗物] 立刻触发一次混沌精华
-            if (typeof this.sys_queueRoundStartReward === 'function') {
-                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
-            }
         }
         else if (relic.effect === 'slot_count_up') {
             this.slotCount = (this.slotCount || 0) + 1;
-            // [钉盘遗物] 立刻触发一次混沌精华
-            if (typeof this.sys_queueRoundStartReward === 'function') {
-                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
-            }
         }
         else if (relic.effect === 'bullet_cap_up') {
-            const amount = (typeof relic.amount === 'number' && relic.amount > 0) ? relic.amount : 1;
-            this.bulletCapBonus = (this.bulletCapBonus || 0) + amount;
-            const newCap = (CONFIG.gameplay.selectionReq || 3) + this.bulletCapBonus;
-            this.selectionRequiredCount = newCap;
-            if (window.showToast) showToast(`子彈持有上限 +${amount}（當前 ${newCap}）`);
+            this.bulletCapBonus = 0;
+            this.selectionRequiredCount = CONFIG.gameplay.selectionReq || 3;
+            if (window.showToast) showToast('Core slots fixed at 3. Old bandolier converted to calibration parts.');
         }
         else if (relic.effect === 'row_count_up') {
             this.currentRows = (this.currentRows || 0) + 2;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
-            // [钉盘遗物] 立刻触发一次混沌精华
-            if (typeof this.sys_queueRoundStartReward === 'function') {
-                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
-            }
         } else if (relic.effect === 'row_count_up_1') {
             // 维度碎片（rare）：每次只加 1 行
             this.currentRows = (this.currentRows || 0) + 1;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
-            // [钉盘遗物] 立刻触发一次混沌精华
-            if (typeof this.sys_queueRoundStartReward === 'function') {
-                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
-            }
         } else if (relic.effect === 'flat_damage_up') {
             // 炼金火药管：所有弹珠基础伤害 +N
             const val = relic.flatDamageValue || 2;
@@ -421,81 +417,44 @@ export const shop_system = {
             this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 3;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
             if (window.showToast) showToast('三角陣形啟動！釘盤 +3 行，漏斗共鳴激活。');
-            // [钉盘遗物] 立刻触发一次混沌精华
-            if (typeof this.sys_queueRoundStartReward === 'function') {
-                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
-            }
         } else if (relic.effect === 'board_layout_diamond') {
             this.boardLayout = 'diamond';
             // [补偿] 菱形顶底稀疏，+2 行让菱形更饱满
             this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 2;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
             if (window.showToast) showToast('菱形陣形啟動！釘盤 +2 行，中段爆發激活。');
-            // [钉盘遗物] 立刻触发一次混沌精华
-            if (typeof this.sys_queueRoundStartReward === 'function') {
-                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
-            }
         } else if (relic.effect === 'board_layout_sparse') {
             this.boardLayout = 'sparse';
             // [补偿] 稀疏布局钉子总数约为 default 的 75%，+4 行补偿总量
             this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 4;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
             if (window.showToast) showToast('稀疏間隔啟動！釘盤 +4 行，通道蓄力激活。');
-            // [钉盘遗物] 立刻触发一次混沌精华
-            if (typeof this.sys_queueRoundStartReward === 'function') {
-                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
-            }
         } else if (relic.effect === 'board_layout_mirror_sync') {
             this.boardLayout = 'mirror_sync';
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
-            // [钉盘遗物] 立刻触发一次混沌精华
-            if (typeof this.sys_queueRoundStartReward === 'function') {
-                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
-            }
         } else if (relic.effect === 'board_layout_wide_narrow') {
             this.boardLayout = 'wide_narrow';
             // [补偿] 宽窄交替分布不均，+2 行轻度补偿
             this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 2;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
             if (window.showToast) showToast('寬窄交替啟動！釘盤 +2 行，邊緣共振激活。');
-            // [钉盘遗物] 立刻触发一次混沌精华
-            if (typeof this.sys_queueRoundStartReward === 'function') {
-                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
-            }
         } else if (relic.effect === 'unlock_marble') {
             const mt = relic.marbleType;
             const boost = relic.boost || 10;
-            const rewardOnlyMarbleTypes = new Set(CONFIG.gameplay.bottomRewardOnlyTypes || []);
-            const rewardOnly = rewardOnlyMarbleTypes.has(mt);
-            // 1. 解锁属性弹珠
+            // 1. 所有弹珠默认可出现；遗物只提高该弹珠后续出现权重。
             if (!this.unlockedWeights) this.unlockedWeights = {};
             const current = this.unlockedWeights[mt] || 0;
-            this.unlockedWeights[mt] = current === 0 ? boost : current + Math.floor(boost * 1.5);
-            if (rewardOnly) {
-                const display = CONFIG.ui?.attributeDisplay?.[mt]?.name || mt;
-                if (window.showToast) showToast(`已校准底部奖励区：[${display}] 属性会在研磨底部分栏中出现。`);
-                if (typeof this.sys_queueRoundStartReward === 'function') {
-                    this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
-                }
-                if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
-                if (!options.skipClose) this.ui_closeRelicSelection();
-                return;
-            }
-            // 2. 保证下次命运抉择带有 2 颗该属性弹珠
-            if (!this.guaranteedNextRound) this.guaranteedNextRound = [];
-            this.guaranteedNextRound.push(mt);
-            this.guaranteedNextRound.push(mt);
+            this.unlockedWeights[mt] = Math.max(current, CONFIG.probabilities?.[mt] || 0) + Math.floor(boost * 1.5);
+            // 2. 立即提供一包对应倾向弹珠，下一次弹珠选择优先出现。
+            const packTypes = _grantRelicMarblePack(this, mt, 3);
             // 3. 永久翻倍同化概率
             if (!this.assimilationBoostRounds) this.assimilationBoostRounds = {};
             if (!this.doubleAssimilationBoostRounds) this.doubleAssimilationBoostRounds = {};
             this.assimilationBoostRounds[mt] = Infinity;
             this.doubleAssimilationBoostRounds[mt] = Infinity;
-            // 4. 提示 + 触发混沌精华
+            // 4. 提示
             const display = CONFIG.ui?.attributeDisplay?.[mt]?.name || mt;
-            if (window.showToast) showToast(`已解鎖 [${display}彈珠]！下次命運抉擇保證含 2 顆${display}彈珠，同化概率永久翻倍。`);
-            if (typeof this.sys_queueRoundStartReward === 'function') {
-                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
-            }
+            if (window.showToast) showToast(`${display}權重提升！立即获得倾向弹珠包：${packTypes.join(' / ')}。`);
         } else if (relic.effect === 'assimilation_surge') {
             // [兼容旧存档] 保留旧效果处理
             const mt = relic.marbleType;
@@ -508,17 +467,10 @@ export const shop_system = {
             this.doubleAssimilationBoostRounds[mt] = 2;
             const display = CONFIG.ui?.attributeDisplay?.[mt]?.name || mt;
             if (window.showToast) showToast(`${relic.name}已啟動！${display} 同化率 x${CONFIG.gameplay.assimilationDoubleMultiplier || 2}（持續 2 回合）。`);
-            if (typeof this.sys_queueRoundStartReward === 'function') {
-                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
-            }
+            _grantRelicMarblePack(this, mt, 3);
         } else if (relic.effect === 'pure_essence') {
-            this.pendingSelectionMode = {
-                mode: 'pure_essence',
-                requiredCount: 1,
-                sourceRelicId: relic.id,
-                sourceRelicName: relic.name,
-            };
-            if (window.showToast) showToast('純淨精華已就緒！下次命運抉擇可選擇 1 枚彈珠並注入 1 個合法符文。');
+            _grantRelicMarblePack(this, 'white', 3);
+            if (window.showToast) showToast('純淨精華已转化为纯净胚珠包。');
         }
         
         if (relic.unlocks) {
@@ -529,14 +481,10 @@ export const shop_system = {
 
             keys.forEach(key => {
                 const current = this.unlockedWeights[key] || 0;
-                this.unlockedWeights[key] = current === 0 ? boost : current + Math.floor(boost * 1.5);
-                this.guaranteedNextRound.push(key);
+                this.unlockedWeights[key] = Math.max(current, CONFIG.probabilities?.[key] || 0) + Math.floor(boost * 1.5);
+                _grantRelicMarblePack(this, key, 3);
             });
-            if (window.showToast) showToast(`已解鎖相關屬性!`);
-            // [钉盘遗物] 立刻触发一次混沌精华
-            if (typeof this.sys_queueRoundStartReward === 'function') {
-                this.sys_queueRoundStartReward({ type: 'chaos_essence', source: 'relic', sourceRelicId: relic.id, sourceRelicName: relic.name, round: this.round });
-            }
+            if (window.showToast) showToast(`相关弹珠权重已提升，并获得对应倾向包。`);
         }
 
         // ==================== [v2 即时感重塑] 新遗物即时效果分支 ====================

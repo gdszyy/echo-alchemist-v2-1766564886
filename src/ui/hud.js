@@ -42,6 +42,27 @@ function _buildRuneIconEl(runeDef, runeLevel) {
     return frame;
 }
 
+function _playRuneAcquireReveal(runeDef, runeLevel, delay = 0) {
+    if (typeof document === 'undefined' || !runeDef) return;
+    setTimeout(() => {
+        const reveal = document.createElement('div');
+        reveal.className = `rune-acquire-reveal rarity-${runeDef.rarity || 'common'}`;
+        const iconFrame = _buildRuneIconEl(runeDef, runeLevel || 1);
+        const textWrap = document.createElement('div');
+        textWrap.className = 'rune-acquire-copy';
+        const label = document.createElement('div');
+        label.className = 'rune-acquire-label';
+        label.textContent = '符文获得';
+        const name = document.createElement('div');
+        name.className = 'rune-acquire-name';
+        name.textContent = `${runeDef.name || runeDef.id || '未知符文'} Lv.${runeLevel || 1}`;
+        textWrap.append(label, name);
+        reveal.append(iconFrame, textWrap);
+        document.body.appendChild(reveal);
+        setTimeout(() => reveal.remove(), 1250);
+    }, Math.max(0, delay || 0));
+}
+
 /**
  * HUD 渲染方法集合
  * 通过 bind(this) 组合模式作为实例方法注入到 Game 实例
@@ -997,6 +1018,7 @@ export const hud_system = {
         eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_CLAIM, ({ runeDef, level }) => {
             const slot = document.getElementById('combat-rune-single-slot');
             if (!slot || !runeDef) return;
+            _playRuneAcquireReveal(runeDef, level, 0);
 
             // 获取符文槽屏幕位置
             const slotRect = slot.getBoundingClientRect();
@@ -1041,6 +1063,7 @@ export const hud_system = {
             runes.forEach((runeInfo, index) => {
                 const { runeDef, level, source, x: lootX, y: lootY } = runeInfo;
                 if (!runeDef) return;
+                _playRuneAcquireReveal(runeDef, level, index * 150);
 
                 // 延迟播放，多个符文依次错开（每个间隔 150ms）
                 setTimeout(() => {

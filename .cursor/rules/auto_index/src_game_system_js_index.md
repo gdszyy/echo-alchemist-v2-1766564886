@@ -1,6 +1,6 @@
 # src\game_system.js 函数索引
 
-> 自动生成于 2026-06-20 | 总行数: 3124 | 函数数: 56 | 语言: javascript
+> 自动生成于 2026-06-21 | 总行数: 3136 | 函数数: 56 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -78,11 +78,11 @@
 |----------|------|
 | `@section:field_reward_density` | 第一步：统计场上奖励数量，达硬上限时直接返回 |
 | `@section:power_pressure_eval` | 第二步：计算玩家战力比和踪迹血量，评估生存压力 |
-| `@section:emergency_relief` | 第三步：生存压力超阈时强制标记精华（紧急救援） |
+| `@section:emergency_relief` | 第三步：生存压力超阈时强制标记遗物线索（紧急救援） |
 | `@section:base_drop_chance` | 第四步：基础概率 = 基础值 + 回合加成 + 词缀加成 |
 | `@section:dynamic_multiplier` | 第五步：战力/血量/密度四维动态倍率修正 |
 | `@section:pity_guarantee` | 第六步：三回合平均伤害 vs 威胁HP保底判定（V3算法） |
-| `@section:final_reward_type` | 第七步：随机抗成判定奖励类型（遗物/混沌/纯净精华） |
+| `@section:final_reward_type` | 第七步：随机判定奖励类型（遗物线索） |
 
 ### sys_loadRunState
 

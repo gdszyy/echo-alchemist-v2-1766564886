@@ -862,8 +862,7 @@ export const ui_system = {
         if (this.selectionMode === 'pure_essence') {
             // [feat] 纯净精华允许不注入符文直接进入研磨（只有一个弹珠）
             // 有符文注入时仍需校验 marbleIndex 匹配；无符文时直接放行
-            if (!this.selectionInjectedRune) return true;
-            return !!(this.selectionInjectedRune.marbleIndex === this.selectedMarbles[0]);
+            return true;
         }
         return true;
     },
@@ -881,7 +880,7 @@ export const ui_system = {
         if (isReplace) {
             const ctx = this.replaceAmmoContext;
             const allRecipes = [...(ctx.newRecipes || []), ...(ctx.chargedRecipes || [])];
-            const bulletCap = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
+            const bulletCap = (CONFIG.gameplay.selectionReq || 3);
             required = Math.min(bulletCap, allRecipes.length);
             selectedItems = (ctx.selectedIndices || [])
                 .filter(idx => idx >= 0 && idx < allRecipes.length)
@@ -901,10 +900,12 @@ export const ui_system = {
                 const marble = this.marblesPool?.[idx];
                 if (!marble) return null;
                 const info = attrDisplay[marble.type] || {};
+                const runeCount = Array.isArray(marble.runeSlots) ? marble.runeSlots.length : 0;
+                const maxRuneSlots = marble.maxRuneSlots || 3;
                 return {
                     icon: info.icon || '',
                     label: marble.getName ? marble.getName() : (info.name || marble.type || '弹珠'),
-                    detail: info.name || marble.type || '',
+                    detail: `${info.name || marble.type || ''}${runeCount ? ` / Rune ${runeCount}/${maxRuneSlots}` : ''}`,
                 };
             }).filter(Boolean);
         }
@@ -941,7 +942,50 @@ export const ui_system = {
         }).filter(Boolean);
     },
 
+    ui_fuseRuneIntoMarble(selectionIndex, inventoryIndex) {
+        if (!(this.selectedMarbles || []).includes(selectionIndex)) {
+            if (typeof showToast === 'function') showToast('Select this marble first.');
+            return;
+        }
+        const marbleDef = this.marblesPool?.[selectionIndex];
+        if (!marbleDef) return;
+        if (!Array.isArray(marbleDef.runeSlots)) marbleDef.runeSlots = [];
+        marbleDef.maxRuneSlots = marbleDef.maxRuneSlots || 3;
+        if (marbleDef.runeSlots.length >= marbleDef.maxRuneSlots) {
+            if (typeof showToast === 'function') showToast('Rune slots full.');
+            return;
+        }
+        const option = this.ui_getPureEssenceRuneOptions(marbleDef).find(item => item.inventoryIndex === inventoryIndex);
+        if (!option) {
+            if (typeof showToast === 'function') showToast('Rune not found.');
+            return;
+        }
+        const level = Math.max(1, option.rune.level || 1);
+        const statAmount = level * Math.max(1, option.runeDef.baseStatPerLevel || 1);
+        marbleDef.runeSlots.push({
+            runeId: option.rune.id,
+            level,
+            element: option.runeDef.element,
+            statAmount,
+            name: option.runeDef.name,
+            icon: option.runeDef.icon,
+            rarity: option.runeDef.rarity || 'common',
+        });
+        if (typeof marbleDef.normalizeRuneSlots === 'function') marbleDef.normalizeRuneSlots();
+        if (Array.isArray(this.runeInventory) && inventoryIndex >= 0) {
+            this.runeInventory.splice(inventoryIndex, 1);
+            if (this.saveData) this.saveData.runeInventory = (this.runeInventory || []).slice();
+        }
+        this.selectionInjectedRune = null;
+        this.ui_updateRuneCountDisplay();
+        this.ui_refreshSelectionModeUI();
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        if (typeof showToast === 'function') showToast(`Fused ${option.runeDef.name} into marble.`);
+    },
+
     ui_selectPureEssenceRune(selectionIndex, inventoryIndex) {
+        this.ui_fuseRuneIntoMarble(selectionIndex, inventoryIndex);
+        return;
         if (this.selectionMode !== 'pure_essence') return;
         if (!(this.selectedMarbles || []).includes(selectionIndex)) {
             if (typeof showToast === 'function') showToast('請先選中這枚彈珠，再注入符文。');
@@ -967,6 +1011,49 @@ export const ui_system = {
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
     },
 
+    ui_renderMarbleRuneSlotsPanel(host, marbleDef, selectionIndex) {
+        const isSelected = (this.selectedMarbles || []).includes(selectionIndex);
+        if (!Array.isArray(marbleDef.runeSlots)) marbleDef.runeSlots = [];
+        marbleDef.maxRuneSlots = marbleDef.maxRuneSlots || 3;
+        if (typeof marbleDef.normalizeRuneSlots === 'function') marbleDef.normalizeRuneSlots();
+        const slots = marbleDef.runeSlots || [];
+        const attrDisplay = (typeof CONFIG !== 'undefined' && CONFIG.ui?.attributeDisplay) ? CONFIG.ui.attributeDisplay : {};
+        const slotHtml = Array.from({ length: marbleDef.maxRuneSlots }, (_, idx) => {
+            const slot = slots[idx];
+            if (!slot) {
+                return `<span class="inline-flex min-w-[46px] items-center justify-center rounded-md border border-dashed border-slate-500/70 bg-slate-900/50 px-2 py-1 text-[11px] text-slate-500">EMPTY</span>`;
+            }
+            const attr = attrDisplay[slot.element] || {};
+            return `<span class="inline-flex min-w-[46px] items-center justify-center gap-1 rounded-md border border-amber-300/70 bg-amber-500/15 px-2 py-1 text-[11px] text-amber-100" title="${_escapeHtml(slot.name || slot.runeId)}">${_escapeHtml(slot.icon || attr.icon || '✦')} ${_escapeHtml(attr.name || slot.element)} +${slot.statAmount || slot.level || 1}</span>`;
+        }).join('');
+        const options = this.ui_getPureEssenceRuneOptions(marbleDef);
+        let optionsHtml = '';
+        if (!isSelected) {
+            optionsHtml = '<div class="text-xs text-slate-400">Select this marble to fuse runes.</div>';
+        } else if (slots.length >= marbleDef.maxRuneSlots) {
+            optionsHtml = '<div class="text-xs text-amber-200">Rune slots full.</div>';
+        } else if (options.length === 0) {
+            optionsHtml = '<div class="text-xs text-slate-400">Rune inventory empty.</div>';
+        } else {
+            optionsHtml = options.map(item => {
+                const attr = attrDisplay[item.runeDef.element] || {};
+                const amount = Math.max(1, item.rune.level || 1) * Math.max(1, item.runeDef.baseStatPerLevel || 1);
+                return `<button type="button" data-inventory-index="${item.inventoryIndex}" class="pure-essence-rune-btn px-2 py-1 rounded-lg border border-slate-600 bg-slate-800/80 text-xs text-slate-200 transition-all hover:border-amber-300 hover:text-white">${item.runeDef.icon || '✦'} ${item.runeDef.name} Lv.${item.rune.level || 1} / ${attr.name || item.runeDef.element} +${amount}</button>`;
+            }).join('');
+        }
+        host.style.display = 'block';
+        host.innerHTML = `
+            <div class="preview-divider"></div>
+            <div class="preview-peg-label">MARBLE RUNE SLOTS</div>
+            <div class="text-xs text-slate-300 mb-2">Each marble can hold up to 3 fused runes. Fusing consumes the rune immediately and adds its attribute to this marble.</div>
+            <div class="flex flex-wrap gap-2 mb-2">${slotHtml}</div>
+            <div class="flex flex-wrap gap-2">${optionsHtml}</div>
+        `;
+        host.querySelectorAll('.pure-essence-rune-btn').forEach(btn => {
+            btn.onclick = () => this.ui_fuseRuneIntoMarble(selectionIndex, Number(btn.dataset.inventoryIndex));
+        });
+    },
+
     ui_renderPureEssencePanel(marbleDef, selectionIndex) {
         const panel = document.getElementById('marble-preview-panel');
         if (!panel) return;
@@ -976,6 +1063,15 @@ export const ui_system = {
             host.id = 'selection-augment-panel';
             host.className = 'mt-3';
             panel.appendChild(host);
+        }
+        if (!marbleDef || selectionIndex < 0) {
+            host.style.display = 'none';
+            host.innerHTML = '';
+            return;
+        }
+        if (typeof this.ui_renderMarbleRuneSlotsPanel === 'function') {
+            this.ui_renderMarbleRuneSlotsPanel(host, marbleDef, selectionIndex);
+            return;
         }
         if (this.selectionMode !== 'pure_essence' || !marbleDef || selectionIndex < 0) {
             host.style.display = 'none';
@@ -1135,7 +1231,7 @@ export const ui_system = {
 
         const newRecipes = ctx.newRecipes || [];
         const chargedRecipes = ctx.chargedRecipes || [];
-        const bulletCap = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
+        const bulletCap = (CONFIG.gameplay.selectionReq || 3);
         const maxSelect = Math.min(bulletCap, newRecipes.length + chargedRecipes.length);
         const selectedIndices = ctx.selectedIndices || [];
         const needed = Math.max(0, maxSelect - selectedIndices.length);
@@ -1446,7 +1542,7 @@ export const ui_system = {
         const ctx = this.replaceAmmoContext;
         if (!ctx || !ctx.active) return;
         const selectedIndices = ctx.selectedIndices || [];
-        const bulletCap = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
+        const bulletCap = (CONFIG.gameplay.selectionReq || 3);
         const maxSelect = Math.min(bulletCap, ((ctx.newRecipes || []).length + (ctx.chargedRecipes || []).length));
         const idx = selectedIndices.indexOf(globalIdx);
         if (idx > -1) {
@@ -1541,7 +1637,7 @@ export const ui_system = {
                 ? '\u7d14\u6de8\u7cbe\u83ef'
                 : this.selectionMode === 'chaos_essence'
                     ? '\u6df7\u6c8c\u7cbe\u83ef'
-                    : '\u547d\u904b\u6289\u64c7';
+                    : '\u80da\u73e0\u5305';
         }
         if (subtitleEl) {
             if (this.selectionMode === 'pure_essence') {
@@ -1556,9 +1652,9 @@ export const ui_system = {
                 subtitleEl.classList.remove('hidden');
                 subtitleEl.innerText = `\u547d\u904b\u6642\u523b\u5df2\u958b\u555f\uff0c\u8acb\u9078\u64c7 ${required} \u679a\u5f48\u73e0\u5f8c\u9032\u5165\u7df4\u91d1\u3002`;
             } else {
-                subtitleEl.style.display = 'none';
-                subtitleEl.classList.add('hidden');
-                subtitleEl.innerText = '';
+                subtitleEl.style.display = 'block';
+                subtitleEl.classList.remove('hidden');
+                subtitleEl.innerText = `从本包胚珠中保留 ${required} 颗，作为本轮晶石核心的充能序列。`;
             }
         }
         if (confirmBtn) {
@@ -1923,7 +2019,7 @@ export const ui_system = {
         this.replaceAmmoContext = null;
 
         this.selectionMode = 'standard';
-        this.selectionRequiredCount = ((typeof CONFIG !== 'undefined' && CONFIG.gameplay.selectionReq) || 3) + (this.bulletCapBonus || 0);
+        this.selectionRequiredCount = ((typeof CONFIG !== 'undefined' && CONFIG.gameplay.selectionReq) || 3);
         this.selectionInjectedRune = null;
         this.selectionPreviewState = null;
         this.fateMomentContext = null;

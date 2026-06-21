@@ -33,10 +33,67 @@ import {
     selectFusionTargetPegs,
     setModulePegState,
 } from './pinboard_modules.js';
+import { calc_getCirclePolygonCollision, calc_getCircleArcCollision } from './combat/collision_shapes.js';
 
 function getCombatAimEnemyHit(game, start, dir, maxDist, radius) {
     let closest = null;
     const enemies = Array.isArray(game.enemies) ? game.enemies : [];
+
+    const rayAabbRange = (minX, maxX, minY, maxY) => {
+        let tMin = -Infinity;
+        let tMax = Infinity;
+        let normal = null;
+
+        if (Math.abs(dir.x) < 0.0001) {
+            if (start.x < minX || start.x > maxX) return null;
+        } else {
+            const tx1 = (minX - start.x) / dir.x;
+            const tx2 = (maxX - start.x) / dir.x;
+            const nearX = Math.min(tx1, tx2);
+            const farX = Math.max(tx1, tx2);
+            if (nearX > tMin) normal = new Vec2(tx1 < tx2 ? -1 : 1, 0);
+            tMin = Math.max(tMin, nearX);
+            tMax = Math.min(tMax, farX);
+        }
+
+        if (Math.abs(dir.y) < 0.0001) {
+            if (start.y < minY || start.y > maxY) return null;
+        } else {
+            const ty1 = (minY - start.y) / dir.y;
+            const ty2 = (maxY - start.y) / dir.y;
+            const nearY = Math.min(ty1, ty2);
+            const farY = Math.max(ty1, ty2);
+            if (nearY > tMin) normal = new Vec2(0, ty1 < ty2 ? -1 : 1);
+            tMin = Math.max(tMin, nearY);
+            tMax = Math.min(tMax, farY);
+        }
+
+        if (tMax < Math.max(0.01, tMin)) return null;
+        return { enter: tMin > 0.01 ? tMin : tMax, exit: tMax, normal };
+    };
+
+    const shapeHitAt = (enemy, point) => {
+        if (enemy.collisionShape === 'polygon' && enemy.collisionData) {
+            const absoluteVertices = typeof enemy.getAbsoluteVertices === 'function'
+                ? enemy.getAbsoluteVertices()
+                : (enemy.collisionData.vertices || []).map(v => new Vec2(enemy.pos.x + v.x, enemy.pos.y + v.y));
+            return calc_getCirclePolygonCollision(point, radius, absoluteVertices);
+        }
+
+        if (enemy.collisionShape === 'arc' && enemy.collisionData) {
+            return calc_getCircleArcCollision(
+                point,
+                radius,
+                enemy.pos,
+                enemy.collisionData.radius,
+                enemy.collisionData.startAngle,
+                enemy.collisionData.endAngle,
+                enemy.collisionData.thickness
+            );
+        }
+
+        return null;
+    };
 
     for (const enemy of enemies) {
         if (!enemy || !enemy.active) continue;
@@ -50,39 +107,51 @@ function getCombatAimEnemyHit(game, start, dir, maxDist, radius) {
         const maxX = enemy.pos.x + halfW;
         const minY = enemy.pos.y - halfH;
         const maxY = enemy.pos.y + halfH;
-        let tMin = -Infinity;
-        let tMax = Infinity;
-        let normal = null;
+        const range = rayAabbRange(minX, maxX, minY, maxY);
+        if (!range) continue;
 
-        if (Math.abs(dir.x) < 0.0001) {
-            if (start.x < minX || start.x > maxX) continue;
-        } else {
-            const tx1 = (minX - start.x) / dir.x;
-            const tx2 = (maxX - start.x) / dir.x;
-            const nearX = Math.min(tx1, tx2);
-            const farX = Math.max(tx1, tx2);
-            if (nearX > tMin) normal = new Vec2(tx1 < tx2 ? -1 : 1, 0);
-            tMin = Math.max(tMin, nearX);
-            tMax = Math.min(tMax, farX);
+        if (enemy.collisionShape === 'polygon' || enemy.collisionShape === 'arc') {
+            const endDist = Math.min(range.exit, maxDist);
+            if (endDist <= 0.01 || range.enter >= maxDist) continue;
+            const step = Math.max(2, Math.min(6, radius * 0.65));
+            let prevDist = Math.max(0.01, range.enter - step);
+            let found = null;
+
+            for (let dist = Math.max(0.01, range.enter); dist <= endDist; dist += step) {
+                const point = start.add(dir.mult(dist));
+                const hit = shapeHitAt(enemy, point);
+                if (!hit) {
+                    prevDist = dist;
+                    continue;
+                }
+
+                let lo = prevDist;
+                let hi = dist;
+                let refinedHit = hit;
+                for (let iter = 0; iter < 7; iter++) {
+                    const mid = (lo + hi) / 2;
+                    const midHit = shapeHitAt(enemy, start.add(dir.mult(mid)));
+                    if (midHit) {
+                        hi = mid;
+                        refinedHit = midHit;
+                    } else {
+                        lo = mid;
+                    }
+                }
+                found = { dist: hi, normal: refinedHit.normal, enemy };
+                break;
+            }
+
+            if (found && (!closest || found.dist < closest.dist)) {
+                closest = found;
+            }
+            continue;
         }
 
-        if (Math.abs(dir.y) < 0.0001) {
-            if (start.y < minY || start.y > maxY) continue;
-        } else {
-            const ty1 = (minY - start.y) / dir.y;
-            const ty2 = (maxY - start.y) / dir.y;
-            const nearY = Math.min(ty1, ty2);
-            const farY = Math.max(ty1, ty2);
-            if (nearY > tMin) normal = new Vec2(0, ty1 < ty2 ? -1 : 1);
-            tMin = Math.max(tMin, nearY);
-            tMax = Math.min(tMax, farY);
-        }
-
-        if (tMax < Math.max(0.01, tMin)) continue;
-        const dist = tMin > 0.01 ? tMin : tMax;
+        const dist = range.enter;
         if (dist <= 0.01 || dist >= maxDist) continue;
         if (!closest || dist < closest.dist) {
-            closest = { dist, normal, enemy };
+            closest = { dist, normal: range.normal, enemy };
         }
     }
 
@@ -391,7 +460,7 @@ function drawBottomRewardZones(ctx, zones) {
 
 function buildFallbackMarbleQueue(game) {
     const cfg = CONFIG.gameplay || {};
-    const required = Math.max(1, (cfg.selectionReq || 3) + (game.bulletCapBonus || 0));
+    const required = Math.max(1, (cfg.selectionReq || 3));
     const existingPool = Array.isArray(game.marblesPool) ? game.marblesPool : [];
     const selected = Array.isArray(game.selectedMarbles) ? game.selectedMarbles : [];
     const queue = selected
@@ -545,6 +614,8 @@ export const game_phase = {
         this.ui.updateSkillPoints(this.skillPoints);
         this.ammoQueue = []; 
         this.dropBalls = []; 
+        this.gatheringSessions = [];
+        this.currentSession = null;
         this.activeMarbleIndex = 0; 
         this.combat_updateHitProgress(0, this.persistentThreshold);
         this.ui_updateGatheringQueueUI();
@@ -1416,8 +1487,8 @@ phase_gathering_getRandomPegType() {
             this.ammoQueue = [...this._carryOverAmmo, ...this.ammoQueue];
             this._carryOverAmmo = null;
         }
-        // 子弹持有上限：基础 3 颗，特殊遗物可通过 bulletCapBonus 增加
-        const _bulletCap = (CONFIG.gameplay.selectionReq || 3) + (this.bulletCapBonus || 0);
+        // 子弹持有上限：基础 3 颗，对应三枚晶石核心充能位
+        const _bulletCap = (CONFIG.gameplay.selectionReq || 3);
         if (this.ammoQueue.length > _bulletCap) {
             this.ammoQueue = this.ammoQueue.slice(0, _bulletCap);
         }
@@ -1553,6 +1624,71 @@ phase_gathering_getRandomPegType() {
         }
     },
 
+    phase_gathering_createSession(marbleDef, marbleIndex) {
+        const inheritedCollected = Array.isArray(marbleDef.collected)
+            ? marbleDef.collected.map(item => (typeof item === 'string' ? item : { ...item }))
+            : [];
+        const runeSlotCollected = typeof marbleDef.getRuneSlotCollected === 'function'
+            ? marbleDef.getRuneSlotCollected()
+            : (Array.isArray(marbleDef.runeSlots)
+                ? marbleDef.runeSlots
+                    .filter(slot => slot && slot.element)
+                    .map(slot => ({
+                        type: slot.element,
+                        level: Math.max(1, Math.floor(slot.statAmount || slot.level || 1)),
+                        source: 'rune_slot',
+                        runeId: slot.runeId,
+                    }))
+                : []);
+        const session = {
+            game: this,
+            marbleIndex,
+            marbleDef,
+            collected: [...inheritedCollected, ...runeSlotCollected],
+            multicast: 0,
+            activeBalls: 1,
+            currentHits: 0,
+            nextTriggerThreshold: this.persistentThreshold,
+            totalHits: 0,
+            multicastAdded: [],
+            isFinished: false,
+        };
+        if (marbleDef.type === 'laser') {
+            session.collected.push('laser');
+        } else if (marbleDef.type === 'colored' && marbleDef.type) {
+            session.collected.push(marbleDef.type);
+        }
+        return session;
+    },
+
+    phase_gathering_launchMarbleBatch(pos) {
+        const queue = Array.isArray(this.marbleQueue) ? this.marbleQueue.slice(0, CONFIG.gameplay.selectionReq || 3) : [];
+        if (queue.length === 0) return false;
+        this.gatheringSessions = [];
+        this.currentSession = null;
+        this.activeMarbleIndex = 0;
+        this.combat_updateHitProgress(0, this.persistentThreshold);
+        this.combat_updateMulticastDisplay(0);
+
+        const spread = Math.min(30, Math.max(16, this.width / 18));
+        const centerOffset = (queue.length - 1) / 2;
+        queue.forEach((marbleDef, marbleIndex) => {
+            const session = this.phase_gathering_createSession(marbleDef, marbleIndex);
+            const offsetX = (marbleIndex - centerOffset) * spread;
+            const spawnX = Math.max(20, Math.min(this.width - 20, pos.x + offsetX));
+            const newBall = new DropBall(spawnX, 30 - marbleIndex * 6, marbleDef, session);
+            newBall.vel.x += offsetX * 0.018;
+            newBall.layoutParams = getLayoutParams(this.currentLayout || 'default');
+            this.gatheringSessions.push(session);
+            this.dropBalls.push(newBall);
+            this._updateDropDistribution(spawnX);
+        });
+        this.currentSession = this.gatheringSessions[0] || null;
+        this.ui_updateGatheringQueueUI();
+        audio.playShoot();
+        return true;
+    },
+
 /**
      * @method handleInputStart
      * @description 处理输入开始 (鼠标按下/触摸开始) - [修改版：直射模式]
@@ -1599,35 +1735,8 @@ phase_gathering_getRandomPegType() {
             // 原阈值 0.4 仅覆盖屏幕上方 40%，导致点击钉盘中下部区域时被错误路由到倾斜模式。
             // 底部手柄区域（height - 40 ± 40px）已在 input_handleInputStart 中提前拦截，无需在此重复判断。
             if (pos.y < this.height * 0.85) {
-                // 上方区域：发射弹珠
-                if (this.activeMarbleIndex >= this.marbleQueue.length) return;
-                const marbleDef = this.marbleQueue[this.activeMarbleIndex];
-                
-                // 使用之前修复过的持久化阈值逻辑
-                const inheritedCollected = Array.isArray(marbleDef.collected)
-                    ? marbleDef.collected.map(item => (typeof item === 'string' ? item : { ...item }))
-                    : [];
-                this.currentSession = {
-                    game: this, // [新增] 传入 game 实例引用
-                    collected: inheritedCollected, multicast: 0, activeBalls: 1, currentHits: 0,
-                    nextTriggerThreshold: this.persistentThreshold, // 确保这里用了 persistentThreshold
-                    totalHits: 0, multicastAdded: [], isFinished: false
-                };
-                if (marbleDef.type === 'laser') {
-                    this.currentSession.collected.push('laser');
-                } else if (marbleDef.type === 'colored' && marbleDef.type) {
-                    this.currentSession.collected.push(marbleDef.type);
-                }
-                this.combat_updateHitProgress(0, this.persistentThreshold);
-                const newBall = new DropBall(pos.x, 30, marbleDef, this.currentSession);
-                // [物理增强] 注入当前布局的物理参数，使弹珠具备布局专属的物理特性
-                newBall.layoutParams = getLayoutParams(this.currentLayout || 'default');
-                this.dropBalls.push(newBall);
-                // [概率分析] 计算当前布局的落点分布，用于热力图显示
-                this._updateDropDistribution(pos.x);
-                this.ui_updateGatheringQueueUI();
-                audio.playShoot();
-                this.combat_updateMulticastDisplay(0);
+                // 上方区域：一次充能最多发射 3 颗弹珠，分别独立收集并在结束时生成子弹列表。
+                this.phase_gathering_launchMarbleBatch(pos);
             } else {
                 // ---  下方区域：进入“抓取倾斜”模式，暂不报错 ---
                 this.isTiltingGrip = true;
@@ -3222,72 +3331,69 @@ phase_gathering_getRandomPegType() {
      */
     phase_gathering_attemptComplete() {
         if (this.isWheelSpinning) return;
-        // [修复] 检查底部侧边转盘（triangleSideWheels）是否还在旋转
-        // Bug 根因：弹珠落底后立即触发结算，但底部转盘的回调（翻倍逻辑）尚未执行
-        // 导致：1) 传给战斗子弹的属性是翻倍前的值；2) 最后一个转盘未停就进入战斗阶段
         if (this.triangleSideWheels && this.triangleSideWheels.some(w => w.spinning)) return;
-        // 解决方法：只计算 active 为 true 的能量球。
+
         const activeOrbsCount = this.energyOrbs.filter(orb => orb.active).length;
+        const sessions = Array.isArray(this.gatheringSessions) && this.gatheringSessions.length > 0
+            ? this.gatheringSessions
+            : (this.currentSession ? [this.currentSession] : []);
 
-        // 1. 基础检查：如果还有东西在动，绝对不能结算
-        if (this.dropBalls.length > 0 || activeOrbsCount > 0 || this.currentSession.activeBalls > 0) {
+        if (
+            this.dropBalls.length > 0 ||
+            activeOrbsCount > 0 ||
+            sessions.some(session => session && session.activeBalls > 0)
+        ) {
             return;
         }
 
-        // 2. 状态检查：防止重复结算
-        // 如果当前 session 已经被标记为“已结算”或不存在，则直接返回
-        if (!this.currentSession || this.currentSession.isFinished) return;
+        const pendingSessions = sessions.filter(session => session && !session.isFinished);
+        if (pendingSessions.length === 0) return;
 
-        // 3. 执行结算
-        this.currentSession.isFinished = true; // 立即上锁
+        pendingSessions.forEach(session => {
+            session.isFinished = true;
+            const marbleIndex = Number.isInteger(session.marbleIndex) ? session.marbleIndex : this.activeMarbleIndex;
+            const marbleDef = this.marbleQueue[marbleIndex] || session.marbleDef;
+            if (!marbleDef) return;
 
-        const marbleDef = this.marbleQueue[this.activeMarbleIndex];
-        // 兜底检查：如果此时 marbleDef 不存在（防止数组越界），直接停止
-        if (!marbleDef) {
-            this.currentSession = null;
-            return;
-        }
-        marbleDef.collected = [...this.currentSession.collected];
-        // --- [新增] 觸發倍率轉移特效 ---
-        // 計算當前倍率 (1 + 額外)
-        const totalMulticast = 1 + this.currentSession.multicast;
-        // 只有倍率大於 1 時才播放特效，或者你想每次都播也可以
-        if (totalMulticast > 0) {
-            this.combat_playMulticastTransferEffect(totalMulticast);
-        }
-        const recipe = this.calc_compileCollectionToRecipe(marbleDef, this.currentSession.collected, this.currentSession.multicast > 0);
-        recipe.finalHits = this.currentSession.totalHits;
-        recipe.multicast = this.currentSession.multicast;
-        this.ammoQueue.push(recipe);
-        
-        marbleDef.multicast = this.currentSession.multicast;
-        marbleDef.finalHits = this.currentSession.totalHits;
+            marbleDef.collected = [...session.collected]
+                .filter(item => !(item && typeof item === 'object' && item.source === 'rune_slot'));
 
-        this.activeMarbleIndex++;
-        this.ui_updateGatheringQueueUI();
-        
-        // [新增] 弹珠结算时，重置所有钉子的冷却
-        this.pegs.forEach(p => p.resetCooldown());
-        
-        // 4. 状态流转
-        if (this.activeMarbleIndex >= this.marbleQueue.length) {
-            // 所有弹珠都扔完了
-            // [ammo-replace] 如果有充能子弹（精华触发时保存的），展示替换界面
-            if (this._chargedAmmoQueue && this._chargedAmmoQueue.length > 0) {
-                setTimeout(() => {
-                    if (typeof this.sys_initReplaceAmmoPhase === 'function') {
-                        this.sys_initReplaceAmmoPhase();
-                    } else {
-                        this.phase_startCombatPhase();
-                    }
-                }, 500);
-            } else {
-                // 没有充能子弹，直接进入战斗
-                setTimeout(() => this.phase_startCombatPhase(), 500);
+            const totalMulticast = 1 + session.multicast;
+            if (totalMulticast > 0) {
+                const previousActive = this.activeMarbleIndex;
+                this.activeMarbleIndex = marbleIndex;
+                this.combat_playMulticastTransferEffect(totalMulticast);
+                this.activeMarbleIndex = previousActive;
             }
+
+            const recipe = this.calc_compileCollectionToRecipe(marbleDef, session.collected, session.multicast > 0);
+            recipe.finalHits = session.totalHits;
+            recipe.multicast = session.multicast;
+            recipe._marbleIndex = marbleIndex;
+            this.ammoQueue.push(recipe);
+
+            marbleDef.multicast = session.multicast;
+            marbleDef.finalHits = session.totalHits;
+        });
+
+        this.activeMarbleIndex = this.marbleQueue.length;
+        this.ui_updateGatheringQueueUI();
+        this.pegs.forEach(p => p.resetCooldown());
+        this.currentSession = null;
+        this.gatheringSessions = [];
+
+        if (this.ammoQueue.length === 0) return;
+
+        if (this._chargedAmmoQueue && this._chargedAmmoQueue.length > 0) {
+            setTimeout(() => {
+                if (typeof this.sys_initReplaceAmmoPhase === 'function') {
+                    this.sys_initReplaceAmmoPhase();
+                } else {
+                    this.phase_startCombatPhase();
+                }
+            }, 500);
         } else {
-             // 准备下一回合，清空当前 session，允许玩家再次点击
-             this.currentSession = null; 
+            setTimeout(() => this.phase_startCombatPhase(), 500);
         }
     },
     
@@ -3529,6 +3635,11 @@ phase_gathering_getRandomPegType() {
             }
             
             if (result) {
+                const session = ball.session || this.currentSession;
+                const marbleIndex = session && Number.isInteger(session.marbleIndex)
+                    ? session.marbleIndex
+                    : this.activeMarbleIndex;
+                const marbleDef = (this.marbleQueue && this.marbleQueue[marbleIndex]) || ball.def;
                 // 處理彈珠落出屏幕
                 if (result === 'finished') {
                     // 1. 生成光柱 (在球掉落的X轴位置，屏幕底部升起)
@@ -3537,7 +3648,7 @@ phase_gathering_getRandomPegType() {
                     // 2. 触发 UI 卡片高亮
                     // 获取当前正在进行的配方卡片 DOM 元素
                     // 注意：nth-child 是从 1 开始的，activeMarbleIndex 是从 0 开始
-                    const activeCardIdx = this.activeMarbleIndex + 1;
+                    const activeCardIdx = marbleIndex + 1;
                     const activeCard = document.querySelector(`#gathering-hud-mount .recipe-card:nth-child(${activeCardIdx})`);
                     
                     if (activeCard) {
@@ -3551,7 +3662,7 @@ phase_gathering_getRandomPegType() {
                     audio.playCollect(); // 或者 audio.playTone(800, 'sine', 0.2)
                     // 弹珠落出屏幕
                     this.dropBalls.splice(i, 1);
-                    this.currentSession.activeBalls--;
+                    if (session) session.activeBalls--;
                     
                     // --- ：不再直接結算，而是嘗試結算 ---
                     // 處理“能量球先落地，彈珠後死”的情況
@@ -3559,10 +3670,10 @@ phase_gathering_getRandomPegType() {
 
                 } else if (result.type === 'collected') {
                     // 彈珠收集到材料
-                    this.currentSession.collected.push(result.material);
+                    if (session) session.collected.push(result.material);
                     // 这样 UI (renderRecipeCard) 才能读取到变化
-                    if (this.marbleQueue[this.activeMarbleIndex]) {
-                        this.marbleQueue[this.activeMarbleIndex].collected.push(result.material);
+                    if (marbleDef) {
+                        marbleDef.collected.push(result.material);
                     }
                     this.spawn_createHitFeedback(ball.pos.x, ball.pos.y, ball.vel, result.material); // 這裡也許要傳入屬性類型作為顏色依據
                     audio.playCollect();
@@ -3582,19 +3693,19 @@ phase_gathering_getRandomPegType() {
                         showToast("回溯!");
                     } else if (result.slotType === 'multicast') {
                         // 多重發射槽位：增加多重發射次數
-                        if (!this.currentSession.multicastAdded.includes(i)) {
-                            this.currentSession.multicast++;
-                            this.currentSession.multicastAdded.push(i);
+                        if (session && !session.multicastAdded.includes(i)) {
+                            session.multicast++;
+                            session.multicastAdded.push(i);
                             showToast("+連射!");
                         }
                     } else if (result.slotType === 'split' && ball.canTriggerSplitSlot) {
                         // 分裂槽位：分裂彈珠
                         ball.canTriggerSplitSlot = false;
-                        const newBall = new DropBall(ball.pos.x, ball.pos.y, ball.def, this.currentSession);
+                        const newBall = new DropBall(ball.pos.x, ball.pos.y, ball.def, session);
                         newBall.vel = new Vec2(-ball.vel.x, ball.vel.y);
                         newBall.canTriggerSplitSlot = false;
                         this.dropBalls.push(newBall);
-                        this.currentSession.activeBalls++;
+                        if (session) session.activeBalls++;
                         showToast("分裂!");
                     } else if (result.slotType === 'relic') {
                         // 調用遺物選擇
@@ -3602,19 +3713,19 @@ phase_gathering_getRandomPegType() {
                         
                         // 將彈珠移除
                         this.dropBalls.splice(i, 1);
-                        this.currentSession.activeBalls--;
+                        if (session) session.activeBalls--;
                     }
                 } else if (result.action === 'split') {
                     // 處理 DropBall 內部觸發的分裂
-                    const newBall1 = new DropBall(result.pos.x - 10, result.pos.y, result.def, this.currentSession);
-                    const newBall2 = new DropBall(result.pos.x + 10, result.pos.y, result.def, this.currentSession);
+                    const newBall1 = new DropBall(result.pos.x - 10, result.pos.y, result.def, session);
+                    const newBall2 = new DropBall(result.pos.x + 10, result.pos.y, result.def, session);
                     newBall1.vel = new Vec2(-Math.abs(result.vel.x) - 2, result.vel.y);
                     newBall2.vel = new Vec2(Math.abs(result.vel.x) + 2, result.vel.y);
                     newBall1.canTriggerSplitSlot = false;
                     // @section:gathering_update_ui - 收集阶段 HUD 实时更新
                     newBall2.canTriggerSplitSlot = false;
                     this.dropBalls.push(newBall1, newBall2);
-                    this.currentSession.activeBalls += 1; 
+                    if (session) session.activeBalls += 1; 
                     this.dropBalls.splice(i, 1);
                     showToast("分裂!");
                 } else if (result.action === 'mirror_clone') {
@@ -3623,7 +3734,7 @@ phase_gathering_getRandomPegType() {
                     // 分身弹珠的后续收集属性归入原弹珠（共享同一 session 实现）
                     const originalBall = result.originalBall;
                     // 创建分身弹珠：使用原弹珠的 def（属性定义）和 session（共享收集属性）
-                    const cloneBall = new DropBall(result.mirrorX, result.pos.y, originalBall.def, this.currentSession);
+                    const cloneBall = new DropBall(result.mirrorX, result.pos.y, originalBall.def, session);
                     // 仅复制当前速度（水平分量取反，垂直分量相同）
                     cloneBall.vel = new Vec2(result.vel.x, result.vel.y);
                     // 分身弹珠不能再次触发镜像裂分，防止连锁增幅
@@ -3631,29 +3742,29 @@ phase_gathering_getRandomPegType() {
                     cloneBall.canTriggerSplitSlot = false;
                     cloneBall.isMirrorClone = true; // 标记为镜像分身
                     this.dropBalls.push(cloneBall);
-                    this.currentSession.activeBalls++;
+                    if (session) session.activeBalls++;
                     this.ui_renderRecipeHUD();
 
                 } else if (result.action === 'rainbow_split') {
                     // 處理彩虹彈珠分裂
                     const colors = ['bounce', 'pierce', 'scatter'];
-                    if (this.marbleQueue[this.activeMarbleIndex]) {
+                    if (marbleDef) {
                         colors.forEach(c => {
-                            this.marbleQueue[this.activeMarbleIndex].collected.push(c);
+                            marbleDef.collected.push(c);
                         });
                     }
                     colors.forEach((c, idx) => {
                         const shardDef = new MarbleDefinition(c);
-                        const shard = new DropBall(result.pos.x + (idx - 1) * 20, result.pos.y, shardDef, this.currentSession);
+                        const shard = new DropBall(result.pos.x + (idx - 1) * 20, result.pos.y, shardDef, session);
                         shard.vel = new Vec2((idx - 1) * 3, result.vel.y);
                         shard.isRainbowShard = true;
                         this.dropBalls.push(shard);
 
                         // --- [新增修复]：分裂时直接将对应的材料加入收集列表 ---
-                        this.currentSession.collected.push(c);
+                        if (session) session.collected.push(c);
                     });
                     
-                    this.currentSession.activeBalls += 2; // -1 (本体) + 3 (碎片) = +2
+                    if (session) session.activeBalls += 2; // -1 (本体) + 3 (碎片) = +2
                     this.dropBalls.splice(i, 1);
                     
                     // --- [新增修复]：刷新 UI 以显示新收集到的材料 ---

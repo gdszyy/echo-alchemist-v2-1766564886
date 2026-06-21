@@ -94,6 +94,8 @@ class MarbleDefinition {
     constructor(type) {
         this.type = type;
         this.collected = []; 
+        this.runeSlots = [];
+        this.maxRuneSlots = 3;
         this.compiled = false; 
         this.recipe = null; 
         this.session = null; 
@@ -102,6 +104,36 @@ class MarbleDefinition {
         if (type === 'pyro' || type === 'cryo') {
             this.collected.push(type);
         }
+    }
+
+    normalizeRuneSlots() {
+        const maxSlots = Math.max(0, this.maxRuneSlots || 3);
+        this.runeSlots = (Array.isArray(this.runeSlots) ? this.runeSlots : [])
+            .filter(slot => slot && slot.runeId && slot.element)
+            .slice(0, maxSlots)
+            .map(slot => ({
+                runeId: slot.runeId,
+                level: Math.max(1, Math.floor(slot.level || 1)),
+                element: slot.element,
+                statAmount: Math.max(1, Math.floor(slot.statAmount || slot.level || 1)),
+                name: slot.name || slot.runeId,
+                icon: slot.icon || '✦',
+                rarity: slot.rarity || 'common',
+            }));
+        return this.runeSlots;
+    }
+
+    getRuneSlotCollected() {
+        return this.normalizeRuneSlots().map(slot => ({
+            type: slot.element,
+            level: slot.statAmount,
+            source: 'rune_slot',
+            runeId: slot.runeId,
+        }));
+    }
+
+    canFuseRune() {
+        return this.normalizeRuneSlots().length < (this.maxRuneSlots || 3);
     }
 
     getName() {
@@ -2046,6 +2078,7 @@ class DropBall {
             this._lastRowPassed = -1;        // [sparse] 记录上次经过的行号，用于检测穿越窄行
             this._pendingChannelBoost = false; // [sparse] 待处理的通道蓄力等级加成
             this._mirrorAxisCooldown = 0;    // [mirror_sync] 镜像裂分冷却，防止同一钉子连续触发
+            this.lastScoringPegKey = null;   // Per-ball guard: the same peg must be left before it can score again.
 	    }
         /**
          * [核心方法] 获取当前所有属性的层数
@@ -2094,6 +2127,26 @@ class DropBall {
 
             return stats;
         }
+        _getPegTriggerKey(peg) {
+            if (!peg) return null;
+            if (peg.id !== undefined) return `id:${peg.id}`;
+            if (peg.uid !== undefined) return `uid:${peg.uid}`;
+            const row = Number.isFinite(peg.row) ? peg.row : 'x';
+            const col = Number.isFinite(peg.col) ? peg.col : 'x';
+            const x = peg.pos ? Math.round(peg.pos.x) : 'x';
+            const y = peg.pos ? Math.round(peg.pos.y) : 'y';
+            return `${row}:${col}:${x}:${y}`;
+        }
+
+        canScorePeg(peg) {
+            const key = this._getPegTriggerKey(peg);
+            return !key || key !== this.lastScoringPegKey;
+        }
+
+        markScoredPeg(peg) {
+            this.lastScoringPegKey = this._getPegTriggerKey(peg);
+        }
+
         // [新增] 处理钉子交互（同化、突变、升级）
 
         handlePegInteraction(peg, game) {
@@ -2462,7 +2515,7 @@ class DropBall {
                                 // [修复] 转盘停止后重新尝试结算
                                 // 原因：弹珠落底时 attemptComplete 因转盘旋转被拦截，
                                 // 转盘停止后需要在此处重新触发，否则结算永远不会执行
-                                if (_game.dropBalls.length === 0 && _game.currentSession) {
+                                if (_game.dropBalls.length === 0 && (ball.session || _game.currentSession)) {
                                     _game.phase_gathering_attemptComplete();
                                 }
                             });
@@ -2663,9 +2716,8 @@ class DropBall {
                                 game.isWheelSpinning = false;
                                 
                                 if (game.dropBalls.length === 0) { 
-                                    game.currentSession.activeBalls = 0; 
+                                    if (this.session) this.session.activeBalls = 0; 
                                     game.phase_gathering_attemptComplete();
-                                    game.currentSession = null; 
                                 }
                             });
 
@@ -2713,7 +2765,8 @@ class DropBall {
                             const slide = this.vel.dot(tangent);
                             this.vel = this.vel.sub(tangent.mult(slide * 0.08));
                         }
-                        if (peg.cooldownTimer <= 0 && peg.frozenTurns <= 0) {
+                        if (peg.frozenTurns <= 0 && this.canScorePeg(peg)) {
+                            this.markScoredPeg(peg);
                             peg.hit(impactVel.mag());
                             this.hitCount++;
                             game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel, 'pink');
@@ -2824,9 +2877,10 @@ class DropBall {
                         }
                     }
 
-                    if (peg.cooldownTimer <= 0 && peg.frozenTurns <= 0) {
+                    if (peg.frozenTurns <= 0 && this.canScorePeg(peg)) {
                         // --- [关键修改：传递速度参数] ---
                         const impactSpeedVal = impactVel.mag(); 
+                        this.markScoredPeg(peg);
                         peg.hit(impactSpeedVal);
                         this.hitCount++; 
                         // 如果是普通钉子 (normal)，触发两次能量球反馈
