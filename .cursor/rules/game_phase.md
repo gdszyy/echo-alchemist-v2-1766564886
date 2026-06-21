@@ -64,8 +64,8 @@ globs: ["src/game_phase.js"]
 - **编辑器轮廓**：`render_moduleEditorOverlay()` 会根据 `shape.footprint` 绘制轻量组件轮廓（导流翼、菱格、杯形、沙漏、螺旋、桥形等）。轮廓仅使用平面 `stroke` / 曲线，不得新增粒子、渐变或额外 `shadowBlur`。
 - **编辑器入口与点击语义**：研磨阶段只显示「编辑钉板」入口，玩家点击后才进入编辑态；`render_moduleEditorOverlay()` 只在编辑态绘制槽位选择提示。`_moduleEditor_handleClick()` 只能选中槽位和刷新预览，装备/卸下必须由库存栏中的「装备到槽位」/「卸下」按钮确认。
 - **密度参数**：模块内部最小钉距由 `CONFIG.physics.pegRadius`、`CONFIG.physics.marbleRadius` 与 `CONFIG.physics.pinboardSpacingBuffer` 共同决定；不得在模块生成器里重新硬编码旧版大弹珠间距。
-- **权重来源**：模块生成普通钉子时必须读取当前 `game.unlockedWeights`，其中 `white` 映射为普通钉子权重，`bounce`、`pierce`、`scatter`、`damage`、`cryo`、`pyro`、`wind` 按权重生成对应属性钉子。
-- **禁止类型**：与旧版 `phase_gathering_getRandomPegType()` 保持一致，`laser` 与 `lightning` 不得作为钉子类型生成。
+- **权重来源**：模块生成普通钉子时必须读取当前 `game.unlockedWeights`，其中 `white` 映射为普通钉子权重，初始化随机属性钉只允许 `bounce` 与 `damage` 两种纯净弹珠属性。`pierce`、`scatter`、`cryo`、`pyro` 等元素/战斗属性只能由弹珠本身、符文融合、奖励区或其它显式机制写入。
+- **禁止类型**：与旧版 `phase_gathering_getRandomPegType()` 保持一致，`laser`、`lightning` 与变异属性 `wind` 不得作为初始化随机钉子类型生成。
 - **底部奖励分栏**：`phase_gathering_initPachinko_v2()` 会按 `CONFIG.gameplay.bottomRewardZoneChance` 小概率在底部生成 1 个窄奖励区，宽度由 `bottomRewardZoneWidthMultiplier` 按倍化弹珠直径换算，两侧使用 `shape='barrier'` 的竖直 Peg 挡板。弹珠进入分栏时返回 `reward_zone`，向当前收集列表写入 `{ type, level: 1, source: 'bottom_reward_zone' }`，用于提供 `explosive` / `laser` 等奖励专属属性。
 - **覆盖边界**：只允许随机覆盖模块生成出的 `normal` 钉子；模块预置的 `pink`、固定 `cryo` / `pyro` 等特殊钉子必须保留，以免破坏模块本身定位。
 - **后置流程**：随机属性生成完成后，`pendingFusions` 会优先注入 `fusionPriority` 更高的普通钉子，再按中下区域价值排序；注入结果必须通过 `setModulePegState()` 写回组件实例的 `pegStates`，保证重建、拆卸或替换其它组件后，被同化钉子的属性不丢失。模块编辑器中选择符文融合后必须立即调用 `phase_gathering_initPachinko(false)` 重建当前盘面，保证玩家在点击「开始采集」前看到真实融合结果。
@@ -217,9 +217,9 @@ globs: ["src/game_phase.js"]
 - **机制**: 
   - 如果越线的敌人是 Boss（`e.type === 'boss'`），触发 `_triggerPityDrop` 怜悯掉落。
   - 系统分析玩家近期的伤害历史，找出主属性（占比最高的属性）。
-  - 根据 `COUNTER_MAP` 找到该主属性的克制属性。
-  - 调用 `loot_calcRuneDrop` 强制生成一个克制属性的 1 级符文，掉落在 Boss 越线位置。
-  - 触发 UI 提示："💔 怜悯掉落：获得克制符文"。
+  - 将该主属性作为 `themeWeights` 注入 `loot_calcRuneDrop`。
+  - 调用 `loot_calcRuneDrop` 生成一个同主题 1 级符文，掉落在 Boss 越线位置。
+  - 触发 UI 提示："💔 怜悯掉落：获得主属性符文"。
 
 ### 8.3 掉落权重边际递减 (Marginal Decay)
 - **触发时机**: 计算符文掉落权重时（`loot_system.js` 中的 `_calcBuildVector`）
@@ -234,3 +234,17 @@ globs: ["src/game_phase.js"]
 - `phase_gathering_attemptComplete()` waits until all drop balls, energy orbs, side wheels, and session `activeBalls` are finished, then compiles each session into one ammo recipe.
 - Result handling inside `phase_gathering_update()` must use `ball.session` for collected stats, multicast, split clones, mirror clones, and rainbow shards.
 - Do not add new sequential-click dependencies to gathering. One player click should produce the final bullet list for the current charge batch.
+
+## 2026-06-21 Combat Aim Guide Scatter Parity
+
+- `buildCombatAimGuides()` must not treat `recipe.scatter` as the direct number of preview branches.
+- The scatter preview must mirror `spawn_spawnBullet()` branch semantics: `floor(scatterCount / 2) + (scatterCount % 2)`, with non-laser scatter resonance adding `extraScatterShots` and applying `scatterAngleReduction`.
+- The main guide remains separate from scatter guides; wind recipes stay single-shot in the preview.
+
+## 2026-06-21 Combat Arena Bounds
+
+- Combat uses an inset arena inside the canvas because the left and right side bands are decorative.
+- `sys_resize()` derives `combatGridLeftX`, `combatGridRightX`, `combatGridWidth`, and `enemyWidth` from `CONFIG.gameplay.combatSideInsetRatio`, `combatSideInsetMin`, and `combatSideInsetMax`.
+- Use `sys_getCombatBounds()` for left/right wall positions and `sys_getCombatColumnCenterX(col, spanCols)` for enemy column centers.
+- Visible walls, projectile wall bounce, laser wall reflection, enemy movement bounds, Boss center, and row/preset spawning must share these bounds.
+- Do not use `0` or `this.width` as combat side walls unless the code is explicitly drawing decorative side bands.

@@ -598,11 +598,12 @@ export const run_shop = {
         const dock = document.getElementById('run-shop-status-dock');
         if (!dock) return;
 
-        const visiblePhase = ['gathering', 'combat'].includes(this.phase);
+        const visiblePhase = this.phase === 'gathering';
         const state = typeof this.sys_getRunShopScheduleState === 'function'
             ? this.sys_getRunShopScheduleState()
             : null;
         if (!visiblePhase || !state || state.hidden) {
+            dock.classList.remove('is-gathering-top');
             dock.style.display = 'none';
             return;
         }
@@ -614,6 +615,7 @@ export const run_shop = {
         const pct = Math.max(0, Math.min(100, Math.round((state.progress || 0) * 100)));
 
         dock.style.display = 'flex';
+        dock.classList.toggle('is-gathering-top', this.phase === 'gathering');
         dock.classList.toggle('is-active', !!state.isActive);
         if (fillEl) fillEl.style.width = `${pct}%`;
 

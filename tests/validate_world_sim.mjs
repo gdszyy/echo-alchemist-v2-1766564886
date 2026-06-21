@@ -157,6 +157,7 @@ let sawBetaCrystal = false; // Alpha 枯竭退化为 Beta 的证据
 let landChangedTick = -1;
 let sawTerrainSlope = false;
 let sawBasinDepth = false;
+let sawPersistentWind = false;
 
 for (let t = 0; t < TICKS; t++) {
     engine.update();
@@ -171,12 +172,16 @@ for (let t = 0; t < TICKS; t++) {
                 if (isBad(c.mantleEnergy) || isBad(c.temperature) ||
                     isBad(c.storedEnergy) || isBad(c.prosperity) ||
                     isBad(c.terrainElevation) || isBad(c.terrainSlope) ||
-                    isBad(c.terrainBasinDepth) || isBad(c.terrainMoveCost)) {
+                    isBad(c.terrainBasinDepth) || isBad(c.terrainMoveCost) ||
+                    isBad(c.climatePotential) || isBad(c.windX) ||
+                    isBad(c.windY) || isBad(c.verticalMotion) ||
+                    isBad(c.crystalClimateCharge)) {
                     nanHits++;
                 }
                 landNow++;
                 if (c.temperature !== 0) sawNonZeroTemp = true;
                 if (c.hasThunderstorm) sawThunderstorm = true;
+                if (Math.hypot(c.windX ?? 0, c.windY ?? 0) > 0.0001) sawPersistentWind = true;
                 if (c.terrainSlope > 0) sawTerrainSlope = true;
                 if (c.terrainBasinDepth > 0) sawBasinDepth = true;
                 if (c.crystalState === CELL_TYPE.BETA) sawBetaCrystal = true;
@@ -194,6 +199,7 @@ for (let t = 0; t < TICKS; t++) {
 check(engine.timeStep === TICKS, `timeStep advanced to ${TICKS} (got ${engine.timeStep})`);
 check(nanHits === 0, `no NaN/Infinity across 200 ticks (got ${nanHits} bad cells)`);
 check(sawNonZeroTemp, 'climate layer ran (temperatures diverged from 0)');
+check(sawPersistentWind, 'climate layer produces persistent wind state');
 check(landChangedTick !== -1, 'mantle layer can reshape land extent (land count changed)');
 check(sawTerrainSlope, 'terrain metrics expose non-zero slopes');
 check(sawBasinDepth, 'terrain metrics expose local basin depth');
@@ -390,7 +396,7 @@ const lowReductionAttrs = {
     speciesId: 21,
     color: '#aaa',
 };
-const highReductionAttrs = { ...lowReductionAttrs, crystalDamageReduction: 0.8, speciesId: 22 };
+const highReductionAttrs = { ...lowReductionAttrs, civilizationLevel: 1, crystalDamageReduction: 0.8, speciesId: 22 };
 reductionEngine.grid[1][1].crystalState = CELL_TYPE.ALPHA;
 reductionEngine.grid[1][1].storedEnergy = 30;
 reductionEngine.grid[1][3].crystalState = CELL_TYPE.ALPHA;
@@ -406,6 +412,81 @@ check(
     reductionEngine.grid[1][4].prosperity - reductionEngine.grid[1][0].prosperity >= 3,
     `crystalDamageReduction lowers Alpha adjacency damage (low ${reductionEngine.grid[1][0].prosperity.toFixed(1)}, high ${reductionEngine.grid[1][4].prosperity.toFixed(1)})`
 );
+check(
+    Math.abs(reductionEngine.grid[1][4].bioAttributes.civilizationLevel - DEFAULT_PARAMS.alphaCivilizationDecay) < 1e-9,
+    `Alpha adjacency lowers civilization (${reductionEngine.grid[1][4].bioAttributes.civilizationLevel.toFixed(2)})`
+);
+
+const respawnEngine = new SimulationEngine(7, 5, {
+    ...DEFAULT_PARAMS,
+    initialHumanSpawn: false,
+    initialBioSpeciesCount: 0,
+    bioAutoSpawnCount: 0,
+    initialAlphaDelaySteps: 999999,
+    initialAlphaRadius: 0,
+}, { seed: 'dynamic-human-respawn' });
+respawnEngine.params.initialHumanSpawn = true;
+respawnEngine.isFirstSpawn = false;
+for (let y = 0; y < respawnEngine.height; y++) {
+    for (let x = 0; x < respawnEngine.width; x++) {
+        const cell = respawnEngine.grid[y][x];
+        cell.exists = false;
+        cell.crystalState = CELL_TYPE.EMPTY;
+        cell.temperature = 24;
+        cell.hasThunderstorm = false;
+        cell.windX = 0;
+        cell.windY = 0;
+        cell.verticalMotion = 0;
+        cell.terrainMoveCost = 1;
+        cell.terrainSlope = 0;
+        cell.prosperity = 0;
+        cell.bioAttributes = undefined;
+        cell.migrant = null;
+    }
+}
+for (const [x, y] of [[1, 2], [2, 2], [2, 1], [4, 2], [5, 2]]) {
+    respawnEngine.grid[y][x].exists = true;
+}
+respawnEngine.grid[1][2].hasThunderstorm = true;
+respawnEngine.grid[2][5].crystalState = CELL_TYPE.ALPHA;
+respawnEngine.grid[2][5].storedEnergy = 40;
+respawnEngine.grid[2][1].crystalState = CELL_TYPE.BIO;
+respawnEngine.grid[2][1].prosperity = 160;
+respawnEngine.grid[2][1].bioAttributes = {
+    minTemp: 7,
+    maxTemp: 34,
+    survivalMinTemp: -50,
+    survivalMaxTemp: 50,
+    prosperityGrowth: 0,
+    prosperityDecay: 0,
+    expansionThreshold: 9999,
+    miningReward: 0,
+    migrationThreshold: 0,
+    alphaRadiationDamage: 0,
+    civilizationLevel: 0.2,
+    crystalDamageReduction: 0.2,
+    settlementSize: 1,
+    speciesId: 0,
+    color: '#FFA500',
+};
+const initialRespawnPoint = respawnEngine.updateHumanRespawnPoint();
+check(
+    initialRespawnPoint?.x === 2 && initialRespawnPoint?.y === 2 &&
+        initialRespawnPoint.weatherScore > 0.9 &&
+        initialRespawnPoint.humanSupport > 0 &&
+        initialRespawnPoint.crystalScore > 0.6,
+    `dynamic human respawn prefers habitable empty land near human tribe and away from crystal (${JSON.stringify(initialRespawnPoint)})`
+);
+respawnEngine.grid[2][2].temperature = 80;
+const updatedRespawnPoint = respawnEngine.updateHumanRespawnPoint();
+check(
+    updatedRespawnPoint?.x !== 2 || updatedRespawnPoint?.y !== 2,
+    `dynamic human respawn updates when the previous site becomes uninhabitable (${JSON.stringify(updatedRespawnPoint)})`
+);
+respawnEngine.grid[2][2].temperature = 24;
+respawnEngine.updateHumanRespawnPoint();
+respawnEngine.spawnHuman(100, { settlementSize: 1 });
+check(respawnEngine.grid[2][2].crystalState === CELL_TYPE.BIO, 'spawnHuman uses the dynamic respawn point when no fixed humanSpawnPoint is configured');
 
 function createMiningEngine(seed) {
     const engine = new SimulationEngine(3, 3, {
@@ -471,8 +552,104 @@ fastMiningEngine.grid[1][2].prosperity = 100;
 fastMiningEngine.grid[1][2].bioAttributes = { ...miningAttrs, civilizationLevel: 0.8, speciesId: 33 };
 fastMiningEngine.grid[1][1].crystalState = CELL_TYPE.BETA;
 fastMiningEngine.updateBioLayer();
-check(fastMiningEngine.grid[1][1].crystalState === CELL_TYPE.EMPTY, 'high-civilization mining can finish at most one adjacent Beta crystal in one step');
-check(fastMiningEngine.grid[1][0].bioAttributes.civilizationLevel === 0.5 && fastMiningEngine.grid[1][2].bioAttributes.civilizationLevel === 0.4, 'mining a Beta crystal halves civilization for BIO settlements in its +1 neighborhood');
+check(fastMiningEngine.grid[1][1].crystalState === CELL_TYPE.BETA, 'high-civilization mining is no longer instant under default pacing');
+check(
+    fastMiningEngine.grid[1][0].betaMiningProgress > slowMiningEngine.grid[1][0].betaMiningProgress,
+    `higher civilization still mines faster (${fastMiningEngine.grid[1][0].betaMiningProgress.toFixed(2)} > ${slowMiningEngine.grid[1][0].betaMiningProgress.toFixed(2)})`
+);
+for (let t = 0; t < 3; t++) fastMiningEngine.updateBioLayer();
+check(fastMiningEngine.grid[1][1].crystalState === CELL_TYPE.EMPTY, 'high-civilization mining eventually finishes a Beta crystal after paced progress');
+check(fastMiningEngine.grid[1][0].bioAttributes.civilizationLevel === 1 && fastMiningEngine.grid[1][2].bioAttributes.civilizationLevel === 0.8, 'mining a Beta crystal does not lower civilization for nearby BIO settlements');
+
+const smallSettlementEngine = new SimulationEngine(1, 1, {
+    ...DEFAULT_PARAMS,
+    bioAutoSpawnCount: 0,
+    initialBioSpeciesCount: 0,
+    initialHumanSpawn: false,
+    minProsperityGrowth: 0,
+    bioSmallSettlementSurvivalBonus: 1.2,
+}, { seed: 'small-settlement-survival' });
+smallSettlementEngine.isFirstSpawn = false;
+smallSettlementEngine.grid[0][0].exists = true;
+smallSettlementEngine.grid[0][0].temperature = 20;
+smallSettlementEngine.grid[0][0].crystalState = CELL_TYPE.BIO;
+smallSettlementEngine.grid[0][0].prosperity = 10;
+smallSettlementEngine.grid[0][0].bioAttributes = { ...miningAttrs, prosperityGrowth: 0, expansionThreshold: 9999, speciesId: 41 };
+smallSettlementEngine.updateBioLayer();
+check(smallSettlementEngine.grid[0][0].prosperity > 11, `small settlements receive survival buffer (${smallSettlementEngine.grid[0][0].prosperity.toFixed(1)})`);
+
+const settlementCapEngine = new SimulationEngine(3, 3, {
+    ...DEFAULT_PARAMS,
+    bioAutoSpawnCount: 0,
+    initialBioSpeciesCount: 0,
+    initialHumanSpawn: false,
+    minProsperityGrowth: 0,
+    sameSpeciesBonus: 0,
+    competitionPenalty: 0,
+    bioMaxSettlementCells: 1,
+    bioExpansionCost: 20,
+    migrantExpansionProb: 0,
+}, { seed: 'settlement-cap' });
+settlementCapEngine.isFirstSpawn = false;
+for (let y = 0; y < settlementCapEngine.height; y++) {
+    for (let x = 0; x < settlementCapEngine.width; x++) {
+        const cell = settlementCapEngine.grid[y][x];
+        cell.exists = true;
+        cell.temperature = 20;
+        cell.crystalState = CELL_TYPE.EMPTY;
+        cell.prosperity = 0;
+        cell.bioAttributes = undefined;
+        cell.migrant = null;
+    }
+}
+settlementCapEngine.grid[1][1].crystalState = CELL_TYPE.BIO;
+settlementCapEngine.grid[1][1].prosperity = 100;
+settlementCapEngine.grid[1][1].bioAttributes = { ...miningAttrs, prosperityGrowth: 20, expansionThreshold: 10, speciesId: 42 };
+settlementCapEngine.updateBioLayer();
+const cappedBioCells = settlementCapEngine.grid.flat().filter(c => c.crystalState === CELL_TYPE.BIO && c.bioAttributes?.speciesId === 42).length;
+const cappedMigrants = settlementCapEngine.grid.flat().filter(c => c.migrant?.attributes?.speciesId === 42).length;
+check(cappedBioCells === 1 && cappedMigrants === 1, `settlement cap prevents direct tile sprawl while producing a migrant (bio ${cappedBioCells}, migrants ${cappedMigrants})`);
+
+const mutationBranchEngine = new SimulationEngine(3, 3, {
+    ...DEFAULT_PARAMS,
+    bioAutoSpawnCount: 0,
+    initialBioSpeciesCount: 0,
+    initialHumanSpawn: false,
+    minProsperityGrowth: 0,
+    sameSpeciesBonus: 0,
+    competitionPenalty: 0,
+    mutationRate: 1,
+    mutationStrength: 0.25,
+    newSpeciesThreshold: 0.2,
+    bioExpansionCost: 20,
+    migrantExpansionProb: 0,
+}, { seed: 'mutation-branch' });
+mutationBranchEngine.isFirstSpawn = false;
+for (let y = 0; y < mutationBranchEngine.height; y++) {
+    for (let x = 0; x < mutationBranchEngine.width; x++) {
+        const cell = mutationBranchEngine.grid[y][x];
+        cell.exists = true;
+        cell.temperature = 20;
+        cell.terrainElevation = 0.5;
+        cell.terrainSlope = 0;
+        cell.terrainBasinDepth = 0;
+        cell.terrainMoveCost = 1;
+        cell.crystalState = CELL_TYPE.EMPTY;
+        cell.prosperity = 0;
+        cell.bioAttributes = undefined;
+        cell.migrant = null;
+    }
+}
+mutationBranchEngine.grid[1][1].crystalState = CELL_TYPE.BIO;
+mutationBranchEngine.grid[1][1].prosperity = 120;
+mutationBranchEngine.grid[1][1].bioAttributes = { ...miningAttrs, prosperityGrowth: 30, expansionThreshold: 10, speciesId: 51 };
+mutationBranchEngine.updateBioLayer();
+const mutationSpecies = new Set(
+    mutationBranchEngine.grid.flat()
+        .filter(c => c.crystalState === CELL_TYPE.BIO && c.bioAttributes)
+        .map(c => c.bioAttributes.speciesId)
+);
+check(mutationSpecies.size >= 2 && ![...mutationSpecies].every(id => id === 51), `high mutation expansion creates a new species branch (${[...mutationSpecies].join(', ')})`);
 
 // ---------------------------------------------------------------------------
 // 2) 晶石灾害拓扑
@@ -700,6 +877,38 @@ terrainPassEngine.updateBioLayer();
 check(!!terrainPassEngine.grid[2][2].migrant, 'migrant takes the only passable mid-slope corridor');
 check(!terrainPassEngine.grid[1][2].migrant && !terrainPassEngine.grid[3][2].migrant, 'migrant does not cross blocked plateau-to-plain cliffs despite better temperature');
 
+const migrantStabilityEngine = new SimulationEngine(5, 5, {
+    ...DEFAULT_PARAMS,
+    bioAutoSpawnCount: 0,
+    initialBioSpeciesCount: 0,
+    initialHumanSpawn: false,
+    initialAlphaDelaySteps: 999999,
+}, { seed: 'migrant-stability' });
+migrantStabilityEngine.isFirstSpawn = false;
+for (let y = 0; y < migrantStabilityEngine.height; y++) {
+    for (let x = 0; x < migrantStabilityEngine.width; x++) {
+        const cell = migrantStabilityEngine.grid[y][x];
+        cell.exists = true;
+        cell.crystalState = CELL_TYPE.EMPTY;
+        cell.temperature = 22;
+        cell.terrainElevation = 0.2;
+        cell.terrainSlope = 0;
+        cell.terrainBasinDepth = 0;
+        cell.terrainMoveCost = 1;
+        cell.prosperity = 0;
+        cell.bioAttributes = undefined;
+        cell.migrant = null;
+    }
+}
+const lowMigrantAttrs = { ...migrantAttrs, migrationThreshold: 28, speciesId: 8 };
+migrantStabilityEngine.grid[2][2].migrant = { prosperity: 12, attributes: lowMigrantAttrs };
+migrantStabilityEngine.grid[2][3].crystalState = CELL_TYPE.BETA;
+migrantStabilityEngine.updateBioLayer();
+const lowMigrantCells = migrantStabilityEngine.grid.flat().filter(c => c.migrant?.attributes?.speciesId === 8);
+const lowMigrantBio = migrantStabilityEngine.grid.flat().filter(c => c.crystalState === CELL_TYPE.BIO && c.bioAttributes?.speciesId === 8);
+check(lowMigrantCells.length === 1 && lowMigrantBio.length === 0, 'low-prosperity migrant keeps wandering instead of immediately settling into an unstable colony');
+check(lowMigrantCells[0].migrant.prosperity === 11, 'nearby Beta crystal does not apply range damage to migrants');
+
 const terrainClimateEngine = new SimulationEngine(3, 1, {
     ...DEFAULT_PARAMS,
     bioAutoSpawnCount: 0,
@@ -723,13 +932,157 @@ const highElevationWarmup = terrainClimateEngine.grid[0][0].temperature + 100;
 const lowElevationWarmup = terrainClimateEngine.grid[0][2].temperature + 100;
 check(highElevationWarmup < lowElevationWarmup, 'high elevation weakens mantle heating under equal mantle energy');
 
+const windPersistenceEngine = new SimulationEngine(5, 1, {
+    ...DEFAULT_PARAMS,
+    bioAutoSpawnCount: 0,
+    initialBioSpeciesCount: 0,
+    initialHumanSpawn: false,
+    initialAlphaDelaySteps: 999999,
+    diffusionRate: 0,
+    advectionRate: 0,
+    climateBaseReturnRate: 0,
+    mantleClimateAnomalyRate: 0,
+    climatePotentialElevationBias: 0,
+    windAcceleration: 0.2,
+    windInertia: 0.9,
+    windFriction: 0.1,
+    windCirculationBias: 0,
+}, { seed: 'weather-wind-persistence' });
+for (let x = 0; x < windPersistenceEngine.width; x++) {
+    const cell = windPersistenceEngine.grid[0][x];
+    cell.exists = true;
+    cell.crystalState = CELL_TYPE.EMPTY;
+    cell.temperature = 40 - x * 15;
+    cell.terrainElevation = 0.2;
+    cell.terrainSlope = 0;
+    cell.terrainBasinDepth = 0;
+    cell.windX = 0;
+    cell.windY = 0;
+}
+windPersistenceEngine.updateClimateLayer();
+const firstWind = windPersistenceEngine.grid[0][2].windX;
+for (let x = 0; x < windPersistenceEngine.width; x++) {
+    windPersistenceEngine.grid[0][x].temperature = 0;
+}
+windPersistenceEngine.updateClimateLayer();
+const decayedWind = windPersistenceEngine.grid[0][2].windX;
+check(firstWind > 0.05, `wind accelerates from climate potential gradient (${firstWind.toFixed(3)})`);
+check(decayedWind > 0 && decayedWind < firstWind, `wind persists and decays after gradient removal (${decayedWind.toFixed(3)} < ${firstWind.toFixed(3)})`);
+
+const terrainWindEngine = new SimulationEngine(5, 3, {
+    ...DEFAULT_PARAMS,
+    bioAutoSpawnCount: 0,
+    initialBioSpeciesCount: 0,
+    initialHumanSpawn: false,
+    initialAlphaDelaySteps: 999999,
+    diffusionRate: 0,
+    advectionRate: 0,
+    climateBaseReturnRate: 0,
+    mantleClimateAnomalyRate: 0,
+    climatePotentialElevationBias: 0,
+    windAcceleration: 0.25,
+    windInertia: 0,
+    windFriction: 0,
+    windCirculationBias: 0,
+}, { seed: 'weather-terrain-deflection' });
+for (let y = 0; y < terrainWindEngine.height; y++) {
+    for (let x = 0; x < terrainWindEngine.width; x++) {
+        const cell = terrainWindEngine.grid[y][x];
+        cell.exists = true;
+        cell.crystalState = CELL_TYPE.EMPTY;
+        cell.temperature = 40 - x * 12;
+        cell.terrainElevation = x === 2 && y !== 1 ? 0.85 : 0.18;
+        cell.terrainSlope = x === 2 && y !== 1 ? 0.7 : 0.05;
+        cell.terrainBasinDepth = 0;
+        cell.windX = 0;
+        cell.windY = 0;
+    }
+}
+terrainWindEngine.updateClimateLayer();
+const ridgeCrossWind = terrainWindEngine.grid[0][1].windX;
+const passAlignedWind = terrainWindEngine.grid[1][1].windX;
+check(passAlignedWind > ridgeCrossWind * 1.5, `terrain pass carries stronger wind than ridge crossing (${passAlignedWind.toFixed(3)} vs ${ridgeCrossWind.toFixed(3)})`);
+
+function createCrystalWeatherEngine(seed, betaRing = false) {
+    const engine = new SimulationEngine(5, 5, {
+        ...DEFAULT_PARAMS,
+        bioAutoSpawnCount: 0,
+        initialBioSpeciesCount: 0,
+        initialHumanSpawn: false,
+        initialAlphaDelaySteps: 999999,
+        diffusionRate: 0,
+        advectionRate: 0,
+        climateBaseReturnRate: 0,
+        mantleClimateAnomalyRate: 0,
+        climatePotentialElevationBias: 0,
+        thunderstormThreshold: 5,
+        windAcceleration: 0.8,
+        windInertia: 0,
+        windFriction: 0,
+        windCirculationBias: 0,
+        alphaClimatePotentialBias: -30,
+        alphaClimateStormBoost: 1,
+        betaClimateStormDamping: 1,
+    }, { seed });
+    for (let y = 0; y < engine.height; y++) {
+        for (let x = 0; x < engine.width; x++) {
+            const cell = engine.grid[y][x];
+            cell.exists = true;
+            cell.crystalState = CELL_TYPE.EMPTY;
+            cell.temperature = 45;
+            cell.terrainElevation = 0.2;
+            cell.terrainSlope = 0.05;
+            cell.terrainBasinDepth = 0;
+            cell.windX = 0;
+            cell.windY = 0;
+        }
+    }
+    engine.grid[2][2].crystalState = CELL_TYPE.ALPHA;
+    engine.grid[2][2].storedEnergy = 50;
+    if (betaRing) {
+        for (const [x, y] of [[1, 2], [3, 2], [2, 1], [2, 3]]) {
+            engine.grid[y][x].crystalState = CELL_TYPE.BETA;
+        }
+    }
+    return engine;
+}
+
+const alphaWeatherEngine = createCrystalWeatherEngine('weather-alpha-core', false);
+alphaWeatherEngine.updateClimateLayer();
+const alphaStorms = alphaWeatherEngine.grid.flat().filter(c => c.exists && c.hasThunderstorm).length;
+check(alphaWeatherEngine.grid[2][2].crystalClimateCharge < 0, `Alpha creates a low-potential climate charge (${alphaWeatherEngine.grid[2][2].crystalClimateCharge.toFixed(2)})`);
+check(alphaStorms > 0, `Alpha weather core can trigger nearby storms (${alphaStorms})`);
+
+const betaWeatherEngine = createCrystalWeatherEngine('weather-beta-stabilizer', true);
+betaWeatherEngine.updateClimateLayer();
+const betaStorms = betaWeatherEngine.grid.flat().filter(c => c.exists && c.hasThunderstorm).length;
+check(betaWeatherEngine.grid[2][1].crystalClimateCharge > 0, `Beta exposes stabilizing climate charge (${betaWeatherEngine.grid[2][1].crystalClimateCharge.toFixed(2)})`);
+check(betaStorms < alphaStorms, `Beta stabilizers reduce nearby storms (${betaStorms} < ${alphaStorms})`);
+
+const weakMantleEngine = new SimulationEngine(1, 1, {
+    ...DEFAULT_PARAMS,
+    bioAutoSpawnCount: 0,
+    initialBioSpeciesCount: 0,
+    initialHumanSpawn: false,
+    initialAlphaDelaySteps: 999999,
+    diffusionRate: 0,
+    advectionRate: 0,
+}, { seed: 'weather-mantle-weakness' });
+weakMantleEngine.grid[0][0].exists = true;
+weakMantleEngine.grid[0][0].temperature = -10;
+weakMantleEngine.grid[0][0].mantleEnergy = 200;
+weakMantleEngine.grid[0][0].terrainElevation = 0.2;
+for (let t = 0; t < 10; t++) weakMantleEngine.updateClimateLayer();
+const mantleWarmup = weakMantleEngine.grid[0][0].temperature + 10;
+check(mantleWarmup > 0 && mantleWarmup < 5, `high mantle energy warms climate slowly instead of dominating it (${mantleWarmup.toFixed(2)} over 10 ticks)`);
+
 // ---------------------------------------------------------------------------
 // 3) 静态契约
 // ---------------------------------------------------------------------------
 console.log('\n[3] Static contracts\n');
 
 const files = fs.readdirSync(path.join(repoRoot, SIM_DIR)).filter(f => f.endsWith('.js'));
-check(files.length === 14, `14 module files present (got ${files.length}: ${files.join(', ')})`);
+check(files.length === 15, `15 module files present (got ${files.length}: ${files.join(', ')})`);
 
 // 2a. <500 行
 for (const f of files) {
@@ -747,6 +1100,7 @@ check(/export function generateInitialTerrainElevation/.test(read(`${SIM_DIR}/te
 check(/export const terrain_detectors\s*=/.test(read(`${SIM_DIR}/terrain_detectors.js`)), 'terrain_detectors exported as composition object');
 check(/export const bio_layer\s*=/.test(read(`${SIM_DIR}/bio_layer.js`)), 'bio_layer exported as composition object');
 check(/export const bio_spawn\s*=/.test(read(`${SIM_DIR}/bio_spawn.js`)), 'bio_spawn exported as composition object');
+check(/export function getSettlementSize/.test(read(`${SIM_DIR}/bio_settlement.js`)), 'bio_settlement exports pure settlement helpers');
 check(/export function createSeededRandom/.test(read(`${SIM_DIR}/rng.js`)), 'rng exports createSeededRandom');
 check(/export class SimulationEngine/.test(read(`${SIM_DIR}/engine.js`)), 'engine exports SimulationEngine class');
 check(/val\.bind\(this\)/.test(read(`${SIM_DIR}/engine.js`)), 'engine wires layers via bind(this) composition');

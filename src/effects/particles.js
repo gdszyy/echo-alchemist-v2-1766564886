@@ -569,35 +569,43 @@ class EnergyOrb {
      * @param {Vec2} initialVel 弹珠碰撞时的初速度
      * @param {Function} onArrive 到达回调
      */
-    constructor(x, y, targetX, targetY, color, initialVel, onArrive) {
+    constructor(x, y, targetX, targetY, color, initialVel, onArrive, options = {}) {
         this.pos = new Vec2(x, y);
         this.target = new Vec2(targetX, targetY);
         this.onArrive = onArrive;
         this.color = color || '#fbbf24';
 
         // 物理参数
-        let burstVel = new Vec2(initialVel.x *3.2, initialVel.y * 0.72);
+        const burstXMult = options.burstXMult ?? 1.85;
+        const burstYMult = options.burstYMult ?? 0.42;
+        let burstVel = new Vec2(initialVel.x * burstXMult, initialVel.y * burstYMult);
         const spreadAngle = (Math.random() - 0.5) * 0.6;
         this.vel = burstVel.rotate(spreadAngle);
         
-        if (this.vel.mag() < 3) {
-            this.vel = this.vel.norm().mult(3);
+        const minSpeed = options.minSpeed ?? 1.8;
+        if (this.vel.mag() < minSpeed) {
+            this.vel = this.vel.norm().mult(minSpeed);
         }
 
         this.active = true;
         
         // --- 优化：减少拖尾长度 ---
         this.trail = []; 
-        this.maxTrailLen = 8; // 原来是12，减少到8，降低绘制循环次数
+        this.maxTrailLen = options.maxTrailLen ?? 4;
 
-        this.baseSize = 2.5; 
+        this.baseSize = options.baseSize ?? 1.45; 
+        this.trailAlpha = options.trailAlpha ?? 0.16;
+        this.haloAlpha = options.haloAlpha ?? 0.18;
+        this.coreAlpha = options.coreAlpha ?? 0.82;
+        this.compositeOperation = options.compositeOperation || 'source-over';
+        this.arriveRadius = options.arriveRadius ?? 24;
         this.timer = 0;
         this.seed = Math.random() * 100;
 
-        this.hoverTime = 20;     
-        this.friction = 0.88;    
-        this.floatForce = 0.21;  
-        this.suctionAcc = 0.07;  
+        this.hoverTime = options.hoverTime ?? 14;     
+        this.friction = options.friction ?? 0.9;    
+        this.floatForce = options.floatForce ?? 0.12;  
+        this.suctionAcc = options.suctionAcc ?? 0.08;  
         this.currentSuction = 0; 
     }
 
@@ -615,7 +623,7 @@ class EnergyOrb {
             let dir = this.target.sub(this.pos);
             const dist = dir.mag();
 
-            if (dist < 20) { 
+            if (dist < this.arriveRadius) { 
                 this.active = false;
                 if (this.onArrive) this.onArrive();
                 return;
@@ -637,9 +645,8 @@ class EnergyOrb {
         if (!this.active) return;
         ctx.save();
         
-        // 关键优化：使用 lighter 混合模式代替阴影来实现发光
-        // 这比 shadowBlur 快得多
-        ctx.globalCompositeOperation = 'lighter'; 
+        // @perf-impact: Gathering hit orbs use source-over by default; no shadowBlur or gradients.
+        ctx.globalCompositeOperation = this.compositeOperation; 
 
         // ------------------------------------
         // 1. 绘制极简拖尾
@@ -658,7 +665,7 @@ class EnergyOrb {
             ctx.lineCap = 'round';
             ctx.lineWidth = this.baseSize; 
             ctx.strokeStyle = this.color;
-            ctx.globalAlpha = 0.3; // 低透明度
+            ctx.globalAlpha = this.trailAlpha;
             
             // 彻底移除循环内的 shadow 设置
             ctx.shadowBlur = 0; 
@@ -675,16 +682,16 @@ class EnergyOrb {
         // 绘制外发光 (用半透明实心圆代替渐变)
         ctx.beginPath();
         ctx.fillStyle = this.color;
-        ctx.globalAlpha = 0.4; // 降低透明度模拟光晕
+        ctx.globalAlpha = this.haloAlpha;
         // 大小随闪烁变化
-        ctx.arc(this.pos.x, this.pos.y, this.baseSize * 2.5 * flicker, 0, Math.PI * 2);
+        ctx.arc(this.pos.x, this.pos.y, this.baseSize * 2.0 * flicker, 0, Math.PI * 2);
         ctx.fill();
 
         // 绘制核心亮点
         ctx.beginPath();
         ctx.fillStyle = '#ffffff';
-        ctx.globalAlpha = 1.0;
-        ctx.arc(this.pos.x, this.pos.y, this.baseSize * 0.8, 0, Math.PI * 2);
+        ctx.globalAlpha = this.coreAlpha;
+        ctx.arc(this.pos.x, this.pos.y, this.baseSize * 0.62, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();

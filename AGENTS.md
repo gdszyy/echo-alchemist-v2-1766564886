@@ -8,6 +8,7 @@
 *   **架构与防坑指南**：[`.cursor/rules/global.md`](.cursor/rules/global.md)（必读，包含子系统扩展规范与全局状态流转）。
 *   **待办与进度大盘**：[`TODO.md`](TODO.md)（包含各阶段的完成状态与重构指标）。
 *   **P0 交互优化 TODO**：[`docs/p0_interaction_optimization_todo.md`](docs/p0_interaction_optimization_todo.md)（当前核心页面交互优化优先级、已落地项与下一轮 P0/P1 清单）。
+*   **世界观正典**：[`docs/world_lore_canon.md`](docs/world_lore_canon.md)（凡涉及剧情、NPC、重生循环、晶石灾害叙事或 `world_sim` 接入 gameplay 时必读；用于区分叙事真相与后续模拟器实现）。
 *   **自适应性能规范**：[`.cursor/rules/performance.md`](.cursor/rules/performance.md)（凡修改粒子/特效/Peg/敌人渲染相关代码，必读）。
 *   **流程洞察索引**：[`.cursor/rules/process_insights/index.md`](.cursor/rules/process_insights/index.md)（在涉及复杂跨模块流程、修复历史 Bug 区域或新增特效时必读；包含历次任务沉淀的防坑经验与版本化洞察文档）。
 *   **自动函数索引**：[`.cursor/rules/auto_index/INDEX.md`](.cursor/rules/auto_index/INDEX.md)（在涉及大文件修改时必读；包含所有大文件的函数名、行号范围和 @section 内部节点映射，由 `code-indexer` 脚本自动维护，**严禁手动编辑**）。
@@ -89,6 +90,7 @@
 *   **生成系统规范**：[`.cursor/rules/spawn_system.md`](.cursor/rules/spawn_system.md) - 导演系统阵型模板完整规范（所有阵型的设计意图、触发条件和实现细节）。（Task B.1/B.2 完成）
 *   **自适应性能系统规范**：[`.cursor/rules/performance.md`](.cursor/rules/performance.md) - 基于手机平均帧率的动态特效等级系统（FPS 采样器、三档预算表、所有消费端关联索引、Agent 修改防坑指南）。**凡涉及粒子数量、特效上限、Peg 光效、敌人光泽的修改，必须先读此文档。**
 *   **世界变迁模拟器规范**：[`.cursor/rules/world_sim.md`](.cursor/rules/world_sim.md) - `src/world_sim/` 元胞自动机星球演化引擎（地幔/气候/晶石/生物四层）的移植规范。**纯数据模块，当前未接入 `Game` 主类与 EventBus**；凡修改四层演化逻辑、元胞状态模型或欲接入 gameplay 时必读。
+*   **世界观正典**：[`docs/world_lore_canon.md`](docs/world_lore_canon.md) - 定义主角/核心锚点 NPC 重生循环、旧时代永生实验、晶石失控与文明反复灭绝的叙事真相。**凡修改剧情、NPC、教程文本、重生机制或将 `world_sim` 接入 gameplay 时，必须以此文档为上层约束。**
 
 ### 数据索引文档（快速速查，无需读取源码）
 

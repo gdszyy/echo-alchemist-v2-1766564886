@@ -1,6 +1,6 @@
 # src\spawn_system.js 函数索引
 
-> 自动生成于 2026-06-20 | 总行数: 2877 | 函数数: 40 | 语言: javascript
+> 自动生成于 2026-06-21 | 总行数: 2911 | 函数数: 40 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -33,7 +33,7 @@
 | spawn_createExplosion | method | `spawn_createExplosion(x, y, color)` |  |
 | spawn_createShockwave | method | `spawn_createShockwave(x, y, color = null)` |  |
 | spawn_createHealWave | method | `spawn_createHealWave(x, y, range = 120)` |  |
-| spawn_createHitFeedback | method | `spawn_createHitFeedback(x, y, velocity, type = 'normal')` |  |
+| spawn_createHitFeedback | method | `spawn_createHitFeedback(x, y, velocity, type = 'normal', options = {})` |  |
 | spawn_triggerLevelUpEvent | method | `spawn_triggerLevelUpEvent(uiX, uiY)` |  |
 | spawn_scheduleNextBoss | method | `spawn_scheduleNextBoss(extraDelay = 0)` |  |
 | spawn_checkBossRoundFor | method | `spawn_checkBossRoundFor(round)` |  |

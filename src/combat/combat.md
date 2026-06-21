@@ -1,5 +1,9 @@
 # 战斗系统规范 (Combat System Architecture)
 
+## 0.3 Combat Arena Bounds (2026-06-21)
+
+Projectile and laser wall logic must use `game.sys_getCombatBounds()` for the left and right walls. The canvas may include decorative side bands that are outside the playable combat arena. Enemy movement, projectile bounce, laser reflection, and aim-guide prediction should all treat `combatGridLeftX` and `combatGridRightX` as the side walls, not `0` and `game.width`.
+
 ## 0. Battle Relic Cinematic Timing (2026-06-18)
 
 `relic_runRoundStartHooks()` returns the number of milliseconds needed for round-start relic animations. `phase_finalizeRound()` calls it after `round++`; when the return value is greater than 0, Boss spawning, reward resolving, and the next round banner are delayed until `phase_continueFinalizeRoundAfterRelicHooks()` runs.
@@ -18,7 +22,7 @@ New combat relic animations must read `CONFIG.performance.relicCinematicDelayMs`
 
 - Defense outcomes: `屏障` when a deflection ward absorbs damage, `护盾` when shield charges are actually spent.
 - Damage outcomes: `暴击` for focused-fire crits.
-- Counter outcomes: `克制` / `有效` by reading `COUNTER_MAP` from `src/rune_config.js`; this is explanatory only and does not change damage math or rune drop weights.
+- Hit feedback no longer reads a global counter table. `combat_getHitFeedbackLabel()` only emits direct event labels such as shield, barrier, crit, bounce, pierce, and Boss vulnerability progress.
 - Projectile outcomes: fallback labels for `弹射` and `穿透` when no higher-priority label applies.
 - Boss vulnerability outcomes: `破绽+` when the current hit advances the Boss vulnerability meter, `破绽` when the meter breaks, and `易伤` while the exposed-hit window is being consumed.
 

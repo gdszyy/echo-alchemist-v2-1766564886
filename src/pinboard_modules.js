@@ -22,8 +22,9 @@
 import { CONFIG } from './config.js';
 import { Peg, SpecialSlot } from './entities.js';
 
-// 与 game_phase.phase_gathering_getRandomPegType 保持一致：laser / lightning 不生成钉子。
-const RANDOMIZABLE_PEG_TYPES = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'wind'];
+// 与 game_phase.phase_gathering_getRandomPegType 保持一致：
+// 初始随机属性钉只保留纯净弹珠属性；wind 是变异属性，不参与初始化随机刷新。
+const RANDOMIZABLE_PEG_TYPES = ['bounce', 'damage'];
 
 const PEG_RADIUS = CONFIG.physics.pegRadius || 4;
 const MARBLE_RADIUS = CONFIG.physics.marbleRadius || 5.8;

@@ -10,7 +10,7 @@ import {
 } from './entities.js';
 import { loot_calcRuneDrop } from './loot_system.js';
 import { calcRuneBaseStats } from './rune_system.js';
-import { COUNTER_MAP, RUNE_DB } from './rune_config.js';
+import { RUNE_DB } from './rune_config.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
@@ -322,7 +322,7 @@ export const combat_system = {
                 const spawnY = Math.max(30, target.pos.y - 80);
                 const swordConfig = {
                     damage: swordDmg,
-                    pyro: 0, cryo: 0, lightning: 0, wind: 0,
+                    pyro: 0, cryo: 0, lightning: 0, overcharge: 0, wind: 0,
                     multicast: 0,
                     type: 'flying_sword'
                 };
@@ -1671,63 +1671,6 @@ export const combat_system = {
             return { text: '暴击', color: '#ff4444', size: 16 };
         }
 
-        const affixTags = new Set(Array.isArray(enemy.affixes) ? enemy.affixes : []);
-        const aliasMap = {
-            deflectionWard: ['shield'],
-            heavyArmor: ['shield'],
-            bastion: ['shield'],
-            hive: ['clone'],
-            echoRelay: ['healer', 'clone'],
-            maw: ['devour'],
-            devourer: ['devour'],
-            splitter: ['clone']
-        };
-        const rawTags = [
-            enemy.archetype,
-            enemy.baseShape,
-            enemy.assetKey,
-            enemy.bossType,
-            enemy.v2Affix
-        ];
-        for (const tag of rawTags) {
-            if (!tag) continue;
-            affixTags.add(tag);
-            const aliases = aliasMap[tag];
-            if (aliases) aliases.forEach(alias => affixTags.add(alias));
-        }
-        for (const tag of [...affixTags]) {
-            const aliases = aliasMap[tag];
-            if (aliases) aliases.forEach(alias => affixTags.add(alias));
-        }
-
-        const attrs = [];
-        const addAttr = (attr, value = 0) => {
-            if (!COUNTER_MAP[attr]) return;
-            const strength = Number(value) || 0;
-            if (strength <= 0) return;
-            attrs.push({ attr, strength });
-        };
-        addAttr('pyro', config.pyro);
-        addAttr('cryo', config.cryo);
-        addAttr('lightning', config.lightning);
-        addAttr('venom', config.venom);
-        addAttr('overcharge', config.overcharge);
-        addAttr('echo', config.echo);
-        addAttr('scatter', (config.scatter || 0) + (config.isScatterChild ? 1 : 0));
-        addAttr('laser', (config.laser || 0) + (config.isLaser || config.type === 'laser' ? 1 : 0));
-        addAttr('bounce', context.isBounceHit ? Math.max(1, config.bounce || 0) : 0);
-        addAttr('pierce', context.isPierceHit ? Math.max(1, config.pierce || 0) : 0);
-        attrs.sort((a, b) => b.strength - a.strength);
-
-        let bestWeight = 0;
-        for (const { attr } of attrs) {
-            const counter = COUNTER_MAP[attr];
-            for (const tag of affixTags) {
-                bestWeight = Math.max(bestWeight, counter[tag] || 0);
-            }
-        }
-        if (bestWeight >= 0.8) return { text: '克制', color: '#22c55e', size: 15 };
-        if (bestWeight >= 0.4) return { text: '有效', color: '#a3e635', size: 14 };
         if (context.isBounceHit) return { text: '弹射', color: '#fbbf24', size: 13 };
         if (context.isPierceHit) return { text: '穿透', color: '#fca5a5', size: 13 };
         return null;
@@ -1844,7 +1787,7 @@ export const combat_system = {
         // 共鸣提供的基础冰霜属性加成（叠加到实际 cryo 层数上）
         const cryoBonus = cryoResParams ? (cryoResParams.baseCryoBonus || 0) : 0;
         const effectiveCryo = config.cryo + cryoBonus;
-        // @section:damage_element_bonus - 属性加成与克制倍率计算
+        // @section:damage_element_bonus - 属性加成与共鸣倍率计算
         // 共鸣整体冰霜伤害倍率：1.0/1.2/1.5
         const cryoResMult = cryoResParams ? (cryoResParams.cryoMultiplier || 1.0) : 1.0;
         // 三阶共鸣：冻结状态下物理伤害加深
@@ -2142,6 +2085,7 @@ export const combat_system = {
                         pyro: config.pyro || 0,
                         cryo: config.cryo || 0,
                         lightning: config.lightning || 0,
+                        overcharge: config.overcharge || 0,
                         wind: 0,
                         multicast: 0,
                         type: 'flying_sword'
@@ -2926,7 +2870,7 @@ export const combat_system = {
         if (this.ownedRelics && this.ownedRelics.includes('attribute_protocol')) {
             // 统计 ammoQueue 中所有属性种类合集
             const queueKinds = new Set();
-            const ATTR_KEYS = ['cryo','pyro','lightning','laser','wind','bounce','pierce','scatter','flying_sword'];
+            const ATTR_KEYS = ['cryo','pyro','lightning','laser','overcharge','wind','bounce','pierce','scatter','flying_sword'];
             for (const r of (this.ammoQueue || [])) {
                 for (const k of ATTR_KEYS) if (r && r[k] && r[k] > 0) queueKinds.add(k);
             }

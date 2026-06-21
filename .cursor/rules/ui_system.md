@@ -99,6 +99,7 @@ for (const subsystem of _subsystems) {
 | 2026-06-18 | `index.html`, `src/ui_system.js` | **交互可解释性增强**：替换子弹卡片必须支持焦点态、Enter/Space 选择与 `aria-pressed`；确认按钮禁用时必须通过提示条/标题说明阻塞原因；运行态护盾等生存资源必须在顶栏可见，避免只依赖 Toast 记忆。 |
 | 2026-06-18 | `src/utils/ammo_readability.js`, `src/render_system.js`, `src/game_phase.js`, `src/ui/hud.js`, `src/ui_system.js`, `index.html` | **下一发弹药可读性增强**：新增统一弹药读数工具，战斗 HUD 与 Canvas 发射器共用弹药构成、伤害数字、散射弹数、连射次数与主属性摘要；发射器绘制层以扇形预览展示散射，以数字徽标展示伤害，以能量条展示连射，不改变伤害公式。 |
 | 2026-06-19 | `index.html`, `src/ui/shop.js`, `.cursor/rules/ui_system.md` | **测试遗物库移动端布局修复**：`ui_showRelicSelection({ showAllRelics: true })` 必须进入 `relic-debug-picker` 专用布局，使用紧凑纵向列表 + 预览面板 + 返回商店按钮；普通遗物选择仍保持三选一横向卡片语法。 |
+| 2026-06-21 | `index.html`, `src/ui_system.js`, `.cursor/rules/ui_system.md` | **战斗主界面 P0 布局落地**：`combat-status-panel` 迁入 `#unified-top-bar` 中心区，作为顶部战斗 HUD 的紧凑态势胶囊，不再独立占用第二条顶部空间；`#phase-combat` 新增左右沉浸装饰带和 `.combat-safe-frame` 战斗判定区边框；战斗阶段进入时会移除 `#module-editor-entry-layer`，避免「编辑钉板」入口残留在右上角。业务层不直接操作 DOM，仍由 UI 层读取 Game 状态并刷新视图。 |
 | 2026-04-17 | `index.html`, `src/game_system.js` | 游戏容器宽高未同时适配屏幕宽度和高度：原 `height: 100dvh` 在竞屏手机上会超出屏幕宽度；`sys_resize` 中 `container.style.height = window.innerHeight` 会覆盖 CSS 高度计算。 | **完整等比缩放方案**：1. `#app-wrapper` 的 `align-items` 改为 `center`（防止 stretch 拉伸 game-container）；2. `#pc-left/right-sidebar` 加 `align-self: stretch`（PC 侧边栏仍填满高度）；3. `#game-container` 宽度改为 `min(100vw, calc(100dvh*9/16), 480px)`，移除 `height` 和 `min-width`，改用 `aspect-ratio: 9/16` + `max-height: 100dvh` 实现宽高双向等比缩放；4. `sys_resize()` 移除 `container.style.height` 覆盖，改用 `getBoundingClientRect()` 读取实际尺寸。 |
 
 ### 5.x 2026-06-18 新属性 UI 显示兜底记录
@@ -320,3 +321,14 @@ for (const subsystem of _subsystems) {
 - The marble preview panel owns the in-run rune fusion entry. It renders three slots per marble and uses `ui_fuseRuneIntoMarble()` to consume a rune immediately.
 - Fused runes are stored on the marble as `runeSlots`; do not write them directly into `marble.collected` from UI code.
 - Once a selected marble has fused rune slots, selection toggling must keep it locked for the current charge sequence to prevent accidental rune loss.
+
+## 2026-06-21 Combat HUD Stack Fix
+
+- `#combat-status-panel` is now a compact left-side numeric strip inside `#unified-top-bar`; it must not share the centered lane with `#combat-rune-charge-ui`.
+- Combat status copy must not surface pressure-line / defense-line wording. Keep this panel focused on enemy, elite, Boss, shield, and ammo counts.
+- `src/game_phase.js` no longer draws the red defense-line art layer. `defeatLineY` remains gameplay state for lose checks only.
+- `sys_resize()` should reserve only the unified top bar for `combatGridTopY`, because the status strip no longer occupies a second top row.
+- Follow-up: the combat top bar is a three-column grid: left status, center rune charge, right round/settings. Do not place floating labels, shop countdown docks, or stretched 9-slice combat frames over the first viewport.
+- Phase switching must restore `#unified-top-bar` with `display: grid`, never `display: flex`, or the three lanes collapse on narrow combat views.
+- Combat recipe HUD cards must stay narrow, left-aligned, and clear of the bottom launcher/core interaction area.
+- Gathering uses `#unified-top-bar.is-gathering`: keep it compact, keep the run-shop schedule in `.run-shop-status-dock.is-gathering-top`, and do not let the merchant/status strip drop into the first peg rows.

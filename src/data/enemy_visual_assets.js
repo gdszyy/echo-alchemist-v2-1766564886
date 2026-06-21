@@ -49,22 +49,22 @@ const _DEFAULT_DIRS = {
 };
 
 const _DEFAULT_COMPOSITES = {
-    'residue:1x1:':                     'enemy_residue_1x1_idle',
+    'residue:1x1:':                     'enemy_residue_1x1_native_hollow_idle',
     'bastion:3x1:heavyArmor':           'enemy_bastion_heavyarmor_3x1_idle',
-    'maw:2x2:devour':                   'enemy_maw_devour_2x2_idle',
-    'siege:3x2:siege':                  'enemy_siege_siege_3x2_idle',
+    'maw:2x2:devour':                   'enemy_maw_devour_2x2_native_hollow_idle',
+    'siege:3x2:siege':                  'enemy_siege_siege_3x2_native_hollow_idle',
     'echoSpire:1x2:echoRelay':          'enemy_spire_echorelay_1x2_idle',
     'deflector:2x1:deflectionWard':     'enemy_ward_deflection_2x1_idle',
 };
 
 const _DEFAULT_ARCHETYPE_FILES = {
     bastion:     'enemy_bastion_3x1',
-    maw:         'enemy_maw_2x2',
+    maw:         'enemy_maw_2x2_native_hollow',
     deflector:   'enemy_deflector_2x1',
     echoSpire:   'enemy_echo_spire_1x2',
     prism:       'enemy_prism_1x3',
-    hive:        'enemy_hive_2x3',
-    siege:       'enemy_siege_3x2',
+    hive:        'enemy_hive_2x3_native_hollow',
+    siege:       'enemy_siege_3x2_native_hollow',
     gravityWell: 'enemy_gravity_core_3x3',
 };
 
@@ -108,9 +108,9 @@ const _DEFAULT_FRAMES = {
     'deflector:2x1': { spritePath: 'assets/sprites/enemies/frames/frame_deflector_2x1.png', shape: 'polygon' },
     'echoSpire:1x2': { spritePath: 'assets/sprites/enemies/frames/frame_echo_spire_1x2.png', shape: 'polygon' },
     'prism:1x3':     { spritePath: 'assets/sprites/enemies/frames/frame_prism_1x3.png', shape: 'polygon' },
-    'hive:2x3':      { spritePath: 'assets/sprites/enemies/frames/frame_hive_2x3.png', shape: 'polygon' },
-    'siege:3x2':     { spritePath: 'assets/sprites/enemies/frames/frame_siege_3x2.png', shape: 'aabb' },
-    'gravityWell:3x3': { spritePath: 'assets/sprites/enemies/frames/frame_gravity_core_3x3.png', shape: 'polygon' },
+    'hive:2x3':      { spritePath: 'assets/sprites/enemies/frames/frame_hive_2x3.png', shape: 'aabb' },
+    'siege:3x2':     { spritePath: 'assets/sprites/enemies/frames/frame_siege_3x2.png', shape: 'polygon' },
+    'gravityWell:3x3': { spritePath: 'assets/sprites/enemies/frames/frame_gravity_core_3x3.png', shape: 'arc' },
 };
 
 /**

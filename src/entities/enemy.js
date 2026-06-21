@@ -53,8 +53,11 @@ function _getAffixOverlayImage(src) {
     if (cached) return cached;
 
     const img = new Image();
-    const record = { img, ready: false, failed: false };
-    img.onload = () => { record.ready = true; };
+    const record = { img, ready: false, failed: false, sourceRect: null };
+    img.onload = () => {
+        record.sourceRect = _measureImageAlphaBounds(img);
+        record.ready = true;
+    };
     img.onerror = () => { record.failed = true; };
     img.src = src;
     _affixOverlayImageCache.set(src, record);
@@ -64,6 +67,105 @@ function _getAffixOverlayImage(src) {
 function _getEnemyFrameImage(src) {
     return _getAffixOverlayImage(src);
 }
+
+function _measureImageAlphaBounds(img) {
+    const width = img.naturalWidth || img.width || 0;
+    const height = img.naturalHeight || img.height || 0;
+    if (!width || !height || typeof document === 'undefined') return null;
+
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const c = canvas.getContext('2d', { willReadFrequently: true });
+        if (!c) return null;
+        c.drawImage(img, 0, 0);
+        const data = c.getImageData(0, 0, width, height).data;
+        let minX = width, minY = height, maxX = -1, maxY = -1;
+        for (let y = 0; y < height; y++) {
+            const row = y * width * 4;
+            for (let x = 0; x < width; x++) {
+                if (data[row + x * 4 + 3] <= 8) continue;
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+        if (maxX < minX || maxY < minY) return null;
+        const pad = 1;
+        minX = Math.max(0, minX - pad);
+        minY = Math.max(0, minY - pad);
+        maxX = Math.min(width - 1, maxX + pad);
+        maxY = Math.min(height - 1, maxY + pad);
+        return {
+            x: minX,
+            y: minY,
+            w: maxX - minX + 1,
+            h: maxY - minY + 1,
+        };
+    } catch (err) {
+        return null;
+    }
+}
+
+function _hexToRgba(hex, alpha) {
+    if (typeof hex !== 'string' || !hex.startsWith('#')) return `rgba(148, 163, 184, ${alpha})`;
+    const raw = hex.slice(1);
+    const full = raw.length === 3
+        ? raw.split('').map(ch => ch + ch).join('')
+        : raw;
+    if (full.length !== 6) return `rgba(148, 163, 184, ${alpha})`;
+    const num = Number.parseInt(full, 16);
+    if (Number.isNaN(num)) return `rgba(148, 163, 184, ${alpha})`;
+    const r = (num >> 16) & 255;
+    const g = (num >> 8) & 255;
+    const b = num & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+const MINION_COLLISION_FRAME_ASSETS = {
+    ignis: {
+        key: 'minion:ignis:1x1',
+        path: 'assets/sprites/enemies/frames/frame_minion_ignis_1x1.png',
+        shape: 'polygon',
+    },
+    glacies: {
+        key: 'minion:glacies:1x1',
+        path: 'assets/sprites/enemies/frames/frame_minion_glacies_1x1.png',
+        shape: 'polygon',
+    },
+    mikro: {
+        key: 'minion:mikro:1x1',
+        path: 'assets/sprites/enemies/frames/frame_minion_mikro_1x1.png',
+        shape: 'polygon',
+    },
+    devourer: {
+        key: 'minion:devourer:1x1',
+        path: 'assets/sprites/enemies/frames/frame_minion_devourer_1x1.png',
+        shape: 'polygon',
+    },
+    viridis: {
+        key: 'minion:viridis:1x1',
+        path: 'assets/sprites/enemies/frames/frame_minion_viridis_1x1.png',
+        shape: 'polygon',
+    },
+    tesla: {
+        key: 'minion:tesla:1x1',
+        path: 'assets/sprites/enemies/frames/frame_minion_tesla_1x1.png',
+        shape: 'polygon',
+    },
+    chimera: {
+        key: 'minion:chimera:1x1',
+        path: 'assets/sprites/enemies/frames/frame_minion_chimera_1x1.png',
+        shape: 'polygon',
+    },
+    ouroboros: {
+        key: 'minion:ouroboros:1x1',
+        path: 'assets/sprites/enemies/frames/frame_minion_ouroboros_1x1.png',
+        shape: 'polygon',
+    },
+};
 
 // ==================== 敌人底层纹理缓存 ====================
 // @perf-impact: _initTexture 同步创建 OffscreenCanvas，批量刷怪时密集分配引发进场卡顿。
@@ -210,6 +312,7 @@ class Enemy {
         // bossType 在构造时可能尚未赋值，由 spawn_system.js 调用 initSprite() 完成
         this._spriteRenderer = null;
         this._spriteLastMs = 0; // 上次 update 的时间戳（ms）
+        this._spriteVisualKey = '';
         this._visualAssetKey = '';
         this._visualFrameKey = '';
         this._visualFramePath = '';
@@ -223,8 +326,19 @@ class Enemy {
      */
     initSprite() {
         this._syncAffixOverlayImages();
-        // [V2 资源协议] 传入完整 enemy 信息（footprint + affixSet）让 createSpriteRenderer
-        // 优先解析 composite 资源，缺失时回退到基底 Sprite / 矢量绘制，敌人不会消失。
+        this._syncCollisionFrameImage();
+        const resolved = resolveEnemyVisualAsset({
+            type: this.type,
+            bossType: this.bossType,
+            baseArchetype: this.baseArchetype,
+            gridCols: this.gridCols || 1,
+            gridRows: this.gridRows || 1,
+            affixes: this.affixes || [],
+        });
+        const spriteKey = `${this.type || 'normal'}|${this.bossType || ''}|${resolved?.assetKey || ''}`;
+        if (this._spriteRenderer && this._spriteVisualKey === spriteKey) return;
+
+        this._spriteVisualKey = spriteKey;
         this._spriteRenderer = createSpriteRenderer({
             type: this.type,
             bossType: this.bossType,
@@ -235,7 +349,9 @@ class Enemy {
         });
         if (this._spriteRenderer) {
             this._spriteRenderer.play('idle');
-            this._spriteLastMs = performance.now();
+            this._spriteLastMs = (typeof performance !== 'undefined' && performance.now)
+                ? performance.now()
+                : Date.now();
         }
     }
     
@@ -1521,6 +1637,10 @@ class Enemy {
         const h = this.height - 4; 
         // @section:draw_shadow_and_base - 软阴影与敌人基础形体绘制
         const r = 6;
+        this.initSprite();
+        const collisionFrameCandidate = this.type !== 'boss'
+            && this._collisionFrameImage
+            && this._collisionFrameImage.path;
 
         // === Layer 1: 容器裁剪 ===
         // 根据 collisionShape 选择裁剪路径：polygon 用多边形，arc 用环形，其余用 roundRect
@@ -1554,6 +1674,8 @@ class Enemy {
                 ctx.arc(0, 0, innerR, ea, sa, true);
                 ctx.closePath();
             }
+        } else if (collisionFrameCandidate && this.collisionShape === 'aabb') {
+            ctx.rect(-w/2, -h/2, w, h);
         } else {
             ctx.roundRect(-w/2, -h/2, w, h, r);
         }
@@ -1576,17 +1698,19 @@ class Enemy {
         // 由于 ctx.clip() 之后描边会被裁剪一半，这里预先绘制可保留完整外缘。
         // [柔化] 外缘轮廓改为更柔的辉光：降低描边 alpha，让轮廓融入背景而不是
         // 像贴上去的环。shadowBlur 略增以补偿亮度损失，整体感觉更"渗出"而非"切边"。
-        ctx.save();
-        ctx.shadowColor = (this.type === 'boss') ? 'rgba(239, 68, 68, 0.55)'
-                         : (this.type === 'elite') ? 'rgba(168, 85, 247, 0.50)'
-                         : 'rgba(148, 163, 184, 0.32)';
-        ctx.shadowBlur = _sb((this.type === 'boss') ? 22 : (this.type === 'elite') ? 16 : 9);
-        ctx.strokeStyle = (this.type === 'boss') ? 'rgba(239, 68, 68, 0.55)'
-                         : (this.type === 'elite') ? 'rgba(196, 152, 255, 0.50)'
-                         : 'rgba(203, 213, 225, 0.42)';
-        ctx.lineWidth = (this.type === 'boss') ? 2.5 : 1.6;
-        ctx.stroke();
-        ctx.restore();
+        if (!collisionFrameCandidate) {
+            ctx.save();
+            ctx.shadowColor = (this.type === 'boss') ? 'rgba(239, 68, 68, 0.55)'
+                             : (this.type === 'elite') ? 'rgba(168, 85, 247, 0.50)'
+                             : 'rgba(148, 163, 184, 0.32)';
+            ctx.shadowBlur = _sb((this.type === 'boss') ? 22 : (this.type === 'elite') ? 16 : 9);
+            ctx.strokeStyle = (this.type === 'boss') ? 'rgba(239, 68, 68, 0.55)'
+                             : (this.type === 'elite') ? 'rgba(196, 152, 255, 0.50)'
+                             : 'rgba(203, 213, 225, 0.42)';
+            ctx.lineWidth = (this.type === 'boss') ? 2.5 : 1.6;
+            ctx.stroke();
+            ctx.restore();
+        }
         ctx.clip();
 
          // === Layer 1.5: 底层纹理 (预计算 OffscreenCanvas) ===
@@ -1660,7 +1784,7 @@ class Enemy {
         if (whiteRatio > hpRatio) {
             const damageTrailHeight = Math.max(0, fillY - whiteY);
             ctx.fillStyle = CONFIG.enemyRender.delayedDamageTrailColor || '#fca5a5';
-            ctx.globalAlpha = CONFIG.enemyRender.delayedDamageTrailAlpha ?? 0.18;
+            ctx.globalAlpha = Math.max(CONFIG.enemyRender.delayedDamageTrailAlpha ?? 0.18, 0.34);
             ctx.fillRect(-w/2, whiteY, w, damageTrailHeight);
             ctx.globalAlpha = 1.0;
         }
@@ -1701,7 +1825,7 @@ class Enemy {
             _hpGrad.addColorStop(0, _hpHighlight);
             _hpGrad.addColorStop(0.18, _hpBody);
             _hpGrad.addColorStop(1, _hpShadow);
-            ctx.globalAlpha = 0.46;
+            ctx.globalAlpha = 0.68;
             ctx.fillStyle = _hpGrad;
             ctx.fillRect(-w/2, fillY, w, fillHeight);
 
@@ -2511,6 +2635,8 @@ class Enemy {
             // [V2 资源协议] 大型基底（cols 或 rows >= 2）需用整个占格作为绘制区，
             // 避免 min(w,h) 把 3×1 装甲横梁压成中央小方块；小型敌人保留原行为。
             const isLargeV2 = !!this.baseArchetype && ((this.gridCols || 1) > 1 || (this.gridRows || 1) > 1);
+            ctx.save();
+            this._clipSpriteForHpWindows(ctx, w, h);
             if (isLargeV2) {
                 const padX = 6, padY = 6;
                 this._spriteRenderer.draw(ctx, -w/2 + padX, -h/2 + padY, w - padX*2, h - padY*2, 0.92);
@@ -2518,8 +2644,10 @@ class Enemy {
                 const sprSize1 = Math.min(w, h);
                 this._spriteRenderer.draw(ctx, -sprSize1/2, h/2 - sprSize1, sprSize1, sprSize1, 0.85);
             }
+            ctx.restore();
         }
         this._drawAffixBitmapOverlays(ctx, w, h);
+        this._drawHpReadabilityOverlay(ctx, w, h, hpRatio, whiteRatio, greenRatio, baseColor);
         // === Layer 4: 裂纹绘制 (Fissures) - [保持不变] ===
 
         // **过热 Stage 3**
@@ -2635,7 +2763,7 @@ class Enemy {
         // === Layer 5: 内部边框 ===
         // === 边框分级样式（Border Tier）：根据词条数量 + Boss 类型决定边框颜色/线宽 ===
         // @perf-impact: 仅替换 strokeStyle/lineWidth，无额外 Canvas 操作，性能影响极低
-        if (!boundaryFrameDrawn) {
+        if (!boundaryFrameDrawn && !collisionFrameCandidate) {
         ctx.strokeStyle = '#334155'; ctx.lineWidth = 2; // 默认：0 词条（无特殊边框）
         if (this.type === 'boss') { ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 4; } // Boss 保持红色基础边框
         if (this.type === 'elite' || this.type === 'boss') {
@@ -5854,6 +5982,31 @@ class Enemy {
         return TINTS[sorted] || TINTS[this.affixes[0]] || null;
     }
 
+    _resolveMinionCollisionFrameAsset() {
+        if (this.type === 'boss' || this.baseArchetype || this.collisionShape !== 'polygon') return null;
+        const verts = this.collisionData && this.collisionData.vertices;
+        if (!verts || verts.length < 3) return null;
+
+        let id = null;
+        if (verts.length === 3) {
+            id = 'ignis';
+        } else if (verts.length === 4) {
+            const v0 = verts[0], v1 = verts[1];
+            id = Math.abs((v0.y || 0) - (v1.y || 0)) < this.height * 0.08 ? 'tesla' : 'glacies';
+        } else if (verts.length === 5) {
+            const v2 = verts[2];
+            id = (v2 && v2.y < -this.height * 0.08) ? 'devourer' : 'chimera';
+        } else if (verts.length === 6) {
+            id = 'mikro';
+        } else if (verts.length === 7) {
+            id = 'viridis';
+        } else if (verts.length === 8) {
+            id = 'ouroboros';
+        }
+
+        return id ? MINION_COLLISION_FRAME_ASSETS[id] : null;
+    }
+
     _syncCollisionFrameImage() {
         const resolved = resolveEnemyVisualAsset({
             type: this.type,
@@ -5863,18 +6016,130 @@ class Enemy {
             gridRows: this.gridRows || 1,
             affixes: this.affixes || [],
         });
-        if (!resolved) return;
-        const framePath = resolved.framePath || '';
-        if (resolved.frameKey === this._visualFrameKey && framePath === this._visualFramePath) return;
+        const minionFrame = this._resolveMinionCollisionFrameAsset();
+        const frameKey = minionFrame ? minionFrame.key : (resolved && resolved.frameKey);
+        const framePath = minionFrame ? minionFrame.path : (resolved && resolved.framePath) || '';
+        const frameShape = minionFrame ? minionFrame.shape : (resolved && resolved.frameShape);
+        if (!resolved && !minionFrame) return;
+        if (frameKey === this._visualFrameKey && framePath === this._visualFramePath) return;
 
-        this._visualFrameKey = resolved.frameKey || null;
+        this._visualFrameKey = frameKey || null;
         this._visualFramePath = framePath;
-        this._collisionFrameImage = resolved.framePath ? {
-            key: resolved.frameKey,
-            path: resolved.framePath,
-            shape: resolved.frameShape,
-            image: _getEnemyFrameImage(resolved.framePath),
+        this._collisionFrameImage = framePath ? {
+            key: frameKey,
+            path: framePath,
+            shape: frameShape,
+            image: _getEnemyFrameImage(framePath),
         } : null;
+    }
+
+    _clipSpriteForHpWindows(ctx, w, h) {
+        if (this.type === 'boss') return;
+        const cols = this.gridCols || 1;
+        const rows = this.gridRows || 1;
+        const cells = cols * rows;
+        const archetype = this.baseArchetype || (cols === 1 && rows === 1 ? 'residue' : '');
+        const needsWindow = cells > 1 || archetype === 'residue' || this.type === 'elite';
+        if (!needsWindow || w < 24 || h < 24) return;
+
+        // @perf-impact: Sprite 镂空只增加少量 clip 路径，不新增粒子、渐变、shadowBlur 或混合模式。
+        // 镂空区域让底层运行时 HP 液体透出，避免大面积主体位图遮住掉血反馈。
+        ctx.beginPath();
+        ctx.rect(-w / 2, -h / 2, w, h);
+        const rr = Math.max(2, Math.min(7, Math.min(w, h) * 0.08));
+        if (w > h * 1.45) {
+            const slotH = Math.max(5, h * 0.20);
+            ctx.roundRect(-w * 0.34, h * 0.12, w * 0.68, slotH, rr);
+            if (w > 90) {
+                ctx.roundRect(-w * 0.48, -h * 0.02, w * 0.14, slotH * 0.86, rr);
+                ctx.roundRect(w * 0.34, -h * 0.02, w * 0.14, slotH * 0.86, rr);
+            }
+        } else if (h > w * 1.45) {
+            const slotW = Math.max(7, w * 0.22);
+            const slotH = Math.max(10, h * 0.22);
+            ctx.roundRect(-slotW / 2, h * 0.18, slotW, slotH, rr);
+            ctx.roundRect(-w * 0.30, -h * 0.04, w * 0.18, slotH * 0.86, rr);
+            ctx.roundRect(w * 0.12, -h * 0.04, w * 0.18, slotH * 0.86, rr);
+        } else if (archetype === 'maw') {
+            const slotW = Math.max(8, w * 0.18);
+            const slotH = Math.max(8, h * 0.22);
+            ctx.roundRect(-w * 0.38, h * 0.14, slotW, slotH, rr);
+            ctx.roundRect(w * 0.20, h * 0.14, slotW, slotH, rr);
+        } else {
+            const slotW = Math.max(8, w * 0.24);
+            const slotH = Math.max(7, h * 0.18);
+            ctx.roundRect(-w * 0.36, h * 0.16, slotW, slotH, rr);
+            ctx.roundRect(w * 0.12, h * 0.16, slotW, slotH, rr);
+        }
+
+        try {
+            ctx.clip('evenodd');
+        } catch (err) {
+            ctx.clip();
+        }
+    }
+
+    _drawHpReadabilityOverlay(ctx, w, h, hpRatio, whiteRatio, greenRatio, baseColor) {
+        if (!(this.maxHp > 0) || h < 18 || w < 18) return;
+        const hp = Math.max(0, Math.min(1, hpRatio));
+        const delayed = Math.max(0, Math.min(1, whiteRatio));
+        const healing = Math.max(0, Math.min(1, greenRatio));
+        const fillHeight = h * hp;
+        const fillY = h / 2 - fillHeight;
+        const cols = this.gridCols || 1;
+        const rows = this.gridRows || 1;
+        const isLargeOrSprite = cols * rows > 1 || !!this.baseArchetype || this.type === 'elite';
+
+        // @perf-impact: 前景 HP 视窗只使用 fillRect/strokeRect/短线，low 档完整保留语义可读性。
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+
+        if (fillHeight > 0.5) {
+            const bodyAlpha = hp < 0.995
+                ? (isLargeOrSprite ? 0.26 : 0.20)
+                : (isLargeOrSprite ? 0.13 : 0.09);
+            ctx.fillStyle = _hexToRgba(baseColor, bodyAlpha);
+            ctx.fillRect(-w / 2, fillY, w, fillHeight);
+        }
+
+        if (hp > 0 && hp < 0.995) {
+            const y = Math.max(-h / 2 + 1, Math.min(h / 2 - 1, fillY));
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+            ctx.fillRect(-w / 2 + 2, y, w - 4, 1.5);
+            ctx.fillStyle = _hexToRgba(baseColor, 0.88);
+            ctx.fillRect(-w / 2 + 2, y + 2, w - 4, 1);
+        }
+
+        const gaugeW = Math.max(3, Math.min(8, Math.min(w, h) * 0.075));
+        const gx = -w / 2 + Math.max(3, gaugeW * 0.65);
+        const gy = -h / 2 + 4;
+        const gh = Math.max(1, h - 8);
+        const drawGaugeFill = (ratio, color) => {
+            const clamped = Math.max(0, Math.min(1, ratio));
+            if (clamped <= 0) return;
+            const fh = gh * clamped;
+            ctx.fillStyle = color;
+            ctx.fillRect(gx, gy + gh - fh, gaugeW, fh);
+        };
+
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.54)';
+        ctx.fillRect(gx, gy, gaugeW, gh);
+        if (delayed > hp) {
+            drawGaugeFill(delayed, 'rgba(252, 165, 165, 0.72)');
+        }
+        if (healing > hp) {
+            drawGaugeFill(healing, 'rgba(74, 222, 128, 0.72)');
+        }
+        drawGaugeFill(hp, _hexToRgba(baseColor, 0.92));
+        const gaugeSurfaceY = gy + gh - gh * hp;
+        if (hp > 0 && hp < 1) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+            ctx.fillRect(gx - 1, gaugeSurfaceY, gaugeW + 2, 1);
+        }
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.38)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(gx - 0.5, gy - 0.5, gaugeW + 1, gh + 1);
+        ctx.restore();
     }
 
     _drawCollisionFrameBitmap(ctx, w, h) {
@@ -5893,7 +6158,16 @@ class Enemy {
         ctx.save();
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha *= quality === 'low' ? 0.84 : 0.96;
-        ctx.drawImage(frame.image.img, -w / 2, -h / 2, w, h);
+        const src = frame.image.sourceRect;
+        if (src) {
+            ctx.drawImage(
+                frame.image.img,
+                src.x, src.y, src.w, src.h,
+                -w / 2, -h / 2, w, h
+            );
+        } else {
+            ctx.drawImage(frame.image.img, -w / 2, -h / 2, w, h);
+        }
         ctx.restore();
         return true;
     }

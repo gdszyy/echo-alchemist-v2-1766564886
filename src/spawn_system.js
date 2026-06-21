@@ -479,7 +479,9 @@ export const spawn_system = {
 
         // 开始填充
         for (let c of freeCols) {
-            const centerX = c * w + w / 2;
+            const centerX = this.sys_getCombatColumnCenterX
+                ? this.sys_getCombatColumnCenterX(c)
+                : c * w + w / 2;
             
             // 基础生成判定
             let shouldSpawn = false;
@@ -540,7 +542,9 @@ export const spawn_system = {
         // 4. 最后实例化导演生成的精英 (Pending Spawns)
         // =========================================
         for (let cfg of pendingSpawns) {
-            const centerX = cfg.col * w + w / 2;
+            const centerX = this.sys_getCombatColumnCenterX
+                ? this.sys_getCombatColumnCenterX(cfg.col)
+                : cfg.col * w + w / 2;
             // 二次检查碰撞，虽然 occupiedCols 应该保证了位置
             if (!this.calc_isAreaOccupied(centerX, yPos, w * 0.8, this.enemyHeight * 0.8)) {
                 const e = new Enemy(centerX, yPos, w, this.enemyHeight, cfg.hp);
@@ -671,7 +675,9 @@ export const spawn_system = {
         const validCols = [];
         for(let r = 0; r < 3; r++) {
              for(let c = 0; c < CONFIG.gameplay.enemyCols; c++) {
-                 const tx = c * w + w/2;
+                 const tx = this.sys_getCombatColumnCenterX
+                     ? this.sys_getCombatColumnCenterX(c)
+                     : c * w + w/2;
                  const ty = this.combatGridTopY + r * this.enemyHeight;
                  if (!this.calc_isAreaOccupied(tx, ty, w * 0.9, this.enemyHeight * 0.9)) {
                      validCols.push({x: tx, y: ty});
@@ -1580,7 +1586,7 @@ export const spawn_system = {
      * @param {any} velocity - TODO: Describe this parameter.
      * @param {any} type - TODO: Describe this parameter.
      */
-    spawn_createHitFeedback(x, y, velocity, type = 'normal') {
+    spawn_createHitFeedback(x, y, velocity, type = 'normal', options = {}) {
         // 1. 获取目标坐标
         if (!this.uiCache) this.ui_updateUICache();
         
@@ -1605,20 +1611,43 @@ export const spawn_system = {
         
         let color = '#fbbf24'; 
         if (type === 'cryo') {
-            color = CONFIG.colors.cryo;
+            color = CONFIG.colors.matCryo;
         } else if (type == 'pyro') {
-            color = CONFIG.colors.pyro;
+            color = CONFIG.colors.matPyro;
         } else if (type == 'lightning') {
-            color = CONFIG.colors.lightning;
+            color = CONFIG.colors.matLightning;
         } else if (type == 'bounce') {
-            color = CONFIG.colors.bounce;
+            color = CONFIG.colors.matBounce;
         } else if (type == 'resonance') {
             color = CONFIG.colors.resonanceRipple;
 
         } else if (type == 'damage') {
-            color = CONFIG.colors.damage;
+            color = CONFIG.colors.matDamage;
+        } else if (type === 'pierce') {
+            color = CONFIG.colors.matPierce;
+        } else if (type === 'scatter') {
+            color = CONFIG.colors.matScatter;
+        } else if (type === 'pink') {
+            color = CONFIG.colors.pegPink;
         } 
         const initVel = velocity ? velocity : new Vec2((Math.random()-0.5)*5, -5);
+        const secondaryScale = options.secondary ? 0.72 : 1;
+        const isHighSignal = type !== 'normal' && type !== 'pink';
+        // @perf-impact: Peg-hit energy feedback remains an EnergyOrb but uses smaller source-over visuals.
+        // It preserves arrival callbacks and charge math while reducing collision-screen dominance.
+        const orbOptions = {
+            baseSize: (isHighSignal ? 1.55 : 1.28) * secondaryScale,
+            maxTrailLen: options.secondary ? 2 : (isHighSignal ? 4 : 3),
+            trailAlpha: options.secondary ? 0.07 : (isHighSignal ? 0.14 : 0.1),
+            haloAlpha: options.secondary ? 0.1 : (isHighSignal ? 0.18 : 0.13),
+            coreAlpha: options.secondary ? 0.68 : 0.78,
+            burstXMult: options.secondary ? 1.25 : 1.55,
+            burstYMult: options.secondary ? 0.28 : 0.36,
+            minSpeed: options.secondary ? 1.2 : 1.6,
+            hoverTime: options.secondary ? 9 : 12,
+            ...options,
+        };
+        delete orbOptions.secondary;
 
         this.energyOrbs.push(new EnergyOrb(x, y, targetX, targetY, color, initVel, () => {
             if(this.currentSession) { 
@@ -1669,7 +1698,7 @@ export const spawn_system = {
                 } 
             }
             this.phase_gathering_attemptComplete();
-        }));
+        }, orbOptions));
     },
 
 /**
@@ -1909,7 +1938,8 @@ export const spawn_system = {
 
         const bossW = this.enemyWidth * 3;                        // 实际宽度：3列宽（固定）
         const bossH = this.enemyHeight * 2;                        // 高度为 2 行（整数行，与网格对齐）
-        const centerX = this.width / 2;                            // 画布水平中心（更健壮，不依赖 enemyCols 为偶数）
+        const bossBounds = this.sys_getCombatBounds ? this.sys_getCombatBounds() : { left: 0, right: this.width };
+        const centerX = (bossBounds.left + bossBounds.right) / 2;  // Combat arena center.
         // spawnY 数学推导：
         //   combatGridTopY = 第一行中心 Y
         //   第一行上边界 = combatGridTopY - enemyHeight/2
@@ -2410,7 +2440,9 @@ export const spawn_system = {
 
             const widthPx = w * cols;
             const heightPx = this.enemyHeight * rows;
-            const centerX = (startCol + (cols - 1) / 2) * w + w / 2;
+            const centerX = this.sys_getCombatColumnCenterX
+                ? this.sys_getCombatColumnCenterX(startCol, cols)
+                : (startCol + (cols - 1) / 2) * w + w / 2;
             const centerY = yPos + (rows - 1) * this.enemyHeight / 2;
             if (this.calc_isAreaOccupied(centerX, centerY, widthPx * 0.85, heightPx * 0.85)) continue;
             return { startCol, cols, rows, centerX, centerY, widthPx, heightPx };
@@ -2569,7 +2601,9 @@ export const spawn_system = {
             const wPx = w * chosen.cols;
             const hPx = this.enemyHeight * chosen.rows;
             // 中心 X
-            const centerX = (sc + (chosen.cols - 1) / 2) * w + w / 2;
+            const centerX = this.sys_getCombatColumnCenterX
+                ? this.sys_getCombatColumnCenterX(sc, chosen.cols)
+                : (sc + (chosen.cols - 1) / 2) * w + w / 2;
             // 中心 Y：多行基底向下扩展，中心 = yPos + (rows-1)*enemyHeight/2
             const centerY = yPos + (chosen.rows - 1) * this.enemyHeight / 2;
 

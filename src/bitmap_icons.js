@@ -278,6 +278,27 @@ export const EMITTER_CHARGING_SRCS = [
 export const BG_MAIN_CANVAS_SRC   = versionBitmapSrc('assets/ui/backgrounds/bg_main_canvas.png');
 export const BG_EMITTER_ZONE_SRC  = versionBitmapSrc('assets/ui/backgrounds/bg_emitter_zone.png');
 
+// Combat UI HUD bitmaps. Keep launcher-specific emitter/orbital assets above so art
+// refreshes can preload the surrounding combat interface without touching the launcher.
+export const COMBAT_UI_BITMAP_SRCS = [
+    'assets/ui/panels/top_bar_9s.png',
+    'assets/ui/panels/bottom_panel_9s.png',
+    'assets/ui/sprites/skill_bar_panel_9s.png',
+    'assets/ui/sprites/skill_button_frame_9s.png',
+    'assets/ui/sprites/skill_cooldown_overlay.png',
+    'assets/ui/sprites/combat_rune_charge_frame_9s.png',
+    'assets/ui/sprites/combat_rune_charge_fill.png',
+    'assets/ui/sprites/multiplier_x2.png',
+    'assets/ui/sprites/multiplier_x3.png',
+    'assets/ui/sprites/multiplier_x5.png',
+    'assets/ui/banners/round_banner_1.png',
+    'assets/ui/banners/round_banner_2.png',
+    'assets/ui/banners/round_banner_3.png',
+    'assets/ui/banners/round_banner_4.png',
+    'assets/ui/banners/round_banner_5.png',
+    'assets/ui/banners/round_banner_6.png',
+].map(versionBitmapSrc);
+
 /**
  * 预热 UI 位图（在游戏启动早期调用，避免战斗首帧卡顿）。
  */
@@ -292,6 +313,7 @@ export function preloadUiBitmaps() {
         ...ORBITAL_INTAKE,
         BG_MAIN_CANVAS_SRC,
         BG_EMITTER_ZONE_SRC,
+        ...COMBAT_UI_BITMAP_SRCS,
     ];
     paths.forEach(p => getUiBitmap(p));
 }

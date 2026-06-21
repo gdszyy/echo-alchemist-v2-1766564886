@@ -1,17 +1,19 @@
 {
-  "frameSize": 1248,
-  "frameWidth": 1248,
-  "frameHeight": 1248,
+  "frameSize": 256,
+  "frameWidth": 256,
+  "frameHeight": 256,
   "placeholder": false,
   "single": true,
+  "generated": "imagegen_frontview_atlas_2026_06_21",
+  "sourceAtlas": "docs/screenshots/enemy-layer-debug-2026-06-21/enemy_frontview_atlas_generated.png",
+  "sourceCellLabel": "maw_composite",
   "animations": {
     "idle": {
       "row": 0,
       "frames": 1,
       "fps": 1,
-      "frameWidth": 1248,
-      "frameHeight": 1248
+      "frameWidth": 256,
+      "frameHeight": 256
     }
-  },
-  "_note": "Single-frame externally-generated artwork. To upgrade to a multi-frame sprite sheet, partition the PNG into rows/columns and add hit/move/cast entries with their own frameWidth/frameHeight."
+  }
 }

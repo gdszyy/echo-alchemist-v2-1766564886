@@ -42,6 +42,95 @@ function isFutureInitialAlphaFootprint(engine, x, y) {
     return Math.hypot(x - engine.width / 2, y - engine.height / 2) < radius;
 }
 
+function scoreTemperature(engine, cell) {
+    const temp = Number.isFinite(cell.temperature) ? cell.temperature : 0;
+    const min = engine.params.humanMinTemp ?? 7;
+    const max = engine.params.humanMaxTemp ?? 34;
+    const survivalMin = engine.params.humanSurvivalMinTemp ?? -50;
+    const survivalMax = engine.params.humanSurvivalMaxTemp ?? 50;
+    if (temp < survivalMin || temp > survivalMax) return null;
+
+    if (temp >= min && temp <= max) {
+        const mid = (min + max) / 2;
+        const halfRange = Math.max(1, (max - min) / 2);
+        return 0.75 + (1 - Math.abs(temp - mid) / halfRange) * 0.25;
+    }
+
+    const distance = temp < min ? min - temp : temp - max;
+    const buffer = temp < min ? min - survivalMin : survivalMax - max;
+    return Math.max(0, 1 - distance / Math.max(1, buffer)) * 0.7;
+}
+
+function collectHumanRespawnContext(engine, x, y) {
+    const crystalRadius = Math.max(1, Math.floor(engine.params.humanRespawnCrystalRadius ?? 4));
+    const tribeRadius = Math.max(1, Math.floor(engine.params.humanRespawnTribeRadius ?? 6));
+    let crystalRisk = 0;
+    let humanSupport = 0;
+
+    const radius = Math.max(crystalRadius, tribeRadius);
+    for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || nx >= engine.width || ny < 0 || ny >= engine.height) continue;
+            const distance = Math.hypot(dx, dy);
+            if (distance > radius) continue;
+            const cell = engine.grid[ny][nx];
+            if (!cell.exists) continue;
+
+            if (distance <= crystalRadius) {
+                const falloff = 1 - distance / (crystalRadius + 1);
+                if (cell.crystalState === CELL_TYPE.ALPHA) crystalRisk += 1.4 * falloff;
+                if (cell.crystalState === CELL_TYPE.BETA) crystalRisk += 0.35 * falloff;
+            }
+
+            if (distance > 0 && distance <= tribeRadius &&
+                cell.crystalState === CELL_TYPE.BIO &&
+                cell.bioAttributes?.speciesId === 0) {
+                const falloff = 1 - distance / (tribeRadius + 1);
+                humanSupport += Math.min(2, (cell.prosperity ?? 0) / 100) * falloff;
+            }
+        }
+    }
+
+    return { crystalRisk, humanSupport };
+}
+
+function scoreHumanRespawnCandidate(engine, cell) {
+    if (!cell.exists || cell.crystalState !== CELL_TYPE.EMPTY) return null;
+    if (isFutureInitialAlphaFootprint(engine, cell.x, cell.y)) return null;
+
+    const temperatureScore = scoreTemperature(engine, cell);
+    if (temperatureScore === null) return null;
+
+    const { crystalRisk, humanSupport } = collectHumanRespawnContext(engine, cell.x, cell.y);
+    const windSpeed = Math.hypot(cell.windX ?? 0, cell.windY ?? 0);
+    const stormPenalty = cell.hasThunderstorm ? 0.45 : 0;
+    const windPenalty = Math.min(0.25, windSpeed / Math.max(1, engine.params.windMaxSpeed ?? 1.6) * 0.25);
+    const verticalPenalty = Math.min(0.2, Math.abs(cell.verticalMotion ?? 0) / 80);
+    const weatherScore = Math.max(0, temperatureScore - stormPenalty - windPenalty - verticalPenalty);
+    const crystalScore = 1 / (1 + crystalRisk);
+    const tribeScore = Math.min(1, humanSupport / Math.max(1, engine.params.humanRespawnTribeSupportCap ?? 3));
+    const terrainScore = 1 / (1 + Math.max(0, cell.terrainMoveCost ?? 1) * 0.08 + Math.max(0, cell.terrainSlope ?? 0) * 0.4);
+
+    return {
+        x: cell.x,
+        y: cell.y,
+        score:
+            weatherScore * (engine.params.humanRespawnWeatherWeight ?? 55) +
+            crystalScore * (engine.params.humanRespawnCrystalWeight ?? 45) +
+            tribeScore * (engine.params.humanRespawnTribeWeight ?? 28) +
+            terrainScore * (engine.params.humanRespawnTerrainWeight ?? 8),
+        weatherScore,
+        crystalScore,
+        tribeScore,
+        terrainScore,
+        temperature: cell.temperature,
+        crystalRisk,
+        humanSupport,
+    };
+}
+
 function collectEmptyLandCandidates(engine, options = {}) {
     const safeDistance = options.safeDistance ?? 3;
     const preferNearAlpha = options.preferNearAlpha ?? false;
@@ -110,12 +199,38 @@ function placeBioCluster(engine, target, attrs, prosperity, settlementSize, opti
 /**
  * @type {{
  *   seedInitialBiosphere: (this: import('./engine.js').SimulationEngine) => void,
+ *   updateHumanRespawnPoint: (this: import('./engine.js').SimulationEngine) => Object|null,
  *   spawnBio: (this: import('./engine.js').SimulationEngine, prosperity: number, options?: Object) => boolean,
  *   spawnHuman: (this: import('./engine.js').SimulationEngine, prosperity: number, options?: Object) => boolean,
  *   spawnRandomSpecies: (this: import('./engine.js').SimulationEngine, options?: Object) => boolean,
  * }}
  */
 export const bio_spawn = {
+    /**
+     * Recompute the best current human respawn point from climate, crystal risk,
+     * nearby human settlements, and traversability. params.humanSpawnPoint stays
+     * as an explicit fixed override and is never mutated here.
+     * @returns {Object|null}
+     */
+    updateHumanRespawnPoint() {
+        if (this.params.initialHumanSpawn === false) {
+            this.humanRespawnPoint = null;
+            return null;
+        }
+
+        let best = null;
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                const candidate = scoreHumanRespawnCandidate(this, this.grid[y][x]);
+                if (!candidate) continue;
+                if (!best || candidate.score > best.score) best = candidate;
+            }
+        }
+
+        this.humanRespawnPoint = best;
+        return best;
+    },
+
     /**
      * 构造期初始生物圈：直接在已有陆地上投放多物种、多规模聚落。
      */
@@ -136,7 +251,7 @@ export const bio_spawn = {
                     this.params.initialBioMinSettlementSize ?? 1,
                     this.params.initialBioMaxSettlementSize ?? 5
                 ),
-                civilizationLevel: tolerant ? randomRange(this, 0.35, 1) : this.random(),
+                civilizationLevel: tolerant ? randomRange(this, 0.18, 0.55) : randomRange(this, 0, 0.28),
                 crystalDamageReduction: tolerant
                     ? randomRange(
                         this,
@@ -178,7 +293,8 @@ export const bio_spawn = {
      * @returns {boolean} 是否成功投放
      */
     spawnBio(prosperity, options = {}) {
-        const { humanSpawnPoint } = this.params;
+        const humanSpawnPoint = this.params.humanSpawnPoint ?? this.humanRespawnPoint;
+        const isForcedSpawnPoint = !!this.params.humanSpawnPoint;
         let targetX = -1;
         let targetY = -1;
 
@@ -210,7 +326,7 @@ export const bio_spawn = {
 
         // 指定生成点可强制覆盖；随机选址点必须为 EMPTY
         let canSpawn = false;
-        if (humanSpawnPoint && targetX === humanSpawnPoint.x && targetY === humanSpawnPoint.y) {
+        if (isForcedSpawnPoint && humanSpawnPoint && targetX === humanSpawnPoint.x && targetY === humanSpawnPoint.y) {
             canSpawn = true;
         } else if (targetX !== -1 && this.grid[targetY][targetX].crystalState === CELL_TYPE.EMPTY) {
             canSpawn = true;
@@ -339,7 +455,7 @@ export const bio_spawn = {
                 attrs.maxTemp = Math.max(attrs.maxTemp, 80);
                 attrs.survivalMinTemp = Math.min(attrs.survivalMinTemp, -100);
                 attrs.survivalMaxTemp = Math.max(attrs.survivalMaxTemp, 140);
-                attrs.prosperityGrowth = Math.max(attrs.prosperityGrowth, 6);
+                attrs.prosperityGrowth = Math.max(attrs.prosperityGrowth, this.params.minProsperityGrowth ?? 0.35);
                 attrs.prosperityDecay = Math.min(attrs.prosperityDecay, 0.35);
             }
             return placeBioCluster(this, target, attrs, options.prosperity ?? 50, settlementSize) > 0;

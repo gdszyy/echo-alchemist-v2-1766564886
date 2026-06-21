@@ -43,6 +43,10 @@ const gamePhase = read('src/game_phase.js');
 const gameOver = read('src/ui/game_over.js');
 const runShop = read('src/ui/run_shop.js');
 const indexHtml = read('index.html');
+const spawnSystem = read('src/spawn_system.js');
+const collisionSystem = read('src/combat/collision.js');
+const projectile = read('src/entities/projectile.js');
+const config = read('src/config.js');
 
 check(has(uiSystem, /ui_resetCombatPhaseHud\s*\(options\s*=\s*\{\}\)/), 'ui_resetCombatPhaseHud exists');
 check(has(uiSystem, /ui_clearTransientOverlays\s*\(options\s*=\s*\{\}\)/), 'ui_clearTransientOverlays exists');
@@ -79,6 +83,19 @@ check(has(gameSystem, /this\.marblesPool\s*=\s*state\.marblesPool\.map\(m\s*=>\s
 check(has(gameSystem, /const\s+shouldRestoreSelection\s*=\s*savedPhase\s*===\s*['"]selection['"][\s\S]*this\.fateMomentContext[\s\S]*this\.selectionMode[\s\S]*!==\s*['"]standard['"]/), 'run load detects saved fate selection before running resolver');
 check(has(gameSystem, /else\s+if\s*\(shouldRestoreSelection\)\s*\{[\s\S]*phase_switchPhase\(['"]selection['"]\)[\s\S]*spawn_generateMarbleOptions\(\)[\s\S]*ui_refreshSelectionModeUI\(\)[\s\S]*spawn_showMarblePreview/), 'run load restores selection UI instead of falling through to round-start resolver');
 check(has(gameSystem, /sys_showRoundStartBanner\s*\(\)\s*\{[\s\S]*phase_switchPhase\(['"]combat['"]\)[\s\S]*phase_startCombatPhase\(\)/), 'normal round-start banner transitions to combat, not gathering');
+check(has(config, /combatSideInsetRatio\s*:\s*0\.08/), 'combat side inset ratio is configured');
+check(has(gameSystem, /combatGridLeftX[\s\S]*combatGridRightX[\s\S]*combatGridWidth[\s\S]*this\.enemyWidth\s*=\s*\(this\.combatGridWidth\s*\/\s*CONFIG\.gameplay\.enemyCols\)/), 'sys_resize derives enemy grid width from inset combat arena');
+check(has(gameSystem, /sys_getCombatBounds\s*\(\)/), 'combat bounds helper exists');
+check(has(gameSystem, /sys_getCombatColumnCenterX\s*\(col,\s*spanCols\s*=\s*1\)/), 'combat column center helper exists');
+check(has(gamePhase, /wallLeftX[\s\S]*wallRightX[\s\S]*createLinearGradient\(wallLeftX[\s\S]*lineTo\(wallRightX,\s*wallTopY\)/), 'combat walls are drawn at inset arena bounds');
+check(has(gamePhase, /leftBound\s*=\s*combatBounds\.left\s*\+\s*radius[\s\S]*rightBound\s*=\s*combatBounds\.right\s*-\s*radius[\s\S]*rightBound\s*-\s*current\.x[\s\S]*leftBound\s*-\s*current\.x/), 'combat aim guide uses inset arena side walls');
+check(has(spawnSystem, /sys_getCombatColumnCenterX\(c\)/), 'normal enemy spawn columns use inset arena centers');
+check(has(spawnSystem, /sys_getCombatColumnCenterX\(startCol,\s*cols\)/), 'wave preset spawn columns use inset arena centers');
+check(has(spawnSystem, /sys_getCombatColumnCenterX\(sc,\s*chosen\.cols\)/), 'archetype spawn columns use inset arena centers');
+check(has(spawnSystem, /bossBounds[\s\S]*bossBounds\.left\s*\+\s*bossBounds\.right/), 'boss spawn centers on inset combat arena');
+check(has(collisionSystem, /moveBounds[\s\S]*newPos\.x\s*-\s*halfW\s*<\s*moveBounds\.left[\s\S]*newPos\.x\s*\+\s*halfW\s*>\s*moveBounds\.right/), 'enemy movement is clamped to inset combat arena');
+check(has(collisionSystem, /leftBound\s*=\s*combatBounds\.left\s*\+\s*CONFIG\.physics\.bulletRadius[\s\S]*rightBound\s*=\s*combatBounds\.right\s*-\s*CONFIG\.physics\.bulletRadius[\s\S]*leftBound\s*-\s*start\.x[\s\S]*rightBound\s*-\s*start\.x/), 'laser wall reflection uses inset combat arena');
+check(has(projectile, /leftBound\s*=\s*combatBounds\.left\s*\+\s*this\.radius[\s\S]*rightBound\s*=\s*combatBounds\.right\s*-\s*this\.radius[\s\S]*this\.pos\.x\s*<\s*leftBound[\s\S]*this\.pos\.x\s*>\s*rightBound/), 'projectile wall bounce uses inset combat arena');
 check(has(gameSystem, /runShopFirstOfferRound\)\s*\|\|\s*3|runShopFirstOfferRound\s*\|\|\s*3/), 'run shop first scheduled visit defaults to round 3');
 check(has(gameSystem, /runShopVisitDurationRounds\s*\|\|\s*2/), 'run shop visits default to a two-round stay');
 check(has(gameSystem, /sys_rollNextRunShopRound[\s\S]*runShopRandomWaitMin[\s\S]*fromRound/), 'run shop next visit rolls between configured min wait and current round');
@@ -89,6 +106,11 @@ check(has(gamePhase, /function\s+buildFallbackMarbleQueue\s*\(game\)/), 'gatheri
 check(has(gamePhase, /phase_startGatheringPhase\s*\(\)\s*\{[\s\S]*this\.marbleQueue\s*=\s*buildFallbackMarbleQueue\(this\)/), 'gathering phase rebuilds missing marbleQueue before empty grind');
 check(has(gamePhase, /while\s*\(\s*queue\.length\s*<\s*required\s*\)\s*\{[\s\S]*new\s+MarbleDefinition\(pickType\(\)\)/), 'fallback marble queue fills partial stale pools to the required count');
 check(has(gamePhase, /runShopStarterBoostDamageRounds[\s\S]*flatDamageBonus[\s\S]*runShopStarterBoostDamageAmount/), 'starter merchant damage boost expires during round finalization');
+check(has(gamePhase, /import\s*\{\s*calc_getCirclePolygonCollision,\s*calc_getCircleArcCollision\s*\}\s*from\s*['"]\.\/combat\/collision_shapes\.js['"]/), 'combat aim guide imports shared collision shape helpers');
+check(has(gamePhase, /function\s+getCombatAimEnemyHit[\s\S]*enemy\.collisionShape\s*===\s*['"]polygon['"][\s\S]*calc_getCirclePolygonCollision[\s\S]*enemy\.collisionShape\s*===\s*['"]arc['"][\s\S]*calc_getCircleArcCollision/), 'combat aim guide respects polygon and arc enemy collision shapes');
+check(has(gamePhase, /function\s+buildCombatAimScatterOffsets[\s\S]*extraScatterShots[\s\S]*scatterAngleReduction[\s\S]*Math\.floor\(scatterCount\s*\/\s*2\)\s*\+\s*\(scatterCount\s*%\s*2\)/), 'combat aim guide mirrors scatter layer branch count and resonance angle rules');
+check(has(gamePhase, /const\s+allPegTypes\s*=\s*\[\s*['"]bounce['"]\s*,\s*['"]damage['"]\s*\]/), 'gathering random peg pool only includes pure bounce and damage pegs');
+check(has(read('src/pinboard_modules.js'), /const\s+RANDOMIZABLE_PEG_TYPES\s*=\s*\[\s*['"]bounce['"]\s*,\s*['"]damage['"]\s*\]/), 'module pinboard random peg pool only includes pure bounce and damage pegs');
 
 check(has(gameOver, /ui_clearTransientOverlays\s*\(\)/), 'gameover trigger clears transient overlays');
 check(has(gameOver, /meta_addCurrency\(settled\)/), 'gameover settlement writes leftover run fragments through unified resource API');

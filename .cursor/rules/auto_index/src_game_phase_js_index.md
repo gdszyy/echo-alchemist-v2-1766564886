@@ -1,6 +1,6 @@
 # src\game_phase.js 函数索引
 
-> 自动生成于 2026-06-21 | 总行数: 3929 | 函数数: 35 | 语言: javascript
+> 自动生成于 2026-06-21 | 总行数: 3962 | 函数数: 36 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -14,6 +14,7 @@
 | getCombatAimEnemyHit | function | `getCombatAimEnemyHit(game, start, dir, maxDist, radius)` |  |
 | buildCombatAimGuide | function | `buildCombatAimGuide(game, start, dir, bounceCount = 3, options = {})` |  |
 | buildCombatAimGuides | function | `buildCombatAimGuides(game, start, dir, recipe)` |  |
+| buildCombatAimScatterOffsets | function | `buildCombatAimScatterOffsets(game, recipe)` |  |
 | drawModuleFootprintOutline | function | `drawModuleFootprintOutline(ctx, rect, footprint, color, pulse = 0)` |  |
 | pickBottomRewardType | function | `pickBottomRewardType(game)` |  |
 | makeBottomRewardBarrier | function | `makeBottomRewardBarrier(x, y1, y2, rewardType)` |  |

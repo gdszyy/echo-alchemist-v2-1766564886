@@ -66,6 +66,8 @@
 | `echoSpire:1x2:echoRelay` | `enemy_spire_echorelay_1x2` | 双层声纹嵌入柱体，不做外部大光环 |
 | `deflector:2x1:deflectionWard` | `enemy_ward_deflection_2x1` | 前缘偏折膜和副屏障槽，不画全身护罩 |
 
+2026-06-21 可读性评审：否决“在完整主体上硬开孔”的 `_readability_v2` 方案。后续重绘必须从概念阶段设计为原生镂空结构，例如环形石框、桥架、肋骨、蜂巢孔、履带拱架、悬浮核心等；镂空区域应是结构本身的一部分，用来露出 Layer 2 HP 液体，而不是后期从完整石块上切掉。第一批已接入 `*_native_hollow*` 运行时素材：`residue:1x1:`、`maw:2x2:devour`、`siege:3x2:siege`，并补充 `maw` / `siege` / `hive` archetype fallback。
+
 ### Batch C：Overlay 与图标统一
 
 目标：让通用词条在任意体型上都像“覆层”，而不是另一套身体。
@@ -93,6 +95,8 @@
 | `frame_siege_3x2` | 3x2 | 履带磨石框、推铲边、热管槽 |
 | `frame_gravity_core_3x3` | 3x3 | 环形炉心石框、向心网格边缘 |
 
+Boss 历史转换出的 1×1 异型随从不走旧 Canvas 轮廓提示，运行时按 `collisionData.vertices` 识别并使用 `frame_minion_ignis/glacies/mikro/devourer/viridis/tesla/chimera/ouroboros_1x1.png`。这些 PNG 必须由 `spawn_applyMinionShape()` 的真实物理 hull 生成，主体 sprite 仍由 normal/elite 敌人图负责。
+
 接入建议：
 
 - manifest 可新增 `frames` 段，键使用 `<baseArchetype>:<cols>x<rows>`，并记录 `shape: 'aabb' | 'polygon' | 'arc'` 与归一化顶点。
@@ -108,12 +112,12 @@
 
 目标：重画 `golem_normal.png` 与 `golem_elite.png`，让没有 V2 资源命中的敌人也符合新母题。
 
-当前进度：`golem_normal.png` 已用高质量静态磨石主体重做，并按原 `golem_normal.json` 包装为 `idle(6) / move(4) / hit(2)` Sprite Sheet；`enemy_residue_1x1_idle.png` 同步替换为同一主体的高分辨率单帧 composite。常规 1×1 不使用独立空心 frame；实体外缘石材本身承担物理边界感。
+当前进度：`golem_normal.png` 已用高质量静态磨石主体重做，并按原 `golem_normal.json` 包装为 `idle(6) / move(4) / hit(2)` Sprite Sheet；`enemy_residue_1x1_idle.png` 同步替换为同一主体的高分辨率单帧 composite。常规 1×1 与 V2 大型敌人一样使用独立 collision frame；`frame_residue_1x1.png` 必须由 1×1 真实碰撞 hull 生成并接管运行时物理边界表达，主体 sprite 不得再烘焙额外 UI 式边框。2026-06-21 起 `residue:1x1:` manifest 改用 `enemy_residue_1x1_native_hollow_idle.png`，普通敌人读血优化走原生中空磨石环路线，不在现有完整石块上挖孔。
 
 - Normal：单格切角磨石块，小暗核，低饱和。
 - Elite：同 silhouette，但裂缝更亮、嵌核更清晰、边缘有紫色晶化纹。
 - 保持 `golem_normal.json` / `golem_elite.json` 的动画契约，避免改代码。
-- 普通敌人的“框”不能作为额外空心装饰层叠加；若要表达物理边界，必须作为实体外轮廓/边缘材质的一部分，而不是扩大或误导碰撞边界。
+- 普通敌人的“框”必须走 `residue:1x1` collision frame 资产层；主体 sprite 只负责内部磨石/晶核，不得把边框烘焙进主体图，也不得回退到旧矢量圆角描边。
 - 本轮源图记录在 `docs/design/concepts/enemy_normal_redo/`，后续若调整普通敌人，优先从该高分辨率透明源图重新裁切，而不是添加额外边框层。
 
 ### Batch E：Boss 专属资产预研

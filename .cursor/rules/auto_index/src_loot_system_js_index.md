@@ -1,6 +1,6 @@
 # src\loot_system.js 函数索引
 
-> 自动生成于 2026-06-20 | 总行数: 302 | 函数数: 6 | 语言: javascript
+> 自动生成于 2026-06-21 | 总行数: 251 | 函数数: 5 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -11,7 +11,6 @@
 |--------|------|------|------|
 | _extractAttrDamage | function | `_extractAttrDamage(byAttr)` |  |
 | _calcBuildVector | function | `_calcBuildVector(game)` |  |
-| _calcTagWeights | function | `_calcTagWeights(buildVector)` |  |
 | _weightedRandomChoice | function | `_weightedRandomChoice(candidates)` |  |
-| _selectRuneByWeight | function | `_selectRuneByWeight(tagWeights, themeWeights = {})` |  |
+| _selectRuneByWeight | function | `_selectRuneByWeight(buildVector, themeWeights = {})` |  |
 | loot_calcRuneDrop | function | `loot_calcRuneDrop(game, overrideOptions = {})` |  |

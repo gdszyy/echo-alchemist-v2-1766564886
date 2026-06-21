@@ -67,6 +67,8 @@ export const RING_FRONT_PARAMS = {
   humanExtractorMantleFloor: 0,
   humanExtractorAutoUpgrade: false,
   bioAutoSpawnCount: 0,
+  initialBioSpeciesCount: 0,
+  initialHumanSpawn: false,
   humanRespawnDelay: 999999,
 };
 export const RING_FRONT_SEED = 42;

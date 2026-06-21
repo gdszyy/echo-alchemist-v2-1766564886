@@ -269,3 +269,10 @@
 - A ball may physically bounce on the same peg repeatedly, but it only gains energy or attributes when the current peg key differs from its previous scoring peg key.
 - Hitting a different peg updates `lastScoringPegKey`, so returning to the first peg can score again.
 - Split, mirror, and rainbow child balls carry their own session references and should not write through `game.currentSession`.
+
+## 2026-06-21 Gathering Visual Focus Pass
+
+- `Peg.hit()` uses shorter lit/scale/spin feedback so a hit peg reads as a fixed pin cap rather than another marble.
+- `Peg.draw()` uses a diamond rivet-plate silhouette plus an inner bevel, short specular/shadow strokes, and a small center slot so pegs read as fixed hardware rather than round marbles; high-cost halo remains controlled by `pegGlowHalo`.
+- `DropBall.draw()` adds a glass-material rim: dark silhouette, upper highlight arc, lower shadow arc, and a soft highlight spot so the marble reads as a rounded bead instead of a flat icon.
+- Hit feedback orbs still drive the same arrival callbacks and charge math, but their visuals are smaller and shorter-lived through `spawn_createHitFeedback(..., options)`.

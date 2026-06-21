@@ -72,17 +72,17 @@
     },
     "hive:2x3": {
       "spritePath": "assets/sprites/enemies/frames/frame_hive_2x3.png",
-      "shape": "polygon",
+      "shape": "aabb",
       "footprint": "2x3"
     },
     "siege:3x2": {
       "spritePath": "assets/sprites/enemies/frames/frame_siege_3x2.png",
-      "shape": "aabb",
+      "shape": "polygon",
       "footprint": "3x2"
     },
     "gravityWell:3x3": {
       "spritePath": "assets/sprites/enemies/frames/frame_gravity_core_3x3.png",
-      "shape": "polygon",
+      "shape": "arc",
       "footprint": "3x3"
     }
   },
@@ -94,8 +94,8 @@
       "placeholder": false
     },
     "maw": {
-      "spritePath": "assets/sprites/enemies/archetypes/enemy_maw_2x2.png",
-      "manifestPath": "assets/sprites/enemies/archetypes/enemy_maw_2x2.json",
+      "spritePath": "assets/sprites/enemies/archetypes/enemy_maw_2x2_native_hollow.png",
+      "manifestPath": "assets/sprites/enemies/archetypes/enemy_maw_2x2_native_hollow.json",
       "footprint": "2x2",
       "placeholder": false
     },
@@ -118,14 +118,14 @@
       "placeholder": false
     },
     "hive": {
-      "spritePath": "assets/sprites/enemies/archetypes/enemy_hive_2x3.png",
-      "manifestPath": "assets/sprites/enemies/archetypes/enemy_hive_2x3.json",
+      "spritePath": "assets/sprites/enemies/archetypes/enemy_hive_2x3_native_hollow.png",
+      "manifestPath": "assets/sprites/enemies/archetypes/enemy_hive_2x3_native_hollow.json",
       "footprint": "2x3",
       "placeholder": false
     },
     "siege": {
-      "spritePath": "assets/sprites/enemies/archetypes/enemy_siege_3x2.png",
-      "manifestPath": "assets/sprites/enemies/archetypes/enemy_siege_3x2.json",
+      "spritePath": "assets/sprites/enemies/archetypes/enemy_siege_3x2_native_hollow.png",
+      "manifestPath": "assets/sprites/enemies/archetypes/enemy_siege_3x2_native_hollow.json",
       "footprint": "3x2",
       "placeholder": false
     },
@@ -138,9 +138,9 @@
   },
   "composites": {
     "residue:1x1:": {
-      "resourceId": "enemy_residue_1x1",
-      "spritePath": "assets/sprites/enemies/composites/enemy_residue_1x1_idle.png",
-      "manifestPath": "assets/sprites/enemies/composites/enemy_residue_1x1_idle.json",
+      "resourceId": "enemy_residue_1x1_native_hollow",
+      "spritePath": "assets/sprites/enemies/composites/enemy_residue_1x1_native_hollow_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_residue_1x1_native_hollow_idle.json",
       "baseArchetype": "residue",
       "footprint": "1x1",
       "affixes": [],
@@ -158,9 +158,9 @@
       "placeholder": false
     },
     "maw:2x2:devour": {
-      "resourceId": "enemy_maw_devour_2x2",
-      "spritePath": "assets/sprites/enemies/composites/enemy_maw_devour_2x2_idle.png",
-      "manifestPath": "assets/sprites/enemies/composites/enemy_maw_devour_2x2_idle.json",
+      "resourceId": "enemy_maw_devour_2x2_native_hollow",
+      "spritePath": "assets/sprites/enemies/composites/enemy_maw_devour_2x2_native_hollow_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_maw_devour_2x2_native_hollow_idle.json",
       "baseArchetype": "maw",
       "footprint": "2x2",
       "affixes": [
@@ -169,9 +169,9 @@
       "placeholder": false
     },
     "siege:3x2:siege": {
-      "resourceId": "enemy_siege_siege_3x2",
-      "spritePath": "assets/sprites/enemies/composites/enemy_siege_siege_3x2_idle.png",
-      "manifestPath": "assets/sprites/enemies/composites/enemy_siege_siege_3x2_idle.json",
+      "resourceId": "enemy_siege_siege_3x2_native_hollow",
+      "spritePath": "assets/sprites/enemies/composites/enemy_siege_siege_3x2_native_hollow_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_siege_siege_3x2_native_hollow_idle.json",
       "baseArchetype": "siege",
       "footprint": "3x2",
       "affixes": [

@@ -2,10 +2,9 @@
  * loot_system.js - 符文智能掉落权重计算系统
  *
  * 职责：
- * - 实现三层智能掉落权重计算逻辑
+ * - 实现两层智能掉落权重计算逻辑
  * - 第一层：玩家套路成分识别（分析近几回合伤害历史）
- * - 第二层：克制关系映射（将套路成分向量映射为敌人标签权重池）
- * - 第三层：符文关联与抽取（基于权重池对 RUNE_DB 进行加权随机抽取）
+ * - 第二层：符文关联与抽取（基于玩家属性占比对 RUNE_DB 进行加权随机抽取）
  *
  * 导出：
  * - loot_calcRuneDrop(game, overrideOptions): 计算并返回应掉落的符文结果对象
@@ -17,7 +16,7 @@
  *     在第二层计算完成后叠加，放大 Boss 主题相关符文的掉落概率
  */
 
-import { RUNE_DB, COUNTER_MAP } from './rune_config.js';
+import { RUNE_DB } from './rune_config.js';
 
 // ==================== 常量配置 ====================
 
@@ -142,47 +141,7 @@ function _calcBuildVector(game) {
     return buildVector;
 }
 
-// ==================== 第二层：克制关系映射 ====================
-
-/**
- * 第二层：克制关系映射
- *
- * 将套路成分向量 buildVector 与 COUNTER_MAP 相乘叠加，
- * 得到标签权重池 tagWeights，并进行归一化处理。
- *
- * 计算公式：
- *   tagWeights[tag] += buildVector[attr] * COUNTER_MAP[attr][tag]
- *
- * @param {Object} buildVector - 套路成分向量 { attrType: percentage }
- * @returns {Object} 归一化后的标签权重池 { tag: normalizedWeight }
- */
-function _calcTagWeights(buildVector) {
-    const tagWeights = {};
-
-    // 遍历套路成分向量中的每种属性
-    for (const [attr, attrWeight] of Object.entries(buildVector)) {
-        // 查找该属性在 COUNTER_MAP 中的克制关系
-        const counterEntry = COUNTER_MAP[attr];
-        if (!counterEntry) continue;
-
-        // 将克制关系权重叠加到标签权重池
-        for (const [tag, counterWeight] of Object.entries(counterEntry)) {
-            tagWeights[tag] = (tagWeights[tag] || 0) + attrWeight * counterWeight;
-        }
-    }
-
-    // 归一化标签权重池
-    const totalTagWeight = Object.values(tagWeights).reduce((a, b) => a + b, 0);
-    if (totalTagWeight > 0) {
-        for (const tag of Object.keys(tagWeights)) {
-            tagWeights[tag] /= totalTagWeight;
-        }
-    }
-
-    return tagWeights;
-}
-
-// ==================== 第三层：符文关联与抽取 ====================
+// ==================== 第二层：符文关联与抽取 ====================
 
 /**
  * 加权随机算法（Weighted Random Choice）
@@ -218,24 +177,18 @@ function _weightedRandomChoice(candidates) {
  *
  * 遍历 RUNE_DB，计算每个符文的最终权重：
  *   finalWeight = baseDropWeight
- *               + sum(affinity_tags 在 tagWeights 中的值) * SMART_DROP_MULTIPLIER
- *               + sum(affinity_tags 在 themeWeights 中的值) * BOSS_THEME_MULTIPLIER（可选）
+ *               + buildVector[rune.element] * SMART_DROP_MULTIPLIER
+ *               + themeWeights[rune.element] * BOSS_THEME_MULTIPLIER（可选）
  *
  * 使用加权随机算法抽取最终掉落的符文 id。
  *
- * @param {Object} tagWeights - 归一化后的标签权重池 { tag: normalizedWeight }
+ * @param {Object} buildVector - 归一化后的玩家套路成分向量 { attrType: percentage }
  * @param {Object} [themeWeights={}] - Boss 主题额外权重注入 { elementKey: bonusWeight }
  * @returns {string} 被抽中的符文 id
  */
-function _selectRuneByWeight(tagWeights, themeWeights = {}) {
+function _selectRuneByWeight(buildVector, themeWeights = {}) {
     const candidates = RUNE_DB.map(rune => {
-        // 计算亲和标签在权重池中的累计贡献（智能掉落）
-        let affinityBonus = 0;
-        if (rune.affinity_tags && Array.isArray(rune.affinity_tags)) {
-            for (const tag of rune.affinity_tags) {
-                affinityBonus += tagWeights[tag] || 0;
-            }
-        }
+        const buildBonus = rune.element ? (buildVector[rune.element] || 0) : 0;
 
         // 计算 Boss 主题权重注入贡献（按符文 element 匹配 themeWeights 键）
         let themeBonus = 0;
@@ -243,9 +196,9 @@ function _selectRuneByWeight(tagWeights, themeWeights = {}) {
             themeBonus = themeWeights[rune.element] * BOSS_THEME_MULTIPLIER;
         }
 
-        // 最终权重 = 基础掉落权重 + 亲和标签贡献 * 智能掉落乘数 + Boss 主题贡献
+        // 最终权重 = 基础掉落权重 + 同属性构筑贡献 + Boss 主题贡献
         const finalWeight = (rune.baseDropWeight || 1)
-            + affinityBonus * SMART_DROP_MULTIPLIER
+            + buildBonus * SMART_DROP_MULTIPLIER
             + themeBonus;
 
         return {
@@ -262,10 +215,9 @@ function _selectRuneByWeight(tagWeights, themeWeights = {}) {
 /**
  * loot_calcRuneDrop - 计算并返回应掉落的符文结果对象
  *
- * 三层逻辑：
+ * 两层逻辑：
  * 1. 玩家套路成分识别：分析近几回合伤害历史，得到套路成分向量
- * 2. 克制关系映射：将套路向量映射为敌人标签权重池（归一化）
- * 3. 符文关联与抽取：基于权重池对 RUNE_DB 进行加权随机抽取
+ * 2. 符文关联与抽取：基于同属性构筑权重对 RUNE_DB 进行加权随机抽取
  *
  * @param {Object} game - Game 实例，需包含以下属性：
  *   - game.roundDamageHistory: 历史回合伤害数据数组
@@ -284,11 +236,8 @@ function loot_calcRuneDrop(game, overrideOptions = {}) {
     // 第一层：玩家套路成分识别
     const buildVector = _calcBuildVector(game);
 
-    // 第二层：克制关系映射
-    const tagWeights = _calcTagWeights(buildVector);
-
-    // 第三层：符文关联与抽取（注入 Boss 主题权重）
-    const runeId = _selectRuneByWeight(tagWeights, themeWeights || {});
+    // 第二层：符文关联与抽取（注入 Boss 主题权重）
+    const runeId = _selectRuneByWeight(buildVector, themeWeights || {});
 
     // 确定掉落等级：优先使用 forcedLevel，否则默认 1
     const level = (typeof forcedLevel === 'number' && forcedLevel >= 1)

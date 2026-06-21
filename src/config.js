@@ -779,6 +779,10 @@ const CONFIG = {
 	        laserLengthBonus: 0,    
         enemyShowTimeFrames:72,
         relicChoiceNum:4,
+        // Combat arena is narrower than the full canvas because the side bands are decorative.
+        combatSideInsetRatio: 0.08,
+        combatSideInsetMin: 24,
+        combatSideInsetMax: 44,
         enemyCols:6,
         cols: 10,           // 网格列数 
         rows: 5,           // 钉子行数
@@ -818,12 +822,13 @@ const CONFIG = {
         moduleSpacingY: 0,             // 模块纵向间距 px；上下行边缘钉共同形成连续通道
         // 钉板左右两侧到画布墙的留白（每侧 1.5 个弹珠直径 = 1.5 × 2 × 7.7 ≈ 23 px）
         moduleAreaSideMargin: 23,
-        bottomRewardZoneChance: 0.28,  // 每次研磨阶段生成底部奖励分栏的基础概率
-        bottomRewardZoneMaxCount: 1,   // 当前仅生成一个窄奖励分栏，避免底部过度拥挤
-        bottomRewardZoneWidthMultiplier: 1.5, // 奖励分栏宽度 = 1.5 个倍化弹珠直径
+        bottomRewardZoneChance: 0.22,  // 每次研磨阶段生成至少一个底部奖励分栏的基础概率
+        bottomRewardZoneAdditionalChance: 0.36, // 已生成 1 个后，继续生成下一个分栏的递减概率
+        bottomRewardZoneMaxCount: 3,   // 少数回合可同时出现多个窄奖励分栏
+        bottomRewardZoneWidthMultiplier: 2.8, // 分栏两侧为实体碰撞板，中心可通过窗口仍然很窄
         bottomRewardZoneHeight: 48,
-        bottomRewardOnlyTypes: [],
-        bottomRewardZoneWeights: { explosive: 2, laser: 1 },
+        bottomRewardOnlyTypes: ['explosive', 'laser', 'overcharge'],
+        bottomRewardZoneWeights: { explosive: 2, laser: 1, overcharge: 1 },
         // ==================== [v2 局内商店 + 符文碎片经济] ====================
         runShopFirstOfferRound: 3,     // 第一次商人固定在第 3 回合到访
         runShopRandomWaitMin: 3,       // 后续商人离开后，等待 3..当前回合数的随机回合数
@@ -1904,15 +1909,7 @@ const SKILL_DB = [
  *     在 loot_calcRuneDrop 的第三层抽取中，与 BOSS_THEME_MULTIPLIER 相乘后叠加到符文权重
  *
  * 破绽谱来源：docs/boss_system_design.md
- * 对应 COUNTER_MAP 中的克制关系：
- *   pyro.shield=1.0, pierce.shield=1.0 → 伊格尼斯（护盾+极速）
- *   cryo.jump=0.8, pierce.jump=0.8   → 格拉西斯（跳跃+再生）
- *   lightning.clone=1.0, scatter.clone=1.0 → 米克罗（分身+治疗）
- *   bounce.devour=0.8, laser.devour=0.8  → 噬神者（吞噬+护盾）
- *   laser.regen=1.0, pyro.regen=0.8      → 维里迪斯（再生+治疗）
- *   cryo.haste=1.0, bounce.haste=0.4     → 特斯拉（极速+分身）
- *   pierce.shield=1.0, laser.shield=0.5  → 奇美拉（狂暴+吞噬）
- *   动态破绽谱                          → 奥罗波罗斯（全词缀轮转）
+ * Boss 使用显式 vulnerability/themeWeights 配置，不再依赖全局属性克制关系表。
  */
 const BOSS_DB = [
     {

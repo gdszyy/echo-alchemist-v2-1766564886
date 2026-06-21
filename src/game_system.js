@@ -17,7 +17,7 @@ import { Vec2, showToast, RuneLoot, Enemy, RewardDropEffect, FieldLootItem, Marb
 import { CONFIG, RELIC_DB } from './config.js';
 import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
-import { COUNTER_MAP, RUNE_DB } from './rune_config.js';
+import { RUNE_DB } from './rune_config.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { EMITTER_PORT_OFFSET_Y } from './bitmap_icons.js';
 import {
@@ -277,7 +277,21 @@ export const game_system = {
         const isPCMode = document.body.classList.contains('pc-mode');
         this.defeatLineY = this.height - (isPCMode ? 20 : 120);
 
-        this.enemyWidth = (this.width / CONFIG.gameplay.enemyCols);
+        const rawCombatInset = this.width * (CONFIG.gameplay.combatSideInsetRatio ?? 0);
+        const minCombatInset = CONFIG.gameplay.combatSideInsetMin ?? 0;
+        const maxCombatInset = CONFIG.gameplay.combatSideInsetMax ?? this.width / 4;
+        const safeMinCellWidth = 28;
+        const maxSafeInset = Math.max(0, Math.floor((this.width - CONFIG.gameplay.enemyCols * safeMinCellWidth) / 2));
+        const combatInset = Math.min(
+            maxSafeInset,
+            Math.max(minCombatInset, Math.min(maxCombatInset, rawCombatInset))
+        );
+        this.combatSideInset = Math.round(combatInset);
+        this.combatGridLeftX = this.combatSideInset;
+        this.combatGridRightX = this.width - this.combatSideInset;
+        this.combatGridWidth = Math.max(1, this.combatGridRightX - this.combatGridLeftX);
+
+        this.enemyWidth = (this.combatGridWidth / CONFIG.gameplay.enemyCols);
         this.enemyHeight = this.enemyWidth;
 
         // 动态计算战斗网格第一行敌人的中心 Y（避免被顶部半透明栏遮挡）
@@ -286,18 +300,34 @@ export const game_system = {
         // 这样第一行上边界 = topBarH + 8，恰好在顶部栏下方，且与后续行网格完全对齐
         const topBarEl = document.getElementById('unified-top-bar');
         const topBarH = topBarEl ? topBarEl.getBoundingClientRect().height : 64;
-        // Combat reserves both the unified top bar and the compact status strip.
-        const statusPanelEl = document.getElementById('combat-status-panel');
-        const statusPanelRect = statusPanelEl ? statusPanelEl.getBoundingClientRect() : null;
-        const statusPanelH = statusPanelRect && statusPanelRect.height ? statusPanelRect.height : 48;
-        const combatTopUiBottom = topBarH + 6 + statusPanelH;
-        this.combatGridTopY = combatTopUiBottom + 8 + this.enemyHeight / 2;
+        this.combatGridTopY = topBarH + 8 + this.enemyHeight / 2;
 
         this.ui_updateUICache();
 
         if (this.phase === 'gathering') {
             this.phase_gathering_initPachinko(true);
         }
+    },
+
+    sys_getCombatBounds() {
+        const left = Number.isFinite(this.combatGridLeftX) ? this.combatGridLeftX : 0;
+        const right = Number.isFinite(this.combatGridRightX) ? this.combatGridRightX : (this.width || 0);
+        const top = (this.combatGridTopY != null && this.enemyHeight != null)
+            ? this.combatGridTopY - this.enemyHeight / 2
+            : 0;
+        return {
+            left,
+            right,
+            top,
+            bottom: this.height || 0,
+            width: Math.max(1, right - left)
+        };
+    },
+
+    sys_getCombatColumnCenterX(col, spanCols = 1) {
+        const left = Number.isFinite(this.combatGridLeftX) ? this.combatGridLeftX : 0;
+        const w = this.enemyWidth || ((this.width || 1) / (CONFIG.gameplay.enemyCols || 1));
+        return left + (col + (spanCols - 1) / 2) * w + w / 2;
     },
 
     /**
@@ -807,7 +837,7 @@ export const game_system = {
             const main = r._marbleType || r.type || 'normal';
             const flags = `${r.explosive ? 'E' : ''}${r.isMatryoshka ? 'M' : ''}${r.isLaser ? 'L' : ''}`;
             const mc = (r.multicast || 0) >= 3 ? 'm' : '';
-            const stats = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind']
+            const stats = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','overcharge','flying_sword','wind']
                 .map(k => r[k] || 0).join('-');
             return `${main}|${flags}|${mc}|${stats}`;
         };
@@ -904,7 +934,7 @@ export const game_system = {
             const main = r._marbleType || r.type || 'normal';
             const flags = `${r.explosive ? 'E' : ''}${r.isMatryoshka ? 'M' : ''}${r.isLaser ? 'L' : ''}`;
             const mc = (r.multicast || 0) >= 3 ? 'm' : '';
-            const stats = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind']
+            const stats = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','overcharge','flying_sword','wind']
                 .map(k => r[k] || 0).join('-');
             return `${main}|${flags}|${mc}|${stats}`;
         };
@@ -961,7 +991,7 @@ export const game_system = {
             const main = r._marbleType || r.type || 'normal';
             const flags = `${r.explosive ? 'E' : ''}${r.isMatryoshka ? 'M' : ''}${r.isLaser ? 'L' : ''}`;
             const mc = (r.multicast || 0) >= 3 ? 'm' : '';
-            const stats = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','flying_sword','wind']
+            const stats = ['damage','bounce','pierce','scatter','cryo','pyro','lightning','laser','overcharge','flying_sword','wind']
                 .map(k => r[k] || 0).join('-');
             return `${main}|${flags}|${mc}|${stats}`;
         };
@@ -1147,11 +1177,11 @@ export const game_system = {
         }
         this._chaosSlotMachineActive = true;
 
-        const STAT_KEYS = ['damage','bounce','pierce','scatter','multicast','cryo','pyro','lightning','laser','flying_sword','wind'];
+        const STAT_KEYS = ['damage','bounce','pierce','scatter','multicast','cryo','pyro','lightning','laser','overcharge','flying_sword','wind'];
         const ATTR_LABEL = {
             damage: '伤害', bounce: '反弹', pierce: '穿透', scatter: '散射',
             multicast: '连射', cryo: '冰', pyro: '火', lightning: '雷',
-            laser: '激光', flying_sword: '飞剑', wind: '风',
+            laser: '激光', overcharge: '超载', flying_sword: '飞剑', wind: '风',
         };
 
         // 每枚子弹当前拥有（>0）的属性集合
@@ -1231,11 +1261,11 @@ export const game_system = {
      * @param {Function} [onComplete] 抽奖动画 + 升级应用全部完成后触发的回调。
      */
     sys_runInWallClearLottery(chargedSnapshot, bonusCount = 0, onComplete) {
-        const STAT_KEYS = ['damage','bounce','pierce','scatter','multicast','cryo','pyro','lightning','laser','flying_sword','wind'];
+        const STAT_KEYS = ['damage','bounce','pierce','scatter','multicast','cryo','pyro','lightning','laser','overcharge','flying_sword','wind'];
         const ATTR_LABEL = {
             damage: '伤害', bounce: '反弹', pierce: '穿透', scatter: '散射',
             multicast: '连射', cryo: '冰', pyro: '火', lightning: '雷',
-            laser: '激光', flying_sword: '飞剑', wind: '风',
+            laser: '激光', overcharge: '超载', flying_sword: '飞剑', wind: '风',
         };
 
         const charged = Array.isArray(chargedSnapshot) ? chargedSnapshot.map(r => ({ ...r })) : [];
@@ -2448,7 +2478,7 @@ export const game_system = {
 
     /**
      * @method _triggerPityDrop
-     * @description [难度平衡] Boss 越线时触发怜悯掉落，生成一个克制属性符文。
+     * @description [难度平衡] Boss 越线时触发怜悯掉落，按玩家主属性生成一个同主题符文。
      * @param {Enemy} bossEnemy - 越线的 Boss 实体
      */
     _triggerPityDrop(bossEnemy) {
@@ -2489,29 +2519,16 @@ export const game_system = {
             }
             if (!dominantAttr) return;
 
-            // 2. 找到克制属性（COUNTER_MAP 中权重最高的 tag 对应的元素）
-            let counterElement = null;
-            if (COUNTER_MAP && COUNTER_MAP[dominantAttr]) {
-                const counterMap = COUNTER_MAP[dominantAttr];
-                let maxCounterWeight = -1;
-                for (const [tag, weight] of Object.entries(counterMap)) {
-                    if (weight > maxCounterWeight) {
-                        maxCounterWeight = weight;
-                        counterElement = tag;
-                    }
-                }
-            }
-
-            // 3. 调用 loot_calcRuneDrop 生成1个怜悯符文
-            const themeWeights = counterElement ? { [counterElement]: 10.0 } : {};
+            // 2. 调用 loot_calcRuneDrop 生成 1 个同主题怜悯符文
+            const themeWeights = { [dominantAttr]: 10.0 };
             const drop = loot_calcRuneDrop(this, { forcedLevel: 1, themeWeights });
             if (drop && drop.runeId) {
                 const loot = new RuneLoot(bossEnemy.pos.x, bossEnemy.pos.y, drop.runeId);
                 loot.level = drop.level || 1;
                 this.runeLootItems.push(loot);
                 // 4. 通过 EventBus 显示提示
-                eventBus.emit('ui:toast', { message: '💔 怜悯掉落：获得克制符文' });
-                showToast('💔 怜悯掉落：获得克制符文');
+                eventBus.emit('ui:toast', { message: '💔 怜悯掉落：获得主属性符文' });
+                showToast('💔 怜悯掉落：获得主属性符文');
             }
         } catch (err) {
             console.warn('[_triggerPityDrop] 怜悯掉落失败:', err);

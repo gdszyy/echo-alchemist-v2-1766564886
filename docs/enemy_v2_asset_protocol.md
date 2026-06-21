@@ -20,6 +20,7 @@ manifest、metadata 接入路径与回退策略。所有 V2 敌人必须遵守�
 | Sprite Sheet PNG | `assets/sprites/enemies/v2/<resourceId>.png` | `enemy_<base>_<cols>x<rows>` |
 | Sprite manifest  | `assets/sprites/enemies/v2/<resourceId>.json` | 同 PNG，扩展名 `.json` |
 | Collision Frame PNG | `assets/sprites/enemies/frames/frame_<base>_<cols>x<rows>.png` | 与物理碰撞框同形，中心透明；作为顶层物理边界 |
+| Collision Frame 绿幕源图 | `docs/archive/enemy_collision_frame_sources_2026-06-21/source_green/frame_<base>_<cols>x<rows>_green.png` | 已归档的纯绿底 + 同形描边源图，仅供后续美术重绘/去底参考；运行时目录只保留最新版透明 PNG |
 | UI 头像/图鉴图标 | `assets/icons/enemies/<resourceId>.png`        | 64×64，与 PNG 同名 |
 
 **当前已建立的 `resourceId`（P0–P3）**：
@@ -58,6 +59,8 @@ manifest、metadata 接入路径与回退策略。所有 V2 敌人必须遵守�
 - `animations.move/cast`：可选；如果未提供，渲染层会自动回退到 `idle`。
 - `placeholder`：true 表示占位资源，后续美术替换时改为 false。
 
+当前普通敌人中心层资产来自 `docs/screenshots/enemy-layer-debug-2026-06-21/enemy_frontview_atlas_generated.png`，由 `scripts/build_enemy_frontview_assets_from_atlas.py` 切分为透明 PNG，并同步写入 `assets/sprites/enemies/v2/`、`assets/sprites/enemies/archetypes/`、`assets/sprites/enemies/composites/` 三条消费路径。后续重生图必须保持正视图、同一几何磨石/晶核风格、同一 footprint 比例，不得回退到旧斜视图或混合不同风格素材。
+
 > 资源可以只提供 `idle` + `hit` 两行，后续 `move` / `cast` 为可选增强。若美术只交付静态 PNG，应仍按同名 manifest 包装为单帧或少帧 Sprite Sheet，避免绕开现有 `SpriteRenderer` 和 manifest 回退链路。
 
 ## 2.5 Collision Frame manifest 规格
@@ -77,8 +80,11 @@ manifest、metadata 接入路径与回退策略。所有 V2 敌人必须遵守�
 ```
 
 - Frame 必须匹配 `spawn_applyArchetypeShape()` 设定的真实 `collisionShape/collisionData`，不是独立装饰容器。
-- PNG 中心保持透明或近透明，给 Layer 2 血条、HP 数字、状态短标和预警 UI 留出可读空间。
-- 绘制层在 Layer 4.9 内壁阴影之后。若 frame PNG 已加载并成功绘制，Layer 5 矢量描边/边框脉冲不再绘制，避免旧边框盖过物理边界；若 frame 资源缺失或未 ready，则继续使用 Layer 5 作为兜底。
+- Frame PNG 与绿幕源图必须按 footprint 比例出图：`3x1` 为宽图、`1x3` 为竖图、`2x3` 为竖向矩形；禁止把所有边框资产做成统一 1:1 方图再靠预览或运行时拉伸解释。
+- PNG 必须只沿真实物理 hull 描边，中心保持透明，给 Layer 2 血条、HP 数字、状态短标和预警 UI 留出可读空间。
+- 当前 frame 资源由 `scripts/generate_enemy_boundary_frames.py` 从真实物理边界生成；`maw/deflector/echoSpire/prism/siege/gravityWell` 逐点对应 `spawn_applyArchetypeShape()` 里的 polygon / circle 定义，`residue/bastion/hive` 使用 AABB 边界。Boss 历史转换出的 1×1 异型随从也必须使用 `frame_minion_<boss>_1x1.png` 系列，逐点对应 `spawn_applyMinionShape()` 的 triangle / diamond / hex / octagon 等物理 hull。
+- 美术重绘时应先在绿幕源图上沿同一 hull 画描边：背景和中间挖空区域使用纯绿幕色，去底后导出透明 PNG。不得把 frame 画成徽章、外框、装饰面板或主体轮廓猜测。
+- 绘制层在 Layer 4.9 内壁阴影之后。只要运行时已经命中 frame 资源路径，Layer 5 矢量描边、边框脉冲和 footprint cue 都不得再绘制，避免图片加载首帧或异型随从路径露出旧白线框；若完全没有 frame 资源路径，才允许使用 Layer 5 作为兜底。
 
 ## 3. metadata 字段（src/data/enemy_v2_metadata.js）
 
@@ -158,13 +164,15 @@ normal              →  golem_normal
 
 正式美术验收时额外检查：主体是否仍是几何磨石块基座，专属机制是否嵌在石槽内部，通用词条是否只作为覆层存在。若资源看起来像纯发光云、纯软体器官、独立机械载具或 UI 徽章，应退回重画。
 
-## 6.5 2026-06-19 asset update
+## 6.5 2026-06-19 / 2026-06-21 asset updates
 
 - The 8 V2 base enemies now use procedural bitmap sprite sheets instead of the original line/block placeholders.
 - Updated folders: `assets/sprites/enemies/v2/`, `assets/sprites/enemies/archetypes/`, and `assets/icons/enemies/`.
 - Each V2 sheet keeps the 128 px frame contract with 4 idle frames and 2 hit frames.
 - Related manifests and `src/data/enemy_v2_metadata.js` now use `placeholder: false`.
 - Later hand-painted art can still replace the same file names in place.
+- 2026-06-21: the V2 metadata sprites, runtime archetype/composite enemy body PNGs, and material collision frames were regenerated from the same front-view asset pass; non-runtime source_green/material files are archived under `docs/archive/enemy_collision_frame_sources_2026-06-21/` so `assets/sprites/enemies/frames/` contains only the latest runtime frame PNGs.
+- 2026-06-21 frame iteration: collision frames now clip the generated obsidian/metal material texture to the exact physics hull, with fractured armor plates, beveled seams, cracks, and sparse colored crystal fissures. Keep the frame itself dark neutral; do not tint the whole border by enemy attribute, and do not add black ruler stripes, heavy black outlines, or rivet-node borders.
 
 ## 7. 验收清单
 
@@ -175,4 +183,4 @@ normal              →  golem_normal
 - [x] 试炼场 V2 矩阵 / 真理之书图鉴共用 `ENEMY_V2_METADATA`
 - [x] 每个 V2 敌人具备：中文名、footprint、baseArchetype、affix、战术职责、克制提示
 - [x] 资源加载失败时回退到矢量绘制 + 元素轮廓，敌人保持可见
-- [x] Collision Frame 已覆盖普通 `residue:1x1` 与 8 个 V2 基底，成功绘制时接管顶层物理边界
+- [x] Collision Frame 已覆盖普通 `residue:1x1`、8 个 V2 基底，以及 8 个 Boss 历史转换 1×1 异型随从，命中资源路径后接管顶层物理边界

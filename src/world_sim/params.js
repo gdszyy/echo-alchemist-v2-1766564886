@@ -41,6 +41,30 @@
  * @property {number} terrainClimateBarrierThreshold 高于该坡差时显著阻隔热交换
  * @property {number} terrainOrographicStormBoost 坡地抬升对雷暴判定的增益
  * @property {number} terrainBasinHeatRetention 盆地减少辐射散热的比例
+ * @property {number} climateBaseTemp     Weak surface climate baseline.
+ * @property {number} climateBaseReturnRate Temperature drift rate toward the weak base climate.
+ * @property {number} mantleClimateAnomalyScale Mantle energy anomaly scale for climate.
+ * @property {number} mantleClimateAnomalyRate Mantle anomaly coupling rate.
+ * @property {number} climatePotentialHeatScale Temperature contribution to climate potential.
+ * @property {number} climatePotentialCrystalScale Crystal charge contribution to climate potential.
+ * @property {number} climatePotentialElevationBias Elevation bias applied to climate potential.
+ * @property {number} climatePotentialBasinBias Basin bias applied to climate potential.
+ * @property {number} windAcceleration    Potential-gradient acceleration for persistent wind.
+ * @property {number} windInertia         Wind persistence between ticks.
+ * @property {number} windFriction        Wind damping between ticks.
+ * @property {number} windMaxSpeed        Maximum persistent wind speed.
+ * @property {number} windCirculationBias Small circulation twist to avoid pure radial flow.
+ * @property {number} terrainWindSlopeResistance Slope resistance applied to wind.
+ * @property {number} terrainWindBarrierThreshold Steep terrain threshold for wind blocking.
+ * @property {number} terrainWindChannelBoost Valley/pass wind boost.
+ * @property {number} terrainWindBasinDamping Basin wind damping.
+ * @property {number} alphaClimateThermalBias Alpha thermal anomaly.
+ * @property {number} alphaClimatePotentialBias Alpha potential anomaly.
+ * @property {number} alphaClimateStormBoost Alpha storm boost.
+ * @property {number} alphaClimateWindTwist Alpha local wind destabilization.
+ * @property {number} betaClimateThermalBias Beta cooling anomaly.
+ * @property {number} betaClimatePotentialBias Beta stabilizing potential anomaly.
+ * @property {number} betaClimateStormDamping Beta storm damping.
  * // --- 晶石层 ---
  * @property {number} alphaEnergyDemand    Alpha 晶石每帧基础能耗
  * @property {number} betaEnergyDemand     Beta 晶石每帧基础能耗
@@ -78,6 +102,12 @@
  * @property {number} minProsperityGrowth  非人类生物最小繁荣度增长
  * @property {number} sameSpeciesBonus     同种相邻协作加成
  * @property {number} civilizationCrystalDamageReductionScale 文明程度转化为晶石伤害减免的倍率
+ * @property {number} bioMaxSettlementCells 单个同物种连续聚落的最大占地格数
+ * @property {number} bioSmallSettlementSize 小部落保护判定的最大连续格数
+ * @property {number} bioSmallSettlementSurvivalBonus 小部落每步繁荣保底补偿
+ * @property {number} bioSmallSettlementCompetitionResistance 小部落受到强势邻居竞争时的减伤比例
+ * @property {number} bioExpansionCost 聚落扩张或产生迁徙者时消耗/转移的繁荣度
+ * @property {number} [migrantSettleMinProsperity] 迁徙者定居所需最低繁荣度；默认使用物种 migrationThreshold
  * @property {number} randomSpeciesMinCrystalDamageReduction 随机物种最低晶石伤害减免比例
  * @property {number} randomSpeciesMaxCrystalDamageReduction 随机物种最高晶石伤害减免比例
  * @property {number} initialBioSpeciesCount 初始地图随机生物物种数
@@ -91,7 +121,7 @@
  * @property {number} crystalTolerantDamageReductionMax 耐受型初始物种最高晶石伤害减免
  * @property {number} betaMiningRate Beta 晶石开采基础进度倍率
  * @property {number} betaMiningMinRate Beta 晶石最低开采进度，避免低文明完全停摆
- * @property {number} betaMiningCivilizationDecay 成功开采时对相邻生物文明保留比例
+ * @property {number} alphaCivilizationDecay Alpha 邻接每步对生物文明的保留比例
  * // --- 人类（默认物种）---
  * @property {number} humanMinTemp
  * @property {number} humanMaxTemp
@@ -111,6 +141,13 @@
  * @property {number} humanInitialMaxSettlementSize 初始人类最大聚落格数
  * @property {boolean} initialHumanSpawn 是否自动投放/重生人类聚落
  * @property {{x:number,y:number}} [humanSpawnPoint] 人类强制重生点
+ * @property {number} humanRespawnCrystalRadius 动态重生点检测晶石风险半径
+ * @property {number} humanRespawnTribeRadius 动态重生点检测人类部落半径
+ * @property {number} humanRespawnTribeSupportCap 人类部落支援评分封顶值
+ * @property {number} humanRespawnWeatherWeight 动态重生点天气评分权重
+ * @property {number} humanRespawnCrystalWeight 动态重生点晶石安全评分权重
+ * @property {number} humanRespawnTribeWeight 动态重生点附近人类部落评分权重
+ * @property {number} humanRespawnTerrainWeight 动态重生点地形通行评分权重
  * @property {number} humanRespawnDelay    人类灭绝后重生延迟（步数）
  * @property {number} bioAutoSpawnCount    自动生成新物种的触发阈值（物种数少于此值）
  * @property {number} bioAutoSpawnInterval 自动生成新物种的时间间隔（步数）
@@ -159,6 +196,30 @@ export const DEFAULT_PARAMS = {
     terrainClimateBarrierThreshold: 0.32,
     terrainOrographicStormBoost: 18,
     terrainBasinHeatRetention: 0.45,
+    climateBaseTemp: -10,
+    climateBaseReturnRate: 0.006,
+    mantleClimateAnomalyScale: 8,
+    mantleClimateAnomalyRate: 0.003,
+    climatePotentialHeatScale: 0.06,
+    climatePotentialCrystalScale: 1,
+    climatePotentialElevationBias: 0.8,
+    climatePotentialBasinBias: 0.35,
+    windAcceleration: 0.05,
+    windInertia: 0.82,
+    windFriction: 0.08,
+    windMaxSpeed: 1.6,
+    windCirculationBias: 0.04,
+    terrainWindSlopeResistance: 4,
+    terrainWindBarrierThreshold: 0.32,
+    terrainWindChannelBoost: 0.35,
+    terrainWindBasinDamping: 0.3,
+    alphaClimateThermalBias: 8,
+    alphaClimatePotentialBias: -10,
+    alphaClimateStormBoost: 0.18,
+    alphaClimateWindTwist: 0.06,
+    betaClimateThermalBias: -3,
+    betaClimatePotentialBias: 3,
+    betaClimateStormDamping: 0.08,
 
     // 晶石层
     alphaEnergyDemand: 4.5,
@@ -191,50 +252,62 @@ export const DEFAULT_PARAMS = {
     humanExtractorFalloffPower: 1.35,
 
     // 生物层通用
-    extinctionBonus: 50,
-    competitionPenalty: 5,
-    mutationRate: 0.1,
-    mutationStrength: 0.1,
+    extinctionBonus: 16,
+    competitionPenalty: 1.8,
+    mutationRate: 0.06,
+    mutationStrength: 0.06,
     newSpeciesThreshold: 0.2,
-    minProsperityGrowth: 5,
-    sameSpeciesBonus: 0.5,
-    civilizationCrystalDamageReductionScale: 0.45,
+    minProsperityGrowth: 0.35,
+    sameSpeciesBonus: 0.2,
+    civilizationCrystalDamageReductionScale: 0.32,
+    bioMaxSettlementCells: 8,
+    bioSmallSettlementSize: 3,
+    bioSmallSettlementSurvivalBonus: 0.45,
+    bioSmallSettlementCompetitionResistance: 0.55,
+    bioExpansionCost: 45,
     randomSpeciesMinCrystalDamageReduction: 0,
-    randomSpeciesMaxCrystalDamageReduction: 0.75,
-    initialBioSpeciesCount: 8,
-    initialBioMinProsperity: 45,
-    initialBioMaxProsperity: 120,
+    randomSpeciesMaxCrystalDamageReduction: 0.55,
+    initialBioSpeciesCount: 10,
+    initialBioMinProsperity: 35,
+    initialBioMaxProsperity: 85,
     initialBioMinSettlementSize: 1,
     initialBioMaxSettlementSize: 5,
     initialBioCrystalTolerantRatio: 0.35,
     initialBioAlphaSafeDistance: 3,
     crystalTolerantDamageReductionMin: 0.8,
     crystalTolerantDamageReductionMax: 0.95,
-    betaMiningRate: 1,
-    betaMiningMinRate: 0.05,
-    betaMiningCivilizationDecay: 0.5,
+    betaMiningRate: 0.25,
+    betaMiningMinRate: 0.01,
+    alphaCivilizationDecay: 0.965,
 
     // 人类层（默认生物）
     humanMinTemp: 7,
     humanMaxTemp: 34,
     humanSurvivalMinTemp: -50,
     humanSurvivalMaxTemp: 50,
-    humanProsperityGrowth: 0.5,
-    humanProsperityDecay: 1.4,
-    humanExpansionThreshold: 80,
-    humanMiningReward: 27,
-    humanMigrationThreshold: 80,
+    humanProsperityGrowth: 0.35,
+    humanProsperityDecay: 0.9,
+    humanExpansionThreshold: 165,
+    humanMiningReward: 10,
+    humanMigrationThreshold: 28,
     alphaRadiationDamage: 10,
-    humanCivilizationLevel: 0.55,
-    humanCrystalDamageReduction: 0.4,
-    humanInitialMinProsperity: 70,
-    humanInitialMaxProsperity: 140,
+    humanCivilizationLevel: 0.18,
+    humanCrystalDamageReduction: 0.28,
+    humanInitialMinProsperity: 50,
+    humanInitialMaxProsperity: 95,
     humanInitialMinSettlementSize: 2,
     humanInitialMaxSettlementSize: 5,
     initialHumanSpawn: true,
+    humanRespawnCrystalRadius: 4,
+    humanRespawnTribeRadius: 6,
+    humanRespawnTribeSupportCap: 3,
+    humanRespawnWeatherWeight: 55,
+    humanRespawnCrystalWeight: 45,
+    humanRespawnTribeWeight: 28,
+    humanRespawnTerrainWeight: 8,
     humanRespawnDelay: 20,
     bioAutoSpawnCount: 5,
-    bioAutoSpawnInterval: 10,
-    migrantExpansionProb: 0.8,
+    bioAutoSpawnInterval: 18,
+    migrantExpansionProb: 0.9,
     radiationImmunityThreshold: 200,
 };

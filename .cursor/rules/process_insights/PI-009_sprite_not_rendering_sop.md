@@ -1,7 +1,7 @@
 ---
 id: "PI-009"
-version: "v1.0"
-last_updated: "2026-04-25"
+version: "v1.1"
+last_updated: "2026-06-21"
 author: "Manus AI"
 related_modules: ["entities", "render_system", "core"]
 status: "active"
@@ -49,6 +49,13 @@ status: "active"
 **根因**：浏览器对 ES 模块（`type="module"`）有强缓存机制，普通的本地文件访问（`file://`）或简单的 HTTP 服务器可能无法强制刷新。
 **正确做法**：在调试期间，必须使用无缓存的 HTTP 服务器（如仓库根目录提供的 `serve_nocache.py`），并在浏览器中禁用缓存（DevTools -> Network -> Disable cache）。
 
+### 坑 6: 只改 manifest，漏改内嵌默认表（首帧/Node fallback 命中旧图）
+
+**现象**：`assets/sprites/enemies/enemy_sprite_manifest.json` 已经指向新 PNG，但测试、首帧生成或 manifest fetch 失败时仍命中旧资源。
+**根因**：`src/data/enemy_visual_assets.js` 同时维护 `_DEFAULT_COMPOSITES`、`_DEFAULT_ARCHETYPE_FILES` 和 `_DEFAULT_FRAMES`，用于 Node 环境、fetch 失败以及 manifest 尚未加载完成时的同步兜底。只更新 JSON manifest 不会更新这条 fallback 链。
+**正确做法**：新增/替换敌人 Sprite 路径时，必须同步更新 `enemy_sprite_manifest.json` 与 `src/data/enemy_visual_assets.js` 的内嵌默认表，并用 `resolveEnemyVisualAsset()` spot check 目标敌人是否命中新路径。
+**关键位置**：`src/data/enemy_visual_assets.js` → `_DEFAULT_COMPOSITES` / `_DEFAULT_ARCHETYPE_FILES`。
+
 ## 关键排查视角（SOP 顺序）
 
 1. **资源存在性**：检查 PNG 和 JSON 文件路径是否正确，网络请求是否 404。
@@ -56,9 +63,11 @@ status: "active"
 3. **元数据准确性**：检查 JSON 中的 `frameSize` 和 `row` 是否与 PNG 实际内容匹配。
 4. **层级顺序**：检查 `draw()` 函数中的绘制顺序，确认 Sprite 没有被后续的 `fillRect` 或 `fill()` 覆盖。
 5. **比例与裁剪**：检查 `drawImage` 的参数，确认宽高比是否正确，以及外层的 `clip()` 是否意外裁剪了 Sprite。
+6. **解析兜底**：检查 `enemy_sprite_manifest.json` 与 `enemy_visual_assets.js` 内嵌默认表是否同时指向同一资源。
 
 ## 版本变更日志
 
 | 版本 | 日期 | 变更内容 | 作者 |
 |------|------|---------|------|
+| v1.1 | 2026-06-21 | 补充 manifest 与内嵌默认资源表必须同步的防坑项，覆盖首帧/Node fallback 命中旧图问题 | Codex |
 | v1.0 | 2026-04-25 | 初始记录，基于 echo-alchemist-v2 Boss 与敌人贴图修复经验提炼 | Manus AI |

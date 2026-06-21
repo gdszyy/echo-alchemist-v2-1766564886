@@ -4,7 +4,7 @@
  * 职责：
  * - 定义所有符文的基础属性（RUNE_DB）
  * - 定义词条组合词典（RUNEWORD_DB）
- * - 定义套路克制关系字典（COUNTER_MAP）
+ * - 定义属性显示与共鸣数据
  *
  * 设计约束：
  * - 符文 element 与现有属性类型保持一致：pyro, cryo, lightning, bounce, pierce, scatter, laser
@@ -481,87 +481,6 @@ const RUNEWORD_DB = [
     }
 ];
 
-// ==================== 套路克制关系字典 ====================
-/**
- * COUNTER_MAP - 套路克制关系字典
- * 定义每种套路对应的敌人标签权重
- * 用于第二层：克制关系映射（玩家套路 → 敌人标签权重）
- *
- * 格式：{ [element]: { [affix_tag]: weight } }
- * weight 表示该套路对该标签敌人的克制强度（0~1.0）
- *
- * 设计逻辑：
- * - pyro（火焰）：克制护盾（shield）和再生（regen）类敌人
- * - cryo（冰霜）：克制极速（haste）和跳跃（jump）类敌人
- * - lightning（闪电）：克制分身（clone）和治疗者（healer）类敌人
- * - bounce（弹射）：克制分身（clone）和吞噬（devour）类敌人
- * - pierce（穿透）：克制护盾（shield）和跳跃（jump）类敌人
- * - scatter（散射）：克制分身（clone）和治疗者（healer）类敌人
- * - laser（激光）：克制再生（regen）和吞噬（devour）类敌人
- */
-const COUNTER_MAP = {
-    pyro: {
-        shield: 1.0,   // 火焰最克制护盾（熔化护盾）
-        regen: 0.8,    // 火焰持续伤害克制再生
-        healer: 0.4,   // 火焰对治疗者有一定效果
-        devour: 0.2    // 火焰对吞噬者效果较弱
-    },
-    cryo: {
-        haste: 1.0,    // 冰霜最克制极速（减速效果）
-        jump: 0.8,     // 冰霜冻结克制跳跃
-        regen: 0.4,    // 冰霜减缓再生速度
-        shield: 0.2    // 冰霜对护盾效果较弱
-    },
-    lightning: {
-        clone: 1.0,    // 闪电链最克制分身（连锁伤害）
-        healer: 0.8,   // 闪电克制治疗者（中断治疗）
-        haste: 0.4,    // 闪电对极速有一定效果
-        jump: 0.2      // 闪电对跳跃效果较弱
-    },
-    bounce: {
-        clone: 1.0,    // 弹射最克制分身（多目标弹跳）
-        devour: 0.8,   // 弹射克制吞噬（弹开吞噬）
-        jump: 0.5,     // 弹射对跳跃有一定效果
-        healer: 0.3    // 弹射对治疗者效果较弱
-    },
-    pierce: {
-        shield: 1.0,   // 穿透最克制护盾（直接穿透）
-        jump: 0.8,     // 穿透克制跳跃（精准打击）
-        devour: 0.5,   // 穿透对吞噬有一定效果
-        regen: 0.2     // 穿透对再生效果较弱
-    },
-    scatter: {
-        clone: 1.0,    // 散射最克制分身（范围覆盖）
-        healer: 0.8,   // 散射克制治疗者（多目标覆盖）
-        haste: 0.4,    // 散射对极速有一定效果
-        shield: 0.2    // 散射对护盾效果较弱
-    },
-    laser: {
-        regen: 1.0,    // 激光最克制再生（持续伤害压制）
-        devour: 0.8,   // 激光克制吞噬（精准击杀）
-        shield: 0.5,   // 激光对护盾有一定效果
-        healer: 0.3    // 激光对治疗者效果较弱
-    },
-    venom: {
-        regen: 1.0,    // 毒素强克再生（持续伤害对抗回血）
-        shield: 0.8,   // 毒素穿透护盾结算 DoT
-        healer: 0.4,
-        haste: 0.2
-    },
-    overcharge: {
-        shield: 1.0,   // 超载爆炸克制护盾
-        devour: 0.8,   // 大范围爆炸对吞噬有效
-        clone: 0.4,
-        regen: 0.2
-    },
-    echo: {
-        clone: 1.0,    // 回响克制分身（回响子弹形成多目标）
-        jump: 0.8,     // 回响子弹镜像反向克制跳跃绕后
-        haste: 0.3,
-        healer: 0.2
-    }
-};
-
 // ==================== 属性显示名称映射 ====================
 /**
  * STAT_DISPLAY - 属性显示名称与图标映射
@@ -986,4 +905,4 @@ const ELEMENT_RESONANCE_DB = {
 };
 
 // ==================== 导出 ====================
-export { RUNE_DB, RUNEWORD_DB, COUNTER_MAP, STAT_DISPLAY, RARITY_DISPLAY, ELEMENT_RESONANCE_DB };
+export { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY, RARITY_DISPLAY, ELEMENT_RESONANCE_DB };

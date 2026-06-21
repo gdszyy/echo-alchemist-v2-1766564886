@@ -38,8 +38,9 @@ export const CollisionSystem = {
         const newPos = enemy.pos.add(delta);
         const halfW = enemy.width / 2;
         const halfH = enemy.height / 2;
+        const moveBounds = this.sys_getCombatBounds ? this.sys_getCombatBounds() : { left: 0, right: this.width };
         // 1. 边界检查 (确保不超出画布左右和上下边界)
-        if (newPos.x - halfW < 0 || newPos.x + halfW > this.width) return false;
+        if (newPos.x - halfW < moveBounds.left || newPos.x + halfW > moveBounds.right) return false;
         if (newPos.y - halfH < 0 || newPos.y + halfH > this.height) return false;
         // 2. 碰撞检查 (确保不与其他活跃敌人重叠)
         // 使用简单的 AABB 碰撞检测
@@ -70,15 +71,18 @@ export const CollisionSystem = {
      */
     combat_laser_castRay(start, dir, maxDist) {
         let closest = { dist: maxDist, hitType: 'none', normal: null, enemy: null };
+        const combatBounds = this.sys_getCombatBounds ? this.sys_getCombatBounds() : { left: 0, right: this.width };
+        const leftBound = combatBounds.left + CONFIG.physics.bulletRadius;
+        const rightBound = combatBounds.right - CONFIG.physics.bulletRadius;
         // 1. 检测墙壁
         // 左墙 (x=radius)
         if (dir.x < 0) {
-            let d = (CONFIG.physics.bulletRadius - start.x) / dir.x;
+            let d = (leftBound - start.x) / dir.x;
             if (d > 0 && d < closest.dist) closest = { dist: d, hitType: 'wall', normal: 'x' };
         }
         // 右墙 (x=width-radius)
         if (dir.x > 0) {
-            let d = (this.width - CONFIG.physics.bulletRadius - start.x) / dir.x;
+            let d = (rightBound - start.x) / dir.x;
             if (d > 0 && d < closest.dist) closest = { dist: d, hitType: 'wall', normal: 'x' };
         }
         // 顶墙 (y=radius)

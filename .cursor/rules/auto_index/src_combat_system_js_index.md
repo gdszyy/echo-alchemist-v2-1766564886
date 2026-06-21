@@ -1,6 +1,6 @@
 # src\combat_system.js 函数索引
 
-> 自动生成于 2026-06-20 | 总行数: 4079 | 函数数: 51 | 语言: javascript
+> 自动生成于 2026-06-21 | 总行数: 4023 | 函数数: 50 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 5 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -42,7 +42,6 @@
 | combat_applyBossVulnerability | method | `combat_applyBossVulnerability(enemy, config = {}, projectile = null, dmg = 0)` |  |
 | combat_updateBossVulnerabilityProgress | method | `combat_updateBossVulnerabilityProgress(enemy, bossVulnerability, actualDamage = 0)` |  |
 | combat_getHitFeedbackLabel | method | `combat_getHitFeedbackLabel(enemy, config = {}, projectile = null, damageResult = null, context = {})` |  |
-| addAttr | function | `addAttr(attr, value = 0)` |  |
 | combat_damageEnemy | method | `combat_damageEnemy(enemy, projectile, damageOverride = null)` | ⚠️ 巨型函数，见 @section 导航 |
 | combat_fireNextShot | method | `combat_fireNextShot(vel)` | ⚠️ 巨型函数，见 @section 导航 |
 | combat_laser_fire | method | `combat_laser_fire(startX, startY, vel, recipe, shotId = null, isTickFire = false)` | ⚠️ 巨型函数，见 @section 导航 |
@@ -91,7 +90,7 @@
 
 | 节点标记 | 说明 |
 |----------|------|
-| `@section:damage_element_bonus` | 属性加成与克制倍率计算 |
+| `@section:damage_element_bonus` | 属性加成与共鸣倍率计算 |
 | `@section:damage_runeword_hooks` | 符文词条 Hook 注入点 |
 | `@section:damage_apply_to_enemy` | 伤害写入敌人并触发属性反应 |
 | `@section:damage_kill_check` | 击杀判断与掉落物/经验触发 |

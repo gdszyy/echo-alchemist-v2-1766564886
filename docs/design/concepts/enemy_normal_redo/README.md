@@ -1,6 +1,6 @@
 # Normal Enemy Redo - 2026-06-20
 
-This pass replaces the common 1x1 enemy body, not its collision system.
+This pass replaces the common 1x1 enemy body. The runtime collision boundary is now expressed by the separate `residue:1x1` collision frame asset.
 
 ## Files
 
@@ -14,8 +14,8 @@ This pass replaces the common 1x1 enemy body, not its collision system.
 
 ## Boundary Rule
 
-The enemy body itself expresses the physical boundary. There is no separate 1x1 hollow frame overlay. The outer worn stone edge is part of the solid sprite silhouette.
+The enemy body should not bake in an extra UI-like border. Runtime draws the physical boundary from `assets/sprites/enemies/frames/frame_residue_1x1.png`; that frame must remain aligned with the 1x1 collision hull.
 
 ## Prompt Summary
 
-High-detail dark alchemical fantasy sprite, compact geometric whetstone ore block, chipped beveled black basalt, orange ember cracks, small embedded alchemical core, faint violet rune accents, orthographic front-facing slight top-down view, no UI, no health bar, no separate border frame, no hollow center, static source image.
+High-detail dark alchemical fantasy sprite, compact geometric whetstone ore block, chipped beveled black basalt, orange ember cracks, small embedded alchemical core, faint violet rune accents, orthographic front-facing slight top-down view, no UI, no health bar, no baked border frame, static source image.

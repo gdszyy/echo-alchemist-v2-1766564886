@@ -1,0 +1,23 @@
+{
+  "frameSize": 384,
+  "frameWidth": 256,
+  "frameHeight": 384,
+  "placeholder": false,
+  "single": true,
+  "generated": "native_hollow_concept_2026_06_21",
+  "sourceAtlas": "docs/screenshots/enemy-layer-debug-2026-06-21/enemy_frontview_atlas_generated.png",
+  "sourceCellLabel": "hive",
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 1,
+      "fps": 1,
+      "frameWidth": 256,
+      "frameHeight": 384
+    }
+  },
+  "sourceConcept": "docs/design/concepts/enemy_native_hollow_concept_2026-06-21.png",
+  "sourceConceptLabel": "hive",
+  "nativeHollowDesign": true,
+  "readabilityDesign": "body is built from native hollow structures so runtime HP liquid can show through"
+}

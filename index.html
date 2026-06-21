@@ -851,17 +851,18 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: max(64px, calc(env(safe-area-inset-top) + 56px));
+            height: max(76px, calc(env(safe-area-inset-top) + 68px));
             padding-top: env(safe-area-inset-top);
             background: rgba(10, 15, 30, 0.82);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             border-bottom: 1px solid rgba(71, 85, 105, 0.4);
-            display: flex;
+            display: grid;
+            grid-template-columns: minmax(108px, 0.9fr) minmax(148px, 1.12fr) minmax(104px, 0.9fr);
             align-items: center;
-            justify-content: space-between;
-            padding-left: 10px;
-            padding-right: 10px;
+            gap: 6px;
+            padding-left: 8px;
+            padding-right: 8px;
             z-index: 500;
             pointer-events: auto;
             box-shadow: 0 2px 12px rgba(0,0,0,0.4);
@@ -871,16 +872,25 @@
             display: flex;
             align-items: center;
             gap: 6px;
-            flex: 1;
+            min-width: 0;
+        }
+        .top-bar-left {
+            flex-direction: column;
+            align-items: stretch;
+            justify-content: center;
+            gap: 3px;
         }
         .top-bar-center {
             display: flex;
             align-items: center;
             justify-content: center;
-            flex: 1;
+            width: 100%;
+            gap: 0;
+            min-width: 0;
         }
         .top-bar-right {
             justify-content: flex-end;
+            gap: 4px;
         }
         /* 回合数胶囊 */
         .round-pill {
@@ -913,45 +923,42 @@
             display: flex;
         }
         .combat-status-panel {
-            position: absolute;
-            top: calc(max(64px, calc(env(safe-area-inset-top) + 56px)) + 6px);
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 45;
+            position: static;
+            transform: none;
             display: flex;
             align-items: center;
-            gap: 8px;
-            width: min(720px, calc(100% - 16px));
+            gap: 4px;
+            width: 100%;
+            max-width: none;
             box-sizing: border-box;
-            min-height: 36px;
-            padding: 5px 10px;
+            min-height: 24px;
+            padding: 2px 6px;
             border: 1px solid rgba(148, 163, 184, 0.24);
-            border-radius: 8px;
+            border-radius: 7px;
             background: rgba(2, 6, 23, 0.72);
             color: #e2e8f0;
-            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03), 0 8px 20px rgba(0, 0, 0, 0.22);
             backdrop-filter: blur(8px);
             pointer-events: none;
             opacity: 1;
-            transition: opacity 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+            transition: opacity 0.18s ease, border-color 0.18s ease;
         }
         .combat-status-panel.is-hidden {
+            display: none;
             opacity: 0;
-            transform: translate(-50%, -8px);
         }
         .combat-status-main {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 5px;
             min-width: 0;
             flex: 1 1 auto;
             white-space: nowrap;
-            font-size: 0.72rem;
+            font-size: 0.62rem;
+            justify-content: space-between;
         }
         .combat-status-note {
-            min-width: 8rem;
-            max-width: 18rem;
-            flex: 0 1 14rem;
+            display: none;
             color: #cbd5e1;
             font-size: 0.72rem;
             line-height: 1.15;
@@ -960,11 +967,11 @@
             white-space: nowrap;
         }
         .combat-status-pill {
-            display: inline-flex;
+            display: none;
             align-items: center;
             gap: 5px;
             min-width: 4.2rem;
-            padding: 3px 7px;
+            padding: 3px 6px;
             border-radius: 999px;
             border: 1px solid rgba(34, 197, 94, 0.36);
             color: #bbf7d0;
@@ -993,6 +1000,7 @@
             align-items: baseline;
             gap: 3px;
             color: #94a3b8;
+            min-width: 0;
         }
         .combat-status-metric b {
             color: #f8fafc;
@@ -1000,42 +1008,152 @@
             font-variant-numeric: tabular-nums;
         }
         .combat-status-sep {
+            display: none;
             width: 1px;
-            height: 18px;
+            height: 16px;
             background: rgba(148, 163, 184, 0.22);
         }
         @media (max-width: 720px) {
             .combat-status-panel {
-                top: calc(max(64px, calc(env(safe-area-inset-top) + 56px)) + 6px);
-                left: 8px;
-                right: 8px;
-                width: auto;
-                transform: none;
-                max-width: none;
-                padding: 6px 8px;
-                gap: 6px;
-            }
-            .combat-status-panel.is-hidden {
-                transform: translateY(-8px);
+                padding: 2px 5px;
+                gap: 4px;
             }
             .combat-status-main {
-                gap: 6px;
-                font-size: 0.68rem;
-            }
-            .combat-status-note {
-                min-width: 0;
-                max-width: none;
-                flex: 1;
-                font-size: 0.68rem;
+                gap: 4px;
+                font-size: 0.58rem;
             }
             .combat-status-metric .combat-status-label {
                 display: none;
             }
+            #combat-elite-count,
+            #combat-shield-count {
+                display: none;
+            }
+            .combat-status-metric.is-mobile-optional {
+                display: none;
+            }
+        }
+        @media (max-width: 420px) {
+            #unified-top-bar {
+                height: max(70px, calc(env(safe-area-inset-top) + 64px));
+                grid-template-columns: minmax(72px, 0.82fr) minmax(112px, 1fr) minmax(76px, 0.78fr);
+                gap: 4px;
+                padding-left: 5px;
+                padding-right: 5px;
+            }
+            #top-phase-label {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                font-size: 0.62rem;
+            }
+            .top-bar-right {
+                gap: 2px;
+            }
+            .round-pill {
+                padding: 2px 6px;
+                font-size: 0.68rem;
+            }
+            #speed-btn,
+            #settings-btn {
+                width: 28px;
+                height: 28px;
+                min-width: 28px;
+                font-size: 0.78rem;
+            }
+            #combat-rune-slot-row {
+                gap: 5px;
+            }
+            #combat-rune-single-slot {
+                width: 32px;
+                height: 32px;
+            }
+            #combat-rune-single-slot .rune-icon-frame {
+                width: 26px;
+                height: 26px;
+                font-size: 14px;
+            }
+        }
+        #unified-top-bar.is-gathering {
+            height: max(52px, calc(env(safe-area-inset-top) + 46px));
+            grid-template-columns: minmax(74px, 0.78fr) minmax(168px, 1.24fr) minmax(86px, 0.8fr);
+            gap: 5px;
+            padding-left: 8px;
+            padding-right: 8px;
+            background: linear-gradient(180deg, rgba(5, 8, 18, 0.78), rgba(5, 8, 18, 0.42));
+            border-bottom-color: rgba(63, 191, 220, 0.16);
+        }
+        #unified-top-bar.is-gathering .top-bar-left {
+            flex-direction: row;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 7px;
+        }
+        #unified-top-bar.is-gathering #top-phase-label {
+            display: inline-flex;
+            align-items: center;
+            height: 24px;
+            padding: 0 7px;
+            border: 1px solid rgba(251, 191, 36, 0.28);
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.62);
+            color: #facc15;
+            font-size: 0.68rem;
+            line-height: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #unified-top-bar.is-gathering #sp-panel {
+            flex-wrap: nowrap;
+            gap: 5px !important;
+            min-width: 0;
+        }
+        #unified-top-bar.is-gathering .sp-slot {
+            width: 10px;
+            height: 10px;
+        }
+        #unified-top-bar.is-gathering .top-bar-center {
+            min-height: 30px;
+        }
+        #unified-top-bar.is-gathering .top-bar-right {
+            gap: 3px;
+        }
+        #unified-top-bar.is-gathering #speed-btn,
+        #unified-top-bar.is-gathering #settings-btn {
+            width: 28px !important;
+            height: 28px !important;
+            min-width: 28px !important;
+        }
+        #phase-gathering {
+            padding-top: max(52px, calc(env(safe-area-inset-top) + 46px));
+        }
+        @media (max-width: 420px) {
+            #unified-top-bar.is-gathering {
+                height: max(50px, calc(env(safe-area-inset-top) + 44px));
+                grid-template-columns: minmax(62px, 0.7fr) minmax(138px, 1.15fr) minmax(78px, 0.78fr);
+                gap: 3px;
+                padding-left: 5px;
+                padding-right: 5px;
+            }
+            #unified-top-bar.is-gathering #top-phase-label {
+                height: 22px;
+                padding: 0 5px;
+                font-size: 0.6rem;
+            }
+            #unified-top-bar.is-gathering .sp-slot {
+                width: 9px;
+                height: 9px;
+            }
+        }
+        #phase-combat {
+            --combat-top-safe: max(78px, calc(env(safe-area-inset-top) + 70px));
+            --combat-bottom-safe: max(70px, calc(env(safe-area-inset-bottom) + 64px));
         }
         #skill-bar.skill-bar-panel {
             display: none;
             flex-direction: column;
             width: 132px;
+            right: 8px !important;
+            bottom: max(72px, calc(env(safe-area-inset-bottom) + 66px)) !important;
             padding: 8px;
             border: 1px solid rgba(148, 163, 184, 0.26);
             border-radius: 10px;
@@ -1157,7 +1275,7 @@
         @media (max-width: 420px) {
             #skill-bar.skill-bar-panel {
                 right: 8px !important;
-                bottom: 76px !important;
+                bottom: max(72px, calc(env(safe-area-inset-bottom) + 66px)) !important;
                 width: 118px;
                 padding: 7px;
             }
@@ -1340,6 +1458,37 @@
             bottom: auto;
             width: 220px;
             transform: none;
+        }
+        .run-shop-status-dock.is-gathering-top,
+        body.pc-mode .run-shop-status-dock.is-gathering-top {
+            left: 50%;
+            right: auto;
+            top: max(9px, calc(env(safe-area-inset-top) + 9px));
+            bottom: auto;
+            width: min(212px, max(170px, calc(100% - 226px)));
+            min-height: 30px;
+            padding: 5px 8px;
+            transform: translateX(-50%);
+            z-index: 510;
+        }
+        .run-shop-status-dock.is-gathering-top .run-shop-status-track {
+            height: 3px;
+        }
+        .run-shop-status-dock.is-gathering-top #run-shop-status-open {
+            min-width: 48px;
+            min-height: 22px;
+            padding: 3px 7px;
+        }
+        @media (max-width: 420px) {
+            .run-shop-status-dock.is-gathering-top,
+            body.pc-mode .run-shop-status-dock.is-gathering-top {
+                width: min(190px, calc(100% - 150px));
+                padding: 5px 6px;
+            }
+            .run-shop-status-dock.is-gathering-top .run-shop-status-copy {
+                gap: 5px;
+                font-size: 8px;
+            }
         }
 
         .btn-icon {
@@ -2423,7 +2572,7 @@
             width: 160px; 
             display: flex;
             flex-direction: column-reverse;
-            gap: 6px;
+            gap: 5px;
             pointer-events: auto; 
             z-index: 20;
         }
@@ -2438,13 +2587,15 @@
         /* 战斗阶段 HUD 浮动容器 */
         .recipe-hud-floating {
             position: absolute;
-            bottom: 80px;
-            left: 10px; /* 改为固定左边距，不再使用 50% 偏移 */
+            bottom: max(132px, calc(env(safe-area-inset-bottom) + 120px));
+            left: 8px; /* 改为固定左边距，不再使用 50% 偏移 */
             transform: none; /* 移除 translateX */
-            width: 176px;
+            width: 136px;
+            max-height: 38vh;
             display: flex;
             flex-direction: column-reverse;
-            gap: 6px;
+            gap: 5px;
+            overflow: hidden;
             pointer-events: none;
             z-index: 40;
             align-items: flex-start; /* 改为向左对齐 */
@@ -2466,14 +2617,14 @@
             opacity: 0.6;
         }
         .recipe-card.ammo-readout {
-            min-width: 146px;
-            max-width: 168px;
+            min-width: 118px;
+            max-width: 136px;
             border-color: color-mix(in srgb, var(--ammo-accent, #fbbf24) 70%, #475569);
             box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04), 0 0 10px color-mix(in srgb, var(--ammo-accent, #fbbf24) 22%, transparent);
         }
         .recipe-card.ammo-readout.queue {
-            min-width: 124px;
-            max-width: 150px;
+            min-width: 112px;
+            max-width: 126px;
         }
         .ammo-readout-header {
             gap: 6px;
@@ -3905,7 +4056,8 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
+            gap: 3px;
+            width: 100%;
             pointer-events: none;
         }
         /* 符文槽行：左侧标签 + 右侧符文位 */
@@ -4170,7 +4322,7 @@
         }
     </style>
     <!-- Phase 5A: 位图化 UI 样式覆盖层 -->
-    <link rel="stylesheet" href="src/styles/bitmap_ui.css">
+    <link rel="stylesheet" href="src/styles/bitmap_ui.css?v=20260621-combat-ui">
 </head>
 <body>
 <div id="app-wrapper">
@@ -4227,6 +4379,21 @@
         <!-- 左侧：阶段标题 + SP 宝石 -->
         <div class="top-bar-left">
             <div id="top-phase-label" class="text-xs font-bold text-amber-400/80 font-[Cinzel] tracking-wider whitespace-nowrap"></div>
+            <div id="combat-status-panel" class="combat-status-panel is-hidden" aria-live="polite">
+                <div class="combat-status-main">
+                    <span id="combat-threat-pill" class="combat-status-pill">
+                        <span class="combat-status-dot"></span>
+                        <span id="combat-threat-label">稳定</span>
+                    </span>
+                    <span class="combat-status-sep"></span>
+                    <span class="combat-status-metric"><span class="combat-status-label">敌</span><b id="combat-enemy-count">0</b></span>
+                    <span class="combat-status-metric is-mobile-optional"><span class="combat-status-label">精英</span><b id="combat-elite-count">0</b></span>
+                    <span class="combat-status-metric"><span class="combat-status-label">Boss</span><b id="combat-boss-count">0</b></span>
+                    <span class="combat-status-metric is-mobile-optional"><span class="combat-status-label">盾</span><b id="combat-shield-count">0</b></span>
+                    <span class="combat-status-metric"><span class="combat-status-label">弹</span><b id="combat-ammo-count">0</b></span>
+                </div>
+                <div id="combat-status-note" class="combat-status-note">等待战斗开始</div>
+            </div>
             <div id="sp-panel" class="flex flex-wrap gap-2 pointer-events-none transition-opacity duration-300"></div>
         </div>
 
@@ -4696,21 +4863,6 @@
         <div id="skill-bar" class="skill-bar-panel absolute bottom-24 right-4 pointer-events-auto z-50">
         </div>
         <div id="recipe-hud-container" class="absolute z-40 pointer-events-none"></div>
-        <div id="combat-status-panel" class="combat-status-panel is-hidden" aria-live="polite">
-            <div class="combat-status-main">
-                <span id="combat-threat-pill" class="combat-status-pill">
-                    <span class="combat-status-dot"></span>
-                    <span id="combat-threat-label">稳定</span>
-                </span>
-                <span class="combat-status-sep"></span>
-                <span class="combat-status-metric"><span class="combat-status-label">敌</span><b id="combat-enemy-count">0</b></span>
-                <span class="combat-status-metric"><span class="combat-status-label">精英</span><b id="combat-elite-count">0</b></span>
-                <span class="combat-status-metric"><span class="combat-status-label">Boss</span><b id="combat-boss-count">0</b></span>
-                <span class="combat-status-metric"><span class="combat-status-label">盾</span><b id="combat-shield-count">0</b></span>
-                <span class="combat-status-metric"><span class="combat-status-label">弹</span><b id="combat-ammo-count">0</b></span>
-            </div>
-            <div id="combat-status-note" class="combat-status-note">等待战斗开始</div>
-        </div>
         
         <!-- 左下角伤害统计按鈕 -->
         <button id="damage-stats-btn" onclick="game.ui_toggleDamagePanel()" class="absolute bottom-2 left-2 w-10 h-10 bg-slate-800/90 hover:bg-slate-700/90 rounded-full border-2 border-purple-500/50 hover:border-purple-400 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg">

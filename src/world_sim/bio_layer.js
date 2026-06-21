@@ -7,6 +7,11 @@
 // 变更收集模式：本层先把所有改动收集进 changes[] 再统一应用，避免遍历途中改写网格导致读到半更新状态。
 
 import { CELL_TYPE } from './cell.js';
+import {
+    canSettleWithinLimit,
+    getSmallSettlementFactor,
+    isSettlementAtCapacity,
+} from './bio_settlement.js';
 
 function terrainStep(fromCell, toCell) {
     return Math.abs((toCell.terrainElevation ?? 0) - (fromCell.terrainElevation ?? 0));
@@ -93,6 +98,8 @@ export const bio_layer = {
 
         // @section:bio_spawn_respawn - 物种稀少时自动投放新物种；人类灭绝后按延迟强制重生
 
+        this.updateHumanRespawnPoint();
+
         const autoSpawnCount = this.params.bioAutoSpawnCount ?? 5;
         const autoSpawnInterval = this.params.bioAutoSpawnInterval ?? 10;
         if (autoSpawnCount > 0 && speciesSet.size < autoSpawnCount && this.timeStep % autoSpawnInterval === 0) {
@@ -133,6 +140,7 @@ export const bio_layer = {
 
                 if (cell.crystalState === CELL_TYPE.BIO && cell.bioAttributes) {
                     const attrs = cell.bioAttributes;
+                    const smallSettlementFactor = getSmallSettlementFactor(this, x, y, attrs.speciesId);
 
                     // A. 极限温度伤害（不直接致死，而是快速降低繁荣度，每度温差 2 点）
                     let extremeTempDamage = 0;
@@ -144,6 +152,7 @@ export const bio_layer = {
 
                     // B. 繁荣度更新：宜居温度带来增长，偏离则增长递减（甚至为负）
                     let prosperityChange = 0;
+                    prosperityChange += (this.params.bioSmallSettlementSurvivalBonus ?? 0) * smallSettlementFactor;
 
                     let growth = attrs.prosperityGrowth;
                     if (attrs.speciesId !== 0) {
@@ -177,7 +186,11 @@ export const bio_layer = {
                         } else if (cell.prosperity < n.prosperity) {
                             const diff = n.prosperity - cell.prosperity;
                             const damage = competitionPenalty * (1 + diff / 100);
-                            prosperityChange -= damage * terrainContact;
+                            const resistance = Math.min(
+                                0.9,
+                                (this.params.bioSmallSettlementCompetitionResistance ?? 0) * smallSettlementFactor
+                            );
+                            prosperityChange -= damage * terrainContact * (1 - resistance);
                         }
                     }
 
@@ -195,6 +208,13 @@ export const bio_layer = {
                         if (finalDamage > 0) {
                             prosperityChange -= alphaNeighbors.length * finalDamage;
                         }
+                        const civilizationDecay = Math.max(0, Math.min(1, this.params.alphaCivilizationDecay ?? 0.98));
+                        changes.push({
+                            x,
+                            y,
+                            type: 'CIVILIZATION',
+                            value: Math.pow(civilizationDecay, alphaNeighbors.length),
+                        });
                     }
 
                     // C. 采矿（仅聚落可采矿，文明越高越快；单聚落每步最多开采一块）
@@ -215,16 +235,6 @@ export const bio_layer = {
                             minedBetaKeys.add(`${target.x},${target.y}`);
                             changes.push({ x: target.x, y: target.y, type: 'STATE', value: 0 });
                             prosperityChange += attrs.miningReward;
-                            for (const n of this.getNeighbors(target.x, target.y)) {
-                                if (n.crystalState === CELL_TYPE.BIO && n.bioAttributes) {
-                                    changes.push({
-                                        x: n.x,
-                                        y: n.y,
-                                        type: 'CIVILIZATION',
-                                        value: this.params.betaMiningCivilizationDecay ?? 0.5,
-                                    });
-                                }
-                            }
                             changes.push({ x, y, type: 'MINING_PROGRESS', value: nextMiningProgress - 1 });
                         } else {
                             changes.push({ x, y, type: 'MINING_PROGRESS', value: nextMiningProgress });
@@ -246,6 +256,8 @@ export const bio_layer = {
 
                     // E. 扩张（繁荣度达标，概率变异后生成迁徙者或新聚落）
                     if (newProsperity > attrs.expansionThreshold) {
+                        const expansionCost = Math.min(newProsperity * 0.5, this.params.bioExpansionCost ?? 30);
+                        const settlementAtCapacity = isSettlementAtCapacity(this, x, y, attrs.speciesId);
                         const newAttrs = { ...attrs };
                         let isNewSpecies = false;
                         const keys = [
@@ -253,6 +265,7 @@ export const bio_layer = {
                             'expansionThreshold', 'miningReward', 'migrationThreshold',
                             'civilizationLevel', 'crystalDamageReduction',
                         ];
+                        let mutationDrift = 0;
 
                         for (const key of keys) {
                             if (this.random() < mutationRate) {
@@ -260,10 +273,11 @@ export const bio_layer = {
                                 if (typeof val !== 'number') continue;
                                 const change = val * mutationStrength * (this.random() > 0.5 ? 1 : -1);
                                 newAttrs[key] += change;
-                                if (Math.abs(change) > Math.abs(val) * newSpeciesThreshold) {
-                                    isNewSpecies = true;
-                                }
+                                mutationDrift += Math.abs(change) / Math.max(1, Math.abs(val));
                             }
+                        }
+                        if (mutationDrift >= newSpeciesThreshold) {
+                            isNewSpecies = true;
                         }
                         newAttrs.civilizationLevel = clampRatio(newAttrs.civilizationLevel ?? 0);
                         newAttrs.crystalDamageReduction = clampRatio(
@@ -271,12 +285,12 @@ export const bio_layer = {
                         );
 
                         if (isNewSpecies) {
-                            newAttrs.speciesId = Math.floor(this.random() * 100000);
+                            newAttrs.speciesId = Math.floor(this.random() * 100000) + 1;
                             newAttrs.color = `hsl(${this.random() * 360}, 70%, 50%)`;
                         }
 
                         // 决策：大概率生成迁徙者（migrantExpansionProb），否则直接扩张为邻近聚落
-                        const migrantProbability = this.params.migrantExpansionProb;
+                        const migrantProbability = settlementAtCapacity ? 1 : (this.params.migrantExpansionProb ?? 0.8);
 
                         if (this.random() < migrantProbability) {
                             // 生成迁徙者：默认落在当前格；若已有迁徙者则尝试落到空闲邻居
@@ -301,30 +315,31 @@ export const bio_layer = {
                             if (targetX !== -1) {
                                 changes.push({
                                     x: targetX, y: targetY, type: 'MIGRANT_ADD',
-                                    value: { prosperity: 30, attrs: newAttrs },
+                                    value: { prosperity: expansionCost, attrs: newAttrs },
                                 });
-                                changes.push({ x, y, type: 'PROSPERITY', value: newProsperity - 30 });
+                                changes.push({ x, y, type: 'PROSPERITY', value: newProsperity - expansionCost });
                             }
                         } else {
                             // 生成新聚落：需有空的邻居，否则回退为迁徙者以保持扩张压力
                             const emptyNeighbors = neighbors.filter(n =>
                                 n.exists &&
                                 n.crystalState === CELL_TYPE.EMPTY &&
+                                canSettleWithinLimit(this, n, newAttrs.speciesId) &&
                                 canTraverseTerrain(this, cell, n, this.params.terrainExpansionMaxStep)
                             );
                             if (emptyNeighbors.length > 0) {
                                 const target = emptyNeighbors[Math.floor(this.random() * emptyNeighbors.length)];
                                 changes.push({
                                     x: target.x, y: target.y, type: 'NEW_BIO',
-                                    value: { prosperity: 30, attrs: newAttrs },
+                                    value: { prosperity: expansionCost, attrs: newAttrs },
                                 });
-                                changes.push({ x, y, type: 'PROSPERITY', value: newProsperity - 30 });
+                                changes.push({ x, y, type: 'PROSPERITY', value: newProsperity - expansionCost });
                             } else {
                                 changes.push({
                                     x, y, type: 'MIGRANT_ADD',
-                                    value: { prosperity: 30, attrs: newAttrs },
+                                    value: { prosperity: expansionCost, attrs: newAttrs },
                                 });
-                                changes.push({ x, y, type: 'PROSPERITY', value: newProsperity - 30 });
+                                changes.push({ x, y, type: 'PROSPERITY', value: newProsperity - expansionCost });
                             }
                         }
                     }
@@ -353,8 +368,12 @@ export const bio_layer = {
                         continue;
                     }
 
-                    // 尝试定居：当前格为空且温度适宜则落地为聚落
+                    // 尝试定居：当前格为空、温度适宜且繁荣度足以维持聚落时才落地
+                    const settleMinProsperity = this.params.migrantSettleMinProsperity ??
+                        attrs.migrationThreshold ?? 0;
                     if (cell.crystalState === CELL_TYPE.EMPTY &&
+                        canSettleWithinLimit(this, cell, attrs.speciesId) &&
+                        newProsperity >= settleMinProsperity &&
                         cell.temperature >= attrs.minTemp &&
                         cell.temperature <= attrs.maxTemp) {
                         changes.push({ x, y, type: 'MIGRANT_REMOVE' });
@@ -452,6 +471,8 @@ export const bio_layer = {
                 cell.migrant = null;
             }
         }
+
+        this.updateHumanRespawnPoint();
     },
 
     /**

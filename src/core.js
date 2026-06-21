@@ -12,7 +12,7 @@
 import { 
     META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB 
 } from './config.js';
-import { RUNE_DB, RUNEWORD_DB, COUNTER_MAP } from './rune_config.js';
+import { RUNE_DB, RUNEWORD_DB } from './rune_config.js';
 
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, TriangleSideWheel, GhostPeg, Peg, DropBall, Enemy, SwordQi, 
@@ -47,6 +47,7 @@ import { calc_utils } from './calc_utils.js';
 import { tutorial_system } from './tutorial_system.js';
 import { game_over_mixin } from './ui/game_over.js';
 import { preloadAllSprites } from './render/sprite_renderer.js'; // [Phase 5B] 预加载所有 Sprite Sheet
+import { preloadUiBitmaps } from './bitmap_icons.js';
 
 // ==================== 延迟音频初始化 ====================
 let _audioInitialized = false;
@@ -228,6 +229,10 @@ class Game {
         this.gameOver = false; 
         this.defeatLineY = 570; 
         this.combatGridTopY = 90; // 战斗网格第一行敌人中心 Y（由 sys_resize 动态计算并覆盖）
+        this.combatSideInset = 0;
+        this.combatGridLeftX = 0;
+        this.combatGridRightX = this.width;
+        this.combatGridWidth = this.width;
         this.timeScale = 1.0; 
         this.round = 1; 
         this.score = 0; 
@@ -380,6 +385,7 @@ class Game {
         this._rafId = null;         // 当前 requestAnimationFrame 句柄（用于 cancel）
         // [Phase 5B] 预加载所有 Sprite Sheet（在游戏循环开始前触发异步加载）
         preloadAllSprites();
+        preloadUiBitmaps();
         // [省电] 注册页面可见性监听（后台硬停循环 + 挂起音频）
         this.sys_setupVisibilityHandling();
         // 启动游戏主循环

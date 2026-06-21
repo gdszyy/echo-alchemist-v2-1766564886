@@ -45,6 +45,7 @@ export class SimulationEngine {
         this.bioExtinctionStep = null;
         this.isFirstSpawn = true;
         this.humanEnergyBases = [];
+        this.humanRespawnPoint = null;
         this.initialAlphaSeeded = false;
 
         // 组合模式：将各层方法绑定到实例（与 Echo Game 主类一致，this 指向引擎实例）
@@ -75,6 +76,7 @@ export class SimulationEngine {
             this.seedInitialAlpha();
         }
         this.seedInitialBiosphere();
+        this.updateHumanRespawnPoint();
     }
 
     /**

@@ -163,6 +163,9 @@ function buildCombatAimGuide(game, start, dir, bounceCount = 3, options = {}) {
     const topBound = (game.combatGridTopY != null && game.enemyHeight != null)
         ? (game.combatGridTopY - game.enemyHeight / 2 + radius)
         : radius;
+    const combatBounds = game.sys_getCombatBounds ? game.sys_getCombatBounds() : { left: 0, right: game.width };
+    const leftBound = combatBounds.left + radius;
+    const rightBound = combatBounds.right - radius;
     const bottomBound = game.height - radius;
     const points = [start];
     const bouncePoints = [];
@@ -177,13 +180,13 @@ function buildCombatAimGuide(game, start, dir, bounceCount = 3, options = {}) {
         let hitType = 'wall';
 
         if (currentDir.x > 0) {
-            const dist = (game.width - radius - current.x) / currentDir.x;
+            const dist = (rightBound - current.x) / currentDir.x;
             if (dist > 0.01 && dist < hitDist) {
                 hitDist = dist;
                 normal = 'x';
             }
         } else if (currentDir.x < 0) {
-            const dist = (radius - current.x) / currentDir.x;
+            const dist = (leftBound - current.x) / currentDir.x;
             if (dist > 0.01 && dist < hitDist) {
                 hitDist = dist;
                 normal = 'x';
@@ -246,25 +249,48 @@ function buildCombatAimGuide(game, start, dir, bounceCount = 3, options = {}) {
 }
 
 function buildCombatAimGuides(game, start, dir, recipe) {
-    const scatter = recipe && !recipe.wind ? Math.max(0, Math.floor(recipe.scatter || 0)) : 0;
-    const scatterAngleMult = recipe && recipe._scatterAngleMultiplier !== undefined ? recipe._scatterAngleMultiplier : 1.0;
+    const scatterOffsets = buildCombatAimScatterOffsets(game, recipe);
     const pierce = recipe ? Math.max(0, Math.floor(recipe.pierce || 0)) : 0;
     const guides = [{
         kind: 'main',
         guide: buildCombatAimGuide(game, start, dir, 3, { pierce }),
     }];
 
-    for (let idx = 1; idx <= Math.min(scatter, 6); idx++) {
-        const sign = idx % 2 === 0 ? -1 : 1;
-        const multiplier = Math.ceil(idx / 2);
-        const angleOffset = 0.2 * multiplier * sign * scatterAngleMult;
+    scatterOffsets.forEach((angleOffset) => {
         guides.push({
             kind: 'scatter',
             guide: buildCombatAimGuide(game, start, dir.rotate(angleOffset), 3, { pierce }),
         });
-    }
+    });
 
     return guides;
+}
+
+function buildCombatAimScatterOffsets(game, recipe) {
+    if (!recipe || recipe.wind) return [];
+
+    const baseScatter = Math.max(0, Math.floor(recipe.scatter || 0));
+    if (baseScatter <= 0) return [];
+
+    const scatterResonance = !recipe.isLaser && game.activeElementResonances
+        ? game.activeElementResonances.scatter
+        : null;
+    const scatterResParams = scatterResonance ? scatterResonance.params : null;
+    const extraScatterShots = scatterResParams ? Math.max(0, Math.floor(scatterResParams.extraScatterShots || 0)) : 0;
+    const scatterAngleReduction = scatterResParams ? Math.max(0, Math.min(1, scatterResParams.scatterAngleReduction || 0)) : 0;
+    const scatterCount = baseScatter + extraScatterShots;
+    const guideCount = Math.floor(scatterCount / 2) + (scatterCount % 2);
+    const baseAngleMult = recipe._scatterAngleMultiplier !== undefined ? recipe._scatterAngleMultiplier : 1.0;
+    const scatterAngleMult = baseAngleMult * (1 - scatterAngleReduction);
+    const offsets = [];
+
+    for (let idx = 1; idx <= Math.min(guideCount, 6); idx++) {
+        const sign = idx % 2 === 0 ? -1 : 1;
+        const multiplier = Math.ceil(idx / 2);
+        offsets.push(0.2 * multiplier * sign * scatterAngleMult);
+    }
+
+    return offsets;
 }
 
 function drawModuleFootprintOutline(ctx, rect, footprint, color, pulse = 0) {
@@ -392,7 +418,7 @@ function makeBottomRewardBarrier(x, y1, y2, rewardType) {
     return peg;
 }
 
-// @perf-impact: Bottom reward lanes add at most two barrier Peg strokes and a flat HUD band; Peg shadow remains CONFIG.performance-gated.
+// @perf-impact: Bottom reward lanes add a small capped number of barrier Peg strokes and flat HUD bands; Peg shadow remains CONFIG.performance-gated.
 function buildBottomRewardZones(game, maxPegY, canvasWidth, canvasHeight) {
     const cfg = CONFIG.gameplay || {};
     const chance = cfg.bottomRewardZoneChance ?? 0.25;
@@ -404,6 +430,8 @@ function buildBottomRewardZones(game, maxPegY, canvasWidth, canvasHeight) {
     const maxRadius = (CONFIG.physics.marbleRadius || 5.8) + (CONFIG.physics.maxMarbleSizeBonus || 0);
     const zoneWidth = Math.max(18, maxRadius * 2 * (cfg.bottomRewardZoneWidthMultiplier || 1.5));
     const zoneHeight = Math.max(34, cfg.bottomRewardZoneHeight || 48);
+    const barrierHalf = Math.max((CONFIG.physics.pegRadius || 4) * 2.15, 8.5) / 2;
+    const centerClearance = Math.min(zoneWidth / 2 - 2, maxRadius + barrierHalf);
     const top = Math.min(
         canvasHeight - zoneHeight - 28,
         Math.max(maxPegY + 46, canvasHeight - 128)
@@ -415,24 +443,42 @@ function buildBottomRewardZones(game, maxPegY, canvasWidth, canvasHeight) {
         canvasWidth * 0.50 - zoneWidth / 2,
         canvasWidth * 0.72 - zoneWidth / 2,
     ].map(x => Math.max(minX, Math.min(maxX, x)));
-    const x = lanes[Math.floor(Math.random() * lanes.length)];
-    const type = pickBottomRewardType(game);
-    const display = CONFIG.ui.attributeDisplay[type] || {};
-    const zone = {
-        id: `bottom_reward_${type}_${Math.round(x)}_${Math.round(top)}`,
-        x,
-        y: top,
-        w: zoneWidth,
-        h: zoneHeight,
-        type,
-        color: display.color || '#fbbf24',
-        label: display.name || type,
-    };
-    const barriers = [
-        makeBottomRewardBarrier(x, top, top + zoneHeight, type),
-        makeBottomRewardBarrier(x + zoneWidth, top, top + zoneHeight, type),
-    ];
-    return { zones: [zone], barriers };
+    const shuffled = lanes
+        .map(x => ({ x, roll: Math.random() }))
+        .sort((a, b) => a.roll - b.roll)
+        .map(item => item.x);
+    const additionalChance = Math.max(0, Math.min(1, cfg.bottomRewardZoneAdditionalChance ?? 0.35));
+    const targetCount = 1;
+    let count = targetCount;
+    while (count < Math.min(maxCount, shuffled.length) && Math.random() < additionalChance) {
+        count++;
+    }
+
+    const zones = [];
+    const barriers = [];
+    for (let i = 0; i < count; i++) {
+        const x = shuffled[i];
+        const type = pickBottomRewardType(game);
+        const display = CONFIG.ui.attributeDisplay[type] || {};
+        const zone = {
+            id: `bottom_reward_${type}_${Math.round(x)}_${Math.round(top)}_${i}`,
+            x,
+            y: top,
+            w: zoneWidth,
+            h: zoneHeight,
+            entryX1: x + centerClearance,
+            entryX2: x + zoneWidth - centerClearance,
+            type,
+            color: display.color || '#fbbf24',
+            label: display.name || type,
+        };
+        zones.push(zone);
+        barriers.push(
+            makeBottomRewardBarrier(x, top, top + zoneHeight, type),
+            makeBottomRewardBarrier(x + zoneWidth, top, top + zoneHeight, type),
+        );
+    }
+    return { zones, barriers };
 }
 
 function drawBottomRewardZones(ctx, zones) {
@@ -451,6 +497,11 @@ function drawBottomRewardZones(ctx, zones) {
         ctx.strokeStyle = color;
         ctx.lineWidth = 1.5;
         ctx.strokeRect(zone.x + 0.5, zone.y + 0.5, zone.w - 1, zone.h - 1);
+        if (Number.isFinite(zone.entryX1) && Number.isFinite(zone.entryX2) && zone.entryX2 > zone.entryX1) {
+            ctx.globalAlpha = 0.32;
+            ctx.fillStyle = color;
+            ctx.fillRect(zone.entryX1, zone.y, zone.entryX2 - zone.entryX1, zone.h);
+        }
         ctx.globalAlpha = 1;
         ctx.fillStyle = '#f8fafc';
         ctx.fillText(`+${zone.label}`, zone.x + zone.w / 2, zone.y + zone.h / 2);
@@ -577,7 +628,7 @@ export const game_phase = {
                 damage: baseDmg, bounce: 0, pierce: 0, scatter: 0, explosive: false,
                 isMatryoshka: false, isLaser: false, nestedPayload: null, chainPayload: null,
                 multicast: 0, flying_sword: 0, cryo: 0, pyro: 0, lightning: 0, laser: 0,
-                wind: 0, level: 1, type: 'normal'
+                wind: 0, overcharge: 0, level: 1, type: 'normal'
             });
             const snapshot = this._lastFiredAmmoSnapshot;
             if (snapshot && snapshot.length > 0) {
@@ -1415,9 +1466,10 @@ export const game_phase = {
 phase_gathering_getRandomPegType() { 
     // [BUGFIX #1] 恢复完整 pegTypes 数组，根据玩家已解锁属性动态过滤
     // 原 Bug: pegTypes 被硬编码为 ['bounce']，导致所有元素属性钉子无法生成
+    // 初始随机属性钉只保留纯净弹珠属性；wind 是变异属性，不参与初始化随机刷新。
     // [设计约束] laser 已从钉子类型中移除：激光属性仅能通过弹珠本身或符文提供，不能由钉子给予。
     // 参考先例：lightning 属性同样不拥有对应钉子（见 .cursor/rules/config.md 第5节）。
-    const allPegTypes = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'wind'];
+    const allPegTypes = ['bounce', 'damage'];
     const pegTypes = allPegTypes.filter(t => (this.unlockedWeights[t] || 0) > 0);
     // 1. 获取 normal 的基础权重
     // 我们手动从 unlockedWeights 中取 white 作为普通钉子的权重基准（默认 100）
@@ -2563,32 +2615,10 @@ phase_gathering_getRandomPegType() {
 
         // ==========================================
         //  LAYER 0: 固定 UI 层 (防线)
-        // ==========================================
-        this.ctx.save();
-        const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
-        this.ctx.shadowColor = 'rgba(239, 68, 68, 1)';
-        this.ctx.shadowBlur = _sb(8 + pulse * 12);
-        this.ctx.strokeStyle = `rgba(239, 68, 68, ${0.45 + pulse * 0.35})`;
-        this.ctx.lineWidth = 2;
-        this.ctx.setLineDash([10, 10]);
-        this.ctx.beginPath();
-        this.ctx.moveTo(0, this.defeatLineY);
-        this.ctx.lineTo(this.width, this.defeatLineY);
-        this.ctx.stroke();
-        this.ctx.shadowBlur = 0;
-        this.ctx.fillStyle = 'rgba(239, 68, 68, 0.7)';
-        this.ctx.font = 'bold 10px monospace';
-        this.ctx.fillText("⚠️ DEFENSE LINE", 10, this.defeatLineY - 6);
-        const dangerGrad = this.ctx.createLinearGradient(0, this.defeatLineY, 0, this.height);
-        dangerGrad.addColorStop(0, `rgba(239, 68, 68, ${0.08 + pulse * 0.08})`);
-        dangerGrad.addColorStop(1, 'rgba(239, 68, 68, 0.3)');
-        this.ctx.fillStyle = dangerGrad;
-        this.ctx.fillRect(0, this.defeatLineY, this.width, this.height - this.defeatLineY);
-        this.ctx.restore();
-
+        // Visual warning strip removed; defeatLineY still drives lose checks.
 
         // ==========================================
-        //  LAYER 1: 背景层 (网格 & 扫描波)
+        //  LAYER 0: 背景层 (网格 & 扫描波)
         // ==========================================
         this.ctx.save();
         this.ctx.translate(bgShiftX, bgShiftY); 
@@ -2737,27 +2767,30 @@ phase_gathering_getRandomPegType() {
             this.ctx.save();
             // 顶部栏下边界 Y（combatGridTopY - enemyHeight/2 即第一行敌人上边界，也是顶部栏底部）
             const wallTopY = this.combatGridTopY - this.enemyHeight / 2;
+            const combatBounds = this.sys_getCombatBounds ? this.sys_getCombatBounds() : { left: 0, right: this.width };
+            const wallLeftX = combatBounds.left;
+            const wallRightX = combatBounds.right;
             // 左墙 (玻璃质感渐变)
-            const wallGradLeft = this.ctx.createLinearGradient(0, 0, 20, 0);
+            const wallGradLeft = this.ctx.createLinearGradient(wallLeftX, 0, wallLeftX + 20, 0);
             wallGradLeft.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
             wallGradLeft.addColorStop(0.3, 'rgba(148, 163, 184, 0.1)');
             wallGradLeft.addColorStop(1, 'rgba(148, 163, 184, 0)');
             this.ctx.fillStyle = wallGradLeft;
-            this.ctx.fillRect(0, wallTopY, 20, this.height - wallTopY);
+            this.ctx.fillRect(wallLeftX, wallTopY, 20, this.height - wallTopY);
             // 左墙反光线
             this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            this.ctx.fillRect(0, wallTopY, 1, this.height - wallTopY);
+            this.ctx.fillRect(wallLeftX, wallTopY, 1, this.height - wallTopY);
             
             // 右墙 (玻璃质感渐变)
-            const wallGradRight = this.ctx.createLinearGradient(this.width, 0, this.width - 20, 0);
+            const wallGradRight = this.ctx.createLinearGradient(wallRightX, 0, wallRightX - 20, 0);
             wallGradRight.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
             wallGradRight.addColorStop(0.3, 'rgba(148, 163, 184, 0.1)');
             wallGradRight.addColorStop(1, 'rgba(148, 163, 184, 0)');
             this.ctx.fillStyle = wallGradRight;
-            this.ctx.fillRect(this.width - 20, wallTopY, 20, this.height - wallTopY);
+            this.ctx.fillRect(wallRightX - 20, wallTopY, 20, this.height - wallTopY);
             // 右墙反光线
             this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            this.ctx.fillRect(this.width - 1, wallTopY, 1, this.height - wallTopY);
+            this.ctx.fillRect(wallRightX - 1, wallTopY, 1, this.height - wallTopY);
 
             // 墙壁发光边框 (明确反弹线)
             this.ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)'; // Slate-400
@@ -2766,11 +2799,11 @@ phase_gathering_getRandomPegType() {
             this.ctx.shadowBlur = _sb(15);
             this.ctx.beginPath();
             // 左边线（从顶部栏下边界开始）
-            this.ctx.moveTo(1, wallTopY); this.ctx.lineTo(1, this.height);
+            this.ctx.moveTo(wallLeftX + 1, wallTopY); this.ctx.lineTo(wallLeftX + 1, this.height);
             // 右边线（从顶部栏下边界开始）
-            this.ctx.moveTo(this.width - 1, wallTopY); this.ctx.lineTo(this.width - 1, this.height);
+            this.ctx.moveTo(wallRightX - 1, wallTopY); this.ctx.lineTo(wallRightX - 1, this.height);
             // 顶部线 (顶部栏下边界，不遥挡顶部栏)
-            this.ctx.moveTo(0, wallTopY); this.ctx.lineTo(this.width, wallTopY);
+            this.ctx.moveTo(wallLeftX, wallTopY); this.ctx.lineTo(wallRightX, wallTopY);
             this.ctx.stroke();
             this.ctx.restore();
             // ------------------------------------
@@ -3149,7 +3182,7 @@ phase_gathering_getRandomPegType() {
                 this.score *= scoreMult;
                 this.nextRoundHpMultiplier = CONFIG.balance.nextRoundDifficultyMult;
                 // 2. 对每发剩余子弹施加 +1 强化（所有可累加属性）
-                const STACKABLE_KEYS = ['damage', 'pierce', 'bounce', 'scatter', 'pyro', 'cryo', 'lightning', 'laser', 'wind'];
+                const STACKABLE_KEYS = ['damage', 'pierce', 'bounce', 'scatter', 'pyro', 'cryo', 'lightning', 'laser', 'overcharge', 'wind'];
                 const upgradedAmmo = this.ammoQueue.map(recipe => {
                     const enhanced = { ...recipe };
                     STACKABLE_KEYS.forEach(k => {

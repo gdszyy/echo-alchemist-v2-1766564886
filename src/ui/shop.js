@@ -23,7 +23,7 @@ import { getRelicIconSrc } from '../bitmap_icons.js'; // [Phase 5A Task 5.A7] �
 // 这些工具函数被 mirror_magazine / element_injector 调用以判定"最强/最弱"子弹与属性翻倍。
 // 评分采用：基础伤害 + 各属性层数加权 + multicast 加成的简单线性叠加，足以稳定排序。
 
-const _ATTR_KEYS = ['cryo', 'pyro', 'lightning', 'laser', 'wind', 'bounce', 'pierce', 'scatter', 'flying_sword'];
+const _ATTR_KEYS = ['cryo', 'pyro', 'lightning', 'laser', 'overcharge', 'wind', 'bounce', 'pierce', 'scatter', 'flying_sword'];
 
 function _scoreRecipeStrength(r) {
     if (!r) return -Infinity;
@@ -441,10 +441,16 @@ export const shop_system = {
         } else if (relic.effect === 'unlock_marble') {
             const mt = relic.marbleType;
             const boost = relic.boost || 10;
+            const rewardOnlyTypes = new Set(CONFIG.gameplay?.bottomRewardOnlyTypes || []);
             // 1. 所有弹珠默认可出现；遗物只提高该弹珠后续出现权重。
             if (!this.unlockedWeights) this.unlockedWeights = {};
             const current = this.unlockedWeights[mt] || 0;
             this.unlockedWeights[mt] = Math.max(current, CONFIG.probabilities?.[mt] || 0) + Math.floor(boost * 1.5);
+            const display = CONFIG.ui?.attributeDisplay?.[mt]?.name || mt;
+            if (rewardOnlyTypes.has(mt)) {
+                if (window.showToast) showToast(`${display}奖励区权重提升！只能通过底部奖励区获得。`);
+                return;
+            }
             // 2. 立即提供一包对应倾向弹珠，下一次弹珠选择优先出现。
             const packTypes = _grantRelicMarblePack(this, mt, 3);
             // 3. 永久翻倍同化概率
@@ -453,7 +459,6 @@ export const shop_system = {
             this.assimilationBoostRounds[mt] = Infinity;
             this.doubleAssimilationBoostRounds[mt] = Infinity;
             // 4. 提示
-            const display = CONFIG.ui?.attributeDisplay?.[mt]?.name || mt;
             if (window.showToast) showToast(`${display}權重提升！立即获得倾向弹珠包：${packTypes.join(' / ')}。`);
         } else if (relic.effect === 'assimilation_surge') {
             // [兼容旧存档] 保留旧效果处理

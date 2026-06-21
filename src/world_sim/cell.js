@@ -58,6 +58,11 @@ export const CELL_TYPE = {
  * @property {number} temperature        当前地表温度
  * @property {number} baseTemperature    基础温度（受地幔能量与季节影响）
  * @property {number} temperatureChange  温度变化量（用于可视化）
+ * @property {number} climatePotential   Weather potential used to drive persistent wind.
+ * @property {number} windX              Persistent local wind x component.
+ * @property {number} windY              Persistent local wind y component.
+ * @property {number} verticalMotion     Uplift / sinking proxy used by storm logic.
+ * @property {number} crystalClimateCharge Crystal-induced climate anomaly.
  * @property {boolean} hasThunderstorm   是否存在雷暴天气
  * @property {string} crystalState       晶石状态（见 CELL_TYPE）
  * @property {number} crystalEnergy      当前帧获得的能量（仅用于可视化）
@@ -102,6 +107,11 @@ export function createCell(x, y, opts = {}) {
         temperature: 0,
         baseTemperature: 0,
         temperatureChange: 0,
+        climatePotential: 0,
+        windX: 0,
+        windY: 0,
+        verticalMotion: 0,
+        crystalClimateCharge: 0,
         hasThunderstorm: false,
         crystalState,
         crystalEnergy: 0,

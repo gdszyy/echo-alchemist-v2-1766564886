@@ -46,7 +46,7 @@
 | 1.12 | `#unified-top-bar` | 顶部状态栏 | ✅ | 9-Slice `top_bar_9s.png` | — |
 | 1.13 | `.bottom-panel` | 底部弹药栏 | ✅ | 9-Slice `bottom_panel_9s.png` | — |
 | 1.14 | `#settings-panel` | 设置弹窗 | 🟡 | `settings_modal_9s.png`、`toggle_on.png`、`toggle_off.png` | 滑条 Sprite、关闭按钮 |
-| 1.15 | `#combat-rune-charge-ui` | 战斗中符文充能 UI | 🟡 | 符文 PNG | 充能槽底板（液体/能量条）、充能完成「升级」帧动画 |
+| 1.15 | `#combat-rune-charge-ui` | 战斗中符文充能 UI | ✅ | 符文 PNG、`combat_rune_charge_frame_9s.png`、`combat_rune_charge_fill.png` | — |
 | 1.16 | `#multiplier-display` | 连击倍率显示 | ✅ | `multiplier_x2.png`、`multiplier_x3.png`、`multiplier_x5.png` | — |
 | 1.17 | `#skill-bar` | 战斗技能栏 | 🟡 | 技能图标 PNG、`rune_slot_idle.png`、`rune_slot_active.png` | 冷却扫描帧 |
 | 1.18 | `#round-start-banner` | 回合开始横幅 | ✅ | `round_banner_1.png` ~ `round_banner_6.png`（6 帧，600×200） | — |
@@ -115,7 +115,7 @@
 | ~~`assets/ui/sprites/multiplier_x2.png` ~ `x5.png`~~ | ✅ **已生成**（透明 PNG） | 96×48 | 三档稀有度配色 |
 | ~~`assets/ui/panels/gameover_bg.png`~~ | ✅ **已生成** | 720×1280 | 双联画构图 |
 | ~~`assets/ui/sprites/relic_aura_*.png`~~ | ✅ **已生成**（透明 PNG） | 200×200 | C/B/A/S 四档稀有度光环 |
-| `assets/ui/sprites/skill_cooldown_overlay.png` | 技能冷却扫描（待生成） | 64×64 | 遮罩/扫光层 |
+| ~~`assets/ui/sprites/skill_cooldown_overlay.png`~~ | ✅ **已生成** | 64×64 | 遮罩/扫光层 |
 
 ---
 
@@ -133,7 +133,7 @@
 
 - `#phase-selection` 卡片顶部的属性图标当前用 emoji，需要替换为 `assets/ui/sprites/attr_icon_*.png`（与 `assets/icons/ammo` 同源即可）。
 - `#phase-rune-launcher` 当前完全无背景，导致与 `#phase-shop` / `#phase-selection` 视觉割裂；优先级 P0/P1。
-- `#combat-rune-charge-ui` 充能条采用纯 CSS gradient，与符文 PNG 风格不统一；建议补充充能槽位图。
+- `#combat-rune-charge-ui` 已在 2026-06-21 补充 `combat_rune_charge_frame_9s.png` 与 `combat_rune_charge_fill.png`，并通过 `src/styles/bitmap_ui.css` 接入。
 - `assets/icons/relic/` 已较完整（55+ 个），但 `assets/icons/rune/` 与新增符文同步滞后；新增符文时必须同时提供位图。
 - 已生成的 `top_bar_panel.png` 与 `top_bar_9s.png` 同名混乱，建议归档 `top_bar_panel.png`（已被 9-Slice 替代）。
 

@@ -18,7 +18,7 @@
 > **[2026-06-19 更新]** PI-007 升版至 v1.3：补充 `_proceedToFateMomentSelection()` 也必须写入 `fateMomentContext.active = true`。
 > **[2026-04-20 更新]** PI-001 升版至 v1.3：新增坑 8（纯净精华选择跳过替换子弹阶段后 `confirmBtn.onclick` 未恢复，导致无法发射子弹、直接循环敌人回合）。> **[2026-04-22 更新]** PI-001 升版至 v1.5：新增坑 10（纯净精华跳过研磨后 `sys_skipGrindGetRune` 未充能 `ammoQueue`，导致子弹列表为空直接进入敌人回合循环）。
 > **[2026-04-25 更新]** PI-001 升版至 v1.6：新增坑 11（`fieldLootItems` 渲染放在 `sys_loop` 全局循环无阶段限制，导致宝石在 `selection` 阶段泄漏显示且无入场动画）。> **[2026-04-21 更新]** 新增 PI-008：教程系统覆盖层（z-index: 9000+）在符文发射器面板打开时遮挡 Tab 按钮，修复方案为在 `ui_openRuneLauncher` / `ui_closeRuneLauncher` 中临时隐藏/恢复教程 DOM。
-> **[2026-04-25 更新]** 新增 PI-009：Sprite 贴图不显示类型错误排查 SOP，涵盖预加载、JSON 映射、层级覆盖和宽高比等常见坑位。
+> **[2026-06-21 更新]** 更新 PI-009：Sprite 贴图不显示类型错误排查 SOP，补充 manifest 与内嵌默认资源表必须同步的 fallback 防坑项。
 
 | ID | 标题 | 版本 | 关联模块 | 最后更新 | 文档链接 |
 |----|------|------|---------|---------|---------|
@@ -30,7 +30,7 @@
 | PI-006 | Round-Start 延迟奖励结算流程 | v1.5 | game_phase, game_system, core, ui/shop, ui/run_shop | 2026-06-20 | [PI-006_round_start_reward_resolver.md](PI-006_round_start_reward_resolver.md) |
 | PI-007 | 命运时刻 Overlay 返回流与纯净精华选择模式 | v1.3 | ui/shop, game_system, ui_system, spawn_system, game_phase, entities, config, core | 2026-06-19 | [PI-007_destiny_overlay_return_and_selection_mode.md](PI-007_destiny_overlay_return_and_selection_mode.md) |
 | PI-008 | 符文发射器面板 Tab 被底层阶段面板遮挡的修复流程 | v1.1 | tutorial_system, ui/rune_launcher, ui_system | 2026-04-21 | [PI-008_tutorial_overlay_rune_launcher_tab_block.md](PI-008_tutorial_overlay_rune_launcher_tab_block.md) |
-| PI-009 | Sprite 贴图不显示类型错误排查 SOP | v1.0 | entities, render_system, core | 2026-04-25 | [PI-009_sprite_not_rendering_sop.md](PI-009_sprite_not_rendering_sop.md) |
+| PI-009 | Sprite 贴图不显示类型错误排查 SOP | v1.1 | entities, render_system, core | 2026-06-21 | [PI-009_sprite_not_rendering_sop.md](PI-009_sprite_not_rendering_sop.md) |
 
 ### 按模块快速检索
 

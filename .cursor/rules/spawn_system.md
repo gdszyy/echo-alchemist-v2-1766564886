@@ -289,3 +289,10 @@ core.js: _setupEventListeners()
 - **严禁手动编辑** `.cursor/rules/auto_index/src_spawn_system_js_index.md`
 - **严禁删除** `@section` 标记（`spawn_enemy_type_select`、`spawn_position_calc`、`spawn_entity_init`）
 - **严禁**在 `spawn_generateAffixes` 中直接修改 `this.postBossRoundsLeft`，该字段由 `phase_finalizeRound` 统一递减
+
+## 9. 研磨命中反馈入口
+
+`spawn_createHitFeedback(x, y, velocity, type = 'normal', options = {})` 用于研磨阶段 Peg/Slot 命中后的能量球反馈。第五个参数仅控制 `EnergyOrb` 的视觉参数，例如 `secondary`、`baseSize`、`trailAlpha`、`maxTrailLen`；到达回调、充能计数和 `phase_gathering_attemptComplete()` 语义不得在视觉调整中绕开或删除。
+
+- 普通 Peg 的额外二次反馈应传入 `{ secondary: true }`，避免多颗能量球抢占弹珠本体。
+- 新增高亮事件时，优先通过 options 调整现有 `EnergyOrb`，不要在 `spawn_createHitFeedback()` 内新增未受控粒子或冲击波。

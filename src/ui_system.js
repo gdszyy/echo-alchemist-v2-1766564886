@@ -678,21 +678,11 @@ export const ui_system = {
         let eliteCount = 0;
         let bossCount = 0;
         let shieldedCount = 0;
-        let minRowsToLine = Infinity;
-        let nearestLabel = '无敌人';
-        const defeatY = this.defeatLineY || this.height || 0;
-        const rowH = Math.max(1, this.enemyHeight || 48);
 
         activeEnemies.forEach(enemy => {
             if (enemy.type === 'elite') eliteCount++;
             if (enemy.type === 'boss') bossCount++;
             if ((enemy.shieldCharges || 0) > 0 || (enemy.affixes || []).includes('shield')) shieldedCount++;
-            const bottomY = (enemy.pos ? enemy.pos.y : 0) + ((enemy.height || rowH) / 2);
-            const rowsToLine = Math.ceil((defeatY - bottomY) / rowH);
-            if (rowsToLine < minRowsToLine) {
-                minRowsToLine = rowsToLine;
-                nearestLabel = enemy.bossName || (enemy.type === 'boss' ? 'Boss' : enemy.type === 'elite' ? '精英' : '敌人');
-            }
         });
 
         const playerShield = this.playerShield || 0;
@@ -700,34 +690,28 @@ export const ui_system = {
         const currentAmmo = ammoCount > 0 ? this.ammoQueue[0] : null;
         const ammoProfile = currentAmmo ? getAmmoReadabilityProfile(currentAmmo) : null;
         const ammoLabel = currentAmmo
-            ? `${ammoProfile.attributeSummary}${ammoProfile.scatter > 0 ? ` · 散${ammoProfile.scatterPelletCount}` : ''}${ammoProfile.multicast > 0 ? ` · x${ammoProfile.multicastCount}` : ''}`
-            : '无待发弹药';
+            ? ammoProfile.attributeSummary + (ammoProfile.scatter > 0 ? ` / S${ammoProfile.scatterPelletCount}` : '') + (ammoProfile.multicast > 0 ? ` / x${ammoProfile.multicastCount}` : '')
+            : 'no ammo';
 
         let threatClass = '';
-        let threatLabel = '稳定';
+        let threatLabel = 'Combat';
         let note = activeEnemies.length > 0
-            ? `${nearestLabel} 距离防线 ${Math.max(0, minRowsToLine)} 行 · 下一发 ${ammoLabel}`
-            : `场上已清空 · 下一发 ${ammoLabel}`;
+            ? `Enemies ${activeEnemies.length} / Next ${ammoLabel}`
+            : `Clear / Next ${ammoLabel}`;
 
         if (activeEnemies.length === 0) {
-            threatLabel = '清场';
-        } else if (minRowsToLine <= 0) {
+            threatLabel = 'Clear';
+        } else if (bossCount > 0) {
             threatClass = 'is-danger';
-            threatLabel = playerShield > 0 ? '护盾待触发' : '越线危险';
-            note = playerShield > 0
-                ? `${nearestLabel} 已压线，守护者结界可抵消 1 次`
-                : `${nearestLabel} 已越过防线，立即清场或击退`;
-        } else if (minRowsToLine <= 1 || bossCount > 0) {
-            threatClass = 'is-danger';
-            threatLabel = minRowsToLine <= 1 ? '危险' : 'Boss';
-        } else if (minRowsToLine <= 2 || eliteCount >= 2) {
+            threatLabel = 'Boss';
+        } else if (eliteCount >= 2) {
             threatClass = 'is-watch';
-            threatLabel = '压线';
+            threatLabel = 'Elite';
         }
 
         const signature = [
             threatClass, threatLabel, activeEnemies.length, eliteCount, bossCount,
-            shieldedCount, playerShield, ammoCount, minRowsToLine, ammoLabel, note
+            shieldedCount, playerShield, ammoCount, ammoLabel, note
         ].join('|');
         if (!force && signature === this._combatStatusSignature) return;
         this._combatStatusSignature = signature;
@@ -754,7 +738,6 @@ export const ui_system = {
         if (ammoCountEl) ammoCountEl.innerText = String(ammoCount);
         if (noteEl) noteEl.innerText = note;
     },
-
     ui_resetCombatPhaseHud(options = {}) {
         const preserveStatusPanel = !!options.preserveStatusPanel;
         const statusPanel = document.getElementById('combat-status-panel');
@@ -1814,6 +1797,8 @@ export const ui_system = {
         this.ui_updateCombatStatusPanel(true);
         if (this.phase !== 'combat') {
             this.ui_resetCombatPhaseHud({ preserveStatusPanel: this.phase === 'training' });
+        } else {
+            this.ui_hideModuleEditorEntry();
         }
         if (this.phase === 'meta') {
             this.meta_updateContinueButton();
@@ -1862,7 +1847,18 @@ export const ui_system = {
         if (unifiedTopBar) {
             const hideInPhases = ['meta', 'shop', 'truth_book', 'training', 'relic', 'selection', 'gameover'];
             const shouldHideTopBar = hideInPhases.includes(this.phase) && !(typeof this.ui_isFateMomentPhase === 'function' && this.ui_isFateMomentPhase());
-            unifiedTopBar.style.display = shouldHideTopBar ? 'none' : 'flex';
+            unifiedTopBar.classList.toggle('is-gathering', this.phase === 'gathering');
+            unifiedTopBar.classList.toggle('is-combat', this.phase === 'combat' || this.phase === 'training');
+            unifiedTopBar.style.display = shouldHideTopBar ? 'none' : 'grid';
+        }
+        const topPhaseLabel = document.getElementById('top-phase-label');
+        if (topPhaseLabel) {
+            const topLabelMap = {
+                gathering: '研磨',
+                combat: '战斗',
+                training: '试炼',
+            };
+            topPhaseLabel.textContent = topLabelMap[this.phase] || '';
         }
 
         // 8. 战斗充能符文 UI

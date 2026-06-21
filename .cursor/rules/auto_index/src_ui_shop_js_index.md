@@ -1,6 +1,6 @@
 # src\ui\shop.js 函数索引
 
-> 自动生成于 2026-06-20 | 总行数: 937 | 函数数: 12 | 语言: javascript
+> 自动生成于 2026-06-21 | 总行数: 890 | 函数数: 13 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -13,6 +13,7 @@
 | _doubleRecipeAttrs | function | `_doubleRecipeAttrs(r)` |  |
 | recipe_countAttributeKinds | function | `recipe_countAttributeKinds(r)` |  |
 | _isCoarsePointerInput | function | `_isCoarsePointerInput()` |  |
+| _grantRelicMarblePack | function | `_grantRelicMarblePack(game, marbleType, count = 3)` |  |
 | ui_showRelicSelection | method | `ui_showRelicSelection(options = {})` |  |
 | renderRelicPreview | function | `renderRelicPreview(relic, cardEl)` |  |
 | ui_rerollRelicSelection | method | `ui_rerollRelicSelection()` |  |

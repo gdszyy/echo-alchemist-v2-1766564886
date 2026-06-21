@@ -285,7 +285,7 @@ class FortuneWheel {
         
         // [修改] 1. 过滤不可叠加属性 (如 pierce, bounce, scatter, flying_sword 等通常不适合转盘直接翻倍)
         // 我们只允许元素属性和增幅属性进入转盘
-        const stackableTypes = ["bounce","pierce","scatter",'damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind', 'resonance', 'venom', 'explosive'];
+        const stackableTypes = ["bounce","pierce","scatter",'damage', 'cryo', 'pyro', 'lightning', 'laser', 'wind', 'resonance', 'venom', 'overcharge', 'explosive'];
         
         // 统计当前弹珠拥有的可叠加属性
         const counts = {};
@@ -1052,7 +1052,7 @@ class Peg {
      */
     hit(impactSpeed = 5) { 
         this.lit = true; 
-        this.litTimer = 15; 
+        this.litTimer = 8; 
         
         // [修改] 动态冷却逻辑
         // 1. 设置当前冷却计时器为当前的动态冷却时间
@@ -1062,14 +1062,14 @@ class Peg {
         const addAmount = CONFIG.gameplay.pegCooldownAdd || 5;
         this.dynamicCooldown += addAmount;
         
-        // 速度越快，视觉缩放越大 (最大 1.8)
-        this.scale = 1.6 + Math.min(impactSpeed / 20, 0.2); 
+        // 速度越快，视觉缩放越大；保持克制，避免被误读成弹珠。
+        this.scale = 1.18 + Math.min(impactSpeed / 38, 0.16); 
 
         // --- [物理增强] 被击中时产生旋转角速度（视觉反馈）---
         // 弹珠被切向摩擦力作用后，钉子会轻微旋转，这是真实物理现象
         // 旋转方向随机（模拟切向力方向不确定性），速度越大旋转越快
         const spinDir = Math.random() < 0.5 ? 1 : -1;
-        this.impactSpin = spinDir * Math.min(impactSpeed * 0.04, 0.25);
+        this.impactSpin = spinDir * Math.min(impactSpeed * 0.025, 0.14);
 
         // 将速度传递给音效管理器
         audio.playHit(this.type, impactSpeed); 
@@ -1159,34 +1159,45 @@ class Peg {
         }
 
         // 1. 绘制基础圆形鑉子
-        ctx.beginPath(); 
-        ctx.arc(this.pos.x, this.pos.y, currentRadius, 0, Math.PI * 2);
+        const pegCapRadius = currentRadius * 1.14;
+        const pegInnerRadius = currentRadius * 0.58;
+        const drawPegPlate = (radius) => {
+            const radiusY = radius * 0.86;
+            ctx.beginPath();
+            ctx.moveTo(this.pos.x, this.pos.y - radiusY);
+            ctx.lineTo(this.pos.x + radius, this.pos.y);
+            ctx.lineTo(this.pos.x, this.pos.y + radiusY);
+            ctx.lineTo(this.pos.x - radius, this.pos.y);
+            ctx.closePath();
+        };
+
+        drawPegPlate(pegCapRadius);
         
 // @section:peg_base_fill_and_glow - 基础圆形填充与发光效果
         
         if (this.type === 'laser') {
-            ctx.shadowBlur = _sb(10);
+            ctx.shadowBlur = _sb(isLit ? 8 : 3);
             ctx.shadowColor = CONFIG.colors.laser;
             ctx.fillStyle = isLit ? '#ffffff' : color;
         } else if (this.type === 'wind') {
             // 风属性钉子使用特殊的脉冲发光
             const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
-            ctx.shadowBlur = _sb(12 + pulse * 8);
+            ctx.shadowBlur = _sb((isLit ? 8 : 4) + pulse * (isLit ? 5 : 2));
             ctx.shadowColor = CONFIG.colors.matWind;
             ctx.fillStyle = isLit ? '#ffffff' : color;
         } else if (this.type === 'resonance') {
             const pulse = (Math.sin(Date.now() / 400) + 1) / 2;
-            ctx.shadowBlur = _sb(10 + pulse * 8);
+            ctx.shadowBlur = _sb((isLit ? 7 : 4) + pulse * (isLit ? 5 : 2));
             ctx.shadowColor = CONFIG.colors.resonance;
             ctx.fillStyle = isLit ? '#ffffff' : color;
         } else if (this.type === 'venom') {
             const pulse = (Math.sin(Date.now() / 500) + 1) / 2;
-            ctx.shadowBlur = _sb(8 + pulse * 6);
+            ctx.shadowBlur = _sb((isLit ? 6 : 3) + pulse * (isLit ? 4 : 2));
             ctx.shadowColor = CONFIG.colors.matVenom;
             ctx.fillStyle = isLit ? '#ffffff' : color;
         } else if (isLit) {
             ctx.fillStyle = '#ffffff';
-            ctx.shadowBlur = _sb(15);
+            ctx.shadowBlur = _sb(9);
             ctx.shadowColor = '#ffffff';
         } else {
             ctx.fillStyle = color;
@@ -1194,22 +1205,61 @@ class Peg {
         }
         ctx.fill();
 
+        // @perf-impact: Peg rivet plate - cheap polygon/stroke/fill only, no gradients or extra blur.
+        ctx.save();
+        ctx.shadowBlur = 0;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'miter';
+
+        ctx.lineWidth = Math.max(1.1, currentRadius * 0.26);
+        ctx.strokeStyle = isLit ? 'rgba(15, 23, 42, 0.74)' : 'rgba(226, 232, 240, 0.58)';
+        drawPegPlate(pegCapRadius + 0.15);
+        ctx.stroke();
+
+        ctx.lineWidth = Math.max(0.8, currentRadius * 0.14);
+        ctx.strokeStyle = isLit ? 'rgba(255, 255, 255, 0.62)' : 'rgba(255, 255, 255, 0.34)';
+        drawPegPlate(pegInnerRadius);
+        ctx.stroke();
+
+        ctx.strokeStyle = isLit ? 'rgba(255, 255, 255, 0.7)' : 'rgba(255, 255, 255, 0.42)';
+        ctx.lineWidth = Math.max(0.8, currentRadius * 0.16);
+        ctx.beginPath();
+        ctx.moveTo(this.pos.x - currentRadius * 0.42, this.pos.y - currentRadius * 0.3);
+        ctx.lineTo(this.pos.x + currentRadius * 0.28, this.pos.y - currentRadius * 0.42);
+        ctx.stroke();
+
+        ctx.strokeStyle = isLit ? 'rgba(15, 23, 42, 0.44)' : 'rgba(15, 23, 42, 0.62)';
+        ctx.lineWidth = Math.max(1, currentRadius * 0.22);
+        ctx.beginPath();
+        ctx.moveTo(this.pos.x - currentRadius * 0.36, this.pos.y + currentRadius * 0.38);
+        ctx.lineTo(this.pos.x + currentRadius * 0.42, this.pos.y + currentRadius * 0.28);
+        ctx.stroke();
+
+        ctx.strokeStyle = isLit ? 'rgba(15, 23, 42, 0.46)' : 'rgba(15, 23, 42, 0.66)';
+        ctx.lineWidth = Math.max(1, currentRadius * 0.18);
+        ctx.beginPath();
+        ctx.moveTo(this.pos.x - currentRadius * 0.24, this.pos.y);
+        ctx.lineTo(this.pos.x + currentRadius * 0.24, this.pos.y);
+        ctx.stroke();
+        ctx.restore();
+
         // --- [T3] Peg 发光底部光晕（全局光照模拟）：为特殊/发光钉子绘制彩色地面光晕 ---
         // [自适应性能] pegGlowHalo 开关：中端及以下关闭（每帧径向渐变 + lighter 叠加）
+        // @perf-impact: Peg halo retained under pegGlowHalo budget, with reduced radius/alpha for focus balance.
         if ((isSpecial || isLit) && _perfBudgetPeg.pegGlowHalo) {
             ctx.save();
             const glowColor = this.getColor();
-            const glowAlpha = hexToRgba(glowColor, 0.18);
+            const glowAlpha = hexToRgba(glowColor, isLit ? 0.12 : 0.07);
             const glowGrad = ctx.createRadialGradient(
                 this.pos.x, this.pos.y, 0,
-                this.pos.x, this.pos.y, currentRadius * 3.5
+                this.pos.x, this.pos.y, currentRadius * 2.4
             );
             glowGrad.addColorStop(0, glowAlpha);
             glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.globalCompositeOperation = 'lighter';
             ctx.fillStyle = glowGrad;
             ctx.beginPath();
-            ctx.arc(this.pos.x, this.pos.y, currentRadius * 3.5, 0, Math.PI * 2);
+            ctx.arc(this.pos.x, this.pos.y, currentRadius * 2.4, 0, Math.PI * 2);
             // @section:peg_type_icons - 各属性钉子专属图标绘制
             ctx.fill();
             ctx.globalCompositeOperation = 'source-over';
@@ -2531,7 +2581,9 @@ class DropBall {
                 if (!zone) continue;
                 const zoneKey = zone.id || `${zone.type}:${Math.round(zone.x)}:${Math.round(zone.y)}`;
                 if (this._bottomRewardZoneHits.has(zoneKey)) continue;
-                const inZone = this.pos.x >= zone.x && this.pos.x <= zone.x + zone.w
+                const entryX1 = Number.isFinite(zone.entryX1) ? zone.entryX1 : zone.x;
+                const entryX2 = Number.isFinite(zone.entryX2) ? zone.entryX2 : zone.x + zone.w;
+                const inZone = this.pos.x >= entryX1 && this.pos.x <= entryX2
                     && this.pos.y >= zone.y && this.pos.y <= zone.y + zone.h;
                 if (!inZone) continue;
                 this._bottomRewardZoneHits.add(zoneKey);
@@ -2660,6 +2712,20 @@ class DropBall {
                                     
                                     // 播放到達音效 (可選)
                                     audio.playCollect();
+                                },
+                                {
+                                    // @perf-impact: Skill point orb is a rare semantic reward; keep it brighter than peg-hit orbs.
+                                    baseSize: 2.2,
+                                    maxTrailLen: 6,
+                                    trailAlpha: 0.24,
+                                    haloAlpha: 0.32,
+                                    coreAlpha: 0.95,
+                                    compositeOperation: 'lighter',
+                                    burstXMult: 2.4,
+                                    burstYMult: 0.55,
+                                    minSpeed: 2.5,
+                                    hoverTime: 18,
+                                    floatForce: 0.18
                                 }
                             );
 
@@ -2769,7 +2835,7 @@ class DropBall {
                             this.markScoredPeg(peg);
                             peg.hit(impactVel.mag());
                             this.hitCount++;
-                            game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel, 'pink');
+                            game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel, 'pink', { secondary: true });
                         }
                     }
                     continue;
@@ -2887,15 +2953,15 @@ class DropBall {
                         game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel, peg.type);
 
                         if (peg.type === 'normal' && Math.random() < CONFIG.balance.normalPegSecondEnergChancey) {
-                            game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.65), 'normal');
+                            game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.65), 'normal', { secondary: true });
                         }
 
                         if (this.def.type === 'resonance') {
                             if (Math.random() < CONFIG.balance.normalPegSecondEnergChancey){
-                                game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.21+0.42*Math.random()), 'resonance');
+                                game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(0.21+0.42*Math.random()), 'resonance', { secondary: true });
                             }
                             if (Math.random() < CONFIG.balance.normalPegSecondEnergChancey){
-                                game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(-0.21-0.72*Math.random()), 'resonance');
+                                game.spawn_createHitFeedback(this.pos.x, this.pos.y, impactVel.mult(-0.21-0.72*Math.random()), 'resonance', { secondary: true });
                             }
                             
                         }
@@ -3559,6 +3625,34 @@ class DropBall {
                 }
                 ctx.restore();
             }
+
+            // @perf-impact: Marble glass rim - low-cost strokes/fills only, no gradients or glow.
+            ctx.save();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.lineCap = 'round';
+            ctx.lineWidth = Math.max(1.1, r * 0.16);
+            ctx.strokeStyle = 'rgba(15, 23, 42, 0.78)';
+            ctx.beginPath();
+            ctx.arc(0, 0, r + 0.55, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.lineWidth = Math.max(0.8, r * 0.1);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.72)';
+            ctx.beginPath();
+            ctx.arc(0, 0, r - 0.55, Math.PI * 1.08, Math.PI * 1.72);
+            ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(15, 23, 42, 0.5)';
+            ctx.lineWidth = Math.max(0.9, r * 0.12);
+            ctx.beginPath();
+            ctx.arc(0, 0, r - 0.2, Math.PI * 0.12, Math.PI * 0.88);
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+            ctx.beginPath();
+            ctx.ellipse(-r * 0.28, -r * 0.4, r * 0.34, r * 0.13, -0.45, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
             
             // ==========================================
             //  LAYER 5: 🌪️ Wind Blades (风刃环绕特效)
@@ -4642,6 +4736,7 @@ class Player {
             pyro:      { val: recipe.pyro },
             lightning: { val: recipe.lightning },
             laser:     { val: recipe.laser },
+            overcharge:{ val: recipe.overcharge || 0 },
             explosive: { val: recipe.explosive ? 1 : 0 },
             flying_sword: { val: recipe.flying_sword || 0 }
         };

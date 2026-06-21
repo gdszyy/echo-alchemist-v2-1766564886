@@ -72,7 +72,7 @@ const RUNE_CHARGE_MAX_LEVEL  = 3;
 ```
 combat_damageEnemy()
   ├─ 1. damage_pre_calc      基础值 × 暴击 × 穿透
-  ├─ 2. damage_element_bonus 属性克制倍率（火>冰>雷>火 三角克制）
+  ├─ 2. damage_element_bonus 属性效果与共鸣倍率
   ├─ 2.5 boss_vulnerability  Boss 破绽谱进度与易伤窗口
   ├─ 3. damage_runeword_hooks 词条 Hook 注入（thunderstorm / absolute_zero 等）
   ├─ 4. damage_apply_to_enemy 写入 enemy.takeDamage()

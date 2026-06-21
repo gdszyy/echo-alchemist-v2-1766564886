@@ -497,6 +497,11 @@ class Projectile {
 
         // [优化] 在 Demo 模式下强制开启底墙
         const hasBottomWall = (this.game && this.game.isDemo) ? true : game.hasCombatWall;
+        const combatBounds = (typeof game !== 'undefined' && game.sys_getCombatBounds)
+            ? game.sys_getCombatBounds()
+            : { left: 0, right: width };
+        const leftBound = combatBounds.left + this.radius;
+        const rightBound = combatBounds.right - this.radius;
 
         // [新属性] 超载/回响 墙壁碰撞钩子
         const _onWallBounce = () => {
@@ -541,8 +546,8 @@ class Projectile {
             return false;
         };
 
-        if (this.pos.x < this.radius) {
-            this.pos.x = this.radius; this.vel.x = Math.abs(this.vel.x);
+        if (this.pos.x < leftBound) {
+            this.pos.x = leftBound; this.vel.x = Math.abs(this.vel.x);
             _onWallBounce();
             if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
             const angle = Math.abs(Math.atan2(this.vel.x, this.vel.y));
@@ -561,8 +566,8 @@ class Projectile {
             this.hitCooldowns.clear();
             if (handleRelicWallHit('left')) return;
         }
-        if (this.pos.x > width - this.radius) {
-            this.pos.x = width - this.radius; this.vel.x = -Math.abs(this.vel.x);
+        if (this.pos.x > rightBound) {
+            this.pos.x = rightBound; this.vel.x = -Math.abs(this.vel.x);
             _onWallBounce();
             if (this.config.wind && this.isLast && typeof game !== 'undefined') game.combat_wind_addAnchor(this.pos.x, this.pos.y, this.config.damage, this.config);
             const angle = Math.abs(Math.atan2(this.vel.x, this.vel.y));

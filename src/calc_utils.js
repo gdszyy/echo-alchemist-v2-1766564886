@@ -282,6 +282,7 @@ export const calc_utils = {
             multicast: totalMulticast,
             flying_sword: 0,
             cryo: 0, pyro: 0, lightning: 0, laser: marbleDef.type === 'laser' ? 1 : 0,
+            overcharge: 0,
             wind: 0,
             level: 1, 
             type: 'normal'
@@ -326,6 +327,9 @@ export const calc_utils = {
             if (itemType === 'laser') {
                 recipe.laser = (recipe.laser || 0) + itemLevel; 
             }
+            if (itemType === 'overcharge') {
+                recipe.overcharge = (recipe.overcharge || 0) + itemLevel;
+            }
             
             if (itemType === 'flying_sword') {
                 recipe.flying_sword = 1;
@@ -352,7 +356,7 @@ export const calc_utils = {
         // --- [遗物 Hook] 余韵回响 (echo_reverberation) ---
         // 触发钉板时，单一属性收集到 10 层及以上，自动额外再 +1 层（每属性每次只触发一次）
         if (this.ownedRelics && this.ownedRelics.includes('echo_reverberation')) {
-            const echoKeys = ['cryo', 'pyro', 'lightning', 'laser', 'wind', 'damage'];
+            const echoKeys = ['cryo', 'pyro', 'lightning', 'laser', 'overcharge', 'wind', 'damage'];
             for (const k of echoKeys) {
                 if ((recipe[k] || 0) >= 10) {
                     recipe[k] = (recipe[k] || 0) + 1;

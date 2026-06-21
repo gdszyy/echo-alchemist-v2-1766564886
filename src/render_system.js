@@ -47,10 +47,18 @@ export const render_system = {
         if (this.phase === 'combat' || this.phase === 'gathering') {
             const bgEmitter = getUiBitmap(BG_EMITTER_ZONE_SRC);
             if (bgEmitter) {
-                const zoneH = 220;
+                const zoneH = Math.min(220, this.height * 0.24);
+                const scale = Math.max(this.width / bgEmitter.width, zoneH / bgEmitter.height);
+                const drawW = bgEmitter.width * scale;
+                const drawH = bgEmitter.height * scale;
+                const drawX = (this.width - drawW) / 2;
+                const drawY = this.height - zoneH + (zoneH - drawH) / 2;
                 this.ctx.save();
+                this.ctx.beginPath();
+                this.ctx.rect(0, this.height - zoneH, this.width, zoneH);
+                this.ctx.clip();
                 this.ctx.globalAlpha = 0.9;
-                this.ctx.drawImage(bgEmitter, 0, this.height - zoneH, this.width, zoneH);
+                this.ctx.drawImage(bgEmitter, drawX, drawY, drawW, drawH);
                 this.ctx.restore();
             }
         }
