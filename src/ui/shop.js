@@ -726,9 +726,14 @@ export const shop_system = {
             const total = (this.saveData && this.saveData.runeInventory ? this.saveData.runeInventory.length : 0);
             shopRuneCount.textContent = `${total}个符文`;
         }
-        const debugShopEnabled = CONFIG.debug === true
+        const debugShopDisabled = typeof localStorage !== 'undefined'
+            && localStorage.getItem('echo_debug_shop') === '0';
+        const debugShopEnabled = !debugShopDisabled && (
+            CONFIG.debugShopDefaultEnabled === true
+            || CONFIG.debug === true
             || this.debugMode === true
-            || (typeof localStorage !== 'undefined' && localStorage.getItem('echo_debug_shop') === '1');
+            || (typeof localStorage !== 'undefined' && localStorage.getItem('echo_debug_shop') === '1')
+        );
         if (this.meta_currentShopCategory === 'debug' && !debugShopEnabled) {
             this.meta_currentShopCategory = 'attribute';
         }

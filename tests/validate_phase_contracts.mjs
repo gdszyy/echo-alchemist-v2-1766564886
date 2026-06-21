@@ -124,6 +124,9 @@ check(has(read('src/ui/shop.js'), /Object\.values\(META_SHOP_CONFIG\.resources\s
 check(has(read('src/ui/shop.js'), /debugStartRelicIds[\s\S]*selectedSet[\s\S]*debugStartRelicId/), 'debug relic picker persists multiple next-run relics with legacy single-id compatibility');
 check(has(read('src/game_system.js'), /debugStartRelicIds[\s\S]*debugStartRelics[\s\S]*forEach\(relic[\s\S]*ui_selectRelic\(relic,\s*\{\s*skipClose:\s*true/), 'new run applies every selected debug start relic');
 check(has(indexHtml, /relic-debug-picker \.relic-card\.selected/), 'debug relic picker has visible multi-select state');
+check(has(read('src/config.js'), /debugShopDefaultEnabled:\s*true/), 'debug tool category is visible by default');
+check(has(read('src/ui/shop.js'), /debugShopDisabled[\s\S]*debugShopDefaultEnabled[\s\S]*echo_debug_shop['"]\)\s*===\s*['"]1/), 'meta shop debug tab honors default-on config and localStorage override');
+check(has(read('src/ui_system.js'), /debugShopDisabled[\s\S]*debugShopDefaultEnabled[\s\S]*echo_debug_shop['"]\)\s*===\s*['"]1/), 'debug purchase guard honors default-on config and localStorage override');
 check(has(read('src/ui/rune_launcher.js'), /meta_getResourceCount\(['"]rune_fragments['"]\)/), 'rune launcher shard display reads unified rune fragment resource');
 check(has(indexHtml, /game\.ui_abandonRunToMeta\(\)/), 'pause abandon button uses ui_abandonRunToMeta');
 check(has(indexHtml, /id=["']run-shop-status-dock["']/), 'run-shop countdown dock exists');

@@ -267,6 +267,8 @@ function setDeepValue(obj, path, value, type) {
 const CONFIG = {
     /** 调试日志总开关：玩家设备应保持 false，避免 console.* 在热路径产生开销 */
     debug: false,
+    /** 局外商店测试工具默认显示；设置 localStorage.echo_debug_shop = '0' 可临时关闭 */
+    debugShopDefaultEnabled: true,
     /** 颜色配置 (保持不变) */
     ui: {
         damageStats: {

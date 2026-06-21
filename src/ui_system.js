@@ -2075,9 +2075,14 @@ export const ui_system = {
     meta_buyUpgrade(upgradeId) {
         const upgrade = META_SHOP_CONFIG.upgrades.find(u => u.id === upgradeId);
         if (!upgrade) return false;
-        const debugShopEnabled = CONFIG.debug === true
+        const debugShopDisabled = typeof localStorage !== 'undefined'
+            && localStorage.getItem('echo_debug_shop') === '0';
+        const debugShopEnabled = !debugShopDisabled && (
+            CONFIG.debugShopDefaultEnabled === true
+            || CONFIG.debug === true
             || this.debugMode === true
-            || (typeof localStorage !== 'undefined' && localStorage.getItem('echo_debug_shop') === '1');
+            || (typeof localStorage !== 'undefined' && localStorage.getItem('echo_debug_shop') === '1')
+        );
         if (upgrade.debugOnly && !debugShopEnabled) {
             if (typeof showToast === 'function') showToast('测试商品未启用');
             return false;
