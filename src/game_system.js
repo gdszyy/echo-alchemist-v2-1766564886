@@ -378,11 +378,17 @@ export const game_system = {
         }
         // ==================== [爽游模式] 结束 ====================
 
-        const debugStartRelicId = this.saveData?.debugStartRelicId;
-        const debugStartRelic = debugStartRelicId ? RELIC_DB.find(r => r.id === debugStartRelicId) : null;
-        if (debugStartRelic && typeof this.ui_selectRelic === 'function') {
-            this.ui_selectRelic(debugStartRelic, { skipClose: true, source: 'debug_start_relic' });
-            if (window.showToast) showToast(`测试开局遗物已生效：${debugStartRelic.name}`);
+        const debugStartRelicIds = Array.isArray(this.saveData?.debugStartRelicIds)
+            ? this.saveData.debugStartRelicIds
+            : (this.saveData?.debugStartRelicId ? [this.saveData.debugStartRelicId] : []);
+        const debugStartRelics = [...new Set(debugStartRelicIds)]
+            .map(id => RELIC_DB.find(r => r.id === id))
+            .filter(Boolean);
+        if (debugStartRelics.length > 0 && typeof this.ui_selectRelic === 'function') {
+            debugStartRelics.forEach(relic => {
+                this.ui_selectRelic(relic, { skipClose: true, source: 'debug_start_relic' });
+            });
+            if (window.showToast) showToast(`测试开局遗物已生效：${debugStartRelics.map(r => r.name).join('、')}`);
         }
 
         // 生成初始敌人（使用 combatGridTopY 确保不被顶部半透明栏遮挡）
@@ -584,7 +590,7 @@ export const game_system = {
                 const parsed = JSON.parse(saved);
                 // 合并而非覆盖，确保新字段有默认值
                 this.saveData = Object.assign(
-                    { currency: 0, runeFragments: 0, resources: { rune_fragments: 0 }, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0, runeInventory: [], discoveredRunewords: [], debugStartRelicId: null },
+                    { currency: 0, runeFragments: 0, resources: { rune_fragments: 0 }, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0, runeInventory: [], discoveredRunewords: [], debugStartRelicId: null, debugStartRelicIds: [] },
                     parsed
                 );
                 if (!this.saveData.resources || typeof this.saveData.resources !== 'object') {

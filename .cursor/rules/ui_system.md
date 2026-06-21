@@ -100,6 +100,7 @@ for (const subsystem of _subsystems) {
 | 2026-06-18 | `src/utils/ammo_readability.js`, `src/render_system.js`, `src/game_phase.js`, `src/ui/hud.js`, `src/ui_system.js`, `index.html` | **下一发弹药可读性增强**：新增统一弹药读数工具，战斗 HUD 与 Canvas 发射器共用弹药构成、伤害数字、散射弹数、连射次数与主属性摘要；发射器绘制层以扇形预览展示散射，以数字徽标展示伤害，以能量条展示连射，不改变伤害公式。 |
 | 2026-06-19 | `index.html`, `src/ui/shop.js`, `.cursor/rules/ui_system.md` | **测试遗物库移动端布局修复**：`ui_showRelicSelection({ showAllRelics: true })` 必须进入 `relic-debug-picker` 专用布局，使用紧凑纵向列表 + 预览面板 + 返回商店按钮；普通遗物选择仍保持三选一横向卡片语法。 |
 | 2026-06-21 | `index.html`, `src/ui_system.js`, `.cursor/rules/ui_system.md` | **战斗主界面 P0 布局落地**：`combat-status-panel` 迁入 `#unified-top-bar` 中心区，作为顶部战斗 HUD 的紧凑态势胶囊，不再独立占用第二条顶部空间；`#phase-combat` 新增左右沉浸装饰带和 `.combat-safe-frame` 战斗判定区边框；战斗阶段进入时会移除 `#module-editor-entry-layer`，避免「编辑钉板」入口残留在右上角。业务层不直接操作 DOM，仍由 UI 层读取 Game 状态并刷新视图。 |
+| 2026-06-22 | `src/config.js`, `src/ui/shop.js`, `src/game_system.js`, `src/core.js`, `index.html` | **局外商店测试遗物多选**：`debug_pick_any_relic` 价格保持 0，开启全遗物列表后使用 `saveData.debugStartRelicIds` 保存多个开局遗物；`debugStartRelicId` 仅作为旧存档兼容单值保留；`sys_initGameStart()` 必须逐个应用数组内遗物并触发对应即时效果。 |
 | 2026-04-17 | `index.html`, `src/game_system.js` | 游戏容器宽高未同时适配屏幕宽度和高度：原 `height: 100dvh` 在竞屏手机上会超出屏幕宽度；`sys_resize` 中 `container.style.height = window.innerHeight` 会覆盖 CSS 高度计算。 | **完整等比缩放方案**：1. `#app-wrapper` 的 `align-items` 改为 `center`（防止 stretch 拉伸 game-container）；2. `#pc-left/right-sidebar` 加 `align-self: stretch`（PC 侧边栏仍填满高度）；3. `#game-container` 宽度改为 `min(100vw, calc(100dvh*9/16), 480px)`，移除 `height` 和 `min-width`，改用 `aspect-ratio: 9/16` + `max-height: 100dvh` 实现宽高双向等比缩放；4. `sys_resize()` 移除 `container.style.height` 覆盖，改用 `getBoundingClientRect()` 读取实际尺寸。 |
 
 ### 5.x 2026-06-18 新属性 UI 显示兜底记录
@@ -242,7 +243,7 @@ for (const subsystem of _subsystems) {
 - `ui_updateUI()` 进入 `meta` / `shop` / `truth_book` / `gameover` 等局外或终止阶段时必须调用 `ui_clearTransientOverlays()`，清掉 Boss 入场、混沌老虎机、遗物 overlay、模块编辑器、符文选择弹层和终局 Toast。`gameover` 入口也应主动调用一次，避免失败发生在高 z-index 演出期间时遮挡结算页。
 - 暂停页不得只显示 DOM overlay；`ui_openPause()` 必须设置 `isPaused=true` 和 `_pausedFromPhase`，`ui_closePause()` 必须恢复这两个字段并禁用 `#phase-pause` 的 pointer events。“放弃本局”不得直接 `phase_switchPhase('meta')`，必须走 `ui_abandonRunToMeta()` 统一清理局内存档和临时 UI。
 - PC 侧栏只允许在 `gathering` / `combat` / `selection` / `training` 运行态显示；`meta`、`shop`、`gameover`、`truth_book`、`relic` 等全屏/局外阶段必须隐藏左右侧栏，避免常驻符文发射器或战斗 HUD 残留。
-- 局外商店中的 `debugOnly` 商品默认必须隐藏，`meta_buyUpgrade()` 也必须校验 `CONFIG.debug` / `debugMode` / `localStorage.echo_debug_shop`，禁止通过普通商店或控制台直接购买测试遗物任选项。
+- 局外商店中的 `debugOnly` 商品默认必须隐藏，`meta_buyUpgrade()` 也必须校验 `CONFIG.debug` / `debugMode` / `localStorage.echo_debug_shop`，禁止通过普通商店或控制台直接购买测试遗物任选项。测试遗物任选项必须写入 `saveData.debugStartRelicIds` 多选数组并在下一次 `meta_startRun()` / `sys_initGameStart()` 中生效；旧的 `debugStartRelicId` 只能作为兼容字段同步首个选中项。
 
 ### 6.4 src/ui/rune_launcher.js（符文发射器）
 

@@ -185,7 +185,7 @@ const META_SHOP_CONFIG = {
             id: 'debug_pick_any_relic',
             category: 'debug',
             name: '测试遗物任选',
-            desc: '测试用：立即打开全遗物列表，可从所有遗物中任选一个获得。',
+            desc: '测试用：打开全遗物列表，可任选多个遗物带入下一局游戏。',
             icon: '🧪',
             maxLevel: 999,
             cost: { resourceId: 'rune_fragments', values: [0], type: 'fixed' },

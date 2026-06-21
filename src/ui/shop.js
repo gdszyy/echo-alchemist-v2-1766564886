@@ -105,7 +105,7 @@ export const shop_system = {
         };
         if (!isReroll) this.relicRerollUsed = false;
         this.relicSelectionContext = showAllRelics && options.source === 'debug_pick_any_relic'
-            ? { mode: 'debug_start_relic' }
+            ? { mode: 'debug_start_relics' }
             : null;
         const ammoRequiredRelics = new Set(['mirror_magazine', 'element_injector']);
         let pool = RELIC_DB.filter(r => {
@@ -244,6 +244,12 @@ export const shop_system = {
                 const count = (this.ownedRelics || []).filter(id => id === relic.id).length;
                 const max = relic.maxStacks || 1;
                 const stackInfo = max > 1 ? `<div class="relic-stack text-xs text-amber-400 mt-1">当前层数: ${count} / ${max}</div>` : '';
+                const debugStartRelicIds = Array.isArray(this.saveData?.debugStartRelicIds)
+                    ? this.saveData.debugStartRelicIds
+                    : (this.saveData?.debugStartRelicId ? [this.saveData.debugStartRelicId] : []);
+                const debugSelected = this.relicSelectionContext?.mode === 'debug_start_relics'
+                    && debugStartRelicIds.includes(relic.id);
+                if (debugSelected) el.classList.add('selected');
                 
                 // 推荐标签和 Tip（仅前三次遗物选择且遗物标记为推荐时显示）
                 let recommendHtml = '';
@@ -301,7 +307,7 @@ export const shop_system = {
             const titleEl = overlay.querySelector('.relic-title-block h2');
             const subtitleEl = overlay.querySelector('.relic-title-block p');
             if (titleEl) titleEl.textContent = showAllRelics ? '测试遗物库' : '古代遺物';
-            if (subtitleEl) subtitleEl.textContent = showAllRelics ? '选择任意遗物用于本轮测试' : '命運的饋贈，選擇一種力量';
+            if (subtitleEl) subtitleEl.textContent = showAllRelics ? '点击切换多个开局遗物，返回商店后从首页开始下一局生效' : '命運的饋贈，選擇一種力量';
             const skipBtn = document.getElementById('relic-skip-to-shop-btn');
             if (skipBtn) {
                 const skipBonus = ((CONFIG.gameplay || {}).runShopSkipRelicBonus || 0);
@@ -354,13 +360,33 @@ export const shop_system = {
      * 玩家选择遗物
      */
     ui_selectRelic(relic, options = {}) {
-        if (this.relicSelectionContext?.mode === 'debug_start_relic') {
+        if (this.relicSelectionContext?.mode === 'debug_start_relics') {
             if (!this.saveData) this.saveData = {};
-            this.saveData.debugStartRelicId = relic.id;
+            const selected = Array.isArray(this.saveData.debugStartRelicIds)
+                ? this.saveData.debugStartRelicIds.slice()
+                : (this.saveData.debugStartRelicId ? [this.saveData.debugStartRelicId] : []);
+            const selectedSet = new Set(selected);
+            if (selectedSet.has(relic.id)) {
+                selectedSet.delete(relic.id);
+            } else {
+                selectedSet.add(relic.id);
+            }
+            this.saveData.debugStartRelicIds = [...selectedSet];
+            this.saveData.debugStartRelicId = this.saveData.debugStartRelicIds[0] || null;
             if (typeof this.sys_saveData === 'function') this.sys_saveData();
-            if (window.showToast) showToast(`已设置开局遗物：${relic.name}`);
-            this.relicSelectionContext = null;
-            this.ui_closeRelicSelection();
+            if (window.showToast) {
+                const action = selectedSet.has(relic.id) ? '已加入' : '已移除';
+                showToast(`${action}开局遗物：${relic.name}（共 ${this.saveData.debugStartRelicIds.length} 个）`);
+            }
+            if (typeof this.ui_showRelicSelection === 'function') {
+                this.ui_showRelicSelection({
+                    ...(this._lastRelicSelectionOptions || {}),
+                    resumeTarget: 'shop',
+                    source: 'debug_pick_any_relic',
+                    showAllRelics: true,
+                    isReroll: true,
+                });
+            }
             return;
         }
 
@@ -776,9 +802,14 @@ export const shop_system = {
                 card.tabIndex = 0;
                 const previewState = { level, isMax, cost, resDef, canAfford };
                 const isDebugRelicPicker = upgrade.effect && upgrade.effect.type === 'debug_pick_any_relic';
-                const selectedDebugRelic = isDebugRelicPicker && this.saveData?.debugStartRelicId
-                    ? RELIC_DB.find(r => r.id === this.saveData.debugStartRelicId)
-                    : null;
+                const debugStartRelicIds = isDebugRelicPicker
+                    ? (Array.isArray(this.saveData?.debugStartRelicIds)
+                        ? this.saveData.debugStartRelicIds
+                        : (this.saveData?.debugStartRelicId ? [this.saveData.debugStartRelicId] : []))
+                    : [];
+                const selectedDebugRelicNames = debugStartRelicIds
+                    .map(id => RELIC_DB.find(r => r.id === id)?.name || id)
+                    .join('、');
 
                 const topRow = document.createElement('div');
                 topRow.className = 'flex justify-between items-start';
@@ -799,7 +830,7 @@ export const shop_system = {
                 const levelBadge = document.createElement('div');
                 levelBadge.className = `px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] font-mono ${isMax ? 'text-amber-500' : 'text-slate-400'}`;
                 levelBadge.innerText = isDebugRelicPicker
-                    ? (selectedDebugRelic ? '已选' : '未选')
+                    ? (debugStartRelicIds.length > 0 ? `已选 ${debugStartRelicIds.length}` : '未选')
                     : (isMax ? 'MAX' : `LV.${level}`);
                 
                 topRow.appendChild(iconGroup);
@@ -807,8 +838,8 @@ export const shop_system = {
                 
                 const desc = document.createElement('div');
                 desc.className = 'shop-upgrade-desc text-xs text-slate-400 leading-relaxed min-h-[3em]';
-                desc.innerText = selectedDebugRelic
-                    ? `${upgrade.desc}\n当前开局遗物：${selectedDebugRelic.name}`
+                desc.innerText = selectedDebugRelicNames
+                    ? `${upgrade.desc}\n当前开局遗物：${selectedDebugRelicNames}`
                     : upgrade.desc;
                 
                 const bottomRow = document.createElement('div');

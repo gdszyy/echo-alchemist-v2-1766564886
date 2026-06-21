@@ -263,7 +263,7 @@ class Game {
         this.frameDamageAccumulator = 0; 
         this.slowMotionTimer = 0;        
         this.slowMotionThreshold = 100;  
-        this.saveData = { currency: 0, runeFragments: 0, resources: { rune_fragments: 0 }, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0, debugStartRelicId: null };
+        this.saveData = { currency: 0, runeFragments: 0, resources: { rune_fragments: 0 }, upgrades: {}, temporaryUpgrades: {}, unlockedItems: [], highScore: 0, debugStartRelicId: null, debugStartRelicIds: [] };
         this.runCurrency = 0;
         // ==================== 本局统计字段 ====================
         this.runKillCount = 0;          // 本局击杀数
