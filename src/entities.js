@@ -35,7 +35,7 @@ import {
     Particle, SlashEffect, CollectionBeam, Shockwave, LaserBeam, 
     FloatingText, EnergyOrb, LightningBolt, FireWave,
     IceWave, DeathExplosion, HealWave,
-    BladeStormRing, SwordScar, RewardDropEffect
+    GreedyWheelEffect, BladeStormRing, SwordScar, RewardDropEffect
 } from './effects/particles.js';
 import { Enemy, setEnemyAudioProvider } from './entities/enemy.js';
 import { Projectile, setProjectileAudioProvider } from './entities/projectile.js';
@@ -5291,6 +5291,7 @@ export {
     IceWave,
     DeathExplosion,
     HealWave,
+    GreedyWheelEffect,
     BladeStormRing,
     SwordScar,
     RewardDropEffect,

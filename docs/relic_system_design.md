@@ -72,7 +72,7 @@
 | `mortal_burst` | 殒命爆裂 | rare | 击杀联动 | `combat_system.js` killed 块：max(2, maxHp×10%) AOE 真实伤害 |
 | `corridor_arc` | 回廊电弧 | epic | 墙撞 + 回合开始 | `entities/projectile.js` `_applyMove`（左右墙壁 +1 闪电层）+ `relic_runRoundStartHooks`（紧贴墙壁 50% 触发电弧） |
 | `chaos_pact` | 混沌契约 | cursed | 永久 + 流程 | `ui/shop.js`（拾取时给 3 稀有符文 + 设置 `chaosPactDamageMult=2`）+ `game_phase.js` `phase_startGatheringPhase`（直接跳过研磨）+ `combat_fireNextShot`（伤害倍率应用） |
-| `greedy_wheel` | 贪婪轮盘 | cursed | 发射时 | `combat_system.js` `combat_fireNextShot`：multicast 折算为 +damage×0.5/层；末尾按 75% 概率向 `burstQueue` 追加一次重发射 |
+| `greedy_wheel` | 贪婪轮盘 | cursed | 发射时 | `combat_system.js` `combat_fireNextShot`：multicast 折算为 +damage×0.5/层；`game_phase.js` `burstQueue` 在每次贪婪发射后按 75% 概率继续排入下一次续转 |
 | `energy_shield`（修改） | 力場護盾 | cursed | 墙壁联动 | `entities/projectile.js` `_applyMove`：每次墙体接触最多消耗 1 层反弹或穿透；同帧角落碰撞也只扣 1 层；无耐久时继续正常墙体反弹 |
 
 ### 5.3 状态字段
@@ -82,7 +82,7 @@
 | 字段 | 默认值 | 说明 |
 |---|---|---|
 | `chaosPactDamageMult` | `1` | 混沌契约的永久伤害倍率，发射时应用到 `finalRecipe.damage` |
-| 子弹 recipe `_isGreedyReFire` | `false` | 贪婪轮盘 75% 重发射时标记，避免在 `combat_fireNextShot` 内重复折算 multicast |
+| 子弹 recipe `_greedyWheelEnabled` / `_greedyWheelChance` | `false` / `0.75` | 贪婪轮盘发射链标记；续转子弹也会按同一概率继续触发，直到失败或达到防御性最大链长 |
 | 子弹 recipe `_attributeProtocolBonus` | `undefined` | 调试用，记录属性协议本次发射叠加的伤害值 |
 | 敌人 `_mortalBurstTriggered` | `false` | 殒命爆裂连锁防递归 |
 

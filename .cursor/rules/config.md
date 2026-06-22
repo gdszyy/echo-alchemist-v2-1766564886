@@ -215,3 +215,9 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 - `CONFIG.balance.bossEnrageHpRatio` 是唯一 Boss 狂暴血量阈值，当前为 `0.2`。
 - `CONFIG.balance.bossConfigs[id].hpMult` 会在 `spawn_spawnBoss()` 中乘入生成血量；当前 `ignis.hpMult = 1.08`。
 - `CONFIG.balance.bossConfigs[id].regenPercentOverride` 可覆盖 Boss 自身 `regen` 词缀回血比例；当前 `glacies.regenPercentOverride = 0.12`，普通敌人仍使用 `CONFIG.balance.affixes.regenPercent`。
+## 2026-06-22 Greedy Wheel Tuning
+
+- `CONFIG.gameplay.greedyWheelChance` controls the repeat probability and remains `0.75`.
+- `greedyWheelIntervalFrames`, `greedyWheelPreludeFrames`, and `greedyWheelFireDelayFrames` split the chain rhythm into post-shot wait, convergence roll, and success fire delay.
+- `greedyWheelMaxChain` is a defensive cap for pathological lucky streaks; normal rolls still use the same probability until that cap.
+- `CONFIG.performance.*.greedyWheelEffectLimit` caps the dedicated convergence/success/fail VFX count per quality tier.

@@ -1,6 +1,6 @@
 # src\game_phase.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 3967 | 函数数: 36 | 语言: javascript
+> 自动生成于 2026-06-22 | 总行数: 4060 | 函数数: 38 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -41,6 +41,8 @@
 | phase_continueFinalizeRoundAfterRelicHooks | method | `phase_continueFinalizeRoundAfterRelicHooks()` |  |
 | phase_playChargeUpgradeFX | method | `phase_playChargeUpgradeFX(leftoverCount = 1)` |  |
 | smartScientific | method | `smartScientific(num, fractionDigits = 2)` |  |
+| phase_queueGreedyWheelPrelude | method | `phase_queueGreedyWheelPrelude(shot, spawnX, spawnY)` |  |
+| phase_handleGreedyWheelQueueEvent | method | `phase_handleGreedyWheelQueueEvent(shot)` |  |
 | phase_combat_update | method | `phase_combat_update(timeScale)` | ⚠️ 巨型函数，见 @section 导航 |
 | phase_gathering_attemptComplete | method | `phase_gathering_attemptComplete()` |  |
 | phase_gathering_update | method | `phase_gathering_update(timeScale = 1)` | ⚠️ 巨型函数，见 @section 导航 |

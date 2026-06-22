@@ -2,27 +2,35 @@
   "indexed": [
     {
       "file": "src\\entities\\enemy.js",
-      "lines": 6225,
-      "funcs": 42,
+      "lines": 6509,
+      "funcs": 47,
       "sections": 21,
-      "mega_funcs": 4,
+      "mega_funcs": 5,
       "index_path": ".cursor\\rules\\auto_index\\src_entities_enemy_js_index.md"
     },
     {
       "file": "src\\entities.js",
-      "lines": 5160,
-      "funcs": 97,
+      "lines": 5310,
+      "funcs": 104,
       "sections": 23,
       "mega_funcs": 2,
       "index_path": ".cursor\\rules\\auto_index\\src_entities_js_index.md"
     },
     {
       "file": "src\\combat_system.js",
-      "lines": 4079,
-      "funcs": 51,
+      "lines": 4081,
+      "funcs": 50,
       "sections": 25,
       "mega_funcs": 5,
       "index_path": ".cursor\\rules\\auto_index\\src_combat_system_js_index.md"
+    },
+    {
+      "file": "src\\game_phase.js",
+      "lines": 4060,
+      "funcs": 38,
+      "sections": 15,
+      "mega_funcs": 3,
+      "index_path": ".cursor\\rules\\auto_index\\src_game_phase_js_index.md"
     },
     {
       "file": "src\\systems.js",
@@ -33,16 +41,8 @@
       "index_path": ".cursor\\rules\\auto_index\\src_systems_js_index.md"
     },
     {
-      "file": "src\\game_phase.js",
-      "lines": 3818,
-      "funcs": 33,
-      "sections": 15,
-      "mega_funcs": 3,
-      "index_path": ".cursor\\rules\\auto_index\\src_game_phase_js_index.md"
-    },
-    {
       "file": "src\\ui_system.js",
-      "lines": 3137,
+      "lines": 3234,
       "funcs": 57,
       "sections": 5,
       "mega_funcs": 2,
@@ -50,23 +50,23 @@
     },
     {
       "file": "src\\game_system.js",
-      "lines": 3124,
-      "funcs": 56,
+      "lines": 3160,
+      "funcs": 58,
       "sections": 7,
       "mega_funcs": 2,
       "index_path": ".cursor\\rules\\auto_index\\src_game_system_js_index.md"
     },
     {
       "file": "src\\spawn_system.js",
-      "lines": 2877,
-      "funcs": 40,
+      "lines": 2927,
+      "funcs": 41,
       "sections": 10,
       "mega_funcs": 3,
       "index_path": ".cursor\\rules\\auto_index\\src_spawn_system_js_index.md"
     },
     {
       "file": "src\\config.js",
-      "lines": 2109,
+      "lines": 2124,
       "funcs": 1,
       "sections": 0,
       "mega_funcs": 0,
@@ -82,15 +82,15 @@
     },
     {
       "file": "src\\effects\\particles.js",
-      "lines": 1866,
-      "funcs": 49,
+      "lines": 1975,
+      "funcs": 52,
       "sections": 3,
       "mega_funcs": 1,
       "index_path": ".cursor\\rules\\auto_index\\src_effects_particles_js_index.md"
     },
     {
       "file": "src\\pinboard_modules.js",
-      "lines": 1583,
+      "lines": 1584,
       "funcs": 76,
       "sections": 0,
       "mega_funcs": 0,
@@ -98,7 +98,7 @@
     },
     {
       "file": "src\\entities\\projectile.js",
-      "lines": 1371,
+      "lines": 1382,
       "funcs": 15,
       "sections": 7,
       "mega_funcs": 1,
@@ -106,15 +106,15 @@
     },
     {
       "file": "src\\ui\\hud.js",
-      "lines": 1186,
-      "funcs": 16,
+      "lines": 1292,
+      "funcs": 20,
       "sections": 4,
       "mega_funcs": 2,
       "index_path": ".cursor\\rules\\auto_index\\src_ui_hud_js_index.md"
     },
     {
       "file": "src\\render_system.js",
-      "lines": 1128,
+      "lines": 1136,
       "funcs": 20,
       "sections": 8,
       "mega_funcs": 1,
@@ -122,7 +122,7 @@
     },
     {
       "file": "src\\rune_config.js",
-      "lines": 989,
+      "lines": 935,
       "funcs": 0,
       "sections": 0,
       "mega_funcs": 0,
@@ -130,10 +130,10 @@
     },
     {
       "file": "src\\ui\\shop.js",
-      "lines": 937,
-      "funcs": 12,
+      "lines": 926,
+      "funcs": 13,
       "sections": 0,
-      "mega_funcs": 0,
+      "mega_funcs": 1,
       "index_path": ".cursor\\rules\\auto_index\\src_ui_shop_js_index.md"
     },
     {
@@ -153,6 +153,14 @@
       "index_path": ".cursor\\rules\\auto_index\\src_audio_js_index.md"
     },
     {
+      "file": "src\\ui\\run_shop.js",
+      "lines": 648,
+      "funcs": 25,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_ui_run_shop_js_index.md"
+    },
+    {
       "file": "src\\plinko_physics.js",
       "lines": 597,
       "funcs": 15,
@@ -162,7 +170,7 @@
     },
     {
       "file": "src\\core.js",
-      "lines": 510,
+      "lines": 518,
       "funcs": 5,
       "sections": 0,
       "mega_funcs": 1,
@@ -194,7 +202,7 @@
     },
     {
       "file": "src\\combat\\collision.js",
-      "lines": 450,
+      "lines": 454,
       "funcs": 3,
       "sections": 0,
       "mega_funcs": 1,
@@ -202,19 +210,11 @@
     },
     {
       "file": "src\\calc_utils.js",
-      "lines": 348,
-      "funcs": 8,
+      "lines": 400,
+      "funcs": 10,
       "sections": 0,
       "mega_funcs": 0,
       "index_path": ".cursor\\rules\\auto_index\\src_calc_utils_js_index.md"
-    },
-    {
-      "file": "src\\loot_system.js",
-      "lines": 302,
-      "funcs": 6,
-      "sections": 0,
-      "mega_funcs": 0,
-      "index_path": ".cursor\\rules\\auto_index\\src_loot_system_js_index.md"
     },
     {
       "file": "src\\utils\\math_utils.js",
@@ -233,6 +233,14 @@
       "index_path": ".cursor\\rules\\auto_index\\src_event_bus_js_index.md"
     },
     {
+      "file": "src\\loot_system.js",
+      "lines": 251,
+      "funcs": 5,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_loot_system_js_index.md"
+    },
+    {
       "file": "src\\combat\\collision_shapes.js",
       "lines": 146,
       "funcs": 2,
@@ -243,16 +251,16 @@
   ],
   "skipped": [
     {
-      "file": "src\\ui\\run_shop.js",
-      "lines": 488,
-      "funcs": 17,
-      "reason": "未达阈值(行数=488<500, 函数数=17<20)"
+      "file": "src\\world_sim\\bio_layer.js",
+      "lines": 498,
+      "funcs": 9,
+      "reason": "未达阈值(行数=498<500, 函数数=9<20)"
     },
     {
-      "file": "src\\world_sim\\bio_layer.js",
-      "lines": 474,
-      "funcs": 9,
-      "reason": "未达阈值(行数=474<500, 函数数=9<20)"
+      "file": "src\\world_sim\\bio_spawn.js",
+      "lines": 465,
+      "funcs": 18,
+      "reason": "未达阈值(行数=465<500, 函数数=18<20)"
     },
     {
       "file": "src\\world_sim\\crystal_disaster.js",
@@ -273,28 +281,28 @@
       "reason": "未达阈值(行数=357<500, 函数数=10<20)"
     },
     {
-      "file": "src\\world_sim\\bio_spawn.js",
-      "lines": 349,
-      "funcs": 14,
-      "reason": "未达阈值(行数=349<500, 函数数=14<20)"
+      "file": "src\\bitmap_icons.js",
+      "lines": 319,
+      "funcs": 9,
+      "reason": "未达阈值(行数=319<500, 函数数=9<20)"
     },
     {
-      "file": "src\\bitmap_icons.js",
-      "lines": 297,
-      "funcs": 9,
-      "reason": "未达阈值(行数=297<500, 函数数=9<20)"
+      "file": "src\\world_sim\\params.js",
+      "lines": 313,
+      "funcs": 0,
+      "reason": "未达阈值(行数=313<500, 函数数=0<20)"
+    },
+    {
+      "file": "src\\world_sim\\climate_layer.js",
+      "lines": 280,
+      "funcs": 13,
+      "reason": "未达阈值(行数=280<500, 函数数=13<20)"
     },
     {
       "file": "src\\world_sim\\mantle_layer.js",
       "lines": 245,
       "funcs": 2,
       "reason": "未达阈值(行数=245<500, 函数数=2<20)"
-    },
-    {
-      "file": "src\\world_sim\\params.js",
-      "lines": 240,
-      "funcs": 0,
-      "reason": "未达阈值(行数=240<500, 函数数=0<20)"
     },
     {
       "file": "src\\data\\enemy_v2_metadata.js",
@@ -304,9 +312,9 @@
     },
     {
       "file": "src\\world_sim\\engine.js",
-      "lines": 191,
+      "lines": 193,
       "funcs": 5,
-      "reason": "未达阈值(行数=191<500, 函数数=5<20)"
+      "reason": "未达阈值(行数=193<500, 函数数=5<20)"
     },
     {
       "file": "src\\world_sim\\human_energy.js",
@@ -321,16 +329,10 @@
       "reason": "未达阈值(行数=170<500, 函数数=1<20)"
     },
     {
-      "file": "src\\world_sim\\climate_layer.js",
-      "lines": 124,
-      "funcs": 2,
-      "reason": "未达阈值(行数=124<500, 函数数=2<20)"
-    },
-    {
       "file": "src\\world_sim\\cell.js",
-      "lines": 118,
+      "lines": 128,
       "funcs": 1,
-      "reason": "未达阈值(行数=118<500, 函数数=1<20)"
+      "reason": "未达阈值(行数=128<500, 函数数=1<20)"
     },
     {
       "file": "src\\utils\\ammo_readability.js",
@@ -361,6 +363,12 @@
       "lines": 65,
       "funcs": 2,
       "reason": "未达阈值(行数=65<500, 函数数=2<20)"
+    },
+    {
+      "file": "src\\world_sim\\bio_settlement.js",
+      "lines": 59,
+      "funcs": 6,
+      "reason": "未达阈值(行数=59<500, 函数数=6<20)"
     },
     {
       "file": "src\\world_sim\\rng.js",

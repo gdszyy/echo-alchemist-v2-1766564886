@@ -1,6 +1,6 @@
 # src\effects\particles.js 函数索引
 
-> 自动生成于 2026-06-21 | 总行数: 1873 | 函数数: 49 | 语言: javascript
+> 自动生成于 2026-06-22 | 总行数: 1975 | 函数数: 52 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -23,6 +23,9 @@
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
 | constructor | method | `constructor(x, y, color)` |  |
+| update | method | `update(timeScale)` |  |
+| draw | method | `draw(ctx)` |  |
+| constructor | method | `constructor(x, y, mode = 'prelude', quality = 'high')` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
 | constructor | method | `constructor(segments, width, color, isContinuous = false)` |  |

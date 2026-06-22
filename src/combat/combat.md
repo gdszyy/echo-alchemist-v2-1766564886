@@ -202,3 +202,6 @@ combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = nul
 - Combat clear checks use the arena-wall AABB helper (`calc_isEnemyInsideCombatWalls()` via `phase_isEnemyClearable()`), not `pos.y > 0` row shortcuts. Bosses inside the walls count; ordinary enemies above the top wall do not.
 - Boss enrage, enrage rune-drop, and vulnerability-delayed enrage all read `CONFIG.balance.bossEnrageHpRatio` (`0.2`).
 - Pierce follow-up hits now create a light impact pulse and short feedback text from `combat_damageEnemy()`; the extra VFX is budgeted by existing shockwave/spark limits.
+- `greedy_wheel` still converts `multicast` into flat damage in `combat_fireNextShot()`, then marks the queued shot with `_greedyWheelEnabled` and `_greedyWheelChance`.
+- The repeat roll now lives in `game_phase.js` `burstQueue` handling: each greedy-fired bullet schedules a prelude, rolls the same probability, fires on success, and schedules the next roll after that bullet fires. `_isGreedyReFire` is no longer part of the contract.
+- Visual feedback uses capped `GreedyWheelEffect` instances via `spawn_createGreedyWheelEffect()`; failure also triggers a light screen shake.

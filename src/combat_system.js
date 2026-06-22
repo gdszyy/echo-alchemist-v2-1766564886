@@ -2943,15 +2943,16 @@ export const combat_system = {
 
         // --- [遗物 Hook] 贪婪轮盘 (greedy_wheel) ---
         // 1. multicast 折算为伤害（每层 +damage * 0.5），随后清零
-        // 2. 设置 _greedyWheelReFireChance = 0.75，由 burstQueue 末端的逻辑读取
-        if (this.ownedRelics && this.ownedRelics.includes('greedy_wheel') && !finalRecipe._isGreedyReFire) {
+        // 2. 标记 burstQueue 项进入“汇聚 -> 判定 -> 成功续射 / 失败震动”的概率链
+        if (this.ownedRelics && this.ownedRelics.includes('greedy_wheel')) {
             const layers = finalRecipe.multicast || 0;
             if (layers > 0) {
                 const baseDmg = finalRecipe.damage || 1;
                 finalRecipe.damage = Math.ceil(baseDmg + baseDmg * 0.5 * layers);
                 finalRecipe.multicast = 0;
             }
-            finalRecipe._greedyWheelReFire = true;
+            finalRecipe._greedyWheelEnabled = true;
+            finalRecipe._greedyWheelChance = CONFIG.gameplay.greedyWheelChance ?? 0.75;
         }
 
         // --- [遗物 Hook] 混沌契约 (chaos_pact) ---
@@ -2987,22 +2988,21 @@ export const combat_system = {
         // [词条 Hook] 化弹为剑：取消连射，连射次数将作为子飞剑攻击次数
         const isReplacedSword = !!finalRecipe._replaceWithSonSword;
         const isOnlyOne = isReplacedSword || !(finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword' && !finalRecipe.wind);
-        this.burstQueue.push({ delay: 0, vel: vel, recipe: finalRecipe, shotId: shotId, isLast: isOnlyOne });
+        this.burstQueue.push({
+            delay: 0,
+            vel: vel,
+            recipe: finalRecipe,
+            shotId: shotId,
+            isLast: isOnlyOne,
+            greedyWheelChain: !!finalRecipe._greedyWheelEnabled,
+            greedyWheelChainCount: 0
+        });
 
         // 多重射击
         if (!isReplacedSword && finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword' && !finalRecipe.wind) {
             for(let i=1; i<=finalRecipe.multicast; i++) {
                 const isLastInBurst = (i === finalRecipe.multicast);
                 this.burstQueue.push({ delay: i * 20, vel: vel, recipe: finalRecipe, shotId: shotId, isLast: isLastInBurst });
-            }
-        }
-
-        // [遗物 Hook] 贪婪轮盘 (greedy_wheel)：每次发射后 75% 概率追加一次相同 recipe 的发射
-        // 通过 burstQueue 直接追加，spawn_spawnBullet 不会再回到 combat_fireNextShot，因此天然不会再次触发本效果
-        if (this.ownedRelics && this.ownedRelics.includes('greedy_wheel') && !finalRecipe._isGreedyReFire) {
-            if (Math.random() < 0.75) {
-                const reFireRecipe = { ...finalRecipe, _isGreedyReFire: true };
-                this.burstQueue.push({ delay: 30, vel: vel, recipe: reFireRecipe, shotId: shotId, isLast: true });
             }
         }
     },

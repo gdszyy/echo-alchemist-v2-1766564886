@@ -2467,6 +2467,82 @@ phase_gathering_getRandomPegType() {
         // 并自动去掉末尾多余的 0 (例如 5.500 -> 5.5)
         return parseFloat(num.toFixed(fractionDigits)).toString();
     },
+    // Greedy Wheel chain helpers: split post-shot delay, prelude VFX, roll, and outcome feedback.
+    phase_queueGreedyWheelPrelude(shot, spawnX, spawnY) {
+        const maxChain = CONFIG.gameplay.greedyWheelMaxChain ?? 48;
+        const chainCount = shot.greedyWheelChainCount || 0;
+        if (chainCount >= maxChain) {
+            if (typeof this.spawn_createGreedyWheelEffect === 'function') {
+                this.spawn_createGreedyWheelEffect(spawnX, spawnY, 'fail');
+            }
+            if (typeof this.triggerScreenShake === 'function') this.triggerScreenShake(5);
+            return;
+        }
+
+        this.burstQueue.push({
+            type: 'greedy_wheel_prelude',
+            delay: CONFIG.gameplay.greedyWheelIntervalFrames ?? 24,
+            x: spawnX,
+            y: spawnY,
+            vel: shot.vel,
+            recipe: shot.recipe,
+            shotId: shot.shotId,
+            greedyWheelChainCount: chainCount
+        });
+    },
+
+    phase_handleGreedyWheelQueueEvent(shot) {
+        const gx = (typeof shot.x === 'number') ? shot.x : this.width / 2;
+        const gy = (typeof shot.y === 'number') ? shot.y : this.height - 80 - EMITTER_PORT_OFFSET_Y;
+        if (shot.type === 'greedy_wheel_prelude') {
+            if (typeof this.spawn_createGreedyWheelEffect === 'function') {
+                this.spawn_createGreedyWheelEffect(gx, gy, 'prelude');
+            }
+            this.burstQueue.push({
+                type: 'greedy_wheel_roll',
+                delay: CONFIG.gameplay.greedyWheelPreludeFrames ?? 22,
+                x: gx,
+                y: gy,
+                vel: shot.vel,
+                recipe: shot.recipe,
+                shotId: shot.shotId,
+                greedyWheelChainCount: shot.greedyWheelChainCount || 0
+            });
+            return;
+        }
+
+        const chance = shot.recipe?._greedyWheelChance ?? CONFIG.gameplay.greedyWheelChance ?? 0.75;
+        const chainCount = shot.greedyWheelChainCount || 0;
+        // @perf-impact: Greedy wheel chain VFX - queue events create capped GreedyWheelEffect instances only
+        if (Math.random() < chance) {
+            if (typeof this.spawn_createGreedyWheelEffect === 'function') {
+                this.spawn_createGreedyWheelEffect(gx, gy, 'success');
+            }
+            if (typeof this.spawn_createFloatingText === 'function') {
+                this.spawn_createFloatingText(gx, gy - 34, 'GREED +1', '#fbbf24', 16);
+            }
+            this.burstQueue.push({
+                delay: CONFIG.gameplay.greedyWheelFireDelayFrames ?? 10,
+                x: gx,
+                y: gy,
+                vel: shot.vel,
+                recipe: { ...shot.recipe, _greedyWheelChainShot: true },
+                shotId: shot.shotId,
+                isLast: true,
+                greedyWheelChain: true,
+                greedyWheelChainCount: chainCount + 1
+            });
+        } else {
+            if (typeof this.spawn_createGreedyWheelEffect === 'function') {
+                this.spawn_createGreedyWheelEffect(gx, gy, 'fail');
+            }
+            if (typeof this.triggerScreenShake === 'function') this.triggerScreenShake(6);
+            if (typeof this.spawn_createFloatingText === 'function') {
+                this.spawn_createFloatingText(gx, gy - 34, 'GREED FAIL', '#fca5a5', 14);
+            }
+        }
+    },
+
 /**
      * @method updateCombat
      * @description 战斗阶段的游戏逻辑更新 (含可视化墙壁与分层视差)。
@@ -2602,12 +2678,20 @@ phase_gathering_getRandomPegType() {
             const shot = this.burstQueue[i];
             shot.delay -= timeScale;
             if (shot.delay <= 0) {
+                if (shot.type === 'greedy_wheel_prelude' || shot.type === 'greedy_wheel_roll') {
+                    this.phase_handleGreedyWheelQueueEvent(shot);
+                    this.burstQueue.splice(i, 1);
+                    continue;
+                }
                 // [emitter-port] 子弹从发射器素材的上沿发射口生成，偏移量统一来自 EMITTER_PORT_OFFSET_Y。
                 // [echo-origin] 若 shot 携带 x/y（如回响弹），则从该坐标发射，否则回退到发射器
                 const spawnX = (typeof shot.x === 'number') ? shot.x : this.width/2;
                 const spawnY = (typeof shot.y === 'number') ? shot.y : this.height - 80 - EMITTER_PORT_OFFSET_Y;
                 this.spawn_spawnBullet(spawnX, spawnY, shot.vel, shot.recipe, shot.shotId, shot.isLast);
                 audio.playShoot();
+                if (shot.greedyWheelChain) {
+                    this.phase_queueGreedyWheelPrelude(shot, spawnX, spawnY);
+                }
                 this.burstQueue.splice(i, 1);
             }
         }
@@ -2981,6 +3065,15 @@ phase_gathering_getRandomPegType() {
             }
 
             // 更新和绘制特效（两指针原地压缩，避免 splice O(N²) 与临时数组分配；死亡粒子归还对象池）
+            if (this.greedyWheelEffects) {
+                for (let i = this.greedyWheelEffects.length - 1; i >= 0; i--) {
+                    const gwe = this.greedyWheelEffects[i];
+                    gwe.update(timeScale);
+                    gwe.draw(this.ctx);
+                    if (gwe.life <= 0) this.greedyWheelEffects.splice(i, 1);
+                }
+            }
+
             {
                 const arr = this.particles;
                 const counts = this.particleCounts;

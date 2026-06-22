@@ -782,6 +782,11 @@ const CONFIG = {
 	        initWindPegs: 0,
 	        initSwordPegs: 0,
 	        baseDamage: 1,
+        greedyWheelChance: 0.75,
+        greedyWheelIntervalFrames: 24,
+        greedyWheelPreludeFrames: 22,
+        greedyWheelFireDelayFrames: 10,
+        greedyWheelMaxChain: 48,
 	        laserLengthBonus: 0,    
         enemyShowTimeFrames:72,
         relicChoiceNum:4,
@@ -1318,6 +1323,7 @@ const CONFIG = {
             relicCinematicDelayMs: 900,
             relicCinematicSparkCount: 18,
             relicCinematicBoltCount: 8,
+            greedyWheelEffectLimit: 8,
             // shadowBlur 全局开关（移动端 GPU 上 shadowBlur 是单帧最贵的 Canvas2D 操作）
             shadowBlurEnabled: true,
         },
@@ -1358,6 +1364,7 @@ const CONFIG = {
             relicCinematicDelayMs: 650,
             relicCinematicSparkCount: 10,
             relicCinematicBoltCount: 4,
+            greedyWheelEffectLimit: 5,
             shadowBlurEnabled: true,
         },
         // LOW：省电模式，适合低端手机 / 发热严重时
@@ -1400,6 +1407,7 @@ const CONFIG = {
             relicCinematicDelayMs: 300,
             relicCinematicSparkCount: 4,
             relicCinematicBoltCount: 1,
+            greedyWheelEffectLimit: 3,
             // shadowBlur 在 low 等级一律关闭，是降温的关键开关
             shadowBlurEnabled: false,
         }
@@ -1787,12 +1795,12 @@ const RELIC_DB = [
         effect: 'chaos_pact',
         maxStacks: 1
     },
-    // 贪婪轮盘（诅咒）：发射时 multicast 折算为伤害（每层 +damage×0.5），每发 75% 概率再发射一次
+    // 贪婪轮盘（诅咒）：发射时 multicast 折算为伤害（每层 +damage×0.5），每发 75% 概率进入连续续转
     {
         id: 'greedy_wheel',
         name: '贪婪轮盘',
         icon: '🎲',
-        desc: '【诅咒】子弹发射时，所有连射 (multicast) 层数清零并按每层 +(基础伤害 × 0.5) 折算为固定伤害。【收益】每次发射后有 75% 概率自动再发射一次（再发射不会再触发本效果）。',
+        desc: '【诅咒】子弹发射时，所有连射 (multicast) 层数清零并按每层 +(基础伤害 × 0.5) 折算为固定伤害。【收益】每次发射后有 75% 概率自动再发射一次；再发射也会继续以相同概率续转。',
         rarity: 'cursed',
         effect: 'greedy_wheel',
         maxStacks: 1

@@ -94,6 +94,7 @@ if avgFps > fpsThresholdUp (55):
 | `lightningLimit` | 15 | 8 | 4 | LightningBolt 特效上限 |
 | `deathExplosionLimit` | 14 | 8 | 4 | DeathExplosion 上限（精英/普通受限，Boss 不受限）；防清场卡顿 |
 | `iceWaveLimit` | 10 | 6 | 3 | 冰冻死亡 IceWave 冰波环上限；防清场卡顿 |
+| `greedyWheelEffectLimit` | 8 | 5 | 3 | 贪婪轮盘汇聚/成功/失败专用特效上限 |
 | `pegSoftShadow` | `true` | `true` | `false` | Peg 渓圆软阴影开关 |
 | `pegGlowHalo` | `true` | `false` | `false` | Peg 底部径向光晕开关 |
 | `enemyGloss` | `true` | `true` | `false` | 敌人材质光泽渐变开关 |
@@ -123,6 +124,7 @@ if avgFps > fpsThresholdUp (55):
 | `spawn_pushParticleWithLimit(particle)` | `maxParticles` / `sparkLimit` / `smokeLimit` / `venomLimit` | 通用粒子推入前检查全局上限及 spark/smoke/venom 独立限制 |
 | `spawn_createShockwave(x, y, color)` | `shockwaveLimit` | 超限时跳过创建 |
 | `spawn_createHealWave(x, y, range)` | `waveLimit` | 超限时跳过创建 |
+| `spawn_createGreedyWheelEffect(x, y, mode)` | `greedyWheelEffectLimit` | 贪婪轮盘链式发射演出超限时跳过创建；low 档使用平面描边 |
 
 ### 5.2 战斗系统（`src/combat_system.js`）
 
@@ -318,6 +320,7 @@ if avgFps > fpsThresholdUp (55):
 - `doomsday_timer`: 回合开始锁定、冲击波、倒计时读数、钟面碎片和粒子爆发；若击杀成功会补触发，补触发上限从 1 开始，并随主触发累计每 5 次 +1。每段演出仍复用同一组预算和既有效果上限，单轮最多受当前存活敌人数约束。
 - `corridor_arc`: 回合开始墙体电弧、墙撞火花。
 - `mortal_burst`: 击杀爆裂的 FireWave、冲击波和碎片粒子。
+- `greedy_wheel`: 发射后进入汇聚、成功续射或失败震动；每段只创建 `GreedyWheelEffect`，数量受 `greedyWheelEffectLimit` 限制，low 档关闭发光/径向渐变。
 
 这些演出仍叠加既有 `shockwaveLimit` / `waveLimit` / `lightningLimit` / `sparkLimit` 检查；其中 `doomsday_timer` 不再创建 `LightningBolt`，但仍复用 `relicCinematicBoltCount` 作为钟面碎片数量预算。`phase_finalizeRound()` 会按遗物 Hook 返回的演出时长延后 Boss 生成、奖励解析和下一阶段横幅，避免动画被阶段切换吞掉。
 

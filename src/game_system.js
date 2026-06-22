@@ -2167,6 +2167,7 @@ export const game_system = {
         this.burstQueue = [];
         this.spores = [];
         this.fireWaves = [];
+        this.greedyWheelEffects = [];
     },
 
     /**

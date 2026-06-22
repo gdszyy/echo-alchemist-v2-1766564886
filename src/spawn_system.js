@@ -4,7 +4,7 @@ import {
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
-    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, HealWave, showToast, 
+    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, HealWave, GreedyWheelEffect, showToast,
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
 } from './entities.js';
 import { getThemeSegment } from './utils/math_utils.js';
@@ -1577,6 +1577,15 @@ export const spawn_system = {
         const _budget = CONFIG.performance[this.perfQualityLevel || 'high'];
         if (this.healWaves.length >= _budget.waveLimit) return;
         this.healWaves.push(new HealWave(x, y, range));
+    },
+
+    spawn_createGreedyWheelEffect(x, y, mode = 'prelude') {
+        if (!this.greedyWheelEffects) this.greedyWheelEffects = [];
+        const quality = this.perfQualityLevel || 'high';
+        const _budget = CONFIG.performance[quality] || CONFIG.performance.high;
+        // @perf-impact: Greedy wheel battle VFX - capped by greedyWheelEffectLimit and drawn flat in low quality
+        if (this.greedyWheelEffects.length >= (_budget.greedyWheelEffectLimit ?? 6)) return;
+        this.greedyWheelEffects.push(new GreedyWheelEffect(x, y, mode, quality));
     },
 
 // ---  createHitFeedback ---

@@ -445,6 +445,107 @@ class Shockwave {
     }
 }
 
+// @perf-impact: Greedy wheel radial glow and shadowBlur - gated by quality and greedyWheelEffectLimit
+// --- 贪婪轮盘链式发射特效 ---
+class GreedyWheelEffect {
+    constructor(x, y, mode = 'prelude', quality = 'high') {
+        this.x = x;
+        this.y = y;
+        this.mode = mode;
+        this.quality = quality || 'high';
+        this.age = 0;
+        this.duration = mode === 'prelude' ? 28 : (mode === 'success' ? 34 : 24);
+        this.life = 1.0;
+        this.seed = Math.random() * Math.PI * 2;
+    }
+
+    update(timeScale) {
+        this.age += timeScale;
+        this.life = Math.max(0, 1 - this.age / this.duration);
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+
+        const t = Math.min(1, this.age / this.duration);
+        const isLow = this.quality === 'low';
+        const isFail = this.mode === 'fail';
+        const isSuccess = this.mode === 'success';
+        const gold = isFail ? '#ef4444' : '#fbbf24';
+        const dark = isFail ? '#450a0a' : '#451a03';
+        const radius = this.mode === 'prelude'
+            ? 40 - t * 18
+            : 18 + t * (isSuccess ? 58 : 42);
+        const alpha = this.life;
+        const spin = this.seed + (isFail ? -1 : 1) * t * Math.PI * 1.8;
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.globalAlpha = alpha;
+        ctx.globalCompositeOperation = isLow ? 'source-over' : 'lighter';
+
+        if (!isLow) {
+            const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, radius * 1.25);
+            glow.addColorStop(0, isFail ? `rgba(239,68,68,${0.25 * alpha})` : `rgba(255,255,220,${0.28 * alpha})`);
+            glow.addColorStop(0.45, isFail ? `rgba(127,29,29,${0.22 * alpha})` : `rgba(251,191,36,${0.22 * alpha})`);
+            glow.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 1.25, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowColor = gold;
+            ctx.shadowBlur = _sb(isSuccess ? 18 : 10);
+        }
+
+        ctx.rotate(spin);
+        ctx.lineWidth = isLow ? 2 : 3;
+        ctx.strokeStyle = gold;
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+            const a = i * Math.PI / 4;
+            const inner = Math.max(6, radius * 0.45);
+            const outer = radius * (this.mode === 'prelude' ? (1.15 - t * 0.25) : 1);
+            ctx.moveTo(Math.cos(a) * inner, Math.sin(a) * inner);
+            ctx.lineTo(Math.cos(a) * outer, Math.sin(a) * outer);
+        }
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, Math.max(8, radius * 0.58), 0, Math.PI * 2);
+        ctx.strokeStyle = isFail ? '#fca5a5' : '#fde68a';
+        ctx.stroke();
+
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) {
+            const a0 = i * Math.PI / 2 + (isFail ? t * 0.8 : 0);
+            ctx.arc(0, 0, radius, a0, a0 + Math.PI * 0.32);
+        }
+        ctx.strokeStyle = isFail ? '#991b1b' : '#f59e0b';
+        ctx.stroke();
+
+        if (isFail) {
+            ctx.strokeStyle = '#fecaca';
+            ctx.lineWidth = isLow ? 1.5 : 2.5;
+            for (let i = 0; i < 5; i++) {
+                const a = this.seed + i * 1.7;
+                const start = radius * 0.25;
+                const end = radius * (0.8 + (i % 2) * 0.2);
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(a) * start, Math.sin(a) * start);
+                ctx.lineTo(Math.cos(a + 0.18) * end, Math.sin(a + 0.18) * end);
+                ctx.stroke();
+            }
+        } else {
+            ctx.fillStyle = isSuccess ? '#fff7ed' : dark;
+            ctx.beginPath();
+            ctx.arc(0, 0, Math.max(4, radius * 0.16), 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+}
+
 // --- 新增：激光光束特效 ---
 class LaserBeam {
     /**
@@ -1867,6 +1968,7 @@ export {
     IceWave,
     DeathExplosion,
     HealWave,
+    GreedyWheelEffect,
     BladeStormRing,
     SwordScar,
     RewardDropEffect
