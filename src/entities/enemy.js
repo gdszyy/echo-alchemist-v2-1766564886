@@ -888,7 +888,7 @@ class Enemy {
         // [新增] 更新 Boss 专属物理状态机
         if (this.type === 'boss') {
             if (this.bossType === 'devourer' && this.collisionShape === 'arc') {
-                const isBerserk = (this.hp / this.maxHp) < 0.5;
+                const isBerserk = (this.hp / this.maxHp) < (CONFIG.balance.bossEnrageHpRatio ?? 0.2);
                 const cooldownTime = isBerserk ? 2 : 4;
                 
                 if (this.devourState === 'IDLE') {
@@ -918,7 +918,7 @@ class Enemy {
                     }
                 }
             } else if (this.bossType === 'ouroboros' && this.collisionShape === 'arc') {
-                const isBerserk = (this.hp / this.maxHp) < 0.5;
+                const isBerserk = (this.hp / this.maxHp) < (CONFIG.balance.bossEnrageHpRatio ?? 0.2);
                 const rotationSpeed = isBerserk ? Math.PI * 0.5 : Math.PI * 0.25;
                 
                 this.gapAngle += rotationSpeed;
@@ -1034,7 +1034,13 @@ class Enemy {
                 const selfRegenMult = (this.type === 'boss' && this.bossType === 'viridis' && this.berserked && this._berserkedSelfRegenMult)
                     ? this._berserkedSelfRegenMult
                     : 1;
-                const heal = Math.floor(this.maxHp * afx.regenPercent * selfRegenMult) || 1;
+                const bossRegenCfg = this.type === 'boss' && this.bossType && CONFIG.balance.bossConfigs
+                    ? CONFIG.balance.bossConfigs[this.bossType]
+                    : null;
+                const regenPercent = Number.isFinite(bossRegenCfg?.regenPercentOverride)
+                    ? bossRegenCfg.regenPercentOverride
+                    : afx.regenPercent;
+                const heal = Math.floor(this.maxHp * regenPercent * selfRegenMult) || 1;
                 if(this.hp < this.maxHp) {
                     this.hp = Math.min(this.maxHp, this.hp + heal);
                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 30, `+${heal}`, '#4ade80');
@@ -1229,7 +1235,13 @@ class Enemy {
             
             // --- 1. 再生 (Regen) ---
             if(this.affixes.includes('regen')) {
-                const heal = Math.floor(this.maxHp * afx.regenPercent) || 1;
+                const bossRegenCfg = this.type === 'boss' && this.bossType && CONFIG.balance.bossConfigs
+                    ? CONFIG.balance.bossConfigs[this.bossType]
+                    : null;
+                const regenPercent = Number.isFinite(bossRegenCfg?.regenPercentOverride)
+                    ? bossRegenCfg.regenPercentOverride
+                    : afx.regenPercent;
+                const heal = Math.floor(this.maxHp * regenPercent) || 1;
                 if(this.hp < this.maxHp) {
                     this.hp = Math.min(this.maxHp, this.hp + heal);
                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 30, `+${heal}`, '#4ade80');
@@ -4169,7 +4181,7 @@ class Enemy {
             const gapSize = Math.PI * 0.5; // 缺口角度（90度）
             const arcStart = gapAngle + gapSize; // 实体弧起始角
             const arcEnd = gapAngle + Math.PI * 2; // 实体弧结束角（绕回缺口前）
-            const isBerserk = (this.hp / this.maxHp) < 0.5;
+            const isBerserk = (this.hp / this.maxHp) < (CONFIG.balance.bossEnrageHpRatio ?? 0.2);
             const ringPulse = (Math.sin(ouroTime * (isBerserk ? 4 : 2)) + 1) * 0.5;
 
             // --- 1. 绘制旋转残影（狂暴时多层半透明历史弧）---
@@ -5264,7 +5276,7 @@ class Enemy {
         }
 
         const t = Date.now() / 1000;
-        const isBerserk = this.berserked || (this.hp / this.maxHp) < 0.5;
+        const isBerserk = this.berserked || (this.hp / this.maxHp) < (CONFIG.balance.bossEnrageHpRatio ?? 0.2);
         switch (this.bossType) {
             case 'ignis': {
                 // === Ignis: 燕火之心 + 火星喷射 ===

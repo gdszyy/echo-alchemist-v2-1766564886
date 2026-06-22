@@ -130,3 +130,8 @@ Boss 不再使用旧 `weakness` 静态字段。`combat_damageEnemy()` 在 `enemy
 - 属性系统：[attribute_index.md](attribute_index.md)
 - 符文词条：[runeword_index.md](runeword_index.md)
 - 性能规范：[performance.md](performance.md)
+## 2026-06-22 清场统计与 Boss 狂暴阈值
+
+- 清空敌人、清场抽奖、清场后 projectile 清理，统一以 `calc_isEnemyInsideCombatWalls()` / `phase_isEnemyClearable()` 的围墙 AABB 相交口径统计；Boss 在围墙内必须计入，顶部墙外普通敌人不计入。
+- Boss 狂暴阈值统一读取 `CONFIG.balance.bossEnrageHpRatio`，当前为 `0.2`。破绽延后狂暴、狂暴符文掉落、`combat_checkBossPhaseChange()` 都必须使用同一阈值。
+- 穿透后续命中在 `combat_damageEnemy()` 中追加轻量冲击波、3 个 spark 和 `PIERCE!` 浮字；该效果有 `@perf-impact` 标记并依赖既有 `shockwaveLimit` / `sparkLimit` 预算。

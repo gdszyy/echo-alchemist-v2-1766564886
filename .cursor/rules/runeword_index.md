@@ -125,3 +125,12 @@
 | `_pierceDecayReduction` | number (0~1) | 穿透共鸣 (T2/T3) | 全局穿透衰减消费段（`combat_damageEnemy` 约第 1530 行）：每次穿透命中伤害衰减 35%（最低 15%），`pierceDecayReduction` 减小衰减率 |
 | `_replaceWithSonSword` | boolean | `bullet_to_sword` | `spawn_spawnBullet` 入口判断；触发后改为生成一把 SonSword 而非常规弹丸 |
 | `_sonSwordLevel` | number (1~3) | `bullet_to_sword` | `spawn_spawnBullet` 入口；对应生成的子飞剑等级（词条等级 → 子飞剑 Lv） |
+## 2026-06-22 新增属性词条补充
+
+| effectId | 词条名称 | 主要实现位置 | 关键状态字段 |
+|---|---|---|---|
+| `toxic_bloom` | 毒花绽放 | `src/combat_system.js` 剧毒命中段 | `finalRecipe._toxicBloom`：`radius` / `spreadStacks` / `bonusStacks` |
+| `overload_core` | 超载核心 | `src/entities/projectile.js` `_detonateOvercharge()` | `finalRecipe._overloadRadiusBonus`, `finalRecipe._overloadDamageMult` |
+| `echo_chamber` | 回响腔体 | `src/entities/projectile.js` `_tryTriggerEchoBullet()` | `finalRecipe._echoChamberChanceBonus`, `finalRecipe._echoChamberInheritBonus` |
+
+三条词条对应最新加入的 `venom`、`overcharge`、`echo` 子弹属性；定义位于 `src/rune_config.js` 的 `RUNEWORD_DB`，并由 `combat_fireNextShot()` 写入最终子弹配方。

@@ -492,3 +492,9 @@ this.activeElementResonances = newResonances;
 - Selection UI fuses runes directly into the selected marble and consumes the rune immediately from `runeInventory`.
 - `calc_compileCollectionToRecipe()` treats rune slots as temporary collected stats with `source: 'rune_slot'`; gathering write-back must filter these temporary stats out of `marble.collected` to avoid duplicate stacking on later rounds.
 - A marble with fused rune slots is locked in the current charge selection, preventing accidental deselection after the rune has been consumed.
+## 2026-06-22 新增属性符文词条
+
+- `venom`：`runeword_toxic_bloom` / `effectId: toxic_bloom`，配方字段 `_toxicBloom`，命中时给目标追加毒层并向半径内敌人扩散。
+- `overcharge`：`runeword_overload_core` / `effectId: overload_core`，配方字段 `_overloadRadiusBonus`、`_overloadDamageMult`，由 `Projectile._detonateOvercharge()` 消费。
+- `echo`：`runeword_echo_chamber` / `effectId: echo_chamber`，配方字段 `_echoChamberChanceBonus`、`_echoChamberInheritBonus`，由 `Projectile._tryTriggerEchoBullet()` 消费。
+- Boss 狂暴掉落阈值同步为 `CONFIG.balance.bossEnrageHpRatio = 0.2`，不再使用旧 50% 口径。

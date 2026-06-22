@@ -476,6 +476,9 @@ export const hud_system = {
         // --- 战斗阶段 ---
         if (this.phase === 'combat') {  // [Mixin 正常用法：读取 Game 实例状态]
             // 1. 确保收集阶段的容器为空 (尽管 updateUI 已经隐藏了它的父级，清空更保险)
+            if (typeof this._hud_renderSessionChargeStack === 'function') {
+                this._hud_renderSessionChargeStack();
+            }
             if (gatheringHud) gatheringHud.innerHTML = '';
 
             // 2. 渲染战斗悬浮 HUD
@@ -575,6 +578,9 @@ export const hud_system = {
                     const isActive = idx === this.activeMarbleIndex;  // [Mixin 正常用法：读取 Game 实例状态]
                     this.ui_renderRecipeCard(gatheringHud, item, isActive, isActive ? 'current' : 'queue'); 
                 }); 
+                if (typeof this._hud_renderSessionChargeStack === 'function') {
+                    this._hud_renderSessionChargeStack();
+                }
             }
         }
     },
@@ -681,6 +687,75 @@ export const hud_system = {
 
         el.append(head, mats); 
         container.appendChild(el);
+    },
+
+    _hud_getGatheringSessionViewModels() {
+        const queue = Array.isArray(this.marbleQueue) ? this.marbleQueue : [];
+        const sessions = Array.isArray(this.gatheringSessions) ? this.gatheringSessions : [];
+        const count = Math.max(queue.length, sessions.length);
+        const models = [];
+        for (let i = 0; i < count; i++) {
+            const session = sessions.find(s => s && Number.isInteger(s.marbleIndex) && s.marbleIndex === i) || sessions[i] || null;
+            const marble = queue[i] || (session && session.marbleDef) || null;
+            const currentHits = Math.max(0, Math.floor(session ? (session.currentHits || 0) : 0));
+            const target = Math.max(1, Math.floor(session ? (session.nextTriggerThreshold || this.persistentThreshold || 1) : (this.persistentThreshold || 1)));
+            const multicast = Math.max(0, Math.floor(session ? (session.multicast || 0) : ((marble && marble.multicast) || 0)));
+            const active = !!(session && !session.isFinished && (session.activeBalls || 0) > 0);
+            models.push({ index: i, marble, currentHits, target, multicast, active });
+        }
+        return models;
+    },
+
+    _hud_renderSessionChargeStack() {
+        const stack = document.getElementById('session-charge-stack');
+        if (!stack) return false;
+
+        const models = this._hud_getGatheringSessionViewModels ? this._hud_getGatheringSessionViewModels() : [];
+        const shouldShow = this.phase === 'gathering' && models.length > 1;
+        stack.classList.toggle('hidden', !shouldShow);
+
+        const legacyShell = document.getElementById('gauge-shell');
+        const legacyMulticast = document.getElementById('multicast-ui');
+        if (legacyShell) legacyShell.classList.toggle('hidden', shouldShow);
+        if (legacyMulticast) legacyMulticast.classList.toggle('hidden', shouldShow);
+
+        if (!shouldShow) {
+            stack.innerHTML = '';
+            return false;
+        }
+
+        stack.innerHTML = models.slice(0, 3).map(model => {
+            const pct = model.target > 0 ? Math.max(0, Math.min(100, (model.currentHits / model.target) * 100)) : 0;
+            const name = model.marble && model.marble.getName ? model.marble.getName() : `#${model.index + 1}`;
+            const fullClass = pct >= 99 ? ' is-full' : '';
+            const activeClass = model.active ? ' is-active' : '';
+            return `
+                <div class="session-charge-row${activeClass}${fullClass}" data-marble-index="${model.index}" title="${name}">
+                    <span class="session-charge-index">${model.index + 1}</span>
+                    <span class="session-charge-track">
+                        <span class="session-charge-fill" style="width:${pct}%"></span>
+                        <span class="session-charge-text">${model.currentHits}/${model.target}</span>
+                    </span>
+                    <span class="session-charge-multicast">x${1 + model.multicast}</span>
+                </div>
+            `;
+        }).join('');
+        return true;
+    },
+
+    _hud_updateLegacyHitProgress(val, target) {
+        const hitText = document.getElementById('hit-text');
+        if (hitText) hitText.innerText = `${val}/${target}`;
+        const pct = target > 0 ? Math.min(100, (val / target) * 100) : 0;
+        const bar = document.getElementById('hit-bar');
+        if (bar) {
+            bar.style.width = `${pct}%`;
+            if (pct >= 99) {
+                bar.classList.add('bar-full');
+            } else {
+                bar.classList.remove('bar-full');
+            }
+        }
     },
 
 
@@ -854,6 +929,9 @@ export const hud_system = {
         // @section:hud_multicast_listeners - 连射倍率显示与飞行特效事件监听器
         // ── 连射倍率显示 ────────────────────────────────────────────
         eventBus.on(EVENT_TYPES.UI_MULTICAST_UPDATE, ({ total, bonusAmount }) => {
+            if (typeof this._hud_renderSessionChargeStack === 'function') {
+                this._hud_renderSessionChargeStack();
+            }
             const ui = document.getElementById('multicast-ui');
             const num = document.getElementById('multicast-num');
             if (ui && num) {
@@ -871,7 +949,8 @@ export const hud_system = {
 
         // ── 倍率转移飞行特效 ──────────────────────────────────────────
         eventBus.on(EVENT_TYPES.UI_MULTICAST_TRANSFER, ({ multicastValue, activeMarbleIndex }) => {
-            const startEl = document.getElementById('multicast-ui');
+            const startEl = document.querySelector(`.session-charge-row[data-marble-index="${activeMarbleIndex}"] .session-charge-multicast`)
+                || document.getElementById('multicast-ui');
             const targetEl = document.querySelector(`#gathering-hud-mount .recipe-card:nth-child(${activeMarbleIndex + 1})`);
             if (!startEl || !targetEl) return;
             const startRect = startEl.getBoundingClientRect();
@@ -907,6 +986,10 @@ export const hud_system = {
 
         // ── 命中进度条 ────────────────────────────────────────────────
         eventBus.on(EVENT_TYPES.UI_HIT_PROGRESS, ({ val, target }) => {
+            const renderedStack = typeof this._hud_renderSessionChargeStack === 'function'
+                ? this._hud_renderSessionChargeStack()
+                : false;
+            if (renderedStack) return;
             const hitText = document.getElementById('hit-text');
             if (hitText) hitText.innerText = `${val}/${target}`;
             const pct = target > 0 ? Math.min(100, (val / target) * 100) : 0;

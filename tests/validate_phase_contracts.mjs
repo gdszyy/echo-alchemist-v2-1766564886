@@ -47,8 +47,11 @@ const spawnSystem = read('src/spawn_system.js');
 const collisionSystem = read('src/combat/collision.js');
 const projectile = read('src/entities/projectile.js');
 const config = read('src/config.js');
+const calcUtils = read('src/calc_utils.js');
 
 check(has(uiSystem, /ui_resetCombatPhaseHud\s*\(options\s*=\s*\{\}\)/), 'ui_resetCombatPhaseHud exists');
+check(has(calcUtils, /calc_isEnemyInsideCombatWalls\s*\(enemy\)[\s\S]*sys_getCombatBounds[\s\S]*bottom\s*>\s*bounds\.top/), 'combat clear counting uses wall-intersection helper');
+check(!has(gamePhase, /pos\.y\s*>\s*0\s*&&\s*this\.phase_isEnemyClearable/), 'combat clear checks no longer gate enemies by pos.y > 0');
 check(has(uiSystem, /ui_clearTransientOverlays\s*\(options\s*=\s*\{\}\)/), 'ui_clearTransientOverlays exists');
 check(has(uiSystem, /ui_abandonRunToMeta\s*\(\)/), 'ui_abandonRunToMeta exists');
 check(has(uiSystem, /if\s*\(this\.phase\s*!==\s*['"]combat['"]\)\s*\{\s*this\.ui_resetCombatPhaseHud\(\{\s*preserveStatusPanel:\s*this\.phase\s*===\s*['"]training['"]\s*\}\)/s), 'ui_updateUI resets combat HUD outside combat and preserves training status panel');
@@ -133,6 +136,9 @@ check(has(indexHtml, /id=["']run-shop-status-dock["']/), 'run-shop countdown doc
 check(has(runShop, /const\s+visiblePhase\s*=\s*this\.phase\s*===\s*['"]gathering['"]\s*\|\|\s*this\.phase\s*===\s*['"]combat['"]/), 'run shop countdown remains visible in gathering and combat');
 check(has(gamePhase, /multicast:\s*Math\.max\(0,\s*Math\.floor\(marbleDef\.multicast\s*\|\|\s*0\)\)/), 'gathering sessions inherit stored marble multicast layers');
 check(has(gamePhase, /const\s+inheritedMulticast\s*=\s*Math\.max\(0,\s*Math\.floor\(marbleDef\.multicast\s*\|\|\s*0\)\)[\s\S]{0,220}recipe\.multicast\s*=\s*inheritedMulticast/), 'combat fallback compile preserves stored marble multicast layers');
+check(has(indexHtml, /id=["']session-charge-stack["'][\s\S]{0,80}session-charge-stack/), 'gathering HUD has a three-session charge stack container');
+check(has(read('src/ui/hud.js'), /_hud_renderSessionChargeStack[\s\S]{0,900}session-charge-row[\s\S]{0,360}session-charge-multicast/), 'gathering HUD renders per-marble charge and multicast rows');
+check(has(read('src/ui/hud.js'), /UI_HIT_PROGRESS[\s\S]{0,220}_hud_renderSessionChargeStack/), 'hit progress updates refresh the per-marble charge stack');
 check(has(runShop, /kind:\s*['"]starter_boost['"]/), 'first run-shop visit can generate a free starter boost item');
 check(has(runShop, /runShopStarterBoostDamageRounds/), 'starter boost item displays a temporary damage duration');
 check(has(runShop, /ensureInventoryForCurrentVisit[\s\S]*_runShopInventoryGeneratedForRound/), 'run shop inventory is generated once per active visit');

@@ -1,9 +1,9 @@
 # src\entities\enemy.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 6497 | 函数数: 47 | 语言: javascript
+> 自动生成于 2026-06-22 | 总行数: 6509 | 函数数: 47 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 4 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 5 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -27,7 +27,7 @@
 | _isMoveBlocked | method | `_isMoveBlocked(game, rows = 1)` |  |
 | _selectTurnIntent | method | `_selectTurnIntent(game, afx)` |  |
 | startTurnAction | method | `startTurnAction(game)` |  |
-| executeTurnAction | method | `executeTurnAction(game)` |  |
+| executeTurnAction | method | `executeTurnAction(game)` | ⚠️ 巨型函数，见 @section 导航 |
 | performTurnActionAndMove | method | `performTurnActionAndMove(game)` | ⚠️ 巨型函数，见 @section 导航 |
 | _getBossActionCount | method | `_getBossActionCount(baseCount)` |  |
 | _performOuroborosRotation | method | `_performOuroborosRotation(game)` |  |
@@ -60,6 +60,14 @@
 | getAbsoluteVertices | method | `getAbsoluteVertices()` |  |
 
 ## 巨型函数内部节点 (@section 标记)
+
+### executeTurnAction
+
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
+
+| 节点标记 | 说明 |
+|----------|------|
+| `@section:enemy_action_audio` | 敌人行动音效分发：regen/split/freeze 按词缀类型路由 |
 
 ### performTurnActionAndMove
 
@@ -111,7 +119,6 @@
 | 节点标记 | 说明 |
 |----------|------|
 | `@section:enemy_telegraph_audio` | 敌人特殊动作预警蓄力音（低频 200Hz，区别于玩家蓄力 800Hz） |
-| `@section:enemy_action_audio` | 敌人行动音效分发：regen/split/freeze 按词缀类型路由 |
 | `@section:draw_entry_and_perf_check` | 绘制入口与性能等级检查 |
 | `@section:damage_shield_check` | 护盾吸收与穿透判断 |
 | `@section:boss_deco_phase_check` | Boss 阶段检查与装饰基础参数 |

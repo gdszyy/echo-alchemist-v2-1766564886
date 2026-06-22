@@ -640,10 +640,13 @@ const CONFIG = {
         },
 
         /** 8 个 Boss 专属配置 */
+        bossEnrageHpRatio: 0.2,
+
         bossConfigs: {
             ignis: {
                 name: '熔炉守卫·伊格尼斯',
                 isBigBoss: false,
+                hpMult: 1.08,
                 affixes: ['shield', 'haste'],
                 vulnerability: { attrs: ['pierce', 'pyro'], label: '破甲熔炉', mode: 'hits', hitThreshold: 3 },
                 shieldChargesBonus: 5,    // 额外护盾层数
@@ -651,13 +654,14 @@ const CONFIG = {
                 berserkedTempRisePerTurn: 30, // 狂暴后每回合温度上升值
                 berserkedFireSplashRadius: 80, // 狂暴后火焰溅射半径（像素）
                 berserkedFireSplashDamage: 5,  // 狂暴后火焰溅射伤害
-                moveInterval: 2,          // 常规模式：每 2 回合移动一次（有 haste 词缀，移动较频繁）
+                moveInterval: 3,          // 常规模式：每 3 回合移动一次（有 haste 词缀，但降低前期压迫感）
                 themeWeights: { pyro: 1.5, pierce: 1.5 }
             },
             glacies: {
                 name: '霜晶缝合怪·格拉西斯',
                 isBigBoss: false,
                 affixes: ['jump', 'regen'],
+                regenPercentOverride: 0.12,
                 vulnerability: { attrs: ['cryo', 'pierce'], label: '冻结裂隙', mode: 'damage', damageRatio: 0.10 },
                 jumpRowsBonus: 2,         // 额外跳跃行数
                 berserkedJumpRows: 3,     // 狂暴后每回合跳跃行数

@@ -13,7 +13,7 @@
 // Task 5.A5 — 弹药法球图标映射（属性 32×32）
 // key 对应 recipe 中的属性名 / MarbleDefinition.type
 // ============================================================
-const BITMAP_ASSET_VERSION = '20260619-bitmap-v3';
+const BITMAP_ASSET_VERSION = '20260622-rune-attrs';
 
 function versionBitmapSrc(path) {
     if (!path) return path;

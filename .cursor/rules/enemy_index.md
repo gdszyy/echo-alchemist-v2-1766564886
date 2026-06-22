@@ -303,3 +303,8 @@ finalHP = max(
 | 主题段落配置 | `src/config.js` | `ENEMY_CURVE_CONFIG.THEME_SEGMENTS` 约第 1477 行 |
 | 词缀图鉴 | `src/systems.js` | `TRUTH_BOOK_DATA.enemies` 第 24 行起 |
 | Boss 图鉴 | `src/systems.js` | `TRUTH_BOOK_DATA` → `categoryId: 'boss'` 约第 782 行 |
+## 2026-06-22 Boss 数值调整
+
+- Boss 狂暴触发阈值统一为 `CONFIG.balance.bossEnrageHpRatio = 0.2`，即 20% HP；`combat_checkBossPhaseChange()`、狂暴符文掉落和破绽延后狂暴均读取该配置。
+- `ignis`：`moveInterval` 从 2 调整为 3，`hpMult = 1.08`，通过 `spawn_spawnBoss()` 乘入生成血量。
+- `glacies`：`regenPercentOverride = 0.12`，Boss 专属 regen 覆盖普通 `CONFIG.balance.affixes.regenPercent = 0.2`。

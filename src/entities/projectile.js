@@ -752,8 +752,10 @@ class Projectile {
         const baseChance = (CONFIG.balance && CONFIG.balance.echo && CONFIG.balance.echo.baseTriggerChance) || 0.25;
         const chancePerLevel = (CONFIG.balance && CONFIG.balance.echo && CONFIG.balance.echo.chancePerLevel) || 0.05;
         const triggerBonus = echoResParams ? (echoResParams.triggerChanceBonus || 0) : 0;
-        const inheritRatio = echoResParams ? (echoResParams.inheritRatio || 0.5) : 0.5;
-        const triggerChance = Math.min(1.0, baseChance + echoLevel * chancePerLevel + triggerBonus);
+        const chamberChanceBonus = this.config._echoChamberChanceBonus || 0;
+        const chamberInheritBonus = this.config._echoChamberInheritBonus || 0;
+        const inheritRatio = Math.min(0.9, (echoResParams ? (echoResParams.inheritRatio || 0.5) : 0.5) + chamberInheritBonus);
+        const triggerChance = Math.min(1.0, baseChance + echoLevel * chancePerLevel + triggerBonus + chamberChanceBonus);
 
         if (Math.random() >= triggerChance) return;
 
@@ -815,8 +817,10 @@ class Projectile {
 
         const baseDmg = this.config.damage || 1;
         const inherit = this._scatterInheritRatio || 1.0;
-        let dmg = this._chargeCount * this.overcharge * baseDmg * baseChargeMult * inherit * explosionMultiplier;
-        let radius = aoeBaseRadius + this._chargeCount * aoeRadiusPerCharge;
+        const overloadDamageMult = this.config._overloadDamageMult || 0;
+        const overloadRadiusBonus = this.config._overloadRadiusBonus || 0;
+        let dmg = this._chargeCount * this.overcharge * baseDmg * baseChargeMult * inherit * explosionMultiplier * (1 + overloadDamageMult);
+        let radius = aoeBaseRadius + this._chargeCount * aoeRadiusPerCharge + overloadRadiusBonus;
         if (aoeBonus) radius *= 1.4;
         dmg = Math.max(1, Math.ceil(dmg));
 

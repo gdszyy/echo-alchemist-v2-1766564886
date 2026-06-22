@@ -1954,7 +1954,7 @@ export const spawn_system = {
         //   得 spawnY = combatGridTopY + enemyHeight/2，Boss 占满第 0、1 行完整网格
         const spawnY = this.combatGridTopY + this.enemyHeight / 2; // Boss 上边界与第一行上边界对齐
 
-        const bossHP = this.spawn_calculateBossHP(isBigBoss);
+        const bossHP = Math.floor(this.spawn_calculateBossHP(isBigBoss) * (bossCfg.hpMult || 1));
 
         // ===== 问题 1 修复：Boss 入场动画初始化 =====
         // Boss 从屏幕顶部外坠入，_entranceStartY 为屏幕外上方
@@ -1963,6 +1963,7 @@ export const spawn_system = {
         boss.type = 'boss';
         boss.bossType = bossId;
         boss.bossName = bossCfg.name;
+        boss.bossConfig = bossCfg;
         boss.isBigBoss = isBigBoss;
         boss.berserked = false; // 狂暴阶段标志
         boss._bossVulnerabilityProgress = 0;

@@ -1,6 +1,6 @@
 # src\ui\hud.js 函数索引
 
-> 自动生成于 2026-06-20 | 总行数: 1186 | 函数数: 16 | 语言: javascript
+> 自动生成于 2026-06-22 | 总行数: 1292 | 函数数: 20 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -12,6 +12,7 @@
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
 | _buildRuneIconEl | function | `_buildRuneIconEl(runeDef, runeLevel)` |  |
+| _playRuneAcquireReveal | function | `_playRuneAcquireReveal(runeDef, runeLevel, delay = 0)` |  |
 | ui_updateMultiplierUI | method | `ui_updateMultiplierUI()` |  |
 | ui_saveShotDamage | method | `ui_saveShotDamage()` |  |
 | ui_updateRoundDamage | method | `ui_updateRoundDamage()` |  |
@@ -21,6 +22,9 @@
 | ui_toggleDamagePanel | method | `ui_toggleDamagePanel()` |  |
 | ui_renderRecipeHUD | method | `ui_renderRecipeHUD()` |  |
 | ui_renderRecipeCard | method | `ui_renderRecipeCard(container, item, isActive, statusClass)` |  |
+| _hud_getGatheringSessionViewModels | method | `_hud_getGatheringSessionViewModels()` |  |
+| _hud_renderSessionChargeStack | method | `_hud_renderSessionChargeStack()` |  |
+| _hud_updateLegacyHitProgress | method | `_hud_updateLegacyHitProgress(val, target)` |  |
 | ui_updateUICache | method | `ui_updateUICache()` |  |
 | ui_updateGatheringQueueUI | method | `ui_updateGatheringQueueUI()` |  |
 | ui_updateAmmoUI | method | `ui_updateAmmoUI()` |  |

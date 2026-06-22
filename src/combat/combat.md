@@ -197,3 +197,8 @@ combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = nul
 - 额外链使用独立的 `[...history]` 副本，不影响主链的历史记录。
 - 额外链触发概率保持 50%（`Math.random() < 0.5`），在合理范围内。
 - `isExtraChain` 参数仅影响 thunder_scatter 的触发，不影响其他词条（thunderstorm、elemental_fusion）。
+## 2026-06-22 Boss / Clear Count Contract
+
+- Combat clear checks use the arena-wall AABB helper (`calc_isEnemyInsideCombatWalls()` via `phase_isEnemyClearable()`), not `pos.y > 0` row shortcuts. Bosses inside the walls count; ordinary enemies above the top wall do not.
+- Boss enrage, enrage rune-drop, and vulnerability-delayed enrage all read `CONFIG.balance.bossEnrageHpRatio` (`0.2`).
+- Pierce follow-up hits now create a light impact pulse and short feedback text from `combat_damageEnemy()`; the extra VFX is budgeted by existing shockwave/spark limits.

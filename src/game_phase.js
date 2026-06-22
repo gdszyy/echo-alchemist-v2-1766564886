@@ -1566,9 +1566,8 @@ phase_gathering_getRandomPegType() {
         if (this.phase !== 'training' && Array.isArray(this.enemies)) {
             const hasInWallEnemy = this.enemies.some(e =>
                 e.active && (
-                    e.pos.y > 0 ||
-                    (e.type === 'boss' && (e.entranceTimer > 0 || e._pendingEntrance)) ||
-                    e._spawnedThisTurn
+                    this.phase_isEnemyClearable(e) ||
+                    (e.type === 'boss' && (e.entranceTimer > 0 || e._pendingEntrance))
                 )
             );
             if (!hasInWallEnemy && typeof this.spawn_spawnEnemyRowAt === 'function') {
@@ -2143,7 +2142,7 @@ phase_gathering_getRandomPegType() {
         const activeEnemies = this.enemies.filter(e => e.active);
         // [清屏检测] 仅统计围墙内 (pos.y > 0) 且能被子弹击中的敌人。
         // 顶部两排（row 0 & row 1）位于顶部墙的死角内，子弹无法触及，因此不参与清场判定。
-        const clearedThisRound = !activeEnemies.some(e => e.pos.y > 0 && this.phase_isEnemyClearable(e));
+        const clearedThisRound = !activeEnemies.some(e => this.phase_isEnemyClearable(e));
         // 使用 Set 统计有多少个不同的 Y 坐标（即有多少行）
         // Math.round 处理浮点误差，/50 是行高，确保归类准确
         const uniqueRows = new Set(activeEnemies.map(e => Math.round(e.pos.y / this.enemyHeight)));
@@ -2821,8 +2820,8 @@ phase_gathering_getRandomPegType() {
                     // [issue-2] 普通敌人画面外入场（_spawnedThisTurn）也计入活跃，避免误判完美清场
                     // 顶部两排敌人（row 0 / row 1）被顶部墙挡住，子弹无法击中，
                     // 不计入「围墙内活跃敌人」用以触发清场抽奖判定。
-                    const inWallAndClearable = e.pos.y > 0 && this.phase_isEnemyClearable(e);
-                    if (inWallAndClearable || (e.type === 'boss' && (e.entranceTimer > 0 || e._pendingEntrance)) || e._spawnedThisTurn) {
+                    const inWallAndClearable = this.phase_isEnemyClearable(e);
+                    if (inWallAndClearable || (e.type === 'boss' && (e.entranceTimer > 0 || e._pendingEntrance))) {
                         activeEnemies++;
                     }
                     if (Math.abs(e.pos.y - e.dropTargetY) > 1) anyEnemyMoving = true;
@@ -3730,6 +3729,7 @@ phase_gathering_getRandomPegType() {
                         if (session && !session.multicastAdded.includes(i)) {
                             session.multicast++;
                             session.multicastAdded.push(i);
+                            this.combat_updateMulticastDisplay(1);
                             showToast("+連射!");
                         }
                     } else if (result.slotType === 'split' && ball.canTriggerSplitSlot) {
@@ -3939,25 +3939,29 @@ phase_gathering_getRandomPegType() {
     },
 
     /**
-     * 判断敌人是否处于"可被子弹击中"的可清场区域。
-     * 顶部两排（row 0 / row 1）位于顶部墙的死角内，子弹无法触及，
-     * 因此不应参与「围墙清空」判定（包括完美清场、in-wall 清场抽奖等）。
+     * Returns whether an active enemy intersects the combat wall bounds.
+     * Used by in-wall clear, perfect-clear, and projectile cleanup checks.
      *
-     * 多行敌人（gridRows ≥ 2）只要有任一格延伸到 row 2 及以下，即视为可清场。
-     *
-     * @param {Object} e - 敌人对象（具有 pos.y / height / gridRows 字段）
-     * @returns {boolean} 该敌人是否参与清场判定
+     * @param {Object} e - Enemy object with pos/width/height fields.
+     * @returns {boolean} Whether the enemy should count for clear checks.
      */
     phase_isEnemyClearable(e) {
-        if (!e) return false;
-        const eh = this.enemyHeight || 40;
-        const topY = (typeof this.combatGridTopY === 'number') ? this.combatGridTopY : 90;
-        // row 2 的上边界 = combatGridTopY + 1.5 × enemyHeight
-        const row2TopEdge = topY + 1.5 * eh;
-        const rows = e.gridRows || 1;
-        const heightPx = (rows > 1) ? rows * eh : (e.height || eh);
-        const bottomEdge = e.pos.y + heightPx / 2;
-        // 留 1px 容差避免浮点误差
-        return bottomEdge > row2TopEdge + 1;
+        if (!e || !e.active) return false;
+        if (typeof this.calc_isEnemyInsideCombatWalls === 'function') {
+            return this.calc_isEnemyInsideCombatWalls(e);
+        }
+        const bounds = this.sys_getCombatBounds
+            ? this.sys_getCombatBounds()
+            : { left: 0, right: this.width || 0, top: 0, bottom: this.height || Infinity };
+        const width = e.width || this.enemyWidth || 40;
+        const height = e.height || ((e.gridRows || 1) * (this.enemyHeight || 40));
+        const left = e.pos.x - width / 2;
+        const right = e.pos.x + width / 2;
+        const top = e.pos.y - height / 2;
+        const bottom = e.pos.y + height / 2;
+        return right > bounds.left + 1 &&
+            left < bounds.right - 1 &&
+            bottom > bounds.top + 1 &&
+            top < bounds.bottom - 1;
     },
 };

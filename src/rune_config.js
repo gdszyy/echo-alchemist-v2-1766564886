@@ -330,6 +330,33 @@ const RUNEWORD_DB = [
 
     // ---- 复合机制词条 (6个) ----
     {
+        id: 'runeword_toxic_bloom',
+        name: '毒花绽放',
+        effectId: 'toxic_bloom',
+        pattern: ['rune_venom_1', 'rune_venom_2', 'rune_venom_1'],
+        effect_desc: '【剧毒系】剧毒命中时向附近敌人扩散少量毒层。',
+        baseParams: { radius: 90, spreadStacks: 1, bonusStacks: 1 },
+        perLevelParams: { radius: 10, spreadStacks: 0, bonusStacks: 1 }
+    },
+    {
+        id: 'runeword_overload_core',
+        name: '超载核心',
+        effectId: 'overload_core',
+        pattern: ['rune_overcharge_1', 'rune_bounce_1', 'rune_overcharge_1'],
+        effect_desc: '【超载系】超载爆炸半径与爆炸伤害提升。',
+        baseParams: { radiusBonus: 24, damageMult: 0.20 },
+        perLevelParams: { radiusBonus: 8, damageMult: 0.10 }
+    },
+    {
+        id: 'runeword_echo_chamber',
+        name: '回响腔体',
+        effectId: 'echo_chamber',
+        pattern: ['rune_echo_1', 'rune_bounce_1', 'rune_echo_1'],
+        effect_desc: '【回响系】回响触发率提升，并让回响子弹继承更多属性。',
+        baseParams: { chanceBonus: 0.10, inheritBonus: 0.10 },
+        perLevelParams: { chanceBonus: 0.05, inheritBonus: 0.05 }
+    },
+    {
         id: 'runeword_flame_sword',
         name: '炎光剑影',
         effectId: 'flame_sword',

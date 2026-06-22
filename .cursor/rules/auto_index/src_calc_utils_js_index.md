@@ -1,6 +1,6 @@
 # src\calc_utils.js 函数索引
 
-> 自动生成于 2026-06-21 | 总行数: 368 | 函数数: 8 | 语言: javascript
+> 自动生成于 2026-06-22 | 总行数: 400 | 函数数: 10 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -14,6 +14,8 @@
 | calc_evaluateAndAdjustDifficulty | method | `calc_evaluateAndAdjustDifficulty()` |  |
 | calc_calculateDynamicThreshold | method | `calc_calculateDynamicThreshold()` |  |
 | calc_isAreaOccupied | method | `calc_isAreaOccupied(x, y, w, h, excludeEnemy = null)` |  |
+| calc_isEnemyInsideCombatWalls | method | `calc_isEnemyInsideCombatWalls(enemy)` |  |
+| calc_countActiveCombatEnemies | method | `calc_countActiveCombatEnemies(options = {})` |  |
 | calc_calculateWaveSpeed | method | `calc_calculateWaveSpeed()` |  |
 | calc_getLineRectIntersection | method | `calc_getLineRectIntersection(start, dir, rx, ry, rw, rh)` |  |
 | calc_compileCollectionToRecipe | method | `calc_compileCollectionToRecipe(marbleDef, collectedTypes, totalMulticast)` |  |

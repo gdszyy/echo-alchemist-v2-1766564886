@@ -1718,6 +1718,9 @@ export const combat_system = {
         // --- 1. 视觉特效生成逻辑 ---
         const hitX = projectile.pos.x;
         const hitY = projectile.pos.y;
+        const isPierceHitNow = config.pierce > 0 &&
+            projectile.piercesLeft !== undefined &&
+            projectile.piercesLeft < config.pierce;
         const afx = CONFIG.balance.affixes; // 获取配置引用
         
         // 根据子弹属性决定打击特效
@@ -1760,6 +1763,18 @@ export const combat_system = {
         } else if (config.pierce > 0) {
             // 穿透：红色锐利碎片
             for(let i=0; i<5; i++) this.spawn_createParticle(hitX, hitY, '#fca5a5', 'spark');
+            // @perf-impact: 穿透后的后续命中追加轻量冲击波和少量 spark；走 shockwaveLimit/sparkLimit 预算
+            if (isPierceHitNow) {
+                if (typeof this.spawn_createShockwave === 'function') {
+                    this.spawn_createShockwave(hitX, hitY, '#fca5a5');
+                }
+                for (let i = 0; i < 3; i++) {
+                    this.spawn_createParticle(hitX, hitY, '#fecaca', 'spark');
+                }
+                if (typeof this.spawn_createFloatingText === 'function') {
+                    this.spawn_createFloatingText(hitX, hitY - 18, 'PIERCE!', '#fca5a5', 13);
+                }
+            }
         } else if (config.wind > 0) {
             // 风：生成青绿色气流粒子
             for(let i=0; i<6; i++) {
@@ -1915,6 +1930,25 @@ export const combat_system = {
                             hitY + (Math.random() - 0.5) * 8,
                             '#4ade80', 'venom'
                         );
+                    }
+                }
+                const toxicBloom = config._toxicBloom;
+                if (toxicBloom && (toxicBloom.spreadStacks || 0) > 0) {
+                    const radius = toxicBloom.radius || 90;
+                    const spreadStacks = Math.max(1, Math.floor(toxicBloom.spreadStacks || 1));
+                    const bonusStacks = Math.max(0, Math.floor(toxicBloom.bonusStacks || 0));
+                    if (bonusStacks > 0) enemy.applyVenom(bonusStacks);
+                    const r2 = radius * radius;
+                    for (const other of (this.enemies || [])) {
+                        if (!other || other === enemy || !other.active || typeof other.applyVenom !== 'function') continue;
+                        const dx = other.pos.x - enemy.pos.x;
+                        const dy = other.pos.y - enemy.pos.y;
+                        if (dx * dx + dy * dy <= r2) {
+                            other.applyVenom(spreadStacks);
+                        }
+                    }
+                    if (this.spawn_createFloatingText) {
+                        this.spawn_createFloatingText(hitX, hitY - 28, 'TOXIC BLOOM', '#86efac', 13);
                     }
                 }
             }
@@ -2102,15 +2136,16 @@ export const combat_system = {
         }
 
         this.combat_recordDamage(actualDmg, damageType, sourceType, shotId);
+        const bossEnrageRatio = CONFIG.balance.bossEnrageHpRatio ?? 0.2;
 
-        // [新增] Boss 狂暴阶段即时掉落：HP 首次降至 50% 时生成 1 个 Lv1 符文并立即自动拾取
+        // [新增] Boss 狂暴阶段即时掉落：HP 首次降至 bossEnrageHpRatio 时生成 1 个 Lv1 符文并立即自动拾取
         // 使用 enemy._bossEnrageDropped 标志确保每个 Boss 仅触发一次
         if (
             !killed &&
             enemy.type === 'boss' &&
             !enemy._bossEnrageDropped &&
             enemy.hp > 0 &&
-            enemy.hp / enemy.maxHp < 0.5
+            enemy.hp / enemy.maxHp < bossEnrageRatio
         ) {
             enemy._bossEnrageDropped = true; // 标记已触发，防止重复掉落
 
@@ -2150,7 +2185,7 @@ export const combat_system = {
 
         // Boss 阶段变化检测：伤害结算后检测是否触发狂暴
         if (!killed && enemy.type === 'boss' && !enemy.berserked) {
-            if (enemy._bossVulnerabilitySuppressedEnrage && enemy.hp <= enemy.maxHp * 0.5) {
+            if (enemy._bossVulnerabilitySuppressedEnrage && enemy.hp <= enemy.maxHp * bossEnrageRatio) {
                 enemy._bossVulnerabilitySuppressedEnrage = false;
                 this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 64, '狂暴延迟', '#facc15', 14);
             } else {
@@ -2482,7 +2517,9 @@ export const combat_system = {
             // [分级死亡特效系统] v2 - 区分普通/精英/Boss，支持冰冻/燃烧状态
             // ============================================================
             this._triggerDeathFX(enemy, shotId);
-            const activeCount = this.enemies.filter(e => e.active && (e.pos.y > 0)).length;
+            const activeCount = typeof this.calc_countActiveCombatEnemies === 'function'
+                ? this.calc_countActiveCombatEnemies({ includePendingBoss: true })
+                : this.enemies.filter(e => e.active && (!this.phase_isEnemyClearable || this.phase_isEnemyClearable(e))).length;
             if(activeCount === 0) {
                 this.data_clearProjectiles(); 
                 if (this.isEnemyTurn) {
@@ -2806,6 +2843,26 @@ export const combat_system = {
 
             // 7. 化弹为剑 (bullet_to_sword)
             // 将子弹替换为一把子飞剑，连射次数转化为子飞剑攻击次数
+            const toxicBloomFx = this.activeRunewordEffects['toxic_bloom'];
+            if (toxicBloomFx) {
+                const { radius, spreadStacks, bonusStacks } = toxicBloomFx.params;
+                finalRecipe._toxicBloom = { radius, spreadStacks, bonusStacks };
+            }
+
+            const overloadCoreFx = this.activeRunewordEffects['overload_core'];
+            if (overloadCoreFx) {
+                const { radiusBonus, damageMult } = overloadCoreFx.params;
+                finalRecipe._overloadRadiusBonus = radiusBonus || 0;
+                finalRecipe._overloadDamageMult = damageMult || 0;
+            }
+
+            const echoChamberFx = this.activeRunewordEffects['echo_chamber'];
+            if (echoChamberFx) {
+                const { chanceBonus, inheritBonus } = echoChamberFx.params;
+                finalRecipe._echoChamberChanceBonus = chanceBonus || 0;
+                finalRecipe._echoChamberInheritBonus = inheritBonus || 0;
+            }
+
             const bulletToSwordFx = this.activeRunewordEffects['bullet_to_sword'];
             if (bulletToSwordFx) {
                 const swordLevel = Math.max(1, Math.min(3, Math.floor(bulletToSwordFx.params.swordLevel || 1)));
@@ -3750,13 +3807,14 @@ export const combat_system = {
     /**
      * @method combat_checkBossPhaseChange
      * @description 检测所有活跃 Boss 的阶段变化。
-     * 当 Boss HP < 50% 且未狂暴时，触发狂暴阶段。
+     * 当 Boss HP < CONFIG.balance.bossEnrageHpRatio 且未狂暴时，触发狂暴阶段。
      * 应在每次伤害结算后调用。
      */
     combat_checkBossPhaseChange() {
         const bosses = this.enemies.filter(e => e.active && e.type === 'boss' && !e.berserked);
+        const bossEnrageRatio = CONFIG.balance.bossEnrageHpRatio ?? 0.2;
         for (const boss of bosses) {
-            if (boss.hp <= boss.maxHp * 0.5) {
+            if (boss.hp <= boss.maxHp * bossEnrageRatio) {
                 this.combat_triggerBossEnrage(boss);
             }
         }

@@ -173,6 +173,35 @@ export const calc_utils = {
     // [修正] 计算波浪的动态速度
     /**
      */
+    calc_isEnemyInsideCombatWalls(enemy) {
+        if (!enemy || !enemy.active || !enemy.pos) return false;
+        const bounds = this.sys_getCombatBounds
+            ? this.sys_getCombatBounds()
+            : { left: 0, right: this.width || 0, top: 0, bottom: this.height || Infinity };
+        const width = enemy.width || this.enemyWidth || 40;
+        const height = enemy.height || ((enemy.gridRows || 1) * (this.enemyHeight || 40));
+        const left = enemy.pos.x - width / 2;
+        const right = enemy.pos.x + width / 2;
+        const top = enemy.pos.y - height / 2;
+        const bottom = enemy.pos.y + height / 2;
+
+        return right > bounds.left + 1 &&
+            left < bounds.right - 1 &&
+            bottom > bounds.top + 1 &&
+            top < bounds.bottom - 1;
+    },
+
+    calc_countActiveCombatEnemies(options = {}) {
+        const includePendingBoss = options.includePendingBoss !== false;
+        return (this.enemies || []).filter(e => {
+            if (!e || !e.active) return false;
+            if (this.calc_isEnemyInsideCombatWalls(e)) return true;
+            return includePendingBoss &&
+                e.type === 'boss' &&
+                (e.entranceTimer > 0 || e._pendingEntrance);
+        }).length;
+    },
+
     calc_calculateWaveSpeed() {
         const maxSpeed = 25 * this.timeScale;
         const scanSpeed = 3 * this.timeScale;
@@ -187,7 +216,9 @@ export const calc_utils = {
         if (this.enemyWaveY < -50) return maxSpeed;
 
         // 3. 统计活着的敌人数量
-        const activeEnemyCount = this.enemies.filter(e => e.active).length;
+        const activeEnemyCount = typeof this.calc_countActiveCombatEnemies === 'function'
+            ? this.calc_countActiveCombatEnemies({ includePendingBoss: true })
+            : this.enemies.filter(e => e.active).length;
 
         // [核心修复] 如果场上没有敌人 (清场状态)，不要用 maxSpeed，
         // 而是用 clearSpeed，让玩家能看清波浪扫过空场，产生"安全确认"的视觉反馈。
@@ -204,6 +235,7 @@ export const calc_utils = {
         let hasEnemyAbove = false;
         this.enemies.forEach(e => {
             if (!e.active || e.hasActedThisTurn) return;
+            if (typeof this.calc_isEnemyInsideCombatWalls === 'function' && !this.calc_isEnemyInsideCombatWalls(e)) return;
             
             const enemyBottom = e.pos.y + e.height/2;
             // 只检测波浪上方的敌人

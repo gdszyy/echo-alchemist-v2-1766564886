@@ -210,3 +210,8 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
   - 未引入词缀：0-5
 - **`ELITE_DUAL_AFFIX_BASE`**: 双词缀精英基础概率（默认 0.15）。
 - **`ELITE_DUAL_AFFIX_POST_BOSS_BOOST`**: Boss 战后高压提升值（+0.25，持续 3 回合）。
+## 2026-06-22 Boss 配置补充
+
+- `CONFIG.balance.bossEnrageHpRatio` 是唯一 Boss 狂暴血量阈值，当前为 `0.2`。
+- `CONFIG.balance.bossConfigs[id].hpMult` 会在 `spawn_spawnBoss()` 中乘入生成血量；当前 `ignis.hpMult = 1.08`。
+- `CONFIG.balance.bossConfigs[id].regenPercentOverride` 可覆盖 Boss 自身 `regen` 词缀回血比例；当前 `glacies.regenPercentOverride = 0.12`，普通敌人仍使用 `CONFIG.balance.affixes.regenPercent`。

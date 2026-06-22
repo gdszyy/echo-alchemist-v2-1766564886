@@ -367,3 +367,6 @@
   - `assets/ui/sprites/emitter_charging_v3_0.png` through `emitter_charging_v3_5.png`
 - V3 art reserves a central projectile chamber, left electronic display frame, right capacitor stack, and six lower ammo sockets so runtime damage/scatter/multicast/load data can read as part of the launcher body.
 - Runtime mapping remains in `src/bitmap_icons.js`; `render_combat_launcherSignal()` continues to draw fixed-count Canvas readouts over the bitmap with low-quality glow disabled.
+## 2026-06-22 新增属性符文素材状态
+
+`rune_venom_1.png`、`rune_venom_2.png`、`rune_overcharge_1.png`、`rune_echo_1.png` 已存在于 `assets/icons/rune/`，并由 `src/bitmap_icons.js` 的 `RUNE_ICON_MAP` 引用。`BITMAP_ASSET_VERSION` 更新为 `20260622-rune-attrs`，用于刷新旧缓存。
