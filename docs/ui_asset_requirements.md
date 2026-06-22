@@ -368,11 +368,22 @@
   - `assets/ui/sprites/emitter_charging_v3_0.png` through `emitter_charging_v3_5.png`
 - V3 art reserves a central projectile chamber, left electronic display frame, right capacitor stack, and six lower ammo sockets so runtime damage/scatter/multicast/load data can read as part of the launcher body.
 - Runtime mapping remains in `src/bitmap_icons.js`; `render_combat_launcherSignal()` continues to draw fixed-count Canvas readouts over the bitmap with low-quality glow disabled.
+## 10. 2026-06-23 Combat Bottom Emitter V4 Split Assets
+
+- `#phase-combat` bottom bullet launcher now uses a split V4 Canvas sprite set:
+  - `assets/ui/sprites/emitter_base_stationary_v4_alpha_raw.png`
+  - `assets/ui/sprites/emitter_base_stationary_v4.png`
+  - `assets/ui/sprites/emitter_barrel_rotating_v4_alpha_raw.png`
+  - `assets/ui/sprites/emitter_barrel_rotating_v4.png`
+  - `assets/ui/sprites/emitter_charging_v4_0.png` through `emitter_charging_v4_5.png`
+- Static data UI, ammo sockets, and readout frames stay on `emitter_base_stationary_v4.png`; the barrel is drawn from `emitter_barrel_rotating_v4.png` and rotates with the current aiming direction.
+- Runtime mapping lives in `src/bitmap_icons.js` via `EMITTER_BASE_SRC`, `EMITTER_BARREL_SRC`, `EMITTER_BARREL_DRAW_SIZE`, and `EMITTER_CHARGING_SRCS`.
+- Rendering remains a bitmap replacement path in `render_combat_launcherEmitterBase()`; it adds one small rotating `drawImage` and does not add particles, gradients, or new performance budgets.
 ## 2026-06-22 新增属性符文素材状态
 
 `rune_venom_1.png`、`rune_venom_2.png`、`rune_overcharge_1.png`、`rune_echo_1.png` 已存在于 `assets/icons/rune/`，并由 `src/bitmap_icons.js` 的 `RUNE_ICON_MAP` 引用。`BITMAP_ASSET_VERSION` 更新为 `20260622-rune-attrs`，用于刷新旧缓存。
 
-## 10. 2026-06-23 Combat Battlefield UI Redesign
+## 11. 2026-06-23 Combat Battlefield UI Redesign
 
 战斗阶段进入新一轮美术重绘设计，目标不是补缺，而是统一 `#phase-combat` 的场地、墙体、HUD 面板和战斗常驻图标语言。权威设计案见 [`docs/design/combat_battlefield_ui_asset_redesign.md`](design/combat_battlefield_ui_asset_redesign.md)。
 

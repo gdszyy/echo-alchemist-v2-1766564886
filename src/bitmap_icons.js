@@ -262,16 +262,18 @@ export const ORBITAL_INTAKE = [
     'assets/ui/sprites/orbital_intake_3.png',
 ];
 
-export const EMITTER_BASE_SRC = 'assets/ui/sprites/emitter_base_v3.png';
+export const EMITTER_BASE_SRC = 'assets/ui/sprites/emitter_base_stationary_v4.png';
+export const EMITTER_BARREL_SRC = 'assets/ui/sprites/emitter_barrel_rotating_v4.png';
 export const EMITTER_DRAW_SIZE = 128;
+export const EMITTER_BARREL_DRAW_SIZE = 104;
 export const EMITTER_PORT_OFFSET_Y = 44;
 export const EMITTER_CHARGING_SRCS = [
-    'assets/ui/sprites/emitter_charging_v3_0.png',
-    'assets/ui/sprites/emitter_charging_v3_1.png',
-    'assets/ui/sprites/emitter_charging_v3_2.png',
-    'assets/ui/sprites/emitter_charging_v3_3.png',
-    'assets/ui/sprites/emitter_charging_v3_4.png',
-    'assets/ui/sprites/emitter_charging_v3_5.png',
+    'assets/ui/sprites/emitter_charging_v4_0.png',
+    'assets/ui/sprites/emitter_charging_v4_1.png',
+    'assets/ui/sprites/emitter_charging_v4_2.png',
+    'assets/ui/sprites/emitter_charging_v4_3.png',
+    'assets/ui/sprites/emitter_charging_v4_4.png',
+    'assets/ui/sprites/emitter_charging_v4_5.png',
 ];
 
 // Canvas 背景位图（战斗 / 研磨阶段共用主底图，发射区单独叠加炼金台层）
@@ -305,6 +307,7 @@ export const COMBAT_UI_BITMAP_SRCS = [
 export function preloadUiBitmaps() {
     const paths = [
         EMITTER_BASE_SRC,
+        EMITTER_BARREL_SRC,
         ...EMITTER_CHARGING_SRCS,
         ...Object.values(ORBITAL_SOCKET_MAP),
         ORBITAL_LINK_STRIP,

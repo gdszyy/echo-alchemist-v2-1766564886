@@ -3467,23 +3467,22 @@ phase_gathering_getRandomPegType() {
         // [emitter-port] startPos = 发射器底座视觉中心；portPos = 实际发射口（沿素材上沿）
         const startPos = new Vec2(this.width / 2, this.height - 80);
         const portPos = new Vec2(startPos.x, startPos.y - EMITTER_PORT_OFFSET_Y);
+        let nextAmmo = this.ammoQueue.length > 0 ? this.ammoQueue[0] : null;
+        let previewRotation = -Math.PI / 2;
+        let deformation = {x: 1, y: 1};
+        if (nextAmmo && this.isDragging) {
+            const aimVector = this.dragCurrent.sub(this.dragStart);
+            if (aimVector.mag() > 10) {
+                previewRotation = Math.atan2(aimVector.y, aimVector.x);
+                deformation = {x: 1.15, y: 0.85};
+            }
+        }
         // [bitmap-emitter] 优先使用 emitter_base.png + emitter_charging_*.png 渲染发射器底座；
         // 位图未加载时 fallback 到原始 arc 椭圆。
-        this.render_combat_launcherEmitterBase(this.ctx, startPos.x, startPos.y, this.isChargingShot, this.chargeProgress, this.isReloading ? this.reloadProgress : 0);
-        let nextAmmo = this.ammoQueue.length > 0 ? this.ammoQueue[0] : null;
+        this.render_combat_launcherEmitterBase(this.ctx, startPos.x, startPos.y, this.isChargingShot, this.chargeProgress, this.isReloading ? this.reloadProgress : 0, previewRotation);
 
         if (nextAmmo) {
             const params = Projectile.calculateVisualParams(nextAmmo, false);
-            let previewRotation =  -Math.PI / 2;
-            let deformation = {x: 1, y: 1};
-
-            if (this.isDragging) {
-                const aimVector = this.dragCurrent.sub(this.dragStart);
-                if (aimVector.mag() > 10) {
-                    previewRotation = Math.atan2(aimVector.y, aimVector.x) ;
-                    deformation = {x: 1.15, y: 0.85};
-                }
-            }
             if (this.isChargingShot) {
                 const shake = Math.random() * 2; // 吸收时的剧烈抖动
                 portPos.x += (Math.random()-0.5) * shake;

@@ -1,6 +1,6 @@
 # src\render_system.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 1136 | 函数数: 20 | 语言: javascript
+> 自动生成于 2026-06-23 | 总行数: 1157 | 函数数: 20 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -27,7 +27,7 @@
 | drawBurstStack | function | `drawBurstStack()` |  |
 | drawAttributeMagazine | function | `drawAttributeMagazine()` |  |
 | drawLoadedProjectile | function | `drawLoadedProjectile()` |  |
-| render_combat_launcherEmitterBase | method | `render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress, reloadProgress = 0)` |  |
+| render_combat_launcherEmitterBase | method | `render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress, reloadProgress = 0, aimRotation = -Math.PI / 2)` |  |
 | drawTiltVignette | method | `drawTiltVignette(ctx, tilt)` |  |
 | drawTiltIndicator | method | `drawTiltIndicator(ctx, tilt)` |  |
 | render_perfOverlay | method | `render_perfOverlay()` |  |

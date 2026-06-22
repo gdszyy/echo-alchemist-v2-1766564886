@@ -9052,6 +9052,59 @@ class Enemy {
                 ctx.fill();
                 ctx.restore();
             };
+            const drawRivet = (x, y, size, color, alpha = 0.78) => {
+                ctx.save();
+                ctx.fillStyle = colorAlpha(color, alpha);
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            };
+            const drawVentTicks = (edge, count, color, alpha = 0.70) => {
+                ctx.save();
+                ctx.strokeStyle = colorAlpha(color, alpha);
+                ctx.lineWidth = Math.max(1.1, minSide * 0.018);
+                for (let i = 0; i < count; i++) {
+                    const p = (i + 1) / (count + 1);
+                    const tick = Math.max(5, minSide * 0.070);
+                    ctx.beginPath();
+                    if (edge === 'bottom') {
+                        const x = left + (right - left) * p;
+                        ctx.moveTo(x - tick * 0.35, bottom - tick * 0.25);
+                        ctx.lineTo(x + tick * 0.35, bottom - tick * 0.75);
+                    } else {
+                        const y = top + (bottom - top) * p;
+                        ctx.moveTo(right - tick * 0.25, y - tick * 0.35);
+                        ctx.lineTo(right - tick * 0.75, y + tick * 0.35);
+                    }
+                    ctx.stroke();
+                }
+                ctx.restore();
+            };
+            const drawArmorPlates = (edge, count, color, alpha = 0.66, stacked = false) => {
+                const plateW = Math.max(8, minSide * (stacked ? 0.145 : 0.115));
+                const plateH = Math.max(4, minSide * (stacked ? 0.055 : 0.042));
+                ctx.save();
+                ctx.fillStyle = colorAlpha(color, alpha);
+                ctx.strokeStyle = colorAlpha('#ecfccb', stacked ? 0.72 : 0.46);
+                ctx.lineWidth = Math.max(1, minSide * 0.014);
+                for (let i = 0; i < count; i++) {
+                    const p = (i + 1) / (count + 1);
+                    ctx.beginPath();
+                    if (edge === 'top' || edge === 'bottom') {
+                        const x = left + (right - left) * p;
+                        const y = edge === 'top' ? top : bottom - plateH;
+                        ctx.roundRect(x - plateW / 2, y, plateW, plateH, Math.max(2, plateH * 0.45));
+                    } else {
+                        const x = edge === 'left' ? left : right - plateH;
+                        const y = top + (bottom - top) * p;
+                        ctx.roundRect(x, y - plateW / 2, plateH, plateW, Math.max(2, plateH * 0.45));
+                    }
+                    ctx.fill();
+                    ctx.stroke();
+                }
+                ctx.restore();
+            };
             const edgePointToward = (sx, sy) => {
                 if (Math.abs(sx) < 0.001 && Math.abs(sy) < 0.001) return { x: right, y: 0 };
                 const scaleX = Math.abs(sx) > 0.001 ? (w * 0.5 - inset) / Math.abs(sx) : Infinity;
@@ -9110,6 +9163,12 @@ class Enemy {
                     drawCornerBracket('lb', color, 0.72, 0.72);
                     drawCornerBracket('rb', color, 0.80, 0.82);
                 }
+                drawArmorPlates('top', stacked ? 5 : 4, color, ratio > 0.2 ? 0.46 : 0.30, stacked);
+                drawArmorPlates('bottom', stacked ? 5 : 4, color, ratio > 0.2 ? 0.42 : 0.28, stacked);
+                if (ratio > 0.2) {
+                    drawArmorPlates('left', stacked ? 3 : 2, color, 0.34, stacked);
+                    drawArmorPlates('right', stacked ? 3 : 2, color, 0.34, stacked);
+                }
                 if (stacked) {
                     const dash = [Math.max(4, minSide * 0.08), Math.max(3, minSide * 0.05)];
                     drawEdgeSegment('top', 0.02, 0.98, '#ecfccb', line, 0.58, dash);
@@ -9119,7 +9178,7 @@ class Enemy {
 
             if (hasAffix('armorSpore')) {
                 const podColor = '#84cc16';
-                ctx.fillStyle = colorAlpha(podColor, 0.60 + pulse * 0.12);
+                ctx.fillStyle = colorAlpha(podColor, 0.48 + pulse * 0.10);
                 ctx.strokeStyle = colorAlpha('#d9f99d', 0.76);
                 ctx.lineWidth = Math.max(1.1, minSide * 0.020);
                 const pods = [
@@ -9132,13 +9191,23 @@ class Enemy {
                     ctx.ellipse(x, y, r * 0.78, r, -0.35, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(x - r * 0.35, y);
+                    ctx.lineTo(x + r * 0.35, y);
+                    ctx.stroke();
                 });
+                drawVentTicks('right', 4, '#bef264', 0.42);
             }
 
             if (hasAffix('lowDamageImmune')) {
                 ['lt', 'rt', 'lb', 'rb'].forEach(corner => drawCornerBracket(corner, '#cbd5e1', 0.90, 0.74));
                 drawEdgeSegment('left', 0.34, 0.66, '#94a3b8', heavyLine, 0.62);
                 drawEdgeSegment('right', 0.34, 0.66, '#94a3b8', heavyLine, 0.62);
+                const rivetSize = Math.max(1.8, minSide * 0.028);
+                [[left, top], [right, top], [left, bottom], [right, bottom]].forEach(([x, y]) => {
+                    drawRivet(x, y, rivetSize, '#e2e8f0', 0.70);
+                });
+                drawVentTicks('bottom', 5, '#cbd5e1', 0.50);
             }
 
             if (hasAffix('energyArmor')) {
@@ -9157,6 +9226,9 @@ class Enemy {
                     ctx.stroke();
                 });
                 drawEdgeSegment('top', 0.42, 0.58, '#fbbf24', heavyLine, alpha);
+                drawEdgeSegment('top', 0.18, 0.30, '#fde68a', line, charged ? 0.64 : 0.34);
+                drawEdgeSegment('top', 0.70, 0.82, '#fde68a', line, charged ? 0.64 : 0.34);
+                drawVentTicks('bottom', 4, '#fbbf24', charged ? 0.56 : 0.30);
             }
 
             if (hasAffix('phaseShield')) {
@@ -9169,6 +9241,11 @@ class Enemy {
                 ctx.roundRect(left, top, right - left, bottom - top, Math.max(5, minSide * 0.12));
                 ctx.stroke();
                 setDash([]);
+                ctx.strokeStyle = colorAlpha(color, disabled ? 0.38 : 0.42 + pulse * 0.08);
+                ctx.lineWidth = line;
+                ctx.beginPath();
+                ctx.roundRect(left + minSide * 0.055, top - minSide * 0.035, right - left, bottom - top, Math.max(5, minSide * 0.12));
+                ctx.stroke();
                 if (disabled) {
                     ctx.strokeStyle = colorAlpha(color, 0.84);
                     ctx.lineWidth = Math.max(1.8, minSide * 0.030);
@@ -9192,6 +9269,9 @@ class Enemy {
                     ctx.fillRect(x - barW / 2, bottom - barH, barW, barH);
                 }
                 drawEdgeSegment('bottom', 0.34, 0.66, '#fb923c', line, level > 0 ? 0.74 : 0.42);
+                drawEdgeSegment('bottom', 0.16, 0.28, '#fed7aa', line, level > 0 ? 0.52 : 0.28);
+                drawEdgeSegment('bottom', 0.72, 0.84, '#fed7aa', line, level > 0 ? 0.52 : 0.28);
+                drawVentTicks('bottom', 6, '#fb923c', level > 0 ? 0.66 : 0.36);
             }
 
             if (hasAffix('siegeBreaker')) {
@@ -9210,6 +9290,7 @@ class Enemy {
                     ctx.fill();
                     ctx.stroke();
                 }
+                drawEdgeSegment('bottom', 0.22, 0.78, '#fb923c', heavyLine, 0.56);
             }
 
             if (hasAffix('carrier')) {
@@ -9227,6 +9308,17 @@ class Enemy {
                 ctx.lineTo(bayRight, bayBottom);
                 ctx.lineTo(bayRight, bayTop);
                 ctx.stroke();
+                ctx.strokeStyle = 'rgba(165, 243, 252, 0.46)';
+                ctx.lineWidth = line;
+                for (let i = 0; i < 3; i++) {
+                    const y = bayTop + (bayBottom - bayTop) * (0.24 + i * 0.22);
+                    ctx.beginPath();
+                    ctx.moveTo(bayLeft - minSide * 0.060, y);
+                    ctx.lineTo(bayLeft, y - minSide * 0.035);
+                    ctx.moveTo(bayRight + minSide * 0.060, y);
+                    ctx.lineTo(bayRight, y - minSide * 0.035);
+                    ctx.stroke();
+                }
                 drawArrowHead(0, bayBottom - minSide * 0.060, -Math.PI / 2, Math.max(4, minSide * 0.060), '#67e8f9', 0.72);
             }
 
@@ -9242,6 +9334,8 @@ class Enemy {
                     ctx.stroke();
                     drawArrowHead(Math.cos(a0 + Math.PI * 0.48) * r, Math.sin(a0 + Math.PI * 0.48) * r, a0 + Math.PI * 0.48 + Math.PI / 2, Math.max(4, minSide * 0.070), '#67e8f9', 0.82);
                 }
+                drawEdgeSegment('top', 0.28, 0.40, '#a5f3fc', line, 0.54);
+                drawEdgeSegment('bottom', 0.60, 0.72, '#a5f3fc', line, 0.54);
             }
 
             ctx.restore();

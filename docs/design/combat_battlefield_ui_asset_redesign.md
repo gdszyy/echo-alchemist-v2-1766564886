@@ -272,3 +272,19 @@ Avoid: tiny unreadable details, full scene illustration, overexposed glow
 | 可旋转炮管 | `emitter_barrel_rotating_v4_concept.png` | 独立方向层成立；正式版建议收窄，避免旋转时压住底座读数 |
 
 注意：本轮概念图为 RGB 预览图，部分“透明”区域是生成器烘焙出的棋盘格，并非真实 alpha。正式接入前必须重新生成或本地处理为透明 PNG，并按运行时目标尺寸裁切。
+
+## 11. V4 分层运行时接入记录
+
+2026-06-23 已接入第一版 V4 分层发射器资源：
+
+| 资产 | 文件 | 说明 |
+|---|---|---|
+| 静态底座 raw | `assets/ui/sprites/emitter_base_stationary_v4_alpha_raw.png` | 从概念图抠出 alpha 后的源尺寸裁切版 |
+| 静态底座运行时 | `assets/ui/sprites/emitter_base_stationary_v4.png` | 256x256；承载读数框、弹仓和中央枢轴，不包含炮管 |
+| 可旋转炮管 raw | `assets/ui/sprites/emitter_barrel_rotating_v4_alpha_raw.png` | 从概念图抠出 alpha 后的源尺寸裁切版 |
+| 可旋转炮管运行时 | `assets/ui/sprites/emitter_barrel_rotating_v4.png` | 256x256；运行时以底部圆环为锚点旋转 |
+| 蓄力叠加层 | `assets/ui/sprites/emitter_charging_v4_0.png` ~ `_5.png` | 透明 PNG；只叠加底座能量，不旋转数据 UI |
+
+运行时映射已从 `emitter_base_v3.png` 切换到 V4 分层资源：`src/bitmap_icons.js` 暴露 `EMITTER_BASE_SRC`、`EMITTER_BARREL_SRC`、`EMITTER_CHARGING_SRCS`；`src/render_system.js` 的 `render_combat_launcherEmitterBase()` 负责先画静态底座，再以当前瞄准角绘制炮管，最后叠加 V4 蓄力层。`src/game_phase.js` 只把已有 `previewRotation` 传入发射器渲染，不改变实际发射物理与瞄准线锚点。
+
+性能自适应影响评估：该接入每帧最多新增 1 次 104px 炮管 `drawImage`，并把旧 V3 底图/蓄力图替换为 V4 底图/蓄力图；没有新增粒子、渐变、`shadowBlur`、`screen/lighter` 混合预算或持续遍历。`high/medium/low` 三档表现一致，low 档仍依赖既有 `render_combat_launcherSignal()` 关闭高开销 glow；无需新增 `CONFIG.performance` 字段。

@@ -18,7 +18,9 @@ import {
     ORBITAL_LINK_FLOW,
     ORBITAL_INTAKE,
     EMITTER_BASE_SRC,
+    EMITTER_BARREL_SRC,
     EMITTER_DRAW_SIZE,
+    EMITTER_BARREL_DRAW_SIZE,
     EMITTER_CHARGING_SRCS,
     BG_MAIN_CANVAS_SRC,
     BG_EMITTER_ZONE_SRC,
@@ -936,10 +938,13 @@ export const render_system = {
      * @param {number} chargeProgress  0~1
      * @param {number} reloadProgress  0~1
      */
-    render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress, reloadProgress = 0) {
+    render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress, reloadProgress = 0, aimRotation = -Math.PI / 2) {
         const baseImg = getUiBitmap(EMITTER_BASE_SRC);
-        // @perf-impact: Combat emitter V3 uses one 128px bitmap draw plus the existing optional charging overlay; recoil is a translate only.
+        const barrelImg = getUiBitmap(EMITTER_BARREL_SRC);
+        // @perf-impact: Combat emitter V4 split draw uses one stationary base draw, one rotating barrel draw, and the existing optional charging overlay; no new particles or gradients.
         const baseSize = EMITTER_DRAW_SIZE;
+        const barrelSize = EMITTER_BARREL_DRAW_SIZE;
+        const barrelRotation = (Number.isFinite(aimRotation) ? aimRotation : -Math.PI / 2) + Math.PI / 2;
         const recoilY = Math.sin(Math.max(0, Math.min(1, reloadProgress || 0)) * Math.PI) * 4;
         if (baseImg) {
             ctx.save();
@@ -953,6 +958,22 @@ export const render_system = {
             ctx.beginPath();
             ctx.arc(cx, cy, 22, 0, Math.PI * 2);
             ctx.fill();
+            ctx.restore();
+        }
+
+        if (barrelImg) {
+            ctx.save();
+            ctx.translate(cx, cy + recoilY);
+            ctx.rotate(barrelRotation);
+            const barrelPivotX = barrelSize * 0.5;
+            const barrelPivotY = barrelSize * 0.84;
+            ctx.drawImage(
+                barrelImg,
+                -barrelPivotX,
+                -barrelPivotY,
+                barrelSize,
+                barrelSize
+            );
             ctx.restore();
         }
 
