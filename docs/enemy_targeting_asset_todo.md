@@ -1,6 +1,6 @@
 # 敌人针对词缀美术资产 TODO
 
-状态：生成前契约
+状态：第一批边框 Overlay 已生成
 更新时间：2026-06-23
 关联文档：[`docs/enemy_visual_design_v2.md`](enemy_visual_design_v2.md)、[`docs/enemy_art_implementation_impact.md`](enemy_art_implementation_impact.md)、[`design_spec_bitmap.md`](../design_spec_bitmap.md)
 
@@ -9,6 +9,8 @@
 2026-06-23 更新：正式 PNG / Sprite Sheet 生成前，`src/entities/enemy.js` 已加入 `_drawEnemyTargetingFallback()` 作为代码态兜底层。当前版本已从“中心大图标”改为边框/外缘 fallback：蓄能甲、电容条、相位护盾断窗、过量炉底部刻度、低伤免疫硬壳角标、活体护甲边缘甲片、护甲孢子边缘种荚与飞线、撞城者底部齿、铸巢母架空舱口、偏折壳外缘旋转弧都不应遮住敌人主体。正式资产接入时优先做 frame / collision frame / 边缘 overlay，避免重画或覆盖原本敌人美术。
 
 2026-06-23 追加：新边框美术不需要复刻原本敌人纹理，优先把“机制效果”做出差异化。蓄能甲可以更像侧边电容与充能母线；相位护盾可以用错相双框、断窗与短缺口；过量反应炉用底部炉栅、热刻度和排气齿；低伤免疫用铆接硬壳、厚角钢和抗冲击短刻线；活体护甲用可分档的边缘甲片，叠甲版本明显更厚；护甲孢子用边缘种荚/炼金容器与飞线；撞城者用底部冲齿或破城楔；铸巢母架以“冂”形空舱和舱口导轨为主；偏折壳用旋转反射弧与切向小箭头。验收标准是同屏看 `ev2_enemy_targeting_fallback` 时，九类边框即使套在同一敌人基底上也能一眼分辨。
+
+2026-06-23 落地：第一批透明 PNG 边框 Overlay 已生成到 `assets/sprites/enemies/overlays/`，生成脚本为 `scripts/generate_enemy_targeting_overlays.py`，总览图为 `docs/design/enemy_targeting_overlay_contact_sheet.png`。静态 Overlay 已登记：`lowDamageImmune`、`armorSpore`、`siegeBreaker`、`carrier`、`deflectShell`；状态型 Overlay 已登记：`energyArmor charged/empty`、`phaseShield active/disabled`、`livingArmor normal/stack × high/mid/low`、`overloadReactor level1/2/3`。运行时正式 PNG 命中后，`_drawEnemyTargetingFallback()` 只保留缺失兜底，避免 PNG 与 Canvas 线稿重复叠加。
 
 ## 1. 已定设计决策
 
@@ -68,10 +70,11 @@
 
 | 资产组 | 建议命名 | 触发条件 | 代码前置 TODO |
 |---|---|---|---|
-| 活体护甲普通三档 | `overlay_living_armor_high.png` / `mid.png` / `low.png` | `livingArmorHp / livingArmorMax > 50%`、`<=50%`、`<=20%` | 已有动态解析入口；登记到 `dynamicOverlays.livingArmor.normal_high/mid/low`。 |
-| 活体护甲叠加强化三档 | `overlay_living_armor_stack_high.png` / `mid.png` / `low.png` | `livingArmorStacked === true` | 已持久化 `livingArmorBaseMax` / `livingArmorStacked`；登记到 `dynamicOverlays.livingArmor.stack_high/mid/low`。 |
-| 相位护盾失效态 | `overlay_phase_shield_active.png` / `disabled.png` | `phaseShieldDisabledThisTurn` | 登记到 `dynamicOverlays.phaseShield.active/disabled`。 |
-| 过量反应炉计数态 | `overlay_overload_reactor_1.png` / `2.png` / `3.png` | `_overloadBonusThisTurn` | 登记到 `dynamicOverlays.overloadReactor.level1/level2/level3`。 |
+| 蓄能甲状态 | `overlay_energy_armor_charged.png` / `empty.png` | `energyArmorShield > 0` | 已登记到 `dynamicOverlays.energyArmor.charged/empty`。 |
+| 活体护甲普通三档 | `overlay_living_armor_high.png` / `mid.png` / `low.png` | `livingArmorHp / livingArmorMax > 50%`、`<=50%`、`<=20%` | 已登记到 `dynamicOverlays.livingArmor.normal_high/mid/low`。 |
+| 活体护甲叠加强化三档 | `overlay_living_armor_stack_high.png` / `mid.png` / `low.png` | `livingArmorStacked === true` | 已登记到 `dynamicOverlays.livingArmor.stack_high/mid/low`。 |
+| 相位护盾状态 | `overlay_phase_shield_active.png` / `disabled.png` | `phaseShieldDisabledThisTurn` | 已登记到 `dynamicOverlays.phaseShield.active/disabled`。 |
+| 过量反应炉计数态 | `overlay_overload_reactor_1.png` / `2.png` / `3.png` | `_overloadBonusThisTurn` | 已登记到 `dynamicOverlays.overloadReactor.level1/level2/level3`。 |
 
 ## 4. 事件特效资产
 
@@ -82,7 +85,7 @@
 | 护甲孢子分派 | `vfx_armor_spore_trail_0~3.png` | 现有 Canvas fallback 会在目标上记录 `_armorSporeTrailTimer` 与来源坐标，绘制从分派者孢囊飞向目标的轻量飞线；位图版本应保持清爽，不做黏液。 |
 | 活体护甲反弹代承 | `vfx_living_armor_block_0~3.png` | 护甲层短闪，伤害不进本体。 |
 | 活体护甲穿透双层命中 | `vfx_living_armor_pierce_0~3.png` | 护甲与本体同时受击，必须明确是双层反馈。 |
-| 低伤免疫 | 可继续使用浮字“过低” | 现有 fallback 已画金属硬壳；不需要单独复杂触发特效。 |
+| 低伤免疫 | 可继续使用浮字“过低” | 现有 `overlay_affix_lowDamageImmune.png` 已画金属硬壳；不需要单独复杂触发特效。 |
 | 偏折壳反弹偏折 | `vfx_deflect_shell_turn_0~3.png` | 现有 fallback 只在 1×1 敌人上画旋转壳；位图事件表示反弹法线被旋转，不应用于非反弹命中。 |
 | 铸巢母架推出 | 可继续使用浮字“推出” | 后续可补短推力线，但不是 P0。 |
 

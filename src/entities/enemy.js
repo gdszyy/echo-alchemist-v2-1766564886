@@ -8986,6 +8986,9 @@ class Enemy {
             || ((this.livingArmorHp || 0) > 0 && !this.livingArmorBroken)
             || (this._armorSporeTrailTimer || 0) > 0;
         if (!hasTargetingAffix) return;
+        this._syncAffixOverlayImages();
+        const hasReadyOverlay = (id) => !!(this._affixOverlayImages || [])
+            .some(item => item.affix === id && item.image && item.image.ready && !item.image.failed);
 
         // @section:targeting_fallback_border_frame - border-only fallback art
         {
@@ -9142,7 +9145,7 @@ class Enemy {
                 ctx.globalAlpha = 1;
             }
 
-            if ((this.livingArmorHp || 0) > 0 && !this.livingArmorBroken) {
+            if ((this.livingArmorHp || 0) > 0 && !this.livingArmorBroken && !hasReadyOverlay('livingArmor')) {
                 const ratio = Math.max(0, Math.min(1, this.livingArmorHp / Math.max(1, this.livingArmorMax || this.maxHp * 0.1)));
                 const color = ratio > 0.5 ? '#bef264' : ratio > 0.2 ? '#a3e635' : '#facc15';
                 const stacked = !!this.livingArmorStacked;
@@ -9176,7 +9179,7 @@ class Enemy {
                 }
             }
 
-            if (hasAffix('armorSpore')) {
+            if (hasAffix('armorSpore') && !hasReadyOverlay('armorSpore')) {
                 const podColor = '#84cc16';
                 ctx.fillStyle = colorAlpha(podColor, 0.48 + pulse * 0.10);
                 ctx.strokeStyle = colorAlpha('#d9f99d', 0.76);
@@ -9199,7 +9202,7 @@ class Enemy {
                 drawVentTicks('right', 4, '#bef264', 0.42);
             }
 
-            if (hasAffix('lowDamageImmune')) {
+            if (hasAffix('lowDamageImmune') && !hasReadyOverlay('lowDamageImmune')) {
                 ['lt', 'rt', 'lb', 'rb'].forEach(corner => drawCornerBracket(corner, '#cbd5e1', 0.90, 0.74));
                 drawEdgeSegment('left', 0.34, 0.66, '#94a3b8', heavyLine, 0.62);
                 drawEdgeSegment('right', 0.34, 0.66, '#94a3b8', heavyLine, 0.62);
@@ -9210,7 +9213,7 @@ class Enemy {
                 drawVentTicks('bottom', 5, '#cbd5e1', 0.50);
             }
 
-            if (hasAffix('energyArmor')) {
+            if (hasAffix('energyArmor') && !hasReadyOverlay('energyArmor')) {
                 const charged = (this.energyArmorShield || 0) > 0;
                 const alpha = charged ? 0.74 + pulse * 0.12 : 0.46;
                 const capW = Math.max(4, minSide * 0.060);
@@ -9231,7 +9234,7 @@ class Enemy {
                 drawVentTicks('bottom', 4, '#fbbf24', charged ? 0.56 : 0.30);
             }
 
-            if (hasAffix('phaseShield')) {
+            if (hasAffix('phaseShield') && !hasReadyOverlay('phaseShield')) {
                 const disabled = !!this.phaseShieldDisabledThisTurn;
                 const color = disabled ? '#facc15' : '#a5b4fc';
                 ctx.strokeStyle = colorAlpha(color, disabled ? 0.82 : 0.62 + pulse * 0.10);
@@ -9259,7 +9262,7 @@ class Enemy {
                 }
             }
 
-            if (hasAffix('overloadReactor')) {
+            if (hasAffix('overloadReactor') && !hasReadyOverlay('overloadReactor')) {
                 const level = Math.max(0, Math.min(3, Math.floor(this._overloadBonusThisTurn || 0)));
                 for (let i = 0; i < 3; i++) {
                     const x = left + (right - left) * (0.40 + i * 0.10);
@@ -9274,7 +9277,7 @@ class Enemy {
                 drawVentTicks('bottom', 6, '#fb923c', level > 0 ? 0.66 : 0.36);
             }
 
-            if (hasAffix('siegeBreaker')) {
+            if (hasAffix('siegeBreaker') && !hasReadyOverlay('siegeBreaker')) {
                 ctx.fillStyle = 'rgba(249, 115, 22, 0.24)';
                 ctx.strokeStyle = 'rgba(251, 146, 60, 0.76)';
                 ctx.lineWidth = line;
@@ -9293,7 +9296,7 @@ class Enemy {
                 drawEdgeSegment('bottom', 0.22, 0.78, '#fb923c', heavyLine, 0.56);
             }
 
-            if (hasAffix('carrier')) {
+            if (hasAffix('carrier') && !hasReadyOverlay('carrier')) {
                 const bayW = w / 3;
                 const bayH = h / 2;
                 const bayLeft = -bayW * 0.36;
@@ -9322,7 +9325,7 @@ class Enemy {
                 drawArrowHead(0, bayBottom - minSide * 0.060, -Math.PI / 2, Math.max(4, minSide * 0.060), '#67e8f9', 0.72);
             }
 
-            if (hasAffix('deflectShell') && (this.gridCols || 1) <= 1 && (this.gridRows || 1) <= 1) {
+            if (hasAffix('deflectShell') && !hasReadyOverlay('deflectShell') && (this.gridCols || 1) <= 1 && (this.gridRows || 1) <= 1) {
                 const r = minSide * 0.485;
                 const spin = t * 1.8;
                 ctx.strokeStyle = colorAlpha('#67e8f9', 0.72 + pulse * 0.10);
@@ -9352,8 +9355,20 @@ class Enemy {
         const gameRef = (typeof game !== 'undefined') ? game : null;
         const quality = gameRef?.perfQualityLevel || 'high';
         const maxOverlays = quality === 'high' ? 2 : 1;
+        const targetingOverlayAffixes = new Set([
+            'energyArmor',
+            'phaseShield',
+            'overloadReactor',
+            'lowDamageImmune',
+            'livingArmor',
+            'armorSpore',
+            'siegeBreaker',
+            'carrier',
+            'deflectShell',
+        ]);
         const readyOverlays = this._affixOverlayImages
             .filter((item) => item.image && item.image.ready && !item.image.failed)
+            .sort((a, b) => Number(targetingOverlayAffixes.has(b.affix)) - Number(targetingOverlayAffixes.has(a.affix)))
             .slice(0, maxOverlays);
         if (readyOverlays.length === 0) return;
 
@@ -9366,12 +9381,14 @@ class Enemy {
 
         readyOverlays.forEach((item, index) => {
             const pulse = quality === 'low' ? 0 : Math.sin(t * 1.4 + index * 1.7 + this.visualSeed * 3) * 0.04;
-            const scale = item.affix === 'shield' ? 1.10 : item.affix === 'haste' ? 1.02 : 0.94;
-            const drawSize = Math.max(w, h) * (scale + pulse);
-            const alpha = baseAlpha * (index === 0 ? 1 : 0.72);
+            const isTargetingOverlay = targetingOverlayAffixes.has(item.affix);
+            const scale = isTargetingOverlay ? 1 : item.affix === 'shield' ? 1.10 : item.affix === 'haste' ? 1.02 : 0.94;
+            const drawW = isTargetingOverlay ? w : Math.max(w, h) * (scale + pulse);
+            const drawH = isTargetingOverlay ? h : drawW;
+            const alpha = (isTargetingOverlay ? Math.min(0.82, baseAlpha * 1.65) : baseAlpha) * (index === 0 ? 1 : 0.72);
             const prevAlpha = ctx.globalAlpha;
             ctx.globalAlpha = prevAlpha * alpha;
-            ctx.drawImage(item.image.img, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+            ctx.drawImage(item.image.img, -drawW / 2, -drawH / 2, drawW, drawH);
             ctx.globalAlpha = prevAlpha;
         });
         ctx.restore();
