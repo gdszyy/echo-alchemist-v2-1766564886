@@ -1,6 +1,6 @@
 # src\entities.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 5310 | 函数数: 104 | 语言: javascript
+> 自动生成于 2026-06-23 | 总行数: 5443 | 函数数: 107 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -18,7 +18,10 @@
 | canFuseRune | method | `canFuseRune()` |  |
 | getName | method | `getName()` |  |
 | getColor | method | `getColor()` |  |
-| constructor | method | `constructor(x, y, x2, y2, type)` |  |
+| constructor | method | `constructor(x, y, x2, y2, type, options = {})` |  |
+| update | method | `update(timeScale = 1)` |  |
+| tryActivate | method | `tryActivate(session)` |  |
+| getLaunchDirection | method | `getLaunchDirection()` |  |
 | draw | method | `draw(ctx)` |  |
 | constructor | method | `constructor(game)` |  |
 | spin | method | `spin(x, y, collectedAttributes, callback)` |  |

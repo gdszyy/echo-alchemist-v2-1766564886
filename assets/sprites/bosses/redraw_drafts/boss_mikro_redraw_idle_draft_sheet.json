@@ -1,0 +1,12 @@
+{
+  "frameWidth": 384,
+  "frameHeight": 256,
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 6,
+      "fps": 6
+    }
+  },
+  "source": "draft generated via imagegen chroma-key workflow; do not ship without art review"
+}

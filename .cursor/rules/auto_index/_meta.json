@@ -2,39 +2,39 @@
   "indexed": [
     {
       "file": "src\\entities\\enemy.js",
-      "lines": 6509,
-      "funcs": 47,
+      "lines": 6870,
+      "funcs": 55,
       "sections": 21,
       "mega_funcs": 5,
       "index_path": ".cursor\\rules\\auto_index\\src_entities_enemy_js_index.md"
     },
     {
       "file": "src\\entities.js",
-      "lines": 5310,
-      "funcs": 104,
+      "lines": 5437,
+      "funcs": 107,
       "sections": 23,
       "mega_funcs": 2,
       "index_path": ".cursor\\rules\\auto_index\\src_entities_js_index.md"
     },
     {
-      "file": "src\\combat_system.js",
-      "lines": 4081,
-      "funcs": 50,
-      "sections": 25,
-      "mega_funcs": 5,
-      "index_path": ".cursor\\rules\\auto_index\\src_combat_system_js_index.md"
-    },
-    {
       "file": "src\\game_phase.js",
-      "lines": 4060,
+      "lines": 4086,
       "funcs": 38,
       "sections": 15,
       "mega_funcs": 3,
       "index_path": ".cursor\\rules\\auto_index\\src_game_phase_js_index.md"
     },
     {
+      "file": "src\\combat_system.js",
+      "lines": 4082,
+      "funcs": 50,
+      "sections": 25,
+      "mega_funcs": 5,
+      "index_path": ".cursor\\rules\\auto_index\\src_combat_system_js_index.md"
+    },
+    {
       "file": "src\\systems.js",
-      "lines": 3930,
+      "lines": 3953,
       "funcs": 50,
       "sections": 10,
       "mega_funcs": 2,
@@ -50,23 +50,23 @@
     },
     {
       "file": "src\\game_system.js",
-      "lines": 3160,
+      "lines": 3206,
       "funcs": 58,
       "sections": 7,
-      "mega_funcs": 2,
+      "mega_funcs": 3,
       "index_path": ".cursor\\rules\\auto_index\\src_game_system_js_index.md"
     },
     {
       "file": "src\\spawn_system.js",
-      "lines": 2927,
-      "funcs": 41,
+      "lines": 3154,
+      "funcs": 48,
       "sections": 10,
       "mega_funcs": 3,
       "index_path": ".cursor\\rules\\auto_index\\src_spawn_system_js_index.md"
     },
     {
       "file": "src\\config.js",
-      "lines": 2124,
+      "lines": 2132,
       "funcs": 1,
       "sections": 0,
       "mega_funcs": 0,
@@ -90,15 +90,15 @@
     },
     {
       "file": "src\\pinboard_modules.js",
-      "lines": 1584,
-      "funcs": 76,
+      "lines": 1762,
+      "funcs": 80,
       "sections": 0,
       "mega_funcs": 0,
       "index_path": ".cursor\\rules\\auto_index\\src_pinboard_modules_js_index.md"
     },
     {
       "file": "src\\entities\\projectile.js",
-      "lines": 1382,
+      "lines": 1388,
       "funcs": 15,
       "sections": 7,
       "mega_funcs": 1,
@@ -154,8 +154,8 @@
     },
     {
       "file": "src\\ui\\run_shop.js",
-      "lines": 648,
-      "funcs": 25,
+      "lines": 672,
+      "funcs": 26,
       "sections": 0,
       "mega_funcs": 0,
       "index_path": ".cursor\\rules\\auto_index\\src_ui_run_shop_js_index.md"
@@ -270,9 +270,9 @@
     },
     {
       "file": "src\\data\\enemy_visual_assets.js",
-      "lines": 357,
+      "lines": 359,
       "funcs": 7,
-      "reason": "未达阈值(行数=357<500, 函数数=7<20)"
+      "reason": "未达阈值(行数=359<500, 函数数=7<20)"
     },
     {
       "file": "src\\render\\sprite_renderer.js",
@@ -303,6 +303,12 @@
       "lines": 245,
       "funcs": 2,
       "reason": "未达阈值(行数=245<500, 函数数=2<20)"
+    },
+    {
+      "file": "src\\wave_presets.js",
+      "lines": 242,
+      "funcs": 0,
+      "reason": "未达阈值(行数=242<500, 函数数=0<20)"
     },
     {
       "file": "src\\data\\enemy_v2_metadata.js",
@@ -345,12 +351,6 @@
       "lines": 113,
       "funcs": 9,
       "reason": "未达阈值(行数=113<500, 函数数=9<20)"
-    },
-    {
-      "file": "src\\wave_presets.js",
-      "lines": 110,
-      "funcs": 0,
-      "reason": "未达阈值(行数=110<500, 函数数=0<20)"
     },
     {
       "file": "src\\world_sim\\perlin.js",

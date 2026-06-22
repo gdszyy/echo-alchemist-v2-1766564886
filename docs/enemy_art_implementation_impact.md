@@ -127,6 +127,8 @@ V2 专属词条已经具备基础绘制识别，但还需要补齐“常驻、�
 > 中央索引文件：[`assets/sprites/enemies/enemy_sprite_manifest.json`](../assets/sprites/enemies/enemy_sprite_manifest.json)。
 > 每条 composite 条目都使用 `<baseArchetype>:<cols>x<rows>:<sortedAffixSet>` 作为键，例如 `bastion:3x1:heavyArmor`、`siege:3x2:siege`、`residue:1x1:`（空 affixSet 末尾留冒号）。
 
+2026-06-22 补充：敌人针对词缀的生成前清单独立记录在 [`docs/enemy_targeting_asset_todo.md`](enemy_targeting_asset_todo.md)。其中 `carrier` 使用显示名“铸巢母架”，第 5 格空舱需要在本体、collision frame 与图标中同时保留；`livingArmor` / `armorSpore` / `phaseShield` 等状态型资产走 `dynamicOverlays`，由 `resolveDynamicEnemyOverlayPaths(enemy)` 按当前状态选择。不存在的 PNG 不应提前写入 `enemy_sprite_manifest.json`，避免资源命中状态误报。
+
 ### 7.5.1 manifest 字段
 
 ```json
@@ -135,6 +137,7 @@ V2 专属词条已经具备基础绘制识别，但还需要补齐“常驻、�
   "archetypeIcons":  { "<baseArchetype>": "<archetype_xxx.png>" },
   "affixIcons":      { "<affix>":         "<affix_xxx.png>" },
   "overlays":        { "<affix>":         "<overlay_affix_xxx.png>" },
+  "dynamicOverlays": { "<affix>":         { "<state>": "<overlay_state_xxx.png>" } },
   "archetypes":      { "<baseArchetype>": { "spritePath", "manifestPath", "footprint", "placeholder" } },
   "composites":      { "<assetKey>":      { "resourceId", "spritePath", "manifestPath", "baseArchetype", "footprint", "affixes[]", "placeholder" } }
 }
@@ -167,6 +170,7 @@ V2 专属词条已经具备基础绘制识别，但还需要补齐“常驻、�
 - `src/render/sprite_renderer.js` 的 `createSpriteRenderer({ type, baseArchetype, gridCols, gridRows, affixes, ... })` 现在第一步就调用 `resolveEnemyVisualAsset`，命中 composite/archetype 时直接使用 manifest 给出的路径；命中失败再回退到既有 V2 metadata，再回退到 `golem_elite` / `golem_normal`，最后由 SpriteRenderer 自身的 failed 状态触发 Canvas 矢量绘制。
 - `src/entities/enemy.js` 的 `Enemy.initSprite()` 已传入完整 `gridCols / gridRows / affixes`，让组合 Sprite 能被命中。
 - `src/entities/enemy.js` 的 `_drawAffixBitmapOverlays()` 会读取 `resolveEnemyVisualAsset(enemy).overlayPaths`，把通用词条覆盖层叠加在非 Boss 敌人的 Sprite/基底之上；资源缺失或未加载时静默跳过，继续保留既有 Canvas 词条视觉与短标签兜底。
+- 2026-06-23 补充：敌人针对词缀的资产前读法由 `_drawEnemyTargetingFallback()` 兜底，但该 fallback 已收束为边框/外缘效果，避免遮挡敌人主体美术。它通过活体护甲边缘甲片、护甲孢子边缘种荚与飞线、相位护盾断窗边框、过量反应炉底部刻度、低伤硬壳角标、蓄能甲侧边电容、撞城者底部齿、铸巢母架空舱口与 1×1 偏折壳外缘旋转弧表达机制。正式 PNG / VFX 接入后应优先覆盖 frame / collision frame / 边缘 overlay 的同一语义点，不要删除 fallback。
 - `src/systems.js` 的 `buildEnemyV2Scenarios` 不再硬编码 `placeholder` 字段，而是调用 `resolveEnemyVisualAsset` + `describeAssetHitStatus`，把 `Sprite / Composite Sprite / Overlay / Vector fallback / Missing asset` 标签同时显示在场景卡片的徽标和说明面板中。
 
 ## 8. 试炼场验收说明（enemy_v2 分类）

@@ -1869,6 +1869,46 @@ phase_gathering_getRandomPegType() {
         // 一阶: -60, 二阶: -40, 三阶: -20（默认: -100 必冻 / -50~-100 概率冻）
         const _freezeHardThreshold = _cryoResParams ? (_cryoResParams.freezeTempThreshold || -100) : -100;
         const _freezeSoftThreshold = _freezeHardThreshold + 50; // 概率触发起始点（比必冻阈值高50度）
+        const _isIgnisFurnace = e.type === 'boss' && e.bossType === 'ignis';
+        const _ignisCfg = _isIgnisFurnace && CONFIG.balance.bossConfigs ? CONFIG.balance.bossConfigs.ignis : null;
+        const _ignisPressureThreshold = _ignisCfg ? (_ignisCfg.furnacePressureThreshold || 45) : 45;
+        const _applyIgnisPressurePulse = (label = '温压流彩') => {
+            if (!_isIgnisFurnace || !e.active) return;
+            const pulsePct = _ignisCfg ? (_ignisCfg.furnacePressurePulsePct || 0.02) : 0.02;
+            const pulseAmount = Math.max(1, Math.ceil(e.maxHp * pulsePct));
+            if (typeof e._grantRadiantAegisPulse === 'function') {
+                e._grantRadiantAegisPulse(this, pulseAmount, { rearmBroken: true, label });
+            }
+            e._furnacePressurePulseTimer = 30;
+            if (typeof this.spawn_createFloatingText === 'function') {
+                this.spawn_createFloatingText(e.pos.x, e.pos.y - e.height / 2 - 34, '温压释放', '#fb923c');
+            }
+        };
+        const _addIgnisPressure = (rawAmount) => {
+            if (!_isIgnisFurnace || !e.active) return;
+            const baseGain = _ignisCfg ? (_ignisCfg.furnacePressureBaseGain || 5) : 5;
+            const gain = Math.max(1, Math.ceil((rawAmount || 0) + baseGain));
+            e.furnacePressureThreshold = _ignisPressureThreshold;
+            e.furnacePressure = Math.max(0, (e.furnacePressure || 0) + gain);
+            if (typeof this.spawn_createFloatingText === 'function') {
+                this.spawn_createFloatingText(e.pos.x, e.pos.y - 34, `温压+${gain}`, '#fb923c');
+            }
+            while (e.furnacePressure >= _ignisPressureThreshold) {
+                e.furnacePressure -= _ignisPressureThreshold;
+                _applyIgnisPressurePulse();
+            }
+        };
+        const _ventIgnisPressure = () => {
+            if (!_isIgnisFurnace || !e.active || (e.furnacePressure || 0) <= 0) return;
+            const ventRatio = _ignisCfg ? (_ignisCfg.furnacePressureCryoVentRatio || 0.6) : 0.6;
+            const vent = Math.max(1, Math.ceil(Math.abs(e.temp || 0) * ventRatio));
+            const before = e.furnacePressure || 0;
+            e.furnacePressure = Math.max(0, before - vent);
+            e.furnacePressureThreshold = _ignisPressureThreshold;
+            if (typeof this.spawn_createFloatingText === 'function') {
+                this.spawn_createFloatingText(e.pos.x, e.pos.y - 48, `泄压-${Math.ceil(before - e.furnacePressure)}`, '#67e8f9');
+            }
+        };
         const _processTempOnce = () => {
             if (e.temp < 0) {
                 let shouldFreeze = false;
@@ -1889,10 +1929,16 @@ phase_gathering_getRandomPegType() {
                         this.spawn_createFloatingText(e.pos.x, e.pos.y - 35, 'FREEZE IMMUNE', '#facc15');
                     }
                 }
+                _ventIgnisPressure();
                 e.temp = Math.ceil(e.temp / 2);
             }
             if (e.temp > 0 && e.active) {
-                if (e.temp < 100) {
+                if (_isIgnisFurnace && e.temp >= 100) {
+                    const overflow = Math.max(0, e.temp - 100);
+                    _addIgnisPressure(overflow);
+                    const decay = Math.max(5, Math.floor(e.temp / 20));
+                    e.temp = Math.max(0, 100 - decay);
+                } else if (e.temp < 100) {
                     e.temp = Math.max(0, e.temp - 5);
                 } else {
                     const dot = 5 + (e.temp - 100);
@@ -1914,7 +1960,7 @@ phase_gathering_getRandomPegType() {
         }
 
         // --- 2. Ignis 狂暴阶段：温度急升 + 火焰溅射 ---
-        if (e.active && e.type === 'boss' && e.bossType === 'ignis' && e._berserkedTempRise) {
+        if (e.active && e.type === 'boss' && e.bossType === 'ignis' && e._berserkedTempRise && (e._bossVulnerabilityExposedTurns || 0) <= 0) {
             // 每回合温度上升
             e.temp += e._berserkedTempRise;
             this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, `+${e._berserkedTempRise}℃`, '#f97316');
@@ -1956,9 +2002,10 @@ phase_gathering_getRandomPegType() {
 
         // --- 3. 行动逻辑 ---
         // 只有活着的敌人才移动
-        if (e.active && e.isFrozenCurrentTurn == false) {
+        const isBossVulnerabilityExposed = e.type === 'boss' && (e._bossVulnerabilityExposedTurns || 0) > 0;
+        if (e.active && (e.isFrozenCurrentTurn == false || isBossVulnerabilityExposed)) {
             // 奥罗波罗斯 Boss：回合开始时进行词缀轮转
-            if (e.type === 'boss' && e.bossType === 'ouroboros' && typeof e._performOuroborosRotation === 'function') {
+            if (!isBossVulnerabilityExposed && e.type === 'boss' && e.bossType === 'ouroboros' && typeof e._performOuroborosRotation === 'function') {
                 e._performOuroborosRotation(this);
             }
             e.startTurnAction(this);
@@ -2100,6 +2147,15 @@ phase_gathering_getRandomPegType() {
 
             // [V2 echoRelay] 重置回合内的 echo 触发标记
             e._echoedThisTurn = false;
+            e._defenseBarrierArrivedThisTurn = false;
+            e._defenseBarrierHitThisTurn = false;
+
+            // [敌人针对] 回合开始状态：活体护甲恢复、相位护盾节奏、护甲孢子分派。
+            if (typeof e._restoreLivingArmorForTurn === 'function') e._restoreLivingArmorForTurn();
+            if (typeof e._tickPhaseShieldForTurn === 'function') e._tickPhaseShieldForTurn(this);
+            if (typeof e._tickArmorSporeForTurn === 'function') e._tickArmorSporeForTurn(this);
+            if (typeof e._tickTeslaConductorForTurn === 'function') e._tickTeslaConductorForTurn(this);
+            if (typeof e._tickGlaciesFrostSeamForTurn === 'function') e._tickGlaciesFrostSeamForTurn(this);
 
             // [V2 deflectionWard] 偏折屏障：若上一回合未被击破，则本回合开始恢复至满屏障值
             if (e.affixes && e.affixes.includes('deflectionWard')) {
@@ -2113,10 +2169,17 @@ phase_gathering_getRandomPegType() {
                 e.wardBrokenThisTurn = false;
             }
 
+            // [radiantAegis] 流彩护盾：未破时回合开始自增；满层后转化为周围一格敌人的护盾层。
+            if (e.affixes && e.affixes.includes('radiantAegis') && typeof e._tickRadiantAegis === 'function') {
+                e._tickRadiantAegis(this);
+            }
+
             // [Boss 移动提示预计算]
             // 在回合开始时预计算 Boss 本回合是否会移动，以便 UI 标签能在回合开始时就显示正确提示
             if (e.type === 'boss' && e.bossType && typeof e._moveCooldown !== 'undefined') {
-                if (e.berserked) {
+                if ((e._bossVulnerabilityExposedTurns || 0) > 0) {
+                    e._willMoveThisTurn = false;
+                } else if (e.berserked) {
                     e._willMoveThisTurn = true;
                 } else {
                     e._willMoveThisTurn = (e._moveCooldown === 0);
@@ -2204,15 +2267,6 @@ phase_gathering_getRandomPegType() {
         // 仅将库存同步到存档（符文已在 phase_claimPendingRunes 中入库）
         this.saveData.runeInventory = (this.runeInventory || []).slice();
         this.sys_saveData();
-
-        // --- [Glacies 狂暴] Peg 冻结回合数递减 ---
-        if (this.pegs && Array.isArray(this.pegs)) {
-            this.pegs.forEach(peg => {
-                if (peg && peg.frozenTurns > 0) {
-                    peg.frozenTurns--;
-                }
-            });
-        }
 
         // --- 以下保持原有的回合结算逻辑 ---
         
@@ -2700,6 +2754,25 @@ phase_gathering_getRandomPegType() {
         // ==========================================
         //  LAYER 0: 固定 UI 层 (防线)
         // Visual warning strip removed; defeatLineY still drives lose checks.
+        if ((this.playerShield || 0) > 0) {
+            const barrierY = this.defeatLineY - 2;
+            this.ctx.save();
+            this.ctx.strokeStyle = 'rgba(147, 197, 253, 0.72)';
+            this.ctx.lineWidth = 3;
+            this.ctx.setLineDash([14, 10]);
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, barrierY);
+            this.ctx.lineTo(this.width, barrierY);
+            this.ctx.stroke();
+            this.ctx.setLineDash([]);
+            this.ctx.fillStyle = 'rgba(147, 197, 253, 0.12)';
+            this.ctx.fillRect(0, barrierY - 10, this.width, 20);
+            this.ctx.font = 'bold 12px sans-serif';
+            this.ctx.textAlign = 'right';
+            this.ctx.fillStyle = 'rgba(191, 219, 254, 0.92)';
+            this.ctx.fillText(`防线屏障 ${this.playerShield}`, this.width - 16, barrierY - 14);
+            this.ctx.restore();
+        }
 
         // ==========================================
         //  LAYER 0: 背景层 (网格 & 扫描波)

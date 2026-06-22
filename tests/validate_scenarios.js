@@ -137,6 +137,24 @@ requiredRelicIds.forEach(id => {
     }
 });
 
+const requiredBossIds = [
+    'boss_vulnerability_break'
+];
+
+requiredBossIds.forEach(id => {
+    const sc = scenarios.find(s => s.id === id);
+    check(!!sc, `Boss 场景 ${id} 存在`);
+    if (sc) {
+        check(sc.categoryId === 'boss', `${id}.categoryId === 'boss'`);
+        if (sc.bulletConfig) {
+            const missingKeys = REQUIRED_BULLET_KEYS.filter(k => !(k in sc.bulletConfig));
+            check(missingKeys.length === 0, `${id}.bulletConfig 包含所有必填键（缺少: ${missingKeys.join(', ')}）`);
+        }
+        check(typeof sc.name === 'string' && sc.name.length > 0, `${id}.name 非空`);
+        check(typeof sc.desc === 'string' && sc.desc.length > 0, `${id}.desc 非空`);
+    }
+});
+
 // 5. 所有场景的 categoryId 合法性
 console.log('\n── 分类合法性校验 ──');
 const invalidCat = scenarios.filter(s => !validCategoryIds.includes(s.categoryId));

@@ -1,6 +1,6 @@
 # Echo Alchemist V2 核心机制解析文档
 
-本文档详细解析了《Echo Alchemist V2》中的几项核心游戏机制，包括子弹充能与符文充能机制、遗物与精华的掉落保底机制、以及基于玩家套路的智能掉落算法。
+本文档详细解析了《Echo Alchemist V2》中的几项核心游戏机制，包括弹珠包研磨、子弹充能与符文充能机制、遗物掉落保底机制、以及基于玩家套路的智能掉落算法。
 
 ## 1. 充能机制解析
 
@@ -8,9 +8,9 @@
 
 ### 1.1 子弹充能（Ammo Charge）
 
-子弹充能机制主要与“命运抉择（Fate Moment）”中的精华奖励相关。
+子弹充能机制当前主要与弹珠包研磨后的“保留旧子弹 / 使用新研磨子弹”替换阶段相关。
 
-当玩家在回合开始时触发了“混沌精华”或“纯净精华”奖励，游戏会进入命运抉择阶段。此时，如果玩家在上一回合的研磨阶段（Gathering Phase）已经收集并编译了弹珠配方（`marbleQueue`），系统会将这些配方转化为**充能子弹（Charged Ammo）**并保存在 `_chargedAmmoQueue` 中。
+当玩家通过开局杂色包或局内商店购买弹珠包进入研磨时，如果上一轮已有可保留子弹，系统会将这些配方转化为**充能子弹（Charged Ammo）**并保存在 `_chargedAmmoQueue` 中。
 
 在随后的战斗阶段中，这些充能子弹会作为额外的弹药提供给玩家，通常显示在界面的右侧。充能子弹继承了原弹珠的属性和收集到的元素层数，但在生成时会重置其多重施法（multicast）和最终连击数（finalHits）。
 
@@ -122,10 +122,10 @@
 
 当玩家在替换界面确认选择后（`sys_confirmReplaceAmmo`），系统会将选中的卡片合并为最终的 `ammoQueue`，并清空临时队列 `_chargedAmmoQueue` 和替换上下文 `replaceAmmoContext`。随后，游戏正式进入战斗阶段。
 
-这一机制赋予了玩家在获得精华奖励时“保留上回合强力子弹”的策略选择权，同时通过纯净精华的“跳过研磨”分支，为玩家提供了更灵活的节奏控制。
+这一机制赋予了玩家在弹珠包研磨后“保留上回合强力子弹”的策略选择权；历史精华分支仅作兼容，不再作为主循环奖励来源。
 ## 2026-06-21 Marble Rune Slot Update
 
-- Essence rewards are no longer a new-run reward source. The standard pre-grind entry is now `marble_pack`.
+- Essence rewards are no longer a new-run reward source. `marble_pack` is the active grind entry: run start queues one mixed pack, and run-shop purchases open a mixed pack directly into gathering.
 - Each `MarbleDefinition` can hold up to 3 fused rune slots through `runeSlots`.
 - Fusing a rune in the marble selection preview consumes the rune immediately and adds temporary recipe stats through `source: 'rune_slot'`.
 - Gathering settlement must not persist `source: 'rune_slot'` entries inside `marble.collected`; the durable source of truth is the marble's `runeSlots` array.

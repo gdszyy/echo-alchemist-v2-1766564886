@@ -3811,11 +3811,10 @@
 
         /* ===== [tsk-f35c6d10] 回合开始大字提示横幅 ===== */
         #round-start-banner {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -3834,6 +3833,7 @@
             background: linear-gradient(to bottom, #fef08a, #ca8a04);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            transform-origin: center;
         }
         /* 隐藏状态：完全透明且不占据层叠 */
         .round-banner-hide {
@@ -4506,7 +4506,7 @@
 
         <!-- 右侧：回合数 + 加速 + 设置 -->
         <div class="top-bar-right">
-            <div id="shield-pill" class="shield-pill" title="守护者结界：敌人越线时消耗 1 层并抵消失败">
+            <div id="shield-pill" class="shield-pill" title="守护者结界：防线前能量屏障，敌人撞击时消耗层数">
                 <span>🔰</span><span id="shield-count">0</span>
             </div>
             <div class="round-pill">R <span id="round-num" class="stat-highlight">1</span></div>

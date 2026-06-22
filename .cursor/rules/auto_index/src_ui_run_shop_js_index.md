@@ -1,6 +1,6 @@
 # src\ui\run_shop.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 648 | 函数数: 25 | 语言: javascript
+> 自动生成于 2026-06-23 | 总行数: 535 | 函数数: 19 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -11,17 +11,11 @@
 |--------|------|------|------|
 | rollAttributePinType | function | `rollAttributePinType(game)` |  |
 | takeRandom | function | `takeRandom(pool)` |  |
-| getMarbleWeights | function | `getMarbleWeights(game, spec = {})` |  |
-| pickWeightedType | function | `pickWeightedType(weights)` |  |
-| marbleTypeValue | function | `marbleTypeValue(type)` |  |
-| calcRandomSlotEv | function | `calcRandomSlotEv(weights)` |  |
-| rollMarblePack | function | `rollMarblePack(game, spec)` |  |
-| priceMarblePack | function | `priceMarblePack(game, spec)` |  |
-| createMarblePackItem | function | `createMarblePackItem(game, specId)` |  |
-| grantMarblePack | function | `grantMarblePack(game, packId)` |  |
+| takeRandomByTag | function | `takeRandomByTag(pool, tag)` |  |
 | countAffordable | function | `countAffordable(items, fragments)` |  |
 | isStarterBoostVisit | function | `isStarterBoostVisit(game)` |  |
 | createStarterBoostItem | function | `createStarterBoostItem()` |  |
+| createMixedMarblePackItem | function | `createMixedMarblePackItem()` |  |
 | generateInventory | function | `generateInventory(game, count)` |  |
 | generateInventoryForCurrentVisit | function | `generateInventoryForCurrentVisit(game, count)` |  |
 | getRunShopVisitKey | function | `getRunShopVisitKey(game)` |  |

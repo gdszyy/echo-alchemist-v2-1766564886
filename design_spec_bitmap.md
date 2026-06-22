@@ -19,6 +19,8 @@
 
 ### 2.1 核心面板与背景（建议 9-Slice 切图）
 
+> 2026-06-23 补充：`#phase-combat` 进入战斗场地与 UI 重绘设计阶段。新一轮不以“补缺”为目标，而是统一战斗背景、墙体、防线、态势条、技能栏、符文充能与战斗图标的资产语言；执行设计、首轮概念清单、prompt 草案与性能边界见 [`docs/design/combat_battlefield_ui_asset_redesign.md`](docs/design/combat_battlefield_ui_asset_redesign.md)。
+
 | 组件名称 | 对应 DOM 元素 | 尺寸建议 | 视觉描述 |
 |---------|-------------|---------|---------|
 | **顶部状态栏** | `#unified-top-bar` | 高度 52px，横向拉伸 | 暗色半透明金属底板，底部带有微弱的科技感刻线。 |
@@ -75,6 +77,13 @@
 为了保持灵活性，**不建议**将所有状态（如冰冻、燃烧）直接画死在基础 Sprite 中。建议采用 **「基础 Sprite + 状态特效层」** 的渲染方式：
 
 > 2026-06-22 补充：奖励边框和词条 Overlay 必须拆层。当前敌人奖励美术只面向带遗物敌人的独立“金边”奖励框；`shield`、`regen`、`jump` 等词条只作为机制覆层或触发反馈，不承担掉落价值表达。详细规格见 [`docs/design/enemy_affix_visual_iteration_plan.md`](docs/design/enemy_affix_visual_iteration_plan.md)。
+
+> 2026-06-22 补充：Boss 破绽视觉先按透明 PNG Overlay 接入，不替换 Boss 基础 Sprite。统一使用 `384 × 256`、中心锚点 `(192, 128)`、`assets/sprites/enemies/bosses/<bossId>/vulnerability/` 目录与 `vuln_25/50/75/break/exposed/recover/weak_mask` 命名；完整契约与 Ignis 样板 Prompt 见 [`docs/boss_vulnerability_asset_contract.md`](docs/boss_vulnerability_asset_contract.md)。
+
+> 2026-06-22 补充：Boss 本体也进入重绘契约。现有 `assets/sprites/bosses/boss_<bossId>.png/.json` 的 `256 × 256` 方形帧仍视为 legacy 可运行资源；新重绘目标为 `384 × 256` 横向帧，JSON 必须声明 `frameWidth/frameHeight`，渲染器会按 3×2 占格绘制。完整规格见 [`docs/boss_sprite_redraw_asset_contract.md`](docs/boss_sprite_redraw_asset_contract.md)。
+> 2026-06-23 补充：Boss 重绘必须贴合物理碰撞外轮廓。8 个 Boss 当前运行时 `collisionShape/collisionData` 已整理为 `assets/sprites/bosses/redraw_drafts/boss_collision_guides_v2_no_three_rings_384x256.png`，后续生成基础本体和破绽 Overlay 时都要以该图作为外轮廓验收参考，避免视觉主体与弹珠反弹/命中范围偏差过大。当前只有最终 Boss `ouroboros` 使用完整闭合环来承载 6 个附体槽；`mikro` 与 `devourer` 已改为实体 polygon，不再按环形 Boss 生成。旧同名图已归档到 `assets/sprites/bosses/redraw_drafts/archive/`，不要继续引用。
+
+> 2026-06-22 补充：敌人针对词缀进入生成前资产契约。`carrier` 显示名固定为“铸巢母架”，第 5 格空舱必须在 Sprite、collision frame 与头像中可见；`livingArmor` 需要普通/叠加强化各三档状态资产；完整清单见 [`docs/enemy_targeting_asset_todo.md`](docs/enemy_targeting_asset_todo.md)。
 
 - **血量显示**：保留现有的 Canvas 绘制逻辑（液体血条 + 绿色回血条 + 白色延迟条），将其作为 Overlay 盖在 Sprite 上方。
 - **战损裂纹**：当血量低于 30% 时，在 Sprite 上方叠加一层半透明的「裂纹」PNG，或者使用 Shader/混合模式处理。

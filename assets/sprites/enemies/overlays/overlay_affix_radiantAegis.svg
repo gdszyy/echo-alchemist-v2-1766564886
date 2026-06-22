@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="flowA" x1="24" y1="32" x2="232" y2="224">
+      <stop offset="0" stop-color="#67e8f9" stop-opacity="0.86"/>
+      <stop offset="0.34" stop-color="#a78bfa" stop-opacity="0.78"/>
+      <stop offset="0.68" stop-color="#f0abfc" stop-opacity="0.82"/>
+      <stop offset="1" stop-color="#fef08a" stop-opacity="0.72"/>
+    </linearGradient>
+    <filter id="softGlow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#softGlow)">
+    <rect x="31" y="31" width="194" height="194" rx="34" stroke="url(#flowA)" stroke-width="10" opacity="0.72"/>
+    <rect x="50" y="50" width="156" height="156" rx="25" stroke="#e0f2fe" stroke-width="3" opacity="0.34"/>
+    <path d="M128 25 216 128 128 231 40 128Z" stroke="url(#flowA)" stroke-width="6" opacity="0.7"/>
+    <path d="M128 54 166 128 128 202 90 128Z" stroke="#fef08a" stroke-width="4" opacity="0.58"/>
+    <path d="M55 84 C92 51 164 51 201 84" stroke="#67e8f9" stroke-width="5" opacity="0.5"/>
+    <path d="M55 172 C92 205 164 205 201 172" stroke="#f0abfc" stroke-width="5" opacity="0.5"/>
+  </g>
+</svg>

@@ -1,10 +1,28 @@
 export const ENEMY_WAVE_PRESETS = [
     {
+        id: 'early_bastion_brace',
+        scriptId: 'armor_line',
+        beatId: 'intro',
+        roundRange: [6, 9],
+        weight: 12,
+        maxUses: 1,
+        cooldownRounds: 99,
+        directorTags: ['earlyPressure', 'antiCompression'],
+        introText: '装甲横梁会挡住弹路，穿透或连锁可以拆开防线。',
+        slots: [
+            { archetype: 'bastion', affixes: ['heavyArmor'], cols: 3, rows: 1, lane: 'center', hpMult: 1.45 },
+            { archetype: 'normal', affixes: [], cols: 1, rows: 1, lane: 'side', hpMult: 0.65 },
+        ],
+    },
+    {
         id: 'teach_deflection_ward',
+        scriptId: 'ward_filter',
+        beatId: 'intro',
         roundRange: [9, 14],
         weight: 14,
         maxUses: 1,
         cooldownRounds: 99,
+        directorTags: ['antiCompression', 'damageFilter'],
         introText: '棱盾兽会挡下反弹与穿透，换用直击或元素伤害。',
         slots: [
             { archetype: 'deflector', affixes: ['deflectionWard'], cols: 2, rows: 1, lane: 'center', hpMult: 1.0 },
@@ -13,10 +31,13 @@ export const ENEMY_WAVE_PRESETS = [
     },
     {
         id: 'bastion_wall',
+        scriptId: 'armor_line',
+        beatId: 'combo',
         roundRange: [10, 20],
         weight: 12,
         maxUses: 2,
         cooldownRounds: 6,
+        directorTags: ['antiCompression', 'backlinePriority'],
         introText: '装甲横梁正在保护后排，穿透或连锁能更快破阵。',
         slots: [
             { archetype: 'bastion', affixes: ['heavyArmor'], cols: 3, rows: 1, lane: 'center', hpMult: 2.0 },
@@ -25,10 +46,13 @@ export const ENEMY_WAVE_PRESETS = [
     },
     {
         id: 'teach_echo_relay',
+        scriptId: 'support_relay',
+        beatId: 'intro',
         roundRange: [12, 18],
         weight: 12,
         maxUses: 1,
         cooldownRounds: 99,
+        directorTags: ['supportPunish', 'snowball'],
         introText: '共振尖塔会额外触发周围词缀，优先拆掉核心。',
         slots: [
             { archetype: 'echoSpire', affixes: ['echoRelay'], cols: 1, rows: 2, lane: 'center', hpMult: 0.55 },
@@ -37,10 +61,13 @@ export const ENEMY_WAVE_PRESETS = [
     },
     {
         id: 'maw_food_chain_v2',
+        scriptId: 'maw_tempo',
+        beatId: 'combo',
         roundRange: [18, 26],
         weight: 11,
         maxUses: 2,
         cooldownRounds: 7,
+        directorTags: ['tempoPunish', 'snowball'],
         introText: '深渊胃囊会吞噬身边单位，先切断供给。',
         slots: [
             { archetype: 'maw', affixes: ['devour'], cols: 2, rows: 2, lane: 'center', hpMult: 2.0 },
@@ -50,10 +77,13 @@ export const ENEMY_WAVE_PRESETS = [
     },
     {
         id: 'siege_push_line',
+        scriptId: 'breach_control',
+        beatId: 'intro',
         roundRange: [22, 30],
         weight: 9,
         maxUses: 1,
         cooldownRounds: 99,
+        directorTags: ['linePush', 'antiControl'],
         introText: '攻城履带无法被冰冻停住，会持续压缩阵线。',
         slots: [
             { archetype: 'siege', affixes: ['siege'], cols: 3, rows: 2, lane: 'center', hpMult: 3.5 },
@@ -63,10 +93,13 @@ export const ENEMY_WAVE_PRESETS = [
     },
     {
         id: 'prism_refraction',
+        scriptId: 'trajectory_lab',
+        beatId: 'intro',
         roundRange: [22, 30],
         weight: 10,
         maxUses: 1,
         cooldownRounds: 99,
+        directorTags: ['trajectoryDisrupt'],
         introText: '折光棱柱会干扰射线路径，注意调整发射角。',
         slots: [
             { archetype: 'prism', affixes: ['prism'], cols: 1, rows: 3, lane: 'center', hpMult: 1.4 },
@@ -75,10 +108,13 @@ export const ENEMY_WAVE_PRESETS = [
     },
     {
         id: 'hive_incubator',
+        scriptId: 'attrition_hive',
+        beatId: 'intro',
         roundRange: [24, 34],
         weight: 8,
         maxUses: 1,
         cooldownRounds: 99,
+        directorTags: ['attrition', 'snowball'],
         introText: '孵化巢会持续产出幼体，拖久会淹没战场。',
         slots: [
             { archetype: 'hive', affixes: ['hive'], cols: 2, rows: 3, lane: 'center', hpMult: 2.5 },
@@ -86,11 +122,28 @@ export const ENEMY_WAVE_PRESETS = [
         ],
     },
     {
+        id: 'carrier_launch_deck',
+        scriptId: 'carrier_pressure',
+        beatId: 'intro',
+        roundRange: [28, 40],
+        weight: 7,
+        maxUses: 1,
+        cooldownRounds: 99,
+        directorTags: ['tempoPunish', 'snowball', 'linePush'],
+        introText: '铸巢母架会在第 5 格空舱投放急速跳跃小怪；空舱被占时会先推出旧单位，推不出去则跳过本次投放。',
+        slots: [
+            { archetype: 'carrier', affixes: ['carrier'], cols: 3, rows: 2, lane: 'center', hpMult: 3.2 },
+        ],
+    },
+    {
         id: 'gravity_blackout',
+        scriptId: 'trajectory_lab',
+        beatId: 'climax',
         roundRange: [32, 42],
         weight: 5,
         maxUses: 1,
         cooldownRounds: 99,
+        directorTags: ['fieldControl', 'trajectoryDisrupt'],
         introText: '引力炉心会牵引弹道，是稀有的大型场控核心。',
         slots: [
             { archetype: 'gravityWell', affixes: ['gravityWell'], cols: 3, rows: 3, lane: 'center', hpMult: 6.0 },
@@ -106,5 +159,109 @@ export const ENEMY_WAVE_PRESET_ARCHETYPES = {
     prism: { cols: 1, rows: 3, affix: 'prism', color: '#67e8f9' },
     hive: { cols: 2, rows: 3, affix: 'hive', color: '#a3e635' },
     siege: { cols: 3, rows: 2, affix: 'siege', color: '#facc15' },
+    carrier: { cols: 3, rows: 2, affix: 'carrier', color: '#38bdf8' },
     gravityWell: { cols: 3, rows: 3, affix: 'gravityWell', color: '#7c3aed' },
 };
+
+export const DIRECTOR_SCRIPT_CONFIG = {
+    unfamiliarRoundWindow: 3,
+    maxUnfamiliarActorsPerPreset: 1,
+    defaultRepeatCooldownRounds: 3,
+};
+
+export const DIRECTOR_ACTOR_INTRO_ROUNDS = {
+    shield: 3,
+    regen: 5,
+    healer: 6,
+    heavyArmor: 5,
+    haste: 8,
+    jump: 9,
+    deflectionWard: 9,
+    echoRelay: 10,
+    clone: 12,
+    devour: 12,
+    berserk: 14,
+    prism: 16,
+    radiantAegis: 20,
+    hive: 18,
+    siege: 22,
+    carrier: 28,
+    gravityWell: 30,
+};
+
+export const DIRECTOR_SCRIPTS = [
+    {
+        id: 'armor_line',
+        label: '装甲压线',
+        repeatCooldownRounds: 4,
+        maxUnfamiliarActors: 1,
+        beats: [
+            { presetId: 'early_bastion_brace', roundRange: [6, 9], actors: ['bastion', 'normal'] },
+            { presetId: 'bastion_wall', roundRange: [10, 20], actors: ['bastion', 'healer'] },
+        ],
+    },
+    {
+        id: 'ward_filter',
+        label: '伤害筛选',
+        repeatCooldownRounds: 4,
+        maxUnfamiliarActors: 1,
+        beats: [
+            { presetId: 'teach_deflection_ward', roundRange: [9, 14], actors: ['deflector', 'normal'] },
+        ],
+    },
+    {
+        id: 'support_relay',
+        label: '支援核心',
+        repeatCooldownRounds: 4,
+        maxUnfamiliarActors: 1,
+        beats: [
+            { presetId: 'teach_echo_relay', roundRange: [12, 18], actors: ['echoSpire', 'regen'] },
+        ],
+    },
+    {
+        id: 'maw_tempo',
+        label: '吞噬倒计时',
+        repeatCooldownRounds: 5,
+        maxUnfamiliarActors: 1,
+        beats: [
+            { presetId: 'maw_food_chain_v2', roundRange: [18, 26], actors: ['maw', 'normal'] },
+        ],
+    },
+    {
+        id: 'breach_control',
+        label: '破阵推进',
+        repeatCooldownRounds: 6,
+        maxUnfamiliarActors: 1,
+        beats: [
+            { presetId: 'siege_push_line', roundRange: [22, 30], actors: ['siege', 'shield'] },
+        ],
+    },
+    {
+        id: 'trajectory_lab',
+        label: '弹道改造',
+        repeatCooldownRounds: 6,
+        maxUnfamiliarActors: 1,
+        beats: [
+            { presetId: 'prism_refraction', roundRange: [22, 30], actors: ['prism', 'normal'] },
+            { presetId: 'gravity_blackout', roundRange: [32, 42], actors: ['gravityWell'] },
+        ],
+    },
+    {
+        id: 'attrition_hive',
+        label: '持续消耗',
+        repeatCooldownRounds: 5,
+        maxUnfamiliarActors: 1,
+        beats: [
+            { presetId: 'hive_incubator', roundRange: [24, 34], actors: ['hive', 'normal'] },
+        ],
+    },
+    {
+        id: 'carrier_pressure',
+        label: '巢架投放',
+        repeatCooldownRounds: 7,
+        maxUnfamiliarActors: 1,
+        beats: [
+            { presetId: 'carrier_launch_deck', roundRange: [28, 40], actors: ['carrier'] },
+        ],
+    },
+];

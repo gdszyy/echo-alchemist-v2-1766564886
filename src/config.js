@@ -550,6 +550,12 @@ const CONFIG = {
         },
         affixes: {
             shieldReduction: 0.5,   // 护盾减伤 50%
+            // [radiantAegis] 流彩护盾：Boss 满强度，非 Boss 精英使用半强度
+            radiantAegisBossRegenPct: 0.02,   // Boss 每回合生成最大生命 2% 的数值护盾
+            radiantAegisBossCapPct: 0.10,     // Boss 满层阈值：最大生命 10%
+            radiantAegisEliteRegenPct: 0.01,  // 精英半强度：每回合最大生命 1%
+            radiantAegisEliteCapPct: 0.05,    // 精英半强度满层阈值：最大生命 5%
+            radiantAegisSpreadRangeCells: 1,  // 满层后再次获取护盾时，给周围一格敌人 +1 护盾层
             hasteActions: 2,        // 极速行动次数
             regenPercent: 0.2,      // 再生回血百分比
             cloneChanceHit: 0.2,    // 受击分身概率
@@ -560,6 +566,18 @@ const CONFIG = {
             devourChance: 1,      // 吞噬触发概率
             devourRange: 2,       // 吞噬范围
             jumpRows: 2,            // 跳跃距离 (行数)
+            energyArmorThresholdPct: 0.20, // 蓄能甲：单次超过最大生命 20% 的伤害溢出转护盾
+            energyArmorShieldCapPct: 1.0,  // 蓄能甲临时数值护盾上限 = 最大生命 100%
+            phaseShieldCycle: 3,           // 相位护盾：每 3 个敌方回合有 1 回合护盾失效
+            phaseShieldMult: 2,            // 相位护盾：初始/新增护盾层数翻倍
+            overloadStepPct: 0.20,         // 过量反应炉：每累积 20% 最大生命伤害 +1 行动/移动
+            overloadMaxBonus: 3,           // 过量反应炉：每回合最多额外行动/移动次数
+            lowDamageImmunePct: 0.05,      // 低伤免疫：低于最大生命 5% 的单次最终伤害无效
+            livingArmorPct: 0.10,          // 活体护甲：护甲生命 = 来源最大生命 10%
+            armorSporeStackPct: 0.50,      // 护甲孢子：已有活体护甲时按 50% 数值叠加
+            siegeBreakerDamageMult: 2,     // 撞城者：防线伤害倍率
+            deflectShellNormalRotateAmp: 0.85, // 偏折壳：反弹法线最大旋转弧度
+            deflectShellNormalRotateSpeed: 1.8, // 偏折壳：边界旋转速度
             // [重装] 重装词条：血量翻倍，每2回合才移动一次
             heavyArmorHpMult: 2.0,      // 重装：血量倍率
             heavyArmorMoveInterval: 2,  // 重装：移动间隔（回合数）
@@ -598,6 +616,10 @@ const CONFIG = {
             gravityWellPullRadius: 220,       // 引力影响半径（像素）
             gravityWellHpMult: 6.0,           // 引力炉心血量倍率
             gravityWellMoveInterval: 3,       // 移动间隔（极慢）
+            carrierHpMult: 3.2,                // 铸巢母架五格冂形血量倍率
+            carrierSpawnInterval: 1,           // 铸巢母架每回合生成小型敌人
+            carrierSpawnHpPct: 0.10,           // 小型敌人血量 = 母体最大生命比例
+            carrierMoveInterval: 2,            // 铸巢母架移动间隔
         },
 
         // =========================================
@@ -649,11 +671,15 @@ const CONFIG = {
                 name: '熔炉守卫·伊格尼斯',
                 isBigBoss: false,
                 hpMult: 1.08,
-                affixes: ['shield', 'haste'],
+                affixes: ['shield', 'haste', 'radiantAegis'],
                 vulnerability: { attrs: ['pierce', 'pyro'], label: '破甲熔炉', mode: 'hits', hitThreshold: 3 },
                 shieldChargesBonus: 5,    // 额外护盾层数
                 berserkedShieldMult: 2,   // 狂暴后护盾层数翻倍系数
                 berserkedTempRisePerTurn: 30, // 狂暴后每回合温度上升值
+                furnacePressureThreshold: 45, // 温压达到阈值时触发一次流光彩护盾
+                furnacePressureBaseGain: 5,   // 过热结算时的基础温压增量
+                furnacePressureCryoVentRatio: 0.6, // 冰霜结算按低温绝对值泄压比例
+                furnacePressurePulsePct: 0.02, // 温压脉冲授予最大生命 2% 的流光护盾
                 berserkedFireSplashRadius: 80, // 狂暴后火焰溅射半径（像素）
                 berserkedFireSplashDamage: 5,  // 狂暴后火焰溅射伤害
                 moveInterval: 3,          // 常规模式：每 3 回合移动一次（有 haste 词缀，但降低前期压迫感）
@@ -667,7 +693,17 @@ const CONFIG = {
                 vulnerability: { attrs: ['cryo', 'pierce'], label: '冻结裂隙', mode: 'damage', damageRatio: 0.10 },
                 jumpRowsBonus: 2,         // 额外跳跃行数
                 berserkedJumpRows: 3,     // 狂暴后每回合跳跃行数
-                berserkedFreezePegRadius: 120, // 狂暴后跳跃落地冻结周围 Peg 的范围（像素）
+                frostSeamRangeCells: 2,   // 霜缝选择 Boss 周围多少格内的敌人
+                frostSeamMaxTargets: 3,   // 普通状态每次缝合目标数
+                frostSeamBerserkMaxTargets: 5, // 狂暴后每次缝合目标数
+                frostSeamDuration: 2,     // 被缝合敌人的霜缝持续回合
+                frostSeamBerserkDurationBonus: 1, // 狂暴后霜缝额外持续
+                frostSeamShieldCharges: 1, // 初次缝合时补一层标准护盾
+                frostSeamRegenPct: 0.04,  // 霜缝每回合为目标回血
+                frostSeamDamageReduction: 0.35, // 非 cryo / pierce 命中被缝合目标时的减伤
+                frostSeamPierceBonusDamage: 0.20, // pierce 切断霜缝时本次命中增伤
+                frostSeamCryoSkipTurns: 1, // cryo 切断霜缝后冻结 Glacies 下一次霜缝 tick
+                frostSeamLandingBonusTargets: 1, // 跳跃落地时额外缝合目标
                 moveInterval: 3,          // 常规模式：每 3 回合移动一次（有 regen 词缀，移动较慢）
                 themeWeights: { cryo: 1.5, pierce: 1.3 }
             },
@@ -696,21 +732,57 @@ const CONFIG = {
             viridis: {
                 name: '翠绿共生体·维里迪斯',
                 isBigBoss: true,
-                affixes: ['regen', 'healer'],
-                vulnerability: { attrs: ['laser', 'pyro'], label: '再生烧蚀', mode: 'damage', damageRatio: 0.12 },
+                affixes: ['regen', 'healer', 'livingArmor', 'armorSpore'],
+                vulnerability: { attrs: ['pyro', 'venom'], label: '孢甲净化', mode: 'damage', damageRatio: 0.12 },
                 regenPercentBonus: 0.2,   // 额外再生百分比
                 berserkedHealerRange: 0,   // 狂暴后停止治疗其他敌人（放弃治疗他人）
                 berserkedSelfRegenMult: 3.0, // 狂暴后自身回血速度倍率（集中治疗自身）
+                sporeBloomMax: 18,
+                sporeBloomBaseGain: 1,
+                sporeBloomPerVassal: 1,
+                sporeBloomPerHeal: 2,
+                sporeArmorThreshold: 4,
+                sporeArmorMaxBursts: 2,
+                sporeArmorTargets: 2,
+                sporeArmorBerserkTargets: 3,
+                sporeArmorStackMult: 1.1,
+                sporeArmorBreakBloomGain: 2,
+                sporeArmorCounterDrain: 4,
+                sporeArmorPyroDamagePct: 0.60,
+                sporeArmorVenomDamagePct: 0.45,
+                sporeArmorCounterVenomStacks: 2,
+                sporeArmorCorrodeTurns: 2,
                 moveInterval: 3,          // 常规模式：每 3 回合移动一次（专注治疗，移动缓慢）
-                themeWeights: { laser: 1.5, pyro: 1.3 }
+                themeWeights: { pyro: 1.5, venom: 1.4 }
             },
             tesla: {
                 name: '雷霆幻影·特斯拉',
                 isBigBoss: true,
                 affixes: ['haste', 'clone'],
-                vulnerability: { attrs: ['cryo', 'bounce'], label: '惯性失衡', mode: 'hits', hitThreshold: 4 },
+                vulnerability: { attrs: ['cryo', 'bounce'], label: '导体接地', mode: 'hits', hitThreshold: 4 },
                 hasteActionsBonus: 1,     // 额外行动次数（共3次）
                 berserkedActionsBonus: 1, // 狂暴后再+1次行动
+                teslaFieldPowerMax: 36,
+                teslaConductorFieldGain: 3,
+                teslaChargedConductorBonus: 2,
+                teslaFieldDecay: 2,
+                teslaFieldActionStep: 12,
+                teslaFieldActionBonusMax: 2,
+                teslaSummonThreshold: 18,
+                teslaSummonMaxPerTurn: 2,
+                teslaSummonHpPct: 0.18,
+                teslaMaxConductors: 8,
+                teslaShockDamage: 1,
+                teslaShockTargets: 1,
+                teslaShockHasteTurns: 2,
+                teslaShockFieldGain: 4,
+                teslaLightningHasteTurns: 2,
+                teslaLightningFieldGain: 5,
+                teslaCryoFieldDrain: 6,
+                teslaBounceFieldDrain: 8,
+                teslaGroundedTurns: 1,
+                teslaGroundedGainMult: 0.35,
+                teslaConductorAffixes: ['clone'],
                 moveInterval: 2,          // 常规模式：每 2 回合移动一次（有 haste 词缀，移动较快）
                 themeWeights: { cryo: 1.5, bounce: 1.3 }
             },
@@ -718,12 +790,23 @@ const CONFIG = {
                 name: '混沌融合体·奇美拉',
                 isBigBoss: true,
                 affixes: ['berserk', 'devour'],
-                vulnerability: { attrs: ['pierce', 'laser'], label: '混沌核心', mode: 'damage', damageRatio: 0.09 },
+                vulnerability: { attrs: ['venom', 'laser'], label: '污染胃域', mode: 'damage', damageRatio: 0.09 },
                 initTemp: 60,             // 初始温度（半狂暴状态）
                 berserkedTempThreshold: 100, // 狂暴后温度阈值
                 berserkedBlastOnHitChance: 0.25, // 狂暴后受击触发全场爆炸概率
+                chimeraMawRangeCells: 2,
+                chimeraPullCellsPerTurn: 1,
+                chimeraDigestInterval: 2,
+                chimeraBerserkDigestInterval: 1,
+                chimeraSummonInterval: 2,
+                chimeraSummonMaxPerTurn: 1,
+                chimeraMaxFeeders: 5,
+                chimeraSummonHpPct: 0.12,
+                chimeraDigestHealPct: 0.08,
+                chimeraDigestShieldPerFeed: 1,
+                chimeraFeedAffixes: ['berserk'],
                 moveInterval: 2,          // 常规模式：每 2 回合移动一次（混沌体，移动较频繁）
-                themeWeights: { pierce: 1.5, laser: 1.5 }
+                themeWeights: { venom: 1.5, laser: 1.5 }
             },
             ouroboros: {
                 name: '永恒回声·奥罗波罗斯',
@@ -734,19 +817,39 @@ const CONFIG = {
                     rotationAttrs: [
                         ['pierce', 'cryo'],
                         ['laser', 'pyro'],
-                        ['lightning', 'scatter']
+                        ['lightning', 'scatter'],
+                        ['cryo', 'bounce'],
+                        ['pierce', 'laser'],
+                        ['lightning', 'bounce']
                     ],
-                    labels: ['鳞盾裂隙', '轮回再生核', '回声裂群'],
-                    rotationModes: ['hits', 'damage', 'hits'],
-                    rotationHitThresholds: [4, null, 5],
-                    rotationDamageRatios: [null, 0.11, null]
+                    labels: ['鳞盾裂隙', '轮回再生核', '回声裂群', '疾步断环', '吞尾咽喉', '雷回涌核'],
+                    rotationModes: ['hits', 'damage', 'hits', 'hits', 'damage', 'hits'],
+                    rotationHitThresholds: [4, null, 5, 4, null, 5],
+                    rotationDamageRatios: [null, 0.11, null, null, 0.10, null]
                 },
                 rotationSets: [             // 词缀轮转组
                     ['shield', 'haste'],
                     ['regen', 'healer'],
-                    ['clone', 'jump']
+                    ['clone', 'shield'],
+                    ['jump', 'haste'],
+                    ['devour', 'regen'],
+                    ['haste', 'berserk']
                 ],
-                rotationInterval: 3,        // 每 3 回合切换一次
+                orbitAttachments: [
+                    { id: 'aegis', name: '鳞盾附体', icon: '盾', affixes: ['shield', 'haste'], attrs: ['pierce', 'cryo'], action: 'shield', color: '#93c5fd' },
+                    { id: 'graft', name: '愈合附体', icon: '愈', affixes: ['regen', 'healer'], attrs: ['laser', 'pyro'], action: 'heal', color: '#86efac' },
+                    { id: 'brood', name: '裂群附体', icon: '裂', affixes: ['clone', 'shield'], attrs: ['lightning', 'scatter'], action: 'summon', color: '#c084fc' },
+                    { id: 'stride', name: '疾步附体', icon: '疾', affixes: ['jump', 'haste'], attrs: ['cryo', 'bounce'], action: 'haste', color: '#facc15' },
+                    { id: 'maw', name: '吞尾附体', icon: '噬', affixes: ['devour', 'regen'], attrs: ['pierce', 'laser'], action: 'devour', color: '#ef4444' },
+                    { id: 'surge', name: '雷回附体', icon: '雷', affixes: ['haste', 'berserk'], attrs: ['lightning', 'bounce'], action: 'charge', color: '#a78bfa' }
+                ],
+                orbitAttachmentDisruptTurns: 2,
+                orbitEchoMax: 4,
+                orbitEchoHpPct: 0.10,
+                orbitEchoSpawnPerPulse: 1,
+                orbitShieldGain: 2,
+                orbitHealPct: 0.05,
+                rotationInterval: 1,        // 六附体每回合转位一次
                 berserkedRotationInterval: 1, // 狂暴后每回合切换
                 moveInterval: 3,          // 常规模式：每 3 回合移动一次（永恒回声，移动最慢）
                 themeWeights: { pierce: 1.2, cryo: 1.2, lightning: 1.2 }
@@ -756,7 +859,7 @@ const CONFIG = {
         bossVulnerability: {
             breakThreshold: 3,        // 兼容旧默认值；未配置 hitThreshold 时使用
             baseDamageRatio: 0.10,    // 未配置 damageRatio 时，按 Boss 最大生命百分比累积
-            exposedHits: 3,
+            exposedTurns: 1,          // 破绽触发后 Boss 暴露并跳过行动的回合数
             exposedDamageMult: 1.35,
             counterHitGain: 1,
             offPatternGain: 0,
@@ -775,7 +878,17 @@ const CONFIG = {
             shakeDuration: 400,     // 屏幕震动持续时间（毫秒）
             affixChance: 0.35,      // 被冲击波命中后获得 Boss 特殊词条的概率
             minionChance: 0.05,     // 被冲击波命中后直接转化为 Boss 随从的概率（降低：减少异型敌人数量）
-            bigBossBonus: 0.10      // 大 Boss 进场时概率加成
+            bigBossBonus: 0.10,     // 大 Boss 进场时概率加成
+            bossMinionProfiles: {
+                ignis:    { role: 'furnace_guard', affixes: ['shield', 'radiantAegis'], tags: ['furnacePressure', 'radiantAegis'] },
+                glacies:  { role: 'frost_stitch', affixes: ['regen', 'jump'], tags: ['frostStitch'] },
+                mikro:    { role: 'fission_cell', affixes: ['clone', 'healer'], tags: ['fissionLink'] },
+                devourer: { role: 'maw_thrall', affixes: ['devour', 'shield'], tags: ['mawFeed'] },
+                viridis:  { role: 'spore_vassal', affixes: ['regen', 'healer', 'armorSpore'], tags: ['sporeArmor'] },
+                tesla:    { role: 'conductor', affixes: ['clone'], tags: ['teslaConductor'] },
+                chimera:  { role: 'chaos_feed', affixes: ['berserk'], tags: ['chaosFeed'] },
+                ouroboros:{ role: 'orbit_echo', affixes: ['shield', 'haste', 'regen'], tags: ['orbitAttachment'] }
+            }
         }
     },
     /** 游戏玩法配置 */
@@ -857,9 +970,8 @@ const CONFIG = {
         runShopRefreshCost: 10,        // 刷新一次商店消耗碎片
         runShopItemsPerOffer: 5,       // 每次刷新提供的商品数
         runShopRunesRatio: 0.6,        // 商品中符文占比
-        runShopMarblePackBasePrice: 7,
-        runShopMarblePackMarkup: 1.0,
-        runShopMarblePackRarityPower: 0.5,
+        runShopMixedMarblePackPrice: 18, // 杂色弹珠包：购买后立即进入 3 弹珠研磨
+        runResourcePackFragments: 48,  // 旧存档兜底资源包：仅兼容旧奖励，不作为新主循环入口
         runShopEndOfRunFragmentSettle: 0.3, // 局结束时未消费碎片转换为 saveData 的比例
         enemyDropFragmentChance: 0.30, // 普通敌人击杀掉落碎片基础概率
         enemyDropFragmentBaseAmount: 1,
@@ -1516,14 +1628,14 @@ const RELIC_DB = [
         id: 'guardian_barrier',
         name: '守护者结界',
         icon: '🔰',
-        desc: '获得 5 层守护护盾。敌人越过防线时，消耗 1 层护盾并抵消这次失败。',
+        desc: '获得 5 层防线屏障。敌人抵达防线前会被屏障拦停，之后每次移动撞击消耗 1 层屏障。',
         rarity: 'common',
         effect: 'early_temp_shield',
         shieldValue: 5,
         maxStacks: 2,
         recommended: true,
-        tags: ['生存保护', '新手友好'],
-        recommendTip: '漏怪时不会立刻失败，给你更多时间熟悉战斗节奏。'
+        tags: ['防线屏障', '新手友好'],
+        recommendTip: '把漏怪变成可见的防线压力，给你更多时间处理贴线敌人。'
     },
     {
         id: 'fate_reroll_token',
@@ -1931,7 +2043,7 @@ const BOSS_DB = [
     {
         id: 'boss_ignis',
         name: '燕炉守卫·伊格尼斯',
-        affixes: ['shield', 'haste'],
+        affixes: ['shield', 'haste', 'radiantAegis'],
         // 破绽谱：穿透 (Pierce) 与 火焰 (Pyro) —— 克制护盾
         themeWeights: { pierce: 3.0, pyro: 3.0 }
     },
@@ -1958,10 +2070,10 @@ const BOSS_DB = [
     },
     {
         id: 'boss_viridis',
-        name: '翠绳共生体·维里迪斯',
-        affixes: ['regen', 'healer'],
-        // 破绽谱：激光 (Laser) 与 火焰 (Pyro) —— 克制再生与治疗
-        themeWeights: { laser: 3.0, pyro: 3.0 }
+        name: '翠绿共生体·维里迪斯',
+        affixes: ['regen', 'healer', 'livingArmor', 'armorSpore'],
+        // 破绽谱：火焰 (Pyro) 与 毒素 (Venom) —— 克制孢甲再生网络
+        themeWeights: { pyro: 3.0, venom: 3.0 }
     },
     {
         id: 'boss_tesla',
@@ -1974,8 +2086,8 @@ const BOSS_DB = [
         id: 'boss_chimera',
         name: '混沌融合体·奇美拉',
         affixes: ['berserk', 'devour'],
-        // 破绽谱：穿透 (Pierce) 与 激光 (Laser) —— 克制狂暴与吞噬
-        themeWeights: { pierce: 3.0, laser: 3.0 }
+        // 破绽谱：毒素 (Venom) 与 激光 (Laser) —— 污染胃域 / 精准剖解
+        themeWeights: { venom: 3.0, laser: 3.0 }
     },
     {
         id: 'boss_ouroboros',
@@ -2075,35 +2187,35 @@ const ENEMY_CURVE_CONFIG = {
 
         // R1-R5 基础教学段：引入 shield (R3), regen (R5)
 
-        { shield: 80, regen: 30, healer: 0, haste: 0, jump: 0, clone: 0, devour: 0, berserk: 0 },
+        { shield: 80, regen: 30, healer: 0, haste: 0, jump: 0, clone: 0, devour: 0, berserk: 0, radiantAegis: 0, livingArmor: 0, armorSpore: 0, siegeBreaker: 0, deflectShell: 0, energyArmor: 0, phaseShield: 0, overloadReactor: 0, lowDamageImmune: 0 },
 
         // R6-R12 持续压力段：引入 healer (R6), haste (R8), jump (R9)
 
-        { shield: 40, regen: 80, healer: 50, haste: 30, jump: 30, clone: 0, devour: 0, berserk: 0 },
+        { shield: 40, regen: 80, healer: 50, haste: 30, jump: 30, clone: 0, devour: 0, berserk: 0, radiantAegis: 0, livingArmor: 25, armorSpore: 0, siegeBreaker: 0, deflectShell: 20, energyArmor: 0, phaseShield: 0, overloadReactor: 0, lowDamageImmune: 0 },
 
         // R13-R19 群体控制段：引入 clone (R12), devour (R12), berserk (R14)
 
-        { shield: 20, regen: 40, healer: 80, haste: 50, jump: 50, clone: 80, devour: 40, berserk: 30 },
+        { shield: 20, regen: 40, healer: 80, haste: 50, jump: 50, clone: 80, devour: 40, berserk: 30, radiantAegis: 0, livingArmor: 45, armorSpore: 30, siegeBreaker: 0, deflectShell: 35, energyArmor: 25, phaseShield: 0, overloadReactor: 0, lowDamageImmune: 0 },
 
         // R20-R26 机制复合段：强化 haste, jump, devour
 
-        { shield: 20, regen: 20, healer: 40, haste: 80, jump: 80, clone: 50, devour: 80, berserk: 50 },
+        { shield: 20, regen: 20, healer: 40, haste: 80, jump: 80, clone: 50, devour: 80, berserk: 50, radiantAegis: 12, livingArmor: 50, armorSpore: 45, siegeBreaker: 35, deflectShell: 50, energyArmor: 45, phaseShield: 25, overloadReactor: 30, lowDamageImmune: 25 },
 
         // R27-R33 进阶测试段：强化 regen, healer, berserk
 
-        { shield: 30, regen: 80, healer: 80, haste: 40, jump: 40, clone: 40, devour: 50, berserk: 80 },
+        { shield: 30, regen: 80, healer: 80, haste: 40, jump: 40, clone: 40, devour: 50, berserk: 80, radiantAegis: 18, livingArmor: 55, armorSpore: 50, siegeBreaker: 45, deflectShell: 45, energyArmor: 55, phaseShield: 45, overloadReactor: 50, lowDamageImmune: 40 },
 
         // R34-R40 速度地狱段：极速与跳跃的极致
 
-        { shield: 20, regen: 20, healer: 20, haste: 100, jump: 100, clone: 60, devour: 40, berserk: 60 },
+        { shield: 20, regen: 20, healer: 20, haste: 100, jump: 100, clone: 60, devour: 40, berserk: 60, radiantAegis: 22, livingArmor: 40, armorSpore: 35, siegeBreaker: 55, deflectShell: 55, energyArmor: 45, phaseShield: 50, overloadReactor: 55, lowDamageImmune: 45 },
 
         // R41-R47 混沌段：分身与吞噬的狂欢
 
-        { shield: 40, regen: 40, healer: 40, haste: 40, jump: 40, clone: 100, devour: 100, berserk: 80 },
+        { shield: 40, regen: 40, healer: 40, haste: 40, jump: 40, clone: 100, devour: 100, berserk: 80, radiantAegis: 30, livingArmor: 45, armorSpore: 55, siegeBreaker: 45, deflectShell: 45, energyArmor: 60, phaseShield: 60, overloadReactor: 65, lowDamageImmune: 50 },
 
         // R48-R54 终极考验段：全词缀高压
 
-        { shield: 80, regen: 80, healer: 80, haste: 80, jump: 80, clone: 80, devour: 80, berserk: 100 }
+        { shield: 80, regen: 80, healer: 80, haste: 80, jump: 80, clone: 80, devour: 80, berserk: 100, radiantAegis: 35, livingArmor: 60, armorSpore: 60, siegeBreaker: 60, deflectShell: 55, energyArmor: 70, phaseShield: 70, overloadReactor: 75, lowDamageImmune: 60 }
 
     ]
 

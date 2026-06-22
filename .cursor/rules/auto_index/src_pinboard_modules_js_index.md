@@ -1,6 +1,6 @@
 # src\pinboard_modules.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 1584 | 函数数: 76 | 语言: javascript
+> 自动生成于 2026-06-22 | 总行数: 1762 | 函数数: 80 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -43,6 +43,10 @@
 | build | method | `build(ox, oy, w, h)` |  |
 | build | method | `build(ox, oy, w, h)` |  |
 | build | method | `build(ox, oy, w, h, ctx, slotIdx)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
+| build | method | `build(ox, oy, w, h)` |  |
 | build | method | `build(ox, oy, w, h)` |  |
 | build | method | `build(ox, oy, w, h)` |  |
 | build | method | `build(ox, oy, w, h)` |  |

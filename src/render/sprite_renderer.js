@@ -225,6 +225,24 @@ export class SpriteRenderer {
     /** 当前帧索引 */
     get frameIndex() { return this._frameIndex; }
 
+    /** 当前动画帧尺寸（用于 Boss 3:2 重绘资产按占格比例绘制） */
+    getCurrentFrameDimensions() {
+        if (!this._meta) return null;
+        const anim = this._meta.animations && this._meta.animations[this._currentAnim];
+        if (!anim) return null;
+        const fs = this._meta.frameSize || 128;
+        return {
+            width: anim.frameWidth || this._meta.frameWidth || fs,
+            height: anim.frameHeight || this._meta.frameHeight || fs
+        };
+    }
+
+    /** 当前动画帧宽高比。旧 256 方形 Boss 资源返回 1，新 384x256 重绘资源返回 1.5。 */
+    getCurrentFrameAspect() {
+        const dims = this.getCurrentFrameDimensions();
+        return dims && dims.height > 0 ? dims.width / dims.height : 1;
+    }
+
     /** 是否有指定动画 */
     hasAnim(name) {
         return !!(this._meta && this._meta.animations[name]);
@@ -236,6 +254,7 @@ export class SpriteRenderer {
 
 import { ENEMY_V2_METADATA, ENEMY_V2_BY_ARCHETYPE } from '../data/enemy_v2_metadata.js';
 import { resolveEnemyVisualAsset, loadEnemyVisualAssetManifest } from '../data/enemy_visual_assets.js';
+import { BOSS_SPRITE_BOSS_IDS, getBossSpriteSheetPath } from '../data/boss_sprite_assets.js';
 
 const SPRITE_REGISTRY = {
     'golem_normal': 'assets/sprites/enemies/golem_normal.png',
@@ -245,15 +264,11 @@ const SPRITE_REGISTRY = {
         acc[m.resourceId] = m.spritePath;
         return acc;
     }, {}),
-    // Boss Sprite（Phase C 完成后逐步填充）
-    'boss_ignis':     'assets/sprites/bosses/boss_ignis.png',
-    'boss_glacies':   'assets/sprites/bosses/boss_glacies.png',
-    'boss_mikro':     'assets/sprites/bosses/boss_mikro.png',
-    'boss_devourer':  'assets/sprites/bosses/boss_devourer.png',
-    'boss_viridis':   'assets/sprites/bosses/boss_viridis.png',
-    'boss_tesla':     'assets/sprites/bosses/boss_tesla.png',
-    'boss_chimera':   'assets/sprites/bosses/boss_chimera.png',
-    'boss_ouroboros': 'assets/sprites/bosses/boss_ouroboros.png',
+    // Boss Sprite：路径契约见 src/data/boss_sprite_assets.js。
+    ...BOSS_SPRITE_BOSS_IDS.reduce((acc, bossId) => {
+        acc[`boss_${bossId}`] = getBossSpriteSheetPath(bossId);
+        return acc;
+    }, {}),
 };
 
 /** 预加载的 SpriteRenderer 实例池 */

@@ -151,14 +151,39 @@ export const calc_utils = {
             const enemyY = e.dropTargetY; 
             const enemyX = e.pos.x; // X轴通常不改变，用 pos.x 即可
 
-            // 手动计算边界，代替 e.getBounds()
+            const margin = 2;
+            if (Array.isArray(e.footprintMask) && e.footprintMask.length > 0) {
+                const rows = e.footprintMask.length;
+                const cols = Math.max(1, ...e.footprintMask.map(row => Array.isArray(row) ? row.length : 0));
+                const cellW = e.width / Math.max(1, cols);
+                const cellH = e.height / Math.max(1, rows);
+                const originX = enemyX - e.width / 2;
+                const originY = enemyY - e.height / 2;
+                for (let row = 0; row < rows; row++) {
+                    const maskRow = e.footprintMask[row] || [];
+                    for (let col = 0; col < cols; col++) {
+                        if (!maskRow[col]) continue;
+                        const cellLeft = originX + col * cellW;
+                        const cellRight = cellLeft + cellW;
+                        const cellTop = originY + row * cellH;
+                        const cellBottom = cellTop + cellH;
+                        if (l1 < cellRight - margin &&
+                            r1 > cellLeft + margin &&
+                            t1 < cellBottom - margin &&
+                            b1 > cellTop + margin) {
+                            return true;
+                        }
+                    }
+                }
+                continue;
+            }
+
             const eLeft = enemyX - e.width / 2;
             const eRight = enemyX + e.width / 2;
             const eTop = enemyY - e.height / 2;
             const eBottom = enemyY + e.height / 2;
 
             // AABB 碰撞檢測 (保留 margin 防止边缘误触)
-            const margin = 2;
             if (l1 < eRight - margin &&
                 r1 > eLeft + margin &&
                 t1 < eBottom - margin &&

@@ -18,7 +18,6 @@
  */
 
 import { CONFIG } from '../config.js';
-import { MarbleDefinition } from '../entities.js';
 import { RUNE_DB } from '../rune_config.js';
 import { MODULE_DEFS, ATTR_PIN_TYPES, addModuleComponentToInventory, getModuleMetaSummary } from '../pinboard_modules.js';
 
@@ -43,53 +42,12 @@ const SLOT_TYPE_META = {
 
 // [v2] 属性钉板：商店随机刷新一个带某属性的钉板模块（按当前属性权重）
 const ATTR_PIN_PRICE = 70;
+const MODULE_SHOWCASE_TAG = 'showcase';
+const MODULE_SHOWCASE_PRIORITY = 0.65;
 const ATTR_PIN_LABEL = {
     bounce: '彈性', pierce: '穿透', scatter: '散射',
     damage: '增幅', cryo: '冰霜',   pyro: '火焰', wind: '疾風',
 };
-
-const MARBLE_PACK_SPECS = {
-    mixed: {
-        id: 'mixed',
-        name: '杂色胚珠包',
-        icon: '⚪',
-        desc: '按基础概率抽取 3 颗弹珠；纯净弹珠权重最高，价格最低。',
-        slots: 3,
-        rarity: 'common',
-    },
-    no_white: {
-        id: 'no_white',
-        name: '去纯胚珠包',
-        icon: '✦',
-        desc: '移除纯净弹珠后重新计算概率，抽取 3 颗弹珠。',
-        slots: 3,
-        exclude: ['white'],
-        rarity: 'rare',
-        ruleMarkup: 1.18,
-    },
-    pierce_fixed: {
-        id: 'pierce_fixed',
-        name: '穿透定向包',
-        icon: '↗',
-        desc: '固定提供 1 颗穿透弹珠，再按基础概率抽取 2 颗。',
-        slots: 2,
-        fixed: ['pierce'],
-        rarity: 'legendary',
-        ruleMarkup: 1.12,
-    },
-    pyro_bias: {
-        id: 'pyro_bias',
-        name: '火焰倾向包',
-        icon: '🔥',
-        desc: '火焰权重大幅提高后抽取 3 颗弹珠，不保证必出。',
-        slots: 3,
-        bias: { pyro: 3 },
-        rarity: 'rare',
-        ruleMarkup: 1.08,
-    },
-};
-
-const MARBLE_PACK_ROTATION = ['mixed', 'no_white', 'pyro_bias', 'pierce_fixed'];
 
 function rollAttributePinType(game) {
     const weights = (game && game.unlockedWeights) || {};
@@ -111,110 +69,19 @@ function takeRandom(pool) {
     return pool.splice(idx, 1)[0];
 }
 
-function getMarbleWeights(game, spec = {}) {
-    const base = { ...(CONFIG.probabilities || {}) };
-    const boosted = (game && game.unlockedWeights) || {};
-    const exclude = new Set(spec.exclude || []);
-    const weights = {};
-    for (const [type, baseWeight] of Object.entries(base)) {
-        if (exclude.has(type)) continue;
-        const boostedWeight = Math.max(0, boosted[type] || 0);
-        const weight = Math.max(0, boostedWeight || baseWeight || 0);
-        if (weight > 0) weights[type] = weight;
-    }
-    if (spec.bias) {
-        for (const [type, mult] of Object.entries(spec.bias)) {
-            if (weights[type]) weights[type] *= Math.max(1, mult || 1);
+function takeRandomByTag(pool, tag) {
+    if (!Array.isArray(pool) || pool.length === 0 || !tag) return null;
+    const candidates = [];
+    for (let i = 0; i < pool.length; i++) {
+        const def = pool[i];
+        if (!def) continue;
+        if (Array.isArray(def.tags) && def.tags.includes(tag)) {
+            candidates.push(i);
         }
     }
-    return weights;
-}
-
-function pickWeightedType(weights) {
-    const entries = Object.entries(weights || {}).filter(([, w]) => w > 0);
-    const total = entries.reduce((sum, [, w]) => sum + w, 0);
-    if (total <= 0) return 'white';
-    let r = Math.random() * total;
-    for (const [type, weight] of entries) {
-        r -= weight;
-        if (r <= 0) return type;
-    }
-    return entries[entries.length - 1][0] || 'white';
-}
-
-function marbleTypeValue(type) {
-    const cfg = CONFIG.gameplay || {};
-    const probs = CONFIG.probabilities || {};
-    const basePrice = Math.max(1, cfg.runShopMarblePackBasePrice || 16);
-    const rarityPower = cfg.runShopMarblePackRarityPower ?? 0.65;
-    const reference = Math.max(1, probs.white || 100);
-    const p = Math.max(1, probs[type] || 1);
-    return basePrice * Math.pow(reference / p, rarityPower);
-}
-
-function calcRandomSlotEv(weights) {
-    const entries = Object.entries(weights || {}).filter(([, w]) => w > 0);
-    const total = entries.reduce((sum, [, w]) => sum + w, 0);
-    if (total <= 0) return marbleTypeValue('white');
-    return entries.reduce((sum, [type, weight]) => {
-        return sum + (weight / total) * marbleTypeValue(type);
-    }, 0);
-}
-
-function rollMarblePack(game, spec) {
-    const result = [];
-    (spec.fixed || []).forEach(type => result.push(type));
-    const weights = getMarbleWeights(game, spec);
-    for (let i = 0; i < (spec.slots || 3); i++) {
-        result.push(pickWeightedType(weights));
-    }
-    return result.slice(0, 3);
-}
-
-function priceMarblePack(game, spec) {
-    const cfg = CONFIG.gameplay || {};
-    const weights = getMarbleWeights(game, spec);
-    const fixedValue = (spec.fixed || []).reduce((sum, type) => sum + marbleTypeValue(type), 0);
-    const randomValue = calcRandomSlotEv(weights) * (spec.slots || 3);
-    const markup = Math.max(1, cfg.runShopMarblePackMarkup || 1.15) * Math.max(1, spec.ruleMarkup || 1);
-    return Math.max(8, Math.round((fixedValue + randomValue) * markup));
-}
-
-function createMarblePackItem(game, specId) {
-    const spec = MARBLE_PACK_SPECS[specId] || MARBLE_PACK_SPECS.mixed;
-    const fixedText = spec.fixed && spec.fixed.length > 0 ? ` 固定: ${spec.fixed.join('/')}` : '';
-    return {
-        kind: 'marble_pack',
-        packId: spec.id,
-        name: spec.name,
-        icon: spec.icon,
-        desc: `${spec.desc}${fixedText}`,
-        price: priceMarblePack(game, spec),
-        rarity: spec.rarity || 'common',
-    };
-}
-
-function grantMarblePack(game, packId) {
-    const spec = MARBLE_PACK_SPECS[packId] || MARBLE_PACK_SPECS.mixed;
-    const types = rollMarblePack(game, spec);
-    if (!Array.isArray(game.guaranteedNextRound)) game.guaranteedNextRound = [];
-    game.guaranteedNextRound.unshift(...types);
-    game.lastMarblePackTypes = types.slice();
-
-    const currentQueueEmpty = !Array.isArray(game.marbleQueue) || game.marbleQueue.length === 0;
-    const canPrimeImmediately = currentQueueEmpty && !['combat', 'gathering'].includes(game.phase);
-    if (canPrimeImmediately) {
-        game.marbleQueue = types.map(type => new MarbleDefinition(type));
-        game.marblesPool = game.marbleQueue.slice();
-        game.selectedMarbles = game.marbleQueue.map((_, idx) => idx);
-    }
-
-    const names = types.map(type => {
-        const display = CONFIG.ui?.attributeDisplay?.[type];
-        return display ? display.name : type;
-    }).join(' / ');
-    if (window.showToast) window.showToast(`打开${spec.name}: ${names}`);
-    return types;
+    if (candidates.length === 0) return null;
+    const idx = candidates[Math.floor(Math.random() * candidates.length)];
+    return pool.splice(idx, 1)[0];
 }
 
 function countAffordable(items, fragments) {
@@ -244,29 +111,43 @@ function createStarterBoostItem() {
     };
 }
 
+function createMixedMarblePackItem() {
+    const cfg = CONFIG.gameplay || {};
+    return {
+        kind: 'marble_pack',
+        packId: 'mixed',
+        name: '杂色弹珠包',
+        icon: '🔮',
+        desc: '购买后立即开启 3 枚随机弹珠并进入研磨结算；不触发命运选择。',
+        price: cfg.runShopMixedMarblePackPrice || 18,
+        rarity: 'common',
+    };
+}
+
 /**
  * 生成商品列表
  */
 function generateInventory(game, count) {
     const cfg = CONFIG.gameplay || {};
-    const items = [];
-
-    // 0. 弹珠包：商人提供低价杂色包，并随机提供一个更强规则包。
-    items.push(createMarblePackItem(game, 'mixed'));
-    const packPool = MARBLE_PACK_ROTATION.filter(id => id !== 'mixed');
-    const packId = packPool[Math.floor(Math.random() * packPool.length)] || 'no_white';
-    items.push(createMarblePackItem(game, packId));
+    const items = [createMixedMarblePackItem()];
 
     // 1. 构筑组件：购买得到的是单个组件实例，不是无限使用的模板解锁。
     const modulePool = Object.values(MODULE_DEFS).filter(d => d.price > 0 && !d.isAttrPin);
-    const addModuleItem = () => {
-        const def = takeRandom(modulePool);
+    const addModuleItem = (preferShowcase = false) => {
+        let def = null;
+        if (preferShowcase) {
+            def = takeRandomByTag(modulePool, MODULE_SHOWCASE_TAG);
+        }
+        if (!def) def = takeRandom(modulePool);
         if (!def) return false;
         const meta = getModuleMetaSummary(def.id);
         items.push({ kind: 'module', moduleId: def.id, name: def.name, icon: def.icon, desc: def.desc, meta, price: def.price, rarity: def.rarity });
         return true;
     };
-    if (items.length < count) addModuleItem();
+    if (items.length < count) {
+        const forceShowcase = modulePool.some(d => Array.isArray(d.tags) && d.tags.includes(MODULE_SHOWCASE_TAG));
+        addModuleItem(forceShowcase && Math.random() < MODULE_SHOWCASE_PRIORITY);
+    }
 
     // 2. 结构扩展：槽位扩张 / 特殊槽解锁 / 特殊槽数量，三者最多出现一个。
     const totalSlots = (cfg.moduleCols || 4) * (cfg.moduleRows || 3);
@@ -356,7 +237,7 @@ function applyStarterBoost(game) {
     game.runFragments = (game.runFragments || 0) + fragments;
     game.runShopStarterBoostClaimed = true;
     if (window.showToast) {
-        window.showToast(`首访援助：护盾 +${shield} / 伤害 +${damage}（${damageRounds} 回合） / 碎片 +${fragments}`);
+        window.showToast(`首访援助：防线屏障 +${shield} / 伤害 +${damage}（${damageRounds} 回合） / 碎片 +${fragments}`);
     }
 }
 
@@ -585,7 +466,13 @@ export const run_shop = {
             this.runeInventory.push({ id: it.runeId, level: 1 });
             if (window.showToast) window.showToast(`获得符文: ${it.name}`);
         } else if (it.kind === 'marble_pack') {
-            grantMarblePack(this, it.packId);
+            this.runFragments -= it.price;
+            inventory.splice(idx, 1);
+            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+            if (typeof this.sys_startMarblePackGrind === 'function') {
+                this.sys_startMarblePackGrind({ packId: it.packId || 'mixed', source: 'run_shop_purchase', round: this.round || 1 });
+            }
+            return;
         }
         this.runFragments -= it.price;
         // 售出后从商店列表移除

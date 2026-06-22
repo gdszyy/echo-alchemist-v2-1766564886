@@ -160,9 +160,9 @@ class SpecialSlot {
      * @param {number} y  - 第一个钉子的 y 坐标
      * @param {number} x2 - 第二个钉子的 x 坐标
      * @param {number} y2 - 第二个钉子的 y 坐标
-     * @param {string} type - 槽位类型 ('recall' | 'multicast' | 'split' | 'relic' | 'giant' | 'skill_point' | 'wheel')
+     * @param {string} type - 槽位类型 ('recall' | 'multicast' | 'split' | 'relic' | 'giant' | 'skill_point' | 'wheel' | 'launcher' | 'energy_wheel')
      */
-    constructor(x, y, x2, y2, type) {
+    constructor(x, y, x2, y2, type, options = {}) {
         this.x = x;   this.y = y;
         this.x2 = x2; this.y2 = y2;
         // 保留 width 以便旧代码兼容（取两点距离）
@@ -171,6 +171,52 @@ class SpecialSlot {
         this.type = type;
         this.animTimer = 0;
         this.hit = false;
+        this.persistent = !!options.persistent;
+        this.activationCooldown = options.activationCooldown || 0;
+        this.maxSessionCharges = options.maxSessionCharges || options.maxCharges || 1;
+        this.launchSpeed = options.launchSpeed || 13;
+        this.launchDirection = options.launchDirection ?? (-Math.PI / 2);
+        this.rotationSpeed = options.rotationSpeed || 0;
+        this.rodCount = options.rodCount || 5;
+        this.spinRadius = options.spinRadius || 18;
+        this.spinVisual = options.spinVisual !== false;
+        this._cooldownTimer = 0;
+        this._spinAngle = options.initialSpin || 0;
+        this._globalActivations = 0;
+        this._sessionHits = new WeakMap();
+    }
+
+    update(timeScale = 1) {
+        this.animTimer += 0.05 * timeScale;
+        if (this._cooldownTimer > 0) this._cooldownTimer = Math.max(0, this._cooldownTimer - timeScale);
+        if (this.spinVisual) this._spinAngle += this.rotationSpeed * timeScale;
+    }
+
+    tryActivate(session) {
+        if (!this.persistent && this.hit) return false;
+        if (this.persistent && this._cooldownTimer > 0) return false;
+        const limit = Math.max(0, this.maxSessionCharges || 0);
+        const key = session && typeof session === 'object' ? session : null;
+        const count = key ? (this._sessionHits.get(key) || 0) : this._globalActivations;
+        if (limit > 0 && count >= limit) return false;
+        if (key) this._sessionHits.set(key, count + 1);
+        else this._globalActivations += 1;
+        if (this.persistent) this._cooldownTimer = this.activationCooldown;
+        else this.hit = true;
+        return true;
+    }
+
+    getLaunchDirection() {
+        if (this.launchDirection && typeof this.launchDirection === 'object') {
+            const lx = Number.isFinite(this.launchDirection.x) ? this.launchDirection.x : 1;
+            const ly = Number.isFinite(this.launchDirection.y) ? this.launchDirection.y : 0;
+            const baseAngle = Math.atan2(ly, lx);
+            const angle = baseAngle + (this.spinVisual ? this._spinAngle : 0);
+            return { x: Math.cos(angle), y: Math.sin(angle) };
+        }
+        const base = Number.isFinite(this.launchDirection) ? this.launchDirection : (-Math.PI / 2);
+        const angle = base + (this.spinVisual ? this._spinAngle : 0);
+        return { x: Math.cos(angle), y: Math.sin(angle) };
     }
 
     /**
@@ -180,7 +226,7 @@ class SpecialSlot {
     draw(ctx) {
         if (this.hit) return;
 
-        this.animTimer += 0.05;
+        this.update(1);
         let color = '#fff'; let text = '';
         if (this.type === 'recall')        { color = CONFIG.colors.slotRecall;    text = '↺'; }
         else if (this.type === 'multicast')  { color = CONFIG.colors.slotMulticast; text = '+2'; }
@@ -189,6 +235,8 @@ class SpecialSlot {
         else if (this.type === 'giant')      { color = CONFIG.colors.slotGiant;     text = '⬆️'; }
         else if (this.type === 'skill_point'){ color = CONFIG.colors.slotSkill;     text = '★'; }
         else if (this.type === 'wheel')      { color = CONFIG.colors.slotWheel;     text = '🎡'; }
+        else if (this.type === 'launcher')   { color = CONFIG.colors.slotLauncher || '#22d3ee'; text = '↗'; }
+        else if (this.type === 'energy_wheel') { color = CONFIG.colors.slotEnergyWheel || '#fde047'; text = '+3'; }
 
         const glow  = Math.sin(this.animTimer) * 5 + 12;          // 呼吸光晕 7~17
         const pulse = 0.65 + Math.sin(this.animTimer) * 0.2;      // 透明度脉冲 0.45~0.85
@@ -232,6 +280,40 @@ class SpecialSlot {
             ctx.arc(ax, ay, 5, 0, Math.PI * 2);
             ctx.fill();
         });
+
+        // @perf-impact: New mechanism rods reuse fixed-path SpecialSlot drawing and _sb() shadow gating.
+        if ((this.type === 'launcher' || this.type === 'energy_wheel') && this.spinVisual) {
+            ctx.save();
+            ctx.translate(midX, midY);
+            ctx.rotate(this._spinAngle);
+            ctx.globalAlpha = 0.9;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = _sb(glow);
+            ctx.shadowColor = color;
+            if (this.type === 'launcher') {
+                ctx.beginPath();
+                ctx.moveTo(-this.spinRadius * 0.3, 0);
+                ctx.lineTo(this.spinRadius, 0);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(this.spinRadius, 0);
+                ctx.lineTo(this.spinRadius - 5, -4);
+                ctx.lineTo(this.spinRadius - 5, 4);
+                ctx.closePath();
+                ctx.fill();
+            } else {
+                const rods = Math.max(4, Math.min(6, this.rodCount || 5));
+                for (let i = 0; i < rods; i++) {
+                    const a = (Math.PI * 2 * i) / rods;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(Math.cos(a) * this.spinRadius, Math.sin(a) * this.spinRadius);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+        }
 
         // ===== 第四层：中点符号文字（无背景圆）=====
         ctx.globalAlpha  = 1.0;
@@ -868,7 +950,7 @@ class Peg {
         this.row = -1;
         this.col = -1;
         this.mirrorIdx = -1; // 存储镜像钉子在 game.pegs 中的索引
-        this.frozenTurns = 0;  // Glacies 狂暴冻结剩余回合数（> 0 时不可触发）
+        this.frozenTurns = 0;  // 遗留 Peg 冻结剩余回合数（> 0 时不可触发）；当前 Boss 机制不再写入
         this.shape = 'circle';
         this.segment = null;
         this.thickness = this.radius * 2;
@@ -1318,7 +1400,7 @@ class Peg {
         if (this.type === 'resonance') this.drawResonancePeg(ctx, currentRadius, isLit);
         if (this.type === 'venom')     this.drawVenomPeg(ctx, currentRadius, isLit);
 
-        // [Glacies 狂暴] 冻结 Peg 蓝色光晕
+        // [legacy] Peg 冻结蓝色光晕（当前 Boss 机制不再写入）
         if (this.frozenTurns > 0) {
             const pulse = (Math.sin(Date.now() / 400) + 1) / 2;
             ctx.save();
@@ -2638,7 +2720,8 @@ class DropBall {
                     const _distToLine = Math.hypot(this.pos.x - _closestX, this.pos.y - _closestY);
                     const _triggerThreshold = this.radius + slot.height; // slot.height = 12 为触发带宽
                     if (_onSegmentInterior && _distToLine < _triggerThreshold) {
-                        slot.hit = true;
+                        if (typeof slot.tryActivate === 'function' && !slot.tryActivate(this.session, game, this)) continue;
+                        if (typeof slot.tryActivate !== 'function') slot.hit = true;
                         this.portalCooldown = 40; 
                         if (slot.type === 'recall') {
                             this.pos.y = 80; this.vel.y = 2; this.portalCooldown = 60; audio.playPowerup(); game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotRecall); showToast("時空回溯！");
@@ -2788,6 +2871,50 @@ class DropBall {
                             });
 
                             return { type: 'slot', slotType: 'wheel', pos: this.pos };
+                        } else if (slot.type === 'launcher') {
+                            const midX = (slot.x + slot.x2) / 2;
+                            const midY = (slot.y + slot.y2) / 2;
+                            const dir = typeof slot.getLaunchDirection === 'function'
+                                ? slot.getLaunchDirection()
+                                : { x: 0, y: -1 };
+                            const speed = Math.max(8, slot.launchSpeed || 13);
+                            this.pos.x = midX + dir.x * (this.radius + 6);
+                            this.pos.y = midY + dir.y * (this.radius + 6);
+                            this.vel.x = dir.x * speed;
+                            this.vel.y = dir.y * speed;
+                            this.angularVel += speed * 0.05;
+                            this.portalCooldown = Math.max(this.portalCooldown, 14);
+                            if (slot.spinVisual !== false) slot._spinAngle += 0.45;
+                            audio.playPowerup();
+                            game.spawn_createExplosion(midX, midY, CONFIG.colors.slotLauncher || '#22d3ee');
+                            if (game.spawn_createFloatingText) {
+                                game.spawn_createFloatingText(midX, midY - 16, '高速发射!', CONFIG.colors.slotLauncher || '#22d3ee');
+                            }
+                            return { type: 'slot', slotType: 'launcher', pos: this.pos };
+                        } else if (slot.type === 'energy_wheel') {
+                            const midX = (slot.x + slot.x2) / 2;
+                            const midY = (slot.y + slot.y2) / 2;
+                            const sessions = Array.isArray(game.gatheringSessions) && game.gatheringSessions.length > 0
+                                ? game.gatheringSessions
+                                : [this.session];
+                            const targets = sessions.filter(Boolean).slice(0, 3);
+                            for (const target of targets) {
+                                target.multicast = (target.multicast || 0) + 1;
+                            }
+                            this.vel.x *= 0.65;
+                            this.vel.y = Math.min(this.vel.y + 1.8, 8);
+                            this.angularVel += 0.35;
+                            this.portalCooldown = Math.max(this.portalCooldown, 16);
+                            if (slot.spinVisual !== false) slot._spinAngle += 0.75;
+                            audio.playPowerup();
+                            game.spawn_createExplosion(midX, midY, CONFIG.colors.slotEnergyWheel || '#fde047');
+                            if (game.spawn_createFloatingText) {
+                                game.spawn_createFloatingText(midX, midY - 18, `连射能量 +${targets.length}`, CONFIG.colors.slotEnergyWheel || '#fde047');
+                            }
+                            if (game.combat_updateMulticastDisplay && targets.length > 0) {
+                                game.combat_updateMulticastDisplay(targets.length);
+                            }
+                            return { type: 'slot', slotType: 'energy_wheel', pos: this.pos };
                         }
                     }
                 }
@@ -4961,13 +5088,13 @@ class Player {
  * FieldLootItem - 战场持久掉落物实体
  * 
  * 职责：在敌人死亡后留在原地，直到回合结束进入选择阶段。
- * 支持遗物、混沌精华、纯净精华三种类型。
+ * 支持遗物、弹珠包、旧资源包、混沌精华、纯净精华类型。
  */
 class FieldLootItem {
     /**
      * @param {number} x - 掉落位置 X 坐标
      * @param {number} y - 掉落位置 Y 坐标
-     * @param {'relic'|'chaos_essence'|'pure_essence'} type - 掉落物类型
+     * @param {'relic'|'marble_pack'|'run_resource_pack'|'chaos_essence'|'pure_essence'} type - 掉落物类型
      */
     constructor(x, y, type) {
         this.x = x;
@@ -5019,6 +5146,12 @@ class FieldLootItem {
         if (this.type === 'relic') {
             icon = '🏆';
             glowColor = 'rgba(250, 204, 21, 0.6)';
+        } else if (this.type === 'run_resource_pack') {
+            icon = '💰';
+            glowColor = 'rgba(251, 191, 36, 0.7)';
+        } else if (this.type === 'marble_pack') {
+            icon = '🔮';
+            glowColor = 'rgba(125, 211, 252, 0.72)';
         } else if (this.type === 'chaos_essence') {
             icon = '🔮';
             glowColor = 'rgba(168, 85, 247, 0.6)';

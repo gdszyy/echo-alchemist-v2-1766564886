@@ -1,6 +1,6 @@
 # src\systems.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 3930 | 函数数: 50 | 语言: javascript
+> 自动生成于 2026-06-23 | 总行数: 4231 | 函数数: 52 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -21,6 +21,8 @@
 | showEnemyInfo | method | `showEnemyInfo(enemy)` |  |
 | addStatusItem | method | `addStatusItem(container, title, desc, colorClass)` |  |
 | closeDrawer | method | `closeDrawer()` |  |
+| resolveBossVulnerabilityAttrs | function | `resolveBossVulnerabilityAttrs(bossId, rotationIndex = 0)` |  |
+| setupBossVulnerabilityVisualState | function | `setupBossVulnerabilityVisualState(boss, bossId, state, rotationIndex = 0)` |  |
 | buildV2MatrixScenarios | function | `buildV2MatrixScenarios()` |  |
 | buildEnemyV2Scenarios | function | `buildEnemyV2Scenarios()` | ⚠️ 巨型函数，见 @section 导航 |
 | constructor | method | `constructor(game)` |  |
@@ -66,7 +68,13 @@
 
 ### buildEnemyV2Scenarios
 
-> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
+
+| 节点标记 | 说明 |
+|----------|------|
+| `@section:enemy_v2_asset_status` | 资源命中状态文本 |
+| `@section:enemy_v2_targeting_fallback` | 敌人针对兜底验收 |
+| `@section:enemy_v2_scene_list` | 验收场景列表 |
 
 ### initUI
 

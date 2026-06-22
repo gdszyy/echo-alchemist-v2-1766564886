@@ -1,6 +1,6 @@
 # src\spawn_system.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 2927 | 函数数: 41 | 语言: javascript
+> 自动生成于 2026-06-23 | 总行数: 3227 | 函数数: 50 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -14,6 +14,8 @@
 | spawn_windSkillParticles | method | `spawn_windSkillParticles(type, rect, progress)` |  |
 | spawn_createFloatingText | method | `spawn_createFloatingText(x, y, text, color, fontSize)` |  |
 | spawn_generateAffixes | method | `spawn_generateAffixes()` |  |
+| spawn_getBossMinionProfile | method | `spawn_getBossMinionProfile(bossId)` |  |
+| spawn_applyBossMinionMetadata | method | `spawn_applyBossMinionMetadata(e, bossId, profile = null, roleOverride = null)` |  |
 | spawn_spawnEnemyRowAt | method | `spawn_spawnEnemyRowAt(yPos, options = {})` |  |
 | addPreset | function | `addPreset(col, hpMult, forceAffixes, extraInit)` |  |
 | spawn_addSkillPoint | method | `spawn_addSkillPoint(amount = 1)` |  |
@@ -43,7 +45,14 @@
 | spawn_spawnBoss | method | `spawn_spawnBoss(bossId, isBigBoss)` | ⚠️ 巨型函数，见 @section 导航 |
 | spawn_selectBossForRound | method | `spawn_selectBossForRound(isBigBoss)` |  |
 | spawn_applyMinionShape | method | `spawn_applyMinionShape(e)` |  |
-| spawn_pickWavePreset | method | `spawn_pickWavePreset()` |  |
+| spawn_getDirectorPressureProfile | method | `spawn_getDirectorPressureProfile()` |  |
+| spawn_scoreWavePresetForDirector | method | `spawn_scoreWavePresetForDirector(preset, profile)` |  |
+| spawn_getDirectorScriptMeta | method | `spawn_getDirectorScriptMeta(scriptId)` |  |
+| spawn_collectPresetActorAffixes | method | `spawn_collectPresetActorAffixes(preset)` |  |
+| spawn_getPresetActorProfile | method | `spawn_getPresetActorProfile(preset, round = this.round || 1)` |  |
+| spawn_canUseDirectorScript | method | `spawn_canUseDirectorScript(preset, actorProfile, round = this.round || 1)` |  |
+| spawn_scoreDirectorScriptForRound | method | `spawn_scoreDirectorScriptForRound(preset, actorProfile, round = this.round || 1)` |  |
+| spawn_pickWavePreset | method | `spawn_pickWavePreset(options = {})` |  |
 | spawn_countActiveArchetypes | method | `spawn_countActiveArchetypes()` |  |
 | spawn_canUseWavePreset | method | `spawn_canUseWavePreset(preset, counts)` |  |
 | spawn_trySpawnWavePreset | method | `spawn_trySpawnWavePreset(yPos, baseHP, occupiedCols, w, options = {})` |  |

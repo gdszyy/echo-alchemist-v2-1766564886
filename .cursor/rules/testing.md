@@ -13,8 +13,10 @@
 | **T1：静态结构校验** | `tests/validate_scenarios.js` | Node.js，无需浏览器 | 每次修改 `systems.js` 后立即执行 | < 30s |
 | **T1：阶段契约校验** | `tests/validate_phase_contracts.mjs` | Node.js，无需浏览器 | 每次修改阶段切换、暂停、gameover、命运时刻或 overlay 返回流后执行 | < 30s |
 | **T1：预设波次校验** | `tests/validate_wave_presets.mjs` | Node.js，无需浏览器 | 每次修改 `src/wave_presets.js` 或 preset 放置规则后执行 | < 30s |
-| **T1：大型基底运行期生成校验** | `tests/validate_enemy_spawn_runtime.mjs` | Node.js + 最小 Canvas/DOM stub | 每次修改大型基底生成限制、preset 回退逻辑或同屏上限后执行 | < 30s |
+| **T1：大型基底 / Boss 机制运行期校验** | `tests/validate_enemy_spawn_runtime.mjs` | Node.js + 最小 Canvas/DOM stub | 每次修改大型基底生成限制、preset 回退逻辑、同屏上限、Boss 专属敌人或 Boss 机制 tick 后执行 | < 30s |
 | **T1：Boss 破绽契约校验** | `tests/validate_boss_vulnerability.mjs` | Node.js，无需浏览器 | 每次修改 Boss 破绽谱、Boss 伤害结算或普通波次机会布局后执行 | < 30s |
+| **T1：Boss 本体资产校验** | `tests/validate_boss_sprite_assets.mjs` | Node.js，无需浏览器 | 每次新增或替换 Boss 本体 Sprite 后执行 | < 30s |
+| **T1：Boss 破绽资产校验** | `tests/validate_boss_vulnerability_assets.mjs` | Node.js，无需浏览器 | 每次新增或替换 Boss 破绽 PNG Overlay 后执行 | < 30s |
 | **T2：试炼场实机验证** | 浏览器内 `TrainingGround` 沙盒 | 游戏内置，需部署 | 部署到测试环境后，AI 或人工操作 | 按需 |
 | **T3：Puppeteer 自动化** | `tests/ai_test_runner.js` | Puppeteer，需本地游戏服务 | 完整回归测试 | 2~5min |
 
@@ -64,7 +66,7 @@
 |---------|------|-----------|-------------|
 | `enemy` | 敌人词条 | 4+ | 护盾、分身、精英、Boss 词条行为 |
 | `attribute` | 属性弹珠 | 4+ | 元素弹珠伤害、符文词条触发 |
-| `boss` | Boss 机制 | 2+ | Boss 专属技能与阶段切换 |
+| `boss` | Boss 机制 | 2+ | Boss 专属技能、阶段切换与破绽视觉逐档验收 |
 | `runeword` | 符文词条 | 4+ | focused_fire / mass_collapse / kinetic_decay / echo_shot |
 | `relic` | 遗物/精华 | **8** | 保底、精华全链路、存档持久化（见 2.3 节） |
 
@@ -183,6 +185,10 @@ node tests/validate_wave_presets.mjs
 - 强制旧随机大型基底路径，确认 `spawn_trySpawnArchetypes()` 的 `gravityWell`、`maw`、`hive`、`siege` 同屏上限有效。
 - 60 回合 seeded 模拟同时覆盖 preset 与随机回退路径，检查活跃敌人不重叠，且 `gridCols/gridRows` 与实际 `width/height` 一致。
 - 逐类实例化 8 种 V2 基底，验证 `baseArchetype`、专属词条、`collisionShape/collisionData`、宽体标记、慢速移动间隔和专属初始化（如 deflector 屏障、hive 冷却）。
+- 覆盖敌人针对词缀首批运行期行为：`livingArmor` 代承/穿透同伤、破裂后可被 `armorSpore` 重新挂甲、`armorSpore` 叠甲、`siegeBreaker` 按占格数打防线、`phaseShield` 倍化和失效窗口、`overloadReactor` 伤害换行动、`lowDamageImmune` 阈值过滤、`energyArmor` 高伤溢出转盾。
+- 覆盖敌人针对词缀第二批运行期行为：`carrier` 每回合在第 5 格空舱投放 `haste+jump` 小型敌人并继承母体词条；空舱被占时先推出占位敌人，推不出去则跳过本次投放，新小怪生成当回合立即移动；V2 基底契约包含 1/2/3/4/6 占格、5 号空洞、碰撞形状和冷却初始化。
+- 覆盖 Boss 专属敌人与机制 tick：Mikro 入场 `fission_cell` 计入母体分裂减伤；Devourer 入场 `maw_thrall` 会被吞噬优先选中；Glacies / Tesla / Viridis / Chimera / Ouroboros 覆盖霜缝、导体、孢甲、胃域与六附体运行期链路。
+- 覆盖 Ouroboros 六附体运行期行为：6 个 `orbitAttachments` 配置、每回合转位、裂群附体召唤 `orbit_echo`、破绽满格封印当前附体并改变轮转。
 
 运行方式：
 ```bash
@@ -198,6 +204,7 @@ node tests/validate_enemy_spawn_runtime.mjs
 - `_proceedToFateMomentSelection()` 必须重建 `fateMomentContext.active = true` 语义。
 - round-start reward resolver 打开遗物 overlay 时必须带 `resumeTarget: 'round_start_resolver'`。
 - 继续游戏若命中 selection / 命运时刻存档，必须恢复 `phase`、`marblesPool`、`selectedMarbles`、注入符文与预览 UI，禁止直接落回 `sys_startRoundStartResolver()`。
+- Boss 机制存档必须成对保存/恢复随从归属、机制标签、温压、孢甲资源、Tesla 场强、霜缝、Chimera 冷却和破绽状态，避免读档后资源条丢失或机制重复初始化。
 
 运行方式：
 ```bash
@@ -210,7 +217,10 @@ node tests/validate_phase_contracts.mjs
 - `spawn_system.js` 不得重新出现旧 `weak_spot` 普通波次低血量弱点怪。
 - `config.js` 不得重新使用旧 `weakness:` Boss 字段。
 - 8 个 Boss 必须配置 `vulnerability` 破绽谱。
-- `combat_system.js` 必须保留 `combat_applyBossVulnerability()`、`combat_updateBossVulnerabilityProgress()` 与 `_bossVulnerabilityExposedHits` 易伤窗口消费。
+- 固定 Boss 的 `BOSS_DB.themeWeights` 必须覆盖对应 `vulnerability.attrs`，避免图鉴、主题权重和实战破绽口径分裂；历史 `mikro` 运行时 key 对应 `BOSS_DB` 的 `boss_micro`。
+- `combat_system.js` 必须保留 `combat_applyBossVulnerability()`、`combat_updateBossVulnerabilityProgress()` 与 `_bossVulnerabilityExposedTurns` 暴露回合窗口。
+- `systems.js` 必须保留 `boss_vulnerability_break` 试炼场逐档验收场景，覆盖 8 个 Boss 的 `0/25/50/75/break/exposed/recover` 视觉状态。
+- `src/data/boss_vulnerability_assets.js` 必须保留 8 个 Boss、7 档状态、`384 × 256` 中心锚点与透明 PNG 路径解析。
 - 固定 Boss 必须同时覆盖 `hits` 与 `damage` 两类累积方式。
 - `CONFIG.balance.bossVulnerability` 必须保留回合缩放参数，确保回合越高破绽条件越苛刻。
 - `ouroboros` 必须使用动态轮转破绽谱。
@@ -218,6 +228,23 @@ node tests/validate_phase_contracts.mjs
 运行方式：
 ```bash
 node tests/validate_boss_vulnerability.mjs
+node tests/validate_boss_vulnerability_assets.mjs
+```
+
+`validate_boss_vulnerability_assets.mjs` 在正式 PNG 尚未生成时会把缺失文件记为 `PENDING` 并通过；若文件存在，则必须通过 PNG 签名、尺寸、8-bit RGBA 检查。
+
+### 4.7 Boss 本体资产校验
+
+`tests/validate_boss_sprite_assets.mjs` 检查 8 个 Boss 的基础 Sprite Sheet：
+- `assets/sprites/bosses/boss_<bossId>.png/.json` 必须存在。
+- PNG 必须是 8-bit RGBA。
+- JSON 必须包含 `idle` 动画，`row = 0`，帧数至少 6。
+- 当前 `256 × 256` 帧记为 `legacy`；新重绘 `384 × 256` 帧记为 `redraw`，需要通过 `frameWidth/frameHeight` 声明。
+- PNG 尺寸必须能容纳 JSON 声明的帧数和动画行数。
+
+运行方式：
+```bash
+node tests/validate_boss_sprite_assets.mjs
 ```
 
 ---
@@ -238,6 +265,7 @@ node tests/validate_boss_vulnerability.mjs
 | 存档持久化 | T2 + T3 | `localStorage` 写入验证 |
 | 符文词条（4 个） | T2 + T3 | focused_fire / mass_collapse / kinetic_decay / echo_shot |
 | 敌人词条（shield/clone） | T2 + T3 | 词条生成与伤害输出 |
+| Boss 专属机制运行期 | T1 | Mikro 入场裂变随从参与减伤；Devourer 入场胃域随从被优先吞噬；Viridis 孢子侍体、孢甲补盾、火毒反制与非反制破甲反哺；Ouroboros 六附体转位、轨道回声与破绽封印 |
 
 ### 5.2 已知盲区（需人工实机测试）
 

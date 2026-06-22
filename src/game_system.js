@@ -399,8 +399,8 @@ export const game_system = {
 
         // 新局首个遗物也走 round-start resolver，避免再依赖固定入口。
         this.sys_queueRoundStartReward({ type: 'relic', source: 'run_start', round: this.round });
-        // 开局遗物后提供一包基础弹珠，作为本局三枚晶石核心的初始配置入口。
-        this.sys_queueRoundStartReward({ type: 'marble_pack', source: 'run_start', round: this.round });
+        // 开局直接给一次杂色弹珠包，作为本局第一次研磨入口；精华奖励不再参与主循环。
+        this.sys_queueRoundStartReward({ type: 'marble_pack', packId: 'mixed', source: 'run_start', round: this.round });
         this.sys_startRoundStartResolver();
     },
 
@@ -518,12 +518,14 @@ export const game_system = {
         this._wavePresetUsage = {};
         this._wavePresetIntroShown = {};
         this._wavePresetRoundUsed = null;
+        this._directorScriptUsage = {};
+        this._directorLastScriptId = null;
         this._roundStartResolverActive = false;
         this.fieldLootItems = []; // 重置战场持久掉落物，防止跨局残留
         this._roundStartBannerActive = false; // 重置横幅保护标志
         // 重置 炼金火药管平坦伤害加成
         this.flatDamageBonus = 0;
-        // 守护者结界：越线保护层数
+        // 守护者结界：防线屏障层数
         this.playerShield = 0;
         this._doomsdayTimerTriggerCount = 0;
         // [v2 即时感重塑] 重置 混沌契约伤害倍率
@@ -755,42 +757,7 @@ export const game_system = {
             fateMomentContext: JSON.stringify(this.fateMomentContext),
         });
 
-        // [marble-pack-replace] 标准胚珠包也可能是一次显式的新研磨。
-        // 若玩家已有子弹，先把现有子弹预充为 CHARGED 行，等新胚珠研磨完成后进入子弹选择。
-        const isMarblePackSelection = mode === 'standard' && pendingMode?.sourceRewardType === 'marble_pack';
-        if (isMarblePackSelection) {
-            const cloneRecipe = (recipe) => {
-                if (!recipe) return null;
-                return {
-                    ...recipe,
-                    finalHits: 0,
-                    multicast: recipe.multicast || 0,
-                };
-            };
-            const compileMarble = (marbleDef) => {
-                if (!marbleDef || typeof this.calc_compileCollectionToRecipe !== 'function') return null;
-                const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
-                const recipe = this.calc_compileCollectionToRecipe(
-                    marbleDef,
-                    collected,
-                    (marbleDef.multicast || 0) > 0
-                );
-                recipe.finalHits = 0;
-                recipe.multicast = marbleDef.multicast || 0;
-                recipe._marbleType = marbleDef.type;
-                return recipe;
-            };
-            let charged = [];
-            if (Array.isArray(this._lastFiredAmmoSnapshot) && this._lastFiredAmmoSnapshot.length > 0) {
-                charged = this._lastFiredAmmoSnapshot.map(cloneRecipe).filter(Boolean);
-            } else if (Array.isArray(this.ammoQueue) && this.ammoQueue.length > 0) {
-                charged = this.ammoQueue.map(cloneRecipe).filter(Boolean);
-            } else if (Array.isArray(this.marbleQueue) && this.marbleQueue.length > 0) {
-                charged = this.marbleQueue.map(compileMarble).filter(Boolean);
-            }
-            const bulletCap = CONFIG.gameplay.selectionReq || 3;
-            this._chargedAmmoQueue = charged.length > 0 ? charged.slice(0, bulletCap) : null;
-        } else if (mode === 'standard') {
+        if (mode === 'standard') {
             this._chargedAmmoQueue = null;
         }
 
@@ -1369,16 +1336,10 @@ export const game_system = {
     sys_queueRoundStartReward(reward = {}) {
         if (!this.pendingRoundStartRewards) this.pendingRoundStartRewards = [];
 
-        const legacyEssenceType = reward.essenceType || reward.essenceKind || reward.mode || null;
-        const requestedType = ['relic', 'marble_pack', 'chaos_essence', 'pure_essence'].includes(reward.type)
-            ? reward.type
-            : reward.type === 'essence'
-                ? (legacyEssenceType === 'pure_essence' ? 'pure_essence' : 'chaos_essence')
-                : 'relic';
-
-        if (requestedType === 'relic' && this.pendingRoundStartRewards.some(item => item && item.type === 'relic')) {
-            return this.sys_queueRoundStartReward({ ...reward, type: 'marble_pack' });
-        }
+        const legacyRewardType = reward.type === 'essence' ? 'marble_pack' : reward.type;
+        const requestedType = ['relic', 'marble_pack', 'run_resource_pack', 'chaos_essence', 'pure_essence'].includes(legacyRewardType)
+            ? legacyRewardType
+            : 'relic';
 
         const normalized = {
             type: requestedType,
@@ -1388,7 +1349,9 @@ export const game_system = {
             enemyMaxHp: reward.enemyMaxHp || 0,
             sourceRelicId: reward.sourceRelicId || null,
             sourceRelicName: reward.sourceRelicName || null,
+            packId: reward.packId || 'mixed',
             marbleTypes: Array.isArray(reward.marbleTypes) ? reward.marbleTypes.slice(0, 3) : null,
+            fragmentAmount: Math.max(0, Math.floor(Number(reward.fragmentAmount || 0))),
         };
         this.pendingRoundStartRewards.push(normalized);
         eventBus.emit(EVENT_TYPES.ROUND_START_REWARD_QUEUED, {
@@ -1396,6 +1359,81 @@ export const game_system = {
             pendingCount: this.pendingRoundStartRewards.length,
         });
         return normalized;
+    },
+
+    sys_rollMarblePackTypes(packId = 'mixed', count = CONFIG.gameplay.selectionReq || 3) {
+        const rewardOnly = new Set(CONFIG.gameplay.bottomRewardOnlyTypes || []);
+        const weights = this.unlockedWeights || CONFIG.probabilities || {};
+        const candidates = Object.entries(weights)
+            .filter(([type, weight]) => !rewardOnly.has(type) && (weight || 0) > 0)
+            .map(([type, weight]) => ({ type, weight: Math.max(0, Number(weight) || 0) }));
+        if (candidates.length === 0) return Array.from({ length: count }, () => 'white');
+
+        const result = [];
+        for (let i = 0; i < count; i++) {
+            const total = candidates.reduce((sum, item) => sum + item.weight, 0);
+            let roll = Math.random() * total;
+            let picked = candidates[candidates.length - 1].type;
+            for (const item of candidates) {
+                roll -= item.weight;
+                if (roll <= 0) {
+                    picked = item.type;
+                    break;
+                }
+            }
+            result.push(picked);
+        }
+        return result;
+    },
+
+    sys_startMarblePackGrind(reward = {}) {
+        const count = CONFIG.gameplay.selectionReq || 3;
+        const marbleTypes = Array.isArray(reward.marbleTypes) && reward.marbleTypes.length > 0
+            ? reward.marbleTypes.slice(0, count)
+            : this.sys_rollMarblePackTypes(reward.packId || 'mixed', count);
+        while (marbleTypes.length < count) marbleTypes.push('white');
+
+        const chargedSource = Array.isArray(this._lastFiredAmmoSnapshot) && this._lastFiredAmmoSnapshot.length > 0
+            ? this._lastFiredAmmoSnapshot
+            : (Array.isArray(this.ammoQueue) && this.ammoQueue.length > 0 ? this.ammoQueue : null);
+        this._chargedAmmoQueue = chargedSource
+            ? chargedSource.map(recipe => ({ ...recipe, finalHits: 0, multicast: recipe.multicast || 0 }))
+            : null;
+
+        this.selectionMode = 'standard';
+        this.pendingSelectionMode = null;
+        this.fateMomentContext = null;
+        this.selectionInjectedRune = null;
+        this.selectedMarbles = marbleTypes.map((_, idx) => idx);
+        this.marbleQueue = marbleTypes.map(type => new MarbleDefinition(type || 'white'));
+        this.marblesPool = this.marbleQueue.slice();
+
+        if (typeof this.ui_hideRunShop === 'function') this.ui_hideRunShop();
+        if (typeof showToast === 'function') {
+            showToast(`杂色弹珠包已开启：${marbleTypes.join(' / ')}，开始研磨。`);
+        }
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        if (typeof this.phase_startGatheringPhase === 'function') this.phase_startGatheringPhase();
+    },
+
+    sys_grantRunResourcePack(reward = {}) {
+        const cfg = CONFIG.gameplay || {};
+        const amount = Math.max(1, Math.floor(Number(reward.fragmentAmount || cfg.runResourcePackFragments || 48)));
+        const x = Number.isFinite(reward.dropX) ? reward.dropX : (this.width || 400) / 2;
+        const y = Number.isFinite(reward.dropY) ? reward.dropY : Math.max(80, (this.height || 700) * 0.32);
+
+        if (typeof this.spawn_dropRuneFragments === 'function') {
+            this.spawn_dropRuneFragments(x, y, amount, 'resource_pack');
+        } else {
+            this.runFragments = (this.runFragments || 0) + amount;
+            this.runRuneFragmentsGained = (this.runRuneFragmentsGained || 0) + amount;
+        }
+        if (typeof showToast === 'function') {
+            showToast(`资源包 +${amount} 局内碎片。你有一大笔钱，等着去商店消费。`);
+        }
+        if (typeof this.ui_updateRunShopScheduleUI === 'function') this.ui_updateRunShopScheduleUI();
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        return amount;
     },
 
     /**
@@ -1849,11 +1887,9 @@ export const game_system = {
         const _nextRewardType = (() => {
             const r = (this.pendingRoundStartRewards || [])[0];
             if (!r) return null;
-            return r.type === 'essence'
-                ? (r.essenceType === 'pure_essence' ? 'pure_essence' : 'chaos_essence')
-                : r.type;
+            return r.type === 'essence' ? 'marble_pack' : r.type;
         })();
-        if ((_nextRewardType === 'marble_pack' || _nextRewardType === 'chaos_essence' || _nextRewardType === 'pure_essence') && this.phase !== 'selection') {
+        if ((_nextRewardType === 'chaos_essence' || _nextRewardType === 'pure_essence') && this.phase !== 'selection') {
             // 同步预先清空残留的弹珠卡片，避免 ui_updateUI 渲染出旧 DOM 闪一帧
             const _earlyGridEl = document.getElementById('marble-selection-grid');
             if (_earlyGridEl) {
@@ -1873,15 +1909,15 @@ export const game_system = {
             const reward = this.pendingRoundStartRewards.shift();
             if (!reward) continue;
 
-            const rewardType = reward.type === 'essence'
-                ? (reward.essenceType === 'pure_essence' ? 'pure_essence' : 'chaos_essence')
-                : reward.type;
+            const rewardType = reward.type === 'essence' ? 'marble_pack' : reward.type;
             const totalRewards = this._roundStartResolverTotalCount || (this.pendingRoundStartRewards.length + 1);
             const currentRewardIndex = Math.max(1, totalRewards - this.pendingRoundStartRewards.length);
             const rewardLabel = rewardType === 'relic'
                 ? '遗物线索'
                 : rewardType === 'marble_pack'
-                    ? '弹珠包'
+                    ? '杂色弹珠包'
+                : rewardType === 'run_resource_pack'
+                    ? '局内资源包'
                 : rewardType === 'pure_essence'
                     ? '纯净精华'
                     : '混沌精华';
@@ -1916,16 +1952,38 @@ export const game_system = {
             }
 
             if (rewardType === 'marble_pack') {
-                if (Array.isArray(reward.marbleTypes) && reward.marbleTypes.length > 0) {
-                    if (!Array.isArray(this.guaranteedNextRound)) this.guaranteedNextRound = [];
-                    this.guaranteedNextRound.unshift(...reward.marbleTypes.slice(0, 3));
+                const startPackGrind = () => {
+                    this._roundStartResolverActive = false;
+                    eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
+                        round: this.round || 1,
+                        pendingCount: this.pendingRoundStartRewards.length,
+                        totalCount: totalRewards,
+                        resolvedCount: currentRewardIndex,
+                        currentRewardType: rewardType,
+                    });
+                    this._roundStartResolverTotalCount = 0;
+                    if (typeof this.sys_startMarblePackGrind === 'function') this.sys_startMarblePackGrind(reward);
+                };
+                if (reward.dropX !== undefined && reward.dropY !== undefined && typeof this.ui_playLootToCardAnimation === 'function') {
+                    if (this.fieldLootItems) {
+                        const item = this.fieldLootItems.find(i => i.id === reward.lootItemId);
+                        if (item) item.active = false;
+                    }
+                    this.ui_playLootToCardAnimation(reward.dropX, reward.dropY, rewardType, startPackGrind);
+                } else if (typeof this.ui_playLootToCardAnimation === 'function') {
+                    const x = (this.width || 400) / 2;
+                    const y = Math.max(90, (this.height || 700) * 0.34);
+                    this.ui_playLootToCardAnimation(x, y, rewardType, startPackGrind);
+                } else {
+                    startPackGrind();
                 }
-                this.pendingSelectionMode = {
-                    mode: 'standard',
-                    requiredCount: (CONFIG.gameplay.selectionReq || 3),
-                    sourceRewardType: 'marble_pack',
-                    source: reward.source || 'unknown',
-                    round: reward.round || this.round || 1,
+                return;
+            }
+
+            if (rewardType === 'run_resource_pack') {
+                const grantPack = () => {
+                    if (typeof this.sys_grantRunResourcePack === 'function') this.sys_grantRunResourcePack(reward);
+                    if (typeof this.sys_continueRoundStartResolver === 'function') this.sys_continueRoundStartResolver();
                 };
                 this._roundStartResolverActive = false;
                 eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
@@ -1935,8 +1993,19 @@ export const game_system = {
                     resolvedCount: currentRewardIndex,
                     currentRewardType: rewardType,
                 });
-                this._roundStartResolverTotalCount = 0;
-                if (typeof this.sys_initSelectionPhase === 'function') this.sys_initSelectionPhase();
+                if (reward.dropX !== undefined && reward.dropY !== undefined && typeof this.ui_playLootToCardAnimation === 'function') {
+                    if (this.fieldLootItems) {
+                        const item = this.fieldLootItems.find(i => i.id === reward.lootItemId);
+                        if (item) item.active = false;
+                    }
+                    this.ui_playLootToCardAnimation(reward.dropX, reward.dropY, rewardType, grantPack);
+                } else if (typeof this.ui_playLootToCardAnimation === 'function') {
+                    const x = (this.width || 400) / 2;
+                    const y = Math.max(90, (this.height || 700) * 0.34);
+                    this.ui_playLootToCardAnimation(x, y, rewardType, grantPack);
+                } else {
+                    grantPack();
+                }
                 return;
             }
 
@@ -2032,10 +2101,10 @@ export const game_system = {
 
     /**
      * @method sys_showRoundStartBanner
-     * @description 无精华奖励时，在直接进入战斗前显示「第 X 回合开始」大字提示（约 1.5 秒），
+     * @description 无弹珠包研磨入口时，在直接进入战斗前显示「第 X 回合开始」大字提示（约 1.5 秒），
      * 同时触发左侧子弹属性面板充能特效。特效等级接入 CONFIG.performance 三档预算。
      * 横幅结束后直接进入战斗阶段（跳过研磨）。
-     * 有精华奖励时由 ui_confirmSelection 直接调用 phase_startGatheringPhase。
+     * 有弹珠包时由 sys_startMarblePackGrind 直接调用 phase_startGatheringPhase。
      * @perf-impact: CSS keyframe 动画（无 Canvas 开销），low 档降级为简单淡入
      */
     sys_showRoundStartBanner() {
@@ -2497,24 +2566,19 @@ export const game_system = {
         const viewShiftY = this.boardTilt.current.y * -20;
         for (let e of this.enemies) {
             if (e.active && (e.pos.y + viewShiftY) > this.defeatLineY) {
+                if ((this.playerShield || 0) > 0) {
+                    const barrierY = this.defeatLineY - e.height / 2;
+                    e.dropTargetY = Math.min(e.dropTargetY, barrierY);
+                    e.pos.y = Math.min(e.pos.y, barrierY);
+                    e.bumpOffsetY = -10;
+                    if (typeof this.spawn_createFloatingText === 'function') {
+                        this.spawn_createFloatingText(e.pos.x, barrierY - e.height / 2, '屏障拦截', '#93c5fd');
+                    }
+                    return false;
+                }
                 // [难度平衡] Boss 越线：触发怜悯掉落
                 if (e.type === 'boss') {
                     this._triggerPityDrop(e);
-                }
-                if ((this.playerShield || 0) > 0) {
-                    this.playerShield = Math.max(0, this.playerShield - 1);
-                    e.active = false;
-                    if (typeof this.spawn_createFloatingText === 'function') {
-                        this.spawn_createFloatingText(e.pos.x, this.defeatLineY - 18, `护盾抵消 (${this.playerShield})`, '#93c5fd');
-                    }
-                    if (typeof this.spawn_createParticle === 'function') {
-                        for (let i = 0; i < 8; i++) {
-                            this.spawn_createParticle(e.pos.x, this.defeatLineY, '#93c5fd', 'spark');
-                        }
-                    }
-                    showToast(`🔰 守护者结界抵消越线！剩余 ${this.playerShield} 层`);
-                    if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
-                    return false;
                 }
                 return true;
             }
@@ -2597,12 +2661,37 @@ export const game_system = {
                     width: e.width, height: e.height,
                     hp: e.hp, maxHp: e.maxHp,
                     type: e.type, affixes: e.affixes ? [...e.affixes] : [],
+                    baseArchetype: e.baseArchetype || null,
+                    gridCols: e.gridCols || 1,
+                    gridRows: e.gridRows || 1,
+                    footprintCells: e.footprintCells || null,
+                    footprintMask: Array.isArray(e.footprintMask) ? e.footprintMask.map(row => [...row]) : null,
+                    isWideEnemy: e.isWideEnemy || false,
                     shieldCharges: e.shieldCharges || 0,
+                    radiantAegis: e.radiantAegis || 0,
+                    radiantAegisMax: e.radiantAegisMax || 0,
+                    radiantAegisBroken: e.radiantAegisBroken || false,
+                    energyArmorShield: e.energyArmorShield || 0,
+                    livingArmorHp: e.livingArmorHp || 0,
+                    livingArmorMax: e.livingArmorMax || 0,
+                    livingArmorBaseMax: e.livingArmorBaseMax || 0,
+                    livingArmorStacked: e.livingArmorStacked || false,
+                    livingArmorBroken: e.livingArmorBroken || false,
+                    phaseShieldTurn: e._phaseShieldTurn || 0,
+                    phaseShieldInitialApplied: e._phaseShieldInitialApplied || false,
+                    overloadDamageThisTurn: e._overloadDamageThisTurn || 0,
+                    overloadBonusThisTurn: e._overloadBonusThisTurn || 0,
+                    carrierCooldown: e._carrierCooldown || 0,
                     temp: e.temp || 0,
                     frozenCount: e.frozenCount || 0,
                     berserked: e.berserked || false,
                     rotationIndex: e.rotationIndex || 0,
                     rotationTurnCount: e.rotationTurnCount || 0,
+                    ouroborosOrbitStates: Array.isArray(e.ouroborosOrbitStates)
+                        ? e.ouroborosOrbitStates.map(state => ({ ...state }))
+                        : [],
+                    ouroborosOrbitDisruptions: e.ouroborosOrbitDisruptions || 0,
+                    ouroborosOrbitInitialized: e._ouroborosOrbitInitialized || false,
                     swordMarks: e.swordMarks || 0,
                     markTimer: e.markTimer || 0,
                     collisionShape: e.collisionShape || 'aabb',
@@ -2611,16 +2700,42 @@ export const game_system = {
                     bossType: e.bossType,
                     bossName: e.bossName,
                     isBigBoss: e.isBigBoss || false,
+                    bossOwnerId: e.bossOwnerId,
+                    bossMinionRole: e.bossMinionRole,
+                    bossMechanicTags: Array.isArray(e.bossMechanicTags) ? [...e.bossMechanicTags] : [],
+                    furnacePressure: e.furnacePressure || 0,
+                    furnacePressureThreshold: e.furnacePressureThreshold || 0,
+                    viridisSporeBloom: e.viridisSporeBloom || 0,
+                    viridisSporeCorrodedTurns: e._viridisSporeCorrodedTurns || 0,
+                    teslaFieldPower: e.teslaFieldPower || 0,
+                    teslaFieldPowerMax: e.teslaFieldPowerMax || 0,
+                    teslaSummonCharge: e._teslaSummonCharge || 0,
+                    teslaGroundedTurns: e._teslaGroundedTurns || 0,
+                    teslaChargedTurns: e._teslaChargedTurns || 0,
+                    teslaGrantedHaste: e._teslaGrantedHaste || false,
+                    frostSeamTurns: e.frostSeamTurns || 0,
+                    glaciesFrostSeamReduction: e._glaciesFrostSeamReduction || 0,
+                    glaciesSeamSkipTurns: e._glaciesSeamSkipTurns || 0,
+                    chimeraFeedStacks: e.chimeraFeedStacks || 0,
+                    chimeraInheritedStatusCount: e.chimeraInheritedStatusCount || 0,
+                    chimeraDigestCooldown: e._chimeraDigestCooldown || 0,
+                    chimeraSummonCooldown: e._chimeraSummonCooldown || 0,
                     devourState: e.devourState,
                     devourTimer: e.devourTimer,
                     gapAngle: e.gapAngle,
                     _moveInterval: e._moveInterval,
                     _moveCooldown: e._moveCooldown,
                     _bossVulnerabilityProgress: e._bossVulnerabilityProgress || 0,
+                    _bossVulnerabilityVisualRatio: e._bossVulnerabilityVisualRatio || 0,
+                    _bossVulnerabilityVisualAttrs: Array.isArray(e._bossVulnerabilityVisualAttrs) ? [...e._bossVulnerabilityVisualAttrs] : [],
+                    _bossVulnerabilityExposedTurns: e._bossVulnerabilityExposedTurns || 0,
                     _bossVulnerabilityExposedHits: e._bossVulnerabilityExposedHits || 0,
+                    _bossVulnerabilityExposedPart: e._bossVulnerabilityExposedPart || null,
                     _bossVulnerabilitySuppressedEnrage: e._bossVulnerabilitySuppressedEnrage || false,
                     _bossVulnerabilityMode: e._bossVulnerabilityMode,
                     _bossVulnerabilityThreshold: e._bossVulnerabilityThreshold || 0,
+                    _bossVulnerabilityBreakTimer: e._bossVulnerabilityBreakTimer || 0,
+                    _bossVulnerabilityRecoverTimer: e._bossVulnerabilityRecoverTimer || 0,
                 };
                 // 序列化 collisionData（将 Vec2 转为 {x,y}）
                 if (e.collisionData) {
@@ -2717,6 +2832,8 @@ export const game_system = {
                 wavePresetUsage: this._wavePresetUsage ? JSON.parse(JSON.stringify(this._wavePresetUsage)) : {},
                 wavePresetIntroShown: this._wavePresetIntroShown ? { ...this._wavePresetIntroShown } : {},
                 wavePresetRoundUsed: this._wavePresetRoundUsed || null,
+                directorScriptUsage: this._directorScriptUsage ? JSON.parse(JSON.stringify(this._directorScriptUsage)) : {},
+                directorLastScriptId: this._directorLastScriptId || null,
                 replaceAmmoContext: this.replaceAmmoContext ? JSON.parse(JSON.stringify(this.replaceAmmoContext)) : null, // [ammo-replace]
                 _chargedAmmoQueue: this._chargedAmmoQueue ? this._chargedAmmoQueue.map(r => ({ ...r })) : null, // [ammo-replace]
                 _lastFiredAmmoSnapshot: this._lastFiredAmmoSnapshot ? this._lastFiredAmmoSnapshot.map(r => ({ ...r })) : null, // [bullet-charge-fix]
@@ -2862,6 +2979,8 @@ export const game_system = {
             this._wavePresetUsage = state.wavePresetUsage ? JSON.parse(JSON.stringify(state.wavePresetUsage)) : {};
             this._wavePresetIntroShown = state.wavePresetIntroShown ? { ...state.wavePresetIntroShown } : {};
             this._wavePresetRoundUsed = state.wavePresetRoundUsed || null;
+            this._directorScriptUsage = state.directorScriptUsage ? JSON.parse(JSON.stringify(state.directorScriptUsage)) : {};
+            this._directorLastScriptId = state.directorLastScriptId || null;
             this.replaceAmmoContext = state.replaceAmmoContext ? JSON.parse(JSON.stringify(state.replaceAmmoContext)) : null; // [ammo-replace]
             this._chargedAmmoQueue = state._chargedAmmoQueue ? state._chargedAmmoQueue.map(r => ({ ...r })) : null; // [ammo-replace]
             if (this.replaceAmmoContext && this.replaceAmmoContext.active) {
@@ -2896,7 +3015,11 @@ export const game_system = {
             this._bossSpawnCount = state._bossSpawnCount || 0;
             this._pendingBossRelic = state._pendingBossRelic || false;
             this._pendingRelicEvent = state._pendingRelicEvent || false;
-            this.pendingRoundStartRewards = (state.pendingRoundStartRewards || []).map(item => ({ ...item }));
+            this.pendingRoundStartRewards = (state.pendingRoundStartRewards || []).map(item => ({
+                ...item,
+                type: item && item.type === 'essence' ? 'marble_pack' : item.type,
+                packId: item && item.packId ? item.packId : 'mixed',
+            }));
             if ((state._pendingRelicEvent || state._pendingBossRelic) && !this.pendingRoundStartRewards.some(item => item && item.type === 'relic')) {
                 this.pendingRoundStartRewards.push({ type: 'relic', amount: 0, source: 'legacy_save', round: state.round || 1, enemyType: null, enemyMaxHp: 0 });
             }
@@ -2980,11 +3103,36 @@ export const game_system = {
             this.enemies = (state.enemies || []).map(d => {
                 const e = new Enemy(d.x, d.y, d.width, d.height, d.hp, d.maxHp, d.type, d.affixes || []);
                 e.shieldCharges = d.shieldCharges || 0;
+                e.radiantAegis = d.radiantAegis || 0;
+                e.radiantAegisMax = d.radiantAegisMax || 0;
+                e.radiantAegisBroken = d.radiantAegisBroken || false;
+                e.energyArmorShield = d.energyArmorShield || 0;
+                e.livingArmorHp = d.livingArmorHp || 0;
+                e.livingArmorMax = d.livingArmorMax || 0;
+                e.livingArmorBaseMax = d.livingArmorBaseMax || 0;
+                e.livingArmorStacked = d.livingArmorStacked || false;
+                e.livingArmorBroken = d.livingArmorBroken || false;
+                e._phaseShieldTurn = d.phaseShieldTurn || 0;
+                e._phaseShieldInitialApplied = d.phaseShieldInitialApplied || false;
+                e._overloadDamageThisTurn = d.overloadDamageThisTurn || 0;
+                e._overloadBonusThisTurn = d.overloadBonusThisTurn || 0;
+                e.baseArchetype = d.baseArchetype || null;
+                e.gridCols = d.gridCols || 1;
+                e.gridRows = d.gridRows || 1;
+                e.footprintCells = d.footprintCells || null;
+                e.footprintMask = Array.isArray(d.footprintMask) ? d.footprintMask.map(row => [...row]) : null;
+                e.isWideEnemy = d.isWideEnemy || false;
+                e._carrierCooldown = d.carrierCooldown || 0;
                 e.temp = d.temp || 0;
                 e.frozenCount = d.frozenCount || 0;
                 e.berserked = d.berserked || false;
                 e.rotationIndex = d.rotationIndex || 0;
                 e.rotationTurnCount = d.rotationTurnCount || 0;
+                e.ouroborosOrbitStates = Array.isArray(d.ouroborosOrbitStates)
+                    ? d.ouroborosOrbitStates.map(state => ({ ...state }))
+                    : [];
+                e.ouroborosOrbitDisruptions = d.ouroborosOrbitDisruptions || 0;
+                e._ouroborosOrbitInitialized = d.ouroborosOrbitInitialized || false;
                 e.swordMarks = d.swordMarks || 0;
                 e.markTimer = d.markTimer || 0;
                 e.collisionShape = d.collisionShape || 'aabb';
@@ -3004,16 +3152,45 @@ export const game_system = {
                     e.bossName = d.bossName;
                     e.isBigBoss = d.isBigBoss || false;
                 }
+                e.bossOwnerId = d.bossOwnerId;
+                e.bossMinionRole = d.bossMinionRole;
+                e.bossMechanicTags = Array.isArray(d.bossMechanicTags) ? [...d.bossMechanicTags] : [];
+                e.furnacePressure = d.furnacePressure || 0;
+                e.furnacePressureThreshold = d.furnacePressureThreshold || 0;
+                e.viridisSporeBloom = d.viridisSporeBloom || 0;
+                e._viridisSporeCorrodedTurns = d.viridisSporeCorrodedTurns || 0;
+                e.teslaFieldPower = d.teslaFieldPower || 0;
+                e.teslaFieldPowerMax = d.teslaFieldPowerMax || 0;
+                e._teslaSummonCharge = d.teslaSummonCharge || 0;
+                e._teslaGroundedTurns = d.teslaGroundedTurns || 0;
+                e._teslaChargedTurns = d.teslaChargedTurns || 0;
+                e._teslaGrantedHaste = d.teslaGrantedHaste || false;
+                e.frostSeamTurns = d.frostSeamTurns || 0;
+                e._glaciesFrostSeamReduction = d.glaciesFrostSeamReduction || 0;
+                e._glaciesSeamSkipTurns = d.glaciesSeamSkipTurns || 0;
+                if (e.frostSeamTurns > 0 && !e.bossMechanicTags.includes('frostSeam')) {
+                    e.bossMechanicTags.push('frostSeam');
+                }
+                e.chimeraFeedStacks = d.chimeraFeedStacks || 0;
+                e.chimeraInheritedStatusCount = d.chimeraInheritedStatusCount || 0;
+                e._chimeraDigestCooldown = d.chimeraDigestCooldown || 0;
+                e._chimeraSummonCooldown = d.chimeraSummonCooldown || 0;
                 if (d.devourState !== undefined) e.devourState = d.devourState;
                 if (d.devourTimer !== undefined) e.devourTimer = d.devourTimer;
                 if (d.gapAngle !== undefined) e.gapAngle = d.gapAngle;
                 if (d._moveInterval !== undefined) e._moveInterval = d._moveInterval;
                 if (d._moveCooldown !== undefined) e._moveCooldown = d._moveCooldown;
                 e._bossVulnerabilityProgress = d._bossVulnerabilityProgress || 0;
-                e._bossVulnerabilityExposedHits = d._bossVulnerabilityExposedHits || 0;
+                e._bossVulnerabilityVisualRatio = d._bossVulnerabilityVisualRatio || 0;
+                e._bossVulnerabilityVisualAttrs = Array.isArray(d._bossVulnerabilityVisualAttrs) ? [...d._bossVulnerabilityVisualAttrs] : [];
+                e._bossVulnerabilityExposedTurns = d._bossVulnerabilityExposedTurns || ((d._bossVulnerabilityExposedHits || 0) > 0 ? 1 : 0);
+                e._bossVulnerabilityExposedHits = 0;
+                e._bossVulnerabilityExposedPart = d._bossVulnerabilityExposedPart || null;
                 e._bossVulnerabilitySuppressedEnrage = d._bossVulnerabilitySuppressedEnrage || false;
                 e._bossVulnerabilityMode = d._bossVulnerabilityMode;
                 e._bossVulnerabilityThreshold = d._bossVulnerabilityThreshold || 0;
+                e._bossVulnerabilityBreakTimer = d._bossVulnerabilityBreakTimer || 0;
+                e._bossVulnerabilityRecoverTimer = d._bossVulnerabilityRecoverTimer || 0;
                 e.justSpawned = false; // 恢复时不播放入场动画
                 return e;
             });

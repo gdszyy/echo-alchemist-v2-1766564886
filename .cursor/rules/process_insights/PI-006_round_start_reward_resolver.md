@@ -70,6 +70,8 @@ status: "active"
 | v1.4 | 2026-06-19 | Pitfall 7: gathering initialization must rebuild missing launchable `marbleQueue` entries without touching `ammoQueue`, preventing empty grind phases after banner/resume edge cases. | Codex |
 | v1.5 | 2026-06-20 | Pitfall 8: scheduled run-shop visits must update beside the round-start banner instead of opening an overlay from resolver, preserving reward queue and banner flow. | Codex |
 | v1.6 | 2026-06-22 | Pitfall 9: standard `marble_pack` selection is still an explicit new grind and must pre-charge existing bullets so gathering completion enters replace-ammo selection. | Codex |
+| v1.7 | 2026-06-23 | Pitfall 9 deprecated: active marble packs were removed; legacy `marble_pack` rewards must normalize to `run_resource_pack` and never enter selection / gathering. | Codex |
+| v1.8 | 2026-06-23 | Corrects v1.7: essence rewards are removed from the active loop; `marble_pack` is the run-start / run-shop grind entry and must go directly to gathering. | Codex |
 
 ## Pitfall 6: Normal Round-Start Banner Reuses Charge Sources
 
@@ -101,12 +103,12 @@ status: "active"
 
 **Key location**: `src/game_system.js` -> `sys_updateRunShopScheduleForRound()` / `sys_maybeOfferRunShopBeforeRoundStart()`, `src/ui/run_shop.js` -> `ui_updateRunShopScheduleUI()`.
 
-## Pitfall 9: Marble Pack Grind Skips Replace Selection
+## Pitfall 9: Marble Pack Must Directly Enter Gathering, Not Fate Selection
 
-**Symptom**: after a `marble_pack` reward, the player can grind a new set of marbles while already having a previous bullet set, but the game jumps straight into combat with the new bullets instead of asking which bullets to keep.
+**Symptom**: buying a marble pack in the run shop does not start a grind next, or the code routes the pack through fate / essence selection semantics.
 
-**Root cause**: `marble_pack` uses `selectionMode = 'standard'`, so it looked like a normal selection path. The replace-ammo charge setup only lived on `chaos_essence` / `pure_essence`, leaving standard marble-pack grinds without `_chargedAmmoQueue`.
+**Root cause**: `marble_pack`, `run_resource_pack`, and `chaos_essence` / `pure_essence` have been conflated across several refactors. The current design removes essence rewards from the active loop. A marble pack is not a fate choice and should not write `pendingSelectionMode`.
 
-**Correct approach**: when `sys_initSelectionPhase()` consumes `pendingSelectionMode.sourceRewardType === 'marble_pack'`, it must prefill `_chargedAmmoQueue` from `_lastFiredAmmoSnapshot`, then `ammoQueue`, then compiled `marbleQueue`. `phase_gathering_attemptComplete()` already detects `_chargedAmmoQueue` and opens `sys_initReplaceAmmoPhase()`, so no separate UI path is needed.
+**Correct approach**: run start queues one `marble_pack` after the first relic. The run shop must sell mixed marble packs. Both routes call `sys_startMarblePackGrind()`, which fills `marbleQueue`, snapshots any keepable ammo into `_chargedAmmoQueue`, and calls `phase_startGatheringPhase()` directly. Legacy `essence` rewards may normalize to `marble_pack`; new active rewards must not queue `chaos_essence` / `pure_essence`.
 
-**Key location**: `src/game_system.js` -> `sys_initSelectionPhase()`, `src/game_phase.js` -> `phase_gathering_attemptComplete()`.
+**Key location**: `src/game_system.js` -> `sys_queueRoundStartReward()` / `sys_startMarblePackGrind()` / `sys_startRoundStartResolver()`, `src/ui/run_shop.js` -> `ui_buyRunShopItem()`.

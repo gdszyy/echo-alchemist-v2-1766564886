@@ -5,7 +5,13 @@
  *   node tests/validate_wave_presets.mjs
  */
 
-import { ENEMY_WAVE_PRESETS, ENEMY_WAVE_PRESET_ARCHETYPES } from '../src/wave_presets.js';
+import {
+    ENEMY_WAVE_PRESETS,
+    ENEMY_WAVE_PRESET_ARCHETYPES,
+    DIRECTOR_SCRIPTS,
+    DIRECTOR_SCRIPT_CONFIG,
+    DIRECTOR_ACTOR_INTRO_ROUNDS,
+} from '../src/wave_presets.js';
 
 const ENEMY_COLS = 6;
 const LARGE_LIMITS = {
@@ -77,11 +83,35 @@ function placePresetSlots(preset) {
     return { ok: true, placements };
 }
 
+function collectPresetActorAffixes(preset) {
+    const affixes = new Set();
+    for (const slot of preset.slots || []) {
+        const meta = ENEMY_WAVE_PRESET_ARCHETYPES[slot.archetype] || {};
+        if (meta.affix) affixes.add(meta.affix);
+        for (const affix of slot.affixes || []) {
+            if (affix) affixes.add(affix);
+        }
+    }
+    return [...affixes];
+}
+
 console.log('═══════════════════════════════════════════════════');
 console.log('  ENEMY_WAVE_PRESETS 静态结构校验');
 console.log('═══════════════════════════════════════════════════\n');
 
 const ids = new Set();
+const scriptIds = new Set();
+const scriptMap = new Map();
+for (const script of DIRECTOR_SCRIPTS) {
+    check(typeof script.id === 'string' && script.id.length > 0, `${script.id || '<missing>'}.script id non-empty`);
+    check(!scriptIds.has(script.id), `${script.id}.script id unique`);
+    scriptIds.add(script.id);
+    scriptMap.set(script.id, script);
+    check((script.repeatCooldownRounds || 0) >= 0, `${script.id}.repeatCooldownRounds valid`);
+    check((script.maxUnfamiliarActors ?? DIRECTOR_SCRIPT_CONFIG.maxUnfamiliarActorsPerPreset) >= 0, `${script.id}.maxUnfamiliarActors valid`);
+    check(Array.isArray(script.beats) && script.beats.length > 0, `${script.id}.beats non-empty`);
+}
+
 for (const preset of ENEMY_WAVE_PRESETS) {
     check(typeof preset.id === 'string' && preset.id.length > 0, `${preset.id || '<missing>'}.id 非空`);
     check(!ids.has(preset.id), `${preset.id}.id 唯一`);
@@ -93,6 +123,25 @@ for (const preset of ENEMY_WAVE_PRESETS) {
     }
     check((preset.weight || 0) > 0, `${preset.id}.weight > 0`);
     check(Array.isArray(preset.slots) && preset.slots.length > 0, `${preset.id}.slots 非空`);
+    check(typeof preset.scriptId === 'string' && preset.scriptId.length > 0, `${preset.id}.scriptId non-empty`);
+    check(typeof preset.beatId === 'string' && preset.beatId.length > 0, `${preset.id}.beatId non-empty`);
+    const script = scriptMap.get(preset.scriptId);
+    check(!!script, `${preset.id}.scriptId registered`);
+    const beat = script?.beats?.find(item => item.presetId === preset.id);
+    check(!!beat, `${preset.id}.script beat registered`);
+    if (beat) {
+        check(
+            beat.roundRange?.[0] === preset.roundRange?.[0] && beat.roundRange?.[1] === preset.roundRange?.[1],
+            `${preset.id}.script beat roundRange matches preset`
+        );
+        check(Array.isArray(beat.actors) && beat.actors.length > 0, `${preset.id}.script beat actors non-empty`);
+    }
+    if (preset.directorTags !== undefined) {
+        check(
+            Array.isArray(preset.directorTags) && preset.directorTags.every(tag => typeof tag === 'string' && tag.length > 0),
+            `${preset.id}.directorTags 格式正确`
+        );
+    }
 
     const largeCounts = {};
     for (const slot of preset.slots || []) {
@@ -122,6 +171,22 @@ for (const preset of ENEMY_WAVE_PRESETS) {
         const otherLarge = Object.keys(largeCounts).filter(k => k !== 'gravityWell' && largeCounts[k] > 0);
         check(otherLarge.length === 0, `${preset.id}.gravityWell 不与其它大型基底同 preset`);
     }
+
+    const affixes = collectPresetActorAffixes(preset);
+    for (const affix of affixes) {
+        check(Number.isFinite(DIRECTOR_ACTOR_INTRO_ROUNDS[affix]), `${preset.id}.${affix} actor intro round registered`);
+    }
+    const firstRound = preset.roundRange?.[0] || 1;
+    const unfamiliarAffixes = affixes.filter(affix => {
+        const introRound = DIRECTOR_ACTOR_INTRO_ROUNDS[affix];
+        return Number.isFinite(introRound)
+            && firstRound >= introRound
+            && firstRound - introRound <= (DIRECTOR_SCRIPT_CONFIG.unfamiliarRoundWindow || 0);
+    });
+    const unfamiliarLimit = preset.maxUnfamiliarActors
+        ?? script?.maxUnfamiliarActors
+        ?? DIRECTOR_SCRIPT_CONFIG.maxUnfamiliarActorsPerPreset;
+    check(unfamiliarAffixes.length <= unfamiliarLimit, `${preset.id}.unfamiliar actors <= ${unfamiliarLimit}`);
 
     const placement = placePresetSlots(preset);
     check(placement.ok, `${preset.id} 可按 lane 放入 ${ENEMY_COLS} 列`);

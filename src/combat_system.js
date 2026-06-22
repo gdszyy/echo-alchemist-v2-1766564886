@@ -1554,7 +1554,7 @@ export const combat_system = {
                 label,
                 mode: resolvedMode,
                 breakThreshold,
-                exposedHits: vulnCfg.exposedHits || mech.exposedHits || 3,
+                exposedTurns: vulnCfg.exposedTurns || mech.exposedTurns || 1,
                 exposedDamageMult: vulnCfg.exposedDamageMult || mech.exposedDamageMult || 1.35
             };
         };
@@ -1599,9 +1599,8 @@ export const combat_system = {
         enemy._bossVulnerabilityMode = profile.mode;
         enemy._bossVulnerabilityThreshold = profile.breakThreshold;
         const mech = CONFIG.balance.bossVulnerability || {};
-        if ((enemy._bossVulnerabilityExposedHits || 0) > 0) {
+        if ((enemy._bossVulnerabilityExposedTurns || 0) > 0) {
             result.damage = result.damage * profile.exposedDamageMult;
-            enemy._bossVulnerabilityExposedHits = Math.max(0, (enemy._bossVulnerabilityExposedHits || 0) - 1);
             result.exposedApplied = true;
         }
 
@@ -1630,17 +1629,41 @@ export const combat_system = {
             : (mech.counterHitGain || 1);
 
         bossVulnerability.progressGain = gain;
+        const visualAttrs = Array.isArray(enemy._bossVulnerabilityVisualAttrs)
+            ? enemy._bossVulnerabilityVisualAttrs.filter(Boolean)
+            : [];
+        enemy._bossVulnerabilityVisualAttrs = [
+            bossVulnerability.matchedAttr,
+            ...visualAttrs.filter(attr => attr !== bossVulnerability.matchedAttr)
+        ].slice(0, 2);
         enemy._bossVulnerabilityProgress = (enemy._bossVulnerabilityProgress || 0) + bossVulnerability.progressGain;
+        enemy._bossVulnerabilityVisualRatio = Math.max(
+            0,
+            Math.min(0.99, enemy._bossVulnerabilityProgress / Math.max(1, profile.breakThreshold || 1))
+        );
 
         if (enemy._bossVulnerabilityProgress >= profile.breakThreshold) {
             enemy._bossVulnerabilityProgress = 0;
-            enemy._bossVulnerabilityExposedHits = Math.max(enemy._bossVulnerabilityExposedHits || 0, profile.exposedHits);
+            enemy._bossVulnerabilityVisualRatio = 1;
+            enemy._bossVulnerabilityExposedTurns = Math.max(enemy._bossVulnerabilityExposedTurns || 0, profile.exposedTurns);
+            enemy._bossVulnerabilityExposedHits = 0; // legacy save field; exposed state is now turn-based
+            enemy._bossVulnerabilityExposedPart = ({
+                ignis: 'furnace_gate',
+                glacies: 'frozen_joint',
+                mikro: 'fission_core',
+                devourer: 'maw_throat',
+                viridis: 'symbiote_heart',
+                tesla: 'phase_core',
+                chimera: 'chaos_reactor',
+                ouroboros: 'rotation_node'
+            })[enemy.bossType] || 'core';
+            enemy._bossVulnerabilityBreakTimer = Math.max(enemy._bossVulnerabilityBreakTimer || 0, 34);
             if (mech.enrageDelayOnBreak && !enemy.berserked) {
                 enemy._bossVulnerabilitySuppressedEnrage = true;
             }
             bossVulnerability.breakTriggered = true;
-            if (this.spawn_createFloatingText) {
-                this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 56, `${profile.label} 破!`, '#facc15', 16);
+            if (enemy.bossType === 'ouroboros' && typeof enemy._interruptOuroborosAttachment === 'function') {
+                enemy._interruptOuroborosAttachment(this, bossVulnerability.matchedAttr);
             }
         }
 
@@ -1651,15 +1674,8 @@ export const combat_system = {
         if (!enemy || !config || !damageResult) return null;
 
         if (context.bossVulnerability) {
-            if (context.bossVulnerability.breakTriggered) {
-                return { text: '破绽', color: '#facc15', size: 16 };
-            }
-            if (context.bossVulnerability.exposedApplied) {
-                return { text: '易伤', color: '#fbbf24', size: 15 };
-            }
-            if (context.bossVulnerability.progressGain > 0) {
-                return { text: '破绽+', color: '#fde68a', size: 14 };
-            }
+            // Boss 破绽反馈由敌人身体 Overlay 表达，不再用命中飘字打断阅读。
+            if (context.bossVulnerability.breakTriggered || context.bossVulnerability.exposedApplied || context.bossVulnerability.progressGain > 0) return null;
         }
         if (context.wardSpent || damageResult.deflected) {
             return { text: '屏障', color: '#67e8f9', size: 14 };
@@ -1678,7 +1694,7 @@ export const combat_system = {
 
     // @section:damage_pre_calc - 伤害前置计算：基础值、暴击、穿透
     combat_damageEnemy(enemy, projectile, damageOverride = null) {
-        if (!enemy || !enemy.active) return; 
+        if (!enemy || !enemy.active) return null;
         // --- [修復]：如果是光球/偽造子彈，補齊 chainHistory 防止報措 ---
         if (!projectile.chainHistory) projectile.chainHistory = [];
 
@@ -1810,6 +1826,35 @@ export const combat_system = {
         if (config.cryo > 0) {
             // 使用 effectiveCryo（含共鸣加成）计算降温量，并应用共鸣倍率
             enemy.applyTemp(-CONFIG.balance.cryoAmount * effectiveCryo * cryoResMult);
+            if (enemy.type === 'boss' && enemy.bossType === 'ignis' && (enemy.furnacePressure || 0) > 0) {
+                const ignisCfg = CONFIG.balance.bossConfigs && CONFIG.balance.bossConfigs.ignis;
+                const ventRatio = ignisCfg ? (ignisCfg.furnacePressureCryoVentRatio || 0.6) : 0.6;
+                const vent = Math.max(1, Math.ceil(CONFIG.balance.cryoAmount * effectiveCryo * cryoResMult * ventRatio));
+                const before = enemy.furnacePressure || 0;
+                enemy.furnacePressure = Math.max(0, before - vent);
+                enemy.furnacePressureThreshold = ignisCfg ? (ignisCfg.furnacePressureThreshold || 45) : 45;
+                if (before > enemy.furnacePressure && this.spawn_createFloatingText) {
+                    this.spawn_createFloatingText(hitX, hitY - 22, `泄压-${Math.ceil(before - enemy.furnacePressure)}`, '#67e8f9');
+                }
+            }
+            const teslaCfg = CONFIG.balance.bossConfigs && CONFIG.balance.bossConfigs.tesla;
+            if (enemy.type === 'boss' && enemy.bossType === 'tesla' && (enemy.teslaFieldPower || 0) > 0) {
+                const drain = Math.max(1, Math.ceil(effectiveCryo * (teslaCfg?.teslaCryoFieldDrain || 6) * cryoResMult));
+                if (typeof enemy._addTeslaFieldPower === 'function') {
+                    enemy._addTeslaFieldPower(-drain, this, 'FREEZE');
+                } else {
+                    enemy.teslaFieldPower = Math.max(0, (enemy.teslaFieldPower || 0) - drain);
+                }
+            }
+            if (typeof enemy._isTeslaConductor === 'function' && enemy._isTeslaConductor()) {
+                enemy._teslaChargedTurns = 0;
+                if (enemy._teslaGrantedHaste) {
+                    enemy.affixes = enemy.affixes.filter(affix => affix !== 'haste');
+                    enemy._teslaGrantedHaste = false;
+                    if (typeof enemy._syncAffixOverlayImages === 'function') enemy._syncAffixOverlayImages();
+                }
+                if (this.spawn_createFloatingText) this.spawn_createFloatingText(hitX, hitY - 22, 'DISCHARGE', '#67e8f9', 12);
+            }
             // 标记本回合被冰属性命中（供元素聚变使用）
             enemy._cryoHitThisRound = true;
             // 三阶共鸣：冻结状态下物理伤害加深（在 takeDamage 前修改 dmg）
@@ -1852,6 +1897,14 @@ export const combat_system = {
             }
             // 标记本回合被闪电命中（供元素聚变使用）
             enemy._lightningHitThisRound = true;
+            if (typeof enemy._isTeslaConductor === 'function' && enemy._isTeslaConductor() && typeof enemy._applyTeslaConductorCharge === 'function') {
+                const teslaCfg = CONFIG.balance.bossConfigs && CONFIG.balance.bossConfigs.tesla;
+                enemy._applyTeslaConductorCharge(
+                    this,
+                    teslaCfg?.teslaLightningHasteTurns || 2,
+                    Math.max(1, Math.ceil((teslaCfg?.teslaLightningFieldGain || 5) * effectiveLightning))
+                );
+            }
             projectile.chainHistory.push(enemy);
         }
         // --- [属性共鸣] 弹跳共鸣：读取共鸣参数，增强弹跳伤害加成 ---
@@ -1989,6 +2042,20 @@ export const combat_system = {
         // 判定是否为弹射或穿透产生的击打
         const isBounceHit = (config.bounce > 0 && projectile.bouncesLeft < config.bounce);
         const isPierceHit = (config.pierce > 0 && projectile.piercesLeft < config.pierce);
+        if (isBounceHit && actualDmg > 0 && enemy.type === 'boss' && enemy.bossType === 'tesla') {
+            const teslaCfg = CONFIG.balance.bossConfigs && CONFIG.balance.bossConfigs.tesla;
+            const drain = Math.max(1, Math.ceil(teslaCfg?.teslaBounceFieldDrain || 8));
+            if (typeof enemy._addTeslaFieldPower === 'function') {
+                enemy._addTeslaFieldPower(-drain, this, 'GROUND');
+            } else {
+                enemy.teslaFieldPower = Math.max(0, (enemy.teslaFieldPower || 0) - drain);
+            }
+            enemy._teslaGroundedTurns = Math.max(
+                enemy._teslaGroundedTurns || 0,
+                Math.max(1, Math.floor(teslaCfg?.teslaGroundedTurns || 1))
+            );
+            if (this.spawn_createFloatingText) this.spawn_createFloatingText(hitX, hitY - 30, 'GROUNDED', '#fbbf24', 12);
+        }
 
         if (isBounceHit) {
             damageType = 'bounce';
@@ -2086,6 +2153,14 @@ export const combat_system = {
                             // 施加 shockStacks 层感电状态（升温）
                             ne.applyTemp(CONFIG.balance.lightningTempIncrease * shockStacks);
                             ne._lightningHitThisRound = true; // 标记雷属性命中（供元素聚变使用）
+                            if (typeof ne._isTeslaConductor === 'function' && ne._isTeslaConductor() && typeof ne._applyTeslaConductorCharge === 'function') {
+                                const teslaCfg = CONFIG.balance.bossConfigs && CONFIG.balance.bossConfigs.tesla;
+                                ne._applyTeslaConductorCharge(
+                                    this,
+                                    teslaCfg?.teslaLightningHasteTurns || 2,
+                                    Math.max(1, Math.ceil((teslaCfg?.teslaLightningFieldGain || 5) * shockStacks))
+                                );
+                            }
                             // LightningBolt 视觉特效：从命中点到每个受影响敌人
                             // [自适应性能] 闪电特效数量上限
                             if (this.lightningBolts.length < CONFIG.performance[this.perfQualityLevel || 'high'].lightningLimit) {
@@ -2206,8 +2281,9 @@ export const combat_system = {
         const effectivePyro = config.pyro + pyroBonus;
         // 共鸣整体火焰伤害倍率：1.0/1.2/1.5
         const pyroResMult = pyroResParams ? (pyroResParams.pyroMultiplier || 1.0) : 1.0;
+        const isIgnisFurnaceTarget = enemy.type === 'boss' && enemy.bossType === 'ignis';
 
-        if (config.pyro > 0 && enemy.temp >= burnTempThreshold) {
+        if (config.pyro > 0 && enemy.temp >= burnTempThreshold && !isIgnisFurnaceTarget) {
             // [Agent D] 熱毁词条 Hook：计算火焰伤害倍率
             let meltdownMult = 1.0;
             const meltdownFx = this.activeRunewordEffects && this.activeRunewordEffects['meltdown'];
@@ -2277,6 +2353,10 @@ export const combat_system = {
                     });
                 }
             }    // D. 移除热量回填机制 (根据需求取消回填)
+        } else if (config.pyro > 0 && isIgnisFurnaceTarget && enemy.temp >= burnTempThreshold) {
+            if (this.spawn_createFloatingText) {
+                this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 25, '炉心升温', '#fb923c');
+            }
         }
         
         // --- [CRT效果] 根据伤害大小触发色差效果 ---
@@ -2671,6 +2751,7 @@ export const combat_system = {
                 }
             });
         }
+        return damageResult;
     },
     
     // [已迁移至 src/combat/damage_calc.js] combat_triggerChromaticAberration
@@ -3872,8 +3953,8 @@ export const combat_system = {
             case 'glacies':
                 // 狂暴后每回合跳跃 3 行
                 boss._berserkedJumpRows = bossCfg.berserkedJumpRows || 3;
-                // 狂暴后跳跃落地时冻结周围 Peg
-                boss._berserkedFreezePegs = true;
+                // 狂暴后改为强化战斗场内霜缝，不再影响钉盘 Peg
+                boss._glaciesBerserkSeamBoost = true;
                 break;
 
             case 'mikro':
@@ -3887,9 +3968,13 @@ export const combat_system = {
                 break;
 
             case 'viridis':
-                // 狂暴后放弃治疗他人，集中治疗自身并加速再生
+                // 狂暴后放弃治疗他人，集中治疗自身并加速孢甲网络
                 boss._berserkedHealerRange = 0; // 治疗范围设为 0，停止治疗其他敌人
                 boss._berserkedSelfRegenMult = bossCfg.berserkedSelfRegenMult || 3.0; // 自身再生倍率
+                boss._viridisBerserkSporeArmor = true;
+                if (typeof boss._addViridisSporeBloom === 'function') {
+                    boss._addViridisSporeBloom(bossCfg.sporeArmorThreshold || 4, this, 'SPORE');
+                }
                 break;
 
             case 'tesla':

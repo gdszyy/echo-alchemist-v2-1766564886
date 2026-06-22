@@ -145,6 +145,7 @@
 - 位图样式接入：[`src/styles/bitmap_ui.css`](../src/styles/bitmap_ui.css)
 - 图标映射模块：[`src/bitmap_icons.js`](../src/bitmap_icons.js)
 - UI 系统模块：[`src/ui_system.js`](../src/ui_system.js)、[`src/ui/`](../src/ui/)
+- 战斗场地与 UI 重绘设计：[`docs/design/combat_battlefield_ui_asset_redesign.md`](design/combat_battlefield_ui_asset_redesign.md)
 - P0 交互优化 TODO：[`docs/p0_interaction_optimization_todo.md`](./p0_interaction_optimization_todo.md)
 - 全局规范：[`AGENTS.md`](../AGENTS.md) §1
 
@@ -370,3 +371,25 @@
 ## 2026-06-22 新增属性符文素材状态
 
 `rune_venom_1.png`、`rune_venom_2.png`、`rune_overcharge_1.png`、`rune_echo_1.png` 已存在于 `assets/icons/rune/`，并由 `src/bitmap_icons.js` 的 `RUNE_ICON_MAP` 引用。`BITMAP_ASSET_VERSION` 更新为 `20260622-rune-attrs`，用于刷新旧缓存。
+
+## 10. 2026-06-23 Combat Battlefield UI Redesign
+
+战斗阶段进入新一轮美术重绘设计，目标不是补缺，而是统一 `#phase-combat` 的场地、墙体、HUD 面板和战斗常驻图标语言。权威设计案见 [`docs/design/combat_battlefield_ui_asset_redesign.md`](design/combat_battlefield_ui_asset_redesign.md)。
+
+首轮只生成概念预览，正式接入前不得覆盖现有运行时资产：
+
+- `docs/design/concepts/combat_ui_pass1/combat_ui_pass1_contact_sheet.png`
+- `docs/design/concepts/combat_ui_pass1/bg_combat_table_v2_concept.png`
+- `docs/design/concepts/combat_ui_pass1/bg_combat_emitter_zone_v2_concept.png`
+- `docs/design/concepts/combat_ui_pass1/combat_wall_left_v2_concept.png`
+- `docs/design/concepts/combat_ui_pass1/combat_wall_top_v2_concept.png`
+- `docs/design/concepts/combat_ui_pass1/combat_status_panel_v2_concept.png`
+- `docs/design/concepts/combat_ui_pass1/skill_bar_panel_v2_concept.png`
+- `docs/design/concepts/combat_ui_pass1/combat_rune_charge_frame_v2_concept.png`
+- `docs/design/concepts/combat_ui_pass1/emitter_v4_concept.png`
+- `docs/design/concepts/combat_ui_pass1/emitter_base_stationary_v4_concept.png`
+- `docs/design/concepts/combat_ui_pass1/emitter_barrel_rotating_v4_concept.png`
+
+正式资源若进入运行时目录，建议使用 `_v2` / `_v4` 后缀非破坏式接入，并同步更新本清单、`src/bitmap_icons.js` 或 `src/styles/bitmap_ui.css` 中的集中映射。
+当前概念图仅用于风格评审，部分透明区域为烘焙棋盘格而非真实 alpha；正式接入前必须重新生成透明 PNG 或做本地抠图处理。
+发射器 V4 必须拆为静态底座与可旋转炮管：数据 UI、弹仓和读数框保留在 `emitter_base_stationary_v4.png`，炮管使用独立 `emitter_barrel_rotating_v4.png` 随发射方向旋转。

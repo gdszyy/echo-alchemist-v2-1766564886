@@ -17,6 +17,9 @@
  *
  * 任何步骤的缺失原因都写入 `missingReasons`，方便试炼场 UI 显示资源命中状态。
  *
+ * 动态 Overlay（如活体护甲三档、相位护盾失效态）不走静态 `overlays`
+ * 字段，必须由 `resolveDynamicEnemyOverlayPaths(enemy)` 按敌人当前状态选择。
+ *
  * 该模块不应直接执行 fetch；manifest 通过静态 JSON 引入（顶层 import assertion 无法
  * 在浏览器原生 ESM 中保证可用，因此采用同步要求嵌入策略：项目通过 Vite/构建工具
  * 处理 JSON 模块时正常工作；运行环境支持原生 fetch 时由调用者负责预加载）。
@@ -90,10 +93,12 @@ const _DEFAULT_AFFIX_ICONS = {
     siege:      'affix_siege.png',
     shield:     'affix_shield.png',
     regen:      'affix_regen.png',
+    radiantAegis: 'affix_radiantAegis.svg',
 };
 
 const _DEFAULT_OVERLAYS = {
     shield:  'overlay_affix_shield.png',
+    radiantAegis: 'overlay_affix_radiantAegis.svg',
     regen:   'overlay_affix_regen.png',
     berserk: 'overlay_affix_berserk.png',
     haste:   'overlay_affix_haste.png',
@@ -166,6 +171,7 @@ function _buildDefaultManifest() {
         archetypeIcons: { ..._DEFAULT_ARCHETYPE_ICONS },
         affixIcons:    { ..._DEFAULT_AFFIX_ICONS },
         overlays:      { ..._DEFAULT_OVERLAYS },
+        dynamicOverlays: {},
         frames:        { ..._DEFAULT_FRAMES },
         archetypes,
         composites,
@@ -323,6 +329,42 @@ export function resolveEnemyVisualAsset(enemy) {
         framePath,
         frameShape,
     };
+}
+
+export function resolveDynamicEnemyOverlayPaths(enemy) {
+    if (!enemy) return [];
+    const manifest = getEnemyVisualAssetManifest();
+    const defs = manifest.dynamicOverlays || {};
+    const dirs = manifest.directories || _DEFAULT_DIRS;
+    const overlayDir = dirs.overlays || _DEFAULT_DIRS.overlays;
+    const out = [];
+
+    const pushDynamic = (affix, file) => {
+        if (!file) return;
+        out.push({ affix, path: overlayDir + file });
+    };
+
+    if ((enemy.livingArmorHp || 0) > 0 && !enemy.livingArmorBroken) {
+        const armorMax = Math.max(1, enemy.livingArmorMax || enemy.livingArmorHp || 1);
+        const ratio = (enemy.livingArmorHp || 0) / armorMax;
+        const band = ratio <= 0.20 ? 'low' : ratio <= 0.50 ? 'mid' : 'high';
+        const tier = enemy.livingArmorStacked ? 'stack' : 'normal';
+        const livingDefs = defs.livingArmor || {};
+        pushDynamic('livingArmor', livingDefs[`${tier}_${band}`] || livingDefs[band]);
+    }
+
+    if ((enemy.affixes || []).includes('phaseShield')) {
+        const phaseDefs = defs.phaseShield || {};
+        pushDynamic('phaseShield', enemy.phaseShieldDisabledThisTurn ? phaseDefs.disabled : phaseDefs.active);
+    }
+
+    if ((enemy.affixes || []).includes('overloadReactor')) {
+        const overloadDefs = defs.overloadReactor || {};
+        const level = Math.max(0, Math.min(3, Math.floor(enemy._overloadBonusThisTurn || 0)));
+        if (level > 0) pushDynamic('overloadReactor', overloadDefs[`level${level}`] || overloadDefs[String(level)]);
+    }
+
+    return out;
 }
 
 /**

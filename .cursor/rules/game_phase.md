@@ -18,12 +18,13 @@ globs: ["src/game_phase.js"]
 - **禁止将此阈值降低至 0.5 以下**：钉盘分布在屏幕 20%~70% 高度，过小的阈值会导致点击钉盘中下部区域时被错误路由到"倾斜模式"，弹珠无法发射。
 - 底部手柄区域（`height - 40 ± 40px`）已在 `game_system.js` 的 `input_handleInputStart` 中提前拦截，`phase_handleInputStart` 无需重复处理。
 
-### 2.1 胚珠包选择阶段 (Selection Phase)
-- **职责**: 玩家在回合开始前处理 round-start resolver 结算后的遗物线索与胚珠包。当前主循环已取消精华投放，`marble_pack` 是标准 3 弹珠选择入口。
+### 2.1 回合奖励结算阶段 (Round-Start Reward Resolution)
+- **职责**: 玩家在回合开始前处理 round-start resolver 结算后的遗物线索与弹珠包研磨入口。当前主循环不再投放精华奖励；`marble_pack` 是显式研磨入口，`run_resource_pack` 仅用于旧存档兜底。
 - **[tsk-f35c6d10] 普通选择入口**：`sys_startRoundStartResolver()` 队列为空时，**不再**进入普通弹珠选择（`sys_initSelectionPhase()`），改为调用 `sys_showRoundStartBanner()` 直接进入战斗阶段（跳过研磨）。
-- **[胚珠包开局]**：`sys_initGameStart()` 在队列遗物奖励后，额外队列一个 `marble_pack`（`source: 'run_start'`）奖励。遗物选完后，resolver 继续处理该奖励，触发标准 3 枚弹珠选择界面，作为开局弹珠配置入口。开局流程变为：遗物选择 → 胚珠包选择（3 枚弹珠）→ 研磨阶段。
-- **入口**: `sys_startRoundStartResolver()` 会先消费 `pendingRoundStartRewards`；若命中 `relic`，进入遗物事件；若命中 `marble_pack`，则先写入 `pendingSelectionMode.mode = 'standard'` 再调用 `sys_initSelectionPhase()` 呈现胚珠包选择界面。
-- **[tsk-668f3dba] 替换子弹阶段（当前实现）**：当精华触发（`chaos_essence` / `pure_essence`）或标准 `marble_pack` 触发新胚珠研磨，且玩家已有可保留子弹时，系统会在进入选择前将既有子弹写入**充能子弹**（`_chargedAmmoQueue`，`multicast`/`finalHits` 重置为 0）。研磨阶段全部弹珠结算完毕后，若 `_chargedAmmoQueue` 非空，自动调用 `sys_initReplaceAmmoPhase()` 进入替换阶段；否则直接进入战斗。
+- **[杂色包开局]**：`sys_initGameStart()` 在队列遗物奖励后，额外队列一个 `marble_pack`（`packId: 'mixed'`, `source: 'run_start'`）奖励。遗物选完后，resolver 播放弹珠包飞行动画并调用 `sys_startMarblePackGrind()` 直接进入研磨。
+- **入口**: `sys_startRoundStartResolver()` 会先消费 `pendingRoundStartRewards`；若命中 `relic`，进入遗物事件；若命中 `marble_pack`，直接生成 3 枚包内弹珠并进入 `phase_startGatheringPhase()`；若命中旧 `run_resource_pack`，只发放局内碎片并自动继续 resolver。新主循环不得主动队列 `chaos_essence` / `pure_essence`。
+- **弹珠包边界**：`marble_pack` 不得写入 `pendingSelectionMode.sourceRewardType = 'marble_pack'`，不得展示命运选择。商店购买弹珠包后也必须直接进入研磨结算；若已有可保留子弹，`sys_startMarblePackGrind()` 负责写入 `_chargedAmmoQueue`，研磨完成后再进入替换子弹阶段。
+- **[tsk-668f3dba] 替换子弹阶段（当前实现）**：当弹珠包研磨或历史精华兼容流程带有可保留子弹时，系统会将既有子弹写入**充能子弹**（`_chargedAmmoQueue`，`multicast`/`finalHits` 重置为 0）。研磨阶段全部弹珠结算完毕后，若 `_chargedAmmoQueue` 非空，自动调用 `sys_initReplaceAmmoPhase()` 进入替换阶段；否则直接进入战斗。
   - `replaceAmmoContext`：替换阶段上下文，包含 `active`、`newRecipes`（本回合新研磨，左侧）、`chargedRecipes`（上回合充能子弹，右侧）、`selectedIndices`（多选索引数组，默认全选右侧充能子弹）。
   - UI：`ui_renderReplaceAmmoUI()` 展示两行卡片（NEW GRIND / CHARGED），每张卡片显示属性值、Tier 徽章（C/B/A/S）和主属性主题色。玩家可逐张切换选中，必须选 `min(子弹上限, newRecipes.length + chargedRecipes.length)` 张；纯净精华跳过研磨时即使只有 1-2 枚充能子弹，也可以正常确认。
   - 替换确认：`sys_confirmReplaceAmmo()` 按 `selectedIndices` 从 `allRecipes = [...newRecipes, ...chargedRecipes]` 中取出子弹写入 `ammoQueue`，清空 `replaceAmmoContext` 和 `_chargedAmmoQueue`，恢复 gridEl CSS 布局后进入战斗。
@@ -36,14 +37,14 @@ globs: ["src/game_phase.js"]
 - **触发时机**: `sys_startRoundStartResolver()` 的 `pendingRoundStartRewards` 队列为空时，调用 `sys_showRoundStartBanner()`。
 - **局内商人调度**: 在奖励队列清空后、`sys_showRoundStartBanner()` 之前，`sys_maybeOfferRunShopBeforeRoundStart()` 只负责更新商人到访调度并返回 `false`，不得阻塞回合开始横幅。首访固定第 3 回合，后续由 `sys_rollNextRunShopRound()` 按 3..当前回合数随机等待；每次到访停留 2 回合，由右上角紧凑 `#run-shop-status-dock` 在研磨/战斗阶段显示到访/离开倒计时并打开商店。
 - **充能触发条件**: 普通回合开始横幅不触发子弹充能；`ammoQueue` 只来自当前保留的最多 3 枚弹珠或显式替换确认。三发上限来自三枚晶石核心充能位，禁止通过遗物或存档字段扩大选择数量。
-- **弹珠包替换边界**：`marble_pack` 是显式新研磨入口；若进入该选择时已有 `_lastFiredAmmoSnapshot`、`ammoQueue` 或可编译的 `marbleQueue`，`sys_initSelectionPhase()` 必须预设 `_chargedAmmoQueue`，让新研磨完成后进入子弹选择。普通回合横幅仍不得自行重建或充能子弹。
+- **旧资源包边界**：`run_resource_pack` 只增加 `runFragments` 并播放资源反馈，不得进入 `selection` / `gathering`，不得重建 `marbleQueue` 或 `_chargedAmmoQueue`。新主循环应使用局内商店弹珠包作为研磨入口。
 - **弹珠符文槽**: 选择阶段的弹珠预览面板允许把符文直接融合进已选弹珠；每颗弹珠最多 3 个 `runeSlots`，融合会立即消耗 `runeInventory` 中的符文。进入研磨/编译时槽位以 `source: 'rune_slot'` 临时加入属性，结算写回 `marble.collected` 时必须过滤，避免重复叠层。
-- **实现**: 先调用 `phase_switchPhase('combat')` 切换背景，然后显示 `#round-start-banner` 全屏大字提示（「第 X 回合開始」），持续约 1.5 秒后自动调用 `phase_startCombatPhase()` 进入战斗。只有精华/命运选择确认才会调用 `phase_startGatheringPhase()`。
+- **实现**: 先调用 `phase_switchPhase('combat')` 切换背景，然后显示 `#round-start-banner` 游戏容器内大字提示（「第 X 回合開始」），持续约 1.5 秒后自动调用 `phase_startCombatPhase()` 进入战斗。只有弹珠包开包/历史精华兼容等显式研磨入口才会调用 `phase_startGatheringPhase()`。
 - **子弹队列边界（2026-06-19）**: `sys_showRoundStartBanner()` 只负责进入下一轮战斗阶段，普通回合开始时不得从 `_lastFiredAmmoSnapshot` 或 `marbleQueue` 重建 `ammoQueue`。这两个来源仅用于精华触发 / 子弹替换等显式充能流程，避免下一回合待发射子弹串成上一轮保留子弹或新生成候选弹珠。
 - **空弹珠兜底（2026-06-19）**: `phase_startGatheringPhase()` 只允许由精华/命运选择等显式研磨入口调用，并必须在真正初始化时确认 `marbleQueue` 非空；若存档恢复、overlay 返回或特殊流程清空了队列，应通过 `buildFallbackMarbleQueue()` 从选择池/当前权重补齐可发射弹珠，禁止进入没有弹珠的研磨阶段。
 - **充能特效**: 同时为 `#pc-left-sidebar` 添加 CSS 动画类 `.ammo-panel-charging`（high/medium 档：边框光流扫过）或 `.ammo-panel-charging-simple`（low 档：简单淡入淡出）。
 - **性能门控**: 特效等级由 `CONFIG.performance[perfQualityLevel].roundStartBannerGlow` 控制（high/medium: `true`，low: `false`）。
-- **DOM 元素**: `#round-start-banner`（全屏覆盖层，z-index: 9500）、`#round-start-banner-text`（大字文本）。
+- **DOM 元素**: `#round-start-banner`（`#game-container` 内绝对定位覆盖层，z-index: 9500，禁止使用 `100vw/100vh` 作为居中基准）、`#round-start-banner-text`（大字文本）。
 - **CSS 类**: `.round-banner-hide`（隐藏）、`.round-banner-show`（显示）、`.round-banner-glow`（光晕动画，需 high/medium 档）。
 
 ### 2.2 研磨阶段 (Gathering Phase)
@@ -60,7 +61,8 @@ globs: ["src/game_phase.js"]
 - **组件实例**：`currentModuleLayout` 的管理单位是钉盘组件实例 `{ id, uid, pegStates, pluginStates }`；多格组件的非锚点槽位使用 `{ ref: anchorIdx }`。旧版字符串布局只允许在 `ensureModuleLayoutInstances()` 中兼容升级。
 - **组件库存**：可替换来源必须是 `ownedModuleComponents` 中的组件实例。商店或遗物获得组件时只能向该库存加入 1 个实例，禁止通过 `unlockedModuleTypes` 形成“解锁一次即可无限替换”的模板仓库。
 - **融合承载模块**：初始盘使用 `rune_lattice_light` 作为轻量符文融合承载组件，`rune_lattice` / `rune_focus_module` 是后续可获得的强化融合组件；三者通过 `fusionPriority` 标记影响符文注入落点。
-- **模块扩展池**：商店可出售的组件可组合现有 Peg / `SpecialSlot` 能力形成新玩法，如 `split_gate_module`（分裂槽）、`recall_loop_module`（召回槽）、`cascade_bank_module`（弹钉斜坡）、`crucible_core_module`（固定属性三角）、`double_wheel_module`（双轮盘）、`fusion_garden_module`（2x1 融合承载）、`split_yoke_module`（Y 字分流）、`hourglass_gate_module`（1x2 聚焦/分流）、`crescent_bank_module`（2x1 横移导流）、`spiral_return_module`（2x2 回收）、`prism_splitter_module`（固定属性分光）和 `twin_wheel_bridge_module`（3x1 双轮盘横桥）。
+- **模块扩展池**：商店可出售的组件可组合现有 Peg / `SpecialSlot` 能力形成新玩法，如 `split_gate_module`（分裂槽）、`recall_loop_module`（召回槽）、`cascade_bank_module`（弹钉斜坡）、`crucible_core_module`（固定属性三角）、`double_wheel_module`（双轮盘）、`fusion_garden_module`（2x1 融合承载）、`split_yoke_module`（Y 字分流）、`hourglass_gate_module`（1x2 聚焦/分流）、`crescent_bank_module`（2x1 横移导流）、`spiral_return_module`（2x2 回收）、`prism_splitter_module`（固定属性分光）、`twin_wheel_bridge_module`（3x1 双轮盘横桥）、`launcher_gate_module`（旋向高速发射槽）、`pinwheel_capacitor_module`（5 杆连射蓄能轮）、`turbine_loop_module`（杆轮 + 发射器回路）和 `swerve_cannon_module`（定向斜炮）。
+- **机关槽位语义**：`SpecialSlot` 可使用 `launcher` 与 `energy_wheel` 两种可重复触发机关。两者必须设置 `persistent: true`、`activationCooldown` 和 `maxCharges`，通过 `tryActivate()` 控制同一研磨会话的触发上限；旧 `recall` / `multicast` / `split` / `wheel` 槽仍保持触发后消失。`launcher` 只改变当前弹珠速度与位置，`energy_wheel` 只向最多 3 个当前 `gatheringSessions` 增加 `multicast`，不得直接改写 `ammoQueue` 或跨阶段状态。
 - **组件路线元数据**：组件可通过 `shape` 声明 `footprint`、`entry`、`exit`。该元数据只用于商店/编辑器说明与后续轻量轮廓绘制，不参与物理结算。
 - **编辑器轮廓**：`render_moduleEditorOverlay()` 会根据 `shape.footprint` 绘制轻量组件轮廓（导流翼、菱格、杯形、沙漏、螺旋、桥形等）。轮廓仅使用平面 `stroke` / 曲线，不得新增粒子、渐变或额外 `shadowBlur`。
 - **编辑器入口与点击语义**：研磨阶段只显示「编辑钉板」入口，玩家点击后才进入编辑态；`render_moduleEditorOverlay()` 只在编辑态绘制槽位选择提示。`_moduleEditor_handleClick()` 只能选中槽位和刷新预览，装备/卸下必须由库存栏中的「装备到槽位」/「卸下」按钮确认。
@@ -108,6 +110,8 @@ globs: ["src/game_phase.js"]
   - `-100 < temp <= -50`：根据温度概率冰冻（0% ~ 100% 线性增加）。
 - **冰冻衰减机制**：若判定被冰冻，则 `e.isFrozenCurrentTurn = true` 且 `e.frozenCount` 增加 1。该计数用于在 `Enemy.applyTemp` 中衰减后续的降温效果（系数为 `0.9 ^ frozenCount`）。
 - **温度回暖**：每回合结算时，负温度减半（`Math.ceil(e.temp / 2)`），正温度自然衰减或造成燃烧伤害。
+- **Ignis 温压例外（2026-06-22）**：`bossType === 'ignis'` 时，100℃以上的正温结算不得调用普通燃烧 DoT。`phase_enemy_processTurn()` 会把 `temp - 100` 加上 `bossConfigs.ignis.furnacePressureBaseGain` 转为 `furnacePressure`，温压达到 `furnacePressureThreshold` 时触发 `Enemy._grantRadiantAegisPulse()`；cryo 命中和负温结算按配置比例泄压。该逻辑只属于 Ignis，不得影响普通敌人的过热路径。
+- **Tesla 导体网络（2026-06-22）**：`Enemy.startTurnAction()` 在 Tesla 未暴露破绽、未被冻结时调用 `_tickTeslaNetwork(game)`。该 tick 会先电击随机非 Boss 敌人并转为导体，再按导体数量/充能状态结算 `teslaFieldPower`、召唤进度和非重叠导体生成。`phase_enemy_startLogic()` 同时递减导体 `_teslaChargedTurns`，到期移除由 Tesla 机制授予的临时 `haste`。
 
 ## 5. Boss 系统规范
 
@@ -149,6 +153,7 @@ globs: ["src/game_phase.js"]
 - **狂暴阶段**: Boss HP < 50% 时自动触发，通过 `combat_triggerBossEnrage` 处理
 - 狂暴状态存储在 `boss.berserked` 属性中，防止重复触发
 - 狂暴触发后通过 EventBus 广播 `boss:phase_change` 事件
+- **破绽暴露停摆**: 当 Boss 存在 `_bossVulnerabilityExposedTurns > 0` 时，敌人回合仍会进入 `startTurnAction()` 以消费 1 个暴露回合，但必须跳过 Boss 物理状态机、预警、特殊行动、移动和 Ouroboros 轮转；`_willMoveThisTurn` 预计算应为 `false`，避免 UI 误报本回合移动。
 
 ### 4.4 Boss 事件类型
 | 事件名 | 触发时机 | 数据字段 |
@@ -162,12 +167,12 @@ globs: ["src/game_phase.js"]
 | Boss ID | 名称 | 类型 | 核心特性 |
 |---|---|---|---|
 | `ignis` | 烈焰之心 | Mini-Boss | 护盾+狂暴，狂暴后护盾翻倍，每回合温度急剧上升并对周围敌人造成火焰溅射伤害 |
-| `glacies` | 冰封山峡 | Mini-Boss | 跳跃+再生，狂暴后跳跃行数+1，且落地冻结周围 Peg 2 回合 |
+| `glacies` | 冰封山峡 | Mini-Boss | 跳跃+再生，回合 tick / 跳跃落地在战斗场内制造霜缝；霜缝缝住专属随从或周围敌人，提供短暂减伤、回血与护盾，cryo / pierce 可反制；不再影响 Peg |
 | `mikro` | 细胞山峡 | Mini-Boss | 分裂+极速，狂暴后分裂概率 100% |
 | `devourer` | 噬神者 | Mini-Boss | 吞噬相邻敌人获得护盾层数 |
 | `viridis` | 绿色山峡 | 大 Boss | 治疗者，狂暴后治疗范围扩大到全场 |
-| `tesla` | 特斯拉山峡 | 大 Boss | 极速+多次行动，狂暴后行动次数再+1 |
-| `chimera` | 奇美拉 | 大 Boss | 初始高温，狂暴后温度直接达到阈值 |
+| `tesla` | 特斯拉山峡 | 大 Boss | 导体网络场强：每回合电击并转化导体，场强提升行动与召唤压力，cryo / bounce 可反制 |
+| `chimera` | 奇美拉 | 大 Boss | 回合开始触发 +2 格胃域吸引与养料召唤；专属吞噬动作吞噬胃域内所有非 Boss 敌人并继承负面状态 / 温度相加 |
 | `ouroboros` | 奥罗波罗斯 | 大 Boss | 每 N 回合切换词缀组，狂暴后切换加速 |
 
 ## 6. Boss 遗物与 round-start 延迟奖励处理
@@ -214,8 +219,13 @@ globs: ["src/game_phase.js"]
   - `postBossMultiplier` 每次减 0.1，直到恢复至 1.0。
 
 ### 8.2 Boss 底线怜悯掉落 (Pity Drop)
-- **触发时机**: 敌人越过失败线时（`input_checkDefeat` 检测到越线）
-- **机制**: 
+- **触发时机**: 敌人在没有防线屏障保护时越过失败线（`input_checkDefeat` 检测到越线）
+- **防线屏障前置规则**:
+  - `playerShield > 0` 时，守护者结界不是越线后抵消失败，而是在失败线前形成能量屏障。
+  - 敌人移动到屏障前的当回合只会被拦停；下一次移动尝试会撞击屏障并消耗 `占格数 × 词缀倍率` 层 `playerShield`，本次不再移动。
+  - `siegeBreaker`（撞城者）会让屏障伤害再乘以 `CONFIG.balance.affixes.siegeBreakerDamageMult`；非 1×1 大型敌人默认按 `gridCols × gridRows` 计算防线伤害。
+  - `input_checkDefeat` 只负责兜底把越线敌人夹回屏障位置，不得扣盾或删除敌人。
+- **怜悯掉落机制**:
   - 如果越线的敌人是 Boss（`e.type === 'boss'`），触发 `_triggerPityDrop` 怜悯掉落。
   - 系统分析玩家近期的伤害历史，找出主属性（占比最高的属性）。
   - 将该主属性作为 `themeWeights` 注入 `loot_calcRuneDrop`。

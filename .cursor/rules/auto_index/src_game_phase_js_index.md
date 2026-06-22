@@ -1,9 +1,9 @@
 # src\game_phase.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 4060 | 函数数: 38 | 语言: javascript
+> 自动生成于 2026-06-22 | 总行数: 4133 | 函数数: 38 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 4 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -33,7 +33,7 @@
 | phase_gathering_createSession | method | `phase_gathering_createSession(marbleDef, marbleIndex)` |  |
 | phase_gathering_launchMarbleBatch | method | `phase_gathering_launchMarbleBatch(pos)` |  |
 | phase_handleInputStart | method | `phase_handleInputStart(pos)` |  |
-| phase_enemy_processTurn | method | `phase_enemy_processTurn(e)` |  |
+| phase_enemy_processTurn | method | `phase_enemy_processTurn(e)` | ⚠️ 巨型函数，见 @section 导航 |
 | phase_claimPendingRunes | method | `phase_claimPendingRunes()` |  |
 | phase_inWallClearTrigger | method | `phase_inWallClearTrigger()` |  |
 | phase_enemy_startLogic | method | `phase_enemy_startLogic()` |  |
@@ -62,6 +62,10 @@
 | `@section:pachinko_inherit_state` | 继承上局状态（符文/弹珠/加成） |
 | `@section:pachinko_special_pegs` | 特殊钉子生成（布局角色分配） |
 | `@section:pachinko_ui_init` | 弹珠台 UI 初始化与事件绑定 |
+
+### phase_enemy_processTurn
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
 
 ### phase_combat_update
 

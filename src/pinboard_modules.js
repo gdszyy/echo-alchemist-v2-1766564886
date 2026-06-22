@@ -1356,6 +1356,184 @@ MODULE_DEFS.twin_wheel_bridge_module = {
     },
 };
 
+MODULE_DEFS.launcher_gate_module = {
+    id: 'launcher_gate_module',
+    name: '旋向发射槽',
+    icon: '↪',
+    desc: '2x1 入口槽接持续旋转发射器，弹珠穿过时按当前朝向高速射出。',
+    rarity: 'rare',
+    price: 95,
+    tags: ['showcase'],
+    span: { cols: 2, rows: 1 },
+    shape: { footprint: 'launcher', entry: 'top-center', exit: 'rotating-shot' },
+    build(ox, oy, w, h) {
+        const pegs = [
+            makePegAt(ox, oy, w, h, 0.18, 0.24, 'normal', 0, 0),
+            makePegAt(ox, oy, w, h, 0.50, 0.18, 'pink', 0, 2),
+            makePegAt(ox, oy, w, h, 0.82, 0.24, 'normal', 0, 4),
+            makePegAt(ox, oy, w, h, 0.26, 0.70, 'normal', 2, 1),
+            makePegAt(ox, oy, w, h, 0.74, 0.70, 'normal', 2, 3),
+        ];
+        const leftRail = makeBarrierAt(ox, oy, w, h, 0.24, 0.38, 0.42, 0.58, 'pink', 1, 0);
+        const rightRail = makeBarrierAt(ox, oy, w, h, 0.76, 0.38, 0.58, 0.58, 'pink', 1, 4);
+        leftRail.layoutRole = 'launcher_gate_rail';
+        rightRail.layoutRole = 'launcher_gate_rail';
+        pegs.push(leftRail, rightRail);
+        pegs.forEach(p => { p.layoutRole = p.layoutRole || 'launcher_gate'; });
+        const specialSlots = [new SpecialSlot(
+            ox + w * 0.42, oy + h * 0.56,
+            ox + w * 0.58, oy + h * 0.56,
+            'launcher',
+            {
+                persistent: true,
+                maxCharges: 4,
+                activationCooldown: 18,
+                launchDirection: -Math.PI / 2,
+                launchSpeed: 14.5,
+                rotationSpeed: 0.085,
+                spinRadius: Math.min(w, h) * 0.18,
+            }
+        )];
+        return { pegs, specialSlots };
+    },
+};
+
+MODULE_DEFS.pinwheel_capacitor_module = {
+    id: 'pinwheel_capacitor_module',
+    name: '蓄能杆轮',
+    icon: '⚙',
+    desc: '5 杆转轮，弹珠撞入后为最多 3 枚当前弹珠各储存 1 层连射能量。',
+    rarity: 'epic',
+    price: 110,
+    tags: ['showcase'],
+    shape: { footprint: 'pinwheel', entry: 'top', exit: 'multicast' },
+    build(ox, oy, w, h) {
+        const anchors = [
+            [0.22, 0.26, 'normal'], [0.78, 0.26, 'normal'],
+            [0.26, 0.76, 'normal'], [0.74, 0.76, 'normal'],
+            [0.50, 0.14, 'pink'],
+        ];
+        const pegs = anchors.map(([px, py, type], i) => {
+            const peg = makePegAt(ox, oy, w, h, px, py, type, Math.floor(i / 2), i % 2);
+            peg.layoutRole = 'pinwheel_capacitor';
+            return peg;
+        });
+        const specialSlots = [new SpecialSlot(
+            ox + w * 0.32, oy + h * 0.52,
+            ox + w * 0.68, oy + h * 0.52,
+            'energy_wheel',
+            {
+                persistent: true,
+                maxCharges: 3,
+                activationCooldown: 20,
+                rodCount: 5,
+                spinRadius: Math.min(w, h) * 0.22,
+                rotationSpeed: 0.095,
+            }
+        )];
+        return { pegs, specialSlots };
+    },
+};
+
+MODULE_DEFS.turbine_loop_module = {
+    id: 'turbine_loop_module',
+    name: '涡轮回路',
+    icon: 'T',
+    desc: '2x2 大型机关：上层杆轮充连射，下层旋向发射器把弹珠重新打回盘面。',
+    rarity: 'legendary',
+    price: 155,
+    tags: ['showcase'],
+    span: { cols: 2, rows: 2 },
+    shape: { footprint: 'turbine', entry: 'top', exit: 'loop-shot' },
+    build(ox, oy, w, h) {
+        const pegs = [
+            makePegAt(ox, oy, w, h, 0.22, 0.16, 'normal', 0, 0),
+            makePegAt(ox, oy, w, h, 0.50, 0.12, 'pink', 0, 2),
+            makePegAt(ox, oy, w, h, 0.78, 0.16, 'normal', 0, 4),
+            makePegAt(ox, oy, w, h, 0.18, 0.38, 'pink', 1, 0),
+            makePegAt(ox, oy, w, h, 0.82, 0.38, 'pink', 1, 4),
+            makePegAt(ox, oy, w, h, 0.30, 0.70, 'normal', 3, 1),
+            makePegAt(ox, oy, w, h, 0.70, 0.70, 'normal', 3, 3),
+            makePegAt(ox, oy, w, h, 0.50, 0.86, 'normal', 4, 2),
+        ];
+        const leftWall = makeBarrierAt(ox, oy, w, h, 0.18, 0.52, 0.34, 0.82, 'pink', 2, 0);
+        const rightWall = makeBarrierAt(ox, oy, w, h, 0.82, 0.52, 0.66, 0.82, 'pink', 2, 4);
+        leftWall.layoutRole = 'turbine_loop_wall';
+        rightWall.layoutRole = 'turbine_loop_wall';
+        pegs.push(leftWall, rightWall);
+        pegs.forEach(p => { p.layoutRole = p.layoutRole || 'turbine_loop'; });
+        const specialSlots = [
+            new SpecialSlot(
+                ox + w * 0.34, oy + h * 0.36,
+                ox + w * 0.66, oy + h * 0.36,
+                'energy_wheel',
+                {
+                    persistent: true,
+                    maxCharges: 3,
+                    activationCooldown: 22,
+                    rodCount: 5,
+                    spinRadius: Math.min(w, h) * 0.13,
+                    rotationSpeed: 0.08,
+                }
+            ),
+            new SpecialSlot(
+                ox + w * 0.42, oy + h * 0.70,
+                ox + w * 0.58, oy + h * 0.70,
+                'launcher',
+                {
+                    persistent: true,
+                    maxCharges: 3,
+                    activationCooldown: 24,
+                    launchDirection: -Math.PI / 2,
+                    launchSpeed: 13.5,
+                    rotationSpeed: 0.07,
+                    spinRadius: Math.min(w, h) * 0.13,
+                }
+            ),
+        ];
+        return { pegs, specialSlots };
+    },
+};
+
+MODULE_DEFS.swerve_cannon_module = {
+    id: 'swerve_cannon_module',
+    name: '偏航斜炮',
+    icon: '↗',
+    desc: '1x2 定向加速器，把落入侧槽的弹珠高速斜射回中上区。',
+    rarity: 'rare',
+    price: 85,
+    tags: ['showcase'],
+    span: { cols: 1, rows: 2 },
+    shape: { footprint: 'cannon', entry: 'side', exit: 'up-right' },
+    build(ox, oy, w, h) {
+        const pegs = [
+            makePegAt(ox, oy, w, h, 0.28, 0.18, 'normal', 0, 0),
+            makePegAt(ox, oy, w, h, 0.72, 0.28, 'pink', 0, 1),
+            makePegAt(ox, oy, w, h, 0.28, 0.52, 'pink', 1, 0),
+            makePegAt(ox, oy, w, h, 0.72, 0.76, 'normal', 2, 1),
+        ];
+        const rail = makeBarrierAt(ox, oy, w, h, 0.20, 0.72, 0.72, 0.48, 'pink', 3, 0);
+        rail.layoutRole = 'swerve_cannon_rail';
+        pegs.push(rail);
+        pegs.forEach(p => { p.layoutRole = p.layoutRole || 'swerve_cannon'; });
+        const specialSlots = [new SpecialSlot(
+            ox + w * 0.28, oy + h * 0.58,
+            ox + w * 0.70, oy + h * 0.46,
+            'launcher',
+            {
+                persistent: true,
+                maxCharges: 3,
+                activationCooldown: 20,
+                launchDirection: { x: 0.75, y: -1 },
+                launchSpeed: 13,
+                spinVisual: false,
+                spinRadius: Math.min(w, h) * 0.20,
+            }
+        )];
+        return { pegs, specialSlots };
+    },
+};
+
 export const ATTR_PIN_TYPES = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'wind'];
 const ATTR_PIN_META = {
     bounce: { name: '彈性釘板', icon: '🔵' },

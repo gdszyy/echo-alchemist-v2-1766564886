@@ -502,6 +502,16 @@ export const ui_system = {
             cardBg = 'linear-gradient(160deg,#0c4a6e 0%,#082f49 60%,#020f1a 100%)';
             cardBorder = '#38bdf8';
             title = '純淨精華';
+        } else if (type === 'run_resource_pack') {
+            icon = '💰'; glow = 'rgba(251, 191, 36, 0.9)';
+            cardBg = 'linear-gradient(160deg,#854d0e 0%,#422006 60%,#120a02 100%)';
+            cardBorder = '#facc15';
+            title = '资源包';
+        } else if (type === 'marble_pack') {
+            icon = '🔮'; glow = 'rgba(125, 211, 252, 0.85)';
+            cardBg = 'linear-gradient(160deg,#164e63 0%,#0f172a 58%,#020617 100%)';
+            cardBorder = '#67e8f9';
+            title = '杂色弹珠包';
         }
 
         // ---- A. 掉落物开启脉冲 + 光束迸发（保留原图标位置感） ----
@@ -657,8 +667,8 @@ export const ui_system = {
         countEl.innerText = String(shield);
         pill.classList.toggle('is-visible', shield > 0 && this.phase !== 'meta');
         pill.title = shield > 0
-            ? `守护者结界：剩余 ${shield} 层。敌人越线时消耗 1 层并抵消失败。`
-            : '守护者结界：当前没有护盾';
+            ? `守护者结界：防线屏障剩余 ${shield} 层。敌人抵达防线前会被拦停，后续移动撞击消耗 1 层。`
+            : '守护者结界：当前没有防线屏障';
     },
 
     ui_updateCombatStatusPanel(force = false) {
@@ -1545,6 +1555,11 @@ export const ui_system = {
 
     ui_rerollMarbleSelection() {
         if (this.phase !== 'selection' || (this.replaceAmmoContext && this.replaceAmmoContext.active)) return;
+        const isFateSelection = this.selectionMode === 'chaos_essence' || this.selectionMode === 'pure_essence';
+        if (!isFateSelection) {
+            if (window.showToast) showToast('\u80da\u73e0\u5305\u4e0d\u80fd\u4f7f\u7528\u547d\u8fd0\u91cd\u94f8\u3002');
+            return;
+        }
         if (!(this.ownedRelics || []).includes('fate_reroll_token')) {
             if (window.showToast) showToast('需要遗物「命运重铸币」才能刷新弹珠候选。');
             return;
@@ -1575,6 +1590,7 @@ export const ui_system = {
             this.ui_renderReplaceAmmoUI();
             return;
         }
+        const isFateSelection = this.selectionMode === 'chaos_essence' || this.selectionMode === 'pure_essence';
         const countEl = document.getElementById('selected-count');
         const requiredEl = document.getElementById('selected-required-count');
         const labelEl = document.getElementById('selection-mode-label');
@@ -1646,7 +1662,7 @@ export const ui_system = {
                 ? '\u6ce8\u5165\u5f8c\u958b\u59cb\u7df4\u91d1'
                 : this.selectionMode === 'chaos_essence'
                     ? '\u63a5\u53d7\u547d\u904b\u5f8c\u958b\u59cb\u7df4\u91d1'
-                    : '\u958b\u59cb\u7df4\u91d1';
+                    : '\u4fdd\u7559\u80da\u73e0\u5e76\u5f00\u59cb\u70bc\u91d1';
         }
         let rerollBtn = document.getElementById('selection-reroll-btn');
         if (!rerollBtn && confirmBtn && confirmBtn.parentNode) {
@@ -1657,7 +1673,7 @@ export const ui_system = {
         }
         if (rerollBtn) {
             const hasRerollRelic = (this.ownedRelics || []).includes('fate_reroll_token');
-            const canReroll = hasRerollRelic && !this.selectionRerollUsed && this.phase === 'selection';
+            const canReroll = isFateSelection && hasRerollRelic && !this.selectionRerollUsed && this.phase === 'selection';
             rerollBtn.style.display = canReroll ? 'flex' : 'none';
             rerollBtn.innerHTML = '<span>🪙</span><span>刷新弹珠候选</span>';
             rerollBtn.onclick = () => this.ui_rerollMarbleSelection();

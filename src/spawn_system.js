@@ -13,7 +13,13 @@ import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
 import { interpolateAffixWeights, weightedRandom, getEliteDualAffixChance } from './utils/math_utils.js';
-import { ENEMY_WAVE_PRESETS, ENEMY_WAVE_PRESET_ARCHETYPES } from './wave_presets.js';
+import {
+    ENEMY_WAVE_PRESETS,
+    ENEMY_WAVE_PRESET_ARCHETYPES,
+    DIRECTOR_SCRIPTS,
+    DIRECTOR_SCRIPT_CONFIG,
+    DIRECTOR_ACTOR_INTRO_ROUNDS,
+} from './wave_presets.js';
 
 /**
  * [导演系统] 方阵突击（Phalanx）阵型模板
@@ -186,6 +192,23 @@ export const spawn_system = {
         return affixes;
     },
 
+    spawn_getBossMinionProfile(bossId) {
+        const cfg = CONFIG.balance.bossEntranceShockwave || {};
+        const profiles = cfg.bossMinionProfiles || {};
+        return profiles[bossId] || null;
+    },
+
+    spawn_applyBossMinionMetadata(e, bossId, profile = null, roleOverride = null) {
+        if (!e || !bossId) return;
+        const minionProfile = profile || this.spawn_getBossMinionProfile(bossId) || {};
+        e.bossOwnerId = bossId;
+        e.bossMinionRole = roleOverride || minionProfile.role || 'boss_minion';
+        e.bossMechanicTags = Array.isArray(minionProfile.tags) ? [...minionProfile.tags] : [];
+        if (bossId === 'ignis') {
+            e.furnacePressureThreshold = CONFIG.balance.bossConfigs?.ignis?.furnacePressureThreshold || 45;
+        }
+    },
+
 /**
      * @method spawnEnemyRowAt
      * @description [重构V3] 导演系统 + 机会生成器
@@ -237,6 +260,9 @@ export const spawn_system = {
         // ----------------------------
 
         const w = this.enemyWidth;
+        const directorProfile = typeof this.spawn_getDirectorPressureProfile === 'function'
+            ? this.spawn_getDirectorPressureProfile()
+            : null;
         
         // 标记占用状态：true 表示该列已被"处理"（可能是生成了怪，也可能是强制留空）
         const occupiedCols = Array(CONFIG.gameplay.enemyCols).fill(false);
@@ -245,7 +271,10 @@ export const spawn_system = {
         // =========================================
         // 1. 导演系统 (The Director) - 生成精英小队
         // =========================================
-        const directorChance = Math.min(0.35, 0.15 + (this.round * 0.01));
+        const directorPressureBonus = directorProfile
+            ? Math.min(0.18, directorProfile.dominanceLevel * 0.06 + (directorProfile.topPinned ? 0.04 : 0))
+            : 0;
+        const directorChance = Math.min(0.52, 0.15 + (this.round * 0.01) + directorPressureBonus);
         if (Math.random() < directorChance) {
             let playerHasCryo = false;
             let playerHasPyro = false;
@@ -416,7 +445,10 @@ export const spawn_system = {
         // 仅在非 Boss 覆盖的区域生效（Boss战通常不生成普通行，这里作为防御性判断）
         // 概率：初期(前15关)极高，给玩家爽感
         let layoutType = 'random'; 
-        const helpChance = Math.max(0.42, 0.99 - (this.round * 0.02)); 
+        const helpPressureCut = directorProfile
+            ? Math.min(0.34, directorProfile.dominanceLevel * 0.12 + (directorProfile.topPinned ? 0.08 : 0))
+            : 0;
+        const helpChance = Math.max(0.24, Math.max(0.42, 0.99 - (this.round * 0.02)) - helpPressureCut);
 
         if (Math.random() < helpChance) {
             const types = ['gap', 'checkerboard'];
@@ -452,7 +484,10 @@ export const spawn_system = {
         // 详见 design_spec_bitmap.md / "敌人视觉设计 V2" 文档：
         // 不同尺寸（1x1、2x1、1x2、2x2、3x1、1x3、2x3、3x2、3x3）对应不同基底，
         // 每个基底绑定一个专属词条；专属词条不进入随机词条池。
-        const wavePresetSpawned = this.spawn_trySpawnWavePreset(yPos, baseHP, occupiedCols, w, options);
+        const wavePresetSpawned = this.spawn_trySpawnWavePreset(yPos, baseHP, occupiedCols, w, {
+            ...options,
+            directorProfile,
+        });
         if (!wavePresetSpawned) {
             this.spawn_trySpawnArchetypes(yPos, baseHP, occupiedCols, w, options);
         }
@@ -460,7 +495,11 @@ export const spawn_system = {
         // =========================================
         // 3. 填充剩余空位 (Fill Loop)
         // =========================================
-        const minEnemies = Math.min(CONFIG.gameplay.enemyCols, CONFIG.gameplay.spawnMin + Math.floor(this.round / 4));
+        const pressureMinBonus = directorProfile && directorProfile.dominanceLevel >= 2 ? 1 : 0;
+        const minEnemies = Math.min(
+            CONFIG.gameplay.enemyCols,
+            CONFIG.gameplay.spawnMin + Math.floor(this.round / 4) + pressureMinBonus
+        );
 
         // 计算当前已确定的敌人数量 (导演生成的)
         let currentCount = pendingSpawns.length;
@@ -509,6 +548,9 @@ export const spawn_system = {
                 // [新增] 初始化护盾层数 (1 + 回合数)
                 if (e.affixes.includes('shield')) {
                     e.shieldCharges = 1 + this.round;
+                }
+                if (e.affixes.includes('radiantAegis') && typeof e._initRadiantAegis === 'function') {
+                    e._initRadiantAegis();
                 }
 
                 // [新增] 根据 Boss 历史分配随从异型几何形状
@@ -563,6 +605,9 @@ export const spawn_system = {
                 // [新增] 初始化护盾层数
                 if (e.affixes.includes('shield')) {
                     e.shieldCharges = 1 + this.round;
+                }
+                if (e.affixes.includes('radiantAegis') && typeof e._initRadiantAegis === 'function') {
+                    e._initRadiantAegis();
                 }
 
                 // [B.3] 应用 extraInit 额外初始化参数（如 thermal_bomb 的初始温度）
@@ -818,8 +863,9 @@ export const spawn_system = {
 
         const isBoss = tier === 'boss';
         const isElite = tier === 'elite';
-        const sparkColor = isBoss ? '#facc15' : (isElite ? '#c084fc' : '#a855f7');
-        const sparkleCount = isBoss ? 14 : (isElite ? 9 : 5);
+        const isResourcePack = tier === 'resource_pack';
+        const sparkColor = (isBoss || isResourcePack) ? '#facc15' : (isElite ? '#c084fc' : '#a855f7');
+        const sparkleCount = isResourcePack ? 18 : (isBoss ? 14 : (isElite ? 9 : 5));
 
         if (typeof this.spawn_createParticle === 'function') {
             for (let i = 0; i < sparkleCount; i++) {
@@ -833,11 +879,11 @@ export const spawn_system = {
                 );
             }
         }
-        if (typeof this.spawn_createShockwave === 'function' && (isBoss || isElite)) {
+        if (typeof this.spawn_createShockwave === 'function' && (isBoss || isElite || isResourcePack)) {
             this.spawn_createShockwave(x, y, sparkColor);
         }
         if (typeof this.spawn_createFloatingText === 'function') {
-            const fontSize = isBoss ? 18 : (isElite ? 15 : 13);
+            const fontSize = isResourcePack ? 20 : (isBoss ? 18 : (isElite ? 15 : 13));
             this.spawn_createFloatingText(x, y - 22, `+${count} 🔮`, sparkColor, fontSize);
         }
     },
@@ -1976,10 +2022,25 @@ export const spawn_system = {
         boss.isBigBoss = isBigBoss;
         boss.berserked = false; // 狂暴阶段标志
         boss._bossVulnerabilityProgress = 0;
+        boss._bossVulnerabilityVisualRatio = 0;
+        boss._bossVulnerabilityVisualAttrs = [];
+        boss._bossVulnerabilityExposedTurns = 0;
         boss._bossVulnerabilityExposedHits = 0;
+        boss._bossVulnerabilityExposedPart = null;
         boss._bossVulnerabilitySuppressedEnrage = false;
+        boss._bossVulnerabilityBreakTimer = 0;
+        boss._bossVulnerabilityRecoverTimer = 0;
         
         // 分配异型碰撞形状
+        const buildEllipseVertices = (rx, ry, count = 12, phase = -Math.PI / 2) => {
+            const vertices = [];
+            for (let i = 0; i < count; i++) {
+                const a = phase + (i / count) * Math.PI * 2;
+                vertices.push(new Vec2(Math.cos(a) * rx, Math.sin(a) * ry));
+            }
+            return vertices;
+        };
+
         switch(bossId) {
             case 'ignis':
                 boss.collisionShape = 'polygon';
@@ -2005,21 +2066,24 @@ export const spawn_system = {
                 };
                 break;
             case 'mikro':
-                boss.collisionShape = 'arc';
+                boss.collisionShape = 'polygon';
                 boss.collisionData = {
-                    radius: bossW * 0.3,
-                    startAngle: 0,
-                    endAngle: Math.PI * 2,
-                    thickness: bossH * 0.1
+                    vertices: buildEllipseVertices(bossW * 0.32, bossH * 0.46, 12)
                 };
                 break;
             case 'devourer':
-                boss.collisionShape = 'arc';
+                boss.collisionShape = 'polygon';
                 boss.collisionData = {
-                    radius: bossW * 0.35,
-                    startAngle: Math.PI * 0.25, // 下方缺口
-                    endAngle: Math.PI * 1.75,
-                    thickness: bossH * 0.15
+                    vertices: [
+                        new Vec2(-bossW * 0.42, -bossH * 0.34), // 左上胃壁
+                        new Vec2(-bossW * 0.10, -bossH * 0.46), // 上颚
+                        new Vec2( bossW * 0.34, -bossH * 0.38), // 右上颚
+                        new Vec2( bossW * 0.46, -bossH * 0.02), // 右侧胃囊
+                        new Vec2( bossW * 0.32,  bossH * 0.40), // 右下齿槽
+                        new Vec2( 0,             bossH * 0.50), // 下颚
+                        new Vec2(-bossW * 0.38,  bossH * 0.34), // 左下齿槽
+                        new Vec2(-bossW * 0.48, -bossH * 0.02)  // 左侧胃囊
+                    ]
                 };
                 boss.devourState = 'IDLE';
                 boss.devourTimer = 0;
@@ -2064,10 +2128,10 @@ export const spawn_system = {
                 boss.collisionData = {
                     radius: bossW * 0.4,
                     startAngle: 0,
-                    endAngle: Math.PI * 1.5, // 缺口 90 度
+                    endAngle: Math.PI * 2, // 完整环，六附体挂载在外圈
                     thickness: bossH * 0.2
                 };
-                boss.gapAngle = 0; // 缺口旋转角度
+                boss.gapAngle = 0; // 轮转锚点角度（不再表示物理缺口）
                 break;
             default:
                 boss.collisionShape = 'aabb';
@@ -2082,6 +2146,9 @@ export const spawn_system = {
             const baseShield = 1 + this.round;
             const bonus = bossCfg.shieldChargesBonus || 0;
             boss.shieldCharges = baseShield + bonus;
+        }
+        if (boss.affixes.includes('radiantAegis') && typeof boss._initRadiantAegis === 'function') {
+            boss._initRadiantAegis();
         }
 
         // 奇美拉特殊：初始温度
@@ -2330,12 +2397,169 @@ export const spawn_system = {
         }
     },
 
-    spawn_pickWavePreset() {
+    spawn_getDirectorPressureProfile() {
+        const activeEnemies = (this.enemies || []).filter(e => e && e.active);
+        const clearableEnemies = typeof this.phase_isEnemyClearable === 'function'
+            ? activeEnemies.filter(e => this.phase_isEnemyClearable(e))
+            : activeEnemies;
+        const rowKeys = new Set(activeEnemies.map(e => {
+            const y = e.dropTargetY ?? e.pos?.y ?? 0;
+            return Math.round(y / Math.max(1, this.enemyHeight || 1));
+        }));
+        const topLimit = (this.combatGridTopY || 0) + (this.enemyHeight || 0) * 1.35;
+        const topPinnedCount = activeEnemies.filter(e => {
+            const y = e.dropTargetY ?? e.pos?.y ?? 0;
+            return y <= topLimit;
+        }).length;
+        const activeHpBudget = activeEnemies.reduce((sum, e) => sum + Math.max(0, e.maxHp || e.hp || 0), 0);
+        const recentDamage = Math.max(
+            this.roundDamage || 0,
+            this.prevRoundDamage || 0,
+            typeof this.calc_getRecentAverageDamage === 'function' ? this.calc_getRecentAverageDamage(2) || 0 : 0
+        );
+
+        const emptyBoard = clearableEnemies.length === 0;
+        const sparseBoard = activeEnemies.length > 0 && activeEnemies.length <= 5;
+        const topPinned = activeEnemies.length > 0
+            && rowKeys.size <= 2
+            && topPinnedCount >= Math.ceil(activeEnemies.length * 0.67);
+        const overkill = recentDamage > 0 && (activeHpBudget <= 0 || recentDamage >= activeHpBudget * 0.9);
+
+        let dominanceLevel = 0;
+        if (emptyBoard || sparseBoard) dominanceLevel++;
+        if (topPinned) dominanceLevel++;
+        if (overkill) dominanceLevel++;
+        if (this._prevRoundCleared) dominanceLevel++;
+
+        return {
+            activeCount: activeEnemies.length,
+            clearableCount: clearableEnemies.length,
+            rowCount: rowKeys.size,
+            topPinnedCount,
+            activeHpBudget,
+            recentDamage,
+            emptyBoard,
+            sparseBoard,
+            topPinned,
+            overkill,
+            dominanceLevel: Math.min(3, dominanceLevel),
+        };
+    },
+
+    spawn_scoreWavePresetForDirector(preset, profile) {
+        if (!profile || !preset) return 0;
+        const tags = new Set(preset.directorTags || []);
+        let bonus = 0;
+
+        if (profile.emptyBoard || profile.clearableCount <= 2) {
+            if (tags.has('earlyPressure')) bonus += 12;
+            if (tags.has('antiCompression')) bonus += 8;
+            if (tags.has('backlinePriority')) bonus += 4;
+        }
+        if (profile.topPinned) {
+            if (tags.has('antiCompression')) bonus += 10;
+            if (tags.has('linePush')) bonus += 8;
+            if (tags.has('trajectoryDisrupt')) bonus += 4;
+            if (tags.has('fieldControl')) bonus += 4;
+        }
+        if (profile.overkill) {
+            if (tags.has('supportPunish')) bonus += 5;
+            if (tags.has('tempoPunish')) bonus += 6;
+            if (tags.has('snowball')) bonus += 3;
+        }
+        if (profile.dominanceLevel >= 2) {
+            if (tags.has('antiControl')) bonus += 3;
+            if (tags.has('attrition')) bonus += 3;
+            if (tags.has('damageFilter')) bonus += 4;
+        }
+
+        return bonus;
+    },
+
+    spawn_getDirectorScriptMeta(scriptId) {
+        if (!scriptId) return null;
+        return (DIRECTOR_SCRIPTS || []).find(script => script.id === scriptId) || null;
+    },
+
+    spawn_collectPresetActorAffixes(preset) {
+        const affixes = new Set();
+        for (const slot of preset?.slots || []) {
+            const archetypeMeta = ENEMY_WAVE_PRESET_ARCHETYPES[slot.archetype] || {};
+            if (archetypeMeta.affix) affixes.add(archetypeMeta.affix);
+            for (const affix of slot.affixes || []) {
+                if (affix) affixes.add(affix);
+            }
+        }
+        return [...affixes];
+    },
+
+    spawn_getPresetActorProfile(preset, round = this.round || 1) {
+        const script = this.spawn_getDirectorScriptMeta(preset?.scriptId);
+        const affixes = this.spawn_collectPresetActorAffixes(preset);
+        const window = DIRECTOR_SCRIPT_CONFIG.unfamiliarRoundWindow || 0;
+        const unfamiliarAffixes = affixes.filter(affix => {
+            const introRound = DIRECTOR_ACTOR_INTRO_ROUNDS[affix];
+            return Number.isFinite(introRound) && round >= introRound && round - introRound <= window;
+        });
+        const maxUnfamiliarActors = Number.isFinite(preset?.maxUnfamiliarActors)
+            ? preset.maxUnfamiliarActors
+            : (Number.isFinite(script?.maxUnfamiliarActors)
+                ? script.maxUnfamiliarActors
+                : DIRECTOR_SCRIPT_CONFIG.maxUnfamiliarActorsPerPreset);
+
+        return {
+            script,
+            scriptId: preset?.scriptId || null,
+            beatId: preset?.beatId || null,
+            affixes,
+            unfamiliarAffixes,
+            unfamiliarCount: unfamiliarAffixes.length,
+            maxUnfamiliarActors,
+        };
+    },
+
+    spawn_canUseDirectorScript(preset, actorProfile, round = this.round || 1) {
+        if (!preset) return false;
+        if (actorProfile.unfamiliarCount > actorProfile.maxUnfamiliarActors) return false;
+        if (!preset.scriptId) return true;
+
+        const script = actorProfile.script;
+        if (!script) return false;
+
+        const beat = (script.beats || []).find(item => item.presetId === preset.id);
+        if (!beat) return false;
+        const [beatMinRound, beatMaxRound] = beat.roundRange || preset.roundRange || [1, 999];
+        if (round < beatMinRound || round > beatMaxRound) return false;
+
+        const scriptUsage = this._directorScriptUsage || (this._directorScriptUsage = {});
+        const state = scriptUsage[preset.scriptId] || { lastRound: -999, lastPresetId: null };
+        const cooldown = Number.isFinite(preset.scriptCooldownRounds)
+            ? preset.scriptCooldownRounds
+            : (Number.isFinite(script.repeatCooldownRounds)
+                ? script.repeatCooldownRounds
+                : DIRECTOR_SCRIPT_CONFIG.defaultRepeatCooldownRounds);
+        if (round - state.lastRound < cooldown) return false;
+
+        if (state.lastPresetId === preset.id && round - state.lastRound < cooldown * 2) return false;
+        return true;
+    },
+
+    spawn_scoreDirectorScriptForRound(preset, actorProfile, round = this.round || 1) {
+        if (!preset || !actorProfile) return 0;
+        let bonus = 0;
+        if (actorProfile.beatId === 'intro' && actorProfile.unfamiliarCount > 0) bonus += 3;
+        if (actorProfile.beatId === 'combo' && round >= (preset.roundRange?.[0] || 1) + 2) bonus += 2;
+        if (this._directorLastScriptId && this._directorLastScriptId !== actorProfile.scriptId) bonus += 1;
+        return bonus;
+    },
+
+    spawn_pickWavePreset(options = {}) {
         const round = this.round || 1;
         if (this._wavePresetRoundUsed === round) return null;
 
         const usage = this._wavePresetUsage || (this._wavePresetUsage = {});
         const activeLargeCounts = this.spawn_countActiveArchetypes();
+        const directorProfile = options.directorProfile || this.spawn_getDirectorPressureProfile();
         const candidates = [];
         let totalWeight = 0;
 
@@ -2348,13 +2572,28 @@ export const spawn_system = {
             if (round - state.lastRound < (preset.cooldownRounds || 0)) continue;
             if (!this.spawn_canUseWavePreset(preset, activeLargeCounts)) continue;
 
-            candidates.push({ preset, weight: preset.weight || 1 });
-            totalWeight += preset.weight || 1;
+            const actorProfile = this.spawn_getPresetActorProfile(preset, round);
+            if (!this.spawn_canUseDirectorScript(preset, actorProfile, round)) continue;
+
+            const weight = Math.max(
+                1,
+                (preset.weight || 1)
+                + this.spawn_scoreWavePresetForDirector(preset, directorProfile)
+                + this.spawn_scoreDirectorScriptForRound(preset, actorProfile, round)
+            );
+            candidates.push({ preset, weight });
+            totalWeight += weight;
         }
 
         if (!candidates.length || totalWeight <= 0) return null;
 
-        const chance = Math.min(0.30, 0.12 + round * 0.006);
+        let chance = Math.min(0.30, 0.12 + round * 0.006);
+        if (directorProfile) {
+            chance += Math.min(0.24, directorProfile.dominanceLevel * 0.07);
+            if (directorProfile.topPinned) chance += 0.06;
+            if (directorProfile.emptyBoard) chance += 0.04;
+        }
+        chance = Math.min(0.58, chance);
         if (Math.random() >= chance) return null;
 
         let roll = Math.random() * totalWeight;
@@ -2386,12 +2625,13 @@ export const spawn_system = {
             if (archetype === 'maw' && (counts.maw || 0) >= 2) return false;
             if (archetype === 'hive' && (counts.hive || 0) >= 1) return false;
             if (archetype === 'siege' && (counts.siege || 0) >= 1) return false;
+            if (archetype === 'carrier' && (counts.carrier || 0) >= 1) return false;
         }
         return true;
     },
 
     spawn_trySpawnWavePreset(yPos, baseHP, occupiedCols, w, options = {}) {
-        const preset = this.spawn_pickWavePreset();
+        const preset = this.spawn_pickWavePreset(options);
         if (!preset) return false;
 
         const placements = [];
@@ -2412,6 +2652,18 @@ export const spawn_system = {
         const state = usage[preset.id] || { count: 0, lastRound: -999 };
         usage[preset.id] = { count: state.count + 1, lastRound: this.round || 1 };
         this._wavePresetRoundUsed = this.round || 1;
+
+        if (preset.scriptId) {
+            const scriptUsage = this._directorScriptUsage || (this._directorScriptUsage = {});
+            const scriptState = scriptUsage[preset.scriptId] || { count: 0, lastRound: -999, lastPresetId: null };
+            scriptUsage[preset.scriptId] = {
+                count: scriptState.count + 1,
+                lastRound: this.round || 1,
+                lastPresetId: preset.id,
+                lastBeatId: preset.beatId || null,
+            };
+            this._directorLastScriptId = preset.scriptId;
+        }
 
         if (preset.introText && !this._wavePresetIntroShown?.[preset.id] && typeof showToast === 'function') {
             this._wavePresetIntroShown = this._wavePresetIntroShown || {};
@@ -2492,6 +2744,9 @@ export const spawn_system = {
         if (e.affixes.includes('shield')) {
             e.shieldCharges = 1 + this.round;
         }
+        if (e.affixes.includes('radiantAegis') && typeof e._initRadiantAegis === 'function') {
+            e._initRadiantAegis();
+        }
         if (e.affixes.includes('deflectionWard')) {
             const pct = afx.deflectionWardBarrierPct || 0.10;
             e.wardBarrierMax = Math.max(1, Math.floor(hp * pct));
@@ -2499,9 +2754,11 @@ export const spawn_system = {
             e.wardBrokenThisTurn = false;
         }
         if (e.affixes.includes('hive')) e._hiveCooldown = afx.hiveSpawnInterval || 2;
+        if (e.affixes.includes('carrier')) e._carrierCooldown = afx.carrierSpawnInterval || 1;
 
         if (e.affixes.includes('heavyArmor')) e._moveInterval = afx.heavyArmorMoveInterval || 2;
         else if (e.affixes.includes('siege')) e._moveInterval = afx.siegeMoveInterval || 2;
+        else if (e.affixes.includes('carrier')) e._moveInterval = afx.carrierMoveInterval || 2;
         else if (e.affixes.includes('gravityWell')) e._moveInterval = afx.gravityWellMoveInterval || 3;
         else if (rows >= 2 || cols >= 3) e._moveInterval = 2;
         e._moveCooldown = 0;
@@ -2540,6 +2797,7 @@ export const spawn_system = {
      *   - 1x3 折光棱柱  prism           (R16+)
      *   - 2x3 孵化巢    hive            (R18+)
      *   - 3x2 攻城履带  siege           (R22+)  冰冻免疫 / 阻挡推挤
+     *   - 5格冂形铸巢母架 carrier        (R28+)  第 5 格空舱投放小型敌人
      *   - 3x3 引力炉心  gravityWell     (R30+)
      *
      * 同屏限流（避免大型机制单位扎堆）：
@@ -2552,7 +2810,7 @@ export const spawn_system = {
         const afx = CONFIG.balance.affixes;
 
         // 当前同屏大型基底统计（用于限流）
-        let countMaw = 0, countHive = 0, countSiege = 0, countWell = 0, countOtherLarge = 0;
+        let countMaw = 0, countHive = 0, countSiege = 0, countWell = 0, countCarrier = 0, countOtherLarge = 0;
         for (const e of this.enemies) {
             if (!e || !e.active) continue;
             const a = e.baseArchetype;
@@ -2560,12 +2818,14 @@ export const spawn_system = {
             else if (a === 'hive') countHive++;
             else if (a === 'siege') countSiege++;
             else if (a === 'gravityWell') countWell++;
+            else if (a === 'carrier') countCarrier++;
             else if (a) countOtherLarge++;
         }
 
         // 候选基底列表（按从大到小尝试，3x3 出现时跳过其他大型）
         const candidates = [
-            { id: 'gravityWell',   cols: 3, rows: 3, affix: 'gravityWell',   minRound: 30, weight: 0.025, hpMult: afx.gravityWellHpMult || 6.0,  color: '#7c3aed', skip: countWell >= 1 || countOtherLarge > 0 || countMaw > 0 || countHive > 0 || countSiege > 0 },
+            { id: 'gravityWell',   cols: 3, rows: 3, affix: 'gravityWell',   minRound: 30, weight: 0.025, hpMult: afx.gravityWellHpMult || 6.0,  color: '#7c3aed', skip: countWell >= 1 || countOtherLarge > 0 || countMaw > 0 || countHive > 0 || countSiege > 0 || countCarrier > 0 },
+            { id: 'carrier',       cols: 3, rows: 2, affix: 'carrier',       minRound: 28, weight: 0.035, hpMult: afx.carrierHpMult || 3.2,      color: '#38bdf8', skip: countCarrier >= 1 || countWell >= 1 },
             { id: 'siege',         cols: 3, rows: 2, affix: 'siege',         minRound: 22, weight: 0.05,  hpMult: afx.siegeHpMult || 3.5,        color: '#facc15', skip: countSiege >= 1 || countWell >= 1 },
             { id: 'hive',          cols: 2, rows: 3, affix: 'hive',          minRound: 18, weight: 0.06,  hpMult: afx.hiveHpMult || 2.5,         color: '#a3e635', skip: countHive >= 1 || countWell >= 1 },
             { id: 'prism',         cols: 1, rows: 3, affix: 'prism',         minRound: 16, weight: 0.08,  hpMult: afx.prismHpMult || 1.4,        color: '#67e8f9', skip: countWell >= 1 },
@@ -2645,6 +2905,8 @@ export const spawn_system = {
                 e._moveInterval = afx.heavyArmorMoveInterval || 2;
             } else if (chosen.affix === 'siege') {
                 e._moveInterval = afx.siegeMoveInterval || 2;
+            } else if (chosen.affix === 'carrier') {
+                e._moveInterval = afx.carrierMoveInterval || 2;
             } else if (chosen.affix === 'gravityWell') {
                 e._moveInterval = afx.gravityWellMoveInterval || 3;
             } else if (chosen.rows >= 2 || chosen.cols >= 3) {
@@ -2661,11 +2923,17 @@ export const spawn_system = {
                 e.wardBarrier = e.wardBarrierMax;
                 e.wardBrokenThisTurn = false;
             }
+            if (chosen.affix === 'radiantAegis' && typeof e._initRadiantAegis === 'function') {
+                e._initRadiantAegis();
+            }
             // [echoRelay] 自身血量减半（覆盖 hp 计算的 echoRelayHpMult，再保险）
             // 这里不再二次乘以 0.5，保持 hpMult 已经设为 0.5
             // [hive] 孵化倒计时
             if (chosen.affix === 'hive') {
                 e._hiveCooldown = afx.hiveSpawnInterval || 2;
+            }
+            if (chosen.affix === 'carrier') {
+                e._carrierCooldown = afx.carrierSpawnInterval || 1;
             }
             // 入场动画与状态
             if (options.offScreenEntrance) {
@@ -2761,6 +3029,24 @@ export const spawn_system = {
                     new Vec2(-w * 0.50,  h * 0.20),
                 ]};
                 break;
+            case 'carrier': // 五格冂形铸巢母架：冂形外框的近似碰撞轮廓
+                e.footprintCells = 5;
+                e.footprintMask = [
+                    [1, 1, 1],
+                    [1, 0, 1],
+                ];
+                e.collisionShape = 'polygon';
+                e.collisionData = { vertices: [
+                    new Vec2(-w * 0.50, -h * 0.50),
+                    new Vec2( w * 0.50, -h * 0.50),
+                    new Vec2( w * 0.50,  h * 0.50),
+                    new Vec2( w * 0.18,  h * 0.50),
+                    new Vec2( w * 0.18,  h * 0.08),
+                    new Vec2(-w * 0.18,  h * 0.08),
+                    new Vec2(-w * 0.18,  h * 0.50),
+                    new Vec2(-w * 0.50,  h * 0.50),
+                ]};
+                break;
             case 'gravityWell': // 3x3 引力炉心：圆形
                 e.collisionShape = 'arc';
                 e.collisionData = { radius: Math.min(w, h) * 0.45 };
@@ -2805,7 +3091,7 @@ export const spawn_system = {
 
         // === Boss 词条池（符合 Boss 主题的特殊词条）===
         const BOSS_AFFIX_POOLS = {
-            ignis:    ['shield', 'berserk'],
+            ignis:    ['shield', 'berserk', 'radiantAegis'],
             glacies:  ['regen', 'jump'],
             mikro:    ['clone', 'healer'],
             devourer: ['devour', 'shield'],
@@ -2814,7 +3100,9 @@ export const spawn_system = {
             chimera:  ['berserk', 'devour'],
             ouroboros:['shield', 'haste', 'regen'],
         };
-        const affixPool = BOSS_AFFIX_POOLS[bossId] || ['shield'];
+        const minionProfile = this.spawn_getBossMinionProfile ? this.spawn_getBossMinionProfile(bossId) : null;
+        const profileAffixes = minionProfile && Array.isArray(minionProfile.affixes) ? minionProfile.affixes : null;
+        const affixPool = profileAffixes && profileAffixes.length > 0 ? profileAffixes : (BOSS_AFFIX_POOLS[bossId] || ['shield']);
 
         // === 概率加成 ===
         const bonus = isBigBoss ? cfg.bigBossBonus : 0;
@@ -2849,7 +3137,7 @@ export const spawn_system = {
             const affixNames = {
                 shield: '护盾', haste: '极速', regen: '再生',
                 healer: '治疗', jump: '跳跃', clone: '分身',
-                devour: '吞噬', berserk: '狂暴'
+                devour: '吞噬', berserk: '狂暴', radiantAegis: '流彩护盾'
             };
 
             this.enemies.forEach(e => {
@@ -2869,6 +3157,9 @@ export const spawn_system = {
                     // 保留位置和尺寸，重置词条为 Boss 属性词条
                     e.affixes = [...affixPool];
                     e.type = 'elite';
+                    if (typeof this.spawn_applyBossMinionMetadata === 'function') {
+                        this.spawn_applyBossMinionMetadata(e, bossId, minionProfile);
+                    }
                     // 应用 Boss 对应的随从形状（修改 bossHistory 临时指向当前 Boss）
                     const savedHistory = this.bossHistory ? [...this.bossHistory] : [];
                     if (!this.bossHistory) this.bossHistory = [];
@@ -2881,6 +3172,9 @@ export const spawn_system = {
                     if (e.affixes.includes('shield')) {
                         e.shieldCharges = Math.max(1, Math.floor((1 + this.round) * 0.5));
                     }
+                    if (e.affixes.includes('radiantAegis') && typeof e._initRadiantAegis === 'function') {
+                        e._initRadiantAegis();
+                    }
                     // 浮动文字提示
                     this.spawn_createFloatingText(
                         e.pos.x, e.pos.y - e.height / 2 - 10,
@@ -2892,9 +3186,15 @@ export const spawn_system = {
                     if (!e.affixes.includes(newAffix)) {
                         e.affixes.push(newAffix);
                         if (e.affixes.length > 0) e.type = 'elite';
+                        if (typeof this.spawn_applyBossMinionMetadata === 'function') {
+                            this.spawn_applyBossMinionMetadata(e, bossId, minionProfile, 'boss_empowered');
+                        }
                         // 初始化护盾层数
                         if (newAffix === 'shield') {
                             e.shieldCharges = Math.max(1, 1 + Math.floor(this.round * 0.5));
+                        }
+                        if (newAffix === 'radiantAegis' && typeof e._initRadiantAegis === 'function') {
+                            e._initRadiantAegis();
                         }
                         // 浮动文字提示
                         const affixLabel = affixNames[newAffix] || newAffix;

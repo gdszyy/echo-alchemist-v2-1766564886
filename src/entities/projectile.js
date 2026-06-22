@@ -159,20 +159,22 @@ class Projectile {
         // [优化 1] 增加空气阻力，防止无限加速导致的隧穿 (可选，这里设为 1.0 表示无阻力)
         this.vel = this.vel.mult(1.0);
 
-        // [V2 gravityWell] 引力炉心：对附近的子弹施加微弱回拉，造成可预测的弹道偏折
+        // [V2 gravityWell] 场域类大型敌人：牵引附近子弹，造成可预测的弹道干扰
         // 仅对带速度的常规子弹生效；激光/风刀等无 vel 主体不在此处理。
         if (this.vel && this.vel.mag() > 0.1) {
             const cfgAfx = (typeof CONFIG !== 'undefined' && CONFIG.balance) ? CONFIG.balance.affixes : null;
             if (cfgAfx) {
-                const pullR = cfgAfx.gravityWellPullRadius || 220;
-                const pullS = cfgAfx.gravityWellPullStrength || 0.18;
                 for (const e of enemies) {
-                    if (!e || !e.active || !e.affixes || !e.affixes.includes('gravityWell')) continue;
+                    if (!e || !e.active || !e.affixes) continue;
+                    const isGravityWell = e.affixes.includes('gravityWell');
+                    if (!isGravityWell) continue;
+                    const pullR = cfgAfx.gravityWellPullRadius || 220;
                     const dx = e.pos.x - this.pos.x;
                     const dy = e.pos.y - this.pos.y;
                     const dist = Math.hypot(dx, dy);
                     if (dist > 1 && dist < pullR) {
                         const falloff = 1 - dist / pullR;
+                        const pullS = cfgAfx.gravityWellPullStrength || 0.18;
                         const accel = pullS * falloff * timeScale;
                         this.vel.x += (dx / dist) * accel;
                         this.vel.y += (dy / dist) * accel;
@@ -296,7 +298,8 @@ class Projectile {
             if (this.hitCooldowns.has(e)) return;
             this.hitCooldowns.set(e, CONFIG.gameplay.hitCooldowns);
             this.lastHitEnemy = e;
-            this.onHit(e, enemies);
+            const damageResult = this.onHit(e, enemies);
+            const blockedPierce = !!(damageResult && damageResult.blockedPierce);
 
             // [词条 Hook] 回响射击 (echo_shot)
             // 首次命中时，有概率触发回响射击，按原角度额外发射一颗子弹
@@ -338,7 +341,12 @@ class Projectile {
             if (this.config.flying_sword) {
                 if (typeof game !== 'undefined') game.combat_flyingSword_assignTarget(e);
             }
-            if (this.piercesLeft > 0) {
+            if (blockedPierce && this.piercesLeft > 0) {
+                this.piercesLeft--;
+                if (typeof game !== 'undefined' && game.spawn_createFloatingText) {
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 18, 'NO PIERCE', '#67e8f9', 12);
+                }
+            } else if (this.piercesLeft > 0) {
                 if (this.config.flying_sword) {
                     const pegLevel = this.config.level || 1;
                     if (this.hasAreaDamage) this.performSlashAttack(e, game.enemies);
@@ -438,6 +446,27 @@ class Projectile {
                 } else {
                     // 3. 正常情况：法线就是 "最近点 -> 圆心" 的单位向量
                     normal = new Vec2(distVecX / dist, distVecY / dist);
+                }
+                if (e.affixes && e.affixes.includes('deflectShell')) {
+                    const gridCols = Math.max(1, Math.round(e.gridCols || 1));
+                    const gridRows = Math.max(1, Math.round(e.gridRows || 1));
+                    if (gridCols === 1 && gridRows === 1) {
+                        const afx = CONFIG.balance.affixes || {};
+                        const amp = afx.deflectShellNormalRotateAmp || 0.85;
+                        const speed = afx.deflectShellNormalRotateSpeed || 1.8;
+                        const phase = Date.now() / 1000 * speed + (e.visualSeed || 0) * Math.PI * 2;
+                        const rot = Math.sin(phase) * amp;
+                        const cos = Math.cos(rot);
+                        const sin = Math.sin(rot);
+                        normal = new Vec2(
+                            normal.x * cos - normal.y * sin,
+                            normal.x * sin + normal.y * cos
+                        );
+                        if (typeof game !== 'undefined' && game.spawn_createFloatingText && (!e._deflectShellTextTimer || e._deflectShellTextTimer <= 0)) {
+                            e._deflectShellTextTimer = 14;
+                            game.spawn_createFloatingText(e.pos.x, e.pos.y - 26, '偏折', '#67e8f9', 12);
+                        }
+                    }
                 }
 
                 // [反弹算法优化] 位置修正 (Push Out)：使用更大的安全间隙，
@@ -675,7 +704,7 @@ class Projectile {
             }
         }
 
-        game.combat_damageEnemy(enemy, this, damageOverride);
+        return game.combat_damageEnemy(enemy, this, damageOverride);
     }
 
     performSlashAttack(target, enemies) {

@@ -22,9 +22,9 @@ New combat relic animations must read `CONFIG.performance.relicCinematicDelayMs`
 
 - Defense outcomes: `屏障` when a deflection ward absorbs damage, `护盾` when shield charges are actually spent.
 - Damage outcomes: `暴击` for focused-fire crits.
-- Hit feedback no longer reads a global counter table. `combat_getHitFeedbackLabel()` only emits direct event labels such as shield, barrier, crit, bounce, pierce, and Boss vulnerability progress.
+- Hit feedback no longer reads a global counter table. `combat_getHitFeedbackLabel()` only emits direct event labels such as shield, barrier, crit, bounce, and pierce.
 - Projectile outcomes: fallback labels for `弹射` and `穿透` when no higher-priority label applies.
-- Boss vulnerability outcomes: `破绽+` when the current hit advances the Boss vulnerability meter, `破绽` when the meter breaks, and `易伤` while the exposed-hit window is being consumed.
+- Boss vulnerability no longer uses hit floating labels. Progress, break, exposed, and recover states are rendered on the Boss body via `_drawBossVulnerabilityOverlay()`.
 
 The helper must remain side-effect free. It may inspect enemy tags, archetype aliases, projectile config, and the post-hit `damageResult`, but damage formulas stay in the existing damage sections.
 
@@ -32,11 +32,43 @@ The helper must remain side-effect free. It may inspect enemy tags, archetype al
 
 The old static Boss `weakness` field has been replaced by `CONFIG.balance.bossConfigs[*].vulnerability` plus the global `CONFIG.balance.bossVulnerability` tuning block.
 
-- `combat_getBossVulnerabilityProfile()` resolves the active vulnerability attrs, accumulation mode, and round-scaled threshold; Ouroboros uses `rotationIndex` to switch attrs with its affix set.
-- `combat_applyBossVulnerability()` runs before `Enemy.takeDamage()` to consume exposed hits and remember whether the hit matched the current vulnerability attrs.
+- `combat_getBossVulnerabilityProfile()` resolves the active vulnerability attrs, accumulation mode, and round-scaled threshold; Ouroboros uses `rotationIndex` as its six-attachment slot index, so the active orbit attachment controls both attrs and affix set.
+- `combat_applyBossVulnerability()` runs before `Enemy.takeDamage()` to apply the current exposed-turn multiplier and remember whether the hit matched the current vulnerability attrs.
 - `combat_updateBossVulnerabilityProgress()` runs after `Enemy.takeDamage()` so `hits` mode counts real damaging hits and `damage` mode uses `damageResult.actualDamage`.
+- Breaking the meter writes `_bossVulnerabilityExposedTurns = 1`, `_bossVulnerabilityExposedPart`, `_bossVulnerabilityVisualAttrs`, and break/recover timers. While exposed, the Boss takes the exposed damage multiplier until its next enemy action.
+- `Enemy.startTurnAction()` consumes one exposed turn before any Boss physical state, telegraph, movement, or special action; this makes the Boss skip that action and then enter the recover visual state.
 - Breaking the meter before enrage sets `_bossVulnerabilitySuppressedEnrage`, delaying one 50% HP enrage check.
-- The mechanic is numeric and label-only; it does not add persistent particles, new blend modes, gradients, or `shadowBlur`.
+- The first visual pass is a Canvas fallback: low-cost body cracks, cut lines, exposed rings, and per-Boss weak-part marks. It does not add particles or new budget fields; `low` quality uses flat linework.
+
+## 0.2.1 Ignis Furnace Pressure Exception (2026-06-22)
+
+Ignis keeps `pyro` as one of its vulnerability attrs, but pyro no longer means ordinary burn damage for this Boss. In `combat_damageEnemy()`:
+
+- Pyro hits still call `enemy.applyTemp(...)` and can progress the Boss vulnerability meter.
+- The normal extra Burn damage branch must skip `enemy.bossType === 'ignis'`.
+- When skipped, combat may show a light "炉心升温" floating label, but it must not call `Enemy.takeDamage()` for burn damage.
+- Cryo hits may immediately vent `enemy.furnacePressure`; the enemy-turn temperature settlement also vents pressure when Ignis is below 0℃.
+
+The actual 100℃+ pressure conversion belongs to `phase_enemy_processTurn()` so it stays in the enemy-turn temperature settlement, not in projectile collision.
+
+## 0.2.2 Tesla Conductor Network Interactions (2026-06-22)
+
+Tesla keeps `cryo + bounce` as its vulnerability attrs, but those attrs also have direct mechanism feedback:
+
+- Lightning hits on enemies tagged `teslaConductor` call `Enemy._applyTeslaConductorCharge(game, ...)`, granting temporary `haste` and feeding `teslaFieldPower` on the active Tesla Boss.
+- Lightning AOE from `lightning_shield` follows the same conductor charge path after applying shock temperature.
+- Cryo hits on Tesla drain `teslaFieldPower`; cryo hits on a conductor remove the temporary haste granted by the Tesla mechanism.
+- Bounce hits on Tesla ground the network, draining field power and reducing the next network gain via `_teslaGroundedTurns`.
+- These effects stay in combat resolution because they are direct attribute-hit consequences; the field decay, random shock, action bonus, and conductor summon loop stay in `Enemy._tickTeslaNetwork()` during the enemy turn.
+
+## 0.2.3 Glacies Frost Seam Interactions (2026-06-22)
+
+Glacies keeps `cryo + pierce` as its vulnerability attrs, but those attrs also directly counter the battlefield frost seam:
+
+- Glacies no longer writes Peg freeze state. Its enemy-turn tick and jump landing call `Enemy._tickGlaciesFrostSeams()` / `_glaciesPulseFrostSeamsOnLanding()` to stitch `frostStitch` minions or nearby enemies in the combat grid.
+- Targets with `frostSeamTurns > 0` gain temporary damage reduction, healing on enemy-turn start, a status badge, and a low-cost stitch visual.
+- In `Enemy.takeDamage()`, non-counter hits are reduced by the seam; `pierce` cuts the seam and grants a small one-hit damage multiplier; `cryo` cuts the seam and writes `_glaciesSeamSkipTurns` on the active Glacies Boss so its next seam tick is skipped.
+- These effects stay in `Enemy` because they alter enemy entity state and damage intake. Combat-system enrage only sets `_glaciesBerserkSeamBoost` and `_berserkedJumpRows`; it must not set Peg freeze flags.
 
 本文档定义了 `src/combat_system.js` 拆分后的战斗系统模块结构及职责边界。
 

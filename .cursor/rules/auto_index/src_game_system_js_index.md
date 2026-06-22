@@ -1,9 +1,9 @@
 # src\game_system.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 3199 | 函数数: 58 | 语言: javascript
+> 自动生成于 2026-06-23 | 总行数: 3376 | 函数数: 61 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 4 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -31,6 +31,9 @@
 | sys_skipChaosEssenceUpgrade | method | `sys_skipChaosEssenceUpgrade()` |  |
 | sys_runInWallClearLottery | method | `sys_runInWallClearLottery(chargedSnapshot, bonusCount = 0, onComplete)` |  |
 | sys_queueRoundStartReward | method | `sys_queueRoundStartReward(reward = {})` |  |
+| sys_rollMarblePackTypes | method | `sys_rollMarblePackTypes(packId = 'mixed', count = CONFIG.gameplay.selectionReq || 3)` |  |
+| sys_startMarblePackGrind | method | `sys_startMarblePackGrind(reward = {})` |  |
+| sys_grantRunResourcePack | method | `sys_grantRunResourcePack(reward = {})` |  |
 | sys_determineEnemyReward | method | `sys_determineEnemyReward(enemy, isRowRepresentative = false)` | ⚠️ 巨型函数，见 @section 导航 |
 | sys_preCalcEnemyRewardType | method | `sys_preCalcEnemyRewardType(enemy)` |  |
 | sys_tryQueueEnemyRoundReward | method | `sys_tryQueueEnemyRoundReward(enemy)` |  |
@@ -41,7 +44,7 @@
 | sys_isRunShopActive | method | `sys_isRunShopActive()` |  |
 | sys_getRunShopScheduleState | method | `sys_getRunShopScheduleState()` |  |
 | sys_maybeOfferRunShopBeforeRoundStart | method | `sys_maybeOfferRunShopBeforeRoundStart()` |  |
-| sys_startRoundStartResolver | method | `sys_startRoundStartResolver()` |  |
+| sys_startRoundStartResolver | method | `sys_startRoundStartResolver()` | ⚠️ 巨型函数，见 @section 导航 |
 | sys_continueRoundStartResolver | method | `sys_continueRoundStartResolver()` |  |
 | sys_showRoundStartBanner | method | `sys_showRoundStartBanner()` |  |
 | sys_toggleMarbleSelection | method | `sys_toggleMarbleSelection(idx, cardEl)` |  |
@@ -63,7 +66,7 @@
 | input_handleInputEnd | method | `input_handleInputEnd(pos, e)` |  |
 | input_checkDefeat | method | `input_checkDefeat()` |  |
 | _triggerPityDrop | method | `_triggerPityDrop(bossEnemy)` |  |
-| sys_saveRunState | method | `sys_saveRunState()` |  |
+| sys_saveRunState | method | `sys_saveRunState()` | ⚠️ 巨型函数，见 @section 导航 |
 | sys_clearRunState | method | `sys_clearRunState()` |  |
 | sys_hasRunState | method | `sys_hasRunState()` |  |
 | sys_loadRunState | method | `sys_loadRunState()` | ⚠️ 巨型函数，见 @section 导航 |
@@ -85,6 +88,14 @@
 | `@section:dynamic_multiplier` | 第五步：战力/血量/密度四维动态倍率修正 |
 | `@section:pity_guarantee` | 第六步：三回合平均伤害 vs 威胁HP保底判定（V3算法） |
 | `@section:final_reward_type` | 第七步：随机判定奖励类型（遗物线索） |
+
+### sys_startRoundStartResolver
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
+
+### sys_saveRunState
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
 
 ### sys_loadRunState
 

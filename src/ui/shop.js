@@ -15,7 +15,7 @@
 
 import { META_SHOP_CONFIG, CONFIG, RELIC_DB, BOARD_STRUCTURE_RELICS } from '../config.js';
 import { RUNE_DB } from '../rune_config.js';
-import { showToast, MarbleDefinition } from '../entities.js';
+import { showToast } from '../entities.js';
 import { eventBus } from '../event_bus.js';
 import { getRelicIconSrc } from '../bitmap_icons.js'; // [Phase 5A Task 5.A7] 位图遗物图标
 
@@ -55,21 +55,20 @@ function _isCoarsePointerInput() {
     return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 }
 
-function _grantRelicMarblePack(game, marbleType, count = 3) {
-    if (!marbleType) return [];
-    const types = [marbleType, marbleType, 'white'].slice(0, Math.max(1, count));
-    if (!Array.isArray(game.guaranteedNextRound)) game.guaranteedNextRound = [];
-    game.guaranteedNextRound.unshift(...types);
-    game.lastMarblePackTypes = types.slice();
-
-    const currentQueueEmpty = !Array.isArray(game.marbleQueue) || game.marbleQueue.length === 0;
-    const canPrimeImmediately = currentQueueEmpty && !['combat', 'gathering'].includes(game.phase);
-    if (canPrimeImmediately) {
-        game.marbleQueue = types.map(type => new MarbleDefinition(type));
-        game.marblesPool = game.marbleQueue.slice();
-        game.selectedMarbles = game.marbleQueue.map((_, idx) => idx);
+function _grantRelicResourcePack(game, multiplier = 0.5) {
+    const base = CONFIG.gameplay?.runResourcePackFragments || 48;
+    const amount = Math.max(1, Math.round(base * multiplier));
+    if (typeof game.spawn_dropRuneFragments === 'function') {
+        const x = (game.width || 400) / 2;
+        const y = Math.max(90, (game.height || 700) * 0.32);
+        game.spawn_dropRuneFragments(x, y, amount, 'resource_pack');
+    } else {
+        if (typeof game.runFragments !== 'number') game.runFragments = 0;
+        if (typeof game.runRuneFragmentsGained !== 'number') game.runRuneFragmentsGained = 0;
+        game.runFragments += amount;
+        game.runRuneFragmentsGained += amount;
     }
-    return types;
+    return amount;
 }
 
 /**
@@ -432,7 +431,7 @@ export const shop_system = {
         } else if (relic.effect === 'early_temp_shield') {
             const val = relic.shieldValue || 5;
             this.playerShield = (this.playerShield || 0) + val;
-            if (window.showToast) showToast(`守护者结界展开！防线护盾 +${val}。`);
+            if (window.showToast) showToast(`守护者结界展开！防线屏障 +${val}。`);
         } else if (relic.effect === 'grant_runes') {
             // 走私者系列：立即给予指定稀有度的符文
             this._grantRunesByRarity(relic.grantRarity || 'common', relic.grantCount || 2);
@@ -477,15 +476,15 @@ export const shop_system = {
                 if (window.showToast) showToast(`${display}奖励区权重提升！只能通过底部奖励区获得。`);
                 return;
             }
-            // 2. 立即提供一包对应倾向弹珠，下一次弹珠选择优先出现。
-            const packTypes = _grantRelicMarblePack(this, mt, 3);
+            // 2. 立即提供局内资源包，让玩家去商店消费。
+            const packFragments = _grantRelicResourcePack(this, 0.5);
             // 3. 永久翻倍同化概率
             if (!this.assimilationBoostRounds) this.assimilationBoostRounds = {};
             if (!this.doubleAssimilationBoostRounds) this.doubleAssimilationBoostRounds = {};
             this.assimilationBoostRounds[mt] = Infinity;
             this.doubleAssimilationBoostRounds[mt] = Infinity;
             // 4. 提示
-            if (window.showToast) showToast(`${display}權重提升！立即获得倾向弹珠包：${packTypes.join(' / ')}。`);
+            if (window.showToast) showToast(`${display}权重提升！资源包 +${packFragments}，去局内商店换构筑。`);
         } else if (relic.effect === 'assimilation_surge') {
             // [兼容旧存档] 保留旧效果处理
             const mt = relic.marbleType;
@@ -498,10 +497,10 @@ export const shop_system = {
             this.doubleAssimilationBoostRounds[mt] = 2;
             const display = CONFIG.ui?.attributeDisplay?.[mt]?.name || mt;
             if (window.showToast) showToast(`${relic.name}已啟動！${display} 同化率 x${CONFIG.gameplay.assimilationDoubleMultiplier || 2}（持續 2 回合）。`);
-            _grantRelicMarblePack(this, mt, 3);
+            _grantRelicResourcePack(this, 0.5);
         } else if (relic.effect === 'pure_essence') {
-            _grantRelicMarblePack(this, 'white', 3);
-            if (window.showToast) showToast('純淨精華已转化为纯净胚珠包。');
+            const packFragments = _grantRelicResourcePack(this, 0.5);
+            if (window.showToast) showToast(`纯净精华已转化为资源包 +${packFragments}，去局内商店消费。`);
         }
         
         if (relic.unlocks) {
@@ -513,9 +512,9 @@ export const shop_system = {
             keys.forEach(key => {
                 const current = this.unlockedWeights[key] || 0;
                 this.unlockedWeights[key] = Math.max(current, CONFIG.probabilities?.[key] || 0) + Math.floor(boost * 1.5);
-                _grantRelicMarblePack(this, key, 3);
+                _grantRelicResourcePack(this, 0.35);
             });
-            if (window.showToast) showToast(`相关弹珠权重已提升，并获得对应倾向包。`);
+            if (window.showToast) showToast(`相关弹珠权重已提升，并获得局内资源补给。`);
         }
 
         // ==================== [v2 即时感重塑] 新遗物即时效果分支 ====================
@@ -591,7 +590,7 @@ export const shop_system = {
     /**
      * 跳过遗物选择 → 进入局内商店
      * [v2 调整] 不再奖励 500 score；改为打开局内商店，本回合丧失遗物。
-     * 商店关闭后接续 round-start resolver，继续后续流程（精华奖励等）。
+     * 商店关闭后接续 round-start resolver，继续后续遗物/弹珠包流程。
      */
     ui_skipRelic() {
         const skipBonus = ((CONFIG.gameplay || {}).runShopSkipRelicBonus || 0);

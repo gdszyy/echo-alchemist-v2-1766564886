@@ -42,12 +42,17 @@ const gameSystem = read('src/game_system.js');
 const gamePhase = read('src/game_phase.js');
 const gameOver = read('src/ui/game_over.js');
 const runShop = read('src/ui/run_shop.js');
+const shop = read('src/ui/shop.js');
 const indexHtml = read('index.html');
 const spawnSystem = read('src/spawn_system.js');
 const collisionSystem = read('src/combat/collision.js');
 const projectile = read('src/entities/projectile.js');
+const enemy = read('src/entities/enemy.js');
 const config = read('src/config.js');
 const calcUtils = read('src/calc_utils.js');
+const systems = read('src/systems.js');
+const enemyV2Metadata = read('src/data/enemy_v2_metadata.js');
+const wavePresets = read('src/wave_presets.js');
 
 check(has(uiSystem, /ui_resetCombatPhaseHud\s*\(options\s*=\s*\{\}\)/), 'ui_resetCombatPhaseHud exists');
 check(has(calcUtils, /calc_isEnemyInsideCombatWalls\s*\(enemy\)[\s\S]*sys_getCombatBounds[\s\S]*bottom\s*>\s*bounds\.top/), 'combat clear counting uses wall-intersection helper');
@@ -86,11 +91,21 @@ check(has(gameSystem, /this\.marblesPool\s*=\s*state\.marblesPool\.map\(m\s*=>\s
 check(has(gameSystem, /const\s+shouldRestoreSelection\s*=\s*savedPhase\s*===\s*['"]selection['"][\s\S]*this\.fateMomentContext[\s\S]*this\.selectionMode[\s\S]*!==\s*['"]standard['"]/), 'run load detects saved fate selection before running resolver');
 check(has(gameSystem, /else\s+if\s*\(shouldRestoreSelection\)\s*\{[\s\S]*phase_switchPhase\(['"]selection['"]\)[\s\S]*spawn_generateMarbleOptions\(\)[\s\S]*ui_refreshSelectionModeUI\(\)[\s\S]*spawn_showMarblePreview/), 'run load restores selection UI instead of falling through to round-start resolver');
 check(has(gameSystem, /sys_showRoundStartBanner\s*\(\)\s*\{[\s\S]*phase_switchPhase\(['"]combat['"]\)[\s\S]*phase_startCombatPhase\(\)/), 'normal round-start banner transitions to combat, not gathering');
-check(has(gameSystem, /sourceRewardType\s*===\s*['"]marble_pack['"][\s\S]*_lastFiredAmmoSnapshot[\s\S]*ammoQueue[\s\S]*marbleQueue[\s\S]*this\._chargedAmmoQueue\s*=/), 'marble_pack selection pre-charges existing bullets for replace-ammo flow');
+check(has(gameSystem, /sys_queueRoundStartReward\(\{\s*type:\s*['"]marble_pack['"][\s\S]{0,120}source:\s*['"]run_start['"]/), 'run start queues a mixed marble pack after the first relic');
+check(has(gameSystem, /sys_startMarblePackGrind\s*\(reward\s*=\s*\{\}\)[\s\S]*phase_startGatheringPhase\(\)/), 'marble packs directly enter gathering grind');
+check(!has(gameSystem, /sourceRewardType\s*===\s*['"]marble_pack['"]/), 'marble packs no longer enter selection mode');
+check(has(runShop, /kind:\s*['"]marble_pack['"][\s\S]{0,180}name:\s*['"]杂色弹珠包['"]/), 'run shop sells mixed marble packs');
+check(has(runShop, /it\.kind\s*===\s*['"]marble_pack['"][\s\S]{0,260}sys_startMarblePackGrind/), 'buying a marble pack starts grind immediately');
+check(has(shop, /_grantRelicResourcePack\s*\(game,\s*multiplier\s*=\s*0\.5\)/), 'relic marble-weight bonuses grant run resource packs');
+check(has(uiSystem, /type\s*===\s*['"]marble_pack['"][\s\S]{0,240}title\s*=\s*['"]杂色弹珠包['"]/), 'marble packs use a dedicated reveal animation card');
+check(has(indexHtml, /#round-start-banner\s*\{[\s\S]{0,140}position:\s*absolute;[\s\S]{0,80}inset:\s*0;/), 'round-start banner centers inside the game container');
+check(
+    has(uiSystem, /const\s+isFateSelection\s*=\s*this\.selectionMode\s*===\s*['"]chaos_essence['"][\s\S]{0,120}this\.selectionMode\s*===\s*['"]pure_essence['"]/) &&
+    has(uiSystem, /const\s+canReroll\s*=\s*isFateSelection\s*&&/),
+    'marble packs are semantically distinct from fate selection reroll'
+);
 check(has(config, /combatSideInsetRatio\s*:\s*0\.08/), 'combat side inset ratio is configured');
-check(has(config, /runShopMarblePackBasePrice:\s*7/), 'run shop marble pack base price is tuned down');
-check(has(config, /runShopMarblePackMarkup:\s*1\.0/), 'run shop marble pack markup is tuned down');
-check(has(config, /runShopMarblePackRarityPower:\s*0\.5/), 'run shop marble pack rarity power is tuned down');
+check(has(config, /runShopMixedMarblePackPrice:\s*18/), 'mixed marble pack shop price is configured');
 check(has(gameSystem, /combatGridLeftX[\s\S]*combatGridRightX[\s\S]*combatGridWidth[\s\S]*this\.enemyWidth\s*=\s*\(this\.combatGridWidth\s*\/\s*CONFIG\.gameplay\.enemyCols\)/), 'sys_resize derives enemy grid width from inset combat arena');
 check(has(gameSystem, /sys_getCombatBounds\s*\(\)/), 'combat bounds helper exists');
 check(has(gameSystem, /sys_getCombatColumnCenterX\s*\(col,\s*spanCols\s*=\s*1\)/), 'combat column center helper exists');
@@ -107,6 +122,117 @@ check(!has(projectile, /ownedRelics\.includes\(['"]energy_shield['"]\)[\s\S]{0,3
 check(has(projectile, /let\s+shieldWallDurabilityConsumed\s*=\s*false/), 'energy shield wall collision tracks per-step durability consumption');
 check(has(projectile, /ownedRelics\.includes\(['"]energy_shield['"]\)\s*&&\s*!\s*shieldWallDurabilityConsumed[\s\S]{0,180}this\.bouncesLeft--[\s\S]{0,120}shieldWallDurabilityConsumed\s*=\s*true[\s\S]{0,180}this\.piercesLeft--[\s\S]{0,120}shieldWallDurabilityConsumed\s*=\s*true/), 'energy shield wall collision consumes at most one durability layer per movement step');
 check(has(config, /energy_shield[\s\S]{0,280}最多消耗一層[\s\S]{0,120}不會被墻吞沒/), 'energy shield relic copy states one-layer wall durability consumption and no bullet swallowing');
+check(has(enemy, /_tryResolveDefenseBarrierMove\s*\(game,\s*moveAmount\)/), 'enemies resolve guardian barrier movement before normal advance');
+check(has(enemy, /this\.dropTargetY\s*=\s*barrierY[\s\S]{0,180}_defenseBarrierArrivedThisTurn\s*=\s*true/), 'guardian barrier first contact clamps enemy at the defense line without spending a layer');
+check(has(enemy, /const\s+barrierDamage\s*=\s*this\._getDefenseBarrierDamage\(game\)[\s\S]{0,120}game\.playerShield\s*=\s*Math\.max\(0,\s*\(game\.playerShield\s*\|\|\s*0\)\s*-\s*barrierDamage\)[\s\S]{0,120}_defenseBarrierHitThisTurn\s*=\s*true/), 'guardian barrier later movement collision spends footprint-scaled shield layers');
+check(has(enemy, /_getDefenseBarrierDamage\s*\(game\)[\s\S]{0,220}_getFootprintCells\(game\)[\s\S]{0,180}siegeBreakerDamageMult/), 'guardian barrier damage scales by enemy footprint and siegeBreaker multiplier');
+check(has(gamePhase, /_defenseBarrierArrivedThisTurn\s*=\s*false[\s\S]{0,100}_defenseBarrierHitThisTurn\s*=\s*false/), 'guardian barrier per-turn collision flags reset at enemy phase start');
+check(has(gamePhase, /_restoreLivingArmorForTurn[\s\S]{0,160}_tickPhaseShieldForTurn[\s\S]{0,160}_tickArmorSporeForTurn/), 'enemy turn start restores living armor, advances phase shield, and distributes armor spores');
+check(
+    has(enemy, /_tickBossPhysicsForTurn\s*\(\)[\s\S]{0,2600}bossType\s*===\s*['"]devourer['"][\s\S]{0,2600}bossType\s*===\s*['"]ouroboros['"]/) &&
+    has(enemy, /_tickBossMechanicsForTurn\s*\(game\)[\s\S]{0,1200}_tickTeslaNetwork\(game\)[\s\S]{0,1200}_tickGlaciesFrostSeams\(game\)[\s\S]{0,1200}_tickViridisSporeArmor\(game\)[\s\S]{0,1200}_tickChimeraMawField\(game\)[\s\S]{0,1200}_tickOuroborosOrbit\(game\)/) &&
+    has(enemy, /startTurnAction\s*\(game\)[\s\S]{0,220}_tickBossPhysicsForTurn\(\)[\s\S]{0,2600}_tickBossMechanicsForTurn\(game\)/),
+    'Boss turn start uses centralized physics and mechanics tick gateways'
+);
+check(has(gamePhase, /防线屏障 \$\{this\.playerShield\}/), 'combat render exposes active guardian barrier layers at the defense line');
+check(
+    has(gameSystem, /if\s*\(\(this\.playerShield\s*\|\|\s*0\)\s*>\s*0\)/) &&
+    has(gameSystem, /const\s+barrierY\s*=\s*this\.defeatLineY\s*-\s*e\.height\s*\/\s*2/) &&
+    has(gameSystem, /e\.dropTargetY\s*=\s*Math\.min\(e\.dropTargetY,\s*barrierY\)/) &&
+    has(gameSystem, /e\.pos\.y\s*=\s*Math\.min\(e\.pos\.y,\s*barrierY\)/),
+    'defeat check clamps shielded enemies back to the barrier instead of consuming shield'
+);
+check(!has(gameSystem, /playerShield[\s\S]{0,220}e\.active\s*=\s*false/), 'guardian barrier no longer deletes enemies during defeat checks');
+check(has(enemy, /blockedPierce:\s*isPierce/), 'deflectionWard damage result reports pierce blocking on absorbed pierce hits');
+check(has(projectile, /const\s+blockedPierce\s*=\s*!!\(damageResult\s*&&\s*damageResult\.blockedPierce\)/), 'projectile collision reads blockedPierce from damage result');
+check(has(projectile, /blockedPierce\s*&&\s*this\.piercesLeft\s*>\s*0[\s\S]{0,120}this\.piercesLeft--[\s\S]{0,180}NO PIERCE/), 'blocked pierce consumes a pierce layer and does not pass through the deflection ward');
+check(has(projectile, /affixes\s*&&\s*e\.affixes\.includes\(['"]deflectShell['"]\)[\s\S]{0,520}deflectShellNormalRotateAmp[\s\S]{0,420}normal\s*=\s*new\s+Vec2/), 'deflectShell rotates the collision normal for 1x1 enemy bounce targeting');
+check(has(read('src/combat_system.js'), /return\s+damageResult/), 'combat damage returns enemy takeDamage result to projectile collision');
+check(has(config, /guardian_barrier[\s\S]{0,260}防线屏障[\s\S]{0,220}移动撞击消耗 1 层屏障/), 'guardian barrier relic copy describes defense-line collision layers');
+check(
+    has(config, /energyArmorThresholdPct/) &&
+    has(config, /phaseShieldCycle/) &&
+    has(config, /overloadStepPct/) &&
+    has(config, /livingArmorPct/) &&
+    has(config, /siegeBreakerDamageMult/) &&
+    has(config, /carrierSpawnInterval/),
+    'enemy-targeting affix config includes only the approved armor, barrier, overload, and carrier thresholds'
+);
+check(has(gameSystem, /energyArmorShield[\s\S]{0,260}livingArmorHp[\s\S]{0,260}livingArmorBaseMax[\s\S]{0,260}livingArmorStacked[\s\S]{0,260}phaseShieldTurn[\s\S]{0,260}overloadBonusThisTurn[\s\S]{0,260}carrierCooldown/), 'run save state persists enemy-targeting affix state');
+const bossSaveFields = [
+    /bossOwnerId:\s*e\.bossOwnerId/,
+    /bossMinionRole:\s*e\.bossMinionRole/,
+    /bossMechanicTags:\s*Array\.isArray\(e\.bossMechanicTags\)/,
+    /furnacePressure:\s*e\.furnacePressure/,
+    /viridisSporeBloom:\s*e\.viridisSporeBloom/,
+    /teslaFieldPower:\s*e\.teslaFieldPower/,
+    /teslaSummonCharge:\s*e\._teslaSummonCharge/,
+    /frostSeamTurns:\s*e\.frostSeamTurns/,
+    /chimeraDigestCooldown:\s*e\._chimeraDigestCooldown/,
+    /_bossVulnerabilityProgress:\s*e\._bossVulnerabilityProgress/,
+];
+const bossLoadFields = [
+    /e\.bossOwnerId\s*=\s*d\.bossOwnerId/,
+    /e\.bossMinionRole\s*=\s*d\.bossMinionRole/,
+    /e\.bossMechanicTags\s*=\s*Array\.isArray\(d\.bossMechanicTags\)/,
+    /e\.furnacePressure\s*=\s*d\.furnacePressure/,
+    /e\.viridisSporeBloom\s*=\s*d\.viridisSporeBloom/,
+    /e\.teslaFieldPower\s*=\s*d\.teslaFieldPower/,
+    /e\._teslaSummonCharge\s*=\s*d\.teslaSummonCharge/,
+    /e\.frostSeamTurns\s*=\s*d\.frostSeamTurns/,
+    /e\._chimeraDigestCooldown\s*=\s*d\.chimeraDigestCooldown/,
+    /e\._bossVulnerabilityProgress\s*=\s*d\._bossVulnerabilityProgress/,
+];
+check(
+    bossSaveFields.every(re => has(gameSystem, re)) && bossLoadFields.every(re => has(gameSystem, re)),
+    'run save/load persists Boss mechanic resources, minion metadata, and vulnerability state'
+);
+check(has(enemy, "const affixes = ['haste', 'jump'];") && has(enemy, 'drone._isCarrierDrone = true;') && has(enemy, /_getCarrierBayPosition/) && has(enemy, /_pushCarrierBayOccupant/) && has(enemy, /_carrierLaunchDroneMovement/), 'carrier pushes bay occupants and immediately launches haste+jump drones from bay slot 5');
+const enemyVisualAssets = read('src/data/enemy_visual_assets.js');
+check(
+    has(enemyVisualAssets, /export function resolveDynamicEnemyOverlayPaths/) &&
+    has(enemyVisualAssets, /livingArmorStacked/) &&
+    has(enemyVisualAssets, /phaseShieldDisabledThisTurn/) &&
+    has(enemyVisualAssets, /_overloadBonusThisTurn/) &&
+    has(enemy, /resolveDynamicEnemyOverlayPaths\(this\)/) &&
+    has(enemy, /overlayKey === this\._visualOverlayKey/),
+    'stateful enemy-targeting overlays can be resolved without changing assetKey'
+);
+check(
+    has(enemy, /_drawEnemyTargetingFallback\s*\(ctx,\s*w,\s*h\)/) &&
+    has(enemy, /_armorSporeTrailTimer/) &&
+    has(enemy, /case\s+['"]carrier['"]/) &&
+    has(enemy, /fillRect\(-cellW\s*\/\s*2\s*\+\s*pad,\s*pad\s*\*\s*0\.55/) &&
+    has(enemy, /hasAffix\(['"]deflectShell['"]\)\s*&&\s*\(this\.gridCols\s*\|\|\s*1\)\s*<=\s*1/),
+    'enemy-targeting affixes have Canvas fallback art for spore trails, carrier bay holes, and 1x1 deflect shells'
+);
+check(
+    has(enemy, /@section:targeting_fallback_border_frame/) &&
+    has(enemy, /drawEdgeSegment\s*=\s*\(/) &&
+    has(enemy, /drawCornerBracket\s*=\s*\(/) &&
+    has(enemy, /drawArrowHead\s*=\s*\(/) &&
+    has(enemy, /edgePointToward\s*=\s*\(/) &&
+    has(enemy, /hasAffix\(['"]carrier['"]\)[\s\S]{0,900}bayLeft[\s\S]{0,900}bayRight/) &&
+    has(enemy, /hasAffix\(['"]deflectShell['"]\)[\s\S]{0,900}Math\.PI \* 0\.48/) &&
+    has(enemy, /ctx\.restore\(\);\s*return;\s*\}\s*\}\s*_drawAffixBitmapOverlays/),
+    'enemy-targeting Canvas fallback is border-frame art and returns before old center-blocking glyphs'
+);
+check(
+    has(systems, /id:\s*['"]ev2_enemy_targeting_fallback['"]/) &&
+    has(systems, /setupTargetingFallbackAcceptance/) &&
+    has(systems, /name:\s*['"]蓄能甲['"]/) &&
+    has(systems, /name:\s*['"]相位护盾·断['"]/) &&
+    has(systems, /name:\s*['"]过量炉\+3['"]/) &&
+    has(systems, /name:\s*['"]低伤免疫['"]/) &&
+    has(systems, /name:\s*['"]活甲 >50%['"]/) &&
+    has(systems, /name:\s*['"]叠甲 <20%['"]/) &&
+    has(systems, /_armorSporeTrailFromX\s*=\s*sporeSource\.pos\.x/),
+    'training ground exposes an enemy-targeting fallback acceptance scenario'
+);
+check(has(spawnSystem, /footprintCells\s*=\s*5/) && has(spawnSystem, /\[1,\s*0,\s*1\]/) && has(config, /carrierSpawnInterval:\s*1/), 'carrier is a five-cell U footprint with empty slot 5 and spawns every turn');
+check(has(systems, /针对提示：\$\{meta\.targeting\}/), 'V2 bestiary uses targeting tips rather than counter tips');
+check(has(enemyV2Metadata, /targeting:\s*['"][^'"]*穿透会被拦下/), 'deflector metadata states pierce is blocked by the ward');
+check(!has(enemyV2Metadata, /\bcounter:/), 'V2 enemy metadata no longer uses counter fields');
 check(has(gameSystem, /runShopFirstOfferRound\)\s*\|\|\s*3|runShopFirstOfferRound\s*\|\|\s*3/), 'run shop first scheduled visit defaults to round 3');
 check(has(gameSystem, /runShopVisitDurationRounds\s*\|\|\s*2/), 'run shop visits default to a two-round stay');
 check(has(gameSystem, /sys_rollNextRunShopRound[\s\S]*runShopRandomWaitMin[\s\S]*fromRound/), 'run shop next visit rolls between configured min wait and current round');

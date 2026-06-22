@@ -35,9 +35,9 @@
 **遗物 ID**: `early_temp_shield`
 **名称**: 守护者结界
 **图标**: 🔰
-**描述**: 获得 5 层护盾。每当敌人触底时消耗 1 层护盾抵消伤害。
-**机制实现**: 在 `ui_selectRelic` 中设置 `this.playerShield = (this.playerShield || 0) + 5`，在 `input_checkDefeat` 判定越线时，优先扣除护盾而非直接 Game Over。
-**推荐 Tip**: 极高的容错率！即使漏怪也能保命，适合还在熟悉操作的新手。
+**描述**: 获得 5 层防线屏障。敌人抵达防线前会被拦停，之后每次移动撞击消耗 1 层屏障。
+**机制实现**: 在 `ui_selectRelic` 中设置 `this.playerShield = (this.playerShield || 0) + 5`；敌人移动阶段若将抵达防线，则先夹到 `defeatLineY - height/2`，下一次移动尝试才扣除 1 层屏障。`input_checkDefeat` 只做越线兜底夹回，不扣盾、不删除敌人。
+**推荐 Tip**: 把漏怪变成可见的防线压力，适合还在熟悉操作的新手。
 
 ### 方案 C：前 N 回合无条件秒杀小怪
 **遗物 ID**: `early_execute_aura`

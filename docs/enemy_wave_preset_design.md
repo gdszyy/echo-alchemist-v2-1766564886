@@ -45,15 +45,17 @@ export const ENEMY_WAVE_PRESETS = [
 | `weight` | number | 在当前可用 preset 池中的抽取权重。 |
 | `maxUses` | number | 单局最大出现次数。 |
 | `cooldownRounds` | number | 同类 preset 出现后的冷却回合。 |
+| `directorTags` | string[] | 可选的导演调度标签；`spawn_getDirectorPressureProfile()` 识别顶部压制、清场过快、伤害溢出后会提高匹配标签的权重。 |
 | `introText` | string | 可选的 UI 提示或浮字，用于首次教学。 |
 | `slots` | array | 敌人槽位列表，描述大型基底、通用敌人和相对位置。 |
 
 ## 3. 首批预设波次组合
 
-首批预设不应追求数量，而应覆盖 V2 设计中最需要教学的行为差异。建议先实现 8 个 preset，覆盖屏障、回响、孵化、破阵、折光、引力、吞噬和重装等核心语义。
+首批预设不应追求数量，而应覆盖 V2 设计中最需要教学的行为差异。当前实现包含 9 个 preset，覆盖屏障、回响、孵化、破阵、折光、引力、吞噬、重装和早期反压制等核心语义。
 
 | Preset ID | 推荐回合 | 敌人组合 | 出场意图 | 克制/学习点 |
 |---|---:|---|---|---|
+| `early_bastion_brace` | R6-R9 | `bastion(3×1, heavyArmor)` + 1 个普通敌人 | 当初期玩家火力过强时，提前给出横向装甲封锁题。 | 穿透、闪电或调整角度拆开横梁。 |
 | `teach_deflection_ward` | R8-R14 | `deflector(2×1, deflectionWard)` + 1 个普通敌人 | 教学偏折屏障只阻挡反弹/穿透。 | 引导玩家改用火焰、毒或直击伤害。 |
 | `teach_echo_relay` | R12-R18 | `echoSpire(1×2, echoRelay)` + `regen` 或 `shield` 小队 | 展示“额外触发周围词条”的威胁。 | 优先击杀尖塔或拉开周围敌人。 |
 | `siege_push_line` | R16-R24 | `siege(3×2, siege)` + 前方 2 个低血盾兵 | 展示无法冰冻与阻挡推挤。 | 玩家需要提前清前排，不能依赖冰冻停住攻城履带。 |
@@ -119,3 +121,15 @@ therefore document or display the live-combat baseline instead of redefining com
 [2]: ../.cursor/rules/spawn_system.md "生成系统规范与现有导演模板"
 [3]: ../src/config.js "敌人曲线与模板权重配置"
 [4]: enemy_art_implementation_impact.md "敌人美术资产与词条特效影响范围评估"
+## 11. 剧本层补充（2026-06-22）
+
+V2 preset 现在不只是孤立波次，还需要归入导演“剧本”。每个 `ENEMY_WAVE_PRESETS` 条目必须填写：
+
+| 字段 | 类型 | 用途 |
+|---|---|---|
+| `scriptId` | string | 所属导演剧本 ID，必须存在于 `DIRECTOR_SCRIPTS`，用于避免同一剧本短时间重复出演。 |
+| `beatId` | string | 剧本内节拍 ID，如 `intro`、`combo`、`climax`，用于区分首演教学、组合强化和后期压轴。 |
+
+选择流程为：`spawn_pickWavePreset()` 先检查 `roundRange`、`maxUses`、preset 冷却和同屏大型上限，再通过 `spawn_getPresetActorProfile()` / `spawn_canUseDirectorScript()` 检查剧本回合、剧本重复冷却和陌生演员预算，最后才按 `directorTags` 与压力画像加权抽取。
+
+陌生演员定义来自 `DIRECTOR_ACTOR_INTRO_ROUNDS`。在词条首演窗口内，一个 preset 默认最多引入 1 个陌生词条；如需例外，必须显式设置 preset 或 script 的 `maxUnfamiliarActors` 并同步补测试说明。

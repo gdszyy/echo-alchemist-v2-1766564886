@@ -21,6 +21,8 @@ Echo Alchemist V2 以 Canvas 2D API 渲染，在中低端手机上粒子特效�
 | 3a | **高密度模块化钉盘** | 细钉/小弹珠会提高可见 Peg 数量；必须继续依赖 `pegSoftShadow` / `pegGlowHalo` 在 medium/low 档关闭高开销层 | `src/pinboard_modules.js`、`src/game_phase.js`、`src/entities.js` |
 | 4 | **敌人材质光泽** | `OffscreenCanvas` 上 `LinearGradient` 叠加，敌人构造时执行 | `src/entities/enemy.js`（`Enemy._initTexture`） |
 
+> 2026-06-22：Ignis 温压与 Boss 入场专属敌人元数据不新增持续渲染对象。温压状态只增加一个 `压XX%` 状态短标签，温压触发流光时复用 `spawn_createShockwave()` 与既有流光护盾视觉，继续受 `shockwaveLimit` 和现有流光护盾 low/medium/high 分支约束。Tesla 导体网络新增 `电XX%` / `导N` 状态短标签和 2-4 条紫白短电弧，`shadowBlur` 通过 `_sb()` 门控；电击、导体召唤只复用现有 `spark`、`shockwave` 和 floating text 预算，不新增持续粒子池或 `CONFIG.performance` 字段。Glacies 霜缝新增 `缝N` 状态短标签、最多 5 条连接线和 3-4 条缝线，low 档关闭发光/混合；施加与切断只复用 `shard`、`shockwave` 与 floating text 预算，不新增持续粒子池或 `CONFIG.performance` 字段。Viridis 孢子活甲新增 `孢N` / `腐N` 状态短标签、2-3 条黄绿描边环和最多 6 个静态孢点，low 档关闭 `screen` / 发光；补甲与破甲反馈复用 `spark`、`shockwave` 与 floating text 预算，不新增持续粒子池或 `CONFIG.performance` 字段。Ouroboros 六附体新增 `附X` / `断N` 状态短标签、6 个轨道节点和一个短暂封印环，low 档关闭节点文字、发光和混合；裂群召唤复用普通敌人生成、`shockwave` 与 floating text 预算，不新增持续粒子池或 `CONFIG.performance` 字段。
+
 ---
 
 ## 3. 架构设计
@@ -177,12 +179,30 @@ if avgFps > fpsThresholdUp (55):
 |------|---------|------|
 | 通用词条 Overlay 位图叠层（Layer 3.96） | `perfQualityLevel` | `high`：每敌最多 2 次 `drawImage`；`medium/low`：每敌最多 1 次 `drawImage`。不新增粒子、渐变、`shadowBlur` 或预算字段；缺失/未加载资源时静默跳过，语义由 Canvas 词条层与短标签兜底 |
 
+### 5.5.2b 敌人针对边框 fallback（`src/entities/enemy.js` → `Enemy._drawEnemyTargetingFallback`）
+| 位置 | 读取字段 | 行为 |
+|------|---------|------|
+| 敌人针对词缀边框/外缘语义层（Layer 3.95a） | `perfQualityLevel` | `high/medium`：允许轻微 pulse 与虚线；`low`：关闭 pulse，保留边缘甲片、角标、窄条、空舱口、底部齿和外缘旋转弧。该层不绘制中心大图标或暗底块，不遮挡敌人主体；不新增粒子、渐变、`shadowBlur`、混合模式或 `CONFIG.performance` 字段。 |
+
 ### 5.5.3 碰撞框材质边框（`src/entities/enemy.js` → `Enemy._drawCollisionFrameBitmap`）
 | 位置 | 读取字段 | 行为 |
 |------|---------|------|
 | 非 Boss 敌人 Collision Frame 位图层（Layer 4.9b） | `perfQualityLevel` | `high/medium`：每个已登记 frame 的非 Boss 敌人 1 次缓存 `drawImage`，透明度 0.96；`low`：仍保留边框语义，透明度降为 0.84。不新增粒子、渐变、`shadowBlur`、混合模式或预算字段；绘制成功时接管顶层物理边界并跳过 Layer 5 矢量边框，缺失/未加载资源时由 Layer 5 矢量碰撞描边兜底 |
 
-### 5.6 Arc Boss VFX（`src/entities/enemy.js` → Devourer Layer 6.5 & Ouroboros Layer 6.5）
+### 5.5.4 流彩护盾词条视觉（`src/entities/enemy.js` → `Enemy.draw` Layer 3.5 & feedback）
+| 位置 | 读取字段 | 行为 |
+|------|---------|------|
+| `radiantAegis` 内部护罩纹理（Layer 3.5） | `perfQualityLevel` | `high`：3 层流彩菱环 + 节点 + `screen` 混合；`medium`：2 层菱环、无节点；`low`：平面描边，关闭 `screen` 混合与 `_sb()` 阴影，仍保留词条身份 |
+| `radiantAegis` 命中/破盾反馈 | `perfQualityLevel` + 既有粒子/冲击波预算 | 破盾只通过 `spawn_createParticle(..., 'shard')` 和 `spawn_createShockwave()` 复用 `shardLimit` / `shockwaveLimit`；没有新增粒子类型或 `CONFIG.performance` 字段 |
+
+### 5.5.5 Boss 破绽身体 Overlay（`src/entities/enemy.js` → `Enemy._drawBossVulnerabilityOverlay`）
+| 位置 | 读取字段 | 行为 |
+|------|---------|------|
+| Boss 破绽进度、爆开、暴露、恢复视觉（Layer 3.8 后） | `perfQualityLevel` | `high/medium`：少量裂纹、切口、弱点环和 `_sb()` 门控发光，使用 `screen` 混合；`low`：改用 `source-over` 平面线条，关闭发光和混合。该层不新增粒子、渐变预算或新 `CONFIG.performance` 字段；破绽满格只触发一次既有 `spawn_createShockwave()` 作为停摆反馈。 |
+| Boss 破绽 PNG Overlay（`src/data/boss_vulnerability_assets.js`） | 图片缓存状态 | 若 `boss_<bossId>_<state>.png` 已缓存加载，`_drawBossVulnerabilityAssetOverlay()` 每个 Boss 每帧最多绘制 1 张透明图；图片缺失、失败或加载中时继续走上方 Canvas fallback。PNG 路径与尺寸契约见 `docs/boss_vulnerability_asset_contract.md`；不新增粒子、渐变、`shadowBlur`、混合预算或 `CONFIG.performance` 字段。 |
+| Boss 本体 Sprite 重绘（`src/data/boss_sprite_assets.js` + `SpriteRenderer`） | 图片/JSON 缓存状态 | 旧 `256 × 256` 方形帧和新 `384 × 256` 横向帧都只产生每个 Boss 每帧 1 次 `drawImage`；`getCurrentFrameAspect()` 仅改变目标绘制矩形，不新增粒子、渐变、混合或预算字段。资源失败时 `SpriteRenderer.failed`，Boss Canvas 装饰继续兜底。 |
+
+### 5.6 Boss 专属 VFX（`src/entities/enemy.js` → Devourer Layer 6.5 & Ouroboros Layer 6.5）
 
 | 位置 | 读取字段 | 行为 |
 |------|---------|------|
@@ -191,7 +211,7 @@ if avgFps > fpsThresholdUp (55):
 | Devourer 吸入粒子每帧生成概率（DEVOURING 状态） | `arcBossVfxSuckProb` | 控制每帧 spark 粒子生成概率（high:0.7 / medium:0.5 / low:0.3） |
 | Ouroboros 狂暴共鸣三角形符文数量（狂暴状态） | `arcBossVfxTriCount` | 控制外圈旋转三角形数量（high:6 / medium:3 / low:0），0 时完全跳过循环 |
 
-> **注意**：Arc Boss VFX 通过 `game.perfQualityLevel` 动态读取等级，默认回退到 `'high'`。吸入粒子已通过 `spawn_pushParticleWithLimit` 接入全局 sparkLimit 预算检查。
+> **注意**：这些 VFX 通过 `game.perfQualityLevel` 动态读取等级，默认回退到 `'high'`。吸入粒子已通过 `spawn_pushParticleWithLimit` 接入全局 sparkLimit 预算检查。2026-06-23 起 Devourer 的物理碰撞改为不规则 polygon，Layer 6.5 仍使用同一组视觉半径 fallback 绘制口器/引力线，不新增预算字段；Ouroboros 是唯一完整环形 Boss。
 
 > **注意**：`_initTexture` 在构造时调用，通过 `window.game` 读取等级（若 `window.game` 尚未初始化则默认开启光泽）。
 
@@ -280,11 +300,13 @@ if avgFps > fpsThresholdUp (55):
 
 | 日期 | 内容 |
 |------|------|
+| 2026-06-23 | **Boss 物理轮廓收口**：Mikro 与 Devourer 从环形/缺口 arc 语义改为实体 polygon，只有 Ouroboros 保留完整闭合环形 arc 以承载 6 个附体槽。Devourer Layer 6.5 继续复用既有 `arcBossVfx*` 三档门控和 sparkLimit，Ouroboros 轮转锚点只改变视觉指示，不新增粒子、渐变预算、混合模式或 `CONFIG.performance` 字段。 |
 | 2026-06-21 | **敌人 HP 与碰撞框可读性修正**：第一轮运行时前景 HP 视窗、液面亮线、侧边液位尺与 Sprite clip 已撤销；当前由 `*_native_hollow*` 敌人素材的原生镂空结构露出 Layer 2 HP 液体，避免把血量 UI 拉到敌人左侧或在完整主体上硬切窗口。保留 collision frame alpha 内容框测量与透明 padding 裁剪，让边框贴合当前碰撞区域。该方案减少 `fillRect` / `strokeRect` / clip 路径，不新增粒子、`shadowBlur`、渐变、混合模式或 `CONFIG.performance` 预算字段；`low` 档完整保留 HP 与物理边界语义。 |
 | 2026-06-21 | **研磨视觉重心调整**：`Peg.hit()` 缩短点亮/缩放反馈，`Peg.draw()` 改为廉价菱形铆钉板轮廓、内倒角、短高光/暗部笔触和中心槽位，以区别圆形玻璃弹珠，并在 `pegGlowHalo` 预算下压低 Peg 光晕半径/透明度；`DropBall.draw()` 增加玻璃边缘高光/暗部弧线强化球体质感；`EnergyOrb` 默认改为更小的 `source-over` 低透明度短拖尾，`spawn_createHitFeedback()` 为普通/二次反馈传入更克制的视觉参数。未新增粒子、`CONFIG.performance` 字段、渐变循环或无预算高开销效果；`high` 保留 Peg halo 但更低调，`medium`/`low` 继续按既有门控关闭 Peg halo / 软阴影。 |
 | 2026-06-19 | **默认钉盘回归纯交错钉板**：默认前两行由 10 个 `dense_stagger` 1x1 模块组成，120 个普通圆钉、0 个 barrier、0 个 SpecialSlot；未新增粒子、渐变或额外 `shadowBlur`，Peg 绘制继续受 `pegSoftShadow` / `pegGlowHalo` 三档预算控制。三档影响：`high`/`medium` 维持原 Peg 视觉门控，`low` 继续关闭高开销 Peg halo。 |
 | 2026-06-19 | **底部奖励分栏与初始 5 钉板**：默认开放槽位回调为首行 5 个 `dense_stagger` 模块；研磨底部小概率生成 1 个奖励分栏，宽度按 `1.5` 个倍化弹珠直径计算，两侧新增最多 2 条 `shape='barrier'` 竖直挡板。分栏绘制只使用 `fillRect` / `strokeRect` / 文本，挡板复用 `Peg.drawBarrierPeg()`，软阴影继续由 `pegSoftShadow` 门控；不新增粒子、渐变、混合模式、额外 `shadowBlur` 或 `CONFIG.performance` 预算字段。 |
 | 2026-06-19 | **战斗发射器信号 V2.2**：`render_combat_launcherSignal()` 改为居中的下一发 HUD，集中展示弹体轮廓、弹药位图核心、`DMG` 伤害、`S` 散射弹数、散射扇形预览、`xN` 连射数、连射柱和装填格。该层复用现有弹药位图，绘制数量固定；`shadowBlur` 继续由 `perfQualityLevel !== 'low'` 门控，不新增粒子、渐变循环或 `CONFIG.performance` 预算字段。 |
+| 2026-06-22 | **流彩护盾超级词条**：`enemy.js` 新增 `radiantAegis` 护罩纹理、命中反馈与破盾反馈；high 绘制 3 层流彩菱环和节点，medium 降为 2 层无节点，low 关闭 `screen` 混合与 `_sb()` 阴影并保留平面语义描边。扩盾冲击波和破盾碎片复用既有 `shockwaveLimit` / `shardLimit`，未新增 `CONFIG.performance` 预算字段。 |
 | 2026-06-19 | **钉盘编辑器放置预览**：模块 picker 在 hover/focus 候选组件时写入 `_moduleEditorPlacementPreview`，`render_moduleEditorOverlay()` 用平面填充和描边标记当前槽、可放置覆盖槽、不可放置覆盖槽。该反馈不新增粒子、渐变、混合模式或 `shadowBlur`，无需新增 `CONFIG.performance` 预算字段。 |
 | 2026-06-19 | **钉盘编辑器异形轮廓**：`render_moduleEditorOverlay()` 根据组件 `shape.footprint` 绘制导流翼、杯形、沙漏、螺旋等平面轮廓，帮助玩家在编辑态识别组件身份。该层只使用 `stroke`、`lineTo`、`quadraticCurveTo`、`arc/ellipse` 等廉价路径绘制，不新增粒子、渐变、混合模式或额外 `shadowBlur`。 |
 | 2026-06-19 | **异形挡板钉与倍化弹珠安全间距**：圆钉中心距统一按 `marbleRadius + maxMarbleSizeBonus` 计算，默认盘圆钉最小中心距审计为 `24.04px`，大于当前阈值 `23.8px`；导流翼、杯口、回环、挡板改用 `shape='barrier'` 的异形 Peg，以线段胶囊碰撞实现，不再用近距离圆钉拼挡板。`Peg.drawBarrierPeg()` 只绘制圆角线段，软阴影仍受 `pegSoftShadow` 门控；不新增粒子、渐变、混合模式或新预算字段。 |
@@ -292,6 +314,7 @@ if avgFps > fpsThresholdUp (55):
 | 2026-06-19 | **初始钉盘 2x5 铺满与异形机关化**：默认开放前两行 10 个槽，首发组件提升到约 120 Peg / 5 SpecialSlot，并新增轻分裂门、连射门、轻回环、轻轮盘杯等真实机关模块。该修改复用现有 `Peg` / `SpecialSlot`、既有 `split` / `multicast` / `recall` / `wheel` 触发逻辑，不新增粒子、`shadowBlur`、渐变、混合模式或新预算字段；高开销 Peg 阴影/光晕仍由 `pegSoftShadow` / `pegGlowHalo` 三档门控。 |
 | 2026-06-19 | **钉盘钉子密度加密**：初始 6 个异形组件从约 35 颗 Peg 提升到约 58 颗 Peg，商店路线型组件同步补齐入口、转折和出口空洞。该修改只增加普通 Peg/少量既有类型 Peg，未新增粒子、`shadowBlur`、渐变、混合模式或新预算字段；高开销 Peg 阴影/光晕仍由 `pegSoftShadow` / `pegGlowHalo` 三档门控。 |
 | 2026-06-19 | **商店异形钉盘组件池扩展**：新增 6 个路线型商店组件（Y 字分流、沙漏门、月牙坡、螺旋回廊、棱镜分光、双轮桥），全部复用现有 `Peg` 与 `SpecialSlot` 绘制和触发逻辑，不新增粒子、`shadowBlur`、渐变或混合模式。性能影响仍主要来自同屏 Peg/Slot 数量，继续归入高密度模块化钉盘预算。 |
+| 2026-06-22 | **钉盘机关槽扩展**：`SpecialSlot` 新增可重复触发的 `launcher` 与 `energy_wheel` 玩法分支，商店新增 `launcher_gate_module`、`pinwheel_capacitor_module`、`turbine_loop_module`、`swerve_cannon_module`。机关视觉复用 `SpecialSlot.draw()` 的固定数量路径、文字和 `_sb()` 门控阴影，不新增粒子、渐变循环、混合模式或 `CONFIG.performance` 预算字段；额外开销主要来自少量可见 `SpecialSlot` 与 Peg/barrier 数量，仍归入高密度模块化钉盘预算。 |
 | 2026-06-19 | **钉盘居中 3+3 初始布局与异形组件**：`moduleCols` 调整为 5，默认激活槽从 3 个提升到居中 `3+3` 两行共 6 个组件，并新增 6 个首发异形组件（导流翼、轻符文格、弹跳室、炼金核、接球杯）。该调整会提高初始 Peg 数量，但不新增粒子、`shadowBlur`、`createRadialGradient` 或混合模式；Peg 软阴影/光晕继续由 `pegSoftShadow` / `pegGlowHalo` 三档门控。 |
 | 2026-04-16 | 初始实现：FPS 采样器、三档等级预算、粒子/特效/Peg/敌人全面接入、FPS 指示层 |
 | 2026-04-16 | 新增 `sparkLimit`（high:100/medium:50/low:20）和 `smokeLimit`（high:60/medium:25/low:8）两个预算字段；在 `spawn_createParticle` 和 `spawn_pushParticleWithLimit` 中同步接入 spark/smoke 上限检查，防止能量泄漏、机械类受击等高频 spark 场景占用全局粒子预算 |

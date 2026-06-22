@@ -40,7 +40,7 @@ function buildV2BestiaryEntries() {
         iconSrc: meta.iconPath,                 // 後續可由 TruthBook 渲染為 <img>
         tags: [meta.footprint, meta.priority, ...meta.affixes],
         desc: `【${meta.name}・${meta.footprint}】基底=${meta.baseArchetype}，专属词条=${meta.affixes.join('/') || '无'}\n` +
-              `登场阶段：${meta.stage}\n战术职责：${meta.role}\n克制提示：${meta.counter}\n` +
+              `登场阶段：${meta.stage}\n战术职责：${meta.role}\n针对提示：${meta.targeting}\n` +
               (meta.placeholder ? '※ 当前为占位资源，待正式美术替换。' : ''),
         // 圖鑒演示直接調用 V2 矩陣的單體場景
         setup: (game) => {
@@ -515,6 +515,10 @@ class UIManager {
                 name: '🛡️ 護盾', 
                 desc: `受到的傷害減少 ${afx.shieldReduction * 100}%。(可反射激光)` 
             },
+            'radiantAegis': {
+                name: '✦ 流彩護盾',
+                desc: `Boss 版：只要流彩盾未破，每回合生成最大生命 ${(afx.radiantAegisBossRegenPct || 0.02) * 100}% 的数值护盾；满 ${(afx.radiantAegisBossCapPct || 0.10) * 100}% 后再次获取会给周围一格敌人 +1 层护盾。精英版数值减半。`
+            },
             'haste': { 
                 name: '⚡ 極速', 
                 desc: '每回合在正常移动后额外追加一次冲刺移动。加速仅作用于移动，不重复结算其他词条。' 
@@ -571,6 +575,42 @@ class UIManager {
             'gravityWell': {
                 name: '🌀 引力井',
                 desc: `3×3 引力炉心：在 ${afx.gravityWellPullRadius || 220}px 半徑內對所有子彈施加微弱回拉，造成可預測的彈道偏折。`
+            },
+            'carrier': {
+                name: '▱ 鑄巢母架',
+                desc: `五格冂形母架：每 ${afx.carrierSpawnInterval || 1} 回合在第 5 格空艙投放一隻 haste+jump 小型敵人；若空艙被佔會先推出舊單位，推不出去則跳過本次投放。`
+            },
+            'livingArmor': {
+                name: '🟢 活體護甲',
+                desc: `獲得最大生命 ${(afx.livingArmorPct || 0.10) * 100}% 的活體護甲；每回合開始回滿，破裂後自身不再生效，可被護甲孢子重新掛甲。代承反彈傷害，穿透會同時打護甲與本體。`
+            },
+            'armorSpore': {
+                name: '🍃 護甲孢子',
+                desc: `每回合為一名隨機友軍添加活體護甲；若目標已有活體護甲，按 ${(afx.armorSporeStackPct || 0.50) * 100}% 數值疊加。`
+            },
+            'siegeBreaker': {
+                name: '🏚️ 撞城者',
+                desc: `撞擊防線屏障時造成占格數 ×${afx.siegeBreakerDamageMult || 2} 的屏障傷害。`
+            },
+            'deflectShell': {
+                name: '🔄 偏折殼',
+                desc: '僅 1×1 敵人攜帶；物理邊界持續旋轉，子彈反彈方向會被偏折。'
+            },
+            'energyArmor': {
+                name: '🟡 蓄能甲',
+                desc: `單次傷害超過最大生命 ${(afx.energyArmorThresholdPct || 0.20) * 100}% 時，只承受閾值部分，溢出轉化為臨時護盾。`
+            },
+            'phaseShield': {
+                name: '🟣 相位護盾',
+                desc: `初始與新增護盾層數 ×${afx.phaseShieldMult || 2}；每 ${afx.phaseShieldCycle || 3} 個敵方回合有 1 回合護盾失效。`
+            },
+            'overloadReactor': {
+                name: '🔥 過量反應爐',
+                desc: `本回合每累積受到最大生命 ${(afx.overloadStepPct || 0.20) * 100}% 的傷害，下次行動與移動次數 +1（最多 +${afx.overloadMaxBonus || 3}）。`
+            },
+            'lowDamageImmune': {
+                name: '⬜ 低傷免疫',
+                desc: `低於最大生命 ${(afx.lowDamageImmunePct || 0.05) * 100}% 的單次最終傷害無效。`
             }
         };
     }
@@ -823,6 +863,60 @@ class UIManager {
 //   bulletConfig      — 预设子弹配置（可选，不填则保留当前配置）
 //   demoAction(game)  — 触发演示动作（可选，如自动发射子弹或触发敌人行动）
 //   desc              — 场景说明文字（可选）
+const BOSS_VULNERABILITY_VISUAL_BOSSES = [
+    'ignis', 'glacies', 'mikro', 'devourer', 'viridis', 'tesla', 'chimera', 'ouroboros'
+];
+
+const BOSS_VULNERABILITY_VISUAL_STATES = [
+    { id: 'vuln_0', label: '0%', ratio: 0, exposedTurns: 0, breakTimer: 0, recoverTimer: 0 },
+    { id: 'vuln_25', label: '25%', ratio: 0.25, exposedTurns: 0, breakTimer: 0, recoverTimer: 0 },
+    { id: 'vuln_50', label: '50%', ratio: 0.5, exposedTurns: 0, breakTimer: 0, recoverTimer: 0 },
+    { id: 'vuln_75', label: '75%', ratio: 0.75, exposedTurns: 0, breakTimer: 0, recoverTimer: 0 },
+    { id: 'break', label: '破绽爆开', ratio: 1, exposedTurns: 1, breakTimer: 34, recoverTimer: 0 },
+    { id: 'exposed', label: '暴露停摆', ratio: 1, exposedTurns: 1, breakTimer: 0, recoverTimer: 0 },
+    { id: 'recover', label: '恢复闭合', ratio: 0, exposedTurns: 0, breakTimer: 0, recoverTimer: 32 }
+];
+
+const BOSS_VULNERABILITY_EXPOSED_PARTS = {
+    ignis: 'furnace_gate',
+    glacies: 'frozen_joint',
+    mikro: 'fission_core',
+    devourer: 'maw_throat',
+    viridis: 'symbiote_heart',
+    tesla: 'phase_core',
+    chimera: 'chaos_reactor',
+    ouroboros: 'rotation_node'
+};
+
+function resolveBossVulnerabilityAttrs(bossId, rotationIndex = 0) {
+    const cfg = CONFIG.balance.bossConfigs?.[bossId]?.vulnerability || {};
+    if (cfg.dynamic) {
+        const sets = cfg.rotationAttrs || [];
+        return sets.length > 0 ? sets[Math.max(0, rotationIndex) % sets.length] || [] : [];
+    }
+    return cfg.attrs || [];
+}
+
+function setupBossVulnerabilityVisualState(boss, bossId, state, rotationIndex = 0) {
+    if (!boss || !state) return;
+    const threshold = Math.max(1, boss._bossVulnerabilityThreshold || 4);
+    const ratio = Math.max(0, Math.min(1, state.ratio || 0));
+    boss._bossVulnerabilityMode = 'visual_acceptance';
+    boss._bossVulnerabilityThreshold = threshold;
+    boss._bossVulnerabilityProgress = Math.floor(threshold * Math.min(0.99, ratio));
+    boss._bossVulnerabilityVisualRatio = ratio;
+    boss._bossVulnerabilityVisualAttrs = resolveBossVulnerabilityAttrs(bossId, rotationIndex).slice(0, 2);
+    boss._bossVulnerabilityExposedTurns = state.exposedTurns || 0;
+    boss._bossVulnerabilityExposedHits = 0;
+    boss._bossVulnerabilityExposedPart = BOSS_VULNERABILITY_EXPOSED_PARTS[bossId] || 'core';
+    boss._bossVulnerabilityBreakTimer = state.breakTimer || 0;
+    boss._bossVulnerabilityRecoverTimer = state.recoverTimer || 0;
+    boss._willMoveThisTurn = state.exposedTurns > 0 ? false : boss._willMoveThisTurn;
+    if (bossId === 'ouroboros') {
+        boss.rotationIndex = rotationIndex % 3;
+    }
+}
+
 const TRAINING_SCENARIOS = {
     categories: [
         { id: 'enemy', name: '敵人詞條' },
@@ -847,6 +941,25 @@ const TRAINING_SCENARIOS = {
                 game.enemies.push(new Enemy(x, y, 60, 60, 500, 500, 'normal', ['shield']));
             },
             bulletConfig: { damage: 30, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: true, isMatryoshka: false, type: 'normal', laser: 5 },
+            demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
+        {
+            id: 'enemy_radiant_aegis',
+            categoryId: 'enemy',
+            name: '流彩護盾',
+            icon: '✦',
+            desc: '超級精英詞條：流彩盾未破時每回合自增；满层后再次获取会为周围一格敌人增加 1 层护盾。此场景演示精英半强度版本。',
+            setup: (game) => {
+                const w = game.enemyWidth;
+                const h = game.enemyHeight;
+                const top = game.combatGridTopY;
+                const core = new Enemy(2.5 * w + w / 2, top + h / 2, 60, 60, 600, 600, 'elite', ['radiantAegis']);
+                if (typeof core._initRadiantAegis === 'function') core._initRadiantAegis();
+                const left = new Enemy(1.5 * w + w / 2, top + h / 2, 60, 60, 220, 220);
+                const right = new Enemy(3.5 * w + w / 2, top + h / 2, 60, 60, 220, 220);
+                game.enemies.push(left, core, right);
+            },
+            bulletConfig: { damage: 80, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
         },
         {
@@ -1129,7 +1242,7 @@ const TRAINING_SCENARIOS = {
             categoryId: 'boss',
             name: '霜晶縫合怪·格拉西斯',
             icon: '❄️',
-            desc: '跳躍+再生。狂暴後跳躍行數增加，落地冰凍周圍鋼釘。破綻譜：冰霜/穿透。',
+            desc: '跳躍+再生。回合與落地會在戰場內縫合霜縫，使敵人短暫減傷、回血並獲得護盾；冰霜可凍結下一次霜縫，穿透可切斷霜縫。破綻譜：冰霜/穿透。',
             setup: (game) => { game.spawn_spawnBoss('glacies', false); },
             bulletConfig: { damage: 50, bounce: 0, pierce: 3, scatter: 0, multicast: 0, pyro: 0, cryo: 200, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
@@ -1155,39 +1268,70 @@ const TRAINING_SCENARIOS = {
             demoAction: (game) => { game.phase_enemy_startLogic(); }
         },
         {
+            id: 'boss_viridis',
+            categoryId: 'boss',
+            name: '翠绿共生体·维里迪斯',
+            icon: '🍃',
+            desc: '再生+治疗+活体护甲。专属孢子侍体和治疗会积累孢甲资源，资源达阈值为侍体/自身补活体护甲；非火毒破甲会反哺孢甲，火焰/毒素会蚀甲并削减资源。破绽谱：火焰/毒素。',
+            setup: (game) => { game.spawn_spawnBoss('viridis', true); },
+            bulletConfig: { damage: 45, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 180, cryo: 0, lightning: 0, wind: 0, venom: 6, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
+        {
             id: 'boss_ouroboros',
             categoryId: 'boss',
             name: '永恆回聲·奧羅波羅斯',
             icon: '🔄',
-            desc: '詞條每 3 回合輪轉（護盾/極速 → 再生/治療 → 分身/跳躍）。破綻譜會隨輪轉組切換。',
+            desc: '六附体轮转。每回合前位附体更换并授予护盾、治疗、召唤、位移、吞噬、加速六类机制；当前附体决定破绽谱，打满破绽会封印该附体并改变轮转节奏。',
             setup: (game) => { game.spawn_spawnBoss('ouroboros', true); },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
         },
         {
             id: 'boss_vulnerability_break',
             categoryId: 'boss',
-            name: 'Boss 破綻窗口',
+            name: 'Boss 破綻逐档验收',
             icon: '🎯',
-            desc: '連續用破綻譜屬性命中 Boss，累積「隙」並觸發「破」易傷窗口，同時延後一次狂暴觸發。',
+            keepSidebarOpenOnDemo: true,
+            desc: '逐档预览 8 个 Boss 的身体破绽层：0/25/50/75/破绽爆开/暴露停摆/恢复闭合。点击触发演示切换到下一档。',
             setup: (game) => {
-                const boss = game.spawn_spawnBoss('ignis', false);
+                game._bossVulnerabilityVisualAcceptance = { bossIndex: 0, stateIndex: 0 };
+                const bossId = BOSS_VULNERABILITY_VISUAL_BOSSES[0];
+                const state = BOSS_VULNERABILITY_VISUAL_STATES[0];
+                const boss = game.spawn_spawnBoss(bossId, false);
                 if (boss) {
                     boss._pendingEntrance = false;
                     boss.entranceTimer = 1;
+                    setupBossVulnerabilityVisualState(boss, bossId, state, 0);
                 }
             },
             bulletConfig: { damage: 20, bounce: 0, pierce: 3, scatter: 0, multicast: 0, pyro: 3, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game, tg) => {
-                const boss = game.enemies.find(e => e.active && e.type === 'boss');
-                if (!boss) return;
-                const recipe = { ...tg.bulletConfig };
-                for (let i = 0; i < 4; i++) {
-                    game.combat_damageEnemy(boss, {
-                        config: recipe,
-                        pos: boss.pos,
-                        isCopy: false,
-                        chainHistory: []
-                    });
+                const cursor = game._bossVulnerabilityVisualAcceptance || { bossIndex: 0, stateIndex: 0 };
+                const nextStateIndex = (cursor.stateIndex + 1) % BOSS_VULNERABILITY_VISUAL_STATES.length;
+                const nextBossIndex = nextStateIndex === 0
+                    ? (cursor.bossIndex + 1) % BOSS_VULNERABILITY_VISUAL_BOSSES.length
+                    : cursor.bossIndex;
+                game._bossVulnerabilityVisualAcceptance = {
+                    bossIndex: nextBossIndex,
+                    stateIndex: nextStateIndex
+                };
+
+                if (typeof tg._clearBattlefield === 'function') tg._clearBattlefield();
+                else game.enemies = [];
+
+                const bossId = BOSS_VULNERABILITY_VISUAL_BOSSES[nextBossIndex];
+                const state = BOSS_VULNERABILITY_VISUAL_STATES[nextStateIndex];
+                const boss = game.spawn_spawnBoss(bossId, bossId === 'viridis' || bossId === 'tesla' || bossId === 'chimera' || bossId === 'ouroboros');
+                if (boss) {
+                    boss._pendingEntrance = false;
+                    boss.entranceTimer = 1;
+                    setupBossVulnerabilityVisualState(boss, bossId, state, nextBossIndex);
+                }
+
+                const descEl = document.getElementById('train-scenario-desc');
+                if (descEl) {
+                    const attrs = resolveBossVulnerabilityAttrs(bossId, boss?.rotationIndex || 0).join(' / ') || 'dynamic';
+                    descEl.textContent = `视觉验收：${boss?.bossName || bossId} · ${state.label} · 破绽谱 ${attrs}。继续点击切换下一档。`;
                 }
             }
         },
@@ -2167,14 +2311,16 @@ function buildV2MatrixScenarios() {
 
 /**
  * [敌人 V2 美术验收] 构建 enemy_v2 分类下的验收场景列表。
- * 共 7 个场景（6 必选 + 1 可选 fallback），覆盖：
+ * 共 9 个场景（8 必选 + 1 可选 fallback），覆盖：
  *   1. 1×1 基准对照
  *   2. 2×2 maw/devour
  *   3. 3×1 bastion/heavyArmor
  *   4. 3×2 siege（静态展示）
  *   5. siege 前排阻挡链推挤
  *   6. 大型敌人 + 通用词条适配（maw + shield）
- *   7. 资源 fallback 展示（3×3 gravityWell）
+ *   7. 敌人针对词缀 Canvas fallback 集中验收
+ *   8. 资源 fallback 展示（3×3 gravityWell）
+ *   9. 导演预设波次生成入口
  *
  * 每个场景的 setup(game) 显式创建 Enemy 实例并赋值：
  *   baseArchetype, gridCols, gridRows, affixes, width, height, maxHp/hp
@@ -2183,6 +2329,8 @@ function buildV2MatrixScenarios() {
  * desc 字符串包含：尺寸 footprint / 基底 / 词条 / 行为摘要 / 资源状态。
  */
 function buildEnemyV2Scenarios() {
+
+    // @section:enemy_v2_asset_status - 资源命中状态文本
     // [资源命中状态] 直接从 enemy_sprite_manifest.json 解析，避免重复硬编码命名。
     // 同时保留 ENEMY_V2_BY_ID.placeholder 作为占位资源标记。
     const resourceStatusFor = ({ archetype, cols, rows, affixes, archetypeIdForPlaceholder }) => {
@@ -2222,6 +2370,120 @@ function buildEnemyV2Scenarios() {
     const lineFor = (opts) => resourceStatusFor(opts).line;
     const tagFor  = (opts) => resourceStatusFor(opts).tag;
 
+    // @section:enemy_v2_targeting_fallback - 敌人针对兜底验收
+    const setupTargetingFallbackAcceptance = (game) => {
+        const tg = game.trainingGround;
+        if (tg && typeof tg._clearV2MatrixOverlay === 'function') tg._clearV2MatrixOverlay();
+
+        const w = game.enemyWidth;
+        const h = game.enemyHeight;
+        const top = game.combatGridTopY;
+        const labelData = [];
+
+        const placeEnemy = ({
+            col,
+            row,
+            cols = 1,
+            rows = 1,
+            name,
+            affixes = [],
+            hp = 240,
+            type = 'elite',
+            baseArchetype = null,
+            setup = null,
+        }) => {
+            const centerX = (col + (cols - 1) / 2) * w + w / 2;
+            const centerY = top + (row + (rows - 1) / 2) * h;
+            const e = new Enemy(centerX, centerY, w * cols, h * rows, hp, hp, type, affixes.slice());
+            e.baseArchetype = baseArchetype;
+            e.gridCols = cols;
+            e.gridRows = rows;
+            if (cols >= 2) e.isWideEnemy = true;
+            e._moveInterval = 9999;
+            e._moveCooldown = 9999;
+            e.hasActedThisTurn = true;
+            e.dropTargetY = e.pos.y;
+            if (setup) setup(e);
+            if (typeof game.spawn_applyArchetypeShape === 'function' && baseArchetype) {
+                game.spawn_applyArchetypeShape(e, baseArchetype);
+            }
+            if (typeof e.initSprite === 'function') e.initSprite();
+            game.enemies.push(e);
+            labelData.push({
+                enemy: e,
+                centerX,
+                centerY,
+                hPx: h * rows,
+                def: {
+                    name,
+                    footprint: `${cols}×${rows}`,
+                    baseArchetype: baseArchetype || 'residue',
+                    affixes: affixes.slice(),
+                },
+            });
+            return e;
+        };
+
+        placeEnemy({
+            col: 0, row: 0, name: '蓄能甲', affixes: ['energyArmor'],
+            setup: (e) => { e.energyArmorShield = 70; },
+        });
+        placeEnemy({
+            col: 1, row: 0, name: '相位护盾·启', affixes: ['phaseShield', 'shield'],
+            setup: (e) => { e.shieldCharges = 4; e.phaseShieldDisabledThisTurn = false; },
+        });
+        placeEnemy({
+            col: 2, row: 0, name: '相位护盾·断', affixes: ['phaseShield', 'shield'],
+            setup: (e) => { e.shieldCharges = 4; e.phaseShieldDisabledThisTurn = true; },
+        });
+        placeEnemy({
+            col: 3, row: 0, name: '过量炉+3', affixes: ['overloadReactor'],
+            setup: (e) => { e._overloadDamageThisTurn = e.maxHp; e._overloadBonusThisTurn = 3; },
+        });
+        placeEnemy({ col: 4, row: 0, name: '低伤免疫', affixes: ['lowDamageImmune'] });
+        placeEnemy({ col: 5, row: 0, name: '偏折壳', affixes: ['deflectShell'] });
+
+        const livingArmorState = (hp, max, stacked = false) => (e) => {
+            e.livingArmorMax = max;
+            e.livingArmorHp = hp;
+            e.livingArmorBaseMax = stacked ? Math.floor(max * 0.65) : max;
+            e.livingArmorStacked = stacked;
+            e.livingArmorBroken = false;
+        };
+        placeEnemy({ col: 0, row: 1, name: '活甲 >50%', affixes: ['livingArmor'], setup: livingArmorState(90, 100) });
+        placeEnemy({ col: 1, row: 1, name: '活甲 <50%', affixes: ['livingArmor'], setup: livingArmorState(45, 100) });
+        placeEnemy({ col: 2, row: 1, name: '活甲 <20%', affixes: ['livingArmor'], setup: livingArmorState(15, 100) });
+        const sporeSource = placeEnemy({ col: 3, row: 1, name: '护甲孢子', affixes: ['armorSpore'], hp: 300 });
+        const sporeTarget = placeEnemy({
+            col: 4, row: 1, name: '孢子叠甲', affixes: [],
+            setup: livingArmorState(125, 150, true),
+        });
+        sporeTarget._armorSporeTrailFromX = sporeSource.pos.x;
+        sporeTarget._armorSporeTrailFromY = sporeSource.pos.y;
+        sporeTarget._armorSporeTrailDuration = 120;
+        sporeTarget._armorSporeTrailTimer = 120;
+        placeEnemy({ col: 5, row: 1, name: '撞城者', cols: 1, rows: 1, affixes: ['siegeBreaker'] });
+
+        placeEnemy({ col: 0, row: 2, name: '叠甲 >50%', affixes: ['livingArmor'], setup: livingArmorState(160, 180, true) });
+        placeEnemy({ col: 1, row: 2, name: '叠甲 <50%', affixes: ['livingArmor'], setup: livingArmorState(70, 180, true) });
+        placeEnemy({ col: 2, row: 2, name: '叠甲 <20%', affixes: ['livingArmor'], setup: livingArmorState(25, 180, true) });
+
+        placeEnemy({
+            col: 1, row: 3, cols: 3, rows: 2,
+            name: '铸巢母架', affixes: ['carrier'], hp: 900, baseArchetype: 'carrier',
+            setup: (e) => {
+                e.footprintMask = [[1, 1, 1], [1, 0, 1]];
+                e.footprintCells = 5;
+                e._carrierCooldown = 1;
+            },
+        });
+
+        if (tg && typeof tg._renderV2MatrixLabels === 'function') {
+            tg._renderV2MatrixLabels(labelData);
+        }
+    };
+
+    // @section:enemy_v2_scene_list - 验收场景列表
     return [
         // ── 场景 1：普通 1×1 对照 ─────────────────────────────────────
         {
@@ -2438,7 +2700,44 @@ function buildEnemyV2Scenarios() {
             demoAction: (game) => { game.phase_enemy_startLogic(); }
         },
 
-        // ── 场景 7（可选 fallback）：3×3 引力炉心资源降级渲染 ────────
+        // ── 场景 7：敌人针对词缀 Canvas fallback 集中验收 ────────────
+        {
+            id: 'ev2_enemy_targeting_fallback',
+            categoryId: 'enemy_v2',
+            name: '敌人针对 Fallback',
+            icon: '🎯',
+            assetHitTag: 'Vector fallback',
+            keepSidebarOpenOnDemo: true,
+            desc: [
+                '📐 集中验收：九个保留的敌人针对词缀与铸巢母架空舱。',
+                '⚙️ 行为：静态冻结敌人，展示蓄能甲、相位护盾启/断、过量炉计数、低伤硬壳、活甲三档、叠甲三档、孢子飞线、撞城者、1×1 偏折壳与铸巢母架第 5 格空舱。',
+                '📦 资源：正式 PNG 未生成前必须保持 Canvas fallback 可读；点「触发演示」刷新孢子飞线与状态脉冲。'
+            ].join('\n'),
+            setup: (game) => setupTargetingFallbackAcceptance(game),
+            bulletConfig: { damage: 45, bounce: 2, pierce: 1, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const source = game.enemies.find(e => e && e.affixes && e.affixes.includes('armorSpore'));
+                const target = game.enemies.find(e => e && e.livingArmorStacked && !(e.affixes || []).includes('livingArmor'));
+                if (source && target) {
+                    target._armorSporeTrailFromX = source.pos.x;
+                    target._armorSporeTrailFromY = source.pos.y;
+                    target._armorSporeTrailDuration = 120;
+                    target._armorSporeTrailTimer = 120;
+                }
+                game.enemies.forEach(e => {
+                    if (!e || !e.active) return;
+                    if ((e.affixes || []).includes('overloadReactor')) e._overloadBonusThisTurn = 3;
+                    if ((e.affixes || []).includes('energyArmor')) e.energyArmorShield = Math.max(e.energyArmorShield || 0, 70);
+                    if ((e.affixes || []).includes('phaseShield') && e.pos.x > game.enemyWidth * 2) e.phaseShieldDisabledThisTurn = true;
+                });
+                if (typeof game.spawn_createFloatingText === 'function' && source) {
+                    game.spawn_createFloatingText(source.pos.x, source.pos.y - 34, 'Fallback', '#bef264', 12);
+                }
+                if (tg && tg.addLog) tg.addLog('已刷新敌人针对 fallback：孢子飞线、相位断窗、炉心层数与蓄能甲。');
+            }
+        },
+
+        // ── 场景 8（可选 fallback）：3×3 引力炉心资源降级渲染 ────────
         {
             id: 'ev2_fallback_large',
             categoryId: 'enemy_v2',
@@ -2468,7 +2767,7 @@ function buildEnemyV2Scenarios() {
             demoAction: (game) => { game.phase_enemy_startLogic(); }
         },
 
-        // ── 场景 8：V2 大型基底 preset 生成入口验收 ────────────────
+        // ── 场景 9：V2 大型基底 preset 生成入口验收 ────────────────
         {
             id: 'ev2_wave_preset_spawn',
             categoryId: 'enemy_v2',
@@ -3205,8 +3504,10 @@ class TrainingGround {
      */
     triggerScenarioAction() {
         if (!this.currentScenario) return;
-        // 触发演示时自动收起侧边栏，让战斗区域全屏展示
-        this.collapseSidebar();
+        // 触发演示时默认收起侧边栏，让战斗区域全屏展示；逐档视觉验收类场景需要保留说明。
+        if (!this.currentScenario.keepSidebarOpenOnDemo) {
+            this.collapseSidebar();
+        }
         if (this.currentScenario.demoAction) {
             try {
                 this.currentScenario.demoAction(this.game, this);

@@ -103,6 +103,7 @@ for (const subsystem of _subsystems) {
 | 2026-06-22 | `src/config.js`, `src/ui/shop.js`, `src/game_system.js`, `src/core.js`, `index.html` | **局外商店测试遗物多选**：`debug_pick_any_relic` 价格保持 0，开启全遗物列表后使用 `saveData.debugStartRelicIds` 保存多个开局遗物；`debugStartRelicId` 仅作为旧存档兼容单值保留；`sys_initGameStart()` 必须逐个应用数组内遗物并触发对应即时效果。 |
 | 2026-06-22 | `src/config.js`, `src/ui/shop.js`, `src/ui_system.js` | **测试工具默认显示**：局外商店测试工具默认开启，由 `CONFIG.debugShopDefaultEnabled` 控制；若需要临时隐藏，可设置 `localStorage.echo_debug_shop = '0'`。购买入口仍需通过同一闸门校验，避免显示与购买状态不一致。 |
 | 2026-06-22 | `index.html`, `src/ui/hud.js`, `src/game_phase.js` | **三弹珠研磨 HUD 分轨**：`#hero-gauge-container` 内新增 `#session-charge-stack`，在三弹珠同时掉落时按弹珠序号分别展示能量进度与 `xN` 连射层数；旧 `#gauge-shell` / `#multicast-ui` 仅保留为单弹珠兜底。`UI_HIT_PROGRESS` 与 `UI_MULTICAST_UPDATE` 必须刷新三条 session 轨道，连射转移动画优先从对应 `.session-charge-multicast` 起飞。 |
+| 2026-06-23 | `index.html`, `src/game_system.js`, `src/ui_system.js`, `src/ui/run_shop.js` | **弹珠包回归为商店研磨入口**：精华奖励不再作为主循环入口；`marble_pack` 是开局与局内商店购买后的显式研磨入口，播放“杂色弹珠包”揭示动画后直接进入 `phase_startGatheringPhase()`，不得进入命运选择；`#round-start-banner` 必须在 `#game-container` 内居中，避免 PC 侧边栏布局下偏向浏览器视口中心。 |
 | 2026-04-17 | `index.html`, `src/game_system.js` | 游戏容器宽高未同时适配屏幕宽度和高度：原 `height: 100dvh` 在竞屏手机上会超出屏幕宽度；`sys_resize` 中 `container.style.height = window.innerHeight` 会覆盖 CSS 高度计算。 | **完整等比缩放方案**：1. `#app-wrapper` 的 `align-items` 改为 `center`（防止 stretch 拉伸 game-container）；2. `#pc-left/right-sidebar` 加 `align-self: stretch`（PC 侧边栏仍填满高度）；3. `#game-container` 宽度改为 `min(100vw, calc(100dvh*9/16), 480px)`，移除 `height` 和 `min-width`，改用 `aspect-ratio: 9/16` + `max-height: 100dvh` 实现宽高双向等比缩放；4. `sys_resize()` 移除 `container.style.height` 覆盖，改用 `getBoundingClientRect()` 读取实际尺寸。 |
 
 ### 5.x 2026-06-18 新属性 UI 显示兜底记录
@@ -118,7 +119,7 @@ for (const subsystem of _subsystems) {
 3. 方法名遵循 `ui_` 或 `_ui_` 前缀约定
 4. 如果方法直接读取 Game 状态，添加 `// TODO[Task 3.2]: 改为监听 EventBus 事件` 注释
 5. 命运抉择相关 UI **禁止写死 `3`**；底栏计数、按钮启用条件和确认逻辑必须统一经由 `selectionMode` / `selectionRequiredCount` 与 `ui_getSelectionRequirement()` / `ui_isSelectionConfirmReady()`。
-6. `ui_refreshSelectionModeUI()` 必须显式覆盖 `standard` / `chaos_essence` / `pure_essence` 三种文案，避免命运时刻进入后仍显示旧的“命运抉择”标签。
+6. `ui_refreshSelectionModeUI()` 必须显式覆盖 `standard` / `chaos_essence` / `pure_essence` 三种文案；`marble_pack` 不进入该选择 UI，而是由业务层直接填充 `marbleQueue` 并进入研磨。`ui_playLootToCardAnimation()` 需要展示“杂色弹珠包”反馈，避免弹珠包被误读成命运时刻。
 6.1 `ui_onPhaseChange()` 在 `selection` 阶段若检测到 `fateMomentContext.type`，必须把大标题和顶部阶段标签切换为“命运时刻”语义，而不是沿用普通选择阶段默认标题。
 6.2 `ui_updateUI()`、顶部短标签与其他阶段显隐逻辑，必须优先复用统一的命运时刻语义判断（例如 `ui_isFateMomentPhase()`）；即使底层仍复用 `selection` overlay，也不能让命运时刻继续被普通 `selection` 的隐藏规则整体吞掉。
 6.3 教程系统若通过 `PHASE_CHANGED -> selection` 作为推进条件，必须显式排除命运时刻场景，避免特殊流程误推进新手教程。

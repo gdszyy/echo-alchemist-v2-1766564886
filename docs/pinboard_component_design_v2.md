@@ -263,6 +263,10 @@ Canvas overlay 只根据 `shape.footprint` 画廉价线框，不参与物理。
 - `spiral_return_module`（已落地）
 - `prism_splitter_module`（已落地）
 - `twin_wheel_bridge_module`（已落地）
+- `launcher_gate_module`（已落地：旋向高速发射槽）
+- `pinwheel_capacitor_module`（已落地：5 杆连射蓄能轮）
+- `turbine_loop_module`（已落地：杆轮 + 发射器大型回路）
+- `swerve_cannon_module`（已落地：定向斜炮）
 
 商店展示卡需要显示：
 

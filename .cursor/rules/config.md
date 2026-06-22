@@ -21,6 +21,57 @@ globs: ["src/config.js"]
 - **格式一致性**: 添加新数据字典条目时，必须严格遵循现有对象的键名 and 数据类型结构。
 - **注释说明**: 修改核心数値或添加新配置项时，必须添加注释说明其用途和影响范围。
 
+## 3.0 Boss 机制配置（2026-06-22）
+
+Boss 专属机制参数必须优先放在 `CONFIG.balance.bossConfigs[bossId]` 或 `CONFIG.balance.bossEntranceShockwave`，业务逻辑只读取配置，不散落阈值：
+
+| 参数 | 位置 | 用途 |
+| :--- | :--- | :--- |
+| `furnacePressureThreshold` | `bossConfigs.ignis` | Ignis 温压触发一次流光彩护盾的阈值 |
+| `furnacePressureBaseGain` | `bossConfigs.ignis` | 100℃以上温度结算转温压时的基础增量 |
+| `furnacePressureCryoVentRatio` | `bossConfigs.ignis` | cryo 命中或负温结算泄压比例 |
+| `furnacePressurePulsePct` | `bossConfigs.ignis` | 温压脉冲授予的流光护盾量，占最大生命比例 |
+| `teslaFieldPowerMax` / `teslaFieldDecay` | `bossConfigs.tesla` | Tesla 导体网络场强上限与每回合衰减 |
+| `teslaConductorFieldGain` / `teslaChargedConductorBonus` | `bossConfigs.tesla` | 普通导体与 haste 充能导体对 Tesla 场强的贡献 |
+| `teslaFieldActionStep` / `teslaFieldActionBonusMax` | `bossConfigs.tesla` | 场强提升 Tesla 行动频率的分段阈值与上限 |
+| `teslaSummonThreshold` / `teslaSummonMaxPerTurn` / `teslaMaxConductors` | `bossConfigs.tesla` | 场强转召唤压力的阈值、单回合上限和导体硬上限 |
+| `teslaShockDamage` / `teslaShockHasteTurns` / `teslaShockFieldGain` | `bossConfigs.tesla` | Tesla 每回合随机电击敌人的伤害、haste 时长和场强增量 |
+| `teslaLightningHasteTurns` / `teslaLightningFieldGain` | `bossConfigs.tesla` | 玩家 lightning 命中 Tesla 导体时的 haste 时长和反向供能 |
+| `teslaCryoFieldDrain` / `teslaBounceFieldDrain` / `teslaGroundedGainMult` | `bossConfigs.tesla` | cryo 泄场、bounce 接地和接地期间网络收益倍率 |
+| `sporeBloomMax` / `sporeArmorThreshold` | `bossConfigs.viridis` | Viridis 孢子活甲资源上限与补甲触发阈值 |
+| `sporeBloomBaseGain` / `sporeBloomPerVassal` / `sporeBloomPerHeal` | `bossConfigs.viridis` | Viridis 每回合、每个孢子侍体和治疗行为带来的孢甲资源收益 |
+| `sporeArmorTargets` / `sporeArmorBerserkTargets` / `sporeArmorStackMult` | `bossConfigs.viridis` | Viridis 普通/狂暴补甲目标数与已有活甲叠加倍率 |
+| `sporeArmorCounterDrain` / `sporeArmorPyroDamagePct` / `sporeArmorVenomDamagePct` | `bossConfigs.viridis` | 火焰/毒素反制孢甲时的资源削减和活甲侵蚀比例 |
+| `orbitAttachments` | `bossConfigs.ouroboros` | Ouroboros 六附体槽配置：每槽包含词缀组合、破绽属性、主机制和视觉颜色 |
+| `orbitAttachmentDisruptTurns` | `bossConfigs.ouroboros` | 当前附体被破绽打断后封印并跳过轮转的回合数 |
+| `orbitEchoMax` / `orbitEchoHpPct` / `orbitEchoSpawnPerPulse` | `bossConfigs.ouroboros` | Ouroboros 裂群附体生成轨道回声的数量上限、血量比例与单次生成量 |
+| `bossMinionProfiles` | `bossEntranceShockwave` | Boss 入场冲击波转化专属敌人的画像，包含 `role`、`affixes`、`tags` |
+
+`bossMinionProfiles` 是后续 Tesla 导体、Chimera 养料、Ouroboros 附体等机制的共享入口。新增 Boss 专属敌人时，应先扩展该配置，再在 `spawn_applyBossMinionMetadata()` 读取，禁止在具体 Boss 逻辑中临时写死一组随从词缀。
+
+## 3.1 敌人针对词缀配置（2026-06-22）
+
+`CONFIG.balance.affixes` 中新增的敌人针对词缀参数必须继续保持集中配置，禁止在 `enemy.js` / `projectile.js` 中散落匿名阈值：
+
+| 参数 | 默认值 | 用途 |
+| :--- | :--- | :--- |
+| `energyArmorThresholdPct` | 0.20 | 蓄能甲：单次超过最大生命 20% 的最终伤害溢出转临时护盾 |
+| `energyArmorShieldCapPct` | 1.0 | 蓄能甲临时护盾上限 |
+| `phaseShieldCycle` | 3 | 相位护盾每 N 个敌方回合进入 1 回合护盾失效窗口 |
+| `phaseShieldMult` | 2 | 相位护盾初始/新增护盾层数倍率 |
+| `overloadStepPct` | 0.20 | 过量反应炉每累计多少最大生命伤害增加行动/移动 |
+| `overloadMaxBonus` | 3 | 过量反应炉每回合额外行动/移动上限 |
+| `lowDamageImmunePct` | 0.05 | 低伤免疫的单次最终伤害阈值 |
+| `livingArmorPct` | 0.10 | 活体护甲生命值占来源最大生命比例 |
+| `armorSporeStackPct` | 0.50 | 护甲孢子叠加到已有活体护甲时的折算比例 |
+| `siegeBreakerDamageMult` | 2 | 撞城者防线屏障伤害倍率 |
+| `deflectShellNormalRotateAmp` | 0.85 | 偏折壳反弹法线最大旋转弧度 |
+| `deflectShellNormalRotateSpeed` | 1.8 | 偏折壳反弹法线旋转速度 |
+| `carrierHpMult` | 3.2 | 铸巢母架设计参考血量倍率 |
+| `carrierSpawnInterval` | 1 | 铸巢母架每回合投放小型敌人 |
+| `carrierSpawnHpPct` | 0.10 | 铸巢母架小型敌人血量占母体最大生命比例 |
+| `carrierMoveInterval` | 2 | 铸巢母架移动间隔 |
+
 ## 6. Boss 血量公式参数说明（bossHpFormula）
 
 `CONFIG.balance.bossHpFormula` 控制 Boss 血量的混合计算公式。实际计算在 `src/spawn_system.js` 的 `spawn_calculateBossHP` 方法中执行。
@@ -73,10 +124,10 @@ globs: ["src/config.js"]
 
 - **设计原则**：
 - **所有弹珠默认进池**：`white` 权重最高，`bounce`、`damage`、`cryo`、`pyro` 等常规弹珠默认可出现，`rainbow`、`matryoshka` 等特殊弹珠使用低权重控制稀有度。
-- **遗物权重机制**：玩家选择弹珠倾向遗物时，`shop.js` 中的 `ui_selectRelic` 会提高对应 `this.unlockedWeights[key]`，并立即提供一包对应倾向胚珠；遗物不再负责“解锁弹珠”或触发精华。
-- **商人弹珠包定价**：`run_shop.js` 根据 `CONFIG.probabilities` 的归一化期望价值动态计算弹珠包价格。去纯净包、固定低概率弹珠包等必须重新计算概率分布，不允许手填固定价格绕过期望价值。当前调参使用低基准价与低稀有幂，常规包应落在可通过数回合局内碎片购买的区间。
+- **遗物权重机制**：玩家选择弹珠倾向遗物时，`shop.js` 中的 `ui_selectRelic` 只提高对应 `this.unlockedWeights[key]`；遗物不再提供倾向胚珠包、解锁弹珠或触发精华奖励。
+- **局内商店弹珠包**：`CONFIG.gameplay.runShopMixedMarblePackPrice` 控制杂色弹珠包价格。局内商人必须出售弹珠包；购买后调用 `sys_startMarblePackGrind()` 立即进入 3 弹珠研磨结算，不进入命运选择。
 - **闪电属性特殊性**：自 2026-04-14 起，**闪电（lightning）属性不再拥有对应的钉子**，也不再通过遗物直接解锁其生成权重。闪电属性仅能通过收集阶段中【冰霜】与【火焰】属性的抗消（合成）产生。
-- **奖励专属属性特殊性**：自 2026-06-21 起，`explosive` / `laser` / `overcharge` 均为底部奖励区专属属性，不进入普通弹珠候选池；相关遗物只能提高底部奖励区权重，不直接发放对应弹珠包。
+- **奖励专属属性特殊性**：自 2026-06-21 起，`explosive` / `laser` / `overcharge` 均为底部奖励区专属属性，不进入普通弹珠候选池；相关遗物只能提高底部奖励区权重并发放局内资源，不直接发放对应弹珠包。
 - **修改警告**：`allPegTypes` / `RANDOMIZABLE_PEG_TYPES` 是钉板初始化随机刷新池，只允许 `bounce` 与 `damage` 两种纯净弹珠属性。严禁在其中加入 `lightning`、`laser`、`overcharge`、`wind` 或其它元素/变异属性；这些属性只能作为弹珠本身、符文融合、奖励区或其它显式来源进入收集结果。调整 `white` 权重会直接影响杂色包价格和玩家获得纯净弹珠的体感，必须同步检查商店包价格。
 ## 7. Boss 配置参数说明 (bossConfigs)
 
@@ -87,10 +138,11 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 | 字段 | 类型 | 说明 |
 | :--- | :--- | :--- |
 | `vulnerability.attrs` | string[] | 固定 Boss 的破绽谱属性。命中这些属性会累积破绽进度。 |
-| `vulnerability.label` | string | 破绽满格时的浮字标签。 |
+| `vulnerability.label` | string | 破绽满格时的语义标签；首版运行时反馈以 Boss 身体 Overlay 为主，不再依赖命中飘字。 |
 | `vulnerability.mode` | `'hits' \| 'damage'` | 累积方式：按实际造成伤害次数，或按实际伤害量。 |
 | `vulnerability.hitThreshold` | number | `hits` 模式基础命中次数阈值。 |
 | `vulnerability.damageRatio` | number | `damage` 模式基础伤害阈值，占 Boss 最大生命百分比。 |
+| `vulnerability.exposedTurns` | number | 可选覆盖：破绽触发后暴露并跳过行动的回合数。 |
 | `vulnerability.dynamic` | boolean | `ouroboros` 专用；为 true 时按轮转组读取动态破绽谱。 |
 | `vulnerability.rotationAttrs` | string[][] | `ouroboros` 每个轮转组对应的破绽谱属性。 |
 | `vulnerability.labels` | string[] | `ouroboros` 每个轮转组的破绽标签。 |
@@ -104,8 +156,8 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 | :--- | :--- | :--- |
 | `breakThreshold` | `3` | 破绽进度满格阈值。 |
 | `baseDamageRatio` | `0.10` | 未显式配置 `damageRatio` 时的基础伤害比例。 |
-| `exposedHits` | `3` | 破绽触发后持续的易伤命中次数。 |
-| `exposedDamageMult` | `1.35` | 易伤窗口内的伤害倍率。 |
+| `exposedTurns` | `1` | 破绽触发后 Boss 暴露并跳过行动的回合数。 |
+| `exposedDamageMult` | `1.35` | 暴露回合内的伤害倍率。 |
 | `counterHitGain` | `1` | 命中破绽谱属性时增加的进度。 |
 | `offPatternGain` | `0` | 未命中破绽谱属性时的进度变化；当前不惩罚。 |
 | `roundScalingStart` | `5` | 从该回合后开始提高破绽条件。 |
@@ -114,6 +166,8 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 | `damageRatioRoundBonus` | `0.015` | 每个缩放步给 `damage` 模式增加的最大生命百分比。 |
 | `maxRoundScaleSteps` | `6` | 回合缩放最大步数，避免后期无限膨胀。 |
 | `enrageDelayOnBreak` | `true` | 破绽触发后，若 Boss 尚未狂暴，则延后一次 50% 血量狂暴检测。 |
+
+破绽触发后运行时写入 `_bossVulnerabilityExposedTurns`、`_bossVulnerabilityExposedPart`、`_bossVulnerabilityVisualAttrs`、`_bossVulnerabilityVisualRatio`、`_bossVulnerabilityBreakTimer` 与 `_bossVulnerabilityRecoverTimer`。旧 `_bossVulnerabilityExposedHits` 字段仅用于存档兼容，不再作为新逻辑的消耗单位。
 
 **Mikro (裂变母体·米克罗) 专有参数**:
 - `cloneChanceHitBonus`: 额外受击分身概率 (默认 0.3)
@@ -125,6 +179,13 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
+| 2026-06-23 | `src/config.js`, `src/game_system.js`, `src/ui/run_shop.js`, `src/ui_system.js`, `src/entities.js` | **纠正弹珠包主循环方向**：精华奖励不再作为主循环入口；开局队列 `marble_pack` 杂色包，局内商店恢复出售杂色弹珠包，购买后调用 `sys_startMarblePackGrind()` 直接进入 3 弹珠研磨，不进入命运选择；`run_resource_pack` 仅作为旧存档兜底。 |
+| 2026-06-23 | `src/config.js`, `src/entities/enemy.js`, `tests/validate_boss_vulnerability.mjs` | **Chimera 破绽谱校准**：`bossConfigs.chimera.vulnerability.attrs` 从 `pierce + laser` 调整为 `venom + laser`，标签改为“污染胃域”，`bossConfigs.chimera.themeWeights` 与 `BOSS_DB.boss_chimera.themeWeights` 同步改为 `venom + laser`，与吞噬继承负面状态、毒素污染胃域、激光精准剖解的机制语义一致；Boss 破绽测试新增固定 Boss 属性表与 BOSS_DB 主题权重一致性锁定。 |
+| 2026-06-23 | `src/config.js`, `src/game_system.js`, `src/ui/run_shop.js`, `src/ui/shop.js`, `src/ui_system.js`, `src/entities.js`, `src/spawn_system.js` | **弹珠包退场与资源包替代**：删除局内商店弹珠包商品与遗物即时倾向包，`marble_pack` 旧奖励只做存档兼容并转译为 `run_resource_pack`；新增 `runResourcePackFragments`，资源包直接增加 `runFragments` 并播放金币/碎片动画，引导玩家去局内商店消费。 |
+| 2026-06-23 | `src/config.js`, `src/entities/enemy.js`, `src/combat_system.js`, `src/game_system.js`, `src/systems.js` | **Ouroboros 六附体轮转参数**：`bossConfigs.ouroboros` 从 3 组词缀轮转扩展为 6 个 `orbitAttachments`，每槽定义词缀组合、破绽属性与主机制；新增 `orbitAttachmentDisruptTurns`、`orbitEchoMax`、`orbitEchoHpPct`、`orbitEchoSpawnPerPulse`、`orbitShieldGain`、`orbitHealPct`。动态破绽谱同步扩展为 6 组。 |
+| 2026-06-22 | `src/config.js`, `src/entities/enemy.js`, `src/combat_system.js`, `src/game_system.js`, `src/systems.js` | **Viridis 孢子活甲网络参数**：`bossConfigs.viridis` 新增 `livingArmor` / `armorSpore` 词缀、`pyro + venom` 破绽谱、`sporeBloom*` 孢甲资源、补甲目标数、火毒反制削甲/腐蚀参数；Boss 入场 `viridis` 专属随从调整为 `spore_vassal`，携带 `regen + healer + armorSpore`。 |
+| 2026-06-22 | `src/config.js`, `src/entities/enemy.js`, `src/game_system.js` | **Chimera 胃域循环参数**：`bossConfigs.chimera` 新增 `chimeraMawRangeCells`、`chimeraPullCellsPerTurn`、`chimeraDigestInterval`、`chimeraBerserkDigestInterval`、`chimeraSummonInterval`、`chimeraSummonMaxPerTurn`、`chimeraMaxFeeders`、`chimeraSummonHpPct`、`chimeraDigestHealPct`、`chimeraDigestShieldPerFeed`、`chimeraFeedAffixes`。Boss 入场 `chimera` 专属随从调整为 `chaos_feed + berserk`，不再带 `devour`，避免养料敌人自吞噬。 |
+| 2026-06-22 | `src/entities.js`, `src/pinboard_modules.js`, `src/ui/run_shop.js`, `.cursor/rules/game_phase.md`, `.cursor/rules/performance.md` | **钉盘机关槽扩展**：`SpecialSlot` 的 `launcher` / `energy_wheel` 类型接入真实研磨触发逻辑；新增 `launcher_gate_module`、`pinwheel_capacitor_module`、`turbine_loop_module`、`swerve_cannon_module` 四个局内商店组件，并通过 `showcase` 标签提高新机关首轮曝光。新机关通过 `persistent`、`activationCooldown`、`maxCharges` 控制重复触发，不新增全局配置项或性能预算字段。 |
 | 2026-06-22 | `src/config.js`, `src/game_system.js`, `.cursor/rules/config.md`, `.cursor/rules/game_phase.md` | **弹珠包价格与新研磨替换选择**：下调 `runShopMarblePackBasePrice`、`runShopMarblePackMarkup`、`runShopMarblePackRarityPower`，使局内商人弹珠包从百级碎片价格降到数十级；标准 `marble_pack` 若在已有子弹时触发新研磨，会预充既有子弹并在研磨完成后进入子弹选择。 |
 | 2026-06-22 | `src/config.js`, `src/entities/projectile.js`, `docs/relic_system_design.md` | **力场护盾墙体语义修正**：`energy_shield` 文案与实现统一为“每次墙体接触最多消耗 1 层现有反弹/穿透耐久；耐久耗尽后按普通墙体反弹，不销毁子弹”。该改动修复无耐久子弹贴墙后被墙体吞没的问题，并避免角落同帧碰撞连续扣多层；不新增配置项、粒子、Canvas 光效或性能预算消费。 |
 | 2026-06-21 | `src/config.js`, `src/ui/run_shop.js`, `src/ui/shop.js`, `src/game_system.js`, `src/game_phase.js`, `src/ui_system.js`, `src/ui/hud.js`, `index.html`, `.cursor/rules/config.md`, `.cursor/rules/game_phase.md`, `.cursor/rules/ui_system.md` | **弹珠包主循环第一批落地**：取消新精华投放，敌人奖励只登记遗物线索；所有弹珠默认进入基础概率池，遗物改为提高对应弹珠权重并立即提供倾向胚珠包；局内商人新增杂色包、去纯包、倾向包和固定穿透包，价格按概率期望动态计算；三发/三弹珠上限固定为晶石核心 3 充能位；商人状态条移至右上角小胶囊；符文获取增加中央揭示动画。 |
@@ -132,6 +193,7 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 | 2026-06-21 | `src/config.js`, `src/game_phase.js`, `src/entities.js`, `src/calc_utils.js`, `src/ui/shop.js` | **底部奖励分栏收窄与超载接入**：底部奖励区可同时出现 1..3 个，中心入口按两侧实体碰撞板收窄判定；`bottomRewardOnlyTypes` 固定为 `explosive` / `laser` / `overcharge`，三者不进入普通弹珠候选池，遗物只提高奖励区权重。 |
 | 2026-06-19 | `src/config.js`, `src/spawn_system.js`, `src/ui/shop.js`, `src/game_phase.js`, `src/entities.js`, `src/calc_utils.js` | **底部奖励分栏与奖励专属属性**：`moduleDefaultSlots` / `moduleInitialSlots` 回调为首行 5 个初始钉板；`CONFIG.gameplay` 新增 `bottomRewardZoneChance`、`bottomRewardZoneWidthMultiplier`、`bottomRewardOnlyTypes`、`bottomRewardZoneWeights` 等底部分栏参数。`explosive` / `laser` 从命运弹珠候选与保底队列中过滤，不再作为普通弹珠出现；对应遗物只校准底部奖励分栏并触发混沌精华。 |
 | 2026-06-19 | `src/config.js`, `src/ui/shop.js`, `src/ui_system.js`, `src/game_system.js`, `src/core.js`, `.cursor/rules/config.md`, `.cursor/rules/ui_system.md` | **新增选择刷新遗物**：`fate_reroll_token` 提供每次命运抉择 1 次弹珠候选刷新；`relic_reroll_seal` 提供每次遗物选择 1 次遗物候选刷新。两者为选择 UI 被动遗物，不新增粒子、Canvas 光效或性能预算消费；刷新使用状态进入局内存档，避免刷新页面重复使用。 |
+| 2026-06-22 | `src/config.js`, `src/combat_system.js`, `src/entities/enemy.js`, `src/game_phase.js`, `src/game_system.js`, `src/spawn_system.js`, `src/combat/combat.md`, `.cursor/rules/config.md`, `.cursor/rules/enemy_index.md`, `.cursor/rules/performance.md`, `docs/boss_vulnerability_visual_plan.md` | **Boss 破绽视觉化首版**：破绽易伤从 `exposedHits` 命中次数改为 `exposedTurns` 暴露回合；破绽满格后 Boss 暴露 1 回合、跳过行动并延后一次狂暴检测；命中飘字退出破绽反馈，改由 Boss 身体上的 Canvas Overlay 表达进度、爆开、暴露和恢复。 |
 | 2026-06-19 | `src/config.js`, `src/combat_system.js`, `src/spawn_system.js`, `src/entities/enemy.js`, `src/game_system.js`, `src/systems.js`, `.cursor/rules/config.md`, `.cursor/rules/enemy_index.md`, `.cursor/rules/spawn_system.md` | **Boss 破绽机制与旧弱点移除**：删除普通波次 `weak_spot` 低血量弱点怪；Boss 配置从 `weakness` 改为 `vulnerability` 破绽谱；不同 Boss 可按实际命中次数或实际伤害量累积破绽，回合越高阈值越苛刻；满格后触发短暂易伤窗口并延后一次狂暴检测。破绽进度与易伤命中数进入局内存档，Boss 状态短标签显示 `隙` / `破`。 |
 | 2026-06-19 | `src/pinboard_modules.js`, `docs/pinboard_component_design_v2.md`, `.cursor/rules/performance.md` | **默认钉盘回归纯交错钉板**：默认 `2x5` 前两行全部使用 `dense_stagger`，不再放入 `starter_*`、转盘、弹力角或异形默认模块。`dense_stagger` 提升为安全上限内的 2x6 交错生成，当前默认盘审计为 120 圆钉 / 0 barrier / 0 SpecialSlot，最小圆钉中心距约 `29.49px`，高于当前倍化弹珠阈值 `23.8px`。旧多异形默认盘、临时 `caret_wheel_field` 超大默认盘与 `starter_*` 默认盘会精确迁移回新版纯交错默认盘。 |
 | 2026-06-19 | `src/config.js`, `src/pinboard_modules.js`, `src/entities.js`, `src/game_system.js`, `docs/pinboard_component_design_v2.md`, `.cursor/rules/performance.md` | **初始钉盘 2x5 铺满与异形机关化**：`moduleDefaultSlots` 调整为 10，`moduleInitialSlots` 改为前两行 `[0..9]`，`moduleSpacingX/Y` 调整为 `0`，默认盘面由首发异形组件铺满；新增 `split_lattice_bridge`、`split_gate_light`、`multicast_gate_light`、`recall_loop_light`、`wheel_cup_light`，并新增 `shape='barrier'` 异形 Peg 用于真实挡板/杯口/导流翼。圆钉间距按倍化弹珠半径强制大于约 `23.8px`，默认盘审计为约 75 圆钉 + 10 barrier / 5 SpecialSlot。旧存档若低于当前默认槽数会自动抬到新版 `2x5`，空活动槽会补默认组件。 |
@@ -165,7 +227,7 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 | 2026-04-12 | `src/spawn_system.js` | **修复 mikro/micro 命名不一致 Bug**：将 `spawn_system.js` 中的 `switch case 'micro'` 改为 `mikro`，与 `config.js` 中的 Boss ID 保持一致。 |
 | 2026-04-12 | `src/config.js` | **Chimera 狂暴爆炸概率配置**：`CONFIG.balance.bossConfigs.chimera` 中新增 `berserkedBlastOnHitChance: 0.25`，表示 Chimera 狂暴后每次受击有5% 概率触发全场爆炸。 |
 | 2026-04-12 | `src/config.js` | **Viridis Boss 狂暴配置修正**：`bossConfigs.viridis.berserkedHealerRange` 从 `999` 改为 `0`（狂暴后停止治疗其他敌人），新增 `berserkedSelfRegenMult: 3.0`（狂暴后自身回血速度倍率）。 |
-| 2026-04-12 | `src/config.js` | **新增 Glacies 狂暴冻结参数**：在 `CONFIG.balance.bossConfigs.glacies` 中新增 `berserkedFreezePegRadius: 120`，用于控制其狂暴跳跃落地后冻结周围 Peg 的范围。 |
+| 2026-04-12 | `src/config.js` | **[已废弃] Glacies 狂暴冻结 Peg 参数**：旧 `berserkedFreezePegRadius` 已被移除；Glacies 不再修改钉盘 Peg，见 2026-06-22 Boss 配置补充中的 `frostSeam*` 参数。 |
 
 ## 5. 遗物重复获取机制规范
 - **数据结构**: 遗物数据字典 (`RELIC_DB`) 中使用 `maxStacks` 字段控制遗物的最大可获取次数。
@@ -183,13 +245,12 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 - **同化加成**: `entities.js` 中只要 `assimilationBoostRounds[ballType] > 0` 或 `doubleAssimilationBoostRounds[ballType] > 0`，就对基础同化概率乘以 `CONFIG.gameplay.assimilationDoubleMultiplier`（当前为 `2`），禁止继续散落 `+0.195` 等匿名常数。
 - **递减逻辑**: `game_phase.js` 的 `phase_finalizeRound` 中需要同时遍历 `assimilationBoostRounds` 与 `doubleAssimilationBoostRounds`，按回合递减并在归零时清理。
 
-## 7. 命运时刻 / 纯净精华奖励规范
-- **混沌精华 (`chaos_essence`)**：语义上承接旧命运轮盘，但当前不再作为普通遗物候选出现，而是由非 Boss 敌人掉落并写入 `pendingRoundStartRewards`；resolver 处理到该奖励时，应写入 `pendingSelectionMode = { mode: 'chaos_essence', requiredCount: 3, ... }`，然后进入标准命运抉择。
-- **敌人掉落参数**：非 Boss 掉落概率与奖励构成必须通过 `CONFIG.gameplay.enemyDrop*` 参数族统一配置，至少包括基础掉率、回合成长、词缀加成、遗物权重、高血量遗物补正和纯净精华占比，禁止再把这些数值散落为匿名常数。
-- **纯净精华 (`pure_essence`)**：同样由非 Boss 敌人掉落并写入 `pendingRoundStartRewards`；resolver 处理到该奖励时，应写入 `pendingSelectionMode = { mode: 'pure_essence', requiredCount: 1, ... }`，由下一次 `sys_initSelectionPhase()` 消费。
-- **遗物池边界**：`ui_showRelicSelection()` 必须将 `chaos_essence` 与 `pure_essence` 排除在普通遗物候选池外，避免精华再次通过遗物界面重复发放。
-- **纯净精华写回要求**：确认选择时必须把符文元素作为合成属性追加写入 `MarbleDefinition.collected`，不得覆盖 `marble.type` 或清空弹珠原有属性；同时同步写入 `source`、`infusedRuneId`、`infusedAttribute`、`assimilationMultiplier` 等局部运行态，并为对应 `marble.type` 写入 `doubleAssimilationBoostRounds`，确保“同化率 x2”真实生效。研磨发射时 `currentSession.collected` 必须继承该弹珠已有 `collected`，否则合成属性不会进入最终子弹 recipe。
-- **运行态契约**：`selectionMode`、`selectionRequiredCount`、`selectionInjectedRune`、`selectionPreviewState`、`relicOverlayReturnState`、`pendingSelectionMode`、`doubleAssimilationBoostRounds`、`fateMomentContext` 必须同时出现在 `core.js` 初始化、`sys_resetGame()` 重置、`sys_saveRunState()` / `sys_loadRunState()` 持久化中。
+## 7. 弹珠包 / 历史精华兼容规范
+- **主循环入口**：新主循环不得主动投放 `chaos_essence` / `pure_essence`。研磨入口来自开局 `marble_pack` 与局内商店购买的杂色弹珠包。
+- **敌人掉落参数**：非 Boss 掉落概率与奖励构成必须通过 `CONFIG.gameplay.enemyDrop*` 参数族统一配置，当前只负责遗物线索与局内碎片，不得重新引入精华奖励占比。
+- **弹珠包配置**：`runShopMixedMarblePackPrice` 是杂色弹珠包价格；弹珠包具体内容由 `sys_rollMarblePackTypes()` 根据当前 `unlockedWeights` 生成，并过滤 `bottomRewardOnlyTypes`。
+- **历史精华兼容**：旧存档或旧调用中的 `type: 'essence'` 可以规范化为 `marble_pack`，但不得再打开命运选择。`chaos_essence` / `pure_essence` 相关 UI 与状态字段只作为历史兼容和调试残留，不是新奖励来源。
+- **运行态契约**：`marbleQueue`、`marblesPool`、`selectedMarbles`、`_chargedAmmoQueue`、`pendingRoundStartRewards` 必须同时出现在 `core.js` 初始化、`sys_resetGame()` 重置、`sys_saveRunState()` / `sys_loadRunState()` 持久化中。
 
 ## 9. 教学曲线配置 (ENEMY_CURVE_CONFIG)
 
@@ -204,7 +265,7 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
   - R34-R40 速度地狱段 (boss_tesla)
   - R41-R47 混沌段 (boss_chimera)
   - R48-R54 终极考验段 (boss_ouroboros)
-- **`AFFIX_WEIGHT_CURVES`**: 定义了每个段落内各词缀（shield/haste/regen/jump/healer/clone/devour/berserk）的权重值（0-100）。
+- **`AFFIX_WEIGHT_CURVES`**: 定义了每个段落内各词缀（shield/haste/regen/jump/healer/clone/devour/berserk/radiantAegis）的权重值（0-100）。
   - 核心词缀：80-100
   - 引入词缀：30-50
   - 背景词缀：10-20
@@ -216,6 +277,11 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 - `CONFIG.balance.bossEnrageHpRatio` 是唯一 Boss 狂暴血量阈值，当前为 `0.2`。
 - `CONFIG.balance.bossConfigs[id].hpMult` 会在 `spawn_spawnBoss()` 中乘入生成血量；当前 `ignis.hpMult = 1.08`。
 - `CONFIG.balance.bossConfigs[id].regenPercentOverride` 可覆盖 Boss 自身 `regen` 词缀回血比例；当前 `glacies.regenPercentOverride = 0.12`，普通敌人仍使用 `CONFIG.balance.affixes.regenPercent`。
+- `CONFIG.balance.bossConfigs.glacies.frostSeam*` 管理 Glacies 战斗场霜缝：目标数、+2 格范围、持续回合、被缝目标回血、非反制伤害减免、pierce 切断增伤和 cryo 冻结下一次霜缝 tick。该机制只作用于敌人实体与 Boss 专属 `frostStitch` 随从，不读取或修改 Peg。
+- `CONFIG.balance.bossConfigs.viridis.sporeBloom*` / `sporeArmor*` 管理 Viridis 孢子活甲网络：专属孢子侍体与治疗累积资源，达到阈值为自身或侍体补 `livingArmor`；`pyro` / `venom` 负责蚀甲、削资源和触发 `pyro + venom` 破绽谱。
+- `CONFIG.balance.bossConfigs.ouroboros.orbitAttachments` 管理 Ouroboros 六附体：每槽同时定义当前词缀、动态破绽谱、主机制和颜色；破绽打满后按 `orbitAttachmentDisruptTurns` 封印当前槽，并由 `orbitEcho*` 参数限制轨道回声召唤压力。
+- `CONFIG.balance.affixes.radiantAegis*` 管理超级精英词条“流彩护盾”：Boss 版每回合 2% 最大生命、10% 上限，精英随机版减半为 1% / 5%，扩盾范围为 1 格。
+- `CONFIG.balance.bossConfigs.ignis.affixes` 与 `BOSS_DB.boss_ignis.affixes` 已加入 `radiantAegis`，使 Ignis 成为首个拥有机制型超级词条的 Boss；随机精英从 R20 起通过 `ENEMY_CURVE_CONFIG.AFFIX_WEIGHT_CURVES.radiantAegis` 低权重出现。
 ## 2026-06-22 Greedy Wheel Tuning
 
 - `CONFIG.gameplay.greedyWheelChance` controls the repeat probability and remains `0.75`.

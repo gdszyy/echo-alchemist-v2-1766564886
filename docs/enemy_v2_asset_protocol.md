@@ -142,6 +142,7 @@ elite               →  golem_elite
 normal              →  golem_normal
 ```
 
+- Boss 本体 Sprite 的路径与重绘尺寸不进入 `enemy_sprite_manifest.json`，由 `src/data/boss_sprite_assets.js` 与 [`docs/boss_sprite_redraw_asset_contract.md`](boss_sprite_redraw_asset_contract.md) 约束。当前 `256 × 256` 方形帧为 legacy 可运行资源；重绘目标为 `384 × 256` 横向帧，并通过 JSON 的 `frameWidth/frameHeight` 让渲染器按 3×2 Boss 占格绘制。
 - 任何 PNG/JSON 加载失败：`SpriteRenderer.failed = true`，
   `Enemy.draw` 中 `_spriteRenderer.ready` 为 false，自动跳过 Sprite 绘制，
   **`_drawArchetypeBody` 仍会以矢量形式画出基底轮廓**，敌人不会白屏 / 消失。
@@ -181,6 +182,6 @@ normal              →  golem_normal
 - [x] `sprite_renderer.createSpriteRenderer` 支持 baseArchetype 选择并回退
 - [x] `bitmap_icons.ENEMY_V2_ICON_MAP` 8 个 baseArchetype 全覆盖
 - [x] 试炼场 V2 矩阵 / 真理之书图鉴共用 `ENEMY_V2_METADATA`
-- [x] 每个 V2 敌人具备：中文名、footprint、baseArchetype、affix、战术职责、克制提示
+- [x] 每个 V2 敌人具备：中文名、footprint、baseArchetype、affix、战术职责、针对提示
 - [x] 资源加载失败时回退到矢量绘制 + 元素轮廓，敌人保持可见
 - [x] Collision Frame 已覆盖普通 `residue:1x1`、8 个 V2 基底，以及 8 个 Boss 历史转换 1×1 异型随从，命中资源路径后接管顶层物理边界
