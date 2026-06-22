@@ -57,6 +57,8 @@ enemy/{tier}/{cols}x{rows}/{base_archetype}/{affix_key}.png
 
 现有词条特效大多以敌人中心、`radius` 或固定比例绘制。对于 `2×1`、`1×2`、`2×2`、`3×2` 和 `3×3` 敌人，这种方式会导致护盾不覆盖完整轮廓、治疗波与边界不贴合、速度线偏移、吞噬口过小或印章挤在中心。因此，需要把词条特效升级为**锚点驱动**。[1]
 
+2026-06-22 补充：奖励敌人的边框、词条常驻 Overlay 和词条触发反馈必须拆成三层，详见 [`docs/design/enemy_affix_visual_iteration_plan.md`](design/enemy_affix_visual_iteration_plan.md)。其中带遗物敌人使用独立金色 reward frame，不应复用 `shield` 或 elite 边框；旧 `chaos_essence` / `pure_essence` 分支不进入本轮敌人奖励美术目标；`shield`、`deflectionWard` 和 `jump` 需要额外事件反馈，而不是只靠常驻纹理表达。
+
 | 特效类型 | 当前风险 | 非 `1×1` 适配规则 |
 |---|---|---|
 | 常驻护盾 | 大体型只包住中心，无法表达完整屏障。 | 使用 `max(width, height)` 决定屏障外接尺寸，并根据碰撞形状裁剪。 |
@@ -65,6 +67,8 @@ enemy/{tier}/{cols}x{rows}/{base_archetype}/{affix_key}.png
 | 吞噬/孵化 | 大型口器或卵囊不应只在中心缩放。 | 用基底局部锚点，例如 `maw.mouth`、`hive.eggPods`。 |
 | 棱盾屏障 | 屏障只阻挡反弹与穿透，需要区别于普通 `shield`。 | 在前缘倾斜棱面绘制薄膜与副屏障条，不画全身护罩。 |
 | 破阵推挤 | 推挤反馈需要表现阻挡链，而非只表现自身。 | 从 `siege` 推铲到被推动敌人之间生成尘埃、短震波和位移箭头。 |
+| 奖励边框 | 奖励目标被词条膜层或大型基底边框淹没。 | 独立 reward frame 层：遗物=金边，低档保留平面双描边。 |
+| 跳跃腾空 | 只有常驻弹簧线时，玩家看不出敌人越过了阻挡物。 | 使用 `_jumpFxTimer` 驱动视觉抬升、椭圆影子和落地短线，真实碰撞不跟随视觉偏移。 |
 
 建议新增轻量函数 `getEnemyVisualAnchors(enemy)`，统一返回 `center`、`frontEdge`、`rearEdge`、`corners`、`bodyNodes`、`affixBadgeSlots` 和 `archetypePorts`。这样 `src/entities/enemy.js`、`src/effects/particles.js` 和未来资产叠层可以共用同一套几何语义。[1] [5]
 

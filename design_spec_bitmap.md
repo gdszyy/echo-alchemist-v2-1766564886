@@ -74,6 +74,8 @@
 
 为了保持灵活性，**不建议**将所有状态（如冰冻、燃烧）直接画死在基础 Sprite 中。建议采用 **「基础 Sprite + 状态特效层」** 的渲染方式：
 
+> 2026-06-22 补充：奖励边框和词条 Overlay 必须拆层。当前敌人奖励美术只面向带遗物敌人的独立“金边”奖励框；`shield`、`regen`、`jump` 等词条只作为机制覆层或触发反馈，不承担掉落价值表达。详细规格见 [`docs/design/enemy_affix_visual_iteration_plan.md`](docs/design/enemy_affix_visual_iteration_plan.md)。
+
 - **血量显示**：保留现有的 Canvas 绘制逻辑（液体血条 + 绿色回血条 + 白色延迟条），将其作为 Overlay 盖在 Sprite 上方。
 - **战损裂纹**：当血量低于 30% 时，在 Sprite 上方叠加一层半透明的「裂纹」PNG，或者使用 Shader/混合模式处理。
 - **温度状态**：

@@ -1,6 +1,6 @@
 # src\entities\enemy.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 6509 | 函数数: 47 | 语言: javascript
+> 自动生成于 2026-06-22 | 总行数: 6614 | 函数数: 50 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 5 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -16,6 +16,7 @@
 | _getEnemyFrameImage | function | `_getEnemyFrameImage(src)` |  |
 | _measureImageAlphaBounds | function | `_measureImageAlphaBounds(img)` |  |
 | _hexToRgba | function | `_hexToRgba(hex, alpha)` |  |
+| Enemy | class | `Enemy()` |  |
 | constructor | method | `constructor(x, y, width, height, hp, maxHp = hp, type = 'normal', affixes = [])` |  |
 | initSprite | method | `initSprite()` |  |
 | _initTexture | method | `_initTexture(width, height)` |  |
@@ -34,6 +35,8 @@
 | _glaciesFreezePegsOnLanding | method | `_glaciesFreezePegsOnLanding(game)` |  |
 | playFreezeBlockEffect | method | `playFreezeBlockEffect(game)` |  |
 | triggerLaserHitShake | method | `triggerLaserHitShake()` |  |
+| _tickVisualFxTimers | method | `_tickVisualFxTimers(timeScale)` |  |
+| _startJumpFx | method | `_startJumpFx(rows = 1, startY = this.dropTargetY, targetY = this.dropTargetY)` |  |
 | playBurnTickEffect | method | `playBurnTickEffect(game, dmg)` |  |
 | playScanFeedback | method | `playScanFeedback()` |  |
 | draw | method | `draw(ctx)` | ⚠️ 巨型函数，见 @section 导航 |
@@ -63,7 +66,7 @@
 
 ### executeTurnAction
 
-> 定位：`grep -n '@section:节点名'` 跳转到对应节点
+> 定位：`grep -n '@section:{}'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|
@@ -71,7 +74,7 @@
 
 ### performTurnActionAndMove
 
-> 定位：`grep -n '@section:节点名'` 跳转到对应节点
+> 定位：`grep -n '@section:{}'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|
@@ -79,7 +82,7 @@
 
 ### draw
 
-> 定位：`grep -n '@section:节点名'` 跳转到对应节点
+> 定位：`grep -n '@section:{}'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|
@@ -95,7 +98,7 @@
 
 ### takeDamage
 
-> 定位：`grep -n '@section:节点名'` 跳转到对应节点
+> 定位：`grep -n '@section:{}'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|
@@ -105,14 +108,13 @@
 
 ### _drawBossDecoration
 
-> 定位：`grep -n '@section:节点名'` 跳转到对应节点
+> 定位：`grep -n '@section:{}'` 跳转到对应节点
 
 | 节点标记 | 说明 |
 |----------|------|
 | `@section:boss_deco_crown_and_wings` | 皇冠/翅膀/触手等 Boss 专属装饰 |
 | `@section:boss_deco_aura_rings` | 光环圆环动画绘制 |
 | `@section:boss_deco_rune_symbols` | 符文符号与能量纹路绘制 |
-
 
 ## 其他 @section 标记
 

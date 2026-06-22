@@ -72,9 +72,12 @@
 
 目标：让通用词条在任意体型上都像“覆层”，而不是另一套身体。
 
+本批次必须同时遵守 [`enemy_affix_visual_iteration_plan.md`](enemy_affix_visual_iteration_plan.md)：奖励边框、通用词条 Overlay 和触发反馈不能混成同一张图。带遗物敌人优先制作独立金色 reward frame；旧 `chaos_essence` / `pure_essence` 不进入本轮敌人奖励美术目标；`shield` / `deflectionWard` / `jump` 需要额外事件反馈方案，不能只交付静态 Overlay。
+
 | 类型 | 目标资产 | 风格规则 |
 |---|---|---|
 | Overlay | `shield`、`regen`、`berserk`、`haste`、`healer`、`clone` | 透明 PNG，边缘化构图，中心留空，不遮挡嵌核 |
+| Reward Frame | `relic` | 独立奖励边框，中心透明；遗物使用古金边框 |
 | 专属词条图标 | `devour`、`heavyArmor`、`deflectionWard`、`echoRelay`、`prism`、`hive`、`siege`、`gravityWell` | 只画符号或嵌槽，不画完整敌人 |
 | 基底图标 | 8 个 baseArchetype | 从 Batch A 主体裁切/重绘为 64x64，保持 silhouette 可读 |
 
@@ -220,6 +223,8 @@ Constraints: transparent background, no text, no numbers, no full enemy scene
 - Family：看起来属于几何磨石块家族，而不是独立怪物种族。
 - Core：专属机制核心嵌在石槽内部。
 - Overlay：通用词条不会遮挡主体轮廓和专属核心。
+- Reward：带遗物敌人有独立古金边框；低性能档仍能通过平面描边读出奖励目标。
+- Trigger：护盾拦截、偏折屏障破碎和跳跃腾空有事件反馈；若资源缺失，Canvas fallback 仍保留语义。
 - Runtime：`describeAssetHitStatus()` 显示 Composite Sprite 或 Sprite 命中，不出现 Missing asset。
 - Frame：材质边框必须匹配物理碰撞框，中心必须透明，不能挡住 HP 液体、HP 数字、状态短标或预警 UI。
 - Fallback：删除或故意改错资源时，敌人仍能回退到矢量基底，不白屏。

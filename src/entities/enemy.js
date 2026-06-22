@@ -286,6 +286,14 @@ class Enemy {
         this.hasActedThisTurn = false;
         this.scanFeedbackTimer = 0;
         this.shieldHitTimer = 0; // 护盾受击反馈计时器
+        this._shieldBreakTimer = 0; // 护盾破碎反馈计时器
+        this._wardBlockTimer = 0; // 偏折屏障拦截反馈计时器
+        this._wardBreakTimer = 0; // 偏折屏障破碎反馈计时器
+        this._jumpFxTimer = 0; // 跳越伪 3D 反馈计时器
+        this._jumpFxDuration = 28;
+        this._jumpFxRows = 1;
+        this._jumpFxStartY = 0;
+        this._jumpFxTargetY = 0;
         // === Boss 入场动画 ===
         // entranceTimer: 入场动画帧计数器，>0 时播放入场动画
         // 阶段 1 (90→60): Boss 从屏幕外高速坠入
@@ -533,6 +541,7 @@ class Enemy {
                 this.actionPhase = 'idle';
                 this.bumpOffsetY = 0;
             }
+            this._tickVisualFxTimers(timeScale);
             return; // 预警期间不处理其他移动逻辑
         }
 
@@ -543,7 +552,7 @@ class Enemy {
             this.pos.y = this._entranceStartY;
             if (this.hitTimer > 0) this.hitTimer -= timeScale;
             if (this._hitFlashTimer > 0) this._hitFlashTimer -= timeScale;
-            if (this.shieldHitTimer > 0) this.shieldHitTimer -= timeScale;
+            this._tickVisualFxTimers(timeScale);
             if (this._hitImpact > 0) this._hitImpact *= Math.pow(CONFIG.enemyRender.hitImpactDecay, timeScale);
             return;
         }
@@ -572,7 +581,7 @@ class Enemy {
             // 入场动画期间不进行其他移动逻辑
             if (this.hitTimer > 0) this.hitTimer -= timeScale;
             if (this._hitFlashTimer > 0) this._hitFlashTimer -= timeScale;
-            if (this.shieldHitTimer > 0) this.shieldHitTimer -= timeScale;
+            this._tickVisualFxTimers(timeScale);
             if (this._hitImpact > 0) this._hitImpact *= Math.pow(CONFIG.enemyRender.hitImpactDecay, timeScale);
             return;
         }
@@ -585,7 +594,7 @@ class Enemy {
         
         if (this.hitTimer > 0) this.hitTimer -= timeScale;
         if (this._hitFlashTimer > 0) this._hitFlashTimer -= timeScale;
-        if (this.shieldHitTimer > 0) this.shieldHitTimer -= timeScale;
+        this._tickVisualFxTimers(timeScale);
         // === A3: 受击形变弹性衰减 ===
         if (this._hitImpact > 0) this._hitImpact *= Math.pow(CONFIG.enemyRender.hitImpactDecay, timeScale);
         // === D4: 激光照射抖动衰减 ===
@@ -1179,9 +1188,11 @@ class Enemy {
                     if (this.type === 'boss' && this.bossType === 'glacies') {
                         effectiveJumpRows = this._berserkedJumpRows || effectiveJumpRows;
                     }
-                    const jumpTargetY = this.dropTargetY + (moveAmount * effectiveJumpRows);
+                    const jumpStartY = this.dropTargetY;
+                    const jumpTargetY = jumpStartY + (moveAmount * effectiveJumpRows);
                     const isJumpBlocked = game.calc_isAreaOccupied(this.pos.x, jumpTargetY, this.width * 0.8, this.height * 0.8, this);
                     if (!isJumpBlocked) {
+                        this._startJumpFx(effectiveJumpRows, jumpStartY, jumpTargetY);
                         this.advance(moveAmount * effectiveJumpRows);
                         this.bumpOffsetY = -30;
                         game.spawn_createFloatingText(this.pos.x, this.pos.y, 'JUMP!', '#38bdf8');
@@ -1388,9 +1399,11 @@ class Enemy {
                     if (this.type === 'boss' && this.bossType === 'glacies') {
                         effectiveJumpRows = this._berserkedJumpRows || effectiveJumpRows;
                     }
-                    const jumpTargetY = this.dropTargetY + (moveAmount * effectiveJumpRows);
+                    const jumpStartY = this.dropTargetY;
+                    const jumpTargetY = jumpStartY + (moveAmount * effectiveJumpRows);
                     const isJumpBlocked = game.calc_isAreaOccupied(this.pos.x, jumpTargetY, this.width * 0.8, this.height * 0.8, this);
                     if (!isJumpBlocked) {
+                        this._startJumpFx(effectiveJumpRows, jumpStartY, jumpTargetY);
                         this.advance(moveAmount * effectiveJumpRows);
                         this.bumpOffsetY = -30;
                         game.spawn_createFloatingText(this.pos.x, this.pos.y, 'JUMP!', '#38bdf8');
@@ -1577,6 +1590,23 @@ class Enemy {
         this._laserHitIntensity = 1.0;
     }
 
+    // @perf-impact: 仅递减若干特效计时器，不分配对象；为护盾/偏折/跳越反馈提供统一生命周期。
+    _tickVisualFxTimers(timeScale) {
+        if (this.shieldHitTimer > 0) this.shieldHitTimer = Math.max(0, this.shieldHitTimer - timeScale);
+        if (this._shieldBreakTimer > 0) this._shieldBreakTimer = Math.max(0, this._shieldBreakTimer - timeScale);
+        if (this._wardBlockTimer > 0) this._wardBlockTimer = Math.max(0, this._wardBlockTimer - timeScale);
+        if (this._wardBreakTimer > 0) this._wardBreakTimer = Math.max(0, this._wardBreakTimer - timeScale);
+        if (this._jumpFxTimer > 0) this._jumpFxTimer = Math.max(0, this._jumpFxTimer - timeScale);
+    }
+
+    _startJumpFx(rows = 1, startY = this.dropTargetY, targetY = this.dropTargetY) {
+        this._jumpFxDuration = 28;
+        this._jumpFxTimer = this._jumpFxDuration;
+        this._jumpFxRows = rows;
+        this._jumpFxStartY = startY;
+        this._jumpFxTargetY = targetY;
+    }
+
     playBurnTickEffect(game, dmg) {
         this.hitTimer = 15;
         this._hitFlashTimer = Math.max(0, CONFIG.enemyRender.hitFlashDuration || 0);
@@ -1649,6 +1679,28 @@ class Enemy {
         const h = this.height - 4; 
         // @section:draw_shadow_and_base - 软阴影与敌人基础形体绘制
         const r = 6;
+        // @perf-impact: 跳越伪 3D 反馈每帧最多一次阴影椭圆与一次 transform，不创建粒子；受 _jumpFxTimer 生命周期限制。
+        if (this._jumpFxTimer > 0 && this._jumpFxDuration > 0) {
+            const jumpProgress = 1 - (this._jumpFxTimer / this._jumpFxDuration);
+            const jumpArc = Math.sin(Math.max(0, Math.min(1, jumpProgress)) * Math.PI);
+            const jumpRows = Math.max(1, this._jumpFxRows || 1);
+            const lift = -Math.min(h * 0.42, 18 + jumpRows * 5) * jumpArc;
+            const landingSquash = Math.max(
+                0,
+                Math.sin(Math.max(0, Math.min(1, jumpProgress * 2)) * Math.PI) * (1 - jumpProgress)
+            ) * 0.08;
+
+            ctx.save();
+            ctx.globalAlpha = 0.14 + jumpArc * 0.26;
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+            ctx.beginPath();
+            ctx.ellipse(0, h / 2 + 7, w * (0.38 + jumpArc * 0.08), 5 + jumpArc * 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            ctx.translate(0, lift);
+            ctx.scale(1 + landingSquash, 1 - landingSquash * 0.55);
+        }
         this.initSprite();
         const collisionFrameCandidate = this.type !== 'boss'
             && this._collisionFrameImage
@@ -3015,26 +3067,81 @@ class Enemy {
             ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, this._hitFlashTimer / flashDuration) * flashMaxAlpha})`;
             ctx.fillRect(-w/2, -h/2, w, h);
         }
-        // --- [新增] 护盾受击视觉反馈 (放大虚化的护盾) ---
-        if (this.shieldHitTimer > 0) {
+        // --- 词条特效层：护盾/偏折屏障受击视觉反馈 ---
+        // @perf-impact: 防御反馈在命中后的短计时内绘制 1-3 条描边/裂片，使用既有 shadowBlur 门控，不新增粒子池压力。
+        if (this.shieldHitTimer > 0 || this._shieldBreakTimer > 0 || this._wardBlockTimer > 0 || this._wardBreakTimer > 0) {
             ctx.save();
-            const alpha = (this.shieldHitTimer / 15) * 0.5;
-            const scale = 1.2 + (1 - this.shieldHitTimer / 15) * 0.2; // 逐渐放大
-            ctx.scale(scale, scale);
-            
-            // 绘制一个圆角矩形虚化护盾
-            ctx.strokeStyle = `rgba(147, 197, 253, ${alpha})`; // 浅蓝色
-            ctx.lineWidth = 4;
-            ctx.shadowBlur = _sb(15);
-            ctx.shadowColor = '#60a5fa';
-            
-            ctx.beginPath();
-            ctx.roundRect(-w/2 - 5, -h/2 - 5, w + 10, h + 10, r + 2);
-            ctx.stroke();
-            
-            // 内部填充一点淡蓝色
-            ctx.fillStyle = `rgba(147, 197, 253, ${alpha * 0.3})`;
-            ctx.fill();
+
+            if (this.shieldHitTimer > 0) {
+                const shieldAlpha = (this.shieldHitTimer / 15) * 0.56;
+                const shieldScale = 1.14 + (1 - this.shieldHitTimer / 15) * 0.18;
+                ctx.save();
+                ctx.scale(shieldScale, shieldScale);
+                ctx.strokeStyle = `rgba(147, 197, 253, ${shieldAlpha})`;
+                ctx.lineWidth = 4;
+                ctx.shadowBlur = _sb(14);
+                ctx.shadowColor = '#60a5fa';
+                ctx.beginPath();
+                ctx.roundRect(-w / 2 - 5, -h / 2 - 5, w + 10, h + 10, r + 3);
+                ctx.stroke();
+                ctx.fillStyle = `rgba(147, 197, 253, ${shieldAlpha * 0.16})`;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            if (this._shieldBreakTimer > 0) {
+                const breakAlpha = Math.min(1, this._shieldBreakTimer / 24);
+                ctx.save();
+                ctx.strokeStyle = `rgba(191, 219, 254, ${breakAlpha * 0.78})`;
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = _sb(8);
+                ctx.shadowColor = '#93c5fd';
+                const crackCount = 5;
+                for (let i = 0; i < crackCount; i++) {
+                    const x = -w * 0.38 + i * (w * 0.19);
+                    const y = -h * 0.48 + (i % 2) * h * 0.18;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + w * 0.08, y + h * 0.12);
+                    ctx.lineTo(x + w * 0.02, y + h * 0.25);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            if (this._wardBlockTimer > 0 || this._wardBreakTimer > 0) {
+                const wardTimer = Math.max(this._wardBlockTimer, this._wardBreakTimer);
+                const wardDuration = this._wardBreakTimer > 0 ? 24 : 18;
+                const wardAlpha = Math.min(1, wardTimer / wardDuration);
+                const wardBurst = this._wardBreakTimer > 0 ? 1.12 + (1 - wardAlpha) * 0.22 : 1;
+                ctx.save();
+                ctx.scale(wardBurst, wardBurst);
+                ctx.strokeStyle = `rgba(103, 232, 249, ${wardAlpha * 0.82})`;
+                ctx.fillStyle = `rgba(14, 165, 233, ${wardAlpha * 0.08})`;
+                ctx.lineWidth = this._wardBreakTimer > 0 ? 3 : 2;
+                ctx.shadowBlur = _sb(this._wardBreakTimer > 0 ? 14 : 9);
+                ctx.shadowColor = '#22d3ee';
+                ctx.beginPath();
+                ctx.moveTo(0, -h / 2 - 11);
+                ctx.lineTo(w / 2 + 12, -h * 0.12);
+                ctx.lineTo(w * 0.36, h / 2 + 8);
+                ctx.lineTo(-w * 0.36, h / 2 + 8);
+                ctx.lineTo(-w / 2 - 12, -h * 0.12);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                if (this._wardBreakTimer > 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(-w * 0.16, -h * 0.48);
+                    ctx.lineTo(w * 0.04, -h * 0.12);
+                    ctx.lineTo(-w * 0.05, h * 0.18);
+                    ctx.moveTo(w * 0.2, -h * 0.34);
+                    ctx.lineTo(w * 0.06, h * 0.05);
+                    ctx.lineTo(w * 0.24, h * 0.32);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
             
             ctx.restore();
         }
@@ -3373,11 +3480,11 @@ class Enemy {
             ctx.restore();
         }
 
-        // === Layer 6.8: 奖励标记敌人专属光晕 (Pending Reward Halo) ===
-        // @perf-impact: 新增 shadowBlur + createRadialGradient + 旋转符文/晶体 - 已通过 rewardHaloEnabled/rewardRuneCount/rewardCrystalCount 三档门控
-        // [V2] 兼容新字段 rewardType 和旧字段 _pendingRewardType
+        // === Layer 6.8: 遗物标记敌人专属金边 (Relic Reward Border) ===
+        // @perf-impact: 遗物金边使用 shadowBlur + createRadialGradient + 流光描边，已通过 rewardHaloEnabled/rewardRuneCount/rewardCrystalCount 三档门控。
+        // [V3] 奖励敌人当前只承载 relic；旧 chaos/pure 字段不再进入视觉标记入口。
         const _effectiveRewardType = this.rewardType !== undefined ? this.rewardType : this._pendingRewardType;
-        if (_effectiveRewardType && this.actionPhase === 'idle') {
+        if (_effectiveRewardType === 'relic' && this.actionPhase === 'idle') {
             const _perfBudget = (typeof game !== 'undefined' && game.perfQualityLevel)
                 ? CONFIG.performance[game.perfQualityLevel]
                 : CONFIG.performance.high;
@@ -3801,18 +3908,12 @@ class Enemy {
                 }
 
             } else {
-                // @perf-impact: low 档奖励标记平面兜底 - 仅纯色双层描边，无 shadowBlur/渐变/旋转
-                // 省电模式下 rewardHaloEnabled=false 会跳过完整光晕，但「敌人携带遗物/精华」是
+                // @perf-impact: low 档遗物标记平面兜底 - 仅金色双层描边，无 shadowBlur/渐变/旋转
+                // 省电模式下 rewardHaloEnabled=false 会跳过完整光晕，但「敌人携带遗物」是
                 // 核心玩法可读性信号，必须保留。此处以约 2 次 stroke/敌的极低成本绘制平面边框，
                 // 不触发任何 GPU 模糊/混合 pass，符合 low 档降温目标。
-                let _markColor, _markColor2;
-                if (_effectiveRewardType === 'relic') {
-                    _markColor = 'rgba(250, 204, 21, 0.95)';  _markColor2 = 'rgba(245, 158, 11, 0.6)';
-                } else if (_effectiveRewardType === 'chaos_essence') {
-                    _markColor = 'rgba(168, 85, 247, 0.95)';  _markColor2 = 'rgba(239, 68, 68, 0.6)';
-                } else { // pure_essence
-                    _markColor = 'rgba(191, 219, 254, 0.95)'; _markColor2 = 'rgba(147, 197, 253, 0.6)';
-                }
+                const _markColor = 'rgba(250, 204, 21, 0.95)';
+                const _markColor2 = 'rgba(245, 158, 11, 0.6)';
                 // 极廉价脉冲（仅 1 次 Math.sin，纯 CPU、无 GPU 开销）让标记更易被注意
                 const _markPulse = 0.7 + Math.sin(Date.now() / 400 + this.visualSeed * 3) * 0.3;
                 const _markPoly = this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3;
@@ -4622,11 +4723,13 @@ class Enemy {
                 const absorbed = Math.min(this.wardBarrier, actualDamage);
                 this.wardBarrier -= absorbed;
                 actualDamage -= absorbed;
+                this._wardBlockTimer = 18;
                 if (typeof game !== 'undefined') {
                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 18, `🔷-${Math.ceil(absorbed)}`, '#67e8f9');
                 }
                 if (this.wardBarrier <= 0) {
                     this.wardBrokenThisTurn = true;
+                    this._wardBreakTimer = 24;
                     if (typeof game !== 'undefined') {
                         game.spawn_createParticle(this.pos.x, this.pos.y, '#67e8f9', 'shard');
                         game.spawn_createFloatingText(this.pos.x, this.pos.y - 36, '🔷BREAK', '#22d3ee');
@@ -4652,8 +4755,9 @@ class Enemy {
                 this.shieldCharges--; // 消耗一层护盾
 
                 // 触发护盾视觉反馈 (限制频率)
-                if (this.shieldHitTimer <= 0) {
-                    this.shieldHitTimer = 15;
+                const shouldShowShieldText = this.shieldHitTimer <= 0;
+                this.shieldHitTimer = Math.max(this.shieldHitTimer, 15);
+                if (shouldShowShieldText) {
                     if (typeof game !== 'undefined') {
                         // 显示剩余层数
                         game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, `🛡️${this.shieldCharges}`, "#93c5fd");
@@ -4664,6 +4768,7 @@ class Enemy {
                 if (this.shieldCharges <= 0) {
                     // 移除护盾词条
                     this.affixes = this.affixes.filter(a => a !== 'shield');
+                    this._shieldBreakTimer = 24;
                     if (typeof game !== 'undefined') {
                         game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, "💔BROKEN!", "#ef4444");
                         game.spawn_createParticle(this.pos.x, this.pos.y, '#93c5fd', 'shard');

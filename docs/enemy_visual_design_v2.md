@@ -6,6 +6,8 @@
 
 > **2026-06-19 风格收口**：所有 V2 基底与后续 Boss 美术统一采用“几何磨石块基座 + 镶嵌核心”的母题。尺寸和基底先由磨石块轮廓读取，专属词条由嵌入石槽的核心读取，通用词条只作为覆层刻线、薄膜或晶片追加。完整规则见 [`docs/design/enemy_geometric_whetstone_style.md`](design/enemy_geometric_whetstone_style.md)。
 
+> **2026-06-22 词条与奖励层补充**：奖励敌人、通用词条和触发反馈必须分层处理。当前敌人掉落奖励美术只面向遗物金边；`shield` / `regen` / `jump` 等词条使用常驻 Overlay 与触发反馈层。护盾拦截、偏折屏障破碎、跳跃腾空等属于语义类特效，低性能档也必须保留平面版本。详见 [`docs/design/enemy_affix_visual_iteration_plan.md`](design/enemy_affix_visual_iteration_plan.md)。
+
 当前实现已经具备支撑该体系的基础。普通敌人按 `enemyWidth × enemyHeight` 的单格网格生成，带词条的敌人会被标记为 `type='elite'`。重装变种已经以 `3×1` 宽体敌人的形式存在，生成时设置 `affixes=['heavyArmor']`、`type='elite'`、`isWideEnemy=true`。Boss 则采用固定 `3×2` 尺寸，并且根据 `bossType` 设置 `polygon`、`arc` 或 `aabb` 等碰撞形状。与此同时，`spawn_applyMinionShape(e)` 已经可以根据最近击败或出现过的 Boss 类型，为随从分配异形几何形状，这说明当前系统已经不再只能表达矩形敌人。[`src/spawn_system.js`](../src/spawn_system.js)
 
 > **核心结论**：V2 不应该把所有敌人继续视为同一种方块容器。敌人应拆为三层语义：第一层是占格尺寸，第二层是基底类型，第三层才是词条。尺寸与基底类型共同决定“它是什么”，词条决定“它额外会什么”。
@@ -223,6 +225,8 @@
 | 6 | Elite/Boss 边框与强调 | 紫晶核心、金色流光、Boss 深渊熔炉 |
 
 对于 `2×2` 以上敌人，通用词条的视觉表现应按尺寸进行缩放，但不应简单等比放大。例如，`shield` 在 `1×1` 上可以是外框，在 `3×1` 重装上应表现为三段装甲板之间的能量桥，在 `3×3` 引力炉心上则应表现为环形护罩节点。
+
+奖励边框不属于通用词条特效。携带 `rewardType='relic'` 的敌人应以独立古金边框表达掉落价值。该层必须绘制在基底和碰撞材质框之后、词条常驻 Overlay 之前，避免被 `shield` 等词条膜层吞掉。旧 `chaos_essence` / `pure_essence` 表现分支不属于本轮敌人奖励美术目标。
 
 ### 7.1 当前实现记录（2026-06-18）
 
