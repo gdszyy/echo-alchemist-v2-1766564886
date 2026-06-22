@@ -37,7 +37,35 @@
     "berserk": "overlay_affix_berserk.png",
     "haste": "overlay_affix_haste.png",
     "healer": "overlay_affix_healer.png",
-    "clone": "overlay_affix_clone.png"
+    "clone": "overlay_affix_clone.png",
+    "lowDamageImmune": "overlay_affix_lowDamageImmune.png",
+    "armorSpore": "overlay_affix_armorSpore.png",
+    "siegeBreaker": "overlay_affix_siegeBreaker.png",
+    "carrier": "overlay_affix_carrier.png",
+    "deflectShell": "overlay_affix_deflectShell.png"
+  },
+  "dynamicOverlays": {
+    "energyArmor": {
+      "charged": "overlay_energy_armor_charged.png",
+      "empty": "overlay_energy_armor_empty.png"
+    },
+    "phaseShield": {
+      "active": "overlay_phase_shield_active.png",
+      "disabled": "overlay_phase_shield_disabled.png"
+    },
+    "livingArmor": {
+      "normal_high": "overlay_living_armor_high.png",
+      "normal_mid": "overlay_living_armor_mid.png",
+      "normal_low": "overlay_living_armor_low.png",
+      "stack_high": "overlay_living_armor_stack_high.png",
+      "stack_mid": "overlay_living_armor_stack_mid.png",
+      "stack_low": "overlay_living_armor_stack_low.png"
+    },
+    "overloadReactor": {
+      "level1": "overlay_overload_reactor_1.png",
+      "level2": "overlay_overload_reactor_2.png",
+      "level3": "overlay_overload_reactor_3.png"
+    }
   },
   "frames": {
     "residue:1x1": {

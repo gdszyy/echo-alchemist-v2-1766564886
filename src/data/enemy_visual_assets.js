@@ -104,6 +104,35 @@ const _DEFAULT_OVERLAYS = {
     haste:   'overlay_affix_haste.png',
     healer:  'overlay_affix_healer.png',
     clone:   'overlay_affix_clone.png',
+    lowDamageImmune: 'overlay_affix_lowDamageImmune.png',
+    armorSpore: 'overlay_affix_armorSpore.png',
+    siegeBreaker: 'overlay_affix_siegeBreaker.png',
+    carrier: 'overlay_affix_carrier.png',
+    deflectShell: 'overlay_affix_deflectShell.png',
+};
+
+const _DEFAULT_DYNAMIC_OVERLAYS = {
+    energyArmor: {
+        charged: 'overlay_energy_armor_charged.png',
+        empty: 'overlay_energy_armor_empty.png',
+    },
+    phaseShield: {
+        active: 'overlay_phase_shield_active.png',
+        disabled: 'overlay_phase_shield_disabled.png',
+    },
+    livingArmor: {
+        normal_high: 'overlay_living_armor_high.png',
+        normal_mid: 'overlay_living_armor_mid.png',
+        normal_low: 'overlay_living_armor_low.png',
+        stack_high: 'overlay_living_armor_stack_high.png',
+        stack_mid: 'overlay_living_armor_stack_mid.png',
+        stack_low: 'overlay_living_armor_stack_low.png',
+    },
+    overloadReactor: {
+        level1: 'overlay_overload_reactor_1.png',
+        level2: 'overlay_overload_reactor_2.png',
+        level3: 'overlay_overload_reactor_3.png',
+    },
 };
 
 const _DEFAULT_FRAMES = {
@@ -171,7 +200,7 @@ function _buildDefaultManifest() {
         archetypeIcons: { ..._DEFAULT_ARCHETYPE_ICONS },
         affixIcons:    { ..._DEFAULT_AFFIX_ICONS },
         overlays:      { ..._DEFAULT_OVERLAYS },
-        dynamicOverlays: {},
+        dynamicOverlays: { ..._DEFAULT_DYNAMIC_OVERLAYS },
         frames:        { ..._DEFAULT_FRAMES },
         archetypes,
         composites,
@@ -343,6 +372,11 @@ export function resolveDynamicEnemyOverlayPaths(enemy) {
         if (!file) return;
         out.push({ affix, path: overlayDir + file });
     };
+
+    if ((enemy.affixes || []).includes('energyArmor')) {
+        const energyDefs = defs.energyArmor || {};
+        pushDynamic('energyArmor', (enemy.energyArmorShield || 0) > 0 ? energyDefs.charged : energyDefs.empty);
+    }
 
     if ((enemy.livingArmorHp || 0) > 0 && !enemy.livingArmorBroken) {
         const armorMax = Math.max(1, enemy.livingArmorMax || enemy.livingArmorHp || 1);
