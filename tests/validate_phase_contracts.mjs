@@ -86,7 +86,11 @@ check(has(gameSystem, /this\.marblesPool\s*=\s*state\.marblesPool\.map\(m\s*=>\s
 check(has(gameSystem, /const\s+shouldRestoreSelection\s*=\s*savedPhase\s*===\s*['"]selection['"][\s\S]*this\.fateMomentContext[\s\S]*this\.selectionMode[\s\S]*!==\s*['"]standard['"]/), 'run load detects saved fate selection before running resolver');
 check(has(gameSystem, /else\s+if\s*\(shouldRestoreSelection\)\s*\{[\s\S]*phase_switchPhase\(['"]selection['"]\)[\s\S]*spawn_generateMarbleOptions\(\)[\s\S]*ui_refreshSelectionModeUI\(\)[\s\S]*spawn_showMarblePreview/), 'run load restores selection UI instead of falling through to round-start resolver');
 check(has(gameSystem, /sys_showRoundStartBanner\s*\(\)\s*\{[\s\S]*phase_switchPhase\(['"]combat['"]\)[\s\S]*phase_startCombatPhase\(\)/), 'normal round-start banner transitions to combat, not gathering');
+check(has(gameSystem, /sourceRewardType\s*===\s*['"]marble_pack['"][\s\S]*_lastFiredAmmoSnapshot[\s\S]*ammoQueue[\s\S]*marbleQueue[\s\S]*this\._chargedAmmoQueue\s*=/), 'marble_pack selection pre-charges existing bullets for replace-ammo flow');
 check(has(config, /combatSideInsetRatio\s*:\s*0\.08/), 'combat side inset ratio is configured');
+check(has(config, /runShopMarblePackBasePrice:\s*7/), 'run shop marble pack base price is tuned down');
+check(has(config, /runShopMarblePackMarkup:\s*1\.0/), 'run shop marble pack markup is tuned down');
+check(has(config, /runShopMarblePackRarityPower:\s*0\.5/), 'run shop marble pack rarity power is tuned down');
 check(has(gameSystem, /combatGridLeftX[\s\S]*combatGridRightX[\s\S]*combatGridWidth[\s\S]*this\.enemyWidth\s*=\s*\(this\.combatGridWidth\s*\/\s*CONFIG\.gameplay\.enemyCols\)/), 'sys_resize derives enemy grid width from inset combat arena');
 check(has(gameSystem, /sys_getCombatBounds\s*\(\)/), 'combat bounds helper exists');
 check(has(gameSystem, /sys_getCombatColumnCenterX\s*\(col,\s*spanCols\s*=\s*1\)/), 'combat column center helper exists');

@@ -349,7 +349,9 @@ const CONFIG = {
         enemyShield: '#3b82f6',
         slotRecall: '#a855f7',
         slotMulticast: '#f97316',
-        slotSplit: '#3b82f6',
+         slotSplit: '#3b82f6',
+         slotLauncher: '#22d3ee',
+         slotEnergyWheel: '#fde047',
         // [新增]
         slotGiant: '#ef4444', // 紅色 (變大)
         slotSkill: '#10b981', // 綠色 (技能點)
@@ -855,9 +857,9 @@ const CONFIG = {
         runShopRefreshCost: 10,        // 刷新一次商店消耗碎片
         runShopItemsPerOffer: 5,       // 每次刷新提供的商品数
         runShopRunesRatio: 0.6,        // 商品中符文占比
-        runShopMarblePackBasePrice: 16,
-        runShopMarblePackMarkup: 1.15,
-        runShopMarblePackRarityPower: 0.65,
+        runShopMarblePackBasePrice: 7,
+        runShopMarblePackMarkup: 1.0,
+        runShopMarblePackRarityPower: 0.5,
         runShopEndOfRunFragmentSettle: 0.3, // 局结束时未消费碎片转换为 saveData 的比例
         enemyDropFragmentChance: 0.30, // 普通敌人击杀掉落碎片基础概率
         enemyDropFragmentBaseAmount: 1,

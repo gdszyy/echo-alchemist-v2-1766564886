@@ -755,6 +755,45 @@ export const game_system = {
             fateMomentContext: JSON.stringify(this.fateMomentContext),
         });
 
+        // [marble-pack-replace] 标准胚珠包也可能是一次显式的新研磨。
+        // 若玩家已有子弹，先把现有子弹预充为 CHARGED 行，等新胚珠研磨完成后进入子弹选择。
+        const isMarblePackSelection = mode === 'standard' && pendingMode?.sourceRewardType === 'marble_pack';
+        if (isMarblePackSelection) {
+            const cloneRecipe = (recipe) => {
+                if (!recipe) return null;
+                return {
+                    ...recipe,
+                    finalHits: 0,
+                    multicast: recipe.multicast || 0,
+                };
+            };
+            const compileMarble = (marbleDef) => {
+                if (!marbleDef || typeof this.calc_compileCollectionToRecipe !== 'function') return null;
+                const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
+                const recipe = this.calc_compileCollectionToRecipe(
+                    marbleDef,
+                    collected,
+                    (marbleDef.multicast || 0) > 0
+                );
+                recipe.finalHits = 0;
+                recipe.multicast = marbleDef.multicast || 0;
+                recipe._marbleType = marbleDef.type;
+                return recipe;
+            };
+            let charged = [];
+            if (Array.isArray(this._lastFiredAmmoSnapshot) && this._lastFiredAmmoSnapshot.length > 0) {
+                charged = this._lastFiredAmmoSnapshot.map(cloneRecipe).filter(Boolean);
+            } else if (Array.isArray(this.ammoQueue) && this.ammoQueue.length > 0) {
+                charged = this.ammoQueue.map(cloneRecipe).filter(Boolean);
+            } else if (Array.isArray(this.marbleQueue) && this.marbleQueue.length > 0) {
+                charged = this.marbleQueue.map(compileMarble).filter(Boolean);
+            }
+            const bulletCap = CONFIG.gameplay.selectionReq || 3;
+            this._chargedAmmoQueue = charged.length > 0 ? charged.slice(0, bulletCap) : null;
+        } else if (mode === 'standard') {
+            this._chargedAmmoQueue = null;
+        }
+
         // [ammo-replace] 已移除命运选择前的替换阶段检测。
         // 替换阶段现在在研磨全部完成后触发（phase_gathering_attemptComplete 中），
         // 展示新研磨的子弹 vs 充能子弹，让玩家选择。

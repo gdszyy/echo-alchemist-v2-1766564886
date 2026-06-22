@@ -74,7 +74,7 @@ globs: ["src/config.js"]
 - **设计原则**：
 - **所有弹珠默认进池**：`white` 权重最高，`bounce`、`damage`、`cryo`、`pyro` 等常规弹珠默认可出现，`rainbow`、`matryoshka` 等特殊弹珠使用低权重控制稀有度。
 - **遗物权重机制**：玩家选择弹珠倾向遗物时，`shop.js` 中的 `ui_selectRelic` 会提高对应 `this.unlockedWeights[key]`，并立即提供一包对应倾向胚珠；遗物不再负责“解锁弹珠”或触发精华。
-- **商人弹珠包定价**：`run_shop.js` 根据 `CONFIG.probabilities` 的归一化期望价值动态计算弹珠包价格。去纯净包、固定低概率弹珠包等必须重新计算概率分布，不允许手填固定价格绕过期望价值。
+- **商人弹珠包定价**：`run_shop.js` 根据 `CONFIG.probabilities` 的归一化期望价值动态计算弹珠包价格。去纯净包、固定低概率弹珠包等必须重新计算概率分布，不允许手填固定价格绕过期望价值。当前调参使用低基准价与低稀有幂，常规包应落在可通过数回合局内碎片购买的区间。
 - **闪电属性特殊性**：自 2026-04-14 起，**闪电（lightning）属性不再拥有对应的钉子**，也不再通过遗物直接解锁其生成权重。闪电属性仅能通过收集阶段中【冰霜】与【火焰】属性的抗消（合成）产生。
 - **奖励专属属性特殊性**：自 2026-06-21 起，`explosive` / `laser` / `overcharge` 均为底部奖励区专属属性，不进入普通弹珠候选池；相关遗物只能提高底部奖励区权重，不直接发放对应弹珠包。
 - **修改警告**：`allPegTypes` / `RANDOMIZABLE_PEG_TYPES` 是钉板初始化随机刷新池，只允许 `bounce` 与 `damage` 两种纯净弹珠属性。严禁在其中加入 `lightning`、`laser`、`overcharge`、`wind` 或其它元素/变异属性；这些属性只能作为弹珠本身、符文融合、奖励区或其它显式来源进入收集结果。调整 `white` 权重会直接影响杂色包价格和玩家获得纯净弹珠的体感，必须同步检查商店包价格。
@@ -125,6 +125,7 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
+| 2026-06-22 | `src/config.js`, `src/game_system.js`, `.cursor/rules/config.md`, `.cursor/rules/game_phase.md` | **弹珠包价格与新研磨替换选择**：下调 `runShopMarblePackBasePrice`、`runShopMarblePackMarkup`、`runShopMarblePackRarityPower`，使局内商人弹珠包从百级碎片价格降到数十级；标准 `marble_pack` 若在已有子弹时触发新研磨，会预充既有子弹并在研磨完成后进入子弹选择。 |
 | 2026-06-22 | `src/config.js`, `src/entities/projectile.js`, `docs/relic_system_design.md` | **力场护盾墙体语义修正**：`energy_shield` 文案与实现统一为“每次墙体接触最多消耗 1 层现有反弹/穿透耐久；耐久耗尽后按普通墙体反弹，不销毁子弹”。该改动修复无耐久子弹贴墙后被墙体吞没的问题，并避免角落同帧碰撞连续扣多层；不新增配置项、粒子、Canvas 光效或性能预算消费。 |
 | 2026-06-21 | `src/config.js`, `src/ui/run_shop.js`, `src/ui/shop.js`, `src/game_system.js`, `src/game_phase.js`, `src/ui_system.js`, `src/ui/hud.js`, `index.html`, `.cursor/rules/config.md`, `.cursor/rules/game_phase.md`, `.cursor/rules/ui_system.md` | **弹珠包主循环第一批落地**：取消新精华投放，敌人奖励只登记遗物线索；所有弹珠默认进入基础概率池，遗物改为提高对应弹珠权重并立即提供倾向胚珠包；局内商人新增杂色包、去纯包、倾向包和固定穿透包，价格按概率期望动态计算；三发/三弹珠上限固定为晶石核心 3 充能位；商人状态条移至右上角小胶囊；符文获取增加中央揭示动画。 |
 | 2026-06-20 | `src/config.js`, `src/game_system.js`, `src/game_phase.js`, `src/ui/run_shop.js`, `src/ui_system.js`, `src/core.js`, `index.html`, `.cursor/rules/config.md`, `.cursor/rules/game_phase.md`, `.cursor/rules/ui_system.md` | **局内商人随机到访调度**：`CONFIG.gameplay` 新增 `runShopFirstOfferRound`、`runShopRandomWaitMin`、`runShopVisitDurationRounds`、`runShopStarterBoostShield`、`runShopStarterBoostFlatDamage`、`runShopStarterBoostDamageRounds`、`runShopStarterBoostFragments`；首访固定第 3 回合且提供免费 `starter_boost` 占位援助包，后续商人按 3..当前回合数随机等待并停留 2 回合，底部 UI 显示到访/离开倒计时。 |

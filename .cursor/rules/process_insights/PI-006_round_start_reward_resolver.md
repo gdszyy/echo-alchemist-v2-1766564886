@@ -1,8 +1,8 @@
 ---
 id: "PI-006"
-version: "v1.5"
-last_updated: "2026-06-20"
-author: "tsk-f35c6d10-d6f"
+version: "v1.6"
+last_updated: "2026-06-22"
+author: "Codex"
 related_modules: ["game_phase", "game_system", "core", "ui/shop", "ui/run_shop"]
 status: "active"
 ---
@@ -69,6 +69,7 @@ status: "active"
 | v1.3 | 2026-06-19 | Pitfall 6: normal round-start banner must not rebuild `ammoQueue` from `_lastFiredAmmoSnapshot` or `marbleQueue`; those sources are only for explicit essence / replace-ammo charge flows. | Current Agent |
 | v1.4 | 2026-06-19 | Pitfall 7: gathering initialization must rebuild missing launchable `marbleQueue` entries without touching `ammoQueue`, preventing empty grind phases after banner/resume edge cases. | Codex |
 | v1.5 | 2026-06-20 | Pitfall 8: scheduled run-shop visits must update beside the round-start banner instead of opening an overlay from resolver, preserving reward queue and banner flow. | Codex |
+| v1.6 | 2026-06-22 | Pitfall 9: standard `marble_pack` selection is still an explicit new grind and must pre-charge existing bullets so gathering completion enters replace-ammo selection. | Codex |
 
 ## Pitfall 6: Normal Round-Start Banner Reuses Charge Sources
 
@@ -99,3 +100,13 @@ status: "active"
 **Correct approach**: `sys_maybeOfferRunShopBeforeRoundStart()` should call `sys_updateRunShopScheduleForRound()`, persist the run, and return `false`. `ui_updateRunShopScheduleUI()` reads `sys_getRunShopScheduleState()` every UI tick and shows the bottom countdown/open button during gathering/combat. The first visit is fixed at round 3, later waits are rolled by `sys_rollNextRunShopRound(fromRound)` from `runShopRandomWaitMin` through the current round, and each visit stays active for `runShopVisitDurationRounds`.
 
 **Key location**: `src/game_system.js` -> `sys_updateRunShopScheduleForRound()` / `sys_maybeOfferRunShopBeforeRoundStart()`, `src/ui/run_shop.js` -> `ui_updateRunShopScheduleUI()`.
+
+## Pitfall 9: Marble Pack Grind Skips Replace Selection
+
+**Symptom**: after a `marble_pack` reward, the player can grind a new set of marbles while already having a previous bullet set, but the game jumps straight into combat with the new bullets instead of asking which bullets to keep.
+
+**Root cause**: `marble_pack` uses `selectionMode = 'standard'`, so it looked like a normal selection path. The replace-ammo charge setup only lived on `chaos_essence` / `pure_essence`, leaving standard marble-pack grinds without `_chargedAmmoQueue`.
+
+**Correct approach**: when `sys_initSelectionPhase()` consumes `pendingSelectionMode.sourceRewardType === 'marble_pack'`, it must prefill `_chargedAmmoQueue` from `_lastFiredAmmoSnapshot`, then `ammoQueue`, then compiled `marbleQueue`. `phase_gathering_attemptComplete()` already detects `_chargedAmmoQueue` and opens `sys_initReplaceAmmoPhase()`, so no separate UI path is needed.
+
+**Key location**: `src/game_system.js` -> `sys_initSelectionPhase()`, `src/game_phase.js` -> `phase_gathering_attemptComplete()`.
