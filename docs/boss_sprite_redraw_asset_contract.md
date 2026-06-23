@@ -8,7 +8,8 @@ Boss 视觉拆成三层：
 
 | 层 | 资产 | 职责 |
 |---|---|---|
-| 基础本体 | `assets/sprites/bosses/boss_<bossId>.png/.json` | Boss 主轮廓、材质、核心结构、待机呼吸 |
+| 运行时基础本体 | `assets/sprites/bosses/redraw_drafts/boss_<bossId>_redraw_idle_draft_sheet.png/.json` | Boss 主轮廓、材质、核心结构、待机呼吸 |
+| Legacy 对照 | `assets/sprites/bosses/boss_<bossId>.png/.json` | 旧 256×256 资源，仅保留为回退/对照，不再是运行时优先路径 |
 | 破绽 Overlay | `assets/sprites/enemies/bosses/<bossId>/vulnerability/` | 破绽累积、爆开、易伤、恢复 |
 | 程序化状态层 | `Enemy.draw()` / `_drawBossDecoration()` | 血条、温度、护盾、狂暴、行动预警、粒子和动态光效 |
 
@@ -16,9 +17,11 @@ Boss 视觉拆成三层：
 
 ## 2. 文件路径
 
-现有 8 个 Boss 已经接入 SpriteRenderer，重绘时覆盖同名文件即可：
+现有 8 个 Boss 已经接入 SpriteRenderer，运行时优先读取 `redraw_drafts/` 下的 384×256 draft sheet；旧同名 `assets/sprites/bosses/boss_<bossId>.png/.json` 只作为 legacy 对照：
 
 ```text
+assets/sprites/bosses/redraw_drafts/boss_<bossId>_redraw_idle_draft_sheet.png
+assets/sprites/bosses/redraw_drafts/boss_<bossId>_redraw_idle_draft_sheet.json
 assets/sprites/bosses/boss_<bossId>.png
 assets/sprites/bosses/boss_<bossId>.json
 assets/sprites/bosses/raw/<bossId>_idle_raw.png
@@ -143,11 +146,11 @@ node tests/validate_boss_sprite_assets.mjs
 
 当前旧资源会显示为 `legacy`；重绘完成后应显示为 `redraw`。若存在 PNG/JSON 不匹配、尺寸错误、非 RGBA PNG 或 idle 帧不足，脚本会失败。
 
-若 `assets/sprites/bosses/redraw_drafts/` 下存在 `boss_<id>_base_draft_384x256.png`，同一脚本还会执行 HP 透光窗口验收。该检查只约束 draft 阶段的可读性，不代表正式资源已经替换进运行时。
+同一脚本还会执行 HP 透光窗口验收，并确认运行时 sheet path 已指向 `redraw_drafts/` 的 384×256 sheet；若路径退回旧 `assets/sprites/bosses/boss_<bossId>.png`，测试必须失败。
 
 ## 7. 当前 Draft 状态
 
-2026-06-22：已生成 Ignis 与 Glacies 的基础重绘 draft；2026-06-23 追加 Mikro、Devourer、Viridis、Tesla、Chimera 与 Ouroboros 基础重绘 draft。当前均尚未覆盖正式运行时 `assets/sprites/bosses/boss_<bossId>.png/.json`。
+2026-06-22：已生成 Ignis 与 Glacies 的基础重绘 draft；2026-06-23 追加 Mikro、Devourer、Viridis、Tesla、Chimera 与 Ouroboros 基础重绘 draft。2026-06-23 运行时已通过 `src/data/boss_sprite_assets.js` 切换到 `redraw_drafts/boss_<bossId>_redraw_idle_draft_sheet.png/.json`。
 
 2026-06-23：8 个 Boss base draft 均已具备区域式 HP 透光窗口方案：只让炉芯、冰腔、孢室、胃囊、电核罩、混合核心、衔尾蛇环槽等 mask 标记区域变为透光；此前前四个整体半透明版本已归档为 `_2026-06-23_overall-alpha-superseded`，原不透明源稿归档为 `_2026-06-23_opaque_source`。后四个由 `scripts/generate_remaining_boss_hp_drafts.py` 生成碰撞轮廓优先的 draft，用于补齐验收与后续美术重绘参考。
 
@@ -207,4 +210,4 @@ assets/sprites/bosses/redraw_drafts/boss_base_draft_hp_readability_contact_sheet
 assets/sprites/bosses/redraw_drafts/boss_hp_translucency_mask_contact_sheet.png
 ```
 
-正式替换前仍需人工美术验收：确认 384×256 单帧主体不会遮挡血条、主体实心轮廓贴合 `boss_collision_guides_v2_no_three_rings_384x256.png`、弱点位置与 `vulnerability/weak_mask` 对齐，并决定是否把 6 帧 draft idle 扩展到 8-12 帧正式 sheet。
+正式美术终稿前仍需人工验收：确认 384×256 单帧主体不会遮挡血条、主体实心轮廓贴合 `boss_collision_guides_v2_no_three_rings_384x256.png`、弱点位置与 `vulnerability/weak_mask` 对齐，并决定是否把当前 6 帧 draft idle 扩展到 8-12 帧终稿 sheet。

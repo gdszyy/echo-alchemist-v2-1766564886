@@ -236,7 +236,7 @@ node tests/validate_boss_vulnerability_assets.mjs
 ### 4.7 Boss 本体资产校验
 
 `tests/validate_boss_sprite_assets.mjs` 检查 8 个 Boss 的基础 Sprite Sheet：
-- `assets/sprites/bosses/boss_<bossId>.png/.json` 必须存在。
+- 运行时 `assets/sprites/bosses/redraw_drafts/boss_<bossId>_redraw_idle_draft_sheet.png/.json` 必须存在且为 `384 × 256` 帧；旧 `assets/sprites/bosses/boss_<bossId>.png/.json` 仅作为 legacy 对照。
 - PNG 必须是 8-bit RGBA。
 - JSON 必须包含 `idle` 动画，`row = 0`，帧数至少 6。
 - 当前 `256 × 256` 帧记为 `legacy`；新重绘 `384 × 256` 帧记为 `redraw`，需要通过 `frameWidth/frameHeight` 声明。

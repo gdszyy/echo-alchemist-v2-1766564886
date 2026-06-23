@@ -182,6 +182,15 @@ function validateBossSprite(bossId) {
     const sheetPath = path.join(root, sheetRel);
     const metaPath = path.join(root, metaRel);
 
+    if (!sheetRel.startsWith(`${DRAFT_DIR}/`) || !sheetRel.endsWith(`boss_${bossId}_redraw_idle_draft_sheet.png`)) {
+        fail(`${bossId} runtime sheet must use redraw draft, got ${sheetRel}`);
+        return;
+    }
+    if (metaRel !== sheetRel.replace(/\.png$/i, '.json')) {
+        fail(`${bossId} runtime meta must sit beside redraw draft sheet, got ${metaRel}`);
+        return;
+    }
+
     if (!fs.existsSync(sheetPath)) {
         fail(`${bossId} missing sheet (${sheetRel})`);
         return;
@@ -213,8 +222,8 @@ function validateBossSprite(bossId) {
             && frame.height === BOSS_SPRITE_LEGACY_FRAME_SIZE.height;
         const isRedraw = frame.width === BOSS_SPRITE_REDRAW_FRAME_SIZE.width
             && frame.height === BOSS_SPRITE_REDRAW_FRAME_SIZE.height;
-        if (!isLegacy && !isRedraw) {
-            fail(`${bossId} frame must be legacy 256x256 or redraw 384x256, got ${frame.width}x${frame.height}`);
+        if (!isRedraw) {
+            fail(`${bossId} runtime frame must be redraw 384x256, got ${frame.width}x${frame.height}${isLegacy ? ' legacy' : ''}`);
             return;
         }
 

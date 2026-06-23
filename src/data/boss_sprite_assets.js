@@ -18,6 +18,7 @@ export const BOSS_SPRITE_BOSS_IDS = [
 ];
 
 export const BOSS_SPRITE_ROOT = 'assets/sprites/bosses';
+export const BOSS_SPRITE_REDRAW_DRAFT_ROOT = `${BOSS_SPRITE_ROOT}/redraw_drafts`;
 
 export const BOSS_SPRITE_LEGACY_FRAME_SIZE = {
     width: 256,
@@ -38,14 +39,33 @@ export const BOSS_SPRITE_IDLE_CONTRACT = {
     fps: 6
 };
 
-export function getBossSpriteSheetPath(bossId) {
+export function getBossSpriteLegacySheetPath(bossId) {
     if (!bossId) return null;
     return `${BOSS_SPRITE_ROOT}/boss_${bossId}.png`;
 }
 
-export function getBossSpriteMetaPath(bossId) {
+export function getBossSpriteLegacyMetaPath(bossId) {
     if (!bossId) return null;
     return `${BOSS_SPRITE_ROOT}/boss_${bossId}.json`;
+}
+
+export function getBossSpriteRedrawDraftSheetPath(bossId) {
+    if (!bossId) return null;
+    return `${BOSS_SPRITE_REDRAW_DRAFT_ROOT}/boss_${bossId}_redraw_idle_draft_sheet.png`;
+}
+
+export function getBossSpriteRedrawDraftMetaPath(bossId) {
+    if (!bossId) return null;
+    return `${BOSS_SPRITE_REDRAW_DRAFT_ROOT}/boss_${bossId}_redraw_idle_draft_sheet.json`;
+}
+
+// @perf-impact: Boss runtime uses 384x256 redraw sheets through the existing single SpriteRenderer draw call.
+export function getBossSpriteSheetPath(bossId) {
+    return getBossSpriteRedrawDraftSheetPath(bossId);
+}
+
+export function getBossSpriteMetaPath(bossId) {
+    return getBossSpriteRedrawDraftMetaPath(bossId);
 }
 
 export function getBossSpriteRawConceptPath(bossId) {
