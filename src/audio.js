@@ -41,6 +41,26 @@ class SoundManager {
         // 防抖记录表
         this.lastPlayTime = {};
 
+        // Local preview samples. These files are intentionally kept in
+        // assets/audio-local and ignored by git so the remote repo stays clean.
+        this.sampleBuffers = {};
+        this.sampleLoadPromises = {};
+        this.sampleFailed = new Set();
+        this.sampleManifest = {
+            shoot: 'assets/audio-local/sfx/shoot_laser.wav',
+            pegHit: 'assets/audio-local/sfx/hit_peg.wav',
+            bounceHit: 'assets/audio-local/sfx/hit_bounce.wav',
+            enemyHit: 'assets/audio-local/sfx/enemy_hit.wav',
+            slash: 'assets/audio-local/sfx/slash.wav',
+            collect: 'assets/audio-local/sfx/collect.wav',
+            split: 'assets/audio-local/sfx/split.wav',
+            shatter: 'assets/audio-local/sfx/shatter.wav',
+            lightning: 'assets/audio-local/sfx/lightning.wav',
+            powerup: 'assets/audio-local/sfx/powerup.wav',
+            explosion: 'assets/audio-local/sfx/explosion_sub.wav',
+        };
+        this._preloadLocalSamples();
+
         // ── Reverb 效果器（钉盘弹珠专用）──
         // 信号链：钉盘音效节点 → pegDryGain(0.6) → masterGain
         //                      ↘ pegWetGain(0.45) → pegReverbNode → masterGain
@@ -88,6 +108,88 @@ class SoundManager {
     _connectToPegBus(node) {
         node.connect(this.pegDryGain);
         node.connect(this.pegWetGain);
+    }
+
+    _preloadLocalSamples() {
+        Object.keys(this.sampleManifest).forEach(key => this._loadSample(key));
+    }
+
+    _loadSample(key) {
+        if (this.sampleBuffers[key]) return Promise.resolve(this.sampleBuffers[key]);
+        if (this.sampleLoadPromises[key]) return this.sampleLoadPromises[key];
+        if (this.sampleFailed.has(key)) return Promise.resolve(null);
+
+        const url = this.sampleManifest[key];
+        if (!url || typeof fetch !== 'function') return Promise.resolve(null);
+
+        const promise = fetch(url)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.arrayBuffer();
+            })
+            .then(arrayBuffer => this.ctx.decodeAudioData(arrayBuffer))
+            .then(buffer => {
+                this.sampleBuffers[key] = buffer;
+                return buffer;
+            })
+            .catch(error => {
+                this.sampleFailed.add(key);
+                if (typeof console !== 'undefined') {
+                    console.warn(`[Audio] Local sample unavailable: ${key}`, error);
+                }
+                return null;
+            })
+            .finally(() => {
+                delete this.sampleLoadPromises[key];
+            });
+
+        this.sampleLoadPromises[key] = promise;
+        return promise;
+    }
+
+    _playSample(key, options = {}) {
+        if (this.muted) return true;
+
+        const buffer = this.sampleBuffers[key];
+        if (!buffer) {
+            this._loadSample(key);
+            return false;
+        }
+
+        const {
+            volume = 0.35,
+            rate = 1,
+            output = 'master',
+            cooldown = 0,
+        } = options;
+        const perfNow = performance.now();
+        const playKey = `sample:${key}`;
+        if (cooldown > 0 && this.lastPlayTime[playKey] && perfNow - this.lastPlayTime[playKey] < cooldown) {
+            return true;
+        }
+        this.lastPlayTime[playKey] = perfNow;
+
+        try {
+            const now = this.ctx.currentTime;
+            const source = this.ctx.createBufferSource();
+            const gain = this.ctx.createGain();
+            source.buffer = buffer;
+            source.playbackRate.setValueAtTime(rate, now);
+            gain.gain.setValueAtTime(volume, now);
+            source.connect(gain);
+            if (output === 'peg') {
+                this._connectToPegBus(gain);
+            } else {
+                gain.connect(this.masterGain);
+            }
+            source.start(now);
+            return true;
+        } catch (error) {
+            if (typeof console !== 'undefined') {
+                console.warn(`[Audio] Local sample playback failed: ${key}`, error);
+            }
+            return false;
+        }
     }
 
     // ─────────────────────────────────────────────
@@ -203,6 +305,16 @@ class SoundManager {
         const _nowMs = performance.now();
         if (this.lastPlayTime[_key] && _nowMs - this.lastPlayTime[_key] < 30) return;
         this.lastPlayTime[_key] = _nowMs;
+        if (type === 'normal' && this._playSample('pegHit', {
+            volume: 0.34,
+            rate: 0.92 + Math.min(Math.max(speed, 0), 20) * 0.015,
+            output: 'peg',
+        })) return;
+        if (type === 'bounce' && this._playSample('bounceHit', {
+            volume: 0.36,
+            rate: 0.96 + Math.min(Math.max(speed, 0), 20) * 0.012,
+            output: 'peg',
+        })) return;
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -295,6 +407,7 @@ class SoundManager {
      */
     playShoot() {
         if (this.muted) return;
+        if (this._playSample('shoot', { volume: 0.38, rate: 1.08, cooldown: 40 })) return;
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -321,6 +434,10 @@ class SoundManager {
         const key = `enemyHit_${hitType}`;
         if (this.lastPlayTime[key] && now - this.lastPlayTime[key] < 50) return;
         this.lastPlayTime[key] = now;
+
+        const sampleKey = hitType === 'lightning' ? 'lightning' : 'enemyHit';
+        const sampleRate = hitType === 'pyro' ? 0.88 : (hitType === 'cryo' ? 1.12 : 1);
+        if (this._playSample(sampleKey, { volume: 0.28, rate: sampleRate, cooldown: 45 })) return;
 
         const audioNow = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
@@ -369,6 +486,8 @@ class SoundManager {
         if (this.lastPlayTime['lightning'] && perfNow - this.lastPlayTime['lightning'] < 80) return;
         this.lastPlayTime['lightning'] = perfNow;
 
+        if (this._playSample('lightning', { volume: 0.32, rate: 1.14, cooldown: 80 })) return;
+
         const now = this.ctx.currentTime;
 
         // 噪声 + 高频扫描
@@ -400,6 +519,7 @@ class SoundManager {
      */
     playExplosion() {
         if (this.muted) return;
+        if (this._playSample('explosion', { volume: 0.42, rate: 1.05, cooldown: 120 })) return;
         const now = this.ctx.currentTime;
 
         // 噪声爆发
@@ -438,6 +558,11 @@ class SoundManager {
      */
     playPowerup(pitch = 1) {
         if (this.muted) return;
+        if (this._playSample('powerup', {
+            volume: 0.3,
+            rate: Math.min(1.7, 0.9 + pitch * 0.06),
+            cooldown: 45,
+        })) return;
         const now = this.ctx.currentTime;
         const baseFreq = 400 + pitch * 50;
         const osc = this.ctx.createOscillator();
@@ -459,6 +584,15 @@ class SoundManager {
      */
     playEffect(type) {
         if (this.muted) return;
+        const sampleByEffect = {
+            split: 'split',
+            shatter: 'shatter',
+        };
+        if (sampleByEffect[type] && this._playSample(sampleByEffect[type], {
+            volume: type === 'shatter' ? 0.36 : 0.3,
+            rate: 1,
+            cooldown: type === 'shatter' ? 70 : 50,
+        })) return;
         const now = this.ctx.currentTime;
 
         switch(type) {
@@ -559,6 +693,7 @@ class SoundManager {
      */
     playMagic() {
         if (this.muted) return;
+        if (this._playSample('powerup', { volume: 0.24, rate: 1.28, cooldown: 60 })) return;
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -584,6 +719,8 @@ class SoundManager {
         const perfNow = performance.now();
         if (this.lastPlayTime['slash'] && perfNow - this.lastPlayTime['slash'] < 60) return;
         this.lastPlayTime['slash'] = perfNow;
+
+        if (this._playSample('slash', { volume: 0.34, rate: 1.02, cooldown: 60 })) return;
 
         const now = this.ctx.currentTime;
 
@@ -623,7 +760,11 @@ class SoundManager {
     /**
      * 播放收集音效
      */
-    playCollect() { this.playTone(700, 'sine', 0.1, 0.4); }
+    playCollect() {
+        if (this.muted) return;
+        if (this._playSample('collect', { volume: 0.26, rate: 1.08, cooldown: 50 })) return;
+        this.playTone(700, 'sine', 0.1, 0.4);
+    }
 }
 
 // ==================== 变更：不再在模块顶层创建实例 ====================
