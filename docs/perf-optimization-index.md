@@ -59,7 +59,7 @@
 | **P-019** | P-015 (TASK-A) | `src/effects/particles.js` | 全局 | 缺少分级渲染逻辑 | 无 | `particles.js` 中的所有特效类（`DeathExplosion`, `EnergyOrb`, `IceWave` 等）均未接入 `perfQualityLevel` 分级渲染逻辑，导致低端设备下无法降级特效细节 | 极高 |
 | **P-020** | P-D16 | `src/effects/particles.js` | 960-1060 | 混合模式/发光叠加 | `createRadialGradient`, `lighter`, `shadowBlur` | `DeathExplosion.draw` 内部在膨胀阶段和虚空阶段，每帧分别创建 `createRadialGradient`，并使用了 `lighter`。虚空孔洞绘制使用大面积径向渐变填充，叠加无上限创建问题，是导致清场卡顿的直接根源 | 极高 |
 | **P-021** | P-D01 | `src/render_system.js` | 44-132 | 无门控的每帧渲染开销 | `shadowBlur`, `Date.now()` | `render_windAnchors` 函数没有 `perfQualityLevel` 门控检查。每帧使用 `Date.now()` 计算 `Math.sin` 作为脉冲动画，并在连线和锚点绘制中高频调用 `shadowBlur`（最高可达25）。同时还在每帧以一定概率（10%或20%）生成新的火星粒子 | 极高 |
-| **P-022** | P-D03 | `src/render_system.js` | 407-480 | 弹珠属性轨道每帧渐变重建 | `createLinearGradient`, `shadowBlur`, `screen` | `render_combat_launcherOrbitals` 绘制发射器周围的属性轨道球时，在 `stats.forEach` 循环内对每个属性球调用 `shadowBlur`，并且在循环内部每帧重建 `createLinearGradient`，再使用 `globalCompositeOperation = 'screen'` 混合 | 极高 |
+| **P-022** | P-D03 | `src/render_system.js` | retired | 发射器属性轨道已退役 | 已移除运行时调用/预加载 | `render_combat_launcherOrbitals` 原先绘制发射器周围的属性轨道球，并在循环内使用 `createLinearGradient`、`shadowBlur` 与 `screen` 混合。2026-06-23 发射器改为贴图槽位读数 + 炮管方向闪光，该路径不再运行。 | 已解决 |
 | **P-023** | P-001 (TASK-B) | `src/spawn_system.js` | 1190-1244 | 特效实例无上限 | 无 | `spawn_createHitFeedback` 中创建 `EnergyOrb` 时没有数量上限检查和时间窗口聚合机制（防抖/节流）。高频命中（如弹珠在钉盘中快速反弹，尤其是共鸣类型）会导致同屏创建大量实例 | 极高 |
 | **P-024** | P-B02 | `src/spawn_system.js` | 787-892 | O(n) 全量扫描 | `.filter()` | `spawn_createParticle` 在每帧大量调用时，内部多次执行 `.filter()` 遍历整个 `particles` 数组（如计算风属性数量等），产生显著的 CPU 瓶颈。每次调用最多执行 7 次 `Array.filter()` | 极高 |
 | **P-025** | ENT-01 | `src/entities.js` | 1038-1052 | 阴影绘制 | `ellipse` | `pegSoftShadow` 在 `Peg.draw` 中每帧调用，约50个钉子同时执行，虽然有 `_perfBudgetPeg.pegSoftShadow` 门控，但在高端设备上大量绘制依然会导致性能开销，建议缓存为静态图片 | 高 |
@@ -119,7 +119,7 @@
 | P-018 | `particles.js` | HealWave 混合模式与发光开销 |
 | P-020 | `particles.js` | DeathExplosion 虚空阶段大面积渐变与 `lighter` 叠加 |
 | P-021 | `render_system.js` | `render_windAnchors` 无门控高频 `shadowBlur` |
-| P-022 | `render_system.js` | 属性轨道球每帧重建线性渐变并使用 `screen` 混合 |
+| P-022 | `render_system.js` | 已退役：属性轨道球不再运行时绘制 |
 | P-028 | `enemy.js` | Boss 边框脉冲光晕无门控，每帧修改 `shadowBlur` |
 | P-029 | `enemy.js` | Viridis Boss 狂暴状态无门控，极高 `shadowBlur` |
 | P-034 | `particles.js` | ember 每帧重建渐变并叠加 `screen` 和 `shadowBlur` |
@@ -168,7 +168,7 @@
 | P-006 | `enemy.js` | Devourer Boss 每帧执行 8 次以上渐变创建 |
 | P-017 | `particles.js` | DeathExplosion 每帧重建多个径向渐变 |
 | P-018 | `particles.js` | HealWave 每帧重建线性与径向渐变 |
-| P-022 | `render_system.js` | 属性轨道球每帧重建线性渐变 |
+| P-022 | `render_system.js` | 已退役：属性轨道球不再运行时绘制 |
 | P-026 | `entities.js` | pegGlowHalo 每帧创建径向渐变，GC 压力大 |
 
 ### D. 初始化开销与计算冗余
@@ -214,7 +214,7 @@
 
 **目标**：减少常规游戏过程中的渲染开销
 
-4. **缓存渐变对象与预渲染**：将 `Enemy` 的 `_initTexture` 改为异步预渲染或全局缓存池（解决 P-004）。对高频创建的渐变（如 Boss 技能、Peg 光晕、属性轨道球），在构造函数或尺寸变化时生成并缓存为 `CanvasGradient` 对象或 `OffscreenCanvas`（解决 P-003、P-006、P-017、P-018、P-022、P-026）。
+4. **缓存渐变对象与预渲染**：将 `Enemy` 的 `_initTexture` 改为异步预渲染或全局缓存池（解决 P-004）。对高频创建的渐变（如 Boss 技能、Peg 光晕），在构造函数或尺寸变化时生成并缓存为 `CanvasGradient` 对象或 `OffscreenCanvas`（解决 P-003、P-006、P-017、P-018、P-026）。P-022 已通过退役发射器属性轨道运行时绘制解决。
 
 5. **为实体渲染添加 `perfQualityLevel` 门控**：为 `entities.js` 中的 `drawLayoutRoleStyle`、`Ball.draw` 以及 `enemy.js` 中的词缀渲染、Boss 光晕渲染添加性能等级检查（解决 P-001、P-002、P-003、P-005、P-008）。
 

@@ -68,10 +68,10 @@
 
 | 资产 | 路径建议 | 尺寸 | 用途 | 9-Slice |
 |---|---|---:|---|---:|
-| 态势条底板 | `assets/ui/panels/combat_status_panel_v2_9s.png` | 512x96 | `#combat-status-panel` | 24 |
-| 技能栏底板 | `assets/ui/panels/skill_bar_panel_v2_9s.png` | 360x160 | `#skill-bar.skill-bar-panel` | 32 |
+| 态势条底板 | `assets/ui/sprites/combat_status_panel_v2_9s.png` | 640x160 | `#combat-status-panel` | 44 92 |
+| 技能栏底板 | `assets/ui/sprites/skill_bar_panel_v2_9s.png` | 384x512 | `#skill-bar.skill-bar-panel` | 38 48 |
 | 技能按钮框 | `assets/ui/sprites/skill_button_frame_v2_9s.png` | 96x96 | 单个技能按钮 | 20 |
-| 符文充能框 | `assets/ui/panels/combat_rune_charge_frame_v2_9s.png` | 260x72 | `#combat-rune-charge-ui` | 24 |
+| 符文充能框 | `assets/ui/sprites/combat_rune_charge_frame_v2_9s.png` | 420x96 | `#combat-rune-charge-ui` | 30 78 |
 | 符文充能填充 | `assets/ui/sprites/combat_rune_charge_fill_v2.png` | 224x28 | 符文充能条 | 无 |
 | 伤害统计按钮底 | `assets/ui/sprites/damage_stats_button_v2.png` | 132x44 | 伤害统计入口 | 无 |
 
@@ -88,7 +88,7 @@ HUD 资产要求：
 
 | 资产组 | 路径建议 | 尺寸 | 数量 | 说明 |
 |---|---|---:|---:|---|
-| 技能图标 V2 | `assets/ui/icons/skills/skill_<id>_v2.png` | 48x48 | 6 | 与技能栏底板同材质，透明背景 |
+| 技能图标 V2 | `assets/ui/icons/skills/skill_<id>_v2.png` | 48x48 | 6 | 与技能栏底板同材质；生成用绿幕背景，接入前本地抠 alpha |
 | 态势条短图标 | `assets/ui/icons/combat/status_<id>_v2.png` | 24x24 | 8 | 敌人、精英、Boss、盾、弹药、防线、警戒、稳定 |
 | 防线状态徽章 | `assets/ui/icons/combat/threat_<safe/watch/danger>_v2.png` | 32x32 | 3 | 给态势条使用 |
 | 墙体遗物图标刷新 | `assets/icons/relic/energy_shield_v2.png` | 64x64 | 1 | 与新墙体材质一致 |
@@ -112,7 +112,7 @@ HUD 资产要求：
 | 静态炮台底座概念 | `docs/design/concepts/combat_ui_pass1/emitter_base_stationary_v4_concept.png` | 1024x1024 | 数据 UI 不旋转，保留中央枢轴 |
 | 可旋转炮管概念 | `docs/design/concepts/combat_ui_pass1/emitter_barrel_rotating_v4_concept.png` | 1024x1024 | 单独炮管层，底部锚点对齐底座枢轴 |
 | 发射器 V4 正式底座 | `assets/ui/sprites/emitter_base_stationary_v4.png` | 256x256 | 只画底座、读数框、弹仓和枢轴，不画炮管 |
-| 发射器 V4 正式炮管 | `assets/ui/sprites/emitter_barrel_rotating_v4.png` | 128x192 或 256x256 | 透明 PNG，锚点为底部旋转轴；运行时随发射角旋转 |
+| 发射器 V4 正式炮管 | `assets/ui/sprites/emitter_barrel_rotating_v4.png` | 128x192 或 256x256 | 绿幕抠图后的 PNG，锚点为底部旋转轴；运行时随发射角旋转 |
 | 发射器 V4 蓄力层 | `assets/ui/sprites/emitter_charging_v4_0.png` ~ `_5.png` | 256x256 | 只叠加底座能量，不改变炮管方向 |
 
 V4 静态底座必须保留：
@@ -131,6 +131,8 @@ V4 可旋转炮管必须满足：
 - 枪口、能量管和蓄力高亮可以随炮管旋转，但炮台读数永远保持水平。
 
 ## 4. 生成 Prompt 草案
+
+重要约束：图片生成阶段不要要求“透明背景 / transparent background / no background”。当前透明运行时资产统一采用 **绿幕抠图流程**：prompt 要求纯色 chroma key 背景，生成后再由本地脚本把 key 色转换为 alpha。推荐 key 色为 `#00ff00` 或高饱和纯绿；素材主体不得使用接近 key 色的大面积绿色，边缘不要投影到绿幕上。
 
 ### 4.1 主战场背景
 
@@ -152,15 +154,15 @@ Avoid: busy texture in the middle, atmospheric fog that hides projectiles, stock
 
 ```text
 Use case: stylized-concept
-Asset type: transparent game UI sprite for a vertical combat wall rail
+Asset type: game UI sprite for a vertical combat wall rail on chroma key background
 Primary request: left-side alchemical rebound wall rail for a vertical battle arena
-Style/medium: polished bitmap game asset, dark metal and obsidian, transparent background
-Composition/framing: tall narrow vertical rail, hard readable inner rebound edge, outer side fades into transparent darkness
+Style/medium: polished bitmap game asset, dark metal and obsidian, rendered on a flat chroma green background
+Composition/framing: tall narrow vertical rail, hard readable inner rebound edge, outer side fades to dark material but does not fade into the green screen
 Lighting/mood: cold cyan glass edge with subtle amber mechanical clamps
 Color palette: charcoal, obsidian, cyan, dark gold
 Materials/textures: beveled metal, glass energy channel, engraved alchemy ticks, worn stone sockets
-Constraints: transparent background, no text, no icons, no enemies, inner edge must be straight and readable
-Avoid: thick bloom, noisy center, curved silhouette, perspective tilt, cast shadow
+Constraints: flat solid #00ff00 chroma key background, no text, no icons, no enemies, inner edge must be straight and readable
+Avoid: checkerboard preview background, green glow, thick bloom, noisy center, curved silhouette, perspective tilt, cast shadow on the green background
 ```
 
 右墙可由左墙镜像，除非生成结果有明显方向性纹理。
@@ -184,14 +186,14 @@ Avoid: bright center glow, complex symbols in stretch zones, soft blurry card st
 
 ```text
 Use case: stylized-concept
-Asset type: transparent 48x48 game skill icon
+Asset type: 48x48 game skill icon on chroma key background
 Primary request: <skill semantic>, compact readable icon for a dark alchemy combat skill button
-Style/medium: polished small game icon, transparent background, strong silhouette
+Style/medium: polished small game icon, rendered on a flat chroma green background, strong silhouette
 Composition/framing: centered symbol, no button frame, generous padding, readable at 24px
 Lighting/mood: restrained inner glow only on the symbol
 Color palette: match skill element, with dark metal micro accents
-Constraints: no text, no UI frame, no background card, no watermark
-Avoid: tiny unreadable details, full scene illustration, overexposed glow
+Constraints: flat solid #00ff00 chroma key background, no text, no UI frame, no background card, no watermark
+Avoid: checkerboard preview background, green glow, tiny unreadable details, full scene illustration, overexposed glow
 ```
 
 ## 5. 接入顺序
@@ -262,7 +264,7 @@ Avoid: tiny unreadable details, full scene illustration, overexposed glow
 | 汇总图 | `combat_ui_pass1_contact_sheet.png` | 用于快速横向比较整体风格 |
 | 战斗主背景 | `bg_combat_table_v2_concept.png` | 中场干净、边轨明确，适合作为正式背景方向 |
 | 底部发射区 | `bg_combat_emitter_zone_v2_concept.png` | 中央凹槽和两侧能量管清晰，可继续压暗中心 |
-| 左墙导轨 | `combat_wall_left_v2_concept.png` | 直线内缘明确，正式版需要裁成窄条并保证真实 alpha |
+| 左墙导轨 | `combat_wall_left_v2_concept.png` | 直线内缘明确；后续正式版应从绿幕源图裁成窄条并本地抠 alpha |
 | 顶部横梁 | `combat_wall_top_v2_concept.png` | 下沿冷色线可作为反弹边界视觉锚点 |
 | 态势条底板 | `combat_status_panel_v2_concept.png` | 中心可读性好，可继续简化边角细节 |
 | 技能栏底板 | `skill_bar_panel_v2_concept.png` | 结构感强，但按钮槽烘得较重；正式版建议拆成面板底与按钮框 |
@@ -270,21 +272,43 @@ Avoid: tiny unreadable details, full scene illustration, overexposed glow
 | 发射器 V4 | `emitter_v4_concept.png` | 读数位、中央弹舱和六弹仓清楚，值得进入正式拆层预研 |
 | 静态炮台底座 | `emitter_base_stationary_v4_concept.png` | 数据 UI 固定在底座，中央枢轴清楚，符合拆层方向 |
 | 可旋转炮管 | `emitter_barrel_rotating_v4_concept.png` | 独立方向层成立；正式版建议收窄，避免旋转时压住底座读数 |
+| V4 分层运行时预览 | `emitter_v4_split_runtime_preview.png` | 同一底座叠加三种炮管角度；用于验收数据 UI 固定、炮管独立旋转 |
 
-注意：本轮概念图为 RGB 预览图，部分“透明”区域是生成器烘焙出的棋盘格，并非真实 alpha。正式接入前必须重新生成或本地处理为透明 PNG，并按运行时目标尺寸裁切。
+注意：本轮概念图为 RGB 预览图，部分“透明”区域是生成器烘焙出的棋盘格，并非真实 alpha。后续正式生成不要在 prompt 中要求透明底，应要求纯绿幕 key 背景，再由本地脚本抠成透明 PNG，并按运行时目标尺寸裁切。
 
-## 11. V4 分层运行时接入记录
+## 11. V4 分层运行时撤回记录
 
-2026-06-23 已接入第一版 V4 分层发射器资源：
+2026-06-23 已撤回第一版 V4 分层发射器运行时资源：这些文件来自非绿幕透明/棋盘格 prompt 后处理，不符合当前 chroma key 资产流程。原文件已移动到 `docs/design/concepts/combat_ui_pass1/rejected_chroma_key_required/`，仅保留为反例和重做参考。运行时已切回 V3 发射器资源，`EMITTER_BARREL_SRC` 当前为 `null`。
 
 | 资产 | 文件 | 说明 |
 |---|---|---|
-| 静态底座 raw | `assets/ui/sprites/emitter_base_stationary_v4_alpha_raw.png` | 从概念图抠出 alpha 后的源尺寸裁切版 |
-| 静态底座运行时 | `assets/ui/sprites/emitter_base_stationary_v4.png` | 256x256；承载读数框、弹仓和中央枢轴，不包含炮管 |
-| 可旋转炮管 raw | `assets/ui/sprites/emitter_barrel_rotating_v4_alpha_raw.png` | 从概念图抠出 alpha 后的源尺寸裁切版 |
-| 可旋转炮管运行时 | `assets/ui/sprites/emitter_barrel_rotating_v4.png` | 256x256；运行时以底部圆环为锚点旋转 |
-| 蓄力叠加层 | `assets/ui/sprites/emitter_charging_v4_0.png` ~ `_5.png` | 透明 PNG；只叠加底座能量，不旋转数据 UI |
+| 静态底座 raw | `assets/ui/sprites/emitter_base_stationary_v4_alpha_raw.png` | 从概念图/绿幕源图后处理出 alpha 后的源尺寸裁切版 |
+| 静态底座运行时 | `assets/ui/sprites/emitter_base_stationary_v4.png` | 已撤回；256x256；承载读数框、弹仓和中央枢轴，不包含炮管 |
+| 可旋转炮管 raw | `assets/ui/sprites/emitter_barrel_rotating_v4_alpha_raw.png` | 从概念图/绿幕源图后处理出 alpha 后的源尺寸裁切版 |
+| 可旋转炮管运行时 | `assets/ui/sprites/emitter_barrel_rotating_v4.png` | 已撤回；256x256；运行时以底部圆环为锚点旋转 |
+| 蓄力叠加层 | `assets/ui/sprites/emitter_charging_v4_0.png` ~ `_5.png` | 已撤回；只叠加底座能量，不旋转数据 UI |
+| 分层验收预览 | `docs/design/concepts/combat_ui_pass1/emitter_v4_split_runtime_preview.png` | 使用运行时底座、炮管和同一 pivot 规则合成，确认读数 UI 不跟随炮管旋转 |
 
-运行时映射已从 `emitter_base_v3.png` 切换到 V4 分层资源：`src/bitmap_icons.js` 暴露 `EMITTER_BASE_SRC`、`EMITTER_BARREL_SRC`、`EMITTER_CHARGING_SRCS`；`src/render_system.js` 的 `render_combat_launcherEmitterBase()` 负责先画静态底座，再以当前瞄准角绘制炮管，最后叠加 V4 蓄力层。`src/game_phase.js` 只把已有 `previewRotation` 传入发射器渲染，不改变实际发射物理与瞄准线锚点。
+运行时映射已恢复为 V3：`src/bitmap_icons.js` 中 `EMITTER_BASE_SRC = emitter_base_v3.png`，`EMITTER_BARREL_SRC = null`，`EMITTER_CHARGING_SRCS` 指向 V3 蓄力帧。`src/render_system.js` 的 `render_combat_launcherEmitterBase()` 仍保留可选炮管分层绘制能力，等绿幕重做资产合格后再重新启用，不改变实际发射物理与瞄准线锚点。
 
-性能自适应影响评估：该接入每帧最多新增 1 次 104px 炮管 `drawImage`，并把旧 V3 底图/蓄力图替换为 V4 底图/蓄力图；没有新增粒子、渐变、`shadowBlur`、`screen/lighter` 混合预算或持续遍历。`high/medium/low` 三档表现一致，low 档仍依赖既有 `render_combat_launcherSignal()` 关闭高开销 glow；无需新增 `CONFIG.performance` 字段。
+性能自适应影响评估：撤回后不再新增炮管 `drawImage`；当前恢复到 V3 底图 + V3 蓄力帧路径。后续绿幕版 V4 重新接入时，再重新记录 1 次额外炮管 `drawImage` 的影响评估。
+
+## 12. 战斗场地 V2 运行时接入与撤回记录
+
+2026-06-23 已将首轮概念稿中的完整背景处理为第一版运行时资源，并以 `_v2` 后缀非破坏式接入。依赖透明边缘的墙体/HUD 资源已撤回，原因同上：源图未按绿幕/chroma key 流程生成。
+
+| 资产 | 文件 | 说明 |
+|---|---|---|
+| 战斗主背景 | `assets/ui/backgrounds/bg_combat_table_v2.png` | 720x1280；仅 `phase === 'combat'` 时替代原 `bg_main_canvas.png` |
+| 战斗底部发射区 | `assets/ui/backgrounds/bg_combat_emitter_zone_v2.png` | 720x220；仅战斗阶段替代原 `bg_emitter_zone.png` |
+| 左反弹墙 | `assets/ui/sprites/combat_wall_left_v2.png` | 已撤回；48x1024；需绿幕源图重做 |
+| 右反弹墙 | `assets/ui/sprites/combat_wall_right_v2.png` | 已撤回；48x1024；需绿幕源图重做 |
+| 顶部反弹墙梁 | `assets/ui/sprites/combat_wall_top_v2.png` | 已撤回；720x64；需绿幕源图重做 |
+| 态势条底板 | `assets/ui/sprites/combat_status_panel_v2_9s.png` | 已撤回；640x160；需绿幕源图重做 |
+| 技能栏底板 | `assets/ui/sprites/skill_bar_panel_v2_9s.png` | 已撤回；384x512；需绿幕源图重做 |
+| 符文充能框 | `assets/ui/sprites/combat_rune_charge_frame_v2_9s.png` | 已撤回；420x96；需绿幕源图重做 |
+| 运行时资产预览 | `docs/design/concepts/combat_ui_pass1/combat_ui_runtime_v2_asset_preview.png` | 用于检查正式资源尺寸、alpha 与整体方向 |
+
+运行时映射集中在 `src/bitmap_icons.js`：战斗阶段继续使用 `BG_COMBAT_TABLE_SRC`、`BG_COMBAT_EMITTER_ZONE_SRC`；墙体 `COMBAT_WALL_LEFT_SRC`、`COMBAT_WALL_RIGHT_SRC`、`COMBAT_WALL_TOP_SRC` 当前为 `null`。`src/render_system.js` 的 `render_combat_walls()` 因此走旧渐变墙 fallback。`src/game_phase.js` 只从内联墙体绘制切换为调用该渲染函数，不改变碰撞边界、敌人生成、子弹反弹或阶段流转。
+
+性能自适应影响评估：当前只保留战斗背景每帧 1 次全屏 `drawImage` 与底部发射区 1 次裁剪 `drawImage`；墙体回到旧渐变 fallback，HUD 回到旧 CSS/9-Slice 资源。后续绿幕版墙体重新接入时，再重新记录最多 3 次静态 `drawImage` 的影响评估。

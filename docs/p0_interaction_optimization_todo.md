@@ -11,6 +11,20 @@
 | P0-C | 命运时刻极端状态 | 检查刷新、继续游戏、教程等待、遗物/精华 overlay 返回时的语义一致性 | 基本完成，待浏览器实机复核 |
 | P0-D | 钉板编辑闭环 | 继续补齐编辑态视觉、符文融合预览、错误提示一致性和开始采集边界 | 基本完成，待体验微调 |
 
+## 0.5 上传前收口清单（2026-06-23 巡检）
+
+本节记录最近本地改动中尚未完整收口、尚未实装或尚未上传 `origin/main` 的事项，避免只停留在聊天记录里。
+
+- [ ] 推送本地领先远程的提交：`990b90c feat: add boss hp translucency masks [perf-impact]` 当前在本地 `main`，`origin/main` 仍停在 `c171207 feat: prefer enemy overlay sprites over fallback art [perf-impact]`。
+- [x] 复核发射器锚点契约：二次扫描确认当前源码/测试以 `port` 为炮台旋转圆心和发射锚点、`muzzle` 为视觉端点；`node tests/validate_phase_contracts.mjs` 中该项已通过。仍需随提交纳入未跟踪的 `src/utils/emitter_geometry.js`。
+- [ ] 修复钉板空槽契约：`ensureModuleLayoutInstances()` 仍会用 `createDefaultModuleLayout(count, defaultSlots)` 回填已解锁但被玩家卸下的空槽；需保证只有新解锁槽位可自动填入 `dense_stagger`，并让 `pinboard normalization does not refill intentionally emptied active slots` 通过。
+- [ ] 纳入必要未跟踪运行时文件：至少包括 `src/utils/emitter_geometry.js`、`src/utils/boss_schedule_utils.js`、`scripts/generate_enemy_targeting_overlays.py`、敌人 footprint overlay PNG 资产族、`bg_combat_table_v2.png` / `bg_combat_emitter_zone_v2.png` 与对应文档预览图；否则当前源码或测试会引用远程不存在的文件。
+- [ ] 整理不应上传的临时文件：当前 `git ls-files --others --exclude-standard` 仍有 1181 个未跟踪文件，其中 `tmp/` 572 个、`codex-*.log` 10 个、`docs/archive/tasks/` 424 个；`tmp/`、`codex-*.log`、`_verif.mjs` 等验证残留不应进入提交，如需长期忽略，应补 `.gitignore`。
+- [ ] 收口任务归档迁移：当前有大量 `tasks/` 删除与 `docs/archive/tasks/` 新增，需确认这是有意归档并以同一次提交记录为 rename/move，而不是误删任务交付物。
+- [ ] 修复 `git diff --check` 报告的行尾空格：当前集中在 `src/entities/projectile.js:1431`、`src/entities/projectile.js:1531`、`src/entities/projectile.js:1574`。
+- [ ] 明确未实装的美术资产：V4 发射器、战斗墙体、HUD V2 透明资源已从运行时撤回，`EMITTER_BARREL_SRC` 与 `COMBAT_WALL_*_SRC` 当前为 `null`；后续必须按绿幕/chroma key 流程重做后再重新接入。
+- [ ] 上传前复跑验证：`node tests/validate_phase_contracts.mjs` 当前为 142/143，通过失败仅剩 `pinboard normalization does not refill intentionally emptied active slots`；修复后需恢复为全通过，并保留已通过的 `validate_enemy_spawn_runtime.mjs`、`validate_scenarios.js`、`validate_wave_presets.mjs`、`validate_boss_sprite_assets.mjs` 作为回归基线。
+
 ## 1. 页面 / 系统状态总览
 
 | 优先级 | 页面 / 系统 | 当前状态 | 下一步判断 |

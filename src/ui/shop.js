@@ -18,6 +18,7 @@ import { RUNE_DB } from '../rune_config.js';
 import { showToast } from '../entities.js';
 import { eventBus } from '../event_bus.js';
 import { getRelicIconSrc } from '../bitmap_icons.js'; // [Phase 5A Task 5.A7] 位图遗物图标
+import { createModuleInstance, getActiveModuleSlots } from '../pinboard_modules.js';
 
 // ==================== [v2 即时感重塑] 子弹评分与属性操作辅助函数 ====================
 // 这些工具函数被 mirror_magazine / element_injector 调用以判定"最强/最弱"子弹与属性翻倍。
@@ -410,6 +411,30 @@ export const shop_system = {
         }
         else if (relic.effect === 'slot_count_up') {
             this.slotCount = (this.slotCount || 0) + 1;
+        } else if (relic.effect === 'module_row_unlock') {
+            const cfg = CONFIG.gameplay || {};
+            const cols = cfg.moduleCols || 5;
+            const rows = cfg.moduleRows || 3;
+            const totalSlots = cols * rows;
+            const beforeSlots = Math.max(0, Math.min(this.unlockedModuleSlots || cfg.moduleDefaultSlots || cols, totalSlots));
+            const targetSlots = Math.max(beforeSlots, Math.min(totalSlots, relic.targetSlots || (cols * 2)));
+            const beforeActive = new Set(getActiveModuleSlots(beforeSlots, totalSlots, cfg));
+            const afterActive = getActiveModuleSlots(targetSlots, totalSlots, cfg);
+
+            if (!Array.isArray(this.currentModuleLayout) || this.currentModuleLayout.length !== totalSlots) {
+                const previous = Array.isArray(this.currentModuleLayout) ? this.currentModuleLayout : [];
+                this.currentModuleLayout = Array.from({ length: totalSlots }, (_, i) => previous[i] || null);
+            }
+
+            this.unlockedModuleSlots = targetSlots;
+            for (const slotIdx of afterActive) {
+                if (beforeActive.has(slotIdx) || this.currentModuleLayout[slotIdx]) continue;
+                this.currentModuleLayout[slotIdx] = createModuleInstance('dense_stagger');
+            }
+
+            if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(false);
+            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+            if (window.showToast) showToast(`钉盘第二行已解锁：${beforeSlots} → ${targetSlots} 个槽位。`);
         }
         else if (relic.effect === 'bullet_cap_up') {
             this.bulletCapBonus = 0;

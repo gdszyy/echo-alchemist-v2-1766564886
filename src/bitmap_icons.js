@@ -13,7 +13,7 @@
 // Task 5.A5 — 弹药法球图标映射（属性 32×32）
 // key 对应 recipe 中的属性名 / MarbleDefinition.type
 // ============================================================
-const BITMAP_ASSET_VERSION = '20260622-rune-attrs';
+const BITMAP_ASSET_VERSION = '20260623-combat-v2';
 
 function versionBitmapSrc(path) {
     if (!path) return path;
@@ -236,51 +236,30 @@ export function getUiBitmap(path) {
     return (img.complete && img.naturalWidth > 0) ? img : null;
 }
 
-// 属性轨道球底座（recipe 关键字 → 7 元素 socket 贴图，覆盖率不全则保持 fallback）
-export const ORBITAL_SOCKET_MAP = {
-    pyro:      'assets/ui/sprites/orbital_socket_pyro.png',
-    cryo:      'assets/ui/sprites/orbital_socket_cryo.png',
-    lightning: 'assets/ui/sprites/orbital_socket_electro.png',
-    laser:     'assets/ui/sprites/orbital_socket_hydro.png',
-    bounce:    'assets/ui/sprites/orbital_socket_dendro.png',
-    pierce:    'assets/ui/sprites/orbital_socket_anemo.png',
-    damage:    'assets/ui/sprites/orbital_socket_geo.png',
-};
-
-export const ORBITAL_LINK_STRIP   = 'assets/ui/sprites/orbital_link_strip.png';
-export const ORBITAL_LINK_CAP     = 'assets/ui/sprites/orbital_link_cap.png';
-export const ORBITAL_LINK_FLOW    = [
-    'assets/ui/sprites/orbital_link_flow_0.png',
-    'assets/ui/sprites/orbital_link_flow_1.png',
-    'assets/ui/sprites/orbital_link_flow_2.png',
-    'assets/ui/sprites/orbital_link_flow_3.png',
-];
-export const ORBITAL_INTAKE = [
-    'assets/ui/sprites/orbital_intake_0.png',
-    'assets/ui/sprites/orbital_intake_1.png',
-    'assets/ui/sprites/orbital_intake_2.png',
-    'assets/ui/sprites/orbital_intake_3.png',
-];
-
-export const EMITTER_BASE_SRC = 'assets/ui/sprites/emitter_base_stationary_v4.png';
-export const EMITTER_BARREL_SRC = 'assets/ui/sprites/emitter_barrel_rotating_v4.png';
+export const EMITTER_BASE_SRC = 'assets/ui/sprites/emitter_base_v3.png';
+export const EMITTER_BARREL_SRC = null;
 export const EMITTER_DRAW_SIZE = 128;
 export const EMITTER_BARREL_DRAW_SIZE = 104;
 export const EMITTER_PORT_OFFSET_Y = 44;
 export const EMITTER_CHARGING_SRCS = [
-    'assets/ui/sprites/emitter_charging_v4_0.png',
-    'assets/ui/sprites/emitter_charging_v4_1.png',
-    'assets/ui/sprites/emitter_charging_v4_2.png',
-    'assets/ui/sprites/emitter_charging_v4_3.png',
-    'assets/ui/sprites/emitter_charging_v4_4.png',
-    'assets/ui/sprites/emitter_charging_v4_5.png',
+    'assets/ui/sprites/emitter_charging_v3_0.png',
+    'assets/ui/sprites/emitter_charging_v3_1.png',
+    'assets/ui/sprites/emitter_charging_v3_2.png',
+    'assets/ui/sprites/emitter_charging_v3_3.png',
+    'assets/ui/sprites/emitter_charging_v3_4.png',
+    'assets/ui/sprites/emitter_charging_v3_5.png',
 ];
 
 // Canvas 背景位图（战斗 / 研磨阶段共用主底图，发射区单独叠加炼金台层）
 export const BG_MAIN_CANVAS_SRC   = versionBitmapSrc('assets/ui/backgrounds/bg_main_canvas.png');
 export const BG_EMITTER_ZONE_SRC  = versionBitmapSrc('assets/ui/backgrounds/bg_emitter_zone.png');
+export const BG_COMBAT_TABLE_SRC  = versionBitmapSrc('assets/ui/backgrounds/bg_combat_table_v2.png');
+export const BG_COMBAT_EMITTER_ZONE_SRC = versionBitmapSrc('assets/ui/backgrounds/bg_combat_emitter_zone_v2.png');
+export const COMBAT_WALL_LEFT_SRC = null;
+export const COMBAT_WALL_RIGHT_SRC = null;
+export const COMBAT_WALL_TOP_SRC = null;
 
-// Combat UI HUD bitmaps. Keep launcher-specific emitter/orbital assets above so art
+// Combat UI HUD bitmaps. Keep launcher-specific emitter assets above so art
 // refreshes can preload the surrounding combat interface without touching the launcher.
 export const COMBAT_UI_BITMAP_SRCS = [
     'assets/ui/panels/top_bar_9s.png',
@@ -309,13 +288,13 @@ export function preloadUiBitmaps() {
         EMITTER_BASE_SRC,
         EMITTER_BARREL_SRC,
         ...EMITTER_CHARGING_SRCS,
-        ...Object.values(ORBITAL_SOCKET_MAP),
-        ORBITAL_LINK_STRIP,
-        ORBITAL_LINK_CAP,
-        ...ORBITAL_LINK_FLOW,
-        ...ORBITAL_INTAKE,
         BG_MAIN_CANVAS_SRC,
         BG_EMITTER_ZONE_SRC,
+        BG_COMBAT_TABLE_SRC,
+        BG_COMBAT_EMITTER_ZONE_SRC,
+        COMBAT_WALL_LEFT_SRC,
+        COMBAT_WALL_RIGHT_SRC,
+        COMBAT_WALL_TOP_SRC,
         ...COMBAT_UI_BITMAP_SRCS,
     ];
     paths.forEach(p => getUiBitmap(p));

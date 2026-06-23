@@ -196,7 +196,7 @@ function makeGame(spawnSystem, config) {
         calc_getRecentAverageDamage() { return 0; },
         sys_determineEnemyReward(enemy) { enemy.rewardType = 'gold'; },
         spawn_createShockwave() { this.shockwaves.push({}); },
-        spawn_createParticle() { this.particles.push({}); },
+        spawn_createParticle(x, y, color, mode = 'normal') { this.particles.push({ x, y, color, mode }); },
         spawn_pushParticleWithLimit(particle) { this.particles.push(particle); },
         spawn_createFloatingText(x, y, text) { this.floatingTexts.push({ x, y, text }); },
         combat_recordDamage(amount) { this.damageReported += amount || 0; },
@@ -988,6 +988,12 @@ withRandom(() => 0, () => {
     const energy = new Enemy(340, 100, 60, 50, 100, 100, 'normal', ['energyArmor']);
     energy.takeDamage(50, { config: {}, pos: { x: 340, y: 100 } });
     check(energy.hp === 80 && energy.energyArmorShield === 30, 'energyArmor caps high hit damage and stores overflow shield');
+
+    const jumper = new Enemy(420, 100, 60, 50, 100, 100, 'normal', ['jump']);
+    game.particles = [];
+    jumper.takeDamage(12, { config: { damage: 12, cryo: 0, pierce: 0, bounce: 0 }, pos: { x: 420, y: 100 } });
+    check(game.particles.some(p => p.mode === 'spark'), 'jump hit feedback uses spark particles');
+    check(!game.particles.some(p => p.mode === 'shard'), 'jump hit feedback does not look like cryo shards');
 
     const carrier = new Enemy(180, 320, 180, 100, 300, 300, 'elite', ['carrier', 'shield']);
     carrier.baseArchetype = 'carrier';

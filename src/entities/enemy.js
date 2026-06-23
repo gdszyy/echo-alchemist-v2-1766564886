@@ -7145,8 +7145,8 @@ class Enemy {
                         bm.size = this.width * 0.25 + Math.random() * 4;
                         game.spawn_pushParticleWithLimit(bm);
                     }
-                } else if (dominantAffix === 'jump' || this.bossType === 'glacies') {
-                    // 冰系/跳跃：#a5f3fc shard，向四周散射
+                } else if (this.bossType === 'glacies') {
+                    // 冰系 Boss：保留碎冰语义，避免普通 jump 敌人被误读成冰属性命中。
                     const shardCount = 4 + Math.floor(Math.random() * 3); // 4~6
                     for (let i = 0; i < shardCount; i++) {
                         const angle = (i / shardCount) * Math.PI * 2 + Math.random() * 0.5;
@@ -7159,6 +7159,23 @@ class Enemy {
                         sh.vel.x = Math.cos(angle) * speed;
                         sh.vel.y = Math.sin(angle) * speed;
                         game.spawn_pushParticleWithLimit(sh);
+                    }
+                } else if (dominantAffix === 'jump') {
+                    // @perf-impact: jump 受击反馈复用 spark 粒子预算，替代冰蓝 shard，避免普通子弹命中时产生碎冰误读。
+                    const sparkCount = 3 + Math.floor(Math.random() * 3); // 3~5
+                    for (let i = 0; i < sparkCount; i++) {
+                        const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.9;
+                        const speed = 2.0 + Math.random() * 2.0;
+                        const js = new Particle(
+                            this.pos.x + (Math.random() - 0.5) * this.width * 0.45,
+                            this.pos.y + (Math.random() - 0.5) * this.height * 0.35,
+                            Math.random() > 0.45 ? '#facc15' : '#7dd3fc',
+                            'spark'
+                        );
+                        js.vel.x = Math.cos(angle) * speed;
+                        js.vel.y = Math.sin(angle) * speed - 0.4;
+                        js.size = 1.5 + Math.random() * 1.6;
+                        game.spawn_pushParticleWithLimit(js);
                     }
                 } else if (dominantAffix === 'berserk' || dominantAffix === 'overloadReactor' || dominantAffix === 'siegeBreaker') {
                     // 狂暴：橙红 ember + 小型 smoke

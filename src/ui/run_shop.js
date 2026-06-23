@@ -19,7 +19,7 @@
 
 import { CONFIG } from '../config.js';
 import { RUNE_DB } from '../rune_config.js';
-import { MODULE_DEFS, ATTR_PIN_TYPES, addModuleComponentToInventory, getModuleMetaSummary } from '../pinboard_modules.js';
+import { MODULE_DEFS, addModuleComponentToInventory, getModuleMetaSummary } from '../pinboard_modules.js';
 
 const RUNE_PRICE_BY_RARITY = {
     common: 18,
@@ -40,28 +40,8 @@ const SLOT_TYPE_META = {
     split:     { name: '解鎖分裂槽',  icon: '☢️', desc: '加入「分裂」特殊槽到鑒池。' },
 };
 
-// [v2] 属性钉板：商店随机刷新一个带某属性的钉板模块（按当前属性权重）
-const ATTR_PIN_PRICE = 70;
 const MODULE_SHOWCASE_TAG = 'showcase';
 const MODULE_SHOWCASE_PRIORITY = 0.65;
-const ATTR_PIN_LABEL = {
-    bounce: '彈性', pierce: '穿透', scatter: '散射',
-    damage: '增幅', cryo: '冰霜',   pyro: '火焰', wind: '疾風',
-};
-
-function rollAttributePinType(game) {
-    const weights = (game && game.unlockedWeights) || {};
-    const candidates = [];
-    let total = 0;
-    for (const t of ATTR_PIN_TYPES) {
-        const w = Math.max(0, weights[t] || 0);
-        if (w > 0) { candidates.push({ type: t, w }); total += w; }
-    }
-    if (total <= 0 || candidates.length === 0) return null;
-    let r = Math.random() * total;
-    for (const c of candidates) { if (r < c.w) return c.type; r -= c.w; }
-    return candidates[candidates.length - 1].type;
-}
 
 function takeRandom(pool) {
     if (!pool || pool.length === 0) return null;
@@ -168,26 +148,7 @@ function generateInventory(game, count) {
     const utility = takeRandom(utilityItems);
     if (utility && items.length < count) items.push(utility);
 
-    // 3. 属性钉板：按当前属性权重随机刷出一个带属性的钉板模块。
-    const attrPinType = rollAttributePinType(game);
-    if (attrPinType) {
-        const moduleId = `attr_pin_${attrPinType}`;
-        const def = MODULE_DEFS[moduleId];
-        if (def) {
-            if (items.length < count) items.push({
-                kind: 'attr_pin',
-                moduleId,
-                attribute: attrPinType,
-                name: def.name,
-                icon: def.icon,
-                desc: `3×3 釘板，全部釘子為 [${ATTR_PIN_LABEL[attrPinType] || attrPinType}] 屬性。`,
-                price: ATTR_PIN_PRICE,
-                rarity: 'rare',
-            });
-        }
-    }
-
-    // 4. 符文商品：保底至少一个，其余按缺口补齐到目标数量。
+    // 3. 符文商品：保底至少一个，其余按缺口补齐到目标数量。
     const allRunes = (RUNE_DB || []).filter(r => r && r.id);
     while (items.length < count && allRunes.length > 0) {
         const r = allRunes[Math.floor(Math.random() * allRunes.length)];
@@ -442,7 +403,7 @@ export const run_shop = {
             return;
         }
         const cfg = CONFIG.gameplay || {};
-        if (it.kind === 'module' || it.kind === 'attr_pin') {
+        if (it.kind === 'module') {
             this.ownedModuleComponents = addModuleComponentToInventory(this.ownedModuleComponents, it.moduleId);
             if (window.showToast) window.showToast(`获得钉盘组件: ${it.name}`);
         } else if (it.kind === 'starter_boost') {

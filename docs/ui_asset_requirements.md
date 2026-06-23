@@ -18,6 +18,7 @@
 | 发光 | `box-shadow + filter: drop-shadow`；位图素材自带柔光层即可，不要重复堆 CSS |
 | 命名规范 | `kebab-case.png`，对应 raw 源图加 `_raw` 后缀，9-Slice 切图加 `_9s` 后缀 |
 | 目录结构 | `assets/ui/{panels,borders,sprites,icons}/` 与 `assets/icons/{ammo,relic,rune}/` |
+| 透明资产生成 | prompt 阶段使用纯绿幕/chroma key 背景，不要求模型直接生成透明底；运行时透明 PNG 由本地抠图脚本后处理得到 |
 
 接入约定：所有新增的位图样式必须写到 [`src/styles/bitmap_ui.css`](../src/styles/bitmap_ui.css)，**严禁**在 `index.html` 内嵌 `<style>` 中写位图样式（避免与 9-Slice 体系冲突）。
 
@@ -38,7 +39,7 @@
 | 1.4 | `#phase-shop` | 局外商店（货架） | 🟡 | 卡片 9-Slice、`replace_ammo_bg.png` 复用炼金工坊底图 | 商店物品分类图标、价格标签 |
 | 1.5 | `#phase-selection` | 弹珠选择 / 子弹替换 / 命运时刻 | ✅ | `replace_ammo_bg.png`、`replace_card_frame_<C/B/A/S>_9s.png`、`replace_card_attr_slot.png`、`skip_btn_metal.png` | — |
 | 1.6 | `#phase-gathering` | 研磨阶段（弹珠台） | 🟡 | `bg_main_canvas.png`、`bg_emitter_zone.png`、`emitter_base.png` | 底部「钉盘外框」装饰 |
-| 1.7 | `#phase-combat` | 战斗阶段（无 DOM 主面板） | ✅ | `bg_main_canvas.png`、`emitter_base_v3.png`、`emitter_charging_v3_0~5.png`（蓄力 6 帧叠加） | — |
+| 1.7 | `#phase-combat` | 战斗阶段（无 DOM 主面板） | 🟡 | `bg_combat_table_v2.png`、`bg_combat_emitter_zone_v2.png`、旧渐变墙 fallback、`emitter_base_v3.png`、`emitter_charging_v3_0~5.png` | 墙体/HUD/V4 发射器需按绿幕流程重做 |
 | 1.8 | `#phase-truth-book` | 真理之书 / 图鉴 | 🟡 | `truth_book_bg_9s.png`（已接入背景） | 章节侧标 Tab、属性卡片底板、Boss 头像位 |
 | 1.9 | `#phase-relic` | 遗物选择 overlay | ✅ | `relic_overlay_bg.png`、`skip_btn_metal.png` + 已有遗物图标/9-Slice 边框（**已移除**旋转圆形稀有度光环） | — |
 | 1.10 | `#phase-gameover` | 游戏结束/结算 | 🟡 | `gameover_bg.png`（已接入） | 统计数据卡片 9-Slice、奖励发放动画图层 |
@@ -46,13 +47,13 @@
 | 1.12 | `#unified-top-bar` | 顶部状态栏 | ✅ | 9-Slice `top_bar_9s.png` | — |
 | 1.13 | `.bottom-panel` | 底部弹药栏 | ✅ | 9-Slice `bottom_panel_9s.png` | — |
 | 1.14 | `#settings-panel` | 设置弹窗 | 🟡 | `settings_modal_9s.png`、`toggle_on.png`、`toggle_off.png` | 滑条 Sprite、关闭按钮 |
-| 1.15 | `#combat-rune-charge-ui` | 战斗中符文充能 UI | ✅ | 符文 PNG、`combat_rune_charge_frame_9s.png`、`combat_rune_charge_fill.png` | — |
+| 1.15 | `#combat-rune-charge-ui` | 战斗中符文充能 UI | ✅ | 符文 PNG、`combat_rune_charge_frame_9s.png`、`combat_rune_charge_fill.png` | V2 框需按绿幕流程重做 |
 | 1.16 | `#multiplier-display` | 连击倍率显示 | ✅ | `multiplier_x2.png`、`multiplier_x3.png`、`multiplier_x5.png` | — |
-| 1.17 | `#skill-bar` | 战斗技能栏 | 🟡 | 技能图标 PNG、`rune_slot_idle.png`、`rune_slot_active.png` | 冷却扫描帧 |
+| 1.17 | `#skill-bar` | 战斗技能栏 | 🟡 | 技能图标 PNG、`skill_bar_panel_9s.png`、`skill_button_frame_9s.png`、`skill_cooldown_overlay.png` | V2 技能栏底板需按绿幕流程重做 |
 | 1.18 | `#round-start-banner` | 回合开始横幅 | ✅ | `round_banner_1.png` ~ `round_banner_6.png`（6 帧，600×200） | — |
 | 1.19 | 数据统计页（与图鉴并入 truth-book） | 历次伤害/记录 | ❌ | — | 折线图背景、数据指标徽章、最佳记录 ribbon |
 | 1.20 | `.ammo-icon` 弹药槽位 | 战斗 / 收集阶段 | ✅ | `assets/icons/ammo/*.png` 已覆盖原有 12 种及 `venom` / `overcharge` / `echo`（含 matryoshka、rainbow、resonance、flying_sword、wind） | - |
-| 1.21 | 发射器属性球轨道（Canvas 渲染层） | 战斗 / 装填时围绕发射器旋转的属性球 + 连线 | ✅ | `orbital_socket_<elem>.png`×7、`orbital_link_strip.png`、`orbital_link_cap.png`、`orbital_link_flow_0~3.png`、`orbital_intake_0~3.png` | — |
+| 1.21 | 发射器属性球轨道（Canvas 渲染层） | 已退役；战斗发射器数据改写入 V3 底座贴图槽位，发射反馈改为炮管方向闪光 | 🟡 | 旧 `orbital_*` 资源保留为历史素材但不再预加载/绘制 | 若未来恢复，需按新发射器静态底座/旋转炮管分层重做 |
 
 ---
 
@@ -157,8 +158,10 @@
 
 ### 6.1 发射器属性球轨道（对应 §1.21）
 
+> 2026-06-23 状态：该运行时模块已退役。`render_combat_launcherOrbitals()` 不再绘制，`src/bitmap_icons.js` 也不再预加载 `orbital_*` 资源；下一发数据改由 `render_combat_launcherSignal()` 写入 V3 发射器底座贴图的左屏、中央弹仓、右侧电容柱和底部弹药槽。旧资产条目仅作为历史素材参考。
+
 **当前实现**
-- 渲染入口：[`src/render_system.js:344`](../src/render_system.js) `render_combat_launcherOrbitals(ctx, centerX, centerY, recipe)`，由 [`src/game_phase.js:1969`](../src/game_phase.js) 调用
+- 渲染入口：已从战斗主渲染链路移除；发射器数据入口改为 [`src/render_system.js`](../src/render_system.js) `render_combat_launcherSignal(ctx, cx, cy, portX, portY, recipe, visual)`
 - 物理：[`src/entities.js:4042`](../src/entities.js) `updateOrbitalPhysics(timeScale)`，基础角速度 `0.00012` rad/帧 + `spinBoost`（0.95 衰减）
 - 轨道半径：基础 55px；蓄力时收缩；装填时从 450px 外吸入
 - 连线：`render_system.js:464-479`，单段 `createLinearGradient(中心→属性球)`，`globalCompositeOperation = 'screen'`，alpha 0.3，仅在半径 10-120px 区间绘制
@@ -358,7 +361,7 @@
   - `assets/ui/sprites/emitter_charging_v2_0.png` through `emitter_charging_v2_5.png`
 - Runtime mapping lives in `src/bitmap_icons.js` via `EMITTER_BASE_SRC`, `EMITTER_CHARGING_SRCS`, `EMITTER_DRAW_SIZE`, and `EMITTER_PORT_OFFSET_Y`.
 - Rendering remains a bitmap-sprite replacement path in `render_combat_launcherEmitterBase()`; no new particle system or gradient loop was added.
-- 2026-06-19 V2.2 readout pass: `render_combat_launcherSignal()` now presents the next-shot preview as a centered launcher HUD: a visible bullet body with reused ammo icon core, `DMG` damage chip, scatter count (`S`) plus mini fan preview, multicast count (`xN`) plus burst columns, and colored load cells. No new bitmap asset is required; the core reuses `AMMO_ICON_MAP`.
+- 2026-06-19 V2.2 readout pass: `render_combat_launcherSignal()` now presents the next-shot preview as a centered launcher HUD: a visible bullet body with reused ammo icon core, `DMG` damage chip, scatter count (`S`), multicast count (`xN`) plus burst columns, and colored load cells. 2026-06-23 slot-alignment pass removes the top muzzle/fire-point overlay, places `S` inside the left display, retires the old rotating orbital/link layer, and keeps the projectile spawn anchor at the turret rotation center. No new bitmap asset is required; the core reuses `AMMO_ICON_MAP`.
 
 ## 9. 2026-06-19 Combat Bottom Emitter V3 Assets
 
@@ -366,24 +369,44 @@
   - `assets/ui/sprites/emitter_base_v3_alpha_raw.png`
   - `assets/ui/sprites/emitter_base_v3.png`
   - `assets/ui/sprites/emitter_charging_v3_0.png` through `emitter_charging_v3_5.png`
-- V3 art reserves a central projectile chamber, left electronic display frame, right capacitor stack, and six lower ammo sockets so runtime damage/scatter/multicast/load data can read as part of the launcher body.
-- Runtime mapping remains in `src/bitmap_icons.js`; `render_combat_launcherSignal()` continues to draw fixed-count Canvas readouts over the bitmap with low-quality glow disabled.
+- V3 art reserves a central projectile chamber, left electronic display frame, right capacitor stack, and six lower ammo sockets so runtime damage/scatter/multicast/load data can read as part of the launcher body; the upper muzzle/fire point is reserved for the actual projectile anchor and no longer carries extra readout UI.
+- Runtime mapping remains in `src/bitmap_icons.js`; `render_combat_launcherSignal()` continues to draw fixed-count Canvas readouts over the bitmap with low-quality glow disabled. Current visible base UI: left damage/scatter screen, central projectile chamber, right multicast capacitor stack, and six bottom load sockets. Per-shot fire feedback is drawn by `render_queueLauncherBarrelFireEffect()` / `render_combat_launcherEmitterBase()` as a short barrel-direction flash.
 ## 10. 2026-06-23 Combat Bottom Emitter V4 Split Assets
 
-- `#phase-combat` bottom bullet launcher now uses a split V4 Canvas sprite set:
+- 2026-06-23 correction: the first V4 split runtime files were removed from active runtime use because they were derived from non-chroma-key transparent/checkerboard prompts. They now live under `docs/design/concepts/combat_ui_pass1/rejected_chroma_key_required/` as rejection references.
+- `#phase-combat` bottom bullet launcher currently uses the stable V3 Canvas sprite set again:
+  - `assets/ui/sprites/emitter_base_v3.png`
+  - `assets/ui/sprites/emitter_charging_v3_0.png` through `emitter_charging_v3_5.png`
+- V4 still remains the target architecture, but the following files must be regenerated from green-screen/chroma-key source before returning to `assets/ui/sprites/`:
   - `assets/ui/sprites/emitter_base_stationary_v4_alpha_raw.png`
   - `assets/ui/sprites/emitter_base_stationary_v4.png`
   - `assets/ui/sprites/emitter_barrel_rotating_v4_alpha_raw.png`
   - `assets/ui/sprites/emitter_barrel_rotating_v4.png`
   - `assets/ui/sprites/emitter_charging_v4_0.png` through `emitter_charging_v4_5.png`
-- Static data UI, ammo sockets, and readout frames stay on `emitter_base_stationary_v4.png`; the barrel is drawn from `emitter_barrel_rotating_v4.png` and rotates with the current aiming direction.
-- Runtime mapping lives in `src/bitmap_icons.js` via `EMITTER_BASE_SRC`, `EMITTER_BARREL_SRC`, `EMITTER_BARREL_DRAW_SIZE`, and `EMITTER_CHARGING_SRCS`.
-- Rendering remains a bitmap replacement path in `render_combat_launcherEmitterBase()`; it adds one small rotating `drawImage` and does not add particles, gradients, or new performance budgets.
+- The intended split remains: static data UI, ammo sockets, and readout frames stay on `emitter_base_stationary_v4.png`; the barrel is drawn from `emitter_barrel_rotating_v4.png` and rotates with the current aiming direction.
+- Runtime mapping in `src/bitmap_icons.js` has been reverted to `EMITTER_BASE_SRC = emitter_base_v3.png`, `EMITTER_BARREL_SRC = null`, and V3 charging frames until green-screen V4 assets are available.
+- Rendering still supports an optional split barrel path in `render_combat_launcherEmitterBase()`, but it is inactive while `EMITTER_BARREL_SRC` is null.
+- Split-layer runtime preview lives at `docs/design/concepts/combat_ui_pass1/emitter_v4_split_runtime_preview.png`; it verifies that the base/readout UI stays fixed while only the barrel rotates.
+
+## 11. 2026-06-23 Combat Battlefield V2 Runtime Assets
+
+- `#phase-combat` keeps the combat-specific Canvas background layers because they are full-frame backgrounds and do not depend on transparent generation:
+  - `assets/ui/backgrounds/bg_combat_table_v2.png`
+  - `assets/ui/backgrounds/bg_combat_emitter_zone_v2.png`
+- 2026-06-23 correction: the first transparent-dependent wall/HUD runtime files were removed from active runtime use and moved to `docs/design/concepts/combat_ui_pass1/rejected_chroma_key_required/`:
+  - `assets/ui/sprites/combat_wall_left_v2.png`
+  - `assets/ui/sprites/combat_wall_right_v2.png`
+  - `assets/ui/sprites/combat_wall_top_v2.png`
+  - `assets/ui/sprites/combat_status_panel_v2_9s.png`
+  - `assets/ui/sprites/skill_bar_panel_v2_9s.png`
+  - `assets/ui/sprites/combat_rune_charge_frame_v2_9s.png`
+- Runtime mapping still uses `BG_COMBAT_TABLE_SRC` and `BG_COMBAT_EMITTER_ZONE_SRC`; `COMBAT_WALL_*_SRC` is currently null so `render_combat_walls()` falls back to the old gradient wall.
+- Runtime asset preview lives at `docs/design/concepts/combat_ui_pass1/combat_ui_runtime_v2_asset_preview.png`.
 ## 2026-06-22 新增属性符文素材状态
 
-`rune_venom_1.png`、`rune_venom_2.png`、`rune_overcharge_1.png`、`rune_echo_1.png` 已存在于 `assets/icons/rune/`，并由 `src/bitmap_icons.js` 的 `RUNE_ICON_MAP` 引用。`BITMAP_ASSET_VERSION` 更新为 `20260622-rune-attrs`，用于刷新旧缓存。
+`rune_venom_1.png`、`rune_venom_2.png`、`rune_overcharge_1.png`、`rune_echo_1.png` 已存在于 `assets/icons/rune/`，并由 `src/bitmap_icons.js` 的 `RUNE_ICON_MAP` 引用。当前 `BITMAP_ASSET_VERSION` 为 `20260623-combat-v2`，覆盖本轮战斗场地与此前符文属性图标缓存刷新。
 
-## 11. 2026-06-23 Combat Battlefield UI Redesign
+## 12. 2026-06-23 Combat Battlefield UI Redesign
 
 战斗阶段进入新一轮美术重绘设计，目标不是补缺，而是统一 `#phase-combat` 的场地、墙体、HUD 面板和战斗常驻图标语言。权威设计案见 [`docs/design/combat_battlefield_ui_asset_redesign.md`](design/combat_battlefield_ui_asset_redesign.md)。
 
@@ -400,7 +423,8 @@
 - `docs/design/concepts/combat_ui_pass1/emitter_v4_concept.png`
 - `docs/design/concepts/combat_ui_pass1/emitter_base_stationary_v4_concept.png`
 - `docs/design/concepts/combat_ui_pass1/emitter_barrel_rotating_v4_concept.png`
+- `docs/design/concepts/combat_ui_pass1/emitter_v4_split_runtime_preview.png`
 
 正式资源若进入运行时目录，建议使用 `_v2` / `_v4` 后缀非破坏式接入，并同步更新本清单、`src/bitmap_icons.js` 或 `src/styles/bitmap_ui.css` 中的集中映射。
-当前概念图仅用于风格评审，部分透明区域为烘焙棋盘格而非真实 alpha；正式接入前必须重新生成透明 PNG 或做本地抠图处理。
+当前概念图仅用于风格评审，部分透明区域为烘焙棋盘格而非真实 alpha；后续正式生成不得在 prompt 中要求透明底，必须使用纯绿幕/chroma key 背景，再做本地抠图处理。
 发射器 V4 必须拆为静态底座与可旋转炮管：数据 UI、弹仓和读数框保留在 `emitter_base_stationary_v4.png`，炮管使用独立 `emitter_barrel_rotating_v4.png` 随发射方向旋转。

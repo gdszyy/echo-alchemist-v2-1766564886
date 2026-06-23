@@ -12,7 +12,7 @@ import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
 import { sb as _sb } from './utils/perf.js';
-import { EMITTER_PORT_OFFSET_Y } from './bitmap_icons.js';
+import { calcCombatLauncherGeometry, calcCombatLauncherGeometryToTarget } from './utils/emitter_geometry.js';
 import {
     calcDropDistribution,
     generateHeatmapData,
@@ -1766,8 +1766,8 @@ phase_gathering_getRandomPegType() {
              }
              if (!this.isEnemyTurn && this.ammoQueue.length > 0 && this.projectiles.length === 0 && this.burstQueue.length === 0) {
                 this.isDragging = true;
-                // [emitter-port] 发射口位于发射器素材上沿，偏移量统一来自 EMITTER_PORT_OFFSET_Y。
-                this.dragStart = new Vec2(this.width / 2, this.height - 80 - EMITTER_PORT_OFFSET_Y);
+                // [emitter-anchor] 发射锚点固定为炮台旋转圆心，统一由 emitter_geometry 计算。
+                this.dragStart = calcCombatLauncherGeometry(this.width, this.height).port;
                 this.dragCurrent = logicPos;
                 this.ui.closeDrawer();
             }
@@ -2546,8 +2546,9 @@ phase_gathering_getRandomPegType() {
     },
 
     phase_handleGreedyWheelQueueEvent(shot) {
-        const gx = (typeof shot.x === 'number') ? shot.x : this.width / 2;
-        const gy = (typeof shot.y === 'number') ? shot.y : this.height - 80 - EMITTER_PORT_OFFSET_Y;
+        const fallbackPort = calcCombatLauncherGeometry(this.width, this.height, shot.vel).port;
+        const gx = (typeof shot.x === 'number') ? shot.x : fallbackPort.x;
+        const gy = (typeof shot.y === 'number') ? shot.y : fallbackPort.y;
         if (shot.type === 'greedy_wheel_prelude') {
             if (typeof this.spawn_createGreedyWheelEffect === 'function') {
                 this.spawn_createGreedyWheelEffect(gx, gy, 'prelude');
@@ -2666,25 +2667,9 @@ phase_gathering_getRandomPegType() {
             if (this.reloadProgress >= 1.0) {
                 this.isReloading = false;
                 this.reloadProgress = 1.0;
-                
-                // [新增] 撞击时刻！给予轨道一个巨大的旋转初速度
-                // 就像能量球狠狠砸在了轨道上，带动它疯狂旋转
-                this.spinBoost = 0.002; 
             }
         }
 
-        // --- [新增] 3. 计算轨道旋转物理 (惯性与阻力) ---
-        // 基础旋转速度 (约为 0.5 rad/frame)
-        const baseSpeed = 0.00012; 
-        
-        // 阻力衰减：每一帧速度乘以 0.92，快速慢下来
-        this.spinBoost *= 0.95;
-        if (this.spinBoost < 0.0001) this.spinBoost = 0;
-
-        // 最终角度累加：基础速度 + 爆发速度
-        // 在装填过程中(isReloading)，为了体现"未就位"，我们可以让轨道转得稍慢一点，或者反向转
-        let currentFrameSpeed = baseSpeed + this.spinBoost;
-        this.orbitalAngle += currentFrameSpeed * timeScale * 60; // *60 是为了适配 timeScale 的基准
         this.ui_updateSlowMotion();
         // [充能符文系统] 充能条自动衰减
         if (this.phase === 'combat' || this.phase === 'training') {
@@ -2737,10 +2722,14 @@ phase_gathering_getRandomPegType() {
                     this.burstQueue.splice(i, 1);
                     continue;
                 }
-                // [emitter-port] 子弹从发射器素材的上沿发射口生成，偏移量统一来自 EMITTER_PORT_OFFSET_Y。
+                // [emitter-anchor] 子弹从炮台旋转圆心生成；炮管火光只作为美术层反馈。
                 // [echo-origin] 若 shot 携带 x/y（如回响弹），则从该坐标发射，否则回退到发射器
-                const spawnX = (typeof shot.x === 'number') ? shot.x : this.width/2;
-                const spawnY = (typeof shot.y === 'number') ? shot.y : this.height - 80 - EMITTER_PORT_OFFSET_Y;
+                const fallbackPort = calcCombatLauncherGeometry(this.width, this.height, shot.vel).port;
+                const spawnX = (typeof shot.x === 'number') ? shot.x : fallbackPort.x;
+                const spawnY = (typeof shot.y === 'number') ? shot.y : fallbackPort.y;
+                if (typeof this.render_queueLauncherBarrelFireEffect === 'function') {
+                    this.render_queueLauncherBarrelFireEffect(shot.vel, shot.recipe);
+                }
                 this.spawn_spawnBullet(spawnX, spawnY, shot.vel, shot.recipe, shot.shotId, shot.isLast);
                 audio.playShoot();
                 if (shot.greedyWheelChain) {
@@ -2920,49 +2909,13 @@ phase_gathering_getRandomPegType() {
         this.ctx.save();
         this.ctx.translate(entityShiftX, entityShiftY); 
 
-            // --- [修复]：绘制可视化的边界墙壁（从顶部栏下边界开始，不遥挡顶部栏内容）---
-            this.ctx.save();
+            // --- 绘制可视化边界墙壁（从顶部栏下边界开始，不遮挡顶部栏内容）---
             // 顶部栏下边界 Y（combatGridTopY - enemyHeight/2 即第一行敌人上边界，也是顶部栏底部）
             const wallTopY = this.combatGridTopY - this.enemyHeight / 2;
             const combatBounds = this.sys_getCombatBounds ? this.sys_getCombatBounds() : { left: 0, right: this.width };
             const wallLeftX = combatBounds.left;
             const wallRightX = combatBounds.right;
-            // 左墙 (玻璃质感渐变)
-            const wallGradLeft = this.ctx.createLinearGradient(wallLeftX, 0, wallLeftX + 20, 0);
-            wallGradLeft.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
-            wallGradLeft.addColorStop(0.3, 'rgba(148, 163, 184, 0.1)');
-            wallGradLeft.addColorStop(1, 'rgba(148, 163, 184, 0)');
-            this.ctx.fillStyle = wallGradLeft;
-            this.ctx.fillRect(wallLeftX, wallTopY, 20, this.height - wallTopY);
-            // 左墙反光线
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            this.ctx.fillRect(wallLeftX, wallTopY, 1, this.height - wallTopY);
-            
-            // 右墙 (玻璃质感渐变)
-            const wallGradRight = this.ctx.createLinearGradient(wallRightX, 0, wallRightX - 20, 0);
-            wallGradRight.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
-            wallGradRight.addColorStop(0.3, 'rgba(148, 163, 184, 0.1)');
-            wallGradRight.addColorStop(1, 'rgba(148, 163, 184, 0)');
-            this.ctx.fillStyle = wallGradRight;
-            this.ctx.fillRect(wallRightX - 20, wallTopY, 20, this.height - wallTopY);
-            // 右墙反光线
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            this.ctx.fillRect(wallRightX - 1, wallTopY, 1, this.height - wallTopY);
-
-            // 墙壁发光边框 (明确反弹线)
-            this.ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)'; // Slate-400
-            this.ctx.lineWidth = 2;
-            this.ctx.shadowColor = '#38bdf8';
-            this.ctx.shadowBlur = _sb(15);
-            this.ctx.beginPath();
-            // 左边线（从顶部栏下边界开始）
-            this.ctx.moveTo(wallLeftX + 1, wallTopY); this.ctx.lineTo(wallLeftX + 1, this.height);
-            // 右边线（从顶部栏下边界开始）
-            this.ctx.moveTo(wallRightX - 1, wallTopY); this.ctx.lineTo(wallRightX - 1, this.height);
-            // 顶部线 (顶部栏下边界，不遥挡顶部栏)
-            this.ctx.moveTo(wallLeftX, wallTopY); this.ctx.lineTo(wallRightX, wallTopY);
-            this.ctx.stroke();
-            this.ctx.restore();
+            this.render_combat_walls(this.ctx, wallLeftX, wallRightX, wallTopY);
             // ------------------------------------
 
             // C. 绘制游戏实体
@@ -3199,8 +3152,9 @@ phase_gathering_getRandomPegType() {
             }
             // 拖拽瞄准线
             if (this.isDragging && this.projectiles.length === 0 && this.ammoQueue.length > 0 && this.burstQueue.length === 0) {
-                // [emitter-port] 瞄准线起点对齐到发射器素材的上沿发射口
-                const start = new Vec2(this.width / 2, this.height - 80 - EMITTER_PORT_OFFSET_Y);
+                // [emitter-anchor] 瞄准线起点对齐到炮台旋转圆心。
+                const aimGeometry = calcCombatLauncherGeometryToTarget(this.width, this.height, this.lastMousePos);
+                const start = aimGeometry.port;
                 let force = this.lastMousePos.sub(start);
                 
                 if (force.y < -20) {
@@ -3245,29 +3199,7 @@ phase_gathering_getRandomPegType() {
                     });
                     this.ctx.restore();
 
-                    this.ctx.save();
-                    this.ctx.translate(start.x, start.y);
-                    this.ctx.rotate(Math.atan2(force.y, force.x));
-                    this.ctx.fillStyle = '#6366f1';
-                    this.ctx.beginPath();
-                    this.ctx.arc(0, 0, 15, 0, Math.PI * 2);
-                    this.ctx.fill();
-                    this.ctx.fillStyle = '#818cf8';
-                    this.ctx.fillRect(10, -6, 12, 12); 
-                    this.ctx.restore();
                 }
-            } else if (this.projectiles.length === 0) {
-                // [emitter-port] 空仓占位炮台对齐到发射器素材的上沿发射口
-                const start = new Vec2(this.width / 2, this.height - 80 - EMITTER_PORT_OFFSET_Y);
-                this.ctx.save();
-                this.ctx.translate(start.x, start.y);
-                this.ctx.rotate(-Math.PI / 2);
-                this.ctx.fillStyle = '#475569';
-                this.ctx.beginPath();
-                this.ctx.arc(0, 0, 12, 0, Math.PI * 2);
-                this.ctx.fill();
-                this.ctx.fillRect(8, -4, 8, 8);
-                this.ctx.restore();
             }
 
         this.sonSwords.forEach(s => s.update(timeScale, this.enemies, this));
@@ -3464,16 +3396,21 @@ phase_gathering_getRandomPegType() {
         // 应用与实体层相同的视差偏移
         this.ctx.translate(entityShiftX, entityShiftY);
 
-        // [emitter-port] startPos = 发射器底座视觉中心；portPos = 实际发射口（沿素材上沿）
-        const startPos = new Vec2(this.width / 2, this.height - 80);
-        const portPos = new Vec2(startPos.x, startPos.y - EMITTER_PORT_OFFSET_Y);
+        // [emitter-anchor] startPos/portPos 均为炮台旋转圆心；muzzle 仅供美术炮管效果使用。
+        let launcherGeometry = this.pendingFireVelocity
+            ? calcCombatLauncherGeometry(this.width, this.height, this.pendingFireVelocity)
+            : calcCombatLauncherGeometry(this.width, this.height);
+        const startPos = launcherGeometry.base;
+        let portPos = launcherGeometry.port;
         let nextAmmo = this.ammoQueue.length > 0 ? this.ammoQueue[0] : null;
-        let previewRotation = -Math.PI / 2;
+        let previewRotation = launcherGeometry.aimRotation;
         let deformation = {x: 1, y: 1};
         if (nextAmmo && this.isDragging) {
-            const aimVector = this.dragCurrent.sub(this.dragStart);
+            launcherGeometry = calcCombatLauncherGeometryToTarget(this.width, this.height, this.dragCurrent);
+            portPos = launcherGeometry.port;
+            previewRotation = launcherGeometry.aimRotation;
+            const aimVector = this.dragCurrent.sub(portPos);
             if (aimVector.mag() > 10) {
-                previewRotation = Math.atan2(aimVector.y, aimVector.x);
                 deformation = {x: 1.15, y: 0.85};
             }
         }
@@ -3493,8 +3430,6 @@ phase_gathering_getRandomPegType() {
                 deformation.y *= absorbScale;
             }
 
-            // 轨道仍以发射器底座为圆心绕飞
-            this.render_combat_launcherOrbitals(this.ctx, startPos.x, startPos.y, nextAmmo);
             this.render_combat_launcherSignal(this.ctx, startPos.x, startPos.y, portPos.x, portPos.y, nextAmmo, {
                 previewRotation,
                 deformation,
@@ -3505,14 +3440,6 @@ phase_gathering_getRandomPegType() {
                 isReloading: this.isReloading,
             });
 
-        } else {
-            // 空仓状态：占位圈贴在发射口
-            this.ctx.fillStyle = '#1e293b';
-            this.ctx.beginPath();
-            this.ctx.arc(portPos.x, portPos.y, 10, 0, Math.PI * 2);
-            this.ctx.fill();
-            this.ctx.strokeStyle = '#475569';
-            this.ctx.stroke();
         }
         this.ctx.restore();
 

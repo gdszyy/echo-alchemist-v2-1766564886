@@ -220,7 +220,8 @@ if avgFps > fpsThresholdUp (55):
 | 函数 | 行为 |
 |------|------|
 | `render_perfOverlay()` | 当 `perfQualityLevel !== 'high'` 时，在 Canvas 左上角绘制半透明 FPS 数值和等级标签（均衡/省电） |
-| `render_combat_launcherSignal()` | 绘制下一发弹药可读性信号（装填格、散射扇形预览、伤害数字、连射炮管与能量条）。`high/medium` 档允许发射口主弹和连射条轻量发光，`low` 档关闭 `shadowBlur`，保留平面装填格、散射弹点、伤害数字和 xN 连射条，确保语义不消失。 |
+| `render_combat_launcherSignal()` | 绘制下一发弹药可读性信号（左侧伤害/散射屏、中央弹仓、底部装填格、右侧连射能量条）。读数只写入 V3 发射器贴图现有槽位，不再绘制上方发射点叠层、额外面板、自动旋转属性球或连线。`high/medium` 档允许读数与连射条轻量发光，`low` 档关闭 `shadowBlur`，保留平面装填格、伤害数字、S 散射数和 xN 连射条，确保语义不消失。 |
+| `render_queueLauncherBarrelFireEffect()` / `render_combat_launcherEmitterBase()` | 每次真实发射排队一次基于炮管方向的短生命周期闪光，由发射器美术层绘制固定椭圆/折线形状。该反馈不创建粒子、shockwave、渐变循环或新 `CONFIG.performance` 字段；`low` 档关闭 `shadowBlur`。 |
 
 ### 5.8 毒素状态视觉（`src/entities/enemy.js` → `Enemy.draw` Layer 3.4）
 
@@ -303,9 +304,10 @@ if avgFps > fpsThresholdUp (55):
 | 2026-06-23 | **Boss 物理轮廓收口**：Mikro 与 Devourer 从环形/缺口 arc 语义改为实体 polygon，只有 Ouroboros 保留完整闭合环形 arc 以承载 6 个附体槽。Devourer Layer 6.5 继续复用既有 `arcBossVfx*` 三档门控和 sparkLimit，Ouroboros 轮转锚点只改变视觉指示，不新增粒子、渐变预算、混合模式或 `CONFIG.performance` 字段。 |
 | 2026-06-21 | **敌人 HP 与碰撞框可读性修正**：第一轮运行时前景 HP 视窗、液面亮线、侧边液位尺与 Sprite clip 已撤销；当前由 `*_native_hollow*` 敌人素材的原生镂空结构露出 Layer 2 HP 液体，避免把血量 UI 拉到敌人左侧或在完整主体上硬切窗口。保留 collision frame alpha 内容框测量与透明 padding 裁剪，让边框贴合当前碰撞区域。该方案减少 `fillRect` / `strokeRect` / clip 路径，不新增粒子、`shadowBlur`、渐变、混合模式或 `CONFIG.performance` 预算字段；`low` 档完整保留 HP 与物理边界语义。 |
 | 2026-06-21 | **研磨视觉重心调整**：`Peg.hit()` 缩短点亮/缩放反馈，`Peg.draw()` 改为廉价菱形铆钉板轮廓、内倒角、短高光/暗部笔触和中心槽位，以区别圆形玻璃弹珠，并在 `pegGlowHalo` 预算下压低 Peg 光晕半径/透明度；`DropBall.draw()` 增加玻璃边缘高光/暗部弧线强化球体质感；`EnergyOrb` 默认改为更小的 `source-over` 低透明度短拖尾，`spawn_createHitFeedback()` 为普通/二次反馈传入更克制的视觉参数。未新增粒子、`CONFIG.performance` 字段、渐变循环或无预算高开销效果；`high` 保留 Peg halo 但更低调，`medium`/`low` 继续按既有门控关闭 Peg halo / 软阴影。 |
+| 2026-06-23 | **发射器贴图槽位与炮管闪光**：战斗发射器 `port` 改为炮台旋转圆心，`muzzle` 仅作为美术端点；`render_combat_launcherSignal()` 只写入 V3 底座现有读数屏、电容柱、弹仓和底部弹药槽。旧自动旋转属性球/连线运行时退役并停止预加载，旧 `spawn_createLauncherFireEffect()` 粒子/shockwave 路径删除；每次真实发射改由 `render_queueLauncherBarrelFireEffect()` 在炮管方向绘制短生命周期固定形状闪光。三档影响：`high/medium` 只保留轻量 `shadowBlur`，`low` 关闭发光；不新增粒子、渐变循环、shockwave 或 `CONFIG.performance` 预算字段。 |
 | 2026-06-19 | **默认钉盘回归纯交错钉板**：默认前两行由 10 个 `dense_stagger` 1x1 模块组成，120 个普通圆钉、0 个 barrier、0 个 SpecialSlot；未新增粒子、渐变或额外 `shadowBlur`，Peg 绘制继续受 `pegSoftShadow` / `pegGlowHalo` 三档预算控制。三档影响：`high`/`medium` 维持原 Peg 视觉门控，`low` 继续关闭高开销 Peg halo。 |
 | 2026-06-19 | **底部奖励分栏与初始 5 钉板**：默认开放槽位回调为首行 5 个 `dense_stagger` 模块；研磨底部小概率生成 1 个奖励分栏，宽度按 `1.5` 个倍化弹珠直径计算，两侧新增最多 2 条 `shape='barrier'` 竖直挡板。分栏绘制只使用 `fillRect` / `strokeRect` / 文本，挡板复用 `Peg.drawBarrierPeg()`，软阴影继续由 `pegSoftShadow` 门控；不新增粒子、渐变、混合模式、额外 `shadowBlur` 或 `CONFIG.performance` 预算字段。 |
-| 2026-06-19 | **战斗发射器信号 V2.2**：`render_combat_launcherSignal()` 改为居中的下一发 HUD，集中展示弹体轮廓、弹药位图核心、`DMG` 伤害、`S` 散射弹数、散射扇形预览、`xN` 连射数、连射柱和装填格。该层复用现有弹药位图，绘制数量固定；`shadowBlur` 继续由 `perfQualityLevel !== 'low'` 门控，不新增粒子、渐变循环或 `CONFIG.performance` 预算字段。 |
+| 2026-06-19 | **战斗发射器信号 V2.2**：`render_combat_launcherSignal()` 改为居中的下一发 HUD，集中展示弹体轮廓、弹药位图核心、`DMG` 伤害、`S` 散射弹数、`xN` 连射数、连射柱和装填格。2026-06-23 发射点/炮口叠层被移除，散射数并入左侧屏幕，避免占用上方发射槽。该层复用现有弹药位图，绘制数量固定；`shadowBlur` 继续由 `perfQualityLevel !== 'low'` 门控，不新增粒子、渐变循环或 `CONFIG.performance` 预算字段。 |
 | 2026-06-22 | **流彩护盾超级词条**：`enemy.js` 新增 `radiantAegis` 护罩纹理、命中反馈与破盾反馈；high 绘制 3 层流彩菱环和节点，medium 降为 2 层无节点，low 关闭 `screen` 混合与 `_sb()` 阴影并保留平面语义描边。扩盾冲击波和破盾碎片复用既有 `shockwaveLimit` / `shardLimit`，未新增 `CONFIG.performance` 预算字段。 |
 | 2026-06-19 | **钉盘编辑器放置预览**：模块 picker 在 hover/focus 候选组件时写入 `_moduleEditorPlacementPreview`，`render_moduleEditorOverlay()` 用平面填充和描边标记当前槽、可放置覆盖槽、不可放置覆盖槽。该反馈不新增粒子、渐变、混合模式或 `shadowBlur`，无需新增 `CONFIG.performance` 预算字段。 |
 | 2026-06-19 | **钉盘编辑器异形轮廓**：`render_moduleEditorOverlay()` 根据组件 `shape.footprint` 绘制导流翼、杯形、沙漏、螺旋等平面轮廓，帮助玩家在编辑态识别组件身份。该层只使用 `stroke`、`lineTo`、`quadraticCurveTo`、`arc/ellipse` 等廉价路径绘制，不新增粒子、渐变、混合模式或额外 `shadowBlur`。 |

@@ -1,8 +1,9 @@
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY } from './rune_config.js';
-import { CONFIG, META_SHOP_CONFIG, RELIC_DB, setDeepValue } from './config.js';
+import { CONFIG, META_SHOP_CONFIG, RELIC_DB, BOSS_DB, ENEMY_CURVE_CONFIG, setDeepValue } from './config.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
 import { getAmmoReadabilityProfile } from './utils/ammo_readability.js';
+import { getNextBossRoundPreview, normalizeBossKey, predictBossIdFromHistory } from './utils/boss_schedule_utils.js';
 import {
     MODULE_DEFS,
     getModuleSpan,
@@ -45,6 +46,63 @@ function _getRuneLevel(entry) {
 function _getStatLabel(statKey) {
     const meta = (STAT_DISPLAY || {})[statKey] || {};
     return `${meta.icon || ''} ${meta.name || statKey}`.trim();
+}
+
+function _getBossDisplayName(bossId) {
+    const key = normalizeBossKey(bossId);
+    if (!key) return 'Boss';
+    const configName = CONFIG.balance?.bossConfigs?.[key]?.name;
+    const dbEntry = (BOSS_DB || []).find(entry => normalizeBossKey(entry.id) === key);
+    return configName || dbEntry?.name || key;
+}
+
+function _getBossShortName(bossId) {
+    const fullName = _getBossDisplayName(bossId);
+    const parts = String(fullName).split(/[·・]/);
+    return (parts[parts.length - 1] || fullName).trim();
+}
+
+function _getNextBossThreatInfo(game) {
+    const activeBoss = (game?.enemies || []).find(enemy =>
+        enemy && enemy.active && !enemy.isDead && enemy.hp > 0 && enemy.type === 'boss'
+    );
+    if (activeBoss) {
+        const bossId = normalizeBossKey(activeBoss.bossType || activeBoss.bossId || activeBoss.id);
+        const name = _getBossShortName(bossId);
+        return {
+            state: 'active',
+            known: true,
+            label: '交战',
+            title: `当前威胁：${name} 已登场`,
+        };
+    }
+
+    const nextRound = getNextBossRoundPreview(game, ENEMY_CURVE_CONFIG);
+    if (!nextRound) return null;
+
+    const currentRound = Math.max(1, Number(game?.round) || 1);
+    const turnsUntil = Math.max(0, nextRound - currentRound);
+    const isBigBoss = game?._isTutorialRun ? true : (game?._bossSpawnCount || 0) >= 4;
+    const bossId = predictBossIdFromHistory(game?.bossHistory, isBigBoss, ENEMY_CURVE_CONFIG);
+    const knownBossIds = [
+        ...(Array.isArray(game?.bossHistory) ? game.bossHistory : []),
+        ...(Array.isArray(game?.bossDefeatedLog) ? game.bossDefeatedLog.map(entry => entry?.bossId) : []),
+    ].map(normalizeBossKey);
+    const known = knownBossIds.includes(bossId);
+    const shortName = known ? _getBossShortName(bossId) : '未知';
+    const label = turnsUntil <= 0
+        ? (known ? '本回合' : '未知')
+        : `${known ? shortName : '未知'} ${turnsUntil}`;
+    const title = known
+        ? `下一威胁：${_getBossDisplayName(bossId)} 将在 Round ${nextRound} 出现（${turnsUntil} 回合后）`
+        : `下一威胁：未知 Boss 将在 Round ${nextRound} 出现（${turnsUntil} 回合后，未遭遇前仅显示剪影）`;
+
+    return {
+        state: turnsUntil <= 1 ? 'soon' : 'countdown',
+        known,
+        label,
+        title,
+    };
 }
 
 // ======================================================================
@@ -702,6 +760,10 @@ export const ui_system = {
         const ammoLabel = currentAmmo
             ? ammoProfile.attributeSummary + (ammoProfile.scatter > 0 ? ` / S${ammoProfile.scatterPelletCount}` : '') + (ammoProfile.multicast > 0 ? ` / x${ammoProfile.multicastCount}` : '')
             : 'no ammo';
+        const nextBossThreat = _getNextBossThreatInfo(this);
+        const nextBossSignature = nextBossThreat
+            ? `${nextBossThreat.state}:${nextBossThreat.known ? 'known' : 'unknown'}:${nextBossThreat.label}`
+            : 'none';
 
         let threatClass = '';
         let threatLabel = 'Combat';
@@ -721,7 +783,7 @@ export const ui_system = {
 
         const signature = [
             threatClass, threatLabel, activeEnemies.length, eliteCount, bossCount,
-            shieldedCount, playerShield, ammoCount, ammoLabel, note
+            shieldedCount, playerShield, ammoCount, ammoLabel, note, nextBossSignature
         ].join('|');
         if (!force && signature === this._combatStatusSignature) return;
         this._combatStatusSignature = signature;
@@ -733,6 +795,9 @@ export const ui_system = {
         const bossCountEl = document.getElementById('combat-boss-count');
         const shieldCountEl = document.getElementById('combat-shield-count');
         const ammoCountEl = document.getElementById('combat-ammo-count');
+        const nextThreatEl = document.getElementById('combat-next-threat');
+        const nextThreatLabelEl = document.getElementById('combat-next-threat-label');
+        const nextThreatIconEl = document.getElementById('combat-next-threat-icon');
         const noteEl = document.getElementById('combat-status-note');
 
         panel.classList.remove('is-hidden');
@@ -746,6 +811,17 @@ export const ui_system = {
         if (bossCountEl) bossCountEl.innerText = String(bossCount);
         if (shieldCountEl) shieldCountEl.innerText = String(playerShield);
         if (ammoCountEl) ammoCountEl.innerText = String(ammoCount);
+        if (nextThreatEl) {
+            nextThreatEl.classList.toggle('is-hidden', !nextBossThreat);
+            nextThreatEl.classList.toggle('is-active', nextBossThreat?.state === 'active');
+            nextThreatEl.classList.toggle('is-soon', nextBossThreat?.state === 'soon');
+            nextThreatEl.classList.toggle('is-known', !!nextBossThreat?.known);
+            nextThreatEl.classList.toggle('is-unknown', !!nextBossThreat && !nextBossThreat.known);
+            nextThreatEl.title = nextBossThreat?.title || '';
+            nextThreatEl.setAttribute('aria-label', nextBossThreat?.title || '下一威胁未排定');
+        }
+        if (nextThreatLabelEl) nextThreatLabelEl.innerText = nextBossThreat?.label || '--';
+        if (nextThreatIconEl) nextThreatIconEl.classList.toggle('is-silhouette', !!nextBossThreat && !nextBossThreat.known);
         if (noteEl) noteEl.innerText = note;
     },
     ui_resetCombatPhaseHud(options = {}) {
@@ -3092,6 +3168,29 @@ export const ui_system = {
             .filter(Boolean);
     },
 
+    _moduleEditor_describeRuneTargets(targets) {
+        if (!Array.isArray(targets) || targets.length <= 0) return '无可注入目标';
+        const layout = this.currentModuleLayout || [];
+        const groups = new Map();
+        for (const peg of targets) {
+            const slotIdx = Number.isInteger(peg && peg.moduleSlotIdx) ? peg.moduleSlotIdx : -1;
+            const key = slotIdx >= 0 ? String(slotIdx) : 'board';
+            if (!groups.has(key)) {
+                const moduleId = slotIdx >= 0 ? getModuleIdFromEntry(layout[slotIdx]) : null;
+                const def = moduleId ? MODULE_DEFS[moduleId] : null;
+                const label = slotIdx >= 0
+                    ? `槽位 ${slotIdx + 1}${def ? `「${def.name || moduleId}」` : ''}`
+                    : '钉盘';
+                groups.set(key, { label, count: 0 });
+            }
+            groups.get(key).count++;
+        }
+        const parts = Array.from(groups.values())
+            .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+            .map(item => `${item.label} x${item.count}`);
+        return parts.slice(0, 3).join('，') + (parts.length > 3 ? `，另 ${parts.length - 3} 处` : '');
+    },
+
     _moduleEditor_buildFusionSummaryHtml(extraFusion = null) {
         const summary = this._moduleEditor_collectFusionSummary(extraFusion);
         if (!summary.entries.length) return '';
@@ -3114,6 +3213,7 @@ export const ui_system = {
         const targetCount = Array.isArray(targets) ? targets.length : 0;
         const summary = this._moduleEditor_collectFusionSummary({ ...preview, count: targetCount });
         const elementLabel = _getStatLabel(preview.element);
+        const targetDesc = this._moduleEditor_describeRuneTargets(targets);
         const hints = this._moduleEditor_getRunewordHintsForRune(preview.runeId, 3);
         const hintHtml = hints.length
             ? `<div class="is-hint">发射器词条线索：${hints.map(_escapeHtml).join(' / ')}</div>`
@@ -3123,6 +3223,7 @@ export const ui_system = {
             : '';
         return `<div class="me-rune-chain">
             <div><strong>${_escapeHtml(preview.name)}</strong> 将注入 ${targetCount}/${preview.count} 颗 ${_escapeHtml(elementLabel)} 钉</div>
+            <div class="is-good">作用位置：${_escapeHtml(targetDesc)}。画布紫色圆环为实际落点。</div>
             ${totalHtml}
             ${hintHtml}
         </div>`;
@@ -3148,7 +3249,8 @@ export const ui_system = {
             return;
         }
         const targets = this._moduleEditor_getRunePreviewTargets(preview);
-        text.textContent = `${preview.name} L${preview.level}：将注入 ${targets.length}/${preview.count} 颗 ${preview.element} 钉。`;
+        const targetDesc = this._moduleEditor_describeRuneTargets(targets);
+        text.textContent = `${preview.name} L${preview.level}：作用于 ${targetDesc}，注入 ${targets.length}/${preview.count} 颗 ${preview.element} 钉。`;
         if (chain) chain.innerHTML = this._moduleEditor_buildRunePreviewChainHtml(preview, targets);
         confirm.disabled = targets.length <= 0;
         confirm.textContent = targets.length > 0 ? '确认融合' : '没有可注入钉';

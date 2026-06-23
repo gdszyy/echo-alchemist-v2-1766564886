@@ -13,6 +13,7 @@ import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
 import { interpolateAffixWeights, weightedRandom, getEliteDualAffixChance } from './utils/math_utils.js';
+import { predictBossIdFromHistory } from './utils/boss_schedule_utils.js';
 import {
     ENEMY_WAVE_PRESETS,
     ENEMY_WAVE_PRESET_ARCHETYPES,
@@ -1298,7 +1299,6 @@ export const spawn_system = {
         return true;
     },
 
-/**
     /**
      * @method spawnBullet
      * @description 生成弹丸 (处理散射)。
@@ -2230,23 +2230,9 @@ export const spawn_system = {
      * @returns {string} Boss ID
      */
     spawn_selectBossForRound(isBigBoss) {
-        const miniBossOrder = ['ignis', 'glacies', 'mikro', 'devourer'];
-        const bigBossOrder  = ['viridis', 'tesla', 'chimera', 'ouroboros'];
-        const order = isBigBoss ? bigBossOrder : miniBossOrder;
-
         // 记录已出现的 Boss
         if (!this.bossHistory) this.bossHistory = [];
-        const appeared = this.bossHistory.filter(id => order.includes(id));
-        const remaining = order.filter(id => !appeared.includes(id));
-
-        let selectedId;
-        if (remaining.length > 0) {
-            selectedId = remaining[0]; // 按顺序选取下一个
-        } else {
-            // 循环：重新从头
-            selectedId = order[appeared.length % order.length];
-        }
-
+        const selectedId = predictBossIdFromHistory(this.bossHistory, isBigBoss, ENEMY_CURVE_CONFIG);
         this.bossHistory.push(selectedId);
         return selectedId;
     },

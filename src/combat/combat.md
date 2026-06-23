@@ -237,3 +237,10 @@ combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = nul
 - `greedy_wheel` still converts `multicast` into flat damage in `combat_fireNextShot()`, then marks the queued shot with `_greedyWheelEnabled` and `_greedyWheelChance`.
 - The repeat roll now lives in `game_phase.js` `burstQueue` handling: each greedy-fired bullet schedules a prelude, rolls the same probability, fires on success, and schedules the next roll after that bullet fires. `_isGreedyReFire` is no longer part of the contract.
 - Visual feedback uses capped `GreedyWheelEffect` instances via `spawn_createGreedyWheelEffect()`; failure also triggers a light screen shake.
+
+## 2026-06-23 Launcher Muzzle Contract
+
+- `src/utils/emitter_geometry.js` is the shared launcher geometry source. The base remains at `(width / 2, height - 80)`, `port` is the turret rotation center, and `muzzle` remains available as the visual barrel endpoint.
+- Drag release in `game_system.js`, combat aim guides in `game_phase.js`, launcher preview rendering, and `burstQueue` fallback spawn points must all use this shared geometry rather than a fixed `height - 80 - offset` point.
+- `burstQueue` queues `render_queueLauncherBarrelFireEffect()` immediately before every real launcher shot. This covers normal shots, multicast shots, and `greedy_wheel` chain refires; echo-style shots with explicit `x/y` keep their custom projectile origin while the emitter art layer still flashes from the barrel direction.
+- Launcher fire feedback is a short-lived fixed-shape Canvas overlay in `render_combat_launcherEmitterBase()`. The old `spawn_createLauncherFireEffect()` particle/shockwave path is removed.

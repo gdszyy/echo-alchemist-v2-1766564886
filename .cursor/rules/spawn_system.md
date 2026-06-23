@@ -5,7 +5,7 @@
 > **索引**：[auto_index/src_spawn_system_js_index.md](auto_index/src_spawn_system_js_index.md)
 > **用途**：记录导演系统（The Director）所有阵型模板的设计意图、触发条件和实现细节。
 > **临场导演索引**：[`director_system.md`](director_system.md) 记录压力画像、preset 标签、反压制调参旋钮、扩展流程与测试入口。
-> **最后更新**：Boss 物理轮廓收口：`mikro` / `devourer` 改为实体 polygon，只有最终 Boss `ouroboros` 保留完整闭合环形 arc（2026-06-23）
+> **最后更新**：Boss 顺序预测与 UI 预告共用 `src/utils/boss_schedule_utils.js`，`spawn_selectBossForRound()` 仍是唯一写入 `bossHistory` 的入口（2026-06-23）
 
 ---
 
@@ -100,6 +100,12 @@ Tesla 的 `conductor` 入场画像当前只给 `clone`，不直接给 `haste`。
 | `tesla` | 窄菱形 `polygon` | 残影和电弧不能扩大实体宽度 |
 | `chimera` | 不对称五边形 `polygon` | 异质核心可不对称，底部落点保留 |
 | `ouroboros` | 完整闭合圆弧 `arc` | 唯一环形 Boss；外圈承载 6 个附体槽，`gapAngle` 只作为视觉锚点 |
+
+### 2.0.3 Boss 顺序预测与预告（2026-06-23）
+
+`src/utils/boss_schedule_utils.js` 提供 Boss 调度的纯读取工具：`normalizeBossKey()`、`getBossOrder()`、`predictBossIdFromHistory()` 与 `getNextBossRoundPreview()`。这些函数只读取 `bossHistory`、`_nextBossRound`、`_bossSpawnCount`、`_lastBossSpawnRound` 和 `ENEMY_CURVE_CONFIG.THEME_SEGMENTS`，不得写入游戏状态。
+
+`spawn_selectBossForRound(isBigBoss)` 是唯一允许把选中的 Boss 追加到 `bossHistory` 的入口；UI 的 `#combat-next-threat` 只能调用纯工具做倒计时和未知剪影预告，禁止为了预览调用 `spawn_selectBossForRound()`。
 
 | 阵型 ID | 名称 | 最早回合 | 教学目标 | 常量引用 |
 |---|---|---|---|---|

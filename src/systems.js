@@ -2483,6 +2483,110 @@ function buildEnemyV2Scenarios() {
         }
     };
 
+    // @section:enemy_v2_targeting_footprints - 多尺寸 targeting overlay 验收
+    const setupTargetingFootprintAcceptance = (game) => {
+        const tg = game.trainingGround;
+        if (tg && typeof tg._clearV2MatrixOverlay === 'function') tg._clearV2MatrixOverlay();
+
+        const w = game.enemyWidth;
+        const h = game.enemyHeight;
+        const top = game.combatGridTopY;
+        const labelData = [];
+
+        const placeEnemy = ({
+            col,
+            row,
+            cols,
+            rows,
+            name,
+            affixes,
+            hp = 800,
+            baseArchetype = null,
+            setup = null,
+        }) => {
+            const centerX = (col + (cols - 1) / 2) * w + w / 2;
+            const centerY = top + (row + (rows - 1) / 2) * h;
+            const e = new Enemy(centerX, centerY, w * cols, h * rows, hp, hp, 'elite', affixes.slice());
+            e.baseArchetype = baseArchetype;
+            e.gridCols = cols;
+            e.gridRows = rows;
+            if (cols >= 2) e.isWideEnemy = true;
+            e._moveInterval = 9999;
+            e._moveCooldown = 9999;
+            e.hasActedThisTurn = true;
+            e.dropTargetY = e.pos.y;
+            if (setup) setup(e);
+            if (typeof game.spawn_applyArchetypeShape === 'function' && baseArchetype) {
+                game.spawn_applyArchetypeShape(e, baseArchetype);
+            }
+            if (typeof e.initSprite === 'function') e.initSprite();
+            game.enemies.push(e);
+            labelData.push({
+                enemy: e,
+                centerX,
+                centerY,
+                hPx: h * rows,
+                def: {
+                    name,
+                    footprint: `${cols}x${rows}`,
+                    baseArchetype: baseArchetype || 'residue',
+                    affixes: affixes.slice(),
+                },
+            });
+            return e;
+        };
+
+        const livingArmorState = (hp, max, stacked = false) => (e) => {
+            e.livingArmorMax = max;
+            e.livingArmorHp = hp;
+            e.livingArmorBaseMax = stacked ? Math.floor(max * 0.65) : max;
+            e.livingArmorStacked = stacked;
+            e.livingArmorBroken = false;
+        };
+
+        placeEnemy({
+            col: 0, row: 0, cols: 3, rows: 3,
+            name: 'overload 3x3', affixes: ['overloadReactor'], hp: 1600, baseArchetype: 'gravityWell',
+            setup: (e) => { e._overloadDamageThisTurn = e.maxHp; e._overloadBonusThisTurn = 3; },
+        });
+        placeEnemy({
+            col: 3, row: 0, cols: 1, rows: 2,
+            name: 'phase 1x2', affixes: ['phaseShield', 'shield'], hp: 700, baseArchetype: 'echoSpire',
+            setup: (e) => { e.shieldCharges = 4; e.phaseShieldDisabledThisTurn = false; },
+        });
+        placeEnemy({
+            col: 4, row: 0, cols: 2, rows: 1,
+            name: 'energy 2x1', affixes: ['energyArmor'], hp: 700, baseArchetype: 'deflector',
+            setup: (e) => { e.energyArmorShield = 85; },
+        });
+        placeEnemy({
+            col: 3, row: 2, cols: 3, rows: 1,
+            name: 'immune 3x1', affixes: ['lowDamageImmune'], hp: 1000, baseArchetype: 'bastion',
+        });
+        placeEnemy({
+            col: 0, row: 3, cols: 2, rows: 3,
+            name: 'living 2x3', affixes: ['livingArmor'], hp: 1300, baseArchetype: 'hive',
+            setup: livingArmorState(170, 220, true),
+        });
+        placeEnemy({
+            col: 3, row: 3, cols: 3, rows: 2,
+            name: 'carrier 3x2', affixes: ['carrier'], hp: 1200, baseArchetype: 'carrier',
+            setup: (e) => {
+                e.footprintMask = [[1, 1, 1], [1, 0, 1]];
+                e.footprintCells = 5;
+                e._carrierCooldown = 1;
+            },
+        });
+        placeEnemy({
+            col: 3, row: 5, cols: 3, rows: 1,
+            name: 'siege 3x1', affixes: ['siegeBreaker'], hp: 950, baseArchetype: 'bastion',
+        });
+
+        if (tg && typeof tg._renderV2MatrixLabels === 'function') {
+            tg._renderV2MatrixLabels(labelData);
+        }
+    };
+
     // @section:enemy_v2_scene_list - 验收场景列表
     return [
         // ── 场景 1：普通 1×1 对照 ─────────────────────────────────────
@@ -2738,6 +2842,36 @@ function buildEnemyV2Scenarios() {
         },
 
         // ── 场景 8（可选 fallback）：3×3 引力炉心资源降级渲染 ────────
+        {
+            id: 'ev2_enemy_targeting_footprints',
+            categoryId: 'enemy_v2',
+            name: 'Targeting Footprints',
+            icon: '▣',
+            assetHitTag: 'Overlay PNG',
+            keepSidebarOpenOnDemo: true,
+            desc: [
+                '[enemy_v2] Footprint-aware targeting overlay acceptance.',
+                'Layout: overloadReactor 3x3, phaseShield 1x2, energyArmor 2x1, lowDamageImmune 3x1, livingArmor 2x3, carrier 3x2, siegeBreaker 3x1.',
+                'Expected: every targeting border follows the full grid footprint and does not collapse back to a centered 1x1 overlay.'
+            ].join('\n'),
+            setup: (game) => setupTargetingFootprintAcceptance(game),
+            bulletConfig: { damage: 45, bounce: 2, pierce: 1, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                game.enemies.forEach(e => {
+                    if (!e || !e.active) return;
+                    if ((e.affixes || []).includes('overloadReactor')) e._overloadBonusThisTurn = 3;
+                    if ((e.affixes || []).includes('energyArmor')) e.energyArmorShield = Math.max(e.energyArmorShield || 0, 85);
+                    if ((e.affixes || []).includes('phaseShield')) e.phaseShieldDisabledThisTurn = !e.phaseShieldDisabledThisTurn;
+                    if ((e.affixes || []).includes('livingArmor')) {
+                        e.livingArmorHp = Math.max(1, Math.floor((e.livingArmorMax || 220) * 0.72));
+                        e.livingArmorStacked = true;
+                        e.livingArmorBroken = false;
+                    }
+                });
+                if (tg && tg.addLog) tg.addLog('Refreshed footprint-aware targeting PNG overlays.');
+            }
+        },
+
         {
             id: 'ev2_fallback_large',
             categoryId: 'enemy_v2',

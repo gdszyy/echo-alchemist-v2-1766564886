@@ -674,7 +674,9 @@ async function suitePinboard(page) {
         }));
         assert(preview.hasPreview, 'selecting a rune should create fusion preview');
         assert(preview.targetText.length > 0, 'fusion preview should show target count');
+        assert(preview.targetText.includes('槽位'), 'fusion preview should name the target module slot');
         assert(preview.chainText.length > 0, 'fusion preview should show launcher/runeword hints');
+        assert(preview.chainText.includes('作用位置'), 'fusion preview chain should explain where the rune will land');
 
         await page.click('#me-rune-confirm');
         await page.waitForFunction(() => !document.getElementById('me-rune-picker-backdrop'), { timeout: 5000 });

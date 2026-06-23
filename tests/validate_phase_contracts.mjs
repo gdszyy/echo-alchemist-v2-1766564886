@@ -15,6 +15,17 @@ function read(relPath) {
     return fs.readFileSync(path.join(repoRoot, relPath), 'utf8');
 }
 
+function readPngSize(relPath) {
+    const filePath = path.join(repoRoot, relPath);
+    if (!fs.existsSync(filePath)) return null;
+    const buf = fs.readFileSync(filePath);
+    if (buf.length < 24 || buf.toString('ascii', 1, 4) !== 'PNG') return null;
+    return {
+        width: buf.readUInt32BE(16),
+        height: buf.readUInt32BE(20),
+    };
+}
+
 let passed = 0;
 let failed = 0;
 const failures = [];
@@ -40,6 +51,7 @@ console.log('===================================================\n');
 const uiSystem = read('src/ui_system.js');
 const gameSystem = read('src/game_system.js');
 const gamePhase = read('src/game_phase.js');
+const renderSystem = read('src/render_system.js');
 const gameOver = read('src/ui/game_over.js');
 const runShop = read('src/ui/run_shop.js');
 const shop = read('src/ui/shop.js');
@@ -53,6 +65,8 @@ const calcUtils = read('src/calc_utils.js');
 const systems = read('src/systems.js');
 const enemyV2Metadata = read('src/data/enemy_v2_metadata.js');
 const wavePresets = read('src/wave_presets.js');
+const emitterGeometry = read('src/utils/emitter_geometry.js');
+const targetingOverlayGenerator = read('scripts/generate_enemy_targeting_overlays.py');
 
 check(has(uiSystem, /ui_resetCombatPhaseHud\s*\(options\s*=\s*\{\}\)/), 'ui_resetCombatPhaseHud exists');
 check(has(calcUtils, /calc_isEnemyInsideCombatWalls\s*\(enemy\)[\s\S]*sys_getCombatBounds[\s\S]*bottom\s*>\s*bounds\.top/), 'combat clear counting uses wall-intersection helper');
@@ -109,8 +123,27 @@ check(has(config, /runShopMixedMarblePackPrice:\s*18/), 'mixed marble pack shop 
 check(has(gameSystem, /combatGridLeftX[\s\S]*combatGridRightX[\s\S]*combatGridWidth[\s\S]*this\.enemyWidth\s*=\s*\(this\.combatGridWidth\s*\/\s*CONFIG\.gameplay\.enemyCols\)/), 'sys_resize derives enemy grid width from inset combat arena');
 check(has(gameSystem, /sys_getCombatBounds\s*\(\)/), 'combat bounds helper exists');
 check(has(gameSystem, /sys_getCombatColumnCenterX\s*\(col,\s*spanCols\s*=\s*1\)/), 'combat column center helper exists');
-check(has(gamePhase, /wallLeftX[\s\S]*wallRightX[\s\S]*createLinearGradient\(wallLeftX[\s\S]*lineTo\(wallRightX,\s*wallTopY\)/), 'combat walls are drawn at inset arena bounds');
+check(
+    has(gamePhase, /wallLeftX\s*=\s*combatBounds\.left[\s\S]{0,160}wallRightX\s*=\s*combatBounds\.right[\s\S]{0,160}render_combat_walls\(this\.ctx,\s*wallLeftX,\s*wallRightX,\s*wallTopY\)/) &&
+    has(renderSystem, /render_combat_walls\s*\(ctx,\s*wallLeftX,\s*wallRightX,\s*wallTopY\)[\s\S]*lineTo\(wallRightX,\s*wallTopY\)/),
+    'combat walls are drawn at inset arena bounds'
+);
 check(has(gamePhase, /leftBound\s*=\s*combatBounds\.left\s*\+\s*radius[\s\S]*rightBound\s*=\s*combatBounds\.right\s*-\s*radius[\s\S]*rightBound\s*-\s*current\.x[\s\S]*leftBound\s*-\s*current\.x/), 'combat aim guide uses inset arena side walls');
+check(
+    has(emitterGeometry, /muzzle\s*=\s*base\.add\(aimDir\.mult\(EMITTER_PORT_OFFSET_Y\)\)/) &&
+    has(emitterGeometry, /port:\s*new\s+Vec2\(base\.x,\s*base\.y\)/),
+    'launcher geometry fires from turret center and keeps muzzle as visual endpoint'
+);
+check(has(gameSystem, /calcCombatLauncherGeometryToTarget\(this\.width,\s*this\.height,\s*targetPos\)[\s\S]{0,120}targetPos\.sub\(launcherGeometry\.port\)/), 'combat release velocity is calculated from the turret center anchor');
+check(has(gamePhase, /calcCombatLauncherGeometryToTarget\(this\.width,\s*this\.height,\s*this\.lastMousePos\)[\s\S]{0,120}const\s+start\s*=\s*aimGeometry\.port/), 'combat aim guide starts at the turret center anchor');
+check(has(gamePhase, /fallbackPort\s*=\s*calcCombatLauncherGeometry\(this\.width,\s*this\.height,\s*shot\.vel\)\.port[\s\S]{0,500}render_queueLauncherBarrelFireEffect\(shot\.vel,\s*shot\.recipe\)/), 'burstQueue shots, including greedy wheel refires, use turret-center fallback and barrel flash');
+check(
+    has(renderSystem, /render_queueLauncherBarrelFireEffect\s*\(vel,\s*recipe\s*=\s*\{\}\)/) &&
+    has(renderSystem, /_launcherBarrelFireFx/) &&
+    has(renderSystem, /globalCompositeOperation\s*=\s*['"]screen['"]/),
+    'launcher barrel fire feedback is rendered from the emitter art layer'
+);
+check(!has(spawnSystem, /spawn_createLauncherFireEffect/), 'old launcher particle/shockwave muzzle VFX is removed');
 check(has(spawnSystem, /sys_getCombatColumnCenterX\(c\)/), 'normal enemy spawn columns use inset arena centers');
 check(has(spawnSystem, /sys_getCombatColumnCenterX\(startCol,\s*cols\)/), 'wave preset spawn columns use inset arena centers');
 check(has(spawnSystem, /sys_getCombatColumnCenterX\(sc,\s*chosen\.cols\)/), 'archetype spawn columns use inset arena centers');
@@ -189,8 +222,10 @@ check(
 );
 check(has(enemy, "const affixes = ['haste', 'jump'];") && has(enemy, 'drone._isCarrierDrone = true;') && has(enemy, /_getCarrierBayPosition/) && has(enemy, /_pushCarrierBayOccupant/) && has(enemy, /_carrierLaunchDroneMovement/), 'carrier pushes bay occupants and immediately launches haste+jump drones from bay slot 5');
 const enemyVisualAssets = read('src/data/enemy_visual_assets.js');
+const enemySpriteManifest = read('assets/sprites/enemies/enemy_sprite_manifest.json');
 check(
     has(enemyVisualAssets, /export function resolveDynamicEnemyOverlayPaths/) &&
+    has(enemyVisualAssets, /energyArmorShield/) &&
     has(enemyVisualAssets, /livingArmorStacked/) &&
     has(enemyVisualAssets, /phaseShieldDisabledThisTurn/) &&
     has(enemyVisualAssets, /_overloadBonusThisTurn/) &&
@@ -198,12 +233,69 @@ check(
     has(enemy, /overlayKey === this\._visualOverlayKey/),
     'stateful enemy-targeting overlays can be resolved without changing assetKey'
 );
+const targetingOverlayFiles = [
+    'overlay_energy_armor_charged.png',
+    'overlay_energy_armor_empty.png',
+    'overlay_phase_shield_active.png',
+    'overlay_phase_shield_disabled.png',
+    'overlay_living_armor_high.png',
+    'overlay_living_armor_mid.png',
+    'overlay_living_armor_low.png',
+    'overlay_living_armor_stack_high.png',
+    'overlay_living_armor_stack_mid.png',
+    'overlay_living_armor_stack_low.png',
+    'overlay_overload_reactor_1.png',
+    'overlay_overload_reactor_2.png',
+    'overlay_overload_reactor_3.png',
+    'overlay_affix_lowDamageImmune.png',
+    'overlay_affix_armorSpore.png',
+    'overlay_affix_siegeBreaker.png',
+    'overlay_affix_carrier.png',
+    'overlay_affix_deflectShell.png',
+];
+check(
+    targetingOverlayFiles.every(file => fs.existsSync(path.join(repoRoot, 'assets/sprites/enemies/overlays', file))) &&
+    has(enemySpriteManifest, /"dynamicOverlays"\s*:\s*\{[\s\S]*"energyArmor"[\s\S]*"phaseShield"[\s\S]*"livingArmor"[\s\S]*"overloadReactor"/) &&
+    has(enemySpriteManifest, /"lowDamageImmune"\s*:\s*"overlay_affix_lowDamageImmune\.png"/) &&
+    has(enemy, /hasReadyOverlay\s*=\s*\(id\)/) &&
+    has(enemy, /targetingOverlayAffixes\.has\(item\.affix\)/),
+    'enemy-targeting PNG border overlays are generated, manifest-registered, and prioritized over Canvas fallback'
+);
+const targetingOverlayFootprints = ['2x1', '1x2', '2x2', '3x1', '1x3', '2x3', '3x2', '3x3'];
+const sampledFootprintOverlaySizes = [
+    ['overlay_phase_shield_active_3x2.png', 384, 256],
+    ['overlay_living_armor_high_2x3.png', 256, 384],
+    ['overlay_affix_lowDamageImmune_3x1.png', 384, 128],
+    ['overlay_affix_carrier_3x2.png', 384, 256],
+    ['overlay_energy_armor_charged_2x1.png', 256, 128],
+    ['overlay_overload_reactor_3_3x2.png', 384, 256],
+];
+check(
+    has(enemyVisualAssets, /function\s+_resolveOverlayVariantFile\s*\(affix,\s*fileOrDef,\s*footprint\s*=\s*['"]1x1['"]\)/) &&
+    has(enemyVisualAssets, /return\s+fileOrDef\.replace\([^\n]+`\_\$\{footprint\}\.png`\)/) &&
+    has(enemyVisualAssets, /const\s+footprint\s*=\s*`\$\{cols\}x\$\{rows\}`/) &&
+    has(enemyVisualAssets, /resolveDynamicEnemyOverlayPaths[\s\S]*const\s+footprint\s*=\s*`\$\{\(enemy\.gridCols\s*\|\|\s*1\)\}x\$\{\(enemy\.gridRows\s*\|\|\s*1\)\}`/) &&
+    has(targetingOverlayGenerator, /FOOTPRINTS\s*=\s*\[\(1,\s*1\),\s*\(2,\s*1\),\s*\(1,\s*2\),\s*\(2,\s*2\),\s*\(3,\s*1\),\s*\(1,\s*3\),\s*\(2,\s*3\),\s*\(3,\s*2\),\s*\(3,\s*3\)\]/) &&
+    has(targetingOverlayGenerator, /def\s+expand_overlay_to_footprint\s*\(src,\s*cols,\s*rows\):/) &&
+    has(targetingOverlayGenerator, /def\s+carrier\s*\(\):[\s\S]{0,180}draw_segmented_frame\(img,\s*91,\s*"#67e8f9",\s*sides=\("top",\s*"left",\s*"right"\)/) &&
+    targetingOverlayFootprints.every(footprint => targetingOverlayFiles.every(file => fs.existsSync(path.join(
+        repoRoot,
+        'assets/sprites/enemies/overlays',
+        file.replace(/\.png$/, `_${footprint}.png`)
+    )))) &&
+    sampledFootprintOverlaySizes.every(([file, width, height]) => {
+        const size = readPngSize(path.join('assets/sprites/enemies/overlays', file));
+        return size && size.width === width && size.height === height;
+    }) &&
+    fs.existsSync(path.join(repoRoot, 'docs/design/enemy_targeting_overlay_footprints_contact_sheet.png')),
+    'enemy-targeting PNG border overlays have footprint-specific variants and runtime size selection'
+);
 check(
     has(enemy, /_drawEnemyTargetingFallback\s*\(ctx,\s*w,\s*h\)/) &&
     has(enemy, /_armorSporeTrailTimer/) &&
     has(enemy, /case\s+['"]carrier['"]/) &&
     has(enemy, /fillRect\(-cellW\s*\/\s*2\s*\+\s*pad,\s*pad\s*\*\s*0\.55/) &&
-    has(enemy, /hasAffix\(['"]deflectShell['"]\)\s*&&\s*\(this\.gridCols\s*\|\|\s*1\)\s*<=\s*1/),
+    has(enemy, /hasAffix\(['"]deflectShell['"]\)[\s\S]{0,140}\(this\.gridCols\s*\|\|\s*1\)\s*<=\s*1/),
     'enemy-targeting affixes have Canvas fallback art for spore trails, carrier bay holes, and 1x1 deflect shells'
 );
 check(
@@ -229,6 +321,19 @@ check(
     has(systems, /_armorSporeTrailFromX\s*=\s*sporeSource\.pos\.x/),
     'training ground exposes an enemy-targeting fallback acceptance scenario'
 );
+check(
+    has(systems, /@section:enemy_v2_targeting_footprints/) &&
+    has(systems, /id:\s*['"]ev2_enemy_targeting_footprints['"]/) &&
+    has(systems, /setupTargetingFootprintAcceptance/) &&
+    has(systems, /name:\s*['"]overload 3x3['"][\s\S]{0,140}affixes:\s*\[['"]overloadReactor['"]\][\s\S]{0,100}baseArchetype:\s*['"]gravityWell['"]/) &&
+    has(systems, /name:\s*['"]phase 1x2['"][\s\S]{0,140}affixes:\s*\[['"]phaseShield['"],\s*['"]shield['"]\][\s\S]{0,100}baseArchetype:\s*['"]echoSpire['"]/) &&
+    has(systems, /name:\s*['"]energy 2x1['"][\s\S]{0,140}affixes:\s*\[['"]energyArmor['"]\][\s\S]{0,100}baseArchetype:\s*['"]deflector['"]/) &&
+    has(systems, /name:\s*['"]immune 3x1['"][\s\S]{0,140}affixes:\s*\[['"]lowDamageImmune['"]\][\s\S]{0,100}baseArchetype:\s*['"]bastion['"]/) &&
+    has(systems, /name:\s*['"]living 2x3['"][\s\S]{0,140}affixes:\s*\[['"]livingArmor['"]\][\s\S]{0,100}baseArchetype:\s*['"]hive['"]/) &&
+    has(systems, /name:\s*['"]carrier 3x2['"][\s\S]{0,140}affixes:\s*\[['"]carrier['"]\][\s\S]{0,100}baseArchetype:\s*['"]carrier['"]/) &&
+    has(systems, /name:\s*['"]siege 3x1['"][\s\S]{0,140}affixes:\s*\[['"]siegeBreaker['"]\][\s\S]{0,100}baseArchetype:\s*['"]bastion['"]/),
+    'training ground exposes a footprint-aware enemy-targeting overlay acceptance scenario'
+);
 check(has(spawnSystem, /footprintCells\s*=\s*5/) && has(spawnSystem, /\[1,\s*0,\s*1\]/) && has(config, /carrierSpawnInterval:\s*1/), 'carrier is a five-cell U footprint with empty slot 5 and spawns every turn');
 check(has(systems, /针对提示：\$\{meta\.targeting\}/), 'V2 bestiary uses targeting tips rather than counter tips');
 check(has(enemyV2Metadata, /targeting:\s*['"][^'"]*穿透会被拦下/), 'deflector metadata states pierce is blocked by the ward');
@@ -248,6 +353,10 @@ check(has(gamePhase, /function\s+getCombatAimEnemyHit[\s\S]*enemy\.collisionShap
 check(has(gamePhase, /function\s+buildCombatAimScatterOffsets[\s\S]*extraScatterShots[\s\S]*scatterAngleReduction[\s\S]*Math\.floor\(scatterCount\s*\/\s*2\)\s*\+\s*\(scatterCount\s*%\s*2\)/), 'combat aim guide mirrors scatter layer branch count and resonance angle rules');
 check(has(gamePhase, /const\s+allPegTypes\s*=\s*\[\s*['"]bounce['"]\s*,\s*['"]damage['"]\s*\]/), 'gathering random peg pool only includes pure bounce and damage pegs');
 check(has(read('src/pinboard_modules.js'), /const\s+RANDOMIZABLE_PEG_TYPES\s*=\s*\[\s*['"]bounce['"]\s*,\s*['"]damage['"]\s*\]/), 'module pinboard random peg pool only includes pure bounce and damage pegs');
+check(!has(read('src/pinboard_modules.js'), /const\s+defaultLayout\s*=\s*createDefaultModuleLayout\(count,\s*defaultSlots\)/), 'pinboard normalization does not refill intentionally emptied active slots');
+check(has(read('src/ui_system.js'), /_moduleEditor_describeRuneTargets[\s\S]*槽位[\s\S]*_moduleEditor_buildRunePreviewChainHtml[\s\S]*作用位置/), 'pinboard rune fusion preview names the target module slot');
+check(has(config, /id:\s*['"]pinboard_second_row['"][\s\S]*effect:\s*['"]module_row_unlock['"][\s\S]*targetSlots:\s*10/), 'relic database includes second-row pinboard unlock relic');
+check(!has(config, /name:\s*['"]旧/), 'relic database no longer contains relic names starting with 旧');
 
 check(has(gameOver, /ui_clearTransientOverlays\s*\(\)/), 'gameover trigger clears transient overlays');
 check(has(gameOver, /meta_addCurrency\(settled\)/), 'gameover settlement writes leftover run fragments through unified resource API');

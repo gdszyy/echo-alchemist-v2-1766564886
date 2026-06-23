@@ -135,6 +135,33 @@ const _DEFAULT_DYNAMIC_OVERLAYS = {
     },
 };
 
+const _TARGETING_OVERLAY_AFFIXES = new Set([
+    'energyArmor',
+    'phaseShield',
+    'overloadReactor',
+    'lowDamageImmune',
+    'livingArmor',
+    'armorSpore',
+    'siegeBreaker',
+    'carrier',
+    'deflectShell',
+]);
+
+function _resolveOverlayVariantFile(affix, fileOrDef, footprint = '1x1') {
+    if (!fileOrDef) return null;
+    if (typeof fileOrDef === 'object') {
+        return fileOrDef[footprint]
+            || (fileOrDef.footprints && fileOrDef.footprints[footprint])
+            || fileOrDef.default
+            || fileOrDef['1x1']
+            || null;
+    }
+    if (!_TARGETING_OVERLAY_AFFIXES.has(affix) || footprint === '1x1' || !/\.png$/i.test(fileOrDef)) {
+        return fileOrDef;
+    }
+    return fileOrDef.replace(/\.png$/i, `_${footprint}.png`);
+}
+
 const _DEFAULT_FRAMES = {
     'residue:1x1':   { spritePath: 'assets/sprites/enemies/frames/frame_residue_1x1.png', shape: 'aabb' },
     'bastion:3x1':   { spritePath: 'assets/sprites/enemies/frames/frame_bastion_3x1.png', shape: 'aabb' },
@@ -267,6 +294,7 @@ export function resolveEnemyVisualAsset(enemy) {
     const assetKey = buildEnemyAssetKey(enemy);
     const cols = (enemy && enemy.gridCols) || 1;
     const rows = (enemy && enemy.gridRows) || 1;
+    const footprint = `${cols}x${rows}`;
     const baseArchetype = (enemy && enemy.baseArchetype) || ((cols === 1 && rows === 1) ? 'residue' : null);
     const affixes = (enemy && enemy.affixes) || [];
     const frameKey = baseArchetype ? `${baseArchetype}:${cols}x${rows}` : null;
@@ -322,7 +350,7 @@ export function resolveEnemyVisualAsset(enemy) {
         });
         if (!iconFile) missingReasons.push(`无词条 UI 图标: ${a}`);
 
-        const overlayFile = overlayMap[a];
+        const overlayFile = _resolveOverlayVariantFile(a, overlayMap[a], footprint);
         if (overlayFile) {
             overlayPaths.push({
                 affix: a,
@@ -366,11 +394,13 @@ export function resolveDynamicEnemyOverlayPaths(enemy) {
     const defs = manifest.dynamicOverlays || {};
     const dirs = manifest.directories || _DEFAULT_DIRS;
     const overlayDir = dirs.overlays || _DEFAULT_DIRS.overlays;
+    const footprint = `${(enemy.gridCols || 1)}x${(enemy.gridRows || 1)}`;
     const out = [];
 
     const pushDynamic = (affix, file) => {
-        if (!file) return;
-        out.push({ affix, path: overlayDir + file });
+        const resolvedFile = _resolveOverlayVariantFile(affix, file, footprint);
+        if (!resolvedFile) return;
+        out.push({ affix, path: overlayDir + resolvedFile });
     };
 
     if ((enemy.affixes || []).includes('energyArmor')) {

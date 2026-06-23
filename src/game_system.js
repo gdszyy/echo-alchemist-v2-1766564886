@@ -19,7 +19,7 @@ import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
 import { RUNE_DB } from './rune_config.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
-import { EMITTER_PORT_OFFSET_Y } from './bitmap_icons.js';
+import { calcCombatLauncherGeometryToTarget } from './utils/emitter_geometry.js';
 import {
     addModuleComponentToInventory,
     createDefaultModuleLayout,
@@ -2538,10 +2538,9 @@ export const game_system = {
 
         if (this.isDragging) {
             this.isDragging = false;
-            // [emitter-port] 发射方向必须和战斗引导线/子弹生成点共用同一个炮口锚点。
-            const cannonPos = new Vec2(this.width / 2, this.height - 80 - EMITTER_PORT_OFFSET_Y);
             const targetPos = this.dragCurrent || this.lastMousePos;
-            const aimVector = targetPos.sub(cannonPos);
+            const launcherGeometry = calcCombatLauncherGeometryToTarget(this.width, this.height, targetPos);
+            const aimVector = targetPos.sub(launcherGeometry.port);
             if (aimVector.y < -20) {
                 this.sys_resetMultiplier();
                 this.pendingFireVelocity = aimVector.norm().mult(12);

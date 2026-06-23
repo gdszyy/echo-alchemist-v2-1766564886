@@ -14,7 +14,7 @@
  *   - 模块自身预置的特殊钉子（如 pink、cryo、pyro）必须保留，不参与随机覆盖
  *
  * MVP 实现说明：
- *   - wheel_module 复用 SpecialSlot type='wheel'（已有的转盘触发机制）
+ *   - 转盘类模块复用 SpecialSlot type='wheel'（已有的转盘触发机制）
  *   - baffle 模块使用 barrier 形态的异形钉，避免用近距离圆钉拼挡板造成卡球
  *   - fixed_slot 模块复用 SpecialSlot 类（multicast/recall/split 轮换）
  */
@@ -195,14 +195,7 @@ export function ensureModuleLayoutInstances(layout, totalSlots, defaultSlots = C
     if (shouldResetLegacyStarterLayout(source, count, defaultSlots)) {
         source = createDefaultModuleLayout(count, defaultSlots);
     }
-    const next = Array.from({ length: count }, (_, i) => normalizeModuleEntry(source[i]));
-    const defaultLayout = createDefaultModuleLayout(count, defaultSlots);
-    for (const slotIdx of getActiveModuleSlots(defaultSlots, count)) {
-        if (next[slotIdx]) continue;
-        const fallback = normalizeModuleEntry(defaultLayout[slotIdx]);
-        if (fallback && !isModuleRef(fallback)) next[slotIdx] = fallback;
-    }
-    return next;
+    return Array.from({ length: count }, (_, i) => normalizeModuleEntry(source[i]));
 }
 
 /**
@@ -509,25 +502,27 @@ export const MODULE_DEFS = {
         id: 'wheel_module',
         name: '幸運轉盤',
         icon: '🎰',
-        desc: '在底部生成一個 [輪盤槽]，弹珠穿越時觸發屬性翻倍輪盤。占用 1×2 槽。',
+        desc: '單槽內上下疊放兩個 [輪盤槽]，弹珠下落時有機會連續觸發兩次；導向釘較少，回報更跳。占用 1×1 槽。',
         rarity: 'rare',
-        price: 60,
-        span: { cols: 1, rows: 2 },
+        price: 70,
+        shape: { footprint: 'stack', entry: 'top', exit: 'wheel' },
         build(ox, oy, w, h) {
-            // 顶部 2 颗钉（原为3颗，间距w/4=21px导致弹珠卡死；改为2颗间距w/2≈43px）
-            const pegs = [];
-            for (let i = 0; i < 2; i++) {
-                const p = new Peg(ox + w * (0.25 + i * 0.5), oy + h * 0.25, 'normal');
-                p.level = 1; p.row = 0; p.col = i; pegs.push(p);
-            }
-            // 底部两颗钉子（用作 SpecialSlot 锚点）
-            const pegA = new Peg(ox + w * 0.25, oy + h * 0.85, 'normal');
-            pegA.row = 1; pegA.col = 0; pegA.level = 1;
-            const pegB = new Peg(ox + w * 0.75, oy + h * 0.85, 'normal');
-            pegB.row = 1; pegB.col = 1; pegB.level = 1;
-            pegs.push(pegA, pegB);
-            const slot = new SpecialSlot(pegA.pos.x, pegA.pos.y, pegB.pos.x, pegB.pos.y, 'wheel');
-            return { pegs, specialSlots: [slot] };
+            const pegs = [
+                makePegAt(ox, oy, w, h, 0.34, 0.14, 'normal', 0, 0),
+                makePegAt(ox, oy, w, h, 0.66, 0.14, 'normal', 0, 1),
+                makePegAt(ox, oy, w, h, 0.26, 0.42, 'pink', 1, 0),
+                makePegAt(ox, oy, w, h, 0.74, 0.42, 'pink', 1, 1),
+                makePegAt(ox, oy, w, h, 0.40, 0.62, 'normal', 2, 0),
+                makePegAt(ox, oy, w, h, 0.60, 0.62, 'normal', 2, 1),
+                makePegAt(ox, oy, w, h, 0.26, 0.84, 'pink', 3, 0),
+                makePegAt(ox, oy, w, h, 0.74, 0.84, 'pink', 3, 1),
+            ];
+            pegs.forEach(p => { p.layoutRole = 'wheel_module'; });
+            const specialSlots = [
+                new SpecialSlot(ox + w * 0.26, oy + h * 0.42, ox + w * 0.74, oy + h * 0.42, 'wheel'),
+                new SpecialSlot(ox + w * 0.26, oy + h * 0.84, ox + w * 0.74, oy + h * 0.84, 'wheel'),
+            ];
+            return { pegs, specialSlots };
         },
     },
     baffle: {
@@ -1039,9 +1034,6 @@ MODULE_DEFS.dim_crystal_module = {
     },
 };
 
-// ==================== [属性钉板] 商店随机属性钉板 ====================
-// 每个属性对应一个 attr_pin_<type> 模块，所有 normal 钉子被强制赋予该属性，
-// 且不参与 unlockedWeights 随机覆盖（applyWeightedPegTypes 仅替换 type === 'normal'）。
 MODULE_DEFS.rune_focus_module = {
     id: 'rune_focus_module',
     name: 'Rune Focus',
@@ -1056,46 +1048,6 @@ MODULE_DEFS.rune_focus_module = {
             if (peg.fusionPriority >= 3) peg.level = 2;
         }
         return { pegs, specialSlots: [] };
-    },
-};
-
-MODULE_DEFS.split_gate_module = {
-    id: 'split_gate_module',
-    name: 'Split Gate',
-    icon: 'S',
-    desc: 'A narrow center split slot framed by four guide pegs.',
-    rarity: 'rare',
-    price: 75,
-    build(ox, oy, w, h) {
-        const pegs = [
-            new Peg(ox + w * 0.28, oy + h * 0.22, 'normal'),
-            new Peg(ox + w * 0.72, oy + h * 0.22, 'normal'),
-            new Peg(ox + w * 0.28, oy + h * 0.78, 'normal'),
-            new Peg(ox + w * 0.72, oy + h * 0.78, 'normal'),
-        ];
-        pegs.forEach((p, i) => { p.row = Math.floor(i / 2); p.col = i % 2; p.level = 1; });
-        const specialSlots = [new SpecialSlot(ox + w * 0.32, oy + h * 0.5, ox + w * 0.68, oy + h * 0.5, 'split')];
-        return { pegs, specialSlots };
-    },
-};
-
-MODULE_DEFS.recall_loop_module = {
-    id: 'recall_loop_module',
-    name: 'Recall Loop',
-    icon: 'U',
-    desc: 'Pink bumpers wrap a recall slot, giving lucky balls another pass.',
-    rarity: 'epic',
-    price: 90,
-    build(ox, oy, w, h) {
-        const pegs = [
-            new Peg(ox + w * 0.22, oy + h * 0.25, 'pink'),
-            new Peg(ox + w * 0.78, oy + h * 0.25, 'pink'),
-            new Peg(ox + w * 0.34, oy + h * 0.72, 'normal'),
-            new Peg(ox + w * 0.66, oy + h * 0.72, 'normal'),
-        ];
-        pegs.forEach((p, i) => { p.row = Math.floor(i / 2); p.col = i % 2; p.level = 1; });
-        const specialSlots = [new SpecialSlot(ox + w * 0.34, oy + h * 0.55, ox + w * 0.66, oy + h * 0.55, 'recall')];
-        return { pegs, specialSlots };
     },
 };
 
@@ -1534,34 +1486,6 @@ MODULE_DEFS.swerve_cannon_module = {
     },
 };
 
-export const ATTR_PIN_TYPES = ['bounce', 'pierce', 'scatter', 'damage', 'cryo', 'pyro', 'wind'];
-const ATTR_PIN_META = {
-    bounce: { name: '彈性釘板', icon: '🔵' },
-    pierce: { name: '穿透釘板', icon: '↗' },
-    scatter: { name: '散射釘板', icon: '🔱' },
-    damage: { name: '增幅釘板', icon: '⚔️' },
-    cryo:   { name: '冰霜釘板', icon: '❄️' },
-    pyro:   { name: '火焰釘板', icon: '🔥' },
-    wind:   { name: '疾風釘板', icon: '💨' },
-};
-ATTR_PIN_TYPES.forEach(type => {
-    const meta = ATTR_PIN_META[type];
-    MODULE_DEFS[`attr_pin_${type}`] = {
-        id: `attr_pin_${type}`,
-        name: meta.name,
-        icon: meta.icon,
-        desc: `3×3 釘板，全部釘子強制為「${type}」屬性。`,
-        rarity: 'rare',
-        price: 0, // 由商店动态定价；不通过通用 module 列表暴露
-        attribute: type,
-        isAttrPin: true,
-        build(ox, oy, w, h) {
-            const pegs = generateStaggeredPegs(ox, oy, w, h, 3, 3, type);
-            return { pegs, specialSlots: [] };
-        },
-    };
-});
-
 // @perf-impact: Default 2x5 starter returns to plain dense staggered modules; Peg shadow/halo cost remains gated by CONFIG.performance.
 const DEFAULT_MODULE_SEQUENCE = [
     'dense_stagger',
@@ -1759,4 +1683,3 @@ export function getCoveredSlots(anchorIdx, span, totalCols, totalRows) {
     }
     return out;
 }
-

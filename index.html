@@ -1086,6 +1086,45 @@
             font-weight: 800;
             font-variant-numeric: tabular-nums;
         }
+        .combat-status-next-threat {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            color: #fde68a;
+            min-width: 0;
+            max-width: 5.8rem;
+            overflow: hidden;
+        }
+        .combat-status-next-threat.is-hidden {
+            display: none;
+        }
+        .combat-status-next-threat.is-active,
+        .combat-status-next-threat.is-soon {
+            color: #fecaca;
+        }
+        .combat-status-next-threat.is-unknown {
+            color: #cbd5e1;
+        }
+        .combat-status-next-threat b {
+            color: currentColor;
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .combat-boss-silhouette {
+            width: 11px;
+            height: 12px;
+            flex: 0 0 auto;
+            background: currentColor;
+            opacity: 0.9;
+            clip-path: polygon(50% 0, 82% 18%, 100% 56%, 76% 100%, 50% 82%, 24% 100%, 0 56%, 18% 18%);
+            box-shadow: 0 0 8px currentColor;
+        }
+        .combat-boss-silhouette.is-silhouette {
+            opacity: 0.48;
+            filter: saturate(0);
+        }
         .combat-status-sep {
             display: none;
             width: 1px;
@@ -1102,6 +1141,12 @@
                 font-size: 0.58rem;
             }
             .combat-status-metric .combat-status-label {
+                display: none;
+            }
+            .combat-status-next-threat {
+                max-width: 3.8rem;
+            }
+            .combat-status-next-threat .combat-status-label {
                 display: none;
             }
             #combat-elite-count,
@@ -4412,7 +4457,7 @@
         }
     </style>
     <!-- Phase 5A: 位图化 UI 样式覆盖层 -->
-    <link rel="stylesheet" href="src/styles/bitmap_ui.css?v=20260621-combat-ui">
+    <link rel="stylesheet" href="src/styles/bitmap_ui.css?v=20260623-combat-v2">
 </head>
 <body>
 <div id="app-wrapper">
@@ -4479,6 +4524,11 @@
                     <span class="combat-status-metric"><span class="combat-status-label">敌</span><b id="combat-enemy-count">0</b></span>
                     <span class="combat-status-metric is-mobile-optional"><span class="combat-status-label">精英</span><b id="combat-elite-count">0</b></span>
                     <span class="combat-status-metric"><span class="combat-status-label">Boss</span><b id="combat-boss-count">0</b></span>
+                    <span id="combat-next-threat" class="combat-status-next-threat is-hidden" title="下一威胁未排定">
+                        <span id="combat-next-threat-icon" class="combat-boss-silhouette is-silhouette" aria-hidden="true"></span>
+                        <span class="combat-status-label">威</span>
+                        <b id="combat-next-threat-label">--</b>
+                    </span>
                     <span class="combat-status-metric is-mobile-optional"><span class="combat-status-label">盾</span><b id="combat-shield-count">0</b></span>
                     <span class="combat-status-metric"><span class="combat-status-label">弹</span><b id="combat-ammo-count">0</b></span>
                 </div>

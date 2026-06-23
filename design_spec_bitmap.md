@@ -17,9 +17,11 @@
 
 当前 UI 主要由 HTML/CSS DOM 构成。为了在保留 DOM 灵活性的同时提升视觉表现，建议采用 **「九宫格背景图（9-Slice） + 装饰性 Sprite」** 的混合方案。
 
+> 透明资产生成约束：生成器不可靠地产出真实 alpha。凡需要透明底的 UI sprite、icon、overlay，prompt 阶段必须要求纯绿幕/chroma key 背景（推荐 `#00ff00`），再通过本地抠图脚本转换为透明 PNG；不要在 prompt 中写“transparent background / no background”。
+
 ### 2.1 核心面板与背景（建议 9-Slice 切图）
 
-> 2026-06-23 补充：`#phase-combat` 进入战斗场地与 UI 重绘设计阶段。新一轮不以“补缺”为目标，而是统一战斗背景、墙体、防线、态势条、技能栏、符文充能与战斗图标的资产语言；执行设计、首轮概念清单、prompt 草案与性能边界见 [`docs/design/combat_battlefield_ui_asset_redesign.md`](docs/design/combat_battlefield_ui_asset_redesign.md)。
+> 2026-06-23 补充：`#phase-combat` 已保留战斗专属背景/底部发射区 `_v2` 位图；首批依赖透明底的墙体、HUD V2 与发射器 V4 资源因未使用绿幕源图，已从运行时撤回并移入 rejected 目录，等待按 chroma key 流程重做。执行设计、资产清单、prompt 草案与性能边界见 [`docs/design/combat_battlefield_ui_asset_redesign.md`](docs/design/combat_battlefield_ui_asset_redesign.md)。
 
 | 组件名称 | 对应 DOM 元素 | 尺寸建议 | 视觉描述 |
 |---------|-------------|---------|---------|

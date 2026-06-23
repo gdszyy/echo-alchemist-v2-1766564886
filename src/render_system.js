@@ -12,11 +12,6 @@ import { audio } from './audio.js';
 import { sb as _sb } from './utils/perf.js';
 import {
     getUiBitmap,
-    ORBITAL_SOCKET_MAP,
-    ORBITAL_LINK_STRIP,
-    ORBITAL_LINK_CAP,
-    ORBITAL_LINK_FLOW,
-    ORBITAL_INTAKE,
     EMITTER_BASE_SRC,
     EMITTER_BARREL_SRC,
     EMITTER_DRAW_SIZE,
@@ -24,6 +19,11 @@ import {
     EMITTER_CHARGING_SRCS,
     BG_MAIN_CANVAS_SRC,
     BG_EMITTER_ZONE_SRC,
+    BG_COMBAT_TABLE_SRC,
+    BG_COMBAT_EMITTER_ZONE_SRC,
+    COMBAT_WALL_LEFT_SRC,
+    COMBAT_WALL_RIGHT_SRC,
+    COMBAT_WALL_TOP_SRC,
     getAmmoIconSrc,
     getAmmoIconSrcByKey,
 } from './bitmap_icons.js';
@@ -37,8 +37,8 @@ export const render_system = {
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.ctx.fillStyle = CONFIG.colors.bg;
         this.ctx.fillRect(0, 0, this.width, this.height);
-        // 主底图位图（已生成 720×1280 暗黑赛博炼金风），未加载完成时回退到纯色底
-        const bgMain = getUiBitmap(BG_MAIN_CANVAS_SRC);
+        // 主底图位图；战斗阶段使用更明确的反弹墙场地，其他阶段保留原共用底图。
+        const bgMain = getUiBitmap(this.phase === 'combat' ? BG_COMBAT_TABLE_SRC : BG_MAIN_CANVAS_SRC);
         if (bgMain) {
             this.ctx.save();
             this.ctx.globalAlpha = 0.85;
@@ -47,7 +47,7 @@ export const render_system = {
         }
         // 发射器区域（底部 220px 高的炼金台层），仅在战斗 / 研磨阶段叠加
         if (this.phase === 'combat' || this.phase === 'gathering') {
-            const bgEmitter = getUiBitmap(BG_EMITTER_ZONE_SRC);
+            const bgEmitter = getUiBitmap(this.phase === 'combat' ? BG_COMBAT_EMITTER_ZONE_SRC : BG_EMITTER_ZONE_SRC);
             if (bgEmitter) {
                 const zoneH = Math.min(220, this.height * 0.24);
                 const scale = Math.max(this.width / bgEmitter.width, zoneH / bgEmitter.height);
@@ -85,6 +85,74 @@ export const render_system = {
             this.ctx.beginPath(); this.ctx.moveTo(0, y); this.ctx.lineTo(this.width, y); this.ctx.stroke();
         }
         this.ctx.restore();
+    },
+
+    /**
+     * [RENDER] 绘制战斗可反弹边界墙。
+     * 位图未加载时保留旧渐变线条 fallback，避免资产加载失败时丢失碰撞边界提示。
+     */
+    render_combat_walls(ctx, wallLeftX, wallRightX, wallTopY) {
+        const wallH = Math.max(0, this.height - wallTopY);
+        const leftImg = getUiBitmap(COMBAT_WALL_LEFT_SRC);
+        const rightImg = getUiBitmap(COMBAT_WALL_RIGHT_SRC);
+        const topImg = getUiBitmap(COMBAT_WALL_TOP_SRC);
+        const wallW = Math.min(48, Math.max(28, (wallRightX - wallLeftX) * 0.055));
+        const topH = Math.min(64, Math.max(42, this.enemyHeight * 0.72));
+        const hasWallArt = leftImg && rightImg && topImg;
+
+        ctx.save();
+        if (hasWallArt) {
+            // @perf-impact: Combat wall V2 art adds up to three static drawImage calls per combat frame; no particles, gradients, or dynamic bitmap generation.
+            ctx.globalAlpha = 0.9;
+            ctx.drawImage(leftImg, wallLeftX, wallTopY, wallW, wallH);
+            ctx.drawImage(rightImg, wallRightX - wallW, wallTopY, wallW, wallH);
+            ctx.drawImage(topImg, wallLeftX, wallTopY - topH + 8, wallRightX - wallLeftX, topH);
+
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = 'rgba(148, 226, 232, 0.58)';
+            ctx.lineWidth = 1.25;
+            ctx.shadowColor = '#38bdf8';
+            ctx.shadowBlur = _sb(8);
+            ctx.beginPath();
+            ctx.moveTo(wallLeftX + 1, wallTopY);
+            ctx.lineTo(wallLeftX + 1, this.height);
+            ctx.moveTo(wallRightX - 1, wallTopY);
+            ctx.lineTo(wallRightX - 1, this.height);
+            ctx.moveTo(wallLeftX, wallTopY);
+            ctx.lineTo(wallRightX, wallTopY);
+            ctx.stroke();
+            ctx.restore();
+            return;
+        }
+
+        const wallGradLeft = ctx.createLinearGradient(wallLeftX, 0, wallLeftX + 20, 0);
+        wallGradLeft.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
+        wallGradLeft.addColorStop(0.3, 'rgba(148, 163, 184, 0.1)');
+        wallGradLeft.addColorStop(1, 'rgba(148, 163, 184, 0)');
+        ctx.fillStyle = wallGradLeft;
+        ctx.fillRect(wallLeftX, wallTopY, 20, wallH);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.fillRect(wallLeftX, wallTopY, 1, wallH);
+
+        const wallGradRight = ctx.createLinearGradient(wallRightX, 0, wallRightX - 20, 0);
+        wallGradRight.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
+        wallGradRight.addColorStop(0.3, 'rgba(148, 163, 184, 0.1)');
+        wallGradRight.addColorStop(1, 'rgba(148, 163, 184, 0)');
+        ctx.fillStyle = wallGradRight;
+        ctx.fillRect(wallRightX - 20, wallTopY, 20, wallH);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.fillRect(wallRightX - 1, wallTopY, 1, wallH);
+
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = _sb(15);
+        ctx.beginPath();
+        ctx.moveTo(wallLeftX + 1, wallTopY); ctx.lineTo(wallLeftX + 1, this.height);
+        ctx.moveTo(wallRightX - 1, wallTopY); ctx.lineTo(wallRightX - 1, this.height);
+        ctx.moveTo(wallLeftX, wallTopY); ctx.lineTo(wallRightX, wallTopY);
+        ctx.stroke();
+        ctx.restore();
     },
 
     render_windAnchors() {
@@ -385,250 +453,14 @@ export const render_system = {
 
 /**
      * @method drawLauncherOrbitals
-     * @description 绘制发射器周围的属性轨道 (方案2：透明能量球环绕)
+     * @description ??????????/??????????????????????????
      */
-    render_combat_launcherOrbitals(ctx, centerX, centerY, recipe) {
-        if (!recipe) return;
-
-        // @section:launcher_orbital_stats - 读取下一发属性并生成轨道球列表
-        const stats = [];
-        const mapping = {
-            damage:    { val: recipe.damage > 2 ? recipe.damage : 0},
-            bounce:    { val: recipe.bounce},
-            pierce:    { val: recipe.pierce},
-            scatter:   { val: recipe.scatter},
-            cryo:      { val: recipe.cryo},
-            multicast: { val: recipe.multicast},
-            pyro:      { val: recipe.pyro},
-            lightning: { val: recipe.lightning},
-            laser:     { val: recipe.laser},
-            explosive: { val: recipe.explosive ? 1 : 0},
-            flying_sword: { val: recipe.flying_sword || 0 }
-        };
-        Object.keys(mapping).forEach(key => {
-            // [icon-fix] 必须把 key 写回条目，否则下方 ORBITAL_SOCKET_MAP[stat.key] 永远拿到 undefined，
-            // 导致 socket 位图永远走不进 if 分支，发射器环绕属性永远显示成 fallback 的彩色圆环。
-            mapping[key].key = key;
-            mapping[key].color = CONFIG.ui.attributeDisplay[key].color;
-            mapping[key].icon = CONFIG.ui.attributeDisplay[key].icon;
-            if (mapping[key].val > 0) stats.push(mapping[key]);
-        });
-        if (stats.length === 0) return;
-
-        // @section:launcher_orbital_motion - 装填/蓄力时的半径、透明度与缩放
-        // --- 动画数值计算 ---
-        let currentRotation = this.orbitalAngle;
-        let baseRadius = 55;
-        let globalAlpha = 1.0;
-        let orbScale = 1.0;
-
-        if (this.isChargingShot) {
-            const t = this.chargeProgress;
-            baseRadius = 55 * (1 - t * t); 
-            currentRotation += t * 2; // 吸收时稍微加速旋转
-            if (t > 0.8) globalAlpha = 1.0 - (t - 0.8) * 5;
-            orbScale = 1 - t * 0.6;
-        } 
-        else if (this.isReloading) {
-            const t = this.reloadProgress;
-            // 使用 EaseInCubic，能量球会从远处缓缓启动，快撞击时猛地加速
-            const easeVal = t * t * t; 
-            const startDist = 450; // 从更远的地方（屏幕外）抓取回来
-            const endDist = 55;
-            baseRadius = startDist + (endDist - startDist) * easeVal;
-            globalAlpha = easeVal;
-            orbScale = 0.3 + 0.7 * easeVal;
-            // 抓取时由于还没“合体”，产生轻微的抖动感
-            const shake = (1 - t) * 5;
-            baseRadius += (Math.random() - 0.5) * shake;
-        }
-
-        const radius = baseRadius;
-        const stepAngle = (Math.PI * 2) / stats.length;
-        
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.globalAlpha = Math.max(0, globalAlpha);
-
-        // @section:launcher_orbital_track - 绘制轨道环和位图连线资源
-        // 绘制轨道线 (仅在非吸收状态画)
-        if (radius > 15 && radius < 150) {
-            ctx.beginPath();
-            ctx.arc(0, 0, radius, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${0.1 * globalAlpha})`;
-            ctx.lineWidth = 1;
-            ctx.stroke();
-        }
-
-        // [bitmap-orbital] 预取连线相关位图（一次性 lookup）
-        const linkStripImg = getUiBitmap(ORBITAL_LINK_STRIP);
-        const linkCapImg   = getUiBitmap(ORBITAL_LINK_CAP);
-        const flowFrameIdx = Math.floor((Date.now() / 90) % ORBITAL_LINK_FLOW.length);
-        const flowImg      = getUiBitmap(ORBITAL_LINK_FLOW[flowFrameIdx]);
-
-        // @section:launcher_orbital_orbs - 绘制属性球、图标、连线和吸入轨迹
-        stats.forEach((stat, index) => {
-            const angle = stepAngle * index + currentRotation;
-            const ox = Math.cos(angle) * radius;
-            const oy = Math.sin(angle) * radius;
-
-            // --- [报错防御点] ---
-            // 如果计算出的位置不是有效的数字，跳过绘制，防止 createLinearGradient 崩溃
-            if (!isFinite(ox) || !isFinite(oy)) return;
-
-            const speedGlow = Math.min(1, this.spinBoost * 2); // 撞击后的高光
-            const baseSize = Math.min(22, 14 + stat.val * 0.5);
-            const currentSize = Math.max(0, baseSize * orbScale);
-
-            // [bitmap-orbital] 优先使用元素 socket 贴图作为底座，未命中或未加载时 fallback 到原 arc
-            const socketImg = getUiBitmap(ORBITAL_SOCKET_MAP[stat.key]);
-            if (socketImg && currentSize > 4) {
-                const socketSize = currentSize * 2.4; // 64×64 源图，按当前球径放大成"光环底座"
-                ctx.save();
-                ctx.shadowBlur = _sb((8 + speedGlow * 18) * orbScale);
-                ctx.shadowColor = stat.color;
-                ctx.globalCompositeOperation = 'screen';
-                ctx.drawImage(socketImg, ox - socketSize / 2, oy - socketSize / 2, socketSize, socketSize);
-                ctx.restore();
-            } else {
-                ctx.shadowBlur = _sb((10 + speedGlow * 20) * orbScale);
-                ctx.shadowColor = stat.color;
-                ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-                ctx.beginPath();
-                ctx.arc(ox, oy, currentSize, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = stat.color;
-                ctx.lineWidth = (2 + speedGlow * 2) * orbScale;
-                ctx.stroke();
-            }
-
-            // 拖尾特效 (增强撞击爆发感)
-            const totalTrail = this.spinBoost * 3 + (this.isReloading ? (1-this.reloadProgress) * 0.5 : 0);
-            if (totalTrail > 0.05) {
-                ctx.shadowBlur = 0;
-                ctx.beginPath();
-                ctx.strokeStyle = stat.color;
-                ctx.lineWidth = 2 * orbScale;
-                const dir = this.isReloading ? 1 : -1;
-                ctx.arc(0, 0, radius, angle, angle + totalTrail * dir, this.isReloading);
-                ctx.stroke();
-            }
-
-            // 绘制文字 (仅在大小合适时)
-            // [bitmap-orbital-icon] 优先使用 AMMO_ICON_MAP 位图替代 emoji；位图未加载或属性
-            // 无对应贴图（如 multicast）时回退到 emoji，保持视觉连续性。
-            if (radius < 200 && currentSize > 8) {
-                ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                if (stat.isMulticast) {
-                    ctx.font = `bold ${12 * orbScale}px monospace`;
-                    ctx.fillText(`x${1 + stat.val}`, ox, oy);
-                } else {
-                    const iconSrc = getAmmoIconSrcByKey(stat.key);
-                    const iconImg = iconSrc ? getUiBitmap(iconSrc) : null;
-                    const iconBoxRaw = currentSize * 1.6;
-                    if (stat.val > 1) {
-                        const iconBox = iconBoxRaw * 0.85;
-                        if (iconImg) {
-                            ctx.drawImage(iconImg, ox - iconBox / 2, oy - 6 * orbScale - iconBox / 2, iconBox, iconBox);
-                        } else {
-                            ctx.font = `${10 * orbScale}px sans-serif`;
-                            ctx.fillText(stat.icon, ox, oy - 5 * orbScale);
-                        }
-                        ctx.font = `bold ${9 * orbScale}px sans-serif`;
-                        ctx.fillStyle = stat.color;
-                        ctx.fillText(`${stat.val}`, ox, oy + 6 * orbScale);
-                    } else {
-                        if (iconImg) {
-                            ctx.drawImage(iconImg, ox - iconBoxRaw / 2, oy - iconBoxRaw / 2, iconBoxRaw, iconBoxRaw);
-                        } else {
-                            ctx.font = `${14 * orbScale}px sans-serif`;
-                            ctx.fillText(stat.icon, ox, oy);
-                        }
-                    }
-                }
-            }
-
-            // --- 绘制连线：优先使用 strip 平铺贴图 + 端帽 + 流光，未加载时 fallback 到原 gradient ---
-            if (radius > 10 && radius < 120) {
-                const segLen = Math.hypot(ox, oy);
-                const segAngle = Math.atan2(oy, ox);
-                if (linkStripImg && segLen > 8) {
-                    ctx.save();
-                    ctx.globalCompositeOperation = 'screen';
-                    ctx.globalAlpha = 0.55 * globalAlpha;
-                    ctx.translate(0, 0);
-                    ctx.rotate(segAngle);
-                    // strip 高度按缩放调整，避免在 orbScale<1 时显得过粗
-                    const stripH = 6 * orbScale;
-                    ctx.drawImage(linkStripImg, 0, -stripH / 2, segLen, stripH);
-                    ctx.restore();
-
-                    // 流光：3 个错相位光点沿连线移动
-                    if (flowImg) {
-                        const flowSize = 8 * orbScale;
-                        const phase = (Date.now() / 600) % 1;
-                        ctx.save();
-                        ctx.globalCompositeOperation = 'screen';
-                        ctx.globalAlpha = 0.85 * globalAlpha;
-                        for (let p = 0; p < 3; p++) {
-                            const t = (phase + p / 3) % 1;
-                            const fx = ox * t;
-                            const fy = oy * t;
-                            ctx.drawImage(flowImg, fx - flowSize / 2, fy - flowSize / 2, flowSize, flowSize);
-                        }
-                        ctx.restore();
-                    }
-
-                    // 端帽：覆盖连线两端硬切口
-                    if (linkCapImg) {
-                        const capSize = 12 * orbScale;
-                        ctx.save();
-                        ctx.globalCompositeOperation = 'screen';
-                        ctx.globalAlpha = 0.7 * globalAlpha;
-                        ctx.drawImage(linkCapImg, -capSize / 2, -capSize / 2, capSize, capSize);
-                        ctx.drawImage(linkCapImg, ox - capSize / 2, oy - capSize / 2, capSize, capSize);
-                        ctx.restore();
-                    }
-                } else {
-                    ctx.save();
-                    ctx.globalCompositeOperation = 'screen';
-                    const grad = ctx.createLinearGradient(0, 0, ox, oy);
-                    grad.addColorStop(0, 'rgba(255,255,255,0)');
-                    grad.addColorStop(1, stat.color);
-                    ctx.strokeStyle = grad;
-                    ctx.globalAlpha = 0.3 * globalAlpha;
-                    ctx.beginPath();
-                    ctx.moveTo(0, 0);
-                    ctx.lineTo(ox, oy);
-                    ctx.stroke();
-                    ctx.restore();
-                }
-            }
-
-            // [bitmap-orbital] 装填吸入轨迹粒子：球离中心还很远时，每帧在球的拖尾位置叠一帧吸入纹理
-            if (this.isReloading && radius > 120) {
-                const intakeFrame = ORBITAL_INTAKE[Math.floor((Date.now() / 90) % ORBITAL_INTAKE.length)];
-                const intakeImg = getUiBitmap(intakeFrame);
-                if (intakeImg) {
-                    const trailT = 0.25 + Math.random() * 0.5;
-                    const tx = ox * trailT;
-                    const ty = oy * trailT;
-                    const sz = 24 * orbScale;
-                    ctx.save();
-                    ctx.globalCompositeOperation = 'screen';
-                    ctx.globalAlpha = 0.6 * globalAlpha;
-                    ctx.drawImage(intakeImg, tx - sz / 2, ty - sz / 2, sz, sz);
-                    ctx.restore();
-                }
-            }
-        });
-
-        ctx.restore();
+    render_combat_launcherOrbitals() {
+        // Retired for the V3/V4 emitter art pass. Kept as a no-op for legacy callers.
     },
-
-    /**
-     * [RENDER] 绘制发射器的下一发可读性信号：装填格、散射扇形预览和连射能量条。
-     * @perf-impact: 发射器下一发信号 - 每帧最多 7 个散射预览弹、6 个装填格、6 段连射能量条；low 档关闭 shadowBlur。
+/**
+     * [RENDER] 绘制发射器的下一发可读性信号：左屏读数、中央弹仓、底部装填格和连射能量条。
+     * @perf-impact: 发射器下一发信号 - 每帧固定绘制 6 个装填格、5 段连射能量条和少量文本；low 档关闭 shadowBlur。
      */
     render_combat_launcherSignal(ctx, cx, cy, portX, portY, recipe, visual = {}) {
         if (!recipe) return;
@@ -636,8 +468,6 @@ export const render_system = {
         const quality = this.perfQualityLevel || 'high';
         const glowFx = quality !== 'low';
         const accent = profile.primary.color || '#fbbf24';
-        const relPortX = portX - cx;
-        const relPortY = portY - cy;
         const time = Date.now();
         const pulse = (Math.sin(time / 260) + 1) / 2;
         ctx.save();
@@ -648,162 +478,51 @@ export const render_system = {
         const chargeProgress = Math.max(0, Math.min(1, visual.chargeProgress || 0));
         const reloadProgress = Math.max(0, Math.min(1, visual.reloadProgress || 0));
         const recoilY = visual.isReloading ? Math.sin(reloadProgress * Math.PI) * 4 * bodyScale : 0;
-        const muzzleX = relPortX;
-        const muzzleY = relPortY;
         const chamberX = 0;
         const chamberY = 7 * bodyScale + recoilY;
-        const screen = { x: -54 * bodyScale, y: -8 * bodyScale + recoilY, w: 28 * bodyScale, h: 36 * bodyScale };
-        const scatter = { x: muzzleX, y: muzzleY + recoilY };
-        const capacitor = { x: 39 * bodyScale, y: -9 * bodyScale + recoilY, w: 16 * bodyScale, h: 44 * bodyScale };
+        const screen = { x: -51 * bodyScale, y: -9 * bodyScale + recoilY, w: 19 * bodyScale, h: 38 * bodyScale };
+        const capacitor = { x: 38 * bodyScale, y: -17 * bodyScale + recoilY, w: 14 * bodyScale, h: 47 * bodyScale };
         const magazine = {
-            y: 41 * bodyScale + recoilY,
-            centers: [-33, -20, -7, 7, 20, 33].map(x => x * bodyScale),
+            y: 43 * bodyScale + recoilY,
+            centers: [-29, -18, -7, 7, 18, 29].map(x => x * bodyScale),
         };
         const pelletCount = profile.scatterPelletCount;
-        const iconImg = getUiBitmap(getAmmoIconSrc(recipe));
-
-        const drawInsetPanel = (x, y, w, h, color, radius = 5, alpha = 0.9) => {
-            ctx.save();
-            ctx.globalAlpha = alpha;
-            ctx.fillStyle = 'rgba(2, 6, 23, 0.78)';
-            ctx.strokeStyle = 'rgba(226, 232, 240, 0.18)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.roundRect(x, y, w, h, radius * bodyScale);
-            ctx.fill();
-            ctx.stroke();
-            if (glowFx) {
-                ctx.shadowColor = color;
-                ctx.shadowBlur = _sb(5 + pulse * 4);
-            }
-            ctx.strokeStyle = color;
-            ctx.globalAlpha = alpha * (0.45 + pulse * 0.18);
-            ctx.beginPath();
-            ctx.roundRect(x + 2 * bodyScale, y + 2 * bodyScale, w - 4 * bodyScale, h - 4 * bodyScale, Math.max(1, radius - 2) * bodyScale);
-            ctx.stroke();
-            ctx.restore();
-        };
-
-        const drawChamberFrame = () => {
-            ctx.save();
-            ctx.globalAlpha = 0.82;
-            ctx.strokeStyle = `rgba(226, 232, 240, ${0.2 + pulse * 0.08})`;
-            ctx.lineWidth = 1.4 * bodyScale;
-            if (glowFx) {
-                ctx.shadowColor = accent;
-                ctx.shadowBlur = _sb(5 + chargeProgress * 7);
-            }
-            ctx.beginPath();
-            ctx.arc(chamberX, chamberY, 29 * bodyScale, Math.PI * 0.1, Math.PI * 0.9);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(chamberX, chamberY, 29 * bodyScale, Math.PI * 1.1, Math.PI * 1.9);
-            ctx.stroke();
-
-            const intakeAlpha = 0.25 + chargeProgress * 0.45 + pulse * 0.08;
-            ctx.shadowBlur = glowFx ? _sb(4 + chargeProgress * 6) : 0;
-            ctx.strokeStyle = `rgba(34, 211, 238, ${intakeAlpha})`;
-            ctx.lineWidth = 1 * bodyScale;
-            ctx.beginPath();
-            ctx.moveTo(0, muzzleY + 8 * bodyScale + recoilY);
-            ctx.lineTo(0, chamberY - 28 * bodyScale);
-            ctx.stroke();
-            ctx.restore();
-        };
 
         const drawValueScreen = () => {
-            drawInsetPanel(screen.x, screen.y, screen.w, screen.h, accent, 4, 0.9);
             ctx.save();
             const value = String(profile.damage);
-            const maxValueWidth = screen.w - 6 * bodyScale;
-            let valueSize = 12 * bodyScale;
+            const maxValueWidth = screen.w - 2 * bodyScale;
+            let valueSize = 8.5 * bodyScale;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = 'rgba(103, 232, 249, 0.82)';
-            ctx.font = `bold ${5 * bodyScale}px Cinzel`;
+            ctx.font = `bold ${4.2 * bodyScale}px Cinzel`;
             ctx.fillText('DMG', screen.x + screen.w / 2, screen.y + 7 * bodyScale);
             ctx.fillStyle = '#f8fafc';
             do {
                 ctx.font = `bold ${valueSize}px Cinzel`;
-                if (ctx.measureText(value).width <= maxValueWidth || valueSize <= 7 * bodyScale) break;
-                valueSize -= bodyScale;
+                if (ctx.measureText(value).width <= maxValueWidth || valueSize <= 5 * bodyScale) break;
+                valueSize -= 0.5 * bodyScale;
             } while (true);
             if (glowFx) {
                 ctx.shadowColor = accent;
                 ctx.shadowBlur = _sb(5 + pulse * 4);
             }
-            ctx.fillText(value, screen.x + screen.w / 2, screen.y + 21 * bodyScale);
+            ctx.fillText(value, screen.x + screen.w / 2, screen.y + 18 * bodyScale);
             ctx.shadowBlur = 0;
             ctx.strokeStyle = `rgba(103, 232, 249, ${0.28 + pulse * 0.14})`;
-            ctx.lineWidth = 0.7 * bodyScale;
+            ctx.lineWidth = 0.5 * bodyScale;
             ctx.beginPath();
-            ctx.moveTo(screen.x + 5 * bodyScale, screen.y + 29 * bodyScale);
-            ctx.lineTo(screen.x + screen.w - 5 * bodyScale, screen.y + 29 * bodyScale);
+            ctx.moveTo(screen.x + 2 * bodyScale, screen.y + 25 * bodyScale);
+            ctx.lineTo(screen.x + screen.w - 2 * bodyScale, screen.y + 25 * bodyScale);
             ctx.stroke();
-            ctx.restore();
-        };
-
-        const drawScatterPreview = () => {
-            const fanSpan = pelletCount > 1 ? Math.min(Math.PI * 0.72, Math.PI * (0.2 + profile.scatter * 0.08)) : 0;
-            const visible = Math.min(pelletCount, 7);
-            const fanR = 25 * bodyScale;
-            ctx.save();
-            ctx.lineWidth = 1;
-            ctx.strokeStyle = `rgba(250, 204, 21, ${0.3 + chargeProgress * 0.22 + pulse * 0.1})`;
-            for (let i = 0; i < visible; i++) {
-                const t = visible === 1 ? 0.5 : i / (visible - 1);
-                const angle = -Math.PI / 2 - fanSpan / 2 + fanSpan * t;
-                const px = scatter.x + Math.cos(angle) * fanR;
-                const py = scatter.y + Math.sin(angle) * fanR * 0.8;
-                ctx.beginPath();
-                ctx.moveTo(scatter.x, scatter.y);
-                ctx.lineTo(px, py);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.arc(px, py, (i === Math.floor(visible / 2) ? 3.8 : 2.7) * bodyScale, 0, Math.PI * 2);
-                ctx.fillStyle = i === Math.floor(visible / 2) ? '#fef3c7' : '#facc15';
-                if (glowFx) {
-                    ctx.shadowColor = '#facc15';
-                    ctx.shadowBlur = _sb(5);
-                }
-                ctx.fill();
-                ctx.shadowBlur = 0;
-            }
-            drawInsetPanel(-12 * bodyScale, -34 * bodyScale + recoilY, 24 * bodyScale, 13 * bodyScale, '#facc15', 4, 0.84);
             ctx.fillStyle = '#fef3c7';
-            ctx.font = `bold ${7 * bodyScale}px Cinzel`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(`S${Math.max(1, pelletCount)}`, 0, -27.5 * bodyScale + recoilY);
-            ctx.restore();
-        };
-
-        const drawMuzzlePulse = () => {
-            if (!visual.isReloading && chargeProgress <= 0.02) return;
-            const fire = visual.isReloading ? Math.sin(reloadProgress * Math.PI) : chargeProgress * 0.45;
-            if (fire <= 0.02) return;
-            ctx.save();
-            ctx.globalAlpha = Math.min(0.92, fire);
-            ctx.fillStyle = 'rgba(254, 243, 199, 0.86)';
-            ctx.strokeStyle = `rgba(34, 211, 238, ${0.24 + fire * 0.34})`;
-            if (glowFx) {
-                ctx.shadowColor = visual.isReloading ? '#facc15' : accent;
-                ctx.shadowBlur = _sb(8 + fire * 12);
-            }
-            ctx.beginPath();
-            ctx.moveTo(muzzleX, muzzleY - 13 * bodyScale);
-            ctx.lineTo(muzzleX - 7 * bodyScale * fire, muzzleY + 5 * bodyScale);
-            ctx.lineTo(muzzleX + 7 * bodyScale * fire, muzzleY + 5 * bodyScale);
-            ctx.closePath();
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(muzzleX, muzzleY, (8 + fire * 10) * bodyScale, Math.PI * 1.08, Math.PI * 1.92);
-            ctx.stroke();
+            ctx.font = `bold ${5.8 * bodyScale}px Cinzel`;
+            ctx.fillText(`S${Math.max(1, pelletCount)}`, screen.x + screen.w / 2, screen.y + 32 * bodyScale);
             ctx.restore();
         };
 
         const drawBurstStack = () => {
-            drawInsetPanel(capacitor.x, capacitor.y, capacitor.w, capacitor.h, '#f59e0b', 5, 0.72);
             ctx.save();
             ctx.globalAlpha = 0.94;
             const maxSegments = 5;
@@ -811,10 +530,10 @@ export const render_system = {
             for (let i = 0; i < maxSegments; i++) {
                 const lit = i < litSegments;
                 const x = capacitor.x + 3 * bodyScale;
-                const y = capacitor.y + capacitor.h - (8 + i * 7) * bodyScale;
+                const y = capacitor.y + capacitor.h - (6.8 + i * 6.7) * bodyScale;
                 const w = capacitor.w - 6 * bodyScale;
                 ctx.beginPath();
-                ctx.roundRect(x, y, w, 4.2 * bodyScale, 2 * bodyScale);
+                ctx.roundRect(x, y, w, 4.8 * bodyScale, 2.2 * bodyScale);
                 ctx.fillStyle = lit ? `rgba(251, 191, 36, ${0.72 + pulse * 0.18})` : 'rgba(30, 41, 59, 0.5)';
                 if (lit && glowFx) {
                     ctx.shadowColor = '#f59e0b';
@@ -827,10 +546,10 @@ export const render_system = {
                 ctx.stroke();
             }
             ctx.fillStyle = '#fef3c7';
-            ctx.font = `bold ${6.5 * bodyScale}px Cinzel`;
+            ctx.font = `bold ${5.8 * bodyScale}px Cinzel`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(`x${profile.multicastCount}`, capacitor.x + capacitor.w / 2, capacitor.y + 6 * bodyScale);
+            ctx.fillText(`x${profile.multicastCount}`, capacitor.x + capacitor.w / 2, capacitor.y - 1.5 * bodyScale);
             ctx.restore();
         };
 
@@ -843,7 +562,7 @@ export const render_system = {
                 const x = magazine.centers[i];
                 const color = entry.color || accent;
                 ctx.beginPath();
-                ctx.arc(x, magazine.y, 5.8 * bodyScale, 0, Math.PI * 2);
+                ctx.arc(x, magazine.y, 5.2 * bodyScale, 0, Math.PI * 2);
                 ctx.fillStyle = lit ? 'rgba(15, 23, 42, 0.86)' : 'rgba(30, 41, 59, 0.56)';
                 ctx.globalAlpha = lit ? 0.95 : 0.55;
                 ctx.fill();
@@ -857,22 +576,17 @@ export const render_system = {
                         ctx.shadowBlur = _sb(5);
                     }
                     if (smallIcon) {
-                        ctx.drawImage(smallIcon, x - 3.5 * bodyScale, magazine.y - 3.5 * bodyScale, 7 * bodyScale, 7 * bodyScale);
+                        ctx.drawImage(smallIcon, x - 3.2 * bodyScale, magazine.y - 3.2 * bodyScale, 6.4 * bodyScale, 6.4 * bodyScale);
                     } else {
                         ctx.fillStyle = color;
                         ctx.beginPath();
-                        ctx.arc(x, magazine.y, 2.8 * bodyScale, 0, Math.PI * 2);
+                        ctx.arc(x, magazine.y, 2.6 * bodyScale, 0, Math.PI * 2);
                         ctx.fill();
                     }
                     ctx.shadowBlur = 0;
                 }
             }
             ctx.globalAlpha = 1;
-            ctx.fillStyle = 'rgba(226, 232, 240, 0.82)';
-            ctx.font = `bold ${6 * bodyScale}px Cinzel`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(`${Math.min(6, profile.loadCount)}/6`, 0, magazine.y + 12 * bodyScale);
             ctx.restore();
         };
 
@@ -892,34 +606,8 @@ export const render_system = {
                 deformation
             );
 
-            ctx.save();
-            ctx.globalAlpha = 0.95;
-            ctx.strokeStyle = `rgba(226, 232, 240, ${0.44 + pulse * 0.1})`;
-            ctx.lineWidth = 2 * bodyScale;
-            ctx.beginPath();
-            ctx.arc(chamberX, chamberY, 23 * bodyScale, Math.PI * 0.1, Math.PI * 0.9);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(chamberX, chamberY, 23 * bodyScale, Math.PI * 1.1, Math.PI * 1.9);
-            ctx.stroke();
-            if (visual.isCharging || visual.isReloading) {
-                ctx.strokeStyle = `rgba(34, 211, 238, ${0.2 + chargeProgress * 0.4 + pulse * 0.12})`;
-                ctx.lineWidth = 1 * bodyScale;
-                ctx.beginPath();
-                ctx.moveTo(chamberX, chamberY - 24 * bodyScale);
-                ctx.lineTo(muzzleX, muzzleY + recoilY);
-                ctx.stroke();
-            }
-            if (iconImg) {
-                ctx.globalAlpha = 0.86;
-                ctx.drawImage(iconImg, chamberX - 7 * bodyScale, chamberY + 25 * bodyScale, 14 * bodyScale, 14 * bodyScale);
-            }
-            ctx.restore();
         };
 
-        drawChamberFrame();
-        drawMuzzlePulse();
-        drawScatterPreview();
         drawLoadedProjectile();
         drawValueScreen();
         drawBurstStack();
@@ -929,8 +617,33 @@ export const render_system = {
     },
 
     /**
+     * [RENDER] 排队一次基于炮管方向的发射闪光。
+     * @perf-impact: launcher barrel flash is a short-lived fixed-shape canvas overlay; it does not create particles, shockwaves, gradients, or new CONFIG.performance budgets.
+     */
+    render_queueLauncherBarrelFireEffect(vel, recipe = {}) {
+        const dir = vel && typeof vel.norm === 'function' && vel.mag && vel.mag() > 0.001
+            ? vel.norm()
+            : { x: 0, y: -1 };
+        const color = recipe.pyro > 0 || recipe.explosive ? '#fb923c'
+            : recipe.cryo > 0 ? '#67e8f9'
+            : recipe.lightning > 0 || recipe.overcharge > 0 ? '#c084fc'
+            : recipe.venom > 0 ? '#86efac'
+            : recipe.wind > 0 ? '#7dd3fc'
+            : '#fef3c7';
+        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        this._launcherBarrelFireFx = (this._launcherBarrelFireFx || []).slice(-4);
+        this._launcherBarrelFireFx.push({
+            dir,
+            color,
+            born: now,
+            life: 220,
+            intensity: recipe._openingSalvo ? 1.25 : 1,
+        });
+    },
+
+    /**
      * [RENDER] 绘制发射器底座 + 蓄力动画帧。
-     * 替代 game_phase 中的简单椭圆，未加载位图时退回原始绘制。
+     * 运行时只绘制当前美术资产；资源缺失时静默跳过，避免回退到旧简陋炮台。
      * @param {CanvasRenderingContext2D} ctx
      * @param {number} cx
      * @param {number} cy
@@ -941,7 +654,7 @@ export const render_system = {
     render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress, reloadProgress = 0, aimRotation = -Math.PI / 2) {
         const baseImg = getUiBitmap(EMITTER_BASE_SRC);
         const barrelImg = getUiBitmap(EMITTER_BARREL_SRC);
-        // @perf-impact: Combat emitter V4 split draw uses one stationary base draw, one rotating barrel draw, and the existing optional charging overlay; no new particles or gradients.
+        // @perf-impact: Combat emitter art draw uses one stationary base draw, an optional rotating barrel draw, short-lived barrel flash overlays, and the existing optional charging overlay; no particles or dynamic bitmap generation.
         const baseSize = EMITTER_DRAW_SIZE;
         const barrelSize = EMITTER_BARREL_DRAW_SIZE;
         const barrelRotation = (Number.isFinite(aimRotation) ? aimRotation : -Math.PI / 2) + Math.PI / 2;
@@ -950,14 +663,6 @@ export const render_system = {
             ctx.save();
             ctx.translate(0, recoilY);
             ctx.drawImage(baseImg, cx - baseSize / 2, cy - baseSize / 2, baseSize, baseSize);
-            ctx.restore();
-        } else {
-            ctx.save();
-            ctx.translate(0, recoilY);
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
-            ctx.beginPath();
-            ctx.arc(cx, cy, 22, 0, Math.PI * 2);
-            ctx.fill();
             ctx.restore();
         }
 
@@ -976,6 +681,48 @@ export const render_system = {
             );
             ctx.restore();
         }
+
+        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        const quality = this.perfQualityLevel || 'high';
+        const activeFx = [];
+        (this._launcherBarrelFireFx || []).forEach(fx => {
+            const age = now - fx.born;
+            if (age < 0 || age > fx.life) return;
+            activeFx.push(fx);
+            const t = age / fx.life;
+            const alpha = (1 - t) * (0.82 + (fx.intensity || 1) * 0.12);
+            const dir = fx.dir || { x: 0, y: -1 };
+            const rotation = Math.atan2(dir.y, dir.x) + Math.PI / 2;
+            const stretch = 1 + t * 0.35;
+            ctx.save();
+            ctx.translate(cx, cy + recoilY);
+            ctx.rotate(rotation);
+            ctx.globalCompositeOperation = 'screen';
+            ctx.globalAlpha = Math.max(0, Math.min(0.95, alpha));
+            if (quality !== 'low') {
+                ctx.shadowColor = fx.color || '#fef3c7';
+                ctx.shadowBlur = _sb(12 * (1 - t));
+            }
+            ctx.fillStyle = fx.color || '#fef3c7';
+            ctx.beginPath();
+            ctx.ellipse(0, -30 * stretch, (5 + 9 * t) * (fx.intensity || 1), 22 * (1 - t * 0.15), 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha *= 0.72;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.ellipse(0, -39 * stretch, 3.2 + 5 * t, 10 * (1 - t * 0.2), 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = fx.color || '#fef3c7';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(-4 - 5 * t, -12);
+            ctx.lineTo(0, -55 * stretch);
+            ctx.lineTo(4 + 5 * t, -12);
+            ctx.stroke();
+            ctx.restore();
+        });
+        this._launcherBarrelFireFx = activeFx;
 
         if (isCharging) {
             const t = Math.max(0, Math.min(1, chargeProgress || 0));

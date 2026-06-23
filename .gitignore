@@ -1,5 +1,10 @@
 node_modules/
 .codex_tmp/
 .tmp-serve-*.log
+tmp/
+Audio_sample/
+assets/audio-local/
+codex-*.log
+_verif.mjs
 scripts/__pycache__/
 *.pyc

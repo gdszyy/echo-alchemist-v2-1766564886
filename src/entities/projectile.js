@@ -93,7 +93,8 @@ class Projectile {
         const _tierStat = (config.damage || 0) + (config.bounce || 0) + (config.pierce || 0)
             + (config.scatter || 0) + (config.cryo || 0) + (config.pyro || 0)
             + (config.lightning || 0) + (config.laser || 0)
-            + (config.flying_sword || 0) + (config.wind || 0);
+            + (config.flying_sword || 0) + (config.wind || 0)
+            + (config.venom || 0) + (config.overcharge || 0) + (config.echo || 0);
         let _trailMax = 4 + Math.min(14, Math.floor(_tierStat * 0.3));
         if (config.isLaser) _trailMax += 4;
         if (config.type === 'flying_sword') _trailMax += 3;
@@ -996,29 +997,39 @@ class Projectile {
         else if ((cfg.pierce || 0) > 0) trailColor = '#fca5a5';
         else if ((cfg.bounce || 0) > 0) trailColor = '#86efac';
         else if ((cfg.scatter || 0) > 0) trailColor = '#facc15';
+        else if ((cfg.venom || 0) > 0) trailColor = '#84cc16';
+        else if ((cfg.overcharge || 0) > 0) trailColor = '#f59e0b';
+        else if ((cfg.echo || 0) > 0) trailColor = '#c084fc';
 
         const tier = Math.min(3, Math.floor((this.tierStat || 0) / 8));
         // [拖尾调优] 用户反馈：拖尾过粗过亮，整体降一档。
         // 基础宽度随子弹半径联动；高强度子弹仅小幅加宽
         const baseWidth = Math.max(1.0, this.radius * (0.35 + tier * 0.10));
         const len = trail.length;
+        const perfQuality = Projectile.resolvePerfQuality();
+        const isLowQuality = perfQuality === 'low';
+        const isHighQuality = perfQuality === 'high';
+        const renderLimit = isLowQuality ? 6 : (isHighQuality ? len : 10);
+        const startIndex = Math.max(1, len - renderLimit);
+        const visibleSpan = Math.max(1, len - startIndex);
 
         ctx.save();
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         // S 级（含激光/飞剑）使用 lighter 增亮拖尾
-        if (tier >= 2 || cfg.isLaser || cfg.type === 'flying_sword' || cfg.explosive) {
+        if (!isLowQuality && (tier >= 2 || cfg.isLaser || cfg.type === 'flying_sword' || cfg.explosive)) {
             ctx.globalCompositeOperation = 'lighter';
         }
         ctx.shadowColor = trailColor;
-        ctx.shadowBlur = _sb(2 + tier * 2);
+        ctx.shadowBlur = isLowQuality ? 0 : _sb(2 + tier * 2);
 
         // 段落式渐变描边：越靠近当前位置越亮、越粗，整体透明度更低更轻盈
-        for (let i = 1; i < len; i++) {
+        for (let i = startIndex; i < len; i++) {
             const a = trail[i - 1];
             const b = trail[i];
-            const t = i / (len - 1);
-            const alpha = Math.max(0.02, t * (0.30 + tier * 0.08));
+            const t = (i - startIndex + 1) / visibleSpan;
+            const alphaBase = isLowQuality ? 0.18 : (0.30 + tier * 0.08);
+            const alpha = Math.max(isLowQuality ? 0.035 : 0.02, t * alphaBase);
             const width = Math.max(0.4, baseWidth * t);
             ctx.strokeStyle = `${trailColor}`;
             ctx.globalAlpha = alpha;
@@ -1030,9 +1041,9 @@ class Projectile {
         }
 
         // S 级追加一层更细更亮的核心拖尾
-        if (tier >= 3 || cfg.isLaser) {
+        if ((tier >= 3 || cfg.isLaser) && isHighQuality) {
             ctx.shadowBlur = _sb(6);
-            for (let i = Math.max(1, len - 5); i < len; i++) {
+            for (let i = Math.max(startIndex, len - 5); i < len; i++) {
                 const a = trail[i - 1];
                 const b = trail[i];
                 const t = i / (len - 1);
@@ -1048,8 +1059,184 @@ class Projectile {
         ctx.restore();
     }
 
+    static resolvePerfQuality() {
+        const g = (typeof window !== 'undefined' && window.game)
+            ? window.game
+            : ((typeof game !== 'undefined') ? game : null);
+        return (g && g.perfQualityLevel) || 'high';
+    }
+
+    static resolveAccentColors(config, fallbackColor = '#94a3b8') {
+        const colors = [];
+
+        if (!config) return [fallbackColor];
+        if (config.type === 'rainbow') {
+            colors.push('#fca5a5', '#facc15', '#4ade80', '#60a5fa', '#c084fc');
+        }
+        if (config.explosive) colors.push('#ef4444');
+        if ((config.pyro || 0) > 0) colors.push('#f97316');
+        if ((config.cryo || 0) > 0) colors.push('#22d3ee');
+        if ((config.lightning || 0) > 0) colors.push('#a855f7');
+        if ((config.wind || 0) > 0) colors.push('#34d399');
+        if ((config.pierce || 0) > 0) colors.push('#fb7185');
+        if ((config.bounce || 0) > 0) colors.push('#22c55e');
+        if ((config.scatter || 0) > 0) colors.push('#facc15');
+        if ((config.venom || 0) > 0) colors.push('#84cc16');
+        if ((config.overcharge || 0) > 0) colors.push('#f59e0b');
+        if ((config.echo || 0) > 0) colors.push('#c084fc');
+
+        const uniqueColors = [...new Set(colors.filter(Boolean))];
+        return uniqueColors.length > 0 ? uniqueColors : [fallbackColor];
+    }
+
+    static resolveProjectileMaterial(config, mainColor, glowColor) {
+        const accents = Projectile.resolveAccentColors(config, glowColor);
+        let shell = '#1e293b';
+        let edge = 'rgba(180, 145, 82, 0.78)';
+        let edgeDim = 'rgba(100, 116, 139, 0.72)';
+        let core = accents[0] || glowColor || '#94a3b8';
+
+        if (config.explosive) {
+            shell = '#38201d';
+            edge = 'rgba(248, 113, 113, 0.78)';
+        } else if ((config.pyro || 0) > 0) {
+            shell = '#31241b';
+            edge = 'rgba(217, 119, 6, 0.82)';
+        } else if ((config.cryo || 0) > 0 || config.isLaser) {
+            shell = '#172633';
+            edge = 'rgba(125, 211, 252, 0.78)';
+        } else if ((config.lightning || 0) > 0 || (config.echo || 0) > 0 || config.type === 'rainbow') {
+            shell = '#241b34';
+            edge = 'rgba(192, 132, 252, 0.74)';
+        } else if ((config.wind || 0) > 0 || (config.venom || 0) > 0) {
+            shell = '#172a24';
+            edge = 'rgba(52, 211, 153, 0.74)';
+        } else if ((config.pierce || 0) > 0) {
+            shell = '#2f2326';
+            edge = 'rgba(251, 113, 133, 0.72)';
+        } else if ((config.bounce || 0) > 0) {
+            shell = '#1d2b22';
+            edge = 'rgba(74, 222, 128, 0.68)';
+        } else if ((config.scatter || 0) > 0 || (config.overcharge || 0) > 0) {
+            shell = '#302614';
+            edge = 'rgba(250, 204, 21, 0.72)';
+        } else if (mainColor && mainColor !== 'rainbow') {
+            core = mainColor;
+        }
+
+        return {
+            accents,
+            shell,
+            shellShadow: 'rgba(2, 6, 23, 0.72)',
+            socket: 'rgba(2, 6, 23, 0.82)',
+            edge,
+            edgeDim,
+            core,
+            glint: 'rgba(226, 232, 240, 0.48)'
+        };
+    }
+
+    static traceProjectileShape(ctx, shapeType, radius) {
+        if (shapeType === 'arrow') {
+            const arrowScale = 1.8;
+            ctx.moveTo(radius * arrowScale, 0);
+            ctx.lineTo(-radius * 0.8, radius * 0.7);
+            ctx.lineTo(-radius * 0.3, 0);
+            ctx.lineTo(-radius * 0.8, -radius * 0.7);
+        } else if (shapeType === 'star') {
+            for (let i = 0; i < 4; i++) {
+                ctx.rotate(Math.PI / 2);
+                ctx.lineTo(radius, 0);
+                ctx.lineTo(radius * 0.4, radius * 0.4);
+            }
+        } else if (shapeType === 'crystal') {
+            ctx.moveTo(0, -radius * 1.3);
+            ctx.lineTo(radius * 0.8, 0);
+            ctx.lineTo(0, radius * 1.3);
+            ctx.lineTo(-radius * 0.8, 0);
+        } else {
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        }
+    }
+
+    static drawAlchemicalDetails(ctx, shapeType, radius, material, isLowQuality, isHighQuality) {
+        // @perf-impact: projectile alchemical casing - flat clipped strokes/fills only; glow is perfQualityLevel gated.
+        ctx.save();
+        ctx.beginPath();
+        Projectile.traceProjectileShape(ctx, shapeType, radius);
+        ctx.closePath();
+        ctx.clip();
+        ctx.globalAlpha = isLowQuality ? 0.28 : 0.38;
+        ctx.fillStyle = material.shellShadow;
+        ctx.fillRect(-radius * 1.7, radius * 0.05, radius * 3.4, radius * 1.65);
+
+        ctx.globalAlpha = isLowQuality ? 0.16 : 0.28;
+        ctx.strokeStyle = material.glint;
+        ctx.lineWidth = Math.max(0.7, radius * 0.06);
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.78, -radius * 0.18);
+        ctx.lineTo(radius * 0.54, -radius * 0.48);
+        ctx.moveTo(-radius * 0.46, radius * 0.52);
+        ctx.lineTo(radius * 0.82, radius * 0.22);
+        if (isHighQuality) {
+            ctx.moveTo(-radius * 0.86, radius * 0.04);
+            ctx.lineTo(-radius * 0.52, -radius * 0.34);
+            ctx.moveTo(radius * 0.38, radius * 0.48);
+            ctx.lineTo(radius * 0.74, radius * 0.10);
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.shadowBlur = isLowQuality ? 0 : _sb(isHighQuality ? 5 : 2);
+        ctx.shadowColor = material.core;
+        ctx.fillStyle = material.socket;
+        ctx.strokeStyle = material.edge;
+        ctx.lineWidth = Math.max(0.9, radius * 0.11);
+        ctx.beginPath();
+        if (shapeType === 'arrow') {
+            ctx.ellipse(-radius * 0.08, 0, radius * 0.46, radius * 0.32, 0, 0, Math.PI * 2);
+        } else if (shapeType === 'crystal') {
+            ctx.moveTo(0, -radius * 0.62);
+            ctx.lineTo(radius * 0.38, 0);
+            ctx.lineTo(0, radius * 0.62);
+            ctx.lineTo(-radius * 0.38, 0);
+            ctx.closePath();
+        } else {
+            ctx.arc(0, 0, radius * 0.48, 0, Math.PI * 2);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.shadowBlur = isLowQuality ? 0 : _sb(isHighQuality ? 6 : 3);
+        ctx.fillStyle = material.core;
+        ctx.beginPath();
+        if (shapeType === 'crystal') {
+            ctx.moveTo(0, -radius * 0.34);
+            ctx.lineTo(radius * 0.22, 0);
+            ctx.lineTo(0, radius * 0.34);
+            ctx.lineTo(-radius * 0.22, 0);
+            ctx.closePath();
+        } else {
+            ctx.arc(0, 0, radius * 0.25, 0, Math.PI * 2);
+        }
+        ctx.fill();
+
+        if (!isLowQuality) {
+            ctx.globalAlpha = 0.78;
+            ctx.fillStyle = material.glint;
+            ctx.beginPath();
+            ctx.arc(-radius * 0.10, -radius * 0.12, Math.max(1, radius * 0.07), 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
     static drawVisuals(ctx, x, y, radius, config, rotation, intensity, deformation = {x:1, y:1}, integrity = 1.0, crackSeed = [], windBladeAngle = 0) {
         // @section:draw_entry_transform - 坐标变换入口（translate + rotate），确定绘制坐标系
+        const perfQuality = Projectile.resolvePerfQuality();
+        const isLowQuality = perfQuality === 'low';
+        const isHighQuality = perfQuality === 'high';
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(rotation);
@@ -1060,7 +1247,7 @@ class Projectile {
             // 這裡我們直接畫朝右的劍，與 velocity 方向一致
             const scale = radius / 6; // 根據半徑動態調整大小 (基礎半徑約7~10)
             // 1. 劍身發光 (Spirit Aura) - 隨耐久度減弱
-            ctx.shadowBlur = _sb(15 * intensity * integrity);
+            ctx.shadowBlur = isLowQuality ? 0 : _sb(15 * intensity * integrity);
             ctx.shadowColor = '#0ea5e9'; // 青色光暈
             // 2. 劍身 (Blade) - 雙刃劍，指向右側
             ctx.beginPath();
@@ -1085,7 +1272,7 @@ class Projectile {
             ctx.lineWidth = 1.5;
             ctx.stroke();
             // 3. 劍格 (Guard) - 祥雲/蝙蝠紋飾
-            ctx.shadowBlur = _sb(5);
+            ctx.shadowBlur = isLowQuality ? 0 : _sb(5);
             ctx.shadowColor = '#f59e0b';
             ctx.fillStyle = '#fbbf24'; // 金色
             ctx.beginPath();
@@ -1116,7 +1303,7 @@ class Projectile {
                 -50 * scale, swing * 0.5      // 終點
             );
             ctx.shadowColor = '#ef4444';
-            ctx.shadowBlur = _sb(5);
+            ctx.shadowBlur = isLowQuality ? 0 : _sb(5);
             ctx.strokeStyle = '#ef4444'; // 紅色
             ctx.lineWidth = 2;
             ctx.lineCap = 'round';
@@ -1148,13 +1335,16 @@ class Projectile {
         if (config.cryo > 0) { mainColors.push('#cffafe'); glowColors.push('#06b6d4'); }
         if (config.lightning > 0) { mainColors.push('#f3e8ff'); glowColors.push('#c084fc'); }
         if (config.wind) { mainColors.push('#d1fae5'); glowColors.push('#34d399'); } // 风属性颜色
+        if (config.venom > 0) { mainColors.push('#ecfccb'); glowColors.push('#84cc16'); }
+        if (config.overcharge > 0) { mainColors.push('#fef3c7'); glowColors.push('#f59e0b'); }
+        if (config.echo > 0) { mainColors.push('#f3e8ff'); glowColors.push('#c084fc'); }
         if (config.pierce > 0 && mainColors.length === 0) { mainColors.push('#fee2e2'); glowColors.push('#ef4444'); }
         if (mainColors.length === 0) {
             if (config.bounce > 0) { mainColors.push('#dcfce7'); glowColors.push('#22c55e'); }
             else { mainColors.push('#f1f5f9'); glowColors.push('#94a3b8'); }
         }
-        const mainColor = mainColors[mainColors.length - 1];
-        const glowColor = glowColors[glowColors.length - 1];
+        let mainColor = mainColors[mainColors.length - 1];
+        let glowColor = glowColors[glowColors.length - 1];
         if (config.explosive && integrity > 0.1) {
             const time = Date.now();
             const pulse = (Math.sin(time / 50) + 1) / 2; 
@@ -1163,12 +1353,15 @@ class Projectile {
                 glowColors[glowColors.length - 1] = '#fca5a5'; 
                 intensity *= 1.5; 
             }
+            mainColor = mainColors[mainColors.length - 1];
+            glowColor = glowColors[glowColors.length - 1];
             const scaleMod = 1.0 + pulse * 0.15;
             deformation.x *= scaleMod;
             deformation.y *= scaleMod;
             const shakeAmount = 1.5; 
             ctx.translate((Math.random() - 0.5) * shakeAmount, (Math.random() - 0.5) * shakeAmount);
         }
+        const material = Projectile.resolveProjectileMaterial(config, mainColor, glowColor);
         // @section:draw_orb_special - 光球(orb)特殊渲染：脉冲光晕 + 纯白核心（独立 restore）
         // ---  光球的特殊渲染逻辑 (绑定特效) ---
         if (shapeType === 'orb') {  // [fix] 此 if 在 else 块内，与 flying_sword 互斥
@@ -1176,102 +1369,116 @@ class Projectile {
             const pulse = Math.sin(time) * 0.1 + 1.0; 
             const laserPower = config.laser || 0;
             const sizeMod = 1 + (laserPower * 0.1); 
-            ctx.shadowBlur = _sb(20 * intensity * sizeMod);
+            ctx.globalCompositeOperation = isHighQuality ? 'lighter' : 'source-over';
+            ctx.shadowBlur = isLowQuality ? 0 : _sb(14 * intensity * sizeMod);
             ctx.shadowColor = glowColor;
             ctx.fillStyle = glowColor;
-            ctx.globalAlpha = 0.4;
+            ctx.globalAlpha = isLowQuality ? 0.16 : 0.28;
             ctx.beginPath();
             ctx.arc(0, 0, radius * 1.2 * pulse * sizeMod, 0, Math.PI * 2);
             ctx.fill();
-            ctx.shadowBlur = _sb(10);
-            ctx.shadowColor = '#fff';
-            ctx.fillStyle = '#ffffff';
+            if (!isLowQuality) {
+                ctx.globalAlpha = 0.46;
+                ctx.lineWidth = Math.max(1, radius * 0.16);
+                ctx.strokeStyle = material.edge;
+                ctx.beginPath();
+                ctx.arc(0, 0, radius * 1.02 * pulse * sizeMod, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            ctx.globalCompositeOperation = 'source-over';
+            // @perf-impact: laser orb alchemical shell - flat rings only; glow remains perfQualityLevel gated.
+            ctx.shadowBlur = isLowQuality ? 0 : _sb(6);
+            ctx.shadowColor = material.core;
+            ctx.fillStyle = material.shell;
+            ctx.globalAlpha = 0.94;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.92 * sizeMod, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.lineWidth = Math.max(1, radius * 0.12);
+            ctx.strokeStyle = isLowQuality ? material.edgeDim : material.edge;
+            ctx.stroke();
+            ctx.shadowBlur = isLowQuality ? 0 : _sb(4);
+            ctx.fillStyle = material.socket;
             ctx.globalAlpha = 1.0;
             ctx.beginPath();
-            ctx.arc(0, 0, radius * 0.8 * sizeMod, 0, Math.PI * 2);
+            ctx.arc(0, 0, radius * 0.56 * sizeMod, 0, Math.PI * 2);
             ctx.fill();
+            ctx.lineWidth = Math.max(0.8, radius * 0.08);
+            ctx.strokeStyle = material.edge;
+            ctx.stroke();
+            ctx.shadowBlur = isLowQuality ? 0 : _sb(6);
+            ctx.fillStyle = material.core;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.30 * sizeMod, 0, Math.PI * 2);
+            ctx.fill();
+            if (isHighQuality) {
+                ctx.globalAlpha = 0.65;
+                ctx.lineWidth = Math.max(1, radius * 0.12);
+                ctx.strokeStyle = material.glint;
+                ctx.beginPath();
+                ctx.moveTo(-radius * 0.46 * sizeMod, -radius * 0.18 * sizeMod);
+                ctx.quadraticCurveTo(0, -radius * 0.48 * sizeMod, radius * 0.46 * sizeMod, -radius * 0.18 * sizeMod);
+                ctx.stroke();
+            }
             ctx.restore(); // [bugfix] orb 分支必须自行 restore，否则 else 块被跳过时状态栈泄漏
         } else {
         // @section:draw_shape_fill - 形状绘制与填色：arrow/star/crystal/matryoshka/circle 分支 + 渐变/发光
         // 3. 绘制形状 (orb 的 else 分支，即正常绘制路径)
         ctx.scale(deformation.x, deformation.y);
         ctx.beginPath();
-        if (shapeType === 'arrow') {
-            const arrowScale = 1.8; 
-            ctx.moveTo(radius * arrowScale, 0); 
-            ctx.lineTo(-radius * 0.8, radius * 0.7); 
-            ctx.lineTo(-radius * 0.3, 0); 
-            ctx.lineTo(-radius * 0.8, -radius * 0.7); 
-        } else if (shapeType === 'star') {
-            for (let i = 0; i < 4; i++) {
-                ctx.rotate(Math.PI / 2);
-                ctx.lineTo(radius, 0);
-                ctx.lineTo(radius * 0.4, radius * 0.4);
-            }
-        } else if (shapeType === 'crystal') { 
-            ctx.moveTo(0, -radius * 1.3);
-            ctx.lineTo(radius * 0.8, 0);
-            ctx.lineTo(0, radius * 1.3);
-            ctx.lineTo(-radius * 0.8, 0);
-        } else if (shapeType === 'matryoshka') {
-             ctx.arc(0, 0, radius, 0, Math.PI * 2);
-        } else {
-            if (config.pyro > 0 && !config.explosive) {
-                const time = Date.now() / 120;
-                const tipFlicker = Math.sin(time) * radius * 0.08;
-                const sideFlicker = Math.sin(time * 1.7) * radius * 0.06;
-                ctx.moveTo(0, -radius * 1.55 - tipFlicker);
-                ctx.bezierCurveTo(
-                    radius * (0.96 + sideFlicker / radius), -radius * 0.78,
-                    radius * 0.88, radius * 0.42,
-                    radius * 0.18, radius * 1.04
-                );
-                ctx.bezierCurveTo(
-                    radius * 0.05, radius * 0.88,
-                    -radius * 0.06, radius * 0.88,
-                    -radius * 0.18, radius * 1.04
-                );
-                ctx.bezierCurveTo(
-                    -radius * 0.88, radius * 0.42,
-                    -radius * (0.96 - sideFlicker / radius), -radius * 0.78,
-                    0, -radius * 1.55 - tipFlicker
-                );
-            } else {
-                ctx.arc(0, 0, radius, 0, Math.PI * 2);
-            }
-        }
+        Projectile.traceProjectileShape(ctx, shapeType, radius);
         ctx.closePath();
-        ctx.shadowBlur = _sb(CONFIG.visuals.glowBase * intensity * integrity); 
-        ctx.shadowColor = glowColor;
-        if (mainColor === 'rainbow') {
-            const grad = ctx.createLinearGradient(-radius, -radius, radius, radius);
-            grad.addColorStop(0, '#fca5a5');
-            grad.addColorStop(0.25, '#facc15');
-            grad.addColorStop(0.5, '#4ade80');
-            grad.addColorStop(0.75, '#60a5fa');
-            grad.addColorStop(1, '#c084fc');
-            ctx.fillStyle = grad;
-        } else {
-            ctx.fillStyle = mainColor;
-        }
+        ctx.shadowBlur = isLowQuality ? 0 : _sb(CONFIG.visuals.glowBase * intensity * integrity);
+        ctx.shadowColor = material.core;
+        ctx.fillStyle = material.shell;
         ctx.fill();
         if (integrity < 1.0) {
             ctx.fillStyle = `rgba(0, 0, 0, ${0.6 - 0.6 * integrity})`; 
             ctx.fill();
         }
-        // @perf-impact: Pure pyro bullet inner flame - two small bezier fills only; no extra gradient or blend mode.
+        const accentColors = material.accents;
+        // @perf-impact: projectile casing and accent ticks - perfQualityLevel gates glow/blend/tick count; no new CONFIG budget.
+        ctx.save();
+        ctx.shadowBlur = isLowQuality ? 0 : _sb(Math.max(1.5, 2.5 * intensity * integrity));
+        ctx.shadowColor = material.core;
+        ctx.lineWidth = Math.max(1, radius * 0.13);
+        ctx.strokeStyle = isLowQuality ? material.edgeDim : material.edge;
+        ctx.stroke();
+        if (!isLowQuality) {
+            ctx.globalAlpha = 0.5;
+            ctx.lineWidth = Math.max(0.6, radius * 0.055);
+            ctx.strokeStyle = material.edgeDim;
+            ctx.stroke();
+        }
+        ctx.restore();
+        Projectile.drawAlchemicalDetails(ctx, shapeType, radius, material, isLowQuality, isHighQuality);
+        // @perf-impact: Pure pyro bullet molten core - small flat fills and gated glow only; no particles or gradient rebuild.
         if (config.pyro > 0 && !config.explosive) {
-            const time = Date.now() / 150;
-            const innerPulse = Math.sin(time) * radius * 0.06;
-            ctx.shadowBlur = _sb(4 * intensity * integrity);
-            ctx.shadowColor = '#facc15';
-            ctx.fillStyle = 'rgba(254, 240, 138, 0.88)';
+            const time = Date.now() / 180;
+            const corePulse = 1 + Math.sin(time) * 0.05;
+            ctx.save();
+            ctx.globalCompositeOperation = isHighQuality ? 'lighter' : 'source-over';
+            ctx.shadowBlur = isLowQuality ? 0 : _sb(5 * intensity * integrity);
+            ctx.shadowColor = '#f97316';
+            ctx.fillStyle = 'rgba(251, 146, 60, 0.54)';
             ctx.beginPath();
-            ctx.moveTo(0, -radius * 0.92 - innerPulse);
-            ctx.bezierCurveTo(radius * 0.42, -radius * 0.36, radius * 0.34, radius * 0.38, 0, radius * 0.7);
-            ctx.bezierCurveTo(-radius * 0.34, radius * 0.38, -radius * 0.42, -radius * 0.36, 0, -radius * 0.92 - innerPulse);
-            ctx.closePath();
+            ctx.arc(0, 0, radius * 0.42 * corePulse, 0, Math.PI * 2);
             ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(254, 240, 138, 0.9)';
+            ctx.beginPath();
+            ctx.ellipse(-radius * 0.14, -radius * 0.14, radius * 0.22, radius * 0.15, -0.55, 0, Math.PI * 2);
+            ctx.fill();
+            if (!isLowQuality) {
+                ctx.globalAlpha = 0.62;
+                ctx.lineWidth = Math.max(0.8, radius * 0.08);
+                ctx.strokeStyle = 'rgba(254, 215, 170, 0.78)';
+                ctx.beginPath();
+                ctx.arc(radius * 0.04, radius * 0.03, radius * 0.32, Math.PI * 0.15, Math.PI * 0.88);
+                ctx.stroke();
+            }
+            ctx.restore();
         }
         if (config.cryo > 0) {
             ctx.shadowBlur = 0;
@@ -1299,6 +1506,9 @@ class Projectile {
             ctx.shadowBlur = 0; 
             ctx.lineWidth = 1.5; 
             ctx.strokeStyle = 'rgba(30, 41, 59, 0.8)'; 
+            ctx.beginPath();
+            Projectile.traceProjectileShape(ctx, shapeType, radius);
+            ctx.closePath();
             ctx.clip(); 
             crackSeed.forEach(seed => {
                 ctx.beginPath();
@@ -1315,24 +1525,63 @@ class Projectile {
             ctx.restore();
         }
         if (config.bounce > 0 && integrity < 0.2) {
-            ctx.strokeStyle = '#475569'; 
+            ctx.beginPath();
+            Projectile.traceProjectileShape(ctx, shapeType, radius);
+            ctx.closePath();
+            ctx.strokeStyle = material.edgeDim;
             ctx.lineWidth = 2;
             ctx.stroke(); 
+        }
+        if (!isLowQuality) {
+            ctx.save();
+            ctx.globalAlpha = 0.45;
+            ctx.lineWidth = Math.max(0.8, radius * 0.12);
+            ctx.strokeStyle = material.glint;
+            ctx.beginPath();
+            if (shapeType === 'arrow') {
+                ctx.moveTo(radius * 0.65, -radius * 0.16);
+                ctx.lineTo(-radius * 0.12, -radius * 0.28);
+            } else {
+                ctx.arc(-radius * 0.18, -radius * 0.22, radius * 0.52, Math.PI * 1.05, Math.PI * 1.62);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+        const tickLimit = isLowQuality ? 0 : (isHighQuality ? Math.min(accentColors.length, 5) : Math.min(accentColors.length, 3));
+        if (tickLimit > 1) {
+            ctx.save();
+            ctx.globalCompositeOperation = isHighQuality ? 'lighter' : 'source-over';
+            ctx.shadowBlur = isHighQuality ? _sb(4) : 0;
+            const tickRadius = Math.max(1.1, radius * 0.12);
+            const orbitRadius = radius * (shapeType === 'arrow' ? 1.0 : 1.12);
+            for (let i = 0; i < tickLimit; i++) {
+                const angle = -Math.PI / 2 + (i * Math.PI * 2 / tickLimit);
+                const tx = Math.cos(angle) * orbitRadius;
+                const ty = Math.sin(angle) * orbitRadius;
+                ctx.shadowColor = accentColors[i];
+                ctx.fillStyle = accentColors[i];
+                ctx.globalAlpha = isHighQuality ? 0.68 : 0.54;
+                ctx.beginPath();
+                ctx.arc(tx, ty, tickRadius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
         }
         if (config.lightning > 0) {
             ctx.save();
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            ctx.globalCompositeOperation = 'lighter'; 
-            const arcCount = 1 + Math.floor(config.lightning / 2);
-            ctx.shadowBlur = _sb(8 + config.lightning);
+            ctx.globalCompositeOperation = isLowQuality ? 'source-over' : 'lighter';
+            const baseArcCount = 1 + Math.floor(config.lightning / 2);
+            const arcCount = isLowQuality ? 1 : (isHighQuality ? baseArcCount : Math.min(2, baseArcCount));
+            ctx.shadowBlur = isLowQuality ? 0 : _sb(8 + config.lightning);
             ctx.shadowColor = '#a855f7'; 
             ctx.strokeStyle = '#e9d5ff'; 
             for (let k = 0; k < arcCount; k++) {
                 ctx.beginPath();
                 const startAngle = Math.random() * Math.PI * 2;
                 const arcLen = 0.5 + Math.random() * 0.5; 
-                const segments = 3 + Math.floor(Math.random() * 2);
+                const segments = isLowQuality ? 2 : (3 + Math.floor(Math.random() * 2));
                 for (let i = 0; i <= segments; i++) {
                     const t = i / segments;
                     const currentAngle = startAngle + t * arcLen;
@@ -1343,10 +1592,10 @@ class Projectile {
                     if (i === 0) ctx.moveTo(px, py);
                     else ctx.lineTo(px, py);
                 }
-                ctx.lineWidth = 0.8 + Math.random() * 1.2;
+                ctx.lineWidth = isLowQuality ? 0.8 : (0.8 + Math.random() * 1.2);
                 ctx.stroke();
             }
-            if (Math.random() < 0.2) {
+            if (!isLowQuality && Math.random() < 0.2) {
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
                 ctx.beginPath();
                 ctx.arc(0, 0, radius * 0.8, 0, Math.PI * 2);
@@ -1365,9 +1614,10 @@ class Projectile {
         // 风属性环绕风刃特效
         if (config.wind && config.wind > 0) {
             ctx.save();
-            ctx.shadowBlur = _sb(10);
+            ctx.shadowBlur = isLowQuality ? 0 : _sb(isHighQuality ? 10 : 5);
             ctx.shadowColor = '#34d399';
-            const bladeCount = Math.min(3 + config.wind, 6); // 根据风属性等级决定风刃数量
+            const maxBlades = isLowQuality ? 3 : (isHighQuality ? 6 : 4);
+            const bladeCount = Math.min(3 + config.wind, maxBlades); // 根据风属性等级决定风刃数量
             const orbitRadius = radius * 1.8; // 环绕轨道半径
             
             for (let i = 0; i < bladeCount; i++) {

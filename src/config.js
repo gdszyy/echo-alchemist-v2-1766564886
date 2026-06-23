@@ -1550,27 +1550,6 @@ const RELIC_DB = [
     tags: ['伤害提升', '新手友好'],
     recommendTip: '弹珠变大后更容易命中钉子，大幅提升每回合伤害输出！'
 },
-    { 
-    id: 'chaos_essence', 
-    name: '旧混沌精华', 
-    icon: '🎡', 
-    desc: '已废弃：旧版命运轮盘入口。当前主循环不再投放精华。', 
-    rarity: 'legendary', 
-    effect: 'unlock_slot', 
-    slotType: 'wheel',
-    maxStacks: 1,
-    deprecated: true
-    },
-    {
-    id: 'pure_essence',
-    name: '旧纯净精华',
-    icon: '🕊️',
-    desc: '已废弃：旧版单弹珠符文注入入口。当前主循环不再投放精华。',
-    rarity: 'legendary',
-    effect: 'pure_essence',
-    maxStacks: 1,
-    deprecated: true
-    },
     // [v2 模块化] 旧 dimension_shard / dimension_crystal 行数遗物已移除，迁移为
     // pinboard_modules.js 中的 dim_shard_module / dim_crystal_module（高密度釘板模块），
     // 通过商店购买后挂载到模块槽位。
@@ -1581,6 +1560,20 @@ const RELIC_DB = [
 
     //  2. 战斗底部反弹墙（诅咒：每次墙体接触最多消耗 1 层反弹/穿透，但不吞子弹）
     { id: 'energy_shield', name: '力場護盾', icon: '🛡️', desc: '戰鬥階段：底部邊界可反彈子彈。但子彈每次觸碰墻體（左/右/頂/底）最多消耗一層反彈或穿透；若已無耐久，仍按普通墻體反彈，不會被墻吞沒。', rarity: 'cursed', effect: 'combat_wall' ,maxStacks: 1},
+
+    {
+        id: 'pinboard_second_row',
+        name: '第二行钉盘',
+        icon: '▦',
+        desc: '解锁钉盘第二行 5 个模块槽位。新槽位会先放入密集交错模块，之后可以在钉盘编辑器中卸下并保持为空。',
+        rarity: 'rare',
+        effect: 'module_row_unlock',
+        targetSlots: 10,
+        maxStacks: 1,
+        recommended: true,
+        tags: ['钉盘扩容', '模块编辑'],
+        recommendTip: '把可编辑钉盘扩展到第二行，提供更多模块组合空间。'
+    },
 
     // [v2 模块化] 特殊槽解锁 (unlock_recall / unlock_multicast / unlock_split) 和
     // 槽数 +1 (slot_expander) 已从遗物池移除，迁移到局内商店出售
@@ -1763,20 +1756,6 @@ const RELIC_DB = [
         recommendTip: '不只奖励击杀，连刮痧命中也能稳定推进符文充能。'
     },
     {
-        id: 'ammo_bandolier',
-        name: '旧炼金弹带',
-        icon: '🎞️',
-        desc: '已废弃：当前晶石核心默认最多保留并充能 3 颗弹珠。',
-        rarity: 'legendary',
-        effect: 'bullet_cap_up',
-        amount: 1,
-        maxStacks: 1,
-        deprecated: true,
-        recommended: false,
-        tags: ['弹药容量', '高阶构筑'],
-        recommendTip: '多留一颗弹珠，但开局火力会被压低，适合能用后续弹药赚回节奏的构筑。'
-    },
-    {
         id: 'opening_salvo',
         name: '开幕齐射管',
         icon: '📯',
@@ -1851,17 +1830,6 @@ const RELIC_DB = [
         rarity: 'epic',
         effect: 'element_injector',
         maxStacks: 1
-    },
-    // 旧精华体系遗物：当前主循环已停用
-    {
-        id: 'chaos_burst',
-        name: '旧混沌爆发',
-        icon: '💥',
-        desc: '已废弃：旧版精华掉落联动遗物。',
-        rarity: 'cursed',
-        effect: 'chaos_burst',
-        maxStacks: 1,
-        deprecated: true
     },
     // 属性协议：弹药配方含 4 种以上不同属性时，所有子弹基础伤害 +{该子弹携带属性种类数}
     {

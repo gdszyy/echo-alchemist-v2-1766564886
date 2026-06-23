@@ -100,6 +100,7 @@ for (const subsystem of _subsystems) {
 | 2026-06-18 | `src/utils/ammo_readability.js`, `src/render_system.js`, `src/game_phase.js`, `src/ui/hud.js`, `src/ui_system.js`, `index.html` | **下一发弹药可读性增强**：新增统一弹药读数工具，战斗 HUD 与 Canvas 发射器共用弹药构成、伤害数字、散射弹数、连射次数与主属性摘要；发射器绘制层以扇形预览展示散射，以数字徽标展示伤害，以能量条展示连射，不改变伤害公式。 |
 | 2026-06-19 | `index.html`, `src/ui/shop.js`, `.cursor/rules/ui_system.md` | **测试遗物库移动端布局修复**：`ui_showRelicSelection({ showAllRelics: true })` 必须进入 `relic-debug-picker` 专用布局，使用紧凑纵向列表 + 预览面板 + 返回商店按钮；普通遗物选择仍保持三选一横向卡片语法。 |
 | 2026-06-21 | `index.html`, `src/ui_system.js`, `.cursor/rules/ui_system.md` | **战斗主界面 P0 布局落地**：`combat-status-panel` 迁入 `#unified-top-bar` 中心区，作为顶部战斗 HUD 的紧凑态势胶囊，不再独立占用第二条顶部空间；`#phase-combat` 新增左右沉浸装饰带和 `.combat-safe-frame` 战斗判定区边框；战斗阶段进入时会移除 `#module-editor-entry-layer`，避免「编辑钉板」入口残留在右上角。业务层不直接操作 DOM，仍由 UI 层读取 Game 状态并刷新视图。 |
+| 2026-06-23 | `index.html`, `src/ui_system.js`, `src/spawn_system.js`, `src/utils/boss_schedule_utils.js`, `.cursor/rules/ui_system.md`, `.cursor/rules/spawn_system.md` | **下一 Boss 威胁倒计时接入**：复用 `#combat-status-panel` 增加 `#combat-next-threat` 小胶囊，按 `_nextBossRound` / `ENEMY_CURVE_CONFIG.THEME_SEGMENTS` 只读推导下一 Boss 回合；未遭遇 Boss 只显示未知剪影与倒计时，不提前泄露名称；Boss 顺序预测统一走 `boss_schedule_utils`，UI 预览不得调用会写入 `bossHistory` 的 `spawn_selectBossForRound()`。 |
 | 2026-06-22 | `src/config.js`, `src/ui/shop.js`, `src/game_system.js`, `src/core.js`, `index.html` | **局外商店测试遗物多选**：`debug_pick_any_relic` 价格保持 0，开启全遗物列表后使用 `saveData.debugStartRelicIds` 保存多个开局遗物；`debugStartRelicId` 仅作为旧存档兼容单值保留；`sys_initGameStart()` 必须逐个应用数组内遗物并触发对应即时效果。 |
 | 2026-06-22 | `src/config.js`, `src/ui/shop.js`, `src/ui_system.js` | **测试工具默认显示**：局外商店测试工具默认开启，由 `CONFIG.debugShopDefaultEnabled` 控制；若需要临时隐藏，可设置 `localStorage.echo_debug_shop = '0'`。购买入口仍需通过同一闸门校验，避免显示与购买状态不一致。 |
 | 2026-06-22 | `index.html`, `src/ui/hud.js`, `src/game_phase.js` | **三弹珠研磨 HUD 分轨**：`#hero-gauge-container` 内新增 `#session-charge-stack`，在三弹珠同时掉落时按弹珠序号分别展示能量进度与 `xN` 连射层数；旧 `#gauge-shell` / `#multicast-ui` 仅保留为单弹珠兜底。`UI_HIT_PROGRESS` 与 `UI_MULTICAST_UPDATE` 必须刷新三条 session 轨道，连射转移动画优先从对应 `.session-charge-multicast` 起飞。 |
@@ -239,6 +240,7 @@ for (const subsystem of _subsystems) {
 - 模块编辑器写入 `currentModuleLayout` 时必须创建 `{ id, uid, pegStates, pluginStates }` 组件实例；多格占位使用 `{ ref: anchorIdx }`。不得重新写入裸字符串模块 ID，否则符文融合写入的 `pegStates` 会在替换/重建时丢失。
 - 模块编辑器的 picker 必须读取 `ownedModuleComponents` 库存；装备组件时从库存移除该 `uid`，卸下组件时放回库存。不得读取 `unlockedModuleTypes` 作为可无限使用的模板列表。
 - `#combat-status-panel` 是战斗态势聚合入口，由 `ui_updateCombatStatusPanel()` 节流刷新；只读 `enemies`、`defeatLineY`、`playerShield`、`ammoQueue` 等现有状态，不得在该函数内改变战斗逻辑。
+- `#combat-next-threat` 是 `#combat-status-panel` 内的下一 Boss 威胁倒计时；只能通过 `src/utils/boss_schedule_utils.js` 只读 `_nextBossRound`、`_bossSpawnCount`、`_lastBossSpawnRound`、`bossHistory` 与 `ENEMY_CURVE_CONFIG.THEME_SEGMENTS` 做预告，禁止调用会写入 `bossHistory` 的 `spawn_selectBossForRound()`。未遭遇 Boss 只能显示未知剪影，不提前显示 Boss 名称。
 - 战斗危险反馈统一使用“稳定 / 压线 / 危险 / 护盾待触发”语义，避免各处新增彼此冲突的临时文案。
 - 下一发弹药的属性构成、散射弹数、连射次数和装填格必须统一走 `getAmmoReadabilityProfile()`；`ui_updateCombatStatusPanel()`、战斗 HUD 卡片和 `render_combat_launcherSignal()` 不得各自重新定义展示阈值或评价文案。
 - `UIManager.updateSkillBar()` 负责战斗技能栏工具组：顶部显示当前 SP，技能按钮使用两列网格、`button` 语义、成本徽章、可用状态点和禁用原因；只调用 `game.combat_activateSkill(skill)`，不得在 UI 层扣 SP 或改技能效果。
@@ -336,3 +338,9 @@ for (const subsystem of _subsystems) {
 - Phase switching must restore `#unified-top-bar` with `display: grid`, never `display: flex`, or the three lanes collapse on narrow combat views.
 - Combat recipe HUD cards must stay narrow, left-aligned, and clear of the bottom launcher/core interaction area.
 - Gathering uses `#unified-top-bar.is-gathering`: keep it compact, keep the run-shop schedule in `.run-shop-status-dock.is-gathering-top`, and do not let the merchant/status strip drop into the first peg rows.
+
+## 2026-06-23 Pinboard Editor Target Clarity
+
+- Rune fusion preview copy must call `_moduleEditor_describeRuneTargets()` so the picker names the target slot and module, not only the rune count.
+- `_moduleEditor_buildRunePreviewChainHtml()` must include a visible target-position line; the canvas overlay remains the visual source of truth for the exact peg landing points.
+- Unequipping a module intentionally leaves `currentModuleLayout[slotIdx] = null`. UI code must not call normalization paths that refill that slot with `dense_stagger`; only a newly unlocked slot may receive a starter module automatically.

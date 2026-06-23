@@ -288,3 +288,10 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 - `greedyWheelIntervalFrames`, `greedyWheelPreludeFrames`, and `greedyWheelFireDelayFrames` split the chain rhythm into post-shot wait, convergence roll, and success fire delay.
 - `greedyWheelMaxChain` is a defensive cap for pathological lucky streaks; normal rolls still use the same probability until that cap.
 - `CONFIG.performance.*.greedyWheelEffectLimit` caps the dedicated convergence/success/fail VFX count per quality tier.
+
+## 2026-06-23 Pinboard Row Unlock Relic
+
+- `RELIC_DB` must not include player-facing relic names that start with `旧`; those legacy entries are removed from the current reward pool.
+- `pinboard_second_row` is the current relic for unlocking the second pinboard row. It uses `effect: 'module_row_unlock'`, `targetSlots: 10`, and `maxStacks: 1`.
+- `module_row_unlock` initialization belongs in `ui_selectRelic()`: raise `unlockedModuleSlots`, fill only newly unlocked active slots with starter `dense_stagger`, save run state, and rebuild the gathering pinboard.
+- This relic adds no particles, gradients, `shadowBlur`, or new Canvas blend work; it does not consume additional `CONFIG.performance` budget.

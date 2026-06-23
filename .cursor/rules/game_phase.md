@@ -73,6 +73,9 @@ globs: ["src/game_phase.js"]
 - **覆盖边界**：只允许随机覆盖模块生成出的 `normal` 钉子；模块预置的 `pink`、固定 `cryo` / `pyro` 等特殊钉子必须保留，以免破坏模块本身定位。
 - **后置流程**：随机属性生成完成后，`pendingFusions` 会优先注入 `fusionPriority` 更高的普通钉子，再按中下区域价值排序；注入结果必须通过 `setModulePegState()` 写回组件实例的 `pegStates`，保证重建、拆卸或替换其它组件后，被同化钉子的属性不丢失。模块编辑器中选择符文融合后必须立即调用 `phase_gathering_initPachinko(false)` 重建当前盘面，保证玩家在点击「开始采集」前看到真实融合结果。
 - **融合预览**：模块编辑器存在 `_moduleEditorRunePreview` 时，`render_moduleEditorOverlay()` 必须用 `selectFusionTargetPegs()` 高亮目标钉子；该高亮只做轻量描边/填充，不新增粒子或高开销阴影。
+- **空槽契约（2026-06-23）**：`ensureModuleLayoutInstances()` 只能规范化已有布局，不得把已解锁但为 `null` 的槽位重新补成默认 `dense_stagger`。玩家在编辑器中卸下组件后，该槽位必须保持为空，避免重复向 `ownedModuleComponents` 生成同一默认组件。
+- **第二行解锁遗物（2026-06-23）**：`pinboard_second_row` 使用 `effect: 'module_row_unlock'` 将 `unlockedModuleSlots` 提升到 `targetSlots: 10`。只有这次新解锁的槽位允许一次性填入 `dense_stagger` 起始组件；之后玩家可卸下并保持为空。
+- **融合目标说明（2026-06-23）**：模块编辑器符文融合预览必须同时说明目标槽位与承载组件名称，并用画布高亮实际落点，避免玩家不清楚符文会融合到哪个钉盘模块。
 
 ### 2.3 战斗阶段 (Combat Phase)
 - **职责**: 使用收集到的弹药队列攻击敌人，进行回合制结算。

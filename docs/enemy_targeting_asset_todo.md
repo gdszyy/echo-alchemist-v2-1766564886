@@ -12,6 +12,12 @@
 
 2026-06-23 落地：第一批透明 PNG 边框 Overlay 已生成到 `assets/sprites/enemies/overlays/`，生成脚本为 `scripts/generate_enemy_targeting_overlays.py`，总览图为 `docs/design/enemy_targeting_overlay_contact_sheet.png`。静态 Overlay 已登记：`lowDamageImmune`、`armorSpore`、`siegeBreaker`、`carrier`、`deflectShell`；状态型 Overlay 已登记：`energyArmor charged/empty`、`phaseShield active/disabled`、`livingArmor normal/stack × high/mid/low`、`overloadReactor level1/2/3`。运行时正式 PNG 命中后，`_drawEnemyTargetingFallback()` 只保留缺失兜底，避免 PNG 与 Canvas 线稿重复叠加。
 
+2026-06-23 返工：上一版边框过于工程线稿化，已重写生成器并重新导出为材质化 Overlay。新版本直接从现有 `frame_residue_1x1.png`、`frame_deflector_2x1.png`、`frame_siege_3x2.png`、`frame_bastion_3x1.png` 与 `enemy_residue_1x1_native_hollow_idle.png` 的非透明区域抽取材质，再裁切到各词条边框遮罩里。暗色磨石/金属块体、切削倒角、磨损颗粒、细裂纹和嵌槽是主体，黄/蓝/绿/橙机制色只作为局部晶脉、能量膜、炉栅或导轨。后续继续迭代时，禁止回退到纯线条、纯 UI 图标、纯发光环或无材质的几何符号。
+
+2026-06-23 尺寸适配：targeting overlay 已从单一 1x1 扩展为 footprint-aware 资产族。`assets/sprites/enemies/overlays/` 中每个正式 PNG 均保留 1x1 基准文件，并派生 `_2x1`、`_1x2`、`_2x2`、`_3x1`、`_1x3`、`_2x3`、`_3x2`、`_3x3` 版本；生成器使用九宫格边框扩展，避免把角件、边缘材料和护盾断窗直接拉伸。运行时由 `src/data/enemy_visual_assets.js` 按 `gridCols x gridRows` 自动选择对应文件，静态词条 overlay 与 `energyArmor`、`phaseShield`、`livingArmor`、`overloadReactor` 等动态状态 overlay 均适用。总览图见 `docs/design/enemy_targeting_overlay_footprints_contact_sheet.png`；验收时必须在 2x1、1x2、3x1、2x3、3x2、3x3 敌人上确认边框覆盖真实 footprint，而不是只套 128x128 中心框。
+
+2026-06-23 试炼场落地：`enemy_v2` 分类新增 `ev2_enemy_targeting_footprints`，用于正式 PNG 多尺寸验收。该场景冻结展示 `overloadReactor 3x3`、`phaseShield 1x2`、`energyArmor 2x1`、`lowDamageImmune 3x1`、`livingArmor 2x3`、`carrier 3x2` 与 `siegeBreaker 3x1`，应作为 contact sheet 之外的实机场景检查入口。
+
 ## 1. 已定设计决策
 
 | 主题 | 决策 |
