@@ -24,6 +24,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const DRAFT_DIR = 'assets/sprites/bosses/redraw_drafts';
+const REQUIRED_PAINTERLY_SOURCE_BOSSES = new Set(['viridis', 'ouroboros']);
 const HP_WINDOW_DRAFT = {
     width: 384,
     height: 256,
@@ -38,6 +39,10 @@ const HP_WINDOW_DRAFT = {
         mikro: { min: 0.92, max: 1.08 }
     }
 };
+
+function getPainterlySourceRel(bossId) {
+    return `${DRAFT_DIR}/source_ai/boss_${bossId}_redraw_source_2026-06-23.png`;
+}
 
 let passed = 0;
 let failed = 0;
@@ -198,6 +203,30 @@ function validateBossSprite(bossId) {
     if (!fs.existsSync(metaPath)) {
         fail(`${bossId} missing meta (${metaRel})`);
         return;
+    }
+
+    if (REQUIRED_PAINTERLY_SOURCE_BOSSES.has(bossId)) {
+        const sourceRel = getPainterlySourceRel(bossId);
+        const sourcePath = path.join(root, sourceRel);
+        if (!fs.existsSync(sourcePath)) {
+            fail(`${bossId} missing painterly redraw source (${sourceRel})`);
+            return;
+        }
+        try {
+            const sourcePng = readPngInfo(sourcePath);
+            if (sourcePng.width < BOSS_SPRITE_REDRAW_FRAME_SIZE.width || sourcePng.height < BOSS_SPRITE_REDRAW_FRAME_SIZE.height) {
+                fail(`${bossId} painterly redraw source is too small: ${sourcePng.width}x${sourcePng.height}`);
+                return;
+            }
+            if (![2, 6].includes(sourcePng.colorType) || sourcePng.bitDepth !== 8) {
+                fail(`${bossId} painterly redraw source must be 8-bit RGB/RGBA PNG, got bitDepth=${sourcePng.bitDepth}, colorType=${sourcePng.colorType}`);
+                return;
+            }
+            pass(`${bossId} painterly redraw source present ${sourcePng.width}x${sourcePng.height}`);
+        } catch (err) {
+            fail(`${bossId} invalid painterly redraw source: ${err.message}`);
+            return;
+        }
     }
 
     try {
@@ -374,6 +403,13 @@ function validateBossSpriteRuntimeDrawContract() {
     }
 
     const helperCode = code.slice(methodStart, methodEnd);
+    const decorationStart = methodEnd;
+    const decorationEnd = code.indexOf('_drawArchetypeBody(ctx, w, h)', decorationStart);
+    if (decorationEnd <= decorationStart) {
+        fail('Boss runtime draw must keep Boss decoration before archetype rendering');
+        return;
+    }
+    const decorationCode = code.slice(decorationStart, decorationEnd);
     const hasPostClipCall = code.includes('this._drawBossSpriteOutsideCollisionClip(ctx, w, h);');
     const clipsOnlyPolygonBosses = helperCode.includes("this.type !== 'boss' || this.collisionShape !== 'polygon'");
     const usesInverseClip = helperCode.includes("ctx.clip('evenodd')");
@@ -384,6 +420,35 @@ function validateBossSpriteRuntimeDrawContract() {
     }
 
     pass('Boss runtime draw repairs polygon collision clipping after the physics clip is restored');
+
+    const scalesMikroAndDevourer = helperCode.includes('bossSpriteScale')
+        && decorationCode.includes('bossSpriteScale')
+        && code.includes("this.bossType === 'devourer'")
+        && code.includes('1.14')
+        && code.includes("this.bossType === 'mikro'")
+        && code.includes('1.10');
+    const appliesSpriteScale = helperCode.includes('w * bossSpriteScale')
+        && helperCode.includes('h * bossSpriteScale')
+        && helperCode.includes('Math.min(w, h) * bossSpriteScale')
+        && decorationCode.includes('w * bossSpriteScale')
+        && decorationCode.includes('h * bossSpriteScale')
+        && decorationCode.includes('Math.min(w, h) * bossSpriteScale');
+    if (!scalesMikroAndDevourer || !appliesSpriteScale) {
+        fail('Boss runtime draw must enlarge Mikro and Devourer sprite art without changing collision data');
+        return;
+    }
+
+    const softensOverlay = decorationCode.includes('bossEffectBreath')
+        && decorationCode.includes('bossEffectAlpha')
+        && decorationCode.includes('ctx.globalAlpha *= bossEffectAlpha')
+        && decorationCode.includes('0.34')
+        && decorationCode.includes('0.46');
+    if (!softensOverlay) {
+        fail('Boss runtime draw must soften programmatic Boss overlay effects with a breathing alpha gate');
+        return;
+    }
+
+    pass('Boss runtime draw keeps Mikro/Devourer art larger and gates legacy overlay effects with breathing alpha');
 }
 
 console.log('Boss base sprite asset validation');

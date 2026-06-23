@@ -304,3 +304,6 @@
 - `Enemy.draw()` now keeps the original clipped Boss sprite pass, then calls `_drawBossSpriteOutsideCollisionClip()` immediately after the physics clip is restored.
 - The repair pass only runs for polygon Bosses and uses an even-odd inverse clip, so it paints the sprite pixels that were cut by the collision polygon without covering HP, vulnerability overlays, cracks, or other in-body state layers.
 - Arc Bosses keep the existing full post-clip sprite pass for the complete ring silhouette. Physics collision data is unchanged; this is a rendering-only correction with at most one extra cached `drawImage` per visible polygon Boss.
+- Boss procedural decoration effects are gated by `bossEffectAlpha`, a low-amplitude breathing alpha multiplier, so legacy glow/rune/aura layers remain readable without covering the bitmap Boss body.
+- Mikro and Devourer receive runtime-only sprite target-rect boosts (`1.10x` / `1.14x`) in both the clipped pass and polygon clip-repair pass. This does not change collision data, footprint cues, projectile hit tests, or Boss placement.
+- `tests/validate_boss_sprite_assets.mjs` requires Viridis and Ouroboros source-art files in `assets/sprites/bosses/redraw_drafts/source_ai/` so future path regressions or missing painterly source assets fail before runtime review.

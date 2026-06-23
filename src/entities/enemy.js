@@ -8073,21 +8073,22 @@ class Enemy {
         const bossSpriteAspect = typeof this._spriteRenderer.getCurrentFrameAspect === 'function'
             ? this._spriteRenderer.getCurrentFrameAspect()
             : 1;
+        const bossSpriteScale = this.bossType === 'devourer' ? 1.14 : this.bossType === 'mikro' ? 1.10 : 1;
         let drawn = false;
         if (bossSpriteAspect > 1.18) {
-            const bossSpriteW = w;
-            const bossSpriteH = Math.min(h, bossSpriteW / bossSpriteAspect);
-            drawn = this._spriteRenderer.draw(ctx, -bossSpriteW / 2, -bossSpriteH / 2, bossSpriteW, bossSpriteH, 0.88);
+            const bossSpriteW = w * bossSpriteScale;
+            const bossSpriteH = Math.min(h * bossSpriteScale, bossSpriteW / bossSpriteAspect);
+            drawn = this._spriteRenderer.draw(ctx, -bossSpriteW / 2, -bossSpriteH / 2, bossSpriteW, bossSpriteH, 0.94);
         } else {
-            const sprSize2 = Math.min(w, h);
-            drawn = this._spriteRenderer.draw(ctx, -sprSize2 / 2, h / 2 - sprSize2, sprSize2, sprSize2, 0.85);
+            const sprSize2 = Math.min(w, h) * bossSpriteScale;
+            drawn = this._spriteRenderer.draw(ctx, -sprSize2 / 2, h / 2 - sprSize2, sprSize2, sprSize2, 0.90);
         }
 
         ctx.restore();
         return drawn;
     }
 
-    // @perf-impact: Boss 本体 Sprite 仍每个 Boss 每帧最多 1 次 drawImage；384x256 重绘资源只改变目标矩形，加载失败继续 Canvas 装饰 fallback。
+    // @perf-impact: Boss body Sprite remains at at most one drawImage per Boss per frame; this pass only changes target rects and effect-layer alpha breathing, adding no particles, gradients, or budget fields.
     // @section:boss_deco_phase_check - Boss 阶段检查与装饰基础参数
      _drawBossDecoration(ctx, w, h) {
         // === [Phase C Task 5.C] Boss Sprite 优先绘制 ===
@@ -8098,18 +8099,23 @@ class Enemy {
             const bossSpriteAspect = typeof this._spriteRenderer.getCurrentFrameAspect === 'function'
                 ? this._spriteRenderer.getCurrentFrameAspect()
                 : 1;
+            const bossSpriteScale = this.bossType === 'devourer' ? 1.14 : this.bossType === 'mikro' ? 1.10 : 1;
             if (bossSpriteAspect > 1.18) {
-                const bossSpriteW = w;
-                const bossSpriteH = Math.min(h, bossSpriteW / bossSpriteAspect);
-                this._spriteRenderer.draw(ctx, -bossSpriteW / 2, -bossSpriteH / 2, bossSpriteW, bossSpriteH, 0.88);
+                const bossSpriteW = w * bossSpriteScale;
+                const bossSpriteH = Math.min(h * bossSpriteScale, bossSpriteW / bossSpriteAspect);
+                this._spriteRenderer.draw(ctx, -bossSpriteW / 2, -bossSpriteH / 2, bossSpriteW, bossSpriteH, 0.94);
             } else {
-                const sprSize2 = Math.min(w, h);
-                this._spriteRenderer.draw(ctx, -sprSize2/2, h/2 - sprSize2, sprSize2, sprSize2, 0.85);
+                const sprSize2 = Math.min(w, h) * bossSpriteScale;
+                this._spriteRenderer.draw(ctx, -sprSize2/2, h/2 - sprSize2, sprSize2, sprSize2, 0.90);
             }
         }
 
         const t = Date.now() / 1000;
         const isBerserk = this.berserked || (this.hp / this.maxHp) < (CONFIG.balance.bossEnrageHpRatio ?? 0.2);
+        const bossEffectBreath = 0.78 + ((Math.sin(t * 1.35 + this.visualSeed * Math.PI * 2) + 1) * 0.5) * 0.22;
+        const bossEffectAlpha = (isBerserk ? 0.46 : 0.34) * bossEffectBreath;
+        ctx.save();
+        ctx.globalAlpha *= bossEffectAlpha;
         switch (this.bossType) {
             case 'ignis': {
                 // === Ignis: 燕火之心 + 火星喷射 ===
@@ -8579,6 +8585,7 @@ class Enemy {
             default:
                 break;
         }
+        ctx.restore();
     }
 
     /**

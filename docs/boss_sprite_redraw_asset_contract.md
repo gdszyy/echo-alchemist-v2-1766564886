@@ -217,3 +217,10 @@ assets/sprites/bosses/redraw_drafts/boss_hp_translucency_mask_contact_sheet.png
 2026-06-23 更新：polygon Boss 的本体 sprite 不应被物理碰撞多边形直接裁成缺块。运行时保留原有物理 clip 内绘制，用于让 HP、破绽、裂纹等内部层级维持正确遮挡；随后在 clip 恢复后通过 `_drawBossSpriteOutsideCollisionClip()` 使用 even-odd 反向裁剪，只补出被 polygon 裁掉的外沿像素。该逻辑不改变 `collisionShape/collisionData`，也不要求把美术主体强行缩小到多边形内部。Arc Boss 仍使用原有的 post-clip 完整绘制，以保证最终 Boss 的完整环形资产可见。
 
 正式美术终稿前仍需人工验收：确认 384×256 单帧主体不会遮挡血条、主体实心轮廓贴合 `boss_collision_guides_v2_no_three_rings_384x256.png`、弱点位置与 `vulnerability/weak_mask` 对齐，并决定是否把当前 6 帧 draft idle 扩展到 8-12 帧终稿 sheet。
+
+## 9. Runtime readability tuning
+2026-06-23 update: the runtime Boss pass now keeps Viridis and Ouroboros source-art validation explicit. `tests/validate_boss_sprite_assets.mjs` requires their `source_ai/boss_<id>_redraw_source_2026-06-23.png` files in addition to the redraw runtime sheet and HP translucency mask, so a missing painterly source or a path regression fails fast.
+
+The legacy Canvas Boss effect layer remains active for state readability, but it is now gated by `bossEffectAlpha` with a slow breathing multiplier. Normal Bosses should sit around low-to-mid alpha and berserk Bosses only slightly higher; the goal is to let the bitmap body carry the silhouette and material while the old procedural layer reads as aura, not as paint over the asset.
+
+Mikro and Devourer receive a runtime-only sprite scale boost (`1.10x` and `1.14x`) in both the clipped draw and polygon clip-repair draw. This is a visual target-rect change only: `collisionShape`, `collisionData`, projectile hit tests, and footprint cues stay unchanged.
