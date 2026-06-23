@@ -1,0 +1,15 @@
+{
+  "frameWidth": 384,
+  "frameHeight": 256,
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 6,
+      "fps": 6,
+      "frameWidth": 384,
+      "frameHeight": 256
+    }
+  },
+  "hpTranslucencyMask": "boss_viridis_hp_translucency_mask_v20260623painterly.png",
+  "notes": "Versioned painterly redraw draft from AI source with local chroma removal and regional HP translucency."
+}

@@ -20,6 +20,11 @@ export const BOSS_SPRITE_BOSS_IDS = [
 export const BOSS_SPRITE_ROOT = 'assets/sprites/bosses';
 export const BOSS_SPRITE_REDRAW_DRAFT_ROOT = `${BOSS_SPRITE_ROOT}/redraw_drafts`;
 
+export const BOSS_SPRITE_VERSION_SUFFIX_BY_BOSS = {
+    viridis: 'v20260623painterly',
+    ouroboros: 'v20260623painterly'
+};
+
 export const BOSS_SPRITE_LEGACY_FRAME_SIZE = {
     width: 256,
     height: 256
@@ -51,12 +56,16 @@ export function getBossSpriteLegacyMetaPath(bossId) {
 
 export function getBossSpriteRedrawDraftSheetPath(bossId) {
     if (!bossId) return null;
-    return `${BOSS_SPRITE_REDRAW_DRAFT_ROOT}/boss_${bossId}_redraw_idle_draft_sheet.png`;
+    const suffix = BOSS_SPRITE_VERSION_SUFFIX_BY_BOSS[bossId];
+    const versionPart = suffix ? `_${suffix}` : '';
+    return `${BOSS_SPRITE_REDRAW_DRAFT_ROOT}/boss_${bossId}_redraw_idle_draft_sheet${versionPart}.png`;
 }
 
 export function getBossSpriteRedrawDraftMetaPath(bossId) {
     if (!bossId) return null;
-    return `${BOSS_SPRITE_REDRAW_DRAFT_ROOT}/boss_${bossId}_redraw_idle_draft_sheet.json`;
+    const suffix = BOSS_SPRITE_VERSION_SUFFIX_BY_BOSS[bossId];
+    const versionPart = suffix ? `_${suffix}` : '';
+    return `${BOSS_SPRITE_REDRAW_DRAFT_ROOT}/boss_${bossId}_redraw_idle_draft_sheet${versionPart}.json`;
 }
 
 // @perf-impact: Boss runtime uses 384x256 redraw sheets through the existing single SpriteRenderer draw call.
@@ -71,6 +80,27 @@ export function getBossSpriteMetaPath(bossId) {
 export function getBossSpriteRawConceptPath(bossId) {
     if (!bossId) return null;
     return `${BOSS_SPRITE_ROOT}/raw/${bossId}_idle_raw.png`;
+}
+
+export function getBossSpriteBaseDraftPath(bossId) {
+    if (!bossId) return null;
+    const suffix = BOSS_SPRITE_VERSION_SUFFIX_BY_BOSS[bossId];
+    const versionPart = suffix ? `_${suffix}` : '';
+    return `${BOSS_SPRITE_REDRAW_DRAFT_ROOT}/boss_${bossId}_base_draft_384x256${versionPart}.png`;
+}
+
+export function getBossSpriteHpTranslucencyMaskPath(bossId) {
+    if (!bossId) return null;
+    const suffix = BOSS_SPRITE_VERSION_SUFFIX_BY_BOSS[bossId];
+    const versionPart = suffix ? `_${suffix}` : '';
+    return `${BOSS_SPRITE_REDRAW_DRAFT_ROOT}/boss_${bossId}_hp_translucency_mask${versionPart}.png`;
+}
+
+export function getBossSpriteHpWindowPreviewPath(bossId) {
+    if (!bossId) return null;
+    const suffix = BOSS_SPRITE_VERSION_SUFFIX_BY_BOSS[bossId];
+    const versionPart = suffix ? `_${suffix}` : '';
+    return `${BOSS_SPRITE_REDRAW_DRAFT_ROOT}/boss_${bossId}_base_draft_hp_window_preview${versionPart}.png`;
 }
 
 export function isKnownBossSpriteId(bossId) {

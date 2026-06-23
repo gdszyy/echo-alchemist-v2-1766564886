@@ -224,3 +224,8 @@ assets/sprites/bosses/redraw_drafts/boss_hp_translucency_mask_contact_sheet.png
 The legacy Canvas Boss effect layer remains active for state readability, but it is now gated by `bossEffectAlpha` with a slow breathing multiplier. Normal Bosses should sit around low-to-mid alpha and berserk Bosses only slightly higher; the goal is to let the bitmap body carry the silhouette and material while the old procedural layer reads as aura, not as paint over the asset.
 
 Mikro and Devourer receive a runtime-only sprite scale boost (`1.10x` and `1.14x`) in both the clipped draw and polygon clip-repair draw. This is a visual target-rect change only: `collisionShape`, `collisionData`, projectile hit tests, and footprint cues stay unchanged.
+
+## 10. Versioned painterly runtime paths
+2026-06-23 follow-up: Viridis and Ouroboros must not use the old same-name runtime files in training-ground review. Their runtime sprite sheets, JSON metadata, HP translucency masks, HP preview images, vulnerability overlays, and weak-mask alpha files now use the `_v20260623painterly` suffix. This prevents the browser image cache and the SpriteRenderer path cache from reusing the earlier placeholder-looking assets after an art repaint.
+
+The active paths are resolved through `src/data/boss_sprite_assets.js` and `src/data/boss_vulnerability_assets.js`; tests must call those helpers rather than reconstructing `boss_<id>_...png` strings locally. Future repaint passes for these Bosses should add a new suffix instead of overwriting the existing suffix in place.

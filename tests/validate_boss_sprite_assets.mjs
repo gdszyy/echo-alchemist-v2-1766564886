@@ -15,6 +15,10 @@ import {
     BOSS_SPRITE_IDLE_CONTRACT,
     BOSS_SPRITE_LEGACY_FRAME_SIZE,
     BOSS_SPRITE_REDRAW_FRAME_SIZE,
+    BOSS_SPRITE_VERSION_SUFFIX_BY_BOSS,
+    getBossSpriteBaseDraftPath,
+    getBossSpriteHpTranslucencyMaskPath,
+    getBossSpriteHpWindowPreviewPath,
     getBossSpriteMetaPath,
     getBossSpriteRawConceptPath,
     getBossSpriteSheetPath
@@ -25,6 +29,7 @@ const root = path.resolve(__dirname, '..');
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const DRAFT_DIR = 'assets/sprites/bosses/redraw_drafts';
 const REQUIRED_PAINTERLY_SOURCE_BOSSES = new Set(['viridis', 'ouroboros']);
+const REQUIRED_VERSIONED_RUNTIME_BOSSES = new Set(['viridis', 'ouroboros']);
 const HP_WINDOW_DRAFT = {
     width: 384,
     height: 256,
@@ -186,13 +191,25 @@ function validateBossSprite(bossId) {
     const rawRel = getBossSpriteRawConceptPath(bossId);
     const sheetPath = path.join(root, sheetRel);
     const metaPath = path.join(root, metaRel);
+    const suffix = BOSS_SPRITE_VERSION_SUFFIX_BY_BOSS[bossId];
 
     if (!sheetRel.startsWith(`${DRAFT_DIR}/`) || !sheetRel.endsWith(`boss_${bossId}_redraw_idle_draft_sheet.png`)) {
-        fail(`${bossId} runtime sheet must use redraw draft, got ${sheetRel}`);
-        return;
+        const expectedVersionedTail = suffix ? `boss_${bossId}_redraw_idle_draft_sheet_${suffix}.png` : null;
+        if (!expectedVersionedTail || !sheetRel.endsWith(expectedVersionedTail)) {
+            fail(`${bossId} runtime sheet must use redraw draft, got ${sheetRel}`);
+            return;
+        }
     }
     if (metaRel !== sheetRel.replace(/\.png$/i, '.json')) {
         fail(`${bossId} runtime meta must sit beside redraw draft sheet, got ${metaRel}`);
+        return;
+    }
+    if (REQUIRED_VERSIONED_RUNTIME_BOSSES.has(bossId) && !suffix) {
+        fail(`${bossId} must declare a version suffix for painterly runtime art`);
+        return;
+    }
+    if (REQUIRED_VERSIONED_RUNTIME_BOSSES.has(bossId) && (!sheetRel.includes(`_${suffix}.png`) || !metaRel.includes(`_${suffix}.json`))) {
+        fail(`${bossId} runtime sprite must use versioned painterly paths to avoid stale same-name cache`);
         return;
     }
 
@@ -232,6 +249,13 @@ function validateBossSprite(bossId) {
     try {
         const png = readPngInfo(sheetPath);
         const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+        if (REQUIRED_VERSIONED_RUNTIME_BOSSES.has(bossId)) {
+            const expectedMaskName = path.basename(getBossSpriteHpTranslucencyMaskPath(bossId));
+            if (meta.hpTranslucencyMask !== expectedMaskName) {
+                fail(`${bossId} runtime meta must point at versioned HP alpha mask ${expectedMaskName}, got ${meta.hpTranslucencyMask}`);
+                return;
+            }
+        }
         const idle = meta.animations && meta.animations[BOSS_SPRITE_IDLE_CONTRACT.animation];
         if (!idle) {
             fail(`${bossId} missing idle animation`);
@@ -277,12 +301,17 @@ function validateBossSprite(bossId) {
 }
 
 function validateHpReadableDraft(bossId) {
-    const baseRel = path.join(DRAFT_DIR, `boss_${bossId}_base_draft_384x256.png`);
-    const maskRel = path.join(DRAFT_DIR, `boss_${bossId}_hp_translucency_mask.png`);
-    const previewRel = path.join(DRAFT_DIR, `boss_${bossId}_base_draft_hp_window_preview.png`);
+    const baseRel = getBossSpriteBaseDraftPath(bossId);
+    const maskRel = getBossSpriteHpTranslucencyMaskPath(bossId);
+    const previewRel = getBossSpriteHpWindowPreviewPath(bossId);
     const basePath = path.join(root, baseRel);
     const maskPath = path.join(root, maskRel);
     const previewPath = path.join(root, previewRel);
+    const suffix = BOSS_SPRITE_VERSION_SUFFIX_BY_BOSS[bossId];
+    if (REQUIRED_VERSIONED_RUNTIME_BOSSES.has(bossId) && (!baseRel.includes(`_${suffix}.png`) || !maskRel.includes(`_${suffix}.png`) || !previewRel.includes(`_${suffix}.png`))) {
+        fail(`${bossId} HP alpha layer and preview must use versioned painterly paths`);
+        return;
+    }
     if (!fs.existsSync(basePath)) {
         fail(`${bossId} missing HP-readable 384x256 draft (${baseRel})`);
         return;
