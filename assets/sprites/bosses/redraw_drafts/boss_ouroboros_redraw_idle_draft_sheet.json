@@ -11,5 +11,5 @@
     }
   },
   "hpTranslucencyMask": "boss_ouroboros_hp_translucency_mask.png",
-  "notes": "Draft idle sheet generated with regional HP translucency mask; non-mask body remains solid, only material windows reveal HP."
+  "notes": "Painterly redraw draft from AI source with local chroma removal and regional HP translucency."
 }
