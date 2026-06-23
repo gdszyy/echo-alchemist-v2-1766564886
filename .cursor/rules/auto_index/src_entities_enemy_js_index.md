@@ -1,6 +1,6 @@
 # src\entities\enemy.js 函数索引
 
-> 自动生成于 2026-06-23 | 总行数: 9877 | 函数数: 141 | 语言: javascript
+> 自动生成于 2026-06-23 | 总行数: 9931 | 函数数: 142 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 9 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -16,6 +16,7 @@
 | _getEnemyFrameImage | function | `_getEnemyFrameImage(src)` |  |
 | _measureImageAlphaBounds | function | `_measureImageAlphaBounds(img)` |  |
 | _hexToRgba | function | `_hexToRgba(hex, alpha)` |  |
+| _getBossHpThemePalette | function | `_getBossHpThemePalette(bossType)` |  |
 | constructor | method | `constructor(x, y, width, height, hp, maxHp = hp, type = 'normal', affixes = [])` | ⚠️ 巨型函数，见 @section 导航 |
 | initSprite | method | `initSprite()` |  |
 | _initTexture | method | `_initTexture(width, height)` |  |

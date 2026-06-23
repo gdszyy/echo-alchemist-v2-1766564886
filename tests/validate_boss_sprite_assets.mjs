@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import zlib from 'node:zlib';
 import {
     BOSS_SPRITE_BOSS_IDS,
     BOSS_SPRITE_IDLE_CONTRACT,
@@ -22,6 +23,21 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+const DRAFT_DIR = 'assets/sprites/bosses/redraw_drafts';
+const HP_WINDOW_DRAFT = {
+    width: 384,
+    height: 256,
+    minSubjectPixels: 6000,
+    minWindowRatio: 0.08,
+    maxWindowRatio: 0.42,
+    minOutsideMeanAlpha: 220,
+    maxOutsideLowAlphaRatio: 0.24,
+    maxWindowMeanAlpha: 165,
+    minWindowTransparentRatio: 0.55,
+    maskAspectByBoss: {
+        mikro: { min: 0.92, max: 1.08 }
+    }
+};
 
 let passed = 0;
 let failed = 0;
@@ -52,8 +68,103 @@ function readPngInfo(fullPath) {
         width: bytes.readUInt32BE(16),
         height: bytes.readUInt32BE(20),
         bitDepth: bytes[24],
-        colorType: bytes[25]
+        colorType: bytes[25],
+        compression: bytes[26],
+        filter: bytes[27],
+        interlace: bytes[28]
     };
+}
+
+function verifyPngSignature(bytes) {
+    if (bytes.length < 33) throw new Error('file is too small for PNG IHDR');
+    for (let i = 0; i < PNG_SIGNATURE.length; i++) {
+        if (bytes[i] !== PNG_SIGNATURE[i]) throw new Error('invalid PNG signature');
+    }
+}
+
+function paethPredictor(left, up, upLeft) {
+    const p = left + up - upLeft;
+    const pa = Math.abs(p - left);
+    const pb = Math.abs(p - up);
+    const pc = Math.abs(p - upLeft);
+    if (pa <= pb && pa <= pc) return left;
+    if (pb <= pc) return up;
+    return upLeft;
+}
+
+function readPngRgba(fullPath) {
+    const bytes = fs.readFileSync(fullPath);
+    verifyPngSignature(bytes);
+    let offset = 8;
+    let info = null;
+    const idat = [];
+
+    while (offset + 12 <= bytes.length) {
+        const length = bytes.readUInt32BE(offset);
+        const type = bytes.toString('ascii', offset + 4, offset + 8);
+        const dataStart = offset + 8;
+        const dataEnd = dataStart + length;
+        if (dataEnd + 4 > bytes.length) throw new Error(`invalid PNG chunk ${type}`);
+        if (type === 'IHDR') {
+            info = {
+                width: bytes.readUInt32BE(dataStart),
+                height: bytes.readUInt32BE(dataStart + 4),
+                bitDepth: bytes[dataStart + 8],
+                colorType: bytes[dataStart + 9],
+                compression: bytes[dataStart + 10],
+                filter: bytes[dataStart + 11],
+                interlace: bytes[dataStart + 12]
+            };
+        } else if (type === 'IDAT') {
+            idat.push(bytes.subarray(dataStart, dataEnd));
+        } else if (type === 'IEND') {
+            break;
+        }
+        offset = dataEnd + 4;
+    }
+
+    if (!info) throw new Error('missing IHDR');
+    if (info.bitDepth !== 8 || info.colorType !== 6) {
+        throw new Error(`expected 8-bit RGBA PNG, got bitDepth=${info.bitDepth}, colorType=${info.colorType}`);
+    }
+    if (info.compression !== 0 || info.filter !== 0 || info.interlace !== 0) {
+        throw new Error('unsupported PNG compression/filter/interlace mode');
+    }
+    if (idat.length === 0) throw new Error('missing IDAT data');
+
+    const inflated = zlib.inflateSync(Buffer.concat(idat));
+    const channels = 4;
+    const bpp = 4;
+    const rowBytes = info.width * channels;
+    const expected = (rowBytes + 1) * info.height;
+    if (inflated.length < expected) {
+        throw new Error(`inflated PNG is too small: ${inflated.length}, expected at least ${expected}`);
+    }
+
+    const rgba = Buffer.alloc(rowBytes * info.height);
+    let inOffset = 0;
+    let outOffset = 0;
+    for (let y = 0; y < info.height; y++) {
+        const filterType = inflated[inOffset++];
+        for (let x = 0; x < rowBytes; x++) {
+            const raw = inflated[inOffset + x];
+            const left = x >= bpp ? rgba[outOffset + x - bpp] : 0;
+            const up = y > 0 ? rgba[outOffset + x - rowBytes] : 0;
+            const upLeft = y > 0 && x >= bpp ? rgba[outOffset + x - rowBytes - bpp] : 0;
+            let value;
+            if (filterType === 0) value = raw;
+            else if (filterType === 1) value = raw + left;
+            else if (filterType === 2) value = raw + up;
+            else if (filterType === 3) value = raw + Math.floor((left + up) / 2);
+            else if (filterType === 4) value = raw + paethPredictor(left, up, upLeft);
+            else throw new Error(`unsupported PNG row filter ${filterType}`);
+            rgba[outOffset + x] = value & 0xff;
+        }
+        inOffset += rowBytes;
+        outOffset += rowBytes;
+    }
+
+    return { ...info, rgba };
 }
 
 function getFrameSizeFromMeta(meta, anim) {
@@ -127,10 +238,124 @@ function validateBossSprite(bossId) {
     }
 }
 
+function validateHpReadableDraft(bossId) {
+    const baseRel = path.join(DRAFT_DIR, `boss_${bossId}_base_draft_384x256.png`);
+    const maskRel = path.join(DRAFT_DIR, `boss_${bossId}_hp_translucency_mask.png`);
+    const previewRel = path.join(DRAFT_DIR, `boss_${bossId}_base_draft_hp_window_preview.png`);
+    const basePath = path.join(root, baseRel);
+    const maskPath = path.join(root, maskRel);
+    const previewPath = path.join(root, previewRel);
+    if (!fs.existsSync(basePath)) return;
+
+    try {
+        const png = readPngRgba(basePath);
+        if (png.width !== HP_WINDOW_DRAFT.width || png.height !== HP_WINDOW_DRAFT.height) {
+            fail(`${bossId} HP-window draft must be ${HP_WINDOW_DRAFT.width}x${HP_WINDOW_DRAFT.height}, got ${png.width}x${png.height}`);
+            return;
+        }
+        if (!fs.existsSync(maskPath)) {
+            fail(`${bossId} missing HP translucency mask (${maskRel})`);
+            return;
+        }
+        const mask = readPngRgba(maskPath);
+        if (mask.width !== HP_WINDOW_DRAFT.width || mask.height !== HP_WINDOW_DRAFT.height) {
+            fail(`${bossId} HP translucency mask must be ${HP_WINDOW_DRAFT.width}x${HP_WINDOW_DRAFT.height}, got ${mask.width}x${mask.height}`);
+            return;
+        }
+
+        let subject = 0;
+        let windowPixels = 0;
+        let windowAlphaSum = 0;
+        let windowTransparent = 0;
+        let outsidePixels = 0;
+        let outsideAlphaSum = 0;
+        let outsideLowAlpha = 0;
+        let maskMinX = Infinity;
+        let maskMinY = Infinity;
+        let maskMaxX = -Infinity;
+        let maskMaxY = -Infinity;
+        let pixelIndex = 0;
+        for (let i = 3; i < png.rgba.length; i += 4) {
+            const alpha = png.rgba[i];
+            const x = pixelIndex % png.width;
+            const y = Math.floor(pixelIndex / png.width);
+            pixelIndex++;
+            if (alpha <= 0) continue;
+            subject++;
+            const maskAlpha = mask.rgba[i];
+            if (maskAlpha > 48) {
+                windowPixels++;
+                windowAlphaSum += alpha;
+                if (alpha <= 170) windowTransparent++;
+                if (x < maskMinX) maskMinX = x;
+                if (y < maskMinY) maskMinY = y;
+                if (x > maskMaxX) maskMaxX = x;
+                if (y > maskMaxY) maskMaxY = y;
+            } else {
+                outsidePixels++;
+                outsideAlphaSum += alpha;
+                if (alpha < 220) outsideLowAlpha++;
+            }
+        }
+        if (subject < HP_WINDOW_DRAFT.minSubjectPixels) {
+            fail(`${bossId} HP-window draft subject is too small: ${subject} pixels`);
+            return;
+        }
+        const windowRatio = windowPixels / subject;
+        if (windowRatio < HP_WINDOW_DRAFT.minWindowRatio || windowRatio > HP_WINDOW_DRAFT.maxWindowRatio) {
+            fail(`${bossId} HP translucency mask coverage must be ${(HP_WINDOW_DRAFT.minWindowRatio * 100).toFixed(0)}%-${(HP_WINDOW_DRAFT.maxWindowRatio * 100).toFixed(0)}% of subject, got ${(windowRatio * 100).toFixed(1)}%`);
+            return;
+        }
+        const aspectLimit = HP_WINDOW_DRAFT.maskAspectByBoss[bossId];
+        if (aspectLimit) {
+            const maskWidth = maskMaxX - maskMinX + 1;
+            const maskHeight = maskMaxY - maskMinY + 1;
+            const maskAspect = maskWidth / Math.max(1, maskHeight);
+            if (maskAspect < aspectLimit.min || maskAspect > aspectLimit.max) {
+                fail(`${bossId} HP translucency mask aspect must be ${aspectLimit.min}-${aspectLimit.max}, got ${maskAspect.toFixed(2)} (${maskWidth}x${maskHeight})`);
+                return;
+            }
+        }
+        const windowMeanAlpha = windowAlphaSum / Math.max(1, windowPixels);
+        if (windowMeanAlpha > HP_WINDOW_DRAFT.maxWindowMeanAlpha) {
+            fail(`${bossId} HP window mean alpha is too high: ${windowMeanAlpha.toFixed(1)}`);
+            return;
+        }
+        const windowTransparentRatio = windowTransparent / Math.max(1, windowPixels);
+        if (windowTransparentRatio < HP_WINDOW_DRAFT.minWindowTransparentRatio) {
+            fail(`${bossId} HP window needs more translucent pixels, got ${(windowTransparentRatio * 100).toFixed(1)}%`);
+            return;
+        }
+        const outsideMeanAlpha = outsideAlphaSum / Math.max(1, outsidePixels);
+        if (outsideMeanAlpha < HP_WINDOW_DRAFT.minOutsideMeanAlpha) {
+            fail(`${bossId} non-window body mean alpha is too low: ${outsideMeanAlpha.toFixed(1)}`);
+            return;
+        }
+        const outsideLowAlphaRatio = outsideLowAlpha / Math.max(1, outsidePixels);
+        if (outsideLowAlphaRatio > HP_WINDOW_DRAFT.maxOutsideLowAlphaRatio) {
+            fail(`${bossId} too much non-window body is translucent: ${(outsideLowAlphaRatio * 100).toFixed(1)}%`);
+            return;
+        }
+        if (!fs.existsSync(previewPath)) {
+            fail(`${bossId} missing HP window preview (${previewRel})`);
+            return;
+        }
+        const preview = readPngInfo(previewPath);
+        if (preview.width !== HP_WINDOW_DRAFT.width || preview.height !== HP_WINDOW_DRAFT.height || preview.colorType !== 6) {
+            fail(`${bossId} HP window preview must be ${HP_WINDOW_DRAFT.width}x${HP_WINDOW_DRAFT.height} RGBA`);
+            return;
+        }
+        pass(`${bossId} HP-window mask coverage=${(windowRatio * 100).toFixed(1)}%, windowMean=${windowMeanAlpha.toFixed(1)}, bodyMean=${outsideMeanAlpha.toFixed(1)}`);
+    } catch (err) {
+        fail(`${bossId} invalid HP-window draft: ${err.message}`);
+    }
+}
+
 console.log('Boss base sprite asset validation');
 
 for (const bossId of BOSS_SPRITE_BOSS_IDS) {
     validateBossSprite(bossId);
+    validateHpReadableDraft(bossId);
 }
 
 const total = passed + failed;

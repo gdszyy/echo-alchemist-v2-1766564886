@@ -1,0 +1,30 @@
+{
+  "ignis": {
+    "subject": 54072,
+    "windowPixels": 8651,
+    "windowCoverage": 0.16,
+    "windowMeanAlpha": 151.1,
+    "bodyMeanAlpha": 239.8
+  },
+  "glacies": {
+    "subject": 50604,
+    "windowPixels": 9108,
+    "windowCoverage": 0.18,
+    "windowMeanAlpha": 136.5,
+    "bodyMeanAlpha": 227.6
+  },
+  "mikro": {
+    "subject": 16309,
+    "windowPixels": 4240,
+    "windowCoverage": 0.26,
+    "windowMeanAlpha": 141.7,
+    "bodyMeanAlpha": 241.0
+  },
+  "devourer": {
+    "subject": 24207,
+    "windowPixels": 5325,
+    "windowCoverage": 0.22,
+    "windowMeanAlpha": 150.6,
+    "bodyMeanAlpha": 244.1
+  }
+}

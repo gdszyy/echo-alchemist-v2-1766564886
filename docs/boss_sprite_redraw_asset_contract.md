@@ -85,13 +85,35 @@ assets/sprites/bosses/redraw_drafts/boss_collision_guides_v2_no_three_rings_384x
 - 关键实体边缘与 guide 的视觉偏差建议控制在 16-24 px 内；超过该范围的内容只能是明显的半透明特效或背景式装饰。
 - 每个正式替换候选都需要制作“base + collision guide”叠加验收图，确认血条、弱点、碰撞轮廓三者不互相矛盾。
 
+### 4.2 血量可读性 Mask 契约
+
+Boss 本体 Sprite 在运行时绘制在液体 HP 层之后，但不能靠“整张图整体降 alpha”解决可读性。正式资产和 draft 必须采用“正常本体 + 独立透光 mask”的管线：装甲、石壳、藤蔓、外轮廓等非窗口区域保持实体重量；只有材质上合理的炉门缝、冰晶腔、孢室膜、胃囊薄膜、电核罩等位置通过 mask 转成透光窗口，让玩家从这些结构里看到下方 HP 液体。
+
+生成与验收规则：
+
+- 每个 base draft 必须有 `boss_<id>_hp_translucency_mask.png`。mask 使用绿/蓝高饱和区域标记透光材质窗口，后处理脚本只根据 mask 改 alpha，不得扫描整张图做统一透明。
+- 每个 base draft 必须有 `boss_<id>_base_draft_hp_window_preview.png`，把最终本体叠在模拟 HP 液体背景上，人工确认血量只从透光部件中读出。
+- 运行时 Boss HP 槽底和真实 HP 液体会按 `bossType` 使用主题色：Ignis 橙红、Glacies 冰蓝、Mikro 绿核、Devourer 紫渊、Viridis 毒绿、Tesla 电蓝、Chimera 红紫、Ouroboros 金色；预览图也应尽量使用对应主题底色，避免 mask 在正式画面里读感偏色。
+- 透光窗口建议覆盖主体面积约 `8%-35%`，特殊胃囊/孢室类 Boss 可略高但不得超过 `42%`；非 mask 区域应保持高 alpha 和实体重量。
+- mask 内部允许透明渐变，边缘应保留纹路、裂缝、膜边或金属框，避免看起来像硬切 UI 窗口。
+- `tests/validate_boss_sprite_assets.mjs` 会检查已有 draft 的 mask 尺寸、窗口覆盖率、窗口平均 alpha、非窗口主体平均 alpha 和预览图是否存在。
+- 如果某个 Boss 必须有厚重外壳，优先在外壳内部开“材质上合理的透光腔/薄膜/晶体”，不要把整片外壳整体调淡。
+
+可用自动初稿流程：
+
+```bash
+python scripts/extract_boss_hp_translucency_masks.py --root .
+```
+
+该脚本从 `_2026-06-23_opaque_source` 不透明源稿中用 HSV 局部对比、亮纹 top-hat、边缘过滤、连通域清理和覆盖率收缩提取候选 mask，并输出到 `assets/sprites/bosses/redraw_drafts/auto_extract/`。自动结果只能作为美术初稿，不得直接替换 active mask；需要人工检查是否抓到了真实裂纹/透光孔隙，是否误选普通材质纹理。当前实验表明它能较好提取 Ignis 炉栅裂纹、Glacies 冰晶高光、Mikro 孢室纹路和 Devourer 口器缝，但边缘较碎，正式使用前仍要合并主窗口、删除噪点并保持物理轮廓语义。
+
 每个 Boss 的当前物理轮廓：
 
 | Boss | 运行时碰撞 | 美术轮廓要求 |
 |---|---|---|
 | Ignis | 顶窄底宽梯形 polygon | 炉体两侧向下展开，顶部不要画成宽平墙 |
 | Glacies | 顶尖五边形 polygon | 冰晶背脊对齐顶点，两侧肩部贴合斜面 |
-| Mikro | 近圆/椭圆 12 点 polygon | 母核/孢室读成实心近圆或厚壳实体，不要画成空心环，也不要横向铺满 |
+| Mikro | 近圆/正圆 12 点 polygon | 当前美术 draft 按正圆母核读取；母核/孢室 mask 必须保持圆形，不要纵向压扁成椭圆，也不要横向铺满或画成空心环 |
 | Devourer | 不规则 8 点巨口 polygon | 巨口、胃囊和齿槽要贴合实体轮廓；吞噬涡只能作为内部结构或特效，不得形成新碰撞环 |
 | Viridis | 顶尖波浪五边形 polygon | 藤蔓攀附边缘，但主体仍保持尖顶/斜边 |
 | Tesla | 窄菱形 polygon | 中央电核纵向窄身，外扩残影不能像实体 |
@@ -121,25 +143,44 @@ node tests/validate_boss_sprite_assets.mjs
 
 当前旧资源会显示为 `legacy`；重绘完成后应显示为 `redraw`。若存在 PNG/JSON 不匹配、尺寸错误、非 RGBA PNG 或 idle 帧不足，脚本会失败。
 
+若 `assets/sprites/bosses/redraw_drafts/` 下存在 `boss_<id>_base_draft_384x256.png`，同一脚本还会执行 HP 透光窗口验收。该检查只约束 draft 阶段的可读性，不代表正式资源已经替换进运行时。
+
 ## 7. 当前 Draft 状态
 
 2026-06-22：已生成 Ignis 与 Glacies 的基础重绘 draft；2026-06-23 追加 Mikro 与 Devourer 基础重绘 draft。当前均尚未覆盖正式运行时 `assets/sprites/bosses/boss_<bossId>.png/.json`。
 
+2026-06-23：四个已生成 base draft 已改为区域式 HP 透光窗口方案：从不透明源稿恢复实体主体，只让炉芯、冰腔、孢室、胃囊等 mask 标记区域变为透光；此前整体半透明版本已归档为 `_2026-06-23_overall-alpha-superseded`，原不透明源稿归档为 `_2026-06-23_opaque_source`。
+
 ```text
 assets/sprites/bosses/redraw_drafts/boss_ignis_base_draft_384x256.png
+assets/sprites/bosses/redraw_drafts/boss_ignis_hp_translucency_mask.png
+assets/sprites/bosses/redraw_drafts/boss_ignis_base_draft_hp_window_preview.png
+assets/sprites/bosses/redraw_drafts/boss_ignis_base_draft_hp_readability_preview.png
 assets/sprites/bosses/redraw_drafts/boss_ignis_redraw_idle_draft_sheet.png
 assets/sprites/bosses/redraw_drafts/boss_ignis_redraw_idle_draft_sheet.json
 assets/sprites/bosses/redraw_drafts/boss_glacies_base_draft_384x256.png
+assets/sprites/bosses/redraw_drafts/boss_glacies_hp_translucency_mask.png
+assets/sprites/bosses/redraw_drafts/boss_glacies_base_draft_hp_window_preview.png
+assets/sprites/bosses/redraw_drafts/boss_glacies_base_draft_hp_readability_preview.png
 assets/sprites/bosses/redraw_drafts/boss_glacies_redraw_idle_draft_sheet.png
 assets/sprites/bosses/redraw_drafts/boss_glacies_redraw_idle_draft_sheet.json
 assets/sprites/bosses/redraw_drafts/boss_mikro_base_draft_384x256.png
 assets/sprites/bosses/redraw_drafts/boss_mikro_base_draft_collision_overlay.png
+assets/sprites/bosses/redraw_drafts/boss_mikro_hp_translucency_mask.png
+assets/sprites/bosses/redraw_drafts/boss_mikro_base_draft_hp_window_preview.png
+assets/sprites/bosses/redraw_drafts/boss_mikro_base_draft_hp_readability_preview.png
 assets/sprites/bosses/redraw_drafts/boss_mikro_redraw_idle_draft_sheet.png
 assets/sprites/bosses/redraw_drafts/boss_mikro_redraw_idle_draft_sheet.json
 assets/sprites/bosses/redraw_drafts/boss_devourer_base_draft_384x256.png
 assets/sprites/bosses/redraw_drafts/boss_devourer_base_draft_collision_overlay.png
+assets/sprites/bosses/redraw_drafts/boss_devourer_hp_translucency_mask.png
+assets/sprites/bosses/redraw_drafts/boss_devourer_base_draft_hp_window_preview.png
+assets/sprites/bosses/redraw_drafts/boss_devourer_base_draft_hp_readability_preview.png
 assets/sprites/bosses/redraw_drafts/boss_devourer_redraw_idle_draft_sheet.png
 assets/sprites/bosses/redraw_drafts/boss_devourer_redraw_idle_draft_sheet.json
+assets/sprites/bosses/redraw_drafts/boss_base_draft_hp_window_contact_sheet.png
+assets/sprites/bosses/redraw_drafts/boss_base_draft_hp_readability_contact_sheet.png
+assets/sprites/bosses/redraw_drafts/boss_hp_translucency_mask_contact_sheet.png
 ```
 
 正式替换前仍需人工美术验收：确认 384×256 单帧主体不会遮挡血条、主体实心轮廓贴合 `boss_collision_guides_v2_no_three_rings_384x256.png`、弱点位置与 `vulnerability/weak_mask` 对齐，并决定是否把 6 帧 draft idle 扩展到 8-12 帧正式 sheet。

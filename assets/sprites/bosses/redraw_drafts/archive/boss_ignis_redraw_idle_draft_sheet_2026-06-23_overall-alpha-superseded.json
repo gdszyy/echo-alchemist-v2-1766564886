@@ -1,0 +1,14 @@
+{
+  "frameWidth": 384,
+  "frameHeight": 256,
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 6,
+      "fps": 6,
+      "frameWidth": 384,
+      "frameHeight": 256
+    }
+  },
+  "notes": "Draft idle sheet regenerated from HP-readable alpha base; broad plates sit at roughly 50-65% alpha, key seams/cores/texture edges at 70-85%, and only small highlights go higher."
+}

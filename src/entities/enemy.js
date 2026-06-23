@@ -125,6 +125,57 @@ function _hexToRgba(hex, alpha) {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+const BOSS_HP_THEME_PALETTE = {
+    ignis: {
+        fill: '#f97316',
+        slotTop: 'rgba(154, 67, 20, 0.10)',
+        slotBottom: 'rgba(67, 20, 7, 0.18)',
+    },
+    glacies: {
+        fill: '#06b6d4',
+        slotTop: 'rgba(14, 116, 144, 0.10)',
+        slotBottom: 'rgba(8, 47, 73, 0.18)',
+    },
+    mikro: {
+        fill: '#22c55e',
+        slotTop: 'rgba(21, 128, 61, 0.10)',
+        slotBottom: 'rgba(5, 46, 22, 0.18)',
+    },
+    devourer: {
+        fill: '#8b5cf6',
+        slotTop: 'rgba(109, 40, 217, 0.10)',
+        slotBottom: 'rgba(46, 16, 101, 0.18)',
+    },
+    viridis: {
+        fill: '#84cc16',
+        slotTop: 'rgba(77, 124, 15, 0.10)',
+        slotBottom: 'rgba(26, 46, 5, 0.18)',
+    },
+    tesla: {
+        fill: '#60a5fa',
+        slotTop: 'rgba(37, 99, 235, 0.10)',
+        slotBottom: 'rgba(23, 37, 84, 0.18)',
+    },
+    chimera: {
+        fill: '#d946ef',
+        slotTop: 'rgba(190, 24, 93, 0.10)',
+        slotBottom: 'rgba(76, 5, 25, 0.18)',
+    },
+    ouroboros: {
+        fill: '#facc15',
+        slotTop: 'rgba(202, 138, 4, 0.10)',
+        slotBottom: 'rgba(66, 32, 6, 0.18)',
+    },
+};
+
+function _getBossHpThemePalette(bossType) {
+    return BOSS_HP_THEME_PALETTE[bossType] || {
+        fill: '#dc2626',
+        slotTop: 'rgba(96, 28, 44, 0.06)',
+        slotBottom: 'rgba(40, 8, 16, 0.14)',
+    };
+}
+
 const MINION_COLLISION_FRAME_ASSETS = {
     ignis: {
         key: 'minion:ignis:1x1',
@@ -3555,25 +3606,28 @@ class Enemy {
         // @perf-impact: 空槽改为线性渐变（每帧 1 个 LinearGradient/敌人）
         // [玻璃质感] 空槽保留类型色调（普通/精英/Boss）但改为顶浅底深的微弱渐变，
         // 进一步打散纯色面，提升透明感与体积感。alpha 进一步降低，让背景透出更多。
+        const _bossHpTheme = this.type === 'boss' ? _getBossHpThemePalette(this.bossType) : null;
         let _slotTop, _slotBottom;
+        let _slotCacheKey = this.type;
         if (this.type === 'elite') {
             _slotTop = 'rgba(76, 48, 122, 0.05)';
             _slotBottom = 'rgba(28, 14, 52, 0.12)';
         } else if (this.type === 'boss') {
-            _slotTop = 'rgba(96, 28, 44, 0.06)';
-            _slotBottom = 'rgba(40, 8, 16, 0.14)';
+            _slotTop = _bossHpTheme.slotTop;
+            _slotBottom = _bossHpTheme.slotBottom;
+            _slotCacheKey = `boss:${this.bossType || 'default'}`;
         } else {
             _slotTop = 'rgba(40, 52, 74, 0.04)';
             _slotBottom = 'rgba(12, 18, 30, 0.10)';
         }
-        // @perf-impact: 空槽渐变按实例缓存（色标仅依赖 h + type）- 消除每帧每敌 1 个 LinearGradient 分配
-        if (!this._cachedSlotGrad || this._cachedSlotGradH !== h || this._cachedSlotGradType !== this.type) {
+        // @perf-impact: 空槽渐变按实例缓存；Boss 额外按 bossType 缓存主题色，不新增 draw call 或渐变数量。
+        if (!this._cachedSlotGrad || this._cachedSlotGradH !== h || this._cachedSlotGradType !== _slotCacheKey) {
             const _sg = ctx.createLinearGradient(0, -h/2, 0, h/2);
             _sg.addColorStop(0, _slotTop);
             _sg.addColorStop(1, _slotBottom);
             this._cachedSlotGrad = _sg;
             this._cachedSlotGradH = h;
-            this._cachedSlotGradType = this.type;
+            this._cachedSlotGradType = _slotCacheKey;
         }
         ctx.fillStyle = this._cachedSlotGrad;
         ctx.fillRect(-w/2, -h/2, w, h);
@@ -3599,7 +3653,7 @@ class Enemy {
         // [增强对比] 加深基础血色，并与外部背景拉开差异。
         let baseColor = '#64748b';                  // 普通：石板蓝（更亮）
         if (this.type === 'elite') baseColor = '#7c3aed'; // 精英：饱和紫
-        if (this.type === 'boss') baseColor = '#dc2626';  // Boss：饱和血红
+        if (this.type === 'boss') baseColor = (_bossHpTheme && _bossHpTheme.fill) || '#dc2626';
 
         // 温度变色逻辑
         if (this.temp > 0) {
