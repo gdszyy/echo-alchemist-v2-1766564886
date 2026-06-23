@@ -212,4 +212,8 @@ assets/sprites/bosses/redraw_drafts/boss_base_draft_hp_readability_contact_sheet
 assets/sprites/bosses/redraw_drafts/boss_hp_translucency_mask_contact_sheet.png
 ```
 
+## 8. 运行时物理裁剪补边
+
+2026-06-23 更新：polygon Boss 的本体 sprite 不应被物理碰撞多边形直接裁成缺块。运行时保留原有物理 clip 内绘制，用于让 HP、破绽、裂纹等内部层级维持正确遮挡；随后在 clip 恢复后通过 `_drawBossSpriteOutsideCollisionClip()` 使用 even-odd 反向裁剪，只补出被 polygon 裁掉的外沿像素。该逻辑不改变 `collisionShape/collisionData`，也不要求把美术主体强行缩小到多边形内部。Arc Boss 仍使用原有的 post-clip 完整绘制，以保证最终 Boss 的完整环形资产可见。
+
 正式美术终稿前仍需人工验收：确认 384×256 单帧主体不会遮挡血条、主体实心轮廓贴合 `boss_collision_guides_v2_no_three_rings_384x256.png`、弱点位置与 `vulnerability/weak_mask` 对齐，并决定是否把当前 6 帧 draft idle 扩展到 8-12 帧终稿 sheet。

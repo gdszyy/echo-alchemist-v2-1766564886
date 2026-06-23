@@ -298,3 +298,9 @@
 - `Peg.draw()` uses a diamond rivet-plate silhouette plus an inner bevel, short specular/shadow strokes, and a small center slot so pegs read as fixed hardware rather than round marbles; high-cost halo remains controlled by `pegGlowHalo`.
 - `DropBall.draw()` adds a glass-material rim: dark silhouette, upper highlight arc, lower shadow arc, and a soft highlight spot so the marble reads as a rounded bead instead of a flat icon.
 - Hit feedback orbs still drive the same arrival callbacks and charge math, but their visuals are smaller and shorter-lived through `spawn_createHitFeedback(..., options)`.
+
+## 2026-06-23 Boss Sprite Polygon Clip Repair
+
+- `Enemy.draw()` now keeps the original clipped Boss sprite pass, then calls `_drawBossSpriteOutsideCollisionClip()` immediately after the physics clip is restored.
+- The repair pass only runs for polygon Bosses and uses an even-odd inverse clip, so it paints the sprite pixels that were cut by the collision polygon without covering HP, vulnerability overlays, cracks, or other in-body state layers.
+- Arc Bosses keep the existing full post-clip sprite pass for the complete ring silhouette. Physics collision data is unchanged; this is a rendering-only correction with at most one extra cached `drawImage` per visible polygon Boss.

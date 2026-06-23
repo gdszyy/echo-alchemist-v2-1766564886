@@ -363,7 +363,32 @@ function validateHpReadableDraft(bossId) {
     }
 }
 
+function validateBossSpriteRuntimeDrawContract() {
+    const enemyJsPath = path.join(root, 'src/entities/enemy.js');
+    const code = fs.readFileSync(enemyJsPath, 'utf8');
+    const methodStart = code.indexOf('_drawBossSpriteOutsideCollisionClip(ctx, w, h) {');
+    const methodEnd = code.indexOf('_drawBossDecoration(ctx, w, h)', methodStart);
+    if (methodStart < 0 || methodEnd <= methodStart) {
+        fail('Boss runtime draw must expose a polygon clip-repair helper');
+        return;
+    }
+
+    const helperCode = code.slice(methodStart, methodEnd);
+    const hasPostClipCall = code.includes('this._drawBossSpriteOutsideCollisionClip(ctx, w, h);');
+    const clipsOnlyPolygonBosses = helperCode.includes("this.type !== 'boss' || this.collisionShape !== 'polygon'");
+    const usesInverseClip = helperCode.includes("ctx.clip('evenodd')");
+    const keepsFrameAspect = helperCode.includes('getCurrentFrameAspect') && helperCode.includes('bossSpriteAspect > 1.18');
+    if (!hasPostClipCall || !clipsOnlyPolygonBosses || !usesInverseClip || !keepsFrameAspect) {
+        fail('Boss runtime draw must repair polygon collision clipping without changing 384x256 frame aspect');
+        return;
+    }
+
+    pass('Boss runtime draw repairs polygon collision clipping after the physics clip is restored');
+}
+
 console.log('Boss base sprite asset validation');
+
+validateBossSpriteRuntimeDrawContract();
 
 for (const bossId of BOSS_SPRITE_BOSS_IDS) {
     validateBossSprite(bossId);

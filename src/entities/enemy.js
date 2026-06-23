@@ -5282,7 +5282,10 @@ class Enemy {
 
         ctx.restore(); // <--- 裁剪结束
 
-        // === Layer 3.95b: Arc Boss Sprite（裁剪区域外绘制，完整呈现美术资产）===
+        // === Layer 3.95b: Boss Sprite clip repair (post-clip edge fill) ===
+        this._drawBossSpriteOutsideCollisionClip(ctx, w, h);
+
+        // === Layer 3.95c: Arc Boss Sprite（裁剪区域外绘制，完整呈现美术资产）===
         // Arc boss 的圆环裁剪区域会遮挡中央 sprite，因此在 clip 恢复后单独绘制，
         // 使 sprite 完整显示在圆环内部及周围区域。
         if (this.type === 'boss' && this.collisionShape === 'arc' &&
@@ -8040,6 +8043,50 @@ class Enemy {
      * @param {number} w - Boss 宽度（已减去边距）
      * @param {number} h - Boss 高度（已减去边距）
      */
+    // @perf-impact: Non-arc Bosses add at most one cached drawImage after the physics clip is restored; it only fills sprite pixels cut by polygon clips and adds no particles, gradients, or budget fields.
+    _drawBossSpriteOutsideCollisionClip(ctx, w, h) {
+        if (this.type !== 'boss' || this.collisionShape !== 'polygon' ||
+            !this._spriteRenderer || !this._spriteRenderer.ready ||
+            !this.collisionData || !Array.isArray(this.collisionData.vertices) ||
+            this.collisionData.vertices.length < 3) {
+            return false;
+        }
+
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+
+        const clipPad = Math.max(12, Math.min(w, h) * 0.18);
+        const verts = this.collisionData.vertices;
+        ctx.beginPath();
+        ctx.rect(-w / 2 - clipPad, -h / 2 - clipPad, w + clipPad * 2, h + clipPad * 2);
+        ctx.moveTo(verts[0].x, verts[0].y);
+        for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x, verts[i].y);
+        ctx.closePath();
+
+        try {
+            ctx.clip('evenodd');
+        } catch (err) {
+            ctx.restore();
+            return false;
+        }
+
+        const bossSpriteAspect = typeof this._spriteRenderer.getCurrentFrameAspect === 'function'
+            ? this._spriteRenderer.getCurrentFrameAspect()
+            : 1;
+        let drawn = false;
+        if (bossSpriteAspect > 1.18) {
+            const bossSpriteW = w;
+            const bossSpriteH = Math.min(h, bossSpriteW / bossSpriteAspect);
+            drawn = this._spriteRenderer.draw(ctx, -bossSpriteW / 2, -bossSpriteH / 2, bossSpriteW, bossSpriteH, 0.88);
+        } else {
+            const sprSize2 = Math.min(w, h);
+            drawn = this._spriteRenderer.draw(ctx, -sprSize2 / 2, h / 2 - sprSize2, sprSize2, sprSize2, 0.85);
+        }
+
+        ctx.restore();
+        return drawn;
+    }
+
     // @perf-impact: Boss 本体 Sprite 仍每个 Boss 每帧最多 1 次 drawImage；384x256 重绘资源只改变目标矩形，加载失败继续 Canvas 装饰 fallback。
     // @section:boss_deco_phase_check - Boss 阶段检查与装饰基础参数
      _drawBossDecoration(ctx, w, h) {
