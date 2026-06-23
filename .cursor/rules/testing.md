@@ -231,7 +231,7 @@ node tests/validate_boss_vulnerability.mjs
 node tests/validate_boss_vulnerability_assets.mjs
 ```
 
-`validate_boss_vulnerability_assets.mjs` 在正式 PNG 尚未生成时会把缺失文件记为 `PENDING` 并通过；若文件存在，则必须通过 PNG 签名、尺寸、8-bit RGBA 检查。
+`validate_boss_vulnerability_assets.mjs` 在正式 PNG 尚未生成时会把缺失文件记为 `PENDING` 并通过；已生成并纳入运行时资产清单的 Boss（当前为 Ignis / Glacies / Viridis / Ouroboros）缺失文件会直接失败。若文件存在，则必须通过 PNG 签名、尺寸、8-bit RGBA 检查。
 
 ### 4.7 Boss 本体资产校验
 
