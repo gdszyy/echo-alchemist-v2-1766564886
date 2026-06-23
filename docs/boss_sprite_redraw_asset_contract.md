@@ -147,9 +147,9 @@ node tests/validate_boss_sprite_assets.mjs
 
 ## 7. 当前 Draft 状态
 
-2026-06-22：已生成 Ignis 与 Glacies 的基础重绘 draft；2026-06-23 追加 Mikro 与 Devourer 基础重绘 draft。当前均尚未覆盖正式运行时 `assets/sprites/bosses/boss_<bossId>.png/.json`。
+2026-06-22：已生成 Ignis 与 Glacies 的基础重绘 draft；2026-06-23 追加 Mikro、Devourer、Viridis、Tesla、Chimera 与 Ouroboros 基础重绘 draft。当前均尚未覆盖正式运行时 `assets/sprites/bosses/boss_<bossId>.png/.json`。
 
-2026-06-23：四个已生成 base draft 已改为区域式 HP 透光窗口方案：从不透明源稿恢复实体主体，只让炉芯、冰腔、孢室、胃囊等 mask 标记区域变为透光；此前整体半透明版本已归档为 `_2026-06-23_overall-alpha-superseded`，原不透明源稿归档为 `_2026-06-23_opaque_source`。
+2026-06-23：8 个 Boss base draft 均已具备区域式 HP 透光窗口方案：只让炉芯、冰腔、孢室、胃囊、电核罩、混合核心、衔尾蛇环槽等 mask 标记区域变为透光；此前前四个整体半透明版本已归档为 `_2026-06-23_overall-alpha-superseded`，原不透明源稿归档为 `_2026-06-23_opaque_source`。后四个由 `scripts/generate_remaining_boss_hp_drafts.py` 生成碰撞轮廓优先的 draft，用于补齐验收与后续美术重绘参考。
 
 ```text
 assets/sprites/bosses/redraw_drafts/boss_ignis_base_draft_384x256.png
@@ -178,6 +178,30 @@ assets/sprites/bosses/redraw_drafts/boss_devourer_base_draft_hp_window_preview.p
 assets/sprites/bosses/redraw_drafts/boss_devourer_base_draft_hp_readability_preview.png
 assets/sprites/bosses/redraw_drafts/boss_devourer_redraw_idle_draft_sheet.png
 assets/sprites/bosses/redraw_drafts/boss_devourer_redraw_idle_draft_sheet.json
+assets/sprites/bosses/redraw_drafts/boss_viridis_base_draft_384x256.png
+assets/sprites/bosses/redraw_drafts/boss_viridis_hp_translucency_mask.png
+assets/sprites/bosses/redraw_drafts/boss_viridis_base_draft_hp_window_preview.png
+assets/sprites/bosses/redraw_drafts/boss_viridis_base_draft_hp_readability_preview.png
+assets/sprites/bosses/redraw_drafts/boss_viridis_redraw_idle_draft_sheet.png
+assets/sprites/bosses/redraw_drafts/boss_viridis_redraw_idle_draft_sheet.json
+assets/sprites/bosses/redraw_drafts/boss_tesla_base_draft_384x256.png
+assets/sprites/bosses/redraw_drafts/boss_tesla_hp_translucency_mask.png
+assets/sprites/bosses/redraw_drafts/boss_tesla_base_draft_hp_window_preview.png
+assets/sprites/bosses/redraw_drafts/boss_tesla_base_draft_hp_readability_preview.png
+assets/sprites/bosses/redraw_drafts/boss_tesla_redraw_idle_draft_sheet.png
+assets/sprites/bosses/redraw_drafts/boss_tesla_redraw_idle_draft_sheet.json
+assets/sprites/bosses/redraw_drafts/boss_chimera_base_draft_384x256.png
+assets/sprites/bosses/redraw_drafts/boss_chimera_hp_translucency_mask.png
+assets/sprites/bosses/redraw_drafts/boss_chimera_base_draft_hp_window_preview.png
+assets/sprites/bosses/redraw_drafts/boss_chimera_base_draft_hp_readability_preview.png
+assets/sprites/bosses/redraw_drafts/boss_chimera_redraw_idle_draft_sheet.png
+assets/sprites/bosses/redraw_drafts/boss_chimera_redraw_idle_draft_sheet.json
+assets/sprites/bosses/redraw_drafts/boss_ouroboros_base_draft_384x256.png
+assets/sprites/bosses/redraw_drafts/boss_ouroboros_hp_translucency_mask.png
+assets/sprites/bosses/redraw_drafts/boss_ouroboros_base_draft_hp_window_preview.png
+assets/sprites/bosses/redraw_drafts/boss_ouroboros_base_draft_hp_readability_preview.png
+assets/sprites/bosses/redraw_drafts/boss_ouroboros_redraw_idle_draft_sheet.png
+assets/sprites/bosses/redraw_drafts/boss_ouroboros_redraw_idle_draft_sheet.json
 assets/sprites/bosses/redraw_drafts/boss_base_draft_hp_window_contact_sheet.png
 assets/sprites/bosses/redraw_drafts/boss_base_draft_hp_readability_contact_sheet.png
 assets/sprites/bosses/redraw_drafts/boss_hp_translucency_mask_contact_sheet.png

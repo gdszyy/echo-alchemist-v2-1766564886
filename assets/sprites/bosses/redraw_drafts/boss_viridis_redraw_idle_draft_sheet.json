@@ -1,0 +1,15 @@
+{
+  "frameWidth": 384,
+  "frameHeight": 256,
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 6,
+      "fps": 6,
+      "frameWidth": 384,
+      "frameHeight": 256
+    }
+  },
+  "hpTranslucencyMask": "boss_viridis_hp_translucency_mask.png",
+  "notes": "Draft idle sheet generated with regional HP translucency mask; non-mask body remains solid, only material windows reveal HP."
+}

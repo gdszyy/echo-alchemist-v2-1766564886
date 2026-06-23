@@ -26,5 +26,33 @@
     "windowCoverage": 0.22,
     "windowMeanAlpha": 150.6,
     "bodyMeanAlpha": 244.1
+  },
+  "viridis": {
+    "subject": 21983,
+    "windowPixels": 5275,
+    "windowCoverage": 0.24,
+    "windowMeanAlpha": 143.2,
+    "bodyMeanAlpha": 189.4
+  },
+  "tesla": {
+    "subject": 10569,
+    "windowPixels": 2325,
+    "windowCoverage": 0.22,
+    "windowMeanAlpha": 141.2,
+    "bodyMeanAlpha": 190.3
+  },
+  "chimera": {
+    "subject": 24875,
+    "windowPixels": 5472,
+    "windowCoverage": 0.22,
+    "windowMeanAlpha": 141.0,
+    "bodyMeanAlpha": 213.7
+  },
+  "ouroboros": {
+    "subject": 22549,
+    "windowPixels": 4509,
+    "windowCoverage": 0.2,
+    "windowMeanAlpha": 134.3,
+    "bodyMeanAlpha": 200.6
   }
 }

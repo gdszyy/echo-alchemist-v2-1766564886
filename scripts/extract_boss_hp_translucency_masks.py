@@ -19,7 +19,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 FRAME_W = 384
 FRAME_H = 256
-BOSSES = ("ignis", "glacies", "mikro", "devourer")
+BOSSES = ("ignis", "glacies", "mikro", "devourer", "viridis", "tesla", "chimera", "ouroboros")
 
 BOSS_PROFILES = {
     "ignis": {
@@ -52,6 +52,38 @@ BOSS_PROFILES = {
         "target_max": 0.30,
         "target_final": 0.22,
         "threshold": 82,
+        "top_hat": 12,
+    },
+    "viridis": {
+        "hue_ranges": [(0.19, 0.42)],
+        "target_min": 0.08,
+        "target_max": 0.32,
+        "target_final": 0.24,
+        "threshold": 82,
+        "top_hat": 12,
+    },
+    "tesla": {
+        "hue_ranges": [(0.50, 0.66)],
+        "target_min": 0.08,
+        "target_max": 0.30,
+        "target_final": 0.22,
+        "threshold": 86,
+        "top_hat": 12,
+    },
+    "chimera": {
+        "hue_ranges": [(0.82, 1.00), (0.00, 0.12), (0.22, 0.42)],
+        "target_min": 0.08,
+        "target_max": 0.30,
+        "target_final": 0.22,
+        "threshold": 84,
+        "top_hat": 12,
+    },
+    "ouroboros": {
+        "hue_ranges": [(0.10, 0.20), (0.72, 0.84)],
+        "target_min": 0.08,
+        "target_max": 0.28,
+        "target_final": 0.20,
+        "threshold": 88,
         "top_hat": 12,
     },
 }

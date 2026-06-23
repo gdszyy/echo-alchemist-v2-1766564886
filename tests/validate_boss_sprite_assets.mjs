@@ -245,7 +245,10 @@ function validateHpReadableDraft(bossId) {
     const basePath = path.join(root, baseRel);
     const maskPath = path.join(root, maskRel);
     const previewPath = path.join(root, previewRel);
-    if (!fs.existsSync(basePath)) return;
+    if (!fs.existsSync(basePath)) {
+        fail(`${bossId} missing HP-readable 384x256 draft (${baseRel})`);
+        return;
+    }
 
     try {
         const png = readPngRgba(basePath);
