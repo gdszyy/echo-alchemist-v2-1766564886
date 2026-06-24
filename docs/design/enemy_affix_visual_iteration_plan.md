@@ -2,17 +2,23 @@
 
 本文档用于承接当前敌人美术迭代：奖励敌人的“金边”可读性、通用词条的差异化视觉设计，以及护盾拦截、偏折屏障、跳跃等需要事件反馈的特效层。它不替代 `enemy_visual_design_v2.md`，而是在既有“几何磨石块基座 + 镶嵌核心”母题上补齐奖励层、词条层和触发层的执行规则。
 
+> 2026-06-23 迭代：遗物奖励层不再使用悬浮皇冠、中心晶核或单纯发光描边，改为嵌入敌人轮廓内侧的金属材质装饰框：暗金厚底、亮金细边、四角 L 形角标、铆钉与上下/侧边小凸起。`low` 档也保留同一材质轮廓，只关闭动态模糊和高光。
+>
 > 2026-06-22 首轮落地：`src/entities/enemy.js` 已将奖励视觉入口收束为 `rewardType='relic'` 金边；补齐 `shield` / `deflectionWard` 的拦截与破碎短计时反馈；`jump` 在真实越过阻挡时播放不改碰撞的伪 3D 起跳/腾空表现。后续位图 reward frame 与 Overlay PNG 仍按本方案继续推进。
+
+> 2026-06-24 落地：`shield` 与 `radiantAegis` 已生成正式 footprint-aware PNG overlay，覆盖 1x1 到 3x3 资产族；Boss 默认按 3x2 取图。普通护盾层仍保留 `盾N` 状态徽记和命中/破碎 Canvas 反馈，但常驻美术层不再缺失。UI icon 侧同步接入：敌方护盾层数指标显示 `affix_shield.png`，`radiantAegis` 使用正式 `affix_radiantAegis.png`。
+> 2026-06-24 追补：敌人本体 HUD 的防御数值不再混入 `_drawStatusBadges()` 文字短标签。`shield` / `radiantAegis` 由 `_drawDefenseHudBadges()` 常驻绘制在 HP 数字旁，直接使用 `affix_shield.png` / `affix_radiantAegis.png` + 数值，受击浮字只保留瞬时反馈。
+> 2026-06-24 追补：护盾挡伤反馈不再使用全身脉冲作为唯一表现。`Enemy.takeDamage()` 会记录防御层命中来源：有 `source.pos` / `source.vel` 的子弹或激光走“面向弹道方向的侧向抵挡”，无方向的属性结算、扩盾、补盾走“正面护面”。`shield`、`phaseShield`、`deflectionWard`、`radiantAegis`、`energyArmor`、`livingArmor`、`lowDamageImmune` 使用不同颜色语言和折射纹理；挡击版绘制更厚的弧形能量幕、层叠波前、压缩纹，并在 high/medium 叠加沿命中方向推进的线性渐变。`phaseShield` 额外使用错相断续波前，`livingArmor` 在弧幕内叠加黄绿生物甲脉络、甲结和分叉裂纹，`lowDamageImmune` 使用硬壳压痕，避免玩家把所有护盾读成同一种轻微波纹。
 
 ## 1. 分层原则
 
 敌人最终画面按“身份先于状态、状态先于反馈”的顺序阅读：
 
 | 层级 | 职责 | 示例 | 实现方式 |
-|---|---|---|---|
+|---|---|---|---|---|
 | 基底主体 | 表达 footprint、碰撞边界、基底职责 | residue / bastion / maw / siege | Sprite / Canvas fallback |
 | 碰撞材质框 | 强化真实物理边界 | 1x1 框、3x1 框、Boss 随从异形框 | `frames` manifest + `drawImage` |
-| 奖励边框 | 表达击杀后掉落价值 | 遗物金边 | 独立 reward frame / 当前 halo 降级 |
+| 奖励边框 | 表达击杀后掉落价值 | 遗物金属装饰框 | 独立 reward frame / Canvas 金属框 fallback |
 | 词条常驻层 | 表达敌人会什么 | shield / regen / haste / jump | Overlay PNG + Canvas fallback |
 | 词条触发层 | 表达机制刚发生 | 护盾拦截、跳跃落地、回响触发 | 事件计时字段 + 低成本 Canvas 特效 |
 | UI 语义层 | 保底阅读 | 状态短标、威胁角标、命中反馈文字 | 现有短标签系统 |
@@ -21,11 +27,11 @@
 
 ## 2. 奖励敌人：遗物金边
 
-当前敌人掉落标记应只面向 `rewardType='relic'`。代码中仍存在历史 `chaos_essence` / `pure_essence` resolver 与表现分支，但它们不再作为本轮敌人奖励美术目标；后续若正式删除旧分支，应单独做机制清理任务。下一轮美术应把遗物敌人的“光晕”升级为“奖励材质边框”，让低性能档也清楚可见。
+当前敌人掉落标记应只面向 `rewardType='relic'`。代码中仍存在历史 `chaos_essence` / `pure_essence` resolver 与表现分支，但它们不再作为本轮敌人奖励美术目标；后续若正式删除旧分支，应单独做机制清理任务。遗物敌人必须使用“奖励材质边框”，低性能档也不能退回单纯发光或平面双描边。
 
 | rewardType | 主视觉 | high | medium | low |
 |---|---|---|---|---|
-| `relic` | 古金双层边框，角落有炼金铆钉或小符片 | 金边 + 轻微符文旋转 + 暖金脉冲 | 金边 + 2 个符片 | 平面金色双描边 |
+| `relic` | 古金金属装饰框，细金边 + L 形角标 + 铆钉/小凸起 | 金属框 + 轻微材质高光 | 金属框 + 降低高光 | 金属框轮廓，关闭模糊 |
 
 资产建议：
 
@@ -33,7 +39,20 @@
 |---|---|---|
 | `reward_frame_relic.png` | `assets/sprites/enemies/rewards/` | 中心透明，边框不改变碰撞判定。 |
 
-实现建议：新增 reward frame manifest 段，或先在 `enemy_sprite_manifest.json` 增加 `rewardFrames`。命中位图时只做 1 次 `drawImage`；缺失时继续使用当前 Canvas relic halo / 平面金边兜底。
+实现建议：新增 reward frame manifest 段，或先在 `enemy_sprite_manifest.json` 增加 `rewardFrames`。命中位图时只做 1 次 `drawImage`；缺失时使用 Canvas 金属框 fallback，不能退回皇冠、中心晶核或纯光晕提示。
+
+## 2.5 符文奖励敌人：奖励词条层
+
+带符文敌人需要特殊处理，但不要做成新基底或新敌人种族。首批只规划为两个奖励词条：`runeBearer` 表示通用符文掉落，额外携带一个每回合随机变化的临时词条；`adaptiveRune` 表示自适应符文，会记录最近受到的有效属性伤害或属性效果，切换成对应属性态，并在死亡时掉落该属性家族符文。
+
+| 词条 | 常驻视觉 | 触发反馈 | 掉落读法 |
+|---|---|---|---|---|
+| `runeBearer` | 嵌入式紫金符文槽、轮换刻度、小型当前临时词条副徽记 | 敌方回合开始轮换临时词条时，播放 3-4 帧低成本刻度转动或副徽记替换反馈 | 通用智能符文掉落，仍走标准构筑权重 |
+| `adaptiveRune` | 可变色符文核心、属性纹路、贴边短元素特效 | 有效属性命中或属性效果结算时，核心切到对应属性色并播放短促边缘脉冲 | 按当前记录的属性家族掉落符文；无记录时回退标准智能掉落 |
+
+符文奖励层位于“奖励边框”和“词条常驻层”之间：它必须比普通 `rewardType='relic'` 更像构筑目标，但不能遮挡 `shield`、`phaseShield`、`livingArmor` 等生存机制。`runeBearer` 的临时词条只显示为副徽记，不应混入原始词条图标队列；`adaptiveRune` 只改变核心色、纹路和局部边缘特效，不改变敌人 silhouette。
+
+资产登记规则（2026-06-23 更新）：首版已使用 SVG 占位资产登记到 `enemy_sprite_manifest.json` 与内嵌默认 manifest，避免运行时 404 并提供可验收兜底。正式美术仍需按同名语义替换为最终 PNG/SVG，且 `runeBearer` 保持静态奖励 overlay，`adaptiveRune` 保持静态 overlay + `adaptiveRune.<element>` 动态 overlay 分层。
 
 ## 3. 通用词条差异化视觉
 
@@ -55,16 +74,22 @@
 
 护盾类视觉需要区分两种机制：
 
-| 机制 | 常驻层 | 拦截反馈 | 破碎反馈 |
-|---|---|---|---|
-| `shield` | 全身或分段六边形护膜，表示通用减伤/激光偏折 | 命中点六边形波纹；显示剩余 `盾N` | 最后一层耗尽时外膜断成 3-5 段短线 |
-| `deflectionWard` | 只在前缘/斜面显示青蓝偏折薄膜，表示只挡反弹和穿透 | 反弹/穿透被挡时前缘棱面闪烁，不对普通直击播放 | `wardBarrier` 归零时播放晶片碎裂，回合刷新时薄膜回流 |
+| 机制 | 常驻层 | 有方向拦截反馈 | 无方向/属性反馈 | 破碎反馈 |
+|---|---|---|---|---|
+| `shield` | 全身或分段六边形护膜，表示通用减伤/激光偏折 | 沿子弹入射侧生成蓝白弧形能量幕，内部保留短六边形压缩纹 | 居中椭圆护面闪一下，表示非弹道结算被护住 | 最后一层耗尽时在命中侧或正面断成 3-5 段裂波 |
+| `phaseShield` | 双层错相护膜，表示护盾层数翻倍但有失效窗口 | 入射侧生成紫色错相断续波前，和普通蓝盾明显区分 | 正面双层椭圆护面短闪，用于扩盾/补盾 | 最后一层耗尽时显示紫色错相裂线 |
+| `deflectionWard` | 只在前缘/斜面显示青蓝偏折薄膜，表示只挡反弹和穿透 | 沿入射侧生成偏斜弧幕和切向折射波，不对普通直击播放 | 居中椭圆偏折薄膜，仅用于无方向的屏障刷新/回流 | `wardBarrier` 归零时播放晶片碎裂，回合刷新时薄膜回流 |
+| `radiantAegis` | 流彩菱环和节点，表示可再生数值护盾 | 入射侧出现三层流彩波前，强调它是能量护盾而非普通层数盾 | 正面多色椭圆护面闪烁，用于回合自增、温压补盾或扩盾 | 破裂时命中侧/正面出现多色裂片线 |
+| `energyArmor` | 金色蓄能甲/外缘甲片，表示高伤溢出转护盾 | 入射侧出现厚重金色弧幕和压缩波，强调“硬吃一发” | 正面厚能量罩短闪，用于无方向蓄盾结算 | 当前首版只做挡击反馈，破裂语义由数值归零和状态徽记消失表达 |
+| `livingArmor` | 黄绿活体甲环/孢甲边缘，表示代承层 | 入射侧出现有机弧形能量幕、叶脉状脉络和小甲结，强调活甲代承 | 正面椭圆活甲护面，适合火毒反制等无清晰弹道来源 | 破甲时保留活甲浮字/现有粒子，并在同一方向绘制黄绿分叉裂线 |
+| `lowDamageImmune` | 金属硬壳/厚边，表示低伤无效 | 入射侧显示灰白硬壳压痕和反震短线 | 正面硬壳凹痕短闪，与“过低”浮字同步 | 无破碎态，强调阈值未突破 |
 
 代码接入建议：
 
-- `Enemy.takeDamage()` 已有 `shieldHitTimer`，可扩展为更语义化的 `_affixFxTimers`，例如 `{ shieldBlock, shieldBreak, wardBlock, wardBreak }`。
+- `Enemy.takeDamage()` 已有 `shieldHitTimer`，并新增 `_defenseImpactFx` 记录瞬时防御命中方向；`phaseShield` 使用 `_phaseShieldBlockTimer/_phaseShieldBreakTimer`，`lowDamageImmune` 使用 `_lowDamageImmuneBlockTimer`。后续若继续扩展，可再收束为更语义化的 `_affixFxTimers`。
+- 有 `source.pos` / `source.vel` 的伤害必须优先使用入射侧/弹道方向；没有来源方向的属性结算、补盾、扩盾必须走正面护面反馈，禁止随机方向。
 - `deflectionWard` 的拦截分支应设置 `wardBlockTimer`；破碎时设置 `wardBreakTimer`。
-- 不新增粒子作为首版实现；优先用 `stroke`、`fill`、`lineTo` 和 1-2 次低成本局部渐变。若加入碎片粒子，必须走 `CONFIG.performance` 上限。
+- 不新增粒子作为首版实现；优先用 `stroke`、`fill`、`ellipse`、`quadraticCurveTo` 绘制短生命周期能量弧幕、波前和折射纹。high/medium 可叠加 1 次与入射方向一致的 `createLinearGradient` 能量压缩层；low 档必须关闭该渐变，只保留平面弧幕和降数入射波。若加入碎片粒子，必须走 `CONFIG.performance` 上限。
 
 ## 5. 跳跃：伪 3D 行动表现
 
@@ -106,7 +131,8 @@ V2 专属词条已具备基底身份，但还需要触发反馈：
 2. 使用 `ev2_large_generic_affix` 验证 `shield` / `regen` 在大型基底上不会遮挡主体和 HP。
 3. 增加或复用跳跃场景，确认 `jump` 发生时能看到起跳、腾空、落地，不改变真实碰撞。
 4. 对 `deflectionWard` 分别用 bounce / pierce / normal / pyro / poison 验证只有正确伤害类型播放拦截反馈。
-5. 运行静态验证和浏览器试炼场回归；若改动 `src/entities/enemy.js`，同步更新自动索引。
+5. 若实现 `runeBearer` / `adaptiveRune`，新增试炼场用例分别验证每回合临时词条轮换、属性态切换、死亡掉落家族与 low 档视觉兜底。
+6. 运行静态验证和浏览器试炼场回归；若改动 `src/entities/enemy.js`，同步更新自动索引。
 
 ## 8. 性能自适应影响评估
 
@@ -117,5 +143,7 @@ V2 专属词条已具备基底身份，但还需要触发反馈：
 | high | 完整奖励边框、常驻 Overlay、护盾拦截波、跳跃伪 3D。 |
 | medium | 减少旋转符片和局部高光，保留语义反馈。 |
 | low | 全部语义保留为平面描边/短线；关闭 `shadowBlur`、旋转符片、大面积渐变和粒子。 |
+
+符文奖励敌人的首版实现也应遵守同一预算：`runeBearer` 的轮换反馈优先使用副徽记替换和短刻度线，`adaptiveRune` 的属性切换优先使用核心填色、贴边线和 1 次短脉冲。不得默认新增持续粒子或高频 `shadowBlur`。
 
 若后续实现新增粒子、`shadowBlur`、`createRadialGradient` 或 `screen/lighter` 混合，必须按 `.cursor/rules/performance.md` 补 `// @perf-impact`，并接入 `CONFIG.performance` 三档预算。

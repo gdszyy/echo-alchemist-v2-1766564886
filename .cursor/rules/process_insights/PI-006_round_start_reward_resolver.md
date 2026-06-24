@@ -40,7 +40,7 @@ status: "active"
 
 **现象**：每回合开始时玩家都被迫进入弹珠选择界面，即使没有任何奖励。
 **根因**：`sys_startRoundStartResolver()` 在队列为空时仍调用 `sys_initSelectionPhase()`。
-**正确做法**：队列为空时调用 `sys_showRoundStartBanner()`，显示回合开始大字提示 1.5 秒后直接进入 `phase_startCombatPhase()`；只有精华/命运选择确认才进入 `phase_startGatheringPhase()`。
+**正确做法**：队列为空时调用 `sys_showRoundStartBanner()`，显示回合开始大字提示约 2.2 秒后直接进入 `phase_startCombatPhase()`；只有精华/命运选择确认才进入 `phase_startGatheringPhase()`。
 **关键位置**：`src/game_system.js` → `sys_startRoundStartResolver()` 末尾、`sys_showRoundStartBanner()`
 
 ### 坑 5: 开局缺少弹珠命运选择阶段
@@ -109,6 +109,6 @@ status: "active"
 
 **Root cause**: `marble_pack`, `run_resource_pack`, and `chaos_essence` / `pure_essence` have been conflated across several refactors. The current design removes essence rewards from the active loop. A marble pack is not a fate choice and should not write `pendingSelectionMode`.
 
-**Correct approach**: run start queues one `marble_pack` after the first relic. The run shop must sell mixed marble packs. Both routes call `sys_startMarblePackGrind()`, which fills `marbleQueue`, snapshots any keepable ammo into `_chargedAmmoQueue`, and calls `phase_startGatheringPhase()` directly. Legacy `essence` rewards may normalize to `marble_pack`; new active rewards must not queue `chaos_essence` / `pure_essence`.
+**Correct approach**: run start queues one `marble_pack` after the first relic. The run shop must sell mixed marble packs. Both routes call `sys_startMarblePackGrind()`, which fills `marbleQueue`, snapshots any keepable ammo into `_chargedAmmoQueue`, and calls `phase_startGatheringPhase()` directly. It may play `sys_showRoundStartBanner({ enterCombat:false, protectCombat:false })` as a non-blocking round / next-Boss threat overlay after entering gathering, but must not wait for the banner or route the pack through the combat-only banner path. Legacy `essence` rewards may normalize to `marble_pack`; new active rewards must not queue `chaos_essence` / `pure_essence`.
 
 **Key location**: `src/game_system.js` -> `sys_queueRoundStartReward()` / `sys_startMarblePackGrind()` / `sys_startRoundStartResolver()`, `src/ui/run_shop.js` -> `ui_buyRunShopItem()`.

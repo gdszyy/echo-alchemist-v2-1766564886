@@ -3,8 +3,8 @@ import {
 } from './config.js';
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, TriangleSideWheel, GhostPeg, Peg, DropBall, Enemy, SwordQi, 
-    SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
-    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, showToast, 
+    SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, PierceCutEffect, CollectionBeam,
+    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, SwordScar, BladeStormVortex, showToast,
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
@@ -12,6 +12,19 @@ import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { RUNE_DB } from './rune_config.js';
 import { sb as _sb } from './utils/perf.js';
+import { pixiReleaseParticleSprite, pixiCssColor } from './render/pixi_bridge.js';
+import {
+    iceWave_pixiDestroy, collectionBeam_pixiDestroy,
+    healWave_pixiDestroy, laserBeam_pixiDestroy,
+    lightningBolt_pixiDestroy,
+    fireWave_pixiDestroy, deathExplosion_pixiDestroy,
+    rewardDropEffect_pixiDestroy, greedyWheelEffect_pixiDestroy,
+    shockwave_pixiDestroy, energyOrb_pixiDestroy,
+    slashEffect_pixiDestroy, pierceCutEffect_pixiDestroy,
+    swordScar_pixiDestroy, bladeStormVortex_pixiDestroy,
+    floatingText_pixiDestroy,
+    pixiCleanupAllEffects,
+} from './render/pixi_effect_adapter.js';
 import { calcCombatLauncherGeometry, calcCombatLauncherGeometryToTarget } from './utils/emitter_geometry.js';
 import {
     calcDropDistribution,
@@ -663,7 +676,9 @@ export const game_phase = {
         this.persistentThreshold = CONFIG.gameplay.initTriggerThreshold; 
         // -----------------------------
         this.ui.updateSkillPoints(this.skillPoints);
-        this.ammoQueue = []; 
+        // [PixiJS 迁移] 销毁所有残留特效的 PixiJS 适配器，防止阶段切换后孤立 Sprite 残留
+        pixiCleanupAllEffects(this);
+        this.ammoQueue = [];
         this.dropBalls = []; 
         this.gatheringSessions = [];
         this.currentSession = null;
@@ -1508,7 +1523,10 @@ phase_gathering_getRandomPegType() {
      * @method startCombatPhase
      * @description 开始战斗阶段，初始化敌人和UI。
      */
-    phase_startCombatPhase() { 
+    phase_startCombatPhase() {
+        // [PixiJS 迁移] 销毁所有残留特效的 PixiJS 适配器，防止阶段切换后孤立 Sprite 残留
+        pixiCleanupAllEffects(this);
+
         this.isEnemyTurn = false;
         this.energyOrbs = [];
         this.sonSwordQueue = []; 
@@ -1645,8 +1663,8 @@ phase_gathering_getRandomPegType() {
             if (e._frostPrisonAmp) e._frostPrisonAmp = 0; // 冰牢封印伤害加成每回合清除
         });
         
-        // [充能符文系统] 初始化充能状态
-        this.combat_runeCharge_init();
+        // [技能充能系统] 初始化充能状态
+        this.combat_skillCharge_init();
         
         if (this.ui) {
             this.ui.updateSkillPoints(this.skillPoints);
@@ -1767,7 +1785,7 @@ phase_gathering_getRandomPegType() {
              if (!this.isEnemyTurn && this.ammoQueue.length > 0 && this.projectiles.length === 0 && this.burstQueue.length === 0) {
                 this.isDragging = true;
                 // [emitter-anchor] 发射锚点固定为炮台旋转圆心，统一由 emitter_geometry 计算。
-                this.dragStart = calcCombatLauncherGeometry(this.width, this.height).port;
+                this.dragStart = calcCombatLauncherGeometry(this.width, this.height).muzzle;
                 this.dragCurrent = logicPos;
                 this.ui.closeDrawer();
             }
@@ -2015,31 +2033,15 @@ phase_gathering_getRandomPegType() {
 /**
      * @method phase_claimPendingRunes
      * @description 敌人动作后领取待入库符文：
-     *   1. 充能符文（combo充能奖励）
-     *   2. 场地掉落符文（回合结算自动拾取）
+     *   1. 场地掉落符文（回合结算自动拾取）
      * 对每个符文触发飞入背包动画，让玩家知道获得了这些符文。
      * 应在 phase_finalizeRound 之前调用（敌人动作后）。
      */
     phase_claimPendingRunes() {
-        // 收集所有待领取符文（充能符文 + 掉落符文）
+        // 收集所有待领取符文（仅掉落符文；充能已迁移为技能点奖励）
         const pendingRunes = [];
 
-        // 1. 充能符文：如果充能有奖励，先入库再加入动画队列
-        const chargeDef = this.runeChargeCurrentRune;
-        if (chargeDef) {
-            const chargeLevel = this.runeChargeCurrentLevel || 1;
-            this.runeInventory.push({ id: chargeDef.id, level: chargeLevel });
-            pendingRunes.push({ runeDef: chargeDef, level: chargeLevel, source: 'charge' });
-            // 重置充能状态（不再在 combat_runeCharge_claimReward 中重复入库）
-            this.runeChargeValue        = 0;
-            this.runeChargeLevel        = 0;
-            this.runeChargeCurrentRune  = null;
-            this.runeChargeCurrentLevel = 1;
-            // 音效
-            try { if (audio?.playPowerup) audio.playPowerup(); } catch(e) {}
-        }
-
-        // 2. 掉落符文：将场地掉落符文入库，加入动画队列
+        // 掉落符文：将场地掉落符文入库，加入动画队列
         if (this.runeLootItems && this.runeLootItems.length > 0) {
             this.runeLootItems.forEach(loot => {
                 if (!loot.active) return;
@@ -2149,6 +2151,7 @@ phase_gathering_getRandomPegType() {
             e._echoedThisTurn = false;
             e._defenseBarrierArrivedThisTurn = false;
             e._defenseBarrierHitThisTurn = false;
+            if (typeof e._tickRuneBearerForTurn === 'function') e._tickRuneBearerForTurn(this);
 
             // [敌人针对] 回合开始状态：活体护甲恢复、相位护盾节奏、护甲孢子分派。
             if (typeof e._restoreLivingArmorForTurn === 'function') e._restoreLivingArmorForTurn();
@@ -2263,7 +2266,7 @@ phase_gathering_getRandomPegType() {
             }
         }
 
-        // --- [符文领取] 充能符文和掉落符文的领取已提前到敌人动作后（phase_claimPendingRunes）执行
+        // --- [符文领取] 掉落符文的领取已提前到敌人动作后（phase_claimPendingRunes）执行
         // 仅将库存同步到存档（符文已在 phase_claimPendingRunes 中入库）
         this.saveData.runeInventory = (this.runeInventory || []).slice();
         this.sys_saveData();
@@ -2546,9 +2549,9 @@ phase_gathering_getRandomPegType() {
     },
 
     phase_handleGreedyWheelQueueEvent(shot) {
-        const fallbackPort = calcCombatLauncherGeometry(this.width, this.height, shot.vel).port;
-        const gx = (typeof shot.x === 'number') ? shot.x : fallbackPort.x;
-        const gy = (typeof shot.y === 'number') ? shot.y : fallbackPort.y;
+        const fallbackMuzzle = calcCombatLauncherGeometry(this.width, this.height, shot.vel).muzzle;
+        const gx = (typeof shot.x === 'number') ? shot.x : fallbackMuzzle.x;
+        const gy = (typeof shot.y === 'number') ? shot.y : fallbackMuzzle.y;
         if (shot.type === 'greedy_wheel_prelude') {
             if (typeof this.spawn_createGreedyWheelEffect === 'function') {
                 this.spawn_createGreedyWheelEffect(gx, gy, 'prelude');
@@ -2651,8 +2654,13 @@ phase_gathering_getRandomPegType() {
                 this.isChargingShot = false;
                 this.chargeProgress = 0;
                 if (this.pendingFireVelocity) {
-                    this.combat_fireNextShot(this.pendingFireVelocity);
+                    const firedVelocity = this.pendingFireVelocity;
+                    const firedOrigin = this.pendingFireOrigin;
+                    this._launcherShotAimRotation = Math.atan2(firedVelocity.y, firedVelocity.x);
+                    this._launcherReturnDelay = Math.max(this._launcherReturnDelay || 0, 42);
+                    this.combat_fireNextShot(firedVelocity, firedOrigin);
                     this.pendingFireVelocity = null;
+                    this.pendingFireOrigin = null;
                     // --- [新增] 发射后立即触发“能量注入”动画 ---
                     this.isReloading = true;
                     this.reloadProgress = 0;
@@ -2671,9 +2679,9 @@ phase_gathering_getRandomPegType() {
         }
 
         this.ui_updateSlowMotion();
-        // [充能符文系统] 充能条自动衰减
+        // [技能充能系统] 临时充能条自动衰减
         if (this.phase === 'combat' || this.phase === 'training') {
-            this.combat_runeCharge_decay(timeScale);
+            this.combat_skillCharge_decay(timeScale);
         }
         const tilt = this.boardTilt.current;
         // @section:combat_update_entities - 实体批量更新（敌人/子弹/特效）
@@ -2724,9 +2732,13 @@ phase_gathering_getRandomPegType() {
                 }
                 // [emitter-anchor] 子弹从炮台旋转圆心生成；炮管火光只作为美术层反馈。
                 // [echo-origin] 若 shot 携带 x/y（如回响弹），则从该坐标发射，否则回退到发射器
-                const fallbackPort = calcCombatLauncherGeometry(this.width, this.height, shot.vel).port;
-                const spawnX = (typeof shot.x === 'number') ? shot.x : fallbackPort.x;
-                const spawnY = (typeof shot.y === 'number') ? shot.y : fallbackPort.y;
+                const fallbackMuzzle = calcCombatLauncherGeometry(this.width, this.height, shot.vel).muzzle;
+                const spawnX = (typeof shot.x === 'number') ? shot.x : fallbackMuzzle.x;
+                const spawnY = (typeof shot.y === 'number') ? shot.y : fallbackMuzzle.y;
+                if (shot.vel && Number.isFinite(shot.vel.x) && Number.isFinite(shot.vel.y)) {
+                    this._launcherShotAimRotation = Math.atan2(shot.vel.y, shot.vel.x);
+                    this._launcherReturnDelay = Math.max(this._launcherReturnDelay || 0, 36);
+                }
                 if (typeof this.render_queueLauncherBarrelFireEffect === 'function') {
                     this.render_queueLauncherBarrelFireEffect(shot.vel, shot.recipe);
                 }
@@ -2741,26 +2753,9 @@ phase_gathering_getRandomPegType() {
         if (this.waveMomentumTimer > 0) this.waveMomentumTimer -= timeScale;
 
         // ==========================================
-        //  LAYER 0: 固定 UI 层 (防线)
-        // Visual warning strip removed; defeatLineY still drives lose checks.
-        if ((this.playerShield || 0) > 0) {
-            const barrierY = this.defeatLineY - 2;
-            this.ctx.save();
-            this.ctx.strokeStyle = 'rgba(147, 197, 253, 0.72)';
-            this.ctx.lineWidth = 3;
-            this.ctx.setLineDash([14, 10]);
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, barrierY);
-            this.ctx.lineTo(this.width, barrierY);
-            this.ctx.stroke();
-            this.ctx.setLineDash([]);
-            this.ctx.fillStyle = 'rgba(147, 197, 253, 0.12)';
-            this.ctx.fillRect(0, barrierY - 10, this.width, 20);
-            this.ctx.font = 'bold 12px sans-serif';
-            this.ctx.textAlign = 'right';
-            this.ctx.fillStyle = 'rgba(191, 219, 254, 0.92)';
-            this.ctx.fillText(`防线屏障 ${this.playerShield}`, this.width - 16, barrierY - 14);
-            this.ctx.restore();
+        //  LAYER 0: 固定 UI 层 (防线 / 失败警戒线)
+        if (typeof this.render_combat_defeatLine === 'function') {
+            this.render_combat_defeatLine(this.ctx);
         }
 
         // ==========================================
@@ -3050,7 +3045,10 @@ phase_gathering_getRandomPegType() {
                 const fw = this.fireWaves[i];
                 fw.update(timeScale);
                 fw.draw(this.ctx);
-                if (fw.life <= 0) this.fireWaves.splice(i, 1);
+                if (fw.life <= 0) {
+                    if (fw._pixi) { fireWave_pixiDestroy(fw._pixi); fw._pixi = null; }
+                    this.fireWaves.splice(i, 1);
+                }
             }
             // @section:combat_update_wave_logic - 波次推进与 Boss 生成判断
             // 更新和绘制 IceWaves（冰冻状态死亡特效）
@@ -3059,7 +3057,10 @@ phase_gathering_getRandomPegType() {
                     const iw = this.iceWaves[i];
                     iw.update(timeScale);
                     iw.draw(this.ctx);
-                    if (iw.life <= 0) this.iceWaves.splice(i, 1);
+                    if (iw.life <= 0) {
+                        if (iw._pixi) { iceWave_pixiDestroy(iw._pixi); iw._pixi = null; }
+                        this.iceWaves.splice(i, 1);
+                    }
                 }
             }
             // 更新和绘制 HealWaves（范围治疗扩散波特效）
@@ -3068,7 +3069,10 @@ phase_gathering_getRandomPegType() {
                     const hw = this.healWaves[i];
                     hw.update(timeScale);
                     hw.draw(this.ctx);
-                    if (hw.life <= 0) this.healWaves.splice(i, 1);
+                    if (hw.life <= 0) {
+                        if (hw._pixi) { healWave_pixiDestroy(hw._pixi); hw._pixi = null; }
+                        this.healWaves.splice(i, 1);
+                    }
                 }
             }
             // 更新和绘制 DeathExplosions（分级死亡爆炸特效）
@@ -3077,7 +3081,10 @@ phase_gathering_getRandomPegType() {
                     const de = this.deathExplosions[i];
                     de.update(timeScale);
                     de.draw(this.ctx);
-                    if (de.life <= 0) this.deathExplosions.splice(i, 1);
+                    if (de.life <= 0) {
+                        if (de._pixi) { deathExplosion_pixiDestroy(de._pixi); de._pixi = null; }
+                        this.deathExplosions.splice(i, 1);
+                    }
                 }
             }
             // 更新和绘制 RewardDropEffects（遗物/精华掉落特效）
@@ -3086,7 +3093,10 @@ phase_gathering_getRandomPegType() {
                     const rde = this.rewardDropEffects[i];
                     rde.update(timeScale);
                     rde.draw(this.ctx);
-                    if (rde.life <= 0) this.rewardDropEffects.splice(i, 1);
+                    if (rde.life <= 0) {
+                        if (rde._pixi) { rewardDropEffect_pixiDestroy(rde._pixi); rde._pixi = null; }
+                        this.rewardDropEffects.splice(i, 1);
+                    }
                 }
             }
 
@@ -3096,7 +3106,10 @@ phase_gathering_getRandomPegType() {
                     const gwe = this.greedyWheelEffects[i];
                     gwe.update(timeScale);
                     gwe.draw(this.ctx);
-                    if (gwe.life <= 0) this.greedyWheelEffects.splice(i, 1);
+                    if (gwe.life <= 0) {
+                        if (gwe._pixi) { greedyWheelEffect_pixiDestroy(gwe._pixi); gwe._pixi = null; }
+                        this.greedyWheelEffects.splice(i, 1);
+                    }
                 }
             }
 
@@ -3110,18 +3123,56 @@ phase_gathering_getRandomPegType() {
                     if (!p) continue;
                     p.update(timeScale);
                     p.draw(this.ctx);
+                    // [PixiJS 迁移 · 阶段二] 同步 WebGL Sprite 属性
+                    if (p._pixiSprite) {
+                        const sp = p._pixiSprite;
+                        sp.x = p.pos.x;
+                        sp.y = p.pos.y;
+                        sp.alpha = p.mode === 'mist' ? Math.max(0, p.life * 0.5) : Math.max(0, p.life);
+                        // [T2.7] wind_slash/line: 速度方向旋转 + 非均匀缩放 + 预彩色纹理不上 tint
+                        if (p.mode === 'wind_slash') {
+                            const speed = p.vel ? Math.hypot(p.vel.x, p.vel.y) : 0;
+                            sp.rotation = speed > 0.1 ? Math.atan2(p.vel.y, p.vel.x) : 0;
+                            const stretch = Math.min(3.0, 1.0 + speed * 0.1);
+                            const baseScale = (p.size || 10) / 32;
+                            sp.scale.set(baseScale * stretch, baseScale);
+                        } else if (p.mode === 'line') {
+                            const speed = p.vel ? Math.hypot(p.vel.x, p.vel.y) : 0;
+                            sp.rotation = speed > 0.1 ? Math.atan2(p.vel.y, p.vel.x) : 0;
+                            sp.scale.set(p.scale ? p.scale.x : 1, p.scale ? p.scale.y : 1);
+                        } else {
+                            const sz = (p.size || 4) * 2.5;
+                            sp.scale.set(sz / 64, sz / 64);  // 64 = 纹理边长
+                            sp.rotation = p.angle || 0;
+                            sp.tint = pixiCssColor(p.color);
+                        }
+                    }
                     if (p.life > 0) {
                         if (w !== r) arr[w] = p;
                         w++;
                     } else {
+                        // [PixiJS 迁移] 释放 Sprite 回池
+                        if (p._pixiSprite) {
+                            pixiReleaseParticleSprite(p._pixiSprite);
+                            p._pixiSprite = null;
+                        }
+                        // [PixiJS 迁移 · 阶段三] 特效对象使用 _pixi 而非 _pixiSprite
+                        if (p._pixi) {
+                            if (p instanceof LaserBeam) { laserBeam_pixiDestroy(p._pixi); }
+                            else if (p instanceof SlashEffect) { slashEffect_pixiDestroy(p._pixi); }
+                            else if (p instanceof PierceCutEffect) { pierceCutEffect_pixiDestroy(p._pixi); }
+                            else if (p instanceof SwordScar) { swordScar_pixiDestroy(p._pixi); }
+                            else if (p instanceof BladeStormVortex) { bladeStormVortex_pixiDestroy(p._pixi); }
+                            p._pixi = null;
+                        }
                         if (counts[p.mode] !== undefined && counts[p.mode] > 0) counts[p.mode]--;
                         if (pool.length < 200 && typeof p.reset === 'function') pool.push(p);
                     }
                 }
                 arr.length = w;
             }
-            for(let i=this.shockwaves.length-1; i>=0; i--) { let s = this.shockwaves[i]; if(s) { s.update(timeScale); s.draw(this.ctx); if(s.alpha <= 0) this.shockwaves.splice(i,1); } } 
-            for(let i=this.lightningBolts.length-1; i>=0; i--) { let b = this.lightningBolts[i]; b.update(timeScale); b.draw(this.ctx); if(b.life <= 0) this.lightningBolts.splice(i,1); } 
+            for(let i=this.shockwaves.length-1; i>=0; i--) { let s = this.shockwaves[i]; if(s) { s.update(timeScale); s.draw(this.ctx); if(s.alpha <= 0) { if(s._pixi) { shockwave_pixiDestroy(s._pixi); s._pixi = null; } this.shockwaves.splice(i,1); } } }
+            for(let i=this.lightningBolts.length-1; i>=0; i--) { let b = this.lightningBolts[i]; b.update(timeScale); b.draw(this.ctx); if(b.life <= 0) { if(b._pixi) { lightningBolt_pixiDestroy(b._pixi); b._pixi = null; } this.lightningBolts.splice(i,1); } }
             for(let i=this.spores.length-1; i>=0; i--) { let s = this.spores[i]; if(s) { s.update(timeScale); s.draw(this.ctx); if(!s.active) this.spores.splice(i,1); } }
             if (this.swordQis) {
                 this.swordQis.forEach(qi => qi.draw(this.ctx));
@@ -3154,11 +3205,11 @@ phase_gathering_getRandomPegType() {
             if (this.isDragging && this.projectiles.length === 0 && this.ammoQueue.length > 0 && this.burstQueue.length === 0) {
                 // [emitter-anchor] 瞄准线起点对齐到炮台旋转圆心。
                 const aimGeometry = calcCombatLauncherGeometryToTarget(this.width, this.height, this.lastMousePos);
-                const start = aimGeometry.port;
-                let force = this.lastMousePos.sub(start);
+                const start = aimGeometry.muzzle;
+                let force = this.lastMousePos.sub(aimGeometry.port);
                 
                 if (force.y < -20) {
-                    let dir = force.norm(); 
+                    let dir = aimGeometry.aimDir;
                     const aimRecipe = this.ammoQueue && this.ammoQueue.length > 0 ? this.ammoQueue[0] : null;
                     const guides = buildCombatAimGuides(this, start, dir, aimRecipe);
                     
@@ -3178,23 +3229,39 @@ phase_gathering_getRandomPegType() {
                         if (guideIndex > 0) return;
 
                         this.ctx.setLineDash([]);
-                        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                        if (typeof this.render_combat_aimGuideNode === 'function') {
+                            this.render_combat_aimGuideNode(this.ctx, start.x, start.y, 'origin', 17, 0.86);
+                        }
                         guide.bouncePoints.forEach((point, index) => {
-                            this.ctx.beginPath();
-                            this.ctx.arc(point.x, point.y, 3 + index * 0.5, 0, Math.PI * 2);
-                            this.ctx.fill();
+                            if (typeof this.render_combat_aimGuideNode === 'function') {
+                                this.render_combat_aimGuideNode(this.ctx, point.x, point.y, 'wall', 18 + index * 1.8, 0.82);
+                            } else {
+                                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                                this.ctx.beginPath();
+                                this.ctx.arc(point.x, point.y, 3 + index * 0.5, 0, Math.PI * 2);
+                                this.ctx.fill();
+                            }
                         });
-                        this.ctx.fillStyle = 'rgba(250, 204, 21, 0.92)';
                         guide.enemyBouncePoints.forEach((point, index) => {
-                            this.ctx.beginPath();
-                            this.ctx.arc(point.x, point.y, 4 + index * 0.4, 0, Math.PI * 2);
-                            this.ctx.fill();
+                            if (typeof this.render_combat_aimGuideNode === 'function') {
+                                this.render_combat_aimGuideNode(this.ctx, point.x, point.y, 'enemy', 20 + index * 1.8, 0.9);
+                            } else {
+                                this.ctx.fillStyle = 'rgba(250, 204, 21, 0.92)';
+                                this.ctx.beginPath();
+                                this.ctx.arc(point.x, point.y, 4 + index * 0.4, 0, Math.PI * 2);
+                                this.ctx.fill();
+                            }
                         });
                         const endPoint = guide.points[guide.points.length - 1];
                         if (endPoint) {
-                            this.ctx.beginPath();
-                            this.ctx.arc(endPoint.x, endPoint.y, 3, 0, Math.PI * 2);
-                            this.ctx.fill();
+                            if (typeof this.render_combat_aimGuideNode === 'function') {
+                                this.render_combat_aimGuideNode(this.ctx, endPoint.x, endPoint.y, 'endpoint', 16, 0.7);
+                            } else {
+                                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                                this.ctx.beginPath();
+                                this.ctx.arc(endPoint.x, endPoint.y, 3, 0, Math.PI * 2);
+                                this.ctx.fill();
+                            }
                         }
                     });
                     this.ctx.restore();
@@ -3304,10 +3371,25 @@ phase_gathering_getRandomPegType() {
             }
         }
 
-        const playerTurnFinished = this.ammoQueue.length === 0 && 
-                                   this.projectiles.length === 0 && 
-                                   this.burstQueue.length === 0 &&
-                           !this.isVisualEffectActive;
+        // [BUGFIX] 风暴核心合并/衰减必须在 playerTurnFinished 块之前执行，
+        // 因为该块内所有路径都有 return，会导致后续代码永远不可达。
+        const _roundAmmoClear = this.ammoQueue.length === 0 &&
+                                this.projectiles.length === 0 &&
+                                this.burstQueue.length === 0;
+        // 防重复守卫：合并/衰减每轮只触发一次，避免每帧衰减导致能量瞬间归零
+        if (!_roundAmmoClear) this._windMergeDone = false;
+        if (_roundAmmoClear && !this.gameOver && !this._windMergeDone) {
+            this._windMergeDone = true;
+            // 回合弹药清空：合并相交风暴核心 + 衰减能量
+            this.combat_wind_mergeStormCores();
+            this.combat_wind_decayStormCoresEnergy();
+            // @section:combat_update_phase_end - 战斗结束条件检查与阶段切换
+            document.getElementById('combat-message').innerHTML = '<div class="bg-black/50 p-4 rounded-xl backdrop-blur-md border border-blue-500/50 pointer-events-none"><span class="text-blue-300 font-bold text-xl block mb-2">彈藥耗盡</span><span class="text-sm text-slate-300">點擊收集新彈药</span></div>';
+        } else if (!_roundAmmoClear && !this.gameOver) {
+            document.getElementById('combat-message').innerHTML = '';
+        }
+
+        const playerTurnFinished = _roundAmmoClear && !this.isVisualEffectActive;
 
         if (playerTurnFinished && !this.gameOver) {
             // [in-wall-clear-lottery] 抽奖暂停期间禁止启动敌人回合，等待玩家关闭老虎机覆盖层
@@ -3382,15 +3464,6 @@ phase_gathering_getRandomPegType() {
             return;
         }
 
-        if (this.ammoQueue.length === 0 && this.projectiles.length === 0 && this.burstQueue.length === 0 && !this.gameOver) { 
-            // 回合结束：先合并相交风暴核心，再衰减能量
-            this.combat_wind_mergeStormCores();
-            this.combat_wind_decayStormCoresEnergy();
-            // @section:combat_update_phase_end - 战斗结束条件检查与阶段切换
-            document.getElementById('combat-message').innerHTML = '<div class="bg-black/50 p-4 rounded-xl backdrop-blur-md border border-blue-500/50 pointer-events-none"><span class="text-blue-300 font-bold text-xl block mb-2">彈藥耗盡</span><span class="text-sm text-slate-300">點擊收集新彈药</span></div>'; 
-        } else { 
-            if (!this.gameOver) document.getElementById('combat-message').innerHTML = ''; 
-        }
         // --- 修改开始：调整层级，先画轨道，再画炮台 ---
         this.ctx.save();
         // 应用与实体层相同的视差偏移
@@ -3414,6 +3487,21 @@ phase_gathering_getRandomPegType() {
                 deformation = {x: 1.15, y: 0.85};
             }
         }
+        const returningAfterShot = !this.isDragging && !this.pendingFireVelocity && !this.isChargingShot
+            && (this._launcherReturnDelay || 0) > 0
+            && Number.isFinite(this._launcherShotAimRotation);
+        if (returningAfterShot) {
+            previewRotation = this._launcherShotAimRotation;
+            this._launcherReturnDelay = Math.max(0, (this._launcherReturnDelay || 0) - Math.max(0.25, timeScale || 1));
+        }
+        if (!Number.isFinite(this._launcherAimRotation)) {
+            this._launcherAimRotation = previewRotation;
+        }
+        const rotationStep = (this.isDragging || this.pendingFireVelocity || this.isChargingShot)
+            ? 0.34 * Math.max(0.25, timeScale || 1)
+            : 0.055 * Math.max(0.25, timeScale || 1);
+        this._launcherAimRotation = rotateTowards(this._launcherAimRotation, previewRotation, rotationStep);
+        previewRotation = this._launcherAimRotation;
         // [bitmap-emitter] 优先使用 emitter_base.png + emitter_charging_*.png 渲染发射器底座；
         // 位图未加载时 fallback 到原始 arc 椭圆。
         this.render_combat_launcherEmitterBase(this.ctx, startPos.x, startPos.y, this.isChargingShot, this.chargeProgress, this.isReloading ? this.reloadProgress : 0, previewRotation);
@@ -3705,7 +3793,10 @@ phase_gathering_getRandomPegType() {
             const beam = this.collectionBeams[i];
             beam.update(timeScale);
             beam.draw(this.ctx);
-            if (beam.life <= 0) this.collectionBeams.splice(i, 1);
+            if (beam.life <= 0) {
+                if (beam._pixi) { collectionBeam_pixiDestroy(beam._pixi); beam._pixi = null; }
+                this.collectionBeams.splice(i, 1);
+            }
         }
         // 更新和繪製下落的彈珠
         for (let i = this.dropBalls.length - 1; i >= 0; i--) {
@@ -3906,7 +3997,10 @@ phase_gathering_getRandomPegType() {
             const orb = this.energyOrbs[i];
             orb.update(timeScale);
             orb.draw(this.ctx);
-            if (!orb.active) this.energyOrbs.splice(i, 1);
+            if (!orb.active) {
+                if (orb._pixi) { energyOrb_pixiDestroy(orb._pixi); orb._pixi = null; }
+                this.energyOrbs.splice(i, 1);
+            }
         }
         // 繪製粒子（两指针原地压缩，归还对象池；同步 particleCounts）
         {
@@ -3919,10 +4013,48 @@ phase_gathering_getRandomPegType() {
                 if (!p) continue;
                 p.update(this.timeScale);
                 p.draw(this.ctx);
+                // [PixiJS 迁移 · 阶段二] 同步 WebGL Sprite 属性
+                if (p._pixiSprite) {
+                    const sp = p._pixiSprite;
+                    sp.x = p.pos.x;
+                    sp.y = p.pos.y;
+                    sp.alpha = p.mode === 'mist' ? Math.max(0, p.life * 0.5) : Math.max(0, p.life);
+                    // [T2.7] wind_slash/line: 速度方向旋转 + 非均匀缩放 + 预彩色纹理不上 tint
+                    if (p.mode === 'wind_slash') {
+                        const speed = p.vel ? Math.hypot(p.vel.x, p.vel.y) : 0;
+                        sp.rotation = speed > 0.1 ? Math.atan2(p.vel.y, p.vel.x) : 0;
+                        const stretch = Math.min(3.0, 1.0 + speed * 0.1);
+                        const baseScale = (p.size || 10) / 32;
+                        sp.scale.set(baseScale * stretch, baseScale);
+                    } else if (p.mode === 'line') {
+                        const speed = p.vel ? Math.hypot(p.vel.x, p.vel.y) : 0;
+                        sp.rotation = speed > 0.1 ? Math.atan2(p.vel.y, p.vel.x) : 0;
+                        sp.scale.set(p.scale ? p.scale.x : 1, p.scale ? p.scale.y : 1);
+                    } else {
+                        const sz = (p.size || 4) * 2.5;
+                        sp.scale.set(sz / 64, sz / 64);
+                        sp.rotation = p.angle || 0;
+                        sp.tint = pixiCssColor(p.color);
+                    }
+                }
                 if (p.life > 0) {
                     if (w !== r) arr[w] = p;
                     w++;
                 } else {
+                    // [PixiJS 迁移] 释放 Sprite 回池
+                    if (p._pixiSprite) {
+                        pixiReleaseParticleSprite(p._pixiSprite);
+                        p._pixiSprite = null;
+                    }
+                    // [PixiJS 迁移 · 阶段三] 特效对象使用 _pixi 而非 _pixiSprite
+                    if (p._pixi) {
+                        if (p instanceof LaserBeam) { laserBeam_pixiDestroy(p._pixi); }
+                        else if (p instanceof SlashEffect) { slashEffect_pixiDestroy(p._pixi); }
+                        else if (p instanceof PierceCutEffect) { pierceCutEffect_pixiDestroy(p._pixi); }
+                        else if (p instanceof SwordScar) { swordScar_pixiDestroy(p._pixi); }
+                        else if (p instanceof BladeStormVortex) { bladeStormVortex_pixiDestroy(p._pixi); }
+                        p._pixi = null;
+                    }
                     if (counts[p.mode] !== undefined && counts[p.mode] > 0) counts[p.mode]--;
                     if (pool.length < 200 && typeof p.reset === 'function') pool.push(p);
                 }
@@ -3935,7 +4067,10 @@ phase_gathering_getRandomPegType() {
             if (s) {
                 s.update(timeScale);
                 s.draw(this.ctx);
-                if (s.alpha <= 0) this.shockwaves.splice(i, 1);
+                if (s.alpha <= 0) {
+                    if (s._pixi) { shockwave_pixiDestroy(s._pixi); s._pixi = null; }
+                    this.shockwaves.splice(i, 1);
+                }
             }
         }
         // [注意] 研磨阶段的 container 3D 变换已在函数头部设置，此处不再重复设置（避免覆盖主要的 3D 旋转特效）

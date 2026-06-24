@@ -102,6 +102,7 @@ Boss 本体 Sprite 在运行时绘制在液体 HP 层之后，但不能靠“整
 - `tests/validate_boss_sprite_assets.mjs` 会检查已有 draft 的 mask 尺寸、窗口覆盖率、窗口平均 alpha、非窗口主体平均 alpha 和预览图是否存在。
 - 如果某个 Boss 必须有厚重外壳，优先在外壳内部开“材质上合理的透光腔/薄膜/晶体”，不要把整片外壳整体调淡。
 - 运行时 `SpriteRenderer` 不会再单独加载 `hpTranslucencyMask`；mask 是生成和验收契约，最终透明度已经烘入 `boss_<id>_redraw_idle_draft_sheet_<version>.png`。因此战斗与试炼场只要走同一个 sheet path，就会使用同一套 alpha 表现。
+- Boss 本体不得再通过“底图/背景垫图 + 前景裁剪图”补边。透明 PNG 本体必须作为单一运行时 Sprite 绘制，由素材 alpha 自己决定哪些部位戳出物理轮廓；破绽、狂暴、温度和流光等动态层继续在同一变换下叠在其上。
 
 可用自动初稿流程：
 
@@ -135,7 +136,7 @@ python scripts/extract_boss_hp_translucency_masks.py --root .
 | Viridis | 藤蔓共生、再生核心、毒液管束 | 绿色核心不能淹没主轮廓，藤蔓沿边缘攀附 |
 | Tesla | 线圈、导体尖塔、残影轨 | 中心电核与两侧导体结构 |
 | Chimera | 双/多核心缝合、反应炉、异质装甲 | 左右异质核心和缝合线 |
-| Ouroboros | 完整环形回声、六附体槽、衔尾结构 | 六个可轮转附体槽和完整闭合环形方向感 |
+| Ouroboros | 完整环形回声、六附体槽、衔尾结构 | 六个可轮转附体槽和完整闭合环形方向感；程序槽位节点贴合物理环中线，当前槽位锚定 `gapAngle` |
 
 ## 6. 验收
 
@@ -215,18 +216,20 @@ assets/sprites/bosses/redraw_drafts/boss_base_draft_hp_readability_contact_sheet
 assets/sprites/bosses/redraw_drafts/boss_hp_translucency_mask_contact_sheet.png
 ```
 
-## 8. 运行时物理裁剪补边
+## 8. 运行时物理轮廓外伸
 
-2026-06-23 更新：polygon Boss 的本体 sprite 不应被物理碰撞多边形直接裁成缺块。运行时保留原有物理 clip 内绘制，用于让 HP、破绽、裂纹等内部层级维持正确遮挡；随后在 clip 恢复后通过 `_drawBossSpriteOutsideCollisionClip()` 使用 even-odd 反向裁剪，只补出被 polygon 裁掉的外沿像素。该逻辑不改变 `collisionShape/collisionData`，也不要求把美术主体强行缩小到多边形内部。Arc Boss 仍使用原有的 post-clip 完整绘制，以保证最终 Boss 的完整环形资产可见。
+2026-06-24 更新：Boss 本体 Sprite 不再走“物理 clip 内先画一份 + even-odd 反向补边”的双绘制方案。`Enemy.draw()` 会先在物理 clip 内绘制 HP、内部状态、裂纹等身体层；clip 恢复后，再通过 `_drawBossSpriteOutsideCollisionClip()` 在同一个 Boss 本地变换下绘制透明 Sprite，让 384×256 本体自然戳出碰撞轮廓。`high/medium` 档会把当前帧按 `CONFIG.enemyRender.bossSpriteMotion` 分成“上部本体 + 下部底座”两段 `drawRegion()`，用不同频率、相位和振幅模拟类 Live2D 的呼吸与底座脉动；`low` 档仍保持单次整图绘制。破绽 Overlay、程序化 Boss 动效、6+ 词条流光边框和 HUD 随后依次叠加；该逻辑不改变 `collisionShape/collisionData`，也不要求把美术主体强行缩小到多边形内部。
 
 正式美术终稿前仍需人工验收：确认 384×256 单帧主体不会遮挡血条、主体实心轮廓贴合 `boss_collision_guides_v2_no_three_rings_384x256.png`、弱点位置与 `vulnerability/weak_mask` 对齐，并决定是否把当前 6 帧 draft idle 扩展到 8-12 帧终稿 sheet。
+
+若后续正式美术拆分出独立底座/核心层，应继续沿用当前节奏约定：本体呼吸较明显，底座更慢更重，核心/弱点脉冲可以更快但不得改变物理轮廓读法。未拆层前，运行时分区绘制只作为轻量动态增强，不替代正式 idle 帧动画。
 
 ## 9. Runtime readability tuning
 2026-06-23 update: the runtime Boss pass keeps Viridis and Ouroboros source-art validation explicit. 2026-06-24 update: Tesla and Chimera also use source-art validation with `source_ai/boss_<id>_redraw_source_2026-06-24.png`. `tests/validate_boss_sprite_assets.mjs` requires these source files in addition to the redraw runtime sheet and HP translucency mask, so a missing painterly source or a path regression fails fast.
 
 The legacy Canvas Boss effect layer remains active for state readability, but it is now gated by `bossEffectAlpha` with a slow breathing multiplier. Normal Bosses should sit around low-to-mid alpha and berserk Bosses only slightly higher; the goal is to let the bitmap body carry the silhouette and material while the old procedural layer reads as aura, not as paint over the asset.
 
-Mikro and Devourer receive a runtime-only sprite scale boost (`1.10x` and `1.14x`) in both the clipped draw and polygon clip-repair draw. This is a visual target-rect change only: `collisionShape`, `collisionData`, projectile hit tests, and footprint cues stay unchanged.
+Mikro and Devourer receive a runtime-only sprite scale boost (`1.18x` and `1.22x`) in the post-clip complete sprite draw. This is a visual target-rect change only: `collisionShape`, `collisionData`, projectile hit tests, and footprint cues stay unchanged.
 
 ## 10. Versioned painterly runtime paths
 2026-06-23 follow-up: Viridis and Ouroboros must not use the old same-name runtime files in training-ground review. Their runtime sprite sheets, JSON metadata, HP translucency masks, and HP preview images now use the `_v20260623painterly` suffix. This prevents the browser image cache and the SpriteRenderer path cache from reusing the earlier placeholder-looking assets after an art repaint.
@@ -234,3 +237,24 @@ Mikro and Devourer receive a runtime-only sprite scale boost (`1.10x` and `1.14x
 2026-06-24 follow-up: Boss vulnerability overlays are now versioned separately from base sprites. Ignis and Glacies keep their original unversioned quality-reference overlays. Mikro, Devourer, Viridis, Tesla, Chimera, and Ouroboros use `_v20260624igstyle`, generated to follow the Ignis/Glacies structural-damage language. The rejected `_v20260624forged` weak-point circle/line pass must not be used in runtime or review.
 
 The active paths are resolved through `src/data/boss_sprite_assets.js` and `src/data/boss_vulnerability_assets.js`; tests must call those helpers rather than reconstructing `boss_<id>_...png` strings locally. Future repaint passes for these Bosses should add a new suffix instead of overwriting the existing suffix in place.
+
+## 11. Ouroboros Attachment Slot And Companion Assets
+
+2026-06-24 update: Ouroboros 的六个附体槽不再使用文本、普通敌人或旧 `assets/sprites/bosses/ouroboros_slots/` 图标冒充。环上槽位与实际可移动的 `orbit_echo` 伴生敌共用同一批 boss-matched PNG：
+
+2026-06-24 follow-up: Ouroboros 本体运行时 `bossSpriteScale` 调整为 1.72，使 384x256 成稿主体高度更接近完整环形物理边界，避免“碰撞环套住美术资产”的观感。该比例只改变绘制目标矩形，不改变 `arc` 碰撞数据。
+
+Ouroboros 的裂群/召唤类机制仍然拥有对应的 1×1 `orbit_echo` 伴生敌人主体资源：
+
+```text
+assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_aegis_1x1_idle.png
+assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_graft_1x1_idle.png
+assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_brood_1x1_idle.png
+assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_stride_1x1_idle.png
+assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_maw_1x1_idle.png
+assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_surge_1x1_idle.png
+```
+
+2026-06-24 follow-up: 六个 `orbit_echo` PNG 已改为从当前 Ouroboros Boss 成稿 sheet `boss_ouroboros_redraw_idle_draft_sheet_v20260624alphafix.png` 提炼同材质壳体，JSON 必须保留 `bossMatched: true`、`styleFamily: "ouroboros_boss_matched"` 和 `sourceAtlas`。运行时通过 `orbit:<slotId>` tag 解析到 `orbitEcho:<slotId>` composite。所有可移动 `orbit_echo` 仍使用 `frame_minion_ouroboros_1x1.png` 的八角物理 hull；Boss 环上的槽位只复用主体 sprite 表达语义，不改变 Boss 自身 `arc` 碰撞范围。试炼场 `boss_ouroboros_attachment_slots` 只切换真实 Boss 实例的 `_applyOuroborosAttachment()`，不得通过 `_ouroborosSpawnEchoes()` 或普通敌人对象冒充槽位。
+
+2026-06-24 layering fix: 有成稿 Boss sprite 时，Ouroboros 的程序化完整环只保留低透明细轨道提示（约 12% alpha），不再绘制厚蓝实体环、核心大光球或粗内高光压在本体美术之上。只有 sprite 未 ready / failed 的兜底路径才恢复厚环，确保 Boss 仍可见。

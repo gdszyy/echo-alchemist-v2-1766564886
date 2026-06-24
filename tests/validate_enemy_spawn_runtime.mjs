@@ -336,13 +336,16 @@ function check(condition, message) {
 
 installBrowserStubs();
 
-const [{ spawn_system }, { combat_system }, { game_phase }, { CONFIG }, { ENEMY_WAVE_PRESETS, ENEMY_WAVE_PRESET_ARCHETYPES }, { Enemy }] = await Promise.all([
+const [{ spawn_system }, { combat_system }, { game_phase }, { CONFIG }, { ENEMY_WAVE_PRESETS, ENEMY_WAVE_PRESET_ARCHETYPES }, { Enemy }, { loot_calcRuneDrop }, { RUNE_DB }, { resolveEnemyVisualAsset }] = await Promise.all([
     import('../src/spawn_system.js'),
     import('../src/combat_system.js'),
     import('../src/game_phase.js'),
     import('../src/config.js'),
     import('../src/wave_presets.js'),
     import('../src/entities.js'),
+    import('../src/loot_system.js'),
+    import('../src/rune_config.js'),
+    import('../src/data/enemy_visual_assets.js'),
 ]);
 
 console.log('===================================================');
@@ -351,6 +354,29 @@ console.log('===================================================\n');
 
 const baseHP = CONFIG.balance.enemyBaseHp || 10;
 const colWidth = 60;
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+
+    const bearer = new Enemy(120, 120, 60, 50, 120, 120, 'elite', ['runeBearer']);
+    withRandom(() => 0, () => bearer._tickRuneBearerForTurn(game));
+    check(!!bearer._runeBearerTempAffix, 'runeBearer rolls one temporary affix at enemy turn start');
+    check(bearer.affixes.includes(bearer._runeBearerTempAffix), 'runeBearer temporary affix is active for the turn');
+    bearer._clearRuneBearerTempAffix();
+    check(!bearer._runeBearerTempAffix, 'runeBearer temporary affix can be cleared cleanly');
+    check(!bearer.affixes.includes('shield') && (bearer.shieldCharges || 0) === 0, 'runeBearer temporary shield layer is removed with the affix');
+
+    const adaptive = new Enemy(160, 120, 60, 50, 120, 120, 'elite', ['adaptiveRune']);
+    adaptive.takeDamage(10, { config: { pyro: 1 }, pos: adaptive.pos }, true);
+    check(adaptive.adaptiveRuneElement === 'pyro', 'adaptiveRune records damage source element');
+    adaptive.applyVenom(1);
+    check(adaptive.adaptiveRuneElement === 'venom', 'adaptiveRune records status effect element');
+
+    const drop = withRandom(() => 0, () => loot_calcRuneDrop(game, { forcedElement: 'venom' }));
+    const rune = RUNE_DB.find(item => item.id === drop.runeId);
+    check(!!rune && rune.element === 'venom', 'loot_calcRuneDrop forcedElement restricts rune family');
+}
 
 withRandom(() => 0, () => {
     const game = makeGame(spawn_system, CONFIG);
@@ -598,10 +624,14 @@ withRandom(() => 0, () => {
     check(target.affixes.includes('devour') && target.affixes.includes('shield'), 'Devourer maw thrall receives devour+shield profile affixes');
 
     const ordinary = new Enemy(120, 220, 60, 50, 120, 120, 'normal', []);
-    game.enemies = [boss, ordinary, target];
-    boss.actionName = '吞噬';
+    const far = new Enemy(999, 220, 60, 50, 120, 120, 'normal', []);
+    game.enemies = [boss, ordinary, target, far];
+    const shieldBefore = boss.shieldCharges || 0;
+    boss.telegraphIntent = { key: 'devourer_maw' };
+    boss.actionName = '深渊吞噬';
     withRandom(() => 0.99, () => boss.executeTurnAction(game));
-    check(!target.active && ordinary.active, 'Devourer devour prioritizes mawFeed minion over generic prey');
+    check(!target.active && !ordinary.active && far.active, 'Devourer maw devours every prey in the maw field and leaves outside prey alone');
+    check((boss.shieldCharges || 0) > shieldBefore, 'Devourer maw converts consumed prey into shield layers');
 }
 
 {
@@ -816,14 +846,14 @@ withRandom(() => 0, () => {
 {
     const game = makeGame(spawn_system, CONFIG);
     globalThis.game = game;
-    const boss = new Enemy(210, 200, 180, 100, 900, 1000, 'boss', ['berserk', 'devour']);
-    boss.bossType = 'chimera';
+    const boss = new Enemy(210, 200, 180, 100, 900, 1000, 'boss', ['devour', 'shield']);
+    boss.bossType = 'devourer';
     const target = new Enemy(30, 200, 60, 50, 120, 120, 'normal', []);
     game.enemies = [boss, target];
 
-    const pulled = boss._chimeraAttractPrey(game);
-    check(pulled === 1, 'Chimera maw attracts prey in +2 grid range');
-    check(target.pos.x === 90 && target.dropTargetY === 200, 'Chimera pull moves prey exactly one legal grid cell');
+    const pulled = boss._devourerAttractPrey(game);
+    check(pulled === 1, 'Devourer maw attracts prey in +2 grid range');
+    check(target.pos.x === 90 && target.dropTargetY === 200, 'Devourer pull moves prey exactly one legal grid cell');
     assertNoOverlap(game);
 }
 
@@ -832,30 +862,44 @@ withRandom(() => 0, () => {
     globalThis.game = game;
     const boss = new Enemy(210, 200, 180, 100, 900, 1000, 'boss', ['berserk', 'devour']);
     boss.bossType = 'chimera';
-    boss.temp = 10;
+    boss.chimeraFrostStacks = 1;
     const preyA = new Enemy(30, 200, 60, 50, 100, 100, 'normal', []);
-    preyA.temp = 30;
+    preyA.temp = 100;
     preyA.venomStacks = 2;
     preyA.swordMarks = 1;
     preyA.markTimer = 7;
     preyA.frozenCount = 2;
     const preyB = new Enemy(330, 200, 60, 50, 100, 100, 'elite', ['shield']);
-    preyB.temp = -40;
+    preyB.temp = -100;
     preyB.isFrozenCurrentTurn = true;
     preyB._irradiationStacks = 3;
     preyB.phaseShieldDisabledThisTurn = true;
     preyB.shieldCharges = 1;
     game.enemies = [boss, preyA, preyB];
 
-    const devoured = boss._chimeraDevourTargets(game, { force: true });
-    check(devoured === 2, 'Chimera devours every non-boss enemy in +2 grid range');
-    check(!preyA.active && !preyB.active, 'Chimera devour removes all consumed enemies');
-    check(boss.temp === 0, 'Chimera inherits temperature by addition');
-    check(boss.venomStacks === 2 && boss.swordMarks === 1 && boss.markTimer === 7, 'Chimera inherits venom and sword mark negative states');
-    check(boss.frozenCount === 2 && boss.isFrozenCurrentTurn === true, 'Chimera inherits freeze state markers');
-    check(boss._irradiationStacks === 3 && boss.phaseShieldDisabledThisTurn === true, 'Chimera inherits additional negative status flags');
-    check((boss.chimeraFeedStacks || 0) === 2 && (boss.chimeraInheritedStatusCount || 0) >= 6, 'Chimera records feed and inherited status stacks');
-    check((boss.shieldCharges || 0) >= 3, 'Chimera digest converts consumed shield into shield layers');
+    const devoured = withRandom(() => 0, () => boss._chimeraDevourTargets(game, { force: true }));
+    const feeder = game.enemies.find(enemy => enemy !== boss && enemy.bossOwnerId === 'chimera' && enemy.bossMechanicTags.includes('thermalFeed'));
+    check(devoured === 1, 'Chimera thermal devour consumes exactly one random enemy');
+    check(!preyA.active && preyB.active, 'Chimera thermal devour leaves the other prey on the board');
+    check((boss.chimeraHeatStacks || 0) === 0 && (boss.chimeraFrostStacks || 0) === 0, 'Chimera heat and frost stacks cancel each other');
+    check((boss.chimeraRadiantConversions || 0) === 1 && (boss.radiantAegis || 0) > 0, 'Chimera canceled thermal stacks convert into radiant aegis shield');
+    check((boss.venomStacks || 0) === 0 && (boss.frozenCount || 0) === 0, 'Chimera no longer inherits non-temperature negative states');
+    check((boss.chimeraFeedStacks || 0) === 1 && !!feeder && Math.abs(feeder.temp) === 100, 'Chimera records feed stacks and summons a +/-100C thermal feed');
+}
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+    const boss = new Enemy(210, 200, 180, 100, 900, 1000, 'boss', ['berserk', 'devour']);
+    boss.bossType = 'chimera';
+    boss.berserked = true;
+    boss.chimeraHeatStacks = 2;
+    const prey = new Enemy(30, 200, 60, 50, 100, 100, 'normal', []);
+    prey.temp = -100;
+    game.enemies = [boss, prey];
+
+    withRandom(() => 0, () => boss._chimeraDevourTargets(game, { force: true }));
+    check((boss.chimeraRadiantConversions || 0) === 2, 'Berserk Chimera gains double thermal stacks before radiant conversion');
 }
 
 {
@@ -868,7 +912,8 @@ withRandom(() => 0, () => {
     const spawned = boss._chimeraSpawnFeeders(game, 1);
     const feeder = game.enemies.find(enemy => enemy !== boss && enemy.bossOwnerId === 'chimera');
     check(spawned === 1 && !!feeder, 'Chimera summons a chaos feed enemy');
-    check(feeder.bossMechanicTags.includes('chaosFeed') && feeder.affixes.includes('berserk'), 'Chimera summoned feed keeps chaosFeed identity');
+    check(feeder.bossMechanicTags.includes('chaosFeed') && feeder.bossMechanicTags.includes('thermalFeed') && feeder.affixes.includes('berserk'), 'Chimera summoned feed keeps chaosFeed and thermalFeed identity');
+    check(Math.abs(feeder.temp) === 100, 'Chimera summoned feed carries +100C or -100C temperature');
     assertNoOverlap(game);
 }
 
@@ -901,7 +946,36 @@ withRandom(() => 0, () => {
     const echoes = game.enemies.filter(e => e !== boss && e.bossOwnerId === 'ouroboros');
     check(result.spawned > 0 && echoes.length > 0, 'Ouroboros brood attachment summons orbit echo minions');
     check(echoes[0].bossMinionRole === 'orbit_echo' && echoes[0].bossMechanicTags.includes('orbitAttachment'), 'Ouroboros orbit echo stores boss minion metadata');
+    check(echoes[0].bossMechanicTags.includes('orbit:brood'), 'Ouroboros orbit echo records the active attachment slot');
+    check(echoes[0].collisionShape === 'polygon' && (echoes[0].collisionData?.vertices || []).length === 8, 'Ouroboros orbit echo uses the octagonal minion collision hull');
+    check(echoes[0]._visualFrameKey === 'minion:ouroboros:1x1', 'Ouroboros orbit echo uses the matching material collision frame');
+    const echoAsset = resolveEnemyVisualAsset(echoes[0]);
+    check(echoAsset.assetKey === 'orbitEcho:brood' && echoAsset.fallbackLevel === 'composite', 'Ouroboros orbit echo resolves the brood companion sprite asset');
+    check(echoes[0]._spriteRenderer?.sheetPath?.includes('enemy_ouroboros_orbit_echo_brood_1x1_idle.png'), 'Ouroboros orbit echo renderer uses the brood companion sprite sheet in runtime');
     assertNoOverlap(game);
+}
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+    const cfg = CONFIG.balance.bossConfigs.ouroboros;
+    const boss = new Enemy(180, 160, 180, 100, 1000, 1000, 'boss', ['shield', 'haste']);
+    boss.bossType = 'ouroboros';
+
+    for (const slot of cfg.orbitAttachments || []) {
+        game.enemies = [boss];
+        const spawned = boss._ouroborosSpawnEchoes(game, 1, slot);
+        const echo = game.enemies.find(e => e !== boss && e.bossOwnerId === 'ouroboros');
+        const asset = echo ? resolveEnemyVisualAsset(echo) : null;
+        check(spawned === 1 && !!echo, `Ouroboros ${slot.id} acceptance spawns an orbit echo through runtime logic`);
+        check(echo?.bossMechanicTags?.includes(`orbit:${slot.id}`), `Ouroboros ${slot.id} echo stores its slot tag`);
+        check(echo?.visualAssetKey === `orbitEcho:${slot.id}`, `Ouroboros ${slot.id} echo stores explicit visualAssetKey`);
+        check(echo?.collisionShape === 'polygon' && (echo?.collisionData?.vertices || []).length === 8, `Ouroboros ${slot.id} echo keeps octagonal collision hull`);
+        check(echo?._visualFrameKey === 'minion:ouroboros:1x1', `Ouroboros ${slot.id} echo keeps the material minion frame`);
+        check(asset?.assetKey === `orbitEcho:${slot.id}` && asset?.fallbackLevel === 'composite', `Ouroboros ${slot.id} echo resolves its companion sprite asset`);
+        check(echo?._spriteRenderer?.sheetPath?.includes(`enemy_ouroboros_orbit_echo_${slot.id}_1x1_idle.png`), `Ouroboros ${slot.id} echo renderer uses its companion sprite sheet`);
+        assertNoOverlap(game);
+    }
 }
 
 {
@@ -926,13 +1000,61 @@ withRandom(() => 0, () => {
 {
     const game = makeGame(spawn_system, CONFIG);
     globalThis.game = game;
+    const cfg = CONFIG.balance.bossConfigs.ouroboros;
+    const boss = new Enemy(180, 160, 180, 100, 1000, 1000, 'boss', ['shield', 'haste']);
+    boss.bossType = 'ouroboros';
+    game.enemies = [boss];
+
+    boss._applyOuroborosAttachment(0, game);
+    const threshold = boss._getOuroborosDamageGateThreshold();
+    boss._ouroborosDamageGateProgress = threshold - 1;
+    const hit = boss.takeDamage(1, { config: { damage: 1, pierce: 1 }, pos: { x: boss.pos.x, y: boss.pos.y } }, true);
+
+    check(hit.hpDamage === 1 && boss._ouroborosDamageGateProgress === 0, 'Ouroboros damage gate only counts real HP damage and resets after firing');
+    check(boss._ouroborosLastDamageGateAction?.slotId === 'aegis' && boss._ouroborosLastDamageGateAction?.action === 'shield', 'Ouroboros damage gate fires the currently active attachment action');
+    check((boss.ouroborosOrbitStates[0]?.disabledTurns || 0) >= (cfg.orbitDamageGateDisruptTurns || 2), 'Ouroboros damage gate seals the fired attachment for two turns');
+    check(boss.rotationIndex === 1 && boss.affixes.includes('regen') && boss.affixes.includes('healer'), 'Ouroboros damage gate switches to the next available attachment after firing');
+}
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+    for (const [key, value] of Object.entries(combat_system)) {
+        if (typeof value === 'function') game[key] = value.bind(game);
+    }
+    const boss = new Enemy(180, 160, 180, 100, 1000, 1000, 'boss', ['shield', 'haste']);
+    boss.bossType = 'ouroboros';
+    game.enemies = [boss];
+
+    boss._applyOuroborosAttachment(0, game);
+    const profile = game.combat_getBossVulnerabilityProfile(boss);
+    boss._bossVulnerabilityProgress = Math.max(0, profile.breakThreshold - 1);
+    boss._ouroborosDamageGateProgress = boss._getOuroborosDamageGateThreshold() - 1;
+    const bossVulnerability = game.combat_applyBossVulnerability(
+        boss,
+        { damage: 1, pierce: 1 },
+        { config: { damage: 1, pierce: 1 }, pos: { x: boss.pos.x, y: boss.pos.y } },
+        1
+    );
+    const beforeDisruptions = boss.ouroborosOrbitDisruptions || 0;
+    const hit = boss.takeDamage(1, { config: { damage: 1, pierce: 1 }, pos: { x: boss.pos.x, y: boss.pos.y } }, true);
+    const updated = game.combat_updateBossVulnerabilityProgress(boss, bossVulnerability, hit.hpDamage);
+
+    check(updated.breakTriggered && updated.damageGateAlreadyShifted, 'Ouroboros damage gate and vulnerability can resolve on the same hit without losing exposure');
+    check((boss.ouroborosOrbitDisruptions || 0) === beforeDisruptions + 1, 'Ouroboros same-hit damage gate prevents duplicate attachment disruption');
+    check((boss.ouroborosOrbitStates[1]?.disabledTurns || 0) === 0, 'Ouroboros same-hit vulnerability does not seal the newly switched attachment');
+}
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
 
     const armored = new Enemy(100, 100, 60, 50, 100, 100, 'normal', ['livingArmor']);
     armored._restoreLivingArmorForTurn();
     check(armored.livingArmorHp === 10, 'livingArmor initializes to 10% max HP');
-    const bounceSource = { config: { bounce: 1, pierce: 0 }, bouncesLeft: 0, pos: { x: 100, y: 100 } };
-    armored.takeDamage(8, bounceSource);
-    check(armored.hp === 100 && armored.livingArmorHp === 2, 'livingArmor absorbs bounced damage before body HP');
+    const normalSource = { config: { damage: 8, bounce: 0, pierce: 0, cryo: 0, pyro: 0, lightning: 0, venom: 0, wind: 0 }, pos: { x: 100, y: 100 } };
+    const normalBlock = armored.takeDamage(8, normalSource);
+    check(armored.hp === 100 && armored.livingArmorHp === 2 && normalBlock.hpDamage === 0 && normalBlock.blockedBy === 'livingArmor', 'livingArmor fully absorbs normal physical projectile hits');
     const pierceSource = { config: { bounce: 0, pierce: 1 }, bouncesLeft: 0, pos: { x: 100, y: 100 } };
     armored.takeDamage(2, pierceSource);
     check(armored.hp === 98 && armored.livingArmorBroken === true, 'pierce damages livingArmor and body together');
@@ -994,6 +1116,21 @@ withRandom(() => 0, () => {
     jumper.takeDamage(12, { config: { damage: 12, cryo: 0, pierce: 0, bounce: 0 }, pos: { x: 420, y: 100 } });
     check(game.particles.some(p => p.mode === 'spark'), 'jump hit feedback uses spark particles');
     check(!game.particles.some(p => p.mode === 'shard'), 'jump hit feedback does not look like cryo shards');
+
+    const shielded = new Enemy(500, 100, 60, 50, 100, 100, 'normal', ['shield']);
+    shielded.shieldCharges = 1;
+    game.particles = [];
+    shielded.takeDamage(12, { config: { damage: 12, cryo: 0, pierce: 0, bounce: 0 }, pos: { x: 500, y: 100 } });
+    check(game.particles.some(p => p.mode === 'spark'), 'shield break feedback uses spark particles');
+    check(!game.particles.some(p => p.mode === 'shard'), 'shield break feedback does not look like cryo shards');
+
+    const radiant = new Enemy(580, 100, 60, 50, 100, 100, 'normal', ['radiantAegis']);
+    radiant.radiantAegis = 1;
+    radiant.radiantAegisBroken = false;
+    game.particles = [];
+    radiant.takeDamage(12, { config: { damage: 12, cryo: 0, pierce: 0, bounce: 0 }, pos: { x: 580, y: 100 } });
+    check(game.particles.some(p => p.mode === 'spark'), 'radiantAegis break feedback uses spark particles');
+    check(!game.particles.some(p => p.mode === 'shard'), 'radiantAegis break feedback does not look like cryo shards');
 
     const carrier = new Enemy(180, 320, 180, 100, 300, 300, 'elite', ['carrier', 'shield']);
     carrier.baseArchetype = 'carrier';

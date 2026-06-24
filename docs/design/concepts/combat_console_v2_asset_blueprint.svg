@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="1386" viewBox="0 0 390 693">
+  <defs>
+    <linearGradient id="battle" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#101827"/>
+      <stop offset="0.55" stop-color="#07101a"/>
+      <stop offset="1" stop-color="#030712"/>
+    </linearGradient>
+    <linearGradient id="pane" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#122434"/>
+      <stop offset="1" stop-color="#050913"/>
+    </linearGradient>
+    <style>
+      .label { fill: #e5faff; font: 7px "Noto Sans SC", "Microsoft YaHei", sans-serif; }
+      .note { fill: #9edbea; font: 5.5px "Noto Sans SC", "Microsoft YaHei", sans-serif; }
+      .dim { fill: #cbd5e1; font: 5px Consolas, monospace; }
+      .outline { fill: none; stroke: #6ee7f9; stroke-width: 0.9; stroke-dasharray: 3 2; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="390" height="693" fill="#020617"/>
+  <rect x="6" y="46" width="378" height="523" rx="8" fill="url(#battle)" stroke="#1e3a4a" stroke-width="1"/>
+
+  <rect x="0" y="0" width="390" height="46" fill="#07111d" stroke="#263849"/>
+  <text x="9" y="17" class="label">顶部状态栏</text>
+  <rect x="117" y="8" width="156" height="30" rx="7" fill="#121a22" stroke="#fbbf24" stroke-width="0.8"/>
+  <text x="150" y="25" class="label">商人旅程顶栏</text>
+  <text x="278" y="25" class="dim">156x30</text>
+
+  <line x1="18" y1="573" x2="372" y2="573" stroke="#fb7185" stroke-width="1.3"/>
+  <text x="21" y="568" class="label">警戒线 y=573</text>
+  <rect x="6" y="573" width="378" height="16" fill="#7f1d1d" opacity="0.15"/>
+  <text x="284" y="585" class="note">UI 顶部必须低于可视带</text>
+
+  <rect x="131" y="549" width="128" height="128" rx="64" fill="#0f172a" opacity="0.28" stroke="#facc15" stroke-width="1" stroke-dasharray="4 2"/>
+  <circle cx="195" cy="613" r="40" fill="#172033" stroke="#facc15" stroke-width="1.2"/>
+  <rect x="182" y="552" width="26" height="78" rx="10" fill="#253449" stroke="#67e8f9" stroke-width="0.9"/>
+  <text x="162" y="615" class="label">发射器安全框</text>
+  <text x="161" y="626" class="dim">128x128</text>
+
+  <rect x="6" y="591" width="378" height="96" rx="8" fill="none" stroke="#475569" stroke-width="1"/>
+  <text x="9" y="587" class="dim">bottom dock: x6 y591 w378 h96</text>
+
+  <rect x="6" y="599" width="119" height="88" rx="8" fill="url(#pane)" stroke="#67e8f9" stroke-width="0.9"/>
+  <rect x="12" y="606" width="106" height="32" rx="5" fill="#020617" stroke="#38bdf8" stroke-width="0.6"/>
+  <rect x="12" y="644" width="20" height="16" rx="4" fill="#172554" stroke="#60a5fa" stroke-width="0.5"/>
+  <rect x="35" y="644" width="20" height="16" rx="4" fill="#172554" stroke="#60a5fa" stroke-width="0.5"/>
+  <rect x="58" y="644" width="20" height="16" rx="4" fill="#172554" stroke="#60a5fa" stroke-width="0.5"/>
+  <rect x="82" y="644" width="36" height="18" rx="5" fill="#111827" stroke="#f0abfc" stroke-width="0.5"/>
+  <text x="26" y="625" class="label">左翼：弹药 / 队列 / 分析</text>
+  <text x="35" y="678" class="dim">119x88</text>
+
+  <rect x="129" y="591" width="132" height="96" rx="8" fill="#020617" opacity="0.18" stroke="#94a3b8" stroke-width="0.9" stroke-dasharray="4 3"/>
+  <text x="158" y="681" class="label">中央透明发射器井</text>
+  <text x="169" y="690" class="dim">132px wide</text>
+
+  <rect x="265" y="599" width="119" height="88" rx="8" fill="url(#pane)" stroke="#67e8f9" stroke-width="0.9"/>
+  <rect x="296" y="602" width="58" height="10" rx="5" fill="#020617" stroke="#38bdf8" stroke-width="0.5"/>
+  <circle cx="306" cy="607" r="2.7" fill="#2dd4bf"/>
+  <circle cx="316" cy="607" r="2.7" fill="#2dd4bf"/>
+  <circle cx="326" cy="607" r="2.7" fill="#334155"/>
+  <circle cx="336" cy="607" r="2.7" fill="#334155"/>
+  <rect x="271" y="617" width="47" height="20" rx="5" fill="#111827" stroke="#38bdf8" stroke-width="0.5"/>
+  <rect x="321" y="617" width="47" height="20" rx="5" fill="#111827" stroke="#38bdf8" stroke-width="0.5"/>
+  <rect x="271" y="640" width="47" height="20" rx="5" fill="#111827" stroke="#38bdf8" stroke-width="0.5"/>
+  <rect x="321" y="640" width="47" height="20" rx="5" fill="#111827" stroke="#38bdf8" stroke-width="0.5"/>
+  <rect x="271" y="665" width="86" height="7" rx="4" fill="#0f172a" stroke="#14b8a6" stroke-width="0.5"/>
+  <rect x="361" y="648" width="18" height="18" rx="5" fill="#111827" stroke="#fbbf24" stroke-width="0.6"/>
+  <text x="280" y="678" class="dim">119x88</text>
+  <text x="276" y="626" class="label">右翼：技能</text>
+  <text x="276" y="657" class="label">SP 宝石 / 充能 / 配置</text>
+
+  <rect x="6" y="599" width="119" height="88" class="outline"/>
+  <rect x="265" y="599" width="119" height="88" class="outline"/>
+  <rect x="129" y="591" width="132" height="96" class="outline"/>
+</svg>

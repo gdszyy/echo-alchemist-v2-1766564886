@@ -1,6 +1,6 @@
 # src\effects\particles.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 1975 | 函数数: 52 | 语言: javascript
+> 自动生成于 2026-06-25 | 总行数: 2700 | 函数数: 62 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -11,6 +11,7 @@
 
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
+| withAlpha | function | `withAlpha(color, alpha)` |  |
 | constructor | method | `constructor(x, y, color, mode = 'normal')` |  |
 | reset | method | `reset(x, y, color, mode = 'normal')` |  |
 | _init | method | `_init(x, y, color, mode = 'normal')` |  |
@@ -18,6 +19,9 @@
 | draw | method | `draw(ctx)` |  |
 | constructor | method | `constructor(x, y, angle, length, color)` |  |
 | update | method | `update()` |  |
+| draw | method | `draw(ctx)` |  |
+| constructor | method | `constructor(x, y, angle, length = 92, color = '#fca5a5', quality = 'high')` |  |
+| update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
 | constructor | method | `constructor(x, bottomY)` |  |
 | update | method | `update(timeScale)` |  |
@@ -32,7 +36,7 @@
 | startFadeOut | method | `startFadeOut()` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
-| constructor | method | `constructor(x, y, text, color = '#fbbf24', fontSize = 16)` |  |
+| constructor | method | `constructor(x, y, text, color = '#fbbf24', fontSize = 16, iconImg = null)` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
 | constructor | method | `constructor(x, y, targetX, targetY, color, initialVel, onArrive, options = {})` |  |
@@ -57,7 +61,13 @@
 | constructor | method | `constructor(x, y, radius)` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
-| constructor | method | `constructor(x, y)` |  |
+| constructor | method | `constructor(x, y, radius = 120)` |  |
+| setCenter | method | `setCenter(x, y)` |  |
+| fadeOut | method | `fadeOut()` |  |
+| update | method | `update(timeScale = 1)` |  |
+| _drawBlade | method | `_drawBlade(ctx, ang, r, dirSign, lenScale, widScale, alpha)` |  |
+| draw | method | `draw(ctx)` |  |
+| constructor | method | `constructor(x, y, color = '#34d399')` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
 | constructor | method | `constructor(x, y, rewardType)` |  |

@@ -45,9 +45,12 @@ export const EVENT_TYPES = {
     UI_MULTICAST_TRANSFER: 'ui:multicast_transfer',     // 播放倍率转移飞行特效
     UI_HIT_PROGRESS: 'ui:hit_progress',                // 更新命中进度条
     UI_AMMO_FIRED: 'ui:ammo_fired',                    // 弹药发射（触发动画+更新UI）
-    UI_RUNE_CHARGE_INIT: 'ui:rune_charge_init',        // 初始化充能符文UI（单符文槽，空状态）
-    UI_RUNE_CHARGE_LEVEL_UP: 'ui:rune_charge_level_up', // 充能满 → 刷新符文预览（带特效）
-    UI_RUNE_CHARGE_UPDATE: 'ui:rune_charge_update',    // 更新充能条进度
+    UI_SKILL_CHARGE_INIT: 'ui:skill_charge_init',
+    UI_SKILL_CHARGE_LEVEL_UP: 'ui:skill_charge_level_up',
+    UI_SKILL_CHARGE_UPDATE: 'ui:skill_charge_update',
+    UI_RUNE_CHARGE_INIT: 'ui:skill_charge_init',        // deprecated alias for skill charge UI
+    UI_RUNE_CHARGE_LEVEL_UP: 'ui:skill_charge_level_up', // deprecated alias for skill charge UI
+    UI_RUNE_CHARGE_UPDATE: 'ui:skill_charge_update',    // deprecated alias for skill charge UI
     UI_RUNE_CHARGE_CLAIM: 'ui:rune_charge_claim',      // deprecated：旧充能符文领取事件，改用 UI_RUNE_CLAIM_AFTER_ENEMY
     UI_RUNE_CLAIM_AFTER_ENEMY: 'ui:rune_claim_after_enemy', // 敌人动作后领取符文（充能/掉落）→ 飞入背包动画
     UI_CHROMATIC_ABERRATION: 'ui:chromatic_aberration', // CRT 色差特效

@@ -171,7 +171,7 @@ export const ENEMY_V2_METADATA = [
         spritePath: 'assets/sprites/enemies/v2/enemy_carrier_3x2.png',
         iconPath:   'assets/icons/enemies/enemy_carrier_3x2.png',
         hpMult: 3.2,
-        placeholder: true,
+        placeholder: false,
     },
     {
         id: 'gravityCore',

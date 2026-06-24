@@ -38,8 +38,8 @@
 | 1.3 | `#phase-rune-launcher` | 符文发射器主面板 | ✅ | `rune_launcher_9s.png`（已收缩到内层卡片宽度 384px）、`rune_grid_bg_9s.png`、`rune_slot_idle/hover/filled/highlight.png` | — |
 | 1.4 | `#phase-shop` | 局外商店（货架） | 🟡 | 卡片 9-Slice、`replace_ammo_bg.png` 复用炼金工坊底图 | 商店物品分类图标、价格标签 |
 | 1.5 | `#phase-selection` | 弹珠选择 / 子弹替换 / 命运时刻 | ✅ | `replace_ammo_bg.png`、`replace_card_frame_<C/B/A/S>_9s.png`、`replace_card_attr_slot.png`、`skip_btn_metal.png` | — |
-| 1.6 | `#phase-gathering` | 研磨阶段（弹珠台） | 🟡 | `bg_main_canvas.png`、`bg_emitter_zone.png`、`emitter_base.png` | 底部「钉盘外框」装饰 |
-| 1.7 | `#phase-combat` | 战斗阶段（无 DOM 主面板） | 🟡 | `bg_combat_table_v2.png`、`bg_combat_emitter_zone_v2.png`、旧渐变墙 fallback、`emitter_base_v3.png`、`emitter_charging_v3_0~5.png` | 墙体/HUD/V4 发射器需按绿幕流程重做 |
+| 1.6 | `#phase-gathering` | 研磨阶段（弹珠台） | 🟡 | `bg_main_canvas.png`、`bg_emitter_zone.png`、`emitter_base.png`；三弹珠子弹面板 `gathering_ammo_panel_9s.png` + `gathering_charge_track/fill.png` 已通过 `src/styles/bitmap_ui.css` 接入 | 底部「钉盘外框」装饰 |
+| 1.7 | `#phase-combat` | 战斗阶段（无 DOM 主面板） | ✅ | `bg_combat_table_v2.png`、`bg_combat_emitter_zone_v2.png`、`combat_wall_left/right/top_v2.png`、`combat_defeat_line_v2.png`、`emitter_base_v3.png`、`emitter_barrel_rotating_v4_runtime.png`、`emitter_charging_v3_0~5.png`、`ammo_queue_panel_9s.png`、`ammo_queue_slot.png`、`speed_btn_x1/x2/x3/xslow.png` | 底座保留 V3；后续仅替换缺口明确的 runtime 占位资产 |
 | 1.8 | `#phase-truth-book` | 真理之书 / 图鉴 | 🟡 | `truth_book_bg_9s.png`（已接入背景） | 章节侧标 Tab、属性卡片底板、Boss 头像位 |
 | 1.9 | `#phase-relic` | 遗物选择 overlay | ✅ | `relic_overlay_bg.png`、`skip_btn_metal.png` + 已有遗物图标/9-Slice 边框（**已移除**旋转圆形稀有度光环） | — |
 | 1.10 | `#phase-gameover` | 游戏结束/结算 | 🟡 | `gameover_bg.png`（已接入） | 统计数据卡片 9-Slice、奖励发放动画图层 |
@@ -47,10 +47,10 @@
 | 1.12 | `#unified-top-bar` | 顶部状态栏 | ✅ | 9-Slice `top_bar_9s.png` | — |
 | 1.13 | `.bottom-panel` | 底部弹药栏 | ✅ | 9-Slice `bottom_panel_9s.png` | — |
 | 1.14 | `#settings-panel` | 设置弹窗 | 🟡 | `settings_modal_9s.png`、`toggle_on.png`、`toggle_off.png` | 滑条 Sprite、关闭按钮 |
-| 1.15 | `#combat-rune-charge-ui` | 战斗中符文充能 UI | ✅ | 符文 PNG、`combat_rune_charge_frame_9s.png`、`combat_rune_charge_fill.png` | V2 框需按绿幕流程重做 |
+| 1.15 | `#combat-rune-charge-ui` | 战斗中技能充能 UI | ✅ | `skill_charge_panel_9s.png`、`skill_charge_actual_fill.png`、`skill_charge_temp_fill.png`、`skill_charge_crystal_empty/full.png`、`skill_charge_burst.png` | — |
 | 1.16 | `#multiplier-display` | 连击倍率显示 | ✅ | `multiplier_x2.png`、`multiplier_x3.png`、`multiplier_x5.png` | — |
 | 1.17 | `#skill-bar` | 战斗技能栏 | 🟡 | 技能图标 PNG、`skill_bar_panel_9s.png`、`skill_button_frame_9s.png`、`skill_cooldown_overlay.png` | V2 技能栏底板需按绿幕流程重做 |
-| 1.18 | `#round-start-banner` | 回合开始横幅 | ✅ | `round_banner_1.png` ~ `round_banner_6.png`（6 帧，600×200） | — |
+| 1.18 | `#round-start-banner` | 回合开始横幅 / 下一 Boss 威胁预告 | 🟡 | `round_title_panel_9s.png`（主标题牌）、`round_banner_1.png` ~ `round_banner_6.png`（旧通用帧，保留兼容）、`round_threat_plate_9s.png`、8 个 Boss 预告小像/顶栏小图标、未知 Boss 封印剪影 | 状态化 `round_toast_<state>_*.png` 横幅、危险威胁槽与高危边框待生成；契约见 [`docs/design/round_start_boss_toast_asset_contract.md`](design/round_start_boss_toast_asset_contract.md) |
 | 1.19 | 数据统计页（与图鉴并入 truth-book） | 历次伤害/记录 | ❌ | — | 折线图背景、数据指标徽章、最佳记录 ribbon |
 | 1.20 | `.ammo-icon` 弹药槽位 | 战斗 / 收集阶段 | ✅ | `assets/icons/ammo/*.png` 已覆盖原有 12 种及 `venom` / `overcharge` / `echo`（含 matryoshka、rainbow、resonance、flying_sword、wind） | - |
 | 1.21 | 发射器属性球轨道（Canvas 渲染层） | 已退役；战斗发射器数据改写入 V3 底座贴图槽位，发射反馈改为炮管方向闪光 | 🟡 | 旧 `orbital_*` 资源保留为历史素材但不再预加载/绘制 | 若未来恢复，需按新发射器静态底座/旋转炮管分层重做 |
@@ -90,12 +90,20 @@
 | `assets/ui/sprites/slider_track.png` / `slider_thumb.png` | 滑条（待生成） | 240×16 / 24×24 | 用于音量、速度 |
 | ~~`assets/ui/panels/truth_book_bg_9s.png`~~ | ✅ **已生成** | 720×1280，slice 64 | 卷轴/书页质感 |
 | `assets/ui/sprites/truth_book_tab_*.png` | 章节侧标（待生成） | 64×120 | 每章节一张 |
-| ~~`assets/ui/banners/round_banner_*.png`~~ | ✅ **已生成**（6 帧） | 600×200 | 金属字 + 光晕动画 |
+| ~~`assets/ui/banners/round_banner_*.png`~~ | ✅ **已生成**（6 帧） | 600×200 | 通用回合横幅底图；只能作为 L0 临时底图，不能覆盖 Boss 预告小像需求 |
+| ~~`assets/ui/banners/round_title_panel_9s.png`~~ | ✅ **已生成并接入** | 600×200 | 回合 Toast 主标题牌，承载 DOM 文本“第 X 回合开始”；`roundBannerBitmapPulse` 不再切回旧 `round_banner_*.png` |
+| ~~`assets/ui/banners/round_threat_plate_9s.png`~~ | ✅ **已生成并接入** | 420×72，slice 18~24 | 暗金/黑曜石小牌，不烘焙文字；详见 [`round_start_boss_toast_asset_contract.md`](design/round_start_boss_toast_asset_contract.md) |
+| `assets/ui/banners/round_toast_<state>_1.png` ~ `_6.png` | normal/countdown/soon/now 四类回合 Toast 状态横幅 | 600×200 | 可分批生成；首批可继续复用 `round_banner_*.png`，优先补威胁槽与 Boss 小像 |
+| ~~`assets/ui/icons/boss_preview/boss_unknown_seal.png` / `_tiny.png`~~ | ✅ **已生成并接入** | 96×96 / 32×32 | 替换当前 CSS 几何剪影；未知状态不得泄露具体 Boss 外形 |
+| ~~`assets/ui/icons/boss_preview/boss_<bossId>_preview.png` / `_tiny.png`~~ | ✅ **已生成并接入** | 96×96 / 32×32 | Boss ID：`ignis/glacies/mikro/devourer/viridis/tesla/chimera/ouroboros`；与 Boss 本体重绘风格一致 |
+| ~~`assets/ui/icons/enemy_affixes/affix_energyArmor.png` / `affix_phaseShield.png` / `affix_livingArmor.png`~~ | ✅ 已生成：敌人头顶防御 HUD 图标 | 1248×1248 源图，HUD 缩放使用 | 蓄能甲、相位护盾、活体护甲的 HUD 专用高质位图；仅用于 `_drawDefenseHudBadges()`，不要复用大尺寸敌人 Overlay |
 | ~~`assets/ui/sprites/orbital_link_flow_*.png`~~ | ✅ **已生成**（透明 PNG） | 8×8 | `_0.png` ~ `_3.png`，循环 |
 | ~~`assets/ui/sprites/orbital_intake_*.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | `_0.png` ~ `_3.png`；吸入轨迹粒子 |
 | ~~`assets/ui/panels/replace_ammo_bg.png`~~ | ✅ **已生成** | 720×1280 | 炼金工坊促視构图，中部低对比区域 |
 | ~~`assets/ui/sprites/replace_card_frame_<tier>_9s.png`~~ | ✅ **已生成**（透明 PNG） | 192×260，slice 24 | C/B/A/S 四档卡片边框 |
 | ~~`assets/ui/sprites/replace_card_attr_slot.png`~~ | ✅ **已生成**（透明 PNG） | 56×56 | 属性 icon 圆形底座 |
+| ~~`assets/ui/panels/gathering_ammo_panel_9s.png`~~ | ✅ **已生成并接入**：研磨阶段三弹珠子弹面板底板 | 180×140，slice 24 | 暗色炼金金属小面板，顶部预留横向充能槽，主体预留弹珠球与属性 chip；文字仍由 DOM 渲染 |
+| ~~`assets/ui/sprites/gathering_charge_track.png` / `_fill.png`~~ | ✅ **已生成并接入**：研磨子弹面板顶部充能槽 | 128×12 | 轨道与填充可横向拉伸；通过 `src/styles/bitmap_ui.css` 覆盖 `.gathering-ammo-charge` 与 `.gathering-ammo-charge-fill` |
 | ~~`assets/ui/panels/relic_overlay_bg.png`~~ | ✅ **已生成** | 720×1280 | 暗紫炼金阵纹理 |
 | ~~`assets/ui/sprites/skip_btn_metal.png`~~ | ✅ **已生成**（透明 PNG） | 128×40 | 金属底板按钮 |
 | ~~`assets/ui/panels/rune_grid_bg_9s.png`~~ | ✅ **已生成** | 320×320，slice 32 | 九宫格容器，含九格分隔线纹理 |
@@ -116,7 +124,13 @@
 | ~~`assets/ui/sprites/multiplier_x2.png` ~ `x5.png`~~ | ✅ **已生成**（透明 PNG） | 96×48 | 三档稀有度配色 |
 | ~~`assets/ui/panels/gameover_bg.png`~~ | ✅ **已生成** | 720×1280 | 双联画构图 |
 | ~~`assets/ui/sprites/relic_aura_*.png`~~ | ✅ **已生成**（透明 PNG） | 200×200 | C/B/A/S 四档稀有度光环 |
+| ~~`assets/ui/sprites/loot_relic_capsule.png`~~ / ~~`loot_essence_chaos_capsule.png`~~ / ~~`loot_essence_pure_capsule.png`~~ | ✅ **已生成**（透明 PNG） | 256×256 | 战场持久掉落物与飞卡动画共用外壳；中心继续复用 `RELIC_ICON_MAP` 图标，low 档不新增粒子预算 |
 | ~~`assets/ui/sprites/skill_cooldown_overlay.png`~~ | ✅ **已生成** | 64×64 | 遮罩/扫光层 |
+| ~~`assets/ui/sprites/skill_charge_panel_9s.png`~~ | ✅ **已生成** | 288×84，slice 32 | SP 充能仪表九宫格面板，替代旧符文充能框 |
+| ~~`assets/ui/sprites/skill_charge_actual_fill.png`~~ | ✅ **已生成** | 192×12 | 单条总充能的青绿色底纹；实际段即未被衰减 overlay 覆盖的部分 |
+| ~~`assets/ui/sprites/skill_charge_temp_fill.png`~~ | ✅ **已生成** | 192×12 | 条内临时衰减段的半透明琥珀 overlay，不作为第二根进度条 |
+| ~~`assets/ui/sprites/skill_charge_crystal_empty.png`~~ / ~~`skill_charge_crystal_full.png`~~ | ✅ **已生成** | 64×64 | SP 晶体槽空/满状态 |
+| ~~`assets/ui/sprites/skill_charge_burst.png`~~ | ✅ **已生成** | 320×108 | 满充发放 SP 时的位图光爆 overlay |
 
 ---
 
@@ -134,7 +148,7 @@
 
 - `#phase-selection` 卡片顶部的属性图标当前用 emoji，需要替换为 `assets/ui/sprites/attr_icon_*.png`（与 `assets/icons/ammo` 同源即可）。
 - `#phase-rune-launcher` 当前完全无背景，导致与 `#phase-shop` / `#phase-selection` 视觉割裂；优先级 P0/P1。
-- `#combat-rune-charge-ui` 已在 2026-06-21 补充 `combat_rune_charge_frame_9s.png` 与 `combat_rune_charge_fill.png`，并通过 `src/styles/bitmap_ui.css` 接入。
+- `#combat-rune-charge-ui` 已在 2026-06-23 改为技能充能仪表，旧 `combat_rune_charge_*` 仅作为历史素材保留；现行资源为 `skill_charge_*` 系列，并通过 `src/styles/bitmap_ui.css` 接入。
 - `assets/icons/relic/` 已较完整（55+ 个），但 `assets/icons/rune/` 与新增符文同步滞后；新增符文时必须同时提供位图。
 - 已生成的 `top_bar_panel.png` 与 `top_bar_9s.png` 同名混乱，建议归档 `top_bar_panel.png`（已被 9-Slice 替代）。
 
@@ -376,6 +390,7 @@
 - 2026-06-23 correction: the first V4 split runtime files were removed from active runtime use because they were derived from non-chroma-key transparent/checkerboard prompts. They now live under `docs/design/concepts/combat_ui_pass1/rejected_chroma_key_required/` as rejection references.
 - `#phase-combat` bottom bullet launcher currently uses the stable V3 Canvas sprite set again:
   - `assets/ui/sprites/emitter_base_v3.png`
+  - `assets/ui/sprites/emitter_barrel_rotating_v4_runtime.png`（从 V4 炮管概念裁切出的窄炮管层；底座 UI 仍固定在 V3 贴图上）
   - `assets/ui/sprites/emitter_charging_v3_0.png` through `emitter_charging_v3_5.png`
 - V4 still remains the target architecture, but the following files must be regenerated from green-screen/chroma-key source before returning to `assets/ui/sprites/`:
   - `assets/ui/sprites/emitter_base_stationary_v4_alpha_raw.png`
@@ -383,9 +398,9 @@
   - `assets/ui/sprites/emitter_barrel_rotating_v4_alpha_raw.png`
   - `assets/ui/sprites/emitter_barrel_rotating_v4.png`
   - `assets/ui/sprites/emitter_charging_v4_0.png` through `emitter_charging_v4_5.png`
-- The intended split remains: static data UI, ammo sockets, and readout frames stay on `emitter_base_stationary_v4.png`; the barrel is drawn from `emitter_barrel_rotating_v4.png` and rotates with the current aiming direction.
-- Runtime mapping in `src/bitmap_icons.js` has been reverted to `EMITTER_BASE_SRC = emitter_base_v3.png`, `EMITTER_BARREL_SRC = null`, and V3 charging frames until green-screen V4 assets are available.
-- Rendering still supports an optional split barrel path in `render_combat_launcherEmitterBase()`, but it is inactive while `EMITTER_BARREL_SRC` is null.
+- Runtime split keeps the approved `emitter_base_v3.png` as the stationary base/readout body; only the current runtime barrel layer is drawn as an independent rotating layer.
+- Runtime mapping in `src/bitmap_icons.js` uses `EMITTER_BASE_SRC = emitter_base_v3.png`, `EMITTER_BARREL_SRC = emitter_barrel_rotating_v5_runtime.png`, and V3 charging frames until full green-screen replacement assets are available.
+- Rendering uses the optional split barrel path in `render_combat_launcherEmitterBase()` so only the narrow barrel layer rotates; the V3 base/readout UI remains fixed. The launcher holds the last shot angle briefly after a real projectile spawn before slowly returning to neutral.
 - Split-layer runtime preview lives at `docs/design/concepts/combat_ui_pass1/emitter_v4_split_runtime_preview.png`; it verifies that the base/readout UI stays fixed while only the barrel rotates.
 
 ## 11. 2026-06-23 Combat Battlefield V2 Runtime Assets
@@ -393,14 +408,12 @@
 - `#phase-combat` keeps the combat-specific Canvas background layers because they are full-frame backgrounds and do not depend on transparent generation:
   - `assets/ui/backgrounds/bg_combat_table_v2.png`
   - `assets/ui/backgrounds/bg_combat_emitter_zone_v2.png`
-- 2026-06-23 correction: the first transparent-dependent wall/HUD runtime files were removed from active runtime use and moved to `docs/design/concepts/combat_ui_pass1/rejected_chroma_key_required/`:
+- 2026-06-24 correction: wall runtime files are active again and must be shipped with the current `src/bitmap_icons.js` mapping:
   - `assets/ui/sprites/combat_wall_left_v2.png`
   - `assets/ui/sprites/combat_wall_right_v2.png`
   - `assets/ui/sprites/combat_wall_top_v2.png`
-  - `assets/ui/sprites/combat_status_panel_v2_9s.png`
-  - `assets/ui/sprites/skill_bar_panel_v2_9s.png`
-  - `assets/ui/sprites/combat_rune_charge_frame_v2_9s.png`
-- Runtime mapping still uses `BG_COMBAT_TABLE_SRC` and `BG_COMBAT_EMITTER_ZONE_SRC`; `COMBAT_WALL_*_SRC` is currently null so `render_combat_walls()` falls back to the old gradient wall.
+- `combat_status_panel_v2_9s.png`、`skill_bar_panel_v2_9s.png`、`combat_rune_charge_frame_v2_9s.png` 仍不在当前运行时映射内，后续若重接入需走绿幕/chroma key 资产验收。
+- Runtime mapping uses `BG_COMBAT_TABLE_SRC`、`BG_COMBAT_EMITTER_ZONE_SRC` and `COMBAT_WALL_*_SRC`; `render_combat_walls()` only falls back to the old gradient wall when these image assets are missing or not yet loaded.
 - Runtime asset preview lives at `docs/design/concepts/combat_ui_pass1/combat_ui_runtime_v2_asset_preview.png`.
 ## 2026-06-22 新增属性符文素材状态
 
@@ -427,4 +440,96 @@
 
 正式资源若进入运行时目录，建议使用 `_v2` / `_v4` 后缀非破坏式接入，并同步更新本清单、`src/bitmap_icons.js` 或 `src/styles/bitmap_ui.css` 中的集中映射。
 当前概念图仅用于风格评审，部分透明区域为烘焙棋盘格而非真实 alpha；后续正式生成不得在 prompt 中要求透明底，必须使用纯绿幕/chroma key 背景，再做本地抠图处理。
-发射器 V4 必须拆为静态底座与可旋转炮管：数据 UI、弹仓和读数框保留在 `emitter_base_stationary_v4.png`，炮管使用独立 `emitter_barrel_rotating_v4.png` 随发射方向旋转。
+发射器后续正式重绘若替换底座，必须先证明 128px 运行尺寸下优于 `emitter_base_v3.png`；运行时当前只要求炮管独立为 `emitter_barrel_rotating_v4_runtime.png` 并随发射方向旋转，数据 UI、弹仓和读数框继续保留在 V3 底座上。
+
+## 13. 2026-06-24 Combat Console V2 Operation Table Plan
+
+战斗底部 UI 已进入“操作台资产”设计阶段，权威拆分见 [`docs/design/combat_console_v2_asset_plan.md`](design/combat_console_v2_asset_plan.md)，移动端蓝图见 [`docs/design/concepts/combat_console_v2_asset_blueprint.svg`](design/concepts/combat_console_v2_asset_blueprint.svg)。
+
+首批待生成资产：
+
+- `assets/ui/panels/combat_console_left_wing_9s.png`
+- `assets/ui/panels/combat_console_right_wing_9s.png`
+- `assets/ui/panels/merchant_journey_topbar_9s.png`
+- `assets/ui/sprites/skill_sp_gem_empty.png`
+- `assets/ui/sprites/skill_sp_gem_full.png`
+- `assets/ui/panels/combat_current_ammo_slot_9s.png`
+- `assets/ui/sprites/combat_ammo_queue_chip.png`
+- `assets/ui/panels/combat_skill_button_frame_9s.png`
+- `assets/ui/sprites/rune_config_socket_button.png`
+
+接入前约束：
+
+- 390px 宽下左翼和右翼不得进入 132px 中央发射器井。
+- 运行时仍以 `#combat-bottom-dock` 的 96px 高度为上限，不能抬高到底部警戒线可视带之上。
+- 顶部商人旅程只能作为 `#unified-top-bar` 内的紧凑状态，不得遮挡敌人出生区。
+- 正式透明 PNG 进入运行目录前必须来自绿幕/chroma key 源图；概念图不得直接覆盖运行时资产。
+
+Pass 1 概念图已生成，全部仅作评审参考：
+
+- `docs/design/concepts/combat_console_v2_pass1/combat_console_v2_contact_sheet_concept.png`
+- `docs/design/concepts/combat_console_v2_pass1/combat_console_side_wings_raw_concept.png`
+- `docs/design/concepts/combat_console_v2_pass1/merchant_journey_topbar_raw_concept.png`
+- `docs/design/concepts/combat_console_v2_pass1/skill_sp_gem_states_raw_concept.png`
+
+2026-06-24 选型更新：技能点宝石锁定为 `skill_sp_gem_states_raw_concept.png` 第 2 列狭长六边形，已裁出透明候选：
+
+- `docs/design/concepts/combat_console_v2_pass1/extracted/skill_sp_gem_hex_empty_candidate.png`
+- `docs/design/concepts/combat_console_v2_pass1/extracted/skill_sp_gem_hex_full_candidate.png`
+- `docs/design/concepts/combat_console_v2_pass1/extracted/skill_sp_gem_hex_readability_sheet.png`
+
+Pass 2 综合概念图：
+
+- `docs/design/concepts/combat_console_v2_pass2/combat_console_v2_integrated_mockup_hex_gems.png`
+- `docs/design/concepts/combat_console_v2_pass2/combat_console_v2_390_candidate_preview.png`
+
+390px 拆件预览结论：中间发射器井未被覆盖，SP 狭长六边形宝石可读；但 Pass 1/Pass 3 侧翼源图偏横条，非等比压入 119x88 后会产生明显压缩感，因此旧预览仅作为反例，不得作为正式切图依据。正式左右翼源尺寸从 360x192 修正为 360x264，以贴近 119x88 运行时比例。
+
+移动端触控修正：所有可点击目标最小热区为 40x40。右侧技能区最多展示 2x2 个 40x40 技能按钮；SP 宝石和技能充能均为非点击边框信息。符文配置不得继续使用 20x18 小按钮，需要移到左翼或另设 40x40 热区。
+
+Pass 4 触控/比例修正版：
+
+- `docs/design/concepts/combat_console_v2_pass4/combat_console_left_touch_target_candidate.png`
+- `docs/design/concepts/combat_console_v2_pass4/combat_console_right_touch_target_wide_candidate.png`
+- `docs/design/concepts/combat_console_v2_pass4/combat_console_v2_390_touch_target_art_preview.png`
+- `docs/design/concepts/combat_console_v2_pass4/combat_console_v2_info_annotation.svg`
+
+比例验收：左翼 alpha bbox 1.231，右翼宽版 alpha bbox 1.489，均可等比进入 119x88 目标区域。旧的 `combat_console_v2_390_candidate_preview.png` 与 `combat_console_v2_390_pass3_compact_preview.png` 存在非等比压缩或候选比例不匹配，仅保留为反例。
+
+信息标注已锁定：左翼放下一发弹药、子弹属性、弹药序列、伤害分析 40x40、符文配置 40x40；中间发射器井不放 DOM 面板；右翼放 SP 宝石、2x2 技能按钮与底部横向技能充能轨。
+
+Pass 5 叠加小件候选：
+
+- `docs/design/concepts/combat_console_v2_pass5/combat_current_ammo_core_socket_candidate.png`
+- `docs/design/concepts/combat_console_v2_pass5/combat_damage_analysis_button_candidate.png`
+- `docs/design/concepts/combat_console_v2_pass5/combat_rune_config_button_candidate.png`
+- `docs/design/concepts/combat_console_v2_pass5/combat_skill_charge_endpoint_candidate.png`
+- `docs/design/concepts/combat_console_v2_pass5/combat_console_overlay_sprites_size_check.png`
+- `docs/design/concepts/combat_console_v2_pass5/combat_console_v2_overlay_sprites_applied_preview.png`
+
+这些候选对应左上当前弹药核心槽、左下/左侧操作区的伤害分析与符文配置、右下技能充能端点；正式接入前需复制到 `assets/ui/sprites/` 并重新命名为运行时资源。
+
+Pass 6 贴边放大预览：
+
+- `docs/design/concepts/combat_console_v2_pass6/combat_console_v2_390_edge_attached_overlay_preview.png`
+
+布局更新：左右面板直接贴屏幕边缘，目标框改为左翼 `x=0 y=589 w=128 h=104`、中间发射器井 `x=128 y=589 w=134 h=104`、右翼 `x=262 y=589 w=128 h=104`。该版本优先级高于旧 6px 外边距预览。
+
+Runtime shell 状态：2026-06-24 已先接入 DOM/CSS 布局验证，随后接入 Pass4/Pass5/Pass1 的 runtime candidate PNG。`#combat-bottom-dock` 采用 Pass6 三段式贴边网格；左翼承载下一发弹药、独立属性芯片、短队列、伤害分析 40x40、符文配置 40x40；右翼固定 2x2 技能按钮，每个热区 40x40，技能点以横向狭长六边形 PNG 宝石嵌在上边框，技能充能回到底部横向轨道。
+
+已进入运行时预览的候选资产：
+
+- `assets/ui/panels/combat_console_left_wing_runtime_candidate.png`
+- `assets/ui/panels/combat_console_right_selected_runtime_candidate.png`
+- `assets/ui/panels/merchant_journey_topbar_runtime_candidate.png`
+- `assets/ui/sprites/combat_current_ammo_core_socket_runtime_candidate.png`
+- `assets/ui/sprites/combat_damage_analysis_button_runtime_candidate.png`
+- `assets/ui/sprites/combat_rune_config_button_runtime_candidate.png`
+- `assets/ui/sprites/skill_sp_gem_hex_empty_runtime_candidate.png`
+- `assets/ui/sprites/skill_sp_gem_hex_full_runtime_candidate.png`
+- `assets/ui/sprites/attribute_chips/attribute_chip_*.png`
+- `assets/ui/sprites/attribute_icons/attribute_icon_*.png`
+
+这些文件仍按 `_runtime_candidate` 或运行时候选小件管理，不标记为最终已配齐。正式左右翼、宝石、按钮框、属性芯片和属性 ICON 仍需按绿幕/chroma key 与 9-slice 流程进入最终命名后再登记为已配齐。属性 ICON 已先作为透明 PNG 符号层接入研磨属性 chip、战斗左翼属性 chip 与发射器底部属性孔。
+
+2026-06-24 Pass10 更新：用户选中的右翼面板已接入为 `combat_console_right_selected_runtime_candidate.png`，顶部最多 5 个技能点、中央 2x2 技能槽、底部横向技能充能轨均按该素材槽位定位。旧宽版右翼、旧右下端点、旧横向 SP 宝石已移至 `assets/ui/archive/combat_console_v2_replaced_pass10/`，避免继续误用。底部技能充能条不再叠加 `skill_charge_panel_9s.png` 外壳，DOM 仅叠加 actual/temp fill。

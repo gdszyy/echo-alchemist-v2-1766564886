@@ -1,4 +1,5 @@
 from pathlib import Path
+import math
 from random import Random
 
 from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter
@@ -6,6 +7,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "assets" / "sprites" / "enemies" / "overlays"
+ICON_DIR = ROOT / "assets" / "ui" / "icons" / "enemy_affixes"
 CONTACT_SHEET = ROOT / "docs" / "design" / "enemy_targeting_overlay_contact_sheet.png"
 FOOTPRINT_SHEET = ROOT / "docs" / "design" / "enemy_targeting_overlay_footprints_contact_sheet.png"
 SIZE = 128
@@ -269,6 +271,13 @@ def save(name, img):
     return out
 
 
+def save_icon(name, img):
+    ICON_DIR.mkdir(parents=True, exist_ok=True)
+    out = img.resize((SIZE, SIZE), Image.Resampling.LANCZOS)
+    out.save(ICON_DIR / name)
+    return out
+
+
 def footprint_name(name, cols, rows):
     stem, suffix = name.rsplit(".", 1)
     return f"{stem}_{cols}x{rows}.{suffix}"
@@ -366,6 +375,87 @@ def phase_shield(disabled=False):
         draw_energy_groove(img, [(38, 25), (90, 25)], "#bfdbfe", width=1.6, glow=2.5, alpha=210)
         draw_energy_groove(img, [(36, 103), (88, 102)], "#bfdbfe", width=1.4, glow=2.0, alpha=160)
     return save_footprint_variants(f"overlay_phase_shield_{'disabled' if disabled else 'active'}.png", img)
+
+
+def shield_defense():
+    img = new_layer()
+    accent = "#93c5fd"
+    draw_segmented_frame(img, 24, accent, sides=("top", "bottom", "left", "right"), thickness=12, inset=8, heavy=True)
+    d = ImageDraw.Draw(img)
+
+    # Materialized hex-grid plating: this matches the runtime shield mechanic
+    # without relying on the old vector-only hatch.
+    for row, y in enumerate([31, 47, 63, 79, 95]):
+        for col, x in enumerate([30, 48, 66, 84, 102]):
+            if (row + col) % 2 == 0:
+                r = 6.6 if 24 < x < 106 and 26 < y < 100 else 5.0
+                pts = []
+                for k in range(6):
+                    a = (k / 6) * math.pi * 2 - math.pi / 6
+                    pts.append((x + r * math.cos(a), y + r * math.sin(a)))
+                draw_material_plate(img, pts, 2400 + row * 17 + col, accent, fill="#263545", edge="#bfdbfe")
+
+    for pts in [
+        [(18, 18), (36, 14), (32, 28), (20, 34)],
+        [(110, 18), (94, 14), (98, 28), (108, 34)],
+        [(18, 110), (34, 114), (31, 99), (20, 94)],
+        [(110, 110), (94, 114), (98, 99), (108, 94)],
+    ]:
+        draw_crystal_shard(img, pts, "#bfdbfe", 2480 + len(pts))
+
+    draw_energy_groove(img, [(24, 64), (48, 49), (80, 49), (104, 64)], "#dbeafe", width=1.9, glow=2.2, alpha=190)
+    draw_energy_groove(img, [(24, 66), (49, 82), (80, 82), (104, 66)], "#60a5fa", width=1.5, glow=1.6, alpha=145)
+    d.rounded_rectangle((sc(47), sc(38), sc(81), sc(90)), radius=sc(11), outline=rgba("#eff6ff", 130), width=sc(1.5))
+    return save_footprint_variants("overlay_affix_shield.png", img)
+
+
+def radiant_aegis():
+    img = new_layer()
+    draw_segmented_frame(img, 28, "#f0abfc", sides=("top", "bottom", "left", "right"), thickness=9, inset=10, heavy=True)
+    d = ImageDraw.Draw(img)
+
+    diamond = [(64, 16), (105, 64), (64, 112), (23, 64)]
+    inner = [(64, 30), (91, 64), (64, 98), (37, 64)]
+    draw_material_plate(img, diamond, 2810, "#f0abfc", fill="#30263b", edge="#f5d0fe")
+    draw_material_plate(img, inner, 2811, "#67e8f9", fill="#253544", edge="#a5f3fc")
+
+    add_glow(img, polygon_mask(diamond), "#f0abfc", blur=5, alpha=78)
+    for offset, color, alpha in [
+        (0, "#f0abfc", 230),
+        (10, "#67e8f9", 175),
+        (-10, "#fde68a", 150),
+    ]:
+        d.arc((sc(24 + offset * 0.18), sc(23), sc(104 + offset * 0.18), sc(105)), 208, 332, fill=rgba(color, alpha), width=sc(3.2))
+        d.arc((sc(24 - offset * 0.18), sc(23), sc(104 - offset * 0.18), sc(105)), 28, 152, fill=rgba(color, int(alpha * 0.78)), width=sc(2.4))
+
+    for pts, color in [
+        ([(64, 20), (64, 108)], "#f0abfc"),
+        ([(30, 64), (98, 64)], "#67e8f9"),
+        ([(43, 43), (85, 85)], "#fde68a"),
+        ([(85, 43), (43, 85)], "#a78bfa"),
+    ]:
+        draw_energy_groove(img, pts, color, width=1.5, glow=2.0, alpha=145)
+
+    d.ellipse((sc(55), sc(55), sc(73), sc(73)), fill=rgba("#fdf4ff", 165), outline=rgba("#0f172a", 130), width=sc(1.2))
+    return save_footprint_variants("overlay_affix_radiantAegis.png", img)
+
+
+def radiant_aegis_icon():
+    img = new_layer()
+    add_glow(img, polygon_mask([(64, 12), (108, 37), (100, 91), (64, 116), (28, 91), (20, 37)]), "#f0abfc", blur=5, alpha=90)
+    draw_material_plate(img, [(64, 12), (108, 37), (100, 91), (64, 116), (28, 91), (20, 37)], 2910, "#f0abfc", fill="#30263b", edge="#f5d0fe")
+    draw_material_plate(img, [(64, 28), (90, 43), (85, 82), (64, 98), (43, 82), (38, 43)], 2911, "#67e8f9", fill="#253544", edge="#a5f3fc")
+    d = ImageDraw.Draw(img)
+    for start, color, width, alpha in [
+        (208, "#67e8f9", 4.8, 215),
+        (28, "#f0abfc", 4.2, 205),
+        (114, "#fde68a", 2.5, 150),
+    ]:
+        d.arc((sc(18), sc(18), sc(110), sc(110)), start, start + 124, fill=rgba(color, alpha), width=sc(width))
+    draw_energy_groove(img, [(64, 34), (80, 64), (64, 94), (48, 64), (64, 34)], "#fef08a", width=2.4, glow=2.6, alpha=220)
+    draw_energy_groove(img, [(35, 64), (93, 64)], "#67e8f9", width=1.8, glow=1.8, alpha=175)
+    d.ellipse((sc(54), sc(54), sc(74), sc(74)), fill=rgba("#ffffff", 210), outline=rgba("#0f172a", 125), width=sc(1.4))
+    return save_icon("affix_radiantAegis.png", img)
 
 
 def low_damage_immune():
@@ -492,6 +582,8 @@ def build_contact_sheet(images):
 
 def build_footprint_contact_sheet(variant_sets):
     samples = [
+        ("shield", "shield", [(1, 1), (3, 2), (3, 3)]),
+        ("radiant", "radiant", [(1, 1), (3, 2), (3, 3)]),
         ("phase active", "phase active", [(1, 1), (2, 1), (1, 2), (3, 2)]),
         ("living high", "living high", [(1, 1), (2, 2), (3, 1), (2, 3)]),
         ("carrier", "carrier", [(1, 1), (3, 2), (3, 3)]),
@@ -527,7 +619,10 @@ def build_footprint_contact_sheet(variant_sets):
 
 
 def main():
+    radiant_aegis_icon()
     variant_sets = {
+        "shield": shield_defense(),
+        "radiant": radiant_aegis(),
         "energy charged": energy_armor(True),
         "energy empty": energy_armor(False),
         "phase active": phase_shield(False),

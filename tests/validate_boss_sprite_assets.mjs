@@ -31,6 +31,8 @@ const DRAFT_DIR = 'assets/sprites/bosses/redraw_drafts';
 const ALPHA_FIX_VERSION_SUFFIX = 'v20260624alphafix';
 const REQUIRED_PAINTERLY_SOURCE_BOSSES = new Set(['viridis', 'tesla', 'chimera', 'ouroboros']);
 const REQUIRED_VERSIONED_RUNTIME_BOSSES = new Set(BOSS_SPRITE_BOSS_IDS);
+const OUROBOROS_ATTACHMENT_SLOT_IDS = ['aegis', 'graft', 'brood', 'stride', 'maw', 'surge'];
+const OUROBOROS_ORBIT_ECHO_IDS = OUROBOROS_ATTACHMENT_SLOT_IDS;
 const PAINTERLY_SOURCE_DATE_BY_BOSS = {
     viridis: '2026-06-23',
     ouroboros: '2026-06-23',
@@ -432,13 +434,91 @@ function validateHpReadableDraft(bossId) {
     }
 }
 
+function validateOuroborosAttachmentSlotAssets() {
+    const manifestRel = 'assets/sprites/bosses/ouroboros_slots/ouroboros_slot_manifest.json';
+    const manifestPath = path.join(root, manifestRel);
+    if (!fs.existsSync(manifestPath)) {
+        fail(`Ouroboros attachment slot manifest is missing (${manifestRel})`);
+        return;
+    }
+
+    let manifest;
+    try {
+        manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    } catch (err) {
+        fail(`Ouroboros attachment slot manifest is invalid JSON: ${err.message}`);
+        return;
+    }
+
+    const slots = manifest.slots || {};
+    for (const slotId of OUROBOROS_ATTACHMENT_SLOT_IDS) {
+        const entry = slots[slotId];
+        if (!entry?.spritePath) {
+            fail(`Ouroboros attachment slot ${slotId} is missing from manifest`);
+            return;
+        }
+        if (entry.spritePath !== `assets/sprites/bosses/ouroboros_slots/ouroboros_slot_${slotId}.png`) {
+            fail(`Ouroboros attachment slot ${slotId} path must be stable, got ${entry.spritePath}`);
+            return;
+        }
+        const pngPath = path.join(root, entry.spritePath);
+        if (!fs.existsSync(pngPath)) {
+            fail(`Ouroboros attachment slot ${slotId} PNG is missing (${entry.spritePath})`);
+            return;
+        }
+        const png = readPngInfo(pngPath);
+        if (png.width !== 128 || png.height !== 128 || png.colorType !== 6) {
+            fail(`Ouroboros attachment slot ${slotId} must be a 128x128 RGBA PNG, got ${png.width}x${png.height} colorType=${png.colorType}`);
+            return;
+        }
+    }
+
+    pass('Ouroboros six attachment slot sprites are stable 128x128 RGBA boss-mounted assets');
+}
+
+function validateOuroborosOrbitEchoBossMatchedAssets() {
+    const sourceAtlas = 'assets/sprites/bosses/redraw_drafts/boss_ouroboros_redraw_idle_draft_sheet_v20260624alphafix.png';
+    for (const slotId of OUROBOROS_ORBIT_ECHO_IDS) {
+        const baseRel = `assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_${slotId}_1x1_idle`;
+        const pngPath = path.join(root, `${baseRel}.png`);
+        const jsonPath = path.join(root, `${baseRel}.json`);
+        if (!fs.existsSync(pngPath) || !fs.existsSync(jsonPath)) {
+            fail(`Ouroboros orbit echo ${slotId} must have boss-matched PNG and JSON assets`);
+            return;
+        }
+
+        const png = readPngInfo(pngPath);
+        if (png.width !== 256 || png.height !== 256 || png.colorType !== 6) {
+            fail(`Ouroboros orbit echo ${slotId} must remain a 256x256 RGBA sprite, got ${png.width}x${png.height} colorType=${png.colorType}`);
+            return;
+        }
+
+        let meta;
+        try {
+            meta = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+        } catch (err) {
+            fail(`Ouroboros orbit echo ${slotId} metadata is invalid JSON: ${err.message}`);
+            return;
+        }
+
+        if (meta.bossMatched !== true || meta.styleFamily !== 'ouroboros_boss_matched' || meta.sourceAtlas !== sourceAtlas) {
+            fail(`Ouroboros orbit echo ${slotId} metadata must lock to the boss-matched source atlas`);
+            return;
+        }
+    }
+
+    pass('Ouroboros orbit echo companions use boss-matched 256x256 RGBA assets sourced from the active Ouroboros sheet');
+}
+
 function validateBossSpriteRuntimeDrawContract() {
     const enemyJsPath = path.join(root, 'src/entities/enemy.js');
     const code = fs.readFileSync(enemyJsPath, 'utf8');
+    const configCode = fs.readFileSync(path.join(root, 'src/config.js'), 'utf8');
+    const spriteRendererCode = fs.readFileSync(path.join(root, 'src/render/sprite_renderer.js'), 'utf8');
     const methodStart = code.indexOf('_drawBossSpriteOutsideCollisionClip(ctx, w, h) {');
     const methodEnd = code.indexOf('_drawBossDecoration(ctx, w, h)', methodStart);
     if (methodStart < 0 || methodEnd <= methodStart) {
-        fail('Boss runtime draw must expose a polygon clip-repair helper');
+        fail('Boss runtime draw must expose a post-clip complete sprite helper');
         return;
     }
 
@@ -451,49 +531,100 @@ function validateBossSpriteRuntimeDrawContract() {
     }
     const decorationCode = code.slice(decorationStart, decorationEnd);
     const hasPostClipCall = code.includes('this._drawBossSpriteOutsideCollisionClip(ctx, w, h);');
-    const clipsOnlyPolygonBosses = helperCode.includes("this.type !== 'boss' || this.collisionShape !== 'polygon'");
-    const usesInverseClip = helperCode.includes("ctx.clip('evenodd')");
+    const drawsAllBosses = helperCode.includes("this.type !== 'boss'") && !helperCode.includes("this.collisionShape !== 'polygon'");
+    const avoidsInverseClip = !helperCode.includes("ctx.clip('evenodd')");
+    const staysInLocalTransform = !helperCode.includes('ctx.translate(this.pos.x');
     const keepsFrameAspect = helperCode.includes('getCurrentFrameAspect') && helperCode.includes('bossSpriteAspect > 1.18');
-    if (!hasPostClipCall || !clipsOnlyPolygonBosses || !usesInverseClip || !keepsFrameAspect) {
-        fail('Boss runtime draw must repair polygon collision clipping without changing 384x256 frame aspect');
+    const spriteDrawIsOutsideDecoration = !decorationCode.includes('this._spriteRenderer.draw');
+    if (!hasPostClipCall || !drawsAllBosses || !avoidsInverseClip || !staysInLocalTransform || !keepsFrameAspect || !spriteDrawIsOutsideDecoration) {
+        fail('Boss runtime draw must render the complete transparent sprite once after the physics clip without inverse-clip patching');
         return;
     }
 
-    pass('Boss runtime draw repairs polygon collision clipping after the physics clip is restored');
+    pass('Boss runtime draw renders the complete transparent sprite after the physics clip is restored');
 
-    const scalesMikroAndDevourer = helperCode.includes('bossSpriteScale')
-        && decorationCode.includes('bossSpriteScale')
+    const hasRegionDrawSupport = spriteRendererCode.includes('drawRegion(ctx, srcXRatio, srcYRatio, srcWRatio, srcHRatio')
+        && spriteRendererCode.includes('frameX + rx * fw')
+        && spriteRendererCode.includes('frameY + ry * fh')
+        && spriteRendererCode.includes('rw * fw, rh * fh');
+    const hasMotionConfig = configCode.includes('bossSpriteMotion')
+        && configCode.includes('splitY')
+        && configCode.includes('mediumScale')
+        && BOSS_SPRITE_BOSS_IDS.every(bossId => configCode.includes(`${bossId}: {`));
+    const usesSplitMotion = helperCode.includes('CONFIG.enemyRender?.bossSpriteMotion')
+        && helperCode.includes("quality !== 'low'")
+        && helperCode.includes('typeof this._spriteRenderer.drawRegion')
+        && helperCode.includes('profile.splitY ?? motionCfg.splitY')
+        && helperCode.includes('baseDrawn')
+        && helperCode.includes('bodyDrawn');
+    if (!hasRegionDrawSupport || !hasMotionConfig || !usesSplitMotion) {
+        fail('Boss runtime draw must support configurable high/medium body-base region breathing with low-quality single-draw fallback');
+        return;
+    }
+
+    pass('Boss runtime draw supports configurable body/base region breathing and low-quality fallback');
+
+    const scalesMikroDevourerAndOuroboros = helperCode.includes('bossSpriteScale')
+        && code.includes("this.bossType === 'ouroboros'")
+        && code.includes('1.72')
         && code.includes("this.bossType === 'devourer'")
-        && code.includes('1.14')
+        && code.includes('1.22')
         && code.includes("this.bossType === 'mikro'")
-        && code.includes('1.10');
+        && code.includes('1.18');
     const appliesSpriteScale = helperCode.includes('w * bossSpriteScale')
         && helperCode.includes('h * bossSpriteScale')
-        && helperCode.includes('Math.min(w, h) * bossSpriteScale')
-        && decorationCode.includes('w * bossSpriteScale')
-        && decorationCode.includes('h * bossSpriteScale')
-        && decorationCode.includes('Math.min(w, h) * bossSpriteScale');
-    if (!scalesMikroAndDevourer || !appliesSpriteScale) {
-        fail('Boss runtime draw must enlarge Mikro and Devourer sprite art without changing collision data');
+        && helperCode.includes('Math.min(w, h) * bossSpriteScale');
+    if (!scalesMikroDevourerAndOuroboros || !appliesSpriteScale) {
+        fail('Boss runtime draw must enlarge Mikro, Devourer, and Ouroboros sprite art without changing collision data');
+        return;
+    }
+
+    const slotStart = code.indexOf('_drawOuroborosOrbitAttachments(ctx, w, h, radius, thickness, isBerserk = false)');
+    const slotEnd = code.indexOf('if ((this._ouroborosOrbitDisruptTimer', slotStart);
+    const slotCode = slotStart >= 0 && slotEnd > slotStart ? code.slice(slotStart, slotEnd) : '';
+    const requiredSlots = ['aegis', 'graft', 'brood', 'stride', 'maw', 'surge'];
+    const hasOuroborosSlotSprites = requiredSlots.every(slotId =>
+        code.includes(`enemy_ouroboros_orbit_echo_${slotId}_1x1_idle.png`)
+    ) && slotCode.includes('OUROBOROS_ATTACHMENT_SLOT_ASSETS[slot.id]')
+        && slotCode.includes('_getAffixOverlayImage(slotAssetPath)')
+        && slotCode.includes('ctx.drawImage(')
+        && !slotCode.includes('fillText(slot.icon');
+    if (!hasOuroborosSlotSprites) {
+        fail('Ouroboros runtime draw must mount the six boss-matched orbit echo PNGs on the boss ring instead of text/proxy enemy art');
+        return;
+    }
+
+    const suppressesProgrammaticRingOverSprite = code.includes('bossSpriteReady')
+        && code.includes('ctx.lineWidth = bossSpriteReady ? Math.max(1.5, ouroThickness * 0.08) : ouroThickness')
+        && code.includes('ctx.globalAlpha = bossSpriteReady ? (0.12 + ringPulse * 0.04) : (0.85 + ringPulse * 0.15)')
+        && code.includes('if (!bossSpriteReady) {')
+        && code.includes('ctx.lineWidth = bossSpriteReady ? Math.max(2, ouroThickness * 0.12) : ouroThickness * 0.55');
+    if (!suppressesProgrammaticRingOverSprite) {
+        fail('Ouroboros runtime draw must suppress the thick programmatic ring whenever the boss sprite is ready');
         return;
     }
 
     const softensOverlay = decorationCode.includes('bossEffectBreath')
         && decorationCode.includes('bossEffectAlpha')
+        && decorationCode.includes('bossEffectAlphaScale')
         && decorationCode.includes('ctx.globalAlpha *= bossEffectAlpha')
-        && decorationCode.includes('0.34')
-        && decorationCode.includes('0.46');
+        && decorationCode.includes('0.24')
+        && decorationCode.includes('0.32')
+        && decorationCode.includes('0.58')
+        && decorationCode.includes('0.50');
     if (!softensOverlay) {
         fail('Boss runtime draw must soften programmatic Boss overlay effects with a breathing alpha gate');
         return;
     }
 
-    pass('Boss runtime draw keeps Mikro/Devourer art larger and gates legacy overlay effects with breathing alpha');
+    pass('Boss runtime draw keeps enlarged boss art, mounts boss-matched Ouroboros slot PNGs, and gates legacy overlay effects');
 }
 
 console.log('Boss base sprite asset validation');
 
 validateBossSpriteRuntimeDrawContract();
+validateOuroborosAttachmentSlotAssets();
+validateOuroborosOrbitEchoBossMatchedAssets();
 
 for (const bossId of BOSS_SPRITE_BOSS_IDS) {
     validateBossSprite(bossId);

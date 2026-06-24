@@ -1,6 +1,6 @@
 # src\spawn_system.js 函数索引
 
-> 自动生成于 2026-06-23 | 总行数: 3213 | 函数数: 50 | 语言: javascript
+> 自动生成于 2026-06-25 | 总行数: 3454 | 函数数: 54 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -12,10 +12,14 @@
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
 | spawn_windSkillParticles | method | `spawn_windSkillParticles(type, rect, progress)` |  |
-| spawn_createFloatingText | method | `spawn_createFloatingText(x, y, text, color, fontSize)` |  |
+| spawn_createFloatingText | method | `spawn_createFloatingText(x, y, text, color, fontSize, iconImg)` |  |
 | spawn_generateAffixes | method | `spawn_generateAffixes()` |  |
 | spawn_getBossMinionProfile | method | `spawn_getBossMinionProfile(bossId)` |  |
 | spawn_applyBossMinionMetadata | method | `spawn_applyBossMinionMetadata(e, bossId, profile = null, roleOverride = null)` |  |
+| spawn_applyTeachingGate | method | `spawn_applyTeachingGate(weights, round)` |  |
+| spawn_markAffixSeenIfNew | method | `spawn_markAffixSeenIfNew(affix)` |  |
+| spawn_getNextBossPreTeach | method | `spawn_getNextBossPreTeach(round)` |  |
+| spawn_estimateFieldStrength | method | `spawn_estimateFieldStrength()` |  |
 | spawn_spawnEnemyRowAt | method | `spawn_spawnEnemyRowAt(yPos, options = {})` |  |
 | addPreset | function | `addPreset(col, hpMult, forceAffixes, extraInit)` |  |
 | spawn_addSkillPoint | method | `spawn_addSkillPoint(amount = 1)` |  |

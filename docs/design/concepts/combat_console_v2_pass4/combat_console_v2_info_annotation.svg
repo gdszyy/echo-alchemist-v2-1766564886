@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="860" viewBox="0 0 1120 860">
+  <defs>
+    <style>
+      .bg { fill: #030712; }
+      .panel { fill: #08101f; stroke: #334155; stroke-width: 1; }
+      .title { fill: #e5e7eb; font: 700 24px "Noto Sans SC", "Microsoft YaHei", sans-serif; }
+      .sub { fill: #94a3b8; font: 13px "Noto Sans SC", "Microsoft YaHei", sans-serif; }
+      .h { fill: #e5e7eb; font: 700 16px "Noto Sans SC", "Microsoft YaHei", sans-serif; }
+      .body { fill: #cbd5e1; font: 13px "Noto Sans SC", "Microsoft YaHei", sans-serif; }
+      .tiny { fill: #94a3b8; font: 11px "Noto Sans SC", "Microsoft YaHei", sans-serif; }
+      .dim { fill: #94a3b8; font: 10px Consolas, monospace; }
+      .top { stroke: #fbbf24; }
+      .left { stroke: #38bdf8; }
+      .act { stroke: #e879f9; }
+      .center { stroke: #facc15; }
+      .right { stroke: #2dd4bf; }
+      .danger { stroke: #fb7185; }
+      .frame { fill: none; stroke-width: 2; }
+      .numText { fill: #020617; font: 700 13px Arial, sans-serif; text-anchor: middle; dominant-baseline: central; }
+    </style>
+    <linearGradient id="battle" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#020617"/>
+      <stop offset="0.55" stop-color="#050b14"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="console" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#132335"/>
+      <stop offset="1" stop-color="#050913"/>
+    </linearGradient>
+  </defs>
+
+  <rect class="bg" width="1120" height="860"/>
+  <text x="24" y="34" class="title">战斗底部操作台信息标注（390px 移动端）</text>
+  <text x="24" y="60" class="sub">原则：可点击目标 ≥ 40×40；素材等比缩放；中间发射器井不放 UI。</text>
+
+  <!-- phone preview -->
+  <g transform="translate(24 88)">
+    <rect x="0" y="0" width="390" height="693" rx="14" fill="#020617" stroke="#1e293b"/>
+    <rect x="0" y="0" width="390" height="46" fill="#07111d"/>
+    <rect x="6" y="46" width="378" height="523" rx="8" fill="url(#battle)" stroke="#172336"/>
+
+    <!-- top merchant -->
+    <rect x="117" y="8" width="156" height="30" rx="7" fill="#0a1018" class="top frame"/>
+    <rect x="132" y="22" width="126" height="3" fill="#f59e0b"/>
+    <circle cx="273" cy="23" r="12" fill="#fbbf24"/>
+    <text x="273" y="23" class="numText">1</text>
+
+    <!-- warning line -->
+    <rect x="6" y="573" width="378" height="16" fill="#7f1d1d" opacity="0.38"/>
+    <line x1="18" y1="573" x2="372" y2="573" class="danger" stroke-width="2"/>
+    <circle cx="374" cy="580" r="12" fill="#fb7185"/>
+    <text x="374" y="580" class="numText">2</text>
+
+    <!-- bottom dock -->
+    <rect x="6" y="591" width="378" height="96" rx="8" fill="none" stroke="#64748b"/>
+
+    <!-- launcher well -->
+    <rect x="129" y="591" width="132" height="96" rx="8" fill="#020617" opacity="0.58" class="center frame"/>
+    <circle cx="195" cy="613" r="64" fill="none" class="center" stroke-width="1"/>
+    <circle cx="195" cy="623" r="49" fill="#020617" stroke="#38bdf8" opacity="0.88"/>
+    <circle cx="195" cy="588" r="12" fill="#facc15"/>
+    <text x="195" y="588" class="numText">7</text>
+
+    <!-- left pane -->
+    <rect x="6" y="599" width="119" height="88" rx="8" fill="url(#console)" class="left frame"/>
+    <rect x="10" y="603" width="67" height="40" rx="5" fill="#020617" class="left frame"/>
+    <circle cx="82" cy="620" r="12" fill="#38bdf8"/>
+    <text x="82" y="620" class="numText">3</text>
+    <rect x="10" y="647" width="67" height="40" rx="5" fill="#0f172a" class="left frame"/>
+    <rect x="16" y="659" width="13" height="13" rx="3" fill="#1e293b" stroke="#60a5fa"/>
+    <rect x="35" y="659" width="13" height="13" rx="3" fill="#1e293b" stroke="#60a5fa"/>
+    <rect x="54" y="659" width="13" height="13" rx="3" fill="#1e293b" stroke="#60a5fa"/>
+    <circle cx="82" cy="670" r="12" fill="#38bdf8"/>
+    <text x="82" y="670" class="numText">4</text>
+    <rect x="83" y="603" width="40" height="40" rx="7" fill="#111827" class="act frame"/>
+    <text x="103" y="628" class="h" text-anchor="middle">A</text>
+    <circle cx="127" cy="623" r="12" fill="#e879f9"/>
+    <text x="127" y="623" class="numText">5</text>
+    <rect x="83" y="647" width="40" height="40" rx="7" fill="#111827" class="act frame"/>
+    <text x="103" y="672" class="h" text-anchor="middle">R</text>
+    <circle cx="127" cy="667" r="12" fill="#e879f9"/>
+    <text x="127" y="667" class="numText">6</text>
+
+    <!-- right pane -->
+    <rect x="265" y="599" width="119" height="88" rx="8" fill="url(#console)" class="right frame"/>
+    <g class="right">
+      <polygon points="278,594 282,600 279,608 275,608 272,600" fill="#2dd4bf" stroke="#cbd5e1"/>
+      <polygon points="288,594 292,600 289,608 285,608 282,600" fill="#2dd4bf" stroke="#cbd5e1"/>
+      <polygon points="298,594 302,600 299,608 295,608 292,600" fill="#2dd4bf" stroke="#cbd5e1"/>
+      <polygon points="308,594 312,600 309,608 305,608 302,600" fill="#1e293b" stroke="#cbd5e1"/>
+      <polygon points="318,594 322,600 319,608 315,608 312,600" fill="#1e293b" stroke="#cbd5e1"/>
+    </g>
+    <circle cx="260" cy="600" r="12" fill="#2dd4bf"/>
+    <text x="260" y="600" class="numText">8</text>
+    <g>
+      <rect x="271" y="603" width="40" height="40" rx="7" fill="#111827" class="right frame"/>
+      <rect x="315" y="603" width="40" height="40" rx="7" fill="#111827" class="right frame"/>
+      <rect x="271" y="647" width="40" height="40" rx="7" fill="#111827" class="right frame"/>
+      <rect x="315" y="647" width="40" height="40" rx="7" fill="#111827" class="right frame"/>
+      <text x="291" y="628" class="h" text-anchor="middle">S</text>
+      <text x="335" y="628" class="h" text-anchor="middle">S</text>
+      <text x="291" y="672" class="h" text-anchor="middle">S</text>
+      <text x="335" y="672" class="h" text-anchor="middle">S</text>
+    </g>
+    <circle cx="360" cy="645" r="12" fill="#2dd4bf"/>
+    <text x="360" y="645" class="numText">9</text>
+    <rect x="360" y="603" width="7" height="84" rx="4" fill="#041114" class="right frame"/>
+    <rect x="362" y="637" width="3" height="48" fill="#2dd4bf"/>
+    <circle cx="383" cy="645" r="12" fill="#2dd4bf"/>
+    <text x="383" y="645" class="numText">10</text>
+
+    <text x="8" y="586" class="tiny">可点击目标均按 40×40 热区设计</text>
+    <text x="144" y="686" class="dim">132px launcher well</text>
+  </g>
+
+  <!-- legend -->
+  <g transform="translate(520 88)">
+    <rect width="570" height="742" rx="14" class="panel"/>
+    <text x="22" y="34" class="title" font-size="20">区域说明</text>
+
+    <text x="24" y="76" class="h">1 顶部商人旅程</text>
+    <text x="24" y="96" class="body">商人进度 / 到达提示 / 可进入商店状态；不放战斗统计。</text>
+
+    <text x="24" y="132" class="h">2 警戒线</text>
+    <text x="24" y="152" class="body">敌人越线风险提示，只做场地标记，不承载按钮。</text>
+
+    <text x="24" y="188" class="h">3 当前弹药信息区</text>
+    <text x="24" y="208" class="body">当前/下一发弹药图标、属性、伤害短读数、关键标签。</text>
+
+    <text x="24" y="244" class="h">4 弹药序列区</text>
+    <text x="24" y="264" class="body">后续 3-4 发队列芯片，只展示顺序，不做小按钮。</text>
+
+    <text x="24" y="300" class="h">5 伤害分析按钮</text>
+    <text x="24" y="320" class="body">40×40 热区，打开伤害/输出分析。只放图标。</text>
+
+    <text x="24" y="356" class="h">6 符文配置按钮</text>
+    <text x="24" y="376" class="body">40×40 热区，打开符文配置/发射器配置。</text>
+
+    <text x="24" y="412" class="h">7 发射器井</text>
+    <text x="24" y="432" class="body">132px 透明安全区。发射器、炮管、发射反馈在这里。</text>
+
+    <text x="24" y="468" class="h">8 SP 宝石边框</text>
+    <text x="24" y="488" class="body">狭长六边形宝石：当前 SP / 上限。非点击。</text>
+
+    <text x="24" y="524" class="h">9 技能按钮区</text>
+    <text x="24" y="544" class="body">2×2 技能热区，每个 40×40；图标 22-26px，角标放 cost。</text>
+
+    <text x="24" y="580" class="h">10 技能充能轨</text>
+    <text x="24" y="600" class="body">技能充能 actual/temp 进度，非点击，可沿边框细条显示。</text>
+
+    <rect x="18" y="652" width="534" height="64" rx="8" fill="#0f172a" stroke="#2dd4bf"/>
+    <text x="34" y="676" class="h" fill="#2dd4bf">超出规则</text>
+    <text x="34" y="700" class="body">主动技能 &gt; 4 时，不缩小按钮；改用技能抽屉/轮盘/局内配置。</text>
+  </g>
+</svg>

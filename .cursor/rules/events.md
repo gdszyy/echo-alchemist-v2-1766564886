@@ -22,11 +22,11 @@
 
 | 事件名常量 | 字符串值 | 触发时机 | Payload 结构 | 监听方 |
 | :--- | :--- | :--- | :--- | :--- |
-| `COMBAT_DAMAGE_DEALT` | `damage:dealt` | 弹丸对敌人造成伤害时 | `{ enemy: object, amount: number, type: string, sourceType: string, shotId: number, hitX: number, hitY: number, killed: boolean }` | 核心引擎、UI 系统（伤害统计）、符文充能系统 |
+| `COMBAT_DAMAGE_DEALT` | `damage:dealt` | 弹丸对敌人造成伤害时 | `{ enemy: object, amount: number, type: string, sourceType: string, shotId: number, hitX: number, hitY: number, killed: boolean }` | 核心引擎、UI 系统（伤害统计）、技能充能系统 |
 | `COMBAT_ENEMY_KILLED` | `enemy:killed` | 敌人死亡时 | `{ enemy: object, maxHp: number, shotId: number }` | 核心引擎、UI 系统、掉落系统 |
 | `COMBAT_AMMO_FIRED` | `combat:ammo_fired` | 玩家发射一发弹药时 | `{ recipe: object, shotId: number }` | UI 系统（更新弹药槽、播放动画） |
 | `COMBAT_HIT_PROGRESS` | `combat:hit_progress` | 连击进度更新时 | `{ current: number, target: number }` | UI 系统（更新连击进度条） |
-| `COMBAT_RUNE_CHARGE` | `combat:rune_charge` | 符文充能等级提升时 | `{ level: number, value: number }` | UI 系统（更新充能条、播放动画） |
+| `COMBAT_RUNE_CHARGE` | `combat:rune_charge` | 历史事件，旧符文充能等级提升时 | `{ level: number, value: number }` | 仅兼容旧调用；新代码使用 `UI_SKILL_CHARGE_*` |
 | `COMBAT_EFFECT_TRIGGER` | `combat:effect_trigger` | 触发特殊视觉特效时（如色差特效） | `{ type: string, data: object }` | UI 系统（渲染特效） |
 
 ### 2.3 UI 类事件 (UI Events)
@@ -36,6 +36,11 @@
 | `UI_HUD_UPDATE` | `ui:hud_update` | 需要刷新 HUD（如乘数、弹药队列）时 | `{ type: string, data: object }` | HUD 渲染模块 |
 | `UI_SHOP_UPDATE` | `ui:shop_update` | 商店状态更新（如购买、刷新）时 | `{ type: string, item: object }` | 商店渲染模块 |
 | `UI_RUNE_UPDATE` | `ui:rune_update` | 符文网格或背包发生变化时 | `{ type: string, source: string }` | 符文发射器渲染模块 |
+| `UI_SKILL_CHARGE_INIT` | `ui:skill_charge_init` | 战斗开始初始化技能充能 UI 时 | `{ actualValue: number, tempValue: number, totalValue: number }` | HUD 渲染模块 |
+| `UI_SKILL_CHARGE_UPDATE` | `ui:skill_charge_update` | 技能充能实际条或临时条变化时 | `{ value: number, actualValue: number, tempValue: number, totalValue: number }` | HUD 渲染模块 |
+| `UI_SKILL_CHARGE_LEVEL_UP` | `ui:skill_charge_level_up` | 技能充能满条并成功发放 SP 时 | `{ awarded: number, skillPoints: number, maxSkillPoints: number }` | HUD 渲染模块 |
+
+> `UI_RUNE_CHARGE_INIT` / `UI_RUNE_CHARGE_UPDATE` / `UI_RUNE_CHARGE_LEVEL_UP` 当前在 `EVENT_TYPES` 中保留为 `UI_SKILL_CHARGE_*` 的 deprecated alias，避免旧调用断裂；新代码必须使用 `UI_SKILL_CHARGE_*`。
 
 ### 2.4 元数据类事件 (Meta Events)
 

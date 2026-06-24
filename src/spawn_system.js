@@ -12,6 +12,7 @@ import { UIManager, TrainingGround, TruthBook, TRUTH_BOOK_DATA } from './systems
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
+import { pixiAcquireParticleSprite, pixiIsActive } from './render/pixi_bridge.js';
 import { interpolateAffixWeights, weightedRandom, getEliteDualAffixChance } from './utils/math_utils.js';
 import { predictBossIdFromHistory } from './utils/boss_schedule_utils.js';
 import {
@@ -146,9 +147,11 @@ export const spawn_system = {
      * @param {number} y - 位置 Y
      * @param {string} text - 文字內容
      * @param {string} [color] - 文字顏色 (可選)
+     * @param {number} [fontSize] - 字號 (可選)
+     * @param {HTMLImageElement|null} [iconImg] - 可選圖標圖片
      */
-    spawn_createFloatingText(x, y, text, color, fontSize) { 
-        this.floatingTexts.push(new FloatingText(x, y, text, color, fontSize)); 
+    spawn_createFloatingText(x, y, text, color, fontSize, iconImg) { 
+        this.floatingTexts.push(new FloatingText(x, y, text, color, fontSize, iconImg)); 
     },
 
 // --- 敌人生成与词缀系统 ---
@@ -177,17 +180,29 @@ export const spawn_system = {
 
         if (Object.keys(affixWeights).length === 0) return [];
 
+        // 2.5 [教学闸门·boss 预教学] 临近 boss 时，用本行"新词条"预算优先教一个该 boss 的随从词条
+        const preTeach = this.spawn_getNextBossPreTeach(r);
+        if (preTeach && preTeach.length && (this._rowBrandNewBudget || 0) > 0) {
+            affixes.push(preTeach[0]);
+            this.spawn_markAffixSeenIfNew(preTeach[0]);
+        }
+
         // 3. 抽取词条（使用 weightedRandom 加权随机，避免重复）
-        for (let i = 0; i < count; i++) {
+        //    每次迭代都重新过闸门：硬回合门 + "一次只放一个未见词条"（预算随放置递减）
+        for (let i = affixes.length; i < count; i++) {
+            const gated = this.spawn_applyTeachingGate(affixWeights, r);
             // 构建排除已选词缀的权重字典
             const remainingWeights = {};
-            for (const [id, w] of Object.entries(affixWeights)) {
+            for (const [id, w] of Object.entries(gated)) {
                 if (!affixes.includes(id)) {
                     remainingWeights[id] = w;
                 }
             }
             const chosen = weightedRandom(remainingWeights);
-            if (chosen) affixes.push(chosen);
+            if (chosen) {
+                affixes.push(chosen);
+                this.spawn_markAffixSeenIfNew(chosen);
+            }
         }
 
         return affixes;
@@ -208,6 +223,145 @@ export const spawn_system = {
         if (bossId === 'ignis') {
             e.furnacePressureThreshold = CONFIG.balance.bossConfigs?.ignis?.furnacePressureThreshold || 45;
         }
+    },
+
+    // =========================================
+    // [教学闸门] 方案2：按 boss 关卡 + 回合数错峰教学词条
+    //   - spawn_applyTeachingGate: 硬回合门 + "一次只放一个未见词条"预算过滤
+    //   - spawn_markAffixSeenIfNew: 记录已教学词条并扣减本行预算
+    //   - spawn_getNextBossPreTeach: 临近 boss 时优先返回该 boss 随从的未教学词条
+    // =========================================
+
+    /**
+     * @method spawn_applyTeachingGate
+     * @description 过滤词条权重池：① 回合未到 introRound 的词条剔除；
+     *   ② 当本行"新词条预算"已用尽时，剔除所有"玩家没见过"的进阶词条（intro!=null 且未在 seen 集合）。
+     *   基础词条（DIRECTOR_ACTOR_INTRO_ROUNDS 无记录，intro==null）不受预算约束，始终保留。
+     * @param {Object} weights - {affixId: weight}
+     * @param {number} round
+     * @returns {Object} 过滤后的权重字典
+     */
+    spawn_applyTeachingGate(weights, round) {
+        if (!weights) return {};
+        if (!this.directorSeenAffixes) this.directorSeenAffixes = new Set();
+        const budget = (typeof this._rowBrandNewBudget === 'number')
+            ? this._rowBrandNewBudget
+            : (DIRECTOR_SCRIPT_CONFIG.maxBrandNewAffixPerRound || 1);
+        const out = {};
+        for (const [affix, w] of Object.entries(weights)) {
+            if (!(w > 0)) continue;
+            const intro = DIRECTOR_ACTOR_INTRO_ROUNDS[affix];
+            // ① 硬回合门
+            if (Number.isFinite(intro) && round < intro) continue;
+            // ② 预算用尽时禁止再引入"未见过"的进阶词条
+            if (intro != null && budget <= 0 && !this.directorSeenAffixes.has(affix)) continue;
+            out[affix] = w;
+        }
+        return out;
+    },
+
+    /**
+     * @method spawn_markAffixSeenIfNew
+     * @description 记录一个被选中的进阶词条；若它是本局首次出现，扣减本行"新词条预算"。
+     *   基础词条（intro==null）不计入预算、不记录。
+     */
+    spawn_markAffixSeenIfNew(affix) {
+        if (!affix) return;
+        if (!this.directorSeenAffixes) this.directorSeenAffixes = new Set();
+        const intro = DIRECTOR_ACTOR_INTRO_ROUNDS[affix];
+        if (intro == null) return;
+        if (!this.directorSeenAffixes.has(affix)) {
+            this.directorSeenAffixes.add(affix);
+            if (typeof this._rowBrandNewBudget === 'number') {
+                this._rowBrandNewBudget = Math.max(0, this._rowBrandNewBudget - 1);
+            }
+        }
+    },
+
+    /**
+     * @method spawn_getNextBossPreTeach
+     * @description 若当前回合处于"下一个 boss 出现前 preTeachWindow 回合"窗口内，
+     *   返回该 boss 随从档（bossMinionProfiles）中"回合已到且尚未教学"的词条数组。
+     *   命名桥接：THEME_SEGMENTS 用 boss_xxx，bossMinionProfiles 用短名，去前缀 + alias 修正。
+     * @param {number} round
+     * @returns {string[]}
+     */
+    spawn_getNextBossPreTeach(round) {
+        const nextRound = this._nextBossRound;
+        if (!Number.isFinite(nextRound)) return [];
+        const window = DIRECTOR_SCRIPT_CONFIG.preTeachWindow || 0;
+        if (nextRound < round || nextRound - round > window) return [];
+        const segments = (ENEMY_CURVE_CONFIG && ENEMY_CURVE_CONFIG.THEME_SEGMENTS) || [];
+        const seg = segments.find(s => round >= s.startRound && round <= s.endRound)
+            || segments[Math.min(this._bossSpawnCount || 0, Math.max(0, segments.length - 1))];
+        if (!seg || !seg.bossId) return [];
+        const aliasMap = DIRECTOR_SCRIPT_CONFIG.bossIdAlias || {};
+        const bossKey = aliasMap[seg.bossId] || seg.bossId.replace(/^boss_/, '');
+        const profile = this.spawn_getBossMinionProfile(bossKey);
+        if (!profile || !Array.isArray(profile.affixes)) return [];
+        if (!this.directorSeenAffixes) this.directorSeenAffixes = new Set();
+        return profile.affixes.filter(a => {
+            const intro = DIRECTOR_ACTOR_INTRO_ROUNDS[a];
+            if (Number.isFinite(intro) && round < intro) return false;
+            return !this.directorSeenAffixes.has(a);
+        });
+    },
+
+    /**
+     * @method spawn_estimateFieldStrength
+     * @description [方案3] 估算"在场敌人强度"相对玩家战力的压制档位，决定是否"插入"更多导演内容。
+     *   口径统一到"每回合总伤"：
+     *     · 近战力 recentRound = calc_getRecentAverageDamage(3)（真实近3回合每回合总伤）
+     *     · 手牌战力 ammoPerEnemy = combat_calculatePlayerExpectedDamage()（单发期望，与单怪血量同口径），
+     *       乘 fullRowsCapacity 投影成"每回合总伤"口径（与 spawnEnemyRowAt 的 idealHP=peakAvg/12 互逆）
+     *     · 有历史：capacity = 0.6×近战力 + 0.4×手牌投影；无历史：退化为手牌投影
+     *   demand = 在场存活敌人的总有效血量（含再生护盾/活体护甲/蓄能甲/护盾层粗折算）
+     *   headroom = capacity × horizon / demand（horizon 回合内能否清场）
+     *   档位 tier：0 压制 / 1 吃紧 / 2 均衡 / 3 碾压 → intensityFactor 0.3 / 0.7 / 1.0 / 1.25
+     * @returns {{tier:number,intensityFactor:number,headroom:number,capacity:number,demand:number}}
+     */
+    spawn_estimateFieldStrength() {
+        const NEUTRAL = { tier: 2, intensityFactor: 1.0, headroom: 1.2, capacity: 0, demand: 0 };
+        // 预热：前 3 回合无可靠数据，保持中性（与 calc_evaluateAndAdjustDifficulty 的 round<3 一致）
+        if ((this.round || 0) < 3) return NEUTRAL;
+
+        const fullRowsCapacity = 2 * (CONFIG.gameplay.enemyCols || 6); // "满 2 行"对标，用于口径换算
+        const recentRound = (typeof this.calc_getRecentAverageDamage === 'function')
+            ? (this.calc_getRecentAverageDamage(3) || 0) : 0;
+        const ammoPerEnemy = (typeof this.combat_calculatePlayerExpectedDamage === 'function')
+            ? (this.combat_calculatePlayerExpectedDamage() || 0) : 0;
+        const ammoProjectedRound = ammoPerEnemy * fullRowsCapacity; // 单发期望 → 每回合总伤口径
+
+        const capacity = recentRound > 0
+            ? (0.6 * recentRound + 0.4 * ammoProjectedRound)
+            : ammoProjectedRound;
+        if (!(capacity > 0)) return NEUTRAL; // 无任何战力信号 → 中性，不乱插/乱松
+
+        // demand：在场存活敌人的总有效血量
+        let demand = 0;
+        for (const e of this.enemies || []) {
+            if (!e || e.isDead || (e.hp || 0) <= 0) continue;
+            demand += e.hp;
+            demand += e.radiantAegis || 0;       // 流彩护盾（真实数值护盾）
+            demand += e.livingArmorHp || 0;       // 活体护甲
+            demand += e.energyArmorShield || 0;   // 蓄能甲
+            // 护盾层：每层粗略折算为该怪 10% 最大血量的"额外消耗"
+            if ((e.shieldCharges || 0) > 0) demand += (e.maxHp || 0) * 0.1 * e.shieldCharges;
+        }
+        // 空场（已清完）→ 充裕，可建压
+        if (demand <= 0) return { tier: 3, intensityFactor: 1.25, headroom: 999, capacity, demand: 0 };
+
+        const horizon = 2; // 期望 2 回合内清场视为"均衡"
+        let headroom = (capacity * horizon) / demand;
+        if (!Number.isFinite(headroom)) headroom = 1.2;
+
+        let tier, intensityFactor;
+        if (headroom < 0.6)      { tier = 0; intensityFactor = 0.3; }
+        else if (headroom < 1.0) { tier = 1; intensityFactor = 0.7; }
+        else if (headroom < 1.6) { tier = 2; intensityFactor = 1.0; }
+        else                     { tier = 3; intensityFactor = 1.25; }
+
+        return { tier, intensityFactor, headroom, capacity, demand };
     },
 
 /**
@@ -269,13 +423,26 @@ export const spawn_system = {
         const occupiedCols = Array(CONFIG.gameplay.enemyCols).fill(false);
         const pendingSpawns = []; // 暂存导演生成的怪，最后统一实例化
 
+        // [教学闸门 + 方案3] 本行只估算一次：在场强度档位 → 决定"新词条预算"与导演插入强度
+        //   tier<=0（玩家被压制）：预算归零，本行不引入任何"未见过"的进阶词条，给玩家喘息
+        //   否则：恢复为每行最多放 1 个新词条（maxBrandNewAffixPerRound）
+        this._fieldStrength = (typeof this.spawn_estimateFieldStrength === 'function')
+            ? this.spawn_estimateFieldStrength()
+            : null;
+        const _fsTier = this._fieldStrength ? this._fieldStrength.tier : 2;
+        this._rowBrandNewBudget = (_fsTier <= 0) ? 0 : (DIRECTOR_SCRIPT_CONFIG.maxBrandNewAffixPerRound || 1);
+
         // =========================================
         // 1. 导演系统 (The Director) - 生成精英小队
         // =========================================
         const directorPressureBonus = directorProfile
             ? Math.min(0.18, directorProfile.dominanceLevel * 0.06 + (directorProfile.topPinned ? 0.04 : 0))
             : 0;
-        const directorChance = Math.min(0.52, 0.15 + (this.round * 0.01) + directorPressureBonus);
+        // [方案3] 在场强度档位调制 Layer1(模板导演) 插入强度：被压制(tier0)收敛、碾压(tier3)加码
+        const _fsFactor1 = (this._fieldStrength && Number.isFinite(this._fieldStrength.intensityFactor))
+            ? this._fieldStrength.intensityFactor : 1.0;
+        const directorChanceBase = Math.min(0.52, 0.15 + (this.round * 0.01) + directorPressureBonus);
+        const directorChance = Math.max(0, Math.min(0.6, directorChanceBase * _fsFactor1));
         if (Math.random() < directorChance) {
             let playerHasCryo = false;
             let playerHasPyro = false;
@@ -651,9 +818,14 @@ export const spawn_system = {
      * @param {any} amount - TODO: Describe this parameter.
      */
     spawn_addSkillPoint(amount = 1) {
-        this.skillPoints += amount;
+        const configuredMaxSkillPoints = Number(CONFIG.gameplay?.maxSkillPoints ?? 3);
+        const maxSkillPoints = Math.max(0, Number.isFinite(configuredMaxSkillPoints) ? configuredMaxSkillPoints : 3);
+        const before = Math.max(0, Number(this.skillPoints) || 0);
+        const gain = Math.max(0, Number(amount) || 0);
+        this.skillPoints = Math.min(maxSkillPoints, before + gain);
         this.ui.updateSkillPoints(this.skillPoints);
         this.ui.updateSkillBar(this.skillPoints, this.activeSkills); // 更新技能杠状态
+        return this.skillPoints > before;
     },
 
 /**
@@ -1260,6 +1432,14 @@ export const spawn_system = {
         }
         this.particles.push(p);
         if (counts[mode] !== undefined) counts[mode]++;
+
+        // [PixiJS 迁移 · 阶段二] 为高开销粒子模式获取 WebGL Sprite
+        // mist/ember/venom 每帧 createRadialGradient + shadowBlur → 替换为预烘焙纹理 Sprite
+        // [T2.7] wind_slash/line 同样使用预烘焙纹理替代每帧渐变
+        if ((mode === 'mist' || mode === 'ember' || mode === 'venom' || mode === 'wind_slash' || mode === 'line') && pixiIsActive()) {
+            p._pixiSprite = pixiAcquireParticleSprite(mode);
+        }
+
         return p;
     },
 
@@ -1296,6 +1476,13 @@ export const spawn_system = {
 
         this.particles.push(p);
         if (counts[mode] !== undefined) counts[mode]++;
+
+        // [PixiJS 迁移 · 阶段二] 同 spawn_createParticle，为高开销模式注入 WebGL Sprite
+        // [T2.7] wind_slash/line 同样使用预烘焙纹理
+        if ((mode === 'mist' || mode === 'ember' || mode === 'venom' || mode === 'wind_slash' || mode === 'line') && pixiIsActive()) {
+            p._pixiSprite = pixiAcquireParticleSprite(mode);
+        }
+
         return true;
     },
 
@@ -1590,11 +1777,37 @@ export const spawn_system = {
      * @param {number} y - **重要参数** 位置 Y。
      * @param {string} color - 颜色。
      */
-    spawn_createExplosion(x, y, color) { 
-        for(let i=0; i<10; i++) { 
-            // [限制] 爆炸粒子受全局粒子上限约束
-            this.spawn_pushParticleWithLimit(new Particle(x, y, color || '#f87171')); 
-        } 
+    spawn_createExplosion(x, y, color) {
+        const quality = this.perfQualityLevel || 'high';
+        const burstCount = quality === 'low' ? 5 : (quality === 'medium' ? 7 : 10);
+        const sparkColor = color || '#f87171';
+        // @perf-impact: 泛用爆点细化 - 仍仅使用 spark/smoke 粒子并受既有粒子预算限制。
+        for (let i = 0; i < burstCount; i++) {
+            const p = this.spawn_createParticle(x, y, sparkColor, 'spark');
+            if (p && p.vel) {
+                const angle = (i / burstCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.45;
+                const speed = 2.1 + Math.random() * 3.4;
+                p.vel.x = Math.cos(angle) * speed;
+                p.vel.y = Math.sin(angle) * speed - Math.random() * 0.5;
+                p.size *= 0.8 + Math.random() * 0.75;
+            }
+        }
+        if (quality !== 'low') {
+            const smokeCount = quality === 'medium' ? 1 : 2;
+            for (let i = 0; i < smokeCount; i++) {
+                const s = this.spawn_createParticle(
+                    x + (Math.random() - 0.5) * 8,
+                    y + (Math.random() - 0.5) * 8,
+                    'rgba(30, 20, 16, 0.45)',
+                    'smoke'
+                );
+                if (s) {
+                    s.vel.x *= 0.35;
+                    s.vel.y = -0.4 - Math.random() * 0.5;
+                    s.size *= 0.9;
+                }
+            }
+        }
     },
 
 /**
@@ -1737,10 +1950,16 @@ export const spawn_system = {
                 const now = Date.now();
                 if (this.uiCache.el && (!this.lastUiShakeTime || now - this.lastUiShakeTime > 100)) {
                     this.lastUiShakeTime = now;
-                    const el = this.uiCache.el;
-                    el.classList.remove('gauge-shake');
-                    void el.offsetWidth; 
-                    el.classList.add('gauge-shake');
+                    const panel = Number.isInteger(chargeSession.marbleIndex)
+                        ? document.querySelector(`.gathering-ammo-panel[data-marble-index="${chargeSession.marbleIndex}"]`)
+                        : null;
+                    const el = panel || this.uiCache.el;
+                    const pulseClass = panel ? 'is-charge-pulse' : 'gauge-shake';
+                    el.classList.remove(pulseClass);
+                    void el.offsetWidth;
+                    el.classList.add(pulseClass);
+                    clearTimeout(el._chargePulseTimer);
+                    el._chargePulseTimer = setTimeout(() => el.classList.remove(pulseClass), panel ? 260 : 240);
                 }
                 
                 // 粒子
@@ -1997,17 +2216,23 @@ export const spawn_system = {
             return;
         }
 
-        const bossW = this.enemyWidth * 3;                        // 实际宽度：3列宽（固定）
-        const bossH = this.enemyHeight * 2;                        // 高度为 2 行（整数行，与网格对齐）
+        // 体型放大系数（视觉 + 碰撞 + 血条等比放大，全部 Boss 通用）：1.0=原始，1.5=放大50%
+        const BOSS_BODY_SCALE = 1.5;
+        // 放大后【取整到整数格】并【居中】，避免半格错位 / 溢出画布：
+        //   行数：round(2×系数)，决定多数 Boss 实际体型（精灵按 min(宽,高) 适配，故高度是主导维度）
+        //   列数：round(3×系数) 再夹到 enemyCols-2，保证偶数列在 6 列竞技场左右各留 1 格居中，
+        //         且最宽体 Boss（ouroboros 精灵 1.72×）不会溢出画布。系数=1 时退化为原始 3 列 × 2 行。
+        const enemyCols = CONFIG.gameplay.enemyCols ?? 6;
+        const bossRows = Math.max(1, Math.round(2 * BOSS_BODY_SCALE));                                   // 2 → 3 行
+        const bossCols = Math.max(1, Math.min(Math.round(3 * BOSS_BODY_SCALE), enemyCols - 2));          // 3 → 4 列（偶数→居中，且不溢出）
+        const bossW = Math.round(this.enemyWidth * bossCols);                       // 整数像素宽（整数格对齐）
+        const bossH = Math.round(this.enemyHeight * bossRows);                      // 整数像素高（整数格对齐）
         const bossBounds = this.sys_getCombatBounds ? this.sys_getCombatBounds() : { left: 0, right: this.width };
-        const centerX = (bossBounds.left + bossBounds.right) / 2;  // Combat arena center.
-        // spawnY 数学推导：
-        //   combatGridTopY = 第一行中心 Y
+        const centerX = Math.round((bossBounds.left + bossBounds.right) / 2);  // 竞技场水平中心（取整，确保左右对称居中）
+        // spawnY 数学推导（顶边对齐）：Boss 顶边与第一行上边界对齐，体型放大时向下扩展（避免顶进 HUD）。
         //   第一行上边界 = combatGridTopY - enemyHeight/2
-        //   Boss 上边界 = spawnY - bossH/2 = spawnY - enemyHeight
-        //   令 Boss 上边界 = 第一行上边界： spawnY - enemyHeight = combatGridTopY - enemyHeight/2
-        //   得 spawnY = combatGridTopY + enemyHeight/2，Boss 占满第 0、1 行完整网格
-        const spawnY = this.combatGridTopY + this.enemyHeight / 2; // Boss 上边界与第一行上边界对齐
+        //   spawnY = combatGridTopY - enemyHeight/2 + bossH/2，BOSS_BODY_SCALE=1 时退化为原值 combatGridTopY + enemyHeight/2
+        const spawnY = this.combatGridTopY - this.enemyHeight / 2 + bossH / 2;
 
         const bossHP = Math.floor(this.spawn_calculateBossHP(isBigBoss) * (bossCfg.hpMult || 1));
 
@@ -2016,6 +2241,8 @@ export const spawn_system = {
         const entranceStartY = this.combatGridTopY - bossH * 2; // 屏幕外上方（Boss 高度的 2 倍）
         const boss = new Enemy(centerX, entranceStartY, bossW, bossH, bossHP);
         boss.type = 'boss';
+        boss.gridCols = 3;
+        boss.gridRows = 2;
         boss.bossType = bossId;
         boss.bossName = bossCfg.name;
         boss.bossConfig = bossCfg;
@@ -2140,6 +2367,13 @@ export const spawn_system = {
 
         // 赋予词缀
         boss.affixes = [...bossCfg.affixes];
+
+        // [教学闸门·方案2] 首个 boss（ignis @ R5，_bossSpawnCount 在 spawn 后才自增，此刻为 0）
+        // 的流彩护盾降为精英/教学档强度（regen 0.01 / cap 0.05），让玩家初见该机制时不被满档自愈劝退；
+        // 满档强度（0.02 / 0.10）由后续 ignis 与 R20+ 随机精英恢复。aegisTutorialMode 会随存档持久化。
+        if (bossId === 'ignis' && (this._bossSpawnCount || 0) === 0) {
+            boss.aegisTutorialMode = true;
+        }
 
         // 初始化护盾层数
         if (boss.affixes.includes('shield')) {
@@ -2580,6 +2814,10 @@ export const spawn_system = {
             if (directorProfile.emptyBoard) chance += 0.04;
         }
         chance = Math.min(0.58, chance);
+        // [方案3] 在场强度档位调制 Layer2(波次预设导演) 插入强度
+        const _fsFactor2 = (this._fieldStrength && Number.isFinite(this._fieldStrength.intensityFactor))
+            ? this._fieldStrength.intensityFactor : 1.0;
+        chance = Math.max(0, Math.min(0.66, chance * _fsFactor2));
         if (Math.random() >= chance) return null;
 
         let roll = Math.random() * totalWeight;
@@ -2833,7 +3071,10 @@ export const spawn_system = {
         if (pool.length === 0) return;
 
         // 总体生成概率：保留与原 heavyArmor 相近的曲线（最高 40%）
-        const overallChance = Math.min(0.40, 0.10 + r * 0.012);
+        // [方案3] 在场强度档位调制 Layer3(后备基底) 插入强度
+        const _fsFactor3 = (this._fieldStrength && Number.isFinite(this._fieldStrength.intensityFactor))
+            ? this._fieldStrength.intensityFactor : 1.0;
+        const overallChance = Math.max(0, Math.min(0.5, Math.min(0.40, 0.10 + r * 0.012) * _fsFactor3));
         if (Math.random() >= overallChance) return;
 
         // 加权抽签

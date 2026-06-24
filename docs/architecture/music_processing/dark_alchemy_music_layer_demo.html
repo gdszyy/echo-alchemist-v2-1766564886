@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dark Alchemy Music Layer Demo</title>
+  <link rel="stylesheet" href="./dark_alchemy_music_layer_demo.css" />
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Dark Alchemy Music Layer Demo</h1>
+        <div class="sub">Fixed bed, staged variable tracks, pause veil, intensity-driven effects, boss identity.</div>
+      </div>
+      <button class="primary" id="startBtn">Start Audio</button>
+    </header>
+
+    <section class="grid">
+      <aside class="panel controls">
+        <section>
+          <div class="label-row"><span>Stage</span><span id="stageText">Room</span></div>
+          <div class="seg stage" id="stageButtons">
+            <button data-stage="room" class="active">Room</button>
+            <button data-stage="surge">Surge</button>
+            <button data-stage="boss">Boss</button>
+          </div>
+        </section>
+
+        <section>
+          <div class="label-row"><span>Intensity</span><span id="intensityText">2</span></div>
+          <input id="intensity" type="range" min="0" max="5" step="1" value="2" />
+          <div class="meter"><i id="intensityBar"></i></div>
+        </section>
+
+        <section>
+          <div class="label-row"><span>Boss Style</span><span id="bossText">Crucible</span></div>
+          <div class="seg boss" id="bossButtons">
+            <button data-boss="crucible" class="active">Crucible</button>
+            <button data-boss="venom">Venom</button>
+            <button data-boss="aether">Aether</button>
+            <button data-boss="gothic">Gothic</button>
+            <button data-boss="darkpsy">Dark Psy</button>
+          </div>
+        </section>
+
+        <section>
+          <div class="label-row"><span>Pause Effect</span><span id="pauseText">Off</span></div>
+          <button class="toggle" id="pauseBtn">Pause Veil</button>
+        </section>
+
+        <section>
+          <div class="label-row"><span>Event Phrases</span><span>Quantized</span></div>
+          <div class="seg phrases">
+            <button data-phrase="paddle">Paddle</button>
+            <button data-phrase="brick">Brick</button>
+            <button data-phrase="combo">Combo</button>
+            <button data-phrase="warning">Warning</button>
+          </div>
+        </section>
+      </aside>
+
+      <section class="panel">
+        <div class="stage-board">
+          <div class="readout">
+            <strong id="bpmReadout">128 BPM</strong>
+            <span>Fixed tracks keep the alchemy pulse alive while variable layers follow stage and intensity.</span>
+          </div>
+          <div class="readout">
+            <strong id="modeReadout">Phrygian</strong>
+            <span>Boss profiles swap scale color, groove dialect, and effect pressure.</span>
+          </div>
+          <div class="readout">
+            <strong id="chordReadout">i - bII - i - VII</strong>
+            <span>Stage and intensity choose the emotional progression that drives the pad.</span>
+          </div>
+          <div class="readout">
+            <strong id="fxReadout">Filter + Duck</strong>
+            <span>Pause veil mutes moving layers and leaves a filtered ritual echo.</span>
+          </div>
+        </div>
+
+        <div class="lanes" id="lanes"></div>
+        <canvas id="scope" width="960" height="220"></canvas>
+      </section>
+    </section>
+  </main>
+
+  <script src="./dark_alchemy_music_layer_demo_data.js"></script>
+  <script src="./dark_alchemy_music_layer_visualizer.js"></script>
+  <script src="./dark_alchemy_music_layer_demo.js"></script>
+</body>
+</html>

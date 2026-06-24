@@ -2,6 +2,17 @@
 description: "音频系统的架构约定、延迟初始化机制、音效方法全览与调用分布"
 globs: ["src/audio.js", "src/core.js"]
 ---
+
+## Local sample preview layer
+
+- `SoundManager` may preload local wav samples from `assets/audio-local/sfx/` and prefer them inside existing public methods such as `playShoot`, `playHit`, `playEnemyHit`, `playLightning`, `playExplosion`, `playPowerup`, `playEffect('split'|'shatter')`, `playMagic`, `playSlash`, and `playCollect`.
+- Public callers must keep using the `audio` proxy methods. Do not create `Audio`, `AudioContext`, or `fetch` calls in gameplay/UI modules.
+- Local sample files are a preview-only asset layer. `Audio_sample/` and `assets/audio-local/` must stay ignored by git, and sample files must not be uploaded to the remote repository unless the user explicitly approves an asset licensing/import task.
+- Every sample playback path must keep synthesized Web Audio fallback behavior. If fetch/decode fails or a sample has not loaded yet, the old synthesized sound should still play.
+- High-frequency sounds must keep debounce/cooldown protection through `lastPlayTime` or `_playSample(..., { cooldown })`.
+- Cinematic SFX should be authored as layered recipes rather than one-shot replacements: combine a body/sub layer, a recognizable core sample, high-frequency detail/noise, a short transient, and a tail/reverb layer where useful.
+- Use `sampleGroups` with round-robin and small random pitch/volume ranges for repeated combat sounds. Avoid one fixed wav for high-frequency triggers.
+- Keep the public API stable; gameplay code should still call `playShoot`, `playHit`, `playEffect`, etc. Layering belongs inside `SoundManager`.
 # 音频系统规范 (Audio System)
 
 ## 1. 架构约定

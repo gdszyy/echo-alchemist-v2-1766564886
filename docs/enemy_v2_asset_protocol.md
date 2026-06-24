@@ -34,6 +34,7 @@ manifest、metadata 接入路径与回退策略。所有 V2 敌人必须遵守�
 | P2 | `enemy_prism_1x3`        | prism       | 1×3 |
 | P2 | `enemy_hive_2x3`         | hive        | 2×3 |
 | P3 | `enemy_siege_3x2`        | siege       | 3×2 |
+| P3 | `enemy_carrier_3x2`      | carrier     | 3×2（底部中格为空舱） |
 | P3 | `enemy_gravity_core_3x3` | gravityWell | 3×3 |
 
 > 普通 1×1 残渣使用 `residue:1x1` frame 键，V2 大型基底使用 `<baseArchetype>:<cols>x<rows>` frame 键。
@@ -65,7 +66,7 @@ manifest、metadata 接入路径与回退策略。所有 V2 敌人必须遵守�
 
 ## 2.5 Collision Frame manifest 规格
 
-`assets/sprites/enemies/enemy_sprite_manifest.json` 的 `frames` 段用于登记材质化物理碰撞框。键名为 `<baseArchetype>:<cols>x<rows>`，运行时由 `resolveEnemyVisualAsset(enemy)` 返回 `frameKey/framePath/frameShape`，再由 `Enemy._drawCollisionFrameBitmap()` 绘制。
+`assets/sprites/enemies/enemy_sprite_manifest.json` 的 `frames` 段用于登记材质化物理碰撞框。键名为 `<baseArchetype>:<cols>x<rows>`，运行时由 `resolveEnemyVisualAsset(enemy)` 返回 `frameKey/framePath/frameShape`，再由 `Enemy._drawCollisionFrameBitmap()` 绘制。少数 Boss 专属 1×1 召唤物可使用显式 composite 键（例如 `orbitEcho:<slotId>`）选择主体 sprite，但顶层 frame 仍必须来自真实物理 hull。
 
 ```json
 {
@@ -82,7 +83,7 @@ manifest、metadata 接入路径与回退策略。所有 V2 敌人必须遵守�
 - Frame 必须匹配 `spawn_applyArchetypeShape()` 设定的真实 `collisionShape/collisionData`，不是独立装饰容器。
 - Frame PNG 与绿幕源图必须按 footprint 比例出图：`3x1` 为宽图、`1x3` 为竖图、`2x3` 为竖向矩形；禁止把所有边框资产做成统一 1:1 方图再靠预览或运行时拉伸解释。
 - PNG 必须只沿真实物理 hull 描边，中心保持透明，给 Layer 2 血条、HP 数字、状态短标和预警 UI 留出可读空间。
-- 当前 frame 资源由 `scripts/generate_enemy_boundary_frames.py` 从真实物理边界生成；`maw/deflector/echoSpire/prism/siege/gravityWell` 逐点对应 `spawn_applyArchetypeShape()` 里的 polygon / circle 定义，`residue/bastion/hive` 使用 AABB 边界。Boss 历史转换出的 1×1 异型随从也必须使用 `frame_minion_<boss>_1x1.png` 系列，逐点对应 `spawn_applyMinionShape()` 的 triangle / diamond / hex / octagon 等物理 hull。
+- 当前 frame 资源由 `scripts/generate_enemy_boundary_frames.py` 从真实物理边界生成；`maw/deflector/echoSpire/prism/siege/gravityWell` 逐点对应 `spawn_applyArchetypeShape()` 里的 polygon / circle 定义，`residue/bastion/hive` 使用 AABB 边界。Boss 历史转换出的 1×1 异型随从也必须使用 `frame_minion_<boss>_1x1.png` 系列，逐点对应 `spawn_applyMinionShape()` 的 triangle / diamond / hex / octagon 等物理 hull；最终 Boss `ouroboros` 主动召唤的 `orbit_echo` 也遵守同一条 octagon hull/frame 契约。
 - 美术重绘时应先在绿幕源图上沿同一 hull 画描边：背景和中间挖空区域使用纯绿幕色，去底后导出透明 PNG。不得把 frame 画成徽章、外框、装饰面板或主体轮廓猜测。
 - 绘制层在 Layer 4.9 内壁阴影之后。只要运行时已经命中 frame 资源路径，Layer 5 矢量描边、边框脉冲和 footprint cue 都不得再绘制，避免图片加载首帧或异型随从路径露出旧白线框；若完全没有 frame 资源路径，才允许使用 Layer 5 作为兜底。
 
@@ -131,6 +132,23 @@ sprite_renderer / icon map / 试炼场 / 图鉴会自动同步。
 
 当前目标图层收束为：底层 Canvas 血量容器，中层中心敌人 Sprite，顶层中空 Collision Frame。状态和词条特效暂时沿用既有 Layer 3.x / overlay 管线，后续再单独拆分为可控特效层。
 
+### 4.1 Ouroboros Orbit Echo 变体
+
+`ouroboros` 的六附体槽会主动召唤 `orbit_echo` 伴生敌人。它们不走普通 `residue:1x1:` 主体图，而是通过 `bossOwnerId='ouroboros'`、`bossMinionRole='orbit_echo'` 与 `bossMechanicTags` 中的 `orbit:<slotId>` 解析到显式 composite：
+
+```text
+orbitEcho:aegis
+orbitEcho:graft
+orbitEcho:brood
+orbitEcho:stride
+orbitEcho:maw
+orbitEcho:surge
+```
+
+这些主体资源位于 `assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_<slotId>_1x1_idle.png/.json`。2026-06-24 起，这 6 张 PNG 必须从当前 Ouroboros Boss 成稿 sheet `boss_ouroboros_redraw_idle_draft_sheet_v20260624alphafix.png` 提炼同材质壳体，JSON 需保留 `bossMatched: true`、`styleFamily: "ouroboros_boss_matched"` 与 `sourceAtlas`，由 `tests/validate_boss_sprite_assets.mjs` 锁定。运行时仍强制使用 `frame_minion_ouroboros_1x1.png` 表达八角物理边界，避免伴生敌看成普通方形残渣。
+
+注意：这些 `orbit_echo` 主体 PNG 同时用于两处：实际可移动的伴生敌，以及 Boss 环上的六个附体槽。`Enemy._drawOuroborosOrbitAttachments()` 必须直接挂载这批 `enemy_ouroboros_orbit_echo_<slotId>_1x1_idle.png`，不得回退到普通敌人、文本符号或旧 `assets/sprites/bosses/ouroboros_slots/` 图标。试炼场 `boss_ouroboros_attachment_slots` 只切换真实 Boss 的 `_applyOuroborosAttachment()` 以预览同一套槽位贴图，不调用 `_ouroborosSpawnEchoes()`，避免生成会每回合移动的预览敌人。
+
 ## 5. 回退策略（防止敌人消失）
 
 `createSpriteRenderer(type, bossType, baseArchetype)` 选择优先级：
@@ -167,21 +185,22 @@ normal              →  golem_normal
 
 ## 6.5 2026-06-19 / 2026-06-21 asset updates
 
-- The 8 V2 base enemies now use procedural bitmap sprite sheets instead of the original line/block placeholders.
+- The 9 V2 base enemies now use formal bitmap sprite sheets instead of the original line/block placeholders. The 2026-06-24 `carrier` pass uses an imagegen-painted source; older V2 bases still come from the procedural/material pass until their own repaint.
 - Updated folders: `assets/sprites/enemies/v2/`, `assets/sprites/enemies/archetypes/`, and `assets/icons/enemies/`.
 - Each V2 sheet keeps the 128 px frame contract with 4 idle frames and 2 hit frames.
 - Related manifests and `src/data/enemy_v2_metadata.js` now use `placeholder: false`.
 - Later hand-painted art can still replace the same file names in place.
 - 2026-06-21: the V2 metadata sprites, runtime archetype/composite enemy body PNGs, and material collision frames were regenerated from the same front-view asset pass; non-runtime source_green/material files are archived under `docs/archive/enemy_collision_frame_sources_2026-06-21/` so `assets/sprites/enemies/frames/` contains only the latest runtime frame PNGs.
 - 2026-06-21 frame iteration: collision frames now clip the generated obsidian/metal material texture to the exact physics hull, with fractured armor plates, beveled seams, cracks, and sparse colored crystal fissures. Keep the frame itself dark neutral; do not tint the whole border by enemy attribute, and do not add black ruler stripes, heavy black outlines, or rivet-node borders.
+- 2026-06-24 carrier follow-up: `enemy_carrier_3x2` is now a formal imagegen-painted runtime asset generated from `docs/design/concepts/carrier_imagegen_pass1/carrier_imagegen_alpha.png` by `scripts/generate_carrier_enemy_assets.py`; V2 sprite, archetype sprite, exact composite, collision frame, UI archetype icon, bestiary icon, and `affix_carrier.png` all preserve the lower-center launch bay as transparent space and are marked `placeholder:false`.
 
 ## 7. 验收清单
 
-- [x] `assets/sprites/enemies/v2/` 包含 8 个 P0–P3 PNG + manifest
-- [x] `assets/icons/enemies/` 包含 8 个 64×64 头像
+- [x] `assets/sprites/enemies/v2/` 包含 9 个 P0–P3 PNG + manifest
+- [x] `assets/icons/enemies/` 包含 9 个 64×64 头像
 - [x] `sprite_renderer.createSpriteRenderer` 支持 baseArchetype 选择并回退
-- [x] `bitmap_icons.ENEMY_V2_ICON_MAP` 8 个 baseArchetype 全覆盖
+- [x] `bitmap_icons.ENEMY_V2_ICON_MAP` 9 个 baseArchetype 全覆盖
 - [x] 试炼场 V2 矩阵 / 真理之书图鉴共用 `ENEMY_V2_METADATA`
 - [x] 每个 V2 敌人具备：中文名、footprint、baseArchetype、affix、战术职责、针对提示
 - [x] 资源加载失败时回退到矢量绘制 + 元素轮廓，敌人保持可见
-- [x] Collision Frame 已覆盖普通 `residue:1x1`、8 个 V2 基底，以及 8 个 Boss 历史转换 1×1 异型随从，命中资源路径后接管顶层物理边界
+- [x] Collision Frame 已覆盖普通 `residue:1x1`、9 个 V2 基底，以及 8 个 Boss 历史转换 1×1 异型随从，命中资源路径后接管顶层物理边界

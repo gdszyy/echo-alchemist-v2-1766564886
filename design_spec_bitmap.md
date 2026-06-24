@@ -22,6 +22,7 @@
 ### 2.1 核心面板与背景（建议 9-Slice 切图）
 
 > 2026-06-23 补充：`#phase-combat` 已保留战斗专属背景/底部发射区 `_v2` 位图；首批依赖透明底的墙体、HUD V2 与发射器 V4 资源因未使用绿幕源图，已从运行时撤回并移入 rejected 目录，等待按 chroma key 流程重做。执行设计、资产清单、prompt 草案与性能边界见 [`docs/design/combat_battlefield_ui_asset_redesign.md`](docs/design/combat_battlefield_ui_asset_redesign.md)。
+> 2026-06-23 运行时落地补充：已先接入轻量 runtime 占位资产，覆盖 `combat_wall_left/right/top_v2.png`、`combat_defeat_line_v2.png`、`emitter_barrel_rotating_v4_runtime.png`、`ammo_queue_panel_9s.png`、`ammo_queue_slot.png` 与 `speed_btn_x1/x2/x3/xslow.png`。发射器底座继续使用已认可的 `emitter_base_v3.png`，仅叠加独立炮管层、充能线圈与发射闪光；这些资产用于验证布局、锚点与交互，不取代后续正式绿幕美术重绘。
 
 | 组件名称 | 对应 DOM 元素 | 尺寸建议 | 视觉描述 |
 |---------|-------------|---------|---------|
@@ -36,8 +37,12 @@
 |---------|-------------|---------|---------|
 | **SP 宝石（空/满）** | `.sp-gem` | 24x24 | 空状态为暗淡的晶体凹槽；满状态为散发翠绿光芒的菱形宝石。 |
 | **回合数胶囊** | `.round-pill` | 64x24 | 带有金属边框的椭圆指示器，内部数字区域发光。 |
+| **回合 Toast / 下一 Boss 预告** | `#round-start-banner`, `#combat-next-threat` | 主标题牌 600×200；威胁槽 420×72；Boss 小像 96×96 / 32×32 | `round_title_panel_9s.png` 已作为“第 X 回合开始”主背板接入；回合开始横幅后续仍可拆状态化底图、危险威胁槽、8 个 Boss 预告小像和未知 Boss 封印剪影。动态回合数、Boss 名称和倒计时继续由 DOM 文本渲染，不烘焙进图片；完整契约见 [`docs/design/round_start_boss_toast_asset_contract.md`](docs/design/round_start_boss_toast_asset_contract.md)。 |
 | **弹药图标** | `.ammo-icon` | 32x32 | 各种属性（火、冰、雷、穿透等）的炼金法球，带有对应的元素光晕。 |
 | **功能按钮** | `#settings-btn`, `#speed-btn` | 40x40 | 带有机械齿轮或炼金符号的圆形金属按钮，包含按下（Active）状态。 |
+| **战场奖励掉落外壳** | `FieldLootItem` / `.loot-fly-card-icon` | 256x256 源图，运行时 50x58 / 54x62 | `relic`、`chaos_essence`、`pure_essence` 三种透明 PNG 外壳，中心镂空并复用 `RELIC_ICON_MAP` 图标；只增加 `drawImage`/DOM `img`，不新增粒子预算。 |
+| **技能充能仪表** | `#combat-rune-charge-ui` | 面板 288×84，运行时约 226×64；条纹 192×12；晶体 64×64 | 2026-06-23 起替代旧符文充能视觉。视觉上必须是一根连续充能槽：`skill_charge_actual_fill.png` 表示当前总充能底纹，`skill_charge_temp_fill.png` 仅作为条内“会回落”段的半透明 overlay；另含 SP 晶体空/满状态和满充光爆 overlay。样式只写入 `src/styles/bitmap_ui.css`。 |
+| **研磨三弹珠子弹面板** | `#session-charge-stack .gathering-ammo-panel` | 面板 180×140，运行时三列自适应；充能槽约 128×12 | 2026-06-24 起将研磨阶段固定 3 颗弹珠与各自充能槽合并展示。正式资产已落地为 `gathering_ammo_panel_9s.png`、`gathering_charge_track.png`、`gathering_charge_fill.png`，并通过 `src/styles/bitmap_ui.css` 接入；文字、弹珠名、属性 chip 与进度数值继续由 DOM 渲染，不烘焙进图片。 |
 
 ---
 
@@ -78,12 +83,13 @@
 
 为了保持灵活性，**不建议**将所有状态（如冰冻、燃烧）直接画死在基础 Sprite 中。建议采用 **「基础 Sprite + 状态特效层」** 的渲染方式：
 
-> 2026-06-22 补充：奖励边框和词条 Overlay 必须拆层。当前敌人奖励美术只面向带遗物敌人的独立“金边”奖励框；`shield`、`regen`、`jump` 等词条只作为机制覆层或触发反馈，不承担掉落价值表达。详细规格见 [`docs/design/enemy_affix_visual_iteration_plan.md`](docs/design/enemy_affix_visual_iteration_plan.md)。
+> 2026-06-23 补充：奖励边框和词条 Overlay 必须拆层。当前敌人奖励美术只面向带遗物敌人的独立“金属材质装饰框”，需要细金边、角标、铆钉/小凸起等实体边框信号；`shield`、`regen`、`jump` 等词条只作为机制覆层或触发反馈，不承担掉落价值表达。详细规格见 [`docs/design/enemy_affix_visual_iteration_plan.md`](docs/design/enemy_affix_visual_iteration_plan.md)。
 
 > 2026-06-22 补充：Boss 破绽视觉先按透明 PNG Overlay 接入，不替换 Boss 基础 Sprite。统一使用 `384 × 256`、中心锚点 `(192, 128)`、`assets/sprites/enemies/bosses/<bossId>/vulnerability/` 目录与 `vuln_25/50/75/break/exposed/recover/weak_mask` 命名；完整契约与 Ignis 样板 Prompt 见 [`docs/boss_vulnerability_asset_contract.md`](docs/boss_vulnerability_asset_contract.md)。
 
 > 2026-06-22 补充：Boss 本体也进入重绘契约。现有 `assets/sprites/bosses/boss_<bossId>.png/.json` 的 `256 × 256` 方形帧仍视为 legacy 可运行资源；新重绘目标为 `384 × 256` 横向帧，JSON 必须声明 `frameWidth/frameHeight`，渲染器会按 3×2 占格绘制。完整规格见 [`docs/boss_sprite_redraw_asset_contract.md`](docs/boss_sprite_redraw_asset_contract.md)。
 > 2026-06-23 补充：Boss 重绘必须贴合物理碰撞外轮廓。8 个 Boss 当前运行时 `collisionShape/collisionData` 已整理为 `assets/sprites/bosses/redraw_drafts/boss_collision_guides_v2_no_three_rings_384x256.png`，后续生成基础本体和破绽 Overlay 时都要以该图作为外轮廓验收参考，避免视觉主体与弹珠反弹/命中范围偏差过大。当前只有最终 Boss `ouroboros` 使用完整闭合环来承载 6 个附体槽；`mikro` 与 `devourer` 已改为实体 polygon，不再按环形 Boss 生成。旧同名图已归档到 `assets/sprites/bosses/redraw_drafts/archive/`，不要继续引用。
+> 2026-06-24 补充：Boss 资产允许直接戳出物理轮廓。运行时在身体裁剪恢复后绘制透明 Sprite，破绽/狂暴/流光等动态层仍跟随同一个 Boss 本地变换；本体内部允许通过“上部主体 + 下部底座”分区绘制形成轻量相位差呼吸，底座节奏应更慢更重。不要再生成或接入“背景垫图 + 前景裁剪图”的双层方案。
 > 2026-06-23 补充：Boss 本体重绘还必须满足 HP 可读性。Boss Sprite 当前绘制在液体血量层之后，不能整块不透明压住血量，也不能把整张图整体调淡；应使用 `boss_<id>_hp_translucency_mask.png` 从素材自身的缝隙、发光裂纹、透明孔洞、玻璃/晶体/炉腔等真实透光部位提取 alpha 透明区，再用 `boss_<id>_base_draft_hp_window_preview.png` 验收。
 
 > 2026-06-22 补充：敌人针对词缀进入生成前资产契约。`carrier` 显示名固定为“铸巢母架”，第 5 格空舱必须在 Sprite、collision frame 与头像中可见；`livingArmor` 需要普通/叠加强化各三档状态资产；完整清单见 [`docs/enemy_targeting_asset_todo.md`](docs/enemy_targeting_asset_todo.md)。

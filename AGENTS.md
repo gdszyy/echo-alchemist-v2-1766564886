@@ -11,6 +11,7 @@
 *   **临场导演系统索引**：[`.cursor/rules/director_system.md`](.cursor/rules/director_system.md)（凡修改局内导演、压力画像、波次 preset、`directorTags`、反压制节奏或敌人生成调参时必读）。
 *   **世界观正典**：[`docs/world_lore_canon.md`](docs/world_lore_canon.md)（凡涉及剧情、NPC、重生循环、晶石灾害叙事或 `world_sim` 接入 gameplay 时必读；用于区分叙事真相与后续模拟器实现）。
 *   **自适应性能规范**：[`.cursor/rules/performance.md`](.cursor/rules/performance.md)（凡修改粒子/特效/Peg/敌人渲染相关代码，必读）。
+*   **PixiJS 渲染管线迁移计划**：[`docs/pixijs_migration_todo.md`](docs/pixijs_migration_todo.md)（凡涉及粒子系统、特效对象、渲染管线架构变更时必读；包含 Canvas 2D → WebGL 迁移的 5 阶段任务清单、36 条验收标准与风险控制要求）。
 *   **流程洞察索引**：[`.cursor/rules/process_insights/index.md`](.cursor/rules/process_insights/index.md)（在涉及复杂跨模块流程、修复历史 Bug 区域或新增特效时必读；包含历次任务沉淀的防坑经验与版本化洞察文档）。
 *   **自动函数索引**：[`.cursor/rules/auto_index/INDEX.md`](.cursor/rules/auto_index/INDEX.md)（在涉及大文件修改时必读；包含所有大文件的函数名、行号范围和 @section 内部节点映射，由 `code-indexer` 脚本自动维护，**严禁手动编辑**）。
 *   **位图化视觉重构规格**：[`design_spec_bitmap.md`](design_spec_bitmap.md)（凡涉及位图生成、Sprite 接入、图标替换的任务必读；包含 UI 切图清单、敌人 Sprite 规格、Boss 形象清单）。
@@ -183,6 +184,7 @@
 | PI-002 | 符文词条 Hook 注入流程 | 新增或修改符文词条效果时 |
 | PI-003 | 子系统扩展与组合模式注入流程 | 新增子系统或修改 `core.js` 时 |
 | PI-004 | 性能预算扩展与新特效接入流程 | 新增粒子特效或高开销视觉效果时 |
+| PI-010 | PixiJS WebGL 渲染管线迁移流程与防坑指南 | 修改粒子系统、特效对象、渲染管线架构时 |
 
 **Agent 维护规范**：
 - 当任务中发现隐蔽逻辑或耦合陷阱时，**必须**在任务完成后在此目录创建或更新对应洞察文档。

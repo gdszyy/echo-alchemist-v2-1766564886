@@ -11,7 +11,7 @@ globs: ["src/ui/**/*", "src/ui_system.js"]
 
 | 文件 | 导出对象 | 职责 |
 |------|---------|------|
-| `src/ui/hud.js` | `hud_system` | 战斗/收集阶段 HUD（弹药槽、伤害统计、充能符文条） |
+| `src/ui/hud.js` | `hud_system` | 战斗/收集阶段 HUD（弹药槽、伤害统计、技能充能条） |
 | `src/ui/rune_launcher.js` | `rune_launcher_system` | 符文发射器面板（网格管理、符文选择、合成/重铸） |
 | `src/ui/shop.js` | `shop_system` | 局外商店与遗物选择界面 |
 | `src/ui/game_over.js` | `game_over_mixin` | 每局结束结算页面（回合节点图、统计、操作按钮） |
@@ -45,10 +45,10 @@ globs: ["src/ui/**/*", "src/ui_system.js"]
 | `UI_MULTICAST_TRANSFER` | 倍率转移到配方卡 | 创建飞行徽章 DOM 动画 |
 | `UI_HIT_PROGRESS` | 命中进度更新 | 更新 `#hit-bar` 宽度和 `#hit-text` |
 | `UI_AMMO_FIRED` | 弹药发射 | 触发射击动画，延迟 150ms 后更新弹药 UI |
-| `UI_RUNE_CHARGE_INIT` | 充能符文初始化 | 清空 `#combat-rune-single-slot`，重置进度条 |
-| `UI_RUNE_CHARGE_LEVEL_UP` | 充能等级提升 | 刷新符文预览，触发升级特效 |
-| `UI_RUNE_CHARGE_UPDATE` | 充能条进度更新 | 更新 `#combat-charge-bar-fill` 宽度 |
-| `UI_RUNE_CLAIM_AFTER_ENEMY` | 敌人动作后领取充能/掉落符文 | 触发多个符文飞入背包动画 |
+| `UI_SKILL_CHARGE_INIT` | 技能充能初始化 | 将 `#combat-rune-single-slot` 重置为 SP 状态，清空实际条与临时条 |
+| `UI_SKILL_CHARGE_LEVEL_UP` | 充能满条并发放 SP | 播放满条反馈，槽位显示 `+N SP` |
+| `UI_SKILL_CHARGE_UPDATE` | 充能条进度更新 | 更新一根连续充能槽：`#combat-charge-bar-fill` 表示总充能，`#combat-charge-bar-temp-fill` 仅覆盖条内会回落的临时段 |
+| `UI_RUNE_CLAIM_AFTER_ENEMY` | 敌人动作后领取掉落符文 | 触发多个符文飞入背包动画 |
 | `UI_ROUND_NUM_UPDATE` | 回合数变化 | 更新回合数显示 |
 | `UI_FLASH_EFFECT` | 全屏闪光 | 触发全屏颜色叠加层动画 |
 | `UI_CHROMATIC_ABERRATION` | CRT 色差特效 | 添加 CSS class 到 body |

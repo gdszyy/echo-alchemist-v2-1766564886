@@ -1,6 +1,6 @@
 # src\game_system.js 函数索引
 
-> 自动生成于 2026-06-23 | 总行数: 3375 | 函数数: 61 | 语言: javascript
+> 自动生成于 2026-06-24 | 总行数: 3474 | 函数数: 62 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 4 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -11,6 +11,7 @@
 
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
+| _getRoundStartBossThreat | function | `_getRoundStartBossThreat(game)` |  |
 | sys_loop | method | `sys_loop()` |  |
 | sys_setupVisibilityHandling | method | `sys_setupVisibilityHandling()` |  |
 | sys_resize | method | `sys_resize()` |  |

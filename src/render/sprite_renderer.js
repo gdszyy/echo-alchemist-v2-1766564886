@@ -217,6 +217,59 @@ export class SpriteRenderer {
         return true;
     }
 
+    /**
+     * Draw a normalized source region from the current frame.
+     *
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {number} srcXRatio 0..1 source X inside the current frame
+     * @param {number} srcYRatio 0..1 source Y inside the current frame
+     * @param {number} srcWRatio 0..1 source width inside the current frame
+     * @param {number} srcHRatio 0..1 source height inside the current frame
+     * @param {number} x Destination X
+     * @param {number} y Destination Y
+     * @param {number} w Destination width
+     * @param {number} h Destination height
+     * @param {number} [alpha=1] 0..1 alpha multiplier
+     * @returns {boolean} 是否成功绘制位图（false = 使用了 fallback）
+     */
+    // @perf-impact: Region drawing reuses the cached current frame and adds only caller-controlled drawImage calls; it creates no particles, gradients, shadowBlur, or new budget fields.
+    drawRegion(ctx, srcXRatio, srcYRatio, srcWRatio, srcHRatio, x, y, w, h, alpha = 1) {
+        if (!this.ready || !this._image || !this._meta) return false;
+
+        const anim = this._meta.animations[this._currentAnim];
+        if (!anim) return false;
+
+        const fs = this._meta.frameSize || 128;
+        const fw = anim.frameWidth  || this._meta.frameWidth  || fs;
+        const fh = anim.frameHeight || this._meta.frameHeight || fs;
+        const frameX = this._frameIndex * fw;
+        const frameY = anim.row * fh;
+
+        const rx = Math.max(0, Math.min(1, srcXRatio || 0));
+        const ry = Math.max(0, Math.min(1, srcYRatio || 0));
+        const rw = Math.max(0, Math.min(1 - rx, srcWRatio || 0));
+        const rh = Math.max(0, Math.min(1 - ry, srcHRatio || 0));
+        if (rw <= 0 || rh <= 0 || w <= 0 || h <= 0) return false;
+
+        const prevAlpha = ctx.globalAlpha;
+        ctx.globalAlpha = prevAlpha * alpha;
+
+        try {
+            ctx.drawImage(
+                this._image,
+                frameX + rx * fw, frameY + ry * fh, rw * fw, rh * fh,
+                x, y, w, h
+            );
+        } catch (e) {
+            console.warn('[SpriteRenderer] drawRegion drawImage 失败:', e);
+            ctx.globalAlpha = prevAlpha;
+            return false;
+        }
+
+        ctx.globalAlpha = prevAlpha;
+        return true;
+    }
+
     // ─── 查询 ──────────────────────────────────────────────────────────────
 
     /** 当前动画名称 */
@@ -314,6 +367,10 @@ export function createSpriteRenderer(enemyTypeOrEnemy, bossType, baseArchetype) 
             gridCols: enemyTypeOrEnemy.gridCols,
             gridRows: enemyTypeOrEnemy.gridRows,
             affixes: enemyTypeOrEnemy.affixes,
+            visualAssetKey: enemyTypeOrEnemy.visualAssetKey,
+            bossOwnerId: enemyTypeOrEnemy.bossOwnerId,
+            bossMinionRole: enemyTypeOrEnemy.bossMinionRole,
+            bossMechanicTags: enemyTypeOrEnemy.bossMechanicTags,
         };
     } else {
         enemyInfo = {
@@ -323,6 +380,10 @@ export function createSpriteRenderer(enemyTypeOrEnemy, bossType, baseArchetype) 
             gridCols: 1,
             gridRows: 1,
             affixes: [],
+            visualAssetKey: null,
+            bossOwnerId: null,
+            bossMinionRole: null,
+            bossMechanicTags: [],
         };
     }
 

@@ -11,19 +11,19 @@
 | P0-C | 命运时刻极端状态 | 检查刷新、继续游戏、教程等待、遗物/精华 overlay 返回时的语义一致性 | 基本完成，待浏览器实机复核 |
 | P0-D | 钉板编辑闭环 | 继续补齐编辑态视觉、符文融合预览、错误提示一致性和开始采集边界 | 基本完成，待体验微调 |
 
-## 0.5 上传前收口清单（2026-06-23 巡检）
+## 0.5 上传前收口清单（2026-06-24 巡检）
 
 本节记录最近本地改动中尚未完整收口、尚未实装或尚未上传 `origin/main` 的事项，避免只停留在聊天记录里。
 
-- [ ] 推送本地领先远程的提交：`990b90c feat: add boss hp translucency masks [perf-impact]` 当前在本地 `main`，`origin/main` 仍停在 `c171207 feat: prefer enemy overlay sprites over fallback art [perf-impact]`。
-- [x] 复核发射器锚点契约：二次扫描确认当前源码/测试以 `port` 为炮台旋转圆心和发射锚点、`muzzle` 为视觉端点；`node tests/validate_phase_contracts.mjs` 中该项已通过。仍需随提交纳入未跟踪的 `src/utils/emitter_geometry.js`。
-- [ ] 修复钉板空槽契约：`ensureModuleLayoutInstances()` 仍会用 `createDefaultModuleLayout(count, defaultSlots)` 回填已解锁但被玩家卸下的空槽；需保证只有新解锁槽位可自动填入 `dense_stagger`，并让 `pinboard normalization does not refill intentionally emptied active slots` 通过。
-- [ ] 纳入必要未跟踪运行时文件：至少包括 `src/utils/emitter_geometry.js`、`src/utils/boss_schedule_utils.js`、`scripts/generate_enemy_targeting_overlays.py`、敌人 footprint overlay PNG 资产族、`bg_combat_table_v2.png` / `bg_combat_emitter_zone_v2.png` 与对应文档预览图；否则当前源码或测试会引用远程不存在的文件。
-- [ ] 整理不应上传的临时文件：当前 `git ls-files --others --exclude-standard` 仍有 1181 个未跟踪文件，其中 `tmp/` 572 个、`codex-*.log` 10 个、`docs/archive/tasks/` 424 个；`tmp/`、`codex-*.log`、`_verif.mjs` 等验证残留不应进入提交，如需长期忽略，应补 `.gitignore`。
-- [ ] 收口任务归档迁移：当前有大量 `tasks/` 删除与 `docs/archive/tasks/` 新增，需确认这是有意归档并以同一次提交记录为 rename/move，而不是误删任务交付物。
-- [ ] 修复 `git diff --check` 报告的行尾空格：当前集中在 `src/entities/projectile.js:1431`、`src/entities/projectile.js:1531`、`src/entities/projectile.js:1574`。
-- [ ] 明确未实装的美术资产：V4 发射器、战斗墙体、HUD V2 透明资源已从运行时撤回，`EMITTER_BARREL_SRC` 与 `COMBAT_WALL_*_SRC` 当前为 `null`；后续必须按绿幕/chroma key 流程重做后再重新接入。
-- [ ] 上传前复跑验证：`node tests/validate_phase_contracts.mjs` 当前为 142/143，通过失败仅剩 `pinboard normalization does not refill intentionally emptied active slots`；修复后需恢复为全通过，并保留已通过的 `validate_enemy_spawn_runtime.mjs`、`validate_scenarios.js`、`validate_wave_presets.mjs`、`validate_boss_sprite_assets.mjs` 作为回归基线。
+- [ ] 推送本地领先远程的提交：当前 `main` 领先 `origin/main` 9 个提交，HEAD 为 `14204c2 Fix boss alpha assets and training roster`，`origin/main` 为 `ce53ebc`。
+- [x] 复核发射器锚点契约：当前源码/测试以 `port` 为炮台旋转圆心和发射锚点、`muzzle` 为视觉端点；`src/utils/emitter_geometry.js` 已在 Git 跟踪内，`node tests/validate_phase_contracts.mjs` 中该项已通过。
+- [x] 修复钉板空槽契约：`node tests/validate_phase_contracts.mjs` 当前为 150/150，通过项包含 `pinboard normalization does not refill intentionally emptied active slots`。
+- [ ] 纳入必要未跟踪运行时文件：当前 `git ls-files --others --exclude-standard` 展开为 163 个文件，其中 `assets/sprites/enemies/` 49 个、`assets/ui/sprites/` 41 个、`assets/ui/icons/` 5 个、`assets/icons/enemies/` 1 个；这些包含 manifest / 测试 / 运行时引用的 `carrier`、`radiantAegis`、`runeBearer`、`adaptiveRune`、战斗墙体、发射器、SP 与 loot UI 资产。
+- [ ] 整理概念稿与资料目录：`docs/design/concepts/` 53 个、`docs/architecture/music_processing/` 11 个未跟踪文件应作为文档/审稿资产单独分组，不要混入运行时资产提交。
+- [x] 整理不应上传的临时文件：当前未跟踪列表已不含 `tmp/`、`codex-*.log`、`_verif.mjs`、`docs/archive/tasks/` 等旧巡检残留；`.gitignore` 已覆盖这些路径。
+- [x] 修复 `git diff --check` 报告的行尾空格：当前 `git diff --check` 通过，仅剩 Windows LF/CRLF 提示。
+- [ ] 明确当前运行时美术资产：`EMITTER_BARREL_SRC` 当前指向 `emitter_barrel_rotating_v5_runtime.png`，`COMBAT_WALL_*_SRC` 指向 `combat_wall_left/right/top_v2.png`；这些文件处于未跟踪状态，必须随运行时代码一起纳入或回退映射。
+- [x] 上传前复跑验证：`git diff --check`、`validate_phase_contracts.mjs`、`validate_enemy_spawn_runtime.mjs`、`validate_scenarios.js`、`validate_wave_presets.mjs`、`validate_boss_sprite_assets.mjs` 均已通过。
 
 ## 1. 页面 / 系统状态总览
 
@@ -148,7 +148,10 @@
 - [x] Pass 1 概念预览：生成 `bastion`、`maw`、`deflector`、`echoSpire` 四张 alpha 概念稿与 contact sheet，保存到 `docs/design/concepts/enemy_pass1/`。
 - [x] Pass 1 视角/打光修正：补充正交正面轻俯视与居中前顶光规范，生成 view-fix 版本并保存到 `docs/design/concepts/enemy_pass1_viewfix/`。
 - [x] Pass 1 碰撞框材质层：修正“装饰框”误解，按 `collisionShape/collisionData` 生成 4 个 collision-aligned frame，后续建议接入 `frames` manifest 段。
+- [x] 回合 Toast / 下一 Boss 预告资产契约：新增 `docs/design/round_start_boss_toast_asset_contract.md`，明确 `#round-start-banner`、`#combat-next-threat`、状态横幅、威胁槽与 8 个 Boss 预告小像的命名、尺寸和 prompt。
+- [x] 回合 Toast / 下一 Boss 预告 Pass 1：生成并接入 `round_title_panel_9s.png`、`round_threat_plate_9s.png`、`boss_unknown_seal.png`、8 个 `boss_<bossId>_preview/tiny.png`，并在 `bitmap_icons.js` / `game_system.js` / `ui_system.js` / `bitmap_ui.css` 中替换旧 CSS 剪影与旧标题牌帧。
 - [ ] 按 `docs/design/enemy_asset_regeneration_plan.md` 执行 Pass 1：重生成 `bastion`、`maw`、`deflector`、`echoSpire` 四个 V2 基底与对应图标。
+- [ ] 按 `docs/design/round_start_boss_toast_asset_contract.md` 继续生成状态化 `round_toast_<state>_*.png` 横幅、`round_threat_plate_danger_9s.png` 和 `boss_preview_frame_danger.png`。
 - [ ] 按 `docs/ui_asset_requirements.md` 和 `design_spec_bitmap.md` 逐项补 UI 9-Slice、弹药图标、符文图标、遗物图标、词条图标。
 - [ ] 在素材接入前保留现有 DOM / Canvas 逻辑，先替换静态装饰层，避免同时改交互和美术资源。
 - [ ] 接入 Sprite 或高开销 Canvas 特效时，必须先读 `.cursor/rules/performance.md` 并补 `// @perf-impact` 与三档评估。

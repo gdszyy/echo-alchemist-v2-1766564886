@@ -1,9 +1,9 @@
 # src\entities\enemy.js 函数索引
 
-> 自动生成于 2026-06-23 | 总行数: 10002 | 函数数: 143 | 语言: javascript
+> 自动生成于 2026-06-24 | 总行数: 11431 | 函数数: 181 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 9 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 10 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -20,6 +20,8 @@
 | constructor | method | `constructor(x, y, width, height, hp, maxHp = hp, type = 'normal', affixes = [])` | ⚠️ 巨型函数，见 @section 导航 |
 | initSprite | method | `initSprite()` |  |
 | _initTexture | method | `_initTexture(width, height)` |  |
+| applyExplosionKnockback | method | `applyExplosionKnockback(cx, cy, radius = 100, maxOffset = 12)` |  |
+| _tickExplosionKnockback | method | `_tickExplosionKnockback(timeScale)` |  |
 | update | method | `update(timeScale, game)` |  |
 | addSwordCrack | method | `addSwordCrack(relPos, angle)` |  |
 | updateTempParticles | method | `updateTempParticles(timeScale)` |  |
@@ -29,6 +31,14 @@
 | _getFootprintCells | method | `_getFootprintCells(game)` |  |
 | _getDefenseBarrierDamage | method | `_getDefenseBarrierDamage(game)` |  |
 | _areShieldsDisabledThisTurn | method | `_areShieldsDisabledThisTurn()` |  |
+| _getAdaptiveRuneAllowedElements | method | `_getAdaptiveRuneAllowedElements()` |  |
+| _clearRuneBearerTempAffix | method | `_clearRuneBearerTempAffix()` |  |
+| _tickRuneBearerForTurn | method | `_tickRuneBearerForTurn(gameRef = null)` |  |
+| _resolveAdaptiveRuneElementFromSource | method | `_resolveAdaptiveRuneElementFromSource(source)` |  |
+| _recordAdaptiveRuneElement | method | `_recordAdaptiveRuneElement(element, gameRef = null, reason = 'damage')` |  |
+| _recordAdaptiveRuneElementFromSource | method | `_recordAdaptiveRuneElementFromSource(source, gameRef = null, reason = 'damage')` |  |
+| _getAdaptiveRuneDropElement | method | `_getAdaptiveRuneDropElement()` |  |
+| _tickRuneRewardVisualTimers | method | `_tickRuneRewardVisualTimers(timeScale = 1)` |  |
 | _applyPhaseShieldInitialBonus | method | `_applyPhaseShieldInitialBonus()` |  |
 | _grantShieldCharges | method | `_grantShieldCharges(amount)` |  |
 | _ensureLivingArmor | method | `_ensureLivingArmor(sourceMaxHp = null)` |  |
@@ -84,6 +94,16 @@
 | _tickViridisSporeArmor | method | `_tickViridisSporeArmor(game)` |  |
 | _viridisApplyCounterHit | method | `_viridisApplyCounterHit(source, gameRef = null)` |  |
 | _onLivingArmorBroken | method | `_onLivingArmorBroken(gameRef = null, source = null, options = {})` |  |
+| _getDevourerConfig | method | `_getDevourerConfig()` |  |
+| _isDevourerBoss | method | `_isDevourerBoss()` |  |
+| _isDevourerFeed | method | `_isDevourerFeed()` |  |
+| _getDevourerMawPrey | method | `_getDevourerMawPrey(game)` |  |
+| _devourerAttractPrey | method | `_devourerAttractPrey(game)` |  |
+| _devourerDevourTargets | method | `_devourerDevourTargets(game, options = {})` |  |
+| _getDevourerFeeders | method | `_getDevourerFeeders(game)` |  |
+| _findDevourerFeederSpawnPositions | method | `_findDevourerFeederSpawnPositions(game, count)` |  |
+| _devourerSpawnThralls | method | `_devourerSpawnThralls(game, count = 1)` |  |
+| _tickDevourerMawField | method | `_tickDevourerMawField(game)` |  |
 | _getChimeraConfig | method | `_getChimeraConfig()` |  |
 | _isChimeraBoss | method | `_isChimeraBoss()` |  |
 | _isChimeraFeed | method | `_isChimeraFeed()` |  |
@@ -93,7 +113,10 @@
 | _getChimeraPrey | method | `_getChimeraPrey(game)` |  |
 | _findChimeraPullCell | method | `_findChimeraPullCell(game, target)` |  |
 | _chimeraAttractPrey | method | `_chimeraAttractPrey(game)` |  |
-| _chimeraAbsorbNegativeStates | method | `_chimeraAbsorbNegativeStates(victim)` |  |
+| _chimeraPickRandomPrey | method | `_chimeraPickRandomPrey(game)` |  |
+| _chimeraNormalizeThermalStacks | method | `_chimeraNormalizeThermalStacks(game)` |  |
+| _chimeraAbsorbThermalStacks | method | `_chimeraAbsorbThermalStacks(victim, game = null)` |  |
+| _chimeraAbsorbNegativeStates | method | `_chimeraAbsorbNegativeStates(victim, game = null)` |  |
 | _chimeraDevourTargets | method | `_chimeraDevourTargets(game, options = {})` |  |
 | _getChimeraFeeders | method | `_getChimeraFeeders(game)` |  |
 | _findChimeraFeederSpawnPositions | method | `_findChimeraFeederSpawnPositions(game, count)` |  |
@@ -116,14 +139,26 @@
 | _findOuroborosEchoSpawnPositions | method | `_findOuroborosEchoSpawnPositions(game, count)` |  |
 | _ouroborosSpawnEchoes | method | `_ouroborosSpawnEchoes(game, count = 1, slot = null)` |  |
 | _performOuroborosAttachmentAction | method | `_performOuroborosAttachmentAction(game, slot)` |  |
+| _getOuroborosDamageGateThreshold | method | `_getOuroborosDamageGateThreshold()` |  |
+| _recordOuroborosDamageGate | method | `_recordOuroborosDamageGate(actualDamage = 0, gameRef = null)` |  |
+| _triggerOuroborosDamageGate | method | `_triggerOuroborosDamageGate(gameRef = null)` |  |
 | _tickOuroborosOrbit | method | `_tickOuroborosOrbit(game)` |  |
 | _interruptOuroborosAttachment | method | `_interruptOuroborosAttachment(gameRef = null, matchedAttr = null)` |  |
 | _performOuroborosRotation | method | `_performOuroborosRotation(game)` |  |
 | _glaciesPulseFrostSeamsOnLanding | method | `_glaciesPulseFrostSeamsOnLanding(game)` |  |
 | playFreezeBlockEffect | method | `playFreezeBlockEffect(game)` |  |
 | triggerLaserHitShake | method | `triggerLaserHitShake()` |  |
+| _resolveDefenseImpactVector | method | `_resolveDefenseImpactVector(source = null)` |  |
+| _triggerDefenseImpactFx | method | `_triggerDefenseImpactFx(kind, source = null, duration = 16, options = {})` |  |
+| _getDefenseImpactFx | method | `_getDefenseImpactFx(kind, duration = 16)` |  |
+| _drawDefenseImpactFeedback | method | `_drawDefenseImpactFeedback(ctx, w, h, r)` | ⚠️ 巨型函数，见 @section 导航 |
 | _tickVisualFxTimers | method | `_tickVisualFxTimers(timeScale)` |  |
 | _startJumpFx | method | `_startJumpFx(rows = 1, startY = this.dropTargetY, targetY = this.dropTargetY)` |  |
+| _drawRelicMaterialFrame | method | `_drawRelicMaterialFrame(ctx, w, h, r, options = {})` |  |
+| strokeFrame | function | `strokeFrame(dx, dy, width, height, radius)` |  |
+| drawPlate | function | `drawPlate(x, y, width, height, radius = 2)` |  |
+| drawRivet | function | `drawRivet(x, y, size = 2.1)` |  |
+| drawCorner | function | `drawCorner(sx, sy)` |  |
 | playBurnTickEffect | method | `playBurnTickEffect(game, dmg)` |  |
 | playScanFeedback | method | `playScanFeedback()` |  |
 | draw | method | `draw(ctx)` | ⚠️ 巨型函数，见 @section 导航 |
@@ -137,9 +172,12 @@
 | _drawBossVulnerabilityAssetOverlay | method | `_drawBossVulnerabilityAssetOverlay(ctx, w, h, stateId, ratio)` |  |
 | _drawBossVulnerabilityOverlay | method | `_drawBossVulnerabilityOverlay(ctx, w, h)` | ⚠️ 巨型函数，见 @section 导航 |
 | _drawOuroborosOrbitAttachments | method | `_drawOuroborosOrbitAttachments(ctx, w, h, radius, thickness, isBerserk = false)` |  |
+| _drawRuneRewardFallback | method | `_drawRuneRewardFallback(ctx, w, h)` |  |
+| _drawDefenseHudBadges | method | `_drawDefenseHudBadges(ctx, w, h)` |  |
 | _drawStatusBadges | method | `_drawStatusBadges(ctx, w, h)` |  |
 | _drawEliteDecoration | method | `_drawEliteDecoration(ctx, w, h)` |  |
 | _drawBossSpriteOutsideCollisionClip | method | `_drawBossSpriteOutsideCollisionClip(ctx, w, h)` |  |
+| _drawBossRainbowBorder | method | `_drawBossRainbowBorder(ctx, w, h)` |  |
 | _drawBossDecoration | method | `_drawBossDecoration(ctx, w, h)` | ⚠️ 巨型函数，见 @section 导航 |
 | _drawArchetypeBody | method | `_drawArchetypeBody(ctx, w, h)` | ⚠️ 巨型函数，见 @section 导航 |
 | _getAffixTintColor | method | `_getAffixTintColor()` |  |
@@ -176,6 +214,15 @@
 | 节点标记 | 说明 |
 |----------|------|
 | `@section:enemy_move_audio` | 敌人移动时的状态音效（regen/split/devour 词缀） |
+
+### _drawDefenseImpactFeedback
+
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
+
+| 节点标记 | 说明 |
+|----------|------|
+| `@section:defense_fx_helpers` | 防御反馈绘制工具函数 |
+| `@section:defense_fx_type_dispatch` | 各防御层样式分发 |
 
 ### draw
 

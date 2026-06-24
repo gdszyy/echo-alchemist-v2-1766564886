@@ -186,8 +186,15 @@ function _weightedRandomChoice(candidates) {
  * @param {Object} [themeWeights={}] - Boss 主题额外权重注入 { elementKey: bonusWeight }
  * @returns {string} 被抽中的符文 id
  */
-function _selectRuneByWeight(buildVector, themeWeights = {}) {
-    const candidates = RUNE_DB.map(rune => {
+function _selectRuneByWeight(buildVector, themeWeights = {}, options = {}) {
+    const allowedSet = Array.isArray(options.allowedElements) && options.allowedElements.length > 0
+        ? new Set(options.allowedElements.filter(Boolean))
+        : null;
+    const runePool = allowedSet
+        ? RUNE_DB.filter(rune => rune && allowedSet.has(rune.element))
+        : RUNE_DB;
+    const sourcePool = runePool.length > 0 ? runePool : RUNE_DB;
+    const candidates = sourcePool.map(rune => {
         const buildBonus = rune.element ? (buildVector[rune.element] || 0) : 0;
 
         // 计算 Boss 主题权重注入贡献（按符文 element 匹配 themeWeights 键）
@@ -231,13 +238,14 @@ function _selectRuneByWeight(buildVector, themeWeights = {}) {
  *   - level: 掉落等级（默认 1，或由 forcedLevel 指定）
  */
 function loot_calcRuneDrop(game, overrideOptions = {}) {
-    const { forcedLevel, themeWeights } = overrideOptions;
+    const { forcedLevel, themeWeights, forcedElement, allowedElements } = overrideOptions;
 
     // 第一层：玩家套路成分识别
     const buildVector = _calcBuildVector(game);
 
     // 第二层：符文关联与抽取（注入 Boss 主题权重）
-    const runeId = _selectRuneByWeight(buildVector, themeWeights || {});
+    const elementFilter = forcedElement ? [forcedElement] : allowedElements;
+    const runeId = _selectRuneByWeight(buildVector, themeWeights || {}, { allowedElements: elementFilter });
 
     // 确定掉落等级：优先使用 forcedLevel，否则默认 1
     const level = (typeof forcedLevel === 'number' && forcedLevel >= 1)

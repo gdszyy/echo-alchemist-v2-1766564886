@@ -60,14 +60,14 @@
 *   **演示触发收栏**：`triggerScenarioAction()` 默认会调用 `collapseSidebar()`，让战斗区域腾出空间；需要持续阅读状态说明的验收场景可设置 `keepSidebarOpenOnDemo: true`。
 *   **Boss 入场动画特殊处理**：试炼场不走完整的战斗阶段（`phase === 'training'`），因此在 `loadScenario` 中有专门针对 `categoryId === 'boss'` 的硬编码逻辑：强制将 `e._pendingEntrance = false` 并设置 `e.entranceTimer = 1` 以激活 Boss 入场动画。
 *   **Boss 破绽视觉验收**：`boss_vulnerability_break` 场景是破绽 Overlay 的逐档验收入口。它通过 `BOSS_VULNERABILITY_VISUAL_BOSSES` / `BOSS_VULNERABILITY_VISUAL_STATES` 轮播 8 个 Boss 的 `0/25/50/75/break/exposed/recover` 状态，并直接写入 `_bossVulnerabilityVisualRatio`、`_bossVulnerabilityExposedTurns`、`_bossVulnerabilityBreakTimer`、`_bossVulnerabilityRecoverTimer` 等视觉状态字段；该场景只用于验收，不代表实战伤害触发流程。
-*   **Ouroboros 六附体验收**：`boss_ouroboros` 场景用于实机查看六附体轮转、轨道节点、`附X/断N` 状态短标签和动态破绽谱。场景本身只调用 `spawn_spawnBoss('ouroboros', true)` 与 `phase_enemy_startLogic()`，附体切换和封印必须由 `Enemy._tickOuroborosOrbit()` / `_interruptOuroborosAttachment()` 驱动，禁止在试炼场里写死视觉状态替代实战逻辑。
+*   **Ouroboros 六附体验收**：`boss_ouroboros` 场景用于实机查看六附体轮转、轨道节点、`附X/断N` 状态短标签和动态破绽谱。场景本身只调用 `spawn_spawnBoss('ouroboros', true)` 与 `phase_enemy_startLogic()`，附体切换和封印必须由 `Enemy._tickOuroborosOrbit()` / `_interruptOuroborosAttachment()` 驱动，禁止在试炼场里写死视觉状态替代实战逻辑。`boss_ouroboros_attachment_slots` 场景用于逐槽验收 Boss 环上的六个附体槽贴图；它必须通过真实 Boss 实例的 `_applyOuroborosAttachment(normalizedIndex, game, { feedback: false })` 切换槽位，并由 `Enemy._drawOuroborosOrbitAttachments()` 绘制 `assets/sprites/bosses/ouroboros_slots/ouroboros_slot_<slotId>.png`。该场景不得调用 `_ouroborosSpawnEchoes()`，不得用普通敌人或会移动的 `orbit_echo` 伴生敌冒充槽位；`orbit_echo` 只用于正式裂群/召唤机制的伴生敌资源验收。
 *   **敌人针对 fallback 验收**：`enemy_v2` 分类包含 `ev2_enemy_targeting_fallback` 场景，集中冻结展示 `energyArmor`、`phaseShield`、`overloadReactor`、`lowDamageImmune`、`livingArmor`、`armorSpore`、`siegeBreaker`、`deflectShell` 与 `carrier`。该场景直接写入护甲血量档位、`_armorSporeTrailTimer`、`phaseShieldDisabledThisTurn`、`_overloadBonusThisTurn` 等视觉状态，只用于资产生成前检查 Canvas fallback 可读性，不代表正常生成曲线。
 *   **敌人针对 footprint PNG 验收**：`enemy_v2` 分类包含 `ev2_enemy_targeting_footprints` 场景，用于正式 PNG overlay 接入后的多尺寸实机验收。该场景冻结展示 `overloadReactor 3x3`、`phaseShield 1x2`、`energyArmor 2x1`、`lowDamageImmune 3x1`、`livingArmor 2x3`、`carrier 3x2` 与 `siegeBreaker 3x1`，必须确认边框覆盖完整 `gridCols x gridRows` footprint，而不是回退为居中的 1x1 overlay。
 *   **V2 预设波次验证**：`enemy_v2` 分类包含 `ev2_wave_preset_spawn` 场景，临时固定 Round 12 与随机数后调用真实 `spawn_trySpawnWavePreset()`，用于验证大型基底能通过导演 preset 入口生成。该场景结束 setup 后必须恢复 `round`、`_wavePresetUsage`、`_wavePresetIntroShown`、`_wavePresetRoundUsed` 和 `Math.random`，避免污染其它试炼场场景。
 
 ## 3. 真理之书图鉴配置 (TruthBook)
 
-真理之书同样采用数据驱动架构，数据定义在 `TRUTH_BOOK_DATA` 中。
+真理之书同样采用数据驱动架构，数据定义在 `TRUTH_BOOK_DATA` 中。当前 UI 入口统一读取 `TRUTH_BOOK_DATA.entries`，左栏按 `TRUTH_BOOK_DATA.categories` 渲染分类、搜索与条目列表。
 
 ### 3.1 图鉴数据结构契约
 
@@ -76,19 +76,41 @@
 ```javascript
 {
     id: 'entry_id',
-    categoryId: 'basic',      // 分类
+    categoryId: 'boss',       // 分类：boss / enemy_affix / enemy_v2 / attribute / core
     title: '条目标题',
     content: '详细说明文字（支持多行）',
+    icon: '◇',
+    tags: ['机制标签', '反制属性'],
     
     // [可选] 图鉴附带的互动演示
     setup: (demoGame) => {
         // 在右侧画布 (demoGame) 中布置演示场景
     },
-    demoAction: (demoGame) => {
-        // 演示动画逻辑
-    }
+    loop: [
+        { type: 'log', text: '演示日志' },
+        { type: 'enemy_turn' },
+        { type: 'wait', frames: 120 },
+        { type: 'reset' }
+    ],
+    trainingScenarioId: 'boss_ignis' // 可选：关联试炼场验收场景
 }
 ```
+
+#### 3.1.1 兼容层
+
+- `TRUTH_BOOK_DATA.enemies` 与 `TRUTH_BOOK_DATA.attributes` 仍作为旧入口保留；命运选择页仍读取 `TRUTH_BOOK_DATA.attributes` 作为弹珠说明来源。
+- `TRUTH_BOOK_DATA.entries` 由旧敌人词缀、属性条目、Boss 条目与核心机制条目归一化生成，条目同时具备 `title/content` 与兼容字段 `name/desc`。
+- V2 敌人条目继续由 `ENEMY_V2_METADATA` 构建；`id` 以 `v2_` 开头的条目归入 `enemy_v2` 分类，其余旧敌人条目归入 `enemy_affix`。
+
+#### 3.1.2 当前分类
+
+| 分类 ID | 用途 |
+|---|---|
+| `boss` | 8 个 Boss 专属机制、破绽谱、狂暴变化与试炼场入口 |
+| `enemy_affix` | 普通/精英敌人词缀演示 |
+| `enemy_v2` | 多格敌人、V2 基底与专属形体 |
+| `attribute` | 弹药属性、元素反应与子弹演示 |
+| `core` | 技能/符文充能、子弹替换、掉落保底、智能符文掉落 |
 
 ## 3.3 符文词条场景分类 (`categoryId: 'runeword'`)
 

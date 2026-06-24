@@ -1,0 +1,23 @@
+{
+  "frameSize": 256,
+  "frameWidth": 256,
+  "frameHeight": 256,
+  "placeholder": false,
+  "single": true,
+  "bossMatched": true,
+  "styleFamily": "ouroboros_boss_matched",
+  "generated": "boss_matched_ouroboros_orbit_echo_2026_06_24",
+  "sourceAtlas": "assets/sprites/bosses/redraw_drafts/boss_ouroboros_redraw_idle_draft_sheet_v20260624alphafix.png",
+  "sourceFrame": 0,
+  "sourceCellLabel": "surge",
+  "notes": "Ouroboros orbit echo companion variant: surge charge echo. Runtime collision uses frame_minion_ouroboros_1x1 octagonal hull.",
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 1,
+      "fps": 1,
+      "frameWidth": 256,
+      "frameHeight": 256
+    }
+  }
+}

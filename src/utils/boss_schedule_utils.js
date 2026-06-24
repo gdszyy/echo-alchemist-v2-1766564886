@@ -7,6 +7,20 @@ export function normalizeBossKey(id) {
     return raw === 'micro' ? 'mikro' : raw;
 }
 
+export function getBossDisplayName(bossId, bossConfigs = null, bossDb = []) {
+    const key = normalizeBossKey(bossId);
+    if (!key) return 'Boss';
+    const configName = bossConfigs?.[key]?.name;
+    const dbEntry = (bossDb || []).find(entry => normalizeBossKey(entry?.id) === key);
+    return configName || dbEntry?.name || key;
+}
+
+export function getBossShortName(bossId, bossConfigs = null, bossDb = []) {
+    const fullName = getBossDisplayName(bossId, bossConfigs, bossDb);
+    const parts = String(fullName).split(/[·・]/);
+    return (parts[parts.length - 1] || fullName).trim();
+}
+
 function _uniqueKnownBosses(ids, fallbackOrder) {
     const fallbackSet = new Set(fallbackOrder);
     const unique = [];
@@ -56,4 +70,34 @@ export function getNextBossRoundPreview(game, curveConfig = null) {
 
     if (spawnCount < FALLBACK_BOSS_ROUNDS.length) return FALLBACK_BOSS_ROUNDS[spawnCount];
     return (game._lastBossSpawnRound || game.round || 1) + 7;
+}
+
+export function getBossPreviewInfo(game, curveConfig = null) {
+    const nextRound = getNextBossRoundPreview(game, curveConfig);
+    if (!nextRound) return null;
+
+    const currentRound = Math.max(1, Number(game?.round) || 1);
+    const pendingBossId = normalizeBossKey(game?._pendingBossSpawn?.bossId);
+    const isBigBoss = pendingBossId
+        ? !!game?._pendingBossSpawn?.isBigBoss
+        : (game?._isTutorialRun ? true : (game?._bossSpawnCount || 0) >= 4);
+    const bossId = pendingBossId || predictBossIdFromHistory(game?.bossHistory, isBigBoss, curveConfig);
+
+    let history = Array.isArray(game?.bossHistory) ? game.bossHistory.map(normalizeBossKey) : [];
+    if (pendingBossId && history[history.length - 1] === pendingBossId) {
+        history = history.slice(0, -1);
+    }
+    const defeated = Array.isArray(game?.bossDefeatedLog)
+        ? game.bossDefeatedLog.map(entry => normalizeBossKey(entry?.bossId))
+        : [];
+
+    return {
+        bossId,
+        currentRound,
+        isBigBoss,
+        isPending: !!pendingBossId,
+        known: [...history, ...defeated].includes(bossId),
+        nextRound,
+        turnsUntil: Math.max(0, nextRound - currentRound),
+    };
 }

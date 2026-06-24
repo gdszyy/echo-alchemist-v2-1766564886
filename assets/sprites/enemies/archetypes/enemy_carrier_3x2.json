@@ -1,0 +1,22 @@
+{
+  "frameSize": 256,
+  "frameWidth": 384,
+  "frameHeight": 256,
+  "placeholder": false,
+  "single": true,
+  "generated": "imagegen_carrier_native_hollow_2026_06_24",
+  "source": "docs/design/concepts/carrier_imagegen_pass1/carrier_imagegen_alpha.png",
+  "rawSource": "docs/design/concepts/carrier_imagegen_pass1/carrier_imagegen_raw.png",
+  "postprocess": "chroma-key alpha removal, subject fit to 384x256, launch bay alpha validation",
+  "nativeHollowDesign": true,
+  "readabilityDesign": "3x2 U-shaped carrier body leaves the fifth lower-center cell transparent for the launch bay",
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 1,
+      "fps": 1,
+      "frameWidth": 384,
+      "frameHeight": 256
+    }
+  }
+}

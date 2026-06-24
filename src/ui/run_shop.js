@@ -452,6 +452,7 @@ export const run_shop = {
             : null;
         if (!visiblePhase || !state || state.hidden) {
             dock.classList.remove('is-gathering-top');
+            dock.classList.remove('is-combat-top');
             dock.style.display = 'none';
             return;
         }
@@ -464,6 +465,7 @@ export const run_shop = {
 
         dock.style.display = 'flex';
         dock.classList.toggle('is-gathering-top', this.phase === 'gathering');
+        dock.classList.toggle('is-combat-top', this.phase === 'combat');
         dock.classList.toggle('is-active', !!state.isActive);
         if (fillEl) fillEl.style.width = `${pct}%`;
 

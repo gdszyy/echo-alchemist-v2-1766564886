@@ -1,9 +1,10 @@
 import { eventBus, EVENT_TYPES } from './event_bus.js';
+import { audio } from './audio.js';
 import { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY } from './rune_config.js';
 import { CONFIG, META_SHOP_CONFIG, RELIC_DB, BOSS_DB, ENEMY_CURVE_CONFIG, setDeepValue } from './config.js';
-import { getAmmoIconSrcByKey } from './bitmap_icons.js';
+import { getAmmoIconSrcByKey, getBossPreviewIconSrc, getRelicIconSrc, getLootCapsuleSrc } from './bitmap_icons.js';
 import { getAmmoReadabilityProfile } from './utils/ammo_readability.js';
-import { getNextBossRoundPreview, normalizeBossKey, predictBossIdFromHistory } from './utils/boss_schedule_utils.js';
+import { getBossDisplayName, getBossPreviewInfo, getBossShortName, normalizeBossKey } from './utils/boss_schedule_utils.js';
 import {
     MODULE_DEFS,
     getModuleSpan,
@@ -48,59 +49,41 @@ function _getStatLabel(statKey) {
     return `${meta.icon || ''} ${meta.name || statKey}`.trim();
 }
 
-function _getBossDisplayName(bossId) {
-    const key = normalizeBossKey(bossId);
-    if (!key) return 'Boss';
-    const configName = CONFIG.balance?.bossConfigs?.[key]?.name;
-    const dbEntry = (BOSS_DB || []).find(entry => normalizeBossKey(entry.id) === key);
-    return configName || dbEntry?.name || key;
-}
-
-function _getBossShortName(bossId) {
-    const fullName = _getBossDisplayName(bossId);
-    const parts = String(fullName).split(/[·・]/);
-    return (parts[parts.length - 1] || fullName).trim();
-}
-
 function _getNextBossThreatInfo(game) {
     const activeBoss = (game?.enemies || []).find(enemy =>
         enemy && enemy.active && !enemy.isDead && enemy.hp > 0 && enemy.type === 'boss'
     );
     if (activeBoss) {
         const bossId = normalizeBossKey(activeBoss.bossType || activeBoss.bossId || activeBoss.id);
-        const name = _getBossShortName(bossId);
+        const name = getBossShortName(bossId, CONFIG.balance?.bossConfigs, BOSS_DB);
         return {
             state: 'active',
             known: true,
+            bossId,
             label: '交战',
+            iconSrc: getBossPreviewIconSrc(bossId, { tiny: true }),
             title: `当前威胁：${name} 已登场`,
         };
     }
 
-    const nextRound = getNextBossRoundPreview(game, ENEMY_CURVE_CONFIG);
-    if (!nextRound) return null;
+    const preview = getBossPreviewInfo(game, ENEMY_CURVE_CONFIG);
+    if (!preview) return null;
 
-    const currentRound = Math.max(1, Number(game?.round) || 1);
-    const turnsUntil = Math.max(0, nextRound - currentRound);
-    const isBigBoss = game?._isTutorialRun ? true : (game?._bossSpawnCount || 0) >= 4;
-    const bossId = predictBossIdFromHistory(game?.bossHistory, isBigBoss, ENEMY_CURVE_CONFIG);
-    const knownBossIds = [
-        ...(Array.isArray(game?.bossHistory) ? game.bossHistory : []),
-        ...(Array.isArray(game?.bossDefeatedLog) ? game.bossDefeatedLog.map(entry => entry?.bossId) : []),
-    ].map(normalizeBossKey);
-    const known = knownBossIds.includes(bossId);
-    const shortName = known ? _getBossShortName(bossId) : '未知';
+    const { bossId, known, nextRound, turnsUntil } = preview;
+    const shortName = known ? getBossShortName(bossId, CONFIG.balance?.bossConfigs, BOSS_DB) : '未知';
     const label = turnsUntil <= 0
         ? (known ? '本回合' : '未知')
         : `${known ? shortName : '未知'} ${turnsUntil}`;
     const title = known
-        ? `下一威胁：${_getBossDisplayName(bossId)} 将在 Round ${nextRound} 出现（${turnsUntil} 回合后）`
+        ? `下一威胁：${getBossDisplayName(bossId, CONFIG.balance?.bossConfigs, BOSS_DB)} 将在 Round ${nextRound} 出现（${turnsUntil} 回合后）`
         : `下一威胁：未知 Boss 将在 Round ${nextRound} 出现（${turnsUntil} 回合后，未遭遇前仅显示剪影）`;
 
     return {
         state: turnsUntil <= 1 ? 'soon' : 'countdown',
         known,
+        bossId,
         label,
+        iconSrc: getBossPreviewIconSrc(bossId, { tiny: true, known }),
         title,
     };
 }
@@ -573,6 +556,15 @@ export const ui_system = {
         }
 
         // ---- A. 掉落物开启脉冲 + 光束迸发（保留原图标位置感） ----
+        const rewardIconSrc = getRelicIconSrc(type);
+        const rewardCapsuleSrc = getLootCapsuleSrc(type);
+        const capsuleHtml = rewardCapsuleSrc
+            ? `<img class="loot-fly-card-capsule" src="${rewardCapsuleSrc}" alt="">`
+            : '';
+        const iconHtml = rewardIconSrc
+            ? `<img class="loot-fly-card-icon-img" src="${rewardIconSrc}" alt="">`
+            : `<span class="loot-fly-card-icon-text">${icon}</span>`;
+
         const burst = document.createElement('div');
         burst.style.cssText = `
             position: absolute;
@@ -620,7 +612,7 @@ export const ui_system = {
         const card = document.createElement('div');
         card.className = 'loot-fly-card';
         card.innerHTML = `
-            <div class="loot-fly-card-icon">${icon}</div>
+            <div class="loot-fly-card-icon">${capsuleHtml}${iconHtml}</div>
             <div class="loot-fly-card-title">${title}</div>
         `;
         card.style.cssText = `
@@ -647,7 +639,13 @@ export const ui_system = {
             transition: transform 0.7s cubic-bezier(0.22, 1.2, 0.36, 1), opacity 0.5s ease-out, left 0.7s cubic-bezier(0.22, 1.2, 0.36, 1), top 0.7s cubic-bezier(0.22, 1.2, 0.36, 1);
         `;
         const iconEl = card.querySelector('.loot-fly-card-icon');
-        if (iconEl) iconEl.style.cssText = `font-size: 38px; text-shadow: 0 0 14px ${glow};`;
+        if (iconEl) iconEl.style.cssText = `position: relative; width: 54px; height: 62px; display: flex; align-items: center; justify-content: center; font-size: 32px; text-shadow: 0 0 14px ${glow};`;
+        const capsuleEl = card.querySelector('.loot-fly-card-capsule');
+        if (capsuleEl) capsuleEl.style.cssText = 'position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none;';
+        const iconImgEl = card.querySelector('.loot-fly-card-icon-img');
+        if (iconImgEl) iconImgEl.style.cssText = `position:relative; z-index:1; width:${rewardCapsuleSrc ? 24 : 36}px; height:${rewardCapsuleSrc ? 24 : 36}px; object-fit:contain; filter: drop-shadow(0 0 8px ${glow});`;
+        const iconTextEl = card.querySelector('.loot-fly-card-icon-text');
+        if (iconTextEl) iconTextEl.style.cssText = 'position:relative; z-index:1;';
         const titleEl = card.querySelector('.loot-fly-card-title');
         if (titleEl) titleEl.style.cssText = `font-size: 12px; letter-spacing: 2px; color: ${cardBorder}; text-shadow: 0 0 6px ${glow};`;
         container.appendChild(card);
@@ -746,11 +744,14 @@ export const ui_system = {
         let eliteCount = 0;
         let bossCount = 0;
         let shieldedCount = 0;
+        let enemyShieldLayers = 0;
 
         activeEnemies.forEach(enemy => {
             if (enemy.type === 'elite') eliteCount++;
             if (enemy.type === 'boss') bossCount++;
-            if ((enemy.shieldCharges || 0) > 0 || (enemy.affixes || []).includes('shield')) shieldedCount++;
+            const shieldLayers = Math.max(0, Math.floor(enemy.shieldCharges || 0));
+            if (shieldLayers > 0 || (enemy.affixes || []).includes('shield')) shieldedCount++;
+            enemyShieldLayers += shieldLayers;
         });
 
         const playerShield = this.playerShield || 0;
@@ -762,7 +763,7 @@ export const ui_system = {
             : 'no ammo';
         const nextBossThreat = _getNextBossThreatInfo(this);
         const nextBossSignature = nextBossThreat
-            ? `${nextBossThreat.state}:${nextBossThreat.known ? 'known' : 'unknown'}:${nextBossThreat.label}`
+            ? `${nextBossThreat.state}:${nextBossThreat.known ? 'known' : 'unknown'}:${nextBossThreat.bossId}:${nextBossThreat.label}:${nextBossThreat.iconSrc}`
             : 'none';
 
         let threatClass = '';
@@ -783,7 +784,7 @@ export const ui_system = {
 
         const signature = [
             threatClass, threatLabel, activeEnemies.length, eliteCount, bossCount,
-            shieldedCount, playerShield, ammoCount, ammoLabel, note, nextBossSignature
+            shieldedCount, enemyShieldLayers, playerShield, ammoCount, ammoLabel, note, nextBossSignature
         ].join('|');
         if (!force && signature === this._combatStatusSignature) return;
         this._combatStatusSignature = signature;
@@ -809,7 +810,16 @@ export const ui_system = {
         if (enemyCountEl) enemyCountEl.innerText = String(activeEnemies.length);
         if (eliteCountEl) eliteCountEl.innerText = String(eliteCount);
         if (bossCountEl) bossCountEl.innerText = String(bossCount);
-        if (shieldCountEl) shieldCountEl.innerText = String(playerShield);
+        if (shieldCountEl) {
+            shieldCountEl.innerText = String(enemyShieldLayers);
+            const shieldMetric = shieldCountEl.closest('.combat-status-metric');
+            if (shieldMetric) {
+                shieldMetric.title = enemyShieldLayers > 0
+                    ? `敌方护盾：${shieldedCount} 个目标，共 ${enemyShieldLayers} 层。Boss 护盾也计入。`
+                    : '敌方护盾：当前没有可消耗护盾层。防线屏障在顶部结界胶囊显示。';
+                shieldMetric.setAttribute('aria-label', shieldMetric.title);
+            }
+        }
         if (ammoCountEl) ammoCountEl.innerText = String(ammoCount);
         if (nextThreatEl) {
             nextThreatEl.classList.toggle('is-hidden', !nextBossThreat);
@@ -821,7 +831,14 @@ export const ui_system = {
             nextThreatEl.setAttribute('aria-label', nextBossThreat?.title || '下一威胁未排定');
         }
         if (nextThreatLabelEl) nextThreatLabelEl.innerText = nextBossThreat?.label || '--';
-        if (nextThreatIconEl) nextThreatIconEl.classList.toggle('is-silhouette', !!nextBossThreat && !nextBossThreat.known);
+        if (nextThreatIconEl) {
+            nextThreatIconEl.classList.toggle('is-silhouette', !!nextBossThreat && !nextBossThreat.known);
+            if (nextBossThreat?.iconSrc) {
+                nextThreatIconEl.style.setProperty('--boss-preview-icon', `url("${nextBossThreat.iconSrc}")`);
+            } else {
+                nextThreatIconEl.style.removeProperty('--boss-preview-icon');
+            }
+        }
         if (noteEl) noteEl.innerText = note;
     },
     ui_resetCombatPhaseHud(options = {}) {
@@ -1953,7 +1970,7 @@ export const ui_system = {
             topPhaseLabel.textContent = topLabelMap[this.phase] || '';
         }
 
-        // 8. 战斗充能符文 UI
+        // 8. 战斗技能充能 UI
         const runeChargeUi = document.getElementById('combat-rune-charge-ui');
         if (runeChargeUi) {
             runeChargeUi.style.display = (this.phase === 'combat') ? 'flex' : 'none';
@@ -2359,6 +2376,39 @@ export const ui_system = {
 
     ui_syncPauseSettings() {
         if (typeof this.ui_renderPauseRelics === 'function') this.ui_renderPauseRelics();
+
+        // 同步静音状态
+        const isMuted = audio.muted;
+        const muteIcon = document.getElementById('pause-mute-icon');
+        const muteBadge = document.getElementById('pause-mute-badge');
+        const muteRow = document.getElementById('pause-mute-row');
+        if (muteIcon) muteIcon.textContent = isMuted ? '🔇' : '🔊';
+        if (muteBadge) {
+            muteBadge.textContent = isMuted ? '关闭' : '开启';
+            isMuted ? muteBadge.classList.remove('active') : muteBadge.classList.add('active');
+        }
+        if (muteRow) isMuted ? muteRow.classList.remove('active') : muteRow.classList.add('active');
+
+        // 同步伤害数字状态
+        const showDmgNum = this.showDamageNumbers !== false;
+        const dmgBadge = document.getElementById('pause-damage-numbers-badge');
+        const dmgRow = document.getElementById('pause-damage-numbers-row');
+        if (dmgBadge) {
+            dmgBadge.textContent = showDmgNum ? '开启' : '关闭';
+            showDmgNum ? dmgBadge.classList.add('active') : dmgBadge.classList.remove('active');
+        }
+        if (dmgRow) showDmgNum ? dmgRow.classList.add('active') : dmgRow.classList.remove('active');
+
+        // 同步 CRT 状态
+        const isCrtOn = localStorage.getItem('ea_crt_enabled') !== 'false';
+        const crtBadge = document.getElementById('pause-crt-badge');
+        const crtRow = document.getElementById('pause-crt-row');
+        if (crtBadge) {
+            crtBadge.textContent = isCrtOn ? '开启' : '关闭';
+            isCrtOn ? crtBadge.classList.add('active') : crtBadge.classList.remove('active');
+        }
+        if (crtRow) isCrtOn ? crtRow.classList.add('active') : crtRow.classList.remove('active');
+
         // 同步渲染品质按钮高亮
         const activeLevel = this.perfQualityLevel;
         const isAuto = !this._perfManualMode;
@@ -2368,6 +2418,12 @@ export const ui_system = {
             const isActive = id === 'auto' ? isAuto : (!isAuto && id === activeLevel);
             btn.classList.toggle('active', isActive);
         });
+
+        // 同步音量滑块值
+        const sfxSlider = document.getElementById('pause-sfx-volume');
+        const bgmSlider = document.getElementById('pause-bgm-volume');
+        if (sfxSlider) sfxSlider.value = Math.round((audio.sfxVolume ?? 1) * 100);
+        if (bgmSlider) bgmSlider.value = Math.round((audio.bgmVolume ?? 1) * 100);
     },
     ui_renderPauseRelics() {
         const list = document.getElementById('pause-relic-list');

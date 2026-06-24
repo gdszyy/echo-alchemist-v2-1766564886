@@ -187,7 +187,7 @@ node tests/validate_wave_presets.mjs
 - 逐类实例化 8 种 V2 基底，验证 `baseArchetype`、专属词条、`collisionShape/collisionData`、宽体标记、慢速移动间隔和专属初始化（如 deflector 屏障、hive 冷却）。
 - 覆盖敌人针对词缀首批运行期行为：`livingArmor` 代承/穿透同伤、破裂后可被 `armorSpore` 重新挂甲、`armorSpore` 叠甲、`siegeBreaker` 按占格数打防线、`phaseShield` 倍化和失效窗口、`overloadReactor` 伤害换行动、`lowDamageImmune` 阈值过滤、`energyArmor` 高伤溢出转盾。
 - 覆盖敌人针对词缀第二批运行期行为：`carrier` 每回合在第 5 格空舱投放 `haste+jump` 小型敌人并继承母体词条；空舱被占时先推出占位敌人，推不出去则跳过本次投放，新小怪生成当回合立即移动；V2 基底契约包含 1/2/3/4/6 占格、5 号空洞、碰撞形状和冷却初始化。
-- 覆盖 Boss 专属敌人与机制 tick：Mikro 入场 `fission_cell` 计入母体分裂减伤；Devourer 入场 `maw_thrall` 会被吞噬优先选中；Glacies / Tesla / Viridis / Chimera / Ouroboros 覆盖霜缝、导体、孢甲、胃域与六附体运行期链路。
+- 覆盖 Boss 专属敌人与机制 tick：Mikro 入场 `fission_cell` 计入母体分裂减伤；Devourer 入场 `maw_thrall` 会进入深渊胃域拉拽/范围吞噬；Glacies / Tesla / Viridis / Chimera / Ouroboros 覆盖霜缝、导体、孢甲、热核吞噬与六附体运行期链路。
 - 覆盖 Ouroboros 六附体运行期行为：6 个 `orbitAttachments` 配置、每回合转位、裂群附体召唤 `orbit_echo`、破绽满格封印当前附体并改变轮转。
 
 运行方式：
@@ -204,7 +204,7 @@ node tests/validate_enemy_spawn_runtime.mjs
 - `_proceedToFateMomentSelection()` 必须重建 `fateMomentContext.active = true` 语义。
 - round-start reward resolver 打开遗物 overlay 时必须带 `resumeTarget: 'round_start_resolver'`。
 - 继续游戏若命中 selection / 命运时刻存档，必须恢复 `phase`、`marblesPool`、`selectedMarbles`、注入符文与预览 UI，禁止直接落回 `sys_startRoundStartResolver()`。
-- Boss 机制存档必须成对保存/恢复随从归属、机制标签、温压、孢甲资源、Tesla 场强、霜缝、Chimera 冷却和破绽状态，避免读档后资源条丢失或机制重复初始化。
+- Boss 机制存档必须成对保存/恢复随从归属、机制标签、温压、孢甲资源、Tesla 场强、霜缝、Devourer 胃域冷却、Chimera 热/寒/流彩层与破绽状态，避免读档后资源条丢失或机制重复初始化。
 
 运行方式：
 ```bash

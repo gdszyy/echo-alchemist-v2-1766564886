@@ -13,7 +13,7 @@
 // Task 5.A5 — 弹药法球图标映射（属性 32×32）
 // key 对应 recipe 中的属性名 / MarbleDefinition.type
 // ============================================================
-const BITMAP_ASSET_VERSION = '20260623-combat-v2';
+const BITMAP_ASSET_VERSION = '20260624-round-boss-preview-clean1';
 
 function versionBitmapSrc(path) {
     if (!path) return path;
@@ -21,26 +21,50 @@ function versionBitmapSrc(path) {
 }
 
 export const AMMO_ICON_MAP = {
-    default:      'assets/icons/ammo/ammo_normal.png',
-    normal:       'assets/icons/ammo/ammo_normal.png',
-    white:        'assets/icons/ammo/ammo_normal.png',
-    pyro:         'assets/icons/ammo/ammo_pyro.png',
-    cryo:         'assets/icons/ammo/ammo_cryo.png',
-    lightning:    'assets/icons/ammo/ammo_lightning.png',
-    laser:        'assets/icons/ammo/ammo_laser.png',
-    pierce:       'assets/icons/ammo/ammo_pierce.png',
-    bounce:       'assets/icons/ammo/ammo_bounce.png',
-    scatter:      'assets/icons/ammo/ammo_scatter.png',
-    explosive:    'assets/icons/ammo/ammo_explosive.png',
-    wind:         'assets/icons/ammo/ammo_wind.png',
-    flying_sword: 'assets/icons/ammo/ammo_flying_sword.png',
-    matryoshka:   'assets/icons/ammo/ammo_matryoshka.png',
-    rainbow:      'assets/icons/ammo/ammo_rainbow.png',
-    resonance:    'assets/icons/ammo/ammo_resonance.png',
-    damage:       'assets/icons/ammo/ammo_normal.png',
-    venom:        'assets/icons/ammo/ammo_venom.png',
-    overcharge:   'assets/icons/ammo/ammo_overcharge.png',
-    echo:         'assets/icons/ammo/ammo_echo.png',
+    default:      '/assets/icons/ammo/ammo_normal.png',
+    normal:       '/assets/icons/ammo/ammo_normal.png',
+    white:        '/assets/icons/ammo/ammo_normal.png',
+    pyro:         '/assets/icons/ammo/ammo_pyro.png',
+    cryo:         '/assets/icons/ammo/ammo_cryo.png',
+    lightning:    '/assets/icons/ammo/ammo_lightning.png',
+    laser:        '/assets/icons/ammo/ammo_laser.png',
+    pierce:       '/assets/icons/ammo/ammo_pierce.png',
+    bounce:       '/assets/icons/ammo/ammo_bounce.png',
+    scatter:      '/assets/icons/ammo/ammo_scatter.png',
+    explosive:    '/assets/icons/ammo/ammo_explosive.png',
+    wind:         '/assets/icons/ammo/ammo_wind.png',
+    flying_sword: '/assets/icons/ammo/ammo_flying_sword.png',
+    matryoshka:   '/assets/icons/ammo/ammo_matryoshka.png',
+    rainbow:      '/assets/icons/ammo/ammo_rainbow.png',
+    resonance:    '/assets/icons/ammo/ammo_resonance.png',
+    damage:       '/assets/icons/ammo/ammo_normal.png',
+    venom:        '/assets/icons/ammo/ammo_venom.png',
+    overcharge:   '/assets/icons/ammo/ammo_overcharge.png',
+    echo:         '/assets/icons/ammo/ammo_echo.png',
+};
+
+export const ATTRIBUTE_ICON_MAP = {
+    default:       '/assets/ui/sprites/attribute_icons/attribute_icon_empty.png',
+    empty:         '/assets/ui/sprites/attribute_icons/attribute_icon_empty.png',
+    damage:        '/assets/ui/sprites/attribute_icons/attribute_icon_damage.png',
+    bounce:        '/assets/ui/sprites/attribute_icons/attribute_icon_bounce.png',
+    pierce:        '/assets/ui/sprites/attribute_icons/attribute_icon_pierce.png',
+    scatter:       '/assets/ui/sprites/attribute_icons/attribute_icon_scatter.png',
+    cryo:          '/assets/ui/sprites/attribute_icons/attribute_icon_cryo.png',
+    pyro:          '/assets/ui/sprites/attribute_icons/attribute_icon_pyro.png',
+    lightning:     '/assets/ui/sprites/attribute_icons/attribute_icon_lightning.png',
+    laser:         '/assets/ui/sprites/attribute_icons/attribute_icon_laser.png',
+    wind:          '/assets/ui/sprites/attribute_icons/attribute_icon_wind.png',
+    flying_sword:  '/assets/ui/sprites/attribute_icons/attribute_icon_flying_sword.png',
+    resonance:     '/assets/ui/sprites/attribute_icons/attribute_icon_resonance.png',
+    venom:         '/assets/ui/sprites/attribute_icons/attribute_icon_venom.png',
+    overcharge:    '/assets/ui/sprites/attribute_icons/attribute_icon_overcharge.png',
+    echo:          '/assets/ui/sprites/attribute_icons/attribute_icon_echo.png',
+    explosive:     '/assets/ui/sprites/attribute_icons/attribute_icon_explosive.png',
+    white:         '/assets/ui/sprites/attribute_icons/attribute_icon_white.png',
+    rainbow:       '/assets/ui/sprites/attribute_icons/attribute_icon_rainbow.png',
+    matryoshka:    '/assets/ui/sprites/attribute_icons/attribute_icon_matryoshka.png',
+    multicast:     '/assets/ui/sprites/attribute_icons/attribute_icon_multicast.png',
 };
 
 // ============================================================
@@ -48,23 +72,23 @@ export const AMMO_ICON_MAP = {
 // key 对应 RUNE_DB 中的 id 字段
 // ============================================================
 export const RUNE_ICON_MAP = {
-    rune_pyro_1:      'assets/icons/rune/rune_pyro_1.png',
-    rune_pyro_2:      'assets/icons/rune/rune_pyro_2.png',
-    rune_cryo_1:      'assets/icons/rune/rune_cryo_1.png',
-    rune_cryo_2:      'assets/icons/rune/rune_cryo_2.png',
-    rune_lightning_1: 'assets/icons/rune/rune_lightning_1.png',
-    rune_lightning_2: 'assets/icons/rune/rune_lightning_2.png',
-    rune_bounce_1:    'assets/icons/rune/rune_bounce_1.png',
-    rune_bounce_2:    'assets/icons/rune/rune_bounce_2.png',
-    rune_pierce_1:    'assets/icons/rune/rune_pierce_1.png',
-    rune_pierce_2:    'assets/icons/rune/rune_pierce_2.png',
-    rune_scatter_1:   'assets/icons/rune/rune_scatter_1.png',
-    rune_laser_1:     'assets/icons/rune/rune_laser_1.png',
-    rune_laser_2:     'assets/icons/rune/rune_laser_2.png',
-    rune_venom_1:     'assets/icons/rune/rune_venom_1.png',
-    rune_venom_2:     'assets/icons/rune/rune_venom_2.png',
-    rune_overcharge_1:'assets/icons/rune/rune_overcharge_1.png',
-    rune_echo_1:      'assets/icons/rune/rune_echo_1.png',
+    rune_pyro_1:      '/assets/icons/rune/rune_pyro_1.png',
+    rune_pyro_2:      '/assets/icons/rune/rune_pyro_2.png',
+    rune_cryo_1:      '/assets/icons/rune/rune_cryo_1.png',
+    rune_cryo_2:      '/assets/icons/rune/rune_cryo_2.png',
+    rune_lightning_1: '/assets/icons/rune/rune_lightning_1.png',
+    rune_lightning_2: '/assets/icons/rune/rune_lightning_2.png',
+    rune_bounce_1:    '/assets/icons/rune/rune_bounce_1.png',
+    rune_bounce_2:    '/assets/icons/rune/rune_bounce_2.png',
+    rune_pierce_1:    '/assets/icons/rune/rune_pierce_1.png',
+    rune_pierce_2:    '/assets/icons/rune/rune_pierce_2.png',
+    rune_scatter_1:   '/assets/icons/rune/rune_scatter_1.png',
+    rune_laser_1:     '/assets/icons/rune/rune_laser_1.png',
+    rune_laser_2:     '/assets/icons/rune/rune_laser_2.png',
+    rune_venom_1:     '/assets/icons/rune/rune_venom_1.png',
+    rune_venom_2:     '/assets/icons/rune/rune_venom_2.png',
+    rune_overcharge_1:'/assets/icons/rune/rune_overcharge_1.png',
+    rune_echo_1:      '/assets/icons/rune/rune_echo_1.png',
 };
 
 // ============================================================
@@ -72,56 +96,57 @@ export const RUNE_ICON_MAP = {
 // key 对应 RELIC_DB 中的 id 字段
 // ============================================================
 export const RELIC_ICON_MAP = {
-    gigantism_relic:           'assets/icons/relic/gigantism_relic.png',
-    chaos_essence:             'assets/icons/relic/chaos_essence.png',
-    pure_essence:              'assets/icons/relic/pure_essence.png',
-    dimension_shard:           'assets/icons/relic/dimension_shard.png',
-    dimension_crystal:         'assets/icons/relic/dimension_crystal.png',
-    stars_shines:              'assets/icons/relic/stars_shines.png',
-    optical_lens:              'assets/icons/relic/optical_lens.png',
-    pink_slime:                'assets/icons/relic/pink_slime.png',
-    energy_shield:             'assets/icons/relic/energy_shield.png',
-    unlock_recall:             'assets/icons/relic/unlock_recall.png',
-    unlock_multicast:          'assets/icons/relic/unlock_multicast.png',
-    unlock_split:              'assets/icons/relic/unlock_split.png',
-    slot_expander:             'assets/icons/relic/slot_expander.png',
-    cryo_stone:                'assets/icons/relic/cryo_stone.png',
-    pyro_stone:                'assets/icons/relic/pyro_stone.png',
+    relic:                     '/assets/icons/relic/smuggler_chest_rare.png',
+    gigantism_relic:           '/assets/icons/relic/gigantism_relic.png',
+    chaos_essence:             '/assets/icons/relic/chaos_essence.png',
+    pure_essence:              '/assets/icons/relic/pure_essence.png',
+    dimension_shard:           '/assets/icons/relic/dimension_shard.png',
+    dimension_crystal:         '/assets/icons/relic/dimension_crystal.png',
+    stars_shines:              '/assets/icons/relic/stars_shines.png',
+    optical_lens:              '/assets/icons/relic/optical_lens.png',
+    pink_slime:                '/assets/icons/relic/pink_slime.png',
+    energy_shield:             '/assets/icons/relic/energy_shield.png',
+    unlock_recall:             '/assets/icons/relic/unlock_recall.png',
+    unlock_multicast:          '/assets/icons/relic/unlock_multicast.png',
+    unlock_split:              '/assets/icons/relic/unlock_split.png',
+    slot_expander:             '/assets/icons/relic/slot_expander.png',
+    cryo_stone:                '/assets/icons/relic/cryo_stone.png',
+    pyro_stone:                '/assets/icons/relic/pyro_stone.png',
     // lightning_stone 暂未生成位图：移除指向 cryo_stone 的错误 fallback，让 UI 走 emoji
-    tactical_kit_pierce:       'assets/icons/relic/tactical_kit_pierce.png',
-    tactical_kit_scatter:      'assets/icons/relic/tactical_kit_scatter.png',
-    tactical_kit_damage:       'assets/icons/relic/tactical_kit_damage.png',
-    explosive_ammo:            'assets/icons/relic/explosive_ammo.png',
-    prism_shard:               'assets/icons/relic/prism_shard.png',
-    russian_doll:              'assets/icons/relic/russian_doll.png',
-    triangle_formation:        'assets/icons/relic/triangle_formation.png',
-    diamond_formation:         'assets/icons/relic/diamond_formation.png',
-    sparse_interval:           'assets/icons/relic/sparse_interval.png',
-    mirror_sync:               'assets/icons/relic/mirror_sync.png',
-    wide_narrow:               'assets/icons/relic/wide_narrow.png',
-    surge_bounce:              'assets/icons/relic/surge_bounce.png',
-    surge_pierce:              'assets/icons/relic/surge_pierce.png',
-    surge_scatter:             'assets/icons/relic/surge_scatter.png',
-    surge_damage:              'assets/icons/relic/surge_damage.png',
-    surge_cryo:                'assets/icons/relic/surge_cryo.png',
-    surge_pyro:                'assets/icons/relic/surge_pyro.png',
-    rune_siphon:               'assets/icons/relic/rune_siphon.png',
-    ammo_bandolier:            'assets/icons/relic/ammo_bandolier.png',
-    opening_salvo:             'assets/icons/relic/opening_salvo.png',
-    thunder_coil:              'assets/icons/relic/thunder_coil.png',
-    ember_fuse:                'assets/icons/relic/ember_fuse.png',
-    alchemist_powder_tube:     'assets/icons/relic/alchemist_powder_tube.png',
-    smuggler_pouch_common:     'assets/icons/relic/smuggler_pouch_common.png',
-    smuggler_chest_rare:       'assets/icons/relic/smuggler_chest_rare.png',
-    smuggler_vault_epic:       'assets/icons/relic/smuggler_vault_epic.png',
-    smuggler_sanctum_legendary:'assets/icons/relic/smuggler_sanctum_legendary.png',
-    desperation_blade:         'assets/icons/relic/desperation_blade.png',
-    skill_frost_prison:        'assets/icons/relic/skill_frost_prison.png',
-    skill_thunder_call:        'assets/icons/relic/skill_thunder_call.png',
-    skill_kinetic_burst:       'assets/icons/relic/skill_kinetic_burst.png',
-    skill_meltdown_nova:       'assets/icons/relic/skill_meltdown_nova.png',
-    skill_blade_rain:          'assets/icons/relic/skill_blade_rain.png',
-    skill_prismatic_shot:      'assets/icons/relic/skill_prismatic_shot.png',
+    tactical_kit_pierce:       '/assets/icons/relic/tactical_kit_pierce.png',
+    tactical_kit_scatter:      '/assets/icons/relic/tactical_kit_scatter.png',
+    tactical_kit_damage:       '/assets/icons/relic/tactical_kit_damage.png',
+    explosive_ammo:            '/assets/icons/relic/explosive_ammo.png',
+    prism_shard:               '/assets/icons/relic/prism_shard.png',
+    russian_doll:              '/assets/icons/relic/russian_doll.png',
+    triangle_formation:        '/assets/icons/relic/triangle_formation.png',
+    diamond_formation:         '/assets/icons/relic/diamond_formation.png',
+    sparse_interval:           '/assets/icons/relic/sparse_interval.png',
+    mirror_sync:               '/assets/icons/relic/mirror_sync.png',
+    wide_narrow:               '/assets/icons/relic/wide_narrow.png',
+    surge_bounce:              '/assets/icons/relic/surge_bounce.png',
+    surge_pierce:              '/assets/icons/relic/surge_pierce.png',
+    surge_scatter:             '/assets/icons/relic/surge_scatter.png',
+    surge_damage:              '/assets/icons/relic/surge_damage.png',
+    surge_cryo:                '/assets/icons/relic/surge_cryo.png',
+    surge_pyro:                '/assets/icons/relic/surge_pyro.png',
+    rune_siphon:               '/assets/icons/relic/rune_siphon.png',
+    ammo_bandolier:            '/assets/icons/relic/ammo_bandolier.png',
+    opening_salvo:             '/assets/icons/relic/opening_salvo.png',
+    thunder_coil:              '/assets/icons/relic/thunder_coil.png',
+    ember_fuse:                '/assets/icons/relic/ember_fuse.png',
+    alchemist_powder_tube:     '/assets/icons/relic/alchemist_powder_tube.png',
+    smuggler_pouch_common:     '/assets/icons/relic/smuggler_pouch_common.png',
+    smuggler_chest_rare:       '/assets/icons/relic/smuggler_chest_rare.png',
+    smuggler_vault_epic:       '/assets/icons/relic/smuggler_vault_epic.png',
+    smuggler_sanctum_legendary:'/assets/icons/relic/smuggler_sanctum_legendary.png',
+    desperation_blade:         '/assets/icons/relic/desperation_blade.png',
+    skill_frost_prison:        '/assets/icons/relic/skill_frost_prison.png',
+    skill_thunder_call:        '/assets/icons/relic/skill_thunder_call.png',
+    skill_kinetic_burst:       '/assets/icons/relic/skill_kinetic_burst.png',
+    skill_meltdown_nova:       '/assets/icons/relic/skill_meltdown_nova.png',
+    skill_blade_rain:          '/assets/icons/relic/skill_blade_rain.png',
+    skill_prismatic_shot:      '/assets/icons/relic/skill_prismatic_shot.png',
 };
 
 // ============================================================
@@ -195,6 +220,10 @@ export function getAmmoIconSrcByKey(key) {
     return versionBitmapSrc(AMMO_ICON_MAP[key] ?? null);
 }
 
+export function getAttributeIconSrcByKey(key) {
+    return versionBitmapSrc(ATTRIBUTE_ICON_MAP[key] ?? ATTRIBUTE_ICON_MAP.default);
+}
+
 /**
  * 获取符文图标路径
  * @param {string} runeId - RUNE_DB 中的 id
@@ -211,6 +240,67 @@ export function getRuneIconSrc(runeId) {
  */
 export function getRelicIconSrc(relicId) {
     return versionBitmapSrc(RELIC_ICON_MAP[relicId] ?? null);
+}
+
+export const LOOT_CAPSULE_MAP = {
+    relic: '/assets/ui/sprites/loot_relic_capsule.png',
+    chaos_essence: '/assets/ui/sprites/loot_essence_chaos_capsule.png',
+    pure_essence: '/assets/ui/sprites/loot_essence_pure_capsule.png',
+};
+
+export function getLootCapsuleSrc(type) {
+    return versionBitmapSrc(LOOT_CAPSULE_MAP[type] ?? null);
+}
+
+export const BOSS_PREVIEW_ICON_MAP = {
+    unknown: {
+        preview: '/assets/ui/icons/boss_preview/boss_unknown_seal.png',
+        tiny: '/assets/ui/icons/boss_preview/boss_unknown_seal_tiny.png',
+    },
+    ignis: {
+        preview: '/assets/ui/icons/boss_preview/boss_ignis_preview.png',
+        tiny: '/assets/ui/icons/boss_preview/boss_ignis_tiny.png',
+    },
+    glacies: {
+        preview: '/assets/ui/icons/boss_preview/boss_glacies_preview.png',
+        tiny: '/assets/ui/icons/boss_preview/boss_glacies_tiny.png',
+    },
+    mikro: {
+        preview: '/assets/ui/icons/boss_preview/boss_mikro_preview.png',
+        tiny: '/assets/ui/icons/boss_preview/boss_mikro_tiny.png',
+    },
+    micro: {
+        preview: '/assets/ui/icons/boss_preview/boss_mikro_preview.png',
+        tiny: '/assets/ui/icons/boss_preview/boss_mikro_tiny.png',
+    },
+    devourer: {
+        preview: '/assets/ui/icons/boss_preview/boss_devourer_preview.png',
+        tiny: '/assets/ui/icons/boss_preview/boss_devourer_tiny.png',
+    },
+    viridis: {
+        preview: '/assets/ui/icons/boss_preview/boss_viridis_preview.png',
+        tiny: '/assets/ui/icons/boss_preview/boss_viridis_tiny.png',
+    },
+    tesla: {
+        preview: '/assets/ui/icons/boss_preview/boss_tesla_preview.png',
+        tiny: '/assets/ui/icons/boss_preview/boss_tesla_tiny.png',
+    },
+    chimera: {
+        preview: '/assets/ui/icons/boss_preview/boss_chimera_preview.png',
+        tiny: '/assets/ui/icons/boss_preview/boss_chimera_tiny.png',
+    },
+    ouroboros: {
+        preview: '/assets/ui/icons/boss_preview/boss_ouroboros_preview.png',
+        tiny: '/assets/ui/icons/boss_preview/boss_ouroboros_tiny.png',
+    },
+};
+
+export function getBossPreviewIconSrc(bossId, options = {}) {
+    const key = options.known === false
+        ? 'unknown'
+        : String(bossId || 'unknown').replace(/^boss_/, '') || 'unknown';
+    const entry = BOSS_PREVIEW_ICON_MAP[key] || BOSS_PREVIEW_ICON_MAP.unknown;
+    return versionBitmapSrc(options.tiny ? entry.tiny : entry.preview);
 }
 
 // ============================================================
@@ -236,49 +326,88 @@ export function getUiBitmap(path) {
     return (img.complete && img.naturalWidth > 0) ? img : null;
 }
 
-export const EMITTER_BASE_SRC = 'assets/ui/sprites/emitter_base_v3.png';
-export const EMITTER_BARREL_SRC = null;
-export const EMITTER_DRAW_SIZE = 128;
-export const EMITTER_BARREL_DRAW_SIZE = 104;
-export const EMITTER_PORT_OFFSET_Y = 44;
+export const EMITTER_BASE_SRC = versionBitmapSrc('/assets/ui/sprites/emitter_base_v3.png');
+export const EMITTER_BARREL_SRC = versionBitmapSrc('/assets/ui/sprites/emitter_barrel_rotating_v5_runtime.png');
+export const EMITTER_RING_SRC = versionBitmapSrc('/assets/ui/sprites/emitter_turret_ring_v1.png');
+export const EMITTER_DRAW_SIZE = 144;
+export const EMITTER_BARREL_DRAW_SIZE = 100;
+export const EMITTER_RING_DRAW_SIZE = 96;
+export const EMITTER_PORT_OFFSET_Y = 76;
+export const AIM_GUIDE_NODE_SRCS = {
+    origin: versionBitmapSrc('/assets/ui/sprites/aim_guide_node_origin.png'),
+    wall: versionBitmapSrc('/assets/ui/sprites/aim_guide_node_wall.png'),
+    enemy: versionBitmapSrc('/assets/ui/sprites/aim_guide_node_enemy.png'),
+    endpoint: versionBitmapSrc('/assets/ui/sprites/aim_guide_node_endpoint.png'),
+};
+export const EMITTER_MUZZLE_FLASH_SRCS = [
+    '/assets/ui/sprites/emitter_muzzle_flash_v1_0.png',
+    '/assets/ui/sprites/emitter_muzzle_flash_v1_1.png',
+    '/assets/ui/sprites/emitter_muzzle_flash_v1_2.png',
+    '/assets/ui/sprites/emitter_muzzle_flash_v1_3.png',
+].map(versionBitmapSrc);
 export const EMITTER_CHARGING_SRCS = [
-    'assets/ui/sprites/emitter_charging_v3_0.png',
-    'assets/ui/sprites/emitter_charging_v3_1.png',
-    'assets/ui/sprites/emitter_charging_v3_2.png',
-    'assets/ui/sprites/emitter_charging_v3_3.png',
-    'assets/ui/sprites/emitter_charging_v3_4.png',
-    'assets/ui/sprites/emitter_charging_v3_5.png',
+    '/assets/ui/sprites/emitter_charging_v3_0.png',
+    '/assets/ui/sprites/emitter_charging_v3_1.png',
+    '/assets/ui/sprites/emitter_charging_v3_2.png',
+    '/assets/ui/sprites/emitter_charging_v3_3.png',
+    '/assets/ui/sprites/emitter_charging_v3_4.png',
+    '/assets/ui/sprites/emitter_charging_v3_5.png',
 ];
 
 // Canvas 背景位图（战斗 / 研磨阶段共用主底图，发射区单独叠加炼金台层）
-export const BG_MAIN_CANVAS_SRC   = versionBitmapSrc('assets/ui/backgrounds/bg_main_canvas.png');
-export const BG_EMITTER_ZONE_SRC  = versionBitmapSrc('assets/ui/backgrounds/bg_emitter_zone.png');
-export const BG_COMBAT_TABLE_SRC  = versionBitmapSrc('assets/ui/backgrounds/bg_combat_table_v2.png');
-export const BG_COMBAT_EMITTER_ZONE_SRC = versionBitmapSrc('assets/ui/backgrounds/bg_combat_emitter_zone_v2.png');
-export const COMBAT_WALL_LEFT_SRC = null;
-export const COMBAT_WALL_RIGHT_SRC = null;
-export const COMBAT_WALL_TOP_SRC = null;
+export const BG_MAIN_CANVAS_SRC   = versionBitmapSrc('/assets/ui/backgrounds/bg_main_canvas.png');
+export const BG_EMITTER_ZONE_SRC  = versionBitmapSrc('/assets/ui/backgrounds/bg_emitter_zone.png');
+export const BG_COMBAT_TABLE_SRC  = versionBitmapSrc('/assets/ui/backgrounds/bg_combat_table_v2.png');
+export const BG_COMBAT_EMITTER_ZONE_SRC = versionBitmapSrc('/assets/ui/backgrounds/bg_combat_emitter_zone_v2.png');
+export const COMBAT_WALL_LEFT_SRC = versionBitmapSrc('/assets/ui/sprites/combat_wall_left_v2.png');
+export const COMBAT_WALL_RIGHT_SRC = versionBitmapSrc('/assets/ui/sprites/combat_wall_right_v2.png');
+export const COMBAT_WALL_TOP_SRC = versionBitmapSrc('/assets/ui/sprites/combat_wall_top_v2.png');
+export const COMBAT_DEFEAT_LINE_SRC = versionBitmapSrc('/assets/ui/sprites/combat_defeat_line_v2.png');
 
 // Combat UI HUD bitmaps. Keep launcher-specific emitter assets above so art
 // refreshes can preload the surrounding combat interface without touching the launcher.
 export const COMBAT_UI_BITMAP_SRCS = [
-    'assets/ui/panels/top_bar_9s.png',
-    'assets/ui/panels/bottom_panel_9s.png',
-    'assets/ui/sprites/skill_bar_panel_9s.png',
-    'assets/ui/sprites/skill_button_frame_9s.png',
-    'assets/ui/sprites/skill_cooldown_overlay.png',
-    'assets/ui/sprites/combat_rune_charge_frame_9s.png',
-    'assets/ui/sprites/combat_rune_charge_fill.png',
-    'assets/ui/sprites/multiplier_x2.png',
-    'assets/ui/sprites/multiplier_x3.png',
-    'assets/ui/sprites/multiplier_x5.png',
-    'assets/ui/banners/round_banner_1.png',
-    'assets/ui/banners/round_banner_2.png',
-    'assets/ui/banners/round_banner_3.png',
-    'assets/ui/banners/round_banner_4.png',
-    'assets/ui/banners/round_banner_5.png',
-    'assets/ui/banners/round_banner_6.png',
+    '/assets/ui/panels/top_bar_9s.png',
+    '/assets/ui/panels/bottom_panel_9s.png',
+    '/assets/ui/sprites/skill_bar_panel_9s.png',
+    '/assets/ui/sprites/skill_button_frame_9s.png',
+    '/assets/ui/sprites/skill_cooldown_overlay.png',
+    '/assets/ui/sprites/combat_rune_charge_frame_9s.png',
+    '/assets/ui/sprites/combat_rune_charge_fill.png',
+    '/assets/ui/sprites/ammo_queue_panel_9s.png',
+    '/assets/ui/sprites/ammo_queue_slot.png',
+    ...Object.values(ATTRIBUTE_ICON_MAP),
+    '/assets/ui/sprites/combat_defeat_line_v2.png',
+    '/assets/ui/sprites/speed_btn_x1.png',
+    '/assets/ui/sprites/speed_btn_x2.png',
+    '/assets/ui/sprites/speed_btn_x3.png',
+    '/assets/ui/sprites/speed_btn_xslow.png',
+    '/assets/ui/sprites/multiplier_x2.png',
+    '/assets/ui/sprites/multiplier_x3.png',
+    '/assets/ui/sprites/multiplier_x5.png',
+    '/assets/ui/banners/round_banner_1.png',
+    '/assets/ui/banners/round_banner_2.png',
+    '/assets/ui/banners/round_banner_3.png',
+    '/assets/ui/banners/round_banner_4.png',
+    '/assets/ui/banners/round_banner_5.png',
+    '/assets/ui/banners/round_banner_6.png',
+    '/assets/ui/banners/round_title_panel_9s.png',
+    '/assets/ui/banners/round_threat_plate_9s.png',
+    ...Object.values(BOSS_PREVIEW_ICON_MAP).flatMap(entry => [entry.preview, entry.tiny]),
 ].map(versionBitmapSrc);
+
+// ============================================================
+// 防御层 HUD 图标映射（伤害跳字中护盾 icon）
+// key 对应 takeDamage 中 blockedBy 的返回值
+// ============================================================
+export const DEFENSE_ICON_MAP = {
+    shield:         versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_shield.png'),
+    radiantAegis:   versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_radiantAegis.png'),
+    energyArmor:    versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_energyArmor.png'),
+    phaseShield:    versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_phaseShield.png'),
+    livingArmor:    versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_livingArmor.png'),
+    ward:           versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_deflectionWard.png'),
+};
 
 /**
  * 预热 UI 位图（在游戏启动早期调用，避免战斗首帧卡顿）。
@@ -287,6 +416,7 @@ export function preloadUiBitmaps() {
     const paths = [
         EMITTER_BASE_SRC,
         EMITTER_BARREL_SRC,
+        EMITTER_RING_SRC,
         ...EMITTER_CHARGING_SRCS,
         BG_MAIN_CANVAS_SRC,
         BG_EMITTER_ZONE_SRC,
@@ -295,7 +425,9 @@ export function preloadUiBitmaps() {
         COMBAT_WALL_LEFT_SRC,
         COMBAT_WALL_RIGHT_SRC,
         COMBAT_WALL_TOP_SRC,
+        COMBAT_DEFEAT_LINE_SRC,
         ...COMBAT_UI_BITMAP_SRCS,
+        ...Object.values(DEFENSE_ICON_MAP),
     ];
     paths.forEach(p => getUiBitmap(p));
 }

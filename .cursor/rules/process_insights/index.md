@@ -10,8 +10,9 @@
 
 ## 活跃洞察 (Active Insights)
 
-当前共有 **9** 条活跃洞察。
+当前共有 **10** 条活跃洞察。
 
+> **[2026-06-25 新增]** PI-010：PixiJS WebGL 渲染管线迁移流程与防坑指南（7 个坑位：compaction instanceof 遗漏、粒子模式特殊同步、blendMode 不一致、_pixi/_pixiSprite 区分、BladeStormRing 未实例化、SwordQi 无需迁移、预烘焙纹理形状准确性）。
 > **[2026-06-23 更新]** PI-006 升版至 v1.8：纠正 v1.7 错误方向；精华奖励退出主循环，`marble_pack` 是开局与局内商店购买后的直接研磨入口。
 > **[2026-06-23 更新]** PI-006 升版至 v1.7：坑 9 废弃；主动 `marble_pack` 已移除，旧奖励必须转译为 `run_resource_pack` 并直接发放局内资源。（已由 v1.8 纠正）
 > **[2026-06-22 更新]** PI-006 升版至 v1.6：新增坑 9（标准 `marble_pack` 也是显式新研磨，已有子弹时必须预充并在研磨后进入替换选择）。
@@ -34,12 +35,13 @@
 | PI-007 | 命运时刻 Overlay 返回流与纯净精华选择模式 | v1.3 | ui/shop, game_system, ui_system, spawn_system, game_phase, entities, config, core | 2026-06-19 | [PI-007_destiny_overlay_return_and_selection_mode.md](PI-007_destiny_overlay_return_and_selection_mode.md) |
 | PI-008 | 符文发射器面板 Tab 被底层阶段面板遮挡的修复流程 | v1.1 | tutorial_system, ui/rune_launcher, ui_system | 2026-04-21 | [PI-008_tutorial_overlay_rune_launcher_tab_block.md](PI-008_tutorial_overlay_rune_launcher_tab_block.md) |
 | PI-009 | Sprite 贴图不显示类型错误排查 SOP | v1.1 | entities, render_system, core | 2026-06-21 | [PI-009_sprite_not_rendering_sop.md](PI-009_sprite_not_rendering_sop.md) |
+| PI-010 | PixiJS WebGL 渲染管线迁移流程与防坑指南 | v1.0 | render_system, particles, combat_system, spawn_system, game_phase, pixi_bridge, pixi_effect_adapter | 2026-06-25 | [PI-010_pixijs_webgl_rendering_migration.md](PI-010_pixijs_webgl_rendering_migration.md) |
 
 ### 按模块快速检索
 
 | 模块 | 相关洞察 |
 |------|---------|
-| `game_phase.js` | PI-001（阶段切换双重赋値、round++ 重复执行、`fieldLootItems` 必须在 LAYER 2 内渲染）、PI-006（回合结束后必须进入 round-start resolver）、PI-007（纯净精华注入后的标准实体链路与同化倍率衰减） |
+| `game_phase.js` | PI-001（阶段切换双重赋値、round++ 重复执行、`fieldLootItems` 必须在 LAYER 2 内渲染）、PI-006（回合结束后必须进入 round-start resolver）、PI-007（纯净精华注入后的标准实体链路与同化倍率衰减）、PI-010（compaction 循环 instanceof 清理、粒子 _pixiSprite 同步） |
 | `ui_system.js` | PI-001（multicast 颜色顺序、setDeepValue 双重调用）、PI-007（命运抉择动态数量与纯净精华注入 UI） |
 | `game_system.js` | PI-001（specialSlots 初始化类型、`fieldLootItems` 渲染已从 `sys_loop` 移除）、PI-003（sys_resetGame 新属性重置）、PI-006（pendingRoundStartRewards 存档/恢复、普通命运选择已取消、sys_showRoundStartBanner 不重建 ammoQueue、局内商人调度不得阻塞横幅、`marble_pack` 直接进入研磨且不得走命运选择）、PI-007（selectionMode / pendingSelectionMode / 选择态持久化） |
 | `combat_system.js` | PI-002（词条 Hook 注入位置）、PI-003（组合模式）、PI-004（性能预算） |
@@ -49,9 +51,11 @@
 | `ui_system.js` | PI-001（multicast 颜色顺序、setDeepValue 双重调用）、PI-007（命运抗决动态数量与纯净精华注入 UI）、PI-008（ui_updateUI 重新激活底层面板遮挡 Tab） |
 | `core.js` | PI-003（_subsystems 数组、组合模式）、PI-006（enemy:killed 只登记延迟奖励）、PI-007（选择态与双倍同化率运行态初始化） |
 | `config.js` | PI-004（CONFIG.performance 三档配置）、PI-007（混沌精华 / 纯净精华 / 同化倍率显式配置） |
-| `spawn_system.js` | PI-004（EnergyOrb 聚合优化）、PI-007（预览状态与纯净精华注入面板联动） |
-| `effects/particles.js` | PI-004（未接入预算的高风险特效清单）、PI-005（性能自适应影响评估） |
-| `render_system.js` | PI-005（性能自适应影响评估）、PI-009（SpriteRenderer 异步加载与绘制） |
+| `spawn_system.js` | PI-004（EnergyOrb 聚合优化）、PI-007（预览状态与纯净精华注入面板联动）、PI-010（粒子模式 Sprite 获取条件扩展） |
+| `effects/particles.js` | PI-004（未接入预算的高风险特效清单）、PI-005（性能自适应影响评估）、PI-010（特效类 _pixi 钩子、draw() PixiJS 早返回、预烘焙纹理形状准确性） |
+| `render_system.js` | PI-005（性能自适应影响评估）、PI-009（SpriteRenderer 异步加载与绘制）、PI-010（floatingTexts splice _pixiDestroy 清理） |
+| `render/pixi_bridge.js` | PI-010（PixiJS 初始化、预烘焙纹理、粒子 Sprite 对象池、blendMode 设置） |
+| `render/pixi_effect_adapter.js` | PI-010（20 种特效适配器三函数、生命周期清理模式） |
 | `entities/enemy.js` | PI-009（Sprite 绘制层级、宽高比与居中逻辑） |
 
 ---

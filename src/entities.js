@@ -32,10 +32,10 @@ import {
     Vec2, showToast, rotateTowards 
 } from './utils/math_utils.js';
 import { 
-    Particle, SlashEffect, CollectionBeam, Shockwave, LaserBeam, 
+    Particle, SlashEffect, PierceCutEffect, CollectionBeam, Shockwave, LaserBeam,
     FloatingText, EnergyOrb, LightningBolt, FireWave,
     IceWave, DeathExplosion, HealWave,
-    GreedyWheelEffect, BladeStormRing, SwordScar, RewardDropEffect
+    GreedyWheelEffect, BladeStormRing, BladeStormVortex, SwordScar, RewardDropEffect
 } from './effects/particles.js';
 import { Enemy, setEnemyAudioProvider } from './entities/enemy.js';
 import { Projectile, setProjectileAudioProvider } from './entities/projectile.js';
@@ -49,6 +49,7 @@ import {
 import {
     getRuneIconSrc,
     getRelicIconSrc,
+    getLootCapsuleSrc,
     getUiBitmap,
 } from './bitmap_icons.js';
 import { sb as _sb } from './utils/perf.js';
@@ -5171,11 +5172,19 @@ class FieldLootItem {
 
         // 绘制图标 —— 优先位图，未加载则 fallback 到 emoji
         // [icon-fix] 战场掉落的遗物 / 混沌精华 / 纯净精华统一使用 RELIC_ICON_MAP 中的位图
+        const capsulePath = getLootCapsuleSrc(this.type);
+        const capsuleBitmap = capsulePath ? getUiBitmap(capsulePath) : null;
+        if (capsuleBitmap) {
+            const capsuleW = 50;
+            const capsuleH = 58;
+            ctx.drawImage(capsuleBitmap, -capsuleW / 2, -capsuleH / 2, capsuleW, capsuleH);
+        }
+
         const lootBitmapPath = getRelicIconSrc(this.type);
         const lootBitmap = lootBitmapPath ? getUiBitmap(lootBitmapPath) : null;
         if (lootBitmap) {
-            const sz = 36;
-            ctx.shadowBlur = _sb(10);
+            const sz = capsuleBitmap ? 24 : 36;
+            ctx.shadowBlur = _sb(capsuleBitmap ? 6 : 10);
             ctx.shadowColor = glowColor;
             ctx.drawImage(lootBitmap, -sz / 2, -sz / 2, sz, sz);
         } else {
@@ -5414,6 +5423,7 @@ export {
     CloneSpore,
     Particle,
     SlashEffect,
+    PierceCutEffect,
     CollectionBeam,
     Shockwave,
     LaserBeam,
@@ -5426,6 +5436,7 @@ export {
     HealWave,
     GreedyWheelEffect,
     BladeStormRing,
+    BladeStormVortex,
     SwordScar,
     RewardDropEffect,
     Player,

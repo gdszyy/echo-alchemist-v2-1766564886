@@ -582,6 +582,8 @@ const CONFIG = {
             heavyArmorHpMult: 2.0,      // 重装：血量倍率
             heavyArmorMoveInterval: 2,  // 重装：移动间隔（回合数）
             heavyArmorWideGridCols: 3,  // 重装变种：占3列宽
+            runeBearerTempAffixPool: ['shield', 'regen', 'healer', 'haste', 'jump', 'clone', 'berserk'],
+            adaptiveRuneElements: ['pyro', 'cryo', 'lightning', 'bounce', 'pierce', 'scatter', 'laser', 'venom', 'overcharge', 'echo'],
 
             // ============================================
             // [V2 基底专属词条] 详见 design_spec_bitmap.md / 敌人视觉重设计 V2 文档
@@ -726,6 +728,19 @@ const CONFIG = {
                 vulnerability: { attrs: ['bounce', 'laser'], label: '深渊开口', mode: 'damage', damageRatio: 0.08 },
                 devourRangeBonus: 2,      // 额外吞噬范围
                 berserkedDevourRange: 99, // 狂暴后全屏吞噬
+                devourerMawRangeCells: 2,
+                devourerPullCellsPerTurn: 1,
+                devourerDigestInterval: 2,
+                devourerBerserkDigestInterval: 1,
+                devourerSummonInterval: 2,
+                devourerSummonMaxPerTurn: 1,
+                devourerMaxThralls: 5,
+                devourerSummonHpPct: 0.12,
+                // [废弃] devourer 已改用常规吞噬逻辑（获取血量上限/词条 + 继承负面状态/温度），
+                // 不再走「吞噬回血百分比 / 每次喂养固定加盾」；保留键位仅为向后兼容，代码已不引用。
+                devourerDigestHealPct: 0.08,        // DEPRECATED：旧版吞噬回血比例，现由 hp += 猎物当前血量取代
+                devourerDigestShieldPerFeed: 2,     // DEPRECATED：旧版每次喂养固定加盾，现改为按猎物现有护盾叠加
+                devourerFeedAffixes: ['devour', 'shield'],
                 moveInterval: 2,          // 常规模式：每 2 回合移动一次（吞噬后需要靠近）
                 themeWeights: { bounce: 1.5, laser: 1.5 }
             },
@@ -794,16 +809,17 @@ const CONFIG = {
                 initTemp: 60,             // 初始温度（半狂暴状态）
                 berserkedTempThreshold: 100, // 狂暴后温度阈值
                 berserkedBlastOnHitChance: 0.25, // 狂暴后受击触发全场爆炸概率
-                chimeraMawRangeCells: 2,
-                chimeraPullCellsPerTurn: 1,
                 chimeraDigestInterval: 2,
                 chimeraBerserkDigestInterval: 1,
-                chimeraSummonInterval: 2,
                 chimeraSummonMaxPerTurn: 1,
                 chimeraMaxFeeders: 5,
-                chimeraSummonHpPct: 0.12,
-                chimeraDigestHealPct: 0.08,
-                chimeraDigestShieldPerFeed: 1,
+                chimeraSummonHpPct: 0.14,
+                chimeraDigestHealPct: 0.06,
+                chimeraDigestShieldPerFeed: 2,
+                chimeraThermalStackUnit: 100,
+                chimeraThermalAbsorbMinTemp: 24,
+                chimeraThermalShieldPct: 0.06,
+                chimeraThermalFeedTemps: [100, -100],
                 chimeraFeedAffixes: ['berserk'],
                 moveInterval: 2,          // 常规模式：每 2 回合移动一次（混沌体，移动较频繁）
                 themeWeights: { venom: 1.5, laser: 1.5 }
@@ -844,6 +860,8 @@ const CONFIG = {
                     { id: 'surge', name: '雷回附体', icon: '雷', affixes: ['haste', 'berserk'], attrs: ['lightning', 'bounce'], action: 'charge', color: '#a78bfa' }
                 ],
                 orbitAttachmentDisruptTurns: 2,
+                orbitDamageGatePct: 0.12,
+                orbitDamageGateDisruptTurns: 2,
                 orbitEchoMax: 4,
                 orbitEchoHpPct: 0.10,
                 orbitEchoSpawnPerPulse: 1,
@@ -981,6 +999,10 @@ const CONFIG = {
         eliteFragmentDropChance: 0.80,
         bossFragmentDrop: 8,            // Boss 击杀必掉
         maxSkillPoints: 3,  // 技能点上限
+        skillChargeHitGain: 0.03,       // 命中获得的技能充能
+        skillChargeKillGain: 0.10,      // 击杀获得的技能充能
+        skillChargeRetainRatio: 0.35,   // 充能衰减后保留到实际条的比例
+        skillChargeDecayRate: 0.003,    // 临时条每帧衰减速度
         spSlotsStartRow:3,
         spSlotsEndRow:8,
         fireSpreadDamagePercent:0.25,
@@ -1191,6 +1213,33 @@ const CONFIG = {
         bossOverglowAlpha: 0.35,
         // 狂暴状态下过曝强度倍率（叠加在 bossOverglowAlpha 上）
         bossOverglowBerserkMult: 1.5,
+        // Boss 位图本体轻量分区呼吸：高/中画质下把 384x256 帧拆为本体与底座两段绘制，
+        // 两段使用不同频率/相位；low 档回退为单次整图绘制以控制 drawImage 次数。
+        bossSpriteMotion: {
+            enabled: true,
+            splitY: 0.72,
+            overlapRatio: 0.018,
+            easingPower: 1.45,
+            mediumScale: 0.78,
+            nonIdleScale: 0.32,
+            bodyScaleX: 0.006,
+            bodyScaleY: 0.022,
+            bodyLiftRatio: 0.012,
+            baseScaleX: 0.007,
+            baseScaleY: 0.006,
+            baseDropRatio: 0.004,
+            profiles: {
+                default: { bodyHz: 0.58, baseHz: 0.28, bodyAmp: 1.0, baseAmp: 0.6, phase: 0.0, basePhase: 1.5 },
+                ignis: { bodyHz: 0.86, baseHz: 0.38, bodyAmp: 1.1, baseAmp: 0.62, phase: 0.2, basePhase: 1.8 },
+                glacies: { bodyHz: 0.46, baseHz: 0.22, bodyAmp: 0.72, baseAmp: 0.46, phase: 0.4, basePhase: 2.1 },
+                mikro: { bodyHz: 0.78, baseHz: 0.32, bodyAmp: 0.96, baseAmp: 0.55, phase: 1.0, basePhase: 2.6 },
+                devourer: { bodyHz: 0.52, baseHz: 0.24, bodyAmp: 1.35, baseAmp: 0.7, phase: 0.8, basePhase: 2.4 },
+                viridis: { bodyHz: 0.58, baseHz: 0.27, bodyAmp: 0.9, baseAmp: 0.6, phase: 1.4, basePhase: 2.8 },
+                tesla: { bodyHz: 1.05, baseHz: 0.44, bodyAmp: 0.82, baseAmp: 0.42, phase: 2.2, basePhase: 0.6 },
+                chimera: { bodyHz: 0.64, baseHz: 0.3, bodyAmp: 1.18, baseAmp: 0.64, phase: 2.7, basePhase: 1.2 },
+                ouroboros: { bodyHz: 0.42, baseHz: 0.18, bodyAmp: 0.58, baseAmp: 0.32, phase: 0.0, basePhase: 2.9, splitY: 0.64 }
+            }
+        },
 
         // Arc Boss VFX 高阶视觉特效参数（Task T3）
         // Devourer 深渊核心震颤幅度（像素），DEVOURING 状态下核心的随机位移范围
@@ -2054,7 +2103,7 @@ const BOSS_DB = [
         id: 'boss_chimera',
         name: '混沌融合体·奇美拉',
         affixes: ['berserk', 'devour'],
-        // 破绽谱：毒素 (Venom) 与 激光 (Laser) —— 污染胃域 / 精准剖解
+        // 破绽谱：毒素 (Venom) 与 激光 (Laser) —— 扰乱热核 / 精准剖解
         themeWeights: { venom: 3.0, laser: 3.0 }
     },
     {
@@ -2115,33 +2164,34 @@ const ENEMY_CURVE_CONFIG = {
     ],
 
     // 导演系统模板权重调度表（与 THEME_SEGMENTS 一一对应）
-    // 格式：{ phalanx, blitz, berserk_pack, jumper_pack, thermal_bomb }（权重为 0 表示不出现）
-    // 权重设计原则：各模板权重之和为 100，权重 0 表示禁用，剩余权重按比例随机选择
+    // 格式：{ phalanx, blitz, berserk_pack, jumper_pack, thermal_bomb, swarm_core, food_chain }（权重为 0 表示不出现）
+    // 权重设计原则：核心模板高权重，引入模板中权重；swarm_core/food_chain 门槛 R12，故前两段为 0
+    // 注：加入 swarm_core/food_chain 后各行权重之和不再强制为 100，加权随机用相对值即可
     TEMPLATE_WEIGHTS: [
 
         // R1-R5 基础教学段：引入 phalanx（教学流穿和治愈的配合）
-        { phalanx: 60, blitz: 0, berserk_pack: 0, jumper_pack: 0, thermal_bomb: 0 },
+        { phalanx: 60, blitz: 0, berserk_pack: 0, jumper_pack: 0, thermal_bomb: 0, swarm_core: 0, food_chain: 0 },
 
-        // R6-R12 持续压力段：引入 blitz（教学极速和跳跃的应对）
-        { phalanx: 40, blitz: 40, berserk_pack: 0, jumper_pack: 20, thermal_bomb: 0 },
+        // R6-R12 持续压力段：引入 blitz（教学极速和跳跃的应对）；swarm/food 门槛 R12，本段先不出
+        { phalanx: 40, blitz: 40, berserk_pack: 0, jumper_pack: 20, thermal_bomb: 0, swarm_core: 0, food_chain: 0 },
 
-        // R13-R19 群体控制段：引入 berserk_pack（教学冰霜降温控制）
-        { phalanx: 20, blitz: 30, berserk_pack: 30, jumper_pack: 20, thermal_bomb: 0 },
+        // R13-R19 群体控制段：引入 berserk_pack + swarm_core（群体压制）
+        { phalanx: 20, blitz: 30, berserk_pack: 30, jumper_pack: 20, thermal_bomb: 0, swarm_core: 25, food_chain: 15 },
 
-        // R20-R26 机制复合段：引入 thermal_bomb（教学紧急降温）
-        { phalanx: 15, blitz: 25, berserk_pack: 25, jumper_pack: 20, thermal_bomb: 15 },
+        // R20-R26 机制复合段：引入 thermal_bomb + food_chain（吞噬链）
+        { phalanx: 15, blitz: 25, berserk_pack: 25, jumper_pack: 20, thermal_bomb: 15, swarm_core: 20, food_chain: 20 },
 
         // R27-R33 进阶测试段：强化 berserk 和 thermal_bomb
-        { phalanx: 10, blitz: 20, berserk_pack: 30, jumper_pack: 15, thermal_bomb: 25 },
+        { phalanx: 10, blitz: 20, berserk_pack: 30, jumper_pack: 15, thermal_bomb: 25, swarm_core: 15, food_chain: 20 },
 
         // R34-R40 速度地狱段：极速为主， thermal_bomb 开始高频出现
-        { phalanx: 5, blitz: 35, berserk_pack: 20, jumper_pack: 20, thermal_bomb: 20 },
+        { phalanx: 5, blitz: 35, berserk_pack: 20, jumper_pack: 20, thermal_bomb: 20, swarm_core: 20, food_chain: 10 },
 
         // R41-R47 混沌段： thermal_bomb 最高频，考验玩家全面应对能力
-        { phalanx: 5, blitz: 20, berserk_pack: 20, jumper_pack: 15, thermal_bomb: 40 },
+        { phalanx: 5, blitz: 20, berserk_pack: 20, jumper_pack: 15, thermal_bomb: 40, swarm_core: 15, food_chain: 20 },
 
         // R48-R54 终极考验段：全模板高压，均衡分布
-        { phalanx: 10, blitz: 20, berserk_pack: 25, jumper_pack: 15, thermal_bomb: 30 }
+        { phalanx: 10, blitz: 20, berserk_pack: 25, jumper_pack: 15, thermal_bomb: 30, swarm_core: 15, food_chain: 15 }
 
     ],
 

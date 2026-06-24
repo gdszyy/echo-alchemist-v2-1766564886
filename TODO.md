@@ -1,6 +1,6 @@
 # Echo Alchemist V2 改造工程 TODO 清单
 
-**最后更新：** 2026年6月19日 | **状态：⏳ P0 交互优化大盘已整理 · 阶段状态残留 / 大型基底生成节奏为下一优先级 · 位图化视觉重构规划中**
+**最后更新：** 2026年6月24日 | **状态：⏳ P0 交互优化大盘已整理 · PixiJS 渲染管线迁移规划中 · 阶段状态残留 / 大型基底生成节奏为下一优先级 · 位图化视觉重构规划中**
 
 > 当前完整优化 TODO、已完成项、下一轮 P0/P1/P2 优先级与验收清单见 [`docs/p0_interaction_optimization_todo.md`](docs/p0_interaction_optimization_todo.md)。该文档承接“先打磨现有机制、修 bug、再考虑减法”的最新执行优先级。
 
@@ -185,3 +185,20 @@ Phase C（Boss 专属）─── 依赖 Phase B 框架完成
 - [x] 继续游戏恢复收口：`sys_saveRunState()` 已持久化 `phase`、`marblesPool`、`selectedMarbles`；`sys_loadRunState()` 对命运时刻/selection 存档优先恢复卡片 DOM、已选状态、注入符文与预览，避免落回 round-start resolver。
 - [x] 钉板编辑闭环浏览器脚本：`tests/ai_test_runner.js --suite pinboard` 覆盖编辑器打开、无效开始采集阻塞、模块禁用原因、符文融合预览/确认、有效开始采集关闭编辑器。
 - [ ] 下一步 P1：把钉板符文融合结果与发射器可用词条建立明确反馈链，并复查移动端长列表/底部安全区。
+
+---
+
+## 阶段六：PixiJS 渲染管线迁移 🚀 规划中
+
+> 将粒子系统和特效对象的渲染从 Canvas 2D 渐进迁移至 PixiJS (WebGL)，彻底解决 `shadowBlur` / `createRadialGradient` / `lighter` 混合模式的 API 级性能天花板。
+> 完整迁移计划、33 个子任务与 36 条验收标准见 [`docs/pixijs_migration_todo.md`](docs/pixijs_migration_todo.md)。
+
+| 阶段 | 目标 | 状态 |
+| :--- | :--- | :--- |
+| **阶段一** PixiJS 基础设施 | 引入 PixiJS 依赖、创建 overlay canvas、建立 Bridge 层 | ⬜ 待开始 |
+| **阶段二** 粒子系统迁移 | 6 种粒子模式迁移到 `ParticleContainer`，GPU 批渲染 | ⬜ 待开始 |
+| **阶段三** 特效对象迁移 | 15 种特效类迁移到 `Container + Sprite + Filter` | ⬜ 待开始 |
+| **阶段四** 性能验证与调优 | 压测场景帧率基准、内存/GC 对比、移动端真机验证 | ⬜ 待开始 |
+| **阶段五** 文档收尾 | 更新 performance.md / perf-optimization-index.md / 流程洞察 | ⬜ 待开始 |
+
+**预期收益**：桌面 high 档同场景 avgFps 提升 ≥ 40%；GC 频率从 ~8-15 次/5分钟降至 ≤ 2 次。

@@ -230,9 +230,24 @@
 
 对于 `2×2` 以上敌人，通用词条的视觉表现应按尺寸进行缩放，但不应简单等比放大。例如，`shield` 在 `1×1` 上可以是外框，在 `3×1` 重装上应表现为三段装甲板之间的能量桥，在 `3×3` 引力炉心上则应表现为环形护罩节点。
 
-奖励边框不属于通用词条特效。携带 `rewardType='relic'` 的敌人应以独立古金边框表达掉落价值。该层必须绘制在基底和碰撞材质框之后、词条常驻 Overlay 之前，避免被 `shield` 等词条膜层吞掉。旧 `chaos_essence` / `pure_essence` 表现分支不属于本轮敌人奖励美术目标。
+奖励边框不属于通用词条特效。携带 `rewardType='relic'` 的敌人应以独立古金金属内边框表达掉落价值，包含细金边、四角角标、铆钉或小凸起等实体材质信号，并嵌入敌人轮廓内侧而不是外扩到碰撞框外；低性能档也必须保留该轮廓，不能退回纯光晕或平面双描边。该层必须绘制在基底和碰撞材质框之后、词条常驻 Overlay 之前，避免被 `shield` 等词条膜层吞掉。旧 `chaos_essence` / `pure_essence` 表现分支不属于本轮敌人奖励美术目标。
 
-### 7.1 当前实现记录（2026-06-18）
+### 7.1 符文敌人奖励词条标记
+
+带有符文的敌人需要特殊处理，但不应升级为新基底或新敌人种族。它们更适合作为通用词条层上的“奖励 / 构筑词条”，复用现有 `loot_calcRuneDrop()` 与 `RuneLoot` 领取链路，只在敌人存活期间提供清晰的美术标记和少量行为差异。
+
+| 词条 ID | 显示名 | 机制定位 | 死亡掉落 | 视觉锚点 |
+|---|---|---|---|---|
+| `runeBearer` | 通用符文携带者 | 携带一个每回合轮换的临时额外词条；该临时词条参与行为，但不永久写入原始词条池。 | 通用智能符文掉落，走标准构筑权重。 | 紫金嵌入式符文槽、轮换刻度、小型当前临时词条徽记。 |
+| `adaptiveRune` | 自适应符文体 | 记录最后一次受到的有效属性伤害或属性效果，并切换到对应属性态。 | 按记录的属性家族掉落符文；无记录时回退标准智能掉落。 | 可变色符文核心、属性纹路、短元素边缘特效。 |
+
+符文敌人的视觉层级应位于“奖励边框”和“通用词条 Overlay”之间：它需要让玩家在开火前知道“击杀后会给符文”，但不能压过 `shield`、`phaseShield`、`livingArmor` 等生存机制的读法。`adaptiveRune` 的属性态只改变核心色、纹路和局部特效，不改变主体 silhouette；`runeBearer` 的临时额外词条应显示为小型副徽记，避免让玩家误以为敌人永久多了一条不可预期词条。
+
+`runeBearer` 的临时词条池建议只包含通用 1×1 行为词条：`shield`、`regen`、`healer`、`haste`、`jump`、`clone`、`berserk`。禁止轮换到 `devour`、V2 基底专属词条、敌人针对词缀、Boss 机制词条或另一个符文词条，避免形成不可读的复合经济怪。`adaptiveRune` 的属性家族首批覆盖 `pyro`、`cryo`、`lightning`、`bounce`、`pierce`、`scatter`、`laser`、`venom`、`overcharge`、`echo`，后续若 `wind` 正式进入可掉落符文家族再补。
+
+2026-06-23 首版落地：运行时已提供 `overlay_affix_rune_bearer.svg`、`overlay_affix_adaptive_rune.svg`、`overlay_adaptive_rune_<element>.svg` 与 Canvas 兜底。正式美术替换时应沿用“静态奖励 overlay + 自适应元素 dynamic overlay”的分层，不要为每个元素重画完整敌人主体。
+
+### 7.2 当前实现记录（2026-06-18）
 
 - `src/entities/enemy.js` 已新增 `_drawFootprintCue()`：对大体型、特殊碰撞形状和 Boss 绘制廉价足迹描边；多格敌人额外绘制占格分隔线，帮助玩家读出实际碰撞边界。
 - `src/entities/enemy.js` 已新增 `_drawThreatTierBadge()`：Boss、精英和大型基底在左上角显示短标签（如“首领”“精英”“装甲”“吞噬”），用于第一眼识别威胁层级与基底职责。
@@ -241,7 +256,7 @@
 - `src/entities/enemy.js` 已接入 `_drawEnemyTargetingFallback()`：在正式 PNG / Sprite Sheet 缺席时，为 `energyArmor`、`phaseShield`、`overloadReactor`、`lowDamageImmune`、`livingArmor`、`armorSpore`、`siegeBreaker`、`deflectShell` 提供边框/外缘可读性层。该层不再使用中心大图标或暗底块遮住敌人主体，而是通过边缘甲片、角标、窄条、空舱口、底部齿和外缘旋转弧表达机制。
 - 性能约束：足迹、角标、状态短标签与敌人针对 fallback 只使用 `stroke` / 少量贴边 `fillRect` / 小圆点，不使用渐变、`shadowBlur`、混合模式或持续粒子；属于语义边框层，`low` 档也应保留。基底轮廓层允许在 high/medium 使用少量 `screen` 和径向渐变，但必须在 `low` 档降级为纯色线面。
 
-### 7.2 敌人针对词缀美术确认（2026-06-22）
+### 7.3 敌人针对词缀美术确认（2026-06-22）
 
 以下规格来自最新机制收束，仅适用于保留的敌人针对词缀。若 Boss 专属变体与普通词缀效果一致，只添加 Boss 属性、材质或特色变体，不改变核心视觉特征；若效果不同，必须明确做出视觉差异，并补齐承伤、受击和产生效果时的对应特效。
 

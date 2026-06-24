@@ -17,6 +17,8 @@ const path = require('path');
 
 const systemsPath = path.resolve(__dirname, '../src/systems.js');
 const source = fs.readFileSync(systemsPath, 'utf8');
+const indexPath = path.resolve(__dirname, '../index.html');
+const indexSource = fs.readFileSync(indexPath, 'utf8');
 
 // 提取 TRAINING_SCENARIOS 对象字面量（简单方式：eval 沙盒）
 // 注意：需要 mock 掉 Enemy、Vec2 等依赖
@@ -146,6 +148,7 @@ const requiredBossIds = [
     'boss_tesla',
     'boss_chimera',
     'boss_ouroboros',
+    'boss_ouroboros_attachment_slots',
     'boss_vulnerability_break'
 ];
 
@@ -178,6 +181,50 @@ scenarios.forEach(s => {
     idSet.add(s.id);
 });
 check(dupIds.length === 0, `场景 ID 无重复（重复: ${dupIds.join(', ')}）`);
+
+// 7. 真理之书契约校验
+console.log('\n── 真理之书契约校验 ──');
+check(/const\s+TRUTH_BOOK_CATEGORIES\s*=\s*\[/.test(source), 'TruthBook 定义 categories 分类入口');
+check(/TRUTH_BOOK_DATA\.entries\s*=\s*buildTruthBookEntries\(\)/.test(source), 'TruthBook 统一 entries 由构建函数生成');
+check(/TRUTH_BOOK_DATA\.bosses\s*=/.test(source), 'TruthBook 暴露 bosses 兼容分类');
+check(/TRUTH_BOOK_DATA\.core\s*=/.test(source), 'TruthBook 暴露 core 核心机制分类');
+check(/TRUTH_BOOK_DATA\.attributes/.test(source), 'TruthBook 保留 attributes 旧入口供弹珠选择页使用');
+
+const requiredTruthCategories = ['boss', 'enemy_affix', 'enemy_v2', 'attribute', 'core'];
+requiredTruthCategories.forEach(id => {
+    const re = new RegExp(`\\{\\s*id:\\s*'${id}'[\\s\\S]{0,120}?name:`);
+    check(re.test(source), `TruthBook 分类 ${id} 存在`);
+});
+
+const truthBossScenarioIds = [
+    'boss_ignis',
+    'boss_glacies',
+    'boss_mikro',
+    'boss_devourer',
+    'boss_viridis',
+    'boss_tesla',
+    'boss_chimera',
+    'boss_ouroboros'
+];
+truthBossScenarioIds.forEach(scenarioId => {
+    const suffix = scenarioId.replace('boss_', '');
+    const re = new RegExp(`id:\\s*'truth_boss_${suffix}'[\\s\\S]{0,900}?trainingScenarioId:\\s*'${scenarioId}'`);
+    check(re.test(source), `TruthBook Boss 条目关联试炼场 ${scenarioId}`);
+});
+
+[
+    'truth_core_skill_charge',
+    'truth_core_ammo_replace',
+    'truth_core_drop_pity',
+    'truth_core_smart_rune_drop'
+].forEach(id => {
+    const re = new RegExp(`id:\\s*'${id}'`);
+    check(re.test(source), `TruthBook 核心机制条目 ${id} 存在`);
+});
+
+check(/id="truth-category-tabs"/.test(indexSource), 'TruthBook HTML 提供分类容器');
+check(/id="truth-search"/.test(indexSource), 'TruthBook HTML 提供搜索输入');
+check(/id="truth-entry-list"/.test(indexSource), 'TruthBook HTML 提供统一条目列表');
 
 // ─── 报告 ─────────────────────────────────────────────────────────────────────
 

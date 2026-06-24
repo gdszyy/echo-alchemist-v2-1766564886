@@ -71,6 +71,8 @@ Boss 专属机制参数必须优先放在 `CONFIG.balance.bossConfigs[bossId]` �
 | `carrierSpawnInterval` | 1 | 铸巢母架每回合投放小型敌人 |
 | `carrierSpawnHpPct` | 0.10 | 铸巢母架小型敌人血量占母体最大生命比例 |
 | `carrierMoveInterval` | 2 | 铸巢母架移动间隔 |
+| `runeBearerTempAffixPool` | `['shield', 'regen', 'healer', 'haste', 'jump', 'clone', 'berserk']` | `runeBearer` 每回合临时词条候选池；只作为奖励敌人的额外压力，不进入普通随机词缀池 |
+| `adaptiveRuneElements` | `['pyro', 'cryo', 'lightning', 'bounce', 'pierce', 'scatter', 'laser', 'venom', 'overcharge', 'echo']` | `adaptiveRune` 可记录的属性家族白名单，并用于死亡时限制符文掉落家族 |
 
 ## 6. Boss 血量公式参数说明（bossHpFormula）
 
@@ -165,7 +167,7 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 | `hitThresholdRoundBonus` | `1` | 每个缩放步给 `hits` 模式增加的命中次数。 |
 | `damageRatioRoundBonus` | `0.015` | 每个缩放步给 `damage` 模式增加的最大生命百分比。 |
 | `maxRoundScaleSteps` | `6` | 回合缩放最大步数，避免后期无限膨胀。 |
-| `enrageDelayOnBreak` | `true` | 破绽触发后，若 Boss 尚未狂暴，则延后一次 50% 血量狂暴检测。 |
+| `enrageDelayOnBreak` | `true` | 破绽触发后，若 Boss 尚未狂暴，则延后一次 `bossEnrageHpRatio` 血量阈值狂暴检测（当前 20% HP）。 |
 
 破绽触发后运行时写入 `_bossVulnerabilityExposedTurns`、`_bossVulnerabilityExposedPart`、`_bossVulnerabilityVisualAttrs`、`_bossVulnerabilityVisualRatio`、`_bossVulnerabilityBreakTimer` 与 `_bossVulnerabilityRecoverTimer`。旧 `_bossVulnerabilityExposedHits` 字段仅用于存档兼容，不再作为新逻辑的消耗单位。
 
@@ -179,12 +181,14 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 
 | 日期 | 文件 | 修改内容 |
 |------|------|----------|
+| 2026-06-24 | `src/config.js`, `src/entities/enemy.js`, `src/game_system.js`, `src/systems.js`, `tests/validate_enemy_spawn_runtime.mjs` | **Devourer / Chimera 吞噬机制互换参数**：Devourer 新增 `devourerMawRangeCells`、拉拽/消化/召唤冷却、`devourerMaxThralls`、`devourerDigestShieldPerFeed` 等深渊胃域参数；Chimera 改为热核吞噬，新增 `chimeraThermalStackUnit`、`chimeraThermalAbsorbMinTemp`、`chimeraThermalShieldPct`、`chimeraThermalFeedTemps`，保留消化冷却与养料上限。Chimera 召唤物仍是 `chaos_feed + berserk`，运行时额外写入 `thermalFeed` 并赋予 +100°C / -100°C。 |
+| 2026-06-23 | `src/config.js`, `src/loot_system.js`, `src/entities/enemy.js`, `src/combat_system.js`, `src/game_phase.js`, `src/systems.js`, `src/data/enemy_visual_assets.js`, `.cursor/rules/config.md`, `.cursor/rules/rune_system.md`, `.cursor/rules/enemy_index.md`, `.cursor/rules/spawn_system.md`, `docs/core_mechanics.md`, `docs/enemy_visual_design_v2.md`, `docs/enemy_targeting_asset_todo.md` | **符文奖励敌人首版落地**：新增 `runeBearerTempAffixPool` 与 `adaptiveRuneElements`；`runeBearer` 死亡必掉通用智能符文并在每个敌方回合刷新一个临时词条；`adaptiveRune` 根据受到的属性伤害/效果记录符文家族，死亡时通过 `forcedElement` 限制掉落；同步接入 SVG 占位图标、覆盖层 manifest、试炼场场景与运行时验证。 |
 | 2026-06-23 | `src/config.js`, `src/game_system.js`, `src/ui/run_shop.js`, `src/ui_system.js`, `src/entities.js` | **纠正弹珠包主循环方向**：精华奖励不再作为主循环入口；开局队列 `marble_pack` 杂色包，局内商店恢复出售杂色弹珠包，购买后调用 `sys_startMarblePackGrind()` 直接进入 3 弹珠研磨，不进入命运选择；`run_resource_pack` 仅作为旧存档兜底。 |
-| 2026-06-23 | `src/config.js`, `src/entities/enemy.js`, `tests/validate_boss_vulnerability.mjs` | **Chimera 破绽谱校准**：`bossConfigs.chimera.vulnerability.attrs` 从 `pierce + laser` 调整为 `venom + laser`，标签改为“污染胃域”，`bossConfigs.chimera.themeWeights` 与 `BOSS_DB.boss_chimera.themeWeights` 同步改为 `venom + laser`，与吞噬继承负面状态、毒素污染胃域、激光精准剖解的机制语义一致；Boss 破绽测试新增固定 Boss 属性表与 BOSS_DB 主题权重一致性锁定。 |
+| 2026-06-23 | `src/config.js`, `src/entities/enemy.js`, `tests/validate_boss_vulnerability.mjs` | **Chimera 破绽谱校准**：`bossConfigs.chimera.vulnerability.attrs` 从 `pierce + laser` 调整为 `venom + laser`，标签改为“污染胃域”，`bossConfigs.chimera.themeWeights` 与 `BOSS_DB.boss_chimera.themeWeights` 同步改为 `venom + laser`；2026-06-24 后该破绽谱继续对应“毒素扰乱热核循环、激光精准剖解反应核”的语义。 |
 | 2026-06-23 | `src/config.js`, `src/game_system.js`, `src/ui/run_shop.js`, `src/ui/shop.js`, `src/ui_system.js`, `src/entities.js`, `src/spawn_system.js` | **弹珠包退场与资源包替代**：删除局内商店弹珠包商品与遗物即时倾向包，`marble_pack` 旧奖励只做存档兼容并转译为 `run_resource_pack`；新增 `runResourcePackFragments`，资源包直接增加 `runFragments` 并播放金币/碎片动画，引导玩家去局内商店消费。 |
 | 2026-06-23 | `src/config.js`, `src/entities/enemy.js`, `src/combat_system.js`, `src/game_system.js`, `src/systems.js` | **Ouroboros 六附体轮转参数**：`bossConfigs.ouroboros` 从 3 组词缀轮转扩展为 6 个 `orbitAttachments`，每槽定义词缀组合、破绽属性与主机制；新增 `orbitAttachmentDisruptTurns`、`orbitEchoMax`、`orbitEchoHpPct`、`orbitEchoSpawnPerPulse`、`orbitShieldGain`、`orbitHealPct`。动态破绽谱同步扩展为 6 组。 |
 | 2026-06-22 | `src/config.js`, `src/entities/enemy.js`, `src/combat_system.js`, `src/game_system.js`, `src/systems.js` | **Viridis 孢子活甲网络参数**：`bossConfigs.viridis` 新增 `livingArmor` / `armorSpore` 词缀、`pyro + venom` 破绽谱、`sporeBloom*` 孢甲资源、补甲目标数、火毒反制削甲/腐蚀参数；Boss 入场 `viridis` 专属随从调整为 `spore_vassal`，携带 `regen + healer + armorSpore`。 |
-| 2026-06-22 | `src/config.js`, `src/entities/enemy.js`, `src/game_system.js` | **Chimera 胃域循环参数**：`bossConfigs.chimera` 新增 `chimeraMawRangeCells`、`chimeraPullCellsPerTurn`、`chimeraDigestInterval`、`chimeraBerserkDigestInterval`、`chimeraSummonInterval`、`chimeraSummonMaxPerTurn`、`chimeraMaxFeeders`、`chimeraSummonHpPct`、`chimeraDigestHealPct`、`chimeraDigestShieldPerFeed`、`chimeraFeedAffixes`。Boss 入场 `chimera` 专属随从调整为 `chaos_feed + berserk`，不再带 `devour`，避免养料敌人自吞噬。 |
+| 2026-06-22 | `src/config.js`, `src/entities/enemy.js`, `src/game_system.js` | **Chimera 胃域循环参数（已由 2026-06-24 互换重构替代）**：旧版 `chimeraMawRangeCells` / `chimeraPullCellsPerTurn` / `chimeraSummonInterval` 用于胃域吸引与继承状态；当前 Chimera 已改为热核吞噬，Devourer 接管胃域拉拽与范围吞噬。 |
 | 2026-06-22 | `src/entities.js`, `src/pinboard_modules.js`, `src/ui/run_shop.js`, `.cursor/rules/game_phase.md`, `.cursor/rules/performance.md` | **钉盘机关槽扩展**：`SpecialSlot` 的 `launcher` / `energy_wheel` 类型接入真实研磨触发逻辑；新增 `launcher_gate_module`、`pinwheel_capacitor_module`、`turbine_loop_module`、`swerve_cannon_module` 四个局内商店组件，并通过 `showcase` 标签提高新机关首轮曝光。新机关通过 `persistent`、`activationCooldown`、`maxCharges` 控制重复触发，不新增全局配置项或性能预算字段。 |
 | 2026-06-22 | `src/config.js`, `src/game_system.js`, `.cursor/rules/config.md`, `.cursor/rules/game_phase.md` | **弹珠包价格与新研磨替换选择**：下调 `runShopMarblePackBasePrice`、`runShopMarblePackMarkup`、`runShopMarblePackRarityPower`，使局内商人弹珠包从百级碎片价格降到数十级；标准 `marble_pack` 若在已有子弹时触发新研磨，会预充既有子弹并在研磨完成后进入子弹选择。 |
 | 2026-06-22 | `src/config.js`, `src/entities/projectile.js`, `docs/relic_system_design.md` | **力场护盾墙体语义修正**：`energy_shield` 文案与实现统一为“每次墙体接触最多消耗 1 层现有反弹/穿透耐久；耐久耗尽后按普通墙体反弹，不销毁子弹”。该改动修复无耐久子弹贴墙后被墙体吞没的问题，并避免角落同帧碰撞连续扣多层；不新增配置项、粒子、Canvas 光效或性能预算消费。 |
@@ -251,6 +255,15 @@ Boss 对抗属性不再使用旧 `weakness` 字段。每个 Boss 使用 `vulnera
 - **弹珠包配置**：`runShopMixedMarblePackPrice` 是杂色弹珠包价格；弹珠包具体内容由 `sys_rollMarblePackTypes()` 根据当前 `unlockedWeights` 生成，并过滤 `bottomRewardOnlyTypes`。
 - **历史精华兼容**：旧存档或旧调用中的 `type: 'essence'` 可以规范化为 `marble_pack`，但不得再打开命运选择。`chaos_essence` / `pure_essence` 相关 UI 与状态字段只作为历史兼容和调试残留，不是新奖励来源。
 - **运行态契约**：`marbleQueue`、`marblesPool`、`selectedMarbles`、`_chargedAmmoQueue`、`pendingRoundStartRewards` 必须同时出现在 `core.js` 初始化、`sys_resetGame()` 重置、`sys_saveRunState()` / `sys_loadRunState()` 持久化中。
+
+## 8. 技能充能配置
+
+- `CONFIG.gameplay.skillChargeHitGain`：普通命中获得的技能充能，默认 `0.03`。
+- `CONFIG.gameplay.skillChargeKillGain`：击杀获得的技能充能，默认 `0.10`。
+- `CONFIG.gameplay.skillChargeRetainRatio`：单次获得充能中进入实际条的比例，默认 `0.35`；剩余部分进入临时条。
+- `CONFIG.gameplay.skillChargeDecayRate`：临时条每帧衰减速度，默认 `0.003`。
+- `CONFIG.gameplay.maxSkillPoints` 继续作为 SP 上限；`spawn_addSkillPoint()` 必须按该上限夹取。
+- 旧 `rune_siphon` / `rune_resonance_core` 的充能加成当前转接到技能充能，避免遗物效果空转。若后续重命名遗物，需要同步更新 `combat_skillCharge_onHit()` 和遗物文案。
 
 ## 9. 教学曲线配置 (ENEMY_CURVE_CONFIG)
 

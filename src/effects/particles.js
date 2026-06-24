@@ -4,6 +4,7 @@
  * 职责：
  * - 粒子系统（Particle）
  * - 斩击特效（SlashEffect）
+ * - 穿透切割特效（PierceCutEffect）
  * - 收集光柱特效（CollectionBeam）
  * - 冲击波（Shockwave）
  * - 激光光束（LaserBeam）
@@ -17,6 +18,47 @@
  */
 import { Vec2, lerp } from '../utils/math_utils.js';
 import { sb as _sb } from '../utils/perf.js';
+import { pixiIsActive } from '../render/pixi_bridge.js';
+import {
+    iceWave_pixiCreate, iceWave_pixiSync, iceWave_pixiDestroy,
+    collectionBeam_pixiCreate, collectionBeam_pixiSync, collectionBeam_pixiDestroy,
+    healWave_pixiCreate, healWave_pixiSync, healWave_pixiDestroy,
+    laserBeam_pixiCreate, laserBeam_pixiSync, laserBeam_pixiDestroy,
+    lightningBolt_pixiCreate, lightningBolt_pixiSync, lightningBolt_pixiDestroy,
+    shockwave_pixiCreate, shockwave_pixiSync, shockwave_pixiDestroy,
+    fireWave_pixiCreate, fireWave_pixiSync, fireWave_pixiDestroy,
+    deathExplosion_pixiCreate, deathExplosion_pixiSync, deathExplosion_pixiDestroy,
+    slashEffect_pixiCreate, slashEffect_pixiSync, slashEffect_pixiDestroy,
+    pierceCutEffect_pixiCreate, pierceCutEffect_pixiSync, pierceCutEffect_pixiDestroy,
+    swordScar_pixiCreate, swordScar_pixiSync, swordScar_pixiDestroy,
+    bladeStormRing_pixiCreate, bladeStormRing_pixiSync, bladeStormRing_pixiDestroy,
+    bladeStormVortex_pixiCreate, bladeStormVortex_pixiSync, bladeStormVortex_pixiDestroy,
+    greedyWheelEffect_pixiCreate, greedyWheelEffect_pixiSync, greedyWheelEffect_pixiDestroy,
+    energyOrb_pixiCreate, energyOrb_pixiSync, energyOrb_pixiDestroy,
+    floatingText_pixiCreate, floatingText_pixiSync, floatingText_pixiDestroy,
+    rewardDropEffect_pixiCreate, rewardDropEffect_pixiSync, rewardDropEffect_pixiDestroy,
+    muzzleFlashV2_pixiCreate, muzzleFlashV2_pixiSync, muzzleFlashV2_pixiDestroy,
+    firingBurst_pixiCreate, firingBurst_pixiSync, firingBurst_pixiDestroy,
+} from '../render/pixi_effect_adapter.js';
+
+function withAlpha(color, alpha) {
+    const a = Math.max(0, Math.min(1, alpha));
+    if (!color || typeof color !== 'string') return `rgba(255,255,255,${a})`;
+    if (color.startsWith('#')) {
+        let hex = color.slice(1);
+        if (hex.length === 3) hex = hex.split('').map(ch => ch + ch).join('');
+        if (hex.length >= 6) {
+            const r = parseInt(hex.slice(0, 2), 16);
+            const g = parseInt(hex.slice(2, 4), 16);
+            const b = parseInt(hex.slice(4, 6), 16);
+            if ([r, g, b].every(Number.isFinite)) return `rgba(${r},${g},${b},${a})`;
+        }
+    }
+    if (color.startsWith('rgb(')) {
+        return color.replace('rgb(', 'rgba(').replace(')', `,${a})`);
+    }
+    return color;
+}
 
 class Particle {
     constructor(x, y, color, mode = 'normal') {
@@ -48,6 +90,8 @@ class Particle {
         this.scaleY = 1;
         this.spin = 0;
         this.angle = 0;
+        // [PixiJS 迁移] WebGL Sprite 引用（由 pixiAcquireParticleSprite 注入）
+        this._pixiSprite = null;
 
         const angle = Math.random() * Math.PI * 2;
         const vel = this.vel;
@@ -68,7 +112,7 @@ class Particle {
             vel.x = (Math.random() - 0.5) * 0.8; vel.y = Math.random() * 0.5 + 0.5;
             this.drag = 0.96; this.gravity = 0.02;
             this.decay = 0.015 + Math.random() * 0.01;
-            this.size = Math.random() * 8 + 6;
+            this.size = Math.random() * 5 + 4;
             this.angle = Math.random() * Math.PI * 2;
         } else if (mode === 'shard') {
             const speed = Math.random() * 4 + 2;
@@ -84,7 +128,7 @@ class Particle {
         } else if (mode === 'smoke') {
             vel.x = (Math.random() - 0.5) * 0.5; vel.y = -Math.random() * 1.5 - 0.5;
             this.drag = 0.98; this.gravity = -0.02; this.decay = 0.015;
-            this.size = Math.random() * 6 + 4; this.life = 1.2;
+            this.size = Math.random() * 4 + 3; this.life = 1.2;
         } else if (mode === 'venom') {
             // 毒液滴：缓慢上浮，轻微横向摆动，半透明绿色液滴
             vel.x = (Math.random() - 0.5) * 0.6;
@@ -140,6 +184,9 @@ class Particle {
     // --- Particle 类的 draw 方法 ---
     draw(ctx) {
         if (this.life <= 0) return;
+        // [PixiJS 迁移] 若已绑定 WebGL Sprite，跳过 Canvas 2D 绘制
+        // Sprite 的 position/alpha/rotation 由 compaction 循环同步
+        if (this._pixiSprite) return;
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
         
@@ -161,7 +208,7 @@ class Particle {
                 grad.addColorStop(0, this.color); 
                 grad.addColorStop(1, 'rgba(0,0,0,0)');
             } else {
-                grad.addColorStop(0, `rgba(207, 250, 254, ${this.life * 0.4})`); 
+                grad.addColorStop(0, `rgba(207, 250, 254, ${this.life * 0.2})`); 
                 grad.addColorStop(1, `rgba(165, 243, 252, 0)`); 
             } 
             ctx.fillStyle = grad;
@@ -275,6 +322,7 @@ class SlashEffect {
         this.life = 1.0;     // 生命周期 (1.0 -> 0.0)
         this.decay = 0.06;   // 消散速度 (约 16 帧)
         this.active = true;
+        this._pixi = null; // [PixiJS 迁移]
     }
 
     update() {
@@ -284,6 +332,11 @@ class SlashEffect {
 
     draw(ctx) {
         if (!this.active) return;
+        // [PixiJS 迁移 · 阶段三] SlashEffect
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = slashEffect_pixiCreate(this);
+            if (this._pixi) { slashEffect_pixiSync(this, this._pixi); return; }
+        }
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
@@ -337,6 +390,141 @@ class SlashEffect {
     }
 }
 
+// @perf-impact: 穿透命中切割特效 - 复用全局 maxParticles 入口，low 档关闭 shadowBlur 与高亮叠加。
+class PierceCutEffect {
+    constructor(x, y, angle, length = 92, color = '#fca5a5', quality = 'high') {
+        this.x = x;
+        this.y = y;
+        this.angle = angle || 0;
+        this.length = length;
+        this.color = color || '#fca5a5';
+        this.quality = quality || 'high';
+        this.life = 1.0;
+        this.age = 0;
+        this.duration = this.quality === 'low' ? 14 : 18;
+        this.active = true;
+        this.cutWidth = 5 + Math.random() * 2;
+        this.edgeSeed = Math.random() * Math.PI * 2;
+        const chipCount = this.quality === 'low' ? 3 : (this.quality === 'medium' ? 5 : 7);
+        this.chips = Array.from({ length: chipCount }, (_, i) => ({
+            side: i % 2 === 0 ? 1 : -1,
+            along: (Math.random() - 0.5) * this.length * 0.74,
+            lift: 3 + Math.random() * 8,
+            speed: 1.4 + Math.random() * 2.2,
+            size: 2 + Math.random() * 2.5,
+            alpha: 0.5 + Math.random() * 0.35,
+        }));
+        this._pixi = null; // [PixiJS 迁移]
+    }
+
+    update(timeScale) {
+        this.age += timeScale;
+        const t = this.age / this.duration;
+        this.life = Math.max(0, 1 - t);
+        if (this.life <= 0) this.active = false;
+        for (const chip of this.chips) {
+            chip.lift += chip.speed * timeScale;
+        }
+    }
+
+    draw(ctx) {
+        if (!this.active || this.life <= 0) return;
+        // [PixiJS 迁移 · 阶段三] PierceCutEffect
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = pierceCutEffect_pixiCreate(this);
+            if (this._pixi) { pierceCutEffect_pixiSync(this, this._pixi); return; }
+        }
+        const t = Math.min(1, this.age / this.duration);
+        const isLow = this.quality === 'low';
+        const open = Math.sin(t * Math.PI) * (isLow ? 4 : 8);
+        const halfL = this.length / 2;
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        ctx.globalCompositeOperation = isLow ? 'source-over' : 'lighter';
+        ctx.lineCap = 'round';
+
+        if (!isLow) {
+            ctx.globalAlpha = this.life * 0.42;
+            ctx.strokeStyle = withAlpha(this.color, 0.85);
+            ctx.lineWidth = this.cutWidth * (1.8 + 0.4 * this.life);
+            ctx.shadowColor = this.color;
+            ctx.shadowBlur = _sb(14);
+            ctx.beginPath();
+            ctx.moveTo(-halfL - 6, -open * 0.35);
+            ctx.quadraticCurveTo(-halfL * 0.18, -open * 1.25, halfL + 6, -open * 0.5);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(-halfL - 6, open * 0.35);
+            ctx.quadraticCurveTo(halfL * 0.18, open * 1.25, halfL + 6, open * 0.5);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        const slitAlpha = Math.min(1, this.life * 1.35);
+        const slit = ctx.createLinearGradient(-halfL, 0, halfL, 0);
+        slit.addColorStop(0, 'rgba(255,255,255,0)');
+        slit.addColorStop(0.22, withAlpha(this.color, 0.78 * slitAlpha));
+        slit.addColorStop(0.5, `rgba(255,255,255,${slitAlpha})`);
+        slit.addColorStop(0.78, withAlpha(this.color, 0.78 * slitAlpha));
+        slit.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.globalAlpha = 0.95;
+        ctx.strokeStyle = slit;
+        ctx.lineWidth = Math.max(1.2, this.cutWidth * this.life);
+        ctx.beginPath();
+        ctx.moveTo(-halfL, 0);
+        ctx.lineTo(halfL, 0);
+        ctx.stroke();
+
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = this.life * 0.78;
+        ctx.strokeStyle = withAlpha('#1f0f16', isLow ? 0.46 : 0.62);
+        ctx.lineWidth = Math.max(1, this.cutWidth * 0.42);
+        ctx.beginPath();
+        ctx.moveTo(-halfL * 0.72, 0);
+        ctx.lineTo(halfL * 0.72, 0);
+        ctx.stroke();
+
+        ctx.globalCompositeOperation = isLow ? 'source-over' : 'lighter';
+        const tickCount = isLow ? 2 : 4;
+        for (let i = 0; i < tickCount; i++) {
+            const k = (i + 1) / (tickCount + 1);
+            const x = -halfL + this.length * k;
+            const wobble = Math.sin(this.edgeSeed + i * 1.7) * 4;
+            ctx.globalAlpha = this.life * (0.32 + i * 0.08);
+            ctx.strokeStyle = i % 2 ? '#ffffff' : this.color;
+            ctx.lineWidth = isLow ? 1 : 1.4;
+            ctx.beginPath();
+            ctx.moveTo(x - 5, -open - wobble * 0.25);
+            ctx.lineTo(x + 6, open + wobble * 0.25);
+            ctx.stroke();
+        }
+
+        for (const chip of this.chips) {
+            const chipAlpha = chip.alpha * this.life;
+            ctx.globalAlpha = chipAlpha;
+            ctx.fillStyle = this.color;
+            const cx = chip.along;
+            const cy = chip.side * chip.lift;
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(chip.side * 0.65 + t * chip.side);
+            ctx.beginPath();
+            ctx.moveTo(-chip.size, 0);
+            ctx.lineTo(chip.size * 0.8, -chip.size * 0.45);
+            ctx.lineTo(chip.size * 0.35, chip.size * 0.85);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+}
+
 
 // --- 新增：收集完成的光柱特效 ---
 class CollectionBeam {
@@ -348,6 +536,7 @@ class CollectionBeam {
         this.decay = 0.04;
         this.height = 0;
         this.maxHeight = bottomY + 100; // 向上延伸的高度
+        this._pixi = null; // [PixiJS 迁移]
     }
 
     update(timeScale) {
@@ -358,6 +547,11 @@ class CollectionBeam {
 
     draw(ctx) {
         if (this.life <= 0) return;
+        // [PixiJS 迁移 · 阶段三] CollectionBeam → 预烘焙光柱 Sprite
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = collectionBeam_pixiCreate(this);
+            if (this._pixi) { collectionBeam_pixiSync(this, this._pixi); return; }
+        }
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         
@@ -393,55 +587,122 @@ class CollectionBeam {
         ctx.restore();
     }
 }
+// @perf-impact: 通用范围冲击波 - 仍由 shockwaveLimit 控制，low 档关闭径向填充和阴影。
 class Shockwave {
-    constructor(x, y, color) { 
-        this.x = x; 
-        this.y = y; 
-        this.radius = 1; 
-        this.alpha = 1.0; 
-        this.color = color || '#ffffff'; 
-        this.maxRadius = 120; // 稍微加大一点爆炸范围视觉
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.radius = 1;
+        this.alpha = 1.0;
+        this.color = color || '#ffffff';
+        this.maxRadius = 120;
+        this.seed = Math.random() * Math.PI * 2;
+        this.arcJitter = Array.from({ length: 7 }, (_, i) => ({
+            start: this.seed + i * (Math.PI * 2 / 7) + (Math.random() - 0.5) * 0.25,
+            span: 0.42 + Math.random() * 0.34,
+            weight: 0.6 + Math.random() * 0.7,
+        }));
+        this.spokes = Array.from({ length: 8 }, (_, i) => ({
+            angle: this.seed + i * (Math.PI * 2 / 8) + (Math.random() - 0.5) * 0.28,
+            reach: 0.58 + Math.random() * 0.38,
+            width: 1 + Math.random() * 1.5,
+        }));
+        this._pixi = null; // [PixiJS 迁移]
     }
 
-    update(timeScale) { 
+    update(timeScale) {
+        const scale = Number.isFinite(timeScale) ? Math.max(0, timeScale) : 1;
         if (this.radius < this.maxRadius) {
-            this.radius += 4 * timeScale; // 扩散速度
+            this.radius = Math.min(this.maxRadius, Math.max(0.1, this.radius + 4 * scale));
         }
-        this.alpha -= 0.04 * timeScale; // 消失速度
+        this.alpha = Math.max(0, this.alpha - 0.04 * scale);
     }
 
-    draw(ctx) { 
-        if(this.alpha <= 0) return; 
-        ctx.save(); 
-        
-        // --- 核心修改：让波纹发光 ---
-        ctx.globalCompositeOperation = 'lighter'; 
-        ctx.globalAlpha = this.alpha;
-        
-        ctx.beginPath(); 
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2); 
-        
-        // 1. 填充部 (很淡)
-        ctx.fillStyle = this.color; 
-        ctx.globalAlpha = this.alpha * 0.2; 
-        ctx.fill();
+    draw(ctx) {
+        if (this.alpha <= 0) return;
+        // [PixiJS 迁移 · 阶段三] Shockwave
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = shockwave_pixiCreate(this);
+            if (this._pixi) { shockwave_pixiSync(this, this._pixi); return; }
+        }
+        const quality = (typeof game !== 'undefined' && game.perfQualityLevel) || 'high';
+        const isLow = quality === 'low';
+        const radius = Number.isFinite(this.radius) ? Math.max(0.1, this.radius) : 0.1;
+        const t = Math.min(1, radius / this.maxRadius);
+        const band = 10 + 14 * (1 - t);
 
-        // 2. 高亮边缘 (冲击波本体)
-        ctx.globalAlpha = this.alpha; 
-        ctx.strokeStyle = this.color; 
-        ctx.lineWidth = 4; // 稍微加粗
-        ctx.stroke(); 
-        
-        // 3. 内部的一圈细线 (增加层次感)
-        if (this.radius > 10) {
+        ctx.save();
+        ctx.globalCompositeOperation = isLow ? 'source-over' : 'lighter';
+
+        if (!isLow) {
+            ctx.globalAlpha = this.alpha * 0.18;
+            const pressure = ctx.createRadialGradient(
+                this.x, this.y, Math.max(0, radius - band * 1.6),
+                this.x, this.y, radius + band
+            );
+            pressure.addColorStop(0, 'rgba(255,255,255,0)');
+            pressure.addColorStop(0.45, withAlpha(this.color, 0.18 * this.alpha));
+            pressure.addColorStop(0.68, withAlpha('#ffffff', 0.10 * this.alpha));
+            pressure.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = pressure;
             ctx.beginPath();
-            ctx.arc(this.x, this.y, this.radius * 0.7, 0, Math.PI*2);
-            ctx.lineWidth = 1;
-            ctx.globalAlpha = this.alpha * 0.5;
+            ctx.arc(this.x, this.y, radius + band, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = isLow ? 0 : _sb(8);
+        for (const arc of this.arcJitter) {
+            const r = Math.max(0.1, radius + Math.sin(this.seed + arc.start + t * 5) * 3);
+            ctx.globalAlpha = this.alpha * arc.weight;
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = (isLow ? 2 : 4.5) * arc.weight * (1 - t * 0.35);
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, r, arc.start, arc.start + arc.span);
             ctx.stroke();
         }
-        
-        ctx.restore(); 
+
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = this.alpha * (isLow ? 0.45 : 0.58);
+        ctx.strokeStyle = withAlpha('#ffffff', isLow ? 0.45 : 0.8);
+        ctx.lineWidth = isLow ? 1 : 1.5;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, Math.max(0.1, radius - band * 0.45), 0, Math.PI * 2);
+        ctx.stroke();
+
+        const spokeCount = isLow ? 4 : this.spokes.length;
+        for (let i = 0; i < spokeCount; i++) {
+            const spoke = this.spokes[i];
+            const inner = radius * 0.45;
+            const outer = radius * spoke.reach;
+            const fade = this.alpha * (1 - t * 0.45);
+            const grad = ctx.createLinearGradient(
+                this.x + Math.cos(spoke.angle) * inner,
+                this.y + Math.sin(spoke.angle) * inner,
+                this.x + Math.cos(spoke.angle) * outer,
+                this.y + Math.sin(spoke.angle) * outer
+            );
+            grad.addColorStop(0, withAlpha(this.color, 0));
+            grad.addColorStop(0.55, withAlpha(this.color, fade * 0.42));
+            grad.addColorStop(1, withAlpha('#ffffff', 0));
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = spoke.width;
+            ctx.beginPath();
+            ctx.moveTo(
+                this.x + Math.cos(spoke.angle) * inner,
+                this.y + Math.sin(spoke.angle) * inner
+            );
+            ctx.lineTo(
+                this.x + Math.cos(spoke.angle) * outer,
+                this.y + Math.sin(spoke.angle) * outer
+            );
+            ctx.stroke();
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
     }
 }
 
@@ -457,6 +718,7 @@ class GreedyWheelEffect {
         this.duration = mode === 'prelude' ? 28 : (mode === 'success' ? 34 : 24);
         this.life = 1.0;
         this.seed = Math.random() * Math.PI * 2;
+        this._pixi = null; // [PixiJS 迁移]
     }
 
     update(timeScale) {
@@ -466,6 +728,12 @@ class GreedyWheelEffect {
 
     draw(ctx) {
         if (this.life <= 0) return;
+
+        // [PixiJS 迁移 · 阶段三] GreedyWheelEffect
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = greedyWheelEffect_pixiCreate(this);
+            if (this._pixi) { greedyWheelEffect_pixiSync(this, this._pixi); return; }
+        }
 
         const t = Math.min(1, this.age / this.duration);
         const isLow = this.quality === 'low';
@@ -562,6 +830,7 @@ class LaserBeam {
         this.isContinuous = isContinuous;
         this.life = 1.0;
         this.decay = isContinuous ? 0 : 0.04; // 持续模式下不自动衰减
+        this._pixi = null; // [PixiJS 迁移]
     }
 
     /**
@@ -578,6 +847,11 @@ class LaserBeam {
 
     draw(ctx) {
         if (this.life <= 0) return;
+        // [PixiJS 迁移 · 阶段三] LaserBeam → PIXI.Graphics 多层辉光（消除 shadowBlur + lighter）
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = laserBeam_pixiCreate();
+            if (this._pixi) { laserBeam_pixiSync(this, this._pixi); return; }
+        }
         ctx.save();
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -623,36 +897,63 @@ class FloatingText {
      * @param {number} y - y 坐标
      * @param {string} text - 文本
      * @param {string} [color='#fbbf24'] - 颜色 (默认为金色)
+     * @param {number} [fontSize=16] - 字号
+     * @param {HTMLImageElement|null} [iconImg=null] - 可选图标图片（渲染在文字左侧）
      */
-    constructor(x, y, text, color = '#fbbf24', fontSize = 16) { 
+    constructor(x, y, text, color = '#fbbf24', fontSize = 16, iconImg = null) { 
         this.pos = new Vec2(x, y); 
         this.vel = new Vec2(0, -1); // 向上飄
         this.life = 1.0; 
         this.text = text; 
         this.color = color;
         this.fontSize = fontSize;
+        this.iconImg = iconImg;
+        this._pixi = null; // [PixiJS 迁移]
     }
 
-    update(timeScale) { 
+    update(timeScale) {
         this.pos = this.pos.add(this.vel.mult(timeScale)); 
         this.life -= 0.02 * timeScale; 
     }
 
-    draw(ctx) { 
+    draw(ctx) {
         if (this.life <= 0) return;
+        // [PixiJS 迁移 · 阶段三] FloatingText
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = floatingText_pixiCreate(this);
+            if (this._pixi) { floatingText_pixiSync(this, this._pixi); return; }
+        }
         ctx.save();
         ctx.globalAlpha = Math.max(0, this.life); 
         ctx.font = `bold ${this.fontSize}px sans-serif`; 
         ctx.textAlign = 'center';
+
+        let textOffsetX = 0;
+
+        // 绘制图标（如果有）
+        if (this.iconImg && this.iconImg.complete && this.iconImg.naturalWidth > 0) {
+            const iconSize = this.fontSize * 1.2;
+            const textWidth = ctx.measureText(this.text).width;
+            const totalWidth = iconSize + 3 + textWidth;
+            const startX = this.pos.x - totalWidth / 2;
+            const iconX = startX;
+            const iconY = this.pos.y - this.fontSize * 0.8;
+
+            ctx.drawImage(this.iconImg, iconX, iconY, iconSize, iconSize);
+            // 文字偏移到图标右侧
+            textOffsetX = (iconSize + 3 + textWidth) / 2 - textWidth / 2;
+        }
         
+        const drawX = this.pos.x + textOffsetX;
+
         // 繪製描邊讓文字更清楚
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
         ctx.lineWidth = Math.max(3, this.fontSize / 5);
-        ctx.strokeText(this.text, this.pos.x, this.pos.y);
+        ctx.strokeText(this.text, drawX, this.pos.y);
         
         // 繪製填充
         ctx.fillStyle = this.color; 
-        ctx.fillText(this.text, this.pos.x, this.pos.y); 
+        ctx.fillText(this.text, drawX, this.pos.y); 
         ctx.restore();
     }
 }
@@ -707,7 +1008,8 @@ class EnergyOrb {
         this.friction = options.friction ?? 0.9;    
         this.floatForce = options.floatForce ?? 0.12;  
         this.suctionAcc = options.suctionAcc ?? 0.08;  
-        this.currentSuction = 0; 
+        this.currentSuction = 0;
+        this._pixi = null; // [PixiJS 迁移]
     }
 
     update(timeScale) {
@@ -739,13 +1041,18 @@ class EnergyOrb {
 
         // 更新拖尾 (只存简单的 x,y 对象，减少 Vec2 开销)
         this.trail.push({x: this.pos.x, y: this.pos.y});
-        if (this.trail.length > this.maxTrailLen) this.trail.shift(); 
+        if (this.trail.length > this.maxTrailLen) this.trail.shift();
     }
 
     draw(ctx) {
         if (!this.active) return;
+        // [PixiJS 迁移 · 阶段三] EnergyOrb
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = energyOrb_pixiCreate(this);
+            if (this._pixi) { energyOrb_pixiSync(this, this._pixi); return; }
+        }
         ctx.save();
-        
+
         // @perf-impact: Gathering hit orbs use source-over by default; no shadowBlur or gradients.
         ctx.globalCompositeOperation = this.compositeOperation; 
 
@@ -803,10 +1110,11 @@ class LightningBolt {
     constructor(x1, y1, x2, y2) {
         this.start = new Vec2(x1, y1);
         this.end = new Vec2(x2, y2);
-        this.life = 1.0; 
+        this.life = 1.0;
         this.progress = 0; // [新增] 生长进度 (0.0 -> 1.0)
         this.segments = [];
         this.generateSegments();
+        this._pixi = null; // [PixiJS 迁移]
     }
 
     generateSegments() {
@@ -848,6 +1156,11 @@ class LightningBolt {
 
     draw(ctx) {
         if (this.life <= 0) return;
+        // [PixiJS 迁移 · 阶段三] LightningBolt → PIXI.Graphics 批量线段（消除 N×shadowBlur）
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = lightningBolt_pixiCreate();
+            if (this._pixi) { lightningBolt_pixiSync(this, this._pixi); return; }
+        }
         ctx.save();
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -893,6 +1206,7 @@ class LightningBolt {
     }
 }
 
+// @perf-impact: 火焰范围波细化 - 仍由 waveLimit 控制，low 档关闭径向填充和 shadowBlur。
 class FireWave {
     constructor(x, y) {
         this.x = x;
@@ -900,6 +1214,13 @@ class FireWave {
         this.radius = 10;
         this.maxRadius = 80; // 擴散範圍
         this.life = 1.0;
+        this.seed = Math.random() * Math.PI * 2;
+        this.flameArcs = Array.from({ length: 9 }, (_, i) => ({
+            start: this.seed + i * Math.PI * 2 / 9 + (Math.random() - 0.5) * 0.28,
+            span: 0.32 + Math.random() * 0.38,
+            lift: 0.85 + Math.random() * 0.28,
+        }));
+        this._pixi = null; // [PixiJS 迁移]
     }
 
     update(timeScale) {
@@ -909,19 +1230,74 @@ class FireWave {
 
     draw(ctx) {
         if (this.life <= 0) return;
+        // [PixiJS 迁移 · 阶段三] FireWave
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = fireWave_pixiCreate(this);
+            if (this._pixi) { fireWave_pixiSync(this, this._pixi); return; }
+        }
+        const quality = (typeof game !== 'undefined' && game.perfQualityLevel) || 'high';
+        const isLow = quality === 'low';
+        const t = Math.min(1, this.radius / this.maxRadius);
         ctx.save();
-        // 使用 lighter 混合模式讓火焰看起來更亮
-        ctx.globalCompositeOperation = 'lighter'; 
-        
-        const grad = ctx.createRadialGradient(this.x, this.y, this.radius * 0.6, this.x, this.y, this.radius);
-        grad.addColorStop(0, `rgba(255, 200, 0, 0)`); // 中心透明
-        grad.addColorStop(0.5, `rgba(249, 115, 22, ${this.life * 0.8})`); // 橙色火焰
-        grad.addColorStop(1, `rgba(255, 0, 0, 0)`); // 邊緣透明
+        ctx.globalCompositeOperation = isLow ? 'source-over' : 'lighter';
 
-        ctx.fillStyle = grad;
+        if (!isLow) {
+            const heat = ctx.createRadialGradient(this.x, this.y, this.radius * 0.38, this.x, this.y, this.radius * 1.05);
+            heat.addColorStop(0, 'rgba(255, 200, 0, 0)');
+            heat.addColorStop(0.52, `rgba(249, 115, 22, ${this.life * 0.22})`);
+            heat.addColorStop(0.82, `rgba(220, 38, 38, ${this.life * 0.18})`);
+            heat.addColorStop(1, 'rgba(127, 29, 29, 0)');
+            ctx.fillStyle = heat;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius * 1.05, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowColor = '#f97316';
+            ctx.shadowBlur = _sb(10);
+        }
+
+        for (const arc of this.flameArcs) {
+            const r = this.radius * arc.lift;
+            ctx.globalAlpha = this.life * (0.72 + 0.28 * arc.lift);
+            ctx.strokeStyle = arc.lift > 1 ? '#ef4444' : '#f97316';
+            ctx.lineWidth = (isLow ? 2.2 : 4.2) * (1 - t * 0.25);
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, r, arc.start, arc.start + arc.span);
+            ctx.stroke();
+        }
+
+        ctx.shadowBlur = 0;
+        const spokeCount = isLow ? 4 : 8;
+        for (let i = 0; i < spokeCount; i++) {
+            const a = this.seed + i * Math.PI * 2 / spokeCount + t * 0.25;
+            const inner = this.radius * 0.32;
+            const outer = this.radius * (0.72 + (i % 3) * 0.08);
+            const grad = ctx.createLinearGradient(
+                this.x + Math.cos(a) * inner,
+                this.y + Math.sin(a) * inner,
+                this.x + Math.cos(a) * outer,
+                this.y + Math.sin(a) * outer
+            );
+            grad.addColorStop(0, 'rgba(253,186,116,0)');
+            grad.addColorStop(0.55, `rgba(253,186,116,${this.life * 0.45})`);
+            grad.addColorStop(1, 'rgba(239,68,68,0)');
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = isLow ? 1 : 1.7;
+            ctx.beginPath();
+            ctx.moveTo(this.x + Math.cos(a) * inner, this.y + Math.sin(a) * inner);
+            ctx.lineTo(this.x + Math.cos(a) * outer, this.y + Math.sin(a) * outer);
+            ctx.stroke();
+        }
+
+        ctx.globalAlpha = this.life * 0.55;
+        ctx.strokeStyle = '#fde68a';
+        ctx.lineWidth = isLow ? 1 : 1.5;
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.arc(this.x, this.y, this.radius * 0.55, this.seed + t, this.seed + t + Math.PI * 1.35);
+        ctx.stroke();
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
         ctx.restore();
     }
 }
@@ -942,6 +1318,7 @@ class IceWave {
         // 内圈冰晶环
         this.innerRadius = 2;
         this.innerLife = 1.2;
+        this._pixi = null; // [PixiJS 迁移]
     }
 
     update(timeScale) {
@@ -953,6 +1330,11 @@ class IceWave {
 
     draw(ctx) {
         if (this.life <= 0) return;
+        // [PixiJS 迁移 · 阶段三] IceWave → 预烘焙冰晶环 Sprite
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = iceWave_pixiCreate(this);
+            if (this._pixi) { iceWave_pixiSync(this, this._pixi); return; }
+        }
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
 
@@ -994,9 +1376,9 @@ class IceWave {
 /**
  * DeathExplosion - 敌人死亡时的分级「消散」特效
  *
- * 设计理念：不是向外爆炸，而是内爆收缩 + 粒子内吸 + 灵魂消散
+ * 设计理念：不是向外爆炸，而是按敌人层级拆解材质
  *   - 普通：小圆圈内缩消失 + 灰色烟尘向内漂散
- *   - 精英：能量环内缩收紧 + 紫色虚空孔洞残留 + 灵魂粒子内吸
+ *   - 精英：紫晶裂隙切开 + 碎片分离 + 暗芯熄灭
  *   - Boss：先膨胀挥扎，再猛烈内爆塑陷 + 黑洞涡旋 + 缓慢消散
  *
  * tier: 'normal' | 'elite' | 'boss'
@@ -1036,6 +1418,7 @@ class DeathExplosion {
             this.voidRadius = 0;
             this.voidMaxRadius = 30;
             this.voidDecay = 0.022;
+            this.voidEnabled = true;
             // 灵魂粒子：小圆点向心漂移
             this.souls = Array.from({ length: 18 }, () => ({
                 angle: Math.random() * Math.PI * 2,
@@ -1046,28 +1429,37 @@ class DeathExplosion {
                 color: Math.random() < 0.5 ? '#fca5a5' : '#fbbf24',
             }));
         } else if (tier === 'elite') {
-            // 精英：能量环内缩 + 紫色虚空孔洞
-            this.decay = 0.02;
-            this.collapseRings = [
-                { r: 60,  color: '#c084fc', lw: 3,   alpha: 0.9 },
-                { r: 38,  color: '#a78bfa', lw: 2,   alpha: 0.65 },
-            ];
+            // 精英：紫晶裂隙，不再使用圆形光圈。
+            this.decay = 0.024;
+            this.collapseRings = [];
             this.collapseSpeed = 4.0;
             this.collapseStarted = true; // 精英直接内缩
             this.expanding = false;
             this.expandR = 0;
-            this.voidLife = 0.85;
+            this.voidLife = 0;
             this.voidRadius = 0;
-            this.voidMaxRadius = 18;
+            this.voidMaxRadius = 0;
             this.voidDecay = 0.03;
-            this.souls = Array.from({ length: 10 }, () => ({
-                angle: Math.random() * Math.PI * 2,
-                dist: 40 + Math.random() * 20,
-                speed: 1.5 + Math.random() * 1.2,
-                size: 1.2 + Math.random() * 1.5,
-                alpha: 0.6 + Math.random() * 0.3,
-                color: Math.random() < 0.6 ? '#c084fc' : '#e9d5ff',
+            this.voidEnabled = false;
+            this.eliteFractureAngle = Math.random() * Math.PI * 2;
+            this.eliteCuts = Array.from({ length: 5 }, (_, i) => ({
+                angle: this.eliteFractureAngle + (i - 2) * 0.34 + (Math.random() - 0.5) * 0.2,
+                offset: (i - 2) * 7 + (Math.random() - 0.5) * 5,
+                length: 32 + Math.random() * 34,
+                alpha: 0.55 + Math.random() * 0.35,
             }));
+            this.eliteShards = Array.from({ length: 12 }, (_, i) => ({
+                angle: this.eliteFractureAngle + Math.PI * (i % 2 ? 0.5 : -0.5) + (Math.random() - 0.5) * 1.1,
+                along: (Math.random() - 0.5) * 54,
+                dist: 4 + Math.random() * 8,
+                speed: 1.2 + Math.random() * 2.4,
+                size: 3 + Math.random() * 4,
+                spin: (Math.random() - 0.5) * 0.18,
+                spinAngle: Math.random() * Math.PI * 2,
+                alpha: 0.58 + Math.random() * 0.35,
+                color: Math.random() < 0.58 ? '#c084fc' : '#e9d5ff',
+            }));
+            this.souls = [];
         } else {
             // 普通：小圆圈内缩消失 + 灰烟尘
             this.decay = 0.04;
@@ -1082,6 +1474,7 @@ class DeathExplosion {
             this.voidRadius = 0;
             this.voidMaxRadius = 8;
             this.voidDecay = 0.06;
+            this.voidEnabled = true;
             this.souls = Array.from({ length: 5 }, () => ({
                 angle: Math.random() * Math.PI * 2,
                 dist: 18 + Math.random() * 10,
@@ -1091,6 +1484,7 @@ class DeathExplosion {
                 color: '#94a3b8',
             }));
         }
+        this._pixi = null; // [PixiJS 迁移]
     }
 
     update(timeScale) {
@@ -1116,14 +1510,21 @@ class DeathExplosion {
                 if (ring.r < 0) ring.r = 0;
             }
             // 精英/普通内缩开始后激活虚空
-            if (this.voidLife <= 0 && !this.expanding && this.tier !== 'boss') {
-                this.voidLife = this.tier === 'elite' ? 0.85 : 0.5;
+            if (this.voidEnabled && this.voidLife <= 0 && !this.expanding && this.tier !== 'boss') {
+                this.voidLife = 0.5;
                 this.voidRadius = 0;
             }
         }
 
+        if (this.tier === 'elite') {
+            for (const shard of this.eliteShards) {
+                shard.dist += shard.speed * timeScale;
+                shard.spinAngle += shard.spin * timeScale;
+            }
+        }
+
         // 虚空孔洞生长并消退
-        if (this.voidLife > 0) {
+        if (this.voidEnabled && this.voidLife > 0) {
             this.voidLife -= this.voidDecay * timeScale;
             // 先展开到 maxRadius，再缓慢收缩
             if (this.voidRadius < this.voidMaxRadius) {
@@ -1140,7 +1541,15 @@ class DeathExplosion {
 
     draw(ctx) {
         if (this.life <= 0) return;
+        // [PixiJS 迁移 · 阶段三] DeathExplosion
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = deathExplosion_pixiCreate(this);
+            if (this._pixi) { deathExplosion_pixiSync(this, this._pixi); return; }
+        }
         ctx.save();
+        const quality = (typeof game !== 'undefined' && game.perfQualityLevel) || 'high';
+        const isLow = quality === 'low';
+        const t = Math.min(1, this.timer / (1 / this.decay));
 
         // ---- 1. Boss 膨胀阶段：向外的气带圆圈（最后挥扎）----
         if (this.expanding && this.expandR > 0) {
@@ -1166,6 +1575,97 @@ class DeathExplosion {
             ctx.globalAlpha = 1;
         }
 
+        // ---- 1b. 精英死亡：紫晶裂解，不绘制圆形光圈 ----
+        if (this.tier === 'elite') {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.eliteFractureAngle);
+            ctx.globalCompositeOperation = isLow ? 'source-over' : 'lighter';
+
+            if (!isLow) {
+                ctx.globalAlpha = this.life * 0.28;
+                const core = ctx.createLinearGradient(-42, 0, 42, 0);
+                core.addColorStop(0, 'rgba(192,132,252,0)');
+                core.addColorStop(0.48, withAlpha('#c084fc', 0.62 * this.life));
+                core.addColorStop(0.52, withAlpha('#ffffff', 0.7 * this.life));
+                core.addColorStop(1, 'rgba(192,132,252,0)');
+                ctx.fillStyle = core;
+                ctx.beginPath();
+                ctx.moveTo(-42, -5 - t * 5);
+                ctx.lineTo(42, -2 - t * 8);
+                ctx.lineTo(36, 6 + t * 8);
+                ctx.lineTo(-38, 4 + t * 5);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            ctx.lineCap = 'round';
+            for (const cut of this.eliteCuts) {
+                const localT = Math.min(1, t * 1.25);
+                const half = cut.length * (0.35 + localT * 0.65) / 2;
+                ctx.save();
+                ctx.rotate(cut.angle - this.eliteFractureAngle);
+                ctx.translate(0, cut.offset);
+                ctx.globalAlpha = cut.alpha * this.life;
+                ctx.strokeStyle = cut.alpha > 0.72 ? '#ffffff' : '#c084fc';
+                ctx.lineWidth = isLow ? 1.4 : 2.2;
+                if (!isLow) {
+                    ctx.shadowColor = '#c084fc';
+                    ctx.shadowBlur = _sb(8);
+                }
+                ctx.beginPath();
+                ctx.moveTo(-half, 0);
+                ctx.lineTo(half, 0);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = cut.alpha * this.life * 0.42;
+                ctx.strokeStyle = '#2e1065';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(-half * 0.75, 2.5);
+                ctx.lineTo(half * 0.75, -2.5);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            for (const shard of this.eliteShards) {
+                const sx = shard.along;
+                const sy = Math.sin(shard.angle - this.eliteFractureAngle) * shard.dist;
+                const side = sy >= 0 ? 1 : -1;
+                ctx.save();
+                ctx.translate(sx, sy + side * t * 10);
+                ctx.rotate(shard.spinAngle);
+                ctx.globalAlpha = shard.alpha * this.life;
+                ctx.fillStyle = shard.color;
+                ctx.beginPath();
+                ctx.moveTo(-shard.size, 0);
+                ctx.lineTo(shard.size * 0.95, -shard.size * 0.58);
+                ctx.lineTo(shard.size * 0.35, shard.size * 1.05);
+                ctx.closePath();
+                ctx.fill();
+                if (!isLow) {
+                    ctx.globalAlpha = shard.alpha * this.life * 0.5;
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 0.8;
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = this.life * 0.55;
+            ctx.fillStyle = 'rgba(24, 12, 36, 0.78)';
+            ctx.beginPath();
+            ctx.moveTo(-18, -6 - t * 4);
+            ctx.lineTo(18, -3 - t * 6);
+            ctx.lineTo(14, 5 + t * 5);
+            ctx.lineTo(-16, 4 + t * 4);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+        }
+
         // ---- 2. 内爆收缩环（从外向内收紧）----
         if (this.collapseStarted) {
             ctx.globalCompositeOperation = 'lighter';
@@ -1186,7 +1686,7 @@ class DeathExplosion {
         }
 
         // ---- 3. 虚空孔洞（中心暗色消失感）----
-        if (this.voidLife > 0 && this.voidRadius > 0) {
+        if (this.voidEnabled && this.voidLife > 0 && this.voidRadius > 0) {
             const vl = Math.max(0, this.voidLife);
             const vColor = this.tier === 'boss' ? '120,40,40' : (this.tier === 'elite' ? '88,28,135' : '30,30,40');
             // 外圈暗色渐变圈（表现被吸入虚空的感觉）
@@ -1262,6 +1762,7 @@ class HealWave {
         this.crossLife = 1.0;
         this.crossLen = 0;
         this.crossMaxLen = range * 0.5;
+        this._pixi = null; // [PixiJS 迁移]
     }
 
     update(timeScale) {
@@ -1282,6 +1783,11 @@ class HealWave {
 
     draw(ctx) {
         if (this.life <= 0) return;
+        // [PixiJS 迁移 · 阶段三] HealWave → 预烘焙辉光/环 Sprite（消除 6 渐变 + 2 shadowBlur）
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = healWave_pixiCreate(this);
+            if (this._pixi) { healWave_pixiSync(this, this._pixi); return; }
+        }
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
 
@@ -1385,6 +1891,7 @@ class BladeStormRing {
         this.radius = radius * 0.3; // 从 30% 半径开始扩散
         this.life = 1.0;
         this.active = true;
+        this._pixi = null; // [PixiJS 迁移]
     }
 
     update(timeScale) {
@@ -1401,6 +1908,13 @@ class BladeStormRing {
 
     draw(ctx) {
         if (!this.active || this.life <= 0) return;
+
+        // [PixiJS 迁移 · 阶段三] BladeStormRing
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = bladeStormRing_pixiCreate(this);
+            if (this._pixi) { bladeStormRing_pixiSync(this, this._pixi); return; }
+        }
+
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         ctx.globalAlpha = this.life * 0.7;
@@ -1429,13 +1943,209 @@ class BladeStormRing {
 }
 
 /**
+ * BladeStormVortex - 剑刃风暴：环绕中心持续旋转的「流光剑群」
+ *
+ * 设计要点（刻意区别于风属性的翠绿旋风）：
+ *  - 配色走「钢冷青白」(#7dd3fc / #38bdf8 / #eaf6ff)，而非风属性的 #34d399，避免与风混淆；
+ *  - 形态是「一直围绕中心旋转」的飞剑群（持续环绕，而非一波波甩出去）；
+ *  - 每把剑是细长流光剑：尖锐光刃 + 身后沿轨道拖一条更长的渐隐流光尾迹；
+ *  - 双层剑环（外层 / 内层方向相反、速度不同）制造层次与风暴混沌感；
+ *  - 中心一团冷青涡心微光 + 几缕内卷螺旋，凝聚出「风暴」但不画成绿色实心环。
+ *
+ * 生命周期：持续型。中心点由外部每帧 setCenter() 跟随首个子弹；
+ *   入场约 12 帧「召剑」（半径从外向内收束 + 强度渐显）；
+ *   外部调用 fadeOut() 后剑群外扩飞散并淡出（约 16 帧），life<=0 时被主循环回收。
+ */
+class BladeStormVortex {
+    constructor(x, y, radius = 120) {
+        this.x = x;
+        this.y = y;
+        this.targetRadius = Math.max(40, radius);
+        this.radius = this.targetRadius * 1.55;   // 入场：从外向内收束
+        this.phase = Math.random() * 100;          // 旋转相位累加（帧）
+        this.age = 0;
+        this.life = 1.0;        // 主循环按 life>0 保活 / 回收
+        this.active = true;
+        this.fading = false;
+        this.intensity = 0;     // 0→1 入场强度
+        this.fadeT = 1.0;       // 1→0 淡出系数
+
+        // 三层剑环：外层剑多、内层剑少，方向交替、速度更快
+        const outerCount = Math.min(16, Math.max(8, Math.round(this.targetRadius / 12)));
+        const midCount   = Math.max(6, Math.round(outerCount * 0.7));
+        const innerCount = Math.max(4, Math.round(outerCount * 0.45));
+        this.rings = [
+            { count: outerCount, rFactor: 1.0,  speed:  0.15, len: 1.05, width: 1.0  },
+            { count: midCount,   rFactor: 0.74, speed: -0.22, len: 0.9,  width: 0.9  },
+            { count: innerCount, rFactor: 0.46, speed:  0.29, len: 0.72, width: 0.78 },
+        ];
+        // 每把剑加随机扰动：角度/半径/长度/转速/闪烁相位，打破完全均匀
+        for (const ring of this.rings) {
+            ring.jit = [];
+            const step = (Math.PI * 2) / ring.count;
+            for (let k = 0; k < ring.count; k++) {
+                ring.jit.push({
+                    a: (Math.random() - 0.5) * step * 0.6,   // 角度抖动
+                    r: (Math.random() - 0.5) * 0.18,          // 半径抖动
+                    l: 0.8 + Math.random() * 0.5,             // 长度缩放
+                    s: 0.85 + Math.random() * 0.3,            // 转速微差
+                    f: Math.random() * Math.PI * 2,           // 闪烁相位
+                });
+            }
+        }
+        this._pixi = null; // [PixiJS 迁移]
+    }
+
+    setCenter(x, y) { this.x = x; this.y = y; }
+    fadeOut() { this.fading = true; }
+
+    update(timeScale = 1) {
+        const ts = timeScale || 1;
+        this.age += ts;
+        this.phase += ts;
+        this.intensity = Math.min(1, this.intensity + 0.1 * ts);
+        this.radius += (this.targetRadius - this.radius) * 0.16 * ts;
+        if (this.fading) {
+            this.fadeT -= 0.06 * ts;
+            this.radius += 3.2 * ts;   // 淡出时向外飞散
+            if (this.fadeT <= 0) {
+                this.fadeT = 0;
+                this.life = 0;
+                this.active = false;
+            }
+        }
+    }
+
+    // 画一把流光剑：ang=当前轨道角，r=轨道半径，dirSign=旋转方向(+1/-1)
+    _drawBlade(ctx, ang, r, dirSign, lenScale, widScale, alpha) {
+        const cx = this.x, cy = this.y;
+        const bx = cx + Math.cos(ang) * r;
+        const by = cy + Math.sin(ang) * r;
+        const tang = ang + dirSign * Math.PI / 2;   // 切向 = 运动方向
+
+        // 1) 流光尾迹：沿轨道在身后拖一条更长的渐隐光带
+        const trailSpan = 0.6 * lenScale;
+        const segs = 8;
+        ctx.lineCap = 'round';
+        for (let s = 0; s < segs; s++) {
+            const t0 = s / segs, t1 = (s + 1) / segs;
+            const a0 = ang - dirSign * trailSpan * t0;
+            const a1 = ang - dirSign * trailSpan * t1;
+            const x0 = cx + Math.cos(a0) * r, y0 = cy + Math.sin(a0) * r;
+            const x1 = cx + Math.cos(a1) * r, y1 = cy + Math.sin(a1) * r;
+            const fade = 1 - t1;
+            ctx.globalAlpha = alpha * fade * 0.7;
+            ctx.strokeStyle = s < 2 ? '#eaf6ff' : '#7dd3fc';
+            ctx.lineWidth = 3.4 * widScale * fade;
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x1, y1);
+            ctx.stroke();
+        }
+
+        // 2) 剑身：细长光刃（尖锐菱形），指向切向
+        ctx.save();
+        ctx.translate(bx, by);
+        ctx.rotate(tang);
+        const L = 21 * lenScale;
+        const W = 3.2 * widScale;
+        ctx.globalAlpha = alpha;
+        ctx.shadowBlur = _sb(10);
+        ctx.shadowColor = '#38bdf8';
+        ctx.fillStyle = '#7dd3fc';
+        ctx.beginPath();
+        ctx.moveTo(L, 0);
+        ctx.lineTo(0, -W);
+        ctx.lineTo(-L * 0.36, 0);
+        ctx.lineTo(0, W);
+        ctx.closePath();
+        ctx.fill();
+        // 白热核心
+        ctx.shadowBlur = _sb(4);
+        ctx.shadowColor = '#ffffff';
+        ctx.fillStyle = '#eaf6ff';
+        ctx.beginPath();
+        ctx.moveTo(L * 0.9, 0);
+        ctx.lineTo(0, -W * 0.42);
+        ctx.lineTo(-L * 0.28, 0);
+        ctx.lineTo(0, W * 0.42);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+        // [PixiJS 迁移 · 阶段三] BladeStormVortex
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = bladeStormVortex_pixiCreate(this);
+            if (this._pixi) { bladeStormVortex_pixiSync(this, this._pixi); return; }
+        }
+        const alphaBase = this.intensity * this.fadeT;
+        if (alphaBase <= 0.01) return;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+
+        // 中心涡心微光（冷青，低调，不画成绿色实心环）
+        const coreR = this.radius * 0.95;
+        const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, coreR);
+        g.addColorStop(0,   withAlpha('#bfe9ff', 0.22 * alphaBase));
+        g.addColorStop(0.5, withAlpha('#38bdf8', 0.10 * alphaBase));
+        g.addColorStop(1,   'rgba(56,189,248,0)');
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, coreR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 几缕内卷螺旋（凝聚“风暴”感）：反向拖尾 + 高分辨率成曲线
+        ctx.lineCap = 'round';
+        const wisps = 4;
+        for (let i = 0; i < wisps; i++) {
+            const base = this.phase * 0.11 + (i / wisps) * Math.PI * 2;
+            ctx.globalAlpha = 0.14 * alphaBase;
+            ctx.strokeStyle = '#7dd3fc';
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            let firstPt = true;
+            for (let t = 0; t <= 1.0001; t += 0.035) {
+                const a = base - t * Math.PI * 2 * 1.15;   // 外端落后于旋转 → 拖尾螺旋
+                const rr = this.radius * (0.18 + 0.74 * t);
+                const px = this.x + Math.cos(a) * rr;
+                const py = this.y + Math.sin(a) * rr;
+                if (firstPt) { ctx.moveTo(px, py); firstPt = false; } else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+        }
+
+        // 多层剑环：持续围绕中心旋转的飞剑群（带随机扰动，不再完全均匀）
+        for (const ring of this.rings) {
+            const r0 = this.radius * ring.rFactor;
+            const dirSign = ring.speed >= 0 ? 1 : -1;
+            for (let k = 0; k < ring.count; k++) {
+                const j = ring.jit[k];
+                const ang = ring.speed * this.phase * j.s + (k / ring.count) * Math.PI * 2 + j.a;
+                const r = r0 * (1 + j.r);
+                const flick = 0.7 + 0.3 * Math.sin(this.age * 0.35 + j.f);
+                this._drawBlade(ctx, ang, r, dirSign, ring.len * j.l, ring.width, alphaBase * flick);
+            }
+        }
+
+        ctx.restore();
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+    }
+}
+
+/**
  * SwordScar - 剑痕残留特效
  * 在敌人位置绘制一道短暂的斜线剑痕，模拟被斩击后的刀痕
  */
 class SwordScar {
-    constructor(x, y) {
+    constructor(x, y, color = '#34d399') {
         this.x = x;
         this.y = y;
+        this.color = color;
         // 随机斜向角度（偏向斜线感）
         this.angle = (Math.random() - 0.5) * Math.PI * 0.5 + Math.PI * 0.25;
         this.length = 20 + Math.random() * 20;
@@ -1444,6 +2154,7 @@ class SwordScar {
         // 随机偏移，避免所有剑痕重叠
         this.offsetX = (Math.random() - 0.5) * 20;
         this.offsetY = (Math.random() - 0.5) * 20;
+        this._pixi = null; // [PixiJS 迁移]
     }
 
     update(timeScale) {
@@ -1457,6 +2168,13 @@ class SwordScar {
 
     draw(ctx) {
         if (!this.active || this.life <= 0) return;
+
+        // [PixiJS 迁移 · 阶段三] SwordScar
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = swordScar_pixiCreate(this);
+            if (this._pixi) { swordScar_pixiSync(this, this._pixi); return; }
+        }
+
         ctx.save();
         ctx.translate(this.x + this.offsetX, this.y + this.offsetY);
         ctx.rotate(this.angle);
@@ -1465,18 +2183,19 @@ class SwordScar {
 
         const halfL = this.length / 2;
         // 主剑痕线
+        const c = this.color || '#34d399';
         const grad = ctx.createLinearGradient(-halfL, 0, halfL, 0);
-        grad.addColorStop(0, 'rgba(255,255,255,0)');
-        grad.addColorStop(0.3, 'rgba(52, 211, 153, 0.9)');
+        grad.addColorStop(0, withAlpha(c, 0));
+        grad.addColorStop(0.3, withAlpha(c, 0.9));
         grad.addColorStop(0.5, 'rgba(255, 255, 255, 1)');
-        grad.addColorStop(0.7, 'rgba(52, 211, 153, 0.9)');
-        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        grad.addColorStop(0.7, withAlpha(c, 0.9));
+        grad.addColorStop(1, withAlpha(c, 0));
 
         ctx.strokeStyle = grad;
         ctx.lineWidth = 2.5 * this.life;
         ctx.lineCap = 'round';
         ctx.shadowBlur = _sb(8);
-        ctx.shadowColor = '#34d399';
+        ctx.shadowColor = c;
         ctx.beginPath();
         ctx.moveTo(-halfL, 0);
         ctx.lineTo(halfL, 0);
@@ -1592,6 +2311,7 @@ class RewardDropEffect {
                 alpha: 0.7 + Math.random() * 0.3,
             }));
         }
+        this._pixi = null; // [PixiJS 迁移]
     }
 
     update(timeScale) {
@@ -1659,6 +2379,11 @@ class RewardDropEffect {
 
     draw(ctx) {
         if (this.life <= 0) return;
+        // [PixiJS 迁移 · 阶段三] RewardDropEffect
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = rewardDropEffect_pixiCreate(this);
+            if (this._pixi) { rewardDropEffect_pixiSync(this, this._pixi); return; }
+        }
         const alpha = Math.max(0, this.life);
         ctx.save();
 
@@ -1958,6 +2683,7 @@ class RewardDropEffect {
 export {
     Particle,
     SlashEffect,
+    PierceCutEffect,
     CollectionBeam,
     Shockwave,
     LaserBeam,
@@ -1970,6 +2696,7 @@ export {
     HealWave,
     GreedyWheelEffect,
     BladeStormRing,
+    BladeStormVortex,
     SwordScar,
     RewardDropEffect
 };

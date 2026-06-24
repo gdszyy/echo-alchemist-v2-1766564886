@@ -2,7 +2,9 @@
 
 > 日期：2026-06-23
 > 范围：`#phase-combat` 战斗背景、墙体、防线、底部发射区、技能栏、符文充能、态势条、战斗 UI 图标与面板底。
-> 目标：先统一设计语言，再进入图片生成与接入；本案不修改运行时代码。
+> 目标：先统一设计语言，再进入图片生成与接入；原始设计案不修改运行时代码。
+
+> 2026-06-23 runtime 落地记录：已接入一批轻量占位位图用于验证交互与锚点，包含墙体导轨、防线条、速度倍率按钮、弹药队列托盘和独立旋转炮管。发射器底座继续使用已认可的 V3 底座；正式美术仍应按本文绿幕流程替换同名 runtime 资产或新增正式版路径。
 
 ## 1. 设计结论
 
@@ -205,7 +207,7 @@ Avoid: checkerboard preview background, green glow, tiny unreadable details, ful
 3. **低风险接入**：先替换静态背景与 DOM 9-Slice，不改交互。
 4. **墙体接入**：把墙体位图作为 Canvas `drawImage` 层，保留现有线条 fallback。
 5. **图标刷新**：技能与态势短图标接入 `src/bitmap_icons.js` 或集中映射文件。
-6. **发射器 V4**：只有当 V4 在 128px 绘制尺寸下明显优于 V3，再替换运行时映射。
+6. **发射器底座**：当前保留 V3 底座；只有当后续新底座在 128px 绘制尺寸下明显优于 V3，才允许替换运行时映射。
 
 ## 6. 性能边界
 
@@ -278,7 +280,7 @@ Avoid: checkerboard preview background, green glow, tiny unreadable details, ful
 
 ## 11. V4 分层运行时撤回记录
 
-2026-06-23 已撤回第一版 V4 分层发射器运行时资源：这些文件来自非绿幕透明/棋盘格 prompt 后处理，不符合当前 chroma key 资产流程。原文件已移动到 `docs/design/concepts/combat_ui_pass1/rejected_chroma_key_required/`，仅保留为反例和重做参考。运行时已切回 V3 发射器资源，`EMITTER_BARREL_SRC` 当前为 `null`。
+2026-06-23 已撤回第一版 V4 分层发射器底座运行时资源：这些文件来自非绿幕透明/棋盘格 prompt 后处理，不符合当前 chroma key 资产流程。原文件已移动到 `docs/design/concepts/combat_ui_pass1/rejected_chroma_key_required/`，仅保留为反例和重做参考。运行时底座仍使用 V3 发射器资源；为了保留可旋转炮管，当前从 V4 炮管概念裁出窄炮管层 `assets/ui/sprites/emitter_barrel_rotating_v4_runtime.png` 并挂到 `EMITTER_BARREL_SRC`。
 
 | 资产 | 文件 | 说明 |
 |---|---|---|
@@ -289,26 +291,40 @@ Avoid: checkerboard preview background, green glow, tiny unreadable details, ful
 | 蓄力叠加层 | `assets/ui/sprites/emitter_charging_v4_0.png` ~ `_5.png` | 已撤回；只叠加底座能量，不旋转数据 UI |
 | 分层验收预览 | `docs/design/concepts/combat_ui_pass1/emitter_v4_split_runtime_preview.png` | 使用运行时底座、炮管和同一 pivot 规则合成，确认读数 UI 不跟随炮管旋转 |
 
-运行时映射已恢复为 V3：`src/bitmap_icons.js` 中 `EMITTER_BASE_SRC = emitter_base_v3.png`，`EMITTER_BARREL_SRC = null`，`EMITTER_CHARGING_SRCS` 指向 V3 蓄力帧。`src/render_system.js` 的 `render_combat_launcherEmitterBase()` 仍保留可选炮管分层绘制能力，等绿幕重做资产合格后再重新启用，不改变实际发射物理与瞄准线锚点。
+运行时映射当前为混合过渡态：`src/bitmap_icons.js` 中 `EMITTER_BASE_SRC = emitter_base_v3.png`，`EMITTER_BARREL_SRC = emitter_barrel_rotating_v5_runtime.png`，`EMITTER_CHARGING_SRCS` 指向 V3 蓄力帧。`src/render_system.js` 的 `render_combat_launcherEmitterBase()` 会让窄炮管层随瞄准方向旋转，并把充能线圈、枪口闪光绑定到炮管方向；`src/game_phase.js` 会在真实出弹后短暂锁定发射角，再缓慢回正，不改变实际发射物理与瞄准线锚点。
 
-性能自适应影响评估：撤回后不再新增炮管 `drawImage`；当前恢复到 V3 底图 + V3 蓄力帧路径。后续绿幕版 V4 重新接入时，再重新记录 1 次额外炮管 `drawImage` 的影响评估。
+性能自适应影响评估：当前每帧保留 V3 底图 `drawImage`，新增 1 次可选炮管 `drawImage` 和固定形状的充能/枪口 Canvas 覆盖；`low` 档关闭高亮阴影，`medium/high` 档保留短时 glow。后续绿幕版 V4 底座重新接入时，再重新记录底座替换的影响评估。
 
 ## 12. 战斗场地 V2 运行时接入与撤回记录
 
-2026-06-23 已将首轮概念稿中的完整背景处理为第一版运行时资源，并以 `_v2` 后缀非破坏式接入。依赖透明边缘的墙体/HUD 资源已撤回，原因同上：源图未按绿幕/chroma key 流程生成。
+2026-06-23 已将首轮概念稿中的完整背景处理为第一版运行时资源，并以 `_v2` 后缀非破坏式接入。2026-06-24 墙体资源重新进入运行时映射；HUD 大面板资源仍不在当前运行时映射内，后续接入前仍需按绿幕/chroma key 流程验收。
 
 | 资产 | 文件 | 说明 |
 |---|---|---|
 | 战斗主背景 | `assets/ui/backgrounds/bg_combat_table_v2.png` | 720x1280；仅 `phase === 'combat'` 时替代原 `bg_main_canvas.png` |
 | 战斗底部发射区 | `assets/ui/backgrounds/bg_combat_emitter_zone_v2.png` | 720x220；仅战斗阶段替代原 `bg_emitter_zone.png` |
-| 左反弹墙 | `assets/ui/sprites/combat_wall_left_v2.png` | 已撤回；48x1024；需绿幕源图重做 |
-| 右反弹墙 | `assets/ui/sprites/combat_wall_right_v2.png` | 已撤回；48x1024；需绿幕源图重做 |
-| 顶部反弹墙梁 | `assets/ui/sprites/combat_wall_top_v2.png` | 已撤回；720x64；需绿幕源图重做 |
+| 左反弹墙 | `assets/ui/sprites/combat_wall_left_v2.png` | 当前运行时映射使用；48x1024；需随代码提交 |
+| 右反弹墙 | `assets/ui/sprites/combat_wall_right_v2.png` | 当前运行时映射使用；48x1024；需随代码提交 |
+| 顶部反弹墙梁 | `assets/ui/sprites/combat_wall_top_v2.png` | 当前运行时映射使用；720x64；需随代码提交 |
 | 态势条底板 | `assets/ui/sprites/combat_status_panel_v2_9s.png` | 已撤回；640x160；需绿幕源图重做 |
 | 技能栏底板 | `assets/ui/sprites/skill_bar_panel_v2_9s.png` | 已撤回；384x512；需绿幕源图重做 |
 | 符文充能框 | `assets/ui/sprites/combat_rune_charge_frame_v2_9s.png` | 已撤回；420x96；需绿幕源图重做 |
 | 运行时资产预览 | `docs/design/concepts/combat_ui_pass1/combat_ui_runtime_v2_asset_preview.png` | 用于检查正式资源尺寸、alpha 与整体方向 |
 
-运行时映射集中在 `src/bitmap_icons.js`：战斗阶段继续使用 `BG_COMBAT_TABLE_SRC`、`BG_COMBAT_EMITTER_ZONE_SRC`；墙体 `COMBAT_WALL_LEFT_SRC`、`COMBAT_WALL_RIGHT_SRC`、`COMBAT_WALL_TOP_SRC` 当前为 `null`。`src/render_system.js` 的 `render_combat_walls()` 因此走旧渐变墙 fallback。`src/game_phase.js` 只从内联墙体绘制切换为调用该渲染函数，不改变碰撞边界、敌人生成、子弹反弹或阶段流转。
+运行时映射集中在 `src/bitmap_icons.js`：战斗阶段继续使用 `BG_COMBAT_TABLE_SRC`、`BG_COMBAT_EMITTER_ZONE_SRC`；墙体 `COMBAT_WALL_LEFT_SRC`、`COMBAT_WALL_RIGHT_SRC`、`COMBAT_WALL_TOP_SRC` 指向上述 V2 文件。`src/render_system.js` 的 `render_combat_walls()` 会优先绘制位图墙体，资源缺失或未加载时走旧渐变墙 fallback。`src/game_phase.js` 只从内联墙体绘制切换为调用该渲染函数，不改变碰撞边界、敌人生成、子弹反弹或阶段流转。
 
-性能自适应影响评估：当前只保留战斗背景每帧 1 次全屏 `drawImage` 与底部发射区 1 次裁剪 `drawImage`；墙体回到旧渐变 fallback，HUD 回到旧 CSS/9-Slice 资源。后续绿幕版墙体重新接入时，再重新记录最多 3 次静态 `drawImage` 的影响评估。
+性能自适应影响评估：当前保留战斗背景每帧 1 次全屏 `drawImage`、底部发射区 1 次裁剪 `drawImage`，并新增最多 3 次静态墙体 `drawImage`；资源缺失时仍回到旧渐变 fallback。HUD 继续使用旧 CSS/9-Slice 资源，后续若重接入 HUD 大面板位图需单独记录评估。
+
+## 13. 战斗底部操作台 V2 资产拆分
+
+2026-06-24 根据移动端 390px 宽运行验证，底部 UI 不再按整条横向面板设计，而是拆成“左翼操作台 + 中央透明发射器井 + 右翼技能台”。正式资产契约见 [`docs/design/combat_console_v2_asset_plan.md`](combat_console_v2_asset_plan.md)，移动端蓝图见 [`docs/design/concepts/combat_console_v2_asset_blueprint.svg`](concepts/combat_console_v2_asset_blueprint.svg)。
+
+核心约束：
+
+- 中央 132px 发射器井不出整块底板，不允许 DOM 面板或装饰跨过发射器。
+- 底部 dock 高度保持 96px，左右翼视觉高度约 88px，不越过警戒线可视带。
+- 左翼补充弹药序列、当前弹药和分析入口，删除旧战斗统计数字。
+- 右翼承载技能按钮、技能点宝石、技能充能短轨和符文配置 socket。
+- 商人旅程进入顶部栏，作为紧凑进度条，不下压到敌人区域。
+
+首批正式资产建议从 `combat_console_left_wing_9s.png`、`combat_console_right_wing_9s.png`、`skill_sp_gem_empty/full.png` 和 `merchant_journey_topbar_9s.png` 开始。所有透明资源仍必须使用纯绿幕/chroma key 生成源图，再由本地流程抠出 alpha。

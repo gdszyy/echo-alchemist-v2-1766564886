@@ -266,7 +266,13 @@ export const DamageCalc = {
                 selected._lightningHitThisRound = true;
 
                 const result = selected.takeDamage(dmg);
-                this.combat_recordDamage(result.actualDamage, 'lightning', 'main', shotId);
+                const hpDamage = result.hpDamage ?? result.actualDamage ?? 0;
+                this.combat_recordDamage(hpDamage, 'lightning', 'main', shotId);
+
+                // [修复] 闪电链伤害飘字：与主命中路径一致，受 showDamageNumbers 开关控制，使用雷属性紫色 #c084fc
+                if (this.showDamageNumbers && hpDamage > 0 && typeof this.spawn_createFloatingText === 'function') {
+                    this.spawn_createFloatingText(selected.pos.x, selected.pos.y, `-${Math.ceil(hpDamage)}`, '#c084fc');
+                }
 
                 if (result.killed) this.spawn_addScore(selected.maxHp);
 
@@ -462,11 +468,12 @@ export const DamageCalc = {
 
         // 造成真实伤害（直接调用 takeDamage，不经过护盾）
         const fusionResult = enemy.takeDamage(fusionDmg, null, true);
-        this.combat_recordDamage(fusionResult.actualDamage, 'lightning', 'main', shotId);
+        const fusionHpDamage = fusionResult.hpDamage ?? fusionResult.actualDamage ?? 0;
+        this.combat_recordDamage(fusionHpDamage, 'lightning', 'main', shotId);
 
         // 8. 超大浮动文字（字号 28px，三行：标题 + 伤害数值）
         this.spawn_createFloatingText(ex, ey - 60, `⚗️ ELEMENTAL FUSION!`, '#f0abfc', 22);
-        this.spawn_createFloatingText(ex, ey - 30, `${Math.ceil(fusionResult.actualDamage)}`, '#ffffff', 28);
+        this.spawn_createFloatingText(ex, ey - 30, `${Math.ceil(fusionHpDamage)}`, '#ffffff', 28);
 
         if (fusionResult.killed) this.spawn_addScore(enemy.maxHp);
 

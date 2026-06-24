@@ -18,6 +18,7 @@
 import { CONFIG } from '../config.js';
 import { Vec2, lerp, lerpColor } from '../utils/math_utils.js';
 import { Particle } from '../effects/particles.js';
+import { getUiBitmap, DEFENSE_ICON_MAP } from '../bitmap_icons.js';
 import { sb as _sb } from '../utils/perf.js';
 import { eventBus } from '../event_bus.js';
 import { createSpriteRenderer } from '../render/sprite_renderer.js'; // [Phase 5B Task 5.B3] Sprite 动画渲染器
@@ -47,6 +48,13 @@ const audio = new Proxy({}, {
 });
 
 const _affixOverlayImageCache = new Map();
+const _DEFENSE_HUD_ICON_SRC = {
+    shield: 'assets/ui/icons/enemy_affixes/affix_shield.png',
+    radiantAegis: 'assets/ui/icons/enemy_affixes/affix_radiantAegis.png',
+    energyArmor: 'assets/ui/icons/enemy_affixes/affix_energyArmor.png',
+    phaseShield: 'assets/ui/icons/enemy_affixes/affix_phaseShield.png',
+    livingArmor: 'assets/ui/icons/enemy_affixes/affix_livingArmor.png',
+};
 
 function _getAffixOverlayImage(src) {
     if (!src || typeof Image === 'undefined') return null;
@@ -219,6 +227,15 @@ const MINION_COLLISION_FRAME_ASSETS = {
     },
 };
 
+const OUROBOROS_ATTACHMENT_SLOT_ASSETS = {
+    aegis: 'assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_aegis_1x1_idle.png',
+    graft: 'assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_graft_1x1_idle.png',
+    brood: 'assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_brood_1x1_idle.png',
+    stride: 'assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_stride_1x1_idle.png',
+    maw: 'assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_maw_1x1_idle.png',
+    surge: 'assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_surge_1x1_idle.png',
+};
+
 // ==================== 敌人底层纹理缓存 ====================
 // @perf-impact: _initTexture 同步创建 OffscreenCanvas，批量刷怪时密集分配引发进场卡顿。
 // 纹理为静态只读（仅 drawImage 读取，从不修改），故按「类型|尺寸|seed桶|gloss」共享同一画布。
@@ -251,7 +268,16 @@ class Enemy {
         this.hpDropTimer = 0;
         this.active = true; 
         this.type = type;
+        this.gridCols = type === 'boss' ? 3 : 1;
+        this.gridRows = type === 'boss' ? 2 : 1;
         this.affixes = affixes;
+        this._runeBearerTempAffix = null;
+        this._runeBearerBaseAffixes = null;
+        this._runeBearerTempShieldCharges = 0;
+        this._runeBearerRollTimer = 0;
+        this.adaptiveRuneElement = null;
+        this._adaptiveRuneShiftTimer = 0;
+        this._adaptiveRuneLastReason = null;
         // [架构] elite/boss 由 spawn_system.js 通过 e.type 直接赋值，不再从 affixes 隐式转换
         this.hitTimer = 0;
         this._hitFlashTimer = 0;
@@ -259,6 +285,8 @@ class Enemy {
         this.justSpawned = true; 
         this.temp = 0; 
         this.bumpOffsetY = 0; 
+        this._blastOffsetX = 0;
+        this._blastOffsetY = 0;
         this.isFrozenCurrentTurn = false; 
         this.frozenCount = 0; // [温度衰减] 该敌人累计被冰冻的次数，每次被冰冻后温度降低效果乘以 0.9^frozenCount
 
@@ -293,6 +321,9 @@ class Enemy {
         this._ouroborosOrbitPulseTimer = 0;
         this._ouroborosOrbitDisruptTimer = 0;
         this._ouroborosLastAction = null;
+        this._ouroborosDamageGateProgress = 0;
+        this._ouroborosDamageGateSeq = 0;
+        this._ouroborosLastDamageGateAction = null;
 
         this.swordMarks = 0; // 剑痕标记层数
         this.markTimer = 0;  // 标记持续时间
@@ -347,18 +378,21 @@ class Enemy {
         this._shieldBreakTimer = 0; // 护盾破碎反馈计时器
         this._wardBlockTimer = 0; // 偏折屏障拦截反馈计时器
         this._wardBreakTimer = 0; // 偏折屏障破碎反馈计时器
+        this._defenseImpactFx = {}; // 防御层受击方向快照（瞬时视觉态，不持久化）
         this.radiantAegis = 0; // 流彩护盾数值护盾
         this.radiantAegisMax = 0;
         this.radiantAegisBroken = false;
         this._radiantAegisPulseTimer = 0;
         this._radiantAegisBreakTimer = 0;
         this.energyArmorShield = 0; // 蓄能甲转换出的临时数值护盾
+        this._energyArmorBlockTimer = 0;
         this.livingArmorHp = 0; // 活体护甲当前生命
         this.livingArmorMax = 0;
         this.livingArmorBaseMax = 0;
         this.livingArmorStacked = false;
         this.livingArmorBroken = false;
         this._livingArmorHitTimer = 0;
+        this._livingArmorBreakTimer = 0;
         this._armorSporeTrailTimer = 0;
         this._armorSporeTrailDuration = 0;
         this._armorSporeTrailFromX = 0;
@@ -366,6 +400,9 @@ class Enemy {
         this._phaseShieldTurn = 0;
         this.phaseShieldDisabledThisTurn = false;
         this._phaseShieldInitialApplied = false;
+        this._phaseShieldBlockTimer = 0;
+        this._phaseShieldBreakTimer = 0;
+        this._lowDamageImmuneBlockTimer = 0;
         this._overloadDamageThisTurn = 0;
         this._overloadBonusThisTurn = 0;
         this._carrierCooldown = 0;
@@ -380,6 +417,7 @@ class Enemy {
         this.bossOwnerId = undefined; // Boss 入场转化出的专属敌人归属
         this.bossMinionRole = undefined;
         this.bossMechanicTags = [];
+        this.visualAssetKey = null;
         this.furnacePressure = 0; // Ignis 专属：100℃以上不烧伤，转为温压
         this.furnacePressureThreshold = 0;
         this._furnacePressurePulseTimer = 0;
@@ -390,8 +428,16 @@ class Enemy {
         this._teslaChargedTurns = 0;
         this._teslaGrantedHaste = false;
         this._teslaShockTimer = 0;
+        this.devourerFeedStacks = 0;
+        this._devourerDigestCooldown = 0;
+        this._devourerSummonCooldown = 0;
+        this._devourerMawPulseTimer = 0;
+        this._devourerPullTimer = 0;
         this.chimeraFeedStacks = 0;
         this.chimeraInheritedStatusCount = 0;
+        this.chimeraHeatStacks = 0;
+        this.chimeraFrostStacks = 0;
+        this.chimeraRadiantConversions = 0;
         this._chimeraDigestCooldown = 0;
         this._chimeraSummonCooldown = 0;
         this._chimeraMawPulseTimer = 0;
@@ -445,6 +491,9 @@ class Enemy {
         this._visualFramePath = '';
         this._collisionFrameImage = null;
         this._affixOverlayImages = [];
+        if ((this.affixes || []).includes('runeBearer')) {
+            this._tickRuneBearerForTurn(null);
+        }
     }
 
     /**
@@ -461,6 +510,10 @@ class Enemy {
             gridCols: this.gridCols || 1,
             gridRows: this.gridRows || 1,
             affixes: this.affixes || [],
+            visualAssetKey: this.visualAssetKey,
+            bossOwnerId: this.bossOwnerId,
+            bossMinionRole: this.bossMinionRole,
+            bossMechanicTags: this.bossMechanicTags,
         });
         const spriteKey = `${this.type || 'normal'}|${this.bossType || ''}|${resolved?.assetKey || ''}`;
         if (this._spriteRenderer && this._spriteVisualKey === spriteKey) return;
@@ -473,6 +526,10 @@ class Enemy {
             gridCols: this.gridCols || 1,
             gridRows: this.gridRows || 1,
             affixes: this.affixes || [],
+            visualAssetKey: this.visualAssetKey,
+            bossOwnerId: this.bossOwnerId,
+            bossMinionRole: this.bossMinionRole,
+            bossMechanicTags: this.bossMechanicTags,
         });
         if (this._spriteRenderer) {
             this._spriteRenderer.play('idle');
@@ -627,8 +684,61 @@ class Enemy {
         _enemyTextureCache.set(_texKey, offscreen);
     }
 
+    // @perf-impact: Explosion knockback is a visual-only transform offset; no particles, gradients, collision, or grid movement are added.
+    applyExplosionKnockback(cx, cy, radius = 100, maxOffset = 12) {
+        if (!this.active) return false;
+        if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(radius) || !Number.isFinite(maxOffset)) return false;
+        if (radius <= 0 || maxOffset <= 0) return false;
+
+        const dx = this.pos.x - cx;
+        const dy = this.pos.y - cy;
+        const radiusSq = radius * radius;
+        const distSq = dx * dx + dy * dy;
+        if (distSq > radiusSq) return false;
+
+        const dist = Math.sqrt(distSq);
+        const falloff = Math.max(0, 1 - dist / radius);
+        const eased = falloff * falloff * (3 - 2 * falloff);
+        if (eased <= 0.001) return false;
+
+        const sizeDamp = this.type === 'boss' ? 0.35 : (this.type === 'elite' ? 0.72 : 1);
+        const amount = Math.min(maxOffset, maxOffset * eased * sizeDamp);
+        if (amount <= 0.05) return false;
+
+        const fallbackAngle = ((this.visualSeed || 0.5) * Math.PI * 2) || 0;
+        const nx = dist > 0.01 ? dx / dist : Math.cos(fallbackAngle);
+        const ny = dist > 0.01 ? dy / dist : Math.sin(fallbackAngle);
+        const capX = Math.max(10, maxOffset * 1.25);
+        const capY = Math.max(8, maxOffset);
+
+        this._blastOffsetX = Math.max(-capX, Math.min(capX, (this._blastOffsetX || 0) + nx * amount));
+        this._blastOffsetY = Math.max(-capY, Math.min(capY, (this._blastOffsetY || 0) + ny * amount));
+        return true;
+    }
+
+    _tickExplosionKnockback(timeScale) {
+        if (!this._blastOffsetX && !this._blastOffsetY) return;
+        const decay = Math.pow(0.88, Math.max(0, timeScale || 1));
+        this._blastOffsetX *= decay;
+        this._blastOffsetY *= decay;
+        if (Math.abs(this._blastOffsetX) < 0.05) this._blastOffsetX = 0;
+        if (Math.abs(this._blastOffsetY) < 0.05) this._blastOffsetY = 0;
+    }
+
+    /**
+     * @getter isFrozen
+     * @description 冰冻判定，与冻结视觉（冰晶覆盖，temp <= -34）保持一致。
+     * 冻结期间停止待机浮动与精灵动画。
+     */
+    get isFrozen() {
+        return this.isFrozenCurrentTurn === true
+            || this.temp <= -34
+            || (this.frozenTurns && this.frozenTurns > 0);
+    }
+
     update(timeScale, game) {
         if (!this.active) return;
+        this._tickExplosionKnockback(timeScale);
         if (this.bossType === 'devourer') this._ensureDevourerBodyCollisionShape();
 
         // === [Phase 5B Task 5.B3] SpriteRenderer 动画状态更新 ===
@@ -637,17 +747,20 @@ class Enemy {
             const dt = Math.min((nowMs - this._spriteLastMs) / 1000, 0.1); // 限制最大帧时间差
             this._spriteLastMs = nowMs;
 
-            // 根据 actionPhase 和 hitTimer 映射到动画名称
-            let targetAnim = 'idle';
-            if (this.hitTimer > 0 && this._spriteRenderer.hasAnim('hit')) {
-                targetAnim = 'hit';
-            } else if (this.actionPhase === 'telegraphing' && this._spriteRenderer.hasAnim('cast')) {
-                targetAnim = 'cast';
-            } else if (this.actionPhase === 'telegraphing' && this._spriteRenderer.hasAnim('move')) {
-                targetAnim = 'move';
+            // 冰冻时：定格精灵动画，不再推进帧（_spriteLastMs 已更新，解冻后不会跳帧）
+            if (!this.isFrozen) {
+                // 根据 actionPhase 和 hitTimer 映射到动画名称
+                let targetAnim = 'idle';
+                if (this.hitTimer > 0 && this._spriteRenderer.hasAnim('hit')) {
+                    targetAnim = 'hit';
+                } else if (this.actionPhase === 'telegraphing' && this._spriteRenderer.hasAnim('cast')) {
+                    targetAnim = 'cast';
+                } else if (this.actionPhase === 'telegraphing' && this._spriteRenderer.hasAnim('move')) {
+                    targetAnim = 'move';
+                }
+                this._spriteRenderer.play(targetAnim);
+                this._spriteRenderer.update(dt * timeScale);
             }
-            this._spriteRenderer.play(targetAnim);
-            this._spriteRenderer.update(dt * timeScale);
         }
 
         // --- [新增] 预警状态更新 ----
@@ -662,6 +775,7 @@ class Enemy {
                 this.bumpOffsetY = 0;
             }
             this._tickVisualFxTimers(timeScale);
+            this._tickRuneRewardVisualTimers(timeScale);
             return; // 预警期间不处理其他移动逻辑
         }
 
@@ -673,6 +787,7 @@ class Enemy {
             if (this.hitTimer > 0) this.hitTimer -= timeScale;
             if (this._hitFlashTimer > 0) this._hitFlashTimer -= timeScale;
             this._tickVisualFxTimers(timeScale);
+            this._tickRuneRewardVisualTimers(timeScale);
             if (this._hitImpact > 0) this._hitImpact *= Math.pow(CONFIG.enemyRender.hitImpactDecay, timeScale);
             return;
         }
@@ -702,6 +817,7 @@ class Enemy {
             if (this.hitTimer > 0) this.hitTimer -= timeScale;
             if (this._hitFlashTimer > 0) this._hitFlashTimer -= timeScale;
             this._tickVisualFxTimers(timeScale);
+            this._tickRuneRewardVisualTimers(timeScale);
             if (this._hitImpact > 0) this._hitImpact *= Math.pow(CONFIG.enemyRender.hitImpactDecay, timeScale);
             return;
         }
@@ -715,6 +831,7 @@ class Enemy {
         if (this.hitTimer > 0) this.hitTimer -= timeScale;
         if (this._hitFlashTimer > 0) this._hitFlashTimer -= timeScale;
         this._tickVisualFxTimers(timeScale);
+        this._tickRuneRewardVisualTimers(timeScale);
         // === A3: 受击形变弹性衰减 ===
         if (this._hitImpact > 0) this._hitImpact *= Math.pow(CONFIG.enemyRender.hitImpactDecay, timeScale);
         // === D4: 激光照射抖动衰减 ===
@@ -739,20 +856,18 @@ class Enemy {
         
         if (this.displayHp > this.hp) {
             // Case A: 受到伤害 (Damage) -> 向下滚动
+            // [修复同步] 旧逻辑对小额掉血用「每 N 帧扣 1」的整数步进，
+            // 导致数字逐格慢跳；而血条是 displayHp/maxHp 的比例，小额掉血时
+            // 移动幅度极小看起来「瞬间结束」，于是出现血条已停、数字还在跳的脱节。
+            // 改为统一的 lerp + 最小步长（步长随 maxHp 缩放），保证无论掉血多少
+            // 都在 ~12-18 帧内收敛，数字与血条同时停下。
             const diff = this.displayHp - this.hp;
-            if (diff > 20) {
-                this.displayHp -= diff * 0.2 * timeScale;
-                this.hpDropTimer = 0;
-            } else {
-                this.hpDropTimer += timeScale;
-                if (this.hpDropTimer >= Math.max(1, 5 - Math.floor(diff / 5))) {
-                    this.hpDropTimer = 0;
-                    this.displayHp -= 1;
-                }
-            }
+            const step = Math.max(diff * 0.22, this.maxHp * 0.012, 1) * timeScale;
+            this.displayHp -= step;
+            this.hpDropTimer = 0;
             // 防止过冲
             if (this.displayHp < this.hp) this.displayHp = this.hp;
-            
+
         } else if (this.displayHp < this.hp) {
             // Case B: 正在回血 (Healing) -> 向上增长
             // [关键]：此处不做任何操作，也不重置 displayHp！
@@ -837,18 +952,18 @@ class Enemy {
             
             // 1.  燃烧前的黑烟 -> 改为 Mist (模拟热浪/蒸汽)
             // 概率随温度升高
-            if (Math.random() < (0.05 + (this.temp / 200)) * timeScale) {
+            if (Math.random() < (0.02 + (this.temp / 400)) * timeScale) {
                 const spawnX = this.pos.x + (Math.random() - 0.5) * this.width * 0.8;
                 const spawnY = this.pos.y - this.height * 0.4;
-                
+
                 // 颜色：使用纯黑色，带一点透明度
                 // 必须包含 '0,0,0' 以便让 Particle.draw 识别并关闭混合模式
-                const smokeColor = `rgba(0, 0, 0, ${0.4 + Math.random() * 0.3})`;
-                
+                const smokeColor = `rgba(0, 0, 0, ${0.2 + Math.random() * 0.15})`;
+
                 const heatSmoke = new Particle(spawnX, spawnY, smokeColor, 'mist');
                 heatSmoke.vel.y = -0.8 - Math.random() * 0.8; // 上升速度稍快
                 heatSmoke.vel.x = (Math.random() - 0.5) * 0.5; // 稍微左右飘
-                heatSmoke.size = this.width * 0.35; // 大团烟雾
+                heatSmoke.size = this.width * 0.22; // 减小烟雾团尺寸
                 // [限制] 热浪烟雾也受风属性压制
                 game.spawn_pushParticleWithLimit(heatSmoke);
             }
@@ -881,8 +996,8 @@ class Enemy {
         if (this.temp <= -34) {
             const freezeIntensity = (absTemp - 34) / 66; 
             const sizeFactor = this.width / 100; 
-            const baseChance = 0.2 * sizeFactor;  
-            const mistChance = (baseChance + freezeIntensity * 0.2);
+            const baseChance = 0.1 * sizeFactor;
+            const mistChance = (baseChance + freezeIntensity * 0.12);
 
             let chancePool = mistChance * timeScale;
             while(chancePool > 0) {
@@ -892,8 +1007,7 @@ class Enemy {
                     
                     // 这里的 mist 是白色的冷气
                     const mist = new Particle(spawnX, spawnY, null, 'mist');
-                    mist.size = this.width * (0.15 + Math.random() * 0.1); 
-                    mist.size *= (1 + freezeIntensity * 0.2);
+                    mist.size = this.width * (0.1 + Math.random() * 0.06);
                     mist.vel = new Vec2((Math.random() - 0.5) * 0.3, 0.8 + Math.random() * 0.5); // 下沉
                     mist.decay *= 1.5; 
                     // [限制] 冰雾受风属性压制
@@ -978,6 +1092,133 @@ class Enemy {
 
     _areShieldsDisabledThisTurn() {
         return !!(this.phaseShieldDisabledThisTurn && (this.affixes || []).includes('phaseShield'));
+    }
+
+    _getAdaptiveRuneAllowedElements() {
+        return new Set(
+            (CONFIG.balance.affixes && CONFIG.balance.affixes.adaptiveRuneElements)
+                || ['pyro', 'cryo', 'lightning', 'bounce', 'pierce', 'scatter', 'laser', 'venom', 'overcharge', 'echo']
+        );
+    }
+
+    _clearRuneBearerTempAffix() {
+        const current = this._runeBearerTempAffix;
+        if (!current) return;
+        const baseSet = new Set(this._runeBearerBaseAffixes || []);
+        if (current === 'shield' && this._runeBearerTempShieldCharges > 0) {
+            this.shieldCharges = Math.max(0, (this.shieldCharges || 0) - this._runeBearerTempShieldCharges);
+        }
+        if (!baseSet.has(current)) {
+            this.affixes = (this.affixes || []).filter(a => a !== current);
+        }
+        if (current === 'shield' && (this.shieldCharges || 0) <= 0 && !baseSet.has('shield')) {
+            this.affixes = (this.affixes || []).filter(a => a !== 'shield');
+        }
+        this._runeBearerTempAffix = null;
+        this._runeBearerTempShieldCharges = 0;
+        this._runeBearerRollTimer = 0;
+        this._runeBearerBaseAffixes = null;
+        if (typeof this._syncAffixOverlayImages === 'function') this._syncAffixOverlayImages();
+    }
+
+    _tickRuneBearerForTurn(gameRef = null) {
+        if (!(this.affixes || []).includes('runeBearer')) {
+            this._clearRuneBearerTempAffix();
+            return;
+        }
+        this._clearRuneBearerTempAffix();
+        const afx = CONFIG.balance.affixes || {};
+        const pool = Array.isArray(afx.runeBearerTempAffixPool)
+            ? afx.runeBearerTempAffixPool
+            : ['shield', 'regen', 'healer', 'haste', 'jump', 'clone', 'berserk'];
+        const forbidden = new Set([
+            'runeBearer', 'adaptiveRune', 'radiantAegis', 'energyArmor', 'phaseShield',
+            'livingArmor', 'armorSpore', 'overloadReactor', 'lowDamageImmune',
+            'deflectShell', 'deflectionWard', 'echoRelay', 'prism', 'hive',
+            'siege', 'carrier', 'gravityWell', 'heavyArmor', 'siegeBreaker',
+        ]);
+        const existing = new Set(this.affixes || []);
+        const candidates = pool.filter(a => a && !forbidden.has(a) && !existing.has(a));
+        if (candidates.length === 0) return;
+        const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+        this._runeBearerBaseAffixes = (this.affixes || []).slice();
+        this._runeBearerTempAffix = chosen;
+        this._runeBearerRollTimer = 32;
+        if (!this.affixes.includes(chosen)) this.affixes.push(chosen);
+        if (chosen === 'shield') {
+            this.shieldCharges = (this.shieldCharges || 0) + 1;
+            this._runeBearerTempShieldCharges = 1;
+        }
+        if (typeof this._syncAffixOverlayImages === 'function') this._syncAffixOverlayImages();
+        if (gameRef && typeof gameRef.spawn_createFloatingText === 'function') {
+            gameRef.spawn_createFloatingText(this.pos.x, this.pos.y - 36, `RUNE:${chosen}`, '#c084fc', 12);
+        }
+    }
+
+    _resolveAdaptiveRuneElementFromSource(source) {
+        const cfg = source && source.config ? source.config : {};
+        const allowed = this._getAdaptiveRuneAllowedElements();
+        const normalize = (value) => {
+            if (!value) return null;
+            const id = String(value);
+            return allowed.has(id) ? id : null;
+        };
+
+        const explicit = normalize(source?.adaptiveRuneElement)
+            || normalize(source?.runeElement)
+            || normalize(cfg.adaptiveRuneElement)
+            || normalize(cfg._adaptiveRuneElement)
+            || normalize(cfg.runeElement)
+            || normalize(cfg.element);
+        if (explicit) return explicit;
+
+        if (cfg.isLaser || cfg.laser > 0 || source?.isLaser) return allowed.has('laser') ? 'laser' : null;
+        if (cfg.overcharge > 0) return allowed.has('overcharge') ? 'overcharge' : null;
+        if (cfg.echo > 0) return allowed.has('echo') ? 'echo' : null;
+        if (cfg.venom > 0) return allowed.has('venom') ? 'venom' : null;
+        if (cfg.scatter > 0 || cfg.isScatterChild || source?.isScatterChild) return allowed.has('scatter') ? 'scatter' : null;
+        if (cfg.bounce > 0) return allowed.has('bounce') ? 'bounce' : null;
+        if (cfg.pierce > 0) return allowed.has('pierce') ? 'pierce' : null;
+        if (cfg.pyro > 0) return allowed.has('pyro') ? 'pyro' : null;
+        if (cfg.cryo > 0) return allowed.has('cryo') ? 'cryo' : null;
+        if (cfg.lightning > 0) return allowed.has('lightning') ? 'lightning' : null;
+        return null;
+    }
+
+    _recordAdaptiveRuneElement(element, gameRef = null, reason = 'damage') {
+        if (!(this.affixes || []).includes('adaptiveRune')) return false;
+        const allowed = this._getAdaptiveRuneAllowedElements();
+        if (!element || !allowed.has(element)) return false;
+        if (this.adaptiveRuneElement === element) {
+            this._adaptiveRuneShiftTimer = Math.max(this._adaptiveRuneShiftTimer || 0, 16);
+            return false;
+        }
+        this.adaptiveRuneElement = element;
+        this._adaptiveRuneShiftTimer = 32;
+        this._adaptiveRuneLastReason = reason;
+        if (typeof this._syncAffixOverlayImages === 'function') this._syncAffixOverlayImages();
+        if (gameRef && typeof gameRef.spawn_createFloatingText === 'function') {
+            gameRef.spawn_createFloatingText(this.pos.x, this.pos.y - 48, `RUNE:${element}`, '#a78bfa', 12);
+        }
+        return true;
+    }
+
+    _recordAdaptiveRuneElementFromSource(source, gameRef = null, reason = 'damage') {
+        return this._recordAdaptiveRuneElement(this._resolveAdaptiveRuneElementFromSource(source), gameRef, reason);
+    }
+
+    _getAdaptiveRuneDropElement() {
+        const allowed = this._getAdaptiveRuneAllowedElements();
+        return allowed.has(this.adaptiveRuneElement) ? this.adaptiveRuneElement : null;
+    }
+
+    _tickRuneRewardVisualTimers(timeScale = 1) {
+        if (this._runeBearerRollTimer > 0) {
+            this._runeBearerRollTimer = Math.max(0, this._runeBearerRollTimer - timeScale);
+        }
+        if (this._adaptiveRuneShiftTimer > 0) {
+            this._adaptiveRuneShiftTimer = Math.max(0, this._adaptiveRuneShiftTimer - timeScale);
+        }
     }
 
     _applyPhaseShieldInitialBonus() {
@@ -1126,7 +1367,7 @@ class Enemy {
     }
 
     _selectTurnIntent(game, afx) {
-        if (this.temp > 0 && this.affixes.includes('berserk')) {
+        if (!this._isChimeraBoss?.() && this.temp > 0 && this.affixes.includes('berserk')) {
             const chance = (this.temp / 100) * afx.berserkChanceMult;
             if (Math.random() < chance) {
                 return { key: 'berserk', icon: '😡', name: '狂暴', label: '狂暴', color: '#ef4444', tone: 180, severity: 3 };
@@ -1147,14 +1388,21 @@ class Enemy {
             }
         }
 
-        if (this._isChimeraBoss && this._isChimeraBoss()) {
-            const targets = this._getChimeraPrey(game);
-            if (targets.length > 0 && (this._chimeraDigestCooldown || 0) <= 0) {
-                return { key: 'chimera_maw', icon: '◈', name: '胃域吞噬', label: `胃域x${targets.length}`, color: '#a855f7', tone: 150, severity: 4 };
+        if (this._isDevourerBoss?.()) {
+            const targets = this._getDevourerMawPrey(game);
+            if (targets.length > 0 && (this._devourerDigestCooldown || 0) <= 0) {
+                return { key: 'devourer_maw', icon: '◑', name: '深渊吞噬', label: `胃域x${targets.length}`, color: '#ef4444', tone: 150, severity: 4 };
             }
         }
 
-        if (!this._isChimeraBoss?.() && this.affixes.includes('devour') && Math.random() < afx.devourChance) {
+        if (this._isChimeraBoss && this._isChimeraBoss()) {
+            const targets = this._getChimeraPrey(game);
+            if (targets.length > 0 && (this._chimeraDigestCooldown || 0) <= 0) {
+                return { key: 'chimera_thermal_devour', icon: '◈', name: '热核吞噬', label: '热核吞噬', color: '#f0abfc', tone: 150, severity: 4 };
+            }
+        }
+
+        if (!this._isChimeraBoss?.() && !this._isDevourerBoss?.() && this.affixes.includes('devour') && Math.random() < afx.devourChance) {
             const targets = this._getDevourTargets(game, afx);
             if (targets.length > 0) {
                 return { key: 'devour', icon: '👅', name: '吞噬', label: `吞噬x${targets.length}`, color: '#dc2626', tone: 160, severity: 3 };
@@ -1188,11 +1436,13 @@ class Enemy {
 
     _getRadiantAegisConfig() {
         const afx = (CONFIG.balance && CONFIG.balance.affixes) || {};
-        const isBoss = this.type === 'boss';
-        const regenPct = isBoss
+        // [教学闸门·方案2] 首战教学档：ignis 首个 boss 的流彩护盾按精英(elite)强度结算，
+        // 避免玩家初见即面对满档自愈护盾；aegisTutorialMode 由 spawn_spawnBoss 设置、随存档持久化。
+        const useBossStrength = this.type === 'boss' && !this.aegisTutorialMode;
+        const regenPct = useBossStrength
             ? (afx.radiantAegisBossRegenPct || 0.02)
             : (afx.radiantAegisEliteRegenPct || 0.01);
-        const capPct = isBoss
+        const capPct = useBossStrength
             ? (afx.radiantAegisBossCapPct || 0.10)
             : (afx.radiantAegisEliteCapPct || 0.05);
         return { regenPct, capPct, spreadCells: afx.radiantAegisSpreadRangeCells || 1 };
@@ -1210,7 +1460,13 @@ class Enemy {
     _grantShieldLayer(amount = 1) {
         if (!this.affixes.includes('shield')) this.affixes.push('shield');
         this.shieldCharges = (this.shieldCharges || 0) + amount;
-        this.shieldHitTimer = Math.max(this.shieldHitTimer || 0, 12);
+        if (this.affixes.includes('phaseShield')) {
+            this._phaseShieldBlockTimer = Math.max(this._phaseShieldBlockTimer || 0, 12);
+            this._triggerDefenseImpactFx('phaseShield', null, 12);
+        } else {
+            this.shieldHitTimer = Math.max(this.shieldHitTimer || 0, 12);
+            this._triggerDefenseImpactFx('shield', null, 12);
+        }
         if (typeof this._syncAffixOverlayImages === 'function') this._syncAffixOverlayImages();
     }
 
@@ -1233,9 +1489,11 @@ class Enemy {
                 if (typeof target._grantShieldLayer === 'function') {
                     target._grantShieldLayer(1);
                     target._radiantAegisPulseTimer = Math.max(target._radiantAegisPulseTimer || 0, 18);
+                    target._triggerDefenseImpactFx('radiantAegis', null, 18);
                 }
             }
             this._radiantAegisPulseTimer = 24;
+            this._triggerDefenseImpactFx('radiantAegis', null, 24);
             if (game && targets.length > 0) {
                 game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 18, `${label}扩盾 x${targets.length}`, '#a5f3fc');
                 game.spawn_createShockwave(this.pos.x, this.pos.y, '#67e8f9');
@@ -1248,6 +1506,7 @@ class Enemy {
         const before = this.radiantAegis || 0;
         this.radiantAegis = Math.min(this.radiantAegisMax, before + gain);
         this._radiantAegisPulseTimer = 20;
+        this._triggerDefenseImpactFx('radiantAegis', null, 20);
         if (game && this.radiantAegis > before) {
             game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 18, `${label}+${Math.ceil(this.radiantAegis - before)}`, '#a5f3fc');
             game.spawn_createShockwave(this.pos.x, this.pos.y, '#67e8f9');
@@ -1306,9 +1565,11 @@ class Enemy {
                 if (typeof target._grantShieldLayer === 'function') {
                     target._grantShieldLayer(1);
                     target._radiantAegisPulseTimer = Math.max(target._radiantAegisPulseTimer || 0, 18);
+                    target._triggerDefenseImpactFx('radiantAegis', null, 18);
                 }
             }
             this._radiantAegisPulseTimer = 24;
+            this._triggerDefenseImpactFx('radiantAegis', null, 24);
             if (game && targets.length > 0) {
                 game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 18, `流彩扩盾 x${targets.length}`, '#a5f3fc');
                 game.spawn_createShockwave(this.pos.x, this.pos.y, '#67e8f9');
@@ -1318,6 +1579,7 @@ class Enemy {
 
         this.radiantAegis = Math.min(this.radiantAegisMax, (this.radiantAegis || 0) + gain);
         this._radiantAegisPulseTimer = 18;
+        this._triggerDefenseImpactFx('radiantAegis', null, 18);
         if (game) {
             game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 18, `流彩+${gain}`, '#a5f3fc');
         }
@@ -1500,7 +1762,7 @@ class Enemy {
             if (typeof target.takeDamage === 'function') {
                 const result = target.takeDamage(damage, { config: { lightning: 1, _teslaShock: true }, pos: this.pos }, true);
                 if (game && typeof game.combat_recordDamage === 'function') {
-                    game.combat_recordDamage(result?.actualDamage || damage, 'lightning', 'boss');
+                    game.combat_recordDamage(result?.hpDamage ?? result?.actualDamage ?? damage, 'lightning', 'boss');
                 }
             }
             if (target.active && typeof target._applyTeslaConductorCharge === 'function') {
@@ -1907,6 +2169,7 @@ class Enemy {
             const armorDamage = Math.min(this.livingArmorHp, Math.max(1, Math.ceil(armorMax * Math.max(pyroPct, venomPct))));
             this.livingArmorHp -= armorDamage;
             this._livingArmorHitTimer = Math.max(this._livingArmorHitTimer || 0, 18);
+            this._triggerDefenseImpactFx('livingArmor', source, 18, { absorbed: armorDamage });
             if (gameRef && typeof gameRef.spawn_createFloatingText === 'function') {
                 gameRef.spawn_createFloatingText(this.pos.x, this.pos.y - 34, `SPORE-${Math.ceil(armorDamage)}`, isVenom ? '#86efac' : '#fdba74', 12);
             }
@@ -1958,6 +2221,284 @@ class Enemy {
         }
     }
 
+    _getDevourerConfig() {
+        return (CONFIG.balance.bossConfigs && CONFIG.balance.bossConfigs.devourer) || {};
+    }
+
+    _isDevourerBoss() {
+        return this.type === 'boss' && this.bossType === 'devourer';
+    }
+
+    _isDevourerFeed() {
+        return this.bossOwnerId === 'devourer'
+            || (Array.isArray(this.bossMechanicTags) && this.bossMechanicTags.includes('mawFeed'));
+    }
+
+    _getDevourerMawPrey(game) {
+        if (!this._isDevourerBoss() || !game || !Array.isArray(game.enemies)) return [];
+        const cfg = this._getDevourerConfig();
+        const m = this._getChimeraGridMetrics(game);
+        const rangeCells = Math.max(1, Math.floor(
+            (this.berserked || (this._berserkedDevourRange || 0) >= 99)
+                ? (cfg.berserkedDevourRange || 99)
+                : (cfg.devourerMawRangeCells || cfg.devourRangeBonus || 2)
+        ));
+        const bossY = this.dropTargetY ?? this.pos.y;
+
+        return game.enemies.filter(enemy => {
+            if (!enemy || !enemy.active || enemy === this || enemy.type === 'boss') return false;
+            if (rangeCells >= 20) return true;
+            const targetY = enemy.dropTargetY ?? enemy.pos.y;
+            const limitX = this.width / 2 + enemy.width / 2 + m.w * rangeCells + 1;
+            const limitY = this.height / 2 + enemy.height / 2 + m.h * rangeCells + 1;
+            return Math.abs(enemy.pos.x - this.pos.x) <= limitX
+                && Math.abs(targetY - bossY) <= limitY;
+        });
+    }
+
+    _devourerAttractPrey(game) {
+        const prey = this._getDevourerMawPrey(game);
+        if (prey.length === 0) return 0;
+        prey.sort((a, b) => {
+            const score = (enemy) => {
+                const y = enemy.dropTargetY ?? enemy.pos.y;
+                const dx = enemy.pos.x - this.pos.x;
+                const dy = y - (this.dropTargetY ?? this.pos.y);
+                const feedBonus = (enemy._isDevourerFeed?.() || enemy.bossOwnerId === 'devourer') ? 100000 : 0;
+                return feedBonus + dx * dx + dy * dy;
+            };
+            return score(b) - score(a);
+        });
+
+        let pulled = 0;
+        for (const target of prey) {
+            const cell = this._findChimeraPullCell(game, target);
+            if (!cell) continue;
+            target.pos.x = cell.x;
+            target.dropTargetY = cell.y;
+            target._chimeraPulledTimer = Math.max(target._chimeraPulledTimer || 0, 18);
+            pulled++;
+            if (typeof game.spawn_createFloatingText === 'function') {
+                game.spawn_createFloatingText(cell.x, cell.y - target.height / 2 - 12, 'PULL', '#ef4444', 11);
+            }
+        }
+
+        if (pulled > 0) {
+            this._devourerPullTimer = Math.max(this._devourerPullTimer || 0, 20);
+            this._devourerMawPulseTimer = Math.max(this._devourerMawPulseTimer || 0, 24);
+            if (typeof game.spawn_createShockwave === 'function') {
+                game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
+            }
+        }
+        return pulled;
+    }
+
+    _devourerDevourTargets(game, options = {}) {
+        if (!this._isDevourerBoss()) return 0;
+        if (!options.force && (this._devourerDigestCooldown || 0) > 0) return 0;
+        const targets = this._getDevourerMawPrey(game);
+        if (targets.length === 0) return 0;
+
+        const cfg = this._getDevourerConfig();
+        // [改动] 第四 Boss 不再「吞噬获取盾」，改用常规吞噬逻辑（与 devour 词缀一致）：
+        //   - 获取血量上限：maxHp += 猎物 maxHp，并同步吃下其当前 hp。
+        //   - 获取词条：吸收猎物 affixes（含 shield；护盾按数值叠加猎物现有充能）。
+        //   - 额外通用继承：负面状态（NEGATIVE_STATUS_FIELDS，当前为 venom；未来新增数值层 debuff
+        //     只需加进此列表即可自动继承）与温度（temp）。继承的 venom/temp 会经回合结算真实作用
+        //     于 Boss（中毒掉血、阈值燃烧/冰冻），作为玩家的反制弱点。
+        const NEGATIVE_STATUS_FIELDS = ['venomStacks'];
+        const sorted = [...targets].sort((a, b) => {
+            const aFeed = (a._isDevourerFeed?.() || a.bossOwnerId === 'devourer') ? 1 : 0;
+            const bFeed = (b._isDevourerFeed?.() || b.bossOwnerId === 'devourer') ? 1 : 0;
+            return bFeed - aFeed;
+        });
+
+        let devoured = 0;
+        let maxHpGainTotal = 0;
+        let shieldTotal = 0;
+        let venomTotal = 0;
+        let tempTotal = 0;
+        let absorbedAffix = false;
+        for (const victim of sorted) {
+            if (!victim || !victim.active || victim.type === 'boss') continue;
+
+            // --- 常规吞噬：获取血量上限 + 当前血量 ---
+            const gainMax = Math.max(0, Math.floor(victim.maxHp || victim.hp || 0));
+            const gainHp = Math.max(0, Math.floor(victim.hp || 0));
+            this.maxHp += gainMax;
+            this.hp = Math.min(this.maxHp, (this.hp || 0) + gainHp);
+            maxHpGainTotal += gainMax;
+
+            // --- 获取词条：吸收猎物 affixes（含 shield 词条）---
+            if (Array.isArray(victim.affixes)) {
+                victim.affixes.forEach(af => {
+                    if (af && !this.affixes.includes(af)) { this.affixes.push(af); absorbedAffix = true; }
+                });
+            }
+            // 护盾：相同的护盾，叠加数值（吃下猎物现有护盾充能）
+            const gainedShield = Math.max(0, Math.floor(victim.shieldCharges || 0));
+            if (gainedShield > 0) {
+                if (!this.affixes.includes('shield')) { this.affixes.push('shield'); absorbedAffix = true; }
+                this.shieldCharges = (this.shieldCharges || 0) + gainedShield;
+                shieldTotal += gainedShield;
+            }
+
+            // --- 额外通用继承：负面状态（venom 等）---
+            for (const field of NEGATIVE_STATUS_FIELDS) {
+                const v = Math.max(0, Math.floor(victim[field] || 0));
+                if (v <= 0) continue;
+                this[field] = Math.min(99, (this[field] || 0) + v);
+                if (field === 'venomStacks') venomTotal += v;
+            }
+            // --- 额外继承：温度（热/冷一并吃下，回合结算时真实触发燃烧/冰冻）---
+            const vt = victim.temp || 0;
+            if (vt !== 0) { this.temp += vt; tempTotal += vt; }
+
+            victim.active = false;
+            victim.hp = 0;
+            devoured++;
+            this.devourerFeedStacks = Math.min(99, (this.devourerFeedStacks || 0) + 1);
+            if (typeof game?.spawn_addScore === 'function') game.spawn_addScore(victim.maxHp || 0);
+            if (typeof game?.spawn_createParticle === 'function') {
+                game.spawn_createParticle(victim.pos.x, victim.pos.y, '#ef4444', 'mist');
+            }
+        }
+
+        if (devoured > 0) {
+            if (absorbedAffix && typeof this._syncAffixOverlayImages === 'function') {
+                this._syncAffixOverlayImages();
+            }
+            const interval = this.berserked
+                ? (cfg.devourerBerserkDigestInterval || 1)
+                : (cfg.devourerDigestInterval || 2);
+            this._devourerDigestCooldown = Math.max(1, Math.floor(interval));
+            this._devourerMawPulseTimer = Math.max(this._devourerMawPulseTimer || 0, 32);
+            if (typeof game?.spawn_createFloatingText === 'function') {
+                let label = `ABYSS x${devoured} 噬+${maxHpGainTotal}`;
+                if (shieldTotal > 0) label += ` 盾+${shieldTotal}`;
+                if (venomTotal > 0) label += ` 毒+${venomTotal}`;
+                if (tempTotal !== 0) label += ` ${tempTotal > 0 ? '热' : '冻'}${Math.round(Math.abs(tempTotal))}`;
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 38, label, '#fca5a5', 13);
+            }
+            if (typeof game?.spawn_createShockwave === 'function') {
+                game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
+            }
+            audio.playEffect('split');
+        }
+        return devoured;
+    }
+
+    _getDevourerFeeders(game) {
+        if (!game || !Array.isArray(game.enemies)) return [];
+        return game.enemies.filter(enemy =>
+            enemy && enemy.active && enemy !== this && enemy.type !== 'boss'
+            && (enemy.bossOwnerId === 'devourer'
+                || (Array.isArray(enemy.bossMechanicTags) && enemy.bossMechanicTags.includes('mawFeed')))
+        );
+    }
+
+    _findDevourerFeederSpawnPositions(game, count) {
+        if (!game) return [];
+        const cfg = this._getDevourerConfig();
+        const m = this._getChimeraGridMetrics(game);
+        const rangeCells = Math.max(1, Math.floor(cfg.devourerMawRangeCells || 2));
+        const bossCol = this._getChimeraGridCol(game, this.pos.x, m);
+        const bossRow = this._getChimeraGridRow(this.dropTargetY ?? this.pos.y, m);
+        const candidates = [];
+
+        for (let row = Math.max(0, bossRow - rangeCells); row <= Math.min(m.maxRows - 1, bossRow + rangeCells); row++) {
+            for (let col = Math.max(0, bossCol - rangeCells); col <= Math.min(m.cols - 1, bossCol + rangeCells); col++) {
+                if (row === bossRow && col === bossCol) continue;
+                const x = typeof game.sys_getCombatColumnCenterX === 'function'
+                    ? game.sys_getCombatColumnCenterX(col)
+                    : col * m.w + m.w / 2;
+                const y = m.topY + row * m.h;
+                if (typeof game.calc_isAreaOccupied === 'function' && game.calc_isAreaOccupied(x, y, m.w * 0.86, m.h * 0.86)) {
+                    continue;
+                }
+                const dx = col - bossCol;
+                const dy = row - bossRow;
+                candidates.push({ x, y, dist: dx * dx + dy * dy });
+            }
+        }
+
+        candidates.sort((a, b) => b.dist - a.dist);
+        return candidates.slice(0, count);
+    }
+
+    // @perf-impact: Devourer maw-field spawns reuse existing enemy creation, floating text, shockwave and 1-2 particle calls; no persistent particle pool is added.
+    _devourerSpawnThralls(game, count = 1) {
+        if (!this._isDevourerBoss() || !game || !Array.isArray(game.enemies)) return 0;
+        const cfg = this._getDevourerConfig();
+        const existing = this._getDevourerFeeders(game).length;
+        const cap = Math.max(1, Math.floor(cfg.devourerMaxThralls || 5));
+        const spawnCount = Math.min(Math.max(0, Math.floor(count)), Math.max(0, cap - existing));
+        if (spawnCount <= 0) return 0;
+
+        const positions = this._findDevourerFeederSpawnPositions(game, spawnCount);
+        const profile = (typeof game.spawn_getBossMinionProfile === 'function' && game.spawn_getBossMinionProfile('devourer'))
+            || (CONFIG.balance.bossEntranceShockwave?.bossMinionProfiles?.devourer)
+            || { role: 'maw_thrall', affixes: cfg.devourerFeedAffixes || ['devour', 'shield'], tags: ['mawFeed'] };
+        const w = game.enemyWidth || 60;
+        const h = game.enemyHeight || 50;
+        const hp = Math.max(1, Math.ceil(this.maxHp * (cfg.devourerSummonHpPct || 0.12)));
+        let spawned = 0;
+
+        for (const pos of positions) {
+            const affixes = Array.isArray(profile.affixes) ? [...profile.affixes] : [...(cfg.devourerFeedAffixes || ['devour', 'shield'])];
+            const feeder = new Enemy(pos.x, pos.y, w, h, hp, hp, 'elite', affixes);
+            feeder.dropTargetY = pos.y;
+            feeder.hasActedThisTurn = true;
+            if (typeof game.spawn_applyBossMinionMetadata === 'function') {
+                game.spawn_applyBossMinionMetadata(feeder, 'devourer', profile);
+            } else {
+                feeder.bossOwnerId = 'devourer';
+                feeder.bossMinionRole = profile.role || 'maw_thrall';
+                feeder.bossMechanicTags = Array.isArray(profile.tags) ? [...profile.tags] : ['mawFeed'];
+            }
+            if (typeof feeder.initSprite === 'function') feeder.initSprite();
+            if (typeof game.sys_determineEnemyReward === 'function') game.sys_determineEnemyReward(feeder);
+            game.enemies.push(feeder);
+            spawned++;
+
+            if (typeof game.spawn_createShockwave === 'function') game.spawn_createShockwave(pos.x, pos.y, '#ef4444');
+            if (typeof game.spawn_createFloatingText === 'function') game.spawn_createFloatingText(pos.x, pos.y - h / 2 - 14, 'MAW FEED', '#fca5a5', 12);
+            if (typeof game.spawn_createParticle === 'function') {
+                game.spawn_createParticle(pos.x, pos.y, '#ef4444', 'mist');
+                game.spawn_createParticle(pos.x, pos.y, '#f87171', 'spark');
+            }
+        }
+
+        return spawned;
+    }
+
+    _tickDevourerMawField(game) {
+        if (!this._isDevourerBoss()) return { pulled: 0, spawned: 0 };
+        const cfg = this._getDevourerConfig();
+        this._devourerMawPulseTimer = Math.max(this._devourerMawPulseTimer || 0, 12);
+        if ((this._devourerDigestCooldown || 0) > 0) {
+            this._devourerDigestCooldown = Math.max(0, (this._devourerDigestCooldown || 0) - 1);
+        }
+        if ((this._devourerSummonCooldown || 0) > 0) {
+            this._devourerSummonCooldown = Math.max(0, (this._devourerSummonCooldown || 0) - 1);
+        }
+
+        const pulled = this._devourerAttractPrey(game);
+        let spawned = 0;
+        if ((this._devourerSummonCooldown || 0) <= 0) {
+            const maxPerTurn = Math.max(1, Math.floor(cfg.devourerSummonMaxPerTurn || 1));
+            spawned = this._devourerSpawnThralls(game, maxPerTurn);
+            if (spawned > 0) {
+                this._devourerSummonCooldown = Math.max(1, Math.floor(cfg.devourerSummonInterval || 2));
+            }
+        }
+
+        if ((pulled > 0 || spawned > 0) && typeof game?.spawn_createFloatingText === 'function') {
+            game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 24, `ABYSS ${pulled}/${spawned}`, '#fca5a5', 12);
+        }
+        return { pulled, spawned };
+    }
+
     _getChimeraConfig() {
         return (CONFIG.balance.bossConfigs && CONFIG.balance.bossConfigs.chimera) || {};
     }
@@ -2005,19 +2546,9 @@ class Enemy {
 
     _getChimeraPrey(game) {
         if (!this._isChimeraBoss() || !game || !Array.isArray(game.enemies)) return [];
-        const cfg = this._getChimeraConfig();
-        const m = this._getChimeraGridMetrics(game);
-        const rangeCells = Math.max(1, Math.floor(cfg.chimeraMawRangeCells || 2));
-        const bossY = this.dropTargetY ?? this.pos.y;
-
-        return game.enemies.filter(enemy => {
-            if (!enemy || !enemy.active || enemy === this || enemy.type === 'boss') return false;
-            const targetY = enemy.dropTargetY ?? enemy.pos.y;
-            const limitX = this.width / 2 + enemy.width / 2 + m.w * rangeCells + 1;
-            const limitY = this.height / 2 + enemy.height / 2 + m.h * rangeCells + 1;
-            return Math.abs(enemy.pos.x - this.pos.x) <= limitX
-                && Math.abs(targetY - bossY) <= limitY;
-        });
+        return game.enemies.filter(enemy =>
+            enemy && enemy.active && enemy !== this && enemy.type !== 'boss'
+        );
     }
 
     _findChimeraPullCell(game, target) {
@@ -2061,99 +2592,95 @@ class Enemy {
     }
 
     _chimeraAttractPrey(game) {
-        const prey = this._getChimeraPrey(game);
-        if (prey.length === 0) return 0;
-        prey.sort((a, b) => {
-            const ay = a.dropTargetY ?? a.pos.y;
-            const by = b.dropTargetY ?? b.pos.y;
-            const adx = a.pos.x - this.pos.x;
-            const ady = ay - (this.dropTargetY ?? this.pos.y);
-            const bdx = b.pos.x - this.pos.x;
-            const bdy = by - (this.dropTargetY ?? this.pos.y);
-            return (bdx * bdx + bdy * bdy) - (adx * adx + ady * ady);
-        });
-
-        let pulled = 0;
-        for (const target of prey) {
-            const cell = this._findChimeraPullCell(game, target);
-            if (!cell) continue;
-            target.pos.x = cell.x;
-            target.dropTargetY = cell.y;
-            target._chimeraPulledTimer = Math.max(target._chimeraPulledTimer || 0, 18);
-            pulled++;
-            if (typeof game.spawn_createFloatingText === 'function') {
-                game.spawn_createFloatingText(cell.x, cell.y - target.height / 2 - 12, 'PULL', '#c084fc', 11);
-            }
-        }
-
-        if (pulled > 0) {
-            this._chimeraPullTimer = Math.max(this._chimeraPullTimer || 0, 20);
-            this._chimeraMawPulseTimer = Math.max(this._chimeraMawPulseTimer || 0, 24);
-            if (typeof game.spawn_createShockwave === 'function') {
-                game.spawn_createShockwave(this.pos.x, this.pos.y, '#c084fc');
-            }
-        }
-        return pulled;
+        return 0;
     }
 
-    _chimeraAbsorbNegativeStates(victim) {
-        let statusCount = 0;
-        const tempGain = Number.isFinite(victim.temp) ? victim.temp : 0;
-        if (tempGain !== 0) {
-            this.temp = (this.temp || 0) + tempGain;
-            statusCount++;
+    _chimeraPickRandomPrey(game) {
+        const targets = this._getChimeraPrey(game);
+        if (targets.length === 0) return null;
+        return targets[Math.floor(Math.random() * targets.length)];
+    }
+
+    _chimeraNormalizeThermalStacks(game) {
+        const paired = Math.min(this.chimeraHeatStacks || 0, this.chimeraFrostStacks || 0);
+        if (paired <= 0) return { paired: 0, shieldAmount: 0 };
+        const cfg = this._getChimeraConfig();
+        this.chimeraHeatStacks = Math.max(0, (this.chimeraHeatStacks || 0) - paired);
+        this.chimeraFrostStacks = Math.max(0, (this.chimeraFrostStacks || 0) - paired);
+        this.chimeraRadiantConversions = Math.min(999, (this.chimeraRadiantConversions || 0) + paired);
+        const shieldAmount = Math.max(1, Math.ceil((this.maxHp || 1) * Math.max(0, cfg.chimeraThermalShieldPct ?? 0.06) * paired));
+        if (typeof this._grantRadiantAegisPulse === 'function') {
+            this._grantRadiantAegisPulse(game, shieldAmount, { rearmBroken: true, label: '流彩' });
         }
-        if ((victim.venomStacks || 0) > 0) {
-            this.venomStacks = (this.venomStacks || 0) + victim.venomStacks;
-            statusCount++;
+        return { paired, shieldAmount };
+    }
+
+    _chimeraAbsorbThermalStacks(victim, game = null) {
+        const cfg = this._getChimeraConfig();
+        const temp = Number.isFinite(victim?.temp) ? victim.temp : 0;
+        const minTemp = Math.max(1, Math.floor(cfg.chimeraThermalAbsorbMinTemp || 24));
+        if (Math.abs(temp) < minTemp) return { statusCount: 0, tempGain: 0, heatGain: 0, frostGain: 0, paired: 0 };
+
+        const unit = Math.max(1, Math.floor(cfg.chimeraThermalStackUnit || 100));
+        const rawStacks = Math.max(1, Math.floor(Math.abs(temp) / unit));
+        const mult = this.berserked ? 2 : 1;
+        const stacks = rawStacks * mult;
+        let heatGain = 0;
+        let frostGain = 0;
+        if (temp > 0) {
+            this.chimeraHeatStacks = Math.min(99, (this.chimeraHeatStacks || 0) + stacks);
+            heatGain = stacks;
+        } else {
+            this.chimeraFrostStacks = Math.min(99, (this.chimeraFrostStacks || 0) + stacks);
+            frostGain = stacks;
         }
-        if ((victim.swordMarks || 0) > 0) {
-            this.swordMarks = (this.swordMarks || 0) + victim.swordMarks;
-            this.markTimer = Math.max(this.markTimer || 0, victim.markTimer || 0);
-            statusCount++;
+
+        const normalized = this._chimeraNormalizeThermalStacks(game);
+        this.chimeraInheritedStatusCount = Math.min(99, (this.chimeraInheritedStatusCount || 0) + stacks);
+        if (game && typeof game.spawn_createFloatingText === 'function') {
+            const label = temp > 0 ? `热核+${stacks}` : `寒核+${stacks}`;
+            const color = temp > 0 ? '#fdba74' : '#67e8f9';
+            game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 54, label, color, 12);
+            if (normalized.paired > 0) {
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 70, `流彩x${normalized.paired}`, '#f0abfc', 12);
+            }
         }
-        if ((victim.frozenCount || 0) > 0) {
-            this.frozenCount = (this.frozenCount || 0) + victim.frozenCount;
-            statusCount++;
-        }
-        if (victim.isFrozenCurrentTurn) {
-            this.isFrozenCurrentTurn = true;
-            this._chimeraDigestCooldown = Math.max(this._chimeraDigestCooldown || 0, 1);
-            statusCount++;
-        }
-        if ((victim._irradiationStacks || 0) > 0) {
-            this._irradiationStacks = (this._irradiationStacks || 0) + victim._irradiationStacks;
-            statusCount++;
-        }
-        if (victim.phaseShieldDisabledThisTurn) {
-            this.phaseShieldDisabledThisTurn = true;
-            statusCount++;
-        }
-        this.chimeraInheritedStatusCount = Math.min(99, (this.chimeraInheritedStatusCount || 0) + statusCount);
-        return { statusCount, tempGain };
+        return { statusCount: stacks, tempGain: temp, heatGain, frostGain, paired: normalized.paired };
+    }
+
+    _chimeraAbsorbNegativeStates(victim, game = null) {
+        return this._chimeraAbsorbThermalStacks(victim, game);
     }
 
     _chimeraDevourTargets(game, options = {}) {
         if (!this._isChimeraBoss()) return 0;
         if (!options.force && (this._chimeraDigestCooldown || 0) > 0) return 0;
-        const targets = this._getChimeraPrey(game);
+        const maxCount = Math.max(1, Math.floor(options.count || 1));
+        const targets = [];
+        for (let i = 0; i < maxCount; i++) {
+            const target = this._chimeraPickRandomPrey(game);
+            if (!target || targets.includes(target)) break;
+            targets.push(target);
+        }
         if (targets.length === 0) return 0;
 
         const cfg = this._getChimeraConfig();
-        const healPct = Math.max(0, cfg.chimeraDigestHealPct ?? 0.08);
+        const healPct = Math.max(0, cfg.chimeraDigestHealPct ?? 0.06);
         const shieldGain = Math.max(0, Math.floor(cfg.chimeraDigestShieldPerFeed ?? 1));
         let devoured = 0;
-        let tempDelta = 0;
-        let statusGain = 0;
+        let heatGain = 0;
+        let frostGain = 0;
+        let pairedGain = 0;
         for (const victim of targets) {
             if (!victim || !victim.active || victim.type === 'boss') continue;
-            const absorbed = this._chimeraAbsorbNegativeStates(victim);
-            tempDelta += absorbed.tempGain;
-            statusGain += absorbed.statusCount;
+            const absorbed = this._chimeraAbsorbThermalStacks(victim, game);
+            heatGain += absorbed.heatGain || 0;
+            frostGain += absorbed.frostGain || 0;
+            pairedGain += absorbed.paired || 0;
             const heal = Math.max(1, Math.ceil((victim.maxHp || victim.hp || 1) * healPct));
             this.hp = Math.min(this.maxHp, (this.hp || 0) + heal);
             if (shieldGain > 0 && typeof this._grantShieldLayer === 'function') {
-                this._grantShieldLayer(shieldGain + Math.max(0, victim.shieldCharges || 0));
+                this._grantShieldLayer(shieldGain);
             }
             victim.active = false;
             victim.hp = 0;
@@ -2161,7 +2688,8 @@ class Enemy {
             this.chimeraFeedStacks = Math.min(99, (this.chimeraFeedStacks || 0) + 1);
             if (typeof game?.spawn_addScore === 'function') game.spawn_addScore(victim.maxHp || 0);
             if (typeof game?.spawn_createParticle === 'function') {
-                game.spawn_createParticle(victim.pos.x, victim.pos.y, '#a855f7', 'mist');
+                const color = (victim.temp || 0) >= 0 ? '#fdba74' : '#67e8f9';
+                game.spawn_createParticle(victim.pos.x, victim.pos.y, color, 'mist');
             }
         }
 
@@ -2172,15 +2700,14 @@ class Enemy {
             this._chimeraDigestCooldown = Math.max(1, Math.floor(interval));
             this._chimeraMawPulseTimer = Math.max(this._chimeraMawPulseTimer || 0, 32);
             if (typeof game?.spawn_createFloatingText === 'function') {
-                const tempText = tempDelta === 0 ? '' : ` T${tempDelta > 0 ? '+' : ''}${Math.ceil(tempDelta)}`;
-                game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 38, `MAW x${devoured}${tempText}`, '#d8b4fe', 13);
-                if (statusGain > 0) {
-                    game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 54, `STATUS +${statusGain}`, '#f0abfc', 12);
-                }
+                const stackText = `热${heatGain}/寒${frostGain}`;
+                const shieldText = pairedGain > 0 ? ` 流${pairedGain}` : '';
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 38, `THERMAL x${devoured} ${stackText}${shieldText}`, '#f0abfc', 13);
             }
             if (typeof game?.spawn_createShockwave === 'function') {
-                game.spawn_createShockwave(this.pos.x, this.pos.y, '#a855f7');
+                game.spawn_createShockwave(this.pos.x, this.pos.y, '#f0abfc');
             }
+            this._chimeraSpawnFeeders(game, Math.max(1, Math.floor(cfg.chimeraSummonMaxPerTurn || 1)));
             audio.playEffect('split');
         }
         return devoured;
@@ -2199,7 +2726,7 @@ class Enemy {
         if (!game) return [];
         const cfg = this._getChimeraConfig();
         const m = this._getChimeraGridMetrics(game);
-        const rangeCells = Math.max(1, Math.floor(cfg.chimeraMawRangeCells || 2));
+        const rangeCells = Math.max(1, Math.floor(cfg.chimeraThermalSpawnRangeCells || 2));
         const bossCol = this._getChimeraGridCol(game, this.pos.x, m);
         const bossRow = this._getChimeraGridRow(this.dropTargetY ?? this.pos.y, m);
         const candidates = [];
@@ -2245,6 +2772,11 @@ class Enemy {
         for (const pos of positions) {
             const affixes = Array.isArray(profile.affixes) ? [...profile.affixes] : [...(cfg.chimeraFeedAffixes || ['berserk'])];
             const feeder = new Enemy(pos.x, pos.y, w, h, hp, hp, 'elite', affixes);
+            const tempChoices = Array.isArray(cfg.chimeraThermalFeedTemps) && cfg.chimeraThermalFeedTemps.length > 0
+                ? cfg.chimeraThermalFeedTemps
+                : [100, -100];
+            const feedTemp = tempChoices[Math.floor(Math.random() * tempChoices.length)] || 100;
+            feeder.temp = feedTemp;
             feeder.dropTargetY = pos.y;
             feeder.hasActedThisTurn = true;
             if (typeof game.spawn_applyBossMinionMetadata === 'function') {
@@ -2254,15 +2786,20 @@ class Enemy {
                 feeder.bossMinionRole = profile.role || 'chaos_feed';
                 feeder.bossMechanicTags = Array.isArray(profile.tags) ? [...profile.tags] : ['chaosFeed'];
             }
+            if (!Array.isArray(feeder.bossMechanicTags)) feeder.bossMechanicTags = [];
+            if (!feeder.bossMechanicTags.includes('thermalFeed')) feeder.bossMechanicTags.push('thermalFeed');
             if (typeof feeder.initSprite === 'function') feeder.initSprite();
             if (typeof game.sys_determineEnemyReward === 'function') game.sys_determineEnemyReward(feeder);
             game.enemies.push(feeder);
             spawned++;
 
-            if (typeof game.spawn_createShockwave === 'function') game.spawn_createShockwave(pos.x, pos.y, '#a855f7');
-            if (typeof game.spawn_createFloatingText === 'function') game.spawn_createFloatingText(pos.x, pos.y - h / 2 - 14, 'FEED', '#d8b4fe', 12);
+            const feedColor = feedTemp > 0 ? '#fdba74' : '#67e8f9';
+            if (typeof game.spawn_createShockwave === 'function') game.spawn_createShockwave(pos.x, pos.y, feedColor);
+            if (typeof game.spawn_createFloatingText === 'function') {
+                game.spawn_createFloatingText(pos.x, pos.y - h / 2 - 14, feedTemp > 0 ? '+100°C' : '-100°C', feedColor, 12);
+            }
             if (typeof game.spawn_createParticle === 'function') {
-                game.spawn_createParticle(pos.x, pos.y, '#a855f7', 'mist');
+                game.spawn_createParticle(pos.x, pos.y, feedColor, 'mist');
                 game.spawn_createParticle(pos.x, pos.y, '#f0abfc', 'spark');
             }
         }
@@ -2272,7 +2809,6 @@ class Enemy {
 
     _tickChimeraMawField(game) {
         if (!this._isChimeraBoss()) return { pulled: 0, spawned: 0 };
-        const cfg = this._getChimeraConfig();
         this._chimeraMawPulseTimer = Math.max(this._chimeraMawPulseTimer || 0, 12);
         if ((this._chimeraDigestCooldown || 0) > 0) {
             this._chimeraDigestCooldown = Math.max(0, (this._chimeraDigestCooldown || 0) - 1);
@@ -2280,21 +2816,7 @@ class Enemy {
         if ((this._chimeraSummonCooldown || 0) > 0) {
             this._chimeraSummonCooldown = Math.max(0, (this._chimeraSummonCooldown || 0) - 1);
         }
-
-        const pulled = this._chimeraAttractPrey(game);
-        let spawned = 0;
-        if ((this._chimeraSummonCooldown || 0) <= 0) {
-            const maxPerTurn = Math.max(1, Math.floor(cfg.chimeraSummonMaxPerTurn || 1));
-            spawned = this._chimeraSpawnFeeders(game, maxPerTurn);
-            if (spawned > 0) {
-                this._chimeraSummonCooldown = Math.max(1, Math.floor(cfg.chimeraSummonInterval || 2));
-            }
-        }
-
-        if ((pulled > 0 || spawned > 0) && typeof game?.spawn_createFloatingText === 'function') {
-            game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 24, `MAW ${pulled}/${spawned}`, '#c084fc', 12);
-        }
-        return { pulled, spawned };
+        return { pulled: 0, spawned: 0 };
     }
 
     _ensureDevourerBodyCollisionShape() {
@@ -2366,6 +2888,9 @@ class Enemy {
         }
         if (this._isViridisBoss()) {
             this._tickViridisSporeArmor(game);
+        }
+        if (this._isDevourerBoss?.()) {
+            this._tickDevourerMawField(game);
         }
         if (this._isChimeraBoss()) {
             this._tickChimeraMawField(game);
@@ -2553,60 +3078,41 @@ class Enemy {
             }
 
             // --- 3. 吞噬 ---
-            if (this.actionName === '吞噬' || this.telegraphIntent?.key === 'chimera_maw') {
-                 if (this._isChimeraBoss()) {
+            if (this.telegraphIntent?.key === 'chimera_thermal_devour') {
+                this._chimeraDevourTargets(game, { force: true });
+                continue;
+            }
+            if (this.telegraphIntent?.key === 'devourer_maw') {
+                this._devourerDevourTargets(game, { force: true });
+                continue;
+            }
+            if (this.actionName === '吞噬') {
+                 if (this._isDevourerBoss?.()) {
+                     this._devourerDevourTargets(game, { force: true });
+                     continue;
+                 }
+                 if (this._isChimeraBoss?.()) {
                      this._chimeraDevourTargets(game, { force: true });
                      continue;
                  }
-                 // Boss 噬神者特殊行为：吞噬相邻敌人获得护盾层数
-                 if (this.type === 'boss' && this.bossType === 'devourer') {
-                     const bossDevourCfg = CONFIG.balance.bossConfigs && CONFIG.balance.bossConfigs.devourer;
-                     const rangeBonus = bossDevourCfg ? (bossDevourCfg.devourRangeBonus || 0) : 0;
-                     const devourRange = this._berserkedDevourRange || (afx.devourRange + rangeBonus);
-                     const range = this.width * devourRange;
-                     const neighbors = game.enemies.filter(e =>
-                         e !== this && e.active && e.type !== 'boss' && this.pos.dist(e.pos) < range
-                     );
-                     if (neighbors.length > 0) {
-                         const mawFeeds = neighbors.filter(e =>
-                             e.bossOwnerId === 'devourer'
-                             || (Array.isArray(e.bossMechanicTags) && e.bossMechanicTags.includes('mawFeed'))
-                         );
-                         const pool = mawFeeds.length > 0 ? mawFeeds : neighbors;
-                         const victim = pool[Math.floor(Math.random() * pool.length)];
-                         // 吸收护盾层数（而非血量）
-                         const absorbedShield = (victim.shieldCharges || 0) + 1;
-                         if (!this.affixes.includes('shield')) {
-                             this.affixes.push('shield');
-                         }
-                         this.shieldCharges = (this.shieldCharges || 0) + absorbedShield;
-                         const isDead = victim.takeDamage(99999);
-                         if (isDead) game.spawn_addScore(victim.maxHp);
-                         game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, 'DEVOUR! +Shield ' + absorbedShield, '#ef4444');
-                         game.spawn_createParticle(victim.pos.x, victim.pos.y, '#ef4444', 'mist');
-                         game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
-                         audio.playEffect('split');
-                     }
-                 } else {
-                     // 普通吞噬行为
-                     const range = this.width * afx.devourRange;
-                     const neighbors = game.enemies.filter(e => 
-                         e !== this && e.active && e.type !== 'boss' && this.pos.dist(e.pos) < range
-                     );
-                     if (neighbors.length > 0) {
-                         const victim = neighbors[Math.floor(Math.random() * neighbors.length)];
-                         const absorbHp = victim.hp;
-                         const absorbMax = victim.maxHp;
-                         this.maxHp += absorbMax;
-                         this.hp += absorbHp;
-                         victim.affixes.forEach(af => { if (!this.affixes.includes(af)) this.affixes.push(af); });
-                         const isDead = victim.takeDamage(99999); 
-                         if (isDead) game.spawn_addScore(absorbMax); 
-                         game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, 'DEVOUR!', '#ef4444');
-                         game.spawn_createParticle(victim.pos.x, victim.pos.y, '#ef4444', 'mist'); 
-                         game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
-                         audio.playEffect('split');
-                     }
+                 // 普通吞噬行为
+                 const range = this.width * afx.devourRange;
+                 const neighbors = game.enemies.filter(e =>
+                     e !== this && e.active && e.type !== 'boss' && this.pos.dist(e.pos) < range
+                 );
+                 if (neighbors.length > 0) {
+                     const victim = neighbors[Math.floor(Math.random() * neighbors.length)];
+                     const absorbHp = victim.hp;
+                     const absorbMax = victim.maxHp;
+                     this.maxHp += absorbMax;
+                     this.hp += absorbHp;
+                     victim.affixes.forEach(af => { if (!this.affixes.includes(af)) this.affixes.push(af); });
+                     const damageResult = victim.takeDamage(99999);
+                     if (damageResult.killed) game.spawn_addScore(absorbMax);
+                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, 'DEVOUR!', '#ef4444');
+                     game.spawn_createParticle(victim.pos.x, victim.pos.y, '#ef4444', 'mist');
+                     game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
+                     audio.playEffect('split');
                  }
             }
 
@@ -2818,8 +3324,8 @@ class Enemy {
                     victim.affixes.forEach(af => {
                         if (!this.affixes.includes(af)) this.affixes.push(af);
                     });
-                    const isDead = victim.takeDamage(99999); 
-                    if (isDead) game.spawn_addScore(absorbMax);
+                    const damageResult = victim.takeDamage(99999);
+                    if (damageResult.killed) game.spawn_addScore(absorbMax);
                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, "DEVOUR!", "#ef4444");
                     game.spawn_createParticle(victim.pos.x, victim.pos.y, '#ef4444', 'mist'); 
                     game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
@@ -3032,7 +3538,8 @@ class Enemy {
                 return {
                     id: slot.id,
                     disabledTurns: Math.max(0, old.disabledTurns || 0),
-                    breakCount: Math.max(0, old.breakCount || 0)
+                    breakCount: Math.max(0, old.breakCount || 0),
+                    damageGateCount: Math.max(0, old.damageGateCount || 0)
                 };
             });
         }
@@ -3163,7 +3670,22 @@ class Enemy {
                 echo.bossMinionRole = profile.role || 'orbit_echo';
                 echo.bossMechanicTags = Array.isArray(profile.tags) ? [...profile.tags] : ['orbitAttachment'];
             }
-            echo.bossMechanicTags = Array.from(new Set([...(echo.bossMechanicTags || []), slot?.id ? `orbit:${slot.id}` : 'orbitAttachment']));
+            const slotId = slot?.id || 'brood';
+            echo.bossMechanicTags = Array.from(new Set([...(echo.bossMechanicTags || []), `orbit:${slotId}`, 'orbitAttachment']));
+            echo.visualAssetKey = `orbitEcho:${slotId}`;
+            echo.collisionShape = 'polygon';
+            echo.collisionData = {
+                vertices: [
+                    new Vec2(-w * 0.2, -h * 0.5),
+                    new Vec2( w * 0.2, -h * 0.5),
+                    new Vec2( w * 0.5, -h * 0.2),
+                    new Vec2( w * 0.5,  h * 0.2),
+                    new Vec2( w * 0.2,  h * 0.5),
+                    new Vec2(-w * 0.2,  h * 0.5),
+                    new Vec2(-w * 0.5,  h * 0.2),
+                    new Vec2(-w * 0.5, -h * 0.2)
+                ]
+            };
             if (typeof echo.initSprite === 'function') echo.initSprite();
             if (typeof game.sys_determineEnemyReward === 'function') game.sys_determineEnemyReward(echo);
             game.enemies.push(echo);
@@ -3241,6 +3763,65 @@ class Enemy {
             default:
                 return { action };
         }
+    }
+
+    _getOuroborosDamageGateThreshold() {
+        const cfg = this._getOuroborosConfig();
+        const rawPct = Number.isFinite(cfg.orbitDamageGatePct) ? cfg.orbitDamageGatePct : 0.12;
+        const pct = Math.max(0.01, Math.min(1, rawPct));
+        return Math.max(1, Math.ceil((this.maxHp || 1) * pct));
+    }
+
+    _recordOuroborosDamageGate(actualDamage = 0, gameRef = null) {
+        if (!this._isOuroborosBoss() || !gameRef || !this.active || this.hp <= 0) return null;
+        const damage = Math.max(0, actualDamage || 0);
+        if (damage <= 0) return null;
+
+        const threshold = this._getOuroborosDamageGateThreshold();
+        this._ouroborosDamageGateProgress = Math.max(0, this._ouroborosDamageGateProgress || 0) + damage;
+        if (this._ouroborosDamageGateProgress < threshold) {
+            return {
+                triggered: false,
+                progress: this._ouroborosDamageGateProgress,
+                threshold
+            };
+        }
+
+        this._ouroborosDamageGateProgress = 0;
+        return this._triggerOuroborosDamageGate(gameRef);
+    }
+
+    // @perf-impact: Damage-gated Ouroboros slot trigger reuses existing slot action feedback and one rotation feedback; no persistent particles or new per-frame effects.
+    _triggerOuroborosDamageGate(gameRef = null) {
+        if (!this._isOuroborosBoss()) return null;
+        const attachments = this._ensureOuroborosOrbitState();
+        if (attachments.length === 0) return null;
+
+        const idx = Math.max(0, this.rotationIndex || 0) % attachments.length;
+        const slot = attachments[idx];
+        const cfg = this._getOuroborosConfig();
+        const result = this._performOuroborosAttachmentAction(gameRef, slot);
+        const state = this.ouroborosOrbitStates[idx] || { id: slot.id, disabledTurns: 0, breakCount: 0, damageGateCount: 0 };
+        const disableTurns = Math.max(1, Math.floor(cfg.orbitDamageGateDisruptTurns || cfg.orbitAttachmentDisruptTurns || 2));
+        state.disabledTurns = Math.max(state.disabledTurns || 0, disableTurns);
+        state.damageGateCount = (state.damageGateCount || 0) + 1;
+        this.ouroborosOrbitStates[idx] = state;
+        this.ouroborosOrbitDisruptions = (this.ouroborosOrbitDisruptions || 0) + 1;
+        this._ouroborosDamageGateSeq = (this._ouroborosDamageGateSeq || 0) + 1;
+        this._ouroborosOrbitDisruptTimer = Math.max(this._ouroborosOrbitDisruptTimer || 0, 30);
+        this._rotationFlashTimer = Math.max(this._rotationFlashTimer || 0, 8);
+        this.rotationTurnCount = 0;
+        this._ouroborosLastDamageGateAction = {
+            slotId: slot.id,
+            action: slot.action || 'shield',
+            disabledTurns: disableTurns
+        };
+
+        gameRef?.spawn_createFloatingText?.(this.pos.x, this.pos.y - 72, `ORBIT ${slot.icon || '附'} -${disableTurns}T`, slot.color || '#facc15', 13);
+        gameRef?.spawn_createShockwave?.(this.pos.x, this.pos.y, slot.color || '#facc15');
+        const nextIdx = this._getOuroborosNextActiveIndex(idx + 1);
+        this._applyOuroborosAttachment(nextIdx, gameRef, { feedback: true, preserveExposure: true });
+        return { triggered: true, slot, result, nextIndex: nextIdx, disabledTurns: disableTurns };
     }
 
     _tickOuroborosOrbit(game) {
@@ -3358,6 +3939,586 @@ class Enemy {
         this._laserHitIntensity = 1.0;
     }
 
+    _resolveDefenseImpactVector(source = null) {
+        const sourcePos = source && source.pos;
+        const sourceVel = source && (source.vel || source.velocity);
+        let sideAngle = null;
+        let travelAngle = null;
+
+        if (sourcePos && Number.isFinite(sourcePos.x) && Number.isFinite(sourcePos.y)) {
+            const dx = sourcePos.x - this.pos.x;
+            const dy = sourcePos.y - this.pos.y;
+            if ((dx * dx + dy * dy) > 4) sideAngle = Math.atan2(dy, dx);
+        }
+
+        if (sourceVel && Number.isFinite(sourceVel.x) && Number.isFinite(sourceVel.y)) {
+            const speedSq = sourceVel.x * sourceVel.x + sourceVel.y * sourceVel.y;
+            if (speedSq > 0.0001) travelAngle = Math.atan2(sourceVel.y, sourceVel.x);
+        }
+
+        if (sideAngle == null && travelAngle != null) sideAngle = travelAngle + Math.PI;
+        if (travelAngle == null && sideAngle != null) travelAngle = sideAngle + Math.PI;
+
+        if (sideAngle != null || travelAngle != null) {
+            return {
+                mode: 'directional',
+                sideAngle: sideAngle != null ? sideAngle : travelAngle + Math.PI,
+                travelAngle: travelAngle != null ? travelAngle : sideAngle + Math.PI
+            };
+        }
+
+        return { mode: 'front', sideAngle: -Math.PI / 2, travelAngle: -Math.PI / 2 };
+    }
+
+    _triggerDefenseImpactFx(kind, source = null, duration = 16, options = {}) {
+        if (!this._defenseImpactFx) this._defenseImpactFx = {};
+        const vector = this._resolveDefenseImpactVector(source);
+        this._defenseImpactFx[kind] = {
+            ...vector,
+            kind,
+            duration,
+            break: !!options.break,
+            absorbed: Math.max(0, options.absorbed || 0)
+        };
+    }
+
+    _getDefenseImpactFx(kind, duration = 16) {
+        const fx = this._defenseImpactFx && this._defenseImpactFx[kind];
+        if (fx) return fx;
+        return { kind, mode: 'front', sideAngle: -Math.PI / 2, travelAngle: -Math.PI / 2, duration };
+    }
+
+    _drawDefenseImpactFeedback(ctx, w, h, r) {
+        const hasDefenseFx = this.shieldHitTimer > 0 || this._shieldBreakTimer > 0
+            || this._wardBlockTimer > 0 || this._wardBreakTimer > 0
+            || this._radiantAegisPulseTimer > 0 || this._radiantAegisBreakTimer > 0
+            || this._energyArmorBlockTimer > 0 || this._livingArmorHitTimer > 0 || this._livingArmorBreakTimer > 0
+            || this._phaseShieldBlockTimer > 0 || this._phaseShieldBreakTimer > 0
+            || this._lowDamageImmuneBlockTimer > 0;
+        if (!hasDefenseFx) return;
+
+        const perfLevel = (typeof game !== 'undefined' && game.perfQualityLevel) || 'high';
+        const shadow = (value) => perfLevel === 'low' ? 0 : value;
+        const clamp01 = (value) => Math.max(0, Math.min(1, value));
+        const edgeSpan = Math.max(24, Math.min(h * 0.96, w * 1.12));
+        const edgeDepth = Math.max(15, Math.min(w, h) * 0.32);
+
+        // @section:defense_fx_helpers - 防御反馈绘制工具函数
+        const drawDirectionalPlate = (fx, alpha, palette, options = {}) => {
+            const sideAngle = Number.isFinite(fx.sideAngle) ? fx.sideAngle : -Math.PI / 2;
+            const style = options.style || 'shield';
+            const outward = Math.max(w, h) * 0.06 + (options.extraOut || 0);
+            const depth = edgeDepth * (options.depthMult || 1);
+            const span = edgeSpan * (options.spanMult || 1);
+            const alphaBase = clamp01(alpha);
+
+            ctx.save();
+            ctx.rotate(sideAngle);
+            ctx.translate(w / 2 + outward, 0);
+            ctx.shadowBlur = shadow(options.shadow || 10);
+            ctx.shadowColor = palette.glow || palette.stroke;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            const traceEnergyCurtain = (xOffset = 0, spanScale = 1, depthScale = 1) => {
+                ctx.beginPath();
+                ctx.moveTo(xOffset - depth * 0.42 * depthScale, -span * 0.50 * spanScale);
+                ctx.quadraticCurveTo(xOffset + depth * 0.46 * depthScale, -span * 0.42 * spanScale, xOffset + depth * 0.66 * depthScale, 0);
+                ctx.quadraticCurveTo(xOffset + depth * 0.46 * depthScale, span * 0.42 * spanScale, xOffset - depth * 0.42 * depthScale, span * 0.50 * spanScale);
+                ctx.quadraticCurveTo(xOffset - depth * 0.12 * depthScale, span * 0.22 * spanScale, xOffset - depth * 0.12 * depthScale, 0);
+                ctx.quadraticCurveTo(xOffset - depth * 0.12 * depthScale, -span * 0.22 * spanScale, xOffset - depth * 0.42 * depthScale, -span * 0.50 * spanScale);
+            };
+
+            // @perf-impact: Directional gradient overlay is gated off on low quality; no particles or persistent objects.
+            const drawEnergyCurtain = (fillAlpha = 0.42) => {
+                ctx.save();
+                ctx.globalAlpha = alphaBase * fillAlpha;
+                ctx.fillStyle = palette.fill;
+                traceEnergyCurtain();
+                ctx.fill();
+
+                if (perfLevel !== 'low') {
+                    const impactGradient = ctx.createLinearGradient(-depth * 0.58, 0, depth * 1.12, 0);
+                    impactGradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+                    impactGradient.addColorStop(0.34, palette.gradientHit || palette.ray || palette.stroke);
+                    impactGradient.addColorStop(0.58, palette.gradientCore || palette.stroke);
+                    impactGradient.addColorStop(0.86, palette.gradientTail || palette.fill);
+                    impactGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.globalAlpha = alphaBase * (options.gradientAlpha || 0.44);
+                    ctx.fillStyle = impactGradient;
+                    traceEnergyCurtain(depth * 0.10, 0.92, 1.16);
+                    ctx.fill();
+                }
+                ctx.restore();
+            };
+
+            const drawWavefront = (offset, spanScale, alphaMult, color, lineMult = 1) => {
+                ctx.save();
+                ctx.globalAlpha = clamp01(alphaBase * alphaMult);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = Math.max(1.2, (options.lineWidth || 2.4) * lineMult);
+                ctx.beginPath();
+                ctx.moveTo(-depth * 0.34 + offset, -span * 0.49 * spanScale);
+                ctx.quadraticCurveTo(depth * (0.24 + offset / Math.max(1, depth)), -span * 0.34 * spanScale, depth * 0.58 + offset, 0);
+                ctx.quadraticCurveTo(depth * (0.24 + offset / Math.max(1, depth)), span * 0.34 * spanScale, -depth * 0.34 + offset, span * 0.49 * spanScale);
+                ctx.stroke();
+                ctx.restore();
+            };
+
+            drawEnergyCurtain(style === 'energy' ? 0.50 : style === 'shell' ? 0.32 : style === 'phase' ? 0.44 : style === 'living' ? 0.36 : 0.40);
+
+            if (style === 'radiant') {
+                const colors = palette.colors || [palette.stroke];
+                const waveCount = perfLevel === 'low' ? 3 : 4;
+                for (let i = 0; i < waveCount; i++) {
+                    drawWavefront(i * depth * 0.16, 1 - i * 0.08, 0.98 - i * 0.15, colors[i % colors.length], 0.94 - i * 0.07);
+                }
+            } else if (style === 'phase') {
+                drawWavefront(-depth * 0.12, 1.08, 0.90, palette.stroke, 1.05);
+                drawWavefront(depth * 0.12, 0.90, 0.72, palette.phase || palette.ray || palette.stroke, 0.82);
+                drawWavefront(depth * 0.30, 0.72, 0.50, palette.ray || palette.stroke, 0.56);
+                if (perfLevel !== 'low') {
+                    drawWavefront(depth * 0.46, 0.56, 0.32, palette.pressure || palette.stroke, 0.40);
+                }
+            } else if (style === 'shell') {
+                drawWavefront(-depth * 0.05, 0.96, 0.90, palette.stroke, 1.30);
+                drawWavefront(depth * 0.10, 0.74, 0.58, palette.pressure || palette.stroke, 0.78);
+                if (perfLevel !== 'low') {
+                    drawWavefront(depth * 0.28, 0.58, 0.36, palette.ray || palette.stroke, 0.44);
+                }
+            } else if (style === 'living') {
+                drawWavefront(-depth * 0.04, 1.03, 0.92, palette.stroke, 1.10);
+                drawWavefront(depth * 0.12, 0.86, 0.70, palette.pressure || palette.stroke, 0.72);
+                drawWavefront(depth * 0.26, 0.68, 0.48, palette.ray || palette.stroke, 0.54);
+                if (perfLevel !== 'low') {
+                    drawWavefront(depth * 0.40, 0.50, 0.28, palette.membrane || palette.gradientCore || palette.stroke, 0.34);
+                }
+            } else {
+                drawWavefront(0, 1, 0.98, palette.stroke, style === 'energy' ? 1.28 : 1.08);
+                drawWavefront(depth * 0.18, 0.84, 0.64, palette.ray || palette.stroke, 0.68);
+                if (perfLevel !== 'low') {
+                    drawWavefront(depth * 0.34, 0.66, 0.40, palette.pressure || palette.stroke, 0.46);
+                }
+            }
+
+            if (style === 'ward') {
+                ctx.save();
+                ctx.globalAlpha = alphaBase * 0.78;
+                ctx.strokeStyle = palette.ray || palette.stroke;
+                ctx.lineWidth = Math.max(1.1, (options.lineWidth || 2.4) * 0.38);
+                for (let i = -1; i <= 1; i++) {
+                    const y = i * span * 0.18;
+                    ctx.beginPath();
+                    ctx.moveTo(-depth * 0.40, y - span * 0.10);
+                    ctx.quadraticCurveTo(depth * 0.20, y, depth * 0.76, y + span * 0.12);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            } else if (style === 'energy') {
+                ctx.save();
+                ctx.globalAlpha = alphaBase * 0.72;
+                ctx.strokeStyle = palette.pressure || palette.stroke;
+                ctx.lineWidth = Math.max(1.3, (options.lineWidth || 2.4) * 0.46);
+                for (let i = -1; i <= 1; i++) {
+                    const y = i * span * 0.16;
+                    ctx.beginPath();
+                    ctx.moveTo(-depth * 0.18, y);
+                    ctx.quadraticCurveTo(depth * 0.20, y * 0.86, depth * 0.52, y * 0.70);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            } else if (style === 'living') {
+                ctx.save();
+                ctx.globalAlpha = alphaBase * 0.76;
+                ctx.strokeStyle = palette.pressure || palette.stroke;
+                ctx.lineWidth = Math.max(1.1, (options.lineWidth || 2.4) * 0.38);
+                const veinCount = perfLevel === 'low' ? 4 : 7;
+                for (let i = 0; i < veinCount; i++) {
+                    const t = veinCount === 1 ? 0.5 : i / (veinCount - 1);
+                    const y = -span * 0.36 + span * 0.72 * t;
+                    const weave = Math.sin((t * Math.PI * 2) + alphaBase * Math.PI) * span * 0.045;
+                    ctx.beginPath();
+                    ctx.moveTo(-depth * 0.34, y + weave * 0.45);
+                    ctx.bezierCurveTo(-depth * 0.02, y - span * 0.10 + weave, depth * 0.12, y + span * 0.09 - weave, depth * 0.46, y * 0.72);
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = alphaBase * (perfLevel === 'low' ? 0.38 : 0.56);
+                ctx.fillStyle = palette.membrane || palette.pressure || palette.stroke;
+                const nodeCount = perfLevel === 'low' ? 2 : 4;
+                for (let i = 0; i < nodeCount; i++) {
+                    const t = (i + 0.5) / nodeCount;
+                    const x = -depth * 0.12 + depth * 0.38 * (i % 2);
+                    const y = -span * 0.30 + span * 0.60 * t;
+                    ctx.beginPath();
+                    ctx.ellipse(x, y, Math.max(1.6, depth * 0.055), Math.max(1.1, span * 0.025), 0.25, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            } else if (style === 'phase') {
+                ctx.save();
+                ctx.globalAlpha = alphaBase * 0.62;
+                ctx.strokeStyle = palette.pressure || palette.stroke;
+                ctx.lineWidth = Math.max(1, (options.lineWidth || 2.4) * 0.30);
+                ctx.setLineDash([Math.max(3, depth * 0.16), Math.max(4, depth * 0.18)]);
+                for (let i = -1; i <= 1; i++) {
+                    const y = i * span * 0.19;
+                    ctx.beginPath();
+                    ctx.moveTo(-depth * 0.42, y - span * 0.06);
+                    ctx.quadraticCurveTo(depth * 0.18, y, depth * 0.70, y + span * 0.06);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            } else if (style === 'shell') {
+                ctx.save();
+                ctx.globalAlpha = alphaBase * 0.70;
+                ctx.strokeStyle = palette.pressure || palette.stroke;
+                ctx.lineWidth = Math.max(1.2, (options.lineWidth || 2.4) * 0.36);
+                for (let i = -1; i <= 1; i++) {
+                    const y = i * span * 0.16;
+                    ctx.beginPath();
+                    ctx.moveTo(-depth * 0.20, y - span * 0.045);
+                    ctx.lineTo(depth * 0.10, y);
+                    ctx.lineTo(-depth * 0.14, y + span * 0.045);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            } else if (style === 'shield') {
+                ctx.save();
+                ctx.globalAlpha = alphaBase * 0.68;
+                ctx.strokeStyle = palette.pressure || palette.stroke;
+                ctx.lineWidth = Math.max(1, (options.lineWidth || 2.4) * 0.30);
+                for (let i = -2; i <= 2; i++) {
+                    const y = i * span * 0.12;
+                    ctx.beginPath();
+                    ctx.moveTo(depth * 0.02, y - span * 0.035);
+                    ctx.quadraticCurveTo(depth * 0.22, y, depth * 0.02, y + span * 0.035);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            const rayCount = options.rayCount || (perfLevel === 'low' ? 3 : 6);
+            const raySpread = span * 0.78;
+            ctx.save();
+            ctx.globalAlpha = alphaBase * (options.rayAlpha || 0.82);
+            ctx.strokeStyle = palette.ray || palette.stroke;
+            ctx.lineWidth = Math.max(1.25, (options.lineWidth || 2.4) * 0.45);
+            ctx.shadowBlur = shadow((options.shadow || 10) * 0.65);
+            for (let i = 0; i < rayCount; i++) {
+                const t = rayCount === 1 ? 0.5 : i / (rayCount - 1);
+                const y = -raySpread * 0.5 + raySpread * t;
+                const bend = (t - 0.5) * span * 0.10;
+                ctx.beginPath();
+                ctx.moveTo(depth * 0.58, y * 0.78);
+                ctx.quadraticCurveTo(depth * 1.02, y + bend * 0.55, depth * 1.42, y + bend * 1.20);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            ctx.save();
+            ctx.globalAlpha = alphaBase * 0.52;
+            ctx.strokeStyle = palette.pressure || palette.stroke;
+            ctx.lineWidth = Math.max(1.1, (options.lineWidth || 2.4) * 0.34);
+            ctx.setLineDash([Math.max(4, depth * 0.20), Math.max(3, depth * 0.12)]);
+            for (let i = -1; i <= 1; i++) {
+                const y = i * span * 0.19;
+                ctx.beginPath();
+                ctx.moveTo(-depth * 0.66, y);
+                ctx.quadraticCurveTo(-depth * 0.34, y * 0.90, -depth * 0.08, y * 0.64);
+                ctx.stroke();
+            }
+            ctx.restore();
+            ctx.restore();
+        };
+
+        const drawFrontPlate = (alpha, palette, options = {}) => {
+            const style = options.style || 'shield';
+            const alphaBase = clamp01(alpha);
+            ctx.save();
+            ctx.shadowBlur = shadow(options.shadow || 10);
+            ctx.shadowColor = palette.glow || palette.stroke;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            const rx = w * (style === 'energy' ? 0.64 : style === 'shell' ? 0.56 : 0.60);
+            const ry = h * (style === 'energy' ? 0.58 : style === 'shell' ? 0.56 : 0.62);
+            ctx.globalAlpha = alphaBase * 0.34;
+            ctx.fillStyle = palette.fill;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            const colors = style === 'radiant' ? (palette.colors || [palette.stroke]) : [palette.stroke, palette.ray || palette.stroke, palette.phase || palette.stroke];
+            const ringCount = style === 'radiant' || style === 'phase' ? 3 : 2;
+            for (let i = 0; i < ringCount; i++) {
+                ctx.globalAlpha = alphaBase * (0.92 - i * 0.18);
+                ctx.strokeStyle = colors[i % colors.length];
+                ctx.lineWidth = Math.max(1.3, (options.lineWidth || 2.2) * (0.84 - i * 0.12));
+                ctx.beginPath();
+                ctx.ellipse(0, 0, rx + i * 5, ry + i * 4, i % 2 ? 0.10 : -0.08, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            ctx.save();
+            ctx.globalAlpha = alphaBase * 0.62;
+            ctx.strokeStyle = palette.ray || palette.stroke;
+            ctx.lineWidth = Math.max(1, (options.lineWidth || 2.2) * 0.34);
+            const frontWaveCount = perfLevel === 'low' ? 2 : 3;
+            for (let i = 0; i < frontWaveCount; i++) {
+                const y = (i - (frontWaveCount - 1) / 2) * ry * 0.34;
+                ctx.beginPath();
+                ctx.moveTo(-rx * 0.68, y);
+                ctx.quadraticCurveTo(0, y - ry * 0.16 * (i % 2 ? -1 : 1), rx * 0.68, y);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            if (style === 'ward') {
+                ctx.save();
+                ctx.globalAlpha = alphaBase * 0.64;
+                ctx.strokeStyle = palette.pressure || palette.stroke;
+                ctx.lineWidth = Math.max(1, (options.lineWidth || 2.2) * 0.32);
+                for (let i = -1; i <= 1; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(-rx * 0.46, i * ry * 0.23 - ry * 0.12);
+                    ctx.quadraticCurveTo(0, i * ry * 0.23, rx * 0.46, i * ry * 0.23 + ry * 0.12);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            } else if (style === 'energy') {
+                ctx.save();
+                ctx.globalAlpha = alphaBase * 0.74;
+                ctx.strokeStyle = palette.pressure || palette.stroke;
+                ctx.lineWidth = Math.max(1.2, (options.lineWidth || 2.2) * 0.42);
+                for (let i = -1; i <= 1; i++) {
+                    const y = i * ry * 0.20;
+                    ctx.beginPath();
+                    ctx.moveTo(-rx * 0.42, y);
+                    ctx.quadraticCurveTo(0, y * 0.72, rx * 0.42, y);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            } else if (style === 'living') {
+                ctx.save();
+                ctx.globalAlpha = alphaBase * 0.64;
+                ctx.strokeStyle = palette.pressure || palette.stroke;
+                ctx.lineWidth = Math.max(1.1, (options.lineWidth || 2.2) * 0.34);
+                const ribCount = perfLevel === 'low' ? 4 : 6;
+                for (let i = 0; i < ribCount; i++) {
+                    const angle = -Math.PI * 0.76 + i * (Math.PI * 1.52 / Math.max(1, ribCount - 1));
+                    const curl = (i % 2 ? 1 : -1) * 0.13;
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(angle) * rx * 0.24, Math.sin(angle) * ry * 0.24);
+                    ctx.quadraticCurveTo(
+                        Math.cos(angle + curl) * rx * 0.50,
+                        Math.sin(angle + curl) * ry * 0.46,
+                        Math.cos(angle) * rx * 0.82,
+                        Math.sin(angle) * ry * 0.78
+                    );
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = alphaBase * (perfLevel === 'low' ? 0.30 : 0.46);
+                ctx.fillStyle = palette.membrane || palette.pressure || palette.stroke;
+                const budCount = perfLevel === 'low' ? 3 : 5;
+                for (let i = 0; i < budCount; i++) {
+                    const angle = -Math.PI * 0.62 + i * (Math.PI * 1.24 / Math.max(1, budCount - 1));
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        Math.cos(angle) * rx * 0.52,
+                        Math.sin(angle) * ry * 0.52,
+                        Math.max(1.5, rx * 0.035),
+                        Math.max(1.0, ry * 0.022),
+                        angle,
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+                ctx.restore();
+            } else if (style === 'phase') {
+                ctx.save();
+                ctx.globalAlpha = alphaBase * 0.58;
+                ctx.strokeStyle = palette.pressure || palette.stroke;
+                ctx.lineWidth = Math.max(1, (options.lineWidth || 2.2) * 0.30);
+                ctx.setLineDash([Math.max(4, rx * 0.10), Math.max(4, rx * 0.08)]);
+                for (let i = -1; i <= 1; i++) {
+                    const y = i * ry * 0.24;
+                    ctx.beginPath();
+                    ctx.moveTo(-rx * 0.60, y - ry * 0.06);
+                    ctx.quadraticCurveTo(0, y, rx * 0.60, y + ry * 0.06);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            } else if (style === 'shell') {
+                ctx.save();
+                ctx.globalAlpha = alphaBase * 0.68;
+                ctx.strokeStyle = palette.pressure || palette.stroke;
+                ctx.lineWidth = Math.max(1.2, (options.lineWidth || 2.2) * 0.34);
+                for (let i = 0; i < 5; i++) {
+                    const angle = -Math.PI * 0.74 + i * Math.PI * 0.37;
+                    const x = Math.cos(angle) * rx * 0.70;
+                    const y = Math.sin(angle) * ry * 0.70;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x * 0.82, y * 0.82);
+                    ctx.lineTo(x * 0.96, y * 0.58);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+            ctx.restore();
+        };
+
+        const drawDefensePlate = (kind, timer, duration, palette, options = {}) => {
+            if (timer <= 0) return;
+            const alpha = clamp01(timer / duration) * (options.alpha || 1);
+            const fx = this._getDefenseImpactFx(kind, duration);
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            if (fx.mode === 'directional') {
+                drawDirectionalPlate(fx, alpha, palette, options);
+            } else {
+                drawFrontPlate(alpha, palette, options);
+            }
+            ctx.restore();
+        };
+
+        const drawBreakCuts = (kind, timer, duration, color, count = 5) => {
+            if (timer <= 0) return;
+            const alpha = clamp01(timer / duration);
+            const fx = this._getDefenseImpactFx(kind, duration);
+            const sideAngle = fx.mode === 'directional' && Number.isFinite(fx.sideAngle) ? fx.sideAngle : 0;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.8;
+            ctx.shadowBlur = shadow(8);
+            ctx.shadowColor = color;
+            if (fx.mode === 'directional') {
+                ctx.rotate(sideAngle);
+                ctx.translate(w / 2 + Math.max(w, h) * 0.08, 0);
+                for (let i = 0; i < count; i++) {
+                    const y = -edgeSpan * 0.38 + i * (edgeSpan * 0.76 / Math.max(1, count - 1));
+                    ctx.beginPath();
+                    if (kind === 'livingArmor') {
+                        const split = (i % 2 ? 1 : -1) * edgeSpan * 0.035;
+                        ctx.moveTo(-edgeDepth * 0.34, y);
+                        ctx.quadraticCurveTo(-edgeDepth * 0.02, y + split, edgeDepth * 0.22, y + edgeSpan * 0.055);
+                        ctx.quadraticCurveTo(edgeDepth * 0.05, y + edgeSpan * 0.10 + split, edgeDepth * 0.34, y + edgeSpan * 0.18);
+                    } else {
+                        ctx.moveTo(-edgeDepth * 0.24, y);
+                        ctx.lineTo(edgeDepth * 0.22, y + edgeSpan * 0.055);
+                        ctx.lineTo(edgeDepth * 0.02, y + edgeSpan * 0.14);
+                    }
+                    ctx.stroke();
+                }
+            } else {
+                for (let i = 0; i < count; i++) {
+                    const x = -w * 0.38 + i * (w * 0.76 / Math.max(1, count - 1));
+                    const y = -h * 0.48 + (i % 2) * h * 0.18;
+                    ctx.beginPath();
+                    if (kind === 'livingArmor') {
+                        ctx.moveTo(x, y);
+                        ctx.quadraticCurveTo(x + w * 0.10, y + h * 0.08, x + w * 0.04, y + h * 0.18);
+                        ctx.quadraticCurveTo(x + w * 0.16, y + h * 0.24, x + w * 0.08, y + h * 0.33);
+                    } else {
+                        ctx.moveTo(x, y);
+                        ctx.lineTo(x + w * 0.08, y + h * 0.12);
+                        ctx.lineTo(x + w * 0.02, y + h * 0.25);
+                    }
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+        };
+
+        // @section:defense_fx_type_dispatch - 各防御层样式分发
+        // @perf-impact: 防御受击反馈只绘制短生命周期描边/切线，不新增粒子、渐变或持久对象；shadowBlur 受 low 档门控。
+        drawDefensePlate('shield', this.shieldHitTimer, 20, {
+            stroke: 'rgba(147, 197, 253, 0.98)',
+            fill: 'rgba(147, 197, 253, 0.20)',
+            glow: '#60a5fa',
+            ray: 'rgba(219, 234, 254, 0.95)',
+            pressure: 'rgba(96, 165, 250, 0.92)',
+            gradientHit: 'rgba(248, 250, 252, 0.92)',
+            gradientCore: 'rgba(147, 197, 253, 0.82)',
+            gradientTail: 'rgba(59, 130, 246, 0.12)'
+        }, { style: 'shield', shadow: 18, lineWidth: 4.8, alpha: 1.0, rayAlpha: 1.0, gradientAlpha: 0.54, depthMult: 1.16, spanMult: 1.12 });
+        drawBreakCuts('shield', this._shieldBreakTimer, 24, 'rgba(191, 219, 254, 0.88)', 5);
+
+        drawDefensePlate('phaseShield', Math.max(this._phaseShieldBlockTimer, this._phaseShieldBreakTimer), this._phaseShieldBreakTimer > 0 ? 24 : 22, {
+            stroke: 'rgba(165, 180, 252, 0.96)',
+            fill: 'rgba(99, 102, 241, 0.16)',
+            glow: '#818cf8',
+            ray: 'rgba(224, 231, 255, 0.92)',
+            phase: 'rgba(196, 181, 253, 0.90)',
+            pressure: 'rgba(129, 140, 248, 0.88)',
+            gradientHit: 'rgba(238, 242, 255, 0.86)',
+            gradientCore: 'rgba(165, 180, 252, 0.76)',
+            gradientTail: 'rgba(109, 40, 217, 0.12)'
+        }, { style: 'phase', shadow: this._phaseShieldBreakTimer > 0 ? 19 : 16, lineWidth: this._phaseShieldBreakTimer > 0 ? 4.1 : 3.5, alpha: 1.0, rayAlpha: 0.92, gradientAlpha: 0.48, depthMult: 1.20, spanMult: 1.14, rayCount: perfLevel === 'low' ? 3 : 5 });
+        drawBreakCuts('phaseShield', this._phaseShieldBreakTimer, 24, 'rgba(196, 181, 253, 0.88)', 5);
+
+        drawDefensePlate('ward', Math.max(this._wardBlockTimer, this._wardBreakTimer), this._wardBreakTimer > 0 ? 24 : 22, {
+            stroke: 'rgba(103, 232, 249, 0.98)',
+            fill: 'rgba(14, 165, 233, 0.18)',
+            glow: '#22d3ee',
+            ray: 'rgba(207, 250, 254, 0.96)',
+            pressure: 'rgba(34, 211, 238, 0.88)',
+            gradientHit: 'rgba(236, 254, 255, 0.88)',
+            gradientCore: 'rgba(103, 232, 249, 0.80)',
+            gradientTail: 'rgba(8, 145, 178, 0.12)'
+        }, { style: 'ward', shadow: this._wardBreakTimer > 0 ? 18 : 14, lineWidth: this._wardBreakTimer > 0 ? 4.1 : 3.4, alpha: 1.0, rayAlpha: 0.96, gradientAlpha: 0.50, depthMult: 1.10, spanMult: 1.10 });
+        drawBreakCuts('ward', this._wardBreakTimer, 24, 'rgba(103, 232, 249, 0.9)', 4);
+
+        drawDefensePlate('radiantAegis', Math.max(this._radiantAegisPulseTimer, this._radiantAegisBreakTimer), this._radiantAegisBreakTimer > 0 ? 28 : 24, {
+            stroke: 'rgba(165, 243, 252, 0.95)',
+            fill: 'rgba(167, 139, 250, 0.15)',
+            glow: this._radiantAegisBreakTimer > 0 ? '#f0abfc' : '#67e8f9',
+            colors: ['#67e8f9', '#a78bfa', '#f0abfc', '#fef08a'],
+            ray: 'rgba(240, 249, 255, 0.92)',
+            pressure: 'rgba(192, 132, 252, 0.86)',
+            gradientHit: 'rgba(240, 249, 255, 0.88)',
+            gradientCore: this._radiantAegisBreakTimer > 0 ? 'rgba(240, 171, 252, 0.78)' : 'rgba(103, 232, 249, 0.78)',
+            gradientTail: 'rgba(167, 139, 250, 0.14)'
+        }, { style: 'radiant', shadow: this._radiantAegisBreakTimer > 0 ? 20 : 17, lineWidth: this._radiantAegisBreakTimer > 0 ? 4.2 : 3.5, alpha: 1.0, rayAlpha: 0.96, gradientAlpha: 0.52, depthMult: 1.30, spanMult: 1.22 });
+        drawBreakCuts('radiantAegis', this._radiantAegisBreakTimer, 28, 'rgba(240, 171, 252, 0.88)', 7);
+
+        drawDefensePlate('energyArmor', this._energyArmorBlockTimer, 20, {
+            stroke: 'rgba(251, 191, 36, 0.94)',
+            fill: 'rgba(251, 191, 36, 0.18)',
+            glow: '#facc15',
+            ray: 'rgba(254, 240, 138, 0.94)',
+            pressure: 'rgba(245, 158, 11, 0.88)',
+            gradientHit: 'rgba(255, 251, 235, 0.88)',
+            gradientCore: 'rgba(251, 191, 36, 0.78)',
+            gradientTail: 'rgba(217, 119, 6, 0.14)'
+        }, { style: 'energy', shadow: 16, lineWidth: 3.9, alpha: 1.0, rayAlpha: 0.94, gradientAlpha: 0.50, depthMult: 1.22, spanMult: 1.12 });
+
+        drawDefensePlate('livingArmor', Math.max(this._livingArmorHitTimer, this._livingArmorBreakTimer), this._livingArmorBreakTimer > 0 ? 26 : 22, {
+            stroke: 'rgba(190, 242, 100, 0.92)',
+            fill: 'rgba(132, 204, 22, 0.16)',
+            glow: '#bef264',
+            ray: 'rgba(236, 252, 203, 0.90)',
+            pressure: 'rgba(163, 230, 53, 0.84)',
+            gradientHit: 'rgba(247, 254, 231, 0.84)',
+            gradientCore: 'rgba(190, 242, 100, 0.72)',
+            gradientTail: 'rgba(101, 163, 13, 0.12)'
+        }, { style: 'living', shadow: this._livingArmorBreakTimer > 0 ? 15 : 13, lineWidth: this._livingArmorBreakTimer > 0 ? 3.8 : 3.4, alpha: 0.98, rayAlpha: 0.88, gradientAlpha: 0.46, depthMult: this._livingArmorBreakTimer > 0 ? 1.12 : 1.04, spanMult: 1.08 });
+        drawBreakCuts('livingArmor', this._livingArmorBreakTimer, 26, 'rgba(217, 249, 157, 0.9)', 5);
+
+        drawDefensePlate('lowDamageImmune', this._lowDamageImmuneBlockTimer, 18, {
+            stroke: 'rgba(203, 213, 225, 0.94)',
+            fill: 'rgba(71, 85, 105, 0.18)',
+            glow: '#cbd5e1',
+            ray: 'rgba(241, 245, 249, 0.82)',
+            pressure: 'rgba(148, 163, 184, 0.88)',
+            gradientHit: 'rgba(248, 250, 252, 0.74)',
+            gradientCore: 'rgba(203, 213, 225, 0.62)',
+            gradientTail: 'rgba(71, 85, 105, 0.12)'
+        }, { style: 'shell', shadow: 11, lineWidth: 3.9, alpha: 0.94, rayAlpha: 0.66, gradientAlpha: 0.36, depthMult: 0.94, spanMult: 0.94, rayCount: perfLevel === 'low' ? 2 : 4 });
+    }
+
     // @perf-impact: 仅递减若干特效计时器，不分配对象；为护盾/偏折/跳越反馈提供统一生命周期。
     _tickVisualFxTimers(timeScale) {
         if (this.shieldHitTimer > 0) this.shieldHitTimer = Math.max(0, this.shieldHitTimer - timeScale);
@@ -3366,6 +4527,10 @@ class Enemy {
         if (this._wardBreakTimer > 0) this._wardBreakTimer = Math.max(0, this._wardBreakTimer - timeScale);
         if (this._radiantAegisPulseTimer > 0) this._radiantAegisPulseTimer = Math.max(0, this._radiantAegisPulseTimer - timeScale);
         if (this._radiantAegisBreakTimer > 0) this._radiantAegisBreakTimer = Math.max(0, this._radiantAegisBreakTimer - timeScale);
+        if (this._energyArmorBlockTimer > 0) this._energyArmorBlockTimer = Math.max(0, this._energyArmorBlockTimer - timeScale);
+        if (this._phaseShieldBlockTimer > 0) this._phaseShieldBlockTimer = Math.max(0, this._phaseShieldBlockTimer - timeScale);
+        if (this._phaseShieldBreakTimer > 0) this._phaseShieldBreakTimer = Math.max(0, this._phaseShieldBreakTimer - timeScale);
+        if (this._lowDamageImmuneBlockTimer > 0) this._lowDamageImmuneBlockTimer = Math.max(0, this._lowDamageImmuneBlockTimer - timeScale);
         if (this._furnacePressurePulseTimer > 0) this._furnacePressurePulseTimer = Math.max(0, this._furnacePressurePulseTimer - timeScale);
         if (this._teslaShockTimer > 0) this._teslaShockTimer = Math.max(0, this._teslaShockTimer - timeScale);
         if (this._glaciesFrostSeamPulseTimer > 0) this._glaciesFrostSeamPulseTimer = Math.max(0, this._glaciesFrostSeamPulseTimer - timeScale);
@@ -3379,6 +4544,7 @@ class Enemy {
         if (this._chimeraPulledTimer > 0) this._chimeraPulledTimer = Math.max(0, this._chimeraPulledTimer - timeScale);
         if (this._jumpFxTimer > 0) this._jumpFxTimer = Math.max(0, this._jumpFxTimer - timeScale);
         if (this._livingArmorHitTimer > 0) this._livingArmorHitTimer = Math.max(0, this._livingArmorHitTimer - timeScale);
+        if (this._livingArmorBreakTimer > 0) this._livingArmorBreakTimer = Math.max(0, this._livingArmorBreakTimer - timeScale);
         if (this._deflectShellTextTimer > 0) this._deflectShellTextTimer = Math.max(0, this._deflectShellTextTimer - timeScale);
         if (this._bossVulnerabilityBreakTimer > 0) this._bossVulnerabilityBreakTimer = Math.max(0, this._bossVulnerabilityBreakTimer - timeScale);
         if (this._bossVulnerabilityRecoverTimer > 0) this._bossVulnerabilityRecoverTimer = Math.max(0, this._bossVulnerabilityRecoverTimer - timeScale);
@@ -3390,6 +4556,145 @@ class Enemy {
         this._jumpFxRows = rows;
         this._jumpFxStartY = startY;
         this._jumpFxTargetY = targetY;
+    }
+
+    // @perf-impact: 遗物奖励金属框每帧绘制固定描边、角标和铆钉；high/medium 仅增加少量 shadowBlur 与 LinearGradient，low 关闭模糊但保留材质轮廓。
+    _drawRelicMaterialFrame(ctx, w, h, r, options = {}) {
+        const detail = options.detail !== false;
+        const intensity = Math.max(0, Math.min(1, options.intensity ?? 0.45));
+        const inset = Math.max(0, Math.min(Math.min(w, h) * 0.16, options.inset ?? 2));
+        const fw = Math.max(12, w - inset * 2);
+        const fh = Math.max(12, h - inset * 2);
+        const outerR = Math.max(3, r - 4);
+        const innerR = Math.max(2, outerR - 3);
+        const frameLineWidth = Math.max(2.6, Math.min(4, Math.min(fw, fh) * 0.055));
+        const trimLineWidth = Math.max(1.4, frameLineWidth * 0.58);
+        const capLen = Math.min(18, Math.max(10, Math.min(fw, fh) * 0.28));
+        const capThick = Math.max(3, Math.min(4, Math.min(fw, fh) * 0.08));
+
+        const strokeFrame = (dx, dy, width, height, radius) => {
+            ctx.beginPath();
+            ctx.roundRect(-width / 2 + dx, -height / 2 + dy, width, height, radius);
+            ctx.stroke();
+        };
+
+        const metalGrad = ctx.createLinearGradient(-fw / 2, -fh / 2, fw / 2, fh / 2);
+        metalGrad.addColorStop(0, '#5b3707');
+        metalGrad.addColorStop(0.18, '#d89b24');
+        metalGrad.addColorStop(0.38, '#fff0a8');
+        metalGrad.addColorStop(0.58, '#b87514');
+        metalGrad.addColorStop(0.82, '#f6c453');
+        metalGrad.addColorStop(1, '#4b2b05');
+
+        const darkGold = '#513006';
+        const lineGold = '#f7c948';
+        const paleGold = '#fff3b0';
+        const amber = '#b66b10';
+
+        ctx.save();
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+
+        if (detail) {
+            ctx.shadowColor = `rgba(250, 204, 21, ${0.18 + intensity * 0.16})`;
+            ctx.shadowBlur = _sb(3 + intensity * 5);
+        } else {
+            ctx.shadowBlur = 0;
+        }
+
+        ctx.strokeStyle = 'rgba(36, 21, 3, 0.82)';
+        ctx.lineWidth = frameLineWidth;
+        strokeFrame(0, 0, fw, fh, outerR);
+
+        ctx.shadowBlur = detail ? _sb(1 + intensity * 2) : 0;
+        ctx.strokeStyle = metalGrad;
+        ctx.lineWidth = trimLineWidth;
+        strokeFrame(0, 0, fw, fh, outerR);
+
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = paleGold;
+        ctx.lineWidth = 0.75;
+        strokeFrame(0, 0, Math.max(6, fw - frameLineWidth * 1.6), Math.max(6, fh - frameLineWidth * 1.6), innerR);
+
+        ctx.strokeStyle = 'rgba(78, 40, 4, 0.72)';
+        ctx.lineWidth = 0.75;
+        strokeFrame(0, 0, Math.max(6, fw + 2), Math.max(6, fh + 2), outerR + 1);
+
+        const drawPlate = (x, y, width, height, radius = 2) => {
+            const plateGrad = ctx.createLinearGradient(x, y, x + width, y + height);
+            plateGrad.addColorStop(0, '#7b4709');
+            plateGrad.addColorStop(0.33, '#f7c948');
+            plateGrad.addColorStop(0.62, '#fff0a8');
+            plateGrad.addColorStop(1, '#9a5a0a');
+
+            ctx.fillStyle = plateGrad;
+            ctx.strokeStyle = darkGold;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(x, y, width, height, radius);
+            ctx.fill();
+            ctx.stroke();
+
+            if (detail) {
+                ctx.strokeStyle = 'rgba(255, 246, 196, 0.72)';
+                ctx.lineWidth = 0.8;
+                ctx.beginPath();
+                ctx.moveTo(x + 2, y + 1.4);
+                ctx.lineTo(x + width - 2, y + 1.4);
+                ctx.stroke();
+            }
+        };
+
+        const drawRivet = (x, y, size = 2.1) => {
+            const rivetGrad = ctx.createRadialGradient(x - size * 0.35, y - size * 0.45, 0, x, y, size * 1.45);
+            rivetGrad.addColorStop(0, '#fff7c2');
+            rivetGrad.addColorStop(0.45, lineGold);
+            rivetGrad.addColorStop(1, amber);
+            ctx.fillStyle = rivetGrad;
+            ctx.strokeStyle = '#4a2a05';
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        };
+
+        const drawCorner = (sx, sy) => {
+            ctx.save();
+            ctx.scale(sx, sy);
+            const x = -fw / 2 + 1.5;
+            const y = -fh / 2 + 1.5;
+            drawPlate(x, y, capLen, capThick);
+            drawPlate(x, y, capThick, capLen);
+            drawRivet(x + capThick + 2.6, y + capThick + 2.6, 1.45);
+            ctx.restore();
+        };
+
+        drawCorner(1, 1);
+        drawCorner(-1, 1);
+        drawCorner(1, -1);
+        drawCorner(-1, -1);
+
+        // Keep the top-center lane clear for the HP number; relic identity lives in corners and side rails.
+        drawPlate(-fw / 2 + 2, -6, 4, 12, 2);
+        drawPlate(fw / 2 - 6, -6, 4, 12, 2);
+        drawRivet(-fw / 2 + 4, 0, 1.25);
+        drawRivet(fw / 2 - 4, 0, 1.25);
+
+        if (detail) {
+            ctx.globalCompositeOperation = 'screen';
+            ctx.globalAlpha = 0.38 + intensity * 0.28;
+            ctx.strokeStyle = 'rgba(255, 249, 196, 0.92)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(-fw / 2 + 12, -fh / 2 + 2);
+            ctx.lineTo(fw / 2 - 12, -fh / 2 + 2);
+            ctx.moveTo(-fw / 2 + 2, -fh / 2 + 12);
+            ctx.lineTo(-fw / 2 + 2, fh / 2 - 12);
+            ctx.stroke();
+        }
+
+        ctx.restore();
     }
 
     playBurnTickEffect(game, dmg) {
@@ -3410,11 +4715,12 @@ class Enemy {
     draw(ctx) {
         if (!this.active) return;
         ctx.save(); 
-        ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+        ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
 
         // === D1 & D2: 待机生动感（呼吸缩放 + 微浮动）===
         // 仅在 idle 状态且无受击/预警时生效，使用 visualSeed 作为相位偏移
-        if (this.actionPhase === 'idle' && this._hitImpact <= 0.001 && this.hitTimer <= 0) {
+        // 冰冻时：静止，不再呼吸/飘动
+        if (this.actionPhase === 'idle' && this._hitImpact <= 0.001 && this.hitTimer <= 0 && !this.isFrozen) {
             const now = Date.now();
             // D1: 呼吸缩放 — 使用 visualSeed * 2π 作为相位偏移，确保多敌人节奏各异
             // 升级：使用 Math.pow 非线性缓动曲线，增强极值停留感（breatheEasingPower 越大停留感越强）
@@ -3560,6 +4866,10 @@ class Enemy {
             ctx.stroke();
             ctx.restore();
         }
+        // [HUD-fix] 将身体裁剪包裹进一个独立的 save 作用域（S_clip），
+        // 这样血量数字 + 护盾标记能在裁剪结束后、仍处于 S1 呼吸/倾斜变换内
+        // 绘制，从而"贴在敌人身上却不被身体轮廓裁掉"。
+        ctx.save(); // [S_clip] 身体裁剪作用域开始
         ctx.clip();
 
          // === Layer 1.5: 底层纹理 (预计算 OffscreenCanvas) ===
@@ -3709,9 +5019,9 @@ class Enemy {
 
         // **过热 Stage 3: 内部炙热发光**
         if (this.temp >= 67) {
-            const glowAlpha = Math.min(0.6, (this.temp - 60) / 60);
-            const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 0.8);
-            grad.addColorStop(0, `rgba(251, 146, 60, ${glowAlpha})`); 
+            const glowAlpha = Math.min(0.35, (this.temp - 60) / 120);
+            const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 0.6);
+            grad.addColorStop(0, `rgba(251, 146, 60, ${glowAlpha})`);
             grad.addColorStop(1, `rgba(251, 146, 60, 0)`);
             ctx.fillStyle = grad;
             ctx.fillRect(-w/2, -h/2, w, h);
@@ -3724,10 +5034,10 @@ class Enemy {
             
             // --- 修改点：大幅降低不透明度 ---
             let mistOpacity = 0;
-            // 即使完全冻结，透明度最高也只有 0.5 (原来是 0.9)
+            // 即使完全冻结，透明度最高也只有 0.25
             // @section:draw_status_effects - 状态效果视觉（冻结/灼烧/眩晕等）
-            if (this.isFrozenCurrentTurn || this.temp <= -100) mistOpacity = 0.5;
-            else mistOpacity = Math.min(0.4, (Math.abs(this.temp) - 30) / 70);
+            if (this.isFrozenCurrentTurn || this.temp <= -100) mistOpacity = 0.25;
+            else mistOpacity = Math.min(0.2, (Math.abs(this.temp) - 30) / 100);
 
             const time = Date.now() / 2500; 
 
@@ -3742,7 +5052,7 @@ class Enemy {
 
                 const grad = ctx.createRadialGradient(offsetX, offsetY, 0, offsetX, offsetY, size);
                 // 颜色变得极淡
-                grad.addColorStop(0, `rgba(207, 250, 254, ${mistOpacity * 0.4})`); 
+                grad.addColorStop(0, `rgba(207, 250, 254, ${mistOpacity * 0.2})`); 
                 grad.addColorStop(1, `rgba(207, 250, 254, 0)`);
                 
                 ctx.fillStyle = grad;
@@ -3750,7 +5060,7 @@ class Enemy {
             }
 
             // 全身薄霜 (降低浓度)
-            ctx.fillStyle = `rgba(165, 243, 252, ${mistOpacity * 0.15})`;
+            ctx.fillStyle = `rgba(165, 243, 252, ${mistOpacity * 0.08})`;
             ctx.fillRect(-w/2, -h/2, w, h);
             ctx.restore();
         }
@@ -4014,6 +5324,25 @@ class Enemy {
                         ctx.lineTo(w * 0.32 + lean, y + h * 0.06);
                         ctx.stroke();
                     }
+                    const reductionPct = Math.round(Math.max(0, this._glaciesFrostSeamReduction || 0) * 100);
+                    ctx.globalAlpha = (0.58 + pulse * 0.18) * affixAlpha35;
+                    ctx.lineWidth = 1.8;
+                    ctx.setLineDash([5, 4]);
+                    ctx.lineDashOffset = -tSeam * 14;
+                    ctx.beginPath();
+                    ctx.roundRect(-w * 0.42, -h * 0.38, w * 0.84, h * 0.76, Math.max(4, Math.min(w, h) * 0.08));
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    if (reductionPct > 0) {
+                        ctx.font = `bold ${Math.max(10, Math.min(14, h * 0.16))}px sans-serif`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.lineWidth = 3;
+                        ctx.strokeStyle = 'rgba(2, 6, 23, 0.9)';
+                        ctx.fillStyle = '#a5f3fc';
+                        ctx.strokeText(`减伤${reductionPct}%`, 0, h * 0.26);
+                        ctx.fillText(`减伤${reductionPct}%`, 0, h * 0.26);
+                    }
                 }
                 ctx.restore();
             }
@@ -4071,30 +5400,32 @@ class Enemy {
                 ctx.restore();
             }
 
-            // --- chimera: 胃域牵引环（Boss 专属机制装饰） ---
-            // @perf-impact: Chimera 胃域只绘制 2-3 个椭圆描边和少量短线，使用 _sb 门控 shadowBlur；low 档关闭混合与发光。
+            // --- chimera: 热核反应环（Boss 专属机制装饰） ---
+            // @perf-impact: Chimera 热核环只绘制 2-3 个椭圆描边和少量短线，使用 _sb 门控 shadowBlur；low 档关闭混合与发光。
             if (this._isChimeraBoss && this._isChimeraBoss()) {
                 const perfLevel = (typeof game !== 'undefined' && game.perfQualityLevel) || 'high';
-                const cfgChimera = CONFIG.balance.bossConfigs?.chimera || {};
-                const rangeCells = Math.max(1, Math.floor(cfgChimera.chimeraMawRangeCells || 2));
-                const cellW = (typeof game !== 'undefined' && game.enemyWidth) || Math.max(40, w * 0.5);
-                const cellH = (typeof game !== 'undefined' && game.enemyHeight) || Math.max(34, h * 0.35);
-                const tMaw = Date.now() / 1000 + this.visualSeed * 5;
-                const pulse = (Math.sin(tMaw * 2.6) + 1) * 0.5;
-                const rx = w * 0.5 + cellW * rangeCells + 8;
-                const ry = h * 0.5 + cellH * rangeCells + 8;
+                const tCore = Date.now() / 1000 + this.visualSeed * 5;
+                const pulse = (Math.sin(tCore * 2.6) + 1) * 0.5;
+                const rx = w * 0.62 + pulse * 4;
+                const ry = h * 0.54 + pulse * 3;
                 const ringCount = perfLevel === 'high' ? 3 : 2;
+                const heat = Math.max(0, Math.floor(this.chimeraHeatStacks || 0));
+                const frost = Math.max(0, Math.floor(this.chimeraFrostStacks || 0));
+                const radiant = Math.max(0, Math.floor(this.chimeraRadiantConversions || 0));
+                const palette = heat >= frost
+                    ? ['#fdba74', '#f0abfc', '#67e8f9']
+                    : ['#67e8f9', '#f0abfc', '#fdba74'];
                 ctx.save();
                 if (perfLevel !== 'low') ctx.globalCompositeOperation = 'screen';
                 ctx.shadowBlur = _sb(perfLevel === 'low' ? 0 : 14 + pulse * 8);
-                ctx.shadowColor = '#a855f7';
+                ctx.shadowColor = radiant > 0 ? '#f0abfc' : palette[0];
                 for (let ri = 0; ri < ringCount; ri++) {
                     const scale = 1 - ri * 0.12 + pulse * 0.035;
                     ctx.globalAlpha = (0.11 + ri * 0.045 + pulse * 0.05) * affixAlpha35;
                     ctx.lineWidth = ri === 0 ? 2.2 : 1.2;
-                    ctx.strokeStyle = ri % 2 === 0 ? '#c084fc' : '#67e8f9';
+                    ctx.strokeStyle = palette[ri % palette.length];
                     ctx.setLineDash(ri === 0 ? [10, 7] : [4, 8]);
-                    ctx.lineDashOffset = -tMaw * (18 + ri * 7);
+                    ctx.lineDashOffset = -tCore * (18 + ri * 7);
                     ctx.beginPath();
                     ctx.ellipse(0, 0, rx * scale, ry * scale, 0, 0, Math.PI * 2);
                     ctx.stroke();
@@ -4103,26 +5434,26 @@ class Enemy {
                 const arrowCount = perfLevel === 'high' ? 8 : 4;
                 ctx.globalAlpha = (0.35 + pulse * 0.22) * affixAlpha35;
                 ctx.lineWidth = 1.6;
-                ctx.strokeStyle = '#f0abfc';
                 for (let ai = 0; ai < arrowCount; ai++) {
-                    const a = tMaw * 0.6 + (ai / arrowCount) * Math.PI * 2;
-                    const sx = Math.cos(a) * rx * 0.74;
-                    const sy = Math.sin(a) * ry * 0.74;
-                    const ex = Math.cos(a) * rx * 0.58;
-                    const ey = Math.sin(a) * ry * 0.58;
+                    const a = tCore * 0.72 + (ai / arrowCount) * Math.PI * 2;
+                    const sx = Math.cos(a) * rx * 0.46;
+                    const sy = Math.sin(a) * ry * 0.46;
+                    const ex = Math.cos(a) * rx * 0.72;
+                    const ey = Math.sin(a) * ry * 0.72;
+                    ctx.strokeStyle = palette[ai % palette.length];
                     ctx.beginPath();
                     ctx.moveTo(sx, sy);
                     ctx.lineTo(ex, ey);
                     ctx.stroke();
                 }
-                if ((this.chimeraFeedStacks || 0) > 0 || (this.chimeraInheritedStatusCount || 0) > 0) {
+                if (heat > 0 || frost > 0 || radiant > 0) {
                     ctx.globalAlpha = 0.75 * affixAlpha35;
                     ctx.shadowBlur = _sb(perfLevel === 'low' ? 0 : 8);
                     ctx.font = 'bold 10px sans-serif';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillStyle = '#f5d0fe';
-                    ctx.fillText(`MAW ${this.chimeraFeedStacks || 0}/${this.chimeraInheritedStatusCount || 0}`, 0, -h * 0.5 - 18);
+                    ctx.fillText(`热${heat} 寒${frost} 流${radiant}`, 0, -h * 0.5 - 18);
                 }
                 ctx.restore();
             }
@@ -4665,70 +5996,14 @@ class Enemy {
             this._drawAffixSigil(ctx, w, h);
         }
 
-        // === Layer 3.8: Boss 专属装饰 ===
-        if (this.type === 'boss' && this.bossType) {
-            this._drawBossDecoration(ctx, w, h);
-            this._drawBossVulnerabilityOverlay(ctx, w, h);
-        }
+        // Boss 本体与叠加装饰在身体裁剪恢复后统一绘制，避免 Sprite 被物理轮廓切断。
         // === Layer 3.9: 精英专属装饰（晶化变异）===
         if (this.type === 'elite') {
             this._drawEliteDecoration(ctx, w, h);
         }
-        // === Layer 3.9b: 大BOSS（6+ 词条）炫彩流光边框补充 ===
-        // 大BOSS 的 E4 炫彩流光边框需要单独调用，不依赖 _drawEliteDecoration 的其他精英装饰
-        if (this.type === 'boss' && this.affixes && this.affixes.length >= 6) {
-            const _bossE4Cfg = CONFIG.enemyRender;
-            const _bossE4T = Date.now() / 1000;
-            const _bossPerimeter = 2 * (w + h);
-            const _bossFlowPos = ((_bossE4T * _bossE4Cfg.eliteBorderRainbowFlowSpeed) % 1) * _bossPerimeter;
-            const _bossFlowHW = _bossPerimeter * _bossE4Cfg.eliteBorderRainbowFlowWidth * 0.5;
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighter';
-            const _bossSegs = [
-                { x1: -w/2, y1: -h/2, x2: w/2, y2: -h/2 },
-                { x1: w/2,  y1: -h/2, x2: w/2, y2: h/2  },
-                { x1: w/2,  y1: h/2,  x2: -w/2, y2: h/2 },
-                { x1: -w/2, y1: h/2,  x2: -w/2, y2: -h/2 }
-            ];
-            const _bossSegLens = [w, h, w, h];
-            let _bossCumLen = 0;
-            for (let _bsi = 0; _bsi < 4; _bsi++) {
-                const _bSeg = _bossSegs[_bsi];
-                const _bSegLen = _bossSegLens[_bsi];
-                const _bLo = _bossFlowPos - _bossFlowHW;
-                const _bHi = _bossFlowPos + _bossFlowHW;
-                if (_bHi > _bossCumLen && _bLo < _bossCumLen + _bSegLen) {
-                    const _bLocalLo = Math.max(_bLo, _bossCumLen) - _bossCumLen;
-                    const _bLocalHi = Math.min(_bHi, _bossCumLen + _bSegLen) - _bossCumLen;
-                    const _bt0 = _bLocalLo / _bSegLen;
-                    const _bt1 = _bLocalHi / _bSegLen;
-                    const _bpx0 = _bSeg.x1 + (_bSeg.x2 - _bSeg.x1) * _bt0;
-                    const _bpy0 = _bSeg.y1 + (_bSeg.y2 - _bSeg.y1) * _bt0;
-                    const _bpx1 = _bSeg.x1 + (_bSeg.x2 - _bSeg.x1) * _bt1;
-                    const _bpy1 = _bSeg.y1 + (_bSeg.y2 - _bSeg.y1) * _bt1;
-                    const _bGrad = ctx.createLinearGradient(_bpx0, _bpy0, _bpx1, _bpy1);
-                    const _bHue0 = (Date.now() / 20 + _bsi * 90) % 360;
-                    const _bHue1 = (_bHue0 + 60) % 360;
-                    _bGrad.addColorStop(0, `hsla(${_bHue0}, 100%, 70%, 0)`);
-                    _bGrad.addColorStop(0.5, `hsla(${(_bHue0 + _bHue1) / 2}, 100%, 85%, 0.95)`);
-                    _bGrad.addColorStop(1, `hsla(${_bHue1}, 100%, 70%, 0)`);
-                    ctx.strokeStyle = _bGrad;
-                    ctx.lineWidth = _bossE4Cfg.borderTierRainbowWidth + 1; // Boss 比精英稍宽
-                    ctx.shadowColor = `hsl(${_bHue0}, 100%, 65%)`;
-                    ctx.shadowBlur = _sb(_bossE4Cfg.borderTierRainbowGlowBlur + 4); // Boss 光晕更强
-                    ctx.beginPath();
-                    ctx.moveTo(_bpx0, _bpy0);
-                    ctx.lineTo(_bpx1, _bpy1);
-                    ctx.stroke();
-                }
-                _bossCumLen += _bSegLen;
-            }
-            ctx.restore();
-        }
 
         // === [Phase 5B Task 5.B3] Layer 3.95: Sprite Sheet 覆盖层（在血条和内部特效之后）===
-        // Boss 的 sprite 统一由 _drawBossDecoration 在 Layer 3.8 绘制，此处跳过所有 boss
-        // Arc Boss 的 sprite 另在 Layer 3.95b 裁剪区域外绘制
+        // Boss 的 sprite 在身体裁剪恢复后完整绘制；这里仅处理非 Boss 敌人。
         if (this._spriteRenderer && this._spriteRenderer.ready && this.type !== 'boss') {
             // [V2 资源协议] 大型基底（cols 或 rows >= 2）需用整个占格作为绘制区，
             // 避免 min(w,h) 把 3×1 装甲横梁压成中央小方块；小型敌人保留原行为。
@@ -4745,6 +6020,7 @@ class Enemy {
         }
         this._drawAffixBitmapOverlays(ctx, w, h);
         this._drawEnemyTargetingFallback(ctx, w, h);
+        this._drawRuneRewardFallback(ctx, w, h);
         // === Layer 4: 裂纹绘制 (Fissures) - [保持不变] ===
 
         // **过热 Stage 3**
@@ -5063,13 +6339,13 @@ class Enemy {
             ctx.lineCap = 'round';
             ctx.shadowBlur = _sb(5);
             ctx.shadowColor = '#0ea5e9';
-            
+
             this.swordCracks.forEach(crack => {
                 ctx.save();
                 ctx.translate(crack.x, crack.y);
                 ctx.rotate(crack.angle);
                 ctx.scale(crack.scale, crack.scale);
-                
+
                 // 画一个 "X" 或 简单的 "一" 字裂痕
                 ctx.beginPath();
                 ctx.moveTo(-8, 0);
@@ -5077,24 +6353,17 @@ class Enemy {
                 // 稍微加一点分叉
                 ctx.moveTo(2, 0); ctx.lineTo(6, -3);
                 ctx.moveTo(-2, 0); ctx.lineTo(-5, 3);
-                
+
                 ctx.stroke();
                 ctx.restore();
             });
             ctx.restore();
         }
 
-        // 文字层：保留血量数字显示
-        // [修复] 即使被冻结也显示生命值数字，除非生命值为 0
-        if (this.displayHp > 0) {
-            ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif';
-            ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-            if (this.displayHp > this.hp + 1) ctx.fillStyle = '#fca5a5';
-            ctx.fillText(Math.ceil(this.displayHp), 0, -h/2 + 3);
-        }
+        // [HUD-fix] 血量数字 + 护盾标记 + 状态标签已移至身体裁剪结束之后绘制
+        // （见下方 [S_clip] 作用域恢复之后的 _drawDefenseHudBadges 调用），
+        // 以免被身体轮廓裁掉、并去除原本难看的黑色底板。
 
-        this._drawStatusBadges(ctx, w, h);
-        
         // 受击闪白 - 使用独立的短时计时器，确保只闪一下而非持续白色
         if (this._hitFlashTimer > 0) {
             const flashDuration = Math.max(1, CONFIG.enemyRender.hitFlashDuration || 1);
@@ -5103,118 +6372,7 @@ class Enemy {
             ctx.fillRect(-w/2, -h/2, w, h);
         }
         // --- 词条特效层：护盾/偏折屏障受击视觉反馈 ---
-        // @perf-impact: 防御反馈在命中后的短计时内绘制 1-3 条描边/裂片，使用既有 shadowBlur 门控，不新增粒子池压力。
-        if (this.shieldHitTimer > 0 || this._shieldBreakTimer > 0 || this._wardBlockTimer > 0 || this._wardBreakTimer > 0 || this._radiantAegisPulseTimer > 0 || this._radiantAegisBreakTimer > 0) {
-            ctx.save();
-
-            if (this.shieldHitTimer > 0) {
-                const shieldAlpha = (this.shieldHitTimer / 15) * 0.56;
-                const shieldScale = 1.14 + (1 - this.shieldHitTimer / 15) * 0.18;
-                ctx.save();
-                ctx.scale(shieldScale, shieldScale);
-                ctx.strokeStyle = `rgba(147, 197, 253, ${shieldAlpha})`;
-                ctx.lineWidth = 4;
-                ctx.shadowBlur = _sb(14);
-                ctx.shadowColor = '#60a5fa';
-                ctx.beginPath();
-                ctx.roundRect(-w / 2 - 5, -h / 2 - 5, w + 10, h + 10, r + 3);
-                ctx.stroke();
-                ctx.fillStyle = `rgba(147, 197, 253, ${shieldAlpha * 0.16})`;
-                ctx.fill();
-                ctx.restore();
-            }
-
-            if (this._shieldBreakTimer > 0) {
-                const breakAlpha = Math.min(1, this._shieldBreakTimer / 24);
-                ctx.save();
-                ctx.strokeStyle = `rgba(191, 219, 254, ${breakAlpha * 0.78})`;
-                ctx.lineWidth = 2;
-                ctx.shadowBlur = _sb(8);
-                ctx.shadowColor = '#93c5fd';
-                const crackCount = 5;
-                for (let i = 0; i < crackCount; i++) {
-                    const x = -w * 0.38 + i * (w * 0.19);
-                    const y = -h * 0.48 + (i % 2) * h * 0.18;
-                    ctx.beginPath();
-                    ctx.moveTo(x, y);
-                    ctx.lineTo(x + w * 0.08, y + h * 0.12);
-                    ctx.lineTo(x + w * 0.02, y + h * 0.25);
-                    ctx.stroke();
-                }
-                ctx.restore();
-            }
-
-            if (this._wardBlockTimer > 0 || this._wardBreakTimer > 0) {
-                const wardTimer = Math.max(this._wardBlockTimer, this._wardBreakTimer);
-                const wardDuration = this._wardBreakTimer > 0 ? 24 : 18;
-                const wardAlpha = Math.min(1, wardTimer / wardDuration);
-                const wardBurst = this._wardBreakTimer > 0 ? 1.12 + (1 - wardAlpha) * 0.22 : 1;
-                ctx.save();
-                ctx.scale(wardBurst, wardBurst);
-                ctx.strokeStyle = `rgba(103, 232, 249, ${wardAlpha * 0.82})`;
-                ctx.fillStyle = `rgba(14, 165, 233, ${wardAlpha * 0.08})`;
-                ctx.lineWidth = this._wardBreakTimer > 0 ? 3 : 2;
-                ctx.shadowBlur = _sb(this._wardBreakTimer > 0 ? 14 : 9);
-                ctx.shadowColor = '#22d3ee';
-                ctx.beginPath();
-                ctx.moveTo(0, -h / 2 - 11);
-                ctx.lineTo(w / 2 + 12, -h * 0.12);
-                ctx.lineTo(w * 0.36, h / 2 + 8);
-                ctx.lineTo(-w * 0.36, h / 2 + 8);
-                ctx.lineTo(-w / 2 - 12, -h * 0.12);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-                if (this._wardBreakTimer > 0) {
-                    ctx.beginPath();
-                    ctx.moveTo(-w * 0.16, -h * 0.48);
-                    ctx.lineTo(w * 0.04, -h * 0.12);
-                    ctx.lineTo(-w * 0.05, h * 0.18);
-                    ctx.moveTo(w * 0.2, -h * 0.34);
-                    ctx.lineTo(w * 0.06, h * 0.05);
-                    ctx.lineTo(w * 0.24, h * 0.32);
-                    ctx.stroke();
-                }
-                ctx.restore();
-            }
-
-            if (this._radiantAegisPulseTimer > 0 || this._radiantAegisBreakTimer > 0) {
-                const isBreak = this._radiantAegisBreakTimer > 0;
-                const timer = isBreak ? this._radiantAegisBreakTimer : this._radiantAegisPulseTimer;
-                const duration = isBreak ? 28 : 24;
-                const alpha = Math.min(1, timer / duration);
-                const scale = isBreak ? 1.04 + (1 - alpha) * 0.35 : 1.08 + (1 - alpha) * 0.16;
-                const colors = ['#67e8f9', '#a78bfa', '#f0abfc', '#fef08a'];
-                ctx.save();
-                ctx.scale(scale, scale);
-                ctx.lineWidth = isBreak ? 3 : 2;
-                ctx.shadowBlur = _sb(isBreak ? 16 : 12);
-                ctx.shadowColor = isBreak ? '#f0abfc' : '#67e8f9';
-                for (let i = 0; i < (isBreak ? 4 : 3); i++) {
-                    ctx.strokeStyle = _hexToRgba(colors[i % colors.length], alpha * (0.72 - i * 0.12));
-                    ctx.beginPath();
-                    const pad = 10 + i * 6;
-                    ctx.roundRect(-w / 2 - pad, -h / 2 - pad, w + pad * 2, h + pad * 2, r + pad * 0.45);
-                    ctx.stroke();
-                }
-                if (isBreak) {
-                    ctx.lineWidth = 1.4;
-                    for (let i = 0; i < 7; i++) {
-                        const x = -w * 0.44 + i * (w * 0.15);
-                        const y = -h * 0.54 + (i % 3) * h * 0.18;
-                        ctx.strokeStyle = _hexToRgba(colors[i % colors.length], alpha * 0.9);
-                        ctx.beginPath();
-                        ctx.moveTo(x, y);
-                        ctx.lineTo(x + w * 0.08, y + h * 0.10);
-                        ctx.lineTo(x + w * 0.03, y + h * 0.22);
-                        ctx.stroke();
-                    }
-                }
-                ctx.restore();
-            }
-
-            ctx.restore();
-        }
+        this._drawDefenseImpactFeedback(ctx, w, h, r);
 
         // === Layer 5.5: 插在身上的子剑 (Stuck Swords) ===
         if (this.stuckSwords && this.stuckSwords.length > 0) {
@@ -5280,34 +6438,24 @@ class Enemy {
             });
         }
 
-        ctx.restore(); // <--- 裁剪结束
+        ctx.restore(); // [S_clip] 身体裁剪作用域结束（仍处于 S1 呼吸/倾斜变换内）
 
-        // === Layer 3.95b: Boss Sprite clip repair (post-clip edge fill) ===
-        this._drawBossSpriteOutsideCollisionClip(ctx, w, h);
-
-        // === Layer 3.95c: Arc Boss Sprite（裁剪区域外绘制，完整呈现美术资产）===
-        // Arc boss 的圆环裁剪区域会遮挡中央 sprite，因此在 clip 恢复后单独绘制，
-        // 使 sprite 完整显示在圆环内部及周围区域。
-        if (this.type === 'boss' && this.collisionShape === 'arc' &&
-            this._spriteRenderer && this._spriteRenderer.ready) {
-            ctx.save();
-            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
-            // 对 arc boss 使用较大的 sprite 尺寸（直径约等于圆环直径），居中不偏移
-            const _arcSprW = this.width - 4;
-            const _arcSprH = this.height - 4;
-            const _arcSpriteAspect = typeof this._spriteRenderer.getCurrentFrameAspect === 'function'
-                ? this._spriteRenderer.getCurrentFrameAspect()
-                : 1;
-            if (_arcSpriteAspect > 1.18) {
-                const _arcDrawW = _arcSprW * 0.94;
-                const _arcDrawH = Math.min(_arcSprH * 0.94, _arcDrawW / _arcSpriteAspect);
-                this._spriteRenderer.draw(ctx, -_arcDrawW / 2, -_arcDrawH / 2, _arcDrawW, _arcDrawH, 0.90);
-            } else {
-                const _arcSprSize = Math.min(_arcSprW, _arcSprH) * 0.9;
-                this._spriteRenderer.draw(ctx, -_arcSprSize / 2, -_arcSprSize / 2, _arcSprSize, _arcSprSize, 0.90);
-            }
-            ctx.restore();
+        // === Layer 3.8: Boss 完整本体与上层装饰 ===
+        // 裁剪恢复后直接绘制完整透明 Boss Sprite，让美术主体自然戳出物理轮廓；
+        // 程序化装饰与破绽 Overlay 保持在本体之上，HUD 继续压在最上层。
+        if (this.type === 'boss' && this.bossType) {
+            this._drawBossSpriteOutsideCollisionClip(ctx, w, h);
+            this._drawBossDecoration(ctx, w, h);
+            this._drawBossVulnerabilityOverlay(ctx, w, h);
+            this._drawBossRainbowBorder(ctx, w, h);
         }
+
+        // [HUD-fix] 裁剪结束、S1 变换仍生效时绘制 HUD：血量数字 + 护盾标记融合显示，
+        // 以及状态标签。这样既贴在敌人身上、又不会被身体轮廓裁掉，也无黑色底板。
+        this._drawDefenseHudBadges(ctx, w, h);
+        this._drawStatusBadges(ctx, w, h);
+
+        ctx.restore(); // [S1] 敌人本地变换结束
 
         // === Layer 6: 外部特效 (光环/冰壳) ===
 
@@ -5315,7 +6463,7 @@ class Enemy {
         if (this.type === 'boss') {
             const abyssalCfg = CONFIG.enemyRender;
             ctx.save();
-            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
             ctx.shadowColor = abyssalCfg.bossAbyssalAuraColor;
             ctx.shadowBlur = _sb(abyssalCfg.bossAbyssalAuraBlur);
             ctx.strokeStyle = 'rgba(0, 0, 0, 0)'; // 透明描边，仅依靠 shadowBlur 投射阴影
@@ -5345,7 +6493,7 @@ class Enemy {
             const magmaPhase = (magmaT / (magmaCfg.bossMagmaVeinPeriod / 1000) + this.visualSeed * 2) * Math.PI * 2;
             const magmaIntensity = Math.pow((Math.sin(magmaPhase) + 1) * 0.5, 1.5);
             ctx.save();
-            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
             ctx.globalCompositeOperation = 'screen';
             // 绘制 3 条熔岩纹路，使用 visualSeed 确定起点和方向
             const veinCount = 3;
@@ -5386,7 +6534,7 @@ class Enemy {
             const flickerIntensity = Math.pow(Math.max(0, flickerRaw), 3); // 仅保留峰値阶段
             if (flickerIntensity > 0.05) {
                 ctx.save();
-                ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+                ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
                 ctx.globalCompositeOperation = 'lighter';
                 const flickerGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(w, h) * 0.6);
                 flickerGrad.addColorStop(0, `rgba(255, 255, 255, ${flickerCfg.bossBerserkCoreAlpha * flickerIntensity})`);
@@ -5403,7 +6551,7 @@ class Enemy {
         // **Viridis 狂暴状态: 绿色脉冲光晕**
         if (this.type === 'boss' && this.bossType === 'viridis' && this.berserked) {
             ctx.save();
-            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
             const viridisTime = Date.now() / 1000;
             // 双层脉冲光晕：外层慢脉冲 + 内层快脉冲
             const outerPulse = (Math.sin(viridisTime * 1.8) + 1) * 0.5;  // 慢脉冲
@@ -5444,7 +6592,7 @@ class Enemy {
         // **过热 Stage 4: 炙热发光边框**
         if (this.temp >= 100) {
             ctx.save();
-            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
             const pulse = (Math.sin(Date.now() / 200) + 1) * 0.5;
             ctx.shadowColor = '#f97316';
             ctx.shadowBlur = _sb(15 + pulse * 10);
@@ -5475,7 +6623,7 @@ class Enemy {
         // **过冷 Stage 4: 冰封外壳 - [修复：贴合敌人形状绘制]**
         if (this.temp <= -100 || this.isFrozenCurrentTurn) {
             ctx.save();
-            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
             
             // 冰的颜色：边框亮白/青，内部半透明
             ctx.strokeStyle = 'rgba(207, 250, 254, 0.9)'; // 亮青白
@@ -5567,6 +6715,9 @@ class Enemy {
         // [V3] 奖励敌人当前只承载 relic；旧 chaos/pure 字段不再进入视觉标记入口。
         const _effectiveRewardType = this.rewardType !== undefined ? this.rewardType : this._pendingRewardType;
         if (_effectiveRewardType === 'relic' && this.actionPhase === 'idle') {
+            const _relicFrameW = this.width || w;
+            const _relicFrameH = this.height || h;
+            const _relicFrameR = Math.max(r + 2, Math.min(_relicFrameW, _relicFrameH) * 0.08);
             const _perfBudget = (typeof game !== 'undefined' && game.perfQualityLevel)
                 ? CONFIG.performance[game.perfQualityLevel]
                 : CONFIG.performance.high;
@@ -5575,143 +6726,17 @@ class Enemy {
                 const _now = Date.now();
 
                 if (_effectiveRewardType === 'relic') {
-                    // --- 遗物（relic）：「宝藏封印」风格 ---
-                    // 借用精英 E2 虚空晶核（金色版）+ E4 流光金边 + 双层脉冲环
+                    // --- 遗物（relic）：「实体金属边框」风格 ---
+                    // 不再用悬浮皇冠/中心晶核，而是在敌人轮廓内侧嵌入一层真实金材质装饰框。
                     const _relicPhase = (_now / _rc.relicHaloPeriod + this.visualSeed * 0.5) * Math.PI * 2;
                     const _relicIntensity = (Math.sin(_relicPhase) + 1) * 0.5;
-                    const _relicT = _now / 1000;
                     ctx.save();
-                    ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
-
-                    // --- R1: 外圈金色脉冲光晕（双层描边）---
-                    ctx.shadowColor = _rc.relicHaloColor;
-                    ctx.shadowBlur = _sb(_relicIntensity * _rc.relicHaloBlurMax);
-                    ctx.strokeStyle = `rgba(250, 204, 21, ${_relicIntensity * _rc.relicHaloStrokeAlpha})`;
-                    ctx.lineWidth = 2.5;
-                    if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
-                        const _verts = this.collisionData.vertices;
-                        ctx.beginPath();
-                        ctx.moveTo(_verts[0].x * 1.14, _verts[0].y * 1.14);
-                        for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.14, _verts[_i].y * 1.14);
-                        ctx.closePath();
-                        ctx.stroke();
-                    } else {
-                        ctx.beginPath();
-                        ctx.roundRect(-w/2 - 9, -h/2 - 9, w + 18, h + 18, r + 5);
-                        ctx.stroke();
-                    }
-                    // 内圈琥珀色描边（偏移一层，体现双层封印）
-                    ctx.shadowColor = _rc.relicHaloColorInner;
-                    ctx.shadowBlur = _sb(_relicIntensity * _rc.relicHaloInnerBlurMax);
-                    ctx.strokeStyle = `rgba(245, 158, 11, ${_relicIntensity * _rc.relicHaloStrokeAlpha * 0.7})`;
-                    ctx.lineWidth = 1.5;
-                    if (this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3) {
-                        const _verts = this.collisionData.vertices;
-                        ctx.beginPath();
-                        ctx.moveTo(_verts[0].x * 1.07, _verts[0].y * 1.07);
-                        for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.07, _verts[_i].y * 1.07);
-                        ctx.closePath();
-                        ctx.stroke();
-                    } else {
-                        ctx.beginPath();
-                        ctx.roundRect(-w/2 - 4, -h/2 - 4, w + 8, h + 8, r + 2);
-                        ctx.stroke();
-                    }
-
-                    // --- R2: 金色旋转晶核（借用精英 E2 虚空晶核，金色版）---
-                    const _relicCoreR = Math.min(w, h) * _rc.relicCoreRadiusRatio;
-                    const _relicCoreAngle = _relicT * _rc.relicCoreRotateSpeed + this.visualSeed * Math.PI;
-                    ctx.save();
-                    ctx.rotate(_relicCoreAngle);
-                    const _relicCoreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, _relicCoreR);
-                    _relicCoreGrad.addColorStop(0, `rgba(255, 251, 180, ${0.95 * (0.6 + _relicIntensity * 0.4)})`);
-                    _relicCoreGrad.addColorStop(0.5, `rgba(250, 204, 21, ${0.7 * (0.5 + _relicIntensity * 0.5)})`);
-                    _relicCoreGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
-                    ctx.fillStyle = _relicCoreGrad;
-                    ctx.shadowColor = '#facc15';
-                    ctx.shadowBlur = _sb(10 + _relicIntensity * 8);
-                    // 菱形晶核路径（与精英 E2 一致）
-                    ctx.beginPath();
-                    ctx.moveTo(0, -_relicCoreR);
-                    ctx.lineTo(_relicCoreR * 0.55, 0);
-                    ctx.lineTo(0, _relicCoreR);
-                    ctx.lineTo(-_relicCoreR * 0.55, 0);
-                    ctx.closePath();
-                    ctx.fill();
-                    // 晶核描边（亮金色）
-                    ctx.strokeStyle = `rgba(255, 255, 200, ${0.6 + _relicIntensity * 0.35})`;
-                    ctx.lineWidth = 1.2;
-                    ctx.stroke();
-                    ctx.restore();
-
-                    // --- R3: 晶核过曝叠加（lighter 模式，金色能量溢出）---
-                    ctx.save();
-                    ctx.globalCompositeOperation = 'lighter';
-                    const _relicOverglowR = _relicCoreR * 1.8;
-                    const _relicOverglowGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, _relicOverglowR);
-                    _relicOverglowGrad.addColorStop(0, `rgba(250, 204, 21, ${0.35 * _relicIntensity})`);
-                    _relicOverglowGrad.addColorStop(1, 'rgba(250, 204, 21, 0)');
-                    ctx.fillStyle = _relicOverglowGrad;
-                    ctx.beginPath();
-                    ctx.arc(0, 0, _relicOverglowR, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.restore();
-
-                    // --- R4: 流光金边（借用精英 E4，高光点沿边框流动）---
-                    const _relicPerimeter = 2 * (w + h);
-                    const _relicFlowPos = ((_relicT * _rc.relicBorderFlowSpeed) % 1) * _relicPerimeter;
-                    const _relicFlowHalfW = _relicPerimeter * _rc.relicBorderFlowWidth * 0.5;
-                    ctx.save();
-                    ctx.globalCompositeOperation = 'lighter';
-                    const _relicSegments = [
-                        { x1: -w/2, y1: -h/2, x2: w/2, y2: -h/2 },
-                        { x1: w/2,  y1: -h/2, x2: w/2, y2: h/2  },
-                        { x1: w/2,  y1: h/2,  x2: -w/2, y2: h/2 },
-                        { x1: -w/2, y1: h/2,  x2: -w/2, y2: -h/2 }
-                    ];
-                    const _relicSegLens = [w, h, w, h];
-                    let _relicCumLen = 0;
-                    for (let _si = 0; _si < 4; _si++) {
-                        const _seg = _relicSegments[_si];
-                        const _segLen = _relicSegLens[_si];
-                        const _lo = _relicFlowPos - _relicFlowHalfW;
-                        const _hi = _relicFlowPos + _relicFlowHalfW;
-                        if (_hi > _relicCumLen && _lo < _relicCumLen + _segLen) {
-                            const _localLo = Math.max(_lo, _relicCumLen) - _relicCumLen;
-                            const _localHi = Math.min(_hi, _relicCumLen + _segLen) - _relicCumLen;
-                            const _t0 = _localLo / _segLen;
-                            const _t1 = _localHi / _segLen;
-                            const _px0 = _seg.x1 + (_seg.x2 - _seg.x1) * _t0;
-                            const _py0 = _seg.y1 + (_seg.y2 - _seg.y1) * _t0;
-                            const _px1 = _seg.x1 + (_seg.x2 - _seg.x1) * _t1;
-                            const _py1 = _seg.y1 + (_seg.y2 - _seg.y1) * _t1;
-                            const _relicFlowGrad = ctx.createLinearGradient(_px0, _py0, _px1, _py1);
-                            _relicFlowGrad.addColorStop(0, 'rgba(250, 204, 21, 0)');
-                            _relicFlowGrad.addColorStop(0.5, 'rgba(255, 255, 180, 0.9)');
-                            _relicFlowGrad.addColorStop(1, 'rgba(250, 204, 21, 0)');
-                            ctx.strokeStyle = _relicFlowGrad;
-                            ctx.lineWidth = 3.5;
-                            ctx.shadowColor = '#facc15';
-                            ctx.shadowBlur = _sb(10);
-                            ctx.beginPath();
-                            ctx.moveTo(_px0, _py0);
-                            ctx.lineTo(_px1, _py1);
-                            ctx.stroke();
-                        }
-                        _relicCumLen += _segLen;
-                    }
-                    ctx.restore();
-
-                    ctx.restore();
-                    // 王冠图标浮动（替换宝箱，更符合遗物"珍贵宝物"语义）
-                    const _relicFloatY = Math.sin((_now / _rc.relicIconFloatPeriod + this.visualSeed) * Math.PI * 2) * _rc.relicIconFloatAmplitude;
-                    ctx.save();
-                    ctx.font = `${_rc.relicIconFontSize}px sans-serif`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.shadowColor = _rc.relicHaloColor;
-                    ctx.shadowBlur = _sb(12);
-                    ctx.fillText('👑', this.pos.x, this.pos.y + this.bumpOffsetY - h/2 + _rc.relicIconOffsetY + _relicFloatY);
+                    ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
+                    this._drawRelicMaterialFrame(ctx, _relicFrameW, _relicFrameH, _relicFrameR, {
+                        detail: true,
+                        intensity: _relicIntensity,
+                        inset: 2
+                    });
                     ctx.restore();
 
                 } else if (_effectiveRewardType === 'chaos_essence') {
@@ -5721,7 +6746,7 @@ class Enemy {
                     const _chaosIntensity = (Math.sin(_chaosPhase) + 1) * 0.5;
                     const _chaosT = _now / 1000;
                     ctx.save();
-                    ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+                    ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
 
                     // --- C1: 混沌晶化切面（借用精英 E1，紫/红混沌色系）---
                     ctx.save();
@@ -5844,7 +6869,7 @@ class Enemy {
                     const _pureIntensity = Math.pow((Math.sin(_purePhase) + 1) * 0.5, 1.5); // 非线性缓动
                     const _pureT = _now / 1000;
                     ctx.save();
-                    ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+                    ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
 
                     // --- P1: 冰晶切面（借用精英 E1，白/蓝冰晶色系）---
                     ctx.save();
@@ -5990,49 +7015,14 @@ class Enemy {
                 }
 
             } else {
-                // @perf-impact: low 档遗物标记平面兜底 - 仅金色双层描边，无 shadowBlur/渐变/旋转
-                // 省电模式下 rewardHaloEnabled=false 会跳过完整光晕，但「敌人携带遗物」是
-                // 核心玩法可读性信号，必须保留。此处以约 2 次 stroke/敌的极低成本绘制平面边框，
-                // 不触发任何 GPU 模糊/混合 pass，符合 low 档降温目标。
-                const _markColor = 'rgba(250, 204, 21, 0.95)';
-                const _markColor2 = 'rgba(245, 158, 11, 0.6)';
-                // 极廉价脉冲（仅 1 次 Math.sin，纯 CPU、无 GPU 开销）让标记更易被注意
-                const _markPulse = 0.7 + Math.sin(Date.now() / 400 + this.visualSeed * 3) * 0.3;
-                const _markPoly = this.collisionShape === 'polygon' && this.collisionData && this.collisionData.vertices && this.collisionData.vertices.length >= 3;
+                // @perf-impact: low 档遗物标记保留同一套金属材质框，关闭 shadowBlur 与动态发光，只保留固定描边/角标/铆钉。
                 ctx.save();
-                ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
-                ctx.shadowBlur = 0;
-                ctx.globalAlpha = _markPulse;
-                // 外圈主色描边
-                ctx.strokeStyle = _markColor;
-                ctx.lineWidth = 2.5;
-                if (_markPoly) {
-                    const _verts = this.collisionData.vertices;
-                    ctx.beginPath();
-                    ctx.moveTo(_verts[0].x * 1.12, _verts[0].y * 1.12);
-                    for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.12, _verts[_i].y * 1.12);
-                    ctx.closePath();
-                    ctx.stroke();
-                } else {
-                    ctx.beginPath();
-                    ctx.roundRect(-w/2 - 7, -h/2 - 7, w + 14, h + 14, r + 4);
-                    ctx.stroke();
-                }
-                // 内圈辅色描边（双层，强化「被封印/标记」语义）
-                ctx.strokeStyle = _markColor2;
-                ctx.lineWidth = 1.5;
-                if (_markPoly) {
-                    const _verts = this.collisionData.vertices;
-                    ctx.beginPath();
-                    ctx.moveTo(_verts[0].x * 1.05, _verts[0].y * 1.05);
-                    for (let _i = 1; _i < _verts.length; _i++) ctx.lineTo(_verts[_i].x * 1.05, _verts[_i].y * 1.05);
-                    ctx.closePath();
-                    ctx.stroke();
-                } else {
-                    ctx.beginPath();
-                    ctx.roundRect(-w/2 - 3, -h/2 - 3, w + 6, h + 6, r + 2);
-                    ctx.stroke();
-                }
+                ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
+                this._drawRelicMaterialFrame(ctx, _relicFrameW, _relicFrameH, _relicFrameR, {
+                    detail: false,
+                    intensity: 0.25,
+                    inset: 2
+                });
                 ctx.restore();
             }
         }
@@ -6105,7 +7095,7 @@ class Enemy {
             const hw = this.width / 2 + 4 + expand;
             const hh = this.height / 2 + 4 + expand;
             ctx.save();
-            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
             ctx.shadowColor = '#fff'; ctx.shadowBlur = _sb(10);
             ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`; ctx.lineWidth = 2;
             ctx.beginPath();
@@ -6123,7 +7113,7 @@ class Enemy {
         // **Devourer 噬神者: 胃囊实体上的吞噬状态动画**
         if (this.type === 'boss' && this.bossType === 'devourer') {
             ctx.save();
-            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
             const devTime = Date.now() / 1000;
             const hasArcMetrics = this.collisionData
                 && Number.isFinite(this.collisionData.radius)
@@ -6136,20 +7126,20 @@ class Enemy {
             if (devState === 'IDLE') {
                 // IDLE: 胃囊口器闭合，绘制深色凹陷区域
                 ctx.save();
-                ctx.globalAlpha = 0.7;
+                ctx.globalAlpha = 0.32;
                 const idleGrad = ctx.createRadialGradient(0, 0, devRadius * 0.3, 0, 0, devRadius * 0.8);
-                idleGrad.addColorStop(0, 'rgba(15, 5, 30, 0.9)');
-                idleGrad.addColorStop(0.6, 'rgba(40, 10, 60, 0.5)');
+                idleGrad.addColorStop(0, 'rgba(15, 5, 30, 0.44)');
+                idleGrad.addColorStop(0.6, 'rgba(40, 10, 60, 0.24)');
                 idleGrad.addColorStop(1, 'rgba(60, 20, 80, 0)');
                 ctx.fillStyle = idleGrad;
                 ctx.beginPath();
                 ctx.arc(0, 0, devRadius * 0.75, 0, Math.PI * 2);
                 ctx.fill();
                 // 绘制闭合口器的深色封印线
-                ctx.strokeStyle = 'rgba(80, 20, 120, 0.6)';
+                ctx.strokeStyle = 'rgba(80, 20, 120, 0.36)';
                 ctx.lineWidth = 3;
                 ctx.shadowColor = '#4b0082';
-                ctx.shadowBlur = _sb(8);
+                ctx.shadowBlur = _sb(4);
                 ctx.beginPath();
                 ctx.moveTo(-devRadius * 0.3, -devRadius * 0.1);
                 ctx.lineTo(0, devRadius * 0.15);
@@ -6165,17 +7155,17 @@ class Enemy {
 
                 ctx.save();
                 // 绘制扩张中的口器弧形
-                ctx.strokeStyle = `rgba(138, 43, 226, ${0.5 + openPulse * 0.4})`;
+                ctx.strokeStyle = `rgba(138, 43, 226, ${0.34 + openPulse * 0.22})`;
                 ctx.lineWidth = devThickness * 0.6;
                 ctx.shadowColor = '#8b00ff';
-                ctx.shadowBlur = _sb(15 + openPulse * 10);
+                ctx.shadowBlur = _sb(8 + openPulse * 6);
                 ctx.lineCap = 'round';
                 ctx.beginPath();
                 ctx.arc(0, 0, devRadius, openAngle, Math.PI * 2 - openAngle);
                 ctx.stroke();
                 // 口腔中心的扭曲光晕
                 const gapGrad = ctx.createRadialGradient(0, devRadius * 0.1, 0, 0, devRadius * 0.1, devRadius * 0.5);
-                gapGrad.addColorStop(0, `rgba(75, 0, 130, ${0.6 + openPulse * 0.3})`);
+                gapGrad.addColorStop(0, `rgba(75, 0, 130, ${0.28 + openPulse * 0.18})`);
                 gapGrad.addColorStop(1, 'rgba(75, 0, 130, 0)');
                 ctx.fillStyle = gapGrad;
                 ctx.beginPath();
@@ -6206,9 +7196,9 @@ class Enemy {
                 ctx.save();
                 // 外层紫黑色 radialGradient 光芒
                 const devourGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, devRadius * 1.4);
-                devourGrad.addColorStop(0, `rgba(20, 0, 40, ${0.9 + devourPulse * 0.1})`);
-                devourGrad.addColorStop(0.3, `rgba(75, 0, 130, ${0.7 + devourPulse * 0.2})`);
-                devourGrad.addColorStop(0.7, `rgba(139, 0, 139, ${0.3 + devourPulse * 0.3})`);
+                devourGrad.addColorStop(0, `rgba(20, 0, 40, ${0.48 + devourPulse * 0.08})`);
+                devourGrad.addColorStop(0.3, `rgba(75, 0, 130, ${0.38 + devourPulse * 0.12})`);
+                devourGrad.addColorStop(0.7, `rgba(139, 0, 139, ${0.18 + devourPulse * 0.14})`);
                 devourGrad.addColorStop(1, 'rgba(75, 0, 130, 0)');
                 ctx.fillStyle = devourGrad;
                 ctx.beginPath();
@@ -6221,8 +7211,8 @@ class Enemy {
                 const shakeX = Math.sin(shakePhase * 1.7 + 0.3) * shakeAmp * (Math.random() * 0.5 + 0.5);
                 const shakeY = Math.cos(shakePhase * 2.1 + 1.1) * shakeAmp * (Math.random() * 0.5 + 0.5);
                 const voidGrad = ctx.createRadialGradient(shakeX, shakeY, 0, shakeX, shakeY, devRadius * 0.5);
-                voidGrad.addColorStop(0, 'rgba(0, 0, 0, 1)');
-                voidGrad.addColorStop(0.5, 'rgba(20, 0, 40, 0.9)');
+                voidGrad.addColorStop(0, 'rgba(0, 0, 0, 0.58)');
+                voidGrad.addColorStop(0.5, 'rgba(20, 0, 40, 0.42)');
                 voidGrad.addColorStop(1, 'rgba(75, 0, 130, 0)');
                 ctx.fillStyle = voidGrad;
                 ctx.beginPath();
@@ -6360,7 +7350,7 @@ class Enemy {
         // **Ouroboros 永恒回声: 完整环 + 六附体轮转锚点**
         if (this.type === 'boss' && this.bossType === 'ouroboros' && this.collisionShape === 'arc') {
             ctx.save();
-            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
             const ouroTime = Date.now() / 1000;
             const ouroRadius = this.collisionData ? this.collisionData.radius : (this.width * 0.4);
             const ouroThickness = this.collisionData ? this.collisionData.thickness : (this.height * 0.2);
@@ -6369,9 +7359,10 @@ class Enemy {
             const arcEnd = Math.PI * 2;
             const isBerserk = (this.hp / this.maxHp) < (CONFIG.balance.bossEnrageHpRatio ?? 0.2);
             const ringPulse = (Math.sin(ouroTime * (isBerserk ? 4 : 2)) + 1) * 0.5;
+            const bossSpriteReady = !!(this._spriteRenderer && this._spriteRenderer.ready && !this._spriteRenderer.failed);
 
             // --- 1. 绘制旋转残影（狂暴时多层半透明历史弧）---
-            if (isBerserk) {
+            if (isBerserk && !bossSpriteReady) {
                 const trailCount = 5;
                 for (let ti = 0; ti < trailCount; ti++) {
                     const trailOffset = (ti + 1) * (Math.PI * 0.12); // 每层残影偏移角度
@@ -6395,26 +7386,27 @@ class Enemy {
 
             // --- 2. 绘制主环形实体（完整闭合环）---
             ctx.save();
-            // 主环颜色：狂暴时更亮更紫
             const ringColor = isBerserk ? '#c084fc' : '#818cf8';
             const ringGlowColor = isBerserk ? '#9333ea' : '#6366f1';
             ctx.strokeStyle = ringColor;
-            ctx.lineWidth = ouroThickness;
-            ctx.lineCap = 'butt';
+            ctx.lineWidth = bossSpriteReady ? Math.max(1.5, ouroThickness * 0.08) : ouroThickness;
+            ctx.lineCap = bossSpriteReady ? 'round' : 'butt';
             ctx.shadowColor = ringGlowColor;
-            ctx.shadowBlur = _sb(12 + ringPulse * 10);
-            ctx.globalAlpha = 0.85 + ringPulse * 0.15;
+            ctx.shadowBlur = bossSpriteReady ? _sb(2 + ringPulse * 2) : _sb(12 + ringPulse * 10);
+            ctx.globalAlpha = bossSpriteReady ? (0.12 + ringPulse * 0.04) : (0.85 + ringPulse * 0.15);
             ctx.beginPath();
             ctx.arc(0, 0, ouroRadius, arcStart, arcEnd);
             ctx.stroke();
 
             // 内层高光
-            ctx.strokeStyle = isBerserk ? 'rgba(233, 213, 255, 0.5)' : 'rgba(199, 210, 254, 0.35)';
-            ctx.lineWidth = ouroThickness * 0.3;
-            ctx.shadowBlur = _sb(5);
-            ctx.beginPath();
-            ctx.arc(0, 0, ouroRadius - ouroThickness * 0.15, arcStart, arcEnd);
-            ctx.stroke();
+            if (!bossSpriteReady) {
+                ctx.strokeStyle = isBerserk ? 'rgba(233, 213, 255, 0.5)' : 'rgba(199, 210, 254, 0.35)';
+                ctx.lineWidth = ouroThickness * 0.3;
+                ctx.shadowBlur = _sb(5);
+                ctx.beginPath();
+                ctx.arc(0, 0, ouroRadius - ouroThickness * 0.15, arcStart, arcEnd);
+                ctx.stroke();
+            }
             ctx.restore();
 
             // --- 3. 当前轮转锚点（不再表示物理缺口）---
@@ -6423,47 +7415,47 @@ class Enemy {
             const corePulse = (Math.sin(ouroTime * (isBerserk ? 8 : 4)) + 1) * 0.5;
             const coreRadius = ouroThickness * (0.5 + corePulse * 0.3);
 
-            ctx.save();
-            // 核心发光球
-            const coreGrad = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, coreRadius * 2);
-            coreGrad.addColorStop(0, isBerserk ? 'rgba(255, 200, 255, 1)' : 'rgba(200, 220, 255, 1)');
-            coreGrad.addColorStop(0.3, isBerserk ? 'rgba(200, 50, 255, 0.9)' : 'rgba(100, 130, 255, 0.8)');
-            coreGrad.addColorStop(1, 'rgba(100, 50, 200, 0)');
-            ctx.fillStyle = coreGrad;
-            ctx.shadowColor = isBerserk ? '#ff00ff' : '#818cf8';
-            ctx.shadowBlur = _sb(15 + corePulse * 15);
-            ctx.beginPath();
-            ctx.arc(coreX, coreY, coreRadius * 2, 0, Math.PI * 2);
-            ctx.fill();
-
-            // 核心闪烁光点
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-            ctx.shadowBlur = _sb(8);
-            ctx.beginPath();
-            ctx.arc(coreX, coreY, coreRadius * 0.4, 0, Math.PI * 2);
-            ctx.fill();
-
-            // 狂暴时核心周围添加旋转光环
-            if (isBerserk) {
-                ctx.strokeStyle = `rgba(255, 100, 255, ${0.4 + corePulse * 0.5})`;
-                ctx.lineWidth = 1.5;
-                ctx.shadowColor = '#ff00ff';
-                ctx.shadowBlur = _sb(10);
-                ctx.setLineDash([4, 4]);
+            if (!bossSpriteReady) {
+                ctx.save();
+                const coreGrad = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, coreRadius * 2);
+                coreGrad.addColorStop(0, isBerserk ? 'rgba(255, 200, 255, 1)' : 'rgba(200, 220, 255, 1)');
+                coreGrad.addColorStop(0.3, isBerserk ? 'rgba(200, 50, 255, 0.9)' : 'rgba(100, 130, 255, 0.8)');
+                coreGrad.addColorStop(1, 'rgba(100, 50, 200, 0)');
+                ctx.fillStyle = coreGrad;
+                ctx.shadowColor = isBerserk ? '#ff00ff' : '#818cf8';
+                ctx.shadowBlur = _sb(15 + corePulse * 15);
                 ctx.beginPath();
-                ctx.arc(coreX, coreY, coreRadius * 2.5, ouroTime * 3, ouroTime * 3 + Math.PI * 1.5);
-                ctx.stroke();
-                ctx.setLineDash([]);
+                ctx.arc(coreX, coreY, coreRadius * 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.shadowBlur = _sb(8);
+                ctx.beginPath();
+                ctx.arc(coreX, coreY, coreRadius * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (isBerserk) {
+                    ctx.strokeStyle = `rgba(255, 100, 255, ${0.4 + corePulse * 0.5})`;
+                    ctx.lineWidth = 1.5;
+                    ctx.shadowColor = '#ff00ff';
+                    ctx.shadowBlur = _sb(10);
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.arc(coreX, coreY, coreRadius * 2.5, ouroTime * 3, ouroTime * 3 + Math.PI * 1.5);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+                ctx.restore();
             }
-            ctx.restore();
 
             // --- 4. 轮转锚点背后的短弧辉光 ---
             ctx.save();
             ctx.strokeStyle = isBerserk ? 'rgba(255, 150, 255, 0.76)' : 'rgba(150, 180, 255, 0.62)';
-            ctx.lineWidth = ouroThickness * 0.55;
+            ctx.lineWidth = bossSpriteReady ? Math.max(2, ouroThickness * 0.12) : ouroThickness * 0.55;
             ctx.lineCap = 'round';
             ctx.shadowColor = isBerserk ? '#cc00cc' : '#6366f1';
-            ctx.shadowBlur = _sb(10 + ringPulse * 8);
+            ctx.shadowBlur = bossSpriteReady ? _sb(3 + ringPulse * 3) : _sb(10 + ringPulse * 8);
+            ctx.globalAlpha = bossSpriteReady ? 0.22 : 1;
             ctx.beginPath();
             ctx.arc(0, 0, ouroRadius, markerAngle - Math.PI * 0.10, markerAngle + Math.PI * 0.10);
             ctx.stroke();
@@ -6643,7 +7635,7 @@ class Enemy {
                 ? 0.9                            // 阶段 2：持续强亮
                 : (t / 30) * 0.9;               // 阶段 3：淡出
             ctx.save();
-            ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
+            ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
             const flashPulse = Math.sin(Date.now() / 60) * 0.3 + 0.7;
             ctx.shadowColor = '#ef4444';
             ctx.shadowBlur = _sb(30 * pulseAlpha * flashPulse);
@@ -6790,6 +7782,30 @@ class Enemy {
         let actualDamage = amount;
         this._blockedPierceThisHit = false;
         this._applyPhaseShieldInitialBonus();
+        let blockedDamage = 0;
+        let blockedBy = null;
+        const recordDefenseBlock = (kind, blocked = 0) => {
+            const value = Math.max(0, Number(blocked) || 0);
+            if (value <= 0) return;
+            blockedDamage += value;
+            if (!blockedBy) blockedBy = kind;
+        };
+        const makeDamageResult = (hpDamage, extra = {}) => {
+            const safeHpDamage = Math.max(0, Number(hpDamage) || 0);
+            const safeBlockedDamage = Math.max(0, Number(blockedDamage) || 0);
+            const resultBlockedBy = extra.blockedBy || blockedBy || null;
+            return {
+                ...extra,
+                killed: !!extra.killed,
+                actualDamage: safeHpDamage,
+                hpDamage: safeHpDamage,
+                blockedDamage: safeBlockedDamage,
+                blockedAmount: safeBlockedDamage,
+                blockedBy: resultBlockedBy,
+                defenseBlocked: !!(extra.defenseBlocked || resultBlockedBy || safeBlockedDamage > 0),
+                blockedPierce: !!(extra.blockedPierce || this._blockedPierceThisHit)
+            };
+        };
 
         const gameRef = typeof game !== 'undefined' ? game : null;
         if (!bypassShield && actualDamage > 0 && typeof this._viridisApplyCounterHit === 'function') {
@@ -6811,20 +7827,23 @@ class Enemy {
                 const absorbed = Math.min(this.wardBarrier, actualDamage);
                 this.wardBarrier -= absorbed;
                 actualDamage -= absorbed;
-                this._wardBlockTimer = 18;
+                recordDefenseBlock('ward', absorbed);
+                this._wardBlockTimer = 22;
+                this._triggerDefenseImpactFx('ward', source, 22, { absorbed });
                 if (typeof game !== 'undefined') {
                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 18, `🔷-${Math.ceil(absorbed)}`, '#67e8f9');
                 }
                 if (this.wardBarrier <= 0) {
                     this.wardBrokenThisTurn = true;
                     this._wardBreakTimer = 24;
+                    this._triggerDefenseImpactFx('ward', source, 24, { break: true, absorbed });
                     if (typeof game !== 'undefined') {
-                        game.spawn_createParticle(this.pos.x, this.pos.y, '#67e8f9', 'shard');
+                        game.spawn_createParticle(this.pos.x, this.pos.y, '#67e8f9', 'spark');
                         game.spawn_createFloatingText(this.pos.x, this.pos.y - 36, '🔷BREAK', '#22d3ee');
                     }
                 }
                 if (isPierce) this._blockedPierceThisHit = true;
-                if (actualDamage <= 0) return { actualDamage: Math.ceil(absorbed), killed: false, deflected: true, blockedPierce: isPierce };
+                if (actualDamage <= 0) return makeDamageResult(0, { deflected: true, blockedPierce: isPierce, blockedBy: 'ward' });
             }
         }
 
@@ -6834,10 +7853,20 @@ class Enemy {
             const isPierce = !!(cfg && cfg.pierce > 0);
             const isBounceHit = !!(cfg && cfg.bounce > 0
                 && source.bouncesLeft !== undefined && source.bouncesLeft < cfg.bounce);
-            if (isPierce || isBounceHit) {
+            const isElementalHit = !!(cfg && (
+                (cfg.cryo || 0) > 0
+                || (cfg.pyro || 0) > 0
+                || (cfg.lightning || 0) > 0
+                || (cfg.venom || 0) > 0
+                || (cfg.wind || 0) > 0
+            ));
+            const armorShouldCatchHit = !!cfg && actualDamage > 0 && (isPierce || isBounceHit || !isElementalHit);
+            if (armorShouldCatchHit) {
                 const armorDamage = Math.min(this.livingArmorHp, actualDamage);
                 this.livingArmorHp -= armorDamage;
-                this._livingArmorHitTimer = 16;
+                recordDefenseBlock('livingArmor', armorDamage);
+                this._livingArmorHitTimer = 22;
+                this._triggerDefenseImpactFx('livingArmor', source, 22, { absorbed: armorDamage });
                 if (typeof game !== 'undefined') {
                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 26, `活甲-${Math.ceil(armorDamage)}`, '#bef264', 12);
                 }
@@ -6845,6 +7874,8 @@ class Enemy {
                     this.livingArmorHp = 0;
                     this.livingArmorMax = 0;
                     this.livingArmorBroken = true;
+                    this._livingArmorBreakTimer = 26;
+                    this._triggerDefenseImpactFx('livingArmor', source, 26, { break: true, absorbed: armorDamage });
                     if (typeof this._onLivingArmorBroken === 'function') {
                         this._onLivingArmorBroken(gameRef, source);
                     }
@@ -6856,7 +7887,7 @@ class Enemy {
                 if (!isPierce) {
                     actualDamage -= armorDamage;
                     if (actualDamage <= 0) {
-                        return { actualDamage: 0, killed: false, livingArmorBlocked: true };
+                        return makeDamageResult(0, { livingArmorBlocked: true, blockedBy: 'livingArmor' });
                     }
                 }
             }
@@ -6867,11 +7898,14 @@ class Enemy {
             const absorbed = Math.min(this.energyArmorShield, actualDamage);
             this.energyArmorShield -= absorbed;
             actualDamage -= absorbed;
+            recordDefenseBlock('energyArmor', absorbed);
+            this._energyArmorBlockTimer = Math.max(this._energyArmorBlockTimer || 0, 20);
+            this._triggerDefenseImpactFx('energyArmor', source, 20, { absorbed });
             if (typeof game !== 'undefined') {
                 game.spawn_createFloatingText(this.pos.x, this.pos.y - 30, `蓄盾-${Math.ceil(absorbed)}`, '#fbbf24', 12);
             }
             if (actualDamage <= 0) {
-                return { actualDamage: Math.ceil(absorbed), killed: false, energyArmorBlocked: true };
+                return makeDamageResult(0, { energyArmorBlocked: true, blockedBy: 'energyArmor' });
             }
         }
 
@@ -6882,7 +7916,9 @@ class Enemy {
                 const absorbed = Math.min(this.radiantAegis, actualDamage);
                 this.radiantAegis -= absorbed;
                 actualDamage -= absorbed;
-                this._radiantAegisPulseTimer = 18;
+                recordDefenseBlock('radiantAegis', absorbed);
+                this._radiantAegisPulseTimer = 24;
+                this._triggerDefenseImpactFx('radiantAegis', source, 24, { absorbed });
                 if (typeof game !== 'undefined') {
                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 28, `✦-${Math.ceil(absorbed)}`, '#a5f3fc');
                 }
@@ -6890,13 +7926,14 @@ class Enemy {
                     this.radiantAegis = 0;
                     this.radiantAegisBroken = true;
                     this._radiantAegisBreakTimer = 28;
+                    this._triggerDefenseImpactFx('radiantAegis', source, 28, { break: true, absorbed });
                     if (typeof game !== 'undefined') {
                         game.spawn_createFloatingText(this.pos.x, this.pos.y - 48, '✦SHATTER', '#f0abfc');
-                        game.spawn_createParticle(this.pos.x, this.pos.y, '#a5f3fc', 'shard');
+                        game.spawn_createParticle(this.pos.x, this.pos.y, '#f0abfc', 'spark');
                     }
                 }
                 if (actualDamage <= 0) {
-                    return { actualDamage: Math.ceil(absorbed), killed: false, radiantBlocked: true };
+                    return makeDamageResult(0, { radiantBlocked: true, blockedBy: 'radiantAegis' });
                 }
             }
         }
@@ -6913,16 +7950,30 @@ class Enemy {
             // B. 护盾生效判定：非绕后且有剩余次数
             if (!isBackAttack && this.shieldCharges > 0) {
                 const reduction = CONFIG.balance.affixes.shieldReduction || 0.8;
+                const isPhaseShieldBlock = this.affixes.includes('phaseShield');
+                const shieldKind = isPhaseShieldBlock ? 'phaseShield' : 'shield';
+                const beforeShieldDamage = actualDamage;
                 actualDamage *= reduction; // 护盾减少伤害 (只受20%伤害)
+                const shieldBlocked = Math.max(0, beforeShieldDamage - actualDamage);
+                recordDefenseBlock(shieldKind, shieldBlocked);
                 this.shieldCharges--; // 消耗一层护盾
 
                 // 触发护盾视觉反馈 (限制频率)
-                const shouldShowShieldText = this.shieldHitTimer <= 0;
-                this.shieldHitTimer = Math.max(this.shieldHitTimer, 15);
+                const shouldShowShieldText = isPhaseShieldBlock
+                    ? (this._phaseShieldBlockTimer || 0) <= 0
+                    : this.shieldHitTimer <= 0;
+                if (isPhaseShieldBlock) {
+                    this._phaseShieldBlockTimer = Math.max(this._phaseShieldBlockTimer || 0, 22);
+                    this._triggerDefenseImpactFx('phaseShield', source, 22, { absorbed: shieldBlocked });
+                } else {
+                    this.shieldHitTimer = Math.max(this.shieldHitTimer, 20);
+                    this._triggerDefenseImpactFx('shield', source, 20, { absorbed: shieldBlocked });
+                }
                 if (shouldShowShieldText) {
                     if (typeof game !== 'undefined') {
-                        // 显示剩余层数
-                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, `🛡️${this.shieldCharges}`, "#93c5fd");
+                        // 显示剩余层数（使用位图护盾图标代替 emoji）
+                        const shieldIcon = getUiBitmap(DEFENSE_ICON_MAP[isPhaseShieldBlock ? 'phaseShield' : 'shield']);
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, `${this.shieldCharges}`, isPhaseShieldBlock ? '#a5b4fc' : '#93c5fd', 14, shieldIcon);
                     }
                 }
 
@@ -6930,10 +7981,17 @@ class Enemy {
                 if (this.shieldCharges <= 0) {
                     // 移除护盾词条
                     this.affixes = this.affixes.filter(a => a !== 'shield');
-                    this._shieldBreakTimer = 24;
+                    if (isPhaseShieldBlock) {
+                        this._phaseShieldBreakTimer = 24;
+                        this._triggerDefenseImpactFx('phaseShield', source, 24, { break: true });
+                    } else {
+                        this._shieldBreakTimer = 24;
+                        this._triggerDefenseImpactFx('shield', source, 24, { break: true });
+                    }
                     if (typeof game !== 'undefined') {
-                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, "💔BROKEN!", "#ef4444");
-                        game.spawn_createParticle(this.pos.x, this.pos.y, '#93c5fd', 'shard');
+                        const breakIcon = getUiBitmap(DEFENSE_ICON_MAP[isPhaseShieldBlock ? 'phaseShield' : 'shield']);
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, "BROKEN!", "#ef4444", 14, breakIcon);
+                        game.spawn_createParticle(this.pos.x, this.pos.y, '#93c5fd', 'spark');
                         // 播放破碎音效 (如果支持)
                         // audio.playEffect('shatter'); 
                     }
@@ -7019,6 +8077,7 @@ class Enemy {
             if (actualDamage > threshold) {
                 const overflow = actualDamage - threshold;
                 actualDamage = threshold;
+                recordDefenseBlock('energyArmor', overflow);
                 const cap = Math.max(1, this.maxHp * (afx.energyArmorShieldCapPct || 1.0));
                 this.energyArmorShield = Math.min(cap, (this.energyArmorShield || 0) + overflow);
                 if (typeof game !== 'undefined') {
@@ -7031,13 +8090,20 @@ class Enemy {
         if (this.affixes.includes('lowDamageImmune') && !bypassShield && actualDamage > 0) {
             const threshold = Math.max(1, this.maxHp * ((CONFIG.balance.affixes && CONFIG.balance.affixes.lowDamageImmunePct) || 0.05));
             if (actualDamage < threshold) {
+                recordDefenseBlock('lowDamageImmune', actualDamage);
+                this._lowDamageImmuneBlockTimer = Math.max(this._lowDamageImmuneBlockTimer || 0, 18);
+                this._triggerDefenseImpactFx('lowDamageImmune', source, 18, { absorbed: actualDamage });
                 if (typeof game !== 'undefined') {
                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 24, '过低', '#94a3b8', 12);
                 }
-                return { actualDamage: 0, killed: false, lowDamageImmune: true };
+                return makeDamageResult(0, { lowDamageImmune: true, blockedBy: 'lowDamageImmune' });
             }
         }
 
+
+        if (actualDamage > 0) {
+            this._recordAdaptiveRuneElementFromSource(source, gameRef, 'damage');
+        }
 
         // 4. 执行扣血
         this.hp -= actualDamage;
@@ -7052,6 +8118,10 @@ class Enemy {
         } 
         if (typeof game !== 'undefined') {
             game.combat_reportDamage(actualDamage);
+
+            if (actualDamage > 0 && this._isOuroborosBoss?.() && this.hp > 0) {
+                this._recordOuroborosDamageGate(actualDamage, game);
+            }
 
             if (this.affixes.includes('overloadReactor') && actualDamage > 0 && this.maxHp > 0) {
                 const afx = CONFIG.balance.affixes || {};
@@ -7263,11 +8333,7 @@ class Enemy {
             // --- [B2 END] ---
         }
 
-        return { 
-            killed: killed, 
-            actualDamage: actualDamage,
-            blockedPierce: !!this._blockedPierceThisHit
-        };
+        return makeDamageResult(actualDamage, { killed });
     }
     /**
      * [新属性] 累加毒素层数。
@@ -7276,10 +8342,14 @@ class Enemy {
     applyVenom(stacks) {
         const s = Math.max(0, Math.floor(stacks || 0));
         if (s <= 0) return;
+        this._recordAdaptiveRuneElement('venom', null, 'venom');
         this.venomStacks = (this.venomStacks || 0) + s;
     }
 
     applyTemp(amount) {
+        if (amount !== 0) {
+            this._recordAdaptiveRuneElement(amount < 0 ? 'cryo' : 'pyro', null, 'temp');
+        }
         if (amount < 0) {
             // [温度衰减机制] 每被冰冻一次，降温效果额外乘以 0.9，叠加计算（冰冻 n 次后系数为 0.9^n）
             const decayFactor = Math.pow(0.9, this.frozenCount);
@@ -7705,7 +8775,7 @@ class Enemy {
         ctx.restore();
     }
 
-    // @perf-impact: Ouroboros orbit attachments draw six small static nodes; low disables text/glow and uses flat strokes only.
+    // @perf-impact: Ouroboros orbit attachments draw six cached PNG slot sprites; low disables glow/ring extras but keeps the same drawImage slot art.
     _drawOuroborosOrbitAttachments(ctx, w, h, radius, thickness, isBerserk = false) {
         if (!this._isOuroborosBoss?.()) return;
         const attachments = this._ensureOuroborosOrbitState();
@@ -7715,10 +8785,11 @@ class Enemy {
             : 'high';
         const low = perf === 'low';
         const now = Date.now() / 1000;
-        const orbitR = radius + thickness * 1.45;
+        const orbitR = radius;
         const activeIdx = Math.max(0, this.rotationIndex || 0) % attachments.length;
         const nextIdx = this._getOuroborosNextActiveIndex(activeIdx + 1);
         const pulse = (Math.sin(now * (isBerserk ? 5 : 2.5)) + 1) * 0.5;
+        const anchorAngle = this.gapAngle || 0;
 
         ctx.save();
         ctx.lineCap = 'round';
@@ -7729,50 +8800,75 @@ class Enemy {
             const disabled = (state.disabledTurns || 0) > 0;
             const active = i === activeIdx;
             const next = i === nextIdx && !active;
-            const angle = -Math.PI * 0.5 + (i / attachments.length) * Math.PI * 2 + now * 0.14;
+            const angle = anchorAngle + ((i - activeIdx) / attachments.length) * Math.PI * 2;
             const x = Math.cos(angle) * orbitR;
             const y = Math.sin(angle) * orbitR;
-            const nodeR = thickness * (active ? 0.64 + pulse * 0.12 : next ? 0.48 : 0.38);
             const color = disabled ? '#64748b' : (slot.color || '#a855f7');
+            const slotAssetPath = OUROBOROS_ATTACHMENT_SLOT_ASSETS[slot.id];
+            const slotImage = slotAssetPath ? _getAffixOverlayImage(slotAssetPath) : null;
+            const slotSize = Math.max(
+                22,
+                thickness * (active ? 2.42 + pulse * 0.18 : next ? 2.12 : 1.84)
+            );
 
             ctx.save();
             ctx.globalAlpha = disabled ? 0.42 : active ? 0.96 : next ? 0.72 : 0.56;
             if (!low && !disabled) {
                 ctx.shadowColor = color;
-                ctx.shadowBlur = _sb(active ? 16 : 8);
+                ctx.shadowBlur = _sb(active ? 14 : 7);
                 ctx.globalCompositeOperation = 'screen';
-            }
-            ctx.strokeStyle = color;
-            ctx.lineWidth = active ? 2.4 : 1.3;
-            ctx.beginPath();
-            ctx.arc(x, y, nodeR, 0, Math.PI * 2);
-            ctx.stroke();
-            if (active) {
+                ctx.fillStyle = `${color}33`;
                 ctx.beginPath();
-                ctx.arc(x, y, nodeR * 1.55, angle - 0.9, angle + 0.9);
-                ctx.stroke();
-            }
-            if (!low) {
-                ctx.fillStyle = disabled ? 'rgba(100,116,139,0.22)' : `${color}44`;
-                ctx.beginPath();
-                ctx.arc(x, y, nodeR * 0.72, 0, Math.PI * 2);
+                ctx.arc(x, y, slotSize * (active ? 0.56 : 0.48), 0, Math.PI * 2);
                 ctx.fill();
             }
-            if (!low && active) {
-                ctx.globalCompositeOperation = 'source-over';
-                ctx.font = `${Math.max(8, Math.floor(thickness * 0.52))}px sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillStyle = '#fff7ed';
-                ctx.shadowBlur = _sb(4);
-                ctx.fillText(slot.icon || '附', x, y + 0.5);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = active ? 2.2 : 1.2;
+            ctx.beginPath();
+            ctx.arc(x, y, slotSize * 0.45, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.shadowBlur = 0;
+            if (slotImage?.ready && !slotImage.failed) {
+                ctx.drawImage(
+                    slotImage.img,
+                    x - slotSize / 2,
+                    y - slotSize / 2,
+                    slotSize,
+                    slotSize
+                );
+            } else {
+                const fallbackR = slotSize * 0.42;
+                ctx.fillStyle = disabled ? 'rgba(30, 41, 59, 0.78)' : `${color}55`;
+                ctx.strokeStyle = disabled ? '#94a3b8' : color;
+                ctx.lineWidth = active ? 2 : 1.2;
+                ctx.beginPath();
+                for (let p = 0; p < 8; p++) {
+                    const px = x + Math.cos(-Math.PI / 8 + p * Math.PI / 4) * fallbackR;
+                    const py = y + Math.sin(-Math.PI / 8 + p * Math.PI / 4) * fallbackR;
+                    if (p === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
+
+            if (active || next) {
+                ctx.strokeStyle = active ? '#fff7ed' : color;
+                ctx.globalAlpha *= active ? 0.95 : 0.72;
+                ctx.lineWidth = active ? 2.1 : 1.25;
+                ctx.beginPath();
+                ctx.arc(x, y, slotSize * (active ? 0.64 : 0.57), angle - 0.9, angle + 0.9);
+                ctx.stroke();
             }
             if (disabled) {
                 ctx.strokeStyle = '#94a3b8';
-                ctx.lineWidth = 1.2;
+                ctx.lineWidth = 1.4;
                 ctx.beginPath();
-                ctx.moveTo(x - nodeR * 0.72, y + nodeR * 0.72);
-                ctx.lineTo(x + nodeR * 0.72, y - nodeR * 0.72);
+                ctx.moveTo(x - slotSize * 0.30, y + slotSize * 0.30);
+                ctx.lineTo(x + slotSize * 0.30, y - slotSize * 0.30);
                 ctx.stroke();
             }
             ctx.restore();
@@ -7797,16 +8893,211 @@ class Enemy {
         ctx.restore();
     }
 
+    // @perf-impact: Rune reward fallback draws only strokes, flat fills, and optional tiny text; no particles, gradients, shadowBlur, or blend modes.
+    _drawRuneRewardFallback(ctx, w, h) {
+        const affixes = this.affixes || [];
+        const isRuneBearer = affixes.includes('runeBearer');
+        const isAdaptiveRune = affixes.includes('adaptiveRune');
+        if (!isRuneBearer && !isAdaptiveRune) return;
+
+        const elementColors = {
+            pyro: '#fb923c',
+            cryo: '#67e8f9',
+            lightning: '#c084fc',
+            bounce: '#fde047',
+            pierce: '#e5e7eb',
+            scatter: '#f9a8d4',
+            laser: '#22d3ee',
+            venom: '#86efac',
+            overcharge: '#f97316',
+            echo: '#a78bfa',
+        };
+        const element = isAdaptiveRune ? this._getAdaptiveRuneDropElement?.() : null;
+        const baseColor = isAdaptiveRune ? (elementColors[element] || '#a78bfa') : '#c084fc';
+        const minSide = Math.max(1, Math.min(w, h));
+        const pulse = (this._runeBearerRollTimer || this._adaptiveRuneShiftTimer || 0) > 0 ? 1 : 0.72;
+        const pad = Math.max(4, minSide * 0.070);
+        const left = -w / 2 + pad;
+        const right = w / 2 - pad;
+        const top = -h / 2 + pad;
+        const bottom = h / 2 - pad;
+        const setDash = (dash) => {
+            if (typeof ctx.setLineDash === 'function') ctx.setLineDash(dash);
+        };
+
+        ctx.save();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 0.58 + pulse * 0.22;
+        ctx.strokeStyle = _hexToRgba(baseColor, 0.88);
+        ctx.fillStyle = _hexToRgba(baseColor, 0.70);
+        ctx.lineWidth = Math.max(1.5, minSide * 0.028);
+        setDash(isAdaptiveRune ? [] : [Math.max(4, minSide * 0.07), Math.max(3, minSide * 0.05)]);
+        ctx.beginPath();
+        ctx.roundRect(left, top, right - left, bottom - top, Math.max(4, minSide * 0.09));
+        ctx.stroke();
+        setDash([]);
+
+        const gemY = top + Math.max(6, minSide * 0.13);
+        const gemR = Math.max(4, minSide * 0.075);
+        ctx.beginPath();
+        ctx.moveTo(0, gemY - gemR);
+        ctx.lineTo(gemR * 0.75, gemY);
+        ctx.lineTo(0, gemY + gemR);
+        ctx.lineTo(-gemR * 0.75, gemY);
+        ctx.closePath();
+        ctx.fill();
+
+        if (isRuneBearer && this._runeBearerTempAffix) {
+            const dotR = Math.max(2.5, minSide * 0.042);
+            for (const [x, y] of [[left, top], [right, top], [left, bottom], [right, bottom]]) {
+                ctx.beginPath();
+                ctx.arc(x, y, dotR, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        if (isAdaptiveRune) {
+            const code = element ? element.slice(0, 2).toUpperCase() : '??';
+            ctx.font = `bold ${Math.max(9, Math.min(13, minSide * 0.16))}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = _hexToRgba(baseColor, 0.92);
+            ctx.fillText(code, 0, bottom - Math.max(8, minSide * 0.13));
+        }
+        ctx.restore();
+    }
+
+    // [HUD-fix 方案B] 血量数字 + 防御资源标记融合显示。
+    // 护盾 / 活甲 / 蓄能甲的图标紧贴其剩余值，整组（图标×数值 … 血量）在敌人正上方居中。
+    // 去掉了原来难看的黑色底板，改用深色描边提升对比度——既"明显"、又不挡美术、
+    // 又与血量数字放在一起。本方法在身体裁剪结束后调用（不会被身体轮廓裁掉）。
+    _drawDefenseHudBadges(ctx, w, h) {
+        if (this.displayHp <= 0) return;
+
+        const defenseHudDefs = [
+            { id: 'shield', color: '#93c5fd' },
+            { id: 'radiantAegis', color: '#f0abfc' },
+            { id: 'energyArmor', color: '#fbbf24' },
+            { id: 'phaseShield', color: '#a5b4fc' },
+            { id: 'livingArmor', color: '#bef264' },
+        ];
+
+        // --- 1) 收集防御项（护盾 / 数值护甲）---
+        const items = [];
+        const affixes = this.affixes || [];
+        const formatDefenseValue = (value) => {
+            const n = Math.max(0, Math.ceil(value || 0));
+            if (n >= 1000) return `${Number((n / 1000).toFixed(n >= 9950 ? 0 : 1))}k`;
+            return String(n);
+        };
+        const pushDefenseItem = (id, value, colorOverride = null) => {
+            const n = Math.max(0, Math.ceil(value || 0));
+            if (n <= 0) return;
+            const def = defenseHudDefs.find(item => item.id === id) || { id, color: '#e5e7eb' };
+            items.push({ ...def, color: colorOverride || def.color, label: formatDefenseValue(n) });
+        };
+        const shieldLayers = Math.max(0, Math.floor(this.shieldCharges || 0));
+        const shieldHudId = affixes.includes('phaseShield') ? 'phaseShield' : 'shield';
+        const shieldHudColor = this.phaseShieldDisabledThisTurn ? '#facc15' : null;
+        const aegisActive = (this.radiantAegis || 0) > 0 && !this.radiantAegisBroken;
+        pushDefenseItem(shieldHudId, shieldLayers, shieldHudColor);
+        if (aegisActive) pushDefenseItem('radiantAegis', this.radiantAegis);
+        pushDefenseItem('energyArmor', this.energyArmorShield);
+        if ((this.livingArmorHp || 0) > 0 && !this.livingArmorBroken) {
+            pushDefenseItem('livingArmor', this.livingArmorHp);
+        }
+
+        const isBoss = this.type === 'boss';
+        const defItems = items.slice(0, isBoss ? 4 : 3);
+        const iconSize = isBoss ? 18 : (defItems.length >= 3 ? 14 : 16);
+        const iconCountGap = 1; // 图标与其数值之间的间隙
+        const unitGap = 4;      // 防御单元之间 / 防御单元与血量之间的间隙
+        const hpStr = String(Math.ceil(this.displayHp));
+        const countFont = isBoss ? 'bold 12px sans-serif' : (defItems.length >= 3 ? 'bold 10px sans-serif' : 'bold 11px sans-serif');
+        const hpFont = 'bold 14px sans-serif';
+        const midY = -h / 2 + 10;
+
+        // @perf-impact: 常驻 HUD —— 仅 drawImage + strokeText/fillText（最多 4 图标 + 文本），
+        // 无渐变、阴影模糊或混合模式；measureText 与绘制在同一 save 作用域内完成。
+        ctx.save();
+        ctx.shadowBlur = 0;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.lineJoin = 'round';
+
+        // --- 2) 量测每个防御单元与血量的宽度，算出整组宽度以便居中 ---
+        const unitW = [];
+        let unitsW = 0;
+        for (const it of defItems) {
+            ctx.font = countFont;
+            const countW = Math.ceil(ctx.measureText(it.label).width);
+            const uW = iconSize + iconCountGap + countW;
+            unitW.push(uW);
+            unitsW += uW + unitGap; // 每个单元后留一个间隙（与下一单元或血量分隔）
+        }
+        ctx.font = hpFont;
+        const hpW = Math.ceil(ctx.measureText(hpStr).width);
+        const clusterW = unitsW + hpW;
+        let cx = -clusterW / 2;
+
+        // --- 3) 绘制各防御单元：图标 + 数值（白字 + 深描边，无底板）---
+        for (let i = 0; i < defItems.length; i++) {
+            const item = defItems[i];
+            const icon = _getAffixOverlayImage(_DEFENSE_HUD_ICON_SRC[item.id]);
+            const iconX = cx;
+            const iconY = midY - iconSize / 2;
+            if (icon && icon.ready && !icon.failed && icon.img) {
+                const rect = icon.sourceRect;
+                if (rect) {
+                    ctx.drawImage(icon.img, rect.x, rect.y, rect.w, rect.h, iconX, iconY, iconSize, iconSize);
+                } else {
+                    ctx.drawImage(icon.img, iconX, iconY, iconSize, iconSize);
+                }
+            } else {
+                // 图标尚未就绪时退化为彩色圆角块，避免空缺
+                ctx.fillStyle = item.color;
+                ctx.beginPath();
+                ctx.roundRect(iconX + 2, iconY + 2, iconSize - 4, iconSize - 4, 4);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(248, 250, 252, 0.76)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+            ctx.font = countFont;
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = 'rgba(2, 6, 23, 0.9)';
+            ctx.fillStyle = item.color || '#f8fafc';
+            const countX = iconX + iconSize + iconCountGap;
+            ctx.strokeText(item.label, countX, midY + 0.5);
+            ctx.fillText(item.label, countX, midY + 0.5);
+            cx += unitW[i] + unitGap;
+        }
+
+        // --- 4) 绘制血量数字（白字 / 受击瞬间变红，深描边保证在液态身体上可读）---
+        ctx.font = hpFont;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(2, 6, 23, 0.85)';
+        ctx.fillStyle = (this.displayHp > this.hp + 1) ? '#fca5a5' : '#ffffff';
+        ctx.strokeText(hpStr, cx, midY + 0.5);
+        ctx.fillText(hpStr, cx, midY + 0.5);
+
+        ctx.restore();
+    }
+
     _drawStatusBadges(ctx, w, h) {
         const badges = [];
-        if ((this.shieldCharges || 0) > 0) badges.push({ text: `盾${this.shieldCharges}`, color: '#93c5fd' });
+        const affixes = this.affixes || [];
+        if (affixes.includes('runeBearer')) {
+            badges.push({ text: this._runeBearerTempAffix ? `R:${this._runeBearerTempAffix.slice(0, 2)}` : 'RUNE', color: '#c084fc' });
+        }
+        if (affixes.includes('adaptiveRune')) {
+            const element = this._getAdaptiveRuneDropElement?.();
+            const colorMap = { pyro: '#fb923c', cryo: '#67e8f9', lightning: '#c084fc', bounce: '#fde047', pierce: '#e5e7eb', scatter: '#f9a8d4', laser: '#22d3ee', venom: '#86efac', overcharge: '#f97316', echo: '#a78bfa' };
+            badges.push({ text: element ? `A:${element.slice(0, 2)}` : 'A:??', color: colorMap[element] || '#a78bfa' });
+        }
         if ((this.wardBarrier || 0) > 0) {
             const pct = Math.max(1, Math.round((this.wardBarrier / Math.max(1, this.wardBarrierMax || this.maxHp * 0.1)) * 100));
             badges.push({ text: `屏${pct}%`, color: '#67e8f9' });
-        }
-        if ((this.radiantAegis || 0) > 0 && !this.radiantAegisBroken) {
-            const pct = Math.max(1, Math.round((this.radiantAegis / Math.max(1, this.radiantAegisMax || this.maxHp * 0.1)) * 100));
-            badges.push({ text: `彩${pct}%`, color: '#f0abfc' });
         }
         if ((this.furnacePressure || 0) > 0) {
             const threshold = Math.max(1, this.furnacePressureThreshold || (CONFIG.balance.bossConfigs?.ignis?.furnacePressureThreshold || 45));
@@ -7820,19 +9111,23 @@ class Enemy {
         } else if (this._isTeslaConductor() && (this._teslaChargedTurns || 0) > 0) {
             badges.push({ text: `导${this._teslaChargedTurns}`, color: '#c084fc' });
         }
-        if ((this.energyArmorShield || 0) > 0) badges.push({ text: `蓄${Math.ceil(this.energyArmorShield)}`, color: '#fbbf24' });
-        if ((this.livingArmorHp || 0) > 0 && !this.livingArmorBroken) {
-            const pct = Math.max(1, Math.round((this.livingArmorHp / Math.max(1, this.livingArmorMax || this.maxHp * 0.1)) * 100));
-            badges.push({ text: `甲${pct}%`, color: '#bef264' });
-        }
         if (this.phaseShieldDisabledThisTurn) badges.push({ text: '相断', color: '#facc15' });
         if ((this._overloadBonusThisTurn || 0) > 0) badges.push({ text: `炉+${this._overloadBonusThisTurn}`, color: '#fb923c' });
         if (this.berserked || (this.affixes || []).includes('berserk')) badges.push({ text: '狂', color: '#f87171' });
-        if (this._isChimeraBoss?.() && ((this.chimeraFeedStacks || 0) > 0 || (this.chimeraInheritedStatusCount || 0) > 0)) {
-            badges.push({ text: `胃${this.chimeraFeedStacks || 0}/${this.chimeraInheritedStatusCount || 0}`, color: '#d8b4fe' });
+        if (this._isDevourerBoss?.() && (this.devourerFeedStacks || 0) > 0) {
+            badges.push({ text: `噬${this.devourerFeedStacks || 0}`, color: '#fca5a5' });
+        }
+        if (this._isChimeraBoss?.()) {
+            const heat = Math.max(0, Math.floor(this.chimeraHeatStacks || 0));
+            const frost = Math.max(0, Math.floor(this.chimeraFrostStacks || 0));
+            const radiant = Math.max(0, Math.floor(this.chimeraRadiantConversions || 0));
+            if (heat > 0) badges.push({ text: `热核${heat}`, color: '#fdba74' });
+            if (frost > 0) badges.push({ text: `寒核${frost}`, color: '#67e8f9' });
+            if (radiant > 0) badges.push({ text: `流${radiant}`, color: '#f0abfc' });
         }
         if ((this.frostSeamTurns || 0) > 0) {
-            badges.push({ text: `缝${this.frostSeamTurns}`, color: '#a5f3fc' });
+            const reduction = Math.round(Math.max(0, this._glaciesFrostSeamReduction || 0) * 100);
+            badges.push({ text: reduction > 0 ? `霜缝${this.frostSeamTurns}-${reduction}%` : `霜缝${this.frostSeamTurns}`, color: '#a5f3fc' });
         }
         if (this._isViridisBoss?.() && (this.viridisSporeBloom || 0) > 0) {
             badges.push({ text: `孢${Math.ceil(this.viridisSporeBloom || 0)}`, color: '#bef264' });
@@ -7870,7 +9165,7 @@ class Enemy {
         let x = w / 2 - 2;
         const y = -h / 2 - 12;
         badges.slice(0, 3).forEach((badge) => {
-            const textW = Math.min(38, Math.max(18, ctx.measureText(badge.text).width + 9));
+            const textW = Math.max(18, ctx.measureText(badge.text).width + 9);
             x -= textW;
             ctx.fillStyle = 'rgba(2, 6, 23, 0.78)';
             ctx.strokeStyle = badge.color;
@@ -8043,42 +9338,96 @@ class Enemy {
      * @param {number} w - Boss 宽度（已减去边距）
      * @param {number} h - Boss 高度（已减去边距）
      */
-    // @perf-impact: Non-arc Bosses add at most one cached drawImage after the physics clip is restored; it only fills sprite pixels cut by polygon clips and adds no particles, gradients, or budget fields.
+    // @perf-impact: Boss base sprites draw once on low quality, and up to two cached drawImage region calls on high/medium for body/base breathing; no particles, gradients, shadowBlur, blend modes, or budget fields are added.
     _drawBossSpriteOutsideCollisionClip(ctx, w, h) {
-        if (this.type !== 'boss' || this.collisionShape !== 'polygon' ||
-            !this._spriteRenderer || !this._spriteRenderer.ready ||
-            !this.collisionData || !Array.isArray(this.collisionData.vertices) ||
-            this.collisionData.vertices.length < 3) {
+        if (this.type !== 'boss' || !this._spriteRenderer || !this._spriteRenderer.ready) {
             return false;
         }
 
         ctx.save();
-        ctx.translate(this.pos.x, this.pos.y + this.bumpOffsetY);
-
-        const clipPad = Math.max(12, Math.min(w, h) * 0.18);
-        const verts = this.collisionData.vertices;
-        ctx.beginPath();
-        ctx.rect(-w / 2 - clipPad, -h / 2 - clipPad, w + clipPad * 2, h + clipPad * 2);
-        ctx.moveTo(verts[0].x, verts[0].y);
-        for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x, verts[i].y);
-        ctx.closePath();
-
-        try {
-            ctx.clip('evenodd');
-        } catch (err) {
-            ctx.restore();
-            return false;
-        }
+        ctx.globalCompositeOperation = 'source-over';
 
         const bossSpriteAspect = typeof this._spriteRenderer.getCurrentFrameAspect === 'function'
             ? this._spriteRenderer.getCurrentFrameAspect()
             : 1;
-        const bossSpriteScale = this.bossType === 'devourer' ? 1.14 : this.bossType === 'mikro' ? 1.10 : 1;
+        const bossSpriteScale = this.bossType === 'ouroboros' ? 1.72 : this.bossType === 'devourer' ? 1.22 : this.bossType === 'mikro' ? 1.18 : 1;
         let drawn = false;
         if (bossSpriteAspect > 1.18) {
             const bossSpriteW = w * bossSpriteScale;
             const bossSpriteH = Math.min(h * bossSpriteScale, bossSpriteW / bossSpriteAspect);
-            drawn = this._spriteRenderer.draw(ctx, -bossSpriteW / 2, -bossSpriteH / 2, bossSpriteW, bossSpriteH, 0.94);
+            const motionCfg = CONFIG.enemyRender?.bossSpriteMotion || {};
+            const quality = (typeof window !== 'undefined' && window.game && window.game.perfQualityLevel)
+                ? window.game.perfQualityLevel
+                : 'high';
+            const canSplitSprite = motionCfg.enabled !== false
+                && quality !== 'low'
+                && typeof this._spriteRenderer.drawRegion === 'function';
+
+            if (canSplitSprite) {
+                const profileMap = motionCfg.profiles || {};
+                const profile = {
+                    ...(profileMap.default || {}),
+                    ...(profileMap[this.bossType] || {})
+                };
+                const splitY = Math.max(0.52, Math.min(0.84, profile.splitY ?? motionCfg.splitY ?? 0.72));
+                const overlap = Math.max(0, Math.min(0.045, motionCfg.overlapRatio ?? 0.018));
+                const easingPower = Math.max(0.25, motionCfg.easingPower || 1.35);
+                const qualityScale = quality === 'medium' ? (motionCfg.mediumScale ?? 0.78) : 1;
+                const idleScale = (this.actionPhase === 'idle' && this._hitImpact <= 0.001 && this.hitTimer <= 0 && !this.isFrozen)
+                    ? 1
+                    : (motionCfg.nonIdleScale ?? 0.32);
+                const motionScale = this.isFrozen ? 0 : qualityScale * idleScale;
+                const t = Date.now() / 1000;
+                const seedPhase = (this.visualSeed || 0) * Math.PI * 2;
+                const sampleWave = (hz, phase = 0) => {
+                    const raw = (Math.sin(t * Math.PI * 2 * hz + seedPhase + phase) + 1) * 0.5;
+                    const eased = Math.pow(raw, easingPower);
+                    return { unit: eased, centered: eased * 2 - 1 };
+                };
+                const bodyWave = sampleWave(profile.bodyHz || 0.58, profile.phase || 0);
+                const baseWave = sampleWave(profile.baseHz || 0.28, profile.basePhase || 1.5);
+                const bodyAmp = motionScale * (profile.bodyAmp ?? 1);
+                const baseAmp = motionScale * (profile.baseAmp ?? 0.6);
+
+                const bodyEnd = Math.min(1, splitY + overlap);
+                const baseStart = Math.max(0, splitY - overlap);
+                const bodyRegionH = bodyEnd;
+                const baseRegionH = 1 - baseStart;
+                const spriteTop = -bossSpriteH / 2;
+                const spriteBottom = bossSpriteH / 2;
+
+                const baseSx = 1 + baseWave.centered * (motionCfg.baseScaleX ?? 0.007) * baseAmp;
+                const baseSy = 1 + baseWave.centered * (motionCfg.baseScaleY ?? 0.006) * baseAmp;
+                const baseW = bossSpriteW * baseSx;
+                const baseH = bossSpriteH * baseRegionH * baseSy;
+                const baseDrop = baseWave.unit * bossSpriteH * (motionCfg.baseDropRatio ?? 0.004) * baseAmp;
+                const baseY = spriteBottom - baseH + baseDrop;
+                const baseDrawn = this._spriteRenderer.drawRegion(
+                    ctx,
+                    0, baseStart, 1, baseRegionH,
+                    -baseW / 2, baseY, baseW, baseH,
+                    0.94
+                );
+
+                const bodySx = 1 + bodyWave.centered * (motionCfg.bodyScaleX ?? 0.006) * bodyAmp;
+                const bodySy = 1 + bodyWave.centered * (motionCfg.bodyScaleY ?? 0.022) * bodyAmp;
+                const bodyW = bossSpriteW * bodySx;
+                const bodyH = bossSpriteH * bodyRegionH * bodySy;
+                const bodyAnchorY = spriteTop + bossSpriteH * bodyEnd;
+                const bodyLift = -bodyWave.unit * bossSpriteH * (motionCfg.bodyLiftRatio ?? 0.012) * bodyAmp;
+                const bodyY = bodyAnchorY - bodyH + bodyLift;
+                const bodyDrawn = this._spriteRenderer.drawRegion(
+                    ctx,
+                    0, 0, 1, bodyRegionH,
+                    -bodyW / 2, bodyY, bodyW, bodyH,
+                    0.94
+                );
+                drawn = baseDrawn || bodyDrawn;
+            }
+
+            if (!drawn) {
+                drawn = this._spriteRenderer.draw(ctx, -bossSpriteW / 2, -bossSpriteH / 2, bossSpriteW, bossSpriteH, 0.94);
+            }
         } else {
             const sprSize2 = Math.min(w, h) * bossSpriteScale;
             drawn = this._spriteRenderer.draw(ctx, -sprSize2 / 2, h / 2 - sprSize2, sprSize2, sprSize2, 0.90);
@@ -8088,49 +9437,91 @@ class Enemy {
         return drawn;
     }
 
-    // @perf-impact: Boss body Sprite remains at at most one drawImage per Boss per frame; this pass only changes target rects and effect-layer alpha breathing, adding no particles, gradients, or budget fields.
+    // @perf-impact: Existing 6+ affix Boss rainbow border moved after the body clip; draw count and gradient/shadowBlur budget are unchanged.
+    _drawBossRainbowBorder(ctx, w, h) {
+        if (this.type !== 'boss' || !this.affixes || this.affixes.length < 6) return false;
+
+        const _bossE4Cfg = CONFIG.enemyRender;
+        const _bossE4T = Date.now() / 1000;
+        const _bossPerimeter = 2 * (w + h);
+        const _bossFlowPos = ((_bossE4T * _bossE4Cfg.eliteBorderRainbowFlowSpeed) % 1) * _bossPerimeter;
+        const _bossFlowHW = _bossPerimeter * _bossE4Cfg.eliteBorderRainbowFlowWidth * 0.5;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const _bossSegs = [
+            { x1: -w / 2, y1: -h / 2, x2: w / 2, y2: -h / 2 },
+            { x1: w / 2,  y1: -h / 2, x2: w / 2, y2: h / 2 },
+            { x1: w / 2,  y1: h / 2,  x2: -w / 2, y2: h / 2 },
+            { x1: -w / 2, y1: h / 2,  x2: -w / 2, y2: -h / 2 }
+        ];
+        const _bossSegLens = [w, h, w, h];
+        let _bossCumLen = 0;
+        let drawn = false;
+        for (let _bsi = 0; _bsi < 4; _bsi++) {
+            const _bSeg = _bossSegs[_bsi];
+            const _bSegLen = _bossSegLens[_bsi];
+            const _bLo = _bossFlowPos - _bossFlowHW;
+            const _bHi = _bossFlowPos + _bossFlowHW;
+            if (_bHi > _bossCumLen && _bLo < _bossCumLen + _bSegLen) {
+                const _bLocalLo = Math.max(_bLo, _bossCumLen) - _bossCumLen;
+                const _bLocalHi = Math.min(_bHi, _bossCumLen + _bSegLen) - _bossCumLen;
+                const _bt0 = _bLocalLo / _bSegLen;
+                const _bt1 = _bLocalHi / _bSegLen;
+                const _bpx0 = _bSeg.x1 + (_bSeg.x2 - _bSeg.x1) * _bt0;
+                const _bpy0 = _bSeg.y1 + (_bSeg.y2 - _bSeg.y1) * _bt0;
+                const _bpx1 = _bSeg.x1 + (_bSeg.x2 - _bSeg.x1) * _bt1;
+                const _bpy1 = _bSeg.y1 + (_bSeg.y2 - _bSeg.y1) * _bt1;
+                const _bGrad = ctx.createLinearGradient(_bpx0, _bpy0, _bpx1, _bpy1);
+                const _bHue0 = (Date.now() / 20 + _bsi * 90) % 360;
+                const _bHue1 = (_bHue0 + 60) % 360;
+                _bGrad.addColorStop(0, `hsla(${_bHue0}, 100%, 70%, 0)`);
+                _bGrad.addColorStop(0.5, `hsla(${(_bHue0 + _bHue1) / 2}, 100%, 85%, 0.95)`);
+                _bGrad.addColorStop(1, `hsla(${_bHue1}, 100%, 70%, 0)`);
+                ctx.strokeStyle = _bGrad;
+                ctx.lineWidth = _bossE4Cfg.borderTierRainbowWidth + 1;
+                ctx.shadowColor = `hsl(${_bHue0}, 100%, 65%)`;
+                ctx.shadowBlur = _sb(_bossE4Cfg.borderTierRainbowGlowBlur + 4);
+                ctx.beginPath();
+                ctx.moveTo(_bpx0, _bpy0);
+                ctx.lineTo(_bpx1, _bpy1);
+                ctx.stroke();
+                drawn = true;
+            }
+            _bossCumLen += _bossSegLen;
+        }
+        ctx.restore();
+        return drawn;
+    }
+
+    // @perf-impact: Boss 本体 Sprite 仍每个 Boss 每帧最多 1 次 drawImage；本轮只调整目标矩形与既有效果层 alpha 呼吸，不新增粒子、渐变或预算字段。
     // @section:boss_deco_phase_check - Boss 阶段检查与装饰基础参数
      _drawBossDecoration(ctx, w, h) {
-        // === [Phase C Task 5.C] Boss Sprite 优先绘制 ===
-        // 如果 SpriteRenderer 已就绪，将 Sprite 以半透明度叠盖在矢量装饰之上
-        // Sprite 不替换矢量装饰，而是与其叠加（矢量层提供动态效果，Sprite 层提供角色外观）
-        // 这里的 SpriteRenderer.draw() 在 Layer 3.8 调用，已在 ctx.save()/restore() 块内
-        if (this._spriteRenderer && this._spriteRenderer.ready) {
-            const bossSpriteAspect = typeof this._spriteRenderer.getCurrentFrameAspect === 'function'
-                ? this._spriteRenderer.getCurrentFrameAspect()
-                : 1;
-            const bossSpriteScale = this.bossType === 'devourer' ? 1.14 : this.bossType === 'mikro' ? 1.10 : 1;
-            if (bossSpriteAspect > 1.18) {
-                const bossSpriteW = w * bossSpriteScale;
-                const bossSpriteH = Math.min(h * bossSpriteScale, bossSpriteW / bossSpriteAspect);
-                this._spriteRenderer.draw(ctx, -bossSpriteW / 2, -bossSpriteH / 2, bossSpriteW, bossSpriteH, 0.94);
-            } else {
-                const sprSize2 = Math.min(w, h) * bossSpriteScale;
-                this._spriteRenderer.draw(ctx, -sprSize2/2, h/2 - sprSize2, sprSize2, sprSize2, 0.90);
-            }
-        }
-
         const t = Date.now() / 1000;
         const isBerserk = this.berserked || (this.hp / this.maxHp) < (CONFIG.balance.bossEnrageHpRatio ?? 0.2);
-        const bossEffectBreath = 0.78 + ((Math.sin(t * 1.35 + this.visualSeed * Math.PI * 2) + 1) * 0.5) * 0.22;
-        const bossEffectAlpha = (isBerserk ? 0.46 : 0.34) * bossEffectBreath;
+        const bossEffectBreath = 0.74 + ((Math.sin(t * 1.35 + this.visualSeed * Math.PI * 2) + 1) * 0.5) * 0.20;
+        const bossEffectAlphaScale = this.bossType === 'ignis'
+            ? 0.58
+            : this.bossType === 'devourer'
+                ? 0.50
+                : 1;
+        const bossEffectAlpha = (isBerserk ? 0.32 : 0.24) * bossEffectBreath * bossEffectAlphaScale;
         ctx.save();
         ctx.globalAlpha *= bossEffectAlpha;
         switch (this.bossType) {
             case 'ignis': {
                 // === Ignis: 燕火之心 + 火星喷射 ===
                 const heartPulse = Math.sin(t * (isBerserk ? 5 : 2.5)) * 0.25 + 0.75;
-                const heartR = Math.min(w, h) * 0.18 * heartPulse;
+                const heartR = Math.min(w, h) * 0.145 * heartPulse;
                 // 外圈火焰光晕
                 ctx.save();
                 ctx.globalCompositeOperation = 'screen';
-                const ignisGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, heartR * 2.5);
-                ignisGrad.addColorStop(0, `rgba(255, 200, 50, ${0.7 * heartPulse})`);
-                ignisGrad.addColorStop(0.4, `rgba(255, 100, 20, ${0.5 * heartPulse})`);
+                const ignisGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, heartR * 2.15);
+                ignisGrad.addColorStop(0, `rgba(255, 200, 50, ${0.46 * heartPulse})`);
+                ignisGrad.addColorStop(0.4, `rgba(255, 100, 20, ${0.30 * heartPulse})`);
                 ignisGrad.addColorStop(1, 'rgba(255, 50, 0, 0)');
                 ctx.fillStyle = ignisGrad;
                 ctx.beginPath();
-                ctx.arc(0, 0, heartR * 2.5, 0, Math.PI * 2);
+                ctx.arc(0, 0, heartR * 2.15, 0, Math.PI * 2);
                 ctx.fill();
                 // 心核实体
                 ctx.globalCompositeOperation = 'source-over';
@@ -8142,14 +9533,14 @@ class Enemy {
                 coreGrad.addColorStop(1, '#e65100');
                 ctx.fillStyle = coreGrad;
                 ctx.shadowColor = '#ff6d00';
-                ctx.shadowBlur = _sb(15);
+                ctx.shadowBlur = _sb(8);
                 ctx.fill();
                 ctx.restore();
                 // [T2] 过曝白化叠加层（模拟 CSS brightness(1.4)）
                 {
                     const pulseIntensity = (Math.sin(t * (isBerserk ? 5 : 2.5)) + 1) * 0.5;
                     const berserkMult = isBerserk ? CONFIG.enemyRender.bossOverglowBerserkMult : 1.0;
-                    const overglowAlpha = pulseIntensity * CONFIG.enemyRender.bossOverglowAlpha * berserkMult;
+                    const overglowAlpha = pulseIntensity * CONFIG.enemyRender.bossOverglowAlpha * berserkMult * 0.42;
                     ctx.save();
                     ctx.globalCompositeOperation = 'lighter';
                     const overGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, heartR * 1.2);
@@ -8161,7 +9552,7 @@ class Enemy {
                     if (isBerserk) {
                         const ripplePhase = (t * 1.5) % 1;
                         const rippleR = heartR * (1.2 + ripplePhase * 1.5);
-                        const rippleAlpha = (1 - ripplePhase) * 0.5 * CONFIG.enemyRender.bossOverglowAlpha;
+                        const rippleAlpha = (1 - ripplePhase) * 0.25 * CONFIG.enemyRender.bossOverglowAlpha;
                         ctx.strokeStyle = `rgba(255, 200, 100, ${rippleAlpha})`;
                         ctx.lineWidth = 2;
                         ctx.beginPath(); ctx.arc(0, 0, rippleR, 0, Math.PI * 2); ctx.stroke();
@@ -8181,7 +9572,7 @@ class Enemy {
                         const sr = 2 + Math.random() * 2;
                         ctx.beginPath();
                         ctx.arc(sx, sy, sr, 0, Math.PI * 2);
-                        ctx.fillStyle = `rgba(255, ${150 + Math.floor(Math.random() * 100)}, 0, 0.9)`;
+                        ctx.fillStyle = `rgba(255, ${150 + Math.floor(Math.random() * 100)}, 0, 0.46)`;
                         ctx.fill();
                     }
                     ctx.restore();
@@ -8295,7 +9686,7 @@ class Enemy {
                     const linePhase = (devourerPhase + i / lineCount) % 1;
                     const startDist = outerR2 * (0.5 + linePhase * 0.5);
                     const endDist = outerR2 * 0.1;
-                    const alpha = (1 - linePhase) * 0.4;
+                    const alpha = (1 - linePhase) * 0.24;
                     const grad = ctx.createLinearGradient(
                         Math.cos(angle) * startDist, Math.sin(angle) * startDist,
                         Math.cos(angle) * endDist, Math.sin(angle) * endDist
@@ -8311,8 +9702,8 @@ class Enemy {
                 }
                 // 中心吸入点
                 const devGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, outerR2 * 0.3);
-                devGrad.addColorStop(0, `rgba(0, 0, 0, ${0.8 + Math.sin(t * 2) * 0.1})`);
-                devGrad.addColorStop(0.5, `rgba(88, 28, 135, 0.4)`);
+                devGrad.addColorStop(0, `rgba(0, 0, 0, ${0.42 + Math.sin(t * 2) * 0.05})`);
+                devGrad.addColorStop(0.5, `rgba(88, 28, 135, 0.22)`);
                 devGrad.addColorStop(1, 'rgba(88, 28, 135, 0)');
                 ctx.fillStyle = devGrad;
                 ctx.beginPath();
@@ -8844,6 +10235,8 @@ class Enemy {
             'phaseShield': '#818cf8',
             'overloadReactor': '#ea580c',
             'lowDamageImmune': '#94a3b8',
+            'runeBearer': '#a855f7',
+            'adaptiveRune': '#38bdf8',
             // 双词缀组合
             'haste+shield':    '#60a5fa',  // 蓝黄 → 亮蓝
             'regen+shield':    '#34d399',  // 蓝绿 → 青绿
@@ -8904,6 +10297,10 @@ class Enemy {
             gridCols: this.gridCols || 1,
             gridRows: this.gridRows || 1,
             affixes: this.affixes || [],
+            visualAssetKey: this.visualAssetKey,
+            bossOwnerId: this.bossOwnerId,
+            bossMinionRole: this.bossMinionRole,
+            bossMechanicTags: this.bossMechanicTags,
         });
         const minionFrame = this._resolveMinionCollisionFrameAsset();
         const frameKey = minionFrame ? minionFrame.key : (resolved && resolved.frameKey);
@@ -9069,6 +10466,10 @@ class Enemy {
             gridCols: this.gridCols || 1,
             gridRows: this.gridRows || 1,
             affixes: this.affixes || [],
+            visualAssetKey: this.visualAssetKey,
+            bossOwnerId: this.bossOwnerId,
+            bossMinionRole: this.bossMinionRole,
+            bossMechanicTags: this.bossMechanicTags,
         });
         const dynamicOverlayPaths = resolveDynamicEnemyOverlayPaths(this);
         const overlayKey = [
@@ -9473,7 +10874,7 @@ class Enemy {
     }
 
     _drawAffixBitmapOverlays(ctx, w, h) {
-        if (this.type === 'boss' || !this.affixes || this.affixes.length === 0) return;
+        if (!this.affixes || this.affixes.length === 0) return;
         this._syncAffixOverlayImages();
         if (!this._affixOverlayImages || this._affixOverlayImages.length === 0) return;
 
@@ -9481,6 +10882,8 @@ class Enemy {
         const quality = gameRef?.perfQualityLevel || 'high';
         const maxOverlays = quality === 'high' ? 2 : 1;
         const targetingOverlayAffixes = new Set([
+            'shield',
+            'radiantAegis',
             'energyArmor',
             'phaseShield',
             'overloadReactor',
@@ -9490,9 +10893,12 @@ class Enemy {
             'siegeBreaker',
             'carrier',
             'deflectShell',
+            'runeBearer',
+            'adaptiveRune',
         ]);
         const readyOverlays = this._affixOverlayImages
             .filter((item) => item.image && item.image.ready && !item.image.failed)
+            .filter((item) => this.type !== 'boss' || targetingOverlayAffixes.has(item.affix))
             .sort((a, b) => Number(targetingOverlayAffixes.has(b.affix)) - Number(targetingOverlayAffixes.has(a.affix)))
             .slice(0, maxOverlays);
         if (readyOverlays.length === 0) return;
@@ -9557,6 +10963,8 @@ class Enemy {
             phaseShield: '#a5b4fc',
             overloadReactor: '#fb923c',
             lowDamageImmune: '#cbd5e1',
+            runeBearer: '#c084fc',
+            adaptiveRune: '#38bdf8',
         };
 
         ctx.save();
@@ -9672,6 +11080,29 @@ class Enemy {
                     ctx.stroke();
                     ctx.beginPath();
                     ctx.arc(cx, cy + r * 0.4, r * 0.5, 0, Math.PI);
+                    ctx.stroke();
+                    break;
+                }
+                case 'runeBearer': {
+                    ctx.moveTo(cx, cy - r);
+                    ctx.lineTo(cx + r * 0.75, cy);
+                    ctx.lineTo(cx, cy + r);
+                    ctx.lineTo(cx - r * 0.75, cy);
+                    ctx.closePath();
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, r * 0.36, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                }
+                case 'adaptiveRune': {
+                    ctx.arc(cx, cy, r * 0.82, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy - r * 0.65);
+                    ctx.lineTo(cx + r * 0.55, cy + r * 0.38);
+                    ctx.lineTo(cx - r * 0.55, cy + r * 0.38);
+                    ctx.closePath();
                     ctx.stroke();
                     break;
                 }

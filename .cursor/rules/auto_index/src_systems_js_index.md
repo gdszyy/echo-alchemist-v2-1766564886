@@ -1,9 +1,9 @@
 # src\systems.js 函数索引
 
-> 自动生成于 2026-06-24 | 总行数: 4385 | 函数数: 52 | 语言: javascript
+> 自动生成于 2026-06-24 | 总行数: 5282 | 函数数: 72 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -12,6 +12,9 @@
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
 | buildV2BestiaryEntries | function | `buildV2BestiaryEntries()` |  |
+| setupTruthBookBossDemo | function | `setupTruthBookBossDemo(game, bossId, isBigBoss = false)` |  |
+| normalizeTruthBookEntry | function | `normalizeTruthBookEntry(entry, categoryId)` |  |
+| buildTruthBookEntries | function | `buildTruthBookEntries()` |  |
 | constructor | method | `constructor()` |  |
 | renderAttributeControls | method | `renderAttributeControls()` |  |
 | updateBulletPreview | method | `updateBulletPreview()` |  |
@@ -23,13 +26,26 @@
 | closeDrawer | method | `closeDrawer()` |  |
 | resolveBossVulnerabilityAttrs | function | `resolveBossVulnerabilityAttrs(bossId, rotationIndex = 0)` |  |
 | setupBossVulnerabilityVisualState | function | `setupBossVulnerabilityVisualState(boss, bossId, state, rotationIndex = 0)` |  |
+| getOuroborosOrbitAttachmentSlots | function | `getOuroborosOrbitAttachmentSlots()` |  |
+| clearOuroborosOrbitEchoes | function | `clearOuroborosOrbitEchoes(game)` |  |
+| setupOuroborosAttachmentSlotAcceptance | function | `setupOuroborosAttachmentSlotAcceptance(game, slotIndex = 0)` |  |
+| advanceOuroborosAttachmentSlotAcceptance | function | `advanceOuroborosAttachmentSlotAcceptance(game)` |  |
 | buildV2MatrixScenarios | function | `buildV2MatrixScenarios()` |  |
 | buildEnemyV2Scenarios | function | `buildEnemyV2Scenarios()` | ⚠️ 巨型函数，见 @section 导航 |
 | constructor | method | `constructor(game)` |  |
 | initUI | method | `initUI()` | ⚠️ 巨型函数，见 @section 导航 |
 | clearEnemies | method | `clearEnemies()` |  |
+| setBullet | method | `setBullet(key, rawVal, opts = {})` |  |
 | adjustBullet | method | `adjustBullet(key, delta)` |  |
 | renderAttributeControls | method | `renderAttributeControls()` |  |
+| renderEnemyControls | method | `renderEnemyControls()` |  |
+| setEnemyBase | method | `setEnemyBase(id)` |  |
+| setEnemyHp | method | `setEnemyHp(rawVal)` |  |
+| adjustEnemyHp | method | `adjustEnemyHp(delta)` |  |
+| toggleEnemyAffix | method | `toggleEnemyAffix(id)` |  |
+| clearEnemyAffixes | method | `clearEnemyAffixes()` |  |
+| _initCustomEnemyAffixes | method | `_initCustomEnemyAffixes(e, hp)` |  |
+| spawnCustomEnemy | method | `spawnCustomEnemy()` |  |
 | updateBulletPreview | method | `updateBulletPreview()` |  |
 | initSidebar | method | `initSidebar()` |  |
 | switchCategory | method | `switchCategory(categoryId)` |  |
@@ -53,6 +69,10 @@
 | switchTab | method | `switchTab(tab)` |  |
 | constructor | method | `constructor(mainGame)` |  |
 | initUI | method | `initUI()` |  |
+| getEntries | method | `getEntries()` |  |
+| getCategories | method | `getCategories()` |  |
+| renderCategoryTabs | method | `renderCategoryTabs()` |  |
+| renderEntryList | method | `renderEntryList()` |  |
 | createListButton | method | `createListButton(entry)` |  |
 | showEntry | method | `showEntry(entry, btnElement)` |  |
 | resetDemo | method | `resetDemo()` |  |
@@ -62,7 +82,7 @@
 | executeInstruction | method | `executeInstruction(inst)` |  |
 | addLog | method | `addLog(text, colorClass = 'text-cyan-400')` |  |
 | draw | method | `draw()` |  |
-| createCombatContext | function | `createCombatContext(mainGame, canvas)` |  |
+| createCombatContext | function | `createCombatContext(mainGame, canvas)` | ⚠️ 巨型函数，见 @section 导航 |
 
 ## 巨型函数内部节点 (@section 标记)
 
@@ -86,6 +106,17 @@
 | `@section:ui_event_binding` | 鼠标/触摸/键盘事件绑定 |
 | `@section:ui_hud_components` | HUD 组件初始化（血条/弹药/符文槽） |
 | `@section:ui_overlay_panels` | Overlay 面板初始化（商店/命运/设置） |
+
+### createCombatContext
+
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
+
+| 节点标记 | 说明 |
+|----------|------|
+| `@section:demo_state_seed` | 演示状态初始化 |
+| `@section:demo_spawn_bridge` | 生成与Boss转发 |
+| `@section:demo_combat_bridge` | 战斗逻辑转发 |
+| `@section:demo_charge_bridge` | 充能兼容转发 |
 
 
 ## 其他 @section 标记

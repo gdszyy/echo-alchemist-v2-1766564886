@@ -16,10 +16,11 @@ import { CONFIG } from './config.js';
 import { Enemy, Projectile, Particle, FloatingText, CloneSpore } from './entities.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { Vec2, adjustColorBrightness } from './utils/math_utils.js';
-import { RUNEWORD_DB } from './rune_config.js';
+import { RUNEWORD_DB, ELEMENT_RESONANCE_DB } from './rune_config.js';
 import { ENEMY_V2_METADATA, ENEMY_V2_BY_ID } from './data/enemy_v2_metadata.js';
 import { getEnemyV2IconSrc } from './bitmap_icons.js';
 import { resolveEnemyVisualAsset, describeAssetHitStatus, buildEnemyAssetKey } from './data/enemy_visual_assets.js';
+import { pixiCleanupAllEffects } from './render/pixi_effect_adapter.js';
 
 // ==================== 真理之书数据 ====================
 
@@ -499,6 +500,264 @@ const TRUTH_BOOK_DATA = {
     ]
 };
 
+const TRUTH_BOOK_CATEGORIES = [
+    { id: 'boss', name: 'Boss 机制', icon: '☠️', hint: '专属资源、破绽谱与狂暴变化' },
+    { id: 'enemy_affix', name: '敌人词缀', icon: '◇', hint: '普通/精英敌人的行为规则' },
+    { id: 'enemy_v2', name: 'V2 基底', icon: '▣', hint: '多格敌人与专属形体' },
+    { id: 'attribute', name: '属性百科', icon: '✦', hint: '弹药属性、元素反应与演示' },
+    { id: 'core', name: '核心机制', icon: '📘', hint: '充能、替换、保底与掉落' }
+];
+
+function setupTruthBookBossDemo(game, bossId, isBigBoss = false) {
+    if (!game || typeof game.spawn_spawnBoss !== 'function') return;
+    const boss = game.spawn_spawnBoss(bossId, isBigBoss);
+    if (!boss) return;
+    boss._pendingEntrance = false;
+    boss.entranceTimer = 1;
+    if (typeof boss.dropTargetY === 'number') boss.pos.y = boss.dropTargetY;
+}
+
+const TRUTH_BOOK_BOSS_ENTRIES = [
+    {
+        id: 'truth_boss_ignis',
+        categoryId: 'boss',
+        title: '熔炉守卫·伊格尼斯',
+        icon: '🔥',
+        tags: ['R5', '温压', '流彩护盾', '破绽: pierce/pyro'],
+        trainingScenarioId: 'boss_ignis',
+        content: '护盾、极速与流彩护盾构成第一段 Boss 教学。伊格尼斯不会把过热当作普通烧伤结算，100°C 以上的正温度会转化为温压；温压达到阈值时触发一次流彩护盾脉冲。狂暴后每回合额外升温，并对周围产生火焰溅射。穿透用于破甲，火焰用于推动炉心压力。试炼场入口：boss_ignis。',
+        setup: (game) => setupTruthBookBossDemo(game, 'ignis', false),
+        loop: [
+            { type: 'log', text: '温压核心：过热转为炉压' },
+            { type: 'wait', frames: 80 },
+            { type: 'log', text: '破绽谱：pierce / pyro' },
+            { type: 'enemy_turn' },
+            { type: 'wait', frames: 120 },
+            { type: 'reset' }
+        ]
+    },
+    {
+        id: 'truth_boss_glacies',
+        categoryId: 'boss',
+        title: '霜晶缝合怪·格拉西斯',
+        icon: '❄️',
+        tags: ['R12', '霜缝', '减伤提示', '破绽: cryo/pierce'],
+        trainingScenarioId: 'boss_glacies',
+        content: '格拉西斯会在战斗场内缝合霜缝，给周围敌人短暂减伤、回血与护盾。被缝目标现在会有冰蓝缝线、外框与“减伤”状态提示，玩家能直接看到霜缝收益来源。cryo 会切断霜缝并冻结下一次机制 tick，pierce 会切断霜缝并在本次命中获得额外伤害。试炼场入口：boss_glacies。',
+        setup: (game) => setupTruthBookBossDemo(game, 'glacies', false),
+        loop: [
+            { type: 'log', text: '霜缝：目标获得减伤与护盾' },
+            { type: 'wait', frames: 80 },
+            { type: 'log', text: '破绽谱：cryo / pierce' },
+            { type: 'enemy_turn' },
+            { type: 'wait', frames: 120 },
+            { type: 'reset' }
+        ]
+    },
+    {
+        id: 'truth_boss_mikro',
+        categoryId: 'boss',
+        title: '裂变母体·米克罗',
+        icon: '🦠',
+        tags: ['R19', '分身减伤', '治疗链', '破绽: lightning/scatter'],
+        trainingScenarioId: 'boss_mikro',
+        content: '米克罗把分身与治疗组合成群体压力。每个存活分身和入场裂变细胞都会为母体提供减伤，最高 50%；狂暴后分裂概率提升到 100%。lightning 适合过载分身链，scatter 适合清理复制体和治疗站位。试炼场入口：boss_mikro。',
+        setup: (game) => setupTruthBookBossDemo(game, 'mikro', false),
+        loop: [
+            { type: 'log', text: '分身越多，母体越硬' },
+            { type: 'wait', frames: 80 },
+            { type: 'log', text: '破绽谱：lightning / scatter' },
+            { type: 'enemy_turn' },
+            { type: 'wait', frames: 120 },
+            { type: 'reset' }
+        ]
+    },
+    {
+        id: 'truth_boss_devourer',
+        categoryId: 'boss',
+        title: '贪婪之渊·噬神者',
+        icon: '👅',
+        tags: ['R26', '深渊胃域', '吞噬换盾', '破绽: bounce/laser'],
+        trainingScenarioId: 'boss_devourer',
+        content: 'Devourer 现在接管“胃域”机制。每回合先拉拽胃域范围内的非 Boss 敌人，并周期性召唤 maw_thrall 养料；消化时会吞噬胃域内所有非 Boss 目标，把吞噬次数与被吞护盾转化为自身护盾。狂暴后候选范围扩至全屏。bounce 用于胃袋反弹消耗，laser 用于精准灼穿。试炼场入口：boss_devourer。',
+        setup: (game) => setupTruthBookBossDemo(game, 'devourer', false),
+        loop: [
+            { type: 'log', text: '胃域拉拽并召唤养料' },
+            { type: 'wait', frames: 80 },
+            { type: 'log', text: '吞噬转化为护盾' },
+            { type: 'enemy_turn' },
+            { type: 'wait', frames: 120 },
+            { type: 'reset' }
+        ]
+    },
+    {
+        id: 'truth_boss_viridis',
+        categoryId: 'boss',
+        title: '翠绿共生体·维里迪斯',
+        icon: '🍃',
+        tags: ['R33', '孢甲资源', '活体护甲', '破绽: pyro/venom'],
+        trainingScenarioId: 'boss_viridis',
+        content: '维里迪斯围绕孢子活甲循环展开。专属孢子侍体、再生和治疗会积累孢甲资源；资源达到阈值后，为自身或侍体补充活体护甲。非反制破甲会反哺孢甲，pyro 与 venom 会直接蚀甲、降低资源并留下腐蚀反馈。试炼场入口：boss_viridis。',
+        setup: (game) => setupTruthBookBossDemo(game, 'viridis', true),
+        loop: [
+            { type: 'log', text: '孢甲资源积累中' },
+            { type: 'wait', frames: 80 },
+            { type: 'log', text: '破绽谱：pyro / venom' },
+            { type: 'enemy_turn' },
+            { type: 'wait', frames: 120 },
+            { type: 'reset' }
+        ]
+    },
+    {
+        id: 'truth_boss_tesla',
+        categoryId: 'boss',
+        title: '雷霆幻影·特斯拉',
+        icon: '⚡',
+        tags: ['R40', '导体网络', '场强', '破绽: cryo/bounce'],
+        trainingScenarioId: 'boss_tesla',
+        content: '特斯拉每回合电击敌人并制造导体，导体越多场强越高；场强会带来额外行动和召唤压力，但有上限与回合衰减。lightning 会给导体充能，反过来喂给特斯拉；cryo 能移除临时 haste 并泄场，bounce 能接地并压低网络收益。试炼场入口：boss_tesla。',
+        setup: (game) => setupTruthBookBossDemo(game, 'tesla', true),
+        loop: [
+            { type: 'log', text: '导体网络提升场强' },
+            { type: 'wait', frames: 80 },
+            { type: 'log', text: '破绽谱：cryo / bounce' },
+            { type: 'enemy_turn' },
+            { type: 'wait', frames: 120 },
+            { type: 'reset' }
+        ]
+    },
+    {
+        id: 'truth_boss_chimera',
+        categoryId: 'boss',
+        title: '混沌融合体·奇美拉',
+        icon: '◇',
+        tags: ['R47', '热核吞噬', '冷热抵消', '破绽: venom/laser'],
+        trainingScenarioId: 'boss_chimera',
+        content: 'Chimera 现在是随机热核吞噬。每回合随机吞噬 1 个非 Boss 敌人，然后召唤一个 +100°C 或 -100°C 的热核养料。被吞目标温度达到阈值时，会按 100°C 为单位转成热层或寒层；冷热层互相抵消，并转化为流彩护盾。狂暴时本次吸收层数翻倍。试炼场入口：boss_chimera。',
+        setup: (game) => setupTruthBookBossDemo(game, 'chimera', true),
+        loop: [
+            { type: 'log', text: '随机吞噬热核养料' },
+            { type: 'wait', frames: 80 },
+            { type: 'log', text: '冷热抵消转流彩护盾' },
+            { type: 'enemy_turn' },
+            { type: 'wait', frames: 120 },
+            { type: 'reset' }
+        ]
+    },
+    {
+        id: 'truth_boss_ouroboros',
+        categoryId: 'boss',
+        title: '永恒回声·奥罗波罗斯',
+        icon: '🔄',
+        tags: ['R54', '六附体', '动态破绽', '轮转封印'],
+        trainingScenarioId: 'boss_ouroboros',
+        content: '奥罗波罗斯携带六个附体槽，前位附体每回合轮转，并授予护盾、治疗、召唤、位移、吞噬、加速六类机制。当前附体决定动态破绽谱；打满正确属性会封印该附体若干回合，使后续轮转跳过它。附体槽美术验收入口：boss_ouroboros_attachment_slots。',
+        setup: (game) => setupTruthBookBossDemo(game, 'ouroboros', true),
+        loop: [
+            { type: 'log', text: '六附体轮转中' },
+            { type: 'wait', frames: 80 },
+            { type: 'log', text: '破绽谱随前位附体变化' },
+            { type: 'enemy_turn' },
+            { type: 'wait', frames: 120 },
+            { type: 'reset' }
+        ]
+    }
+];
+
+const TRUTH_BOOK_CORE_ENTRIES = [
+    {
+        id: 'truth_core_skill_charge',
+        categoryId: 'core',
+        title: '技能/符文充能',
+        icon: '🔋',
+        tags: ['命中 3%', '击杀 10%', '实际条/临时条'],
+        content: '旧“符文充能”已兼容为技能充能。战斗命中提供基础 3% 充能，击杀提供 10%；每次命中可能触发 2x/4x/8x 倍率。获得的充能按保留比例拆成实际条与临时条：实际条稳定保留，临时条会在战斗中衰减。总量达到 100% 时尝试发放 1 点 SP；若 SP 已满，满条会保留到玩家消耗 SP 后再转换。',
+        loop: [
+            { type: 'log', text: '命中：实际条 + 临时条' },
+            { type: 'wait', frames: 90 },
+            { type: 'log', text: '满条：尝试发放 1 SP' },
+            { type: 'wait', frames: 120 },
+            { type: 'reset' }
+        ]
+    },
+    {
+        id: 'truth_core_ammo_replace',
+        categoryId: 'core',
+        title: '子弹替换',
+        icon: '🔁',
+        tags: ['充能子弹', 'New Grind', 'Charged'],
+        content: '当上一轮已有可保留弹药，而本轮又完成研磨时，系统会进入子弹替换阶段。左侧展示本轮新研磨子弹，右侧展示上轮保留下来的充能子弹；玩家最多选择子弹上限数量进入战斗。纯净精华跳过研磨时会只展示可保留的充能子弹，并隐藏“跳过”按钮，避免空弹药进入战斗。',
+        loop: [
+            { type: 'log', text: '上一轮弹药进入 Charged 队列' },
+            { type: 'wait', frames: 90 },
+            { type: 'log', text: '确认选择后合并为 ammoQueue' },
+            { type: 'wait', frames: 120 },
+            { type: 'reset' }
+        ]
+    },
+    {
+        id: 'truth_core_drop_pity',
+        categoryId: 'core',
+        title: '遗物/精华保底',
+        icon: '🎁',
+        tags: ['精华 5 行', '遗物 13 行', '密度限制'],
+        content: '敌人奖励采用动态掉落与保底机制。连续 4 行未掉落精华时，第 5 行强制触发精华；连续 12 行未掉落遗物时，第 13 行强制触发遗物。若玩家战力碾压当前敌人，保底会暂停；若场上奖励敌人过多，掉落概率会衰减，达到硬上限后本行不再新增奖励。',
+        loop: [
+            { type: 'log', text: '保底计数随无掉落行推进' },
+            { type: 'wait', frames: 90 },
+            { type: 'log', text: '战力碾压/奖励密度会暂停保底' },
+            { type: 'wait', frames: 120 },
+            { type: 'reset' }
+        ]
+    },
+    {
+        id: 'truth_core_smart_rune_drop',
+        categoryId: 'core',
+        title: '智能符文掉落',
+        icon: '🧭',
+        tags: ['Build Vector', '同属性加权', 'Boss 主题权重'],
+        content: '符文掉落会读取最近 5 回合伤害构成，形成玩家当前套路向量。近期某属性伤害占比越高，同属性符文权重越高；Boss 还会注入独立主题权重。最终权重 = 基础掉落权重 + 同属性伤害占比 × 3.0 + Boss 主题额外权重。runeBearer 与 adaptiveRune 敌人可以覆写掉落池：前者必掉通用智能符文，后者按最近承受属性定向掉落。',
+        loop: [
+            { type: 'log', text: '读取最近 5 回合伤害构成' },
+            { type: 'wait', frames: 90 },
+            { type: 'log', text: '同属性符文权重上升' },
+            { type: 'wait', frames: 120 },
+            { type: 'reset' }
+        ]
+    }
+];
+
+function normalizeTruthBookEntry(entry, categoryId) {
+    const title = entry.title || entry.name || entry.id;
+    const content = entry.content || entry.desc || '';
+    return {
+        ...entry,
+        categoryId: entry.categoryId || categoryId,
+        title,
+        content,
+        name: entry.name || title,
+        desc: entry.desc || content,
+        tags: Array.isArray(entry.tags) ? entry.tags : [],
+        loop: Array.isArray(entry.loop) ? entry.loop : []
+    };
+}
+
+function buildTruthBookEntries() {
+    const enemyEntries = (TRUTH_BOOK_DATA.enemies || []).map(entry => {
+        const categoryId = entry.id && entry.id.startsWith('v2_') ? 'enemy_v2' : 'enemy_affix';
+        return normalizeTruthBookEntry(entry, categoryId);
+    });
+    const attributeEntries = (TRUTH_BOOK_DATA.attributes || []).map(entry => normalizeTruthBookEntry(entry, 'attribute'));
+    const bossEntries = TRUTH_BOOK_BOSS_ENTRIES.map(entry => normalizeTruthBookEntry(entry, 'boss'));
+    const coreEntries = TRUTH_BOOK_CORE_ENTRIES.map(entry => normalizeTruthBookEntry(entry, 'core'));
+    return [...bossEntries, ...enemyEntries, ...attributeEntries, ...coreEntries];
+}
+
+TRUTH_BOOK_DATA.categories = TRUTH_BOOK_CATEGORIES;
+TRUTH_BOOK_DATA.bosses = TRUTH_BOOK_BOSS_ENTRIES.map(entry => normalizeTruthBookEntry(entry, 'boss'));
+TRUTH_BOOK_DATA.core = TRUTH_BOOK_CORE_ENTRIES.map(entry => normalizeTruthBookEntry(entry, 'core'));
+TRUTH_BOOK_DATA.entries = buildTruthBookEntries();
+
 // ==================== UI 管理器 ====================
 
 class UIManager {
@@ -611,6 +870,14 @@ class UIManager {
             'lowDamageImmune': {
                 name: '⬜ 低傷免疫',
                 desc: `低於最大生命 ${(afx.lowDamageImmunePct || 0.05) * 100}% 的單次最終傷害無效。`
+            },
+            'runeBearer': {
+                name: '通用符文掉落',
+                desc: '死亡时必定掉落一个智能权重符文；每个敌方回合开始获得一个随机临时词条。'
+            },
+            'adaptiveRune': {
+                name: '自适应符文',
+                desc: '记录最近承受的属性伤害或状态效果，死亡时掉落该属性家族的符文。'
             }
         };
     }
@@ -687,19 +954,36 @@ class UIManager {
         container.innerHTML = '';
         // 仅渲染已解锁的技能，而非遍历全部 SKILL_DB
         const skillsToRender = activeSkills || [];
+        const directSkillLimit = 4;
+        const visibleSkills = skillsToRender.slice(0, directSkillLimit);
+        const overflowCount = Math.max(0, skillsToRender.length - directSkillLimit);
+        container.dataset.visibleSkillCount = String(visibleSkills.length);
+        if (overflowCount > 0) {
+            container.dataset.overflowSkillCount = String(overflowCount);
+        } else {
+            delete container.dataset.overflowSkillCount;
+        }
         if (skillsToRender.length === 0) return;
 
+        const maxVisibleSP = 5;
+        const maxSP = Math.min(maxVisibleSP, Math.max(CONFIG.gameplay.maxSkillPoints || 0, currentSP));
+        const spGems = Array.from({ length: maxSP }, (_, idx) => {
+            const filled = idx < currentSP;
+            return `<span class="skill-sp-gem ${filled ? 'is-full' : 'is-empty'}" aria-hidden="true"></span>`;
+        }).join('');
         const head = document.createElement('div');
         head.className = 'skill-bar-head';
         head.innerHTML = `
             <span class="skill-bar-title">技能</span>
-            <span class="skill-sp-readout">SP ${currentSP}</span>
+            <span class="skill-sp-readout" aria-label="SP ${currentSP}">${spGems}</span>
         `;
         container.appendChild(head);
 
         const grid = document.createElement('div');
         grid.className = 'skill-button-grid';
-        skillsToRender.forEach(skill => {
+        // The Pass6 combat console reserves exactly four 40x40 touch targets.
+        // Extra active skills need a later drawer/page pass; never shrink these buttons.
+        visibleSkills.forEach(skill => {
             const cost = Math.max(0, Number(skill.cost) || 0);
             const btn = document.createElement('button');
             const isDisabled = currentSP < cost;
@@ -917,12 +1201,63 @@ function setupBossVulnerabilityVisualState(boss, bossId, state, rotationIndex = 
     }
 }
 
+function getOuroborosOrbitAttachmentSlots() {
+    const slots = CONFIG.balance.bossConfigs?.ouroboros?.orbitAttachments;
+    return Array.isArray(slots) ? slots : [];
+}
+
+function clearOuroborosOrbitEchoes(game) {
+    if (!game || !Array.isArray(game.enemies)) return;
+    game.enemies = game.enemies.filter(enemy =>
+        !(enemy?.bossOwnerId === 'ouroboros' && enemy?.bossMinionRole === 'orbit_echo')
+    );
+}
+
+function setupOuroborosAttachmentSlotAcceptance(game, slotIndex = 0) {
+    if (!game || typeof game.spawn_spawnBoss !== 'function') return null;
+    const slots = getOuroborosOrbitAttachmentSlots();
+    if (slots.length === 0) return null;
+
+    const normalizedIndex = ((Math.floor(slotIndex) % slots.length) + slots.length) % slots.length;
+    const slot = slots[normalizedIndex];
+    let boss = game.enemies?.find(enemy => enemy?.type === 'boss' && enemy?.bossType === 'ouroboros');
+    if (!boss) boss = game.spawn_spawnBoss('ouroboros', true);
+    if (!boss) return null;
+
+    clearOuroborosOrbitEchoes(game);
+    boss._pendingEntrance = false;
+    boss.entranceTimer = 1;
+    if (typeof boss.dropTargetY === 'number') boss.pos.y = boss.dropTargetY;
+    boss.rotationTurnCount = 0;
+    boss._ouroborosOrbitInitialized = true;
+    if (typeof boss._applyOuroborosAttachment === 'function') {
+        boss._applyOuroborosAttachment(normalizedIndex, game, { feedback: false });
+    }
+
+    game._ouroborosAttachmentSlotAcceptance = { slotIndex: normalizedIndex };
+    return { boss, slot, slotIndex: normalizedIndex };
+}
+
+function advanceOuroborosAttachmentSlotAcceptance(game) {
+    const slots = getOuroborosOrbitAttachmentSlots();
+    if (slots.length === 0) return null;
+    const cursor = game?._ouroborosAttachmentSlotAcceptance || { slotIndex: -1 };
+    const result = setupOuroborosAttachmentSlotAcceptance(game, (cursor.slotIndex || 0) + 1);
+
+    const descEl = document.getElementById('train-scenario-desc');
+    if (descEl && result?.slot) {
+        descEl.textContent = `Ouroboros attachment slot: ${result.slot.id}. The six slot sprites are mounted on the boss ring; no orbit_echo minion is spawned in this acceptance scene.`;
+    }
+    return result;
+}
+
 const TRAINING_SCENARIOS = {
     categories: [
         { id: 'enemy', name: '敵人詞條' },
         { id: 'attribute', name: '屬性效果' },
         { id: 'boss', name: 'Boss 機制' },
         { id: 'runeword', name: '符文詞條' },
+        { id: 'resonance', name: '屬性共鳴' },
         { id: 'relic', name: '遺物/精華' },
         { id: 'v2matrix', name: '敵人 V2 矩陣' },
         { id: 'enemy_v2', name: '敵人 V2 / 美術驗收' }
@@ -1065,6 +1400,37 @@ const TRAINING_SCENARIOS = {
             demoAction: (game) => { game.phase_enemy_startLogic(); }
         },
         // ── 屬性效果 ──────────────────────────────────────────────────
+        {
+            id: 'enemy_rune_bearer',
+            categoryId: 'enemy',
+            name: '通用符文敌人',
+            icon: 'R',
+            desc: '死亡时必掉通用智能符文；每个敌方回合开始随机获得一个临时词条。',
+            setup: (game) => {
+                const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                game.enemies.push(new Enemy(x, y, 60, 60, 420, 420, 'elite', ['runeBearer']));
+            },
+            bulletConfig: { damage: 120, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
+        {
+            id: 'enemy_adaptive_rune',
+            categoryId: 'enemy',
+            name: '自适应符文敌人',
+            icon: 'A',
+            desc: '受到属性伤害或属性效果后切换当前符文家族；死亡时掉落该家族符文。',
+            setup: (game) => {
+                const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
+                const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
+                game.enemies.push(new Enemy(x, y, 60, 60, 520, 520, 'elite', ['adaptiveRune']));
+            },
+            bulletConfig: { damage: 80, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 1, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game) => {
+                const target = game.enemies.find(e => e.active && (e.affixes || []).includes('adaptiveRune'));
+                if (target) target.takeDamage(40, { config: { pyro: 1 }, pos: target.pos });
+            }
+        },
         {
             id: 'attr_bounce',
             categoryId: 'attribute',
@@ -1226,6 +1592,64 @@ const TRAINING_SCENARIOS = {
                 game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, recipe, null, true);
             }
         },
+        {
+            id: 'attr_venom',
+            categoryId: 'attribute',
+            name: '毒素 (Venom)',
+            icon: '☠️',
+            desc: '命中疊加毒層，造成持續傷害（DoT）。毒層越高，每秒傷害越高。適合高血量敵人。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 3000));
+                [{c:1.5,r:1},{c:3.5,r:1}].forEach(p => {
+                    game.enemies.push(new Enemy(p.c * w + w/2, top + p.r * h + h/2, 60, 60, 2000));
+                });
+            },
+            bulletConfig: { damage: 8, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, venom: 15, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'attr_overcharge',
+            categoryId: 'attribute',
+            name: '超載 (Overcharge)',
+            icon: '💥',
+            desc: '命中時引發超載爆炸，對命中點周圍敵人造成 AOE 傷害。適合密集怪群。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 1200));
+                [{c:1.5,r:0},{c:2.5,r:0},{c:3.5,r:0},{c:1.5,r:1},{c:3.5,r:1},{c:1.5,r:2},{c:2.5,r:2},{c:3.5,r:2}].forEach(p => {
+                    game.enemies.push(new Enemy(p.c * w + w/2, top + p.r * h + h/2, 60, 60, 300));
+                });
+            },
+            bulletConfig: { damage: 15, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, overcharge: 15, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'attr_echo',
+            categoryId: 'attribute',
+            name: '回響 (Echo)',
+            icon: '🔁',
+            desc: '命中時有概率分裂出回響子彈，繼承部分屬性向附近敵人飛行。適合擴大打擊覆蓋面。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 1; c < 4; c++) {
+                        game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + r * h + h/2, 60, 60, 400));
+                    }
+                }
+            },
+            bulletConfig: { damage: 15, bounce: 2, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, echo: 15, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(1, -16);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
         // ── Boss 機制 ──────────────────────────────────────────────────
         {
             id: 'boss_ignis',
@@ -1262,7 +1686,7 @@ const TRAINING_SCENARIOS = {
             categoryId: 'boss',
             name: '貪婪之淵·噬神者',
             icon: '👅',
-            desc: '吞噬+護盾。狂暴後全屏吞噬。破綻譜：彈跳/激光。',
+            desc: '深渊胃域+护盾。每回合拉拽并召唤 maw_thrall 养料，吞噬胃域内所有非 Boss 敌人并转化为护盾；狂暴后吞噬范围扩至全屏。破绽谱：弹跳/激光。',
             setup: (game) => { game.spawn_spawnBoss('devourer', false); },
             bulletConfig: { damage: 40, bounce: 5, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: true, isMatryoshka: false, type: 'normal', laser: 8 },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
@@ -1292,7 +1716,7 @@ const TRAINING_SCENARIOS = {
             categoryId: 'boss',
             name: '缝合奇美拉·喀迈拉',
             icon: '◇',
-            desc: '双相狂暴+胃域爆发。左右异质核心保留缝合线与反应炉窗口，破绽谱：毒素/激光。',
+            desc: '热核吞噬+流彩护盾。每回合随机吞噬 1 名敌人并召唤 +100°C 或 -100°C 热核养料；吞噬温度会转为热/寒层，冷热抵消时生成流彩护盾，狂暴时层数翻倍。破绽谱：毒素/激光。',
             setup: (game) => { game.spawn_spawnBoss('chimera', true); },
             bulletConfig: { damage: 46, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, venom: 6, isLaser: true, isMatryoshka: false, type: 'normal', laser: 8 },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
@@ -1305,6 +1729,16 @@ const TRAINING_SCENARIOS = {
             desc: '六附体轮转。每回合前位附体更换并授予护盾、治疗、召唤、位移、吞噬、加速六类机制；当前附体决定破绽谱，打满破绽会封印该附体并改变轮转节奏。',
             setup: (game) => { game.spawn_spawnBoss('ouroboros', true); },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
+        {
+            id: 'boss_ouroboros_attachment_slots',
+            categoryId: 'boss',
+            name: '奧羅波羅斯·附体槽验收',
+            icon: '⬡',
+            keepSidebarOpenOnDemo: true,
+            desc: '使用真实 Ouroboros Boss 逐槽预览六个附体槽贴图。点击触发演示会依次切换 aegis / graft / brood / stride / maw / surge；槽位贴在 Boss 环上，不生成会移动的 orbit_echo 伴生敌。',
+            setup: (game) => { setupOuroborosAttachmentSlotAcceptance(game, 0); },
+            demoAction: (game) => { advanceOuroborosAttachmentSlotAcceptance(game); }
         },
         {
             id: 'boss_vulnerability_break',
@@ -1861,6 +2295,94 @@ const TRAINING_SCENARIOS = {
             }
         },
         {
+            id: 'rw_toxic_bloom',
+            categoryId: 'runeword',
+            runewordId: 'runeword_toxic_bloom',
+            runewordLevel: 1,
+            name: '毒花綻放',
+            icon: '🌿',
+            desc: '[劇毒系] 劇毒命中時向半徑 90 內的鄰近敵人擴散少量毒層。建議讓子彈命中密集怪群的中心，觀察周圍敵人是否被附加毒層。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                // 3x3 密集怪群：子彈命中前排即可向四周擴散毒層
+                [{c:1.5,r:0},{c:2.5,r:0},{c:3.5,r:0},
+                 {c:1.5,r:1},{c:2.5,r:1},{c:3.5,r:1},
+                 {c:1.5,r:2},{c:2.5,r:2},{c:3.5,r:2}].forEach(p => {
+                    game.enemies.push(new Enemy(p.c * w + w/2, top + p.r * h + h/2, 60, 60, 800));
+                });
+            },
+            bulletConfig: { damage: 10, bounce: 0, pierce: 3, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, venom: 12, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_overload_core',
+            categoryId: 'runeword',
+            runewordId: 'runeword_overload_core',
+            runewordLevel: 1,
+            name: '超載核心',
+            icon: '💥',
+            desc: '[超載系] 超載爆炸半徑 +24、爆炸傷害 +20%。建議命中怪群中心，觀察更大的爆炸範圍與更高的 AOE 傷害。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 1500));
+                [{c:1.5,r:0},{c:2.5,r:0},{c:3.5,r:0},{c:1.5,r:1},{c:3.5,r:1},{c:1.5,r:2},{c:2.5,r:2},{c:3.5,r:2}].forEach(p => {
+                    game.enemies.push(new Enemy(p.c * w + w/2, top + p.r * h + h/2, 60, 60, 300));
+                });
+            },
+            bulletConfig: { damage: 20, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, overcharge: 12, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_echo_chamber',
+            categoryId: 'runeword',
+            runewordId: 'runeword_echo_chamber',
+            runewordLevel: 1,
+            name: '回響腔體',
+            icon: '🔁',
+            desc: '[回響系] 回響觸發率 +10%，回響子彈繼承更多屬性。建議多次發射帶回響的子彈，觀察分裂子彈數量與屬性繼承。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 1; c < 4; c++) {
+                        game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + r * h + h/2, 60, 60, 400));
+                    }
+                }
+            },
+            bulletConfig: { damage: 15, bounce: 2, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, echo: 12, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(1, -16);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'rw_son_sword_summon',
+            categoryId: 'runeword',
+            runewordId: 'runeword_son_sword_summon',
+            runewordLevel: 1,
+            name: '召劍之語',
+            icon: '🗡️',
+            desc: '[特殊系] 彈珠每次命中敵人時有 7% 概率在命中位置召喚一把三級子飛劍，子飛劍繼承彈珠屬性（火/冰/雷）。建議用高彈跳+元素子彈製造大量命中，觀察子飛劍召喚。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                // 密集怪群 + 高血量，製造大量命中以觸發召喚
+                for (let r = 0; r < 4; r++) {
+                    for (let c = 1; c < 4; c++) {
+                        game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + r * h + h/2, 60, 60, 1200));
+                    }
+                }
+            },
+            bulletConfig: { damage: 20, bounce: 10, pierce: 0, scatter: 0, multicast: 0, pyro: 200, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                tg.fireBulletWithEffects(tg.bulletConfig);
+            }
+        },
+        {
             id: 'rw_pierce_decay',
             categoryId: 'attribute',
             name: '穿透衰減',
@@ -1876,6 +2398,230 @@ const TRAINING_SCENARIOS = {
             demoAction: (game, tg) => {
                 const vel = new Vec2(0, -15);
                 game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+
+        // ── 屬性共鳴（ELEMENT_RESONANCE_DB）────────────────────────────────────────────────
+        //   每个场景注入对应元素的「三阶」共鸣（statCount 设为阈值），并配置对应属性子弹用于现场观察。
+        //   切换 resonanceTier(1/2/3) 可验证不同阶位。引擎在 loadScenario 中自动注入到 activeElementResonances。
+        {
+            id: 'res_pyro',
+            categoryId: 'resonance',
+            resonanceElement: 'pyro',
+            resonanceTier: 3,
+            name: '炎焰共鳴·三階',
+            icon: '🔥',
+            desc: '[炎焰共鳴 T3] 火焰額外傷害觸發溫度降至 0°、爆燃閾值降至 100°、基礎火焰 +25、火焰傷害整體 +50%。建議連續命中觀察更快的燃燒/爆燃。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                const e = new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 2500);
+                e.temp = 60;
+                game.enemies.push(e);
+                [{c:1.5,r:0},{c:3.5,r:0},{c:1.5,r:2},{c:3.5,r:2}].forEach(p => {
+                    game.enemies.push(new Enemy(p.c * w + w/2, top + p.r * h + h/2, 60, 60, 400));
+                });
+            },
+            bulletConfig: { damage: 10, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 300, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'res_cryo',
+            categoryId: 'resonance',
+            resonanceElement: 'cryo',
+            resonanceTier: 3,
+            name: '冰霜共鳴·三階',
+            icon: '❄️',
+            desc: '[冰霜共鳴 T3] 凍結觸發溫度提升至 -20°（極易凍結）、基礎冰霜 +25、冰霜傷害 +50%、凍結狀態額外受傷 +30%。建議觀察敵人是否快速凍結。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                const e = new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 2000);
+                e.temp = 0;
+                game.enemies.push(e);
+            },
+            bulletConfig: { damage: 60, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 80, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'res_lightning',
+            categoryId: 'resonance',
+            resonanceElement: 'lightning',
+            resonanceTier: 3,
+            name: '雷霆共鳴·三階',
+            icon: '⚡',
+            desc: '[雷霆共鳴 T3] 閃電鏈觸發概率與額外鏈數大幅提升、基礎閃電 +25。建議布置密集敵群觀察連鎖閃電覆蓋。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                for (let r = 0; r < 4; r++) {
+                    for (let c = 1; c < 4; c++) {
+                        const e = new Enemy((c + 0.5) * w + w/2, top + r * h + h/2, 60, 60, 400);
+                        e.temp = -100;
+                        game.enemies.push(e);
+                    }
+                }
+            },
+            bulletConfig: { damage: 15, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 10, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'res_bounce',
+            categoryId: 'resonance',
+            resonanceElement: 'bounce',
+            resonanceTier: 3,
+            name: '彈跳共鳴·三階',
+            icon: '⤴️',
+            desc: '[彈跳共鳴 T3] 彈跳相關加成達到最高階。建議布置分散怪群，觀察彈跳次數與連擊加成。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                game.enemies.push(
+                    new Enemy(1.5 * w + w/2, top + 2 * h + h/2, 60, 60, 500),
+                    new Enemy(3.5 * w + w/2, top + 2 * h + h/2, 60, 60, 500),
+                    new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 500),
+                    new Enemy(0.5 * w + w/2, top + 0 * h + h/2, 60, 60, 300),
+                    new Enemy(4.5 * w + w/2, top + 0 * h + h/2, 60, 60, 300)
+                );
+            },
+            bulletConfig: { damage: 15, bounce: 8, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(2, -18);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'res_pierce',
+            categoryId: 'resonance',
+            resonanceElement: 'pierce',
+            resonanceTier: 3,
+            name: '穿透共鳴·三階',
+            icon: '↗️',
+            desc: '[穿透共鳴 T3] 穿透衰減率大幅降低（T3 -40%）、基礎穿透提升。建議布置縱列敵群，觀察穿透後排傷害衰減是否減緩。',
+            setup: (game) => {
+                const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
+                for (let i = 0; i < 6; i++) {
+                    game.enemies.push(new Enemy(x, game.combatGridTopY + i * game.enemyHeight + game.enemyHeight / 2, 60, 60, 800));
+                }
+            },
+            bulletConfig: { damage: 100, bounce: 0, pierce: 8, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'res_scatter',
+            categoryId: 'resonance',
+            resonanceElement: 'scatter',
+            resonanceTier: 3,
+            name: '散射共鳴·三階',
+            icon: '🔱',
+            desc: '[散射共鳴 T3] 散射分裂相關加成達到最高階。建議布置寬幅怪群，觀察分裂子彈覆蓋面。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 2 * h + h/2, 60, 60, 1000));
+                [{c:1.5,r:1},{c:3.5,r:1},{c:0.5,r:2},{c:4.5,r:2},{c:1.5,r:3},{c:3.5,r:3}].forEach(p => {
+                    game.enemies.push(new Enemy(p.c * w + w/2, top + p.r * h + h/2, 60, 60, 100));
+                });
+            },
+            bulletConfig: { damage: 12, bounce: 0, pierce: 0, scatter: 8, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'res_venom',
+            categoryId: 'resonance',
+            resonanceElement: 'venom',
+            resonanceTier: 3,
+            name: '毒素共鳴·三階',
+            icon: '☠️',
+            desc: '[毒素共鳴 T3] 命中附加更多毒層（baseVenomBonus）、毒素傷害提升。建議用高血量敵人觀察 DoT 疊加速度。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 4000));
+                [{c:1.5,r:1},{c:3.5,r:1}].forEach(p => {
+                    game.enemies.push(new Enemy(p.c * w + w/2, top + p.r * h + h/2, 60, 60, 2000));
+                });
+            },
+            bulletConfig: { damage: 8, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, venom: 10, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'res_overcharge',
+            categoryId: 'resonance',
+            resonanceElement: 'overcharge',
+            resonanceTier: 3,
+            name: '超載共鳴·三階',
+            icon: '💥',
+            desc: '[超載共鳴 T3] 超載爆炸範圍/傷害達到最高階。建議命中怪群中心觀察 AOE 範圍與傷害。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 1200));
+                [{c:1.5,r:0},{c:2.5,r:0},{c:3.5,r:0},{c:1.5,r:1},{c:3.5,r:1},{c:1.5,r:2},{c:2.5,r:2},{c:3.5,r:2}].forEach(p => {
+                    game.enemies.push(new Enemy(p.c * w + w/2, top + p.r * h + h/2, 60, 60, 300));
+                });
+            },
+            bulletConfig: { damage: 15, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, overcharge: 10, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(0, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'res_echo',
+            categoryId: 'resonance',
+            resonanceElement: 'echo',
+            resonanceTier: 3,
+            name: '回響共鳴·三階',
+            icon: '🔁',
+            desc: '[回響共鳴 T3] 回響觸發率與屬性繼承達到最高階。建議多次發射，觀察分裂子彈數量。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 1; c < 4; c++) {
+                        game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + r * h + h/2, 60, 60, 400));
+                    }
+                }
+            },
+            bulletConfig: { damage: 15, bounce: 2, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, echo: 10, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                const vel = new Vec2(1, -16);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
+            }
+        },
+        {
+            id: 'res_laser',
+            categoryId: 'resonance',
+            resonanceElement: 'laser',
+            resonanceTier: 3,
+            name: '激光共鳴·三階',
+            icon: '🔦',
+            desc: '[激光共鳴 T3] 激光相關加成（持續/反射/傷害）達到最高階。建議布置縱列敵群觀察射線穿透與傷害。',
+            setup: (game) => {
+                const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
+                for (let i = 0; i < 6; i++) {
+                    const col = i % 2 === 0 ? 1.5 : 3.5;
+                    const row = Math.floor(i / 2);
+                    game.enemies.push(new Enemy(col * w + w/2, top + row * h + h/2, 60, 60, 300));
+                }
+            },
+            bulletConfig: { damage: 40, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: true, isMatryoshka: false, type: 'normal', laser: 10 },
+            demoAction: (game, tg) => {
+                const recipe = { ...tg.bulletConfig };
+                if (recipe.laser > 0) recipe.isLaser = true;
+                const vel = new Vec2(2, -15);
+                game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, recipe, null, true);
             }
         },
 
@@ -2976,6 +3722,8 @@ class TrainingGround {
             pyro: 0, cryo: 0, lightning: 0, wind: 0,
             isLaser: false, isMatryoshka: false, type: 'normal'
         };
+        // 自定义敌人配置
+        this.enemyConfig = { base: 'normal', hp: 1000, affixes: [] };
         this.stats = {
             totalDamage: 0,
             lastTotal: 0,
@@ -3283,6 +4031,29 @@ class TrainingGround {
                 padding: 1px 7px;
                 font-family: monospace;
             }
+            /* 子弹属性卡片：输入框 + 滑块 + 步进 */
+            .train-attr-card { display:flex; flex-direction:column; gap:5px; padding:7px 8px; background:rgba(30,41,59,0.6); border:1px solid #334155; border-radius:8px; }
+            .train-attr-head { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+            .train-attr-label { font-size:10px; font-weight:bold; color:#94a3b8; text-transform:uppercase; letter-spacing:0.03em; }
+            .train-attr-num { width:58px; background:#0f172a; border:1px solid #475569; border-radius:5px; color:#22d3ee; font-family:monospace; font-size:12px; text-align:right; padding:2px 5px; -moz-appearance:textfield; }
+            .train-attr-num:focus { outline:none; border-color:#06b6d4; }
+            .train-attr-num::-webkit-outer-spin-button, .train-attr-num::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+            .train-attr-range { width:100%; height:4px; accent-color:#06b6d4; cursor:pointer; }
+            .train-attr-steps { display:flex; gap:4px; }
+            .train-attr-step { flex:1; padding:2px 0; background:#334155; color:#cbd5e1; border-radius:4px; font-size:11px; line-height:1.4; transition:background .15s; cursor:pointer; }
+            .train-attr-step:hover { background:#475569; }
+            .train-attr-toggle { width:100%; padding:5px 0; border-radius:5px; font-size:11px; font-weight:bold; transition:background .15s; cursor:pointer; }
+            /* 敌人配置面板 */
+            .train-enemy-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:10px; }
+            .train-enemy-label { font-size:11px; font-weight:bold; color:#94a3b8; min-width:48px; }
+            .train-enemy-select, .train-enemy-num { background:#0f172a; border:1px solid #475569; border-radius:6px; color:#e2e8f0; font-size:12px; padding:4px 8px; }
+            .train-enemy-num { width:84px; font-family:monospace; color:#fca5a5; text-align:right; -moz-appearance:textfield; }
+            .train-enemy-num::-webkit-outer-spin-button, .train-enemy-num::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+            .train-enemy-range { flex:1; min-width:120px; height:4px; accent-color:#ef4444; cursor:pointer; }
+            .train-affix-chip { padding:3px 9px; border-radius:999px; border:1px solid #475569; background:rgba(30,41,59,0.6); color:#94a3b8; font-size:11px; cursor:pointer; transition:all .15s; user-select:none; }
+            .train-affix-chip:hover { border-color:#64748b; color:#e2e8f0; }
+            .train-affix-chip.on { background:rgba(6,182,212,0.18); border-color:#06b6d4; color:#cffafe; }
+            .train-affix-group-label { width:100%; font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin:6px 0 2px; }
             @media (max-width: 767px) {
                 .train-panel-content { max-height: 50vh; }
                 #train-attr-grid { grid-template-columns: repeat(2, 1fr) !important; }
@@ -3318,7 +4089,7 @@ class TrainingGround {
                     <button onclick="game.trainingGround.fireBullet()" class="w-12 h-12 rounded-full bg-indigo-600/80 backdrop-blur-md border border-indigo-400/50 text-white shadow-lg shadow-indigo-500/20 flex items-center justify-center active:scale-90 transition-transform">
                         <span class="text-xl">🔥</span>
                     </button>
-                    <button onclick="game.trainingGround.spawnEnemy()" class="w-12 h-12 rounded-full bg-red-600/80 backdrop-blur-md border border-red-400/50 text-white shadow-lg shadow-red-500/20 flex items-center justify-center active:scale-90 transition-transform">
+                    <button onclick="game.trainingGround.spawnCustomEnemy()" class="w-12 h-12 rounded-full bg-red-600/80 backdrop-blur-md border border-red-400/50 text-white shadow-lg shadow-red-500/20 flex items-center justify-center active:scale-90 transition-transform">
                         <span class="text-xl">👾</span>
                     </button>
                 </div>
@@ -3347,8 +4118,9 @@ class TrainingGround {
                     </div>
                     <!-- 敌人配置面板 -->
                     <div id="panel-enemy" class="train-panel-content">
-                        <div class="flex gap-2 flex-wrap">
-                            <button onclick="game.trainingGround.spawnEnemy()" class="py-2 px-4 bg-red-600 hover:bg-red-500 text-white rounded font-bold transition-colors text-sm">召唤敌人</button>
+                        <div id="train-enemy-config"></div>
+                        <div class="flex gap-2 flex-wrap mt-3">
+                            <button onclick="game.trainingGround.spawnCustomEnemy()" class="py-2 px-4 bg-red-600 hover:bg-red-500 text-white rounded font-bold transition-colors text-sm">召唤敌人</button>
                             <button onclick="game.trainingGround.clearEnemies()" class="py-2 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold transition-colors text-sm">清空</button>
                             <button onclick="game.phase_enemy_startLogic()" class="py-2 px-4 bg-amber-600 hover:bg-amber-500 text-white rounded font-bold transition-colors text-sm">触发敌人行动</button>
                         </div>
@@ -3360,6 +4132,7 @@ class TrainingGround {
         this.initSidebar();
         this.renderAttributeControls();
         this.updateBulletPreview();
+        this.renderEnemyControls();
     }
 
     clearEnemies() {
@@ -3369,17 +4142,57 @@ class TrainingGround {
         if (this.game.particleCounts) { for (const k in this.game.particleCounts) this.game.particleCounts[k] = 0; }
     }
 
-    adjustBullet(key, delta) {
-        if (key === 'isLaser' || key === 'isMatryoshka') {
-            this.bulletConfig[key] = !this.bulletConfig[key];
+    // 子弹数值属性的滑块范围 / 步进 / 中文标签（输入框可超出 max 手动填入）
+    static get BULLET_ATTR_META() {
+        return {
+            damage:    { label: '伤害',  max: 1000, step: 5,  big: 50 },
+            bounce:    { label: '弹跳',  max: 30,   step: 1,  big: 5 },
+            pierce:    { label: '穿透',  max: 30,   step: 1,  big: 5 },
+            scatter:   { label: '分裂',  max: 30,   step: 1,  big: 5 },
+            multicast: { label: '连射',  max: 20,   step: 1,  big: 5 },
+            pyro:      { label: '火焰',  max: 1000, step: 10, big: 100 },
+            cryo:      { label: '冰冻',  max: 1000, step: 10, big: 100 },
+            lightning: { label: '闪电',  max: 1000, step: 10, big: 100 },
+            wind:      { label: '风',    max: 30,   step: 1,  big: 5 },
+            venom:     { label: '毒',    max: 30,   step: 1,  big: 5 },
+            laser:     { label: '激光',  max: 30,   step: 1,  big: 5 },
+        };
+    }
+
+    /**
+     * 精确设置子弹属性数值（输入框 onchange / 滑块 oninput / 步进按钮调用）。
+     * 轻量同步成对控件，不整表重建，避免拖动滑块时被打断。
+     */
+    setBullet(key, rawVal, opts = {}) {
+        const cur = this.bulletConfig[key];
+        if (typeof cur === 'boolean') {
+            this.bulletConfig[key] = (typeof rawVal === 'boolean') ? rawVal : !cur;
         } else {
-            this.bulletConfig[key] = Math.max(0, (this.bulletConfig[key] || 0) + delta);
+            let v = Math.round(Number(rawVal));
+            if (!isFinite(v)) v = 0;
+            this.bulletConfig[key] = Math.max(0, v);
         }
-        this.renderAttributeControls();
+        const v = this.bulletConfig[key];
+        const numEl = document.getElementById(`train-attr-num-${key}`);
+        const rangeEl = document.getElementById(`train-attr-range-${key}`);
+        // 不覆盖用户正在输入的输入框
+        if (numEl && document.activeElement !== numEl) numEl.value = v;
+        if (rangeEl) rangeEl.value = Math.min(v, Number(rangeEl.max) || v);
         this.updateBulletPreview();
-        // [修复] 如果修改了连射，同步更新 HUD
+        // [修复] 修改连射时同步更新 HUD
         if (key === 'multicast') {
-            eventBus.emit(EVENT_TYPES.UI_MULTICAST_UPDATE, { total: 1 + (this.bulletConfig.multicast || 0), bonusAmount: delta > 0 ? 1 : 0 });
+            eventBus.emit(EVENT_TYPES.UI_MULTICAST_UPDATE, { total: 1 + (this.bulletConfig.multicast || 0), bonusAmount: 0 });
+        }
+        if (opts.rerender) this.renderAttributeControls();
+    }
+
+    adjustBullet(key, delta) {
+        if (typeof this.bulletConfig[key] === 'boolean') {
+            this.bulletConfig[key] = !this.bulletConfig[key];
+            this.renderAttributeControls();
+            this.updateBulletPreview();
+        } else {
+            this.setBullet(key, (this.bulletConfig[key] || 0) + delta);
         }
     }
 
@@ -3388,25 +4201,271 @@ class TrainingGround {
         if (!container) return;
         container.innerHTML = '';
         
+        const META = TrainingGround.BULLET_ATTR_META;
+
         Object.entries(this.bulletConfig).forEach(([key, val]) => {
             const item = document.createElement('div');
-            item.className = 'flex flex-col gap-1 p-2 bg-slate-800/60 border border-slate-700 rounded-lg';
-            
-            let displayVal = val;
-            if (typeof val === 'boolean') displayVal = val ? 'ON' : 'OFF';
+            item.className = 'train-attr-card';
 
+            // 布尔属性（isLaser / isMatryoshka）：TOGGLE 按钮
+            if (typeof val === 'boolean') {
+                item.innerHTML = `
+                    <div class="train-attr-head">
+                        <span class="train-attr-label">${key}</span>
+                        <span class="text-xs font-mono ${val ? 'text-emerald-400' : 'text-slate-500'}">${val ? 'ON' : 'OFF'}</span>
+                    </div>
+                    <button onclick="game.trainingGround.adjustBullet('${key}', 0)" class="train-attr-toggle ${val ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300'}">TOGGLE</button>
+                `;
+                container.appendChild(item);
+                return;
+            }
+
+            // 非数值（如 type 字符串）：只展示
+            if (typeof val !== 'number') {
+                item.innerHTML = `
+                    <div class="train-attr-head">
+                        <span class="train-attr-label">${key}</span>
+                        <span class="text-xs font-mono text-slate-400">${val}</span>
+                    </div>`;
+                container.appendChild(item);
+                return;
+            }
+
+            // 数值属性：输入框 + 滑块 + 步进
+            const meta = META[key] || { label: key, max: 100, step: 1, big: 10 };
+            const sliderMax = Math.max(meta.max, val);
             item.innerHTML = `
-                <div class="flex justify-between items-center">
-                    <span class="text-[10px] text-slate-400 uppercase font-bold">${key}</span>
-                    <span class="text-xs font-mono text-cyan-400">${displayVal}</span>
+                <div class="train-attr-head">
+                    <span class="train-attr-label">${meta.label}<span class="text-slate-600 lowercase ml-1">${key}</span></span>
+                    <input id="train-attr-num-${key}" type="number" min="0" value="${val}"
+                        onchange="game.trainingGround.setBullet('${key}', this.value)"
+                        onfocus="this.select()"
+                        class="train-attr-num">
                 </div>
-                <div class="flex gap-1">
-                    <button onclick="game.trainingGround.adjustBullet('${key}', ${typeof val === 'boolean' ? '0' : '-1'})" class="flex-1 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[10px]">${typeof val === 'boolean' ? 'TOGGLE' : '-'}</button>
-                    ${typeof val === 'number' ? `<button onclick="game.trainingGround.adjustBullet('${key}', 1)" class="flex-1 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[10px]">+</button>` : ''}
+                <input id="train-attr-range-${key}" type="range" min="0" max="${sliderMax}" step="${meta.step}" value="${Math.min(val, sliderMax)}"
+                    oninput="game.trainingGround.setBullet('${key}', this.value)"
+                    class="train-attr-range">
+                <div class="train-attr-steps">
+                    <button class="train-attr-step" onclick="game.trainingGround.setBullet('${key}', 0)">0</button>
+                    <button class="train-attr-step" onclick="game.trainingGround.adjustBullet('${key}', ${-meta.step})">−${meta.step}</button>
+                    <button class="train-attr-step" onclick="game.trainingGround.adjustBullet('${key}', ${meta.step})">+${meta.step}</button>
+                    <button class="train-attr-step" onclick="game.trainingGround.adjustBullet('${key}', ${meta.big})">+${meta.big}</button>
                 </div>
             `;
             container.appendChild(item);
         });
+    }
+
+    // ── 自定义敌人面板（基座 / 血量 / 词缀）────────────────────────────
+    // 词缀分组（id 与 enemy.js 中 affixes.includes 判定一致）
+    static get ENEMY_AFFIX_OPTIONS() {
+        return [
+            { label: '防御', items: [
+                { id: 'shield', name: '护盾' },
+                { id: 'radiantAegis', name: '流彩护盾' },
+                { id: 'energyArmor', name: '蓄能甲' },
+                { id: 'phaseShield', name: '相位护盾' },
+                { id: 'livingArmor', name: '活体护甲' },
+                { id: 'deflectShell', name: '偏折壳' },
+                { id: 'lowDamageImmune', name: '低伤免疫' },
+                { id: 'overloadReactor', name: '过量炉' },
+            ] },
+            { label: '行为', items: [
+                { id: 'regen', name: '再生' },
+                { id: 'healer', name: '治疗' },
+                { id: 'haste', name: '极速' },
+                { id: 'clone', name: '分裂' },
+                { id: 'jump', name: '跳跃' },
+                { id: 'berserk', name: '狂暴' },
+                { id: 'siegeBreaker', name: '撞城者' },
+                { id: 'armorSpore', name: '护甲孢子' },
+            ] },
+            { label: '基底专属', items: [
+                { id: 'heavyArmor', name: '重装' },
+                { id: 'devour', name: '吞噬' },
+                { id: 'deflectionWard', name: '偏折屏障' },
+                { id: 'echoRelay', name: '回响中继' },
+                { id: 'prism', name: '折光' },
+                { id: 'hive', name: '孵化' },
+                { id: 'siege', name: '攻城' },
+                { id: 'carrier', name: '铸巢' },
+                { id: 'gravityWell', name: '引力' },
+            ] },
+            { label: '符文', items: [
+                { id: 'runeBearer', name: '符文携带' },
+                { id: 'adaptiveRune', name: '自适应符文' },
+            ] },
+        ];
+    }
+
+    renderEnemyControls() {
+        const container = document.getElementById('train-enemy-config');
+        if (!container) return;
+        const cfg = this.enemyConfig;
+
+        const bases = [{ id: 'normal', name: '普通方块', footprint: '1×1' }]
+            .concat(ENEMY_V2_METADATA.map(m => ({ id: m.id, name: m.name, footprint: m.footprint })));
+        const baseOpts = bases.map(b =>
+            `<option value="${b.id}" ${b.id === cfg.base ? 'selected' : ''}>${b.footprint} ${b.name}</option>`
+        ).join('');
+
+        const hp = cfg.hp;
+        const hpMax = Math.max(20000, hp);
+
+        const groups = TrainingGround.ENEMY_AFFIX_OPTIONS.map(g => {
+            const chips = g.items.map(it => {
+                const on = cfg.affixes.includes(it.id);
+                return `<button class="train-affix-chip ${on ? 'on' : ''}" onclick="game.trainingGround.toggleEnemyAffix('${it.id}')">${it.name}</button>`;
+            }).join('');
+            return `<div class="train-affix-group-label">${g.label}</div><div class="flex flex-wrap gap-1 mb-1">${chips}</div>`;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="train-enemy-row">
+                <span class="train-enemy-label">基座</span>
+                <select class="train-enemy-select" onchange="game.trainingGround.setEnemyBase(this.value)">${baseOpts}</select>
+            </div>
+            <div class="train-attr-card mt-2">
+                <div class="train-attr-head">
+                    <span class="train-attr-label">血量<span class="text-slate-600 lowercase ml-1">hp</span></span>
+                    <input id="train-enemy-hp-num" type="number" min="1" value="${hp}"
+                        onchange="game.trainingGround.setEnemyHp(this.value)" onfocus="this.select()" class="train-attr-num">
+                </div>
+                <input id="train-enemy-hp-range" type="range" min="1" max="${hpMax}" step="50" value="${Math.min(hp, hpMax)}"
+                    oninput="game.trainingGround.setEnemyHp(this.value)" class="train-attr-range">
+                <div class="train-attr-steps">
+                    <button class="train-attr-step" onclick="game.trainingGround.setEnemyHp(100)">100</button>
+                    <button class="train-attr-step" onclick="game.trainingGround.adjustEnemyHp(-100)">−100</button>
+                    <button class="train-attr-step" onclick="game.trainingGround.adjustEnemyHp(100)">+100</button>
+                    <button class="train-attr-step" onclick="game.trainingGround.adjustEnemyHp(1000)">+1000</button>
+                </div>
+            </div>
+            <div class="mt-2">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="train-enemy-label">词缀</span>
+                    <button class="train-affix-chip" onclick="game.trainingGround.clearEnemyAffixes()">清空词缀</button>
+                </div>
+                ${groups}
+            </div>
+        `;
+    }
+
+    // 切换基座：自动套用该基座的推荐血量与专属词条（仍可手动微调）
+    setEnemyBase(id) {
+        this.enemyConfig.base = id;
+        const meta = ENEMY_V2_BY_ID[id];
+        if (meta) {
+            this.enemyConfig.hp = Math.round(1000 * (meta.hpMult || 1));
+            this.enemyConfig.affixes = (meta.affixes || []).slice();
+        } else {
+            this.enemyConfig.hp = 1000;
+            this.enemyConfig.affixes = [];
+        }
+        this.renderEnemyControls();
+    }
+
+    setEnemyHp(rawVal) {
+        let v = Math.round(Number(rawVal));
+        if (!isFinite(v)) v = 1;
+        this.enemyConfig.hp = Math.max(1, v);
+        const val = this.enemyConfig.hp;
+        const numEl = document.getElementById('train-enemy-hp-num');
+        const rangeEl = document.getElementById('train-enemy-hp-range');
+        if (numEl && document.activeElement !== numEl) numEl.value = val;
+        if (rangeEl) rangeEl.value = Math.min(val, Number(rangeEl.max) || val);
+    }
+
+    adjustEnemyHp(delta) {
+        this.setEnemyHp((this.enemyConfig.hp || 0) + delta);
+    }
+
+    toggleEnemyAffix(id) {
+        const arr = this.enemyConfig.affixes;
+        const i = arr.indexOf(id);
+        if (i >= 0) arr.splice(i, 1); else arr.push(id);
+        this.renderEnemyControls();
+    }
+
+    clearEnemyAffixes() {
+        this.enemyConfig.affixes = [];
+        this.renderEnemyControls();
+    }
+
+    // 按勾选的词缀做最小必要初始化（口径对齐 spawn_system / 验收场景）
+    _initCustomEnemyAffixes(e, hp) {
+        const afx = (typeof CONFIG !== 'undefined' && CONFIG.balance && CONFIG.balance.affixes) || {};
+        const A = e.affixes || [];
+        if (A.includes('shield')) e.shieldCharges = 1 + (this.game.round || 0);
+        if (A.includes('radiantAegis') && typeof e._initRadiantAegis === 'function') e._initRadiantAegis();
+        if (A.includes('phaseShield')) {
+            e.shieldCharges = Math.max(e.shieldCharges || 0, 4);
+            e.phaseShieldDisabledThisTurn = false;
+        }
+        if (A.includes('energyArmor')) e.energyArmorShield = Math.max(70, Math.floor(hp * 0.3));
+        if (A.includes('overloadReactor')) {
+            e._overloadDamageThisTurn = e.maxHp;
+            e._overloadBonusThisTurn = 3;
+        }
+        if (A.includes('livingArmor')) {
+            const max = Math.max(50, Math.floor(hp * 0.5));
+            e.livingArmorMax = max;
+            e.livingArmorHp = max;
+            e.livingArmorBaseMax = max;
+            e.livingArmorStacked = false;
+            e.livingArmorBroken = false;
+        }
+        if (A.includes('deflectionWard')) {
+            const pct = afx.deflectionWardBarrierPct || 0.10;
+            e.wardBarrierMax = Math.max(1, Math.floor(hp * pct));
+            e.wardBarrier = e.wardBarrierMax;
+            e.wardBrokenThisTurn = false;
+        }
+        if (A.includes('hive')) e._hiveCooldown = afx.hiveSpawnInterval || 2;
+        if (A.includes('carrier')) e._carrierCooldown = afx.carrierSpawnInterval || 1;
+    }
+
+    // 按当前 enemyConfig 生成一个自定义敌人
+    spawnCustomEnemy() {
+        const game = this.game;
+        const cfg = this.enemyConfig;
+        const w = game.enemyWidth;
+        const h = game.enemyHeight;
+        const top = game.combatGridTopY;
+
+        const meta = ENEMY_V2_BY_ID[cfg.base];
+        const cols = meta ? meta.cols : 1;
+        const rows = meta ? meta.rows : 1;
+        const hp = Math.max(1, Math.round(cfg.hp || 1));
+        const affixes = (cfg.affixes || []).slice();
+
+        const totalCols = (typeof CONFIG !== 'undefined' && CONFIG.gameplay && CONFIG.gameplay.enemyCols) || 6;
+        const startCol = Math.floor(Math.random() * Math.max(1, totalCols - cols + 1));
+        const baseRow = 1;
+        const centerX = (startCol + (cols - 1) / 2) * w + w / 2;
+        const centerY = top + (baseRow + (rows - 1) / 2) * h;
+
+        const type = (meta || affixes.length > 0) ? 'elite' : 'normal';
+        const e = new Enemy(centerX, centerY, w * cols, h * rows, hp, hp, type, affixes);
+        e.dropTargetY = e.pos.y;
+
+        if (meta) {
+            e.baseArchetype = meta.baseArchetype;
+            e.gridCols = cols;
+            e.gridRows = rows;
+            if (cols >= 2) e.isWideEnemy = true;
+        }
+
+        this._initCustomEnemyAffixes(e, hp);
+
+        if (meta && typeof game.spawn_applyArchetypeShape === 'function') {
+            game.spawn_applyArchetypeShape(e, meta.baseArchetype);
+        } else if (!meta && affixes.length > 0 && typeof game.spawn_applyMinionShape === 'function') {
+            game.spawn_applyMinionShape(e);
+        }
+        if (typeof e.initSprite === 'function') e.initSprite();
+
+        game.enemies.push(e);
+        return e;
     }
 
     updateBulletPreview() {
@@ -3448,6 +4507,7 @@ class TrainingGround {
                 <button onclick="game.trainingGround.switchCategory('attribute')" id="scat-btn-attribute" class="train-scat-btn">屬性</button>
                 <button onclick="game.trainingGround.switchCategory('boss')" id="scat-btn-boss" class="train-scat-btn">Boss</button>
                 <button onclick="game.trainingGround.switchCategory('runeword')" id="scat-btn-runeword" class="train-scat-btn">符文</button>
+                <button onclick="game.trainingGround.switchCategory('resonance')" id="scat-btn-resonance" class="train-scat-btn" title="屬性共鳴 1/2/3 階驗證">共鳴</button>
                 <button onclick="game.trainingGround.switchCategory('v2matrix')" id="scat-btn-v2matrix" class="train-scat-btn" title="敵人視覺 V2 基底矩陣">V2</button>
                 <button onclick="game.trainingGround.switchCategory('enemy_v2')" id="scat-btn-enemy_v2" class="train-scat-btn" title="敵人 V2 美術驗收場景">驗收</button>
             </div>
@@ -3524,11 +4584,13 @@ class TrainingGround {
         // 0. 重置符文词条效果（切换场景时清空旧词条）
         this.game.activeRunewordEffects = {};
         this.game.activeRunewordStats = {};
+        // 0a-pre. 重置属性共鸣（切换场景时清空旧共鸣，避免泄漏到其他场景）
+        this.game.activeElementResonances = {};
 
         // 0b. 根据分类动态调整 combatGridTopY
         // 符文词条分类有顶部横幅（约70px），需要让敵人在横幅下方居中偏上放置
         const trainTopBarH = 40;
-        if (scenario.categoryId === 'runeword') {
+        if (scenario.categoryId === 'runeword' || scenario.categoryId === 'resonance') {
             // 横幅高度约70px，在其下方保留 8px 间距
             const bannerH = 70;
             this.game.combatGridTopY = trainTopBarH + bannerH + 8 + this.game.enemyHeight / 2;
@@ -3549,6 +4611,23 @@ class TrainingGround {
                     params[key] = (baseParams[key] || 0) + (level - 1) * (perLevelParams[key] || 0);
                 }
                 this.game.activeRunewordEffects[rwDef.effectId] = { level, params };
+            }
+        }
+
+        // 0a-res. 属性共鸣场景特殊处理：注入指定元素的共鸣阶位到 activeElementResonances
+        //   战斗层（combat_system / projectile / collision 等）读取 game.activeElementResonances[element].params
+        if (scenario.categoryId === 'resonance' && scenario.resonanceElement) {
+            const resDef = ELEMENT_RESONANCE_DB[scenario.resonanceElement];
+            if (resDef && Array.isArray(resDef.tiers) && resDef.tiers.length > 0) {
+                const tierLevel = scenario.resonanceTier || resDef.tiers.length; // 默认取最高阶
+                const tier = resDef.tiers[Math.max(0, Math.min(tierLevel, resDef.tiers.length) - 1)];
+                this.game.activeElementResonances[scenario.resonanceElement] = {
+                    label: tier.label,
+                    desc: tier.desc,
+                    threshold: tier.threshold,
+                    statCount: tier.threshold,
+                    params: tier.params,
+                };
             }
         }
 
@@ -3628,6 +4707,34 @@ class TrainingGround {
                         }).join('');
                     }
 
+                    banner.classList.add('visible');
+                } else {
+                    banner.classList.remove('visible');
+                }
+            } else if (scenario.categoryId === 'resonance' && scenario.resonanceElement) {
+                const resDef = ELEMENT_RESONANCE_DB[scenario.resonanceElement];
+                const active = this.game.activeElementResonances[scenario.resonanceElement];
+                if (resDef && active) {
+                    const iconEl = document.getElementById('rw-banner-icon');
+                    const nameEl = document.getElementById('rw-banner-name');
+                    const levelEl = document.getElementById('rw-banner-level');
+                    const descBannerEl = document.getElementById('rw-banner-desc');
+                    const paramsEl = document.getElementById('rw-banner-params');
+                    if (iconEl) iconEl.textContent = resDef.icon || scenario.icon || '✨';
+                    if (nameEl) nameEl.textContent = active.label || resDef.name;
+                    if (levelEl) {
+                        const tierLevel = scenario.resonanceTier || resDef.tiers.length;
+                        levelEl.textContent = 'T' + tierLevel + ' (' + active.threshold + '层)';
+                    }
+                    if (descBannerEl) descBannerEl.textContent = active.desc || '';
+                    if (paramsEl) {
+                        paramsEl.innerHTML = Object.entries(active.params || {}).map(([key, val]) => {
+                            const displayVal = (typeof val === 'number' && val % 1 !== 0 && Math.abs(val) < 10)
+                                ? (val * 100).toFixed(0) + '%'
+                                : val;
+                            return `<span class="rw-banner-param-tag">${key}: ${displayVal}</span>`;
+                        }).join('');
+                    }
                     banner.classList.add('visible');
                 } else {
                     banner.classList.remove('visible');
@@ -3767,6 +4874,8 @@ class TrainingGround {
     _clearBattlefield() {
         // [V2 可見性驗收] 同步清理矩陣標籤層
         this._clearV2MatrixOverlay();
+        // [PixiJS 迁移] 销毁所有残留特效的 PixiJS 适配器，防止孤立 Sprite 残留
+        pixiCleanupAllEffects(this.game);
         this.game.enemies = [];
         this.game.projectiles = [];
         this.game.particles = [];
@@ -3898,7 +5007,11 @@ class TrainingGround {
         this.game.isReloading = false;
         this.game.reloadProgress = 0;
         this.game.isEnemyTurn = false;
-        this.game.combat_runeCharge_init();
+        if (typeof this.game.combat_skillCharge_init === 'function') {
+            this.game.combat_skillCharge_init();
+        } else {
+            this.game.combat_runeCharge_init();
+        }
         // [修复] 进入试炼场时，同步初始连射倍率（默认为 1）
         eventBus.emit(EVENT_TYPES.UI_MULTICAST_UPDATE, { total: 1 + (this.bulletConfig.multicast || 0), bonusAmount: 0 });
     }
@@ -3950,36 +5063,141 @@ class TruthBook {
         this.simFrame = 0;
         this.scanLineY = 0;
         this.gridOffset = 0;
+        this.selectedCategoryId = TRUTH_BOOK_DATA.categories?.[0]?.id || 'boss';
+        this.searchQuery = '';
         this.initUI();
         window.addEventListener('resize', () => { if (this.active) this.resize(); });
     }
 
     initUI() {
-        const enemyList = document.getElementById('truth-enemy-list');
-        const attrList = document.getElementById('truth-attr-list');
-        if(enemyList) enemyList.innerHTML = '';
-        if(attrList) attrList.innerHTML = '';
-        if (typeof TRUTH_BOOK_DATA !== 'undefined') {
-            TRUTH_BOOK_DATA.enemies.forEach(entry => {
-                if (enemyList) enemyList.appendChild(this.createListButton(entry));
+        const searchInput = document.getElementById('truth-search');
+        if (searchInput && !searchInput.dataset.truthBound) {
+            searchInput.addEventListener('input', () => {
+                this.searchQuery = searchInput.value.trim().toLowerCase();
+                this.renderEntryList();
             });
-            TRUTH_BOOK_DATA.attributes.forEach(entry => {
-                if (attrList) attrList.appendChild(this.createListButton(entry));
-            });
+            searchInput.dataset.truthBound = '1';
         }
+        if (searchInput) searchInput.value = this.searchQuery;
+        this.renderCategoryTabs();
+        this.renderEntryList();
+    }
+
+    getEntries() {
+        if (Array.isArray(TRUTH_BOOK_DATA.entries)) return TRUTH_BOOK_DATA.entries;
+        const enemies = (TRUTH_BOOK_DATA.enemies || []).map(entry => normalizeTruthBookEntry(entry, 'enemy_affix'));
+        const attributes = (TRUTH_BOOK_DATA.attributes || []).map(entry => normalizeTruthBookEntry(entry, 'attribute'));
+        return [...enemies, ...attributes];
+    }
+
+    getCategories() {
+        const categories = Array.isArray(TRUTH_BOOK_DATA.categories) ? TRUTH_BOOK_DATA.categories : [];
+        if (categories.length > 0) return categories;
+        return [
+            { id: 'enemy_affix', name: '敌人词缀', icon: '◇', hint: '' },
+            { id: 'attribute', name: '属性百科', icon: '✦', hint: '' }
+        ];
+    }
+
+    renderCategoryTabs() {
+        const categoryTabs = document.getElementById('truth-category-tabs');
+        if (!categoryTabs) return;
+        const entries = this.getEntries();
+        const categories = this.getCategories();
+        if (!categories.some(category => category.id === this.selectedCategoryId)) {
+            this.selectedCategoryId = categories[0]?.id || 'boss';
+        }
+        categoryTabs.innerHTML = '';
+        categories.forEach(category => {
+            const count = entries.filter(entry => entry.categoryId === category.id).length;
+            const btn = document.createElement('button');
+            const active = category.id === this.selectedCategoryId;
+            btn.className = `truth-category-btn ${active ? 'active' : ''}`;
+            btn.type = 'button';
+            btn.innerHTML = `
+                <span class="truth-category-icon">${category.icon || '•'}</span>
+                <span class="truth-category-text">
+                    <span class="truth-category-name">${category.name}</span>
+                    <span class="truth-category-hint">${category.hint || ''}</span>
+                </span>
+                <span class="truth-category-count">${count}</span>
+            `;
+            btn.onclick = () => {
+                this.selectedCategoryId = category.id;
+                this.renderCategoryTabs();
+                this.renderEntryList();
+            };
+            categoryTabs.appendChild(btn);
+        });
+    }
+
+    renderEntryList() {
+        const entryList = document.getElementById('truth-entry-list') || document.getElementById('truth-enemy-list');
+        const entryCount = document.getElementById('truth-entry-count');
+        if (!entryList) return;
+        const query = this.searchQuery || '';
+        const entries = this.getEntries().filter(entry => {
+            if (entry.categoryId !== this.selectedCategoryId) return false;
+            if (!query) return true;
+            const haystack = [
+                entry.title,
+                entry.name,
+                entry.content,
+                entry.desc,
+                ...(entry.tags || [])
+            ].join(' ').toLowerCase();
+            return haystack.includes(query);
+        });
+        entryList.innerHTML = '';
+        if (entryCount) {
+            const category = this.getCategories().find(item => item.id === this.selectedCategoryId);
+            entryCount.textContent = `${category?.name || '条目'} · ${entries.length} 项`;
+        }
+        if (entries.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'p-4 border border-slate-800 bg-slate-900/40 text-slate-500 text-xs leading-relaxed';
+            empty.textContent = query ? '没有匹配的条目。' : '该分类暂无条目。';
+            entryList.appendChild(empty);
+            return;
+        }
+        entries.forEach(entry => {
+            entryList.appendChild(this.createListButton(entry));
+        });
     }
 
     createListButton(entry) {
         const btn = document.createElement('button');
         btn.className = 'truth-list-btn flex items-center gap-3 p-3 w-full bg-slate-800/40 border border-slate-700/50 rounded-xl hover:bg-cyan-900/20 hover:border-cyan-500/50 transition-all text-left group mb-2';
-        btn.innerHTML = `
-            <span class="text-2xl group-hover:scale-110 transition-transform filter drop-shadow-md">${entry.icon}</span>
-            <div class="flex flex-col">
-                <span class="text-sm font-bold text-slate-300 group-hover:text-cyan-100 transition-colors">${entry.name}</span>
-                <span class="text-[9px] text-slate-500 uppercase tracking-wider group-hover:text-cyan-400/70">${entry.tags[0] || 'ENTITY'}</span>
-            </div>
-        `;
+        btn.dataset.entryId = entry.id;
+        const iconWrap = document.createElement('span');
+        iconWrap.className = 'text-2xl group-hover:scale-110 transition-transform filter drop-shadow-md truth-list-icon';
+        if (entry.iconSrc) {
+            const img = document.createElement('img');
+            img.src = entry.iconSrc;
+            img.alt = entry.title || entry.name || '';
+            img.loading = 'lazy';
+            img.onerror = function() {
+                this.replaceWith(document.createTextNode(entry.icon || '◇'));
+            };
+            iconWrap.appendChild(img);
+        } else {
+            iconWrap.textContent = entry.icon || '◇';
+        }
+        const textWrap = document.createElement('div');
+        textWrap.className = 'flex flex-col min-w-0';
+        const title = document.createElement('span');
+        title.className = 'text-sm font-bold text-slate-300 group-hover:text-cyan-100 transition-colors truncate';
+        title.textContent = entry.title || entry.name;
+        const subtitle = document.createElement('span');
+        subtitle.className = 'text-[9px] text-slate-500 uppercase tracking-wider group-hover:text-cyan-400/70 truncate';
+        subtitle.textContent = (entry.tags && entry.tags[0]) || entry.categoryId || 'ENTITY';
+        textWrap.append(title, subtitle);
+        btn.append(iconWrap, textWrap);
         btn.onclick = () => this.showEntry(entry, btn);
+        if (this.currentEntry && this.currentEntry.id === entry.id) {
+            btn.classList.remove('border-slate-700/50', 'bg-slate-800/40');
+            btn.classList.add('border-cyan-500', 'bg-cyan-900/30');
+        }
         return btn;
     }
 
@@ -3990,18 +5208,34 @@ class TruthBook {
         const content = document.getElementById('truth-content');
         if (content) content.classList.remove('hidden');
         const iconEl = document.getElementById('truth-item-icon');
-        if (iconEl) iconEl.innerText = entry.icon;
+        if (iconEl) {
+            iconEl.innerHTML = '';
+            if (entry.iconSrc) {
+                const img = document.createElement('img');
+                img.src = entry.iconSrc;
+                img.alt = entry.title || entry.name || '';
+                img.loading = 'lazy';
+                img.onerror = function() {
+                    this.replaceWith(document.createTextNode(entry.icon || '◇'));
+                };
+                iconEl.appendChild(img);
+            } else {
+                iconEl.textContent = entry.icon || '◇';
+            }
+        }
         const nameEl = document.getElementById('truth-item-name');
-        if (nameEl) nameEl.innerText = entry.name;
+        if (nameEl) nameEl.innerText = entry.title || entry.name;
         const descEl = document.getElementById('truth-item-desc');
-        if (descEl) descEl.innerText = entry.desc;
+        if (descEl) descEl.innerText = entry.content || entry.desc || '';
         const tagsCont = document.getElementById('truth-item-tags');
         if (tagsCont) {
             tagsCont.innerHTML = '';
-            entry.tags.forEach(tag => {
+            const category = this.getCategories().find(item => item.id === entry.categoryId);
+            const tags = [category?.name, ...(entry.tags || [])].filter(Boolean);
+            tags.forEach(tag => {
                 const s = document.createElement('span');
                 s.className = 'text-[9px] font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700 shadow-sm tracking-wide';
-                s.innerText = tag.toUpperCase();
+                s.innerText = String(tag);
                 tagsCont.appendChild(s);
             });
         }
@@ -4212,6 +5446,7 @@ class TruthBook {
  * @returns {object} 包含完整战斗状态与方法的演示上下文
  */
 function createCombatContext(mainGame, canvas) {
+    // @section:demo_state_seed - 演示状态初始化
     const context = {
         // ── 全局配置引用（演示环境需要访问 CONFIG）────────────────────────────
         CONFIG: CONFIG,
@@ -4251,6 +5486,7 @@ function createCombatContext(mainGame, canvas) {
         hasCombatWall: true,
         isDemo: true,
         round: 1,
+        bossHistory: [],
         timeScale: 1.0,
         slowMotionTimer: 0,
         screenShake: 0,
@@ -4267,6 +5503,11 @@ function createCombatContext(mainGame, canvas) {
         runeInventory: [],
         activeRunewordEffects: {},
         activeRunewordStats: {},
+        skillPoints: 0,
+        activeSkills: [],
+        skillChargeActualValue: 0,
+        skillChargeTempValue: 0,
+        skillChargeLevel: 0,
         runeChargeValue: 0,
         runeChargeLevel: 0,
         runeChargeCurrentRune: null,
@@ -4283,6 +5524,59 @@ function createCombatContext(mainGame, canvas) {
             this.screenShake = amount;
         },
         ui_triggerScreenShake() {},
+
+        // @section:demo_spawn_bridge - 生成与Boss转发
+        sys_getCombatBounds() {
+            if (typeof mainGame.sys_getCombatBounds === 'function') {
+                return mainGame.sys_getCombatBounds.call(this);
+            }
+            return { left: 0, right: this.width, top: 0, bottom: this.height, width: this.width };
+        },
+        calc_getRecentAverageDamage(...args) {
+            if (typeof mainGame.calc_getRecentAverageDamage === 'function') {
+                return mainGame.calc_getRecentAverageDamage.call(this, ...args);
+            }
+            return 60;
+        },
+        combat_calculatePlayerExpectedDamage(...args) {
+            if (typeof mainGame.combat_calculatePlayerExpectedDamage === 'function') {
+                return mainGame.combat_calculatePlayerExpectedDamage.call(this, ...args);
+            }
+            return 60;
+        },
+        spawn_calculateBossHP(...args) {
+            if (typeof mainGame.spawn_calculateBossHP === 'function') {
+                return mainGame.spawn_calculateBossHP.call(this, ...args);
+            }
+            return args[0] ? 1200 : 700;
+        },
+        spawn_getBossMinionProfile(...args) {
+            if (typeof mainGame.spawn_getBossMinionProfile === 'function') {
+                return mainGame.spawn_getBossMinionProfile.call(this, ...args);
+            }
+            return null;
+        },
+        spawn_applyBossMinionMetadata(...args) {
+            if (typeof mainGame.spawn_applyBossMinionMetadata === 'function') {
+                return mainGame.spawn_applyBossMinionMetadata.call(this, ...args);
+            }
+        },
+        spawn_applyMinionShape(...args) {
+            if (typeof mainGame.spawn_applyMinionShape === 'function') {
+                return mainGame.spawn_applyMinionShape.call(this, ...args);
+            }
+        },
+        spawn_applyArchetypeShape(...args) {
+            if (typeof mainGame.spawn_applyArchetypeShape === 'function') {
+                return mainGame.spawn_applyArchetypeShape.call(this, ...args);
+            }
+        },
+        spawn_spawnBoss(...args) {
+            if (typeof mainGame.spawn_spawnBoss === 'function') {
+                return mainGame.spawn_spawnBoss.call(this, ...args);
+            }
+            return null;
+        },
         spawn_createParticle(...args) {
             return mainGame.spawn_createParticle.call(this, ...args);
         },
@@ -4311,6 +5605,8 @@ function createCombatContext(mainGame, canvas) {
         spawn_spawnBullet(...args) {
             return mainGame.spawn_spawnBullet.call(this, ...args);
         },
+
+        // @section:demo_combat_bridge - 战斗逻辑转发
         spawn_triggerCloneSpawn(...args) {
             return mainGame.spawn_triggerCloneSpawn.call(this, ...args);
         },
@@ -4362,8 +5658,25 @@ function createCombatContext(mainGame, canvas) {
         combat_reportDamage(...args) {
             return mainGame.combat_reportDamage.call(this, ...args);
         },
+
+        // @section:demo_charge_bridge - 充能兼容转发
+        combat_skillCharge_onHit(...args) {
+            return mainGame.combat_skillCharge_onHit.call(this, ...args);
+        },
+        combat_skillCharge_tryAward(...args) {
+            return mainGame.combat_skillCharge_tryAward.call(this, ...args);
+        },
+        combat_skillCharge_updateUI(...args) {
+            return mainGame.combat_skillCharge_updateUI.call(this, ...args);
+        },
+        combat_skillCharge_decay(...args) {
+            return mainGame.combat_skillCharge_decay.call(this, ...args);
+        },
+        combat_skillCharge_syncLegacyState(...args) {
+            return mainGame.combat_skillCharge_syncLegacyState.call(this, ...args);
+        },
         combat_runeCharge_onHit(...args) {
-            return mainGame.combat_runeCharge_onHit.call(this, ...args);
+            return this.combat_skillCharge_onHit(...args);
         },
         combat_checkBossPhaseChange(...args) {
             return mainGame.combat_checkBossPhaseChange.call(this, ...args);
@@ -4375,7 +5688,13 @@ function createCombatContext(mainGame, canvas) {
             return mainGame.calc_isAreaOccupied.call(this, ...args);
         },
         spawn_addScore() {},
-        combat_runeCharge_init() {},
+        spawn_addSkillPoint() {},
+        combat_skillCharge_init(...args) {
+            return mainGame.combat_skillCharge_init.call(this, ...args);
+        },
+        combat_runeCharge_init(...args) {
+            return this.combat_skillCharge_init(...args);
+        },
         combat_runeCharge_update() {},
         combat_runeCharge_draw() {}
     };

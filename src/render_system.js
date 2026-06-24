@@ -10,12 +10,18 @@ import {
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { sb as _sb } from './utils/perf.js';
+import { floatingText_pixiDestroy } from './render/pixi_effect_adapter.js';
 import {
     getUiBitmap,
     EMITTER_BASE_SRC,
     EMITTER_BARREL_SRC,
+    EMITTER_RING_SRC,
     EMITTER_DRAW_SIZE,
     EMITTER_BARREL_DRAW_SIZE,
+    EMITTER_RING_DRAW_SIZE,
+    EMITTER_PORT_OFFSET_Y,
+    AIM_GUIDE_NODE_SRCS,
+    EMITTER_MUZZLE_FLASH_SRCS,
     EMITTER_CHARGING_SRCS,
     BG_MAIN_CANVAS_SRC,
     BG_EMITTER_ZONE_SRC,
@@ -24,8 +30,9 @@ import {
     COMBAT_WALL_LEFT_SRC,
     COMBAT_WALL_RIGHT_SRC,
     COMBAT_WALL_TOP_SRC,
+    COMBAT_DEFEAT_LINE_SRC,
     getAmmoIconSrc,
-    getAmmoIconSrcByKey,
+    getAttributeIconSrcByKey,
 } from './bitmap_icons.js';
 import { getAmmoReadabilityProfile } from './utils/ammo_readability.js';
 
@@ -98,15 +105,21 @@ export const render_system = {
         const topImg = getUiBitmap(COMBAT_WALL_TOP_SRC);
         const wallW = Math.min(48, Math.max(28, (wallRightX - wallLeftX) * 0.055));
         const topH = Math.min(64, Math.max(42, this.enemyHeight * 0.72));
+        const leftArtX = wallLeftX - wallW;
+        const rightArtX = wallRightX;
+        const topArtX = wallLeftX - wallW;
+        const topArtW = (wallRightX - wallLeftX) + wallW * 2;
+        const topArtY = wallTopY - topH;
         const hasWallArt = leftImg && rightImg && topImg;
 
         ctx.save();
         if (hasWallArt) {
             // @perf-impact: Combat wall V2 art adds up to three static drawImage calls per combat frame; no particles, gradients, or dynamic bitmap generation.
             ctx.globalAlpha = 0.9;
-            ctx.drawImage(leftImg, wallLeftX, wallTopY, wallW, wallH);
-            ctx.drawImage(rightImg, wallRightX - wallW, wallTopY, wallW, wallH);
-            ctx.drawImage(topImg, wallLeftX, wallTopY - topH + 8, wallRightX - wallLeftX, topH);
+            // Keep decorative wall thickness outside the physics arena so enemies never overlap the art frame.
+            ctx.drawImage(leftImg, leftArtX, wallTopY, wallW, wallH);
+            ctx.drawImage(rightImg, rightArtX, wallTopY, wallW, wallH);
+            ctx.drawImage(topImg, topArtX, topArtY, topArtW, topH);
 
             ctx.globalAlpha = 1;
             ctx.strokeStyle = 'rgba(148, 226, 232, 0.58)';
@@ -114,10 +127,10 @@ export const render_system = {
             ctx.shadowColor = '#38bdf8';
             ctx.shadowBlur = _sb(8);
             ctx.beginPath();
-            ctx.moveTo(wallLeftX + 1, wallTopY);
-            ctx.lineTo(wallLeftX + 1, this.height);
-            ctx.moveTo(wallRightX - 1, wallTopY);
-            ctx.lineTo(wallRightX - 1, this.height);
+            ctx.moveTo(wallLeftX, wallTopY);
+            ctx.lineTo(wallLeftX, this.height);
+            ctx.moveTo(wallRightX, wallTopY);
+            ctx.lineTo(wallRightX, this.height);
             ctx.moveTo(wallLeftX, wallTopY);
             ctx.lineTo(wallRightX, wallTopY);
             ctx.stroke();
@@ -125,33 +138,84 @@ export const render_system = {
             return;
         }
 
-        const wallGradLeft = ctx.createLinearGradient(wallLeftX, 0, wallLeftX + 20, 0);
+        const fallbackWallW = Math.min(20, wallW);
+        const wallGradLeft = ctx.createLinearGradient(wallLeftX - fallbackWallW, 0, wallLeftX, 0);
         wallGradLeft.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
         wallGradLeft.addColorStop(0.3, 'rgba(148, 163, 184, 0.1)');
         wallGradLeft.addColorStop(1, 'rgba(148, 163, 184, 0)');
         ctx.fillStyle = wallGradLeft;
-        ctx.fillRect(wallLeftX, wallTopY, 20, wallH);
+        ctx.fillRect(wallLeftX - fallbackWallW, wallTopY, fallbackWallW, wallH);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.fillRect(wallLeftX, wallTopY, 1, wallH);
+        ctx.fillRect(wallLeftX - 1, wallTopY, 1, wallH);
 
-        const wallGradRight = ctx.createLinearGradient(wallRightX, 0, wallRightX - 20, 0);
+        const wallGradRight = ctx.createLinearGradient(wallRightX + fallbackWallW, 0, wallRightX, 0);
         wallGradRight.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
         wallGradRight.addColorStop(0.3, 'rgba(148, 163, 184, 0.1)');
         wallGradRight.addColorStop(1, 'rgba(148, 163, 184, 0)');
         ctx.fillStyle = wallGradRight;
-        ctx.fillRect(wallRightX - 20, wallTopY, 20, wallH);
+        ctx.fillRect(wallRightX, wallTopY, fallbackWallW, wallH);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.fillRect(wallRightX - 1, wallTopY, 1, wallH);
+        ctx.fillRect(wallRightX, wallTopY, 1, wallH);
 
         ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
         ctx.lineWidth = 2;
         ctx.shadowColor = '#38bdf8';
         ctx.shadowBlur = _sb(15);
         ctx.beginPath();
-        ctx.moveTo(wallLeftX + 1, wallTopY); ctx.lineTo(wallLeftX + 1, this.height);
-        ctx.moveTo(wallRightX - 1, wallTopY); ctx.lineTo(wallRightX - 1, this.height);
+        ctx.moveTo(wallLeftX, wallTopY); ctx.lineTo(wallLeftX, this.height);
+        ctx.moveTo(wallRightX, wallTopY); ctx.lineTo(wallRightX, this.height);
         ctx.moveTo(wallLeftX, wallTopY); ctx.lineTo(wallRightX, wallTopY);
         ctx.stroke();
+        ctx.restore();
+    },
+
+    /**
+     * [RENDER] 绘制战斗失败警戒线 / 护盾防线。
+     * @perf-impact: Combat defeat line uses one static bitmap strip plus fixed-count line/text draws; high/medium keep small gated glow and low uses flat strokes only.
+     */
+    render_combat_defeatLine(ctx) {
+        if (!Number.isFinite(this.defeatLineY)) return;
+        const lineY = this.defeatLineY - 2;
+        const shield = this.playerShield || 0;
+        const enemies = Array.isArray(this.enemies) ? this.enemies : [];
+        const dangerRange = Math.max(58, (this.enemyHeight || 42) * 1.45);
+        const isDanger = enemies.some(e => e && !e.dead && e.pos && (e.pos.y + (e.height || this.enemyHeight || 0) / 2) >= lineY - dangerRange);
+        const quality = this.perfQualityLevel || 'high';
+        const lineImg = getUiBitmap(COMBAT_DEFEAT_LINE_SRC);
+        const alpha = shield > 0 ? 0.9 : (isDanger ? 0.76 : 0.38);
+        const color = shield > 0 ? '#93c5fd' : (isDanger ? '#f87171' : '#fbbf24');
+        const label = shield > 0 ? `防线屏障 ${shield}` : (isDanger ? '警戒线 危险' : '警戒线');
+
+        ctx.save();
+        if (lineImg) {
+            ctx.globalAlpha = alpha;
+            ctx.drawImage(lineImg, 0, lineY - 16, this.width, 32);
+        } else {
+            ctx.globalAlpha = alpha * 0.75;
+            ctx.fillStyle = shield > 0 ? 'rgba(147, 197, 253, 0.14)' : (isDanger ? 'rgba(248, 113, 113, 0.16)' : 'rgba(251, 191, 36, 0.10)');
+            ctx.fillRect(0, lineY - 10, this.width, 20);
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = shield > 0 || isDanger ? 2.5 : 1.5;
+        ctx.setLineDash(shield > 0 ? [14, 10] : [18, 12]);
+        ctx.lineDashOffset = -((Date.now() / (isDanger ? 90 : 150)) % 30);
+        if (quality !== 'low') {
+            ctx.shadowColor = color;
+            ctx.shadowBlur = _sb(isDanger ? 12 : 7);
+        }
+        ctx.beginPath();
+        ctx.moveTo(0, lineY);
+        ctx.lineTo(this.width, lineY);
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+        ctx.shadowBlur = 0;
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillStyle = shield > 0 ? 'rgba(191, 219, 254, 0.96)' : (isDanger ? 'rgba(254, 202, 202, 0.96)' : 'rgba(253, 230, 138, 0.82)');
+        ctx.fillText(label, this.width - 16, lineY - 14);
         ctx.restore();
     },
 
@@ -446,6 +510,7 @@ export const render_system = {
             this.floatingTexts[i].update(timeScale);
             this.floatingTexts[i].draw(this.ctx);
             if (this.floatingTexts[i].life <= 0) {
+                if (this.floatingTexts[i]._pixi) { floatingText_pixiDestroy(this.floatingTexts[i]._pixi); this.floatingTexts[i]._pixi = null; }
                 this.floatingTexts.splice(i, 1);
             }
         }
@@ -458,12 +523,32 @@ export const render_system = {
     render_combat_launcherOrbitals() {
         // Retired for the V3/V4 emitter art pass. Kept as a no-op for legacy callers.
     },
+    /**
+     * [RENDER] Draws generated aim guide node art with a flat fallback while the asset is loading.
+     * @perf-impact: Aim guide nodes are fixed-size generated bitmap sprites; no particles, gradients, or new performance budgets.
+     */
+    render_combat_aimGuideNode(ctx, x, y, kind = 'wall', size = 18, alpha = 0.9) {
+        const src = AIM_GUIDE_NODE_SRCS[kind] || AIM_GUIDE_NODE_SRCS.wall;
+        const img = getUiBitmap(src);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        if (img) {
+            ctx.drawImage(img, x - size / 2, y - size / 2, size, size);
+        } else {
+            ctx.fillStyle = kind === 'enemy' ? 'rgba(250, 204, 21, 0.92)' : 'rgba(255, 255, 255, 0.78)';
+            ctx.beginPath();
+            ctx.arc(x, y, size * 0.18, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    },
 /**
      * [RENDER] 绘制发射器的下一发可读性信号：左屏读数、中央弹仓、底部装填格和连射能量条。
      * @perf-impact: 发射器下一发信号 - 每帧固定绘制 6 个装填格、5 段连射能量条和少量文本；low 档关闭 shadowBlur。
      */
     render_combat_launcherSignal(ctx, cx, cy, portX, portY, recipe, visual = {}) {
         if (!recipe) return;
+        // Current-ammo readout lives on the launcher; the left wing starts at ammoQueue[1].
         const profile = getAmmoReadabilityProfile(recipe);
         const quality = this.perfQualityLevel || 'high';
         const glowFx = quality !== 'low';
@@ -480,24 +565,31 @@ export const render_system = {
         const recoilY = visual.isReloading ? Math.sin(reloadProgress * Math.PI) * 4 * bodyScale : 0;
         const chamberX = 0;
         const chamberY = 7 * bodyScale + recoilY;
-        const screen = { x: -51 * bodyScale, y: -9 * bodyScale + recoilY, w: 19 * bodyScale, h: 38 * bodyScale };
-        const capacitor = { x: 38 * bodyScale, y: -17 * bodyScale + recoilY, w: 14 * bodyScale, h: 47 * bodyScale };
         const magazine = {
             y: 43 * bodyScale + recoilY,
             centers: [-29, -18, -7, 7, 18, 29].map(x => x * bodyScale),
         };
-        const pelletCount = profile.scatterPelletCount;
+        const damageReadout = {
+            x: -49 * bodyScale,
+            y: 12 * bodyScale + recoilY,
+        };
+        const burstReadout = {
+            x: 43 * bodyScale,
+            y: 35 * bodyScale + recoilY,
+        };
 
-        const drawValueScreen = () => {
+        const drawDamageReadout = () => {
             ctx.save();
             const value = String(profile.damage);
-            const maxValueWidth = screen.w - 2 * bodyScale;
-            let valueSize = 8.5 * bodyScale;
+            const maxValueWidth = 23 * bodyScale;
+            let valueSize = 10 * bodyScale;
+            ctx.translate(damageReadout.x, damageReadout.y);
+            ctx.rotate(-Math.PI / 2);
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = 'rgba(103, 232, 249, 0.82)';
-            ctx.font = `bold ${4.2 * bodyScale}px Cinzel`;
-            ctx.fillText('DMG', screen.x + screen.w / 2, screen.y + 7 * bodyScale);
+            ctx.font = `bold ${4.6 * bodyScale}px Cinzel`;
+            ctx.fillText('DMG', 0, -5.8 * bodyScale);
             ctx.fillStyle = '#f8fafc';
             do {
                 ctx.font = `bold ${valueSize}px Cinzel`;
@@ -508,83 +600,68 @@ export const render_system = {
                 ctx.shadowColor = accent;
                 ctx.shadowBlur = _sb(5 + pulse * 4);
             }
-            ctx.fillText(value, screen.x + screen.w / 2, screen.y + 18 * bodyScale);
-            ctx.shadowBlur = 0;
-            ctx.strokeStyle = `rgba(103, 232, 249, ${0.28 + pulse * 0.14})`;
-            ctx.lineWidth = 0.5 * bodyScale;
-            ctx.beginPath();
-            ctx.moveTo(screen.x + 2 * bodyScale, screen.y + 25 * bodyScale);
-            ctx.lineTo(screen.x + screen.w - 2 * bodyScale, screen.y + 25 * bodyScale);
-            ctx.stroke();
-            ctx.fillStyle = '#fef3c7';
-            ctx.font = `bold ${5.8 * bodyScale}px Cinzel`;
-            ctx.fillText(`S${Math.max(1, pelletCount)}`, screen.x + screen.w / 2, screen.y + 32 * bodyScale);
+            ctx.fillText(value, 0, 4.5 * bodyScale);
             ctx.restore();
         };
 
-        const drawBurstStack = () => {
+        const drawBurstReadout = () => {
             ctx.save();
-            ctx.globalAlpha = 0.94;
-            const maxSegments = 5;
-            const litSegments = Math.max(1, Math.min(maxSegments, profile.multicastCount));
-            for (let i = 0; i < maxSegments; i++) {
-                const lit = i < litSegments;
-                const x = capacitor.x + 3 * bodyScale;
-                const y = capacitor.y + capacitor.h - (6.8 + i * 6.7) * bodyScale;
-                const w = capacitor.w - 6 * bodyScale;
-                ctx.beginPath();
-                ctx.roundRect(x, y, w, 4.8 * bodyScale, 2.2 * bodyScale);
-                ctx.fillStyle = lit ? `rgba(251, 191, 36, ${0.72 + pulse * 0.18})` : 'rgba(30, 41, 59, 0.5)';
-                if (lit && glowFx) {
-                    ctx.shadowColor = '#f59e0b';
-                    ctx.shadowBlur = _sb(4 + chargeProgress * 5);
-                }
-                ctx.fill();
-                ctx.shadowBlur = 0;
-                ctx.strokeStyle = lit ? 'rgba(255,255,255,0.5)' : 'rgba(100,116,139,0.34)';
-                ctx.lineWidth = 0.7;
-                ctx.stroke();
-            }
+            ctx.globalAlpha = 0.96;
             ctx.fillStyle = '#fef3c7';
-            ctx.font = `bold ${5.8 * bodyScale}px Cinzel`;
+            ctx.font = `bold ${8 * bodyScale}px Cinzel`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(`x${profile.multicastCount}`, capacitor.x + capacitor.w / 2, capacitor.y - 1.5 * bodyScale);
+            if (glowFx) {
+                ctx.shadowColor = '#f59e0b';
+                ctx.shadowBlur = _sb(4 + chargeProgress * 4 + pulse * 3);
+            }
+            ctx.fillText(`x${profile.multicastCount}`, burstReadout.x, burstReadout.y);
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = `rgba(251, 191, 36, ${0.24 + pulse * 0.18})`;
+            ctx.lineWidth = 0.9 * bodyScale;
+            ctx.beginPath();
+            ctx.moveTo(burstReadout.x - 8.5 * bodyScale, burstReadout.y + 6.2 * bodyScale);
+            ctx.lineTo(burstReadout.x + 8.5 * bodyScale, burstReadout.y + 6.2 * bodyScale);
+            ctx.stroke();
             ctx.restore();
         };
 
         const drawAttributeMagazine = () => {
-            const loadEntries = profile.entries.length > 0 ? profile.entries : [profile.primary];
+            const attributeEntries = profile.entries.slice(0, 6);
             ctx.save();
             for (let i = 0; i < 6; i++) {
-                const lit = i < profile.loadCount;
-                const entry = loadEntries[i % loadEntries.length] || profile.primary;
+                const entry = attributeEntries[i];
                 const x = magazine.centers[i];
+                if (!entry) continue;
                 const color = entry.color || accent;
-                ctx.beginPath();
-                ctx.arc(x, magazine.y, 5.2 * bodyScale, 0, Math.PI * 2);
-                ctx.fillStyle = lit ? 'rgba(15, 23, 42, 0.86)' : 'rgba(30, 41, 59, 0.56)';
-                ctx.globalAlpha = lit ? 0.95 : 0.55;
-                ctx.fill();
-                ctx.strokeStyle = lit ? color : 'rgba(100,116,139,0.45)';
-                ctx.lineWidth = lit ? 1 * bodyScale : 0.75;
-                ctx.stroke();
-                if (lit) {
-                    const smallIcon = getUiBitmap(getAmmoIconSrcByKey(entry.key));
-                    if (glowFx) {
-                        ctx.shadowColor = color;
-                        ctx.shadowBlur = _sb(5);
-                    }
-                    if (smallIcon) {
-                        ctx.drawImage(smallIcon, x - 3.2 * bodyScale, magazine.y - 3.2 * bodyScale, 6.4 * bodyScale, 6.4 * bodyScale);
-                    } else {
-                        ctx.fillStyle = color;
-                        ctx.beginPath();
-                        ctx.arc(x, magazine.y, 2.6 * bodyScale, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                    ctx.shadowBlur = 0;
+                const smallIcon = getUiBitmap(getAttributeIconSrcByKey(entry.key));
+                if (glowFx) {
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = _sb(4);
                 }
+                if (smallIcon) {
+                    const iconSize = 9.8 * bodyScale;
+                    ctx.globalAlpha = 0.96;
+                    ctx.drawImage(smallIcon, x - iconSize / 2, magazine.y - iconSize / 2, iconSize, iconSize);
+                } else {
+                    ctx.fillStyle = color;
+                    ctx.globalAlpha = 0.92;
+                    ctx.beginPath();
+                    ctx.arc(x, magazine.y, 4.2 * bodyScale, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1;
+                ctx.font = `bold ${5.3 * bodyScale}px Cinzel`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const stackText = String(entry.value);
+                const textY = magazine.y + 11.8 * bodyScale;
+                ctx.lineWidth = 2 * bodyScale;
+                ctx.strokeStyle = 'rgba(3, 7, 18, 0.92)';
+                ctx.strokeText(stackText, x, textY);
+                ctx.fillStyle = '#fef3c7';
+                ctx.fillText(stackText, x, textY);
             }
             ctx.globalAlpha = 1;
             ctx.restore();
@@ -609,16 +686,16 @@ export const render_system = {
         };
 
         drawLoadedProjectile();
-        drawValueScreen();
-        drawBurstStack();
+        drawDamageReadout();
+        drawBurstReadout();
         drawAttributeMagazine();
 
         ctx.restore();
     },
 
     /**
-     * [RENDER] 排队一次基于炮管方向的发射闪光。
-     * @perf-impact: launcher barrel flash is a short-lived fixed-shape canvas overlay; it does not create particles, shockwaves, gradients, or new CONFIG.performance budgets.
+     * [RENDER] 排队一次基于炮管方向的发射闪光（含发射后热辉余烬冷却）。
+     * @perf-impact: launcher barrel fire FX is a capped (<=4) list of short-lived canvas overlays. Each entry draws one bright radial bloom + cone during the flash window and one cooling ember radial gradient that fades over ~600-900ms; quality!=='low' gates the gradients/shadow. No particles, shockwaves, or new CONFIG.performance budgets.
      */
     render_queueLauncherBarrelFireEffect(vel, recipe = {}) {
         const dir = vel && typeof vel.norm === 'function' && vel.mag && vel.mag() > 0.001
@@ -630,14 +707,18 @@ export const render_system = {
             : recipe.venom > 0 ? '#86efac'
             : recipe.wind > 0 ? '#7dd3fc'
             : '#fef3c7';
+        // 开幕齐射那一发打得更狠：火光更大、冷却余烬更久。（普通发射本身已是大火光基线）
+        const charged = !!recipe._openingSalvo;
         const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-        this._launcherBarrelFireFx = (this._launcherBarrelFireFx || []).slice(-4);
+        this._launcherBarrelFireFx = (this._launcherBarrelFireFx || []).slice(-3);
         this._launcherBarrelFireFx.push({
             dir,
             color,
             born: now,
-            life: 220,
-            intensity: recipe._openingSalvo ? 1.25 : 1,
+            flashLife: charged ? 210 : 150,   // 明亮发射火光持续时长
+            life: charged ? 900 : 700,        // 含热辉余烬冷却的总时长
+            intensity: charged ? 1.65 : 1,
+            charged,
         });
     },
 
@@ -654,15 +735,33 @@ export const render_system = {
     render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress, reloadProgress = 0, aimRotation = -Math.PI / 2) {
         const baseImg = getUiBitmap(EMITTER_BASE_SRC);
         const barrelImg = getUiBitmap(EMITTER_BARREL_SRC);
-        // @perf-impact: Combat emitter art draw uses one stationary base draw, an optional rotating barrel draw, short-lived barrel flash overlays, and the existing optional charging overlay; no particles or dynamic bitmap generation.
+        const ringImg = getUiBitmap(EMITTER_RING_SRC);
+        // @perf-impact: Combat emitter art draw uses one stationary base draw, an optional rotating barrel draw, short-lived barrel fire overlays (capped <=4: one bright bloom+cone during the flash window + one cooling ember radial gradient that fades over ~600-900ms, both gated by quality!=='low'), and the existing optional charging overlay; no particles or dynamic bitmap generation.
         const baseSize = EMITTER_DRAW_SIZE;
         const barrelSize = EMITTER_BARREL_DRAW_SIZE;
+        const ringSize = EMITTER_RING_DRAW_SIZE;
+        const quality = this.perfQualityLevel || 'high';
         const barrelRotation = (Number.isFinite(aimRotation) ? aimRotation : -Math.PI / 2) + Math.PI / 2;
         const recoilY = Math.sin(Math.max(0, Math.min(1, reloadProgress || 0)) * Math.PI) * 4;
+        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         if (baseImg) {
             ctx.save();
             ctx.translate(0, recoilY);
             ctx.drawImage(baseImg, cx - baseSize / 2, cy - baseSize / 2, baseSize, baseSize);
+            ctx.restore();
+        }
+
+        if (ringImg) {
+            ctx.save();
+            ctx.translate(cx, cy + recoilY + 4);
+            ctx.rotate(barrelRotation);
+            ctx.drawImage(
+                ringImg,
+                -ringSize / 2,
+                -ringSize / 2,
+                ringSize,
+                ringSize
+            );
             ctx.restore();
         }
 
@@ -679,48 +778,160 @@ export const render_system = {
                 barrelSize,
                 barrelSize
             );
+            if (isCharging) {
+                const t = Math.max(0, Math.min(1, chargeProgress || 0));
+                const pulse = 0.72 + Math.sin(now * 0.018) * 0.12;
+                const chargeStartY = -barrelPivotY + 28;
+                const chargeEndY = -barrelPivotY + 90;
+                ctx.globalCompositeOperation = 'screen';
+                ctx.lineCap = 'round';
+                if (quality !== 'low') {
+                    ctx.shadowColor = '#67e8f9';
+                    ctx.shadowBlur = _sb(9 + t * 13);
+                }
+
+                ctx.globalAlpha = (0.18 + t * 0.36) * pulse;
+                ctx.strokeStyle = '#164e63';
+                ctx.lineWidth = 14 + t * 8;
+                ctx.beginPath();
+                ctx.moveTo(0, chargeStartY);
+                ctx.lineTo(0, chargeEndY);
+                ctx.stroke();
+
+                ctx.globalAlpha = (0.38 + t * 0.48) * pulse;
+                ctx.strokeStyle = '#67e8f9';
+                ctx.lineWidth = 4 + t * 3.5;
+                ctx.beginPath();
+                ctx.moveTo(0, chargeStartY + 2);
+                ctx.lineTo(0, chargeEndY - 3);
+                ctx.stroke();
+
+                ctx.globalAlpha = 0.38 + t * 0.42;
+                ctx.strokeStyle = '#fef3c7';
+                ctx.lineWidth = 1.4 + t * 1.2;
+                const railOffset = 6 + t * 1.5;
+                ctx.beginPath();
+                ctx.moveTo(-railOffset, chargeStartY + 8);
+                ctx.lineTo(-railOffset * 0.45, chargeEndY - 8);
+                ctx.moveTo(railOffset, chargeStartY + 8);
+                ctx.lineTo(railOffset * 0.45, chargeEndY - 8);
+                ctx.stroke();
+
+                const ringCount = quality === 'low' ? 1 : 3;
+                for (let i = 0; i < ringCount; i++) {
+                    const y = chargeStartY + 13 + i * 18 + Math.sin(now * 0.014 + i) * 1.5;
+                    ctx.globalAlpha = (0.22 + t * 0.28) * (1 - i * 0.14);
+                    ctx.beginPath();
+                    ctx.ellipse(0, y, 8 + t * 4 - i * 0.6, 2.2 + t * 1.2, 0, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
             ctx.restore();
         }
 
-        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-        const quality = this.perfQualityLevel || 'high';
         const activeFx = [];
         (this._launcherBarrelFireFx || []).forEach(fx => {
             const age = now - fx.born;
-            if (age < 0 || age > fx.life) return;
+            const life = fx.life || 700;
+            if (age < 0 || age > life) return;
             activeFx.push(fx);
-            const t = age / fx.life;
-            const alpha = (1 - t) * (0.82 + (fx.intensity || 1) * 0.12);
+
             const dir = fx.dir || { x: 0, y: -1 };
             const rotation = Math.atan2(dir.y, dir.x) + Math.PI / 2;
-            const stretch = 1 + t * 0.35;
-            ctx.save();
-            ctx.translate(cx, cy + recoilY);
-            ctx.rotate(rotation);
-            ctx.globalCompositeOperation = 'screen';
-            ctx.globalAlpha = Math.max(0, Math.min(0.95, alpha));
-            if (quality !== 'low') {
-                ctx.shadowColor = fx.color || '#fef3c7';
-                ctx.shadowBlur = _sb(12 * (1 - t));
+            const intensity = fx.intensity || 1;
+            const elementColor = fx.color || '#fef3c7';
+            const muzzleX = cx + dir.x * EMITTER_PORT_OFFSET_Y;
+            const muzzleY = cy + recoilY + dir.y * EMITTER_PORT_OFFSET_Y;
+
+            // ── 冷却热辉余烬层（贯穿整段生命：白炽 → 元素色 → 暗烬，半径收缩、渐隐） ──
+            // 让"发射好了"之后炮口还残留一团逐渐冷却的热辉，而不是瞬间消失。
+            const coolT = age / life;                          // 0→1 整体进度
+            const coolFade = Math.pow(1 - coolT, 1.5);         // 余烬淡出曲线
+            const heatColor = lerpColor('#fff4d6', elementColor, Math.min(1, coolT * 1.8));
+            const emberColor = lerpColor(heatColor, '#1a1206', Math.max(0, coolT - 0.45) * 1.5);
+            const glowR = (20 + 16 * intensity) * (0.55 + 0.6 * coolFade);
+            const coolAlpha = coolFade * (0.34 + 0.16 * intensity);
+            if (coolAlpha > 0.012) {
+                ctx.save();
+                ctx.translate(muzzleX, muzzleY);
+                ctx.rotate(rotation);
+                ctx.globalCompositeOperation = 'screen';
+                if (quality !== 'low') {
+                    const grad = ctx.createRadialGradient(0, glowR * 0.18, 0, 0, glowR * 0.18, glowR);
+                    grad.addColorStop(0, hexToRgba(emberColor, coolAlpha));
+                    grad.addColorStop(0.45, hexToRgba(emberColor, coolAlpha * 0.5));
+                    grad.addColorStop(1, hexToRgba(emberColor, 0));
+                    ctx.fillStyle = grad;
+                } else {
+                    ctx.globalAlpha = coolAlpha * 0.8;
+                    ctx.fillStyle = emberColor;
+                }
+                // 沿炮管轴向(纵向)略拉长，模拟炮口余温向管内回退
+                ctx.beginPath();
+                ctx.ellipse(0, glowR * 0.18, glowR * 0.72, glowR, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
             }
-            ctx.fillStyle = fx.color || '#fef3c7';
-            ctx.beginPath();
-            ctx.ellipse(0, -30 * stretch, (5 + 9 * t) * (fx.intensity || 1), 22 * (1 - t * 0.15), 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.globalAlpha *= 0.72;
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.ellipse(0, -39 * stretch, 3.2 + 5 * t, 10 * (1 - t * 0.2), 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.shadowBlur = 0;
-            ctx.strokeStyle = fx.color || '#fef3c7';
-            ctx.lineWidth = 1.2;
-            ctx.beginPath();
-            ctx.moveTo(-4 - 5 * t, -12);
-            ctx.lineTo(0, -55 * stretch);
-            ctx.lineTo(4 + 5 * t, -12);
-            ctx.stroke();
-            ctx.restore();
+
+            // ── 发射火光层（仅前段：大而炸裂的白核爆发 + 喷口光锥 + 美术帧） ──
+            const flashLife = fx.flashLife || 150;
+            if (age <= flashLife) {
+                const t = age / flashLife;                     // 0→1 火光进度
+                const ease = 1 - Math.pow(1 - t, 2);
+                const pop = Math.sin(Math.min(1, t) * Math.PI);
+                const frameIndex = Math.min(
+                    EMITTER_MUZZLE_FLASH_SRCS.length - 1,
+                    Math.floor(t * EMITTER_MUZZLE_FLASH_SRCS.length)
+                );
+                const flashImg = getUiBitmap(EMITTER_MUZZLE_FLASH_SRCS[frameIndex]);
+                const baseFlash = 78 + 46 * intensity;          // 大幅放大（原仅 34~42px）
+                const flashSize = baseFlash * (0.72 + 0.42 * ease);
+                const flashAlpha = Math.min(0.95, (1 - t) * (0.6 + 0.34 * intensity));
+
+                ctx.save();
+                ctx.translate(muzzleX, muzzleY);
+                ctx.rotate(rotation);
+                ctx.globalCompositeOperation = 'screen';
+
+                if (quality !== 'low') {
+                    // 1) 径向爆发泛光：白核 → 暖白 → 元素色 → 透明
+                    const bloomR = flashSize * 0.8;
+                    const bloomY = -flashSize * 0.18;
+                    const bloom = ctx.createRadialGradient(0, bloomY, 0, 0, bloomY, bloomR);
+                    bloom.addColorStop(0, hexToRgba('#ffffff', flashAlpha));
+                    bloom.addColorStop(0.26, hexToRgba('#fff3c4', flashAlpha * 0.9));
+                    bloom.addColorStop(0.62, hexToRgba(elementColor, flashAlpha * 0.5));
+                    bloom.addColorStop(1, hexToRgba(elementColor, 0));
+                    ctx.fillStyle = bloom;
+                    ctx.beginPath();
+                    ctx.arc(0, bloomY, bloomR, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // 2) 喷口冲击光锥：沿炮管方向(−Y)喷出的尖瓣
+                    const coneLen = flashSize * (0.95 + 0.35 * pop);
+                    const coneW = flashSize * 0.24;
+                    ctx.globalAlpha = flashAlpha * 0.85;
+                    ctx.fillStyle = hexToRgba('#fff7e0', 1);
+                    ctx.beginPath();
+                    ctx.moveTo(0, -coneLen);
+                    ctx.quadraticCurveTo(coneW, -coneLen * 0.28, 0, flashSize * 0.2);
+                    ctx.quadraticCurveTo(-coneW, -coneLen * 0.28, 0, -coneLen);
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+                }
+
+                // 3) 美术帧叠加（带元素色辉光）
+                if (flashImg) {
+                    if (quality !== 'low') {
+                        ctx.shadowColor = elementColor;
+                        ctx.shadowBlur = _sb(10 * (1 - t) * intensity);
+                    }
+                    ctx.globalAlpha = Math.min(1, flashAlpha + 0.1);
+                    ctx.drawImage(flashImg, -flashSize / 2, -flashSize * 0.72, flashSize, flashSize);
+                    ctx.shadowBlur = 0;
+                }
+                ctx.restore();
+            }
         });
         this._launcherBarrelFireFx = activeFx;
 

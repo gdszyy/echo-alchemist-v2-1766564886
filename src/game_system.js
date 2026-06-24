@@ -14,18 +14,45 @@
  * - 分数乘数重置 (sys_resetMultiplier)
  */
 import { Vec2, showToast, RuneLoot, Enemy, RewardDropEffect, FieldLootItem, MarbleDefinition } from './entities.js';
-import { CONFIG, RELIC_DB } from './config.js';
+import { CONFIG, RELIC_DB, BOSS_DB, ENEMY_CURVE_CONFIG } from './config.js';
 import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
 import { RUNE_DB } from './rune_config.js';
+import { pixiTick, pixiResize, pixiSetVisibility } from './render/pixi_bridge.js';
+import { pixiCleanupAllEffects } from './render/pixi_effect_adapter.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { calcCombatLauncherGeometryToTarget } from './utils/emitter_geometry.js';
+import { getBossDisplayName, getBossPreviewInfo, getBossShortName } from './utils/boss_schedule_utils.js';
+import { getBossPreviewIconSrc } from './bitmap_icons.js';
 import {
     addModuleComponentToInventory,
     createDefaultModuleLayout,
     ensureModuleLayoutInstances,
     normalizeModuleInventory,
 } from './pinboard_modules.js';
+
+function _getRoundStartBossThreat(game) {
+    const preview = getBossPreviewInfo(game, ENEMY_CURVE_CONFIG);
+    if (!preview) return null;
+
+    const { bossId, known, nextRound, turnsUntil } = preview;
+    const isNow = turnsUntil <= 0;
+    const shortName = known ? getBossShortName(bossId, CONFIG.balance?.bossConfigs, BOSS_DB) : '未知 Boss';
+    const fullName = known ? getBossDisplayName(bossId, CONFIG.balance?.bossConfigs, BOSS_DB) : '未知 Boss';
+
+    return {
+        bossId,
+        known,
+        stateClass: isNow ? 'is-now' : (turnsUntil <= 1 ? 'is-soon' : 'is-countdown'),
+        kicker: isNow ? '本回合威胁' : '下一威胁',
+        label: isNow ? `${shortName} 登场` : `${shortName} · ${turnsUntil} 回合后`,
+        meta: known ? `Round ${nextRound}` : `Round ${nextRound} · 剪影预告`,
+        iconSrc: getBossPreviewIconSrc(bossId, { known }),
+        title: isNow
+            ? `${fullName} 将在本回合登场`
+            : `${fullName} 将在 Round ${nextRound} 出现（${turnsUntil} 回合后）`,
+    };
+}
 
 export const game_system = {
 
@@ -220,6 +247,11 @@ export const game_system = {
         // 9. [自适应性能] FPS 和性能等级指示层
         this.render_perfOverlay();
 
+        // 9.5 [PixiJS 迁移] 驱动 WebGL 层渲染（粒子/特效，阶段二起生效）
+        if (this._pixiReady) {
+            pixiTick(shakeX, shakeY);
+        }
+
         // 10. 下一帧请求
         this.ctx.restore();
         this._rafId = requestAnimationFrame(() => this.sys_loop());
@@ -240,9 +272,13 @@ export const game_system = {
                 this._loopStopped = true;
                 if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
                 try { audio.suspend(); } catch (e) {}
+                // [PixiJS 迁移] 通知 WebGL 层暂停
+                if (this._pixiReady) pixiSetVisibility(true);
             } else {
                 // 回到前台：恢复音频，若循环已停则重启
                 try { audio.resume(); } catch (e) {}
+                // [PixiJS 迁移] 通知 WebGL 层恢复
+                if (this._pixiReady) pixiSetVisibility(false);
                 if (this._loopStopped) {
                     this._loopStopped = false;
                     this._lastFrameTime = 0;   // 重置采样起点，避免后台期的超大 dt
@@ -271,6 +307,11 @@ export const game_system = {
         if (!rect.width || !rect.height) return;
         this.width = this.canvas.width = Math.round(rect.width);
         this.height = this.canvas.height = Math.round(rect.height);
+
+        // [PixiJS 迁移] 同步 WebGL canvas 尺寸
+        if (this._pixiReady) {
+            pixiResize(this.width, this.height);
+        }
 
         // 动态调整失败判定线
         // PC 模式下底部面板隐藏，可以缩小安全边距
@@ -459,6 +500,9 @@ export const game_system = {
         this.activeSkills = []; // 重置已解锁技能列表
         this.marbleSizeBonus = 0;
 
+        // [PixiJS 迁移] 销毁所有残留特效的 PixiJS 适配器，防止阶段切换后孤立 Sprite 残留
+        pixiCleanupAllEffects(this);
+
         // 清空实体
         this.enemies = [];
         this.projectiles = [];
@@ -502,6 +546,8 @@ export const game_system = {
         this._nextBossRound = null;      // 下一个 Boss 预定回合
         this._lastBossSpawnRound = null; // 上一个 Boss 生成回合
         this._bossSpawnCount = 0;        // 已生成 Boss 数量
+        // [教学闸门] 本局玩家已"见过"的词条集合（用于"一次只教一个" + boss 预教学去重）
+        this.directorSeenAffixes = new Set();
         // 重置 遗物串行标志
         this._pendingBossRelic = false;
         this._pendingRelicEvent = false;
@@ -672,6 +718,17 @@ export const game_system = {
         // 速度控制按钮
         const speedBtn = document.getElementById('speed-btn');
         if (speedBtn) {
+            const syncSpeedButton = () => {
+                const speed = this.baseTimeScale || 1.0;
+                const speedKey = speed === 0.42 ? 'slow' : String(Math.round(speed));
+                const label = speed === 0.42 ? '慢' : `${Math.round(speed)}x`;
+                speedBtn.dataset.speed = speedKey;
+                speedBtn.dataset.speedLabel = label;
+                speedBtn.textContent = label;
+                speedBtn.title = `当前速度：${label}`;
+                speedBtn.setAttribute('aria-label', `当前速度：${label}，点击切换速度`);
+            };
+            syncSpeedButton();
             speedBtn.onclick = () => {
                 // [修复-bullet-time] 基于 baseTimeScale（玩家选择的速度）循环，
                 // 而不是基于当前 timeScale —— 否则在子弹时间生效期间点击会读到 0.2/0.02 等慢动作值，
@@ -684,7 +741,7 @@ export const game_system = {
                 this.timeScale = this.baseTimeScale;
                 this.slowMotionTimer = 0;
                 this.isSlowMotion = false;
-                speedBtn.innerText = `⏩ x${this.baseTimeScale}`;
+                syncSpeedButton();
             };
         }
 
@@ -1414,6 +1471,9 @@ export const game_system = {
         }
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
         if (typeof this.phase_startGatheringPhase === 'function') this.phase_startGatheringPhase();
+        if (typeof this.sys_showRoundStartBanner === 'function') {
+            this.sys_showRoundStartBanner({ enterCombat: false, protectCombat: false });
+        }
     },
 
     sys_grantRunResourcePack(reward = {}) {
@@ -2101,16 +2161,26 @@ export const game_system = {
 
     /**
      * @method sys_showRoundStartBanner
-     * @description 无弹珠包研磨入口时，在直接进入战斗前显示「第 X 回合开始」大字提示（约 1.5 秒），
+     * @description 无弹珠包研磨入口时，在直接进入战斗前显示「第 X 回合开始」大字提示（约 2.2 秒），
      * 同时触发左侧子弹属性面板充能特效。特效等级接入 CONFIG.performance 三档预算。
      * 横幅结束后直接进入战斗阶段（跳过研磨）。
      * 有弹珠包时由 sys_startMarblePackGrind 直接调用 phase_startGatheringPhase。
      * @perf-impact: CSS keyframe 动画（无 Canvas 开销），low 档降级为简单淡入
      */
     sys_showRoundStartBanner() {
+        const options = arguments[0] || {};
+        const enterCombat = options.enterCombat !== false;
+        const protectCombat = options.protectCombat !== false && enterCombat;
+        const durationMs = Math.max(1200, Number(options.durationMs) || 2200);
         const round = this.round || 1;
         const banner = document.getElementById('round-start-banner');
         const bannerText = document.getElementById('round-start-banner-text');
+        const threatEl = document.getElementById('round-start-threat');
+        const threatKickerEl = document.getElementById('round-start-threat-kicker');
+        const threatLabelEl = document.getElementById('round-start-threat-label');
+        const threatMetaEl = document.getElementById('round-start-threat-meta');
+        const threatIconEl = document.getElementById('round-start-threat-icon');
+        const bossThreat = _getRoundStartBossThreat(this);
 
         // [BUGFIX] 切换到 combat 阶段前，显式重置敌人回合状态。
         // 根因：phase_switchPhase('combat') 会让主循环 sys_loop 立即开始执行
@@ -2120,21 +2190,46 @@ export const game_system = {
         // 重复行动（与上一回合结束时的行动重复）。
         // [BUGFIX 2] 设置横幅保护标志，阻止 phase_combat_update 在横幅期间触发敌人行动。
         // 该标志在 setTimeout 回调结束、phase_startCombatPhase() 调用前清除。
-        this._roundStartBannerActive = true;
-        this.isEnemyTurn = false;
-        this.enemyWaveActive = false;
-        this.enemyTurnTimer = 0;
-        this._runeClaimPending = false;
+        if (protectCombat) {
+            this._roundStartBannerActive = true;
+            this.isEnemyTurn = false;
+            this.enemyWaveActive = false;
+            this.enemyTurnTimer = 0;
+            this._runeClaimPending = false;
+        }
 
         // 切换到 combat 阶段作为横幅背景，避免残留 selection 界面。
         // Round-start banner is only a transition into the next combat phase when no essence is active.
         // Do not rebuild ammoQueue here from stale fired snapshots or marbleQueue.
-        if (this.phase !== 'combat') {
+        if (enterCombat && this.phase !== 'combat') {
             this.phase_switchPhase('combat');
         }
 
         // 更新文本
         if (bannerText) bannerText.textContent = `第 ${round} 回合開始`;
+        if (threatEl) {
+            threatEl.classList.remove('is-hidden', 'is-known', 'is-unknown', 'is-now', 'is-soon', 'is-countdown');
+            if (bossThreat) {
+                threatEl.classList.add(bossThreat.known ? 'is-known' : 'is-unknown', bossThreat.stateClass);
+                threatEl.title = bossThreat.title;
+                threatEl.setAttribute('aria-label', bossThreat.title);
+            } else {
+                threatEl.classList.add('is-hidden');
+                threatEl.title = '';
+                threatEl.removeAttribute('aria-label');
+            }
+        }
+        if (threatKickerEl) threatKickerEl.textContent = bossThreat?.kicker || '';
+        if (threatLabelEl) threatLabelEl.textContent = bossThreat?.label || '';
+        if (threatMetaEl) threatMetaEl.textContent = bossThreat?.meta || '';
+        if (threatIconEl) {
+            threatIconEl.classList.toggle('is-silhouette', !!bossThreat && !bossThreat.known);
+            if (bossThreat?.iconSrc) {
+                threatIconEl.style.setProperty('--boss-preview-icon', `url("${bossThreat.iconSrc}")`);
+            } else {
+                threatIconEl.style.removeProperty('--boss-preview-icon');
+            }
+        }
 
         // 根据性能档位选择特效级别
         const perfLevel = this.perfQualityLevel || 'high';
@@ -2145,6 +2240,7 @@ export const game_system = {
         if (banner) {
             banner.classList.remove('round-banner-hide');
             banner.classList.add('round-banner-show');
+            banner.classList.toggle('round-banner-has-threat', !!bossThreat);
             if (useGlow) {
                 banner.classList.add('round-banner-glow');
             } else {
@@ -2165,10 +2261,11 @@ export const game_system = {
             }
         }
 
-        // 1.5 秒后隐藏横幅并直接进入战斗阶段（无精华时跳过研磨）
+        // 横幅结束后隐藏；默认路径直接进入战斗阶段（无精华时跳过研磨）
         setTimeout(() => {
             if (banner) {
                 banner.classList.remove('round-banner-show', 'round-banner-glow');
+                banner.classList.remove('round-banner-has-threat');
                 banner.classList.add('round-banner-hide');
             }
             if (leftSidebar) {
@@ -2176,9 +2273,13 @@ export const game_system = {
             }
             // Normal round start goes to combat; essence-triggered grinding is handled by ui_confirmSelection.
             // [BUGFIX 2] 横幅结束，清除保护标志，再进入战斗阶段
-            this._roundStartBannerActive = false;
-            this.phase_startCombatPhase();
-        }, 1500);
+            if (protectCombat) this._roundStartBannerActive = false;
+            if (typeof options.onComplete === 'function') {
+                options.onComplete();
+            } else if (enterCombat) {
+                this.phase_startCombatPhase();
+            }
+        }, durationMs);
     },
 
     /**
@@ -2544,9 +2645,12 @@ export const game_system = {
             if (aimVector.y < -20) {
                 this.sys_resetMultiplier();
                 this.pendingFireVelocity = aimVector.norm().mult(12);
+                this.pendingFireOrigin = launcherGeometry.muzzle;
                 this.isChargingShot = true;
                 this.chargeProgress = 0;
                 audio.playTone(800, 'sine', 0.1, 0.1);
+            } else {
+                this.pendingFireOrigin = null;
             }
         }
 
@@ -2670,6 +2774,7 @@ export const game_system = {
                     radiantAegis: e.radiantAegis || 0,
                     radiantAegisMax: e.radiantAegisMax || 0,
                     radiantAegisBroken: e.radiantAegisBroken || false,
+                    aegisTutorialMode: e.aegisTutorialMode || false,
                     energyArmorShield: e.energyArmorShield || 0,
                     livingArmorHp: e.livingArmorHp || 0,
                     livingArmorMax: e.livingArmorMax || 0,
@@ -2691,6 +2796,8 @@ export const game_system = {
                         : [],
                     ouroborosOrbitDisruptions: e.ouroborosOrbitDisruptions || 0,
                     ouroborosOrbitInitialized: e._ouroborosOrbitInitialized || false,
+                    ouroborosDamageGateProgress: e._ouroborosDamageGateProgress || 0,
+                    ouroborosDamageGateSeq: e._ouroborosDamageGateSeq || 0,
                     swordMarks: e.swordMarks || 0,
                     markTimer: e.markTimer || 0,
                     collisionShape: e.collisionShape || 'aabb',
@@ -2715,8 +2822,14 @@ export const game_system = {
                     frostSeamTurns: e.frostSeamTurns || 0,
                     glaciesFrostSeamReduction: e._glaciesFrostSeamReduction || 0,
                     glaciesSeamSkipTurns: e._glaciesSeamSkipTurns || 0,
+                    devourerFeedStacks: e.devourerFeedStacks || 0,
+                    devourerDigestCooldown: e._devourerDigestCooldown || 0,
+                    devourerSummonCooldown: e._devourerSummonCooldown || 0,
                     chimeraFeedStacks: e.chimeraFeedStacks || 0,
                     chimeraInheritedStatusCount: e.chimeraInheritedStatusCount || 0,
+                    chimeraHeatStacks: e.chimeraHeatStacks || 0,
+                    chimeraFrostStacks: e.chimeraFrostStacks || 0,
+                    chimeraRadiantConversions: e.chimeraRadiantConversions || 0,
                     chimeraDigestCooldown: e._chimeraDigestCooldown || 0,
                     chimeraSummonCooldown: e._chimeraSummonCooldown || 0,
                     devourState: e.devourState,
@@ -2842,6 +2955,7 @@ export const game_system = {
                 _nextBossRound: this._nextBossRound || null,
                 _lastBossSpawnRound: this._lastBossSpawnRound || null,
                 _bossSpawnCount: this._bossSpawnCount || 0,
+                directorSeenAffixes: this.directorSeenAffixes ? [...this.directorSeenAffixes] : [],
                 _pendingBossRelic: this._pendingBossRelic || false,
                 _pendingRelicEvent: this._pendingRelicEvent || false,
                 pendingRoundStartRewards: (this.pendingRoundStartRewards || []).map(item => ({ ...item })),
@@ -3012,6 +3126,7 @@ export const game_system = {
             this._nextBossRound = state._nextBossRound || null;
             this._lastBossSpawnRound = state._lastBossSpawnRound || null;
             this._bossSpawnCount = state._bossSpawnCount || 0;
+            this.directorSeenAffixes = new Set(state.directorSeenAffixes || []);
             this._pendingBossRelic = state._pendingBossRelic || false;
             this._pendingRelicEvent = state._pendingRelicEvent || false;
             this.pendingRoundStartRewards = (state.pendingRoundStartRewards || []).map(item => ({
@@ -3105,6 +3220,7 @@ export const game_system = {
                 e.radiantAegis = d.radiantAegis || 0;
                 e.radiantAegisMax = d.radiantAegisMax || 0;
                 e.radiantAegisBroken = d.radiantAegisBroken || false;
+                e.aegisTutorialMode = d.aegisTutorialMode || false;
                 e.energyArmorShield = d.energyArmorShield || 0;
                 e.livingArmorHp = d.livingArmorHp || 0;
                 e.livingArmorMax = d.livingArmorMax || 0;
@@ -3132,6 +3248,8 @@ export const game_system = {
                     : [];
                 e.ouroborosOrbitDisruptions = d.ouroborosOrbitDisruptions || 0;
                 e._ouroborosOrbitInitialized = d.ouroborosOrbitInitialized || false;
+                e._ouroborosDamageGateProgress = d.ouroborosDamageGateProgress || 0;
+                e._ouroborosDamageGateSeq = d.ouroborosDamageGateSeq || 0;
                 e.swordMarks = d.swordMarks || 0;
                 e.markTimer = d.markTimer || 0;
                 e.collisionShape = d.collisionShape || 'aabb';
@@ -3170,8 +3288,14 @@ export const game_system = {
                 if (e.frostSeamTurns > 0 && !e.bossMechanicTags.includes('frostSeam')) {
                     e.bossMechanicTags.push('frostSeam');
                 }
+                e.devourerFeedStacks = d.devourerFeedStacks || 0;
+                e._devourerDigestCooldown = d.devourerDigestCooldown || 0;
+                e._devourerSummonCooldown = d.devourerSummonCooldown || 0;
                 e.chimeraFeedStacks = d.chimeraFeedStacks || 0;
                 e.chimeraInheritedStatusCount = d.chimeraInheritedStatusCount || 0;
+                e.chimeraHeatStacks = d.chimeraHeatStacks || 0;
+                e.chimeraFrostStacks = d.chimeraFrostStacks || 0;
+                e.chimeraRadiantConversions = d.chimeraRadiantConversions || 0;
                 e._chimeraDigestCooldown = d.chimeraDigestCooldown || 0;
                 e._chimeraSummonCooldown = d.chimeraSummonCooldown || 0;
                 if (d.devourState !== undefined) e.devourState = d.devourState;

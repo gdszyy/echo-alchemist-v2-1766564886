@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "frameSize": 128,
+  "description": "Ouroboros boss-mounted orbit attachment slot sprites. These are visual sockets, not orbit_echo minion bodies.",
+  "slots": {
+    "aegis": {
+      "spritePath": "assets/sprites/bosses/ouroboros_slots/ouroboros_slot_aegis.png",
+      "role": "shield",
+      "frameSize": 128,
+      "alpha": true,
+      "mountedOn": "boss_ouroboros_orbit_ring"
+    },
+    "graft": {
+      "spritePath": "assets/sprites/bosses/ouroboros_slots/ouroboros_slot_graft.png",
+      "role": "graft",
+      "frameSize": 128,
+      "alpha": true,
+      "mountedOn": "boss_ouroboros_orbit_ring"
+    },
+    "brood": {
+      "spritePath": "assets/sprites/bosses/ouroboros_slots/ouroboros_slot_brood.png",
+      "role": "brood",
+      "frameSize": 128,
+      "alpha": true,
+      "mountedOn": "boss_ouroboros_orbit_ring"
+    },
+    "stride": {
+      "spritePath": "assets/sprites/bosses/ouroboros_slots/ouroboros_slot_stride.png",
+      "role": "stride",
+      "frameSize": 128,
+      "alpha": true,
+      "mountedOn": "boss_ouroboros_orbit_ring"
+    },
+    "maw": {
+      "spritePath": "assets/sprites/bosses/ouroboros_slots/ouroboros_slot_maw.png",
+      "role": "maw",
+      "frameSize": 128,
+      "alpha": true,
+      "mountedOn": "boss_ouroboros_orbit_ring"
+    },
+    "surge": {
+      "spritePath": "assets/sprites/bosses/ouroboros_slots/ouroboros_slot_surge.png",
+      "role": "surge",
+      "frameSize": 128,
+      "alpha": true,
+      "mountedOn": "boss_ouroboros_orbit_ring"
+    }
+  }
+}

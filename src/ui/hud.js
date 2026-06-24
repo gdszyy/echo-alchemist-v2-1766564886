@@ -18,7 +18,7 @@
 import { CONFIG } from '../config.js';
 import { eventBus, EVENT_TYPES } from '../event_bus.js';
 import { RUNE_DB, RARITY_DISPLAY, STAT_DISPLAY } from '../rune_config.js';
-import { getAmmoIconSrc } from '../bitmap_icons.js';
+import { getAmmoIconSrc, getAttributeIconSrcByKey } from '../bitmap_icons.js';
 import { getAmmoReadabilityProfile } from '../utils/ammo_readability.js';
 
 /**
@@ -40,6 +40,42 @@ function _buildRuneIconEl(runeDef, runeLevel) {
     badge.textContent = `Lv.${runeLevel || 1}`;
     frame.appendChild(badge);
     return frame;
+}
+
+function _safeAttributeKey(key) {
+    return String(key || 'empty').replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
+function _attributeChipAssetUrl(key) {
+    return `url("/assets/ui/sprites/attribute_chips/attribute_chip_${_safeAttributeKey(key)}.png")`;
+}
+
+function _attributeIconAssetUrl(key) {
+    const src = getAttributeIconSrcByKey(_safeAttributeKey(key));
+    return src ? `url("${src}")` : 'none';
+}
+
+function _buildAttributeChip(entry, className = '') {
+    const key = _safeAttributeKey(entry && entry.key);
+    const value = Math.max(0, Math.floor(Number(entry && entry.value) || 0));
+    const chip = document.createElement('span');
+    chip.className = `attribute-chip attr-chip-${key}${className ? ` ${className}` : ''}`;
+    chip.dataset.attribute = key;
+    chip.style.setProperty('--chip-color', (entry && entry.color) || '#cbd5e1');
+    chip.style.setProperty('--attribute-chip-image', _attributeChipAssetUrl(key));
+    chip.style.setProperty('--attribute-icon-image', _attributeIconAssetUrl(key));
+    chip.title = `${(entry && entry.name) || key} ${value}`;
+
+    const icon = document.createElement('span');
+    icon.className = 'attribute-chip-icon';
+    icon.setAttribute('aria-hidden', 'true');
+
+    const count = document.createElement('span');
+    count.className = 'attribute-chip-value';
+    count.textContent = value > 0 ? String(value) : '';
+
+    chip.append(icon, count);
+    return chip;
 }
 
 function _playRuneAcquireReveal(runeDef, runeLevel, delay = 0) {
@@ -76,7 +112,7 @@ export const hud_system = {
      */
     ui_updateMultiplierUI() { 
         const el = document.getElementById('multiplier-val'); 
-        if (!el) return; // 元素已被移除（充能符文系统替代了 combo 显示）
+        if (!el) return; // 元素已被移除（技能充能系统替代了 combo 显示）
         el.innerText = `x${this.scoreMultiplier.toFixed(1)}`;  // [Mixin 正常用法：读取 Game 实例状态]
         const container = document.getElementById('multiplier-display'); 
         if (!container) return;
@@ -487,74 +523,120 @@ export const hud_system = {
                 combatHud.classList.add('recipe-hud-floating'); 
                 combatHud.innerHTML = '';
                 
-                const previewLimit = 4;
-                this.ammoQueue.slice(0, previewLimit).forEach((recipe, idx) => {  // [Mixin 正常用法：读取 Game 实例状态]
-                    const isCurrent = (idx === 0);
-                    const profile = getAmmoReadabilityProfile(recipe);
-                    const card = document.createElement('div');
-                    card.className = `recipe-card ${isCurrent ? 'current' : 'queue'} ammo-readout mb-1 transition-all duration-300`;
-                    card.style.setProperty('--ammo-accent', profile.primary.color);
-                    card.title = profile.summary;
-                    
-                    // --- 渲染 Header ---
-                    const header = document.createElement('div');
-                    header.className = 'ammo-readout-header flex justify-between items-center border-b border-white/10 pb-1 mb-1';
-                    let nameStr = '普通魔藥';
-                    if (recipe.explosive) nameStr = '爆破魔藥';
-                    else if (recipe.isLaser) nameStr = '光束魔藥';
-                    else if (recipe.isMatryoshka) nameStr = '套娃魔藥';
-                    header.innerHTML = `<span class="font-bold text-amber-400 text-[11px]">${nameStr}</span><span class="ammo-damage" title="damage">${recipe.damage || 0}</span>`;
+                const recipes = this.ammoQueue || [];
+                const upcomingRecipes = recipes.slice(1, 6);
+                combatHud.classList.add('combat-ammo-console');
+                combatHud.classList.toggle('is-empty', upcomingRecipes.length === 0);
+                combatHud.dataset.queueCount = String(upcomingRecipes.length);
 
-                    const signalRow = document.createElement('div');
-                    signalRow.className = 'ammo-signal-row';
-                    signalRow.innerHTML = `
-                        <span class="ammo-load-list">${profile.entries.length > 0 ? profile.entries.slice(0, 5).map(entry => `<b style="color:${entry.color}">${entry.icon}${entry.value}</b>`).join('') : `<b>${profile.damage}</b>`}</span>
-                        <span class="ammo-scatter-fan" title="scatter">${Array.from({ length: profile.scatterPelletCount }, () => '<i></i>').join('')}</span>
-                        <span class="ammo-multicast-meter" title="multicast">${Array.from({ length: 6 }, (_, i) => `<i class="${i < profile.multicastCount ? 'is-lit' : ''}"></i>`).join('')}<b>x${profile.multicastCount}</b></span>
-                    `;
-                    
-                    // --- 渲染 Grid ---
-                    const grid = document.createElement('div');
-                    grid.className = 'grid grid-cols-4 gap-0.5 text-[9px] leading-tight';
-                    // ... (复制你原有的 stats 遍历逻辑) ...
-                    const stats = [
-                        { k: 'flying_sword', i: CONFIG.ui.attributeDisplay.flying_sword.icon },
-                        { k: 'bounce', i: CONFIG.ui.attributeDisplay.bounce.icon },
-                        { k: 'pierce', i: CONFIG.ui.attributeDisplay.pierce.icon },
-                        { k: 'scatter', i: CONFIG.ui.attributeDisplay.scatter.icon },
-                        { k: 'multicast', i: CONFIG.ui.attributeDisplay.multicast.icon },
-                        { k: 'cryo', i: CONFIG.ui.attributeDisplay.cryo.icon },
-                        { k: 'pyro', i: CONFIG.ui.attributeDisplay.pyro.icon },
-                        { k: 'lightning', i: CONFIG.ui.attributeDisplay.lightning.icon },
-                        { k: 'laser', i: CONFIG.ui.attributeDisplay.laser.icon },
-                        { k: 'wind', i: CONFIG.ui.attributeDisplay.wind.icon },
-                        { k: 'resonance', i: CONFIG.ui.attributeDisplay.resonance.icon },
-                        { k: 'venom', i: CONFIG.ui.attributeDisplay.venom.icon },
-                        { k: 'overcharge', i: CONFIG.ui.attributeDisplay.overcharge.icon },
-                        { k: 'echo', i: CONFIG.ui.attributeDisplay.echo.icon }
-                    ];
-                    let hasStats = false;
-                    stats.forEach(s => {
-                        const val = recipe[s.k];
-                        if (val > 0) {
-                            hasStats = true;
-                            const tag = document.createElement('div');
-                            tag.innerHTML = `${s.i}<span class="text-white ml-px">${val}</span>`;
-                            grid.appendChild(tag);
-                        }
-                    });
-                    if (!hasStats) grid.innerHTML = '<span class="col-span-4 text-slate-500 italic text-center">基础属性</span>';
+                if (upcomingRecipes.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'combat-ammo-empty-state';
+                    empty.textContent = 'NO QUEUE';
+                    combatHud.appendChild(empty);
+                } else {
+                    const nextRecipe = upcomingRecipes[0];
+                    const nextProfile = getAmmoReadabilityProfile(nextRecipe);
+                    const nextIconSrc = getAmmoIconSrc(nextRecipe);
 
-                    card.appendChild(header); // 挂载标题
-                    card.appendChild(signalRow);
-                    card.appendChild(grid);   // 必须添加这一行，否则图标不显示！
-                    if (isCurrent) {
-                        const indicator = document.createElement('div');
-                        indicator.className = 'absolute -left-2 top-1/2 -translate-y-1/2 w-1 h-8 bg-amber-400 rounded-full shadow-[0_0_8px_#fbbf24]';
-                        card.appendChild(indicator);
+                    const nextSlot = document.createElement('div');
+                    nextSlot.className = 'combat-ammo-next-slot';
+                    nextSlot.style.setProperty('--ammo-accent', nextProfile.primary.color);
+                    if (nextIconSrc) nextSlot.style.setProperty('--ammo-icon', `url("${nextIconSrc}")`);
+                    nextSlot.title = nextProfile.summary;
+
+                    const icon = document.createElement('span');
+                    icon.className = 'combat-ammo-core-icon';
+                    icon.setAttribute('aria-hidden', 'true');
+
+                    const copy = document.createElement('span');
+                    copy.className = 'combat-ammo-copy';
+                    const label = document.createElement('span');
+                    label.className = 'combat-ammo-label';
+                    label.textContent = 'NEXT';
+                    const name = document.createElement('span');
+                    name.className = 'combat-ammo-name';
+                    name.textContent = nextProfile.shapeLabel || '基础弹';
+                    copy.append(label, name);
+
+                    const damage = document.createElement('span');
+                    damage.className = 'combat-ammo-damage';
+                    damage.textContent = String(nextRecipe.damage || 0);
+                    damage.title = 'damage';
+                    nextSlot.append(icon, copy, damage);
+
+                    const attributeRow = document.createElement('div');
+                    attributeRow.className = 'combat-ammo-attribute-row';
+                    const entries = nextProfile.entries.slice(0, 4);
+                    if (entries.length === 0) {
+                        attributeRow.appendChild(_buildAttributeChip({
+                            key: 'damage',
+                            value: nextProfile.damage,
+                            name: '基础伤害',
+                            icon: CONFIG.ui.attributeDisplay.damage.icon,
+                            color: CONFIG.ui.attributeDisplay.damage.color,
+                        }, 'combat-ammo-attribute-chip'));
+                    } else {
+                        entries.forEach(entry => {
+                            attributeRow.appendChild(_buildAttributeChip(entry, 'combat-ammo-attribute-chip'));
+                        });
                     }
-                    combatHud.appendChild(card);
-                });
+
+                    combatHud.append(nextSlot, attributeRow);
+
+                    const queueStrip = document.createElement('div');
+                    queueStrip.className = 'combat-ammo-queue-strip';
+                    queueStrip.classList.toggle('is-empty', upcomingRecipes.length <= 1);
+                    upcomingRecipes.slice(1, 5).forEach((recipe, idx) => {
+                        const profile = getAmmoReadabilityProfile(recipe);
+                        const iconSrc = getAmmoIconSrc(recipe);
+                        const chip = document.createElement('div');
+                        chip.className = 'combat-ammo-queue-chip';
+                        chip.dataset.queueIndex = String(idx + 3);
+                        chip.style.setProperty('--ammo-accent', profile.primary.color);
+                        if (iconSrc) chip.style.setProperty('--ammo-icon', `url("${iconSrc}")`);
+                        chip.title = profile.summary;
+
+                        const chipIcon = document.createElement('span');
+                        chipIcon.className = 'combat-ammo-queue-icon';
+                        chipIcon.setAttribute('aria-hidden', 'true');
+                        const chipDamage = document.createElement('b');
+                        chipDamage.textContent = String(recipe.damage || 0);
+
+                        const chipAttrs = document.createElement('span');
+                        chipAttrs.className = 'combat-ammo-queue-attrs';
+                        const queueEntries = profile.entries.slice(0, 2);
+                        if (queueEntries.length === 0) {
+                            const dot = document.createElement('i');
+                            dot.style.setProperty('--dot-color', profile.primary.color);
+                            chipAttrs.appendChild(dot);
+                        } else {
+                            queueEntries.forEach(entry => {
+                                const dot = document.createElement('i');
+                                dot.style.setProperty('--dot-color', entry.color);
+                                dot.title = `${entry.name} ${entry.value}`;
+                                chipAttrs.appendChild(dot);
+                            });
+                        }
+
+                        chip.append(chipIcon, chipDamage, chipAttrs);
+                        queueStrip.appendChild(chip);
+                    });
+                    if (upcomingRecipes.length <= 1) {
+                        const emptyQueue = document.createElement('span');
+                        emptyQueue.className = 'combat-ammo-queue-empty';
+                        emptyQueue.textContent = 'QUEUE EMPTY';
+                        queueStrip.appendChild(emptyQueue);
+                    }
+                    const hiddenCount = Math.max(0, recipes.length - 6);
+                    if (hiddenCount > 0) {
+                        const more = document.createElement('div');
+                        more.className = 'combat-ammo-queue-more';
+                        more.textContent = `+${hiddenCount}`;
+                        queueStrip.appendChild(more);
+                    }
+                    combatHud.appendChild(queueStrip);
+                }
 
                 // --- [继承加成] 显示符文基础属性、词条加成与全局额外伤害/击杀加成 ---
                 const inheritCard = this._buildInheritanceCard();
@@ -701,7 +783,10 @@ export const hud_system = {
             const target = Math.max(1, Math.floor(session ? (session.nextTriggerThreshold || this.persistentThreshold || 1) : (this.persistentThreshold || 1)));
             const multicast = Math.max(0, Math.floor(session ? (session.multicast || 0) : ((marble && marble.multicast) || 0)));
             const active = !!(session && !session.isFinished && (session.activeBalls || 0) > 0);
-            models.push({ index: i, marble, currentHits, target, multicast, active });
+            const collection = Array.isArray(session && session.collected)
+                ? session.collected
+                : (Array.isArray(marble && marble.collected) ? marble.collected : []);
+            models.push({ index: i, marble, currentHits, target, multicast, active, collection, finished: !!(session && session.isFinished) });
         }
         return models;
     },
@@ -713,6 +798,13 @@ export const hud_system = {
         const models = this._hud_getGatheringSessionViewModels ? this._hud_getGatheringSessionViewModels() : [];
         const shouldShow = this.phase === 'gathering' && models.length > 1;
         stack.classList.toggle('hidden', !shouldShow);
+        stack.classList.toggle('gathering-ammo-panel-grid', shouldShow);
+
+        const phaseEl = document.getElementById('phase-gathering');
+        if (phaseEl) phaseEl.classList.toggle('has-ammo-panels', shouldShow);
+
+        const gaugeEl = document.getElementById('hero-gauge-container');
+        if (gaugeEl) gaugeEl.classList.toggle('has-session-panels', shouldShow);
 
         const legacyShell = document.getElementById('gauge-shell');
         const legacyMulticast = document.getElementById('multicast-ui');
@@ -724,22 +816,91 @@ export const hud_system = {
             return false;
         }
 
-        stack.innerHTML = models.slice(0, 3).map(model => {
+        stack.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        models.slice(0, 3).forEach(model => {
             const pct = model.target > 0 ? Math.max(0, Math.min(100, (model.currentHits / model.target) * 100)) : 0;
             const name = model.marble && model.marble.getName ? model.marble.getName() : `#${model.index + 1}`;
-            const fullClass = pct >= 99 ? ' is-full' : '';
-            const activeClass = model.active ? ' is-active' : '';
-            return `
-                <div class="session-charge-row${activeClass}${fullClass}" data-marble-index="${model.index}" title="${name}">
-                    <span class="session-charge-index">${model.index + 1}</span>
-                    <span class="session-charge-track">
-                        <span class="session-charge-fill" style="width:${pct}%"></span>
-                        <span class="session-charge-text">${model.currentHits}/${model.target}</span>
-                    </span>
-                    <span class="session-charge-multicast">x${1 + model.multicast}</span>
-                </div>
-            `;
-        }).join('');
+            const rawColor = model.marble && typeof model.marble.getColor === 'function'
+                ? model.marble.getColor()
+                : (model.marble && model.marble.color) || '#e2e8f0';
+            const isGradient = typeof rawColor === 'string' && rawColor.includes('gradient');
+            const accent = isGradient ? '#facc15' : rawColor;
+
+            const panel = document.createElement('div');
+            panel.className = `gathering-ammo-panel${model.active ? ' is-active' : ''}${pct >= 99 ? ' is-full' : ''}${model.finished ? ' is-finished' : ''}`;
+            panel.dataset.marbleIndex = String(model.index);
+            panel.title = `${name} · ${model.currentHits}/${model.target} · x${1 + model.multicast}`;
+            panel.style.setProperty('--marble-accent', accent);
+            panel.style.setProperty('--marble-bg', rawColor);
+
+            const charge = document.createElement('div');
+            charge.className = 'gathering-ammo-charge';
+            const fill = document.createElement('span');
+            fill.className = 'gathering-ammo-charge-fill';
+            fill.style.width = `${pct}%`;
+            const text = document.createElement('span');
+            text.className = 'gathering-ammo-charge-text';
+            text.textContent = `${model.currentHits}/${model.target}`;
+            charge.append(fill, text);
+
+            const main = document.createElement('div');
+            main.className = 'gathering-ammo-main';
+            const orb = document.createElement('span');
+            orb.className = 'gathering-ammo-orb';
+            const copy = document.createElement('span');
+            copy.className = 'gathering-ammo-copy';
+            const label = document.createElement('span');
+            label.className = 'gathering-ammo-label';
+            label.textContent = `弹 ${model.index + 1}`;
+            const nameEl = document.createElement('span');
+            nameEl.className = 'gathering-ammo-name';
+            nameEl.textContent = name;
+            copy.append(label, nameEl);
+            main.append(orb, copy);
+
+            const stats = document.createElement('div');
+            stats.className = 'gathering-ammo-stats';
+            const counts = new Map();
+            for (const item of model.collection || []) {
+                const type = typeof item === 'string' ? item : (item && item.type);
+                if (!type || !CONFIG.ui.attributeDisplay[type]) continue;
+                const amount = Math.max(1, Math.floor((item && typeof item === 'object' && item.level) ? item.level : 1));
+                counts.set(type, (counts.get(type) || 0) + amount);
+            }
+            if (counts.size === 0) {
+                const empty = document.createElement('span');
+                empty.className = 'gathering-ammo-empty';
+                empty.textContent = '待收集';
+                stats.appendChild(empty);
+            } else {
+                Array.from(counts.entries()).slice(0, 4).forEach(([type, count]) => {
+                    const display = CONFIG.ui.attributeDisplay[type];
+                    const chip = _buildAttributeChip({
+                        key: type,
+                        value: count,
+                        name: display.name || type,
+                        icon: display.icon || '',
+                        color: display.color || '#cbd5e1',
+                    }, 'gathering-ammo-stat-chip');
+                    stats.appendChild(chip);
+                });
+                if (counts.size > 4) {
+                    const more = document.createElement('span');
+                    more.className = 'gathering-ammo-stat-chip is-more';
+                    more.textContent = `+${counts.size - 4}`;
+                    stats.appendChild(more);
+                }
+            }
+
+            const multi = document.createElement('span');
+            multi.className = 'gathering-ammo-multicast session-charge-multicast';
+            multi.textContent = `x${1 + model.multicast}`;
+
+            panel.append(charge, main, stats, multi);
+            fragment.appendChild(panel);
+        });
+        stack.appendChild(fragment);
         return true;
     },
 
@@ -764,13 +925,17 @@ export const hud_system = {
     ui_updateUICache() {
         const gaugeEl = document.getElementById('hero-gauge-container');
         if (gaugeEl) {
-            const rect = gaugeEl.getBoundingClientRect();
+            const panelStack = document.getElementById('session-charge-stack');
+            const targetEl = panelStack && !panelStack.classList.contains('hidden') && panelStack.children.length > 0
+                ? panelStack
+                : gaugeEl;
+            const rect = targetEl.getBoundingClientRect();
             // 缓存中心坐标
             this.uiCache = {
                 x: rect.left + rect.width / 2,
                 y: rect.top + rect.height / 2,
                 // 缓存 DOM 引用，避免重复查询
-                el: gaugeEl,
+                el: targetEl,
                 pulseLayer: document.getElementById('gauge-pulse-layer'),
                 gaugeShell: document.getElementById('gauge-shell')
             };
@@ -788,12 +953,20 @@ export const hud_system = {
      */
     ui_updateGatheringQueueUI() { 
         const q = document.getElementById('gathering-queue'); 
+        const renderedPanels = typeof this._hud_renderSessionChargeStack === 'function'
+            ? this._hud_renderSessionChargeStack()
+            : false;
+        if (!q) return;
         q.innerHTML = ''; 
+        q.classList.toggle('hidden', renderedPanels);
+        if (renderedPanels) return;
         for(let i = this.activeMarbleIndex; i < this.marbleQueue.length; i++) {  // [Mixin 正常用法：读取 Game 实例状态]
             const m = this.marbleQueue[i];  // [Mixin 正常用法：读取 Game 实例状态]
             const d = document.createElement('div'); 
             d.className = 'queue-dot flex-shrink-0'; 
-            d.style.background = m.type === 'rainbow' ? CONFIG.colors.marbleRainbow : m.getColor(); 
+            d.style.background = m.type === 'rainbow'
+                ? CONFIG.colors.marbleRainbow
+                : (typeof m.getColor === 'function' ? m.getColor() : (m.color || '#e2e8f0'));
             q.appendChild(d); 
         } 
     },
@@ -949,7 +1122,8 @@ export const hud_system = {
 
         // ── 倍率转移飞行特效 ──────────────────────────────────────────
         eventBus.on(EVENT_TYPES.UI_MULTICAST_TRANSFER, ({ multicastValue, activeMarbleIndex }) => {
-            const startEl = document.querySelector(`.session-charge-row[data-marble-index="${activeMarbleIndex}"] .session-charge-multicast`)
+            const startEl = document.querySelector(`.gathering-ammo-panel[data-marble-index="${activeMarbleIndex}"] .gathering-ammo-multicast`)
+                || document.querySelector(`.session-charge-row[data-marble-index="${activeMarbleIndex}"] .session-charge-multicast`)
                 || document.getElementById('multicast-ui');
             const targetEl = document.querySelector(`#gathering-hud-mount .recipe-card:nth-child(${activeMarbleIndex + 1})`);
             if (!startEl || !targetEl) return;
@@ -1023,29 +1197,59 @@ export const hud_system = {
             }
         });
 
-        // @section:hud_rune_charge_listeners - 充能符文初始化/升级/进度更新事件监听器
-        // ── 充能符文 UI 初始化 ──────────────────────────────────────────
-        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_INIT, () => {
+        // @section:hud_rune_charge_listeners - 技能充能初始化/升级/进度更新事件监听器
+        // ── 技能充能 UI 初始化 ──────────────────────────────────────────
+        eventBus.on(EVENT_TYPES.UI_SKILL_CHARGE_INIT, () => {
+            const meter = document.getElementById('combat-rune-charge-ui');
+            if (meter) {
+                meter.classList.remove('skill-charge-bursting');
+                meter.style.setProperty('--skill-charge-actual', '0%');
+                meter.style.setProperty('--skill-charge-temp', '0%');
+                meter.style.setProperty('--skill-charge-total', '0%');
+            }
             const slot = document.getElementById('combat-rune-single-slot');
             if (slot) {
                 // 保留 glow-overlay，清除其他内容
                 const glowOverlay = slot.querySelector('.rune-slot-glow-overlay');
                 slot.innerHTML = '';
                 if (glowOverlay) slot.appendChild(glowOverlay);
-                slot.className = 'empty';
+                const mark = document.createElement('span');
+                mark.className = 'skill-charge-slot-mark';
+                mark.textContent = 'SP';
+                slot.appendChild(mark);
+                slot.className = 'empty skill-charge-slot';
             }
             const fill = document.getElementById('combat-charge-bar-fill');
             if (fill) {
                 fill.style.width = '0%';
                 fill.classList.remove('charge-burst');
             }
+            const tempFill = document.getElementById('combat-charge-bar-temp-fill');
+            if (tempFill) {
+                tempFill.style.left = '0%';
+                tempFill.style.width = '0%';
+            }
         });
 
-        // ── 充能满 → 刷新符文预览（带闪光特效）──────────────────────────────────
-        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_LEVEL_UP, ({ runeDef, runeLevel }) => {
+        // ── 充能满 → 发放技能点反馈（带闪光特效）────────────────────────────────
+        eventBus.on(EVENT_TYPES.UI_SKILL_CHARGE_LEVEL_UP, ({ awarded = 1 }) => {
+            const meter = document.getElementById('combat-rune-charge-ui');
             const slot = document.getElementById('combat-rune-single-slot');
             const shell = document.getElementById('combat-charge-bar-shell');
             const fill = document.getElementById('combat-charge-bar-fill');
+            const tempFill = document.getElementById('combat-charge-bar-temp-fill');
+
+            if (meter) {
+                meter.classList.remove('skill-charge-bursting');
+                void meter.offsetWidth;
+                meter.classList.add('skill-charge-bursting');
+                setTimeout(() => meter.classList.remove('skill-charge-bursting'), 560);
+                setTimeout(() => {
+                    meter.style.setProperty('--skill-charge-actual', '0%');
+                    meter.style.setProperty('--skill-charge-temp', '0%');
+                    meter.style.setProperty('--skill-charge-total', '0%');
+                }, 400);
+            }
 
             // 充能条闪光脱去动画
             if (fill) {
@@ -1057,6 +1261,10 @@ export const hud_system = {
                     fill.style.width = '0%';
                 }, 400);
             }
+            if (tempFill) {
+                tempFill.style.left = '0%';
+                tempFill.style.width = '0%';
+            }
 
             // 外壳发光
             if (shell) {
@@ -1064,35 +1272,52 @@ export const hud_system = {
                 setTimeout(() => shell.classList.remove('charge-full-flash'), 450);
             }
 
-            // 符文槽刷新（使用新的 rune-icon-frame 系统）
+            // 技能点槽刷新
             if (slot) {
                 slot.classList.remove('rune-refresh');
                 void slot.offsetWidth; // 重流
-                if (runeDef) {
-                    // 保留 glow-overlay，清除其他内容，重建符文图标框架
-                    const glowOverlay = slot.querySelector('.rune-slot-glow-overlay');
+                const glowOverlay = slot.querySelector('.rune-slot-glow-overlay');
+                slot.innerHTML = '';
+                if (glowOverlay) slot.appendChild(glowOverlay);
+                const mark = document.createElement('span');
+                mark.className = 'skill-charge-slot-mark skill-charge-slot-mark--gain';
+                mark.textContent = `+${awarded} SP`;
+                slot.appendChild(mark);
+                slot.className = 'has-rune rune-refresh skill-charge-slot skill-charge-awarding';
+                setTimeout(() => {
+                    slot.classList.remove('rune-refresh');
+                    const currentGlow = slot.querySelector('.rune-slot-glow-overlay');
                     slot.innerHTML = '';
-                    if (glowOverlay) slot.appendChild(glowOverlay);
-                    // 构建带稀有度边框和等级角标的符文图标
-                    const iconFrame = _buildRuneIconEl(runeDef, runeLevel);
-                    slot.appendChild(iconFrame);
-                    slot.className = 'has-rune rune-refresh';
-                    setTimeout(() => slot.classList.remove('rune-refresh'), 600);
-                } else {
-                    const glowOverlay = slot.querySelector('.rune-slot-glow-overlay');
-                    slot.innerHTML = '';
-                    if (glowOverlay) slot.appendChild(glowOverlay);
-                    slot.className = 'empty';
-                }
+                    if (currentGlow) slot.appendChild(currentGlow);
+                    const steadyMark = document.createElement('span');
+                    steadyMark.className = 'skill-charge-slot-mark';
+                    steadyMark.textContent = 'SP';
+                    slot.appendChild(steadyMark);
+                    slot.className = 'empty skill-charge-slot';
+                }, 650);
             }
         });
 
         // ── 充能条进度更新 ────────────────────────────────────────────────
-        eventBus.on(EVENT_TYPES.UI_RUNE_CHARGE_UPDATE, ({ value }) => {
+        eventBus.on(EVENT_TYPES.UI_SKILL_CHARGE_UPDATE, ({ value, actualValue, tempValue, totalValue }) => {
+            const meter = document.getElementById('combat-rune-charge-ui');
             const fill = document.getElementById('combat-charge-bar-fill');
-            // 如果正在播放 burst 动画，不覆盖 width
+            const tempFill = document.getElementById('combat-charge-bar-temp-fill');
+            const actual = Math.max(0, Math.min(1, actualValue ?? value ?? 0));
+            const total = Math.max(0, Math.min(1, totalValue ?? value ?? actual));
+            const temporary = Math.max(0, Math.min(1 - actual, tempValue ?? (total - actual)));
+            if (meter) {
+                meter.style.setProperty('--skill-charge-actual', `${actual * 100}%`);
+                meter.style.setProperty('--skill-charge-temp', `${temporary * 100}%`);
+                meter.style.setProperty('--skill-charge-total', `${total * 100}%`);
+            }
+            // One visual bar: the base fill is total charge; temp fill is a decaying overlay zone.
             if (fill && !fill.classList.contains('charge-burst')) {
-                fill.style.width = `${value * 100}%`;
+                fill.style.width = `${total * 100}%`;
+            }
+            if (tempFill) {
+                tempFill.style.left = `${actual * 100}%`;
+                tempFill.style.width = `${temporary * 100}%`;
             }
         });
 
@@ -1153,7 +1378,7 @@ export const hud_system = {
                     // 确定起始位置
                     let startX, startY;
                     if (source === 'charge') {
-                        // 充能符文：从充能槽位置出发
+                        // 旧充能符文兼容路径：从充能槽位置出发
                         const chargeSlot = document.getElementById('combat-rune-single-slot');
                         if (chargeSlot) {
                             const rect = chargeSlot.getBoundingClientRect();
@@ -1202,7 +1427,7 @@ export const hud_system = {
                     flyEl.appendChild(flyIconFrame);
                     document.body.appendChild(flyEl);
 
-                    // 充能槽消失动画（仅充能符文）
+                    // 旧充能符文兼容路径的消失动画
                     if (source === 'charge') {
                         const slot = document.getElementById('combat-rune-single-slot');
                         if (slot) {

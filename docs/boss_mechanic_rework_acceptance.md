@@ -1,6 +1,6 @@
 # Boss 特色机制重构范围与验收文档
 
-> 状态：执行中。2026-06-22 已落地第一批：Boss 专属敌人元数据、Boss 入场画像驱动转化、Ignis 温压流光护盾闭环；第二批：Tesla 导体网络、场强召唤闭环与 cryo / bounce 反制；第三批：Chimera 胃域吸引、吞噬继承状态与养料循环。
+> 状态：执行中。2026-06-22 已落地第一批：Boss 专属敌人元数据、Boss 入场画像驱动转化、Ignis 温压流光护盾闭环；第二批：Tesla 导体网络、场强召唤闭环与 cryo / bounce 反制；第三批：Chimera 旧胃域吸引、吞噬继承状态与养料循环；2026-06-24 已将 Devourer / Chimera 吞噬机制互换，Devourer 接管胃域循环，Chimera 改为热核吞噬与流彩护盾。
 > 目标：在不改动基础回合结构和符文主循环的前提下，为 Boss 与超级精英建立强识别、可反制、可测试的专属机制。
 > 非目标：本轮不重写符文系统、不重写战斗阶段状态机、不把战斗阶段逻辑接入钉盘交互。
 
@@ -10,7 +10,7 @@
 - 每个 Boss 机制必须使用当前游戏已经存在的资源：元素属性、温度、护盾、词缀、召唤、位置、回合结算、Boss 入场转化。
 - 每个 Boss 必须有清晰反制入口，反制入口映射到 `bossConfigs.vulnerability` 或动态弱点。
 - 所有位移、吸引、召唤必须遵守格子占用规则，敌人不能重叠。
-- 视觉必须让玩家在第一眼看出 Boss 当前机制状态，例如流光护盾、导体网络、胃域吸引、六附体轮转。
+- 视觉必须让玩家在第一眼看出 Boss 当前机制状态，例如流光护盾、导体网络、深渊胃域、热核吞噬、霜缝减伤、六附体轮转。
 - 涉及粒子、发光、渐变、混合模式的改动必须接入 `CONFIG.performance` 预算，并带 `@perf-impact` 注释。
 
 ## 2. 修改范围
@@ -44,7 +44,7 @@
 - `src/game_phase.js`
   - 在敌方回合开始或 Boss tick 节点触发 Boss 机制。
   - 确认 Glacies 不接触钉盘阶段逻辑。
-  - 接入 Chimera 吸引、吞噬、召唤的回合顺序。
+  - 接入 Devourer 深渊胃域与 Chimera 热核吞噬的回合顺序。
   - 接入 Ouroboros 六附体轮转。
 
 - `src/spawn_system.js`
@@ -123,16 +123,16 @@
 - [x] cryo 命中可移除 haste 或冻结 `fieldPower`。
 - [x] 视觉显示导体网络、电弧链路、Tesla 本体充能层数。
 
-### 阶段 F：Chimera 机制
+### 阶段 F：Devourer / Chimera 吞噬互换
 
-- [x] Chimera 每个机制 tick 吸引身边 +2 格范围内敌人一格。
-- [x] 吸引必须把敌人移动到合法空格，不能重叠。
-- [x] Chimera 可吞噬身边 +2 格范围内所有敌人。
-- [x] 吞噬后继承目标所有负面状态。
-- [x] 吞噬后继承目标温度，温度采用相加。
-- [x] Chimera 同时召唤可被吸引和吞噬的专属敌人。
-- [x] 召唤物与吸引必须形成“养料循环”，但不能无限爆场。
-- [x] 视觉显示胃域范围、吸引方向、吞噬继承的状态堆叠。
+- [x] Devourer 每个机制 tick 吸引身边 +2 格范围内敌人一格，狂暴后吞噬候选扩至全屏。
+- [x] Devourer 吸引必须把敌人移动到合法空格，不能重叠。
+- [x] Devourer 可吞噬胃域内所有非 Boss 敌人，并将吞噬转化为护盾层数。
+- [x] Devourer 能召唤可被吸引和吞噬的 `maw_thrall` 专属敌人。
+- [x] Chimera 每回合随机吞噬 1 名非 Boss 敌人，不再继承毒、冻结、相位失效等负面状态。
+- [x] Chimera 吞噬温度敌人时获得热/寒层，冷热抵消后转为流彩护盾，狂暴时本次获得层数翻倍。
+- [x] Chimera 每次成功吞噬后召唤 +100°C / -100°C `thermalFeed` 养料。
+- [x] 视觉显示 Devourer 胃域拉拽、Chimera 热/寒/流层和流彩护盾转换。
 
 ### 阶段 G：孢子 / 活体护甲 Boss
 
@@ -173,8 +173,8 @@
 - [ ] 所有 Boss 至少有一个可观察的机制资源条或状态标记。
 - [ ] 所有 Boss 的反制属性在实战中有明确反馈，不只是额外伤害。
 - [ ] 所有召唤、吸引、位移都不产生敌人重叠。
-- [x] Boss 入场转化出的专属敌人能参与对应 Boss 机制：Mikro 的 `fissionLink` / `fission_cell` 计入母体分裂减伤，Devourer 的 `mawFeed` / `maw_thrall` 会被吞噬优先选中；Tesla / Glacies / Viridis / Chimera / Ouroboros 已由对应运行期测试覆盖机制 tick 或专属随从链路。
-- [x] 保存并读取后，Boss 机制状态不丢失、不重复触发：`validate_phase_contracts.mjs` 锁定 Boss 随从元数据、温压、孢甲资源、Tesla 场强、霜缝、Chimera 冷却与破绽状态的 save/load 成对恢复。
+- [x] Boss 入场转化出的专属敌人能参与对应 Boss 机制：Mikro 的 `fissionLink` / `fission_cell` 计入母体分裂减伤，Devourer 的 `mawFeed` / `maw_thrall` 参与深渊胃域拉拽与范围吞噬；Tesla / Glacies / Viridis / Chimera / Ouroboros 已由对应运行期测试覆盖机制 tick 或专属随从链路。
+- [x] 保存并读取后，Boss 机制状态不丢失、不重复触发：`validate_phase_contracts.mjs` 锁定 Boss 随从元数据、温压、孢甲资源、Tesla 场强、霜缝、Devourer 胃域冷却、Chimera 热/寒/流彩层与破绽状态的 save/load 成对恢复。
 - [ ] 低性能档下仍能识别机制状态，且不会生成过量粒子。
 - [ ] 新增视觉效果在 `high / medium / low` 三档都有预算说明。
 - [ ] 不在战斗逻辑模块直接操作 DOM。
@@ -186,7 +186,8 @@
 - [x] Ignis：温度超过 100 会进入温压结算；温压满时触发流光彩护盾；不会产生烧伤 DoT。
 - [x] Glacies：机制完全发生在战斗场；不会修改钉盘；霜缝可被 pierce / cryo 反制。
 - [x] Tesla：召唤物越多，本体越强；本体越强又能制造更多召唤压力；该循环有上限、衰减和反制。
-- [x] Chimera：能吸引 +2 格范围敌人一格并避免重叠；能吞噬 +2 格范围敌人；继承负面状态和温度相加。
+- [x] Devourer：能吸引 +2 格范围敌人一格并避免重叠；能吞噬胃域内所有非 Boss 敌人并换护盾；狂暴后候选扩至全屏。
+- [x] Chimera：能随机吞噬温度敌人；热/寒层可抵消并转为流彩护盾；吞噬后召唤 +100°C / -100°C 热核养料。
 - [x] 孢子 / 活体护甲 Boss：护甲、孢子、破裂、反制四个环节都可观察。
 - [x] Ouroboros：六附体每回合轮转；附体词条组合能互相配合；动态弱点随轮转变化。
 
@@ -212,7 +213,7 @@
 2. Boss 入场转化：先把“Boss 出现时转换一批敌人为 Boss 专属敌人”的基础链路做稳。
 3. Ignis：基于已存在的温度和流光彩护盾，是最适合先落地的机制闭环。
 4. Tesla：围绕导体网络建立“召唤越多，本体越强，本体越能召唤”的正反馈循环。
-5. Chimera：实现吸引、吞噬、继承状态和温度相加，重点验证非重叠位移。
+5. Devourer / Chimera：Devourer 承接吸引、范围吞噬与非重叠召唤；Chimera 实现随机热核吞噬、热/寒层抵消与流彩护盾转换。
 6. Glacies：在战斗场内重做霜缝机制，避免误接钉盘阶段。
 7. 孢子 / 活体护甲 Boss：已重做为 Viridis 孢子活甲网络。
 8. Ouroboros：最后实现六附体轮转，因为它依赖词条组合、动态弱点、视觉层和存档字段。
@@ -264,10 +265,10 @@
 本阶段把 Ouroboros 从三组词缀轮转升级为六个附体槽位围绕本体旋转的终局 Boss。
 
 影响范围：
-- `src/config.js`：`bossConfigs.ouroboros` 新增 6 个 `orbitAttachments`，动态破绽谱扩展到六组，并配置轨道回声上限、封印回合、护盾与治疗参数。
-- `src/entities/enemy.js`：新增六附体状态、每回合转位、附体主机制、轨道回声召唤、破绽封印与六节点视觉。
-- `src/combat_system.js`：Boss 破绽满格时调用 `_interruptOuroborosAttachment()`，让打断影响轮转节奏。
-- `src/game_system.js`：持久化六附体槽状态、打断次数与初始化标记。
+- `src/config.js`：`bossConfigs.ouroboros` 新增 6 个 `orbitAttachments`，动态破绽谱扩展到六组，并配置轨道回声上限、封印回合、护盾与治疗参数；2026-06-24 追加 `orbitDamageGatePct` / `orbitDamageGateDisruptTurns`。
+- `src/entities/enemy.js`：新增六附体状态、每回合转位、附体主机制、轨道回声召唤、破绽封印与六节点视觉；2026-06-24 追加受伤门槛触发当前附体主机制、封印当前槽并切换下一槽。
+- `src/combat_system.js`：Boss 破绽满格时调用 `_interruptOuroborosAttachment()`，让打断影响轮转节奏；同一击若受伤门槛已经切槽，破绽只给暴露窗口，不重复封印新槽。
+- `src/game_system.js`：持久化六附体槽状态、打断次数、初始化标记与受伤门槛累计进度。
 - `src/systems.js`：更新 `boss_ouroboros` 试炼场描述。
 - `tests/validate_enemy_spawn_runtime.mjs`：覆盖六槽配置、逐回合轮转、轨道回声召唤和破绽封印。
 
@@ -276,7 +277,8 @@
 - [x] 每回合前位附体改变 Boss 当前词缀与当前破绽谱。
 - [x] 附体组合覆盖护盾、治疗、召唤、位移、吞噬、加速六类压力。
 - [x] 打满当前破绽会封印当前附体，轮转跳到下一个可用槽。
+- [x] 累计实际 HP 伤害达到门槛时会触发当前附体主机制；该附体随后失效 2 回合并切到下一槽。
 - [x] 裂群附体召唤 `orbit_echo`，并使用非重叠格子检查。
-- [x] 存档保存并恢复 `ouroborosOrbitStates`、打断次数与轮转索引。
+- [x] 存档保存并恢复 `ouroborosOrbitStates`、打断次数、轮转索引与 `_ouroborosDamageGateProgress`。
 - [x] 视觉显示六节点轨道、当前前位、下一位和封印槽。
 - [x] 浏览器试炼场实机打开 `boss_ouroboros`，确认六节点轨道与封印反馈无新增控制台错误。

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect x="16" y="16" width="96" height="96" rx="14" fill="none" stroke="#a78bfa" stroke-width="5"/>
+  <circle cx="52" cy="64" r="19" fill="none" stroke="#ddd6fe" stroke-width="5"/>
+  <circle cx="76" cy="64" r="19" fill="none" stroke="#c4b5fd" stroke-width="5"/>
+  <text x="64" y="96" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" font-weight="700" fill="#a78bfa">EC</text>
+</svg>

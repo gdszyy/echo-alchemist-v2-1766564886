@@ -1,11 +1,11 @@
 ---
-description: "符文系统完整规范（智能掉落、网格拼图、合成重铸、充能符文）"
+description: "符文系统完整规范（智能掉落、网格拼图、合成重铸；旧充能符文已迁移为技能充能）"
 globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js", "src/combat_system.js"]
 ---
 # 符文系统规范 (Rune System)
 
 ## 1. 系统概述
-符文系统是游戏局内的核心策略维度，包含智能掉落算法、网格拼图逻辑、合成重铸规则以及战斗阶段充能符文系统。
+符文系统是游戏局内的核心策略维度，包含智能掉落算法、网格拼图逻辑、合成重铸规则以及钉盘融合。旧版战斗阶段“充能符文”已退役，当前战斗充能产出技能点（SP），详见 `docs/core_mechanics.md` 的“技能充能”小节。
 
 ## 2. 智能掉落算法 (`loot_system.js`)
 - **机制**: 敌人的符文掉落并非纯随机。
@@ -21,8 +21,15 @@ globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js", "src/c
   - `overrideOptions.themeWeights` {Object}: Boss 主题额外权重注入（如 `{ pyro: 3.0, laser: 3.0 }`）
   - **返回值**: `{ runeId: string|null, level: number }` 对象（原来直接返回字符串，已升级）
 - **调用方彿变更警告**: 所有调用方必须适配新返回对象格式。已更新的调用方：
-  - `combat_system.js`: Boss 死亡掉落、普通敌人掉落、`combat_runeCharge_initUI`
+  - `combat_system.js`: Boss 死亡掉落、普通敌人掉落；旧 `combat_runeCharge_*` 入口仅作为技能充能兼容代理
   - `rune_system.js`: `rune_reforge` 重铸函数
+
+### 2.1 符文奖励敌人掉落覆写（2026-06-23）
+
+- `loot_calcRuneDrop(game, overrideOptions)` 现在额外支持 `forcedElement` 与 `allowedElements`。前者将候选符文限制到单一 `RUNE_DB.element` 家族，后者限制到多个元素家族；若过滤后没有候选项，回退全量符文池。
+- `runeBearer`：普通 / 精英敌人死亡时跳过普通随机掉率，必定生成 1 个标准智能符文；掉落仍读取玩家近期构筑权重，不强制元素。
+- `adaptiveRune`：记录最近承受的有效属性伤害或属性效果到 `enemy.adaptiveRuneElement`；死亡时通过 `forcedElement` 限制到该属性家族。若没有有效记录，则回退标准智能符文掉落。
+- 这两个词条不得加入 `AFFIX_WEIGHT_CURVES` 普通随机池；应通过显式奖励事件、试炼场或后续导演模板少量投放。
 
 ## 3. 网格拼图逻辑 (`rune_system.js`)
 - **发射器网格**: 3x3 的符文放置区域。
@@ -123,7 +130,15 @@ globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js", "src/c
 
 ## 8. 战斗阶段充能符文系统 (`combat_system.js`)
 
-> **状态**: 已实现（充能奖励在敌人动作后领取，伴飞入背包动画）
+> **状态**: 已退役。2026-06-23 起，战斗充能不再抽取或入库符文，改为 `combat_skillCharge_*` 发放技能点（SP）。本节以下内容仅记录旧机制历史，新增或修复不得继续接入 `_runeCharge_draw` / `runeChargeCurrentRune` 奖励流。
+
+### 8.0 当前替代机制：技能充能
+
+- 命中/击杀仍沿用旧基准：命中 3%，击杀 10%，并保留 x2/x4/x8 概率翻倍。
+- 单次获得的充能按 `CONFIG.gameplay.skillChargeRetainRatio` 拆成实际条与临时条；默认 35% 进入实际条，65% 进入临时条。
+- 临时条按 `skillChargeDecayRate` 衰减，实际条不衰减。
+- 当“实际条 + 临时条”达到满条时，立刻尝试发放 1 个 SP；SP 已满时保留满条充能，等待消耗 SP 后再转换。
+- `UI_SKILL_CHARGE_INIT` / `UI_SKILL_CHARGE_UPDATE` / `UI_SKILL_CHARGE_LEVEL_UP` 是当前 UI 事件；`UI_RUNE_CHARGE_*` 仅作为同字符串兼容别名。
 
 ### 8.1 系统概述
 

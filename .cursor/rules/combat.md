@@ -55,15 +55,17 @@ globs: ["src/combat/**/*", "src/combat_system.js"]
 | `combat_tryMoveEnemy(enemy, delta)` | `collision.js` | 尝试移动敌人（AABB 碰撞检测） |
 | `combat_laser_castRay(start, dir, maxDist)` | `collision.js` | 激光射线投射，返回最近反射面 |
 
-### 2.3 充能符文系统常量（§8.5）
+### 2.3 技能充能系统
+
+战斗充能现由 `combat_skillCharge_*` 方法管理，旧 `combat_runeCharge_*` 只作为兼容代理：
 
 ```js
-const RUNE_CHARGE_THRESHOLDS = [999, 999, 6.1, 5.1, 2.6, 2.15, 0.9, 0.4];
-const RUNE_CHARGE_DECAY      = 1.26 / 3;  // ≈ 0.42
-const RUNE_CHARGE_MAX_LEVEL  = 3;
+skillChargeActualValue: number; // 实际条，不衰减
+skillChargeTempValue: number;   // 临时条，按 skillChargeDecayRate 衰减
+skillChargeLevel: number;       // 本场战斗已成功发放 SP 的次数
 ```
 
-充能等级越高，门槛越低，高稀有度符文越容易入池。
+命中/击杀获得的充能按 `CONFIG.gameplay.skillChargeRetainRatio` 拆分为实际条和临时条；当两者总和达到 1.0 时，通过 `spawn_addSkillPoint()` 发放 SP，并受 `maxSkillPoints` 上限约束。HUD 使用 `UI_SKILL_CHARGE_*` 事件更新双条进度和满条反馈。
 
 ## 3. 状态流转 / 业务规则
 
@@ -100,10 +102,10 @@ Boss 不再使用旧 `weakness` 静态字段。`combat_damageEnemy()` 在 `enemy
 - `combat_applyBossVulnerability()` 在 `Enemy.takeDamage()` 前判断本次命中是否匹配破绽谱，并消费已有易伤窗口。
 - `combat_updateBossVulnerabilityProgress()` 在实际伤害产生后推进进度：`hits` 模式按实际造成伤害的命中次数累积，`damage` 模式按 `damageResult.actualDamage` 累积。
 - 回合缩放由 `CONFIG.balance.bossVulnerability.roundScaling*` 控制：回合越高，命中次数阈值或最大生命百分比阈值越高。
-- 命中破绽谱属性并达到当前阈值后进入 `_bossVulnerabilityExposedHits` 易伤窗口。
-- 易伤窗口内伤害乘以 `exposedDamageMult`，每次命中消耗 1 次。
-- 若 Boss 尚未狂暴，破绽触发会设置 `_bossVulnerabilitySuppressedEnrage`，延后一次 50% 血量狂暴检测。
-- 命中反馈标签为 `破绽+` / `破绽` / `易伤`；该机制不新增粒子、渐变或常驻 Canvas 光效。
+- 命中破绽谱属性并达到当前阈值后进入 `_bossVulnerabilityExposedTurns` 暴露窗口。
+- 暴露窗口内伤害乘以 `exposedDamageMult`，在 Boss 行动入口按回合消耗。
+- 若 Boss 尚未狂暴，破绽触发会设置 `_bossVulnerabilitySuppressedEnrage`，延后一次 `CONFIG.balance.bossEnrageHpRatio` 血量阈值狂暴检测（当前 20% HP）。
+- 命中飘字不再显示破绽文本；Boss 身体 Overlay 与状态短标签表达进度/暴露。该机制不新增粒子、渐变或常驻 Canvas 光效。
 
 ### 3.3 DDA（动态难度调整）规则
 

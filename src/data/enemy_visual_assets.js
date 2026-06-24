@@ -56,8 +56,15 @@ const _DEFAULT_COMPOSITES = {
     'bastion:3x1:heavyArmor':           'enemy_bastion_heavyarmor_3x1_idle',
     'maw:2x2:devour':                   'enemy_maw_devour_2x2_native_hollow_idle',
     'siege:3x2:siege':                  'enemy_siege_siege_3x2_native_hollow_idle',
+    'carrier:3x2:carrier':              'enemy_carrier_carrier_3x2_idle',
     'echoSpire:1x2:echoRelay':          'enemy_spire_echorelay_1x2_idle',
     'deflector:2x1:deflectionWard':     'enemy_ward_deflection_2x1_idle',
+    'orbitEcho:aegis':                  'enemy_ouroboros_orbit_echo_aegis_1x1_idle',
+    'orbitEcho:graft':                  'enemy_ouroboros_orbit_echo_graft_1x1_idle',
+    'orbitEcho:brood':                  'enemy_ouroboros_orbit_echo_brood_1x1_idle',
+    'orbitEcho:stride':                 'enemy_ouroboros_orbit_echo_stride_1x1_idle',
+    'orbitEcho:maw':                    'enemy_ouroboros_orbit_echo_maw_1x1_idle',
+    'orbitEcho:surge':                  'enemy_ouroboros_orbit_echo_surge_1x1_idle',
 };
 
 const _DEFAULT_ARCHETYPE_FILES = {
@@ -68,6 +75,7 @@ const _DEFAULT_ARCHETYPE_FILES = {
     prism:       'enemy_prism_1x3',
     hive:        'enemy_hive_2x3_native_hollow',
     siege:       'enemy_siege_3x2_native_hollow',
+    carrier:     'enemy_carrier_3x2',
     gravityWell: 'enemy_gravity_core_3x3',
 };
 
@@ -79,6 +87,7 @@ const _DEFAULT_ARCHETYPE_ICONS = {
     echoSpire:   'enemy_echo_spire_1x2.png',
     prism:       'enemy_prism_1x3.png',
     hive:        'enemy_hive_2x3.png',
+    carrier:     'enemy_carrier_3x2.png',
     gravityWell: 'enemy_gravity_core_3x3.png',
 };
 
@@ -91,14 +100,20 @@ const _DEFAULT_AFFIX_ICONS = {
     hive:       'affix_hive.png',
     gravityWell:'affix_gravityWell.png',
     siege:      'affix_siege.png',
+    carrier:    'affix_carrier.png',
     shield:     'affix_shield.png',
     regen:      'affix_regen.png',
-    radiantAegis: 'affix_radiantAegis.svg',
+    radiantAegis: 'affix_radiantAegis.png',
+    energyArmor: 'affix_energyArmor.png',
+    phaseShield: 'affix_phaseShield.png',
+    livingArmor: 'affix_livingArmor.png',
+    runeBearer: 'affix_rune_bearer.svg',
+    adaptiveRune: 'affix_adaptive_rune.svg',
 };
 
 const _DEFAULT_OVERLAYS = {
     shield:  'overlay_affix_shield.png',
-    radiantAegis: 'overlay_affix_radiantAegis.svg',
+    radiantAegis: 'overlay_affix_radiantAegis.png',
     regen:   'overlay_affix_regen.png',
     berserk: 'overlay_affix_berserk.png',
     haste:   'overlay_affix_haste.png',
@@ -109,6 +124,8 @@ const _DEFAULT_OVERLAYS = {
     siegeBreaker: 'overlay_affix_siegeBreaker.png',
     carrier: 'overlay_affix_carrier.png',
     deflectShell: 'overlay_affix_deflectShell.png',
+    runeBearer: 'overlay_affix_rune_bearer.svg',
+    adaptiveRune: 'overlay_affix_adaptive_rune.svg',
 };
 
 const _DEFAULT_DYNAMIC_OVERLAYS = {
@@ -133,9 +150,24 @@ const _DEFAULT_DYNAMIC_OVERLAYS = {
         level2: 'overlay_overload_reactor_2.png',
         level3: 'overlay_overload_reactor_3.png',
     },
+    adaptiveRune: {
+        pyro: 'overlay_adaptive_rune_pyro.svg',
+        cryo: 'overlay_adaptive_rune_cryo.svg',
+        lightning: 'overlay_adaptive_rune_lightning.svg',
+        bounce: 'overlay_adaptive_rune_bounce.svg',
+        pierce: 'overlay_adaptive_rune_pierce.svg',
+        scatter: 'overlay_adaptive_rune_scatter.svg',
+        laser: 'overlay_adaptive_rune_laser.svg',
+        venom: 'overlay_adaptive_rune_venom.svg',
+        overcharge: 'overlay_adaptive_rune_overcharge.svg',
+        echo: 'overlay_adaptive_rune_echo.svg',
+        unknown: 'overlay_adaptive_rune_unknown.svg',
+    },
 };
 
 const _TARGETING_OVERLAY_AFFIXES = new Set([
+    'shield',
+    'radiantAegis',
     'energyArmor',
     'phaseShield',
     'overloadReactor',
@@ -171,6 +203,7 @@ const _DEFAULT_FRAMES = {
     'prism:1x3':     { spritePath: 'assets/sprites/enemies/frames/frame_prism_1x3.png', shape: 'polygon' },
     'hive:2x3':      { spritePath: 'assets/sprites/enemies/frames/frame_hive_2x3.png', shape: 'aabb' },
     'siege:3x2':     { spritePath: 'assets/sprites/enemies/frames/frame_siege_3x2.png', shape: 'polygon' },
+    'carrier:3x2':   { spritePath: 'assets/sprites/enemies/frames/frame_carrier_3x2.png', shape: 'polygon' },
     'gravityWell:3x3': { spritePath: 'assets/sprites/enemies/frames/frame_gravity_core_3x3.png', shape: 'arc' },
 };
 
@@ -202,7 +235,8 @@ export function loadEnemyVisualAssetManifest() {
 function _buildDefaultManifest() {
     const composites = {};
     for (const [key, baseName] of Object.entries(_DEFAULT_COMPOSITES)) {
-        const [arch, foot, affix] = key.split(':');
+        const parts = key.split(':');
+        const [arch, foot, affix] = parts.length >= 3 ? parts : [parts[0], '1x1', ''];
         composites[key] = {
             resourceId: baseName.replace(/_idle$/, ''),
             spritePath: _DEFAULT_DIRS.composites + baseName + '.png',
@@ -252,6 +286,20 @@ export function normalizeAffixSet(affixes) {
     return [...affixes].map(String).sort().join('+');
 }
 
+function _resolveExplicitVisualAssetKey(enemy) {
+    if (!enemy) return null;
+    if (enemy.visualAssetKey) return String(enemy.visualAssetKey);
+
+    if (enemy.bossOwnerId === 'ouroboros' && enemy.bossMinionRole === 'orbit_echo') {
+        const tags = Array.isArray(enemy.bossMechanicTags) ? enemy.bossMechanicTags : [];
+        const orbitTag = tags.find(tag => typeof tag === 'string' && tag.startsWith('orbit:'));
+        const slotId = orbitTag ? orbitTag.slice('orbit:'.length) : 'brood';
+        if (slotId) return `orbitEcho:${slotId}`;
+    }
+
+    return null;
+}
+
 /**
  * 根据 enemy 信息计算资源键。
  *   <baseArchetype>:<cols>x<rows>:<sortedAffixSet>
@@ -259,6 +307,9 @@ export function normalizeAffixSet(affixes) {
  * baseArchetype 缺省时使用 'residue'（1×1 普通敌人基线）。
  */
 export function buildEnemyAssetKey(enemy) {
+    const explicitKey = _resolveExplicitVisualAssetKey(enemy);
+    if (explicitKey) return explicitKey;
+
     const cols = (enemy && enemy.gridCols) || 1;
     const rows = (enemy && enemy.gridRows) || 1;
     let arch = enemy && enemy.baseArchetype;
@@ -426,6 +477,14 @@ export function resolveDynamicEnemyOverlayPaths(enemy) {
         const overloadDefs = defs.overloadReactor || {};
         const level = Math.max(0, Math.min(3, Math.floor(enemy._overloadBonusThisTurn || 0)));
         if (level > 0) pushDynamic('overloadReactor', overloadDefs[`level${level}`] || overloadDefs[String(level)]);
+    }
+
+    if ((enemy.affixes || []).includes('adaptiveRune')) {
+        const adaptiveDefs = defs.adaptiveRune || {};
+        const element = typeof enemy._getAdaptiveRuneDropElement === 'function'
+            ? enemy._getAdaptiveRuneDropElement()
+            : enemy.adaptiveRuneElement;
+        pushDynamic('adaptiveRune', adaptiveDefs[element] || adaptiveDefs.unknown);
     }
 
     return out;

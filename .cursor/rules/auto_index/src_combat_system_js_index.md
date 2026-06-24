@@ -1,6 +1,6 @@
 # src\combat_system.js 函数索引
 
-> 自动生成于 2026-06-23 | 总行数: 4166 | 函数数: 50 | 语言: javascript
+> 自动生成于 2026-06-24 | 总行数: 4312 | 函数数: 58 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 5 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -11,7 +11,6 @@
 
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
-| _runeCharge_draw | function | `_runeCharge_draw(chargeLevel)` |  |
 | combat_createFloatingText | method | `combat_createFloatingText(x, y, text, color)` |  |
 | combat_updateMulticastDisplay | method | `combat_updateMulticastDisplay(bonusAmount = 0)` |  |
 | combat_playMulticastTransferEffect | method | `combat_playMulticastTransferEffect(multicastValue)` |  |
@@ -43,14 +42,23 @@
 | combat_updateBossVulnerabilityProgress | method | `combat_updateBossVulnerabilityProgress(enemy, bossVulnerability, actualDamage = 0)` |  |
 | combat_getHitFeedbackLabel | method | `combat_getHitFeedbackLabel(enemy, config = {}, projectile = null, damageResult = null, context = {})` |  |
 | combat_damageEnemy | method | `combat_damageEnemy(enemy, projectile, damageOverride = null)` | ⚠️ 巨型函数，见 @section 导航 |
-| combat_fireNextShot | method | `combat_fireNextShot(vel)` | ⚠️ 巨型函数，见 @section 导航 |
+| combat_applyExplosionKnockback | method | `combat_applyExplosionKnockback(cx, cy, radius = 100, maxOffset = 12)` |  |
+| combat_fireNextShot | method | `combat_fireNextShot(vel, origin = null)` | ⚠️ 巨型函数，见 @section 导航 |
 | combat_laser_fire | method | `combat_laser_fire(startX, startY, vel, recipe, shotId = null, isTickFire = false)` | ⚠️ 巨型函数，见 @section 导航 |
 | combat_triggerFrostNova | method | `combat_triggerFrostNova(centerPos, sourceConfig, novaParams, probMult = 1.0, chainDepth = 0)` |  |
 | combat_bladeStorm_update | method | `combat_bladeStorm_update(timeScale)` |  |
+| _bladeStorm_killVortex | method | `_bladeStorm_killVortex()` |  |
 | combat_continuousLaser_update | method | `combat_continuousLaser_update(timeScale = 1)` |  |
 | _laser_blendRefractionColor | method | `_laser_blendRefractionColor(baseColor)` |  |
 | combat_updateHitProgress | method | `combat_updateHitProgress(val, target)` |  |
 | relic_runRoundStartHooks | method | `relic_runRoundStartHooks()` |  |
+| combat_skillCharge_init | method | `combat_skillCharge_init()` |  |
+| combat_skillCharge_initUI | method | `combat_skillCharge_initUI()` |  |
+| combat_skillCharge_onHit | method | `combat_skillCharge_onHit(hitX, hitY, isKill = false)` |  |
+| combat_skillCharge_tryAward | method | `combat_skillCharge_tryAward()` |  |
+| combat_skillCharge_decay | method | `combat_skillCharge_decay(timeScale)` |  |
+| combat_skillCharge_updateUI | method | `combat_skillCharge_updateUI()` |  |
+| combat_skillCharge_syncLegacyState | method | `combat_skillCharge_syncLegacyState()` |  |
 | combat_runeCharge_init | method | `combat_runeCharge_init()` |  |
 | combat_runeCharge_initUI | method | `combat_runeCharge_initUI()` |  |
 | combat_runeCharge_onHit | method | `combat_runeCharge_onHit(hitX, hitY, isKill = false)` |  |
@@ -127,5 +135,4 @@
 | `@section:damage_pre_calc` | 伤害前置计算：基础值、暴击、穿透 |
 | `@section:fire_ammo_selection` | 弹药选择与配方读取 |
 | `@section:laser_ray_cast` | 激光射线投射与穿透检测 |
-| `@section:rune_charge_levelup_audio` | 符文充能条升级音效（520Hz sine，轻柔上升感） |
-| `@section:rune_charge_claim_audio` | 符文充能完成领取音效（playPowerup 确认感） |
+| `@section:rune_charge_levelup_audio` | 充能满条发放技能点音效（520Hz sine，轻柔上升感） |

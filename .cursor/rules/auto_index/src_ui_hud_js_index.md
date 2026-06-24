@@ -1,6 +1,6 @@
 # src\ui\hud.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 1292 | 函数数: 20 | 语言: javascript
+> 自动生成于 2026-06-24 | 总行数: 1517 | 函数数: 24 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -12,6 +12,10 @@
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
 | _buildRuneIconEl | function | `_buildRuneIconEl(runeDef, runeLevel)` |  |
+| _safeAttributeKey | function | `_safeAttributeKey(key)` |  |
+| _attributeChipAssetUrl | function | `_attributeChipAssetUrl(key)` |  |
+| _attributeIconAssetUrl | function | `_attributeIconAssetUrl(key)` |  |
+| _buildAttributeChip | function | `_buildAttributeChip(entry, className = '')` |  |
 | _playRuneAcquireReveal | function | `_playRuneAcquireReveal(runeDef, runeLevel, delay = 0)` |  |
 | ui_updateMultiplierUI | method | `ui_updateMultiplierUI()` |  |
 | ui_saveShotDamage | method | `ui_saveShotDamage()` |  |
@@ -46,5 +50,5 @@
 |----------|------|
 | `@section:hud_multicast_listeners` | 连射倍率显示与飞行特效事件监听器 |
 | `@section:hud_ammo_listeners` | 弹药发射动画与命中进度条事件监听器 |
-| `@section:hud_rune_charge_listeners` | 充能符文初始化/升级/进度更新事件监听器 |
+| `@section:hud_rune_charge_listeners` | 技能充能初始化/升级/进度更新事件监听器 |
 | `@section:hud_rune_claim_listeners` | 符文领取飞入背包动画事件监听器（回局结束与敌人动作后） |

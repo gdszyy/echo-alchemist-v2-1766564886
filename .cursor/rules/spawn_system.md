@@ -328,6 +328,12 @@ core.js: _setupEventListeners()
 | `berserk` | r >= 14 | `r * 3`（无上限，后期极危险） |
 | `radiantAegis` | r >= 20 | R20-R26: 12，R27-R33: 18，R34-R40: 22，R41-R47: 30，R48+: 35；随机精英获得半值版流彩护盾 |
 
+### 7.3 符文奖励词条的投放边界
+
+`runeBearer` 与 `adaptiveRune` 是奖励 / 构筑词条，不是普通难度词条。首版机制、占位资产、试炼场验证已接入，但仍不得把它们加入 `spawn_generateAffixes()` 的随机权重池，也不得通过 `forceAffixes` 在导演模板中批量投放。后续开放应由导演系统用显式模板或奖励事件少量投放，并配套收益频率上限。
+
+后续若开放生成，`runeBearer` 的临时词条池只允许抽取 `shield`、`regen`、`healer`、`haste`、`jump`、`clone`、`berserk` 等通用 1×1 行为词条；禁止轮换到 `devour`、V2 基底专属词条、敌人针对词缀、Boss 机制词条或另一个符文词条。`adaptiveRune` 的属性态必须来自已存在的可掉落符文家族，死亡掉落若没有有效属性记录，应回退标准智能符文掉落。
+
 ---
 
 ## 8. 修改规范

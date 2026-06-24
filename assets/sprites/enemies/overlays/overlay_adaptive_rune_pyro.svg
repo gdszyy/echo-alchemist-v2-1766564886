@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect x="16" y="16" width="96" height="96" rx="14" fill="none" stroke="#fb923c" stroke-width="5"/>
+  <path d="M64 24c14 18 24 30 12 54-4 9-13 16-12 28-17-9-27-22-23-39 3-13 14-20 23-43Z" fill="none" stroke="#fed7aa" stroke-width="5" stroke-linejoin="round"/>
+  <text x="64" y="80" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" font-weight="700" fill="#fb923c">PY</text>
+</svg>

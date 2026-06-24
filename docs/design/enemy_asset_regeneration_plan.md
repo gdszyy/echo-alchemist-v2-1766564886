@@ -6,12 +6,12 @@
 
 | 资产层 | 当前目录 | 当前状态 | 重生成策略 |
 |---|---|---|---|
-| V2 archetype Sprite | `assets/sprites/enemies/v2/` 与 `assets/sprites/enemies/archetypes/` | 8 个基底均已接入，manifest 为 `placeholder:false` | 第一批重生成，保持文件名、footprint、manifest 帧契约 |
+| V2 archetype Sprite | `assets/sprites/enemies/v2/` 与 `assets/sprites/enemies/archetypes/` | 9 个基底均已接入，manifest 为 `placeholder:false` | 第一批重生成，保持文件名、footprint、manifest 帧契约 |
 | Composite Sprite | `assets/sprites/enemies/composites/` | 6 个高频组合已接入 | 第二批重生成，优先覆盖现有 6 个，再扩展高频组合 |
 | 通用词条 Overlay | `assets/sprites/enemies/overlays/` | 6 个通用词条覆盖层 | 第三批统一为“刻线/薄膜/晶片覆层”，避免盖住主体 silhouette |
 | 碰撞材质框 Collision Frame | `assets/sprites/enemies/frames/` | Pass 1 已接入运行时：4 个 frame 通过 manifest `frames` 段命中 | 必须匹配 `collisionShape/collisionData`，中心透明，用于提升物理边界质感并保留 HP/UI |
-| V2 图鉴头像 | `assets/icons/enemies/` | 8 个 64x64 头像 | 跟随 V2 archetype 同步导出 |
-| 基底 UI 图标 | `assets/ui/icons/enemy_archetypes/` | 8 个小图标 + 3 个高精图标 | 统一压成 64x64/128x128 两档源图，manifest 只登记运行时文件 |
+| V2 图鉴头像 | `assets/icons/enemies/` | 9 个 64x64 头像 | 跟随 V2 archetype 同步导出 |
+| 基底 UI 图标 | `assets/ui/icons/enemy_archetypes/` | 9 个小图标 + 3 个高精图标 | 统一压成 64x64/128x128 两档源图，manifest 只登记运行时文件 |
 | 词条 UI 图标 | `assets/ui/icons/enemy_affixes/` | 专属词条 + 通用词条图标 | 以“嵌槽符号”重画，不做完整敌人头像 |
 | Normal / Elite golem fallback | `assets/sprites/enemies/golem_*.png` | `golem_normal.png` 已重做；`golem_elite.png` 待重做 | 第四批重生成，使普通/精英 fallback 也符合磨石母题 |
 
@@ -31,9 +31,9 @@
 
 ## 3. 重生成批次
 
-### Batch A：8 个 V2 基底 Sprite
+### Batch A：9 个 V2 基底 Sprite
 
-目标：重画现有 8 个 V2 基底，建立统一家族感。
+目标：重画现有 9 个 V2 基底，建立统一家族感。
 
 | 优先级 | resourceId | baseArchetype | footprint | 画面重点 |
 |---|---|---|---|---|
@@ -44,7 +44,10 @@
 | A2 | `enemy_prism_1x3` | `prism` | 1x3 | 竖直折光磨石棱柱、白色折射线 |
 | A2 | `enemy_hive_2x3` | `hive` | 2x3 | 多孔孵化石巢、半透明卵囊嵌孔 |
 | A3 | `enemy_siege_3x2` | `siege` | 3x2 | 双层履带磨石车、推铲、抗冻热管 |
+| A3 | `enemy_carrier_3x2` | `carrier` | 3x2（底部中格为空舱） | 冂形磨石桥架、中央投放空舱、蓝色航道线 |
 | A3 | `enemy_gravity_core_3x3` | `gravityWell` | 3x3 | 三层环形磨石炉心、中央黑核、向心网格 |
+
+2026-06-24 追补：`enemy_carrier_3x2` 已通过 imagegen 重绘源图补齐正式运行时资源。源文件位于 `docs/design/concepts/carrier_imagegen_pass1/`，`scripts/generate_carrier_enemy_assets.py` 负责绿幕去底、运行时缩放和派生资源，覆盖 V2 sprite、archetype sprite、`carrier:3x2:carrier` composite、collision frame、图鉴头像、基底 UI 图标和词条图标；manifest 与 `ENEMY_V2_METADATA` 已标记 `placeholder:false`。
 
 交付要求：
 
@@ -79,7 +82,7 @@
 | Overlay | `shield`、`regen`、`berserk`、`haste`、`healer`、`clone` | 透明 PNG，边缘化构图，中心留空，不遮挡嵌核 |
 | Reward Frame | `relic` | 独立奖励边框，中心透明；遗物使用古金边框 |
 | 专属词条图标 | `devour`、`heavyArmor`、`deflectionWard`、`echoRelay`、`prism`、`hive`、`siege`、`gravityWell` | 只画符号或嵌槽，不画完整敌人 |
-| 基底图标 | 8 个 baseArchetype | 从 Batch A 主体裁切/重绘为 64x64，保持 silhouette 可读 |
+| 基底图标 | 9 个 baseArchetype | 从 Batch A 主体裁切/重绘为 64x64，保持 silhouette 可读 |
 
 ### Batch C2：碰撞材质框 Collision Frame
 
@@ -235,7 +238,7 @@ Constraints: transparent background, no text, no numbers, no full enemy scene
 | 周期 | 内容 | 完成标准 |
 |---|---|---|
 | Pass 1 | Batch A0/A1：bastion、maw、deflector、echoSpire | 4 个基底在试炼场可读，图标同步 |
-| Pass 2 | Batch A2/A3：prism、hive、siege、gravityWell | 8 个 V2 基底全部统一 |
+| Pass 2 | Batch A2/A3：prism、hive、siege、carrier、gravityWell | 9 个 V2 基底全部统一 |
 | Pass 3 | Batch B：6 个 composite | 高频组合命中 composite，fallback 未破坏 |
 | Pass 4 | Batch C2：material frame | 边框质感提升，HP/UI 可读性不下降 |
 | Pass 5 | Batch C：overlay + icon | 通用词条覆层不遮挡主体 |

@@ -3,9 +3,9 @@ import {
 } from './config.js';
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
-    SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
+    SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, PierceCutEffect, CollectionBeam,
     Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave,
-    IceWave, DeathExplosion, showToast, BladeStormRing, SwordScar, RewardDropEffect,
+    IceWave, DeathExplosion, showToast, BladeStormRing, BladeStormVortex, SwordScar, RewardDropEffect,
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba, RuneLoot
 } from './entities.js';
 import { loot_calcRuneDrop } from './loot_system.js';
@@ -17,40 +17,7 @@ import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { sb as _sb } from './utils/perf.js';
 import { DamageCalc } from './combat/damage_calc.js';
 import { CollisionSystem } from './combat/collision.js';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 充能符文系统常量（§8.5）
-// ─────────────────────────────────────────────────────────────────────────────
-const RUNE_CHARGE_THRESHOLDS = [999, 999, 6.1, 5.1, 2.6, 2.15, 0.9, 0.4];
-const RUNE_CHARGE_DECAY      = 1.26 / 3;   // ≈ 0.42
-const RUNE_CHARGE_MAX_LEVEL  = 3;
-
-/**
- * 充能符文抽取算法（§8.5）
- * 按权重上限门槛筛选入池符文，加权随机抽取符文定义和等级。
- * @param {number} chargeLevel - 当前充能等级（充能条已满次数）
- * @returns {{ runeDef: object|null, runeLevel: number }}
- */
-function _runeCharge_draw(chargeLevel) {
-    const threshold = RUNE_CHARGE_THRESHOLDS[Math.min(chargeLevel, 7)];
-    const maxRuneLv = Math.min(chargeLevel, RUNE_CHARGE_MAX_LEVEL);
-    const pool = [];
-    for (const rune of RUNE_DB) {
-        for (let lv = 1; lv <= maxRuneLv; lv++) {
-            const w = rune.baseDropWeight * Math.pow(RUNE_CHARGE_DECAY, lv - 1);
-            if (w < threshold) pool.push({ runeDef: rune, runeLevel: lv, weight: w });
-        }
-    }
-    if (!pool.length) return { runeDef: null, runeLevel: 1 };
-    const total = pool.reduce((s, c) => s + c.weight, 0);
-    let rand = Math.random() * total;
-    for (const c of pool) {
-        rand -= c.weight;
-        if (rand <= 0) return { runeDef: c.runeDef, runeLevel: c.runeLevel };
-    }
-    const last = pool[pool.length - 1];
-    return { runeDef: last.runeDef, runeLevel: last.runeLevel };
-}
+import { getUiBitmap, DEFENSE_ICON_MAP } from './bitmap_icons.js';
 
 export const combat_system = {
 // [已迁移至 src/combat/damage_calc.js] combat_calculatePlayerExpectedDamage
@@ -101,6 +68,10 @@ export const combat_system = {
         this.skillPoints -= skill.cost;
         this.ui.updateSkillPoints(this.skillPoints);
         this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
+        if (typeof this.combat_skillCharge_tryAward === 'function') {
+            this.combat_skillCharge_tryAward();
+            this.combat_skillCharge_updateUI();
+        }
         
         audio.playPowerup(5); 
         showToast(`釋放: ${skill.name}!`);
@@ -150,9 +121,10 @@ export const combat_system = {
                     
                     // 2. 造成主伤害
                     // @section:skill_cooldown_and_cost - 冷却时间检查与能量消耗
-                    const killed = e.takeDamage(dmg);
-                    this.combat_recordDamage(dmg, 'lightning', 'main', this._currentDamageShotId);
-                    this.spawn_createFloatingText(e.pos.x, e.pos.y, `-${dmg}`, '#c084fc');
+                    const damageResult = e.takeDamage(dmg);
+                    const hpDamage = damageResult.hpDamage ?? damageResult.actualDamage ?? 0;
+                    this.combat_recordDamage(hpDamage, 'lightning', 'main', this._currentDamageShotId);
+                    if (hpDamage > 0) this.spawn_createFloatingText(e.pos.x, e.pos.y, `-${Math.ceil(hpDamage)}`, '#c084fc');
                     
                     // 3. 施加感电效果 (温度)
                     e.applyTemp(CONFIG.balance.lightningTempIncrease || 3); 
@@ -164,7 +136,7 @@ export const combat_system = {
                     const skillChainLevel = p.chainLevel || 15; 
                     this.combat_lightning_triggerChain(e, dmg, [e], skillChainLevel);
 
-                    if (killed) this.spawn_addScore(e.maxHp, e);
+                    if (damageResult.killed) this.spawn_addScore(e.maxHp, e);
                 }
             }
             audio.playLightning();
@@ -249,13 +221,14 @@ export const combat_system = {
                     if (this.lightningBolts.length < CONFIG.performance[this.perfQualityLevel || 'high'].lightningLimit) {
                         this.lightningBolts.push(new LightningBolt(startX, 0, e.pos.x, e.pos.y));
                     }
-                    const killed = e.takeDamage(dmg);
-                    this.combat_recordDamage(dmg, 'lightning', 'main', this._currentDamageShotId);
-                    this.spawn_createFloatingText(e.pos.x, e.pos.y, `-${dmg}`, p.boltColor);
+                    const damageResult = e.takeDamage(dmg);
+                    const hpDamage = damageResult.hpDamage ?? damageResult.actualDamage ?? 0;
+                    this.combat_recordDamage(hpDamage, 'lightning', 'main', this._currentDamageShotId);
+                    if (hpDamage > 0) this.spawn_createFloatingText(e.pos.x, e.pos.y, `-${Math.ceil(hpDamage)}`, p.boltColor);
                     e.applyTemp(CONFIG.balance.lightningTempIncrease || 3);
                     const skillChainLevel = p.chainLevel || 10;
                     this.combat_lightning_triggerChain(e, dmg, [e], skillChainLevel);
-                    if (killed) this.spawn_addScore(e.maxHp, e);
+                    if (damageResult.killed) this.spawn_addScore(e.maxHp, e);
                 }
             }
             try { audio.playLightning(); } catch(e2) {}
@@ -1589,7 +1562,10 @@ export const combat_system = {
             progressMode: null,
             breakTriggered: false,
             exposedApplied: false,
-            profile: null
+            profile: null,
+            progressBefore: enemy?._bossVulnerabilityProgress || 0,
+            ouroborosDamageGateSeqBefore: enemy?.bossType === 'ouroboros' ? (enemy._ouroborosDamageGateSeq || 0) : null,
+            damageGateAlreadyShifted: false
         };
         const profile = this.combat_getBossVulnerabilityProfile(enemy);
         if (!profile || !profile.attrs || profile.attrs.length === 0) return result;
@@ -1629,6 +1605,9 @@ export const combat_system = {
             : (mech.counterHitGain || 1);
 
         bossVulnerability.progressGain = gain;
+        bossVulnerability.damageGateAlreadyShifted = enemy.bossType === 'ouroboros'
+            && bossVulnerability.ouroborosDamageGateSeqBefore != null
+            && (enemy._ouroborosDamageGateSeq || 0) !== bossVulnerability.ouroborosDamageGateSeqBefore;
         const visualAttrs = Array.isArray(enemy._bossVulnerabilityVisualAttrs)
             ? enemy._bossVulnerabilityVisualAttrs.filter(Boolean)
             : [];
@@ -1636,7 +1615,10 @@ export const combat_system = {
             bossVulnerability.matchedAttr,
             ...visualAttrs.filter(attr => attr !== bossVulnerability.matchedAttr)
         ].slice(0, 2);
-        enemy._bossVulnerabilityProgress = (enemy._bossVulnerabilityProgress || 0) + bossVulnerability.progressGain;
+        const progressBase = bossVulnerability.damageGateAlreadyShifted
+            ? Math.max(0, bossVulnerability.progressBefore || 0)
+            : (enemy._bossVulnerabilityProgress || 0);
+        enemy._bossVulnerabilityProgress = progressBase + bossVulnerability.progressGain;
         enemy._bossVulnerabilityVisualRatio = Math.max(
             0,
             Math.min(0.99, enemy._bossVulnerabilityProgress / Math.max(1, profile.breakThreshold || 1))
@@ -1663,7 +1645,9 @@ export const combat_system = {
             }
             bossVulnerability.breakTriggered = true;
             if (enemy.bossType === 'ouroboros' && typeof enemy._interruptOuroborosAttachment === 'function') {
-                enemy._interruptOuroborosAttachment(this, bossVulnerability.matchedAttr);
+                if (!bossVulnerability.damageGateAlreadyShifted) {
+                    enemy._interruptOuroborosAttachment(this, bossVulnerability.matchedAttr);
+                }
             }
         }
 
@@ -1677,11 +1661,25 @@ export const combat_system = {
             // Boss 破绽反馈由敌人身体 Overlay 表达，不再用命中飘字打断阅读。
             if (context.bossVulnerability.breakTriggered || context.bossVulnerability.exposedApplied || context.bossVulnerability.progressGain > 0) return null;
         }
-        if (context.wardSpent || damageResult.deflected) {
-            return { text: '屏障', color: '#67e8f9', size: 14 };
+        const hpDamage = damageResult.hpDamage ?? damageResult.actualDamage ?? 0;
+        const blockLabels = {
+            ward: { text: '屏障', color: '#67e8f9', size: 14, iconImg: getUiBitmap(DEFENSE_ICON_MAP.ward) },
+            shield: { text: '护盾', color: '#93c5fd', size: 14, iconImg: getUiBitmap(DEFENSE_ICON_MAP.shield) },
+            phaseShield: { text: '相盾', color: '#a5b4fc', size: 14, iconImg: getUiBitmap(DEFENSE_ICON_MAP.phaseShield) },
+            radiantAegis: { text: '流彩', color: '#f0abfc', size: 14, iconImg: getUiBitmap(DEFENSE_ICON_MAP.radiantAegis) },
+            energyArmor: { text: '蓄盾', color: '#fbbf24', size: 14, iconImg: getUiBitmap(DEFENSE_ICON_MAP.energyArmor) },
+            livingArmor: { text: '活甲', color: '#bef264', size: 14, iconImg: getUiBitmap(DEFENSE_ICON_MAP.livingArmor) },
+            lowDamageImmune: { text: '免疫', color: '#cbd5e1', size: 14 },
+        };
+        if (damageResult.defenseBlocked || (damageResult.blockedDamage || 0) > 0) {
+            const label = blockLabels[damageResult.blockedBy];
+            if (label) return label;
         }
-        if (context.shieldSpent && damageResult.actualDamage > 0) {
-            return { text: '护盾', color: '#93c5fd', size: 14 };
+        if (context.wardSpent || damageResult.deflected) {
+            return { text: '屏障', color: '#67e8f9', size: 14, iconImg: getUiBitmap(DEFENSE_ICON_MAP.ward) };
+        }
+        if (context.shieldSpent && hpDamage > 0) {
+            return { text: '护盾', color: '#93c5fd', size: 14, iconImg: getUiBitmap(DEFENSE_ICON_MAP.shield) };
         }
         if (context.isCrit) {
             return { text: '暴击', color: '#ff4444', size: 16 };
@@ -1734,11 +1732,11 @@ export const combat_system = {
         // --- 1. 视觉特效生成逻辑 ---
         const hitX = projectile.pos.x;
         const hitY = projectile.pos.y;
+        const afx = CONFIG.balance.affixes;
         const isPierceHitNow = config.pierce > 0 &&
             projectile.piercesLeft !== undefined &&
             projectile.piercesLeft < config.pierce;
-        const afx = CONFIG.balance.affixes; // 获取配置引用
-        
+        const spawnPrimaryHitImpact = () => {
         // 根据子弹属性决定打击特效
         // 根据子弹属性决定打击特效
         if (config.cryo > 0) {
@@ -1777,18 +1775,32 @@ export const combat_system = {
             // 闪电：生成紫色快速火花
             for(let i=0; i<8; i++) this.spawn_createParticle(hitX, hitY, '#d8b4fe', 'spark');
         } else if (config.pierce > 0) {
-            // 穿透：红色锐利碎片
-            for(let i=0; i<5; i++) this.spawn_createParticle(hitX, hitY, '#fca5a5', 'spark');
-            // @perf-impact: 穿透后的后续命中追加轻量冲击波和少量 spark；走 shockwaveLimit/sparkLimit 预算
-            if (isPierceHitNow) {
-                if (typeof this.spawn_createShockwave === 'function') {
-                    this.spawn_createShockwave(hitX, hitY, '#fca5a5');
-                }
-                for (let i = 0; i < 3; i++) {
-                    this.spawn_createParticle(hitX, hitY, '#fecaca', 'spark');
-                }
-                if (typeof this.spawn_createFloatingText === 'function') {
-                    this.spawn_createFloatingText(hitX, hitY - 18, 'PIERCE!', '#fca5a5', 13);
+            const pv = projectile.vel || projectile.velocity || new Vec2(1, 0);
+            const pierceAngle = (Math.abs(pv.x || 0) + Math.abs(pv.y || 0)) > 0.001
+                ? Math.atan2(pv.y || 0, pv.x || 0)
+                : 0;
+            const pierceLength = isPierceHitNow ? 104 : 86;
+            // @perf-impact: 穿透命中切割反馈 - 复用 maxParticles/sparkLimit，移除旧 shockwave 光圈。
+            this.spawn_pushParticleWithLimit(new PierceCutEffect(
+                hitX,
+                hitY,
+                pierceAngle,
+                pierceLength,
+                isPierceHitNow ? '#fecaca' : '#fca5a5',
+                this.perfQualityLevel || 'high'
+            ));
+            const chipCount = this.perfQualityLevel === 'low' ? 1 : (isPierceHitNow ? 3 : 2);
+            const normalX = -Math.sin(pierceAngle);
+            const normalY = Math.cos(pierceAngle);
+            for (let i = 0; i < chipCount; i++) {
+                const p = this.spawn_createParticle(hitX, hitY, i % 2 ? '#fecaca' : '#fca5a5', 'spark');
+                if (p && p.vel) {
+                    const side = i % 2 === 0 ? 1 : -1;
+                    const forward = 1.2 + Math.random() * 1.6;
+                    const lift = (2.2 + Math.random() * 1.4) * side;
+                    p.vel.x = Math.cos(pierceAngle) * forward + normalX * lift;
+                    p.vel.y = Math.sin(pierceAngle) * forward + normalY * lift;
+                    p.size *= 0.85;
                 }
             }
         } else if (config.wind > 0) {
@@ -1802,6 +1814,7 @@ export const combat_system = {
             const color = config.damage > 5 ? '#d8b4fe' : '#e2e8f0';
             for(let i=0; i<4; i++) this.spawn_createParticle(hitX, hitY, color, 'normal');
         }
+        };
         // --- ：判断伤害类型 ---
         let hitType = 'normal';
         if (config.cryo > 0) hitType = 'cryo';
@@ -2032,7 +2045,11 @@ export const combat_system = {
             this.combat_runeword_elementalFusion_check(enemy, dmg, shotId);
         }
         const killed = damageResult.killed;
-        const actualDmg = damageResult.actualDamage; // --- [新增] 确定基础伤害类型 (用于统计图表行) ---
+        const actualDmg = damageResult.hpDamage ?? damageResult.actualDamage ?? 0; // --- [新增] 确定基础伤害类型 (用于统计图表行) ---
+        const blockedByDefense = !!(damageResult.defenseBlocked || (damageResult.blockedDamage || 0) > 0 || damageResult.blockedBy);
+        if (actualDmg > 0 && !blockedByDefense) {
+            spawnPrimaryHitImpact();
+        }
         if (!killed) {
             this.combat_updateBossVulnerabilityProgress(enemy, bossVulnerability, actualDmg);
         }
@@ -2106,7 +2123,8 @@ export const combat_system = {
                     this.enemies.forEach(other => {
                         if (other.active && other.pos.dist(novaCenter) < slashRadius) {
                             const slashResult = other.takeDamage(slashDmg);
-                            this.combat_recordDamage(slashResult.actualDamage, 'pyro', 'main', shotId);
+                            const slashHpDamage = slashResult.hpDamage ?? slashResult.actualDamage ?? 0;
+                            this.combat_recordDamage(slashHpDamage, 'pyro', 'main', shotId);
                             if (slashResult.killed) this.spawn_addScore(other.maxHp, other);
                             if (tempAmount > 0) other.applyTemp(tempAmount);
                             other._pyroHitThisRound = true;
@@ -2147,7 +2165,8 @@ export const combat_system = {
                             // 造成静电场伤害
                             if (staticDmg > 0) {
                                 const staticResult = ne.takeDamage(staticDmg);
-                                this.combat_recordDamage(staticResult.actualDamage, 'lightning', 'main', shotId);
+                                const staticHpDamage = staticResult.hpDamage ?? staticResult.actualDamage ?? 0;
+                                this.combat_recordDamage(staticHpDamage, 'lightning', 'main', shotId);
                                 if (staticResult.killed) this.spawn_addScore(ne.maxHp, ne);
                             }
                             // 施加 shockStacks 层感电状态（升温）
@@ -2296,10 +2315,13 @@ export const combat_system = {
             // Step 2: 造成基础燃烧伤害（应用熱毁倍率 × 共鸣倍率）
             if (baseFireDmg >= 1) {
                 const fireResult = enemy.takeDamage(baseFireDmg * meltdownMult * pyroResMult);
-                this.combat_recordDamage(fireResult.actualDamage, 'pyro', sourceType, shotId);
+                const fireHpDamage = fireResult.hpDamage ?? fireResult.actualDamage ?? 0;
+                this.combat_recordDamage(fireHpDamage, 'pyro', sourceType, shotId);
                 // 显示橙色燃烧字样（共鸣激活时展示共鸣等级标记）
-                const burnLabel = pyroResonance ? `🔥Burn ${Math.ceil(fireResult.actualDamage)}` : `Burn ${Math.ceil(fireResult.actualDamage)}`;
-                this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 25, burnLabel, '#fb923c');
+                if (fireHpDamage > 0) {
+                    const burnLabel = pyroResonance ? `🔥Burn ${Math.ceil(fireHpDamage)}` : `Burn ${Math.ceil(fireHpDamage)}`;
+                    this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 25, burnLabel, '#fb923c');
+                }
             }
             // Step 3: [遗物 Hook] 余烬保险丝 (ember_fuse) - 过热爆炸机制 (Small Explosion)
             // [属性共鸣] 三阶共鸣可将爆燃阈值从 200 降至 100
@@ -2333,11 +2355,13 @@ export const combat_system = {
                     for(let i=0; i<10; i++) this.spawn_createParticle(enemy.pos.x, enemy.pos.y, '#fdba74', 'spark');
                     for(let i=0; i<5; i++) this.spawn_createParticle(enemy.pos.x, enemy.pos.y, 'rgba(0,0,0,0.5)', 'smoke');
                     audio.playExplosion();
+                    this.combat_applyExplosionKnockback(enemy.pos.x, enemy.pos.y, pyroCfg.radius, 10);
 
                     // --- 2. 核心伤害 (对当前敌人) ---
                     const expResult = enemy.takeDamage(explodeDmg);
-                    this.combat_recordDamage(expResult.actualDamage, 'pyro', sourceType, shotId);
-                    this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 50, `BOOM! ${Math.ceil(expResult.actualDamage)}`, '#dc2626');
+                    const expHpDamage = expResult.hpDamage ?? expResult.actualDamage ?? 0;
+                    this.combat_recordDamage(expHpDamage, 'pyro', sourceType, shotId);
+                    if (expHpDamage > 0) this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 50, `BOOM! ${Math.ceil(expHpDamage)}`, '#dc2626');
                     
                     // --- 3. 范围伤害 (AOE) ---
                     const EXPLODE_RADIUS = pyroCfg.radius; // 爆炸半径
@@ -2345,7 +2369,8 @@ export const combat_system = {
                         if (other !== enemy && other.active && enemy.pos.dist(other.pos) < EXPLODE_RADIUS) {
                             const aoeDmg = explodeDmg * pyroCfg.aoeDamageMult; // 范围伤害
                             const aoeResult = other.takeDamage(aoeDmg);
-                            this.combat_recordDamage(aoeResult.actualDamage, 'pyro', sourceType, shotId);
+                            const aoeHpDamage = aoeResult.hpDamage ?? aoeResult.actualDamage ?? 0;
+                            this.combat_recordDamage(aoeHpDamage, 'pyro', sourceType, shotId);
                             
                             // 范围内的敌人也受到热量波及 (增加少量温度)
                             other.applyTemp(consumedHeat*0.25);
@@ -2381,16 +2406,18 @@ export const combat_system = {
         // this._currentDamageShotId = shotId; // 移除：不再需要全局缓存 shotId
         
         // [新增] 统一显示伤害数字 (使用实际造成的伤害)
-        if (this.showDamageNumbers && actualDmg > 0) {
-            if (isCrit) {
-                // [修复] 暴击时：显示更大的红色暴击伤害数字（24px），不再显示 CRIT! 前缀文字
-                this.spawn_createFloatingText(hitX, hitY - 10, `-${Math.ceil(actualDmg)}`, '#FF3333', 24);
-            } else {
-                this.spawn_createFloatingText(hitX, hitY, `-${Math.ceil(actualDmg)}`, damageColor);
+        if (this.showDamageNumbers) {
+            if (actualDmg > 0) {
+                if (isCrit) {
+                    // [修复] 暴击时：显示更大的红色暴击伤害数字（24px），不再显示 CRIT! 前缀文字
+                    this.spawn_createFloatingText(hitX, hitY - 10, `-${Math.ceil(actualDmg)}`, '#FF3333', 24);
+                } else {
+                    this.spawn_createFloatingText(hitX, hitY, `-${Math.ceil(actualDmg)}`, damageColor);
+                }
             }
             if (hitFeedback) {
-                const labelY = hitY - (isCrit ? 36 : 24);
-                this.spawn_createFloatingText(hitX, labelY, hitFeedback.text, hitFeedback.color, hitFeedback.size || 14);
+                const labelY = hitY - (actualDmg > 0 ? (isCrit ? 36 : 24) : 10);
+                this.spawn_createFloatingText(hitX, labelY, hitFeedback.text, hitFeedback.color, hitFeedback.size || 14, hitFeedback.iconImg || null);
             }
         }
         // --- [符文词条 Hook] 专注射击 (focused_fire) - 暴击视觉特效 ---
@@ -2433,9 +2460,12 @@ export const combat_system = {
 
 	                    // 2. 造成额外伤害
 	                    if (extraDmg > 0) {
-	                        enemy.takeDamage(extraDmg);
-	                        this.combat_recordDamage(extraDmg, 'flying_sword', 'flying_sword', shotId);
-	                        this.spawn_createFloatingText(sword.pos.x, sword.pos.y, `+${Math.ceil(extraDmg)}`, resonanceColor);
+	                        const swordResult = enemy.takeDamage(extraDmg);
+	                        const swordHpDamage = swordResult.hpDamage ?? swordResult.actualDamage ?? 0;
+	                        this.combat_recordDamage(swordHpDamage, 'flying_sword', 'flying_sword', shotId);
+	                        if (swordHpDamage > 0) {
+	                            this.spawn_createFloatingText(sword.pos.x, sword.pos.y, `+${Math.ceil(swordHpDamage)}`, resonanceColor);
+	                        }
 
                             // [新增] 电属性飞剑联动：触发连锁闪电
                             if (sword.config.lightning > 0) {
@@ -2542,6 +2572,7 @@ export const combat_system = {
                     this.spawn_createShockwave(cx, cy, '#fb923c');
                     setTimeout(() => { if (this.spawn_createShockwave) this.spawn_createShockwave(cx, cy, '#b91c1c'); }, 100);
                 }
+                this.combat_applyExplosionKnockback(cx, cy, burstRadius, 13);
                 // 3. 大量橙红 ember 余烬粒子（焦碎感）
                 const emberCount = Math.max(3, Math.floor((relicBudget.relicCinematicSparkCount || 0) * 0.8));
                 for (let i = 0; i < emberCount; i++) {
@@ -2660,11 +2691,20 @@ export const combat_system = {
                 const OccupancyPenalty = Math.max(0.2, 1.0 - (this.runeInventory.length + runesInGrid) / MAX_RUNE_CAPACITY);
                 // 最终掉落率
                 const FinalDropRate = BaseDropRate * EnemyModifier * OccupancyPenalty;
-                if (Math.random() < FinalDropRate) {
-                    const dropResult = loot_calcRuneDrop(this);
+                const enemyAffixes = enemy.affixes || [];
+                const runeDropAffix = enemyAffixes.includes('adaptiveRune')
+                    ? 'adaptiveRune'
+                    : (enemyAffixes.includes('runeBearer') ? 'runeBearer' : null);
+                if (runeDropAffix || Math.random() < FinalDropRate) {
+                    const adaptiveElement = runeDropAffix === 'adaptiveRune' && typeof enemy._getAdaptiveRuneDropElement === 'function'
+                        ? enemy._getAdaptiveRuneDropElement()
+                        : null;
+                    const dropResult = loot_calcRuneDrop(this, adaptiveElement ? { forcedElement: adaptiveElement } : {});
                     if (dropResult.runeId) {
                         const loot = new RuneLoot(enemy.pos.x, enemy.pos.y, dropResult.runeId);
                         loot.level = dropResult.level;
+                        loot.sourceAffix = runeDropAffix;
+                        loot.sourceElement = adaptiveElement;
                         this.runeLootItems.push(loot);
                     }
                 }
@@ -2721,17 +2761,20 @@ export const combat_system = {
             
             // 播放音效
             audio.playExplosion();
+            const explosionRadius = 100 * (config._explosionRadiusMult || 1.0);
+            this.combat_applyExplosionKnockback(projectile.pos.x, projectile.pos.y, explosionRadius, 12);
 
             // --- 3. 造成范围伤害与效果 ---
             this.enemies.forEach(other => {
                 // 排除自身 & 距离检测 (爆炸半径 100)
-                if (other !== enemy && other.active && projectile.pos.dist(other.pos) < 100 * (config._explosionRadiusMult || 1.0)) { 
+                if (other !== enemy && other.active && projectile.pos.dist(other.pos) < explosionRadius) {
                     
                     // 造成 AOE 伤害 (减半)
                     const aoeDmg = dmg * 0.5;
-                    const k = other.takeDamage(aoeDmg); 
-                    this.combat_recordDamage(aoeDmg, 'explosive', 'main', shotId); 
-                    if (k) this.spawn_addScore(other.maxHp, other); 
+                    const aoeResult = other.takeDamage(aoeDmg);
+                    const aoeHpDamage = aoeResult.hpDamage ?? aoeResult.actualDamage ?? 0;
+                    this.combat_recordDamage(aoeHpDamage, 'explosive', 'main', shotId);
+                    if (aoeResult.killed) this.spawn_addScore(other.maxHp, other);
                     
                     // --- 4. 关键：AOE 也要施加元素效果 ---
                     // 这样爆炸范围内的敌人也会被冰冻/点燃，符合直觉
@@ -2753,7 +2796,18 @@ export const combat_system = {
         }
         return damageResult;
     },
-    
+
+    // @perf-impact: Explosion knockback only iterates active enemies at explosion moments and updates visual offsets; no new particles or persistent physics state.
+    combat_applyExplosionKnockback(cx, cy, radius = 100, maxOffset = 12) {
+        if (!this.enemies) return;
+        if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(radius) || !Number.isFinite(maxOffset)) return;
+        if (radius <= 0 || maxOffset <= 0) return;
+        for (const other of this.enemies) {
+            if (!other || !other.active || typeof other.applyExplosionKnockback !== 'function') continue;
+            other.applyExplosionKnockback(cx, cy, radius, maxOffset);
+        }
+    },
+
     // [已迁移至 src/combat/damage_calc.js] combat_triggerChromaticAberration
     // CRT 色差效果触发 —— 通过文件底部的 Object.assign(combat_system, DamageCalc) 注入
     // [Task 3.2 已完成] combat_triggerChromaticAberration 已在 damage_calc.js 中改为 EventBus 事件
@@ -2769,7 +2823,7 @@ export const combat_system = {
      * @param {Vec2} vel - **重要参数** 初始速度向量。
      */
     // @section:fire_ammo_selection - 弹药选择与配方读取
-    combat_fireNextShot(vel) {
+    combat_fireNextShot(vel, origin = null) {
         if (this.ammoQueue.length === 0) return;
         
         // 标记首发子弹
@@ -2794,6 +2848,9 @@ export const combat_system = {
         const finalRecipe = pullNext();
         if (!finalRecipe) return;
         const isRoundOpeningShot = this._roundFirstShotId === this.shotIdCounter;
+        const fireOrigin = origin && Number.isFinite(origin.x) && Number.isFinite(origin.y)
+            ? { x: origin.x, y: origin.y }
+            : null;
 
         // ==================== [v2 重构] 符文属性附加路径已移除 ====================
         // 旧版本：activeRunewordStats 和 calcRuneBaseStats 会把 pyro/cryo/bounce/...
@@ -3069,9 +3126,19 @@ export const combat_system = {
         // [词条 Hook] 化弹为剑：取消连射，连射次数将作为子飞剑攻击次数
         const isReplacedSword = !!finalRecipe._replaceWithSonSword;
         const isOnlyOne = isReplacedSword || !(finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword' && !finalRecipe.wind);
+
+        // [剑刃风暴] 携带剑刃风暴的回合首发子弹飞行速度减半，让风暴更久停留在战场
+        let fireVel = vel;
+        if (isRoundOpeningShot && this.activeRunewordEffects && this.activeRunewordEffects['blade_storm']
+            && vel && Number.isFinite(vel.x) && Number.isFinite(vel.y)) {
+            fireVel = { x: vel.x * 0.5, y: vel.y * 0.5 };
+        }
+
         this.burstQueue.push({
             delay: 0,
-            vel: vel,
+            x: fireOrigin ? fireOrigin.x : undefined,
+            y: fireOrigin ? fireOrigin.y : undefined,
+            vel: fireVel,
             recipe: finalRecipe,
             shotId: shotId,
             isLast: isOnlyOne,
@@ -3083,7 +3150,15 @@ export const combat_system = {
         if (!isReplacedSword && finalRecipe.multicast > 0 && finalRecipe.type != 'flying_sword' && !finalRecipe.wind) {
             for(let i=1; i<=finalRecipe.multicast; i++) {
                 const isLastInBurst = (i === finalRecipe.multicast);
-                this.burstQueue.push({ delay: i * 20, vel: vel, recipe: finalRecipe, shotId: shotId, isLast: isLastInBurst });
+                this.burstQueue.push({
+                    delay: i * 20,
+                    x: fireOrigin ? fireOrigin.x : undefined,
+                    y: fireOrigin ? fireOrigin.y : undefined,
+                    vel: fireVel,
+                    recipe: finalRecipe,
+                    shotId: shotId,
+                    isLast: isLastInBurst
+                });
             }
         }
     },
@@ -3387,7 +3462,8 @@ export const combat_system = {
 
             if (novaDmg > 0) {
                 const novaResult = ne.takeDamage(novaDmg);
-                this.combat_recordDamage(novaResult.actualDamage, 'cryo', 'main', null);
+                const novaHpDamage = novaResult.hpDamage ?? novaResult.actualDamage ?? 0;
+                this.combat_recordDamage(novaHpDamage, 'cryo', 'main', null);
                 if (novaResult.killed && typeof this.spawn_addScore === 'function') {
                     this.spawn_addScore(ne.maxHp, ne);
                 }
@@ -3414,59 +3490,88 @@ export const combat_system = {
     // --- [修复] 剑刃风暴定期更新逻辑 ---
     combat_bladeStorm_update(timeScale) {
         const bladeStormFx = this.activeRunewordEffects && this.activeRunewordEffects['blade_storm'];
-        if (!bladeStormFx) return;
-
-        // 寻找首个子弹：在 projectiles 中查找 shotId 等于 _roundFirstShotId 且不是分裂副子弹的主子弹
-        let targetProj = this._bladeStormProjectile;
-        if (!targetProj || !targetProj.active || targetProj.destroyed) {
-            targetProj = this.projectiles.find(p => p.shotId === this._roundFirstShotId && !p.isCopy);
-            if (targetProj) {
-                this._bladeStormProjectile = targetProj;
-            } else {
-                return; // 首个子弹已消失或未生成
-            }
-        }
+        if (!bladeStormFx) { this._bladeStorm_killVortex(); this._bladeStormLingerTimer = null; return; }
 
         const radius = (bladeStormFx.params && bladeStormFx.params.radius) || 120;
         const damageRatio = (bladeStormFx.params && bladeStormFx.params.damageRatio) || 0.6;
         const interval = Math.max(0.1, (bladeStormFx.params && bladeStormFx.params.interval) || 0.5);
 
+        // 寻找首个子弹：shotId 等于 _roundFirstShotId 且不是分裂副子弹的主子弹
+        let targetProj = this._bladeStormProjectile;
+        if (!targetProj || !targetProj.active || targetProj.destroyed) {
+            targetProj = this.projectiles.find(p => p.shotId === this._roundFirstShotId && !p.isCopy);
+            this._bladeStormProjectile = targetProj || null;
+        }
+
+        // 确定本帧风暴中心：子弹存活→跟随子弹；子弹消亡→停留在最后坐标 3 秒后淡出
+        let cx, cy;
+        if (targetProj) {
+            cx = targetProj.pos.x; cy = targetProj.pos.y;
+            this._bladeStormLastPos = { x: cx, y: cy };
+            this._bladeStormBaseDmg = targetProj.config ? targetProj.config.damage : (this._bladeStormBaseDmg || 2);
+            this._bladeStormLingerTimer = null; // 子弹还在，不进入停留倒计时
+        } else {
+            // 子弹已消亡：若没有可停留的剑群或丢失坐标，直接收起
+            if (!this._bladeStormVortexFx || !this._bladeStormLastPos) { this._bladeStorm_killVortex(); return; }
+            if (this._bladeStormLingerTimer == null) this._bladeStormLingerTimer = 180; // 3 秒 = 180 帧
+            this._bladeStormLingerTimer -= timeScale;
+            cx = this._bladeStormLastPos.x; cy = this._bladeStormLastPos.y;
+            if (this._bladeStormLingerTimer <= 0) { this._bladeStorm_killVortex(); this._bladeStormLingerTimer = null; return; }
+        }
+
+        // === 持续型剑刃风暴特效：环绕风暴中心、持续旋转的流光剑群（每帧跟随中心） ===
+        if (!this._bladeStormVortexFx || !this._bladeStormVortexFx.active) {
+            const fx = new BladeStormVortex(cx, cy, radius);
+            this._bladeStormVortexFx = this.spawn_pushParticleWithLimit(fx) ? fx : null;
+        }
+        if (this._bladeStormVortexFx) {
+            this._bladeStormVortexFx.setCenter(cx, cy);
+        }
+
         this._bladeStormTimer = (this._bladeStormTimer || 0) + timeScale;
-        // 60帧 = 1秒
+        // 60帧 = 1秒（停留期间在停留点同样持续造成斩击伤害）
         if (this._bladeStormTimer >= interval * 60) {
             this._bladeStormTimer = 0;
 
-            const baseDmg = targetProj.config ? targetProj.config.damage : 2;
+            const baseDmg = this._bladeStormBaseDmg || 2;
             const slashDmg = Math.ceil(baseDmg * damageRatio);
-
-                // === 特效 1：范围扩散圆环（以子弹为圆心） ===
-            this.spawn_pushParticleWithLimit(new BladeStormRing(targetProj.pos.x, targetProj.pos.y, radius));
+            const STORM_COLOR = '#7dd3fc'; // 钢冷青：与风属性翠绿 #34d399 区分
+            const shotId = targetProj ? targetProj.shotId : this._roundFirstShotId;
 
             let hitAny = false;
             this.enemies.forEach(e => {
                 if (!e.active) return;
-                if (targetProj.pos.dist(e.pos) < radius) {
+                if (Math.hypot(e.pos.x - cx, e.pos.y - cy) < radius) {
                     const slashResult = e.takeDamage(slashDmg);
-                    this.combat_recordDamage(slashResult.actualDamage, 'wind', 'main', targetProj.shotId);
+                    const slashHpDamage = slashResult.hpDamage ?? slashResult.actualDamage ?? 0;
+                    this.combat_recordDamage(slashHpDamage, 'wind', 'main', shotId);
                     // [修复] 去掉伤害跳字，改为纯视觉特效
 
-                    // === 特效 2：敌人受击斩击光效（SlashEffect 梭形光束） ===
+                    // === 敌人受击斩击光效（SlashEffect 梭形光束） ===
                     const slashAngle = Math.random() * Math.PI * 2;
                     const slashLen = 40 + Math.random() * 20;
-                    this.spawn_pushParticleWithLimit(new SlashEffect(e.pos.x, e.pos.y, slashAngle, slashLen, '#34d399'));
+                    this.spawn_pushParticleWithLimit(new SlashEffect(e.pos.x, e.pos.y, slashAngle, slashLen, STORM_COLOR));
 
-                    // === 特效 3：剑痕残留（短暂消逝的斜线刀痕） ===
-                    this.spawn_pushParticleWithLimit(new SwordScar(e.pos.x, e.pos.y));
+                    // === 剑痕残留（短暂消逝的斜线刀痕） ===
+                    this.spawn_pushParticleWithLimit(new SwordScar(e.pos.x, e.pos.y, STORM_COLOR));
 
                     hitAny = true;
                 }
             });
 
-            // 触发时在子弹位置额外加一道斩击光效（无论是否命中敌人）
+            // 触发时在风暴中心额外加一道斩击光效（无论是否命中敌人）
             if (hitAny) {
                 const angle = Math.random() * Math.PI * 2;
-                this.spawn_pushParticleWithLimit(new SlashAnim(targetProj.pos.x, targetProj.pos.y, angle, 0.4, '#34d399'));
+                this.spawn_pushParticleWithLimit(new SlashAnim(cx, cy, angle, 0.4, STORM_COLOR));
             }
+        }
+    },
+
+    // 收起剑刃风暴剑群：淡出并解除引用（停留结束 / 词条失效时调用）
+    _bladeStorm_killVortex() {
+        if (this._bladeStormVortexFx) {
+            if (typeof this._bladeStormVortexFx.fadeOut === 'function') this._bladeStormVortexFx.fadeOut();
+            this._bladeStormVortexFx = null;
         }
     },
 
@@ -3599,6 +3704,7 @@ export const combat_system = {
                     const cx = target.pos.x;
                     const cy = target.pos.y;
                     const result = target.takeDamage(dmg);
+                    const hpDamage = result.hpDamage ?? result.actualDamage ?? 0;
                     cinematicDelayMs = Math.max(cinematicDelayMs, baseDelayMs);
 
                     // 末日时钟特效：深红/黑金主题，模拟倒计时归零与钟面崩裂
@@ -3636,8 +3742,8 @@ export const combat_system = {
                         }
                     }
                     // 4. 浮动文字：计时器/骷髅语义 + 伤害数值，暗红色强调末日感
-                    if (typeof this.spawn_createFloatingText === 'function') {
-                        const label = chainIndex > 0 ? `☠️ 末日回响 -${dmg}` : `☠️ 末日 -${dmg}`;
+                    if (typeof this.spawn_createFloatingText === 'function' && hpDamage > 0) {
+                        const label = chainIndex > 0 ? `☠️ 末日回响 -${Math.ceil(hpDamage)}` : `☠️ 末日 -${Math.ceil(hpDamage)}`;
                         this.spawn_createFloatingText(cx, cy - 36, label, chainIndex > 0 ? '#f97316' : '#dc2626');
                     }
 
@@ -3704,8 +3810,9 @@ export const combat_system = {
                     // 这里以 stacks × maxDmg / 3 作为合理近似的链伤害。
                     const arcDmg = Math.max(1, Math.floor(stacks * maxDmg * 0.33));
                     const result = e.takeDamage(arcDmg);
-                    if (typeof this.spawn_createFloatingText === 'function') {
-                        this.spawn_createFloatingText(e.pos.x, e.pos.y - 18, `电弧 ${arcDmg}`, '#a78bfa');
+                    const arcHpDamage = result.hpDamage ?? result.actualDamage ?? 0;
+                    if (typeof this.spawn_createFloatingText === 'function' && arcHpDamage > 0) {
+                        this.spawn_createFloatingText(e.pos.x, e.pos.y - 18, `电弧 ${Math.ceil(arcHpDamage)}`, '#a78bfa');
                     }
                     // @perf-impact: 遗物回合开始动画（回廊电弧）- 闪电条数受 relicCinematicBoltCount/lightningLimit 双重限制
                     if (Array.isArray(this.lightningBolts) && arcCount < maxArcCount && this.lightningBolts.length < (budget.lightningLimit || 0)) {
@@ -3731,46 +3838,47 @@ export const combat_system = {
         return cinematicDelayMs;
     },
 
-    // ==================== 充能符文系统 ====================
+    // ==================== 技能充能系统 ====================
 
     /**
-     * @method combat_runeCharge_init
-     * @description 初始化充能符文系统状态（战斗阶段开始时调用）
+     * @method combat_skillCharge_init
+     * @description 初始化技能充能状态（战斗阶段开始时调用）
      */
-    combat_runeCharge_init() {
-        this.runeChargeValue        = 0;    // 充能值 0~1，自动衰减
-        this.runeChargeLevel        = 0;    // 当前充能满次数（每满一次+1，无上限）
-        this.runeChargeCurrentRune  = null; // 当前预览符文（单个）
-        this.runeChargeCurrentLevel = 1;    // 当前预览符文等级（新增，§8.5）
-        this.combat_runeCharge_initUI();
+    combat_skillCharge_init() {
+        this.skillChargeActualValue = 0;
+        this.skillChargeTempValue = 0;
+        this.skillChargeLevel = 0;
+        this.runeChargeCurrentRune = null;
+        this.runeChargeCurrentLevel = 1;
+        this.combat_skillCharge_syncLegacyState();
+        this.combat_skillCharge_initUI();
     },
 
     /**
-     * @method combat_runeCharge_initUI
-     * @description 初始化充能符文UI（单符文槽，初始为空）
+     * @method combat_skillCharge_initUI
+     * @description 初始化技能充能 UI（实际条 + 临时条）
      */
-    combat_runeCharge_initUI() {
-        this.runeChargeCurrentRune = null; // 初始为空，不预生成
-        // 通知 hud.js 初始化 UI（空状态）
-        eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_INIT, {
-            runeDef: null
+    combat_skillCharge_initUI() {
+        eventBus.emit(EVENT_TYPES.UI_SKILL_CHARGE_INIT, {
+            actualValue: 0,
+            tempValue: 0,
+            totalValue: 0
         });
     },
 
     /**
-     * @method combat_runeCharge_onHit
-     * @description 子弹击中敌人时调用，充能并概率翻倍
+     * @method combat_skillCharge_onHit
+     * @description 子弹击中敌人时获得技能充能；临时条会衰减，实际条保留。
      * @param {number} hitX - 击中X坐标（保留参数，徽章已移除）
      * @param {number} hitY - 击中Y坐标
      * @param {boolean} isKill - 是否为击杀
      */
-    combat_runeCharge_onHit(hitX, hitY, isKill = false) {
-        // 基础充能量（击杀给更多充能）
-        // 降低基数：击中 3%，击杀 10%（原来 6%/18%）
-        const BASE_CHARGE = isKill ? 0.10 : 0.03;
+    combat_skillCharge_onHit(hitX, hitY, isKill = false) {
+        const gameplay = CONFIG.gameplay || {};
+        const baseCharge = isKill
+            ? (gameplay.skillChargeKillGain ?? 0.10)
+            : (gameplay.skillChargeHitGain ?? 0.03);
 
-        // 概率翻倍机制：x1/x2/x4/x8，概率降低
-        // x1: 82%，x2: 13%，x4: 4%，x8: 1%（原来 65%/25%/8%/2%）
         const roll = Math.random();
         let multiplier = 1;
         if (roll < 0.01) {
@@ -3781,104 +3889,140 @@ export const combat_system = {
             multiplier = 2;
         }
 
-        let chargeAmount = BASE_CHARGE * multiplier;
+        let chargeAmount = baseCharge * multiplier;
 
-        // [遗物 Hook] 符文共鸣核：每次击杀额外 +8% 充能
+        // 旧符文充能相关遗物转为技能充能加成，避免遗物效果空转。
         if (isKill && this.ownedRelics && this.ownedRelics.includes('rune_resonance_core')) {
             chargeAmount += 0.08;
         }
-
-        // [遗物 Hook] 符文虹吸管：稳定奖励命中，击杀时奖励翻倍。
         if (this.ownedRelics && this.ownedRelics.includes('rune_siphon')) {
             chargeAmount += isKill ? 0.04 : 0.02;
         }
 
-        // 累加充能值
-        this.runeChargeValue = Math.min(1.0, (this.runeChargeValue || 0) + chargeAmount);
+        const retainRatio = Math.min(1, Math.max(0, gameplay.skillChargeRetainRatio ?? 0.35));
+        const actualGain = chargeAmount * retainRatio;
+        const tempGain = chargeAmount - actualGain;
+        this.skillChargeActualValue = Math.max(0, (this.skillChargeActualValue || 0) + actualGain);
+        this.skillChargeTempValue = Math.max(0, (this.skillChargeTempValue || 0) + tempGain);
+        this.combat_skillCharge_tryAward();
+        this.combat_skillCharge_updateUI();
+    },
 
-        // 检查是否充能满 → 刷新符文预览
-        if (this.runeChargeValue >= 1.0) {
-            this.runeChargeValue = 0;
-            this.combat_runeCharge_levelUp();
+    /**
+     * @method combat_skillCharge_tryAward
+     * @description 总充能曾达到满条时，消耗一条充能并发放技能点。
+     */
+    combat_skillCharge_tryAward() {
+        let totalValue = (this.skillChargeActualValue || 0) + (this.skillChargeTempValue || 0);
+        if (totalValue < 1) {
+            this.combat_skillCharge_syncLegacyState();
+            return 0;
         }
 
-        // 更新UI
-        this.combat_runeCharge_updateUI();
+        const configuredMaxSkillPoints = Number(CONFIG.gameplay?.maxSkillPoints ?? 3);
+        const maxSkillPoints = Math.max(0, Number.isFinite(configuredMaxSkillPoints) ? configuredMaxSkillPoints : 3);
+        if ((this.skillPoints || 0) >= maxSkillPoints) {
+            this.skillChargeActualValue = 1;
+            this.skillChargeTempValue = 0;
+            this.combat_skillCharge_syncLegacyState();
+            return 0;
+        }
+
+        let awarded = 0;
+        while (totalValue >= 1 && (this.skillPoints || 0) < maxSkillPoints) {
+            const before = this.skillPoints || 0;
+            if (typeof this.spawn_addSkillPoint === 'function') {
+                this.spawn_addSkillPoint(1);
+            } else {
+                this.skillPoints = Math.min(maxSkillPoints, before + 1);
+                this.ui?.updateSkillPoints?.(this.skillPoints);
+                this.ui?.updateSkillBar?.(this.skillPoints, this.activeSkills);
+            }
+            if ((this.skillPoints || 0) <= before) break;
+            awarded += 1;
+            this.skillChargeLevel = (this.skillChargeLevel || 0) + 1;
+            totalValue -= 1;
+        }
+
+        this.skillChargeActualValue = Math.max(0, Math.min(1, totalValue));
+        this.skillChargeTempValue = 0;
+        this.combat_skillCharge_syncLegacyState();
+
+        if (awarded > 0) {
+            eventBus.emit(EVENT_TYPES.UI_SKILL_CHARGE_LEVEL_UP, {
+                awarded,
+                skillPoints: this.skillPoints || 0,
+                maxSkillPoints
+            });
+            // @section:rune_charge_levelup_audio - 充能满条发放技能点音效（520Hz sine，轻柔上升感）
+            try { if (audio?.playTone) audio.playTone(520, 'sine', 0.1, 0.25); } catch(e) {}
+        }
+        return awarded;
     },
 
     /**
-     * @method combat_runeCharge_levelUp
-     * @description 充能条满，刷新当前预览符文（每次充满都会刷新一次符文）
-     */
-    combat_runeCharge_levelUp() {
-        this.runeChargeLevel = (this.runeChargeLevel || 0) + 1;
-        // 使用新充能抽取算法（修复 Bug：原调用 loot_calcRuneDrop 返回字符串，新接口返回对象）
-        const { runeDef, runeLevel } = _runeCharge_draw(this.runeChargeLevel);
-        this.runeChargeCurrentRune  = runeDef  || null;
-        this.runeChargeCurrentLevel = runeLevel || 1;
-        // 通知 hud.js 刷新符文槽（带特效）
-        eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_LEVEL_UP, {
-            runeDef:   this.runeChargeCurrentRune,
-            runeLevel: this.runeChargeCurrentLevel
-        });
-        // @section:rune_charge_levelup_audio - 符文充能条升级音效（520Hz sine，轻柔上升感）
-        // 音效反馈
-        try { if (audio?.playTone) audio.playTone(520, 'sine', 0.1, 0.25); } catch(e) {}
-    },
-
-    /**
-     * @method combat_runeCharge_decay
-     * @description 充能条自动衰减（每帧调用）
+     * @method combat_skillCharge_decay
+     * @description 临时充能条自动衰减（每帧调用），实际条不衰减。
      * @param {number} timeScale - 时间缩放
      */
-    combat_runeCharge_decay(timeScale) {
-        if (!this.runeChargeValue) return;
-        // 衰减速度：每帧减少 0.003（约5秒内衰减完）
-        const DECAY_RATE = 0.003;
-        this.runeChargeValue = Math.max(0, this.runeChargeValue - DECAY_RATE * (timeScale || 1));
-        this.combat_runeCharge_updateUI();
+    combat_skillCharge_decay(timeScale) {
+        if (!this.skillChargeTempValue) return;
+        const decayRate = CONFIG.gameplay?.skillChargeDecayRate ?? 0.003;
+        this.skillChargeTempValue = Math.max(0, this.skillChargeTempValue - decayRate * (timeScale || 1));
+        this.combat_skillCharge_updateUI();
     },
 
     /**
-     * @method combat_runeCharge_updateUI
-     * @description 更新充能条UI
+     * @method combat_skillCharge_updateUI
+     * @description 更新技能充能条 UI。
      */
-    combat_runeCharge_updateUI() {
-        // [Task 3.2] 改为 EventBus 事件，由 hud.js 监听并更新充能条宽度
-        eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_UPDATE, {
-            value: this.runeChargeValue || 0
+    combat_skillCharge_updateUI() {
+        const actualValue = Math.max(0, Math.min(1, this.skillChargeActualValue || 0));
+        const totalValue = Math.max(0, Math.min(1, actualValue + (this.skillChargeTempValue || 0)));
+        const tempValue = Math.max(0, totalValue - actualValue);
+        this.combat_skillCharge_syncLegacyState();
+        eventBus.emit(EVENT_TYPES.UI_SKILL_CHARGE_UPDATE, {
+            value: totalValue,
+            actualValue,
+            tempValue,
+            totalValue
         });
     },
 
-    // combat_runeCharge_showMultiplierBadge 已移除（翻倍徽章功能已废弃）
-
-    /**
-     * @method combat_runeCharge_claimReward
-     * @description 战斗结束后领取当前预览符文（若有），并触发入背包动画
-     */
-    combat_runeCharge_claimReward() {
-        const runeDef = this.runeChargeCurrentRune;
-        if (!runeDef) return; // 未充能满过，无奖励
-
-        // 使用动态等级入库（修复原硬编码 level: 1 的 Bug）
-        const level = this.runeChargeCurrentLevel || 1;
-        this.runeInventory.push({ id: runeDef.id, level });
-
-        // 触发入背包动画事件（由 hud.js 处理 DOM 动画）
-        eventBus.emit(EVENT_TYPES.UI_RUNE_CHARGE_CLAIM, {
-            runeDef,
-            level
-        });
-
-        // @section:rune_charge_claim_audio - 符文充能完成领取音效（playPowerup 确认感）
-        // 音效
-        try { if (audio?.playPowerup) audio.playPowerup(); } catch(e) {}
-
-        // 重置充能状态
-        this.runeChargeValue        = 0;
-        this.runeChargeLevel        = 0;
-        this.runeChargeCurrentRune  = null;
+    combat_skillCharge_syncLegacyState() {
+        const totalValue = Math.max(0, Math.min(1, (this.skillChargeActualValue || 0) + (this.skillChargeTempValue || 0)));
+        this.runeChargeValue = totalValue;
+        this.runeChargeLevel = this.skillChargeLevel || 0;
+        this.runeChargeCurrentRune = null;
         this.runeChargeCurrentLevel = 1;
+    },
+
+    combat_runeCharge_init() {
+        this.combat_skillCharge_init();
+    },
+
+    combat_runeCharge_initUI() {
+        this.combat_skillCharge_initUI();
+    },
+
+    combat_runeCharge_onHit(hitX, hitY, isKill = false) {
+        this.combat_skillCharge_onHit(hitX, hitY, isKill);
+    },
+
+    combat_runeCharge_levelUp() {
+        return this.combat_skillCharge_tryAward();
+    },
+
+    combat_runeCharge_decay(timeScale) {
+        this.combat_skillCharge_decay(timeScale);
+    },
+
+    combat_runeCharge_updateUI() {
+        this.combat_skillCharge_updateUI();
+    },
+
+    combat_runeCharge_claimReward() {
+        return false;
     },
 
     // =========================================
@@ -4083,8 +4227,9 @@ export const combat_system = {
                 if (other.active && other !== enemy && enemy.pos.dist(other.pos) < CONFIG.gameplay.fireSpreadRadius) {
                     other.applyTemp(CONFIG.gameplay.fireSpreadTempIncrease);
                     const spreadDmg = enemy.maxHp * CONFIG.gameplay.fireSpreadDamagePercent;
-                    other.takeDamage(spreadDmg);
-                    this.combat_recordDamage(spreadDmg, 'pyro', 'main', shotId);
+                    const spreadResult = other.takeDamage(spreadDmg);
+                    const spreadHpDamage = spreadResult.hpDamage ?? spreadResult.actualDamage ?? 0;
+                    this.combat_recordDamage(spreadHpDamage, 'pyro', 'main', shotId);
                 }
             });
         }
@@ -4119,20 +4264,22 @@ export const combat_system = {
             audio.playExplosion();
 
         } else if (tier === 'elite') {
-            // 精英：能量环内缩 + 紫色灵魂烟雾
+            // 精英：紫晶裂隙 + 少量棱片脱落，避免旧版光圈扩散。
             if (_deUnderLimit) this.deathExplosions.push(new DeathExplosion(x, y, 'elite'));
-            // 紫色灵魂烟雾（向内漂移）
-            for (let i = 0; i < 5; i++) {
+            const shardCount = this.perfQualityLevel === 'low' ? 3 : 7;
+            for (let i = 0; i < shardCount; i++) {
                 const p = this.spawn_createParticle(
-                    x + (Math.random() - 0.5) * 30,
-                    y + (Math.random() - 0.5) * 30,
-                    'rgba(192,132,252,0.55)', 'mist'
+                    x + (Math.random() - 0.5) * 18,
+                    y + (Math.random() - 0.5) * 14,
+                    i % 2 ? '#e9d5ff' : '#a78bfa',
+                    'shard'
                 );
                 if (p) {
                     const angle = Math.random() * Math.PI * 2;
-                    p.vel = new Vec2(Math.cos(angle) * 0.4, Math.sin(angle) * 0.4 - 0.2);
-                    p.decay = 0.018;
-                    p.size = 8 + Math.random() * 6;
+                    const speed = 1.4 + Math.random() * 2.2;
+                    p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed - 0.45);
+                    p.decay = 0.026 + Math.random() * 0.012;
+                    p.size = 2.5 + Math.random() * 2.5;
                 }
             }
             this.triggerScreenShake(5);

@@ -4,6 +4,12 @@
 
 Projectile and laser wall logic must use `game.sys_getCombatBounds()` for the left and right walls. The canvas may include decorative side bands that are outside the playable combat arena. Enemy movement, projectile bounce, laser reflection, and aim-guide prediction should all treat `combatGridLeftX` and `combatGridRightX` as the side walls, not `0` and `game.width`.
 
+## 0.4 Skill Charge SP Source (2026-06-23)
+
+Combat charge now feeds skill points instead of rune rewards. `combat_skillCharge_onHit()` receives hit/kill events, splits gained charge into an actual retained bar and a temporary decaying bar, and calls `combat_skillCharge_tryAward()` when their total reaches 1.0. A successful full bar awards SP through `spawn_addSkillPoint()` and respects `CONFIG.gameplay.maxSkillPoints`.
+
+The old `combat_runeCharge_*` methods remain only as compatibility wrappers. New combat work must use `combat_skillCharge_*` and `UI_SKILL_CHARGE_*`; do not reintroduce `_runeCharge_draw` or write charge rewards into `runeInventory`.
+
 ## 0. Battle Relic Cinematic Timing (2026-06-18)
 
 `relic_runRoundStartHooks()` returns the number of milliseconds needed for round-start relic animations. `phase_finalizeRound()` calls it after `round++`; when the return value is greater than 0, Boss spawning, reward resolving, and the next round banner are delayed until `phase_continueFinalizeRoundAfterRelicHooks()` runs.
@@ -20,11 +26,17 @@ New combat relic animations must read `CONFIG.performance.relicCinematicDelayMs`
 
 `combat_getHitFeedbackLabel()` is a visual-only helper used by `combat_damageEnemy()` after `Enemy.takeDamage()` returns. It adds a short floating label near the normal damage number for high-signal outcomes:
 
-- Defense outcomes: `屏障` when a deflection ward absorbs damage, `护盾` when shield charges are actually spent.
+- Defense outcomes: `屏障` / `护盾` / `相盾` / `流彩` / `蓄盾` / `活甲` / `免疫` are driven by `damageResult.blockedBy`, so fully absorbed hits can still show a clear block label.
 - Damage outcomes: `暴击` for focused-fire crits.
 - Hit feedback no longer reads a global counter table. `combat_getHitFeedbackLabel()` only emits direct event labels such as shield, barrier, crit, bounce, and pierce.
 - Projectile outcomes: fallback labels for `弹射` and `穿透` when no higher-priority label applies.
 - Boss vulnerability no longer uses hit floating labels. Progress, break, exposed, and recover states are rendered on the Boss body via `_drawBossVulnerabilityOverlay()`.
+
+`Enemy.takeDamage()` must return actual HP loss as `hpDamage` / `actualDamage`, blocked value as `blockedDamage`, and the dominant blocking layer as `blockedBy`. Secondary damage callers should record `hpDamage`, not requested damage, and execute/kill callers must read `damageResult.killed`.
+
+Primary projectile hit particles in `combat_damageEnemy()` must be delayed until after `Enemy.takeDamage()` returns and only play when `hpDamage > 0` and the projectile was not blocked by any defense layer. Shield, phase shield, deflection ward, radiant aegis, energy armor, living armor, and low-damage immunity hits should show the defense label and directional defense feedback, not the normal projectile impact burst.
+
+`livingArmor` is a defense-layer contract: normal physical projectile damage and bounce damage are absorbed by armor first, pierce damage hits armor and body together, and elemental/DoT-style damage bypasses the armor layer.
 
 The helper must remain side-effect free. It may inspect enemy tags, archetype aliases, projectile config, and the post-hit `damageResult`, but damage formulas stay in the existing damage sections.
 

@@ -3,7 +3,7 @@
 > **数据来源**：`src/config.js` → `balance.affixes`, `balance.bossConfigs`, `BOSS_DB`, `ENEMY_CURVE_CONFIG`；`src/spawn_system.js` → `spawn_generateAffixes()`, `spawn_trySpawnWavePreset()`, `spawn_trySpawnArchetypes()`, `spawn_scheduleNextBoss()`；`src/wave_presets.js` → `ENEMY_WAVE_PRESETS`；`src/systems.js` → `TRUTH_BOOK_DATA.enemies`
 > **用途**：Agent 快速查询 26 种敌人词缀（含 V2 基底专属词缀）和 8 个 Boss 的行为机制、出现回合、破绽谱及关键代码位置。
 > **导演调参入口**：[`director_system.md`](director_system.md) 记录临场压力画像、preset 标签和反压制调度规则。
-> **最后更新**：补齐 Mikro / Devourer 入场专属敌人机制参与、Ignis 温压流光护盾闭环与 Tesla 导体网络场强机制（2026-06-23）
+> **最后更新**：补齐 Mikro / Devourer 入场专属敌人机制参与、Ignis 温压流光护盾闭环、Tesla 导体网络场强机制，以及已接入但不进普通随机池的符文奖励词条边界（2026-06-23）
 
 ## 0. V2 基底专属词条总览（7 种，仅通过基底敌人附带，不进入随机词条池）
 
@@ -81,6 +81,15 @@
 | `carrier` | 铸巢母架 | ▱ | Round 28 | 基底专属 | 优先击杀母体，清理投放小怪 |
 
 > **词缀数量概率**（`spawn_generateAffixes`）：0 个词缀（默认）；1 个词缀：最高 60%（r=20）；2 个词缀：最高 15%（r=20），Boss 战后临时 +25%。
+
+### 1.1 已接入：符文奖励词条（不计入普通随机池）
+
+`runeBearer` 与 `adaptiveRune` 已完成首版机制、SVG 占位资产、试炼场场景和掉落验证，但仍不计入普通随机敌人词缀池，也不得直接加入 `spawn_generateAffixes()` / `AFFIX_WEIGHT_CURVES`。后续投放应通过显式奖励事件、手写波次或导演模板少量投放。
+
+| 词条 ID | 规划名称 | 行为边界 | 掉落边界 | 美术资产入口 |
+|---|---|---|---|---|
+| `runeBearer` | 通用符文携带者 | 生成时和每个敌方回合开始携带一个随机变化的临时额外词条；临时词条参与本回合行为，但不永久写入原始词条池 | 死亡时必掉 1 个通用智能符文，走标准构筑权重 | `affix_rune_bearer.svg`、`overlay_affix_rune_bearer.svg` 与 Canvas 兜底 |
+| `adaptiveRune` | 自适应符文体 | 记录最后一次受到的有效属性伤害或属性效果，并切换到对应属性态 | 死亡时掉落当前记录属性家族的符文；无记录时回退标准智能掉落 | `affix_adaptive_rune.svg`、`overlay_affix_adaptive_rune.svg`、`overlay_adaptive_rune_<element>.svg` 与 Canvas 兜底 |
 
 ## 2. 词缀行为详解
 
@@ -184,7 +193,7 @@
 
 | 词缀 | 行为 | 关键配置 | 实现位置 |
 |---|---|---|---|
-| `livingArmor` | 获得最大生命 10% 的活体护甲；每个敌方回合开始回满；归零后自身不再自动恢复，但可被后续护甲孢子重新挂甲。反弹伤害先打护甲，穿透伤害会同时打护甲和本体，属性/DoT 不被代承。 | `livingArmorPct` | `Enemy._ensureLivingArmor()`、`Enemy._grantLivingArmor()`、`Enemy._restoreLivingArmorForTurn()`、`Enemy.takeDamage()` |
+| `livingArmor` | 获得最大生命 10% 的活体护甲；每个敌方回合开始回满；归零后自身不再自动恢复，但可被后续护甲孢子重新挂甲。普通物理弹丸与反弹/弹射伤害先打护甲，完全代承时不触发普通命中粒子；穿透伤害会同时打护甲和本体，属性/DoT 不被代承。 | `livingArmorPct` | `Enemy._ensureLivingArmor()`、`Enemy._grantLivingArmor()`、`Enemy._restoreLivingArmorForTurn()`、`Enemy.takeDamage()` |
 | `armorSpore` | 每个敌方回合给随机友军添加按分派者最大生命计算的活体护甲；目标已有活体护甲时按 50% 数值叠加。 | `armorSporeStackPct` | `Enemy._tickArmorSporeForTurn(game)` |
 | `siegeBreaker` | 防线屏障伤害不再固定为 1，而是按敌人占格数计算；撞城者再乘 2。 | `siegeBreakerDamageMult` | `Enemy._getFootprintCells()`、`Enemy._getDefenseBarrierDamage(game)` |
 | `deflectShell` | 仅 1×1 敌人生效；物理反弹法线持续旋转，使反弹弹道出现可读但不稳定的偏折。 | `deflectShellNormalRotateAmp`、`deflectShellNormalRotateSpeed` | `Projectile._handleCollision()` |
@@ -193,6 +202,8 @@
 | `overloadReactor` | 本回合每累计受到最大生命 20% 的实际伤害，额外获得 1 次行动和 1 次移动，上限 3。 | `overloadStepPct`、`overloadMaxBonus` | `Enemy.takeDamage()`、`Enemy.executeTurnAction()` |
 | `lowDamageImmune` | 小于最大生命 5% 的单次最终伤害无效，用于针对低伤高频流。 | `lowDamageImmunePct` | `Enemy.takeDamage()` |
 | `carrier` | 五格“冂”形铸巢母架专属。3×2 编号中 1/2/3/4/6 为占格，第 5 格为空舱；若空舱被占，先将占位敌人向下推出，推不出去则跳过本次投放；每回合在第 5 格空舱投放 1 个 10% 母体生命的小型敌人，固定 `haste+jump`，继承母体一个额外词条，并在生成当回合立即执行移动。 | `carrierSpawnInterval`、`carrierSpawnHpPct`、`carrierHpMult` | `Enemy._tickCarrierForTurn()`、`Enemy._getCarrierBayPosition()`、`Enemy._pushCarrierBayOccupant()`、`Enemy._carrierLaunchDroneMovement()`、`Enemy._carrierSpawnDrone()` |
+
+显示约定：敌人本地 HUD 中，标准护盾层数、流彩护盾、蓄能甲临时护盾和活体护甲都必须走 `_drawDefenseHudBadges()` 的“图标 + 剩余数值 + 血量”聚合逻辑；防御剩余数值文字必须使用对应防御类型颜色，避免与白色血量混淆；活体护甲不得再作为 `甲100%` 一类百分比状态短标签显示。相位护盾有剩余护盾层时使用相位盾图标显示层数，失效窗口仍保留 `相断` 状态短标签。HUD 图标使用 `assets/ui/icons/enemy_affixes/affix_energyArmor.png`、`affix_phaseShield.png`、`affix_livingArmor.png`，这些是由 HUD 缩放使用的高分辨率源图，不要复用大尺寸敌人 Overlay。
 
 ## 3. Boss 总览（8 个）
 
@@ -203,7 +214,7 @@
 | `ignis` | 熔炉守卫·伊格尼斯 | **R5** | 基础教学段（shield+haste+radiantAegis） | shield + haste + radiantAegis | pierce、pyro | 不触发烧伤 DoT；100℃以上结算转为温压，温压满时触发流光彩护盾；狂暴后每回合升温 +30°C |
 | `glacies` | 霜晶缝合怪·格拉西斯 | **R12** | 持续压力段（regen+jump） | jump + regen | cryo、pierce | 跳跃行数增加至 3 行；回合 tick / 跳跃落地在战斗场内缝合 `frostStitch` 与周围敌人，提供短暂减伤、回血和护盾；cryo 冻结下一次霜缝 tick，pierce 切断霜缝并增伤 |
 | `mikro` | 裂变母体·米克罗 | **R19** | 群体控制段（clone+healer） | clone + healer | lightning、scatter | 分身概率提升至 100%；每个存活分身与入场 `fission_cell` 提供 10% 减伤（上限 50%） |
-| `devourer` | 贪婪之渊·噬神者 | **R26** | 机制复合段（devour+shield） | devour + shield | bounce、laser | 全屏吞噬（吞噬范围 = 99）；若周围存在入场 `maw_thrall`，吞噬会优先选中该专属养料 |
+| `devourer` | 贪婪之渊·噬神者 | **R26** | 机制复合段（devour+shield） | devour + shield | bounce、laser | 每回合深渊胃域拉拽并召唤 `maw_thrall`；吞噬胃域内所有非 Boss 敌人转化为护盾；狂暴后吞噬范围全屏 |
 
 ### 3.2 大 Boss（出场回合：R33 → R40 → R47 → R54，固定对齐主题段落）
 
@@ -211,7 +222,7 @@
 |---|---|---|---|---|---|---|
 | `viridis` | 翠绿共生体·维里迪斯 | **R33** | 进阶测试段（regen+healer+孢甲） | regen + healer + livingArmor + armorSpore | pyro、venom | 专属孢子侍体和治疗会累积 `viridisSporeBloom`，达到阈值为自身/侍体补活体护甲；火焰/毒素会蚀甲并削资源；狂暴后自疗并加速孢甲循环 |
 | `tesla` | 雷霆幻影·特斯拉 | **R40** | 速度地狱段（haste+clone） | haste + clone | cryo、bounce | 每回合电击敌人转为导体；导体越多场强越高，场强提升行动与召唤压力 |
-| `chimera` | 混沌融合体·奇美拉 | **R47** | 混沌段（berserk+devour） | berserk + devour | venom、laser | 每回合胃域吸引 +2 格敌人；吞噬胃域内所有非 Boss 敌人并继承负面状态与温度；召唤 `chaos_feed` 养料循环 |
+| `chimera` | 混沌融合体·奇美拉 | **R47** | 混沌段（berserk+devour） | berserk + devour | venom、laser | 每回合随机吞噬 1 名敌人并召唤 +100°C / -100°C 热核养料；吞噬温度转热/寒层，冷热抵消生成流彩护盾；狂暴吸收层数翻倍 |
 | `ouroboros` | 永恒回声·奥罗波罗斯 | **R54** | 终极考验段（六附体轮转） | 六附体（见下） | 动态六组 | 六个附体槽每回合转位，当前前位附体授予 Boss 词缀与主机制；打满当前破绽会封印该附体并跳到下一个可用槽 |
 
 ### 3.3 奥罗波罗斯词缀轮转规则
@@ -253,7 +264,7 @@
 | 易伤窗口 | 暴露回合数大于 0 时，本次伤害乘以 `exposedDamageMult`；该值不按命中消耗，而是在 Boss 即将行动时消耗 1 回合。 |
 | 停摆行动 | `Enemy.startTurnAction()` 在 Boss 物理状态机、预警、治疗、吞噬、移动和 Ouroboros 轮转前消费暴露回合；Boss 跳过本次行动并进入恢复闭合视觉。 |
 | 回合缩放 | 从 `roundScalingStart` 起，每 `roundScalingStep` 回合提高一次条件；`hits` 模式增加命中次数，`damage` 模式增加最大生命百分比阈值。 |
-| 狂暴延后 | 若 `enrageDelayOnBreak` 为 true 且 Boss 尚未狂暴，破绽触发后会延后一次 50% 血量狂暴检测。 |
+| 狂暴延后 | 若 `enrageDelayOnBreak` 为 true 且 Boss 尚未狂暴，破绽触发后会延后一次 `CONFIG.balance.bossEnrageHpRatio` 血量阈值狂暴检测。 |
 | 可视反馈 | 命中飘字不再显示 `破绽+` / `破绽` / `易伤`；Boss 身体通过 `_drawBossVulnerabilityOverlay()` 显示属性痕迹、弱点部位、爆开、暴露和恢复。状态短标签统一显示 `隙XX%` 或 `破N`。 |
 | 存档 | `_bossVulnerabilityProgress`、`_bossVulnerabilityVisualRatio`、`_bossVulnerabilityVisualAttrs`、`_bossVulnerabilityExposedTurns`、`_bossVulnerabilityExposedPart`、`_bossVulnerabilitySuppressedEnrage`、`_bossVulnerabilityMode`、`_bossVulnerabilityThreshold` 与 break/recover 计时进入 `sys_saveRunState()` / `sys_loadRunState()`；旧 `_bossVulnerabilityExposedHits` 仅做兼容。 |
 
@@ -267,8 +278,8 @@
 |---|---|
 | `bossOwnerId` | 该敌人归属的 Boss ID，如 `ignis` / `tesla` / `chimera` |
 | `bossMinionRole` | 机制角色，如 `furnace_guard`、`conductor`、`chaos_feed` |
-| `bossMechanicTags` | 后续 Boss 机制识别用标签，如 `furnacePressure`、`teslaConductor`、`chaosFeed` |
-| `affixes` | 该 Boss 专属敌人的词缀画像；Ignis 当前为 `shield + radiantAegis`，Mikro 当前为 `clone + healer`（`fission_cell`，计入母体分裂减伤），Devourer 当前为 `devour + shield`（`maw_thrall`，吞噬优先目标），Viridis 当前为 `regen + healer + armorSpore`（孢子侍体），Tesla 当前为 `clone`（被电击或 lightning 命中后临时获得 `haste`），Chimera 当前为 `berserk`（volatile feed，不再带 `devour`），Ouroboros 当前为 `shield + haste + regen`（轨道回声） |
+| `bossMechanicTags` | 后续 Boss 机制识别用标签，如 `furnacePressure`、`teslaConductor`、`chaosFeed`、`thermalFeed` |
+| `affixes` | 该 Boss 专属敌人的词缀画像；Ignis 当前为 `shield + radiantAegis`，Mikro 当前为 `clone + healer`（`fission_cell`，计入母体分裂减伤），Devourer 当前为 `devour + shield`（`maw_thrall`，会被深渊胃域拉拽/吞噬），Viridis 当前为 `regen + healer + armorSpore`（孢子侍体），Tesla 当前为 `clone`（被电击或 lightning 命中后临时获得 `haste`），Chimera 当前为 `berserk`（`chaos_feed` / `thermalFeed`，召唤时带 +100°C 或 -100°C），Ouroboros 当前为 `shield + haste + regen`（轨道回声） |
 
 强化分支也会写入 `bossOwnerId`，但 `bossMinionRole` 使用 `boss_empowered`，用于区分“完全转化的专属敌人”和“被冲击波强化的普通敌人”。这些字段已进入 `sys_saveRunState()` / `sys_loadRunState()`。
 
@@ -282,7 +293,7 @@ Ignis 的火焰对抗语义是“点燃炉心压力”，不是普通烧伤：
 | 100℃以上回合结算 | `phase_enemy_processTurn()` 将 `temp - 100` 加上基础增量转为 `furnacePressure`，不调用 `takeDamage(dot)` 和 `playBurnTickEffect()` |
 | 温压满 | 达到 `bossConfigs.ignis.furnacePressureThreshold` 时调用 `Enemy._grantRadiantAegisPulse()`，触发一次流光彩护盾；若 Ignis 的流光护盾已破，可由温压重新点亮 |
 | 冰霜反制 | cryo 命中和负温结算会按配置比例降低 `furnacePressure` |
-| 可视状态 | 敌人状态短标签显示 `压XX%`，流光护盾继续显示 `彩XX%` |
+| 可视状态 | 敌人状态短标签显示 `压XX%`，流彩护盾吸收值统一走 `_drawDefenseHudBadges()` 的图标 + 数值 HUD |
 
 ### 3.7 Tesla 导体网络（2026-06-22）
 
@@ -313,20 +324,20 @@ Viridis 不再只是高血量治疗 Boss，而是围绕 `livingArmor` / `armorSp
 | 破绽谱 | Viridis 的 Boss 破绽谱为 `pyro` / `venom`，累积方式仍为实际伤害量 |
 | 视觉 | Viridis 与孢子侍体绘制黄绿孢甲环、少量孢点与 `孢N` / `腐N` 状态短标签；施加和破甲反馈复用 shockwave、spark 与浮字预算 |
 
-### 3.9 Chimera 胃域循环（2026-06-22）
+### 3.9 Devourer / Chimera 吞噬机制互换（2026-06-24）
 
-Chimera 的混沌语义改为“吸入、消化、继承代价”，不再只是初始高温或受击爆炸：
+Devourer 接管“胃域拉拽 + 养料循环”的深渊语义；Chimera 改为围绕温度层和流彩护盾的热核循环：
 
-| 规则 | 行为 |
-|---|---|
-| 胃域范围 | `chimeraMawRangeCells = 2`，以 Boss 体积外扩 +2 格扫描非 Boss 敌人 |
-| 胃域吸引 | `Enemy._tickChimeraMawField(game)` 在 Chimera 正常行动前触发，调用 `_chimeraAttractPrey()` 将范围内目标向 Boss 移动一格 |
-| 安全落点 | 吸引使用战斗网格列 / 行并调用 `calc_isAreaOccupied(..., excludeEnemy)`，找不到合法空格时不移动，禁止重叠 |
-| 胃域吞噬 | 消化冷却归零且范围内有目标时，`_selectTurnIntent()` 预告 `chimera_maw`；执行时 `_chimeraDevourTargets()` 吞噬 +2 格范围内所有非 Boss 目标 |
-| 状态继承 | 吞噬会把目标 `temp` 相加到 Chimera，并继承 `venomStacks`、`swordMarks` / `markTimer`、`frozenCount`、当前冻结标记、`_irradiationStacks`、`phaseShieldDisabledThisTurn` 等负面状态字段 |
-| 养料召唤 | `_chimeraSpawnFeeders()` 按 `chimeraSummonInterval` 与 `chimeraMaxFeeders` 在非重叠格子召唤 `bossOwnerId='chimera'` / `bossMinionRole='chaos_feed'` / `bossMechanicTags=['chaosFeed']` 的专属敌人 |
-| 上限与节奏 | 召唤每回合最多 `chimeraSummonMaxPerTurn`，场上养料最多 `chimeraMaxFeeders`；吞噬后进入 `chimeraDigestInterval`，狂暴时使用 `chimeraBerserkDigestInterval` |
-| 视觉 | Chimera 绘制紫青胃域环、向内短线和 `MAW feed/status` 标识；状态短标签显示 `胃N/M`，拉拽与吞噬复用浮字、shockwave 和少量粒子预算 |
+| Boss | 规则 | 行为 |
+|---|---|---|
+| Devourer | 深渊胃域 | `_tickDevourerMawField(game)` 在正常行动前拉拽胃域内非 Boss 敌人，并按 `devourerSummonInterval` 召唤 `maw_thrall` 养料 |
+| Devourer | 胃域吞噬 | `_selectTurnIntent()` 预告 `devourer_maw`；执行时 `_devourerDevourTargets()` 吞噬胃域内所有非 Boss 目标，按 `devourerDigestShieldPerFeed` 和被吞护盾层数转为自身护盾 |
+| Devourer | 狂暴 | `berserkedDevourRange = 99` 让胃域候选扩为全屏；消化冷却使用 `devourerBerserkDigestInterval` |
+| Chimera | 随机热核吞噬 | `_selectTurnIntent()` 预告 `chimera_thermal_devour`；执行时 `_chimeraDevourTargets()` 随机吞噬 1 名非 Boss 敌人，不再拉拽或继承毒、冻结、相位失效等负面状态 |
+| Chimera | 温度层 | 被吞目标温度绝对值达到 `chimeraThermalAbsorbMinTemp` 后，按 `chimeraThermalStackUnit = 100` 转为热层或寒层；狂暴时本次获得层数 ×2 |
+| Chimera | 流彩护盾 | 热层和寒层互相抵消，抵消层数写入 `chimeraRadiantConversions`，并通过 `_grantRadiantAegisPulse(..., rearmBroken: true)` 转为流彩护盾 |
+| Chimera | 热核养料 | 每次成功吞噬后 `_chimeraSpawnFeeders()` 召唤 1 个 `bossOwnerId='chimera'` / `bossMinionRole='chaos_feed'` / `bossMechanicTags=['chaosFeed','thermalFeed']` 的专属敌人，温度随机为 +100°C 或 -100°C |
+| 视觉 | 状态提示 | Devourer 显示深渊胃域和 `噬N`；Chimera 显示热/寒/流状态短标签与热核反应环；Glacies 霜缝目标显示 `霜缝N-减伤%` 并在身体上绘制冰框与减伤字样 |
 
 ### 3.10 Ouroboros 六附体轮转（2026-06-23）
 
@@ -339,8 +350,9 @@ Ouroboros 的终局语义从“三组词缀轮换”升级为六个附体槽位�
 | 当前词缀 | `_applyOuroborosAttachment()` 把当前附体的 `affixes` 写入 Boss 本体，因此普通行动、预警、状态短标签和破绽谱都随槽位变化 |
 | 附体主机制 | `_performOuroborosAttachmentAction()` 处理护盾、治疗、召唤、位移、吞噬、加速六类压力；召唤只生成少量 `orbit_echo`，并走非重叠格子检查 |
 | 打断附体 | Boss 破绽满格时 `combat_updateBossVulnerabilityProgress()` 调用 `_interruptOuroborosAttachment()`；当前槽被封印若干回合，轮转立即跳到下一个可用槽 |
-| 视觉 | 本体环外绘制 6 个小节点，当前槽放大高亮，下一槽次高亮，封印槽划线；状态短标签显示 `附X` 与累计 `断N` |
-| 存档 | `ouroborosOrbitStates`、`ouroborosOrbitDisruptions`、`_ouroborosOrbitInitialized` 与既有 `rotationIndex` / `rotationTurnCount` 一起保存和恢复 |
+| 受伤门槛 | 实际 HP 伤害累计到 `orbitDamageGatePct`（默认最大生命 12%）时，`_triggerOuroborosDamageGate()` 会先触发当前附体主机制，再封印该槽 `orbitDamageGateDisruptTurns`（默认 2 回合）并切到下一个可用槽；同一击若也打满破绽，只给暴露窗口，不重复封印新槽 |
+| 视觉 | 本体环外绘制 6 个 boss-matched `orbit_echo` 伴生体 PNG，当前槽放大高亮，下一槽次高亮，封印槽划线；有成稿 Boss sprite 时只保留低透明细轨道，不再让厚程序环盖住本体美术；状态短标签显示 `附X` 与累计 `断N` |
+| 存档 | `ouroborosOrbitStates`、`ouroborosOrbitDisruptions`、`_ouroborosOrbitInitialized`、`_ouroborosDamageGateProgress` 与既有 `rotationIndex` / `rotationTurnCount` 一起保存和恢复 |
 
 破绽谱速查：
 
@@ -403,7 +415,7 @@ finalHP = max(
 
 ## 7. Boss 狂暴触发机制
 
-**触发条件**：Boss 血量首次降至 50% 以下时触发（`combat_checkBossPhaseChange`）。
+**触发条件**：Boss 血量首次降至 `CONFIG.balance.bossEnrageHpRatio` 以下时触发；当前配置为 **20% HP**（`combat_checkBossPhaseChange`）。
 
 **触发流程**：
 1. `src/combat_system.js` → `combat_checkBossPhaseChange()` 检测血量阈值
@@ -423,6 +435,9 @@ finalHP = max(
 | `enemy.frostSeamTurns` | number | glacies 霜缝目标专用：剩余缝合回合，期间非 cryo / pierce 命中被减伤 |
 | `boss._berserkedCloneChance` | number | mikro 专用：狂暴后分身概率 |
 | `boss._berserkedDevourRange` | number | devourer 专用：狂暴后吞噬范围（99 = 全屏） |
+| `boss.devourerFeedStacks` | number | devourer 专用：深渊胃域累计吞噬计数 |
+| `boss._devourerDigestCooldown` | number | devourer 专用：深渊胃域吞噬冷却 |
+| `boss._devourerSummonCooldown` | number | devourer 专用：`maw_thrall` 养料召唤冷却 |
 | `boss._berserkedHealerRange` | number | viridis 专用：0 = 停止治疗他人 |
 | `boss._berserkedSelfRegenMult` | number | viridis 专用：自身再生倍率 |
 | `boss.viridisSporeBloom` | number | viridis 专用：孢子活甲资源，达到阈值后为孢子侍体/自身补活体护甲 |
@@ -432,15 +447,20 @@ finalHP = max(
 | `boss.teslaFieldPower` | number | tesla 专用：导体网络当前场强 |
 | `boss._teslaSummonCharge` | number | tesla 专用：场强累积召唤进度 |
 | `enemy._teslaChargedTurns` | number | tesla 导体专用：临时 haste / 充能剩余回合 |
-| `boss._berserkedBlastOnHitChance` | number | chimera 兼容旧狂暴爆炸字段；当前核心机制以胃域吸引 / 吞噬为主 |
-| `boss.chimeraFeedStacks` | number | chimera 专用：已吞噬养料 / 敌人的累计层数 |
-| `boss.chimeraInheritedStatusCount` | number | chimera 专用：吞噬继承的负面状态累计显示层 |
-| `boss._chimeraDigestCooldown` | number | chimera 专用：胃域吞噬冷却 |
-| `boss._chimeraSummonCooldown` | number | chimera 专用：养料召唤冷却 |
+| `boss._berserkedBlastOnHitChance` | number | chimera 兼容旧狂暴爆炸字段；当前核心机制以热核吞噬 / 流彩护盾为主 |
+| `boss.chimeraFeedStacks` | number | chimera 专用：已吞噬目标累计数 |
+| `boss.chimeraInheritedStatusCount` | number | chimera 专用：温度层吸收累计显示兼容字段，不再表示继承负面状态 |
+| `boss.chimeraHeatStacks` | number | chimera 专用：未抵消热层 |
+| `boss.chimeraFrostStacks` | number | chimera 专用：未抵消寒层 |
+| `boss.chimeraRadiantConversions` | number | chimera 专用：冷热抵消并转为流彩护盾的累计层数 |
+| `boss._chimeraDigestCooldown` | number | chimera 专用：热核吞噬冷却 |
+| `boss._chimeraSummonCooldown` | number | chimera 兼容字段；当前热核养料随成功吞噬即时召唤 |
 | `boss._berserkedRotation` | boolean | ouroboros 专用：每回合轮转标志 |
 | `boss.ouroborosOrbitStates` | Array | ouroboros 专用：六附体槽状态，记录封印回合与被打断次数 |
 | `boss.ouroborosOrbitDisruptions` | number | ouroboros 专用：累计打断附体次数，状态短标签显示为 `断N` |
 | `boss._ouroborosOrbitInitialized` | boolean | ouroboros 专用：首回合不跳过初始鳞盾附体的初始化标记 |
+| `boss._ouroborosDamageGateProgress` | number | ouroboros 专用：累计实际 HP 伤害，达到 `orbitDamageGatePct` 后触发当前附体主机制 |
+| `boss._ouroborosDamageGateSeq` | number | ouroboros 专用：受伤门槛触发序号，用于避免同一击破绽和门槛重复封印 |
 
 ## 8. 关键代码位置
 

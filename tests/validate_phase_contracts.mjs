@@ -52,11 +52,13 @@ const uiSystem = read('src/ui_system.js');
 const gameSystem = read('src/game_system.js');
 const gamePhase = read('src/game_phase.js');
 const renderSystem = read('src/render_system.js');
+const bitmapIcons = read('src/bitmap_icons.js');
 const gameOver = read('src/ui/game_over.js');
 const runShop = read('src/ui/run_shop.js');
 const shop = read('src/ui/shop.js');
 const indexHtml = read('index.html');
 const spawnSystem = read('src/spawn_system.js');
+const combatSystem = read('src/combat_system.js');
 const collisionSystem = read('src/combat/collision.js');
 const projectile = read('src/entities/projectile.js');
 const enemy = read('src/entities/enemy.js');
@@ -67,6 +69,8 @@ const enemyV2Metadata = read('src/data/enemy_v2_metadata.js');
 const wavePresets = read('src/wave_presets.js');
 const emitterGeometry = read('src/utils/emitter_geometry.js');
 const targetingOverlayGenerator = read('scripts/generate_enemy_targeting_overlays.py');
+const enemyVisualAssets = read('src/data/enemy_visual_assets.js');
+const enemySpriteManifest = read('assets/sprites/enemies/enemy_sprite_manifest.json');
 
 check(has(uiSystem, /ui_resetCombatPhaseHud\s*\(options\s*=\s*\{\}\)/), 'ui_resetCombatPhaseHud exists');
 check(has(calcUtils, /calc_isEnemyInsideCombatWalls\s*\(enemy\)[\s\S]*sys_getCombatBounds[\s\S]*bottom\s*>\s*bounds\.top/), 'combat clear counting uses wall-intersection helper');
@@ -77,6 +81,14 @@ check(has(uiSystem, /if\s*\(this\.phase\s*!==\s*['"]combat['"]\)\s*\{\s*this\.ui
 check(has(uiSystem, /const\s+terminalPhase\s*=\s*\[[^\]]*['"]meta['"][^\]]*['"]shop['"][^\]]*['"]truth_book['"][^\]]*['"]gameover['"][^\]]*\]\.includes\(this\.phase\)/s), 'terminal phases are centralized for transient overlay cleanup');
 check(has(uiSystem, /if\s*\(terminalPhase\)\s*\{\s*this\.ui_clearTransientOverlays\(\{\s*keepRuneLauncher:\s*launcherVisible\s*\}\)/s), 'terminal phases clear transient overlays while preserving visible launcher');
 check(has(uiSystem, /const\s+pcSidebarPhaseActive\s*=\s*\[[^\]]*['"]gathering['"][^\]]*['"]combat['"][^\]]*['"]selection['"][^\]]*['"]training['"][^\]]*\]\.includes\(this\.phase\)/s), 'PC sidebar whitelist includes only run phases and training');
+check(
+    has(systems, /id:\s*['"]boss_ouroboros_attachment_slots['"]/) &&
+    has(systems, /setupOuroborosAttachmentSlotAcceptance/) &&
+    has(systems, /advanceOuroborosAttachmentSlotAcceptance/) &&
+    has(systems, /_applyOuroborosAttachment\(normalizedIndex,\s*game,\s*\{\s*feedback:\s*false\s*\}\)/) &&
+    !has(systems, /setupOuroborosAttachmentSlotAcceptance[\s\S]{0,1600}_ouroborosSpawnEchoes/),
+    'training ground previews Ouroboros attachment slot sprites on the boss ring without spawning moving orbit_echo minions'
+);
 check(has(uiSystem, /ui_isFateMomentPhase\s*\(\)\s*\{[^}]*this\.phase\s*===\s*['"]selection['"][^}]*fateMomentContext[^}]*active/s), 'ui_isFateMomentPhase maps active fate context onto selection phase');
 check(has(uiSystem, /ui_abandonRunToMeta\s*\(\)\s*\{[^}]*ui_clearTransientOverlays/s), 'abandon run clears transient overlays');
 check(has(uiSystem, /ui_abandonRunToMeta\s*\(\)\s*\{[\s\S]*phase_switchPhase\(['"]meta['"]\)/), 'abandon run returns to meta through phase_switchPhase');
@@ -90,6 +102,109 @@ check(has(uiSystem, /meta_getResourceCount\s*\(resourceId\)\s*\{[\s\S]*this\._me
 check(has(uiSystem, /meta_spendResource\s*\(resourceId,\s*amount\)\s*\{[\s\S]*this\.saveData\.runeFragments\s*=\s*resources\.rune_fragments[\s\S]*this\.saveData\.currency\s*=\s*resources\.rune_fragments/), 'meta resource spend keeps rune fragment fields in sync');
 check(has(uiSystem, /meta_addCurrency\s*\(amount,\s*resourceId\s*=\s*['"]rune_fragments['"]\)/), 'meta_addCurrency adds to unified rune fragment resource by default');
 check(has(uiSystem, /document\.getElementById\(['"]meta-currency-value['"]\)\s*\|\|\s*document\.getElementById\(['"]meta-currency-display['"]\)/), 'meta currency UI updates the actual home screen currency element');
+check(
+    has(uiSystem, /let\s+enemyShieldLayers\s*=\s*0/) &&
+    has(uiSystem, /enemyShieldLayers\s*\+=\s*shieldLayers/) &&
+    has(uiSystem, /shieldCountEl\.innerText\s*=\s*String\(enemyShieldLayers\)/) &&
+    has(indexHtml, /assets\/ui\/icons\/enemy_affixes\/affix_shield\.png[\s\S]{0,180}id=["']combat-shield-count["']/),
+    'combat status shield metric shows enemy shield layers with the enemy shield affix icon'
+);
+check(
+    has(enemy, /_DEFENSE_HUD_ICON_SRC\s*=\s*\{[\s\S]{0,160}shield:\s*['"]assets\/ui\/icons\/enemy_affixes\/affix_shield\.png['"][\s\S]{0,180}radiantAegis:\s*['"]assets\/ui\/icons\/enemy_affixes\/affix_radiantAegis\.png['"]/) &&
+    has(enemy, /this\._drawDefenseHudBadges\(ctx,\s*w,\s*h\)[\s\S]{0,80}this\._drawStatusBadges\(ctx,\s*w,\s*h\)/) &&
+    has(enemy, /_drawDefenseHudBadges\(ctx,\s*w,\s*h\)\s*\{[\s\S]{0,260}id:\s*['"]shield['"][\s\S]{0,420}id:\s*['"]radiantAegis['"]/) &&
+    has(enemy, /_drawDefenseHudBadges\(ctx,\s*w,\s*h\)[\s\S]*_getAffixOverlayImage\(_DEFENSE_HUD_ICON_SRC\[item\.id\]\)[\s\S]*ctx\.drawImage\(icon\.img/) &&
+    has(enemy, /ctx\.fillStyle\s*=\s*item\.color\s*\|\|\s*['"]#f8fafc['"]/) &&
+    has(enemy, /ctx\.fillText\(item\.label,\s*countX,\s*midY\s*\+\s*0\.5\)/) &&
+    !has(enemy, /badges\.push\(\{\s*text:\s*`盾/) &&
+    !has(enemy, /badges\.push\(\{\s*text:\s*`彩/),
+    'enemy-local shield and radiantAegis values are colored persistent icon HUD badges beside HP, not text-only hit feedback'
+);
+check(
+    has(enemy, /energyArmor:\s*['"]assets\/ui\/icons\/enemy_affixes\/affix_energyArmor\.png['"]/) &&
+    has(enemy, /phaseShield:\s*['"]assets\/ui\/icons\/enemy_affixes\/affix_phaseShield\.png['"]/) &&
+    has(enemy, /livingArmor:\s*['"]assets\/ui\/icons\/enemy_affixes\/affix_livingArmor\.png['"]/) &&
+    fs.existsSync(path.join(repoRoot, 'assets/ui/icons/enemy_affixes/affix_energyArmor.png')) &&
+    fs.existsSync(path.join(repoRoot, 'assets/ui/icons/enemy_affixes/affix_phaseShield.png')) &&
+    fs.existsSync(path.join(repoRoot, 'assets/ui/icons/enemy_affixes/affix_livingArmor.png')) &&
+    has(enemySpriteManifest, /"energyArmor"\s*:\s*"affix_energyArmor\.png"/) &&
+    has(enemySpriteManifest, /"phaseShield"\s*:\s*"affix_phaseShield\.png"/) &&
+    has(enemySpriteManifest, /"livingArmor"\s*:\s*"affix_livingArmor\.png"/) &&
+    has(enemyVisualAssets, /energyArmor:\s*['"]affix_energyArmor\.png['"]/) &&
+    has(enemyVisualAssets, /phaseShield:\s*['"]affix_phaseShield\.png['"]/) &&
+    has(enemyVisualAssets, /livingArmor:\s*['"]affix_livingArmor\.png['"]/) &&
+    has(enemy, /pushDefenseItem\(['"]energyArmor['"],\s*this\.energyArmorShield\)/) &&
+    has(enemy, /pushDefenseItem\(['"]livingArmor['"],\s*this\.livingArmorHp\)/) &&
+    !has(enemy, /badges\.push\(\{\s*text:\s*`蓄\$\{Math\.ceil\(this\.energyArmorShield\)\}`/) &&
+    !has(enemy, /badges\.push\(\{\s*text:\s*`甲\$\{pct\}%`/),
+    'enemy-local numeric armor pools use persistent defense HUD badges and do not show percent armor status labels'
+);
+check(
+    has(enemy, /_resolveDefenseImpactVector\(source\s*=\s*null\)[\s\S]{0,500}sourceVel\s*=\s*source\s*&&\s*\(source\.vel\s*\|\|\s*source\.velocity\)/) &&
+    has(enemy, /return\s*\{\s*mode:\s*['"]directional['"][\s\S]{0,180}sideAngle[\s\S]{0,180}travelAngle/) &&
+    has(enemy, /return\s*\{\s*mode:\s*['"]front['"][\s\S]{0,120}sideAngle:\s*-Math\.PI\s*\/\s*2/) &&
+    has(enemy, /_triggerDefenseImpactFx\(['"]shield['"],\s*source/) &&
+    has(enemy, /_triggerDefenseImpactFx\(['"]ward['"],\s*source/) &&
+    has(enemy, /_triggerDefenseImpactFx\(['"]radiantAegis['"],\s*source/) &&
+    has(enemy, /_triggerDefenseImpactFx\(['"]energyArmor['"],\s*source/) &&
+    has(enemy, /_triggerDefenseImpactFx\(['"]phaseShield['"],\s*source/) &&
+    has(enemy, /_triggerDefenseImpactFx\(['"]lowDamageImmune['"],\s*source/) &&
+    has(enemy, /style:\s*['"]ward['"]/) &&
+    has(enemy, /style:\s*['"]radiant['"]/) &&
+    has(enemy, /style:\s*['"]energy['"]/) &&
+    has(enemy, /style:\s*['"]living['"]/) &&
+    has(enemy, /style:\s*['"]phase['"]/) &&
+    has(enemy, /style:\s*['"]shell['"]/) &&
+    has(enemy, /const\s+traceEnergyCurtain\s*=\s*\(xOffset\s*=\s*0,\s*spanScale\s*=\s*1,\s*depthScale\s*=\s*1\)/) &&
+    has(enemy, /const\s+drawWavefront\s*=\s*\(offset,\s*spanScale,\s*alphaMult,\s*color,\s*lineMult\s*=\s*1\)/) &&
+    has(enemy, /ctx\.quadraticCurveTo\(depth[\s\S]{0,260}ctx\.quadraticCurveTo\(depth/) &&
+    has(enemy, /ctx\.ellipse\(0,\s*0,\s*rx,\s*ry/) &&
+    has(enemy, /if\s*\(perfLevel\s*!==\s*['"]low['"]\)\s*\{[\s\S]{0,220}createLinearGradient\(-depth\s*\*\s*0\.58,\s*0,\s*depth\s*\*\s*1\.12,\s*0\)/) &&
+    has(enemy, /palette\.gradientHit\s*\|\|\s*palette\.ray\s*\|\|\s*palette\.stroke/) &&
+    has(enemy, /rayCount\s*=\s*options\.rayCount\s*\|\|\s*\(perfLevel\s*===\s*['"]low['"]\s*\?\s*3\s*:\s*6\)/) &&
+    has(enemy, /const\s+veinCount\s*=\s*perfLevel\s*===\s*['"]low['"]\s*\?\s*4\s*:\s*7/) &&
+    has(enemy, /ctx\.bezierCurveTo\(-depth\s*\*\s*0\.02[\s\S]{0,180}depth\s*\*\s*0\.46/) &&
+    has(enemy, /const\s+ribCount\s*=\s*perfLevel\s*===\s*['"]low['"]\s*\?\s*4\s*:\s*6/) &&
+    has(enemy, /drawBreakCuts\(['"]livingArmor['"],\s*this\._livingArmorBreakTimer,\s*26/) &&
+    has(enemy, /palette\.ray\s*\|\|\s*palette\.stroke/) &&
+    has(enemy, /palette\.pressure\s*\|\|\s*palette\.stroke/) &&
+    has(enemy, /_livingArmorBreakTimer\s*=\s*26[\s\S]{0,120}_triggerDefenseImpactFx\(['"]livingArmor['"],\s*source,\s*26,\s*\{\s*break:\s*true/) &&
+    has(enemy, /_phaseShieldBlockTimer\s*=\s*Math\.max\(this\._phaseShieldBlockTimer\s*\|\|\s*0,\s*22\)/) &&
+    has(enemy, /_lowDamageImmuneBlockTimer\s*=\s*Math\.max\(this\._lowDamageImmuneBlockTimer\s*\|\|\s*0,\s*18\)/),
+    'defense block feedback records projectile-facing direction, falls back to front-facing energy shields, and keeps all shield-like types visually distinct'
+);
+check(
+    has(enemy, /const\s+makeDamageResult\s*=\s*\(hpDamage,\s*extra\s*=\s*\{\}\)\s*=>\s*\{[\s\S]{0,520}hpDamage:\s*safeHpDamage[\s\S]{0,260}blockedDamage:\s*safeBlockedDamage[\s\S]{0,220}blockedBy:\s*resultBlockedBy[\s\S]{0,180}defenseBlocked:/) &&
+    has(enemy, /recordDefenseBlock\(['"]ward['"],\s*absorbed\)/) &&
+    has(enemy, /recordDefenseBlock\(['"]livingArmor['"],\s*armorDamage\)/) &&
+    has(enemy, /const\s+isElementalHit\s*=\s*!!\(cfg\s*&&[\s\S]{0,260}cfg\.wind/) &&
+    has(enemy, /const\s+armorShouldCatchHit\s*=\s*!!cfg\s*&&\s*actualDamage\s*>\s*0\s*&&\s*\(isPierce\s*\|\|\s*isBounceHit\s*\|\|\s*!isElementalHit\)/) &&
+    has(enemy, /if\s*\(armorShouldCatchHit\)\s*\{[\s\S]{0,1800}return\s+makeDamageResult\(0,\s*\{\s*livingArmorBlocked:\s*true,\s*blockedBy:\s*['"]livingArmor['"]\s*\}\)/) &&
+    has(enemy, /recordDefenseBlock\(['"]energyArmor['"],\s*absorbed\)/) &&
+    has(enemy, /recordDefenseBlock\(['"]radiantAegis['"],\s*absorbed\)/) &&
+    has(enemy, /const\s+shieldKind\s*=\s*isPhaseShieldBlock\s*\?\s*['"]phaseShield['"]\s*:\s*['"]shield['"]/) &&
+    has(enemy, /recordDefenseBlock\(shieldKind,\s*shieldBlocked\)/) &&
+    has(enemy, /recordDefenseBlock\(['"]lowDamageImmune['"],\s*actualDamage\)/),
+    'Enemy.takeDamage returns unified hp/block damage metadata for every shield-like defense layer'
+);
+check(
+    has(combatSystem, /const\s+hpDamage\s*=\s*damageResult\.hpDamage\s*\?\?\s*damageResult\.actualDamage\s*\?\?\s*0/) &&
+    has(combatSystem, /const\s+blockLabels\s*=\s*\{[\s\S]{0,420}phaseShield:[\s\S]{0,120}radiantAegis:[\s\S]{0,120}energyArmor:[\s\S]{0,120}livingArmor:[\s\S]{0,120}lowDamageImmune:/) &&
+    has(combatSystem, /damageResult\.defenseBlocked\s*\|\|\s*\(damageResult\.blockedDamage\s*\|\|\s*0\)\s*>\s*0/) &&
+    has(combatSystem, /const\s+spawnPrimaryHitImpact\s*=\s*\(\)\s*=>\s*\{[\s\S]*spawn_(?:createParticle|pushParticleWithLimit)/) &&
+    has(combatSystem, /const\s+blockedByDefense\s*=\s*!!\(damageResult\.defenseBlocked\s*\|\|\s*\(damageResult\.blockedDamage\s*\|\|\s*0\)\s*>\s*0\s*\|\|\s*damageResult\.blockedBy\)/) &&
+    has(combatSystem, /const\s+actualDmg\s*=\s*damageResult\.hpDamage\s*\?\?\s*damageResult\.actualDamage\s*\?\?\s*0[\s\S]{0,220}if\s*\(actualDmg\s*>\s*0\s*&&\s*!blockedByDefense\)\s*\{[\s\S]{0,80}spawnPrimaryHitImpact\(\)/) &&
+    has(combatSystem, /if\s*\(this\.showDamageNumbers\)\s*\{[\s\S]{0,100}if\s*\(actualDmg\s*>\s*0\)[\s\S]{0,420}if\s*\(hitFeedback\)[\s\S]{0,220}actualDmg\s*>\s*0\s*\?\s*\(isCrit\s*\?\s*36\s*:\s*24\)\s*:\s*10/),
+    'combat hit feedback shows shield-block labels while primary hit particles only play when no defense layer blocked the projectile'
+);
+check(
+    has(combatSystem, /const\s+swordHpDamage\s*=\s*swordResult\.hpDamage\s*\?\?\s*swordResult\.actualDamage\s*\?\?\s*0[\s\S]{0,160}combat_recordDamage\(swordHpDamage/) &&
+    has(combatSystem, /const\s+spreadHpDamage\s*=\s*spreadResult\.hpDamage\s*\?\?\s*spreadResult\.actualDamage\s*\?\?\s*0[\s\S]{0,160}combat_recordDamage\(spreadHpDamage/) &&
+    has(combatSystem, /const\s+hpDamage\s*=\s*result\.hpDamage\s*\?\?\s*result\.actualDamage\s*\?\?\s*0[\s\S]{0,520}末日/) &&
+    has(enemy, /const\s+damageResult\s*=\s*victim\.takeDamage\(99999\)[\s\S]{0,80}if\s*\(damageResult\.killed\)/) &&
+    !has(enemy, /const\s+isDead\s*=\s*victim\.takeDamage/),
+    'secondary damage and execute call sites consume takeDamage.hpDamage/killed instead of raw requested damage or truthy result objects'
+);
 
 check(has(gameSystem, /_proceedToFateMomentSelection\s*\(\)\s*\{[\s\S]*this\.fateMomentContext\s*=\s*\{[\s\S]*active:\s*true/), '_proceedToFateMomentSelection activates fateMomentContext');
 check(has(gameSystem, /resources:\s*\{\s*rune_fragments:\s*0\s*\}/), 'persistent save defaults include unified resource store');
@@ -128,20 +243,62 @@ check(
     has(renderSystem, /render_combat_walls\s*\(ctx,\s*wallLeftX,\s*wallRightX,\s*wallTopY\)[\s\S]*lineTo\(wallRightX,\s*wallTopY\)/),
     'combat walls are drawn at inset arena bounds'
 );
+check(
+    has(renderSystem, /const\s+leftArtX\s*=\s*wallLeftX\s*-\s*wallW/) &&
+    has(renderSystem, /const\s+rightArtX\s*=\s*wallRightX/) &&
+    has(renderSystem, /ctx\.drawImage\(leftImg,\s*leftArtX,\s*wallTopY,\s*wallW,\s*wallH\)/) &&
+    has(renderSystem, /ctx\.drawImage\(rightImg,\s*rightArtX,\s*wallTopY,\s*wallW,\s*wallH\)/) &&
+    has(renderSystem, /ctx\.drawImage\(topImg,\s*topArtX,\s*topArtY,\s*topArtW,\s*topH\)/),
+    'combat wall bitmap art stays outside enemy physics bounds'
+);
+check(
+    has(enemy, /const\s+inset\s*=\s*Math\.max\(0,\s*Math\.min\(Math\.min\(w,\s*h\)\s*\*\s*0\.16,\s*options\.inset\s*\?\?\s*2\)\)/) &&
+    has(enemy, /const\s+frameLineWidth\s*=\s*Math\.max\(2\.6,\s*Math\.min\(4,\s*Math\.min\(fw,\s*fh\)\s*\*\s*0\.055\)\)/) &&
+    has(enemy, /const\s+_relicFrameW\s*=\s*this\.width\s*\|\|\s*w/) &&
+    has(enemy, /const\s+_relicFrameH\s*=\s*this\.height\s*\|\|\s*h/) &&
+    has(enemy, /_drawRelicMaterialFrame\(ctx,\s*_relicFrameW,\s*_relicFrameH,\s*_relicFrameR/) &&
+    has(enemy, /inset:\s*2/) &&
+    !has(enemy, /drawTopTab\(/),
+    'relic reward metal frame aligns with physical enemy bounds and leaves HP text clear'
+);
 check(has(gamePhase, /leftBound\s*=\s*combatBounds\.left\s*\+\s*radius[\s\S]*rightBound\s*=\s*combatBounds\.right\s*-\s*radius[\s\S]*rightBound\s*-\s*current\.x[\s\S]*leftBound\s*-\s*current\.x/), 'combat aim guide uses inset arena side walls');
 check(
     has(emitterGeometry, /muzzle\s*=\s*base\.add\(aimDir\.mult\(EMITTER_PORT_OFFSET_Y\)\)/) &&
     has(emitterGeometry, /port:\s*new\s+Vec2\(base\.x,\s*base\.y\)/),
-    'launcher geometry fires from turret center and keeps muzzle as visual endpoint'
+    'launcher geometry exposes both turret center port and visual muzzle endpoint'
 );
-check(has(gameSystem, /calcCombatLauncherGeometryToTarget\(this\.width,\s*this\.height,\s*targetPos\)[\s\S]{0,120}targetPos\.sub\(launcherGeometry\.port\)/), 'combat release velocity is calculated from the turret center anchor');
-check(has(gamePhase, /calcCombatLauncherGeometryToTarget\(this\.width,\s*this\.height,\s*this\.lastMousePos\)[\s\S]{0,120}const\s+start\s*=\s*aimGeometry\.port/), 'combat aim guide starts at the turret center anchor');
-check(has(gamePhase, /fallbackPort\s*=\s*calcCombatLauncherGeometry\(this\.width,\s*this\.height,\s*shot\.vel\)\.port[\s\S]{0,500}render_queueLauncherBarrelFireEffect\(shot\.vel,\s*shot\.recipe\)/), 'burstQueue shots, including greedy wheel refires, use turret-center fallback and barrel flash');
+check(
+    has(bitmapIcons, /EMITTER_BARREL_SRC\s*=\s*versionBitmapSrc\('assets\/ui\/sprites\/emitter_barrel_rotating_v5_runtime\.png'\)/) &&
+    has(bitmapIcons, /EMITTER_BARREL_DRAW_SIZE\s*=\s*100/) &&
+    has(bitmapIcons, /EMITTER_PORT_OFFSET_Y\s*=\s*76/),
+    'launcher uses the slimmer v5 cannon barrel with a raised muzzle anchor'
+);
+check(
+    has(gameSystem, /calcCombatLauncherGeometryToTarget\(this\.width,\s*this\.height,\s*targetPos\)[\s\S]{0,180}targetPos\.sub\(launcherGeometry\.port\)[\s\S]{0,180}pendingFireOrigin\s*=\s*launcherGeometry\.muzzle/),
+    'combat release direction uses turret center while projectile origin uses visual muzzle'
+);
+check(
+    has(gamePhase, /calcCombatLauncherGeometryToTarget\(this\.width,\s*this\.height,\s*this\.lastMousePos\)[\s\S]{0,120}const\s+start\s*=\s*aimGeometry\.muzzle[\s\S]{0,160}let\s+dir\s*=\s*aimGeometry\.aimDir/),
+    'combat aim guide starts at the visual muzzle while keeping turret-center aim direction'
+);
+check(
+    has(gamePhase, /fallbackMuzzle\s*=\s*calcCombatLauncherGeometry\(this\.width,\s*this\.height,\s*shot\.vel\)\.muzzle[\s\S]{0,800}_launcherShotAimRotation\s*=\s*Math\.atan2\(shot\.vel\.y,\s*shot\.vel\.x\)[\s\S]{0,400}render_queueLauncherBarrelFireEffect\(shot\.vel,\s*shot\.recipe\)/),
+    'burstQueue shots, including greedy wheel refires, use muzzle fallback, hold the barrel angle, and flash'
+);
 check(
     has(renderSystem, /render_queueLauncherBarrelFireEffect\s*\(vel,\s*recipe\s*=\s*\{\}\)/) &&
     has(renderSystem, /_launcherBarrelFireFx/) &&
-    has(renderSystem, /globalCompositeOperation\s*=\s*['"]screen['"]/),
-    'launcher barrel fire feedback is rendered from the emitter art layer'
+    has(renderSystem, /EMITTER_MUZZLE_FLASH_SRCS/) &&
+    has(renderSystem, /drawImage\(\s*flashImg/),
+    'launcher barrel fire feedback is rendered from generated muzzle bitmap frames'
+);
+check(
+    has(bitmapIcons, /EMITTER_RING_SRC\s*=\s*versionBitmapSrc\('assets\/ui\/sprites\/emitter_turret_ring_v1\.png'\)/) &&
+    has(bitmapIcons, /EMITTER_RING_DRAW_SIZE\s*=\s*96/) &&
+    has(renderSystem, /const\s+ringImg\s*=\s*getUiBitmap\(EMITTER_RING_SRC\)/) &&
+    has(renderSystem, /ctx\.translate\(cx,\s*cy\s*\+\s*recoilY\s*\+\s*4\)/) &&
+    has(renderSystem, /ctx\.drawImage\(\s*ringImg/),
+    'launcher renders generated rotating ring inside the base circle'
 );
 check(!has(spawnSystem, /spawn_createLauncherFireEffect/), 'old launcher particle/shockwave muzzle VFX is removed');
 check(has(spawnSystem, /sys_getCombatColumnCenterX\(c\)/), 'normal enemy spawn columns use inset arena centers');
@@ -163,11 +320,15 @@ check(has(gamePhase, /_defenseBarrierArrivedThisTurn\s*=\s*false[\s\S]{0,100}_de
 check(has(gamePhase, /_restoreLivingArmorForTurn[\s\S]{0,160}_tickPhaseShieldForTurn[\s\S]{0,160}_tickArmorSporeForTurn/), 'enemy turn start restores living armor, advances phase shield, and distributes armor spores');
 check(
     has(enemy, /_tickBossPhysicsForTurn\s*\(\)[\s\S]{0,2600}bossType\s*===\s*['"]devourer['"][\s\S]{0,2600}bossType\s*===\s*['"]ouroboros['"]/) &&
-    has(enemy, /_tickBossMechanicsForTurn\s*\(game\)[\s\S]{0,1200}_tickTeslaNetwork\(game\)[\s\S]{0,1200}_tickGlaciesFrostSeams\(game\)[\s\S]{0,1200}_tickViridisSporeArmor\(game\)[\s\S]{0,1200}_tickChimeraMawField\(game\)[\s\S]{0,1200}_tickOuroborosOrbit\(game\)/) &&
+    has(enemy, /_tickBossMechanicsForTurn\s*\(game\)[\s\S]{0,1200}_tickTeslaNetwork\(game\)[\s\S]{0,1200}_tickGlaciesFrostSeams\(game\)[\s\S]{0,1200}_tickViridisSporeArmor\(game\)[\s\S]{0,1200}_tickDevourerMawField\(game\)[\s\S]{0,1200}_tickChimeraMawField\(game\)[\s\S]{0,1200}_tickOuroborosOrbit\(game\)/) &&
     has(enemy, /startTurnAction\s*\(game\)[\s\S]{0,220}_tickBossPhysicsForTurn\(\)[\s\S]{0,2600}_tickBossMechanicsForTurn\(game\)/),
     'Boss turn start uses centralized physics and mechanics tick gateways'
 );
-check(has(gamePhase, /防线屏障 \$\{this\.playerShield\}/), 'combat render exposes active guardian barrier layers at the defense line');
+check(
+    has(gamePhase, /render_combat_defeatLine\s*\(\s*this\.ctx\s*\)/) &&
+    has(renderSystem, /防线屏障 \$\{shield\}/),
+    'combat render exposes active guardian barrier layers at the defense line'
+);
 check(
     has(gameSystem, /if\s*\(\(this\.playerShield\s*\|\|\s*0\)\s*>\s*0\)/) &&
     has(gameSystem, /const\s+barrierY\s*=\s*this\.defeatLineY\s*-\s*e\.height\s*\/\s*2/) &&
@@ -201,8 +362,12 @@ const bossSaveFields = [
     /teslaFieldPower:\s*e\.teslaFieldPower/,
     /teslaSummonCharge:\s*e\._teslaSummonCharge/,
     /frostSeamTurns:\s*e\.frostSeamTurns/,
+    /devourerDigestCooldown:\s*e\._devourerDigestCooldown/,
+    /chimeraHeatStacks:\s*e\.chimeraHeatStacks/,
     /chimeraDigestCooldown:\s*e\._chimeraDigestCooldown/,
     /_bossVulnerabilityProgress:\s*e\._bossVulnerabilityProgress/,
+    /ouroborosDamageGateProgress:\s*e\._ouroborosDamageGateProgress/,
+    /ouroborosDamageGateSeq:\s*e\._ouroborosDamageGateSeq/,
 ];
 const bossLoadFields = [
     /e\.bossOwnerId\s*=\s*d\.bossOwnerId/,
@@ -213,16 +378,18 @@ const bossLoadFields = [
     /e\.teslaFieldPower\s*=\s*d\.teslaFieldPower/,
     /e\._teslaSummonCharge\s*=\s*d\.teslaSummonCharge/,
     /e\.frostSeamTurns\s*=\s*d\.frostSeamTurns/,
+    /e\._devourerDigestCooldown\s*=\s*d\.devourerDigestCooldown/,
+    /e\.chimeraHeatStacks\s*=\s*d\.chimeraHeatStacks/,
     /e\._chimeraDigestCooldown\s*=\s*d\.chimeraDigestCooldown/,
     /e\._bossVulnerabilityProgress\s*=\s*d\._bossVulnerabilityProgress/,
+    /e\._ouroborosDamageGateProgress\s*=\s*d\.ouroborosDamageGateProgress/,
+    /e\._ouroborosDamageGateSeq\s*=\s*d\.ouroborosDamageGateSeq/,
 ];
 check(
     bossSaveFields.every(re => has(gameSystem, re)) && bossLoadFields.every(re => has(gameSystem, re)),
     'run save/load persists Boss mechanic resources, minion metadata, and vulnerability state'
 );
 check(has(enemy, "const affixes = ['haste', 'jump'];") && has(enemy, 'drone._isCarrierDrone = true;') && has(enemy, /_getCarrierBayPosition/) && has(enemy, /_pushCarrierBayOccupant/) && has(enemy, /_carrierLaunchDroneMovement/), 'carrier pushes bay occupants and immediately launches haste+jump drones from bay slot 5');
-const enemyVisualAssets = read('src/data/enemy_visual_assets.js');
-const enemySpriteManifest = read('assets/sprites/enemies/enemy_sprite_manifest.json');
 check(
     has(enemyVisualAssets, /export function resolveDynamicEnemyOverlayPaths/) &&
     has(enemyVisualAssets, /energyArmorShield/) &&
@@ -233,7 +400,15 @@ check(
     has(enemy, /overlayKey === this\._visualOverlayKey/),
     'stateful enemy-targeting overlays can be resolved without changing assetKey'
 );
+check(
+    has(enemy, /_drawAffixBitmapOverlays\(ctx,\s*w,\s*h\)\s*\{[\s\S]{0,160}if\s*\(!this\.affixes/) &&
+    has(enemy, /\.filter\(\(item\)\s*=>\s*this\.type\s*!==\s*['"]boss['"]\s*\|\|\s*targetingOverlayAffixes\.has\(item\.affix\)\)/) &&
+    !has(enemy, /_drawAffixBitmapOverlays\(ctx,\s*w,\s*h\)\s*\{[\s\S]{0,120}this\.type\s*===\s*['"]boss['"]/),
+    'Boss enemy-targeting overlays are drawn instead of suppressing their Canvas fallback'
+);
 const targetingOverlayFiles = [
+    'overlay_affix_shield.png',
+    'overlay_affix_radiantAegis.png',
     'overlay_energy_armor_charged.png',
     'overlay_energy_armor_empty.png',
     'overlay_phase_shield_active.png',
@@ -255,7 +430,10 @@ const targetingOverlayFiles = [
 ];
 check(
     targetingOverlayFiles.every(file => fs.existsSync(path.join(repoRoot, 'assets/sprites/enemies/overlays', file))) &&
+    fs.existsSync(path.join(repoRoot, 'assets/ui/icons/enemy_affixes/affix_radiantAegis.png')) &&
     has(enemySpriteManifest, /"dynamicOverlays"\s*:\s*\{[\s\S]*"energyArmor"[\s\S]*"phaseShield"[\s\S]*"livingArmor"[\s\S]*"overloadReactor"/) &&
+    has(enemySpriteManifest, /"affixIcons"\s*:\s*\{[\s\S]*"radiantAegis"\s*:\s*"affix_radiantAegis\.png"/) &&
+    has(enemySpriteManifest, /"radiantAegis"\s*:\s*"overlay_affix_radiantAegis\.png"/) &&
     has(enemySpriteManifest, /"lowDamageImmune"\s*:\s*"overlay_affix_lowDamageImmune\.png"/) &&
     has(enemy, /hasReadyOverlay\s*=\s*\(id\)/) &&
     has(enemy, /targetingOverlayAffixes\.has\(item\.affix\)/),
@@ -265,6 +443,8 @@ const targetingOverlayFootprints = ['2x1', '1x2', '2x2', '3x1', '1x3', '2x3', '3
 const sampledFootprintOverlaySizes = [
     ['overlay_phase_shield_active_3x2.png', 384, 256],
     ['overlay_living_armor_high_2x3.png', 256, 384],
+    ['overlay_affix_shield_3x2.png', 384, 256],
+    ['overlay_affix_radiantAegis_3x2.png', 384, 256],
     ['overlay_affix_lowDamageImmune_3x1.png', 384, 128],
     ['overlay_affix_carrier_3x2.png', 384, 256],
     ['overlay_energy_armor_charged_2x1.png', 256, 128],
@@ -272,6 +452,7 @@ const sampledFootprintOverlaySizes = [
 ];
 check(
     has(enemyVisualAssets, /function\s+_resolveOverlayVariantFile\s*\(affix,\s*fileOrDef,\s*footprint\s*=\s*['"]1x1['"]\)/) &&
+    has(enemyVisualAssets, /_TARGETING_OVERLAY_AFFIXES[\s\S]{0,90}['"]shield['"][\s\S]{0,90}['"]radiantAegis['"]/) &&
     has(enemyVisualAssets, /return\s+fileOrDef\.replace\([^\n]+`\_\$\{footprint\}\.png`\)/) &&
     has(enemyVisualAssets, /const\s+footprint\s*=\s*`\$\{cols\}x\$\{rows\}`/) &&
     has(enemyVisualAssets, /resolveDynamicEnemyOverlayPaths[\s\S]*const\s+footprint\s*=\s*`\$\{\(enemy\.gridCols\s*\|\|\s*1\)\}x\$\{\(enemy\.gridRows\s*\|\|\s*1\)\}`/) &&
@@ -376,7 +557,7 @@ check(has(runShop, /const\s+visiblePhase\s*=\s*this\.phase\s*===\s*['"]gathering
 check(has(gamePhase, /multicast:\s*Math\.max\(0,\s*Math\.floor\(marbleDef\.multicast\s*\|\|\s*0\)\)/), 'gathering sessions inherit stored marble multicast layers');
 check(has(gamePhase, /const\s+inheritedMulticast\s*=\s*Math\.max\(0,\s*Math\.floor\(marbleDef\.multicast\s*\|\|\s*0\)\)[\s\S]{0,220}recipe\.multicast\s*=\s*inheritedMulticast/), 'combat fallback compile preserves stored marble multicast layers');
 check(has(indexHtml, /id=["']session-charge-stack["'][\s\S]{0,80}session-charge-stack/), 'gathering HUD has a three-session charge stack container');
-check(has(read('src/ui/hud.js'), /_hud_renderSessionChargeStack[\s\S]{0,900}session-charge-row[\s\S]{0,360}session-charge-multicast/), 'gathering HUD renders per-marble charge and multicast rows');
+check(has(read('src/ui/hud.js'), /_hud_renderSessionChargeStack[\s\S]{0,900}(?:session-charge-row|gathering-ammo-panel)[\s\S]{0,420}session-charge-multicast/), 'gathering HUD renders per-marble charge and multicast rows');
 check(has(read('src/ui/hud.js'), /UI_HIT_PROGRESS[\s\S]{0,220}_hud_renderSessionChargeStack/), 'hit progress updates refresh the per-marble charge stack');
 check(has(runShop, /kind:\s*['"]starter_boost['"]/), 'first run-shop visit can generate a free starter boost item');
 check(has(runShop, /runShopStarterBoostDamageRounds/), 'starter boost item displays a temporary damage duration');

@@ -19,6 +19,7 @@
 | `2. 非 1×1 敌人词条特效适配` | 高 | P1 | 将词条特效从固定半径改为基于 `width/height/grid footprint` 的锚点系统。 |
 | `3. 新词条特效制作和适配` | 中高 | P1 | 为 V2 专属词条补齐触发特效、常驻特效和受击反馈。 |
 | `4. 预设波次组合设计与出场设计` | 高 | P2 | 新增导演型 wave preset 层，控制大型敌人与通用词条的组合节奏。 |
+| `5. 符文奖励敌人资产标记` | 中 | P0/P1 | 先标记 `runeBearer` / `adaptiveRune` 图标、overlay 与短 VFX；正式 PNG/JSON 生成前不登记 manifest。 |
 
 ## 2. `siege` 新机制影响范围
 
@@ -59,6 +60,9 @@ enemy/{tier}/{cols}x{rows}/{base_archetype}/{affix_key}.png
 
 2026-06-22 补充：奖励敌人的边框、词条常驻 Overlay 和词条触发反馈必须拆成三层，详见 [`docs/design/enemy_affix_visual_iteration_plan.md`](design/enemy_affix_visual_iteration_plan.md)。其中带遗物敌人使用独立金色 reward frame，不应复用 `shield` 或 elite 边框；旧 `chaos_essence` / `pure_essence` 分支不进入本轮敌人奖励美术目标；`shield`、`deflectionWard` 和 `jump` 需要额外事件反馈，而不是只靠常驻纹理表达。
 
+2026-06-23 补充：带符文敌人先作为“奖励 / 构筑词条”规划，不新增基底。`runeBearer` 需要通用符文槽、临时词条副徽记与每回合轮换短反馈；`adaptiveRune` 需要可变属性核心、属性态 overlay 与属性切换短反馈。两者在机制实现前不得进入普通随机词条池，也不得提前写入 `enemy_sprite_manifest.json`。
+2026-06-23 落地更新：`runeBearer` / `adaptiveRune` 已接入首版机制和 SVG 占位资产，仍不进入普通随机词条池。manifest 已登记占位 icon、静态 overlay 与 `adaptiveRune` 元素态 dynamic overlay；正式美术可按同名文件替换，占位 SVG 不代表最终品质完成。
+
 | 特效类型 | 当前风险 | 非 `1×1` 适配规则 |
 |---|---|---|
 | 常驻护盾 | 大体型只包住中心，无法表达完整屏障。 | 使用 `max(width, height)` 决定屏障外接尺寸，并根据碰撞形状裁剪。 |
@@ -67,7 +71,8 @@ enemy/{tier}/{cols}x{rows}/{base_archetype}/{affix_key}.png
 | 吞噬/孵化 | 大型口器或卵囊不应只在中心缩放。 | 用基底局部锚点，例如 `maw.mouth`、`hive.eggPods`。 |
 | 棱盾屏障 | 屏障只阻挡反弹与穿透，需要区别于普通 `shield`。 | 在前缘倾斜棱面绘制薄膜与副屏障条，不画全身护罩。 |
 | 破阵推挤 | 推挤反馈需要表现阻挡链，而非只表现自身。 | 从 `siege` 推铲到被推动敌人之间生成尘埃、短震波和位移箭头。 |
-| 奖励边框 | 奖励目标被词条膜层或大型基底边框淹没。 | 独立 reward frame 层：遗物=金边，低档保留平面双描边。 |
+| 奖励边框 | 奖励目标被词条膜层或大型基底边框淹没。 | 独立 reward frame 层：遗物=金属材质装饰框，低档也保留角标/凸起轮廓而不是纯平面描边。 |
+| 符文奖励层 | 构筑掉落目标容易被误读为普通精英或普通词条。 | 位于 reward frame 与通用词条 overlay 之间；`runeBearer` 用小副徽记表达临时词条，`adaptiveRune` 只切换核心色和边缘属性纹路。 |
 | 跳跃腾空 | 只有常驻弹簧线时，玩家看不出敌人越过了阻挡物。 | 使用 `_jumpFxTimer` 驱动视觉抬升、椭圆影子和落地短线，真实碰撞不跟随视觉偏移。 |
 
 建议新增轻量函数 `getEnemyVisualAnchors(enemy)`，统一返回 `center`、`frontEdge`、`rearEdge`、`corners`、`bodyNodes`、`affixBadgeSlots` 和 `archetypePorts`。这样 `src/entities/enemy.js`、`src/effects/particles.js` 和未来资产叠层可以共用同一套几何语义。[1] [5]
@@ -129,6 +134,9 @@ V2 专属词条已经具备基础绘制识别，但还需要补齐“常驻、�
 
 2026-06-22 补充：敌人针对词缀的生成前清单独立记录在 [`docs/enemy_targeting_asset_todo.md`](enemy_targeting_asset_todo.md)。其中 `carrier` 使用显示名“铸巢母架”，第 5 格空舱需要在本体、collision frame 与图标中同时保留；`livingArmor` / `armorSpore` / `phaseShield` 等状态型资产走 `dynamicOverlays`，由 `resolveDynamicEnemyOverlayPaths(enemy)` 按当前状态选择。不存在的 PNG 不应提前写入 `enemy_sprite_manifest.json`，避免资源命中状态误报。
 
+2026-06-23 补充：符文奖励敌人资产同样先进入 [`docs/enemy_targeting_asset_todo.md`](enemy_targeting_asset_todo.md) 的生成前清单。`affix_runeBearer.png`、`affix_adaptiveRune.png`、`overlay_affix_runeBearer.png`、`overlay_adaptive_rune_<element>.png` 与对应短 VFX 真实存在前，不登记 `affixIcons`、`overlays` 或 `dynamicOverlays`；正式登记时必须同步试炼场、敌人词缀索引和符文掉落机制验证。
+2026-06-23 落地更新：生成前清单中的核心运行时占位已经落地为 `.svg`，登记项为 `affix_rune_bearer.svg`、`affix_adaptive_rune.svg`、`overlay_affix_rune_bearer.svg`、`overlay_affix_adaptive_rune.svg` 与 `overlay_adaptive_rune_<element>.svg`。短 VFX 与高品质 composite 仍未完成，继续按本文清单推进。
+
 ### 7.5.1 manifest 字段
 
 ```json
@@ -169,7 +177,9 @@ V2 专属词条已经具备基础绘制识别，但还需要补齐“常驻、�
 
 - `src/render/sprite_renderer.js` 的 `createSpriteRenderer({ type, baseArchetype, gridCols, gridRows, affixes, ... })` 现在第一步就调用 `resolveEnemyVisualAsset`，命中 composite/archetype 时直接使用 manifest 给出的路径；命中失败再回退到既有 V2 metadata，再回退到 `golem_elite` / `golem_normal`，最后由 SpriteRenderer 自身的 failed 状态触发 Canvas 矢量绘制。
 - `src/entities/enemy.js` 的 `Enemy.initSprite()` 已传入完整 `gridCols / gridRows / affixes`，让组合 Sprite 能被命中。
-- `src/entities/enemy.js` 的 `_drawAffixBitmapOverlays()` 会读取 `resolveEnemyVisualAsset(enemy).overlayPaths`，把通用词条覆盖层叠加在非 Boss 敌人的 Sprite/基底之上；资源缺失或未加载时静默跳过，继续保留既有 Canvas 词条视觉与短标签兜底。
+- `src/entities/enemy.js` 的 `_drawAffixBitmapOverlays()` 会读取 `resolveEnemyVisualAsset(enemy).overlayPaths`，把通用词条覆盖层叠加在敌人的 Sprite/基底之上；Boss 仅放行机制型 / 防御型 overlay（如 `shield`、`radiantAegis` 与敌人针对词缀），避免普通装饰词条覆盖 Boss 专属形象。资源缺失或未加载时静默跳过，继续保留既有 Canvas 词条视觉与短标签兜底。
+- 2026-06-24 补充：`shield` 与 `radiantAegis` 已生成 footprint-aware PNG overlay 资产族，`radiantAegis` manifest 常驻 overlay 从 SVG 切换为 PNG。正式 Boss 生成时设置 `gridCols=3`、`gridRows=2`，因此会命中 3x2 版本而不是居中的 1x1 小图。词条 UI icon 同步补齐：战斗状态条敌方护盾层数使用 `affix_shield.png`，`radiantAegis` 的 `affixIcons` 登记切到 `affix_radiantAegis.png`。
+- 2026-06-24 追补：敌人局内本体 HUD 已新增 `_drawDefenseHudBadges()`，在 HP 数字旁常驻绘制 `shield` 层数和 `radiantAegis` 百分比。该层直接 drawImage 词条 icon，不依赖受击浮字，也不占用普通 `_drawStatusBadges()` 的 3 个文字短标签槽位。
 - 2026-06-23 补充：敌人针对词缀的资产前读法由 `_drawEnemyTargetingFallback()` 兜底，但该 fallback 已收束为边框/外缘效果，避免遮挡敌人主体美术。它通过活体护甲边缘甲片、护甲孢子边缘种荚与飞线、相位护盾断窗边框、过量反应炉底部刻度、低伤硬壳角标、蓄能甲侧边电容、撞城者底部齿、铸巢母架空舱口与 1×1 偏折壳外缘旋转弧表达机制。正式 PNG / VFX 接入后应优先覆盖 frame / collision frame / 边缘 overlay 的同一语义点，不要删除 fallback。
 - `src/systems.js` 的 `buildEnemyV2Scenarios` 不再硬编码 `placeholder` 字段，而是调用 `resolveEnemyVisualAsset` + `describeAssetHitStatus`，把 `Sprite / Composite Sprite / Overlay / Vector fallback / Missing asset` 标签同时显示在场景卡片的徽标和说明面板中。
 

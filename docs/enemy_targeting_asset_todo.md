@@ -4,7 +4,10 @@
 更新时间：2026-06-23
 关联文档：[`docs/enemy_visual_design_v2.md`](enemy_visual_design_v2.md)、[`docs/enemy_art_implementation_impact.md`](enemy_art_implementation_impact.md)、[`design_spec_bitmap.md`](../design_spec_bitmap.md)
 
-本文只覆盖已经收束保留的敌人针对词缀：`energyArmor`、`phaseShield`、`overloadReactor`、`lowDamageImmune`、`livingArmor`、`armorSpore`、`siegeBreaker`、`carrier`、`deflectShell`。后续生成 PNG / Sprite Sheet 前，以本文作为资产清单和验收入口。
+本文主要覆盖已经收束保留的敌人针对词缀：`energyArmor`、`phaseShield`、`overloadReactor`、`lowDamageImmune`、`livingArmor`、`armorSpore`、`siegeBreaker`、`carrier`、`deflectShell`。后续生成 PNG / Sprite Sheet 前，以本文作为资产清单和验收入口。
+
+2026-06-23 追加：符文敌人先作为“奖励/构筑词条”记录资产需求，暂不写入 `enemy_sprite_manifest.json`。规划词条为 `runeBearer`（通用符文掉落，持有一个每回合轮换的临时额外词条）与 `adaptiveRune`（记录最后受到的属性伤害/效果，死亡时掉落该属性家族符文）。正式 PNG / JSON 生成前，只能在本文和视觉规范中标记，不得提前登记到 manifest。
+2026-06-23 落地更新：上述“暂不写入 manifest”限制已被首版 SVG 占位资产替代。当前已登记 `affix_rune_bearer.svg`、`affix_adaptive_rune.svg`、`overlay_affix_rune_bearer.svg`、`overlay_affix_adaptive_rune.svg` 与 `overlay_adaptive_rune_<element>.svg`，用于避免运行时 404 并提供可验收的低成本占位。后续正式 PNG / Sprite Sheet 可直接覆盖同名语义文件或新增 composite key，但必须保留 `runeBearer` / `adaptiveRune` 的静态 overlay + `adaptiveRune` 元素态 dynamic overlay 分层。
 
 2026-06-23 更新：正式 PNG / Sprite Sheet 生成前，`src/entities/enemy.js` 已加入 `_drawEnemyTargetingFallback()` 作为代码态兜底层。当前版本已从“中心大图标”改为边框/外缘 fallback：蓄能甲、电容条、相位护盾断窗、过量炉底部刻度、低伤免疫硬壳角标、活体护甲边缘甲片、护甲孢子边缘种荚与飞线、撞城者底部齿、铸巢母架空舱口、偏折壳外缘旋转弧都不应遮住敌人主体。正式资产接入时优先做 frame / collision frame / 边缘 overlay，避免重画或覆盖原本敌人美术。
 
@@ -17,6 +20,10 @@
 2026-06-23 尺寸适配：targeting overlay 已从单一 1x1 扩展为 footprint-aware 资产族。`assets/sprites/enemies/overlays/` 中每个正式 PNG 均保留 1x1 基准文件，并派生 `_2x1`、`_1x2`、`_2x2`、`_3x1`、`_1x3`、`_2x3`、`_3x2`、`_3x3` 版本；生成器使用九宫格边框扩展，避免把角件、边缘材料和护盾断窗直接拉伸。运行时由 `src/data/enemy_visual_assets.js` 按 `gridCols x gridRows` 自动选择对应文件，静态词条 overlay 与 `energyArmor`、`phaseShield`、`livingArmor`、`overloadReactor` 等动态状态 overlay 均适用。总览图见 `docs/design/enemy_targeting_overlay_footprints_contact_sheet.png`；验收时必须在 2x1、1x2、3x1、2x3、3x2、3x3 敌人上确认边框覆盖真实 footprint，而不是只套 128x128 中心框。
 
 2026-06-23 试炼场落地：`enemy_v2` 分类新增 `ev2_enemy_targeting_footprints`，用于正式 PNG 多尺寸验收。该场景冻结展示 `overloadReactor 3x3`、`phaseShield 1x2`、`energyArmor 2x1`、`lowDamageImmune 3x1`、`livingArmor 2x3`、`carrier 3x2` 与 `siegeBreaker 3x1`，应作为 contact sheet 之外的实机场景检查入口。
+
+2026-06-24 更新：`shield` 与 `radiantAegis` 已补入 footprint-aware PNG overlay 资产族。生成器会导出 `overlay_affix_shield.png`、`overlay_affix_radiantAegis.png` 以及 `_2x1` / `_1x2` / `_2x2` / `_3x1` / `_1x3` / `_2x3` / `_3x2` / `_3x3` 变体；运行时 `radiantAegis` 从 SVG 常驻兜底切到 PNG overlay，Boss 通过 `gridCols=3`、`gridRows=2` 命中 3x2 版本。词条 UI icon 同步补齐：战斗状态条敌方护盾数值使用 `affix_shield.png`，`radiantAegis` 登记为正式 `affix_radiantAegis.png`。
+2026-06-24 追补：局内敌人本体的护盾数值展示已改为血量旁常驻 icon badge：`shield` 显示 `affix_shield.png + 层数`，`radiantAegis` 显示 `affix_radiantAegis.png + 百分比`。受击时的浮字/描边反馈只表达瞬时命中，不再承担常驻数值 UI。
+2026-06-24 追补：`carrier` 铸巢母架正式运行时美术已生成，不再使用 PH 占位图。源图由 imagegen 按几何磨石/炼金晶核风格生成并保存在 `docs/design/concepts/carrier_imagegen_pass1/`，`scripts/generate_carrier_enemy_assets.py` 只负责绿幕去底、运行时缩放、空舱透明校验与派生图标/碰撞框。已覆盖 `assets/sprites/enemies/v2/enemy_carrier_3x2.png`、`assets/sprites/enemies/archetypes/enemy_carrier_3x2.png`、`assets/sprites/enemies/composites/enemy_carrier_carrier_3x2_idle.png`、`assets/sprites/enemies/frames/frame_carrier_3x2.png`、图鉴头像、基底 UI 图标与 `affix_carrier.png`；manifest 与 `ENEMY_V2_METADATA` 均已改为 `placeholder:false`。验收预览见 `docs/design/enemy_carrier_asset_preview.png`。
 
 ## 1. 已定设计决策
 
@@ -33,14 +40,35 @@
 
 ## 2. 资产优先级
 
+### P0：符文敌人资产标记（待生成，不登记 manifest）
+
+| 资产 | 目标路径 | 用途 | 验收 |
+|---|---|---|---|
+| 通用符文掉落图标 | `assets/ui/icons/enemy_affixes/affix_rune_bearer.svg` | 图鉴、状态面板、试炼场卡片 | 首版 SVG 占位已落地；正式版需保持嵌入式紫金符文槽，表达“击杀给通用符文”。 |
+| 自适应符文图标 | `assets/ui/icons/enemy_affixes/affix_adaptive_rune.svg` | 图鉴、状态面板、试炼场卡片 | 首版 SVG 占位已落地；正式版需保持中心可变色符文核心与外圈切换刻度。 |
+| 通用符文常驻 Overlay | `assets/sprites/enemies/overlays/overlay_affix_rune_bearer.svg` | 运行时常驻词条层 | 首版 SVG 占位已落地；正式版保持内嵌符文槽 + 细小轮换刻痕，不能遮住主体、HP 或既有词条。 |
+| 自适应符文动态 Overlay | `assets/sprites/enemies/overlays/overlay_adaptive_rune_<element>.svg` | 按 `adaptiveRuneElement` 叠加元素特效 | 首版 SVG 占位已覆盖 `pyro`、`cryo`、`lightning`、`bounce`、`pierce`、`scatter`、`laser`、`venom`、`overcharge`、`echo`、`unknown`；正式版每个属性只改变核心色、纹路和短边缘特效，不重画敌人主体。 |
+| 临时词条轮换 VFX | `assets/sprites/enemies/vfx/vfx_rune_bearer_roll_0~3.png` | `runeBearer` 每回合切换临时词条 | 表现为小型符文槽旋转或卡榫拨动，不新增大面积粒子。 |
+| 自适应切换 VFX | `assets/sprites/enemies/vfx/vfx_adaptive_rune_shift_<element>_0~3.png` | `adaptiveRune` 记录新属性时 | 只在属性改变瞬间播放短闪；low 档可退化为纯色描边和短标签。 |
+| 符文死亡掉落框 | `assets/sprites/enemies/vfx/vfx_rune_drop_mark_0~3.png` | 死亡时提示“将掉符文” | 与场内 `RuneLoot` 区分：这是敌人身上的死亡前提示，不是掉落实体本身。 |
+
+### P1：符文敌人高频组合 Sprite（可选）
+
+| assetKey | 建议文件 | 说明 |
+|---|---|---|
+| `residue:1x1:runeBearer` | `assets/sprites/enemies/composites/enemy_residue_runebearer_1x1_idle.png` + `.json` | 首批通用符文敌人；保留单格磨石主体，符文槽嵌在核心旁。 |
+| `residue:1x1:adaptiveRune` | `assets/sprites/enemies/composites/enemy_residue_adaptiverune_1x1_idle.png` + `.json` | 首批自适应符文敌人；基础态为无属性紫白核心，属性态走动态 Overlay。 |
+| `bastion:3x1:runeBearer` | `assets/sprites/enemies/composites/enemy_bastion_runebearer_3x1_idle.png` + `.json` | 只在后续确认大型符文敌人可读后制作；符文槽沿 3 格横梁分段排布。 |
+| `deflector:2x1:adaptiveRune` | `assets/sprites/enemies/composites/enemy_deflector_adaptiverune_2x1_idle.png` + `.json` | 可作为属性教学变体；自适应元素不要覆盖偏折屏障的青蓝前缘。 |
+
 ### P0：直接影响机制读法
 
 | 资产 | 目标路径 | 用途 | 验收 |
 |---|---|---|---|
-| 铸巢母架本体 Sprite Sheet | `assets/sprites/enemies/v2/enemy_carrier_3x2.png` + `.json` | 图鉴、V2 基底、运行时主体 | 3×2 “冂”形必须留出第 5 格空舱；主体符合几何磨石/晶石灾害背景。 |
-| 铸巢母架 archetype Sprite | `assets/sprites/enemies/archetypes/enemy_carrier_3x2.png` + `.json` | manifest 基底回退 | 与 V2 本体同 silhouette，不额外填满空舱。 |
-| 铸巢母架 collision frame | `assets/sprites/enemies/frames/frame_carrier_3x2.png` | 表达真实凹陷物理边界 | 只描 1/2/3/4/6 占格外壳，第 5 格透明；不能画成完整 3×2 实心框。 |
-| 铸巢母架头像 | `assets/icons/enemies/enemy_carrier_3x2.png` | 图鉴/试炼场小图 | 64×64 仍能看出“冂”形空舱。 |
+| 铸巢母架本体 Sprite Sheet | `assets/sprites/enemies/v2/enemy_carrier_3x2.png` + `.json` | 图鉴、V2 基底、运行时主体 | 已落地；imagegen 绘制主体，3×2 “冂”形留出第 5 格空舱，主体符合几何磨石/晶石灾害背景。 |
+| 铸巢母架 archetype Sprite | `assets/sprites/enemies/archetypes/enemy_carrier_3x2.png` + `.json` | manifest 基底回退 | 已落地；与 V2 本体同 silhouette，不额外填满空舱。 |
+| 铸巢母架 collision frame | `assets/sprites/enemies/frames/frame_carrier_3x2.png` | 表达真实凹陷物理边界 | 已落地；只描 1/2/3/4/6 占格外壳，第 5 格透明，不画成完整 3×2 实心框。 |
+| 铸巢母架头像 | `assets/icons/enemies/enemy_carrier_3x2.png` | 图鉴/试炼场小图 | 已落地；64×64 仍能看出“冂”形空舱。 |
 | 低伤免疫图标 | `assets/ui/icons/enemy_affixes/affix_lowDamageImmune.png` | 图鉴与状态面板 | 金属硬壳符号，和普通 shield 图标明显不同。 |
 | 偏折壳图标 | `assets/ui/icons/enemy_affixes/affix_deflectShell.png` | 图鉴与状态面板 | 旋转硬壳/偏折边界，表现“反弹方向改变”。 |
 | 活体护甲三档 Overlay | 见 §3 | 运行时护甲层状态 | 普通三档与叠加强化三档必须一眼可分。 |
@@ -55,7 +83,7 @@
 | 活体护甲图标 | `assets/ui/icons/enemy_affixes/affix_livingArmor.png` | 图鉴与状态面板 | 护甲层/再生层，不做恶心有机物。 |
 | 护甲孢子图标 | `assets/ui/icons/enemy_affixes/affix_armorSpore.png` | 图鉴与状态面板 | 种荚/孢囊/炼金容器，避免虫卵感。 |
 | 撞城者图标 | `assets/ui/icons/enemy_affixes/affix_siegeBreaker.png` | 图鉴与状态面板 | 装饰撞角或加固件。 |
-| 铸巢母架词条图标 | `assets/ui/icons/enemy_affixes/affix_carrier.png` | 图鉴与状态面板 | 空舱/巢架符号，不画军舰。 |
+| 铸巢母架词条图标 | `assets/ui/icons/enemy_affixes/affix_carrier.png` | 图鉴与状态面板 | 已落地；空舱/巢架符号，不画军舰。 |
 
 ### P2：高频组合 Sprite
 
@@ -102,6 +130,7 @@
 3. 静态 Overlay 真实存在且不需要状态切换时，才登记到 `overlays`。
 4. 状态型 Overlay 走 `dynamicOverlays`，不要混入静态 `overlays`。
 5. 铸巢母架生成后，应同步更新内嵌默认 manifest：`src/data/enemy_visual_assets.js` 的 `_DEFAULT_COMPOSITES`、`_DEFAULT_ARCHETYPE_FILES`、`_DEFAULT_ARCHETYPE_ICONS`、`_DEFAULT_AFFIX_ICONS`、`_DEFAULT_FRAMES`。
+6. `runeBearer` 与 `adaptiveRune` 首版机制和 SVG 占位已接入；后续替换正式 PNG/SVG 时必须同步 `affixIcons`、`overlays` / `dynamicOverlays`、试炼场场景、敌人词缀索引和符文掉落机制验证。
 
 ## 6. 验收清单
 

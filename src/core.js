@@ -13,6 +13,7 @@ import {
     META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB 
 } from './config.js';
 import { RUNE_DB, RUNEWORD_DB } from './rune_config.js';
+import { pixiInit, pixiDestroy } from './render/pixi_bridge.js';
 
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, TriangleSideWheel, GhostPeg, Peg, DropBall, Enemy, SwordQi, 
@@ -29,6 +30,9 @@ import { eventBus } from './event_bus.js';
 
 // 导入 SoundManager 类和音频代理
 import { SoundManager, audio, _setAudioInstance } from './audio.js';
+
+// 导入暗黑炼金 Psytrance 实时音乐引擎（纯合成，复用 SoundManager 的 ctx）
+import { MusicEngine } from './music_engine.js';
 
 // 导入拆分后的子系统
 import { game_system } from './game_system.js';
@@ -51,6 +55,53 @@ import { preloadUiBitmaps } from './bitmap_icons.js';
 
 // ==================== 延迟音频初始化 ====================
 let _audioInitialized = false;
+let _musicEngine = null;
+
+/**
+ * 订阅游戏事件，驱动音乐自适应（垂直叠层 / 变速）。
+ * 事件名取自 event_bus.js 的 EVENT_TYPES（此处用字面量以免扩展 import）。
+ */
+function _wireMusicAdaptivity(music) {
+    // 速度档位
+    const BPM_CALM = 120;   // 菜单 / 选遗物 / 研磨：最低 BPM，慢而暗
+    const BPM_BATTLE = 148; // 战斗 / 试炼：常态律动
+    const BPM_BOSS = 156;   // Boss
+    const BPM_BOSS_RAGE = 160;
+
+    // 战斗活跃阶段：正常律动；其余（菜单 / 选遗物 / 研磨等）：最低 BPM + 低强度（drone 铺底，稀疏）
+    const ACTIVE_PHASES = new Set(['combat', 'training']);
+    let _inBoss = false;      // Boss 期间不被阶段事件抢走速度
+    let _wasActive = false;   // 上一阶段是否战斗活跃（用于只在跨段时播过渡音）
+
+    music.setIntensity(0.3); // 初始为安静菜单律动
+    music.setBpm(BPM_CALM);  // 立即定到最低 BPM（无过渡）
+
+    eventBus.on('phase:change', (data) => {
+        const to = data && data.to;
+        if (_inBoss) return; // Boss 进行中，速度交给 boss 事件控制
+        const active = ACTIVE_PHASES.has(to);
+        if (active && !_wasActive) {
+            // 安静 → 战斗：上升音过渡 + 平滑提速 + 加层
+            music.riser(1.0);
+            music.setIntensity(0.5);
+            music.glideBpm(BPM_BATTLE);
+        } else if (!active && _wasActive) {
+            // 战斗 → 菜单/选遗物/研磨：下降音过渡 + 平滑降到最低 BPM
+            music.downlifter(0.9);
+            music.setIntensity(0.3);
+            music.glideBpm(BPM_CALM);
+        } else {
+            // 同类阶段内切换：只调强度/速度，不重复过渡音
+            music.setIntensity(active ? 0.5 : 0.3);
+            music.glideBpm(active ? BPM_BATTLE : BPM_CALM);
+        }
+        _wasActive = active;
+    });
+
+    eventBus.on('boss:spawned',      () => { _inBoss = true;  music.impact(); music.riser(0.9); music.setIntensity(1.0); music.glideBpm(BPM_BOSS); });    // 进 Boss：落点冲击 + 上升音 + 提速
+    eventBus.on('boss:phase_change', () => { music.riser(0.6); music.glideBpm(BPM_BOSS_RAGE); });                                                         // 狂暴阶段：短上升音 + 再提速
+    eventBus.on('boss:defeated',     () => { _inBoss = false; music.downlifter(0.8); music.setIntensity(0.5); music.glideBpm(BPM_BATTLE); _wasActive = true; }); // Boss 死：下降音回落到战斗律动
+}
 
 /**
  * 初始化音频系统（应在首次用户交互后调用）
@@ -70,7 +121,19 @@ function initAudio() {
     
     // 通过事件总线广播音频就绪
     eventBus.emit('audio:ready', { audio: instance });
-    
+
+    // ── 暗黑炼金 Psytrance 实时音乐引擎（纯合成 BGM）──
+    // 复用同一个 AudioContext / masterGain（受 toggleMute 控制），零采样、零依赖。
+    // 如不想自动播放 BGM，删掉 _musicEngine.start() 一行即可。
+    try {
+        _musicEngine = new MusicEngine(instance);
+        _wireMusicAdaptivity(_musicEngine);
+        _musicEngine.start();
+        if (typeof window !== 'undefined') window.__music = _musicEngine; // 调试句柄：__music.setIntensity(1) / __music.stop()
+    } catch (e) {
+        console.warn('[Core] MusicEngine 启动失败：', e);
+    }
+
     console.log('[Core] SoundManager initialized on user interaction');
     return instance;
 }
@@ -136,6 +199,8 @@ class Game {
         this.isWheelSpinning = false;
         this.canvas = document.getElementById('gameCanvas'); 
         this.ctx = this.canvas.getContext('2d');
+        // [PixiJS 迁移] 初始化 WebGL 渲染管线（双层 Canvas Overlay）
+        this._pixiReady = pixiInit();
         this.boardTilt = { current: { x: 0, y: 0 }, target: { x: 0, y: 0 }, enabled: false };
         this.phase = 'meta'; 
         this.marblesPool = []; 
@@ -408,11 +473,11 @@ class Game {
         // 伤害事件
         this.eventBus.on('damage:dealt', (data) => {
             // 可用于伤害统计面板的实时更新
-            // [充能符文系统] 子弹击中敌人时充能（仅战斗阶段）
+            // [技能充能系统] 子弹击中敌人时充能（仅战斗阶段）
             if (this.phase === 'combat' && !data.killed) {
                 const hitX = data.hitX || (data.enemy ? data.enemy.pos.x : this.width / 2);
                 const hitY = data.hitY || (data.enemy ? data.enemy.pos.y : this.height / 2);
-                this.combat_runeCharge_onHit(hitX, hitY, false);
+                this.combat_skillCharge_onHit(hitX, hitY, false);
             }
         });
 
@@ -424,11 +489,11 @@ class Game {
         // 敌人死亡事件
         this.eventBus.on('enemy:killed', (data) => {
             // 可用于成就系统、掉落系统等
-            // [充能符文系统] 击杀敌人时额外充能（仅战斗阶段）
+            // [技能充能系统] 击杀敌人时额外充能（仅战斗阶段）
             if (this.phase === 'combat') {
                 const hitX = data.hitX || (data.enemy ? data.enemy.pos.x : this.width / 2);
                 const hitY = data.hitY || (data.enemy ? data.enemy.pos.y : this.height / 2);
-                this.combat_runeCharge_onHit(hitX, hitY, true);
+                this.combat_skillCharge_onHit(hitX, hitY, true);
             }
             // [本局统计] 累计击杀数
             this.runKillCount = (this.runKillCount || 0) + 1;
@@ -488,7 +553,7 @@ class Game {
 
         // [Task 3.2] 注册 UI 层 EventBus 监听器
         // ui_initEventListeners: 全局 UI 事件（色差特效、全屏闪光）
-        // hud_initEventListeners: HUD 事件（弹药动画、命中进度、充能符文）
+        // hud_initEventListeners: HUD 事件（弹药动画、命中进度、技能充能）
         this.ui_initEventListeners();
         this.hud_initEventListeners();
         // [新手教程] 检测是否为首次游玩，触发教程
@@ -508,6 +573,8 @@ class Game {
             try { this._resizeObserver.disconnect(); } catch (e) {}
             this._resizeObserver = null;
         }
+        // [PixiJS 迁移] 释放 WebGL 渲染管线资源
+        pixiDestroy();
     }
 }
 
@@ -515,4 +582,7 @@ class Game {
 // 各子系统方法现在通过构造函数中的 bind(this) 注入为实例方法（组合模式）。
 // 详见 .cursor/rules/global.md 第 5 节「子系统扩展规范」。
 
-export { SoundManager, Game, audio, eventBus, initAudio };
+/** 获取当前音乐引擎实例（首次用户交互后才存在，否则为 null） */
+function getMusic() { return _musicEngine; }
+
+export { SoundManager, Game, audio, eventBus, initAudio, MusicEngine, getMusic };

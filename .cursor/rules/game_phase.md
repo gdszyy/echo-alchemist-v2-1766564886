@@ -34,12 +34,13 @@ globs: ["src/game_phase.js"]
 - **出口**: 玩家做出选择并确认，触发转场动画进入研磨阶段。纯净精华模式下，确认时必须先完成合法性校验，把合成属性写回 `MarbleDefinition.collected`；研磨发射时必须把弹珠已有 `collected` 拷贝进本次 `currentSession.collected`，确保最终子弹 recipe 获得对应属性，并为对应 `marble.type` 写入 `doubleAssimilationBoostRounds`。
 
 ### 2.5 回合开始提示与充能特效 (Round Start Banner)
-- **触发时机**: `sys_startRoundStartResolver()` 的 `pendingRoundStartRewards` 队列为空时，调用 `sys_showRoundStartBanner()`。
+- **触发时机**: `sys_startRoundStartResolver()` 的 `pendingRoundStartRewards` 队列为空时，调用 `sys_showRoundStartBanner()` 并在横幅结束后进入战斗；`sys_startMarblePackGrind()` 直接进入研磨后，也必须以 `sys_showRoundStartBanner({ enterCombat:false, protectCombat:false })` 播放同一横幅作为非阻塞回合提示。
 - **局内商人调度**: 在奖励队列清空后、`sys_showRoundStartBanner()` 之前，`sys_maybeOfferRunShopBeforeRoundStart()` 只负责更新商人到访调度并返回 `false`，不得阻塞回合开始横幅。首访固定第 3 回合，后续由 `sys_rollNextRunShopRound()` 按 3..当前回合数随机等待；每次到访停留 2 回合，由右上角紧凑 `#run-shop-status-dock` 在研磨/战斗阶段显示到访/离开倒计时并打开商店。
 - **充能触发条件**: 普通回合开始横幅不触发子弹充能；`ammoQueue` 只来自当前保留的最多 3 枚弹珠或显式替换确认。三发上限来自三枚晶石核心充能位，禁止通过遗物或存档字段扩大选择数量。
 - **旧资源包边界**：`run_resource_pack` 只增加 `runFragments` 并播放资源反馈，不得进入 `selection` / `gathering`，不得重建 `marbleQueue` 或 `_chargedAmmoQueue`。新主循环应使用局内商店弹珠包作为研磨入口。
 - **弹珠符文槽**: 选择阶段的弹珠预览面板允许把符文直接融合进已选弹珠；每颗弹珠最多 3 个 `runeSlots`，融合会立即消耗 `runeInventory` 中的符文。进入研磨/编译时槽位以 `source: 'rune_slot'` 临时加入属性，结算写回 `marble.collected` 时必须过滤，避免重复叠层。
-- **实现**: 先调用 `phase_switchPhase('combat')` 切换背景，然后显示 `#round-start-banner` 游戏容器内大字提示（「第 X 回合開始」），持续约 1.5 秒后自动调用 `phase_startCombatPhase()` 进入战斗。只有弹珠包开包/历史精华兼容等显式研磨入口才会调用 `phase_startGatheringPhase()`。
+- **实现**: 默认路径先调用 `phase_switchPhase('combat')` 切换背景，然后显示 `#round-start-banner` 游戏容器内大字提示（「第 X 回合開始」），持续约 2.2 秒后自动调用 `phase_startCombatPhase()` 进入战斗。弹珠包开包/历史精华兼容等显式研磨入口仍必须直接调用 `phase_startGatheringPhase()`，但可以把横幅作为非阻塞 overlay 播放，不得为了横幅把弹珠包重新路由到战斗入口。
+- **下一 Boss 威胁预告**: `#round-start-banner` 内的 `#round-start-threat` 必须显示下一 Boss 倒计时；未遭遇 Boss 只能显示未知 Boss + 剪影预告，已遭遇 Boss 才显示名称。预告数据统一来自 `src/utils/boss_schedule_utils.js`，不得调用会写入 `bossHistory` 的 `spawn_selectBossForRound()`。
 - **子弹队列边界（2026-06-19）**: `sys_showRoundStartBanner()` 只负责进入下一轮战斗阶段，普通回合开始时不得从 `_lastFiredAmmoSnapshot` 或 `marbleQueue` 重建 `ammoQueue`。这两个来源仅用于精华触发 / 子弹替换等显式充能流程，避免下一回合待发射子弹串成上一轮保留子弹或新生成候选弹珠。
 - **空弹珠兜底（2026-06-19）**: `phase_startGatheringPhase()` 只允许由精华/命运选择等显式研磨入口调用，并必须在真正初始化时确认 `marbleQueue` 非空；若存档恢复、overlay 返回或特殊流程清空了队列，应通过 `buildFallbackMarbleQueue()` 从选择池/当前权重补齐可发射弹珠，禁止进入没有弹珠的研磨阶段。
 - **充能特效**: 同时为 `#pc-left-sidebar` 添加 CSS 动画类 `.ammo-panel-charging`（high/medium 档：边框光流扫过）或 `.ammo-panel-charging-simple`（low 档：简单淡入淡出）。
@@ -172,11 +173,11 @@ globs: ["src/game_phase.js"]
 | `ignis` | 烈焰之心 | Mini-Boss | 护盾+狂暴，狂暴后护盾翻倍，每回合温度急剧上升并对周围敌人造成火焰溅射伤害 |
 | `glacies` | 冰封山峡 | Mini-Boss | 跳跃+再生，回合 tick / 跳跃落地在战斗场内制造霜缝；霜缝缝住专属随从或周围敌人，提供短暂减伤、回血与护盾，cryo / pierce 可反制；不再影响 Peg |
 | `mikro` | 细胞山峡 | Mini-Boss | 分裂+极速，狂暴后分裂概率 100% |
-| `devourer` | 噬神者 | Mini-Boss | 吞噬相邻敌人获得护盾层数 |
-| `viridis` | 绿色山峡 | 大 Boss | 治疗者，狂暴后治疗范围扩大到全场 |
+| `devourer` | 噬神者 | Mini-Boss | 深渊胃域拉拽并召唤 `maw_thrall`，吞噬胃域内敌人转化为护盾；狂暴后全屏候选 |
+| `viridis` | 绿色山峡 | 大 Boss | 孢子活甲网络，治疗与专属侍体累积孢甲资源；狂暴后集中自疗并强化孢甲循环 |
 | `tesla` | 特斯拉山峡 | 大 Boss | 导体网络场强：每回合电击并转化导体，场强提升行动与召唤压力，cryo / bounce 可反制 |
-| `chimera` | 奇美拉 | 大 Boss | 回合开始触发 +2 格胃域吸引与养料召唤；专属吞噬动作吞噬胃域内所有非 Boss 敌人并继承负面状态 / 温度相加 |
-| `ouroboros` | 奥罗波罗斯 | 大 Boss | 每 N 回合切换词缀组，狂暴后切换加速 |
+| `chimera` | 奇美拉 | 大 Boss | 每回合随机热核吞噬 1 名敌人，温度转热/寒层并在冷热抵消时生成流彩护盾；吞噬后召唤 +100°C / -100°C 养料 |
+| `ouroboros` | 奥罗波罗斯 | 大 Boss | 六附体每回合轮转，当前附体决定词缀、主机制和动态破绽谱 |
 
 ## 6. Boss 遗物与 round-start 延迟奖励处理
 
@@ -237,6 +238,13 @@ globs: ["src/game_phase.js"]
 
 ### 8.3 掉落权重边际递减 (Marginal Decay)
 - **触发时机**: 计算符文掉落权重时（`loot_system.js` 中的 `_calcBuildVector`）
+
+## 2026-06-23 技能充能阶段契约
+
+- 进入战斗阶段时，`phase_startCombat()` 调用 `combat_skillCharge_init()` 初始化技能充能状态与顶部 HUD。
+- 战斗 / 训练阶段的逐帧更新调用 `combat_skillCharge_decay(timeScale)`，只衰减临时条；实际条保留到满条或战斗重置。
+- 敌人动作后的 `phase_claimPendingRunes()` 只负责场地掉落符文入库与飞行动画，不再检查或领取 `runeChargeCurrentRune`。
+- 旧 `combat_runeCharge_*` 方法仅作为兼容代理存在；新增阶段逻辑必须使用 `combat_skillCharge_*`。
 - **机制**: 
   - 统计玩家近期伤害占比 `buildVector` 时，如果某一属性的伤害占比超过阈值（默认 60%），则对超出部分进行衰减。
   - 衰减系数为 0.5，即超出部分减半。

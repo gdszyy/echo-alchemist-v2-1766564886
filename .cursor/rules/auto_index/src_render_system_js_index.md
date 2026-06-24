@@ -1,7 +1,9 @@
 # src\render_system.js 函数索引
 
-> 自动生成于 2026-06-23 | 总行数: 904 | 函数数: 18 | 语言: javascript
+> 自动生成于 2026-06-25 | 总行数: 1115 | 函数数: 20 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
+
+**巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -12,21 +14,30 @@
 | render_clearCanvas | method | `render_clearCanvas()` |  |
 | render_background | method | `render_background()` |  |
 | render_combat_walls | method | `render_combat_walls(ctx, wallLeftX, wallRightX, wallTopY)` |  |
+| render_combat_defeatLine | method | `render_combat_defeatLine(ctx)` |  |
 | render_windAnchors | method | `render_windAnchors()` |  |
 | render_butterflyPathWave | method | `render_butterflyPathWave(ctx, anchors, center, progress)` |  |
 | render_singleWindMatrix | method | `render_singleWindMatrix(matrix)` |  |
 | render_floatingTexts | method | `render_floatingTexts(timeScale)` |  |
 | render_combat_launcherOrbitals | method | `render_combat_launcherOrbitals()` |  |
+| render_combat_aimGuideNode | method | `render_combat_aimGuideNode(ctx, x, y, kind = 'wall', size = 18, alpha = 0.9)` |  |
 | render_combat_launcherSignal | method | `render_combat_launcherSignal(ctx, cx, cy, portX, portY, recipe, visual = {})` |  |
-| drawValueScreen | function | `drawValueScreen()` |  |
-| drawBurstStack | function | `drawBurstStack()` |  |
+| drawDamageReadout | function | `drawDamageReadout()` |  |
+| drawBurstReadout | function | `drawBurstReadout()` |  |
 | drawAttributeMagazine | function | `drawAttributeMagazine()` |  |
 | drawLoadedProjectile | function | `drawLoadedProjectile()` |  |
 | render_queueLauncherBarrelFireEffect | method | `render_queueLauncherBarrelFireEffect(vel, recipe = {})` |  |
-| render_combat_launcherEmitterBase | method | `render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress, reloadProgress = 0, aimRotation = -Math.PI / 2)` |  |
+| render_combat_launcherEmitterBase | method | `render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress, reloadProgress = 0, aimRotation = -Math.PI / 2)` | ⚠️ 巨型函数，见 @section 导航 |
 | drawTiltVignette | method | `drawTiltVignette(ctx, tilt)` |  |
 | drawTiltIndicator | method | `drawTiltIndicator(ctx, tilt)` |  |
 | render_perfOverlay | method | `render_perfOverlay()` |  |
+
+## 巨型函数内部节点 (@section 标记)
+
+### render_combat_launcherEmitterBase
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
+
 
 ## 其他 @section 标记
 

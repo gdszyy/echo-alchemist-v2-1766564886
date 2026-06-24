@@ -167,6 +167,12 @@ export const DIRECTOR_SCRIPT_CONFIG = {
     unfamiliarRoundWindow: 3,
     maxUnfamiliarActorsPerPreset: 1,
     defaultRepeatCooldownRounds: 3,
+    // [教学闸门] boss 前几回合开始预教学该 boss 的随从词条
+    preTeachWindow: 2,
+    // [教学闸门] 一行最多引入几个"玩家没见过"的词条（方案3 在场强度 tier0 时会被降为 0）
+    maxBrandNewAffixPerRound: 1,
+    // THEME_SEGMENTS 用 boss_xxx，bossMinionProfiles 用短名；此处桥接两者的命名差异
+    bossIdAlias: { boss_micro: 'mikro' },
 };
 
 export const DIRECTOR_ACTOR_INTRO_ROUNDS = {
@@ -182,11 +188,20 @@ export const DIRECTOR_ACTOR_INTRO_ROUNDS = {
     devour: 12,
     berserk: 14,
     prism: 16,
-    radiantAegis: 20,
     hive: 18,
     siege: 22,
     carrier: 28,
     gravityWell: 30,
+    // [进阶词条教学排程] 按 boss 归属错开，保证一次只教一个；与 AFFIX_WEIGHT_CURVES 的随机放量解耦
+    radiantAegis: 4,     // ignis 招牌：R4 半强度预警 + 首战教学档（满强度由曲线 R20 起放量）
+    livingArmor: 6,      // glacies 段：活体护甲（armorSpore 的前置）
+    deflectShell: 8,     // glacies 段：偏折壳
+    armorSpore: 13,      // 依赖 livingArmor；viridis 随从词条
+    energyArmor: 15,     // micro 段：蓄能甲
+    siegeBreaker: 20,    // devourer 段：撞城者
+    lowDamageImmune: 22, // devourer 段：低伤免疫
+    phaseShield: 24,     // devourer→viridis：相位护盾
+    overloadReactor: 26, // tesla 段：过量反应炉
 };
 
 export const DIRECTOR_SCRIPTS = [

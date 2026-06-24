@@ -17,6 +17,7 @@
     "echoSpire": "enemy_echo_spire_1x2.png",
     "prism": "enemy_prism_1x3.png",
     "hive": "enemy_hive_2x3.png",
+    "carrier": "enemy_carrier_3x2.png",
     "gravityWell": "enemy_gravity_core_3x3.png"
   },
   "affixIcons": {
@@ -28,11 +29,19 @@
     "hive": "affix_hive.png",
     "gravityWell": "affix_gravityWell.png",
     "siege": "affix_siege.png",
+    "carrier": "affix_carrier.png",
     "shield": "affix_shield.png",
-    "regen": "affix_regen.png"
+    "regen": "affix_regen.png",
+    "radiantAegis": "affix_radiantAegis.png",
+    "energyArmor": "affix_energyArmor.png",
+    "phaseShield": "affix_phaseShield.png",
+    "livingArmor": "affix_livingArmor.png",
+    "runeBearer": "affix_rune_bearer.svg",
+    "adaptiveRune": "affix_adaptive_rune.svg"
   },
   "overlays": {
     "shield": "overlay_affix_shield.png",
+    "radiantAegis": "overlay_affix_radiantAegis.png",
     "regen": "overlay_affix_regen.png",
     "berserk": "overlay_affix_berserk.png",
     "haste": "overlay_affix_haste.png",
@@ -42,7 +51,9 @@
     "armorSpore": "overlay_affix_armorSpore.png",
     "siegeBreaker": "overlay_affix_siegeBreaker.png",
     "carrier": "overlay_affix_carrier.png",
-    "deflectShell": "overlay_affix_deflectShell.png"
+    "deflectShell": "overlay_affix_deflectShell.png",
+    "runeBearer": "overlay_affix_rune_bearer.svg",
+    "adaptiveRune": "overlay_affix_adaptive_rune.svg"
   },
   "dynamicOverlays": {
     "energyArmor": {
@@ -65,6 +76,19 @@
       "level1": "overlay_overload_reactor_1.png",
       "level2": "overlay_overload_reactor_2.png",
       "level3": "overlay_overload_reactor_3.png"
+    },
+    "adaptiveRune": {
+      "pyro": "overlay_adaptive_rune_pyro.svg",
+      "cryo": "overlay_adaptive_rune_cryo.svg",
+      "lightning": "overlay_adaptive_rune_lightning.svg",
+      "bounce": "overlay_adaptive_rune_bounce.svg",
+      "pierce": "overlay_adaptive_rune_pierce.svg",
+      "scatter": "overlay_adaptive_rune_scatter.svg",
+      "laser": "overlay_adaptive_rune_laser.svg",
+      "venom": "overlay_adaptive_rune_venom.svg",
+      "overcharge": "overlay_adaptive_rune_overcharge.svg",
+      "echo": "overlay_adaptive_rune_echo.svg",
+      "unknown": "overlay_adaptive_rune_unknown.svg"
     }
   },
   "frames": {
@@ -105,6 +129,11 @@
     },
     "siege:3x2": {
       "spritePath": "assets/sprites/enemies/frames/frame_siege_3x2.png",
+      "shape": "polygon",
+      "footprint": "3x2"
+    },
+    "carrier:3x2": {
+      "spritePath": "assets/sprites/enemies/frames/frame_carrier_3x2.png",
       "shape": "polygon",
       "footprint": "3x2"
     },
@@ -154,6 +183,12 @@
     "siege": {
       "spritePath": "assets/sprites/enemies/archetypes/enemy_siege_3x2_native_hollow.png",
       "manifestPath": "assets/sprites/enemies/archetypes/enemy_siege_3x2_native_hollow.json",
+      "footprint": "3x2",
+      "placeholder": false
+    },
+    "carrier": {
+      "spritePath": "assets/sprites/enemies/archetypes/enemy_carrier_3x2.png",
+      "manifestPath": "assets/sprites/enemies/archetypes/enemy_carrier_3x2.json",
       "footprint": "3x2",
       "placeholder": false
     },
@@ -207,6 +242,17 @@
       ],
       "placeholder": false
     },
+    "carrier:3x2:carrier": {
+      "resourceId": "enemy_carrier_carrier_3x2",
+      "spritePath": "assets/sprites/enemies/composites/enemy_carrier_carrier_3x2_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_carrier_carrier_3x2_idle.json",
+      "baseArchetype": "carrier",
+      "footprint": "3x2",
+      "affixes": [
+        "carrier"
+      ],
+      "placeholder": false
+    },
     "echoSpire:1x2:echoRelay": {
       "resourceId": "enemy_spire_echorelay_1x2",
       "spritePath": "assets/sprites/enemies/composites/enemy_spire_echorelay_1x2_idle.png",
@@ -227,6 +273,78 @@
       "affixes": [
         "deflectionWard"
       ],
+      "placeholder": false
+    },
+    "orbitEcho:aegis": {
+      "resourceId": "enemy_ouroboros_orbit_echo_aegis_1x1",
+      "spritePath": "assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_aegis_1x1_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_aegis_1x1_idle.json",
+      "baseArchetype": "residue",
+      "footprint": "1x1",
+      "affixes": [],
+      "bossOwnerId": "ouroboros",
+      "bossMinionRole": "orbit_echo",
+      "slotId": "aegis",
+      "placeholder": false
+    },
+    "orbitEcho:graft": {
+      "resourceId": "enemy_ouroboros_orbit_echo_graft_1x1",
+      "spritePath": "assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_graft_1x1_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_graft_1x1_idle.json",
+      "baseArchetype": "residue",
+      "footprint": "1x1",
+      "affixes": [],
+      "bossOwnerId": "ouroboros",
+      "bossMinionRole": "orbit_echo",
+      "slotId": "graft",
+      "placeholder": false
+    },
+    "orbitEcho:brood": {
+      "resourceId": "enemy_ouroboros_orbit_echo_brood_1x1",
+      "spritePath": "assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_brood_1x1_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_brood_1x1_idle.json",
+      "baseArchetype": "residue",
+      "footprint": "1x1",
+      "affixes": [],
+      "bossOwnerId": "ouroboros",
+      "bossMinionRole": "orbit_echo",
+      "slotId": "brood",
+      "placeholder": false
+    },
+    "orbitEcho:stride": {
+      "resourceId": "enemy_ouroboros_orbit_echo_stride_1x1",
+      "spritePath": "assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_stride_1x1_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_stride_1x1_idle.json",
+      "baseArchetype": "residue",
+      "footprint": "1x1",
+      "affixes": [],
+      "bossOwnerId": "ouroboros",
+      "bossMinionRole": "orbit_echo",
+      "slotId": "stride",
+      "placeholder": false
+    },
+    "orbitEcho:maw": {
+      "resourceId": "enemy_ouroboros_orbit_echo_maw_1x1",
+      "spritePath": "assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_maw_1x1_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_maw_1x1_idle.json",
+      "baseArchetype": "residue",
+      "footprint": "1x1",
+      "affixes": [],
+      "bossOwnerId": "ouroboros",
+      "bossMinionRole": "orbit_echo",
+      "slotId": "maw",
+      "placeholder": false
+    },
+    "orbitEcho:surge": {
+      "resourceId": "enemy_ouroboros_orbit_echo_surge_1x1",
+      "spritePath": "assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_surge_1x1_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_surge_1x1_idle.json",
+      "baseArchetype": "residue",
+      "footprint": "1x1",
+      "affixes": [],
+      "bossOwnerId": "ouroboros",
+      "bossMinionRole": "orbit_echo",
+      "slotId": "surge",
       "placeholder": false
     }
   }

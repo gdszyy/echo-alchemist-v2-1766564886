@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect x="16" y="16" width="96" height="96" rx="14" fill="none" stroke="#f97316" stroke-width="5"/>
+  <path d="M64 24v24M64 80v24M24 64h24M80 64h24M38 38l17 17M90 38 73 55M38 90l17-17M90 90 73 73" stroke="#fed7aa" stroke-width="6" stroke-linecap="round"/>
+  <text x="64" y="74" text-anchor="middle" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#f97316">OC</text>
+</svg>

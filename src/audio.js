@@ -19,11 +19,21 @@ class SoundManager {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
         this.muted = false;
 
+        // 音量状态（0-1 范围）
+        this.sfxVolume = 1.0;
+        this.bgmVolume = 1.0;
+
         // 1. 创建主音量节点
         this.masterGain = this.ctx.createGain();
         this.masterGain.gain.value = 0.3;
 
-        // 2. 创建动态压缩器（防止爆音）
+        // 2. 创建音效和音乐独立增益节点
+        this.sfxGain = this.ctx.createGain();
+        this.sfxGain.gain.value = this.sfxVolume;
+        this.bgmGain = this.ctx.createGain();
+        this.bgmGain.gain.value = this.bgmVolume;
+
+        // 3. 创建动态压缩器（防止爆音）
         this.compressor = this.ctx.createDynamicsCompressor();
         this.compressor.threshold.setValueAtTime(-24, this.ctx.currentTime);
         this.compressor.knee.setValueAtTime(30, this.ctx.currentTime);
@@ -31,7 +41,9 @@ class SoundManager {
         this.compressor.attack.setValueAtTime(0.003, this.ctx.currentTime);
         this.compressor.release.setValueAtTime(0.25, this.ctx.currentTime);
 
-        // 3. 连接链路：节点 -> Master -> Compressor -> 扬声器
+        // 4. 连接链路：sfxGain/bgmGain -> Master -> Compressor -> 扬声器
+        this.sfxGain.connect(this.masterGain);
+        this.bgmGain.connect(this.masterGain);
         this.masterGain.connect(this.compressor);
         this.compressor.connect(this.ctx.destination);
 
@@ -47,28 +59,63 @@ class SoundManager {
         this.sampleLoadPromises = {};
         this.sampleFailed = new Set();
         this.sampleManifest = {
-            shoot: 'assets/audio-local/sfx/shoot_laser.wav',
-            pegHit: 'assets/audio-local/sfx/hit_peg.wav',
-            bounceHit: 'assets/audio-local/sfx/hit_bounce.wav',
-            enemyHit: 'assets/audio-local/sfx/enemy_hit.wav',
-            slash: 'assets/audio-local/sfx/slash.wav',
-            collect: 'assets/audio-local/sfx/collect.wav',
-            split: 'assets/audio-local/sfx/split.wav',
-            shatter: 'assets/audio-local/sfx/shatter.wav',
-            lightning: 'assets/audio-local/sfx/lightning.wav',
-            powerup: 'assets/audio-local/sfx/powerup.wav',
-            explosion: 'assets/audio-local/sfx/explosion_sub.wav',
+            shoot_laser_1: 'assets/audio-local/sfx/shoot_laser_1.wav',
+            shoot_laser_2: 'assets/audio-local/sfx/shoot_laser_2.wav',
+            shoot_laser_5: 'assets/audio-local/sfx/shoot_laser_5.wav',
+            shoot_zip_1: 'assets/audio-local/sfx/shoot_zip_1.wav',
+            hit_peg_2: 'assets/audio-local/sfx/hit_peg_2.wav',
+            hit_peg_3: 'assets/audio-local/sfx/hit_peg_3.wav',
+            hit_peg_4: 'assets/audio-local/sfx/hit_peg_4.wav',
+            hit_bounce_7: 'assets/audio-local/sfx/hit_bounce_7.wav',
+            hit_switch_3: 'assets/audio-local/sfx/hit_switch_3.wav',
+            enemy_hit_1: 'assets/audio-local/sfx/enemy_hit_1.wav',
+            enemy_hit_5: 'assets/audio-local/sfx/enemy_hit_5.wav',
+            enemy_hit_6: 'assets/audio-local/sfx/enemy_hit_6.wav',
+            slash_swoosh_1: 'assets/audio-local/sfx/slash_swoosh_1.wav',
+            slash_swoosh_2: 'assets/audio-local/sfx/slash_swoosh_2.wav',
+            slash_swoosh_3: 'assets/audio-local/sfx/slash_swoosh_3.wav',
+            slash_zip_2: 'assets/audio-local/sfx/slash_zip_2.wav',
+            collect_bell_4: 'assets/audio-local/sfx/collect_bell_4.wav',
+            collect_bell_5: 'assets/audio-local/sfx/collect_bell_5.wav',
+            collect_switch_1: 'assets/audio-local/sfx/collect_switch_1.wav',
+            split_glitch_2: 'assets/audio-local/sfx/split_glitch_2.wav',
+            split_glitch_3: 'assets/audio-local/sfx/split_glitch_3.wav',
+            split_glitch_4: 'assets/audio-local/sfx/split_glitch_4.wav',
+            shatter_artifact_1: 'assets/audio-local/sfx/shatter_artifact_1.wav',
+            shatter_artifact_3: 'assets/audio-local/sfx/shatter_artifact_3.wav',
+            shatter_artifact_5: 'assets/audio-local/sfx/shatter_artifact_5.wav',
+            lightning_laser_3: 'assets/audio-local/sfx/lightning_laser_3.wav',
+            lightning_laser_4: 'assets/audio-local/sfx/lightning_laser_4.wav',
+            explosion_sub_16: 'assets/audio-local/sfx/explosion_sub_16.wav',
+            explosion_sub_18: 'assets/audio-local/sfx/explosion_sub_18.wav',
+            explosion_sub_19: 'assets/audio-local/sfx/explosion_sub_19.wav',
         };
+        this.sampleGroups = {
+            shootCore: ['shoot_laser_1', 'shoot_laser_2', 'shoot_laser_5'],
+            shootTransient: ['shoot_zip_1'],
+            pegCore: ['hit_peg_2', 'hit_peg_3', 'hit_peg_4'],
+            bounceCore: ['hit_bounce_7', 'hit_switch_3'],
+            enemyCore: ['enemy_hit_1', 'enemy_hit_5', 'enemy_hit_6'],
+            slashCore: ['slash_swoosh_1', 'slash_swoosh_2', 'slash_swoosh_3'],
+            slashTransient: ['slash_zip_2'],
+            collectCore: ['collect_bell_4', 'collect_bell_5', 'collect_switch_1'],
+            splitCore: ['split_glitch_2', 'split_glitch_3', 'split_glitch_4'],
+            shatterCore: ['shatter_artifact_1', 'shatter_artifact_3', 'shatter_artifact_5'],
+            lightningCore: ['lightning_laser_3', 'lightning_laser_4'],
+            explosionCore: ['explosion_sub_16', 'explosion_sub_18', 'explosion_sub_19'],
+            powerupCore: ['collect_bell_4', 'collect_bell_5'],
+        };
+        this.sampleRoundRobin = {};
         this._preloadLocalSamples();
 
         // ── Reverb 效果器（钉盘弹珠专用）──
-        // 信号链：钉盘音效节点 → pegDryGain(0.6) → masterGain
-        //                      ↘ pegWetGain(0.45) → pegReverbNode → masterGain
+        // 信号链：钉盘音效节点 → pegDryGain(0.6) → sfxGain
+        //                      ↘ pegWetGain(0.45) → pegReverbNode → sfxGain
         this.pegReverbNode = this._createReverbNode(0.8, 2.5); // decay=0.8, duration=2.5s
-        this.pegReverbNode.connect(this.masterGain);
+        this.pegReverbNode.connect(this.sfxGain);
         this.pegDryGain = this.ctx.createGain();
         this.pegDryGain.gain.value = 0.6;  // 干声 60%
-        this.pegDryGain.connect(this.masterGain);
+        this.pegDryGain.connect(this.sfxGain);
         this.pegWetGain = this.ctx.createGain();
         this.pegWetGain.gain.value = 0.45; // 湿声 45%
         this.pegWetGain.connect(this.pegReverbNode);
@@ -147,20 +194,51 @@ class SoundManager {
         return promise;
     }
 
+    _rand(min, max) {
+        return min + Math.random() * (max - min);
+    }
+
+    _resolveRange(value) {
+        return Array.isArray(value) ? this._rand(value[0], value[1]) : value;
+    }
+
+    _pickSampleKey(keyOrGroup) {
+        const group = this.sampleGroups[keyOrGroup];
+        if (!group || group.length === 0) return keyOrGroup;
+
+        const cursor = this.sampleRoundRobin[keyOrGroup] || 0;
+        const jitter = Math.floor(Math.random() * group.length);
+        const index = (cursor + jitter) % group.length;
+        this.sampleRoundRobin[keyOrGroup] = (cursor + 1) % group.length;
+        return group[index];
+    }
+
+    _connectOutput(node, output = 'master') {
+        if (output === 'peg') {
+            this._connectToPegBus(node);
+        } else {
+            node.connect(this.sfxGain);
+        }
+    }
+
     _playSample(key, options = {}) {
         if (this.muted) return true;
 
-        const buffer = this.sampleBuffers[key];
+        const sampleKey = this._pickSampleKey(key);
+        const buffer = this.sampleBuffers[sampleKey];
         if (!buffer) {
-            this._loadSample(key);
+            this._loadSample(sampleKey);
             return false;
         }
 
         const {
             volume = 0.35,
             rate = 1,
+            delay = 0,
             output = 'master',
             cooldown = 0,
+            duration = null,
+            fadeOut = null,
         } = options;
         const perfNow = performance.now();
         const playKey = `sample:${key}`;
@@ -171,18 +249,19 @@ class SoundManager {
 
         try {
             const now = this.ctx.currentTime;
+            const startAt = now + Math.max(0, delay);
             const source = this.ctx.createBufferSource();
             const gain = this.ctx.createGain();
             source.buffer = buffer;
-            source.playbackRate.setValueAtTime(rate, now);
-            gain.gain.setValueAtTime(volume, now);
-            source.connect(gain);
-            if (output === 'peg') {
-                this._connectToPegBus(gain);
-            } else {
-                gain.connect(this.masterGain);
+            source.playbackRate.setValueAtTime(this._resolveRange(rate), startAt);
+            gain.gain.setValueAtTime(this._resolveRange(volume), startAt);
+            if (fadeOut) {
+                gain.gain.exponentialRampToValueAtTime(0.001, startAt + fadeOut);
             }
-            source.start(now);
+            source.connect(gain);
+            this._connectOutput(gain, output);
+            source.start(startAt);
+            if (duration) source.stop(startAt + duration);
             return true;
         } catch (error) {
             if (typeof console !== 'undefined') {
@@ -190,6 +269,75 @@ class SoundManager {
             }
             return false;
         }
+    }
+
+    _playToneLayer({
+        type = 'sine',
+        freq = 220,
+        endFreq = null,
+        volume = 0.1,
+        duration = 0.2,
+        delay = 0,
+        output = 'master',
+        attack = 0.004,
+        curve = 'exp',
+    } = {}) {
+        if (this.muted) return;
+        const now = this.ctx.currentTime;
+        const startAt = now + Math.max(0, delay);
+        const endAt = startAt + duration;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        const startFreq = Math.max(1, this._resolveRange(freq));
+        osc.frequency.setValueAtTime(startFreq, startAt);
+        if (endFreq !== null) {
+            const targetFreq = Math.max(1, this._resolveRange(endFreq));
+            if (curve === 'linear') {
+                osc.frequency.linearRampToValueAtTime(targetFreq, endAt);
+            } else {
+                osc.frequency.exponentialRampToValueAtTime(targetFreq, endAt);
+            }
+        }
+        const targetVol = Math.max(0.001, this._resolveRange(volume));
+        gain.gain.setValueAtTime(0.001, startAt);
+        gain.gain.linearRampToValueAtTime(targetVol, startAt + attack);
+        gain.gain.exponentialRampToValueAtTime(0.001, endAt);
+        osc.connect(gain);
+        this._connectOutput(gain, output);
+        osc.start(startAt);
+        osc.stop(endAt + 0.03);
+    }
+
+    _playNoiseLayer({
+        volume = 0.1,
+        duration = 0.2,
+        delay = 0,
+        output = 'master',
+        filterType = 'lowpass',
+        freq = 1400,
+        endFreq = null,
+    } = {}) {
+        if (this.muted) return;
+        const now = this.ctx.currentTime;
+        const startAt = now + Math.max(0, delay);
+        const endAt = startAt + duration;
+        const source = this.ctx.createBufferSource();
+        const filter = this.ctx.createBiquadFilter();
+        const gain = this.ctx.createGain();
+        source.buffer = this.noiseBuffer;
+        filter.type = filterType;
+        filter.frequency.setValueAtTime(Math.max(1, this._resolveRange(freq)), startAt);
+        if (endFreq !== null) {
+            filter.frequency.exponentialRampToValueAtTime(Math.max(1, this._resolveRange(endFreq)), endAt);
+        }
+        gain.gain.setValueAtTime(Math.max(0.001, this._resolveRange(volume)), startAt);
+        gain.gain.exponentialRampToValueAtTime(0.001, endAt);
+        source.connect(filter);
+        filter.connect(gain);
+        this._connectOutput(gain, output);
+        source.start(startAt);
+        source.stop(endAt + 0.02);
     }
 
     // ─────────────────────────────────────────────
@@ -287,6 +435,24 @@ class SoundManager {
      */
     suspend() { if (this.ctx && this.ctx.state === 'running') this.ctx.suspend(); }
 
+    /**
+     * 设置音效音量（0-1 范围）
+     * @param {number} volume - 音量值
+     */
+    setSfxVolume(volume) {
+        this.sfxVolume = Math.max(0, Math.min(1, volume));
+        this.sfxGain.gain.setValueAtTime(this.sfxVolume, this.ctx.currentTime);
+    }
+
+    /**
+     * 设置音乐音量（0-1 范围）
+     * @param {number} volume - 音量值
+     */
+    setBgmVolume(volume) {
+        this.bgmVolume = Math.max(0, Math.min(1, volume));
+        this.bgmGain.gain.setValueAtTime(this.bgmVolume, this.ctx.currentTime);
+    }
+
     // ─────────────────────────────────────────────
     //  通用基础音调
     // ─────────────────────────────────────────────
@@ -305,16 +471,6 @@ class SoundManager {
         const _nowMs = performance.now();
         if (this.lastPlayTime[_key] && _nowMs - this.lastPlayTime[_key] < 30) return;
         this.lastPlayTime[_key] = _nowMs;
-        if (type === 'normal' && this._playSample('pegHit', {
-            volume: 0.34,
-            rate: 0.92 + Math.min(Math.max(speed, 0), 20) * 0.015,
-            output: 'peg',
-        })) return;
-        if (type === 'bounce' && this._playSample('bounceHit', {
-            volume: 0.36,
-            rate: 0.96 + Math.min(Math.max(speed, 0), 20) * 0.012,
-            output: 'peg',
-        })) return;
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -323,7 +479,7 @@ class SoundManager {
         gain.gain.setValueAtTime(vol, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
         osc.connect(gain);
-        gain.connect(this.masterGain);
+        gain.connect(this.sfxGain);
         osc.start(now);
         osc.stop(now + dur);
     }
@@ -397,7 +553,7 @@ class SoundManager {
         }
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
         osc.connect(gain);
-        gain.connect(this.masterGain);
+        gain.connect(this.sfxGain);
         osc.start(now);
         osc.stop(now + 0.15);
     }
@@ -407,19 +563,31 @@ class SoundManager {
      */
     playShoot() {
         if (this.muted) return;
-        if (this._playSample('shoot', { volume: 0.38, rate: 1.08, cooldown: 40 })) return;
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(600, now);
-        osc.frequency.exponentialRampToValueAtTime(200, now + 0.1);
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-        osc.connect(gain);
-        gain.connect(this.masterGain);
-        osc.start(now);
-        osc.stop(now + 0.15);
+        this._playToneLayer({
+            type: 'sine',
+            freq: [105, 135],
+            endFreq: 55,
+            volume: 0.055,
+            duration: 0.12,
+        });
+        this._playSample('shootCore', {
+            volume: [0.26, 0.34],
+            rate: [0.96, 1.12],
+            cooldown: 40,
+            fadeOut: 0.22,
+        });
+        this._playSample('shootTransient', {
+            volume: [0.12, 0.18],
+            rate: [1.05, 1.28],
+            delay: 0.005,
+            fadeOut: 0.08,
+        });
+        this._playNoiseLayer({
+            volume: 0.035,
+            duration: 0.09,
+            filterType: 'highpass',
+            freq: [1800, 2600],
+        });
     }
 
     /**
@@ -435,44 +603,26 @@ class SoundManager {
         if (this.lastPlayTime[key] && now - this.lastPlayTime[key] < 50) return;
         this.lastPlayTime[key] = now;
 
-        const sampleKey = hitType === 'lightning' ? 'lightning' : 'enemyHit';
-        const sampleRate = hitType === 'pyro' ? 0.88 : (hitType === 'cryo' ? 1.12 : 1);
-        if (this._playSample(sampleKey, { volume: 0.28, rate: sampleRate, cooldown: 45 })) return;
-
-        const audioNow = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-
-        switch(hitType) {
-            case 'cryo':
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(1000, audioNow);
-                osc.frequency.linearRampToValueAtTime(600, audioNow + 0.1);
-                gain.gain.setValueAtTime(0.08, audioNow);
-                break;
-            case 'pyro':
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(150, audioNow);
-                osc.frequency.linearRampToValueAtTime(100, audioNow + 0.15);
-                gain.gain.setValueAtTime(0.1, audioNow);
-                break;
-            case 'lightning':
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(2000, audioNow);
-                osc.frequency.exponentialRampToValueAtTime(500, audioNow + 0.08);
-                gain.gain.setValueAtTime(0.06, audioNow);
-                break;
-            default:
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(400, audioNow);
-                osc.frequency.linearRampToValueAtTime(200, audioNow + 0.1);
-                gain.gain.setValueAtTime(0.08, audioNow);
-        }
-        gain.gain.exponentialRampToValueAtTime(0.001, audioNow + 0.15);
-        osc.connect(gain);
-        gain.connect(this.masterGain);
-        osc.start(audioNow);
-        osc.stop(audioNow + 0.2);
+        const sampleRate = hitType === 'pyro' ? [0.84, 0.94] : (hitType === 'cryo' ? [1.08, 1.22] : [0.94, 1.08]);
+        this._playToneLayer({
+            type: 'sine',
+            freq: hitType === 'pyro' ? [70, 95] : [85, 125],
+            endFreq: hitType === 'cryo' ? [90, 120] : [38, 58],
+            volume: hitType === 'lightning' ? 0.035 : 0.055,
+            duration: 0.14,
+        });
+        this._playSample(hitType === 'lightning' ? 'lightningCore' : 'enemyCore', {
+            volume: hitType === 'lightning' ? [0.16, 0.22] : [0.22, 0.3],
+            rate: sampleRate,
+            cooldown: 45,
+            fadeOut: 0.2,
+        });
+        this._playNoiseLayer({
+            volume: hitType === 'cryo' ? 0.045 : 0.03,
+            duration: hitType === 'lightning' ? 0.08 : 0.12,
+            filterType: 'highpass',
+            freq: hitType === 'lightning' ? [2600, 4200] : [1300, 2300],
+        });
     }
 
     /**
@@ -486,32 +636,27 @@ class SoundManager {
         if (this.lastPlayTime['lightning'] && perfNow - this.lastPlayTime['lightning'] < 80) return;
         this.lastPlayTime['lightning'] = perfNow;
 
-        if (this._playSample('lightning', { volume: 0.32, rate: 1.14, cooldown: 80 })) return;
-
-        const now = this.ctx.currentTime;
-
-        // 噪声 + 高频扫描
-        const noise = this.ctx.createBufferSource();
-        noise.buffer = this.noiseBuffer;
-        const noiseGain = this.ctx.createGain();
-        noiseGain.gain.setValueAtTime(0.15, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-        noise.connect(noiseGain);
-        noiseGain.connect(this.masterGain);
-        noise.start(now);
-        noise.stop(now + 0.25);
-
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(3000, now);
-        osc.frequency.exponentialRampToValueAtTime(200, now + 0.1);
-        gain.gain.setValueAtTime(0.05, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-        osc.connect(gain);
-        gain.connect(this.masterGain);
-        osc.start(now);
-        osc.stop(now + 0.15);
+        this._playSample('lightningCore', {
+            volume: [0.22, 0.3],
+            rate: [1.08, 1.24],
+            cooldown: 80,
+            fadeOut: 0.18,
+        });
+        this._playNoiseLayer({
+            volume: 0.12,
+            duration: 0.16,
+            filterType: 'highpass',
+            freq: [2600, 4200],
+            endFreq: 900,
+        });
+        this._playToneLayer({
+            type: 'square',
+            freq: [2800, 3400],
+            endFreq: [180, 260],
+            volume: 0.035,
+            duration: 0.13,
+            attack: 0.001,
+        });
     }
 
     /**
@@ -519,37 +664,27 @@ class SoundManager {
      */
     playExplosion() {
         if (this.muted) return;
-        if (this._playSample('explosion', { volume: 0.42, rate: 1.05, cooldown: 120 })) return;
-        const now = this.ctx.currentTime;
-
-        // 噪声爆发
-        const noise = this.ctx.createBufferSource();
-        noise.buffer = this.noiseBuffer;
-        const noiseGain = this.ctx.createGain();
-        noiseGain.gain.setValueAtTime(0.3, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-        const filter = this.ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(2000, now);
-        filter.frequency.exponentialRampToValueAtTime(100, now + 0.3);
-        noise.connect(filter);
-        filter.connect(noiseGain);
-        noiseGain.connect(this.masterGain);
-        noise.start(now);
-        noise.stop(now + 0.5);
-
-        // 低频冲击
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(100, now);
-        osc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-        osc.connect(gain);
-        gain.connect(this.masterGain);
-        osc.start(now);
-        osc.stop(now + 0.4);
+        this._playToneLayer({
+            type: 'sine',
+            freq: [68, 88],
+            endFreq: [28, 38],
+            volume: 0.16,
+            duration: 0.42,
+            attack: 0.002,
+        });
+        this._playSample('explosionCore', {
+            volume: [0.26, 0.36],
+            rate: [0.88, 1.06],
+            cooldown: 120,
+            fadeOut: 0.65,
+        });
+        this._playNoiseLayer({
+            volume: 0.18,
+            duration: 0.34,
+            filterType: 'lowpass',
+            freq: [1800, 2600],
+            endFreq: [120, 180],
+        });
     }
 
     /**
@@ -558,24 +693,30 @@ class SoundManager {
      */
     playPowerup(pitch = 1) {
         if (this.muted) return;
-        if (this._playSample('powerup', {
-            volume: 0.3,
-            rate: Math.min(1.7, 0.9 + pitch * 0.06),
+        const pitchRate = Math.min(1.7, 0.9 + pitch * 0.06);
+        this._playSample('powerupCore', {
+            volume: [0.18, 0.26],
+            rate: [pitchRate * 0.96, pitchRate * 1.06],
             cooldown: 45,
-        })) return;
-        const now = this.ctx.currentTime;
-        const baseFreq = 400 + pitch * 50;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(baseFreq, now);
-        osc.frequency.linearRampToValueAtTime(baseFreq * 1.5, now + 0.15);
-        gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-        osc.connect(gain);
-        gain.connect(this.masterGain);
-        osc.start(now);
-        osc.stop(now + 0.3);
+            fadeOut: 0.35,
+        });
+        this._playToneLayer({
+            type: 'sine',
+            freq: 360 + pitch * 42,
+            endFreq: 760 + pitch * 72,
+            volume: 0.065,
+            duration: 0.32,
+            curve: 'linear',
+        });
+        this._playToneLayer({
+            type: 'triangle',
+            freq: 840 + pitch * 80,
+            endFreq: 1260 + pitch * 120,
+            volume: 0.035,
+            duration: 0.18,
+            delay: 0.045,
+            curve: 'linear',
+        });
     }
 
     /**
@@ -584,15 +725,52 @@ class SoundManager {
      */
     playEffect(type) {
         if (this.muted) return;
-        const sampleByEffect = {
-            split: 'split',
-            shatter: 'shatter',
-        };
-        if (sampleByEffect[type] && this._playSample(sampleByEffect[type], {
-            volume: type === 'shatter' ? 0.36 : 0.3,
-            rate: 1,
-            cooldown: type === 'shatter' ? 70 : 50,
-        })) return;
+        if (type === 'split') {
+            this._playSample('splitCore', {
+                volume: [0.2, 0.3],
+                rate: [0.92, 1.16],
+                cooldown: 50,
+                fadeOut: 0.22,
+            });
+            this._playToneLayer({
+                type: 'triangle',
+                freq: [560, 720],
+                endFreq: [980, 1240],
+                volume: 0.045,
+                duration: 0.18,
+                curve: 'linear',
+            });
+            this._playNoiseLayer({
+                volume: 0.035,
+                duration: 0.1,
+                filterType: 'highpass',
+                freq: [1800, 3200],
+            });
+            return;
+        }
+        if (type === 'shatter') {
+            this._playToneLayer({
+                type: 'sine',
+                freq: [120, 160],
+                endFreq: [48, 68],
+                volume: 0.065,
+                duration: 0.16,
+            });
+            this._playSample('shatterCore', {
+                volume: [0.24, 0.34],
+                rate: [0.88, 1.12],
+                cooldown: 70,
+                fadeOut: 0.22,
+            });
+            this._playNoiseLayer({
+                volume: 0.12,
+                duration: 0.2,
+                filterType: 'highpass',
+                freq: [2200, 3800],
+                endFreq: [900, 1300],
+            });
+            return;
+        }
         const now = this.ctx.currentTime;
 
         switch(type) {
@@ -621,7 +799,7 @@ class SoundManager {
                 gain.gain.setValueAtTime(0.08, now);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
                 osc.connect(gain);
-                gain.connect(this.masterGain);
+                gain.connect(this.sfxGain);
                 osc.start(now);
                 osc.stop(now + 0.3);
                 break;
@@ -635,7 +813,7 @@ class SoundManager {
                 gain.gain.setValueAtTime(0.05, now);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
                 osc.connect(gain);
-                gain.connect(this.masterGain);
+                gain.connect(this.sfxGain);
                 osc.start(now);
                 osc.stop(now + 0.1);
                 break;
@@ -650,7 +828,7 @@ class SoundManager {
                 gain.gain.setValueAtTime(0.1, now);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
                 osc.connect(gain);
-                gain.connect(this.masterGain);
+                gain.connect(this.sfxGain);
                 osc.start(now);
                 osc.stop(now + 0.15);
                 break;
@@ -665,7 +843,7 @@ class SoundManager {
                 gain.gain.setValueAtTime(0.08, now);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
                 osc.connect(gain);
-                gain.connect(this.masterGain);
+                gain.connect(this.sfxGain);
                 osc.start(now);
                 osc.stop(now + 0.25);
                 break;
@@ -678,7 +856,7 @@ class SoundManager {
                 noiseGain.gain.setValueAtTime(0.15, now);
                 noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
                 noise.connect(noiseGain);
-                noiseGain.connect(this.masterGain);
+                noiseGain.connect(this.sfxGain);
                 noise.start(now);
                 noise.stop(now + 0.25);
                 break;
@@ -693,20 +871,28 @@ class SoundManager {
      */
     playMagic() {
         if (this.muted) return;
-        if (this._playSample('powerup', { volume: 0.24, rate: 1.28, cooldown: 60 })) return;
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(800, now);
-        osc.frequency.linearRampToValueAtTime(1200, now + 0.1);
-        osc.frequency.linearRampToValueAtTime(600, now + 0.2);
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-        osc.connect(gain);
-        gain.connect(this.masterGain);
-        osc.start(now);
-        osc.stop(now + 0.3);
+        this._playSample('powerupCore', {
+            volume: [0.12, 0.2],
+            rate: [1.18, 1.36],
+            cooldown: 60,
+            fadeOut: 0.32,
+        });
+        this._playToneLayer({
+            type: 'sine',
+            freq: [720, 860],
+            endFreq: [1120, 1360],
+            volume: 0.06,
+            duration: 0.16,
+            curve: 'linear',
+        });
+        this._playToneLayer({
+            type: 'triangle',
+            freq: [1100, 1400],
+            endFreq: [520, 680],
+            volume: 0.035,
+            duration: 0.28,
+            delay: 0.08,
+        });
     }
 
     /**
@@ -720,41 +906,33 @@ class SoundManager {
         if (this.lastPlayTime['slash'] && perfNow - this.lastPlayTime['slash'] < 60) return;
         this.lastPlayTime['slash'] = perfNow;
 
-        if (this._playSample('slash', { volume: 0.34, rate: 1.02, cooldown: 60 })) return;
-
-        const now = this.ctx.currentTime;
-
-        // 主音：快速频率下滑
-        const osc1 = this.ctx.createOscillator();
-        const gain1 = this.ctx.createGain();
-        osc1.type = 'sawtooth';
-        osc1.frequency.setValueAtTime(800, now);
-        osc1.frequency.exponentialRampToValueAtTime(200, now + 0.08);
-
-        // 泛音：更高频的点缀
-        const osc2 = this.ctx.createOscillator();
-        const gain2 = this.ctx.createGain();
-        osc2.type = 'triangle';
-        osc2.frequency.setValueAtTime(1200, now);
-        osc2.frequency.exponentialRampToValueAtTime(400, now + 0.06);
-
-        // 主音包络
-        gain1.gain.setValueAtTime(0, now);
-        gain1.gain.linearRampToValueAtTime(0.2, now + 0.02);
-        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-        // 泛音包络（消失得稍微快一点）
-        gain2.gain.setValueAtTime(0, now);
-        gain2.gain.linearRampToValueAtTime(0.1, now + 0.02);
-        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-
-        osc1.connect(gain1);
-        gain1.connect(this.masterGain);
-        osc2.connect(gain2);
-        gain2.connect(this.masterGain);
-        osc1.start(now);
-        osc1.stop(now + 0.55);
-        osc2.start(now);
-        osc2.stop(now + 0.55);
+        this._playToneLayer({
+            type: 'sine',
+            freq: [120, 160],
+            endFreq: [48, 70],
+            volume: 0.05,
+            duration: 0.22,
+        });
+        this._playSample('slashCore', {
+            volume: [0.22, 0.32],
+            rate: [0.92, 1.12],
+            cooldown: 60,
+            fadeOut: 0.34,
+        });
+        this._playSample('slashTransient', {
+            volume: [0.12, 0.2],
+            rate: [1.0, 1.28],
+            delay: 0.012,
+            fadeOut: 0.12,
+        });
+        this._playToneLayer({
+            type: 'sawtooth',
+            freq: [780, 980],
+            endFreq: [180, 260],
+            volume: 0.055,
+            duration: 0.18,
+            attack: 0.001,
+        });
     }
 
     /**
@@ -762,8 +940,29 @@ class SoundManager {
      */
     playCollect() {
         if (this.muted) return;
-        if (this._playSample('collect', { volume: 0.26, rate: 1.08, cooldown: 50 })) return;
-        this.playTone(700, 'sine', 0.1, 0.4);
+        this._playSample('collectCore', {
+            volume: [0.16, 0.24],
+            rate: [1.0, 1.18],
+            cooldown: 50,
+            fadeOut: 0.28,
+        });
+        this._playToneLayer({
+            type: 'sine',
+            freq: [620, 760],
+            endFreq: [980, 1180],
+            volume: 0.04,
+            duration: 0.22,
+            curve: 'linear',
+        });
+        this._playToneLayer({
+            type: 'triangle',
+            freq: [1240, 1480],
+            endFreq: [1620, 1900],
+            volume: 0.022,
+            duration: 0.16,
+            delay: 0.035,
+            curve: 'linear',
+        });
     }
 }
 
@@ -800,6 +999,8 @@ const audio = new Proxy({}, {
         // 未初始化时返回安全默认值
         if (prop === 'ctx') return null;
         if (prop === 'muted') return false;
+        if (prop === 'sfxVolume') return 1.0;
+        if (prop === 'bgmVolume') return 1.0;
         return () => {};
     },
     set: (target, prop, value) => {
