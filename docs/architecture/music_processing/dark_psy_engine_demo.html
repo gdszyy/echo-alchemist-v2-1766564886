@@ -497,6 +497,18 @@ class MusicEngine {
     g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.07);
     o.connect(g); g.connect(this.hatBus); o.start(t); o.stop(t+0.09);
   }
+  playGuitarChug(t,deg=0,gain=0.5){ // 棕榈闷音吉他 chug（mikro Guitar 实测：staccato 闷音、vel 满、reg4 锁根）：锯齿芯过低通 + 噪声拨片瞬态→leadBus（电气 swarm 体）
+    const c=this.ctx, f=this._noteFreq(12+deg);
+    const o=c.createOscillator(), lp=c.createBiquadFilter(), g=c.createGain();
+    o.type='sawtooth'; o.frequency.value=f;
+    lp.type='lowpass'; lp.frequency.setValueAtTime(1600,t); lp.frequency.exponentialRampToValueAtTime(700,t+0.08); lp.Q.value=2;
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+0.004); g.gain.exponentialRampToValueAtTime(0.001,t+0.1);
+    o.connect(lp); lp.connect(g); g.connect(this.leadBus); o.start(t); o.stop(t+0.12);
+    if(this.sm.noiseBuffer){ const src=c.createBufferSource(); src.buffer=this.sm.noiseBuffer; // 拨片瞬态
+      const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=2200; bp.Q.value=1;
+      const ng=c.createGain(); ng.gain.setValueAtTime(0.3*gain,t); ng.gain.exponentialRampToValueAtTime(0.001,t+0.02);
+      src.connect(bp); bp.connect(ng); ng.connect(this.leadBus); src.start(t); src.stop(t+0.03); }
+  }
   drumFill(){ // Tom 连打 fill（参考 DrumFillMidHighCue）：八分铺垫→后半16分加速下行冲刺
     if(this.sm.muted) return;
     const eighth=60/this.bpm/2, sixteenth=eighth/2; let t=this.ctx.currentTime+0.02;
