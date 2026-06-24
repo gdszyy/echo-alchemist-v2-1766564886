@@ -40,6 +40,7 @@ import {
     muzzleFlashV2_pixiCreate, muzzleFlashV2_pixiSync, muzzleFlashV2_pixiDestroy,
     firingBurst_pixiCreate, firingBurst_pixiSync, firingBurst_pixiDestroy,
     burnEffect_pixiCreate, burnEffect_pixiSync, burnEffect_pixiDestroy,
+    affixSkillVFX_pixiCreate, affixSkillVFX_pixiSync, affixSkillVFX_pixiDestroy,
 } from '../render/pixi_effect_adapter.js';
 
 function withAlpha(color, alpha) {
@@ -3104,6 +3105,310 @@ class FiringBurst {
     get dead() { return this.life <= 0; }
 }
 
+// ==================== AffixSkillVFX - 词条技能释放特效 ====================
+/**
+ * 敌人词条 Skill 阶段行动特效
+ * 三幕式生命周期：telegraph(预兆) → burst(爆发) → decay(余韵)
+ * 使用现有粒子纹理 + PIXI.Graphics 程序化绘制
+ * @perf-impact: 新增词条技能特效，复用现有粒子预算，无新增 CONFIG 字段
+ */
+class AffixSkillVFX {
+    static SKILL_TYPES = {
+        berserk: { duration: 42, telegraph: 10, burst: 10, colors: ['#ef4444', '#f97316', '#fbbf24'] },
+        shield:  { duration: 38, telegraph: 10, burst: 8,  colors: ['#93c5fd', '#a78bfa', '#f87171'] },
+        regen:   { duration: 46, telegraph: 12, burst: 10, colors: ['#4ade80', '#86efac'] },
+        haste:   { duration: 30, telegraph: 6,  burst: 8,  colors: ['#facc15', '#fde047'] },
+        jump:    { duration: 44, telegraph: 14, burst: 10, colors: ['#2dd4bf', '#38bdf8'] },
+        clone:   { duration: 48, telegraph: 12, burst: 10, colors: ['#c084fc', '#d8b4fe'] },
+        devour:  { duration: 46, telegraph: 12, burst: 12, colors: ['#dc2626', '#991b1b'] },
+    };
+
+    constructor(x, y, skillType, opts = {}) {
+        this.x = x;
+        this.y = y;
+        this.skillType = skillType;
+        this.cfg = AffixSkillVFX.SKILL_TYPES[skillType] || AffixSkillVFX.SKILL_TYPES.berserk;
+        this.perfTier = opts.perfTier || 'high';
+
+        this.frame = 0;
+        this.life = 1.0;
+        this.phase = 'telegraph';
+        this.phaseFrame = 0;
+        this.duration = this.cfg.duration;
+        this._pixi = null;
+
+        // Intensity modifier (e.g. berserk temp/100)
+        this.intensity = opts.intensity || 1.0;
+        // Boss/elite scaling
+        this.isBoss = opts.isBoss || false;
+        this.isElite = opts.isElite || false;
+
+        // Particle multiplier by perf tier
+        const pmul = this.perfTier === 'high' ? 1.0 : (this.perfTier === 'medium' ? 0.6 : 0.3);
+
+        // Pre-compute particle configs (spawned lazily in _updatePhase)
+        this._particles = [];
+        this._gfxData = { rotation: 0, alpha: 0, scale: 0 };
+        this._burstSpawned = false;
+        this._decaySpawned = false;
+
+        // Per-type setup
+        this._setupType(pmul);
+    }
+
+    _setupType(pmul) {
+        switch (this.skillType) {
+        case 'berserk': {
+            const count = Math.ceil(12 * pmul * this.intensity);
+            for (let i = 0; i < count; i++) {
+                this._particles.push({
+                    mode: 'ember', ox: (Math.random() - 0.5) * 20, oy: 0,
+                    vx: (Math.random() - 0.5) * 2, vy: -(2 + Math.random() * 3),
+                    scale: 0.6 + Math.random() * 0.4, life: 1.0,
+                    color: this.cfg.colors[Math.floor(Math.random() * 3)],
+                    spawnPhase: 'burst', gravity: -0.05,
+                });
+            }
+            // Spark embers at top
+            const sparkCount = Math.ceil(6 * pmul * this.intensity);
+            for (let i = 0; i < sparkCount; i++) {
+                this._particles.push({
+                    mode: 'spark', ox: (Math.random() - 0.5) * 30, oy: -20,
+                    vx: (Math.random() - 0.5) * 4, vy: -(3 + Math.random() * 2),
+                    scale: 0.4 + Math.random() * 0.3, life: 1.0,
+                    color: '#fbbf24', spawnPhase: 'burst', gravity: 0.02,
+                });
+            }
+            this._gfxData.flameSegments = Math.ceil(8 * this.intensity);
+            break;
+        }
+        case 'shield': {
+            const count = Math.ceil(8 * pmul);
+            for (let i = 0; i < count; i++) {
+                const angle = (i / count) * Math.PI * 2;
+                this._particles.push({
+                    mode: 'shard', ox: 0, oy: 0,
+                    vx: Math.cos(angle) * 3.5, vy: Math.sin(angle) * 3.5,
+                    scale: 0.6, life: 1.0, color: this.cfg.colors[0],
+                    spawnPhase: 'burst', gravity: 0,
+                });
+            }
+            // Telegraph particles (slow upward drift)
+            for (let i = 0; i < 3; i++) {
+                this._particles.push({
+                    mode: 'shard', ox: (Math.random() - 0.5) * 16, oy: 10,
+                    vx: 0, vy: -0.5,
+                    scale: 0.3, life: 1.0, color: this.cfg.colors[0],
+                    spawnPhase: 'telegraph', gravity: 0,
+                });
+            }
+            break;
+        }
+        case 'regen': {
+            const count = Math.ceil(10 * pmul);
+            for (let i = 0; i < count; i++) {
+                const angle = (i / count) * Math.PI * 2;
+                this._particles.push({
+                    mode: 'venom', ox: Math.cos(angle) * 8, oy: 15,
+                    vx: Math.cos(angle) * 0.5, vy: -(1.5 + Math.random() * 2),
+                    scale: 0.4 + Math.random() * 0.2, life: 1.0,
+                    color: '#4ade80', spawnPhase: 'burst', gravity: -0.02,
+                    spiral: true, spiralSpeed: 0.1 + Math.random() * 0.05,
+                });
+            }
+            break;
+        }
+        case 'haste': {
+            const count = Math.ceil(5 * pmul);
+            for (let i = 0; i < count; i++) {
+                this._particles.push({
+                    mode: 'wind_slash', ox: -(8 + i * 8), oy: (Math.random() - 0.5) * 10,
+                    vx: -1.5, vy: 0,
+                    scale: 0.7 - i * 0.1, life: 1.0 - i * 0.12,
+                    color: '#facc15', spawnPhase: 'burst', gravity: 0,
+                });
+            }
+            // Spark burst at origin
+            const sparkCount = Math.ceil(4 * pmul);
+            for (let i = 0; i < sparkCount; i++) {
+                const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.8;
+                this._particles.push({
+                    mode: 'spark', ox: 0, oy: 0,
+                    vx: Math.cos(angle) * 3, vy: Math.sin(angle) * 3,
+                    scale: 0.5, life: 1.0, color: '#facc15',
+                    spawnPhase: 'burst', gravity: 0.03,
+                });
+            }
+            break;
+        }
+        case 'jump': {
+            // Spring compression lines (telegraph)
+            for (let i = 0; i < 4; i++) {
+                this._particles.push({
+                    mode: 'line', ox: (i - 1.5) * 8, oy: 20,
+                    vx: 0, vy: 0,
+                    scale: 0.5, life: 1.0, color: '#2dd4bf',
+                    spawnPhase: 'telegraph', gravity: 0,
+                    scaleY_anim: true, // compressed -> extended
+                });
+            }
+            // Ground burst particles (burst phase)
+            const count = Math.ceil(8 * pmul);
+            for (let i = 0; i < count; i++) {
+                const angle = (i / count) * Math.PI * 2;
+                this._particles.push({
+                    mode: 'mist', ox: 0, oy: 0,
+                    vx: Math.cos(angle) * 2.5, vy: Math.sin(angle) * 1.5 - 1,
+                    scale: 0.4, life: 1.0, color: '#38bdf8',
+                    spawnPhase: 'burst', gravity: 0.04,
+                });
+            }
+            break;
+        }
+        case 'clone': {
+            // Division burst particles
+            const count = Math.ceil(8 * pmul);
+            for (let i = 0; i < count; i++) {
+                const angle = (i / count) * Math.PI * 2;
+                this._particles.push({
+                    mode: 'spark', ox: 0, oy: 0,
+                    vx: Math.cos(angle) * 3, vy: Math.sin(angle) * 3,
+                    scale: 0.6, life: 1.0, color: '#d8b4fe',
+                    spawnPhase: 'burst', gravity: 0,
+                });
+            }
+            break;
+        }
+        case 'devour': {
+            // Inward-spiraling smoke particles
+            const count = Math.ceil(8 * pmul);
+            for (let i = 0; i < count; i++) {
+                const angle = (i / count) * Math.PI * 2;
+                const dist = 40 + Math.random() * 20;
+                this._particles.push({
+                    mode: 'smoke', ox: Math.cos(angle) * dist, oy: Math.sin(angle) * dist,
+                    vx: 0, vy: 0, // computed dynamically (inward pull)
+                    scale: 0.5, life: 1.0, color: '#991b1b',
+                    spawnPhase: 'burst', gravity: 0,
+                    inward: true, inwardSpeed: 3 + Math.random(),
+                });
+            }
+            // Red mist at victim
+            for (let i = 0; i < Math.ceil(4 * pmul); i++) {
+                this._particles.push({
+                    mode: 'mist', ox: (Math.random() - 0.5) * 20, oy: (Math.random() - 0.5) * 20,
+                    vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
+                    scale: 0.5, life: 1.0, color: '#dc2626',
+                    spawnPhase: 'burst', gravity: 0,
+                });
+            }
+            break;
+        }
+        }
+    }
+
+    update(timeScale) {
+        const s = Number.isFinite(timeScale) ? Math.max(0, timeScale) : 1;
+        this.frame += s;
+        this.phaseFrame += s;
+
+        // Phase transitions
+        if (this.phase === 'telegraph' && this.phaseFrame >= this.cfg.telegraph) {
+            this.phase = 'burst';
+            this.phaseFrame = 0;
+        } else if (this.phase === 'burst' && this.phaseFrame >= this.cfg.burst) {
+            this.phase = 'decay';
+            this.phaseFrame = 0;
+        }
+
+        // Overall life
+        this.life = Math.max(0, 1.0 - this.frame / this.duration);
+
+        // Phase-specific progress
+        if (this.phase === 'telegraph') {
+            this._telegraphProgress = Math.min(1, this.phaseFrame / this.cfg.telegraph);
+        } else if (this.phase === 'burst') {
+            this._burstProgress = Math.min(1, this.phaseFrame / this.cfg.burst);
+        } else {
+            this._decayProgress = Math.min(1, this.phaseFrame / (this.duration - this.cfg.telegraph - this.cfg.burst));
+        }
+
+        // Update graphics rotation
+        this._gfxData.rotation += 0.08 * s;
+        if (this.phase === 'telegraph') {
+            this._gfxData.alpha = this._telegraphProgress * 0.4;
+            this._gfxData.scale = 0.3 + this._telegraphProgress * 0.2;
+        } else if (this.phase === 'burst') {
+            this._gfxData.alpha = 0.8 - this._burstProgress * 0.3;
+            this._gfxData.scale = 0.5 + this._burstProgress * 0.5;
+            if (this.skillType === 'berserk') this._gfxData.rotation += 0.15 * s;
+        } else {
+            this._gfxData.alpha = Math.max(0, 0.5 * (1 - this._decayProgress));
+            this._gfxData.scale = 1.0 - this._decayProgress * 0.3;
+        }
+
+        // Update particle positions
+        for (const p of this._particles) {
+            // Only update particles that match current phase or are already spawned
+            if (p.spawnPhase === this.phase || (this.phase === 'decay' && p.spawnPhase === 'burst')) {
+                // Inward spiral (devour)
+                if (p.inward) {
+                    const dx = -p.ox;
+                    const dy = -p.oy;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > 2) {
+                        const speed = p.inwardSpeed * (1 + this._burstProgress * 2);
+                        p.ox += (dx / dist) * speed * s;
+                        p.oy += (dy / dist) * speed * s;
+                    }
+                } else {
+                    p.ox += p.vx * s;
+                    p.oy += p.vy * s;
+                }
+                if (p.gravity) p.vy += p.gravity * s;
+                // Spiral motion (regen)
+                if (p.spiral) {
+                    const angle = (p.spiralAngle = (p.spiralAngle || 0) + p.spiralSpeed * s);
+                    p.ox += Math.cos(angle) * 0.5 * s;
+                }
+                // Life decay
+                if (this.phase === 'burst') {
+                    p.life = Math.max(0, 1 - this._burstProgress * 0.8);
+                } else if (this.phase === 'decay') {
+                    p.life = Math.max(0, 0.2 * (1 - this._decayProgress));
+                }
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+
+        // PixiJS path
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = affixSkillVFX_pixiCreate(this);
+            if (this._pixi) { affixSkillVFX_pixiSync(this, this._pixi); return; }
+        }
+
+        // Canvas 2D fallback — draw particles as filled circles
+        ctx.save();
+        for (const p of this._particles) {
+            if (p.life <= 0) continue;
+            const shouldShow = (p.spawnPhase === this.phase) ||
+                (this.phase === 'decay' && p.spawnPhase === 'burst');
+            if (!shouldShow) continue;
+            ctx.globalAlpha = Math.max(0, p.life * 0.7);
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(this.x + p.ox, this.y + p.oy, Math.max(1, p.scale * 5), 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    get dead() { return this.life <= 0; }
+}
+
 // ==================== 导出 ====================
 export {
     Particle,
@@ -3126,5 +3431,6 @@ export {
     SwordScar,
     RewardDropEffect,
     MuzzleFlashV2,
-    FiringBurst
+    FiringBurst,
+    AffixSkillVFX
 };

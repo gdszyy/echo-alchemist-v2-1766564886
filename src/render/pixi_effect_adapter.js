@@ -1586,6 +1586,17 @@ export function burnEffect_pixiDestroy(pixi) {
  *
  * @param {object} game - Game 实例（含 iceWaves / fireWaves / collectionBeams / particles 等数组）
  */
+// AffixSkillVFX adapter placeholder.
+// Kept as no-op until the owning visual class is wired in; this preserves
+// module import integrity for particles.js during the staged PixiJS migration.
+export function affixSkillVFX_pixiCreate() {
+    return null;
+}
+
+export function affixSkillVFX_pixiSync() {}
+
+export function affixSkillVFX_pixiDestroy() {}
+
 export function pixiCleanupAllEffects(game) {
     if (!game) return;
 

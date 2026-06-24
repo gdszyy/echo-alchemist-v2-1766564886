@@ -530,9 +530,9 @@ class MusicEngine {
       glacies:{ bpm:145, rootHz:38.9, rootCycle:[0,0,0,0], padChord:[0,4,7,12], allowLead:false, allowOoh:false, // 深挖 v2：D# 大三度（明亮冰晶）；与 ignis 反着来——不撤 kick，反在四踩上叠 HiTom shimmer；旋律不坍缩而是「持续大三度玻璃铃 + 机械 b2 缝针 stutter」；bass 由中音区跌落低八度
         calm:{ intensity:0.45, bassFill:'frostMid', sig:{ glassBells:true, bellDeg:[36,40,43], tomShimmer:true, chimeOff:true } },                                // 常态：大三度玻璃铃(reg4)密、薄霜中音 bass、冰锥反拍
         rage:{ intensity:0.9, bpm:150, bassFill:'frostDrop', sig:{ glassBells:true, bellDeg:[48,52,55], tomShimmer:true, chimeOff:true, stitchVox:true, stitchN:4 } } }, // 狂暴：铃升 reg5 变疏、bass 跌低八度+b3 冰裂、b2 缝合 stutter 咬入
-      mikro:{ bpm:173, rootHz:43.65, rootCycle:[0,0,0,0], bassPatterns:[[null,0,10,0,null,11,0,7,null,0,10,0,null,7,0,11]], padChord:[0,3,7,11], leadNotes:[12,23,12,18], allowLead:true, allowOoh:false, // F + maj7，狂暴机关枪三全音碎切
-        calm:{ intensity:0.6, bassFill:'offbeat' },
-        rage:{ intensity:1.0, bpm:175, bassFill:'straight8', sig:{ vocalChop:true, chopDeg:6, chopN:8, chopStep:2 } } },
+      mikro:{ bpm:173, rootHz:43.65, rootCycle:[0,0,0,0], bassPatterns:[[null,0,10,0,null,11,0,7,null,0,10,0,null,7,0,11]], padChord:[0,3,7,11], leadNotes:[12,23,12,18], allowLead:true, allowOoh:false, // 深挖 v2：F + maj7/b7 chromatic glitch；裂变=同一动机多八度增殖(分身) + b5 加速颗粒机关枪 + 闷音吉他 swarm
+        calm:{ intensity:0.6, bassFill:'offbeat', sig:{ octaveScatter:true } },                                                                       // 常态：高八度 synth 动机 + 八度分身散射，chromatic offbeat bass
+        rage:{ intensity:1.0, bpm:175, bassFill:'offbeat', sig:{ octaveScatter:true, fissionStutter:true, fissDeg:6, fissBase:4, fissPeriod:2, guitarChug:true } } }, // 狂暴：b5 加速颗粒机关枪 + 闷音吉他 16 分 chug + 八度分身全开（fission 全爆发）
       devourer:{ bpm:141, rootHz:38.9, rootCycle:[0,0,0,0], padChord:[0,3,7,12], allowLead:false, allowOoh:false, shaker:false, kickHalf:true, // D# 巨型 sub，狂暴 16 分雪崩吞没
         calm:{ intensity:0.35, bassFill:'pedal' },
         rage:{ intensity:0.95, bassFill:'avalanche', sig:{ impactOnEnter:true } } },
@@ -637,9 +637,22 @@ class MusicEngine {
     if(sig.fifthStab && (s===4||s===12)) this.playScreech(t,this._noteFreq(19),0.18); // 五度 power stab(ouroboros 狂暴)
     if(sig.tomRoll && s%4===3) this.playTom(t,150,0.5); // 反拍 tom 滚(tesla 狂暴：电压击穿)
     if(sig.woodAccent && (s===6||s===14)) this.playWood(t,0.5); // 木鱼 accent(ignis 喷发：HiWdblk 实测)
+    if(sig.octaveScatter && (s===4||s===10)){ // 八度分身散射(mikro：同一动机同时炸在低/中/高八度=克隆到不同八度，实测 reg2/3/6)
+      const note=this._leadNotes[phrase%this._leadNotes.length];
+      this.playScreech(t,this._noteFreq(note),0.22); this.playScreech(t,this._noteFreq(note+12),0.16); this.playScreech(t,this._noteFreq(note-12),0.26);
+    }
+    if(sig.fissionStutter && s%(sig.fissPeriod||2)===0) // b5 加速颗粒机关枪(mikro 狂暴：一颗 tritone 切成"增殖"颗粒串)
+      this._fissionStutter(t,this._noteFreq(24+(sig.fissDeg!==undefined?sig.fissDeg:6)),sig.fissBase||4);
+    if(sig.guitarChug && this.intensity>0.6){ // 闷音吉他 16 分 chug 锁根(mikro 狂暴：电气 swarm 体)
+      if(s%2===0) this.playGuitarChug(t,0,0.5); else if(s%4===3) this.playGuitarChug(t,0,0.32);
+    }
   }
   _vocalChop(t,freq,n=6,span=0.3){ // 人声碎切 stutter：一颗音切 n 个超短 ooh 走 leadBus
     const dt=span/Math.max(1,n); for(let i=0;i<n;i++) this.playOoh(t+i*dt,freq,dt*0.9,this.leadBus);
+  }
+  _fissionStutter(t,freq,base=4,span=0.5){ // 裂变机关枪：一颗 b5 切成"加速增殖"的颗粒串（base→随强度翻倍，间隔渐缩=越分越快）→leadBus
+    const n=Math.round(base*(1+this.intensity*2)); const beat=60/this.bpm; let dt=beat*span/Math.max(1,n);
+    for(let i=0;i<n;i++){ this.playOoh(t,freq,dt*0.85,this.leadBus); t+=dt; dt*=0.92; }
   }
   _glassBell(t,freq){ this.playScreech(t,freq,0.5); } // 脆玻璃铃：借 FM lead 出高频金属 ring
   _scheduler(){
