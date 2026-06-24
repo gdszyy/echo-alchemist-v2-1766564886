@@ -28,8 +28,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const DRAFT_DIR = 'assets/sprites/bosses/redraw_drafts';
-const REQUIRED_PAINTERLY_SOURCE_BOSSES = new Set(['viridis', 'ouroboros']);
-const REQUIRED_VERSIONED_RUNTIME_BOSSES = new Set(['viridis', 'ouroboros']);
+const REQUIRED_PAINTERLY_SOURCE_BOSSES = new Set(['viridis', 'tesla', 'chimera', 'ouroboros']);
+const REQUIRED_VERSIONED_RUNTIME_BOSSES = new Set(['viridis', 'tesla', 'chimera', 'ouroboros']);
+const PAINTERLY_SOURCE_DATE_BY_BOSS = {
+    viridis: '2026-06-23',
+    ouroboros: '2026-06-23',
+    tesla: '2026-06-24',
+    chimera: '2026-06-24'
+};
 const HP_WINDOW_DRAFT = {
     width: 384,
     height: 256,
@@ -46,7 +52,7 @@ const HP_WINDOW_DRAFT = {
 };
 
 function getPainterlySourceRel(bossId) {
-    return `${DRAFT_DIR}/source_ai/boss_${bossId}_redraw_source_2026-06-23.png`;
+    return `${DRAFT_DIR}/source_ai/boss_${bossId}_redraw_source_${PAINTERLY_SOURCE_DATE_BY_BOSS[bossId]}.png`;
 }
 
 let passed = 0;

@@ -21,6 +21,8 @@ export const BOSS_SPRITE_ROOT = 'assets/sprites/bosses';
 export const BOSS_SPRITE_REDRAW_DRAFT_ROOT = `${BOSS_SPRITE_ROOT}/redraw_drafts`;
 
 export const BOSS_SPRITE_VERSION_SUFFIX_BY_BOSS = {
+    tesla: 'v20260624redraw',
+    chimera: 'v20260624redraw',
     viridis: 'v20260623painterly',
     ouroboros: 'v20260623painterly'
 };

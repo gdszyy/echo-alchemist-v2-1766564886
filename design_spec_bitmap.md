@@ -84,7 +84,7 @@
 
 > 2026-06-22 补充：Boss 本体也进入重绘契约。现有 `assets/sprites/bosses/boss_<bossId>.png/.json` 的 `256 × 256` 方形帧仍视为 legacy 可运行资源；新重绘目标为 `384 × 256` 横向帧，JSON 必须声明 `frameWidth/frameHeight`，渲染器会按 3×2 占格绘制。完整规格见 [`docs/boss_sprite_redraw_asset_contract.md`](docs/boss_sprite_redraw_asset_contract.md)。
 > 2026-06-23 补充：Boss 重绘必须贴合物理碰撞外轮廓。8 个 Boss 当前运行时 `collisionShape/collisionData` 已整理为 `assets/sprites/bosses/redraw_drafts/boss_collision_guides_v2_no_three_rings_384x256.png`，后续生成基础本体和破绽 Overlay 时都要以该图作为外轮廓验收参考，避免视觉主体与弹珠反弹/命中范围偏差过大。当前只有最终 Boss `ouroboros` 使用完整闭合环来承载 6 个附体槽；`mikro` 与 `devourer` 已改为实体 polygon，不再按环形 Boss 生成。旧同名图已归档到 `assets/sprites/bosses/redraw_drafts/archive/`，不要继续引用。
-> 2026-06-23 补充：Boss 本体重绘还必须满足 HP 可读性。Boss Sprite 当前绘制在液体血量层之后，不能整块不透明压住血量，也不能把整张图整体调淡；应使用 `boss_<id>_hp_translucency_mask.png` 标记炉芯、冰腔、孢室、胃囊等材质上合理的透光窗口，再用 `boss_<id>_base_draft_hp_window_preview.png` 验收。
+> 2026-06-23 补充：Boss 本体重绘还必须满足 HP 可读性。Boss Sprite 当前绘制在液体血量层之后，不能整块不透明压住血量，也不能把整张图整体调淡；应使用 `boss_<id>_hp_translucency_mask.png` 从素材自身的缝隙、发光裂纹、透明孔洞、玻璃/晶体/炉腔等真实透光部位提取 alpha 透明区，再用 `boss_<id>_base_draft_hp_window_preview.png` 验收。
 
 > 2026-06-22 补充：敌人针对词缀进入生成前资产契约。`carrier` 显示名固定为“铸巢母架”，第 5 格空舱必须在 Sprite、collision frame 与头像中可见；`livingArmor` 需要普通/叠加强化各三档状态资产；完整清单见 [`docs/enemy_targeting_asset_todo.md`](docs/enemy_targeting_asset_todo.md)。
 

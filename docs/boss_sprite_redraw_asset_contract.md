@@ -90,11 +90,11 @@ assets/sprites/bosses/redraw_drafts/boss_collision_guides_v2_no_three_rings_384x
 
 ### 4.2 血量可读性 Mask 契约
 
-Boss 本体 Sprite 在运行时绘制在液体 HP 层之后，但不能靠“整张图整体降 alpha”解决可读性。正式资产和 draft 必须采用“正常本体 + 独立透光 mask”的管线：装甲、石壳、藤蔓、外轮廓等非窗口区域保持实体重量；只有材质上合理的炉门缝、冰晶腔、孢室膜、胃囊薄膜、电核罩等位置通过 mask 转成透光窗口，让玩家从这些结构里看到下方 HP 液体。
+Boss 本体 Sprite 在运行时绘制在液体 HP 层之后，但不能靠“整张图整体降 alpha”解决可读性。正式资产和 draft 必须采用“正常本体 + 独立透光 mask”的管线：装甲、石壳、藤蔓、外轮廓等非窗口区域保持实体重量；只有材质上真实存在的炉门缝、冰晶腔、孢室膜、胃囊薄膜、电核罩、发光裂缝、透明孔洞等位置通过 mask 转成透光窗口，让玩家从这些结构里看到下方 HP 液体。
 
 生成与验收规则：
 
-- 每个 base draft 必须有 `boss_<id>_hp_translucency_mask.png`。mask 使用绿/蓝高饱和区域标记透光材质窗口，后处理脚本只根据 mask 改 alpha，不得扫描整张图做统一透明。
+- 每个 base draft 必须有 `boss_<id>_hp_translucency_mask.png`。mask 必须从素材自身的透明孔洞、发光缝隙、玻璃/晶体/炉腔等可透光部位提取；禁止额外手绘椭圆窗口或把普通装甲纹理当作透明区。后处理脚本只根据 mask 改 alpha，不得扫描整张图做统一透明。
 - 每个 base draft 必须有 `boss_<id>_base_draft_hp_window_preview.png`，把最终本体叠在模拟 HP 液体背景上，人工确认血量只从透光部件中读出。
 - 运行时 Boss HP 槽底和真实 HP 液体会按 `bossType` 使用主题色：Ignis 橙红、Glacies 冰蓝、Mikro 绿核、Devourer 紫渊、Viridis 毒绿、Tesla 电蓝、Chimera 红紫、Ouroboros 金色；预览图也应尽量使用对应主题底色，避免 mask 在正式画面里读感偏色。
 - 透光窗口建议覆盖主体面积约 `8%-35%`，特殊胃囊/孢室类 Boss 可略高但不得超过 `42%`；非 mask 区域应保持高 alpha 和实体重量。
@@ -219,13 +219,15 @@ assets/sprites/bosses/redraw_drafts/boss_hp_translucency_mask_contact_sheet.png
 正式美术终稿前仍需人工验收：确认 384×256 单帧主体不会遮挡血条、主体实心轮廓贴合 `boss_collision_guides_v2_no_three_rings_384x256.png`、弱点位置与 `vulnerability/weak_mask` 对齐，并决定是否把当前 6 帧 draft idle 扩展到 8-12 帧终稿 sheet。
 
 ## 9. Runtime readability tuning
-2026-06-23 update: the runtime Boss pass now keeps Viridis and Ouroboros source-art validation explicit. `tests/validate_boss_sprite_assets.mjs` requires their `source_ai/boss_<id>_redraw_source_2026-06-23.png` files in addition to the redraw runtime sheet and HP translucency mask, so a missing painterly source or a path regression fails fast.
+2026-06-23 update: the runtime Boss pass keeps Viridis and Ouroboros source-art validation explicit. 2026-06-24 update: Tesla and Chimera also use source-art validation with `source_ai/boss_<id>_redraw_source_2026-06-24.png`. `tests/validate_boss_sprite_assets.mjs` requires these source files in addition to the redraw runtime sheet and HP translucency mask, so a missing painterly source or a path regression fails fast.
 
 The legacy Canvas Boss effect layer remains active for state readability, but it is now gated by `bossEffectAlpha` with a slow breathing multiplier. Normal Bosses should sit around low-to-mid alpha and berserk Bosses only slightly higher; the goal is to let the bitmap body carry the silhouette and material while the old procedural layer reads as aura, not as paint over the asset.
 
 Mikro and Devourer receive a runtime-only sprite scale boost (`1.10x` and `1.14x`) in both the clipped draw and polygon clip-repair draw. This is a visual target-rect change only: `collisionShape`, `collisionData`, projectile hit tests, and footprint cues stay unchanged.
 
 ## 10. Versioned painterly runtime paths
-2026-06-23 follow-up: Viridis and Ouroboros must not use the old same-name runtime files in training-ground review. Their runtime sprite sheets, JSON metadata, HP translucency masks, HP preview images, vulnerability overlays, and weak-mask alpha files now use the `_v20260623painterly` suffix. This prevents the browser image cache and the SpriteRenderer path cache from reusing the earlier placeholder-looking assets after an art repaint.
+2026-06-23 follow-up: Viridis and Ouroboros must not use the old same-name runtime files in training-ground review. Their runtime sprite sheets, JSON metadata, HP translucency masks, and HP preview images now use the `_v20260623painterly` suffix. This prevents the browser image cache and the SpriteRenderer path cache from reusing the earlier placeholder-looking assets after an art repaint.
+
+2026-06-24 follow-up: Boss vulnerability overlays are now versioned separately from base sprites. Ignis and Glacies keep their original unversioned quality-reference overlays. Mikro, Devourer, Viridis, Tesla, Chimera, and Ouroboros use `_v20260624igstyle`, generated to follow the Ignis/Glacies structural-damage language. The rejected `_v20260624forged` weak-point circle/line pass must not be used in runtime or review.
 
 The active paths are resolved through `src/data/boss_sprite_assets.js` and `src/data/boss_vulnerability_assets.js`; tests must call those helpers rather than reconstructing `boss_<id>_...png` strings locally. Future repaint passes for these Bosses should add a new suffix instead of overwriting the existing suffix in place.
