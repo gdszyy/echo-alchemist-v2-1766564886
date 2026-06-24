@@ -942,12 +942,26 @@ export const render_system = {
         });
         this._launcherBarrelFireFx = activeFx;
 
+        // ── [开炮 VFX 增强] 开炮反馈：屏幕震动 + 边缘闪光（不依赖 PixiJS） ──
+        for (const fx of activeFx) {
+            if (!fx._v2Spawned) {
+                fx._v2Spawned = true;
+                // 开炮屏幕震动（开幕齐射更强烈）
+                if (fx.charged) {
+                    if (typeof this.triggerScreenShake === 'function') this.triggerScreenShake(3);
+                    if (typeof this.triggerScreenShakeAdvanced === 'function') this.triggerScreenShakeAdvanced(2, 8);
+                }
+                // 开炮边缘闪光标记
+                this._fireFlashFrames = fx.charged ? 4 : 2;
+            }
+        }
+
         // ── [开炮 VFX 增强] PixiJS V2 特效：惰性创建 + 更新 + 绘制 + 清理 ──
         if (pixiIsActive()) {
             // 惰性创建：首次渲染时为每个火光 FX 创建 V2 特效
             for (const fx of activeFx) {
-                if (!fx._v2Spawned) {
-                    fx._v2Spawned = true;
+                if (fx._v2Spawned && !fx._v2Created) {
+                    fx._v2Created = true;
                     const muzzleX = cx + fx.dir.x * EMITTER_PORT_OFFSET_Y;
                     const muzzleY = cy + recoilY + fx.dir.y * EMITTER_PORT_OFFSET_Y;
                     const angle = Math.atan2(fx.dir.y, fx.dir.x);
@@ -957,21 +971,11 @@ export const render_system = {
 
                     this._firingBursts = this._firingBursts || [];
                     this._firingBursts.push(new FiringBurst(muzzleX, muzzleY, angle, fx.color, fx.intensity));
-
-                    // 开炮屏幕震动
-                    if (fx.charged) {
-                        if (typeof this.triggerScreenShake === 'function') this.triggerScreenShake(3);
-                        if (typeof this.triggerScreenShakeAdvanced === 'function') this.triggerScreenShakeAdvanced(2, 8);
-                    } else if (fx.intensity >= 1) {
-                        // 普通开炮微弱震动（仅爆炸弹）
-                    }
-                    // 开炮边缘闪光标记
-                    this._fireFlashFrames = fx.charged ? 4 : 2;
                 }
             }
 
             // 更新 & 绘制 MuzzleFlashV2
-            const dtSec = (typeof this.dt !== 'undefined' ? this.dt : 16) / 1000;
+            const dtSec = (this.timeScale || 1) / 60;
             if (this._muzzleFlashesV2) {
                 for (let i = this._muzzleFlashesV2.length - 1; i >= 0; i--) {
                     const mf = this._muzzleFlashesV2[i];

@@ -24,7 +24,7 @@
 | 号 | Boss | MIDI 文件前缀 | 分轨 | 引擎 key | 深挖结论位置 | 状态 |
 |---|---|---|---|---|---|---|
 | **M-01** | 熔炉守卫·伊格尼斯 ignis | `熔炉之门` | Bass / Drums / FX / Percussion / Synth | `ignis` | `boss_music_design.md` §3.1 → 「深挖 v2」 | ✅ 完成（tom 四踩+温压脉冲+倒挂弧模态线） |
-| **M-02** | 霜晶缝合怪·格拉西斯 glacies | `Glacies 冰骨` | Backing Vocals / Bass / Drums / FX / Synth | `glacies` | §3.2 → 「深挖 v2」 | ⬜ 待办 |
+| **M-02** | 霜晶缝合怪·格拉西斯 glacies | `Glacies 冰骨` | Backing Vocals / Bass / Drums / FX / Synth | `glacies` | §3.2 → 「深挖 v2」 | ✅ 完成（保 kick 叠高 tom shimmer+大三度玻璃铃+b2 缝合 stutter+八度落差 bass） |
 | **M-03** | 裂变母体·米克罗 mikro | `微裂母体` | Backing Vocals / Bass / Drums / FX / Guitar / Synth / Vocals | `mikro` | §3.3 → 「深挖 v2」 | ⬜ 待办 |
 | **M-04** | 贪婪之渊·噬神者 devourer | `贪渊吞王` | Bass / Drums / FX / Synth | `devourer` | §3.4 → 「深挖 v2」 | ⬜ 待办 |
 | M-05 | 翠绿共生体·维里迪斯 viridis | `Viridis 之茧` | Bass / Drums / FX / Percussion / Synth | `viridis` | §3.5 → 「深挖 v2」 | ⬜ 待办（大 Boss，本批不做） |
@@ -65,6 +65,14 @@
 | `sig.woodAccent` | `_scheduleSignatures` | M-01 ignis | 新增句法 | rage 木鱼点缀（s===6/14） |
 | `_applyIntensity` 的 `needLead` 地板 | `_applyIntensity` | M-01 ignis | 调参（全局收益） | 签名/模态层在低强度保底可闻；threat/intensity 拖动不被压没 |
 | boss 清除复位补 3 字段 | UI `$('boss').onchange` else | M-01 ignis | 调参 | 切回通用 darkpsy 时复位 `_drumMode/_heatPulse/_modalLine` |
+| `playGlassBell(t,freq,dur,gain)` | 方法（playModal 后） | M-02 glacies | 新增声部 | 大三度持续冰晶铃：非谐泛音串 `[1,2.76,5.4,8.93]` → fxBus 进混响 |
+| `playStitch(t,gain)` | 方法 | M-02 glacies | 新增声部 | 定根 b2(`_noteFreq(25)`) 方波过 formant 带通 → leadBus，机械「缝针」 |
+| `playChime(t,gain)` | 方法 | M-02 glacies | 新增声部 | 冰锥 chime：三角 2640→2200Hz 短下扫 → hatBus |
+| `sig.glassBells`(升级) | `_scheduleSignatures` | M-02 glacies | 改句法 | 旧版借 playScreech；现走 `playGlassBell` + `bellDeg`，calm 密低 / rage 疏高 |
+| `sig.tomShimmer` | `_scheduleSignatures` | M-02 glacies | 新增句法 | **保留四踩 kick**，其上叠 HiTom shimmer（calm s%4===3 / rage s%2===1） |
+| `sig.chimeOff` | `_scheduleSignatures` | M-02 glacies | 新增句法 | 反拍冰锥叮（s%4===1） |
+| `sig.stitchVox` | `_scheduleSignatures` | M-02 glacies | 新增句法 | 狂暴 s∈{6,12} 各 `stitchN` 连 b2 缝合 stutter |
+| `bassFill:'frostMid'/'frostDrop'` | `_scheduleBass` | M-02 glacies | 新增句法 | bass 八度落差：calm 中音 pedal `_noteFreq(12)` → rage 跌低八度 `_noteFreq(0)`+b3 冰裂 |
 
 ---
 

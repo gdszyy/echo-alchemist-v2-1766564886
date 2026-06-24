@@ -268,26 +268,29 @@ if avgFps > fpsThresholdUp (55):
 
 | 模块 | 读取字段/状态 | 行为 |
 |------|-------------|------|
-| `pixi_bridge.js` → `_initBakedTextures()` | `PIXI.BaseTexture` 启动时一次性创建 | 为 8 种粒子模式预烘焙发光纹理（spark/ember/mist/shard/smoke/venom/wind_slash/line），为 10 种特效预烘焙纹理（glow/iceRing/beam/healGlow/healRing/shockwaveRing/fireRing/vortexGlow/slashSpindle/bladeStormRing）。总计 18 张预烘焙纹理，初始化后零 GC |
+| `pixi_bridge.js` → `_initBakedTextures()` | `PIXI.BaseTexture` 启动时一次性创建 | 为 9 种粒子模式预烘焙发光纹理（spark/ember/mist/shard/smoke/venom/wind_slash/line/**trail**），为 14 种特效预烘焙纹理（glow/iceRing/beam/healGlow/healRing/shockwaveRing/fireRing/vortexGlow/slashSpindle/bladeStormRing/**muzzleCore/muzzleFlare/muzzleSpark/bulletGlow**）。总计 23 张预烘焙纹理，初始化后零 GC |
 | `pixi_bridge.js` → `pixiAcquireParticleSprite(mode)` | `_spritePool` / `_bakedTextures[mode]` | 从对象池获取 Sprite（优先复用），绑定对应模式纹理，加入 ParticleContainer。wind_slash 使用 `BLEND_MODES.SCREEN`，其余使用 `BLEND_MODES.ADD` |
 | `pixi_bridge.js` → `pixiReleaseParticleSprite(sprite)` | 无 | 隐藏 Sprite 并推回池中，粒子死亡时由 compaction 循环调用 |
-| `pixi_bridge.js` → `pixiGetEffectTexture(name)` | `_effectTextures[name]` | 为特效适配器提供预烘焙纹理（Shockwave/FireWave/BladeStormRing/SlashEffect 等使用） |
+| `pixi_bridge.js` → `pixiGetEffectTexture(name)` | `_effectTextures[name]` | 为特效适配器提供预烘焙纹理（Shockwave/FireWave/BladeStormRing/SlashEffect/MuzzleFlashV2/BulletGlow 等使用） |
 | `spawn_system.js` → `spawn_createParticle` | `pixiIsActive()` + `mode` | mist/ember/venom/wind_slash/line 五种高开销模式在 PixiJS 激活时获取 `_pixiSprite` |
 | `spawn_system.js` → `spawn_pushParticleWithLimit` | `pixiIsActive()` + `mode` | 同上，受限推送路径 |
 | `game_phase.js` → 战斗 compaction 循环 | `p._pixiSprite` / `p._pixi` | 同步 Sprite 属性（position/alpha/scale/rotation/tint）；wind_slash/line 使用速度方向旋转+非均匀缩放；死亡时释放 Sprite 回池 + `_pixiDestroy` 清理 |
 | `game_phase.js` → 研磨 compaction 循环 | 同上 | 与战斗循环完全对称 |
 | `particles.js` → 各特效类 `draw()` | `pixiIsActive()` + `this._pixi` | PixiJS 激活时走适配器路径（`_pixiCreate` → `_pixiSync` → return），跳过 Canvas 2D 绘制；不激活时保留完整 Canvas 2D fallback |
 | `render_system.js` → `render_floatingTexts()` | `floatingText._pixi` | 死亡时调用 `floatingText_pixiDestroy` 清理 PIXI.Text Sprite |
+| `render_system.js` → `render_queueLauncherBarrelFireEffect` | `pixiIsActive()` + `CONFIG.performance[level].muzzleFlashV2/firingBurst` | 开炮时惰性创建 MuzzleFlashV2 + FiringBurst 特效对象；屏幕震动/边缘闪光反馈独立于 PixiJS 触发 |
+| **`projectile.js` → `_drawTrailV2()`** | `pixiIsActive()` + `CONFIG.performance[level].trailV2` | **Trail V2**：每个拖尾段一个 Sprite（从 pool 获取 'trail' 纹理），统一 ParticleContainer 一次 draw call 替代 Canvas 2D 逐段 stroke。速度动态宽度、开幕齐射金色 tint。拖尾缩短/子弹销毁时释放 Sprite 回池 |
+| **`projectile.js` → `_syncBulletGlow()`** | `pixiIsActive()` + `CONFIG.performance[level].bulletGlow` | **Bullet Glow V2**：每子弹惰性创建一个 Sprite（bulletGlow 纹理，ADD 混合），低透明度（0.04~0.12）环境光照 + 元素 tint。命中时 `_bulletGlowHitFlash` 触发 6 帧脉冲 |
 
 **PixiJS 资源总量**：
 
 | 资源 | 数量 | 说明 |
 |------|------|------|
-| 预烘焙粒子纹理 | 8 张 | spark/ember/mist/shard/smoke/venom/wind_slash/line |
-| 预烘焙特效纹理 | 10 张 | glow/iceRing/beam/healGlow/healRing/shockwaveRing/fireRing/vortexGlow/slashSpindle/bladeStormRing |
-| ParticleContainer | 8 个 | 每种粒子模式一个（GPU 批渲染，同模式共享 draw call） |
+| 预烘焙粒子纹理 | 9 张 | spark/ember/mist/shard/smoke/venom/wind_slash/line/trail |
+| 预烘焙特效纹理 | 14 张 | glow/iceRing/beam/healGlow/healRing/shockwaveRing/fireRing/vortexGlow/slashSpindle/bladeStormRing/muzzleCore/muzzleFlare/muzzleSpark/bulletGlow |
+| ParticleContainer | 9 个 | 每种粒子模式一个（GPU 批渲染，同模式共享 draw call） |
 | Sprite 对象池 | 动态增长（上限 ~200） | 复用已创建的 `PIXI.Sprite`，避免频繁 `new` |
-| 特效适配器函数 | 17 组 × 3 函数 | 每组 `_pixiCreate` / `_pixiSync` / `_pixiDestroy` |
+| 特效适配器函数 | 19 组 × 3 函数 | 每组 `_pixiCreate` / `_pixiSync` / `_pixiDestroy`（+MuzzleFlashV2/FiringBurst） |
 
 ---
 
@@ -346,6 +349,7 @@ if avgFps > fpsThresholdUp (55):
 | 日期 | 内容 |
 |------|------|
 | 2026-06-25 | **PixiJS 渲染管线迁移（阶段一+二+三+T2.7）**：粒子系统（8 种模式含 wind_slash/line）和 17 种特效对象迁移至 PixiJS WebGL。新增 `src/render/pixi_bridge.js`（PixiJS Application 生命周期、18 张预烘焙纹理、8 个 ParticleContainer、Sprite 对象池）和 `src/render/pixi_effect_adapter.js`（17 组适配器函数）。粒子通过 `ParticleContainer` GPU 批渲染，特效通过 `PIXI.Graphics` 3-pass 辉光 + 预烘焙纹理 Sprite。`CONFIG.performance` 三档预算继续生效。Canvas 2D fallback 完整保留。详见第 2 节迁移状态说明、第 5.11 节消费端索引和第 6.5 节修改指南。 |
+| 2026-06-25 | **开炮视觉特效增强（4 阶段）**：基于 PixiJS WebGL 管线全面升级开炮与弹道视觉。（A）枪口火光 V2：`MuzzleFlashV2` 类（核心光球 + 方向光锥 + 火星粒子 + 冷却热辉）+ 3 张预烘焙纹理（muzzleCore/muzzleFlare/muzzleSpark）。`pixi_effect_adapter.js` 新增适配器。三档：high 完整 13 火星/medium 简化 6 火星/low 关闭。（B）拖尾 V2：`projectile.js` 新增 `_drawTrailV2()` 用 Sprite GPU 批渲染替代 Canvas 2D 逐段 stroke，新增 `trail` 粒子纹理（64×16 高斯渐变）和 ParticleContainer。速度动态宽度 + 开幕齐射金色 tint。三档：high 22 段/medium 14 段 80%宽/low 关闭回退 Canvas 2D。（C）开炮冲击波 + 屏幕震动 + 边缘闪光：`FiringBurst` 类（径向冲击环 + 方向锥 + 碎片粒子），震动/闪光反馈独立于 PixiJS 始终生效。三档：high 10 碎片/medium 5/low 关闭视觉保留震动。（D）弹道光照：`projectile.js` 新增 `_syncBulletGlow()` 每子弹 1 个 ADD 混合 Sprite 低透明度环境光 + 元素 tint + 命中 6 帧脉冲。新增 `bulletGlow` 纹理（128×128 径向渐变）。三档：high 128px + 命中闪光/medium 96px 无闪光/low 关闭。新增 CONFIG.performance 字段：muzzleFlashV2/muzzleFlashV2Sparks/firingBurst/firingBurstDebris/firingScreenShake/firingScreenFlash/trailV2/trailV2MaxSegments/trailV2WidthMult/trailV2SpeedDynamic/trailV2OpeningSalvo/bulletGlow/bulletGlowScale/bulletGlowHitFlash。预烘焙纹理从 18 → 23 张，ParticleContainer 从 8 → 9 个。修改文件：`pixi_bridge.js`、`pixi_effect_adapter.js`、`particles.js`、`projectile.js`、`render_system.js`、`entities.js`、`config.js`。Canvas 2D fallback 完整保留。 |
 | 2026-06-23 | **爆炸视觉击退**：`Enemy` 新增 `_blastOffsetX/Y` 视觉偏移与阻尼回弹，`combat_applyExplosionKnockback()` 在爆破弹药、过热爆炸、殒命爆裂触发时按距离衰减写入偏移（普通/精英/Boss 分级压低幅度）。该效果只影响 `draw()` transform，不改变 `pos`、碰撞、格子占位或伤害半径；未新增 `CONFIG.performance` 字段，开销为爆炸瞬间一次存活敌人遍历。 |
 | 2026-06-23 | **爆炸类特效视觉重做**：穿透命中从旧 `spawn_createShockwave()` 光圈改为按弹丸速度方向绘制 `PierceCutEffect` 切割裂口，并只追加 1-3 个定向 `spark`；精英 DeathExplosion 去掉紫色光圈/虚空圆，改为紫晶裂隙与棱片碎落；`Shockwave` 与 `FireWave` 改为分段冲击边、热纹和短放射线。未新增 `CONFIG.performance` 字段：切割类走 `spawn_pushParticleWithLimit()` 的 `maxParticles`，碎屑走 `sparkLimit/shardLimit/smokeLimit`，范围波继续走 `shockwaveLimit/waveLimit`；`low` 档关闭高亮阴影并减少碎屑/放射线。 |
 | 2026-06-23 | **Boss 物理轮廓收口**：Mikro 与 Devourer 从环形/缺口 arc 语义改为实体 polygon，只有 Ouroboros 保留完整闭合环形 arc 以承载 6 个附体槽。Devourer Layer 6.5 继续复用既有 `arcBossVfx*` 三档门控和 sparkLimit，Ouroboros 轮转锚点只改变视觉指示，不新增粒子、渐变预算、混合模式或 `CONFIG.performance` 字段。 |

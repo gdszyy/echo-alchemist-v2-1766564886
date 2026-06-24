@@ -313,7 +313,7 @@ class MusicEngine {
   _retuneDrone(t){
     if(!this._drone) return;
     const base=this._noteFreq(0)/2, {oA,oB}=this._drone;
-    oA.frequency.setTargetAtTime(base,t,0.4); oB.frequency.setTargetAtTime(base*(1.006+this.threat*0.03),t,0.4); // 保留 threat 失谐
+    oA.frequency.setTargetAtTime(base,t,0.4); oB.frequency.setTargetAtTime(base*(1.006+this.threat*0.02),t,0.4); // 保留 threat 失谐（0.02 校准）
   }
   _stopDrone(){
     if(!this._drone) return;
@@ -476,6 +476,27 @@ class MusicEngine {
     oA.connect(f); oB.connect(f); oc.connect(f); f.connect(sh); sh.connect(g); g.connect(this.leadBus);
     oA.start(t); oB.start(t); oc.start(t); oA.stop(t+dur+0.04); oB.stop(t+dur+0.04); oc.stop(t+dur+0.04);
   }
+  playGlassBell(t,freq,dur=1.6,gain=0.3){ // 脆玻璃铃（glacies Synth 实测：大三度持续音、reg5、超长 meddur≈3.9 拍）：非谐泛音串→fxBus 进混响出冰晶 ring
+    const c=this.ctx, parts=[1,2.76,5.4,8.93], amp=[1,0.5,0.32,0.18];
+    for(let i=0;i<parts.length;i++){ const o=c.createOscillator(), g=c.createGain();
+      o.type='sine'; o.frequency.value=freq*parts[i];
+      g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain*amp[i],t+0.01); g.gain.exponentialRampToValueAtTime(0.001,t+dur*(1-i*0.16));
+      o.connect(g); g.connect(this.fxBus); o.start(t); o.stop(t+dur); }
+  }
+  playStitch(t,gain=0.4){ // 缝合人声 stutter（glacies BackVox 实测：定根 b2=E5、vel 满、极短≈0.19 拍）：方波芯过 formant 带通→leadBus，机械"缝针"咬合
+    const c=this.ctx, f=this._noteFreq(25); // 固定 b2（高八度），不随 phrase 漂——缝合怪标志性机械刺点
+    const o=c.createOscillator(), bp=c.createBiquadFilter(), g=c.createGain();
+    o.type='square'; o.frequency.value=f;
+    bp.type='bandpass'; bp.frequency.value=f*2.2; bp.Q.value=6;
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+0.004); g.gain.exponentialRampToValueAtTime(0.001,t+0.085);
+    o.connect(bp); bp.connect(g); g.connect(this.leadBus); o.start(t); o.stop(t+0.1);
+  }
+  playChime(t,gain=0.28){ // 冰锥 chime（glacies STwhistle/triangle 高频 perc 实测：反拍高频叮）：三角短下扫→hatBus
+    const c=this.ctx, o=c.createOscillator(), g=c.createGain();
+    o.type='triangle'; o.frequency.setValueAtTime(2640,t); o.frequency.exponentialRampToValueAtTime(2200,t+0.04);
+    g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.07);
+    o.connect(g); g.connect(this.hatBus); o.start(t); o.stop(t+0.09);
+  }
   drumFill(){ // Tom 连打 fill（参考 DrumFillMidHighCue）：八分铺垫→后半16分加速下行冲刺
     if(this.sm.muted) return;
     const eighth=60/this.bpm/2, sixteenth=eighth/2; let t=this.ctx.currentTime+0.02;
@@ -494,9 +515,9 @@ class MusicEngine {
         drumMode:'tribalTom', heatPulse:true, // 深挖 v2：E 弗里几亚 b2/b5；炉腔低 tom 四踩取代 kick + 定根「温压」金属脉冲 + 中音区模态张力线（喷发=节奏化，非加 lead）
         calm:{ intensity:0.5, bassFill:'straight8', modalLine:[0,1,7,6,10,0,3,1,5,1], sig:{ buildSweep:true } },                                  // 常态：密集 Phrygian 张力线(1 b2 5 b5 b7 b3)，反拍 8 分
         rage:{ intensity:1.0, bpm:150, bassFill:'driving16', modalLine:[0,0,1,0,0,0,0,1], sig:{ buildSweep:true, impactOnEnter:true, woodAccent:true } } }, // 喷发：旋律 collapse 回根，密度交给 tom 连击 + 温压加密 + 木鱼 accent
-      glacies:{ bpm:145, rootHz:38.9, rootCycle:[0,0,0,0], bassPatterns:[[null,0,0,4,null,0,7,0,null,0,4,0,null,7,0,12]], padChord:[0,4,7,12], allowLead:false, allowOoh:false, // D# + 大三度玻璃铃
-        calm:{ intensity:0.4, bassFill:'sparse', sig:{ glassBells:true } },
-        rage:{ intensity:0.85, bpm:149, bassFill:'offbeat', sig:{ glassBells:true, vocalChop:true, chopDeg:1, chopN:4, chopStep:4 } } },
+      glacies:{ bpm:145, rootHz:38.9, rootCycle:[0,0,0,0], padChord:[0,4,7,12], allowLead:false, allowOoh:false, // 深挖 v2：D# 大三度（明亮冰晶）；与 ignis 反着来——不撤 kick，反在四踩上叠 HiTom shimmer；旋律不坍缩而是「持续大三度玻璃铃 + 机械 b2 缝针 stutter」；bass 由中音区跌落低八度
+        calm:{ intensity:0.45, bassFill:'frostMid', sig:{ glassBells:true, bellDeg:[36,40,43], tomShimmer:true, chimeOff:true } },                                // 常态：大三度玻璃铃(reg4)密、薄霜中音 bass、冰锥反拍
+        rage:{ intensity:0.9, bpm:150, bassFill:'frostDrop', sig:{ glassBells:true, bellDeg:[48,52,55], tomShimmer:true, chimeOff:true, stitchVox:true, stitchN:4 } } }, // 狂暴：铃升 reg5 变疏、bass 跌低八度+b3 冰裂、b2 缝合 stutter 咬入
       mikro:{ bpm:173, rootHz:43.65, rootCycle:[0,0,0,0], bassPatterns:[[null,0,10,0,null,11,0,7,null,0,10,0,null,7,0,11]], padChord:[0,3,7,11], leadNotes:[12,23,12,18], allowLead:true, allowOoh:false, // F + maj7，狂暴机关枪三全音碎切
         calm:{ intensity:0.6, bassFill:'offbeat' },
         rage:{ intensity:1.0, bpm:175, bassFill:'straight8', sig:{ vocalChop:true, chopDeg:6, chopN:8, chopStep:2 } } },
@@ -571,6 +592,15 @@ class MusicEngine {
         if(s%4===2) this.playBass(t,this._noteFreq(0));
         else if(s%2===0 && I>0.7) this.playBass(t,this._noteFreq(0));
         return;
+      case 'frostMid': // glacies 常态：中音区根音(_noteFreq(12))薄霜 pedal，疏；高强度补反拍
+        if(s%8===0) this.playBass(t,this._noteFreq(12));
+        else if(s%4===2 && I>0.5) this.playBass(t,this._noteFreq(12));
+        return;
+      case 'frostDrop': // glacies 狂暴：bass 跌落低八度根音 + b3 冰裂（mid→low 八度落差，实测 reg4→reg2 + b3/b2）
+        if(s%4===0) this.playBass(t,this._noteFreq(0));
+        else if(s%4===2) this.playBass(t,this._noteFreq(3));        // b3 冰裂
+        else if(s%2===1 && I>0.8) this.playBass(t,this._noteFreq(0));
+        return;
       default:{ const off=this._activePattern[s];
         if(off!==null&&off!==undefined && this._bassStepActive(s)) this.playBass(t,this._noteFreq(off)); }
     }
@@ -585,9 +615,13 @@ class MusicEngine {
       const deg=(sig.chopDeg!==undefined)?sig.chopDeg:6;
       this._vocalChop(t,this._noteFreq(24+deg),sig.chopN||6,(60/this.bpm)*0.5);
     }
-    if(sig.glassBells && s%4===2){ // 脆玻璃铃 shimmer(glacies)
-      const deg=this._padChord[phrase%this._padChord.length]; this._glassBell(t,this._noteFreq(24+deg));
+    if(sig.glassBells){ // 脆玻璃铃 shimmer(glacies 深挖 v2)：calm 低八度密(每拍反拍) / rage 高八度疏(每两拍)、拖更长
+      const bells=sig.bellDeg||[36,40,43], dense=(this.section!=='rage');
+      if(dense?(s%4===2):(s===4||s===12)){ const deg=bells[phrase%bells.length]; this.playGlassBell(t,this._noteFreq(deg),dense?1.4:2.2,dense?0.3:0.26); }
     }
+    if(sig.tomShimmer){ const sh=(this.section==='rage')?(s%2===1):(s%4===3); if(sh) this.playTom(t,300+(s%4)*40,0.3); } // HiTom2 高 tom shimmer(glacies：四踩 kick 上叠 329-主导高 tom)
+    if(sig.chimeOff && s%4===1) this.playChime(t,0.24); // 冰锥 chime 反拍叮(glacies)
+    if(sig.stitchVox && (s===6||s===12)){ const n=sig.stitchN||4, dt=(60/this.bpm/4)/n; for(let i=0;i<n;i++) this.playStitch(t+i*dt,0.4); } // b2 缝合 stutter(glacies 狂暴：缝合怪机械咬针)
     if(sig.fifthStab && (s===4||s===12)) this.playScreech(t,this._noteFreq(19),0.18); // 五度 power stab(ouroboros 狂暴)
     if(sig.tomRoll && s%4===3) this.playTom(t,150,0.5); // 反拍 tom 滚(tesla 狂暴：电压击穿)
     if(sig.woodAccent && (s===6||s===14)) this.playWood(t,0.5); // 木鱼 accent(ignis 喷发：HiWdblk 实测)
@@ -650,7 +684,7 @@ class MusicEngine {
     sine.frequency.setTargetAtTime(1800+p*4200,t,0.25);
     sg.gain.setTargetAtTime(p<0.4?0.0001:(p-0.4)*0.08,t,0.25); } // whine 危机段才显形
   _applyThreatToDrone(){ if(!this._drone) return; const base=this._noteFreq(0)/2;
-    this._drone.oB.frequency.setTargetAtTime(base*(1.006+this.threat*0.03),this.ctx.currentTime,0.3); } // 失谐随迫近变宽
+    this._drone.oB.frequency.setTargetAtTime(base*(1.006+this.threat*0.02),this.ctx.currentTime,0.3); } // 失谐随迫近变宽（0.02：Suno 实测近零不协和）
   _zoneOf(p){ return p>=0.85?'critical':p>=0.6?'danger':p>=0.3?'caution':'safe'; }
   _updateThreatZone(){ const z=this._zoneOf(this.threat); if(z===this._threatZone) return;
     const order={safe:0,caution:1,danger:2,critical:3}, dir=order[z]>order[this._threatZone]?'in':'out';

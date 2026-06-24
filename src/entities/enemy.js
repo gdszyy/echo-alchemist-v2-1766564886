@@ -6722,6 +6722,11 @@ class Enemy {
             ctx.restore();
         }
 
+        // [BurnEffect] 持续燃烧视觉特效（世界坐标空间，PixiJS 优先 / Canvas 2D 回退）
+        if (this._burnEffect) {
+            this._burnEffect.draw(ctx);
+        }
+
         // === Layer 6.8: 遗物标记敌人专属金边 (Relic Reward Border) ===
         // @perf-impact: 遗物金边使用 shadowBlur + createRadialGradient + 流光描边，已通过 rewardHaloEnabled/rewardRuneCount/rewardCrystalCount 三档门控。
         // [V3] 奖励敌人当前只承载 relic；旧 chaos/pure 字段不再进入视觉标记入口。
@@ -8288,6 +8293,8 @@ class Enemy {
         const killed = this.hp <= 0;
         if (killed) {
             this.active = false;
+            // [BurnEffect] 死亡时销毁持续燃烧特效，释放 PixiJS 资源
+            if (this._burnEffect) { this._burnEffect.destroy(); this._burnEffect = null; }
 
             // --- [B2] Boss 专属死亡爆炸粒子 ---
             if (this.type === 'boss' && this.bossType && typeof game !== 'undefined') {

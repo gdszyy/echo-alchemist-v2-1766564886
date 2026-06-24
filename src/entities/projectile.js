@@ -22,6 +22,7 @@ import { CONFIG } from '../config.js';
 import { Vec2 } from '../utils/math_utils.js';
 import { Particle, SlashEffect } from '../effects/particles.js';
 import { sb as _sb } from '../utils/perf.js';
+import { pixiIsActive, pixiAcquireParticleSprite, pixiReleaseParticleSprite, pixiCssColor, pixiGetEffectTexture, pixiGetEffectContainer } from '../render/pixi_bridge.js';
 
 // audio 代理由 entities.js 注入，通过模块级变量共享
 let _audioProvider = null;
@@ -102,6 +103,9 @@ class Projectile {
         if (config.explosive) _trailMax += 1;
         this.maxTrailLength = _trailMax;
         this.tierStat = _tierStat;
+        this._bulletGlowHitFlash = 0;   // [Bullet Glow V2] 命中闪光帧计数器
+        this._bulletGlowSprite = null;  // [Bullet Glow V2] 弹道光照精灵
+        this._trailV2Sprites = null;    // [Trail V2] GPU 拖尾精灵数组
         this.deformation = { x: 1, y: 1 };
         this.targetDeformation = { x: 1, y: 1 }; 
         this.elasticity = 0.2;
@@ -662,6 +666,9 @@ class Projectile {
     }
 
     onHit(enemy, allEnemies) {
+        // [Bullet Glow V2] 命中闪光脉冲：触发 6 帧光照增强
+        this._bulletGlowHitFlash = 6;
+
         // ─────────────────────────────────────────────────────────────────────
         // [词条 Hook] 元素聚变（elemental_fusion）——火/冰状态标记
         // 在伤害结算前，标记该敌人本回合被火/冰属性命中
@@ -885,6 +892,18 @@ class Projectile {
         this.active = false;
         this.destroyed = true;
 
+        // [Trail V2] 释放拖尾 GPU 精灵回池
+        if (this._trailV2Sprites) {
+            for (const s of this._trailV2Sprites) pixiReleaseParticleSprite(s);
+            this._trailV2Sprites.length = 0;
+        }
+        // [Bullet Glow V2] 释放弹道光照精灵
+        if (this._bulletGlowSprite) {
+            if (this._bulletGlowSprite.parent) this._bulletGlowSprite.parent.removeChild(this._bulletGlowSprite);
+            this._bulletGlowSprite.destroy();
+            this._bulletGlowSprite = null;
+        }
+
         // [修改重点]：允许套娃子弹触发嵌套逻辑，即使它是 Copy (散射出来的)
         // 之前的逻辑是 !this.isCopy，这会阻止散射子弹裂变
         // 现在放宽条件：如果是非 Copy，或者 虽然是 Copy 但是是套娃(isMatryoshka)
@@ -974,39 +993,212 @@ class Projectile {
     draw(ctx) {
         if (!this.active && !this.destroyed) return;
         const integrity = (this.bouncesLeft + this.piercesLeft) / (this.maxDurability || 1);
+
+        // [Bullet Glow V2] 弹道环境光照 — PixiJS 激活时在子弹下方绘制柔和发光精灵
+        this._syncBulletGlow();
+
         // [拖尾 #6] 在主体之前先绘制拖尾，主体覆盖在最前
         this._drawTrail(ctx);
         Projectile.drawVisuals(ctx, this.pos.x, this.pos.y, this.radius, this.config, this.rotation, this.intensity, this.deformation, integrity, this.crackSeed, this.windBladeAngle);
     }
 
+    // [Bullet Glow V2] 同步子弹环境光照精灵
+    // @perf-impact: 每子弹 1 个 Sprite（ADD 混合），低透明度微弱光照；命中时短暂脉冲
+    _syncBulletGlow() {
+        const perfCfg = CONFIG.performance;
+        const perfQuality = Projectile.resolvePerfQuality();
+        const glowEnabled = perfCfg && perfCfg[perfQuality] && perfCfg[perfQuality].bulletGlow;
+
+        if (glowEnabled && pixiIsActive()) {
+            // 惰性创建
+            if (!this._bulletGlowSprite) {
+                const tex = pixiGetEffectTexture('bulletGlow');
+                const container = pixiGetEffectContainer();
+                if (!tex || !container) return;
+                this._bulletGlowSprite = new PIXI.Sprite(tex);
+                this._bulletGlowSprite.blendMode = PIXI.BLEND_MODES.ADD;
+                this._bulletGlowSprite.anchor.set(0.5);
+                container.addChild(this._bulletGlowSprite);
+            }
+
+            const glow = this._bulletGlowSprite;
+            glow.x = this.pos.x;
+            glow.y = this.pos.y;
+
+            // 元素色 tint
+            const cfg = this.config || {};
+            const trailColor = this._resolveTrailColor(cfg);
+            glow.tint = pixiCssColor(trailColor);
+
+            // 基础 alpha：tierStat 越高越亮（0.04 ~ 0.12）
+            const tierStat = this.tierStat || 0;
+            let alpha = 0.04 + 0.008 * Math.min(10, tierStat);
+
+            // 命中闪光脉冲：6 帧内从 0.22 衰减至基础值
+            if (this._bulletGlowHitFlash > 0) {
+                const flashT = this._bulletGlowHitFlash / 6;
+                alpha = alpha + (0.22 - alpha) * flashT;
+                this._bulletGlowHitFlash--;
+            }
+
+            glow.alpha = alpha;
+
+            // 缩放：基础 0.8 + tierStat 加成，范围 128px 纹理
+            const glowScale = perfCfg[perfQuality].bulletGlowScale || 1.0;
+            const baseScale = (0.8 + 0.15 * Math.min(5, tierStat)) * glowScale;
+            glow.scale.set(baseScale);
+            glow.visible = true;
+        } else {
+            // PixiJS 未激活或 bulletGlow 关闭：隐藏/清理
+            if (this._bulletGlowSprite) {
+                this._bulletGlowSprite.visible = false;
+                if (this._bulletGlowSprite.parent) {
+                    this._bulletGlowSprite.parent.removeChild(this._bulletGlowSprite);
+                }
+                this._bulletGlowSprite.destroy();
+                this._bulletGlowSprite = null;
+            }
+        }
+    }
+
     // @perf-impact: 子弹拖尾 - 每子弹每帧 1 条 lineTo + 渐变描边；高强度子弹 trail 长度可达 ~30 个点。
+    // [Trail V2] PixiJS 激活时使用 GPU 批渲染 Sprite 替代 Canvas 2D 逐段 stroke
     _drawTrail(ctx) {
+        const trail = this.trail;
+        if (!trail || trail.length < 2) {
+            // 拖尾太短或为空时，释放残留 V2 精灵
+            if (this._trailV2Sprites) {
+                for (const s of this._trailV2Sprites) pixiReleaseParticleSprite(s);
+                this._trailV2Sprites.length = 0;
+            }
+            return;
+        }
+
+        // [Trail V2] PixiJS 路径
+        const perfCfg = CONFIG.performance;
+        const perfQuality = Projectile.resolvePerfQuality();
+        const trailV2Enabled = perfCfg && perfCfg[perfQuality] && perfCfg[perfQuality].trailV2;
+        if (trailV2Enabled && pixiIsActive()) {
+            this._drawTrailV2();
+            return;
+        }
+
+        // PixiJS 未激活：清理残留 V2 精灵，走 Canvas 2D 兜底
+        if (this._trailV2Sprites) {
+            for (const s of this._trailV2Sprites) pixiReleaseParticleSprite(s);
+            this._trailV2Sprites.length = 0;
+        }
+        this._drawTrailCanvas2D(ctx, perfQuality);
+    }
+
+    // [Trail V2] GPU 批渲染拖尾：每个 trail 段一个 Sprite，统一 ParticleContainer 一次 draw call
+    _drawTrailV2() {
+        const trail = this.trail;
+        const len = trail.length;
+        if (!this._trailV2Sprites) this._trailV2Sprites = [];
+
+        const cfg = this.config || {};
+        const perfCfg = CONFIG.performance;
+        const perfQuality = Projectile.resolvePerfQuality();
+        const tierCfg = perfCfg[perfQuality] || {};
+
+        // 渲染段数上限（三档策略）
+        const maxSegments = tierCfg.trailV2MaxSegments || len;
+        const startIndex = Math.max(1, len - maxSegments);
+        const visibleSpan = Math.max(1, len - startIndex);
+
+        // 元素色 → PixiJS tint
+        const trailColor = this._resolveTrailColor(cfg);
+        const tint = pixiCssColor(trailColor);
+
+        // 基础宽度
+        const tier = Math.min(3, Math.floor((this.tierStat || 0) / 8));
+        const baseWidth = Math.max(1.0, this.radius * (0.35 + tier * 0.10));
+        const widthMult = tierCfg.trailV2WidthMult || 1.0;
+
+        // 速度动态宽度：高速子弹拖尾更宽
+        const speed = (this.vel && typeof this.vel.mag === 'function') ? this.vel.mag() : 0;
+        const speedFactor = tierCfg.trailV2SpeedDynamic
+            ? (0.5 + 0.5 * Math.min(1, speed / 800))
+            : 0.75;
+
+        // 开幕齐射金色拖尾
+        const isOpeningSalvo = !!cfg._openingSalvo;
+        const useGoldTint = isOpeningSalvo && tierCfg.trailV2OpeningSalvo;
+
+        // 同步 Sprite 数组：确保数量与可见段匹配
+        while (this._trailV2Sprites.length < visibleSpan) {
+            const s = pixiAcquireParticleSprite('trail');
+            if (!s) break;
+            this._trailV2Sprites.push(s);
+        }
+
+        const spriteCount = Math.min(this._trailV2Sprites.length, visibleSpan);
+        for (let j = 0; j < spriteCount; j++) {
+            const i = startIndex + j;
+            if (i >= len) break;
+            const a = trail[i - 1];
+            const b = trail[i];
+            const t = (j + 1) / spriteCount;  // 0=最旧 → 1=最新
+            const sprite = this._trailV2Sprites[j];
+
+            // 位置：段中点
+            sprite.x = (a.x + b.x) * 0.5;
+            sprite.y = (a.y + b.y) * 0.5;
+
+            // 旋转：对齐运动方向
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            sprite.rotation = Math.atan2(dy, dx);
+
+            // 缩放：scaleX = 段长 / 纹理宽(64)，scaleY = 段宽 / 纹理高(16)
+            const segLen = Math.hypot(dx, dy) || 1;
+            const segWidth = Math.max(0.5, baseWidth * t * speedFactor * widthMult);
+            sprite.scale.x = segLen / 64;
+            sprite.scale.y = segWidth / 16;
+
+            // 透明度：越旧越淡
+            sprite.alpha = Math.max(0.03, t * (0.28 + tier * 0.06));
+
+            // 着色
+            sprite.tint = useGoldTint ? 0xFFD700 : tint;
+            if (useGoldTint) sprite.alpha = Math.min(1, sprite.alpha * 1.3);
+        }
+
+        // 释放多余 Sprite（拖尾缩短时）
+        while (this._trailV2Sprites.length > spriteCount) {
+            pixiReleaseParticleSprite(this._trailV2Sprites.pop());
+        }
+    }
+
+    // [Trail V2] 解析拖尾颜色（与 Canvas 2D 路径一致的属性→颜色映射）
+    _resolveTrailColor(cfg) {
+        if (cfg.isLaser) return '#7dd3fc';
+        if (cfg.type === 'flying_sword') return '#0ea5e9';
+        if (cfg.type === 'rainbow') return '#e9d5ff';
+        if (cfg.explosive) return '#ef4444';
+        if ((cfg.pyro || 0) > 0) return '#f97316';
+        if ((cfg.cryo || 0) > 0) return '#22d3ee';
+        if ((cfg.lightning || 0) > 0) return '#c084fc';
+        if ((cfg.wind || 0) > 0) return '#34d399';
+        if ((cfg.pierce || 0) > 0) return '#fca5a5';
+        if ((cfg.bounce || 0) > 0) return '#86efac';
+        if ((cfg.scatter || 0) > 0) return '#facc15';
+        if ((cfg.venom || 0) > 0) return '#84cc16';
+        if ((cfg.overcharge || 0) > 0) return '#f59e0b';
+        if ((cfg.echo || 0) > 0) return '#c084fc';
+        return '#94a3b8';
+    }
+
+    // Canvas 2D 兜底路径（原有逻辑提取）
+    _drawTrailCanvas2D(ctx, perfQuality) {
         const trail = this.trail;
         if (!trail || trail.length < 2) return;
         const cfg = this.config || {};
-        // 根据属性决定主拖尾色
-        let trailColor = '#94a3b8';
-        if (cfg.isLaser) trailColor = '#7dd3fc';
-        else if (cfg.type === 'flying_sword') trailColor = '#0ea5e9';
-        else if (cfg.type === 'rainbow') trailColor = '#e9d5ff';
-        else if (cfg.explosive) trailColor = '#ef4444';
-        else if ((cfg.pyro || 0) > 0) trailColor = '#f97316';
-        else if ((cfg.cryo || 0) > 0) trailColor = '#22d3ee';
-        else if ((cfg.lightning || 0) > 0) trailColor = '#c084fc';
-        else if ((cfg.wind || 0) > 0) trailColor = '#34d399';
-        else if ((cfg.pierce || 0) > 0) trailColor = '#fca5a5';
-        else if ((cfg.bounce || 0) > 0) trailColor = '#86efac';
-        else if ((cfg.scatter || 0) > 0) trailColor = '#facc15';
-        else if ((cfg.venom || 0) > 0) trailColor = '#84cc16';
-        else if ((cfg.overcharge || 0) > 0) trailColor = '#f59e0b';
-        else if ((cfg.echo || 0) > 0) trailColor = '#c084fc';
-
+        const trailColor = this._resolveTrailColor(cfg);
         const tier = Math.min(3, Math.floor((this.tierStat || 0) / 8));
-        // [拖尾调优] 用户反馈：拖尾过粗过亮，整体降一档。
-        // 基础宽度随子弹半径联动；高强度子弹仅小幅加宽
         const baseWidth = Math.max(1.0, this.radius * (0.35 + tier * 0.10));
         const len = trail.length;
-        const perfQuality = Projectile.resolvePerfQuality();
         const isLowQuality = perfQuality === 'low';
         const isHighQuality = perfQuality === 'high';
         const renderLimit = isLowQuality ? 6 : (isHighQuality ? len : 10);
@@ -1016,14 +1208,12 @@ class Projectile {
         ctx.save();
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        // S 级（含激光/飞剑）使用 lighter 增亮拖尾
         if (!isLowQuality && (tier >= 2 || cfg.isLaser || cfg.type === 'flying_sword' || cfg.explosive)) {
             ctx.globalCompositeOperation = 'lighter';
         }
         ctx.shadowColor = trailColor;
         ctx.shadowBlur = isLowQuality ? 0 : _sb(2 + tier * 2);
 
-        // 段落式渐变描边：越靠近当前位置越亮、越粗，整体透明度更低更轻盈
         for (let i = startIndex; i < len; i++) {
             const a = trail[i - 1];
             const b = trail[i];
@@ -1040,7 +1230,7 @@ class Projectile {
             ctx.stroke();
         }
 
-        // S 级追加一层更细更亮的核心拖尾
+        // S 级追加核心亮线
         if ((tier >= 3 || cfg.isLaser) && isHighQuality) {
             ctx.shadowBlur = _sb(6);
             for (let i = Math.max(startIndex, len - 5); i < len; i++) {

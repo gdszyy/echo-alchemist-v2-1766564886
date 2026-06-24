@@ -1487,6 +1487,23 @@ const CONFIG = {
             relicCinematicSparkCount: 18,
             relicCinematicBoltCount: 8,
             greedyWheelEffectLimit: 8,
+            // [开炮 VFX 增强] 枪口火光 V2 / 冲击波 / 屏幕反馈
+            muzzleFlashV2: true,           // 枪口火光 V2 总开关
+            muzzleFlashV2Sparks: 13,       // 火星粒子数
+            firingBurst: true,             // 开炮冲击波总开关
+            firingBurstDebris: 10,         // 碎片数
+            firingScreenShake: true,       // 开炮屏幕震动
+            firingScreenFlash: true,       // 开炮边缘闪光
+            // [Trail V2] 拖尾 GPU 批渲染
+            trailV2: true,                 // 拖尾 V2 总开关
+            trailV2MaxSegments: 22,        // 最大拖尾渲染段数
+            trailV2WidthMult: 1.0,         // 拖尾宽度倍率
+            trailV2SpeedDynamic: true,     // 速度动态宽度（高速→宽尾）
+            trailV2OpeningSalvo: true,     // 开幕齐射金色拖尾
+            // [Bullet Glow V2] 弹道环境光照
+            bulletGlow: true,              // 弹道光照总开关
+            bulletGlowScale: 1.0,          // 光照范围倍率（128px 基准）
+            bulletGlowHitFlash: true,      // 命中闪光脉冲
             // shadowBlur 全局开关（移动端 GPU 上 shadowBlur 是单帧最贵的 Canvas2D 操作）
             shadowBlurEnabled: true,
         },
@@ -1528,6 +1545,23 @@ const CONFIG = {
             relicCinematicSparkCount: 10,
             relicCinematicBoltCount: 4,
             greedyWheelEffectLimit: 5,
+            // [开炮 VFX 增强] medium 降级
+            muzzleFlashV2: true,
+            muzzleFlashV2Sparks: 6,
+            firingBurst: true,
+            firingBurstDebris: 5,
+            firingScreenShake: true,
+            firingScreenFlash: true,
+            // [Trail V2] 拖尾 GPU 批渲染（medium: 段数削减、宽度收窄）
+            trailV2: true,
+            trailV2MaxSegments: 14,
+            trailV2WidthMult: 0.8,
+            trailV2SpeedDynamic: true,
+            trailV2OpeningSalvo: false,
+            // [Bullet Glow V2] 弹道环境光照（medium: 范围缩小、命中闪光关闭）
+            bulletGlow: true,
+            bulletGlowScale: 0.75,
+            bulletGlowHitFlash: false,
             shadowBlurEnabled: true,
         },
         // LOW：省电模式，适合低端手机 / 发热严重时
@@ -1571,6 +1605,23 @@ const CONFIG = {
             relicCinematicSparkCount: 4,
             relicCinematicBoltCount: 1,
             greedyWheelEffectLimit: 3,
+            // [开炮 VFX 增强] low 档：关闭大部分视觉增强
+            muzzleFlashV2: false,
+            muzzleFlashV2Sparks: 0,
+            firingBurst: false,
+            firingBurstDebris: 0,
+            firingScreenShake: true,
+            firingScreenFlash: false,
+            // [Trail V2] 拖尾 GPU 批渲染（low: 关闭 V2，回退 Canvas 2D 极简拖尾）
+            trailV2: false,
+            trailV2MaxSegments: 6,
+            trailV2WidthMult: 0.5,
+            trailV2SpeedDynamic: false,
+            trailV2OpeningSalvo: false,
+            // [Bullet Glow V2] 弹道环境光照（low: 关闭）
+            bulletGlow: false,
+            bulletGlowScale: 0.5,
+            bulletGlowHitFlash: false,
             // shadowBlur 在 low 等级一律关闭，是降温的关键开关
             shadowBlurEnabled: false,
         }

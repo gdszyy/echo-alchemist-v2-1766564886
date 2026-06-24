@@ -416,7 +416,7 @@ class MusicEngine {
         const base = this._noteFreq(0) / 2;
         const { oA, oB } = this._drone;
         oA.frequency.setTargetAtTime(base, t, 0.4);
-        oB.frequency.setTargetAtTime(base * (1.006 + this.threat * 0.03), t, 0.4);  // 保留 threat 失谐
+        oB.frequency.setTargetAtTime(base * (1.006 + this.threat * 0.02), t, 0.4);  // 保留 threat 失谐（系数 0.02，见 _applyThreatToDrone 校准注）
     }
 
     _stopDrone() {
@@ -986,7 +986,8 @@ class MusicEngine {
     _applyThreatToDrone() {
         if (!this._drone) return;
         const base = this._noteFreq(0) / 2;
-        this._drone.oB.frequency.setTargetAtTime(base * (1.006 + this.threat * 0.03), this.ctx.currentTime, 0.3);
+        // 失谐系数 0.02：Suno「告破 Chase」实测近零不协和（root+五度协和铺底），0.03 会让 lowpass 通带内顶部谐波出现 ~10Hz 粗糙拍频；0.02 留 ~6–7Hz「发毛」漂移而不刺耳
+        this._drone.oB.frequency.setTargetAtTime(base * (1.006 + this.threat * 0.02), this.ctx.currentTime, 0.3);
     }
 
     _zoneOf(p) { return p >= 0.85 ? 'critical' : p >= 0.6 ? 'danger' : p >= 0.3 ? 'caution' : 'safe'; }

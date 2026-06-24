@@ -132,6 +132,35 @@
 - **lead/synth**：常态高音区(reg D#4)缓慢明亮、玻璃铃/钟琴质感（deg 1/5/3）→ `_leadNotes` 抬高八度 + 走大三度；reverb wet / 尾长拉大做冰窟空间。
 - **常态 / 狂暴（分段实测）**：**狂暴段加入 backing 人声层**——落在 **b2(E，相对 D#)**、reg E4、极短 ~0.19 拍 = 诡异「缝合」式短切音；鼓转更密 8 分。→ 引擎狂暴用一条 b2 短促 stab/vox 层（可借 `playOoh` 高八度短包络）+ intensity 上移，表达「缝合收紧」。
 
+**深挖 v2（逐分轨 MIDI 实测 · 2026-06-25 · 见索引 M-02）**
+
+> 上一轮只取中位 BPM + 音级直方图；这一轮把 5 条分轨（BackVox / Bass / Drums / FX / Synth）逐条按 16 分栅格解析。
+> 完整性：5 分轨全过校验（0 截断，div=480，format-1）。全局：143–152 BPM、中位 145、root D#/Eb、约 212s。
+
+关键发现（与 ignis 形成**镜像对比**）：
+
+1. **鼓保留四踩 kick，再在其上叠高 tom shimmer**。Drums 轨主体 = HiTom2(50):329 主导，但 kick 仍踩四分（栅格 `▁   █   ▁   █`，s4/s12 加重）——与 ignis「撤 kick 换炉腔 tom」**正好反着来**：glacies 不撤 kick，而是用高 tom 在四踩上撒「冰晶碎光」。
+2. **大三度玻璃铃是持续音，不是点缀**。Synth deg 1:48 / 5:20 / **3:12** / 2:12，reg5，中位时值 **3.90 拍**（超长持续）。常态 reg4 偏低且更密、狂暴 reg5 抬高反而更疏——明亮**大三度**晶体色，确认不是阴小调。
+3. **定根 b2「缝合」stutter**。BackVox 死锁 **E5(pitch 64)=b2**、vel 127 满、中位时值 0.19 拍极短——这就是「缝合怪」把音机械咬针缝住的标志刺点（仅狂暴段出现）。
+4. **bass 跌落低八度**。常态 106 音 reg4 → 狂暴 218 音 reg2，并掺 b3:15 / b2:6 冰裂音。
+5. **定根 D# FX 脉冲随段加密**（0.24 → 0.88 音/秒）；另有 Crash + STwhistle + 反拍三角高频 perc。
+
+→ 引擎丰富落点 v2（已落 `dark_psy_engine_demo.html`，无新增构造字段，全部走 `sig` 旗标 + `bassFill`，比 ignis 更干净）：
+
+| 改动 | 类型 | 说明 |
+|---|---|---|
+| `playGlassBell` | 新增声部 | 大三度持续冰晶铃：非谐泛音串 `[1,2.76,5.4,8.93]`→fxBus 进混响；calm reg4 密 / rage reg5 疏且拖更长 |
+| `playStitch` | 新增声部 | 定根 b2(`_noteFreq(25)`) 方波芯过 formant 带通→leadBus，极短机械「缝针」 |
+| `playChime` | 新增声部 | 三角高频 2640→2200Hz→hatBus，反拍冰锥「叮」 |
+| `glassBells` 段落编排 | 改句法 | calm `s%4===2` 密 + 低八度 `bellDeg:[36,40,43]`；rage `s∈{4,12}` 疏 + 高八度 `[48,52,55]`（**还原 calm 密低→rage 疏高**） |
+| `tomShimmer` | 新增句法 | **四踩 kick 保留**，在其上叠 HiTom shimmer（calm `s%4===3` / rage `s%2===1` 加密） |
+| `stitchVox` | 新增句法 | 狂暴 `s∈{6,12}` 各 4 连 b2 stutter（缝合收紧；仅狂暴） |
+| `frostMid → frostDrop` | 新增句法 | bass calm 中音 pedal `_noteFreq(12)` → rage 跌低八度 `_noteFreq(0)` + b3 冰裂（**八度落差**落地） |
+
+**辨识度**：glacies 是全 8 Boss 里**唯一「保留四踩 kick 又在其上叠高 tom shimmer」**者，与 ignis（撤 kick 换炉腔 tom）构成镜像；大三度玻璃铃 + 定根 b2 缝合 stutter 为其专属。验证：node 烟测确认 calm `kick=4 / glassBell=4 / tom=4 / chime=4 / bass=2`，rage `kick=4 / glassBell=2 / tom=8 / chime=4 / stitch=8 / bass=16`，与「保 kick 叠 shimmer + 大三度铃 + b2 缝合 + 八度落差」设计一致。
+
+**撞味提醒**：与 mikro 共用的 `vocalChop`（三全音机关枪）句法分开——glacies 改用 `stitchVox`（定根 b2、固定不漂），句法与音程都不同，不撞味。
+
 ---
 
 ### 3.3 裂变母体·米克罗 mikro（lightning / scatter，mini）
@@ -341,16 +370,19 @@ it crosses the line, the alarm screams, full-throttle overrun, hammering kick an
 the chase breaks off, the drive winding down, the pursuer receding into the dark
 ```
 
-**引擎落点（待从 Suno 成品提炼，用来校准 threat 轴常量）**
+**引擎落点（已从 Suno 成品「告破 Chase」提炼，5 分轨 MIDI · 2026-06-25 · 见索引 M-09）**
 
-> 已先落代码（见 `music_engine.js` / demo 的 `setThreat`、`_rideApproach`、`_heartbeat`、`_alarm`、`onThreatZone`、`_zoneOf`）；成品出来后按下表对齐数值。
+> 提炼证据：时长 ~163s；加权中位 **169 BPM**（区间 166–171.5，Suno 抖动）；root = **D#**（bass D# 占 638/703，range D#1–D#4）；synth 以**五度 A#** 为主(339 次，range D#3–F4)；音级(相对 D#)= 1:641 / 5:346 / b2:40 为主 → **root+五度协和**、仅轻 b2、**近零不协和**(不协和占比 早段 0.02 / 高潮 0.00)。能量**前置**：16 桶密度高潮在第 5 桶(~51–61s)后**递减至尾**，**非**脚本设想的 safe→告破 单调递增。鼓层 Crash 189 / Snr 168 / Crash2 117 / maraca 25 主导、**无 kick**（Suno 分轨分离假象，四踩不在此 stem）。FX 层 29 次全在**单音 F3**（根上方大二度），成对出现、间隔 ~1.4s ≈ 169BPM 下一小节。
+>
+> 结论：成品给的是**音色 / 根音 / BPM / FX 性格**参考，**不**自带威胁升级曲线与强不协和（符合 §4「纯合成、不塞音频」）——升级阶梯仍由引擎设计，Suno 只校准底色。本轮据此**改 1 处**(drone 失谐)，其余经证据**校验保留**。
 
-- **心跳加速曲线** → 校 `_scheduleStep` 的 `hb` 细分阶梯（当前 8→4→2→1 分音）与 `_heartbeat` 的音高扫程(62→38Hz)/时值：听成品各区心跳的实际疏密与「砰」的下坠感。
-- **迫近啸叫** → 校 `_rideApproach` 带通扫程(当前 300→3500Hz)、Q、增益曲线，与正弦 whine 的起点/显形阈值(当前 p≥0.4)：听远近时啸叫的亮度与突显点。
-- **告破警报** → 校 `_alarm` 的音程(当前三全音 b5 + 五度)与时值/重复：听告破刺的不协和度与狠劲。
-- **drone 失谐** → 校 `_applyThreatToDrone` 拍频增量(当前 +threat×0.03)：听迫近时底噪的「发毛」程度。
-- **越线打点 & 卸力** → 校 `onThreatZone` 各区 riser/impact 强度与退区 downlifter 时长(当前 0.7s)：听跨线与撤离的力度。
-- **区阈值** → 校 `_zoneOf`（当前 0.3/0.6/0.85）：对齐成品里「不安/危险/告破」的转折点。
+- **心跳加速曲线** → `_scheduleStep` 的 `hb` 阶梯(8→4→2→1) **保留引擎设计**：成品能量前置、非单调，不能照搬其时间线做升级。`_heartbeat` 音高扫程 **62→38Hz 保留**：38Hz ≈ **D#1** 正落在成品根音的下八度，已与参考同调；心跳是体感「砰」，刻意保持绝对音高（不随根漂）。
+- **迫近啸叫** → `_rideApproach` 带通噪声扫程 **300→3500Hz 保留**：成品宽频能量由 **crash/snare** 扛（Crash 系共 306 击），正对应上扫带通噪声的「气压」。正弦 whine **1800→6000Hz / p≥0.4 显形 保留**：成品 FX 是中音 F3 脉冲、并无高频环鸣，故高 whine 记为**引擎自加的「锁定/逼近环鸣」**（游戏可读性），与 Suno 有意分工。
+- **告破警报** → `_alarm` **三全音(18)→五度(19) 保留**。五度经成品**校实** = 高潮主音程(synth A# over D#)；三全音作为**游戏警报色**刻意保留——成品靠**能量/密度**报「告破」(不协和≈0)，但引擎需要一记不会被误听的警报。备选(未落)：加一记**根+大二度**(F over D#) 前置 stinger 呼应成品反复的 F3。
+- **drone 失谐** → `_applyThreatToDrone` 拍频增量 **+threat×0.03 → +threat×0.02**（✅ 已改 engine + demo 各两处：`_applyThreatToDrone` / `_retuneDrone`）。证据：成品近零不协和、稳态 D# 协和铺底；0.03 会让 drone lowpass(300Hz) 通带内顶部谐波出现 ~10Hz 粗糙拍频，听感「跑调」；0.02 留 ~6–7Hz「发毛」漂移，张力在而不刺。
+- **越线打点 & 卸力** → `onThreatZone` riser/impact 与退区 downlifter 时长 **保留**(riser 0.8 / downlifter 0.7s)。参考：成品 stinger 成对、间隔 ~1.4s ≈ 169BPM 一小节；引擎半小节级的 0.7–0.8s 打点在同一量级。
+- **区阈值** → `_zoneOf` **0.3/0.6/0.85 保留**：阈值是**玩法手感**(距离驱动)，成品时间线能量前置、非干净四区，不可由其反推。
+- **参考事实 / 推荐后续**：chase 参考 **BPM≈169**、root **D#≈38.9Hz**(D#1，与 glacies/devourer/ouroboros 同根族)、root+五度协和铺底。**推荐后续**(本轮未动 tempo)：threat 进 danger/critical 时用 `glideBpm` 把 BPM 朝 **~169** 平滑提速耦合，落实 Style 串「accelerating as the gap collapses」；威胁轴现仍不触 tempo。
 
 ---
 

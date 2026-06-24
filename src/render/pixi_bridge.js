@@ -187,6 +187,34 @@ function _initBakedTextures() {
         g.stroke();
         _bakedTextures.line = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
     }
+    // [Trail V2] 拖尾段纹理：64×16，水平高斯衰减 + 垂直柔和轮廓
+    // 用于 GPU 批渲染的拖尾线段替代 Canvas 2D 逐段 stroke
+    {
+        const w = 64, h = 16;
+        const c = new OffscreenCanvas(w, h);
+        const g = c.getContext('2d');
+        const cy = h / 2;
+        // 水平：中间亮两端透明（模拟拖尾段从首到尾的渐隐）
+        const grH = g.createLinearGradient(0, cy, w, cy);
+        grH.addColorStop(0,   'rgba(255,255,255,0)');
+        grH.addColorStop(0.1, 'rgba(255,255,255,0.8)');
+        grH.addColorStop(0.5, 'rgba(255,255,255,1)');
+        grH.addColorStop(0.9, 'rgba(255,255,255,0.8)');
+        grH.addColorStop(1,   'rgba(255,255,255,0)');
+        g.fillStyle = grH;
+        g.fillRect(0, 0, w, h);
+        // 垂直遮罩：用 destination-in 裁出柔和纵向轮廓
+        const grV = g.createLinearGradient(w / 2, 0, w / 2, h);
+        grV.addColorStop(0,   'rgba(255,255,255,0)');
+        grV.addColorStop(0.2, 'rgba(255,255,255,0.6)');
+        grV.addColorStop(0.5, 'rgba(255,255,255,1)');
+        grV.addColorStop(0.8, 'rgba(255,255,255,0.6)');
+        grV.addColorStop(1,   'rgba(255,255,255,0)');
+        g.globalCompositeOperation = 'destination-in';
+        g.fillStyle = grV;
+        g.fillRect(0, 0, w, h);
+        _bakedTextures.trail = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+    }
 }
 
 // ─── ParticleContainer 管理 ────────────────────────────────────
@@ -529,6 +557,22 @@ function _initEffectTextures() {
         gr.addColorStop(1,   'rgba(255,255,255,0)');
         g.fillStyle = gr; g.beginPath(); g.arc(h, h, h, 0, Math.PI * 2); g.fill();
         _effectTextures.muzzleSpark = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+    }
+
+    // ─── [弹道光照] bulletGlow: 子弹环境光纹理 ──────────────────
+    // 128×128 柔和径向渐变，白色中心 → 透明边缘
+    // 用于子弹飞行时的微弱动态光照 + 命中闪光脉冲
+    {
+        const s = 128, h = 64;
+        const c = new OffscreenCanvas(s, s);
+        const g = c.getContext('2d');
+        const gr = g.createRadialGradient(h, h, 0, h, h, h);
+        gr.addColorStop(0,    'rgba(255,255,255,0.9)');
+        gr.addColorStop(0.25, 'rgba(255,255,255,0.5)');
+        gr.addColorStop(0.55, 'rgba(255,255,255,0.15)');
+        gr.addColorStop(1,    'rgba(255,255,255,0)');
+        g.fillStyle = gr; g.beginPath(); g.arc(h, h, h, 0, Math.PI * 2); g.fill();
+        _effectTextures.bulletGlow = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
     }
 }
 
