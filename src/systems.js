@@ -1278,6 +1278,26 @@ const TRAINING_SCENARIOS = {
             demoAction: (game) => { game.phase_enemy_startLogic(); }
         },
         {
+            id: 'boss_tesla',
+            categoryId: 'boss',
+            name: '导体矩阵·特斯拉',
+            icon: '⚡',
+            desc: '导体网络+连锁电弧。进入战斗后以窄菱形导体核心承载电流，破绽谱：冰霜/弹跳。',
+            setup: (game) => { game.spawn_spawnBoss('tesla', true); },
+            bulletConfig: { damage: 42, bounce: 5, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 180, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
+        {
+            id: 'boss_chimera',
+            categoryId: 'boss',
+            name: '缝合奇美拉·喀迈拉',
+            icon: '◇',
+            desc: '双相狂暴+胃域爆发。左右异质核心保留缝合线与反应炉窗口，破绽谱：毒素/激光。',
+            setup: (game) => { game.spawn_spawnBoss('chimera', true); },
+            bulletConfig: { damage: 46, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, venom: 6, isLaser: true, isMatryoshka: false, type: 'normal', laser: 8 },
+            demoAction: (game) => { game.phase_enemy_startLogic(); }
+        },
+        {
             id: 'boss_ouroboros',
             categoryId: 'boss',
             name: '永恆回聲·奧羅波羅斯',

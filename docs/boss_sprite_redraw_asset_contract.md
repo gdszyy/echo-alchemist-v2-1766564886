@@ -97,10 +97,11 @@ Boss 本体 Sprite 在运行时绘制在液体 HP 层之后，但不能靠“整
 - 每个 base draft 必须有 `boss_<id>_hp_translucency_mask.png`。mask 必须从素材自身的透明孔洞、发光缝隙、玻璃/晶体/炉腔等可透光部位提取；禁止额外手绘椭圆窗口或把普通装甲纹理当作透明区。后处理脚本只根据 mask 改 alpha，不得扫描整张图做统一透明。
 - 每个 base draft 必须有 `boss_<id>_base_draft_hp_window_preview.png`，把最终本体叠在模拟 HP 液体背景上，人工确认血量只从透光部件中读出。
 - 运行时 Boss HP 槽底和真实 HP 液体会按 `bossType` 使用主题色：Ignis 橙红、Glacies 冰蓝、Mikro 绿核、Devourer 紫渊、Viridis 毒绿、Tesla 电蓝、Chimera 红紫、Ouroboros 金色；预览图也应尽量使用对应主题底色，避免 mask 在正式画面里读感偏色。
-- 透光窗口建议覆盖主体面积约 `8%-35%`，特殊胃囊/孢室类 Boss 可略高但不得超过 `42%`；非 mask 区域应保持高 alpha 和实体重量。
+- 透光窗口建议覆盖主体面积约 `1.5%-20%`，重点落在裂纹、发光缝、透明孔隙和材质薄膜；非 mask 区域应保持高 alpha 和实体重量，避免把普通装甲/肌理误做半透明。
 - mask 内部允许透明渐变，边缘应保留纹路、裂缝、膜边或金属框，避免看起来像硬切 UI 窗口。
 - `tests/validate_boss_sprite_assets.mjs` 会检查已有 draft 的 mask 尺寸、窗口覆盖率、窗口平均 alpha、非窗口主体平均 alpha 和预览图是否存在。
 - 如果某个 Boss 必须有厚重外壳，优先在外壳内部开“材质上合理的透光腔/薄膜/晶体”，不要把整片外壳整体调淡。
+- 运行时 `SpriteRenderer` 不会再单独加载 `hpTranslucencyMask`；mask 是生成和验收契约，最终透明度已经烘入 `boss_<id>_redraw_idle_draft_sheet_<version>.png`。因此战斗与试炼场只要走同一个 sheet path，就会使用同一套 alpha 表现。
 
 可用自动初稿流程：
 
@@ -153,6 +154,8 @@ node tests/validate_boss_sprite_assets.mjs
 2026-06-22：已生成 Ignis 与 Glacies 的基础重绘 draft；2026-06-23 追加 Mikro、Devourer、Viridis、Tesla、Chimera 与 Ouroboros 基础重绘 draft。2026-06-23 运行时已通过 `src/data/boss_sprite_assets.js` 切换到 `redraw_drafts/boss_<bossId>_redraw_idle_draft_sheet.png/.json`。2026-06-23 返工：Viridis 与 Ouroboros 的低质几何占位 draft 已替换为 `source_ai/` 厚涂源图管线，重新生成本体、HP 透光 mask、idle sheet 与对应破绽 Overlay；Ouroboros 保持完整闭合环和 6 个附体槽。
 
 2026-06-23：8 个 Boss base draft 均已具备区域式 HP 透光窗口方案：只让炉芯、冰腔、孢室、胃囊、电核罩、混合核心、衔尾蛇环槽等 mask 标记区域变为透光；此前前四个整体半透明版本已归档为 `_2026-06-23_overall-alpha-superseded`，原不透明源稿归档为 `_2026-06-23_opaque_source`。后四个由 `scripts/generate_remaining_boss_hp_drafts.py` 生成碰撞轮廓优先的 draft，用于补齐验收与后续美术重绘参考。
+
+2026-06-24：8 个 Boss 已统一生成并接入 `_v20260624alphafix` runtime sheet/base/mask/preview。该批次不重绘主体，只把旧 runtime sheet 中错误的大面积/噪点 alpha 修正为基于裂纹、发光、孔隙和局部透光结构的 alpha，普通本体区域恢复实体不透明；`src/data/boss_sprite_assets.js` 必须让全部 Boss 指向该版本，避免同名缓存或局部旧版本混用。
 
 ```text
 assets/sprites/bosses/redraw_drafts/boss_ignis_base_draft_384x256.png

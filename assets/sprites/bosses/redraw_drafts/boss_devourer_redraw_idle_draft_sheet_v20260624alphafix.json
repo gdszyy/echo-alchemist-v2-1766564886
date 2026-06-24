@@ -1,0 +1,15 @@
+{
+  "frameWidth": 384,
+  "frameHeight": 256,
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 6,
+      "fps": 6,
+      "frameWidth": 384,
+      "frameHeight": 256
+    }
+  },
+  "hpTranslucencyMask": "boss_devourer_hp_translucency_mask_v20260624alphafix.png",
+  "notes": "Alpha-fix pass: HP translucency is extracted from sprite-local glow, cracks, glass/core windows, furnace vents, crystals, and real gaps; ordinary body material is restored to solid alpha."
+}

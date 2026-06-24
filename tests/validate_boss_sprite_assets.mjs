@@ -28,8 +28,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const DRAFT_DIR = 'assets/sprites/bosses/redraw_drafts';
+const ALPHA_FIX_VERSION_SUFFIX = 'v20260624alphafix';
 const REQUIRED_PAINTERLY_SOURCE_BOSSES = new Set(['viridis', 'tesla', 'chimera', 'ouroboros']);
-const REQUIRED_VERSIONED_RUNTIME_BOSSES = new Set(['viridis', 'tesla', 'chimera', 'ouroboros']);
+const REQUIRED_VERSIONED_RUNTIME_BOSSES = new Set(BOSS_SPRITE_BOSS_IDS);
 const PAINTERLY_SOURCE_DATE_BY_BOSS = {
     viridis: '2026-06-23',
     ouroboros: '2026-06-23',
@@ -40,14 +41,14 @@ const HP_WINDOW_DRAFT = {
     width: 384,
     height: 256,
     minSubjectPixels: 6000,
-    minWindowRatio: 0.08,
-    maxWindowRatio: 0.42,
+    minWindowRatio: 0.015,
+    maxWindowRatio: 0.20,
     minOutsideMeanAlpha: 220,
-    maxOutsideLowAlphaRatio: 0.24,
+    maxOutsideLowAlphaRatio: 0.08,
     maxWindowMeanAlpha: 165,
     minWindowTransparentRatio: 0.55,
     maskAspectByBoss: {
-        mikro: { min: 0.92, max: 1.08 }
+        mikro: { min: 0.88, max: 1.12 }
     }
 };
 
@@ -211,11 +212,15 @@ function validateBossSprite(bossId) {
         return;
     }
     if (REQUIRED_VERSIONED_RUNTIME_BOSSES.has(bossId) && !suffix) {
-        fail(`${bossId} must declare a version suffix for painterly runtime art`);
+        fail(`${bossId} must declare a version suffix for runtime art`);
+        return;
+    }
+    if (REQUIRED_VERSIONED_RUNTIME_BOSSES.has(bossId) && suffix !== ALPHA_FIX_VERSION_SUFFIX) {
+        fail(`${bossId} runtime sprite must use ${ALPHA_FIX_VERSION_SUFFIX}, got ${suffix}`);
         return;
     }
     if (REQUIRED_VERSIONED_RUNTIME_BOSSES.has(bossId) && (!sheetRel.includes(`_${suffix}.png`) || !metaRel.includes(`_${suffix}.json`))) {
-        fail(`${bossId} runtime sprite must use versioned painterly paths to avoid stale same-name cache`);
+        fail(`${bossId} runtime sprite must use versioned alpha-fix paths to avoid stale same-name cache`);
         return;
     }
 
@@ -315,7 +320,7 @@ function validateHpReadableDraft(bossId) {
     const previewPath = path.join(root, previewRel);
     const suffix = BOSS_SPRITE_VERSION_SUFFIX_BY_BOSS[bossId];
     if (REQUIRED_VERSIONED_RUNTIME_BOSSES.has(bossId) && (!baseRel.includes(`_${suffix}.png`) || !maskRel.includes(`_${suffix}.png`) || !previewRel.includes(`_${suffix}.png`))) {
-        fail(`${bossId} HP alpha layer and preview must use versioned painterly paths`);
+        fail(`${bossId} HP alpha layer and preview must use versioned alpha-fix paths`);
         return;
     }
     if (!fs.existsSync(basePath)) {

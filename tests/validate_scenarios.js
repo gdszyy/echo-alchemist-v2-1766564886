@@ -138,6 +138,14 @@ requiredRelicIds.forEach(id => {
 });
 
 const requiredBossIds = [
+    'boss_ignis',
+    'boss_glacies',
+    'boss_mikro',
+    'boss_devourer',
+    'boss_viridis',
+    'boss_tesla',
+    'boss_chimera',
+    'boss_ouroboros',
     'boss_vulnerability_break'
 ];
 
