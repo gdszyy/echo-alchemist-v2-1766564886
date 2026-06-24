@@ -5,12 +5,18 @@ import {
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
     Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, showToast, 
-    rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
+    rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba,
+    MuzzleFlashV2, FiringBurst
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
 import { audio } from './audio.js';
 import { sb as _sb } from './utils/perf.js';
-import { floatingText_pixiDestroy } from './render/pixi_effect_adapter.js';
+import { pixiIsActive } from './render/pixi_bridge.js';
+import {
+    floatingText_pixiDestroy,
+    muzzleFlashV2_pixiDestroy,
+    firingBurst_pixiDestroy,
+} from './render/pixi_effect_adapter.js';
 import {
     getUiBitmap,
     EMITTER_BASE_SRC,
@@ -719,6 +725,7 @@ export const render_system = {
             life: charged ? 900 : 700,        // 含热辉余烬冷却的总时长
             intensity: charged ? 1.65 : 1,
             charged,
+            _v2Spawned: false,  // [开炮 VFX 增强] 标记是否已创建 PixiJS V2 特效
         });
     },
 
@@ -934,6 +941,74 @@ export const render_system = {
             }
         });
         this._launcherBarrelFireFx = activeFx;
+
+        // ── [开炮 VFX 增强] PixiJS V2 特效：惰性创建 + 更新 + 绘制 + 清理 ──
+        if (pixiIsActive()) {
+            // 惰性创建：首次渲染时为每个火光 FX 创建 V2 特效
+            for (const fx of activeFx) {
+                if (!fx._v2Spawned) {
+                    fx._v2Spawned = true;
+                    const muzzleX = cx + fx.dir.x * EMITTER_PORT_OFFSET_Y;
+                    const muzzleY = cy + recoilY + fx.dir.y * EMITTER_PORT_OFFSET_Y;
+                    const angle = Math.atan2(fx.dir.y, fx.dir.x);
+
+                    this._muzzleFlashesV2 = this._muzzleFlashesV2 || [];
+                    this._muzzleFlashesV2.push(new MuzzleFlashV2(muzzleX, muzzleY, angle, fx.color, fx.intensity));
+
+                    this._firingBursts = this._firingBursts || [];
+                    this._firingBursts.push(new FiringBurst(muzzleX, muzzleY, angle, fx.color, fx.intensity));
+
+                    // 开炮屏幕震动
+                    if (fx.charged) {
+                        if (typeof this.triggerScreenShake === 'function') this.triggerScreenShake(3);
+                        if (typeof this.triggerScreenShakeAdvanced === 'function') this.triggerScreenShakeAdvanced(2, 8);
+                    } else if (fx.intensity >= 1) {
+                        // 普通开炮微弱震动（仅爆炸弹）
+                    }
+                    // 开炮边缘闪光标记
+                    this._fireFlashFrames = fx.charged ? 4 : 2;
+                }
+            }
+
+            // 更新 & 绘制 MuzzleFlashV2
+            const dtSec = (typeof this.dt !== 'undefined' ? this.dt : 16) / 1000;
+            if (this._muzzleFlashesV2) {
+                for (let i = this._muzzleFlashesV2.length - 1; i >= 0; i--) {
+                    const mf = this._muzzleFlashesV2[i];
+                    mf.update(dtSec);
+                    mf.draw(ctx);
+                    if (mf.dead) {
+                        if (mf._pixi) { muzzleFlashV2_pixiDestroy(mf._pixi); mf._pixi = null; }
+                        this._muzzleFlashesV2.splice(i, 1);
+                    }
+                }
+            }
+
+            // 更新 & 绘制 FiringBurst
+            if (this._firingBursts) {
+                for (let i = this._firingBursts.length - 1; i >= 0; i--) {
+                    const fb = this._firingBursts[i];
+                    fb.update(dtSec);
+                    fb.draw(ctx);
+                    if (fb.dead) {
+                        if (fb._pixi) { firingBurst_pixiDestroy(fb._pixi); fb._pixi = null; }
+                        this._firingBursts.splice(i, 1);
+                    }
+                }
+            }
+        }
+
+        // ── [开炮 VFX 增强] 开炮边缘闪光（Canvas 2D 全屏叠加） ──
+        if (this._fireFlashFrames > 0) {
+            const flashAlpha = (this._fireFlashFrames / 4) * 0.08;
+            ctx.save();
+            // 抵消 translate(cx, cy) 以覆盖全屏
+            ctx.translate(-cx, -cy);
+            ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+            ctx.fillRect(0, 0, this.width, this.height);
+            ctx.restore();
+            this._fireFlashFrames--;
+        }
 
         if (isCharging) {
             const t = Math.max(0, Math.min(1, chargeProgress || 0));

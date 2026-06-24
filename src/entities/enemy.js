@@ -17,7 +17,7 @@
  */
 import { CONFIG } from '../config.js';
 import { Vec2, lerp, lerpColor } from '../utils/math_utils.js';
-import { Particle } from '../effects/particles.js';
+import { Particle, BurnEffect } from '../effects/particles.js';
 import { getUiBitmap, DEFENSE_ICON_MAP } from '../bitmap_icons.js';
 import { sb as _sb } from '../utils/perf.js';
 import { eventBus } from '../event_bus.js';
@@ -926,6 +926,18 @@ class Enemy {
             }
         }
         this.updateTempParticles(timeScale);
+
+        // [BurnEffect] 持续燃烧视觉特效生命周期管理
+        if (this.temp >= 34 && !this._burnEffect) {
+            this._burnEffect = new BurnEffect(this);
+        }
+        if (this._burnEffect) {
+            this._burnEffect.update(this.pos, this.temp, timeScale);
+        }
+        if (this.temp < 20 && this._burnEffect) {
+            this._burnEffect.destroy();
+            this._burnEffect = null;
+        }
     }
 
     addSwordCrack(relPos, angle) {

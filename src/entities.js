@@ -35,7 +35,8 @@ import {
     Particle, SlashEffect, PierceCutEffect, CollectionBeam, Shockwave, LaserBeam,
     FloatingText, EnergyOrb, LightningBolt, FireWave,
     IceWave, DeathExplosion, HealWave,
-    GreedyWheelEffect, BladeStormRing, BladeStormVortex, SwordScar, RewardDropEffect
+    GreedyWheelEffect, BladeStormRing, BladeStormVortex, SwordScar, RewardDropEffect,
+    MuzzleFlashV2, FiringBurst
 } from './effects/particles.js';
 import { Enemy, setEnemyAudioProvider } from './entities/enemy.js';
 import { Projectile, setProjectileAudioProvider } from './entities/projectile.js';
@@ -5439,6 +5440,8 @@ export {
     BladeStormVortex,
     SwordScar,
     RewardDropEffect,
+    MuzzleFlashV2,
+    FiringBurst,
     Player,
     RuneLoot,
     FieldLootItem,

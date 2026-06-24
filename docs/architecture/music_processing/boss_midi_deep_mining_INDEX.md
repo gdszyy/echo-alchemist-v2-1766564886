@@ -23,7 +23,7 @@
 
 | 号 | Boss | MIDI 文件前缀 | 分轨 | 引擎 key | 深挖结论位置 | 状态 |
 |---|---|---|---|---|---|---|
-| **M-01** | 熔炉守卫·伊格尼斯 ignis | `熔炉之门` | Bass / Drums / FX / Percussion / Synth | `ignis` | `boss_music_design.md` §3.1 → 「深挖 v2」 | ⏳ 进行中 |
+| **M-01** | 熔炉守卫·伊格尼斯 ignis | `熔炉之门` | Bass / Drums / FX / Percussion / Synth | `ignis` | `boss_music_design.md` §3.1 → 「深挖 v2」 | ✅ 完成（tom 四踩+温压脉冲+倒挂弧模态线） |
 | **M-02** | 霜晶缝合怪·格拉西斯 glacies | `Glacies 冰骨` | Backing Vocals / Bass / Drums / FX / Synth | `glacies` | §3.2 → 「深挖 v2」 | ⬜ 待办 |
 | **M-03** | 裂变母体·米克罗 mikro | `微裂母体` | Backing Vocals / Bass / Drums / FX / Guitar / Synth / Vocals | `mikro` | §3.3 → 「深挖 v2」 | ⬜ 待办 |
 | **M-04** | 贪婪之渊·噬神者 devourer | `贪渊吞王` | Bass / Drums / FX / Synth | `devourer` | §3.4 → 「深挖 v2」 | ⬜ 待办 |
@@ -53,9 +53,18 @@
 
 > 每完成一个 Boss 就在此登记本轮新增的「引擎能力」，便于回看哪些是 v2 深挖带来的。
 
-| 能力 | 引擎位置 | 来源 Boss | 说明 |
-|---|---|---|---|
-| _（M-01 起逐条登记）_ | | | |
+| 能力 | 引擎位置 | 来源 Boss | 新增/调参 | 说明 |
+|---|---|---|---|---|
+| `playFurnaceTom(t,gain)` | 方法（playTom 后） | M-01 ignis | 新增声部 | 炉腔低 tom 四踩：sine135→62 + 三角腔体泛音 + 噪声皮膜；走 drumBus |
+| `playHeat(t,gain)` | 方法 | M-01 ignis | 新增声部 | 定根 E 温压金属脉冲：正弦芯 + 窄带噪声叮 → fxBus 进混响 |
+| `playModal(t,freq,dur,gain)` | 方法 | M-01 ignis | 新增声部 | 模态张力线：失谐双锯+方波芯 → 谐振带通 → drive → leadBus |
+| `playWood(t,gain)` | 方法 | M-01 ignis | 新增声部 | 木鱼 accent：极短三角咔 → drumBus |
+| `_drumMode='tribalTom'` | 构造默认 + `_scheduleStep` | M-01 ignis | 新增句法 | tom 四踩取代 kick；rage 叠反拍 tom + 末小节 16 分连打 |
+| `_heatPulse` | 构造默认 + `_scheduleStep` | M-01 ignis | 新增句法 | 温压脉冲层：calm 拍头疏(s%8) → rage 每八分(s%2) 线性加密 |
+| `_modalLine`(per-section) | 构造默认 + `setSection` + `_scheduleStep` | M-01 ignis | 段落编排 | calm 反拍 8 分密集 Phrygian；rage 坍缩回根（倒挂弧） |
+| `sig.woodAccent` | `_scheduleSignatures` | M-01 ignis | 新增句法 | rage 木鱼点缀（s===6/14） |
+| `_applyIntensity` 的 `needLead` 地板 | `_applyIntensity` | M-01 ignis | 调参（全局收益） | 签名/模态层在低强度保底可闻；threat/intensity 拖动不被压没 |
+| boss 清除复位补 3 字段 | UI `$('boss').onchange` else | M-01 ignis | 调参 | 切回通用 darkpsy 时复位 `_drumMode/_heatPulse/_modalLine` |
 
 ---
 

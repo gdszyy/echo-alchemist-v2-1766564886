@@ -557,6 +557,15 @@ export function pixiGetEffectTexture(name) {
 }
 
 /**
+ * 获取粒子预烘焙纹理（供 BurnEffect 等特效适配器复用 ember/mist 等粒子贴图）
+ * @param {string} name 纹理名（spark/ember/mist/venom/smoke/shard/wind_slash/line）
+ * @returns {PIXI.Texture|null}
+ */
+export function pixiGetParticleTexture(name) {
+    return _bakedTextures[name] || null;
+}
+
+/**
  * [T1.2] 初始化 PixiJS Application 并叠加到 game-container 中。
  * 必须在 Game 构造函数中 canvas 获取之后调用。
  *

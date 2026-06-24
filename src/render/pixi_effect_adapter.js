@@ -19,7 +19,7 @@
  * @perf-impact: 本模块替代 Canvas 2D 特效渲染，消除 shadowBlur 和 per-frame 渐变
  */
 
-import { pixiGetEffectContainer, pixiGetEffectTexture, pixiCssColor, pixiIsActive, pixiReleaseParticleSprite } from './pixi_bridge.js';
+import { pixiGetEffectContainer, pixiGetEffectTexture, pixiGetParticleTexture, pixiCssColor, pixiIsActive, pixiReleaseParticleSprite } from './pixi_bridge.js';
 
 // ─── IceWave 适配器 ────────────────────────────────────────────
 
@@ -1224,6 +1224,355 @@ export function rewardDropEffect_pixiDestroy(pixi) {
     if (pixi.gfx) { pixi.gfx.destroy(); pixi.gfx = null; }
 }
 
+// ─── MuzzleFlashV2 适配器 [开炮 VFX 增强 · 阶段 A] ─────────────
+
+/**
+ * 为 MuzzleFlashV2 创建 PixiJS 显示对象
+ * 层级：Container > coreSprite + flareSprite + sparkGraphics + heatSprite
+ */
+export function muzzleFlashV2_pixiCreate(mf) {
+    const container = pixiGetEffectContainer();
+    if (!container) return null;
+
+    const coreTex = pixiGetEffectTexture('muzzleCore');
+    const flareTex = pixiGetEffectTexture('muzzleFlare');
+    const sparkTex = pixiGetEffectTexture('muzzleSpark');
+    if (!coreTex) return null;
+
+    const color = pixiCssColor(mf.elementColor);
+
+    // 核心光球
+    const coreSprite = new PIXI.Sprite(coreTex);
+    coreSprite.anchor.set(0.5);
+    coreSprite.blendMode = PIXI.BLEND_MODES.ADD;
+    coreSprite.tint = color;
+    coreSprite.scale.set(0.3);
+    container.addChild(coreSprite);
+
+    // 方向光锥
+    let flareSprite = null;
+    if (flareTex) {
+        flareSprite = new PIXI.Sprite(flareTex);
+        flareSprite.anchor.set(0.05, 0.5);  // 从根部发射
+        flareSprite.blendMode = PIXI.BLEND_MODES.ADD;
+        flareSprite.tint = color;
+        flareSprite.scale.set(0.5, 0.8);
+        flareSprite.rotation = mf.angle;
+        container.addChild(flareSprite);
+    }
+
+    // 火星粒子（Graphics 绘制，避免 ParticleContainer 依赖）
+    const sparkGfx = new PIXI.Graphics();
+    sparkGfx.blendMode = PIXI.BLEND_MODES.ADD;
+    container.addChild(sparkGfx);
+
+    // 冷却热辉（复用 coreTex，SCREEN 混合）
+    const heatSprite = new PIXI.Sprite(coreTex);
+    heatSprite.anchor.set(0.5);
+    heatSprite.blendMode = PIXI.BLEND_MODES.SCREEN;
+    heatSprite.tint = color;
+    heatSprite.alpha = 0;
+    heatSprite.scale.set(0.8);
+    container.addChild(heatSprite);
+
+    const wrapper = new PIXI.Container();
+    wrapper.addChild(coreSprite);
+    if (flareSprite) wrapper.addChild(flareSprite);
+    wrapper.addChild(sparkGfx);
+    wrapper.addChild(heatSprite);
+    // 移除直接子节点引用，通过 wrapper 统一管理
+    // （实际 addChild 到 container 时已从原 parent 移走）
+    container.addChild(wrapper);
+
+    return {
+        wrapper,
+        coreSprite,
+        flareSprite,
+        sparkGfx,
+        heatSprite,
+        color,
+    };
+}
+
+export function muzzleFlashV2_pixiSync(mf, pixi) {
+    if (!pixi) return;
+    const { coreSprite, flareSprite, sparkGfx, heatSprite, color } = pixi;
+    const progress = Math.max(0, Math.min(1, 1 - mf.life / mf.maxLife));
+
+    // 同步位置
+    pixi.wrapper.x = mf.x;
+    pixi.wrapper.y = mf.y;
+
+    // ── 核心光球 ──
+    if (progress < 0.3) {
+        // 膨胀阶段
+        const t = progress / 0.3;
+        const s = (0.3 + 0.9 * t) * mf.intensity;
+        coreSprite.scale.set(s);
+        coreSprite.alpha = 0.8 + 0.2 * t;
+    } else {
+        // 衰减阶段
+        const t = (progress - 0.3) / 0.7;
+        const s = 1.2 * mf.intensity * (1 - t * 0.6);
+        coreSprite.scale.set(Math.max(0.05, s));
+        coreSprite.alpha = Math.max(0, 1.0 - t);
+        // tint 渐变：白热 → 元素色 → 暗红（简化为 alpha 衰减）
+        if (t > 0.6) {
+            coreSprite.tint = 0x8B2020;
+        }
+    }
+
+    // ── 方向光锥 ──
+    if (flareSprite) {
+        const flashEnd = mf.flashPhase / mf.maxLife;
+        if (progress < flashEnd) {
+            const t = progress / flashEnd;
+            flareSprite.scale.set(0.5 + 1.5 * t * mf.intensity, 0.8 + 0.4 * t);
+            flareSprite.alpha = Math.max(0, 1.0 - t * 0.9);
+            flareSprite.rotation = mf.angle;
+        } else {
+            flareSprite.alpha = 0;
+        }
+    }
+
+    // ── 火星粒子 ──
+    sparkGfx.clear();
+    for (const s of mf.sparks) {
+        if (s.life <= 0) continue;
+        const sa = Math.max(0, s.life * 2.5);
+        sparkGfx.beginFill(color, sa);
+        sparkGfx.drawCircle(s.x, s.y, s.size);
+        sparkGfx.endFill();
+    }
+
+    // ── 冷却热辉 ──
+    const flashEnd = mf.flashPhase / mf.maxLife;
+    if (progress > flashEnd) {
+        const t = (progress - flashEnd) / (1 - flashEnd);
+        heatSprite.alpha = 0.3 * (1 - t);
+        heatSprite.scale.set(0.8 + 0.4 * t);
+    } else {
+        heatSprite.alpha = 0;
+    }
+}
+
+export function muzzleFlashV2_pixiDestroy(pixi) {
+    if (!pixi) return;
+    if (pixi.wrapper) { pixi.wrapper.destroy({ children: true }); pixi.wrapper = null; }
+}
+
+// ─── FiringBurst 适配器 [开炮 VFX 增强 · 阶段 C] ────────────────
+
+/**
+ * 为 FiringBurst 创建 PixiJS 显示对象
+ * 层级：Container > ringGraphics + coneGraphics + debrisGraphics
+ */
+export function firingBurst_pixiCreate(fb) {
+    const container = pixiGetEffectContainer();
+    if (!container) return null;
+
+    const color = pixiCssColor(fb.elementColor);
+
+    // 扩散环 + 方向锥 + 碎片全部用 Graphics 绘制
+    const gfx = new PIXI.Graphics();
+    gfx.blendMode = PIXI.BLEND_MODES.ADD;
+    container.addChild(gfx);
+
+    return { gfx, color };
+}
+
+export function firingBurst_pixiSync(fb, pixi) {
+    if (!pixi || !pixi.gfx) return;
+    const { gfx, color } = pixi;
+    const progress = Math.max(0, Math.min(1, 1 - fb.life / fb.maxLife));
+    const alpha = Math.max(0, 1 - progress);
+
+    gfx.clear();
+
+    // 径向扩散环（三层辉光替代 shadowBlur）
+    if (fb.ringWidth > 0.5) {
+        const r = Math.max(0.1, fb.ringRadius);
+        // 外辉光
+        gfx.lineStyle(fb.ringWidth * 2.5, color, alpha * 0.2);
+        gfx.drawCircle(fb.x, fb.y, r);
+        // 中层
+        gfx.lineStyle(fb.ringWidth * 1.5, color, alpha * 0.5);
+        gfx.drawCircle(fb.x, fb.y, r);
+        // 核心
+        gfx.lineStyle(fb.ringWidth, 0xFFFFFF, alpha * 0.8);
+        gfx.drawCircle(fb.x, fb.y, r);
+    }
+
+    // 方向冲击锥（前 30% 生命周期）
+    if (progress < 0.3) {
+        const coneAlpha = alpha * (1 - progress / 0.3) * 0.6;
+        const dist = 60 * fb.intensity * (progress / 0.3);
+        const cos1 = Math.cos(fb.angle - 0.26), sin1 = Math.sin(fb.angle - 0.26);
+        const cos2 = Math.cos(fb.angle + 0.26), sin2 = Math.sin(fb.angle + 0.26);
+        // 外辉光
+        gfx.lineStyle(1, color, coneAlpha * 0.3);
+        gfx.moveTo(fb.x, fb.y);
+        gfx.lineTo(fb.x + cos1 * dist * 1.1, fb.y + sin1 * dist * 1.1);
+        gfx.moveTo(fb.x, fb.y);
+        gfx.lineTo(fb.x + cos2 * dist * 1.1, fb.y + sin2 * dist * 1.1);
+        // 填充锥（用三角形近似）
+        gfx.beginFill(color, coneAlpha * 0.4);
+        gfx.moveTo(fb.x, fb.y);
+        gfx.lineTo(fb.x + cos1 * dist, fb.y + sin1 * dist);
+        gfx.lineTo(fb.x + cos2 * dist, fb.y + sin2 * dist);
+        gfx.closePath();
+        gfx.endFill();
+    }
+
+    // 碎片
+    for (const d of fb.debris) {
+        if (d.life <= 0) continue;
+        const da = Math.max(0, d.life * 3) * alpha;
+        gfx.beginFill(color, da);
+        const dx = fb.x + d.x;
+        const dy = fb.y + d.y;
+        // 小三角形碎片
+        const sz = d.size;
+        const cos = Math.cos(d.rot), sin = Math.sin(d.rot);
+        gfx.drawPolygon([
+            dx + cos * sz,        dy + sin * sz,
+            dx - sin * sz * 0.6,  dy + cos * sz * 0.6,
+            dx - cos * sz * 0.5,  dy - sin * sz * 0.5,
+        ]);
+        gfx.endFill();
+    }
+}
+
+export function firingBurst_pixiDestroy(pixi) {
+    if (!pixi) return;
+    if (pixi.gfx) { pixi.gfx.destroy(); pixi.gfx = null; }
+}
+
+// ─── BurnEffect 适配器 ──────────────────────────────────────────
+
+/**
+ * 为 BurnEffect 创建 PixiJS 显示对象
+ * @param {object} be BurnEffect 实例
+ * @returns {{ auraSprite: PIXI.Sprite, gfx: PIXI.Graphics, emberSprites: PIXI.Sprite[] }}
+ */
+export function burnEffect_pixiCreate(be) {
+    const container = pixiGetEffectContainer();
+    if (!container) return null;
+
+    // 层 1：热光环 — 复用 fireRing 预烘焙纹理
+    const fireRingTex = pixiGetEffectTexture('fireRing');
+    const auraSprite = fireRingTex ? new PIXI.Sprite(fireRingTex) : null;
+    if (auraSprite) {
+        auraSprite.anchor.set(0.5);
+        auraSprite.blendMode = PIXI.BLEND_MODES.ADD;
+        container.addChild(auraSprite);
+    }
+
+    // 层 2：体焰弧 — PIXI.Graphics（三层辉光替代 shadowBlur）
+    const gfx = new PIXI.Graphics();
+    gfx.blendMode = PIXI.BLEND_MODES.ADD;
+    container.addChild(gfx);
+
+    // 层 3：火星飘升 — 复用 ember 粒子纹理
+    const emberTex = pixiGetParticleTexture('ember');
+    const emberSprites = [];
+    if (emberTex) {
+        for (let i = 0; i < 4; i++) {
+            const sp = new PIXI.Sprite(emberTex);
+            sp.anchor.set(0.5);
+            sp.blendMode = PIXI.BLEND_MODES.ADD;
+            sp.alpha = 0;
+            container.addChild(sp);
+            emberSprites.push(sp);
+        }
+    }
+
+    return { auraSprite, gfx, emberSprites };
+}
+
+/**
+ * 同步 BurnEffect 状态到 PixiJS 显示对象
+ * @param {object} be BurnEffect 实例
+ * @param {object} pixi 适配器对象
+ */
+export function burnEffect_pixiSync(be, pixi) {
+    const { auraSprite, gfx, emberSprites } = pixi;
+    if (be.intensity < 0.01) {
+        if (auraSprite) auraSprite.alpha = 0;
+        if (gfx) gfx.clear();
+        for (const sp of emberSprites) sp.alpha = 0;
+        return;
+    }
+
+    const intensity = be.intensity;
+    const t = be.time;
+    const w = be.width, h = be.height;
+
+    // 层 1：热光环脉冲
+    if (auraSprite) {
+        const pulse = (Math.sin(t * 2.5) + 1) * 0.5;
+        const auraAlpha = intensity * (0.15 + pulse * 0.1);
+        const auraScale = Math.max(w, h) * (1.2 + pulse * 0.15);
+        auraSprite.x = be.x;
+        auraSprite.y = be.y;
+        auraSprite.width = auraScale;
+        auraSprite.height = auraScale;
+        auraSprite.alpha = auraAlpha;
+    }
+
+    // 层 2：体焰弧（三层辉光替代 shadowBlur）
+    gfx.clear();
+    for (const seed of be._flameSeeds) {
+        const flicker = Math.sin(t * seed.speed + seed.phase);
+        const r = Math.max(w, h) * 0.45 * seed.lift;
+        const arcAlpha = intensity * (0.4 + flicker * 0.2);
+        const lw = 2.5 + flicker * 0.8;
+        const startAngle = seed.angle + t * 0.3 * seed.speed;
+        const color = seed.lift > 0.85 ? 0xFBBF24 : 0xF97316;
+
+        // 外辉光（宽、淡）
+        gfx.lineStyle(lw * 2, color, Math.max(0, arcAlpha * 0.3));
+        gfx.arc(be.x, be.y, r, startAngle, startAngle + seed.span);
+        // 中层
+        gfx.lineStyle(lw * 1.3, color, Math.max(0, arcAlpha * 0.6));
+        gfx.arc(be.x, be.y, r, startAngle, startAngle + seed.span);
+        // 核心
+        gfx.lineStyle(lw, 0xFFFFFF, Math.max(0, arcAlpha * 0.4));
+        gfx.arc(be.x, be.y, r, startAngle, startAngle + seed.span);
+    }
+
+    // 层 3：火星飘升 Sprite 同步
+    for (let i = 0; i < emberSprites.length; i++) {
+        const sp = emberSprites[i];
+        const ember = be._embers[i];
+        if (ember && ember.active) {
+            const ea = (ember.life / ember.maxLife) * intensity;
+            sp.x = ember.x;
+            sp.y = ember.y;
+            sp.alpha = Math.max(0, ea * 0.7);
+            const sz = ember.size * 4;
+            sp.width = sz;
+            sp.height = sz;
+        } else {
+            sp.alpha = 0;
+        }
+    }
+}
+
+/**
+ * 销毁 BurnEffect 的 PixiJS 显示对象
+ * @param {object} pixi 适配器对象
+ */
+export function burnEffect_pixiDestroy(pixi) {
+    if (!pixi) return;
+    if (pixi.auraSprite) { pixi.auraSprite.destroy(); pixi.auraSprite = null; }
+    if (pixi.gfx) { pixi.gfx.destroy(); pixi.gfx = null; }
+    if (pixi.emberSprites) {
+        for (const sp of pixi.emberSprites) sp.destroy();
+        pixi.emberSprites = null;
+    }
+}
+
 // ─── 全局 PixiJS 特效清理 ──────────────────────────────────────
 
 /**
@@ -1252,6 +1601,8 @@ export function pixiCleanupAllEffects(game) {
         ['collectionBeams',     collectionBeam_pixiDestroy],
         ['lightningBolts',      lightningBolt_pixiDestroy],
         ['floatingTexts',       floatingText_pixiDestroy],
+        ['_muzzleFlashesV2',    muzzleFlashV2_pixiDestroy],
+        ['_firingBursts',       firingBurst_pixiDestroy],
     ];
 
     for (const [arrName, destroyFn] of arrayDestroyMap) {

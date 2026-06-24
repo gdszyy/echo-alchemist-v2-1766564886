@@ -77,6 +77,33 @@
 - **常态 / 狂暴（分段实测）**：常态段 synth 稀疏(~1.06 音/秒、deg 1/b2/b7)、bass 八分 pedal、干净四踩；狂暴段 synth 翻到 ~2.83 音/秒并**点亮 b5 三全音**(deg 1/5/b5/b3、移到 A#3 高八度) + 加 shaker(n70) 层 → 引擎用 `setIntensity` 拉满 + 解锁 `_leadNotes` 的 b5 音 + `playShaker` 加重，表达「升温 → 喷发」。
 - **撞味提醒**：三全音(b5)其实是 ignis 成品**自带**的签名色；原设计把三全音分给了 chimera，后续做 chimera 时改用别的失稳手段（detune / 音高漂移）以免两者撞味。
 
+**深挖 v2（逐分轨 MIDI 实测 · 2026-06-25 · 见索引 M-01）**
+
+> 上一轮只取中位 BPM + 音级直方图；这一轮把 5 条分轨逐条按 16 分栅格解析，挖出**真实节奏骨架**，专治「太单调」。
+> 完整性：5 分轨全过校验（0 截断，div=480，format-1）。全局：143–150 BPM、中位 146、root E、约 180s。
+
+关键发现（颠覆上一轮的「四踩 kick + acid lead」近似）：
+
+1. **鼓是 tom 驱动，不是 kick 驱动**。Drums 轨主体 = HiTom2(50):192 / LoTom(41):113 / Maraca(70):58；LoTom 正落每拍正中（栅格 `█   █   █   █`），是真正的「炉腔」四踩——引擎原来却给的是干净 kick，完全没还原。
+2. **旋律是「倒挂弧」**。常态 synth 极密（412 音，E 弗里几亚 1/b2/5/b5/b7 织成张力线），狂暴 synth 反而**坍缩回根**（88 音、几乎只剩 deg 1）。喷发不是靠「加旋律」，而是旋律退场、把能量交给节奏。
+3. **FX 是定根「温压」脉冲**。FX 轨死锁 E、力度满，密度随段从 0.35 → 1.19 音/秒线性加密——这是「持续升温」的真正声学载体。
+4. **木鱼 accent**。狂暴段出现 HiWdblk 短击点缀。
+
+→ 引擎丰富落点 v2（已落 `dark_psy_engine_demo.html`，大胆改动）：
+
+| 改动 | 类型 | 说明 |
+|---|---|---|
+| `playFurnaceTom` | 新增声部 | 炉腔低 tom 四踩（sine 135→62Hz + 三角腔体泛音 + 噪声皮膜）；`drumMode:'tribalTom'` 时**取代 kick** |
+| `playHeat` | 新增声部 | 定根 E「温压」金属脉冲（正弦芯 + 窄带噪声「叮」，走 fxBus 进混响）；`heatPulse:true` |
+| `playModal` | 新增声部 | 中音区模态张力线（失谐双锯+方波芯 → 谐振带通 → drive → leadBus）；按 `modalLine` 度数序列走 |
+| `playWood` | 新增声部 | 木鱼 accent；狂暴 `sig.woodAccent` 触发 |
+| `modalLine` 段落编排 | 新增句法 | 常态=反拍 8 分密集 Phrygian `[0,1,7,6,10,…]`；狂暴=坍缩回根 `[0,0,1,0,…]` 且更稀（**倒挂弧**落地） |
+| `heatPulse` 密度 | 新增句法 | 常态拍头疏(s%8)、狂暴每八分(s%2) → 还原「升温」线性加密 |
+| `allowLead:false` | 调参 | 关掉原 acid 长啸——ignis 的喷发是节奏化的，acid lead 反而冲淡辨识度 |
+| `_applyIntensity` 加 `needLead` 地板 | 调参(全局收益) | 模态/签名层在低强度也保底可闻，threat 拖动时不被压没（所有签名 Boss 受益） |
+
+**辨识度**：ignis 现在是全 8 Boss 里**唯一以 tom 四踩取代 kick**者，节奏骨架自带签名，不再与其它 boss 共用一套四踩。验证：node 烟测确认 calm `kick=0 / furnace=8 / modal=16 / heat=4`，rage `kick=0 / furnace=16 / modal=8 / heat=16 / wood=4 / tom=4`，与「倒挂弧 + 节奏化喷发」设计一致。
+
 ---
 
 ### 3.2 霜晶缝合怪·格拉西斯 glacies（cryo / pierce，mini）

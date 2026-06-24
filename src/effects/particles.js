@@ -39,6 +39,7 @@ import {
     rewardDropEffect_pixiCreate, rewardDropEffect_pixiSync, rewardDropEffect_pixiDestroy,
     muzzleFlashV2_pixiCreate, muzzleFlashV2_pixiSync, muzzleFlashV2_pixiDestroy,
     firingBurst_pixiCreate, firingBurst_pixiSync, firingBurst_pixiDestroy,
+    burnEffect_pixiCreate, burnEffect_pixiSync, burnEffect_pixiDestroy,
 } from '../render/pixi_effect_adapter.js';
 
 function withAlpha(color, alpha) {
@@ -1303,7 +1304,171 @@ class FireWave {
 }
 
 
-// ==================== 冰冻死亡波 ====================
+// ==================== 持续燃烧特效 ====================
+/**
+ * BurnEffect - 敌人持续燃烧的持久视觉特效
+ *
+ * 附着在 temp >= 34 的敌人身上，强度随温度平滑缩放。
+ * 三层视觉：热光环脉冲 + 体焰弧 + 火星飘升
+ *
+ * 由 enemy.js 管理生命周期（创建/更新/销毁），不在全局数组中。
+ *
+ * @perf-impact: 持续燃烧特效 - 每敌人 1 Sprite + 1 Graphics + 4 ember Sprite（WebGL 批处理）
+ */
+class BurnEffect {
+    /**
+     * @param {object} enemy - 敌人实例引用
+     */
+    constructor(enemy) {
+        this.enemy = enemy;
+        this.x = enemy.pos.x;
+        this.y = enemy.pos.y;
+        this.width = enemy.width;
+        this.height = enemy.height;
+        this.intensity = 0;           // 0-1，平滑渐变
+        this.time = Math.random() * 100; // 相位偏移，避免多敌人同步
+        this._pixi = null;
+
+        // 火星飘升池（最多 4 个，内部循环复用）
+        this._embers = Array.from({ length: 4 }, (_, i) => ({
+            x: 0, y: 0, vy: 0, vx: 0,
+            life: 0, maxLife: 0.8 + Math.random() * 0.4,
+            size: 2 + Math.random() * 2,
+            phase: i * Math.PI * 0.5,
+            active: false,
+        }));
+        this._emberTimer = 0;
+
+        // 焰弧种子（6 段，固定随机偏移确保有机感）
+        this._flameSeeds = Array.from({ length: 6 }, () => ({
+            angle: Math.random() * Math.PI * 2,
+            span: 0.25 + Math.random() * 0.35,
+            lift: 0.7 + Math.random() * 0.35,
+            speed: 0.8 + Math.random() * 0.6,
+            phase: Math.random() * Math.PI * 2,
+        }));
+    }
+
+    /**
+     * 每帧更新：跟踪位置、平滑强度、更新火星
+     */
+    update(pos, temp, timeScale) {
+        this.x = pos.x;
+        this.y = pos.y;
+        this.width = this.enemy.width;
+        this.height = this.enemy.height;
+        this.time += 0.05 * timeScale;
+
+        // 平滑强度渐变：temp 25→125 映射到 0→1
+        const target = Math.max(0, Math.min(1, (temp - 25) / 100));
+        this.intensity += (target - this.intensity) * 0.08 * timeScale;
+
+        this._updateEmbers(timeScale);
+    }
+
+    /**
+     * 火星飘升池更新：循环发射 + 上升衰减 + 自动回收
+     */
+    _updateEmbers(timeScale) {
+        this._emberTimer += timeScale;
+        const spawnInterval = 0.6 / Math.max(0.15, this.intensity);
+
+        for (const e of this._embers) {
+            if (e.active) {
+                e.x += e.vx * timeScale;
+                e.y += e.vy * timeScale;
+                e.vy -= 0.02 * timeScale; // 减速上升
+                e.life -= 0.025 * timeScale;
+                if (e.life <= 0) e.active = false;
+            } else if (this._emberTimer >= spawnInterval && this.intensity > 0.1) {
+                // 重新发射
+                e.x = this.x + (Math.random() - 0.5) * this.width * 0.6;
+                e.y = this.y - this.height * (0.2 + Math.random() * 0.3);
+                e.vx = (Math.random() - 0.5) * 0.4;
+                e.vy = -(0.6 + Math.random() * 0.8);
+                e.life = e.maxLife;
+                e.active = true;
+                this._emberTimer = 0;
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (this.intensity < 0.01) return;
+
+        // [PixiJS 迁移] WebGL 路径
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = burnEffect_pixiCreate(this);
+            if (this._pixi) { burnEffect_pixiSync(this, this._pixi); return; }
+        }
+
+        // Canvas 2D 回退
+        this._drawCanvas2D(ctx);
+    }
+
+    /**
+     * Canvas 2D 回退绘制：热光环 + 焰弧 + 火星
+     */
+    _drawCanvas2D(ctx) {
+        const w = this.width, h = this.height;
+        const intensity = this.intensity;
+        const t = this.time;
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.globalCompositeOperation = 'lighter';
+
+        // 层 1：热光环脉冲
+        const pulse = (Math.sin(t * 2.5) + 1) * 0.5; // 0-1 脉冲
+        const auraAlpha = intensity * (0.12 + pulse * 0.08);
+        const auraR = Math.max(w, h) * (0.6 + pulse * 0.08);
+        const auraGrad = ctx.createRadialGradient(0, 0, auraR * 0.2, 0, 0, auraR);
+        auraGrad.addColorStop(0, `rgba(251, 146, 60, ${auraAlpha})`);
+        auraGrad.addColorStop(0.5, `rgba(239, 68, 68, ${auraAlpha * 0.5})`);
+        auraGrad.addColorStop(1, 'rgba(127, 29, 29, 0)');
+        ctx.fillStyle = auraGrad;
+        ctx.beginPath(); ctx.arc(0, 0, auraR, 0, Math.PI * 2); ctx.fill();
+
+        // 层 2：体焰弧（6 段跳动的火焰弧）
+        for (const seed of this._flameSeeds) {
+            const flicker = Math.sin(t * seed.speed + seed.phase);
+            const r = Math.max(w, h) * 0.45 * seed.lift;
+            const arcAlpha = intensity * (0.4 + flicker * 0.2);
+            const lw = 2.5 + flicker * 0.8;
+            const startAngle = seed.angle + t * 0.3 * seed.speed;
+            ctx.globalAlpha = Math.max(0, arcAlpha);
+            ctx.strokeStyle = seed.lift > 0.85 ? '#fbbf24' : '#f97316';
+            ctx.lineWidth = lw;
+            ctx.shadowBlur = _sb(6 * intensity);
+            ctx.shadowColor = '#f97316';
+            ctx.beginPath();
+            ctx.arc(0, 0, r, startAngle, startAngle + seed.span);
+            ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+
+        // 层 3：火星（Canvas 2D 简化版 - 小圆点）
+        ctx.globalCompositeOperation = 'lighter';
+        for (const e of this._embers) {
+            if (!e.active) continue;
+            const ea = (e.life / e.maxLife) * intensity;
+            ctx.globalAlpha = Math.max(0, ea);
+            ctx.fillStyle = ea > 0.5 ? '#fbbf24' : '#f97316';
+            ctx.beginPath();
+            ctx.arc(e.x - this.x, e.y - this.y, e.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+
+    destroy() {
+        if (this._pixi) { burnEffect_pixiDestroy(this._pixi); this._pixi = null; }
+        for (const e of this._embers) e.active = false;
+    }
+}
 /**
  * IceWave - 冰冻状态死亡时的冰晶爆炸波
  * 表现为蓝白色冰晶碎片扩散环 + 冰雾扩散
@@ -2679,6 +2844,266 @@ class RewardDropEffect {
     }
 }
 
+// ==================== 开炮视觉增强 (Shooting VFX Enhancement) ====================
+
+/**
+ * [开炮 VFX 增强 · 阶段 A] MuzzleFlashV2 — 多层枪口火光
+ *
+ * 替代 Canvas 2D 的三层渐变 + 美术帧，升级为：
+ *   - 核心光球（白热 → 元素色 → 暗红，膨胀 → 衰减）
+ *   - 方向光锥（沿炮管方向喷射的锥形光焰）
+ *   - 火星飞溅（带物理模拟的碎片粒子）
+ *   - 冷却热辉（flash 阶段结束后的缓慢余烬）
+ *
+ * 开幕齐射（intensity > 1.3）效果更强烈、持续更久。
+ * 当 pixiIsActive() 为 false 时，draw(ctx) 直接返回（由 render_system.js Canvas 2D 路径接管）。
+ */
+class MuzzleFlashV2 {
+    constructor(x, y, angle, elementColor, intensity = 1.0) {
+        this.x = x;
+        this.y = y;
+        this.angle = angle;          // 炮管朝向角度（弧度，-Y 方向 = -π/2）
+        this.elementColor = elementColor || '#fef3c7';
+        this.intensity = Math.max(0.5, intensity);
+        this.charged = intensity > 1.3;
+
+        // 生命周期（秒）
+        this.maxLife = this.charged ? 0.9 : 0.7;
+        this.life = this.maxLife;
+        this.flashPhase = this.charged ? 0.21 : 0.15;  // 高光持续时间（秒）
+
+        // 火星粒子数据（物理模拟）
+        const sparkCount = Math.round(8 * this.intensity);
+        this.sparks = [];
+        for (let i = 0; i < sparkCount; i++) {
+            const spread = (Math.random() - 0.5) * 0.9;  // ±25°
+            const speed = 100 + Math.random() * 200;
+            this.sparks.push({
+                x: 0, y: 0,
+                vx: Math.cos(angle + spread) * speed,
+                vy: Math.sin(angle + spread) * speed,
+                life: 0.3 + Math.random() * 0.3,
+                size: 2 + Math.random() * 3,
+                rot: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * 8,
+            });
+        }
+
+        this._pixi = null;
+        this._pixiCreate();
+    }
+
+    _pixiCreate() {
+        if (pixiIsActive()) {
+            this._pixi = muzzleFlashV2_pixiCreate(this);
+        }
+    }
+
+    update(dtSec) {
+        this.life -= dtSec;
+        // 更新火星物理
+        for (const s of this.sparks) {
+            s.x += s.vx * dtSec;
+            s.y += s.vy * dtSec;
+            s.vy += 400 * dtSec;  // 重力
+            s.vx *= 0.97;
+            s.vy *= 0.97;
+            s.life -= dtSec;
+            s.rot += s.rotSpeed * dtSec;
+        }
+        // PixiJS 同步
+        if (this._pixi) {
+            muzzleFlashV2_pixiSync(this, this._pixi);
+        }
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+        // PixiJS 激活时跳过 Canvas 2D（由 render_system.js Canvas 2D 路径独立绘制旧版火光）
+        if (pixiIsActive() && this._pixi) return;
+
+        // Canvas 2D fallback（仅在 PixiJS 不可用时启用）
+        const progress = 1 - this.life / this.maxLife;
+        const alpha = Math.max(0, 1 - progress);
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle + Math.PI / 2);
+        ctx.globalCompositeOperation = 'screen';
+
+        // 核心光球
+        const coreR = (20 + 20 * this.intensity) * (0.5 + 0.5 * Math.sin(progress * Math.PI));
+        if (coreR > 1) {
+            const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR);
+            grad.addColorStop(0, `rgba(255,255,255,${alpha * 0.9})`);
+            grad.addColorStop(0.5, `rgba(255,255,200,${alpha * 0.5})`);
+            grad.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.arc(0, 0, coreR, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // 方向光锥（仅 flashPhase 内）
+        if (progress < this.flashPhase / this.maxLife) {
+            const coneLen = 60 * this.intensity * (1 - progress * 2);
+            const coneW = 16 * this.intensity;
+            ctx.globalAlpha = alpha * 0.8;
+            ctx.fillStyle = '#fff7e0';
+            ctx.beginPath();
+            ctx.moveTo(0, -coneLen);
+            ctx.quadraticCurveTo(coneW, -coneLen * 0.3, 0, 10);
+            ctx.quadraticCurveTo(-coneW, -coneLen * 0.3, 0, -coneLen);
+            ctx.fill();
+        }
+
+        // 火星
+        for (const s of this.sparks) {
+            if (s.life <= 0) continue;
+            ctx.globalAlpha = Math.max(0, s.life * 2) * alpha;
+            ctx.fillStyle = this.elementColor;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    get dead() { return this.life <= 0; }
+}
+
+/**
+ * [开炮 VFX 增强 · 阶段 C] FiringBurst — 开炮冲击波与爆发感
+ *
+ * 新增开炮瞬间的：
+ *   - 径向扩散环（从 muzzle 点向外扩散）
+ *   - 方向性冲击锥（沿炮管方向的扇形气流）
+ *   - 碎片飞溅（带重力下落的粒子）
+ *
+ * 生命周期很短（0.4s），视觉上提供"后坐力冲击"的即时反馈。
+ */
+class FiringBurst {
+    constructor(x, y, angle, elementColor, intensity = 1.0) {
+        this.x = x;
+        this.y = y;
+        this.angle = angle;
+        this.elementColor = elementColor || '#fef3c7';
+        this.intensity = Math.max(0.5, intensity);
+
+        this.maxLife = 0.4;
+        this.life = this.maxLife;
+
+        // 扩散环参数
+        this.ringRadius = 10;
+        this.ringMaxRadius = 80 * this.intensity;
+        this.ringWidth = 4;
+
+        // 碎片粒子
+        const debrisCount = Math.round(6 * this.intensity);
+        this.debris = [];
+        for (let i = 0; i < debrisCount; i++) {
+            const spread = (Math.random() - 0.5) * 1.4;  // ±40°
+            const speed = 200 + Math.random() * 300;
+            this.debris.push({
+                x: 0, y: 0,
+                vx: Math.cos(angle + spread) * speed,
+                vy: Math.sin(angle + spread) * speed,
+                life: 0.25 + Math.random() * 0.15,
+                size: 1.5 + Math.random() * 2.5,
+                rot: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * 12,
+            });
+        }
+
+        this._pixi = null;
+        this._pixiCreate();
+    }
+
+    _pixiCreate() {
+        if (pixiIsActive()) {
+            this._pixi = firingBurst_pixiCreate(this);
+        }
+    }
+
+    update(dtSec) {
+        this.life -= dtSec;
+        const progress = 1 - this.life / this.maxLife;
+
+        // 扩散环
+        this.ringRadius = 10 + (this.ringMaxRadius - 10) * progress;
+        this.ringWidth = 4 * (1 - progress * 0.8);
+
+        // 碎片物理
+        for (const d of this.debris) {
+            d.x += d.vx * dtSec;
+            d.y += d.vy * dtSec;
+            d.vy += 400 * dtSec;
+            d.vx *= 0.95;
+            d.vy *= 0.95;
+            d.life -= dtSec;
+            d.rot += d.rotSpeed * dtSec;
+        }
+
+        if (this._pixi) {
+            firingBurst_pixiSync(this, this._pixi);
+        }
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+        if (pixiIsActive() && this._pixi) return;
+
+        const progress = 1 - this.life / this.maxLife;
+        const alpha = Math.max(0, 1 - progress);
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+
+        // 径向扩散环
+        if (this.ringWidth > 0.5) {
+            ctx.globalCompositeOperation = 'screen';
+            ctx.globalAlpha = alpha * 0.7;
+            ctx.strokeStyle = this.elementColor;
+            ctx.lineWidth = this.ringWidth;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.ringRadius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        // 方向冲击锥（前 30% 生命周期）
+        if (progress < 0.3) {
+            const coneAlpha = alpha * (1 - progress / 0.3);
+            ctx.save();
+            ctx.rotate(this.angle);
+            ctx.globalAlpha = coneAlpha * 0.5;
+            ctx.fillStyle = this.elementColor;
+            const dist = 60 * this.intensity * (progress / 0.3);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(-0.26) * dist, Math.sin(-0.26) * dist);
+            ctx.lineTo(Math.cos(0.26) * dist, Math.sin(0.26) * dist);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // 碎片
+        ctx.globalCompositeOperation = 'source-over';
+        for (const d of this.debris) {
+            if (d.life <= 0) continue;
+            ctx.globalAlpha = Math.max(0, d.life * 3) * alpha;
+            ctx.fillStyle = this.elementColor;
+            ctx.save();
+            ctx.translate(d.x, d.y);
+            ctx.rotate(d.rot);
+            ctx.fillRect(-d.size / 2, -d.size / 2, d.size, d.size);
+            ctx.restore();
+        }
+
+        ctx.restore();
+    }
+
+    get dead() { return this.life <= 0; }
+}
+
 // ==================== 导出 ====================
 export {
     Particle,
@@ -2691,6 +3116,7 @@ export {
     EnergyOrb,
     LightningBolt,
     FireWave,
+    BurnEffect,
     IceWave,
     DeathExplosion,
     HealWave,
@@ -2698,5 +3124,7 @@ export {
     BladeStormRing,
     BladeStormVortex,
     SwordScar,
-    RewardDropEffect
+    RewardDropEffect,
+    MuzzleFlashV2,
+    FiringBurst
 };
