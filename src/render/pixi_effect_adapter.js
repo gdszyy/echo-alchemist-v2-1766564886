@@ -1697,10 +1697,8 @@ export function burnEffect_pixiCreate(be) {
         container.addChild(auraSprite);
     }
 
-    // 层 2：体焰弧 — PIXI.Graphics（三层辉光替代 shadowBlur）
-    const gfx = new PIXI.Graphics();
-    gfx.blendMode = PIXI.BLEND_MODES.ADD;
-    container.addChild(gfx);
+    // 层 2（体焰弧）已移除：保留 gfx=null 占位以兼容 sync/destroy 结构。
+    const gfx = null;
 
     // 层 3：火星飘升 — 复用 ember 粒子纹理
     const emberTex = pixiGetParticleTexture('ember');
@@ -1728,7 +1726,6 @@ export function burnEffect_pixiSync(be, pixi) {
     const { auraSprite, gfx, emberSprites } = pixi;
     if (be.intensity < 0.01) {
         if (auraSprite) auraSprite.alpha = 0;
-        if (gfx) gfx.clear();
         for (const sp of emberSprites) sp.alpha = 0;
         return;
     }
@@ -1749,26 +1746,7 @@ export function burnEffect_pixiSync(be, pixi) {
         auraSprite.alpha = auraAlpha;
     }
 
-    // 层 2：体焰弧（三层辉光替代 shadowBlur）
-    gfx.clear();
-    for (const seed of be._flameSeeds) {
-        const flicker = Math.sin(t * seed.speed + seed.phase);
-        const r = Math.max(w, h) * 0.45 * seed.lift;
-        const arcAlpha = intensity * (0.4 + flicker * 0.2);
-        const lw = 2.5 + flicker * 0.8;
-        const startAngle = seed.angle + t * 0.3 * seed.speed;
-        const color = seed.lift > 0.85 ? 0xFBBF24 : 0xF97316;
-
-        // 外辉光（宽、淡）
-        gfx.lineStyle(lw * 2, color, Math.max(0, arcAlpha * 0.3));
-        gfx.arc(be.x, be.y, r, startAngle, startAngle + seed.span);
-        // 中层
-        gfx.lineStyle(lw * 1.3, color, Math.max(0, arcAlpha * 0.6));
-        gfx.arc(be.x, be.y, r, startAngle, startAngle + seed.span);
-        // 核心
-        gfx.lineStyle(lw, 0xFFFFFF, Math.max(0, arcAlpha * 0.4));
-        gfx.arc(be.x, be.y, r, startAngle, startAngle + seed.span);
-    }
+    // 层 2（体焰弧）已移除。
 
     // 层 3：火星飘升 Sprite 同步
     for (let i = 0; i < emberSprites.length; i++) {
