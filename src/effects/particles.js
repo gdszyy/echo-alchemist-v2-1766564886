@@ -3272,17 +3272,17 @@ class MuzzleFlashV2 {
         this.intensity = Math.max(0.5, intensity);
         this.charged = intensity > 1.3;
 
-        // 生命周期（秒）
-        this.maxLife = this.charged ? 0.9 : 0.7;
+        // 生命周期（秒）— 克制化，缩短余烬拖尾
+        this.maxLife = this.charged ? 0.65 : 0.5;
         this.life = this.maxLife;
-        this.flashPhase = this.charged ? 0.21 : 0.15;  // 高光持续时间（秒）
+        this.flashPhase = this.charged ? 0.16 : 0.12;  // 高光持续时间（秒）
 
-        // 火星粒子数据（物理模拟）
-        const sparkCount = Math.round(8 * this.intensity);
+        // 火星粒子数据（物理模拟）— 克制：减少火星数量与初速
+        const sparkCount = Math.round(5 * this.intensity);
         this.sparks = [];
         for (let i = 0; i < sparkCount; i++) {
             const spread = (Math.random() - 0.5) * 0.9;  // ±25°
-            const speed = 100 + Math.random() * 200;
+            const speed = 70 + Math.random() * 130;
             this.sparks.push({
                 x: 0, y: 0,
                 vx: Math.cos(angle + spread) * speed,
@@ -3393,20 +3393,20 @@ class FiringBurst {
         this.elementColor = elementColor || '#fef3c7';
         this.intensity = Math.max(0.5, intensity);
 
-        this.maxLife = 0.4;
+        this.maxLife = 0.3;
         this.life = this.maxLife;
 
-        // 扩散环参数
+        // 扩散环参数 — 克制：收小最大半径
         this.ringRadius = 10;
-        this.ringMaxRadius = 80 * this.intensity;
+        this.ringMaxRadius = 52 * this.intensity;
         this.ringWidth = 4;
 
-        // 碎片粒子
-        const debrisCount = Math.round(6 * this.intensity);
+        // 碎片粒子 — 克制：减少碎片数量与初速
+        const debrisCount = Math.round(4 * this.intensity);
         this.debris = [];
         for (let i = 0; i < debrisCount; i++) {
             const spread = (Math.random() - 0.5) * 1.4;  // ±40°
-            const speed = 200 + Math.random() * 300;
+            const speed = 140 + Math.random() * 180;
             this.debris.push({
                 x: 0, y: 0,
                 vx: Math.cos(angle + spread) * speed,
