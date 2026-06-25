@@ -1493,6 +1493,7 @@ const CONFIG = {
             relicCinematicSparkCount: 18,
             relicCinematicBoltCount: 8,
             greedyWheelEffectLimit: 8,
+            doomsdayClockLimit: 5,
             // [开炮 VFX 增强] 枪口火光 V2 / 冲击波 / 屏幕反馈
             muzzleFlashV2: true,           // 枪口火光 V2 总开关
             muzzleFlashV2Sparks: 13,       // 火星粒子数
@@ -1551,6 +1552,7 @@ const CONFIG = {
             relicCinematicSparkCount: 10,
             relicCinematicBoltCount: 4,
             greedyWheelEffectLimit: 5,
+            doomsdayClockLimit: 3,
             // [开炮 VFX 增强] medium 降级
             muzzleFlashV2: true,
             muzzleFlashV2Sparks: 6,
@@ -1611,6 +1613,7 @@ const CONFIG = {
             relicCinematicSparkCount: 4,
             relicCinematicBoltCount: 1,
             greedyWheelEffectLimit: 3,
+            doomsdayClockLimit: 2,
             // [开炮 VFX 增强] low 档：关闭大部分视觉增强
             muzzleFlashV2: false,
             muzzleFlashV2Sparks: 0,

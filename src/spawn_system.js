@@ -4,7 +4,7 @@ import {
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
-    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, HealWave, GreedyWheelEffect, AffixSkillVFX, showToast,
+    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, HealWave, GreedyWheelEffect, DoomsdayClockEffect, AffixSkillVFX, showToast,
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
 } from './entities.js';
 import { getThemeSegment } from './utils/math_utils.js';
@@ -2092,6 +2092,22 @@ export const spawn_system = {
         // @perf-impact: Greedy wheel battle VFX - capped by greedyWheelEffectLimit and drawn flat in low quality
         if (this.greedyWheelEffects.length >= (_budget.greedyWheelEffectLimit ?? 6)) return;
         this.greedyWheelEffects.push(new GreedyWheelEffect(x, y, mode, quality));
+    },
+
+    /**
+     * @method spawn_createDoomsdayClock
+     * @description 末日计时器遗物的终末钟面演出（归零 T-00 + 钟盘龟裂 + 三重钟声）。
+     * @param {number} x 钟面中心 X
+     * @param {number} y 钟面中心 Y
+     * @param {number} chainIndex 0=主触发，>0=末日回响（暗橙主题）
+     */
+    spawn_createDoomsdayClock(x, y, chainIndex = 0) {
+        if (!this.doomsdayClockEffects) this.doomsdayClockEffects = [];
+        const quality = this.perfQualityLevel || 'high';
+        const _budget = CONFIG.performance[quality] || CONFIG.performance.high;
+        // @perf-impact: Doomsday clock cinematic - capped by doomsdayClockLimit
+        if (this.doomsdayClockEffects.length >= (_budget.doomsdayClockLimit ?? 4)) return;
+        this.doomsdayClockEffects.push(new DoomsdayClockEffect(x, y, chainIndex, quality));
     },
 
     /**

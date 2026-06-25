@@ -1100,6 +1100,146 @@ export function greedyWheelEffect_pixiDestroy(pixi) {
     if (pixi.gfx) { pixi.gfx.destroy(); pixi.gfx = null; }
 }
 
+// ─── DoomsdayClock 适配器 [末日计时器 · 终末钟面] ─────────────────
+//
+// 末日计时器遗物的专属演出，替代旧的「通用冲击波 + 散点粒子」组合。
+// 母题：一面深红/黑金的终末时钟，秒针加速扫向 12 点归零（T-00），
+//       钟面随之龟裂、刻度崩落、三重终末钟声扩散。
+// 全程 PIXI.Graphics 绘制（三层辉光替代 shadowBlur），与 GreedyWheelEffect 同构。
+
+export function doomsdayClock_pixiCreate(dc) {
+    const container = pixiGetEffectContainer();
+    if (!container) return null;
+
+    const gfx = new PIXI.Graphics();
+    gfx.blendMode = PIXI.BLEND_MODES.ADD;
+    container.addChild(gfx);
+    return { gfx };
+}
+
+export function doomsdayClock_pixiSync(dc, pixi) {
+    const gfx = pixi.gfx;
+    if (!gfx) return;
+    gfx.clear();
+    if (dc.life <= 0) return;
+
+    const ph = dc.phases();
+    const cx = dc.x, cy = dc.y;
+    const isEcho = dc.chainIndex > 0;
+    const primary = isEcho ? 0xf97316 : 0xdc2626;
+    const gold = 0xfacc15;
+    const blood = 0x7f1d1d;
+    const violet = 0x4c1d95;
+
+    // ── 三重终末钟声（血红 → 暗金 → 黑紫，错峰扩散） ──
+    const rings = [
+        { delay: 0.0, color: primary },
+        { delay: 0.14, color: gold },
+        { delay: 0.28, color: violet },
+    ];
+    for (const ring of rings) {
+        const rp = ph.post <= ring.delay ? 0 : Math.min(1, (ph.post - ring.delay) / (1 - ring.delay));
+        if (rp <= 0 || rp >= 1) continue;
+        const r = Math.max(0.1, rp * dc.maxRingRadius);
+        const a = (1 - rp) * dc.life;
+        // 外辉光 + 核心环
+        gfx.lineStyle(5 * (1 - rp * 0.5) * 2.4, ring.color, a * 0.28);
+        gfx.drawCircle(cx, cy, r);
+        gfx.lineStyle(2.4 * (1 - rp * 0.4), 0xFFFFFF, a * 0.5);
+        gfx.drawCircle(cx, cy, r);
+    }
+
+    // 钟面整体随归零产生轻微外胀，然后随龟裂淡出
+    const dialAlpha = dc.life * (1 - ph.post * 0.55);
+    const R = dc.radius * (1 + ph.flash * 0.14);
+
+    if (dialAlpha > 0.01) {
+        // ── 钟盘外环（金，三层辉光） ──
+        gfx.lineStyle(3.2 * 2.6, gold, dialAlpha * 0.22);
+        gfx.drawCircle(cx, cy, R);
+        gfx.lineStyle(3.2 * 1.5, gold, dialAlpha * 0.5);
+        gfx.drawCircle(cx, cy, R);
+        gfx.lineStyle(3.2, 0xFFF7CC, dialAlpha * 0.9);
+        gfx.drawCircle(cx, cy, R);
+
+        // ── 内圈血红薄环 ──
+        gfx.lineStyle(1.6, primary, dialAlpha * 0.7);
+        gfx.drawCircle(cx, cy, R * 0.74);
+
+        // ── 12 刻度（归零瞬间向外迸射） ──
+        const tickPush = ph.flash * 6 + ph.post * 10;
+        for (let i = 0; i < 12; i++) {
+            const a = -Math.PI / 2 + i * (Math.PI / 6);
+            const major = i % 3 === 0;
+            const inner = R * (major ? 0.78 : 0.84) + tickPush;
+            const outer = R * 0.97 + tickPush;
+            const cos = Math.cos(a), sin = Math.sin(a);
+            gfx.lineStyle(major ? 2.6 : 1.4, major ? gold : 0xFDBA74, dialAlpha * (major ? 0.95 : 0.6));
+            gfx.moveTo(cx + cos * inner, cy + sin * inner);
+            gfx.lineTo(cx + cos * outer, cy + sin * outer);
+        }
+
+        // ── 秒针：加速扫向 12 点；归零后定格并淡出 ──
+        const handLen = R * 0.9;
+        const ha = dc.handAngle(ph);
+        const hcos = Math.cos(ha), hsin = Math.sin(ha);
+        // 外辉光
+        gfx.lineStyle(4.5, primary, dialAlpha * 0.4);
+        gfx.moveTo(cx, cy);
+        gfx.lineTo(cx + hcos * handLen, cy + hsin * handLen);
+        // 核心
+        gfx.lineStyle(2, 0xFFFFFF, dialAlpha * 0.95);
+        gfx.moveTo(cx - hcos * R * 0.16, cy - hsin * R * 0.16);
+        gfx.lineTo(cx + hcos * handLen, cy + hsin * handLen);
+
+        // ── 中心轴 ──
+        gfx.beginFill(gold, dialAlpha * 0.95);
+        gfx.drawCircle(cx, cy, 3.2 + ph.flash * 2);
+        gfx.endFill();
+    }
+
+    // ── 钟面龟裂（归零后从轴心向外生长，三层辉光） ──
+    if (ph.post > 0) {
+        for (const crack of dc.cracks) {
+            const grow = Math.min(1, ph.post / 0.7);
+            const len = crack.len * (0.25 + 0.75 * grow);
+            const ca = Math.cos(crack.angle), sa = Math.sin(crack.angle);
+            // 折点（龟裂的拐角）
+            const kx = cx + ca * len * crack.kink - sa * crack.bend * len;
+            const ky = cy + sa * len * crack.kink + ca * crack.bend * len;
+            const ex = cx + ca * len, ey = cy + sa * len;
+            const a = dc.life;
+            gfx.lineStyle(2.4 * 2.2, primary, a * 0.3);
+            gfx.moveTo(cx, cy); gfx.lineTo(kx, ky); gfx.lineTo(ex, ey);
+            gfx.lineStyle(1.3, 0xFFFFFF, a * 0.85);
+            gfx.moveTo(cx, cy); gfx.lineTo(kx, ky); gfx.lineTo(ex, ey);
+        }
+
+        // ── 刻度碎片飞散（钟盘崩落） ──
+        for (const sh of dc.shards) {
+            const dist = sh.dist * Math.min(1, ph.post / 0.85);
+            const sx = cx + Math.cos(sh.angle) * dist;
+            const sy = cy + Math.sin(sh.angle) * dist - ph.post * 6; // 略微上扬
+            const sa = sh.alpha * dc.life * (1 - ph.post * 0.4);
+            if (sa <= 0.01) continue;
+            const s = sh.size;
+            const rot = sh.angle + ph.post * sh.spin;
+            const rc = Math.cos(rot), rs = Math.sin(rot);
+            gfx.beginFill(sh.gold ? gold : blood, sa);
+            gfx.moveTo(sx + rc * s, sy + rs * s);
+            gfx.lineTo(sx - rs * s * 0.7, sy + rc * s * 0.7);
+            gfx.lineTo(sx - rc * s * 0.5, sy - rs * s * 0.5);
+            gfx.closePath();
+            gfx.endFill();
+        }
+    }
+}
+
+export function doomsdayClock_pixiDestroy(pixi) {
+    if (!pixi) return;
+    if (pixi.gfx) { pixi.gfx.destroy(); pixi.gfx = null; }
+}
+
 // ─── EnergyOrb 适配器 ────────────────────────────────────────────
 
 export function energyOrb_pixiCreate(orb) {
