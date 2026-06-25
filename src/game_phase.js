@@ -3413,6 +3413,10 @@ phase_gathering_getRandomPegType() {
         const playerTurnFinished = _roundAmmoClear && !this.isVisualEffectActive;
 
         if (playerTurnFinished && !this.gameOver) {
+            // [enemy-turn-launcher] 玩家本回合弹药已打完 / 敌人行动期间：发射器不再直接消失，
+            // 而是留在原位，循环播放“充能装填下一轮弹药”的动画。必须在所有 return 之前绘制，
+            // 才能覆盖敌人扫描波 / 移动 / 结算等所有提前返回的分支。
+            this.render_combat_launcher(timeScale, entityShiftX, entityShiftY, true);
             // [in-wall-clear-lottery] 抽奖暂停期间禁止启动敌人回合，等待玩家关闭老虎机覆盖层
             if (this._inWallClearLotteryActive) return;
             // [回合开始横幅保护] 横幅期间不触发敌人行动，避免与上一回合结束时的敌人行动重复
@@ -3485,18 +3489,40 @@ phase_gathering_getRandomPegType() {
             return;
         }
 
-        // --- 修改开始：调整层级，先画轨道，再画炮台 ---
+        // [launcher-render] 正常玩家回合：在帧末绘制发射器（含瞄准 / 蓄力 / 装填动画）。
+        this.render_combat_launcher(timeScale, entityShiftX, entityShiftY, false);
+
+        // --- [新增] 手机偏移提示强化：绘制边缘泛光 ---
+        this.drawTiltVignette(this.ctx, this.boardTilt.current);
+        // [移除] 删除底部倾斜指示条调用，设计上不够简洁且在战斗阶段会被结算 UI 遮挡
+        // this.drawTiltIndicator(this.ctx, this.boardTilt.current);
+
+    },
+
+    /**
+     * @method render_combat_launcher
+     * @description 绘制战斗发射器（底座 + 炮管 + 下一发信号）。从 phase_combat_update 抽出，
+     *   以便在「玩家正常回合」与「敌人行动回合」两种情形下复用同一套绘制逻辑。
+     * @param {number} timeScale 当前帧时间缩放
+     * @param {number} entityShiftX 实体层视差偏移 X
+     * @param {number} entityShiftY 实体层视差偏移 Y
+     * @param {boolean} idle  true=敌人行动/弹药打完的待机态：炮口回正，循环播放充能装填动画，
+     *                        不渲染可交互的下一发信号；false=玩家可操作的正常态。
+     */
+    render_combat_launcher(timeScale, entityShiftX, entityShiftY, idle = false) {
+        // --- 调整层级，先画轨道，再画炮台 ---
         this.ctx.save();
         // 应用与实体层相同的视差偏移
         this.ctx.translate(entityShiftX, entityShiftY);
 
         // [emitter-anchor] startPos/portPos 均为炮台旋转圆心；muzzle 仅供美术炮管效果使用。
-        let launcherGeometry = this.pendingFireVelocity
+        let launcherGeometry = (this.pendingFireVelocity && !idle)
             ? calcCombatLauncherGeometry(this.width, this.height, this.pendingFireVelocity)
             : calcCombatLauncherGeometry(this.width, this.height);
         const startPos = launcherGeometry.base;
         let portPos = launcherGeometry.port;
-        let nextAmmo = this.ammoQueue.length > 0 ? this.ammoQueue[0] : null;
+        // 待机态强制炮口回正、不读取队列里的下一发（敌人回合不展示可交互信息）。
+        let nextAmmo = (!idle && this.ammoQueue.length > 0) ? this.ammoQueue[0] : null;
         let previewRotation = launcherGeometry.aimRotation;
         let deformation = {x: 1, y: 1};
         if (nextAmmo && this.isDragging) {
@@ -3508,7 +3534,7 @@ phase_gathering_getRandomPegType() {
                 deformation = {x: 1.15, y: 0.85};
             }
         }
-        const returningAfterShot = !this.isDragging && !this.pendingFireVelocity && !this.isChargingShot
+        const returningAfterShot = !idle && !this.isDragging && !this.pendingFireVelocity && !this.isChargingShot
             && (this._launcherReturnDelay || 0) > 0
             && Number.isFinite(this._launcherShotAimRotation);
         if (returningAfterShot) {
@@ -3518,14 +3544,50 @@ phase_gathering_getRandomPegType() {
         if (!Number.isFinite(this._launcherAimRotation)) {
             this._launcherAimRotation = previewRotation;
         }
-        const rotationStep = (this.isDragging || this.pendingFireVelocity || this.isChargingShot)
+        const rotationStep = (!idle && (this.isDragging || this.pendingFireVelocity || this.isChargingShot))
             ? 0.34 * Math.max(0.25, timeScale || 1)
             : 0.055 * Math.max(0.25, timeScale || 1);
         this._launcherAimRotation = rotateTowards(this._launcherAimRotation, previewRotation, rotationStep);
         previewRotation = this._launcherAimRotation;
+
+        // [enemy-turn idle] 敌人行动回合：用时间驱动的循环充能脉冲，
+        // 复用炮管蓄力发光层，表现为发射器持续“吸能 / 充能装填下一轮弹药”。
+        let baseIsCharging = this.isChargingShot;
+        let baseChargeProgress = this.chargeProgress;
+        if (idle) {
+            const tt = Date.now() / 1000;
+            const loopPulse = (Math.sin(tt * 2.2) + 1) / 2; // 0~1 平滑循环
+            baseIsCharging = true;
+            baseChargeProgress = 0.2 + loopPulse * 0.7;      // 0.2~0.9 之间呼吸式蓄能
+        }
+
         // [bitmap-emitter] 优先使用 emitter_base.png + emitter_charging_*.png 渲染发射器底座；
         // 位图未加载时 fallback 到原始 arc 椭圆。
-        this.render_combat_launcherEmitterBase(this.ctx, startPos.x, startPos.y, this.isChargingShot, this.chargeProgress, this.isReloading ? this.reloadProgress : 0, previewRotation);
+        this.render_combat_launcherEmitterBase(this.ctx, startPos.x, startPos.y, baseIsCharging, baseChargeProgress, this.isReloading ? this.reloadProgress : 0, previewRotation);
+
+        if (idle) {
+            // 弹膛处搏动的能量核心：预示下一轮弹药正在装填成形。
+            const tt = Date.now() / 1000;
+            const corePulse = 0.4 + 0.6 * ((Math.sin(tt * 3.2) + 1) / 2);
+            const coreR = 22 + corePulse * 8;
+            const quality = this.perfQualityLevel || 'high';
+            this.ctx.save();
+            this.ctx.globalCompositeOperation = 'screen';
+            if (quality !== 'low') {
+                const grad = this.ctx.createRadialGradient(portPos.x, portPos.y, 0, portPos.x, portPos.y, coreR);
+                grad.addColorStop(0, `rgba(186, 245, 255, ${0.6 * corePulse})`);
+                grad.addColorStop(0.45, `rgba(56, 189, 248, ${0.3 * corePulse})`);
+                grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+                this.ctx.fillStyle = grad;
+            } else {
+                this.ctx.globalAlpha = 0.32 * corePulse;
+                this.ctx.fillStyle = '#38bdf8';
+            }
+            this.ctx.beginPath();
+            this.ctx.arc(portPos.x, portPos.y, coreR, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.restore();
+        }
 
         if (nextAmmo) {
             const params = Projectile.calculateVisualParams(nextAmmo, false);
@@ -3551,12 +3613,6 @@ phase_gathering_getRandomPegType() {
 
         }
         this.ctx.restore();
-
-        // --- [新增] 手机偏移提示强化：绘制边缘泛光 ---
-        this.drawTiltVignette(this.ctx, this.boardTilt.current);
-        // [移除] 删除底部倾斜指示条调用，设计上不够简洁且在战斗阶段会被结算 UI 遮挡
-        // this.drawTiltIndicator(this.ctx, this.boardTilt.current);
-        
     },
 
 /**
