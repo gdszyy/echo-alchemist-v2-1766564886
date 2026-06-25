@@ -1013,7 +1013,13 @@ class Projectile {
     }
 
     draw(ctx) {
-        if (!this.active && !this.destroyed) return;
+        // [拖尾/光晕残留修复] 仅绘制「存活且未销毁」的子弹。
+        // 关键：主循环顺序为 update()→draw()→（destroyed 则 splice）。若 update() 内部
+        // 触发了 destroy()（生命周期耗尽 / 命中销毁），此处必须早退，否则会重新创建弹道
+        // 光晕 Sprite、重新从池中取拖尾 Sprite，而该子弹随即被移出数组，导致这些 Sprite
+        // 孤立残留在场上（即「拖尾/光晕有时滞留」）。原 `!active && !destroyed` 守卫只挡住
+        // 被吞噬的 limbo 子弹，挡不住已 destroyed 的子弹。
+        if (this.destroyed || !this.active) return;
         const integrity = (this.bouncesLeft + this.piercesLeft) / (this.maxDurability || 1);
 
         // [Bullet Glow V2] 弹道环境光照 — PixiJS 激活时在子弹下方绘制柔和发光精灵
