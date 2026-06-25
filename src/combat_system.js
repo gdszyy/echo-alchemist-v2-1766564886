@@ -1520,9 +1520,12 @@ export const combat_system = {
             const resolvedMode = mode || 'hits';
             const baseHitThreshold = Math.max(1, hitThreshold || mech.breakThreshold || 3);
             const baseDamageRatio = Math.max(0.01, damageRatio || mech.baseDamageRatio || 0.10);
-            const breakThreshold = resolvedMode === 'damage'
+            const baseBreakThreshold = resolvedMode === 'damage'
                 ? Math.max(1, Math.ceil((boss.maxHp || 1) * (baseDamageRatio + scaleSteps * (mech.damageRatioRoundBonus || 0))))
                 : Math.max(1, Math.ceil(baseHitThreshold + scaleSteps * (mech.hitThresholdRoundBonus || 0)));
+            // 每次累积满破绽并从暴露中恢复后，破绽槽上限按 _bossVulnerabilityThresholdMult 永久放大（+25%/次）。
+            const growthMult = Math.max(1, boss._bossVulnerabilityThresholdMult || 1);
+            const breakThreshold = Math.max(1, Math.ceil(baseBreakThreshold * growthMult));
             return {
                 attrs,
                 label,
@@ -1641,6 +1644,8 @@ export const combat_system = {
                 ouroboros: 'rotation_node'
             })[enemy.bossType] || 'core';
             enemy._bossVulnerabilityBreakTimer = Math.max(enemy._bossVulnerabilityBreakTimer || 0, 34);
+            // 标记本次破绽待恢复增长：Boss 从暴露中恢复时把破绽槽上限再 +25%。
+            enemy._bossVulnerabilityPendingThresholdGrowth = true;
             if (mech.enrageDelayOnBreak && !enemy.berserked) {
                 enemy._bossVulnerabilitySuppressedEnrage = true;
             }

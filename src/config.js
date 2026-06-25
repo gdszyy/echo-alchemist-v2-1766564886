@@ -886,7 +886,11 @@ const CONFIG = {
             hitThresholdRoundBonus: 1,
             damageRatioRoundBonus: 0.015,
             maxRoundScaleSteps: 6,
-            enrageDelayOnBreak: true
+            enrageDelayOnBreak: true,
+            // Boss 每次累积满破绽并从暴露中恢复后，破绽槽上限按比例永久增长（+25%）。
+            breakThresholdGrowthOnRecover: 0.25,
+            // 破绽槽上限累计增长倍率上限（防止长局无限膨胀）；<=1 视为不封顶。
+            maxThresholdGrowthMult: 4
         },
         /** Boss 进场冲击波效果配置 */
         bossEntranceShockwave: {
