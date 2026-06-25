@@ -20,7 +20,12 @@ import { RUNEWORD_DB, ELEMENT_RESONANCE_DB } from './rune_config.js';
 import { ENEMY_V2_METADATA, ENEMY_V2_BY_ID } from './data/enemy_v2_metadata.js';
 import { getEnemyV2IconSrc } from './bitmap_icons.js';
 import { resolveEnemyVisualAsset, describeAssetHitStatus, buildEnemyAssetKey } from './data/enemy_visual_assets.js';
-import { pixiCleanupAllEffects } from './render/pixi_effect_adapter.js';
+import {
+    pixiCleanupAllEffects,
+    floatingText_pixiDestroy, shockwave_pixiDestroy, lightningBolt_pixiDestroy,
+    fireWave_pixiDestroy, healWave_pixiDestroy,
+} from './render/pixi_effect_adapter.js';
+import { pixiReleaseParticleSprite } from './render/pixi_bridge.js';
 
 // ==================== 真理之书数据 ====================
 
@@ -5040,6 +5045,9 @@ class TrainingGround {
         const compactTrainingLayout = window.innerWidth <= 767;
         if (trainSidebar) trainSidebar.classList.toggle('collapsed', compactTrainingLayout);
         if (trainSidebarToggle) trainSidebarToggle.textContent = compactTrainingLayout ? '>' : '<';
+        // [特效残留修复] 清空实体/特效数组前先释放其 PixiJS 资源（子弹拖尾/光晕、粒子、持续元素特效等），
+        // 否则进入训练场时上一场的残留 Sprite 会孤立留在共享效果容器上不消失。
+        pixiCleanupAllEffects(this.game);
         this.game.enemies = [];
         this.game.projectiles = [];
         this.game.particles = [];
@@ -5387,14 +5395,29 @@ class TruthBook {
             this.demoGame.fireWaves.forEach(f => f.update(ts));
             this.demoGame.healWaves.forEach(h => h.update(ts, this.demoGame));
             
-            this.demoGame.projectiles = this.demoGame.projectiles.filter(p => p.active);
-            this.demoGame.particles = this.demoGame.particles.filter(p => p.active);
+            // [特效残留修复] 过滤掉失效特效前，先释放被丢弃元素的 PixiJS 资源，
+            // 否则演示画面持续运行会不断把死亡特效的 Sprite 孤立残留在共享效果容器上。
+            // filterAndRelease：保留 keep() 为真的元素，对被丢弃的元素调用 release()。
+            const filterAndRelease = (arr, keep, release) => {
+                if (!Array.isArray(arr)) return arr;
+                for (const it of arr) { if (it && !keep(it)) release(it); }
+                return arr.filter(keep);
+            };
+            this.demoGame.projectiles = filterAndRelease(this.demoGame.projectiles, p => p.active,
+                p => { if (typeof p.releasePixiResources === 'function') p.releasePixiResources(); });
+            this.demoGame.particles = filterAndRelease(this.demoGame.particles, p => p.active,
+                p => { if (p._pixiSprite) { pixiReleaseParticleSprite(p._pixiSprite); p._pixiSprite = null; } });
             this.demoGame.spores = this.demoGame.spores.filter(s => s.active);
-            this.demoGame.floatingTexts = this.demoGame.floatingTexts.filter(f => f.life > 0);
-            this.demoGame.shockwaves = this.demoGame.shockwaves.filter(s => s.alpha > 0);
-            this.demoGame.lightningBolts = this.demoGame.lightningBolts.filter(l => l.life > 0);
-            this.demoGame.fireWaves = this.demoGame.fireWaves.filter(f => f.active);
-            this.demoGame.healWaves = this.demoGame.healWaves.filter(h => h.active);
+            this.demoGame.floatingTexts = filterAndRelease(this.demoGame.floatingTexts, f => f.life > 0,
+                f => { if (f._pixi) { floatingText_pixiDestroy(f._pixi); f._pixi = null; } });
+            this.demoGame.shockwaves = filterAndRelease(this.demoGame.shockwaves, s => s.alpha > 0,
+                s => { if (s._pixi) { shockwave_pixiDestroy(s._pixi); s._pixi = null; } });
+            this.demoGame.lightningBolts = filterAndRelease(this.demoGame.lightningBolts, l => l.life > 0,
+                l => { if (l._pixi) { lightningBolt_pixiDestroy(l._pixi); l._pixi = null; } });
+            this.demoGame.fireWaves = filterAndRelease(this.demoGame.fireWaves, f => f.active,
+                f => { if (f._pixi) { fireWave_pixiDestroy(f._pixi); f._pixi = null; } });
+            this.demoGame.healWaves = filterAndRelease(this.demoGame.healWaves, h => h.active,
+                h => { if (h._pixi) { healWave_pixiDestroy(h._pixi); h._pixi = null; } });
             this.draw();
         } finally {
             window.game = _realGame;
