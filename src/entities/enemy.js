@@ -967,6 +967,20 @@ class Enemy {
         }
     }
 
+    /**
+     * [持续特效清理] 销毁附着在本敌人身上的所有持续元素视觉特效，
+     * 释放其 PixiJS 显示对象，防止敌人离场（被吞噬 / Boss 落点清除 /
+     * 阶段切换 / 关卡重置等非 HP 死亡路径）后火焰等特效 Sprite 残留在屏幕上。
+     *
+     * 幂等：各 destroy() 内部以 _pixi 是否存在为守卫，可安全重复调用。
+     */
+    releasePersistentEffects() {
+        if (this._burnEffect) { this._burnEffect.destroy(); this._burnEffect = null; }
+        if (this._electrocuteEffect) { this._electrocuteEffect.destroy(); this._electrocuteEffect = null; }
+        if (this._venomEffect) { this._venomEffect.destroy(); this._venomEffect = null; }
+        if (this._windMarkEffect) { this._windMarkEffect.destroy(); this._windMarkEffect = null; }
+    }
+
     addSwordCrack(relPos, angle) {
         // 限制裂纹数量，防止过多导致性能问题
         if (this.swordCracks.length > 5) this.swordCracks.shift();
@@ -8362,12 +8376,8 @@ class Enemy {
         const killed = this.hp <= 0;
         if (killed) {
             this.active = false;
-            // [BurnEffect] 死亡时销毁持续燃烧特效，释放 PixiJS 资源
-            if (this._burnEffect) { this._burnEffect.destroy(); this._burnEffect = null; }
-            // [ElementEffects] 死亡时销毁所有持续元素特效
-            if (this._electrocuteEffect) { this._electrocuteEffect.destroy(); this._electrocuteEffect = null; }
-            if (this._venomEffect) { this._venomEffect.destroy(); this._venomEffect = null; }
-            if (this._windMarkEffect) { this._windMarkEffect.destroy(); this._windMarkEffect = null; }
+            // [ElementEffects] 死亡时销毁所有持续元素特效（燃烧/电弧/毒液/风场），释放 PixiJS 资源
+            this.releasePersistentEffects();
 
             // --- [B2] Boss 专属死亡爆炸粒子 ---
             if (this.type === 'boss' && this.bossType && typeof game !== 'undefined') {

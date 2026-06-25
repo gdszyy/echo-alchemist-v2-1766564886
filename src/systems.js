@@ -4136,6 +4136,8 @@ class TrainingGround {
     }
 
     clearEnemies() {
+        // [持续特效残留修复] 清空敌人前先销毁其燃烧/电弧/毒液/风场等持续特效，防止 PixiJS Sprite 残留
+        pixiCleanupAllEffects(this.game);
         this.game.enemies = [];
         this.game.projectiles = [];
         this.game.particles = [];
