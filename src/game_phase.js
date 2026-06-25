@@ -19,6 +19,7 @@ import {
     lightningBolt_pixiDestroy,
     fireWave_pixiDestroy, deathExplosion_pixiDestroy,
     rewardDropEffect_pixiDestroy, greedyWheelEffect_pixiDestroy,
+    doomsdayClock_pixiDestroy,
     shockwave_pixiDestroy, energyOrb_pixiDestroy,
     slashEffect_pixiDestroy, pierceCutEffect_pixiDestroy,
     swordScar_pixiDestroy, bladeStormVortex_pixiDestroy,
@@ -3117,6 +3118,19 @@ phase_gathering_getRandomPegType() {
                     if (gwe.life <= 0) {
                         if (gwe._pixi) { greedyWheelEffect_pixiDestroy(gwe._pixi); gwe._pixi = null; }
                         this.greedyWheelEffects.splice(i, 1);
+                    }
+                }
+            }
+
+            // [末日计时器] 更新和绘制终末钟面演出
+            if (this.doomsdayClockEffects) {
+                for (let i = this.doomsdayClockEffects.length - 1; i >= 0; i--) {
+                    const dce = this.doomsdayClockEffects[i];
+                    dce.update(timeScale);
+                    dce.draw(this.ctx);
+                    if (dce.life <= 0) {
+                        if (dce._pixi) { doomsdayClock_pixiDestroy(dce._pixi); dce._pixi = null; }
+                        this.doomsdayClockEffects.splice(i, 1);
                     }
                 }
             }

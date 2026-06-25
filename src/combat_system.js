@@ -3723,41 +3723,19 @@ export const combat_system = {
                     const hpDamage = result.hpDamage ?? result.actualDamage ?? 0;
                     cinematicDelayMs = Math.max(cinematicDelayMs, baseDelayMs);
 
-                    // 末日时钟特效：深红/黑金主题，模拟倒计时归零与钟面崩裂
-                    // 1. 三层扩散冲击波（血红 → 暗金 → 黑紫，错峰营造"终末钟声"感）
-                    // @perf-impact: 遗物回合开始动画（末日计时器）- 使用 relicCinematic* 预算和既有 Shockwave/Particle 上限
-                    if (typeof this.spawn_createShockwave === 'function') {
+                    // 末日时钟特效：深红/黑金主题，模拟倒计时归零（T-00）与钟面崩裂。
+                    // [PixiJS 引擎重做] 旧版由「通用 Shockwave×3 + 散点 Particle」拼装，
+                    // 现统一为专属 DoomsdayClockEffect 钟面演出（秒针归零 + 钟盘龟裂 + 三重终末钟声）。
+                    // @perf-impact: 遗物回合开始动画（末日计时器）- 使用 doomsdayClockLimit 预算，单 Graphics 演出
+                    if (typeof this.spawn_createDoomsdayClock === 'function') {
+                        this.spawn_createDoomsdayClock(cx, cy, chainIndex);
+                    } else if (typeof this.spawn_createShockwave === 'function') {
+                        // 兜底：旧式三重冲击波（极端环境下钟面演出不可用时）
                         this.spawn_createShockwave(cx, cy, chainIndex > 0 ? '#f97316' : '#dc2626');
                         setTimeout(() => { if (this.spawn_createShockwave) this.spawn_createShockwave(cx, cy, '#facc15'); }, 120);
                         setTimeout(() => { if (this.spawn_createShockwave) this.spawn_createShockwave(cx, cy, '#4c1d95'); }, 240);
                     }
-                    // 2. 环形血红/暗金粒子，表达钟盘刻度崩落
-                    const doomSparkCount = budget.relicCinematicSparkCount || 0;
-                    for (let i = 0; i < doomSparkCount; i++) {
-                        if (typeof this.spawn_createParticle === 'function') {
-                            const color = i % 3 === 0 ? '#facc15' : '#dc2626';
-                            const angle = (Math.PI * 2 * i) / Math.max(1, doomSparkCount);
-                            const radius = 18 + Math.random() * 18;
-                            const p = this.spawn_createParticle(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius * 0.72, color, i % 2 === 0 ? 'spark' : 'ember');
-                            if (p) {
-                                p.vel.x = Math.cos(angle) * (1.2 + Math.random() * 1.8);
-                                p.vel.y = Math.sin(angle) * (1.0 + Math.random() * 1.6) - 0.6;
-                            }
-                        }
-                    }
-                    // 3. 秒针归零碎片：短促横向飞散，避免误读为闪电打击
-                    const clockShardCount = budget.relicCinematicBoltCount || 0;
-                    for (let i = 0; i < clockShardCount; i++) {
-                        if (typeof this.spawn_createParticle === 'function') {
-                            const angle = -Math.PI / 2 + ((i - (clockShardCount - 1) / 2) * Math.PI) / Math.max(3, clockShardCount);
-                            const p = this.spawn_createParticle(cx + Math.cos(angle) * 12, cy + Math.sin(angle) * 8, i % 2 === 0 ? '#facc15' : '#7f1d1d', 'spark');
-                            if (p) {
-                                p.vel.x = Math.cos(angle) * (2.6 + Math.random() * 1.6);
-                                p.vel.y = Math.sin(angle) * (1.5 + Math.random() * 1.2);
-                            }
-                        }
-                    }
-                    // 4. 浮动文字：计时器/骷髅语义 + 伤害数值，暗红色强调末日感
+                    // 浮动文字：计时器/骷髅语义 + 伤害数值，暗红色强调末日感
                     if (typeof this.spawn_createFloatingText === 'function' && hpDamage > 0) {
                         const label = chainIndex > 0 ? `☠️ 末日回响 -${Math.ceil(hpDamage)}` : `☠️ 末日 -${Math.ceil(hpDamage)}`;
                         this.spawn_createFloatingText(cx, cy - 36, label, chainIndex > 0 ? '#f97316' : '#dc2626');

@@ -35,7 +35,7 @@ import {
     Particle, SlashEffect, PierceCutEffect, CollectionBeam, Shockwave, LaserBeam,
     FloatingText, EnergyOrb, LightningBolt, FireWave,
     IceWave, DeathExplosion, HealWave,
-    GreedyWheelEffect, BladeStormRing, BladeStormVortex, SwordScar, RewardDropEffect,
+    GreedyWheelEffect, DoomsdayClockEffect, BladeStormRing, BladeStormVortex, SwordScar, RewardDropEffect,
     MuzzleFlashV2, FiringBurst, AffixSkillVFX,
     BurnEffect, ElectrocuteEffect, VenomEffect, WindMarkEffect
 } from './effects/particles.js';
@@ -5435,6 +5435,7 @@ export {
     DeathExplosion,
     HealWave,
     GreedyWheelEffect,
+    DoomsdayClockEffect,
     BladeStormRing,
     BladeStormVortex,
     SwordScar,

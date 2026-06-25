@@ -34,6 +34,7 @@ import {
     bladeStormRing_pixiCreate, bladeStormRing_pixiSync, bladeStormRing_pixiDestroy,
     bladeStormVortex_pixiCreate, bladeStormVortex_pixiSync, bladeStormVortex_pixiDestroy,
     greedyWheelEffect_pixiCreate, greedyWheelEffect_pixiSync, greedyWheelEffect_pixiDestroy,
+    doomsdayClock_pixiCreate, doomsdayClock_pixiSync, doomsdayClock_pixiDestroy,
     energyOrb_pixiCreate, energyOrb_pixiSync, energyOrb_pixiDestroy,
     floatingText_pixiCreate, floatingText_pixiSync, floatingText_pixiDestroy,
     rewardDropEffect_pixiCreate, rewardDropEffect_pixiSync, rewardDropEffect_pixiDestroy,
@@ -815,6 +816,202 @@ class GreedyWheelEffect {
             ctx.fill();
         }
 
+        ctx.restore();
+    }
+}
+
+// @perf-impact: Doomsday clock cinematic (末日计时器遗物) - capped by doomsdayClockLimit; one short-lived Graphics per strike
+// --- 末日时钟特效：终末钟面归零（T-00）+ 钟盘龟裂 + 三重终末钟声 ---
+// 替代旧的「通用 Shockwave×3 + 散点 Particle + FloatingText」组合，统一走 PixiJS 引擎。
+class DoomsdayClockEffect {
+    /**
+     * @param {number} x 钟面中心 X
+     * @param {number} y 钟面中心 Y
+     * @param {number} chainIndex 0=主触发（深红），>0=末日回响（暗橙）
+     * @param {string} quality 性能档位
+     */
+    constructor(x, y, chainIndex = 0, quality = 'high') {
+        this.x = x;
+        this.y = y;
+        this.chainIndex = chainIndex | 0;
+        this.quality = quality || 'high';
+        this.age = 0;
+        this.duration = 46; // ≈0.77s @60fps
+        this.life = 1.0;
+        this.seed = Math.random() * Math.PI * 2;
+        this.radius = 30 + Math.random() * 6;
+        this.maxRingRadius = 132;
+        // 秒针起始角：归零前从该角加速扫向 12 点（-PI/2）
+        this.handStart = -Math.PI / 2 + Math.PI * 2 * (1.15 + Math.random() * 0.4);
+        // 钟盘龟裂：5 条带折点的裂纹
+        this.cracks = Array.from({ length: 5 }, (_, i) => ({
+            angle: this.seed + i * (Math.PI * 2 / 5) + (Math.random() - 0.5) * 0.5,
+            len: this.radius * (0.9 + Math.random() * 0.5),
+            kink: 0.5 + Math.random() * 0.2,
+            bend: (Math.random() - 0.5) * 0.5,
+        }));
+        // 刻度碎片：钟盘崩落飞散
+        const shardCount = quality === 'low' ? 5 : 10;
+        this.shards = Array.from({ length: shardCount }, (_, i) => ({
+            angle: this.seed * 1.7 + i * (Math.PI * 2 / shardCount) + (Math.random() - 0.5) * 0.4,
+            dist: this.radius * (1.0 + Math.random() * 1.3),
+            size: 2.2 + Math.random() * 2.4,
+            spin: (Math.random() - 0.5) * 4,
+            alpha: 0.7 + Math.random() * 0.3,
+            gold: i % 3 === 0,
+        }));
+        this._pixi = null; // [PixiJS 迁移]
+    }
+
+    update(timeScale) {
+        this.age += (Number.isFinite(timeScale) ? Math.max(0, timeScale) : 1);
+        this.life = Math.max(0, 1 - this.age / this.duration);
+    }
+
+    /** 计算三段相位进度（供 Pixi 适配器与 Canvas 回退共用，避免重复推导） */
+    phases() {
+        const t = Math.min(1, this.age / this.duration);
+        const tStrike = 0.5;
+        // pre: 归零前进度（秒针扫动）；post: 归零后进度（龟裂/钟声）；flash: 归零瞬间闪光
+        const pre = Math.min(1, t / tStrike);
+        const post = t <= tStrike ? 0 : Math.min(1, (t - tStrike) / (1 - tStrike));
+        const flashWin = 0.16;
+        const flash = t < tStrike ? 0 : Math.max(0, 1 - (t - tStrike) / flashWin);
+        return { t, pre, post, flash };
+    }
+
+    /** 秒针角度：归零前缓出扫向 12 点（-PI/2），归零后定格 */
+    handAngle(ph) {
+        const p = ph || this.phases();
+        const ease = 1 - (1 - p.pre) * (1 - p.pre); // easeOut
+        const target = -Math.PI / 2;
+        return this.handStart + (target - this.handStart) * ease;
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+
+        // [PixiJS 迁移] 优先走 WebGL 路径
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = doomsdayClock_pixiCreate(this);
+            if (this._pixi) { doomsdayClock_pixiSync(this, this._pixi); return; }
+        }
+
+        // ── Canvas 2D 回退 ──
+        const ph = this.phases();
+        const isLow = this.quality === 'low';
+        const isEcho = this.chainIndex > 0;
+        const primary = isEcho ? '#f97316' : '#dc2626';
+        const gold = '#facc15';
+        const violet = '#4c1d95';
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.globalCompositeOperation = isLow ? 'source-over' : 'lighter';
+
+        // 三重终末钟声
+        const rings = [
+            { delay: 0.0, color: primary },
+            { delay: 0.14, color: gold },
+            { delay: 0.28, color: violet },
+        ];
+        for (const ring of rings) {
+            const rp = ph.post <= ring.delay ? 0 : Math.min(1, (ph.post - ring.delay) / (1 - ring.delay));
+            if (rp <= 0 || rp >= 1) continue;
+            const r = Math.max(0.1, rp * this.maxRingRadius);
+            const a = (1 - rp) * this.life;
+            ctx.globalAlpha = a * 0.6;
+            ctx.strokeStyle = ring.color;
+            ctx.lineWidth = isLow ? 1.5 : 3 * (1 - rp * 0.4);
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        const dialAlpha = this.life * (1 - ph.post * 0.55);
+        const R = this.radius * (1 + ph.flash * 0.14);
+        if (dialAlpha > 0.01) {
+            if (!isLow) { ctx.shadowColor = gold; ctx.shadowBlur = _sb(8); }
+            // 钟盘外环
+            ctx.globalAlpha = dialAlpha * 0.9;
+            ctx.strokeStyle = gold;
+            ctx.lineWidth = isLow ? 2 : 3.2;
+            ctx.beginPath();
+            ctx.arc(0, 0, R, 0, Math.PI * 2);
+            ctx.stroke();
+            // 内圈血红
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = dialAlpha * 0.7;
+            ctx.strokeStyle = primary;
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.arc(0, 0, R * 0.74, 0, Math.PI * 2);
+            ctx.stroke();
+            // 12 刻度
+            const tickPush = ph.flash * 6 + ph.post * 10;
+            for (let i = 0; i < 12; i++) {
+                const a = -Math.PI / 2 + i * (Math.PI / 6);
+                const major = i % 3 === 0;
+                const inner = R * (major ? 0.78 : 0.84) + tickPush;
+                const outer = R * 0.97 + tickPush;
+                ctx.globalAlpha = dialAlpha * (major ? 0.95 : 0.6);
+                ctx.strokeStyle = major ? gold : '#fdba74';
+                ctx.lineWidth = major ? 2.6 : 1.4;
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(a) * inner, Math.sin(a) * inner);
+                ctx.lineTo(Math.cos(a) * outer, Math.sin(a) * outer);
+                ctx.stroke();
+            }
+            // 秒针
+            const handLen = R * 0.9;
+            const ha = this.handAngle(ph);
+            ctx.globalAlpha = dialAlpha * 0.95;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-Math.cos(ha) * R * 0.16, -Math.sin(ha) * R * 0.16);
+            ctx.lineTo(Math.cos(ha) * handLen, Math.sin(ha) * handLen);
+            ctx.stroke();
+            // 中心轴
+            ctx.globalAlpha = dialAlpha * 0.95;
+            ctx.fillStyle = gold;
+            ctx.beginPath();
+            ctx.arc(0, 0, 3.2 + ph.flash * 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 龟裂 + 碎片
+        if (ph.post > 0) {
+            ctx.shadowBlur = 0;
+            for (const crack of this.cracks) {
+                const grow = Math.min(1, ph.post / 0.7);
+                const len = crack.len * (0.25 + 0.75 * grow);
+                const ca = Math.cos(crack.angle), sa = Math.sin(crack.angle);
+                const kx = ca * len * crack.kink - sa * crack.bend * len;
+                const ky = sa * len * crack.kink + ca * crack.bend * len;
+                ctx.globalAlpha = this.life * 0.85;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.3;
+                ctx.beginPath();
+                ctx.moveTo(0, 0); ctx.lineTo(kx, ky); ctx.lineTo(ca * len, sa * len);
+                ctx.stroke();
+            }
+            for (const sh of this.shards) {
+                const dist = sh.dist * Math.min(1, ph.post / 0.85);
+                const sx = Math.cos(sh.angle) * dist;
+                const sy = Math.sin(sh.angle) * dist - ph.post * 6;
+                const sa = sh.alpha * this.life * (1 - ph.post * 0.4);
+                if (sa <= 0.01) continue;
+                ctx.globalAlpha = sa;
+                ctx.fillStyle = sh.gold ? gold : '#7f1d1d';
+                ctx.beginPath();
+                ctx.arc(sx, sy, sh.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
         ctx.restore();
     }
 }
@@ -3833,6 +4030,7 @@ export {
     DeathExplosion,
     HealWave,
     GreedyWheelEffect,
+    DoomsdayClockEffect,
     BladeStormRing,
     BladeStormVortex,
     SwordScar,

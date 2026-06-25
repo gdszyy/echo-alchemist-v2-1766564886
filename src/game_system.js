@@ -19,7 +19,7 @@ import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
 import { RUNE_DB } from './rune_config.js';
 import { pixiTick, pixiResize, pixiSetVisibility } from './render/pixi_bridge.js';
-import { pixiCleanupAllEffects, fireWave_pixiDestroy, greedyWheelEffect_pixiDestroy } from './render/pixi_effect_adapter.js';
+import { pixiCleanupAllEffects, fireWave_pixiDestroy, greedyWheelEffect_pixiDestroy, doomsdayClock_pixiDestroy } from './render/pixi_effect_adapter.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { calcCombatLauncherGeometryToTarget } from './utils/emitter_geometry.js';
 import { getBossDisplayName, getBossPreviewInfo, getBossShortName } from './utils/boss_schedule_utils.js';
@@ -2388,12 +2388,18 @@ export const game_system = {
                 if (gw && gw._pixi) { greedyWheelEffect_pixiDestroy(gw._pixi); gw._pixi = null; }
             }
         }
+        if (Array.isArray(this.doomsdayClockEffects)) {
+            for (const dce of this.doomsdayClockEffects) {
+                if (dce && dce._pixi) { doomsdayClock_pixiDestroy(dce._pixi); dce._pixi = null; }
+            }
+        }
         this.sonSwords = [];
         this.projectiles = [];
         this.burstQueue = [];
         this.spores = [];
         this.fireWaves = [];
         this.greedyWheelEffects = [];
+        this.doomsdayClockEffects = [];
     },
 
     /**
