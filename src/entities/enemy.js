@@ -408,6 +408,8 @@ class Enemy {
         this._carrierCooldown = 0;
         this._bossVulnerabilityProgress = 0;
         this._bossVulnerabilityThreshold = 0;
+        this._bossVulnerabilityThresholdMult = 1; // 每次累积满破绽并恢复后 *=(1+growth)，破绽槽上限永久增长
+        this._bossVulnerabilityPendingThresholdGrowth = false; // 破绽已触发、等待恢复时结算上限增长
         this._bossVulnerabilityMode = null;
         this._bossVulnerabilityVisualAttrs = [];
         this._bossVulnerabilityVisualRatio = 0;
@@ -1561,6 +1563,11 @@ class Enemy {
         this._bossVulnerabilityExposedHits = 0;
         this._bossVulnerabilityRecoverTimer = Math.max(this._bossVulnerabilityRecoverTimer || 0, 32);
         this._bossVulnerabilityVisualRatio = 0;
+        // 完全恢复（暴露回合耗尽）且本轮确实累积满过破绽时，破绽槽上限永久 +25%。
+        if (this._bossVulnerabilityExposedTurns <= 0 && this._bossVulnerabilityPendingThresholdGrowth) {
+            this._growBossVulnerabilityThreshold(game);
+            this._bossVulnerabilityPendingThresholdGrowth = false;
+        }
         this.actionPhase = 'idle';
         this.telegraphTimer = 0;
         this.telegraphIntent = null;
@@ -1575,6 +1582,26 @@ class Enemy {
             game.spawn_createShockwave(this.pos.x, this.pos.y, '#facc15');
         }
         return true;
+    }
+
+    // Boss 每次累积满破绽并从暴露中恢复后，破绽槽上限按配置比例（默认 +25%）永久增长。
+    _growBossVulnerabilityThreshold(game = null) {
+        if (this.type !== 'boss') return;
+        const mech = CONFIG.balance.bossVulnerability || {};
+        const growth = Math.max(0, mech.breakThresholdGrowthOnRecover || 0);
+        if (growth <= 0) return;
+        const cap = mech.maxThresholdGrowthMult || 0;
+        let mult = (this._bossVulnerabilityThresholdMult || 1) * (1 + growth);
+        if (cap > 1) mult = Math.min(cap, mult);
+        if (mult <= (this._bossVulnerabilityThresholdMult || 1)) return; // 已到上限，无需再涨
+        this._bossVulnerabilityThresholdMult = mult;
+        // 同步刷新展示用阈值，HUD 立即反映新的破绽槽上限（下一次命中会按 profile 精确重算）。
+        if (this._bossVulnerabilityThreshold > 0) {
+            this._bossVulnerabilityThreshold = Math.max(1, Math.ceil(this._bossVulnerabilityThreshold * (1 + growth)));
+        }
+        if (game && typeof game.spawn_createFloatingText === 'function') {
+            game.spawn_createFloatingText(this.pos.x, this.pos.y - 60, '破绽槽强化', '#fbbf24', 13);
+        }
     }
 
     _getRadiantAegisTargets(game) {

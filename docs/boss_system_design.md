@@ -115,6 +115,20 @@
 
 ## 4. Boss 移动间隔系统（已实现）
 
+### 4.0 破绽槽上限恢复增长（已实现）
+
+Boss 每次**累积满破绽**（破绽进度达到 `breakThreshold` 触发暴露），并在**暴露回合耗尽后从暴露中恢复**时，破绽槽上限按比例**永久增长 +25%**（按 `1.25` 复利叠加）。意图是惩罚反复打同一破绽循环、鼓励玩家在窗口内打出更高收益，避免无限循环刷暴露。
+
+**配置层**（`CONFIG.balance.bossVulnerability`）：
+- `breakThresholdGrowthOnRecover`：每次恢复后的上限增长比例（默认 `0.25`）。
+- `maxThresholdGrowthMult`：累计增长倍率封顶（默认 `4`，即最多 4×；`<=1` 视为不封顶）。
+
+**运行时状态**（每个 Boss 实体）：
+- `_bossVulnerabilityThresholdMult`：累计增长倍率（初始 `1`），`combat_getBossVulnerabilityProfile` 计算 `breakThreshold` 时按此放大；按命中（hits）与按伤害（damage）两种累积模式都生效。
+- `_bossVulnerabilityPendingThresholdGrowth`：本轮已触发破绽、等待恢复时结算的增长标记。
+
+**触发时机**：`combat_updateBossVulnerabilityProgress` 触发破绽时置 pending 标记；`_consumeBossVulnerabilityExposedTurn` 在暴露回合归零（恢复）且 pending 为真时调用 `_growBossVulnerabilityThreshold` 结算 +25% 并清除标记。两个字段均纳入存档。
+
 ### 4.1 设计原则
 
 Boss 不再每回合必定移动，而是根据其设定在常规模式下按固定间隔移动，狂暴模式下每回合必定移动。

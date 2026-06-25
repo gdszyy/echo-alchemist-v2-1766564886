@@ -2846,6 +2846,8 @@ export const game_system = {
                     _bossVulnerabilitySuppressedEnrage: e._bossVulnerabilitySuppressedEnrage || false,
                     _bossVulnerabilityMode: e._bossVulnerabilityMode,
                     _bossVulnerabilityThreshold: e._bossVulnerabilityThreshold || 0,
+                    _bossVulnerabilityThresholdMult: e._bossVulnerabilityThresholdMult || 1,
+                    _bossVulnerabilityPendingThresholdGrowth: e._bossVulnerabilityPendingThresholdGrowth || false,
                     _bossVulnerabilityBreakTimer: e._bossVulnerabilityBreakTimer || 0,
                     _bossVulnerabilityRecoverTimer: e._bossVulnerabilityRecoverTimer || 0,
                 };
@@ -3312,6 +3314,8 @@ export const game_system = {
                 e._bossVulnerabilitySuppressedEnrage = d._bossVulnerabilitySuppressedEnrage || false;
                 e._bossVulnerabilityMode = d._bossVulnerabilityMode;
                 e._bossVulnerabilityThreshold = d._bossVulnerabilityThreshold || 0;
+                e._bossVulnerabilityThresholdMult = d._bossVulnerabilityThresholdMult || 1;
+                e._bossVulnerabilityPendingThresholdGrowth = d._bossVulnerabilityPendingThresholdGrowth || false;
                 e._bossVulnerabilityBreakTimer = d._bossVulnerabilityBreakTimer || 0;
                 e._bossVulnerabilityRecoverTimer = d._bossVulnerabilityRecoverTimer || 0;
                 e.justSpawned = false; // 恢复时不播放入场动画
