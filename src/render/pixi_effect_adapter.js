@@ -1931,6 +1931,7 @@ export function affixSkillVFX_pixiCreate(vfx) {
     const glowTexName = {
         regen: 'healGlow', devour: 'vortexGlow', berserk: 'fireRing',
         shield: 'shockwaveRing', jump: 'shockwaveRing', clone: 'vortexGlow',
+        shieldBlock: 'shockwaveRing',
     }[vfx.skillType];
     if (glowTexName) {
         const tex = pixiGetEffectTexture(glowTexName);
@@ -2030,6 +2031,68 @@ export function affixSkillVFX_pixiSync(vfx, pixi) {
                 gfx.drawCircle(px, py, 3 * scale);
             }
             gfx.endFill();
+        }
+        break;
+    }
+    case 'shieldBlock': {
+        // 护盾「抵挡伤害」爆发：核心闪光 + 双层扩散冲击波 + 六角护盾闪光 + 放射冲击线
+        // 全部走 ADD 混合（gfx.blendMode 已在 create 时设为 ADD），在众多特效中更醒目。
+        const lifeProg = 1 - vfx.life;                 // 0→1 全生命周期进度
+        const tierMul = vfx.isBoss ? 1.5 : (vfx.isElite ? 1.25 : 1.0);
+        const R = 46 * scale * (vfx.intensity || 1) * tierMul;
+
+        // 1) 核心闪光：前期最亮，快速衰减
+        const coreA = alpha * Math.max(0, 1 - lifeProg * 1.6);
+        if (coreA > 0.02) {
+            gfx.beginFill(0xFFFFFF, coreA * 0.9);
+            gfx.drawCircle(x, y, R * 0.28 * (1 + lifeProg * 0.6));
+            gfx.endFill();
+            gfx.beginFill(0x93C5FD, coreA * 0.5);
+            gfx.drawCircle(x, y, R * 0.5 * (1 + lifeProg * 0.8));
+            gfx.endFill();
+        }
+
+        // 2) 双层扩散冲击波环：向外推进并变薄淡出
+        for (let ring = 0; ring < 2; ring++) {
+            const rp = Math.min(1, lifeProg * (ring === 0 ? 1.0 : 0.7));
+            const rr = R * (0.4 + rp * 1.3);
+            const ra = alpha * (1 - rp) * (ring === 0 ? 0.9 : 0.6);
+            if (ra <= 0.02) continue;
+            gfx.lineStyle(Math.max(1, (4 - ring * 1.5) * scale), ring === 0 ? 0x67E8F9 : 0x93C5FD, ra);
+            gfx.drawCircle(x, y, rr);
+        }
+
+        // 3) 六角护盾闪光：扩张并淡出，明确传达「护盾」语义
+        const hexA = alpha * Math.max(0, 1 - lifeProg * 1.2);
+        if (hexA > 0.02) {
+            const hr = R * 0.62 * (1 + lifeProg * 0.5);
+            const passWidths = [5, 2];
+            const passColors = [0x93C5FD, 0xFFFFFF];
+            const passAlpha = [0.7, 0.95];
+            for (let pass = 0; pass < 2; pass++) {
+                gfx.lineStyle(passWidths[pass] * scale, passColors[pass], hexA * passAlpha[pass]);
+                for (let i = 0; i <= 6; i++) {
+                    const a = (i / 6) * Math.PI * 2 + rotation * 0.4 - Math.PI / 2;
+                    const px = x + Math.cos(a) * hr;
+                    const py = y + Math.sin(a) * hr;
+                    if (i === 0) gfx.moveTo(px, py);
+                    else gfx.lineTo(px, py);
+                }
+            }
+        }
+
+        // 4) 放射冲击线：burst 阶段最强，向外冲刺
+        const spikeA = alpha * (phase === 'burst' ? 1 : Math.max(0, 1 - lifeProg * 1.5)) * 0.85;
+        if (spikeA > 0.02) {
+            const spikes = vfx.perfTier === 'low' ? 6 : 10;
+            gfx.lineStyle(Math.max(1, 2.4 * scale), 0xDBEAFE, spikeA);
+            for (let i = 0; i < spikes; i++) {
+                const a = (i / spikes) * Math.PI * 2 + rotation * 0.3;
+                const inner = R * (0.55 + lifeProg * 0.5);
+                const outer = inner + R * (0.45 * (1 - lifeProg * 0.4));
+                gfx.moveTo(x + Math.cos(a) * inner, y + Math.sin(a) * inner);
+                gfx.lineTo(x + Math.cos(a) * outer, y + Math.sin(a) * outer);
+            }
         }
         break;
     }

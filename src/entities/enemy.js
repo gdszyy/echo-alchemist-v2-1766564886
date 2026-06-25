@@ -8134,6 +8134,17 @@ class Enemy {
                         // 显示剩余层数（使用位图护盾图标代替 emoji）
                         const shieldIcon = getUiBitmap(DEFENSE_ICON_MAP[isPhaseShieldBlock ? 'phaseShield' : 'shield']);
                         game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, `${this.shieldCharges}`, isPhaseShieldBlock ? '#a5b4fc' : '#93c5fd', 14, shieldIcon);
+                        // [新引擎] 护盾格挡爆发：用 PixiJS 渲染醒目的冲击波 + 六角护盾闪光，
+                        // 叠加在原有「定向能量帷幕」之上，让护盾抵挡伤害在众多特效中更突出。
+                        // 强度随本次格挡吸收量提升，Boss / 精英进一步放大。
+                        if (typeof game.spawn_createAffixSkillVFX === 'function') {
+                            game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'shieldBlock', {
+                                perfTier: game.perfQualityLevel || 'high',
+                                intensity: 1.0 + Math.min(0.8, shieldBlocked / 60),
+                                isBoss: this.type === 'boss',
+                                isElite: !!this.isElite,
+                            });
+                        }
                     }
                 }
 

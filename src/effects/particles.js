@@ -3695,6 +3695,8 @@ class AffixSkillVFX {
     static SKILL_TYPES = {
         berserk: { duration: 42, telegraph: 10, burst: 10, colors: ['#ef4444', '#f97316', '#fbbf24'] },
         shield:  { duration: 38, telegraph: 10, burst: 8,  colors: ['#93c5fd', '#a78bfa', '#f87171'] },
+        // 护盾「抵挡伤害」瞬时爆发：短促、明亮、向外扩散，用于在众多特效中突出格挡反馈
+        shieldBlock: { duration: 26, telegraph: 4, burst: 8, colors: ['#67e8f9', '#93c5fd', '#ffffff'] },
         regen:   { duration: 46, telegraph: 12, burst: 10, colors: ['#4ade80', '#86efac'] },
         haste:   { duration: 30, telegraph: 6,  burst: 8,  colors: ['#facc15', '#fde047'] },
         jump:    { duration: 44, telegraph: 14, burst: 10, colors: ['#2dd4bf', '#38bdf8'] },
@@ -3779,6 +3781,33 @@ class AffixSkillVFX {
                     vx: 0, vy: -0.5,
                     scale: 0.3, life: 1.0, color: this.cfg.colors[0],
                     spawnPhase: 'telegraph', gravity: 0,
+                });
+            }
+            break;
+        }
+        case 'shieldBlock': {
+            // 向外放射的护盾碎片（格挡瞬间四散），数量随性能档位缩放
+            const count = Math.ceil(10 * pmul);
+            for (let i = 0; i < count; i++) {
+                const angle = (i / count) * Math.PI * 2;
+                const spd = 3.5 + Math.random() * 1.6;
+                this._particles.push({
+                    mode: 'shard', ox: 0, oy: 0,
+                    vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd,
+                    scale: 0.7, life: 1.0,
+                    color: this.cfg.colors[i % this.cfg.colors.length],
+                    spawnPhase: 'burst', gravity: 0,
+                });
+            }
+            // 中心迸发的明亮火花
+            const sparkCount = Math.ceil(5 * pmul);
+            for (let i = 0; i < sparkCount; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                this._particles.push({
+                    mode: 'spark', ox: 0, oy: 0,
+                    vx: Math.cos(angle) * 2, vy: Math.sin(angle) * 2,
+                    scale: 0.5, life: 1.0, color: '#e0f2fe',
+                    spawnPhase: 'burst', gravity: 0,
                 });
             }
             break;
