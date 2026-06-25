@@ -153,8 +153,6 @@ class Projectile {
         }
         this.deformation.x += (this.targetDeformation.x - this.deformation.x) * this.elasticity * timeScale;
         this.deformation.y += (this.targetDeformation.y - this.deformation.y) * this.elasticity * timeScale;
-        this.trail.push({x: this.pos.x, y: this.pos.y});
-        if (this.trail.length > (this.maxTrailLength || 8)) this.trail.shift();
         for (const [enemy, timer] of this.hitCooldowns) {
             if (timer > 0) this.hitCooldowns.set(enemy, timer - timeScale);
             else this.hitCooldowns.delete(enemy);
@@ -209,6 +207,13 @@ class Projectile {
                 if (result === 'destroyed') return;
             }
         }
+        // [拖尾居中修复] 在子步「移动之后」记录拖尾最新点。
+        // 此前在移动前 push，导致 trail[last] 滞后子弹一帧的位移，
+        // 拖尾末端连不到子弹中心（高速时缺口尤为明显，所有子弹都受影响）。
+        // 改为移动后记录，使 trail[last] === this.pos（绘制时子弹中心），
+        // 拖尾即从子弹中心起拖。Canvas 2D 与 GPU(V2) 两条路径同时受益。
+        this.trail.push({x: this.pos.x, y: this.pos.y});
+        if (this.trail.length > (this.maxTrailLength || 8)) this.trail.shift();
         // 委托给 _spawnEffect 处理爆炸粒子特效
         this._spawnEffect();
     }
