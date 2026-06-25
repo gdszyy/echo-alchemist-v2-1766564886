@@ -4090,7 +4090,8 @@ class SonSword {
                                      lightning: Math.floor((this.config.lightning || 0) * markRatio)
                                  };
                              }
-                             game.combat_damageEnemy(e, { config: cfgForHit, pos: this.pos, isCopy: true });
+                             // [修复] 传入子剑当前朝向 vel，使穿透切割特效（PierceCutEffect）沿飞行方向，而非固定水平。
+                             game.combat_damageEnemy(e, { config: cfgForHit, pos: this.pos, isCopy: true, vel: new Vec2(Math.cos(this.angle), Math.sin(this.angle)) });
                              // [限制] SlashAnim 受全局粒子上限约束
                              game.spawn_pushParticleWithLimit(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.4));
                              audio.playSlash();
@@ -4256,7 +4257,7 @@ class SonSword {
             this.hitEnemiesInRecall.add(enemy);
             // 回收伤害设定
             const fsCfg = CONFIG.mechanics.flying_sword;
-            game.combat_damageEnemy(enemy, { config: this.config, pos: this.pos, isCopy: true }, fsCfg.recallDamageMult);
+            game.combat_damageEnemy(enemy, { config: this.config, pos: this.pos, isCopy: true, vel: new Vec2(Math.cos(this.angle), Math.sin(this.angle)) }, fsCfg.recallDamageMult);
              // [限制] SlashAnim 受全局粒子上限约束
             game.spawn_pushParticleWithLimit(new SlashAnim(this.pos.x, this.pos.y, this.angle, 0.35));
                 audio.playSlash();
@@ -4266,11 +4267,13 @@ class SonSword {
         if (enemy === this.currentTarget && this.passingThroughEnemy !== enemy) {
             const fsCfg = CONFIG.mechanics.flying_sword;
             let dmg = this.config.damage * fsCfg.dashDamageMult;
+            // [修复] 传入子剑朝向 vel，使穿透切割特效沿飞行方向呈现，而非永远水平。
+            const hitVel = new Vec2(Math.cos(this.angle), Math.sin(this.angle));
             if (this.level >= 2) {
-                game.combat_damageEnemy(enemy, { config: this.config, pos: this.pos, isCopy: true });
+                game.combat_damageEnemy(enemy, { config: this.config, pos: this.pos, isCopy: true, vel: hitVel });
             } else {
                 // Lv1子剑伤害，也通过combat_damageEnemy统一处理
-                game.combat_damageEnemy(enemy, { config: { ...this.config, damage: dmg }, pos: this.pos, isCopy: true });
+                game.combat_damageEnemy(enemy, { config: { ...this.config, damage: dmg }, pos: this.pos, isCopy: true, vel: hitVel });
             }
 
             // 特效
