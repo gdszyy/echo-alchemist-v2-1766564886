@@ -81,6 +81,11 @@
 
 状态字段（均持久化于局存档）：`equippedSkillIds`、`purchasedSkillIds`、`_seenSkillIds`、`_activeRunewordIds`；`unlockedSkills`/`activeSkills` 为运行时派生不持久化。
 
+### 技能图鉴（真理之书内）
+
+- 真理之书（`TruthBook`）新增「主动技能」分类（`TRUTH_BOOK_CATEGORIES` 的 `skill`）。
+- 条目由 `buildSkillCodexEntries()`（`src/systems.js`）从 `SKILL_DB` 动态生成，与 `core` 条目同构（纯说明 + 日志循环演示，无敌人 setup）。每条展示：图标、名称、SP 消耗、来源/解锁条件标签、效果描述。新增/修改技能会自动出现在图鉴，无需手动维护。
+
 ## 2. 词条 effectId 与实现位置速查
 
 | effectId | 词条名称 | 主要实现位置 | 关键状态字段 |

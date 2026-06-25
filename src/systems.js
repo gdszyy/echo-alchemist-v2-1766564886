@@ -12,7 +12,7 @@
  * - eventBus, EVENT_TYPES（来自 event_bus.js）
  */
 
-import { CONFIG } from './config.js';
+import { CONFIG, SKILL_DB, RELIC_DB } from './config.js';
 import { Enemy, Projectile, Particle, FloatingText, CloneSpore } from './entities.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { Vec2, adjustColorBrightness } from './utils/math_utils.js';
@@ -505,8 +505,57 @@ const TRUTH_BOOK_CATEGORIES = [
     { id: 'enemy_affix', name: '敌人词缀', icon: '◇', hint: '普通/精英敌人的行为规则' },
     { id: 'enemy_v2', name: 'V2 基底', icon: '▣', hint: '多格敌人与专属形体' },
     { id: 'attribute', name: '属性百科', icon: '✦', hint: '弹药属性、元素反应与演示' },
+    { id: 'skill', name: '主动技能', icon: '✨', hint: '四类来源、SP 消耗与效果' },
     { id: 'core', name: '核心机制', icon: '📘', hint: '充能、替换、保底与掉落' }
 ];
+
+// [技能图鉴] 由 SKILL_DB 动态生成主动技能图鉴条目（与 core 条目同构：纯说明 + 日志循环演示）
+const SKILL_SOURCE_LABEL = { base: '基础', runeword: '词条', relic: '遗物', shop: '商店' };
+function buildSkillCodexEntries() {
+    const rwName = (id) => (RUNEWORD_DB.find(r => r.id === id) || {}).name || id;
+    const relicName = (id) => (RELIC_DB.find(r => r.id === id) || {}).name || id;
+    return (SKILL_DB || []).map(sk => {
+        const cost = Math.max(0, Number(sk.cost) || 0);
+        let unlockSentence;
+        let unlockTag;
+        switch (sk.source) {
+            case 'base':
+                unlockSentence = '默认解锁：每局开局即可装备。';
+                unlockTag = '基础·常驻';
+                break;
+            case 'runeword':
+                unlockSentence = `解锁方式：激活词条「${rwName(sk.unlockRuneword)}」。`;
+                unlockTag = `词条·${rwName(sk.unlockRuneword)}`;
+                break;
+            case 'relic':
+                unlockSentence = `解锁方式：获得遗物「${relicName(sk.unlockRelic)}」。`;
+                unlockTag = `遗物·${relicName(sk.unlockRelic)}`;
+                break;
+            case 'shop':
+                unlockSentence = `解锁方式：局内商店购买（${sk.shopPrice || 80} 碎片）。`;
+                unlockTag = `商店·${sk.shopPrice || 80}碎片`;
+                break;
+            default:
+                unlockSentence = '解锁方式：未知。';
+                unlockTag = '其他';
+        }
+        return {
+            id: `truth_skill_${sk.id}`,
+            categoryId: 'skill',
+            title: sk.name,
+            icon: sk.icon || '✨',
+            tags: [`${cost} SP`, unlockTag],
+            content: `${sk.desc} 【消耗 ${cost} SP｜${unlockSentence}】`,
+            loop: [
+                { type: 'log', text: `${sk.name}｜消耗 ${cost} SP` },
+                { type: 'wait', frames: 90 },
+                { type: 'log', text: unlockSentence },
+                { type: 'wait', frames: 120 },
+                { type: 'reset' }
+            ]
+        };
+    });
+}
 
 function setupTruthBookBossDemo(game, bossId, isBigBoss = false) {
     if (!game || typeof game.spawn_spawnBoss !== 'function') return;
@@ -750,7 +799,9 @@ function buildTruthBookEntries() {
     const attributeEntries = (TRUTH_BOOK_DATA.attributes || []).map(entry => normalizeTruthBookEntry(entry, 'attribute'));
     const bossEntries = TRUTH_BOOK_BOSS_ENTRIES.map(entry => normalizeTruthBookEntry(entry, 'boss'));
     const coreEntries = TRUTH_BOOK_CORE_ENTRIES.map(entry => normalizeTruthBookEntry(entry, 'core'));
-    return [...bossEntries, ...enemyEntries, ...attributeEntries, ...coreEntries];
+    // [技能图鉴] 主动技能条目（由 SKILL_DB 动态生成）
+    const skillEntries = buildSkillCodexEntries().map(entry => normalizeTruthBookEntry(entry, 'skill'));
+    return [...bossEntries, ...enemyEntries, ...attributeEntries, ...skillEntries, ...coreEntries];
 }
 
 TRUTH_BOOK_DATA.categories = TRUTH_BOOK_CATEGORIES;
