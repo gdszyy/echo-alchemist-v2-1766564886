@@ -408,7 +408,7 @@ class PierceCutEffect {
         this.age = 0;
         this.duration = this.quality === 'low' ? 14 : 18;
         this.active = true;
-        this.cutWidth = 5 + Math.random() * 2;
+        this.cutWidth = 4 + Math.random() * 1.5;
         this.edgeSeed = Math.random() * Math.PI * 2;
         const chipCount = this.quality === 'low' ? 3 : (this.quality === 'medium' ? 5 : 7);
         this.chips = Array.from({ length: chipCount }, (_, i) => ({
@@ -450,46 +450,44 @@ class PierceCutEffect {
         ctx.globalCompositeOperation = isLow ? 'source-over' : 'lighter';
         ctx.lineCap = 'round';
 
+        // 锥形切口：沿轴填充柳叶/纺锤形（两端尖、中段宽），呈现锐利刀痕而非均匀光带。
+        const fillSpindle = (maxHalfW, style, alpha, power, bias) => {
+            if (alpha <= 0 || maxHalfW <= 0) return;
+            const N = 18;
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = style;
+            ctx.beginPath();
+            for (let i = 0; i <= N; i++) { // 上缘 左→右
+                const u = -1 + 2 * i / N;
+                const lx = u * halfL;
+                const w = maxHalfW * Math.pow(Math.max(0, 1 - u * u), power);
+                if (i === 0) ctx.moveTo(lx, bias - w); else ctx.lineTo(lx, bias - w);
+            }
+            for (let i = N; i >= 0; i--) { // 下缘 右→左
+                const u = -1 + 2 * i / N;
+                const lx = u * halfL;
+                const w = maxHalfW * Math.pow(Math.max(0, 1 - u * u), power);
+                ctx.lineTo(lx, bias + w);
+            }
+            ctx.closePath();
+            ctx.fill();
+        };
+
+        const cw = this.cutWidth;
+        const slitAlpha = Math.min(1, this.life * 1.35);
+
         if (!isLow) {
-            ctx.globalAlpha = this.life * 0.42;
-            ctx.strokeStyle = withAlpha(this.color, 0.85);
-            ctx.lineWidth = this.cutWidth * (1.8 + 0.4 * this.life);
+            // 1. 外层热辉光（柔和锥形）
             ctx.shadowColor = this.color;
-            ctx.shadowBlur = _sb(14);
-            ctx.beginPath();
-            ctx.moveTo(-halfL - 6, -open * 0.35);
-            ctx.quadraticCurveTo(-halfL * 0.18, -open * 1.25, halfL + 6, -open * 0.5);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(-halfL - 6, open * 0.35);
-            ctx.quadraticCurveTo(halfL * 0.18, open * 1.25, halfL + 6, open * 0.5);
-            ctx.stroke();
+            ctx.shadowBlur = _sb(12);
+            fillSpindle(cw * 1.25, this.color, this.life * 0.16, 0.5, 0);
             ctx.shadowBlur = 0;
         }
-
-        const slitAlpha = Math.min(1, this.life * 1.35);
-        const slit = ctx.createLinearGradient(-halfL, 0, halfL, 0);
-        slit.addColorStop(0, 'rgba(255,255,255,0)');
-        slit.addColorStop(0.22, withAlpha(this.color, 0.78 * slitAlpha));
-        slit.addColorStop(0.5, `rgba(255,255,255,${slitAlpha})`);
-        slit.addColorStop(0.78, withAlpha(this.color, 0.78 * slitAlpha));
-        slit.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.globalAlpha = 0.95;
-        ctx.strokeStyle = slit;
-        ctx.lineWidth = Math.max(1.2, this.cutWidth * this.life);
-        ctx.beginPath();
-        ctx.moveTo(-halfL, 0);
-        ctx.lineTo(halfL, 0);
-        ctx.stroke();
-
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = this.life * 0.78;
-        ctx.strokeStyle = withAlpha('#1f0f16', isLow ? 0.46 : 0.62);
-        ctx.lineWidth = Math.max(1, this.cutWidth * 0.42);
-        ctx.beginPath();
-        ctx.moveTo(-halfL * 0.72, 0);
-        ctx.lineTo(halfL * 0.72, 0);
-        ctx.stroke();
+        // 2. 上下两唇：沿轴张开，营造「被劈开」的张口
+        fillSpindle(cw * 0.5, this.color, this.life * 0.5, 0.7, -open * 0.5);
+        fillSpindle(cw * 0.5, this.color, this.life * 0.5, 0.7, open * 0.5);
+        // 3. 核心白热切口：极细、两端尖锐
+        fillSpindle(Math.max(0.6, cw * 0.3 * (0.55 + 0.45 * this.life)), '#ffffff', slitAlpha, 1.0, 0);
 
         ctx.globalCompositeOperation = isLow ? 'source-over' : 'lighter';
         const tickCount = isLow ? 2 : 4;
