@@ -1944,6 +1944,93 @@ export function affixSkillVFX_pixiSync(vfx, pixi) {
         }
         break;
     }
+    case 'shieldCurtain': {
+        // [新引擎·定向能量帷幕] 按 enemy._drawDefenseImpactFeedback 中 Canvas 版
+        // traceEnergyCurtain 逐点相同的帷幕曲线、span/depth(spanMult 1.12 / depthMult 1.16)
+        // 与受击朝向 sideAngle 复刻这道护盾能量幕，用 ADD 加色叠加增强辉光（盖在原帷幕之上）。
+        const a = alpha;                       // _gfxData.alpha：telegraph 升 → burst 峰 → decay 落
+        if (a <= 0.02) break;
+        const sideAngle = Number.isFinite(vfx.sideAngle) ? vfx.sideAngle : -Math.PI / 2;
+        const W = vfx.fxW || 56;
+        const H = vfx.fxH || 46;
+        const im = vfx.intensity || 1;
+        const gs = 1 + Math.min(0.35, Math.max(0, im - 1));   // 吸收越多帷幕略大
+        const span = Math.max(24, Math.min(H * 0.96, W * 1.12)) * 1.12 * gs;
+        const baseDepth = Math.max(15, Math.min(W, H) * 0.32) * 1.16 * gs;
+        const outward = Math.max(W, H) * 0.06;
+        const cols = vfx.curtainColors || { soft: 0xBFDBFE, main: 0x93C5FD, ray: 0xDBEAFE, pressure: 0x60A5FA, core: 0xFFFFFF };
+
+        // burst 期向外鼓起的轻微脉冲（与 Canvas 帷幕一致的"受击外鼓"手感）
+        const tp = vfx._telegraphProgress || 0;
+        const bp = vfx._burstProgress || 0;
+        const dp = vfx._decayProgress || 0;
+        const flare = 1 + (phase === 'burst' ? bp * 0.14 : (phase === 'decay' ? 0.14 * (1 - dp) : tp * 0.06));
+        const depth = baseDepth * flare;
+
+        // 受击侧帷幕中心：沿 sideAngle 推到敌人边缘外；局部 (lx 向外, ly 沿幕) → 世界坐标
+        const baseDist = W / 2 + outward;
+        const cx = x + Math.cos(sideAngle) * baseDist;
+        const cy = y + Math.sin(sideAngle) * baseDist;
+        const cosA = Math.cos(sideAngle);
+        const sinA = Math.sin(sideAngle);
+        const TX = (lx, ly) => cx + cosA * lx - sinA * ly;
+        const TY = (lx, ly) => cy + sinA * lx + cosA * ly;
+
+        // 帷幕路径（与 traceEnergyCurtain 完全一致）：xo=外向偏移, ss=spanScale, ds=depthScale
+        const traceCurtain = (xo, ss, ds) => {
+            gfx.moveTo(TX(xo - depth * 0.42 * ds, -span * 0.50 * ss), TY(xo - depth * 0.42 * ds, -span * 0.50 * ss));
+            gfx.quadraticCurveTo(TX(xo + depth * 0.46 * ds, -span * 0.42 * ss), TY(xo + depth * 0.46 * ds, -span * 0.42 * ss), TX(xo + depth * 0.66 * ds, 0), TY(xo + depth * 0.66 * ds, 0));
+            gfx.quadraticCurveTo(TX(xo + depth * 0.46 * ds, span * 0.42 * ss), TY(xo + depth * 0.46 * ds, span * 0.42 * ss), TX(xo - depth * 0.42 * ds, span * 0.50 * ss), TY(xo - depth * 0.42 * ds, span * 0.50 * ss));
+            gfx.quadraticCurveTo(TX(xo - depth * 0.12 * ds, span * 0.22 * ss), TY(xo - depth * 0.12 * ds, span * 0.22 * ss), TX(xo - depth * 0.12 * ds, 0), TY(xo - depth * 0.12 * ds, 0));
+            gfx.quadraticCurveTo(TX(xo - depth * 0.12 * ds, -span * 0.22 * ss), TY(xo - depth * 0.12 * ds, -span * 0.22 * ss), TX(xo - depth * 0.42 * ds, -span * 0.50 * ss), TY(xo - depth * 0.42 * ds, -span * 0.50 * ss));
+        };
+
+        // 1) 外层柔光：放大的帷幕，低 alpha 大范围辉光（bloom 基底）
+        gfx.lineStyle(0);
+        gfx.beginFill(cols.soft, a * 0.30);
+        traceCurtain(depth * 0.08, 1.18, 1.30);
+        gfx.endFill();
+
+        // 2) 主能量膜（与 Canvas 帷幕同尺寸）
+        gfx.beginFill(cols.main, a * 0.42);
+        traceCurtain(0, 1.0, 1.0);
+        gfx.endFill();
+
+        // 3) 命中亮核：更窄更亮，叠白（burst 期最强）
+        gfx.beginFill(cols.core, a * 0.55 * (phase === 'burst' ? 1 : 0.6));
+        traceCurtain(depth * 0.16, 0.52, 0.62);
+        gfx.endFill();
+
+        // 4) 外缘亮描边（帷幕轮廓）
+        gfx.lineStyle(Math.max(1.4, baseDepth * 0.12), cols.main, a * 0.95);
+        traceCurtain(0, 1.0, 1.0);
+
+        // 5) 压力波前：沿幕的弧线，向外递进淡出（mirror drawWavefront）
+        const waves = vfx.perfTier === 'low' ? 2 : 4;
+        for (let i = 0; i < waves; i++) {
+            const off = i * depth * 0.16;
+            const ss = 1 - i * 0.08;
+            const wa = a * (0.95 - i * 0.16);
+            if (wa <= 0.03) continue;
+            gfx.lineStyle(Math.max(1, baseDepth * 0.07 * (1 - i * 0.12)), i === 0 ? cols.ray : cols.pressure, wa);
+            gfx.moveTo(TX(-depth * 0.34 + off, -span * 0.49 * ss), TY(-depth * 0.34 + off, -span * 0.49 * ss));
+            gfx.quadraticCurveTo(TX(depth * 0.24 + off, 0), TY(depth * 0.24 + off, 0), TX(depth * 0.58 + off, 0), TY(depth * 0.58 + off, 0));
+            gfx.quadraticCurveTo(TX(depth * 0.24 + off, span * 0.34 * ss), TY(depth * 0.24 + off, span * 0.34 * ss), TX(-depth * 0.34 + off, span * 0.49 * ss), TY(-depth * 0.34 + off, span * 0.49 * ss));
+        }
+
+        // 6) 向外能量射线（mirror rays）
+        const rayCount = vfx.perfTier === 'low' ? 3 : 6;
+        const raySpread = span * 0.78;
+        gfx.lineStyle(Math.max(1.1, baseDepth * 0.05), cols.ray, a * 0.7);
+        for (let i = 0; i < rayCount; i++) {
+            const t = rayCount === 1 ? 0.5 : i / (rayCount - 1);
+            const ly = -raySpread * 0.5 + raySpread * t;
+            const bend = (t - 0.5) * span * 0.10;
+            gfx.moveTo(TX(depth * 0.58, ly * 0.78), TY(depth * 0.58, ly * 0.78));
+            gfx.quadraticCurveTo(TX(depth * 1.02, ly + bend * 0.55), TY(depth * 1.02, ly + bend * 0.55), TX(depth * 1.42, ly + bend * 1.20), TY(depth * 1.42, ly + bend * 1.20));
+        }
+        break;
+    }
     case 'regen': {
         // Vertical liquid column (three-pass)
         const colHeight = 35 * scale;

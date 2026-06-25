@@ -8134,6 +8134,23 @@ class Enemy {
                         // 显示剩余层数（使用位图护盾图标代替 emoji）
                         const shieldIcon = getUiBitmap(DEFENSE_ICON_MAP[isPhaseShieldBlock ? 'phaseShield' : 'shield']);
                         game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, `${this.shieldCharges}`, isPhaseShieldBlock ? '#a5b4fc' : '#93c5fd', 14, shieldIcon);
+                        // [新引擎·定向能量帷幕辉光] 在 PixiJS 中按完全相同的帷幕曲线与受击朝向
+                        // 复刻这道定向能量护盾，用加色叠加增强辉光，盖在原 Canvas 帷幕之上，
+                        // 让护盾「抵挡伤害」在众多特效中更醒目（仅定向命中时叠加；Pixi 关闭则保持原效果）。
+                        const dfx = this._defenseImpactFx && this._defenseImpactFx[shieldKind];
+                        if (dfx && dfx.mode === 'directional' && typeof game.spawn_createAffixSkillVFX === 'function') {
+                            const curtainColors = isPhaseShieldBlock
+                                ? { soft: 0xC7D2FE, main: 0xA5B4FC, ray: 0xE0E7FF, pressure: 0x818CF8, core: 0xFFFFFF }
+                                : { soft: 0xBFDBFE, main: 0x93C5FD, ray: 0xDBEAFE, pressure: 0x60A5FA, core: 0xFFFFFF };
+                            game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'shieldCurtain', {
+                                perfTier: game.perfQualityLevel || 'high',
+                                sideAngle: dfx.sideAngle,
+                                w: (this.width || 60) - 4,
+                                h: (this.height || 50) - 4,
+                                colors: curtainColors,
+                                intensity: 1.0 + Math.min(0.8, shieldBlocked / 80),
+                            });
+                        }
                     }
                 }
 

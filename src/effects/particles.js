@@ -3520,6 +3520,9 @@ class AffixSkillVFX {
     static SKILL_TYPES = {
         berserk: { duration: 42, telegraph: 10, burst: 10, colors: ['#ef4444', '#f97316', '#fbbf24'] },
         shield:  { duration: 38, telegraph: 10, burst: 8,  colors: ['#93c5fd', '#a78bfa', '#f87171'] },
+        // 定向能量帷幕辉光：复刻护盾「抵挡伤害」的 traceEnergyCurtain，用新引擎(PixiJS)
+        // 加色叠加增强辉光。纯 Graphics 绘制（不挂粒子），几何/朝向/配色由 opts 传入。
+        shieldCurtain: { duration: 22, telegraph: 3, burst: 7, colors: ['#bfdbfe', '#93c5fd', '#60a5fa'] },
         regen:   { duration: 46, telegraph: 12, burst: 10, colors: ['#4ade80', '#86efac'] },
         haste:   { duration: 30, telegraph: 6,  burst: 8,  colors: ['#facc15', '#fde047'] },
         jump:    { duration: 44, telegraph: 14, burst: 10, colors: ['#2dd4bf', '#38bdf8'] },
@@ -3547,6 +3550,13 @@ class AffixSkillVFX {
         this.isBoss = opts.isBoss || false;
         this.isElite = opts.isElite || false;
 
+        // [shieldCurtain] 定向能量帷幕复刻所需：受击侧朝向、敌人尺寸、配色（hex 整数对象）
+        this.sideAngle = Number.isFinite(opts.sideAngle) ? opts.sideAngle : null;
+        this.fxW = opts.w || 0;
+        this.fxH = opts.h || 0;
+        this.curtainColors = opts.colors && typeof opts.colors === 'object' && !Array.isArray(opts.colors)
+            ? opts.colors : null;
+
         // Particle multiplier by perf tier
         const pmul = this.perfTier === 'high' ? 1.0 : (this.perfTier === 'medium' ? 0.6 : 0.3);
 
@@ -3562,6 +3572,10 @@ class AffixSkillVFX {
 
     _setupType(pmul) {
         switch (this.skillType) {
+        case 'shieldCurtain':
+            // 定向能量帷幕辉光：全部由 PixiJS Graphics 程序化绘制，不挂任何粒子。
+            // （Pixi 关闭时本特效不绘制额外内容，回退到 enemy 自身的 Canvas 帷幕。）
+            break;
         case 'berserk': {
             const count = Math.ceil(12 * pmul * this.intensity);
             for (let i = 0; i < count; i++) {
