@@ -1305,15 +1305,15 @@ export function muzzleFlashV2_pixiSync(mf, pixi) {
 
     // ── 核心光球 ──
     if (progress < 0.3) {
-        // 膨胀阶段
+        // 膨胀阶段（克制：收小核心光球）
         const t = progress / 0.3;
-        const s = (0.3 + 0.9 * t) * mf.intensity;
+        const s = (0.25 + 0.55 * t) * mf.intensity;
         coreSprite.scale.set(s);
-        coreSprite.alpha = 0.8 + 0.2 * t;
+        coreSprite.alpha = 0.7 + 0.15 * t;
     } else {
         // 衰减阶段
         const t = (progress - 0.3) / 0.7;
-        const s = 1.2 * mf.intensity * (1 - t * 0.6);
+        const s = 0.8 * mf.intensity * (1 - t * 0.6);
         coreSprite.scale.set(Math.max(0.05, s));
         coreSprite.alpha = Math.max(0, 1.0 - t);
         // tint 渐变：白热 → 元素色 → 暗红（简化为 alpha 衰减）
@@ -1327,8 +1327,8 @@ export function muzzleFlashV2_pixiSync(mf, pixi) {
         const flashEnd = mf.flashPhase / mf.maxLife;
         if (progress < flashEnd) {
             const t = progress / flashEnd;
-            flareSprite.scale.set(0.5 + 1.5 * t * mf.intensity, 0.8 + 0.4 * t);
-            flareSprite.alpha = Math.max(0, 1.0 - t * 0.9);
+            flareSprite.scale.set(0.4 + 1.0 * t * mf.intensity, 0.7 + 0.3 * t);
+            flareSprite.alpha = Math.max(0, 0.85 - t * 0.85);
             flareSprite.rotation = mf.angle;
         } else {
             flareSprite.alpha = 0;
@@ -1405,8 +1405,8 @@ export function firingBurst_pixiSync(fb, pixi) {
 
     // 方向冲击锥（前 30% 生命周期）
     if (progress < 0.3) {
-        const coneAlpha = alpha * (1 - progress / 0.3) * 0.6;
-        const dist = 60 * fb.intensity * (progress / 0.3);
+        const coneAlpha = alpha * (1 - progress / 0.3) * 0.45;
+        const dist = 40 * fb.intensity * (progress / 0.3);
         const cos1 = Math.cos(fb.angle - 0.26), sin1 = Math.sin(fb.angle - 0.26);
         const cos2 = Math.cos(fb.angle + 0.26), sin2 = Math.sin(fb.angle + 0.26);
         // 外辉光

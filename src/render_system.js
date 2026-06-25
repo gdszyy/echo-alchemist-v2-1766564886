@@ -856,8 +856,8 @@ export const render_system = {
             const coolFade = Math.pow(1 - coolT, 1.5);         // 余烬淡出曲线
             const heatColor = lerpColor('#fff4d6', elementColor, Math.min(1, coolT * 1.8));
             const emberColor = lerpColor(heatColor, '#1a1206', Math.max(0, coolT - 0.45) * 1.5);
-            const glowR = (20 + 16 * intensity) * (0.55 + 0.6 * coolFade);
-            const coolAlpha = coolFade * (0.34 + 0.16 * intensity);
+            const glowR = (14 + 11 * intensity) * (0.55 + 0.6 * coolFade);
+            const coolAlpha = coolFade * (0.24 + 0.12 * intensity);
             if (coolAlpha > 0.012) {
                 ctx.save();
                 ctx.translate(muzzleX, muzzleY);
@@ -891,9 +891,9 @@ export const render_system = {
                     Math.floor(t * EMITTER_MUZZLE_FLASH_SRCS.length)
                 );
                 const flashImg = getUiBitmap(EMITTER_MUZZLE_FLASH_SRCS[frameIndex]);
-                const baseFlash = 78 + 46 * intensity;          // 大幅放大（原仅 34~42px）
+                const baseFlash = 52 + 28 * intensity;          // 克制化（原 78+46*intensity，过于浮夸）
                 const flashSize = baseFlash * (0.72 + 0.42 * ease);
-                const flashAlpha = Math.min(0.95, (1 - t) * (0.6 + 0.34 * intensity));
+                const flashAlpha = Math.min(0.85, (1 - t) * (0.5 + 0.28 * intensity));
 
                 ctx.save();
                 ctx.translate(muzzleX, muzzleY);
@@ -948,11 +948,11 @@ export const render_system = {
                 fx._v2Spawned = true;
                 // 开炮屏幕震动（开幕齐射更强烈）
                 if (fx.charged) {
-                    if (typeof this.triggerScreenShake === 'function') this.triggerScreenShake(3);
-                    if (typeof this.triggerScreenShakeAdvanced === 'function') this.triggerScreenShakeAdvanced(2, 8);
+                    if (typeof this.triggerScreenShake === 'function') this.triggerScreenShake(1.5);
+                    if (typeof this.triggerScreenShakeAdvanced === 'function') this.triggerScreenShakeAdvanced(1, 5);
                 }
-                // 开炮边缘闪光标记
-                this._fireFlashFrames = fx.charged ? 4 : 2;
+                // 开炮边缘闪光标记（克制：齐射 2 帧 / 普通 1 帧）
+                this._fireFlashFrames = fx.charged ? 2 : 1;
             }
         }
 
@@ -1004,7 +1004,7 @@ export const render_system = {
 
         // ── [开炮 VFX 增强] 开炮边缘闪光（Canvas 2D 全屏叠加） ──
         if (this._fireFlashFrames > 0) {
-            const flashAlpha = (this._fireFlashFrames / 4) * 0.08;
+            const flashAlpha = (this._fireFlashFrames / 2) * 0.045;
             ctx.save();
             // 抵消 translate(cx, cy) 以覆盖全屏
             ctx.translate(-cx, -cy);
