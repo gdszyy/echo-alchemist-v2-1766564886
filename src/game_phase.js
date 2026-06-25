@@ -3041,8 +3041,11 @@ phase_gathering_getRandomPegType() {
                             }
                         }
                         this.projectiles.splice(i, 1);
-                    } 
-                } 
+                    } else if (!p.active) {
+                        // [拖尾残留修复] 子弹经非 destroy() 路径失活（如被吞噬），从数组移除避免长期滞留
+                        this.projectiles.splice(i, 1);
+                    }
+                }
             }
 
             // 更新和绘制 FireWaves

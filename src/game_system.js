@@ -19,7 +19,7 @@ import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
 import { RUNE_DB } from './rune_config.js';
 import { pixiTick, pixiResize, pixiSetVisibility } from './render/pixi_bridge.js';
-import { pixiCleanupAllEffects } from './render/pixi_effect_adapter.js';
+import { pixiCleanupAllEffects, fireWave_pixiDestroy, greedyWheelEffect_pixiDestroy } from './render/pixi_effect_adapter.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { calcCombatLauncherGeometryToTarget } from './utils/emitter_geometry.js';
 import { getBossDisplayName, getBossPreviewInfo, getBossShortName } from './utils/boss_schedule_utils.js';
@@ -2371,6 +2371,23 @@ export const game_system = {
      * @description 清除所有现存的投射物和爆发队列。
      */
     data_clearProjectiles() {
+        // [拖尾/特效残留修复] 清空数组前释放各自的 PixiJS GPU 资源，
+        // 否则子弹拖尾、火焰波、贪婪转盘等 Sprite 会孤立残留在场上不消失。
+        if (Array.isArray(this.projectiles)) {
+            for (const p of this.projectiles) {
+                if (p && typeof p.releasePixiResources === 'function') p.releasePixiResources();
+            }
+        }
+        if (Array.isArray(this.fireWaves)) {
+            for (const fw of this.fireWaves) {
+                if (fw && fw._pixi) { fireWave_pixiDestroy(fw._pixi); fw._pixi = null; }
+            }
+        }
+        if (Array.isArray(this.greedyWheelEffects)) {
+            for (const gw of this.greedyWheelEffects) {
+                if (gw && gw._pixi) { greedyWheelEffect_pixiDestroy(gw._pixi); gw._pixi = null; }
+            }
+        }
         this.sonSwords = [];
         this.projectiles = [];
         this.burstQueue = [];

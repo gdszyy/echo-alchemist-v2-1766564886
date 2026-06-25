@@ -261,6 +261,8 @@ class Projectile {
                 if (distToCenter >= innerRadius && distToCenter <= outerRadius) {
                     // 子弹进入缺口区域，触发吞噬效果
                     this.active = false;
+                    // [拖尾残留修复] 吞噬走非 destroy() 路径，立即释放拖尾 GPU 精灵，防止拖尾留在场上
+                    this.releasePixiResources();
                     if (typeof game !== 'undefined') {
                         // 吞噬特效：紫色冲击波 + 粒子散射
                         game.spawn_createShockwave(this.pos.x, this.pos.y, '#a855f7');
@@ -891,13 +893,16 @@ class Projectile {
         }
     }
 
-    destroy(spawnCallback) {
-        // [新属性] 超载爆炸（在标记 destroyed 之前以便其它系统可读 chargeCount）
-        try { this._detonateOvercharge(); } catch (e) { /* 防御性：销毁路径不应抛错 */ }
-
-        this.active = false;
-        this.destroyed = true;
-
+    /**
+     * [拖尾残留修复] 释放本子弹占用的所有 PixiJS GPU 资源（拖尾精灵 + 弹道光照精灵），
+     * 无任何游戏逻辑副作用，可在销毁 / 失活 / 阶段切换 / 重置等任意路径安全调用。
+     *
+     * 子弹经非常规路径离场（被吞噬 / 阶段切换 / 关卡重置 / 调试清场）时若不释放，
+     * 其拖尾 Sprite 会孤立残留在 ParticleContainer 上，表现为拖尾永久留在场上不消失。
+     *
+     * 幂等：以数组 / 引用是否存在为守卫，可安全重复调用。
+     */
+    releasePixiResources() {
         // [Trail V2] 释放拖尾 GPU 精灵回池
         if (this._trailV2Sprites) {
             for (const s of this._trailV2Sprites) pixiReleaseParticleSprite(s);
@@ -909,6 +914,17 @@ class Projectile {
             this._bulletGlowSprite.destroy();
             this._bulletGlowSprite = null;
         }
+    }
+
+    destroy(spawnCallback) {
+        // [新属性] 超载爆炸（在标记 destroyed 之前以便其它系统可读 chargeCount）
+        try { this._detonateOvercharge(); } catch (e) { /* 防御性：销毁路径不应抛错 */ }
+
+        this.active = false;
+        this.destroyed = true;
+
+        // [拖尾残留修复] 释放拖尾 / 光照 GPU 精灵
+        this.releasePixiResources();
 
         // [修改重点]：允许套娃子弹触发嵌套逻辑，即使它是 Copy (散射出来的)
         // 之前的逻辑是 !this.isCopy，这会阻止散射子弹裂变

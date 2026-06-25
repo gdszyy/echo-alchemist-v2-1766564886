@@ -2116,6 +2116,17 @@ export function pixiCleanupAllEffects(game) {
         }
     }
 
+    // --- projectiles 数组：释放子弹拖尾 / 弹道光照 GPU 精灵 ---
+    // 子弹拖尾的 Trail V2 Sprite 与光照 Sprite 由 projectile 自身管理；阶段切换 / 重置时
+    // 若不释放，拖尾 Sprite 会孤立残留在 ParticleContainer 上（拖尾留在场上不消失）。
+    if (Array.isArray(game.projectiles)) {
+        for (const p of game.projectiles) {
+            if (p && typeof p.releasePixiResources === 'function') {
+                p.releasePixiResources();
+            }
+        }
+    }
+
     // energyOrbs：用 !active 判定移除
     if (Array.isArray(game.energyOrbs)) {
         for (const orb of game.energyOrbs) {
