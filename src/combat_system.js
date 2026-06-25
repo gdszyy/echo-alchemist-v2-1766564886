@@ -4149,6 +4149,12 @@ export const combat_system = {
                 boss._berserkedRotation = true;
                 break;
         }
+
+        // [狂暴即时行动] 进入狂暴的瞬间，令 Boss 自身立刻额外触发一次行动。
+        // 仅 Boss 本体行动（不触发其他敌人），且不进行移动/跳跃——只结算其词条效果。
+        if (typeof boss.triggerImmediateAction === 'function') {
+            boss.triggerImmediateAction(this);
+        }
     },
 
     // ============================================================
