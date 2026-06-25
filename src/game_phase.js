@@ -2930,6 +2930,11 @@ phase_gathering_getRandomPegType() {
                         activeEnemies++;
                     }
                     if (Math.abs(e.pos.y - e.dropTargetY) > 1) anyEnemyMoving = true;
+                } else if (e._burnEffect || e._electrocuteEffect || e._venomEffect || e._windMarkEffect) {
+                    // [持续特效残留修复] 敌人因非 HP 死亡路径（被吞噬 / Boss 落点清除等）失活，
+                    // 其燃烧/电弧/毒液/风场等持续特效不会再被 update 清理。此处兜底销毁，
+                    // 防止火焰等 PixiJS Sprite 永久残留在屏幕上。
+                    if (typeof e.releasePersistentEffects === 'function') e.releasePersistentEffects();
                 }
             });
 
@@ -3036,8 +3041,11 @@ phase_gathering_getRandomPegType() {
                             }
                         }
                         this.projectiles.splice(i, 1);
-                    } 
-                } 
+                    } else if (!p.active) {
+                        // [拖尾残留修复] 子弹经非 destroy() 路径失活（如被吞噬），从数组移除避免长期滞留
+                        this.projectiles.splice(i, 1);
+                    }
+                }
             }
 
             // 更新和绘制 FireWaves

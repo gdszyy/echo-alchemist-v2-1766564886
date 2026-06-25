@@ -2105,6 +2105,28 @@ export function pixiCleanupAllEffects(game) {
         }
     }
 
+    // --- enemies 数组：销毁附着在敌人身上的持续元素特效（燃烧/电弧/毒液/风场）---
+    // 这些特效不在全局特效数组中，而是挂在 enemy._burnEffect 等字段上，由 enemy 自身管理生命周期。
+    // 阶段切换 / 关卡重置时若不一并清理，其 PixiJS Sprite 会在效果容器上孤立残留（如火焰特效不消失）。
+    if (Array.isArray(game.enemies)) {
+        for (const e of game.enemies) {
+            if (e && typeof e.releasePersistentEffects === 'function') {
+                e.releasePersistentEffects();
+            }
+        }
+    }
+
+    // --- projectiles 数组：释放子弹拖尾 / 弹道光照 GPU 精灵 ---
+    // 子弹拖尾的 Trail V2 Sprite 与光照 Sprite 由 projectile 自身管理；阶段切换 / 重置时
+    // 若不释放，拖尾 Sprite 会孤立残留在 ParticleContainer 上（拖尾留在场上不消失）。
+    if (Array.isArray(game.projectiles)) {
+        for (const p of game.projectiles) {
+            if (p && typeof p.releasePixiResources === 'function') {
+                p.releasePixiResources();
+            }
+        }
+    }
+
     // energyOrbs：用 !active 判定移除
     if (Array.isArray(game.energyOrbs)) {
         for (const orb of game.energyOrbs) {
