@@ -1873,6 +1873,9 @@ class WindMarkEffect {
 
     get active() { return this.timer > 0; }
 }
+
+/**
+ * IceWave - 冰冻状态死亡时的冰晶爆炸波
  * 表现为蓝白色冰晶碎片扩散环 + 冰雾扩散
  */
 class IceWave {
