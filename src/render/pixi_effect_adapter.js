@@ -692,24 +692,42 @@ export function pierceCutEffect_pixiSync(pce, pixi) {
     const rx = (lx, ly) => pce.x + lx * cos - ly * sin;
     const ry = (lx, ly) => pce.y + lx * sin + ly * cos;
 
-    // 辉光边缘（双层替代 shadowBlur）
-    gfx.lineStyle(pce.cutWidth * 3.6, color, pce.life * 0.18);
-    gfx.moveTo(rx(-halfL - 6, -open * 0.35), ry(-halfL - 6, -open * 0.35));
-    gfx.lineTo(rx(halfL + 6, -open * 0.5), ry(halfL + 6, -open * 0.5));
-    gfx.moveTo(rx(-halfL - 6, open * 0.35), ry(-halfL - 6, open * 0.35));
-    gfx.lineTo(rx(halfL + 6, open * 0.5), ry(halfL + 6, open * 0.5));
+    // 锥形切口：沿切割轴采样填充一个柳叶/纺锤形——两端收成尖、中段最宽。
+    // 这样切口才有「锐利的刀痕」感，而不是均匀粗细的光带。
+    // power 越大尖端越锐利；bias 让切口整体偏离轴线（用于上下两唇张开）。
+    const fillSpindle = (maxHalfW, colorHex, alpha, power, bias) => {
+        if (alpha <= 0 || maxHalfW <= 0) return;
+        const N = 18;
+        gfx.beginFill(colorHex, alpha);
+        let started = false;
+        for (let i = 0; i <= N; i++) { // 上缘 左→右
+            const u = -1 + 2 * i / N;
+            const lx = u * halfL;
+            const w = maxHalfW * Math.pow(Math.max(0, 1 - u * u), power);
+            const px = rx(lx, bias - w), py = ry(lx, bias - w);
+            if (!started) { gfx.moveTo(px, py); started = true; }
+            else gfx.lineTo(px, py);
+        }
+        for (let i = N; i >= 0; i--) { // 下缘 右→左
+            const u = -1 + 2 * i / N;
+            const lx = u * halfL;
+            const w = maxHalfW * Math.pow(Math.max(0, 1 - u * u), power);
+            gfx.lineTo(rx(lx, bias + w), ry(lx, bias + w));
+        }
+        gfx.closePath();
+        gfx.endFill();
+    };
 
-    gfx.lineStyle(pce.cutWidth * 1.8, color, pce.life * 0.42);
-    gfx.moveTo(rx(-halfL - 6, -open * 0.35), ry(-halfL - 6, -open * 0.35));
-    gfx.lineTo(rx(halfL + 6, -open * 0.5), ry(halfL + 6, -open * 0.5));
-    gfx.moveTo(rx(-halfL - 6, open * 0.35), ry(-halfL - 6, open * 0.35));
-    gfx.lineTo(rx(halfL + 6, open * 0.5), ry(halfL + 6, open * 0.5));
-
-    // 核心裂缝线
+    const cw = pce.cutWidth;
     const slitAlpha = Math.min(1, pce.life * 1.35);
-    gfx.lineStyle(Math.max(1.2, pce.cutWidth * pce.life), 0xFFFFFF, slitAlpha);
-    gfx.moveTo(rx(-halfL, 0), ry(-halfL, 0));
-    gfx.lineTo(rx(halfL, 0), ry(halfL, 0));
+
+    // 1. 外层热辉光（柔和锥形，替代 shadowBlur）
+    fillSpindle(cw * 1.25, color, pce.life * 0.16, 0.5, 0);
+    // 2. 上下两唇：沿轴张开，营造「被劈开」的张口
+    fillSpindle(cw * 0.5, color, pce.life * 0.5, 0.7, -open * 0.5);
+    fillSpindle(cw * 0.5, color, pce.life * 0.5, 0.7, open * 0.5);
+    // 3. 核心白热切口：极细、两端尖锐
+    fillSpindle(Math.max(0.6, cw * 0.3 * (0.55 + 0.45 * pce.life)), 0xFFFFFF, slitAlpha, 1.0, 0);
 
     // 碎片三角形
     for (const chip of pce.chips) {
