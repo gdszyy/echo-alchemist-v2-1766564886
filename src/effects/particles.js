@@ -1508,11 +1508,11 @@ class FireWave {
  * BurnEffect - 敌人持续燃烧的持久视觉特效
  *
  * 附着在 temp >= 34 的敌人身上，强度随温度平滑缩放。
- * 三层视觉：热光环脉冲 + 体焰弧 + 火星飘升
+ * 两层视觉：热光环脉冲 + 火星飘升（原「体焰弧」层已移除，观感杂乱）
  *
  * 由 enemy.js 管理生命周期（创建/更新/销毁），不在全局数组中。
  *
- * @perf-impact: 持续燃烧特效 - 每敌人 1 Sprite + 1 Graphics + 4 ember Sprite（WebGL 批处理）
+ * @perf-impact: 持续燃烧特效 - 每敌人 1 Sprite + 4 ember Sprite（WebGL 批处理）
  */
 class BurnEffect {
     /**
@@ -1537,15 +1537,7 @@ class BurnEffect {
             active: false,
         }));
         this._emberTimer = 0;
-
-        // 焰弧种子（6 段，固定随机偏移确保有机感）
-        this._flameSeeds = Array.from({ length: 6 }, () => ({
-            angle: Math.random() * Math.PI * 2,
-            span: 0.25 + Math.random() * 0.35,
-            lift: 0.7 + Math.random() * 0.35,
-            speed: 0.8 + Math.random() * 0.6,
-            phase: Math.random() * Math.PI * 2,
-        }));
+        // 注：原「焰弧种子（_flameSeeds）」已随体焰弧层移除。
     }
 
     /**
@@ -1606,7 +1598,7 @@ class BurnEffect {
     }
 
     /**
-     * Canvas 2D 回退绘制：热光环 + 焰弧 + 火星
+     * Canvas 2D 回退绘制：热光环 + 火星
      */
     _drawCanvas2D(ctx) {
         const w = this.width, h = this.height;
@@ -1628,23 +1620,7 @@ class BurnEffect {
         ctx.fillStyle = auraGrad;
         ctx.beginPath(); ctx.arc(0, 0, auraR, 0, Math.PI * 2); ctx.fill();
 
-        // 层 2：体焰弧（6 段跳动的火焰弧）
-        for (const seed of this._flameSeeds) {
-            const flicker = Math.sin(t * seed.speed + seed.phase);
-            const r = Math.max(w, h) * 0.45 * seed.lift;
-            const arcAlpha = intensity * (0.4 + flicker * 0.2);
-            const lw = 2.5 + flicker * 0.8;
-            const startAngle = seed.angle + t * 0.3 * seed.speed;
-            ctx.globalAlpha = Math.max(0, arcAlpha);
-            ctx.strokeStyle = seed.lift > 0.85 ? '#fbbf24' : '#f97316';
-            ctx.lineWidth = lw;
-            ctx.shadowBlur = _sb(6 * intensity);
-            ctx.shadowColor = '#f97316';
-            ctx.beginPath();
-            ctx.arc(0, 0, r, startAngle, startAngle + seed.span);
-            ctx.stroke();
-        }
-        ctx.shadowBlur = 0;
+        // 层 2（体焰弧）已移除：原为 6 段环绕敌人的旋转发光短弧，观感杂乱，去掉只保留光环与火星。
 
         // 层 3：火星（Canvas 2D 简化版 - 小圆点）
         ctx.globalCompositeOperation = 'lighter';
