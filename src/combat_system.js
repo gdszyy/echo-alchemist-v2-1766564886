@@ -2621,12 +2621,26 @@ export const combat_system = {
                         multicast: 0,
                         type: 'flying_sword'
                     };
-                    this.combat_flyingSword_addSon(hitX, hitY, null, swordLevel, swordConfig, 0);
+                    // [修复] 从炮台位置生成子飞剑并朝命中点飞出，避免在敌人身上瞬间生成即扎入、看不出飞行效果。
+                    const cannonX = this.width / 2;
+                    const cannonY = this.height - 100;
+                    const beforeCount = this.sonSwords.length;
+                    this.combat_flyingSword_addSon(cannonX, cannonY, null, swordLevel, swordConfig, 0);
+                    if (this.sonSwords.length > beforeCount) {
+                        const newSword = this.sonSwords[this.sonSwords.length - 1];
+                        if (newSword) {
+                            // 初速指向命中点，使飞剑从炮台射出
+                            const dir = new Vec2(hitX - cannonX, hitY - cannonY).norm();
+                            const launchSpeed = (CONFIG.flyingSword && CONFIG.flyingSword.sonSpeed) || 12;
+                            newSword.vel = dir.mult(launchSpeed);
+                            newSword.angle = Math.atan2(newSword.vel.y, newSword.vel.x);
+                        }
+                    }
                     this.combat_flyingSword_assignTarget(enemy);
-                    // 视觉特效：蓝色剑光 + 浮动文字
-                    const slashAngle = Math.random() * Math.PI * 2;
-                    this.spawn_pushParticleWithLimit(new SlashAnim(hitX, hitY, slashAngle, 0.5, '#0ea5e9'));
-                    this.spawn_createParticle(hitX, hitY, '#0ea5e9', 'spark');
+                    // 视觉特效：在炮台口生成蓝色剑光 + 在命中点保留浮动文字提示
+                    const launchAngle = Math.atan2(hitY - cannonY, hitX - cannonX);
+                    this.spawn_pushParticleWithLimit(new SlashAnim(cannonX, cannonY, launchAngle, 0.5, '#0ea5e9'));
+                    this.spawn_createParticle(cannonX, cannonY, '#0ea5e9', 'spark');
                     this.spawn_createFloatingText(hitX, hitY - 20, '⚔召剑!', '#0ea5e9');
                 }
             }
