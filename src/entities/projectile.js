@@ -1136,6 +1136,10 @@ class Projectile {
         while (this._trailV2Sprites.length < visibleSpan) {
             const s = pixiAcquireParticleSprite('trail');
             if (!s) break;
+            // [拖尾居中修复] 精灵来自共享池，默认锚点为 (0,0)，且可能残留上次使用者
+            // （beam=0.5,1 / flare=0.05,0.5 等）的锚点。拖尾段以「段中点」定位并绕锚点旋转，
+            // 必须将锚点重置为中心 (0.5,0.5)，否则 64×16 纹理会从角部绘制，导致拖尾相对子弹偏移。
+            s.anchor.set(0.5);
             this._trailV2Sprites.push(s);
         }
 
